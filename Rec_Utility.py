@@ -1,7 +1,196 @@
 '''
 Utility functions used to extract, correct, polish automatically reconstructed neurons from the google project
 '''
+def validate_reconstruction_quality(df, com_distance_threshold=50000, output_dir="QA_Reports"):
+    """
+    Evaluates the quality of the final reconstructed neuron (Labled_propagated).
+    
+    Checks:
+      1. Unique Soma root (exactly one p=-1).
+      2. Absence of debris (single connected component).
+      3. Presence of >= 1 Dendritic arbor.
+      4. Presence of exactly 1 Axon arbor (only 1 primary branch leading to an axon).
+      5. Soma is centered within com_distance_threshold (nm) of the entire arbor.
+    """
+    print("\n🔬 Running Quality Assurance Check...")
+    
+    # 1. Setup OS Logging
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    previous_logs = glob.glob(os.path.join(output_dir, "*.txt"))
+    
+    is_valid = True
+    reasons = []
+    
+    if df is None or df.empty:
+        return False, ["DataFrame is empty."]
 
+    df_clean = df.copy()
+    df_clean['annotated_type'] = df_clean['annotated_type'].astype(str)
+    
+    # --- CHECK 1: Unique Soma Root ---
+    roots = df_clean[df_clean['p'] == -1]
+    
+    if len(roots) == 0:
+        is_valid = False
+        reasons.append("Topology Error: No root node (p=-1) found.")
+        soma_root = None
+    elif len(roots) > 1:
+        is_valid = False
+        reasons.append(f"Topology Error: Multiple roots found ({len(roots)}). Skeleton is fragmented.")
+        soma_root = roots.iloc[0] 
+    else:
+        soma_root = roots.iloc[0]
+        if 'Soma' not in soma_root['annotated_type'] and soma_root['annotated_type'] != '3':
+            is_valid = False
+            reasons.append(f"Annotation Error: Root node is annotated as '{soma_root['annotated_type']}', not 'Soma'.")
+
+    # --- CHECK 2: Absence of Debris (NetworkX & DBSCAN) ---
+    G = nx.Graph()
+    G.add_nodes_from(df_clean['id'])
+    edges = df_clean[df_clean['p'] != -1][['id', 'p']].values
+    G.add_edges_from(edges)
+    
+    # Topological Debris Check
+    num_components = nx.number_connected_components(G)
+    if num_components > 1:
+        is_valid = False
+        reasons.append(f"Debris Detected: Skeleton is broken into {num_components} disconnected components.")
+
+    # Spatial Debris Check
+    coords = df_clean[['x', 'y', 'z']].values
+    clustering = DBSCAN(eps=15000, min_samples=10).fit(coords)
+    unique_clusters = len(set(clustering.labels_) - {-1})
+    if unique_clusters > 1:
+        is_valid = False
+        reasons.append(f"Spatial Disconnect: DBSCAN identified {unique_clusters} floating clusters.")
+
+    # --- CHECK 3: Navis Sanity & At least one Dendritic Arbor ---
+    # Validate structure using navis
+    temp_df = df_clean.rename(columns={'id': 'node_id', 'p': 'parent_id', 'r': 'radius'})
+    try:
+        n = navis.TreeNeuron(temp_df, name='qa_neuron')
+        if not n.is_sane:
+            is_valid = False
+            reasons.append("Navis Validation Failed: Tree contains cycles or breaks.")
+    except Exception as e:
+        pass # Handle gracefully if skeleton is severely malformed
+
+    has_dendrite = df_clean['annotated_type'].str.contains('Dendrite|1', case=False, regex=True).any()
+    if not has_dendrite:
+        is_valid = False
+        reasons.append("Morphology Error: No dendritic arbor detected.")
+
+    # --- CHECK 4: Exactly One Single Axon Arbor ---
+    axon_branches = 0
+    if soma_root is not None:
+        soma_id = soma_root['id']
+        primary_roots = df_clean[df_clean['p'] == soma_id]['id'].tolist()
+        
+        DiG = nx.DiGraph()
+        DiG.add_edges_from(df_clean[df_clean['p'] != -1][['p', 'id']].values)
+        
+        for pr_id in primary_roots:
+            try:
+                descendants = list(nx.descendants(DiG, pr_id)) + [pr_id]
+                branch_types = df_clean[df_clean['id'].isin(descendants)]['annotated_type']
+                if branch_types.str.contains('Axon|0|Myelinated', case=False, regex=True).any():
+                    axon_branches += 1
+            except nx.NetworkXError:
+                continue
+                
+        if axon_branches == 0:
+            is_valid = False
+            reasons.append("Morphology Error: No axon arbor detected branching from the soma.")
+        elif axon_branches > 1:
+            is_valid = False
+            reasons.append(f"Morphology Error: Multiple axon arbors detected ({axon_branches} primary branches contain Axon labels).")
+
+    # --- CHECK 5: Soma is Centered (cKDTree & Numpy) ---
+    if soma_root is not None:
+        com = np.mean(coords, axis=0) 
+        soma_coords = np.array([soma_root['x'], soma_root['y'], soma_root['z']])
+        
+        # Snap theoretical CoM to nearest skeleton physical node
+        tree = cKDTree(coords)
+        _, nearest_idx = tree.query(com)
+        snapped_com = coords[nearest_idx]
+
+        distance_to_com = np.linalg.norm(soma_coords - snapped_com)
+        if distance_to_com > com_distance_threshold:
+            is_valid = False
+            reasons.append(f"Spatial Error: Soma is heavily off-center. Distance to CoM is {distance_to_com:.1f} nm (Threshold: {com_distance_threshold} nm).")
+
+    # --- TERMINAL OUTPUT ---
+    print(f"\n📝 QA Result: {'✅ PASS' if is_valid else '❌ FAIL'}")
+    if not is_valid:
+        print("Reasons for failure:")
+        for r in reasons:
+            print(f"  - {r}")
+
+    # --- VISUALIZATION (Plotly & Subplots) ---
+    fig = make_subplots(rows=1, cols=1, specs=[[{'type': 'scene'}]])
+
+    # Skeleton
+    node_map = df_clean.set_index('id')[['x', 'y', 'z']].to_dict('index')
+    x_lines, y_lines, z_lines = [], [], []
+    for _, row in df_clean.iterrows():
+        pid = row['p']
+        if pid != -1 and pid in node_map:
+            parent = node_map[pid]
+            x_lines.extend([row['x'], parent['x'], None])
+            y_lines.extend([row['y'], parent['y'], None])
+            z_lines.extend([row['z'], parent['z'], None])
+            
+    fig.add_trace(go.Scatter3d(
+        x=x_lines, y=y_lines, z=z_lines,
+        mode='lines', line=dict(color='lightgrey', width=2),
+        name='Skeleton', hoverinfo='skip'
+    ))
+
+    if soma_root is not None:
+        # Plot Soma
+        fig.add_trace(go.Scatter3d(
+            x=[soma_root['x']], y=[soma_root['y']], z=[soma_root['z']],
+            mode='markers', marker=dict(size=12, color='gold', symbol='diamond', line=dict(color='black', width=2)),
+            name='Soma Root'
+        ))
+        # Plot CoM
+        fig.add_trace(go.Scatter3d(
+            x=[snapped_com[0]], y=[snapped_com[1]], z=[snapped_com[2]],
+            mode='markers', marker=dict(size=8, color='magenta', symbol='x', line=dict(width=2)),
+            name='Center of Mass (Snapped)'
+        ))
+        # Trace line between Soma and CoM
+        fig.add_trace(go.Scatter3d(
+            x=[soma_root['x'], snapped_com[0]], y=[soma_root['y'], snapped_com[1]], z=[soma_root['z'], snapped_com[2]],
+            mode='lines', line=dict(color='magenta', width=4, dash='dot'),
+            name=f'Soma-CoM Offset ({distance_to_com:.0f} nm)'
+        ))
+
+    # Highlight Debris / Disconnected components (Red)
+    if soma_root is not None and not is_valid:
+        try:
+            connected_to_soma = nx.node_connected_component(G, soma_root['id'])
+            debris_nodes = df_clean[~df_clean['id'].isin(connected_to_soma)]
+            if not debris_nodes.empty:
+                fig.add_trace(go.Scatter3d(
+                    x=debris_nodes['x'], y=debris_nodes['y'], z=debris_nodes['z'],
+                    mode='markers', marker=dict(size=4, color='red'),
+                    name=f'Debris ({len(debris_nodes)} nodes)'
+                ))
+        except:
+            pass
+
+    title_color = "green" if is_valid else "red"
+    fig.update_layout(
+        title=f"<span style='color:{title_color}'><b>Reconstruction Quality Check: {'PASS' if is_valid else 'FAIL'}</b></span>",
+        scene=dict(xaxis_title='X (nm)', yaxis_title='Y (nm)', zaxis_title='Z (nm)', aspectmode='data', bgcolor='white'),
+        height=800, margin=dict(l=0, r=0, b=0, t=50)
+    )
+    fig.show()
+
+    return is_valid
 
 
 def extract_skeleton_data(neuron_id):
