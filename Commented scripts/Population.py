@@ -337,6 +337,8 @@ class PopulationSuper(object):
         """
         tic = time()
 
+        ### ADD MORPHOLOGY CHECK
+
         # electrode = LFPy.RecExtElectrode(**self.electrodeParams)
 
         cellParams = self.cellParams.copy()
@@ -347,6 +349,13 @@ class PopulationSuper(object):
         if return_just_cell:
             return cell
         else:
+
+
+            ### ADD CELLINDEX SPECIFIC MORPHOLGY
+
+
+
+
             # set LFPykit.models instance cell attribute
             for probe in self.probes:
                 probe.cell = cell
@@ -1007,6 +1016,7 @@ class Population(PopulationSuper):
         tic = time()
 
         # containers for synapse idxs existing on this rank
+        # The final form is: self.synIdx[cellindex][presynaptic_population][layer_index]
         synIdx = {}
 
         # ok then, we will draw random numbers across ranks, which have to
@@ -1205,6 +1215,13 @@ class Population(PopulationSuper):
 
         """
         # create a cell instance
+
+
+        ## PROVIDE THE  nidx=self.k_yXL[:, i] TO CHECK THE MORPHOLOGY
+        ## Emulate the for i, X in enumerate(self.X): to check for arbour compliance.
+
+        # cell = self.cellsim(cellindex, return_just_cell=True)
+        ###CHANGED
         cell = self.cellsim(cellindex, return_just_cell=True)
 
         # local containers
@@ -1268,7 +1285,30 @@ class Population(PopulationSuper):
         return syn_idx
 
     def cellsim(self, cellindex, return_just_cell=False):
+            ###CHANGED
         """
+        My notes:
+        This function also performs a morphological check based on the synapse distribution across layers. It must
+        discard the cells that doesn't have dendritic branches in the layers targeted by the synapses. The total number and 
+        poistion of the synapses is retrieved by scanning the k_yXL (already constructed in a populations specific manner) across
+        all possible presynaptic macro-populations
+
+        Sum_per_Layer = np.sum(self.k_yXL, axis=1)
+
+        Sum_per_Layer stores the total number of synapses divided per layer. The funciton will evaluate whether the arbour
+        has a certain length of dendrites (basal or apical is not important) within the non-zero layers in Sum_per_Layer.
+
+        The variable 'self.Subpop' will have stored all the available morphologies for that specific sub-population which will
+        be randomly scanned and in case their arbour comply with the requirements choosen and the self.ImplementedMorph updated
+        accordingly.
+
+        The morphologies MUST be already rotated and the soma must be fixed at the origin. The translation will be done 
+
+
+
+
+
+
         Do the actual simulations of LFP, using synaptic spike times from
         network simulation.
 
@@ -1276,7 +1316,7 @@ class Population(PopulationSuper):
         Parameters
         ----------
         cellindex : int
-            cell index between 0 and population size-1.
+            cell index between 0 and population size-1 Of the population iteratively generated in the main code and specific per layer
         return_just_cell : bool
             If True, return only the `LFPy.Cell` object
             if False, run full simulation, return None.
