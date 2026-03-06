@@ -1302,9 +1302,20 @@ class Population(PopulationSuper):
         be randomly scanned and in case their arbour comply with the requirements choosen and the self.ImplementedMorph updated
         accordingly.
 
-        The morphologies MUST be already rotated and the soma must be fixed at the origin. The translation will be done 
+        The morphologies MUST be already rotated and the soma must be fixed at the origin. The calculation of the arbour length will be done 
+        accounting for the extreme cases, lower and higher depth bound for the placemnt of the soma wihtin the layer of belonging of the neuron.
+        Moreover is needed to put a threshold for the minimum branch length wihtin each layer that accomodates for synapses.
 
+        The variable self.Subpop is structured as a dataframe in whcih the keys are the sub-populations reference while the vlaues are the lists
+        used to import the morphologies. As explained above the morphologies will be drawn randomly and checked before passing them to the 
+        LFPy.Cell() function. This will be done by passing an updated version of the cellParams dictionary where the field 'morphology'
+        is updaed with the choosen morphology.
 
+        The variable self.ImplementedMorph has a similar structure. The top key in the hierarchy refers to the subpopulation, while the value
+        stores matrix with self.RANK_CELLINDICES x 1 where the index is the current cell index 'cellindex' while is stored the index of the
+        pathway for the loading of the morphology.
+
+        
 
 
 
@@ -1332,6 +1343,20 @@ class Population(PopulationSuper):
         hybridLFPy.csd, LFPy.Cell, LFPy.Synapse, LFPy.RecExtElectrode
         """
         tic = time()
+
+        ## Morphology choice
+        Availale_morph = self.Subpop[self.y].copy()
+
+        Load_idx = cell_MorphSelect()
+        
+        # Update the dictionary
+        self.ImplementedMorph[self.y].append(Load_idx)
+
+        # Change the cellParams' field
+        self.cellParams['morphology'] = Availale_morph[Load_idx]
+
+
+
 
 
 
