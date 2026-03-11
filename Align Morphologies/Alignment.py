@@ -9,47 +9,57 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
     """
     Takes an aligned neuron DataFrame and writes a NEURON-compliant .hoc file.
     Extracts unbranched sections iteratively to avoid RecursionError.
+    Converts coordinates from nm to um before building the output.
     """
     df = aligned_neuron_df.copy()
-    
-    # Ensure a radius column 'r' exists. If not, default to 0.5 (NEURON diam = 1.0)
+
+    # --- NEW: Convert coordinates from nm to um ---
+    df['x'] = df['x'] / 1000.0
+    df['y'] = df['y'] / 1000.0
+    df['z'] = df['z'] / 1000.0
+
+    # Ensure a radius column 'r' exists. If not, default to 0.5 um (NEURON diam = 1.0)
+    # If it does exist, we also need to convert it from nm to um.
     if 'r' not in df.columns:
         df['r'] = 0.5
-        
+    else:
+        df['r'] = df['r'] / 1000.0
+    # ----------------------------------------------
+
     # 1. Map labels to standard NEURON section arrays
     def get_hoc_type(annot):
         annot_str = str(annot).lower()
         if 'axon' in annot_str: return 'axon'
         elif 'soma' in annot_str: return 'soma'
         else: return 'dend'
-        
+
     df['hoc_type'] = df['annotated_type'].apply(get_hoc_type)
-    
+
     # 2. Build graph relationships
     children = df.groupby('p')['id'].apply(list).to_dict()
     node_data = df.set_index('id').to_dict('index')
-    
+
     root_rows = df[df['p'] == -1]
     if root_rows.empty:
         print("⚠️ Cannot export to HOC: No root node found.")
         return
     root_id = root_rows.iloc[0]['id']
-    
+
     section_records = []
-    
+
     # 3. Iterative traversal to extract unbranched sections using a Stack
     # Stack stores tuples of: (current_node_id, current_section_nodes_list, current_type, parent_sec_id)
     stack = [(root_id, [], node_data[root_id]['hoc_type'], -1)]
-    
+
     while stack:
         node_id, current_sec_nodes, current_type, parent_sec_id = stack.pop()
         current_sec_nodes.append(node_id)
         chs = children.get(node_id, [])
-        
+
         # Leaf node
         if len(chs) == 0:
             section_records.append({'type': current_type, 'nodes': current_sec_nodes, 'parent_sec_id': parent_sec_id})
-            
+
         # Continuation of an unbranched cable
         elif len(chs) == 1:
             child = chs[0]
@@ -63,7 +73,7 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
                 section_records.append({'type': current_type, 'nodes': current_sec_nodes, 'parent_sec_id': parent_sec_id})
                 # Pass parent node [node_id] to the new child list to maintain physical connection
                 stack.append((child, [node_id], child_type, sec_id))
-                
+
         # Branch point -> break current section, start new child sections
         else:
             sec_id = len(section_records)
@@ -77,17 +87,17 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
     for sec in section_records:
         sec['type_idx'] = counts[sec['type']]
         counts[sec['type']] += 1
-        
+
     # 5. Write the output
     with open(output_filepath, 'w') as f:
         f.write("// NEURON HOC morphology generated from aligned data\n\n")
-        
+
         # Instantiate section arrays
         for t in ['soma', 'axon', 'dend']:
             if counts[t] > 0:
                 f.write(f"create {t}[{counts[t]}]\n")
         f.write("\n")
-        
+
         # Establish topology connections
         for sec in section_records:
             if sec['parent_sec_id'] != -1:
@@ -95,12 +105,12 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
                 # Connect the 0-end of the child to the 1-end of the parent
                 f.write(f"connect {sec['type']}[{sec['type_idx']}](0), {parent_sec['type']}[{parent_sec['type_idx']}](1)\n")
         f.write("\n")
-        
+
         # Populate 3D points
         for sec in section_records:
             f.write(f"{sec['type']}[{sec['type_idx']}] {{\n")
             f.write("  pt3dclear()\n")
-            
+
             # NEURON workaround: A section must have at least 2 points.
             if len(sec['nodes']) == 1:
                 node = sec['nodes'][0]
@@ -115,6 +125,11 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
                     diam = d.get('r', 0.5) * 2
                     f.write(f"  pt3dadd({d['x']}, {d['y']}, {d['z']}, {diam})\n")
             f.write("}\n\n")
+
+
+
+
+
 def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/content/drive/MyDrive/Colab Notebooks/Reconstructed neurons',outpath = '/content/drive/MyDrive/Colab Notebooks/Aligned Neurons HOC', k_neighbors=3, show_plot=True):
     """
     Centers each neuron's soma, finds the nearest 'k' reference neurons, 
