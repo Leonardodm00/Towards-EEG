@@ -6,6 +6,8 @@ Here is a breakdown of exactly what the two functions do:
 
 This function translates a pandas DataFrame containing a neuron's 3D coordinates and connections into a NEURON-compliant `.hoc` script.
 
+- **Unit conversion:** Converts coordinates from nm to um before building the output.
+
 - **Label Mapping:** It standardizes your anatomical labels, categorizing every point as part of an `axon`, `soma`, or `dend` (dendrite).
     
 - **Iterative Topology Building:** It reconstructs the neuron's branching structure (graph topology) using a stack-based `while` loop. It walks through the points and groups contiguous segments of the same type into unbranched cables (sections). By doing this iteratively rather than recursively, it prevents Python from crashing (hitting a `RecursionError`) when processing extremely long, unbranched axons or dendrites.
