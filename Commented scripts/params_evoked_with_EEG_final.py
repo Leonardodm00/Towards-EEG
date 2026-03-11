@@ -362,10 +362,6 @@ class general_params(object):
 
         #list of cell type names used in this script
         #names of every post-syn pop layer
-
-
-
-        # TOCHANGE: for the definition of the cell subtypes. It must be consistent with the morphology paths which load the cell specific .hoc files.
         self.y_in_Y = [
                 [['p23'],['b23','nb23']],
                 [['p4','ss4(L23)','ss4(L4)'],['b4','nb4']],
@@ -375,9 +371,6 @@ class general_params(object):
         self.y = flattenlist(self.y_in_Y)
         
         #need presynaptic cell type to population mapping
-        ## This variable answers the question: When a spike arrives from a broad population 
-        ## X (e.g., L4E),  which specific anatomical cell types x are actually sending that spike?
-
         self.x_in_X = [['TCs', 'TCn']] + sum(self.y_in_Y, [])
         
         
@@ -893,10 +886,6 @@ class multicompartment_params(point_neuron_network_params):
         # assess depth of each 16 subpopulation
         self.depths = self._calcDepths()
         
-
-
-        ####### The m_y at this point should be a list of nested lists with the paths to the .hoc morphological files
-        ####### per each subpopulation.
         # make a nice structure with data for each subpopulation
         self.y_zip_list = list(zip(self.y, self.m_y,
                             self.depths, self.N_y))
@@ -946,7 +935,7 @@ class multicompartment_params(point_neuron_network_params):
         # additional simulation kwargs, see LFPy.Cell.simulate() docstring
         self.simulationParams = {'rec_current_dipole_moment': True}
         
-        ## TOSEE        
+                
         # a dict setting the number of cells N_y and geometry
         # of cell type population y
         self.populationParams = {}
@@ -955,13 +944,12 @@ class multicompartment_params(point_neuron_network_params):
                 y : {
                     'number' : int(N_y*self.SCALING),
                     'radius' : np.sqrt(1000**2 / np.pi),
-                    'z_min' : depth - 25,
-                    'z_max' : depth + 25,
+                    'z_max' : depth[0], # Upper boundary (e.g., -81.6)
+                    'z_min' : depth[1], # Lower boundary (e.g., -587.1)
                     'min_cell_interdist' : 1.,            
                 }
             })
 
-        ## TOSEE 
         # Set up cell type specific synapse parameters in terms of synapse model
         # and synapse locations
         self.synParams = {}
@@ -990,8 +978,6 @@ class multicompartment_params(point_neuron_network_params):
                      self.model_params["tau_syn_ex"] for X in self.X]
             })
 
-
-        ## TOSEE 
         #synaptic delay parameters, loc and scale is mean and std for every
         #network population, negative values will be removed
         self.synDelayLoc, self.synDelayScale = self._synDelayParams()
@@ -1089,20 +1075,22 @@ class multicompartment_params(point_neuron_network_params):
 
     def _calcDepths(self):
         '''
-        return the cortical depth of each subpopulation
+        Return the cortical depth boundaries [z_max, z_min] of each subpopulation's layer.
         '''
-        depths = self.layerBoundaries.mean(axis=1)[1:]
+        # Extract the actual boundaries, skipping Layer 1 (index 0) 
+        # since somas are not placed there in your model.
+        layer_bounds = self.layerBoundaries[1:]
 
         depth_y = []
         for y in self.y:
             if y in ['p23', 'b23', 'nb23']:
-                depth_y = np.r_[depth_y, depths[0]]
+                depth_y.append(layer_bounds[0])  # Layer 2/3 boundaries
             elif y in ['p4', 'ss4(L23)', 'ss4(L4)', 'b4', 'nb4']:
-                depth_y = np.r_[depth_y, depths[1]]
+                depth_y.append(layer_bounds[1])  # Layer 4 boundaries
             elif y in ['p5(L23)', 'p5(L56)', 'b5', 'nb5']:
-                depth_y = np.r_[depth_y, depths[2]]
+                depth_y.append(layer_bounds[2])  # Layer 5 boundaries
             elif y in ['p6(L4)', 'p6(L56)', 'b6', 'nb6']:
-                depth_y = np.r_[depth_y, depths[3]]
+                depth_y.append(layer_bounds[3])  # Layer 6 boundaries
             else:
                 raise Exception('Error, revise parameters')
                 
@@ -1128,3 +1116,4 @@ if __name__ == '__main__':
     params = multicompartment_params()
      
     print(dir(params))
+
