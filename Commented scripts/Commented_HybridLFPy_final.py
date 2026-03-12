@@ -142,6 +142,11 @@ for i, y in enumerate(params.y):
             calculateCSD = params.calculateCSD,
             dt_output = params.dt_output, 
             POPULATIONSEED = SIMULATIONSEED + i,
+
+
+ADD FURTHER VARIABLESSSS
+
+
             #daughter class kwargs
             X = params.X,
             networkSim = networkSim,
