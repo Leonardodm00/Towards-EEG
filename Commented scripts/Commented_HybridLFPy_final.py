@@ -56,7 +56,8 @@ np.random.seed(SEED)
 ################################################################################
 
 from params_evoked_with_EEG import multicompartment_params, \
-                                point_neuron_network_params
+                                point_neuron_network_params, \
+                                MorphoPath
 
 #Full set of parameters including network parameters
 params = multicompartment_params()
@@ -109,6 +110,19 @@ toc = time() - tic
 print('NEST simulation and gdf file processing done in  %.3f seconds' % toc)
 
 
+
+
+# Initialize the morphology loading pathways
+Morph_pathways = MorphoPath()
+
+
+
+
+
+
+ImplementedMorphs = {}
+
+
 ####### Set up populations #####################################################
 
 #iterate over each cell type, and create populationulation object
@@ -142,6 +156,7 @@ for i, y in enumerate(params.y):
     #run population simulation and collect the data
     pop.run()
     pop.collect_data()
+    
 
     #object no longer needed
     del pop
