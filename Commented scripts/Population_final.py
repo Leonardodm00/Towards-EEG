@@ -848,6 +848,42 @@ class PopulationSuper(object):
             assert(os.path.isfile(fname))
             print('save somapos ok')
 
+
+        # Save ImplementedMorphs
+        if RANK == 0:
+            # Iterate through the dictionary (handles 'p4' and any other populations)
+            for pop_name, mapping in self.ImplementedMorph.items():
+                
+                # 1. Create a NumPy array with shape (number of entries, 2)
+                num_entries = len(mapping)
+                pop_morph_data = np.zeros((num_entries, 2), dtype=int)
+                
+                # 2. Populate the array with cellindex (col 0) and morphology index (col 1)
+                for i, (cell_idx, morph_idx) in enumerate(mapping.items()):
+                    pop_morph_data[i, 0] = cell_idx
+                    pop_morph_data[i, 1] = morph_idx
+                    
+                # 3. Construct the file path dynamically 
+                # (incorporating the population name 'p4' into the filename)
+                fname = os.path.join(
+                    self.populations_path,
+                    self.output_file.format(
+                        self.y,
+                        f'{pop_name}_morphologies.gdf' 
+                    )
+                )
+                
+                # 4. Save the array to text
+                # fmt='%d' ensures the indices are saved as integers instead of floats (e.g., 4 instead of 4.00000000e+00)
+                np.savetxt(fname, pop_morph_data, fmt='%d')
+                assert(os.path.isfile(fname))
+                print('save ImplementedMorph ok')
+
+
+
+
+
+
         if RANK == 0:
             # save rotations using hdf5
             fname = os.path.join(
@@ -1014,6 +1050,18 @@ class Population(PopulationSuper):
 
         if RANK == 0:
             print("population initialized in %.2f seconds" % (time() - tic))
+
+
+    def get_ImplementedMorph(self):
+
+        ''' 
+        Utility function used to output the choosen morphologies as well as their location
+        '''
+
+
+        return self.ImplementedMorph
+
+
 
     def get_all_synIdx(self):
         """
@@ -1480,75 +1528,85 @@ class Population(PopulationSuper):
         valid_layers = [i for i, syn in enumerate(synapses_per_layer) if syn > 0]
         target_upper_z = layer_boundaries[target_layer_idx][0]
         target_lower_z = layer_boundaries[target_layer_idx][1]
-
+        
         shuffled_paths = list(enumerate(morph_paths))
         random.shuffle(shuffled_paths)
-
+        
         for original_idx, path in shuffled_paths:
+            print('evaluating')
+            print(original_idx)
             # Clear previous morphology from NEURON memory
             h('forall delete_section()')
-
+            
             # Load the new .hoc file
             success = h.load_file(str(path))
             if not success:
                 print(f"Warning: Could not load {path}")
                 continue
-
+                
             dend_segments = []
-
+            
             # Iterate through all sections loaded into NEURON
             for sec in h.allsec():
                 if 'dend' in sec.name().lower() or 'apic' in sec.name().lower():
                     n3d = int(h.n3d(sec=sec))
                     if n3d > 0:
                         pts = np.array([[h.x3d(i, sec=sec), h.y3d(i, sec=sec), h.z3d(i, sec=sec)] for i in range(n3d)])
-
+                        
                         for i in range(n3d - 1):
-                            p1 = pts[i]
+                            p1 = pts[i] 
                             p2 = pts[i+1] 
-
+                            
                             length = np.linalg.norm(p1 - p2)
                             mid_z = (p1[2] + p2[2]) / 2.0
-
+                            
                             dend_segments.append((mid_z, length, p1, p2))
-
+                            
             valid_for_both_placements = True
-
+            
             # Test BOTH upper and lower boundaries
             for soma_z_placement in [target_upper_z, target_lower_z]:
-                valid_dend_length = 0.0
-
+                
+                # TRACK LENGTH PER LAYER instead of just a global sum
+                length_in_valid_layers = {layer_idx: 0.0 for layer_idx in valid_layers}
+                
                 for mid_z, length, _, _ in dend_segments:
                     shifted_z = mid_z + soma_z_placement
-
-                    in_synapse_layer = False
+                    
                     for layer_idx in valid_layers:
                         upper_bound, lower_bound = layer_boundaries[layer_idx]
                         if lower_bound <= shifted_z <= upper_bound:
-                            in_synapse_layer = True
+                            length_in_valid_layers[layer_idx] += length
                             break
-
-                    if in_synapse_layer:
-                        valid_dend_length += length
-
-                # If the length drops below the threshold for EITHER placement, it fails
-                if valid_dend_length < length_threshold:
+                
+                total_valid_length = sum(length_in_valid_layers.values())
+                
+                # CONDITION 1: Does the total length inside valid layers meet the threshold?
+                if total_valid_length < length_threshold:
                     valid_for_both_placements = False
-                    break
-
-            # If it passed BOTH loops, we generate the side-by-side plot and return it
+                    break 
+                    
+                # CONDITION 2: Does the arbor actually reach EVERY valid layer?
+                # If any valid layer has 0.0 length, it failed to span the necessary layers.
+                spans_all_layers = all(layer_length > 0.0 for layer_length in length_in_valid_layers.values())
+                
+                if not spans_all_layers:
+                    valid_for_both_placements = False
+                    break 
+                    
+            # If it passed BOTH loops (and both conditions), we return it
             if valid_for_both_placements:
                 if plot_result:
                     _plot_both_morphologies(
-                        dend_segments, layer_boundaries, layer_names, valid_layers,
+                        dend_segments, layer_boundaries, layer_names, valid_layers, 
                         target_upper_z, target_lower_z, original_idx
                     )
                 return original_idx
-
-        raise RuntimeError(
-            f"No morphology met the length threshold of {length_threshold}um "
-            f"within the valid synaptic layers."
-        )
+            
+    raise RuntimeError(
+        f"No morphology met the length threshold of {length_threshold}um "
+        f"and successfully spanned all synaptic layers for both placements."
+    )
 
 
 
