@@ -1111,6 +1111,59 @@ class multicompartment_params(point_neuron_network_params):
             })
         return yCellParams
  
+
+class MorphoPath:
+    '''
+    A dictionary-like manager where the key is the subpopulation name 
+    and the value is a list of loading paths.
+    '''
+
+    def __init__(self):
+        self.paths = {}
+
+    def add_subpop(self, name, nids, parent_path):
+        '''
+        - name: the name of the subpopulation (string)
+        - nids: list/array of neurons' identification numbers (integers)
+        - parent_path: path to the folder storing the .hoc files
+        '''
+        morph_paths = [
+            os.path.join(parent_path, f"neuron_{nid}_aligned.hoc") 
+            for nid in nids
+        ]
+
+        # Store in the dictionary
+        self.paths[name] = morph_paths
+
+
+    def construct_dict(self, name_list, name_path, morph_path):
+        ''' 
+        This method iteratively applies the add_subpop method on the subpopulations
+        in the name_list. The nids are stored in the name_path folder txt files.
+        '''
+        for n in name_list:
+            filename = f"{n}_nids.txt"    
+            full_path = os.path.join(name_path, filename)
+            
+            # Use numpy to cleanly read the text file back into an array of integers
+            # dtype=int ensures they don't become floats
+            nids_array = np.loadtxt(full_path, dtype=int)
+            
+            # Safety check: np.loadtxt returns a 0-d array if there's only one number in the file.
+            # We convert it to a 1D array so it can still be iterated over.
+            if nids_array.ndim == 0:
+                nids_array = np.array([nids_array])
+
+            self.add_subpop(n, nids_array, morph_path)
+
+            
+    @property
+    def get_paths(self):
+        return self.paths
+
+
+
+
         
 if __name__ == '__main__':
     params = multicompartment_params()
