@@ -2,4 +2,5 @@ This is the version of scripts that can be found at the links provided below. It
 
 
 Population code: **Link**: https://github.com/INM-6/hybridLFPy/blob/master/hybridLFPy/population.py
+
 Params_evoked and Hybrid_sim: **Link**: https://github.com/solveignaess/EEG/tree/master/src/hybrid_EEG_evoked
