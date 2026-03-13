@@ -127,6 +127,11 @@ class PopulationSuper(object):
                      'r_z': [[-1E199, 1E99], [10, 10]]},
                  y='EX',
                  layerBoundaries=[[0.0, -300], [-300, -500]],
+
+                SubPopulations_list = ['xxxxx.hoc','xxxxx.hoc'],
+                layer_names =  ['L1', 'L2/3', 'L4', 'L5', 'L6'],
+                lenTh = 500.0, #um
+                layer_map = 1,
                  probes=[],
                  savelist=['somapos'],
                  savefolder='simulation_output_example_brunel',
@@ -162,6 +167,21 @@ class PopulationSuper(object):
         layerBoundaries : list of lists
             Each element is a list setting upper and lower layer boundary as
             floats
+
+        SubPopulations_list: list
+            list of the current subpopulation's (self.y) morpholgy paths
+
+        layer_names: list 
+            Layer names
+
+        lenTh: float
+            Minimun arbour length in a layer accomodating synapses to make the cell 
+            feasable.
+
+        layer_map : integer
+            Index that maps the current subpopulation to its layer position in layer_boundaries
+
+
         probes: list
             list of `LFPykit.models.*` like instances for misc. forward-model
             predictions
@@ -191,6 +211,9 @@ class PopulationSuper(object):
 
         """
 
+
+
+
         self.cellParams = cellParams
         self.dt = self.cellParams['dt']
         self.rand_rot_axis = rand_rot_axis
@@ -199,6 +222,11 @@ class PopulationSuper(object):
         self.POPULATION_SIZE = populationParams['number']
         self.y = y
         self.layerBoundaries = np.array(layerBoundaries)
+        self.Subpop = SubPopulations_list
+        self.ImplementedMorph = {self.y : {}}
+        self.layer_names = layer_names
+        self.lenTh = lenTh
+        self.layer_map = layer_map
         self.probes = probes
         self.savelist = savelist
         self.savefolder = savefolder
@@ -820,6 +848,47 @@ class PopulationSuper(object):
             assert(os.path.isfile(fname))
             print('save somapos ok')
 
+
+        # Save ImplementedMorphs
+        
+        # 1. Gather the local dictionaries from all ranks to Rank 0
+        local_mapping = self.ImplementedMorph.get(self.y, {})
+        gathered_mappings = COMM.gather(local_mapping, root=0)
+
+        if RANK == 0:
+            # 2. Merge all gathered dictionaries into one complete mapping
+            full_mapping = {}
+            for mapping in gathered_mappings:
+                full_mapping.update(mapping)
+                
+            # 3. Create a NumPy array with shape (number of entries, 2)
+            num_entries = len(full_mapping)
+            pop_morph_data = np.zeros((num_entries, 2), dtype=int)
+            
+            # 4. Populate the array with SORTED cell indices
+            for i, cell_idx in enumerate(sorted(full_mapping.keys())):
+                pop_morph_data[i, 0] = cell_idx
+                pop_morph_data[i, 1] = full_mapping[cell_idx]
+                
+            # 5. Construct the file path dynamically
+            fname = os.path.join(
+                self.populations_path,
+                self.output_file.format(
+                    self.y,
+                    f'{self.y}_morphologies.gdf' 
+                )
+            )
+            
+            # 6. Save the array to text
+            np.savetxt(fname, pop_morph_data, fmt='%d')
+            assert(os.path.isfile(fname))
+            print('save ImplementedMorph ok')
+
+
+
+
+
+
         if RANK == 0:
             # save rotations using hdf5
             fname = os.path.join(
@@ -986,6 +1055,18 @@ class Population(PopulationSuper):
 
         if RANK == 0:
             print("population initialized in %.2f seconds" % (time() - tic))
+
+
+    def get_ImplementedMorph(self):
+
+        ''' 
+        Utility function used to output the choosen morphologies as well as their location
+        '''
+
+
+        return self.ImplementedMorph
+
+
 
     def get_all_synIdx(self):
         """
@@ -1287,7 +1368,7 @@ class Population(PopulationSuper):
 
 
 
-    def _plot_both_morphologies(dend_segments, layer_boundaries, layer_names, valid_layers, target_upper_z, target_lower_z, morph_idx):
+    def _plot_both_morphologies(self,dend_segments, layer_boundaries, layer_names, valid_layers, target_upper_z, target_lower_z, morph_idx):
         """Helper function to visualize the selected morphology at both boundaries side-by-side."""
         fig, axes = plt.subplots(1, 2, figsize=(16, 10), sharey=True)
 
@@ -1357,7 +1438,7 @@ class Population(PopulationSuper):
         plt.tight_layout()
         plt.show()
 
-    def cell_MorphSelect(
+    def cell_MorphSelect(self,
         morph_paths,
         layer_boundaries,
         layer_names,
@@ -1452,75 +1533,85 @@ class Population(PopulationSuper):
         valid_layers = [i for i, syn in enumerate(synapses_per_layer) if syn > 0]
         target_upper_z = layer_boundaries[target_layer_idx][0]
         target_lower_z = layer_boundaries[target_layer_idx][1]
-
+        
         shuffled_paths = list(enumerate(morph_paths))
         random.shuffle(shuffled_paths)
-
+        
         for original_idx, path in shuffled_paths:
+            print('evaluating')
+            print(original_idx)
             # Clear previous morphology from NEURON memory
             h('forall delete_section()')
-
+            
             # Load the new .hoc file
             success = h.load_file(str(path))
             if not success:
                 print(f"Warning: Could not load {path}")
                 continue
-
+                
             dend_segments = []
-
+            
             # Iterate through all sections loaded into NEURON
             for sec in h.allsec():
                 if 'dend' in sec.name().lower() or 'apic' in sec.name().lower():
                     n3d = int(h.n3d(sec=sec))
                     if n3d > 0:
                         pts = np.array([[h.x3d(i, sec=sec), h.y3d(i, sec=sec), h.z3d(i, sec=sec)] for i in range(n3d)])
-
+                        
                         for i in range(n3d - 1):
-                            p1 = pts[i] / 1000.0
-                            p2 = pts[i+1] / 1000.0
-
+                            p1 = pts[i] 
+                            p2 = pts[i+1] 
+                            
                             length = np.linalg.norm(p1 - p2)
                             mid_z = (p1[2] + p2[2]) / 2.0
-
+                            
                             dend_segments.append((mid_z, length, p1, p2))
-
+                            
             valid_for_both_placements = True
-
+            
             # Test BOTH upper and lower boundaries
             for soma_z_placement in [target_upper_z, target_lower_z]:
-                valid_dend_length = 0.0
-
+                
+                # TRACK LENGTH PER LAYER instead of just a global sum
+                length_in_valid_layers = {layer_idx: 0.0 for layer_idx in valid_layers}
+                
                 for mid_z, length, _, _ in dend_segments:
                     shifted_z = mid_z + soma_z_placement
-
-                    in_synapse_layer = False
+                    
                     for layer_idx in valid_layers:
                         upper_bound, lower_bound = layer_boundaries[layer_idx]
                         if lower_bound <= shifted_z <= upper_bound:
-                            in_synapse_layer = True
+                            length_in_valid_layers[layer_idx] += length
                             break
-
-                    if in_synapse_layer:
-                        valid_dend_length += length
-
-                # If the length drops below the threshold for EITHER placement, it fails
-                if valid_dend_length < length_threshold:
+                
+                total_valid_length = sum(length_in_valid_layers.values())
+                
+                # CONDITION 1: Does the total length inside valid layers meet the threshold?
+                if total_valid_length < length_threshold:
                     valid_for_both_placements = False
-                    break
-
-            # If it passed BOTH loops, we generate the side-by-side plot and return it
+                    break 
+                    
+                # CONDITION 2: Does the arbor actually reach EVERY valid layer?
+                # If any valid layer has 0.0 length, it failed to span the necessary layers.
+                spans_all_layers = all(layer_length > 0.0 for layer_length in length_in_valid_layers.values())
+                
+                if not spans_all_layers:
+                    valid_for_both_placements = False
+                    break 
+                    
+            # If it passed BOTH loops (and both conditions), we return it
             if valid_for_both_placements:
                 if plot_result:
-                    _plot_both_morphologies(
-                        dend_segments, layer_boundaries, layer_names, valid_layers,
+                    self._plot_both_morphologies(
+                        dend_segments, layer_boundaries, layer_names, valid_layers, 
                         target_upper_z, target_lower_z, original_idx
                     )
                 return original_idx
-
-        raise RuntimeError(
-            f"No morphology met the length threshold of {length_threshold}um "
-            f"within the valid synaptic layers."
-        )
+            
+    raise RuntimeError(
+        f"No morphology met the length threshold of {length_threshold}um "
+        f"and successfully spanned all synaptic layers for both placements."
+    )
 
 
 
@@ -1548,10 +1639,7 @@ class Population(PopulationSuper):
         accounting for the extreme cases, lower and higher depth bound for the placemnt of the soma wihtin the layer of belonging of the neuron.
         Moreover is needed to put a threshold for the minimum branch length wihtin each layer that accomodates for synapses.
 
-        The variable self.Subpop is structured as a dataframe in whcih the keys are the sub-populations reference while the vlaues are the lists
-        used to import the morphologies. As explained above the morphologies will be drawn randomly and checked before passing them to the 
-        LFPy.Cell() function. This will be done by passing an updated version of the cellParams dictionary where the field 'morphology'
-        is updaed with the choosen morphology.
+  
 
         The variable self.ImplementedMorph has a similar structure. The top key in the hierarchy refers to the subpopulation, while the value
         stores matrix with self.RANK_CELLINDICES x 1 where the index is the current cell index 'cellindex' while is stored the index of the
@@ -1563,7 +1651,7 @@ class Population(PopulationSuper):
         In this case we need to upload the correct morphology based on the sifting done in the previouse call of the same function but with
         return_just_cell == TRUE used only to load the morphology and place the synapses onto it.
         Thus for a specific sub-population we resort to the variable self.ImplementedMorph[self.y] which encompasses the list of indicies
-        that locate in the self.Subpop[self.y] variable. The correct morphology is located by the current 'cellindex' which inherently 
+        that locate in the self.Subpop variable. The correct morphology is located by the current 'cellindex' which inherently 
         links the latter with the synapses distributed in the previous call of the function
         
         
@@ -1595,21 +1683,36 @@ class Population(PopulationSuper):
         """
         tic = time()
 
-        ## Morphology choice
-        Availale_morph = self.Subpop[self.y].copy() 
-        Layer_index = self.layer_map[self.y]
-        Sum_per_Layer = np.sum(self.k_yXL, axis=1)
-        Load_idx = cell_MorphSelect(Availale_morph,
-                                    self.layerBoundaries,
-                                    self.layer_names,
-                                    Sum_per_Layer,
-                                    self.lenTh,
-                                    Layer_index,
-                                    plot_result=False)
-        # Update the dictionary
-        self.ImplementedMorph[self.y].append(Load_idx)
-        # Change the cellParams' field, this will change iteratively.
-        self.cellParams['morphology'] = Availale_morph[Load_idx]
+        ## Morphology 
+        Availale_morph = self.Subpop.copy()
+
+        if return_just_cell:
+
+             
+            Layer_index = self.layer_map
+            Sum_per_Layer = np.sum(self.k_yXL, axis=1)
+            Load_idx = self.cell_MorphSelect(Availale_morph,
+                                        self.layerBoundaries,
+                                        self.layer_names,
+                                        Sum_per_Layer,
+                                        self.lenTh,
+                                        Layer_index,
+                                        plot_result=False)
+            # Update the dictionary, best to handle parallelization via MPI
+            self.ImplementedMorph[self.y][cellindex] = Load_idx
+
+
+        else:
+             # Retrieve the morphology choosen in the previous call of the function
+             Load_idx = self.ImplementedMorph[self.y][cellindex]
+
+
+
+
+
+        # Change the cellParams' field, after copy.
+        current_params = self.cellParams.copy()
+        current_params['morphology'] = Availale_morph[Load_idx]
 
 
 
@@ -1619,7 +1722,7 @@ class Population(PopulationSuper):
         ### Here we create the cell object: initiates the morphology, set its position and rotation, and insert synapses.
         ### Maybe it would be possible to change the cellParams. for example add to the 'morphology' field the specific path to the cell's morphology file.
         ### We need to load the cell-specific morphology file.
-        cell = LFPy.Cell(**self.cellParams)
+        cell = LFPy.Cell(**current_params)
         cell.set_pos(**self.pop_soma_pos[cellindex])
         cell.set_rotation(**self.rotations[cellindex])
 
