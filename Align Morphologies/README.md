@@ -8,6 +8,8 @@ This function translates a pandas DataFrame containing a neuron's 3D coordinates
 
 - **Unit conversion:** Converts coordinates from nm to um before building the output.
 
+- **Spine recognition and labelling**: done through the *apply_spine_labels_to_df()* function. For more details refer to Spine Detection folder.
+
 - **Label Mapping:** It standardizes your anatomical labels, categorizing every point as part of an `axon`, `soma`, or `dend` (dendrite).
     
 - **Iterative Topology Building:** It reconstructs the neuron's branching structure (graph topology) using a stack-based `while` loop. It walks through the points and groups contiguous segments of the same type into unbranched cables (sections). By doing this iteratively rather than recursively, it prevents Python from crashing (hitting a `RecursionError`) when processing extremely long, unbranched axons or dendrites.
