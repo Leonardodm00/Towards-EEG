@@ -5,6 +5,53 @@ import pandas as pd
 from scipy.spatial.transform import Rotation as R
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import networkx as nx
+import numpy as np
+import re
+
+def apply_spine_labels_to_df(df, spine_length_threshold_nm=3000.0):
+    """
+    Helper function to apply the robust spine-labeling logic directly 
+    to an in-memory dataframe without reading from disk.
+    """
+    G = nx.DiGraph()
+    G.add_nodes_from(df['id'])
+    valid_edges = df[df['p'] != -1][['p', 'id']].values
+    G.add_edges_from(valid_edges)
+
+    node_coords = df.set_index('id')[['x', 'y', 'z']].to_dict('index')
+    node_types = df.set_index('id')['annotated_type'].to_dict()
+    spine_nodes = set()
+    branch_points = [n for n in G.nodes() if G.out_degree(n) > 1]
+
+    for bp in branch_points:
+        parent_type = str(node_types.get(bp, ''))
+        if not re.search(r'dendrite|apical|^1$', parent_type, re.IGNORECASE):
+            continue
+        
+        for child in G.successors(bp):
+            try:
+                subtree_nodes = nx.descendants(G, child)
+                subtree_nodes.add(child)
+            except nx.NetworkXError:
+                continue
+
+            total_subtree_length = 0.0
+            for node in subtree_nodes:
+                parent = list(G.predecessors(node))[0] 
+                p1 = np.array([node_coords[node]['x'], node_coords[node]['y'], node_coords[node]['z']])
+                p2 = np.array([node_coords[parent]['x'], node_coords[parent]['y'], node_coords[parent]['z']])
+                total_subtree_length += np.linalg.norm(p1 - p2)
+
+            if 0 < total_subtree_length <= spine_length_threshold_nm:
+                spine_nodes.update(subtree_nodes)
+
+    if spine_nodes:
+        df.loc[df['id'].isin(spine_nodes), 'annotated_type'] = 'spine'
+        
+    return df
+
+
 def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
     """
     Takes an aligned neuron DataFrame and writes a NEURON-compliant .hoc file.
@@ -12,6 +59,9 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
     Converts coordinates from nm to um before building the output.
     """
     df = aligned_neuron_df.copy()
+
+    # --- NEW: Call the spine labeler directly on the dataframe ---
+    df = apply_spine_labels_to_df(df, spine_length_threshold_nm=3000.0)
 
     # --- NEW: Convert coordinates from nm to um ---
     df['x'] = df['x'] / 1000.0
@@ -31,6 +81,7 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
         annot_str = str(annot).lower()
         if 'axon' in annot_str: return 'axon'
         elif 'soma' in annot_str: return 'soma'
+        elif 'spine' in annot_str: return 'spine'  # <-- Added spine annotation
         else: return 'dend'
 
     df['hoc_type'] = df['annotated_type'].apply(get_hoc_type)
@@ -82,8 +133,8 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
                 child_type = node_data[child]['hoc_type']
                 stack.append((child, [node_id], child_type, sec_id))
 
-    # 4. Count and index the section arrays
-    counts = {'soma': 0, 'axon': 0, 'dend': 0}
+    # 4. Count and index the section arrays (Added 'spine')
+    counts = {'soma': 0, 'axon': 0, 'dend': 0, 'spine': 0}
     for sec in section_records:
         sec['type_idx'] = counts[sec['type']]
         counts[sec['type']] += 1
@@ -92,8 +143,8 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
     with open(output_filepath, 'w') as f:
         f.write("// NEURON HOC morphology generated from aligned data\n\n")
 
-        # Instantiate section arrays
-        for t in ['soma', 'axon', 'dend']:
+        # Instantiate section arrays (Added 'spine')
+        for t in ['soma', 'axon', 'dend', 'spine']:
             if counts[t] > 0:
                 f.write(f"create {t}[{counts[t]}]\n")
         f.write("\n")
@@ -129,10 +180,9 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
 
 
 
-
 def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/content/drive/MyDrive/Colab Notebooks/Reconstructed neurons',outpath = '/content/drive/MyDrive/Colab Notebooks/Aligned Neurons HOC', k_neighbors=3, show_plot=True):
     """
-    Centers each neuron's soma, finds the nearest 'k' reference neurons, 
+    Centers each neuron's soma, finds the nearest 'k' reference neurons,
     applies their average rotation, and optionally plots the transformation.
     """
     aligned_neurons = {}
@@ -166,7 +216,7 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
             continue
 
         soma_pos = root_rows.iloc[0][['x', 'y', 'z']].values.astype(float)
-        
+
         coords = df[['x', 'y', 'z']].values
         centered_coords = coords - soma_pos
 
@@ -211,7 +261,7 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
             # --- Left Panel: Centered Raw Skeleton ---
             df_temp = df[['id', 'p']].copy()
             df_temp['x'], df_temp['y'], df_temp['z'] = centered_coords[:, 0], centered_coords[:, 1], centered_coords[:, 2]
-            
+
             node_map = df_temp.set_index('id')[['x', 'y', 'z']].to_dict('index')
             cx, cy, cz = [], [], []
             for _, row in df_temp[df_temp['p'] != -1].iterrows():
@@ -221,7 +271,7 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
                     cx.extend([row['x'], parent['x'], None])
                     cy.extend([row['y'], parent['y'], None])
                     cz.extend([row['z'], parent['z'], None])
-                    
+
             fig.add_trace(go.Scatter3d(
                 x=cx, y=cy, z=cz, mode='lines',
                 line=dict(color='lightgrey', width=2), opacity=0.5, name='Raw Target', hoverinfo='skip'
@@ -229,16 +279,16 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
 
             # Determine a scale for the sticks based on the target neuron's size
             max_dist = np.max(np.linalg.norm(centered_coords, axis=1)) if len(centered_coords) > 0 else 50000
-            stick_scale = max_dist * 0.4 
+            stick_scale = max_dist * 0.4
 
             # Plot Neighbors in Left and Right Panels
             for i, (_, neighbor) in enumerate(nearest_metadata.iterrows()):
                 # Raw Space Math
                 n_soma_orig = np.array([neighbor['soma_x'], neighbor['soma_y'], neighbor['soma_z']])
                 n_soma_rel = n_soma_orig - soma_pos # Position relative to target soma
-                
+
                 v_com_orig = np.array([neighbor['v_com_x'], neighbor['v_com_y'], neighbor['v_com_z']])
-                v_com_orig = v_com_orig / np.linalg.norm(v_com_orig) 
+                v_com_orig = v_com_orig / np.linalg.norm(v_com_orig)
                 stick_end_raw = n_soma_rel + v_com_orig * stick_scale
 
                 # Aligned Space Math (Rotate neighbor positions and vectors)
@@ -270,7 +320,7 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
 
             # --- Right Panel: Aligned Skeleton ---
             df_temp['x'], df_temp['y'], df_temp['z'] = rotated_coords[:, 0], rotated_coords[:, 1], rotated_coords[:, 2]
-            
+
             node_map_rot = df_temp.set_index('id')[['x', 'y', 'z']].to_dict('index')
             rx, ry, rz = [], [], []
             for _, row in df_temp[df_temp['p'] != -1].iterrows():
@@ -280,9 +330,9 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
                     rx.extend([row['x'], parent['x'], None])
                     ry.extend([row['y'], parent['y'], None])
                     rz.extend([row['z'], parent['z'], None])
-                    
+
             fig.add_trace(go.Scatter3d(
-                x=rx, y=ry, z=rz, mode='lines', 
+                x=rx, y=ry, z=rz, mode='lines',
                 line=dict(color='royalblue', width=2), opacity=0.6, name='Aligned Target', hoverinfo='skip'
             ), row=1, col=2)
 
