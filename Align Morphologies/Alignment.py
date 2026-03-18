@@ -1,34 +1,42 @@
 import os
-import ast
+import re
 import numpy as np
 import pandas as pd
-from scipy.spatial.transform import Rotation as R
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import networkx as nx
-import numpy as np
-import re
+from collections import defaultdict
+from scipy.interpolate import splprep, splev, interp1d
+from scipy.signal import find_peaks
+from scipy.ndimage import gaussian_filter1d
 
-def apply_spine_labels_to_df(df, spine_length_threshold_nm=3000.0):
+def apply_spine_labels_to_df(df, spine_length_threshold_nm=5000.0, num_interp_points=100, smoothing_sigma=1.0):
     """
-    Helper function to apply the robust spine-labeling logic directly 
-    to an in-memory dataframe without reading from disk.
+    Identifies spines, evaluates their morphological radius profiles, 
+    and explicitly labels nodes as 'head' or 'neck' in the DataFrame.
     """
+    if 'r' not in df.columns:
+        df['r'] = 50.0  # Fallback radius if none exists
+        
     G = nx.DiGraph()
     G.add_nodes_from(df['id'])
     valid_edges = df[df['p'] != -1][['p', 'id']].values
     G.add_edges_from(valid_edges)
 
-    node_coords = df.set_index('id')[['x', 'y', 'z']].to_dict('index')
+    node_dict = df.set_index('id').to_dict('index')
     node_types = df.set_index('id')['annotated_type'].to_dict()
+    
+    children_map = defaultdict(list)
+    for _, row in df[df['p'] != -1].iterrows():
+        children_map[row['p']].append(row['id'])
+
     spine_nodes = set()
     branch_points = [n for n in G.nodes() if G.out_degree(n) > 1]
 
+    # --- 1. Identify all Spine Nodes ---
     for bp in branch_points:
         parent_type = str(node_types.get(bp, ''))
         if not re.search(r'dendrite|apical|^1$', parent_type, re.IGNORECASE):
             continue
-        
+
         for child in G.successors(bp):
             try:
                 subtree_nodes = nx.descendants(G, child)
@@ -38,17 +46,112 @@ def apply_spine_labels_to_df(df, spine_length_threshold_nm=3000.0):
 
             total_subtree_length = 0.0
             for node in subtree_nodes:
-                parent = list(G.predecessors(node))[0] 
-                p1 = np.array([node_coords[node]['x'], node_coords[node]['y'], node_coords[node]['z']])
-                p2 = np.array([node_coords[parent]['x'], node_coords[parent]['y'], node_coords[parent]['z']])
+                parent = list(G.predecessors(node))[0]
+                p1 = np.array([node_dict[node]['x'], node_dict[node]['y'], node_dict[node]['z']])
+                p2 = np.array([node_dict[parent]['x'], node_dict[parent]['y'], node_dict[parent]['z']])
                 total_subtree_length += np.linalg.norm(p1 - p2)
 
             if 0 < total_subtree_length <= spine_length_threshold_nm:
                 spine_nodes.update(subtree_nodes)
 
+    # --- 2. Morphological Head/Neck Separation ---
     if spine_nodes:
-        df.loc[df['id'].isin(spine_nodes), 'annotated_type'] = 'spine'
+        # Find the base/root of every isolated spine
+        spine_roots = [
+            nid for nid in spine_nodes 
+            if node_dict[nid]['p'] not in spine_nodes
+        ]
         
+        head_nodes = set()
+        neck_nodes = set()
+        
+        for root_id in spine_roots:
+            # Extract paths from root to tips
+            paths = []
+            def dfs_paths(current_node, current_path):
+                current_path.append(current_node)
+                spine_children = [c for c in children_map[current_node] if c in spine_nodes]
+                if not spine_children:
+                    paths.append(list(current_path))
+                else:
+                    for child in spine_children:
+                        dfs_paths(child, list(current_path))
+            dfs_paths(root_id, [])
+            
+            for path in paths:
+                # Filter out duplicate coordinates to prevent interpolation crashes
+                clean_path, path_coords, path_radii = [], [], []
+                for n in path:
+                    coord = np.array([node_dict[n]['x'], node_dict[n]['y'], node_dict[n]['z']])
+                    if not path_coords or np.linalg.norm(coord - path_coords[-1]) > 1e-4:
+                        path_coords.append(coord)
+                        path_radii.append(node_dict[n]['r'])
+                        clean_path.append(n)
+                
+                # If the branch is too short, label it entirely as head
+                if len(path_coords) < 3:
+                    head_nodes.update(clean_path)
+                    continue
+                    
+                path_coords = np.array(path_coords)
+                path_radii = np.array(path_radii)
+                
+                # Interpolation
+                k = min(3, len(path_coords) - 1)
+                tck, u = splprep(path_coords.T, s=0, k=k)
+                u_new = np.linspace(0, 1, num_interp_points)
+                smooth_coords = np.array(splev(u_new, tck)).T
+                interp_kind = 'cubic' if len(path_coords) > 3 else 'linear'
+                smooth_radii = interp1d(u, path_radii, kind=interp_kind)(u_new)
+                smooth_radii = np.clip(smooth_radii, a_min=1.0, a_max=None)
+                
+                # Distance calculations on interpolated curve
+                diffs = np.diff(smooth_coords, axis=0)
+                ds = np.linalg.norm(diffs, axis=1)
+                ds = np.insert(ds, 0, 0)
+                
+                radii_tip_to_base = smooth_radii[::-1]
+                ds_tip_to_base = ds[::-1]
+                dist_from_tip = np.cumsum(ds_tip_to_base)
+                
+                filtered_radii = gaussian_filter1d(radii_tip_to_base, sigma=smoothing_sigma)
+                prominence_threshold = np.max(filtered_radii) * 0.05
+                minima, _ = find_peaks(-filtered_radii, prominence=prominence_threshold)
+                
+                # Identify the boundary threshold
+                total_length = dist_from_tip[-1]
+                if len(minima) > 0:
+                    neck_start_idx = minima[0]
+                else:
+                    target_dist = total_length / 3.0
+                    neck_start_idx = np.searchsorted(dist_from_tip, target_dist)
+                    neck_start_idx = min(neck_start_idx, len(dist_from_tip) - 1)
+                
+                cutoff_dist_from_tip = dist_from_tip[neck_start_idx]
+                
+                # Calculate real distances of original nodes to map labels back
+                orig_ds = [0.0]
+                for i in range(1, len(path_coords)):
+                    orig_ds.append(np.linalg.norm(path_coords[i] - path_coords[i-1]))
+                orig_cum_dist = np.cumsum(orig_ds)
+                orig_total_len = orig_cum_dist[-1]
+                
+                # Assign labels
+                for i, node in enumerate(clean_path):
+                    node_dist_from_tip = orig_total_len - orig_cum_dist[i]
+                    if node_dist_from_tip <= cutoff_dist_from_tip:
+                        head_nodes.add(node)
+                    else:
+                        neck_nodes.add(node)
+                        
+        # Resolve branch conflicts: If any tip claims a node is part of a head, it's a head
+        final_neck = neck_nodes - head_nodes
+        final_head = head_nodes
+        
+        # 3. Apply the new labels to the dataframe
+        df.loc[df['id'].isin(final_neck), 'annotated_type'] = 'neck'
+        df.loc[df['id'].isin(final_head), 'annotated_type'] = 'head'
+
     return df
 
 
@@ -63,25 +166,24 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
     # --- NEW: Call the spine labeler directly on the dataframe ---
     df = apply_spine_labels_to_df(df, spine_length_threshold_nm=3000.0)
 
-    # --- NEW: Convert coordinates from nm to um ---
+    # --- Convert coordinates from nm to um ---
     df['x'] = df['x'] / 1000.0
     df['y'] = df['y'] / 1000.0
     df['z'] = df['z'] / 1000.0
 
-    # Ensure a radius column 'r' exists. If not, default to 0.5 um (NEURON diam = 1.0)
-    # If it does exist, we also need to convert it from nm to um.
     if 'r' not in df.columns:
         df['r'] = 0.5
     else:
         df['r'] = df['r'] / 1000.0
-    # ----------------------------------------------
 
     # 1. Map labels to standard NEURON section arrays
     def get_hoc_type(annot):
         annot_str = str(annot).lower()
         if 'axon' in annot_str: return 'axon'
         elif 'soma' in annot_str: return 'soma'
-        elif 'spine' in annot_str: return 'spine'  # <-- Added spine annotation
+        elif 'head' in annot_str: return 'head' # Explicitly separate heads
+        elif 'neck' in annot_str: return 'neck' # Explicitly separate necks
+        elif 'spine' in annot_str: return 'spine' # Fallback
         else: return 'dend'
 
     df['hoc_type'] = df['annotated_type'].apply(get_hoc_type)
@@ -99,7 +201,6 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
     section_records = []
 
     # 3. Iterative traversal to extract unbranched sections using a Stack
-    # Stack stores tuples of: (current_node_id, current_section_nodes_list, current_type, parent_sec_id)
     stack = [(root_id, [], node_data[root_id]['hoc_type'], -1)]
 
     while stack:
@@ -107,25 +208,19 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
         current_sec_nodes.append(node_id)
         chs = children.get(node_id, [])
 
-        # Leaf node
         if len(chs) == 0:
             section_records.append({'type': current_type, 'nodes': current_sec_nodes, 'parent_sec_id': parent_sec_id})
 
-        # Continuation of an unbranched cable
         elif len(chs) == 1:
             child = chs[0]
             child_type = node_data[child]['hoc_type']
             if child_type == current_type:
-                # Same type, continue cable: push back to stack with the SAME list object
                 stack.append((child, current_sec_nodes, current_type, parent_sec_id))
             else:
-                # Type changed mid-cable -> break and start new section
                 sec_id = len(section_records)
                 section_records.append({'type': current_type, 'nodes': current_sec_nodes, 'parent_sec_id': parent_sec_id})
-                # Pass parent node [node_id] to the new child list to maintain physical connection
                 stack.append((child, [node_id], child_type, sec_id))
 
-        # Branch point -> break current section, start new child sections
         else:
             sec_id = len(section_records)
             section_records.append({'type': current_type, 'nodes': current_sec_nodes, 'parent_sec_id': parent_sec_id})
@@ -133,8 +228,8 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
                 child_type = node_data[child]['hoc_type']
                 stack.append((child, [node_id], child_type, sec_id))
 
-    # 4. Count and index the section arrays (Added 'spine')
-    counts = {'soma': 0, 'axon': 0, 'dend': 0, 'spine': 0}
+    # 4. Count and index the section arrays
+    counts = {'soma': 0, 'axon': 0, 'dend': 0, 'head': 0, 'neck': 0, 'spine': 0}
     for sec in section_records:
         sec['type_idx'] = counts[sec['type']]
         counts[sec['type']] += 1
@@ -143,26 +238,21 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
     with open(output_filepath, 'w') as f:
         f.write("// NEURON HOC morphology generated from aligned data\n\n")
 
-        # Instantiate section arrays (Added 'spine')
-        for t in ['soma', 'axon', 'dend', 'spine']:
+        for t in ['soma', 'axon', 'dend', 'head', 'neck', 'spine']:
             if counts[t] > 0:
                 f.write(f"create {t}[{counts[t]}]\n")
         f.write("\n")
 
-        # Establish topology connections
         for sec in section_records:
             if sec['parent_sec_id'] != -1:
                 parent_sec = section_records[sec['parent_sec_id']]
-                # Connect the 0-end of the child to the 1-end of the parent
                 f.write(f"connect {sec['type']}[{sec['type_idx']}](0), {parent_sec['type']}[{parent_sec['type_idx']}](1)\n")
         f.write("\n")
 
-        # Populate 3D points
         for sec in section_records:
             f.write(f"{sec['type']}[{sec['type_idx']}] {{\n")
             f.write("  pt3dclear()\n")
 
-            # NEURON workaround: A section must have at least 2 points.
             if len(sec['nodes']) == 1:
                 node = sec['nodes'][0]
                 d = node_data[node]
@@ -178,7 +268,7 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
             f.write("}\n\n")
 
 
-
+            
 
 def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/content/drive/MyDrive/Colab Notebooks/Reconstructed neurons',outpath = '/content/drive/MyDrive/Colab Notebooks/Aligned Neurons HOC', k_neighbors=3, show_plot=True):
     """
