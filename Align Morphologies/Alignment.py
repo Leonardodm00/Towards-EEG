@@ -1,13 +1,71 @@
 import os
 import ast
+import re
 import numpy as np
 import pandas as pd
+import networkx as nx
 from scipy.spatial.transform import Rotation as R
+from scipy.spatial import cKDTree  # <--- Added this!
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import networkx as nx
-import numpy as np
-import re
+
+
+def map_synapses_to_segments(neuron_df, neuron_id, synapses_dir='./h01_extracted_synapses'):
+    """
+    Takes an already loaded neuron dataframe and its ID, finds the closest 
+    neuron segment for each incoming synapse, and labels it as 'exc_syn' or 'inh_syn'.
+    """
+    syn_path = os.path.join(synapses_dir, f"neuron_{neuron_id}_synapses.csv")
+    
+    # 1. Check if synapse file exists
+    if not os.path.exists(syn_path):
+        print(f"⚠️ Synapses file not found for neuron {neuron_id}: {syn_path}")
+        return neuron_df # Return the unmodified skeleton
+
+    # 2. Load and filter synapse data
+    syn_df = pd.read_csv(syn_path)
+    syn_df = syn_df[syn_df['direction'] == 'incoming'].dropna(subset=['location_x', 'location_y', 'location_z'])
+    
+    if syn_df.empty:
+        print(f"⚠️ No valid incoming synapses found to map for neuron {neuron_id}.")
+        return neuron_df
+
+    # 3. Build a KD-Tree using the RAW neuron coordinates
+    neuron_coords = neuron_df[['x', 'y', 'z']].values
+    tree = cKDTree(neuron_coords)
+    
+    # 4. Get the synapse coordinates AND convert from voxels to nanometers
+    syn_coords = syn_df[['location_x', 'location_y', 'location_z']].values
+    syn_coords[:, 0] = syn_coords[:, 0] * 8.0   # Scale X
+    syn_coords[:, 1] = syn_coords[:, 1] * 8.0   # Scale Y
+    syn_coords[:, 2] = syn_coords[:, 2] * 33.0  # Scale Z
+    
+    # 5. Query the KD-Tree
+    distances, closest_node_indices = tree.query(syn_coords)
+    
+    # 6. Initialize label column
+    if 'synapse_label' not in neuron_df.columns:
+        neuron_df['synapse_label'] = None
+        
+    # 7. Map labels
+    for i, node_idx in enumerate(closest_node_indices):
+        df_idx = neuron_df.index[node_idx]
+        raw_type = str(syn_df.iloc[i]['synapse_type']).lower()
+        
+        # Type 2 = Excitatory, Type 1 = Inhibitory
+        if any(keyword in raw_type for keyword in ['2', 'exc', 'asymmetric']):
+            label = 'exc_syn'
+        elif any(keyword in raw_type for keyword in ['1', 'inh', 'symmetric']):
+            label = 'inh_syn'
+        else:
+            label = 'unknown_syn'
+            
+        neuron_df.at[df_idx, 'synapse_label'] = label
+        
+    print(f"✅ Successfully mapped {len(syn_coords)} synapses to neuron {neuron_id}.")
+    
+    return neuron_df
+
 def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
     """
     Takes an aligned neuron DataFrame and writes a NEURON-compliant .hoc file.
@@ -29,14 +87,21 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
         df['r'] = df['r'] / 1000.0
     # ----------------------------------------------
 
-    # 1. Map labels to standard NEURON section arrays
-    def get_hoc_type(annot):
-        annot_str = str(annot).lower()
+    # 1. Map labels to standard NEURON section arrays (Updated for Synapses)
+    def get_hoc_type(row):
+        # First, check if this segment was mapped as a synapse
+        syn_label = str(row.get('synapse_label', '')).lower()
+        if 'exc_syn' in syn_label: return 'exc_syn'
+        if 'inh_syn' in syn_label: return 'inh_syn'
+        
+        # If no synapse, fall back to structural annotation
+        annot_str = str(row.get('annotated_type', '')).lower()
         if 'axon' in annot_str: return 'axon'
         elif 'soma' in annot_str: return 'soma'
         else: return 'dend'
 
-    df['hoc_type'] = df['annotated_type'].apply(get_hoc_type)
+    # FIXED: Applied to the whole DataFrame with axis=1
+    df['hoc_type'] = df.apply(get_hoc_type, axis=1)
 
     # 2. Build graph relationships
     children = df.groupby('p')['id'].apply(list).to_dict()
@@ -85,8 +150,8 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
                 child_type = node_data[child]['hoc_type']
                 stack.append((child, [node_id], child_type, sec_id))
 
-    # 4. Count and index the section arrays (Removed 'spine')
-    counts = {'soma': 0, 'axon': 0, 'dend': 0}
+    # 4. Count and index the section arrays (Added 'exc_syn' and 'inh_syn')
+    counts = {'soma': 0, 'axon': 0, 'dend': 0, 'exc_syn': 0, 'inh_syn': 0}
     for sec in section_records:
         sec['type_idx'] = counts[sec['type']]
         counts[sec['type']] += 1
@@ -96,7 +161,7 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
         f.write("// NEURON HOC morphology generated from aligned data\n\n")
 
         # Instantiate section arrays (Removed 'spine')
-        for t in ['soma', 'axon', 'dend']:
+        for t in ['soma', 'axon', 'dend', 'exc_syn', 'inh_syn']:
             if counts[t] > 0:
                 f.write(f"create {t}[{counts[t]}]\n")
         f.write("\n")
@@ -132,7 +197,7 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
 
 
 
-def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/content/drive/MyDrive/Colab Notebooks/Reconstructed neurons',outpath = '/content/drive/MyDrive/Colab Notebooks/Aligned Neurons HOC', k_neighbors=3, show_plot=True):
+def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/content/drive/MyDrive/Colab Notebooks/Reconstructed neurons',outpath = '/content/drive/MyDrive/Colab Notebooks/Aligned Neurons HOC',synapses_dir = '', k_neighbors=3, show_plot=True):
     """
     Centers each neuron's soma, finds the nearest 'k' reference neurons,
     applies their average rotation, and optionally plots the transformation.
@@ -160,6 +225,9 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
             continue
 
         df = pd.read_csv(filepath)
+
+        # 2. Map the synapses to the dataframe while it is still in raw space!
+        df = map_synapses_to_segments(df, nid, synapses_dir=synapses_dir)
 
         # --- 2. Find Soma and Center the Neuron ---
         root_rows = df[df['p'] == -1]
@@ -298,3 +366,9 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
             fig.show()
 
     return aligned_neurons
+
+
+
+
+
+
