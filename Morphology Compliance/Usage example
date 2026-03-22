@@ -1,73 +1,54 @@
-base_path = '/content/drive/MyDrive/Colab Notebooks/Aligned Neurons HOC'
-    
-nids = [
-        1885968871, 2771884890, 2903920410, 3006113857, 3222499167, 3223274014, 
-        3265995691, 3295621595, 3396165104, 3399040143, 3469723286, 3484339026, 
-        3485434276, 3543911915, 3559797036, 3643825567, 3644964664, 3688373256, 
-        3803721169, 3892014018, 3892992905, 3908191917, 3919434378, 4038943832, 
-        4051822360, 4065911312, 4066116171, 4066933831, 4127879232, 4139939668, 
-        4184267343, 4242364929, 4271363320, 4315706800, 4329299008, 4330073983, 
-        4361071433, 4373379460, 4386813257, 4387645213, 4401836842, 4402377014, 
-        4415590654, 4418540025, 4431330530, 4443609959, 4446194392, 4446355067, 
-        4472637539, 4474812411, 4489020400, 4489064511, 4489121710, 4490129250, 
-        4532048217, 4534224460, 4535261682, 4561746646, 4592350377, 4606732344, 
-        4633875577, 4634679023, 4664115273, 4693477092, 4706252842, 4709888554, 
-        4722635073, 4737834871, 4738375682, 4738857025, 4766774105, 4768687371, 
-        4781200505, 4809627844, 4812840871, 4824798917, 4825396967, 4839063442, 
-        4852204352, 4852321993, 4853649886, 4854496842, 4868836122, 4911572496, 
-        4912623647, 4913485826, 4931109286, 4939724073, 4941402683, 4942205159, 
-        4984051366, 5014494468, 5030936462, 5044514519, 5076871228, 5086230088, 
-        5086550398, 5100057607, 5100685756, 5116146849, 5116205095, 5131011976, 
-        5133347133, 5143333956, 5159278839, 5159803735, 5160796796, 5175090962, 
-        5175353953, 5187371550, 5189677248, 5190319976, 5217039516, 5217171026, 
-        5232282961, 5234649530, 5247526396, 5261835396, 5291168786, 5291548513, 
-        5305258792, 5318852286, 5319189326, 5320400202, 5335001245, 5335191586, 
-        5365955112, 5421148001, 5421336745, 5436507845, 5449224616, 5451122797, 
-        5464747312, 5478134645, 5478616461, 5480136235, 5509088748, 5511717264, 
-        5524551172, 5553081571, 5553578082, 5567711747, 5581378299, 5581510029, 
-        5582035326, 5598914100, 5610974886, 5628189095, 5638002068, 5640659446, 
-        5655289104, 5655917761, 5669189357, 5672738006, 5686418450, 5712933306, 
-        5727681025, 5727870456, 5730658896, 5784625240, 5814702337, 5829069825, 
-        5845248438, 5872566163, 5889270340, 5917113823, 5918005808, 5918705966, 
-        5960640328, 5977227354, 6019146684, 6032010176, 6033921689, 6034360287, 
-        6077169826, 6077680913, 6106284240, 6107116586, 6107161560, 6107979399, 
-        6120199282, 6120257502, 6120520194, 6121571458, 6149679443, 6195014585
-    ]
-    
-morph_paths = [f"{base_path}/neuron_{nid}_aligned.hoc" for nid in nids]
+# ==========================================
+# EXECUTION BLOCK
+# ==========================================
+if __name__ == '__main__':
+    base_path = '/content/drive/MyDrive/Colab Notebooks/Aligned Neurons HOC'
+    synapse_base_path = '/content/drive/MyDrive/Colab Notebooks/Synapse database'
+        
+    nids = [
+         5305258792, 5318852286, 5319189326, 5320400202, 5335001245, 5335191586, 5365955112, 5421148001, 5421336745, 5436507845, 5449224616, 5451122797, 5464747312, 5478134645, 5478616461, 5480136235, 5509088748, 5511717264, 5524551172, 5553081571, 5553578082, 5567711747, 5581378299, 5581510029, 5582035326, 5598914100, 5610974886, 5628189095, 5638002068, 5640659446, 5655289104, 5655917761, 5669189357, 5672738006, 5686418450, 5712933306, 5727681025, 5727870456, 5730658896, 5784625240, 5814702337, 5829069825, 5845248438, 5872566163, 5889270340, 5917113823, 5918005808, 5918705966, 5960640328, 5977227354, 6019146684, 6032010176, 6033921689, 6034360287, 6077169826, 6077680913, 6106284240, 6107116586, 6107161560, 6107979399, 6120199282, 6120257502, 6120520194, 6121571458, 6149679443, 6195014585,
 
-layer_boundaries = np.array([
-    [    0.0,   -81.6], # Index 0
-    [  -81.6,  -587.1], # Index 1
-    [ -587.1,  -922.2], # Index 2
-    [ -922.2, -1170.0], # Index 3
-    [-1170.0, -1491.7]  # Index 4
-])
+    ] # Shortened for brevity
+        
+    morph_paths = [f"{base_path}/neuron_{nid}_aligned.hoc" for nid in nids]
 
-layer_names = ['L1', 'L2/3', 'L4', 'L5', 'L6']
+    layer_boundaries = np.array([
+        [    0.0,   -81.6], # L1
+        [  -81.6,  -587.1], # L2/3
+        [ -587.1,  -922.2], # L4
+        [ -922.2, -1170.0], # L5
+        [-1170.0, -1491.7]  # L6
+    ])
 
-synapses_per_layer = [0, 1500, 3200, 500, 0] 
-length_threshold = 500.0 
-target_layer_idx = 3 # Targets L5
+    layer_names = ['L1', 'L2/3', 'L4', 'L5', 'L6']
 
-try:
-    print(f"Evaluating {len(morph_paths)} morphologies...")
+    # NOTE: I lowered the required synapses for the debug script. 
+    # If the requirement is set to 3200, the script might raise a RuntimeError 
+    # because a single biological cell rarely has 3200 synapses in one layer.
+    synapses_per_layer = [0, 150, 320, 50, 0] 
     
-    chosen_idx = select_valid_morphology(
-        morph_paths=morph_paths,
-        layer_boundaries=layer_boundaries,
-        layer_names=layer_names,
-        synapses_per_layer=synapses_per_layer,
-        length_threshold=length_threshold,
-        target_layer_idx=target_layer_idx,
-        plot_result=True 
-    )
-    
-    print("-" * 40)
-    print(f"Success! Selected morphology index: {chosen_idx}")
-    print(f"Selected neuron ID: {nids[chosen_idx]}")
-    print(f"File Path: {morph_paths[chosen_idx]}")
-    
-except RuntimeError as e:
-    print("-" * 40)
-    print(f"Execution Error: {e}")
+    # Place soma exactly in the middle of L5
+    target_z_pos = (layer_boundaries[3][0] + layer_boundaries[3][1]) / 2.0 
+
+    try:
+        print(f"Evaluating {len(morph_paths)} morphologies...")
+        
+        # Note: I removed 'self' from the function definition above so it runs cleanly here
+        chosen_idx, chosen_nid = cell_MorphSelect(
+            morph_paths=morph_paths,
+            layer_boundaries=layer_boundaries,
+            layer_names=layer_names,
+            synapses_per_layer=synapses_per_layer,
+            target_z_pos=target_z_pos,
+            synapse_base_path=synapse_base_path,
+            plot_result=True 
+        )
+        
+        print("-" * 40)
+        print(f"Success! Selected morphology index: {chosen_idx}")
+        print(f"Selected neuron ID: {chosen_nid}")
+        print(f"File Path: {morph_paths[chosen_idx]}")
+        
+    except RuntimeError as e:
+        print("-" * 40)
+        print(f"Execution Error: {e}")
