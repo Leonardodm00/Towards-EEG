@@ -6,259 +6,193 @@ import random
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from neuron import h
+import os
+import re
+import random
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.collections import LineCollection
+from neuron import h
+
 # Load standard NEURON run library
 h.load_file('stdrun.hoc')
 
-def _plot_both_morphologies(dend_segments, layer_boundaries, layer_names, valid_layers, target_upper_z, target_lower_z, morph_idx):
-    """Helper function to visualize the selected morphology at both boundaries side-by-side."""
-    fig, axes = plt.subplots(1, 2, figsize=(16, 10), sharey=True)
+def _plot_capacity_at_z(dend_segments, syn_df, layer_boundaries, layer_names, valid_layers, target_z_pos, morph_idx):
+    """Helper function to visualize the selected morphology and its synapse capacity."""
+    fig, ax = plt.subplots(figsize=(10, 12))
     
     color_palette = ['#e6194B', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#42d4f4']
     layer_colors = {layer_idx: color_palette[i % len(color_palette)] for i, layer_idx in enumerate(valid_layers)}
     
-    placements = [
-        (axes[0], target_upper_z, "Upper Boundary Placement"),
-        (axes[1], target_lower_z, "Lower Boundary Placement")
-    ]
+    # 1. Plot layer boundaries
+    for i, bounds in enumerate(layer_boundaries):
+        upper_bound, lower_bound = bounds
+        ax.axhline(upper_bound, color='black', linestyle='--', alpha=0.5)
+        
+        bg_color = layer_colors.get(i, 'lightgrey')
+        alpha_val = 0.15 if i in valid_layers else 0.05
+        ax.axhspan(lower_bound, upper_bound, facecolor=bg_color, alpha=alpha_val)
+        
+        layer_label = layer_names[i] if i < len(layer_names) else f"Layer {i}"
+        ax.text(-250, (upper_bound + lower_bound) / 2, layer_label, 
+                va='center', ha='right', fontsize=12, fontweight='bold')
     
-    for ax, soma_z, title in placements:
-        # 1. Plot layer boundaries
-        for i, bounds in enumerate(layer_boundaries):
-            upper_bound, lower_bound = bounds
-            ax.axhline(upper_bound, color='black', linestyle='--', alpha=0.5)
-            
-            bg_color = layer_colors.get(i, 'lightgrey')
-            alpha_val = 0.1 if i in valid_layers else 0.05
-            ax.axhspan(lower_bound, upper_bound, facecolor=bg_color, alpha=alpha_val)
-            
-            # Only draw the text labels on the left plot to avoid clutter
-            if ax == axes[0]:
-                layer_label = layer_names[i] if i < len(layer_names) else f"Layer {i}"
-                ax.text(-200, (upper_bound + lower_bound) / 2, layer_label, 
-                        va='center', ha='right', fontsize=10, fontweight='bold')
-        
-        ax.axhline(layer_boundaries[-1][1], color='black', linestyle='--', alpha=0.5)
+    ax.axhline(layer_boundaries[-1][1], color='black', linestyle='--', alpha=0.5)
 
-        # 2. Plot dendritic segments
-        lines = []
-        line_colors = []
+    # 2. Plot dendritic segments (Light Grey)
+    lines = []
+    for p1, p2 in dend_segments:
+        shifted_z1 = p1[2] + target_z_pos
+        shifted_z2 = p2[2] + target_z_pos
+        lines.append([(p1[0], shifted_z1), (p2[0], shifted_z2)])
         
-        for mid_z, _, p1, p2 in dend_segments:
-            shifted_z1 = p1[2] + soma_z
-            shifted_z2 = p2[2] + soma_z
-            mid_shifted_z = mid_z + soma_z
-            
-            segment = [(p1[0], shifted_z1), (p2[0], shifted_z2)]
-            lines.append(segment)
-            
-            seg_color = 'darkgrey' 
-            for layer_idx in valid_layers:
-                upper_bound, lower_bound = layer_boundaries[layer_idx]
-                if lower_bound <= mid_shifted_z <= upper_bound:
-                    seg_color = layer_colors[layer_idx]
-                    break
-            line_colors.append(seg_color)
-            
-        lc = LineCollection(lines, colors=line_colors, linewidths=1.5, alpha=0.8)
-        ax.add_collection(lc)
+    lc = LineCollection(lines, colors='darkgrey', linewidths=1.2, alpha=0.7)
+    ax.add_collection(lc)
+    
+    # 3. Plot Mapped Synapses
+    shifted_syn_z = syn_df['z'] + target_z_pos
+    
+    # Plot unused synapses in light grey
+    ax.scatter(syn_df['x'], shifted_syn_z, color='lightgrey', s=8, alpha=0.5, label='Unused Synapses', zorder=3)
+    
+    # Plot valid synapses in their respective layer colors
+    for layer_idx in valid_layers:
+        upper_bound, lower_bound = layer_boundaries[layer_idx]
+        mask = (shifted_syn_z >= lower_bound) & (shifted_syn_z <= upper_bound)
         
-        # 3. Plot the soma
-        ax.scatter([0], [soma_z], color='black', s=100, zorder=5, label='Soma')
-        
-        # 4. Final plot formatting
-        ax.set_aspect('equal')
-        ax.set_xlim(-250, 250) 
-        ax.set_ylim(layer_boundaries[-1][1] - 50, layer_boundaries[0][0] + 50)
-        ax.set_xlabel('X distance (um)')
-        if ax == axes[0]:
-            ax.set_ylabel('Depth / Z distance (um)')
-        ax.set_title(title)
-        ax.legend()
-        
-    fig.suptitle(f'Selected Morphology (Index: {morph_idx}) Validated For Both Placements', fontsize=16)
+        if mask.sum() > 0:
+            ax.scatter(syn_df.loc[mask, 'x'], shifted_syn_z[mask], 
+                       color=layer_colors[layer_idx], s=25, 
+                       label=f'Capacity in {layer_names[layer_idx]} ({mask.sum()})', zorder=4)
+
+    # 4. Plot the soma
+    ax.scatter([0], [target_z_pos], color='black', s=150, zorder=5, label='Soma')
+    
+    # 5. Final plot formatting
+    ax.set_aspect('equal')
+    ax.set_xlim(-350, 350) 
+    ax.set_ylim(layer_boundaries[-1][1] - 50, layer_boundaries[0][0] + 50)
+    ax.set_xlabel('X distance (um)', fontsize=12)
+    ax.set_ylabel('Depth / Z distance (um)', fontsize=12)
+    ax.set_title(f'Selected Morphology (ID: {morph_idx})\nCapacity Evaluated at Z = {target_z_pos:.1f} um', fontsize=16, fontweight='bold')
+    ax.legend(loc='lower left', fontsize=10)
+    
     plt.tight_layout()
     plt.show()
 
-def cell_MorphSelect(self,
-                    morph_paths,
-                    layer_boundaries,
-                    layer_names,
-                    synapses_per_layer,
-                    length_threshold,
-                    target_layer_idx,
-                    plot_result=False
-                ):
-                    """
+def cell_MorphSelect(
+    morph_paths,
+    layer_boundaries,
+    layer_names,          # Added for plotting
+    synapses_per_layer,
+    target_z_pos,
+    synapse_base_path,
+    plot_result=False     # Added for debugging hook
+):
+    """
+    Selects a valid neuronal morphology by ensuring its pre-mapped connectome 
+    has enough physical synapse locations to satisfy the network's requirements 
+    at a specific absolute cortical depth.
 
-                    Selects a random morphology meeting a length threshold within synapse-containing
-                    layers using the NEURON simulator library. It evaluates the morphology by placing
-                    its soma at both the upper and lower boundaries of its target layer.
+    Unlike geometric approaches that estimate viability based on dendritic length, 
+    this function performs a direct empirical check. It virtually places the 
+    neuron's soma at the target depth, shifts its pre-calculated synapse coordinates 
+    accordingly, and counts the exact number of available docking sites falling 
+    within the required cortical layers.
 
-                    Args:
-                        morph_paths (list of str):
-                            A list containing the file paths to the candidate .hoc morphology files.
-                            Example: ['/path/to/neuron_1.hoc', '/path/to/neuron_2.hoc']
+    Args:
+        morph_paths (list of str): 
+            A list of file paths to the candidate `.hoc` morphology files.
+            Example: ['/path/neuron_123_aligned.hoc', '/path/neuron_456_aligned.hoc']
+        layer_boundaries (numpy.ndarray): 
+            A 2D array of shape (N, 2) defining the [upper_Z, lower_Z] boundaries 
+            for each cortical layer in micrometers (μm).
+            Example: [[0.0, -81.6], [-81.6, -587.1], ...]
+        layer_names (list of str): 
+            Display names for each layer, used strictly for annotating the debug plot.
+            Example: ['L1', 'L2/3', 'L4', 'L5', 'L6']
+        synapses_per_layer (list or numpy.ndarray of int): 
+            The number of synapses the network model demands in each layer. 
+            The length must exactly match the number of rows in `layer_boundaries`.
+            Example: [0, 1500, 3200, 500, 0]
+        target_z_pos (float): 
+            The absolute Z-coordinate (in μm) where this specific cell's soma 
+            will be placed in the simulated cortical column. 
+        synapse_base_path (str): 
+            The directory path containing the mapped synapse CSV files.
+        plot_result (bool, optional): 
+            If True, boots up the NEURON simulator to extract the 3D skeleton of 
+            the winning morphology and generates a detailed visual report of the 
+            synapse capacity across layers. Defaults to False.
 
-                        layer_boundaries (numpy.ndarray):
-                            A 2D array of shape (N, 2) where N is the number of cortical layers.
-                            Each row must contain exactly two float values representing the
-                            [upper_Z, lower_Z] boundaries in micrometers (um). Values are typically
-                            negative, moving deeper from the pia (0.0).
-                            Example: np.array([[0.0, -81.6], [-81.6, -587.1], ...])
+    Returns:
+        tuple (int, int): 
+            - original_idx: The integer index of the winning morphology in the 
+                            original `morph_paths` list.
+            - nid: The extracted integer Neuron ID of the winning morphology.
 
-                        layer_names (list of str):
-                            A list of strings containing the display names for each layer. The length
-                            must exactly match the number of rows in `layer_boundaries`. Used purely
-                            for labeling the output plot.
-                            Example: ['L1', 'L2/3', 'L4', 'L5', 'L6']
-
-                        synapses_per_layer (list of int or float):
-                            A 1D list storing the total number of synapses per layer. The length
-                            must match the rows in `layer_boundaries`. The function checks if an
-                            entry is > 0 to determine if a layer is "valid" for dendritic length counting.
-                            Example: [0, 1500, 3200, 500, 0]
-
-                        length_threshold (float):
-                            The minimum cumulative length of the dendritic arbor (in um) that *must* fall within the synapse-containing layers for the morphology to be accepted.
-                            Example: 1500.0
-
-                        target_layer_idx (int):
-                            A single integer representing the 0-based index of the layer to which
-                            the chosen neuron belongs. Used to look up the upper and lower Z-boundaries
-                            in `layer_boundaries` to position the soma during the stress test.
-                            Example: 3 (Targets the 4th row in layer_boundaries)
-
-                        plot_result (bool, optional):
-                            If True, generates a side-by-side matplotlib figure showing the successful
-                            neuron placed at both the upper and lower boundaries. Defaults to False.
-
-                    Returns:
-                        int: The index of the successfully selected morphology from the original
-                            `morph_paths` list.
-
-                        int: neuron's ID
-
-                    Raises:
-                        RuntimeError: If the function evaluates every file in `morph_paths` and none
-                                    meet the length threshold for both extreme soma placements.
-
-
-
-
-
-
-                    Neuron Morphology Selection Script
-
-                    This script acts as a strict filter for neuronal morphologies. Its goal is to
-                    find a single random neuron from a dataset whose dendritic tree is large enough
-                    to reach the right synaptic connections, regardless of where its soma sits inside
-                    its home layer.
-
-                    How it works:
-                    1. It shuffles the provided list of candidate .hoc morphologies for random selection.
-                    2. It loads a candidate into the NEURON simulator, isolates the dendritic tree
-                    (basal and apical), extracts its 3D coordinates, and scales them from nm to um.
-                    3. It performs a two-part stress test by virtually placing the neuron's soma at
-                    the absolute top of its assigned home layer, and then at the absolute bottom.
-                    4. For both extreme positions, it calculates exactly how much of the dendritic
-                    tree falls inside the specific layers designated as having synapses.
-                    5. If the total dendritic length in those synaptic layers drops below the minimum
-                    threshold during *either* the top or bottom placement, the neuron is rejected.
-                    6. The first neuron to successfully meet the threshold for *both* placements is
-                    chosen. The script then generates a side-by-side plot of both placements and
-                    returns the winning neuron's index. If no neurons pass, it raises an error.
-
-
-
-                    Selects a random morphology meeting a length threshold within synapse-containing
-                    layers using the NEURON simulator library.
-                    """
-                    valid_layers = [i for i, syn in enumerate(synapses_per_layer) if syn > 0]
-                    target_upper_z = layer_boundaries[target_layer_idx][0]
-                    target_lower_z = layer_boundaries[target_layer_idx][1]
+    Raises:
+        RuntimeError: 
+            If the function evaluates every candidate morphology in the list and 
+            none possess the required synapse capacity at the specified `target_z_pos`.
+    """
+    valid_layers = [i for i, syn in enumerate(synapses_per_layer) if syn > 0]
+    shuffled_paths = list(enumerate(morph_paths))
+    random.shuffle(shuffled_paths)
+    
+    for original_idx, path in shuffled_paths:
+        print(f"Evaluating Original Index: {original_idx}")
+        
+        match = re.search(r'neuron_(\d+)', os.path.basename(path))
+        nid = int(match.group(1)) if match else -1
+        
+        csv_path = os.path.join(synapse_base_path, f"neuron_{nid}_mapped_synapses.csv")
+        if not os.path.exists(csv_path):
+            print(f"⚠️ Warning: Synapse CSV not found for {nid} at {csv_path}")
+            continue
+            
+        syn_df = pd.read_csv(csv_path)
+        
+        shifted_z = syn_df['z'] + target_z_pos
+        is_viable = True
+        
+        for layer_idx in valid_layers:
+            upper_bound, lower_bound = layer_boundaries[layer_idx]
+            required_synapses = synapses_per_layer[layer_idx]
+            
+            available_synapses = ((shifted_z >= lower_bound) & (shifted_z <= upper_bound)).sum()
+            
+            if available_synapses < required_synapses:
+                is_viable = False
+                break 
+                
+        if is_viable:
+            # ---> DEBUG PLOTTING HOOK <---
+            if plot_result:
+                print(f"✅ Winner found ({nid}). Extracting 3D geometry for plot...")
+                h('forall delete_section()')
+                success = h.load_file(str(path))
+                
+                if success:
+                    dend_segments = []
+                    for sec in h.allsec():
+                        if 'dend' in sec.name().lower() or 'apic' in sec.name().lower():
+                            n3d = int(h.n3d(sec=sec))
+                            if n3d > 0:
+                                pts = np.array([[h.x3d(i, sec=sec), h.y3d(i, sec=sec), h.z3d(i, sec=sec)] for i in range(n3d)])
+                                for i in range(n3d - 1):
+                                    dend_segments.append((pts[i], pts[i+1]))
                     
-                    shuffled_paths = list(enumerate(morph_paths))
-                    random.shuffle(shuffled_paths)
-                    
-                    for original_idx, path in shuffled_paths:
-                        print('evaluating')
-                        print(original_idx)
-
-                        # Extract the NID from the path (e.g., 'neuron_1885968871_aligned.hoc' -> 1885968871)
-                        match = re.search(r'neuron_(\d+)', os.path.basename(path))
-                        nid = int(match.group(1)) if match else -1
-                        
-                        print(f'Evaluating Original Index: {original_idx}, NID: {nid}')
-                        # Clear previous morphology from NEURON memory
-                        h('forall delete_section()')
-                        
-                        # Load the new .hoc file
-                        success = h.load_file(str(path))
-                        if not success:
-                            print(f"Warning: Could not load {path}")
-                            continue
-                            
-                        dend_segments = []
-                        
-                        # Iterate through all sections loaded into NEURON
-                        for sec in h.allsec():
-                            if 'dend' in sec.name().lower() or 'apic' in sec.name().lower():
-                                n3d = int(h.n3d(sec=sec))
-                                if n3d > 0:
-                                    pts = np.array([[h.x3d(i, sec=sec), h.y3d(i, sec=sec), h.z3d(i, sec=sec)] for i in range(n3d)])
-                                    
-                                    for i in range(n3d - 1):
-                                        p1 = pts[i] 
-                                        p2 = pts[i+1] 
-                                        
-                                        length = np.linalg.norm(p1 - p2)
-                                        mid_z = (p1[2] + p2[2]) / 2.0
-                                        
-                                        dend_segments.append((mid_z, length, p1, p2))
-                                        
-                        valid_for_both_placements = True
-                        
-                        # Test BOTH upper and lower boundaries
-                        for soma_z_placement in [target_upper_z, target_lower_z]:
-                            
-                            # TRACK LENGTH PER LAYER instead of just a global sum
-                            length_in_valid_layers = {layer_idx: 0.0 for layer_idx in valid_layers}
-                            
-                            for mid_z, length, _, _ in dend_segments:
-                                shifted_z = mid_z + soma_z_placement
-                                
-                                for layer_idx in valid_layers:
-                                    upper_bound, lower_bound = layer_boundaries[layer_idx]
-                                    if lower_bound <= shifted_z <= upper_bound:
-                                        length_in_valid_layers[layer_idx] += length
-                                        break
-                            
-                            total_valid_length = sum(length_in_valid_layers.values())
-                            
-                            # CONDITION 1: Does the total length inside valid layers meet the threshold?
-                            if total_valid_length < length_threshold:
-                                valid_for_both_placements = False
-                                break 
-                                
-                            # CONDITION 2: Does the arbor actually reach EVERY valid layer?
-                            # If any valid layer has 0.0 length, it failed to span the necessary layers.
-                            spans_all_layers = all(layer_length > 0.0 for layer_length in length_in_valid_layers.values())
-                            
-                            if not spans_all_layers:
-                                valid_for_both_placements = False
-                                break 
-                                
-                        # If it passed BOTH loops (and both conditions), we return it
-                        if valid_for_both_placements:
-                            if plot_result:
-                                self._plot_both_morphologies(
-                                    dend_segments, layer_boundaries, layer_names, valid_layers, 
-                                    target_upper_z, target_lower_z, original_idx
-                                )
-                            return original_idx,nid
-                        
-                        raise RuntimeError(
-                            f"No morphology met the length threshold of {length_threshold}um "
-                            f"and successfully spanned all synaptic layers for both placements."
-                        )
+                    _plot_capacity_at_z(
+                        dend_segments, syn_df, layer_boundaries, layer_names, 
+                        valid_layers, target_z_pos, nid
+                    )
+            # ------------------------------
+            return original_idx, nid
+            
+    raise RuntimeError(
+        f"No morphology found with enough synapse capacity to satisfy "
+        f"the requirements: {synapses_per_layer} at Z={target_z_pos:.1f}"
+    )
 
