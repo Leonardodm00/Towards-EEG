@@ -5,6 +5,9 @@ from google.colab import drive
 # This will prompt you to authorize Colab to access your Drive
 drive.mount('/content/drive')
 
+
+
+
 import os
 import ast
 import re
@@ -17,19 +20,23 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
-def map_and_save_synapses(raw_neuron_df, aligned_neuron_df_nm, neuron_id, synapses_dir):
+import os
+import pandas as pd
+import numpy as np
+import LFPy # Ensure LFPy is imported
+
+def map_and_save_synapses_to_lfpy_idx(hoc_filepath, synapses_dir, neuron_id, soma_pos, rotation_matrix, voxel_res=(8.0, 8.0, 33.0)):
     """
-    Maps raw synapses to the closest raw skeleton node via KD-Tree.
-    Extracts the corresponding aligned coordinates (in um) and saves 
-    the segment ID, coords, and synapse type to a new CSV.
+    Transforms raw synapses into the aligned coordinate space, loads the aligned .hoc 
+    into LFPy, and maps them to their closest valid 1D segment index.
     """
     syn_path = os.path.join(synapses_dir, f"neuron_{neuron_id}_synapses.csv")
+    out_path = os.path.join(synapses_dir, f"neuron_{neuron_id}_mapped_synapses.csv")
     
-    # 1. Check if synapse file exists
     if not os.path.exists(syn_path):
         return
 
-    # 2. Load and filter incoming synapses
+    # Load and filter raw synapses
     syn_df = pd.read_csv(syn_path)
     if 'direction' in syn_df.columns:
         syn_df = syn_df[syn_df['direction'] == 'incoming']
@@ -38,32 +45,40 @@ def map_and_save_synapses(raw_neuron_df, aligned_neuron_df_nm, neuron_id, synaps
     if syn_df.empty:
         return
 
-    # 3. Build a KD-Tree using the RAW neuron coordinates (nm)
-    tree = cKDTree(raw_neuron_df[['x', 'y', 'z']].values)
+    # --- THE TRANSFORMATION PIPELINE ---
+    # 1. Extract raw coordinates and scale to nanometers
+    syn_coords_nm = syn_df[['location_x', 'location_y', 'location_z']].values * np.array(voxel_res)
+    
+    # 2. Center using the exact same soma position as the skeleton
+    centered_syns = syn_coords_nm - soma_pos
+    
+    # 3. Rotate using the exact same average matrix
+    rotated_syns = np.dot(centered_syns, rotation_matrix.T)
+    
+    # 4. Scale to micrometers for NEURON/LFPy compatibility
+    aligned_syns_um = rotated_syns / 1000.0
+    # -----------------------------------
 
-    # 4. Get the synapse coordinates AND convert from voxels to nanometers
-    syn_coords = syn_df[['location_x', 'location_y', 'location_z']].values
-    syn_coords[:, 0] = syn_coords[:, 0] * 8.0   # Scale X
-    syn_coords[:, 1] = syn_coords[:, 1] * 8.0   # Scale Y
-    syn_coords[:, 2] = syn_coords[:, 2] * 33.0  # Scale Z
+    # Instantiate the aligned cell in LFPy
+    try:
+        cell = LFPy.Cell(morphology=hoc_filepath,
+                         passive=False, 
+                         nsegs_method='lambda_f', # Ensure this matches simulation params!
+                         delete_sections=True)
+    except Exception as e:
+        print(f"⚠️ Failed to load HOC into LFPy for {neuron_id}: {e}")
+        return
 
-    # 5. Query the KD-Tree to find the closest skeleton node
-    distances, closest_node_indices = tree.query(syn_coords)
-
-    # 6. Build the snapped records
     mapped_records = []
-    for i, node_idx in enumerate(closest_node_indices):
-        
-        # Get the exact node ID from the raw dataframe
-        segment_id = raw_neuron_df.iloc[node_idx]['id']
 
-        # Look up this exact segment's final ALIGNED coordinates, scale to um
-        aligned_x = aligned_neuron_df_nm.iloc[node_idx]['x'] 
-        aligned_y = aligned_neuron_df_nm.iloc[node_idx]['y'] 
-        aligned_z = aligned_neuron_df_nm.iloc[node_idx]['z'] 
+    # Map the ALIGNED synapses to the ALIGNED LFPy cell
+    for i, (_, row) in enumerate(syn_df.iterrows()):
+        syn_x, syn_y, syn_z = aligned_syns_um[i]
 
-        # Determine excitatory vs inhibitory
-        raw_type = str(syn_df.iloc[i]['synapse_type']).lower()
+        flattened_idx = cell.get_closest_idx(x=syn_x, y=syn_y, z=syn_z)
+
+        # Classify synapse type
+        raw_type = str(row.get('synapse_type', '')).lower()
         if any(kw in raw_type for kw in ['2', 'exc', 'asymmetric']):
             syn_type = 'exc'
         elif any(kw in raw_type for kw in ['1', 'inh', 'symmetric']):
@@ -72,19 +87,19 @@ def map_and_save_synapses(raw_neuron_df, aligned_neuron_df_nm, neuron_id, synaps
             syn_type = 'unknown'
 
         mapped_records.append({
-            'segment_id': segment_id,
-            'x': aligned_x,
-            'y': aligned_y,
-            'z': aligned_z,
+            'lfpy_idx': int(flattened_idx),
+            'x': syn_x,  # Saving the aligned coordinates for sanity checking later
+            'y': syn_y,
+            'z': syn_z,
             'synapse_type': syn_type
         })
 
-    # 7. Save the new mapped dataset
+    # Save the mapped dataset
     mapped_df = pd.DataFrame(mapped_records)
-    out_path = os.path.join(synapses_dir, f"neuron_{neuron_id}_mapped_synapses.csv")
     mapped_df.to_csv(out_path, index=False)
     
-    print(f"✅ Snapped {len(mapped_records)} synapses to arbour segments for {neuron_id}.")
+    cell.__del__() 
+    print(f"✅ Snapped {len(mapped_records)} aligned synapses to LFPy indices for {neuron_id}.")
 
 def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
     """
@@ -93,7 +108,7 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
     """
     df = aligned_neuron_df.copy()
 
-    
+
 
     if 'r' not in df.columns:
         df['r'] = 0.5
@@ -192,7 +207,7 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
 def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/content/drive/MyDrive/Colab Notebooks/Reconstructed neurons', outpath='/content/drive/MyDrive/Colab Notebooks/Aligned Neurons HOC', synapses_dir='', k_neighbors=3, show_plot=True):
     """
     Main loop: Centers the neuron, applies local rotation, scales to um, 
-    exports clean HOC, and maps synapses perfectly to the biological nodes.
+    exports clean HOC, and maps synapses directly to LFPy segment indices.
     """
     aligned_neurons = {}
 
@@ -217,16 +232,16 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
 
         df = pd.read_csv(filepath)
         
-        # 1. KEEP A COPY OF THE RAW DATAFRAME FOR THE KD-TREE
-        raw_df = df.copy()
-
         root_rows = df[df['p'] == -1]
         if root_rows.empty:
             continue
         
+        # 1. CENTER TO SOMA
+        # The soma position is extracted in nanometers to match the raw skeleton
         soma_pos = root_rows.iloc[0][['x', 'y', 'z']].values.astype(float)
         centered_coords = df[['x', 'y', 'z']].values - soma_pos
 
+        # 2. FIND NEIGHBORHOOD AND AVERAGE ROTATION
         distances = np.linalg.norm(reference_somas - soma_pos, axis=1)
         k_actual = min(k_neighbors, len(metadata_df))
         nearest_indices = np.argsort(distances)[:k_actual]
@@ -235,24 +250,33 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
         matrices = np.array(nearest_metadata['rotation_matrix'].tolist())
         mean_matrix = R.from_matrix(matrices).mean().as_matrix()
 
+        # Apply local rotation
         rotated_coords = np.dot(centered_coords, mean_matrix.T)
 
-        # 2. OVERWRITE DATAFRAME WITH ALIGNED COORDINATES & SCALE TO MICROMETERS
+        # 3. OVERWRITE DATAFRAME WITH ALIGNED COORDINATES & SCALE TO MICROMETERS
         df['x'] = rotated_coords[:, 0] / 1000.0
         df['y'] = rotated_coords[:, 1] / 1000.0
         df['z'] = rotated_coords[:, 2] / 1000.0
         aligned_neurons[nid] = df
 
-        # 3. EXPORT CLEAN .HOC FILE
+        # 4. EXPORT CLEAN .HOC FILE
         hoc_filename = os.path.join(outpath, f"neuron_{nid}_aligned.hoc")
         export_neuron_to_hoc(df, hoc_filename)
 
-        # 4. SNAP AND SAVE SYNAPSES
-        map_and_save_synapses(raw_df, df, nid, synapses_dir)
+        # 5. SNAP AND SAVE SYNAPSES DIRECTLY TO LFPY INDICES
+        # We pass the raw soma_pos (nm) and mean_matrix so the mapping function 
+        # can apply the exact same transformation pipeline to the synapses.
+        map_and_save_synapses_to_lfpy_idx(
+            hoc_filepath=hoc_filename, 
+            synapses_dir=synapses_dir, 
+            neuron_id=nid, 
+            soma_pos=soma_pos,          
+            rotation_matrix=mean_matrix 
+        )
 
-        print(f"✅ Neuron {nid} fully processed and saved.")
+        print(f"✅ Neuron {nid} fully processed, aligned, and synapses snapped.")
 
-        # 5. PLOTTING (Optional but great for visual confirmation)
+        # 6. PLOTTING (Optional visual confirmation)
         if show_plot:
             fig = make_subplots(
                 rows=1, cols=2,
@@ -293,15 +317,15 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
                 v_com_rot = np.dot(v_com_orig, mean_matrix.T)
                 stick_end_rot = n_soma_rot + v_com_rot * stick_scale
 
-                # Raw
+                # Raw reference vectors
                 fig.add_trace(go.Scatter3d(x=[n_soma_rel[0]], y=[n_soma_rel[1]], z=[n_soma_rel[2]], mode='markers', marker=dict(size=5, color='crimson'), name=f'N{i+1} Soma (Raw)'), row=1, col=1)
                 fig.add_trace(go.Scatter3d(x=[n_soma_rel[0], stick_end_raw[0]], y=[n_soma_rel[1], stick_end_raw[1]], z=[n_soma_rel[2], stick_end_raw[2]], mode='lines', line=dict(color='crimson', width=4), showlegend=False), row=1, col=1)
 
-                # Rotated
+                # Rotated reference vectors
                 fig.add_trace(go.Scatter3d(x=[n_soma_rot[0]], y=[n_soma_rot[1]], z=[n_soma_rot[2]], mode='markers', marker=dict(size=5, color='darkorange'), name=f'N{i+1} Soma (Rotated)'), row=1, col=2)
                 fig.add_trace(go.Scatter3d(x=[n_soma_rot[0], stick_end_rot[0]], y=[n_soma_rot[1], stick_end_rot[1]], z=[n_soma_rot[2], stick_end_rot[2]], mode='lines', line=dict(color='darkorange', width=4), showlegend=False), row=1, col=2)
 
-            # Right Panel: Aligned Skeleton (Scaled back up for visual parity with raw plot)
+            # Right Panel: Aligned Skeleton
             df_temp['x'], df_temp['y'], df_temp['z'] = rotated_coords[:, 0], rotated_coords[:, 1], rotated_coords[:, 2]
             node_map_rot = df_temp.set_index('id')[['x', 'y', 'z']].to_dict('index')
             rx, ry, rz = [], [], []
@@ -333,7 +357,6 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
 
 
 
-
 synapses_dir = '/content/drive/MyDrive/Colab Notebooks/Synapse database'
 output_directory = '/content/drive/MyDrive/Colab Notebooks/Reconstructed neurons'
 output_filename = 'alignment_metadata_L4.csv'
@@ -345,7 +368,7 @@ neuron_ids = [
 
 
 
-           3661346815, 
+           3661346815,
 
 
 
@@ -353,3 +376,4 @@ neuron_ids = [
 
               ]
 algn_neuron =align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/content/drive/MyDrive/Colab Notebooks/Reconstructed neurons',synapses_dir = synapses_dir, k_neighbors=3, show_plot=True)
+
