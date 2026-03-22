@@ -1,57 +1,20 @@
-map_and_save_synapses
-Purpose: To take a messy cloud of raw synapse coordinates, figure out which part of the neuron's 3D skeleton they belong to, and export clean, simulation-ready data.
+This set of functions works as a concerted pipeline designed to bridge the gap between raw biological data (voxel-space reconstructions and synapse clouds) and computational simulation (NEURON/LFPy models). By standardizing the coordinate system, unit scales, and topological structure of the neurons, these functions ensure that your simulated cells are not only anatomically accurate but also computationally optimized and spatially aligned with their original biological neighborhood.
 
-How it works:
+## align_neurons_to_neighborhood
 
-Data Ingestion & Filtering: It loads a CSV of synapses for a specific neuron. It immediately filters out outgoing synapses (keeping only incoming ones) and drops any rows missing spatial coordinates.
+This is the "Orchestrator" function that manages the high-level workflow for each neuron. 
+It begins by translating the neuron so its soma sits at the origin (0, 0, 0). To account for local tissue warping, it identifies the $k$-nearest neighbors from a reference metadata file and calculates a localized, average rotation matrix using Scipy’s Rotation.mean() method. 
+This matrix is applied via a dot product to the centered coordinates: $$\mathbf{v}_{rotated} = \mathbf{v}_{centered} \cdot \mathbf{R}^T$$
+Finally, it converts the spatial units from nanometers to micrometers and triggers the subsequent morphology export and synapse mapping functions, ensuring every output file for a specific neuron is perfectly synchronized in the same aligned space.export_neuron_to_hocThis function is the "Morphology Builder" that translates a tabular DataFrame of 3D points into a .hoc script, the native language of the NEURON simulator. 
+It performs a topological traversal of the neuron’s tree structure using a depth-first search (DFS) to group individual nodes into unbranched Sections (labeled as soma, axon, or dend). Crucially, it handles the complex task of "branch point continuity" by ensuring that the first 3D point of a child section exactly matches the last point of its parent section, preventing "cable fracturing" in the simulator. It also handles the conversion of radius to diameter and writes the final geometry using NEURON’s pt3dadd syntax.
 
-Spatial Indexing (The KD-Tree): It takes the raw, unaligned coordinate points of the neuron's skeleton and builds a cKDTree.  A KD-Tree is a spatial data structure that organizes points in 3D space, allowing the computer to find the "nearest neighbor" of a point in milliseconds rather than brute-force checking every single point against every other point.
+## map_and_save_synapses_to_lfpy_idx
 
-Scaling: It takes the raw synapse locations (which are in voxel coordinates) and multiplies them by their physical resolution (8 nm for X and Y, 33 nm for Z) to convert them into real-world nanometer distances.
+This is the "Synapse Snapper," responsible for the most difficult part of the pipeline: mapping 3D synapse coordinates to discrete 1D simulation segments. It first applies the exact same transformation (translation and rotation) to the raw synapse coordinates that were applied to the neuron skeleton. It then instantiates the aligned .hoc file as an LFPy.Cell object, which automatically partitions the branches into computational segments using the lambda_f rule. Using the get_closest_idx method, it finds the nearest segment for every synapse and "bakes" that specific 1D index into a new CSV file. This allows you to bypass expensive spatial calculations during your actual simulation, as the synapse "homes" are already pre-calculated.
 
-The "Snapping" Query: It feeds the scaled synapse coordinates into the KD-Tree. For every single synapse, the tree returns the index of the closest physical node on the neuron's skeleton.
+## export_neuron_to_hoc
 
-Data Translation & Classification: For every matched skeleton node, the function looks up that exact node's aligned coordinates (which have already been rotated and scaled to micrometers in the main loop). It also checks the raw text of the synapse type to classify it as excitatory (exc) or inhibitory (inh).
-
-Export: It packages the segment ID, the clean micrometric coordinates, and the synapse type into a new CSV.
-
-
-
-
-
-
-
-export_neuron_to_hoc
-Purpose: To convert a tabular list of 3D points (a DataFrame) into a .hoc script, which is the specific programming language required by the NEURON simulation environment to build compartmental models.
-
-How it works:
-
-Standardizing Geometry: It ensures every point has a radius (r), converting it from nanometers to micrometers if necessary.
-
-Labeling Compartments: It maps the raw anatomical labels (like "basal dendrite" or "apical tuft") into the strict, standard arrays that NEURON expects: soma, axon, or dend.
-
-Tree Traversal (Depth-First Search): The code builds a dictionary of parent-child relationships (children). It finds the root node (where parent p is -1) and uses a "stack" to trace the branches of the neuron from the soma outward.
-
-Section Building (Crucial Step): NEURON simulates electrical flow through continuous "sections." Your code traverses the tree and groups unbranched chains of nodes together into a single section.
-
-Preventing Cable Fractures: When the code hits a branch point (a node with 2 or more children), it starts a new section for each child branch. Crucially, it copies the parent's branch-point node and inserts it as the first node of the new child section. This ensures the 3D geometries physically touch in the simulator, preventing the model from breaking into disconnected pieces.
-
-Writing the HOC Syntax: Finally, it writes the text file. It creates the arrays (e.g., create dend[45]), connects them topologically (connect dend[1](0), soma[0](1)), and fills each section with its 3D coordinates and diameters using the pt3dadd command.
-
-
-
-
-
-
-
-
-
-
-align_neurons_to_neighborhoodPurpose: This is the main orchestrator. It aligns a neuron to a biologically meaningful reference frame, standardizes its units, and triggers the HOC export and synapse mapping.How it works:Translation (Centering): It takes the raw neuron data and translates the entire skeleton so that the soma rests perfectly at the origin point (0, 0, 0).Finding the Local Neighborhood: It calculates the Euclidean distance between the target neuron's soma and all the reference somas provided in a metadata file. It selects the $k$-nearest neighbors.Rotation Averaging: Because brain tissue can be warped, a global rotation matrix isn't always accurate. Instead, this function takes the specific rotation matrices of those $k$-nearest neighbors and averages them together using Scipy's spatial transform module. This creates a localized rotation matrix specific to that neuron's micro-environment.Applying the Alignment: It mathematically rotates the centered neuron using this new average matrix (via a dot product).Unit Conversion: It converts the spatial units from nanometers to micrometers by dividing the coordinates by 1000. NEURON strictly requires micrometers for spatial coordinates.Orchestration: With the neuron now perfectly centered, locally rotated, and scaled, it overwrites the DataFrame and passes the clean data to export_neuron_to_hoc and map_and_save_synapses.Visualization: If requested, it renders a side-by-side interactive 3D plot showing the messy raw skeleton next to the cleanly aligned target, drawing vectors to show how it relates to its neighbors.
-
-
-
-
+This function is the "Morphology Builder" that translates a tabular DataFrame of 3D points into a .hoc script, the native language of the NEURON simulator. It performs a topological traversal of the neuron’s tree structure using a depth-first search (DFS) to group individual nodes into unbranched Sections (labeled as soma, axon, or dend). Crucially, it handles the complex task of "branch point continuity" by ensuring that the first 3D point of a child section exactly matches the last point of its parent section, preventing "cable fracturing" in the simulator. It also handles the conversion of radius to diameter and writes the final geometry using NEURON’s pt3dadd syntax.
 
 
 
