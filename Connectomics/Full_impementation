@@ -1,0 +1,54 @@
+'''
+
+Density values taken from: A petavoxel fragment of human cerebral cortex reconstructed at nanoscale resolution
+
+Layer depths taken from: Dendritic and Axonal Architecture of Individual  Pyramidal Neurons across Layers of Adult Human  Neocortex
+
+
+
+
+'''
+import json
+
+# Define the path to your saved file, saved by the pipeline in the folder 'Calculate relative Subpop%'
+json_path = 'bbp_composition.json'
+
+with open(json_path, 'r') as f:
+    bbp_results = json.load(f)
+
+print("Successfully loaded bbp_results from JSON!")
+# Example: Check L23 Inhibitory percentage for LBCs
+print(f"L23_LBC presence: {bbp_results['L23']['Inhibitory']['L23_LBC']['percentage']:.2f}%")
+
+column_input = {
+    'Layers': {
+        'L1':  [-250.0, 0.0],
+        'L23': [-1200.0, -250.0],
+        'L4':  [-1580.0, -1200.0],
+        'L5':  [-2175.0, -1580.0],
+        'L6':  [-2770.0, -2175.0]
+    },
+    'Cells': {
+        'L1':  {'inh': 5145.9},                        # L1 only has inhibitory cells
+        'L23': {'exc': 21466.6+8927.3, 'inh': 11655.3 + 5118.9},
+        'L4':  {'exc': 23201.8, 'inh': 5502.3},           # Your example format
+        'L5':  {'Excitatory': 10297.6, 'Inhibitory': 3249.9}, # Explicit keys work too
+        'L6':  {'exc': 9823.0, 'inh': 1427.2}
+    },
+    'Geometry': {
+        'radius': 300.0 # micrometers
+    }
+}
+
+
+mtypes, coords = generate_microcolumn_cells(column_input, bbp_results, verbose=True)
+
+
+print(f"Generated {len(mtypes)} total cells.")
+print(f"First 5 coords:\n{coords[:5]}")
+
+# 3. Generate the matrix
+adj_matrix = build_adjacency_matrix(mtypes, coords, conn_data)
+
+# Plot
+plot_interactive_adjacency_matrix(adj_matrix, cell_mtypes=mtypes, max_cells=20000)
