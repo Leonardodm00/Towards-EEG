@@ -16,6 +16,10 @@ import LFPy
 # import neuron
 import scipy.signal as ss
 from time import time
+import pandas as pd 
+import random
+import re
+from matplotlib.collections import LineCollection
 
 '''
 TOSEE: used te fix points of the script that need further explanation.
@@ -132,6 +136,12 @@ class PopulationSuper(object):
                 layer_names =  ['L1', 'L2/3', 'L4', 'L5', 'L6'],
                 Pop_to_Syntype = {'L4':'exc'},
                 synapse_base_path = '',
+                SubPop_positions = [1, 10.5, -20.2, -150.0],
+
+                cell_mtypes = ['L1','L23']
+
+
+
 
                  probes=[],
                  savelist=['somapos'],
@@ -182,7 +192,9 @@ class PopulationSuper(object):
         Pop_to_Syntype : dict
             The keys are the sub-populations while the values are the synapse types 'exc' or 'inh'
 
-
+        SubPop_positions: array N_SubPop x4
+            in the 1st column contains the raw identification number of the subpop neurons as they appear in the ADJ matrix
+            the other columns contains the positions in um.
         probes: list
             list of `LFPykit.models.*` like instances for misc. forward-model
             predictions
@@ -228,6 +240,7 @@ class PopulationSuper(object):
         self.layer_names = layer_names
         self.Pop_to_Syntype = Pop_to_Syntype
         self.synapse_base_path = synapse_base_path
+        self.SubPop_positions = SubPop_positions
         self.probes = probes
         self.savelist = savelist
         self.savefolder = savefolder
@@ -437,39 +450,62 @@ class PopulationSuper(object):
 
     def set_pop_soma_pos(self):
         """
-        Set `pop_soma_pos` using draw_rand_pos().
+        Set `pop_soma_pos` and `pop_neuron_ids` using either predefined 
+        coordinates or random generation.
 
         This method takes no keyword arguments.
-
 
         Parameters
         ----------
         None
-
 
         Returns
         -------
         numpy.ndarray
             (x,y,z) coordinates of each neuron in the population
 
-
         See also
         --------
         PopulationSuper.draw_rand_pos
-
         """
+
         tic = time()
         if RANK == 0:
-            pop_soma_pos = self.draw_rand_pos(
-                # min_r = self.electrodeParams['r_z'],
-                **self.populationParams)
+            if self.predefined_positions is not None:
+                # Initialize containers
+                pop_soma_pos = []
+                
+                # Column 0 is your raw neuron ID (matched with adjacency matrix)
+                self.pop_neuron_ids = self.predefined_positions[:, 0].astype(int)
+
+                # Columns 1, 2, and 3 are x, y, z
+                for row in self.predefined_positions:
+                    pop_soma_pos.append({
+                        'x': row[1],
+                        'y': row[2],
+                        'z': row[3]
+                    })
+            else:
+                # Default behavior if no predefined positions are provided
+                pop_soma_pos = self.draw_rand_pos(**self.populationParams)
+                self.pop_neuron_ids = np.arange(self.POPULATION_SIZE)
+
         else:
+            # Initialize as None for all other ranks to prevent MPI AttributeErrors
             pop_soma_pos = None
+            self.pop_neuron_ids = None
 
         if RANK == 0:
             print('found cell positions in %.2f s' % (time() - tic))
 
+        # Synchronize both coordinates and IDs across all MPI ranks
+        self.pop_neuron_ids = COMM.bcast(self.pop_neuron_ids, root=0)
+
         return COMM.bcast(pop_soma_pos, root=0)
+
+
+
+
 
     def set_rotations(self):
         """
@@ -507,6 +543,9 @@ class PopulationSuper(object):
             print('found cell rotations in %.2f s' % (time() - tic))
 
         return COMM.bcast(rotations, root=0)
+    
+
+
 
     def calc_min_cell_interdist(self, x, y, z):
         """
@@ -536,97 +575,103 @@ class PopulationSuper(object):
 
         return min_cell_interdist
 
-    def draw_rand_pos(self, radius, z_min, z_max,
-                      min_r=np.array([0]), min_cell_interdist=10.,
-                      **args):
-        """
-        Draw some random location within radius, z_min, z_max,
-        and constrained by min_r and the minimum cell interdistance.
-        Returned argument is a list of dicts with keys ['x', 'y', 'z'].
 
 
-        Parameters
-        ----------
-        radius : float
-            Radius of population.
-        z_min : float
-            Lower z-boundary of population.
-        z_max : float
-            Upper z-boundary of population.
-        min_r : numpy.ndarray
-            Minimum distance to center axis as function of z.
-        min_cell_interdist : float
-            Minimum cell to cell interdistance.
-        **args : keyword arguments
-            Additional inputs that is being ignored.
+
+    # def draw_rand_pos(self, radius, z_min, z_max,
+    #                   min_r=np.array([0]), min_cell_interdist=10.,
+    #                   **args):
+    #     """
+    #     Draw some random location within radius, z_min, z_max,
+    #     and constrained by min_r and the minimum cell interdistance.
+    #     Returned argument is a list of dicts with keys ['x', 'y', 'z'].
 
 
-        Returns
-        -------
-        soma_pos : list
-            List of dicts of len population size
-            where dict have keys x, y, z specifying
-            xyz-coordinates of cell at list entry `i`.
+    #     Parameters
+    #     ----------
+    #     radius : float
+    #         Radius of population.
+    #     z_min : float
+    #         Lower z-boundary of population.
+    #     z_max : float
+    #         Upper z-boundary of population.
+    #     min_r : numpy.ndarray
+    #         Minimum distance to center axis as function of z.
+    #     min_cell_interdist : float
+    #         Minimum cell to cell interdistance.
+    #     **args : keyword arguments
+    #         Additional inputs that is being ignored.
 
 
-        See also
-        --------
-        PopulationSuper.calc_min_cell_interdist
+    #     Returns
+    #     -------
+    #     soma_pos : list
+    #         List of dicts of len population size
+    #         where dict have keys x, y, z specifying
+    #         xyz-coordinates of cell at list entry `i`.
 
-        """
-        x = (np.random.rand(self.POPULATION_SIZE) - 0.5) * radius * 2
-        y = (np.random.rand(self.POPULATION_SIZE) - 0.5) * radius * 2
-        z = np.random.rand(self.POPULATION_SIZE) * (z_max - z_min) + z_min
-        min_r_z = {}
-        min_r = np.array(min_r)
-        if min_r.size > 0:
-            if isinstance(min_r, type(np.array([]))):
-                j = 0
-                for j in range(min_r.shape[0]):
-                    min_r_z[j] = np.interp(z, min_r[0, ], min_r[1, ])
-                    if j > 0:
-                        [w] = np.where(min_r_z[j] < min_r_z[j - 1])
-                        min_r_z[j][w] = min_r_z[j - 1][w]
-                minrz = min_r_z[j]
-        else:
-            minrz = np.interp(z, min_r[0], min_r[1])
 
-        R_z = np.sqrt(x**2 + y**2)
+    #     See also
+    #     --------
+    #     PopulationSuper.calc_min_cell_interdist
 
-        # want to make sure that no somas are in the same place.
-        cell_interdist = self.calc_min_cell_interdist(x, y, z)
+    #     """
+    #     x = (np.random.rand(self.POPULATION_SIZE) - 0.5) * radius * 2
+    #     y = (np.random.rand(self.POPULATION_SIZE) - 0.5) * radius * 2
+    #     z = np.random.rand(self.POPULATION_SIZE) * (z_max - z_min) + z_min
+    #     min_r_z = {}
+    #     min_r = np.array(min_r)
+    #     if min_r.size > 0:
+    #         if isinstance(min_r, type(np.array([]))):
+    #             j = 0
+    #             for j in range(min_r.shape[0]):
+    #                 min_r_z[j] = np.interp(z, min_r[0, ], min_r[1, ])
+    #                 if j > 0:
+    #                     [w] = np.where(min_r_z[j] < min_r_z[j - 1])
+    #                     min_r_z[j][w] = min_r_z[j - 1][w]
+    #             minrz = min_r_z[j]
+    #     else:
+    #         minrz = np.interp(z, min_r[0], min_r[1])
 
-        [u] = np.where(np.logical_or((R_z < minrz) != (R_z > radius),
-                                     cell_interdist < min_cell_interdist))
+    #     R_z = np.sqrt(x**2 + y**2)
 
-        while len(u) > 0:
-            for i in range(len(u)):
-                x[u[i]] = (np.random.rand() - 0.5) * radius * 2
-                y[u[i]] = (np.random.rand() - 0.5) * radius * 2
-                z[u[i]] = np.random.rand() * (z_max - z_min) + z_min
-                if isinstance(min_r, type(())):
-                    for j in range(np.shape(min_r)[0]):
-                        min_r_z[j][u[i]] = \
-                            np.interp(z[u[i]], min_r[0, ], min_r[1, ])
-                        if j > 0:
-                            [w] = np.where(min_r_z[j] < min_r_z[j - 1])
-                            min_r_z[j][w] = min_r_z[j - 1][w]
-                        minrz = min_r_z[j]
-                else:
-                    minrz[u[i]] = np.interp(z[u[i]], min_r[0, ], min_r[1, ])
-            R_z = np.sqrt(x**2 + y**2)
+    #     # want to make sure that no somas are in the same place.
+    #     cell_interdist = self.calc_min_cell_interdist(x, y, z)
 
-            # want to make sure that no somas are in the same place.
-            cell_interdist = self.calc_min_cell_interdist(x, y, z)
+    #     [u] = np.where(np.logical_or((R_z < minrz) != (R_z > radius),
+    #                                  cell_interdist < min_cell_interdist))
 
-            [u] = np.where(np.logical_or((R_z < minrz) != (R_z > radius),
-                                         cell_interdist < min_cell_interdist))
+    #     while len(u) > 0:
+    #         for i in range(len(u)):
+    #             x[u[i]] = (np.random.rand() - 0.5) * radius * 2
+    #             y[u[i]] = (np.random.rand() - 0.5) * radius * 2
+    #             z[u[i]] = np.random.rand() * (z_max - z_min) + z_min
+    #             if isinstance(min_r, type(())):
+    #                 for j in range(np.shape(min_r)[0]):
+    #                     min_r_z[j][u[i]] = \
+    #                         np.interp(z[u[i]], min_r[0, ], min_r[1, ])
+    #                     if j > 0:
+    #                         [w] = np.where(min_r_z[j] < min_r_z[j - 1])
+    #                         min_r_z[j][w] = min_r_z[j - 1][w]
+    #                     minrz = min_r_z[j]
+    #             else:
+    #                 minrz[u[i]] = np.interp(z[u[i]], min_r[0, ], min_r[1, ])
+    #         R_z = np.sqrt(x**2 + y**2)
 
-        soma_pos = []
-        for i in range(self.POPULATION_SIZE):
-            soma_pos.append({'x': x[i], 'y': y[i], 'z': z[i]})
+    #         # want to make sure that no somas are in the same place.
+    #         cell_interdist = self.calc_min_cell_interdist(x, y, z)
 
-        return soma_pos
+    #         [u] = np.where(np.logical_or((R_z < minrz) != (R_z > radius),
+    #                                      cell_interdist < min_cell_interdist))
+
+    #     soma_pos = []
+    #     for i in range(self.POPULATION_SIZE):
+    #         soma_pos.append({'x': x[i], 'y': y[i], 'z': z[i]})
+
+    #     return soma_pos
+
+
+
 
     def calc_signal_sum(self, measure='LFP'):
         """
@@ -1357,7 +1402,7 @@ class Population(PopulationSuper):
         return syn_indices
 
 
-    ############################## FINISH HERE TO CHANGEEEEEEEEE
+  
 
     def fetchSynIdxCell(self, syn_df, nidx,Prepop):
         """
@@ -1632,7 +1677,7 @@ class Population(PopulationSuper):
 
         The variable self.ImplementedMorph has a similar structure. The top key in the hierarchy refers to the subpopulation, while the value
         stores matrix with self.RANK_CELLINDICES x 1 where the index is the current cell index 'cellindex' while is stored the index of the
-        pathway for the loading of the morphology.
+        pathway for the loading of the morphology, the neuron's current id and the neuron's raw ID (matched to its position into the ADJ)
 
         
         
@@ -1672,6 +1717,10 @@ class Population(PopulationSuper):
         """
         tic = time()
 
+
+        # 1. Grab the raw network ID for this specific cell
+        raw_network_id = self.pop_neuron_ids[cellindex]
+
         ## Morphology 
         Availale_morph = self.Subpop.copy()
 
@@ -1687,12 +1736,13 @@ class Population(PopulationSuper):
                                         synapse_base_path=self.synapse_base_path,
                                         plot_result=False)
             # Update the dictionary, best to handle parallelization via MPI
-            self.ImplementedMorph[self.y][cellindex] = [Load_idx,nid]
+            # Update dictionary to store the Raw Network ID alongside the Morphology ID
+            self.ImplementedMorph[self.y][cellindex] = [raw_network_id, Load_idx, nid]
 
 
         else:
              # Retrieve the morphology choosen in the previous call of the function
-             Load_idx,nid = self.ImplementedMorph[self.y][cellindex]
+             raw_network_id, Load_idx, nid = self.ImplementedMorph[self.y][cellindex]
 
 
 
@@ -2172,6 +2222,9 @@ class TopoPopulation(Population):
 
         return SpCells
 
+
+
+
     def set_pop_soma_pos(self):
         """
         Set `pop_soma_pos` using draw_rand_pos().
@@ -2195,6 +2248,11 @@ class TopoPopulation(Population):
         TopoPopulation.draw_rand_pos
 
         """
+
+
+
+
+
         if RANK == 0:
             pop_soma_pos = self.draw_rand_pos(**self.populationParams)
         else:
@@ -2245,6 +2303,11 @@ class TopoPopulation(Population):
         print('done!')
 
         return soma_pos
+
+import numpy as np
+import plotly.graph_objects as go
+from collections import Counter
+
 
 
 if __name__ == '__main__':
