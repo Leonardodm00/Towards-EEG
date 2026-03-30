@@ -55,9 +55,12 @@ np.random.seed(SEED)
 ## PARAMETERS
 ################################################################################
 
-from params_evoked_with_EEG import multicompartment_params, \
-                                point_neuron_network_params, \
-                                MorphoPath
+# from params_evoked_with_EEG import multicompartment_params, \
+#                                point_neuron_network_params, \
+#                                MorphoPath, Connectomics
+
+import params_evoked_with_EEG 
+
 
 #Full set of parameters including network parameters
 params = multicompartment_params()
@@ -76,6 +79,9 @@ setup_file_dest(params, clearDestination=True)
 
 
 ######## Perform network simulation ############################################
+
+# NEED TO CHANGE IN BRIAN2
+
 
 ##initiate nest simulation with only the point neuron network parameter class
 networkParams = point_neuron_network_params()
@@ -111,50 +117,74 @@ print('NEST simulation and gdf file processing done in  %.3f seconds' % toc)
 
 
 
+# ----------------------------------------
+
+# MORPHOLOGICAL PATHS
+
+# ----------------------------------------
 
 # Initialize the morphology loading pathways
 Morph_pathways = MorphoPath()
 
 # Construct the object
 name_list = [
-    'p23', 'b23', 'nb23', 
-    'p4', 'ss4(L23)', 'ss4(L4)', 'b4', 'nb4', 
-    'p5(L23)', 'p5(L56)', 'b5', 'nb5', 
-    'p6(L4)', 'p6(L56)', 'b6', 'nb6'
+    "L23_exc", "L23_inh", 
+    "L4_exc", "L4_inh", "L4_ss", 
+    "L5_exc", "L5_inh", 
+    "L6_exc", "L6_inh"
 ]
 name_path = r''
 morph_path = r''
 Morph_pathways.construct_dict(name_list, name_path, morph_path)
-
 Paths = Morph_pathways.get_paths()
 
-Layer_map_dict = { 'p23' : 1,
-      'b23' : 1,
-      'nb23': 1,
 
-      'p4' : 2, 
-      'ss4(L23)' : 2, 
-      'ss4(L4)' : 2, 
-      'b4' : 2, 
-      'nb4' : 2,
 
-      'p5(L23)' : 3, 
-      'p5(L56)' : 3, 
-      'b5' : 3, 
-      'nb5' : 3,
+# ----------------------------------------
 
-      'p6(L4)' : 4, 
-      'p6(L56)' : 4, 
-      'b6' : 4,
-      'nb6' : 4
+# CONNECTOMICS 
+
+# ----------------------------------------
+
+connectomics_path = r''
+connectomics_output = r''
+
+
+conn =  Connectomics(connectomics_path,connectomics_output)
+conn_dict = conn.get_ConnectomicInfo
+
+
+extracted_pops = extract_macro_populations_debug(conn_dict, name_list)
+
+
+
+
+
+
+
+Pop_to_Syntype = { 'L23_exc' : 'exc',
+      'L23_inh' : 'inh',
+      
+      'L4_exc' : 'exc', 
+      'L4_ss' : 'exc', 
+      'L4_inh' : 'inh', 
+
+      'L5_exc' : 'exc', 
+      'L5_inh' : 'inh', 
+
+      'L6_exc' : 'exc', 
+      'L6_inh' : 'inh'
 
           }
+
+
+syn_path = ''
 
 
 ####### Set up populations #####################################################
 
 #iterate over each cell type, and create populationulation object
-for i, y in enumerate(params.y):
+for i, y in enumerate(name_list):
     #create population:
     pop = Population(
             #parent class
@@ -171,12 +201,9 @@ for i, y in enumerate(params.y):
             dt_output = params.dt_output, 
             POPULATIONSEED = SIMULATIONSEED + i,
 
-
             SubPopulations_list = Paths[y],
-            lenTh = 300, # um
-            layer_map = Layer_map_dict[y],
-
-
+            Pop_to_Syntype = Pop_to_Syntype,
+            synapse_base_path = syn_path,
 
             #daughter class kwargs
             X = params.X,
