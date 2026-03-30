@@ -16,6 +16,10 @@ import LFPy
 # import neuron
 import scipy.signal as ss
 from time import time
+import pandas as pd 
+import random
+import re
+from matplotlib.collections import LineCollection
 
 '''
 TOSEE: used te fix points of the script that need further explanation.
@@ -130,8 +134,15 @@ class PopulationSuper(object):
 
                 SubPopulations_list = ['xxxxx.hoc','xxxxx.hoc'],
                 layer_names =  ['L1', 'L2/3', 'L4', 'L5', 'L6'],
-                lenTh = 500.0, #um
-                layer_map = 1,
+                Pop_to_Syntype = {'L4':'exc'},
+                synapse_base_path = '',
+                SubPop_positions = [1, 10.5, -20.2, -150.0],
+
+                cell_mtypes = ['L1','L23']
+
+
+
+
                  probes=[],
                  savelist=['somapos'],
                  savefolder='simulation_output_example_brunel',
@@ -174,14 +185,16 @@ class PopulationSuper(object):
         layer_names: list 
             Layer names
 
-        lenTh: float
-            Minimun arbour length in a layer accomodating synapses to make the cell 
-            feasable.
+        synapse_base_path: string
+            path to the folder where the per-neuron synapses csv files are held
 
-        layer_map : integer
-            Index that maps the current subpopulation to its layer position in layer_boundaries
+    
+        Pop_to_Syntype : dict
+            The keys are the sub-populations while the values are the synapse types 'exc' or 'inh'
 
-
+        SubPop_positions: array N_SubPop x4
+            in the 1st column contains the raw identification number of the subpop neurons as they appear in the ADJ matrix
+            the other columns contains the positions in um.
         probes: list
             list of `LFPykit.models.*` like instances for misc. forward-model
             predictions
@@ -225,8 +238,9 @@ class PopulationSuper(object):
         self.Subpop = SubPopulations_list
         self.ImplementedMorph = {self.y : {}}
         self.layer_names = layer_names
-        self.lenTh = lenTh
-        self.layer_map = layer_map
+        self.Pop_to_Syntype = Pop_to_Syntype
+        self.synapse_base_path = synapse_base_path
+        self.SubPop_positions = SubPop_positions
         self.probes = probes
         self.savelist = savelist
         self.savefolder = savefolder
@@ -436,39 +450,62 @@ class PopulationSuper(object):
 
     def set_pop_soma_pos(self):
         """
-        Set `pop_soma_pos` using draw_rand_pos().
+        Set `pop_soma_pos` and `pop_neuron_ids` using either predefined 
+        coordinates or random generation.
 
         This method takes no keyword arguments.
-
 
         Parameters
         ----------
         None
-
 
         Returns
         -------
         numpy.ndarray
             (x,y,z) coordinates of each neuron in the population
 
-
         See also
         --------
         PopulationSuper.draw_rand_pos
-
         """
+
         tic = time()
         if RANK == 0:
-            pop_soma_pos = self.draw_rand_pos(
-                # min_r = self.electrodeParams['r_z'],
-                **self.populationParams)
+            if self.predefined_positions is not None:
+                # Initialize containers
+                pop_soma_pos = []
+                
+                # Column 0 is your raw neuron ID (matched with adjacency matrix)
+                self.pop_neuron_ids = self.predefined_positions[:, 0].astype(int)
+
+                # Columns 1, 2, and 3 are x, y, z
+                for row in self.predefined_positions:
+                    pop_soma_pos.append({
+                        'x': row[1],
+                        'y': row[2],
+                        'z': row[3]
+                    })
+            else:
+                # Default behavior if no predefined positions are provided
+                pop_soma_pos = self.draw_rand_pos(**self.populationParams)
+                self.pop_neuron_ids = np.arange(self.POPULATION_SIZE)
+
         else:
+            # Initialize as None for all other ranks to prevent MPI AttributeErrors
             pop_soma_pos = None
+            self.pop_neuron_ids = None
 
         if RANK == 0:
             print('found cell positions in %.2f s' % (time() - tic))
 
+        # Synchronize both coordinates and IDs across all MPI ranks
+        self.pop_neuron_ids = COMM.bcast(self.pop_neuron_ids, root=0)
+
         return COMM.bcast(pop_soma_pos, root=0)
+
+
+
+
 
     def set_rotations(self):
         """
@@ -506,6 +543,9 @@ class PopulationSuper(object):
             print('found cell rotations in %.2f s' % (time() - tic))
 
         return COMM.bcast(rotations, root=0)
+    
+
+
 
     def calc_min_cell_interdist(self, x, y, z):
         """
@@ -535,97 +575,103 @@ class PopulationSuper(object):
 
         return min_cell_interdist
 
-    def draw_rand_pos(self, radius, z_min, z_max,
-                      min_r=np.array([0]), min_cell_interdist=10.,
-                      **args):
-        """
-        Draw some random location within radius, z_min, z_max,
-        and constrained by min_r and the minimum cell interdistance.
-        Returned argument is a list of dicts with keys ['x', 'y', 'z'].
 
 
-        Parameters
-        ----------
-        radius : float
-            Radius of population.
-        z_min : float
-            Lower z-boundary of population.
-        z_max : float
-            Upper z-boundary of population.
-        min_r : numpy.ndarray
-            Minimum distance to center axis as function of z.
-        min_cell_interdist : float
-            Minimum cell to cell interdistance.
-        **args : keyword arguments
-            Additional inputs that is being ignored.
+
+    # def draw_rand_pos(self, radius, z_min, z_max,
+    #                   min_r=np.array([0]), min_cell_interdist=10.,
+    #                   **args):
+    #     """
+    #     Draw some random location within radius, z_min, z_max,
+    #     and constrained by min_r and the minimum cell interdistance.
+    #     Returned argument is a list of dicts with keys ['x', 'y', 'z'].
 
 
-        Returns
-        -------
-        soma_pos : list
-            List of dicts of len population size
-            where dict have keys x, y, z specifying
-            xyz-coordinates of cell at list entry `i`.
+    #     Parameters
+    #     ----------
+    #     radius : float
+    #         Radius of population.
+    #     z_min : float
+    #         Lower z-boundary of population.
+    #     z_max : float
+    #         Upper z-boundary of population.
+    #     min_r : numpy.ndarray
+    #         Minimum distance to center axis as function of z.
+    #     min_cell_interdist : float
+    #         Minimum cell to cell interdistance.
+    #     **args : keyword arguments
+    #         Additional inputs that is being ignored.
 
 
-        See also
-        --------
-        PopulationSuper.calc_min_cell_interdist
+    #     Returns
+    #     -------
+    #     soma_pos : list
+    #         List of dicts of len population size
+    #         where dict have keys x, y, z specifying
+    #         xyz-coordinates of cell at list entry `i`.
 
-        """
-        x = (np.random.rand(self.POPULATION_SIZE) - 0.5) * radius * 2
-        y = (np.random.rand(self.POPULATION_SIZE) - 0.5) * radius * 2
-        z = np.random.rand(self.POPULATION_SIZE) * (z_max - z_min) + z_min
-        min_r_z = {}
-        min_r = np.array(min_r)
-        if min_r.size > 0:
-            if isinstance(min_r, type(np.array([]))):
-                j = 0
-                for j in range(min_r.shape[0]):
-                    min_r_z[j] = np.interp(z, min_r[0, ], min_r[1, ])
-                    if j > 0:
-                        [w] = np.where(min_r_z[j] < min_r_z[j - 1])
-                        min_r_z[j][w] = min_r_z[j - 1][w]
-                minrz = min_r_z[j]
-        else:
-            minrz = np.interp(z, min_r[0], min_r[1])
 
-        R_z = np.sqrt(x**2 + y**2)
+    #     See also
+    #     --------
+    #     PopulationSuper.calc_min_cell_interdist
 
-        # want to make sure that no somas are in the same place.
-        cell_interdist = self.calc_min_cell_interdist(x, y, z)
+    #     """
+    #     x = (np.random.rand(self.POPULATION_SIZE) - 0.5) * radius * 2
+    #     y = (np.random.rand(self.POPULATION_SIZE) - 0.5) * radius * 2
+    #     z = np.random.rand(self.POPULATION_SIZE) * (z_max - z_min) + z_min
+    #     min_r_z = {}
+    #     min_r = np.array(min_r)
+    #     if min_r.size > 0:
+    #         if isinstance(min_r, type(np.array([]))):
+    #             j = 0
+    #             for j in range(min_r.shape[0]):
+    #                 min_r_z[j] = np.interp(z, min_r[0, ], min_r[1, ])
+    #                 if j > 0:
+    #                     [w] = np.where(min_r_z[j] < min_r_z[j - 1])
+    #                     min_r_z[j][w] = min_r_z[j - 1][w]
+    #             minrz = min_r_z[j]
+    #     else:
+    #         minrz = np.interp(z, min_r[0], min_r[1])
 
-        [u] = np.where(np.logical_or((R_z < minrz) != (R_z > radius),
-                                     cell_interdist < min_cell_interdist))
+    #     R_z = np.sqrt(x**2 + y**2)
 
-        while len(u) > 0:
-            for i in range(len(u)):
-                x[u[i]] = (np.random.rand() - 0.5) * radius * 2
-                y[u[i]] = (np.random.rand() - 0.5) * radius * 2
-                z[u[i]] = np.random.rand() * (z_max - z_min) + z_min
-                if isinstance(min_r, type(())):
-                    for j in range(np.shape(min_r)[0]):
-                        min_r_z[j][u[i]] = \
-                            np.interp(z[u[i]], min_r[0, ], min_r[1, ])
-                        if j > 0:
-                            [w] = np.where(min_r_z[j] < min_r_z[j - 1])
-                            min_r_z[j][w] = min_r_z[j - 1][w]
-                        minrz = min_r_z[j]
-                else:
-                    minrz[u[i]] = np.interp(z[u[i]], min_r[0, ], min_r[1, ])
-            R_z = np.sqrt(x**2 + y**2)
+    #     # want to make sure that no somas are in the same place.
+    #     cell_interdist = self.calc_min_cell_interdist(x, y, z)
 
-            # want to make sure that no somas are in the same place.
-            cell_interdist = self.calc_min_cell_interdist(x, y, z)
+    #     [u] = np.where(np.logical_or((R_z < minrz) != (R_z > radius),
+    #                                  cell_interdist < min_cell_interdist))
 
-            [u] = np.where(np.logical_or((R_z < minrz) != (R_z > radius),
-                                         cell_interdist < min_cell_interdist))
+    #     while len(u) > 0:
+    #         for i in range(len(u)):
+    #             x[u[i]] = (np.random.rand() - 0.5) * radius * 2
+    #             y[u[i]] = (np.random.rand() - 0.5) * radius * 2
+    #             z[u[i]] = np.random.rand() * (z_max - z_min) + z_min
+    #             if isinstance(min_r, type(())):
+    #                 for j in range(np.shape(min_r)[0]):
+    #                     min_r_z[j][u[i]] = \
+    #                         np.interp(z[u[i]], min_r[0, ], min_r[1, ])
+    #                     if j > 0:
+    #                         [w] = np.where(min_r_z[j] < min_r_z[j - 1])
+    #                         min_r_z[j][w] = min_r_z[j - 1][w]
+    #                     minrz = min_r_z[j]
+    #             else:
+    #                 minrz[u[i]] = np.interp(z[u[i]], min_r[0, ], min_r[1, ])
+    #         R_z = np.sqrt(x**2 + y**2)
 
-        soma_pos = []
-        for i in range(self.POPULATION_SIZE):
-            soma_pos.append({'x': x[i], 'y': y[i], 'z': z[i]})
+    #         # want to make sure that no somas are in the same place.
+    #         cell_interdist = self.calc_min_cell_interdist(x, y, z)
 
-        return soma_pos
+    #         [u] = np.where(np.logical_or((R_z < minrz) != (R_z > radius),
+    #                                      cell_interdist < min_cell_interdist))
+
+    #     soma_pos = []
+    #     for i in range(self.POPULATION_SIZE):
+    #         soma_pos.append({'x': x[i], 'y': y[i], 'z': z[i]})
+
+    #     return soma_pos
+
+
+
 
     def calc_signal_sum(self, measure='LFP'):
         """
@@ -1301,25 +1347,64 @@ class Population(PopulationSuper):
         ## PROVIDE THE  nidx=self.k_yXL[:, i] TO CHECK THE MORPHOLOGY
         ## Emulate the for i, X in enumerate(self.X): to check for arbour compliance.
 
-        # cell = self.cellsim(cellindex, return_just_cell=True)
+      
         ###CHANGED
-        cell = self.cellsim(cellindex, return_just_cell=True)
+        cell,neuron_id = self.cellsim(cellindex, return_just_cell=True) # Load the cell
+
+
+
+        # Download the csv file with the mapped incoming synapses
+        base_SynPath = self.synapse_base_path
+        csv_file_path = os.path.join(base_SynPath, f"neuron_{neuron_id}_mapped_synapses.csv")
+
+        if not os.path.exists(csv_file_path):
+            print(f"⚠️ Failed to find synapse CSV: {csv_file_path}")
+            return None
+        syn_df = pd.read_csv(csv_file_path)
+        # Retrieve the absolute Z placement of the cell
+        soma_z = self.pop_soma_pos[cellindex]['z']
+        # Translate the entire column ONCE
+        syn_df['z'] = syn_df['z'] + soma_z
+
+
+
+
+
 
         # local containers
         synidx = {}
 
         # get synaptic placements and cells from the network,
         # then set spike times,
-        for i, X in enumerate(self.X):
-            synidx[X] = self.fetchSynIdxCell(cell=cell,
+        for i, X in enumerate(self.X):  # Loops through all the sub-populations.
+            synidx[X] = self.fetchSynIdxCell(syn_df=syn_df,
                                              nidx=self.k_yXL[:, i],
-                                             synParams=self.synParams.copy())
+                                             Prepop = X)
         # clean up hoc namespace
         cell.__del__()
 
         return synidx
+    
 
-    def fetchSynIdxCell(self, cell, nidx, synParams):
+
+
+
+    def fetch_mapped_synapse_indices(self,syn_df, syn_type, z_min=-np.inf, z_max=np.inf):
+        if syn_type not in ['exc', 'inh']:
+            raise ValueError(f"Invalid syn_type '{syn_type}'. Must be 'exc' or 'inh'.")
+
+        type_mask = syn_df['synapse_type'] == syn_type
+        depth_mask = (syn_df['z'] >= z_min) & (syn_df['z'] <= z_max)
+        
+        filtered_df = syn_df[type_mask & depth_mask]
+        syn_indices = filtered_df['lfpy_idx'].values.astype(int)
+        
+        return syn_indices
+
+
+  
+
+    def fetchSynIdxCell(self, syn_df, nidx,Prepop):
         """
         Find possible synaptic placements for each cell
         As synapses are placed within layers with bounds determined by
@@ -1336,6 +1421,8 @@ class Population(PopulationSuper):
         nidx : numpy.ndarray
             Numbers of synapses per presynaptic population X.
         synParams : which `LFPy.Synapse` parameters to use.
+        Prepop : The current pre-synaptic population. This is needed to set the correct type of synapses 
+                that is established
 
 
         Returns
@@ -1349,6 +1436,11 @@ class Population(PopulationSuper):
         Population.get_all_synIdx, Population.get_synIdx, LFPy.Synapse
 
         """
+        # Retrieve the type of presynaptic neuron to establish the synapse type: whether exc or inh
+        Synapse_type = self.Pop_to_Syntype[Prepop]
+        
+        
+
 
         # segment indices in each layer is stored here, list of np.array
         syn_idx = []
@@ -1357,261 +1449,203 @@ class Population(PopulationSuper):
             if nidx[i] == 0:
                 syn_idx.append(np.array([], dtype=int))
             else:
-                syn_idx.append(cell.get_rand_idx_area_norm(
-                    section=synParams['section'],
-                    nidx=nidx[i],
-                    z_min=zz.min(),
-                    z_max=zz.max()).astype('int16'))
+
+                syn_indicies = self.fetch_mapped_synapse_indices(syn_df, 
+                                                                Synapse_type, 
+                                                                z_min=zz.min(),
+                                                                z_max=zz.max()).astype(np.int16)
+                # Randomly sample nidx synapses
+                # Initialize the generator
+                rng = np.random.default_rng()
+                # Sample nidx elements without replacement
+                syn_idx.append(rng.choice(syn_indicies, size=nidx[i], replace=True))
+                
 
         return syn_idx
     
 
 
 
-    def _plot_both_morphologies(self,dend_segments, layer_boundaries, layer_names, valid_layers, target_upper_z, target_lower_z, morph_idx):
-        """Helper function to visualize the selected morphology at both boundaries side-by-side."""
-        fig, axes = plt.subplots(1, 2, figsize=(16, 10), sharey=True)
 
+
+    def _plot_capacity_at_z(self,dend_segments, syn_df, layer_boundaries, layer_names, valid_layers, target_z_pos, morph_idx):
+        """Helper function to visualize the selected morphology and its synapse capacity."""
+        fig, ax = plt.subplots(figsize=(10, 12))
+        
         color_palette = ['#e6194B', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#42d4f4']
         layer_colors = {layer_idx: color_palette[i % len(color_palette)] for i, layer_idx in enumerate(valid_layers)}
+        
+        # 1. Plot layer boundaries
+        for i, bounds in enumerate(layer_boundaries):
+            upper_bound, lower_bound = bounds
+            ax.axhline(upper_bound, color='black', linestyle='--', alpha=0.5)
+            
+            bg_color = layer_colors.get(i, 'lightgrey')
+            alpha_val = 0.15 if i in valid_layers else 0.05
+            ax.axhspan(lower_bound, upper_bound, facecolor=bg_color, alpha=alpha_val)
+            
+            layer_label = layer_names[i] if i < len(layer_names) else f"Layer {i}"
+            ax.text(-250, (upper_bound + lower_bound) / 2, layer_label, 
+                    va='center', ha='right', fontsize=12, fontweight='bold')
+        
+        ax.axhline(layer_boundaries[-1][1], color='black', linestyle='--', alpha=0.5)
 
-        placements = [
-            (axes[0], target_upper_z, "Upper Boundary Placement"),
-            (axes[1], target_lower_z, "Lower Boundary Placement")
-        ]
+        # 2. Plot dendritic segments (Light Grey)
+        lines = []
+        for p1, p2 in dend_segments:
+            shifted_z1 = p1[2] + target_z_pos
+            shifted_z2 = p2[2] + target_z_pos
+            lines.append([(p1[0], shifted_z1), (p2[0], shifted_z2)])
+            
+        lc = LineCollection(lines, colors='darkgrey', linewidths=1.2, alpha=0.7)
+        ax.add_collection(lc)
+        
+        # 3. Plot Mapped Synapses
+        shifted_syn_z = syn_df['z'] + target_z_pos
+        
+        # Plot unused synapses in light grey
+        ax.scatter(syn_df['x'], shifted_syn_z, color='lightgrey', s=8, alpha=0.5, label='Unused Synapses', zorder=3)
+        
+        # Plot valid synapses in their respective layer colors
+        for layer_idx in valid_layers:
+            upper_bound, lower_bound = layer_boundaries[layer_idx]
+            mask = (shifted_syn_z >= lower_bound) & (shifted_syn_z <= upper_bound)
+            
+            if mask.sum() > 0:
+                ax.scatter(syn_df.loc[mask, 'x'], shifted_syn_z[mask], 
+                        color=layer_colors[layer_idx], s=25, 
+                        label=f'Capacity in {layer_names[layer_idx]} ({mask.sum()})', zorder=4)
 
-        for ax, soma_z, title in placements:
-            # 1. Plot layer boundaries
-            for i, bounds in enumerate(layer_boundaries):
-                upper_bound, lower_bound = bounds
-                ax.axhline(upper_bound, color='black', linestyle='--', alpha=0.5)
-
-                bg_color = layer_colors.get(i, 'lightgrey')
-                alpha_val = 0.1 if i in valid_layers else 0.05
-                ax.axhspan(lower_bound, upper_bound, facecolor=bg_color, alpha=alpha_val)
-
-                # Only draw the text labels on the left plot to avoid clutter
-                if ax == axes[0]:
-                    layer_label = layer_names[i] if i < len(layer_names) else f"Layer {i}"
-                    ax.text(-200, (upper_bound + lower_bound) / 2, layer_label,
-                            va='center', ha='right', fontsize=10, fontweight='bold')
-
-            ax.axhline(layer_boundaries[-1][1], color='black', linestyle='--', alpha=0.5)
-
-            # 2. Plot dendritic segments
-            lines = []
-            line_colors = []
-
-            for mid_z, _, p1, p2 in dend_segments:
-                shifted_z1 = p1[2] + soma_z
-                shifted_z2 = p2[2] + soma_z
-                mid_shifted_z = mid_z + soma_z
-
-                segment = [(p1[0], shifted_z1), (p2[0], shifted_z2)]
-                lines.append(segment)
-
-                seg_color = 'darkgrey'
-                for layer_idx in valid_layers:
-                    upper_bound, lower_bound = layer_boundaries[layer_idx]
-                    if lower_bound <= mid_shifted_z <= upper_bound:
-                        seg_color = layer_colors[layer_idx]
-                        break
-                line_colors.append(seg_color)
-
-            lc = LineCollection(lines, colors=line_colors, linewidths=1.5, alpha=0.8)
-            ax.add_collection(lc)
-
-            # 3. Plot the soma
-            ax.scatter([0], [soma_z], color='black', s=100, zorder=5, label='Soma')
-
-            # 4. Final plot formatting
-            ax.set_aspect('equal')
-            ax.set_xlim(-250, 250)
-            ax.set_ylim(layer_boundaries[-1][1] - 50, layer_boundaries[0][0] + 50)
-            ax.set_xlabel('X distance (um)')
-            if ax == axes[0]:
-                ax.set_ylabel('Depth / Z distance (um)')
-            ax.set_title(title)
-            ax.legend()
-
-        fig.suptitle(f'Selected Morphology (Index: {morph_idx}) Validated For Both Placements', fontsize=16)
+        # 4. Plot the soma
+        ax.scatter([0], [target_z_pos], color='black', s=150, zorder=5, label='Soma')
+        
+        # 5. Final plot formatting
+        ax.set_aspect('equal')
+        ax.set_xlim(-350, 350) 
+        ax.set_ylim(layer_boundaries[-1][1] - 50, layer_boundaries[0][0] + 50)
+        ax.set_xlabel('X distance (um)', fontsize=12)
+        ax.set_ylabel('Depth / Z distance (um)', fontsize=12)
+        ax.set_title(f'Selected Morphology (ID: {morph_idx})\nCapacity Evaluated at Z = {target_z_pos:.1f} um', fontsize=16, fontweight='bold')
+        ax.legend(loc='lower left', fontsize=10)
+        
         plt.tight_layout()
         plt.show()
 
     def cell_MorphSelect(self,
         morph_paths,
         layer_boundaries,
-        layer_names,
+        layer_names,          # Added for plotting
         synapses_per_layer,
-        length_threshold,
-        target_layer_idx,
-        plot_result=False
-    ):
-        """
+        target_z_pos,
+        synapse_base_path,
+        plot_result=False     # Added for debugging hook
+        ):
+            """
+            Selects a valid neuronal morphology by ensuring its pre-mapped connectome 
+            has enough physical synapse locations to satisfy the network's requirements 
+            at a specific absolute cortical depth.
 
-        Selects a random morphology meeting a length threshold within synapse-containing
-        layers using the NEURON simulator library. It evaluates the morphology by placing
-        its soma at both the upper and lower boundaries of its target layer.
+            Unlike geometric approaches that estimate viability based on dendritic length, 
+            this function performs a direct empirical check. It virtually places the 
+            neuron's soma at the target depth, shifts its pre-calculated synapse coordinates 
+            accordingly, and counts the exact number of available docking sites falling 
+            within the required cortical layers.
 
-        Args:
-            morph_paths (list of str):
-                A list containing the file paths to the candidate .hoc morphology files.
-                Example: ['/path/to/neuron_1.hoc', '/path/to/neuron_2.hoc']
+            Args:
+                morph_paths (list of str): 
+                    A list of file paths to the candidate `.hoc` morphology files.
+                    Example: ['/path/neuron_123_aligned.hoc', '/path/neuron_456_aligned.hoc']
+                layer_boundaries (numpy.ndarray): 
+                    A 2D array of shape (N, 2) defining the [upper_Z, lower_Z] boundaries 
+                    for each cortical layer in micrometers (μm).
+                    Example: [[0.0, -81.6], [-81.6, -587.1], ...]
+                layer_names (list of str): 
+                    Display names for each layer, used strictly for annotating the debug plot.
+                    Example: ['L1', 'L2/3', 'L4', 'L5', 'L6']
+                synapses_per_layer (list or numpy.ndarray of int): 
+                    The number of synapses the network model demands in each layer. 
+                    The length must exactly match the number of rows in `layer_boundaries`.
+                    Example: [0, 1500, 3200, 500, 0]
+                target_z_pos (float): 
+                    The absolute Z-coordinate (in μm) where this specific cell's soma 
+                    will be placed in the simulated cortical column. 
+                synapse_base_path (str): 
+                    The directory path containing the mapped synapse CSV files.
+                plot_result (bool, optional): 
+                    If True, boots up the NEURON simulator to extract the 3D skeleton of 
+                    the winning morphology and generates a detailed visual report of the 
+                    synapse capacity across layers. Defaults to False.
 
-            layer_boundaries (numpy.ndarray):
-                A 2D array of shape (N, 2) where N is the number of cortical layers.
-                Each row must contain exactly two float values representing the
-                [upper_Z, lower_Z] boundaries in micrometers (um). Values are typically
-                negative, moving deeper from the pia (0.0).
-                Example: np.array([[0.0, -81.6], [-81.6, -587.1], ...])
+            Returns:
+                tuple (int, int): 
+                    - original_idx: The integer index of the winning morphology in the 
+                                    original `morph_paths` list.
+                    - nid: The extracted integer Neuron ID of the winning morphology.
 
-            layer_names (list of str):
-                A list of strings containing the display names for each layer. The length
-                must exactly match the number of rows in `layer_boundaries`. Used purely
-                for labeling the output plot.
-                Example: ['L1', 'L2/3', 'L4', 'L5', 'L6']
-
-            synapses_per_layer (list of int or float):
-                A 1D list storing the total number of synapses per layer. The length
-                must match the rows in `layer_boundaries`. The function checks if an
-                entry is > 0 to determine if a layer is "valid" for dendritic length counting.
-                Example: [0, 1500, 3200, 500, 0]
-
-            length_threshold (float):
-                The minimum cumulative length of the dendritic arbor (in um) that *must* fall within the synapse-containing layers for the morphology to be accepted.
-                Example: 1500.0
-
-            target_layer_idx (int):
-                A single integer representing the 0-based index of the layer to which
-                the chosen neuron belongs. Used to look up the upper and lower Z-boundaries
-                in `layer_boundaries` to position the soma during the stress test.
-                Example: 3 (Targets the 4th row in layer_boundaries)
-
-            plot_result (bool, optional):
-                If True, generates a side-by-side matplotlib figure showing the successful
-                neuron placed at both the upper and lower boundaries. Defaults to False.
-
-        Returns:
-            int: The index of the successfully selected morphology from the original
-                `morph_paths` list.
-
-        Raises:
-            RuntimeError: If the function evaluates every file in `morph_paths` and none
-                        meet the length threshold for both extreme soma placements.
-
-
-
-
-
-
-        Neuron Morphology Selection Script
-
-        This script acts as a strict filter for neuronal morphologies. Its goal is to
-        find a single random neuron from a dataset whose dendritic tree is large enough
-        to reach the right synaptic connections, regardless of where its soma sits inside
-        its home layer.
-
-        How it works:
-        1. It shuffles the provided list of candidate .hoc morphologies for random selection.
-        2. It loads a candidate into the NEURON simulator, isolates the dendritic tree
-        (basal and apical), extracts its 3D coordinates, and scales them from nm to um.
-        3. It performs a two-part stress test by virtually placing the neuron's soma at
-        the absolute top of its assigned home layer, and then at the absolute bottom.
-        4. For both extreme positions, it calculates exactly how much of the dendritic
-        tree falls inside the specific layers designated as having synapses.
-        5. If the total dendritic length in those synaptic layers drops below the minimum
-        threshold during *either* the top or bottom placement, the neuron is rejected.
-        6. The first neuron to successfully meet the threshold for *both* placements is
-        chosen. The script then generates a side-by-side plot of both placements and
-        returns the winning neuron's index. If no neurons pass, it raises an error.
-
-
-
-        Selects a random morphology meeting a length threshold within synapse-containing
-        layers using the NEURON simulator library.
-        """
-        valid_layers = [i for i, syn in enumerate(synapses_per_layer) if syn > 0]
-        target_upper_z = layer_boundaries[target_layer_idx][0]
-        target_lower_z = layer_boundaries[target_layer_idx][1]
-        
-        shuffled_paths = list(enumerate(morph_paths))
-        random.shuffle(shuffled_paths)
-        
-        for original_idx, path in shuffled_paths:
-            print('evaluating')
-            print(original_idx)
-            # Clear previous morphology from NEURON memory
-            h('forall delete_section()')
+            Raises:
+                RuntimeError: 
+                    If the function evaluates every candidate morphology in the list and 
+                    none possess the required synapse capacity at the specified `target_z_pos`.
+            """
+            valid_layers = [i for i, syn in enumerate(synapses_per_layer) if syn > 0]
+            shuffled_paths = list(enumerate(morph_paths))
+            random.shuffle(shuffled_paths)
             
-            # Load the new .hoc file
-            success = h.load_file(str(path))
-            if not success:
-                print(f"Warning: Could not load {path}")
-                continue
+            for original_idx, path in shuffled_paths:
+                print(f"Evaluating Original Index: {original_idx}")
                 
-            dend_segments = []
-            
-            # Iterate through all sections loaded into NEURON
-            for sec in h.allsec():
-                if 'dend' in sec.name().lower() or 'apic' in sec.name().lower():
-                    n3d = int(h.n3d(sec=sec))
-                    if n3d > 0:
-                        pts = np.array([[h.x3d(i, sec=sec), h.y3d(i, sec=sec), h.z3d(i, sec=sec)] for i in range(n3d)])
+                match = re.search(r'neuron_(\d+)', os.path.basename(path))
+                nid = int(match.group(1)) if match else -1
+                
+                csv_path = os.path.join(synapse_base_path, f"neuron_{nid}_mapped_synapses.csv")
+                if not os.path.exists(csv_path):
+                    print(f"⚠️ Warning: Synapse CSV not found for {nid} at {csv_path}")
+                    continue
+                    
+                syn_df = pd.read_csv(csv_path)
+                
+                shifted_z = syn_df['z'] + target_z_pos
+                is_viable = True
+                
+                for layer_idx in valid_layers:
+                    upper_bound, lower_bound = layer_boundaries[layer_idx]
+                    required_synapses = synapses_per_layer[layer_idx]
+                    
+                    available_synapses = ((shifted_z >= lower_bound) & (shifted_z <= upper_bound)).sum()
+                    
+                    if available_synapses < required_synapses:
+                        is_viable = False
+                        break 
                         
-                        for i in range(n3d - 1):
-                            p1 = pts[i] 
-                            p2 = pts[i+1] 
+                if is_viable:
+                    # ---> DEBUG PLOTTING HOOK <---
+                    if plot_result:
+                        print(f"✅ Winner found ({nid}). Extracting 3D geometry for plot...")
+                        h('forall delete_section()')
+                        success = h.load_file(str(path))
+                        
+                        if success:
+                            dend_segments = []
+                            for sec in h.allsec():
+                                if 'dend' in sec.name().lower() or 'apic' in sec.name().lower():
+                                    n3d = int(h.n3d(sec=sec))
+                                    if n3d > 0:
+                                        pts = np.array([[h.x3d(i, sec=sec), h.y3d(i, sec=sec), h.z3d(i, sec=sec)] for i in range(n3d)])
+                                        for i in range(n3d - 1):
+                                            dend_segments.append((pts[i], pts[i+1]))
                             
-                            length = np.linalg.norm(p1 - p2)
-                            mid_z = (p1[2] + p2[2]) / 2.0
-                            
-                            dend_segments.append((mid_z, length, p1, p2))
-                            
-            valid_for_both_placements = True
-            
-            # Test BOTH upper and lower boundaries
-            for soma_z_placement in [target_upper_z, target_lower_z]:
-                
-                # TRACK LENGTH PER LAYER instead of just a global sum
-                length_in_valid_layers = {layer_idx: 0.0 for layer_idx in valid_layers}
-                
-                for mid_z, length, _, _ in dend_segments:
-                    shifted_z = mid_z + soma_z_placement
+                            self._plot_capacity_at_z(
+                                dend_segments, syn_df, layer_boundaries, layer_names, 
+                                valid_layers, target_z_pos, nid
+                            )
+                    # ------------------------------
+                    return original_idx, nid
                     
-                    for layer_idx in valid_layers:
-                        upper_bound, lower_bound = layer_boundaries[layer_idx]
-                        if lower_bound <= shifted_z <= upper_bound:
-                            length_in_valid_layers[layer_idx] += length
-                            break
-                
-                total_valid_length = sum(length_in_valid_layers.values())
-                
-                # CONDITION 1: Does the total length inside valid layers meet the threshold?
-                if total_valid_length < length_threshold:
-                    valid_for_both_placements = False
-                    break 
-                    
-                # CONDITION 2: Does the arbor actually reach EVERY valid layer?
-                # If any valid layer has 0.0 length, it failed to span the necessary layers.
-                spans_all_layers = all(layer_length > 0.0 for layer_length in length_in_valid_layers.values())
-                
-                if not spans_all_layers:
-                    valid_for_both_placements = False
-                    break 
-                    
-            # If it passed BOTH loops (and both conditions), we return it
-            if valid_for_both_placements:
-                if plot_result:
-                    self._plot_both_morphologies(
-                        dend_segments, layer_boundaries, layer_names, valid_layers, 
-                        target_upper_z, target_lower_z, original_idx
-                    )
-                return original_idx
-            
-    raise RuntimeError(
-        f"No morphology met the length threshold of {length_threshold}um "
-        f"and successfully spanned all synaptic layers for both placements."
-    )
+            raise RuntimeError(
+                f"No morphology found with enough synapse capacity to satisfy "
+                f"the requirements: {synapses_per_layer} at Z={target_z_pos:.1f}"
+            )
+
 
 
 
@@ -1643,7 +1677,7 @@ class Population(PopulationSuper):
 
         The variable self.ImplementedMorph has a similar structure. The top key in the hierarchy refers to the subpopulation, while the value
         stores matrix with self.RANK_CELLINDICES x 1 where the index is the current cell index 'cellindex' while is stored the index of the
-        pathway for the loading of the morphology.
+        pathway for the loading of the morphology, the neuron's current id and the neuron's raw ID (matched to its position into the ADJ)
 
         
         
@@ -1683,28 +1717,32 @@ class Population(PopulationSuper):
         """
         tic = time()
 
+
+        # 1. Grab the raw network ID for this specific cell
+        raw_network_id = self.pop_neuron_ids[cellindex]
+
         ## Morphology 
         Availale_morph = self.Subpop.copy()
 
         if return_just_cell:
 
-             
-            Layer_index = self.layer_map
+            soma_z = self.pop_soma_pos[cellindex]['z']
             Sum_per_Layer = np.sum(self.k_yXL, axis=1)
-            Load_idx = self.cell_MorphSelect(Availale_morph,
+            Load_idx,nid = self.cell_MorphSelect(Availale_morph,
                                         self.layerBoundaries,
                                         self.layer_names,
                                         Sum_per_Layer,
-                                        self.lenTh,
-                                        Layer_index,
+                                        target_z_pos=soma_z,
+                                        synapse_base_path=self.synapse_base_path,
                                         plot_result=False)
             # Update the dictionary, best to handle parallelization via MPI
-            self.ImplementedMorph[self.y][cellindex] = Load_idx
+            # Update dictionary to store the Raw Network ID alongside the Morphology ID
+            self.ImplementedMorph[self.y][cellindex] = [raw_network_id, Load_idx, nid]
 
 
         else:
              # Retrieve the morphology choosen in the previous call of the function
-             Load_idx = self.ImplementedMorph[self.y][cellindex]
+             raw_network_id, Load_idx, nid = self.ImplementedMorph[self.y][cellindex]
 
 
 
@@ -1727,7 +1765,7 @@ class Population(PopulationSuper):
         cell.set_rotation(**self.rotations[cellindex])
 
         if return_just_cell:
-            return cell
+            return cell,nid
         else:
 
             ### TOSEE AFTERWARDS
@@ -1808,13 +1846,13 @@ class Population(PopulationSuper):
         Population.insert_synapse
 
         """
-        for i, X in enumerate(self.X):  # range(self.k_yXL.shape[1]):
+        for i, X in enumerate(self.X):  # Pre-synaptic population
             synParams = self.synParams
             synParams.update({
                 'weight': self.J_yX[i],
                 'tau': self.tau_yX[i],
             })
-            for j in range(len(self.synIdx[cellindex][X])):
+            for j in range(len(self.synIdx[cellindex][X])):  # Loop over the layers j is the layer
                 if self.synDelays is not None:
                     synDelays = self.synDelays[cellindex][X][j]
                 else:
@@ -2184,6 +2222,9 @@ class TopoPopulation(Population):
 
         return SpCells
 
+
+
+
     def set_pop_soma_pos(self):
         """
         Set `pop_soma_pos` using draw_rand_pos().
@@ -2207,6 +2248,11 @@ class TopoPopulation(Population):
         TopoPopulation.draw_rand_pos
 
         """
+
+
+
+
+
         if RANK == 0:
             pop_soma_pos = self.draw_rand_pos(**self.populationParams)
         else:
@@ -2257,6 +2303,11 @@ class TopoPopulation(Population):
         print('done!')
 
         return soma_pos
+
+import numpy as np
+import plotly.graph_objects as go
+from collections import Counter
+
 
 
 if __name__ == '__main__':
