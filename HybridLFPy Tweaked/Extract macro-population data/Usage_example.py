@@ -9,32 +9,63 @@ import os
 class Connectomics:
 
 
-    def __init__(self,connectomics_path,connectomics_output,input_dict):
+   def __init__(self,connectomics_path='',connectomics_output='',Calculate=True):
 
         self.connectomics_path = connectomics_path
         self.connectomics_output = connectomics_output
-        self.input_dict = input_dict
-        
-        # State variables
-        self.bbp_results = None
-        self.bbp_totals = None
-        self.mtype_fast_lookup = None
-        self.cell_mtypes = None
-        self.cell_coords = None
-        self.adj_matrix = None
-        self.post_to_pre = None
-        self.pre_to_post = None
 
-        # Open the file in 'read-binary' mode and load the data
-        full_path_conn = os.path.join(self.connectomics_path, 'conn.pkl')
-        with open(full_path_conn, 'rb') as f:
-            self.conn_data = pickle.load(f)
 
-        # Execute Pipeline
-        self.get_lookup_table()
-        self.calculate_bbp_relative_presences()
-        self.get_ADJ()
-        self.extract_connectivity_dicts()
+        # --------------------------------------
+        # Construct the input dictionary
+
+        column_input = {
+            'Layers': {
+                'L1':  [-250.0, 0.0],
+                'L23': [-1200.0, -250.0],
+                'L4':  [-1580.0, -1200.0],
+                'L5':  [-2175.0, -1580.0],
+                'L6':  [-2770.0, -2175.0]
+            },
+            'Cells': {
+                'L1':  {'inh': 5145.9},                        # L1 only has inhibitory cells
+                'L23': {'exc': 21466.6+8927.3, 'inh': 11655.3 + 5118.9},
+                'L4':  {'exc': 23201.8, 'inh': 5502.3},           # Your example format
+                'L5':  {'Excitatory': 10297.6, 'Inhibitory': 3249.9}, # Explicit keys work too
+                'L6':  {'exc': 9823.0, 'inh': 1427.2}
+            },
+            'Geometry': {
+                'radius': 300.0 # micrometers
+            }
+        }
+
+
+
+
+        if Calculate:
+
+
+            self.input_dict = column_input
+            
+            # State variables
+            self.bbp_results = None
+            self.bbp_totals = None
+            self.mtype_fast_lookup = None
+            self.cell_mtypes = None
+            self.cell_coords = None
+            self.adj_matrix = None
+            self.post_to_pre = None
+            self.pre_to_post = None
+
+            # Open the file in 'read-binary' mode and load the data
+            full_path_conn = os.path.join(self.connectomics_path, 'conn.pkl')
+            with open(full_path_conn, 'rb') as f:
+                self.conn_data = pickle.load(f)
+
+            # Execute Pipeline
+            self.get_lookup_table()
+            self.calculate_bbp_relative_presences()
+            self.get_ADJ()
+            self.extract_connectivity_dicts()
 
 
 
