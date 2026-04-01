@@ -136,7 +136,7 @@ name_list = [
 name_path = r''
 morph_path = r''
 Morph_pathways.construct_dict(name_list, name_path, morph_path)
-Paths = Morph_pathways.get_paths()
+Paths = Morph_pathways.get_paths
 
 
 
@@ -154,12 +154,14 @@ conn =  Connectomics(connectomics_path,connectomics_output)
 conn_dict = conn.get_ConnectomicInfo
 
 
-extracted_pops = extract_macro_populations_debug(conn_dict, name_list)
+# Extract Infos
+extracted_pops = extract_macro_populations(conn_dict, name_list)  # cell_coords, local_to_raw_map, pre_to_post, post_to_pre
 
+# Map between the specific NMC mtype and its layer and synaptic type.
+mtype_fast_lookup = conn_dict['mtype_fast_lookup']
 
-
-
-
+# 1xN list of all cells coupled by the index to all the keys' value in conn_dict. 
+cell_mtypes = conn_dict['cell_mtypes']
 
 
 Pop_to_Syntype = { 'L23_exc' : 'exc',
@@ -184,15 +186,15 @@ syn_path = ''
 ####### Set up populations #####################################################
 
 #iterate over each cell type, and create populationulation object
-for i, y in enumerate(name_list):
+for i, Pop in enumerate(name_list):
     #create population:
-    pop = Population(
+    Macro_Pop = Population(
             #parent class
             cellParams = params.yCellParams[y],
             rand_rot_axis = params.rand_rot_axis[y],
             simulationParams = params.simulationParams,
             populationParams = params.populationParams[y],
-            y = y,
+            Pop = Pop,
             layerBoundaries = params.layerBoundaries,
             electrodeParams = params.electrodeParams,
             savelist = params.savelist,
@@ -201,9 +203,20 @@ for i, y in enumerate(name_list):
             dt_output = params.dt_output, 
             POPULATIONSEED = SIMULATIONSEED + i,
 
-            SubPopulations_list = Paths[y],
+
+            # New
+            SubPopulations_list = Paths[Pop],
             Pop_to_Syntype = Pop_to_Syntype,
             synapse_base_path = syn_path,
+
+
+            cell_mtypes = cell_mtypes,
+            mtype_fast_lookup = mtype_fast_lookup,
+
+
+            local_to_raw_map= extracted_pops[Pop]['local_to_raw_map']
+            Cell_afferences = extracted_pops[Pop]['synapse_dict'],
+            Cell_coords = extracted_pops[Pop]['cell_coords'],
 
             #daughter class kwargs
             X = params.X,
@@ -217,12 +230,12 @@ for i, y in enumerate(name_list):
             recordSingleContribFrac = params.recordSingleContribFrac,
         )
     #run population simulation and collect the data
-    pop.run()
-    pop.collect_data()
+    Macro_Pop.run()
+    Macro_Pop.collect_data()
     
 
     #object no longer needed
-    del pop
+    del Macro_Pop
 
 
 ####### Postprocess the simulation output ######################################
