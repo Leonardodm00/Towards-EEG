@@ -62,11 +62,11 @@ def extract_macro_populations(connectomics_data, name_list):
         # Create Mapping: Local (0 to N) -> Raw Global Index
         local_to_raw_map = {local_idx: raw_idx for local_idx, raw_idx in enumerate(global_indices)}
         
-        # Filter Connectivity Dictionaries (Keys are RAW, Values are RAW)
-        sub_post_to_pre = {raw_idx: post_to_pre[raw_idx] 
-                           for raw_idx in global_indices if raw_idx in post_to_pre}
-        sub_pre_to_post = {raw_idx: pre_to_post[raw_idx] 
-                           for raw_idx in global_indices if raw_idx in pre_to_post}
+       # Filter Connectivity Dictionaries (Keys are LOCAL, Values are RAW)
+        sub_post_to_pre = {local_idx: post_to_pre[raw_idx] 
+                           for local_idx, raw_idx in enumerate(global_indices) if raw_idx in post_to_pre}
+        sub_pre_to_post = {local_idx: pre_to_post[raw_idx] 
+                           for local_idx, raw_idx in enumerate(global_indices) if raw_idx in pre_to_post}
                            
         # 5. Pack strictly the requested keys into the return dictionary
         extracted_data[name] = {
