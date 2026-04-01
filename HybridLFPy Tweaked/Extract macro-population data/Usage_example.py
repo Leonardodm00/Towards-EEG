@@ -18,7 +18,7 @@ class Connectomics:
         # --------------------------------------
         # Construct the input dictionary
 
-        column_input = {
+        input_dict = {
             'Layers': {
                 'L1':  [-250.0, 0.0],
                 'L23': [-1200.0, -250.0],
@@ -40,11 +40,13 @@ class Connectomics:
 
 
 
+        self.input_dict = input_dict
 
+        
         if Calculate:
 
 
-            self.input_dict = column_input
+            
             
             # State variables
             self.bbp_results = None
@@ -66,6 +68,12 @@ class Connectomics:
             self.calculate_bbp_relative_presences()
             self.get_ADJ()
             self.extract_connectivity_dicts()
+
+
+
+    @property
+    def get_ColumnProp(self):
+        return self.input_dict
 
 
 
