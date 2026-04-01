@@ -60,6 +60,23 @@ class PopulationSuper(object):
     its main purpose is to gather common methods for inherited Population
     objects.
 
+    
+
+
+    NOTES:
+
+    1) cellindex is fundamentally equivalent to the local_idx you generated in your extract_macro_populations function. 
+        It is a unique integer strictly bounded by the size of the specific macro-population currently being simulated.
+        If you have a population of 10 cells (cellindex 0 through 9) and are running on 4 MPI ranks (SIZE = 4), the indices are assigned like this:
+        Rank 0: Processes cellindex 0, 4, 8
+        Rank 1: Processes cellindex 1, 5, 9
+        Rank 2: Processes cellindex 2, 6
+        Rank 3: Processes cellindex 3, 7
+
+
+
+
+
 
     Parameters
     ----------
@@ -129,7 +146,7 @@ class PopulationSuper(object):
                      'z_max': -350,
                      'z_min': -450,
                      'r_z': [[-1E199, 1E99], [10, 10]]},
-                 y='EX',
+                 Pop='EX',
                  layerBoundaries=[[0.0, -300], [-300, -500]],
 
                 SubPopulations_list = ['xxxxx.hoc','xxxxx.hoc'],
@@ -138,7 +155,12 @@ class PopulationSuper(object):
                 synapse_base_path = '',
                 SubPop_positions = [1, 10.5, -20.2, -150.0],
 
-                cell_mtypes = ['L1','L23']
+                cell_mtypes = ['L1','L1', 'L23'],
+                mtype_fast_lookup = {},
+
+                local_to_raw_map = {},
+                Cell_afferences = {},
+                Cell_coords = [],
 
 
 
@@ -180,7 +202,7 @@ class PopulationSuper(object):
             floats
 
         SubPopulations_list: list
-            list of the current subpopulation's (self.y) morpholgy paths
+            list of the current subpopulation's (self.Pop) morpholgy paths
 
         layer_names: list 
             Layer names
@@ -195,6 +217,33 @@ class PopulationSuper(object):
         SubPop_positions: array N_SubPop x4
             in the 1st column contains the raw identification number of the subpop neurons as they appear in the ADJ matrix
             the other columns contains the positions in um.
+
+
+        local_to_raw_map : dict
+            Keys are the local id while the values are the same neuron's raw id
+
+
+        cell_mtypes : 1xN_cells array
+            For each cell (in raw indicies) defines its subtype in base of the NMC guidelines.
+
+        mtype_fast_lookup : dict
+            For each sub-type (the ones found in cell_mtypes) defines the layer of belonging and the synaptic type
+
+        Cell_afferences : dict
+            The key is the post_syn neuron's local index, the value is the list of all the pre_syn neurons' raw indicies along with the 
+            specific number of synapses to be distributed on the pre-synaptic arbour.
+            It's subpopulation specific which means that the indicies have been reset.
+
+
+        Cell_coords : Nx3 array
+            Position (um) of the cell's somata (idx are associated to the local indexing)
+
+
+
+
+
+
+
         probes: list
             list of `LFPykit.models.*` like instances for misc. forward-model
             predictions
@@ -232,15 +281,28 @@ class PopulationSuper(object):
         self.rand_rot_axis = rand_rot_axis
         self.simulationParams = simulationParams
         self.populationParams = populationParams
-        self.POPULATION_SIZE = populationParams['number']
-        self.y = y
+        self.Pop = Pop
         self.layerBoundaries = np.array(layerBoundaries)
         self.Subpop = SubPopulations_list
-        self.ImplementedMorph = {self.y : {}}
+        self.ImplementedMorph = {self.Pop : {}}
         self.layer_names = layer_names
         self.Pop_to_Syntype = Pop_to_Syntype
         self.synapse_base_path = synapse_base_path
         self.SubPop_positions = SubPop_positions
+
+
+
+        self.local_to_raw_map = local_to_raw_map
+        self.Cell_afferences = Cell_afferences
+        self.pop_soma_pos = Cell_coords
+        self.mtype_fast_lookup = mtype_fast_lookup
+        self.cell_mtypes = cell_mtypes
+
+
+
+
+
+
         self.probes = probes
         self.savelist = savelist
         self.savefolder = savefolder
@@ -256,6 +318,7 @@ class PopulationSuper(object):
 
         self.decimatefrac = int(self.dt_output / self.dt)
         self.POPULATIONSEED = POPULATIONSEED
+        self.POPULATION_SIZE = len(self.pop_soma_pos)
         self.verbose = verbose
 
         # set the random seed for reproducible populations, synapse locations,
@@ -278,7 +341,7 @@ class PopulationSuper(object):
 
         self.alphas = np.ones(self.POPULATION_SIZE)
 
-        self.pop_soma_pos = self.set_pop_soma_pos()
+        # self.pop_soma_pos = self.set_pop_soma_pos()
         self.rotations = self.set_rotations()
 
         self._set_up_savefolder()
@@ -348,6 +411,9 @@ class PopulationSuper(object):
             self.cellsim(cellindex)
 
         COMM.Barrier()
+
+
+
 
     def cellsim(self, cellindex, return_just_cell=False):
         """
@@ -445,7 +511,7 @@ class PopulationSuper(object):
             # clean up hoc namespace
             cell.__del__()
 
-            print('cell %s population %s in %.2f s' % (cellindex, self.y,
+            print('cell %s population %s in %.2f s' % (cellindex, self.Pop,
                                                        time() - tic))
 
     def set_pop_soma_pos(self):
@@ -801,14 +867,14 @@ class PopulationSuper(object):
             if RANK == 0:
                 # save all single-cell data to file
                 fname = os.path.join(self.populations_path,
-                                     '%s_%ss.h5' % (self.y, measure))
+                                     '%s_%ss.h5' % (self.Pop, measure))
                 f = h5py.File(fname, 'w')
                 f.create_dataset('data', data=data, compression=4)
                 f['srate'] = 1E3 / self.dt_output
                 f.close()
                 assert(os.path.isfile(fname))
 
-                print('file %s_%ss.h5 ok' % (self.y, measure))
+                print('file %s_%ss.h5 ok' % (self.Pop, measure))
 
             COMM.Barrier()
 
@@ -818,7 +884,7 @@ class PopulationSuper(object):
         '''collect cell attribute data to RANK 0 before dumping data to file'''
         if RANK == 0:
             f = h5py.File(os.path.join(self.populations_path,
-                                       '{}_savelist.h5'.format(self.y)), 'w')
+                                       '{}_savelist.h5'.format(self.Pop)), 'w')
         for measure in self.savelist:
             if self.RANK_CELLINDICES.size > 0:
                 shape = (self.POPULATION_SIZE,
@@ -870,7 +936,7 @@ class PopulationSuper(object):
 
             if RANK == 0:
                 fname = os.path.join(self.populations_path,
-                                     self.output_file.format(self.y,
+                                     self.output_file.format(self.Pop,
                                                              measure) + '.h5')
                 f = h5py.File(fname, 'w')
                 f['srate'] = 1E3 / self.dt_output
@@ -888,7 +954,7 @@ class PopulationSuper(object):
             fname = os.path.join(
                 self.populations_path,
                 self.output_file.format(
-                    self.y,
+                    self.Pop,
                     'somapos.gdf'))
             np.savetxt(fname, pop_soma_pos)
             assert(os.path.isfile(fname))
@@ -898,7 +964,7 @@ class PopulationSuper(object):
         # Save ImplementedMorphs
         
         # 1. Gather the local dictionaries from all ranks to Rank 0
-        local_mapping = self.ImplementedMorph.get(self.y, {})
+        local_mapping = self.ImplementedMorph.get(self.Pop, {})
         gathered_mappings = COMM.gather(local_mapping, root=0)
 
         if RANK == 0:
@@ -920,8 +986,8 @@ class PopulationSuper(object):
             fname = os.path.join(
                 self.populations_path,
                 self.output_file.format(
-                    self.y,
-                    f'{self.y}_morphologies.gdf' 
+                    self.Pop,
+                    f'{self.Pop}_morphologies.gdf' 
                 )
             )
             
@@ -940,7 +1006,7 @@ class PopulationSuper(object):
             fname = os.path.join(
                 self.populations_path,
                 self.output_file.format(
-                    self.y,
+                    self.Pop,
                     'rotations.h5'))
             f = h5py.File(fname, 'w')
             f.create_dataset('x', (len(self.rotations),))
@@ -1171,7 +1237,7 @@ class Population(PopulationSuper):
                 for i, synidx in enumerate(synIdx[cellindex]):
                     print(
                         'to:\t%s\tcell:\t%i\tfrom:\t%s:' %
-                        (self.y, cellindex, self.X[i]),)
+                        (self.Pop, cellindex, self.X[i]),)
                     idxcount = 0
                     for idx in synidx:
                         idxcount += idx.size
@@ -1684,7 +1750,7 @@ class Population(PopulationSuper):
         ---------  return_just_cell == FALSE ---------
         In this case we need to upload the correct morphology based on the sifting done in the previouse call of the same function but with
         return_just_cell == TRUE used only to load the morphology and place the synapses onto it.
-        Thus for a specific sub-population we resort to the variable self.ImplementedMorph[self.y] which encompasses the list of indicies
+        Thus for a specific sub-population we resort to the variable self.ImplementedMorph[self.Pop] which encompasses the list of indicies
         that locate in the self.Subpop variable. The correct morphology is located by the current 'cellindex' which inherently 
         links the latter with the synapses distributed in the previous call of the function
         
@@ -1737,12 +1803,12 @@ class Population(PopulationSuper):
                                         plot_result=False)
             # Update the dictionary, best to handle parallelization via MPI
             # Update dictionary to store the Raw Network ID alongside the Morphology ID
-            self.ImplementedMorph[self.y][cellindex] = [raw_network_id, Load_idx, nid]
+            self.ImplementedMorph[self.Pop][cellindex] = [raw_network_id, Load_idx, nid]
 
 
         else:
              # Retrieve the morphology choosen in the previous call of the function
-             raw_network_id, Load_idx, nid = self.ImplementedMorph[self.y][cellindex]
+             raw_network_id, Load_idx, nid = self.ImplementedMorph[self.Pop][cellindex]
 
 
 
@@ -1819,7 +1885,7 @@ class Population(PopulationSuper):
             # clean up hoc namespace
             cell.__del__()
 
-            print('cell %s population %s in %.2f s' % (cellindex, self.y,
+            print('cell %s population %s in %.2f s' % (cellindex, self.Pop,
                                                        time() - tic))
 
     def insert_all_synapses(self, cellindex, cell):
@@ -2084,7 +2150,7 @@ class TopoPopulation(Population):
             for j, X in enumerate(self.X):
                 delays[cellindex][X] = []
                 if 'delays' not in list(
-                        self.topology_connections[X][self.y].keys()):
+                        self.topology_connections[X][self.Pop].keys()):
                     # old behaviour, draw delays from normal distribution
                     for i, k in enumerate(self.k_yXL[:, j]):
                         loc = self.synDelayLoc[j]
@@ -2104,7 +2170,7 @@ class TopoPopulation(Population):
                             delay = np.zeros(k) + self.synDelayLoc[j]
                         delays[cellindex][X] += [delay]
                 else:
-                    topo_conn = self.topology_connections[X][self.y]['delays']
+                    topo_conn = self.topology_connections[X][self.Pop]['delays']
                     if 'linear' in list(topo_conn.keys()):
                         # ok, we're using linear delays,
                         # delay(r) = a * r + c
@@ -2116,9 +2182,9 @@ class TopoPopulation(Population):
                             self.pop_soma_pos[cellindex]['x'],
                             self.pop_soma_pos[cellindex]['y'],
                             self.networkSim.positions[X],
-                            self.topology_connections[X][self.y]['extent'][0],
-                            self.topology_connections[X][self.y]['extent'][1],
-                            self.topology_connections[X][self.y]['edge_wrap'])
+                            self.topology_connections[X][self.Pop]['extent'][0],
+                            self.topology_connections[X][self.Pop]['extent'][1],
+                            self.topology_connections[X][self.Pop]['edge_wrap'])
 
                         # get presynaptic unit GIDs for connections
                         i0 = self.networkSim.nodes[X][0]
@@ -2204,7 +2270,7 @@ class TopoPopulation(Population):
 
         SpCells = _get_all_SpCells(self.RANK_CELLINDICES,
                                    self.X,
-                                   self.y,
+                                   self.Pop,
                                    self.pop_soma_pos,
                                    self.networkSim.positions,
                                    self.topology_connections,
