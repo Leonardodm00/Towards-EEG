@@ -266,57 +266,29 @@ class general_params(object):
         # Number of populations
         self.Npops = 9
 
-        # number of neurons in each population (unscaled)
-        self.full_scale_num_neurons = [[20683,   # layer 23 e
-                                        5834 ],  # layer 23 i
-                                       [21915,   # layer 4 e
-                                        5479 ],  # layer 4 i
-                                       [4850,    # layer 5 e
-                                        1065 ],  # layer 5 i
-                                       [14395,   # layer 6 e
-                                        2948 ]]  # layer 6 i
+
+        # Microcolumn properties
+        conn = Connectomics(Calculate=False)
+        self.Col_prop = conn.get_ColumnProp
+
 
         # Number of thalamic neurons/ point processes
         self.n_thal = 902
 
         # population names TODO: rename
-        self.X = ['TC', 'L23E', 'L23I', 'L4E', 'L4I', 'L5E', 'L5I', 'L6E', 'L6I']
-        self.Y = self.X[1:]
+        self.Pre = ['TC',
+                "L23_exc", "L23_inh", 
+                "L4_exc", "L4_inh", "L4_ss", 
+                "L5_exc", "L5_inh", 
+                "L6_exc", "L6_inh"]
+        self.Post = self.Pre[1:]
 
         # TC and cortical population sizes in one list TODO: rename
         self.N_X = np.array([self.n_thal]+flattenlist([self.full_scale_num_neurons]))
   
 
-        ####################################
-        # CONNECTIVITY                     #
-        ####################################
         
-        # intra-cortical connection probabilities between populations
-        #                            23e      23i      4e     4i      5e     5i       6e      6i
-        self.conn_probs = np.array([[0.1009,0.1689, 0.0437, 0.0818, 0.0323, 0.,     0.0076,  0.    ],  # 23e
-                                    [0.1346,0.1371, 0.0316, 0.0515, 0.0755, 0.,     0.0042,  0.    ],  # 23i
-                                    [0.0077,0.0059, 0.0497, 0.135,  0.0067, 0.0003, 0.0453,  0.    ],  # 4e
-                                    [0.0691,0.0029, 0.0794, 0.1597, 0.0033, 0.,     0.1057,  0.    ],  # 4i
-                                    [0.1004,0.0622, 0.0505, 0.0057, 0.0831, 0.3726, 0.0204,  0.    ],  # 5e 
-                                    [0.0548,0.0269, 0.0257, 0.0022, 0.06,   0.3158, 0.0086,  0.    ],  # 5i
-                                    [0.0156,0.0066, 0.0211, 0.0166, 0.0572, 0.0197, 0.0396,  0.2252],  # 6e
-                                    [0.0364,0.001,  0.0034, 0.0005, 0.0277, 0.008,  0.0658,  0.1443]]) # 6i
-
-        # connection probabilities for thalamic input
-        self.C_th = [[0.0,       # layer 23 e
-                      0.0   ],   # layer 23 i    
-                     [0.0983,    # layer 4 e
-                      0.0619],   # layer 4 i
-                     [0.0,       # layer 5 e
-                      0.0   ],   # layer 5 i
-                     [0.0512,    # layer 6 e
-                      0.0196]]   # layer 6 i
-
-
-        # full connection probabilities including TC connections
-        self.C_YX = np.c_[flattenlist([self.C_th]), self.conn_probs]
         
-
         ####################################
         # CONNECTION PROPERTIES            #
         ####################################
@@ -354,89 +326,20 @@ class general_params(object):
         # CELL-TYPE PARAMETERS             #
         ####################################
         
-        # Note that these parameters are only relevant for the point-neuron network in case
-        # one wants to calculate depth-resolved cell-type specific input currents
-
-        # point to .json connectivity table file
-        self.connectivity_table = 'binzegger_connectivity_table.json'
-
-        #list of cell type names used in this script
-        #names of every post-syn pop layer
-        self.y_in_Y = [
-                [['p23'],['b23','nb23']],
-                [['p4','ss4(L23)','ss4(L4)'],['b4','nb4']],
-                [['p5(L23)','p5(L56)'],['b5','nb5']],
-                [['p6(L4)','p6(L56)'],['b6','nb6']]]
-
-        self.y = flattenlist(self.y_in_Y)
-        
-        #need presynaptic cell type to population mapping
-        self.x_in_X = [['TCs', 'TCn']] + sum(self.y_in_Y, [])
-        
-        
-        #map the pre-synaptic populations to the post-syn populations
-        self.mapping_Yy = list(zip(
-                  ['L23E', 'L23I', 'L23I',
-                   'L4E', 'L4E', 'L4E', 'L4I', 'L4I',
-                   'L5E', 'L5E', 'L5I', 'L5I',
-                   'L6E', 'L6E', 'L6I', 'L6I'],
-                  self.y))
-
-        # Frequency of occurrence of each cell type (F_y); 1-d array 
-        self.F_y = get_F_y(fname=self.connectivity_table, y=self.y)
-
-        # Relative frequency of occurrence of each cell type within its population (F_{y,Y})
-        self.F_yY = [[get_F_y(fname=self.connectivity_table, y=y) for y in Y] for Y in self.y_in_Y]
-        
-        # Number of neurons of each cell type (N_y); 1-d array
-        self.N_y = np.array([self.full_scale_num_neurons[layer][pop] * self.F_yY[layer][pop][k] \
-                                     for layer, array in enumerate(self.y_in_Y)\
-                                     for pop, cell_types in enumerate(array) \
-                                     for k, _ in enumerate(cell_types)]).astype(int)
-        
-        
-        #compute the number of synapses as in Potjans&Diesmann 2012
-        K_YX = np.zeros(self.C_YX.shape)
-        for i in range(K_YX.shape[1]):
-            K_YX[:, i] = (np.log(1. - self.C_YX[:, i]) /
-                                np.log(1. - 1./(self.N_X[1:]*
-                                                self.N_X[i])))
 
 
-        #spatial connection probabilites on each subpopulation
-        #Each key must correspond to a subpopulation like 'L23E' used everywhere else,
-        #each array maps thalamic and intracortical connections.
-        #First column is thalamic connections, and the rest intracortical,
-        #ordered like 'L23E', 'L23I' etc., first row is normalised probability of
-        #connection withing L1, L2, etc.;
-        self.L_yXL = get_L_yXL(fname = self.connectivity_table,
-                                         y = self.y,
-                                         x_in_X = self.x_in_X,
-                                         L = ['1','23','4','5','6'])
-        
-        #compute the cell type specificity
-        self.T_yX = get_T_yX(fname=self.connectivity_table, y=self.y,
-                             y_in_Y=self.y_in_Y, x_in_X=self.x_in_X,
-                             F_y=self.F_y)
-        
-        Y, y = list(zip(*self.mapping_Yy))
 
-        #assess relative distribution of synapses for a given celltype
-        self.K_yXL = {}
-        #self.T_yX = {}
-        for i, (Y, y) in enumerate(self.mapping_Yy):
-            #fill in K_yXL (layer specific connectivity)
-            self.K_yXL[y] = (self.T_yX[i, ] * K_YX[np.array(self.Y)==Y, ] * self.L_yXL[y]).astype(int)
-        
-        #number of incoming connections per cell type per layer per cell 
-        self.k_yXL = {}
-        for y, N_y in zip(self.y, self.N_y):
-            self.k_yXL.update({y : (1. * self.K_yXL[y]).astype(int) // N_y})
 
-        #calculate corresponding connectivity to K_yXL
-        self.C_yXL = {}
-        for y, N_y in zip(self.y, self.N_y):
-            self.C_yXL.update({y : 1. - (1.-1./(N_y* self.N_X))**self.K_yXL[y] })
+
+
+
+
+
+
+
+
+
+
 
 
 ################################################################################################################
@@ -786,7 +689,7 @@ class multicompartment_params(point_neuron_network_params):
             'label' :       'population_spikes',
             'ext' :         'gdf',
             'GIDs' : self.get_GIDs(),
-            'X' : self.X,
+            'Prepop' : self.Pre,
         }
 
 
@@ -867,7 +770,7 @@ class multicompartment_params(point_neuron_network_params):
         # cell type y in population Y
         self.J_yX = {}
         for Y, y in self.mapping_Yy:
-            [i] = np.where(np.array(self.Y) == Y)[0]
+            [i] = np.where(np.array(self.Post) == Y)[0]
             self.J_yX.update({y : J_YX[i, ]})
         
     
@@ -887,7 +790,7 @@ class multicompartment_params(point_neuron_network_params):
         self.depths = self._calcDepths()
         
         # make a nice structure with data for each subpopulation
-        self.y_zip_list = list(zip(self.y, self.m_y,
+        self.Post_zip_list = list(zip(self.Post, self.m_y,
                             self.depths, self.N_y))
 
 
@@ -916,7 +819,7 @@ class multicompartment_params(point_neuron_network_params):
         
 
         # layer specific LFPy.Cell-parameters as nested dictionary
-        self.yCellParams = self._yCellParams()
+        self.PostCellParams = self._yCellParams()
         
         
         # set the axis of which each cell type y is randomly rotated,
@@ -924,7 +827,7 @@ class multicompartment_params(point_neuron_network_params):
         # in the population class, while P-types are
         # only rotated around the z-axis
         self.rand_rot_axis = {}
-        for y, _, _, _ in self.y_zip_list:
+        for y, _, _, _ in self.Post_zip_list:
             #identify pyramidal cell populations:
             if y.rfind('p') >= 0:
                 self.rand_rot_axis.update({y : ['z']})
@@ -939,7 +842,7 @@ class multicompartment_params(point_neuron_network_params):
         # a dict setting the number of cells N_y and geometry
         # of cell type population y
         self.populationParams = {}
-        for y, _, depth, N_y in self.y_zip_list:
+        for y, _, depth, N_y in self.Post_zip_list:
             self.populationParams.update({
                 y : {
                     'number' : int(N_y*self.SCALING),
@@ -953,7 +856,7 @@ class multicompartment_params(point_neuron_network_params):
         # Set up cell type specific synapse parameters in terms of synapse model
         # and synapse locations
         self.synParams = {}
-        for y in self.y:
+        for y in self.Post:
             if y.rfind('p') >= 0:
                 #pyramidal types have apical dendrites
                 section = ['apic', 'dend']
@@ -972,10 +875,10 @@ class multicompartment_params(point_neuron_network_params):
         # set up dictionary of synapse time constants specific to each
         # postsynaptic cell type and presynaptic population
         self.tau_yX = {}
-        for y in self.y:
+        for y in self.Post:
             self.tau_yX.update({
                 y : [self.model_params["tau_syn_in"] if 'I' in X else
-                     self.model_params["tau_syn_ex"] for X in self.X]
+                     self.model_params["tau_syn_ex"] for X in self.Pre]
             })
 
         #synaptic delay parameters, loc and scale is mean and std for every
@@ -1039,7 +942,7 @@ class multicompartment_params(point_neuron_network_params):
     def get_GIDs(self):
         GIDs = {}
         ind = 1
-        for i, (X, N_X) in enumerate(zip(self.X, self.N_X)):
+        for i, (X, N_X) in enumerate(zip(self.Pre, self.N_X)):
             GIDs[X] = [ind, N_X]
             ind += N_X
         return GIDs
@@ -1054,7 +957,7 @@ class multicompartment_params(point_neuron_network_params):
         '''
         delays = {}
         #mean delays
-        loc = np.zeros((len(self.y), len(self.X)))
+        loc = np.zeros((len(self.Post), len(self.Pre)))
         loc[:, 0] = self.delays[0]
         loc[:, 1::2] = self.delays[0]
         loc[:, 2::2] = self.delays[1]
@@ -1063,11 +966,11 @@ class multicompartment_params(point_neuron_network_params):
         
         #prepare output
         delay_loc = {}
-        for i, y in enumerate(self.y):
+        for i, y in enumerate(self.Post):
             delay_loc.update({y : loc[i]})
         
         delay_scale = {}
-        for i, y in enumerate(self.y):
+        for i, y in enumerate(self.Post):
             delay_scale.update({y : scale[i]})
                 
         return delay_loc, delay_scale
@@ -1082,7 +985,7 @@ class multicompartment_params(point_neuron_network_params):
         layer_bounds = self.layerBoundaries[1:]
 
         depth_y = []
-        for y in self.y:
+        for y in self.Post:
             if y in ['p23', 'b23', 'nb23']:
                 depth_y.append(layer_bounds[0])  # Layer 2/3 boundaries
             elif y in ['p4', 'ss4(L23)', 'ss4(L4)', 'b4', 'nb4']:
@@ -1108,7 +1011,7 @@ class multicompartment_params(point_neuron_network_params):
         '''
         #cell type specific parameters going into LFPy.Cell        
         yCellParams = {}
-        for layer, morpho, _, _ in self.y_zip_list:
+        for layer, morpho, _, _ in self.Post_zip_list:
             yCellParams.update({layer : self.cellParams.copy()})
             yCellParams[layer].update({
                 'morphology' : os.path.join(self.PATH_m_y, morpho),
@@ -1117,25 +1020,26 @@ class multicompartment_params(point_neuron_network_params):
  
 
 
-import numpy as np
-from scipy.spatial.distance import cdist
-from scipy import sparse
 import os
-
-
+import pickle
+import numpy as np
+from scipy import sparse
+from scipy.spatial.distance import cdist # This fixes the NameError
 class Connectomics:
 
 
-    def __init__(self,connectomics_path,connectomics_output):
+    def __init__(self,connectomics_path='',connectomics_output='',NSyn_path='',Calculate=True):
+        # NSyn_path path to the number of synapses per path
 
         self.connectomics_path = connectomics_path
         self.connectomics_output = connectomics_output
+        self.dat_file_path = NSyn_path
 
 
         # --------------------------------------
         # Construct the input dictionary
 
-        column_input = {
+        input_dict = {
             'Layers': {
                 'L1':  [-250.0, 0.0],
                 'L23': [-1200.0, -250.0],
@@ -1156,28 +1060,44 @@ class Connectomics:
         }
 
 
-        self.input_dict = column_input
-        
-        # State variables
-        self.bbp_results = None
-        self.bbp_totals = None
-        self.mtype_fast_lookup = None
-        self.cell_mtypes = None
-        self.cell_coords = None
-        self.adj_matrix = None
-        self.post_to_pre = None
-        self.pre_to_post = None
 
-        # Open the file in 'read-binary' mode and load the data
-        full_path_conn = os.path.join(self.connectomics_path, 'conn.pkl')
-        with open(full_path_conn, 'rb') as f:
-            self.conn_data = pickle.load(f)
+        self.input_dict = input_dict
 
-        # Execute Pipeline
-        self.get_lookup_table()
-        self.calculate_bbp_relative_presences()
-        self.get_ADJ()
-        self.extract_connectivity_dicts()
+
+        if Calculate:
+
+
+            
+            
+            # State variables
+            self.bbp_results = None
+            self.bbp_totals = None
+            self.mtype_fast_lookup = None
+            self.cell_mtypes = None
+            self.cell_coords = None
+            self.adj_matrix = None
+            self.post_to_pre = None
+            self.pre_to_post = None
+            self.synapse_dict = None
+
+            # Open the file in 'read-binary' mode and load the data
+            full_path_conn = os.path.join(self.connectomics_path, 'conn.pkl')
+            with open(full_path_conn, 'rb') as f:
+                self.conn_data = pickle.load(f)
+
+            # Execute Pipeline
+            self.get_lookup_table()
+            self.calculate_bbp_relative_presences()
+            self.get_ADJ()
+            self.extract_connectivity_dicts()
+            self.extract_multapses()
+
+
+
+    @property
+    def get_ColumnProp(self):
+        return self.input_dict
+    
 
 
 
@@ -1196,6 +1116,7 @@ class Connectomics:
                 - 'adj_matrix': Sparse CSR matrix representing the synaptic adjacency graph.
                 - 'post_to_pre': Afferent dict mapping Post-synaptic IDs to lists of Pre-synaptic IDs.
                 - 'pre_to_post': Efferent dict mapping Pre-synaptic IDs to lists of Post-synaptic IDs.
+                - 'synapse_dict' : Afferent dict mapping Post-synaptic IDs to lists of Pre-synaptic IDs and number of synapses per connections
         """
         return {
             'bbp_results': self.bbp_results,
@@ -1203,9 +1124,11 @@ class Connectomics:
             'mtype_fast_lookup': self.mtype_fast_lookup,
             'cell_mtypes': self.cell_mtypes,
             'cell_coords': self.cell_coords,
+            'synapse_dict': self.synapse_dict,
             'adj_matrix': self.adj_matrix,
             'post_to_pre': self.post_to_pre,
-            'pre_to_post': self.pre_to_post
+            'pre_to_post': self.pre_to_post,
+
         }
         
     def calculate_bbp_relative_presences(self):
@@ -1340,6 +1263,121 @@ class Connectomics:
 
 
 
+    def extract_multapses(self):
+        """
+        Constructs a dictionary mapping post-synaptic IDs to an Nx2 matrix of 
+        pre-synaptic IDs and their calculated multapse counts, with macro-population
+        averaging for missing structural pathways.
+        """
+        dat_file_path = self.dat_file_path
+        post_to_pre   = self.post_to_pre
+        cell_mtypes   = self.cell_mtypes
+        mtype_fast_lookup = self.mtype_fast_lookup  # Used to group cells into macro-populations
+        
+        # 1. Parse the synNumberperconex.dat file as a text file
+        file_path = 'synNumberperconex.dat'
+        full_path_conn = os.path.join(dat_file_path, file_path)
+        
+        from collections import defaultdict
+        
+        # Nested dictionary to store specific mean and std
+        syn_stats = defaultdict(dict)
+        
+        with open(full_path_conn, 'r') as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 6:
+                    mean_val = float(parts[2])
+                    std_val = float(parts[3])
+                    proj = parts[5]
+                    
+                    if ':' in proj:
+                        pre_mtype_str, post_mtype_str = proj.split(':')
+                        syn_stats[pre_mtype_str][post_mtype_str] = {
+                            'mean': mean_val, 
+                            'std': std_val
+                        }
+
+        # ---------------------------------------------------------
+        # NEW: Calculate Macro-Population Averages for Imputation
+        # ---------------------------------------------------------
+        # Accumulator: Key = ((PreLayer, PreBio), (PostLayer, PostBio))
+        macro_stats_accumulator = defaultdict(lambda: {'sum_mean': 0.0, 'sum_std': 0.0, 'count': 0})
+        
+        for pre_m, post_dict in syn_stats.items():
+            pre_macro = mtype_fast_lookup.get(pre_m)
+            if not pre_macro: continue # Skip if mtype isn't in our circuit
+            
+            for post_m, stats in post_dict.items():
+                post_macro = mtype_fast_lookup.get(post_m)
+                if not post_macro: continue
+                
+                macro_key = (pre_macro, post_macro)
+                macro_stats_accumulator[macro_key]['sum_mean'] += stats['mean']
+                macro_stats_accumulator[macro_key]['sum_std'] += stats['std']
+                macro_stats_accumulator[macro_key]['count'] += 1
+                
+        # Calculate final averages
+        macro_averages = {}
+        for macro_key, acc in macro_stats_accumulator.items():
+            if acc['count'] > 0:
+                macro_averages[macro_key] = {
+                    'mean': acc['sum_mean'] / acc['count'],
+                    'std': acc['sum_std'] / acc['count']
+                }
+        # ---------------------------------------------------------
+
+        multapse_dict = {}
+
+        for post_idx, pre_indices in post_to_pre.items():
+            if not pre_indices:
+                continue
+                
+            post_mtype = cell_mtypes[post_idx]
+            post_macro = mtype_fast_lookup.get(post_mtype)
+            
+            pre_array = np.array(pre_indices, dtype=int)
+            pre_mtypes = cell_mtypes[pre_array]
+            
+            n_pre = len(pre_array)
+            means = np.zeros(n_pre)
+            stds = np.zeros(n_pre)
+            
+            # Populate means and stds based on the pathway
+            for i, pre_mtype in enumerate(pre_mtypes):
+                try:
+                    # Strategy A: Exact structural pathway match
+                    means[i] = syn_stats[pre_mtype][post_mtype]['mean']
+                    stds[i] = syn_stats[pre_mtype][post_mtype]['std']
+                    
+                except KeyError:
+                    # Strategy B: Impute using macro-population average
+                    pre_macro = mtype_fast_lookup.get(pre_mtype)
+                    macro_key = (pre_macro, post_macro)
+                    
+                    if macro_key in macro_averages:
+                        means[i] = macro_averages[macro_key]['mean']
+                        stds[i] = macro_averages[macro_key]['std']
+                    else:
+                        # Strategy C: Absolute last resort to prevent crashes
+                        means[i] = 1.0
+                        stds[i] = 0.0
+                    
+            # 2. Draw from the Gaussian distribution
+            sampled_synapses = np.random.normal(loc=means, scale=stds)
+            
+            # 3. Clean the data (ensure at least 1 synapse if connected)
+            n_synapses = np.maximum(1, np.round(sampled_synapses)).astype(int)
+            
+            # 4. Construct the N_pre x 2 matrix
+            result_matrix = np.column_stack((pre_array, n_synapses))
+            
+            multapse_dict[post_idx] = result_matrix
+
+        self.synapse_dict = multapse_dict
+
+
+
     def extract_connectivity_dicts(self):
         """
         Extracts pre-to-post and post-to-pre connectivity dictionaries from a sparse adjacency matrix.
@@ -1404,10 +1442,6 @@ class Connectomics:
 
         self.post_to_pre = post_to_pre
         self.pre_to_post = pre_to_post
-
-
- 
-
 
     
 
@@ -1747,7 +1781,81 @@ class Connectomics:
     
 
 
+# 1. The Updated Extraction Function (Now includes 'cell_mtypes')
+def extract_macro_populations(connectomics_data, name_list):
+    """
+    Extracts specific macro-populations using the fast lookup table,
+    returning only spatial coordinates, mapping indices, and the integrated synapse dictionary.
+    """
+    # Unpack only the necessary data
+    mtype_fast_lookup = connectomics_data['mtype_fast_lookup']
+    cell_mtypes = connectomics_data['cell_mtypes']
+    cell_coords = connectomics_data['cell_coords']
+    
+    # NEW: Only grab the integrated synapse_dict
+    synapse_dict = connectomics_data['synapse_dict']
 
+    extracted_data = {}
+
+    for name in name_list:
+        # 1. Parse the macro-population string (e.g., "L23_exc" -> "L23", "exc")
+        parts = name.split('_')
+        target_layer = parts[0].upper()
+        target_group = parts[1].lower()
+
+        global_indices = []
+
+        # 2. Iterate through the array using the FAST LOOKUP
+        for raw_idx, mtype in enumerate(cell_mtypes):
+            if mtype not in mtype_fast_lookup:
+                continue
+
+            layer, bio_type = mtype_fast_lookup[mtype]
+
+            # 3. Matching Logic
+            is_match = False
+            if layer == target_layer:
+                if target_group == 'exc' and bio_type == 'Excitatory':
+                    # Ensure L4_exc doesn't swallow L4_ss if both are requested
+                    if target_layer == 'L4' and 'L4_ss' in name_list and 'SS' in mtype:
+                        is_match = False
+                    else:
+                        is_match = True
+                elif target_group == 'inh' and bio_type == 'Inhibitory':
+                    is_match = True
+                elif target_group == 'ss' and 'SS' in mtype:
+                    is_match = True
+
+            if is_match:
+                global_indices.append(raw_idx)
+
+        # 4. Process the matched sub-population
+        global_indices = np.array(global_indices)
+
+        if len(global_indices) == 0:
+            print(f"Warning: No cells found for macro-population '{name}'")
+            continue
+
+        # Extract Coordinates
+        sub_coords = cell_coords[global_indices]
+
+        # Create Mapping: Local (0 to N) -> Raw Global Index
+        local_to_raw_map = {local_idx: raw_idx for local_idx, raw_idx in enumerate(global_indices)}
+
+        # NEW: Filter the single synapse_dict (Keys are LOCAL, Values are RAW)
+        sub_synapse_dict = {
+            local_idx: synapse_dict[raw_idx] 
+            for local_idx, raw_idx in enumerate(global_indices) if raw_idx in synapse_dict
+        }
+
+        # 5. Pack strictly the requested keys into the return dictionary
+        extracted_data[name] = {
+            'cell_coords': sub_coords,
+            'local_to_raw_map': local_to_raw_map,
+            'synapse_dict': sub_synapse_dict
+        }
+
+    return extracted_data
 
 
 
@@ -1805,81 +1913,7 @@ class MorphoPath:
     def get_paths(self):
         return self.paths
 
-# 1. The Updated Extraction Function (Now includes 'cell_mtypes')
-def extract_macro_populations(connectomics_data, name_list):
-    """
-    Extracts specific macro-populations using the fast lookup table, 
-    returning only spatial coordinates, mapping indices, and connectivity dictionaries.
-    """
-    # Unpack only the necessary data for fast processing and requested outputs
-    mtype_fast_lookup = connectomics_data['mtype_fast_lookup']
-    cell_mtypes = connectomics_data['cell_mtypes']
-    cell_coords = connectomics_data['cell_coords']
-    post_to_pre = connectomics_data['post_to_pre']
-    pre_to_post = connectomics_data['pre_to_post']
-    
-    extracted_data = {}
-    
-    for name in name_list:
-        # 1. Parse the macro-population string (e.g., "L23_exc" -> "L23", "exc")
-        parts = name.split('_')
-        target_layer = parts[0].upper()
-        target_group = parts[1].lower()
-        
-        global_indices = []
-        
-        # 2. Iterate through the array using the FAST LOOKUP
-        for raw_idx, mtype in enumerate(cell_mtypes):
-            if mtype not in mtype_fast_lookup:
-                continue
-                
-            layer, bio_type = mtype_fast_lookup[mtype]
-            
-            # 3. Matching Logic
-            is_match = False
-            if layer == target_layer:
-                if target_group == 'exc' and bio_type == 'Excitatory':
-                    # Ensure L4_exc doesn't swallow L4_ss if both are requested
-                    if target_layer == 'L4' and 'L4_ss' in name_list and 'SS' in mtype:
-                        is_match = False 
-                    else:
-                        is_match = True
-                elif target_group == 'inh' and bio_type == 'Inhibitory':
-                    is_match = True
-                elif target_group == 'ss' and 'SS' in mtype:
-                    is_match = True
-                    
-            if is_match:
-                global_indices.append(raw_idx)
-                
-        # 4. Process the matched sub-population
-        global_indices = np.array(global_indices)
-        
-        if len(global_indices) == 0:
-            print(f"Warning: No cells found for macro-population '{name}'")
-            continue
-            
-        # Extract Coordinates
-        sub_coords = cell_coords[global_indices]
-        
-        # Create Mapping: Local (0 to N) -> Raw Global Index
-        local_to_raw_map = {local_idx: raw_idx for local_idx, raw_idx in enumerate(global_indices)}
-        
-        # Filter Connectivity Dictionaries (Keys are RAW, Values are RAW)
-        sub_post_to_pre = {raw_idx: post_to_pre[raw_idx] 
-                           for raw_idx in global_indices if raw_idx in post_to_pre}
-        sub_pre_to_post = {raw_idx: pre_to_post[raw_idx] 
-                           for raw_idx in global_indices if raw_idx in pre_to_post}
-                           
-        # 5. Pack strictly the requested keys into the return dictionary
-        extracted_data[name] = {
-            'cell_coords': sub_coords,
-            'local_to_raw_map': local_to_raw_map,
-            'post_to_pre': sub_post_to_pre,
-            'pre_to_post': sub_pre_to_post
-        }
-        
-    return extracted_data
+
 
 
         
