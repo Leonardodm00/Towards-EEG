@@ -1,18 +1,17 @@
-
-
-import numpy as np
-from scipy.spatial.distance import cdist
-from scipy import sparse
 import os
-
-
+import pickle
+import numpy as np
+from scipy import sparse
+from scipy.spatial.distance import cdist # This fixes the NameError
 class Connectomics:
 
 
-   def __init__(self,connectomics_path='',connectomics_output='',Calculate=True):
+    def __init__(self,connectomics_path='',connectomics_output='',NSyn_path='',Calculate=True):
+        # NSyn_path path to the number of synapses per path
 
         self.connectomics_path = connectomics_path
         self.connectomics_output = connectomics_output
+        self.dat_file_path = NSyn_path
 
 
         # --------------------------------------
@@ -42,7 +41,7 @@ class Connectomics:
 
         self.input_dict = input_dict
 
-        
+
         if Calculate:
 
 
@@ -57,6 +56,7 @@ class Connectomics:
             self.adj_matrix = None
             self.post_to_pre = None
             self.pre_to_post = None
+            self.synapse_dict = None
 
             # Open the file in 'read-binary' mode and load the data
             full_path_conn = os.path.join(self.connectomics_path, 'conn.pkl')
@@ -68,12 +68,14 @@ class Connectomics:
             self.calculate_bbp_relative_presences()
             self.get_ADJ()
             self.extract_connectivity_dicts()
+            self.extract_multapses()
 
 
 
     @property
     def get_ColumnProp(self):
         return self.input_dict
+    
 
 
 
@@ -92,6 +94,7 @@ class Connectomics:
                 - 'adj_matrix': Sparse CSR matrix representing the synaptic adjacency graph.
                 - 'post_to_pre': Afferent dict mapping Post-synaptic IDs to lists of Pre-synaptic IDs.
                 - 'pre_to_post': Efferent dict mapping Pre-synaptic IDs to lists of Post-synaptic IDs.
+                - 'synapse_dict' : Afferent dict mapping Post-synaptic IDs to lists of Pre-synaptic IDs and number of synapses per connections
         """
         return {
             'bbp_results': self.bbp_results,
@@ -99,9 +102,11 @@ class Connectomics:
             'mtype_fast_lookup': self.mtype_fast_lookup,
             'cell_mtypes': self.cell_mtypes,
             'cell_coords': self.cell_coords,
+            'synapse_dict': self.synapse_dict,
             'adj_matrix': self.adj_matrix,
             'post_to_pre': self.post_to_pre,
-            'pre_to_post': self.pre_to_post
+            'pre_to_post': self.pre_to_post,
+
         }
         
     def calculate_bbp_relative_presences(self):
@@ -236,6 +241,121 @@ class Connectomics:
 
 
 
+    def extract_multapses(self):
+        """
+        Constructs a dictionary mapping post-synaptic IDs to an Nx2 matrix of 
+        pre-synaptic IDs and their calculated multapse counts, with macro-population
+        averaging for missing structural pathways.
+        """
+        dat_file_path = self.dat_file_path
+        post_to_pre   = self.post_to_pre
+        cell_mtypes   = self.cell_mtypes
+        mtype_fast_lookup = self.mtype_fast_lookup  # Used to group cells into macro-populations
+        
+        # 1. Parse the synNumberperconex.dat file as a text file
+        file_path = 'synNumberperconex.dat'
+        full_path_conn = os.path.join(dat_file_path, file_path)
+        
+        from collections import defaultdict
+        
+        # Nested dictionary to store specific mean and std
+        syn_stats = defaultdict(dict)
+        
+        with open(full_path_conn, 'r') as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 6:
+                    mean_val = float(parts[2])
+                    std_val = float(parts[3])
+                    proj = parts[5]
+                    
+                    if ':' in proj:
+                        pre_mtype_str, post_mtype_str = proj.split(':')
+                        syn_stats[pre_mtype_str][post_mtype_str] = {
+                            'mean': mean_val, 
+                            'std': std_val
+                        }
+
+        # ---------------------------------------------------------
+        # NEW: Calculate Macro-Population Averages for Imputation
+        # ---------------------------------------------------------
+        # Accumulator: Key = ((PreLayer, PreBio), (PostLayer, PostBio))
+        macro_stats_accumulator = defaultdict(lambda: {'sum_mean': 0.0, 'sum_std': 0.0, 'count': 0})
+        
+        for pre_m, post_dict in syn_stats.items():
+            pre_macro = mtype_fast_lookup.get(pre_m)
+            if not pre_macro: continue # Skip if mtype isn't in our circuit
+            
+            for post_m, stats in post_dict.items():
+                post_macro = mtype_fast_lookup.get(post_m)
+                if not post_macro: continue
+                
+                macro_key = (pre_macro, post_macro)
+                macro_stats_accumulator[macro_key]['sum_mean'] += stats['mean']
+                macro_stats_accumulator[macro_key]['sum_std'] += stats['std']
+                macro_stats_accumulator[macro_key]['count'] += 1
+                
+        # Calculate final averages
+        macro_averages = {}
+        for macro_key, acc in macro_stats_accumulator.items():
+            if acc['count'] > 0:
+                macro_averages[macro_key] = {
+                    'mean': acc['sum_mean'] / acc['count'],
+                    'std': acc['sum_std'] / acc['count']
+                }
+        # ---------------------------------------------------------
+
+        multapse_dict = {}
+
+        for post_idx, pre_indices in post_to_pre.items():
+            if not pre_indices:
+                continue
+                
+            post_mtype = cell_mtypes[post_idx]
+            post_macro = mtype_fast_lookup.get(post_mtype)
+            
+            pre_array = np.array(pre_indices, dtype=int)
+            pre_mtypes = cell_mtypes[pre_array]
+            
+            n_pre = len(pre_array)
+            means = np.zeros(n_pre)
+            stds = np.zeros(n_pre)
+            
+            # Populate means and stds based on the pathway
+            for i, pre_mtype in enumerate(pre_mtypes):
+                try:
+                    # Strategy A: Exact structural pathway match
+                    means[i] = syn_stats[pre_mtype][post_mtype]['mean']
+                    stds[i] = syn_stats[pre_mtype][post_mtype]['std']
+                    
+                except KeyError:
+                    # Strategy B: Impute using macro-population average
+                    pre_macro = mtype_fast_lookup.get(pre_mtype)
+                    macro_key = (pre_macro, post_macro)
+                    
+                    if macro_key in macro_averages:
+                        means[i] = macro_averages[macro_key]['mean']
+                        stds[i] = macro_averages[macro_key]['std']
+                    else:
+                        # Strategy C: Absolute last resort to prevent crashes
+                        means[i] = 1.0
+                        stds[i] = 0.0
+                    
+            # 2. Draw from the Gaussian distribution
+            sampled_synapses = np.random.normal(loc=means, scale=stds)
+            
+            # 3. Clean the data (ensure at least 1 synapse if connected)
+            n_synapses = np.maximum(1, np.round(sampled_synapses)).astype(int)
+            
+            # 4. Construct the N_pre x 2 matrix
+            result_matrix = np.column_stack((pre_array, n_synapses))
+            
+            multapse_dict[post_idx] = result_matrix
+
+        self.synapse_dict = multapse_dict
+
+
+
     def extract_connectivity_dicts(self):
         """
         Extracts pre-to-post and post-to-pre connectivity dictionaries from a sparse adjacency matrix.
@@ -300,10 +420,6 @@ class Connectomics:
 
         self.post_to_pre = post_to_pre
         self.pre_to_post = pre_to_post
-
-
- 
-
 
     
 
@@ -637,40 +753,97 @@ class Connectomics:
 
 
 
+    
 
+
+    
+
+
+# 1. The Updated Extraction Function (Now includes 'cell_mtypes')
+def extract_macro_populations(connectomics_data, name_list):
+    """
+    Extracts specific macro-populations using the fast lookup table,
+    returning only spatial coordinates, mapping indices, and the integrated synapse dictionary.
+    """
+    # Unpack only the necessary data
+    mtype_fast_lookup = connectomics_data['mtype_fast_lookup']
+    cell_mtypes = connectomics_data['cell_mtypes']
+    cell_coords = connectomics_data['cell_coords']
+    
+    # NEW: Only grab the integrated synapse_dict
+    synapse_dict = connectomics_data['synapse_dict']
+
+    extracted_data = {}
+
+    for name in name_list:
+        # 1. Parse the macro-population string (e.g., "L23_exc" -> "L23", "exc")
+        parts = name.split('_')
+        target_layer = parts[0].upper()
+        target_group = parts[1].lower()
+
+        global_indices = []
+
+        # 2. Iterate through the array using the FAST LOOKUP
+        for raw_idx, mtype in enumerate(cell_mtypes):
+            if mtype not in mtype_fast_lookup:
+                continue
+
+            layer, bio_type = mtype_fast_lookup[mtype]
+
+            # 3. Matching Logic
+            is_match = False
+            if layer == target_layer:
+                if target_group == 'exc' and bio_type == 'Excitatory':
+                    # Ensure L4_exc doesn't swallow L4_ss if both are requested
+                    if target_layer == 'L4' and 'L4_ss' in name_list and 'SS' in mtype:
+                        is_match = False
+                    else:
+                        is_match = True
+                elif target_group == 'inh' and bio_type == 'Inhibitory':
+                    is_match = True
+                elif target_group == 'ss' and 'SS' in mtype:
+                    is_match = True
+
+            if is_match:
+                global_indices.append(raw_idx)
+
+        # 4. Process the matched sub-population
+        global_indices = np.array(global_indices)
+
+        if len(global_indices) == 0:
+            print(f"Warning: No cells found for macro-population '{name}'")
+            continue
+
+        # Extract Coordinates
+        sub_coords = cell_coords[global_indices]
+
+        # Create Mapping: Local (0 to N) -> Raw Global Index
+        local_to_raw_map = {local_idx: raw_idx for local_idx, raw_idx in enumerate(global_indices)}
+
+        # NEW: Filter the single synapse_dict (Keys are LOCAL, Values are RAW)
+        sub_synapse_dict = {
+            local_idx: synapse_dict[raw_idx] 
+            for local_idx, raw_idx in enumerate(global_indices) if raw_idx in synapse_dict
+        }
+
+        # 5. Pack strictly the requested keys into the return dictionary
+        extracted_data[name] = {
+            'cell_coords': sub_coords,
+            'local_to_raw_map': local_to_raw_map,
+            'synapse_dict': sub_synapse_dict
+        }
+
+    return extracted_data
 
 
 import pickle
 
 
-
-# ==========================================
-# Execution Example
-# ==========================================
-
 connectomics_path = '/content/drive/MyDrive/Colab Notebooks/Connectomics/'
 
 connectomics_output = '/content/drive/MyDrive/Colab Notebooks/Connectomic_output/'
 
-column_input = {
-    'Layers': {
-        'L1':  [-250.0, 0.0],
-        'L23': [-1200.0, -250.0],
-        'L4':  [-1580.0, -1200.0],
-        'L5':  [-2175.0, -1580.0],
-        'L6':  [-2770.0, -2175.0]
-    },
-    'Cells': {
-        'L1':  {'inh': 5145.9},                        # L1 only has inhibitory cells
-        'L23': {'exc': 21466.6+8927.3, 'inh': 11655.3 + 5118.9},
-        'L4':  {'exc': 23201.8, 'inh': 5502.3},           # Your example format
-        'L5':  {'Excitatory': 10297.6, 'Inhibitory': 3249.9}, # Explicit keys work too
-        'L6':  {'exc': 9823.0, 'inh': 1427.2}
-    },
-    'Geometry': {
-        'radius': 300.0 # micrometers
-    }
-}
+
 
 
 
@@ -678,55 +851,200 @@ conn =  Connectomics(connectomics_path,connectomics_output,column_input)
 
 conn_dict = conn.get_ConnectomicInfo
 
+import numpy as np
+import plotly.graph_objects as go
+from collections import Counter
+
+
+
+import numpy as np
+import plotly.graph_objects as go
+from collections import Counter
+
+def debug_plot_macro_populations(extracted_data, column_input):
+    """
+    Generates a 3D debug plot of extracted cells overlaid with theoretical layer bounds,
+    prints a detailed summary of the morphological types inside each macro-population,
+    and plots the distribution of synapse numbers per connection separated by Exc and Inh.
+    """
+    fig_3d = go.Figure()
+    fig_syn_exc = go.Figure() # Figure for Excitatory & Spiny Stellate
+    fig_syn_inh = go.Figure() # Figure for Inhibitory
+
+    colors = ['#00CCFF', '#FF3366', '#33FF66', '#FFCC00', '#B84DFF', '#FFA500', '#FFD700', '#ADFF2F']
+    radius = column_input['Geometry']['radius']
+
+    print("==========================================")
+    print("MACRO-POPULATION EXTRACTION DEBUG REPORT")
+    print("==========================================\n")
+
+    # A. Plot the extracted cells, print console report, and gather synapse data
+    for i, (pop_name, data) in enumerate(extracted_data.items()):
+        coords = data.get('cell_coords', np.empty((0, 3)))
+        mtypes = data.get('cell_mtypes', [])
+        synapse_dict = data.get('synapse_dict', {})
+
+        # Count the unique m-types to print to console
+        if len(mtypes) > 0:
+            mtype_counts = Counter(mtypes)
+            print(f"--- {pop_name} (Total Cells: {len(coords)}) ---")
+            for mt, count in mtype_counts.most_common():
+                print(f"    • {mt:<12}: {count} cells")
+            print("")
+        else:
+            print(f"--- {pop_name} (Total Cells: {len(coords)}) ---")
+            print("")
+
+        # ---------------------------------------------------------
+        # 1. 3D SPATIAL PLOT LOGIC
+        # ---------------------------------------------------------
+        # Subsample for Plotly performance if massive
+        max_plot = 5000
+        if len(coords) > max_plot:
+            idx = np.random.choice(len(coords), max_plot, replace=False)
+            plot_coords = coords[idx]
+            plot_mtypes = mtypes[idx] if len(mtypes) > 0 else [""] * max_plot
+        else:
+            plot_coords = coords
+            plot_mtypes = mtypes if len(mtypes) > 0 else [""] * len(coords)
+
+        # Add 3D scatter trace
+        fig_3d.add_trace(go.Scatter3d(
+            x=plot_coords[:, 0], y=plot_coords[:, 1], z=plot_coords[:, 2],
+            mode='markers',
+            name=f"{pop_name} (n={len(coords)})",
+            text=plot_mtypes,
+            hoverinfo='text+name',
+            marker=dict(size=3, color=colors[i % len(colors)], opacity=0.8)
+        ))
+
+        # ---------------------------------------------------------
+        # 2. SYNAPSE DISTRIBUTION PLOT LOGIC (SPLIT BY TYPE)
+        # ---------------------------------------------------------
+        # Extract all synapse counts (column 1 of the Nx2 matrix)
+        pop_synapse_counts = []
+        for post_idx, pre_matrix in synapse_dict.items():
+            if len(pre_matrix) > 0 and pre_matrix.ndim == 2:
+                pop_synapse_counts.extend(pre_matrix[:, 1])
+        
+        # Route the data to the correct figure based on the population name
+        if pop_synapse_counts:
+            pop_name_lower = pop_name.lower()
+            
+            # Use 'exc' or 'ss' (spiny stellate) for Excitatory
+            if 'exc' in pop_name_lower or 'ss' in pop_name_lower:
+                target_fig = fig_syn_exc
+            elif 'inh' in pop_name_lower:
+                target_fig = fig_syn_inh
+            else:
+                continue # Skip if it doesn't match standard naming conventions
+
+            target_fig.add_trace(go.Histogram(
+                x=pop_synapse_counts,
+                name=pop_name,
+                marker_color=colors[i % len(colors)],
+                opacity=0.75,
+                xbins=dict(start=0.5, end=max(pop_synapse_counts)+1.5, size=1)
+            ))
+
+    # B. Plot the Layer Boundaries from column_input (3D Plot)
+    theta = np.linspace(0, 2 * np.pi, 50)
+    x_circle = radius * np.cos(theta)
+    y_circle = radius * np.sin(theta)
+
+    for layer, bounds in column_input['Layers'].items():
+        z_min, z_max = min(bounds), max(bounds)
+
+        # Draw top and bottom planes for each layer
+        for z_val in [z_min, z_max]:
+            fig_3d.add_trace(go.Scatter3d(
+                x=x_circle, y=y_circle, z=np.full_like(x_circle, z_val),
+                mode='lines',
+                line=dict(color='rgba(255, 255, 255, 0.4)', width=2),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+
+        # Add a label in 3D space indicating the layer
+        fig_3d.add_trace(go.Scatter3d(
+            x=[radius * 1.1], y=[0], z=[(z_min + z_max) / 2],
+            mode='text',
+            text=[f"<b>{layer}</b>"],
+            textfont=dict(color='white', size=14),
+            showlegend=False,
+            hoverinfo='skip'
+        ))
+
+    # C. Layout Configurations (3D Plot)
+    fig_3d.update_layout(
+        title=dict(text="Extraction Debug: Spatial Bounding Check", font=dict(color='white', size=20)),
+        scene=dict(
+            xaxis=dict(title="X (µm)", backgroundcolor='black', gridcolor='#333', color='white'),
+            yaxis=dict(title="Y (µm)", backgroundcolor='black', gridcolor='#333', color='white'),
+            zaxis=dict(title="Depth Z (µm)", backgroundcolor='black', gridcolor='#333', color='white'),
+            aspectmode='data'
+        ),
+        paper_bgcolor='black',
+        plot_bgcolor='black',
+        legend=dict(font=dict(color='white'), bgcolor='rgba(0,0,0,0)'),
+        margin=dict(l=0, r=0, b=0, t=50)
+    )
+
+    # D. Layout Configurations (Synapse Plots)
+    fig_syn_exc.update_layout(
+        title="Multapses: Excitatory Populations (Including SS)",
+        xaxis_title="Number of Synapses",
+        yaxis_title="Frequency (Number of Connections)",
+        barmode='overlay', 
+        template='plotly_dark'
+    )
+
+    fig_syn_inh.update_layout(
+        title="Multapses: Inhibitory Populations",
+        xaxis_title="Number of Synapses",
+        yaxis_title="Frequency (Number of Connections)",
+        barmode='overlay', 
+        template='plotly_dark'
+    )
+
+    # Show all three figures
+    fig_3d.show(renderer="colab")
+    fig_syn_exc.show(renderer="colab")
+    fig_syn_inh.show(renderer="colab")
+
+# ==========================================
+# Execution Example
+# ==========================================
+
+input_dict = {
+            'Layers': {
+                'L1':  [-250.0, 0.0],
+                'L23': [-1200.0, -250.0],
+                'L4':  [-1580.0, -1200.0],
+                'L5':  [-2175.0, -1580.0],
+                'L6':  [-2770.0, -2175.0]
+            },
+            'Cells': {
+                'L1':  {'inh': 5145.9},                        # L1 only has inhibitory cells
+                'L23': {'exc': 21466.6+8927.3, 'inh': 11655.3 + 5118.9},
+                'L4':  {'exc': 23201.8, 'inh': 5502.3},           # Your example format
+                'L5':  {'Excitatory': 10297.6, 'Inhibitory': 3249.9}, # Explicit keys work too
+                'L6':  {'exc': 9823.0, 'inh': 1427.2}
+            },
+            'Geometry': {
+                'radius': 300.0 # micrometers
+            }
+        }
+
 
 name_list = [
-    "L23_exc", "L23_inh", 
-    "L4_exc", "L4_inh", "L4_ss", 
-    "L5_exc", "L5_inh", 
+    "L23_exc", "L23_inh",
+    "L4_exc", "L4_inh", "L4_ss",
+    "L5_exc", "L5_inh",
     "L6_exc", "L6_inh"
 ]
-extracted_pops = extract_macro_populations_debug(conn_dict, name_list)
-debug_plot_macro_populations(extracted_pops, column_input)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+extracted_pops = extract_macro_populations(conn_dict, name_list)
+debug_plot_macro_populations(extracted_pops, input_dict)
 
 
 
