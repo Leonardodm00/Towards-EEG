@@ -415,3 +415,173 @@ def evaluate_and_select_morphology(
     print(f"🎯 Selected Morphology ID: {best_nid}")
     return best_nid, all_synapse_locations
 
+import os
+import ast
+import numpy as np
+import pandas as pd
+from scipy.spatial.transform import Rotation as R
+import plotly.graph_objects as go
+
+def visualize_final_snapped_synapses_3d(
+    post_neuron_id,
+    matched_synapses_df,
+    input_dir,
+    metadata_filepath,
+    post_soma_pos,
+    pre_mtype=None,          # NEW: Pre-synaptic identifier
+    density_maps_dir=None,   # NEW: Path to the .npy density maps
+    pre_soma_pos=None,       # NEW: Global position of the pre-soma
+    voxel_size=10.0,         # NEW: Required to translate grid indices to um
+    k_neighbors=3
+):
+    """
+    Plots the snapped synapses on the 3D post-synaptic arbor, and optionally
+    overlays the pre-synaptic axonal probability field as a 3D volumetric cloud.
+    """
+    print(f"🎨 Rendering 3D spatial verification for Neuron {post_neuron_id}...")
+    fig = go.Figure()
+
+    # ==========================================
+    # 1. LOAD & PLOT PRE-SYNAPTIC AXONAL CLOUD
+    # ==========================================
+    if all(v is not None for v in [pre_mtype, density_maps_dir, pre_soma_pos]):
+        pre_axon_path = os.path.join(density_maps_dir, f"{pre_mtype}_axon.npy")
+        if os.path.exists(pre_axon_path):
+            print("   -> Adding Pre-Synaptic Axonal Probability Cloud...")
+            pre_grid = np.load(pre_axon_path)
+            Nx, Ny, Nz = pre_grid.shape
+
+            # Find all voxels where the probability is > 0
+            valid_x, valid_y, valid_z = np.where(pre_grid > 0)
+
+            # Convert array indices to local physical distance, then shift to global space
+            center_idx = Nx // 2
+            global_pre_x = (valid_x - center_idx) * voxel_size + pre_soma_pos[0]
+            global_pre_y = (valid_y - center_idx) * voxel_size + pre_soma_pos[1]
+            global_pre_z = (valid_z - center_idx) * voxel_size + pre_soma_pos[2]
+
+            # Downsample the cloud if it's too dense (keeps the browser from freezing)
+            max_points = 15000
+            if len(global_pre_x) > max_points:
+                idx = np.random.choice(len(global_pre_x), max_points, replace=False)
+                global_pre_x, global_pre_y, global_pre_z = global_pre_x[idx], global_pre_y[idx], global_pre_z[idx]
+
+            # Add the Axonal Cloud
+            fig.add_trace(go.Scatter3d(
+                x=global_pre_x, y=global_pre_y, z=global_pre_z,
+                mode='markers',
+                marker=dict(size=3, color='darkorange', opacity=0.05),
+                name='Pre-Synaptic Axon Field',
+                hoverinfo='none'
+            ))
+
+            # Add the Pre-Soma Marker
+            fig.add_trace(go.Scatter3d(
+                x=[pre_soma_pos[0]], y=[pre_soma_pos[1]], z=[pre_soma_pos[2]],
+                mode='markers',
+                marker=dict(size=8, color='red', symbol='circle', line=dict(color='white', width=1)),
+                name='Pre-Soma Position'
+            ))
+
+    # ==========================================
+    # 2. LOAD & ALIGN POST-SYNAPTIC SKELETON
+    # ==========================================
+    metadata_df = pd.read_csv(metadata_filepath)
+    if isinstance(metadata_df['rotation_matrix'].iloc[0], str):
+        metadata_df['rotation_matrix'] = metadata_df['rotation_matrix'].apply(ast.literal_eval)
+    reference_somas = metadata_df[['soma_x', 'soma_y', 'soma_z']].values
+
+    filepath = os.path.join(input_dir, f"neuron_{post_neuron_id}.csv")
+    if not os.path.exists(filepath):
+        print(f"⚠️ Morphology file not found: {filepath}")
+        return
+
+    df = pd.read_csv(filepath)
+    root_rows = df[df['p'] == -1]
+    if root_rows.empty:
+        return
+
+    soma_pos_raw = root_rows.iloc[0][['x', 'y', 'z']].values.astype(float)
+
+    # Align to Local Space
+    centered_coords = df[['x', 'y', 'z']].values - soma_pos_raw
+    distances = np.linalg.norm(reference_somas - soma_pos_raw, axis=1)
+    nearest_metadata = metadata_df.iloc[np.argsort(distances)[:min(k_neighbors, len(metadata_df))]]
+    mean_matrix = R.from_matrix(np.array(nearest_metadata['rotation_matrix'].tolist())).mean().as_matrix()
+    rotated_coords = np.dot(centered_coords, mean_matrix.T)
+
+    # Scale and Shift to Global Space
+    post_soma_pos = np.array(post_soma_pos, dtype=float)
+    global_coords = (rotated_coords / 1000.0) + post_soma_pos
+
+    df['x_glob'], df['y_glob'], df['z_glob'] = global_coords[:, 0], global_coords[:, 1], global_coords[:, 2]
+
+    # Build Skeleton Trace
+    node_map = df.set_index('id')[['x_glob', 'y_glob', 'z_glob']].to_dict('index')
+    skel_x, skel_y, skel_z = [], [], []
+    for _, row in df[df['p'] != -1].iterrows():
+        pid = row['p']
+        if pid in node_map:
+            parent = node_map[pid]
+            skel_x.extend([row['x_glob'], parent['x_glob'], None])
+            skel_y.extend([row['y_glob'], parent['y_glob'], None])
+            skel_z.extend([row['z_glob'], parent['z_glob'], None])
+
+    fig.add_trace(go.Scatter3d(
+        x=skel_x, y=skel_y, z=skel_z,
+        mode='lines',
+        line=dict(color='darkgrey', width=2),
+        opacity=0.6,
+        name='Post-Synaptic Arbor',
+        hoverinfo='none'
+    ))
+
+    # Add Post-Soma Marker
+    fig.add_trace(go.Scatter3d(
+        x=[post_soma_pos[0]], y=[post_soma_pos[1]], z=[post_soma_pos[2]],
+        mode='markers',
+        marker=dict(size=8, color='blue', symbol='square', line=dict(color='white', width=1)),
+        name='Post-Soma Position'
+    ))
+
+    # ==========================================
+    # 3. PLOT SNAPPED SYNAPSES
+    # ==========================================
+    if matched_synapses_df is not None and not matched_synapses_df.empty:
+        # Shift synapses from local to global space
+        syn_glob_x = matched_synapses_df['x'].values + post_soma_pos[0]
+        syn_glob_y = matched_synapses_df['y'].values + post_soma_pos[1]
+        syn_glob_z = matched_synapses_df['z'].values + post_soma_pos[2]
+
+        syn_type = matched_synapses_df['synapse_type'].iloc[0]
+        marker_color = 'lime' if syn_type == 'exc' else 'cyan'
+
+        hover_texts = [
+            f"LFPy idx: {int(row['lfpy_idx'])}<br>Error: {row['snapping_error_um']:.2f} µm"
+            for _, row in matched_synapses_df.iterrows()
+        ]
+
+        fig.add_trace(go.Scatter3d(
+            x=syn_glob_x, y=syn_glob_y, z=syn_glob_z,
+            mode='markers',
+            marker=dict(size=6, color=marker_color, symbol='diamond', line=dict(color='black', width=1)),
+            name=f'Placed {syn_type.upper()} Synapses',
+            text=hover_texts,
+            hoverinfo='text'
+        ))
+
+    # ==========================================
+    # 4. FINAL LAYOUT
+    # ==========================================
+    fig.update_layout(
+        title=f"Global Synaptic Placement & Presynaptic Context: Post-Neuron {post_neuron_id}",
+        scene=dict(
+            xaxis_title='X (µm)', yaxis_title='Y (µm)', zaxis_title='Z (µm)',
+            aspectmode='data', bgcolor='white'
+        ),
+        width=1400, height=900,
+        margin=dict(l=0, r=0, b=0, t=50),
+        legend=dict(x=0.02, y=0.98, itemsizing='constant')
+    )
+
+    fig.show()
