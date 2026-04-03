@@ -147,10 +147,13 @@ Paths = Morph_pathways.get_paths
 # ----------------------------------------
 
 connectomics_path = r''
+SpanTree_path = r''
+N_synapse_path = r''
 connectomics_output = r''
 
 
-conn =  Connectomics(connectomics_path,connectomics_output)
+
+conn =  Connectomics(connectomics_path,connectomics_output,N_synapse_path,SpanTree_path,name_list)
 conn_dict = conn.get_ConnectomicInfo
 
 
@@ -162,6 +165,9 @@ mtype_fast_lookup = conn_dict['mtype_fast_lookup']
 
 # 1xN list of all cells coupled by the index to all the keys' value in conn_dict. 
 cell_mtypes = conn_dict['cell_mtypes']
+
+# Dictionary with the spanning trees distribution
+TreeDensity_load = conn_dict['TreeDensity_load']
 
 
 Pop_to_Syntype = { 'L23_exc' : 'exc',
@@ -208,13 +214,14 @@ for i, Pop in enumerate(name_list):
             SubPopulations_list = Paths[Pop],
             Pop_to_Syntype = Pop_to_Syntype,
             synapse_base_path = syn_path,
+            TreeDensity_load = TreeDensity_load,
 
 
             cell_mtypes = cell_mtypes,
             mtype_fast_lookup = mtype_fast_lookup,
 
 
-            local_to_raw_map= extracted_pops[Pop]['local_to_raw_map']
+            local_to_raw_map= extracted_pops[Pop]['local_to_raw_map'],
             Cell_afferences = extracted_pops[Pop]['synapse_dict'],
             Cell_coords = extracted_pops[Pop]['cell_coords'],
 
