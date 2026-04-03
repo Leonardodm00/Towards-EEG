@@ -161,6 +161,7 @@ class PopulationSuper(object):
                 local_to_raw_map = {},
                 Cell_afferences = {},
                 Cell_coords = [],
+                TreeDensity_load = {},
 
 
 
@@ -239,7 +240,8 @@ class PopulationSuper(object):
             Position (um) of the cell's somata (idx are associated to the local indexing)
 
 
-
+        TreeDensity_load: dict
+            Key are the macropopulations, while values are the paths to load the spanning tree distributions.
 
 
 
@@ -297,6 +299,7 @@ class PopulationSuper(object):
         self.pop_soma_pos = Cell_coords
         self.mtype_fast_lookup = mtype_fast_lookup
         self.cell_mtypes = cell_mtypes
+        self.TreeDensity_load = TreeDensity_load
 
 
 
@@ -1386,8 +1389,7 @@ class Population(PopulationSuper):
         dedicated function to determine exactly where synapses should be physically placed
         on the 3D morphology of a single, specific cell.
 
-        ###TOSEE: understand how the synapses are set according to the position of the arbour inthe specific layer.
-
+   
 
 
         Parameters
@@ -1407,11 +1409,7 @@ class Population(PopulationSuper):
         Population.get_all_synIdx, Population.fetchSynIdxCell
 
         """
-        # create a cell instance
-
-
-        ## PROVIDE THE  nidx=self.k_yXL[:, i] TO CHECK THE MORPHOLOGY
-        ## Emulate the for i, X in enumerate(self.X): to check for arbour compliance.
+  
 
       
         ###CHANGED
@@ -1792,8 +1790,14 @@ class Population(PopulationSuper):
 
         if return_just_cell:
 
+
+##### TODO HEREEEEEEEEEEEEE
+        
             soma_z = self.pop_soma_pos[cellindex]['z']
             Sum_per_Layer = np.sum(self.k_yXL, axis=1)
+
+
+
             Load_idx,nid = self.cell_MorphSelect(Availale_morph,
                                         self.layerBoundaries,
                                         self.layer_names,
@@ -1834,7 +1838,7 @@ class Population(PopulationSuper):
             return cell,nid
         else:
 
-            ### TOSEE AFTERWARDS
+            ### TODO THE SYNAPSE ARE ALREADY PLACED AT THE FIRST INSTANCE.
             self.insert_all_synapses(cellindex, cell)
 
             # set LFPykit.models instance cell attribute
