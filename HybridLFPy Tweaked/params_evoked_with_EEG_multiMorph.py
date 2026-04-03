@@ -1028,12 +1028,16 @@ from scipy.spatial.distance import cdist # This fixes the NameError
 class Connectomics:
 
 
-    def __init__(self,connectomics_path='',connectomics_output='',NSyn_path='',Calculate=True):
-        # NSyn_path path to the number of synapses per path
+    def __init__(self,connectomics_path='',connectomics_output='',NSyn_path='',SpanTree_path ='',name_list = [],Calculate=True):
+        # NSyn_path path to the synapse number distribution per morphological path.
+        # SpanTree_path = path to the saved spanning tree distributon per macro-population
+        # name_list list of macro populations' loading names
 
         self.connectomics_path = connectomics_path
         self.connectomics_output = connectomics_output
         self.dat_file_path = NSyn_path
+        self.SpanTree_path = SpanTree_path
+        self.name_list = name_list
 
 
         # --------------------------------------
@@ -1060,8 +1064,17 @@ class Connectomics:
         }
 
 
+        # Construct the population tree density loading dictionary
+        TreeDensity_load = {}
+        for name in self.name_list:
 
-        self.input_dict = input_dict
+            full_path_tprob = os.path.join(self.SpanTree_path, f'population_probability_{name}')
+            TreeDensity_load[name] = full_path_tprob
+
+
+        self.TreeDensity_load = TreeDensity_load
+
+
 
 
         if Calculate:
@@ -1117,6 +1130,7 @@ class Connectomics:
                 - 'post_to_pre': Afferent dict mapping Post-synaptic IDs to lists of Pre-synaptic IDs.
                 - 'pre_to_post': Efferent dict mapping Pre-synaptic IDs to lists of Post-synaptic IDs.
                 - 'synapse_dict' : Afferent dict mapping Post-synaptic IDs to lists of Pre-synaptic IDs and number of synapses per connections
+                - 'self.TreeDensity_load': Maps the macro-population to the loading path for the spanning tree densities.
         """
         return {
             'bbp_results': self.bbp_results,
@@ -1128,6 +1142,7 @@ class Connectomics:
             'adj_matrix': self.adj_matrix,
             'post_to_pre': self.post_to_pre,
             'pre_to_post': self.pre_to_post,
+            'TreeDensity_load' : self.TreeDensity_load
 
         }
         
@@ -1836,8 +1851,9 @@ def extract_macro_populations(connectomics_data, name_list):
             print(f"Warning: No cells found for macro-population '{name}'")
             continue
 
-        # Extract Coordinates
-        sub_coords = cell_coords[global_indices]
+        # Extract Coordinates (Made compliant: converted to list of dicts)
+        sub_coords_raw = cell_coords[global_indices]
+        sub_coords = [{'x': row[0], 'y': row[1], 'z': row[2]} for row in sub_coords_raw]
 
         # Create Mapping: Local (0 to N) -> Raw Global Index
         local_to_raw_map = {local_idx: raw_idx for local_idx, raw_idx in enumerate(global_indices)}
@@ -1856,7 +1872,6 @@ def extract_macro_populations(connectomics_data, name_list):
         }
 
     return extracted_data
-
 
 
 
