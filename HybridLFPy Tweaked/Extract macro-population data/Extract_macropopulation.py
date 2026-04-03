@@ -1,4 +1,3 @@
-# 1. The Updated Extraction Function (Now includes 'cell_mtypes')
 def extract_macro_populations(connectomics_data, name_list):
     """
     Extracts specific macro-populations using the fast lookup table,
@@ -53,8 +52,9 @@ def extract_macro_populations(connectomics_data, name_list):
             print(f"Warning: No cells found for macro-population '{name}'")
             continue
 
-        # Extract Coordinates
-        sub_coords = cell_coords[global_indices]
+        # Extract Coordinates (Made compliant: converted to list of dicts)
+        sub_coords_raw = cell_coords[global_indices]
+        sub_coords = [{'x': row[0], 'y': row[1], 'z': row[2]} for row in sub_coords_raw]
 
         # Create Mapping: Local (0 to N) -> Raw Global Index
         local_to_raw_map = {local_idx: raw_idx for local_idx, raw_idx in enumerate(global_indices)}
