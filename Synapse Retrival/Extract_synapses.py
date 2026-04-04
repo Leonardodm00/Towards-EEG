@@ -17,16 +17,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def extract_h01_synapses_debug(target_neuron_ids, output_dir='./h01_extracted_synapses', max_workers=8):
     os.makedirs(output_dir, exist_ok=True)
-    
+
     target_set = set(int(nid) for nid in target_neuron_ids).union(
                  set(str(nid) for nid in target_neuron_ids))
-    
+
     print(f"🔗 Connecting to Google Cloud Storage via GCSFS...")
     fs = gcsfs.GCSFileSystem(token='anon')
-    
+
     blob_path = 'h01-release/data/20210729/c3/synapses/exported/*'
     all_paths = fs.glob(blob_path)
-    
+
     json_files = [b for b in all_paths if b.endswith('.json') and fs.info(b)['size'] > 0]
 
     if not json_files:
@@ -36,11 +36,11 @@ def extract_h01_synapses_debug(target_neuron_ids, output_dir='./h01_extracted_sy
     # FOR DEBUGGING: Let's only run the first 3 files so we don't wait hours to see if it works.
     # If this works, you can remove the [:3] to run the whole dataset.
     test_files = json_files
-    
+
     print(f"📂 Found {len(json_files)} JSONL shards. Running DEBUG mode on first {len(test_files)} files...\n")
 
     # --- 1. Disk Writer Thread ---
-    write_queue = Queue(maxsize=50000) 
+    write_queue = Queue(maxsize=50000)
 
     def writer_worker():
         file_handles = {}
@@ -49,8 +49,8 @@ def extract_h01_synapses_debug(target_neuron_ids, output_dir='./h01_extracted_sy
 
         while True:
             item = write_queue.get()
-            if item is None: break 
-            
+            if item is None: break
+
             nid, record = item
 
             if nid not in file_handles:
@@ -75,33 +75,33 @@ def extract_h01_synapses_debug(target_neuron_ids, output_dir='./h01_extracted_sy
     def process_shard(file_path):
         filename = file_path.split('/')[-1]
         print(f"🟢 [START] Opening {filename}...")
-        
+
         lines_read = 0
         matches_found = 0
-        
+
         try:
             with fs.open(file_path, 'rb') as raw_file:
                 with io.TextIOWrapper(raw_file, encoding='utf-8', errors='replace') as text_file:
                     for line in text_file:
                         lines_read += 1
                         line = line.strip()
-                        
+
                         # DEBUG: Print the first 50 characters of the very first line read
                         if lines_read == 1:
                             print(f"📄 [READ {filename}] Line 1 snippet: {line[:50]}...")
-                            
+
                         if not line: continue
-                        
+
                         try:
                             record = json.loads(line)
                         except json.JSONDecodeError as e:
                             # DEBUG: If a line fails to parse, show us why (only for the first few errors to avoid spam)
                             if lines_read < 5:
                                 print(f"⚠️ [JSON ERROR {filename}] Line {lines_read}: {e} | Text: {line[:50]}")
-                            continue 
-                        
+                            continue
+
                         pre_id, post_id = None, None
-                        
+
                         if 'pre_synaptic_site' in record and isinstance(record['pre_synaptic_site'], dict):
                             pre_id = record['pre_synaptic_site'].get('neuron_id')
                         if 'post_synaptic_partner' in record and isinstance(record['post_synaptic_partner'], dict):
@@ -112,7 +112,7 @@ def extract_h01_synapses_debug(target_neuron_ids, output_dir='./h01_extracted_sy
                         # Match Logic
                         if pre_id in target_set or post_id in target_set:
                             matches_found += 1
-                            
+
                             # DEBUG: Print the first match we find in this file
                             if matches_found == 1:
                                 print(f"🎯 [FIRST MATCH {filename}] Found synapse for neuron!")
@@ -120,22 +120,32 @@ def extract_h01_synapses_debug(target_neuron_ids, output_dir='./h01_extracted_sy
                             direction = 'outgoing' if pre_id in target_set else 'incoming'
                             target = int(pre_id) if pre_id in target_set else int(post_id)
                             partner = post_id if pre_id in target_set else pre_id
-                            
+
+                            # 1. Safely extract text fields and convert them to strings
+                            raw_type = str(record.get('type', 'chemical'))
+                            raw_id = str(record.get('id', record.get('synapse_id', 'unknown')))
+
+                            # 2. SANITIZE: Replace commas with hyphens, and remove hidden newlines
+                            clean_type = raw_type.replace(',', ' -').replace('\n', ' ').replace('\r', '')
+                            clean_id = raw_id.replace(',', '-').replace('\n', '').replace('\r', '')
+
                             loc = record.get('location', {})
+                            
+                            # 3. Write the sanitized data to the queue
                             write_queue.put((target, {
-                                'synapse_id': record.get('id', record.get('synapse_id')),
+                                'synapse_id': clean_id,
                                 'partner_neuron_id': partner,
                                 'direction': direction,
-                                'synapse_type': record.get('type', 'chemical'),
+                                'synapse_type': clean_type,
                                 'location_x': loc.get('x'),
                                 'location_y': loc.get('y'),
                                 'location_z': loc.get('z')
                             }))
-                            
+
         except Exception as e:
             print(f"❌ [CRASH {filename}]: {e}")
             traceback.print_exc() # Prints the exact line of code that caused the crash
-            
+
         print(f"🔴 [DONE] {filename} finished. Read {lines_read} lines. Found {matches_found} matches.")
 
     # --- 3. Run Parallel Threads ---
@@ -145,6 +155,10 @@ def extract_h01_synapses_debug(target_neuron_ids, output_dir='./h01_extracted_sy
         for future in as_completed(futures):
             pass # We don't need the progress bar for the debug test
 
+    # Shut down safely
+    write_queue.put(None)
+    writer_thread.join()
+    print(f"\n✅ Debug scan complete! Check the console output above.")
     # Shut down safely
     write_queue.put(None)
     writer_thread.join()
