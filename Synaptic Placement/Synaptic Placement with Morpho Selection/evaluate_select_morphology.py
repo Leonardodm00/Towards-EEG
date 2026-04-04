@@ -244,7 +244,11 @@ def snap_to_closest_actual_synapses(post_neuron_id, synapses_dir, chosen_centroi
 
     # --- FIX: TRANSLATE TARGETS TO LOCAL SPACE ---
     # Convert global target voxels back to the post-synaptic neuron's local reference frame
-    post_soma_pos = np.array(post_soma_pos, dtype=float)
+    # --- FIX: TRANSLATE TARGETS TO LOCAL SPACE (Dict Aware) ---
+    if isinstance(post_soma_pos, dict):
+        post_soma_pos = np.array([post_soma_pos['x'], post_soma_pos['y'], post_soma_pos['z']])
+    else:
+        post_soma_pos = np.array(post_soma_pos, dtype=float)
     local_chosen_centroids = chosen_centroids - post_soma_pos
 
     # 4. Build a KDTree for the local candidate synapses
@@ -271,6 +275,7 @@ def snap_to_closest_actual_synapses(post_neuron_id, synapses_dir, chosen_centroi
 
 
 
+
 def cell_MorphSelect(
     morph_paths,
     layer_boundaries,
@@ -280,7 +285,7 @@ def cell_MorphSelect(
     synapse_base_path,
     plot_result=False     
 ):
-    """Standalone version of the empirical morphology selector."""
+    """Standalone version of the empirical morphology selector with safe CSV loading and exc/inh breakdown printing."""
     valid_layers = [i for i, syn in enumerate(synapses_per_layer) if syn > 0]
     shuffled_paths = list(enumerate(morph_paths))
     random.shuffle(shuffled_paths)
@@ -289,32 +294,138 @@ def cell_MorphSelect(
         match = re.search(r'neuron_(\d+)', os.path.basename(path))
         nid = int(match.group(1)) if match else -1
         
-        csv_path = os.path.join(synapse_base_path, f"neuron_{nid}_synapses.csv")
+        csv_path = os.path.join(synapse_base_path, f"neuron_{nid}_mapped_synapses.csv")
         if not os.path.exists(csv_path):
             print(f"⚠️ Warning: Synapse CSV not found for {nid} at {csv_path}")
             continue
             
+        # ==========================================
+        # BULLETPROOF CSV LOADING
+        # ==========================================
         syn_df = pd.read_csv(csv_path)
+        
+        # 1. Strip hidden whitespace and force lowercase (e.g., " Z " becomes "z")
+        syn_df.columns = syn_df.columns.str.strip().str.lower()
+        
+        # 2. Diagnostic Fallback: Did it load a raw file instead of an aligned one?
+        if 'z' not in syn_df.columns:
+            if 'location_z' in syn_df.columns:
+                # Auto-correct the raw columns to prevent the crash
+                syn_df = syn_df.rename(columns={
+                    'location_x': 'x', 
+                    'location_y': 'y', 
+                    'location_z': 'z'
+                })
+            else:
+                # If it completely fails, print exactly what is inside the file to debug
+                raise KeyError(f"Failed to find 'z' or 'location_z' in {csv_path}. The columns found were: {syn_df.columns.tolist()}")
+        # ==========================================
+
         shifted_z = syn_df['z'] + target_z_pos
         is_viable = True
         
+        print(f"🔍 Evaluating Morphology ID: {nid} (Target Z: {target_z_pos:.1f})")
+        
+        # Evaluate and print every required layer
         for layer_idx in valid_layers:
-            upper_bound, lower_bound = layer_boundaries[layer_idx]
+            lower_bound, upper_bound = layer_boundaries[layer_idx]
             required_synapses = synapses_per_layer[layer_idx]
+            layer_name = layer_names[layer_idx]
             
-            available_synapses = ((shifted_z >= lower_bound) & (shifted_z <= upper_bound)).sum()
+            # Create a boolean mask for all points inside this layer
+            layer_mask = (shifted_z >= lower_bound) & (shifted_z <= upper_bound)
+            available_synapses = layer_mask.sum()
             
-            if available_synapses < required_synapses:
+            # Count the specific types within this layer (if the column exists)
+            if 'synapse_type' in syn_df.columns:
+                exc_count = (layer_mask & (syn_df['synapse_type'] == 'exc')).sum()
+                inh_count = (layer_mask & (syn_df['synapse_type'] == 'inh')).sum()
+                breakdown_str = f"[Exc: {exc_count} | Inh: {inh_count}]"
+            else:
+                breakdown_str = "[Type info missing]"
+            
+            # Check if the TOTAL available meets the requirement
+            if available_synapses >= required_synapses:
+                status = "✅ Pass"
+            else:
+                status = "❌ Fail"
                 is_viable = False
-                break 
+            
+            # Print the total stats alongside the breakdown
+            print(f"   -> {layer_name}: Available = {available_synapses} {breakdown_str} | Required (Total) = {required_synapses} {status}")
                 
         if is_viable:
+            print(f"   🎯 Morphology {nid} ACCEPTED!\n")
             return original_idx, nid
+        else:
+            print(f"   ⏭️ Morphology {nid} REJECTED. Moving to next candidate...\n")
             
     raise RuntimeError(
         f"No morphology found with enough synapse capacity to satisfy "
         f"the requirements: {synapses_per_layer} at Z={target_z_pos:.1f}"
     )
+
+
+
+def map_abstract_synapses_to_segments(
+    abstract_synapses_dict, 
+    post_neuron_id, 
+    synapses_dir, 
+    post_soma_pos, 
+    synapse_type
+):
+    """
+    Iterates through a dictionary of abstract 3D synapse locations, snaps them to the 
+    actual dendritic arbor of the chosen morphology, and returns a dictionary 
+    mapping pre-synaptic indices directly to their flattened 1D segment indices (lfpy_idx).
+    
+    Args:
+        abstract_synapses_dict (dict): {pre_idx: np.ndarray of 3D coordinates}
+        post_neuron_id (int): The selected morphology ID (e.g., 4852204352).
+        synapses_dir (str): Path to the mapped synapse CSV databases.
+        post_soma_pos (list/array): The [x, y, z] global position of the post-synaptic soma.
+        synapse_type (str): 'exc' or 'inh'.
+        
+    Returns:
+        dict: {pre_idx: [list of integer lfpy_idx segment indices]}
+    """
+    final_mapped_synapses_dict = {}
+
+    if not abstract_synapses_dict:
+        print("⚠️ No abstract synapses provided to map.")
+        return final_mapped_synapses_dict
+
+    print(f"\n--- Snapping Abstract Synapses to Morphology {post_neuron_id} ---")
+    
+    for pre_idx, abstract_centroids in abstract_synapses_dict.items():
+        
+        # 1. Snap this specific group of coordinates to the physical tree
+        snapped_df = snap_to_closest_actual_synapses(
+            post_neuron_id=post_neuron_id,
+            synapses_dir=synapses_dir,
+            chosen_centroids=abstract_centroids,
+            post_soma_pos=post_soma_pos,
+            synapse_type=synapse_type
+        )
+        
+        # 2. Extract the segment indices and assign them to the pre_idx key
+        if snapped_df is not None and not snapped_df.empty:
+            # We enforce .astype(int) just in case pandas loaded them as floats (e.g., 45.0)
+            lfpy_indices = snapped_df['lfpy_idx'].astype(int).tolist()
+            final_mapped_synapses_dict[pre_idx] = lfpy_indices
+        else:
+            # If for some reason snapping failed for this specific connection, return an empty list
+            print(f"   -> ⚠️ Snapping failed or returned empty for pre_idx {pre_idx}")
+            final_mapped_synapses_dict[pre_idx] = []
+            
+    # Calculate totals for terminal debugging
+    total_mapped = sum(len(indices) for indices in final_mapped_synapses_dict.values())
+    print(f"✅ Successfully mapped {total_mapped} synapses across {len(final_mapped_synapses_dict)} pre-synaptic connections to LFPy indices.")
+
+    return final_mapped_synapses_dict
+
+
+
 
 def evaluate_and_select_morphology(
     post_cell_index,
@@ -332,62 +443,71 @@ def evaluate_and_select_morphology(
 ):
     """Standalone version of the morphology evaluator and abstract placer."""
     print(f"\n--- Evaluating Morphology for Post-Neuron {post_cell_index} ({post_mtype}) ---")
-    
+
     # Standardize Post-Synaptic Coordinates
     if isinstance(post_soma_pos, dict):
         post_soma_pos_arr = np.array([post_soma_pos['x'], post_soma_pos['y'], post_soma_pos['z']])
     else:
         post_soma_pos_arr = np.array(post_soma_pos, dtype=float)
 
-    all_synapse_locations = []
+    # CHANGED: Now a dictionary to hold locations keyed by pre_idx
+    all_synapse_locations = {} 
     total_synapses_requested = 0
 
     # Iterate across all presynaptic partners
     for row in pre_partners_matrix:
         pre_idx = int(row[0])
         n_syn = int(row[1])
-        
+
         pre_mtype = cell_mtypes[pre_idx]
         total_synapses_requested += n_syn
-        
+
         # Standardize Pre-Synaptic Coordinates
         pre_soma_pos_raw = cell_coords[pre_idx]
         if isinstance(pre_soma_pos_raw, dict):
             pre_soma_pos_arr = np.array([pre_soma_pos_raw['x'], pre_soma_pos_raw['y'], pre_soma_pos_raw['z']])
         else:
             pre_soma_pos_arr = np.array(pre_soma_pos_raw, dtype=float)
-        
+
         # 1. Calculate Overlap
         centroids, probs = calculate_synaptic_overlap_locations(
             pre_mtype=pre_mtype,
             post_mtype=post_mtype,
-            pre_soma_pos=pre_soma_pos_arr,      
-            post_soma_pos=post_soma_pos_arr,    
+            pre_soma_pos=pre_soma_pos_arr,
+            post_soma_pos=post_soma_pos_arr,
             density_maps_dir=density_maps_dir,
             num_synapses=n_syn,
             voxel_size=voxel_size,
             grid_extent=grid_extent
         )
-        
+
         # 2. Distribute Synapses
         if centroids is not None and len(centroids) > 0:
             locations = distribute_synapses_probabilistically(centroids, probs, n_syn)
             if locations is not None and len(locations) > 0:
-                all_synapse_locations.append(locations)
+                # CHANGED: Assign the 3D locations to the dictionary using pre_idx as the key
+                # (If there are duplicate pre_idx rows, we stack them to be safe)
+                if pre_idx in all_synapse_locations:
+                    all_synapse_locations[pre_idx] = np.vstack((all_synapse_locations[pre_idx], locations))
+                else:
+                    all_synapse_locations[pre_idx] = locations
 
     if not all_synapse_locations:
         print(f"⚠️ Warning: No valid synaptic overlaps found for Neuron {post_cell_index}.")
-        return None, np.array([])
-        
-    all_synapse_locations = np.vstack(all_synapse_locations)
-    print(f"✅ Successfully placed {len(all_synapse_locations)}/{total_synapses_requested} synapses in abstract space.")
+        return None, {} # CHANGED: Return an empty dictionary here
+
+    # CHANGED: Stack the dictionary values into a flat array just for the layer counting below
+    stacked_locations = np.vstack(list(all_synapse_locations.values()))
+    
+    print(f"✅ Successfully placed {len(stacked_locations)}/{total_synapses_requested} synapses in abstract space.")
 
     # 3. Layer Formatting for cell_MorphSelect
     layer_names = list(layer_bounds.keys())
     layer_boundaries_array = np.array(list(layer_bounds.values()))
     synapses_per_layer_list = np.zeros(len(layer_names), dtype=int)
-    
-    z_coords = all_synapse_locations[:, 2] 
+
+    # CHANGED: Use the stacked array to extract z_coords so the math below stays exactly the same
+    z_coords = stacked_locations[:, 2]
 
     for idx, bounds in enumerate(layer_boundaries_array):
         z_min, z_max = min(bounds), max(bounds)
@@ -400,8 +520,8 @@ def evaluate_and_select_morphology(
             print(f"      • {name}: {count} synapses")
 
     # 4. Select the best morphology
-    target_z_pos = post_soma_pos_arr[2] 
-    
+    target_z_pos = post_soma_pos_arr[2]
+
     best_original_idx, best_nid = cell_MorphSelect(
         morph_paths=morph_paths,
         layer_boundaries=layer_boundaries_array,
@@ -411,9 +531,12 @@ def evaluate_and_select_morphology(
         synapse_base_path=synapses_dir,
         plot_result=False
     )
-    
+
     print(f"🎯 Selected Morphology ID: {best_nid}")
+    
+    # Return the chosen morphology ID and the dictionary mapping pre_idx -> 3D coordinates
     return best_nid, all_synapse_locations
+
 
 import os
 import ast
@@ -582,6 +705,180 @@ def visualize_final_snapped_synapses_3d(
         width=1400, height=900,
         margin=dict(l=0, r=0, b=0, t=50),
         legend=dict(x=0.02, y=0.98, itemsizing='constant')
+    )
+
+    fig.show()
+
+
+
+import os
+import ast
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+from scipy.spatial.transform import Rotation as R
+
+def debug_snapping_accuracy_3d(
+    post_neuron_id,
+    abstract_synapses_dict,
+    final_mapped_synapses_dict,
+    synapses_dir,
+    input_dir,
+    metadata_filepath,
+    post_soma_pos,
+    k_neighbors=3
+):
+    """
+    Plots the aligned post-synaptic arbor and visually compares the abstract 3D synaptic 
+    cloud against the final snapped locations on the actual morphology, drawing connection 
+    lines to show the physical snapping error.
+    """
+    print(f"🎨 Rendering 3D Snapping Debugger for Neuron {post_neuron_id}...")
+    fig = go.Figure()
+    # --- FIX: TRANSLATE TARGETS TO LOCAL SPACE (Dict Aware) ---
+    if isinstance(post_soma_pos, dict):
+        post_soma_pos = np.array([post_soma_pos['x'], post_soma_pos['y'], post_soma_pos['z']])
+    else:
+        post_soma_pos = np.array(post_soma_pos, dtype=float)
+
+    # ==========================================
+    # 1. LOAD & ALIGN POST-SYNAPTIC SKELETON
+    # ==========================================
+    metadata_df = pd.read_csv(metadata_filepath)
+    if isinstance(metadata_df['rotation_matrix'].iloc[0], str):
+        metadata_df['rotation_matrix'] = metadata_df['rotation_matrix'].apply(ast.literal_eval)
+    reference_somas = metadata_df[['soma_x', 'soma_y', 'soma_z']].values
+
+    filepath = os.path.join(input_dir, f"neuron_{post_neuron_id}.csv")
+    if not os.path.exists(filepath):
+        print(f"⚠️ Morphology file not found: {filepath}")
+        return
+
+    df = pd.read_csv(filepath)
+    root_rows = df[df['p'] == -1]
+    if not root_rows.empty:
+        soma_pos_raw = root_rows.iloc[0][['x', 'y', 'z']].values.astype(float)
+
+        # Align to Local Space
+        centered_coords = df[['x', 'y', 'z']].values - soma_pos_raw
+        distances = np.linalg.norm(reference_somas - soma_pos_raw, axis=1)
+        nearest_metadata = metadata_df.iloc[np.argsort(distances)[:min(k_neighbors, len(metadata_df))]]
+        mean_matrix = R.from_matrix(np.array(nearest_metadata['rotation_matrix'].tolist())).mean().as_matrix()
+        rotated_coords = np.dot(centered_coords, mean_matrix.T)
+
+        # Scale and Shift to Global Space
+        global_coords = (rotated_coords / 1000.0) + post_soma_pos
+        df['x_glob'], df['y_glob'], df['z_glob'] = global_coords[:, 0], global_coords[:, 1], global_coords[:, 2]
+
+        # Build Skeleton Trace
+        node_map = df.set_index('id')[['x_glob', 'y_glob', 'z_glob']].to_dict('index')
+        skel_x, skel_y, skel_z = [], [], []
+        for _, row in df[df['p'] != -1].iterrows():
+            pid = row['p']
+            if pid in node_map:
+                parent = node_map[pid]
+                skel_x.extend([row['x_glob'], parent['x_glob'], None])
+                skel_y.extend([row['y_glob'], parent['y_glob'], None])
+                skel_z.extend([row['z_glob'], parent['z_glob'], None])
+
+        fig.add_trace(go.Scatter3d(
+            x=skel_x, y=skel_y, z=skel_z,
+            mode='lines', line=dict(color='lightgrey', width=2),
+            opacity=0.5, name='Post-Synaptic Arbor', hoverinfo='none'
+        ))
+
+    # ==========================================
+    # 2. LOAD PRE-MAPPED SYNAPSE DB (to translate lfpy_idx back to 3D coords)
+    # ==========================================
+    mapped_csv_path = os.path.join(synapses_dir, f"neuron_{post_neuron_id}_mapped_synapses.csv")
+    mapped_df = pd.read_csv(mapped_csv_path)
+    
+    # Robust column normalization just in case
+    mapped_df.columns = mapped_df.columns.str.strip().str.lower()
+    if 'location_z' in mapped_df.columns and 'z' not in mapped_df.columns:
+        mapped_df = mapped_df.rename(columns={'location_x': 'x', 'location_y': 'y', 'location_z': 'z'})
+
+    # ==========================================
+    # 3. EXTRACT ABSTRACT VS SNAPPED COORDINATES
+    # ==========================================
+    abs_x, abs_y, abs_z = [], [], []
+    snap_x, snap_y, snap_z = [], [], []
+    err_x, err_y, err_z = [], [], []
+
+    for pre_idx, abstract_coords in abstract_synapses_dict.items():
+        lfpy_indices = final_mapped_synapses_dict.get(pre_idx, [])
+        
+        # Iterate through each paired abstract point and snapped index
+        for i, abs_pt in enumerate(abstract_coords):
+            # 1. Store Abstract Point
+            abs_x.append(abs_pt[0])
+            abs_y.append(abs_pt[1])
+            abs_z.append(abs_pt[2])
+            
+            # 2. Look up and store the Snapped Point
+            if i < len(lfpy_indices):
+                l_idx = lfpy_indices[i]
+                match = mapped_df[mapped_df['lfpy_idx'] == l_idx]
+                
+                if not match.empty:
+                    # Snapped coords are in local space, translate to global
+                    loc_x = match.iloc[0]['x'] + post_soma_pos[0]
+                    loc_y = match.iloc[0]['y'] + post_soma_pos[1]
+                    loc_z = match.iloc[0]['z'] + post_soma_pos[2]
+                    
+                    snap_x.append(loc_x)
+                    snap_y.append(loc_y)
+                    snap_z.append(loc_z)
+                    
+                    # 3. Create the snapping error connection line
+                    err_x.extend([abs_pt[0], loc_x, None])
+                    err_y.extend([abs_pt[1], loc_y, None])
+                    err_z.extend([abs_pt[2], loc_z, None])
+
+    # ==========================================
+    # 4. PLOT THE COMPARISON TRACES
+    # ==========================================
+    # Trace 1: Abstract Centroids (Faint, semi-transparent)
+    fig.add_trace(go.Scatter3d(
+        x=abs_x, y=abs_y, z=abs_z,
+        mode='markers',
+        marker=dict(size=4, color='orange', opacity=0.3, symbol='circle'),
+        name='Abstract Targets (PMF)'
+    ))
+
+    # Trace 2: Snapped Synapses (Solid, bright)
+    fig.add_trace(go.Scatter3d(
+        x=snap_x, y=snap_y, z=snap_z,
+        mode='markers',
+        marker=dict(size=5, color='lime', symbol='diamond', line=dict(color='black', width=1)),
+        name='Snapped Synapses (LFPy)'
+    ))
+
+    # Trace 3: Error Lines
+    fig.add_trace(go.Scatter3d(
+        x=err_x, y=err_y, z=err_z,
+        mode='lines',
+        line=dict(color='red', width=1, dash='dot'),
+        opacity=0.6,
+        name='Snapping Displacement'
+    ))
+
+    # Add Post-Soma Marker
+    fig.add_trace(go.Scatter3d(
+        x=[post_soma_pos[0]], y=[post_soma_pos[1]], z=[post_soma_pos[2]],
+        mode='markers',
+        marker=dict(size=8, color='blue', symbol='square', line=dict(color='white', width=1)),
+        name='Post-Soma Position'
+    ))
+
+    fig.update_layout(
+        title=f"Snapping Verification: Abstract Cloud vs Actual Arbor (Neuron {post_neuron_id})",
+        scene=dict(
+            xaxis_title='X (µm)', yaxis_title='Y (µm)', zaxis_title='Z (µm)',
+            aspectmode='data', bgcolor='white'
+        ),
+        width=1200, height=800,
+        margin=dict(l=0, r=0, b=0, t=50)
     )
 
     fig.show()
