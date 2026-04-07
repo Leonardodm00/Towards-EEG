@@ -6,12 +6,16 @@ from scipy.spatial.distance import cdist # This fixes the NameError
 class Connectomics:
 
 
-    def __init__(self,connectomics_path='',connectomics_output='',NSyn_path='',Calculate=True):
-        # NSyn_path path to the number of synapses per path
+    def __init__(self,connectomics_path='',connectomics_output='',NSyn_path='',SpanTree_path ='',name_list = [],Calculate=True):
+        # NSyn_path path to the synapse number distribution per morphological path.
+        # SpanTree_path = path to the saved spanning tree distributon per macro-population
+        # name_list list of macro populations' loading names
 
         self.connectomics_path = connectomics_path
         self.connectomics_output = connectomics_output
         self.dat_file_path = NSyn_path
+        self.SpanTree_path = SpanTree_path
+        self.name_list = name_list
 
 
         # --------------------------------------
@@ -38,8 +42,9 @@ class Connectomics:
         }
 
 
+        
 
-        self.input_dict = input_dict
+
 
 
         if Calculate:
@@ -95,6 +100,7 @@ class Connectomics:
                 - 'post_to_pre': Afferent dict mapping Post-synaptic IDs to lists of Pre-synaptic IDs.
                 - 'pre_to_post': Efferent dict mapping Pre-synaptic IDs to lists of Post-synaptic IDs.
                 - 'synapse_dict' : Afferent dict mapping Post-synaptic IDs to lists of Pre-synaptic IDs and number of synapses per connections
+                - 'self.TreeDensity_load': Maps the macro-population to the loading path for the spanning tree densities.
         """
         return {
             'bbp_results': self.bbp_results,
@@ -106,6 +112,7 @@ class Connectomics:
             'adj_matrix': self.adj_matrix,
             'post_to_pre': self.post_to_pre,
             'pre_to_post': self.pre_to_post,
+            'TreeDensity_load' : self.TreeDensity_load
 
         }
         
