@@ -1064,15 +1064,7 @@ class Connectomics:
         }
 
 
-        # Construct the population tree density loading dictionary
-        TreeDensity_load = {}
-        for name in self.name_list:
-
-            full_path_tprob = os.path.join(self.SpanTree_path, f'population_probability_{name}')
-            TreeDensity_load[name] = full_path_tprob
-
-
-        self.TreeDensity_load = TreeDensity_load
+        
 
 
 
