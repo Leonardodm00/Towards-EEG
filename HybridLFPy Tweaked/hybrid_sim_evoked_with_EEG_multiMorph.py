@@ -155,6 +155,7 @@ connectomics_output = r''
 
 conn =  Connectomics(connectomics_path,connectomics_output,N_synapse_path,SpanTree_path,name_list)
 conn_dict = conn.get_ConnectomicInfo
+input_dict = conn.get_ColumnProp
 
 
 # Extract Infos
@@ -219,6 +220,11 @@ for i, Pop in enumerate(name_list):
 
             cell_mtypes = cell_mtypes,
             mtype_fast_lookup = mtype_fast_lookup,
+
+            input_dict = input_dict,
+
+            voxel_size = None,
+            grid_extent = None,
 
 
             local_to_raw_map= extracted_pops[Pop]['local_to_raw_map'],
