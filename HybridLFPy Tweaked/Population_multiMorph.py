@@ -168,6 +168,9 @@ class PopulationSuper(object):
                 grid_extent = None,
                 SpanTree_path = '',
 
+                SynTau =  {}, 
+                SynWeigths = {},
+
 
 
 
@@ -254,6 +257,14 @@ class PopulationSuper(object):
         grid_extent : float [um]
             Cube edge extent in which the spanning tree probabilities have been evaluated 
 
+        SynTau: dict
+            Nested dictionaries: at the top level the key is the presynaptic macro-population while the second key is the specific 
+            post-synaptic population: The specific value is the decaying time constant 
+
+        SynWeigths: dict 
+            Nested dictionaries: at the top level the key is the presynaptic macro-population while the second key is the specific 
+            post-synaptic population: The specific value is the synaptic weight
+
 
         SpanTree_path: string
             Path to the spanning tree distribution across macro-populations
@@ -324,7 +335,8 @@ class PopulationSuper(object):
         self.input_dict = input_dict
         self.SpanTree_path = SpanTree_path
 
-
+        self.SynWeigths= SynWeigths
+        self.SynTau = SynTau
 
 
         self.probes = probes
@@ -1666,7 +1678,7 @@ class Population(PopulationSuper):
         else:
 
             ### TODO THE SYNAPSE ARE ALREADY PLACED AT THE FIRST INSTANCE.
-            self.insert_all_synapses(cellindex, cell)
+            self.insert_all_mapped_synapses(cellindex, cell)
 
             # set LFPykit.models instance cell attribute
             for probe in self.probes:
@@ -1719,7 +1731,7 @@ class Population(PopulationSuper):
             print('cell %s population %s in %.2f s' % (cellindex, self.Pop,
                                                        time() - tic))
 
-    def insert_all_synapses(self, cellindex, cell):
+    def insert_all_mapped_synapses(self, cellindex, cell):
         """
         Insert all synaptic events from all presynaptic layers on
         cell object with index `cellindex`.
@@ -1743,90 +1755,108 @@ class Population(PopulationSuper):
         Population.insert_synapse
 
         """
-        for i, X in enumerate(self.X):  # Pre-synaptic population
-            synParams = self.synParams
-            synParams.update({
-                'weight': self.J_yX[i],
-                'tau': self.tau_yX[i],
-            })
-            for j in range(len(self.synIdx[cellindex][X])):  # Loop over the layers j is the layer
-                if self.synDelays is not None:
-                    synDelays = self.synDelays[cellindex][X][j]
-                else:
-                    synDelays = None
-                self.insert_synapses(cell=cell,
-                                     cellindex=cellindex,
-                                     synParams=synParams,
-                                     idx=self.synIdx[cellindex][X][j],
-                                     X=X,
-                                     SpCell=self.SpCells[cellindex][X][j],
-                                     synDelays=synDelays)
+        ## Load the cellindex-specific pre-synaptic partners dict
+        mapped_synapses_dict = self.PlacedSynapses.get(cellindex, {}) # .get() prevents key errors
+        if not mapped_synapses_dict:
+            return
 
-    def insert_synapses(self, cell, cellindex, synParams, idx=np.array([]),
-                        X='EX', SpCell=np.array([]),
-                        synDelays=None):
-        """
-        Insert synapse with `parameters`=`synparams` on cell=cell, with
-        segment indexes given by `idx`. `SpCell` and `SpTimes` picked from
-        Brunel network simulation
+        for Pre_neuron_idx, lfpy_segments in mapped_synapses_dict.items():
 
+            ### Extract the syaptic weights
 
-        Parameters
-        ----------
-        cell : `LFPy.Cell` instance
-            Postsynaptic target cell.
-        cellindex : int
-            Index of cell in population.
-        synParams : dict
-            Parameters passed to `LFPy.Synapse`.
-        idx : numpy.ndarray
-            Postsynaptic compartment indices.
-        X : str
-            presynaptic population name
-        SpCell : numpy.ndarray
-            Presynaptic spiking cells.
-        synDelays : numpy.ndarray
-            Per connection specific delays.
-
-
-        Returns
-        -------
-        None
-
-
-        See also
-        --------
-        Population.insert_all_synapses
-
-        """
-        # Insert synapses in an iterative fashion
-        try:
-            spikes = self.networkSim.dbs[X].select(SpCell[:idx.size])
-        except AttributeError:
-            raise AssertionError(
-                'could not open CachedNetwork database objects')
-
-        # convert to object array for slicing
-        spikes = np.array(spikes, dtype=object)
-
-        # apply synaptic delays
-        if synDelays is not None and idx.size > 0:
-            for i, delay in enumerate(synDelays):
-                if spikes[i].size > 0:
-                    spikes[i] += delay
-
-        # unique postsynaptic compartments
-        uidx = np.unique(idx)
-        for i in uidx:
-            st = np.sort(np.concatenate(spikes[idx == i]))
-            st += cell.tstart  # needed?
-            if st.size > 0:
-                synParams.update({'idx': i})
-                # Create synapse(s) and setting times using class LFPy.Synapse
-                synapse = LFPy.Synapse(cell, **synParams)
-                synapse.set_spike_times(st)
+            # 1. Deduce the pre-synaptic population database name (X)
+            # This allows us to find the spikes in self.networkSim.dbs
+            specific_mtype = self.cell_mtypes[Pre_neuron_idx]
+            layer, bio_type = self.mtype_fast_lookup[specific_mtype]
+            
+            if "SS" in specific_mtype.upper():
+                type_suffix = "ss"
             else:
-                pass
+                type_suffix = "exc" if bio_type == "Excitatory" else "inh"
+                
+            pre_pop_name = f"{layer}_{type_suffix}" # Ensure this matches your NEST db keys
+            post_pop_name = self.Pop
+            
+            ## Retrieve the specific weight
+            SynW = self.SynWeigths[pre_pop_name][post_pop_name]
+            SynT = self.SynTau[pre_pop_name][post_pop_name]
+
+
+            synParams = self.synParams.copy()
+            synParams.update({
+                'weight': SynW,
+                'tau': SynT,
+            })
+
+            if self.synDelays is not None:
+                    synDelays = self.CalculateDelay() ## Function to add
+
+            else:
+                synDelays = None
+
+
+            # 3. Delegate to the worker to actually attach the spikes
+            self.insert_specific_connection(
+                cell=cell,
+                pre_idx=Pre_neuron_idx,
+                lfpy_indices=lfpy_segments,
+                pre_pop_name=pre_pop_name,
+                synParams=synParams,
+                synDelay=synDelays
+            )
+
+
+
+                
+
+
+    def insert_specific_connection(self, cell, pre_idx, lfpy_indices, pre_pop_name = None, synParams = None, synDelay=None):
+        """
+        Inserts all synapses from a SINGLE pre-synaptic neuron onto the post-synaptic cell.
+        Handles cases where a single pre-synaptic cell forms multiple synapses on the same 
+        or different dendritic segments.
+        """
+        if not lfpy_indices:
+            return # No synapses to place for this connection
+
+        # 1. Fetch the spike train for this SINGLE pre-synaptic neuron
+        try:
+            # .select() expects an iterable and returns a list of arrays. We take the first [0].
+            spikes = self.networkSim.dbs[pre_pop_name].select([pre_idx])[0]
+        except AttributeError:
+            raise AssertionError(f"Could not open CachedNetwork database for {pre_pop_name}")
+
+        # If this pre-synaptic neuron never fired, we can skip building the synapse entirely!
+        if len(spikes) == 0:
+            return
+
+        # 2. Apply axonal delay
+        if synDelay is not None:
+            spikes = spikes + synDelay
+
+        # 3. Group by unique dendritic segment
+        uidx = np.unique(lfpy_indices)
+        
+        for i in uidx:
+            # Count how many synapses from this pre-neuron land on this exact segment
+            synapse_count = list(lfpy_indices).count(i)
+            
+            # The Grouping Trick: If a cell forms 3 synapses on the same segment, 
+            # we don't build 3 LFPy objects. We build 1 object, and feed it the 
+            # spike train 3 times. NEURON efficiently processes this as 3 simultaneous hits.
+            st = np.sort(np.tile(spikes, synapse_count))
+            st += cell.tstart
+            
+            # 4. Instantiate the Synapse
+            synParams.update({'idx': i})
+            synapse = LFPy.Synapse(cell, **synParams)
+            synapse.set_spike_times(st)
+
+
+
+
+
+
 
     def fetchSpCells(self, nodes, numSyn):
         """
