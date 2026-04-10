@@ -285,6 +285,53 @@ class general_params(object):
 
         # TC and cortical population sizes in one list TODO: rename
         self.N_X = np.array([self.n_thal]+flattenlist([self.full_scale_num_neurons]))
+
+    
+        ## Construct the synaptic params dictionaries
+        self.synParams = {}
+        for y in self.Pre:
+
+            if y.split('_')[-1] == 'exc' or y.split('_')[-1] == 'ss':
+
+                params = {
+                            # ProbAMPANMDA specific parameters:
+                            'tau_r_AMPA': 0.2,
+                            'tau_d_AMPA': 1.7,
+                            'tau_r_NMDA': 0.29,
+                            'tau_d_NMDA': 43.0,
+                            'Use': 0.5,           # Utilization of synaptic efficacy
+                            'Dep': 100.0,         # Depression time constant (ms)
+                            'Fac': 10.0,          # Facilitation time constant (ms)
+                            'e': 0.0,             # Reversal potential (mV)
+                            'gmax': 0.001,        # Base conductance conversion
+                            'weight_factor_NMDA': 1.0 
+                        }
+
+                self.synParams[y] = params
+
+            elif y.split('_')[-1] == 'inh':
+
+
+                params = {
+                            # ProbAMPANMDA specific parameters:
+                            'tau_r_AMPA': 0.2,
+                            'tau_d_AMPA': 1.7,
+                            'tau_r_NMDA': 0.29,
+                            'tau_d_NMDA': 43.0,
+                            'Use': 0.5,           # Utilization of synaptic efficacy
+                            'Dep': 100.0,         # Depression time constant (ms)
+                            'Fac': 10.0,          # Facilitation time constant (ms)
+                            'e': -80.0,             # Reversal potential (mV)
+                            'gmax': 0.001,        # Base conductance conversion
+                            'weight_factor_NMDA': 1.0 
+                        }
+
+                self.synParams[y] = params
+
+
+
+
+
   
 
         
@@ -293,27 +340,6 @@ class general_params(object):
         # CONNECTION PROPERTIES            #
         ####################################
                 
-        # mean EPSP amplitude (mV) for all connections except L4e->L23e
-        self.PSP_e = 0.15
-
-        # mean EPSP amplitude (mv) for L4e->L23e connections
-        # FIX POLISH NOTATION !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        self.PSP_23e_4e = self.PSP_e*2
-
-        # standard deviation of PSC amplitudes relative to mean PSC amplitudes
-        # this is sigma/mu in probability distribution
-        # Gaussian (lognormal_weights = False): mu is mean, sigma is standard deviation
-        # Lognormal (lognormal_weights = False): mean and stdev can be calculated from mu and sigma
-        self.PSC_rel_sd = 3.0
-                
-        # IPSP amplitude relative to EPSP amplitude
-        self.g = -4.               
-
-        # L4i ->L4e stronger in order to get rid of 84 Hz peak
-        self.g_4e_4i = self.g * 1.125
-        
-        # Whether to use lognormal weights or not
-        self.lognormal_weights = True 
 
         # mean dendritic delays for excitatory and inhibitory transmission (ms)
         self.delays = [1.5, 0.75] 
@@ -855,31 +881,38 @@ class multicompartment_params(point_neuron_network_params):
 
         # Set up cell type specific synapse parameters in terms of synapse model
         # and synapse locations
-        self.synParams = {}
-        for y in self.Post:
-            if y.rfind('p') >= 0:
-                #pyramidal types have apical dendrites
-                section = ['apic', 'dend']
-            else:
-                #other cell types do not
+
+        for y in self.Pre:
+
+
+            if y.split('_')[-1] == 'exc' or y.split('_')[-1] == 'ss':
+
                 section = ['dend']
 
-            self.synParams.update({
-                y : {
-                    'syntype' : 'ExpSynI',  #current based exponential synapse
+
+                self.synParams[y].update({
+                    'syntype' : 'ProbAMPANMDA',  
                     'section' : section,
-                    # 'tau' : self.model_params["tau_syn_ex"],
-                },
-            })
+                })
+
+            else:
+                section = ['axon','dend','soma']
+
+
+                self.synParams[y].update({
+                    'syntype' : 'ProbUDFsyn',  
+                    'section' : section,
+                })
+
 
         # set up dictionary of synapse time constants specific to each
         # postsynaptic cell type and presynaptic population
-        self.tau_yX = {}
-        for y in self.Post:
-            self.tau_yX.update({
-                y : [self.model_params["tau_syn_in"] if 'I' in X else
-                     self.model_params["tau_syn_ex"] for X in self.Pre]
-            })
+        #self.tau_yX = {}
+        #for y in self.Post:
+        #    self.tau_yX.update({
+        #        y : [self.model_params["tau_syn_in"] if 'I' in X else
+        #             self.model_params["tau_syn_ex"] for X in self.Pre]
+        #    })
 
         #synaptic delay parameters, loc and scale is mean and std for every
         #network population, negative values will be removed
