@@ -17,7 +17,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 import ast
 
-def rototranslate_and_jitter(input_dir,nid, metadata_df, k_neighbors=3, max_tilt_deg=15.0):
+def rototranslate_and_jitter(input_dir,nid, metadata_df, k_neighbors=3, max_tilt_deg=10.0):
     """
     Loads a raw neuron CSV, calculates the base rototranslation matrix from the
     k-nearest neighbors, applies the alignment, and generates a second version
