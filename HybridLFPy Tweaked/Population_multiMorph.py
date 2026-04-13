@@ -156,6 +156,7 @@ class PopulationSuper(object):
                 SubPop_positions = [1, 10.5, -20.2, -150.0],
 
                 cell_mtypes = ['L1','L1', 'L23'],
+                cell_gtypes = ['SST','PY'],
                 mtype_fast_lookup = {},
 
                 input_dict = {},
@@ -163,12 +164,13 @@ class PopulationSuper(object):
                 local_to_raw_map = {},
                 Cell_afferences = {},
                 Cell_coords = [],
+                Cell_genetictype = [],
                 global_cell_coords = [],
                 voxel_size = None,
                 grid_extent = None,
                 SpanTree_path = '',
 
-                SynTau =  {}, 
+
                 SynWeigths = {},
 
 
@@ -232,8 +234,11 @@ class PopulationSuper(object):
             Keys are the local id while the values are the same neuron's raw id
 
 
-        cell_mtypes : 1xN_cells array
+        cell_mtypes : 1xN
             For each cell (in raw indicies) defines its subtype in base of the NMC guidelines.
+
+        cell_gtypes: 1xN
+            For each cell (in raw indicies) defines its genetic subtype in base of the NMC guidelines.
 
         mtype_fast_lookup : dict
             For each sub-type (the ones found in cell_mtypes) defines the layer of belonging and the synaptic type
@@ -246,6 +251,9 @@ class PopulationSuper(object):
 
         Cell_coords : Nx3 array
             Position (um) of the cell's somata (idx are associated to the local indexing)
+
+        Cell_genetictype: 1D numoy array
+            Represents the genetic identity of a specific subset of neurons wihtin the population (LOCAL idx)
 
         global_cell_coords: N_tot x3 array
             Position (um) of ALL the cells with adj-related global indexing
@@ -265,6 +273,8 @@ class PopulationSuper(object):
             Nested dictionaries: at the top level the key is the presynaptic macro-population while the second key is the specific 
             post-synaptic population: The specific value is the synaptic weight
 
+        
+            
 
         SpanTree_path: string
             Path to the spanning tree distribution across macro-populations
@@ -323,10 +333,12 @@ class PopulationSuper(object):
 
         self.local_to_raw_map = local_to_raw_map
         self.Cell_afferences = Cell_afferences
+        self.Cell_genetictype = Cell_genetictype
         self.pop_soma_pos = Cell_coords
         self.global_cell_coords = global_cell_coords
         self.mtype_fast_lookup = mtype_fast_lookup
         self.cell_mtypes = cell_mtypes
+        self.cell_gtypes = cell_gtypes
 
 
         self.grid_extent = grid_extent
@@ -336,7 +348,7 @@ class PopulationSuper(object):
         self.SpanTree_path = SpanTree_path
 
         self.SynWeigths= SynWeigths
-        self.SynTau = SynTau
+  
 
 
         self.probes = probes
@@ -1405,6 +1417,7 @@ class Population(PopulationSuper):
             # 1. Deduce the pre-synaptic population database name (X)
             # This allows us to find the spikes in self.networkSim.dbs
             specific_mtype = self.cell_mtypes[Pre_neuron_idx]
+            specific_gtype = self.cell_gtypes[Pre_neuron_idx]
             layer, bio_type = self.mtype_fast_lookup[specific_mtype]
             
             if "SS" in specific_mtype.upper():
@@ -1435,6 +1448,7 @@ class Population(PopulationSuper):
 
             # 3. Delegate to the worker to actually attach the spikes
             self.insert_specific_connection(
+                cellindex,
                 cell=cell,
                 pre_idx=Pre_neuron_idx,
                 lfpy_indices=lfpy_segments,
@@ -1448,7 +1462,7 @@ class Population(PopulationSuper):
                 
 
 
-    def insert_specific_connection(self, cell, pre_idx, lfpy_indices, pre_pop_name=None, synParams=None, synDelay=None):
+    def insert_specific_connection(self, cellindex,cell, pre_idx, lfpy_indices, pre_pop_name=None, synParams=None, synDelay=None):
         """
         Inserts all synapses from a SINGLE pre-synaptic neuron onto the post-synaptic cell.
         Uses weight-scaling to efficiently model multiple synapses on the same segment
@@ -1504,13 +1518,16 @@ class Population(PopulationSuper):
             # ProbAMPANMDA.mod requires a pointer to a NEURON random generator for `erand()`
             import neuron
             rng = neuron.h.Random()
+            
             # Generate a unique, reproducible seed based on Population, Cell, and Segment
-            # (Assuming you have self.POPULATIONSEED available)
             rng.Random123(self.POPULATIONSEED, cellindex, i) 
             rng.negexp(1)
             
-            # Access the underlying NEURON hoc object created by LFPy to set the RNG
+            # --- THE FIX ---
+
             synapse.synapse.setRNG(rng)
+            
+            
 
 
 
