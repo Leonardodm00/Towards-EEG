@@ -167,6 +167,8 @@ mtype_fast_lookup = conn_dict['mtype_fast_lookup']
 # 1xN list of all cells coupled by the index to all the keys' value in conn_dict. 
 cell_mtypes = conn_dict['cell_mtypes']
 
+cell_gtypes = conn_dict['cell_gtypes']
+
 # Dictionary with the spanning trees distribution
 TreeDensity_load = conn_dict['TreeDensity_load']
 
@@ -220,6 +222,8 @@ for i, Pop in enumerate(name_list):
 
             cell_mtypes = cell_mtypes,
             mtype_fast_lookup = mtype_fast_lookup,
+            cell_gtypes = cell_gtypes, # GLOBAL
+            SynWeigths = params.synParams,
 
             input_dict = input_dict,
 
@@ -230,6 +234,7 @@ for i, Pop in enumerate(name_list):
             local_to_raw_map= extracted_pops[Pop]['local_to_raw_map'],
             Cell_afferences = extracted_pops[Pop]['synapse_dict'],
             Cell_coords = extracted_pops[Pop]['cell_coords'],
+            Cell_genetictype = extracted_pops[Pop]['cell_gtypes'], # LOCAL
 
             #daughter class kwargs
             X = params.X,
