@@ -287,47 +287,137 @@ class general_params(object):
         self.N_X = np.array([self.n_thal]+flattenlist([self.full_scale_num_neurons]))
 
     
-        ## Construct the synaptic params dictionaries
-        self.synParams = {}
-        for y in self.Pre:
+        import numpy as np
 
-            if y.split('_')[-1] == 'exc' or y.split('_')[-1] == 'ss':
+        # 1. Base values extracted from literature (L2/3 and L5)
+        # Explicitly defining every Pre -> Post combination.
+        base_params = {
+            'L23': {'PY': {}, 'PV': {}, 'SST': {}, 'VIP': {}},
+            'L5':  {'PY': {}, 'PV': {}, 'SST': {}, 'VIP': {}}
+        }
 
-                params = {
-                            # ProbAMPANMDA specific parameters:
-                            'tau_r_AMPA': 0.2,
-                            'tau_d_AMPA': 1.7,
-                            'tau_r_NMDA': 0.29,
-                            'tau_d_NMDA': 43.0,
-                            'Use': 0.5,           # Utilization of synaptic efficacy
-                            'Dep': 100.0,         # Depression time constant (ms)
-                            'Fac': 10.0,          # Facilitation time constant (ms)
-                            'e': 0.0,             # Reversal potential (mV)
-                            'gmax': 0.001,        # Base conductance conversion
-                            'weight_factor_NMDA': 1.0 
+        # ==========================================
+        # LAYER 2/3 DEFINITIONS
+        # ==========================================
+
+        # --- PRE: PY (Excitatory) ---
+        base_params['L23']['PY']['PY']  = {'Use': 0.46, 'Dep': 670.0, 'Fac': 17.0,  'tau_r_AMPA': 0.2, 'tau_d_AMPA': 1.7, 'tau_r_NMDA': 0.29, 'tau_d_NMDA': 43.0, 'gmax': 0.0002482}
+        base_params['L23']['PY']['SST'] = {'Use': 0.09, 'Dep': 140.0, 'Fac': 670.0, 'tau_r_AMPA': 0.2, 'tau_d_AMPA': 1.7, 'tau_r_NMDA': 0.29, 'tau_d_NMDA': 43.0, 'gmax': 0.00038}
+        base_params['L23']['PY']['PV']  = {'Use': 0.88, 'Dep': 510.0, 'Fac': 180.0, 'tau_r_AMPA': 0.2, 'tau_d_AMPA': 1.7, 'tau_r_NMDA': 0.29, 'tau_d_NMDA': 43.0, 'gmax': 0.000337}
+        base_params['L23']['PY']['VIP'] = {'Use': 0.50, 'Dep': 670.0, 'Fac': 17.0,  'tau_r_AMPA': 0.2, 'tau_d_AMPA': 1.7, 'tau_r_NMDA': 0.29, 'tau_d_NMDA': 43.0, 'gmax': 0.00031}
+
+        # --- PRE: SST (Inhibitory - Martinotti/LTS) ---
+        base_params['L23']['SST']['PY']  = {'Use': 0.30, 'Dep': 1300.0, 'Fac': 2.0,   'tau_r': 0.2, 'tau_d': 5.0, 'gmax': 0.00124}
+        base_params['L23']['SST']['SST'] = {'Use': 0.25, 'Dep': 720.0,  'Fac': 21.0,  'tau_r': 0.2, 'tau_d': 5.0, 'gmax': 0.00034}
+        base_params['L23']['SST']['PV']  = {'Use': 0.25, 'Dep': 710.0,  'Fac': 21.0,  'tau_r': 0.2, 'tau_d': 5.0, 'gmax': 0.00033}
+        base_params['L23']['SST']['VIP'] = {'Use': 0.31, 'Dep': 890.0,  'Fac': 25.0,  'tau_r': 0.2, 'tau_d': 5.0, 'gmax': 0.00046}
+
+        # --- PRE: PV (Inhibitory - Fast Spiking) ---
+        base_params['L23']['PV']['PY']  = {'Use': 0.08, 'Dep': 710.0, 'Fac': 23.0, 'tau_r': 0.2, 'tau_d': 2.5, 'gmax': 0.00291}
+        base_params['L23']['PV']['SST'] = {'Use': 0.25, 'Dep': 700.0, 'Fac': 21.0, 'tau_r': 0.2, 'tau_d': 2.5, 'gmax': 0.00033}
+        base_params['L23']['PV']['PV']  = {'Use': 0.25, 'Dep': 710.0, 'Fac': 21.0, 'tau_r': 0.2, 'tau_d': 2.5, 'gmax': 0.00033}
+        base_params['L23']['PV']['VIP'] = {'Use': 0.26, 'Dep': 720.0, 'Fac': 21.0, 'tau_r': 0.2, 'tau_d': 2.5, 'gmax': 0.00034}
+
+        # --- PRE: VIP (Inhibitory) ---
+        base_params['L23']['VIP']['PY']  = {'Use': 0.23, 'Dep': 300.0, 'Fac': 160.0, 'tau_r': 0.2, 'tau_d': 3.5, 'gmax': 0.0}
+        base_params['L23']['VIP']['SST'] = {'Use': 0.27, 'Dep': 760.0, 'Fac': 22.0,  'tau_r': 0.2, 'tau_d': 3.5, 'gmax': 0.00036}
+        base_params['L23']['VIP']['PV']  = {'Use': 0.25, 'Dep': 720.0, 'Fac': 21.0,  'tau_r': 0.2, 'tau_d': 3.5, 'gmax': 0.00034}
+        base_params['L23']['VIP']['VIP'] = {'Use': 0.26, 'Dep': 720.0, 'Fac': 21.0,  'tau_r': 0.2, 'tau_d': 3.5, 'gmax': 0.00034}
+
+
+        # ==========================================
+        # LAYER 5 DEFINITIONS
+        # ==========================================
+
+        # --- PRE: PY (Excitatory) ---
+        base_params['L5']['PY']['PY']  = {'Use': 0.19,  'Dep': 670.0, 'Fac': 17.0,  'tau_r_AMPA': 0.2, 'tau_d_AMPA': 1.7, 'tau_r_NMDA': 0.29, 'tau_d_NMDA': 43.0, 'gmax': 0.00037}
+        base_params['L5']['PY']['PV']  = {'Use': 0.40,  'Dep': 580.0, 'Fac': 120.0, 'tau_r_AMPA': 0.2, 'tau_d_AMPA': 1.7, 'tau_r_NMDA': 0.29, 'tau_d_NMDA': 43.0, 'gmax': 0.00030}
+        base_params['L5']['PY']['SST'] = {'Use': 0.094, 'Dep': 150.0, 'Fac': 690.0, 'tau_r_AMPA': 0.2, 'tau_d_AMPA': 1.7, 'tau_r_NMDA': 0.29, 'tau_d_NMDA': 43.0, 'gmax': 0.00030}
+        base_params['L5']['PY']['VIP'] = {'Use': 0.50,  'Dep': 670.0, 'Fac': 17.0,  'tau_r_AMPA': 0.2, 'tau_d_AMPA': 1.7, 'tau_r_NMDA': 0.29, 'tau_d_NMDA': 43.0, 'gmax': 0.00030}
+
+        # --- PRE: PV (Inhibitory) ---
+        base_params['L5']['PV']['PY']  = {'Use': 0.24, 'Dep': 660.0, 'Fac': 27.0, 'tau_r': 0.2, 'tau_d': 1.8, 'gmax': 0.00092}
+        base_params['L5']['PV']['PV']  = {'Use': 0.25, 'Dep': 720.0, 'Fac': 21.0, 'tau_r': 0.2, 'tau_d': 1.8, 'gmax': 0.00034}
+        base_params['L5']['PV']['SST'] = {'Use': 0.25, 'Dep': 700.0, 'Fac': 21.0, 'tau_r': 0.2, 'tau_d': 1.8, 'gmax': 0.00033}
+        base_params['L5']['PV']['VIP'] = {'Use': 0.24, 'Dep': 680.0, 'Fac': 20.0, 'tau_r': 0.2, 'tau_d': 1.8, 'gmax': 0.00031}
+
+        # --- PRE: SST (Inhibitory) ---
+        base_params['L5']['SST']['PY']  = {'Use': 0.30, 'Dep': 1200.0, 'Fac': 2.2,  'tau_r': 0.2, 'tau_d': 5.2, 'gmax': 0.00134}
+        base_params['L5']['SST']['PV']  = {'Use': 0.25, 'Dep': 710.0,  'Fac': 21.0, 'tau_r': 0.2, 'tau_d': 5.2, 'gmax': 0.00034}
+        base_params['L5']['SST']['SST'] = {'Use': 0.25, 'Dep': 710.0,  'Fac': 21.0, 'tau_r': 0.2, 'tau_d': 5.2, 'gmax': 0.00033}
+        base_params['L5']['SST']['VIP'] = {'Use': 0.24, 'Dep': 670.0,  'Fac': 20.0, 'tau_r': 0.2, 'tau_d': 5.2, 'gmax': 0.00031}
+
+        # --- PRE: VIP (Inhibitory) ---
+        base_params['L5']['VIP']['PY']  = {'Use': 0.26, 'Dep': 360.0, 'Fac': 100.0, 'tau_r': 0.2, 'tau_d': 3.0, 'gmax': 0.00}
+        base_params['L5']['VIP']['PV']  = {'Use': 0.24, 'Dep': 680.0, 'Fac': 20.0,  'tau_r': 0.2, 'tau_d': 3.0, 'gmax': 0.00031}
+        base_params['L5']['VIP']['SST'] = {'Use': 0.25, 'Dep': 700.0, 'Fac': 21.0,  'tau_r': 0.2, 'tau_d': 3.0, 'gmax': 0.00033}
+        base_params['L5']['VIP']['VIP'] = {'Use': 0.28, 'Dep': 810.0, 'Fac': 23.0,  'tau_r': 0.2, 'tau_d': 3.0, 'gmax': 0.00040}
+
+
+        # ==========================================
+        # AUTOMATED AVERAGING FOR L4 AND L6
+        # ==========================================
+        genetic_types = ['PY', 'PV', 'SST', 'VIP']
+
+        for target_layer in ['L4', 'L6']:
+            base_params[target_layer] = {}
+            for pre_gtype in genetic_types:
+                base_params[target_layer][pre_gtype] = {}
+                for post_gtype in genetic_types:
+                    base_params[target_layer][pre_gtype][post_gtype] = {}
+                    for key in base_params['L23'][pre_gtype][post_gtype].keys():
+                        val23 = base_params['L23'][pre_gtype][post_gtype][key]
+                        val5  = base_params['L5'][pre_gtype][post_gtype][key]
+                        # Average the values and round to 3 decimal places
+                        base_params[target_layer][pre_gtype][post_gtype][key] = round((val23 + val5) / 2.0, 3)
+
+        # ==========================================
+        # CONSTRUCT FINAL SYNPARAMS DICTIONARY
+        # ==========================================
+        synParams = {}
+        layers = ['L23', 'L4', 'L5', 'L6']
+
+        for layer in layers:
+            synParams[layer] = {}
+            
+            for pre_gtype in genetic_types:
+                synParams[layer][pre_gtype] = {}
+                
+                for post_gtype in genetic_types:
+                    bp = base_params[layer][pre_gtype][post_gtype]
+                    
+                    if pre_gtype == 'PY':
+                        # Excitatory (PY): Uses ProbAMPANMDA
+                        params = {
+                            'tau_r_AMPA': bp['tau_r_AMPA'],
+                            'tau_d_AMPA': bp['tau_d_AMPA'],
+                            'tau_r_NMDA': bp['tau_r_NMDA'],
+                            'tau_d_NMDA': bp['tau_d_NMDA'],
+                            'Use': bp['Use'],
+                            'Dep': bp['Dep'],
+                            'Fac': bp['Fac'],
+                            'e': 0.0,
+                            'gmax': bp['gmax'],
+                            'weight_factor_NMDA': 1.0,
+                            'syntype': 'ProbAMPANMDA'
                         }
-
-                self.synParams[y] = params
-
-            elif y.split('_')[-1] == 'inh':
-
-
-                params = {
-                            # ProbAMPANMDA specific parameters:
-                            'tau_r_AMPA': 0.2,
-                            'tau_d_AMPA': 1.7,
-                            'tau_r_NMDA': 0.29,
-                            'tau_d_NMDA': 43.0,
-                            'Use': 0.5,           # Utilization of synaptic efficacy
-                            'Dep': 100.0,         # Depression time constant (ms)
-                            'Fac': 10.0,          # Facilitation time constant (ms)
-                            'e': -80.0,             # Reversal potential (mV)
-                            'gmax': 0.001,        # Base conductance conversion
-                            'weight_factor_NMDA': 1.0 
+                    else:
+                        # Inhibitory (SST, PV, VIP): Uses ProbUDFsyn
+                        params = {
+                            'tau_r': bp['tau_r'],
+                            'tau_d': bp['tau_d'],
+                            'Use': bp['Use'],
+                            'Dep': bp['Dep'],
+                            'Fac': bp['Fac'],
+                            'e': -80.0,
+                            'gmax': bp['gmax'],
+                            'syntype': 'ProbUDFsyn'
                         }
+                    
+                    # Assign to the Layer -> Pre -> Post hierarchy
+                    synParams[layer][pre_gtype][post_gtype] = params
 
-                self.synParams[y] = params
-
+        self.synParams = synParams
 
 
 
@@ -891,7 +981,6 @@ class multicompartment_params(point_neuron_network_params):
 
 
                 self.synParams[y].update({
-                    'syntype' : 'ProbAMPANMDA',  
                     'section' : section,
                 })
 
@@ -900,7 +989,6 @@ class multicompartment_params(point_neuron_network_params):
 
 
                 self.synParams[y].update({
-                    'syntype' : 'ProbUDFsyn',  
                     'section' : section,
                 })
 
@@ -1150,6 +1238,7 @@ class Connectomics:
                 - 'bbp_totals': Total cell counts grouped by layer and biological type (Exc/Inh).
                 - 'mtype_fast_lookup': Map of m-type strings to (Layer, BioType) tuples.
                 - 'cell_mtypes': 1D array of morphological types for every generated neuron.
+                - 'cell_gtypes' : 1D array of genetical types for every generated neuron.
                 - 'cell_coords': 2D array of shape $(N, 3)$ containing XYZ coordinates in $\mu m$.
                 - 'adj_matrix': Sparse CSR matrix representing the synaptic adjacency graph.
                 - 'post_to_pre': Afferent dict mapping Post-synaptic IDs to lists of Pre-synaptic IDs.
@@ -1163,6 +1252,7 @@ class Connectomics:
             'mtype_fast_lookup': self.mtype_fast_lookup,
             'cell_mtypes': self.cell_mtypes,
             'cell_coords': self.cell_coords,
+            'cell_gtypes': self.cell_gtypes,
             'synapse_dict': self.synapse_dict,
             'adj_matrix': self.adj_matrix,
             'post_to_pre': self.post_to_pre,
@@ -1504,12 +1594,9 @@ class Connectomics:
         N = len(cell_mtypes)
         unique_mtypes = np.unique(cell_mtypes)
 
-        # We store only the (row, col) indices of successful connections
-        # This avoids storing the millions of 'zeros' in a dense matrix
         all_rows = []
         all_cols = []
 
-        # 1. Pre-group indices to avoid calling np.where millions of times
         mtype_indices = {m: np.where(cell_mtypes == m)[0] for m in unique_mtypes}
 
         for pre_mtype in unique_mtypes:
@@ -1517,20 +1604,14 @@ class Connectomics:
             coords_pre = cell_coords[pre_idx]
 
             for post_mtype in unique_mtypes:
-                # Only proceed if this pathway exists in our connectivity data
                 if post_mtype not in conn_data.get('best_fit', {}).get(pre_mtype, {}):
                     continue
 
                 post_idx = mtype_indices[post_mtype]
                 coords_post = cell_coords[post_idx]
-
-                # 2. Calculate distances ONLY for this sub-block
-                # This is the key RAM saver
                 d_sub = cdist(coords_pre, coords_post, metric='euclidean')
-
                 fit_type = conn_data['best_fit'][pre_mtype][post_mtype]
 
-                # 3. Calculate probabilities for this sub-block
                 if fit_type == 'exp':
                     a0 = float(conn_data['a0mat_exp'][pre_mtype][post_mtype])
                     l = float(conn_data['lmat_exp'][pre_mtype][post_mtype])
@@ -1544,7 +1625,6 @@ class Connectomics:
                     p_sub = a0 * np.exp(-((d_sub - x0)**2) / (l**2))
 
                 else:
-                    # Fallback: Step-function bins
                     p_sub = np.zeros_like(d_sub)
                     dist_bins = [
                         (12.5, 'pmat12um'), (25.0, 'pmat25um'), (50.0, 'pmat50um'),
@@ -1564,31 +1644,55 @@ class Connectomics:
                         p_sub[mask] = bin_prob
                         prev_d = max_d
 
-                # 4. Roll the dice for this sub-block only
-                # random_matrix is now just the size of the population pair
                 trial = np.random.rand(*p_sub.shape) < p_sub
-
-                # 5. Extract successful connection coordinates
-                # local_rows/cols are indices within the sub-block
                 local_rows, local_cols = np.where(trial)
 
                 if len(local_rows) > 0:
-                    # Map local indices back to global cell indices
                     global_rows = pre_idx[local_rows]
                     global_cols = post_idx[local_cols]
 
-                    # Check for and remove autapses (self-connections)
                     mask_autapse = global_rows != global_cols
                     all_rows.extend(global_rows[mask_autapse])
                     all_cols.extend(global_cols[mask_autapse])
 
-                # Explicitly clear sub-matrices from memory
                 del d_sub, p_sub, trial
 
-        # 6. Final Assembly: Create a Sparse CSR matrix
-        # This stores only the '1's. Total RAM used is proportional to number of connections.
         data = np.ones(len(all_rows), dtype=np.uint8)
         adj_matrix = sparse.csr_matrix((data, (all_rows, all_cols)), shape=(N, N))
+
+        # ==========================================
+        # ASSIGN GENETIC MARKERS BASED ON CONNECTIVITY
+        # ==========================================
+        cell_genetics = np.empty(N, dtype=object)
+
+        # 1. Create a boolean mask of which cells are Excitatory
+        is_exc = np.array([mtype_fast_lookup[m][1] == 'Excitatory' for m in cell_mtypes])
+        is_inh = ~is_exc
+
+        # Excitatory cells are 'PY'
+        cell_genetics[is_exc] = 'PY'
+
+        # 2. Count how many Excitatory targets each cell connects to
+        # adj_matrix dot product with the boolean 'is_exc' array calculates 
+        # the sum of excitatory connections along each row efficiently.
+        targets_exc_count = adj_matrix.dot(is_exc.astype(int))
+
+        # 3. Inhibitory cells targeting NO excitatory cells -> VIP
+        is_vip = is_inh & (targets_exc_count == 0)
+        cell_genetics[is_vip] = 'VIP'
+
+        # 4. Inhibitory cells targeting at least 1 excitatory cell -> SST (3/5) or PV (2/5)
+        is_sst_pv = is_inh & (targets_exc_count > 0)
+        num_sst_pv = is_sst_pv.sum()
+        
+        if num_sst_pv > 0:
+            cell_genetics[is_sst_pv] = np.random.choice(
+                ['SST', 'PV'], 
+                size=num_sst_pv, 
+                p=[3/5, 2/5]
+            )
+
+        self.cell_gtypes = cell_genetics
         self.adj_matrix = adj_matrix
 
 
@@ -1612,7 +1716,7 @@ class Connectomics:
         - output_folder: String (optional). Path to save the generated arrays.
 
         Returns:
-        - cell_mtypes: 1D numpy array of string m-types.
+        - cell_mtypes: 2D numpy array of shape (N, 2) containing (m-type, genetic_type).
         - cell_coords: 2D numpy array of shape (N, 3) containing (x, y, z).
         """
         input_dict = self.input_dict
@@ -1620,10 +1724,9 @@ class Connectomics:
         output_folder = self.connectomics_output
         radius = input_dict['Geometry']['radius']
 
-        mtypes_list = []
+        base_mtypes_list = []
         coords_list = []
 
-        # Pre-calculate the column's cross-sectional area
         area = np.pi * (radius ** 2)
 
         if verbose:
@@ -1635,7 +1738,6 @@ class Connectomics:
                 if verbose: print(f"Warning: Z-boundaries for '{layer}' not defined. Skipping.")
                 continue
 
-            # Unpack bounds and calculate layer volume
             bounds = input_dict['Layers'][layer]
             z_min, z_max = min(bounds), max(bounds)
             layer_height = z_max - z_min
@@ -1648,17 +1750,13 @@ class Connectomics:
                 if density_mm3 <= 0:
                     continue
 
-                # 1. Normalize the bio_type key (handles 'inh', 'exc', 'Inhibitory', etc.)
                 bio_type = 'Inhibitory' if raw_bio_type.lower().startswith('inh') else 'Excitatory'
-
-                # 2. Convert density (cells/mm^3) to cells/um^3, calculate TOTAL cells for this group
                 density_um3 = density_mm3 / 1e9
                 total_group_count = int(np.round(density_um3 * volume_um3))
 
                 if total_group_count <= 0:
                     continue
 
-                # 3. Check if we have BBP distribution data for this layer and type
                 if layer not in bbp_results or bio_type not in bbp_results[layer]:
                     if verbose: print(f"  Warning: BBP results for {layer} {bio_type} not found. Skipping.")
                     continue
@@ -1666,13 +1764,10 @@ class Connectomics:
                 if verbose:
                     print(f"  {bio_type} (Target Total: ~{total_group_count} cells):")
 
-                # 4. Iterate through the BBP sub-populations
                 mtype_data = bbp_results[layer][bio_type]
 
                 for mtype, data in mtype_data.items():
                     percentage = data['percentage']
-
-                    # Calculate the exact number of cells for this specific m-type
                     count = int(np.round(total_group_count * (percentage / 100.0)))
 
                     if count <= 0:
@@ -1681,7 +1776,6 @@ class Connectomics:
                     if verbose:
                         print(f"    -> {mtype:<12}: {count:>5} cells ({percentage:>5.2f}%)")
 
-                    # 5. Generate uniform random spatial positions
                     r_random = radius * np.sqrt(np.random.rand(count))
                     theta_random = np.random.rand(count) * 2 * np.pi
 
@@ -1689,27 +1783,24 @@ class Connectomics:
                     y = r_random * np.sin(theta_random)
                     z = np.random.uniform(z_min, z_max, count)
 
-                    # Stack the generated data
                     coords = np.column_stack((x, y, z))
                     coords_list.append(coords)
 
-                    mtypes = np.full(count, mtype, dtype=object)
-                    mtypes_list.append(mtypes)
+                    base_mtypes = np.full(count, mtype, dtype=object)
+                    base_mtypes_list.append(base_mtypes)
 
-        # Concatenate everything into the final format
-        if mtypes_list:
-            cell_mtypes = np.concatenate(mtypes_list)
+        if base_mtypes_list:
+            cell_mtypes = np.concatenate(base_mtypes_list)
             cell_coords = np.vstack(coords_list)
             if verbose:
                 print("="*40)
                 print(f"SUCCESS: Generated {len(cell_mtypes)} total neurons.")
         else:
-            cell_mtypes = np.array([])
+            cell_mtypes = np.array([], dtype=object)
             cell_coords = np.empty((0, 3))
             if verbose:
                 print("WARNING: No cells were generated. Check your input dictionary.")
 
-        # --- NEW: Save arrays to disk if an output folder is provided ---
         if output_folder:
             os.makedirs(output_folder, exist_ok=True)
             mtypes_path = os.path.join(output_folder, 'cell_mtypes.npy')
@@ -1729,11 +1820,13 @@ class Connectomics:
 
 
 
+
     def get_lookup_table(self):
 
         print("="*40)
         print('STARTING THE GENERATION OF THE LOOKUP TABLE')
         # Master Dictionary mapping acronyms to (Full Name, Type)
+
         acronym_map = {
             # Excitatory Types
             'PC': ('Pyramidal Cell', 'Excitatory'),
@@ -1748,7 +1841,7 @@ class Connectomics:
             'TPC_L1': ('Tufted Pyramidal Cell (L1)', 'Excitatory'),
             'TPC_L4': ('Tufted Pyramidal Cell (L4)', 'Excitatory'),
 
-            # Inhibitory Types
+            # Standard Inhibitory Types
             'LBC': ('Large Basket Cell', 'Inhibitory'),
             'NBC': ('Nest Basket Cell', 'Inhibitory'),
             'SBC': ('Small Basket Cell', 'Inhibitory'),
@@ -1760,28 +1853,30 @@ class Connectomics:
             'NGC': ('Neurogliaform Cell', 'Inhibitory'),
             'HAC': ('Horizontal Axon Cell', 'Inhibitory'),
             'DAC': ('Descending Axon Cell', 'Inhibitory'),
-            'SAC': ('Small Axon Cell', 'Inhibitory')
+            'SAC': ('Small Axon Cell', 'Inhibitory'),
+            
+            # --- ADDED: L1 Specific Inhibitory Types ---
+            'NGC-DA': ('Neurogliaform Cell with Dense Axonal Arborization', 'Inhibitory'),
+            'NGC-SA': ('Neurogliaform Cell with Sparse Axonal Arborization', 'Inhibitory'),
+            'DLAC': ('Deiters-Like Axon Cell', 'Inhibitory'),
+            'SLAC': ('Single-Layer Axon Cell', 'Inhibitory')
         }
 
         file_path = 'S1-cells-distributions-Rat.txt'
         valid_layers = {"L1", "L23", "L4", "L5", "L6"}
 
-
-        full_path_conn = os.path.join(self.connectomics_path, file_path)
-
-
         # Initialize the fast-readable variable
         mtype_fast_lookup = {}
 
-        if not os.path.exists(full_path_conn):
-            print(f"Error: '{full_path_conn}' not found. Please upload it to the 'anatomy' folder.")
+        if not os.path.exists(file_path):
+            print(f"Error: '{file_path}' not found. Please upload it to the 'anatomy' folder.")
         else:
-            with open(full_path_conn, 'r') as f:
+            with open(file_path, 'r') as f:
                 for line in f.read().split('\n'):
                     if line.strip():
                         parts = line.split()
-                        if len(parts) == 5:
-                            metype, mtype, etype, n, m = parts
+                        if len(parts) >= 5:
+                            metype, mtype, etype, n, m = parts[:5]
 
                             # Split the mtype to determine layer and acronym
                             mtype_parts = mtype.split('_', 1)
@@ -1803,11 +1898,7 @@ class Connectomics:
             self.mtype_fast_lookup = mtype_fast_lookup
 
 
-        # --- Quick Test ---
-        test_cell = 'L23_LBC'
-        if test_cell in mtype_fast_lookup:
-            layer, cell_type = mtype_fast_lookup[test_cell]
-            print(f"Success! {test_cell} -> Layer: {layer}, Type: {cell_type}")
+        
 
 
 
@@ -1821,11 +1912,12 @@ class Connectomics:
     
 
 
-# 1. The Updated Extraction Function (Now includes 'cell_mtypes')
+# 1. The Updated Extraction Function (Now includes 'cell_mtypes' and 'cell_gtypes')
 def extract_macro_populations(connectomics_data, name_list):
     """
     Extracts specific macro-populations using the fast lookup table,
-    returning only spatial coordinates, mapping indices, and the integrated synapse dictionary.
+    returning only spatial coordinates, mapping indices, the integrated synapse dictionary,
+    and the genetic types.
     """
     # Unpack only the necessary data
     mtype_fast_lookup = connectomics_data['mtype_fast_lookup']
@@ -1834,6 +1926,9 @@ def extract_macro_populations(connectomics_data, name_list):
     
     # NEW: Only grab the integrated synapse_dict
     synapse_dict = connectomics_data['synapse_dict']
+    
+    # NEW: Grab the genetic types array
+    cell_gtypes = connectomics_data['cell_gtypes']
 
     extracted_data = {}
 
@@ -1879,6 +1974,9 @@ def extract_macro_populations(connectomics_data, name_list):
         # Extract Coordinates (Made compliant: converted to list of dicts)
         sub_coords_raw = cell_coords[global_indices]
         sub_coords = [{'x': row[0], 'y': row[1], 'z': row[2]} for row in sub_coords_raw]
+        
+        # NEW: Extract the genetic types for the matched sub-population
+        sub_gtypes = cell_gtypes[global_indices]
 
         # Create Mapping: Local (0 to N) -> Raw Global Index
         local_to_raw_map = {local_idx: raw_idx for local_idx, raw_idx in enumerate(global_indices)}
@@ -1893,7 +1991,8 @@ def extract_macro_populations(connectomics_data, name_list):
         extracted_data[name] = {
             'cell_coords': sub_coords,
             'local_to_raw_map': local_to_raw_map,
-            'synapse_dict': sub_synapse_dict
+            'synapse_dict': sub_synapse_dict,
+            'cell_gtypes': sub_gtypes
         }
 
     return extracted_data
