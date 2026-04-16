@@ -1146,10 +1146,12 @@ import pickle
 import numpy as np
 from scipy import sparse
 from scipy.spatial.distance import cdist # This fixes the NameError
+import numpy as np
+import math
 class Connectomics:
 
 
-    def __init__(self,connectomics_path='',connectomics_output='',NSyn_path='',SpanTree_path ='',name_list = [],Calculate=True):
+    def __init__(self,connectomics_path='',connectomics_output='',NSyn_path='',SpanTree_path ='',thalamus_path= '',name_list = [],Calculate=True):
         # NSyn_path path to the synapse number distribution per morphological path.
         # SpanTree_path = path to the saved spanning tree distributon per macro-population
         # name_list list of macro populations' loading names
@@ -1159,6 +1161,7 @@ class Connectomics:
         self.dat_file_path = NSyn_path
         self.SpanTree_path = SpanTree_path
         self.name_list = name_list
+        self.thalamus_path = thalamus_path
 
 
         # --------------------------------------
@@ -1211,11 +1214,43 @@ class Connectomics:
             with open(full_path_conn, 'rb') as f:
                 self.conn_data = pickle.load(f)
 
+            # Open the file in 'read-binary' mode and load the data
+            full_thalamus_path = os.path.join(self.thalamus_path, 'convergence_Th_S1.txt')
+            
+            self.convergence_Th = {'VPM_sTC': {}, 'VPL_sTC': {}, 'POm_sTC_s1': {}}
+            # 1. Build the convergence dictionary from the text file
+            convergence_Th = {
+                'VPM_sTC': {},
+                'VPL_sTC': {},
+                'POm_sTC_s1': {}
+            }
+
+            with open(full_thalamus_path, 'r') as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    # The file columns: Target_mtype, VPM_count, POm_count, Group
+                    parts = line.split()
+                    mtype = parts[0]
+                    preFO = int(parts[1]) # First-Order (VPM/VPL)
+                    preHO = int(parts[2]) # Higher-Order (POm)
+
+                    # Populate the dictionary
+                    convergence_Th['VPM_sTC'][mtype] = preFO
+                    convergence_Th['VPL_sTC'][mtype] = preFO
+                    convergence_Th['POm_sTC_s1'][mtype] = preHO
+
+
+            self.convergence_Th = convergence_Th
+            
+
             # Execute Pipeline
             self.get_lookup_table()
             self.calculate_bbp_relative_presences()
             self.get_ADJ()
             self.extract_connectivity_dicts()
+            self.add_independent_thalamic_sources()
+            self.validate_thalamic_sources()
             self.extract_multapses()
 
 
@@ -1260,6 +1295,86 @@ class Connectomics:
             'TreeDensity_load' : self.TreeDensity_load
 
         }
+    
+
+
+
+    import math
+
+    def add_independent_thalamic_sources(self):
+        """
+        Appends independent virtual thalamic sources to the cortical network.
+        Handles mtypes and gtypes as NumPy arrays.
+
+        
+        """
+
+        mtypes = self.cell_mtypes
+        gtypes = self.cell_gtypes 
+        post_to_pre = self.post_to_pre 
+        convergence_data = self.convergence_Th
+
+
+        self.original_cortical_ids = list(range(len(mtypes)))
+
+
+
+        # 1. Convert NumPy arrays to Python lists for efficient appending
+        mtypes_list = mtypes.tolist() if isinstance(mtypes, np.ndarray) else list(mtypes)
+        gtypes_list = gtypes.tolist() if isinstance(gtypes, np.ndarray) else list(gtypes)
+
+        # 2. Find the starting ID for virtual cells
+        # In an array, the cell IDs are exactly the indices (0 to N-1)
+        # Therefore, the next available ID is simply the current length of the array
+        current_virtual_id = len(mtypes_list)
+        original_num_cells = len(mtypes_list)
+
+        synapses_per_source = 9.0
+
+        # Iterate only over the original cortical cells (from index 0 to original_num_cells - 1)
+        for post_id in range(original_num_cells):
+            cortical_mtype = mtypes_list[post_id]
+
+            # Ensure the cell exists in the post_to_pre structure
+            if post_id not in post_to_pre:
+                post_to_pre[post_id] = []
+
+            # Add VPM, VPL, and POm sources
+            for th_pop in ['VPM', 'VPL', 'POm']:
+
+                # Map the clean label to the dictionary keys
+                th_key = th_pop + '_sTC' if th_pop in ['VPM', 'VPL'] else 'POm_sTC_s1'
+
+                if th_key not in convergence_data or cortical_mtype not in convergence_data[th_key]:
+                    continue
+
+                raw_target = convergence_data[th_key][cortical_mtype]
+                if raw_target <= 0:
+                    continue
+
+                # Calculate how many independent virtual sources this cell needs
+                required_sources = int(np.ceil(raw_target / synapses_per_source))
+
+                # Generate the specific unique IDs for these sources
+                for _ in range(required_sources):
+                    # Append the generic 'TC' label
+                    mtypes_list.append('TC')
+
+                    # Append the specific thalamic nucleus
+                    gtypes_list.append(th_pop)
+
+                    # Attach the new pre-synaptic ID to the cortical neuron
+                    post_to_pre[post_id].append(current_virtual_id)
+
+                    # Increment the global counter to guarantee independence
+                    current_virtual_id += 1
+
+        # 3. Convert back to NumPy arrays before returning
+        self.cell_mtypes = np.array(mtypes_list)
+        self.cell_gtypes = np.array(gtypes_list)
+        self.post_to_pre = post_to_pre
+
+         
         
     def calculate_bbp_relative_presences(self):
         """
@@ -1475,6 +1590,14 @@ class Connectomics:
             
             # Populate means and stds based on the pathway
             for i, pre_mtype in enumerate(pre_mtypes):
+                
+                # ---> NEW CHANGE: Intercept Thalamic Sources <---
+                if pre_mtype == 'TC':
+                    means[i] = 9.0
+                    stds[i] = 3.0
+                    continue
+                # ------------------------------------------------
+                
                 try:
                     # Strategy A: Exact structural pathway match
                     means[i] = syn_stats[pre_mtype][post_mtype]['mean']
@@ -1506,6 +1629,93 @@ class Connectomics:
 
         self.synapse_dict = multapse_dict
 
+    def validate_thalamic_sources(self):
+        """
+        Validates the integrity of the thalamic connectivity builder.
+        Handles mtypes and gtypes as NumPy arrays.
+        """
+        original_cortical_ids = original_cortical_ids
+        mtypes = self.cell_mtypes
+        gtypes = self.cell_gtypes 
+        post_to_pre = self.post_to_pre 
+        convergence_data = self.convergence_Th
+
+
+
+
+        errors = []
+        synapses_per_source = 9.0
+
+        # 1. Check Strict Independence
+        all_assigned_thalamic_ids = []
+        for post_id in original_cortical_ids:
+            pre_list = post_to_pre.get(post_id, [])
+
+            # CORRECTED: Check if the index is within bounds, then check its value
+            thalamic_pres = [
+                pre_id for pre_id in pre_list
+                if pre_id < len(gtypes) and str(gtypes[pre_id]) in ['VPM', 'VPL', 'POm']
+            ]
+            all_assigned_thalamic_ids.extend(thalamic_pres)
+
+        if len(all_assigned_thalamic_ids) != len(set(all_assigned_thalamic_ids)):
+            errors.append("INDEPENDENCE BUG: Some cortical cells are sharing the same virtual thalamic source ID.")
+
+        # 2. Check Dictionary/Array Consistency
+        for th_id in all_assigned_thalamic_ids:
+            if th_id >= len(mtypes):
+                errors.append(f"CONSISTENCY BUG: Thalamic ID {th_id} is out of bounds for mtypes array.")
+            elif str(mtypes[th_id]) != 'TC':
+                errors.append(f"CONSISTENCY BUG: Thalamic ID {th_id} has mtype '{mtypes[th_id]}' instead of 'TC'.")
+
+            if th_id >= len(gtypes):
+                errors.append(f"CONSISTENCY BUG: Thalamic ID {th_id} is out of bounds for gtypes array.")
+            elif str(gtypes[th_id]) not in ['VPM', 'VPL', 'POm']:
+                errors.append(f"CONSISTENCY BUG: Thalamic ID {th_id} has invalid gtype '{gtypes[th_id]}'.")
+
+        # 3. Check Mathematical Accuracy (Convergence)
+        error_limit = 10
+        math_errors = 0
+
+        for post_id in original_cortical_ids:
+            cortical_mtype = str(mtypes[post_id])
+
+            # Count actual assigned sources
+            actual_counts = {'VPM': 0, 'VPL': 0, 'POm': 0}
+            for pre_id in post_to_pre.get(post_id, []):
+                # CORRECTED: Safe array indexing
+                if pre_id < len(gtypes):
+                    th_nuc = str(gtypes[pre_id])
+                    if th_nuc in actual_counts:
+                        actual_counts[th_nuc] += 1
+
+            # Calculate expected sources
+            for th_pop in ['VPM', 'VPL', 'POm']:
+                th_key = th_pop + '_sTC' if th_pop in ['VPM', 'VPL'] else 'POm_sTC_s1'
+
+                if th_key in convergence_data and cortical_mtype in convergence_data[th_key]:
+                    raw_target = convergence_data[th_key][cortical_mtype]
+                    expected_count = int(np.ceil(max(0, raw_target) / synapses_per_source))
+                else:
+                    expected_count = 0
+
+                if actual_counts[th_pop] != expected_count:
+                    math_errors += 1
+                    if math_errors <= error_limit:
+                        errors.append(f"MATH BUG for Cell {post_id} ({cortical_mtype}): "
+                                    f"Expected {expected_count} {th_pop} sources, but found {actual_counts[th_pop]}.")
+
+        if math_errors > error_limit:
+            errors.append(f"... and {math_errors - error_limit} more math errors suppressed.")
+
+        # --- Final Report ---
+        if not errors:
+            print("✅ VALIDATION PASSED: All thalamic sources are mathematically accurate, perfectly independent, and properly typed.")
+
+        else:
+            print("❌ VALIDATION FAILED with the following hidden bugs:")
+            for error in errors:
+                print(f"  - {error}")
 
 
     def extract_connectivity_dicts(self):
@@ -1666,7 +1876,7 @@ class Connectomics:
         cell_genetics = np.empty(N, dtype=object)
 
         # 1. Create a boolean mask of which cells are Excitatory
-        is_exc = np.array([mtype_fast_lookup[m][1] == 'Excitatory' for m in cell_mtypes])
+        is_exc = np.array([self.mtype_fast_lookup[m][1] == 'Excitatory' for m in cell_mtypes])
         is_inh = ~is_exc
 
         # Excitatory cells are 'PY'
