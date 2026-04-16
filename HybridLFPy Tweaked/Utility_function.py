@@ -24,7 +24,7 @@ def calculate_synaptic_overlap_locations(
     pre_soma_pos,
     post_soma_pos,
     density_maps_dir,
-    num_synapses, # Included for signature completeness, used in the next step
+    num_synapses,        # Included for signature completeness, used in the next step
     voxel_size=10.0,
     grid_extent=1000.0
 ):
