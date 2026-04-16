@@ -152,7 +152,6 @@ N_synapse_path = r''
 connectomics_output = r''
 
 
-
 conn =  Connectomics(connectomics_path,connectomics_output,N_synapse_path,SpanTree_path,name_list)
 conn_dict = conn.get_ConnectomicInfo
 input_dict = conn.get_ColumnProp
@@ -161,13 +160,15 @@ input_dict = conn.get_ColumnProp
 # Extract Infos
 extracted_pops = extract_macro_populations(conn_dict, name_list)  # cell_coords, local_to_raw_map, pre_to_post, post_to_pre
 
+
 # Map between the specific NMC mtype and its layer and synaptic type.
 mtype_fast_lookup = conn_dict['mtype_fast_lookup']
 
+
 # 1xN list of all cells coupled by the index to all the keys' value in conn_dict. 
 cell_mtypes = conn_dict['cell_mtypes']
-
 cell_gtypes = conn_dict['cell_gtypes']
+
 
 # Dictionary with the spanning trees distribution
 TreeDensity_load = conn_dict['TreeDensity_load']
@@ -188,8 +189,31 @@ Pop_to_Syntype = { 'L23_exc' : 'exc',
 
           }
 
+# ----------------------------------------
+
+# SYNAPSE 
+
+# ----------------------------------------
+
 
 syn_path = ''
+
+
+# ----------------------------------------
+
+# Point Neuron simulation output
+
+# ----------------------------------------
+
+
+
+
+PointNetOut_path = '' # Path to the spike trains resulting from the point network simulation.
+
+
+
+
+
 
 
 ####### Set up populations #####################################################
@@ -199,10 +223,10 @@ for i, Pop in enumerate(name_list):
     #create population:
     Macro_Pop = Population(
             #parent class
-            cellParams = params.yCellParams[y],
-            rand_rot_axis = params.rand_rot_axis[y],
+            cellParams = params.yCellParams[Pop],
+            rand_rot_axis = params.rand_rot_axis[Pop],
             simulationParams = params.simulationParams,
-            populationParams = params.populationParams[y],
+            populationParams = params.populationParams[Pop],
             Pop = Pop,
             layerBoundaries = params.layerBoundaries,
             electrodeParams = params.electrodeParams,
@@ -219,13 +243,16 @@ for i, Pop in enumerate(name_list):
             synapse_base_path = syn_path,
             TreeDensity_load = TreeDensity_load,
 
+            PointNetOut_path = PointNetOut_path,
+
 
             cell_mtypes = cell_mtypes,
             mtype_fast_lookup = mtype_fast_lookup,
             cell_gtypes = cell_gtypes, # GLOBAL
-            SynWeigths = params.synParams,
+
 
             input_dict = input_dict,
+            synParams = params.synParams,
 
             voxel_size = None,
             grid_extent = None,
@@ -239,12 +266,12 @@ for i, Pop in enumerate(name_list):
             #daughter class kwargs
             X = params.X,
             networkSim = networkSim,
-            k_yXL = params.k_yXL[y],
-            synParams = params.synParams[y],
-            synDelayLoc = params.synDelayLoc[y],
-            synDelayScale = params.synDelayScale[y],
-            J_yX = params.J_yX[y],
-            tau_yX = params.tau_yX[y],
+            k_yXL = params.k_yXL[Pop],
+            
+            synDelayLoc = params.delays,
+            synDelayScale = params.delay_rel_sd,
+            J_yX = params.J_yX[Pop],
+            tau_yX = params.tau_yX[Pop],
             recordSingleContribFrac = params.recordSingleContribFrac,
         )
     #run population simulation and collect the data
