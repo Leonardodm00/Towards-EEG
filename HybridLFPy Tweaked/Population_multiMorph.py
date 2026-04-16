@@ -170,8 +170,13 @@ class PopulationSuper(object):
                 grid_extent = None,
                 SpanTree_path = '',
 
+                synParams = {},
 
-                SynWeigths = {},
+                PointNetOut_path = '{}_out_{}',
+
+
+
+
 
 
 
@@ -269,9 +274,14 @@ class PopulationSuper(object):
             Nested dictionaries: at the top level the key is the presynaptic macro-population while the second key is the specific 
             post-synaptic population: The specific value is the decaying time constant 
 
-        SynWeigths: dict 
-            Nested dictionaries: at the top level the key is the presynaptic macro-population while the second key is the specific 
-            post-synaptic population: The specific value is the synaptic weight
+        synParams: dict
+            Nested dictionaries where synaptic parameters fixed based on the pre-synaptic neuron's layer of belonging and genetic type 
+            ( first two keys ) and the genetic type of the post-synaptic neuron (independently form the post-synaptic neuron's 
+            layer of dwelling).
+
+
+        PointNetOut_path : string
+            Path to the spike trains resulting from the point network simulation. Refer to the class FastSpikeDatabase
 
         
             
@@ -340,6 +350,8 @@ class PopulationSuper(object):
         self.cell_mtypes = cell_mtypes
         self.cell_gtypes = cell_gtypes
 
+        self.synParams = synParams
+
 
         self.grid_extent = grid_extent
         self.voxel_size = voxel_size
@@ -347,7 +359,9 @@ class PopulationSuper(object):
         self.input_dict = input_dict
         self.SpanTree_path = SpanTree_path
 
-        self.SynWeigths= SynWeigths
+        self.PointNetOut_path = PointNetOut_path
+
+        
   
 
 
@@ -357,6 +371,19 @@ class PopulationSuper(object):
         self.dt_output = dt_output
         self.recordSingleContribFrac = recordSingleContribFrac
         self.output_file = output_file
+
+
+
+        # Construct the LFPy Reader
+        
+
+
+
+
+
+
+
+
 
         # check that decimate fraction is actually a whole number
         try:
@@ -1141,8 +1168,8 @@ class Population(PopulationSuper):
                          # 'tau': [0.5, 0.5],
                      },
                  },
-                 synDelayLoc=[1.5, 1.5],
-                 synDelayScale=[None, None],
+                 synDelayLoc=[],
+                 synDelayScale=None,
                  J_yX=[0.20680155243678455, -1.2408093146207075],
                  tau_yX=[0.5, 0.5],
                  **kwargs):
@@ -1168,9 +1195,9 @@ class Population(PopulationSuper):
             Each toplevel key denote each presynaptic population,
             bottom-level dicts are parameters passed to `LFPy.Synapse` however
             time constants `tau' takes one value per presynaptic population.
-        synDelayLoc : list
+        synDelayLoc : 1x2 list
             Average synapse delay for each presynapse connection.
-        synDelayScale : list
+        synDelayScale :  scalar
             Synapse delay std for each presynapse connection.
         J_yX : list of floats
             Synapse weights for connections from each presynaptic population,
@@ -1276,7 +1303,7 @@ class Population(PopulationSuper):
         layer_limits = self.input_dict['Layers']
         global_cell_coords = self.global_cell_coords
         pre_partners_matrix = self.Cell_afferences[cellindex]
-        post_soma_pos  = self.post_soma_pos[cellindex]
+        post_soma_pos  = self.pop_soma_pos[cellindex]
         post_mtype_load = f"population_probability_{self.Pop}"
 
 
@@ -1412,38 +1439,43 @@ class Population(PopulationSuper):
 
         for Pre_neuron_idx, lfpy_segments in mapped_synapses_dict.items():
 
-            ### Extract the syaptic weights
+            ### Extract the syaptic properties
+            # Retrieve the mtype (for the pre-syn neuron layer of dwelling), the presyn genetic type
+            # and post-syn neuron genetic type.
 
-            # 1. Deduce the pre-synaptic population database name (X)
-            # This allows us to find the spikes in self.networkSim.dbs
-            specific_mtype = self.cell_mtypes[Pre_neuron_idx]
-            specific_gtype = self.cell_gtypes[Pre_neuron_idx]
-            layer, bio_type = self.mtype_fast_lookup[specific_mtype]
+            pre_mtype = self.cell_mtypes[Pre_neuron_idx]
+            pre_layer, bio_type = self.mtype_fast_lookup[pre_mtype]
+            pre_gtype = self.cell_gtypes[Pre_neuron_idx]
+
+            post_gtype = self.Cell_genetictype[cellindex]
             
-            if "SS" in specific_mtype.upper():
+
+            synParams = self.synParams[pre_layer][pre_gtype][post_gtype]
+            
+
+
+            ### Set synaptic delay
+                                    # Derive the suffix matching your name_list conventions
+            if "SS" in pre_mtype.upper():
                 type_suffix = "ss"
             else:
-                type_suffix = "exc" if bio_type == "Excitatory" else "inh"
-                
-            pre_pop_name = f"{layer}_{type_suffix}" # Ensure this matches your NEST db keys
-            post_pop_name = self.Pop
-            
-            ## Retrieve the specific weight
-            SynW = self.SynWeigths[pre_pop_name][post_pop_name]
-            SynT = self.SynTau[pre_pop_name][post_pop_name]
+                type_suffix = "exc" if bio_type == 'Excitatory' else "inh"
 
+            if type_suffix == "exc":
+                mean_idx = 0
 
-            synParams = self.synParams.copy()
-            synParams.update({
-                'weight': SynW,
-                'tau': SynT,
-            })
+            else: 
+                mean_idx = 1
 
-            if self.synDelays is not None:
-                    synDelays = self.CalculateDelay() ## Function to add
+            # Assuming you want a single axonal delay scalar per connection
+            mean_delay = self.synDelayLoc[mean_idx]
+            std_delay = self.synDelayScale
 
-            else:
-                synDelays = None
+            # Draw delay and ensure it doesn't violate NEURON's dt constraints
+            synDelays = np.random.normal(loc=mean_delay, scale=std_delay)
+            synDelays = max(self.dt * 2, synDelays)
+
+            pre_pop_name = f"{pre_layer}_{type_suffix}"
 
 
             # 3. Delegate to the worker to actually attach the spikes
@@ -1498,13 +1530,13 @@ class Population(PopulationSuper):
             
             # We scale the base NEURON NetCon weight by the number of synapses.
             # This perfectly mimics N synapses without triggering artificial STP depletion.
-            base_weight = local_synParams.get('weight', 0.001)
-            local_synParams['weight'] = base_weight * synapse_count
+            # gmax MUST exists
+            base_gmax = local_synParams['gmax']
+            local_synParams['gmax'] = base_gmax * synapse_count
             
             # Update the segment index and force the new MOD file mechanism
             local_synParams.update({
                 'idx': i,
-                'syntype': 'ProbAMPANMDA'
             })
             
             # 4. Instantiate the Synapse
@@ -1520,14 +1552,33 @@ class Population(PopulationSuper):
             rng = neuron.h.Random()
             
             # Generate a unique, reproducible seed based on Population, Cell, and Segment
-            rng.Random123(self.POPULATIONSEED, cellindex, i) 
+            rng.Random123(self.POPULATIONSEED + cellindex, pre_idx, int(i))
             rng.negexp(1)
             
             # --- THE FIX ---
 
             synapse.synapse.setRNG(rng)
-            
-            
+
+
+
+
+class FastSpikeDatabase:
+    def __init__(self, h5_path):
+        self.file = h5py.File(h5_path, 'r')
+        self.times = self.file['times']
+        self.indptr = self.file['indptr']
+
+    def get_spikes(self, raw_idx):
+        start_idx = self.indptr[raw_idx]
+        end_idx = self.indptr[raw_idx + 1]
+
+        if start_idx == end_idx:
+            return np.array([], dtype=np.float32)
+
+        return self.times[start_idx:end_idx][:]
+
+    def close(self):
+        self.file.close()            
 
 
 
