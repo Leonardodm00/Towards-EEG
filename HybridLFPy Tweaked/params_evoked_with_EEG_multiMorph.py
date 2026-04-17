@@ -376,9 +376,36 @@ class general_params(object):
         # ==========================================
         synParams = {}
         layers = ['L23', 'L4', 'L5', 'L6']
+        thalamic_gtypes = ['VPM', 'VPL', 'POm']
 
+        # Pre-define parameter templates for cleanliness
+        tc_params = {
+            'tau_r': 0.2,
+            'tau_d': 1.74,
+            'Use': 0.72,
+            'Dep': 227.0,
+            'Fac': 14.0,
+            'e': 0.0,          # Excitatory projection
+            'gmax': 0.00072,   # 0.72 nS
+            'syntype': 'ProbUDFsyn'
+        }
+        
+        bg_inh_params = {
+            'tau_r': 0.2, 
+            'tau_d': 5.0, 
+            'Use': 0.25, 
+            'Dep': 700.0, 
+            'Fac': 20.0,
+            'e': -80.0, 
+            'gmax': 0.00033, 
+            'syntype': 'ProbUDFsyn'
+        }
+
+        # 1. Base Cortical Parameters
         for layer in layers:
             synParams[layer] = {}
+            synParams[layer]['BG_exc'] = {}
+            synParams[layer]['BG_inh'] = {}
             
             for pre_gtype in genetic_types:
                 synParams[layer][pre_gtype] = {}
@@ -387,7 +414,6 @@ class general_params(object):
                     bp = base_params[layer][pre_gtype][post_gtype]
                     
                     if pre_gtype == 'PY':
-                        # Excitatory (PY): Uses ProbAMPANMDA
                         params = {
                             'tau_r_AMPA': bp['tau_r_AMPA'],
                             'tau_d_AMPA': bp['tau_d_AMPA'],
@@ -402,7 +428,6 @@ class general_params(object):
                             'syntype': 'ProbAMPANMDA'
                         }
                     else:
-                        # Inhibitory (SST, PV, VIP): Uses ProbUDFsyn
                         params = {
                             'tau_r': bp['tau_r'],
                             'tau_d': bp['tau_d'],
@@ -416,6 +441,25 @@ class general_params(object):
                     
                     # Assign to the Layer -> Pre -> Post hierarchy
                     synParams[layer][pre_gtype][post_gtype] = params
+
+            # ==========================================
+            # 2. Add Thalamocortical Parameters (Model #25)
+            # ==========================================
+            for th_pre in thalamic_gtypes:
+                synParams[layer][th_pre] = {}
+                for post_gtype in genetic_types:
+                    # Apply identical TC parameters to all post-synaptic targets
+                    synParams[layer][th_pre][post_gtype] = tc_params
+
+            # ==========================================
+            # 3. Add Background Parameters
+            # ==========================================
+            for post_gtype in genetic_types:
+                # Excitatory BG (Sharing TC mechanics)
+                synParams[layer]['BG_exc'][post_gtype] = tc_params 
+                
+                # Inhibitory BG
+                synParams[layer]['BG_inh'][post_gtype] = bg_inh_params
 
         self.synParams = synParams
 
@@ -1250,7 +1294,8 @@ class Connectomics:
             self.get_ADJ()
             self.extract_connectivity_dicts()
             self.add_independent_thalamic_sources()
-            self.validate_thalamic_sources()
+            self.add_independent_background_sources()
+            self.validate_all_virtual_sources()
             self.extract_multapses()
 
 
@@ -1300,6 +1345,59 @@ class Connectomics:
 
 
     import math
+
+    def add_independent_background_sources(self):
+        """
+        Appends independent virtual background (BG) sources to the cortical network.
+        Adds exactly 10 independent sources (5 excitatory, 5 inhibitory) to every 
+        original cortical cell. Handles mtypes and gtypes as NumPy arrays.
+        """
+        mtypes = self.cell_mtypes
+        gtypes = self.cell_gtypes 
+        post_to_pre = self.post_to_pre 
+
+        # Protect against adding background noise to Thalamic cells if this is 
+        # called AFTER the thalamic function. We only want to target the original cortex.
+        if hasattr(self, 'original_cortical_ids'):
+            target_cells = self.original_cortical_ids
+        else:
+            target_cells = list(range(len(mtypes)))
+            self.original_cortical_ids = target_cells
+
+        # 1. Convert NumPy arrays to Python lists for efficient appending
+        mtypes_list = mtypes.tolist() if isinstance(mtypes, np.ndarray) else list(mtypes)
+        gtypes_list = gtypes.tolist() if isinstance(gtypes, np.ndarray) else list(gtypes)
+
+        # 2. Find the starting ID for virtual cells
+        current_virtual_id = len(mtypes_list)
+
+        # Iterate only over the original cortical cells
+        for post_id in target_cells:
+
+            # Ensure the cell exists in the post_to_pre structure
+            if post_id not in post_to_pre:
+                post_to_pre[post_id] = []
+
+            # --- Add 5 Excitatory Background Sources ---
+            for _ in range(5):
+                mtypes_list.append('BG_exc')
+                gtypes_list.append('BG_exc')
+                post_to_pre[post_id].append(current_virtual_id)
+                current_virtual_id += 1
+                
+            # --- Add 5 Inhibitory Background Sources ---
+            for _ in range(5):
+                mtypes_list.append('BG_inh')
+                gtypes_list.append('BG_inh')
+                post_to_pre[post_id].append(current_virtual_id)
+                current_virtual_id += 1
+
+        # 3. Convert back to NumPy arrays
+        self.cell_mtypes = np.array(mtypes_list)
+        self.cell_gtypes = np.array(gtypes_list)
+        self.post_to_pre = post_to_pre
+        
+        print(f"Added background sources. Network grew from {len(mtypes)} to {len(mtypes_list)} total units.")
 
     def add_independent_thalamic_sources(self):
         """
@@ -1519,7 +1617,7 @@ class Connectomics:
         cell_mtypes   = self.cell_mtypes
         mtype_fast_lookup = self.mtype_fast_lookup  # Used to group cells into macro-populations
         
-        # 1. Parse the synNumberperconex.dat file as a text file
+         # 1. Parse the synNumberperconex.dat file as a text file
         file_path = 'synNumberperconex.dat'
         full_path_conn = os.path.join(dat_file_path, file_path)
         
@@ -1597,6 +1695,13 @@ class Connectomics:
                     stds[i] = 3.0
                     continue
                 # ------------------------------------------------
+
+                # ---> NEW CHANGE: Intercept Background Sources <---
+                if pre_mtype == 'BG':
+                    means[i] = 1.0
+                    stds[i] = 0.0
+                    continue
+                # ------------------------------------------------
                 
                 try:
                     # Strategy A: Exact structural pathway match
@@ -1629,12 +1734,15 @@ class Connectomics:
 
         self.synapse_dict = multapse_dict
 
-    def validate_thalamic_sources(self):
+    def validate_all_virtual_sources(self):
         """
-        Validates the integrity of the thalamic connectivity builder.
+        Generalized validation function that checks the integrity of the network 
+        AFTER both Thalamic (TC) and Background (BG) virtual sources have been added.
         Handles mtypes and gtypes as NumPy arrays.
         """
-        original_cortical_ids = original_cortical_ids
+
+
+        original_cortical_ids = self.original_cortical_ids
         mtypes = self.cell_mtypes
         gtypes = self.cell_gtypes 
         post_to_pre = self.post_to_pre 
@@ -1644,73 +1752,101 @@ class Connectomics:
 
 
         errors = []
+    
+        # Expected Constants based on your pipeline
         synapses_per_source = 9.0
-
-        # 1. Check Strict Independence
-        all_assigned_thalamic_ids = []
+        expected_bg_exc = 5
+        expected_bg_inh = 5
+        
+        # 1. Check Strict Independence (Across EVERYTHING)
+        all_assigned_virtual_ids = []
         for post_id in original_cortical_ids:
             pre_list = post_to_pre.get(post_id, [])
-
-            # CORRECTED: Check if the index is within bounds, then check its value
-            thalamic_pres = [
-                pre_id for pre_id in pre_list
-                if pre_id < len(gtypes) and str(gtypes[pre_id]) in ['VPM', 'VPL', 'POm']
+            
+            # A virtual ID is any ID generated AFTER the original cortical network
+            virtual_pres = [
+                pre_id for pre_id in pre_list 
+                if pre_id >= len(original_cortical_ids)
             ]
-            all_assigned_thalamic_ids.extend(thalamic_pres)
-
-        if len(all_assigned_thalamic_ids) != len(set(all_assigned_thalamic_ids)):
-            errors.append("INDEPENDENCE BUG: Some cortical cells are sharing the same virtual thalamic source ID.")
-
+            all_assigned_virtual_ids.extend(virtual_pres)
+                
+        # If there's a mismatch, it means two cortical cells share a virtual source
+        if len(all_assigned_virtual_ids) != len(set(all_assigned_virtual_ids)):
+            errors.append("INDEPENDENCE BUG: Some cortical cells are sharing the same virtual source ID (TC or BG collision).")
+            
         # 2. Check Dictionary/Array Consistency
-        for th_id in all_assigned_thalamic_ids:
-            if th_id >= len(mtypes):
-                errors.append(f"CONSISTENCY BUG: Thalamic ID {th_id} is out of bounds for mtypes array.")
-            elif str(mtypes[th_id]) != 'TC':
-                errors.append(f"CONSISTENCY BUG: Thalamic ID {th_id} has mtype '{mtypes[th_id]}' instead of 'TC'.")
-
-            if th_id >= len(gtypes):
-                errors.append(f"CONSISTENCY BUG: Thalamic ID {th_id} is out of bounds for gtypes array.")
-            elif str(gtypes[th_id]) not in ['VPM', 'VPL', 'POm']:
-                errors.append(f"CONSISTENCY BUG: Thalamic ID {th_id} has invalid gtype '{gtypes[th_id]}'.")
+        for v_id in all_assigned_virtual_ids:
+            if v_id >= len(mtypes) or v_id >= len(gtypes):
+                errors.append(f"CONSISTENCY BUG: Virtual ID {v_id} is out of bounds for the arrays.")
+                continue
+                
+            mtype_val = str(mtypes[v_id])
+            gtype_val = str(gtypes[v_id])
+            
+            # Route checking for Thalamic Cells
+            if gtype_val in ['VPM', 'VPL', 'POm']:
+                if mtype_val != 'TC':
+                    errors.append(f"CONSISTENCY BUG: ID {v_id} is {gtype_val} but has mtype '{mtype_val}' instead of 'TC'.")
+                    
+            # Route checking for Background Cells
+            elif gtype_val in ['BG_exc', 'BG_inh']:
+                if mtype_val != 'BG':
+                    errors.append(f"CONSISTENCY BUG: ID {v_id} is {gtype_val} but has mtype '{mtype_val}' instead of 'BG'.")
+                    
+            else:
+                errors.append(f"CONSISTENCY BUG: ID {v_id} has an unrecognized/invalid gtype '{gtype_val}'.")
 
         # 3. Check Mathematical Accuracy (Convergence)
-        error_limit = 10
+        error_limit = 15  
         math_errors = 0
-
+        
         for post_id in original_cortical_ids:
             cortical_mtype = str(mtypes[post_id])
-
-            # Count actual assigned sources
-            actual_counts = {'VPM': 0, 'VPL': 0, 'POm': 0}
+            
+            # Count actual assigned sources for this specific cortical cell
+            actual_counts = {'VPM': 0, 'VPL': 0, 'POm': 0, 'BG_exc': 0, 'BG_inh': 0}
+            
             for pre_id in post_to_pre.get(post_id, []):
-                # CORRECTED: Safe array indexing
-                if pre_id < len(gtypes):
-                    th_nuc = str(gtypes[pre_id])
-                    if th_nuc in actual_counts:
-                        actual_counts[th_nuc] += 1
-
-            # Calculate expected sources
+                if pre_id >= len(original_cortical_ids) and pre_id < len(gtypes):
+                    nuc = str(gtypes[pre_id])
+                    if nuc in actual_counts:
+                        actual_counts[nuc] += 1
+                    
+            # Calculate EXPECTED Thalamic sources
             for th_pop in ['VPM', 'VPL', 'POm']:
                 th_key = th_pop + '_sTC' if th_pop in ['VPM', 'VPL'] else 'POm_sTC_s1'
-
+                
                 if th_key in convergence_data and cortical_mtype in convergence_data[th_key]:
                     raw_target = convergence_data[th_key][cortical_mtype]
                     expected_count = int(np.ceil(max(0, raw_target) / synapses_per_source))
                 else:
                     expected_count = 0
-
+                    
                 if actual_counts[th_pop] != expected_count:
                     math_errors += 1
                     if math_errors <= error_limit:
                         errors.append(f"MATH BUG for Cell {post_id} ({cortical_mtype}): "
                                     f"Expected {expected_count} {th_pop} sources, but found {actual_counts[th_pop]}.")
-
+            
+            # Calculate EXPECTED Background sources
+            if actual_counts['BG_exc'] != expected_bg_exc:
+                math_errors += 1
+                if math_errors <= error_limit:
+                    errors.append(f"MATH BUG for Cell {post_id} ({cortical_mtype}): "
+                                f"Expected {expected_bg_exc} BG_exc sources, found {actual_counts['BG_exc']}.")
+                                
+            if actual_counts['BG_inh'] != expected_bg_inh:
+                math_errors += 1
+                if math_errors <= error_limit:
+                    errors.append(f"MATH BUG for Cell {post_id} ({cortical_mtype}): "
+                                f"Expected {expected_bg_inh} BG_inh sources, found {actual_counts['BG_inh']}.")
+        
         if math_errors > error_limit:
             errors.append(f"... and {math_errors - error_limit} more math errors suppressed.")
 
         # --- Final Report ---
         if not errors:
-            print("✅ VALIDATION PASSED: All thalamic sources are mathematically accurate, perfectly independent, and properly typed.")
+            print("✅ FULL VALIDATION PASSED: All Thalamic and Background sources are mathematically accurate, perfectly independent, and properly typed.")
 
         else:
             print("❌ VALIDATION FAILED with the following hidden bugs:")
