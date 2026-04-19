@@ -212,6 +212,34 @@ PointNetOut_path = '' # Path to the spike trains resulting from the point networ
 
 
 
+# ----------------------------------------
+
+# EEG electrode
+
+# ----------------------------------------
+from mpi4py import MPI
+import math         
+import LFPy         
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+
+# Instantiate the volume conductor
+four_sphere_model = LFPy.FourSphereVolumeConductor(params.r_electrodes, params.radii, params.sigmas)
+
+# Initialize local MPI accumulator
+num_timesteps = int(params.tstop/ sparams.dt) + 1 
+
+# (This MUST be the exact same integer you pass as 'decimatefrac' into your population class)
+decimation_factor = 10 
+downsampled_steps = math.ceil(num_timesteps / decimation_factor)
+
+# Initialize the accumulator with the perfectly matching size
+local_eeg_accumulator = np.zeros(downsampled_steps)
+
+
+
+
+
 
 
 
@@ -263,6 +291,14 @@ for i, Pop in enumerate(name_list):
             Cell_coords = extracted_pops[Pop]['cell_coords'],
             Cell_genetictype = extracted_pops[Pop]['cell_gtypes'], # LOCAL
 
+            ### EEG model
+            four_sphere_model = four_sphere_model,
+            local_eeg_accumulator = local_eeg_accumulator,
+            decimation_factor = decimation_factor,
+            FourSphere_radii = params.radii,
+
+
+
             #daughter class kwargs
             X = params.X,
             networkSim = networkSim,
@@ -277,10 +313,39 @@ for i, Pop in enumerate(name_list):
     #run population simulation and collect the data
     Macro_Pop.run()
     Macro_Pop.collect_data()
+
+    
     
 
     #object no longer needed
     del Macro_Pop
+
+
+
+
+################################
+################################
+
+# COLLECT EEG DATA
+
+
+# Prepare an array on the root node to receive the final summed data
+if rank == 0:
+    global_eeg = np.zeros_like(local_eeg_accumulator)
+else:
+    global_eeg = None
+
+# Reduce (Sum) all local arrays into the global array
+comm.Reduce(
+    [local_eeg_accumulator, MPI.DOUBLE], 
+    [global_eeg, MPI.DOUBLE], 
+    op=MPI.SUM, 
+    root=0
+)
+
+if rank == 0:
+    print("Four-Sphere EEG calculation complete. Saving data...")
+    np.save('simulated_four_sphere_EEG.npy', global_eeg)
 
 
 ####### Postprocess the simulation output ######################################
