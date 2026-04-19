@@ -466,6 +466,23 @@ class general_params(object):
 
 
 
+
+
+        ####################################
+        # EEG PROPERTIES            #
+        ####################################
+
+        # Radii for Brain, CSF, Skull, Scalp (in um)
+        self.radii = [79000., 80000., 85000., 90000.] 
+
+        # Conductivities for Brain, CSF, Skull, Scalp (in S/m)
+        self.sigmas = [0.3, 1.5, 0.015, 0.3] 
+
+        # The electrode MUST sit exactly on the scalp surface (radius = 90000 um)
+        # Here, we place one electrode directly above the column at the top of the head (Cz)
+        self.r_electrodes = np.array([[0.0, 0.0, 90000.0]])
+
+
   
 
         
