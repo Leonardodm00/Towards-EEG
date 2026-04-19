@@ -165,6 +165,13 @@ class PopulationSuper(object):
                 Cell_afferences = {},
                 Cell_coords = [],
                 Cell_genetictype = [],
+
+
+                four_sphere_model = [],
+                local_eeg_accumulator = [],
+                decimation_factor = None,
+                FourSphere_radii = [],
+
                 global_cell_coords = [],
                 voxel_size = None,
                 grid_extent = None,
@@ -264,6 +271,19 @@ class PopulationSuper(object):
             Position (um) of ALL the cells with adj-related global indexing
 
 
+        four_sphere_model: LFPy object.
+            EEG electrode model
+
+        local_eeg_accumulator: array
+            Gathers the single cells' EEG contribution wihtin the macro-population
+
+        decimation_factor: integer
+            Downsampling factor for the EEG signal
+
+        FourSphere_radii: 4x1 array
+            radii of the four sections modelled across which the signal propagates
+
+
         voxel_size : float [um]
             Voxel's edge dimension of the discretized volume to evaluate spanning tree probabilities 
 
@@ -344,6 +364,12 @@ class PopulationSuper(object):
         self.local_to_raw_map = local_to_raw_map
         self.Cell_afferences = Cell_afferences
         self.Cell_genetictype = Cell_genetictype
+
+        self.four_sphere_model = four_sphere_model
+        self.local_eeg_accumulator = local_eeg_accumulator
+        self.decimation_factor = decimation_factor
+        self.FourSphere_radii = FourSphere_radii
+
         self.pop_soma_pos = Cell_coords
         self.global_cell_coords = global_cell_coords
         self.mtype_fast_lookup = mtype_fast_lookup
@@ -371,6 +397,8 @@ class PopulationSuper(object):
         self.dt_output = dt_output
         self.recordSingleContribFrac = recordSingleContribFrac
         self.output_file = output_file
+
+
 
 
 
@@ -1357,30 +1385,58 @@ class Population(PopulationSuper):
         ### TODO THE SYNAPSE ARE ALREADY PLACED AT THE FIRST INSTANCE.
         self.insert_all_mapped_synapses(cellindex, cell)
 
-        # set LFPykit.models instance cell attribute
-        for probe in self.probes:
-            probe.cell = cell
 
-        if 'rec_imem' in self.simulationParams.keys():
-            try:
-                assert self.simulationParams['rec_imem']
-                cell.simulate(**self.simulationParams)
-                for probe in self.probes:
-                    M = probe.get_transformation_matrix()
-                    probe.data = M @ cell.imem
-                del cell.imem
-            except AssertionError:
-                cell.simulate(probes=self.probes, **self.simulationParams)
-        else:
-            cell.simulate(probes=self.probes, **self.simulationParams)
 
-        # downsample probe.data attribute and unset cell
-        for probe in self.probes:
-            probe.data = ss.decimate(probe.data,
-                                        q=self.decimatefrac)
-            probe.cell = None
+        # =====================================================================
+        # SIMULATION
+        # =====================================================================
+        # Force dipole recording for the 4-sphere model
+        self.simulationParams['rec_current_dipole_moment'] = True
+  
+        cell.simulate(**self.simulationParams)
 
-        # put all necessary cell output in output dict
+
+
+        # =====================================================================
+        # 4-SPHERE EEG CALCULATION
+        # =====================================================================
+        # 1. Extract Dipole
+        P = cell.current_dipole_moment
+        
+        # 2. Get physical location (using soma_pos dictionary)
+        soma_pos_dict = self.pop_soma_pos[cellindex]
+        somapos = np.array([soma_pos_dict['x'], soma_pos_dict['y'], soma_pos_dict['z']])
+
+
+        r_soma_syns = [cell.get_intersegment_vector(idx0=0,
+                    idx1=i) for i in cell.synidx]
+        r_mid = np.average(r_soma_syns, axis=0)
+        dipole_loc = somapos + r_mid/2.
+
+        ## Shift the z position according to the implemented head model
+        dipole_loc[2] = dipole_loc[2] + FourSphere_radii[0]
+
+
+
+
+        
+        # 3. Calculate Potential (Assumes self.four_sphere_model is initialized in __init__)
+        pot_db_4s = self.four_sphere_model.calc_potential(P, dipole_loc)
+        
+        # 4. Extract array, convert to uV, and downsample to match simulation logic
+        cell_eeg = (np.array(pot_db_4s) * 1e6)[0] 
+        cell_eeg = ss.decimate(cell_eeg, q=self.decimation_factor)
+
+
+        if self.local_eeg_accumulator is not None:
+            # In-place addition (+=) updates the underlying memory block directly!
+            self.local_eeg_accumulator += cell_eeg
+
+
+        # =====================================================================
+        # OUTPUT COLLECTION
+        # =====================================================================
+        # Put all necessary cell output (like voltage, spike times) in output dict
         for attrbt in self.savelist:
             attr = getattr(cell, attrbt)
             if isinstance(attr, np.ndarray):
@@ -1392,21 +1448,71 @@ class Population(PopulationSuper):
                     self.output[cellindex][attrbt] = str(attr)
             self.output[cellindex]['srate'] = 1E3 / self.dt_output
 
-        # collect probe output
-        for probe in self.probes:
-            if cellindex == self.RANK_CELLINDICES[0]:
-                self.output[probe.__class__.__name__] = \
-                    probe.data.copy()
-            else:
-                self.output[probe.__class__.__name__] += \
-                    probe.data.copy()
-            probe.data = None
+        # Accumulate 4-Sphere EEG across the MPI core
+        if cellindex == self.RANK_CELLINDICES[0]:
+            self.output['EEG_4sphere'] = cell_eeg.copy()
+        else:
+            self.output['EEG_4sphere'] += cell_eeg.copy()
 
         # clean up hoc namespace
         cell.__del__()
 
-        print('cell %s population %s in %.2f s' % (cellindex, self.Pop,
-                                                    time() - tic))
+        print('cell %s population %s in %.2f s' % (cellindex, self.Pop, time() - tic))
+
+
+
+
+        ##### PROBE SET UP AND SIMULATION IS NOT NEEDED IN THIS PIPELINE
+        # # set LFPykit.models instance cell attribute
+        # for probe in self.probes:
+        #     probe.cell = cell
+
+        # if 'rec_imem' in self.simulationParams.keys():
+        #     try:
+        #         assert self.simulationParams['rec_imem']
+        #         cell.simulate(**self.simulationParams)
+        #         for probe in self.probes:
+        #             M = probe.get_transformation_matrix()
+        #             probe.data = M @ cell.imem
+        #         del cell.imem
+        #     except AssertionError:
+        #         cell.simulate(probes=self.probes, **self.simulationParams)
+        # else:
+        #     cell.simulate(probes=self.probes, **self.simulationParams)
+
+        # # downsample probe.data attribute and unset cell
+        # for probe in self.probes:
+        #     probe.data = ss.decimate(probe.data,
+        #                                 q=self.decimatefrac)
+        #     probe.cell = None
+
+        # # put all necessary cell output in output dict
+        # for attrbt in self.savelist:
+        #     attr = getattr(cell, attrbt)
+        #     if isinstance(attr, np.ndarray):
+        #         self.output[cellindex][attrbt] = attr.astype('float32')
+        #     else:
+        #         try:
+        #             self.output[cellindex][attrbt] = attr
+        #         except BaseException:
+        #             self.output[cellindex][attrbt] = str(attr)
+        #     self.output[cellindex]['srate'] = 1E3 / self.dt_output
+
+        # # collect probe output
+        # for probe in self.probes:
+        #     if cellindex == self.RANK_CELLINDICES[0]:
+        #         self.output[probe.__class__.__name__] = \
+        #             probe.data.copy()
+        #     else:
+        #         self.output[probe.__class__.__name__] += \
+        #             probe.data.copy()
+        #     probe.data = None
+
+        # # clean up hoc namespace
+        # cell.__del__()
+
+        # print('cell %s population %s in %.2f s' % (cellindex, self.Pop,
+        #                                             time() - tic))
 
     def insert_all_mapped_synapses(self, cellindex, cell):
         """
@@ -1436,6 +1542,9 @@ class Population(PopulationSuper):
         mapped_synapses_dict = self.PlacedSynapses.get(cellindex, {}) # .get() prevents key errors
         if not mapped_synapses_dict:
             return
+
+        # 1. OPEN THE DATABASE ONCE FOR THE ENTIRE CELL
+        spike_db = FastSpikeDatabase(self.PointNetOut_path)
 
         for Pre_neuron_idx, lfpy_segments in mapped_synapses_dict.items():
 
@@ -1486,15 +1595,18 @@ class Population(PopulationSuper):
                 lfpy_indices=lfpy_segments,
                 pre_pop_name=pre_pop_name,
                 synParams=synParams,
-                synDelay=synDelays
+                synDelay=synDelays,
+                spike_database = spike_db
             )
+
+        spike_db.close()
 
 
 
                 
 
 
-    def insert_specific_connection(self, cellindex,cell, pre_idx, lfpy_indices, pre_pop_name=None, synParams=None, synDelay=None):
+    def insert_specific_connection(self, cellindex,cell, pre_idx, lfpy_indices, pre_pop_name=None, synParams=None, synDelay=None,spike_database=None):
         """
         Inserts all synapses from a SINGLE pre-synaptic neuron onto the post-synaptic cell.
         Uses weight-scaling to efficiently model multiple synapses on the same segment
@@ -1505,7 +1617,9 @@ class Population(PopulationSuper):
 
         # 1. Fetch the spike train for this SINGLE pre-synaptic neuron
         try:
-            spikes = self.networkSim.dbs[pre_pop_name].select([pre_idx])[0]
+            spikes = spike_database.get_spikes(pre_idx)
+
+            
         except AttributeError:
             raise AssertionError(f"Could not open CachedNetwork database for {pre_pop_name}")
 
