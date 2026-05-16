@@ -1,0 +1,20 @@
+# HPC requirements — passive fitting pipeline
+# AllenSDK is NOT listed: data is loaded from the local archive
+# produced by phase0_download.py on the internet-connected machine.
+# Installing allensdk on HPC is unnecessary and pulls a very large
+# dependency tree (pynwb, h5py, hdmf, ...).
+
+# --- Core numerics ---
+numpy==2.4.5
+scipy==1.17.1
+pandas==3.0.3
+
+# --- Bayesian optimiser (provides skopt) ---
+# WAS MISSING from the original requirements.txt
+scikit-optimize==0.10.2
+
+# --- NEURON simulator ---
+neuron==9.0.1
+
+# --- Plotting (needed by Phase 2/3 diagnostic functions) ---
+matplotlib==3.10.9
