@@ -1,0 +1,11 @@
+specimen_id,structure_layer_name,dendrite_type,donor_id,structure_area_abbrev,subtype,has_square_subthreshold,has_long_square
+528706755,2,spiny,528574320,MTG,unknown,True,True
+616647103,2,spiny,587641390,MTG,unknown,True,True
+508421103,2,spiny,504921484,MTG,unknown,True,True
+637034000,2,spiny,636948822,SFG,unknown,True,True
+571500474,2,spiny,571364629,MTG,unknown,True,True
+614659629,2,spiny,567704703,MTG,unknown,True,True
+526714733,2,spiny,526633593,TemL,unknown,True,True
+571464200,2,spiny,571364629,MTG,unknown,True,True
+537204107,2,spiny,536912860,MTG,unknown,True,True
+525133308,2,spiny,524848408,FroL,unknown,True,True

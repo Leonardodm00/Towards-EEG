@@ -1,0 +1,61 @@
+{
+  "created": "2026-05-16T12:05:27.085210",
+  "archive_format_version": "1.0",
+  "parameters": {
+    "layer": "2",
+    "dendrite_type": "spiny",
+    "n_cells": 10,
+    "pre_ms": 10.0,
+    "post_ms": 200.0,
+    "pulse_threshold_pA": 50.0,
+    "expected_amplitude_pA": 200.0,
+    "amplitude_tol_pA": 30.0,
+    "expected_duration_s": 0.0005,
+    "duration_tol_s": 0.0005,
+    "F_smoke_test": 1.9,
+    "fit_target_smoke_test": "hyp",
+    "ljp_correction_mV": 14.0
+  },
+  "cells": [
+    {
+      "specimen_id": 528706755,
+      "status": "ok"
+    },
+    {
+      "specimen_id": 616647103,
+      "status": "ok"
+    },
+    {
+      "specimen_id": 508421103,
+      "status": "ok"
+    },
+    {
+      "specimen_id": 637034000,
+      "status": "ok"
+    },
+    {
+      "specimen_id": 571500474,
+      "status": "ok"
+    },
+    {
+      "specimen_id": 614659629,
+      "status": "ok"
+    },
+    {
+      "specimen_id": 526714733,
+      "status": "ok"
+    },
+    {
+      "specimen_id": 571464200,
+      "status": "ok"
+    },
+    {
+      "specimen_id": 537204107,
+      "status": "ok"
+    },
+    {
+      "specimen_id": 525133308,
+      "status": "ok"
+    }
+  ]
+}
