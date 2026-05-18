@@ -1,0 +1,59 @@
+# =====================================================================
+# Requirements for the HPC passive-property optimisation pipeline
+# Target file: passive_fitting_hpc.py (post v4-persistence atomized save)
+#
+# Versions reflect current PyPI latest as of May 2026.
+# No AllenSDK — the HPC entry point uses load_cells_from_archive()
+# reading from a pre-built Phase-0 archive.
+#
+# RECOMMENDED Python: 3.12
+#   • numpy 2.4 / scipy 1.17 / sklearn 1.8 / pandas 3.0 all need 3.11+
+#   • scikit-optimize 0.10.2 (latest, Jun 2024) caps its declared
+#     support at 3.12, so 3.12 is the sweet spot where every line
+#     below is on the latest release with a stamped wheel.
+#   • If your HPC site only has 3.11 modules, that also works.
+#
+# Install:
+#   python -m venv .venv && source .venv/bin/activate
+#   pip install --upgrade pip wheel
+#   pip install -r requirements.txt
+#
+# Reproducibility tip: after a successful install, freeze the resolved
+# set with `pip freeze > requirements.lock` and commit that file.
+# =====================================================================
+
+# ── Core scientific stack ────────────────────────────────────────────
+numpy>=2.4.5
+scipy>=1.17.1
+pandas>=3.0.0
+matplotlib>=3.10.8
+
+# ── Bayesian optimisation ────────────────────────────────────────────
+# scikit-optimize 0.10.2 is the latest release on PyPI (Jun 2024,
+# community-maintained fork).  scikit-learn upstream churned its API
+# in 1.6/1.7/1.8 and skopt has NOT been re-released since.  As of
+# May 2026 the basic `gp_minimize` path (the only one this pipeline
+# uses, via skopt.gp_minimize / Real / use_named_args) imports and
+# runs fine on sklearn 1.8.  If you ever hit a regression like
+#   ImportError: cannot import name 'X' from 'sklearn.utils.fixes'
+# pin scikit-learn back to <1.6 as the recovery move.  Do NOT pin
+# preemptively — get the bug first.
+scikit-optimize>=0.10.2
+scikit-learn>=1.8.0
+
+# ── Compartmental simulator ──────────────────────────────────────────
+# NEURON 9.0.x switched the codebase to C++ and changed internal data
+# structures (Structure-of-Arrays).  This pipeline uses only the built-in
+# `pas` mechanism via `h.load_file("stdrun.hoc")` + `h.load_file("import3d.hoc")`,
+# no custom MOD files, so the 9.0 transition is safe here.
+#
+# On HPC clusters where NEURON is provided as an environment module,
+# comment this out and `module load neuron/9.0` (or whatever your
+# cluster ships) BEFORE running pip — pip wheels collide with module-
+# provided installs.
+neuron>=9.0.1
+
+# ── Parquet I/O (df.to_parquet in Phase 2) ───────────────────────────
+# pandas 3.0 makes PyArrow effectively required (the new default
+# string dtype is PyArrow-backed when available).
+pyarrow>=18.0.0
