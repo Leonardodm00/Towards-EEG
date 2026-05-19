@@ -1,3 +1,56 @@
+[ldellamea@dvnode001 ~]$ conda activate prova
+(prova) [ldellamea@dvnode001 ~]$ python test_pickle_roundtrip.py --archive-dir .
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+
+[load_archive] === specimen_508421103 ===
+[load_archive]   Long Square bundles: 5 ([-10, -30, -50, -70, -90] pA)
+[load_archive] specimen 508421103: 6 SS bundles (38 dep + 36 hyp pulses, n_avg_groups=3), 5 LS bundles, 74 individual pulses for bootstrap
+[load_archive]   Rin=218.5 MΩ  τm=31.2 ms  Vrest=-57.5 mV
+
+[load_archive] loaded 1 cell(s), skipped/failed 0
+[smoke] fitting specimen 508421103 ...
+warning specimen_508421103/reconstruction.swc: more than one tree:
+  root at line 4
+  root at line 4698
+  root at line 4716
+  root at line 4731
+  root at line 4812
+[fit_one_cell] specimen 508421103 (L2 spiny, F=1.9): fit_target=hyp, n_calls=10
+[fit_one_cell]   best fit: Cm=2.110  Rm=17666  Ra=158  train RMSD=0.1069 mV  [log-space: 0.747, 9.779, 5.064]
+[fit_one_cell]   training noise: σ=0.0118 mV  ρ_lag1=0.332  (3 bundle(s))
+Changed dt
+Changed dt
+Changed dt
+Changed dt
+Changed dt
+[fit_one_cell]   validation per-bundle RMSDs:
+      SS dep (+200 pA)          0.0674 mV
+      SS dep (+200 pA)          0.0845 mV
+      SS dep (+200 pA)          0.0911 mV
+      LS (-10 pA)               0.0893 mV
+      LS (-30 pA)               0.2102 mV
+      LS (-50 pA)               0.2365 mV
+      LS (-70 pA)               0.2806 mV
+      LS (-90 pA)               0.3092 mV
+[fit_one_cell]   validation mean RMSD (8 bundle(s)): 0.1711 mV
+[fit_one_cell]   ratio = 1.60  ->  status = good
+[smoke] PASS — 45,170,536 bytes, cm=2.110
+(prova) [ldellamea@dvnode001 ~]$ =>> PBS: job killed: walltime 151 exceeded limit 120
+logout
+
+qsub: job 1091601.pbsserver01 completed
+[ldellamea@dvlogin02 ~]$ qsub -q cpu -l select=1:ncpus=10,walltime=00:05:00 -I
+qsub: waiting for job 1091606.pbsserver01 to start
+qsub: job 1091606.pbsserver01 ready
+
+[ldellamea@dvnode001 ~]$ python passive_fitting_hpc_final.py --archive-dir . --output-dir pipeline_outputs/
+bash: python: command not found...
+[ldellamea@dvnode001 ~]$ conda activate prova
+(prova) [ldellamea@dvnode001 ~]$ python passive_fitting_hpc_final.py --archive-dir . --output-dir pipeline_outputs/
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+
 ============================================================
   PHASE 1 — Loading data from archive
 ============================================================
@@ -133,13 +186,47 @@ Changed dt
       LS (-90 pA)               0.3092 mV
 [fit_one_cell]   validation mean RMSD (8 bundle(s)): 0.1711 mV
 [fit_one_cell]   ratio = 1.60  ->  status = good
-Traceback (most recent call last):
-  File "/davinci-1/home/ldellamea/passive_fitting_hpc_final.py", line 6373, in <module>
-    df, results = fit_cells(
-                  ^^^^^^^^^^
-  File "/davinci-1/home/ldellamea/passive_fitting_hpc_final.py", line 3191, in fit_cells
-    for i, r in enumerate(pool.imap_unordered(_fit_worker, args_list)):
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/davinci-1/home/ldellamea/.conda/envs/prova/lib/python3.12/multiprocessing/pool.py", line 873, in next
-    raise value
-multiprocessing.pool.MaybeEncodingError: Error sending result: 'PassiveFitResult(specimen_id=508421103, layer='2', dendrite_type='spiny', F=1.9, fit_target='hyp', cm_uF_per_cm2=2.1104399216130703, rm_Ohm_cm2=17665.559365643207, ra_Ohm_cm=158.14742875130682, cm_sigma=0.4006617195364021, rm_sigma=1.1586045154139277, ra_sigma=0.5304049860202955, train_rmsd_mV=0.10692245850881393, valid_rmsd_mV=0.1711077066501347, valid_to_train_ratio=1.6002971596096416, rin_MOhm_allen=218.533328, tau_ms_allen=31.2212750880442, v_rest_mV=-57.4732208251953, validation_status='good', n_calls=10, n_initial=10, wall_time_s=8.0816943179816, error_message='', loss_history=[0.6706043779081271, 0.10692245850881393, 0.10692245850881393, 0.10692245850881393, 0.10692245850881393, 0.10692245850881393, 0.10692245850881393, 0.10692245850881393, 0.10692245850881393, 0.10692245850881393], noise_sigma_mV=0.011804003864603105, noise_rho_lag1=0.33218141348657304, noise_rho_lag1_high=False, valid_rmsd_per_bundle=[('SS dep (+200 pA)', 0.06738527429322819), ('SS dep (+200 pA)', 0.08451562677923348), ('SS dep (+200 pA)', 0.0910506303485301), ('LS (-10 pA)', 0.08933347856164743), ('LS (-30 pA)', 0.21022941392932362), ('LS (-50 pA)', 0.23650706163951546), ('LS (-70 pA)', 0.28061471706164776), ('LS (-90 pA)', 0.3092254505879516)], n_validation_bundles=8, residuals_sigma_mV=0.08935367179577537, residuals_rho_lag1=0.9823261510920515)'. Reason: 'AttributeError("Can't get local object 'fit_one_cell.<locals>.objective'")'
+[fit_cells] worker returned 1/1 (specimen 508421103, status=good)
+   specimen_id layer dendrite_type  ...  gp_result neuron_cell  opt_inputs
+0    508421103     2         spiny  ...       None        None        None
+
+[1 rows x 31 columns]
+  layer dendrite_type  n  cm_mean  ...  rm_std     ra_mean  ra_std  status_summary
+0     2         spiny  1  2.11044  ...     0.0  158.147429     0.0          good:1
+
+[1 rows x 10 columns]
+[Phase 2] results saved to pipeline_outputs/phase2_results.csv
+
+============================================================
+  PHASE 3 — Bootstrap & GP diagnostic
+============================================================
+warning specimen_508421103/reconstruction.swc: more than one tree:
+  root at line 4
+  root at line 4698
+  root at line 4716
+  root at line 4731
+  root at line 4812
+[rebuild_neuron_cells_for_phase3] rebuilt 1 NEURON model(s) out of 1 result(s).
+
+=== Phase 3 v3 — cell 508421103 ===
+[bootstrap] cell 508421103
+[bootstrap]   mode=nonparametric  B=10  α=0.95  fit_mode=fast  n_calls=5  n_initial=5
+[bootstrap]   pulse_pool=74 pulses  n_pulses_per_replicate=24  n_avg_groups=3
+[bootstrap]   MLE: Cm=2.11, Rm=1.767e+04, Ra=158.1  RMSD_MLE=0.10692 mV
+[bootstrap]   running 10 iterations ...
+[bootstrap]   Cm: MLE=2.11  perc=1.587…2.576  BCa=1.649…2.431  normal=1.513…2.79
+[bootstrap]   Rm: MLE=1.767e+04  perc=1.353e+04…2.704e+04  BCa=1.385e+04…2.574e+04  normal=9983…2.705e+04
+[bootstrap]   Ra: MLE=158.1  perc=109.4…158.1  BCa=134.7…158.1  normal=104.9…176.4
+[gp_diagnostic] cell 508421103  k=2.0  bootstrap CIs attached
+[save_replot_bundle] cell 508421103: precomputing MLE traces …
+[save_replot_bundle]   validating each field is picklable …
+[save_replot_bundle]   wrote core.pkl              999.4 kB
+[save_replot_bundle]   wrote pulse_pool.pkl      18222.1 kB
+[save_replot_bundle] cell 508421103: done — total 19222.6 kB across 3 files in pipeline_outputs/cell_508421103/replot
+ specimen_id parameter          mle   ci_perc_lo   ci_perc_hi    ci_bca_lo    ci_bca_hi  ci_norm_lo   ci_norm_hi  n_kept  sigma_used          mode  gp_ok
+   508421103        Cm     2.110440     1.587094     2.576486     1.648971     2.430928    1.513370     2.790423      10         NaN nonparametric   True
+   508421103        Rm 17665.559366 13531.311931 27035.785451 13845.796735 25740.052648 9982.830009 27045.331663      10         NaN nonparametric   True
+   508421103        Ra   158.147429   109.353284   158.147429   134.675065   158.147429  104.938685   176.443099      10         NaN nonparametric   True
+[Phase 3] CIs saved to pipeline_outputs/phase3_full_summary.csv
+
+[DONE]
