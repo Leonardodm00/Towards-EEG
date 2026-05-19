@@ -1,0 +1,145 @@
+============================================================
+  PHASE 1 — Loading data from archive
+============================================================
+
+[load_archive] === specimen_508421103 ===
+[load_archive]   Long Square bundles: 5 ([-10, -30, -50, -70, -90] pA)
+[load_archive] specimen 508421103: 6 SS bundles (38 dep + 36 hyp pulses, n_avg_groups=3), 5 LS bundles, 74 individual pulses for bootstrap
+[load_archive]   Rin=218.5 MΩ  τm=31.2 ms  Vrest=-57.5 mV
+
+[load_archive] loaded 1 cell(s), skipped/failed 0
+
+============================================================
+  PHASE 2 — Bayesian optimisation
+============================================================
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+warning specimen_508421103/reconstruction.swc: more than one tree:
+  root at line 4
+  root at line 4698
+  root at line 4716
+  root at line 4731
+  root at line 4812
+[fit_one_cell] specimen 508421103 (L2 spiny, F=1.9): fit_target=hyp, n_calls=10
+[fit_one_cell]   best fit: Cm=2.110  Rm=17666  Ra=158  train RMSD=0.1069 mV  [log-space: 0.747, 9.779, 5.064]
+[fit_one_cell]   training noise: σ=0.0118 mV  ρ_lag1=0.332  (3 bundle(s))
+Changed dt
+Changed dt
+Changed dt
+Changed dt
+Changed dt
+[fit_one_cell]   validation per-bundle RMSDs:
+      SS dep (+200 pA)          0.0674 mV
+      SS dep (+200 pA)          0.0845 mV
+      SS dep (+200 pA)          0.0911 mV
+      LS (-10 pA)               0.0893 mV
+      LS (-30 pA)               0.2102 mV
+      LS (-50 pA)               0.2365 mV
+      LS (-70 pA)               0.2806 mV
+      LS (-90 pA)               0.3092 mV
+[fit_one_cell]   validation mean RMSD (8 bundle(s)): 0.1711 mV
+[fit_one_cell]   ratio = 1.60  ->  status = good
+Traceback (most recent call last):
+  File "/davinci-1/home/ldellamea/passive_fitting_hpc_final.py", line 6373, in <module>
+    df, results = fit_cells(
+                  ^^^^^^^^^^
+  File "/davinci-1/home/ldellamea/passive_fitting_hpc_final.py", line 3191, in fit_cells
+    for i, r in enumerate(pool.imap_unordered(_fit_worker, args_list)):
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/davinci-1/home/ldellamea/.conda/envs/prova/lib/python3.12/multiprocessing/pool.py", line 873, in next
+    raise value
+multiprocessing.pool.MaybeEncodingError: Error sending result: 'PassiveFitResult(specimen_id=508421103, layer='2', dendrite_type='spiny', F=1.9, fit_target='hyp', cm_uF_per_cm2=2.1104399216130703, rm_Ohm_cm2=17665.559365643207, ra_Ohm_cm=158.14742875130682, cm_sigma=0.4006617195364021, rm_sigma=1.1586045154139277, ra_sigma=0.5304049860202955, train_rmsd_mV=0.10692245850881393, valid_rmsd_mV=0.1711077066501347, valid_to_train_ratio=1.6002971596096416, rin_MOhm_allen=218.533328, tau_ms_allen=31.2212750880442, v_rest_mV=-57.4732208251953, validation_status='good', n_calls=10, n_initial=10, wall_time_s=8.0816943179816, error_message='', loss_history=[0.6706043779081271, 0.10692245850881393, 0.10692245850881393, 0.10692245850881393, 0.10692245850881393, 0.10692245850881393, 0.10692245850881393, 0.10692245850881393, 0.10692245850881393, 0.10692245850881393], noise_sigma_mV=0.011804003864603105, noise_rho_lag1=0.33218141348657304, noise_rho_lag1_high=False, valid_rmsd_per_bundle=[('SS dep (+200 pA)', 0.06738527429322819), ('SS dep (+200 pA)', 0.08451562677923348), ('SS dep (+200 pA)', 0.0910506303485301), ('LS (-10 pA)', 0.08933347856164743), ('LS (-30 pA)', 0.21022941392932362), ('LS (-50 pA)', 0.23650706163951546), ('LS (-70 pA)', 0.28061471706164776), ('LS (-90 pA)', 0.3092254505879516)], n_validation_bundles=8, residuals_sigma_mV=0.08935367179577537, residuals_rho_lag1=0.9823261510920515)'. Reason: 'AttributeError("Can't get local object 'fit_one_cell.<locals>.objective'")'
