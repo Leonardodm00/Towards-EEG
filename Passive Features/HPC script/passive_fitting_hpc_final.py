@@ -6276,7 +6276,7 @@ if __name__ == "__main__":
         description="Passive-property pipeline — HPC offline mode"
     )
     parser.add_argument(
-        "--archive-dir", type=str, required=True,
+        "--archive-dir", type=str,
         help="Path to the Phase 0 archive directory",
     )
     parser.add_argument(
@@ -6284,7 +6284,7 @@ if __name__ == "__main__":
         help="Root directory for all outputs (Phase 2 results + Phase 3)",
     )
     parser.add_argument(
-        "--n-avg-groups", type=int, default=1,
+        "--n-avg-groups", type=int, default=3,
         help="Number of averaged bundles per polarity (default: 1)",
     )
     parser.add_argument(
@@ -6297,19 +6297,19 @@ if __name__ == "__main__":
         help="Spine-area correction factor (default: 1.9)",
     )
     parser.add_argument(
-        "--n-calls", type=int, default=150,
-        help="GP optimiser budget per cell (default: 150)",
+        "--n-calls", type=int, default=10,
+        help="GP optimiser budget per cell (default: 10)",
     )
     parser.add_argument(
-        "--n-initial", type=int, default=40,
-        help="Random initial points before GP (default: 40)",
+        "--n-initial", type=int, default=10,
+        help="Random initial points before GP (default: 100)",
     )
     parser.add_argument(
         "--n-workers", type=int, default=n_workers,
         help=f"Parallel workers for Phase 2 (default: auto-detected {n_workers})",
     )
     parser.add_argument(
-        "--max-cells", type=int, default=None,
+        "--max-cells", type=int, default=1,
         help="Limit number of cells to process (default: all)",
     )
     # Phase 3 flags
@@ -6318,11 +6318,11 @@ if __name__ == "__main__":
         help="Skip Phase 3 (bootstrap + GP diagnostic)",
     )
     parser.add_argument(
-        "--bootstrap-B", type=int, default=200,
+        "--bootstrap-B", type=int, default=10,
         help="Bootstrap iterations (default: 200; 1000+ for publication)",
     )
     parser.add_argument(
-        "--bootstrap-mode", type=str, default="parametric",
+        "--bootstrap-mode", type=str, default="nonparametric",
         choices=["parametric", "nonparametric"],
         help="Bootstrap mode (default: parametric)",
     )
@@ -6400,9 +6400,9 @@ if __name__ == "__main__":
         COMMON_KWARGS = dict(
             B=args.bootstrap_B,
             alpha=0.95,
-            fit_mode="rigorous",
-            n_calls=100,
-            n_initial=30,
+            fit_mode="fast",
+            n_calls=5,
+            n_initial=5,
             ball_radius_log=0.2,
             rmsd_reject_mult=5.0,
             n_workers=1,  # bootstrap workers (keep 1 unless module is importable)
