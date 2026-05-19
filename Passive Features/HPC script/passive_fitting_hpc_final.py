@@ -3076,25 +3076,104 @@ def fit_one_cell(
     )
 
 
+# =============================================================================
+#  PATCH for passive_fitting_hpc_final.py
+#
+#  Replaces lines 3080–3098 (current `_fit_worker`).
+#
+#  Bug fixed:
+#      multiprocessing.pool.MaybeEncodingError:
+#          "Can't get local object 'fit_one_cell.<locals>.objective'"
+#
+#  Root cause:
+#      skopt's `gp_minimize` stores the (closure) objective inside
+#      `OptimizeResult.specs['args']['func']`. The worker returns the
+#      full OptimizeResult inside PassiveFitResult.gp_result. pickle
+#      then cannot serialise the local function on the return trip
+#      to the parent process.
+#
+#  Fix:
+#      Null the un-picklable closure references in `gp_result.specs`
+#      inside the worker, before the result leaves it. Everything
+#      Phase 3 actually consumes (`gp_result.models[-1]`,
+#      `gp_result.space`, `gp_result.x_iters`, `gp_result.func_vals`,
+#      `gp_result.x`, `gp_result.fun`) is left intact.
+#
+#  How to apply:
+#      1. Open passive_fitting_hpc_final.py at line ~3079.
+#      2. Delete the existing "Cell 11 — Multiprocessing worker"
+#         block (the comment line 3079 and the `_fit_worker`
+#         function 3080–3098).
+#      3. Paste the block below in its place.
+#      4. (Optional) run the smoke test in test_pickle_roundtrip.py
+#         before launching the full HPC job.
+# =============================================================================
+ 
+ 
 # %% Cell 11 — Multiprocessing worker (top-level for picklability) =============
+def _sanitize_gp_result_for_pickle(gp_result) -> None:
+    """Strip un-picklable closure references from a skopt OptimizeResult.
+ 
+    scikit-optimize stores the objective (and any callbacks) inside
+    ``result.specs['args']``. When the objective is a nested closure
+    -- which it is in fit_one_cell because of ``@use_named_args(dims)``
+    around ``def objective(**params)`` -- it cannot be pickled across a
+    ``multiprocessing.Pool`` boundary, because pickle resolves functions
+    by qualified name and ``fit_one_cell.<locals>.objective`` is not
+    importable on the unpickling side.
+ 
+    Everything Phase 3 needs is preserved:
+        * gp_result.models[-1]   -- the trained GaussianProcessRegressor
+        * gp_result.space        -- the search-space transformer
+        * gp_result.x_iters      -- list of evaluated points
+        * gp_result.func_vals    -- corresponding objective values
+        * gp_result.x, gp_result.fun  -- best point & best value
+    Only the bookkeeping callables in ``specs`` are nulled.
+    """
+    if gp_result is None:
+        return
+    specs = getattr(gp_result, "specs", None)
+    if not isinstance(specs, dict):
+        return
+    args = specs.get("args", None)
+    if isinstance(args, dict):
+        # The objective itself (this is the actual offender)
+        if "func" in args:
+            args["func"] = None
+        # Any user callbacks (also potentially closures)
+        if "callback" in args:
+            args["callback"] = None
+    # Older / some forks of skopt leave a top-level "function" entry too
+    if "function" in specs:
+        specs["function"] = None
+ 
+ 
 def _fit_worker(args) -> PassiveFitResult:
     """Worker entry point for multiprocessing.Pool.  Each worker rebuilds
     its own NEURON model from the SWC path because NEURON sections are
     process-global and cannot be safely pickled across processes.
-
-    gp_result and opt_inputs ARE picklable (sklearn / plain-Python objects)
-    and are preserved so the parent can run Phase 3 after calling
-    rebuild_neuron_cells_for_phase3().  neuron_cell holds NEURON Hoc handles
-    and CANNOT be pickled; it is cleared to None before the result leaves
-    the worker process.
+ 
+    Before returning, we drop / sanitise every field that would break
+    pickling on the return trip to the parent:
+ 
+      * neuron_cell  -> None  (NEURON Hoc handles are process-local)
+      * gp_result    -> .specs['args']['func'] is the local closure
+                        ``fit_one_cell.<locals>.objective``. We null it
+                        out but keep the GP model, space, visited
+                        points and observed values, so Phase 3 still
+                        has everything it needs after the parent calls
+                        ``rebuild_neuron_cells_for_phase3()``.
+      * opt_inputs   -> unchanged (it was already picklable on the way
+                        in, since the parent passed it in).
     """
     (cell_data, opt_in, F, kwargs) = args
-    # from phase1_data_loader import build_neuron_model
     cell = build_neuron_model(cell_data.swc_path, F=F)
     r = fit_one_cell(cell, cell_data, opt_in, F=F, **kwargs)
-    # Drop the un-picklable NEURON cell before the result crosses the
-    # process boundary.  gp_result and opt_inputs are left intact.
+ 
+    # Drop the un-picklable NEURON cell before crossing the process boundary
     r.neuron_cell = None
+    # Strip the closure reference embedded in skopt's OptimizeResult
+    _sanitize_gp_result_for_pickle(r.gp_result)
     return r
 
 
