@@ -1558,7 +1558,12 @@ class PassiveCell:
         self.axon[1].connect(self.axon[0](1.0), 0)
 
     def _insert_passive(self) -> None:
-        for sec in h.allsec():
+        # Only touch sections this instance owns.  Iterating ``h.allsec()`` is
+        # unsafe because NEURON's section list is process-global: any section
+        # not categorised by ``_categorise_sections`` (e.g. from another
+        # PassiveCell in the same process, or an unusual SWC type whose name
+        # doesn't match soma/apic/dend/axon) would silently slip in.
+        for sec in self.soma + self.dend + self.apic + self.axon:
             sec.insert("pas")
 
     def _precompute_F_per_segment(self) -> None:
@@ -1578,7 +1583,11 @@ class PassiveCell:
     def set_passive(self, Cm: float, Rm: float, Ra: float) -> None:
         """Apply (Cm, Rm, Ra); dendrites > cutoff are auto-scaled by F."""
         g_pas_base = 1.0 / float(Rm)
-        for sec in h.allsec():
+        # Iterate only this instance's own sections, NOT ``h.allsec()``.
+        # See ``_insert_passive`` for the rationale — this prevents KeyError
+        # on ``self._F_multiplier`` when foreign sections live in NEURON's
+        # global section list.
+        for sec in self.soma + self.dend + self.apic + self.axon:
             sec.Ra = float(Ra)
             for seg in sec:
                 m = self._F_multiplier[(sec.name(), seg.x)]
@@ -1586,7 +1595,8 @@ class PassiveCell:
                 seg.g_pas = g_pas_base * m
 
     def set_e_pas(self, e_pas_mV: float) -> None:
-        for sec in h.allsec():
+        # Only touch this instance's own sections — see ``_insert_passive``.
+        for sec in self.soma + self.dend + self.apic + self.axon:
             for seg in sec:
                 seg.e_pas = float(e_pas_mV)
 
@@ -2686,9 +2696,23 @@ def _build_loss_function(
         except Exception as e:
             # Never let a NEURON exception crash gp_minimize.  Penalise
             # heavily so the surrogate steers away from the offending region.
-            warnings.warn(f"Loss evaluation crashed at "
-                          f"(log_Cm={cm_log:.3g}, log_Rm={rm_log:.3g}, "
-                          f"log_Ra={ra_log:.3g}): {e}")
+            #
+            # Include the exception TYPE and the source LOCATION of the
+            # exception (file + line of the deepest frame inside our own
+            # code), so that recurring "crashes" can be diagnosed rather
+            # than appearing as opaque tuple args like ``('dend[18]', 0.5)``.
+            import traceback as _tb
+            tb_lines = _tb.format_exc().splitlines()
+            location = ""
+            for line in reversed(tb_lines):
+                if line.strip().startswith("File "):
+                    location = line.strip()
+                    break
+            warnings.warn(
+                f"Loss eval crashed: {type(e).__name__}: {e!s} | "
+                f"params (log): Cm={cm_log:.3g} Rm={rm_log:.3g} "
+                f"Ra={ra_log:.3g} | {location}"
+            )
             return 1e6
 
     return loss
