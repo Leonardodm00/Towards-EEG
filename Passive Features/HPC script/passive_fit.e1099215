@@ -1,0 +1,228 @@
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:3339: UserWarning: [rebuild_neuron_cells_for_phase3] failed for specimen 525133308: RuntimeError: No soma section found after SWC import.
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:3339: UserWarning: [rebuild_neuron_cells_for_phase3] failed for specimen 528706755: RuntimeError: No soma section found after SWC import.
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:3339: UserWarning: [rebuild_neuron_cells_for_phase3] failed for specimen 508421103: RuntimeError: No soma section found after SWC import.
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:3339: UserWarning: [rebuild_neuron_cells_for_phase3] failed for specimen 537204107: RuntimeError: No soma section found after SWC import.
+  warnings.warn(
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.582 Rm=9.59 Ra=5.52 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.588 Rm=9.58 Ra=5.55 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.587 Rm=9.56 Ra=5.54 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.647 Rm=9.64 Ra=5.49 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.518 Rm=9.56 Ra=5.52 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=1.1 Rm=9.59 Ra=5.52 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.982 Rm=9.58 Ra=5.46 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=1.06 Rm=9.56 Ra=5.51 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=1.1 Rm=9.64 Ra=5.52 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=1.1 Rm=9.55 Ra=5.54 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.651 Rm=9.59 Ra=5.52 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.696 Rm=9.59 Ra=5.48 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.605 Rm=9.57 Ra=5.53 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.601 Rm=9.58 Ra=5.51 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.678 Rm=9.6 Ra=5.54 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.651 Rm=9.59 Ra=5.52 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.618 Rm=9.58 Ra=5.56 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.726 Rm=9.53 Ra=5.6 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.718 Rm=9.63 Ra=5.54 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.635 Rm=9.66 Ra=5.62 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.631 Rm=9.59 Ra=5.52 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.721 Rm=9.65 Ra=5.54 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.57 Rm=9.59 Ra=5.55 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.566 Rm=9.61 Ra=5.54 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.665 Rm=9.53 Ra=5.49 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=1.1 Rm=9.59 Ra=5.52 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=1.1 Rm=9.53 Ra=5.61 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=1.1 Rm=9.6 Ra=5.51 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=1.1 Rm=9.65 Ra=5.55 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=1.1 Rm=9.59 Ra=5.56 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.455 Rm=8.98 Ra=5.52 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.506 Rm=8.95 Ra=5.61 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.389 Rm=8.94 Ra=5.57 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.458 Rm=9.08 Ra=5.53 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.424 Rm=8.96 Ra=5.47 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.455 Rm=10.5 Ra=5.52 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.391 Rm=10.5 Ra=5.55 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.52 Rm=10.5 Ra=5.61 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.441 Rm=10.6 Ra=5.5 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.419 Rm=10.5 Ra=5.57 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.455 Rm=9.05 Ra=5.52 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.463 Rm=9.03 Ra=5.45 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.385 Rm=9.08 Ra=5.57 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.447 Rm=9 Ra=5.57 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.391 Rm=9.02 Ra=5.55 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.455 Rm=10.4 Ra=5.52 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.343 Rm=10.4 Ra=5.49 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.461 Rm=10.4 Ra=5.53 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.49 Rm=10.4 Ra=5.59 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2734: UserWarning: Loss eval crashed: ReferenceError: can't access a deleted section | params (log): Cm=0.492 Rm=10.4 Ra=5.58 | File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 1614, in set_passive
+  warnings.warn(
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:3882: RuntimeWarning: invalid value encountered in log
+  centre[pc] = float(np.log(theta_phys))
