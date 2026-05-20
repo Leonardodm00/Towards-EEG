@@ -1,0 +1,209 @@
+Running on node:       dvnode002
+Job ID:                1098854.pbsserver01
+Working dir:           /davinci-1/home/ldellamea
+Python:                /davinci-1/home/ldellamea/.conda/envs/prova/bin/python3
+Conda env:             prova
+Archive dir:           .
+Output dir:            ./pipeline_outputs
+Bootstrap workers:     10
+Bootstrap B:           10  (n_calls=5, n_initial=5)
+-----------------------------------------
+
+============================================================
+  PHASE 1 — Loading data from archive
+============================================================
+
+[load_archive] === specimen_508421103 ===
+[load_archive]   Long Square bundles: 5 ([-10, -30, -50, -70, -90] pA)
+[load_archive] specimen 508421103: 6 SS bundles (38 dep + 36 hyp pulses, n_avg_groups=3), 5 LS bundles, 74 individual pulses for bootstrap
+[load_archive]   Rin=218.5 MΩ  τm=31.2 ms  Vrest=-57.5 mV
+
+[load_archive] === specimen_525133308 ===
+[load_archive]   Long Square bundles: 3 ([-30, -70, -90] pA)
+[load_archive] specimen 525133308: 6 SS bundles (38 dep + 36 hyp pulses, n_avg_groups=3), 3 LS bundles, 74 individual pulses for bootstrap
+[load_archive]   Rin=228.7 MΩ  τm=27.8 ms  Vrest=-63.8 mV
+
+[load_archive] loaded 2 cell(s), skipped/failed 0
+
+============================================================
+  PHASE 2 — Bayesian optimisation
+============================================================
+[fit_one_cell] specimen 525133308 (L2 spiny, F=1.9): fit_target=hyp, n_calls=10
+[fit_one_cell]   best fit: Cm=2.110  Rm=17666  Ra=158  train RMSD=0.1005 mV  [log-space: 0.747, 9.779, 5.064]
+[fit_one_cell]   training noise: σ=0.0134 mV  ρ_lag1=0.405  (3 bundle(s))
+Changed dt
+Changed dt
+Changed dt
+[fit_one_cell]   validation per-bundle RMSDs:
+      SS dep (+200 pA)          0.0913 mV
+      SS dep (+200 pA)          0.1107 mV
+      SS dep (+200 pA)          0.0981 mV
+      LS (-30 pA)               0.5923 mV
+      LS (-70 pA)               1.0655 mV
+      LS (-90 pA)               1.4630 mV
+[fit_one_cell]   validation mean RMSD (6 bundle(s)): 0.5701 mV
+[fit_one_cell]   ratio = 5.67  ->  status = to_refine
+warning specimen_508421103/reconstruction.swc: more than one tree:
+  root at line 4
+  root at line 4698
+  root at line 4716
+  root at line 4731
+  root at line 4812
+[fit_one_cell] specimen 508421103 (L2 spiny, F=1.9): fit_target=hyp, n_calls=10
+[fit_one_cell]   best fit: Cm=3.000  Rm=10192  Ra=129  train RMSD=0.0784 mV  [log-space: 1.099, 9.229, 4.863]
+[fit_one_cell]   training noise: σ=0.0118 mV  ρ_lag1=0.332  (3 bundle(s))
+Changed dt
+Changed dt
+Changed dt
+Changed dt
+Changed dt
+[fit_one_cell]   validation per-bundle RMSDs:
+      SS dep (+200 pA)          0.0954 mV
+      SS dep (+200 pA)          0.0663 mV
+      SS dep (+200 pA)          0.0711 mV
+      LS (-10 pA)               0.2039 mV
+      LS (-30 pA)               0.4165 mV
+      LS (-50 pA)               0.8624 mV
+      LS (-70 pA)               1.1739 mV
+      LS (-90 pA)               1.4762 mV
+[fit_one_cell]   validation mean RMSD (8 bundle(s)): 0.5457 mV
+[fit_one_cell]   ratio = 6.96  ->  status = to_refine
+[fit_cells] worker returned 1/2 (specimen 525133308, status=to_refine)
+[fit_cells] worker returned 2/2 (specimen 508421103, status=to_refine)
+   specimen_id layer dendrite_type  ...  gp_result neuron_cell  opt_inputs
+0    525133308     2         spiny  ...       None        None        None
+1    508421103     2         spiny  ...       None        None        None
+
+[2 rows x 31 columns]
+  layer dendrite_type  n  ...     ra_mean     ra_std  status_summary
+0     2         spiny  2  ...  143.751924  20.358318     to_refine:2
+
+[1 rows x 10 columns]
+[Phase 2] results saved to pipeline_outputs/phase2_results.csv
+
+============================================================
+  PHASE 3 — Bootstrap & GP diagnostic
+============================================================
+warning specimen_508421103/reconstruction.swc: more than one tree:
+  root at line 4
+  root at line 4698
+  root at line 4716
+  root at line 4731
+  root at line 4812
+[rebuild_neuron_cells_for_phase3] rebuilt 2 NEURON model(s) out of 2 result(s).
+
+=== Phase 3 v3 — cell 525133308 ===
+[bootstrap] cell 525133308
+[bootstrap]   mode=nonparametric  B=10  α=0.95  fit_mode=fast  n_calls=5  n_initial=5
+[bootstrap]   pulse_pool=74 pulses  n_pulses_per_replicate=24  n_avg_groups=3
+[bootstrap]   MLE: Cm=2.11, Rm=1.767e+04, Ra=158.1  RMSD_MLE=0.10054 mV
+[bootstrap]   running 10 iterations ...
+warning specimen_508421103/reconstruction.swc: more than one tree:
+  root at line 4
+  root at line 4698
+  root at line 4716
+  root at line 4731
+  root at line 4812
+warning specimen_508421103/reconstruction.swc: more than one tree:
+  root at line 4
+  root at line 4698
+  root at line 4716
+  root at line 4731
+  root at line 4812
+warning specimen_508421103/reconstruction.swc: more than one tree:
+  root at line 4
+  root at line 4698
+  root at line 4716
+  root at line 4731
+  root at line 4812
+warning specimen_508421103/reconstruction.swc: more than one tree:
+  root at line 4
+  root at line 4698
+  root at line 4716
+  root at line 4731
+  root at line 4812
+warning specimen_508421103/reconstruction.swc: more than one tree:
+  root at line 4
+  root at line 4698
+  root at line 4716
+  root at line 4731
+  root at line 4812
+warning specimen_508421103/reconstruction.swc: more than one tree:
+  root at line 4
+  root at line 4698
+  root at line 4716
+  root at line 4731
+  root at line 4812
+warning specimen_508421103/reconstruction.swc: more than one tree:
+  root at line 4
+  root at line 4698
+  root at line 4716
+  root at line 4731
+  root at line 4812
+warning specimen_508421103/reconstruction.swc: more than one tree:
+  root at line 4
+  root at line 4698
+  root at line 4716
+  root at line 4731
+  root at line 4812
+warning specimen_508421103/reconstruction.swc: more than one tree:
+  root at line 4
+  root at line 4698
+  root at line 4716
+  root at line 4731
+  root at line 4812
+[bootstrap]   iter 1/10 ok
+[bootstrap]   iter 2/10 ok
+[bootstrap]   iter 3/10 ok
+[bootstrap]   iter 4/10 ok
+[bootstrap]   iter 5/10 ok
+[bootstrap]   iter 6/10 ok
+[bootstrap]   iter 7/10 ok
+[bootstrap]   iter 10/10 ok
+[bootstrap]   iter 8/10 ok
+[bootstrap]   iter 9/10 ok
+[bootstrap]   Cm: MLE=2.11  perc=1.587…2.576  BCa=1.649…2.431  normal=1.513…2.79
+[bootstrap]   Rm: MLE=1.767e+04  perc=1.353e+04…2.704e+04  BCa=1.385e+04…2.574e+04  normal=9983…2.705e+04
+[bootstrap]   Ra: MLE=158.1  perc=109.4…158.1  BCa=134.7…158.1  normal=104.9…176.4
+[gp_diagnostic] cell 525133308  k=2.0  bootstrap CIs attached
+[gp_diagnostic]   Cm: GP may under-resolve the loss near a CI boundary.
+[gp_diagnostic]   Rm: GP may under-resolve the loss near a CI boundary.
+[gp_diagnostic]   Ra: GP may under-resolve the loss near a CI boundary.
+[save_replot_bundle] cell 525133308: precomputing MLE traces …
+[Phase 3] specimen 525133308 failed: ('dend[18]', 0.5)
+
+=== Phase 3 v3 — cell 508421103 ===
+[bootstrap] cell 508421103
+[bootstrap]   mode=nonparametric  B=10  α=0.95  fit_mode=fast  n_calls=5  n_initial=5
+[bootstrap]   pulse_pool=74 pulses  n_pulses_per_replicate=24  n_avg_groups=3
+[bootstrap]   MLE: Cm=3, Rm=1.019e+04, Ra=129.4  RMSD_MLE=0.07844 mV
+[bootstrap]   running 10 iterations ...
+[bootstrap]   iter 1/10 ok
+[bootstrap]   iter 2/10 ok
+[bootstrap]   iter 3/10 ok
+[bootstrap]   iter 4/10 ok
+[bootstrap]   iter 5/10 ok
+[bootstrap]   iter 6/10 ok
+[bootstrap]   iter 8/10 ok
+[bootstrap]   iter 7/10 ok
+[bootstrap]   iter 9/10 ok
+[bootstrap]   iter 10/10 ok
+[bootstrap]   Cm: MLE=3  perc=2.131…3  BCa=2.45…3  normal=2.068…3.311
+[bootstrap]   Rm: MLE=1.019e+04  perc=9479…1.512e+04  BCa=9516…1.369e+04  normal=7786…1.57e+04
+[bootstrap]   Ra: MLE=129.4  perc=109.9…171  BCa=115.5…138.1  normal=106.7…187.3
+[gp_diagnostic] cell 508421103  k=2.0  bootstrap CIs attached
+[save_replot_bundle] cell 508421103: precomputing MLE traces …
+[save_replot_bundle]   validating each field is picklable …
+[save_replot_bundle]   wrote core.pkl              999.4 kB
+[save_replot_bundle]   wrote pulse_pool.pkl      18222.1 kB
+[save_replot_bundle] cell 508421103: done — total 19222.6 kB across 3 files in pipeline_outputs/cell_508421103/replot
+ specimen_id parameter          mle   ci_perc_lo   ci_perc_hi    ci_bca_lo    ci_bca_hi  ci_norm_lo   ci_norm_hi  n_kept  sigma_used          mode  gp_ok
+   525133308        Cm     2.110440     1.587094     2.576486     1.648971     2.430928    1.513370     2.790423      10         NaN nonparametric  False
+   525133308        Rm 17665.559366 13531.311931 27035.785451 13845.796735 25740.052648 9982.830009 27045.331663      10         NaN nonparametric  False
+   525133308        Ra   158.147429   109.353284   158.147429   134.675065   158.147429  104.938685   176.443099      10         NaN nonparametric  False
+   508421103        Cm     3.000000     2.130526     3.000000     2.449826     3.000000    2.068435     3.311496      10         NaN nonparametric   True
+   508421103        Rm 10192.416442  9478.729239 15122.439120  9516.402040 13694.465832 7785.902982 15698.371320      10         NaN nonparametric   True
+   508421103        Ra   129.356419   109.863272   171.018438   115.524976   138.131858  106.690418   187.337250      10         NaN nonparametric   True
+[Phase 3] CIs saved to pipeline_outputs/phase3_full_summary.csv
+
+[DONE]

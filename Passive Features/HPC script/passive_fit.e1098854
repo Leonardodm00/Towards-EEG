@@ -1,0 +1,318 @@
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.462, log_Rm=9.78, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.468, log_Rm=9.77, log_Ra=5.1): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.467, log_Rm=9.75, log_Ra=5.08): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.527, log_Rm=9.83, log_Ra=5.03): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.399, log_Rm=9.75, log_Ra=5.07): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.946, log_Rm=9.78, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.83, log_Rm=9.77, log_Ra=5): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.91, log_Rm=9.75, log_Ra=5.05): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.967, log_Rm=9.83, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=1.01, log_Rm=9.75, log_Ra=5.08): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.5, log_Rm=9.78, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.545, log_Rm=9.78, log_Ra=5.03): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.454, log_Rm=9.76, log_Ra=5.07): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.45, log_Rm=9.77, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.527, log_Rm=9.79, log_Ra=5.08): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.888, log_Rm=9.78, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.856, log_Rm=9.77, log_Ra=5.1): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.963, log_Rm=9.72, log_Ra=5.14): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.956, log_Rm=9.82, log_Ra=5.08): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.873, log_Rm=9.85, log_Ra=5.16): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.414, log_Rm=9.78, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.504, log_Rm=9.85, log_Ra=5.08): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.354, log_Rm=9.78, log_Ra=5.1): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.35, log_Rm=9.8, log_Ra=5.09): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.449, log_Rm=9.72, log_Ra=5.03): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=1.03, log_Rm=9.78, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=1, log_Rm=9.72, log_Ra=5.15): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=1, log_Rm=9.8, log_Ra=5.05): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=1.1, log_Rm=9.85, log_Ra=5.1): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.916, log_Rm=9.78, log_Ra=5.1): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.747, log_Rm=9.51, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.797, log_Rm=9.48, log_Ra=5.15): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.681, log_Rm=9.48, log_Ra=5.11): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.749, log_Rm=9.61, log_Ra=5.07): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.715, log_Rm=9.49, log_Ra=5.01): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.747, log_Rm=10.2, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.683, log_Rm=10.2, log_Ra=5.09): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.812, log_Rm=10.2, log_Ra=5.15): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.733, log_Rm=10.3, log_Ra=5.04): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.71, log_Rm=10.2, log_Ra=5.12): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.747, log_Rm=9.54, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.755, log_Rm=9.51, log_Ra=5): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.677, log_Rm=9.56, log_Ra=5.11): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.739, log_Rm=9.48, log_Ra=5.11): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.683, log_Rm=9.5, log_Ra=5.09): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.747, log_Rm=10.2, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.634, log_Rm=10.2, log_Ra=5.03): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.752, log_Rm=10.2, log_Ra=5.07): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.782, log_Rm=10.1, log_Ra=5.13): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.783, log_Rm=10.2, log_Ra=5.12): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.747, log_Rm=9.21, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.786, log_Rm=9.25, log_Ra=5.07): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.676, log_Rm=9.2, log_Ra=5.03): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.676, log_Rm=9.22, log_Ra=5.04): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.695, log_Rm=9.16, log_Ra=5.08): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.747, log_Rm=10.2, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.765, log_Rm=10.3, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.799, log_Rm=10.3, log_Ra=5.12): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.629, log_Rm=10.3, log_Ra=5.08): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.768, log_Rm=10.2, log_Ra=5.08): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.747, log_Rm=9.78, log_Ra=4.69): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.763, log_Rm=9.76, log_Ra=4.6): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.741, log_Rm=9.74, log_Ra=4.75): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.732, log_Rm=9.78, log_Ra=4.65): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.721, log_Rm=9.78, log_Ra=4.62): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.747, log_Rm=9.78, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.762, log_Rm=9.77, log_Ra=5): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.627, log_Rm=9.81, log_Ra=5.05): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.72, log_Rm=9.77, log_Ra=5.15): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.744, log_Rm=9.78, log_Ra=4.99): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.747, log_Rm=9.78, log_Ra=4.9): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.829, log_Rm=9.83, log_Ra=4.96): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.749, log_Rm=9.83, log_Ra=4.92): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.778, log_Rm=9.77, log_Ra=4.83): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.798, log_Rm=9.68, log_Ra=4.89): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.747, log_Rm=9.78, log_Ra=5.06): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.737, log_Rm=9.73, log_Ra=5.09): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.737, log_Rm=9.76, log_Ra=5.09): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.723, log_Rm=9.85, log_Ra=5.08): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.723, log_Rm=9.68, log_Ra=5): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.747, log_Rm=9.78, log_Ra=4.65): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.801, log_Rm=9.78, log_Ra=4.64): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.829, log_Rm=9.72, log_Ra=4.62): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.723, log_Rm=9.81, log_Ra=4.62): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.716, log_Rm=9.7, log_Ra=4.69): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.747, log_Rm=9.78, log_Ra=5.17): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.787, log_Rm=9.76, log_Ra=5.18): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.682, log_Rm=9.76, log_Ra=5.24): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.754, log_Rm=9.89, log_Ra=5.13): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.776, log_Rm=9.77, log_Ra=5.2): ('dend[18]', 0.5)
+  warnings.warn(f"Loss evaluation crashed at "
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
