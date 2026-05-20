@@ -1525,36 +1525,13 @@ class PassiveCell:
 
     # ---- Construction helpers ---------------------------------------------
     def _import_swc(self) -> None:
-        # Snapshot how many sections already exist in NEURON's global list
-        # BEFORE we import this cell's SWC, then grab the sections that
-        # were appended afterwards.  This is the only safe way to identify
-        # our own sections: comparing ``id(sec)`` across two separate
-        # iterations of ``h.allsec()`` is UNSAFE, because NEURON may hand
-        # back fresh Python wrapper objects each time it's iterated, with
-        # different ``id()`` values even for the same underlying section.
-        # ``h.allsec()`` yields sections in insertion order, so after the
-        # import the first ``n_pre`` entries are pre-existing and the
-        # rest are ours.
-        n_pre = sum(1 for _ in h.allsec())
         reader = h.Import3d_SWC_read()
         reader.input(str(self.swc_path))
         gui = h.Import3d_GUI(reader, 0)
         gui.instantiate(None)
-        self._own_sections = list(h.allsec())[n_pre:]
 
     def _categorise_sections(self) -> None:
-        # Iterate the list of sections we captured at import time, NOT
-        # ``h.allsec()``.  ``h.allsec()`` would also yield sections that
-        # belong to other PassiveCell instances coexisting in the same
-        # Python process (e.g. during Phase 3's sequential rebuild),
-        # which would then end up in this cell's self.dend/.axon/etc.
-        # and get destroyed by this cell's _replace_axon_hay_stub —
-        # leaving the other cell's section lists full of stale Python
-        # handles that raise ``ReferenceError: can't access a deleted
-        # section`` later.  ``self._own_sections`` was set in
-        # ``_import_swc`` and contains exactly the sections this
-        # instance created, in their insertion order.
-        for sec in self._own_sections:
+        for sec in h.allsec():
             n = sec.name().lower()
             if "soma" in n:
                 self.soma.append(sec)
@@ -1581,12 +1558,7 @@ class PassiveCell:
         self.axon[1].connect(self.axon[0](1.0), 0)
 
     def _insert_passive(self) -> None:
-        # Only touch sections this instance owns.  Iterating ``h.allsec()`` is
-        # unsafe because NEURON's section list is process-global: any section
-        # not categorised by ``_categorise_sections`` (e.g. from another
-        # PassiveCell in the same process, or an unusual SWC type whose name
-        # doesn't match soma/apic/dend/axon) would silently slip in.
-        for sec in self.soma + self.dend + self.apic + self.axon:
+        for sec in h.allsec():
             sec.insert("pas")
 
     def _precompute_F_per_segment(self) -> None:
@@ -1606,11 +1578,7 @@ class PassiveCell:
     def set_passive(self, Cm: float, Rm: float, Ra: float) -> None:
         """Apply (Cm, Rm, Ra); dendrites > cutoff are auto-scaled by F."""
         g_pas_base = 1.0 / float(Rm)
-        # Iterate only this instance's own sections, NOT ``h.allsec()``.
-        # See ``_insert_passive`` for the rationale — this prevents KeyError
-        # on ``self._F_multiplier`` when foreign sections live in NEURON's
-        # global section list.
-        for sec in self.soma + self.dend + self.apic + self.axon:
+        for sec in h.allsec():
             sec.Ra = float(Ra)
             for seg in sec:
                 m = self._F_multiplier[(sec.name(), seg.x)]
@@ -1618,10 +1586,41 @@ class PassiveCell:
                 seg.g_pas = g_pas_base * m
 
     def set_e_pas(self, e_pas_mV: float) -> None:
-        # Only touch this instance's own sections — see ``_insert_passive``.
-        for sec in self.soma + self.dend + self.apic + self.axon:
+        for sec in h.allsec():
             for seg in sec:
                 seg.e_pas = float(e_pas_mV)
+
+    def destroy(self) -> None:
+        """Delete all of this cell's NEURON sections from the global
+        section list so the next cell built in the same Python process
+        starts with a clean slate.
+
+        Colab gets this "for free" because each notebook session
+        processes one cell and Python's GC + kernel restart clears
+        NEURON between runs.  On HPC we fit many cells in a single
+        long-lived process, so we have to do the cleanup explicitly,
+        otherwise sections from finished cells pile up in
+        ``h.allsec()`` and confuse the next cell's construction.
+
+        Order matters: delete leaves before the soma so NEURON's
+        parent-child bookkeeping doesn't trip.  Failures on individual
+        sections are swallowed because the goal is best-effort
+        teardown.
+        """
+        for sec in list(self.axon) + list(self.apic) + list(self.dend) + list(self.soma):
+            try:
+                h.delete_section(sec=sec)
+            except Exception:
+                pass
+        self.soma = []
+        self.dend = []
+        self.apic = []
+        self.axon = []
+        # Drop the iclamp/recording vector references so they don't
+        # hold dangling pointers to the freed soma segment.
+        self._iclamp = None
+        self._t_vec = None
+        self._v_vec = None
 
     def simulate(
         self,
@@ -3208,17 +3207,24 @@ def fit_cells(
     results: List[PassiveFitResult] = []
 
     if n_workers <= 1:
-        # Sequential path
-        # from phase1_data_loader import build_neuron_model
+        # Sequential path — one cell at a time in the calling process.
+        # After each cell is fitted we destroy its NEURON sections so the
+        # next cell builds against a clean ``h.allsec()``.  Mirrors how
+        # the Colab pipeline gets away with using ``h.allsec()`` inside
+        # PassiveCell: only one cell is ever alive in the process.
         for i, (cd, oi) in enumerate(zip(cells_data, opt_inputs)):
             print(f"\n[fit_cells] === cell {i + 1}/{len(cells_data)} "
                   f"(specimen {cd.specimen_id}) ===")
+            pc = None
             try:
                 if cells is not None and i < len(cells):
                     pc = cells[i]
                 else:
                     pc = build_neuron_model(cd.swc_path, F=F)
                 r = fit_one_cell(pc, cd, oi, F=F, **fit_kwargs)
+                # Phase 3 will rebuild the cell fresh; we don't carry the
+                # live NEURON handles forward.
+                r.neuron_cell = None
             except Exception as e:
                 # Bare-minimum row so the batch never aborts
                 r = PassiveFitResult(
@@ -3236,6 +3242,16 @@ def fit_cells(
                     n_calls=0, n_initial=0, wall_time_s=0.0,
                     error_message=f"{type(e).__name__}: {e}",
                 )
+            finally:
+                # Tear down this cell's NEURON sections before the next
+                # iteration builds the next cell.  Best-effort: if pc was
+                # never assigned (build failure) or already partly torn
+                # down, the destroy() call swallows per-section errors.
+                if pc is not None:
+                    try:
+                        pc.destroy()
+                    except Exception:
+                        pass
             results.append(r)
     else:
         # Parallel path — multiprocessing.Pool
@@ -6469,7 +6485,13 @@ if __name__ == "__main__":
     df, results = fit_cells(
         cells_data, opt_inputs,
         F=F,
-        n_workers=args.n_workers,
+        # Force sequential execution to mirror the Colab pipeline.
+        # NEURON section state is process-global; running multiple
+        # PassiveCell constructions in parallel processes is unreliable
+        # in this codebase (workers leak sections via Import3d_GUI).
+        # One cell at a time + ``cell.destroy()`` between fits is the
+        # only fully reliable configuration we have today.
+        n_workers=1,
         n_calls=args.n_calls,
         n_initial=args.n_initial,
     )
@@ -6483,13 +6505,26 @@ if __name__ == "__main__":
 
     # ══════════════════════════════════════════════════════════════════
     #  Phase 3 — Bootstrap CIs + GP diagnostic
+    #
+    #  Mirrors the Colab pipeline's one-cell-at-a-time pattern.  For each
+    #  cell we:
+    #      1. build a fresh PassiveCell from its SWC,
+    #      2. attach it to the fit result so phase3_full_for_cell and
+    #         save_replot_bundle can call set_passive / simulate,
+    #      3. run bootstrap + GP diagnostic (sequentially: n_workers=1),
+    #      4. write the replot bundle while NEURON is still alive,
+    #      5. destroy the cell to wipe its sections from h.allsec()
+    #         before the next iteration builds the next cell.
+    #
+    #  This is the configuration the Colab uses (1 cell per session) and
+    #  is the only configuration we've found that produces zero
+    #  ``ReferenceError: can't access a deleted section`` or
+    #  ``No soma section found`` failures.
     # ══════════════════════════════════════════════════════════════════
     if not args.skip_phase3:
         print("\n" + "=" * 60)
         print("  PHASE 3 — Bootstrap & GP diagnostic")
         print("=" * 60)
-
-        rebuild_neuron_cells_for_phase3(results, cells_data, F=F)
 
         PHASE3_ROOT = str(output_dir)
 
@@ -6501,7 +6536,12 @@ if __name__ == "__main__":
             n_initial=args.bootstrap_n_initial,
             ball_radius_log=0.2,
             rmsd_reject_mult=5.0,
-            n_workers=args.bootstrap_workers,
+            # Force sequential bootstrap.  Parallel bootstrap workers
+            # spawn fresh NEURON processes that have proven unreliable
+            # on this cluster (see previous run history).  Sequential
+            # bootstrap reuses fit_result.neuron_cell directly and stays
+            # safe.
+            n_workers=1,
         )
 
         GP_KWARGS = dict(
@@ -6518,10 +6558,36 @@ if __name__ == "__main__":
         failed_ids = []
 
         for i, (fr, cd) in enumerate(zip(results, cells_data)):
-            if fr.neuron_cell is None:
+            # Skip cells whose Phase 2 fit didn't produce a usable result.
+            if fr.validation_status not in ("good", "to_refine"):
+                continue
+            if fr.gp_result is None:
                 continue
 
-            # Build bootstrap_kwargs for the chosen mode
+            print(f"\n=== Phase 3 — cell {fr.specimen_id} "
+                  f"({i + 1}/{len(results)}) ===")
+
+            # ── 1. Build this cell's NEURON model fresh ──────────────
+            pc = None
+            try:
+                pc = build_neuron_model(cd.swc_path, F=float(fr.F))
+                pc.set_passive(fr.cm_uF_per_cm2, fr.rm_Ohm_cm2, fr.ra_Ohm_cm)
+                pc.set_e_pas(fr.v_rest_mV)
+                fr.neuron_cell = pc
+            except Exception as e:
+                print(f"[Phase 3] specimen {fr.specimen_id} "
+                      f"failed to build NEURON model: "
+                      f"{type(e).__name__}: {e}")
+                failed_ids.append(int(fr.specimen_id))
+                if pc is not None:
+                    try:
+                        pc.destroy()
+                    except Exception:
+                        pass
+                fr.neuron_cell = None
+                continue
+
+            # ── 2. Build bootstrap kwargs ────────────────────────────
             if args.bootstrap_mode == "parametric":
                 boot_kw = {
                     **COMMON_KWARGS,
@@ -6543,6 +6609,7 @@ if __name__ == "__main__":
                     "seed": i,
                 }
 
+            # ── 3. Run bootstrap + GP diagnostic, save bundle ────────
             try:
                 p3 = phase3_full_for_cell(
                     fit_result=fr,
@@ -6561,10 +6628,16 @@ if __name__ == "__main__":
                     root_dir=PHASE3_ROOT,
                     verbose=True,
                 )
-
             except Exception as exc:
                 print(f"[Phase 3] specimen {fr.specimen_id} failed: {exc}")
                 failed_ids.append(int(fr.specimen_id))
+            finally:
+                # ── 4. Tear down before next iteration ───────────────
+                try:
+                    pc.destroy()
+                except Exception:
+                    pass
+                fr.neuron_cell = None
 
         # ── Population CI table ──
         if phase3_results:
