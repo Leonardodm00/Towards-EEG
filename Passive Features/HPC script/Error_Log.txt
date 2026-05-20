@@ -1,4 +1,3 @@
-
 --No graphics will be displayed.
 Warning: no DISPLAY environment variable.
 --No graphics will be displayed.
@@ -30,44 +29,39 @@ Warning: no DISPLAY environment variable.
 --No graphics will be displayed.
 Warning: no DISPLAY environment variable.
 --No graphics will be displayed.
-Warning: no DISPLAY environment variable.
---No graphics will be displayed.
-Warning: no DISPLAY environment variable.
---No graphics will be displayed.
-Warning: no DISPLAY environment variable.
---No graphics will be displayed.
-Warning: no DISPLAY environment variable.
---No graphics will be displayed.
-Warning: no DISPLAY environment variable.
---No graphics will be displayed.
-Warning: no DISPLAY environment variable.
---No graphics will be displayed.
-Warning: no DISPLAY environment variable.
---No graphics will be displayed.
-Warning: no DISPLAY environment variable.
---No graphics will be displayed.
-Warning: no DISPLAY environment variable.
---No graphics will be displayed.
-Warning: no DISPLAY environment variable.
---No graphics will be displayed.
-Warning: no DISPLAY environment variable.
---No graphics will be displayed.
-Warning: no DISPLAY environment variable.
---No graphics will be displayed.
-Warning: no DISPLAY environment variable.
---No graphics will be displayed.
-Warning: no DISPLAY environment variable.
---No graphics will be displayed.
-Traceback (most recent call last):
-  File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 6407, in <module>
-    df, results = fit_cells(
-                  ^^^^^^^^^^
-  File "/davinci-1/home/ldellamea/./passive_fitting_hpc.py", line 3185, in fit_cells
-    for i, r in enumerate(pool.imap_unordered(_fit_worker, args_list)):
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/davinci-1/home/ldellamea/.conda/envs/prova/lib/python3.12/multiprocessing/pool.py", line 873, in next
-    raise value
-multiprocessing.pool.MaybeEncodingError: Error sending result: 'PassiveFitResult(specimen_id=525133308, layer='2', dendrite_t$
-
-
-
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.462, log_Rm=9.78, $
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.468, log_Rm=9.77, $
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.467, log_Rm=9.75, $
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.527, log_Rm=9.83, $
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.399, log_Rm=9.75, $
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.946, log_Rm=9.78, $
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.83, log_Rm=9.77, l$
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.91, log_Rm=9.75, l$
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.967, log_Rm=9.83, $
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=1.01, log_Rm=9.75, l$
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.5, log_Rm=9.78, lo$
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.545, log_Rm=9.78, $
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.454, log_Rm=9.76, $
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.45, log_Rm=9.77, l$
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.527, log_Rm=9.79, $
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.888, log_Rm=9.78, $
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.856, log_Rm=9.77, $
+  warnings.warn(f"Loss evaluation crashed at "
+/davinci-1/home/ldellamea/./passive_fitting_hpc.py:2689: UserWarning: Loss evaluation crashed at (log_Cm=0.963, log_Rm=9.72, $
+  warnings.warn(f"Loss evaluation crashed at "
