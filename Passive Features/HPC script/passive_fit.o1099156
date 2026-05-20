@@ -1,0 +1,45 @@
+Running on node:       dvnode001
+Job ID:                1099156.pbsserver01
+Working dir:           /davinci-1/home/ldellamea
+Python:                /davinci-1/home/ldellamea/.conda/envs/prova/bin/python3
+Conda env:             prova
+Archive dir:           .
+Output dir:            ./pipeline_outputs
+Bootstrap workers:     10
+Bootstrap B:           10  (n_calls=10, n_initial=5)
+-----------------------------------------
+
+============================================================
+  PHASE 1 — Loading data from archive
+============================================================
+
+[load_archive] === specimen_508421103 ===
+[load_archive]   Long Square bundles: 5 ([-10, -30, -50, -70, -90] pA)
+[load_archive] specimen 508421103: 6 SS bundles (38 dep + 36 hyp pulses, n_avg_groups=3), 5 LS bundles, 74 individual pulses for bootstrap
+[load_archive]   Rin=218.5 MΩ  τm=31.2 ms  Vrest=-57.5 mV
+
+[load_archive] === specimen_525133308 ===
+[load_archive]   Long Square bundles: 3 ([-30, -70, -90] pA)
+[load_archive] specimen 525133308: 6 SS bundles (38 dep + 36 hyp pulses, n_avg_groups=3), 3 LS bundles, 74 individual pulses for bootstrap
+[load_archive]   Rin=228.7 MΩ  τm=27.8 ms  Vrest=-63.8 mV
+
+[load_archive] === specimen_526714733 ===
+[load_archive]   Long Square bundles: 2 ([-50, -70] pA)
+[load_archive] specimen 526714733: 6 SS bundles (38 dep + 36 hyp pulses, n_avg_groups=3), 2 LS bundles, 74 individual pulses for bootstrap
+[load_archive]   Rin=71.2 MΩ  τm=21.5 ms  Vrest=-61.1 mV
+
+[load_archive] === specimen_528706755 ===
+[load_archive]   Long Square bundles: 3 ([-50, -70, -90] pA)
+[load_archive] specimen 528706755: 6 SS bundles (38 dep + 36 hyp pulses, n_avg_groups=3), 3 LS bundles, 74 individual pulses for bootstrap
+[load_archive]   Rin=54.0 MΩ  τm=33.7 ms  Vrest=-58.5 mV
+
+[load_archive] === specimen_537204107 ===
+[load_archive]   Long Square bundles: 5 ([-10, -30, -50, -70, -90] pA)
+[load_archive] specimen 537204107: 6 SS bundles (38 dep + 36 hyp pulses, n_avg_groups=3), 5 LS bundles, 74 individual pulses for bootstrap
+[load_archive]   Rin=57.1 MΩ  τm=19.5 ms  Vrest=-50.6 mV
+
+[load_archive] loaded 5 cell(s), skipped/failed 0
+
+============================================================
+  PHASE 2 — Bayesian optimisation
+============================================================
