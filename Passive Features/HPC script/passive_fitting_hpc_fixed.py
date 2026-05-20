@@ -3095,6 +3095,15 @@ def _fit_worker(args) -> PassiveFitResult:
     # Drop the un-picklable NEURON cell before the result crosses the
     # process boundary.  gp_result and opt_inputs are left intact.
     r.neuron_cell = None
+
+    # gp_result.specs holds the original gp_minimize call args, which
+    # include the objective function — a closure that cannot be pickled
+    # across a 'spawn' process boundary.  Clear it.  The trained GP
+    # (gp_result.models[-1]) and search space (gp_result.space) are
+    # picklable and remain available for Phase 3's GP diagnostic.
+    if r.gp_result is not None and hasattr(r.gp_result, "specs"):
+        r.gp_result.specs = {}
+
     return r
 
 
