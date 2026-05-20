@@ -1525,13 +1525,34 @@ class PassiveCell:
 
     # ---- Construction helpers ---------------------------------------------
     def _import_swc(self) -> None:
+        # Snapshot every section that already exists in NEURON's global list
+        # BEFORE we import this cell's SWC.  Anything that appears in
+        # ``h.allsec()`` after the import that wasn't there before is, by
+        # construction, a section this PassiveCell instance just created.
+        # Recording these ids is what lets ``_categorise_sections`` refuse
+        # to harvest sections that belong to a different cell living in
+        # the same Python process (e.g. during Phase 3's sequential
+        # rebuild in the main process).
+        pre = {id(s) for s in h.allsec()}
         reader = h.Import3d_SWC_read()
         reader.input(str(self.swc_path))
         gui = h.Import3d_GUI(reader, 0)
         gui.instantiate(None)
+        self._own_ids = {id(s) for s in h.allsec()} - pre
 
     def _categorise_sections(self) -> None:
         for sec in h.allsec():
+            # Skip sections that don't belong to this instance.  Without
+            # this guard, when two cells coexist in the same process
+            # cell B's categorisation would scoop up cell A's sections
+            # into cell B's lists, and cell B's _replace_axon_hay_stub
+            # would later h.delete_section() cell A's axons — leaving
+            # cell A's self.axon full of stale Python handles that raise
+            # ``ReferenceError: can't access a deleted section`` the next
+            # time cell A is used.  See _import_swc for how _own_ids is
+            # built.
+            if id(sec) not in self._own_ids:
+                continue
             n = sec.name().lower()
             if "soma" in n:
                 self.soma.append(sec)
