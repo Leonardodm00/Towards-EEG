@@ -33,7 +33,7 @@ SKIP_PHASE3=0              # 1 = skip Phase 3, 0 = run it
 BOOTSTRAP_B=10             # Number of bootstrap replicates
 BOOTSTRAP_MODE="nonparametric"   # parametric | nonparametric
 NOISE_MODE="block"               # iid | ar1 | block (parametric only)
-BOOTSTRAP_WORKERS=8        # Parallel workers for the bootstrap loop
+BOOTSTRAP_WORKERS=""       # Parallel workers for the bootstrap loop (empty = auto-detect)
 BOOTSTRAP_N_CALLS=100      # GP budget PER bootstrap replicate
 BOOTSTRAP_N_INITIAL=50     # Random initial points PER bootstrap replicate
 # ────────────────────────────────────────────────────────────────────────
@@ -76,7 +76,6 @@ ARGS=(
     --bootstrap-B          "$BOOTSTRAP_B"
     --bootstrap-mode       "$BOOTSTRAP_MODE"
     --noise-mode           "$NOISE_MODE"
-    --bootstrap-workers    "$BOOTSTRAP_WORKERS"
     --bootstrap-n-calls    "$BOOTSTRAP_N_CALLS"
     --bootstrap-n-initial  "$BOOTSTRAP_N_INITIAL"
 )
@@ -84,6 +83,11 @@ ARGS=(
 # Optional Phase 2 workers override
 if [ -n "$N_WORKERS" ]; then
     ARGS+=(--n-workers "$N_WORKERS")
+fi
+
+# Optional bootstrap workers override
+if [ -n "$BOOTSTRAP_WORKERS" ]; then
+    ARGS+=(--bootstrap-workers "$BOOTSTRAP_WORKERS")
 fi
 
 # Optional skip Phase 3
