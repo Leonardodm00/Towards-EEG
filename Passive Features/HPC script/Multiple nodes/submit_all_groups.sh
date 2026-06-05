@@ -41,23 +41,23 @@ DEFAULT_GROUPS=(
 F_FACTOR_DEFAULT=1.9
 declare -A F_PER_GROUP=(
     [L2_exc]=1.9
-    [L2_inh]=1
+    [L2_inh]=1.9
     [L3_exc]=1.9
-    [L3_inh]=1
+    [L3_inh]=1.9
     [L4_exc]=1.9
-    [L4_inh]=1
+    [L4_inh]=1.9
     [L5_exc]=2.0
-    [L5_inh]=1
+    [L5_inh]=2.0
     [L6_exc]=2.0
-    [L6_inh]=1
+    [L6_inh]=2.0
 )
 # ────────────────────────────────────────────────────────────────────────
 
 # If groups were passed on the command line, use those; else use defaults.
 if [ "$#" -gt 0 ]; then
-    GROUPS=( "$@" )
+    SEL_GROUPS=( "$@" )
 else
-    GROUPS=( "${DEFAULT_GROUPS[@]}" )
+    SEL_GROUPS=( "${DEFAULT_GROUPS[@]}" )
 fi
 
 if [ ! -f "$SUBMIT_SCRIPT" ]; then
@@ -65,14 +65,14 @@ if [ ! -f "$SUBMIT_SCRIPT" ]; then
     exit 1
 fi
 
-echo "Submitting ${#GROUPS[@]} group(s) — one PBS job each."
+echo "Submitting ${#SEL_GROUPS[@]} group(s) — one PBS job each."
 echo "Archive root:  $ARCHIVE_ROOT"
 echo "Submit script: $SUBMIT_SCRIPT"
 echo "----------------------------------------"
 
 n_ok=0
 n_skip=0
-for g in "${GROUPS[@]}"; do
+for g in "${SEL_GROUPS[@]}"; do
     if [ ! -d "$ARCHIVE_ROOT/$g" ]; then
         echo "[skip] $g — directory does not exist: $ARCHIVE_ROOT/$g"
         n_skip=$((n_skip + 1))
