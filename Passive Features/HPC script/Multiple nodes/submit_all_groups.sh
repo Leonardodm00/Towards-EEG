@@ -18,8 +18,8 @@
 # ─── USER CONFIG ────────────────────────────────────────────────────────
 # Must match ARCHIVE_ROOT inside submit_passive_fit.sh — used here only to
 # sanity-check that each group directory exists before we waste a qsub.
-ARCHIVE_ROOT="$HOME/path/to/phase0_archive"   # <-- CHANGE ME (mirror of submit_passive_fit.sh)
-SUBMIT_SCRIPT="$HOME/submit_passive_fit.sh"   # <-- CHANGE ME if different
+ARCHIVE_ROOT="/davinci-1/home/ldellamea/Human Neurons Fitting"
+SUBMIT_SCRIPT="/davinci-1/home/ldellamea/Human Neurons Fitting/submit_passive_fit.sh"
 
 # Default list of groups to submit when no CLI args are given.
 # Comment out any you don't want to run.
@@ -28,12 +28,12 @@ DEFAULT_GROUPS=(
     L2_inh
     L3_exc
     L3_inh
-    # L4_exc
-    # L4_inh
-    # L5_exc
-    # L5_inh
-    # L6_exc
-    # L6_inh
+    L4_exc
+    L4_inh
+    L5_exc
+    L5_inh
+    L6_exc
+    L6_inh
 )
 
 # Per-group spine-area correction factor F (Eyal-style scaling).
@@ -41,15 +41,15 @@ DEFAULT_GROUPS=(
 F_FACTOR_DEFAULT=1.9
 declare -A F_PER_GROUP=(
     [L2_exc]=1.9
-    [L2_inh]=1.9
+    [L2_inh]=1
     [L3_exc]=1.9
-    [L3_inh]=1.9
+    [L3_inh]=1
     [L4_exc]=1.9
-    [L4_inh]=1.9
+    [L4_inh]=1
     [L5_exc]=2.0
-    [L5_inh]=2.0
+    [L5_inh]=1
     [L6_exc]=2.0
-    [L6_inh]=2.0
+    [L6_inh]=1
 )
 # ────────────────────────────────────────────────────────────────────────
 
