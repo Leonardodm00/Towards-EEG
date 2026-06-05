@@ -33,9 +33,9 @@
 # Absolute paths are recommended (jobs don't always inherit $PWD).
 # The actual archive/output dirs used by the job are <ROOT>/<GROUP>.
 
-ARCHIVE_ROOT="$HOME/path/to/phase0_archive"   # <-- CHANGE ME
-OUTPUT_ROOT="$HOME/path/to/pipeline_outputs"  # <-- CHANGE ME
-SCRIPT_PATH="$HOME/passive_fitting_hpc.py"    # <-- CHANGE ME if different
+ARCHIVE_ROOT="/davinci-1/home/ldellamea/Human Neurons Fitting"
+OUTPUT_ROOT="/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs"
+SCRIPT_PATH="/davinci-1/home/ldellamea/Human Neurons Fitting/passive_fitting_hpc_fixed.py"
 
 # ─── Phase 1 / Phase 2 parameters ───────────────────────────────────────
 N_AVG_GROUPS=3          # sweep-average groups per polarity
