@@ -3446,8 +3446,10 @@ class Phase2p5CellResult:
     cm_rail_after: bool
     rm_rail_after: bool
 
-    # Phase 2.5 status (re-classified at the fixed Ra; see _classify_fit reuse)
-    status_2p5: str
+    # Phase 2.5 is training-only and cannot produce a validation verdict.
+    # refit_ok = the 2-D refit succeeded (finite Cm,Rm, no error, no blow-up).
+    # The good/to_refine/failed validation status belongs to Phase 3.
+    refit_ok: bool
     # Set True when train RMSD materially worsens after fixing Ra -> the
     # falsification signal that the cell's DATA are bad, not just its search.
     train_rmsd_blewup: bool
@@ -3800,11 +3802,16 @@ def run_phase2p5_for_group(
     n_calls: int = 100,
     n_initial: int = 50,
     acq_func: str = "gp_hedge",
+    # train_rmsd_fail_mV + blowup_factor define the bad-data falsification test
+    # (train RMSD blows up past `blowup_factor`x and exceeds the absolute floor).
+    train_rmsd_fail_mV: float = 2.0,
+    blowup_factor: float = 3.0,
+    # DEPRECATED no-ops: Phase 2.5 no longer emits a validation-style verdict
+    # (it has no validation pass; see refit_ok).  Retained only so existing
+    # callers that pass these keywords do not break.
     k_good: float = 3.0,
     k_fail: float = 10.0,
-    train_rmsd_fail_mV: float = 2.0,
     valid_rmsd_good_mV: float = 0.2,
-    blowup_factor: float = 3.0,
     make_plots: bool = True,
     seed: int = 0,
     verbose: bool = True,
@@ -3978,13 +3985,18 @@ def run_phase2p5_for_group(
             and train_after > train_rmsd_fail_mV
         )
 
-        # Re-classify at the fixed Ra.  We have no fresh validation pass here
-        # (Stage A is training-only), so feed valid=NaN and lean on the
-        # absolute train ceiling; status is "good" if the train fit is fine.
-        status_2p5 = _classify_fit(
-            train_after, float("nan"),
-            k_good, k_fail, train_rmsd_fail_mV,
-            valid_rmsd_good_mV=valid_rmsd_good_mV,
+        # Phase 2.5 is training-only: it has NO validation pass, so it cannot
+        # emit a good/to_refine/failed verdict (that needs held-out data, and
+        # belongs to Phase 3).  The only thing 2.5 can honestly assert is
+        # whether the 2-D refit succeeded: finite (Cm, Rm), no error, and the
+        # training fit did not blow up when Ra was fixed.  `refit_ok=False`
+        # therefore flags exactly the cells worth inspecting (refit failure or
+        # the bad-data falsification signal), not Ih-driven validation misses.
+        refit_ok = bool(
+            (not err)
+            and np.isfinite(cm_after) and np.isfinite(rm_after)
+            and np.isfinite(train_after)
+            and not blewup
         )
 
         cell_results.append(Phase2p5CellResult(
@@ -3998,7 +4010,7 @@ def run_phase2p5_for_group(
             train_rmsd_before=train_before, train_rmsd_after=train_after,
             d_train_rmsd=d_train,
             cm_rail_after=cm_rail, rm_rail_after=rm_rail,
-            status_2p5=status_2p5, train_rmsd_blewup=blewup,
+            refit_ok=refit_ok, train_rmsd_blewup=blewup,
             error_message=err,
         ))
 
@@ -5378,9 +5390,32 @@ def bootstrap_ci_for_cell(
             print(f"[bootstrap]   noise_mode={noise_mode}  "
                   f"σ_residual={sigma_res:.5f} mV  ρ_residual={rho_res:.3f}")
         else:
+            # Pulse-pool diversity / effective-N sanity check.
+            # The nonparametric bootstrap resamples whole pulses with
+            # replacement, which preserves WITHIN-trace autocorrelation but
+            # assumes pulses are independent draws.  Pulses sharing a
+            # (polarity, amplitude) come from the same protocol step and are
+            # NOT independent, so the number of distinct (polarity, |amp|)
+            # clusters is a coarse upper bound on the effective number of
+            # independent units — if it is small (e.g. <= 5), iid-pulse CIs
+            # will be optimistic and whole-sweep resampling should be
+            # considered.  (Per-pulse sweep IDs are not retained in the pool,
+            # so amplitude is the finest available grouping.)
+            _clusters: Dict[Tuple[str, int], int] = {}
+            for _w in pulse_pool:
+                _key = (str(_w.get("polarity", "?")),
+                        int(round(float(_w.get("peak_pA", 0.0)))))
+                _clusters[_key] = _clusters.get(_key, 0) + 1
+            _n_clusters = len(_clusters)
+            _sizes = sorted(_clusters.values(), reverse=True)
             print(f"[bootstrap]   pulse_pool={len(pulse_pool)} pulses  "
                   f"n_pulses_per_replicate={n_pulses_per_replicate}  "
                   f"n_avg_groups={n_avg_groups_bootstrap}")
+            print(f"[bootstrap]   pool diversity: {_n_clusters} distinct "
+                  f"(polarity, amplitude) clusters; pulses/cluster={_sizes}"
+                  + ("   [WARNING: few independent units -> iid-pulse CIs "
+                     "may be optimistic; consider whole-sweep resampling]"
+                     if _n_clusters <= 5 else ""))
         print(f"[bootstrap]   MLE: Cm={mle_phys[0]:.4g}, "
               f"Rm={mle_phys[1]:.4g}, Ra={mle_phys[2]:.4g}  "
               f"RMSD_MLE={fit_result.train_rmsd_mV:.5f} mV")
