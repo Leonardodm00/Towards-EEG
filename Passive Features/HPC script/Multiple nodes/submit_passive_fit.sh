@@ -55,6 +55,24 @@ BOOTSTRAP_MODE="nonparametric"   # parametric | nonparametric
 NOISE_MODE="block"               # iid | ar1 | block  (parametric only)
 BOOTSTRAP_N_CALLS=40             # GP budget per bootstrap replicate
 BOOTSTRAP_N_INITIAL=20           # random initial points per bootstrap replicate
+
+# ─── Phase 2.5 parameters (fix Ra per group + refit Cm,Rm) ───────────────
+# Phase 2.5 is a MANDATORY stage and runs by default. It profiles RMSD-vs-Ra
+# for every cell, fixes Ra at the cohort median of the per-cell profile
+# argmins (or a literature value if too few cells qualify), then refits
+# (Cm, Rm) at that single fixed Ra. Phase 3's bootstrap then fixes Ra
+# (2-D over Cm,Rm) automatically — this is NOT a separate switch: it is tied
+# to whether Phase 2.5 ran. Set SKIP_PHASE2P5=1 ONLY for a diagnostic run
+# that reproduces the legacy free-Ra behaviour (Ra stays free in Phase 2's
+# fit AND Phase 3 reverts to a full 3-D bootstrap).
+#
+# All three are `-v`-overridable from the wrapper (like F_FACTOR), e.g.
+#     qsub -v GROUP=L4_exc,N_FLOOR=3 submit_passive_fit.sh
+# The values below are the fallbacks used when no override is supplied.
+SKIP_PHASE2P5="${SKIP_PHASE2P5:-0}"   # 1 = skip Phase 2.5 (legacy free-Ra)
+N_FLOOR="${N_FLOOR:-4}"               # min qualifying cells for cohort-median Ra;
+                                      #   below this -> per-(layer,type) literature fallback
+N_RA_PROFILE="${N_RA_PROFILE:-50}"    # Ra grid points for the RMSD-vs-Ra profile (log-spaced)
 # ────────────────────────────────────────────────────────────────────────
 
 # ─── Resolve per-job paths from $GROUP ──────────────────────────────────
@@ -103,6 +121,11 @@ echo "Output root:            $OUTPUT_ROOT"
 echo "Output dir (this job):  $OUTPUT_DIR"
 echo "Fit target:             $FIT_TARGET  (F=$F_FACTOR)"
 echo "Phase 2:                n_calls=$N_CALLS  n_initial=$N_INITIAL  [sequential]"
+if [ "$SKIP_PHASE2P5" = "1" ]; then
+    echo "Phase 2.5:              SKIPPED (legacy free-Ra; Phase 3 = full 3-D bootstrap)"
+else
+    echo "Phase 2.5:              ON  n_floor=$N_FLOOR  n_ra_profile=$N_RA_PROFILE  (Ra fixed -> Phase 3 = 2-D Cm,Rm)"
+fi
 echo "Bootstrap:              B=$BOOTSTRAP_B  mode=$BOOTSTRAP_MODE  n_calls=$BOOTSTRAP_N_CALLS  n_initial=$BOOTSTRAP_N_INITIAL  [sequential]"
 echo "-----------------------------------------"
 
@@ -115,6 +138,8 @@ ARGS=(
     --F                   "$F_FACTOR"
     --n-calls             "$N_CALLS"
     --n-initial           "$N_INITIAL"
+    --n-floor             "$N_FLOOR"
+    --n-ra-profile        "$N_RA_PROFILE"
     --bootstrap-B         "$BOOTSTRAP_B"
     --bootstrap-mode      "$BOOTSTRAP_MODE"
     --noise-mode          "$NOISE_MODE"
@@ -125,6 +150,11 @@ ARGS=(
 # Optional: cap the number of cells processed (useful for test runs)
 if [ -n "$MAX_CELLS" ]; then
     ARGS+=(--max-cells "$MAX_CELLS")
+fi
+
+# Optional: skip Phase 2.5 (diagnostic legacy free-Ra run)
+if [ "$SKIP_PHASE2P5" = "1" ]; then
+    ARGS+=(--skip-phase2p5)
 fi
 
 # Optional: skip Phase 3 entirely
