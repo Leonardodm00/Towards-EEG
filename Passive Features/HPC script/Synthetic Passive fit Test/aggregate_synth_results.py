@@ -22,11 +22,10 @@ Notation (units carried; the 1e-3 in tau_m is explicit)
     <param>_ratio = recovered / injected           (1.0 == perfect)
     <param>_dex   = log10(<param>_ratio)            (0.0 == perfect; +-bias in dex)
 """
-from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -95,7 +94,7 @@ def _safe_bins(v, target: int = 15):
 _RECOVERED_PREFERENCE = ("phase2p5_combined_results.csv", "phase2_results.csv")
 
 
-def load_recovered(output_root: Path | str) -> pd.DataFrame:
+def load_recovered(output_root: Union[Path, str]) -> pd.DataFrame:
     """Concatenate the best-available per-cohort recovered table (prefers the
     post-Phase-2.5 combined file), tagging each row with its cohort dir name and
     merging tau_w_choice.csv when present."""
@@ -120,7 +119,7 @@ def load_recovered(output_root: Path | str) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
-def load_phase3(output_root: Path | str) -> pd.DataFrame:
+def load_phase3(output_root: Union[Path, str]) -> pd.DataFrame:
     """Concatenate phase3_full_summary.csv (long: one row per cell x parameter).
     Empty frame if Phase 3 was not run anywhere."""
     output_root = Path(output_root)
@@ -128,7 +127,7 @@ def load_phase3(output_root: Path | str) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
-def load_generated_meta(archive_root: Optional[Path | str]) -> pd.DataFrame:
+def load_generated_meta(archive_root: Optional[Union[Path, str]]) -> pd.DataFrame:
     """Optional: per-cell measured rin/sag from generation (archive side)."""
     if archive_root is None:
         return pd.DataFrame()
