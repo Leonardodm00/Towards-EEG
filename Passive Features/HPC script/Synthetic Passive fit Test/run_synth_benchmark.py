@@ -23,7 +23,6 @@ Heavy deps (neuron, the monolith, the generator) are imported INSIDE main() so
 the pure helpers below import without NEURON and are unit-tested by
 smoke_run_synth_benchmark.py.
 """
-from __future__ import annotations
 
 import argparse
 import dataclasses
