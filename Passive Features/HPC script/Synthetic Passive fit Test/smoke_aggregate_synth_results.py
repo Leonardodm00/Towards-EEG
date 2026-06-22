@@ -9,7 +9,6 @@ coverage maths (build_summary, build_coverage) AND an end-to-end render check
 
 Run:  python smoke_aggregate_synth_results.py
 """
-from __future__ import annotations
 
 import tempfile
 from pathlib import Path
