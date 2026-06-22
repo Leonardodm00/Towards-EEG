@@ -27,11 +27,10 @@ Factory choice (mirrors the Colab):
     I_h / active present                        -> None (the bundled cell that
                                                    can host I_h / active mechs)
 """
-from __future__ import annotations
 
 import dataclasses
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import Callable, Dict, List, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -114,7 +113,7 @@ def build_proto(sgt, *, ss_n_repeats: int, ls_hyp_amplitudes_pA: Sequence[float]
 # ===========================================================================
 def generate_group(
     group_df: pd.DataFrame,
-    archive_dir: Path | str,
+    archive_dir: Union[Path, str],
     *,
     sgt,                         # synthetic_ground_truth module
     mono,                        # passive_fitting_hpc_fixed module (build_neuron_model)
