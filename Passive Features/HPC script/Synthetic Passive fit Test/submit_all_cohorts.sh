@@ -11,25 +11,28 @@
 # job sees the same draws; the per-cohort jobs only READ their slice.
 ##########################################################################
 
-set -euo pipefail
+set -uo pipefail      # -u: catch typos in variable names
+                      # pipefail: catch errors inside pipes
+                      # NOTE: -e intentionally omitted; every step has an
+                      #       explicit || guard so failures print clearly.
 
 # ─── USER CONFIG ────────────────────────────────────────────────────────
-CODE_DIR="/davinci-1/home/ldellamea/Human Neurons Fitting/synthetic_benchmark"
+CODE_DIR="/davinci-1/home/ldellamea/Human Neurons Fitting/Synthetic Test"
 MANIFEST="$CODE_DIR/manifest.csv"
 JOB_SCRIPT="$CODE_DIR/submit_synth_benchmark.sh"
 
 # Morphology pool (real reconstructions to simulate on):
-MORPH_ROOT="/davinci-1/home/ldellamea/Human Neurons Fitting/Morphologies"
-MORPH_GLOB="specimen_*/reconstruction.swc"   # or "*.swc" for a flat folder
+MORPH_ROOT="/davinci-1/home/ldellamea/Human Neurons Fitting/L3_exc"
+MORPH_GLOB="specimen_*/reconstruction.swc"
 
 # ─── Manifest design (see synth_gt_grid.py) ─────────────────────────────
 SEED=0
-DRAWS_PER_MORPH=2          # GT draws per morphology (n_cells = n_morph * this)
-CELLS_PER_COHORT=10        # cohort size = PBS job size = Phase-2.5 unit (>= N_FLOOR)
-RA_MODE="per_cohort"       # per_cohort (Phase-2.5-coherent) | per_cell (stress test)
+DRAWS_PER_MORPH=2          # GT draws per morphology
+CELLS_PER_COHORT=10        # cohort size = PBS job size = Phase-2.5 unit
+RA_MODE="per_cohort"       # per_cohort | per_cell (stress test)
 E_PAS=-70.0
 F_FACTOR=1.9
-MAX_CELLS=""               # empty = all (n_morph * DRAWS_PER_MORPH)
+MAX_CELLS=""               # empty = all cells; set e.g. "4" for a dry run
 
 # Per-cell variability:
 IH_GIHBAR=2e-4             # nominal I_h maximal conductance [S/cm^2]
@@ -43,40 +46,64 @@ NOISE_CV=0.3               # log-normal CV of the per-cell noise level
 USE_IH=1                   # 1 = inject I_h (default); 0 = passive baseline
 # ────────────────────────────────────────────────────────────────────────
 
-cd "$CODE_DIR"
+cd "$CODE_DIR" \
+    || { echo "[FATAL] cannot cd to CODE_DIR: $CODE_DIR" >&2; exit 1; }
 
-# ─── 1) Build the manifest once (idempotent: skip if present) ───────────
+# ─── 1) Build the manifest once (idempotent: skip if already present) ───
 if [ ! -f "$MANIFEST" ]; then
     echo "[fanout] building manifest -> $MANIFEST"
     ARGS=(
-        --morph-root "$MORPH_ROOT" --morph-glob "$MORPH_GLOB"
-        --out "$MANIFEST" --seed "$SEED"
-        --draws-per-morph "$DRAWS_PER_MORPH"
-        --cells-per-cohort "$CELLS_PER_COHORT" --ra-mode "$RA_MODE"
-        --e-pas "$E_PAS" --F "$F_FACTOR"
-        --ih-gihbar "$IH_GIHBAR" --ih-gihbar-cv "$IH_GIHBAR_CV"
-        --ih-ehcn "$IH_EHCN" --ih-dist "$IH_DIST"
-        --noise-sigma "$NOISE_SIGMA" --noise-baseline "$NOISE_BASELINE"
-        --noise-drift "$NOISE_DRIFT" --noise-cv "$NOISE_CV"
+        --morph-root  "$MORPH_ROOT"
+        --morph-glob  "$MORPH_GLOB"
+        --out         "$MANIFEST"
+        --seed        "$SEED"
+        --draws-per-morph  "$DRAWS_PER_MORPH"
+        --cells-per-cohort "$CELLS_PER_COHORT"
+        --ra-mode     "$RA_MODE"
+        --e-pas       "$E_PAS"
+        --F           "$F_FACTOR"
+        --ih-gihbar   "$IH_GIHBAR"
+        --ih-gihbar-cv "$IH_GIHBAR_CV"
+        --ih-ehcn     "$IH_EHCN"
+        --ih-dist     "$IH_DIST"
+        --noise-sigma    "$NOISE_SIGMA"
+        --noise-baseline "$NOISE_BASELINE"
+        --noise-drift    "$NOISE_DRIFT"
+        --noise-cv    "$NOISE_CV"
     )
     [ -n "$MAX_CELLS" ] && ARGS+=(--max-cells "$MAX_CELLS")
     [ "$USE_IH" = "0" ] && ARGS+=(--no-ih)
-    python3 synth_gt_grid.py "${ARGS[@]}"
+    python synth_gt_grid.py "${ARGS[@]}" \
+        || { echo "[FATAL] synth_gt_grid.py failed" >&2; exit 1; }
 else
-    echo "[fanout] manifest exists, reusing: $MANIFEST"
+    echo "[fanout] manifest exists, reusing -> $MANIFEST"
     echo "         (delete it to redraw with new settings)"
 fi
 
-# ─── 2) Read the unique cohort labels from the manifest ─────────────────
-GROUPS=$(python3 -c "import pandas as pd; print(' '.join(sorted(pd.read_csv(r'''$MANIFEST''')['group'].unique())))")
-if [ -z "$GROUPS" ]; then
-    echo "[FATAL] no cohorts found in $MANIFEST" >&2; exit 1
-fi
-echo "[fanout] cohorts to submit: $GROUPS"
+# ─── 2) Read unique cohort labels from the manifest ─────────────────────
+# Use sys.argv[1] via a heredoc so the path is passed as a real shell
+# argument — this is robust to spaces in CODE_DIR / MANIFEST.
+echo "[fanout] reading cohort labels..."
+GROUPS=$(python - "$MANIFEST" <<'PYEOF'
+import sys
+import pandas as pd
+m = pd.read_csv(sys.argv[1])
+print(' '.join(sorted(m['group'].unique())))
+PYEOF
+) || { echo "[FATAL] failed to read cohort labels from $MANIFEST" >&2; exit 1; }
 
-# ─── 3) One job per cohort ──────────────────────────────────────────────
+if [ -z "$GROUPS" ]; then
+    echo "[FATAL] manifest has no 'group' column or no rows: $MANIFEST" >&2
+    exit 1
+fi
+echo "[fanout] cohorts found: $GROUPS"
+
+# ─── 3) One PBS job per cohort ──────────────────────────────────────────
+N=0
 for g in $GROUPS; do
-    echo "[fanout] qsub -v GROUP=$g $JOB_SCRIPT"
-    qsub -v GROUP="$g" "$JOB_SCRIPT"
+    echo "[fanout] submitting GROUP=$g ..."
+    qsub -v GROUP="$g" "$JOB_SCRIPT" \
+        || { echo "[WARN] qsub failed for GROUP=$g — check qsub availability" >&2; }
+    N=$((N + 1))
 done
-echo "[fanout] submitted $(echo "$GROUPS" | wc -w) cohort job(s)."
+echo "[fanout] done — $N cohort job(s) submitted."
