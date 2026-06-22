@@ -41,11 +41,10 @@ Notation (units carried throughout; the 1e-3 in tau_m is written, not absorbed)
 ------------------------------------------------------------------------------
     tau_m = Rm * Cm * 1e-3   [ms]   (Ohm*uF -> ms)
 """
-from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -137,7 +136,7 @@ def assert_bounds_match_phase1(box: SearchBox = SearchBox()) -> None:
 #  Manifest builder
 # ===========================================================================
 def draw_manifest(
-    swc_paths: Sequence[Path | str],
+    swc_paths: Sequence[Union[Path, str]],
     *,
     draws_per_morph: int = 1,
     seed: int = 0,
@@ -264,12 +263,12 @@ def draw_manifest(
 # ===========================================================================
 #  I/O + per-job slicing
 # ===========================================================================
-def save_manifest(df: pd.DataFrame, path: Path | str) -> None:
+def save_manifest(df: pd.DataFrame, path: Union[Path, str]) -> None:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     df.reindex(columns=MANIFEST_COLUMNS).to_csv(path, index=False)
 
 
-def load_manifest(path: Path | str) -> pd.DataFrame:
+def load_manifest(path: Union[Path, str]) -> pd.DataFrame:
     df = pd.read_csv(path)
     miss = [c for c in MANIFEST_COLUMNS if c not in df.columns]
     if miss:
