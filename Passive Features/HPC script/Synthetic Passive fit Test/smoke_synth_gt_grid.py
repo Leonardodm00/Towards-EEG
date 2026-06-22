@@ -7,7 +7,6 @@ NEURON-free smoke test for synth_gt_grid.py v2. Two independent controls per
 property. Run:  python smoke_synth_gt_grid.py
 Expected tail:  [smoke] ALL CHECKS PASSED
 """
-from __future__ import annotations
 
 import tempfile
 from pathlib import Path
