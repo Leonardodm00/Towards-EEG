@@ -7,7 +7,6 @@ NEURON-free smoke test for the PURE helpers of run_synth_benchmark.py
 (tau_w winner selection, subset parsing, CLI list/window parsing, result
 serialisation). Two independent controls each. Run: python smoke_run_synth_benchmark.py
 """
-from __future__ import annotations
 
 from collections import namedtuple
 
