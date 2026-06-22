@@ -10,7 +10,6 @@ gen_from_manifest.py. Validates against real manifest rows from synth_gt_grid
 Run:  python smoke_gen_from_manifest.py
 Tail: [smoke] ALL CHECKS PASSED
 """
-from __future__ import annotations
 
 import numpy as np
 
