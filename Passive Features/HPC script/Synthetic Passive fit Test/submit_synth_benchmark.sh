@@ -32,11 +32,12 @@
 
 # ─── USER CONFIG ────────────────────────────────────────────────────────
 # Absolute paths recommended (jobs don't inherit $PWD reliably).
-CODE_DIR="/davinci-1/home/ldellamea/Human Neurons Fitting/synthetic_benchmark"
+CODE_DIR="/davinci-1/home/ldellamea/Human Neurons Fitting/Synthetic Test"
+CONDA_ENV="prova"                                 # conda env providing NEURON + python
 MANIFEST="$CODE_DIR/manifest.csv"                 # built once by submit_all_cohorts.sh
 ARCHIVE_ROOT="$CODE_DIR/synthetic_archive"        # generated archives: <ROOT>/<GROUP>/
 OUTPUT_ROOT="$CODE_DIR/synthetic_out"             # fit outputs:        <ROOT>/<GROUP>/
-ENTRYPOINT="$CODE_DIR/run_synth_benchmark.py"     # the Phase-2 Python driver (next deliverable)
+ENTRYPOINT="$CODE_DIR/run_synth_benchmark.py"     # the Phase-2 Python driver
 
 # The fitting/generation modules must be importable from $CODE_DIR:
 #   synth_gt_grid.py  cm_profile_sweep.py  synthetic_ground_truth.py
@@ -89,7 +90,7 @@ BOOTSTRAP_N_INITIAL=20
 # ────────────────────────────────────────────────────────────────────────
 
 # ─── Resolve per-job paths from $GROUP ──────────────────────────────────
-if [ -z "$GROUP" ]; then
+if [ -z "${GROUP:-}" ]; then
     echo "[FATAL] \$GROUP is not set. Submit with:" >&2
     echo "    qsub -v GROUP=<cohort_label> submit_synth_benchmark.sh" >&2
     echo "    e.g. qsub -v GROUP=cohort_0003 submit_synth_benchmark.sh" >&2
@@ -107,26 +108,43 @@ OUTPUT_DIR="$OUTPUT_ROOT/$GROUP"
 
 cd "$PBS_O_WORKDIR"
 
-# Load modules + conda env (source conda.sh in non-interactive shells)
-module load python3
-source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate prova
+# Activate the conda env (it supplies python, NEURON, and the C++ compiler
+# that nrnivmodl needs). There is NO 'python3' module on this cluster, so we
+# do NOT 'module load python3' — that line previously caused Lmod errors and
+# left nrnivmodl without a compiler.
+source "$(conda info --base)/etc/profile.d/conda.sh" \
+    || { echo "[FATAL] cannot source conda.sh" >&2; exit 5; }
+conda activate "$CONDA_ENV" \
+    || { echo "[FATAL] cannot activate conda env '$CONDA_ENV'" >&2; exit 5; }
 
 mkdir -p "$ARCHIVE_DIR" "$OUTPUT_DIR"
 
 # ─── Compile NEURON mechanisms for I_h generation (once per node/workdir) ─
-# The entrypoint runs from $CODE_DIR; NEURON auto-loads x86_64/ from there.
-if [ -d "$MOD_DIR" ] && [ ! -d "$CODE_DIR/x86_64" ]; then
-    echo "[mech] compiling .mod from $MOD_DIR"
+# Guard on the compiled binary (x86_64/special), NOT just the directory.
+# A directory can exist from a previous failed compilation and be empty/broken;
+# only the binary proves nrnivmodl succeeded. This prevents the "argument not a
+# density mechanism name" error caused by skipping recompilation after a
+# partial/failed first attempt.
+if [ -d "$MOD_DIR" ] && [ ! -x "$CODE_DIR/x86_64/special" ]; then
+    echo "[mech] compiling .mod files from $MOD_DIR ..."
+    # Remove any stale/partial x86_64/ left by a previous failed compilation.
+    rm -rf "$CODE_DIR/x86_64"
+    if ! command -v nrnivmodl >/dev/null 2>&1; then
+        echo "[FATAL] nrnivmodl not on PATH — is env '$CONDA_ENV' active?" >&2
+        exit 4
+    fi
     ( cd "$CODE_DIR" && nrnivmodl "$MOD_DIR" ) || {
-        echo "[FATAL] nrnivmodl failed — check $MOD_DIR/*.mod" >&2; exit 4; }
+        echo "[FATAL] nrnivmodl failed — check $MOD_DIR/*.mod and that the" >&2
+        echo "        conda env '$CONDA_ENV' provides the C++ compiler." >&2
+        exit 4; }
+    echo "[mech] compiled OK -> $CODE_DIR/x86_64/special"
 fi
 
 # Sanity prints
 echo "Running on node:        $(hostname)"
 echo "Job ID:                 $PBS_JOBID"
 echo "Cohort ($GROUP):        $GROUP"
-echo "Python:                 $(which python3)   | conda: $CONDA_DEFAULT_ENV"
+echo "Python:                 $(which python)   | conda: $CONDA_DEFAULT_ENV"
 echo "Entrypoint:             $ENTRYPOINT"
 echo "Manifest:               $MANIFEST"
 echo "Archive dir (this job): $ARCHIVE_DIR"
@@ -151,7 +169,9 @@ ARGS=(
     # generation
     --n-avg-groups        "$N_AVG_GROUPS"
     --ss-n-repeats        "$SS_N_REPEATS"
-    --ls-hyp-amps         "$LS_HYP_AMPS"
+    # ls-hyp-amps values start with '-' (negative pA); pass with '=' so argparse
+    # does not mistake the leading minus for another option flag.
+    "--ls-hyp-amps=$LS_HYP_AMPS"
     # fit
     --fit-target          "$FIT_TARGET"
     --n-calls             "$N_CALLS"
@@ -182,7 +202,7 @@ ARGS=(
 [ "$SKIP_PHASE2P5" = "1" ] && ARGS+=(--skip-phase2p5)
 
 # ─── Run ────────────────────────────────────────────────────────────────
-python3 "$ENTRYPOINT" "${ARGS[@]}"
+python "$ENTRYPOINT" "${ARGS[@]}"
 status=$?
 
 conda deactivate
