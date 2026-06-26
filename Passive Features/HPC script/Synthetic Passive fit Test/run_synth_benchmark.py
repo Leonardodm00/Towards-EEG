@@ -27,11 +27,29 @@ smoke_run_synth_benchmark.py.
 import argparse
 import dataclasses
 import sys
+import time
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
+
+
+# ===========================================================================
+#  Progress logging — timestamped + flushed so it lands in the PBS .o file
+#  in REAL TIME (Python buffers stdout when it is a file, so flush=True is
+#  what makes `tail -f job.o*` actually show progress as it happens).
+# ===========================================================================
+_T0 = time.time()
+
+
+def log(msg: str) -> None:
+    """Print '[HH:MM:SS | +MM:SS] msg' and flush immediately."""
+    now = datetime.now().strftime("%H:%M:%S")
+    el = time.time() - _T0
+    elapsed = f"+{int(el // 60):02d}:{int(el % 60):02d}"
+    print(f"[{now} | {elapsed}] {msg}", flush=True)
 
 
 # ===========================================================================
@@ -152,16 +170,21 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     # ---- 1. manifest slice for this cohort ----------------------------------
     manifest = sgg.load_manifest(args.manifest)
     group_df = sgg.group_of(manifest, args.group)
-    print(f"\n{'='*60}\n  COHORT {args.group} — {len(group_df)} cell(s)\n{'='*60}")
+    log(f"COHORT {args.group}: {len(group_df)} cell(s); "
+        f"tau_w grid={tau_grid}; sweep n_grid={args.sweep_n_grid}; "
+        f"n_calls={args.n_calls}")
 
     # ---- 2. GENERATE archives -----------------------------------------------
+    log(f"[1/6] GENERATE — building {len(group_df)} synthetic archive(s) ...")
     gfm.generate_group(
         group_df, args.archive_dir, sgt=sgt, mono=mono,
         ss_n_repeats=args.ss_n_repeats,
         ls_hyp_amplitudes_pA=parse_float_list(args.ls_hyp_amps),
         clear_fn=_clear, verbose=True)
+    log("[1/6] GENERATE — done.")
 
     # ---- 3. PATCH long-step (split is tau_w-independent; placeholder tau_w) --
+    log("[2/6] PATCH — integrate_long_step (train/validation split) ...")
     ls_kwargs = dict(
         n_long_train=args.n_long_train,
         max_ls_train_deflection_mV=args.ls_deflection_cap,
@@ -171,8 +194,10 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         ss_t0_ms=(None if args.ss_t0_ms is None else float(args.ss_t0_ms)),
     )
     plst.integrate_long_step(mono, ss_tau_w_ms=tau_grid[0], **ls_kwargs, verbose=True)
+    log("[2/6] PATCH — done.")
 
     # ---- 4. LOAD this cohort's archives -------------------------------------
+    log("[3/6] LOAD — reading archives + preparing optimiser inputs ...")
     sids = [int(s) for s in group_df["specimen_id"]]
     cells_data = mono.load_cells_from_archive(
         args.archive_dir, n_avg_groups=args.n_avg_groups, specimen_ids=sids)
@@ -180,17 +205,24 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                   for cd in cells_data]
     cm_true_by_sid = dict(zip(group_df["specimen_id"].astype(int),
                               group_df["cm_true"].astype(float)))
+    log(f"[3/6] LOAD — {len(cells_data)} cell(s) loaded.")
 
     # ---- 5. TWO-PASS auto-tau_w fit (one cell at a time) --------------------
+    log(f"[4/6] FIT — two-pass auto-tau_w over {len(cells_data)} cell(s) "
+        f"(sequential) ...")
     results: List[object] = []
     tau_rows: List[dict] = []
     for i, (cd, oi) in enumerate(zip(cells_data, opt_inputs)):
         sid = int(cd.specimen_id)
-        print(f"\n--- cell {i+1}/{len(cells_data)} (specimen {sid}) ---")
+        t_cell = time.time()
+        log(f"  cell {i+1}/{len(cells_data)} (specimen {sid}): START")
         _clear()
         cell = mono.build_neuron_model(cd.swc_path, F=args.F)
         try:
             _assert_loss_live(cps, cell, oi, tau_grid[0], args)
+            log(f"  cell {i+1}/{len(cells_data)} ({sid}): SWEEP "
+                f"({len(tau_grid)} tau_w x {args.sweep_n_grid} Cm pts) ...")
+            t_sw = time.time()
             sweep = cps.sweep_tau_w_per_cell(
                 [cps.CellSweepInput(
                     specimen_id=sid, cell=cell, train_bundles=oi.train_bundles,
@@ -203,12 +235,17 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                 r_in_target=args.r_in_target,
                 ls_window_ms_after_onset=args.ls_window_ms, verbose=True)
             tau_w_star, reason, winner = pick_winning_tau_w(sweep[sid], tau_grid)
+            log(f"  cell {i+1}/{len(cells_data)} ({sid}): SWEEP done in "
+                f"{time.time()-t_sw:.0f}s -> tau_w*={tau_w_star} ms ({reason})")
 
             # re-patch the loss at tau_w_star and VERIFY it took effect
             plst.integrate_long_step(mono, ss_tau_w_ms=tau_w_star, **ls_kwargs,
                                      verbose=False)
             _verify_tau_w_applied(cps, mono, cell, oi, tau_w_star, args)
 
+            log(f"  cell {i+1}/{len(cells_data)} ({sid}): FIT "
+                f"(n_calls={args.n_calls}) ...")
+            t_fit = time.time()
             fr = mono.fit_one_cell(cell, cd, oi, F=args.F, n_calls=args.n_calls,
                                    n_initial=args.n_initial, seed=i)
             fr.tau_w_chosen_ms = float(tau_w_star)
@@ -220,6 +257,15 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                 hw_rho=(winner.hw_rho if winner else np.nan),
                 kappa=(winner.kappa if winner else np.nan),
                 bias_log=(getattr(winner, "bias_log", np.nan) if winner else np.nan)))
+            log(f"  cell {i+1}/{len(cells_data)} ({sid}): FIT done in "
+                f"{time.time()-t_fit:.0f}s -> "
+                f"Cm={fr.cm_uF_per_cm2:.3f} Rm={fr.rm_Ohm_cm2:.0f} "
+                f"Ra={fr.ra_Ohm_cm:.0f} status={fr.validation_status} "
+                f"| cell total {time.time()-t_cell:.0f}s")
+        except Exception as exc:  # noqa: BLE001 — log which cell died, then re-raise
+            log(f"  cell {i+1}/{len(cells_data)} ({sid}): FAILED after "
+                f"{time.time()-t_cell:.0f}s -> {type(exc).__name__}: {exc}")
+            raise
         finally:
             try:
                 cell.destroy()
@@ -229,11 +275,13 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
     pd.DataFrame(tau_rows).to_csv(out / "tau_w_choice.csv", index=False)
     results_to_dataframe(results).to_csv(out / "phase2_results.csv", index=False)
-    print(f"[Phase 2] {len(results)} fits + tau_w choices -> {out}")
+    log(f"[4/6] FIT — done: {len(results)} fit(s) -> phase2_results.csv")
 
     # ---- 6. PHASE 2.5 (mutates results in place; cohort = archive dir name) -
     phase2p5_ran = not args.skip_phase2p5
     if phase2p5_ran:
+        log("[5/6] PHASE 2.5 — profile Ra + fix at cohort median + refit ...")
+        t_p25 = time.time()
         mono.run_phase2p5_for_group(
             results=results, cells_data=cells_data, opt_inputs=opt_inputs,
             F=args.F, group_label=Path(args.archive_dir).name, output_dir=out,
@@ -242,18 +290,22 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             acq_func=mono.DEFAULT_ACQ_FUNC, make_plots=True, seed=0, verbose=True)
         results_to_dataframe(results).to_csv(
             out / "phase2p5_combined_results.csv", index=False)
+        log(f"[5/6] PHASE 2.5 — done in {time.time()-t_p25:.0f}s")
     else:
-        print("[Phase 2.5] SKIPPED (--skip-phase2p5): Ra free; Phase 3 = 3-D.")
+        log("[5/6] PHASE 2.5 — SKIPPED (--skip-phase2p5): Ra free; Phase 3 = 3-D.")
 
     # ---- 7. PHASE 3 (calibration subset only) -------------------------------
     subset = select_phase3_subset(group_df, args.phase3_subset)
     if subset:
+        log(f"[6/6] PHASE 3 — bootstrap subset {subset} ...")
+        t_p3 = time.time()
         _run_phase3_subset(mono, cps, results, cells_data, subset,
                            phase2p5_ran, args, out)
+        log(f"[6/6] PHASE 3 — done in {time.time()-t_p3:.0f}s")
     else:
-        print("[Phase 3] no subset for this cohort -> skipped")
+        log("[6/6] PHASE 3 — no subset for this cohort -> skipped")
 
-    print(f"\n[DONE] cohort {args.group}")
+    log(f"DONE cohort {args.group} — total {time.time()-_T0:.0f}s")
 
 
 # ---------------------------------------------------------------------------
