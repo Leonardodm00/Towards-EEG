@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "snapshot": "github.com/Leonardodm00/Towards-EEG@main",
+  "snapshot_date": "2026-07-19",
+  "note": "Declared ancestry for stage S0.0. Every claim here is CHECKED against measured hashes by analyse.py; a disagreement produces verdict 'unknown' and fails the exit test. Sources: TEEG_01 rev 2 section 3.3 and section 3.2.",
+
+  "transforms": {
+    "T0": "none; bytes identical to ancestor",
+    "T1": "trailing newline added or removed; no other content differs",
+    "T2": "line endings converted (LF <-> CRLF); no other content differs",
+    "T3": "Colab cell magics commented out (applied at S0.2)",
+    "T4": "non-ASCII characters transliterated to ASCII (applied at S0.3)",
+    "T5": "line endings normalised to LF (applied at S0.3)",
+    "T6": "path change only, via git mv; bytes unchanged (applied at S0.4)"
+  },
+
+  "new_infrastructure": [
+    "tools/",
+    "LEDGER.md",
+    "ledger.csv"
+  ],
+
+  "scopes": [
+    ["orchestrator", [
+      "HybridLFPy Tweaked/",
+      "Population/",
+      "Parames evoked with EEG/",
+      "Classes/"
+    ]],
+    ["passive", [
+      "Passive Features/"
+    ]]
+  ],
+
+  "working_branch": [
+    {
+      "local": "params_evoked_with_EEG_CHANGED.py",
+      "ancestor": "HybridLFPy Tweaked/params_evoked_with_EEG_multiMorph.py",
+      "expected_relationship": "identical",
+      "stage": "S0.1",
+      "rationale": "TEEG_01 rev 2 section 3.3: byte-identical to the snapshot; keep"
+    },
+    {
+      "local": "hybrid_sim_evoked_with_EEG_CHANGED.py",
+      "ancestor": "HybridLFPy Tweaked/hybrid_sim_evoked_with_EEG_multiMorph.py",
+      "expected_relationship": "mechanical",
+      "stage": "S0.1",
+      "rationale": "TEEG_01 rev 2 section 3.3: identical modulo a trailing newline; keep"
+    },
+    {
+      "local": "population_CHANGED.py",
+      "ancestor": "HybridLFPy Tweaked/Population_multiMorph.py",
+      "expected_relationship": "working_branch_edit",
+      "stage": "S0.1",
+      "rationale": "TEEG_01 rev 2 section 3.3: ancestor plus 7 lines, an empty tonic-inhibition placeholder comment in cellsim; keep. Not a mechanical transform; legitimate because S0.1 commits it, making it the ancestor for everything downstream"
+    },
+    {
+      "local": "Utility_fun.py",
+      "ancestor": "HybridLFPy Tweaked/Utility_function.py",
+      "expected_relationship": "working_branch_edit",
+      "stage": "S0.1",
+      "rationale": "TEEG_01 rev 2 section 3.3: ancestor plus three new functions (insert_mechanisms, get_gIhbar_L5_apical, get_gCa_HVA_apical); keep. Carries defects U1-U4, deferred to S3"
+    }
+  ],
+
+  "discards": [
+    {
+      "path": "Population/population_CHANGED.py",
+      "stage": "S0.2",
+      "rationale": "Dead branch. Same filename as the local working file but DIFFERENT ancestry (TEEG_01 rev 2 section 3.3); the eleventh ast.parse failure, an unfinished hand edit. Any tree containing both resolves imports by whichever is seen last"
+    },
+    {
+      "path": "Passive Features/HPC script/passive_fit.e1099100",
+      "stage": "S0.7",
+      "rationale": "PROPOSED ADDITION, not in the TEEG_01 register. Committed PBS job log. These are the logs used to WITHDRAW the encoding-failure claim, so they are evidence: move to the payload repository (D-8), do not delete"
+    },
+    {
+      "path": "Passive Features/HPC script/passive_fit.e1099156",
+      "stage": "S0.7",
+      "rationale": "PROPOSED ADDITION, not in the TEEG_01 register. Committed PBS job log; move to the payload repository (D-8), do not delete"
+    },
+    {
+      "path": "Passive Features/HPC script/passive_fit.e1099215",
+      "stage": "S0.7",
+      "rationale": "PROPOSED ADDITION, not in the TEEG_01 register. Committed PBS job log; move to the payload repository (D-8), do not delete"
+    },
+    {
+      "path": "Passive Features/HPC script/passive_fit.o1099100",
+      "stage": "S0.7",
+      "rationale": "PROPOSED ADDITION, not in the TEEG_01 register. Committed PBS job log; move to the payload repository (D-8), do not delete"
+    },
+    {
+      "path": "Passive Features/HPC script/passive_fit.o1099156",
+      "stage": "S0.7",
+      "rationale": "PROPOSED ADDITION, not in the TEEG_01 register. Committed PBS job log; move to the payload repository (D-8), do not delete"
+    },
+    {
+      "path": "Passive Features/HPC script/passive_fit.o1099215",
+      "stage": "S0.7",
+      "rationale": "PROPOSED ADDITION, not in the TEEG_01 register. Committed PBS job log; move to the payload repository (D-8), do not delete"
+    }
+  ],
+
+  "binary_payload": {
+    "extensions": [".zip", ".pdf"],
+    "paths": [],
+    "rationale": "Committed binary payload. TEEG_01 rev 2 section 3.2: not referenced by any code path. D-8: moves to a separate repository; no history rewriting"
+  }
+}
