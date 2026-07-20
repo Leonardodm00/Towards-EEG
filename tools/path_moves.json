@@ -1,0 +1,13 @@
+{
+  "note": "Declared path moves. Transform T6 (git mv): no byte of any file changes, only its location. Consumed by tools/apply_moves.py to perform the moves, and by build_ledger.py --moves so that a moved file's ledger row keeps pointing at its pre-move ancestor instead of appearing to be a new file. S0.4 reuses this mechanism for the whole package layout; this file starts with the single move pulled forward from it.",
+  "moves": [
+    {
+      "from": "Connectomics/Calculate Relative Subpop % ",
+      "to": "Connectomics/Calculate Relative Subpop pct",
+      "kind": "directory",
+      "transform_id": "T6",
+      "stage": "S0.2c",
+      "rationale": "The directory name ends in a space. Windows forbids a trailing space in a path component, so 'git clone' fails at checkout with \"invalid path\" and the repository cannot be worked on locally at all -- confirmed on the owner's machine. The '%' is legal on Windows and is replaced only because a per-cent sign in a path is a persistent nuisance in shell and Make contexts; 'pct' is the conventional ASCII spelling. Pulled forward from S0.4 by decision, because S0.4 is a large reorganisation and this single rename unblocks local work immediately. Two files are affected, both scope 'colab', verdict 'retain', both already parsing."
+    }
+  ]
+}

@@ -192,7 +192,8 @@ def is_payload(path, rule):
 # the ledger
 # ---------------------------------------------------------------------------
 
-def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01"):
+def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
+               moves=None):
     """Assign a verdict to every file.
 
     repo_records  : FileRecords for the repository tree at pre-s0
@@ -212,6 +213,23 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01")
     problems = []
     by_path = {r.path: r for r in repo_records}
     chain = (phases or {}).get("phases", {})
+    move_list = (moves or {}).get("moves", [])
+
+    def pre_move_path(path):
+        """Resolve a current path back to where it lived before any T6 move.
+
+        Without this a moved file's row would name itself as its own ancestor,
+        which erases the move from the only regenerable record of it.
+        """
+        for mv in move_list:
+            if mv.get("kind") == "file":
+                if path == mv["to"]:
+                    return mv["from"], True
+            else:
+                prefix = mv["to"].rstrip("/") + "/"
+                if path.startswith(prefix):
+                    return mv["from"].rstrip("/") + "/" + path[len(prefix):], True
+        return path, False
 
     def chained(path, measured_sha):
         """(pre_s0, post_s02, post_s03, post_s04) for one path."""
@@ -330,15 +348,18 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01")
             if r.is_python and not r.parses:
                 rationale += "; magics stripped at S0.2 so ast.parse succeeds"
 
+        anc_path_r, was_moved = pre_move_path(r.path)
+        if was_moved:
+            rationale = (rationale + "; moved by T6 (git mv), bytes unchanged")
         rows.append(
             LedgerRow(
                 path=r.path,
                 scope=scope,
                 stage=stage,
                 verdict=verdict,
-                relationship="origin",
-                transform_id="",
-                ancestor_path=r.path,
+                relationship="mechanical" if was_moved else "origin",
+                transform_id="T6" if was_moved else "",
+                ancestor_path=anc_path_r,
                 ancestor_sha256=r.sha256,
                 sha256_pre_s0=chained(r.path, r.sha256)[0],
                 sha256_post_s02=chained(r.path, r.sha256)[1],

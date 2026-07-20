@@ -78,6 +78,9 @@ def main(argv=None):
     ap.add_argument("--as-of", default="post_s01", choices=["pre_s01", "post_s01"],
                     help="which declaration of the working-branch relationship to "
                          "check against; see tools/ancestors.json")
+    ap.add_argument("--moves", default=None,
+                    help="path_moves.json; lets a moved file keep pointing at its "
+                         "pre-move ancestor (required from S0.2c onward)")
     ap.add_argument("--phases", default=None,
                     help="phase_hashes.json; preserves the hash chain across a "
                          "full regeneration (required from S0.2 onward)")
@@ -112,7 +115,13 @@ def main(argv=None):
         with open(str(args.phases), "r", encoding="utf-8") as fh:
             phases = json.load(fh)
 
-    rows, problems = analyse.build_rows(repo_records, local_records, spec, phases, args.as_of)
+    moves = None
+    if args.moves:
+        with open(str(args.moves), "r", encoding="utf-8") as fh:
+            moves = json.load(fh)
+
+    rows, problems = analyse.build_rows(repo_records, local_records, spec, phases, args.as_of,
+                                        moves)
     o7 = analyse.find_shadowed_defs(repo_records)
     dup = analyse.find_duplicate_classes(repo_records)
 
