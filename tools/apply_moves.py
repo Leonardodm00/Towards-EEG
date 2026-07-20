@@ -41,6 +41,12 @@ import os
 import subprocess
 import sys
 
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
+from s0_ledger import render  # noqa: E402
+
 
 def sha256_file(path):
     h = hashlib.sha256()
@@ -176,10 +182,7 @@ def rewrite_ledger(root, moves, write):
         row["rationale"] = (row["rationale"] + "; moved by T6 (git mv) at S0.2c, "
                             "bytes unchanged").strip("; ")
     if write and n:
-        with open(ledger, "w", encoding="utf-8", newline="") as fh:
-            w = csv.DictWriter(fh, fieldnames=fields)
-            w.writeheader()
-            w.writerows(rows)
+        render.write_csv_dicts(rows, fields, ledger)
     return n
 
 

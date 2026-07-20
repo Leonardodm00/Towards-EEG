@@ -1,10 +1,10 @@
 # Towards-EEG -- S0.0 Reconciliation Ledger
 
 **Stage:** S0.0 (roadmap rev 3, section 3.2)  
-**Generated:** 2026-07-20 18:38:23 UTC by `s0_ledger` v1.0.0  
+**Generated:** 2026-07-20 19:14:01 UTC by `s0_ledger` v1.0.0  
 **Snapshot:** `github.com/Leonardodm00/Towards-EEG@main`, 2026-07-19  
 **Tree root:** `/content/Towards-EEG`  
-**Rows:** 165 (161 repository files + 4 local working files)
+**Rows:** 170 (166 repository files + 4 local working files)
 
 This ledger is the evidence base for the byte-identity rule (handoff
 brief section 3). Every file in the reorganised tree must be (1) byte-identical
@@ -32,7 +32,7 @@ relationship agrees with the measured hashes.
 |--------------|--------|
 | discard      | 22     |
 | keep         | 16     |
-| new          | 18     |
+| new          | 23     |
 | retain       | 109    |
 
 ### By scope
@@ -40,7 +40,7 @@ relationship agrees with the measured hashes.
 | scope          | files  |
 |----------------|--------|
 | colab          | 60     |
-| infrastructure | 18     |
+| infrastructure | 23     |
 | orchestrator   | 18     |
 | passive        | 69     |
 
@@ -49,14 +49,14 @@ relationship agrees with the measured hashes.
 | stage    | files  |
 |----------|--------|
 | -        | 109    |
-| S0.0     | 18     |
+| S0.0     | 23     |
 | S0.1     | 4      |
 | S0.4     | 12     |
 | S0.7     | 22     |
 
 ### Python surface at pre-s0
 
-- python files: **89**
+- python files: **92**
 - failing `ast.parse`: **0**
 - containing bytes >= 0x80: **47**
 - non-ASCII and no PEP 263 cookie: **24**
@@ -73,11 +73,15 @@ own ancestor for every later sub-step.
 
 | file                                   | relationship         | T   | ancestor                                             | sha256(pre-s0) |
 |----------------------------------------|----------------------|-----|------------------------------------------------------|----------------|
+| Connectomics/Calculate Relative Subpop pct/Usage_example.py | mechanical           | T6  | Connectomics/Calculate Relative Subpop % /Usage_example.py | 7f95739f273f   |
+| Connectomics/Calculate Relative Subpop pct/calculate_bbp_relative_presences.py | mechanical           | T6  | Connectomics/Calculate Relative Subpop % /calculate_bbp_relative_presences.py | d10121eb3f7e   |
 | Utility_fun.py                         | identical            | T0  | HybridLFPy Tweaked/Utility_function.py               | 9d3d29c8a997   |
 | hybrid_sim_evoked_with_EEG_CHANGED.py  | identical            | T0  | HybridLFPy Tweaked/hybrid_sim_evoked_with_EEG_multiMorph.py | 6c3ed490ba14   |
 | params_evoked_with_EEG_CHANGED.py      | identical            | T0  | HybridLFPy Tweaked/params_evoked_with_EEG_multiMorph.py | 927ee3d9cc0d   |
 | population_CHANGED.py                  | identical            | T0  | HybridLFPy Tweaked/Population_multiMorph.py          | 43df1344230e   |
 
+- **Connectomics/Calculate Relative Subpop pct/Usage_example.py** -- colab scope; stays in the repository, outside the installed package; moved by T6 (git mv), bytes unchanged
+- **Connectomics/Calculate Relative Subpop pct/calculate_bbp_relative_presences.py** -- colab scope; stays in the repository, outside the installed package; moved by T6 (git mv), bytes unchanged
 - **Utility_fun.py** -- TEEG_01 rev 2 section 3.3: ancestor plus three new functions (insert_mechanisms, get_gIhbar_L5_apical, get_gCa_HVA_apical); keep. Carries defects U1-U4, deferred to S3; bytes equal
 - **hybrid_sim_evoked_with_EEG_CHANGED.py** -- TEEG_01 rev 2 section 3.3: identical modulo a trailing newline; keep; bytes equal
 - **params_evoked_with_EEG_CHANGED.py** -- TEEG_01 rev 2 section 3.3: byte-identical to the snapshot; keep; bytes equal
@@ -306,8 +310,8 @@ that equality IS the exit test for the move.
 | Alignment Metadata/Extract_metadata.py                                       | colab         | -      | retain   | 1a462fe0a7c1  | 1a4  | -    | -    |
 | Alignment Metadata/README.md                                                 | colab         | -      | retain   | 3a9ff3627f65  | 3a9  | -    | -    |
 | Alignment Metadata/Usage.py                                                  | colab         | -      | retain   | 96d6e6a72c39  | 96d  | -    | -    |
-| Connectomics/Calculate Relative Subpop % /Usage_example.py                   | colab         | -      | retain   | 7f95739f273f  | 7f9  | -    | -    |
-| Connectomics/Calculate Relative Subpop % /calculate_bbp_relative_presences.py | colab         | -      | retain   | d10121eb3f7e  | d10  | -    | -    |
+| Connectomics/Calculate Relative Subpop pct/Usage_example.py                  | colab         | -      | retain   | 7f95739f273f  | 7f9  | -    | -    |
+| Connectomics/Calculate Relative Subpop pct/calculate_bbp_relative_presences.py | colab         | -      | retain   | d10121eb3f7e  | d10  | -    | -    |
 | Connectomics/Construct_ADJ/Construct_ADJ.py                                  | colab         | -      | retain   | 550f1d89a21e  | 550  | -    | -    |
 | Connectomics/Construct_ADJ/Microcircuit Assembly Documentation.pdf           | colab         | S0.7   | discard  | dec69a3bdff9  | dec  | -    | -    |
 | Connectomics/Construct_ADJ/Plotting_function                                 | colab         | -      | retain   | 1af3295bfe7a  | 1af  | -    | -    |
@@ -361,8 +365,10 @@ that equality IS the exit test for the move.
 | LEDGER.md                                                                    | infrastructure | S0.0   | new      | 5075a5ab0a05  | 0bf  | -    | -    |
 | ledger.csv                                                                   | infrastructure | S0.0   | new      | 8f2951bdd603  | 32b  | -    | -    |
 | tools/ancestors.json                                                         | infrastructure | S0.0   | new      | 3a0672db37f8  | 2a3  | -    | -    |
+| tools/apply_moves.py                                                         | infrastructure | S0.0   | new      | 5f3166685c35  | -    | -    | -    |
 | tools/build_ledger.py                                                        | infrastructure | S0.0   | new      | afb19b68ac9a  | 0a3  | -    | -    |
-| tools/phase_hashes.json                                                      | infrastructure | S0.0   | new      | fad001bef261  | -    | -    | -    |
+| tools/path_moves.json                                                        | infrastructure | S0.0   | new      | 6e84488918bf  | -    | -    | -    |
+| tools/phase_hashes.json                                                      | infrastructure | S0.0   | new      | 6eb7a916d9a2  | -    | -    | -    |
 | tools/s0_ledger/__init__.py                                                  | infrastructure | S0.0   | new      | 7ec4151c2327  | 7ec  | -    | -    |
 | tools/s0_ledger/analyse.py                                                   | infrastructure | S0.0   | new      | 8cb68f8e03ad  | a1f  | -    | -    |
 | tools/s0_ledger/render.py                                                    | infrastructure | S0.0   | new      | 5ae8d7abf0ce  | 5ae  | -    | -    |
@@ -371,11 +377,14 @@ that equality IS the exit test for the move.
 | tools/s0_transform/__init__.py                                               | infrastructure | S0.0   | new      | e9e6c067a8ae  | -    | -    | -    |
 | tools/s0_transform/decolab.py                                                | infrastructure | S0.0   | new      | 5bd38389248f  | -    | -    | -    |
 | tools/s0_transform/s02_colab_commands.json                                   | infrastructure | S0.0   | new      | d5c039844cbc  | -    | -    | -    |
+| tools/s0_transform/s02_exit_scope.json                                       | infrastructure | S0.0   | new      | e7bc2d61c3a6  | -    | -    | -    |
 | tools/s0_transform/s02_targets.json                                          | infrastructure | S0.0   | new      | 77796b350ad3  | -    | -    | -    |
 | tools/s0_transform/s02_transform_log.json                                    | infrastructure | S0.0   | new      | 43f9086474d1  | -    | -    | -    |
-| tools/stamp_phase.py                                                         | infrastructure | S0.0   | new      | 90ee55b76d3f  | -    | -    | -    |
+| tools/stamp_phase.py                                                         | infrastructure | S0.0   | new      | 7acecd1899d8  | -    | -    | -    |
+| tools/test_s0_2_exit.py                                                      | infrastructure | S0.0   | new      | d09b71431b4c  | -    | -    | -    |
 | tools/test_s0_decolab_smoke.py                                               | infrastructure | S0.0   | new      | 273c9324079f  | -    | -    | -    |
 | tools/test_s0_ledger_smoke.py                                                | infrastructure | S0.0   | new      | 57eae0d12bc9  | 57e  | -    | -    |
+| tools/test_s0_moves_smoke.py                                                 | infrastructure | S0.0   | new      | 42e8348d917a  | -    | -    | -    |
 | Classes/Connectomics/Class.py                                                | orchestrator  | S0.4   | keep     | 2f58a6ae79a3  | 2f5  | -    | -    |
 | Classes/Connectomics/Connectomics Class Overview.pdf                         | orchestrator  | S0.7   | discard  | 3cea1baed2e4  | 3ce  | -    | -    |
 | Classes/Connectomics/connectivity_buildup (9).py                             | orchestrator  | S0.4   | keep     | e62667fa6e57  | e62  | -    | -    |

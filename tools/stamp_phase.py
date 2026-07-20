@@ -39,7 +39,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from s0_ledger import scan  # noqa: E402
+from s0_ledger import render, scan  # noqa: E402
 
 PHASES = ("pre_s0", "post_s02", "post_s03", "post_s04")
 ABSENT = "-"
@@ -167,10 +167,7 @@ def main(argv=None):
         print("\n--check: nothing written")
         return 0
 
-    with open(ledger_path, "w", encoding="utf-8", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=fieldnames)
-        w.writeheader()
-        w.writerows(rows)
+    render.write_csv_dicts(rows, fieldnames, ledger_path)
     with open(phase_path, "w", encoding="ascii") as fh:
         json.dump(phase_doc, fh, indent=2, sort_keys=True)
         fh.write("\n")

@@ -239,6 +239,24 @@ def check_10_remap_unmap_are_inverse():
     return True, "remap and unmap invert on files, dirs and non-targets"
 
 
+def check_11_ledger_rewrite_stays_lf_and_ascii():
+    """Regression: a bare csv.DictWriter defaults to CRLF and rewrote the
+    whole ledger once. The canonical writer must not, and must refuse
+    non-ASCII."""
+    root, spec, _ = sandbox()
+    try:
+        M.do_moves(root, spec, write=True)
+        M.rewrite_ledger(root, spec["moves"], write=True)
+        data = open(os.path.join(root, "ledger.csv"), "rb").read()
+        if b"\r\n" in data:
+            return False, "MUTATION SURVIVED: rewrite introduced CRLF"
+        if any(b > 127 for b in data):
+            return False, "rewrite introduced non-ASCII bytes"
+        return True, "ledger rewritten LF-only and pure ASCII"
+    finally:
+        shutil.rmtree(root)
+
+
 CHECKS = [check_01_dry_run_writes_nothing,
           check_02_move_preserves_every_byte,
           check_03_ledger_paths_remapped_ancestor_kept,
@@ -248,7 +266,8 @@ CHECKS = [check_01_dry_run_writes_nothing,
           check_07_byte_change_during_move_is_caught,
           check_08_verify_catches_stale_ledger_row,
           check_09_idempotent_second_apply,
-          check_10_remap_unmap_are_inverse]
+          check_10_remap_unmap_are_inverse,
+          check_11_ledger_rewrite_stays_lf_and_ascii]
 
 
 def main():

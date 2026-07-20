@@ -55,6 +55,26 @@ def write_csv(rows, out_path):
             w.writerow({k: r.as_dict()[k] for k in CSV_COLUMNS})
 
 
+def write_csv_dicts(dict_rows, fieldnames, out_path):
+    """Emit a ledger CSV from plain dicts, with the SAME conventions as
+    write_csv above: LF terminator, ASCII, strict.
+
+    It exists because any tool that rewrites ledger.csv in place -- the phase
+    stamper, the move applier -- must not reinvent those conventions. A bare
+    csv.DictWriter defaults to a CRLF terminator, which silently converted the
+    whole file to CRLF once already; in a project whose next sub-step is line
+    ending normalisation, that is not an acceptable failure mode.
+    """
+    with open(str(out_path), "w", newline="", encoding="ascii", errors="strict") as fh:
+        w = csv.DictWriter(fh, fieldnames=fieldnames, lineterminator="\n")
+        w.writeheader()
+        w.writerows(dict_rows)
+    with open(str(out_path), "rb") as fh:
+        data = fh.read()
+    if b"\r\n" in data:
+        raise RuntimeError("write_csv_dicts emitted CRLF into %s" % out_path)
+
+
 def read_csv(in_path):
     """Read ledger.csv back as a list of dicts.  Used by the smoke test to
     prove the round trip, and by later sub-steps to fill the hash chain."""
