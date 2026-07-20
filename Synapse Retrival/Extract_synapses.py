@@ -1,4 +1,4 @@
-!pip install avro google-cloud-storage pandas
+#S0.2:T7# !pip install avro google-cloud-storage pandas
 from google.colab import drive
 
 # This will prompt you to authorize Colab to access your Drive

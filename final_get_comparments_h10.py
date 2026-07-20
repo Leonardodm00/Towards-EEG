@@ -9,12 +9,12 @@ Original file is located at
 
 # Install cloud-volume to access h01 mesh and skeleton data.
 # You may need to restart the runtime after installing.
-!pip install cloud-volume
+#S0.2:T7# !pip install cloud-volume
 import cloudvolume
 import google.colab.auth
 google.colab.auth.authenticate_user()
 
-!pip install neuroglancer
+#S0.2:T7# !pip install neuroglancer
 
 """## CONSTRUCT ANNOTATED DATA FRAME"""
 
@@ -1236,7 +1236,7 @@ def find_and_plot_radial_exits(df, centroid, soma_ids):
 if 'df' in locals() and 'soma_center' in locals() and soma_center is not None:
     exit_points = find_and_plot_radial_exits(df, soma_center, soma_ids)
 
-!pip install -q navis[all] plotly
+#S0.2:T7# !pip install -q navis[all] plotly
 
 import os
 import glob
@@ -1337,7 +1337,7 @@ plot_swc_components(neuron_id,SKELETON_PATH)
 ### Merge the ifferent sub partitions (differnet swc files associated to the same arbour
 """
 
-!pip install navis[all]
+#S0.2:T7# !pip install navis[all]
 
 """##Find unit of measurement
 

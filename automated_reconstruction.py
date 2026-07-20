@@ -8,7 +8,7 @@ Original file is located at
 """
 
 # Install dependencies
-!pip install -q cloud-volume neuroglancer navis[all] plotly
+#S0.2:T7# !pip install -q cloud-volume neuroglancer navis[all] plotly
 
 # Standard library imports
 import os

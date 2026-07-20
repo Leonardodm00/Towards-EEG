@@ -8,7 +8,7 @@ Original file is located at
 """
 
 # Now pip install will find the correct pre-built wheels without crashing!
-!pip install  allensdk neuron scikit-optimize
+#S0.2:T7# !pip install  allensdk neuron scikit-optimize
 
 # -*- coding: utf-8 -*-
 """Save_AllenInstitute_Data.ipynb
@@ -1504,7 +1504,7 @@ PATCH NOTES (Phase 3 v3):
 """
 
 # Now pip install will find the correct pre-built wheels without crashing!
-!pip install  allensdk neuron scikit-optimize
+#S0.2:T7# !pip install  allensdk neuron scikit-optimize
 
 """
 phase1_data_loader.py
@@ -4051,7 +4051,7 @@ out_dir = '/content/drive/MyDrive/Colab Notebooks/Allen_Intitute_Data/L3_exc'
 #     F=1.9,
 # )
 
-!pip install -q morphio neurom scipy
+#S0.2:T7# !pip install -q morphio neurom scipy
 
 # -*- coding: utf-8 -*-
 """
@@ -7225,7 +7225,7 @@ for r in rows:
 
 # %% Cell 2 — Imports =========================================================
 from __future__ import annotations
- from google.colab import drive
+from google.colab import drive
 
 # This will prompt you to authorize Colab to access your Drive
 drive.mount('/content/drive', force_remount=True)
@@ -12549,7 +12549,7 @@ except Exception as _e:
     print("  → make sure trace_qc_v2.py is in TRACE_QC_DIR")
 
 # Now pip install will find the correct pre-built wheels without crashing!
-!pip install  allensdk neuron scikit-optimize
+#S0.2:T7# !pip install  allensdk neuron scikit-optimize
 
 # -*- coding: utf-8 -*-
 # ============================================================================

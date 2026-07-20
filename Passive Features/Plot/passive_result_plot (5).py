@@ -7,7 +7,7 @@ Original file is located at
     https://colab.research.google.com/drive/1EvULs23WZySQOeSZKLpERqV2QYVCj3Ld
 """
 
-!pip install scikit-optimize
+#S0.2:T7# !pip install scikit-optimize
 
 """
 phase1_phase2_dataclasses_only.py
@@ -214,7 +214,7 @@ Original file is located at
     https://colab.research.google.com/drive/1EvULs23WZySQOeSZKLpERqV2QYVCj3Ld
 """
 
-!pip install scikit-optimize
+#S0.2:T7# !pip install scikit-optimize
 
 """
 phase1_phase2_dataclasses_only.py

@@ -7,7 +7,7 @@ Original file is located at
     https://colab.research.google.com/drive/1tRQejgVcs4_YoCpv63RAvaAkADXijwdr
 """
 
-!pip install tifffile
+#S0.2:T7# !pip install tifffile
 
 from google.colab import drive
 

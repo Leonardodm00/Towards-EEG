@@ -1,0 +1,45 @@
+{
+  "files": {
+    "Align Morphologies/Alignment.py": [
+      "!pip install -q neuron LFPy"
+    ],
+    "Morphology Compliance/Compliance_Check.py": [
+      "!pip install neuron"
+    ],
+    "Passive Features/Allen Institute Data/save_alleninstitute_data (6).py": [
+      "!pip install  allensdk neuron scikit-optimize",
+      "!pip install  allensdk neuron scikit-optimize",
+      "!pip install -q morphio neurom scipy",
+      "!pip install  allensdk neuron scikit-optimize"
+    ],
+    "Passive Features/Plot/passive_result_plot (5).py": [
+      "!pip install scikit-optimize",
+      "!pip install scikit-optimize"
+    ],
+    "Passive Features/phase1fittingcolab (2).py": [
+      "!pip install  allensdk neuron scikit-optimize",
+      "!pip install  allensdk neuron scikit-optimize"
+    ],
+    "Synapse Retrival/Extract_synapses.py": [
+      "!pip install avro google-cloud-storage pandas"
+    ],
+    "Synaptic Placement/synaptic_placement (9).py": [
+      "!pip install tifffile"
+    ],
+    "automated_reconstruction.py": [
+      "!pip install -q cloud-volume neuroglancer navis[all] plotly"
+    ],
+    "final_get_comparments_h10.py": [
+      "!pip install cloud-volume",
+      "!pip install neuroglancer",
+      "!pip install -q navis[all] plotly",
+      "!pip install navis[all]"
+    ],
+    "utility.py": [
+      "!pip install -q -U kaleido"
+    ]
+  },
+  "generated_from": "s02_transform_log.json",
+  "purpose": "Ordered shell commands neutralised by T7, per file. These scripts still run in Colab; a bootstrap orchestrator generated from this manifest can reinstate the installs without reinstating the unparseable syntax. Generating that orchestrator is out of scope for S0.2 (see the deferred sub-step in the S0.2 report).",
+  "stage": "S0.2"
+}

@@ -13,7 +13,7 @@ import os
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.colors as pc
-!pip install -q -U kaleido
+#S0.2:T7# !pip install -q -U kaleido
 def plot_centered_neuron_gallery(neuron_ids, input_dir='/content/drive/MyDrive/Colab Notebooks/Reconstructed neurons', shift_nm=400000):
     """
     Loads, centers, and sequentially shifts neurons for visualization in a single Plotly 3D space.

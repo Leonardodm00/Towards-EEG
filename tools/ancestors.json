@@ -3,7 +3,6 @@
   "snapshot": "github.com/Leonardodm00/Towards-EEG@main",
   "snapshot_date": "2026-07-19",
   "note": "Declared ancestry for stage S0.0. Every claim here is CHECKED against measured hashes by analyse.py; a disagreement produces verdict 'unknown' and fails the exit test. Sources: TEEG_01 rev 2 section 3.3 and section 3.2.",
-
   "transforms": {
     "T0": "none; bytes identical to ancestor",
     "T1": "trailing newline added or removed; no other content differs",
@@ -13,56 +12,66 @@
     "T5": "line endings normalised to LF (applied at S0.3)",
     "T6": "path change only, via git mv; bytes unchanged (applied at S0.4)"
   },
-
   "new_infrastructure": [
     "tools/",
     "LEDGER.md",
     "ledger.csv"
   ],
-
   "scopes": [
-    ["orchestrator", [
-      "HybridLFPy Tweaked/",
-      "Population/",
-      "Parames evoked with EEG/",
-      "Classes/"
-    ]],
-    ["passive", [
-      "Passive Features/"
-    ]]
+    [
+      "orchestrator",
+      [
+        "HybridLFPy Tweaked/",
+        "Population/",
+        "Parames evoked with EEG/",
+        "Classes/"
+      ]
+    ],
+    [
+      "passive",
+      [
+        "Passive Features/"
+      ]
+    ]
   ],
-
   "working_branch": [
     {
       "local": "params_evoked_with_EEG_CHANGED.py",
       "ancestor": "HybridLFPy Tweaked/params_evoked_with_EEG_multiMorph.py",
       "expected_relationship": "identical",
       "stage": "S0.1",
-      "rationale": "TEEG_01 rev 2 section 3.3: byte-identical to the snapshot; keep"
+      "rationale": "TEEG_01 rev 2 section 3.3: byte-identical to the snapshot; keep",
+      "expected_relationship_post_s01": "identical",
+      "post_s01_note": "After S0.1 the working-branch content IS the ancestor path's content, so the measured relationship becomes 'identical' for every entry. Declared here so that build_ledger.py remains a green CI gate on a clean checkout; the pre-S0.1 declaration is retained above it and is what the ledger committed at a103146 was checked against."
     },
     {
       "local": "hybrid_sim_evoked_with_EEG_CHANGED.py",
       "ancestor": "HybridLFPy Tweaked/hybrid_sim_evoked_with_EEG_multiMorph.py",
       "expected_relationship": "mechanical",
       "stage": "S0.1",
-      "rationale": "TEEG_01 rev 2 section 3.3: identical modulo a trailing newline; keep"
+      "rationale": "TEEG_01 rev 2 section 3.3: identical modulo a trailing newline; keep",
+      "expected_relationship_post_s01": "identical",
+      "post_s01_note": "After S0.1 the working-branch content IS the ancestor path's content, so the measured relationship becomes 'identical' for every entry. Declared here so that build_ledger.py remains a green CI gate on a clean checkout; the pre-S0.1 declaration is retained above it and is what the ledger committed at a103146 was checked against."
     },
     {
       "local": "population_CHANGED.py",
       "ancestor": "HybridLFPy Tweaked/Population_multiMorph.py",
       "expected_relationship": "working_branch_edit",
       "stage": "S0.1",
-      "rationale": "TEEG_01 rev 2 section 3.3: ancestor plus 7 lines, an empty tonic-inhibition placeholder comment in cellsim; keep. Not a mechanical transform; legitimate because S0.1 commits it, making it the ancestor for everything downstream"
+      "rationale": "TEEG_01 rev 2 section 3.3: ancestor plus 7 lines, an empty tonic-inhibition placeholder comment in cellsim; keep. Not a mechanical transform; legitimate because S0.1 commits it, making it the ancestor for everything downstream",
+      "expected_relationship_post_s01": "identical",
+      "post_s01_note": "After S0.1 the working-branch content IS the ancestor path's content, so the measured relationship becomes 'identical' for every entry. Declared here so that build_ledger.py remains a green CI gate on a clean checkout; the pre-S0.1 declaration is retained above it and is what the ledger committed at a103146 was checked against."
     },
     {
       "local": "Utility_fun.py",
       "ancestor": "HybridLFPy Tweaked/Utility_function.py",
       "expected_relationship": "working_branch_edit",
       "stage": "S0.1",
-      "rationale": "TEEG_01 rev 2 section 3.3: ancestor plus three new functions (insert_mechanisms, get_gIhbar_L5_apical, get_gCa_HVA_apical); keep. Carries defects U1-U4, deferred to S3"
+      "rationale": "TEEG_01 rev 2 section 3.3: ancestor plus three new functions (insert_mechanisms, get_gIhbar_L5_apical, get_gCa_HVA_apical); keep. Carries defects U1-U4, deferred to S3",
+      "expected_relationship_post_s01": "identical",
+      "post_s01_note": "After S0.1 the working-branch content IS the ancestor path's content, so the measured relationship becomes 'identical' for every entry. Declared here so that build_ledger.py remains a green CI gate on a clean checkout; the pre-S0.1 declaration is retained above it and is what the ledger committed at a103146 was checked against."
     }
   ],
-
   "discards": [
     {
       "path": "Population/population_CHANGED.py",
@@ -100,9 +109,11 @@
       "rationale": "PROPOSED ADDITION, not in the TEEG_01 register. Committed PBS job log; move to the payload repository (D-8), do not delete"
     }
   ],
-
   "binary_payload": {
-    "extensions": [".zip", ".pdf"],
+    "extensions": [
+      ".zip",
+      ".pdf"
+    ],
     "paths": [],
     "rationale": "Committed binary payload. TEEG_01 rev 2 section 3.2: not referenced by any code path. D-8: moves to a separate repository; no history rewriting"
   }

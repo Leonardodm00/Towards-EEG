@@ -8,7 +8,7 @@ Original file is located at
 """
 
 # Now pip install will find the correct pre-built wheels without crashing!
-!pip install  allensdk neuron scikit-optimize
+#S0.2:T7# !pip install  allensdk neuron scikit-optimize
 
 # -*- coding: utf-8 -*-
 """Phase1Fitting.ipynb — PATCHED for Phase 3 v3 nonparametric bootstrap
@@ -29,7 +29,7 @@ PATCH NOTES (Phase 3 v3):
 """
 
 # Now pip install will find the correct pre-built wheels without crashing!
-!pip install  allensdk neuron scikit-optimize
+#S0.2:T7# !pip install  allensdk neuron scikit-optimize
 
 """
 phase1_data_loader.py

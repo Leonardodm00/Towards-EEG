@@ -1,6 +1,6 @@
 from google.colab import drive
 drive.mount('/content/drive')
-!pip install neuron
+#S0.2:T7# !pip install neuron
 import numpy as np
 import random
 import matplotlib.pyplot as plt

@@ -1,4 +1,4 @@
-!pip install -q neuron LFPy
+#S0.2:T7# !pip install -q neuron LFPy
 
 from google.colab import drive
 

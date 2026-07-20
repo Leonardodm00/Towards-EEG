@@ -192,12 +192,18 @@ def is_payload(path, rule):
 # the ledger
 # ---------------------------------------------------------------------------
 
-def build_rows(repo_records, local_records, spec):
+def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01"):
     """Assign a verdict to every file.
 
     repo_records  : FileRecords for the repository tree at pre-s0
     local_records : FileRecords for the four local working files
     spec          : the declared ancestor map (see tools/ancestors.json)
+    phases        : optional hash-chain record (see tools/phase_hashes.json,
+                    written by tools/stamp_phase.py).  Without it the chain
+                    columns stay at the NOT_YET sentinel and sha256_pre_s0 is
+                    whatever is on disk -- correct at S0.0 and WRONG from S0.2
+                    onward, because a rescan would overwrite the pre-S0 state
+                    with the post-transform hash.  Pass it after S0.2.
 
     Returns (rows, problems).  problems is a list of human-readable strings;
     a non-empty list means the ledger disagrees with the documents and S0.0
@@ -205,6 +211,15 @@ def build_rows(repo_records, local_records, spec):
     """
     problems = []
     by_path = {r.path: r for r in repo_records}
+    chain = (phases or {}).get("phases", {})
+
+    def chained(path, measured_sha):
+        """(pre_s0, post_s02, post_s03, post_s04) for one path."""
+        pre = chain.get("pre_s0", {}).get(path, measured_sha)
+        return (pre,
+                chain.get("post_s02", {}).get(path, NOT_YET),
+                chain.get("post_s03", {}).get(path, NOT_YET),
+                chain.get("post_s04", {}).get(path, NOT_YET))
     local_by_name = {r.path: r for r in local_records}
 
     scopes = [(k, tuple(v)) for k, v in spec["scopes"]]
@@ -235,6 +250,12 @@ def build_rows(repo_records, local_records, spec):
 
         rel, tid, note = measured_relationship(loc, anc)
         expected = entry["expected_relationship"]
+        if as_of == "post_s01" and "expected_relationship_post_s01" in entry:
+            # S0.1 wrote the working-branch bytes to the ancestor path, so
+            # from that commit onward the two are the same file. Doc 4 s3
+            # calls this out as expected; declaring it keeps the exit test
+            # meaningful instead of permanently red.
+            expected = entry["expected_relationship_post_s01"]
         if rel != expected:
             problems.append(
                 "MISMATCH %s: declared '%s', measured '%s' (%s)"
@@ -260,10 +281,10 @@ def build_rows(repo_records, local_records, spec):
                 transform_id=tid,
                 ancestor_path=anc_path,
                 ancestor_sha256=anc.sha256,
-                sha256_pre_s0=loc.sha256,
-                sha256_post_s02=NOT_YET,
-                sha256_post_s03=NOT_YET,
-                sha256_post_s04=NOT_YET,
+                sha256_pre_s0=chained(name, loc.sha256)[0],
+                sha256_post_s02=chained(name, loc.sha256)[1],
+                sha256_post_s03=chained(name, loc.sha256)[2],
+                sha256_post_s04=chained(name, loc.sha256)[3],
                 size_bytes=loc.size,
                 is_python=loc.is_python,
                 parses=loc.parses,
@@ -319,10 +340,10 @@ def build_rows(repo_records, local_records, spec):
                 transform_id="",
                 ancestor_path=r.path,
                 ancestor_sha256=r.sha256,
-                sha256_pre_s0=r.sha256,
-                sha256_post_s02=NOT_YET,
-                sha256_post_s03=NOT_YET,
-                sha256_post_s04=NOT_YET,
+                sha256_pre_s0=chained(r.path, r.sha256)[0],
+                sha256_post_s02=chained(r.path, r.sha256)[1],
+                sha256_post_s03=chained(r.path, r.sha256)[2],
+                sha256_post_s04=chained(r.path, r.sha256)[3],
                 size_bytes=r.size,
                 is_python=r.is_python,
                 parses=r.parses,
