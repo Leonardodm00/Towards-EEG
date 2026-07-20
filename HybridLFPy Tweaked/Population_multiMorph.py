@@ -1380,6 +1380,13 @@ class Population(PopulationSuper):
         cell.set_pos(**self.pop_soma_pos[cellindex])
         cell.set_rotation(**self.rotations[cellindex])
 
+
+
+        ### The following function is used to add tonic inhibition as well as, if needed, all the active
+        ### compartments.
+
+        
+
         
 
         ### TODO THE SYNAPSE ARE ALREADY PLACED AT THE FIRST INSTANCE.

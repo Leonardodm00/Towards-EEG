@@ -656,4 +656,93 @@ def cell_MorphSelect(
     )
 
 
+### INSERT MECHANISMS
+def insert_mechanisms(cell, mech_dict):
+    """
+    Inserts mechanisms and sets parameter values in a NEURON/LFPy cell.
 
+    Parameters:
+    - cell: LFPy.Cell object (or equivalent custom class with section lists like somalist, apiclist).
+    - mech_dict: Dictionary structured as:
+        {
+            'section_list_name': {
+                'mechanism_name': {
+                    'parameter_name': value_or_function
+                }
+            }
+        }
+        `value_or_function` can be a float or a callable that takes a segment's
+        distance from the soma and returns a float.
+    """
+
+    # Map the string keys to the actual LFPy cell section lists
+    # Adjust these depending on the exact attributes of your cell object
+    section_lists = {
+        'soma': cell.somalist,
+        'axon': cell.axonlist,
+        'basal': getattr(cell, 'basallist', []), # Using getattr in case the cell lacks the compartment
+        'apic': getattr(cell, 'apiclist', [])
+    }
+
+    # Helper to calculate distance from the soma for a given segment
+    # NEURON's h.distance() needs to be initialized to the soma center
+    h.distance(0, 0.5, sec=cell.somalist[0])
+
+    for sec_type, mechanisms in mech_dict.items():
+        if sec_type not in section_lists:
+            print(f"Warning: Section type '{sec_type}' not found in cell mapping.")
+            continue
+
+        seclist = section_lists[sec_type]
+
+        for sec in seclist:
+            for mech_name, params in mechanisms.items():
+                # Insert the active mechanism (e.g., 'Na_Ta', 'Ih')
+                sec.insert(mech_name)
+
+                for param_name, param_value in params.items():
+                    for seg in sec:
+                        if callable(param_value):
+                            # Calculate distance of this segment from the soma
+                            dist = h.distance(seg.x, sec=sec)
+                            # Apply the distance-dependent function
+                            val = param_value(dist)
+                        else:
+                            # Static value
+                            val = param_value
+
+                        # Set the parameter value dynamically using setattr
+                        # e.g., setattr(seg.Ih, 'gIhbar', val)
+                        mech_obj = getattr(seg, mech_name)
+                        setattr(mech_obj, param_name, val)
+
+
+def get_gIhbar_L5_apical(distance_from_soma, gH_soma=1.74e-5):
+    """
+    Calculates the h-channel conductance density (gIhbar) based on distance from the soma
+    using the sigmoidal function defined for human L5 pyramidal neurons.
+
+    Default gH_soma (1.74e-5 S/cm2) is taken from the Younger Pyr model.
+    Change to 2.34e-5 S/cm2 for the Older Pyr model.
+    """
+    # Prevent potential overflow warnings in np.exp by capping the exponent
+    exponent = (distance_from_soma - 950.0) / -285.0
+
+    # Calculate the sigmoidal multiplier
+    multiplier = 0.5 + (24.0 / (1.0 + np.exp(exponent)))
+
+    return gH_soma * multiplier
+
+
+def get_gCa_HVA_apical(distance_from_soma, gCa_HVA_base=4.59e-6, hotspot_multiplier=100.0):
+    """
+    Calculates the Ca_HVA conductance density, applying a 'hot spot' multiplier
+    if the dendritic segment falls within the 360 to 600 µm range from the soma.
+
+    Default gCa_HVA_base (4.59e-6 S/cm2) is taken from the Younger Pyr model somatic baseline.
+    """
+    if 360.0 <= distance_from_soma <= 600.0:
+        return gCa_HVA_base * hotspot_multiplier
+    else:
+        # Outside the hot spot, conductance remains at baseline levels
+        return gCa_HVA_base
