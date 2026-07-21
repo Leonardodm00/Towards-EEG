@@ -8,6 +8,7 @@ Original file is located at
 """
 
 import os
+from towards_eeg.config import resolve  #S0.6:T11
 from google.colab import drive
 
 # This will prompt you to authorize Colab to access your Drive
@@ -18,7 +19,7 @@ drive.mount('/content/drive',force_remount=True)
 import pickle
 
 
-connectomics_path = '/content/drive/MyDrive/Colab Notebooks/Connectomics/'
+connectomics_path = resolve('connectomics_dir')  #S0.6:T11
 os.chdir(connectomics_path)
 # Define the path to your file (update this if the file is in a different folder)
 file_path = 'conn.pkl'
@@ -551,7 +552,7 @@ column_input = {
 }
 
 
-mtypes, coords = generate_microcolumn_cells(column_input, bbp_results, verbose=True,output_folder='/content/drive/MyDrive/Colab Notebooks/Connectomics/')
+mtypes, coords = generate_microcolumn_cells(column_input, bbp_results, verbose=True,output_folder=resolve('connectomics_dir'))  #S0.6:T11
 
 
 print(f"Generated {len(mtypes)} total cells.")
@@ -684,7 +685,7 @@ def extract_connectivity_dicts(adj_matrix, output_folder=None):
 
 
 
-post_to_pre_dict, pre_to_post_dict = extract_connectivity_dicts(adj_matrix,output_folder = '/content/drive/MyDrive/Colab Notebooks/Connectomics/')
+post_to_pre_dict, pre_to_post_dict = extract_connectivity_dicts(adj_matrix,output_folder = resolve('connectomics_dir'))  #S0.6:T11
 
 
 rebuilt_adj, success = rebuild_and_verify_matrix(adj_matrix, pre_to_post_dict)

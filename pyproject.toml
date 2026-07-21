@@ -43,3 +43,7 @@ namespaces = false
 [tool.setuptools.package-data]
 "towards_eeg.hybrid" = ["README.md"]
 "towards_eeg.io" = ["schemas/*.json"]
+# S0.6: without this a wheel install ships a config package whose resolve()
+# raises FileNotFoundError on the first call, and the failure appears at the
+# call site rather than at install time. Same reasoning as io/schemas above.
+"towards_eeg.config" = ["paths.json"]

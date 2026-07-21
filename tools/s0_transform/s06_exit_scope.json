@@ -1,0 +1,158 @@
+{
+  "note": "Declared scope for the S0.6 exit test. Every declaration here is self-verifying: tools/test_s0_6_exit.py asserts each one STILL APPLIES, so a stale entry is an error rather than a harmless leftover (Doc 7 section 3, Doc 9 G-5, Doc 10 section 5).",
+  "sub_step": "S0.6",
+  "what_s06_claims": "The configuration path literals inside the installed package are externalised to towards_eeg/config/paths.json and reached through towards_eeg.config.resolve(). The transform is declared (T11), logged per occurrence, invertible from its own log, and behaviour-preserving under the shipped default configuration. Nothing else changed.",
+  "transform_id": "T11",
+  "config_module": "towards_eeg.config",
+  "config_data_file": "towards_eeg/config/paths.json",
+  "scope_reconciliation": {
+    "decision": "N-18",
+    "settled": "S0.6 is scoped to the installed package (towards_eeg/) only.",
+    "sources_that_disagreed": {
+      "TEEG_03_roadmap and Doc 6 section 8": "the eight driver path literals",
+      "Doc 5 E-3, quoted in s05_exit_scope.json": "126 '/content/drive/...' style literals across 27 files",
+      "TEEG_10 section 4.1": "6 in towards_eeg/, 118 repo-wide outside tools/, 1 in tools/"
+    },
+    "measured_at_e6e51ea_on_21_july_2026": {
+      "quoted_content_lines_in_towards_eeg": 6,
+      "quoted_content_lines_outside_package_py": 113,
+      "quoted_content_lines_outside_tools_total": 119,
+      "literal_OCCURRENCES_outside_tools_total": 123,
+      "lines_carrying_two_literals": 4,
+      "in_tools": "1, and it is a comment in build_ledger.py, not a literal"
+    },
+    "erratum_H1": "TEEG_10 section 4.1 states 118 repo-wide outside tools/ and 112 outside the package. Measured, those are 119 and 113. The one-line discrepancy is not reproducible under any single quoting variant (104 single-quoted, 15 double-quoted, 119 either), so it is recorded as a miscount rather than explained. The decision-relevant number -- 6 in the package -- reproduced EXACTLY, line for line, so N-18 is unaffected.",
+    "erratum_H1b": "No document distinguishes LINES from OCCURRENCES. Four lines outside the package carry two literals each, all the same align_neurons_to_neighborhood(input_dir=..., output_dir=...) signature, so a line count understates the work by four. A transform log must record occurrences.",
+    "why_not_all_118": "retain-verdict files are not installed and have no consumer. Editing 113 literals across 25 superseded forks and Colab data-prep scripts would be a large byte-changing diff, would multiply the surface on which the byte-identity rule has to be defended, and would benefit nothing that runs.",
+    "the_113_are_assigned_not_dropped": "Doc 10 section 10 item 4 warns against leaving the roadmap's '126' to imply they were handled. They are NOT handled. They are Colab data-prep scripts and superseded forks; TEEG_00 section 2 closes the Colab data-prep scripts as 'not a target', so their literals are correct where they are. The superseded forks are removed, not edited, when their fork is retired. PROPOSED ASSIGNMENT, needs ratification: no stage. Recorded here so it is a decision rather than an omission."
+  },
+  "externalised_occurrences": 5,
+  "distinct_configured_paths": 2,
+  "path_keys": [
+    "connectomics_dir",
+    "connectomics_output_dir"
+  ],
+  "edited_files": [
+    "towards_eeg/connectome/connectivity_buildup.py",
+    "towards_eeg/connectome/usage_example.py"
+  ],
+  "behaviour_preservation": {
+    "requirement": "TEEG_10 section 3.3: the shipped default configuration must resolve to exactly the strings currently hard-coded, byte for byte. Anything else is S0.6 silently FIXING the Colab-dependence defect rather than externalising it, and TEEG_00 section 3 forbids that.",
+    "proof_1_value_equality": "For each occurrence in s06_transform_log.json, resolve(key) equals the recorded prior literal, as a string comparison on exact bytes.",
+    "proof_2_invertibility": "STRONGER, and the one that matters. The log records per occurrence the exact prior line bytes and the exact replacement line bytes, and per file the inserted import. Applying that inverse to the bytes on disk reproduces sha256_before exactly. Value equality proves the five lines are right; invertibility proves NOTHING ELSE IN THE FILE CHANGED, which value equality cannot see.",
+    "what_is_NOT_claimed": "That the two edited modules now run, or import. They do not, and S0.6 does not make them. See unimportable_by_construction below."
+  },
+  "resolver_contract": {
+    "decision": "N-20, lazy resolution",
+    "rule": "Importing towards_eeg.config performs NO filesystem access. The first read happens inside load_paths(), on the first resolve() call.",
+    "rationale": "TEEG_10 section 4.3 justifies laziness by the call sites -- import-time file reads would make the package unimportable when the config is absent. That reasoning does not apply to the five occurrences actually in scope, which are all at MODULE scope in files that already cannot be imported, so at those sites 'use time' and 'import time' are the same instant. The property that is real, and that is asserted here, is a property of the config module's own API: towards_eeg.config must stay importable with no configuration present, because the S0.9 import-surface assertions and any future consumer depend on it.",
+    "forbidden_at_import": [
+      "open",
+      "os.listdir",
+      "json.load"
+    ],
+    "no_search_policy": "No environment-variable lookup, no search path, no user-config merging, no writing. Each would be a behaviour change relative to a hard-coded literal. The `overrides` argument exists so a later stage can inject a mapping at its own call site without this module acquiring a policy."
+  },
+  "excluded_by_declaration": [
+    {
+      "item": "towards_eeg/connectome/connectivity_buildup.py line 14, drive.mount('/content/drive',force_remount=True)",
+      "reason": "Colab API call, not a configurable path. '/content/drive' is the fixed mount point the google.colab runtime provides; it is not something a deployment chooses. Externalising it would create a configuration key that must never be changed, which is worse than leaving the call visible.",
+      "flagged_by": "TEEG_10 section 4.1, 'count it separately'",
+      "assigned_to": "de-Colab follow-on; not S0.6",
+      "self_check": "the exit test asserts this line is still present and still matches, so the exclusion cannot go stale"
+    },
+    {
+      "item": "towards_eeg/io/schema.py resolving schemas/ from os.path.dirname(__file__)",
+      "reason": "Declared in s05_exit_scope.json under package_relative_resource_access. A package locating its own data inside itself is not configuration.",
+      "assigned_to": "nothing; correct as it stands",
+      "self_check": "the exit test reads the S0.5 declaration and asserts the S0.6 sweep honours it, so a sweep that regressed into flagging schema.py fails here rather than being argued about"
+    },
+    {
+      "item": "towards_eeg/config/paths.json itself",
+      "reason": "It is the one place a path literal is supposed to live. Sweeping it would be the sweep flagging its own destination.",
+      "assigned_to": "nothing"
+    }
+  ],
+  "package_sweep": {
+    "rule": "No module under towards_eeg/ may contain an absolute or drive-rooted filesystem path literal, except through towards_eeg.config.",
+    "forbidden_substrings": [
+      "/content/",
+      "/mnt/",
+      "/home/",
+      "C:\\\\",
+      "~/",
+      "/gpfs/",
+      "/scratch/"
+    ],
+    "exempt_files": [
+      "towards_eeg/config/paths.json",
+      "towards_eeg/connectome/connectivity_buildup.py"
+    ],
+    "exempt_file_rationale": "paths.json is the destination. connectivity_buildup.py retains exactly ONE occurrence, the declared drive.mount call above; the exit test asserts the count is exactly one and that it is that call, so the exemption cannot widen silently.",
+    "scope_note": "This is the package-scoped form of smoke assertion 5 and of Doc 3's S0.6 exit test. Doc 5 E-3 established that the repository-wide form is unpassable while the Colab data-prep scripts remain in-tree, which the decision register requires them to do. That was blocking decision B-1, ratified as N-5. Recorded again here because the repository-wide phrasing keeps resurfacing."
+  },
+  "unimportable_by_construction": {
+    "finding": "H-3, new at S0.6; no document anticipates it.",
+    "detail": "Both files carrying the externalised literals are exported Colab notebooks with executable module scope, and neither is importable -- before S0.6 or after it. towards_eeg/connectome/connectivity_buildup.py raises ModuleNotFoundError on `from google.colab import drive`; towards_eeg/connectome/usage_example.py raises NameError on an undefined `column_input` at module scope. Both carry verdict 'keep', so both are in the installed package.",
+    "why_s06_does_not_fix_it": "Hoisting a module-scope statement into a function is a CONTENT operation. Byte-identity rule clause (2) admits only stated mechanical transforms of an ancestor, and 'restructure the module' is not one. S0 fixes no defects (TEEG_00 section 3).",
+    "consequence_for_s09": "Smoke assertion 3, 'importlib.import_module succeeds for every module', is currently unreachable for two keep-verdict files, and no document declares an exemption. This is recorded NOW rather than discovered at S0.9, which is the trap T-16 pattern.",
+    "proposed_defect_class": "O10 -- module-scope notebook body in a keep-verdict package module. PROPOSED, needs ratification. Same shape as O9 in Doc 7 F-3: found by transforming, assigned outside S0 on first appearance.",
+    "proposed_assignment": "S1 or S3, with the exporter-pinning work; not S0.",
+    "self_check": "the exit test asserts BOTH files still fail to import AND that each fails for the declared reason. A file that starts importing means this declaration is stale, which is an error and not good news.",
+    "blockers": {
+      "towards_eeg/connectome/connectivity_buildup.py": {
+        "kind": "module_scope_import",
+        "module": "google.colab",
+        "detail": "Imported at module scope, and followed immediately by a module-scope drive.mount(force_remount=True) call."
+      },
+      "towards_eeg/connectome/usage_example.py": {
+        "kind": "module_scope_unbound_name",
+        "name": "column_input",
+        "detail": "Used at module scope by the Connectomics(...) construction with no module-scope binding anywhere in the file."
+      }
+    },
+    "asserted_statically_not_by_importing": "H-3b, found by the S0.6 mutation harness. The first version of check_13 PROVED this declaration by importing both modules in a subprocess. That is safe on a bare machine and dangerous in Colab, which is the environment TEEG_08 mandates for running these harnesses: in Colab 'from google.colab import drive' SUCCEEDS, so the import proceeds to the next module-scope statement, drive.mount(force_remount=True), which blocks on an interactive authorisation prompt -- and if authorised, executes the rest of a 69 KB notebook body including matrix construction and file writes. An exit test that hangs, or that runs its subject's notebook as a side effect, is worse than one that is merely wrong. The dynamic probe was also environment-dependent for the second file: usage_example.py raises NameError where numpy is installed and ModuleNotFoundError where it is not, so the declared cause was a property of the machine rather than of the code. check_13 is therefore STATIC: it asserts each declared blocker is still present in the AST and that both files still carry an executable module-scope body."
+  },
+  "clause_3_files_changed_at_s06": {
+    "rationale": "S0.6 also edits its own tooling. Those edits are byte-identity rule clause (3) -- new infrastructure on which nothing pre-existing depends -- not T11. They are declared here so that test_s0_chain.py's 'every file not in the transform log is byte-identical across the sub-step' half has a complete set of exceptions, rather than a set that grows by whatever happened to change.",
+    "paths": [
+      "pyproject.toml",
+      "tools/ancestors.json",
+      "tools/s0_ledger/analyse.py",
+      "tools/s0_ledger/render.py",
+      "tools/stamp_phase.py",
+      "tools/test_s0_chain.py",
+      "tools/test_s0_moves_smoke.py",
+      "tools/s0_transform/externalise_paths.py",
+      "tools/s0_transform/s06_targets.json",
+      "tools/s0_transform/s06_exit_scope.json",
+      "tools/test_s0_6_exit.py",
+      "tools/test_s0_6_smoke.py",
+      "towards_eeg/config/__init__.py",
+      "towards_eeg/config/paths.json"
+    ],
+    "self_referential": [
+      "ledger.csv",
+      "LEDGER.md",
+      "tools/phase_hashes.json",
+      "tools/s0_transform/s06_transform_log.json"
+    ]
+  },
+  "transform_register_backfill": {
+    "finding": "H-5, new at S0.6.",
+    "detail": "Before S0.6, tools/ancestors.json's transforms register listed T0 through T6 only, while T7, T7p, T8, T9 and T10 were already in active use in s02_transform_log.json and s03_transform_log.json and were documented only in prose (TEEG_10 section 1). A declaration a tool cannot read is not a declaration.",
+    "remedy": "T7, T7p, T8, T9, T10 and T11 backfilled into the register. The exit test asserts every transform id appearing in ANY transform log is registered, so the register cannot drift behind the logs again."
+  },
+  "known_gaps": [
+    {
+      "gap": "the ledger's transform_id column still reads T6 for the two T11-edited files",
+      "detail": "build_ledger.py derives transform_id from the move and ancestry declarations, which record the S0.4 git mv. It carries one id per row and has no notion of a file that has been through two transforms. The authoritative record of T11 is s06_transform_log.json, and the chain link reads from there, so nothing is unverified -- but a reader of ledger.csv alone would not learn that these two files were edited at S0.6.",
+      "assigned_to": "S0.7 or S0.9, as a transform_id list rather than a scalar"
+    },
+    {
+      "gap": "provenance.json field list",
+      "detail": "Carried forward unchanged from s05_exit_scope.json. TEEG_02 revision 2 was not available to this chat either, so the frozen-instance provenance schema is still not pinned.",
+      "assigned_to": "S1, once TEEG_02 revision 2 is to hand"
+    }
+  ]
+}

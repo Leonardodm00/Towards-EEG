@@ -34,6 +34,7 @@ CSV_COLUMNS = [
     "sha256_post_s03",
     "sha256_post_s04",
     "sha256_post_s05",
+    "sha256_post_s06",
     "size_bytes",
     "is_python",
     "parses",

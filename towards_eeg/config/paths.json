@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "note": "Shipped DEFAULT path configuration for S0.6. Every value here is byte-identical to the string literal it replaced, so that externalisation is provably behaviour-preserving under the shipped default (TEEG_10 section 3.3). Changing a value here changes behaviour and is out of S0's scope; S0 moves the literal, it does not fix it.",
+  "format_rationale": "JSON, not YAML. The roadmap and TEEG_00 say 'config/paths.yaml'. PyYAML is not in the standard library and pyproject.toml deliberately declares no dependencies pending B-4, with S0.8 owning the lockfiles; adopting a dependency here would pre-empt that decision and repeat the requirements.txt mistake the project already decided against. JSON is stdlib and matches the project's own idiom: ancestors.json, path_moves.json, phase_hashes.json, every s0_transform/*.json and every schema in io/schemas/. Recorded as decision N-19; the deviation from the roadmap's stated filename is declared, not silent.",
+  "paths": {
+    "connectomics_dir": {
+      "value": "/content/drive/MyDrive/Colab Notebooks/Connectomics/",
+      "description": "Working directory of the connectome build: holds conn.pkl on input and receives generate_microcolumn_cells and extract_connectivity_dicts output. Four of the five externalised occurrences resolve to this key.",
+      "trailing_separator": "PRESERVED. The literal ends in '/' and call sites concatenate onto it without inserting one. Stripping it would be a behaviour change."
+    },
+    "connectomics_output_dir": {
+      "value": "/content/drive/MyDrive/Colab Notebooks/Connectomic_output/",
+      "description": "Output directory passed to Connectomics.__init__ as connectomics_output; the embryo of instances/col_{h}/ (TEEG_00 section 6, which requires it be externalised rather than deleted).",
+      "spelling_warning": "The DIRECTORY is 'Connectomic_output', singular, while the VARIABLE at the call site is 'connectomics_output', plural. TEEG_00 section 6 names the variable. Shipping 'Connectomics_output' here would break behaviour preservation while looking correct."
+    }
+  },
+  "not_configured_here": {
+    "drive_mount": {
+      "occurrence": "towards_eeg/connectome/connectivity_buildup.py, drive.mount('/content/drive', force_remount=True)",
+      "rationale": "This is a Colab API call, not a configurable path. '/content/drive' is the fixed mount point the google.colab runtime provides; it is not something a deployment chooses. Externalising it would create a configuration key that must never be changed, which is worse than leaving the call visible. It belongs to the de-Colab work, not to paths.json. Flagged in TEEG_10 section 4.1 ('count it separately') and excluded by name in s06_exit_scope.json.",
+      "assigned_to": "de-Colab follow-on; not S0.6"
+    },
+    "package_relative_resources": {
+      "occurrence": "towards_eeg/io/schema.py resolves schemas/ from os.path.dirname(__file__)",
+      "rationale": "Declared in s05_exit_scope.json under package_relative_resource_access. A package locating its own data inside itself is not configuration; a package that had to be told where its own schemas live would be misconfigured rather than flexible. S0.6's sweep honours that declaration.",
+      "assigned_to": "nothing; correct as it stands"
+    }
+  }
+}

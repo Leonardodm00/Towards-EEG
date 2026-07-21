@@ -66,6 +66,7 @@ class LedgerRow:
     sha256_post_s03: str
     sha256_post_s04: str
     sha256_post_s05: str
+    sha256_post_s06: str
     size_bytes: int
     is_python: bool
     parses: bool
@@ -252,7 +253,7 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
         return path, False
 
     def chained(path, measured_sha):
-        """(pre_s0, post_s02, post_s03, post_s04, post_s05) for one path.
+        """(pre_s0, post_s02, post_s03, post_s04, post_s05, post_s06) for one path.
 
         One column per byte-changing sub-step. S0.5 adds files rather than
         transforming any, so it contributes a phase but no chain LINK: there
@@ -267,7 +268,8 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
                 chain.get("post_s02", {}).get(path, NOT_YET),
                 chain.get("post_s03", {}).get(path, NOT_YET),
                 chain.get("post_s04", {}).get(path, NOT_YET),
-                chain.get("post_s05", {}).get(path, NOT_YET))
+                chain.get("post_s05", {}).get(path, NOT_YET),
+                chain.get("post_s06", {}).get(path, NOT_YET))
     local_by_name = {r.path: r for r in local_records}
 
     scopes = [(k, tuple(v)) for k, v in spec["scopes"]]
@@ -356,6 +358,7 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
                 sha256_post_s03=chained(name, loc.sha256)[2],
                 sha256_post_s04=chained(name, loc.sha256)[3],
                 sha256_post_s05=chained(name, loc.sha256)[4],
+                sha256_post_s06=chained(name, loc.sha256)[5],
                 size_bytes=loc.size,
                 is_python=loc.is_python,
                 parses=loc.parses,
@@ -432,6 +435,7 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
                 sha256_post_s03=chained(r.path, r.sha256)[2],
                 sha256_post_s04=chained(r.path, r.sha256)[3],
                 sha256_post_s05=chained(r.path, r.sha256)[4],
+                sha256_post_s06=chained(r.path, r.sha256)[5],
                 size_bytes=r.size,
                 is_python=r.is_python,
                 parses=r.parses,

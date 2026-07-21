@@ -1,4 +1,5 @@
 import os
+from towards_eeg.config import resolve  #S0.6:T11
 import pickle
 import numpy as np
 from scipy import sparse
@@ -839,9 +840,9 @@ def extract_macro_populations(connectomics_data, name_list):
 import pickle
 
 
-connectomics_path = '/content/drive/MyDrive/Colab Notebooks/Connectomics/'
+connectomics_path = resolve('connectomics_dir')  #S0.6:T11
 
-connectomics_output = '/content/drive/MyDrive/Colab Notebooks/Connectomic_output/'
+connectomics_output = resolve('connectomics_output_dir')  #S0.6:T11
 
 
 

@@ -10,7 +10,13 @@
     "T3": "Colab cell magics commented out (applied at S0.2)",
     "T4": "non-ASCII characters transliterated to ASCII (applied at S0.3)",
     "T5": "line endings normalised to LF (applied at S0.3)",
-    "T6": "path change only, via git mv; bytes unchanged (applied at S0.4)"
+    "T6": "path change only, via git mv; bytes unchanged (applied at S0.4)",
+    "T7": "Colab notebook magic neutralised in place, prefixed '#S0.2:T7# ' (applied at S0.2)",
+    "T7p": "Colab notebook magic neutralised where the line also carried code (applied at S0.2)",
+    "T8": "declared whitespace correction (applied at S0.2)",
+    "T9": "non-ASCII characters transliterated to ASCII via s03_translit_map.json (applied at S0.3)",
+    "T10": "line endings normalised to LF (applied at S0.3)",
+    "T11": "declared externalisation of a configuration path literal (applied at S0.6): a string literal in a keep-verdict module is replaced by a call to towards_eeg.config.resolve(key), where the shipped default towards_eeg/config/paths.json maps key to the literal's exact prior bytes. Byte-identity rule clause (2). The transform log is INVERTIBLE: applying the recorded inverse to the current bytes reproduces sha256_before exactly, which is the behaviour-preservation proof required by TEEG_10 section 3.3."
   },
   "new_infrastructure": [
     {
@@ -285,6 +291,41 @@
       "path": "towards_eeg/config/__init__.py",
       "stage": "S0.4",
       "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/config/paths.json",
+      "stage": "S0.6",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the shipped DEFAULT path configuration introduced at S0.6. Every value is byte-identical to the literal it replaced, so externalisation is behaviour-preserving under the shipped default (TEEG_10 section 3.3). Nothing pre-existing depends on it: before S0.6 the strings were inline. Decision N-19: JSON, not YAML, because pyproject.toml declares no dependencies pending B-4 and PyYAML is not stdlib."
+    },
+    {
+      "path": "tools/s0_transform/externalise_paths.py",
+      "stage": "S0.6",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the T11 transform tool."
+    },
+    {
+      "path": "tools/s0_transform/s06_targets.json",
+      "stage": "S0.6",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the declared S0.6 target set."
+    },
+    {
+      "path": "tools/s0_transform/s06_transform_log.json",
+      "stage": "S0.6",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the T11 transform log; self-referential."
+    },
+    {
+      "path": "tools/s0_transform/s06_exit_scope.json",
+      "stage": "S0.6",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the declared S0.6 exit scope."
+    },
+    {
+      "path": "tools/test_s0_6_exit.py",
+      "stage": "S0.6",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the S0.6 exit test."
+    },
+    {
+      "path": "tools/test_s0_6_smoke.py",
+      "stage": "S0.6",
+      "rationale": "new infrastructure (byte-identity rule clause 3): mutation harness for the S0.6 exit test."
     }
   ],
   "scopes": [
@@ -406,5 +447,6 @@
       "rationale": "The older parameter fork: last touched 2026-03-22 against 2026-04-01, and it still carries the hardcoded Potjans-Diesmann full_scale_num_neurons and conn_probs arrays with the X = ['TC','L23E',...] naming, where the survivor reads column properties from Connectomics(Calculate=False) and uses the L23_exc / L4_ss vocabulary the rest of the project speaks. Demoting it also removes four duplicate top-level class names (general_params, point_neuron_network_params, multicompartment_params, MorphoPath) from the installed package.",
       "decided": "2026-07-21"
     }
-  ]
+  ],
+  "transforms_register_note": "H-5, recorded at S0.6: before this sub-step this register listed T0-T6 only, while T7, T8, T9 and T10 were already in active use in s02_transform_log.json and s03_transform_log.json and were documented only in prose (TEEG_10 section 1). A declaration a tool cannot read is not a declaration. Backfilled here; tools/test_s0_6_exit.py asserts every transform id appearing in any log is registered."
 }

@@ -1,0 +1,84 @@
+{
+  "config_file": "towards_eeg/config/paths.json",
+  "declaration": "T11 -- declared externalisation of a configuration path literal. Replaces a string literal in a keep-verdict module with a call to towards_eeg.config.resolve(key), where the shipped default towards_eeg/config/paths.json maps key to the literal's exact prior bytes. Per occurrence the transform log records file, pre-edit line number, the exact prior line bytes (base64), the exact replacement line bytes (base64) and the key introduced; per file it records sha256 before and after and any inserted import line. The transform is INVERTIBLE FROM ITS OWN LOG: applying the recorded inverse to the current bytes must reproduce sha256_before exactly. That inversion, not a value comparison, is the behaviour-preservation proof required by TEEG_10 section 3.3.",
+  "files": [
+    {
+      "edits": [
+        {
+          "key": "connectomics_dir",
+          "line": 21,
+          "literal": "/content/drive/MyDrive/Colab Notebooks/Connectomics/",
+          "original_b64": "Y29ubmVjdG9taWNzX3BhdGggPSAnL2NvbnRlbnQvZHJpdmUvTXlEcml2ZS9Db2xhYiBOb3RlYm9va3MvQ29ubmVjdG9taWNzLyc=",
+          "replacement_b64": "Y29ubmVjdG9taWNzX3BhdGggPSByZXNvbHZlKCdjb25uZWN0b21pY3NfZGlyJykgICNTMC42OlQxMQ==",
+          "transform": "T11"
+        },
+        {
+          "key": "connectomics_dir",
+          "line": 554,
+          "literal": "/content/drive/MyDrive/Colab Notebooks/Connectomics/",
+          "original_b64": "bXR5cGVzLCBjb29yZHMgPSBnZW5lcmF0ZV9taWNyb2NvbHVtbl9jZWxscyhjb2x1bW5faW5wdXQsIGJicF9yZXN1bHRzLCB2ZXJib3NlPVRydWUsb3V0cHV0X2ZvbGRlcj0nL2NvbnRlbnQvZHJpdmUvTXlEcml2ZS9Db2xhYiBOb3RlYm9va3MvQ29ubmVjdG9taWNzLycp",
+          "replacement_b64": "bXR5cGVzLCBjb29yZHMgPSBnZW5lcmF0ZV9taWNyb2NvbHVtbl9jZWxscyhjb2x1bW5faW5wdXQsIGJicF9yZXN1bHRzLCB2ZXJib3NlPVRydWUsb3V0cHV0X2ZvbGRlcj1yZXNvbHZlKCdjb25uZWN0b21pY3NfZGlyJykpICAjUzAuNjpUMTE=",
+          "transform": "T11"
+        },
+        {
+          "key": "connectomics_dir",
+          "line": 687,
+          "literal": "/content/drive/MyDrive/Colab Notebooks/Connectomics/",
+          "original_b64": "cG9zdF90b19wcmVfZGljdCwgcHJlX3RvX3Bvc3RfZGljdCA9IGV4dHJhY3RfY29ubmVjdGl2aXR5X2RpY3RzKGFkal9tYXRyaXgsb3V0cHV0X2ZvbGRlciA9ICcvY29udGVudC9kcml2ZS9NeURyaXZlL0NvbGFiIE5vdGVib29rcy9Db25uZWN0b21pY3MvJyk=",
+          "replacement_b64": "cG9zdF90b19wcmVfZGljdCwgcHJlX3RvX3Bvc3RfZGljdCA9IGV4dHJhY3RfY29ubmVjdGl2aXR5X2RpY3RzKGFkal9tYXRyaXgsb3V0cHV0X2ZvbGRlciA9IHJlc29sdmUoJ2Nvbm5lY3RvbWljc19kaXInKSkgICNTMC42OlQxMQ==",
+          "transform": "T11"
+        }
+      ],
+      "ends_with_newline": false,
+      "insert_import": {
+        "after_line": 10,
+        "rationale": "resolve() must be in scope at the call sites; the import is part of T11 and is recorded so the transform inverts.",
+        "text_b64": "ZnJvbSB0b3dhcmRzX2VlZy5jb25maWcgaW1wb3J0IHJlc29sdmUgICNTMC42OlQxMQ==",
+        "transform": "T11"
+      },
+      "n_lines_after": 1875,
+      "n_lines_before": 1874,
+      "path": "towards_eeg/connectome/connectivity_buildup.py",
+      "sha256_after": "26bd8eed4a7b3ee0a3f831363a0205ef979a69458f5b72afaa7305628419f677",
+      "sha256_before": "1a4618057258f808a87262071e9037effe353d26587de75e04a73a6dd9674a5d"
+    },
+    {
+      "edits": [
+        {
+          "key": "connectomics_dir",
+          "line": 842,
+          "literal": "/content/drive/MyDrive/Colab Notebooks/Connectomics/",
+          "original_b64": "Y29ubmVjdG9taWNzX3BhdGggPSAnL2NvbnRlbnQvZHJpdmUvTXlEcml2ZS9Db2xhYiBOb3RlYm9va3MvQ29ubmVjdG9taWNzLyc=",
+          "replacement_b64": "Y29ubmVjdG9taWNzX3BhdGggPSByZXNvbHZlKCdjb25uZWN0b21pY3NfZGlyJykgICNTMC42OlQxMQ==",
+          "transform": "T11"
+        },
+        {
+          "key": "connectomics_output_dir",
+          "line": 844,
+          "literal": "/content/drive/MyDrive/Colab Notebooks/Connectomic_output/",
+          "original_b64": "Y29ubmVjdG9taWNzX291dHB1dCA9ICcvY29udGVudC9kcml2ZS9NeURyaXZlL0NvbGFiIE5vdGVib29rcy9Db25uZWN0b21pY19vdXRwdXQvJw==",
+          "replacement_b64": "Y29ubmVjdG9taWNzX291dHB1dCA9IHJlc29sdmUoJ2Nvbm5lY3RvbWljc19vdXRwdXRfZGlyJykgICNTMC42OlQxMQ==",
+          "transform": "T11"
+        }
+      ],
+      "ends_with_newline": true,
+      "insert_import": {
+        "after_line": 1,
+        "rationale": "resolve() must be in scope at the call sites; the import is part of T11 and is recorded so the transform inverts.",
+        "text_b64": "ZnJvbSB0b3dhcmRzX2VlZy5jb25maWcgaW1wb3J0IHJlc29sdmUgICNTMC42OlQxMQ==",
+        "transform": "T11"
+      },
+      "n_lines_after": 1053,
+      "n_lines_before": 1052,
+      "path": "towards_eeg/connectome/usage_example.py",
+      "sha256_after": "e0291c5f71fb9036a0ae63f94cd647a197a905b6c6c249ce74babeca8262a901",
+      "sha256_before": "6b3ba3ebd53143a1898ffc78361ba67cb68109b553f25f78efcf27058b989b4c"
+    }
+  ],
+  "generated": "2026-07-21T14:08:39Z",
+  "scope_decision": "N-18. Scoped to the installed package (towards_eeg/) only. Measured on e6e51ea, 21 July 2026: 6 quoted '/content' lines inside towards_eeg/, 113 in retain-verdict files outside it, 1 in tools/ (a comment, not a literal). The roadmap's 'eight' and Doc 5 E-3's '126' are both counts of earlier trees at earlier layouts; the reconciliation is recorded in s06_exit_scope.json so that 'eight' stops resurfacing. retain-verdict files are not installed and have no consumer; editing 113 literals in superseded forks would be a large byte-changing diff with no beneficiary.",
+  "stage": "S0.6",
+  "tool": "tools/s0_transform/externalise_paths.py",
+  "transform_id": "T11",
+  "version": 1
+}

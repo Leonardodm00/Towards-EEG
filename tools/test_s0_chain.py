@@ -31,6 +31,7 @@ Standard library only, ASCII source, Python 3.8+.
 """
 
 import argparse
+import base64
 import csv
 import hashlib
 import json
@@ -43,8 +44,8 @@ if _HERE not in sys.path:
 
 from s0_paths import Resolver  # noqa: E402
 
-PHASE_COLUMNS = ("sha256_post_s05", "sha256_post_s04", "sha256_post_s03",
-                 "sha256_post_s02", "sha256_pre_s0")
+PHASE_COLUMNS = ("sha256_post_s06", "sha256_post_s05", "sha256_post_s04",
+                 "sha256_post_s03", "sha256_post_s02", "sha256_pre_s0")
 
 
 def end_of_chain(row):
@@ -139,9 +140,29 @@ def run(root):
         "ledger post_s03 agrees with the S0.3 log for all %d target(s)" % len(s03)
         if not bad else "mismatch: %r" % bad)
 
-    bad = [p for p, e in s03.items()
-           if os.path.isfile(R.full(p))
-           and sha256_file(R.full(p)) != e["sha256_after"]]
+    # The name of this check states the durable invariant; until S0.6 its body
+    # implemented the stale one, comparing disk against the S0.3 log's
+    # sha256_after. That held while every later sub-step preserved bytes --
+    # S0.4 was git mv, S0.5 only added files -- and expired the moment S0.6
+    # edited two S0.3 targets under T11. It reported two failures that meant
+    # "the chain advanced", which is precisely the misreading Doc 7 s3 warns
+    # about. Comparing against end_of_chain() instead keeps it alive for every
+    # remaining sub-step. That the S0.3 log itself is honoured is already
+    # asserted by check_04, against the ledger rather than against disk.
+    bad = []
+    for p, e in s03.items():
+        full = R.full(p)
+        if not os.path.isfile(full):
+            continue
+        row = L(p)
+        if row is None:
+            bad.append("%s: no ledger row" % p)
+            continue
+        col, expected = end_of_chain(row)
+        if expected is None:
+            continue
+        if sha256_file(full) != expected:
+            bad.append("%s (vs %s)" % (p, col))
     add("check_05_disk_equals_end_of_chain", not bad,
         "bytes on disk match the end of the chain for all %d target(s)" % len(s03)
         if not bad else "mismatch: %r" % bad)
@@ -168,7 +189,21 @@ def run(root):
         "tools/s0_transform/s03_transform_log.json",
         "tools/s0_transform/s02_colab_commands.json",
     }
-    touched = set(s03) | set(s02 or {}) | SELF_REFERENTIAL
+    # S0.6 additions: the T11 targets, the clause-(3) tooling edits it declares,
+    # and its own log. Read from the declaration, never from a literal list --
+    # trap T-15, a check that names a moving target quietly verifies less.
+    s06_declared = set()
+    _sc = os.path.join(root, "tools", "s0_transform", "s06_exit_scope.json")
+    if os.path.isfile(_sc):
+        with open(_sc, "r", encoding="utf-8") as fh:
+            _d = json.load(fh)["clause_3_files_changed_at_s06"]
+        s06_declared = set(_d["paths"]) | set(_d["self_referential"])
+    _sl = os.path.join(root, "tools", "s0_transform", "s06_transform_log.json")
+    if os.path.isfile(_sl):
+        with open(_sl, "r", encoding="utf-8") as fh:
+            s06_declared |= set(e["path"] for e in json.load(fh)["files"])
+
+    touched = set(s03) | set(s02 or {}) | SELF_REFERENTIAL | s06_declared
     drifted = []
     for p, row in led.items():
         if p in touched or row["verdict"] == "discard":
@@ -224,6 +259,99 @@ def run(root):
         add("check_09_s04_moves_changed_no_bytes", not bad,
             "post_s04 == post_s03 for all %d moved file(s)" % len(stamped)
             if not bad else "T6 changed bytes: %r" % bad[:5])
+
+    # -- link 4: S0.6 -------------------------------------------------------
+    # S0.4 moved files and S0.5 only added them, so each contributed a phase
+    # COLUMN but no link: post_s04 == post_s03 is an equality about bytes that
+    # did not change. S0.6 is the first sub-step since S0.3 to edit the content
+    # of existing files, so it needs a real link, and a link has two halves.
+    #
+    # Half A is the obvious one: every file T11 touched must have changed, and
+    # changed to exactly the bytes the log records.
+    # Half B is the one that is easy to omit (TEEG_10 s3.2): every file T11 did
+    # NOT touch must be byte-identical across the sub-step. Without half B, a
+    # transform could edit an undeclared file and the chain would still report
+    # continuous, because nothing would be looking at that file.
+    s06_log = os.path.join(root, "tools", "s0_transform", "s06_transform_log.json")
+    s06_scope = os.path.join(root, "tools", "s0_transform", "s06_exit_scope.json")
+    if not os.path.isfile(s06_log):
+        add("check_11_s06_link_present", False, "no S0.6 transform log")
+        return results
+
+    with open(s06_log, "r", encoding="utf-8") as fh:
+        s06 = dict((e["path"], e) for e in json.load(fh)["files"])
+    with open(s06_scope, "r", encoding="utf-8") as fh:
+        scope6 = json.load(fh)
+
+    # -- half A -------------------------------------------------------------
+    bad = []
+    for p, e in s06.items():
+        row = led.get(p)
+        if row is None:
+            bad.append("%s: no ledger row" % p)
+            continue
+        if row["sha256_post_s05"] != e["sha256_before"]:
+            bad.append("%s: T11 did not start from the post-S0.5 bytes" % p)
+        if row["sha256_post_s06"] != e["sha256_after"]:
+            bad.append("%s: ledger post_s06 disagrees with the T11 log" % p)
+        if row["sha256_post_s06"] == row["sha256_post_s05"]:
+            bad.append("%s: declared as edited by T11 but no byte changed" % p)
+    add("check_11_s06_edited_files_changed_to_the_logged_bytes", not bad,
+        "all %d T11 target(s) start from post_s05, end at the logged hash, and "
+        "did change" % len(s06) if not bad else "; ".join(bad[:5]))
+
+    # -- half B -------------------------------------------------------------
+    declared = set(s06)
+    declared |= set(scope6["clause_3_files_changed_at_s06"]["paths"])
+    declared |= set(scope6["clause_3_files_changed_at_s06"]["self_referential"])
+    drifted = []
+    for p, row in led.items():
+        if p in declared or row["verdict"] == "discard":
+            continue
+        a, b = row.get("sha256_post_s05", "-"), row.get("sha256_post_s06", "-")
+        if a in ("-", "") or b in ("-", ""):
+            continue
+        if a != b:
+            drifted.append(p)
+    add("check_12_s06_changed_nothing_undeclared", not drifted,
+        "%d row(s) carry both stamps and every one outside the %d declared "
+        "path(s) is byte-identical across S0.6"
+        % (sum(1 for r in led.values()
+               if r.get("sha256_post_s05", "-") not in ("-", "")
+               and r.get("sha256_post_s06", "-") not in ("-", "")), len(declared))
+        if not drifted else "changed with no declaration: %r" % drifted[:10])
+
+    # -- half A, strengthened: the transform inverts -------------------------
+    # A hash equality proves the file ended where the log says. It does not
+    # prove the log DESCRIBES the change. Inverting the recorded edits and
+    # recovering sha256_before proves that nothing outside a declared edit
+    # moved -- a statement about the whole file, not about five lines.
+    bad = []
+    for p, e in s06.items():
+        full = os.path.join(root, p)
+        if not os.path.isfile(full):
+            bad.append("%s: absent" % p)
+            continue
+        try:
+            with open(full, "rb") as fh:
+                text = fh.read().decode("ascii")
+            lines = text.split("\n")
+            if text.endswith("\n"):
+                lines = lines[:-1]
+            idx = e["insert_import"]["after_line"]
+            del lines[idx]
+            for ed in e["edits"]:
+                lines[ed["line"] - 1] = base64.b64decode(
+                    ed["original_b64"].encode("ascii")).decode("utf-8")
+            back = "\n".join(lines) + ("\n" if e["ends_with_newline"] else "")
+            if hashlib.sha256(back.encode("ascii")).hexdigest() != e["sha256_before"]:
+                bad.append("%s: inverse does not reproduce sha256_before" % p)
+        except Exception as exc:                            # noqa: BLE001
+            bad.append("%s: inversion failed: %s" % (p, exc))
+    add("check_13_t11_inverts_to_its_prior_bytes", not bad,
+        "the recorded inverse of T11 reproduces the pre-S0.6 bytes of all %d "
+        "file(s); nothing changed outside a declared edit" % len(s06)
+        if not bad else "; ".join(bad[:5]))
 
     # -- no logged file may fall out of the checks above ---------------------
     # Every check in this file is of the form "for each entry in a log, look
