@@ -5,7 +5,7 @@ stamp_phase.py -- advance the ledger's hash chain by one sub-step.
 WHY THIS EXISTS
 ---------------
 `build_ledger.py` writes `sha256_pre_s0` from whatever is on disk and leaves
-`sha256_post_s02` / `_post_s03` / `_post_s04` as the sentinel "-". That is
+`sha256_post_s02` / `_post_s03` / `_post_s04` / `_post_s05` as "-". That is
 correct at S0.0 and wrong from S0.2 onward, for two reasons:
 
   1. Nothing filled the chain columns. Smoke assertion 8 (byte-identity
@@ -41,7 +41,7 @@ if _HERE not in sys.path:
 
 from s0_ledger import render, scan  # noqa: E402
 
-PHASES = ("pre_s0", "post_s02", "post_s03", "post_s04")
+PHASES = ("pre_s0", "post_s02", "post_s03", "post_s04", "post_s05")
 ABSENT = "-"
 
 MEASURED_COLUMNS = ("size_bytes", "is_python", "parses", "n_syntax_warnings",

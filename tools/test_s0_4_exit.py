@@ -122,13 +122,26 @@ def run(root):
         if not problems else "; ".join(problems[:5]))
 
     # -- 2: nothing entered the package that was not declared ---------------
+    # "Declared" spans stages, not just this one. A file created by a LATER
+    # sub-step and declared as new infrastructure in tools/ancestors.json is
+    # declared; requiring it to be an S0.4 move target would force every later
+    # stage either to lie about when its files appeared or to weaken this
+    # check. What must still fail is a file declared NOWHERE.
     declared_targets = set(m["to"] for m in s04_moves)
+    with open(os.path.join(root, "tools", "ancestors.json"),
+              "r", encoding="utf-8") as fh:
+        anc = json.load(fh)
+    declared_new = set(e if isinstance(e, str) else e["path"]
+                       for e in anc.get("new_infrastructure", []))
     markers = set(p for p in modules if os.path.basename(p) == "__init__.py")
-    undeclared = [p for p in modules
-                  if p not in declared_targets and p not in markers]
+    undeclared = [p for p in modules if p not in declared_targets
+                  and p not in declared_new and p not in markers]
+    later = sorted(p for p in modules if p in declared_new)
     add("check_02_no_undeclared_file_in_the_package", not undeclared,
-        "every .py in %s is either a declared move target or a package marker"
-        % pkg_root if not undeclared else "undeclared: %r" % undeclared)
+        "every .py in %s is a declared S0.4 move target, a package marker, or "
+        "declared new infrastructure from a later sub-step (%d of those)"
+        % (pkg_root, len(later))
+        if not undeclared else "undeclared: %r" % undeclared)
 
     # -- 3: the layout is the declared one ----------------------------------
     missing, unmarked = [], []

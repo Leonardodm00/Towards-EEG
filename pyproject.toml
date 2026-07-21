@@ -42,3 +42,4 @@ namespaces = false
 
 [tool.setuptools.package-data]
 "towards_eeg.hybrid" = ["README.md"]
+"towards_eeg.io" = ["schemas/*.json"]

@@ -49,6 +49,7 @@ def fixture(root):
                     os.path.join(tmp, "towards_eeg"))
     os.makedirs(os.path.join(tmp, "tools", "s0_transform"))
     for rel in ("tools/path_moves.json",
+                "tools/ancestors.json",
                 "tools/s0_transform/s04_exit_scope.json",
                 "tools/s0_paths.py",
                 "tools/apply_moves.py",
@@ -123,7 +124,15 @@ def m_remove_a_package_marker(tmp):
 
 
 def m_populate_an_empty_package(tmp):
-    with open(os.path.join(tmp, "towards_eeg", "io", "readers.py"),
+    # Read the target from the declaration rather than naming a package.
+    # This mutation used to hardcode towards_eeg/io, which S0.5 legitimately
+    # populated -- so the mutation silently stopped testing anything. A
+    # mutation that names a moving target rots into a no-op (trap T-11).
+    with open(os.path.join(tmp, "tools", "s0_transform", "s04_exit_scope.json"),
+              "r", encoding="utf-8") as fh:
+        pkgs = json.load(fh)["empty_by_construction"]["packages"]
+    assert pkgs, "no package is declared empty; this mutation has no subject"
+    with open(os.path.join(tmp, pkgs[0], "readers.py"),
               "w", encoding="ascii", newline="\n") as fh:
         fh.write("x = 1\n")
     return "check_04_empty_packages_are_still_empty"

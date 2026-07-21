@@ -1,0 +1,130 @@
+{
+  "contract_id": "C-15",
+  "title": "Active mechanism specification",
+  "status_in_repository": "PROPOSED",
+  "status_note": "SCHEMA ONLY at S0.5. Implementation is deferred to S3 by closed decision (TEEG_00 section 2).",
+  "key": [
+    "layer",
+    "gtype"
+  ],
+  "key_note": "keyed identically to C-14, deliberately",
+  "row_meaning": "one row per (layer, gtype, section_key, mechanism, parameter)",
+  "source": "TEEG_02_interface_contracts_v3.md C-15",
+  "invariants": [
+    "I-13c"
+  ],
+  "signature": "for each fixed (layer, gtype): D_{l,g} maps Sigma_cls x Sigma_dom to (mech -> param -> real or callable)",
+  "fields": [
+    {
+      "name": "layer",
+      "type": "str",
+      "units": null,
+      "required": true
+    },
+    {
+      "name": "gtype",
+      "type": "str",
+      "units": null,
+      "required": true
+    },
+    {
+      "name": "mechanism_mode",
+      "type": "str",
+      "units": null,
+      "required": true,
+      "enum": "mechanism_mode",
+      "note": "a property of a SIMULATION, global and not per-cell, written into provenance.json"
+    },
+    {
+      "name": "section_key",
+      "type": "pair",
+      "units": null,
+      "required": true,
+      "element_enum": "section_vocabulary",
+      "meaning": "the (class, domain) pair this row applies to",
+      "note": "rule R6: dom(D) must be a subset of varsigma(nu) for every assignable nu. Invariant I-13c."
+    },
+    {
+      "name": "mechanism",
+      "type": "str",
+      "units": null,
+      "required": true
+    },
+    {
+      "name": "parameter",
+      "type": "str",
+      "units": null,
+      "required": true
+    },
+    {
+      "name": "value",
+      "type": "float_or_callable_name",
+      "units": null,
+      "required": true,
+      "note": "a real number, or the name of an entry in callable_registry"
+    },
+    {
+      "name": "source",
+      "type": "str",
+      "units": null,
+      "required": true
+    },
+    {
+      "name": "provenance",
+      "type": "str",
+      "units": null,
+      "required": true
+    }
+  ],
+  "constraint_C15_2": "mechanism_mode == 'passive' implies D_{l,g} is empty for all (layer, gtype)",
+  "callable_registry": [
+    {
+      "name": "ih_sigmoid_L5",
+      "equation": "C15.3",
+      "applies_to": [
+        [
+          "dend",
+          "apical"
+        ],
+        [
+          "dend",
+          "basal"
+        ]
+      ],
+      "applies_to_note": "BOTH apical and basal dendrite, per its source",
+      "argument": "x, path distance from the soma, in um",
+      "form": "g_H(x) = g_H_soma * (0.5 + 24 / (1 + exp((x - 950) / -285)))",
+      "constants": {
+        "offset": 0.5,
+        "amplitude": 24.0,
+        "midpoint_um": 950.0,
+        "scale_um": -285.0
+      },
+      "implemented": false,
+      "implemented_note": "S0.5 pins the signature and the constants; the body is S3. Every constant carries source and provenance in the table and none is hard-coded in a function signature."
+    },
+    {
+      "name": "ca_hotspot",
+      "equation": "C15.4",
+      "applies_to": [
+        [
+          "dend",
+          "apical"
+        ]
+      ],
+      "applies_to_note": "apical dendrite only",
+      "argument": "x, path distance from the soma, in um",
+      "form": "g(x) = g_base * M for x in [360, 600] um, else g_base",
+      "constants": {
+        "x_min_um": 360.0,
+        "x_max_um": 600.0,
+        "multiplier_by_channel": {
+          "Ca_LVA": 100.0,
+          "Ca_HVA": 10.0
+        }
+      },
+      "implemented": false,
+      "implemented_note": "S0.5 pins the signature and the constants; the body is S3."
+    }
+  ]
+}

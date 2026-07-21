@@ -65,6 +65,7 @@ class LedgerRow:
     sha256_post_s02: str
     sha256_post_s03: str
     sha256_post_s04: str
+    sha256_post_s05: str
     size_bytes: int
     is_python: bool
     parses: bool
@@ -251,12 +252,22 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
         return path, False
 
     def chained(path, measured_sha):
-        """(pre_s0, post_s02, post_s03, post_s04) for one path."""
+        """(pre_s0, post_s02, post_s03, post_s04, post_s05) for one path.
+
+        One column per byte-changing sub-step. S0.5 adds files rather than
+        transforming any, so it contributes a phase but no chain LINK: there
+        is no S0.5 transform log to be equal to. The column exists so that
+        check_07's end-of-chain describes the tree as it now is; without it,
+        files created at S0.5 would be stamped into post_s04 and the
+        regenerable record would say they existed a sub-step earlier than
+        they did.
+        """
         pre = chain.get("pre_s0", {}).get(path, measured_sha)
         return (pre,
                 chain.get("post_s02", {}).get(path, NOT_YET),
                 chain.get("post_s03", {}).get(path, NOT_YET),
-                chain.get("post_s04", {}).get(path, NOT_YET))
+                chain.get("post_s04", {}).get(path, NOT_YET),
+                chain.get("post_s05", {}).get(path, NOT_YET))
     local_by_name = {r.path: r for r in local_records}
 
     scopes = [(k, tuple(v)) for k, v in spec["scopes"]]
@@ -344,6 +355,7 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
                 sha256_post_s02=chained(name, loc.sha256)[1],
                 sha256_post_s03=chained(name, loc.sha256)[2],
                 sha256_post_s04=chained(name, loc.sha256)[3],
+                sha256_post_s05=chained(name, loc.sha256)[4],
                 size_bytes=loc.size,
                 is_python=loc.is_python,
                 parses=loc.parses,
@@ -419,6 +431,7 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
                 sha256_post_s02=chained(r.path, r.sha256)[1],
                 sha256_post_s03=chained(r.path, r.sha256)[2],
                 sha256_post_s04=chained(r.path, r.sha256)[3],
+                sha256_post_s05=chained(r.path, r.sha256)[4],
                 size_bytes=r.size,
                 is_python=r.is_python,
                 parses=r.parses,

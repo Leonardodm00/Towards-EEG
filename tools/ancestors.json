@@ -14,6 +14,66 @@
   },
   "new_infrastructure": [
     {
+      "path": "towards_eeg/io/schema.py",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "towards_eeg/io/geometry.py",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "towards_eeg/io/invariants.py",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "towards_eeg/io/validate.py",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "towards_eeg/io/schemas/alphabets.json",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "towards_eeg/io/schemas/C08_morphology_bank.json",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "towards_eeg/io/schemas/C09_observed_synapses.json",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "towards_eeg/io/schemas/C14_passive_parameters.json",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "towards_eeg/io/schemas/C15_mechanism_spec.json",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "tools/test_s0_5_exit.py",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "tools/test_s0_5_smoke.py",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "tools/s0_transform/s05_exit_scope.json",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
       "path": "pyproject.toml",
       "stage": "S0.4",
       "rationale": "new infrastructure (byte-identity rule clause 3): the packaging declaration. Dependencies deliberately empty until B-4 is answered and S0.8 generates the lockfiles from a real pip freeze."

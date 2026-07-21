@@ -43,7 +43,7 @@ if _HERE not in sys.path:
 
 from s0_paths import Resolver  # noqa: E402
 
-PHASE_COLUMNS = ("sha256_post_s04", "sha256_post_s03",
+PHASE_COLUMNS = ("sha256_post_s05", "sha256_post_s04", "sha256_post_s03",
                  "sha256_post_s02", "sha256_pre_s0")
 
 

@@ -18,12 +18,14 @@
       "towards_eeg/pointnet",
       "towards_eeg/cosim",
       "towards_eeg/passive",
-      "towards_eeg/io",
       "towards_eeg/config"
     ],
-    "rationale": "Appendix A's layout names nine subpackages; only hybrid/ and connectome/ have any existing file whose verdict is 'keep'. S0 may only move files, so the rest carry a package marker and nothing else. structure/ is populated in S1, pointnet/ in S4, cosim/ in S5, io/ in S0.5, config/ in S0.6, passive/ by S6."
+    "rationale": "Appendix A's layout names nine subpackages; only hybrid/ and connectome/ have any existing file whose verdict is 'keep'. S0 may only move files, so the rest carry a package marker and nothing else. structure/ is populated in S1, pointnet/ in S4, cosim/ in S5, io/ in S0.5, config/ in S0.6, passive/ by S6. towards_eeg/io was populated at S0.5 and removed from this list on 21 July 2026; check_04 of the S0.4 exit test required the edit rather than tolerating the change, which is the declaration working."
   },
-  "retired_filename_suffixes": ["_multiMorph", "_CHANGED"],
+  "retired_filename_suffixes": [
+    "_multiMorph",
+    "_CHANGED"
+  ],
   "duplicate_class_allowlist": [
     {
       "name": "Connectomics",

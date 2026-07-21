@@ -1,10 +1,10 @@
 # Towards-EEG -- S0.0 Reconciliation Ledger
 
 **Stage:** S0.0 (roadmap rev 3, section 3.2)  
-**Generated:** 2026-07-21 11:06:22 UTC by `s0_ledger` v1.0.0  
+**Generated:** 2026-07-21 12:56:54 UTC by `s0_ledger` v1.0.0  
 **Snapshot:** `github.com/Leonardodm00/Towards-EEG@main`, 2026-07-19  
 **Tree root:** `<repository root>`  
-**Rows:** 193 (189 repository files + 4 local working files)
+**Rows:** 205 (201 repository files + 4 local working files)
 
 This ledger is the evidence base for the byte-identity rule (handoff
 brief section 3). Every file in the reorganised tree must be (1) byte-identical
@@ -32,7 +32,7 @@ relationship agrees with the measured hashes.
 |--------------|--------|
 | discard      | 22     |
 | keep         | 13     |
-| new          | 46     |
+| new          | 58     |
 | retain       | 112    |
 
 ### By scope
@@ -40,7 +40,7 @@ relationship agrees with the measured hashes.
 | scope          | files  |
 |----------------|--------|
 | colab          | 60     |
-| infrastructure | 46     |
+| infrastructure | 58     |
 | orchestrator   | 18     |
 | passive        | 69     |
 
@@ -55,11 +55,12 @@ relationship agrees with the measured hashes.
 | S0.2c    | 3      |
 | S0.3     | 9      |
 | S0.4     | 21     |
+| S0.5     | 12     |
 | S0.7     | 22     |
 
 ### Python surface at pre-s0
 
-- python files: **108**
+- python files: **114**
 - failing `ast.parse`: **0**
 - containing bytes >= 0x80: **0**
 - non-ASCII and no PEP 263 cookie: **0**
@@ -384,14 +385,14 @@ that equality IS the exit test for the move.
 | final_get_comparments_h10.py                                                 | colab         | -      | retain   | f967b32cd895  | ed4  | 92d  | 92d  |
 | utility.py                                                                   | colab         | -      | retain   | a20f39eedd3b  | 2ab  | 51e  | 51e  |
 | .gitattributes                                                               | infrastructure | S0.3   | new      | 21a67317bef6  | -    | -    | 21a  |
-| LEDGER.md                                                                    | infrastructure | S0.0   | new      | 5075a5ab0a05  | 0bf  | eaa  | 00b  |
-| ledger.csv                                                                   | infrastructure | S0.0   | new      | 8f2951bdd603  | 32b  | 851  | 90a  |
-| pyproject.toml                                                               | infrastructure | S0.4   | new      | 2109a35de6b6  | -    | -    | 210  |
+| LEDGER.md                                                                    | infrastructure | S0.0   | new      | 5075a5ab0a05  | 0bf  | eaa  | 587  |
+| ledger.csv                                                                   | infrastructure | S0.0   | new      | 8f2951bdd603  | 32b  | 851  | 9d7  |
+| pyproject.toml                                                               | infrastructure | S0.4   | new      | 377f9664b589  | -    | -    | 210  |
 | tools/ancestors.json                                                         | infrastructure | S0.0   | new      | 3a0672db37f8  | 2a3  | 2a3  | 8a0  |
 | tools/apply_moves.py                                                         | infrastructure | S0.2c  | new      | 5615213c62b1  | -    | 5f3  | 561  |
-| tools/build_ledger.py                                                        | infrastructure | S0.0   | new      | afb19b68ac9a  | 0a3  | 2e3  | 2e3  |
+| tools/build_ledger.py                                                        | infrastructure | S0.0   | new      | afb19b68ac9a  | 0a3  | 2e3  | ebf  |
 | tools/path_moves.json                                                        | infrastructure | S0.2c  | new      | baf9c7926395  | -    | 6e8  | baf  |
-| tools/phase_hashes.json                                                      | infrastructure | S0.2   | new      | e007c5befd50  | -    | ab1  | f6b  |
+| tools/phase_hashes.json                                                      | infrastructure | S0.2   | new      | e0797061508d  | -    | ab1  | e00  |
 | tools/s0_ledger/__init__.py                                                  | infrastructure | S0.0   | new      | 7ec4151c2327  | 7ec  | 7ec  | 7ec  |
 | tools/s0_ledger/analyse.py                                                   | infrastructure | S0.0   | new      | 8cb68f8e03ad  | a1f  | 336  | 7d0  |
 | tools/s0_ledger/render.py                                                    | infrastructure | S0.0   | new      | 5ae8d7abf0ce  | 5ae  | 610  | 610  |
@@ -409,23 +410,35 @@ that equality IS the exit test for the move.
 | tools/s0_transform/s03_targets.json                                          | infrastructure | S0.3   | new      | 073092c2968b  | -    | -    | 073  |
 | tools/s0_transform/s03_transform_log.json                                    | infrastructure | S0.3   | new      | e1dc45bfda62  | -    | -    | e1d  |
 | tools/s0_transform/s03_translit_map.json                                     | infrastructure | S0.3   | new      | 5f0fd4bf6e2b  | -    | -    | 5f0  |
-| tools/s0_transform/s04_exit_scope.json                                       | infrastructure | S0.0   | new      | 2baaa0cadab8  | -    | -    | 2ba  |
-| tools/stamp_phase.py                                                         | infrastructure | S0.2   | new      | 7acecd1899d8  | -    | 7ac  | 7ac  |
+| tools/s0_transform/s04_exit_scope.json                                       | infrastructure | S0.0   | new      | 43f188d585c7  | -    | -    | 2ba  |
+| tools/s0_transform/s05_exit_scope.json                                       | infrastructure | S0.5   | new      | ec3d7b5b4a53  | -    | -    | -    |
+| tools/stamp_phase.py                                                         | infrastructure | S0.2   | new      | 492dac01b50a  | -    | 7ac  | 7ac  |
 | tools/test_s0_2_exit.py                                                      | infrastructure | S0.2   | new      | dc29ec7d7c87  | -    | dc2  | dc2  |
 | tools/test_s0_3_exit.py                                                      | infrastructure | S0.3   | new      | 17df58d01aab  | -    | -    | 17d  |
-| tools/test_s0_4_exit.py                                                      | infrastructure | S0.4   | new      | 2d8568f419f3  | -    | -    | 2d8  |
-| tools/test_s0_4_smoke.py                                                     | infrastructure | S0.0   | new      | 5654ff7cd8e7  | -    | -    | 565  |
+| tools/test_s0_4_exit.py                                                      | infrastructure | S0.4   | new      | ddf9ba47b8a6  | -    | -    | 2d8  |
+| tools/test_s0_4_smoke.py                                                     | infrastructure | S0.0   | new      | 7a8d6f644cff  | -    | -    | 565  |
+| tools/test_s0_5_exit.py                                                      | infrastructure | S0.5   | new      | b41fdf00ac88  | -    | -    | -    |
+| tools/test_s0_5_smoke.py                                                     | infrastructure | S0.5   | new      | 8d10fc9624e5  | -    | -    | -    |
 | tools/test_s0_asciify_smoke.py                                               | infrastructure | S0.3   | new      | 64f7aebbfd75  | -    | -    | 64f  |
-| tools/test_s0_chain.py                                                       | infrastructure | S0.3   | new      | a88508717441  | -    | -    | a88  |
+| tools/test_s0_chain.py                                                       | infrastructure | S0.3   | new      | be648dc4f3be  | -    | -    | a88  |
 | tools/test_s0_decolab_smoke.py                                               | infrastructure | S0.2   | new      | 49b18e35dbb5  | -    | 49b  | 49b  |
 | tools/test_s0_ledger_smoke.py                                                | infrastructure | S0.0   | new      | 57eae0d12bc9  | 57e  | 57e  | 57e  |
-| tools/test_s0_moves_smoke.py                                                 | infrastructure | S0.2c  | new      | c18c4087d8b5  | -    | 42e  | c18  |
+| tools/test_s0_moves_smoke.py                                                 | infrastructure | S0.2c  | new      | c0e46e478ac0  | -    | 42e  | c18  |
 | towards_eeg/__init__.py                                                      | infrastructure | S0.4   | new      | 53378de1aac3  | -    | -    | 533  |
 | towards_eeg/config/__init__.py                                               | infrastructure | S0.4   | new      | edbe5540e130  | -    | -    | edb  |
 | towards_eeg/connectome/__init__.py                                           | infrastructure | S0.4   | new      | 4b53382c2d9e  | -    | -    | 4b5  |
 | towards_eeg/cosim/__init__.py                                                | infrastructure | S0.4   | new      | 69c430578222  | -    | -    | 69c  |
 | towards_eeg/hybrid/__init__.py                                               | infrastructure | S0.4   | new      | a16a45a3ec5b  | -    | -    | a16  |
-| towards_eeg/io/__init__.py                                                   | infrastructure | S0.4   | new      | 0aa0dd1bb650  | -    | -    | 0aa  |
+| towards_eeg/io/__init__.py                                                   | infrastructure | S0.4   | new      | d678cb676da1  | -    | -    | 0aa  |
+| towards_eeg/io/geometry.py                                                   | infrastructure | S0.5   | new      | a33cf6906644  | -    | -    | -    |
+| towards_eeg/io/invariants.py                                                 | infrastructure | S0.5   | new      | b45c66152e47  | -    | -    | -    |
+| towards_eeg/io/schema.py                                                     | infrastructure | S0.5   | new      | c67c878b9889  | -    | -    | -    |
+| towards_eeg/io/schemas/C08_morphology_bank.json                              | infrastructure | S0.5   | new      | 613bb0403aaa  | -    | -    | -    |
+| towards_eeg/io/schemas/C09_observed_synapses.json                            | infrastructure | S0.5   | new      | adb16e556f93  | -    | -    | -    |
+| towards_eeg/io/schemas/C14_passive_parameters.json                           | infrastructure | S0.5   | new      | 41d7a55b20eb  | -    | -    | -    |
+| towards_eeg/io/schemas/C15_mechanism_spec.json                               | infrastructure | S0.5   | new      | c287c9febd4f  | -    | -    | -    |
+| towards_eeg/io/schemas/alphabets.json                                        | infrastructure | S0.5   | new      | a8332981d5cb  | -    | -    | -    |
+| towards_eeg/io/validate.py                                                   | infrastructure | S0.5   | new      | 4aedc7dabc05  | -    | -    | -    |
 | towards_eeg/passive/__init__.py                                              | infrastructure | S0.4   | new      | a06facd2152f  | -    | -    | a06  |
 | towards_eeg/pointnet/__init__.py                                             | infrastructure | S0.4   | new      | 5be4441efb25  | -    | -    | 5be  |
 | towards_eeg/structure/__init__.py                                            | infrastructure | S0.4   | new      | 835cb1cb771f  | -    | -    | 835  |

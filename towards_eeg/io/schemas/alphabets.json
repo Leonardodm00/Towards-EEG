@@ -1,0 +1,134 @@
+{
+  "note": "Fixed alphabets and enumerated vocabularies pinned from TEEG_02 rev 3. S0.5 pins these; it populates nothing and reads no bank.",
+  "source": "TEEG_02_interface_contracts_v3.md sections 1, 3.1, C8.1, C-14, C-15",
+  "sigma_cls": {
+    "symbol": "Sigma_cls",
+    "meaning": "compartment-class alphabet",
+    "values": [
+      "soma",
+      "axon",
+      "dend"
+    ],
+    "source": "TEEG_02 section 1"
+  },
+  "sigma_dom": {
+    "symbol": "Sigma_dom",
+    "meaning": "dendrite-domain alphabet",
+    "values": [
+      "apical",
+      "basal",
+      "none"
+    ],
+    "source": "TEEG_02 section 1"
+  },
+  "sigma_syn": {
+    "symbol": "Sigma_syn",
+    "meaning": "synapse-type alphabet; a per-synapse attribute of C-09, NEVER a section label",
+    "values": [
+      "exc_syn",
+      "inh_syn"
+    ],
+    "source": "TEEG_02 section 1 and C8.1"
+  },
+  "section_vocabulary": {
+    "meaning": "the four admissible (class, domain) pairs of C8.1, with the NEURON section-array name chosen so that LFPy.Cell.get_idx(section=...) selects on either component by substring with no extra code",
+    "constraint_C8_1": "sigma_dom == 'none' if and only if sigma_cls in {'soma', 'axon'}",
+    "pairs": [
+      {
+        "cls": "soma",
+        "dom": "none",
+        "section_array": "soma",
+        "get_idx_substrings": [
+          "soma"
+        ]
+      },
+      {
+        "cls": "axon",
+        "dom": "none",
+        "section_array": "axon",
+        "get_idx_substrings": [
+          "axon"
+        ]
+      },
+      {
+        "cls": "dend",
+        "dom": "apical",
+        "section_array": "apic_dend",
+        "get_idx_substrings": [
+          "apic",
+          "dend"
+        ]
+      },
+      {
+        "cls": "dend",
+        "dom": "basal",
+        "section_array": "basal_dend",
+        "get_idx_substrings": [
+          "basal",
+          "dend"
+        ]
+      }
+    ],
+    "excluded_by_decision": {
+      "spine_substructure": {
+        "labels": [
+          "head",
+          "neck",
+          "spine"
+        ],
+        "rationale": "spines are pruned and their area is carried by the field phi (C8.2)"
+      },
+      "synapse_type": {
+        "labels": [
+          "exc_syn",
+          "inh_syn"
+        ],
+        "rationale": "a per-synapse attribute belonging to C-09. In the July 2026 bank the label slot was shared and the synapse label won: in neuron_489469961_aligned.hoc the soma itself is emitted as exc_syn[0]. Defect O8; invariants I-16 and I-18 are its regression tests"
+      }
+    }
+  },
+  "mechanism_mode": {
+    "symbol": "m (fraktur)",
+    "meaning": "global per-simulation switch, written into provenance.json so a matched healthy-versus-perturbed pair cannot straddle modes",
+    "values": [
+      "passive",
+      "active"
+    ],
+    "constraint_C15_2": "mechanism_mode == 'passive' implies mech_dict is empty for all (layer, gtype)"
+  },
+  "cm_reference": {
+    "meaning": "which capacitance a stored cm value refers to. The passive fitting pipeline applies the spine correction inside the model, so the optimiser returns the intrinsic, shaft-referenced value. The two differ by roughly a factor 1.7 to 2.4 and are indistinguishable by inspection",
+    "values": [
+      "shaft",
+      "effective"
+    ]
+  },
+  "spine_status": {
+    "meaning": "global per bank, recorded per row. 'pruned' means spine geometry removed and area retained as phi; it is NOT spine omission, in which the area is simply lost",
+    "values": [
+      "pruned",
+      "retained"
+    ]
+  },
+  "layer_source": {
+    "values": [
+      "proofread",
+      "lookup_table",
+      "imputed"
+    ]
+  },
+  "qc_status": {
+    "values": [
+      "pass",
+      "pass_low_confidence",
+      "fail"
+    ]
+  },
+  "parameter_source": {
+    "values": [
+      "fitted",
+      "literature",
+      "imputed"
+    ]
+  }
+}
