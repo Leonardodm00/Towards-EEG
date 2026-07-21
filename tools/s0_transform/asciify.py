@@ -49,6 +49,28 @@ import subprocess
 import sys
 import unicodedata
 
+_TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _TOOLS not in sys.path:
+    sys.path.insert(0, _TOOLS)
+
+from s0_paths import Resolver  # noqa: E402
+
+_RESOLVERS = {}
+
+
+def resolved(root, rel):
+    """Filesystem path of a declared or logged path, after any T6 move.
+
+    s03_targets.json and s03_transform_log.json are both keyed by the paths
+    the files had when S0.3 ran. S0.4 relocates nine of them into
+    towards_eeg/. Resolving forward here keeps --verify and --restore honest
+    instead of reporting a target as missing.
+    """
+    R = _RESOLVERS.get(root)
+    if R is None:
+        R = _RESOLVERS[root] = Resolver(root)
+    return R.full(rel)
+
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _TOOLS = os.path.dirname(_HERE)
 if _TOOLS not in sys.path:
@@ -217,7 +239,7 @@ def select_targets(root, spec):
 def process(root, spec, translit, write):
     entries, failures = [], []
     for rel in select_targets(root, spec):
-        full = os.path.join(root, rel)
+        full = resolved(root, rel)
         if not os.path.isfile(full):
             failures.append("target missing from the working tree: %s" % rel)
             continue
@@ -270,7 +292,7 @@ def process(root, spec, translit, write):
 def verify(root, log):
     problems = []
     for e in log["files"]:
-        full = os.path.join(root, e["path"])
+        full = resolved(root, e["path"])
         if not os.path.isfile(full):
             problems.append("missing: %s" % e["path"])
             continue
@@ -309,7 +331,7 @@ def restore_bytes(data, entry):
 def restore(root, log):
     problems = []
     for e in log["files"]:
-        full = os.path.join(root, e["path"])
+        full = resolved(root, e["path"])
         with open(full, "rb") as fh:
             data = fh.read()
         back = restore_bytes(data, e)

@@ -13,9 +13,219 @@
     "T6": "path change only, via git mv; bytes unchanged (applied at S0.4)"
   },
   "new_infrastructure": [
+    {
+      "path": "pyproject.toml",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the packaging declaration. Dependencies deliberately empty until B-4 is answered and S0.8 generates the lockfiles from a real pip freeze."
+    },
+    {
+      "path": ".gitattributes",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/ancestors.json",
+      "stage": "S0.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/apply_moves.py",
+      "stage": "S0.2c",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/build_ledger.py",
+      "stage": "S0.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/path_moves.json",
+      "stage": "S0.2c",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/phase_hashes.json",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_ledger/__init__.py",
+      "stage": "S0.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_ledger/analyse.py",
+      "stage": "S0.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_ledger/render.py",
+      "stage": "S0.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_ledger/scan.py",
+      "stage": "S0.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_paths.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/S02_discard.sh",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/__init__.py",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/asciify.py",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/decolab.py",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/s02_colab_commands.json",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/s02_exit_scope.json",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/s02_targets.json",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/s02_transform_log.json",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/s03_exit_scope.json",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/s03_targets.json",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/s03_transform_log.json",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/s03_translit_map.json",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/stamp_phase.py",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/test_s0_2_exit.py",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/test_s0_3_exit.py",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/test_s0_4_exit.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/test_s0_asciify_smoke.py",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/test_s0_chain.py",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/test_s0_decolab_smoke.py",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/test_s0_ledger_smoke.py",
+      "stage": "S0.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/test_s0_moves_smoke.py",
+      "stage": "S0.2c",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
     "tools/",
     "LEDGER.md",
-    "ledger.csv"
+    "ledger.csv",
+    {
+      "path": "towards_eeg/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/hybrid/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/connectome/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/structure/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/pointnet/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/cosim/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/passive/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/io/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/config/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    }
   ],
   "scopes": [
     [
@@ -116,5 +326,25 @@
     ],
     "paths": [],
     "rationale": "Committed binary payload. TEEG_01 rev 2 section 3.2: not referenced by any code path. D-8: moves to a separate repository; no history rewriting"
-  }
+  },
+  "superseded_forks": [
+    {
+      "path": "Population/Population_multiMorph.py",
+      "superseded_by": "towards_eeg/hybrid/population.py",
+      "rationale": "Two orchestrator-scope forks of the population module carry verdict 'keep'; only one can be hybrid/population.py. This one is the older: last touched 2026-03-13 against 2026-04-01 for the survivor, and it lacks the FastSpikeDatabase class the survivor defines. The survivor is also the file S0.1 wrote the working-branch bytes to, so demoting this one keeps the working branch canonical. Nothing is deleted and no byte changes.",
+      "decided": "2026-07-21"
+    },
+    {
+      "path": "Population/README.md",
+      "superseded_by": "towards_eeg/hybrid/README.md",
+      "rationale": "Documents the superseded population fork and travels with it. Demoted for the same reason, so that the package carries exactly one README per subpackage.",
+      "decided": "2026-07-21"
+    },
+    {
+      "path": "Parames evoked with EEG/Params_evoked_with_EEG_multiMorph.py",
+      "superseded_by": "towards_eeg/hybrid/params.py",
+      "rationale": "The older parameter fork: last touched 2026-03-22 against 2026-04-01, and it still carries the hardcoded Potjans-Diesmann full_scale_num_neurons and conn_probs arrays with the X = ['TC','L23E',...] naming, where the survivor reads column properties from Connectomics(Calculate=False) and uses the L23_exc / L4_ss vocabulary the rest of the project speaks. Demoting it also removes four duplicate top-level class names (general_params, point_neuron_network_params, multicompartment_params, MorphoPath) from the installed package.",
+      "decided": "2026-07-21"
+    }
+  ]
 }

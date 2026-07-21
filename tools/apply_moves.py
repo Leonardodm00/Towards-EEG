@@ -56,11 +56,76 @@ def sha256_file(path):
     return h.hexdigest()
 
 
+REQUIRED_KEYS = ("from", "to", "kind", "transform_id", "stage", "rationale")
+KINDS = ("file", "directory")
+
+
+def _under(inner, outer):
+    """True if `inner` is `outer` itself or lies beneath it."""
+    outer = outer.rstrip("/")
+    return inner == outer or inner.startswith(outer + "/")
+
+
+def validate_moves(spec):
+    """Structural checks on the declared move list.
+
+    With one declared move none of this could go wrong. S0.4 declares many,
+    and every failure below is silent rather than loud: a shadowed source
+    simply never moves, a collision fails halfway through leaving the tree
+    part-moved. Refusing the whole list up front is the only safe behaviour.
+    Returns a list of problem strings; empty means the list is well formed.
+    """
+    moves = spec["moves"]
+    problems = []
+    for i, mv in enumerate(moves):
+        for k in REQUIRED_KEYS:
+            if k not in mv:
+                problems.append("move %d is missing required key '%s'" % (i, k))
+        if mv.get("kind") not in KINDS:
+            problems.append("move %d has kind %r, expected one of %r"
+                            % (i, mv.get("kind"), KINDS))
+        if mv.get("transform_id") != "T6":
+            problems.append("move %d has transform_id %r, expected 'T6'"
+                            % (i, mv.get("transform_id")))
+        if mv.get("from") == mv.get("to"):
+            problems.append("move %d is a no-op: from == to == %r"
+                            % (i, mv.get("from")))
+
+    for i, a in enumerate(moves):
+        for j, b in enumerate(moves):
+            if i >= j:
+                continue
+            if a["from"] == b["from"]:
+                problems.append("moves %d and %d share a source: %r"
+                                % (i, j, a["from"]))
+            if a["to"] == b["to"]:
+                problems.append("moves %d and %d collide on a target: %r"
+                                % (i, j, a["to"]))
+            if a["kind"] == "directory" and _under(b["from"], a["from"]):
+                problems.append(
+                    "move %d's source %r lies under move %d's directory source "
+                    "%r; the outer move runs first and the inner source is gone"
+                    % (j, b["from"], i, a["from"]))
+            if b["kind"] == "directory" and _under(a["from"], b["from"]):
+                problems.append(
+                    "move %d's source %r lies under move %d's directory source "
+                    "%r; the outer move runs first and the inner source is gone"
+                    % (i, a["from"], j, b["from"]))
+            if _under(b["from"], a["to"]) or _under(a["from"], b["to"]):
+                problems.append("moves %d and %d are chained: one's source is "
+                                "inside the other's target" % (i, j))
+    return problems
+
+
 def load_moves(path):
     with open(path, "r", encoding="utf-8") as fh:
         spec = json.load(fh)
     if "moves" not in spec:
         raise KeyError("move spec is missing required key 'moves'")
+    problems = validate_moves(spec)
+    if problems:
+        raise ValueError("move list is not well formed:\n  - "
+                         + "\n  - ".join(problems))
     return spec
 
 
@@ -79,17 +144,28 @@ def affected_files(root, mv):
     return sorted(out)
 
 
-def remap(path, moves):
-    """Rewrite one path through the move list. Returns (new_path, moved)."""
+def remap_with_move(path, moves):
+    """Rewrite one path through the move list.
+
+    Returns (new_path, mv) where mv is the move that matched, or None.
+    Callers that need the stage or the rationale of the matching move use
+    this; `remap` is the boolean-flavoured wrapper kept for compatibility.
+    """
     for mv in moves:
         if mv["kind"] == "file":
             if path == mv["from"]:
-                return mv["to"], True
+                return mv["to"], mv
         else:
             prefix = mv["from"].rstrip("/") + "/"
             if path.startswith(prefix):
-                return mv["to"].rstrip("/") + "/" + path[len(prefix):], True
-    return path, False
+                return mv["to"].rstrip("/") + "/" + path[len(prefix):], mv
+    return path, None
+
+
+def remap(path, moves):
+    """Rewrite one path through the move list. Returns (new_path, moved)."""
+    new_path, mv = remap_with_move(path, moves)
+    return new_path, mv is not None
 
 
 def unmap(path, moves):
@@ -139,17 +215,30 @@ def do_moves(root, spec, write):
 
         if os.path.exists(dst_abs):
             raise RuntimeError("move target already exists: %s" % mv["to"])
+        # S0.2c moved a directory to a sibling name, so the destination parent
+        # always existed. S0.4 moves into towards_eeg/, which does not exist
+        # yet, and `git mv` fails with "destination directory does not exist".
+        parent = os.path.dirname(dst_abs)
+        if parent and not os.path.isdir(parent):
+            os.makedirs(parent)
         git(root, "mv", "--", mv["from"], mv["to"])
 
+        # Pair old to new EXPLICITLY. The previous form zipped sorted(before)
+        # against sorted(after), which is correct only when the rename is a
+        # constant prefix substitution that happens to preserve sort order --
+        # true for one directory move, not true in general, and silently wrong
+        # rather than loudly wrong when it fails.
         after = {}
+        pairs = []
         for f in files:
             new_f, _ = remap(f, [mv])
             full = os.path.join(root, new_f)
             if not os.path.isfile(full):
                 raise RuntimeError("file vanished in the move: %s -> %s" % (f, new_f))
             after[new_f] = sha256_file(full)
+            pairs.append((f, new_f))
 
-        for old, new in zip(sorted(before), sorted(after)):
+        for old, new in pairs:
             if before[old] != after[new]:
                 raise RuntimeError(
                     "T6 VIOLATED: %s changed bytes during the move (%s -> %s)"
@@ -168,8 +257,8 @@ def rewrite_ledger(root, moves, write):
         fields = reader.fieldnames
     n = 0
     for row in rows:
-        new_path, moved = remap(row["path"], moves)
-        if not moved:
+        new_path, mv = remap_with_move(row["path"], moves)
+        if mv is None:
             continue
         n += 1
         # ancestor_path keeps the PRE-move location: that is the whole point of
@@ -179,8 +268,11 @@ def rewrite_ledger(root, moves, write):
         row["path"] = new_path
         row["relationship"] = "mechanical"
         row["transform_id"] = "T6"
-        row["rationale"] = (row["rationale"] + "; moved by T6 (git mv) at S0.2c, "
-                            "bytes unchanged").strip("; ")
+        # The stage comes from the move that actually matched. Hardcoding it
+        # was correct while exactly one move existed and would have stamped
+        # every S0.4 row with "S0.2c".
+        row["rationale"] = (row["rationale"] + "; moved by T6 (git mv) at %s, "
+                            "bytes unchanged" % mv.get("stage", "S0.4")).strip("; ")
     if write and n:
         render.write_csv_dicts(rows, fields, ledger)
     return n

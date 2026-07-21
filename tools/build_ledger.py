@@ -135,7 +135,13 @@ def main(argv=None):
         "version": TOOL_VERSION,
         "snapshot": spec.get("snapshot", "unknown"),
         "snapshot_date": spec.get("snapshot_date", "unknown"),
-        "root": str(Path(args.root).resolve()),
+        # NOT the resolved absolute path. LEDGER.md is a committed, regenerable
+        # artefact and its authority rests on being reproducible; an absolute
+        # path makes it differ on every machine that regenerates it. HEAD
+        # carried "/content/Towards-EEG" from a Colab runtime and this run
+        # would have carried a sandbox path. What the header is actually for
+        # is saying WHICH tree was measured, and that is the repository.
+        "root": "<repository root>",
         "n_repo": len(repo_records),
         "n_local": len(local_records),
     }

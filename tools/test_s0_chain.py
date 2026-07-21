@@ -37,6 +37,31 @@ import json
 import os
 import sys
 
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
+from s0_paths import Resolver  # noqa: E402
+
+PHASE_COLUMNS = ("sha256_post_s04", "sha256_post_s03",
+                 "sha256_post_s02", "sha256_pre_s0")
+
+
+def end_of_chain(row):
+    """The most recent stamped hash for one ledger row.
+
+    Hardcoding sha256_post_s03 was correct until S0.4 and is exactly the
+    shelf-life problem Doc 7 s3 describes: any tool edited during S0.4
+    legitimately differs from its post-S0.3 bytes, and a check pinned to
+    post_s03 reports that as drift. Reading the last stamped column instead
+    keeps the check alive across every remaining sub-step.
+    """
+    for col in PHASE_COLUMNS:
+        val = row.get(col, "-")
+        if val not in ("-", ""):
+            return col, val
+    return None, None
+
 
 def sha256_file(path):
     h = hashlib.sha256()
@@ -66,7 +91,12 @@ def load(root):
 def run(root):
     d = load(root)
     led, s02, s03 = d["ledger"], d["s02"], d["s03"]
+    R = Resolver(root)
     results = []
+
+    def L(path):
+        """Ledger row for a path as recorded in a transform log."""
+        return led.get(R.current(path))
 
     def add(name, ok, msg):
         results.append((name, ok, msg))
@@ -76,13 +106,13 @@ def run(root):
         add("check_01_s02_log_present", False, "no S0.2 transform log")
     else:
         bad = [p for p, e in s02.items()
-               if p in led and led[p]["sha256_pre_s0"] != e["sha256_before"]]
+               if L(p) is not None and L(p)["sha256_pre_s0"] != e["sha256_before"]]
         add("check_01_pre_s0_equals_s02_input", not bad,
             "%d/%d S0.2 target(s) start from their pre-S0 bytes"
             % (len(s02) - len(bad), len(s02)) if not bad else "mismatch: %r" % bad)
 
         bad = [p for p, e in s02.items()
-               if p in led and led[p]["sha256_post_s02"] != e["sha256_after"]]
+               if L(p) is not None and L(p)["sha256_post_s02"] != e["sha256_after"]]
         add("check_02_s02_output_equals_ledger_post_s02", not bad,
             "ledger post_s02 agrees with the S0.2 log for all %d target(s)" % len(s02)
             if not bad else "mismatch: %r" % bad)
@@ -94,7 +124,7 @@ def run(root):
 
     bad = []
     for p, e in s03.items():
-        row = led.get(p)
+        row = L(p)
         if row is None:
             bad.append("%s: no ledger row" % p)
         elif row["sha256_post_s02"] not in ("-", e["sha256_before"]):
@@ -104,14 +134,14 @@ def run(root):
         if not bad else "; ".join(bad[:5]))
 
     bad = [p for p, e in s03.items()
-           if p in led and led[p]["sha256_post_s03"] != e["sha256_after"]]
+           if L(p) is not None and L(p)["sha256_post_s03"] != e["sha256_after"]]
     add("check_04_s03_output_equals_ledger_post_s03", not bad,
         "ledger post_s03 agrees with the S0.3 log for all %d target(s)" % len(s03)
         if not bad else "mismatch: %r" % bad)
 
     bad = [p for p, e in s03.items()
-           if os.path.isfile(os.path.join(root, p))
-           and sha256_file(os.path.join(root, p)) != e["sha256_after"]]
+           if os.path.isfile(R.full(p))
+           and sha256_file(R.full(p)) != e["sha256_after"]]
     add("check_05_disk_equals_end_of_chain", not bad,
         "bytes on disk match the end of the chain for all %d target(s)" % len(s03)
         if not bad else "mismatch: %r" % bad)
@@ -148,10 +178,11 @@ def run(root):
         full = os.path.join(root, p)
         if not os.path.isfile(full):
             continue
-        if row["sha256_post_s03"] in ("-", ""):
+        col, expected = end_of_chain(row)
+        if expected is None:
             continue
-        if sha256_file(full) != row["sha256_post_s03"]:
-            drifted.append(p)
+        if sha256_file(full) != expected:
+            drifted.append("%s (vs %s)" % (p, col))
     add("check_07_untouched_files_did_not_drift", not drifted,
         "no file changed outside a logged transform"
         if not drifted else "changed with no log entry: %r" % drifted[:10])
@@ -172,6 +203,42 @@ def run(root):
         add("check_08_s02_markers_survived_s03", not missing,
             "every S0.2 neutralisation marker is still present after the sweep"
             if not missing else "markers lost in: %r" % missing)
+
+    # -- link 3: S0.4 -------------------------------------------------------
+    # The roadmap states the S0.4 exit as "every moved file's hash equals its
+    # ancestor's". Concretely that is one more equality on the same chain:
+    # a git mv changes no byte, so post_s04 == post_s03 for every T6 row.
+    # Written here rather than in a fresh per-step verifier, which would
+    # itself go stale at S0.5 (Doc 6 s4).
+    t6 = [r for r in led.values() if r["transform_id"] == "T6"]
+    stamped = [r for r in t6 if r["sha256_post_s04"] not in ("-", "")]
+    bad = [r["path"] for r in stamped
+           if r["sha256_post_s04"] != r["sha256_post_s03"]]
+    if not t6:
+        add("check_09_s04_moves_changed_no_bytes", False, "no T6 row in the ledger")
+    elif not stamped:
+        add("check_09_s04_moves_changed_no_bytes", False,
+            "%d T6 row(s) present but post_s04 is unstamped: run "
+            "tools/stamp_phase.py --phase post_s04" % len(t6))
+    else:
+        add("check_09_s04_moves_changed_no_bytes", not bad,
+            "post_s04 == post_s03 for all %d moved file(s)" % len(stamped)
+            if not bad else "T6 changed bytes: %r" % bad[:5])
+
+    # -- no logged file may fall out of the checks above ---------------------
+    # Every check in this file is of the form "for each entry in a log, look
+    # up the ledger". A lookup that misses removes the file from its own
+    # check and still prints PASS. Doc 7 s3: an exemption that only skips is
+    # an exemption that hides. This asserts the lookups cover the logs.
+    orphans = []
+    for key, logdoc in (("S0.2", s02), ("S0.3", s03)):
+        for p in (logdoc or {}):
+            if L(p) is None:
+                orphans.append("%s:%s" % (key, p))
+    add("check_10_every_logged_path_resolves_to_a_ledger_row", not orphans,
+        "all %d logged path(s) resolve after the declared moves"
+        % (len(s02 or {}) + len(s03 or {}))
+        if not orphans else "unresolvable: %r" % orphans[:5])
 
     return results
 

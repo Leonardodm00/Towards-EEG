@@ -257,6 +257,101 @@ def check_11_ledger_rewrite_stays_lf_and_ascii():
         shutil.rmtree(root)
 
 
+def check_12_move_into_a_nonexistent_parent():
+    """S0.2c moved a directory to a sibling, so the destination parent always
+    existed. S0.4 moves into towards_eeg/, which does not. Without a mkdir,
+    `git mv` fails with 'destination directory does not exist'."""
+    root, spec, before = sandbox()
+    try:
+        spec = {"moves": [{"from": "old dir /a.py",
+                           "to": "towards_eeg/hybrid/population.py",
+                           "kind": "file", "transform_id": "T6",
+                           "stage": "S0.4", "rationale": "fixture"}]}
+        M.do_moves(root, spec, write=True)
+        dst = os.path.join(root, "towards_eeg", "hybrid", "population.py")
+        if not os.path.isfile(dst):
+            return False, "file did not land at the nested destination"
+        if M.sha256_file(dst) != before["old dir /a.py"]:
+            return False, "bytes changed across a move into a new parent"
+        return True, "move into a two-level new parent works, bytes identical"
+    finally:
+        shutil.rmtree(root)
+
+
+def check_13_rationale_names_the_moves_own_stage():
+    """MUTATION of the old behaviour: the rationale was a hardcoded 'at S0.2c'
+    regardless of the move. Applied at S0.4 it mislabels every row."""
+    root, spec, _ = sandbox()
+    try:
+        spec["moves"][0]["stage"] = "S0.4"
+        M.do_moves(root, spec, write=True)
+        M.rewrite_ledger(root, spec["moves"], write=True)
+        rows = list(csv.DictReader(open(os.path.join(root, "ledger.csv"))))
+        for r in rows:
+            if "at S0.4" not in r["rationale"]:
+                return False, ("MUTATION SURVIVED: rationale does not name the "
+                               "move's stage: %r" % r["rationale"])
+            if "S0.2c" in r["rationale"]:
+                return False, "hardcoded S0.2c still present in the rationale"
+        return True, "rationale carries the stage declared on the move"
+    finally:
+        shutil.rmtree(root)
+
+
+def check_14_validator_rejects_malformed_move_lists():
+    """Four ways a multi-move list goes silently wrong. Each must be refused
+    before anything is written."""
+    base = {"from": "a", "to": "b", "kind": "directory",
+            "transform_id": "T6", "stage": "S0.4", "rationale": "x"}
+
+    def mk(*moves):
+        return {"moves": [dict(base, **m) for m in moves]}
+
+    cases = [
+        ("duplicate source", mk({"from": "a", "to": "b"}, {"from": "a", "to": "c"})),
+        ("colliding target", mk({"from": "a", "to": "z"}, {"from": "b", "to": "z"})),
+        ("nested source", mk({"from": "a", "to": "b"},
+                             {"from": "a/inner", "to": "c", "kind": "file"})),
+        ("chained move", mk({"from": "a", "to": "b"}, {"from": "b", "to": "c"})),
+        ("no-op", mk({"from": "a", "to": "a"})),
+        ("wrong transform", mk({"from": "a", "to": "b", "transform_id": "T9"})),
+        ("missing key", {"moves": [{"from": "a", "to": "b", "kind": "file"}]}),
+    ]
+    survived = [name for name, spec in cases if not M.validate_moves(spec)]
+    if survived:
+        return False, "MUTATION SURVIVED: validator accepted %r" % survived
+    if M.validate_moves(mk({"from": "a", "to": "b"}, {"from": "c", "to": "d"})):
+        return False, "validator rejected a well-formed list"
+    return True, "%d malformed list(s) refused, well-formed list accepted" % len(cases)
+
+
+def check_15_real_move_list_is_well_formed_and_reachable():
+    """The declared list in the repository, not a fixture. Every source must
+    either still exist or have already landed at its target -- a typo in a
+    path containing spaces or parentheses is otherwise invisible until
+    --apply is halfway through."""
+    root = os.path.dirname(_HERE)
+    spec_path = os.path.join(root, "tools", "path_moves.json")
+    if not os.path.isfile(spec_path):
+        return False, "tools/path_moves.json is absent"
+    with open(spec_path, "r", encoding="utf-8") as fh:
+        spec = json.load(fh)
+    problems = M.validate_moves(spec)
+    if problems:
+        return False, "declared list is malformed: %r" % problems[:3]
+    unreachable = []
+    for mv in spec["moves"]:
+        src = os.path.join(root, mv["from"])
+        dst = os.path.join(root, mv["to"])
+        if not os.path.exists(src) and not os.path.exists(dst):
+            unreachable.append(mv["from"])
+    if unreachable:
+        return False, ("declared source neither present nor already moved: %r"
+                       % unreachable)
+    return True, ("%d declared move(s), all well formed and reachable"
+                  % len(spec["moves"]))
+
+
 CHECKS = [check_01_dry_run_writes_nothing,
           check_02_move_preserves_every_byte,
           check_03_ledger_paths_remapped_ancestor_kept,
@@ -267,7 +362,11 @@ CHECKS = [check_01_dry_run_writes_nothing,
           check_08_verify_catches_stale_ledger_row,
           check_09_idempotent_second_apply,
           check_10_remap_unmap_are_inverse,
-          check_11_ledger_rewrite_stays_lf_and_ascii]
+          check_11_ledger_rewrite_stays_lf_and_ascii,
+          check_12_move_into_a_nonexistent_parent,
+          check_13_rationale_names_the_moves_own_stage,
+          check_14_validator_rejects_malformed_move_lists,
+          check_15_real_move_list_is_well_formed_and_reachable]
 
 
 def main():

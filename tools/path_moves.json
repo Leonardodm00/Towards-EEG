@@ -1,5 +1,5 @@
 {
-  "note": "Declared path moves. Transform T6 (git mv): no byte of any file changes, only its location. Consumed by tools/apply_moves.py to perform the moves, and by build_ledger.py --moves so that a moved file's ledger row keeps pointing at its pre-move ancestor instead of appearing to be a new file. S0.4 reuses this mechanism for the whole package layout; this file starts with the single move pulled forward from it.",
+  "note": "Declared path moves. Transform T6 (git mv): no byte of any file changes, only its location. Consumed by tools/apply_moves.py to perform the moves, and by build_ledger.py --moves so that a moved file's ledger row keeps pointing at its pre-move ancestor instead of appearing to be a new file. The first entry is the single move pulled forward to S0.2c (decision N-9); the rest are the S0.4 package layout, Appendix A resolved by N-6 (Utility_fun.py as one file) and N-12 (no renames outside towards_eeg/).",
   "moves": [
     {
       "from": "Connectomics/Calculate Relative Subpop % ",
@@ -8,6 +8,78 @@
       "transform_id": "T6",
       "stage": "S0.2c",
       "rationale": "The directory name ends in a space. Windows forbids a trailing space in a path component, so 'git clone' fails at checkout with \"invalid path\" and the repository cannot be worked on locally at all -- confirmed on the owner's machine. The '%' is legal on Windows and is replaced only because a per-cent sign in a path is a persistent nuisance in shell and Make contexts; 'pct' is the conventional ASCII spelling. Pulled forward from S0.4 by decision, because S0.4 is a large reorganisation and this single rename unblocks local work immediately. Two files are affected, both scope 'colab', verdict 'retain', both already parsing."
+    },
+    {
+      "from": "HybridLFPy Tweaked/Population_multiMorph.py",
+      "to": "towards_eeg/hybrid/population.py",
+      "kind": "file",
+      "transform_id": "T6",
+      "stage": "S0.4",
+      "rationale": "The working-branch population module. S0.1 wrote the local population_CHANGED.py bytes to this ancestor path, so this file IS the working branch; the fork at Population/Population_multiMorph.py is the superseded one (older commit, missing FastSpikeDatabase) and is demoted to 'retain' rather than moved. Suffix _multiMorph retired at the move per TEEG_00 s2."
+    },
+    {
+      "from": "HybridLFPy Tweaked/params_evoked_with_EEG_multiMorph.py",
+      "to": "towards_eeg/hybrid/params.py",
+      "kind": "file",
+      "transform_id": "T6",
+      "stage": "S0.4",
+      "rationale": "The working-branch parameter module, and the one that reads column properties from Connectomics(Calculate=False) rather than carrying hardcoded Potjans-Diesmann arrays. It also carries an inlined copy of the Connectomics class; removing that copy is a content operation and belongs to S1/S3, so smoke assertion 6 gets a declared allowlist entry instead. Suffix _multiMorph retired at the move."
+    },
+    {
+      "from": "HybridLFPy Tweaked/hybrid_sim_evoked_with_EEG_multiMorph.py",
+      "to": "towards_eeg/hybrid/driver.py",
+      "kind": "file",
+      "transform_id": "T6",
+      "stage": "S0.4",
+      "rationale": "The hybrid-scheme driver. Still imports neuron, nest, mpi4py, LFPy and hybridLFPy in one file; isolating the legacy Potjans-Diesmann block into hybrid/_legacy_pd_driver.py is a content edit and cannot happen in S0 (see B-4). Suffix _multiMorph retired at the move."
+    },
+    {
+      "from": "HybridLFPy Tweaked/Utility_function.py",
+      "to": "towards_eeg/hybrid/utility.py",
+      "kind": "file",
+      "transform_id": "T6",
+      "stage": "S0.4",
+      "rationale": "Decision N-6, confirmed 21 July 2026: this file moves as ONE file. Two of three recovered Appendix A snippets show a placement.py / mechanisms.py split; that split separates two real jobs (synaptic placement C-09/C-10/C-11, mechanism insertion C-15) but where the boundary falls is a judgement belonging to S3, and splitting a contiguous block of functions is a content operation that byte-identity forbids."
+    },
+    {
+      "from": "HybridLFPy Tweaked/README.md",
+      "to": "towards_eeg/hybrid/README.md",
+      "kind": "file",
+      "transform_id": "T6",
+      "stage": "S0.4",
+      "rationale": "Documentation of the hybrid stage; travels with the four modules it documents."
+    },
+    {
+      "from": "Classes/Connectomics/Class.py",
+      "to": "towards_eeg/connectome/connectomics.py",
+      "kind": "file",
+      "transform_id": "T6",
+      "stage": "S0.4",
+      "rationale": "The canonical Connectomics class -- the single copy Appendix A's connectome/ package is built around. Two further top-level copies exist (usage_example.py and the inlined one in hybrid/params.py); de-duplicating them is a content operation deferred out of S0."
+    },
+    {
+      "from": "Classes/Connectomics/connectivity_buildup (9).py",
+      "to": "towards_eeg/connectome/connectivity_buildup.py",
+      "kind": "file",
+      "transform_id": "T6",
+      "stage": "S0.4",
+      "rationale": "Adjacency construction, microcolumn generation, virtual-source injection. The Colab export suffix ' (9)' makes the stem an illegal Python identifier; the layout move legalises it, which is the whole of trap T-8's package-scoped content (N-12)."
+    },
+    {
+      "from": "HybridLFPy Tweaked/Extract macro-population data/Extract_macropopulation.py",
+      "to": "towards_eeg/connectome/macropopulation.py",
+      "kind": "file",
+      "transform_id": "T6",
+      "stage": "S0.4",
+      "rationale": "extract_macro_populations, the function the driver's population construction depends on. Two further top-level copies exist (usage_example.py and hybrid/params.py); assertion 6 covers classes only, so this duplication is recorded here rather than asserted."
+    },
+    {
+      "from": "HybridLFPy Tweaked/Extract macro-population data/Usage_example.py",
+      "to": "towards_eeg/connectome/usage_example.py",
+      "kind": "file",
+      "transform_id": "T6",
+      "stage": "S0.4",
+      "rationale": "Kept in the package by decision, 21 July 2026, despite being an example script: it is the only worked end-to-end use of the connectome API. Trap: it hides a full Connectomics class at L6, so grep by class name and not by filename when de-duplicating in S1/S3."
     }
   ]
 }

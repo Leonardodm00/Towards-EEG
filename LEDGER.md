@@ -1,10 +1,10 @@
 # Towards-EEG -- S0.0 Reconciliation Ledger
 
 **Stage:** S0.0 (roadmap rev 3, section 3.2)  
-**Generated:** 2026-07-20 19:14:01 UTC by `s0_ledger` v1.0.0  
+**Generated:** 2026-07-21 11:06:22 UTC by `s0_ledger` v1.0.0  
 **Snapshot:** `github.com/Leonardodm00/Towards-EEG@main`, 2026-07-19  
-**Tree root:** `/content/Towards-EEG`  
-**Rows:** 170 (166 repository files + 4 local working files)
+**Tree root:** `<repository root>`  
+**Rows:** 193 (189 repository files + 4 local working files)
 
 This ledger is the evidence base for the byte-identity rule (handoff
 brief section 3). Every file in the reorganised tree must be (1) byte-identical
@@ -31,16 +31,16 @@ relationship agrees with the measured hashes.
 | verdict      | files  |
 |--------------|--------|
 | discard      | 22     |
-| keep         | 16     |
-| new          | 23     |
-| retain       | 109    |
+| keep         | 13     |
+| new          | 46     |
+| retain       | 112    |
 
 ### By scope
 
 | scope          | files  |
 |----------------|--------|
 | colab          | 60     |
-| infrastructure | 23     |
+| infrastructure | 46     |
 | orchestrator   | 18     |
 | passive        | 69     |
 
@@ -48,19 +48,22 @@ relationship agrees with the measured hashes.
 
 | stage    | files  |
 |----------|--------|
-| -        | 109    |
-| S0.0     | 23     |
+| -        | 112    |
+| S0.0     | 11     |
 | S0.1     | 4      |
-| S0.4     | 12     |
+| S0.2     | 11     |
+| S0.2c    | 3      |
+| S0.3     | 9      |
+| S0.4     | 21     |
 | S0.7     | 22     |
 
 ### Python surface at pre-s0
 
-- python files: **92**
+- python files: **108**
 - failing `ast.parse`: **0**
-- containing bytes >= 0x80: **47**
-- non-ASCII and no PEP 263 cookie: **24**
-- containing CRLF: **7**
+- containing bytes >= 0x80: **0**
+- non-ASCII and no PEP 263 cookie: **0**
+- containing CRLF: **0**
 - raising SyntaxWarning (latent, e.g. invalid escape sequences): **6**
 
 ## 2. Working-branch reconciliation (S0.1)
@@ -79,6 +82,15 @@ own ancestor for every later sub-step.
 | hybrid_sim_evoked_with_EEG_CHANGED.py  | identical            | T0  | HybridLFPy Tweaked/hybrid_sim_evoked_with_EEG_multiMorph.py | 6c3ed490ba14   |
 | params_evoked_with_EEG_CHANGED.py      | identical            | T0  | HybridLFPy Tweaked/params_evoked_with_EEG_multiMorph.py | 927ee3d9cc0d   |
 | population_CHANGED.py                  | identical            | T0  | HybridLFPy Tweaked/Population_multiMorph.py          | 43df1344230e   |
+| towards_eeg/connectome/connectivity_buildup.py | mechanical           | T6  | Classes/Connectomics/connectivity_buildup (9).py     | e62667fa6e57   |
+| towards_eeg/connectome/connectomics.py | mechanical           | T6  | Classes/Connectomics/Class.py                        | 2f58a6ae79a3   |
+| towards_eeg/connectome/macropopulation.py | mechanical           | T6  | HybridLFPy Tweaked/Extract macro-population data/Extract_macropopulation.py | 0bfb98e308b9   |
+| towards_eeg/connectome/usage_example.py | mechanical           | T6  | HybridLFPy Tweaked/Extract macro-population data/Usage_example.py | dc4828bb65d4   |
+| towards_eeg/hybrid/README.md           | mechanical           | T6  | HybridLFPy Tweaked/README.md                         | 8183e1b9cd57   |
+| towards_eeg/hybrid/driver.py           | mechanical           | T6  | HybridLFPy Tweaked/hybrid_sim_evoked_with_EEG_multiMorph.py | 566b25332991   |
+| towards_eeg/hybrid/params.py           | mechanical           | T6  | HybridLFPy Tweaked/params_evoked_with_EEG_multiMorph.py | 927ee3d9cc0d   |
+| towards_eeg/hybrid/population.py       | mechanical           | T6  | HybridLFPy Tweaked/Population_multiMorph.py          | 35dbec718a35   |
+| towards_eeg/hybrid/utility.py          | mechanical           | T6  | HybridLFPy Tweaked/Utility_function.py               | ec55afe6c0c1   |
 
 - **Connectomics/Calculate Relative Subpop pct/Usage_example.py** -- colab scope; stays in the repository, outside the installed package; moved by T6 (git mv), bytes unchanged
 - **Connectomics/Calculate Relative Subpop pct/calculate_bbp_relative_presences.py** -- colab scope; stays in the repository, outside the installed package; moved by T6 (git mv), bytes unchanged
@@ -86,6 +98,15 @@ own ancestor for every later sub-step.
 - **hybrid_sim_evoked_with_EEG_CHANGED.py** -- TEEG_01 rev 2 section 3.3: identical modulo a trailing newline; keep; bytes equal
 - **params_evoked_with_EEG_CHANGED.py** -- TEEG_01 rev 2 section 3.3: byte-identical to the snapshot; keep; bytes equal
 - **population_CHANGED.py** -- TEEG_01 rev 2 section 3.3: ancestor plus 7 lines, an empty tonic-inhibition placeholder comment in cellsim; keep. Not a mechanical transform; legitimate because S0.1 commits it, making it the ancestor for everything downstream; bytes equal
+- **towards_eeg/connectome/connectivity_buildup.py** -- orchestrator source; enters the installed package; moved by T6 (git mv), bytes unchanged
+- **towards_eeg/connectome/connectomics.py** -- orchestrator source; enters the installed package; moved by T6 (git mv), bytes unchanged
+- **towards_eeg/connectome/macropopulation.py** -- orchestrator source; enters the installed package; moved by T6 (git mv), bytes unchanged
+- **towards_eeg/connectome/usage_example.py** -- orchestrator source; enters the installed package; moved by T6 (git mv), bytes unchanged
+- **towards_eeg/hybrid/README.md** -- orchestrator source; enters the installed package; moved by T6 (git mv), bytes unchanged
+- **towards_eeg/hybrid/driver.py** -- ancestor of a working-branch file; superseded at S0.1, moved at S0.4; moved by T6 (git mv), bytes unchanged
+- **towards_eeg/hybrid/params.py** -- ancestor of a working-branch file; superseded at S0.1, moved at S0.4; moved by T6 (git mv), bytes unchanged
+- **towards_eeg/hybrid/population.py** -- ancestor of a working-branch file; superseded at S0.1, moved at S0.4; moved by T6 (git mv), bytes unchanged
+- **towards_eeg/hybrid/utility.py** -- ancestor of a working-branch file; superseded at S0.1, moved at S0.4; moved by T6 (git mv), bytes unchanged
 
 ## 3. Discards
 
@@ -258,13 +279,13 @@ the Colab scripts remain in the tree.
 | CellQCResult                 | 2      | Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:11829; Passive Features/Allen Institute Data/trace_qc (1).py:161 |
 | CellSweepInput               | 2      | Passive Features/HPC script/Biological Fit/cm_profile_sweep.py:318; Passive Features/HPC script/Synthetic Passive fit Test/cm_profile_sweep.py:318 |
 | CmProfile                    | 2      | Passive Features/HPC script/Biological Fit/cm_profile_sweep.py:88; Passive Features/HPC script/Synthetic Passive fit Test/cm_profile_sweep.py:88 |
-| Connectomics                 | 3      | Classes/Connectomics/Class.py:6; HybridLFPy Tweaked/Extract macro-population data/Usage_example.py:6; HybridLFPy Tweaked/params_evoked_with_EEG_multiMorph.py:1212 |
+| Connectomics                 | 3      | towards_eeg/connectome/connectomics.py:6; towards_eeg/connectome/usage_example.py:6; towards_eeg/hybrid/params.py:1212 |
 | ElectricalViabilityConfig    | 3      | Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:6631; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:10169; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:15623 |
 | ElectricalViabilityResult    | 3      | Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:6658; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:10225; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:15679 |
 | GpDiagnosticPerParameter     | 6      | Passive Features/HPC script/Biological Fit/passive_fitting_hpc_fixed.py:4787; Passive Features/HPC script/Multiple Sweeps with phase 2.5/passive_fitting_hpc_fixed.py:4787; Passive Features/HPC script/Synthetic Passive fit Test/passive_fitting_hpc_fixed.py:4787; Passive Features/HPC script/passive_fitting_hpc_fixed.py:4056; Passive Features/Plot/passive_result_plot (5).py:809; Passive Features/phase1fittingcolab (2).py:3492 |
 | GpDiagnosticResult           | 6      | Passive Features/HPC script/Biological Fit/passive_fitting_hpc_fixed.py:4802; Passive Features/HPC script/Multiple Sweeps with phase 2.5/passive_fitting_hpc_fixed.py:4802; Passive Features/HPC script/Synthetic Passive fit Test/passive_fitting_hpc_fixed.py:4802; Passive Features/HPC script/passive_fitting_hpc_fixed.py:4071; Passive Features/Plot/passive_result_plot (5).py:824; Passive Features/phase1fittingcolab (2).py:3507 |
 | IncompleteDataError          | 10     | Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:1595; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:7327; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:12692; Passive Features/HPC script/Biological Fit/passive_fitting_hpc_fixed.py:612; Passive Features/HPC script/Multiple Sweeps with phase 2.5/passive_fitting_hpc_fixed.py:612; Passive Features/HPC script/Synthetic Passive fit Test/passive_fitting_hpc_fixed.py:612; Passive Features/HPC script/passive_fitting_hpc_fixed.py:612; Passive Features/Plot/passive_result_plot (5).py:149; Passive Features/Plot/passive_result_plot (5).py:356; Passive Features/phase1fittingcolab (2).py:120 |
-| MorphoPath                   | 2      | HybridLFPy Tweaked/params_evoked_with_EEG_multiMorph.py:2369; Parames evoked with EEG/Params_evoked_with_EEG_multiMorph.py:1119 |
+| MorphoPath                   | 2      | Parames evoked with EEG/Params_evoked_with_EEG_multiMorph.py:1119; towards_eeg/hybrid/params.py:2369 |
 | MorphologyRepair             | 3      | Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:5422; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:9430; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:14884 |
 | OptimiserInputs              | 10     | Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:1712; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:7442; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:12807; Passive Features/HPC script/Biological Fit/passive_fitting_hpc_fixed.py:729; Passive Features/HPC script/Multiple Sweeps with phase 2.5/passive_fitting_hpc_fixed.py:729; Passive Features/HPC script/Synthetic Passive fit Test/passive_fitting_hpc_fixed.py:729; Passive Features/HPC script/passive_fitting_hpc_fixed.py:729; Passive Features/Plot/passive_result_plot (5).py:132; Passive Features/Plot/passive_result_plot (5).py:339; Passive Features/phase1fittingcolab (2).py:237 |
 | PassiveCell                  | 8      | Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:2456; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:8181; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:13553; Passive Features/HPC script/Biological Fit/passive_fitting_hpc_fixed.py:1473; Passive Features/HPC script/Multiple Sweeps with phase 2.5/passive_fitting_hpc_fixed.py:1473; Passive Features/HPC script/Synthetic Passive fit Test/passive_fitting_hpc_fixed.py:1473; Passive Features/HPC script/passive_fitting_hpc_fixed.py:1473; Passive Features/phase1fittingcolab (2).py:981 |
@@ -273,8 +294,8 @@ the Colab scripts remain in the tree.
 | Phase2p5CellResult           | 3      | Passive Features/HPC script/Biological Fit/passive_fitting_hpc_fixed.py:3416; Passive Features/HPC script/Multiple Sweeps with phase 2.5/passive_fitting_hpc_fixed.py:3416; Passive Features/HPC script/Synthetic Passive fit Test/passive_fitting_hpc_fixed.py:3416 |
 | Phase2p5GroupResult          | 3      | Passive Features/HPC script/Biological Fit/passive_fitting_hpc_fixed.py:3461; Passive Features/HPC script/Multiple Sweeps with phase 2.5/passive_fitting_hpc_fixed.py:3461; Passive Features/HPC script/Synthetic Passive fit Test/passive_fitting_hpc_fixed.py:3461 |
 | Phase3Result                 | 6      | Passive Features/HPC script/Biological Fit/passive_fitting_hpc_fixed.py:4811; Passive Features/HPC script/Multiple Sweeps with phase 2.5/passive_fitting_hpc_fixed.py:4811; Passive Features/HPC script/Synthetic Passive fit Test/passive_fitting_hpc_fixed.py:4811; Passive Features/HPC script/passive_fitting_hpc_fixed.py:4080; Passive Features/Plot/passive_result_plot (5).py:833; Passive Features/phase1fittingcolab (2).py:3516 |
-| Population                   | 2      | HybridLFPy Tweaked/Population_multiMorph.py:1138; Population/Population_multiMorph.py:919        |
-| PopulationSuper              | 2      | HybridLFPy Tweaked/Population_multiMorph.py:45; Population/Population_multiMorph.py:41           |
+| Population                   | 2      | Population/Population_multiMorph.py:919; towards_eeg/hybrid/population.py:1138                   |
+| PopulationSuper              | 2      | Population/Population_multiMorph.py:41; towards_eeg/hybrid/population.py:45                      |
 | PulseQCResult                | 2      | Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:11806; Passive Features/Allen Institute Data/trace_qc (1).py:138 |
 | QCConfig                     | 2      | Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:11759; Passive Features/Allen Institute Data/trace_qc (1).py:91 |
 | RepairConfig                 | 3      | Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:4965; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:8973; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:14427 |
@@ -285,13 +306,13 @@ the Colab scripts remain in the tree.
 | ReplotBundle                 | 6      | Passive Features/HPC script/Biological Fit/passive_fitting_hpc_fixed.py:6295; Passive Features/HPC script/Multiple Sweeps with phase 2.5/passive_fitting_hpc_fixed.py:6295; Passive Features/HPC script/Synthetic Passive fit Test/passive_fitting_hpc_fixed.py:6295; Passive Features/HPC script/passive_fitting_hpc_fixed.py:5482; Passive Features/Plot/passive_result_plot (5).py:2209; Passive Features/phase1fittingcolab (2).py:4892 |
 | SomaGatedRepairConfig        | 3      | Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:6148; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:9625; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:15079 |
 | SweepBundle                  | 10     | Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:1613; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:7343; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:12708; Passive Features/HPC script/Biological Fit/passive_fitting_hpc_fixed.py:630; Passive Features/HPC script/Multiple Sweeps with phase 2.5/passive_fitting_hpc_fixed.py:630; Passive Features/HPC script/Synthetic Passive fit Test/passive_fitting_hpc_fixed.py:630; Passive Features/HPC script/passive_fitting_hpc_fixed.py:630; Passive Features/Plot/passive_result_plot (5).py:81; Passive Features/Plot/passive_result_plot (5).py:288; Passive Features/phase1fittingcolab (2).py:138 |
-| TopoPopulation               | 2      | HybridLFPy Tweaked/Population_multiMorph.py:1708; Population/Population_multiMorph.py:1931       |
+| TopoPopulation               | 2      | Population/Population_multiMorph.py:1931; towards_eeg/hybrid/population.py:1708                  |
 | _NumpyEncoder                | 3      | Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:3189; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:8506; Passive Features/Allen Institute Data/save_alleninstitute_data (6).py:13878 |
 | _SkoptDimLite                | 6      | Passive Features/HPC script/Biological Fit/passive_fitting_hpc_fixed.py:6278; Passive Features/HPC script/Multiple Sweeps with phase 2.5/passive_fitting_hpc_fixed.py:6278; Passive Features/HPC script/Synthetic Passive fit Test/passive_fitting_hpc_fixed.py:6278; Passive Features/HPC script/passive_fitting_hpc_fixed.py:5465; Passive Features/Plot/passive_result_plot (5).py:2192; Passive Features/phase1fittingcolab (2).py:4875 |
 | _TrainBundleLite             | 6      | Passive Features/HPC script/Biological Fit/passive_fitting_hpc_fixed.py:6257; Passive Features/HPC script/Multiple Sweeps with phase 2.5/passive_fitting_hpc_fixed.py:6257; Passive Features/HPC script/Synthetic Passive fit Test/passive_fitting_hpc_fixed.py:6257; Passive Features/HPC script/passive_fitting_hpc_fixed.py:5444; Passive Features/Plot/passive_result_plot (5).py:2171; Passive Features/phase1fittingcolab (2).py:4854 |
-| general_params               | 2      | HybridLFPy Tweaked/params_evoked_with_EEG_multiMorph.py:178; Parames evoked with EEG/Params_evoked_with_EEG_multiMorph.py:178 |
-| multicompartment_params      | 2      | HybridLFPy Tweaked/params_evoked_with_EEG_multiMorph.py:824; Parames evoked with EEG/Params_evoked_with_EEG_multiMorph.py:744 |
-| point_neuron_network_params  | 2      | HybridLFPy Tweaked/params_evoked_with_EEG_multiMorph.py:525; Parames evoked with EEG/Params_evoked_with_EEG_multiMorph.py:445 |
+| general_params               | 2      | Parames evoked with EEG/Params_evoked_with_EEG_multiMorph.py:178; towards_eeg/hybrid/params.py:178 |
+| multicompartment_params      | 2      | Parames evoked with EEG/Params_evoked_with_EEG_multiMorph.py:744; towards_eeg/hybrid/params.py:824 |
+| point_neuron_network_params  | 2      | Parames evoked with EEG/Params_evoked_with_EEG_multiMorph.py:445; towards_eeg/hybrid/params.py:525 |
 
 ## 6. Full ledger
 
@@ -302,175 +323,198 @@ that equality IS the exit test for the move.
 
 | path                                                                         | scope         | stage  | verdict  | pre           | s02  | s03  | s04  |
 |------------------------------------------------------------------------------|---------------|--------|----------|---------------|------|------|------|
-| .gitignore                                                                   | colab         | -      | retain   | 36e51240be00  | -    | -    | -    |
-| Align Morphologies/Alignment.py                                              | colab         | -      | retain   | 153229364d93  | 6aa  | -    | -    |
-| Align Morphologies/Alignment_IdentifySpines.py                               | colab         | -      | retain   | 00ea21aaec70  | 00e  | -    | -    |
-| Align Morphologies/README.md                                                 | colab         | -      | retain   | 6abfac74ce73  | 6ab  | -    | -    |
-| Align Morphologies/Usage example.py                                          | colab         | -      | retain   | 2f310fe50363  | 2f3  | -    | -    |
-| Alignment Metadata/Extract_metadata.py                                       | colab         | -      | retain   | 1a462fe0a7c1  | 1a4  | -    | -    |
-| Alignment Metadata/README.md                                                 | colab         | -      | retain   | 3a9ff3627f65  | 3a9  | -    | -    |
-| Alignment Metadata/Usage.py                                                  | colab         | -      | retain   | 96d6e6a72c39  | 96d  | -    | -    |
-| Connectomics/Calculate Relative Subpop pct/Usage_example.py                  | colab         | -      | retain   | 7f95739f273f  | 7f9  | -    | -    |
-| Connectomics/Calculate Relative Subpop pct/calculate_bbp_relative_presences.py | colab         | -      | retain   | d10121eb3f7e  | d10  | -    | -    |
-| Connectomics/Construct_ADJ/Construct_ADJ.py                                  | colab         | -      | retain   | 550f1d89a21e  | 550  | -    | -    |
-| Connectomics/Construct_ADJ/Microcircuit Assembly Documentation.pdf           | colab         | S0.7   | discard  | dec69a3bdff9  | dec  | -    | -    |
-| Connectomics/Construct_ADJ/Plotting_function                                 | colab         | -      | retain   | 1af3295bfe7a  | 1af  | -    | -    |
-| Connectomics/Construct_ADJ/Usage_example.py                                  | colab         | -      | retain   | 5aebc98a68f6  | 5ae  | -    | -    |
-| Connectomics/Full_impementation                                              | colab         | -      | retain   | e5f5fdef748d  | e5f  | -    | -    |
-| Connectomics/Generate Point Microcolumn/Population Generation Documentation (1).pdf | colab         | S0.7   | discard  | be7956c4b022  | be7  | -    | -    |
-| Connectomics/Generate Point Microcolumn/Usage_example.py                     | colab         | -      | retain   | 4c1226dcdce8  | 4c1  | -    | -    |
-| Connectomics/Generate Point Microcolumn/generate_microcolumn_cells.py        | colab         | -      | retain   | d2ce64546d55  | d2c  | -    | -    |
-| Dendrite F score/README.md                                                   | colab         | -      | retain   | f2eae84356fd  | f2e  | -    | -    |
-| Dendrite F score/morpholgy_pathways (6).py                                   | colab         | -      | retain   | bd8cf4b341be  | bd8  | -    | -    |
-| Fetch Synapses/Fetch_MappedSyn.py                                            | colab         | -      | retain   | 81b9fef26511  | 81b  | -    | -    |
-| Fetch Synapses/README.md                                                     | colab         | -      | retain   | d98bf970cbb7  | d98  | -    | -    |
-| Fetch Synapses/Usage_Example.py                                              | colab         | -      | retain   | eeb2aa856814  | eeb  | -    | -    |
-| Final Implementation/README.md                                               | colab         | -      | retain   | 15b82ff6e8cd  | 15b  | -    | -    |
-| Jitter Neuron/README.md                                                      | colab         | -      | retain   | a09b36fc6e2a  | a09  | -    | -    |
-| Jitter Neuron/jitter_neurons (1).py                                          | colab         | -      | retain   | aaf2bbe87751  | aaf  | -    | -    |
-| Morphology Compliance/Compliance_Check.py                                    | colab         | -      | retain   | babeb0342594  | 431  | -    | -    |
-| Morphology Compliance/Morphology Selection Documentation.pdf                 | colab         | S0.7   | discard  | 2acac69e5047  | 2ac  | -    | -    |
-| Morphology Compliance/Usage example                                          | colab         | -      | retain   | 2f366ba474ee  | 2f3  | -    | -    |
-| Nuova cartella compressa.zip                                                 | colab         | S0.7   | discard  | 9da5198cce44  | 9da  | -    | -    |
-| Point Neuronal Network/Utility Functions/HDF5_Builder.py                     | colab         | -      | retain   | 2bc3d3328419  | 2bc  | -    | -    |
-| README.md                                                                    | colab         | -      | retain   | 648aec5644fb  | 648  | -    | -    |
-| Rec_Utility.py                                                               | colab         | -      | retain   | f13de0459687  | f13  | -    | -    |
-| Save nids/Usage_example.py                                                   | colab         | -      | retain   | 7f3657845a84  | 7f3  | -    | -    |
-| Save nids/save_indicies.py                                                   | colab         | -      | retain   | ea8eb268821e  | ea8  | -    | -    |
-| Spanning Trees/Calculate_field.py                                            | colab         | -      | retain   | a481c7f3cdca  | a48  | -    | -    |
-| Spanning Trees/Neuronal Mapping Documentation.pdf                            | colab         | S0.7   | discard  | 14240ebdd440  | 142  | -    | -    |
-| Spanning Trees/Save.py                                                       | colab         | -      | retain   | 5c8b29eaeef0  | 5c8  | -    | -    |
-| Spanning Trees/Usage_example.py                                              | colab         | -      | retain   | 5e7a16b72697  | 5e7  | -    | -    |
-| Spanning tree overlap and synapse identification/Peters Rule Connectivity Engine Documentation.pdf | colab         | S0.7   | discard  | a44a1660a019  | a44  | -    | -    |
-| Spanning tree overlap and synapse identification/Synaptic Overlap Debugger Documentation.pdf | colab         | S0.7   | discard  | 7a7a3b5a8d8a  | 7a7  | -    | -    |
-| Spanning tree overlap and synapse identification/Usage_Example.py            | colab         | -      | retain   | 0d5e17d101cf  | 0d5  | -    | -    |
-| Spanning tree overlap and synapse identification/calculate_synaptic_overlap.py | colab         | -      | retain   | 88206f979839  | 882  | -    | -    |
-| Spine Detection/DEBUG/Generate_smooth_surface.py                             | colab         | -      | retain   | c792fbfc66e4  | c79  | -    | -    |
-| Spine Detection/DEBUG/Label_spines.py                                        | colab         | -      | retain   | 7f30cf1710ed  | 7f3  | -    | -    |
-| Spine Detection/DEBUG/README.md                                              | colab         | -      | retain   | 2d17a2e83686  | 2d1  | -    | -    |
-| Spine Detection/DEBUG/Segment_spine.py                                       | colab         | -      | retain   | 3c63163f6c5e  | 3c6  | -    | -    |
-| Spine Detection/Label_Dendritic_Spines.py                                    | colab         | -      | retain   | 2c56299fde3a  | 2c5  | -    | -    |
-| Spine Detection/README.md                                                    | colab         | -      | retain   | 21224f75dad4  | 212  | -    | -    |
-| Synapse Retrival/Assess_quality.py                                           | colab         | -      | retain   | 5e7569a8ef88  | 5e7  | -    | -    |
-| Synapse Retrival/Extract_synapses.py                                         | colab         | -      | retain   | 2ebf1ef9d730  | 8aa  | -    | -    |
-| Synapse Retrival/README.md                                                   | colab         | -      | retain   | d0354e2a0a56  | d03  | -    | -    |
-| Synapse Retrival/map_synapses_to_segments.py                                 | colab         | -      | retain   | 27b225da3a49  | 27b  | -    | -    |
-| Synaptic Placement/Neural Simulation Documentation.pdf                       | colab         | S0.7   | discard  | d5300eb50e13  | d53  | -    | -    |
-| Synaptic Placement/synaptic_placement (9).py                                 | colab         | -      | retain   | a068ccaba84d  | 799  | -    | -    |
-| TRANSCRIPTOMICS_PROTEOMICS/README.md                                         | colab         | -      | retain   | e2f89bc4b9d2  | e2f  | -    | -    |
-| TRANSCRIPTOMICS_PROTEOMICS/transcriptomics_proteomics (1).py                 | colab         | -      | retain   | 24f7f063a7db  | 24f  | -    | -    |
-| automated_reconstruction.py                                                  | colab         | -      | retain   | 463690b33638  | e3e  | -    | -    |
-| final_get_comparments_h10.py                                                 | colab         | -      | retain   | f967b32cd895  | ed4  | -    | -    |
-| utility.py                                                                   | colab         | -      | retain   | a20f39eedd3b  | 2ab  | -    | -    |
-| LEDGER.md                                                                    | infrastructure | S0.0   | new      | 5075a5ab0a05  | 0bf  | -    | -    |
-| ledger.csv                                                                   | infrastructure | S0.0   | new      | 8f2951bdd603  | 32b  | -    | -    |
-| tools/ancestors.json                                                         | infrastructure | S0.0   | new      | 3a0672db37f8  | 2a3  | -    | -    |
-| tools/apply_moves.py                                                         | infrastructure | S0.0   | new      | 5f3166685c35  | -    | -    | -    |
-| tools/build_ledger.py                                                        | infrastructure | S0.0   | new      | afb19b68ac9a  | 0a3  | -    | -    |
-| tools/path_moves.json                                                        | infrastructure | S0.0   | new      | 6e84488918bf  | -    | -    | -    |
-| tools/phase_hashes.json                                                      | infrastructure | S0.0   | new      | 6eb7a916d9a2  | -    | -    | -    |
-| tools/s0_ledger/__init__.py                                                  | infrastructure | S0.0   | new      | 7ec4151c2327  | 7ec  | -    | -    |
-| tools/s0_ledger/analyse.py                                                   | infrastructure | S0.0   | new      | 8cb68f8e03ad  | a1f  | -    | -    |
-| tools/s0_ledger/render.py                                                    | infrastructure | S0.0   | new      | 5ae8d7abf0ce  | 5ae  | -    | -    |
-| tools/s0_ledger/scan.py                                                      | infrastructure | S0.0   | new      | 6d8862fa2ea6  | 6d8  | -    | -    |
-| tools/s0_transform/S02_discard.sh                                            | infrastructure | S0.0   | new      | 9e5b9e16be5d  | -    | -    | -    |
-| tools/s0_transform/__init__.py                                               | infrastructure | S0.0   | new      | e9e6c067a8ae  | -    | -    | -    |
-| tools/s0_transform/decolab.py                                                | infrastructure | S0.0   | new      | 5bd38389248f  | -    | -    | -    |
-| tools/s0_transform/s02_colab_commands.json                                   | infrastructure | S0.0   | new      | d5c039844cbc  | -    | -    | -    |
-| tools/s0_transform/s02_exit_scope.json                                       | infrastructure | S0.0   | new      | e7bc2d61c3a6  | -    | -    | -    |
-| tools/s0_transform/s02_targets.json                                          | infrastructure | S0.0   | new      | 77796b350ad3  | -    | -    | -    |
-| tools/s0_transform/s02_transform_log.json                                    | infrastructure | S0.0   | new      | 43f9086474d1  | -    | -    | -    |
-| tools/stamp_phase.py                                                         | infrastructure | S0.0   | new      | 7acecd1899d8  | -    | -    | -    |
-| tools/test_s0_2_exit.py                                                      | infrastructure | S0.0   | new      | d09b71431b4c  | -    | -    | -    |
-| tools/test_s0_decolab_smoke.py                                               | infrastructure | S0.0   | new      | 273c9324079f  | -    | -    | -    |
-| tools/test_s0_ledger_smoke.py                                                | infrastructure | S0.0   | new      | 57eae0d12bc9  | 57e  | -    | -    |
-| tools/test_s0_moves_smoke.py                                                 | infrastructure | S0.0   | new      | 42e8348d917a  | -    | -    | -    |
-| Classes/Connectomics/Class.py                                                | orchestrator  | S0.4   | keep     | 2f58a6ae79a3  | 2f5  | -    | -    |
-| Classes/Connectomics/Connectomics Class Overview.pdf                         | orchestrator  | S0.7   | discard  | 3cea1baed2e4  | 3ce  | -    | -    |
-| Classes/Connectomics/connectivity_buildup (9).py                             | orchestrator  | S0.4   | keep     | e62667fa6e57  | e62  | -    | -    |
-| HybridLFPy Tweaked/Extract macro-population data/Extract_macropopulation.py  | orchestrator  | S0.4   | keep     | 0bfb98e308b9  | 0bf  | -    | -    |
-| HybridLFPy Tweaked/Extract macro-population data/Project README.pdf          | orchestrator  | S0.7   | discard  | 95a6e04fd1bd  | 95a  | -    | -    |
-| HybridLFPy Tweaked/Extract macro-population data/Usage_example.py            | orchestrator  | S0.4   | keep     | dc4828bb65d4  | dc4  | -    | -    |
-| HybridLFPy Tweaked/Population_multiMorph.py                                  | orchestrator  | S0.4   | keep     | 35dbec718a35  | 43d  | -    | -    |
-| HybridLFPy Tweaked/README.md                                                 | orchestrator  | S0.4   | keep     | 8183e1b9cd57  | 818  | -    | -    |
-| HybridLFPy Tweaked/Utility_function.py                                       | orchestrator  | S0.4   | keep     | ec55afe6c0c1  | 9d3  | -    | -    |
-| HybridLFPy Tweaked/hybrid_sim_evoked_with_EEG_multiMorph.py                  | orchestrator  | S0.4   | keep     | 566b25332991  | 6c3  | -    | -    |
-| HybridLFPy Tweaked/params_evoked_with_EEG_multiMorph.py                      | orchestrator  | S0.4   | keep     | 927ee3d9cc0d  | 927  | -    | -    |
-| Parames evoked with EEG/Params_evoked_with_EEG_multiMorph.py                 | orchestrator  | S0.4   | keep     | de9169ec67d8  | de9  | -    | -    |
-| Population/Population_multiMorph.py                                          | orchestrator  | S0.4   | keep     | 78ce9475d76c  | 78c  | -    | -    |
-| Population/README.md                                                         | orchestrator  | S0.4   | keep     | ca11825113c5  | ca1  | -    | -    |
+| .gitignore                                                                   | colab         | -      | retain   | 36e51240be00  | -    | 36e  | 36e  |
+| Align Morphologies/Alignment.py                                              | colab         | -      | retain   | 153229364d93  | 6aa  | d99  | d99  |
+| Align Morphologies/Alignment_IdentifySpines.py                               | colab         | -      | retain   | 00ea21aaec70  | 00e  | c34  | c34  |
+| Align Morphologies/README.md                                                 | colab         | -      | retain   | 6abfac74ce73  | 6ab  | 6ab  | 6ab  |
+| Align Morphologies/Usage example.py                                          | colab         | -      | retain   | 2f310fe50363  | 2f3  | 2f3  | 2f3  |
+| Alignment Metadata/Extract_metadata.py                                       | colab         | -      | retain   | 1a462fe0a7c1  | 1a4  | fb3  | fb3  |
+| Alignment Metadata/README.md                                                 | colab         | -      | retain   | 3a9ff3627f65  | 3a9  | 3a9  | 3a9  |
+| Alignment Metadata/Usage.py                                                  | colab         | -      | retain   | 96d6e6a72c39  | 96d  | 78e  | 78e  |
+| Connectomics/Calculate Relative Subpop pct/Usage_example.py                  | colab         | -      | retain   | 7f95739f273f  | 7f9  | 36d  | 36d  |
+| Connectomics/Calculate Relative Subpop pct/calculate_bbp_relative_presences.py | colab         | -      | retain   | d10121eb3f7e  | d10  | d10  | d10  |
+| Connectomics/Construct_ADJ/Construct_ADJ.py                                  | colab         | -      | retain   | 550f1d89a21e  | 550  | 550  | 550  |
+| Connectomics/Construct_ADJ/Microcircuit Assembly Documentation.pdf           | colab         | S0.7   | discard  | dec69a3bdff9  | dec  | dec  | dec  |
+| Connectomics/Construct_ADJ/Plotting_function                                 | colab         | -      | retain   | 1af3295bfe7a  | 1af  | 1af  | 1af  |
+| Connectomics/Construct_ADJ/Usage_example.py                                  | colab         | -      | retain   | 5aebc98a68f6  | 5ae  | 5ae  | 5ae  |
+| Connectomics/Full_impementation                                              | colab         | -      | retain   | e5f5fdef748d  | e5f  | e5f  | e5f  |
+| Connectomics/Generate Point Microcolumn/Population Generation Documentation (1).pdf | colab         | S0.7   | discard  | be7956c4b022  | be7  | be7  | be7  |
+| Connectomics/Generate Point Microcolumn/Usage_example.py                     | colab         | -      | retain   | 4c1226dcdce8  | 4c1  | 4c1  | 4c1  |
+| Connectomics/Generate Point Microcolumn/generate_microcolumn_cells.py        | colab         | -      | retain   | d2ce64546d55  | d2c  | d2c  | d2c  |
+| Dendrite F score/README.md                                                   | colab         | -      | retain   | f2eae84356fd  | f2e  | f2e  | f2e  |
+| Dendrite F score/morpholgy_pathways (6).py                                   | colab         | -      | retain   | bd8cf4b341be  | bd8  | 4a0  | 4a0  |
+| Fetch Synapses/Fetch_MappedSyn.py                                            | colab         | -      | retain   | 81b9fef26511  | 81b  | 81b  | 81b  |
+| Fetch Synapses/README.md                                                     | colab         | -      | retain   | d98bf970cbb7  | d98  | d98  | d98  |
+| Fetch Synapses/Usage_Example.py                                              | colab         | -      | retain   | eeb2aa856814  | eeb  | bdd  | bdd  |
+| Final Implementation/README.md                                               | colab         | -      | retain   | 15b82ff6e8cd  | 15b  | 15b  | 15b  |
+| Jitter Neuron/README.md                                                      | colab         | -      | retain   | a09b36fc6e2a  | a09  | a09  | a09  |
+| Jitter Neuron/jitter_neurons (1).py                                          | colab         | -      | retain   | aaf2bbe87751  | aaf  | 5b5  | 5b5  |
+| Morphology Compliance/Compliance_Check.py                                    | colab         | -      | retain   | babeb0342594  | 431  | 35c  | 35c  |
+| Morphology Compliance/Morphology Selection Documentation.pdf                 | colab         | S0.7   | discard  | 2acac69e5047  | 2ac  | 2ac  | 2ac  |
+| Morphology Compliance/Usage example                                          | colab         | -      | retain   | 2f366ba474ee  | 2f3  | 2f3  | 2f3  |
+| Nuova cartella compressa.zip                                                 | colab         | S0.7   | discard  | 9da5198cce44  | 9da  | 9da  | 9da  |
+| Point Neuronal Network/Utility Functions/HDF5_Builder.py                     | colab         | -      | retain   | 2bc3d3328419  | 2bc  | 2bc  | 2bc  |
+| README.md                                                                    | colab         | -      | retain   | 648aec5644fb  | 648  | 648  | 648  |
+| Rec_Utility.py                                                               | colab         | -      | retain   | f13de0459687  | f13  | e97  | e97  |
+| Save nids/Usage_example.py                                                   | colab         | -      | retain   | 7f3657845a84  | 7f3  | 7f3  | 7f3  |
+| Save nids/save_indicies.py                                                   | colab         | -      | retain   | ea8eb268821e  | ea8  | ea8  | ea8  |
+| Spanning Trees/Calculate_field.py                                            | colab         | -      | retain   | a481c7f3cdca  | a48  | 027  | 027  |
+| Spanning Trees/Neuronal Mapping Documentation.pdf                            | colab         | S0.7   | discard  | 14240ebdd440  | 142  | 142  | 142  |
+| Spanning Trees/Save.py                                                       | colab         | -      | retain   | 5c8b29eaeef0  | 5c8  | 14d  | 14d  |
+| Spanning Trees/Usage_example.py                                              | colab         | -      | retain   | 5e7a16b72697  | 5e7  | 5e7  | 5e7  |
+| Spanning tree overlap and synapse identification/Peters Rule Connectivity Engine Documentation.pdf | colab         | S0.7   | discard  | a44a1660a019  | a44  | a44  | a44  |
+| Spanning tree overlap and synapse identification/Synaptic Overlap Debugger Documentation.pdf | colab         | S0.7   | discard  | 7a7a3b5a8d8a  | 7a7  | 7a7  | 7a7  |
+| Spanning tree overlap and synapse identification/Usage_Example.py            | colab         | -      | retain   | 0d5e17d101cf  | 0d5  | 0d5  | 0d5  |
+| Spanning tree overlap and synapse identification/calculate_synaptic_overlap.py | colab         | -      | retain   | 88206f979839  | 882  | 358  | 358  |
+| Spine Detection/DEBUG/Generate_smooth_surface.py                             | colab         | -      | retain   | c792fbfc66e4  | c79  | 5bb  | 5bb  |
+| Spine Detection/DEBUG/Label_spines.py                                        | colab         | -      | retain   | 7f30cf1710ed  | 7f3  | 6a6  | 6a6  |
+| Spine Detection/DEBUG/README.md                                              | colab         | -      | retain   | 2d17a2e83686  | 2d1  | 2d1  | 2d1  |
+| Spine Detection/DEBUG/Segment_spine.py                                       | colab         | -      | retain   | 3c63163f6c5e  | 3c6  | d47  | d47  |
+| Spine Detection/Label_Dendritic_Spines.py                                    | colab         | -      | retain   | 2c56299fde3a  | 2c5  | d9e  | d9e  |
+| Spine Detection/README.md                                                    | colab         | -      | retain   | 21224f75dad4  | 212  | 212  | 212  |
+| Synapse Retrival/Assess_quality.py                                           | colab         | -      | retain   | 5e7569a8ef88  | 5e7  | 7c2  | 7c2  |
+| Synapse Retrival/Extract_synapses.py                                         | colab         | -      | retain   | 2ebf1ef9d730  | 8aa  | 5c6  | 5c6  |
+| Synapse Retrival/README.md                                                   | colab         | -      | retain   | d0354e2a0a56  | d03  | d03  | d03  |
+| Synapse Retrival/map_synapses_to_segments.py                                 | colab         | -      | retain   | 27b225da3a49  | 27b  | fad  | fad  |
+| Synaptic Placement/Neural Simulation Documentation.pdf                       | colab         | S0.7   | discard  | d5300eb50e13  | d53  | d53  | d53  |
+| Synaptic Placement/synaptic_placement (9).py                                 | colab         | -      | retain   | a068ccaba84d  | 799  | 445  | 445  |
+| TRANSCRIPTOMICS_PROTEOMICS/README.md                                         | colab         | -      | retain   | e2f89bc4b9d2  | e2f  | e2f  | e2f  |
+| TRANSCRIPTOMICS_PROTEOMICS/transcriptomics_proteomics (1).py                 | colab         | -      | retain   | 24f7f063a7db  | 24f  | 24f  | 24f  |
+| automated_reconstruction.py                                                  | colab         | -      | retain   | 463690b33638  | e3e  | 16d  | 16d  |
+| final_get_comparments_h10.py                                                 | colab         | -      | retain   | f967b32cd895  | ed4  | 92d  | 92d  |
+| utility.py                                                                   | colab         | -      | retain   | a20f39eedd3b  | 2ab  | 51e  | 51e  |
+| .gitattributes                                                               | infrastructure | S0.3   | new      | 21a67317bef6  | -    | -    | 21a  |
+| LEDGER.md                                                                    | infrastructure | S0.0   | new      | 5075a5ab0a05  | 0bf  | eaa  | 00b  |
+| ledger.csv                                                                   | infrastructure | S0.0   | new      | 8f2951bdd603  | 32b  | 851  | 90a  |
+| pyproject.toml                                                               | infrastructure | S0.4   | new      | 2109a35de6b6  | -    | -    | 210  |
+| tools/ancestors.json                                                         | infrastructure | S0.0   | new      | 3a0672db37f8  | 2a3  | 2a3  | 8a0  |
+| tools/apply_moves.py                                                         | infrastructure | S0.2c  | new      | 5615213c62b1  | -    | 5f3  | 561  |
+| tools/build_ledger.py                                                        | infrastructure | S0.0   | new      | afb19b68ac9a  | 0a3  | 2e3  | 2e3  |
+| tools/path_moves.json                                                        | infrastructure | S0.2c  | new      | baf9c7926395  | -    | 6e8  | baf  |
+| tools/phase_hashes.json                                                      | infrastructure | S0.2   | new      | e007c5befd50  | -    | ab1  | f6b  |
+| tools/s0_ledger/__init__.py                                                  | infrastructure | S0.0   | new      | 7ec4151c2327  | 7ec  | 7ec  | 7ec  |
+| tools/s0_ledger/analyse.py                                                   | infrastructure | S0.0   | new      | 8cb68f8e03ad  | a1f  | 336  | 7d0  |
+| tools/s0_ledger/render.py                                                    | infrastructure | S0.0   | new      | 5ae8d7abf0ce  | 5ae  | 610  | 610  |
+| tools/s0_ledger/scan.py                                                      | infrastructure | S0.0   | new      | 6d8862fa2ea6  | 6d8  | 6d8  | 6d8  |
+| tools/s0_paths.py                                                            | infrastructure | S0.4   | new      | 929ef005d98b  | -    | -    | 929  |
+| tools/s0_transform/S02_discard.sh                                            | infrastructure | S0.2   | new      | 9e5b9e16be5d  | -    | 9e5  | 9e5  |
+| tools/s0_transform/__init__.py                                               | infrastructure | S0.2   | new      | e9e6c067a8ae  | -    | e9e  | e9e  |
+| tools/s0_transform/asciify.py                                                | infrastructure | S0.3   | new      | e2967d7b04e1  | -    | -    | e29  |
+| tools/s0_transform/decolab.py                                                | infrastructure | S0.2   | new      | 68f7db5fc32d  | -    | 68f  | 68f  |
+| tools/s0_transform/s02_colab_commands.json                                   | infrastructure | S0.2   | new      | d5c039844cbc  | -    | d5c  | d5c  |
+| tools/s0_transform/s02_exit_scope.json                                       | infrastructure | S0.2   | new      | e7bc2d61c3a6  | -    | e7b  | e7b  |
+| tools/s0_transform/s02_targets.json                                          | infrastructure | S0.2   | new      | 77796b350ad3  | -    | 777  | 777  |
+| tools/s0_transform/s02_transform_log.json                                    | infrastructure | S0.2   | new      | 43f9086474d1  | -    | 43f  | 43f  |
+| tools/s0_transform/s03_exit_scope.json                                       | infrastructure | S0.3   | new      | 85dde24f2176  | -    | -    | 85d  |
+| tools/s0_transform/s03_targets.json                                          | infrastructure | S0.3   | new      | 073092c2968b  | -    | -    | 073  |
+| tools/s0_transform/s03_transform_log.json                                    | infrastructure | S0.3   | new      | e1dc45bfda62  | -    | -    | e1d  |
+| tools/s0_transform/s03_translit_map.json                                     | infrastructure | S0.3   | new      | 5f0fd4bf6e2b  | -    | -    | 5f0  |
+| tools/s0_transform/s04_exit_scope.json                                       | infrastructure | S0.0   | new      | 2baaa0cadab8  | -    | -    | 2ba  |
+| tools/stamp_phase.py                                                         | infrastructure | S0.2   | new      | 7acecd1899d8  | -    | 7ac  | 7ac  |
+| tools/test_s0_2_exit.py                                                      | infrastructure | S0.2   | new      | dc29ec7d7c87  | -    | dc2  | dc2  |
+| tools/test_s0_3_exit.py                                                      | infrastructure | S0.3   | new      | 17df58d01aab  | -    | -    | 17d  |
+| tools/test_s0_4_exit.py                                                      | infrastructure | S0.4   | new      | 2d8568f419f3  | -    | -    | 2d8  |
+| tools/test_s0_4_smoke.py                                                     | infrastructure | S0.0   | new      | 5654ff7cd8e7  | -    | -    | 565  |
+| tools/test_s0_asciify_smoke.py                                               | infrastructure | S0.3   | new      | 64f7aebbfd75  | -    | -    | 64f  |
+| tools/test_s0_chain.py                                                       | infrastructure | S0.3   | new      | a88508717441  | -    | -    | a88  |
+| tools/test_s0_decolab_smoke.py                                               | infrastructure | S0.2   | new      | 49b18e35dbb5  | -    | 49b  | 49b  |
+| tools/test_s0_ledger_smoke.py                                                | infrastructure | S0.0   | new      | 57eae0d12bc9  | 57e  | 57e  | 57e  |
+| tools/test_s0_moves_smoke.py                                                 | infrastructure | S0.2c  | new      | c18c4087d8b5  | -    | 42e  | c18  |
+| towards_eeg/__init__.py                                                      | infrastructure | S0.4   | new      | 53378de1aac3  | -    | -    | 533  |
+| towards_eeg/config/__init__.py                                               | infrastructure | S0.4   | new      | edbe5540e130  | -    | -    | edb  |
+| towards_eeg/connectome/__init__.py                                           | infrastructure | S0.4   | new      | 4b53382c2d9e  | -    | -    | 4b5  |
+| towards_eeg/cosim/__init__.py                                                | infrastructure | S0.4   | new      | 69c430578222  | -    | -    | 69c  |
+| towards_eeg/hybrid/__init__.py                                               | infrastructure | S0.4   | new      | a16a45a3ec5b  | -    | -    | a16  |
+| towards_eeg/io/__init__.py                                                   | infrastructure | S0.4   | new      | 0aa0dd1bb650  | -    | -    | 0aa  |
+| towards_eeg/passive/__init__.py                                              | infrastructure | S0.4   | new      | a06facd2152f  | -    | -    | a06  |
+| towards_eeg/pointnet/__init__.py                                             | infrastructure | S0.4   | new      | 5be4441efb25  | -    | -    | 5be  |
+| towards_eeg/structure/__init__.py                                            | infrastructure | S0.4   | new      | 835cb1cb771f  | -    | -    | 835  |
+| Classes/Connectomics/Connectomics Class Overview.pdf                         | orchestrator  | S0.7   | discard  | 3cea1baed2e4  | 3ce  | 3ce  | 3ce  |
+| HybridLFPy Tweaked/Extract macro-population data/Project README.pdf          | orchestrator  | S0.7   | discard  | 95a6e04fd1bd  | 95a  | 95a  | 95a  |
+| Parames evoked with EEG/Params_evoked_with_EEG_multiMorph.py                 | orchestrator  | -      | retain   | de9169ec67d8  | de9  | de9  | de9  |
+| Population/Population_multiMorph.py                                          | orchestrator  | -      | retain   | 78ce9475d76c  | 78c  | 78c  | 78c  |
+| Population/README.md                                                         | orchestrator  | -      | retain   | ca11825113c5  | ca1  | ca1  | ca1  |
 | Utility_fun.py                                                               | orchestrator  | S0.1   | keep     | 9d3d29c8a997  | -    | -    | -    |
 | hybrid_sim_evoked_with_EEG_CHANGED.py                                        | orchestrator  | S0.1   | keep     | 6c3ed490ba14  | -    | -    | -    |
 | params_evoked_with_EEG_CHANGED.py                                            | orchestrator  | S0.1   | keep     | 927ee3d9cc0d  | -    | -    | -    |
 | population_CHANGED.py                                                        | orchestrator  | S0.1   | keep     | 43df1344230e  | -    | -    | -    |
-| Passive Features/Allen Institute Data/README.md                              | passive       | -      | retain   | 954aa51240c9  | 954  | -    | -    |
-| Passive Features/Allen Institute Data/save_alleninstitute_data (6).py        | passive       | -      | retain   | 9d8ccf9f5698  | 84b  | -    | -    |
-| Passive Features/Allen Institute Data/trace_qc (1).py                        | passive       | -      | retain   | 5d983eb7cc91  | 5d9  | -    | -    |
-| Passive Features/Allen Institute Data/trace_qc_v2.py                         | passive       | -      | retain   | 3baf0064e73f  | 3ba  | -    | -    |
-| Passive Features/HPC script/Biological Fit/Biological_Passive_Fit_HPC_Guide.md | passive       | -      | retain   | d5294b571c9b  | d52  | -    | -    |
-| Passive Features/HPC script/Biological Fit/README.md                         | passive       | -      | retain   | 1867dde1be4f  | 186  | -    | -    |
-| Passive Features/HPC script/Biological Fit/cm_profile_sweep.py               | passive       | -      | retain   | 236b3827d6fd  | 236  | -    | -    |
-| Passive Features/HPC script/Biological Fit/passive_fitting_hpc_fixed.py      | passive       | -      | retain   | 6c95c3accb42  | 6c9  | -    | -    |
-| Passive Features/HPC script/Biological Fit/passive_long_step_training.py     | passive       | -      | retain   | 845c4459dbbb  | 845  | -    | -    |
-| Passive Features/HPC script/Biological Fit/run_biological_fit.py             | passive       | -      | retain   | 97f67b587144  | 97f  | -    | -    |
-| Passive Features/HPC script/Biological Fit/smoke_run_biological_fit.py       | passive       | -      | retain   | 9f2f46440e03  | 9f2  | -    | -    |
-| Passive Features/HPC script/Biological Fit/submit_all_groups_biological.sh   | passive       | -      | retain   | 8c3fd53e2abe  | 8c3  | -    | -    |
-| Passive Features/HPC script/Biological Fit/submit_biological_fit.sh          | passive       | -      | retain   | da07d3283977  | da0  | -    | -    |
-| Passive Features/HPC script/Error_Log.txt                                    | passive       | -      | retain   | 042dc06898fa  | 042  | -    | -    |
-| Passive Features/HPC script/Multiple Sweeps with phase 2.5/README.md         | passive       | -      | retain   | 6e924b9543d3  | 6e9  | -    | -    |
-| Passive Features/HPC script/Multiple Sweeps with phase 2.5/passive_fitting_hpc_fixed.py | passive       | -      | retain   | 6c95c3accb42  | 6c9  | -    | -    |
-| Passive Features/HPC script/Multiple Sweeps with phase 2.5/passive_fitting_hpc_fixed_description.md | passive       | -      | retain   | ea52844dec91  | ea5  | -    | -    |
-| Passive Features/HPC script/Multiple nodes/README.md                         | passive       | -      | retain   | cd1425d8e2bc  | cd1  | -    | -    |
-| Passive Features/HPC script/Multiple nodes/submit_all_groups.sh              | passive       | -      | retain   | 57ddbfda6712  | 57d  | -    | -    |
-| Passive Features/HPC script/Multiple nodes/submit_passive_fit.sh             | passive       | -      | retain   | 94cf1cd080ab  | 94c  | -    | -    |
-| Passive Features/HPC script/README.md                                        | passive       | -      | retain   | b3662fa0410a  | b36  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/Ih.mod                | passive       | -      | retain   | c989a36d9730  | c98  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/README.md             | passive       | -      | retain   | 8a29244b39ce  | 8a2  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/aggregate_synth_results.py | passive       | -      | retain   | d995c1b46af7  | d99  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/benchmark_usage_guide.md | passive       | -      | retain   | 9dfd962d4bc6  | 9df  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/cm_profile_sweep.py   | passive       | -      | retain   | 236b3827d6fd  | 236  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/gen_from_manifest.py  | passive       | -      | retain   | bdf4f6d72683  | bdf  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/kv.mod                | passive       | -      | retain   | c97ebc7abff9  | c97  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/na.mod                | passive       | -      | retain   | e8fda3334266  | e8f  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/passive_consistency_diagnostic.py | passive       | -      | retain   | 844c92272e11  | 844  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/passive_fitting_hpc_fixed.py | passive       | -      | retain   | 6c95c3accb42  | 6c9  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/passive_long_step_training.py | passive       | -      | retain   | 845c4459dbbb  | 845  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/run_synth_benchmark.py | passive       | -      | retain   | 2f62abb5249f  | 2f6  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/smoke_aggregate_synth_results.py | passive       | -      | retain   | 2d27a88355ca  | 2d2  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/smoke_gen_from_manifest.py | passive       | -      | retain   | eb9f612cdc94  | eb9  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/smoke_run_synth_benchmark.py | passive       | -      | retain   | 769ea0d8f7d2  | 769  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/smoke_synth_gt_grid.py | passive       | -      | retain   | e8787fd8fe28  | e87  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/submit_all_cohorts.sh | passive       | -      | retain   | 1bca07408152  | 1bc  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/submit_synth_benchmark.sh | passive       | -      | retain   | 0bf477ce6ab6  | 0bf  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/synth_gt_grid.py      | passive       | -      | retain   | 495d2c4eb558  | 495  | -    | -    |
-| Passive Features/HPC script/Synthetic Passive fit Test/synthetic_ground_truth.py | passive       | -      | retain   | fd1bebcaba5b  | fd1  | -    | -    |
-| Passive Features/HPC script/passive_fit.e1099100                             | passive       | S0.7   | discard  | 856f6afb4ea7  | 856  | -    | -    |
-| Passive Features/HPC script/passive_fit.e1099156                             | passive       | S0.7   | discard  | 3c03fe908847  | 3c0  | -    | -    |
-| Passive Features/HPC script/passive_fit.e1099215                             | passive       | S0.7   | discard  | 87501536b336  | 875  | -    | -    |
-| Passive Features/HPC script/passive_fit.o1099100                             | passive       | S0.7   | discard  | 2c2f8bc9b1e7  | 2c2  | -    | -    |
-| Passive Features/HPC script/passive_fit.o1099156                             | passive       | S0.7   | discard  | ef17cc6efc8e  | ef1  | -    | -    |
-| Passive Features/HPC script/passive_fit.o1099215                             | passive       | S0.7   | discard  | c69560156a4e  | c69  | -    | -    |
-| Passive Features/HPC script/passive_fitting_hpc_fixed.py                     | passive       | -      | retain   | 366381884ca2  | 366  | -    | -    |
-| Passive Features/HPC script/requirements.txt                                 | passive       | -      | retain   | f0fbc7ed8c52  | f0f  | -    | -    |
-| Passive Features/HPC script/submit_passive_fit.sh                            | passive       | -      | retain   | aaf476707ddc  | aaf  | -    | -    |
-| Passive Features/HPC script/test_pickle_roundtrip.py                         | passive       | -      | retain   | 4f9e385f9bad  | 4f9  | -    | -    |
-| Passive Features/Passive Allen Data/L2/README.md                             | passive       | -      | retain   | 3bb5a022d1b9  | 3bb  | -    | -    |
-| Passive Features/Passive Allen Data/L2/candidates.csv                        | passive       | -      | retain   | 8dc7a8e93c70  | 8dc  | -    | -    |
-| Passive Features/Passive Allen Data/L2/manifest.json                         | passive       | -      | retain   | bb58c6136861  | bb5  | -    | -    |
-| Passive Features/Passive Allen Data/L2/specimen_528706755.zip                | passive       | S0.7   | discard  | 579910a148da  | 579  | -    | -    |
-| Passive Features/Passive Allen Data/L2/specimen_537204107.zip                | passive       | S0.7   | discard  | 01bff4f88db8  | 01b  | -    | -    |
-| Passive Features/Passive Allen Data/L2/specimen_614659629.zip                | passive       | S0.7   | discard  | e8ceaafe3743  | e8c  | -    | -    |
-| Passive Features/Passive Allen Data/L2/specimen_616647103.zip                | passive       | S0.7   | discard  | f4219ebd7149  | f42  | -    | -    |
-| Passive Features/Phase 1/README.md                                           | passive       | -      | retain   | 99e89cb13b59  | 99e  | -    | -    |
-| Passive Features/Phase 2/aaa.py                                              | passive       | -      | retain   | 17e682f060b5  | 17e  | -    | -    |
-| Passive Features/Phase 2/phase2_patch.pdf                                    | passive       | S0.7   | discard  | 2d488e5e1300  | 2d4  | -    | -    |
-| Passive Features/Phase 2/phase2_technical.pdf                                | passive       | S0.7   | discard  | 03d8016e1289  | 03d  | -    | -    |
-| Passive Features/Phase 3/README.md                                           | passive       | -      | retain   | 4f9b9c11f112  | 4f9  | -    | -    |
-| Passive Features/Plot/X                                                      | passive       | -      | retain   | 10c7dbb397fc  | 10c  | -    | -    |
-| Passive Features/Plot/passive_result_plot (5).py                             | passive       | -      | retain   | a6b24bc1a3a6  | 5ad  | -    | -    |
-| Passive Features/Plot/phase3_publication_plots_v2_documentation.md           | passive       | -      | retain   | c366f5dc493d  | c36  | -    | -    |
-| Passive Features/node_test.py                                                | passive       | -      | retain   | f1c9580c2604  | f1c  | -    | -    |
-| Passive Features/phase1fittingcolab (2).py                                   | passive       | -      | retain   | b47f1f9e552e  | 739  | -    | -    |
-| Passive Features/submit_node_test.sh                                         | passive       | -      | retain   | f2329cb6a4be  | f23  | -    | -    |
+| towards_eeg/connectome/connectivity_buildup.py                               | orchestrator  | S0.4   | keep     | e62667fa6e57  | e62  | 1a4  | 1a4  |
+| towards_eeg/connectome/connectomics.py                                       | orchestrator  | S0.4   | keep     | 2f58a6ae79a3  | 2f5  | 5c2  | 5c2  |
+| towards_eeg/connectome/macropopulation.py                                    | orchestrator  | S0.4   | keep     | 0bfb98e308b9  | 0bf  | 0bf  | 0bf  |
+| towards_eeg/connectome/usage_example.py                                      | orchestrator  | S0.4   | keep     | dc4828bb65d4  | dc4  | 6b3  | 6b3  |
+| towards_eeg/hybrid/README.md                                                 | orchestrator  | S0.4   | keep     | 8183e1b9cd57  | 818  | 818  | 818  |
+| towards_eeg/hybrid/driver.py                                                 | orchestrator  | S0.4   | keep     | 566b25332991  | 6c3  | c19  | c19  |
+| towards_eeg/hybrid/params.py                                                 | orchestrator  | S0.4   | keep     | 927ee3d9cc0d  | 927  | 1fa  | 1fa  |
+| towards_eeg/hybrid/population.py                                             | orchestrator  | S0.4   | keep     | 35dbec718a35  | 43d  | 829  | 829  |
+| towards_eeg/hybrid/utility.py                                                | orchestrator  | S0.4   | keep     | ec55afe6c0c1  | 9d3  | 9da  | 9da  |
+| Passive Features/Allen Institute Data/README.md                              | passive       | -      | retain   | 954aa51240c9  | 954  | 954  | 954  |
+| Passive Features/Allen Institute Data/save_alleninstitute_data (6).py        | passive       | -      | retain   | 9d8ccf9f5698  | 84b  | 0fd  | 0fd  |
+| Passive Features/Allen Institute Data/trace_qc (1).py                        | passive       | -      | retain   | 5d983eb7cc91  | 5d9  | a88  | a88  |
+| Passive Features/Allen Institute Data/trace_qc_v2.py                         | passive       | -      | retain   | 3baf0064e73f  | 3ba  | d21  | d21  |
+| Passive Features/HPC script/Biological Fit/Biological_Passive_Fit_HPC_Guide.md | passive       | -      | retain   | d5294b571c9b  | d52  | d52  | d52  |
+| Passive Features/HPC script/Biological Fit/README.md                         | passive       | -      | retain   | 1867dde1be4f  | 186  | 186  | 186  |
+| Passive Features/HPC script/Biological Fit/cm_profile_sweep.py               | passive       | -      | retain   | 236b3827d6fd  | 236  | 236  | 236  |
+| Passive Features/HPC script/Biological Fit/passive_fitting_hpc_fixed.py      | passive       | -      | retain   | 6c95c3accb42  | 6c9  | caf  | caf  |
+| Passive Features/HPC script/Biological Fit/passive_long_step_training.py     | passive       | -      | retain   | 845c4459dbbb  | 845  | e19  | e19  |
+| Passive Features/HPC script/Biological Fit/run_biological_fit.py             | passive       | -      | retain   | 97f67b587144  | 97f  | 97f  | 97f  |
+| Passive Features/HPC script/Biological Fit/smoke_run_biological_fit.py       | passive       | -      | retain   | 9f2f46440e03  | 9f2  | 9f2  | 9f2  |
+| Passive Features/HPC script/Biological Fit/submit_all_groups_biological.sh   | passive       | -      | retain   | 8c3fd53e2abe  | 8c3  | 8c3  | 8c3  |
+| Passive Features/HPC script/Biological Fit/submit_biological_fit.sh          | passive       | -      | retain   | da07d3283977  | da0  | da0  | da0  |
+| Passive Features/HPC script/Error_Log.txt                                    | passive       | -      | retain   | 042dc06898fa  | 042  | 042  | 042  |
+| Passive Features/HPC script/Multiple Sweeps with phase 2.5/README.md         | passive       | -      | retain   | 6e924b9543d3  | 6e9  | 6e9  | 6e9  |
+| Passive Features/HPC script/Multiple Sweeps with phase 2.5/passive_fitting_hpc_fixed.py | passive       | -      | retain   | 6c95c3accb42  | 6c9  | caf  | caf  |
+| Passive Features/HPC script/Multiple Sweeps with phase 2.5/passive_fitting_hpc_fixed_description.md | passive       | -      | retain   | ea52844dec91  | ea5  | ea5  | ea5  |
+| Passive Features/HPC script/Multiple nodes/README.md                         | passive       | -      | retain   | cd1425d8e2bc  | cd1  | cd1  | cd1  |
+| Passive Features/HPC script/Multiple nodes/submit_all_groups.sh              | passive       | -      | retain   | 57ddbfda6712  | 57d  | fac  | fac  |
+| Passive Features/HPC script/Multiple nodes/submit_passive_fit.sh             | passive       | -      | retain   | 94cf1cd080ab  | 94c  | 68d  | 68d  |
+| Passive Features/HPC script/README.md                                        | passive       | -      | retain   | b3662fa0410a  | b36  | b36  | b36  |
+| Passive Features/HPC script/Synthetic Passive fit Test/Ih.mod                | passive       | -      | retain   | c989a36d9730  | c98  | c98  | c98  |
+| Passive Features/HPC script/Synthetic Passive fit Test/README.md             | passive       | -      | retain   | 8a29244b39ce  | 8a2  | 8a2  | 8a2  |
+| Passive Features/HPC script/Synthetic Passive fit Test/aggregate_synth_results.py | passive       | -      | retain   | d995c1b46af7  | d99  | ecf  | ecf  |
+| Passive Features/HPC script/Synthetic Passive fit Test/benchmark_usage_guide.md | passive       | -      | retain   | 9dfd962d4bc6  | 9df  | 9df  | 9df  |
+| Passive Features/HPC script/Synthetic Passive fit Test/cm_profile_sweep.py   | passive       | -      | retain   | 236b3827d6fd  | 236  | 236  | 236  |
+| Passive Features/HPC script/Synthetic Passive fit Test/gen_from_manifest.py  | passive       | -      | retain   | bdf4f6d72683  | bdf  | 8fa  | 8fa  |
+| Passive Features/HPC script/Synthetic Passive fit Test/kv.mod                | passive       | -      | retain   | c97ebc7abff9  | c97  | c97  | c97  |
+| Passive Features/HPC script/Synthetic Passive fit Test/na.mod                | passive       | -      | retain   | e8fda3334266  | e8f  | e8f  | e8f  |
+| Passive Features/HPC script/Synthetic Passive fit Test/passive_consistency_diagnostic.py | passive       | -      | retain   | 844c92272e11  | 844  | 844  | 844  |
+| Passive Features/HPC script/Synthetic Passive fit Test/passive_fitting_hpc_fixed.py | passive       | -      | retain   | 6c95c3accb42  | 6c9  | caf  | caf  |
+| Passive Features/HPC script/Synthetic Passive fit Test/passive_long_step_training.py | passive       | -      | retain   | 845c4459dbbb  | 845  | e19  | e19  |
+| Passive Features/HPC script/Synthetic Passive fit Test/run_synth_benchmark.py | passive       | -      | retain   | 2f62abb5249f  | 2f6  | 84a  | 84a  |
+| Passive Features/HPC script/Synthetic Passive fit Test/smoke_aggregate_synth_results.py | passive       | -      | retain   | 2d27a88355ca  | 2d2  | 2d2  | 2d2  |
+| Passive Features/HPC script/Synthetic Passive fit Test/smoke_gen_from_manifest.py | passive       | -      | retain   | eb9f612cdc94  | eb9  | eb9  | eb9  |
+| Passive Features/HPC script/Synthetic Passive fit Test/smoke_run_synth_benchmark.py | passive       | -      | retain   | 769ea0d8f7d2  | 769  | 769  | 769  |
+| Passive Features/HPC script/Synthetic Passive fit Test/smoke_synth_gt_grid.py | passive       | -      | retain   | e8787fd8fe28  | e87  | e87  | e87  |
+| Passive Features/HPC script/Synthetic Passive fit Test/submit_all_cohorts.sh | passive       | -      | retain   | 1bca07408152  | 1bc  | 1bc  | 1bc  |
+| Passive Features/HPC script/Synthetic Passive fit Test/submit_synth_benchmark.sh | passive       | -      | retain   | 0bf477ce6ab6  | 0bf  | 2ee  | 2ee  |
+| Passive Features/HPC script/Synthetic Passive fit Test/synth_gt_grid.py      | passive       | -      | retain   | 495d2c4eb558  | 495  | 495  | 495  |
+| Passive Features/HPC script/Synthetic Passive fit Test/synthetic_ground_truth.py | passive       | -      | retain   | fd1bebcaba5b  | fd1  | fd1  | fd1  |
+| Passive Features/HPC script/passive_fit.e1099100                             | passive       | S0.7   | discard  | 856f6afb4ea7  | 856  | 856  | 856  |
+| Passive Features/HPC script/passive_fit.e1099156                             | passive       | S0.7   | discard  | 3c03fe908847  | 3c0  | 3c0  | 3c0  |
+| Passive Features/HPC script/passive_fit.e1099215                             | passive       | S0.7   | discard  | 87501536b336  | 875  | 875  | 875  |
+| Passive Features/HPC script/passive_fit.o1099100                             | passive       | S0.7   | discard  | 2c2f8bc9b1e7  | 2c2  | 2c2  | 2c2  |
+| Passive Features/HPC script/passive_fit.o1099156                             | passive       | S0.7   | discard  | ef17cc6efc8e  | ef1  | ef1  | ef1  |
+| Passive Features/HPC script/passive_fit.o1099215                             | passive       | S0.7   | discard  | c69560156a4e  | c69  | c69  | c69  |
+| Passive Features/HPC script/passive_fitting_hpc_fixed.py                     | passive       | -      | retain   | 366381884ca2  | 366  | dc1  | dc1  |
+| Passive Features/HPC script/requirements.txt                                 | passive       | -      | retain   | f0fbc7ed8c52  | f0f  | f0f  | f0f  |
+| Passive Features/HPC script/submit_passive_fit.sh                            | passive       | -      | retain   | aaf476707ddc  | aaf  | d26  | d26  |
+| Passive Features/HPC script/test_pickle_roundtrip.py                         | passive       | -      | retain   | 4f9e385f9bad  | 4f9  | 4f9  | 4f9  |
+| Passive Features/Passive Allen Data/L2/README.md                             | passive       | -      | retain   | 3bb5a022d1b9  | 3bb  | 3bb  | 3bb  |
+| Passive Features/Passive Allen Data/L2/candidates.csv                        | passive       | -      | retain   | 8dc7a8e93c70  | 8dc  | 8dc  | 8dc  |
+| Passive Features/Passive Allen Data/L2/manifest.json                         | passive       | -      | retain   | bb58c6136861  | bb5  | bb5  | bb5  |
+| Passive Features/Passive Allen Data/L2/specimen_528706755.zip                | passive       | S0.7   | discard  | 579910a148da  | 579  | 579  | 579  |
+| Passive Features/Passive Allen Data/L2/specimen_537204107.zip                | passive       | S0.7   | discard  | 01bff4f88db8  | 01b  | 01b  | 01b  |
+| Passive Features/Passive Allen Data/L2/specimen_614659629.zip                | passive       | S0.7   | discard  | e8ceaafe3743  | e8c  | e8c  | e8c  |
+| Passive Features/Passive Allen Data/L2/specimen_616647103.zip                | passive       | S0.7   | discard  | f4219ebd7149  | f42  | f42  | f42  |
+| Passive Features/Phase 1/README.md                                           | passive       | -      | retain   | 99e89cb13b59  | 99e  | 99e  | 99e  |
+| Passive Features/Phase 2/aaa.py                                              | passive       | -      | retain   | 17e682f060b5  | 17e  | 17e  | 17e  |
+| Passive Features/Phase 2/phase2_patch.pdf                                    | passive       | S0.7   | discard  | 2d488e5e1300  | 2d4  | 2d4  | 2d4  |
+| Passive Features/Phase 2/phase2_technical.pdf                                | passive       | S0.7   | discard  | 03d8016e1289  | 03d  | 03d  | 03d  |
+| Passive Features/Phase 3/README.md                                           | passive       | -      | retain   | 4f9b9c11f112  | 4f9  | 4f9  | 4f9  |
+| Passive Features/Plot/X                                                      | passive       | -      | retain   | 10c7dbb397fc  | 10c  | 10c  | 10c  |
+| Passive Features/Plot/passive_result_plot (5).py                             | passive       | -      | retain   | a6b24bc1a3a6  | 5ad  | 947  | 947  |
+| Passive Features/Plot/phase3_publication_plots_v2_documentation.md           | passive       | -      | retain   | c366f5dc493d  | c36  | c36  | c36  |
+| Passive Features/node_test.py                                                | passive       | -      | retain   | f1c9580c2604  | f1c  | f1c  | f1c  |
+| Passive Features/phase1fittingcolab (2).py                                   | passive       | -      | retain   | b47f1f9e552e  | 739  | 242  | 242  |
+| Passive Features/submit_node_test.sh                                         | passive       | -      | retain   | f2329cb6a4be  | f23  | f23  | f23  |
 
 Full detail, including rationale for every row, is in `ledger.csv`.

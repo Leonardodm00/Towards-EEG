@@ -1,0 +1,44 @@
+# Towards-EEG -- packaging declaration.
+#
+# New infrastructure under clause (3) of the byte-identity rule: nothing
+# pre-existing depends on this file, and it changes no byte of any existing
+# one. Added at S0.4 because without it "the repository is installable" is a
+# claim the stage makes and cannot test.
+#
+# DEPENDENCIES ARE DELIBERATELY ABSENT.
+# TEEG_00 s2 fixes packaging as `pip install -e .` into the HPC conda
+# environment, and S0.8 produces two lockfiles from a real `pip freeze`.
+# Until B-4 is answered -- whether NEURON is a cluster module or a pip
+# install, and whether NEST is reachable -- any dependency list written here
+# would be guesswork committed as fact. An empty `dependencies` is honest;
+# a hand-written one would repeat the mistake TEEG_00 s6 records about
+# requirements.txt, which is not a lockfile and never was.
+#
+# EXPLICIT PACKAGE LIST, NOT AUTO-DISCOVERY.
+# setuptools' flat-layout auto-discovery scans the repository root, finds 27
+# directories whose names contain spaces and are not legal Python
+# identifiers, and fails. Naming towards_eeg* explicitly is what makes the
+# repository installable while the colab and passive trees stay in place
+# under verdict `retain` (decisions N-5 and N-12).
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "towards-eeg"
+version = "0.0.0"
+description = "Simulated scalp EEG from a human cortical column on H01 morphologies"
+requires-python = ">=3.8"
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/Leonardodm00/Towards-EEG"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["towards_eeg*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+"towards_eeg.hybrid" = ["README.md"]

@@ -37,6 +37,8 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
+from s0_paths import Resolver  # noqa: E402
+
 
 def tracked(root):
     out = subprocess.run(["git", "ls-tree", "-r", "--name-only", "HEAD"],
@@ -44,8 +46,26 @@ def tracked(root):
     return out.stdout.splitlines()
 
 
+_RESOLVERS = {}
+
+
+def resolved(root, rel):
+    """Filesystem path of a path AS RECORDED IN THE S0.3 LOG.
+
+    S0.4 moves nine of the swept files. The log keeps naming them by their
+    pre-move paths, which is correct -- that is where they were when S0.3
+    swept them -- so every filesystem access here has to be resolved forward
+    through tools/path_moves.json. Without this the checks below do not fail;
+    they quietly cover a smaller set and still print PASS.
+    """
+    R = _RESOLVERS.get(root)
+    if R is None:
+        R = _RESOLVERS[root] = Resolver(root)
+    return R.full(rel)
+
+
 def read(root, rel):
-    with open(os.path.join(root, rel), "rb") as fh:
+    with open(resolved(root, rel), "rb") as fh:
         return fh.read()
 
 
@@ -117,7 +137,7 @@ def run(root):
                 if not p.endswith(".py") or p in exempt:
                     continue
                 try:
-                    py_compile.compile(os.path.join(root, p), cfile=cfile, doraise=True)
+                    py_compile.compile(resolved(root, p), cfile=cfile, doraise=True)
                 except Exception:                      # noqa: BLE001
                     bad.append(p)
         finally:
@@ -133,7 +153,7 @@ def run(root):
             return True, "no .sh in the swept set"
         bad = []
         for p in sh:
-            r = subprocess.run(["bash", "-n", os.path.join(root, p)],
+            r = subprocess.run(["bash", "-n", resolved(root, p)],
                                capture_output=True, text=True)
             if r.returncode != 0:
                 bad.append("%s: %s" % (p, r.stderr.strip()[:80]))

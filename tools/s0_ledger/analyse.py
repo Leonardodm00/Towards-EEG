@@ -231,6 +231,25 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
                     return mv["from"].rstrip("/") + "/" + path[len(prefix):], True
         return path, False
 
+    def post_move_path(path):
+        """Inverse of pre_move_path: a pre-move path -> where it lives now.
+
+        `spec["working_branch"][*]["ancestor"]` names the ancestor by the path
+        it had before S0.4. Looking that up in a tree measured after S0.4
+        finds nothing, and the ledger then reports four declared ancestors as
+        absent from the snapshot -- which reads as a missing file rather than
+        as a move that the ledger itself declared.
+        """
+        for mv in move_list:
+            if mv.get("kind") == "file":
+                if path == mv["from"]:
+                    return mv["to"], True
+            else:
+                prefix = mv["from"].rstrip("/") + "/"
+                if path.startswith(prefix):
+                    return mv["to"].rstrip("/") + "/" + path[len(prefix):], True
+        return path, False
+
     def chained(path, measured_sha):
         """(pre_s0, post_s02, post_s03, post_s04) for one path."""
         pre = chain.get("pre_s0", {}).get(path, measured_sha)
@@ -244,7 +263,28 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
     payload_rule = spec.get("binary_payload", {})
     discards = {d["path"]: d for d in spec.get("discards", [])}
 
-    new_infra = tuple(spec.get("new_infrastructure", []))
+    # A new-infrastructure entry may be a bare path (created at S0.0, the
+    # original case) or an object declaring its own stage and rationale. The
+    # S0.4 package __init__.py files are clause-(3) new infrastructure but
+    # they are created at S0.4, and stamping them S0.0 would be a lie in the
+    # only regenerable record of when they appeared.
+    DEFAULT_INFRA_WHY = ("new infrastructure (byte-identity rule clause 3): "
+                         "nothing pre-existing depends on it")
+    new_infra = []
+    for _e in spec.get("new_infrastructure", []):
+        if isinstance(_e, dict):
+            new_infra.append((_e["path"], _e.get("stage", "S0.0"),
+                              _e.get("rationale", DEFAULT_INFRA_WHY)))
+        else:
+            new_infra.append((_e, "S0.0", DEFAULT_INFRA_WHY))
+
+    def match_infra(path):
+        for pre, stg, why in new_infra:
+            if path == pre or path.startswith(pre):
+                return stg, why
+        return None
+
+    superseded = {f["path"]: f for f in spec.get("superseded_forks", [])}
 
     rows = []
 
@@ -256,7 +296,8 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
         declared_ancestors.add(anc_path)
 
         loc = local_by_name.get(name)
-        anc = by_path.get(anc_path)
+        anc_now, _ = post_move_path(anc_path)
+        anc = by_path.get(anc_now)
         if loc is None:
             problems.append("working file not measured: %s" % name)
             continue
@@ -317,26 +358,40 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
 
     # -- every file already in the repository -------------------------------
     for r in repo_records:
-        scope = assign_scope(r.path, scopes)
+        # EVERY declaration below -- scopes, discards, payload rules, declared
+        # ancestors, superseded forks -- is keyed by the path the file had
+        # before any T6 move. Deciding on r.path directly would silently
+        # reclassify all nine S0.4 moves: towards_eeg/hybrid/population.py
+        # matches no scope prefix, so it would fall through to "retain" and
+        # its ancestry would vanish from the regenerated ledger.
+        anc_path_r, was_moved = pre_move_path(r.path)
+        scope = assign_scope(anc_path_r, scopes)
+        infra = match_infra(r.path)
 
-        if r.path in discards:
-            d = discards[r.path]
+        if anc_path_r in discards:
+            d = discards[anc_path_r]
             verdict, stage, rationale = "discard", d.get("stage", "S0.2"), d["rationale"]
-        elif is_payload(r.path, payload_rule):
+        elif is_payload(anc_path_r, payload_rule):
             verdict, stage = "discard", "S0.7"
             rationale = payload_rule.get(
                 "rationale", "committed binary payload; moves to a separate repository (D-8)"
             )
-        elif r.path in declared_ancestors:
+        elif anc_path_r in declared_ancestors:
             verdict, stage = "keep", "S0.4"
             rationale = "ancestor of a working-branch file; superseded at S0.1, moved at S0.4"
-        elif any(r.path == pre or r.path.startswith(pre) for pre in new_infra):
-            verdict, stage = "new", "S0.0"
-            rationale = (
-                "new infrastructure (byte-identity rule clause 3): nothing "
-                "pre-existing depends on it"
-            )
+        elif infra is not None:
+            verdict = "new"
+            stage, rationale = infra
             scope = "infrastructure"
+        elif anc_path_r in superseded:
+            # A fork that lost. It is not discarded -- nothing is deleted in
+            # S0 outside the binary payload -- it simply does not enter the
+            # installed package, which is what "retain" means (P-1).
+            f = superseded[anc_path_r]
+            verdict, stage = "retain", "-"
+            rationale = ("superseded fork; survives as %s; stays in the "
+                         "repository outside the installed package; %s"
+                         % (f["superseded_by"], f["rationale"]))
         elif scope == "orchestrator":
             verdict, stage = "keep", "S0.4"
             rationale = "orchestrator source; enters the installed package"
@@ -348,7 +403,6 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
             if r.is_python and not r.parses:
                 rationale += "; magics stripped at S0.2 so ast.parse succeeds"
 
-        anc_path_r, was_moved = pre_move_path(r.path)
         if was_moved:
             rationale = (rationale + "; moved by T6 (git mv), bytes unchanged")
         rows.append(
