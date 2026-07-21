@@ -1605,7 +1605,7 @@ class Connectomics:
                         for mtype, data in sorted_mtypes:
                             perc = data['percentage']
                             count = data['count']
-                            print(f"    • {mtype:<12}: {perc:>6.2f}%  ({count} cells)")
+                            print(f"    * {mtype:<12}: {perc:>6.2f}%  ({count} cells)")
 
  
         
@@ -1863,10 +1863,10 @@ class Connectomics:
 
         # --- Final Report ---
         if not errors:
-            print("✅ FULL VALIDATION PASSED: All Thalamic and Background sources are mathematically accurate, perfectly independent, and properly typed.")
+            print("[OK] FULL VALIDATION PASSED: All Thalamic and Background sources are mathematically accurate, perfectly independent, and properly typed.")
 
         else:
-            print("❌ VALIDATION FAILED with the following hidden bugs:")
+            print("[FAIL] VALIDATION FAILED with the following hidden bugs:")
             for error in errors:
                 print(f"  - {error}")
 

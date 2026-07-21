@@ -20,9 +20,9 @@ archive produced by phase0_download.py.
 
 WHAT TO DO
 ----------
-Apply three small patches to the TOP of your monolithic file (see PATCH 1–3),
+Apply three small patches to the TOP of your monolithic file (see PATCH 1-3),
 then paste the two new loader functions (SECTION A) right after
-``load_complete_cells`` / ``plot_example_traces`` — i.e. in the Phase 1 region,
+``load_complete_cells`` / ``plot_example_traces`` -- i.e. in the Phase 1 region,
 before any Phase 2 code.  Finally, replace your ``if __name__ == "__main__"``
 block with the HPC version (SECTION B).
 
@@ -30,7 +30,7 @@ Phase 2 and Phase 3 require NO changes at all.
 
 
 =======================================================================
- PATCH 1 — Remove the two ``!pip install`` lines
+ PATCH 1 -- Remove the two ``!pip install`` lines
 =======================================================================
 
 Delete (or comment out) these lines, which appear near the top of the file:
@@ -42,7 +42,7 @@ install dependencies via your requirements.txt, not inline shell commands.
 
 
 =======================================================================
- PATCH 2 — Add ``import json`` to the imports block
+ PATCH 2 -- Add ``import json`` to the imports block
 =======================================================================
 
 In the imports section (around line 78), add ``import json`` alongside the
@@ -63,10 +63,10 @@ AFTER:
 
 
 =======================================================================
- PATCH 3 — Make AllenSDK import optional
+ PATCH 3 -- Make AllenSDK import optional
 =======================================================================
 
-Replace these two lines (around lines 87–89):
+Replace these two lines (around lines 87-89):
 
     # AllenSDK
     from allensdk.core.cell_types_cache import CellTypesCache
@@ -74,7 +74,7 @@ Replace these two lines (around lines 87–89):
 
 With:
 
-    # AllenSDK — optional; not needed on HPC (use load_cell_from_archive)
+    # AllenSDK -- optional; not needed on HPC (use load_cell_from_archive)
     try:
         from allensdk.core.cell_types_cache import CellTypesCache
         from allensdk.api.queries.cell_types_api import CellTypesApi
@@ -89,16 +89,16 @@ accidentally call them without AllenSDK installed.
 """
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #
-#   SECTION A — HPC Archive Loader Functions
+#   SECTION A -- HPC Archive Loader Functions
 #
 #   Paste these RIGHT AFTER the existing Phase 1 helper functions
 #   (after plot_example_traces / plot_neuron_morphology, before Phase 2 code).
 #
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
-# %% Cell — HPC archive loader ================================================
+# %% Cell -- HPC archive loader ================================================
 def load_cell_from_archive(
     specimen_dir: "str | Path",
     *,
@@ -111,8 +111,8 @@ def load_cell_from_archive(
 
     This is the HPC replacement for ``load_allen_data``.  It reads the
     ``.npz`` and ``.json`` files produced by ``download_allen_archive``
-    and reconstructs a fully-populated ``CellData`` object — identical in
-    structure to what ``load_allen_data`` returns — so that all downstream
+    and reconstructs a fully-populated ``CellData`` object -- identical in
+    structure to what ``load_allen_data`` returns -- so that all downstream
     code (``prepare_optimiser_inputs``, ``fit_one_cell``, Phase 3) works
     unchanged.
 
@@ -124,7 +124,7 @@ def load_cell_from_archive(
         Number of averaged bundles per polarity for Square Subthreshold.
         ``1`` (default) averages ALL pulses of a given polarity into one
         super-clean trace.  ``K > 1`` partitions the pulse pool into K
-        equal groups, yielding K independent bundles per polarity — useful
+        equal groups, yielding K independent bundles per polarity -- useful
         for leave-one-group-out validation or variance estimation.
     ls_max_amplitude_pA
         Maximum absolute amplitude (pA) for Long Square sweeps to be
@@ -144,14 +144,14 @@ def load_cell_from_archive(
     """
     specimen_dir = Path(specimen_dir)
 
-    # ── 1. Read metadata.json ────────────────────────────────────────────
+    # -- 1. Read metadata.json --------------------------------------------
     with open(specimen_dir / "metadata.json", "r") as f:
         meta = json.load(f)
 
     sid = int(meta["specimen_id"])
     swc_path = specimen_dir / "reconstruction.swc"
 
-    # ── 2. Read SS individual pulses from ss_pulses.npz ──────────────────
+    # -- 2. Read SS individual pulses from ss_pulses.npz ------------------
     all_pulses: List[Dict[str, Any]] = []
     ss_file = specimen_dir / "ss_pulses.npz"
 
@@ -164,7 +164,7 @@ def load_cell_from_archive(
         )
 
         if not is_variable:
-            # Format A — stacked 2-D arrays (normal case)
+            # Format A -- stacked 2-D arrays (normal case)
             t_shared = ss_npz["t"]
             n_pulses = ss_npz["v"].shape[0]
             for k in range(n_pulses):
@@ -180,7 +180,7 @@ def load_cell_from_archive(
                     "sampling_rate_Hz": float(ss_npz["sampling_rate_Hz"][k]),
                 })
         else:
-            # Format B — variable-length, individually indexed (rare)
+            # Format B -- variable-length, individually indexed (rare)
             n_pulses = int(ss_npz["n_pulses"][0])
             for k in range(n_pulses):
                 all_pulses.append({
@@ -195,7 +195,7 @@ def load_cell_from_archive(
                     "sampling_rate_Hz": float(ss_npz["sampling_rate_Hz"][k]),
                 })
 
-    # ── 3. Average SS pulses into SweepBundles ───────────────────────────
+    # -- 3. Average SS pulses into SweepBundles ---------------------------
     #
     # Mirrors the averaging stage of _build_subthreshold_bundles exactly:
     # partition the pulse pool for each polarity into n_avg_groups equal
@@ -240,7 +240,7 @@ def load_cell_from_archive(
                 stimulus_name="Square Subthreshold",
             ))
 
-    # ── 4. Read and process Long Square sweeps ───────────────────────────
+    # -- 4. Read and process Long Square sweeps ---------------------------
     #
     # Mirrors the LS processing in load_allen_data:
     # 1. Filter to hyperpolarising sweeps within amplitude threshold
@@ -330,7 +330,7 @@ def load_cell_from_archive(
                 f"{len(ls_bundles)} ([{amps_str}] pA)"
             )
 
-    # ── 5. Scalar features ───────────────────────────────────────────────
+    # -- 5. Scalar features -----------------------------------------------
     rin = (
         float(meta["rin_MOhm"])
         if meta.get("rin_MOhm") is not None
@@ -348,7 +348,7 @@ def load_cell_from_archive(
     )
     ljp = float(meta["ljp_correction_mV"])
 
-    # ── 6. Reconstruct the Allen metadata dict ───────────────────────────
+    # -- 6. Reconstruct the Allen metadata dict ---------------------------
     #
     # Phase 2's fit_one_cell reads metadata.get("structure_layer_name")
     # and metadata.get("dendrite_type").  Ensure these are present.
@@ -358,11 +358,11 @@ def load_cell_from_archive(
     if "dendrite_type" not in allen_meta:
         allen_meta["dendrite_type"] = meta.get("dendrite_type", "")
     # fit_one_cell also reads metadata.get("id") as a fallback for
-    # specimen_id in certain code paths — ensure it is present.
+    # specimen_id in certain code paths -- ensure it is present.
     if "id" not in allen_meta:
         allen_meta["id"] = sid
 
-    # ── 7. Assemble CellData ─────────────────────────────────────────────
+    # -- 7. Assemble CellData ---------------------------------------------
     cell_data = CellData(
         specimen_id=sid,
         metadata=allen_meta,
@@ -395,8 +395,8 @@ def load_cell_from_archive(
             f"{len(all_pulses)} individual pulses for bootstrap"
         )
         print(
-            f"[load_archive]   Rin={rin:.1f} MΩ  "
-            f"τm={tau:.1f} ms  Vrest={vrest:.1f} mV"
+            f"[load_archive]   Rin={rin:.1f} MOhm  "
+            f"taum={tau:.1f} ms  Vrest={vrest:.1f} mV"
         )
 
     return cell_data
@@ -499,7 +499,7 @@ def load_cells_from_archive(
 
 
 
-"""Phase1Fitting.ipynb — PATCHED for Phase 3 v3 nonparametric bootstrap
+"""Phase1Fitting.ipynb -- PATCHED for Phase 3 v3 nonparametric bootstrap
 
 Automatically generated by Colab.
 
@@ -507,8 +507,8 @@ Original file is located at
     https://colab.research.google.com/drive/1C2eMIkBx5bamdu5EdHZuUQDV6ThkWFE-
 
 PATCH NOTES (Phase 3 v3):
-  1. CellData now carries ``ss_individual_pulses`` — the raw individual pulse
-     window dicts before averaging — so the nonparametric bootstrap can
+  1. CellData now carries ``ss_individual_pulses`` -- the raw individual pulse
+     window dicts before averaging -- so the nonparametric bootstrap can
      resample them.
   2. ``_build_subthreshold_bundles`` now returns a tuple
      ``(bundles, individual_pulses)`` instead of just ``bundles``.
@@ -529,15 +529,15 @@ This module:
      of layer / dendrite-type / protocol / (optional) Patch-seq subtype filters.
   2. Loads experimental electrophysiology and morphology for one chosen cell.
   3. Builds a NEURON compartmental model with a Hay-style stub axon and
-     per-segment spine-area F multiplier on dendrites > 60 µm from the soma.
+     per-segment spine-area F multiplier on dendrites > 60 um from the soma.
   4. Packages everything for Phase-2 Bayesian optimisation with scikit-optimize.
 
 Key references
 --------------
-- Eyal et al. (2016) eLife 5:e16553                    — passive-fit methodology
-- Allen Cell Types Database (Technical White Paper, v5) — Square Subthreshold and
+- Eyal et al. (2016) eLife 5:e16553                    -- passive-fit methodology
+- Allen Cell Types Database (Technical White Paper, v5) -- Square Subthreshold and
                                                           Long Square protocols
-- Hay et al. (2011) PLoS Comp Biol 7:e1002107           — axon-stub convention
+- Hay et al. (2011) PLoS Comp Biol 7:e1002107           -- axon-stub convention
 - Internal pipeline document `passive_properties_summary.docx`
 
 Notes for users
@@ -554,7 +554,7 @@ Notes for users
 """
 
 
-# %% Cell 1 — Colab installs (skip on HPC) =====================================
+# %% Cell 1 -- Colab installs (skip on HPC) =====================================
 # Uncomment these lines in a fresh Colab session.  On HPC, manage your env
 # manually.  AllenSDK pulls in pynwb, h5py, and a fairly fat dependency tree;
 # allow ~3 minutes for the install.
@@ -562,7 +562,7 @@ Notes for users
 # !pip install -q allensdk neuron scikit-optimize
 
 
-# %% Cell 2 — Imports & constants ==============================================
+# %% Cell 2 -- Imports & constants ==============================================
 
 import warnings
 from dataclasses import dataclass, field
@@ -572,7 +572,7 @@ from typing import Optional, List, Dict, Any, Literal, Tuple
 import numpy as np
 import pandas as pd
 
-# AllenSDK — optional; not needed on HPC (use load_cell_from_archive)
+# AllenSDK -- optional; not needed on HPC (use load_cell_from_archive)
 try:
     from allensdk.core.cell_types_cache import CellTypesCache
     from allensdk.api.queries.cell_types_api import CellTypesApi
@@ -595,20 +595,20 @@ DEFAULT_F = 1.9                   # Eyal 2016 average for human L2/3
 
 # Square Subthreshold protocol (Allen Core 1):
 SQ_SUB_DURATION_S        = 5e-4   # 0.5 ms nominal
-SQ_SUB_DURATION_TOL_S    = 5e-4   # ±0.5 ms tolerance (catches "Short Square" variants)
-SQ_SUB_AMPLITUDE_PA      = 200.0  # ±200 pA nominal
-SQ_SUB_AMPLITUDE_TOL_PA  = 30.0   # ±30 pA tolerance
+SQ_SUB_DURATION_TOL_S    = 5e-4   # +/-0.5 ms tolerance (catches "Short Square" variants)
+SQ_SUB_AMPLITUDE_PA      = 200.0  # +/-200 pA nominal
+SQ_SUB_AMPLITUDE_TOL_PA  = 30.0   # +/-30 pA tolerance
 
-# Long Square subthreshold cutoff (used for Rin / τm validation target):
+# Long Square subthreshold cutoff (used for Rin / taum validation target):
 LONG_SQUARE_MAX_ABS_AMPLITUDE_PA = 100.0
 
 # Passive parameter bounds (pipeline doc, mirrored from Eyal/Markram):
-DEFAULT_CM_BOUNDS = (0.3, 3.0)            # µF/cm²
-DEFAULT_RM_BOUNDS = (1_000.0, 100_000.0)  # Ω·cm²
-DEFAULT_RA_BOUNDS = (50.0, 1_000.0)       # Ω·cm
+DEFAULT_CM_BOUNDS = (0.3, 3.0)            # uF/cm^2
+DEFAULT_RM_BOUNDS = (1_000.0, 100_000.0)  # Ohm.cm^2
+DEFAULT_RA_BOUNDS = (50.0, 1_000.0)       # Ohm.cm
 
 
-# %% Cell 2b — Custom exceptions ===============================================
+# %% Cell 2b -- Custom exceptions ===============================================
 class IncompleteDataError(Exception):
     """Raised by ``load_allen_data`` when ``require_complete_data=True`` and
     either the training (Square Subthreshold) or validation (Long Square)
@@ -625,7 +625,7 @@ class IncompleteDataError(Exception):
 
 
 
-# %% Cell 3 — Dataclasses ======================================================
+# %% Cell 3 -- Dataclasses ======================================================
 @dataclass
 class SweepBundle:
     """
@@ -652,10 +652,10 @@ class CellData:
     metadata: Dict[str, Any]               # layer, dendrite_type, donor_id, ...
     swc_path: Path
 
-    # Primary fitting data — from Square Subthreshold sweeps
+    # Primary fitting data -- from Square Subthreshold sweeps
     square_subthreshold: List[SweepBundle]
 
-    # Held-out validation data — from Long Square subthreshold sweeps
+    # Held-out validation data -- from Long Square subthreshold sweeps
     long_square_subthreshold: List[SweepBundle]
 
     # Reference scalars from the Allen Cell Feature Summary (LJP-corrected here)
@@ -666,7 +666,7 @@ class CellData:
     ljp_correction_mV: float
     n_avg_groups: int
 
-    # ── PATCH (Phase 3 v3): individual pulse windows for nonparametric bootstrap ──
+    # -- PATCH (Phase 3 v3): individual pulse windows for nonparametric bootstrap --
     # Each dict has keys: t (ndarray, seconds, t=0 at pulse onset),
     # v (ndarray, mV, LJP-corrected), i (ndarray, pA),
     # polarity ("dep"|"hyp"), peak_pA (float), stim_duration_s (float),
@@ -703,15 +703,15 @@ class PassiveSearchSpace:
           each axis consistently without manual length-scale tuning.
         * A uniform prior in q = log(p) is equivalent to a log-uniform prior
           in p, which is the correct non-informative prior for scale
-          parameters — it assigns equal probability to each decade.
+          parameters -- it assigns equal probability to each decade.
         * The optimisation landscape is smoother in log-space for passive
           cable parameters because the somatic transient depends on
-          log-linear combinations of these parameters (e.g. τm = Cm × Rm
+          log-linear combinations of these parameters (e.g. taum = Cm x Rm
           is additive in log-space).
         * Positive-definiteness is guaranteed: exp(q) > 0 for all finite q,
           so the optimiser can never propose a non-physical negative value.
 
-        Phase 2's loss function is responsible for converting q → p = exp(q)
+        Phase 2's loss function is responsible for converting q -> p = exp(q)
         before passing the parameters to NEURON.  result.x from gp_minimize
         contains the log-space optima and must likewise be exponentiated.
         """
@@ -740,7 +740,7 @@ class OptimiserInputs:
     v_rest_mV: float = np.nan
 
 
-# %% Cell 4 — Helper: list_human_cells_with_morphology =========================
+# %% Cell 4 -- Helper: list_human_cells_with_morphology =========================
 def list_human_cells_with_morphology(
     layer: Optional[str] = None,
     dendrite_type: Optional[Literal["spiny", "aspiny", "sparsely spiny"]] = None,
@@ -758,7 +758,7 @@ def list_human_cells_with_morphology(
     Parameters
     ----------
     layer
-        e.g. ``"2/3"``, ``"4"``, ``"5"``, ``"6a"`` — matched against
+        e.g. ``"2/3"``, ``"4"``, ``"5"``, ``"6a"`` -- matched against
         ``structure_layer_name``.
     dendrite_type
         ``"spiny"`` / ``"aspiny"`` / ``"sparsely spiny"``.
@@ -807,7 +807,7 @@ def list_human_cells_with_morphology(
             print(f"[list_human_cells]   after dendrite_type={dendrite_type!r}: "
                   f"{len(df)} cells")
 
-    # Protocol availability — needs one network round-trip per cell, so done last
+    # Protocol availability -- needs one network round-trip per cell, so done last
     if require_square_subthreshold or require_long_square:
         ss_flags, ls_flags = [], []
         for sid in df["id"]:
@@ -864,7 +864,7 @@ def list_human_cells_with_morphology(
         if patchseq_ttype_csv is None:
             warnings.warn(
                 f"interneuron_subtype={interneuron_subtype!r} was requested but "
-                f"no patchseq_ttype_csv was supplied — filter ignored.")
+                f"no patchseq_ttype_csv was supplied -- filter ignored.")
         else:
             df = df[df["subtype"] == interneuron_subtype]
             if verbose:
@@ -885,14 +885,14 @@ def list_human_cells_with_morphology(
     return out
 
 
-# %% Cell 5 — Internal sweep selection & averaging =============================
+# %% Cell 5 -- Internal sweep selection & averaging =============================
 def _to_pA_seconds(amp, dur) -> Tuple[float, float]:
     """Normalise Allen sweep metadata to (pA, seconds).
 
     Allen Cell Types data can show up with two unit conventions across SDK
     releases: SI (Amperes, seconds) or mixed (pA, ms).  We auto-detect by
     magnitude.  Missing / non-numeric values (None, NaN, strings) are mapped
-    to NaN — callers must filter NaN before use.
+    to NaN -- callers must filter NaN before use.
     """
     # --- amplitude --------------------------------------------------------
     if amp is None:
@@ -930,11 +930,11 @@ def _to_pA_seconds(amp, dur) -> Tuple[float, float]:
 def _select_square_subthreshold(sweeps_meta: List[Dict]) -> List[Dict]:
     """Find Square Subthreshold sweeps by ``stimulus_name`` only.
 
-    The Square Subthreshold protocol stores all 20 ±200 pA pulses **inside a
+    The Square Subthreshold protocol stores all 20 +/-200 pA pulses **inside a
     single sweep** (cf. Allen Cell Types Tech Paper, Appendix p. 15: "0.5 ms
     square current injections to +/- 200 pA, repeated 20 times (200 ms
     intervals). N/A (single sweep)").  This means duration- and amplitude-
-    based filtering on the per-sweep metadata is meaningless here — the sweep
+    based filtering on the per-sweep metadata is meaningless here -- the sweep
     duration covers all 20 repeats, and the polarity alternates within the
     sweep so the average amplitude is ~0.  Pulse identification therefore has
     to happen on the current waveform itself, by ``_detect_pulses_in_current``.
@@ -950,12 +950,12 @@ def _select_square_subthreshold(sweeps_meta: List[Dict]) -> List[Dict]:
 def _select_long_square_subthreshold(sweeps_meta: List[Dict]) -> List[Dict]:
     """Select all Long Square sweeps, regardless of metadata amplitude.
 
-    Allen's standard Long Square protocol starts at −110 pA (not −100 pA),
-    and ``stimulus_amplitude`` is frequently ``None`` in the sweep metadata —
+    Allen's standard Long Square protocol starts at -110 pA (not -100 pA),
+    and ``stimulus_amplitude`` is frequently ``None`` in the sweep metadata --
     both issues make metadata-level amplitude filtering unreliable.  We
     therefore return ALL Long Square sweeps and let the caller measure the
     actual step amplitude from the NWB waveform before deciding which sweep
-    to use for τm / Rin validation.
+    to use for taum / Rin validation.
     """
     return [
         s for s in sweeps_meta
@@ -1076,7 +1076,7 @@ def _extract_windows_around_pulses(
     return out
 
 
-# ── PATCHED: returns (bundles, individual_pulses) instead of just bundles ──
+# -- PATCHED: returns (bundles, individual_pulses) instead of just bundles --
 def _build_subthreshold_bundles(
     data_set,
     sweep_meta_list: List[Dict],
@@ -1130,7 +1130,7 @@ def _build_subthreshold_bundles(
             i_full, sr, threshold_pA=pulse_threshold_pA)
 
         # Amplitude / duration QC on each detected pulse: keep only those whose
-        # peak |I| matches the expected ±200 pA within tolerance, and whose
+        # peak |I| matches the expected +/-200 pA within tolerance, and whose
         # duration matches the expected 0.5 ms within tolerance.  This guards
         # against accidental matches in protocols whose name happens to
         # contain "Square" + "Subthreshold" but with different parameters.
@@ -1146,7 +1146,7 @@ def _build_subthreshold_bundles(
         windows = _extract_windows_around_pulses(
             v_full, i_full, sr, pulses_qc, pre_ms=pre_ms, post_ms=post_ms)
 
-        # ── PATCH: tag each window with its sampling rate ──
+        # -- PATCH: tag each window with its sampling rate --
         for w in windows:
             w["sampling_rate_Hz"] = sr
 
@@ -1195,7 +1195,7 @@ def _build_subthreshold_bundles(
                 stimulus_name=stim_name,
             ))
 
-    # ── PATCH: collect ALL individual pulse windows ──
+    # -- PATCH: collect ALL individual pulse windows --
     individual_pulses = all_dep + all_hyp
 
     return bundles, individual_pulses
@@ -1225,7 +1225,7 @@ def _build_bundles_from_group(
         for sn in part:
             sw = data_set.get_sweep(int(sn))
             # index_range clips out the test pulse that Allen prepends to every
-            # sweep — as shown in the official AllenSDK notebook example.
+            # sweep -- as shown in the official AllenSDK notebook example.
             # Default to (0, end) if the key is absent for robustness.
             idx = sw.get("index_range", (0, len(sw["response"]) - 1))
             v_traces.append(sw["response"][idx[0]: idx[1] + 1])   # Volts
@@ -1263,7 +1263,7 @@ def _build_bundles_from_group(
     return bundles
 
 
-# %% Cell 6 — load_allen_data ==================================================
+# %% Cell 6 -- load_allen_data ==================================================
 def load_allen_data(
     specimen_id: int,
     ljp_correction_mV: float = LJP_CORRECTION_MV,
@@ -1287,10 +1287,10 @@ def load_allen_data(
         If ``True`` (default), raise :class:`IncompleteDataError` when the cell
         does not yield BOTH at least one Square Subthreshold bundle AND at
         least one Long Square subthreshold bundle.  This keeps Phase 2's
-        validation step (Rin/τm against the held-out Long Square sweep)
+        validation step (Rin/taum against the held-out Long Square sweep)
         well-defined for every cell that propagates downstream.  Set to
-        ``False`` to return ``CellData`` regardless — useful when you want to
-        proceed with Allen's scalar Rin/τm features only and skip the
+        ``False`` to return ``CellData`` regardless -- useful when you want to
+        proceed with Allen's scalar Rin/taum features only and skip the
         waveform-level validation.
 
     Notes
@@ -1327,7 +1327,7 @@ def load_allen_data(
     sweeps_meta = ctc.get_ephys_sweeps(specimen_id)
 
     # --- Square Subthreshold: many pulses per sweep -------------------------
-    # All 20 ±200 pA pulses live inside a SINGLE sweep (Allen Tech Paper
+    # All 20 +/-200 pA pulses live inside a SINGLE sweep (Allen Tech Paper
     # appendix p.15: "N/A (single sweep)").  We therefore find candidate
     # sweeps by name, then identify each individual pulse by thresholding the
     # current waveform.
@@ -1335,7 +1335,7 @@ def load_allen_data(
     if verbose:
         print(f"[load_allen_data]   Square-Subthreshold candidate sweeps: "
               f"{len(ss_meta)}")
-    # ── PATCHED: unpack both bundles AND individual pulse windows ──
+    # -- PATCHED: unpack both bundles AND individual pulse windows --
     ss_bundles, ss_individual_pulses = _build_subthreshold_bundles(
         data_set,
         ss_meta,
@@ -1401,13 +1401,13 @@ def load_allen_data(
                     f"{k:+d}" for k in sorted(amp_groups.keys(), key=abs))
                 print(f"[load_allen_data]   Long-Square bundles loaded "
                       f"({len(ls_bundles)} total): [{amp_keys_str}] pA\n"
-                      f"[load_allen_data]   → ls_bundles[0] "
+                      f"[load_allen_data]   -> ls_bundles[0] "
                       f"({ls_bundles[0].amplitude_pA:+.0f} pA) "
-                      f"is Ih-cleanest; use for τm validation.")
+                      f"is Ih-cleanest; use for taum validation.")
         else:
             if verbose:
                 print("[load_allen_data]   No usable hyperpolarising "
-                      "Long Square sweeps — Phase 2 will validate Rin/τm "
+                      "Long Square sweeps -- Phase 2 will validate Rin/taum "
                       "against the Allen scalar features only.")
 
     # --- Reference scalars --------------------------------------------------
@@ -1425,7 +1425,7 @@ def load_allen_data(
 
     if verbose:
         print(f"[load_allen_data] specimen {specimen_id}: "
-              f"Rin={rin:.1f} MΩ  τm={tau:.1f} ms  "
+              f"Rin={rin:.1f} MOhm  taum={tau:.1f} ms  "
               f"Vrest={vrest:.1f} mV (LJP-corrected)")
         n_ss_sweeps = len(ss_meta) if 'ss_meta' in locals() else 0
         n_dep = sum(b.n_repeats_averaged for b in ss_bundles if b.polarity == "dep")
@@ -1437,7 +1437,7 @@ def load_allen_data(
         print(f"[load_allen_data]   Long Square subthreshold: "
               f"{len(ls_bundles)} bundle(s) pooled from {n_ls_pulses} sweep(s)")
 
-    # ── PATCHED: pass ss_individual_pulses into CellData ──
+    # -- PATCHED: pass ss_individual_pulses into CellData --
     cell_data = CellData(
         specimen_id=specimen_id,
         metadata=meta,
@@ -1469,14 +1469,14 @@ def load_allen_data(
     return cell_data
 
 
-# %% Cell 7 — NEURON model: PassiveCell + builder ==============================
+# %% Cell 7 -- NEURON model: PassiveCell + builder ==============================
 class PassiveCell:
     """
     Compartmental passive model of one Allen morphology.
 
     * SWC imported via NEURON's ``Import3d_SWC_read``.
     * Original axon optionally replaced by a Hay-style two-section stub
-      (each 30 µm × 1 µm, 5 segments) attached at soma(1.0).
+      (each 30 um x 1 um, 5 segments) attached at soma(1.0).
     * The passive ``pas`` mechanism is inserted globally.
     * For each segment in dendritic sections (``dend`` + ``apic``), a
       multiplicative factor ``F`` is applied to ``cm`` and ``g_pas`` if the
@@ -1637,7 +1637,7 @@ class PassiveCell:
 
         Returns
         -------
-        (t_ms, v_mV) — both 1-D arrays, sampled every ``dt_ms``.
+        (t_ms, v_mV) -- both 1-D arrays, sampled every ``dt_ms``.
         """
         self._iclamp.delay = float(stim_delay_ms)
         self._iclamp.dur = float(stim_dur_ms)
@@ -1665,7 +1665,7 @@ def build_neuron_model(
     )
 
 
-# %% Cell 8 — prepare_optimiser_inputs =========================================
+# %% Cell 8 -- prepare_optimiser_inputs =========================================
 def prepare_optimiser_inputs(
     cell_data: CellData,
     fit_target: Literal["dep", "hyp", "both"] = "hyp",
@@ -1772,7 +1772,7 @@ def prepare_optimiser_inputs(
     )
 
 
-# %% Cell 8b — Batch helper: keep only cells with complete training+validation
+# %% Cell 8b -- Batch helper: keep only cells with complete training+validation
 def load_complete_cells(
     candidates: pd.DataFrame,
     *,
@@ -1829,7 +1829,7 @@ def load_complete_cells(
     return complete
 
 
-# %% Cell 8c — Plot helper for one cell ========================================
+# %% Cell 8c -- Plot helper for one cell ========================================
 def plot_example_traces(
     cell_data: CellData,
     figsize: Tuple[float, float] = (11.0, 6.0),
@@ -1837,16 +1837,16 @@ def plot_example_traces(
 ):
     """Plot example Square Subthreshold and Long Square traces for one cell.
 
-    Layout: 2 × 2 grid.
+    Layout: 2 x 2 grid.
 
-        ┌─────────────────────────┬─────────────────────────┐
-        │ V (mV)  Square Sub.     │ V (mV)  Long Square     │
-        ├─────────────────────────┼─────────────────────────┤
-        │ I (pA)  Square Sub.     │ I (pA)  Long Square     │
-        └─────────────────────────┴─────────────────────────┘
+        +-------------------------+-------------------------+
+        | V (mV)  Square Sub.     | V (mV)  Long Square     |
+        +-------------------------+-------------------------+
+        | I (pA)  Square Sub.     | I (pA)  Long Square     |
+        +-------------------------+-------------------------+
 
     Square Subthreshold panel overlays the depolarising and hyperpolarising
-    averaged bundles (one trace each — if ``n_avg_groups > 1`` the FIRST group
+    averaged bundles (one trace each -- if ``n_avg_groups > 1`` the FIRST group
     is plotted; the others are equivalent up to noise).  Long Square panel
     plots the chosen hyperpolarising step bundle.
 
@@ -1877,7 +1877,7 @@ def plot_example_traces(
             ax_i_ss.plot(b.t * 1e3, b.i_pA, color=color, lw=1.0)
         ax_v_ss.legend(loc="best", fontsize=8, frameon=False)
         ax_v_ss.set_title(
-            f"Square Subthreshold — cell {cell_data.specimen_id}\n"
+            f"Square Subthreshold -- cell {cell_data.specimen_id}\n"
             f"averaged over {sum(b.n_repeats_averaged for b in cell_data.square_subthreshold)} "
             f"pulses"
         )
@@ -1885,7 +1885,7 @@ def plot_example_traces(
         ax_v_ss.text(0.5, 0.5, "no Square Subthreshold data",
                      transform=ax_v_ss.transAxes, ha="center", va="center",
                      color="grey")
-        ax_v_ss.set_title(f"Square Subthreshold — cell {cell_data.specimen_id}")
+        ax_v_ss.set_title(f"Square Subthreshold -- cell {cell_data.specimen_id}")
 
     ax_v_ss.set_ylabel("V (mV)")
     ax_i_ss.set_ylabel("I (pA)")
@@ -1900,14 +1900,14 @@ def plot_example_traces(
         ax_i_ls.plot(b.t, b.i_pA, color="tab:purple", lw=1.0)
         ax_v_ls.legend(loc="best", fontsize=8, frameon=False)
         ax_v_ls.set_title(
-            f"Long Square — cell {cell_data.specimen_id}\n"
+            f"Long Square -- cell {cell_data.specimen_id}\n"
             f"averaged over {b.n_repeats_averaged} sweep(s)"
         )
     else:
         ax_v_ls.text(0.5, 0.5, "no Long Square data",
                      transform=ax_v_ls.transAxes, ha="center", va="center",
                      color="grey")
-        ax_v_ls.set_title(f"Long Square — cell {cell_data.specimen_id}")
+        ax_v_ls.set_title(f"Long Square -- cell {cell_data.specimen_id}")
 
     ax_v_ls.set_ylabel("V (mV)")
     ax_i_ls.set_ylabel("I (pA)")
@@ -1926,7 +1926,7 @@ def plot_example_traces(
     return fig, axes
 
 
-# %% Cell 8e — Morphology visualiser ==========================================
+# %% Cell 8e -- Morphology visualiser ==========================================
 def plot_neuron_morphology(
     cell: "PassiveCell",
     result=None,
@@ -1943,7 +1943,7 @@ def plot_neuron_morphology(
     This function is fully self-contained: all helper logic (3D-point
     extraction, soma-centroid computation, line-collection drawing) lives
     as nested functions inside the body, so pasting THIS function alone
-    into a Colab cell is enough to call it — there are no module-level
+    into a Colab cell is enough to call it -- there are no module-level
     helper dependencies that you might forget to also paste.
 
     Parameters
@@ -1957,10 +1957,10 @@ def plot_neuron_morphology(
         (Cm, Rm, Ra) with their GP-posterior uncertainties are shown in the
         figure title.
     color_by
-        * ``"compartment"`` (default) — soma black, basal dendrites blue,
+        * ``"compartment"`` (default) -- soma black, basal dendrites blue,
           apical dendrites red, axon grey.
-        * ``"F_factor"`` — dendrites colour-mapped by their spine-area
-          correction factor (F = 1.0 grey → F = 1.9+ orange); soma and axon
+        * ``"F_factor"`` -- dendrites colour-mapped by their spine-area
+          correction factor (F = 1.0 grey -> F = 1.9+ orange); soma and axon
           are always black / grey.  Useful for verifying that the spine
           correction is applied to the correct segments.
     show_F_boundary
@@ -1968,7 +1968,7 @@ def plot_neuron_morphology(
         centroid in each panel.  Segments outside this radius received the
         F-factor spine correction; segments inside did not.
     F_boundary_um
-        Radius of the F-boundary circle (default 60 µm, the value used in
+        Radius of the F-boundary circle (default 60 um, the value used in
         :class:`PassiveCell`).
     diam_scale
         Line-width-per-micrometre-diameter scale factor.  Increase for
@@ -1980,7 +1980,7 @@ def plot_neuron_morphology(
 
     Returns
     -------
-    ``(fig, axes)`` — the matplotlib figure and a (2,) axes array so the
+    ``(fig, axes)`` -- the matplotlib figure and a (2,) axes array so the
     caller can further annotate or save the figure.
     """
     import matplotlib.pyplot as plt
@@ -2052,8 +2052,8 @@ def plot_neuron_morphology(
     centroid = _soma_centroid()
 
     projections = [
-        (0, 1, "X (µm)", "Y (µm)", "XY — front view"),
-        (0, 2, "X (µm)", "Z (µm)", "XZ — side view"),
+        (0, 1, "X (um)", "Y (um)", "XY -- front view"),
+        (0, 2, "X (um)", "Z (um)", "XZ -- side view"),
     ]
 
     fig, axes = plt.subplots(1, 2, figsize=figsize)
@@ -2083,7 +2083,7 @@ def plot_neuron_morphology(
             ax.text(
                 cx_proj + F_boundary_um * 0.72,
                 cy_proj + F_boundary_um * 0.72,
-                f"{F_boundary_um:.0f} µm",
+                f"{F_boundary_um:.0f} um",
                 fontsize=7, color="0.4", va="center", ha="left",
             )
 
@@ -2097,7 +2097,7 @@ def plot_neuron_morphology(
         ax.plot([bar_x0, bar_x0 + bar_len], [bar_y0, bar_y0],
                 color="k", lw=1.5, solid_capstyle="butt")
         ax.text(bar_x0 + bar_len / 2, bar_y0 + yspan * 0.025,
-                "100 µm", ha="center", va="bottom", fontsize=7)
+                "100 um", ha="center", va="bottom", fontsize=7)
 
         ax.set_xlabel(xlabel, fontsize=8)
         ax.set_ylabel(ylabel, fontsize=8)
@@ -2118,7 +2118,7 @@ def plot_neuron_morphology(
         if show_F_boundary:
             legend_handles.append(
                 Line2D([0], [0], color="k", lw=0.8, linestyle="--",
-                       alpha=0.5, label=f"F-boundary ({F_boundary_um:.0f} µm)")
+                       alpha=0.5, label=f"F-boundary ({F_boundary_um:.0f} um)")
             )
         axes[1].legend(handles=legend_handles, loc="upper right",
                        fontsize=7, frameon=True, framealpha=0.8)
@@ -2142,15 +2142,15 @@ def plot_neuron_morphology(
         dt = getattr(result, "dendrite_type", "?")
         sid = getattr(result, "specimen_id", sid)
         fig.suptitle(
-            f"Cell {sid} — L{layer} {dt}\n"
-            f"Cm = {cm:.3f} ± {cms:.3f} µF/cm²  |  "
-            f"Rm = {rm:.0f} ± {rms:.0f} Ω·cm²  |  "
-            f"Ra = {ra:.0f} ± {ras:.0f} Ω·cm",
+            f"Cell {sid} -- L{layer} {dt}\n"
+            f"Cm = {cm:.3f} +/- {cms:.3f} uF/cm^2  |  "
+            f"Rm = {rm:.0f} +/- {rms:.0f} Ohm.cm^2  |  "
+            f"Ra = {ra:.0f} +/- {ras:.0f} Ohm.cm",
             fontsize=10, y=1.01,
         )
     else:
         fig.suptitle(
-            f"Cell {sid} — NEURON compartmental model",
+            f"Cell {sid} -- NEURON compartmental model",
             fontsize=10, y=1.01,
         )
 
@@ -2167,36 +2167,36 @@ Phase 2 of the human-cortex passive-property optimisation pipeline.
 Given the ``(PassiveCell, OptimiserInputs)`` pairs produced by Phase 1, this
 module performs the Bayesian optimisation that determines (Cm, Rm, Ra) per
 cell, validates the fit on held-out Long-Square data, and aggregates the
-results across cells of the same layer × cell type.
+results across cells of the same layer x cell type.
 
 What this module does
 ---------------------
 1. Define the loss function: baseline-subtracted RMSD between the simulated
    somatic transient and the experimental Square-Subthreshold trace, in the
-   1–100 ms post-pulse window (Eyal 2016 convention).
+   1-100 ms post-pulse window (Eyal 2016 convention).
 2. Run ``gp_minimize`` over the 3-D search space (Cm, Rm, Ra) with the
    bounds and priors defined in Phase 1's ``PassiveSearchSpace``.
 3. Validate the best-fit parameters against the held-out Long-Square step:
    simulate the same step on the fitted model, compute baseline-subtracted
    RMSD on the WHOLE trace, classify the fit as
-       • ``"good"``       — validation_rmsd ≤ K_good × train_rmsd
-       • ``"to_refine"``  — between K_good and K_fail
-       • ``"failed"``     — validation_rmsd > K_fail × train_rmsd
+       * ``"good"``       -- validation_rmsd <= K_good x train_rmsd
+       * ``"to_refine"``  -- between K_good and K_fail
+       * ``"failed"``     -- validation_rmsd > K_fail x train_rmsd
                           OR train_rmsd absolute > train_rmsd_fail_mV
 4. Use the trained Gaussian-process surrogate to estimate per-parameter
    uncertainty without further NEURON simulations (sample many points near
    the optimum, predict their loss using the GP, return the spread of
-   parameter values whose predicted loss is within Δ of the optimum).
+   parameter values whose predicted loss is within Delta of the optimum).
 5. Provide a sequential-by-default, multiprocessing-capable batch driver
    ``fit_cells()`` for HPC use, and an ``aggregate_population()`` helper
-   that returns mean ± SD per (layer × cell type) group, filtered on
+   that returns mean +/- SD per (layer x cell type) group, filtered on
    validation status.
 
 Why CoreNEURON is NOT used here
 -------------------------------
 CoreNEURON is built to accelerate ONE LARGE simulation (a network of
 thousands of neurons computed in lockstep, optionally on GPU).  Our workload
-is the opposite: many SHORT simulations (each ~0.5–1 s wall-time) called
+is the opposite: many SHORT simulations (each ~0.5-1 s wall-time) called
 sequentially by the optimiser, where each call depends on the result of the
 previous one to update the GP surrogate.  The CoreNEURON setup overhead per
 simulation would exceed the cost of the simulation itself.
@@ -2208,21 +2208,21 @@ appropriate later, in the full-microcircuit network simulation phase.
 
 Key references
 --------------
-- Eyal et al. (2016) eLife 5:e16553 — passive-fit methodology and 1–100 ms
+- Eyal et al. (2016) eLife 5:e16553 -- passive-fit methodology and 1-100 ms
   RMSD window
-- Internal pipeline document `passive_properties_summary.docx` — bounds,
-  ±20 % validation tolerance (relaxed here in favour of relative-RMSD
+- Internal pipeline document `passive_properties_summary.docx` -- bounds,
+  +/-20 % validation tolerance (relaxed here in favour of relative-RMSD
   validation, see notes on validation strategy below)
 - scikit-optimize gp_minimize:
   https://scikit-optimize.github.io/stable/modules/generated/skopt.gp_minimize.html
 """
 
 
-# %% Cell 1 — Colab installs (skip on HPC) =====================================
+# %% Cell 1 -- Colab installs (skip on HPC) =====================================
 # !pip install -q scikit-optimize
 
 
-# %% Cell 2 — Imports ==========================================================
+# %% Cell 2 -- Imports ==========================================================
 
 import warnings
 import time
@@ -2232,7 +2232,7 @@ from typing import Optional, List, Dict, Any, Tuple, Callable, Sequence
 import numpy as np
 import pandas as pd
 
-# Phase 1 — pull the data structures and the cell builder
+# Phase 1 -- pull the data structures and the cell builder
 # from phase1_data_loader import (
 #     SweepBundle,
 #     CellData,
@@ -2247,9 +2247,9 @@ from skopt import gp_minimize
 from skopt.utils import use_named_args
 
 
-# %% Cell 3 — Defaults from the pipeline document & rationales =================
+# %% Cell 3 -- Defaults from the pipeline document & rationales =================
 
-# gp_minimize budget — see Phase 2 design discussion notes.
+# gp_minimize budget -- see Phase 2 design discussion notes.
 DEFAULT_N_CALLS         = 150     # total NEURON simulations per cell
 DEFAULT_N_INITIAL       = 20      # random samples before the GP starts learning
 DEFAULT_ACQ_FUNC        = "gp_hedge"  # auto-select EI/PI/LCB per iteration
@@ -2259,18 +2259,18 @@ DEFAULT_TRAIN_WINDOW_MS = (1.0, 100.0)
 
 # Validation window for Long Square step.  Restricted to the EARLY part of
 # the step where Ih has not yet substantially activated (Ih kinetics
-# τ ≈ 50–200 ms in human cortex).  Includes the full pre-step baseline.
+# tau ~= 50-200 ms in human cortex).  Includes the full pre-step baseline.
 DEFAULT_VALID_WINDOW_MS_AFTER_ONSET = 50.0
 
 # Validation-RMSD thresholds expressed as multiples of training RMSD.
-DEFAULT_K_GOOD         = 3.0      # validation_rmsd ≤ 3 × train_rmsd → "good"
-DEFAULT_K_FAIL         = 10.0     # validation_rmsd > 10 × train_rmsd → "failed"
+DEFAULT_K_GOOD         = 3.0      # validation_rmsd <= 3 x train_rmsd -> "good"
+DEFAULT_K_FAIL         = 10.0     # validation_rmsd > 10 x train_rmsd -> "failed"
 DEFAULT_TRAIN_RMSD_FAIL_MV = 2.0  # absolute train RMSD ceiling (mV)
 
 # Absolute-value escape hatch: if validation RMSD is below this threshold
 # IN ABSOLUTE TERMS, the fit is accepted as "good" regardless of the ratio.
 # This handles the regime where the optimiser fits the training data
-# extraordinarily tightly (e.g. train RMSD ≈ 0.01 mV) — in that case even a
+# extraordinarily tightly (e.g. train RMSD ~= 0.01 mV) -- in that case even a
 # physically excellent validation RMSD of ~0.1 mV gives ratio > 10, which the
 # pure-ratio classifier would wrongly call "failed".  A fit with sub-0.2 mV
 # error on a several-mV-deflection trace is biophysically a clean fit.
@@ -2282,7 +2282,7 @@ DEFAULT_UNCERTAINTY_DELTA_MV = 0.1  # parameters with predicted RMSD within
 DEFAULT_UNCERTAINTY_N_SAMPLES = 5000  # GP-only; cheap
 
 
-# %% Cell 4 — Result dataclass =================================================
+# %% Cell 4 -- Result dataclass =================================================
 @dataclass
 class PassiveFitResult:
     """One row of Phase 2's output.  Holds everything needed to (a) reproduce
@@ -2323,18 +2323,18 @@ class PassiveFitResult:
     wall_time_s: float
     error_message: str = ""           # populated only on hard failure
 
-    # Convergence trace (loss vs iteration) — for plotting only
+    # Convergence trace (loss vs iteration) -- for plotting only
     loss_history: List[float] = field(default_factory=list)
 
     # ----- Noise on the averaged TRAINING traces (post-processing aid) -----
-    # σ of the pre-stimulus baseline samples, averaged across training
-    # bundles.  Needed for the χ² threshold in profile-likelihood CIs.
+    # sigma of the pre-stimulus baseline samples, averaged across training
+    # bundles.  Needed for the chi^2 threshold in profile-likelihood CIs.
     noise_sigma_mV: float = float("nan")
     # Lag-1 autocorrelation of pre-stimulus samples, averaged across
     # training bundles.  Should be near zero for white noise; high values
-    # mean the effective sample size is reduced (n_eff ~ n*(1-ρ)/(1+ρ)).
+    # mean the effective sample size is reduced (n_eff ~ n*(1-rho)/(1+rho)).
     noise_rho_lag1: float = float("nan")
-    # Flag set when at least one training bundle has ρ_lag1 above threshold
+    # Flag set when at least one training bundle has rho_lag1 above threshold
     # (default 0.5).  When True, post-processing should apply the
     # autocorrelation correction before computing CIs.
     noise_rho_lag1_high: bool = False
@@ -2373,7 +2373,7 @@ class PassiveFitResult:
     #                     loss function via `_build_loss_function` rather
     #                     than reimplementing it.
     #
-    # IMPORTANT — these fields are NOT safe to pickle across processes:
+    # IMPORTANT -- these fields are NOT safe to pickle across processes:
     #   * `neuron_cell` holds NEURON `Hoc` handles that are process-local.
     #   * `gp_result` is in principle picklable but can be very large.
     # The multiprocessing batch driver (`fit_cells`) will therefore break
@@ -2387,7 +2387,7 @@ class PassiveFitResult:
     opt_inputs: Optional[Any] = field(default=None, repr=False)
 
 
-# %% Cell 5 — RMSD helpers =====================================================
+# %% Cell 5 -- RMSD helpers =====================================================
 def _estimate_residual_noise_at_mle(
     cell,
     train_bundles,
@@ -2399,19 +2399,19 @@ def _estimate_residual_noise_at_mle(
     pre_stim_window_ms: Optional[Sequence[float]] = None,
 ) -> Tuple[float, float]:
     """Pool residuals from (pre-stim baseline + post-stim training window)
-    at MLE and return (σ, ρ_lag1).
+    at MLE and return (sigma, rho_lag1).
 
     The simulate call below MUST mirror whatever `_build_loss_function`
-    does internally — for the existing pipeline that means setting the
+    does internally -- for the existing pipeline that means setting the
     passive parameters, running NEURON, and producing a voltage trace on
     the bundle's time grid. Adapt the one annotated line below if your
     PassiveCell exposes a different method name or signature.
     """
-    # ── Set MLE state ────────────────────────────────────────────────
+    # -- Set MLE state ------------------------------------------------
     cell.set_passive(cm_mle, rm_mle, ra_mle)
     cell.set_e_pas(v_rest_mV)
 
-    # ── Window definitions in seconds ────────────────────────────────
+    # -- Window definitions in seconds --------------------------------
     train_t0_s, train_t1_s = (np.asarray(train_window_ms) * 1e-3).tolist()
 
     if pre_stim_window_ms is None:
@@ -2421,7 +2421,7 @@ def _estimate_residual_noise_at_mle(
     else:
         pre_t0_s, pre_t1_s = (np.asarray(pre_stim_window_ms) * 1e-3).tolist()
 
-    # ── Loop over bundles, accumulate residuals ──────────────────────
+    # -- Loop over bundles, accumulate residuals ----------------------
     pooled: List[float] = []
     for b in train_bundles:
         # Mirror exactly what _build_loss_function does internally
@@ -2435,12 +2435,12 @@ def _estimate_residual_noise_at_mle(
         if (not pre_mask.any()) or (not post_mask.any()):
             continue
 
-        baseline_data = float(b.v_mV[pre_mask].mean())   # → b.v_mV
+        baseline_data = float(b.v_mV[pre_mask].mean())   # -> b.v_mV
         baseline_sim  = float(sim_v[pre_mask].mean())
 
-        train_res = ((b.v_mV[post_mask] - baseline_data) -    # → b.v_mV
+        train_res = ((b.v_mV[post_mask] - baseline_data) -    # -> b.v_mV
                     (sim_v[post_mask]    - baseline_sim))
-        pre_res   = b.v_mV[pre_mask] - baseline_data     # → b.v_mV
+        pre_res   = b.v_mV[pre_mask] - baseline_data     # -> b.v_mV
         pooled.extend(pre_res.tolist())
         pooled.extend(train_res.tolist())
 
@@ -2454,7 +2454,7 @@ def _estimate_residual_noise_at_mle(
     return sigma, rho
 def _crop_window(t: np.ndarray, v: np.ndarray,
                  t_start_s: float, t_end_s: float) -> np.ndarray:
-    """Return v[mask] for t ∈ [t_start_s, t_end_s].  No interpolation."""
+    """Return v[mask] for t  in  [t_start_s, t_end_s].  No interpolation."""
     mask = (t >= t_start_s) & (t <= t_end_s)
     return v[mask]
 
@@ -2501,7 +2501,7 @@ def _baseline_subtracted_rmsd(
     return float(np.sqrt(np.mean(diff * diff)))
 
 
-# %% Cell 6 — Stimulus replay helpers ==========================================
+# %% Cell 6 -- Stimulus replay helpers ==========================================
 def _simulate_square_subthreshold(
     cell: PassiveCell, bundle: SweepBundle, v_rest_mV: float,
     pre_pad_ms: float = 10.0, post_pad_ms: float = 100.0,
@@ -2554,7 +2554,7 @@ def _simulate_long_square(
     return t_sim_s, v_sim
 
 
-# %% Cell 6b — Bundle-protocol detection and labelling =========================
+# %% Cell 6b -- Bundle-protocol detection and labelling =========================
 # A "bundle" can be either a Square Subthreshold pulse (~0.5 ms duration) or
 # a Long Square step (~1 s duration).  The stim_duration_s field is a clean
 # discriminator; we use 0.01 s (10 ms) as the boundary because no real Allen
@@ -2576,7 +2576,7 @@ def _bundle_label(bundle: SweepBundle) -> str:
     return f"LS ({bundle.amplitude_pA:+.0f} pA)"
 
 
-# %% Cell 6c — Pre-stimulus noise estimator ====================================
+# %% Cell 6c -- Pre-stimulus noise estimator ====================================
 def _estimate_noise(
     bundle: SweepBundle,
     rho_threshold: float = 0.5,
@@ -2592,16 +2592,16 @@ def _estimate_noise(
 
       * ``sigma_mV``  -- standard deviation of the pre-pulse voltage
                          samples.  This is the residual noise on the
-                         AVERAGED trace and is the σ that later goes
-                         into χ² thresholds for profile-likelihood CIs.
+                         AVERAGED trace and is the sigma that later goes
+                         into chi^2 thresholds for profile-likelihood CIs.
       * ``rho_lag1``  -- lag-1 autocorrelation coefficient of the same
                          samples.  A 50 kHz signal filtered at 10 kHz with
                          a Bessel filter has correlated samples at the
                          original sampling rate; averaging across many
                          pulses tends to whiten this, but residual
-                         correlation can survive.  When ρ is high, the
+                         correlation can survive.  When rho is high, the
                          effective sample size for any noise-based
-                         calculation is reduced by roughly (1-ρ)/(1+ρ).
+                         calculation is reduced by roughly (1-rho)/(1+rho).
 
     The ``is_correlated`` flag (third return value) is True iff
     ``rho_lag1 > rho_threshold`` (default 0.5).  Phase 2 uses this only as
@@ -2645,7 +2645,7 @@ def _estimate_noise(
     return sigma_mV, rho_lag1, is_correlated
 
 
-# %% Cell 6d — Per-bundle validation RMSD ======================================
+# %% Cell 6d -- Per-bundle validation RMSD ======================================
 def _rmsd_for_validation_bundle(
     cell: PassiveCell,
     bundle: SweepBundle,
@@ -2678,7 +2678,7 @@ def _rmsd_for_validation_bundle(
     )
 
 
-# %% Cell 7 — Loss function builder ============================================
+# %% Cell 7 -- Loss function builder ============================================
 def _build_loss_function(
     cell: PassiveCell,
     train_bundles: List[SweepBundle],
@@ -2740,7 +2740,7 @@ def _build_loss_function(
     return loss
 
 
-# %% Cell 8 — GP-posterior uncertainty extraction ==============================
+# %% Cell 8 -- GP-posterior uncertainty extraction ==============================
 def _gp_parameter_uncertainty(
     optim_result,
     delta_mV: float,
@@ -2757,7 +2757,7 @@ def _gp_parameter_uncertainty(
     samples along each parameter axis.
 
     This is essentially a "profile-likelihood" estimate computed on the
-    surrogate rather than on the full simulator — extremely cheap
+    surrogate rather than on the full simulator -- extremely cheap
     (no extra NEURON calls) and gives directly interpretable per-parameter
     one-sigma values.
 
@@ -2767,13 +2767,13 @@ def _gp_parameter_uncertainty(
         Plain ``int`` (NOT a numpy ``Generator``).  ``skopt.Space.rvs``
         forwards ``random_state`` to ``sklearn.utils.check_random_state``,
         which only accepts ``int``, ``None``, or the legacy
-        ``numpy.random.RandomState`` — passing a new-style ``Generator``
+        ``numpy.random.RandomState`` -- passing a new-style ``Generator``
         raises ``ValueError``.
 
     Returns
     -------
     {"cm_sigma": ..., "rm_sigma": ..., "ra_sigma": ...}
-    All values are NaN if the extraction fails for any reason — this
+    All values are NaN if the extraction fails for any reason -- this
     function never raises, because the optimiser is more important than
     the uncertainty estimate.
     """
@@ -2820,7 +2820,7 @@ def _gp_parameter_uncertainty(
     }
 
 
-# %% Cell 9 — Validation status classifier =====================================
+# %% Cell 9 -- Validation status classifier =====================================
 def _classify_fit(
     train_rmsd: float,
     valid_rmsd: float,
@@ -2835,13 +2835,13 @@ def _classify_fit(
       1. If training itself was poor (absolute train RMSD > ceiling),
          the fit failed regardless of validation.  This catches cells
          where the optimiser could not get close to the data at all.
-      2. If validation is dimensionally tiny (≤ ``valid_rmsd_good_mV``),
+      2. If validation is dimensionally tiny (<= ``valid_rmsd_good_mV``),
          accept as "good" regardless of the train/valid ratio.  This
          escape-hatch handles the regime where the optimiser fits the
          training data extraordinarily tightly and the ratio becomes
          dominated by tiny floor-level noise rather than real model error.
-      3. If validation is within k_good× of training, accept as good.
-      4. If validation is moderately worse (within k_fail×), flag for
+      3. If validation is within k_goodx of training, accept as good.
+      4. If validation is moderately worse (within k_failx), flag for
          refinement.
       5. Otherwise, fail.
     """
@@ -2859,7 +2859,7 @@ def _classify_fit(
     return "failed"
 
 
-# %% Cell 10 — Single-cell driver: fit_one_cell ================================
+# %% Cell 10 -- Single-cell driver: fit_one_cell ================================
 def fit_one_cell(
     cell: PassiveCell,
     cell_data: CellData,
@@ -2986,7 +2986,7 @@ def fit_one_cell(
 
     # --- Noise estimation on TRAINING bundles -----------------------------
     # Computed once after the fit (not used by gp_minimize itself); needed
-    # downstream by Phase 3 / post-processing for χ² thresholds in
+    # downstream by Phase 3 / post-processing for chi^2 thresholds in
     # profile-likelihood confidence intervals.  See uploaded
     # "Bayesian Optimisation and Likelihood Profile" notes.
     noise_sigmas = []
@@ -3013,10 +3013,10 @@ def fit_one_cell(
     if verbose:
         if not np.isnan(noise_sigma_mV):
             print(f"[fit_one_cell]   training noise: "
-                  f"σ={noise_sigma_mV:.4f} mV  ρ_lag1={noise_rho_lag1:.3f}  "
+                  f"sigma={noise_sigma_mV:.4f} mV  rho_lag1={noise_rho_lag1:.3f}  "
                   f"({len(opt_in.train_bundles)} bundle(s))")
         if noise_rho_high:
-            print(f"[fit_one_cell]   WARNING: ρ_lag1 > threshold -- "
+            print(f"[fit_one_cell]   WARNING: rho_lag1 > threshold -- "
                   f"effective sample size reduced; apply n_eff correction "
                   f"before computing CIs in post-processing.")
 
@@ -3061,7 +3061,7 @@ def fit_one_cell(
         print(f"[fit_one_cell]   ratio = {ratio:.2f}  ->  status = {status}")
 
     # --- GP-posterior uncertainty -----------------------------------------
-    # Pass int seed (not a numpy Generator) — see _gp_parameter_uncertainty
+    # Pass int seed (not a numpy Generator) -- see _gp_parameter_uncertainty
     # docstring for the reason.
     sigmas = _gp_parameter_uncertainty(
         result, delta_mV=uncertainty_delta_mV,
@@ -3122,7 +3122,7 @@ def fit_one_cell(
     )
 
 
-# %% Cell 11 — Multiprocessing worker (top-level for picklability) =============
+# %% Cell 11 -- Multiprocessing worker (top-level for picklability) =============
 def _fit_worker(args) -> PassiveFitResult:
     """Worker entry point for multiprocessing.Pool.  Each worker rebuilds
     its own NEURON model from the SWC path because NEURON sections are
@@ -3143,7 +3143,7 @@ def _fit_worker(args) -> PassiveFitResult:
     r.neuron_cell = None
 
     # gp_result.specs holds the original gp_minimize call args, which
-    # include the objective function — a closure that cannot be pickled
+    # include the objective function -- a closure that cannot be pickled
     # across a 'spawn' process boundary.  Clear it.  The trained GP
     # (gp_result.models[-1]) and search space (gp_result.space) are
     # picklable and remain available for Phase 3's GP diagnostic.
@@ -3153,7 +3153,7 @@ def _fit_worker(args) -> PassiveFitResult:
     return r
 
 
-# %% Cell 12 — Batch driver: fit_cells =========================================
+# %% Cell 12 -- Batch driver: fit_cells =========================================
 def fit_cells(
     cells_data: Sequence[CellData],
     opt_inputs: Sequence[OptimiserInputs],
@@ -3181,7 +3181,7 @@ def fit_cells(
     F
         Spine-area correction factor, applied uniformly to all cells in the
         call.  For mixed populations (e.g. spiny + aspiny in one call), set
-        this on the basis of the dendrite type of the GROUP, not per cell —
+        this on the basis of the dendrite type of the GROUP, not per cell --
         or call ``fit_cells`` separately per group.
     n_workers
         ``1`` (default): sequential within node.  ``> 1``: distribute cells
@@ -3207,7 +3207,7 @@ def fit_cells(
     results: List[PassiveFitResult] = []
 
     if n_workers <= 1:
-        # Sequential path — one cell at a time in the calling process.
+        # Sequential path -- one cell at a time in the calling process.
         # After each cell is fitted we destroy its NEURON sections so the
         # next cell builds against a clean ``h.allsec()``.  Mirrors how
         # the Colab pipeline gets away with using ``h.allsec()`` inside
@@ -3254,7 +3254,7 @@ def fit_cells(
                         pass
             results.append(r)
     else:
-        # Parallel path — multiprocessing.Pool
+        # Parallel path -- multiprocessing.Pool
         import multiprocessing as mp
         ctx = mp.get_context("spawn")  # safer than fork with NEURON
         args_list = [(cd, oi, F, dict(fit_kwargs))
@@ -3273,7 +3273,7 @@ def fit_cells(
         # The three Phase-3 hand-off fields hold live objects (NEURON Hoc
         # handles, sklearn GP, OptimiserInputs) that deepcopy cannot traverse.
         # dataclasses.replace() creates a shallow copy with only those three
-        # fields nulled out — the originals in `results` are untouched and
+        # fields nulled out -- the originals in `results` are untouched and
         # still carry the live objects for Phase 3.
         import dataclasses
         r_export = dataclasses.replace(r,
@@ -3339,7 +3339,7 @@ def rebuild_neuron_cells_for_phase3(
         if cd is None:
             warnings.warn(
                 f"[rebuild_neuron_cells_for_phase3] specimen {r.specimen_id} "
-                f"not found in cells_data — skipping."
+                f"not found in cells_data -- skipping."
             )
             continue
 
@@ -3361,14 +3361,14 @@ def rebuild_neuron_cells_for_phase3(
         print(f"[rebuild_neuron_cells_for_phase3] rebuilt {n_rebuilt} "
               f"NEURON model(s) out of {len(results)} result(s).")
 
-# %% Cell 13 — Population aggregator ===========================================
+# %% Cell 13 -- Population aggregator ===========================================
 def aggregate_population(
     df: pd.DataFrame,
     *,
     group_by: Sequence[str] = ("layer", "dendrite_type"),
     accept_statuses: Sequence[str] = ("good",),
 ) -> pd.DataFrame:
-    """Compute mean ± SD of (Cm, Rm, Ra) per group.
+    """Compute mean +/- SD of (Cm, Rm, Ra) per group.
 
     Parameters
     ----------
@@ -3376,12 +3376,12 @@ def aggregate_population(
         Output of :func:`fit_cells`.
     group_by
         Columns to group on.  Default ``("layer", "dendrite_type")`` gives
-        one row per (layer × cell-type) combination — exactly the
+        one row per (layer x cell-type) combination -- exactly the
         granularity used in the project pipeline document for canonical
         parameter sets.
     accept_statuses
         Which validation statuses to include in the aggregation.  Default
-        ``("good",)`` is conservative — rejects any cell that failed
+        ``("good",)`` is conservative -- rejects any cell that failed
         validation or needs refinement.  Pass ``("good", "to_refine")``
         to include cells flagged for Phase 3 refinement.
 
@@ -3424,7 +3424,7 @@ def aggregate_population(
     return pd.DataFrame(out_rows)
 
 
-# %% Cell 14 — Diagnostic plot helper ==========================================
+# %% Cell 14 -- Diagnostic plot helper ==========================================
 def plot_fit_diagnostic(
     cell: PassiveCell,
     cell_data: CellData,
@@ -3618,7 +3618,7 @@ def plot_fit_diagnostic(
     return fig, axes
 
 
-# %% Cell 15 — Demo (uncomment to run end-to-end) ==============================
+# %% Cell 15 -- Demo (uncomment to run end-to-end) ==============================
 # if __name__ == "__main__":
 #     from phase1_data_loader import (
 #         list_human_cells_with_morphology,
@@ -3660,24 +3660,24 @@ def plot_fit_diagnostic(
 #     df.to_parquet("phase2_results_layer6_spiny.parquet")
 
 """
-phase3_bootstrap_v3.py — Phase 3 v3: Bootstrap CI + GP Diagnostic
+phase3_bootstrap_v3.py -- Phase 3 v3: Bootstrap CI + GP Diagnostic
 ============================================================================
 
 Features:
-  • Two bootstrap modes:
-      - "parametric"     — add residual noise to MLE trace and refit.
-      - "nonparametric"  — resample individual pulse windows with replacement.
-  • Three CI types per parameter (percentile, BCa, normal) computed with
+  * Two bootstrap modes:
+      - "parametric"     -- add residual noise to MLE trace and refit.
+      - "nonparametric"  -- resample individual pulse windows with replacement.
+  * Three CI types per parameter (percentile, BCa, normal) computed with
     scipy/numpy.
-  • Trace diagnostic plot showing example bootstrap training data.
-  • Histograms, pairwise scatters, and GP diagnostic profile plots that
+  * Trace diagnostic plot showing example bootstrap training data.
+  * Histograms, pairwise scatters, and GP diagnostic profile plots that
     overlay all available CI types.
 
 Prerequisites in the current Colab session:
-  • Phase 1 cells defining `np`, `SweepBundle`, `CellData` with the
+  * Phase 1 cells defining `np`, `SweepBundle`, `CellData` with the
     `ss_individual_pulses` field, `_simulate_square_subthreshold`,
     `_interp_to_grid`.
-  • Phase 2 cells defining `_build_loss_function`, `gp_minimize`, `Real`.
+  * Phase 2 cells defining `_build_loss_function`, `gp_minimize`, `Real`.
 
 Dependencies: numpy, scipy, matplotlib, scikit-optimize.
 
@@ -3711,12 +3711,12 @@ from matplotlib.lines import Line2D
 from skopt import gp_minimize
 from skopt.space import Real
 
-# ── Constants ────────────────────────────────────────────────────────────────
+# -- Constants ----------------------------------------------------------------
 PARAM_NAMES  = ("Cm", "Rm", "Ra")
 PARAM_LABELS = {
-    "Cm": r"$C_m$ (µF/cm²)",
-    "Rm": r"$R_m$ (Ω·cm²)",
-    "Ra": r"$R_a$ (Ω·cm)",
+    "Cm": r"$C_m$ (uF/cm^2)",
+    "Rm": r"$R_m$ (Ohm.cm^2)",
+    "Ra": r"$R_a$ (Ohm.cm)",
 }
 
 # Bootstrap defaults
@@ -3740,7 +3740,7 @@ DEFAULT_GP_BALL_LOGRADIUS  = 0.05
 DEFAULT_TRUST_ABS_MV       = 0.10
 DEFAULT_TRUST_ZSCORE       = 3.0
 
-# CI style registry for plotting — colours, linestyles, labels
+# CI style registry for plotting -- colours, linestyles, labels
 CI_STYLES = {
     "percentile": {"color": "tab:orange", "ls": "--",  "lw": 1.2,
                    "label_fmt": "percentile CI = [{lo:.4g}, {hi:.4g}]"},
@@ -3752,17 +3752,17 @@ CI_STYLES = {
 
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  GP-diagnostic helper functions (called by gp_diagnostic_for_cell below)
 #  These mirror the Phase-2 originals so this module is self-contained.
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def _other_axes_log_grid(opt_inputs, pinned_name, inner_grid_per_axis):
     """Uniform log-space grid over the two parameters that are NOT pinned.
 
     Returns
     -------
-    A, B : ndarray (inner_grid_per_axis²,)
+    A, B : ndarray (inner_grid_per_axis^2,)
         Ravelled meshgrid coordinates for the two free axes.
     other : tuple[str, str]
         Names of the two free parameters, in the order (A, B).
@@ -3792,12 +3792,12 @@ def _build_gp_profile(
     *, gp_result, opt_inputs, param_name: str,
     grid_log: np.ndarray, inner_grid_per_axis: int,
 ):
-    """Compute (μ_GP, σ_GP) along the 1-D profile for one parameter.
+    """Compute (u_GP, sigma_GP) along the 1-D profile for one parameter.
 
     For each pinned value of ``param_name``, the other two parameters are
-    swept over a dense inner grid (``inner_grid_per_axis`` × ``inner_grid_per_axis``
+    swept over a dense inner grid (``inner_grid_per_axis`` x ``inner_grid_per_axis``
     points).  The GP is queried on the full batch in one call; we record
-    μ and σ at the inner argmin — i.e. the point that minimises the GP
+    u and sigma at the inner argmin -- i.e. the point that minimises the GP
     mean for that pinned value.
 
     Parameters
@@ -3858,13 +3858,13 @@ def _validate_at_param_value(
 
     Draws ``n_validation`` points in a small log-space ball around
     (param = theta_phys, others = MLE) and returns both the real NEURON
-    RMSD and the GP-predicted μ/σ at each point.
+    RMSD and the GP-predicted u/sigma at each point.
 
     Parameters
     ----------
     theta_phys : float
         Physical-unit value of ``param_name`` at which to validate (e.g.
-        the lower bound of a CI in Ω·cm²).
+        the lower bound of a CI in Ohm.cm^2).
     param_name : str
         One of ``"Cm"``, ``"Rm"``, ``"Ra"``.
     fit_result : PassiveFitResult
@@ -3938,8 +3938,8 @@ def _gp_trust_combined(pts, abs_mv: float, z_thresh: float) -> bool:
 
     A point fails if:
       - the real RMSD is not finite, or
-      - |RMSD_real − μ_GP| > abs_mv (absolute mismatch in mV), or
-      - |RMSD_real − μ_GP| > z_thresh × σ_GP (z-score mismatch).
+      - |RMSD_real - u_GP| > abs_mv (absolute mismatch in mV), or
+      - |RMSD_real - u_GP| > z_thresh x sigma_GP (z-score mismatch).
 
     Parameters
     ----------
@@ -3986,8 +3986,8 @@ def _simulate_square_subthreshold(
 
     Returns
     -------
-    t_sim_s : ndarray   — seconds, t=0 at pulse onset
-    v_sim   : ndarray   — mV
+    t_sim_s : ndarray   -- seconds, t=0 at pulse onset
+    v_sim   : ndarray   -- mV
     """
     delay_ms = pre_pad_ms
     dur_ms   = bundle.stim_duration_s * 1e3
@@ -4006,13 +4006,13 @@ def _simulate_square_subthreshold(
     return t_sim_s, v_sim
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  Data structures
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 @dataclass
 class BootstrapCIResult:
-    """Bootstrap CIs for one cell (v3 — no joint-projected CI).
+    """Bootstrap CIs for one cell (v3 -- no joint-projected CI).
 
     ``samples`` is the (n_kept, 3) array of bootstrap parameter
     estimates in **physical units**, columns ordered (Cm, Rm, Ra).
@@ -4027,7 +4027,7 @@ class BootstrapCIResult:
     mle_log:       Tuple[float, float, float]
     mle_rmsd:      float
 
-    # CI tables — keyed by parameter name, value = (lo, hi) physical units
+    # CI tables -- keyed by parameter name, value = (lo, hi) physical units
     ci_percentile: Dict[str, Tuple[float, float]]
     ci_bca:        Dict[str, Tuple[float, float]]
     ci_normal:     Dict[str, Tuple[float, float]]
@@ -4036,7 +4036,7 @@ class BootstrapCIResult:
     threshold_alpha: float
     bootstrap_mode:  str              # "parametric" | "nonparametric"
     noise_mode:      str              # used only for parametric
-    sigma_used:      float            # σ for parametric; NaN for nonparametric
+    sigma_used:      float            # sigma for parametric; NaN for nonparametric
     rho_used:        float
     block_length:    Optional[int]
     fit_mode:        str
@@ -4054,14 +4054,14 @@ class BootstrapCIResult:
 
 @dataclass
 class GpDiagnosticPerParameter:
-    """Per-parameter GP profile data with σ-envelope (v3)."""
+    """Per-parameter GP profile data with sigma-envelope (v3)."""
     name:           str
     mle_value:      float
     grid_physical:  np.ndarray
     grid_log:       np.ndarray
     profile_mean:   np.ndarray
     profile_std:    np.ndarray
-    # Validation at bootstrap CI bound points — each tuple is
+    # Validation at bootstrap CI bound points -- each tuple is
     # (theta_physical, rmsd_real, mu_gp, sigma_gp)
     validation_points: Dict[str, List[Tuple[float, float, float, float]]]
     gp_trustworthy: bool
@@ -4084,13 +4084,13 @@ class Phase3Result:
     gp_diagnostic:  GpDiagnosticResult
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  CI computation — percentile, BCa, normal  (scipy/numpy)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  CI computation -- percentile, BCa, normal  (scipy/numpy)
+# ===============================================================================
 
 def _ci_percentile(samples_1d: np.ndarray, alpha: float
                    ) -> Tuple[float, float]:
-    """Basic percentile CI: α/2 and 1−α/2 quantiles."""
+    """Basic percentile CI: alpha/2 and 1-alpha/2 quantiles."""
     tail = (1.0 - alpha) / 2.0
     lo = float(np.quantile(samples_1d, tail))
     hi = float(np.quantile(samples_1d, 1.0 - tail))
@@ -4099,7 +4099,7 @@ def _ci_percentile(samples_1d: np.ndarray, alpha: float
 
 def _ci_normal(samples_1d: np.ndarray, alpha: float
                ) -> Tuple[float, float]:
-    """Normal (Wald) bootstrap CI: mean ± z_{α/2} × SE.
+    """Normal (Wald) bootstrap CI: mean +/- z_{alpha/2} x SE.
 
     Uses ``scipy.stats.norm.ppf`` for the critical value.
     """
@@ -4116,27 +4116,27 @@ def _ci_bca(
 ) -> Tuple[float, float]:
     """Bias-corrected and accelerated (BCa) bootstrap CI.
 
-    Implements Efron & Tibshirani (1993) §14.3:
-        z₀ = Φ⁻¹(fraction of θ* < θ̂)
+    Implements Efron & Tibshirani (1993) Sec.14.3:
+        z_0 = Phi^-1(fraction of theta* < theta^)
         a  = jackknife-on-bootstrap acceleration
-        α₁ = Φ(z₀ + (z₀ + z_{α/2}) / (1 − a·(z₀ + z_{α/2})))
-        α₂ = Φ(z₀ + (z₀ + z_{1−α/2}) / (1 − a·(z₀ + z_{1−α/2})))
+        alpha_1 = Phi(z_0 + (z_0 + z_{alpha/2}) / (1 - a.(z_0 + z_{alpha/2})))
+        alpha_2 = Phi(z_0 + (z_0 + z_{1-alpha/2}) / (1 - a.(z_0 + z_{1-alpha/2})))
 
-    Uses ``scipy.stats.norm.ppf`` / ``.cdf`` for Φ / Φ⁻¹.
+    Uses ``scipy.stats.norm.ppf`` / ``.cdf`` for Phi / Phi^-1.
     """
     n = len(samples_1d)
     if n < 3:
         return float("nan"), float("nan")
 
-    # ── Bias correction z₀ ──
+    # -- Bias correction z_0 --
     frac_below = np.mean(samples_1d < theta_hat)
     frac_below = np.clip(frac_below, 1e-8, 1.0 - 1e-8)
     z0 = float(sp_stats.norm.ppf(frac_below))
 
-    # ── Acceleration a (jackknife on the bootstrap samples) ──
+    # -- Acceleration a (jackknife on the bootstrap samples) --
     # Delete-one mean estimator applied to the bootstrap samples themselves.
     # This is the standard shortcut when the original data is not available
-    # (Efron & Tibshirani 1993 §14.3, DiCiccio & Efron 1996 §5).
+    # (Efron & Tibshirani 1993 Sec.14.3, DiCiccio & Efron 1996 Sec.5).
     jk_means = np.empty(n)
     total = float(np.sum(samples_1d))
     for i in range(n):
@@ -4147,7 +4147,7 @@ def _ci_bca(
     a_den = float(6.0 * (np.sum(d ** 2)) ** 1.5)
     a = a_num / a_den if abs(a_den) > 1e-15 else 0.0
 
-    # ── Adjusted quantiles ──
+    # -- Adjusted quantiles --
     z_lo = float(sp_stats.norm.ppf((1.0 - alpha) / 2.0))
     z_hi = float(sp_stats.norm.ppf(1.0 - (1.0 - alpha) / 2.0))
 
@@ -4170,9 +4170,9 @@ def _ci_bca(
     return lo, hi
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Noise generation (parametric mode only — unchanged from v2)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Noise generation (parametric mode only -- unchanged from v2)
+# ===============================================================================
 
 def _generate_noise(
     n: int, sigma: float, rho: float,
@@ -4210,9 +4210,9 @@ def _generate_noise(
     raise ValueError(f"Unknown noise mode: {mode!r}")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  MLE traces cache (parametric mode)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def _compute_mle_traces(
     cell, train_bundles, v_rest_mV: float,
@@ -4230,9 +4230,9 @@ def _compute_mle_traces(
     return traces
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Single bootstrap iteration — PARAMETRIC
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Single bootstrap iteration -- PARAMETRIC
+# ===============================================================================
 
 def _run_one_parametric_iteration(
     *,
@@ -4248,12 +4248,12 @@ def _run_one_parametric_iteration(
 ) -> Dict[str, float]:
     """One parametric residual bootstrap refit.
 
-    Synthesises noise → adds to MLE trace → builds synthetic bundles → refits.
+    Synthesises noise -> adds to MLE trace -> builds synthetic bundles -> refits.
     """
     rng = np.random.default_rng(int(seed))
     train_t0_s, train_t1_s = (np.asarray(train_window_ms) * 1e-3).tolist()
 
-    # ── Build synthetic bundles ──
+    # -- Build synthetic bundles --
     synthetic_bundles = []
     for i, b in enumerate(opt_inputs.train_bundles):
         sim_v = mle_traces[i]
@@ -4282,9 +4282,9 @@ def _run_one_parametric_iteration(
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Single bootstrap iteration — NONPARAMETRIC
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Single bootstrap iteration -- NONPARAMETRIC
+# ===============================================================================
 
 def _run_one_nonparametric_iteration(
     *,
@@ -4305,11 +4305,11 @@ def _run_one_nonparametric_iteration(
     """
     rng = np.random.default_rng(int(seed))
 
-    # ── Draw with replacement ──
+    # -- Draw with replacement --
     indices = rng.integers(0, len(pulse_pool), size=n_pulses)
     drawn = [pulse_pool[int(j)] for j in indices]
 
-    # ── Separate by polarity and build SweepBundles ──
+    # -- Separate by polarity and build SweepBundles --
     by_pol: Dict[str, List[Dict]] = {"dep": [], "hyp": []}
     for w in drawn:
         by_pol[w["polarity"]].append(w)
@@ -4358,16 +4358,16 @@ def _run_one_nonparametric_iteration(
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  Shared refit logic
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def _refit_from_bundles(
     *, cell, bundles, v_rest_mV, train_window_ms,
     mle_log, dims, fit_mode, n_calls, n_initial, ball_radius,
     seed, rng,
 ) -> Dict[str, float]:
-    """Build loss from bundles → run gp_minimize → return fitted params."""
+    """Build loss from bundles -> run gp_minimize -> return fitted params."""
     fn = _locate_build_loss_function()
     loss_fn = fn(
         cell=cell, train_bundles=bundles,
@@ -4428,9 +4428,9 @@ def _locate_build_loss_function():
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  Worker wrapper (sequential and parallel)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 _WORKER_STATE: Dict[str, Any] = {}
 
@@ -4485,7 +4485,7 @@ def _bootstrap_worker_run_v3(task):
 
 
 def _bootstrap_worker_init(swc_path, F):
-    """Pool initialiser — build one NEURON cell per worker process.
+    """Pool initialiser -- build one NEURON cell per worker process.
 
     NEURON cells are not picklable, so we rebuild them in each worker
     rather than trying to send them through the Pool.  Mirrors the
@@ -4495,9 +4495,9 @@ def _bootstrap_worker_init(swc_path, F):
 
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  Top-level bootstrap function
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def bootstrap_ci_for_cell(
     *,
@@ -4529,7 +4529,7 @@ def bootstrap_ci_for_cell(
     save_plots:  bool = True,
     verbose: bool     = True,
 ) -> BootstrapCIResult:
-    """Phase 3 v3 bootstrap — parametric or nonparametric.
+    """Phase 3 v3 bootstrap -- parametric or nonparametric.
 
     Parameters
     ----------
@@ -4547,7 +4547,7 @@ def bootstrap_ci_for_cell(
         Number of averaged groups to form from the resampled pulses
         (within each polarity).
     """
-    # ── Output directory ──
+    # -- Output directory --
     if output_dir is not None:
         out_dir = Path(output_dir)
     else:
@@ -4559,7 +4559,7 @@ def bootstrap_ci_for_cell(
     opt_inputs = fit_result.opt_inputs
     notes: List[str] = []
 
-    # ── Parametric: σ and ρ from residuals ──
+    # -- Parametric: sigma and rho from residuals --
     sigma_res = float("nan")
     rho_res   = 0.0
     if bootstrap_mode == "parametric":
@@ -4576,7 +4576,7 @@ def bootstrap_ci_for_cell(
         if not np.isfinite(rho_res):
             rho_res = float(getattr(fit_result, "noise_rho_lag1", 0.0))
 
-    # ── Nonparametric: validate pool ──
+    # -- Nonparametric: validate pool --
     if bootstrap_mode == "nonparametric":
         if pulse_pool is None or len(pulse_pool) == 0:
             raise ValueError(
@@ -4586,7 +4586,7 @@ def bootstrap_ci_for_cell(
             raise ValueError(
                 "nonparametric mode requires n_pulses_per_replicate.")
 
-    # ── Fit-mode defaults ──
+    # -- Fit-mode defaults --
     if fit_mode == "fast":
         if n_calls   is None: n_calls   = DEFAULT_FAST_NCALLS
         if n_initial is None: n_initial = DEFAULT_FAST_NINITIAL
@@ -4604,12 +4604,12 @@ def bootstrap_ci_for_cell(
     if verbose:
         print(
             f"[bootstrap] cell {fit_result.specimen_id}\n"
-            f"[bootstrap]   mode={bootstrap_mode}  B={B}  α={alpha}  "
+            f"[bootstrap]   mode={bootstrap_mode}  B={B}  alpha={alpha}  "
             f"fit_mode={fit_mode}  n_calls={n_calls}  n_initial={n_initial}"
         )
         if bootstrap_mode == "parametric":
             print(f"[bootstrap]   noise_mode={noise_mode}  "
-                  f"σ_residual={sigma_res:.5f} mV  ρ_residual={rho_res:.3f}")
+                  f"sigma_residual={sigma_res:.5f} mV  rho_residual={rho_res:.3f}")
         else:
             print(f"[bootstrap]   pulse_pool={len(pulse_pool)} pulses  "
                   f"n_pulses_per_replicate={n_pulses_per_replicate}  "
@@ -4618,7 +4618,7 @@ def bootstrap_ci_for_cell(
               f"Rm={mle_phys[1]:.4g}, Ra={mle_phys[2]:.4g}  "
               f"RMSD_MLE={fit_result.train_rmsd_mV:.5f} mV")
 
-    # ── Cache MLE traces (parametric) ──
+    # -- Cache MLE traces (parametric) --
     mle_traces: Dict[int, np.ndarray] = {}
     empirical_residuals: Optional[np.ndarray] = None
     if bootstrap_mode == "parametric":
@@ -4646,7 +4646,7 @@ def bootstrap_ci_for_cell(
                 pool.extend(res.tolist())
             empirical_residuals = np.asarray(pool, dtype=float)
 
-    # ── Prepare tasks ──
+    # -- Prepare tasks --
     rng_master = np.random.default_rng(int(seed))
     worker_seeds = rng_master.integers(0, 2**31 - 1, size=B).tolist()
 
@@ -4674,7 +4674,7 @@ def bootstrap_ci_for_cell(
         for i in range(B)
     ]
 
-    # ── Run ──
+    # -- Run --
     if verbose:
         print(f"[bootstrap]   running {B} iterations ...")
     raw_results = []
@@ -4703,7 +4703,7 @@ def bootstrap_ci_for_cell(
                     status = "ok" if r[1] is not None else "fail"
                     print(f"[bootstrap]   iter {idx_done + 1}/{B} {status}")
 
-    # ── Collect ──
+    # -- Collect --
     successes = [r for r in raw_results if r[1] is not None]
     failures  = [r for r in raw_results if r[1] is None]
     if failures:
@@ -4721,14 +4721,14 @@ def bootstrap_ci_for_cell(
         [[r[1]["cm_log"], r[1]["rm_log"], r[1]["ra_log"]] for r in successes])
     rmsds = np.array([r[1]["rmsd"] for r in successes])
 
-    # ── RMSD outlier rejection ──
+    # -- RMSD outlier rejection --
     if rmsd_reject_mult is not None and np.isfinite(rmsd_reject_mult):
         thresh = rmsd_reject_mult * fit_result.train_rmsd_mV
         keep = rmsds <= thresh
         n_rej = int((~keep).sum())
         if n_rej > 0:
             msg = (f"[bootstrap]   rejected {n_rej} sample(s) with "
-                   f"RMSD > {rmsd_reject_mult}× MLE_RMSD")
+                   f"RMSD > {rmsd_reject_mult}x MLE_RMSD")
             if verbose:
                 print(msg)
             notes.append(msg)
@@ -4740,7 +4740,7 @@ def bootstrap_ci_for_cell(
         raise RuntimeError(f"After rejection only {n_kept} samples remain.")
     samples_phys = np.exp(samples_log)
 
-    # ── Compute CIs (library-backed) ──
+    # -- Compute CIs (library-backed) --
     ci_perc:   Dict[str, Tuple[float, float]] = {}
     ci_bca:    Dict[str, Tuple[float, float]] = {}
     ci_normal: Dict[str, Tuple[float, float]] = {}
@@ -4757,12 +4757,12 @@ def bootstrap_ci_for_cell(
             idx = PARAM_NAMES.index(p)
             print(
                 f"[bootstrap]   {p}: MLE={mle_phys[idx]:.4g}"
-                f"  perc={ci_perc[p][0]:.4g}…{ci_perc[p][1]:.4g}"
-                f"  BCa={ci_bca[p][0]:.4g}…{ci_bca[p][1]:.4g}"
-                f"  normal={ci_normal[p][0]:.4g}…{ci_normal[p][1]:.4g}"
+                f"  perc={ci_perc[p][0]:.4g}...{ci_perc[p][1]:.4g}"
+                f"  BCa={ci_bca[p][0]:.4g}...{ci_bca[p][1]:.4g}"
+                f"  normal={ci_normal[p][0]:.4g}...{ci_normal[p][1]:.4g}"
             )
 
-    # ── Assemble result ──
+    # -- Assemble result --
     result = BootstrapCIResult(
         specimen_id=int(fit_result.specimen_id),
         B_requested=int(B), n_kept=int(n_kept),
@@ -4790,7 +4790,7 @@ def bootstrap_ci_for_cell(
         notes=notes,
     )
 
-    # ── Persist ──
+    # -- Persist --
     if save_pickle:
         with open(out_dir / "bootstrap_result.pkl", "wb") as f:
             pickle.dump(result, f)
@@ -4837,9 +4837,9 @@ def _save_bootstrap_summary_csv(r: BootstrapCIResult, out_dir: Path):
     pd.DataFrame(rows).to_csv(out_dir / "bootstrap_summary.csv", index=False)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  GP diagnostic (updated for v3 — no joint CIs)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  GP diagnostic (updated for v3 -- no joint CIs)
+# ===============================================================================
 
 def gp_diagnostic_for_cell(
     *,
@@ -4859,7 +4859,7 @@ def gp_diagnostic_for_cell(
     seed: int         = 0,
     verbose: bool     = True,
 ) -> GpDiagnosticResult:
-    """GP-surrogate profile diagnostic with σ-envelope (v3).
+    """GP-surrogate profile diagnostic with sigma-envelope (v3).
 
     Overlays whatever CI types are present in ``bootstrap_result``.
     Validates each CI boundary point with real NEURON calls.
@@ -4881,7 +4881,7 @@ def gp_diagnostic_for_cell(
         print(f"[gp_diagnostic] cell {fit_result.specimen_id}  k={envelope_k}"
               f"  bootstrap CIs {ci_tag}")
 
-    # ── Collect all CI types present in bootstrap_result ──
+    # -- Collect all CI types present in bootstrap_result --
     ci_dict_map: Dict[str, Dict[str, Tuple[float, float]]] = {}
     if bootstrap_result is not None:
         ci_dict_map["percentile"] = bootstrap_result.ci_percentile
@@ -4901,7 +4901,7 @@ def gp_diagnostic_for_cell(
                    "Rm": fit_result.rm_Ohm_cm2,
                    "Ra": fit_result.ra_Ohm_cm}[p]
 
-        # ── Validate at each CI boundary ──
+        # -- Validate at each CI boundary --
         validation_pts: Dict[str, List[Tuple[float, float, float, float]]] = {}
         for ci_name, ci_table in ci_dict_map.items():
             lo_val, hi_val = ci_table[p]
@@ -4954,9 +4954,9 @@ def gp_diagnostic_for_cell(
     return result
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  Top-level wrapper
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def phase3_full_for_cell(
     *,
@@ -4970,11 +4970,11 @@ def phase3_full_for_cell(
 
     Output structure:
         <root_dir>/cell_<id>/
-          ├─ bootstrap/        *.pkl, *.npy, *.csv, histogram_*.png, pairwise_*.png
-          └─ gp_diagnostic/    *.pkl, profile_*.png
+          +- bootstrap/        *.pkl, *.npy, *.csv, histogram_*.png, pairwise_*.png
+          +- gp_diagnostic/    *.pkl, profile_*.png
     """
     if verbose:
-        print(f"\n=== Phase 3 v3 — cell {fit_result.specimen_id} ===")
+        print(f"\n=== Phase 3 v3 -- cell {fit_result.specimen_id} ===")
 
     boot = bootstrap_ci_for_cell(
         fit_result=fit_result, root_dir=root_dir,
@@ -4990,9 +4990,9 @@ def phase3_full_for_cell(
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  PLOTTING — Histograms (v3)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  PLOTTING -- Histograms (v3)
+# ===============================================================================
 
 def plot_bootstrap_histograms(
     r: BootstrapCIResult,
@@ -5034,8 +5034,8 @@ def plot_bootstrap_histograms(
         mode_lbl = (f"noise={r.noise_mode}" if r.bootstrap_mode == "parametric"
                     else f"nonparam (n_pulses={r.n_pulses_per_replicate})")
         ax.set_title(
-            f"Bootstrap distribution — {p}  |  cell {r.specimen_id}\n"
-            f"B={r.B_requested} (n_kept={r.n_kept}), α={r.threshold_alpha}, "
+            f"Bootstrap distribution -- {p}  |  cell {r.specimen_id}\n"
+            f"B={r.B_requested} (n_kept={r.n_kept}), alpha={r.threshold_alpha}, "
             f"fit_mode={r.fit_mode}, {mode_lbl}",
             fontsize=9,
         )
@@ -5048,9 +5048,9 @@ def plot_bootstrap_histograms(
     return saved
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  PLOTTING — Pairwise scatters (v3)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  PLOTTING -- Pairwise scatters (v3)
+# ===============================================================================
 
 def plot_bootstrap_pairwise(
     r: BootstrapCIResult,
@@ -5072,7 +5072,7 @@ def plot_bootstrap_pairwise(
                 marker="*", markersize=18,
                 color="k", linestyle="none", label="MLE")
 
-        # 95% covariance ellipse in log-space → exponentiated
+        # 95% covariance ellipse in log-space -> exponentiated
         mu_log = np.array(r.mle_log)
         sub = np.array([[r.cov_log[ix, ix], r.cov_log[ix, iy]],
                         [r.cov_log[iy, ix], r.cov_log[iy, iy]]])
@@ -5085,7 +5085,7 @@ def plot_bootstrap_pairwise(
             ell_log = mu_log[[ix, iy]][:, None] + radius * (L @ unit_circle)
             ell_phys = np.exp(ell_log)
             ax.plot(ell_phys[0], ell_phys[1], color="tab:red", lw=1.3,
-                    label=fr"cov ellipse (χ²₂, {r.threshold_alpha:.0%})")
+                    label=fr"cov ellipse (chi^2_2, {r.threshold_alpha:.0%})")
         except Exception:
             pass
 
@@ -5096,9 +5096,9 @@ def plot_bootstrap_pairwise(
         ax.set_xlabel(PARAM_LABELS[px])
         ax.set_ylabel(PARAM_LABELS[py])
         ax.set_title(
-            f"Bootstrap joint distribution — {px} vs {py}  |  "
+            f"Bootstrap joint distribution -- {px} vs {py}  |  "
             f"cell {r.specimen_id}\n"
-            f"ρ(log)={corr:+.3f}",
+            f"rho(log)={corr:+.3f}",
             fontsize=10,
         )
         ax.legend(loc="best", fontsize=9)
@@ -5110,9 +5110,9 @@ def plot_bootstrap_pairwise(
     return saved
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  PLOTTING — GP diagnostic profiles (v3)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  PLOTTING -- GP diagnostic profiles (v3)
+# ===============================================================================
 
 def plot_gp_diagnostic(
     gp_result: GpDiagnosticResult,
@@ -5120,7 +5120,7 @@ def plot_gp_diagnostic(
     out_dir,
     envelope_k: float,
 ) -> List[Path]:
-    """Per-parameter GP profile with σ envelope and all available CI overlays."""
+    """Per-parameter GP profile with sigma envelope and all available CI overlays."""
     out_dir = Path(out_dir)
     saved = []
 
@@ -5148,7 +5148,7 @@ def plot_gp_diagnostic(
         # MLE
         ax.axvline(pp.mle_value, color="k", lw=1.0, alpha=0.5, label="MLE")
 
-        # ── Overlay all CI types ──
+        # -- Overlay all CI types --
         for ci_name, ci_table in ci_sources.items():
             lo, hi = ci_table[p]
             sty = CI_STYLES[ci_name]
@@ -5159,7 +5159,7 @@ def plot_gp_diagnostic(
                 ax.axvline(hi, color=sty["color"], lw=sty["lw"],
                            linestyle=sty["ls"], label=f"{ci_name} CI")
 
-        # ── Real-NEURON validation dots ──
+        # -- Real-NEURON validation dots --
         for key, pts in pp.validation_points.items():
             for (th, rr, mg, _) in pts:
                 if np.isfinite(rr):
@@ -5185,9 +5185,9 @@ def plot_gp_diagnostic(
         ax.set_xlabel(PARAM_LABELS[p])
         ax.set_ylabel("Training RMSD (mV)")
 
-        trust = "GP ✓" if pp.gp_trustworthy else "GP ✗ MISMATCH"
+        trust = "GP [ok]" if pp.gp_trustworthy else "GP [x] MISMATCH"
         ax.set_title(
-            f"GP diagnostic — {p}  |  cell {gp_result.specimen_id}\n"
+            f"GP diagnostic -- {p}  |  cell {gp_result.specimen_id}\n"
             f"MLE = {pp.mle_value:.4g}   {trust}  "
             f"(envelope k = {envelope_k:.0f})",
             fontsize=9,
@@ -5200,9 +5200,9 @@ def plot_gp_diagnostic(
     return saved
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  PLOTTING — Trace diagnostic (NEW)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  PLOTTING -- Trace diagnostic (NEW)
+# ===============================================================================
 
 def plot_bootstrap_trace_diagnostic(
     *,
@@ -5219,8 +5219,8 @@ def plot_bootstrap_trace_diagnostic(
     """Diagnostic plot: example training traces for both bootstrap modes.
 
     Produces a figure with two panels (side by side):
-      Left:  PARAMETRIC — real trace, MLE trace, n_examples synthetic traces.
-      Right: NONPARAMETRIC — original averaged trace, n_examples
+      Left:  PARAMETRIC -- real trace, MLE trace, n_examples synthetic traces.
+      Right: NONPARAMETRIC -- original averaged trace, n_examples
              resampled-and-averaged traces.
 
     Parameters
@@ -5242,18 +5242,18 @@ def plot_bootstrap_trace_diagnostic(
     train_t0_s, train_t1_s = (
         np.asarray(opt_inputs.train_window_ms) * 1e-3).tolist()
 
-    # ── Resolve pulse pool ──
+    # -- Resolve pulse pool --
     if pulse_pool is None and cell_data is not None:
         pulse_pool = getattr(cell_data, "ss_individual_pulses", None)
     has_nonparametric = (pulse_pool is not None and len(pulse_pool) > 0)
 
-    # ── Figure layout ──
+    # -- Figure layout --
     n_panels = 2 if has_nonparametric else 1
     fig, axes = plt.subplots(1, n_panels, figsize=(7.0 * n_panels, 5.0))
     if n_panels == 1:
         axes = [axes]
 
-    # ── Compute MLE traces for the first training bundle ──
+    # -- Compute MLE traces for the first training bundle --
     b0 = opt_inputs.train_bundles[0]
     cell = fit_result.neuron_cell
     cm, rm, ra = mle_phys
@@ -5262,7 +5262,7 @@ def plot_bootstrap_trace_diagnostic(
     t_sim_s, v_sim_raw = _simulate_square_subthreshold(cell, b0, v_rest)
     sim_v = _interp_to_grid(t_sim_s, v_sim_raw, b0.t)
 
-    # ── σ_residual for noise ──
+    # -- sigma_residual for noise --
     sigma_res = float(getattr(fit_result, "residuals_sigma_mV", float("nan")))
     if not np.isfinite(sigma_res):
         sigma_res = float(fit_result.noise_sigma_mV)
@@ -5270,7 +5270,7 @@ def plot_bootstrap_trace_diagnostic(
     if not np.isfinite(rho_res):
         rho_res = 0.0
 
-    # ── LEFT PANEL: Parametric ──
+    # -- LEFT PANEL: Parametric --
     ax = axes[0]
     t_ms = b0.t * 1e3  # convert to ms
 
@@ -5300,11 +5300,11 @@ def plot_bootstrap_trace_diagnostic(
     ax.set_xlabel("Time (ms)")
     ax.set_ylabel("V (mV)")
     ax.set_title(f"Parametric bootstrap traces\n"
-                 f"(σ_res={sigma_res:.4f} mV, mode={noise_mode})",
+                 f"(sigma_res={sigma_res:.4f} mV, mode={noise_mode})",
                  fontsize=10)
     ax.legend(loc="best", fontsize=8)
 
-    # ── RIGHT PANEL: Nonparametric ──
+    # -- RIGHT PANEL: Nonparametric --
     if has_nonparametric:
         ax2 = axes[1]
         # Original averaged trace
@@ -5338,7 +5338,7 @@ def plot_bootstrap_trace_diagnostic(
         )
         ax2.legend(loc="best", fontsize=8)
 
-    fig.suptitle(f"Bootstrap trace diagnostic — cell {fit_result.specimen_id}",
+    fig.suptitle(f"Bootstrap trace diagnostic -- cell {fit_result.specimen_id}",
                  fontsize=11, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.95])
 
@@ -5352,7 +5352,7 @@ def plot_bootstrap_trace_diagnostic(
     return path
 
 """
-phase3_persistence_v4.py — robust save/load for Phase-3 v3 artefacts
+phase3_persistence_v4.py -- robust save/load for Phase-3 v3 artefacts
 ============================================================================
 
 Drop-in replacement for the persistence half of
@@ -5366,7 +5366,7 @@ Why this rewrite
 ----------------
 The v3 bundle stored ``fit_result_stripped`` and ``cell_data_stripped``.
 The former still carried ``gp_result``, a ``scipy.optimize.OptimizeResult``
-that references the wrapped loss function — which closes over the live
+that references the wrapped loss function -- which closes over the live
 NEURON cell.  Pickling that closure either silently truncates or fails
 midway, depending on the protocol and the size, which is exactly the
 "43.7 MB and got cut off" symptom we observed on one cell.
@@ -5376,7 +5376,7 @@ Fixes
 1. **No live skopt / sklearn / NEURON objects ever enter the bundle.**
    We extract numpy arrays, primitives, and lite dataclasses defined in
    this module (so unpickling never depends on classes in ``__main__``
-   from Phase 1/2 — except for the two ``BootstrapCIResult`` /
+   from Phase 1/2 -- except for the two ``BootstrapCIResult`` /
    ``GpDiagnosticResult`` dataclasses, which were already safe).
 
 2. **Atomic writes** via ``tempfile.mkstemp`` + ``os.replace``.  A
@@ -5388,9 +5388,9 @@ Fixes
    surface with a precise error name instead of a corrupted blob.
 
 4. **Multi-file layout** under ``<root>/cell_<id>/replot/``:
-       core.pkl        — bootstrap + GP diag + lite fit + MLE traces (~few MB)
-       pulse_pool.pkl  — ss_individual_pulses (optional, ~10–20 MB)
-       meta.json       — tiny human-readable index
+       core.pkl        -- bootstrap + GP diag + lite fit + MLE traces (~few MB)
+       pulse_pool.pkl  -- ss_individual_pulses (optional, ~10-20 MB)
+       meta.json       -- tiny human-readable index
 
 5. **Graceful lazy loading**: ``load_replot_bundle`` works even if
    ``pulse_pool.pkl`` is missing or corrupt; only the nonparametric
@@ -5436,9 +5436,9 @@ _VERSIONS = {
 }
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Lite dataclasses — defined HERE so they unpickle in any session
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Lite dataclasses -- defined HERE so they unpickle in any session
+# ===============================================================================
 
 @dataclass
 class _TrainBundleLite:
@@ -5465,7 +5465,7 @@ class _TrainBundleLite:
 class _SkoptDimLite:
     """Lite snapshot of a skopt ``Real`` / ``Integer`` dimension.
 
-    Carries just the bounds and the name — enough for axis-limit decisions
+    Carries just the bounds and the name -- enough for axis-limit decisions
     or any sanity-check at replot time.  Does *not* try to reconstruct
     a live skopt object on load.
     """
@@ -5474,9 +5474,9 @@ class _SkoptDimLite:
     high: float
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  ReplotBundle — the in-memory representation
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  ReplotBundle -- the in-memory representation
+# ===============================================================================
 
 @dataclass
 class ReplotBundle:
@@ -5485,7 +5485,7 @@ class ReplotBundle:
     Carries everything the four ``replot_*`` functions need.  Never holds
     a live NEURON cell, a ``gp_minimize`` ``OptimizeResult``, a
     ``GaussianProcessRegressor``, or a Phase-1 ``SweepBundle`` /
-    ``CellData`` — only plain data and lite dataclasses defined above.
+    ``CellData`` -- only plain data and lite dataclasses defined above.
 
     Notes
     -----
@@ -5500,7 +5500,7 @@ class ReplotBundle:
     bootstrap_result:     Any   # BootstrapCIResult
     gp_diagnostic_result: Any   # GpDiagnosticResult
 
-    # Phase-2 fit summary — only scalars / tuples / strings
+    # Phase-2 fit summary -- only scalars / tuples / strings
     mle_physical:        Tuple[float, float, float]
     train_rmsd_mV:       float
     residuals_sigma_mV:  float
@@ -5530,9 +5530,9 @@ class ReplotBundle:
     extras: Dict[str, Any] = field(default_factory=dict)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Internal helpers — extraction
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Internal helpers -- extraction
+# ===============================================================================
 
 def _to_train_bundle_lite(b) -> _TrainBundleLite:
     """Snapshot a Phase-1 SweepBundle into a _TrainBundleLite.
@@ -5627,9 +5627,9 @@ def _precompute_mle_traces(fit_result) -> Dict[int, np.ndarray]:
     return traces
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Internal helpers — atomic write + validation
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Internal helpers -- atomic write + validation
+# ===============================================================================
 
 def _validate_picklable(obj: Any, label: str) -> int:
     """Pickle ``obj`` to bytes; raise a clear error if it fails.
@@ -5707,9 +5707,9 @@ def _atomic_json_dump(obj: Any, target: Path) -> int:
     return target.stat().st_size
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Save  —  public API
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Save  --  public API
+# ===============================================================================
 
 def save_replot_bundle(
     *,
@@ -5725,11 +5725,11 @@ def save_replot_bundle(
     """Persist Phase-3 v3 artefacts atomically into ``cell_<id>/replot/``.
 
     Output files (all written atomically):
-        core.pkl        — bootstrap + GP diagnostic + lite fit summary +
+        core.pkl        -- bootstrap + GP diagnostic + lite fit summary +
                           training bundles + MLE traces (always required).
-        pulse_pool.pkl  — ss_individual_pulses (optional; only if available
+        pulse_pool.pkl  -- ss_individual_pulses (optional; only if available
                           and ``save_pulse_pool=True``).
-        meta.json       — human-readable index of shapes and versions.
+        meta.json       -- human-readable index of shapes and versions.
 
     The call signature is identical to v3 plus the new optional
     ``save_pulse_pool`` flag, so existing main scripts need no changes.
@@ -5747,12 +5747,12 @@ def save_replot_bundle(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if verbose:
-        print(f"[save_replot_bundle] cell {sid}: precomputing MLE traces …")
+        print(f"[save_replot_bundle] cell {sid}: precomputing MLE traces ...")
 
-    # ── 1. Precompute MLE traces while NEURON is still alive ──
+    # -- 1. Precompute MLE traces while NEURON is still alive --
     mle_traces = _precompute_mle_traces(fit_result)
 
-    # ── 2. Extract lite snapshots (no live objects past this point) ──
+    # -- 2. Extract lite snapshots (no live objects past this point) --
     train_bundles_lite = [
         _to_train_bundle_lite(b) for b in fit_result.opt_inputs.train_bundles
     ]
@@ -5786,9 +5786,9 @@ def save_replot_bundle(
         extras               = {},
     )
 
-    # ── 3. Upfront per-field validation ──
+    # -- 3. Upfront per-field validation --
     if verbose:
-        print("[save_replot_bundle]   validating each field is picklable …")
+        print("[save_replot_bundle]   validating each field is picklable ...")
     sizes: Dict[str, int] = {}
     for f in fields(bundle):
         if f.name == "pulse_pool":
@@ -5796,7 +5796,7 @@ def save_replot_bundle(
         sizes[f.name] = _validate_picklable(
             getattr(bundle, f.name), f"bundle.{f.name}")
 
-    # ── 4. Atomic write of core.pkl ──
+    # -- 4. Atomic write of core.pkl --
     core_path = out_dir / "core.pkl"
     core_size = _atomic_pickle_dump(bundle, core_path)
     written: Dict[str, Path] = {"core": core_path}
@@ -5804,7 +5804,7 @@ def save_replot_bundle(
         print(f"[save_replot_bundle]   wrote {core_path.name:<16}  "
               f"{core_size/1024:>9.1f} kB")
 
-    # ── 5. Optionally write pulse_pool.pkl ──
+    # -- 5. Optionally write pulse_pool.pkl --
     pulse_pool = getattr(cell_data, "ss_individual_pulses", None)
     if save_pulse_pool and pulse_pool is not None and len(pulse_pool) > 0:
         try:
@@ -5821,7 +5821,7 @@ def save_replot_bundle(
                 f"({type(e).__name__}: {e}). Trace diagnostic will be "
                 f"parametric-only at replot time.")
 
-    # ── 6. Atomic write of meta.json ──
+    # -- 6. Atomic write of meta.json --
     meta = {
         "specimen_id":         sid,
         "F_used":              float(F_used),
@@ -5847,15 +5847,15 @@ def save_replot_bundle(
 
     if verbose:
         total_kb = sum(p.stat().st_size for p in written.values()) / 1024
-        print(f"[save_replot_bundle] cell {sid}: done — total "
+        print(f"[save_replot_bundle] cell {sid}: done -- total "
               f"{total_kb:.1f} kB across {len(written)} files in {out_dir}")
 
     return written
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Load  —  public API
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Load  --  public API
+# ===============================================================================
 
 def load_replot_bundle(
     path,
@@ -5873,7 +5873,7 @@ def load_replot_bundle(
     load_pulse_pool
         If True and a sibling ``pulse_pool.pkl`` exists, it is loaded and
         attached to ``bundle.pulse_pool``.  Failures here are warned and
-        leave ``pulse_pool = None`` — they never abort the load.
+        leave ``pulse_pool = None`` -- they never abort the load.
 
     Notes
     -----
@@ -5920,10 +5920,10 @@ def load_replot_bundle(
     return bundle
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  replot_trace_diagnostic  —  updated to read the flat bundle
+# ===============================================================================
+#  replot_trace_diagnostic  --  updated to read the flat bundle
 #  (the other three replot_* functions are unchanged; keep them from v3)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def replot_trace_diagnostic(
     bundle: ReplotBundle,
@@ -5962,7 +5962,7 @@ def replot_trace_diagnostic(
     sim_v = bundle.mle_traces_by_bundle[bundle_index]
     t_ms  = b0.t * 1e3
 
-    # σ / ρ for the parametric panel: prefer overrides, then saved values
+    # sigma / rho for the parametric panel: prefer overrides, then saved values
     sigma_res = sigma_override
     if sigma_res is None or not np.isfinite(sigma_res):
         sigma_res = bundle.residuals_sigma_mV
@@ -5986,7 +5986,7 @@ def replot_trace_diagnostic(
     p_kw  = dict(lw=0.7, alpha=0.6);  p_kw.update(parametric_kwargs    or {})
     np_kw = dict(lw=0.8, alpha=0.7);  np_kw.update(nonparametric_kwargs or {})
 
-    # ── LEFT: parametric ─────────────────────────────────────────────────
+    # -- LEFT: parametric -------------------------------------------------
     ax_p = axes[0]
     ax_p.plot(t_ms, b0.v_mV, color="k",        lw=1.2, alpha=0.8,
               label="experiment (averaged)")
@@ -6017,11 +6017,11 @@ def replot_trace_diagnostic(
     ax_p.set_ylabel("V (mV)")
     ax_p.set_title(
         f"Parametric bootstrap traces\n"
-        f"(σ_res={sigma_res:.4f} mV, mode={noise_mode})",
+        f"(sigma_res={sigma_res:.4f} mV, mode={noise_mode})",
         fontsize=10)
     ax_p.legend(loc="best", fontsize=8)
 
-    # ── RIGHT: nonparametric (only if pulse_pool was loaded) ─────────────
+    # -- RIGHT: nonparametric (only if pulse_pool was loaded) -------------
     if has_np:
         ax_n = axes[1]
         ax_n.plot(t_ms, b0.v_mV, color="k", lw=1.2, alpha=0.8,
@@ -6050,18 +6050,18 @@ def replot_trace_diagnostic(
 
     if show_suptitle:
         fig.suptitle(
-            f"Bootstrap trace diagnostic — cell {bundle.specimen_id}",
+            f"Bootstrap trace diagnostic -- cell {bundle.specimen_id}",
             fontsize=11, fontweight="bold")
         fig.tight_layout(rect=[0, 0, 1, 0.95])
     else:
         fig.tight_layout()
     return fig, axes
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  (B)  REPLOT FUNCTIONS — one per figure type, fully parameterised
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  (B)  REPLOT FUNCTIONS -- one per figure type, fully parameterised
+# ===============================================================================
 
-# Default CI styles — override per call if you want different aesthetics
+# Default CI styles -- override per call if you want different aesthetics
 DEFAULT_CI_STYLES = {
     "percentile": dict(color="tab:orange", ls="--",  lw=1.2, label="percentile"),
     "bca":        dict(color="tab:purple", ls=":",   lw=1.0, label="BCa"),
@@ -6069,15 +6069,15 @@ DEFAULT_CI_STYLES = {
 }
 
 DEFAULT_PARAM_LABELS = {
-    "Cm": r"$C_m$ (µF/cm²)",
-    "Rm": r"$R_m$ (Ω·cm²)",
-    "Ra": r"$R_a$ (Ω·cm)",
+    "Cm": r"$C_m$ (uF/cm^2)",
+    "Rm": r"$R_m$ (Ohm.cm^2)",
+    "Ra": r"$R_a$ (Ohm.cm)",
 }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 #  1.  Bootstrap histogram (one parameter)
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 def replot_bootstrap_histogram(
     bundle: ReplotBundle,
@@ -6147,8 +6147,8 @@ def replot_bootstrap_histogram(
     if title is None:
         mode_lbl = (f"noise={r.noise_mode}" if r.bootstrap_mode == "parametric"
                     else f"nonparam (n={r.n_pulses_per_replicate})")
-        title = (f"Bootstrap — {parameter}  |  cell {r.specimen_id}\n"
-                 f"B={r.B_requested} (kept={r.n_kept}), α={r.threshold_alpha}, "
+        title = (f"Bootstrap -- {parameter}  |  cell {r.specimen_id}\n"
+                 f"B={r.B_requested} (kept={r.n_kept}), alpha={r.threshold_alpha}, "
                  f"{r.bootstrap_mode}, {mode_lbl}")
     ax.set_title(title, fontsize=9)
 
@@ -6157,9 +6157,9 @@ def replot_bootstrap_histogram(
     return fig, ax
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 #  2.  Pairwise scatter (one pair)
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 def replot_bootstrap_pairwise(
     bundle: ReplotBundle,
@@ -6221,7 +6221,7 @@ def replot_bootstrap_pairwise(
             ell_phys = np.exp(ell_log)
             ax.plot(ell_phys[0], ell_phys[1],
                     color=ellipse_color, lw=ellipse_lw,
-                    label=fr"cov ellipse (χ²₂, {level:.0%})")
+                    label=fr"cov ellipse (chi^2_2, {level:.0%})")
         except Exception:
             pass
 
@@ -6234,8 +6234,8 @@ def replot_bootstrap_pairwise(
     ax.set_ylabel(y_label or DEFAULT_PARAM_LABELS[param_y])
 
     if title is None:
-        title = (f"Bootstrap joint — {param_x} vs {param_y}  |  "
-                 f"cell {r.specimen_id}\nρ(log) = {corr:+.3f}")
+        title = (f"Bootstrap joint -- {param_x} vs {param_y}  |  "
+                 f"cell {r.specimen_id}\nrho(log) = {corr:+.3f}")
     ax.set_title(title, fontsize=10)
 
     if show_legend:
@@ -6243,9 +6243,9 @@ def replot_bootstrap_pairwise(
     return fig, ax
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 #  3.  GP diagnostic profile (one parameter)
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 def replot_gp_profile(
     bundle: ReplotBundle,
@@ -6354,8 +6354,8 @@ def replot_gp_profile(
     ax.set_ylabel(y_label)
 
     if title is None:
-        trust = "GP ✓" if pp.gp_trustworthy else "GP ✗ MISMATCH"
-        title = (f"GP diagnostic — {parameter}  |  cell {gp_res.specimen_id}\n"
+        trust = "GP [ok]" if pp.gp_trustworthy else "GP [x] MISMATCH"
+        title = (f"GP diagnostic -- {parameter}  |  cell {gp_res.specimen_id}\n"
                  f"MLE = {pp.mle_value:.4g}   {trust}  (envelope k = {k:.0f})")
     ax.set_title(title, fontsize=9)
 
@@ -6371,7 +6371,7 @@ if __name__ == "__main__":
     n_workers = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
 
     parser = argparse.ArgumentParser(
-        description="Passive-property pipeline — HPC offline mode"
+        description="Passive-property pipeline -- HPC offline mode"
     )
     parser.add_argument(
         "--bootstrap-workers", type=int, default=n_workers,
@@ -6452,11 +6452,11 @@ if __name__ == "__main__":
 
 
 
-    # ══════════════════════════════════════════════════════════════════
-    #  Phase 1 — Load data from archive
-    # ══════════════════════════════════════════════════════════════════
+    # ==================================================================
+    #  Phase 1 -- Load data from archive
+    # ==================================================================
     print("\n" + "=" * 60)
-    print("  PHASE 1 — Loading data from archive")
+    print("  PHASE 1 -- Loading data from archive")
     print("=" * 60)
 
     cells_data = load_cells_from_archive(
@@ -6475,11 +6475,11 @@ if __name__ == "__main__":
         for cd in cells_data
     ]
 
-    # ══════════════════════════════════════════════════════════════════
-    #  Phase 2 — Bayesian optimisation
-    # ══════════════════════════════════════════════════════════════════
+    # ==================================================================
+    #  Phase 2 -- Bayesian optimisation
+    # ==================================================================
     print("\n" + "=" * 60)
-    print("  PHASE 2 — Bayesian optimisation")
+    print("  PHASE 2 -- Bayesian optimisation")
     print("=" * 60)
 
     df, results = fit_cells(
@@ -6503,8 +6503,8 @@ if __name__ == "__main__":
     df.to_csv(str(output_dir / "phase2_results.csv"), index=False)
     print(f"[Phase 2] results saved to {output_dir / 'phase2_results.csv'}")
 
-    # ══════════════════════════════════════════════════════════════════
-    #  Phase 3 — Bootstrap CIs + GP diagnostic
+    # ==================================================================
+    #  Phase 3 -- Bootstrap CIs + GP diagnostic
     #
     #  Mirrors the Colab pipeline's one-cell-at-a-time pattern.  For each
     #  cell we:
@@ -6520,10 +6520,10 @@ if __name__ == "__main__":
     #  is the only configuration we've found that produces zero
     #  ``ReferenceError: can't access a deleted section`` or
     #  ``No soma section found`` failures.
-    # ══════════════════════════════════════════════════════════════════
+    # ==================================================================
     if not args.skip_phase3:
         print("\n" + "=" * 60)
-        print("  PHASE 3 — Bootstrap & GP diagnostic")
+        print("  PHASE 3 -- Bootstrap & GP diagnostic")
         print("=" * 60)
 
         PHASE3_ROOT = str(output_dir)
@@ -6564,10 +6564,10 @@ if __name__ == "__main__":
             if fr.gp_result is None:
                 continue
 
-            print(f"\n=== Phase 3 — cell {fr.specimen_id} "
+            print(f"\n=== Phase 3 -- cell {fr.specimen_id} "
                   f"({i + 1}/{len(results)}) ===")
 
-            # ── 1. Build this cell's NEURON model fresh ──────────────
+            # -- 1. Build this cell's NEURON model fresh --------------
             pc = None
             try:
                 pc = build_neuron_model(cd.swc_path, F=float(fr.F))
@@ -6587,7 +6587,7 @@ if __name__ == "__main__":
                 fr.neuron_cell = None
                 continue
 
-            # ── 2. Build bootstrap kwargs ────────────────────────────
+            # -- 2. Build bootstrap kwargs ----------------------------
             if args.bootstrap_mode == "parametric":
                 boot_kw = {
                     **COMMON_KWARGS,
@@ -6609,7 +6609,7 @@ if __name__ == "__main__":
                     "seed": i,
                 }
 
-            # ── 3. Run bootstrap + GP diagnostic, save bundle ────────
+            # -- 3. Run bootstrap + GP diagnostic, save bundle --------
             try:
                 p3 = phase3_full_for_cell(
                     fit_result=fr,
@@ -6632,14 +6632,14 @@ if __name__ == "__main__":
                 print(f"[Phase 3] specimen {fr.specimen_id} failed: {exc}")
                 failed_ids.append(int(fr.specimen_id))
             finally:
-                # ── 4. Tear down before next iteration ───────────────
+                # -- 4. Tear down before next iteration ---------------
                 try:
                     pc.destroy()
                 except Exception:
                     pass
                 fr.neuron_cell = None
 
-        # ── Population CI table ──
+        # -- Population CI table --
         if phase3_results:
             rows = []
             for p3 in phase3_results:

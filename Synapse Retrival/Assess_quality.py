@@ -11,11 +11,11 @@ def assess_synapses_for_neurons(neuron_ids, input_dir='./h01_extracted_synapses'
     for nid in neuron_ids:
         csv_path = os.path.join(input_dir, f"neuron_{nid}_synapses.csv")
         
-        print(f"\n📊 --- QA Report: Neuron {nid} ---")
+        print(f"\n --- QA Report: Neuron {nid} ---")
         
         # 1. Check if file exists
         if not os.path.exists(csv_path):
-            print(f"⚠️ CSV file not found: {csv_path}")
+            print(f"[WARN] CSV file not found: {csv_path}")
             all_stats.append({'neuron_id': nid, 'status': 'file_not_found'})
             continue
             
@@ -23,7 +23,7 @@ def assess_synapses_for_neurons(neuron_ids, input_dir='./h01_extracted_synapses'
         
         # 2. Check if file is empty
         if df.empty:
-            print(f"⚠️ The file is empty (0 synapses).")
+            print(f"[WARN] The file is empty (0 synapses).")
             all_stats.append({'neuron_id': nid, 'status': 'empty_file', 'total': 0})
             continue
         
@@ -38,15 +38,15 @@ def assess_synapses_for_neurons(neuron_ids, input_dir='./h01_extracted_synapses'
         
         # 4. Print the single-neuron report
         print(f"Total Synapses: {total}")
-        print("📍 By Direction:")
+        print(" By Direction:")
         print(f"  * Incoming: {incoming}")
         print(f"  * Outgoing: {outgoing}")
         
-        print("🧬 By Type (Global):")
+        print(" By Type (Global):")
         for s_type, count in type_counts.items():
             print(f"  * {s_type}: {count}")
             
-        print("🔍 Detailed Breakdown:")
+        print(" Detailed Breakdown:")
         for direction, types in breakdown.items():
             print(f"  [{direction.upper()}]")
             for s_type, count in types.items():

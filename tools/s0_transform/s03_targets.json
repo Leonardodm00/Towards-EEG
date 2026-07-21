@@ -1,0 +1,27 @@
+{
+  "stage": "S0.3",
+  "note": "Declared target scope for the ASCII sweep and LF normalisation. Globs are matched against git-tracked paths, so nothing untracked and nothing generated is ever swept.",
+  "include_globs": [
+    "*.py",
+    "*.sh"
+  ],
+  "exclude_globs": [
+    "*.zip",
+    "*.pdf",
+    "*.png",
+    "*.jpg",
+    "*.npy",
+    "*.pkl",
+    "*.dat",
+    "*.tif",
+    "*.hoc"
+  ],
+  "exclude_paths": [],
+  "scope_rationale": {
+    "python": "The 44 .py files carrying non-ASCII and the 4 carrying CRLF. Confirmed scope: all of them, package-bound or not, because the transfer-corruption threat applies to any file that crosses a cp1252 boundary, not only to files that are imported.",
+    "pending_decision_shell": "Six .sh files carry non-ASCII, including the PBS submission scripts (submit_passive_fit.sh 984, submit_synth_benchmark.sh 1497, submit_all_groups.sh 564). These are HPC entry points and are squarely in the transfer path -- arguably a higher risk than the Python. NOT included pending a decision; add '*.sh' to include_globs to sweep them.",
+    "pending_decision_markdown": "Eleven .md files carry non-ASCII, mostly box-drawing tables and em-dashes in documentation. They are never executed and never parsed by a locale-sensitive tool, and transliterating them would degrade readability. NOT included; add '*.md' to sweep them.",
+    "excluded_evidence": "The committed PBS job logs (passive_fit.o1099100 and siblings) carry non-ASCII but are EVIDENCE -- they are the logs whose inspection withdrew the encoding-failure claim (Doc 5 E-10). They must be preserved verbatim and are routed to S0.7, so they are never swept.",
+    "excluded_binaries": "Fourteen tracked binaries contain the byte pair 0x0D 0x0A by coincidence rather than as line endings. Treating them as text would corrupt them."
+  }
+}

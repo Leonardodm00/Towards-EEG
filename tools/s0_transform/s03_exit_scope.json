@@ -1,0 +1,36 @@
+{
+  "stage": "S0.3",
+  "exit_test": "tools/test_s0_3_exit.py",
+  "note": "The roadmap states the S0.3 exit as 'byte scan clean; no CRLF'. That is necessary but not sufficient: a transliteration that produced pure ASCII by breaking the syntax would pass it. This file declares what 'clean' means and, as with the S0.2 exemptions, requires every exclusion to justify itself rather than merely be listed.",
+  "must_be_ascii_and_lf": {
+    "globs": ["*.py", "*.sh"],
+    "rationale": "The swept scope. Python because it is imported and compiled; shell because the PBS submission scripts are HPC entry points that cross the cp1252 transfer boundary on every upload."
+  },
+  "nonascii_permitted": [
+    {
+      "glob": "*.md",
+      "reason": "documentation_not_executed",
+      "rationale": "Never executed, never parsed by a locale-sensitive tool. The non-ASCII is box-drawing in tables and typographic dashes; transliterating it degrades the documentation without removing any failure mode."
+    },
+    {
+      "glob": "passive_fit.o*",
+      "reason": "evidence_preserved_verbatim",
+      "rationale": "Committed PBS job logs. These are the logs whose inspection WITHDREW the encoding-failure claim (Doc 5 E-10). Altering them destroys the evidence base for a decision already taken. Routed to S0.7 for preservation in the payload repository."
+    },
+    {
+      "glob": "passive_fit.e*",
+      "reason": "evidence_preserved_verbatim",
+      "rationale": "As above, the stderr stream."
+    },
+    {
+      "glob": "*requirements.txt",
+      "reason": "pending_decision",
+      "rationale": "Carries 513 non-ASCII bytes in comments. Belongs to the passive sub-project (Doc 5 E-8) and is not the orchestrator's dependency list. Not swept; flagged rather than silently permitted."
+    }
+  ],
+  "compile_exempt_inherited_from_s02": [
+    "Passive Features/Allen Institute Data/save_alleninstitute_data (6).py",
+    "Passive Features/Plot/passive_result_plot (5).py",
+    "Passive Features/phase1fittingcolab (2).py"
+  ]
+}

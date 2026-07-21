@@ -78,22 +78,22 @@ original_show = go.Figure.show
 # 2. Override the show function with a dummy that does nothing
 go.Figure.show = lambda self, *args, **kwargs: None
 
-print("🔇 Plotting is globally disabled for this run.")
+print(" Plotting is globally disabled for this run.")
 
 
 # --- Add this to your imports at the top ---
 import gc
 
 for neuron_id in Neuron_id_array:
-    # 🧹 FORCE MEMORY CLEANUP BEFORE STARTING A NEW NEURON
+    #  FORCE MEMORY CLEANUP BEFORE STARTING A NEW NEURON
     gc.collect()
 
     print(f"\n{'='*50}")
-    print(f"🚀 STARTING PROCESSING FOR NEURON ID: {neuron_id}")
+    print(f" STARTING PROCESSING FOR NEURON ID: {neuron_id}")
     print(f"{'='*50}")
 
 
-    print(f"[{neuron_id}] ➔ Step 1: Loading and stitching segments...")
+    print(f"[{neuron_id}] -> Step 1: Loading and stitching segments...")
 
     if proofread:
       Stiched_neuron = stitch_neuron_fragments_smart(neuron_id, SKELETON_PATH)
@@ -102,17 +102,17 @@ for neuron_id in Neuron_id_array:
       Stiched_neuron = stitch_neuron_fragments_smart_nopr(neuron_id, SKELETON_URL)
 
     if Stiched_neuron is None or Stiched_neuron.empty:
-        print(f"[{neuron_id}] ❌ FAILED: Stitched neuron returned None or empty. Skipping.")
+        print(f"[{neuron_id}] [FAIL] FAILED: Stitched neuron returned None or empty. Skipping.")
         Checked_neurons.append(False)
         continue
 
-    print("\n📈 Segment Type Counts:")
+    print("\n Segment Type Counts:")
     print(Stiched_neuron['type'].value_counts())
 
-    # print(f"[{neuron_id}] ➔ Step 2: Closing nearby non-adjacent segments...")
+    # print(f"[{neuron_id}] -> Step 2: Closing nearby non-adjacent segments...")
     # close_pairs_df = highlight_close_non_adjacent_points(Stiched_neuron, threshold=100, min_graph_hops=150)
 
-    print(f"[{neuron_id}] ➔ Step 2: Refining annotations...")
+    print(f"[{neuron_id}] -> Step 2: Refining annotations...")
 
     if proofread:
       final_df = annotate_stitched_neuron(Stiched_neuron, neuron_id=neuron_id, annotation_url=LOCAL_URL)
@@ -121,11 +121,11 @@ for neuron_id in Neuron_id_array:
       final_df=  annotate_stitched_neuron_nopr(Stiched_neuron, neuron_id, annotation_url=ANNOTATION_URL)
 
     if final_df is None or final_df.empty or 'annotated_type' not in final_df.columns:
-        print(f"[{neuron_id}] ❌ FAILED: Annotation failed (empty or missing 'annotated_type'). Skipping.")
+        print(f"[{neuron_id}] [FAIL] FAILED: Annotation failed (empty or missing 'annotated_type'). Skipping.")
         Checked_neurons.append(False)
         continue
 
-    print(f"[{neuron_id}] ➔ Step 3: Rescaling dataframe to nanometers...")
+    print(f"[{neuron_id}] -> Step 3: Rescaling dataframe to nanometers...")
 
     if proofread:
       final_df_nm = scale_dataframe_to_nm(final_df, resolution=VOXEL_RES)
@@ -134,27 +134,27 @@ for neuron_id in Neuron_id_array:
       final_df_nm = final_df
 
     if final_df_nm is None or final_df_nm.empty:
-        print(f"[{neuron_id}] ❌ FAILED: Rescaling returned None or empty. Skipping.")
+        print(f"[{neuron_id}] [FAIL] FAILED: Rescaling returned None or empty. Skipping.")
         Checked_neurons.append(False)
         continue
 
-    print(f"[{neuron_id}] ➔ Step 4: Finding stable soma centroid...")
+    print(f"[{neuron_id}] -> Step 4: Finding stable soma centroid...")
     soma_center, soma_ids = find_stable_soma_centroid(final_df_nm, min_samples=50, step_eps=250, max_eps=40000, REQUIRED_STABILITY= 10)
 
     if soma_center is None or not soma_ids:
-        print(f"[{neuron_id}] ❌ FAILED: Soma clustering failed to find a valid centroid. Skipping.")
+        print(f"[{neuron_id}] [FAIL] FAILED: Soma clustering failed to find a valid centroid. Skipping.")
         Checked_neurons.append(False)
         continue
 
-    print(f"[{neuron_id}] ➔ Step 5: Finding exit points (primary roots)...")
+    print(f"[{neuron_id}] -> Step 5: Finding exit points (primary roots)...")
     unique_exits, final_df_nm_ = find_exits_by_sphere_intersection(final_df_nm, soma_center, radius=10000, tolerance=5000)
 
     if unique_exits is None or unique_exits.empty:
-        print(f"[{neuron_id}] ❌ FAILED: No exit points found from soma. Skipping.")
+        print(f"[{neuron_id}] [FAIL] FAILED: No exit points found from soma. Skipping.")
         Checked_neurons.append(False)
         continue
 
-    print(f"[{neuron_id}] ➔ Step 6: Collapsing soma to root...")
+    print(f"[{neuron_id}] -> Step 6: Collapsing soma to root...")
     collapsed_neuron = collapse_soma_to_root(
         df_=final_df_nm_,
         soma_ids=soma_ids,
@@ -163,21 +163,21 @@ for neuron_id in Neuron_id_array:
     )
 
     if collapsed_neuron is None or collapsed_neuron.empty:
-        print(f"[{neuron_id}] ❌ FAILED: Soma collapse returned None or empty. Skipping.")
+        print(f"[{neuron_id}] [FAIL] FAILED: Soma collapse returned None or empty. Skipping.")
         Checked_neurons.append(False)
         continue
 
-    print(f"[{neuron_id}] ➔ Step 7: Treating orphan segments...")
+    print(f"[{neuron_id}] -> Step 7: Treating orphan segments...")
     df_orphantreated_proximal = treat_orphan_roots(
         collapsed_neuron,
         soma_centroid=soma_center,
         distance_threshold=40000,
         length_threshold=10000,
-        plot_result=False  # 🛑 CHANGED TO FALSE TO SAVE RAM
+        plot_result=False  # [STOP] CHANGED TO FALSE TO SAVE RAM
     )
 
     if df_orphantreated_proximal is None or df_orphantreated_proximal.empty:
-        print(f"[{neuron_id}] ❌ FAILED: Orphan treatment proximally returned None or empty. Skipping.")
+        print(f"[{neuron_id}] [FAIL] FAILED: Orphan treatment proximally returned None or empty. Skipping.")
         Checked_neurons.append(False)
         continue
 
@@ -187,15 +187,15 @@ for neuron_id in Neuron_id_array:
         distance_threshold=25000,
         length_threshold=10000,
         connection_gap=200,
-        plot_result=False  # 🛑 CHANGED TO FALSE TO SAVE RAM
+        plot_result=False  # [STOP] CHANGED TO FALSE TO SAVE RAM
     )
 
     if df_orphantreated is None or df_orphantreated.empty:
-        print(f"[{neuron_id}] ❌ FAILED: Orphan treatment distally returned None or empty. Skipping.")
+        print(f"[{neuron_id}] [FAIL] FAILED: Orphan treatment distally returned None or empty. Skipping.")
         Checked_neurons.append(False)
         continue
 
-    print(f"[{neuron_id}] ➔ Step 8: Performing final stitch...")
+    print(f"[{neuron_id}] -> Step 8: Performing final stitch...")
     df_collapsed_stiched = highlight_and_stitch_points(
         df_orphantreated,
         soma_center,
@@ -205,27 +205,27 @@ for neuron_id in Neuron_id_array:
     )
 
     if df_collapsed_stiched is None or df_collapsed_stiched.empty:
-        print(f"[{neuron_id}] ❌ FAILED: Final stitch returned None or empty. Skipping.")
+        print(f"[{neuron_id}] [FAIL] FAILED: Final stitch returned None or empty. Skipping.")
         Checked_neurons.append(False)
         continue
 
-    print(f"[{neuron_id}] ➔ Step 9: Rerooting entire neuron using Navis...")
+    print(f"[{neuron_id}] -> Step 9: Rerooting entire neuron using Navis...")
     final_oriented_df = reroot_entire_neuron_navis(df_collapsed_stiched)
 
     if final_oriented_df is None or final_oriented_df.empty:
-        print(f"[{neuron_id}] ❌ FAILED: Rerooting returned None or empty. Skipping.")
+        print(f"[{neuron_id}] [FAIL] FAILED: Rerooting returned None or empty. Skipping.")
         Checked_neurons.append(False)
         continue
 
-    print(f"[{neuron_id}] ➔ Step 10: Cleaning and propagating branch labels...")
+    print(f"[{neuron_id}] -> Step 10: Cleaning and propagating branch labels...")
     Labled_propagated = clean_branch_labels(final_oriented_df)
 
     if Labled_propagated is None or Labled_propagated.empty:
-        print(f"[{neuron_id}] ❌ FAILED: Label propagation returned None or empty. Skipping.")
+        print(f"[{neuron_id}] [FAIL] FAILED: Label propagation returned None or empty. Skipping.")
         Checked_neurons.append(False)
         continue
 
-    print(f"[{neuron_id}] ➔ Step 11: Running final quality assurance check...")
+    print(f"[{neuron_id}] -> Step 11: Running final quality assurance check...")
     check = validate_reconstruction_quality(
         Labled_propagated,
         com_distance_threshold=10000000,
@@ -236,19 +236,19 @@ for neuron_id in Neuron_id_array:
     Checked_neurons.append(check)
 
     if not check:
-        print(f"[{neuron_id}] ⚠️ QA CHECK FAILED. Neuron will not be saved. Moving to next.")
+        print(f"[{neuron_id}] [WARN] QA CHECK FAILED. Neuron will not be saved. Moving to next.")
 
-        # 🧹 Clear variables explicitly if it failed to free RAM immediately
+        #  Clear variables explicitly if it failed to free RAM immediately
         Stiched_neuron = final_df = final_df_nm = collapsed_neuron = df_orphantreated = df_collapsed_stiched = final_oriented_df = Labled_propagated = None
         continue
 
     # Saving
     filename = f"{OUTPUT_BASE}/neuron_{neuron_id}.csv"
-    print(f"[{neuron_id}] ➔ Step 12: Saving successfully reconstructed neuron to {filename}...")
+    print(f"[{neuron_id}] -> Step 12: Saving successfully reconstructed neuron to {filename}...")
     Labled_propagated.to_csv(filename, index=False)
-    print(f"✅ SUCCESSFULLY COMPLETED NEURON ID: {neuron_id}")
+    print(f"[OK] SUCCESSFULLY COMPLETED NEURON ID: {neuron_id}")
 
-    # 🧹 Clear massive variables explicitly at the end of a successful run
+    #  Clear massive variables explicitly at the end of a successful run
     Stiched_neuron = final_df = final_df_nm = collapsed_neuron = df_orphantreated = df_collapsed_stiched = final_oriented_df = Labled_propagated = None
 
 print(len(np.where(Checked_neurons))/len(Checked_neurons))

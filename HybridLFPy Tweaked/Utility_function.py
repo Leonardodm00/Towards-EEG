@@ -44,7 +44,7 @@ def calculate_synaptic_overlap_locations(
     post_dend_path = os.path.join(density_maps_dir, f"{post_mtype}_dend.npy")
 
     if not (os.path.exists(pre_axon_path) and os.path.exists(post_dend_path)):
-        print("⚠️ Density maps not found for the specified mtypes.")
+        print("[WARN] Density maps not found for the specified mtypes.")
         return None, None
 
     # 2. Load the 3D probability arrays
@@ -75,7 +75,7 @@ def calculate_synaptic_overlap_locations(
 
         # If the shift is larger than the grid itself, there is zero overlap
         if start_post >= N or start_pre >= N or end_post <= 0 or end_pre <= 0:
-            print("ℹ️ Neurons are too far apart; bounding boxes do not overlap.")
+            print("[info] Neurons are too far apart; bounding boxes do not overlap.")
             return np.array([]), np.array([])
 
         slices_post.append(slice(start_post, end_post))
@@ -130,15 +130,15 @@ def distribute_synapses_probabilistically(overlap_centroids, normalized_probabil
 
     Returns an array of 3D coordinates representing the 'target' voxels for each synapse.
     """
-    print(f"🎲 Distributing {num_synapses} synapses probabilistically...")
+    print(f" Distributing {num_synapses} synapses probabilistically...")
 
     # 1. Edge case handling
     if overlap_centroids is None or len(overlap_centroids) == 0:
-        print("⚠️ No overlapping voxels available to place synapses.")
+        print("[WARN] No overlapping voxels available to place synapses.")
         return np.array([])
 
     if num_synapses <= 0:
-        print("⚠️ Number of synapses to place must be greater than zero.")
+        print("[WARN] Number of synapses to place must be greater than zero.")
         return np.array([])
 
     # 2. Setup indices for sampling
@@ -161,7 +161,7 @@ def distribute_synapses_probabilistically(overlap_centroids, normalized_probabil
 
     # Optional: Log the distribution spread for debugging
     unique_indices, counts = np.unique(chosen_indices, return_counts=True)
-    print(f"✅ Placed {num_synapses} synapses across {len(unique_indices)} unique voxels.")
+    print(f"[OK] Placed {num_synapses} synapses across {len(unique_indices)} unique voxels.")
 
     # Optional: print the highest multi-synapse count in a single voxel
     if len(counts) > 0:
@@ -178,12 +178,12 @@ def snap_to_closest_actual_synapses(post_neuron_id, synapses_dir, chosen_centroi
     Takes probabilistically chosen spatial centroids (in global space), translates them
     to local space, and maps each one to the nearest actual synapse on the post-synaptic tree.
     """
-    print(f"🎯 Snapping {len(chosen_centroids)} target centroids to closest '{synapse_type}' synapses on Neuron {post_neuron_id}...")
+    print(f" Snapping {len(chosen_centroids)} target centroids to closest '{synapse_type}' synapses on Neuron {post_neuron_id}...")
 
     # 1. Load the pre-mapped synapse database for the post-synaptic neuron
     syn_filepath = os.path.join(synapses_dir, f"neuron_{post_neuron_id}_mapped_synapses.csv")
     if not os.path.exists(syn_filepath):
-        print(f"⚠️ Synapse mapping file not found: {syn_filepath}")
+        print(f"[WARN] Synapse mapping file not found: {syn_filepath}")
         return None
 
     mapped_df = pd.read_csv(syn_filepath)
@@ -192,7 +192,7 @@ def snap_to_closest_actual_synapses(post_neuron_id, synapses_dir, chosen_centroi
     valid_synapses = mapped_df[mapped_df['synapse_type'] == synapse_type].copy()
 
     if valid_synapses.empty:
-        print(f"⚠️ No '{synapse_type}' synapses found on post-synaptic neuron {post_neuron_id}.")
+        print(f"[WARN] No '{synapse_type}' synapses found on post-synaptic neuron {post_neuron_id}.")
         return None
 
     valid_synapses.reset_index(drop=True, inplace=True)
@@ -224,8 +224,8 @@ def snap_to_closest_actual_synapses(post_neuron_id, synapses_dir, chosen_centroi
     matched_synapses_df['local_target_z'] = local_chosen_centroids[:, 2]
     matched_synapses_df['snapping_error_um'] = distances
 
-    print(f"✅ Successfully mapped {len(matched_synapses_df)} synapses.")
-    print(f"   -> Average snapping error: {np.mean(distances):.2f} μm")
+    print(f"[OK] Successfully mapped {len(matched_synapses_df)} synapses.")
+    print(f"   -> Average snapping error: {np.mean(distances):.2f} um")
 
     return matched_synapses_df
 
@@ -250,7 +250,7 @@ def add_virtual_synapses_to_morphology(
     # 1. Load the physical synapse database for this specific chosen morphology
     syn_filepath = os.path.join(synapses_dir, f"neuron_{post_neuron_id}_mapped_synapses.csv")
     if not os.path.exists(syn_filepath):
-        print(f"⚠️ Error: Synapse mapping file not found for virtual assignment: {syn_filepath}")
+        print(f"[WARN] Error: Synapse mapping file not found for virtual assignment: {syn_filepath}")
         return final_mapped_synapses_dict
 
     mapped_df = pd.read_csv(syn_filepath)
@@ -259,8 +259,8 @@ def add_virtual_synapses_to_morphology(
     exc_indices = mapped_df[mapped_df['synapse_type'] == 'exc']['lfpy_idx'].astype(int).tolist()
     inh_indices = mapped_df[mapped_df['synapse_type'] == 'inh']['lfpy_idx'].astype(int).tolist()
 
-    if not exc_indices: print(f"⚠️ Warning: No excitatory synapses available on Morphology {post_neuron_id}.")
-    if not inh_indices: print(f"⚠️ Warning: No inhibitory synapses available on Morphology {post_neuron_id}.")
+    if not exc_indices: print(f"[WARN] Warning: No excitatory synapses available on Morphology {post_neuron_id}.")
+    if not inh_indices: print(f"[WARN] Warning: No inhibitory synapses available on Morphology {post_neuron_id}.")
 
     # 3. Iterate over the pre_partners_matrix to find ONLY the virtual cells
     added_tc, added_bg_exc, added_bg_inh = 0, 0, 0
@@ -297,7 +297,7 @@ def add_virtual_synapses_to_morphology(
         elif specific_mtype == 'BG_exc': added_bg_exc += n_syn
         elif specific_mtype == 'BG_inh': added_bg_inh += n_syn
 
-    print(f"✅ Virtual synapses successfully attached: {added_tc} TC, {added_bg_exc} BG_exc, {added_bg_inh} BG_inh.")
+    print(f"[OK] Virtual synapses successfully attached: {added_tc} TC, {added_bg_exc} BG_exc, {added_bg_inh} BG_inh.")
     return final_mapped_synapses_dict
 
 
@@ -393,13 +393,13 @@ def evaluate_select_place(
                     all_synapse_locations[pre_idx] = locations
 
     if not all_synapse_locations:
-        print(f"⚠️ Warning: No valid synaptic overlaps found for Neuron {post_cell_index}.")
+        print(f"[WARN] Warning: No valid synaptic overlaps found for Neuron {post_cell_index}.")
         return None, {} # CHANGED: Return an empty dictionary here
 
     # CHANGED: Stack the dictionary values into a flat array just for the layer counting below
     stacked_locations = np.vstack(list(all_synapse_locations.values()))
 
-    print(f"✅ Successfully placed {len(stacked_locations)}/{total_synapses_requested} synapses in abstract space.")
+    print(f"[OK] Successfully placed {len(stacked_locations)}/{total_synapses_requested} synapses in abstract space.")
 
     # 3. Layer Formatting for cell_MorphSelect
     layer_names = list(layer_bounds.keys())
@@ -417,7 +417,7 @@ def evaluate_select_place(
     print("   -> Synapse Distribution Profile:")
     for name, count in zip(layer_names, synapses_per_layer_list):
         if count > 0:
-            print(f"      • {name}: {count} synapses")
+            print(f"      * {name}: {count} synapses")
 
     # 4. Select the best morphology
     target_z_pos = post_soma_pos_arr[2]
@@ -443,10 +443,10 @@ def evaluate_select_place(
         )
 
         if best_nid is None:
-            print("❌ No remaining morphologies satisfy capacity requirements.")
+            print("[FAIL] No remaining morphologies satisfy capacity requirements.")
             break # Exit the while loop
 
-        print(f"🎯 Evaluating Selected Morphology ID: {best_nid} for synaptic spread...")
+        print(f" Evaluating Selected Morphology ID: {best_nid} for synaptic spread...")
 
         # 1. Snap the abstract 3D coordinates to the chosen morphology
         final_mapped_synapses_dict = map_abstract_synapses_to_segments(
@@ -462,20 +462,20 @@ def evaluate_select_place(
         clustering_detected = False # Reset for this specific morphology
         for pre_idx, lfpy_indices in final_mapped_synapses_dict.items():
             if len(lfpy_indices) > 1 and len(set(lfpy_indices)) == 1:
-                print(f"❌ Partner {pre_idx} has {len(lfpy_indices)} synapses clumped entirely on segment {lfpy_indices[0]}.")
+                print(f"[FAIL] Partner {pre_idx} has {len(lfpy_indices)} synapses clumped entirely on segment {lfpy_indices[0]}.")
                 clustering_detected = True
                 break # FIXED logic: Immediately fail this morphology
 
         if clustering_detected:
             # Remove the failed morphology from the available paths before trying again
-            print(f"⏭️ Morphology {best_nid} REJECTED due to clumping. Trying next candidate...")
+            print(f" Morphology {best_nid} REJECTED due to clumping. Trying next candidate...")
             available_morph_paths = [p for p in available_morph_paths if f"neuron_{best_nid}" not in p]
         else:
-             print(f"✅ Morphology {best_nid} ACCEPTED (Capacity & Spread validated).")
+             print(f"[OK] Morphology {best_nid} ACCEPTED (Capacity & Spread validated).")
 
     # Final Failsafe
     if clustering_detected or best_nid is None:
-         print("❌ Critical Failure: Could not find a morphology satisfying both capacity and spread.")
+         print("[FAIL] Critical Failure: Could not find a morphology satisfying both capacity and spread.")
          return None, {}, {}
 
 
@@ -520,7 +520,7 @@ def map_abstract_synapses_to_segments(
     final_mapped_synapses_dict = {}
 
     if not abstract_synapses_dict:
-        print("⚠️ No abstract synapses provided to map.")
+        print("[WARN] No abstract synapses provided to map.")
         return final_mapped_synapses_dict
 
     print(f"\n--- Snapping Abstract Synapses to Morphology {post_neuron_id} ---")
@@ -537,7 +537,7 @@ def map_abstract_synapses_to_segments(
             print(f'Current syn type:{current_synapse_type}')
             
         except (IndexError, KeyError) as e:
-            print(f"⚠️ Could not determine synapse type for pre_idx {pre_idx}. Defaulting to 'exc'. Error: {e}")
+            print(f"[WARN] Could not determine synapse type for pre_idx {pre_idx}. Defaulting to 'exc'. Error: {e}")
             current_synapse_type = 'exc'
         # ---------------------------------------
 
@@ -557,12 +557,12 @@ def map_abstract_synapses_to_segments(
             final_mapped_synapses_dict[pre_idx] = lfpy_indices
         else:
             # If for some reason snapping failed for this specific connection, return an empty list
-            print(f"   -> ⚠️ Snapping failed or returned empty for pre_idx {pre_idx}")
+            print(f"   -> [WARN] Snapping failed or returned empty for pre_idx {pre_idx}")
             final_mapped_synapses_dict[pre_idx] = []
 
     # Calculate totals for terminal debugging
     total_mapped = sum(len(indices) for indices in final_mapped_synapses_dict.values())
-    print(f"✅ Successfully mapped {total_mapped} synapses across {len(final_mapped_synapses_dict)} pre-synaptic connections to LFPy indices.")
+    print(f"[OK] Successfully mapped {total_mapped} synapses across {len(final_mapped_synapses_dict)} pre-synaptic connections to LFPy indices.")
 
     return final_mapped_synapses_dict
 
@@ -586,7 +586,7 @@ def cell_MorphSelect(
 
         csv_path = os.path.join(synapse_base_path, f"neuron_{nid}_mapped_synapses.csv")
         if not os.path.exists(csv_path):
-            print(f"⚠️ Warning: Synapse CSV not found for {nid} at {csv_path}")
+            print(f"[WARN] Warning: Synapse CSV not found for {nid} at {csv_path}")
             continue
 
         # ==========================================
@@ -614,7 +614,7 @@ def cell_MorphSelect(
         shifted_z = syn_df['z'] + target_z_pos
         is_viable = True
 
-        print(f"🔍 Evaluating Morphology ID: {nid} (Target Z: {target_z_pos:.1f})")
+        print(f" Evaluating Morphology ID: {nid} (Target Z: {target_z_pos:.1f})")
 
         # Evaluate and print every required layer
         for layer_idx in valid_layers:
@@ -636,19 +636,19 @@ def cell_MorphSelect(
 
             # Check if the TOTAL available meets the requirement
             if available_synapses >= required_synapses:
-                status = "✅ Pass"
+                status = "[OK] Pass"
             else:
-                status = "❌ Fail"
+                status = "[FAIL] Fail"
                 is_viable = False
 
             # Print the total stats alongside the breakdown
             print(f"   -> {layer_name}: Available = {available_synapses} {breakdown_str} | Required (Total) = {required_synapses} {status}")
 
         if is_viable:
-            print(f"   🎯 Morphology {nid} ACCEPTED!\n")
+            print(f"    Morphology {nid} ACCEPTED!\n")
             return original_idx, nid
         else:
-            print(f"   ⏭️ Morphology {nid} REJECTED. Moving to next candidate...\n")
+            print(f"    Morphology {nid} REJECTED. Moving to next candidate...\n")
 
     raise RuntimeError(
         f"No morphology found with enough synapse capacity to satisfy "
@@ -737,7 +737,7 @@ def get_gIhbar_L5_apical(distance_from_soma, gH_soma=1.74e-5):
 def get_gCa_HVA_apical(distance_from_soma, gCa_HVA_base=4.59e-6, hotspot_multiplier=100.0):
     """
     Calculates the Ca_HVA conductance density, applying a 'hot spot' multiplier
-    if the dendritic segment falls within the 360 to 600 µm range from the soma.
+    if the dendritic segment falls within the 360 to 600 um range from the soma.
 
     Default gCa_HVA_base (4.59e-6 S/cm2) is taken from the Younger Pyr model somatic baseline.
     """

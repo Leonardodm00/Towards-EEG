@@ -155,7 +155,7 @@ def generate_group(
                 tau_m_true_ms=float(row["tau_m_true_ms"]),
                 ok=True, reason="",
             ))
-        except Exception as exc:  # noqa: BLE001 — record, keep going
+        except Exception as exc:  # noqa: BLE001 -- record, keep going
             if verbose:
                 print(f"[gen] specimen {sid} FAILED: {type(exc).__name__}: {exc}")
             meta.append(dict(specimen_id=sid, rin_MOhm_true=np.nan,

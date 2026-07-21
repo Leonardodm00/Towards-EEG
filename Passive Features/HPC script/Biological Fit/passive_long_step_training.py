@@ -110,7 +110,7 @@ def _simulate_long(cell, b, v_rest_mV: float,
 def exp_time_weight(t0_s: float,
                     tau_w_s: float) -> Callable[[np.ndarray], np.ndarray]:
     """w(t) = exp(-(t - t0)/tau_w) for t >= t0, clamped to 1 for t < t0.
-    Implied noise sigma^2(t) ∝ exp(+(t - t0)/tau_w): variance e-folds in tau_w,
+    Implied noise sigma^2(t)  prop_to  exp(+(t - t0)/tau_w): variance e-folds in tau_w,
     std in 2*tau_w. DEFAULT shape (see module note for why over the Gaussian)."""
     if not (tau_w_s > 0):
         raise ValueError(f"tau_w_s must be > 0, got {tau_w_s}")
@@ -124,7 +124,7 @@ def exp_time_weight(t0_s: float,
 def gauss_time_weight(t0_s: float,
                       sigma_w_s: float) -> Callable[[np.ndarray], np.ndarray]:
     """w(t) = exp(-(t - t0)^2 / (2 sigma_w^2)) for t >= t0, clamped to 1 below.
-    Implied noise sigma^2(t) ∝ exp(+(t - t0)^2 / (2 sigma_w^2)) grows SUPER-
+    Implied noise sigma^2(t)  prop_to  exp(+(t - t0)^2 / (2 sigma_w^2)) grows SUPER-
     exponentially -> sharper tail cutoff, flat top near t0. Provided as a
     swap-in for the tau_w/shape sweep; exponential is the default."""
     if not (sigma_w_s > 0):

@@ -450,8 +450,13 @@ def verify(root, log):
         with open(full, "rb") as fh:
             data = fh.read()
         if sha256(data) != entry["sha256_after"]:
-            problems.append("%s: on-disk hash does not match sha256_after"
-                            % entry["path"])
+            problems.append(
+                "%s: on-disk hash does not match sha256_after. This is EXPECTED "
+                "once a later sub-step has touched the file -- S0.3 sweeps every "
+                "S0.2 target. Single-step verification is only meaningful "
+                "immediately after its own sub-step; use tools/test_s0_chain.py "
+                "for the invariant that holds across all of S0."
+                % entry["path"])
             continue
         if entry["n_lines_before"] != entry["n_lines_after"]:
             problems.append("%s: line count changed (%d -> %d)"

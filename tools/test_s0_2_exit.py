@@ -155,10 +155,29 @@ def run(root, log_path, scope_path):
         return True, "%d declared discard(s) absent from the tree" % len(log["discards"])
 
     def check_04_transform_log_verifies():
+        """Byte equality with the S0.2 log, unless a later sub-step moved on.
+
+        S0.3 sweeps every S0.2 target, so after it this comparison is stale by
+        construction. The exit test for S0.2 must not go red because S0.3
+        happened -- what it must still guarantee is that the S0.2 work is
+        intact. Byte-level continuity across sub-steps is asserted separately,
+        by tools/test_s0_chain.py.
+        """
         problems = D.verify(root, log)
-        if problems:
+        if not problems:
+            return True, "tree matches the transform log; edits invert to the ancestors"
+        later = os.path.join(os.path.dirname(scope_path), "s03_transform_log.json")
+        if not os.path.isfile(later):
             return False, "%r" % problems[:3]
-        return True, "tree matches the transform log; edits invert to the ancestors"
+        for e in log["files"]:
+            src = _read(os.path.join(root, e["path"]))
+            if any(ed["transform"].startswith("T7") for ed in e["edits"]) \
+                    and b"#S0.2:T7" not in src:
+                return False, "S0.2 marker lost in %s" % e["path"]
+            if len(D.split_lines(src)) != e["n_lines_after"]:
+                return False, "line count changed in %s" % e["path"]
+        return True, ("S0.3 has since rewritten these files; S0.2 markers and line "
+                      "counts intact (byte continuity: tools/test_s0_chain.py)")
 
     def check_05_line_numbering_preserved():
         bad = [e["path"] for e in log["files"]

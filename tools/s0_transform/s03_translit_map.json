@@ -1,0 +1,712 @@
+{
+  "note": "S0.3 transliteration map. Applied as an ORDERED sequence: multi-character rules first (so U+207B U+00B9 becomes ^-1 rather than ^-^1), then single characters, then the decorative-drop list. ASCII-first per Doc 5 E-12: no PEP-263 cookie is added anywhere, because a cookie cannot rescue a file already mangled by a cp1252 boundary, whereas pure ASCII cannot be mangled at all. Any non-ASCII character NOT covered here is a hard error, not a silent pass -- the map is required to be exhaustive over the target set.",
+  "ordered_rules": [
+    {
+      "from": "\u207b\u00b9",
+      "to": "^-1",
+      "codepoints": "U+207B U+00B9"
+    },
+    {
+      "from": "\u207b\u00b2",
+      "to": "^-2",
+      "codepoints": "U+207B U+00B2"
+    },
+    {
+      "from": "\u207b\u00b3",
+      "to": "^-3",
+      "codepoints": "U+207B U+00B3"
+    }
+  ],
+  "single_rules": [
+    {
+      "from": "\u2550",
+      "to": "=",
+      "codepoint": "U+2550",
+      "name": "BOX DRAWINGS DOUBLE HORIZONTAL",
+      "occurrences_in_py": 43505
+    },
+    {
+      "from": "\u2500",
+      "to": "-",
+      "codepoint": "U+2500",
+      "name": "BOX DRAWINGS LIGHT HORIZONTAL",
+      "occurrences_in_py": 14407
+    },
+    {
+      "from": "\u2014",
+      "to": "--",
+      "codepoint": "U+2014",
+      "name": "EM DASH",
+      "occurrences_in_py": 1394
+    },
+    {
+      "from": "\u2192",
+      "to": "->",
+      "codepoint": "U+2192",
+      "name": "RIGHTWARDS ARROW",
+      "occurrences_in_py": 207
+    },
+    {
+      "from": "\ufe0f",
+      "to": "",
+      "codepoint": "U+FE0F",
+      "name": "VARIATION SELECTOR-16",
+      "occurrences_in_py": 204
+    },
+    {
+      "from": "\u26a0",
+      "to": "[WARN]",
+      "codepoint": "U+26A0",
+      "name": "WARNING SIGN",
+      "occurrences_in_py": 188
+    },
+    {
+      "from": "\u00b5",
+      "to": "u",
+      "codepoint": "U+00B5",
+      "name": "MICRO SIGN",
+      "occurrences_in_py": 170
+    },
+    {
+      "from": "\u274c",
+      "to": "[FAIL]",
+      "codepoint": "U+274C",
+      "name": "CROSS MARK",
+      "occurrences_in_py": 122
+    },
+    {
+      "from": "\u03c3",
+      "to": "sigma",
+      "codepoint": "U+03C3",
+      "name": "GREEK SMALL LETTER SIGMA",
+      "occurrences_in_py": 117
+    },
+    {
+      "from": "\u00b7",
+      "to": ".",
+      "codepoint": "U+00B7",
+      "name": "MIDDLE DOT",
+      "occurrences_in_py": 113
+    },
+    {
+      "from": "\u00d7",
+      "to": "x",
+      "codepoint": "U+00D7",
+      "name": "MULTIPLICATION SIGN",
+      "occurrences_in_py": 105
+    },
+    {
+      "from": "\u03c4",
+      "to": "tau",
+      "codepoint": "U+03C4",
+      "name": "GREEK SMALL LETTER TAU",
+      "occurrences_in_py": 105
+    },
+    {
+      "from": "\u03a9",
+      "to": "Ohm",
+      "codepoint": "U+03A9",
+      "name": "GREEK CAPITAL LETTER OMEGA",
+      "occurrences_in_py": 105
+    },
+    {
+      "from": "\u00b2",
+      "to": "^2",
+      "codepoint": "U+00B2",
+      "name": "SUPERSCRIPT TWO",
+      "occurrences_in_py": 102
+    },
+    {
+      "from": "\u03c1",
+      "to": "rho",
+      "codepoint": "U+03C1",
+      "name": "GREEK SMALL LETTER RHO",
+      "occurrences_in_py": 102
+    },
+    {
+      "from": "\u2705",
+      "to": "[OK]",
+      "codepoint": "U+2705",
+      "name": "WHITE HEAVY CHECK MARK",
+      "occurrences_in_py": 101
+    },
+    {
+      "from": "\u00b1",
+      "to": "+/-",
+      "codepoint": "U+00B1",
+      "name": "PLUS-MINUS SIGN",
+      "occurrences_in_py": 98
+    },
+    {
+      "from": "\u2022",
+      "to": "*",
+      "codepoint": "U+2022",
+      "name": "BULLET",
+      "occurrences_in_py": 87
+    },
+    {
+      "from": "\u03b1",
+      "to": "alpha",
+      "codepoint": "U+03B1",
+      "name": "GREEK SMALL LETTER ALPHA",
+      "occurrences_in_py": 72
+    },
+    {
+      "from": "\u2212",
+      "to": "-",
+      "codepoint": "U+2212",
+      "name": "MINUS SIGN",
+      "occurrences_in_py": 62
+    },
+    {
+      "from": "\u03bc",
+      "to": "u",
+      "codepoint": "U+03BC",
+      "name": "GREEK SMALL LETTER MU",
+      "occurrences_in_py": 62
+    },
+    {
+      "from": "\u0394",
+      "to": "Delta",
+      "codepoint": "U+0394",
+      "name": "GREEK CAPITAL LETTER DELTA",
+      "occurrences_in_py": 52
+    },
+    {
+      "from": "\u2080",
+      "to": "_0",
+      "codepoint": "U+2080",
+      "name": "SUBSCRIPT ZERO",
+      "occurrences_in_py": 48
+    },
+    {
+      "from": "\u2013",
+      "to": "-",
+      "codepoint": "U+2013",
+      "name": "EN DASH",
+      "occurrences_in_py": 43
+    },
+    {
+      "from": "\u2502",
+      "to": "|",
+      "codepoint": "U+2502",
+      "name": "BOX DRAWINGS LIGHT VERTICAL",
+      "occurrences_in_py": 36
+    },
+    {
+      "from": "\u2026",
+      "to": "...",
+      "codepoint": "U+2026",
+      "name": "HORIZONTAL ELLIPSIS",
+      "occurrences_in_py": 33
+    },
+    {
+      "from": "\u03c7",
+      "to": "chi",
+      "codepoint": "U+03C7",
+      "name": "GREEK SMALL LETTER CHI",
+      "occurrences_in_py": 30
+    },
+    {
+      "from": "\u03a6",
+      "to": "Phi",
+      "codepoint": "U+03A6",
+      "name": "GREEK CAPITAL LETTER PHI",
+      "occurrences_in_py": 30
+    },
+    {
+      "from": "\u2264",
+      "to": "<=",
+      "codepoint": "U+2264",
+      "name": "LESS-THAN OR EQUAL TO",
+      "occurrences_in_py": 26
+    },
+    {
+      "from": "\u2248",
+      "to": "~=",
+      "codepoint": "U+2248",
+      "name": "ALMOST EQUAL TO",
+      "occurrences_in_py": 20
+    },
+    {
+      "from": "\u03bb",
+      "to": "lambda",
+      "codepoint": "U+03BB",
+      "name": "GREEK SMALL LETTER LAMDA",
+      "occurrences_in_py": 19
+    },
+    {
+      "from": "\u2082",
+      "to": "_2",
+      "codepoint": "U+2082",
+      "name": "SUBSCRIPT TWO",
+      "occurrences_in_py": 18
+    },
+    {
+      "from": "\u00a7",
+      "to": "Sec.",
+      "codepoint": "U+00A7",
+      "name": "SECTION SIGN",
+      "occurrences_in_py": 18
+    },
+    {
+      "from": "\u251c",
+      "to": "+",
+      "codepoint": "U+251C",
+      "name": "BOX DRAWINGS LIGHT VERTICAL AND RIGHT",
+      "occurrences_in_py": 17
+    },
+    {
+      "from": "\u2713",
+      "to": "[ok]",
+      "codepoint": "U+2713",
+      "name": "CHECK MARK",
+      "occurrences_in_py": 17
+    },
+    {
+      "from": "\u2717",
+      "to": "[x]",
+      "codepoint": "U+2717",
+      "name": "BALLOT X",
+      "occurrences_in_py": 15
+    },
+    {
+      "from": "\u2514",
+      "to": "+",
+      "codepoint": "U+2514",
+      "name": "BOX DRAWINGS LIGHT UP AND RIGHT",
+      "occurrences_in_py": 14
+    },
+    {
+      "from": "\u207b",
+      "to": "^-",
+      "codepoint": "U+207B",
+      "name": "SUPERSCRIPT MINUS",
+      "occurrences_in_py": 14
+    },
+    {
+      "from": "\u2794",
+      "to": "->",
+      "codepoint": "U+2794",
+      "name": "HEAVY WIDE-HEADED RIGHTWARDS ARROW",
+      "occurrences_in_py": 13
+    },
+    {
+      "from": "\u00b9",
+      "to": "^1",
+      "codepoint": "U+00B9",
+      "name": "SUPERSCRIPT ONE",
+      "occurrences_in_py": 12
+    },
+    {
+      "from": "\u03b8",
+      "to": "theta",
+      "codepoint": "U+03B8",
+      "name": "GREEK SMALL LETTER THETA",
+      "occurrences_in_py": 12
+    },
+    {
+      "from": "\ud83d\uded1",
+      "to": "[STOP]",
+      "codepoint": "U+1F6D1",
+      "name": "OCTAGONAL SIGN",
+      "occurrences_in_py": 11
+    },
+    {
+      "from": "\u2194",
+      "to": "<->",
+      "codepoint": "U+2194",
+      "name": "LEFT RIGHT ARROW",
+      "occurrences_in_py": 9
+    },
+    {
+      "from": "\u00a0",
+      "to": " ",
+      "codepoint": "U+00A0",
+      "name": "NO-BREAK SPACE",
+      "occurrences_in_py": 8
+    },
+    {
+      "from": "\u2190",
+      "to": "<-",
+      "codepoint": "U+2190",
+      "name": "LEFTWARDS ARROW",
+      "occurrences_in_py": 8
+    },
+    {
+      "from": "\u250c",
+      "to": "+",
+      "codepoint": "U+250C",
+      "name": "BOX DRAWINGS LIGHT DOWN AND RIGHT",
+      "occurrences_in_py": 6
+    },
+    {
+      "from": "\u2510",
+      "to": "+",
+      "codepoint": "U+2510",
+      "name": "BOX DRAWINGS LIGHT DOWN AND LEFT",
+      "occurrences_in_py": 6
+    },
+    {
+      "from": "\u2518",
+      "to": "+",
+      "codepoint": "U+2518",
+      "name": "BOX DRAWINGS LIGHT UP AND LEFT",
+      "occurrences_in_py": 6
+    },
+    {
+      "from": "\u252c",
+      "to": "+",
+      "codepoint": "U+252C",
+      "name": "BOX DRAWINGS LIGHT DOWN AND HORIZONTAL",
+      "occurrences_in_py": 6
+    },
+    {
+      "from": "\u2534",
+      "to": "+",
+      "codepoint": "U+2534",
+      "name": "BOX DRAWINGS LIGHT UP AND HORIZONTAL",
+      "occurrences_in_py": 6
+    },
+    {
+      "from": "\u253c",
+      "to": "+",
+      "codepoint": "U+253C",
+      "name": "BOX DRAWINGS LIGHT VERTICAL AND HORIZONTAL",
+      "occurrences_in_py": 6
+    },
+    {
+      "from": "\u2524",
+      "to": "+",
+      "codepoint": "U+2524",
+      "name": "BOX DRAWINGS LIGHT VERTICAL AND LEFT",
+      "occurrences_in_py": 6
+    },
+    {
+      "from": "\u21d2",
+      "to": "=>",
+      "codepoint": "U+21D2",
+      "name": "RIGHTWARDS DOUBLE ARROW",
+      "occurrences_in_py": 6
+    },
+    {
+      "from": "\u2208",
+      "to": " in ",
+      "codepoint": "U+2208",
+      "name": "ELEMENT OF",
+      "occurrences_in_py": 6
+    },
+    {
+      "from": "\u2081",
+      "to": "_1",
+      "codepoint": "U+2081",
+      "name": "SUBSCRIPT ONE",
+      "occurrences_in_py": 6
+    },
+    {
+      "from": "\u0302",
+      "to": "^",
+      "codepoint": "U+0302",
+      "name": "COMBINING CIRCUMFLEX ACCENT",
+      "occurrences_in_py": 6
+    },
+    {
+      "from": "\u221d",
+      "to": " prop_to ",
+      "codepoint": "U+221D",
+      "name": "PROPORTIONAL TO",
+      "occurrences_in_py": 4
+    },
+    {
+      "from": "\u25b6",
+      "to": ">",
+      "codepoint": "U+25B6",
+      "name": "BLACK RIGHT-POINTING TRIANGLE",
+      "occurrences_in_py": 3
+    },
+    {
+      "from": "\u2265",
+      "to": ">=",
+      "codepoint": "U+2265",
+      "name": "GREATER-THAN OR EQUAL TO",
+      "occurrences_in_py": 3
+    },
+    {
+      "from": "\u2714",
+      "to": "[ok]",
+      "codepoint": "U+2714",
+      "name": "HEAVY CHECK MARK",
+      "occurrences_in_py": 3
+    },
+    {
+      "from": "\u2139",
+      "to": "[info]",
+      "codepoint": "U+2139",
+      "name": "INFORMATION SOURCE",
+      "occurrences_in_py": 3
+    },
+    {
+      "from": "\u2032",
+      "to": "'",
+      "codepoint": "U+2032",
+      "name": "PRIME",
+      "occurrences_in_py": 2
+    },
+    {
+      "from": "\ud83d\udca1",
+      "to": "[note]",
+      "codepoint": "U+1F4A1",
+      "name": "ELECTRIC LIGHT BULB",
+      "occurrences_in_py": 2
+    },
+    {
+      "from": "\u00b3",
+      "to": "^3",
+      "codepoint": "U+00B3",
+      "name": "SUPERSCRIPT THREE",
+      "occurrences_in_py": 0
+    }
+  ],
+  "drop_decorative": [
+    {
+      "from": "\ud83d\udcca",
+      "codepoint": "U+1F4CA",
+      "name": "BAR CHART",
+      "occurrences_in_py": 37
+    },
+    {
+      "from": "\ud83d\udd0d",
+      "codepoint": "U+1F50D",
+      "name": "LEFT-POINTING MAGNIFYING GLASS",
+      "occurrences_in_py": 22
+    },
+    {
+      "from": "\ud83d\udd39",
+      "codepoint": "U+1F539",
+      "name": "SMALL BLUE DIAMOND",
+      "occurrences_in_py": 19
+    },
+    {
+      "from": "\ud83c\udfa8",
+      "codepoint": "U+1F3A8",
+      "name": "ARTIST PALETTE",
+      "occurrences_in_py": 14
+    },
+    {
+      "from": "\ud83d\udccd",
+      "codepoint": "U+1F4CD",
+      "name": "ROUND PUSHPIN",
+      "occurrences_in_py": 14
+    },
+    {
+      "from": "\ud83d\udd04",
+      "codepoint": "U+1F504",
+      "name": "ANTICLOCKWISE DOWNWARDS AND UPWARDS OPEN CIRCLE ARROWS",
+      "occurrences_in_py": 13
+    },
+    {
+      "from": "\ud83c\udfaf",
+      "codepoint": "U+1F3AF",
+      "name": "DIRECT HIT",
+      "occurrences_in_py": 12
+    },
+    {
+      "from": "\ud83d\ude80",
+      "codepoint": "U+1F680",
+      "name": "ROCKET",
+      "occurrences_in_py": 11
+    },
+    {
+      "from": "\ud83d\udce5",
+      "codepoint": "U+1F4E5",
+      "name": "INBOX TRAY",
+      "occurrences_in_py": 10
+    },
+    {
+      "from": "\ud83d\udd2c",
+      "codepoint": "U+1F52C",
+      "name": "MICROSCOPE",
+      "occurrences_in_py": 7
+    },
+    {
+      "from": "\ud83d\uddd1",
+      "codepoint": "U+1F5D1",
+      "name": "WASTEBASKET",
+      "occurrences_in_py": 6
+    },
+    {
+      "from": "\ud83d\udd17",
+      "codepoint": "U+1F517",
+      "name": "LINK SYMBOL",
+      "occurrences_in_py": 6
+    },
+    {
+      "from": "\u23ed",
+      "codepoint": "U+23ED",
+      "name": "BLACK RIGHT-POINTING DOUBLE TRIANGLE WITH VERTICAL BAR",
+      "occurrences_in_py": 5
+    },
+    {
+      "from": "\ud83d\udccf",
+      "codepoint": "U+1F4CF",
+      "name": "STRAIGHT RULER",
+      "occurrences_in_py": 5
+    },
+    {
+      "from": "\ud83e\uddec",
+      "codepoint": "U+1F9EC",
+      "name": "DNA DOUBLE HELIX",
+      "occurrences_in_py": 5
+    },
+    {
+      "from": "\ud83d\udd27",
+      "codepoint": "U+1F527",
+      "name": "WRENCH",
+      "occurrences_in_py": 5
+    },
+    {
+      "from": "\ud83e\uddf9",
+      "codepoint": "U+1F9F9",
+      "name": "BROOM",
+      "occurrences_in_py": 5
+    },
+    {
+      "from": "\ud83d\udcd0",
+      "codepoint": "U+1F4D0",
+      "name": "TRIANGULAR RULER",
+      "occurrences_in_py": 4
+    },
+    {
+      "from": "\ud83e\udde9",
+      "codepoint": "U+1F9E9",
+      "name": "JIGSAW PUZZLE PIECE",
+      "occurrences_in_py": 4
+    },
+    {
+      "from": "\u2696",
+      "codepoint": "U+2696",
+      "name": "SCALES",
+      "occurrences_in_py": 4
+    },
+    {
+      "from": "\ud83d\udc49",
+      "codepoint": "U+1F449",
+      "name": "WHITE RIGHT POINTING BACKHAND INDEX",
+      "occurrences_in_py": 4
+    },
+    {
+      "from": "\ud83d\udcbe",
+      "codepoint": "U+1F4BE",
+      "name": "FLOPPY DISK",
+      "occurrences_in_py": 3
+    },
+    {
+      "from": "\ud83d\udcc8",
+      "codepoint": "U+1F4C8",
+      "name": "CHART WITH UPWARDS TREND",
+      "occurrences_in_py": 3
+    },
+    {
+      "from": "\u26a1",
+      "codepoint": "U+26A1",
+      "name": "HIGH VOLTAGE SIGN",
+      "occurrences_in_py": 3
+    },
+    {
+      "from": "\ud83c\udfb2",
+      "codepoint": "U+1F3B2",
+      "name": "GAME DIE",
+      "occurrences_in_py": 2
+    },
+    {
+      "from": "\ud83d\udd2d",
+      "codepoint": "U+1F52D",
+      "name": "TELESCOPE",
+      "occurrences_in_py": 2
+    },
+    {
+      "from": "\ud83d\udc40",
+      "codepoint": "U+1F440",
+      "name": "EYES",
+      "occurrences_in_py": 2
+    },
+    {
+      "from": "\ud83d\udd35",
+      "codepoint": "U+1F535",
+      "name": "LARGE BLUE CIRCLE",
+      "occurrences_in_py": 2
+    },
+    {
+      "from": "\u26ab",
+      "codepoint": "U+26AB",
+      "name": "MEDIUM BLACK CIRCLE",
+      "occurrences_in_py": 2
+    },
+    {
+      "from": "\ud83e\uddd0",
+      "codepoint": "U+1F9D0",
+      "name": "FACE WITH MONOCLE",
+      "occurrences_in_py": 2
+    },
+    {
+      "from": "\ud83d\udcdd",
+      "codepoint": "U+1F4DD",
+      "name": "MEMO",
+      "occurrences_in_py": 2
+    },
+    {
+      "from": "\ud83d\udcc9",
+      "codepoint": "U+1F4C9",
+      "name": "CHART WITH DOWNWARDS TREND",
+      "occurrences_in_py": 2
+    },
+    {
+      "from": "\ud83c\udf32",
+      "codepoint": "U+1F332",
+      "name": "EVERGREEN TREE",
+      "occurrences_in_py": 2
+    },
+    {
+      "from": "\ud83c\udf31",
+      "codepoint": "U+1F331",
+      "name": "SEEDLING",
+      "occurrences_in_py": 2
+    },
+    {
+      "from": "\ud83d\udcc2",
+      "codepoint": "U+1F4C2",
+      "name": "OPEN FILE FOLDER",
+      "occurrences_in_py": 2
+    },
+    {
+      "from": "\ud83d\udfe2",
+      "codepoint": "U+1F7E2",
+      "name": "LARGE GREEN CIRCLE",
+      "occurrences_in_py": 1
+    },
+    {
+      "from": "\ud83d\udcc4",
+      "codepoint": "U+1F4C4",
+      "name": "PAGE FACING UP",
+      "occurrences_in_py": 1
+    },
+    {
+      "from": "\ud83d\udd34",
+      "codepoint": "U+1F534",
+      "name": "LARGE RED CIRCLE",
+      "occurrences_in_py": 1
+    },
+    {
+      "from": "\ud83d\udd07",
+      "codepoint": "U+1F507",
+      "name": "SPEAKER WITH CANCELLATION STROKE",
+      "occurrences_in_py": 1
+    },
+    {
+      "from": "\u2601",
+      "codepoint": "U+2601",
+      "name": "CLOUD",
+      "occurrences_in_py": 1
+    }
+  ]
+}

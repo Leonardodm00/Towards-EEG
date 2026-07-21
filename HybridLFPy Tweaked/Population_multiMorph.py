@@ -1355,7 +1355,7 @@ class Population(PopulationSuper):
                                             )
         
         if Load_idx is None:
-            print(f"⚠️ Cell {cellindex} aborted: No valid morphology found.")
+            print(f"[WARN] Cell {cellindex} aborted: No valid morphology found.")
             return None
         # Update the dictionary, best to handle parallelization via MPI
         # Update dictionary to store the Raw Network ID alongside the Morphology ID

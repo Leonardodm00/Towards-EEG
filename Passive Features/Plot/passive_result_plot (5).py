@@ -20,30 +20,30 @@ the bundle without re-running any AllenSDK calls, NEURON setup, or
 actual fitting.
 
 What's defined here:
-  • SweepBundle         — averaged sweep dataclass
-  • CellData            — per-cell container (with ss_individual_pulses)
-  • PassiveSearchSpace  — parameter bounds
-  • OptimiserInputs     — bundle of inputs for the optimiser
-  • PassiveFitResult    — Phase 2 fit result
+  * SweepBundle         -- averaged sweep dataclass
+  * CellData            -- per-cell container (with ss_individual_pulses)
+  * PassiveSearchSpace  -- parameter bounds
+  * OptimiserInputs     -- bundle of inputs for the optimiser
+  * PassiveFitResult    -- Phase 2 fit result
 
 Pickle compatibility note
 -------------------------
 For a @dataclass saved with the default protocol, pickle reconstructs
 each instance by:
-  1. Calling cls.__new__(cls)               — needs no arguments
+  1. Calling cls.__new__(cls)               -- needs no arguments
   2. Updating instance.__dict__ with the saved state
 
 Therefore the *exact* field list of these classes need not match the
-original definitions — pickle simply assigns whatever attributes were
+original definitions -- pickle simply assigns whatever attributes were
 saved.  The annotations below cover the most common fields so that
 type hints and IDE inspection work; any extra attribute saved at write
 time will appear as an instance attribute after load.
 
 Dependencies on the load side
 -----------------------------
-  • numpy
-  • scipy, scikit-optimize, scikit-learn  (only required if the bundle's
-    gp_result and skopt_dimensions need to be unpickled — i.e., if you
+  * numpy
+  * scipy, scikit-optimize, scikit-learn  (only required if the bundle's
+    gp_result and skopt_dimensions need to be unpickled -- i.e., if you
     plan to call the GP-heatmap plots; basic histogram / corner / 3D
     cloud plots work without these.)
 
@@ -59,7 +59,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 import numpy as np
 
 
-# ── Constants matching Phase 1 defaults ─────────────────────────────────────
+# -- Constants matching Phase 1 defaults -------------------------------------
 LJP_CORRECTION_MV = 14.0
 SPINE_PROXIMAL_CUTOFF_UM = 60.0
 DEFAULT_F = 1.9
@@ -73,9 +73,9 @@ DEFAULT_RM_BOUNDS = (1_000.0, 100_000.0)
 DEFAULT_RA_BOUNDS = (50.0, 1_000.0)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  Phase 1 dataclasses
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 @dataclass
 class SweepBundle:
@@ -116,7 +116,7 @@ class PassiveSearchSpace:
     ra_bounds: Tuple[float, float] = DEFAULT_RA_BOUNDS
 
     def as_skopt_dimensions(self):
-        """Stub — kept for API compatibility, not needed for unpickling.
+        """Stub -- kept for API compatibility, not needed for unpickling.
 
         If you ever need this method to work, import skopt and recreate
         the dimensions; we don't import skopt here so that this module
@@ -124,7 +124,7 @@ class PassiveSearchSpace:
         """
         raise NotImplementedError(
             "PassiveSearchSpace.as_skopt_dimensions() is a stub in "
-            "phase1_phase2_dataclasses_only — re-run the full Phase-1 cell "
+            "phase1_phase2_dataclasses_only -- re-run the full Phase-1 cell "
             "if you need this method.  Unpickling does not call it.")
 
 
@@ -153,9 +153,9 @@ class IncompleteDataError(Exception):
         self.cell_data = cell_data
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  Phase 2 dataclasses
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 @dataclass
 class PassiveFitResult:
@@ -177,7 +177,7 @@ class PassiveFitResult:
     rm_Ohm_cm2:            float  = float("nan")
     ra_Ohm_cm:             float  = float("nan")
 
-    # Posterior σ in log space (per parameter)
+    # Posterior sigma in log space (per parameter)
     cm_sigma:              float  = float("nan")
     rm_sigma:              float  = float("nan")
     ra_sigma:              float  = float("nan")
@@ -200,7 +200,7 @@ class PassiveFitResult:
     residuals_sigma_mV:    float  = float("nan")
     residuals_rho_lag1:    float  = float("nan")
 
-    # Heavy objects — set to None when stripped for replotting
+    # Heavy objects -- set to None when stripped for replotting
     gp_result:    Any = None    # scipy.optimize.OptimizeResult (from skopt)
     neuron_cell:  Any = None    # always None after _strip_fit_result
     opt_inputs:   Optional[OptimiserInputs] = None
@@ -227,30 +227,30 @@ the bundle without re-running any AllenSDK calls, NEURON setup, or
 actual fitting.
 
 What's defined here:
-  • SweepBundle         — averaged sweep dataclass
-  • CellData            — per-cell container (with ss_individual_pulses)
-  • PassiveSearchSpace  — parameter bounds
-  • OptimiserInputs     — bundle of inputs for the optimiser
-  • PassiveFitResult    — Phase 2 fit result
+  * SweepBundle         -- averaged sweep dataclass
+  * CellData            -- per-cell container (with ss_individual_pulses)
+  * PassiveSearchSpace  -- parameter bounds
+  * OptimiserInputs     -- bundle of inputs for the optimiser
+  * PassiveFitResult    -- Phase 2 fit result
 
 Pickle compatibility note
 -------------------------
 For a @dataclass saved with the default protocol, pickle reconstructs
 each instance by:
-  1. Calling cls.__new__(cls)               — needs no arguments
+  1. Calling cls.__new__(cls)               -- needs no arguments
   2. Updating instance.__dict__ with the saved state
 
 Therefore the *exact* field list of these classes need not match the
-original definitions — pickle simply assigns whatever attributes were
+original definitions -- pickle simply assigns whatever attributes were
 saved.  The annotations below cover the most common fields so that
 type hints and IDE inspection work; any extra attribute saved at write
 time will appear as an instance attribute after load.
 
 Dependencies on the load side
 -----------------------------
-  • numpy
-  • scipy, scikit-optimize, scikit-learn  (only required if the bundle's
-    gp_result and skopt_dimensions need to be unpickled — i.e., if you
+  * numpy
+  * scipy, scikit-optimize, scikit-learn  (only required if the bundle's
+    gp_result and skopt_dimensions need to be unpickled -- i.e., if you
     plan to call the GP-heatmap plots; basic histogram / corner / 3D
     cloud plots work without these.)
 
@@ -266,7 +266,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 import numpy as np
 
 
-# ── Constants matching Phase 1 defaults ─────────────────────────────────────
+# -- Constants matching Phase 1 defaults -------------------------------------
 LJP_CORRECTION_MV = 14.0
 SPINE_PROXIMAL_CUTOFF_UM = 60.0
 DEFAULT_F = 1.9
@@ -280,9 +280,9 @@ DEFAULT_RM_BOUNDS = (1_000.0, 100_000.0)
 DEFAULT_RA_BOUNDS = (50.0, 1_000.0)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  Phase 1 dataclasses
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 @dataclass
 class SweepBundle:
@@ -323,7 +323,7 @@ class PassiveSearchSpace:
     ra_bounds: Tuple[float, float] = DEFAULT_RA_BOUNDS
 
     def as_skopt_dimensions(self):
-        """Stub — kept for API compatibility, not needed for unpickling.
+        """Stub -- kept for API compatibility, not needed for unpickling.
 
         If you ever need this method to work, import skopt and recreate
         the dimensions; we don't import skopt here so that this module
@@ -331,7 +331,7 @@ class PassiveSearchSpace:
         """
         raise NotImplementedError(
             "PassiveSearchSpace.as_skopt_dimensions() is a stub in "
-            "phase1_phase2_dataclasses_only — re-run the full Phase-1 cell "
+            "phase1_phase2_dataclasses_only -- re-run the full Phase-1 cell "
             "if you need this method.  Unpickling does not call it.")
 
 
@@ -360,9 +360,9 @@ class IncompleteDataError(Exception):
         self.cell_data = cell_data
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  Phase 2 dataclasses
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 @dataclass
 class PassiveFitResult:
@@ -384,7 +384,7 @@ class PassiveFitResult:
     rm_Ohm_cm2:            float  = float("nan")
     ra_Ohm_cm:             float  = float("nan")
 
-    # Posterior σ in log space (per parameter)
+    # Posterior sigma in log space (per parameter)
     cm_sigma:              float  = float("nan")
     rm_sigma:              float  = float("nan")
     ra_sigma:              float  = float("nan")
@@ -407,30 +407,30 @@ class PassiveFitResult:
     residuals_sigma_mV:    float  = float("nan")
     residuals_rho_lag1:    float  = float("nan")
 
-    # Heavy objects — set to None when stripped for replotting
+    # Heavy objects -- set to None when stripped for replotting
     gp_result:    Any = None    # scipy.optimize.OptimizeResult (from skopt)
     neuron_cell:  Any = None    # always None after _strip_fit_result
     opt_inputs:   Optional[OptimiserInputs] = None
 
 """
-phase3_bootstrap_v3.py — Phase 3 v3: Bootstrap CI + GP Diagnostic
+phase3_bootstrap_v3.py -- Phase 3 v3: Bootstrap CI + GP Diagnostic
 ============================================================================
 
 Features:
-  • Two bootstrap modes:
-      - "parametric"     — add residual noise to MLE trace and refit.
-      - "nonparametric"  — resample individual pulse windows with replacement.
-  • Three CI types per parameter (percentile, BCa, normal) computed with
+  * Two bootstrap modes:
+      - "parametric"     -- add residual noise to MLE trace and refit.
+      - "nonparametric"  -- resample individual pulse windows with replacement.
+  * Three CI types per parameter (percentile, BCa, normal) computed with
     scipy/numpy.
-  • Trace diagnostic plot showing example bootstrap training data.
-  • Histograms, pairwise scatters, and GP diagnostic profile plots that
+  * Trace diagnostic plot showing example bootstrap training data.
+  * Histograms, pairwise scatters, and GP diagnostic profile plots that
     overlay all available CI types.
 
 Prerequisites in the current Colab session:
-  • Phase 1 cells defining `np`, `SweepBundle`, `CellData` with the
+  * Phase 1 cells defining `np`, `SweepBundle`, `CellData` with the
     `ss_individual_pulses` field, `_simulate_square_subthreshold`,
     `_interp_to_grid`.
-  • Phase 2 cells defining `_build_loss_function`, `gp_minimize`, `Real`.
+  * Phase 2 cells defining `_build_loss_function`, `gp_minimize`, `Real`.
 
 Dependencies: numpy, scipy, matplotlib, scikit-optimize.
 
@@ -464,12 +464,12 @@ from matplotlib.lines import Line2D
 from skopt import gp_minimize
 from skopt.space import Real
 
-# ── Constants ────────────────────────────────────────────────────────────────
+# -- Constants ----------------------------------------------------------------
 PARAM_NAMES  = ("Cm", "Rm", "Ra")
 PARAM_LABELS = {
-    "Cm": r"$C_m$ (µF/cm²)",
-    "Rm": r"$R_m$ (Ω·cm²)",
-    "Ra": r"$R_a$ (Ω·cm)",
+    "Cm": r"$C_m$ (uF/cm^2)",
+    "Rm": r"$R_m$ (Ohm.cm^2)",
+    "Ra": r"$R_a$ (Ohm.cm)",
 }
 
 # Bootstrap defaults
@@ -493,7 +493,7 @@ DEFAULT_GP_BALL_LOGRADIUS  = 0.05
 DEFAULT_TRUST_ABS_MV       = 0.10
 DEFAULT_TRUST_ZSCORE       = 3.0
 
-# CI style registry for plotting — colours, linestyles, labels
+# CI style registry for plotting -- colours, linestyles, labels
 CI_STYLES = {
     "percentile": {"color": "tab:orange", "ls": "--",  "lw": 1.2,
                    "label_fmt": "percentile CI = [{lo:.4g}, {hi:.4g}]"},
@@ -505,17 +505,17 @@ CI_STYLES = {
 
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  GP-diagnostic helper functions (called by gp_diagnostic_for_cell below)
 #  These mirror the Phase-2 originals so this module is self-contained.
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def _other_axes_log_grid(opt_inputs, pinned_name, inner_grid_per_axis):
     """Uniform log-space grid over the two parameters that are NOT pinned.
 
     Returns
     -------
-    A, B : ndarray (inner_grid_per_axis²,)
+    A, B : ndarray (inner_grid_per_axis^2,)
         Ravelled meshgrid coordinates for the two free axes.
     other : tuple[str, str]
         Names of the two free parameters, in the order (A, B).
@@ -545,12 +545,12 @@ def _build_gp_profile(
     *, gp_result, opt_inputs, param_name: str,
     grid_log: np.ndarray, inner_grid_per_axis: int,
 ):
-    """Compute (μ_GP, σ_GP) along the 1-D profile for one parameter.
+    """Compute (u_GP, sigma_GP) along the 1-D profile for one parameter.
 
     For each pinned value of ``param_name``, the other two parameters are
-    swept over a dense inner grid (``inner_grid_per_axis`` × ``inner_grid_per_axis``
+    swept over a dense inner grid (``inner_grid_per_axis`` x ``inner_grid_per_axis``
     points).  The GP is queried on the full batch in one call; we record
-    μ and σ at the inner argmin — i.e. the point that minimises the GP
+    u and sigma at the inner argmin -- i.e. the point that minimises the GP
     mean for that pinned value.
 
     Parameters
@@ -611,13 +611,13 @@ def _validate_at_param_value(
 
     Draws ``n_validation`` points in a small log-space ball around
     (param = theta_phys, others = MLE) and returns both the real NEURON
-    RMSD and the GP-predicted μ/σ at each point.
+    RMSD and the GP-predicted u/sigma at each point.
 
     Parameters
     ----------
     theta_phys : float
         Physical-unit value of ``param_name`` at which to validate (e.g.
-        the lower bound of a CI in Ω·cm²).
+        the lower bound of a CI in Ohm.cm^2).
     param_name : str
         One of ``"Cm"``, ``"Rm"``, ``"Ra"``.
     fit_result : PassiveFitResult
@@ -691,8 +691,8 @@ def _gp_trust_combined(pts, abs_mv: float, z_thresh: float) -> bool:
 
     A point fails if:
       - the real RMSD is not finite, or
-      - |RMSD_real − μ_GP| > abs_mv (absolute mismatch in mV), or
-      - |RMSD_real − μ_GP| > z_thresh × σ_GP (z-score mismatch).
+      - |RMSD_real - u_GP| > abs_mv (absolute mismatch in mV), or
+      - |RMSD_real - u_GP| > z_thresh x sigma_GP (z-score mismatch).
 
     Parameters
     ----------
@@ -739,8 +739,8 @@ def _simulate_square_subthreshold(
 
     Returns
     -------
-    t_sim_s : ndarray   — seconds, t=0 at pulse onset
-    v_sim   : ndarray   — mV
+    t_sim_s : ndarray   -- seconds, t=0 at pulse onset
+    v_sim   : ndarray   -- mV
     """
     delay_ms = pre_pad_ms
     dur_ms   = bundle.stim_duration_s * 1e3
@@ -759,13 +759,13 @@ def _simulate_square_subthreshold(
     return t_sim_s, v_sim
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  Data structures
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 @dataclass
 class BootstrapCIResult:
-    """Bootstrap CIs for one cell (v3 — no joint-projected CI).
+    """Bootstrap CIs for one cell (v3 -- no joint-projected CI).
 
     ``samples`` is the (n_kept, 3) array of bootstrap parameter
     estimates in **physical units**, columns ordered (Cm, Rm, Ra).
@@ -780,7 +780,7 @@ class BootstrapCIResult:
     mle_log:       Tuple[float, float, float]
     mle_rmsd:      float
 
-    # CI tables — keyed by parameter name, value = (lo, hi) physical units
+    # CI tables -- keyed by parameter name, value = (lo, hi) physical units
     ci_percentile: Dict[str, Tuple[float, float]]
     ci_bca:        Dict[str, Tuple[float, float]]
     ci_normal:     Dict[str, Tuple[float, float]]
@@ -789,7 +789,7 @@ class BootstrapCIResult:
     threshold_alpha: float
     bootstrap_mode:  str              # "parametric" | "nonparametric"
     noise_mode:      str              # used only for parametric
-    sigma_used:      float            # σ for parametric; NaN for nonparametric
+    sigma_used:      float            # sigma for parametric; NaN for nonparametric
     rho_used:        float
     block_length:    Optional[int]
     fit_mode:        str
@@ -807,14 +807,14 @@ class BootstrapCIResult:
 
 @dataclass
 class GpDiagnosticPerParameter:
-    """Per-parameter GP profile data with σ-envelope (v3)."""
+    """Per-parameter GP profile data with sigma-envelope (v3)."""
     name:           str
     mle_value:      float
     grid_physical:  np.ndarray
     grid_log:       np.ndarray
     profile_mean:   np.ndarray
     profile_std:    np.ndarray
-    # Validation at bootstrap CI bound points — each tuple is
+    # Validation at bootstrap CI bound points -- each tuple is
     # (theta_physical, rmsd_real, mu_gp, sigma_gp)
     validation_points: Dict[str, List[Tuple[float, float, float, float]]]
     gp_trustworthy: bool
@@ -837,13 +837,13 @@ class Phase3Result:
     gp_diagnostic:  GpDiagnosticResult
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  CI computation — percentile, BCa, normal  (scipy/numpy)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  CI computation -- percentile, BCa, normal  (scipy/numpy)
+# ===============================================================================
 
 def _ci_percentile(samples_1d: np.ndarray, alpha: float
                    ) -> Tuple[float, float]:
-    """Basic percentile CI: α/2 and 1−α/2 quantiles."""
+    """Basic percentile CI: alpha/2 and 1-alpha/2 quantiles."""
     tail = (1.0 - alpha) / 2.0
     lo = float(np.quantile(samples_1d, tail))
     hi = float(np.quantile(samples_1d, 1.0 - tail))
@@ -852,7 +852,7 @@ def _ci_percentile(samples_1d: np.ndarray, alpha: float
 
 def _ci_normal(samples_1d: np.ndarray, alpha: float
                ) -> Tuple[float, float]:
-    """Normal (Wald) bootstrap CI: mean ± z_{α/2} × SE.
+    """Normal (Wald) bootstrap CI: mean +/- z_{alpha/2} x SE.
 
     Uses ``scipy.stats.norm.ppf`` for the critical value.
     """
@@ -869,27 +869,27 @@ def _ci_bca(
 ) -> Tuple[float, float]:
     """Bias-corrected and accelerated (BCa) bootstrap CI.
 
-    Implements Efron & Tibshirani (1993) §14.3:
-        z₀ = Φ⁻¹(fraction of θ* < θ̂)
+    Implements Efron & Tibshirani (1993) Sec.14.3:
+        z_0 = Phi^-1(fraction of theta* < theta^)
         a  = jackknife-on-bootstrap acceleration
-        α₁ = Φ(z₀ + (z₀ + z_{α/2}) / (1 − a·(z₀ + z_{α/2})))
-        α₂ = Φ(z₀ + (z₀ + z_{1−α/2}) / (1 − a·(z₀ + z_{1−α/2})))
+        alpha_1 = Phi(z_0 + (z_0 + z_{alpha/2}) / (1 - a.(z_0 + z_{alpha/2})))
+        alpha_2 = Phi(z_0 + (z_0 + z_{1-alpha/2}) / (1 - a.(z_0 + z_{1-alpha/2})))
 
-    Uses ``scipy.stats.norm.ppf`` / ``.cdf`` for Φ / Φ⁻¹.
+    Uses ``scipy.stats.norm.ppf`` / ``.cdf`` for Phi / Phi^-1.
     """
     n = len(samples_1d)
     if n < 3:
         return float("nan"), float("nan")
 
-    # ── Bias correction z₀ ──
+    # -- Bias correction z_0 --
     frac_below = np.mean(samples_1d < theta_hat)
     frac_below = np.clip(frac_below, 1e-8, 1.0 - 1e-8)
     z0 = float(sp_stats.norm.ppf(frac_below))
 
-    # ── Acceleration a (jackknife on the bootstrap samples) ──
+    # -- Acceleration a (jackknife on the bootstrap samples) --
     # Delete-one mean estimator applied to the bootstrap samples themselves.
     # This is the standard shortcut when the original data is not available
-    # (Efron & Tibshirani 1993 §14.3, DiCiccio & Efron 1996 §5).
+    # (Efron & Tibshirani 1993 Sec.14.3, DiCiccio & Efron 1996 Sec.5).
     jk_means = np.empty(n)
     total = float(np.sum(samples_1d))
     for i in range(n):
@@ -900,7 +900,7 @@ def _ci_bca(
     a_den = float(6.0 * (np.sum(d ** 2)) ** 1.5)
     a = a_num / a_den if abs(a_den) > 1e-15 else 0.0
 
-    # ── Adjusted quantiles ──
+    # -- Adjusted quantiles --
     z_lo = float(sp_stats.norm.ppf((1.0 - alpha) / 2.0))
     z_hi = float(sp_stats.norm.ppf(1.0 - (1.0 - alpha) / 2.0))
 
@@ -923,9 +923,9 @@ def _ci_bca(
     return lo, hi
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Noise generation (parametric mode only — unchanged from v2)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Noise generation (parametric mode only -- unchanged from v2)
+# ===============================================================================
 
 def _generate_noise(
     n: int, sigma: float, rho: float,
@@ -963,9 +963,9 @@ def _generate_noise(
     raise ValueError(f"Unknown noise mode: {mode!r}")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  MLE traces cache (parametric mode)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def _compute_mle_traces(
     cell, train_bundles, v_rest_mV: float,
@@ -983,9 +983,9 @@ def _compute_mle_traces(
     return traces
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Single bootstrap iteration — PARAMETRIC
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Single bootstrap iteration -- PARAMETRIC
+# ===============================================================================
 
 def _run_one_parametric_iteration(
     *,
@@ -1001,12 +1001,12 @@ def _run_one_parametric_iteration(
 ) -> Dict[str, float]:
     """One parametric residual bootstrap refit.
 
-    Synthesises noise → adds to MLE trace → builds synthetic bundles → refits.
+    Synthesises noise -> adds to MLE trace -> builds synthetic bundles -> refits.
     """
     rng = np.random.default_rng(int(seed))
     train_t0_s, train_t1_s = (np.asarray(train_window_ms) * 1e-3).tolist()
 
-    # ── Build synthetic bundles ──
+    # -- Build synthetic bundles --
     synthetic_bundles = []
     for i, b in enumerate(opt_inputs.train_bundles):
         sim_v = mle_traces[i]
@@ -1035,9 +1035,9 @@ def _run_one_parametric_iteration(
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Single bootstrap iteration — NONPARAMETRIC
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Single bootstrap iteration -- NONPARAMETRIC
+# ===============================================================================
 
 def _run_one_nonparametric_iteration(
     *,
@@ -1058,11 +1058,11 @@ def _run_one_nonparametric_iteration(
     """
     rng = np.random.default_rng(int(seed))
 
-    # ── Draw with replacement ──
+    # -- Draw with replacement --
     indices = rng.integers(0, len(pulse_pool), size=n_pulses)
     drawn = [pulse_pool[int(j)] for j in indices]
 
-    # ── Separate by polarity and build SweepBundles ──
+    # -- Separate by polarity and build SweepBundles --
     by_pol: Dict[str, List[Dict]] = {"dep": [], "hyp": []}
     for w in drawn:
         by_pol[w["polarity"]].append(w)
@@ -1111,16 +1111,16 @@ def _run_one_nonparametric_iteration(
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  Shared refit logic
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def _refit_from_bundles(
     *, cell, bundles, v_rest_mV, train_window_ms,
     mle_log, dims, fit_mode, n_calls, n_initial, ball_radius,
     seed, rng,
 ) -> Dict[str, float]:
-    """Build loss from bundles → run gp_minimize → return fitted params."""
+    """Build loss from bundles -> run gp_minimize -> return fitted params."""
     fn = _locate_build_loss_function()
     loss_fn = fn(
         cell=cell, train_bundles=bundles,
@@ -1181,9 +1181,9 @@ def _locate_build_loss_function():
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  Worker wrapper (sequential and parallel)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 _WORKER_STATE: Dict[str, Any] = {}
 
@@ -1237,9 +1237,9 @@ def _bootstrap_worker_run_v3(task):
         return (idx, None, f"{type(exc).__name__}: {exc}")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  Top-level bootstrap function
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def bootstrap_ci_for_cell(
     *,
@@ -1270,7 +1270,7 @@ def bootstrap_ci_for_cell(
     save_plots:  bool = True,
     verbose: bool     = True,
 ) -> BootstrapCIResult:
-    """Phase 3 v3 bootstrap — parametric or nonparametric.
+    """Phase 3 v3 bootstrap -- parametric or nonparametric.
 
     Parameters
     ----------
@@ -1288,7 +1288,7 @@ def bootstrap_ci_for_cell(
         Number of averaged groups to form from the resampled pulses
         (within each polarity).
     """
-    # ── Output directory ──
+    # -- Output directory --
     if output_dir is not None:
         out_dir = Path(output_dir)
     else:
@@ -1300,7 +1300,7 @@ def bootstrap_ci_for_cell(
     opt_inputs = fit_result.opt_inputs
     notes: List[str] = []
 
-    # ── Parametric: σ and ρ from residuals ──
+    # -- Parametric: sigma and rho from residuals --
     sigma_res = float("nan")
     rho_res   = 0.0
     if bootstrap_mode == "parametric":
@@ -1317,7 +1317,7 @@ def bootstrap_ci_for_cell(
         if not np.isfinite(rho_res):
             rho_res = float(getattr(fit_result, "noise_rho_lag1", 0.0))
 
-    # ── Nonparametric: validate pool ──
+    # -- Nonparametric: validate pool --
     if bootstrap_mode == "nonparametric":
         if pulse_pool is None or len(pulse_pool) == 0:
             raise ValueError(
@@ -1327,7 +1327,7 @@ def bootstrap_ci_for_cell(
             raise ValueError(
                 "nonparametric mode requires n_pulses_per_replicate.")
 
-    # ── Fit-mode defaults ──
+    # -- Fit-mode defaults --
     if fit_mode == "fast":
         if n_calls   is None: n_calls   = DEFAULT_FAST_NCALLS
         if n_initial is None: n_initial = DEFAULT_FAST_NINITIAL
@@ -1345,12 +1345,12 @@ def bootstrap_ci_for_cell(
     if verbose:
         print(
             f"[bootstrap] cell {fit_result.specimen_id}\n"
-            f"[bootstrap]   mode={bootstrap_mode}  B={B}  α={alpha}  "
+            f"[bootstrap]   mode={bootstrap_mode}  B={B}  alpha={alpha}  "
             f"fit_mode={fit_mode}  n_calls={n_calls}  n_initial={n_initial}"
         )
         if bootstrap_mode == "parametric":
             print(f"[bootstrap]   noise_mode={noise_mode}  "
-                  f"σ_residual={sigma_res:.5f} mV  ρ_residual={rho_res:.3f}")
+                  f"sigma_residual={sigma_res:.5f} mV  rho_residual={rho_res:.3f}")
         else:
             print(f"[bootstrap]   pulse_pool={len(pulse_pool)} pulses  "
                   f"n_pulses_per_replicate={n_pulses_per_replicate}  "
@@ -1359,7 +1359,7 @@ def bootstrap_ci_for_cell(
               f"Rm={mle_phys[1]:.4g}, Ra={mle_phys[2]:.4g}  "
               f"RMSD_MLE={fit_result.train_rmsd_mV:.5f} mV")
 
-    # ── Cache MLE traces (parametric) ──
+    # -- Cache MLE traces (parametric) --
     mle_traces: Dict[int, np.ndarray] = {}
     empirical_residuals: Optional[np.ndarray] = None
     if bootstrap_mode == "parametric":
@@ -1387,7 +1387,7 @@ def bootstrap_ci_for_cell(
                 pool.extend(res.tolist())
             empirical_residuals = np.asarray(pool, dtype=float)
 
-    # ── Prepare tasks ──
+    # -- Prepare tasks --
     rng_master = np.random.default_rng(int(seed))
     worker_seeds = rng_master.integers(0, 2**31 - 1, size=B).tolist()
 
@@ -1415,7 +1415,7 @@ def bootstrap_ci_for_cell(
         for i in range(B)
     ]
 
-    # ── Run ──
+    # -- Run --
     if verbose:
         print(f"[bootstrap]   running {B} iterations ...")
     raw_results = []
@@ -1430,7 +1430,7 @@ def bootstrap_ci_for_cell(
             "Use n_workers=1 in Colab."
         )
 
-    # ── Collect ──
+    # -- Collect --
     successes = [r for r in raw_results if r[1] is not None]
     failures  = [r for r in raw_results if r[1] is None]
     if failures:
@@ -1448,14 +1448,14 @@ def bootstrap_ci_for_cell(
         [[r[1]["cm_log"], r[1]["rm_log"], r[1]["ra_log"]] for r in successes])
     rmsds = np.array([r[1]["rmsd"] for r in successes])
 
-    # ── RMSD outlier rejection ──
+    # -- RMSD outlier rejection --
     if rmsd_reject_mult is not None and np.isfinite(rmsd_reject_mult):
         thresh = rmsd_reject_mult * fit_result.train_rmsd_mV
         keep = rmsds <= thresh
         n_rej = int((~keep).sum())
         if n_rej > 0:
             msg = (f"[bootstrap]   rejected {n_rej} sample(s) with "
-                   f"RMSD > {rmsd_reject_mult}× MLE_RMSD")
+                   f"RMSD > {rmsd_reject_mult}x MLE_RMSD")
             if verbose:
                 print(msg)
             notes.append(msg)
@@ -1467,7 +1467,7 @@ def bootstrap_ci_for_cell(
         raise RuntimeError(f"After rejection only {n_kept} samples remain.")
     samples_phys = np.exp(samples_log)
 
-    # ── Compute CIs (library-backed) ──
+    # -- Compute CIs (library-backed) --
     ci_perc:   Dict[str, Tuple[float, float]] = {}
     ci_bca:    Dict[str, Tuple[float, float]] = {}
     ci_normal: Dict[str, Tuple[float, float]] = {}
@@ -1484,12 +1484,12 @@ def bootstrap_ci_for_cell(
             idx = PARAM_NAMES.index(p)
             print(
                 f"[bootstrap]   {p}: MLE={mle_phys[idx]:.4g}"
-                f"  perc={ci_perc[p][0]:.4g}…{ci_perc[p][1]:.4g}"
-                f"  BCa={ci_bca[p][0]:.4g}…{ci_bca[p][1]:.4g}"
-                f"  normal={ci_normal[p][0]:.4g}…{ci_normal[p][1]:.4g}"
+                f"  perc={ci_perc[p][0]:.4g}...{ci_perc[p][1]:.4g}"
+                f"  BCa={ci_bca[p][0]:.4g}...{ci_bca[p][1]:.4g}"
+                f"  normal={ci_normal[p][0]:.4g}...{ci_normal[p][1]:.4g}"
             )
 
-    # ── Assemble result ──
+    # -- Assemble result --
     result = BootstrapCIResult(
         specimen_id=int(fit_result.specimen_id),
         B_requested=int(B), n_kept=int(n_kept),
@@ -1517,7 +1517,7 @@ def bootstrap_ci_for_cell(
         notes=notes,
     )
 
-    # ── Persist ──
+    # -- Persist --
     if save_pickle:
         with open(out_dir / "bootstrap_result.pkl", "wb") as f:
             pickle.dump(result, f)
@@ -1564,9 +1564,9 @@ def _save_bootstrap_summary_csv(r: BootstrapCIResult, out_dir: Path):
     pd.DataFrame(rows).to_csv(out_dir / "bootstrap_summary.csv", index=False)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  GP diagnostic (updated for v3 — no joint CIs)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  GP diagnostic (updated for v3 -- no joint CIs)
+# ===============================================================================
 
 def gp_diagnostic_for_cell(
     *,
@@ -1586,7 +1586,7 @@ def gp_diagnostic_for_cell(
     seed: int         = 0,
     verbose: bool     = True,
 ) -> GpDiagnosticResult:
-    """GP-surrogate profile diagnostic with σ-envelope (v3).
+    """GP-surrogate profile diagnostic with sigma-envelope (v3).
 
     Overlays whatever CI types are present in ``bootstrap_result``.
     Validates each CI boundary point with real NEURON calls.
@@ -1608,7 +1608,7 @@ def gp_diagnostic_for_cell(
         print(f"[gp_diagnostic] cell {fit_result.specimen_id}  k={envelope_k}"
               f"  bootstrap CIs {ci_tag}")
 
-    # ── Collect all CI types present in bootstrap_result ──
+    # -- Collect all CI types present in bootstrap_result --
     ci_dict_map: Dict[str, Dict[str, Tuple[float, float]]] = {}
     if bootstrap_result is not None:
         ci_dict_map["percentile"] = bootstrap_result.ci_percentile
@@ -1628,7 +1628,7 @@ def gp_diagnostic_for_cell(
                    "Rm": fit_result.rm_Ohm_cm2,
                    "Ra": fit_result.ra_Ohm_cm}[p]
 
-        # ── Validate at each CI boundary ──
+        # -- Validate at each CI boundary --
         validation_pts: Dict[str, List[Tuple[float, float, float, float]]] = {}
         for ci_name, ci_table in ci_dict_map.items():
             lo_val, hi_val = ci_table[p]
@@ -1681,9 +1681,9 @@ def gp_diagnostic_for_cell(
     return result
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  Top-level wrapper
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def phase3_full_for_cell(
     *,
@@ -1697,11 +1697,11 @@ def phase3_full_for_cell(
 
     Output structure:
         <root_dir>/cell_<id>/
-          ├─ bootstrap/        *.pkl, *.npy, *.csv, histogram_*.png, pairwise_*.png
-          └─ gp_diagnostic/    *.pkl, profile_*.png
+          +- bootstrap/        *.pkl, *.npy, *.csv, histogram_*.png, pairwise_*.png
+          +- gp_diagnostic/    *.pkl, profile_*.png
     """
     if verbose:
-        print(f"\n=== Phase 3 v3 — cell {fit_result.specimen_id} ===")
+        print(f"\n=== Phase 3 v3 -- cell {fit_result.specimen_id} ===")
 
     boot = bootstrap_ci_for_cell(
         fit_result=fit_result, root_dir=root_dir,
@@ -1717,9 +1717,9 @@ def phase3_full_for_cell(
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  PLOTTING — Histograms (v3)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  PLOTTING -- Histograms (v3)
+# ===============================================================================
 
 def plot_bootstrap_histograms(
     r: BootstrapCIResult,
@@ -1761,8 +1761,8 @@ def plot_bootstrap_histograms(
         mode_lbl = (f"noise={r.noise_mode}" if r.bootstrap_mode == "parametric"
                     else f"nonparam (n_pulses={r.n_pulses_per_replicate})")
         ax.set_title(
-            f"Bootstrap distribution — {p}  |  cell {r.specimen_id}\n"
-            f"B={r.B_requested} (n_kept={r.n_kept}), α={r.threshold_alpha}, "
+            f"Bootstrap distribution -- {p}  |  cell {r.specimen_id}\n"
+            f"B={r.B_requested} (n_kept={r.n_kept}), alpha={r.threshold_alpha}, "
             f"fit_mode={r.fit_mode}, {mode_lbl}",
             fontsize=9,
         )
@@ -1775,9 +1775,9 @@ def plot_bootstrap_histograms(
     return saved
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  PLOTTING — Pairwise scatters (v3)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  PLOTTING -- Pairwise scatters (v3)
+# ===============================================================================
 
 def plot_bootstrap_pairwise(
     r: BootstrapCIResult,
@@ -1799,7 +1799,7 @@ def plot_bootstrap_pairwise(
                 marker="*", markersize=18,
                 color="k", linestyle="none", label="MLE")
 
-        # 95% covariance ellipse in log-space → exponentiated
+        # 95% covariance ellipse in log-space -> exponentiated
         mu_log = np.array(r.mle_log)
         sub = np.array([[r.cov_log[ix, ix], r.cov_log[ix, iy]],
                         [r.cov_log[iy, ix], r.cov_log[iy, iy]]])
@@ -1812,7 +1812,7 @@ def plot_bootstrap_pairwise(
             ell_log = mu_log[[ix, iy]][:, None] + radius * (L @ unit_circle)
             ell_phys = np.exp(ell_log)
             ax.plot(ell_phys[0], ell_phys[1], color="tab:red", lw=1.3,
-                    label=fr"cov ellipse (χ²₂, {r.threshold_alpha:.0%})")
+                    label=fr"cov ellipse (chi^2_2, {r.threshold_alpha:.0%})")
         except Exception:
             pass
 
@@ -1823,9 +1823,9 @@ def plot_bootstrap_pairwise(
         ax.set_xlabel(PARAM_LABELS[px])
         ax.set_ylabel(PARAM_LABELS[py])
         ax.set_title(
-            f"Bootstrap joint distribution — {px} vs {py}  |  "
+            f"Bootstrap joint distribution -- {px} vs {py}  |  "
             f"cell {r.specimen_id}\n"
-            f"ρ(log)={corr:+.3f}",
+            f"rho(log)={corr:+.3f}",
             fontsize=10,
         )
         ax.legend(loc="best", fontsize=9)
@@ -1837,9 +1837,9 @@ def plot_bootstrap_pairwise(
     return saved
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  PLOTTING — GP diagnostic profiles (v3)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  PLOTTING -- GP diagnostic profiles (v3)
+# ===============================================================================
 
 def plot_gp_diagnostic(
     gp_result: GpDiagnosticResult,
@@ -1847,7 +1847,7 @@ def plot_gp_diagnostic(
     out_dir,
     envelope_k: float,
 ) -> List[Path]:
-    """Per-parameter GP profile with σ envelope and all available CI overlays."""
+    """Per-parameter GP profile with sigma envelope and all available CI overlays."""
     out_dir = Path(out_dir)
     saved = []
 
@@ -1875,7 +1875,7 @@ def plot_gp_diagnostic(
         # MLE
         ax.axvline(pp.mle_value, color="k", lw=1.0, alpha=0.5, label="MLE")
 
-        # ── Overlay all CI types ──
+        # -- Overlay all CI types --
         for ci_name, ci_table in ci_sources.items():
             lo, hi = ci_table[p]
             sty = CI_STYLES[ci_name]
@@ -1886,7 +1886,7 @@ def plot_gp_diagnostic(
                 ax.axvline(hi, color=sty["color"], lw=sty["lw"],
                            linestyle=sty["ls"], label=f"{ci_name} CI")
 
-        # ── Real-NEURON validation dots ──
+        # -- Real-NEURON validation dots --
         for key, pts in pp.validation_points.items():
             for (th, rr, mg, _) in pts:
                 if np.isfinite(rr):
@@ -1912,9 +1912,9 @@ def plot_gp_diagnostic(
         ax.set_xlabel(PARAM_LABELS[p])
         ax.set_ylabel("Training RMSD (mV)")
 
-        trust = "GP ✓" if pp.gp_trustworthy else "GP ✗ MISMATCH"
+        trust = "GP [ok]" if pp.gp_trustworthy else "GP [x] MISMATCH"
         ax.set_title(
-            f"GP diagnostic — {p}  |  cell {gp_result.specimen_id}\n"
+            f"GP diagnostic -- {p}  |  cell {gp_result.specimen_id}\n"
             f"MLE = {pp.mle_value:.4g}   {trust}  "
             f"(envelope k = {envelope_k:.0f})",
             fontsize=9,
@@ -1927,9 +1927,9 @@ def plot_gp_diagnostic(
     return saved
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  PLOTTING — Trace diagnostic (NEW)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  PLOTTING -- Trace diagnostic (NEW)
+# ===============================================================================
 
 def plot_bootstrap_trace_diagnostic(
     *,
@@ -1946,8 +1946,8 @@ def plot_bootstrap_trace_diagnostic(
     """Diagnostic plot: example training traces for both bootstrap modes.
 
     Produces a figure with two panels (side by side):
-      Left:  PARAMETRIC — real trace, MLE trace, n_examples synthetic traces.
-      Right: NONPARAMETRIC — original averaged trace, n_examples
+      Left:  PARAMETRIC -- real trace, MLE trace, n_examples synthetic traces.
+      Right: NONPARAMETRIC -- original averaged trace, n_examples
              resampled-and-averaged traces.
 
     Parameters
@@ -1969,18 +1969,18 @@ def plot_bootstrap_trace_diagnostic(
     train_t0_s, train_t1_s = (
         np.asarray(opt_inputs.train_window_ms) * 1e-3).tolist()
 
-    # ── Resolve pulse pool ──
+    # -- Resolve pulse pool --
     if pulse_pool is None and cell_data is not None:
         pulse_pool = getattr(cell_data, "ss_individual_pulses", None)
     has_nonparametric = (pulse_pool is not None and len(pulse_pool) > 0)
 
-    # ── Figure layout ──
+    # -- Figure layout --
     n_panels = 2 if has_nonparametric else 1
     fig, axes = plt.subplots(1, n_panels, figsize=(7.0 * n_panels, 5.0))
     if n_panels == 1:
         axes = [axes]
 
-    # ── Compute MLE traces for the first training bundle ──
+    # -- Compute MLE traces for the first training bundle --
     b0 = opt_inputs.train_bundles[0]
     cell = fit_result.neuron_cell
     cm, rm, ra = mle_phys
@@ -1989,7 +1989,7 @@ def plot_bootstrap_trace_diagnostic(
     t_sim_s, v_sim_raw = _simulate_square_subthreshold(cell, b0, v_rest)
     sim_v = _interp_to_grid(t_sim_s, v_sim_raw, b0.t)
 
-    # ── σ_residual for noise ──
+    # -- sigma_residual for noise --
     sigma_res = float(getattr(fit_result, "residuals_sigma_mV", float("nan")))
     if not np.isfinite(sigma_res):
         sigma_res = float(fit_result.noise_sigma_mV)
@@ -1997,7 +1997,7 @@ def plot_bootstrap_trace_diagnostic(
     if not np.isfinite(rho_res):
         rho_res = 0.0
 
-    # ── LEFT PANEL: Parametric ──
+    # -- LEFT PANEL: Parametric --
     ax = axes[0]
     t_ms = b0.t * 1e3  # convert to ms
 
@@ -2027,11 +2027,11 @@ def plot_bootstrap_trace_diagnostic(
     ax.set_xlabel("Time (ms)")
     ax.set_ylabel("V (mV)")
     ax.set_title(f"Parametric bootstrap traces\n"
-                 f"(σ_res={sigma_res:.4f} mV, mode={noise_mode})",
+                 f"(sigma_res={sigma_res:.4f} mV, mode={noise_mode})",
                  fontsize=10)
     ax.legend(loc="best", fontsize=8)
 
-    # ── RIGHT PANEL: Nonparametric ──
+    # -- RIGHT PANEL: Nonparametric --
     if has_nonparametric:
         ax2 = axes[1]
         # Original averaged trace
@@ -2065,7 +2065,7 @@ def plot_bootstrap_trace_diagnostic(
         )
         ax2.legend(loc="best", fontsize=8)
 
-    fig.suptitle(f"Bootstrap trace diagnostic — cell {fit_result.specimen_id}",
+    fig.suptitle(f"Bootstrap trace diagnostic -- cell {fit_result.specimen_id}",
                  fontsize=11, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.95])
 
@@ -2079,7 +2079,7 @@ def plot_bootstrap_trace_diagnostic(
     return path
 
 """
-phase3_persistence_v4.py — robust save/load for Phase-3 v3 artefacts
+phase3_persistence_v4.py -- robust save/load for Phase-3 v3 artefacts
 ============================================================================
 
 Drop-in replacement for the persistence half of
@@ -2093,7 +2093,7 @@ Why this rewrite
 ----------------
 The v3 bundle stored ``fit_result_stripped`` and ``cell_data_stripped``.
 The former still carried ``gp_result``, a ``scipy.optimize.OptimizeResult``
-that references the wrapped loss function — which closes over the live
+that references the wrapped loss function -- which closes over the live
 NEURON cell.  Pickling that closure either silently truncates or fails
 midway, depending on the protocol and the size, which is exactly the
 "43.7 MB and got cut off" symptom we observed on one cell.
@@ -2103,7 +2103,7 @@ Fixes
 1. **No live skopt / sklearn / NEURON objects ever enter the bundle.**
    We extract numpy arrays, primitives, and lite dataclasses defined in
    this module (so unpickling never depends on classes in ``__main__``
-   from Phase 1/2 — except for the two ``BootstrapCIResult`` /
+   from Phase 1/2 -- except for the two ``BootstrapCIResult`` /
    ``GpDiagnosticResult`` dataclasses, which were already safe).
 
 2. **Atomic writes** via ``tempfile.mkstemp`` + ``os.replace``.  A
@@ -2115,9 +2115,9 @@ Fixes
    surface with a precise error name instead of a corrupted blob.
 
 4. **Multi-file layout** under ``<root>/cell_<id>/replot/``:
-       core.pkl        — bootstrap + GP diag + lite fit + MLE traces (~few MB)
-       pulse_pool.pkl  — ss_individual_pulses (optional, ~10–20 MB)
-       meta.json       — tiny human-readable index
+       core.pkl        -- bootstrap + GP diag + lite fit + MLE traces (~few MB)
+       pulse_pool.pkl  -- ss_individual_pulses (optional, ~10-20 MB)
+       meta.json       -- tiny human-readable index
 
 5. **Graceful lazy loading**: ``load_replot_bundle`` works even if
    ``pulse_pool.pkl`` is missing or corrupt; only the nonparametric
@@ -2163,9 +2163,9 @@ _VERSIONS = {
 }
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Lite dataclasses — defined HERE so they unpickle in any session
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Lite dataclasses -- defined HERE so they unpickle in any session
+# ===============================================================================
 
 @dataclass
 class _TrainBundleLite:
@@ -2192,7 +2192,7 @@ class _TrainBundleLite:
 class _SkoptDimLite:
     """Lite snapshot of a skopt ``Real`` / ``Integer`` dimension.
 
-    Carries just the bounds and the name — enough for axis-limit decisions
+    Carries just the bounds and the name -- enough for axis-limit decisions
     or any sanity-check at replot time.  Does *not* try to reconstruct
     a live skopt object on load.
     """
@@ -2201,9 +2201,9 @@ class _SkoptDimLite:
     high: float
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  ReplotBundle — the in-memory representation
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  ReplotBundle -- the in-memory representation
+# ===============================================================================
 
 @dataclass
 class ReplotBundle:
@@ -2212,7 +2212,7 @@ class ReplotBundle:
     Carries everything the four ``replot_*`` functions need.  Never holds
     a live NEURON cell, a ``gp_minimize`` ``OptimizeResult``, a
     ``GaussianProcessRegressor``, or a Phase-1 ``SweepBundle`` /
-    ``CellData`` — only plain data and lite dataclasses defined above.
+    ``CellData`` -- only plain data and lite dataclasses defined above.
 
     Notes
     -----
@@ -2227,7 +2227,7 @@ class ReplotBundle:
     bootstrap_result:     Any   # BootstrapCIResult
     gp_diagnostic_result: Any   # GpDiagnosticResult
 
-    # Phase-2 fit summary — only scalars / tuples / strings
+    # Phase-2 fit summary -- only scalars / tuples / strings
     mle_physical:        Tuple[float, float, float]
     train_rmsd_mV:       float
     residuals_sigma_mV:  float
@@ -2257,9 +2257,9 @@ class ReplotBundle:
     extras: Dict[str, Any] = field(default_factory=dict)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Internal helpers — extraction
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Internal helpers -- extraction
+# ===============================================================================
 
 def _to_train_bundle_lite(b) -> _TrainBundleLite:
     """Snapshot a Phase-1 SweepBundle into a _TrainBundleLite.
@@ -2354,9 +2354,9 @@ def _precompute_mle_traces(fit_result) -> Dict[int, np.ndarray]:
     return traces
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Internal helpers — atomic write + validation
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Internal helpers -- atomic write + validation
+# ===============================================================================
 
 def _validate_picklable(obj: Any, label: str) -> int:
     """Pickle ``obj`` to bytes; raise a clear error if it fails.
@@ -2434,9 +2434,9 @@ def _atomic_json_dump(obj: Any, target: Path) -> int:
     return target.stat().st_size
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Save  —  public API
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Save  --  public API
+# ===============================================================================
 
 def save_replot_bundle(
     *,
@@ -2452,11 +2452,11 @@ def save_replot_bundle(
     """Persist Phase-3 v3 artefacts atomically into ``cell_<id>/replot/``.
 
     Output files (all written atomically):
-        core.pkl        — bootstrap + GP diagnostic + lite fit summary +
+        core.pkl        -- bootstrap + GP diagnostic + lite fit summary +
                           training bundles + MLE traces (always required).
-        pulse_pool.pkl  — ss_individual_pulses (optional; only if available
+        pulse_pool.pkl  -- ss_individual_pulses (optional; only if available
                           and ``save_pulse_pool=True``).
-        meta.json       — human-readable index of shapes and versions.
+        meta.json       -- human-readable index of shapes and versions.
 
     The call signature is identical to v3 plus the new optional
     ``save_pulse_pool`` flag, so existing main scripts need no changes.
@@ -2474,12 +2474,12 @@ def save_replot_bundle(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if verbose:
-        print(f"[save_replot_bundle] cell {sid}: precomputing MLE traces …")
+        print(f"[save_replot_bundle] cell {sid}: precomputing MLE traces ...")
 
-    # ── 1. Precompute MLE traces while NEURON is still alive ──
+    # -- 1. Precompute MLE traces while NEURON is still alive --
     mle_traces = _precompute_mle_traces(fit_result)
 
-    # ── 2. Extract lite snapshots (no live objects past this point) ──
+    # -- 2. Extract lite snapshots (no live objects past this point) --
     train_bundles_lite = [
         _to_train_bundle_lite(b) for b in fit_result.opt_inputs.train_bundles
     ]
@@ -2513,9 +2513,9 @@ def save_replot_bundle(
         extras               = {},
     )
 
-    # ── 3. Upfront per-field validation ──
+    # -- 3. Upfront per-field validation --
     if verbose:
-        print("[save_replot_bundle]   validating each field is picklable …")
+        print("[save_replot_bundle]   validating each field is picklable ...")
     sizes: Dict[str, int] = {}
     for f in fields(bundle):
         if f.name == "pulse_pool":
@@ -2523,7 +2523,7 @@ def save_replot_bundle(
         sizes[f.name] = _validate_picklable(
             getattr(bundle, f.name), f"bundle.{f.name}")
 
-    # ── 4. Atomic write of core.pkl ──
+    # -- 4. Atomic write of core.pkl --
     core_path = out_dir / "core.pkl"
     core_size = _atomic_pickle_dump(bundle, core_path)
     written: Dict[str, Path] = {"core": core_path}
@@ -2531,7 +2531,7 @@ def save_replot_bundle(
         print(f"[save_replot_bundle]   wrote {core_path.name:<16}  "
               f"{core_size/1024:>9.1f} kB")
 
-    # ── 5. Optionally write pulse_pool.pkl ──
+    # -- 5. Optionally write pulse_pool.pkl --
     pulse_pool = getattr(cell_data, "ss_individual_pulses", None)
     if save_pulse_pool and pulse_pool is not None and len(pulse_pool) > 0:
         try:
@@ -2548,7 +2548,7 @@ def save_replot_bundle(
                 f"({type(e).__name__}: {e}). Trace diagnostic will be "
                 f"parametric-only at replot time.")
 
-    # ── 6. Atomic write of meta.json ──
+    # -- 6. Atomic write of meta.json --
     meta = {
         "specimen_id":         sid,
         "F_used":              float(F_used),
@@ -2574,15 +2574,15 @@ def save_replot_bundle(
 
     if verbose:
         total_kb = sum(p.stat().st_size for p in written.values()) / 1024
-        print(f"[save_replot_bundle] cell {sid}: done — total "
+        print(f"[save_replot_bundle] cell {sid}: done -- total "
               f"{total_kb:.1f} kB across {len(written)} files in {out_dir}")
 
     return written
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Load  —  public API
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Load  --  public API
+# ===============================================================================
 
 def load_replot_bundle(
     path,
@@ -2600,7 +2600,7 @@ def load_replot_bundle(
     load_pulse_pool
         If True and a sibling ``pulse_pool.pkl`` exists, it is loaded and
         attached to ``bundle.pulse_pool``.  Failures here are warned and
-        leave ``pulse_pool = None`` — they never abort the load.
+        leave ``pulse_pool = None`` -- they never abort the load.
 
     Notes
     -----
@@ -2637,7 +2637,7 @@ def load_replot_bundle(
             print(f"[load_replot_bundle] {len(unique)} class(es) replaced "
                   f"by _AttrBag during resilient load:")
             for mod_name, cls_name in unique:
-                print(f"   • {mod_name}.{cls_name}")
+                print(f"   * {mod_name}.{cls_name}")
 
     if not isinstance(bundle, ReplotBundle):
         warnings.warn(
@@ -2667,10 +2667,10 @@ def load_replot_bundle(
     return bundle
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  replot_trace_diagnostic  —  updated to read the flat bundle
+# ===============================================================================
+#  replot_trace_diagnostic  --  updated to read the flat bundle
 #  (the other three replot_* functions are unchanged; keep them from v3)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def replot_trace_diagnostic(
     bundle: ReplotBundle,
@@ -2709,7 +2709,7 @@ def replot_trace_diagnostic(
     sim_v = bundle.mle_traces_by_bundle[bundle_index]
     t_ms  = b0.t * 1e3
 
-    # σ / ρ for the parametric panel: prefer overrides, then saved values
+    # sigma / rho for the parametric panel: prefer overrides, then saved values
     sigma_res = sigma_override
     if sigma_res is None or not np.isfinite(sigma_res):
         sigma_res = bundle.residuals_sigma_mV
@@ -2733,7 +2733,7 @@ def replot_trace_diagnostic(
     p_kw  = dict(lw=0.7, alpha=0.6);  p_kw.update(parametric_kwargs    or {})
     np_kw = dict(lw=0.8, alpha=0.7);  np_kw.update(nonparametric_kwargs or {})
 
-    # ── LEFT: parametric ─────────────────────────────────────────────────
+    # -- LEFT: parametric -------------------------------------------------
     ax_p = axes[0]
     ax_p.plot(t_ms, b0.v_mV, color="k",        lw=1.2, alpha=0.8,
               label="experiment (averaged)")
@@ -2764,11 +2764,11 @@ def replot_trace_diagnostic(
     ax_p.set_ylabel("V (mV)")
     ax_p.set_title(
         f"Parametric bootstrap traces\n"
-        f"(σ_res={sigma_res:.4f} mV, mode={noise_mode})",
+        f"(sigma_res={sigma_res:.4f} mV, mode={noise_mode})",
         fontsize=10)
     ax_p.legend(loc="best", fontsize=8)
 
-    # ── RIGHT: nonparametric (only if pulse_pool was loaded) ─────────────
+    # -- RIGHT: nonparametric (only if pulse_pool was loaded) -------------
     if has_np:
         ax_n = axes[1]
         ax_n.plot(t_ms, b0.v_mV, color="k", lw=1.2, alpha=0.8,
@@ -2797,18 +2797,18 @@ def replot_trace_diagnostic(
 
     if show_suptitle:
         fig.suptitle(
-            f"Bootstrap trace diagnostic — cell {bundle.specimen_id}",
+            f"Bootstrap trace diagnostic -- cell {bundle.specimen_id}",
             fontsize=11, fontweight="bold")
         fig.tight_layout(rect=[0, 0, 1, 0.95])
     else:
         fig.tight_layout()
     return fig, axes
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  (B)  REPLOT FUNCTIONS — one per figure type, fully parameterised
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  (B)  REPLOT FUNCTIONS -- one per figure type, fully parameterised
+# ===============================================================================
 
-# Default CI styles — override per call if you want different aesthetics
+# Default CI styles -- override per call if you want different aesthetics
 DEFAULT_CI_STYLES = {
     "percentile": dict(color="tab:orange", ls="--",  lw=1.2, label="percentile"),
     "bca":        dict(color="tab:purple", ls=":",   lw=1.0, label="BCa"),
@@ -2816,15 +2816,15 @@ DEFAULT_CI_STYLES = {
 }
 
 DEFAULT_PARAM_LABELS = {
-    "Cm": r"$C_m$ (µF/cm²)",
-    "Rm": r"$R_m$ (Ω·cm²)",
-    "Ra": r"$R_a$ (Ω·cm)",
+    "Cm": r"$C_m$ (uF/cm^2)",
+    "Rm": r"$R_m$ (Ohm.cm^2)",
+    "Ra": r"$R_a$ (Ohm.cm)",
 }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 #  1.  Bootstrap histogram (one parameter)
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 def replot_bootstrap_histogram(
     bundle: ReplotBundle,
@@ -2894,8 +2894,8 @@ def replot_bootstrap_histogram(
     if title is None:
         mode_lbl = (f"noise={r.noise_mode}" if r.bootstrap_mode == "parametric"
                     else f"nonparam (n={r.n_pulses_per_replicate})")
-        title = (f"Bootstrap — {parameter}  |  cell {r.specimen_id}\n"
-                 f"B={r.B_requested} (kept={r.n_kept}), α={r.threshold_alpha}, "
+        title = (f"Bootstrap -- {parameter}  |  cell {r.specimen_id}\n"
+                 f"B={r.B_requested} (kept={r.n_kept}), alpha={r.threshold_alpha}, "
                  f"{r.bootstrap_mode}, {mode_lbl}")
     ax.set_title(title, fontsize=9)
 
@@ -2904,9 +2904,9 @@ def replot_bootstrap_histogram(
     return fig, ax
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 #  2.  Pairwise scatter (one pair)
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 def replot_bootstrap_pairwise(
     bundle: ReplotBundle,
@@ -2968,7 +2968,7 @@ def replot_bootstrap_pairwise(
             ell_phys = np.exp(ell_log)
             ax.plot(ell_phys[0], ell_phys[1],
                     color=ellipse_color, lw=ellipse_lw,
-                    label=fr"cov ellipse (χ²₂, {level:.0%})")
+                    label=fr"cov ellipse (chi^2_2, {level:.0%})")
         except Exception:
             pass
 
@@ -2981,8 +2981,8 @@ def replot_bootstrap_pairwise(
     ax.set_ylabel(y_label or DEFAULT_PARAM_LABELS[param_y])
 
     if title is None:
-        title = (f"Bootstrap joint — {param_x} vs {param_y}  |  "
-                 f"cell {r.specimen_id}\nρ(log) = {corr:+.3f}")
+        title = (f"Bootstrap joint -- {param_x} vs {param_y}  |  "
+                 f"cell {r.specimen_id}\nrho(log) = {corr:+.3f}")
     ax.set_title(title, fontsize=10)
 
     if show_legend:
@@ -2990,9 +2990,9 @@ def replot_bootstrap_pairwise(
     return fig, ax
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 #  3.  GP diagnostic profile (one parameter)
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 def replot_gp_profile(
     bundle: ReplotBundle,
@@ -3101,8 +3101,8 @@ def replot_gp_profile(
     ax.set_ylabel(y_label)
 
     if title is None:
-        trust = "GP ✓" if pp.gp_trustworthy else "GP ✗ MISMATCH"
-        title = (f"GP diagnostic — {parameter}  |  cell {gp_res.specimen_id}\n"
+        trust = "GP [ok]" if pp.gp_trustworthy else "GP [x] MISMATCH"
+        title = (f"GP diagnostic -- {parameter}  |  cell {gp_res.specimen_id}\n"
                  f"MLE = {pp.mle_value:.4g}   {trust}  (envelope k = {k:.0f})")
     ax.set_title(title, fontsize=9)
 
@@ -3112,9 +3112,9 @@ def replot_gp_profile(
                   loc="best", fontsize=8, frameon=True)
     return fig, ax
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  RESILIENT LOADER v2 — more tolerant AttrBag, two-pass strategy
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  RESILIENT LOADER v2 -- more tolerant AttrBag, two-pass strategy
+# ===============================================================================
 #
 #  Paste this cell AFTER phase3_persistence_and_replot.  Overrides
 #  load_replot_bundle with a version that:
@@ -3129,7 +3129,7 @@ def replot_gp_profile(
 #       accepts every pickle reconstruction protocol (cls(), cls(*args),
 #       cls.__new__(cls), cls.__new__(cls, *args), __setstate__,
 #       __setstate__ of (dict, slots), bare __dict__ assignment).
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 import io
 import pickle
@@ -3140,7 +3140,7 @@ class _AttrBag:
     """Bulletproof placeholder accepting every pickle reconstruction path."""
 
     def __new__(cls, *args, **kwargs):
-        # Pickle may call cls.__new__(cls, *args) — accept anything.
+        # Pickle may call cls.__new__(cls, *args) -- accept anything.
         inst = object.__new__(cls)
         if args:
             inst.__dict__["_init_args"] = args
@@ -3149,7 +3149,7 @@ class _AttrBag:
         return inst
 
     def __init__(self, *args, **kwargs):
-        # Pickle may also call cls(*args) — accept anything.
+        # Pickle may also call cls(*args) -- accept anything.
         if args and "_init_args" not in self.__dict__:
             self.__dict__["_init_args"] = args
         if kwargs and "_init_kwargs" not in self.__dict__:
@@ -3168,7 +3168,7 @@ class _AttrBag:
             self.__dict__["_state"] = state
 
     # Some pickle protocols call __reduce__ on the placeholder during
-    # cycle resolution — give a sensible default.
+    # cycle resolution -- give a sensible default.
     def __reduce__(self):
         return (_AttrBag, (), self.__dict__.copy())
 
@@ -3240,9 +3240,9 @@ def _load_replot_bundle_v3_resilient(path, *, verbose: bool = True):
     size = path.stat().st_size
     if size == 0:
         raise RuntimeError(
-            f"replot_bundle at {path} is 0 bytes — the previous save aborted.")
+            f"replot_bundle at {path} is 0 bytes -- the previous save aborted.")
 
-    # ── PASS 1: standard pickle.load ─────────────────────────────────────
+    # -- PASS 1: standard pickle.load -------------------------------------
     try:
         with open(path, "rb") as f:
             bundle = pickle.load(f)
@@ -3260,7 +3260,7 @@ def _load_replot_bundle_v3_resilient(path, *, verbose: bool = True):
             print(f"[load_replot_bundle] standard pickle raised "
                   f"{type(e).__name__}: {e}; trying resilient fallback.")
 
-    # ── PASS 2: resilient unpickler ──────────────────────────────────────
+    # -- PASS 2: resilient unpickler --------------------------------------
     missing: list = []
     try:
         with open(path, "rb") as f:
@@ -3271,7 +3271,7 @@ def _load_replot_bundle_v3_resilient(path, *, verbose: bool = True):
             f"\n"
             f"The standard pickle failed because some class is missing\n"
             f"from your current session, and the resilient fallback then\n"
-            f"hit an EOFError — meaning the substitution corrupted the\n"
+            f"hit an EOFError -- meaning the substitution corrupted the\n"
             f"reconstruction protocol for one of the objects in the\n"
             f"bundle.\n"
             f"\n"
@@ -3279,7 +3279,7 @@ def _load_replot_bundle_v3_resilient(path, *, verbose: bool = True):
             f"Phase 2 cells that DEFINE the dataclasses (SweepBundle,\n"
             f"CellData, PassiveSearchSpace, OptimiserInputs,\n"
             f"PassiveFitResult).  You do NOT need to refetch any AllenSDK\n"
-            f"data or rerun the fitting — only the class definitions need\n"
+            f"data or rerun the fitting -- only the class definitions need\n"
             f"to be present.  Then call load_replot_bundle again.\n"
         )
 
@@ -3288,18 +3288,18 @@ def _load_replot_bundle_v3_resilient(path, *, verbose: bool = True):
         print(f"[load_replot_bundle] {path.name} ({size/1024:.1f} kB) "
               f"loaded with {len(unique)} class(es) replaced by _AttrBag:")
         for mod_name, cls_name in unique:
-            print(f"   • {mod_name}.{cls_name}")
+            print(f"   * {mod_name}.{cls_name}")
     return bundle
 
 
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  USAGE
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 """
-phase3_publication_plots_v2.py — publication figures for v4 ReplotBundle
+phase3_publication_plots_v2.py -- publication figures for v4 ReplotBundle
 ========================================================================
 
 Drop-in replacement for `phase3_publication_plots.py`. Same public API,
@@ -3307,9 +3307,9 @@ re-implemented to consume a v4 ReplotBundle (no live GP model in scope).
 
 WHAT THIS MODULE READS FROM THE BUNDLE
 --------------------------------------
-  bundle.bootstrap_result          — samples (log+physical), RMSDs, CIs, cov_log
-  bundle.gp_diagnostic_result      — pre-computed 1D GP profiles per parameter
-  bundle.skopt_dimensions          — log-space bounds per parameter
+  bundle.bootstrap_result          -- samples (log+physical), RMSDs, CIs, cov_log
+  bundle.gp_diagnostic_result      -- pre-computed 1D GP profiles per parameter
+  bundle.skopt_dimensions          -- log-space bounds per parameter
   bundle.mle_physical, .specimen_id
 
 WHAT V4 DOES NOT SAVE (and why)
@@ -3320,30 +3320,30 @@ captured a closure over the live NEURON cell at fit time, and pickling that
 closure was the cause of the 43 MB corruption in v3. v4 therefore cannot
 evaluate gp.predict(...) at replot time.
 
-CONSEQUENCES — FOUR PLOTS ARE RE-DEFINED
+CONSEQUENCES -- FOUR PLOTS ARE RE-DEFINED
 ----------------------------------------
 The function names below are preserved so your existing calling code runs
 unmodified, but the figures now show statistically distinct quantities
 backed by what IS in the bundle. Each title announces what it is.
 
-  plot_gp_heatmap_pair          → bootstrap-RMSD interpolation heatmap
+  plot_gp_heatmap_pair          -> bootstrap-RMSD interpolation heatmap
                                    (scipy.interpolate.griddata over the
                                     bootstrap cloud; nan outside hull)
-  plot_gp_sigma_heatmap_pair    → bootstrap-density KDE heatmap
+  plot_gp_sigma_heatmap_pair    -> bootstrap-density KDE heatmap
                                    (gaussian_kde of bootstrap samples)
-  plot_3d_loss_surface          → 3D scatter of bootstrap samples, z = refit
+  plot_3d_loss_surface          -> 3D scatter of bootstrap samples, z = refit
                                    RMSD; no continuous surface
-  plot_gp_profile_family        → 1D μ_GP ± k·σ_GP envelope from
+  plot_gp_profile_family        -> 1D u_GP +/- k.sigma_GP envelope from
                                    gp_diagnostic_result + bootstrap histogram
                                    (the "family of curves at quantiles of
                                     family_param" required the live GP and
-                                    is silently dropped — the family_param
+                                    is silently dropped -- the family_param
                                     argument is accepted but unused, with a
                                     UserWarning emitted)
 
 PLOTS UNCHANGED FROM v1
 -----------------------
-  plot_3d_bootstrap_cloud, plot_corner — these never touched the live GP.
+  plot_3d_bootstrap_cloud, plot_corner -- these never touched the live GP.
 
 WHEN TO RE-RUN
 --------------
@@ -3382,21 +3382,21 @@ except ImportError:
 
 PARAM_NAMES  = ("Cm", "Rm", "Ra")
 PARAM_LABELS = {
-    "Cm": r"$C_m$ (µF/cm²)",
-    "Rm": r"$R_m$ (Ω·cm²)",
-    "Ra": r"$R_a$ (Ω·cm)",
+    "Cm": r"$C_m$ (uF/cm^2)",
+    "Rm": r"$R_m$ (Ohm.cm^2)",
+    "Ra": r"$R_a$ (Ohm.cm)",
 }
 PARAM_LABELS_PLAIN = {
-    "Cm": "Cm (µF/cm²)",
-    "Rm": "Rm (Ω·cm²)",
-    "Ra": "Ra (Ω·cm)",
+    "Cm": "Cm (uF/cm^2)",
+    "Rm": "Rm (Ohm.cm^2)",
+    "Ra": "Ra (Ohm.cm)",
 }
 _NC = {"Cm": 0, "Rm": 1, "Ra": 2}
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  THEMES — unchanged from v1
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  THEMES -- unchanged from v1
+# ===============================================================================
 
 @dataclass
 class Theme:
@@ -3480,9 +3480,9 @@ def _apply_mpl_theme(fig: Figure, theme: Theme):
         ax.grid(True, color=theme.grid, alpha=0.4, lw=0.5)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Shared utilities — all read v4 bundle attributes only
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  Shared utilities -- all read v4 bundle attributes only
+# ===============================================================================
 
 def _gather_ci(boot, ci_kinds: Sequence[str], param: str
                ) -> Dict[str, Tuple[float, float]]:
@@ -3559,9 +3559,9 @@ def _output_dir(bundle, root_dir, subdir="publication") -> Path:
     return _ensure_dir(Path(root_dir) / f"cell_{bundle.specimen_id}" / subdir)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  v4-native surrogate slices — replace the v1 GP-slice helper
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  v4-native surrogate slices -- replace the v1 GP-slice helper
+# ===============================================================================
 
 def _bootstrap_rmsd_slice(
     bundle, p_x: str, p_y: str, *,
@@ -3576,7 +3576,7 @@ def _bootstrap_rmsd_slice(
     rmsds) point cloud as scattered observations of the loss surface
     and interpolate them onto a regular grid.
 
-    The third parameter is NOT pinned at MLE — every bootstrap sample
+    The third parameter is NOT pinned at MLE -- every bootstrap sample
     contributes regardless of where its third coordinate lies. The
     resulting surface is therefore the marginalised loss-along-the-
     sampled-manifold, not a true slice. Outside the bootstrap convex
@@ -3605,10 +3605,10 @@ def _bootstrap_density_slice(
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """2D Gaussian KDE of the bootstrap samples in (p_x, p_y) log-space.
 
-    This shows where the bootstrap distribution concentrates — i.e. the
+    This shows where the bootstrap distribution concentrates -- i.e. the
     posterior-like uncertainty over the two parameters after
     marginalising over the third. It is the visual analogue of the v1
-    σ_GP slice, but it is not the same quantity. σ_GP measured GP
+    sigma_GP slice, but it is not the same quantity. sigma_GP measured GP
     uncertainty about the loss surface; this measures the spread of the
     fitted estimator.
 
@@ -3626,9 +3626,9 @@ def _bootstrap_density_slice(
     return np.exp(X), np.exp(Y), Z
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  1.  3D BOOTSTRAP CLOUD — unchanged from v1 (no GP access)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  1.  3D BOOTSTRAP CLOUD -- unchanged from v1 (no GP access)
+# ===============================================================================
 
 def plot_3d_bootstrap_cloud(
     bundle, *,
@@ -3649,12 +3649,12 @@ def plot_3d_bootstrap_cloud(
 ):
     """Interactive Plotly 3D scatter of bootstrap samples in log-space.
 
-    Identical to the v1 implementation — this function never touched
+    Identical to the v1 implementation -- this function never touched
     the live GP. Reads only `bundle.bootstrap_result` (samples, mle_log,
     cov_log, CIs).
     """
     if not _HAS_PLOTLY:
-        raise RuntimeError("plotly not installed — `pip install plotly`.")
+        raise RuntimeError("plotly not installed -- `pip install plotly`.")
     th = _resolve_theme(theme)
     boot = bundle.bootstrap_result
     samples = boot.samples_log
@@ -3754,7 +3754,7 @@ def plot_3d_bootstrap_cloud(
                     ))
 
     if title is None:
-        title = (f"Cell {boot.specimen_id} — bootstrap cloud (log-space)<br>"
+        title = (f"Cell {boot.specimen_id} -- bootstrap cloud (log-space)<br>"
                  f"<sub>B={boot.B_requested}, kept={boot.n_kept}, "
                  f"mode={boot.bootstrap_mode}</sub>")
 
@@ -3788,13 +3788,13 @@ def plot_3d_bootstrap_cloud(
     if save_html and out_dir is not None:
         out_path = _ensure_dir(out_dir) / filename
         fig.write_html(str(out_path), include_plotlyjs="cdn")
-        print(f"[plot_3d_bootstrap_cloud] saved → {out_path}")
+        print(f"[plot_3d_bootstrap_cloud] saved -> {out_path}")
     return fig if return_fig else None
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  2.  CORNER PLOT — unchanged from v1 (no GP access)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  2.  CORNER PLOT -- unchanged from v1 (no GP access)
+# ===============================================================================
 
 def plot_corner(
     bundle, *,
@@ -3811,7 +3811,7 @@ def plot_corner(
     filename_base: str = "corner",
     save_pdf: bool = True, save_png: bool = True,
 ) -> Tuple[Figure, Dict[str, Axes]]:
-    """Corner plot — diagonal 1D KDEs, lower-triangle 2D KDE heatmaps.
+    """Corner plot -- diagonal 1D KDEs, lower-triangle 2D KDE heatmaps.
 
     Unchanged from v1; reads only `bundle.bootstrap_result`.
     """
@@ -3864,7 +3864,7 @@ def plot_corner(
                 #    can expand the KDE grid bounds to cover its extent.
                 #    Otherwise, the ellipse can extend beyond the bootstrap
                 #    convex hull and the KDE colour terminates inside the
-                #    ellipse — visually misleading.
+                #    ellipse -- visually misleading.
                 if show_gaussian_ellipse:
                     sub_cov = np.array([[cov_log[j, j], cov_log[j, i]],
                                         [cov_log[i, j], cov_log[i, i]]])
@@ -3915,7 +3915,7 @@ def plot_corner(
                     ax.set_ylabel(PARAM_LABELS[pi], color=th.fg)
                 else:
                     # plt.setp on each tick-label artist is the most
-                    # robust way to hide labels — survives every
+                    # robust way to hide labels -- survives every
                     # downstream tick_params / autoscale call.
                     plt.setp(ax.get_yticklabels(), visible=False)
 
@@ -3957,10 +3957,10 @@ def plot_corner(
 
     if title is None:
         title = (f"Bootstrap distribution of passive parameters "
-                 f"— cell {boot.specimen_id}")
+                 f"-- cell {boot.specimen_id}")
     fig.suptitle(title, color=th.fg, fontsize=th.title_size+2, y=0.995)
     # Sub-caption with B / kept / mode goes below the title in smaller
-    # type — keeps the main title clean.
+    # type -- keeps the main title clean.
     fig.text(
         0.5, 0.965,
         f"n = {boot.n_kept} bootstrap resamples ({boot.bootstrap_mode}; "
@@ -3971,12 +3971,12 @@ def plot_corner(
     fig.subplots_adjust(left=0.10, right=0.98, top=0.93, bottom=0.08,
                         hspace=0.14, wspace=0.14)
 
-    # ── FINAL tick-label visibility pass ────────────────────────────────
+    # -- FINAL tick-label visibility pass --------------------------------
     # This block MUST run after _apply_mpl_theme and subplots_adjust.
     # On log-scale axes, mpl regenerates tick artists when tick_params is
     # called (e.g. inside _apply_mpl_theme), so any earlier
     # setp(visible=False) call gets silently undone. Running the pass last
-    # — when no further mpl calls touch ticks — guarantees the labels
+    # -- when no further mpl calls touch ticks -- guarantees the labels
     # stay hidden in the saved PDF/PNG.
     n_par = len(PARAM_NAMES)
     for i, pi in enumerate(PARAM_NAMES):
@@ -4003,13 +4003,13 @@ def plot_corner(
         if save_png:
             fig.savefig(out_path / f"{filename_base}.png",
                         facecolor=th.bg, dpi=200, bbox_inches="tight")
-        print(f"[plot_corner] saved → {out_path}/{filename_base}.[pdf|png]")
+        print(f"[plot_corner] saved -> {out_path}/{filename_base}.[pdf|png]")
     return fig, axes
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  3.  GP-mean heatmap (v1)  →  bootstrap-RMSD interpolation heatmap (v2)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  3.  GP-mean heatmap (v1)  ->  bootstrap-RMSD interpolation heatmap (v2)
+# ===============================================================================
 
 def plot_gp_heatmap_pair(
     bundle, p_x: str, p_y: str, *,
@@ -4028,14 +4028,14 @@ def plot_gp_heatmap_pair(
 ) -> Tuple[Figure, Axes]:
     """Heatmap of refit RMSDs interpolated from the bootstrap cloud.
 
-    NOTE — substitution from v1
+    NOTE -- substitution from v1
     ---------------------------
-    v1 showed the GP posterior mean μ_GP on a slice through the loss
+    v1 showed the GP posterior mean u_GP on a slice through the loss
     surface, with the third parameter pinned at its MLE. v4 bundles do
     not save the live GP, so this function instead interpolates the
     scattered (bootstrap_sample, refit_RMSD) pairs onto a regular 2D
     grid via scipy.interpolate.griddata. The third parameter is NOT
-    pinned — it is marginalised over the bootstrap distribution.
+    pinned -- it is marginalised over the bootstrap distribution.
 
     Pixels outside the convex hull of the bootstrap cloud appear as the
     colormap's "bad" colour (typically white/gray); this is honest about
@@ -4092,7 +4092,7 @@ def plot_gp_heatmap_pair(
     if title is None:
         third = next(p for p in PARAM_NAMES if p not in (p_x, p_y))
         title = (f"Loss surface on $({p_x},\\ {p_y})$  "
-                 f"— cell {boot.specimen_id}\n"
+                 f"-- cell {boot.specimen_id}\n"
                  f"RMSD interpolated from bootstrap "
                  f"({third} marginalised)")
     ax.set_title(title, color=th.fg, fontsize=th.title_size)
@@ -4101,9 +4101,9 @@ def plot_gp_heatmap_pair(
     return fig, ax
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  4.  GP-sigma heatmap (v1)  →  bootstrap-density KDE heatmap (v2)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  4.  GP-sigma heatmap (v1)  ->  bootstrap-density KDE heatmap (v2)
+# ===============================================================================
 
 def plot_gp_sigma_heatmap_pair(
     bundle, p_x: str, p_y: str, *,
@@ -4121,9 +4121,9 @@ def plot_gp_sigma_heatmap_pair(
 ) -> Tuple[Figure, Axes]:
     """Heatmap of the 2D bootstrap-sample KDE in (p_x, p_y) log-space.
 
-    NOTE — substitution from v1
+    NOTE -- substitution from v1
     ---------------------------
-    v1 showed σ_GP — the GP's posterior uncertainty about the loss
+    v1 showed sigma_GP -- the GP's posterior uncertainty about the loss
     surface. v4 cannot recompute that. The closest visualisation we can
     build from v4 data is the bootstrap-density KDE: where the
     parameter estimates concentrate after marginalising over the third.
@@ -4177,7 +4177,7 @@ def plot_gp_sigma_heatmap_pair(
     if title is None:
         third = next(p for p in PARAM_NAMES if p not in (p_x, p_y))
         title = (f"Bootstrap parameter density on $({p_x},\\ {p_y})$  "
-                 f"— cell {boot.specimen_id}\n"
+                 f"-- cell {boot.specimen_id}\n"
                  f"2D Gaussian KDE in log-space ({third} marginalised)")
     ax.set_title(title, color=th.fg, fontsize=th.title_size)
     ax.legend(fontsize=7.5, loc="best", labelcolor=th.fg, frameon=True)
@@ -4185,14 +4185,14 @@ def plot_gp_sigma_heatmap_pair(
     return fig, ax
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  5.  Profile family (v1)  →  1D GP profile + bootstrap histogram (v2)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  5.  Profile family (v1)  ->  1D GP profile + bootstrap histogram (v2)
+# ===============================================================================
 
 def plot_gp_profile_family(
     bundle,
     parameter: str,
-    family_param: Optional[str] = None,   # accepted but unused — see warning
+    family_param: Optional[str] = None,   # accepted but unused -- see warning
     *,
     percentiles: Sequence[float] = (0.05, 0.25, 0.50, 0.75, 0.95),  # unused
     envelope_k: float = 2.0,
@@ -4202,14 +4202,14 @@ def plot_gp_profile_family(
     figsize: Tuple[float, float] = (8.5, 5.5),
     title: Optional[str] = None,
     ax: Optional[Axes] = None,
-    # Deprecated v1 keywords — accepted silently for signature compat:
+    # Deprecated v1 keywords -- accepted silently for signature compat:
     show_bootstrap_hist: Optional[bool] = None,
     hist_bins: Optional[int] = None,
     **_unused,
 ) -> Tuple[Figure, Axes]:
-    """1D GP profile (μ ± k·σ) along one passive parameter.
+    """1D GP profile (u +/- k.sigma) along one passive parameter.
 
-    NOTE — substitution from v1
+    NOTE -- substitution from v1
     ---------------------------
     v1 plotted a *family* of GP profile curves, each with `family_param`
     pinned at a different quantile of its bootstrap distribution. That
@@ -4217,7 +4217,7 @@ def plot_gp_profile_family(
 
     v2 plots the single 1D GP profile that v4 *did* persist (in
     ``bundle.gp_diagnostic_result.per_parameter[parameter]``) surrounded
-    by the σ-envelope from that same precomputed profile. The MLE and
+    by the sigma-envelope from that same precomputed profile. The MLE and
     requested bootstrap CIs are overlaid as vertical lines.
 
     A previous version of this function also overlaid the bootstrap
@@ -4250,7 +4250,7 @@ def plot_gp_profile_family(
     else:
         fig = ax.figure
 
-    # GP profile (μ ± k·σ) from the precomputed diagnostic
+    # GP profile (u +/- k.sigma) from the precomputed diagnostic
     ax.plot(pp.grid_physical, pp.profile_mean,
             color=th.gp_mean, lw=1.8, label=r"$\mu_{GP}$")
     ax.fill_between(
@@ -4261,12 +4261,12 @@ def plot_gp_profile_family(
         label=fr"$\mu_{{GP}} \pm {envelope_k:.0f}\sigma_{{GP}}$",
     )
 
-    # MLE — kept in the legend as a generic entry; the numeric value
+    # MLE -- kept in the legend as a generic entry; the numeric value
     # is shown as a small annotation near the line so it doesn't crowd
     # the legend.
     ax.axvline(pp.mle_value, color=th.mle, lw=1.0, alpha=0.7, label="MLE")
 
-    # CIs — collect handles by kind so duplicates don't appear in legend
+    # CIs -- collect handles by kind so duplicates don't appear in legend
     seen_ci = set()
     for ci_kind in show_ci:
         ci = _gather_ci(boot, [ci_kind], parameter).get(ci_kind)
@@ -4282,20 +4282,20 @@ def plot_gp_profile_family(
     ax.set_xlabel(PARAM_LABELS[parameter], color=th.fg)
     ax.set_ylabel("GP profile RMSD (mV)", color=th.fg)
 
-    # Polished title — single line, no internal diagnostic jargon.
+    # Polished title -- single line, no internal diagnostic jargon.
     if title is None:
         title = (f"1D loss profile along {PARAM_LABELS[parameter].split(' ')[0]}  "
-                 f"— cell {bundle.specimen_id}")
+                 f"-- cell {bundle.specimen_id}")
     ax.set_title(title, color=th.fg, fontsize=th.title_size)
 
     # Trust flag: if the precomputed GP profile disagreed with the
     # underlying NEURON simulations at validation time, surface that as
-    # a small italic footnote — never in the title.
+    # a small italic footnote -- never in the title.
     if not pp.gp_trustworthy:
         fig.text(
             0.5, 0.005,
             "Note: precomputed GP profile disagreed with reference "
-            "simulations at validation — interpret envelope with caution.",
+            "simulations at validation -- interpret envelope with caution.",
             ha="center", va="bottom", color=th.fg, fontsize=8, style="italic",
         )
 
@@ -4309,9 +4309,9 @@ def plot_gp_profile_family(
     return fig, ax
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  6.  3D loss surface (v1)  →  3D bootstrap RMSD scatter (v2)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  6.  3D loss surface (v1)  ->  3D bootstrap RMSD scatter (v2)
+# ===============================================================================
 
 def plot_3d_loss_surface(
     bundle, p_x: str, p_y: str,
@@ -4329,11 +4329,11 @@ def plot_3d_loss_surface(
 ):
     """3D scatter of bootstrap samples in (p_x, p_y, RMSD) space.
 
-    NOTE — substitution from v1
+    NOTE -- substitution from v1
     ---------------------------
     v1 drew a continuous GP-mean surface over (p_x, p_y) with the
     bootstrap cloud hovering at their refit RMSDs. v4 has no continuous
-    surface available. v2 keeps only the bootstrap cloud — each sample
+    surface available. v2 keeps only the bootstrap cloud -- each sample
     plotted in 3D with x, y in log-space of the chosen pair and z = its
     stored refit RMSD. This is a "samples on the loss surface" view; no
     continuous fit is implied.
@@ -4375,9 +4375,9 @@ def plot_3d_loss_surface(
 
     third = next(p for p in PARAM_NAMES if p not in (p_x, p_y))
     if title is None:
-        title = (f"Cell {bundle.specimen_id} — bootstrap RMSD cloud "
+        title = (f"Cell {bundle.specimen_id} -- bootstrap RMSD cloud "
                  f"({p_x} vs {p_y}; {third} marginalised)<br>"
-                 f"<sub>substitute for v1 GP surface — no continuous fit</sub>")
+                 f"<sub>substitute for v1 GP surface -- no continuous fit</sub>")
 
     fig.update_layout(
         title=dict(text=title, font=dict(color=th.fg, size=th.title_size+4)),
@@ -4404,13 +4404,13 @@ def plot_3d_loss_surface(
             filename = f"3d_loss_surface_{p_x}_{p_y}.html"
         out_path = _ensure_dir(out_dir) / filename
         fig.write_html(str(out_path), include_plotlyjs="cdn")
-        print(f"[plot_3d_loss_surface] saved → {out_path}")
+        print(f"[plot_3d_loss_surface] saved -> {out_path}")
     return fig
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  RENDER ALL — orchestration wrapper, unchanged orchestration order
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  RENDER ALL -- orchestration wrapper, unchanged orchestration order
+# ===============================================================================
 
 def render_all_publication_figures(
     bundle, *,
@@ -4425,14 +4425,14 @@ def render_all_publication_figures(
     Outputs under  <root_dir>/cell_<id>/publication/<theme>/
 
     For each theme directory:
-      • corner.[pdf|png]
-      • 3d_bootstrap_cloud.html
-      • gp_mean_heatmap_{Cm_Rm,Cm_Ra,Rm_Ra}.[pdf|png]   ← bootstrap-RMSD
-      • gp_sigma_heatmap_{Cm_Rm,Cm_Ra,Rm_Ra}.[pdf|png]  ← bootstrap-density
-      • profile_{Cm,Rm,Ra}.[pdf|png]                    ← 1D GP profile
+      * corner.[pdf|png]
+      * 3d_bootstrap_cloud.html
+      * gp_mean_heatmap_{Cm_Rm,Cm_Ra,Rm_Ra}.[pdf|png]   <- bootstrap-RMSD
+      * gp_sigma_heatmap_{Cm_Rm,Cm_Ra,Rm_Ra}.[pdf|png]  <- bootstrap-density
+      * profile_{Cm,Rm,Ra}.[pdf|png]                    <- 1D GP profile
                                                           (one per param;
                                                           family_param dropped)
-      • 3d_loss_surface_{Cm_Rm,Cm_Ra,Rm_Ra}.html        ← RMSD scatter
+      * 3d_loss_surface_{Cm_Rm,Cm_Ra,Rm_Ra}.html        <- RMSD scatter
     """
     base = _output_dir(bundle, root_dir, subdir="publication")
     pairs = [("Cm", "Rm"), ("Cm", "Ra"), ("Rm", "Ra")]
@@ -4440,7 +4440,7 @@ def render_all_publication_figures(
     for tname in themes:
         out_dir = _ensure_dir(base / tname)
         if verbose:
-            print(f"\n[publication suite — theme={tname}] → {out_dir}")
+            print(f"\n[publication suite -- theme={tname}] -> {out_dir}")
 
         # 1. Corner
         fig, _ = plot_corner(bundle, show_ci=show_ci, theme=tname,
@@ -4492,12 +4492,12 @@ def render_all_publication_figures(
             )
 
         if verbose:
-            print(f"[publication suite — theme={tname}] done.")
+            print(f"[publication suite -- theme={tname}] done.")
     return base
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  USAGE
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 from pathlib import Path
 from google.colab import drive
@@ -4508,7 +4508,7 @@ input_dir = '/content/drive/MyDrive/Colab Notebooks/Passive_opt_out'
 bundle = load_replot_bundle(
   Path(input_dir) / "cell_531520401" / "replot")
 
-# Single calls — same names as v1, but title/colorbars announce
+# Single calls -- same names as v1, but title/colorbars announce
 # what each substitution shows
 fig = plot_3d_bootstrap_cloud(bundle, projection_mode="c",
                             show_ci_rectangles=True, ci_kind="bca",

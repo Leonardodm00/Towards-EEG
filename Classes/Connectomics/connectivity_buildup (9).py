@@ -837,10 +837,10 @@ mtypes_, gtypes_, post_to_pre_= add_independent_thalamic_sources(mtypes, gtypes,
 
 #     # --- Final Report ---
 #     if not errors:
-#         print("✅ VALIDATION PASSED: All thalamic sources are mathematically accurate, perfectly independent, and properly typed.")
+#         print("[OK] VALIDATION PASSED: All thalamic sources are mathematically accurate, perfectly independent, and properly typed.")
 #         return True
 #     else:
-#         print("❌ VALIDATION FAILED with the following hidden bugs:")
+#         print("[FAIL] VALIDATION FAILED with the following hidden bugs:")
 #         for error in errors:
 #             print(f"  - {error}")
 #         return False
@@ -1186,10 +1186,10 @@ def validate_all_virtual_sources(original_cortical_ids, mtypes, gtypes, post_to_
 
     # --- Final Report ---
     if not errors:
-        print("✅ FULL VALIDATION PASSED: All Thalamic and Background sources are mathematically accurate, perfectly independent, and properly typed.")
+        print("[OK] FULL VALIDATION PASSED: All Thalamic and Background sources are mathematically accurate, perfectly independent, and properly typed.")
         return True
     else:
-        print("❌ VALIDATION FAILED with the following hidden bugs:")
+        print("[FAIL] VALIDATION FAILED with the following hidden bugs:")
         for error in errors:
             print(f"  - {error}")
         return False
@@ -1267,15 +1267,15 @@ def plot_3d_microcolumn_colab(cell_coords, cell_mtypes, radius=210.0, max_displa
 
         scene=dict(
             xaxis=dict(
-                title="X (µm)", color='white', gridcolor="#444",
+                title="X (um)", color='white', gridcolor="#444",
                 backgroundcolor='black', showbackground=True
             ),
             yaxis=dict(
-                title="Y (µm)", color='white', gridcolor="#444",
+                title="Y (um)", color='white', gridcolor="#444",
                 backgroundcolor='black', showbackground=True
             ),
             zaxis=dict(
-                title="Depth (µm)", color='white', gridcolor="#444",
+                title="Depth (um)", color='white', gridcolor="#444",
                 backgroundcolor='black', showbackground=True
             ),
             aspectmode='data'
@@ -1548,7 +1548,7 @@ if bbp_results:
                 for mtype, data in sorted_mtypes:
                     perc = data['percentage']
                     count = data['count']
-                    print(f"    • {mtype:<12}: {perc:>6.2f}%  ({count} cells)")
+                    print(f"    * {mtype:<12}: {perc:>6.2f}%  ({count} cells)")
 
 # 1. The Updated Extraction Function (Now includes 'cell_mtypes' and 'cell_gtypes')
 def extract_macro_populations(connectomics_data, name_list):

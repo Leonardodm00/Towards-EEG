@@ -9,7 +9,7 @@
 ##########################################################################
 # Passive-property fitting pipeline (HPC sequential mode)
 #
-# Phase 2 and Phase 3 both run sequentially — one cell at a time —
+# Phase 2 and Phase 3 both run sequentially -- one cell at a time --
 # matching the Colab pipeline's one-session-per-cell semantics.
 # NEURON's process-global section list is wiped between cells via
 # PassiveCell.destroy(), so no section-contamination bugs can occur.
@@ -17,8 +17,8 @@
 # N_WORKERS and BOOTSTRAP_WORKERS have been removed: they are hard-coded
 # to 1 inside the Python script and cannot be overridden from here.
 #
-# ── Multi-node dispatch ─────────────────────────────────────────────────
-# Cells are grouped into per-(layer × type) folders under ARCHIVE_ROOT
+# -- Multi-node dispatch -------------------------------------------------
+# Cells are grouped into per-(layer x type) folders under ARCHIVE_ROOT
 # (e.g. ARCHIVE_ROOT/L2_exc, ARCHIVE_ROOT/L3_inh, ...). Each PBS job
 # processes exactly one group, selected via the $GROUP env variable:
 #
@@ -29,7 +29,7 @@
 # EDIT THE VARIABLES IN THE "USER CONFIG" BLOCK BELOW BEFORE SUBMITTING.
 ##########################################################################
 
-# ─── USER CONFIG ────────────────────────────────────────────────────────
+# --- USER CONFIG --------------------------------------------------------
 # Absolute paths are recommended (jobs don't always inherit $PWD).
 # The actual archive/output dirs used by the job are <ROOT>/<GROUP>.
 
@@ -37,7 +37,7 @@ ARCHIVE_ROOT="/davinci-1/home/ldellamea/Human Neurons Fitting"
 OUTPUT_ROOT="/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs"
 SCRIPT_PATH="/davinci-1/home/ldellamea/Human Neurons Fitting/passive_fitting_hpc_fixed.py"
 
-# ─── Phase 1 / Phase 2 parameters ───────────────────────────────────────
+# --- Phase 1 / Phase 2 parameters ---------------------------------------
 N_AVG_GROUPS=3          # sweep-average groups per polarity
 FIT_TARGET="hyp"        # dep | hyp | both
 # Spine-area correction (Eyal 2016 L2/3 default). Can be overridden per-group
@@ -48,20 +48,20 @@ N_CALLS=100             # GP optimiser evaluations per cell
 N_INITIAL=50            # random initial points before GP takes over
 MAX_CELLS=""            # max cells to process (empty = all in archive)
 
-# ─── Phase 3 / Bootstrap parameters ─────────────────────────────────────
+# --- Phase 3 / Bootstrap parameters -------------------------------------
 SKIP_PHASE3=0                    # 1 = skip Phase 3 entirely, 0 = run it
-BOOTSTRAP_B=200                  # bootstrap replicates (≥200 for stable BCa)
+BOOTSTRAP_B=200                  # bootstrap replicates (>=200 for stable BCa)
 BOOTSTRAP_MODE="nonparametric"   # parametric | nonparametric
 NOISE_MODE="block"               # iid | ar1 | block  (parametric only)
 BOOTSTRAP_N_CALLS=40             # GP budget per bootstrap replicate
 BOOTSTRAP_N_INITIAL=20           # random initial points per bootstrap replicate
 
-# ─── Phase 2.5 parameters (fix Ra per group + refit Cm,Rm) ───────────────
+# --- Phase 2.5 parameters (fix Ra per group + refit Cm,Rm) ---------------
 # Phase 2.5 is a MANDATORY stage and runs by default. It profiles RMSD-vs-Ra
 # for every cell, fixes Ra at the cohort median of the per-cell profile
 # argmins (or a literature value if too few cells qualify), then refits
 # (Cm, Rm) at that single fixed Ra. Phase 3's bootstrap then fixes Ra
-# (2-D over Cm,Rm) automatically — this is NOT a separate switch: it is tied
+# (2-D over Cm,Rm) automatically -- this is NOT a separate switch: it is tied
 # to whether Phase 2.5 ran. Set SKIP_PHASE2P5=1 ONLY for a diagnostic run
 # that reproduces the legacy free-Ra behaviour (Ra stays free in Phase 2's
 # fit AND Phase 3 reverts to a full 3-D bootstrap).
@@ -73,9 +73,9 @@ SKIP_PHASE2P5="${SKIP_PHASE2P5:-0}"   # 1 = skip Phase 2.5 (legacy free-Ra)
 N_FLOOR="${N_FLOOR:-4}"               # min qualifying cells for cohort-median Ra;
                                       #   below this -> per-(layer,type) literature fallback
 N_RA_PROFILE="${N_RA_PROFILE:-50}"    # Ra grid points for the RMSD-vs-Ra profile (log-spaced)
-# ────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------
 
-# ─── Resolve per-job paths from $GROUP ──────────────────────────────────
+# --- Resolve per-job paths from $GROUP ----------------------------------
 # $GROUP must be provided at submission time:
 #     qsub -v GROUP=L2_exc submit_passive_fit.sh
 if [ -z "$GROUP" ]; then
@@ -92,7 +92,7 @@ if [ ! -d "$ARCHIVE_DIR" ]; then
     echo "[FATAL] Archive directory does not exist: $ARCHIVE_DIR" >&2
     exit 3
 fi
-# ────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------
 
 # Move to the directory from which the job was submitted
 cd "$PBS_O_WORKDIR"
@@ -129,7 +129,7 @@ fi
 echo "Bootstrap:              B=$BOOTSTRAP_B  mode=$BOOTSTRAP_MODE  n_calls=$BOOTSTRAP_N_CALLS  n_initial=$BOOTSTRAP_N_INITIAL  [sequential]"
 echo "-----------------------------------------"
 
-# ─── Build the argument list ────────────────────────────────────────────
+# --- Build the argument list --------------------------------------------
 ARGS=(
     --archive-dir         "$ARCHIVE_DIR"
     --output-dir          "$OUTPUT_DIR"
@@ -162,7 +162,7 @@ if [ "$SKIP_PHASE3" = "1" ]; then
     ARGS+=(--skip-phase3)
 fi
 
-# ─── Run ────────────────────────────────────────────────────────────────
+# --- Run ----------------------------------------------------------------
 python3 "$SCRIPT_PATH" "${ARGS[@]}"
 
 # Clean up

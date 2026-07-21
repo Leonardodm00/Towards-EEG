@@ -3,7 +3,7 @@
 run_synth_benchmark.py
 ======================
 
-Phase 2 entrypoint of the da Vinci synthetic passive-fit benchmark — ONE cohort
+Phase 2 entrypoint of the da Vinci synthetic passive-fit benchmark -- ONE cohort
 per invocation (called by submit_synth_benchmark.sh with $GROUP).
 
 Pipeline for the cohort:
@@ -37,7 +37,7 @@ import pandas as pd
 
 
 # ===========================================================================
-#  Progress logging — timestamped + flushed so it lands in the PBS .o file
+#  Progress logging -- timestamped + flushed so it lands in the PBS .o file
 #  in REAL TIME (Python buffers stdout when it is a file, so flush=True is
 #  what makes `tail -f job.o*` actually show progress as it happens).
 # ===========================================================================
@@ -175,16 +175,16 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         f"n_calls={args.n_calls}")
 
     # ---- 2. GENERATE archives -----------------------------------------------
-    log(f"[1/6] GENERATE — building {len(group_df)} synthetic archive(s) ...")
+    log(f"[1/6] GENERATE -- building {len(group_df)} synthetic archive(s) ...")
     gfm.generate_group(
         group_df, args.archive_dir, sgt=sgt, mono=mono,
         ss_n_repeats=args.ss_n_repeats,
         ls_hyp_amplitudes_pA=parse_float_list(args.ls_hyp_amps),
         clear_fn=_clear, verbose=True)
-    log("[1/6] GENERATE — done.")
+    log("[1/6] GENERATE -- done.")
 
     # ---- 3. PATCH long-step (split is tau_w-independent; placeholder tau_w) --
-    log("[2/6] PATCH — integrate_long_step (train/validation split) ...")
+    log("[2/6] PATCH -- integrate_long_step (train/validation split) ...")
     ls_kwargs = dict(
         n_long_train=args.n_long_train,
         max_ls_train_deflection_mV=args.ls_deflection_cap,
@@ -194,10 +194,10 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         ss_t0_ms=(None if args.ss_t0_ms is None else float(args.ss_t0_ms)),
     )
     plst.integrate_long_step(mono, ss_tau_w_ms=tau_grid[0], **ls_kwargs, verbose=True)
-    log("[2/6] PATCH — done.")
+    log("[2/6] PATCH -- done.")
 
     # ---- 4. LOAD this cohort's archives -------------------------------------
-    log("[3/6] LOAD — reading archives + preparing optimiser inputs ...")
+    log("[3/6] LOAD -- reading archives + preparing optimiser inputs ...")
     sids = [int(s) for s in group_df["specimen_id"]]
     cells_data = mono.load_cells_from_archive(
         args.archive_dir, n_avg_groups=args.n_avg_groups, specimen_ids=sids)
@@ -205,10 +205,10 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                   for cd in cells_data]
     cm_true_by_sid = dict(zip(group_df["specimen_id"].astype(int),
                               group_df["cm_true"].astype(float)))
-    log(f"[3/6] LOAD — {len(cells_data)} cell(s) loaded.")
+    log(f"[3/6] LOAD -- {len(cells_data)} cell(s) loaded.")
 
     # ---- 5. TWO-PASS auto-tau_w fit (one cell at a time) --------------------
-    log(f"[4/6] FIT — two-pass auto-tau_w over {len(cells_data)} cell(s) "
+    log(f"[4/6] FIT -- two-pass auto-tau_w over {len(cells_data)} cell(s) "
         f"(sequential) ...")
     results: List[object] = []
     tau_rows: List[dict] = []
@@ -262,7 +262,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                 f"Cm={fr.cm_uF_per_cm2:.3f} Rm={fr.rm_Ohm_cm2:.0f} "
                 f"Ra={fr.ra_Ohm_cm:.0f} status={fr.validation_status} "
                 f"| cell total {time.time()-t_cell:.0f}s")
-        except Exception as exc:  # noqa: BLE001 — log which cell died, then re-raise
+        except Exception as exc:  # noqa: BLE001 -- log which cell died, then re-raise
             log(f"  cell {i+1}/{len(cells_data)} ({sid}): FAILED after "
                 f"{time.time()-t_cell:.0f}s -> {type(exc).__name__}: {exc}")
             raise
@@ -275,12 +275,12 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
     pd.DataFrame(tau_rows).to_csv(out / "tau_w_choice.csv", index=False)
     results_to_dataframe(results).to_csv(out / "phase2_results.csv", index=False)
-    log(f"[4/6] FIT — done: {len(results)} fit(s) -> phase2_results.csv")
+    log(f"[4/6] FIT -- done: {len(results)} fit(s) -> phase2_results.csv")
 
     # ---- 6. PHASE 2.5 (mutates results in place; cohort = archive dir name) -
     phase2p5_ran = not args.skip_phase2p5
     if phase2p5_ran:
-        log("[5/6] PHASE 2.5 — profile Ra + fix at cohort median + refit ...")
+        log("[5/6] PHASE 2.5 -- profile Ra + fix at cohort median + refit ...")
         t_p25 = time.time()
         mono.run_phase2p5_for_group(
             results=results, cells_data=cells_data, opt_inputs=opt_inputs,
@@ -290,22 +290,22 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             acq_func=mono.DEFAULT_ACQ_FUNC, make_plots=True, seed=0, verbose=True)
         results_to_dataframe(results).to_csv(
             out / "phase2p5_combined_results.csv", index=False)
-        log(f"[5/6] PHASE 2.5 — done in {time.time()-t_p25:.0f}s")
+        log(f"[5/6] PHASE 2.5 -- done in {time.time()-t_p25:.0f}s")
     else:
-        log("[5/6] PHASE 2.5 — SKIPPED (--skip-phase2p5): Ra free; Phase 3 = 3-D.")
+        log("[5/6] PHASE 2.5 -- SKIPPED (--skip-phase2p5): Ra free; Phase 3 = 3-D.")
 
     # ---- 7. PHASE 3 (calibration subset only) -------------------------------
     subset = select_phase3_subset(group_df, args.phase3_subset)
     if subset:
-        log(f"[6/6] PHASE 3 — bootstrap subset {subset} ...")
+        log(f"[6/6] PHASE 3 -- bootstrap subset {subset} ...")
         t_p3 = time.time()
         _run_phase3_subset(mono, cps, results, cells_data, subset,
                            phase2p5_ran, args, out)
-        log(f"[6/6] PHASE 3 — done in {time.time()-t_p3:.0f}s")
+        log(f"[6/6] PHASE 3 -- done in {time.time()-t_p3:.0f}s")
     else:
-        log("[6/6] PHASE 3 — no subset for this cohort -> skipped")
+        log("[6/6] PHASE 3 -- no subset for this cohort -> skipped")
 
-    log(f"DONE cohort {args.group} — total {time.time()-_T0:.0f}s")
+    log(f"DONE cohort {args.group} -- total {time.time()-_T0:.0f}s")
 
 
 # ---------------------------------------------------------------------------
@@ -347,7 +347,7 @@ def _run_phase3_subset(mono, cps, results, cells_data, subset_ids,
                        phase2p5_ran, args, out):
     """Bootstrap CIs for the calibration subset, mirroring the monolith __main__
     Phase-3 loop (fix_ra iff Phase 2.5 ran)."""
-    print(f"\n{'='*60}\n  PHASE 3 — bootstrap (subset: {subset_ids})\n{'='*60}")
+    print(f"\n{'='*60}\n  PHASE 3 -- bootstrap (subset: {subset_ids})\n{'='*60}")
     common = dict(B=args.bootstrap_B, alpha=0.95, fit_mode="fast",
                   n_calls=args.bootstrap_n_calls, n_initial=args.bootstrap_n_initial,
                   ball_radius_log=0.2, rmsd_reject_mult=5.0, n_workers=1,
@@ -412,7 +412,7 @@ def _run_phase3_subset(mono, cps, results, cells_data, subset_ids,
 #  CLI
 # ---------------------------------------------------------------------------
 def _parse_args(argv):
-    ap = argparse.ArgumentParser(description="Synthetic passive-fit benchmark — one cohort.")
+    ap = argparse.ArgumentParser(description="Synthetic passive-fit benchmark -- one cohort.")
     ap.add_argument("--manifest", required=True)
     ap.add_argument("--group", required=True)
     ap.add_argument("--archive-dir", required=True)

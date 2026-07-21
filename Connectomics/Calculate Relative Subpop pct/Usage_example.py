@@ -27,4 +27,4 @@ if bbp_results:
                 for mtype, data in sorted_mtypes:
                     perc = data['percentage']
                     count = data['count']
-                    print(f"    • {mtype:<12}: {perc:>6.2f}%  ({count} cells)")
+                    print(f"    * {mtype:<12}: {perc:>6.2f}%  ({count} cells)")

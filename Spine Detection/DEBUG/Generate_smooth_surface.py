@@ -96,7 +96,7 @@ def sample_and_reconstruct_spines_interpolated(neuron_dict, neuron_id, n_samples
     Extracts spines and reconstructs them using continuous spline interpolation.
     """
     if neuron_id not in neuron_dict:
-        print(f"⚠️ Neuron {neuron_id} not found.")
+        print(f"[WARN] Neuron {neuron_id} not found.")
         return
         
     df = neuron_dict[neuron_id].copy()
@@ -116,7 +116,7 @@ def sample_and_reconstruct_spines_interpolated(neuron_dict, neuron_id, n_samples
     ]
 
     if not spine_roots:
-        print(f"🛑 No spines found in Neuron {neuron_id}.")
+        print(f"[STOP] No spines found in Neuron {neuron_id}.")
         return
 
     sampled_roots = random.sample(spine_roots, min(n_samples, len(spine_roots)))

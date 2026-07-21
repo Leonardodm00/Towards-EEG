@@ -107,7 +107,7 @@ def cell_MorphSelect(
             Example: ['/path/neuron_123_aligned.hoc', '/path/neuron_456_aligned.hoc']
         layer_boundaries (numpy.ndarray): 
             A 2D array of shape (N, 2) defining the [upper_Z, lower_Z] boundaries 
-            for each cortical layer in micrometers (μm).
+            for each cortical layer in micrometers (um).
             Example: [[0.0, -81.6], [-81.6, -587.1], ...]
         layer_names (list of str): 
             Display names for each layer, used strictly for annotating the debug plot.
@@ -117,7 +117,7 @@ def cell_MorphSelect(
             The length must exactly match the number of rows in `layer_boundaries`.
             Example: [0, 1500, 3200, 500, 0]
         target_z_pos (float): 
-            The absolute Z-coordinate (in μm) where this specific cell's soma 
+            The absolute Z-coordinate (in um) where this specific cell's soma 
             will be placed in the simulated cortical column. 
         synapse_base_path (str): 
             The directory path containing the mapped synapse CSV files.
@@ -149,7 +149,7 @@ def cell_MorphSelect(
         
         csv_path = os.path.join(synapse_base_path, f"neuron_{nid}_mapped_synapses.csv")
         if not os.path.exists(csv_path):
-            print(f"⚠️ Warning: Synapse CSV not found for {nid} at {csv_path}")
+            print(f"[WARN] Warning: Synapse CSV not found for {nid} at {csv_path}")
             continue
             
         syn_df = pd.read_csv(csv_path)
@@ -170,7 +170,7 @@ def cell_MorphSelect(
         if is_viable:
             # ---> DEBUG PLOTTING HOOK <---
             if plot_result:
-                print(f"✅ Winner found ({nid}). Extracting 3D geometry for plot...")
+                print(f"[OK] Winner found ({nid}). Extracting 3D geometry for plot...")
                 h('forall delete_section()')
                 success = h.load_file(str(path))
                 

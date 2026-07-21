@@ -390,9 +390,25 @@ def real_tree_checks(root, targets):
         with open(log_path, "r", encoding="utf-8") as fh:
             disk_log = json.load(fh)
         problems = D.verify(root, disk_log)
-        if problems:
-            return False, "verify against the committed log failed: %r" % problems[:3]
-        return True, "tree matches tools/s0_transform/s02_transform_log.json"
+        if not problems:
+            return True, "tree matches tools/s0_transform/s02_transform_log.json"
+        # A later sub-step is entitled to change these files. What must still
+        # hold is that the S0.2 work is intact: the neutralisation markers are
+        # present and the line count is unchanged. Byte equality is the job of
+        # tools/test_s0_chain.py, which knows about the whole chain.
+        s03 = os.path.join(os.path.dirname(targets), "s03_transform_log.json")
+        if not os.path.isfile(s03):
+            return False, "verify failed and no later transform explains it: %r" % problems[:2]
+        for e in disk_log["files"]:
+            with open(os.path.join(root, e["path"]), "rb") as fh:
+                data = fh.read()
+            if any(ed["transform"].startswith("T7") for ed in e["edits"]) \
+                    and b"#S0.2:T7" not in data:
+                return False, "S0.2 marker lost in %s" % e["path"]
+            if len(D.split_lines(data)) != e["n_lines_after"]:
+                return False, "line count changed in %s" % e["path"]
+        return True, ("S0.3 has since rewritten these files; S0.2 markers and "
+                      "line counts intact (byte equality: test_s0_chain.py)")
 
     def check_23_line_counts_preserved():
         bad = [e["path"] for e in log["files"]

@@ -21,7 +21,7 @@ def calculate_synaptic_overlap_locations(
     post_dend_path = os.path.join(density_maps_dir, f"{post_mtype}_dend.npy")
     
     if not (os.path.exists(pre_axon_path) and os.path.exists(post_dend_path)):
-        print("⚠️ Density maps not found for the specified mtypes.")
+        print("[WARN] Density maps not found for the specified mtypes.")
         return None, None
 
     # 2. Load the 3D probability arrays
@@ -52,7 +52,7 @@ def calculate_synaptic_overlap_locations(
         
         # If the shift is larger than the grid itself, there is zero overlap
         if start_post >= N or start_pre >= N or end_post <= 0 or end_pre <= 0:
-            print("ℹ️ Neurons are too far apart; bounding boxes do not overlap.")
+            print("[info] Neurons are too far apart; bounding boxes do not overlap.")
             return np.array([]), np.array([])
             
         slices_post.append(slice(start_post, end_post))
@@ -111,14 +111,14 @@ def debug_plot_synaptic_overlap(pre_mtype, post_mtype, density_maps_dir, pre_som
     Generates 2D Maximum Intensity Projections (XY and XZ planes) of the pre- and post-synaptic 
     probability fields in global physical space, highlighting the overlapping voxels as a heatmap.
     """
-    print("🎨 Generating 2D spatial overlap projections...")
+    print(" Generating 2D spatial overlap projections...")
 
     # 1. Construct file paths (assuming the naming convention from previous steps)
     pre_axon_path = os.path.join(density_maps_dir, f"{pre_mtype}_axon.npy")
     post_dend_path = os.path.join(density_maps_dir, f"{post_mtype}_dend.npy")
     
     if not (os.path.exists(pre_axon_path) and os.path.exists(post_dend_path)):
-        print("⚠️ Density maps not found for the specified mtypes.")
+        print("[WARN] Density maps not found for the specified mtypes.")
         return None, None
 
     # 2. Load the 3D probability arrays
@@ -171,8 +171,8 @@ def debug_plot_synaptic_overlap(pre_mtype, post_mtype, density_maps_dir, pre_som
     ax1.scatter(*pre_soma_pos[:2], c='red', s=80, marker='o', edgecolors='white', label='Pre Soma')
     
     ax1.set_title("XY Plane (Top-Down)")
-    ax1.set_xlabel("X (μm)")
-    ax1.set_ylabel("Y (μm)")
+    ax1.set_xlabel("X (um)")
+    ax1.set_ylabel("Y (um)")
     ax1.grid(color='gray', linestyle='--', alpha=0.3)
     ax1.legend(loc='upper right')
 
@@ -190,8 +190,8 @@ def debug_plot_synaptic_overlap(pre_mtype, post_mtype, density_maps_dir, pre_som
     ax2.scatter(pre_soma_pos[0], pre_soma_pos[2], c='red', s=80, marker='o', edgecolors='white')
 
     ax2.set_title("XZ Plane (Side View)")
-    ax2.set_xlabel("X (μm)")
-    ax2.set_ylabel("Z (μm)")
+    ax2.set_xlabel("X (um)")
+    ax2.set_ylabel("Z (um)")
     ax2.grid(color='gray', linestyle='--', alpha=0.3)
 
     plt.tight_layout()

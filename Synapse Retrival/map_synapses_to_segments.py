@@ -14,13 +14,13 @@ def map_synapses_to_segments(neuron_id, skeletons_dir='/content/drive/MyDrive/Co
     
     # 1. Check if files exist
     if not os.path.exists(skel_path):
-        print(f"⚠️ Skeleton file not found for neuron {neuron_id}: {skel_path}")
+        print(f"[WARN] Skeleton file not found for neuron {neuron_id}: {skel_path}")
         return None
         
     neuron_df = pd.read_csv(skel_path)
     
     if not os.path.exists(syn_path):
-        print(f"⚠️ Synapses file not found for neuron {neuron_id}: {syn_path}")
+        print(f"[WARN] Synapses file not found for neuron {neuron_id}: {syn_path}")
         return neuron_df # Return the unmodified skeleton
 
     # 2. Load and filter synapse data
@@ -28,7 +28,7 @@ def map_synapses_to_segments(neuron_id, skeletons_dir='/content/drive/MyDrive/Co
     syn_df = syn_df[syn_df['direction'] == 'incoming'].dropna(subset=['location_x', 'location_y', 'location_z'])
     
     if syn_df.empty:
-        print(f"⚠️ No valid incoming synapses found to map for neuron {neuron_id}.")
+        print(f"[WARN] No valid incoming synapses found to map for neuron {neuron_id}.")
         return neuron_df
 
     # 3. Build a KD-Tree using the RAW neuron coordinates
@@ -63,7 +63,7 @@ def map_synapses_to_segments(neuron_id, skeletons_dir='/content/drive/MyDrive/Co
             
         neuron_df.at[df_idx, 'synapse_label'] = label
         
-    print(f"✅ Successfully mapped {len(syn_coords)} synapses to neuron {neuron_id}.")
+    print(f"[OK] Successfully mapped {len(syn_coords)} synapses to neuron {neuron_id}.")
     
     return neuron_df
 import plotly.graph_objects as go

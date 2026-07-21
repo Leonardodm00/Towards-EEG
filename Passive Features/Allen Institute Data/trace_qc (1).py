@@ -214,7 +214,7 @@ def fit_bounded_single_exp(u_ms: np.ndarray, y_mV: np.ndarray, tau_m_ms: float,
 
 
 # =============================================================================
-# Statistic layer (pure) — all operate row-wise on (B, n) so the observed trace
+# Statistic layer (pure) -- all operate row-wise on (B, n) so the observed trace
 # (B=1) and the surrogate ensemble share one code path.
 # =============================================================================
 def decimate_rows(X: np.ndarray, q: int) -> np.ndarray:
@@ -365,7 +365,7 @@ def monte_carlo_pvalue(resid_full: np.ndarray, null_paths: np.ndarray,
 
 
 # =============================================================================
-# Orchestration (per pulse) — pure scoring, no plotting / no I/O
+# Orchestration (per pulse) -- pure scoring, no plotting / no I/O
 # =============================================================================
 def _detect_onset_offset(t_s: np.ndarray, i_pA: np.ndarray, stim_duration_s: float):
     """Detect pulse onset / offset sample indices from the command current."""
@@ -585,7 +585,7 @@ def plot_accepted_rejected(cell: CellQCResult, path: str, max_each: int = 24):
         ax.set_title(title)
         ax.set_xlabel("time from window start (ms)")
     axes[0].set_ylabel("baseline-subtracted deflection (mV)")
-    fig.suptitle(f"Trace QC — specimen {cell.specimen_id}  "
+    fig.suptitle(f"Trace QC -- specimen {cell.specimen_id}  "
                  f"(dashed = bounded single-exp fit; null='{cell.config['null_generator']}', "
                  f"alpha={cell.config['alpha']})")
     fig.tight_layout()
@@ -608,8 +608,8 @@ def plot_null_distribution(result: PulseQCResult, path: str, alpha: float):
                   f"(argmax @ {result.argmax_scale_ms:g} ms)")
     ax.set_ylabel("surrogate count")
     verdict = "REJECT" if not result.passed else "keep"
-    ax.set_title(f"Pulse {result.pulse_index} ({result.polarity}) — "
-                 f"p={result.p_value:.3f} → {verdict}")
+    ax.set_title(f"Pulse {result.pulse_index} ({result.polarity}) -- "
+                 f"p={result.p_value:.3f} -> {verdict}")
     ax.legend(fontsize=8)
     fig.tight_layout()
     fig.savefig(path, dpi=130)
@@ -769,11 +769,11 @@ def run_smoke_test(outdir: str = "smoke_out", seed: int = 1) -> dict:
           f"trace_qc_null_rejected.png")
 
     # ---- assertions (loose, demonstrational) ----
-    assert fpr <= 0.13, f"false-positive rate {fpr} too high — null miscalibrated"
-    assert power >= 0.70, f"power {power} too low — test missing the bumps"
+    assert fpr <= 0.13, f"false-positive rate {fpr} too high -- null miscalibrated"
+    assert power >= 0.70, f"power {power} too low -- test missing the bumps"
     assert spike_catch >= 0.90, f"spike gate catch {spike_catch} too low"
     assert cell_few.cell_rejected is True, "cell-level <10 rule did not fire"
-    print("  ALL ASSERTIONS PASSED ✔")
+    print("  ALL ASSERTIONS PASSED [ok]")
     print("======================================================\n")
     return metrics
 

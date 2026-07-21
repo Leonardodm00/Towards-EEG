@@ -66,7 +66,7 @@ def map_and_save_synapses_to_lfpy_idx(hoc_filepath, synapses_dir, neuron_id, som
                          nsegs_method='lambda_f', # Ensure this matches simulation params!
                          delete_sections=True)
     except Exception as e:
-        print(f"⚠️ Failed to load HOC into LFPy for {neuron_id}: {e}")
+        print(f"[WARN] Failed to load HOC into LFPy for {neuron_id}: {e}")
         return
 
     mapped_records = []
@@ -99,7 +99,7 @@ def map_and_save_synapses_to_lfpy_idx(hoc_filepath, synapses_dir, neuron_id, som
     mapped_df.to_csv(out_path, index=False)
     
     cell.__del__() 
-    print(f"✅ Snapped {len(mapped_records)} aligned synapses to LFPy indices for {neuron_id}.")
+    print(f"[OK] Snapped {len(mapped_records)} aligned synapses to LFPy indices for {neuron_id}.")
 
 def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
     """
@@ -130,7 +130,7 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
 
     root_rows = df[df['p'] == -1]
     if root_rows.empty:
-        print("⚠️ Cannot export to HOC: No root node found.")
+        print("[WARN] Cannot export to HOC: No root node found.")
         return
     root_id = root_rows.iloc[0]['id']
 
@@ -212,7 +212,7 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
     aligned_neurons = {}
 
     if not os.path.exists(metadata_filepath):
-        print(f"⚠️ Metadata file not found: {metadata_filepath}")
+        print(f"[WARN] Metadata file not found: {metadata_filepath}")
         return aligned_neurons
 
     metadata_df = pd.read_csv(metadata_filepath)
@@ -221,13 +221,13 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
 
     reference_somas = metadata_df[['soma_x', 'soma_y', 'soma_z']].values
 
-    print(f"🔄 Processing {len(neuron_ids)} neurons...")
+    print(f" Processing {len(neuron_ids)} neurons...")
     os.makedirs(outpath, exist_ok=True)
 
     for nid in neuron_ids:
         filepath = os.path.join(input_dir, f"neuron_{nid}.csv")
         if not os.path.exists(filepath):
-            print(f"⚠️ File for {nid} not found. Skipping.")
+            print(f"[WARN] File for {nid} not found. Skipping.")
             continue
 
         df = pd.read_csv(filepath)
@@ -274,7 +274,7 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
             rotation_matrix=mean_matrix 
         )
 
-        print(f"✅ Neuron {nid} fully processed, aligned, and synapses snapped.")
+        print(f"[OK] Neuron {nid} fully processed, aligned, and synapses snapped.")
 
         # 6. PLOTTING (Optional visual confirmation)
         if show_plot:

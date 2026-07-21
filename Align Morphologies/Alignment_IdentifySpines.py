@@ -194,7 +194,7 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
 
     root_rows = df[df['p'] == -1]
     if root_rows.empty:
-        print("⚠️ Cannot export to HOC: No root node found.")
+        print("[WARN] Cannot export to HOC: No root node found.")
         return
     root_id = root_rows.iloc[0]['id']
 
@@ -279,7 +279,7 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
 
     # --- 1. Load and Parse Metadata ---
     if not os.path.exists(metadata_filepath):
-        print(f"⚠️ Metadata file not found: {metadata_filepath}")
+        print(f"[WARN] Metadata file not found: {metadata_filepath}")
         return aligned_neurons
 
     metadata_df = pd.read_csv(metadata_filepath)
@@ -289,12 +289,12 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
 
     reference_somas = metadata_df[['soma_x', 'soma_y', 'soma_z']].values
 
-    print(f"🔄 Aligning {len(neuron_ids)} neurons using top {k_neighbors} neighbors from {os.path.basename(metadata_filepath)}...")
+    print(f" Aligning {len(neuron_ids)} neurons using top {k_neighbors} neighbors from {os.path.basename(metadata_filepath)}...")
 
     for nid in neuron_ids:
         filepath = os.path.join(input_dir, f"neuron_{nid}.csv")
         if not os.path.exists(filepath):
-            print(f"⚠️ File for neuron {nid} not found. Skipping.")
+            print(f"[WARN] File for neuron {nid} not found. Skipping.")
             continue
 
         df = pd.read_csv(filepath)
@@ -302,7 +302,7 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
         # --- 2. Find Soma and Center the Neuron ---
         root_rows = df[df['p'] == -1]
         if root_rows.empty:
-            print(f"⚠️ No root node found for {nid}. Skipping.")
+            print(f"[WARN] No root node found for {nid}. Skipping.")
             continue
 
         soma_pos = root_rows.iloc[0][['x', 'y', 'z']].values.astype(float)
@@ -338,7 +338,7 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
 
 
         mean_dist = np.mean(distances[nearest_indices])
-        print(f"✅ Neuron {nid} aligned and saved to HOC (Mean neighbor distance: {mean_dist:.1f} nm).")
+        print(f"[OK] Neuron {nid} aligned and saved to HOC (Mean neighbor distance: {mean_dist:.1f} nm).")
 
         # --- 6. Plotting ---
         if show_plot:

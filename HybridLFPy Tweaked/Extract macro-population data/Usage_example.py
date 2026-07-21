@@ -223,7 +223,7 @@ class Connectomics:
                         for mtype, data in sorted_mtypes:
                             perc = data['percentage']
                             count = data['count']
-                            print(f"    • {mtype:<12}: {perc:>6.2f}%  ({count} cells)")
+                            print(f"    * {mtype:<12}: {perc:>6.2f}%  ({count} cells)")
 
  
         
@@ -889,7 +889,7 @@ def debug_plot_macro_populations(extracted_data, column_input):
             mtype_counts = Counter(mtypes)
             print(f"--- {pop_name} (Total Cells: {len(coords)}) ---")
             for mt, count in mtype_counts.most_common():
-                print(f"    • {mt:<12}: {count} cells")
+                print(f"    * {mt:<12}: {count} cells")
             print("")
         else:
             print(f"--- {pop_name} (Total Cells: {len(coords)}) ---")
@@ -979,9 +979,9 @@ def debug_plot_macro_populations(extracted_data, column_input):
     fig_3d.update_layout(
         title=dict(text="Extraction Debug: Spatial Bounding Check", font=dict(color='white', size=20)),
         scene=dict(
-            xaxis=dict(title="X (µm)", backgroundcolor='black', gridcolor='#333', color='white'),
-            yaxis=dict(title="Y (µm)", backgroundcolor='black', gridcolor='#333', color='white'),
-            zaxis=dict(title="Depth Z (µm)", backgroundcolor='black', gridcolor='#333', color='white'),
+            xaxis=dict(title="X (um)", backgroundcolor='black', gridcolor='#333', color='white'),
+            yaxis=dict(title="Y (um)", backgroundcolor='black', gridcolor='#333', color='white'),
+            zaxis=dict(title="Depth Z (um)", backgroundcolor='black', gridcolor='#333', color='white'),
             aspectmode='data'
         ),
         paper_bgcolor='black',

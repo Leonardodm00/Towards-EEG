@@ -451,7 +451,7 @@ def render_all(summary: pd.DataFrame, coverage: pd.DataFrame, out_dir: Path,
         for fn in figs:
             try:
                 fn(summary, style, out_dir)
-            except Exception as exc:  # noqa: BLE001 — one bad fig never kills the rest
+            except Exception as exc:  # noqa: BLE001 -- one bad fig never kills the rest
                 print(f"[agg][WARN] {fn.__name__} ({style}) failed: "
                       f"{type(exc).__name__}: {exc}")
         try:
