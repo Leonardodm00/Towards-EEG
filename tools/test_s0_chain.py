@@ -44,8 +44,9 @@ if _HERE not in sys.path:
 
 from s0_paths import Resolver  # noqa: E402
 
-PHASE_COLUMNS = ("sha256_post_s06", "sha256_post_s05", "sha256_post_s04",
-                 "sha256_post_s03", "sha256_post_s02", "sha256_pre_s0")
+PHASE_COLUMNS = ("sha256_post_s07", "sha256_post_s06", "sha256_post_s05",
+                 "sha256_post_s04", "sha256_post_s03", "sha256_post_s02",
+                 "sha256_pre_s0")
 
 
 def end_of_chain(row):
@@ -203,7 +204,18 @@ def run(root):
         with open(_sl, "r", encoding="utf-8") as fh:
             s06_declared |= set(e["path"] for e in json.load(fh)["files"])
 
-    touched = set(s03) | set(s02 or {}) | SELF_REFERENTIAL | s06_declared
+    s07_declared = set()
+    _s7 = os.path.join(root, "tools", "s0_transform", "s07_exit_scope.json")
+    if os.path.isfile(_s7):
+        with open(_s7, "r", encoding="utf-8") as fh:
+            _d7 = json.load(fh)["clause_3_files_changed_at_s07"]
+        s07_declared = set(_d7["paths"]) | set(_d7["self_referential"])
+    _m7 = os.path.join(root, "tools", "s0_transform", "s07_discard_manifest.json")
+    if os.path.isfile(_m7):
+        with open(_m7, "r", encoding="utf-8") as fh:
+            s07_declared |= set(e["path"] for e in json.load(fh)["entries"])
+
+    touched = set(s03) | set(s02 or {}) | SELF_REFERENTIAL | s06_declared | s07_declared
     drifted = []
     for p, row in led.items():
         if p in touched or row["verdict"] == "discard":
@@ -352,6 +364,65 @@ def run(root):
         "the recorded inverse of T11 reproduces the pre-S0.6 bytes of all %d "
         "file(s); nothing changed outside a declared edit" % len(s06)
         if not bad else "; ".join(bad[:5]))
+
+    # -- link 5: S0.7 -------------------------------------------------------
+    # A removal link is shaped differently from an edit link. For an edit,
+    # continuity is "the output hash of one step is the input hash of the
+    # next". For a removal there IS no output hash, so the equivalent
+    # statement is: the last hash the file ever had is preserved somewhere
+    # the ledger can still reach. That is what half A asserts. Half B is the
+    # same shape as always -- everything not declared is unchanged.
+    m7 = os.path.join(root, "tools", "s0_transform", "s07_discard_manifest.json")
+    s7 = os.path.join(root, "tools", "s0_transform", "s07_exit_scope.json")
+    if not os.path.isfile(m7):
+        add("check_14_s07_link_present", False, "no S0.7 discard manifest")
+        return results
+    with open(m7, "r", encoding="utf-8") as fh:
+        man = json.load(fh)
+    with open(s7, "r", encoding="utf-8") as fh:
+        scope7 = json.load(fh)
+    entries = dict((e["path"], e) for e in man["entries"])
+
+    # -- half A: the chain does not END at a removed file, it is PRESERVED --
+    bad = []
+    for p, e in entries.items():
+        if os.path.isfile(os.path.join(root, p)):
+            bad.append("%s: declared removed but still on disk" % p)
+            continue
+        row = led.get(p)
+        if row is None:
+            bad.append("%s: removed and has NO LEDGER ROW -- this is exactly "
+                       "the row loss S0.7 exists to prevent" % p)
+            continue
+        if len(row["sha256_pre_s0"]) != 64:
+            bad.append("%s: row survives but sha256_pre_s0 was lost" % p)
+        if row["sha256_post_s06"] != e["sha256_at_capture"]:
+            bad.append("%s: the manifest's captured hash disagrees with the "
+                       "last hash the ledger recorded" % p)
+        if row["sha256_post_s07"] not in ("-", ""):
+            bad.append("%s: absent file carries a post_s07 hash" % p)
+    add("check_14_s07_removed_files_keep_their_record", not bad,
+        "all %d removed file(s) are absent from disk, still carry a ledger row, "
+        "still carry sha256_pre_s0, and hand their last hash to the manifest"
+        % len(entries) if not bad else "; ".join(bad[:5]))
+
+    # -- half B: nothing undeclared changed or vanished ---------------------
+    declared7 = set(entries)
+    declared7 |= set(scope7["clause_3_files_changed_at_s07"]["paths"])
+    declared7 |= set(scope7["clause_3_files_changed_at_s07"]["self_referential"])
+    drifted = []
+    for p, row in led.items():
+        if p in declared7:
+            continue
+        a, b = row.get("sha256_post_s06", "-"), row.get("sha256_post_s07", "-")
+        if a in ("-", "") or b in ("-", ""):
+            continue
+        if a != b:
+            drifted.append(p)
+    add("check_15_s07_changed_nothing_undeclared", not drifted,
+        "every row outside the %d declared path(s) is byte-identical across "
+        "S0.7" % len(declared7)
+        if not drifted else "changed with no declaration: %r" % drifted[:10])
 
     # -- no logged file may fall out of the checks above ---------------------
     # Every check in this file is of the form "for each entry in a log, look

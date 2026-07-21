@@ -67,6 +67,7 @@ class LedgerRow:
     sha256_post_s04: str
     sha256_post_s05: str
     sha256_post_s06: str
+    sha256_post_s07: str
     size_bytes: int
     is_python: bool
     parses: bool
@@ -195,7 +196,7 @@ def is_payload(path, rule):
 # ---------------------------------------------------------------------------
 
 def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
-               moves=None):
+               moves=None, removed=None):
     """Assign a verdict to every file.
 
     repo_records  : FileRecords for the repository tree at pre-s0
@@ -207,6 +208,20 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
                     whatever is on disk -- correct at S0.0 and WRONG from S0.2
                     onward, because a rescan would overwrite the pre-S0 state
                     with the post-transform hash.  Pass it after S0.2.
+
+    removed       : optional S0.7 discard manifest (see
+                    tools/s0_transform/s07_discard_manifest.json).  Decision
+                    N-21.  Without it, a file deleted at S0.7 loses its ledger
+                    row -- because this function builds rows by SCANNING THE
+                    TREE, so the row set is a function of what is on disk, and
+                    sha256_pre_s0 vanishes with the file.  That is not
+                    hypothetical: it happened at S0.2 to
+                    Population/population_CHANGED.py, which is declared,
+                    absent, and carries no row and no hash anywhere.  Passing
+                    the manifest re-emits the stored row for every entry whose
+                    file is gone, so the ledger stays the single authority and
+                    S0.9's byte-identity reconstruction assertion keeps its
+                    subject.
 
     Returns (rows, problems).  problems is a list of human-readable strings;
     a non-empty list means the ledger disagrees with the documents and S0.0
@@ -253,7 +268,7 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
         return path, False
 
     def chained(path, measured_sha):
-        """(pre_s0, post_s02, post_s03, post_s04, post_s05, post_s06) for one path.
+        """(pre_s0, post_s02, post_s03, post_s04, post_s05, post_s06, post_s07) for one path.
 
         One column per byte-changing sub-step. S0.5 adds files rather than
         transforming any, so it contributes a phase but no chain LINK: there
@@ -269,7 +284,8 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
                 chain.get("post_s03", {}).get(path, NOT_YET),
                 chain.get("post_s04", {}).get(path, NOT_YET),
                 chain.get("post_s05", {}).get(path, NOT_YET),
-                chain.get("post_s06", {}).get(path, NOT_YET))
+                chain.get("post_s06", {}).get(path, NOT_YET),
+                chain.get("post_s07", {}).get(path, NOT_YET))
     local_by_name = {r.path: r for r in local_records}
 
     scopes = [(k, tuple(v)) for k, v in spec["scopes"]]
@@ -359,6 +375,7 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
                 sha256_post_s04=chained(name, loc.sha256)[3],
                 sha256_post_s05=chained(name, loc.sha256)[4],
                 sha256_post_s06=chained(name, loc.sha256)[5],
+                sha256_post_s07=chained(name, loc.sha256)[6],
                 size_bytes=loc.size,
                 is_python=loc.is_python,
                 parses=loc.parses,
@@ -436,6 +453,7 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
                 sha256_post_s04=chained(r.path, r.sha256)[3],
                 sha256_post_s05=chained(r.path, r.sha256)[4],
                 sha256_post_s06=chained(r.path, r.sha256)[5],
+                sha256_post_s07=chained(r.path, r.sha256)[6],
                 size_bytes=r.size,
                 is_python=r.is_python,
                 parses=r.parses,
@@ -447,6 +465,52 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
                 rationale=rationale,
             )
         )
+
+    # -- S0.7: re-emit a row for every file the discard manifest records ----
+    # Decision N-21.  These rows describe files that are NOT on disk, so every
+    # field comes from the manifest rather than from a measurement; measuring
+    # is exactly what is no longer possible.  sha256_post_s07 is the ABSENT
+    # sentinel, which is the honest value: the file has no post-S0.7 bytes.
+    if removed:
+        seen = set(x.path for x in rows)
+        for entry in removed.get("entries", []):
+            rel = entry["path"]
+            if rel in seen:
+                problems.append(
+                    "%s is declared removed at S0.7 but still has a scanned "
+                    "row; the manifest and the tree disagree" % rel)
+                continue
+            r = entry["row"]
+            rows.append(
+                LedgerRow(
+                    path=rel,
+                    scope=r["scope"],
+                    stage=r["stage"],
+                    verdict=r["verdict"],
+                    relationship=r["relationship"],
+                    transform_id="T12",
+                    ancestor_path=r["ancestor_path"],
+                    ancestor_sha256=r["ancestor_sha256"],
+                    sha256_pre_s0=r["sha256_pre_s0"],
+                    sha256_post_s02=r["sha256_post_s02"],
+                    sha256_post_s03=r["sha256_post_s03"],
+                    sha256_post_s04=r["sha256_post_s04"],
+                    sha256_post_s05=r["sha256_post_s05"],
+                    sha256_post_s06=r["sha256_post_s06"],
+                    sha256_post_s07=NOT_YET,
+                    size_bytes=int(r["size_bytes"]),
+                    is_python=str(r["is_python"]).lower() in ("true", "1"),
+                    parses=str(r["parses"]).lower() in ("true", "1"),
+                    n_syntax_warnings=int(r["n_syntax_warnings"]),
+                    n_crlf=int(r["n_crlf"]),
+                    n_lf=int(r["n_lf"]),
+                    n_nonascii=int(r["n_nonascii"]),
+                    has_cookie=str(r["has_cookie"]).lower() in ("true", "1"),
+                    rationale=(r["rationale"] + "; REMOVED from the working "
+                               "tree at S0.7 by T12, bytes recorded in "
+                               "tools/s0_transform/s07_discard_manifest.json"),
+                )
+            )
 
     rows.sort(key=lambda x: (x.scope, x.path))
 

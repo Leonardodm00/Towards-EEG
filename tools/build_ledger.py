@@ -120,8 +120,18 @@ def main(argv=None):
         with open(str(args.moves), "r", encoding="utf-8") as fh:
             moves = json.load(fh)
 
+    # S0.7 discard manifest (decision N-21). Read from its fixed location
+    # rather than from a flag: a ledger that could be regenerated WITHOUT the
+    # manifest would silently drop the removed rows, and the operator would
+    # have no way to tell a correct regeneration from a lossy one.
+    removed = None
+    _mp = Path(args.root) / "tools" / "s0_transform" / "s07_discard_manifest.json"
+    if _mp.is_file():
+        with open(str(_mp), "r", encoding="ascii") as fh:
+            removed = json.load(fh)
+
     rows, problems = analyse.build_rows(repo_records, local_records, spec, phases, args.as_of,
-                                        moves)
+                                        moves, removed)
     o7 = analyse.find_shadowed_defs(repo_records)
     dup = analyse.find_duplicate_classes(repo_records)
 

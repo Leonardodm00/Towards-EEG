@@ -16,7 +16,8 @@
     "T8": "declared whitespace correction (applied at S0.2)",
     "T9": "non-ASCII characters transliterated to ASCII via s03_translit_map.json (applied at S0.3)",
     "T10": "line endings normalised to LF (applied at S0.3)",
-    "T11": "declared externalisation of a configuration path literal (applied at S0.6): a string literal in a keep-verdict module is replaced by a call to towards_eeg.config.resolve(key), where the shipped default towards_eeg/config/paths.json maps key to the literal's exact prior bytes. Byte-identity rule clause (2). The transform log is INVERTIBLE: applying the recorded inverse to the current bytes reproduces sha256_before exactly, which is the behaviour-preservation proof required by TEEG_10 section 3.3."
+    "T11": "declared externalisation of a configuration path literal (applied at S0.6): a string literal in a keep-verdict module is replaced by a call to towards_eeg.config.resolve(key), where the shipped default towards_eeg/config/paths.json maps key to the literal's exact prior bytes. Byte-identity rule clause (2). The transform log is INVERTIBLE: applying the recorded inverse to the current bytes reproduces sha256_before exactly, which is the behaviour-preservation proof required by TEEG_10 section 3.3.",
+    "T12": "declared removal of a tracked file that no code path references (applied at S0.7). Admissible under the byte-identity rule read in the removal direction: a file nothing depends on may leave the tree PROVIDED ITS IDENTITY IS PRESERVED OUTSIDE IT. NOT invertible from its log -- the bytes leave -- so every hash is recorded BEFORE deletion in tools/s0_transform/s07_discard_manifest.json, which carries each file's complete ledger row as it stood at the capture commit. build_ledger.py re-emits those rows though the files are absent (N-21). This is the material difference from T11, which is invertible and needs no such record."
   },
   "new_infrastructure": [
     {
@@ -326,6 +327,31 @@
       "path": "tools/test_s0_6_smoke.py",
       "stage": "S0.6",
       "rationale": "new infrastructure (byte-identity rule clause 3): mutation harness for the S0.6 exit test."
+    },
+    {
+      "path": "tools/s0_transform/remove_discards.py",
+      "stage": "S0.7",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the T12 transform tool."
+    },
+    {
+      "path": "tools/s0_transform/s07_discard_manifest.json",
+      "stage": "S0.7",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the durable record of the 22 files removed at S0.7, carrying each one's pre-S0 hash and full ledger row. Repairs finding R-7: the ledger is built by scanning the tree, so without this a deleted file loses its row and its sha256_pre_s0."
+    },
+    {
+      "path": "tools/s0_transform/s07_exit_scope.json",
+      "stage": "S0.7",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the declared S0.7 exit scope."
+    },
+    {
+      "path": "tools/test_s0_7_exit.py",
+      "stage": "S0.7",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the S0.7 exit test."
+    },
+    {
+      "path": "tools/test_s0_7_smoke.py",
+      "stage": "S0.7",
+      "rationale": "new infrastructure (byte-identity rule clause 3): mutation harness for the S0.7 exit test."
     }
   ],
   "scopes": [

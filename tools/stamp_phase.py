@@ -43,7 +43,7 @@ if _HERE not in sys.path:
 from s0_ledger import render, scan  # noqa: E402
 
 PHASES = ("pre_s0", "post_s02", "post_s03", "post_s04", "post_s05",
-          "post_s06")
+          "post_s06", "post_s07")
 ABSENT = "-"
 
 MEASURED_COLUMNS = ("size_bytes", "is_python", "parses", "n_syntax_warnings",
