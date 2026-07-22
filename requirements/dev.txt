@@ -1,0 +1,22 @@
+# Towards-EEG -- development-only requirements.
+#
+# New infrastructure under clause (3) of the byte-identity rule: nothing
+# pre-existing depends on this file.
+#
+# WHY THIS FILE AND NOT pyproject [project.optional-dependencies].
+# S0.9's exit criterion is "pytest passes on a clean checkout". pytest is a
+# TEST-TIME tool, never a runtime dependency of towards_eeg. Declaring it here,
+# alongside the existing requirements/hybrid_stack.lock, keeps pyproject's
+# runtime `dependencies = []` untouched -- so the still-open zero-runtime-
+# dependencies decision is left undisturbed and `pip install towards_eeg`
+# continues to pull nothing.
+#
+# Usage:
+#   python3 -m pip install -r requirements/dev.txt
+#   python3 -m pytest tests/
+#
+# The 17 plain-python harnesses under tools/ run WITHOUT pytest (python3
+# tools/test_*.py --root .), as they do in Colab where pytest may be absent;
+# tests/test_s0_import_surface.py is dual-mode and runs either way.
+
+pytest>=7.0

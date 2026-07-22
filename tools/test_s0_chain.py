@@ -44,9 +44,9 @@ if _HERE not in sys.path:
 
 from s0_paths import Resolver  # noqa: E402
 
-PHASE_COLUMNS = ("sha256_post_s08", "sha256_post_s07", "sha256_post_s06",
-                 "sha256_post_s05", "sha256_post_s04", "sha256_post_s03",
-                 "sha256_post_s02", "sha256_pre_s0")
+PHASE_COLUMNS = ("sha256_post_s09", "sha256_post_s08", "sha256_post_s07",
+                 "sha256_post_s06", "sha256_post_s05", "sha256_post_s04",
+                 "sha256_post_s03", "sha256_post_s02", "sha256_pre_s0")
 
 
 def end_of_chain(row):
@@ -455,6 +455,32 @@ def run(root):
         add("check_16_s08_changed_nothing_undeclared", not drifted,
             "every row outside the %d declared path(s) is byte-identical "
             "across S0.8" % len(declared8)
+            if not drifted else "changed with no declaration: %r" % drifted[:10])
+
+    # -- link 7: S0.9 -------------------------------------------------------
+    # S0.9 is the same shape as S0.8: it adds the import-surface test and its
+    # declaration and mutation harness, and edits the ledger tooling to thread
+    # the post_s09 column. It removes nothing and transforms no pre-existing
+    # content, so like S0.8 it has no "half A" -- there is no transform whose
+    # output to check -- and the whole link IS the "nothing else moved" half.
+    s9 = os.path.join(root, "tools", "s0_transform", "s09_exit_scope.json")
+    if os.path.isfile(s9):
+        with open(s9, "r", encoding="utf-8") as fh:
+            scope9 = json.load(fh)
+        d9 = scope9["clause_3_files_changed_at_s09"]
+        declared9 = set(d9["paths"]) | set(d9["self_referential"])
+        drifted = []
+        for p, row in led.items():
+            if p in declared9:
+                continue
+            a, b = row.get("sha256_post_s08", "-"), row.get("sha256_post_s09", "-")
+            if a in ("-", "") or b in ("-", ""):
+                continue
+            if a != b:
+                drifted.append(p)
+        add("check_17_s09_changed_nothing_undeclared", not drifted,
+            "every row outside the %d declared path(s) is byte-identical "
+            "across S0.9" % len(declared9)
             if not drifted else "changed with no declaration: %r" % drifted[:10])
 
     # -- no logged file may fall out of the checks above ---------------------

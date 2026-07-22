@@ -69,6 +69,7 @@ class LedgerRow:
     sha256_post_s06: str
     sha256_post_s07: str
     sha256_post_s08: str
+    sha256_post_s09: str
     size_bytes: int
     is_python: bool
     parses: bool
@@ -269,7 +270,7 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
         return path, False
 
     def chained(path, measured_sha):
-        """(pre_s0, post_s02, post_s03, post_s04, post_s05, post_s06, post_s07, post_s08) for one path.
+        """(pre_s0, post_s02, post_s03, post_s04, post_s05, post_s06, post_s07, post_s08, post_s09) for one path.
 
         One column per byte-changing sub-step. S0.5 adds files rather than
         transforming any, so it contributes a phase but no chain LINK: there
@@ -277,7 +278,11 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
         check_07's end-of-chain describes the tree as it now is; without it,
         files created at S0.5 would be stamped into post_s04 and the
         regenerable record would say they existed a sub-step earlier than
-        they did.
+        they did. S0.9 is the same shape as S0.5 and S0.8: it adds test
+        infrastructure and edits its own tooling, transforming no pre-existing
+        content, so post_s09 exists to stamp the files it creates or edits at
+        the sub-step they actually appeared, and to let check_17 assert that
+        nothing outside its declared change set moved.
         """
         pre = chain.get("pre_s0", {}).get(path, measured_sha)
         return (pre,
@@ -287,7 +292,8 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
                 chain.get("post_s05", {}).get(path, NOT_YET),
                 chain.get("post_s06", {}).get(path, NOT_YET),
                 chain.get("post_s07", {}).get(path, NOT_YET),
-                chain.get("post_s08", {}).get(path, NOT_YET))
+                chain.get("post_s08", {}).get(path, NOT_YET),
+                chain.get("post_s09", {}).get(path, NOT_YET))
     local_by_name = {r.path: r for r in local_records}
 
     scopes = [(k, tuple(v)) for k, v in spec["scopes"]]
@@ -379,6 +385,7 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
                 sha256_post_s06=chained(name, loc.sha256)[5],
                 sha256_post_s07=chained(name, loc.sha256)[6],
                 sha256_post_s08=chained(name, loc.sha256)[7],
+                sha256_post_s09=chained(name, loc.sha256)[8],
                 size_bytes=loc.size,
                 is_python=loc.is_python,
                 parses=loc.parses,
@@ -458,6 +465,7 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
                 sha256_post_s06=chained(r.path, r.sha256)[5],
                 sha256_post_s07=chained(r.path, r.sha256)[6],
                 sha256_post_s08=chained(r.path, r.sha256)[7],
+                sha256_post_s09=chained(r.path, r.sha256)[8],
                 size_bytes=r.size,
                 is_python=r.is_python,
                 parses=r.parses,
@@ -503,6 +511,7 @@ def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
                     sha256_post_s06=r["sha256_post_s06"],
                     sha256_post_s07=NOT_YET,
                     sha256_post_s08=NOT_YET,
+                    sha256_post_s09=NOT_YET,
                     size_bytes=int(r["size_bytes"]),
                     is_python=str(r["is_python"]).lower() in ("true", "1"),
                     parses=str(r["parses"]).lower() in ("true", "1"),

@@ -377,6 +377,26 @@
       "path": "tools/test_s0_8_smoke.py",
       "stage": "S0.8",
       "rationale": "new infrastructure (clause 3): mutation harness for the S0.8 exit test."
+    },
+    {
+      "path": "tools/s0_transform/s09_exit_scope.json",
+      "stage": "S0.9",
+      "rationale": "new infrastructure (clause 3): the declared, self-verifying S0.9 exit scope. Carries the three exemptions assertion 3 (O10 + absent-dependency), assertion 6 (duplicate Connectomics) and assertion 8 (self-referential artifacts) assert still apply."
+    },
+    {
+      "path": "tests/test_s0_import_surface.py",
+      "stage": "S0.9",
+      "rationale": "new infrastructure (clause 3): the S0.9 import-surface exit test, eight assertions over the installed package. Dual-mode: a plain --root harness and pytest-collectable."
+    },
+    {
+      "path": "tools/test_s0_9_smoke.py",
+      "stage": "S0.9",
+      "rationale": "new infrastructure (clause 3): mutation harness for the S0.9 exit test."
+    },
+    {
+      "path": "requirements/dev.txt",
+      "stage": "S0.9",
+      "rationale": "new infrastructure (clause 3): pytest declared as a dev-only requirement, leaving pyproject runtime dependencies empty (the pending zero-runtime-dependencies decision undisturbed)."
     }
   ],
   "scopes": [

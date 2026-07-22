@@ -1,0 +1,95 @@
+{
+  "note": "Declared, self-verifying scope for sub-step S0.9. Every entry here is asserted STILL TO APPLY by tests/test_s0_import_surface.py and by tools/test_s0_chain.py check_17; a stale entry fails rather than lingers (Doc 7 s3). ASCII only, LF only.",
+  "sub_step": "S0.9",
+  "what_s09_claims": "Delivers tests/test_s0_import_surface.py with eight assertions over the installed package (parse, compile, import, ASCII, no path literal outside config/, no duplicate top-level class, no shadowed module-level definition, byte-identity reconstruction from the ledger). S0.9 transforms no pre-existing content: it adds the test, this declaration and a mutation harness, and threads one post_s09 column through the ledger tooling. Clause (3) of the byte-identity rule; no transform id.",
+
+  "import_surface": {
+    "note": "Assertion 3 ('importlib.import_module succeeds for every module') cannot pass as literally stated on a clean checkout, for two DISTINCT reasons. Both are handled by declaration here; neither is fixed, because fixing either is a content operation forbidden in S0.",
+
+    "unimportable_by_construction": {
+      "finding": "H-3 / defect class O10, ratified 21 July 2026 as N-23.",
+      "files": [
+        "towards_eeg/connectome/connectivity_buildup.py",
+        "towards_eeg/connectome/usage_example.py"
+      ],
+      "blockers_source": "tools/s0_transform/s06_exit_scope.json:unimportable_by_construction.blockers",
+      "how_asserted": "STATICALLY, via the AST, NEVER by importing. Importing connectivity_buildup.py under Colab succeeds on 'from google.colab import drive' and then blocks on drive.mount(force_remount=True), executing the notebook body as a side effect (see s06 asserted_statically_not_by_importing). test_s0_import_surface.py loads the blockers from the S0.6 declaration named above -- one source of truth -- and asserts each is still present. A file that starts importing means the O10 assignment (N-23) needs revisiting: the declaration is then stale, which is an error, not good news.",
+      "assignment": "S1/S3 with the exporter-pinning work (N-23). Not S0."
+    },
+
+    "absent_runtime_dependency": {
+      "finding": "New at S0.9, measured, not previously narrated. These modules are importable in principle -- their own surface is sound -- but import third-party scientific packages that a clean checkout does not install, because pyproject.toml declares zero runtime dependencies by decision (until B-4 is answered).",
+      "policy": "For every package module NOT in the unimportable_by_construction set and NOT in known_absent_dependency_modules below, importlib.import_module MUST succeed, OR it may fail ONLY with ModuleNotFoundError whose missing top-level package is (a) not in the standard library, (b) not a towards_eeg submodule, and (c) not a declared runtime dependency of towards_eeg (pyproject [project].dependencies). Any other failure -- SyntaxError, NameError, an ImportError that is not this gated ModuleNotFoundError, a missing towards_eeg submodule, or a missing DECLARED runtime dependency -- is a real FAIL. The gate is self-verifying against pyproject: the day a package is declared a runtime dependency, its absence stops excusing an import failure.",
+      "known_absent_dependency_modules": {
+        "note": "The heavy simulator modules. Asserted STATICALLY (like O10) rather than imported, because importing driver.py in an environment where NEURON IS present would run NEURON/MPI initialisation as a side effect. The assertion is a staleness guard: each still imports at least one non-stdlib, non-towards_eeg, non-declared-runtime top-level package at module scope. If one becomes plainly importable, this declaration is flagged stale.",
+        "towards_eeg/hybrid/driver.py": ["neuron", "LFPy", "hybridLFPy", "mpi4py", "nest"],
+        "towards_eeg/hybrid/params.py": ["mpi4py", "scipy"],
+        "towards_eeg/hybrid/population.py": ["h5py", "LFPy", "mpi4py", "matplotlib", "pandas", "plotly", "scipy"]
+      }
+    }
+  },
+
+  "duplicate_class_exemption": {
+    "assertion": "6 -- no duplicate top-level class name across the installed package.",
+    "cannot_pass_as_stated": "The class 'Connectomics' is defined at top level in THREE keep-verdict package modules with different ancestry. S0 may not de-duplicate: hoisting or deleting a definition is a content operation.",
+    "exempt_class_names": ["Connectomics"],
+    "authority": "The ledger's own duplicate-class register (LEDGER.md section 5 / analyse.find_duplicate_classes), which records every copy and line. test_s0_import_surface.py re-derives the register over the package with analyse.find_duplicate_classes -- one implementation of the rule -- and asserts (i) every observed duplicate name is in exempt_class_names and (ii) every exempt name is still observed (still-needed). A NEW duplicate is not exempt and fails.",
+    "copies_recorded_for_awareness": [
+      "towards_eeg/connectome/connectomics.py:6 (ancestor Classes/Connectomics/Class.py)",
+      "towards_eeg/connectome/usage_example.py:7 (ancestor .../Usage_example.py; the TEEG_00 s6 trap)",
+      "towards_eeg/hybrid/params.py:1212 (ancestor params_evoked_with_EEG_multiMorph.py; a third copy, NEW finding at S0.9, folded into the S1 de-duplication item)"
+    ],
+    "assignment": "S1 de-duplication (with the exporter-pinning work). Not S0."
+  },
+
+  "path_literal_exemptions": {
+    "assertion": "5 -- no filesystem path literal in the package outside towards_eeg/config/.",
+    "note": "The S0.6 sweep (T11) already externalised every configurable path literal and is enforced permanently by tools/test_s0_6_exit.py. Assertion 5 re-asserts the package is clean, honouring the ONE literal S0.6 declared as excluded.",
+    "declared_literals_outside_config": [
+      {
+        "path": "towards_eeg/connectome/connectivity_buildup.py",
+        "literal": "/content/drive",
+        "reason": "the drive.mount(force_remount=True) mount point; declared excluded_in_package at S0.6 (test_s0_6_exit check_08/check_09). Not configuration; it is the Colab Drive root, meaningless off Colab, and the module is unimportable by construction anyway (O10)."
+      }
+    ],
+    "cross_reference": "tools/s0_transform/s06_exit_scope.json and s06_targets.json"
+  },
+
+  "ledger_reconstruction_exemptions": {
+    "assertion": "8 -- every tracked file reconstructs byte-identically from its recorded ledger hashes.",
+    "self_referential": ["ledger.csv", "LEDGER.md", "tools/phase_hashes.json"],
+    "reason": "These three ARE the record. Their on-disk bytes include hashes that are computed from their own content, so a regeneration re-measures a file the previous regeneration just rewrote; their current-hash columns necessarily float by one generation and cannot equal a column they help produce. Every OTHER tracked, non-discard file must hash to its end-of-chain column; every discard file must be absent with its last hash preserved in s07_discard_manifest.json (reusing the tools/test_s0_chain.py half-A logic)."
+  },
+
+  "pyproject_still_declares_no_dependencies": {
+    "statement": "S0.9 does NOT add pytest to pyproject.toml [project].dependencies, and does NOT add [project.optional-dependencies]. The runtime dependency list stays empty, so the pending zero-runtime-dependencies decision is left undisturbed and 'pip install towards_eeg' still pulls nothing.",
+    "how_pytest_is_declared_instead": "requirements/dev.txt (new file, clause 3), consistent with the existing requirements/ convention (hybrid_stack.lock). 'pytest passes on a clean checkout' is met by: python3 -m pip install -r requirements/dev.txt && python3 -m pytest tests/. The 17 plain-python harnesses run without pytest, as before, for Colab where pytest may be absent.",
+    "dual_mode": "tests/test_s0_import_surface.py is BOTH a plain-python harness (python3 tests/test_s0_import_surface.py --root .) and pytest-collectable (test_* functions), so both the harness suite and the roadmap's 'pytest passes' exit criterion hold."
+  },
+
+  "clause_3_files_changed_at_s09": {
+    "rationale": "S0.9 adds test infrastructure and edits its own ledger tooling to thread the post_s09 column. Clause (3), no transform.",
+    "paths": [
+      "tools/ancestors.json",
+      "tools/s0_ledger/analyse.py",
+      "tools/s0_ledger/render.py",
+      "tools/stamp_phase.py",
+      "tools/test_s0_chain.py",
+      "tools/test_s0_moves_smoke.py",
+      "tools/s0_transform/s09_exit_scope.json",
+      "tests/test_s0_import_surface.py",
+      "tools/test_s0_9_smoke.py",
+      "requirements/dev.txt"
+    ],
+    "self_referential": [
+      "ledger.csv",
+      "LEDGER.md",
+      "tools/phase_hashes.json"
+    ]
+  },
+
+  "known_gaps": [
+    "Assertion 3 does not prove the heavy simulator modules WOULD import with their dependencies present; that needs the HPC environment (B-4) and is out of scope for a clean-checkout mechanical test.",
+    "The scalar transform_id column and provenance.json (TEEG_12 s5) are untouched here; they are carried forward as before."
+  ]
+}
