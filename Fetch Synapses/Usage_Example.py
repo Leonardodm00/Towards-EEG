@@ -62,7 +62,7 @@ def interactive_debug_morphology():
     csv_file_path = os.path.join(base_dir, "Synapse database", f"neuron_{neuron_id}_mapped_synapses.csv")
 
     if not os.path.exists(hoc_filepath):
-        print(f"⚠️ Error: File '{hoc_filepath}' not found.")
+        print(f"[WARN] Error: File '{hoc_filepath}' not found.")
         return None
 
     print(f"Loading {os.path.basename(hoc_filepath)} into NEURON...")
@@ -82,13 +82,13 @@ def interactive_debug_morphology():
 
     try:
         cell = LFPy.Cell(**cell_parameters)
-        print(f"✅ Success! Cell loaded with {cell.totnsegs} active compartments.")
+        print(f"[OK] Success! Cell loaded with {cell.totnsegs} active compartments.")
     except Exception as e:
-        print(f"❌ Failed to load cell into LFPy. Error: {e}")
+        print(f"[FAIL] Failed to load cell into LFPy. Error: {e}")
         return None
 
     if not os.path.exists(csv_file_path):
-        print(f"⚠️ Failed to find synapse CSV: {csv_file_path}")
+        print(f"[WARN] Failed to find synapse CSV: {csv_file_path}")
         return None
     syn_df = pd.read_csv(csv_file_path)
 

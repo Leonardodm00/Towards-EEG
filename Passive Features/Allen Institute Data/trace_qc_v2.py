@@ -841,7 +841,7 @@ def plot_selfcal_histogram(selfcal: SelfCalResult, path: str, alpha: float):
     ax.axhline(1.0, color="tab:green", ls="--", lw=1.4, label="Uniform(0,1)")
     ax.set_xlabel("held-out per-scale p-value")
     ax.set_ylabel("density")
-    ax.set_title(f"Null self-calibration — M_ms*={selfcal.chosen_M_ms:g} ms  "
+    ax.set_title(f"Null self-calibration -- M_ms*={selfcal.chosen_M_ms:g} ms  "
                  f"(max_s D_n={selfcal.chosen_ks_dist_max:.3f}, KS p={selfcal.chosen_ks_p:.3f}, "
                  f"status={selfcal.status})")
     ax.legend(fontsize=8)
@@ -889,7 +889,7 @@ def plot_rho_bands(cell: CellQCResultV2, path: str):
     ax.set_xticks(xs); ax.set_xticklabels([f"{s:g}" for s in scales])
     ax.set_xlabel("decimation scale s (ms)")
     ax.set_ylabel(r"lag-1 autocorrelation $\rho_1(s)$")
-    ax.set_title("Data $\\rho_1(s)$ vs null band (grey = 2.5–97.5% of surrogates; "
+    ax.set_title("Data $\\rho_1(s)$ vs null band (grey = 2.5-97.5% of surrogates; "
                  "green=kept, red=rejected)")
     fig.tight_layout(); fig.savefig(path, dpi=130); plt.close(fig)
 
@@ -931,7 +931,7 @@ def plot_traces_v2(cell: CellQCResultV2, path: str, max_each: int = 24):
         ax.axhline(0, color="0.6", lw=0.6); ax.set_title(title)
         ax.set_xlabel("time from window start (ms)")
     axes[0].set_ylabel("baseline-subtracted deflection (mV)")
-    fig.suptitle(f"Trace QC v2 — specimen {cell.specimen_id}  (null='{cell.null_generator}', "
+    fig.suptitle(f"Trace QC v2 -- specimen {cell.specimen_id}  (null='{cell.null_generator}', "
                  f"bank={[f'{s:g}' for s in cell.scoring_bank_ms]} ms)")
     fig.tight_layout(); fig.savefig(path, dpi=130); plt.close(fig)
 
@@ -1153,16 +1153,16 @@ def run_smoke_test_v2(outdir: str = "smoke_out_v2", seed: int = 1) -> dict:
           f"_rho_bands.png, _meanresid.png, _traces.png")
 
     # ---- assertions (loose, demonstrational) ----
-    assert fpr <= 0.15, f"new null FPR {fpr:.3f} too high — per-scale null miscalibrated"
-    assert power >= 0.60, f"power {power:.3f} too low — misfit not detected"
-    assert np.isfinite(coh) and coh >= 3.0, f"mean-residual coherence {coh} too low — misfit not coherent"
-    assert fpr_old >= 0.30, f"old full-rate FPR {fpr_old:.3f} not high — bug not reproduced"
-    assert fpr_old >= fpr + 0.15, "old null is not materially worse than new — fix not shown causal"
+    assert fpr <= 0.15, f"new null FPR {fpr:.3f} too high -- per-scale null miscalibrated"
+    assert power >= 0.60, f"power {power:.3f} too low -- misfit not detected"
+    assert np.isfinite(coh) and coh >= 3.0, f"mean-residual coherence {coh} too low -- misfit not coherent"
+    assert fpr_old >= 0.30, f"old full-rate FPR {fpr_old:.3f} not high -- bug not reproduced"
+    assert fpr_old >= fpr + 0.15, "old null is not materially worse than new -- fix not shown causal"
     assert sc is not None and sc.status in ("flat", "flat_relative"), \
         f"self-calibration failed (status={sc.status if sc else None})"
     assert np.isfinite(selfcal_dmax) and selfcal_dmax <= float(np.nanmin(sc.ks_dist_max)) + cfg.selfcal_flat_slack + 1e-9, \
         "chosen M_ms is not within slack of the best achievable calibration"
-    print("  ALL ASSERTIONS PASSED ✔")
+    print("  ALL ASSERTIONS PASSED [ok]")
     print("======================================================\n")
     return metrics
 

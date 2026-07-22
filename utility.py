@@ -13,7 +13,7 @@ import os
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.colors as pc
-!pip install -q -U kaleido
+#S0.2:T7# !pip install -q -U kaleido
 def plot_centered_neuron_gallery(neuron_ids, input_dir='/content/drive/MyDrive/Colab Notebooks/Reconstructed neurons', shift_nm=400000):
     """
     Loads, centers, and sequentially shifts neurons for visualization in a single Plotly 3D space.
@@ -34,14 +34,14 @@ def plot_centered_neuron_gallery(neuron_ids, input_dir='/content/drive/MyDrive/C
         filepath = os.path.join(input_dir, f"neuron_{nid}.csv")
 
         if not os.path.exists(filepath):
-            print(f"⚠️ File for neuron {nid} not found. Skipping.")
+            print(f"[WARN] File for neuron {nid} not found. Skipping.")
             continue
 
         df = pd.read_csv(filepath)
         root_rows = df[df['p'] == -1]
 
         if root_rows.empty:
-            print(f"⚠️ No root node (p=-1) found for neuron {nid}. Skipping.")
+            print(f"[WARN] No root node (p=-1) found for neuron {nid}. Skipping.")
             continue
 
         # 1. Center the neuron to (0,0,0)
@@ -85,11 +85,11 @@ def plot_centered_neuron_gallery(neuron_ids, input_dir='/content/drive/MyDrive/C
 
 
 
-        print(f"✅ Neuron {nid} loaded, centered, shifted by {current_shift} nm, and plotted.")
+        print(f"[OK] Neuron {nid} loaded, centered, shifted by {current_shift} nm, and plotted.")
         valid_count += 1
 
     if valid_count == 0:
-        print("❌ No valid neurons were found to plot.")
+        print("[FAIL] No valid neurons were found to plot.")
         return
 
     # 4. Finalize Layout
@@ -180,14 +180,14 @@ def calculate_total_arbor_lengths(neuron_ids, input_dir='/content/drive/MyDrive/
     """
     results = []
 
-    print(f"📏 Calculating arbor lengths for {len(neuron_ids)} neurons...\n")
+    print(f" Calculating arbor lengths for {len(neuron_ids)} neurons...\n")
 
     for nid in neuron_ids:
         filepath = os.path.join(input_dir, f"neuron_{nid}.csv")
 
         # 1. Check if file exists
         if not os.path.exists(filepath):
-            print(f"⚠️ File for neuron {nid} not found. Skipping.")
+            print(f"[WARN] File for neuron {nid} not found. Skipping.")
             results.append({'neuron_id': nid, 'total_length_nm': np.nan, 'total_length_um': np.nan})
             continue
 
@@ -196,7 +196,7 @@ def calculate_total_arbor_lengths(neuron_ids, input_dir='/content/drive/MyDrive/
 
         # Ensure required columns exist
         if not all(col in df.columns for col in ['id', 'p', 'x', 'y', 'z']):
-            print(f"⚠️ Missing necessary coordinate/parent columns in {nid}. Skipping.")
+            print(f"[WARN] Missing necessary coordinate/parent columns in {nid}. Skipping.")
             results.append({'neuron_id': nid, 'total_length_nm': np.nan, 'total_length_um': np.nan})
             continue
 
@@ -220,7 +220,7 @@ def calculate_total_arbor_lengths(neuron_ids, input_dir='/content/drive/MyDrive/
         total_length_nm = distances.sum()
         total_length_um = total_length_nm / 1000  # Convert nanometers to micrometers
 
-        print(f"✅ Neuron {nid}: {total_length_um:,.2f} μm")
+        print(f"[OK] Neuron {nid}: {total_length_um:,.2f} um")
 
         # 4. Store results
         results.append({
@@ -257,18 +257,18 @@ def plot_histogram_with_median(df, column='total_length_um', title="Distribution
         title (str): The title of the plot.
     """
     if df is None or df.empty:
-        print("❌ DataFrame is empty. Cannot plot.")
+        print("[FAIL] DataFrame is empty. Cannot plot.")
         return
 
     if column not in df.columns:
-        print(f"❌ Column '{column}' not found in the DataFrame.")
+        print(f"[FAIL] Column '{column}' not found in the DataFrame.")
         return
 
     # Drop any NaNs (e.g., from files that failed to load in the previous step)
     data = df[column].dropna()
 
     if data.empty:
-        print("❌ No valid numeric data found to plot.")
+        print("[FAIL] No valid numeric data found to plot.")
         return
 
     # Calculate the median
@@ -334,13 +334,13 @@ def align_and_plot_neurons_to_z_by_com(neuron_ids, input_dir='/content/drive/MyD
     """
     aligned_neurons = {}
 
-    print(f"📐 Aligning {len(neuron_ids)} neurons (Threshold: Top {100-percentile}% | Filter: Largest Dendritic Arbor | Vector: CoM only)...")
+    print(f" Aligning {len(neuron_ids)} neurons (Threshold: Top {100-percentile}% | Filter: Largest Dendritic Arbor | Vector: CoM only)...")
 
     for nid in neuron_ids:
         filepath = os.path.join(input_dir, f"neuron_{nid}.csv")
 
         if not os.path.exists(filepath):
-            print(f"⚠️ File for neuron {nid} not found. Skipping.")
+            print(f"[WARN] File for neuron {nid} not found. Skipping.")
             continue
 
         df = pd.read_csv(filepath)
@@ -348,7 +348,7 @@ def align_and_plot_neurons_to_z_by_com(neuron_ids, input_dir='/content/drive/MyD
         # --- 1. Center the Neuron ---
         root_rows = df[df['p'] == -1]
         if root_rows.empty:
-            print(f"⚠️ No root node (p=-1) found for {nid}. Skipping.")
+            print(f"[WARN] No root node (p=-1) found for {nid}. Skipping.")
             continue
 
         soma_id = root_rows.iloc[0]['id']
@@ -365,14 +365,14 @@ def align_and_plot_neurons_to_z_by_com(neuron_ids, input_dir='/content/drive/MyD
 
         # --- 3. Filter for Dendrites ---
         if 'annotated_type' not in df.columns:
-            print(f"⚠️ 'annotated_type' missing for {nid}. Skipping.")
+            print(f"[WARN] 'annotated_type' missing for {nid}. Skipping.")
             continue
 
         dendrite_mask = df['annotated_type'].astype(str).str.contains('dendrite|apical|^1$', case=False, regex=True)
         candidate_nodes = set(df[distal_mask & dendrite_mask]['id'].values)
 
         if not candidate_nodes:
-            print(f"⚠️ No distal dendrite points found for {nid}. Skipping.")
+            print(f"[WARN] No distal dendrite points found for {nid}. Skipping.")
             continue
 
         # --- 4. Reconstruct Hierarchy (NetworkX) ---
@@ -392,7 +392,7 @@ def align_and_plot_neurons_to_z_by_com(neuron_ids, input_dir='/content/drive/MyD
                 largest_pool = list(pool)
 
         if len(largest_pool) < 5:
-            print(f"⚠️ Not enough clustered points (<5) in the largest distal arbor for {nid}. Skipping.")
+            print(f"[WARN] Not enough clustered points (<5) in the largest distal arbor for {nid}. Skipping.")
             continue
 
         pool_df = df[df['id'].isin(largest_pool)]
@@ -520,7 +520,7 @@ def align_and_plot_neurons_to_z_by_com(neuron_ids, input_dir='/content/drive/MyD
         df['z'] = rotated_coords[:, 2]
 
         aligned_neurons[nid] = df
-        print(f"✅ Neuron {nid} successfully rotated to Z-axis using CoM.\n")
+        print(f"[OK] Neuron {nid} successfully rotated to Z-axis using CoM.\n")
 
     return aligned_neurons
 

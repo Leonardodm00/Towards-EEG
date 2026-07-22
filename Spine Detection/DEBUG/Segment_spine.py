@@ -71,7 +71,7 @@ def debug_spine_morphology(neuron_dict, neuron_id, n_samples=3, num_interp_point
     its 1D radius profile. Includes a 1/3 length fallback for plain spines.
     """
     if neuron_id not in neuron_dict:
-        print(f"⚠️ Neuron {neuron_id} not found.")
+        print(f"[WARN] Neuron {neuron_id} not found.")
         return pd.DataFrame()
         
     df = neuron_dict[neuron_id].copy()
@@ -89,12 +89,12 @@ def debug_spine_morphology(neuron_dict, neuron_id, n_samples=3, num_interp_point
     ]
 
     if not spine_roots:
-        print(f"🛑 No spines found in Neuron {neuron_id}.")
+        print(f"[STOP] No spines found in Neuron {neuron_id}.")
         return pd.DataFrame()
 
     if n_samples is not None:
         sampled_roots = random.sample(spine_roots, min(n_samples, len(spine_roots)))
-        print(f"🔬 Debug Mode: Analyzing {len(sampled_roots)} randomly sampled spines from {len(spine_roots)} total.")
+        print(f" Debug Mode: Analyzing {len(sampled_roots)} randomly sampled spines from {len(spine_roots)} total.")
     else:
         sampled_roots = spine_roots
 

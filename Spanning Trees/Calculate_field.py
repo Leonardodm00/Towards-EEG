@@ -11,7 +11,7 @@ def calculate_spanning_probabilities_jitter(neuron_ids, metadata_filepath, input
     Includes dynamic radial interpolation if the 25th percentile of radii exceeds voxel size.
     """
     if not os.path.exists(metadata_filepath):
-        print(f"⚠️ Metadata file not found: {metadata_filepath}")
+        print(f"[WARN] Metadata file not found: {metadata_filepath}")
         return None, None
 
     # 1. Load Reference Metadata for Rototranslation
@@ -31,7 +31,7 @@ def calculate_spanning_probabilities_jitter(neuron_ids, metadata_filepath, input
     dend_presence_total = np.zeros(num_bins, dtype=np.float32)
 
     valid_neurons_processed = 0
-    print(f"🔄 Calculating spatial probabilities (Jitter Method) for {len(neuron_ids)} neurons...")
+    print(f" Calculating spatial probabilities (Jitter Method) for {len(neuron_ids)} neurons...")
 
     # 3. Process sequentially
     for nid in neuron_ids:
@@ -160,7 +160,7 @@ def calculate_spanning_probabilities_jitter(neuron_ids, metadata_filepath, input
         del df, parents, segments, all_pts, expanded_starts, expanded_ends
         del jittered_pts, axon_pts, dend_pts
         
-    print(f"✅ Finished processing {valid_neurons_processed} neurons.")
+    print(f"[OK] Finished processing {valid_neurons_processed} neurons.")
 
     if valid_neurons_processed == 0:
         return None, None

@@ -8,7 +8,7 @@ Original file is located at
 """
 
 # Now pip install will find the correct pre-built wheels without crashing!
-!pip install  allensdk neuron scikit-optimize
+#S0.2:T7# !pip install  allensdk neuron scikit-optimize
 
 # -*- coding: utf-8 -*-
 """Save_AllenInstitute_Data.ipynb
@@ -30,36 +30,36 @@ Phase 2 of the human-cortex passive-property optimisation pipeline.
 Given the ``(PassiveCell, OptimiserInputs)`` pairs produced by Phase 1, this
 module performs the Bayesian optimisation that determines (Cm, Rm, Ra) per
 cell, validates the fit on held-out Long-Square data, and aggregates the
-results across cells of the same layer × cell type.
+results across cells of the same layer x cell type.
 
 What this module does
 ---------------------
 1. Define the loss function: baseline-subtracted RMSD between the simulated
    somatic transient and the experimental Square-Subthreshold trace, in the
-   1–100 ms post-pulse window (Eyal 2016 convention).
+   1-100 ms post-pulse window (Eyal 2016 convention).
 2. Run ``gp_minimize`` over the 3-D search space (Cm, Rm, Ra) with the
    bounds and priors defined in Phase 1's ``PassiveSearchSpace``.
 3. Validate the best-fit parameters against the held-out Long-Square step:
    simulate the same step on the fitted model, compute baseline-subtracted
    RMSD on the WHOLE trace, classify the fit as
-       • ``"good"``       — validation_rmsd ≤ K_good × train_rmsd
-       • ``"to_refine"``  — between K_good and K_fail
-       • ``"failed"``     — validation_rmsd > K_fail × train_rmsd
+       * ``"good"``       -- validation_rmsd <= K_good x train_rmsd
+       * ``"to_refine"``  -- between K_good and K_fail
+       * ``"failed"``     -- validation_rmsd > K_fail x train_rmsd
                           OR train_rmsd absolute > train_rmsd_fail_mV
 4. Use the trained Gaussian-process surrogate to estimate per-parameter
    uncertainty without further NEURON simulations (sample many points near
    the optimum, predict their loss using the GP, return the spread of
-   parameter values whose predicted loss is within Δ of the optimum).
+   parameter values whose predicted loss is within Delta of the optimum).
 5. Provide a sequential-by-default, multiprocessing-capable batch driver
    ``fit_cells()`` for HPC use, and an ``aggregate_population()`` helper
-   that returns mean ± SD per (layer × cell type) group, filtered on
+   that returns mean +/- SD per (layer x cell type) group, filtered on
    validation status.
 
 Why CoreNEURON is NOT used here
 -------------------------------
 CoreNEURON is built to accelerate ONE LARGE simulation (a network of
 thousands of neurons computed in lockstep, optionally on GPU).  Our workload
-is the opposite: many SHORT simulations (each ~0.5–1 s wall-time) called
+is the opposite: many SHORT simulations (each ~0.5-1 s wall-time) called
 sequentially by the optimiser, where each call depends on the result of the
 previous one to update the GP surrogate.  The CoreNEURON setup overhead per
 simulation would exceed the cost of the simulation itself.
@@ -71,21 +71,21 @@ appropriate later, in the full-microcircuit network simulation phase.
 
 Key references
 --------------
-- Eyal et al. (2016) eLife 5:e16553 — passive-fit methodology and 1–100 ms
+- Eyal et al. (2016) eLife 5:e16553 -- passive-fit methodology and 1-100 ms
   RMSD window
-- Internal pipeline document `passive_properties_summary.docx` — bounds,
-  ±20 % validation tolerance (relaxed here in favour of relative-RMSD
+- Internal pipeline document `passive_properties_summary.docx` -- bounds,
+  +/-20 % validation tolerance (relaxed here in favour of relative-RMSD
   validation, see notes on validation strategy below)
 - scikit-optimize gp_minimize:
   https://scikit-optimize.github.io/stable/modules/generated/skopt.gp_minimize.html
 """
 
 
-# %% Cell 1 — Colab installs (skip on HPC) =====================================
+# %% Cell 1 -- Colab installs (skip on HPC) =====================================
 # !pip install -q scikit-optimize
 
 
-# %% Cell 2 — Imports ==========================================================
+# %% Cell 2 -- Imports ==========================================================
 from __future__ import annotations
 import warnings
 import time
@@ -95,7 +95,7 @@ from typing import Optional, List, Dict, Any, Tuple, Callable, Sequence
 import numpy as np
 import pandas as pd
 
-# Phase 1 — pull the data structures and the cell builder
+# Phase 1 -- pull the data structures and the cell builder
 # from phase1_data_loader import (
 #     SweepBundle,
 #     CellData,
@@ -110,9 +110,9 @@ from skopt import gp_minimize
 from skopt.utils import use_named_args
 
 
-# %% Cell 3 — Defaults from the pipeline document & rationales =================
+# %% Cell 3 -- Defaults from the pipeline document & rationales =================
 
-# gp_minimize budget — see Phase 2 design discussion notes.
+# gp_minimize budget -- see Phase 2 design discussion notes.
 DEFAULT_N_CALLS         = 150     # total NEURON simulations per cell
 DEFAULT_N_INITIAL       = 20      # random samples before the GP starts learning
 DEFAULT_ACQ_FUNC        = "gp_hedge"  # auto-select EI/PI/LCB per iteration
@@ -122,18 +122,18 @@ DEFAULT_TRAIN_WINDOW_MS = (1.0, 100.0)
 
 # Validation window for Long Square step.  Restricted to the EARLY part of
 # the step where Ih has not yet substantially activated (Ih kinetics
-# τ ≈ 50–200 ms in human cortex).  Includes the full pre-step baseline.
+# tau ~= 50-200 ms in human cortex).  Includes the full pre-step baseline.
 DEFAULT_VALID_WINDOW_MS_AFTER_ONSET = 50.0
 
 # Validation-RMSD thresholds expressed as multiples of training RMSD.
-DEFAULT_K_GOOD         = 3.0      # validation_rmsd ≤ 3 × train_rmsd → "good"
-DEFAULT_K_FAIL         = 10.0     # validation_rmsd > 10 × train_rmsd → "failed"
+DEFAULT_K_GOOD         = 3.0      # validation_rmsd <= 3 x train_rmsd -> "good"
+DEFAULT_K_FAIL         = 10.0     # validation_rmsd > 10 x train_rmsd -> "failed"
 DEFAULT_TRAIN_RMSD_FAIL_MV = 2.0  # absolute train RMSD ceiling (mV)
 
 # Absolute-value escape hatch: if validation RMSD is below this threshold
 # IN ABSOLUTE TERMS, the fit is accepted as "good" regardless of the ratio.
 # This handles the regime where the optimiser fits the training data
-# extraordinarily tightly (e.g. train RMSD ≈ 0.01 mV) — in that case even a
+# extraordinarily tightly (e.g. train RMSD ~= 0.01 mV) -- in that case even a
 # physically excellent validation RMSD of ~0.1 mV gives ratio > 10, which the
 # pure-ratio classifier would wrongly call "failed".  A fit with sub-0.2 mV
 # error on a several-mV-deflection trace is biophysically a clean fit.
@@ -145,7 +145,7 @@ DEFAULT_UNCERTAINTY_DELTA_MV = 0.1  # parameters with predicted RMSD within
 DEFAULT_UNCERTAINTY_N_SAMPLES = 5000  # GP-only; cheap
 
 
-# %% Cell 4 — Result dataclass =================================================
+# %% Cell 4 -- Result dataclass =================================================
 @dataclass
 class PassiveFitResult:
     """One row of Phase 2's output.  Holds everything needed to (a) reproduce
@@ -186,18 +186,18 @@ class PassiveFitResult:
     wall_time_s: float
     error_message: str = ""           # populated only on hard failure
 
-    # Convergence trace (loss vs iteration) — for plotting only
+    # Convergence trace (loss vs iteration) -- for plotting only
     loss_history: List[float] = field(default_factory=list)
 
     # ----- Noise on the averaged TRAINING traces (post-processing aid) -----
-    # σ of the pre-stimulus baseline samples, averaged across training
-    # bundles.  Needed for the χ² threshold in profile-likelihood CIs.
+    # sigma of the pre-stimulus baseline samples, averaged across training
+    # bundles.  Needed for the chi^2 threshold in profile-likelihood CIs.
     noise_sigma_mV: float = float("nan")
     # Lag-1 autocorrelation of pre-stimulus samples, averaged across
     # training bundles.  Should be near zero for white noise; high values
-    # mean the effective sample size is reduced (n_eff ~ n*(1-ρ)/(1+ρ)).
+    # mean the effective sample size is reduced (n_eff ~ n*(1-rho)/(1+rho)).
     noise_rho_lag1: float = float("nan")
-    # Flag set when at least one training bundle has ρ_lag1 above threshold
+    # Flag set when at least one training bundle has rho_lag1 above threshold
     # (default 0.5).  When True, post-processing should apply the
     # autocorrelation correction before computing CIs.
     noise_rho_lag1_high: bool = False
@@ -236,7 +236,7 @@ class PassiveFitResult:
     #                     loss function via `_build_loss_function` rather
     #                     than reimplementing it.
     #
-    # IMPORTANT — these fields are NOT safe to pickle across processes:
+    # IMPORTANT -- these fields are NOT safe to pickle across processes:
     #   * `neuron_cell` holds NEURON `Hoc` handles that are process-local.
     #   * `gp_result` is in principle picklable but can be very large.
     # The multiprocessing batch driver (`fit_cells`) will therefore break
@@ -250,7 +250,7 @@ class PassiveFitResult:
     opt_inputs: Optional[Any] = field(default=None, repr=False)
 
 
-# %% Cell 5 — RMSD helpers =====================================================
+# %% Cell 5 -- RMSD helpers =====================================================
 def _estimate_residual_noise_at_mle(
     cell,
     train_bundles,
@@ -262,19 +262,19 @@ def _estimate_residual_noise_at_mle(
     pre_stim_window_ms: Optional[Sequence[float]] = None,
 ) -> Tuple[float, float]:
     """Pool residuals from (pre-stim baseline + post-stim training window)
-    at MLE and return (σ, ρ_lag1).
+    at MLE and return (sigma, rho_lag1).
 
     The simulate call below MUST mirror whatever `_build_loss_function`
-    does internally — for the existing pipeline that means setting the
+    does internally -- for the existing pipeline that means setting the
     passive parameters, running NEURON, and producing a voltage trace on
     the bundle's time grid. Adapt the one annotated line below if your
     PassiveCell exposes a different method name or signature.
     """
-    # ── Set MLE state ────────────────────────────────────────────────
+    # -- Set MLE state ------------------------------------------------
     cell.set_passive(cm_mle, rm_mle, ra_mle)
     cell.set_e_pas(v_rest_mV)
 
-    # ── Window definitions in seconds ────────────────────────────────
+    # -- Window definitions in seconds --------------------------------
     train_t0_s, train_t1_s = (np.asarray(train_window_ms) * 1e-3).tolist()
 
     if pre_stim_window_ms is None:
@@ -284,7 +284,7 @@ def _estimate_residual_noise_at_mle(
     else:
         pre_t0_s, pre_t1_s = (np.asarray(pre_stim_window_ms) * 1e-3).tolist()
 
-    # ── Loop over bundles, accumulate residuals ──────────────────────
+    # -- Loop over bundles, accumulate residuals ----------------------
     pooled: List[float] = []
     for b in train_bundles:
         # Mirror exactly what _build_loss_function does internally
@@ -298,12 +298,12 @@ def _estimate_residual_noise_at_mle(
         if (not pre_mask.any()) or (not post_mask.any()):
             continue
 
-        baseline_data = float(b.v_mV[pre_mask].mean())   # → b.v_mV
+        baseline_data = float(b.v_mV[pre_mask].mean())   # -> b.v_mV
         baseline_sim  = float(sim_v[pre_mask].mean())
 
-        train_res = ((b.v_mV[post_mask] - baseline_data) -    # → b.v_mV
+        train_res = ((b.v_mV[post_mask] - baseline_data) -    # -> b.v_mV
                     (sim_v[post_mask]    - baseline_sim))
-        pre_res   = b.v_mV[pre_mask] - baseline_data     # → b.v_mV
+        pre_res   = b.v_mV[pre_mask] - baseline_data     # -> b.v_mV
         pooled.extend(pre_res.tolist())
         pooled.extend(train_res.tolist())
 
@@ -317,7 +317,7 @@ def _estimate_residual_noise_at_mle(
     return sigma, rho
 def _crop_window(t: np.ndarray, v: np.ndarray,
                  t_start_s: float, t_end_s: float) -> np.ndarray:
-    """Return v[mask] for t ∈ [t_start_s, t_end_s].  No interpolation."""
+    """Return v[mask] for t  in  [t_start_s, t_end_s].  No interpolation."""
     mask = (t >= t_start_s) & (t <= t_end_s)
     return v[mask]
 
@@ -364,7 +364,7 @@ def _baseline_subtracted_rmsd(
     return float(np.sqrt(np.mean(diff * diff)))
 
 
-# %% Cell 6 — Stimulus replay helpers ==========================================
+# %% Cell 6 -- Stimulus replay helpers ==========================================
 def _simulate_square_subthreshold(
     cell: PassiveCell, bundle: SweepBundle, v_rest_mV: float,
     pre_pad_ms: float = 10.0, post_pad_ms: float = 100.0,
@@ -417,7 +417,7 @@ def _simulate_long_square(
     return t_sim_s, v_sim
 
 
-# %% Cell 6b — Bundle-protocol detection and labelling =========================
+# %% Cell 6b -- Bundle-protocol detection and labelling =========================
 # A "bundle" can be either a Square Subthreshold pulse (~0.5 ms duration) or
 # a Long Square step (~1 s duration).  The stim_duration_s field is a clean
 # discriminator; we use 0.01 s (10 ms) as the boundary because no real Allen
@@ -439,7 +439,7 @@ def _bundle_label(bundle: SweepBundle) -> str:
     return f"LS ({bundle.amplitude_pA:+.0f} pA)"
 
 
-# %% Cell 6c — Pre-stimulus noise estimator ====================================
+# %% Cell 6c -- Pre-stimulus noise estimator ====================================
 def _estimate_noise(
     bundle: SweepBundle,
     rho_threshold: float = 0.5,
@@ -455,16 +455,16 @@ def _estimate_noise(
 
       * ``sigma_mV``  -- standard deviation of the pre-pulse voltage
                          samples.  This is the residual noise on the
-                         AVERAGED trace and is the σ that later goes
-                         into χ² thresholds for profile-likelihood CIs.
+                         AVERAGED trace and is the sigma that later goes
+                         into chi^2 thresholds for profile-likelihood CIs.
       * ``rho_lag1``  -- lag-1 autocorrelation coefficient of the same
                          samples.  A 50 kHz signal filtered at 10 kHz with
                          a Bessel filter has correlated samples at the
                          original sampling rate; averaging across many
                          pulses tends to whiten this, but residual
-                         correlation can survive.  When ρ is high, the
+                         correlation can survive.  When rho is high, the
                          effective sample size for any noise-based
-                         calculation is reduced by roughly (1-ρ)/(1+ρ).
+                         calculation is reduced by roughly (1-rho)/(1+rho).
 
     The ``is_correlated`` flag (third return value) is True iff
     ``rho_lag1 > rho_threshold`` (default 0.5).  Phase 2 uses this only as
@@ -508,7 +508,7 @@ def _estimate_noise(
     return sigma_mV, rho_lag1, is_correlated
 
 
-# %% Cell 6d — Per-bundle validation RMSD ======================================
+# %% Cell 6d -- Per-bundle validation RMSD ======================================
 def _rmsd_for_validation_bundle(
     cell: PassiveCell,
     bundle: SweepBundle,
@@ -541,7 +541,7 @@ def _rmsd_for_validation_bundle(
     )
 
 
-# %% Cell 7 — Loss function builder ============================================
+# %% Cell 7 -- Loss function builder ============================================
 def _build_loss_function(
     cell: PassiveCell,
     train_bundles: List[SweepBundle],
@@ -589,7 +589,7 @@ def _build_loss_function(
     return loss
 
 
-# %% Cell 8 — GP-posterior uncertainty extraction ==============================
+# %% Cell 8 -- GP-posterior uncertainty extraction ==============================
 def _gp_parameter_uncertainty(
     optim_result,
     delta_mV: float,
@@ -606,7 +606,7 @@ def _gp_parameter_uncertainty(
     samples along each parameter axis.
 
     This is essentially a "profile-likelihood" estimate computed on the
-    surrogate rather than on the full simulator — extremely cheap
+    surrogate rather than on the full simulator -- extremely cheap
     (no extra NEURON calls) and gives directly interpretable per-parameter
     one-sigma values.
 
@@ -616,13 +616,13 @@ def _gp_parameter_uncertainty(
         Plain ``int`` (NOT a numpy ``Generator``).  ``skopt.Space.rvs``
         forwards ``random_state`` to ``sklearn.utils.check_random_state``,
         which only accepts ``int``, ``None``, or the legacy
-        ``numpy.random.RandomState`` — passing a new-style ``Generator``
+        ``numpy.random.RandomState`` -- passing a new-style ``Generator``
         raises ``ValueError``.
 
     Returns
     -------
     {"cm_sigma": ..., "rm_sigma": ..., "ra_sigma": ...}
-    All values are NaN if the extraction fails for any reason — this
+    All values are NaN if the extraction fails for any reason -- this
     function never raises, because the optimiser is more important than
     the uncertainty estimate.
     """
@@ -669,7 +669,7 @@ def _gp_parameter_uncertainty(
     }
 
 
-# %% Cell 9 — Validation status classifier =====================================
+# %% Cell 9 -- Validation status classifier =====================================
 def _classify_fit(
     train_rmsd: float,
     valid_rmsd: float,
@@ -684,13 +684,13 @@ def _classify_fit(
       1. If training itself was poor (absolute train RMSD > ceiling),
          the fit failed regardless of validation.  This catches cells
          where the optimiser could not get close to the data at all.
-      2. If validation is dimensionally tiny (≤ ``valid_rmsd_good_mV``),
+      2. If validation is dimensionally tiny (<= ``valid_rmsd_good_mV``),
          accept as "good" regardless of the train/valid ratio.  This
          escape-hatch handles the regime where the optimiser fits the
          training data extraordinarily tightly and the ratio becomes
          dominated by tiny floor-level noise rather than real model error.
-      3. If validation is within k_good× of training, accept as good.
-      4. If validation is moderately worse (within k_fail×), flag for
+      3. If validation is within k_goodx of training, accept as good.
+      4. If validation is moderately worse (within k_failx), flag for
          refinement.
       5. Otherwise, fail.
     """
@@ -708,7 +708,7 @@ def _classify_fit(
     return "failed"
 
 
-# %% Cell 10 — Single-cell driver: fit_one_cell ================================
+# %% Cell 10 -- Single-cell driver: fit_one_cell ================================
 def fit_one_cell(
     cell: PassiveCell,
     cell_data: CellData,
@@ -835,7 +835,7 @@ def fit_one_cell(
 
     # --- Noise estimation on TRAINING bundles -----------------------------
     # Computed once after the fit (not used by gp_minimize itself); needed
-    # downstream by Phase 3 / post-processing for χ² thresholds in
+    # downstream by Phase 3 / post-processing for chi^2 thresholds in
     # profile-likelihood confidence intervals.  See uploaded
     # "Bayesian Optimisation and Likelihood Profile" notes.
     noise_sigmas = []
@@ -862,10 +862,10 @@ def fit_one_cell(
     if verbose:
         if not np.isnan(noise_sigma_mV):
             print(f"[fit_one_cell]   training noise: "
-                  f"σ={noise_sigma_mV:.4f} mV  ρ_lag1={noise_rho_lag1:.3f}  "
+                  f"sigma={noise_sigma_mV:.4f} mV  rho_lag1={noise_rho_lag1:.3f}  "
                   f"({len(opt_in.train_bundles)} bundle(s))")
         if noise_rho_high:
-            print(f"[fit_one_cell]   WARNING: ρ_lag1 > threshold -- "
+            print(f"[fit_one_cell]   WARNING: rho_lag1 > threshold -- "
                   f"effective sample size reduced; apply n_eff correction "
                   f"before computing CIs in post-processing.")
 
@@ -910,7 +910,7 @@ def fit_one_cell(
         print(f"[fit_one_cell]   ratio = {ratio:.2f}  ->  status = {status}")
 
     # --- GP-posterior uncertainty -----------------------------------------
-    # Pass int seed (not a numpy Generator) — see _gp_parameter_uncertainty
+    # Pass int seed (not a numpy Generator) -- see _gp_parameter_uncertainty
     # docstring for the reason.
     sigmas = _gp_parameter_uncertainty(
         result, delta_mV=uncertainty_delta_mV,
@@ -971,7 +971,7 @@ def fit_one_cell(
     )
 
 
-# %% Cell 11 — Multiprocessing worker (top-level for picklability) =============
+# %% Cell 11 -- Multiprocessing worker (top-level for picklability) =============
 def _fit_worker(args) -> PassiveFitResult:
     """Worker entry point for multiprocessing.Pool.  Each worker rebuilds
     its own NEURON model from the SWC path because NEURON sections are
@@ -993,7 +993,7 @@ def _fit_worker(args) -> PassiveFitResult:
     return r
 
 
-# %% Cell 12 — Batch driver: fit_cells =========================================
+# %% Cell 12 -- Batch driver: fit_cells =========================================
 def fit_cells(
     cells_data: Sequence[CellData],
     opt_inputs: Sequence[OptimiserInputs],
@@ -1021,7 +1021,7 @@ def fit_cells(
     F
         Spine-area correction factor, applied uniformly to all cells in the
         call.  For mixed populations (e.g. spiny + aspiny in one call), set
-        this on the basis of the dendrite type of the GROUP, not per cell —
+        this on the basis of the dendrite type of the GROUP, not per cell --
         or call ``fit_cells`` separately per group.
     n_workers
         ``1`` (default): sequential within node.  ``> 1``: distribute cells
@@ -1077,7 +1077,7 @@ def fit_cells(
                 )
             results.append(r)
     else:
-        # Parallel path — multiprocessing.Pool
+        # Parallel path -- multiprocessing.Pool
         import multiprocessing as mp
         ctx = mp.get_context("spawn")  # safer than fork with NEURON
         args_list = [(cd, oi, F, dict(fit_kwargs))
@@ -1096,7 +1096,7 @@ def fit_cells(
         # The three Phase-3 hand-off fields hold live objects (NEURON Hoc
         # handles, sklearn GP, OptimiserInputs) that deepcopy cannot traverse.
         # dataclasses.replace() creates a shallow copy with only those three
-        # fields nulled out — the originals in `results` are untouched and
+        # fields nulled out -- the originals in `results` are untouched and
         # still carry the live objects for Phase 3.
         import dataclasses
         r_export = dataclasses.replace(r,
@@ -1162,7 +1162,7 @@ def rebuild_neuron_cells_for_phase3(
         if cd is None:
             warnings.warn(
                 f"[rebuild_neuron_cells_for_phase3] specimen {r.specimen_id} "
-                f"not found in cells_data — skipping."
+                f"not found in cells_data -- skipping."
             )
             continue
 
@@ -1184,14 +1184,14 @@ def rebuild_neuron_cells_for_phase3(
         print(f"[rebuild_neuron_cells_for_phase3] rebuilt {n_rebuilt} "
               f"NEURON model(s) out of {len(results)} result(s).")
 
-# %% Cell 13 — Population aggregator ===========================================
+# %% Cell 13 -- Population aggregator ===========================================
 def aggregate_population(
     df: pd.DataFrame,
     *,
     group_by: Sequence[str] = ("layer", "dendrite_type"),
     accept_statuses: Sequence[str] = ("good",),
 ) -> pd.DataFrame:
-    """Compute mean ± SD of (Cm, Rm, Ra) per group.
+    """Compute mean +/- SD of (Cm, Rm, Ra) per group.
 
     Parameters
     ----------
@@ -1199,12 +1199,12 @@ def aggregate_population(
         Output of :func:`fit_cells`.
     group_by
         Columns to group on.  Default ``("layer", "dendrite_type")`` gives
-        one row per (layer × cell-type) combination — exactly the
+        one row per (layer x cell-type) combination -- exactly the
         granularity used in the project pipeline document for canonical
         parameter sets.
     accept_statuses
         Which validation statuses to include in the aggregation.  Default
-        ``("good",)`` is conservative — rejects any cell that failed
+        ``("good",)`` is conservative -- rejects any cell that failed
         validation or needs refinement.  Pass ``("good", "to_refine")``
         to include cells flagged for Phase 3 refinement.
 
@@ -1247,7 +1247,7 @@ def aggregate_population(
     return pd.DataFrame(out_rows)
 
 
-# %% Cell 14 — Diagnostic plot helper ==========================================
+# %% Cell 14 -- Diagnostic plot helper ==========================================
 def plot_fit_diagnostic(
     cell: PassiveCell,
     cell_data: CellData,
@@ -1441,7 +1441,7 @@ def plot_fit_diagnostic(
     return fig, axes
 
 
-# %% Cell 15 — Demo (uncomment to run end-to-end) ==============================
+# %% Cell 15 -- Demo (uncomment to run end-to-end) ==============================
 # if __name__ == "__main__":
 #     from phase1_data_loader import (
 #         list_human_cells_with_morphology,
@@ -1486,7 +1486,7 @@ def plot_fit_diagnostic(
 
 
 # -*- coding: utf-8 -*-
-"""Phase1Fitting.ipynb — PATCHED for Phase 3 v3 nonparametric bootstrap
+"""Phase1Fitting.ipynb -- PATCHED for Phase 3 v3 nonparametric bootstrap
 
 Automatically generated by Colab.
 
@@ -1494,8 +1494,8 @@ Original file is located at
     https://colab.research.google.com/drive/1C2eMIkBx5bamdu5EdHZuUQDV6ThkWFE-
 
 PATCH NOTES (Phase 3 v3):
-  1. CellData now carries ``ss_individual_pulses`` — the raw individual pulse
-     window dicts before averaging — so the nonparametric bootstrap can
+  1. CellData now carries ``ss_individual_pulses`` -- the raw individual pulse
+     window dicts before averaging -- so the nonparametric bootstrap can
      resample them.
   2. ``_build_subthreshold_bundles`` now returns a tuple
      ``(bundles, individual_pulses)`` instead of just ``bundles``.
@@ -1504,7 +1504,7 @@ PATCH NOTES (Phase 3 v3):
 """
 
 # Now pip install will find the correct pre-built wheels without crashing!
-!pip install  allensdk neuron scikit-optimize
+#S0.2:T7# !pip install  allensdk neuron scikit-optimize
 
 """
 phase1_data_loader.py
@@ -1516,15 +1516,15 @@ This module:
      of layer / dendrite-type / protocol / (optional) Patch-seq subtype filters.
   2. Loads experimental electrophysiology and morphology for one chosen cell.
   3. Builds a NEURON compartmental model with a Hay-style stub axon and
-     per-segment spine-area F multiplier on dendrites > 60 µm from the soma.
+     per-segment spine-area F multiplier on dendrites > 60 um from the soma.
   4. Packages everything for Phase-2 Bayesian optimisation with scikit-optimize.
 
 Key references
 --------------
-- Eyal et al. (2016) eLife 5:e16553                    — passive-fit methodology
-- Allen Cell Types Database (Technical White Paper, v5) — Square Subthreshold and
+- Eyal et al. (2016) eLife 5:e16553                    -- passive-fit methodology
+- Allen Cell Types Database (Technical White Paper, v5) -- Square Subthreshold and
                                                           Long Square protocols
-- Hay et al. (2011) PLoS Comp Biol 7:e1002107           — axon-stub convention
+- Hay et al. (2011) PLoS Comp Biol 7:e1002107           -- axon-stub convention
 - Internal pipeline document `passive_properties_summary.docx`
 
 Notes for users
@@ -1541,7 +1541,7 @@ Notes for users
 """
 
 
-# %% Cell 1 — Colab installs (skip on HPC) =====================================
+# %% Cell 1 -- Colab installs (skip on HPC) =====================================
 # Uncomment these lines in a fresh Colab session.  On HPC, manage your env
 # manually.  AllenSDK pulls in pynwb, h5py, and a fairly fat dependency tree;
 # allow ~3 minutes for the install.
@@ -1549,7 +1549,7 @@ Notes for users
 # !pip install -q allensdk neuron scikit-optimize
 
 
-# %% Cell 2 — Imports & constants ==============================================
+# %% Cell 2 -- Imports & constants ==============================================
 from __future__ import annotations
 import warnings
 from dataclasses import dataclass, field
@@ -1578,20 +1578,20 @@ DEFAULT_F = 1.9                   # Eyal 2016 average for human L2/3
 
 # Square Subthreshold protocol (Allen Core 1):
 SQ_SUB_DURATION_S        = 5e-4   # 0.5 ms nominal
-SQ_SUB_DURATION_TOL_S    = 5e-4   # ±0.5 ms tolerance (catches "Short Square" variants)
-SQ_SUB_AMPLITUDE_PA      = 200.0  # ±200 pA nominal
-SQ_SUB_AMPLITUDE_TOL_PA  = 30.0   # ±30 pA tolerance
+SQ_SUB_DURATION_TOL_S    = 5e-4   # +/-0.5 ms tolerance (catches "Short Square" variants)
+SQ_SUB_AMPLITUDE_PA      = 200.0  # +/-200 pA nominal
+SQ_SUB_AMPLITUDE_TOL_PA  = 30.0   # +/-30 pA tolerance
 
-# Long Square subthreshold cutoff (used for Rin / τm validation target):
+# Long Square subthreshold cutoff (used for Rin / taum validation target):
 LONG_SQUARE_MAX_ABS_AMPLITUDE_PA = 100.0
 
 # Passive parameter bounds (pipeline doc, mirrored from Eyal/Markram):
-DEFAULT_CM_BOUNDS = (0.3, 3.0)            # µF/cm²
-DEFAULT_RM_BOUNDS = (1_000.0, 100_000.0)  # Ω·cm²
-DEFAULT_RA_BOUNDS = (50.0, 1_000.0)       # Ω·cm
+DEFAULT_CM_BOUNDS = (0.3, 3.0)            # uF/cm^2
+DEFAULT_RM_BOUNDS = (1_000.0, 100_000.0)  # Ohm.cm^2
+DEFAULT_RA_BOUNDS = (50.0, 1_000.0)       # Ohm.cm
 
 
-# %% Cell 2b — Custom exceptions ===============================================
+# %% Cell 2b -- Custom exceptions ===============================================
 class IncompleteDataError(Exception):
     """Raised by ``load_allen_data`` when ``require_complete_data=True`` and
     either the training (Square Subthreshold) or validation (Long Square)
@@ -1608,7 +1608,7 @@ class IncompleteDataError(Exception):
 
 
 
-# %% Cell 3 — Dataclasses ======================================================
+# %% Cell 3 -- Dataclasses ======================================================
 @dataclass
 class SweepBundle:
     """
@@ -1635,10 +1635,10 @@ class CellData:
     metadata: Dict[str, Any]               # layer, dendrite_type, donor_id, ...
     swc_path: Path
 
-    # Primary fitting data — from Square Subthreshold sweeps
+    # Primary fitting data -- from Square Subthreshold sweeps
     square_subthreshold: List[SweepBundle]
 
-    # Held-out validation data — from Long Square subthreshold sweeps
+    # Held-out validation data -- from Long Square subthreshold sweeps
     long_square_subthreshold: List[SweepBundle]
 
     # Reference scalars from the Allen Cell Feature Summary (LJP-corrected here)
@@ -1649,7 +1649,7 @@ class CellData:
     ljp_correction_mV: float
     n_avg_groups: int
 
-    # ── PATCH (Phase 3 v3): individual pulse windows for nonparametric bootstrap ──
+    # -- PATCH (Phase 3 v3): individual pulse windows for nonparametric bootstrap --
     # Each dict has keys: t (ndarray, seconds, t=0 at pulse onset),
     # v (ndarray, mV, LJP-corrected), i (ndarray, pA),
     # polarity ("dep"|"hyp"), peak_pA (float), stim_duration_s (float),
@@ -1686,15 +1686,15 @@ class PassiveSearchSpace:
           each axis consistently without manual length-scale tuning.
         * A uniform prior in q = log(p) is equivalent to a log-uniform prior
           in p, which is the correct non-informative prior for scale
-          parameters — it assigns equal probability to each decade.
+          parameters -- it assigns equal probability to each decade.
         * The optimisation landscape is smoother in log-space for passive
           cable parameters because the somatic transient depends on
-          log-linear combinations of these parameters (e.g. τm = Cm × Rm
+          log-linear combinations of these parameters (e.g. taum = Cm x Rm
           is additive in log-space).
         * Positive-definiteness is guaranteed: exp(q) > 0 for all finite q,
           so the optimiser can never propose a non-physical negative value.
 
-        Phase 2's loss function is responsible for converting q → p = exp(q)
+        Phase 2's loss function is responsible for converting q -> p = exp(q)
         before passing the parameters to NEURON.  result.x from gp_minimize
         contains the log-space optima and must likewise be exponentiated.
         """
@@ -1723,7 +1723,7 @@ class OptimiserInputs:
     v_rest_mV: float = np.nan
 
 
-# %% Cell 4 — Helper: list_human_cells_with_morphology =========================
+# %% Cell 4 -- Helper: list_human_cells_with_morphology =========================
 def list_human_cells_with_morphology(
     layer: Optional[str] = None,
     dendrite_type: Optional[Literal["spiny", "aspiny", "sparsely spiny"]] = None,
@@ -1741,7 +1741,7 @@ def list_human_cells_with_morphology(
     Parameters
     ----------
     layer
-        e.g. ``"2/3"``, ``"4"``, ``"5"``, ``"6a"`` — matched against
+        e.g. ``"2/3"``, ``"4"``, ``"5"``, ``"6a"`` -- matched against
         ``structure_layer_name``.
     dendrite_type
         ``"spiny"`` / ``"aspiny"`` / ``"sparsely spiny"``.
@@ -1790,7 +1790,7 @@ def list_human_cells_with_morphology(
             print(f"[list_human_cells]   after dendrite_type={dendrite_type!r}: "
                   f"{len(df)} cells")
 
-    # Protocol availability — needs one network round-trip per cell, so done last
+    # Protocol availability -- needs one network round-trip per cell, so done last
     if require_square_subthreshold or require_long_square:
         ss_flags, ls_flags = [], []
         for sid in df["id"]:
@@ -1847,7 +1847,7 @@ def list_human_cells_with_morphology(
         if patchseq_ttype_csv is None:
             warnings.warn(
                 f"interneuron_subtype={interneuron_subtype!r} was requested but "
-                f"no patchseq_ttype_csv was supplied — filter ignored.")
+                f"no patchseq_ttype_csv was supplied -- filter ignored.")
         else:
             df = df[df["subtype"] == interneuron_subtype]
             if verbose:
@@ -1868,14 +1868,14 @@ def list_human_cells_with_morphology(
     return out
 
 
-# %% Cell 5 — Internal sweep selection & averaging =============================
+# %% Cell 5 -- Internal sweep selection & averaging =============================
 def _to_pA_seconds(amp, dur) -> Tuple[float, float]:
     """Normalise Allen sweep metadata to (pA, seconds).
 
     Allen Cell Types data can show up with two unit conventions across SDK
     releases: SI (Amperes, seconds) or mixed (pA, ms).  We auto-detect by
     magnitude.  Missing / non-numeric values (None, NaN, strings) are mapped
-    to NaN — callers must filter NaN before use.
+    to NaN -- callers must filter NaN before use.
     """
     # --- amplitude --------------------------------------------------------
     if amp is None:
@@ -1913,11 +1913,11 @@ def _to_pA_seconds(amp, dur) -> Tuple[float, float]:
 def _select_square_subthreshold(sweeps_meta: List[Dict]) -> List[Dict]:
     """Find Square Subthreshold sweeps by ``stimulus_name`` only.
 
-    The Square Subthreshold protocol stores all 20 ±200 pA pulses **inside a
+    The Square Subthreshold protocol stores all 20 +/-200 pA pulses **inside a
     single sweep** (cf. Allen Cell Types Tech Paper, Appendix p. 15: "0.5 ms
     square current injections to +/- 200 pA, repeated 20 times (200 ms
     intervals). N/A (single sweep)").  This means duration- and amplitude-
-    based filtering on the per-sweep metadata is meaningless here — the sweep
+    based filtering on the per-sweep metadata is meaningless here -- the sweep
     duration covers all 20 repeats, and the polarity alternates within the
     sweep so the average amplitude is ~0.  Pulse identification therefore has
     to happen on the current waveform itself, by ``_detect_pulses_in_current``.
@@ -1933,12 +1933,12 @@ def _select_square_subthreshold(sweeps_meta: List[Dict]) -> List[Dict]:
 def _select_long_square_subthreshold(sweeps_meta: List[Dict]) -> List[Dict]:
     """Select all Long Square sweeps, regardless of metadata amplitude.
 
-    Allen's standard Long Square protocol starts at −110 pA (not −100 pA),
-    and ``stimulus_amplitude`` is frequently ``None`` in the sweep metadata —
+    Allen's standard Long Square protocol starts at -110 pA (not -100 pA),
+    and ``stimulus_amplitude`` is frequently ``None`` in the sweep metadata --
     both issues make metadata-level amplitude filtering unreliable.  We
     therefore return ALL Long Square sweeps and let the caller measure the
     actual step amplitude from the NWB waveform before deciding which sweep
-    to use for τm / Rin validation.
+    to use for taum / Rin validation.
     """
     return [
         s for s in sweeps_meta
@@ -2059,7 +2059,7 @@ def _extract_windows_around_pulses(
     return out
 
 
-# ── PATCHED: returns (bundles, individual_pulses) instead of just bundles ──
+# -- PATCHED: returns (bundles, individual_pulses) instead of just bundles --
 def _build_subthreshold_bundles(
     data_set,
     sweep_meta_list: List[Dict],
@@ -2113,7 +2113,7 @@ def _build_subthreshold_bundles(
             i_full, sr, threshold_pA=pulse_threshold_pA)
 
         # Amplitude / duration QC on each detected pulse: keep only those whose
-        # peak |I| matches the expected ±200 pA within tolerance, and whose
+        # peak |I| matches the expected +/-200 pA within tolerance, and whose
         # duration matches the expected 0.5 ms within tolerance.  This guards
         # against accidental matches in protocols whose name happens to
         # contain "Square" + "Subthreshold" but with different parameters.
@@ -2129,7 +2129,7 @@ def _build_subthreshold_bundles(
         windows = _extract_windows_around_pulses(
             v_full, i_full, sr, pulses_qc, pre_ms=pre_ms, post_ms=post_ms)
 
-        # ── PATCH: tag each window with its sampling rate ──
+        # -- PATCH: tag each window with its sampling rate --
         for w in windows:
             w["sampling_rate_Hz"] = sr
 
@@ -2178,7 +2178,7 @@ def _build_subthreshold_bundles(
                 stimulus_name=stim_name,
             ))
 
-    # ── PATCH: collect ALL individual pulse windows ──
+    # -- PATCH: collect ALL individual pulse windows --
     individual_pulses = all_dep + all_hyp
 
     return bundles, individual_pulses
@@ -2208,7 +2208,7 @@ def _build_bundles_from_group(
         for sn in part:
             sw = data_set.get_sweep(int(sn))
             # index_range clips out the test pulse that Allen prepends to every
-            # sweep — as shown in the official AllenSDK notebook example.
+            # sweep -- as shown in the official AllenSDK notebook example.
             # Default to (0, end) if the key is absent for robustness.
             idx = sw.get("index_range", (0, len(sw["response"]) - 1))
             v_traces.append(sw["response"][idx[0]: idx[1] + 1])   # Volts
@@ -2246,7 +2246,7 @@ def _build_bundles_from_group(
     return bundles
 
 
-# %% Cell 6 — load_allen_data ==================================================
+# %% Cell 6 -- load_allen_data ==================================================
 def load_allen_data(
     specimen_id: int,
     ljp_correction_mV: float = LJP_CORRECTION_MV,
@@ -2270,10 +2270,10 @@ def load_allen_data(
         If ``True`` (default), raise :class:`IncompleteDataError` when the cell
         does not yield BOTH at least one Square Subthreshold bundle AND at
         least one Long Square subthreshold bundle.  This keeps Phase 2's
-        validation step (Rin/τm against the held-out Long Square sweep)
+        validation step (Rin/taum against the held-out Long Square sweep)
         well-defined for every cell that propagates downstream.  Set to
-        ``False`` to return ``CellData`` regardless — useful when you want to
-        proceed with Allen's scalar Rin/τm features only and skip the
+        ``False`` to return ``CellData`` regardless -- useful when you want to
+        proceed with Allen's scalar Rin/taum features only and skip the
         waveform-level validation.
 
     Notes
@@ -2310,7 +2310,7 @@ def load_allen_data(
     sweeps_meta = ctc.get_ephys_sweeps(specimen_id)
 
     # --- Square Subthreshold: many pulses per sweep -------------------------
-    # All 20 ±200 pA pulses live inside a SINGLE sweep (Allen Tech Paper
+    # All 20 +/-200 pA pulses live inside a SINGLE sweep (Allen Tech Paper
     # appendix p.15: "N/A (single sweep)").  We therefore find candidate
     # sweeps by name, then identify each individual pulse by thresholding the
     # current waveform.
@@ -2318,7 +2318,7 @@ def load_allen_data(
     if verbose:
         print(f"[load_allen_data]   Square-Subthreshold candidate sweeps: "
               f"{len(ss_meta)}")
-    # ── PATCHED: unpack both bundles AND individual pulse windows ──
+    # -- PATCHED: unpack both bundles AND individual pulse windows --
     ss_bundles, ss_individual_pulses = _build_subthreshold_bundles(
         data_set,
         ss_meta,
@@ -2384,13 +2384,13 @@ def load_allen_data(
                     f"{k:+d}" for k in sorted(amp_groups.keys(), key=abs))
                 print(f"[load_allen_data]   Long-Square bundles loaded "
                       f"({len(ls_bundles)} total): [{amp_keys_str}] pA\n"
-                      f"[load_allen_data]   → ls_bundles[0] "
+                      f"[load_allen_data]   -> ls_bundles[0] "
                       f"({ls_bundles[0].amplitude_pA:+.0f} pA) "
-                      f"is Ih-cleanest; use for τm validation.")
+                      f"is Ih-cleanest; use for taum validation.")
         else:
             if verbose:
                 print("[load_allen_data]   No usable hyperpolarising "
-                      "Long Square sweeps — Phase 2 will validate Rin/τm "
+                      "Long Square sweeps -- Phase 2 will validate Rin/taum "
                       "against the Allen scalar features only.")
 
     # --- Reference scalars --------------------------------------------------
@@ -2408,7 +2408,7 @@ def load_allen_data(
 
     if verbose:
         print(f"[load_allen_data] specimen {specimen_id}: "
-              f"Rin={rin:.1f} MΩ  τm={tau:.1f} ms  "
+              f"Rin={rin:.1f} MOhm  taum={tau:.1f} ms  "
               f"Vrest={vrest:.1f} mV (LJP-corrected)")
         n_ss_sweeps = len(ss_meta) if 'ss_meta' in locals() else 0
         n_dep = sum(b.n_repeats_averaged for b in ss_bundles if b.polarity == "dep")
@@ -2420,7 +2420,7 @@ def load_allen_data(
         print(f"[load_allen_data]   Long Square subthreshold: "
               f"{len(ls_bundles)} bundle(s) pooled from {n_ls_pulses} sweep(s)")
 
-    # ── PATCHED: pass ss_individual_pulses into CellData ──
+    # -- PATCHED: pass ss_individual_pulses into CellData --
     cell_data = CellData(
         specimen_id=specimen_id,
         metadata=meta,
@@ -2452,14 +2452,14 @@ def load_allen_data(
     return cell_data
 
 
-# %% Cell 7 — NEURON model: PassiveCell + builder ==============================
+# %% Cell 7 -- NEURON model: PassiveCell + builder ==============================
 class PassiveCell:
     """
     Compartmental passive model of one Allen morphology.
 
     * SWC imported via NEURON's ``Import3d_SWC_read``.
     * Original axon optionally replaced by a Hay-style two-section stub
-      (each 30 µm × 1 µm, 5 segments) attached at soma(1.0).
+      (each 30 um x 1 um, 5 segments) attached at soma(1.0).
     * The passive ``pas`` mechanism is inserted globally.
     * For each segment in dendritic sections (``dend`` + ``apic``), a
       multiplicative factor ``F`` is applied to ``cm`` and ``g_pas`` if the
@@ -2588,7 +2588,7 @@ class PassiveCell:
 
         Returns
         -------
-        (t_ms, v_mV) — both 1-D arrays, sampled every ``dt_ms``.
+        (t_ms, v_mV) -- both 1-D arrays, sampled every ``dt_ms``.
         """
         self._iclamp.delay = float(stim_delay_ms)
         self._iclamp.dur = float(stim_dur_ms)
@@ -2616,7 +2616,7 @@ def build_neuron_model(
     )
 
 
-# %% Cell 8 — prepare_optimiser_inputs =========================================
+# %% Cell 8 -- prepare_optimiser_inputs =========================================
 def prepare_optimiser_inputs(
     cell_data: CellData,
     fit_target: Literal["dep", "hyp", "both"] = "hyp",
@@ -2723,7 +2723,7 @@ def prepare_optimiser_inputs(
     )
 
 
-# %% Cell 8b — Batch helper: keep only cells with complete training+validation
+# %% Cell 8b -- Batch helper: keep only cells with complete training+validation
 def load_complete_cells(
     candidates: pd.DataFrame,
     *,
@@ -2780,7 +2780,7 @@ def load_complete_cells(
     return complete
 
 
-# %% Cell 8c — Plot helper for one cell ========================================
+# %% Cell 8c -- Plot helper for one cell ========================================
 def plot_example_traces(
     cell_data: CellData,
     figsize: Tuple[float, float] = (11.0, 6.0),
@@ -2788,16 +2788,16 @@ def plot_example_traces(
 ):
     """Plot example Square Subthreshold and Long Square traces for one cell.
 
-    Layout: 2 × 2 grid.
+    Layout: 2 x 2 grid.
 
-        ┌─────────────────────────┬─────────────────────────┐
-        │ V (mV)  Square Sub.     │ V (mV)  Long Square     │
-        ├─────────────────────────┼─────────────────────────┤
-        │ I (pA)  Square Sub.     │ I (pA)  Long Square     │
-        └─────────────────────────┴─────────────────────────┘
+        +-------------------------+-------------------------+
+        | V (mV)  Square Sub.     | V (mV)  Long Square     |
+        +-------------------------+-------------------------+
+        | I (pA)  Square Sub.     | I (pA)  Long Square     |
+        +-------------------------+-------------------------+
 
     Square Subthreshold panel overlays the depolarising and hyperpolarising
-    averaged bundles (one trace each — if ``n_avg_groups > 1`` the FIRST group
+    averaged bundles (one trace each -- if ``n_avg_groups > 1`` the FIRST group
     is plotted; the others are equivalent up to noise).  Long Square panel
     plots the chosen hyperpolarising step bundle.
 
@@ -2828,7 +2828,7 @@ def plot_example_traces(
             ax_i_ss.plot(b.t * 1e3, b.i_pA, color=color, lw=1.0)
         ax_v_ss.legend(loc="best", fontsize=8, frameon=False)
         ax_v_ss.set_title(
-            f"Square Subthreshold — cell {cell_data.specimen_id}\n"
+            f"Square Subthreshold -- cell {cell_data.specimen_id}\n"
             f"averaged over {sum(b.n_repeats_averaged for b in cell_data.square_subthreshold)} "
             f"pulses"
         )
@@ -2836,7 +2836,7 @@ def plot_example_traces(
         ax_v_ss.text(0.5, 0.5, "no Square Subthreshold data",
                      transform=ax_v_ss.transAxes, ha="center", va="center",
                      color="grey")
-        ax_v_ss.set_title(f"Square Subthreshold — cell {cell_data.specimen_id}")
+        ax_v_ss.set_title(f"Square Subthreshold -- cell {cell_data.specimen_id}")
 
     ax_v_ss.set_ylabel("V (mV)")
     ax_i_ss.set_ylabel("I (pA)")
@@ -2851,14 +2851,14 @@ def plot_example_traces(
         ax_i_ls.plot(b.t, b.i_pA, color="tab:purple", lw=1.0)
         ax_v_ls.legend(loc="best", fontsize=8, frameon=False)
         ax_v_ls.set_title(
-            f"Long Square — cell {cell_data.specimen_id}\n"
+            f"Long Square -- cell {cell_data.specimen_id}\n"
             f"averaged over {b.n_repeats_averaged} sweep(s)"
         )
     else:
         ax_v_ls.text(0.5, 0.5, "no Long Square data",
                      transform=ax_v_ls.transAxes, ha="center", va="center",
                      color="grey")
-        ax_v_ls.set_title(f"Long Square — cell {cell_data.specimen_id}")
+        ax_v_ls.set_title(f"Long Square -- cell {cell_data.specimen_id}")
 
     ax_v_ls.set_ylabel("V (mV)")
     ax_i_ls.set_ylabel("I (pA)")
@@ -2877,7 +2877,7 @@ def plot_example_traces(
     return fig, axes
 
 
-# %% Cell 8e — Morphology visualiser ==========================================
+# %% Cell 8e -- Morphology visualiser ==========================================
 def plot_neuron_morphology(
     cell: "PassiveCell",
     result=None,
@@ -2894,7 +2894,7 @@ def plot_neuron_morphology(
     This function is fully self-contained: all helper logic (3D-point
     extraction, soma-centroid computation, line-collection drawing) lives
     as nested functions inside the body, so pasting THIS function alone
-    into a Colab cell is enough to call it — there are no module-level
+    into a Colab cell is enough to call it -- there are no module-level
     helper dependencies that you might forget to also paste.
 
     Parameters
@@ -2908,10 +2908,10 @@ def plot_neuron_morphology(
         (Cm, Rm, Ra) with their GP-posterior uncertainties are shown in the
         figure title.
     color_by
-        * ``"compartment"`` (default) — soma black, basal dendrites blue,
+        * ``"compartment"`` (default) -- soma black, basal dendrites blue,
           apical dendrites red, axon grey.
-        * ``"F_factor"`` — dendrites colour-mapped by their spine-area
-          correction factor (F = 1.0 grey → F = 1.9+ orange); soma and axon
+        * ``"F_factor"`` -- dendrites colour-mapped by their spine-area
+          correction factor (F = 1.0 grey -> F = 1.9+ orange); soma and axon
           are always black / grey.  Useful for verifying that the spine
           correction is applied to the correct segments.
     show_F_boundary
@@ -2919,7 +2919,7 @@ def plot_neuron_morphology(
         centroid in each panel.  Segments outside this radius received the
         F-factor spine correction; segments inside did not.
     F_boundary_um
-        Radius of the F-boundary circle (default 60 µm, the value used in
+        Radius of the F-boundary circle (default 60 um, the value used in
         :class:`PassiveCell`).
     diam_scale
         Line-width-per-micrometre-diameter scale factor.  Increase for
@@ -2931,7 +2931,7 @@ def plot_neuron_morphology(
 
     Returns
     -------
-    ``(fig, axes)`` — the matplotlib figure and a (2,) axes array so the
+    ``(fig, axes)`` -- the matplotlib figure and a (2,) axes array so the
     caller can further annotate or save the figure.
     """
     import matplotlib.pyplot as plt
@@ -3003,8 +3003,8 @@ def plot_neuron_morphology(
     centroid = _soma_centroid()
 
     projections = [
-        (0, 1, "X (µm)", "Y (µm)", "XY — front view"),
-        (0, 2, "X (µm)", "Z (µm)", "XZ — side view"),
+        (0, 1, "X (um)", "Y (um)", "XY -- front view"),
+        (0, 2, "X (um)", "Z (um)", "XZ -- side view"),
     ]
 
     fig, axes = plt.subplots(1, 2, figsize=figsize)
@@ -3034,7 +3034,7 @@ def plot_neuron_morphology(
             ax.text(
                 cx_proj + F_boundary_um * 0.72,
                 cy_proj + F_boundary_um * 0.72,
-                f"{F_boundary_um:.0f} µm",
+                f"{F_boundary_um:.0f} um",
                 fontsize=7, color="0.4", va="center", ha="left",
             )
 
@@ -3048,7 +3048,7 @@ def plot_neuron_morphology(
         ax.plot([bar_x0, bar_x0 + bar_len], [bar_y0, bar_y0],
                 color="k", lw=1.5, solid_capstyle="butt")
         ax.text(bar_x0 + bar_len / 2, bar_y0 + yspan * 0.025,
-                "100 µm", ha="center", va="bottom", fontsize=7)
+                "100 um", ha="center", va="bottom", fontsize=7)
 
         ax.set_xlabel(xlabel, fontsize=8)
         ax.set_ylabel(ylabel, fontsize=8)
@@ -3069,7 +3069,7 @@ def plot_neuron_morphology(
         if show_F_boundary:
             legend_handles.append(
                 Line2D([0], [0], color="k", lw=0.8, linestyle="--",
-                       alpha=0.5, label=f"F-boundary ({F_boundary_um:.0f} µm)")
+                       alpha=0.5, label=f"F-boundary ({F_boundary_um:.0f} um)")
             )
         axes[1].legend(handles=legend_handles, loc="upper right",
                        fontsize=7, frameon=True, framealpha=0.8)
@@ -3093,15 +3093,15 @@ def plot_neuron_morphology(
         dt = getattr(result, "dendrite_type", "?")
         sid = getattr(result, "specimen_id", sid)
         fig.suptitle(
-            f"Cell {sid} — L{layer} {dt}\n"
-            f"Cm = {cm:.3f} ± {cms:.3f} µF/cm²  |  "
-            f"Rm = {rm:.0f} ± {rms:.0f} Ω·cm²  |  "
-            f"Ra = {ra:.0f} ± {ras:.0f} Ω·cm",
+            f"Cell {sid} -- L{layer} {dt}\n"
+            f"Cm = {cm:.3f} +/- {cms:.3f} uF/cm^2  |  "
+            f"Rm = {rm:.0f} +/- {rms:.0f} Ohm.cm^2  |  "
+            f"Ra = {ra:.0f} +/- {ras:.0f} Ohm.cm",
             fontsize=10, y=1.01,
         )
     else:
         fig.suptitle(
-            f"Cell {sid} — NEURON compartmental model",
+            f"Cell {sid} -- NEURON compartmental model",
             fontsize=10, y=1.01,
         )
 
@@ -3112,10 +3112,10 @@ def plot_neuron_morphology(
 
 # -*- coding: utf-8 -*-
 """
-phase0_download.py — Allen Data Archival for Offline HPC Use
+phase0_download.py -- Allen Data Archival for Offline HPC Use
 =============================================================
 
-Downloads all experimental data needed for Phases 1–3 from the Allen Cell
+Downloads all experimental data needed for Phases 1-3 from the Allen Cell
 Types Database and saves it in a portable, AllenSDK-free archive format
 (.npz for arrays, .json for metadata/scalars).
 
@@ -3136,28 +3136,28 @@ dataclasses (SweepBundle, CellData, PassiveCell, ...) from that namespace.
 Archive structure
 -----------------
     archive_dir/
-    ├── candidates.csv                 # output of list_human_cells_with_morphology
-    ├── manifest.json                  # provenance: date, parameters, per-cell status
-    └── specimen_<id>/
-        ├── reconstruction.swc         # verbatim copy of the Allen SWC
-        ├── metadata.json              # scalars, Allen metadata, QC stats, smoke test
-        ├── ss_pulses.npz              # individual Square Subthreshold pulse windows
-        └── ls_sweeps.npz              # individual Long Square sweep traces
+    +-- candidates.csv                 # output of list_human_cells_with_morphology
+    +-- manifest.json                  # provenance: date, parameters, per-cell status
+    +-- specimen_<id>/
+        +-- reconstruction.swc         # verbatim copy of the Allen SWC
+        +-- metadata.json              # scalars, Allen metadata, QC stats, smoke test
+        +-- ss_pulses.npz              # individual Square Subthreshold pulse windows
+        +-- ls_sweeps.npz              # individual Long Square sweep traces
 
 Data granularity rationale
 --------------------------
 Square Subthreshold pulses and Long Square sweeps are saved at the finest
-processed level — individual pulse windows (after pulse detection, amplitude/
+processed level -- individual pulse windows (after pulse detection, amplitude/
 duration QC, and LJP correction) and individual sweep traces (after index_range
-clipping, unit conversion, and LJP correction) — but BEFORE any cross-pulse
+clipping, unit conversion, and LJP correction) -- but BEFORE any cross-pulse
 averaging, train/validation splitting, or subthreshold amplitude filtering.
 
 This means every downstream decision is a free parameter on HPC:
 
-    * n_avg_groups    — how many averaged bundles per polarity
-    * fit_target      — dep / hyp / both
-    * LS amplitude    — which Long Square amplitudes to include
-    * bootstrap mode  — the full pulse pool is available for nonparametric resampling
+    * n_avg_groups    -- how many averaged bundles per polarity
+    * fit_target      -- dep / hyp / both
+    * LS amplitude    -- which Long Square amplitudes to include
+    * bootstrap mode  -- the full pulse pool is available for nonparametric resampling
 
 Usage (Colab)
 -------------
@@ -3182,12 +3182,12 @@ import numpy as np
 import pandas as pd
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  JSON encoder for numpy types
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class _NumpyEncoder(json.JSONEncoder):
-    """JSON encoder that transparently handles numpy scalars and NaN → null."""
+    """JSON encoder that transparently handles numpy scalars and NaN -> null."""
 
     def default(self, obj):
         if isinstance(obj, np.integer):
@@ -3204,9 +3204,9 @@ class _NumpyEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  PUBLIC ENTRY POINT
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def download_allen_archive(
     layer: str = "3",
@@ -3214,7 +3214,7 @@ def download_allen_archive(
     n_cells: Optional[int] = 1,
     archive_dir: str = "allen_archive",
     *,
-    # ── SS pulse-extraction parameters (match phase1 defaults) ──
+    # -- SS pulse-extraction parameters (match phase1 defaults) --
     pre_ms: float = 10.0,
     post_ms: float = 200.0,
     pulse_threshold_pA: float = 50.0,
@@ -3222,16 +3222,16 @@ def download_allen_archive(
     amplitude_tol_pA: float = SQ_SUB_AMPLITUDE_TOL_PA,     # 30.0
     expected_duration_s: float = SQ_SUB_DURATION_S,         # 5e-4
     duration_tol_s: float = SQ_SUB_DURATION_TOL_S,          # 5e-4
-    # ── Smoke-test parameters ──
+    # -- Smoke-test parameters --
     F: float = 1.9,
     fit_target: str = "hyp",
-    # ── General ──
+    # -- General --
     ljp_correction_mV: float = LJP_CORRECTION_MV,           # 14.0
     cache_dir: str = "cell_types",
     skip_existing: bool = True,
     skip_multiroot_swc: bool = True,
     verbose: bool = True,
-    # ── Pass-through to list_human_cells_with_morphology ──
+    # -- Pass-through to list_human_cells_with_morphology --
     require_square_subthreshold: bool = True,
     require_long_square: bool = True,
     patchseq_ttype_csv: Optional[str] = None,
@@ -3247,13 +3247,13 @@ def download_allen_archive(
         Root directory for the archive.  Created if absent.
     pre_ms, post_ms
         Window around each Square Subthreshold pulse onset (ms before and
-        after).  Baked into the saved pulse windows — choose generously.
+        after).  Baked into the saved pulse windows -- choose generously.
         Default 10/200 ms matches the phase1 extraction.
-    pulse_threshold_pA … duration_tol_s
+    pulse_threshold_pA ... duration_tol_s
         Pulse-detection QC parameters.  Match the phase1 defaults.
     F
         Spine-area correction factor for the smoke test only (not baked
-        into the archive — HPC code sets F independently).
+        into the archive -- HPC code sets F independently).
     fit_target
         Polarity for the smoke test's ``prepare_optimiser_inputs`` call.
     skip_existing
@@ -3279,7 +3279,7 @@ def download_allen_archive(
     archive_root = Path(archive_dir)
     archive_root.mkdir(parents=True, exist_ok=True)
 
-    # ── 1. Discover candidates ───────────────────────────────────────────────
+    # -- 1. Discover candidates -----------------------------------------------
     ctc = CellTypesCache(manifest_file=f"{cache_dir}/manifest.json")
     candidates = list_human_cells_with_morphology(
         layer=layer,
@@ -3296,10 +3296,10 @@ def download_allen_archive(
 
     if verbose:
         print(f"\n{'='*60}")
-        print(f"[archive] {len(candidates)} candidate(s) → {archive_root}")
+        print(f"[archive] {len(candidates)} candidate(s) -> {archive_root}")
         print(f"{'='*60}\n")
 
-    # ── 2. Archive each cell ─────────────────────────────────────────────────
+    # -- 2. Archive each cell -------------------------------------------------
     results: List[Dict[str, Any]] = []
     for _, row in candidates.iterrows():
         sid = int(row["specimen_id"])
@@ -3313,7 +3313,7 @@ def download_allen_archive(
 
         cell_dir.mkdir(parents=True, exist_ok=True)
         if verbose:
-            print(f"[archive] ═══ specimen {sid} ═══")
+            print(f"[archive] === specimen {sid} ===")
 
         try:
             status = _archive_one_cell(
@@ -3352,7 +3352,7 @@ def download_allen_archive(
                 "status": f"failed: {type(e).__name__}: {e}",
             })
 
-    # ── 3. Save manifest ─────────────────────────────────────────────────────
+    # -- 3. Save manifest -----------------------------------------------------
     manifest = {
         "created": datetime.now().isoformat(),
         "archive_format_version": "1.0",
@@ -3386,7 +3386,7 @@ def download_allen_archive(
             1 for r in results if r["status"].startswith("skipped_multiroot")
         )
         print(f"{'='*60}")
-        print(f"[archive] DONE — ok={n_ok}  partial={n_partial}  "
+        print(f"[archive] DONE -- ok={n_ok}  partial={n_partial}  "
               f"failed={n_fail}  skipped={n_skip}  "
               f"multiroot_skipped={n_multiroot}")
         print(f"{'='*60}")
@@ -3394,9 +3394,9 @@ def download_allen_archive(
     return candidates, results
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  PER-CELL ARCHIVAL WORKER
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def _count_swc_roots(swc_path: Path) -> Tuple[int, List[int]]:
     """Count the number of roots in an SWC file.
@@ -3461,22 +3461,22 @@ def _archive_one_cell(
     ``"ok"`` if all smoke tests pass, ``"partial"`` otherwise.
     """
 
-    # ══════════════════════════════════════════════════════════════════════
+    # ======================================================================
     # A.  CELL METADATA
-    # ══════════════════════════════════════════════════════════════════════
+    # ======================================================================
     cells = ctc.get_cells(species=[CellTypesApi.HUMAN])
     meta = next((c for c in cells if c["id"] == sid), None)
     if meta is None:
         raise ValueError(f"Specimen {sid} not found among human cells")
 
-    # ══════════════════════════════════════════════════════════════════════
-    # B.  MORPHOLOGY  —  download SWC and copy to archive
-    # ══════════════════════════════════════════════════════════════════════
+    # ======================================================================
+    # B.  MORPHOLOGY  --  download SWC and copy to archive
+    # ======================================================================
     swc_cache = Path(cache_dir) / f"specimen_{sid}" / "reconstruction.swc"
     swc_cache.parent.mkdir(parents=True, exist_ok=True)
     ctc.get_reconstruction(sid, file_name=str(swc_cache))
 
-    # ── B1.  Multi-root SWC check ────────────────────────────────────────
+    # -- B1.  Multi-root SWC check ----------------------------------------
     # Some Allen reconstructions contain disconnected sub-trees (parent == -1
     # appearing on more than one sample).  NEURON's Import3d_SWC_read prints
     # a "more than one tree" warning and silently drops the orphan branches,
@@ -3503,15 +3503,15 @@ def _archive_one_cell(
     swc_dst = cell_dir / "reconstruction.swc"
     shutil.copy2(swc_cache, swc_dst)
     if verbose:
-        print(f"[archive]   SWC → {swc_dst.name}")
+        print(f"[archive]   SWC -> {swc_dst.name}")
 
-    # ══════════════════════════════════════════════════════════════════════
-    # C.  ELECTROPHYSIOLOGY  —  raw waveform extraction
-    # ══════════════════════════════════════════════════════════════════════
+    # ======================================================================
+    # C.  ELECTROPHYSIOLOGY  --  raw waveform extraction
+    # ======================================================================
     data_set = ctc.get_ephys_data(sid)
     sweeps_meta = ctc.get_ephys_sweeps(sid)
 
-    # ── C1.  Square Subthreshold: individual pulse windows ───────────────
+    # -- C1.  Square Subthreshold: individual pulse windows ---------------
     #
     # Each detected pulse becomes one entry in all_pulses, carrying its own
     # (t, v, i) window, polarity tag, and provenance fields.  These are the
@@ -3544,7 +3544,7 @@ def _archive_one_cell(
         )
         ss_n_raw += len(pulses_raw)
 
-        # Amplitude / duration QC  — identical logic to _build_subthreshold_bundles
+        # Amplitude / duration QC  -- identical logic to _build_subthreshold_bundles
         pulses_qc: List[Tuple[int, int, float]] = []
         for s_i, e_i, peak in pulses_raw:
             dur = (e_i - s_i) / sr
@@ -3571,16 +3571,16 @@ def _archive_one_cell(
             nh = sum(1 for w in windows if w["polarity"] == "hyp")
             print(
                 f"[archive]   SS sweep {sn}: "
-                f"{len(pulses_raw)} detected → {len(pulses_qc)} QC'd "
+                f"{len(pulses_raw)} detected -> {len(pulses_qc)} QC'd "
                 f"(dep={nd}, hyp={nh})"
             )
 
     n_dep = sum(1 for w in all_pulses if w["polarity"] == "dep")
     n_hyp = len(all_pulses) - n_dep
 
-    # ── Save ss_pulses.npz ──────────────────────────────────────────────
+    # -- Save ss_pulses.npz ----------------------------------------------
     #
-    # Format A (normal case — all windows same length):
+    # Format A (normal case -- all windows same length):
     #   t:               (n_samples,)           shared time vector, t=0 at onset
     #   v:               (n_pulses, n_samples)  mV, LJP-corrected
     #   i_pA:            (n_pulses, n_samples)  pA
@@ -3590,7 +3590,7 @@ def _archive_one_cell(
     #   sampling_rate_Hz:(n_pulses,)            float64
     #   sweep_number:    (n_pulses,)            int64
     #
-    # Format B (rare — variable window lengths across sampling rates):
+    # Format B (rare -- variable window lengths across sampling rates):
     #   same 1-D metadata arrays, plus per-pulse t_k / v_k / i_k arrays
     #   and variable_length = True flag.
 
@@ -3598,7 +3598,7 @@ def _archive_one_cell(
     if all_pulses:
         lengths = set(len(w["t"]) for w in all_pulses)
         if len(lengths) == 1:
-            # ── Format A: stack into 2-D arrays ──
+            # -- Format A: stack into 2-D arrays --
             ss_stacked = True
             ss_data = {
                 "t": all_pulses[0]["t"].astype(np.float64),
@@ -3625,7 +3625,7 @@ def _archive_one_cell(
                 ),
             }
         else:
-            # ── Format B: variable-length windows (index individually) ──
+            # -- Format B: variable-length windows (index individually) --
             ss_data: Dict[str, np.ndarray] = {
                 "n_pulses": np.array([len(all_pulses)], dtype=np.int64),
                 "variable_length": np.array([True], dtype=bool),
@@ -3658,9 +3658,9 @@ def _archive_one_cell(
                 f"{'stacked' if ss_stacked else 'indexed'})"
             )
 
-    # ── C2.  Long Square: individual sweep traces ────────────────────────
+    # -- C2.  Long Square: individual sweep traces ------------------------
     #
-    # Every Long Square sweep is saved individually — including both hyper-
+    # Every Long Square sweep is saved individually -- including both hyper-
     # and depolarising, and both sub- and suprathreshold.  Downstream code
     # on HPC filters by detected_amplitude_pA.
     #
@@ -3733,9 +3733,9 @@ def _archive_one_cell(
         if verbose:
             print(f"[archive]   LS saved: {len(ls_sweep_info)} sweeps")
 
-    # ══════════════════════════════════════════════════════════════════════
-    # D.  SCALAR FEATURES  (Rin, τm, Vrest from Allen Cell Feature Summary)
-    # ══════════════════════════════════════════════════════════════════════
+    # ======================================================================
+    # D.  SCALAR FEATURES  (Rin, taum, Vrest from Allen Cell Feature Summary)
+    # ======================================================================
     all_feats = ctc.get_ephys_features()
     feats = next(
         (f for f in all_feats if f.get("specimen_id") == sid), {}
@@ -3744,20 +3744,20 @@ def _archive_one_cell(
     rin = float(feats.get("input_resistance_mohm", np.nan))
     tau = float(feats.get("tau", np.nan))
     if 0 < tau < 1:
-        tau *= 1e3  # seconds → milliseconds
+        tau *= 1e3  # seconds -> milliseconds
     vrest = float(feats.get("vrest", np.nan))
     if not np.isnan(vrest):
         vrest += ljp_correction_mV
 
     if verbose:
         print(
-            f"[archive]   scalars: Rin={rin:.1f} MΩ  "
-            f"τm={tau:.1f} ms  Vrest={vrest:.1f} mV"
+            f"[archive]   scalars: Rin={rin:.1f} MOhm  "
+            f"taum={tau:.1f} ms  Vrest={vrest:.1f} mV"
         )
 
-    # ══════════════════════════════════════════════════════════════════════
+    # ======================================================================
     # E.  SMOKE TEST
-    # ══════════════════════════════════════════════════════════════════════
+    # ======================================================================
     #
     # Verify the archived data is sufficient to run Phase 2 by:
     #   1. Building a NEURON model from the saved SWC
@@ -3768,7 +3768,7 @@ def _archive_one_cell(
     smoke: Dict[str, Any] = {}
 
     try:
-        # E1.  NEURON model from the archived SWC ──────────────────────
+        # E1.  NEURON model from the archived SWC ----------------------
         cell = build_neuron_model(swc_dst, F=F)
         smoke["build_neuron_model_ok"] = True
         smoke["n_sections"] = {
@@ -3778,7 +3778,7 @@ def _archive_one_cell(
             "axon": len(cell.axon),
         }
 
-        # E2.  Reconstruct CellData from archived data ────────────────
+        # E2.  Reconstruct CellData from archived data ----------------
         cd = _reconstruct_cell_data_for_smoke_test(
             sid=sid,
             meta=meta,
@@ -3795,13 +3795,13 @@ def _archive_one_cell(
         smoke["n_ss_bundles"] = len(cd.square_subthreshold)
         smoke["n_ls_bundles"] = len(cd.long_square_subthreshold)
 
-        # E3.  Prepare optimiser inputs ────────────────────────────────
+        # E3.  Prepare optimiser inputs --------------------------------
         oi = prepare_optimiser_inputs(cd, fit_target=fit_target)
         smoke["prepare_optimiser_inputs_ok"] = True
         smoke["n_train_bundles"] = len(oi.train_bundles)
         smoke["n_validation_bundles"] = len(oi.validation_bundles)
 
-        # E4.  Quick NEURON simulation (nominal parameters) ────────────
+        # E4.  Quick NEURON simulation (nominal parameters) ------------
         if oi.train_bundles and not np.isnan(vrest):
             cell.set_passive(1.0, 20000.0, 150.0)
             cell.set_e_pas(vrest)
@@ -3816,7 +3816,7 @@ def _archive_one_cell(
         if verbose:
             secs = smoke["n_sections"]
             print(
-                f"[archive]   SMOKE TEST: OK — "
+                f"[archive]   SMOKE TEST: OK -- "
                 f"sections={secs['soma']}s/{secs['dend']}d/"
                 f"{secs['apic']}a/{secs['axon']}ax  "
                 f"train={smoke.get('n_train_bundles', '?')}  "
@@ -3828,9 +3828,9 @@ def _archive_one_cell(
         if verbose:
             print(f"[archive]   SMOKE TEST FAILED: {e}")
 
-    # ══════════════════════════════════════════════════════════════════════
+    # ======================================================================
     # F.  SAVE METADATA.JSON
-    # ══════════════════════════════════════════════════════════════════════
+    # ======================================================================
 
     # Make the full Allen metadata dict JSON-safe
     meta_json: Dict[str, Any] = {}
@@ -3845,7 +3845,7 @@ def _archive_one_cell(
             meta_json[k] = str(v)
 
     metadata = {
-        # ── Top-level identity and scalars ──
+        # -- Top-level identity and scalars --
         "specimen_id": sid,
         "layer": str(meta.get("structure_layer_name", "")),
         "dendrite_type": str(meta.get("dendrite_type", "")),
@@ -3855,9 +3855,9 @@ def _archive_one_cell(
         "tau_ms": float(tau) if np.isfinite(tau) else None,
         "v_rest_mV": float(vrest) if np.isfinite(vrest) else None,
         "ljp_correction_mV": ljp_correction_mV,
-        # ── Full Allen metadata (for provenance / debugging) ──
+        # -- Full Allen metadata (for provenance / debugging) --
         "full_allen_metadata": meta_json,
-        # ── SS extraction provenance ──
+        # -- SS extraction provenance --
         "ss_extraction": {
             "sweep_numbers": ss_sweep_numbers,
             "n_pulses_raw": ss_n_raw,
@@ -3873,9 +3873,9 @@ def _archive_one_cell(
             "duration_tol_s": duration_tol_s,
             "stacked": ss_stacked,
         },
-        # ── LS sweep provenance (per-sweep scalar metadata) ──
+        # -- LS sweep provenance (per-sweep scalar metadata) --
         "ls_sweeps": ls_sweep_info,
-        # ── Smoke test results ──
+        # -- Smoke test results --
         "smoke_test": smoke,
     }
 
@@ -3884,14 +3884,14 @@ def _archive_one_cell(
 
     status = "ok" if smoke.get("simulation_ok") else "partial"
     if verbose:
-        print(f"[archive]   → status: {status}\n")
+        print(f"[archive]   -> status: {status}\n")
 
     return status
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  SMOKE-TEST HELPER  —  reconstruct CellData from archived pulse/sweep pools
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  SMOKE-TEST HELPER  --  reconstruct CellData from archived pulse/sweep pools
+# ===============================================================================
 #
 # This is a minimal reconstruction with n_avg_groups=1 (one averaged bundle
 # per polarity for SS, one bundle per distinct amplitude for LS).  The HPC
@@ -3914,10 +3914,10 @@ def _reconstruct_cell_data_for_smoke_test(
     """Build a CellData from the raw pulse/sweep pool (n_avg_groups=1).
 
     This mirrors what the HPC loader will do, but with fixed n_avg_groups=1
-    and standard amplitude filtering — just enough to verify the data is
+    and standard amplitude filtering -- just enough to verify the data is
     usable for Phase 2.
     """
-    # ── SS bundles: average all pulses of each polarity into one bundle ──
+    # -- SS bundles: average all pulses of each polarity into one bundle --
     ss_bundles: List[SweepBundle] = []
     for pol in ("dep", "hyp"):
         group = [w for w in all_pulses if w["polarity"] == pol]
@@ -3949,7 +3949,7 @@ def _reconstruct_cell_data_for_smoke_test(
             )
         )
 
-    # ── LS bundles: group hyp subthreshold sweeps by amplitude ───────────
+    # -- LS bundles: group hyp subthreshold sweeps by amplitude -----------
     #
     # Replicate the same logic as load_allen_data:
     #   1. Keep only hyperpolarising sweeps with |amp| <= 100 pA
@@ -4051,7 +4051,7 @@ out_dir = '/content/drive/MyDrive/Colab Notebooks/Allen_Intitute_Data/L3_exc'
 #     F=1.9,
 # )
 
-!pip install -q morphio neurom scipy
+#S0.2:T7# !pip install -q morphio neurom scipy
 
 # -*- coding: utf-8 -*-
 """
@@ -4065,7 +4065,7 @@ Your archive currently *discards* untrustworthy morphologies (``skip_multiroot_s
 silently drops any SWC whose ``_count_swc_roots`` returns > 1).  This module does
 the inverse: it scans a subpopulation (e.g. L5 spiny), FLAGS the defective cells,
 writes a structured report of *why* each is defective, and renders an image that
-highlights *where* the break is — so a downstream repair pass can graft / interpolate
+highlights *where* the break is -- so a downstream repair pass can graft / interpolate
 the broken structure and return the cell to the usable pool.
 
 This module performs detection + reporting + visualisation only.  Repair is a
@@ -4074,18 +4074,18 @@ family that would rescue it, and a ``repairable`` flag.
 
 Design (four decoupled components)
 ----------------------------------
-1. SCANNER      ``iter_allen_swcs`` — re-queries Allen live and yields one
+1. SCANNER      ``iter_allen_swcs`` -- re-queries Allen live and yields one
                 ``(specimen_id, layer, dendrite_type, swc_path)`` per candidate.
                 The Allen-network coupling lives ONLY here; the rest of the
                 pipeline consumes any iterator of that shape, so it is testable
                 offline and the data source is swappable.
-2. QC LAYER     ``CHECK_REGISTRY`` — a registry of independent check callables,
+2. QC LAYER     ``CHECK_REGISTRY`` -- a registry of independent check callables,
                 grouped by category.  Adding/removing a check never touches the
                 others.  Only the categories in ``enabled_categories`` run.
-3. REPORTER     ``write_cell_report`` / ``write_population_summary`` — serialise
+3. REPORTER     ``write_cell_report`` / ``write_population_summary`` -- serialise
                 results (per-cell JSON + population CSV + manifest), mirroring the
                 archive's ``metadata.json`` / ``manifest.json`` convention.
-4. VISUALISER   ``plot_defect_overlay`` — draw the morphology (XY + XZ) and overlay
+4. VISUALISER   ``plot_defect_overlay`` -- draw the morphology (XY + XZ) and overlay
                 markers on the offending samples, coloured by defect category.
 
 Backend
@@ -4093,7 +4093,7 @@ Backend
 MorphIO + NeuroM only, per design decision.  Consequence handled explicitly:
 a strict load RAISES on the worst files (NaN coordinates -> ``RawDataError``;
 malformed soma -> ``SomaError``).  Those are caught and recorded as a *fatal*
-defect ("bad — unloadable"), so the very cells you most want to rescue surface
+defect ("bad -- unloadable"), so the very cells you most want to rescue surface
 in the report instead of vanishing.  Load-time issues that MorphIO downgrades to
 warnings (disconnected neurite, missing soma, zero diameter) are harvested via a
 ``WarningHandlerCollector`` without raising.
@@ -4124,14 +4124,14 @@ import neurom
 from neurom.check import morphology_checks as _mc
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  0.  CONSTANTS  —  thresholds and category vocabulary
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  0.  CONSTANTS  --  thresholds and category vocabulary
+# ===============================================================================
 #
 # Categories are the user-facing defect classes.  Each check declares which
 # category it belongs to; ``enabled_categories`` gates which checks run.  The
 # "radii" category is implemented (see ``check_zero_neurite_radii``) but DISABLED
-# by default — flip it on via ``enabled_categories`` without editing any check.
+# by default -- flip it on via ``enabled_categories`` without editing any check.
 
 CATEGORY_CONNECTIVITY = "connectivity"   # disconnected trees / orphan subtrees
 CATEGORY_SOMA         = "soma"           # missing / degenerate soma
@@ -4146,16 +4146,16 @@ DEFAULT_ENABLED_CATEGORIES: Set[str] = {
 }
 
 # Detection thresholds (documented so they are tunable, not magic numbers).
-Z_JUMP_MAX_DISTANCE_UM = 30.0   # max allowed |Δz| between consecutive samples in a
+Z_JUMP_MAX_DISTANCE_UM = 30.0   # max allowed |Deltaz| between consecutive samples in a
                                 # section before it is flagged as a slice artefact.
-                                # NeuroM default; ~3× a typical inter-sample spacing.
+                                # NeuroM default; ~3x a typical inter-sample spacing.
 ROOT_JUMP_RADIUS_MULT  = 2.0    # has_no_root_node_jumps: a root point further than
-                                # this × local radius from its trunk is "jumped".
+                                # this x local radius from its trunk is "jumped".
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  1.  DATA MODEL
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 @dataclass
 class Defect:
@@ -4178,7 +4178,7 @@ class Defect:
     n_offenders : int
         Count of offending samples / sub-trees.
     coords : list of (x, y, z)
-        Coordinates of the offending samples (µm), for the overlay image.
+        Coordinates of the offending samples (um), for the overlay image.
         May be empty when the check cannot localise (then the image still
         renders the morphology and names the defect in the legend).
     source_lines : list of int
@@ -4218,9 +4218,9 @@ class CellQCReport:
         self.status = "bad" if self.defects else "good"
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  2a.  LOADER  —  strict load with diagnostics
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  2a.  LOADER  --  strict load with diagnostics
+# ===============================================================================
 
 # MorphIO warning class-name  ->  (our category, repairable, repair_hint)
 _MORPHIO_WARNING_MAP: Dict[str, Tuple[str, bool, str]] = {
@@ -4313,9 +4313,9 @@ def _first_line_number(msg: str) -> Optional[int]:
     return None
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  2b.  QC LAYER  —  registry of independent checks
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  2b.  QC LAYER  --  registry of independent checks
+# ===============================================================================
 #
 # Each check has signature:  check(ctx) -> List[Defect]
 # where ctx is a CheckContext.  Checks must be side-effect free and independent.
@@ -4413,7 +4413,7 @@ def check_z_jumps(ctx: CheckContext) -> List[Defect]:
     coords = _coords_from_neurom_info(res.info)
     return [Defect(
         check="z_jump", category=CATEGORY_GEOMETRY, severity="warning",
-        description=f"{max(len(coords)//2, 1)} z-jump(s) > {Z_JUMP_MAX_DISTANCE_UM:.0f} µm "
+        description=f"{max(len(coords)//2, 1)} z-jump(s) > {Z_JUMP_MAX_DISTANCE_UM:.0f} um "
                     f"between consecutive samples (likely slice-boundary artefact).",
         repairable=True,
         repair_hint="z-shift correction across the slice boundary, or spline-bridge "
@@ -4440,7 +4440,7 @@ def check_duplicate_points(ctx: CheckContext) -> List[Defect]:
 
 
 def check_zero_neurite_radii(ctx: CheckContext) -> List[Defect]:
-    """Zero/negative neurite radii.  CATEGORY_RADII — DISABLED by default.
+    """Zero/negative neurite radii.  CATEGORY_RADII -- DISABLED by default.
 
     Implemented so it can be switched on simply by adding CATEGORY_RADII to
     ``enabled_categories``; no edit to the registry needed.
@@ -4531,9 +4531,9 @@ def _camel_to_snake(name: str) -> str:
     return "".join("_" + c.lower() if c.isupper() else c for c in name).lstrip("_")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  3.  REPORTER
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 class _NpEncoder(json.JSONEncoder):
     """JSON encoder for numpy scalars / arrays (NaN -> null), matching the archive."""
@@ -4614,17 +4614,17 @@ def write_population_summary(
     return csv_path, manifest_path
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  4.  VISUALISER
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 # Per-category overlay colours.
 _CATEGORY_COLORS = {
-    CATEGORY_CONNECTIVITY: "#E53935",  # red    — orphan roots
-    CATEGORY_SOMA:         "#8E24AA",  # purple — soma defect
-    CATEGORY_GEOMETRY:     "#FB8C00",  # orange — z-jumps / duplicates
-    CATEGORY_RADII:        "#1E88E5",  # blue   — zero radii
-    CATEGORY_LOADER:       "#000000",  # black  — unloadable
+    CATEGORY_CONNECTIVITY: "#E53935",  # red    -- orphan roots
+    CATEGORY_SOMA:         "#8E24AA",  # purple -- soma defect
+    CATEGORY_GEOMETRY:     "#FB8C00",  # orange -- z-jumps / duplicates
+    CATEGORY_RADII:        "#1E88E5",  # blue   -- zero radii
+    CATEGORY_LOADER:       "#000000",  # black  -- unloadable
 }
 # Neurite-type colours for the faint morphology backdrop (matplotlib must be present).
 _TYPE_COLORS = {2: "#9E9E9E", 3: "#90CAF9", 4: "#EF9A9A"}  # axon, basal, apical
@@ -4657,8 +4657,8 @@ def plot_defect_overlay(
             m_io = None
 
     fig, axes = plt.subplots(1, 2, figsize=(13, 6))
-    projections = [(0, 1, "X (µm)", "Y (µm)", "XY — front"),
-                   (0, 2, "X (µm)", "Z (µm)", "XZ — side")]
+    projections = [(0, 1, "X (um)", "Y (um)", "XY -- front"),
+                   (0, 2, "X (um)", "Z (um)", "XZ -- side")]
 
     if m_io is None:
         for ax in axes:
@@ -4697,7 +4697,7 @@ def plot_defect_overlay(
     if handles:
         axes[-1].legend(handles=handles, loc="upper right", fontsize=8, framealpha=0.9)
 
-    checks = ", ".join(sorted({d.check for d in report.defects})) or "—"
+    checks = ", ".join(sorted({d.check for d in report.defects})) or "--"
     rescue = "rescuable" if report.all_repairable else "NOT fully rescuable"
     fig.suptitle(
         f"specimen {report.specimen_id}  |  L{report.layer} {report.dendrite_type}  |  "
@@ -4713,9 +4713,9 @@ def plot_defect_overlay(
     return fig, png_path
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  1 (SCANNER).  Allen data source  —  the ONLY network-coupled component
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  1 (SCANNER).  Allen data source  --  the ONLY network-coupled component
+# ===============================================================================
 
 def iter_allen_swcs(
     layer: str = "5",
@@ -4753,9 +4753,9 @@ def iter_allen_swcs(
                str(row.get("dendrite_type", dendrite_type)), swc_file)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  PUBLIC ENTRY POINT  —  ties the four components together
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  PUBLIC ENTRY POINT  --  ties the four components together
+# ===============================================================================
 
 def triage_subpopulation(
     layer: str = "5",
@@ -4802,7 +4802,7 @@ def triage_subpopulation(
     swc_out_dir
         Where to save the copies (default ``None`` -> ``out_dir``).
     save_image_for_good
-        Also render an overlay for clean cells (default ``False`` — images are
+        Also render an overlay for clean cells (default ``False`` -- images are
         the rescue targets).
 
     Returns
@@ -4901,21 +4901,21 @@ Repair philosophy
 -----------------
 Connectivity is fixed holistically rather than defect-by-defect:
 
-    1. raw-table pre-clean        — drop NaN/inf samples and coincident
+    1. raw-table pre-clean        -- drop NaN/inf samples and coincident
                                     duplicates (also the only way to touch the
                                     files MorphIO refuses to load);
-    2. enforce ONE soma           — promote a soma if none exists, choose a
+    2. enforce ONE soma           -- promote a soma if none exists, choose a
                                     single canonical soma node;
-    3. heal connectivity          — stitch every disconnected component to the
+    3. heal connectivity          -- stitch every disconnected component to the
                                     closest point of the soma-rooted tree
                                     (cKDTree), biased to the soma when within
                                     ``soma_radius_um``; fragments farther than
                                     ``max_stitch_dist_um`` are deemed unrepairable;
-    4. REROOT from the soma       — ``networkx.bfs_tree`` recomputes every parent
+    4. REROOT from the soma       -- ``networkx.bfs_tree`` recomputes every parent
                                     pointer outward from the soma, which also
                                     removes any accidental cycle and yields a
                                     NEURON-friendly parent-before-child ordering;
-    5. geometry                   — z-jump correction (propagated to the whole
+    5. geometry                   -- z-jump correction (propagated to the whole
                                     distal sub-tree) and soma-radius repair.
 
 Because the parent pointers are recomputed in step 4, the closest-point stitch
@@ -4958,9 +4958,9 @@ REPAIRABLE_CHECKS: Set[str] = {
 }
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  CONFIG
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 @dataclass
 class RepairConfig:
     """All thresholds and toggles for the repair, in one place."""
@@ -4969,7 +4969,7 @@ class RepairConfig:
                                         # RepairConfig(soma_radius_um=...) calls work
     max_stitch_dist_um: float = 60.0    # a component whose closest approach to ANY
                                         # other component exceeds this is UNREPAIRABLE
-    z_jump_thr_um: float = 30.0         # |Δz| between consecutive samples to flag
+    z_jump_thr_um: float = 30.0         # |Deltaz| between consecutive samples to flag
     dup_tolerance_um: float = 1e-3      # samples within this of their parent = dup
     soma_radius_floor_um: float = 1.0   # fallback soma radius if degenerate w/o stems
     collapse_flagged_soma: bool = True  # if the soma was FLAGGED (non-conform/missing),
@@ -4979,9 +4979,9 @@ class RepairConfig:
     require_positive_neurite_radii: bool = False   # gate success on radii too?
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  RESULT / DIAGNOSTIC DATACLASSES
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 @dataclass
 class RepairStep:
     """One repair action and what it changed."""
@@ -5041,9 +5041,9 @@ class RepairResult:
         return d
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  NODE-TABLE I/O  (raw substrate — works on files MorphIO cannot load)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  NODE-TABLE I/O  (raw substrate -- works on files MorphIO cannot load)
+# ===============================================================================
 def load_node_table(swc: Path) -> np.ndarray:
     """Parse an SWC into an (N, 7) float array; non-finite coords survive as NaN."""
     rows = []
@@ -5071,9 +5071,9 @@ def save_node_table(T: np.ndarray, out: Path) -> None:
                      f"{r[Z]:.4f} {r[R]:.4f} {int(r[PARENT])}\n")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  GRAPH HELPERS
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 def _build_graph(T: np.ndarray) -> nx.Graph:
     """Undirected graph of samples; edges from parent links."""
     G = nx.Graph()
@@ -5098,14 +5098,14 @@ def _path_length(T: np.ndarray) -> float:
     return total
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  REPAIR PRIMITIVES  (each pure: table/graph in -> table/graph + RepairStep out)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 def _preclean(T: np.ndarray, cfg: RepairConfig) -> Tuple[np.ndarray, List[RepairStep]]:
     """Drop NaN/inf rows (reparent children to nearest finite ancestor) and dedup."""
     steps: List[RepairStep] = []
 
-    # (a) non-finite samples — drop them, then reparent SURVIVING rows whose
+    # (a) non-finite samples -- drop them, then reparent SURVIVING rows whose
     #     parent chain passed through a dropped node up to the nearest finite
     #     ancestor.  (Reparent on the kept array, not a throwaway mask copy.)
     finite = np.all(np.isfinite(T[:, X:R + 1]), axis=1)
@@ -5209,7 +5209,7 @@ def _heal_components(T: np.ndarray, G: nx.Graph, soma_root: int,
 
     This deliberately does NOT privilege the soma-rooted ("main") arbour or the
     orphan's root node: a detached segment is joined to whatever element is
-    nearest — another orphan or the main arbour — at the closest point on each.
+    nearest -- another orphan or the main arbour -- at the closest point on each.
     Topological direction is *not* set here; it is recovered afterwards by
     rerooting outward from the soma (``_reroot_table``).
 
@@ -5351,9 +5351,9 @@ def _fix_soma_radius(T: np.ndarray, cfg: RepairConfig) -> Tuple[np.ndarray, Repa
     return T, RepairStep("fix_soma_radius", True, {"radius_set_um": round(r_new, 3)})
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  POST-REPAIR DIAGNOSTIC  (recomputed from the output — verification, not trust)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  POST-REPAIR DIAGNOSTIC  (recomputed from the output -- verification, not trust)
+# ===============================================================================
 def diagnose(T_before: np.ndarray, T_after: np.ndarray,
              cfg: RepairConfig) -> RepairDiagnostic:
     Gb, Ga = _build_graph(T_before), _build_graph(T_after)
@@ -5416,9 +5416,9 @@ def diagnose(T_before: np.ndarray, T_after: np.ndarray,
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  THE REPAIR CLASS
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 class MorphologyRepair:
     """Polish a flagged morphology into a single soma-rooted tree.
 
@@ -5483,9 +5483,9 @@ class MorphologyRepair:
         )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  STANDALONE TEST HELPER  —  run BEFORE integrating
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  STANDALONE TEST HELPER  --  run BEFORE integrating
+# ===============================================================================
 def repair_and_verify(
     swc_path: str, layer: str = "5", dendrite_type: str = "spiny",
     out_dir: Optional[str] = None, config: RepairConfig = RepairConfig(),
@@ -5572,7 +5572,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
-# ── palette ──────────────────────────────────────────────────────────────────
+# -- palette ------------------------------------------------------------------
 TYPE_COLOR = {1: "#222222", 2: "#9E9E9E", 3: "#1f77b4", 4: "#d62728"}  # soma/axon/basal/apical
 TYPE_NAME = {1: "soma", 2: "axon", 3: "basal dendrite", 4: "apical dendrite"}
 MAIN_GREY = "#c7c7c7"
@@ -5581,9 +5581,9 @@ ORPHAN_PALETTE = ["#e377c2", "#2ca02c", "#17becf", "#bcbd22", "#8c564b",
                   "#ff9896", "#9467bd", "#7f7f7f", "#1f9e89", "#f4a261"]
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  PURE GEOMETRY HELPERS  (node table -> plotly coordinate streams)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 def _components(T: np.ndarray) -> List[set]:
     """Connected components of the parent-graph, soma-containing component first."""
     G = nx.Graph()
@@ -5636,9 +5636,9 @@ def _soma_marker(T: np.ndarray, name: str = "soma") -> Optional[go.Scatter3d]:
         name=name, legendgroup="soma", hoverinfo="name")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  SCENE BUILDERS
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 def _add_before(fig: go.Figure, T: np.ndarray, grafts: List[Dict[str, Any]],
                 unrepairable: List[Dict[str, Any]], col: int) -> int:
     """Draw the pre-repair morphology; returns the number of disconnected comps."""
@@ -5665,7 +5665,7 @@ def _add_before(fig: go.Figure, T: np.ndarray, grafts: List[Dict[str, Any]],
         rp = np.vstack(orphan_root_pts)
         fig.add_trace(go.Scatter3d(x=rp[:, X], y=rp[:, Y], z=rp[:, Z], mode="markers",
                                    marker=dict(size=5, color="black", symbol="diamond"),
-                                   name="orphan roots (parent −1)", legendgroup="oroots"),
+                                   name="orphan roots (parent -1)", legendgroup="oroots"),
                       row=1, col=col)
     # planned graft connectors (dashed)
     gx, gy, gz = _graft_lines(grafts)
@@ -5716,9 +5716,9 @@ def _add_after(fig: go.Figure, T: np.ndarray, grafts: List[Dict[str, Any]],
         fig.add_trace(sm, row=1, col=col)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  PUBLIC: build a figure from explicit before/after tables
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 def figure_before_after(
     T_before: np.ndarray,
     T_after: Optional[np.ndarray],
@@ -5740,17 +5740,17 @@ def figure_before_after(
                             horizontal_spacing=0.02)
     else:
         fig = make_subplots(rows=1, cols=1, specs=[[{"type": "scene"}]],
-                            subplot_titles=(f"Before — {note}",))
+                            subplot_titles=(f"Before -- {note}",))
 
     n_disc = _add_before(fig, T_before, grafts, unrepairable, col=1)
-    fig.layout.annotations[0].text = f"Before — {n_disc} disconnected component(s)" if two else \
-        f"Before — {note}"
+    fig.layout.annotations[0].text = f"Before -- {n_disc} disconnected component(s)" if two else \
+        f"Before -- {note}"
     if two:
         _add_after(fig, T_after, grafts, col=2)
 
     cam = dict(eye=dict(x=0.0, y=-2.0, z=0.2))   # look along -y (frontal-ish)
     fig.update_scenes(aspectmode="data", camera=cam,
-                      xaxis_title="x (µm)", yaxis_title="y (µm)", zaxis_title="z (µm)")
+                      xaxis_title="x (um)", yaxis_title="y (um)", zaxis_title="z (um)")
     fig.update_layout(
         title=title or "Morphology repair",
         height=620, width=1180 if two else 640,
@@ -5760,15 +5760,15 @@ def figure_before_after(
     return fig
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  PUBLIC: run triage+repair then visualise  (the one you'll call per cell)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 def visualize_repair(
     swc_path: str, layer: str = "5", dendrite_type: str = "spiny",
     config: Optional[RepairConfig] = None, specimen_id: int = 0,
     show: bool = False,
 ) -> Tuple[go.Figure, RepairResult | None]:
-    """Triage → repair → build a before/after figure.  Returns (figure, result).
+    """Triage -> repair -> build a before/after figure.  Returns (figure, result).
 
     * clean cell    -> both scenes show the same morphology, titled 'no healing'.
     * repaired cell -> before (orphans highlighted) vs after (connected).
@@ -5784,7 +5784,7 @@ def visualize_repair(
     result: RepairResult | None = None
     if report.status == "good":
         fig = figure_before_after(T_before, T_before, grafts=[],
-                                  title=f"{tag} — already clean (no healing needed)")
+                                  title=f"{tag} -- already clean (no healing needed)")
     elif report.all_repairable:
         result = MorphologyRepair(config or RepairConfig()).repair(report)
         prov = result.to_provenance()
@@ -5795,27 +5795,27 @@ def visualize_repair(
             d = result.diagnostic
             fig = figure_before_after(
                 T_before, result._table, grafts=grafts,
-                title=f"{tag} — repaired  "
-                      f"(components {d.n_components_before}→{d.n_components_after}, "
-                      f"path {d.path_length_before_um:.0f}→{d.path_length_after_um:.0f} µm)")
+                title=f"{tag} -- repaired  "
+                      f"(components {d.n_components_before}->{d.n_components_after}, "
+                      f"path {d.path_length_before_um:.0f}->{d.path_length_after_um:.0f} um)")
         else:
             fig = figure_before_after(
                 T_before, None, grafts=grafts, unrepairable=unrep,
                 note=f"DISCARDED: {result.discard_reason}",
-                title=f"{tag} — discarded")
+                title=f"{tag} -- discarded")
     else:
         fig = figure_before_after(
             T_before, None, note=f"DISCARDED: unrepairable {report.categories}",
-            title=f"{tag} — discarded (unrepairable)")
+            title=f"{tag} -- discarded (unrepairable)")
 
     if show:
         fig.show()
     return fig, result
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  PUBLIC: dropdown browser over many cells (Colab / Jupyter)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 def browse_repairs(
     swc_paths: Sequence[str], layer: str = "5", dendrite_type: str = "spiny",
     config: Optional[RepairConfig] = None,
@@ -5846,10 +5846,10 @@ def browse_repairs(
             fig.show()
             if res is not None and res.diagnostic is not None:
                 d = res.diagnostic
-                print(f"success={res.success} | components {d.n_components_before}→"
-                      f"{d.n_components_after} | roots {d.n_roots_before}→{d.n_roots_after} "
+                print(f"success={res.success} | components {d.n_components_before}->"
+                      f"{d.n_components_after} | roots {d.n_roots_before}->{d.n_roots_after} "
                       f"| soma_nodes={d.n_soma_nodes_after} | "
-                      f"path {d.path_length_before_um:.0f}→{d.path_length_after_um:.0f} µm")
+                      f"path {d.path_length_before_um:.0f}->{d.path_length_after_um:.0f} um")
 
     dd.observe(lambda ch: _render(ch["new"]) if ch["name"] == "value" else None,
                names="value")
@@ -5857,11 +5857,11 @@ def browse_repairs(
     _render(dd.value)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  POPULATION OVERVIEW
 #  Split into (1) classify one cell, (2) aggregate -> DataFrame, (3) plot.
 #  Aggregation is decoupled from rendering so the table can feed your stats.
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 OUTCOME_ORDER = ["clean", "repaired", "discarded_unrepairable",
                  "discarded_repair_failed", "error"]
 OUTCOME_COLOR = {"clean": "#2ca02c", "repaired": "#ff7f0e",
@@ -5969,7 +5969,7 @@ def plot_population_overview(summary_df: pd.DataFrame) -> go.Figure:
     fig = make_subplots(
         rows=1, cols=2, column_widths=[0.46, 0.54],
         subplot_titles=(f"Outcome ({n_total} cells)",
-                        "Repair-induced Δ path length (repaired cells)"))
+                        "Repair-induced Delta path length (repaired cells)"))
 
     # left: outcome bars
     fig.add_trace(go.Bar(
@@ -5980,7 +5980,7 @@ def plot_population_overview(summary_df: pd.DataFrame) -> go.Figure:
         showlegend=False), row=1, col=1)
     fig.update_yaxes(title_text="cells", row=1, col=1)
 
-    # right: Δ path-length histogram for repaired cells
+    # right: Delta path-length histogram for repaired cells
     rep = summary_df[(summary_df["outcome"] == "repaired") &
                      summary_df["dpath_pct"].notna()]
     if len(rep):
@@ -5995,7 +5995,7 @@ def plot_population_overview(summary_df: pd.DataFrame) -> go.Figure:
             xref="x2", yref="paper", x=mean_d, y=1.0,
             text=f"mean {mean_d:+.1f}%", showarrow=False,
             font=dict(size=11), yshift=8)
-        fig.update_xaxes(title_text="Δ path length (%)", row=1, col=2)
+        fig.update_xaxes(title_text="Delta path length (%)", row=1, col=2)
         fig.update_yaxes(title_text="repaired cells", row=1, col=2)
     else:
         fig.add_annotation(xref="x2", yref="y2", x=0.5, y=0.5,
@@ -6003,7 +6003,7 @@ def plot_population_overview(summary_df: pd.DataFrame) -> go.Figure:
                            font=dict(color="grey"))
 
     fig.update_layout(height=420, width=980,
-                      title="Morphology QC — population overview",
+                      title="Morphology QC -- population overview",
                       bargap=0.25, margin=dict(l=10, r=10, t=80, b=60))
     return fig
 
@@ -6050,15 +6050,15 @@ fig.show()
 if result is not None:
     d = result.diagnostic
     print(f"success         : {result.success}")
-    print(f"discard reason  : {result.discard_reason or '—'}")
+    print(f"discard reason  : {result.discard_reason or '--'}")
     if d:
-        print(f"components      : {d.n_components_before} → {d.n_components_after}")
-        print(f"roots           : {d.n_roots_before} → {d.n_roots_after}")
+        print(f"components      : {d.n_components_before} -> {d.n_components_after}")
+        print(f"roots           : {d.n_roots_before} -> {d.n_roots_after}")
         print(f"rooted at soma  : {d.rooted_at_soma}")
         print(f"single soma     : {d.single_soma}")
         print(f"acyclic         : {d.acyclic}")
-        print(f"path length µm  : {d.path_length_before_um:.1f} → {d.path_length_after_um:.1f}")
-        print(f"max z-jump after: {d.max_zjump_after_um} µm")
+        print(f"path length um  : {d.path_length_before_um:.1f} -> {d.path_length_after_um:.1f}")
+        print(f"max z-jump after: {d.max_zjump_after_um} um")
         if d.failures:
             print(f"FAILURES        : {d.failures}")
 
@@ -6068,7 +6068,7 @@ allen_repair_loader.py
 ======================
 Standalone loader (Allen Cell Types) that **repairs the SWC before NEURON imports
 it**, replacing NEURON's opaque ``Import3d_SWC_read`` auto-graft with an explicit,
-inspectable, distance-gated, type-aware re-rooting — then produces an interactive
+inspectable, distance-gated, type-aware re-rooting -- then produces an interactive
 raw-vs-reconstructed 3-D figure and a summary.
 
 Why
@@ -6079,17 +6079,17 @@ fragment to the soma with a non-physical jump.  We instead repair the *file* int
 a single, clean, soma-rooted tree; NEURON then imports it with nothing left to
 graft.
 
-Pipeline (matches the intended order: heal → triage → NEURON check → save)
+Pipeline (matches the intended order: heal -> triage -> NEURON check -> save)
 --------------------------------------------------------------------------
     repair_table_for_import:
-        _preclean → _normalize_soma → [STAGE 1] → _heal_components(STAGE 2)
-        → _reroot_table → _fix_z_jumps → _fix_soma_radius → diagnose
+        _preclean -> _normalize_soma -> [STAGE 1] -> _heal_components(STAGE 2)
+        -> _reroot_table -> _fix_z_jumps -> _fix_soma_radius -> diagnose
 
 STAGE 1  (new here; everything else is reused from ``morphology_repair``):
-    For each orphan whose CLOSEST APPROACH TO THE SOMA ≤ ``soma_attach_radius_um``
+    For each orphan whose CLOSEST APPROACH TO THE SOMA <= ``soma_attach_radius_um``
     (processed closest-first so the tree grows greedily): attach it to the soma,
-    UNLESS — within that radius — a SAME-TYPE segment of the soma-rooted tree
-    (dend↔dend, apic↔apic, axon↔axon) is closer than the soma, in which case
+    UNLESS -- within that radius -- a SAME-TYPE segment of the soma-rooted tree
+    (dend<->dend, apic<->apic, axon<->axon) is closer than the soma, in which case
     attach to that segment instead.  Orphans beyond the soma gate fall through to
     STAGE 2 (``_heal_components``: nearest-pair MST stitch, gated by
     ``max_stitch_dist_um``).
@@ -6140,14 +6140,14 @@ _TYPE_COLOR = {1: "#222222", 2: "#2ca02c", 3: "#1f77b4", 4: "#d62728"}
 _DEFAULT_COLOR = "#ff7f0e"
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  CONFIG / OUTCOME
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 @dataclass
 class SomaGatedRepairConfig:
     """STAGE-1 knobs + the reused ``RepairConfig`` for STAGE 2 / reroot / geometry."""
-    soma_attach_radius_um: float = 60.0    # STAGE-1 gate: orphan→soma closest approach
+    soma_attach_radius_um: float = 60.0    # STAGE-1 gate: orphan->soma closest approach
     stage1_type_aware: bool = True         # prefer a closer same-type segment over soma
     base: RepairConfig = field(default_factory=RepairConfig)
 
@@ -6170,9 +6170,9 @@ class RepairOutcome:
         return bool(self.diagnostic and self.diagnostic.success)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  STAGE 1  —  soma-gated, type-aware attachment   (the only new graph logic)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  STAGE 1  --  soma-gated, type-aware attachment   (the only new graph logic)
+# ===============================================================================
 
 def _component_type(typ: Dict[int, int], node_ids: List[int]) -> int:
     """Modal NEURITE type of a component (soma excluded if any neurite present)."""
@@ -6187,7 +6187,7 @@ def _heal_stage1_soma_gated(
 ) -> Tuple[nx.Graph, RepairStep, List[Dict[str, Any]]]:
     """Attach orphans within ``radius_um`` of the soma; same-type-closer wins.
 
-    Mutates ``G`` (adds edges only — geometry untouched).  Direction is recovered
+    Mutates ``G`` (adds edges only -- geometry untouched).  Direction is recovered
     later by ``_reroot_table``.  Greedy: each pass attaches the orphan with the
     smallest soma approach, so the main component grows and chains resolve.
     """
@@ -6251,9 +6251,9 @@ def _heal_stage1_soma_gated(
     return G, step, attachments
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  ORCHESTRATION  —  mirrors MorphologyRepair.repair with STAGE 1 inserted
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  ORCHESTRATION  --  mirrors MorphologyRepair.repair with STAGE 1 inserted
+# ===============================================================================
 
 def _detect_soma_flagged(T: np.ndarray) -> bool:
     """Heuristic soma flag (no triage report at heal time): missing / zero-radius."""
@@ -6310,9 +6310,9 @@ def repair_swc_file(in_swc: Path | str, out_swc: Path | str,
     return outcome
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  THE "CHANGED Import3d_SWC_read"  —  repair, THEN import the clean tree
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  THE "CHANGED Import3d_SWC_read"  --  repair, THEN import the clean tree
+# ===============================================================================
 
 def import3d_swc_read_repaired(
     swc_path: Path | str, h: Any, cfg: Optional[SomaGatedRepairConfig] = None,
@@ -6321,7 +6321,7 @@ def import3d_swc_read_repaired(
     """Drop-in replacement for the ``Import3d_SWC_read`` step.
 
     Repairs the SWC to a single soma-rooted tree, writes it, and imports the CLEAN
-    file — so NEURON's importer has no orphan to auto-graft.  Returns
+    file -- so NEURON's importer has no orphan to auto-graft.  Returns
     ``(repaired_path, RepairOutcome)``.  Sections are now live in ``h``.
     """
     cfg = cfg or SomaGatedRepairConfig()
@@ -6371,15 +6371,15 @@ def make_repaired_build_fn(cfg: Optional[SomaGatedRepairConfig] = None
     return _build
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  ALLEN LOADER  (Colab; needs allensdk + network)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def load_allen_swc(specimen_id: int, cache_dir: str = "cell_types",
                    ctc: Any = None) -> Path:
     """Download (or cache) one Allen reconstruction and return its SWC path.
 
-    Uses ``allensdk.core.cell_types_cache.CellTypesCache`` — identical convention
+    Uses ``allensdk.core.cell_types_cache.CellTypesCache`` -- identical convention
     to the archive's ``load_allen_data`` (see phase1_data_loader.py):
     * the explicit ``file_name`` kwarg is passed to ``get_reconstruction`` so the
       path on disk is deterministic regardless of AllenSDK manifest layout;
@@ -6407,12 +6407,12 @@ def load_allen_swc(specimen_id: int, cache_dir: str = "cell_types",
     return swc
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  INTERACTIVE FIGURE  (plotly 3-D, raw + reconstructed + repair edges)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def _segments_by_type(T: np.ndarray) -> Dict[int, Tuple[List, List, List]]:
-    """Per-type parent→child line segments as None-separated polyline arrays."""
+    """Per-type parent->child line segments as None-separated polyline arrays."""
     by_id = {int(r[ID]): r for r in T}
     out: Dict[int, Tuple[List, List, List]] = {}
     for r in T:
@@ -6429,7 +6429,7 @@ def _segments_by_type(T: np.ndarray) -> Dict[int, Tuple[List, List, List]]:
 
 
 def _orphan_root_markers(T: np.ndarray) -> Tuple[List, List, List]:
-    """XYZ of non-soma roots (parent == -1) — the visible breaks in the RAW file."""
+    """XYZ of non-soma roots (parent == -1) -- the visible breaks in the RAW file."""
     xs, ys, zs = [], [], []
     for r in T:
         if int(r[PARENT]) == -1 and int(r[TYPE]) != SOMA_TYPE:
@@ -6443,7 +6443,7 @@ def figure_raw_vs_repaired(outcome: RepairOutcome, title: str = "raw vs reconstr
     the explicit REPAIR edges (STAGE 1 soma / same-type, STAGE 2 MST)."""
     fig = go.Figure()
 
-    # --- RAW (grey; off by default — toggle in the legend for before/after) ---
+    # --- RAW (grey; off by default -- toggle in the legend for before/after) ---
     raw_by_t = _segments_by_type(outcome.T_raw)
     rx, ry, rz = [], [], []
     for xs, ys, zs in raw_by_t.values():
@@ -6483,7 +6483,7 @@ def figure_raw_vs_repaired(outcome: RepairOutcome, title: str = "raw vs reconstr
             a, b = e[key_from], e[key_to]
             ex += [a[0], b[0], None]; ey += [a[1], b[1], None]; ez += [a[2], b[2], None]
             gap = e.get("gap_um", "?"); kind = e.get("kind", name)
-            txt += [f"{kind}: gap {gap} µm", f"{kind}: gap {gap} µm", ""]
+            txt += [f"{kind}: gap {gap} um", f"{kind}: gap {gap} um", ""]
         if not ex:
             return None
         return go.Scatter3d(
@@ -6494,8 +6494,8 @@ def figure_raw_vs_repaired(outcome: RepairOutcome, title: str = "raw vs reconstr
     s1_soma = [e for e in outcome.stage1_attachments if e["kind"] == "soma"]
     s1_type = [e for e in outcome.stage1_attachments if e["kind"] == "same_type"]
     for tr in (
-        _edge_trace(s1_soma, "repair: STAGE-1 → soma", "#9467bd"),
-        _edge_trace(s1_type, "repair: STAGE-1 → same-type", "#e377c2"),
+        _edge_trace(s1_soma, "repair: STAGE-1 -> soma", "#9467bd"),
+        _edge_trace(s1_type, "repair: STAGE-1 -> same-type", "#e377c2"),
         _edge_trace(outcome.stage2_grafts, "repair: STAGE-2 MST", "#ff7f0e",
                     key_from="anchor_xyz", key_to="to_xyz"),
     ):
@@ -6504,15 +6504,15 @@ def figure_raw_vs_repaired(outcome: RepairOutcome, title: str = "raw vs reconstr
 
     fig.update_layout(
         title=title, showlegend=True,
-        scene=dict(aspectmode="data", xaxis_title="x (µm)",
-                   yaxis_title="y (µm)", zaxis_title="z (µm)"),
+        scene=dict(aspectmode="data", xaxis_title="x (um)",
+                   yaxis_title="y (um)", zaxis_title="z (um)"),
         margin=dict(l=0, r=0, t=40, b=0), legend=dict(itemsizing="constant"))
     return fig
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  SUMMARY
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def summarize_repair(outcome: RepairOutcome, specimen: Any = None) -> Dict[str, Any]:
     """Compact, JSON-able summary of what the repair did."""
@@ -6566,9 +6566,9 @@ def _summary_text(s: Dict[str, Any]) -> str:
          f"({s['stage1_to_soma']} -> soma, {s['stage1_to_same_type']} -> same-type)",
          f"  STAGE 2   : {s['stage2_mst_grafts']} MST graft(s); "
          f"unrepairable {s['unrepairable_fragments']}",
-         f"  gaps (µm) : min {s['gap_min_um']} / med {s['gap_median_um']} / "
-         f"max {s['gap_max_um']}  added cable {s['added_cable_um']} µm",
-         f"  cable len : {s['path_length_before_um']} -> {s['path_length_after_um']} µm",
+         f"  gaps (um) : min {s['gap_min_um']} / med {s['gap_median_um']} / "
+         f"max {s['gap_max_um']}  added cable {s['added_cable_um']} um",
+         f"  cable len : {s['path_length_before_um']} -> {s['path_length_after_um']} um",
          f"  invariants: single_tree={s['single_tree']} rooted_at_soma="
          f"{s['rooted_at_soma']} acyclic={s['acyclic']}"]
     if not s["repair_success"]:
@@ -6576,15 +6576,15 @@ def _summary_text(s: Dict[str, Any]) -> str:
     return "\n".join(L)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  ORCHESTRATOR  (Colab entry point)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def run(specimen_id: Optional[int] = None, swc_path: Optional[str] = None,
         cfg: Optional[SomaGatedRepairConfig] = None,
         out_dir: str = ".", write_outputs: bool = True,
         cache_dir: str = "cell_types") -> Dict[str, Any]:
-    """Load (Allen or local) → repair → figure + summary.
+    """Load (Allen or local) -> repair -> figure + summary.
 
     Returns a dict with keys: ``outcome``, ``figure`` (plotly), ``summary``
     (dict), ``summary_text`` (str), ``repaired_swc`` (Path|None),
@@ -6602,7 +6602,7 @@ def run(specimen_id: Optional[int] = None, swc_path: Optional[str] = None,
     summary = summarize_repair(outcome, specimen=specimen_id or src.name)
     text = _summary_text(summary)
     fig = figure_raw_vs_repaired(
-        outcome, title=f"{summary['specimen']} — raw vs reconstructed")
+        outcome, title=f"{summary['specimen']} -- raw vs reconstructed")
 
     figure_html = None
     if write_outputs:
@@ -6616,7 +6616,7 @@ def run(specimen_id: Optional[int] = None, swc_path: Optional[str] = None,
 
 # %%
 # @title Electrical viability check (NEURON)
-# ── Inline electrical_viability module (no separate file needed) ──────────────
+# -- Inline electrical_viability module (no separate file needed) --------------
 import math, random
 from dataclasses import dataclass, field, asdict as _ev_asdict
 
@@ -6681,13 +6681,13 @@ class ElectricalViabilityResult:
     def summary(self) -> str:
         verdict = "PASS" if self.electrical_ok else "FAIL"
         rin  = f"{self.rin_MOhm:.1f}" if np.isfinite(self.rin_MOhm) else "nan"
-        tau  = f"{self.tau_fit_ms:.1f}" if self.tau_fit_ms is not None else "—"
-        rho  = f"{self.spearman_dist_dv:+.2f}" if self.spearman_dist_dv is not None else "—"
+        tau  = f"{self.tau_fit_ms:.1f}" if self.tau_fit_ms is not None else "--"
+        rho  = f"{self.spearman_dist_dv:+.2f}" if self.spearman_dist_dv is not None else "--"
         return (f"[electrical:{verdict}] {Path(self.swc_path).name}  "
                 f"roots={self.n_swc_roots} graft={self.neuron_grafted_orphans}  "
                 f"reached={self.n_reached}/{self.n_sites} dead={self.n_dead}  "
-                f"dVsoma={self.dv_soma_mV:+.3f} mV  Rin={rin} MΩ  τ={tau} ms  "
-                f"ρ(d,|dV|)={rho}"
+                f"dVsoma={self.dv_soma_mV:+.3f} mV  Rin={rin} MOhm  tau={tau} ms  "
+                f"rho(d,|dV|)={rho}"
                 + ("" if self.electrical_ok else "  reasons: " + "; ".join(self.reasons)))
 
 def _ev_count_swc_roots(swc_path):
@@ -6901,11 +6901,11 @@ def electrical_viability_check(swc_path, config=None, *, h=None, build_fn=None):
     if (cfg.require_monotone_attenuation and res.spearman_dist_dv is not None
             and res.spearman_dist_dv > cfg.monotone_spearman_max):
         ok = False
-        res.reasons.append(f"non_monotone_attenuation: ρ={res.spearman_dist_dv:+.2f}")
+        res.reasons.append(f"non_monotone_attenuation: rho={res.spearman_dist_dv:+.2f}")
     res.electrical_ok = ok
     return res
 
-# # Allen Repair Loader — Colab test on real human pyramidal neurons
+# # Allen Repair Loader -- Colab test on real human pyramidal neurons
 #
 # **What this notebook does**
 # 1. Installs all dependencies (allensdk, neuron, morphio, neurom, plotly, networkx)
@@ -6923,13 +6923,13 @@ def electrical_viability_check(swc_path, config=None, *, h=None, build_fn=None):
 #   electrical_viability.py
 #
 # **Tested specimens** (all human pyramidal neurons, Allen Cell Types DB):
-#   562381210  L5 IT Pyr, female 34 y  — Guet-McCreight et al. 2023
-#   529863215  L5 IT Pyr, male   67 y  — Guet-McCreight et al. 2023
-#   531526539  L2/3 Pyr           —     Hay et al. 2016 (reduced inhibition)
+#   562381210  L5 IT Pyr, female 34 y  -- Guet-McCreight et al. 2023
+#   529863215  L5 IT Pyr, male   67 y  -- Guet-McCreight et al. 2023
+#   531526539  L2/3 Pyr           --     Hay et al. 2016 (reduced inhibition)
 
 
 
-# ## Cell 2 — Upload pipeline files
+# ## Cell 2 -- Upload pipeline files
 # After restarting, run this cell. A file picker will open.
 # Select **all four** files at once:
 #   morphology_qc_triage.py,  morphology_repair.py,
@@ -6942,13 +6942,13 @@ def electrical_viability_check(swc_path, config=None, *, h=None, build_fn=None):
 
 
 
-# ## Cell 3 — Choose a specimen and download its SWC
+# ## Cell 3 -- Choose a specimen and download its SWC
 #
 # | `SPECIMEN_ID` | Layer | Sex | Age | Source |
 # |---|---|---|---|---|
 # | `562381210` | L5 IT Pyr | F | 34 y | Guet-McCreight 2023 |
 # | `529863215` | L5 IT Pyr | M | 67 y | Guet-McCreight 2023 |
-# | `531526539` | L2/3 Pyr  | — | —   | Hay et al. 2016 |
+# | `531526539` | L2/3 Pyr  | -- | --   | Hay et al. 2016 |
 #
 # Change `SPECIMEN_ID` to any human pyramidal neuron from the Allen Cell Types DB.
 
@@ -6960,10 +6960,10 @@ sys.path.insert(0, "/content")       # ensure uploaded files are importable
 from pathlib import Path
 from allensdk.core.cell_types_cache import CellTypesCache
 
-# ── choose your cell ─────────────────────────────────────────────────────────
+# -- choose your cell ---------------------------------------------------------
 SPECIMEN_ID = 529863215   # L5 IT Pyr, female 34 y (Guet-McCreight et al. 2023)
 CACHE_DIR   = "/content/cell_types"
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 ctc = CellTypesCache(manifest_file=f"{CACHE_DIR}/manifest.json")
 
@@ -6978,24 +6978,24 @@ n_roots_raw = int((T_raw[:, PARENT] == -1).sum())
 print(f"Downloaded:  {swc_path}")
 print(f"Nodes      : {len(T_raw)}")
 print(f"SWC roots  : {n_roots_raw}  "
-      f"{'← disconnected fragments present' if n_roots_raw > 1 else '← single tree'}")
+      f"{'<- disconnected fragments present' if n_roots_raw > 1 else '<- single tree'}")
 
-# ## Cell 4 — Repair the morphology
+# ## Cell 4 -- Repair the morphology
 #
 # The two-stage policy:
-# * **Stage 1** (soma-gated, type-aware): orphans ≤ `soma_attach_radius_um` from the soma
+# * **Stage 1** (soma-gated, type-aware): orphans <= `soma_attach_radius_um` from the soma
 #   are attached to the soma, unless a same-type segment of the soma-rooted tree
-#   is even closer (dendrite→dendrite, apical→apical, axon→axon).
+#   is even closer (dendrite->dendrite, apical->apical, axon->axon).
 # * **Stage 2** (`_heal_components` MST): any orphan still disconnected after Stage 1
 #   is stitched to the nearest point of the growing tree, gated at `max_stitch_dist_um`.
 #
 # Both gates are configurable. Tune them here:
 
 
-# ── thresholds ───────────────────────────────────────────────────────────────
-SOMA_ATTACH_RADIUS_UM = 60.0   # Stage-1 gate (µm from soma)
-MAX_STITCH_DIST_UM    = 80.0   # Stage-2 MST gate (µm, any-to-any)
-# ─────────────────────────────────────────────────────────────────────────────
+# -- thresholds ---------------------------------------------------------------
+SOMA_ATTACH_RADIUS_UM = 60.0   # Stage-1 gate (um from soma)
+MAX_STITCH_DIST_UM    = 80.0   # Stage-2 MST gate (um, any-to-any)
+# -----------------------------------------------------------------------------
 
 cfg = SomaGatedRepairConfig(
     soma_attach_radius_um=SOMA_ATTACH_RADIUS_UM,
@@ -7011,23 +7011,23 @@ summary = summarize_repair(outcome, specimen=SPECIMEN_ID)
 print(_summary_text(summary))
 
 if not outcome.success:
-    print("\n⚠  Repair did not produce a clean single tree.")
+    print("\n[WARN]  Repair did not produce a clean single tree.")
     print("   Failures:", outcome.diagnostic.failures if outcome.diagnostic else "no table")
     print("   Try increasing SOMA_ATTACH_RADIUS_UM or MAX_STITCH_DIST_UM.")
 else:
-    print(f"\n✓  Repaired SWC written to {repaired_path}")
+    print(f"\n[ok]  Repaired SWC written to {repaired_path}")
 
-# ## Cell 5 — Interactive 3-D figure
+# ## Cell 5 -- Interactive 3-D figure
 #
 # The figure has three layers (toggle in the legend):
-# * **reconstructed** — arbour coloured by SWC type (soma, basal, apical, axon)
-# * **raw** — original grey arbour + orphan-root markers (hidden by default; toggle on
+# * **reconstructed** -- arbour coloured by SWC type (soma, basal, apical, axon)
+# * **raw** -- original grey arbour + orphan-root markers (hidden by default; toggle on
 #   to overlay it and see exactly what was floating)
-# * **repair edges** — dashed lines showing the gap bridged at each stage:
-#   - purple → soma  (Stage 1 soma attach)
-#   - pink   → same-type segment  (Stage 1 type-aware)
-#   - orange → MST stitch  (Stage 2)
-#   Hover over a dashed edge to see the exact gap distance in µm.
+# * **repair edges** -- dashed lines showing the gap bridged at each stage:
+#   - purple -> soma  (Stage 1 soma attach)
+#   - pink   -> same-type segment  (Stage 1 type-aware)
+#   - orange -> MST stitch  (Stage 2)
+#   Hover over a dashed edge to see the exact gap distance in um.
 
 # %%
 # @title Show interactive figure
@@ -7035,7 +7035,7 @@ else:
 
 fig = figure_raw_vs_repaired(
     outcome,
-    title=f"Specimen {SPECIMEN_ID} — raw vs reconstructed"
+    title=f"Specimen {SPECIMEN_ID} -- raw vs reconstructed"
 )
 fig.show()
 
@@ -7044,11 +7044,11 @@ html_path = f"/content/{SPECIMEN_ID}_repair.html"
 fig.write_html(html_path, include_plotlyjs="cdn")
 print(f"Figure saved to {html_path}")
 
-# Download it locally (optional — comment out if running headless)
+# Download it locally (optional -- comment out if running headless)
 from google.colab import files as colab_files
 colab_files.download(html_path)
 
-# ## Cell 6 — Inspect repair steps in detail
+# ## Cell 6 -- Inspect repair steps in detail
 #
 # `RepairOutcome` carries the full provenance: which orphan attached where,
 # what gap was bridged, which fragments (if any) couldn't be reached within
@@ -7058,46 +7058,46 @@ colab_files.download(html_path)
 # @title Repair provenance
 import json
 
-print(f"{'─'*60}")
+print(f"{'-'*60}")
 print(f"Specimen {SPECIMEN_ID}  |  repair success: {outcome.success}")
-print(f"{'─'*60}")
+print(f"{'-'*60}")
 
-print(f"\n▶ Stage 1 (soma-gated, type-aware) — {len(outcome.stage1_attachments)} attachment(s)")
+print(f"\n> Stage 1 (soma-gated, type-aware) -- {len(outcome.stage1_attachments)} attachment(s)")
 for i, a in enumerate(outcome.stage1_attachments, 1):
     print(f"  {i:2d}. orphan type={a['orphan_type_name']:6s}  "
-          f"n_nodes={a['n_nodes']:3d}  gap={a['gap_um']:6.1f} µm  "
-          f"→ {a['kind']} (node {a['target_node']})")
+          f"n_nodes={a['n_nodes']:3d}  gap={a['gap_um']:6.1f} um  "
+          f"-> {a['kind']} (node {a['target_node']})")
 
-print(f"\n▶ Stage 2 (MST) — {len(outcome.stage2_grafts)} graft(s)")
+print(f"\n> Stage 2 (MST) -- {len(outcome.stage2_grafts)} graft(s)")
 for i, g in enumerate(outcome.stage2_grafts, 1):
-    print(f"  {i:2d}. gap={g['gap_um']:6.1f} µm  "
-          f"from node {g['from_id']} → node {g['to_id']}")
+    print(f"  {i:2d}. gap={g['gap_um']:6.1f} um  "
+          f"from node {g['from_id']} -> node {g['to_id']}")
 
 if outcome.unrepairable:
-    print(f"\n⚠  {len(outcome.unrepairable)} fragment(s) beyond both distance gates "
+    print(f"\n[WARN]  {len(outcome.unrepairable)} fragment(s) beyond both distance gates "
           f"(kept disconnected):")
     for u in outcome.unrepairable:
         print(f"   n_nodes={u['n_nodes']}  centroid={u['anchor_xyz']}")
 else:
-    print(f"\n✓  No unrepairable fragments.")
+    print(f"\n[ok]  No unrepairable fragments.")
 
-print(f"\n▶ Topology invariants (diagnose)")
+print(f"\n> Topology invariants (diagnose)")
 d = outcome.diagnostic
 print(f"   single_tree      : {d.single_tree}")
 print(f"   rooted_at_soma   : {d.rooted_at_soma}")
 print(f"   acyclic          : {d.acyclic}")
-print(f"   n_components     : {d.n_components_before} → {d.n_components_after}")
-print(f"   n_roots          : {d.n_roots_before} → {d.n_roots_after}")
-print(f"   soma_radius (µm) : {d.soma_radius_after_um:.2f}")
-print(f"   path_length (µm) : {d.path_length_before_um:.0f} → {d.path_length_after_um:.0f}")
+print(f"   n_components     : {d.n_components_before} -> {d.n_components_after}")
+print(f"   n_roots          : {d.n_roots_before} -> {d.n_roots_after}")
+print(f"   soma_radius (um) : {d.soma_radius_after_um:.2f}")
+print(f"   path_length (um) : {d.path_length_before_um:.0f} -> {d.path_length_after_um:.0f}")
 
-# ## Cell 7 — Electrical viability check on the repaired morphology
+# ## Cell 7 -- Electrical viability check on the repaired morphology
 #
-# Injects a −50 pA step at the soma, reads steady-state ΔV at every distal tip
+# Injects a -50 pA step at the soma, reads steady-state DeltaV at every distal tip
 # and up to 1000 sampled segments, and checks:
 # * somatic response is finite and non-exploding
 # * every segment is reached (no internal conduction block)
-# * ΔV attenuates monotonically with path distance from the soma (Spearman ρ < 0)
+# * DeltaV attenuates monotonically with path distance from the soma (Spearman rho < 0)
 #
 # This is the final gate before the cell enters Phase 2 optimisation.
 # **Expected outcome** on a successfully repaired morphology: PASS.
@@ -7107,13 +7107,13 @@ print(f"   path_length (µm) : {d.path_length_before_um:.0f} → {d.path_length_
 # import electrical_viability as ev
 
 if not outcome.success:
-    print("⚠  Skipping electrical check: repair did not produce a clean tree.")
+    print("[WARN]  Skipping electrical check: repair did not produce a clean tree.")
 else:
     from neuron import h
     h.load_file("stdrun.hoc")
     h.load_file("import3d.hoc")
 
-    # Use the repaired SWC path — not the raw one.
+    # Use the repaired SWC path -- not the raw one.
     # The ElectricalViabilityConfig default (require_single_swc_root=True)
     # now passes because the repaired file has exactly one root.
     ev_cfg = ElectricalViabilityConfig(
@@ -7125,18 +7125,18 @@ else:
     result = electrical_viability_check(repaired_path, ev_cfg, h=h)
     print(result.summary())
 
-    print(f"\n  Rin           : {result.rin_MOhm:.1f} MΩ")
-    print(f"  τ_fit         : {result.tau_fit_ms} ms")
-    print(f"  λ_fit         : {result.lambda_est_um} µm")
-    print(f"  ΔV_soma       : {result.dv_soma_mV:+.3f} mV")
+    print(f"\n  Rin           : {result.rin_MOhm:.1f} MOhm")
+    print(f"  tau_fit         : {result.tau_fit_ms} ms")
+    print(f"  lambda_fit         : {result.lambda_est_um} um")
+    print(f"  DeltaV_soma       : {result.dv_soma_mV:+.3f} mV")
     print(f"  reached       : {result.n_reached}/{result.n_sites}")
     print(f"  dead segs     : {result.n_dead}")
-    print(f"  ρ(dist,|ΔV|)  : {result.spearman_dist_dv}")
+    print(f"  rho(dist,|DeltaV|)  : {result.spearman_dist_dv}")
 
     if result.electrical_ok:
-        print(f"\n✓  Cell {SPECIMEN_ID} passed all checks — ready for Phase 2 optimisation.")
+        print(f"\n[ok]  Cell {SPECIMEN_ID} passed all checks -- ready for Phase 2 optimisation.")
     else:
-        print(f"\n✗  Failures: {result.reasons}")
+        print(f"\n[x]  Failures: {result.reasons}")
         print("   Check repair thresholds or inspect the dead_coords for geometry issues.")
 
 # %%
@@ -7184,30 +7184,30 @@ for sid in BATCH_IDS:
         rows.append({"specimen": sid, "error": str(exc)})
 
 print(f"\n{'='*60}")
-print(f"{'Specimen':>12}  {'repair':>6}  {'S1→soma':>7}  "
-      f"{'S1→type':>7}  {'S2 MST':>6}  {'unrepair':>8}  {'elec':>5}")
-print("─" * 62)
+print(f"{'Specimen':>12}  {'repair':>6}  {'S1->soma':>7}  "
+      f"{'S1->type':>7}  {'S2 MST':>6}  {'unrepair':>8}  {'elec':>5}")
+print("-" * 62)
 for r in rows:
     if "error" in r:
         print(f"{r['specimen']:>12}  ERROR: {r['error']}")
         continue
     print(f"{r['specimen']:>12}  "
-          f"{'✓' if r['repair_ok'] else '✗':>6}  "
+          f"{'[ok]' if r['repair_ok'] else '[x]':>6}  "
           f"{r['s1_soma']:>7}  "
           f"{r['s1_type']:>7}  "
           f"{r['s2_mst']:>6}  "
           f"{r['unrepairable']:>8}  "
-          f"{'✓' if r['electrical_ok'] else ('✗' if r['electrical_ok'] is False else '—'):>5}")
+          f"{'[ok]' if r['electrical_ok'] else ('[x]' if r['electrical_ok'] is False else '--'):>5}")
 
 # -*- coding: utf-8 -*-
 # ============================================================================
-#  Allen Archive + Phase-0 Repair — SELF-CONTAINED COLAB MONOLITH
+#  Allen Archive + Phase-0 Repair -- SELF-CONTAINED COLAB MONOLITH
 # ============================================================================
 #  One file. Run top to bottom in Colab. Downloads Allen human cortical cells,
 #  REPAIRS each morphology (Phase 0: soma-gated type-aware heal + MST + reroot),
 #  runs an electrical-viability check, and ARCHIVES the repaired tree together
 #  with the Square-Subthreshold pulses and Long-Square traces the optimiser
-#  loads — plus full per-cell Phase-0 provenance (JSON + interactive 3-D figure
+#  loads -- plus full per-cell Phase-0 provenance (JSON + interactive 3-D figure
 #  + electrical-triage PNG).
 #
 #  Contains ONLY what the archive merge needs:
@@ -7220,12 +7220,12 @@ for r in rows:
 #  included (not on the archive path).
 # ============================================================================
 
-# %% Cell 1 — Colab install (run once, then RESTART runtime) ==================
+# %% Cell 1 -- Colab install (run once, then RESTART runtime) ==================
 # !pip install -q allensdk==2.16.2 neuron plotly kaleido networkx scipy matplotlib
 
-# %% Cell 2 — Imports =========================================================
+# %% Cell 2 -- Imports =========================================================
 from __future__ import annotations
- from google.colab import drive
+from google.colab import drive
 
 # This will prompt you to authorize Colab to access your Drive
 drive.mount('/content/drive', force_remount=True)
@@ -7279,21 +7279,21 @@ DEFAULT_F = 1.9                   # Eyal 2016 average for human L2/3
 
 # Square Subthreshold protocol (Allen Core 1):
 SQ_SUB_DURATION_S        = 5e-4   # 0.5 ms nominal
-SQ_SUB_DURATION_TOL_S    = 5e-4   # ±0.5 ms tolerance (catches "Short Square" variants)
-SQ_SUB_AMPLITUDE_PA      = 200.0  # ±200 pA nominal
-SQ_SUB_AMPLITUDE_TOL_PA  = 30.0   # ±30 pA tolerance
+SQ_SUB_DURATION_TOL_S    = 5e-4   # +/-0.5 ms tolerance (catches "Short Square" variants)
+SQ_SUB_AMPLITUDE_PA      = 200.0  # +/-200 pA nominal
+SQ_SUB_AMPLITUDE_TOL_PA  = 30.0   # +/-30 pA tolerance
 
-# Long Square subthreshold cutoff (used for Rin / τm validation target):
+# Long Square subthreshold cutoff (used for Rin / taum validation target):
 LONG_SQUARE_MAX_ABS_AMPLITUDE_PA = 100.0
 
 # Passive parameter bounds (pipeline doc, mirrored from Eyal/Markram):
-DEFAULT_CM_BOUNDS = (0.3, 3.0)            # µF/cm²
-DEFAULT_RM_BOUNDS = (1_000.0, 100_000.0)  # Ω·cm²
-DEFAULT_RA_BOUNDS = (50.0, 1_000.0)       # Ω·cm
+DEFAULT_CM_BOUNDS = (0.3, 3.0)            # uF/cm^2
+DEFAULT_RM_BOUNDS = (1_000.0, 100_000.0)  # Ohm.cm^2
+DEFAULT_RA_BOUNDS = (50.0, 1_000.0)       # Ohm.cm
 
 
 # ============================================================================
-# PHASE 1 — data model, Allen loader, NEURON PassiveCell, archive saver
+# PHASE 1 -- data model, Allen loader, NEURON PassiveCell, archive saver
 # ============================================================================
 
 def _simulate_square_subthreshold(
@@ -7365,10 +7365,10 @@ class CellData:
     metadata: Dict[str, Any]               # layer, dendrite_type, donor_id, ...
     swc_path: Path
 
-    # Primary fitting data — from Square Subthreshold sweeps
+    # Primary fitting data -- from Square Subthreshold sweeps
     square_subthreshold: List[SweepBundle]
 
-    # Held-out validation data — from Long Square subthreshold sweeps
+    # Held-out validation data -- from Long Square subthreshold sweeps
     long_square_subthreshold: List[SweepBundle]
 
     # Reference scalars from the Allen Cell Feature Summary (LJP-corrected here)
@@ -7379,7 +7379,7 @@ class CellData:
     ljp_correction_mV: float
     n_avg_groups: int
 
-    # ── PATCH (Phase 3 v3): individual pulse windows for nonparametric bootstrap ──
+    # -- PATCH (Phase 3 v3): individual pulse windows for nonparametric bootstrap --
     # Each dict has keys: t (ndarray, seconds, t=0 at pulse onset),
     # v (ndarray, mV, LJP-corrected), i (ndarray, pA),
     # polarity ("dep"|"hyp"), peak_pA (float), stim_duration_s (float),
@@ -7416,15 +7416,15 @@ class PassiveSearchSpace:
           each axis consistently without manual length-scale tuning.
         * A uniform prior in q = log(p) is equivalent to a log-uniform prior
           in p, which is the correct non-informative prior for scale
-          parameters — it assigns equal probability to each decade.
+          parameters -- it assigns equal probability to each decade.
         * The optimisation landscape is smoother in log-space for passive
           cable parameters because the somatic transient depends on
-          log-linear combinations of these parameters (e.g. τm = Cm × Rm
+          log-linear combinations of these parameters (e.g. taum = Cm x Rm
           is additive in log-space).
         * Positive-definiteness is guaranteed: exp(q) > 0 for all finite q,
           so the optimiser can never propose a non-physical negative value.
 
-        Phase 2's loss function is responsible for converting q → p = exp(q)
+        Phase 2's loss function is responsible for converting q -> p = exp(q)
         before passing the parameters to NEURON.  result.x from gp_minimize
         contains the log-space optima and must likewise be exponentiated.
         """
@@ -7470,7 +7470,7 @@ def list_human_cells_with_morphology(
     Parameters
     ----------
     layer
-        e.g. ``"2/3"``, ``"4"``, ``"5"``, ``"6a"`` — matched against
+        e.g. ``"2/3"``, ``"4"``, ``"5"``, ``"6a"`` -- matched against
         ``structure_layer_name``.
     dendrite_type
         ``"spiny"`` / ``"aspiny"`` / ``"sparsely spiny"``.
@@ -7519,7 +7519,7 @@ def list_human_cells_with_morphology(
             print(f"[list_human_cells]   after dendrite_type={dendrite_type!r}: "
                   f"{len(df)} cells")
 
-    # Protocol availability — needs one network round-trip per cell, so done last
+    # Protocol availability -- needs one network round-trip per cell, so done last
     if require_square_subthreshold or require_long_square:
         ss_flags, ls_flags = [], []
         for sid in df["id"]:
@@ -7576,7 +7576,7 @@ def list_human_cells_with_morphology(
         if patchseq_ttype_csv is None:
             warnings.warn(
                 f"interneuron_subtype={interneuron_subtype!r} was requested but "
-                f"no patchseq_ttype_csv was supplied — filter ignored.")
+                f"no patchseq_ttype_csv was supplied -- filter ignored.")
         else:
             df = df[df["subtype"] == interneuron_subtype]
             if verbose:
@@ -7603,7 +7603,7 @@ def _to_pA_seconds(amp, dur) -> Tuple[float, float]:
     Allen Cell Types data can show up with two unit conventions across SDK
     releases: SI (Amperes, seconds) or mixed (pA, ms).  We auto-detect by
     magnitude.  Missing / non-numeric values (None, NaN, strings) are mapped
-    to NaN — callers must filter NaN before use.
+    to NaN -- callers must filter NaN before use.
     """
     # --- amplitude --------------------------------------------------------
     if amp is None:
@@ -7641,11 +7641,11 @@ def _to_pA_seconds(amp, dur) -> Tuple[float, float]:
 def _select_square_subthreshold(sweeps_meta: List[Dict]) -> List[Dict]:
     """Find Square Subthreshold sweeps by ``stimulus_name`` only.
 
-    The Square Subthreshold protocol stores all 20 ±200 pA pulses **inside a
+    The Square Subthreshold protocol stores all 20 +/-200 pA pulses **inside a
     single sweep** (cf. Allen Cell Types Tech Paper, Appendix p. 15: "0.5 ms
     square current injections to +/- 200 pA, repeated 20 times (200 ms
     intervals). N/A (single sweep)").  This means duration- and amplitude-
-    based filtering on the per-sweep metadata is meaningless here — the sweep
+    based filtering on the per-sweep metadata is meaningless here -- the sweep
     duration covers all 20 repeats, and the polarity alternates within the
     sweep so the average amplitude is ~0.  Pulse identification therefore has
     to happen on the current waveform itself, by ``_detect_pulses_in_current``.
@@ -7661,12 +7661,12 @@ def _select_square_subthreshold(sweeps_meta: List[Dict]) -> List[Dict]:
 def _select_long_square_subthreshold(sweeps_meta: List[Dict]) -> List[Dict]:
     """Select all Long Square sweeps, regardless of metadata amplitude.
 
-    Allen's standard Long Square protocol starts at −110 pA (not −100 pA),
-    and ``stimulus_amplitude`` is frequently ``None`` in the sweep metadata —
+    Allen's standard Long Square protocol starts at -110 pA (not -100 pA),
+    and ``stimulus_amplitude`` is frequently ``None`` in the sweep metadata --
     both issues make metadata-level amplitude filtering unreliable.  We
     therefore return ALL Long Square sweeps and let the caller measure the
     actual step amplitude from the NWB waveform before deciding which sweep
-    to use for τm / Rin validation.
+    to use for taum / Rin validation.
     """
     return [
         s for s in sweeps_meta
@@ -7840,7 +7840,7 @@ def _build_subthreshold_bundles(
             i_full, sr, threshold_pA=pulse_threshold_pA)
 
         # Amplitude / duration QC on each detected pulse: keep only those whose
-        # peak |I| matches the expected ±200 pA within tolerance, and whose
+        # peak |I| matches the expected +/-200 pA within tolerance, and whose
         # duration matches the expected 0.5 ms within tolerance.  This guards
         # against accidental matches in protocols whose name happens to
         # contain "Square" + "Subthreshold" but with different parameters.
@@ -7856,7 +7856,7 @@ def _build_subthreshold_bundles(
         windows = _extract_windows_around_pulses(
             v_full, i_full, sr, pulses_qc, pre_ms=pre_ms, post_ms=post_ms)
 
-        # ── PATCH: tag each window with its sampling rate ──
+        # -- PATCH: tag each window with its sampling rate --
         for w in windows:
             w["sampling_rate_Hz"] = sr
 
@@ -7905,7 +7905,7 @@ def _build_subthreshold_bundles(
                 stimulus_name=stim_name,
             ))
 
-    # ── PATCH: collect ALL individual pulse windows ──
+    # -- PATCH: collect ALL individual pulse windows --
     individual_pulses = all_dep + all_hyp
 
     return bundles, individual_pulses
@@ -7935,7 +7935,7 @@ def _build_bundles_from_group(
         for sn in part:
             sw = data_set.get_sweep(int(sn))
             # index_range clips out the test pulse that Allen prepends to every
-            # sweep — as shown in the official AllenSDK notebook example.
+            # sweep -- as shown in the official AllenSDK notebook example.
             # Default to (0, end) if the key is absent for robustness.
             idx = sw.get("index_range", (0, len(sw["response"]) - 1))
             v_traces.append(sw["response"][idx[0]: idx[1] + 1])   # Volts
@@ -7996,10 +7996,10 @@ def load_allen_data(
         If ``True`` (default), raise :class:`IncompleteDataError` when the cell
         does not yield BOTH at least one Square Subthreshold bundle AND at
         least one Long Square subthreshold bundle.  This keeps Phase 2's
-        validation step (Rin/τm against the held-out Long Square sweep)
+        validation step (Rin/taum against the held-out Long Square sweep)
         well-defined for every cell that propagates downstream.  Set to
-        ``False`` to return ``CellData`` regardless — useful when you want to
-        proceed with Allen's scalar Rin/τm features only and skip the
+        ``False`` to return ``CellData`` regardless -- useful when you want to
+        proceed with Allen's scalar Rin/taum features only and skip the
         waveform-level validation.
 
     Notes
@@ -8036,7 +8036,7 @@ def load_allen_data(
     sweeps_meta = ctc.get_ephys_sweeps(specimen_id)
 
     # --- Square Subthreshold: many pulses per sweep -------------------------
-    # All 20 ±200 pA pulses live inside a SINGLE sweep (Allen Tech Paper
+    # All 20 +/-200 pA pulses live inside a SINGLE sweep (Allen Tech Paper
     # appendix p.15: "N/A (single sweep)").  We therefore find candidate
     # sweeps by name, then identify each individual pulse by thresholding the
     # current waveform.
@@ -8044,7 +8044,7 @@ def load_allen_data(
     if verbose:
         print(f"[load_allen_data]   Square-Subthreshold candidate sweeps: "
               f"{len(ss_meta)}")
-    # ── PATCHED: unpack both bundles AND individual pulse windows ──
+    # -- PATCHED: unpack both bundles AND individual pulse windows --
     ss_bundles, ss_individual_pulses = _build_subthreshold_bundles(
         data_set,
         ss_meta,
@@ -8110,13 +8110,13 @@ def load_allen_data(
                     f"{k:+d}" for k in sorted(amp_groups.keys(), key=abs))
                 print(f"[load_allen_data]   Long-Square bundles loaded "
                       f"({len(ls_bundles)} total): [{amp_keys_str}] pA\n"
-                      f"[load_allen_data]   → ls_bundles[0] "
+                      f"[load_allen_data]   -> ls_bundles[0] "
                       f"({ls_bundles[0].amplitude_pA:+.0f} pA) "
-                      f"is Ih-cleanest; use for τm validation.")
+                      f"is Ih-cleanest; use for taum validation.")
         else:
             if verbose:
                 print("[load_allen_data]   No usable hyperpolarising "
-                      "Long Square sweeps — Phase 2 will validate Rin/τm "
+                      "Long Square sweeps -- Phase 2 will validate Rin/taum "
                       "against the Allen scalar features only.")
 
     # --- Reference scalars --------------------------------------------------
@@ -8134,7 +8134,7 @@ def load_allen_data(
 
     if verbose:
         print(f"[load_allen_data] specimen {specimen_id}: "
-              f"Rin={rin:.1f} MΩ  τm={tau:.1f} ms  "
+              f"Rin={rin:.1f} MOhm  taum={tau:.1f} ms  "
               f"Vrest={vrest:.1f} mV (LJP-corrected)")
         n_ss_sweeps = len(ss_meta) if 'ss_meta' in locals() else 0
         n_dep = sum(b.n_repeats_averaged for b in ss_bundles if b.polarity == "dep")
@@ -8146,7 +8146,7 @@ def load_allen_data(
         print(f"[load_allen_data]   Long Square subthreshold: "
               f"{len(ls_bundles)} bundle(s) pooled from {n_ls_pulses} sweep(s)")
 
-    # ── PATCHED: pass ss_individual_pulses into CellData ──
+    # -- PATCHED: pass ss_individual_pulses into CellData --
     cell_data = CellData(
         specimen_id=specimen_id,
         metadata=meta,
@@ -8184,7 +8184,7 @@ class PassiveCell:
 
     * SWC imported via NEURON's ``Import3d_SWC_read``.
     * Original axon optionally replaced by a Hay-style two-section stub
-      (each 30 µm × 1 µm, 5 segments) attached at soma(1.0).
+      (each 30 um x 1 um, 5 segments) attached at soma(1.0).
     * The passive ``pas`` mechanism is inserted globally.
     * For each segment in dendritic sections (``dend`` + ``apic``), a
       multiplicative factor ``F`` is applied to ``cm`` and ``g_pas`` if the
@@ -8313,7 +8313,7 @@ class PassiveCell:
 
         Returns
         -------
-        (t_ms, v_mV) — both 1-D arrays, sampled every ``dt_ms``.
+        (t_ms, v_mV) -- both 1-D arrays, sampled every ``dt_ms``.
         """
         self._iclamp.delay = float(stim_delay_ms)
         self._iclamp.dur = float(stim_dur_ms)
@@ -8504,7 +8504,7 @@ def load_complete_cells(
 
 
 class _NumpyEncoder(json.JSONEncoder):
-    """JSON encoder that transparently handles numpy scalars and NaN → null."""
+    """JSON encoder that transparently handles numpy scalars and NaN -> null."""
 
     def default(self, obj):
         if isinstance(obj, np.integer):
@@ -8527,7 +8527,7 @@ def download_allen_archive(
     n_cells: Optional[int] = 1,
     archive_dir: str = "allen_archive",
     *,
-    # ── SS pulse-extraction parameters (match phase1 defaults) ──
+    # -- SS pulse-extraction parameters (match phase1 defaults) --
     pre_ms: float = 10.0,
     post_ms: float = 200.0,
     pulse_threshold_pA: float = 50.0,
@@ -8535,16 +8535,16 @@ def download_allen_archive(
     amplitude_tol_pA: float = SQ_SUB_AMPLITUDE_TOL_PA,     # 30.0
     expected_duration_s: float = SQ_SUB_DURATION_S,         # 5e-4
     duration_tol_s: float = SQ_SUB_DURATION_TOL_S,          # 5e-4
-    # ── Smoke-test parameters ──
+    # -- Smoke-test parameters --
     F: float = 1.9,
     fit_target: str = "hyp",
-    # ── General ──
+    # -- General --
     ljp_correction_mV: float = LJP_CORRECTION_MV,           # 14.0
     cache_dir: str = "cell_types",
     skip_existing: bool = True,
     skip_multiroot_swc: bool = True,
     verbose: bool = True,
-    # ── Pass-through to list_human_cells_with_morphology ──
+    # -- Pass-through to list_human_cells_with_morphology --
     require_square_subthreshold: bool = True,
     require_long_square: bool = True,
     patchseq_ttype_csv: Optional[str] = None,
@@ -8560,13 +8560,13 @@ def download_allen_archive(
         Root directory for the archive.  Created if absent.
     pre_ms, post_ms
         Window around each Square Subthreshold pulse onset (ms before and
-        after).  Baked into the saved pulse windows — choose generously.
+        after).  Baked into the saved pulse windows -- choose generously.
         Default 10/200 ms matches the phase1 extraction.
-    pulse_threshold_pA … duration_tol_s
+    pulse_threshold_pA ... duration_tol_s
         Pulse-detection QC parameters.  Match the phase1 defaults.
     F
         Spine-area correction factor for the smoke test only (not baked
-        into the archive — HPC code sets F independently).
+        into the archive -- HPC code sets F independently).
     fit_target
         Polarity for the smoke test's ``prepare_optimiser_inputs`` call.
     skip_existing
@@ -8592,7 +8592,7 @@ def download_allen_archive(
     archive_root = Path(archive_dir)
     archive_root.mkdir(parents=True, exist_ok=True)
 
-    # ── 1. Discover candidates ───────────────────────────────────────────────
+    # -- 1. Discover candidates -----------------------------------------------
     ctc = CellTypesCache(manifest_file=f"{cache_dir}/manifest.json")
     candidates = list_human_cells_with_morphology(
         layer=layer,
@@ -8609,10 +8609,10 @@ def download_allen_archive(
 
     if verbose:
         print(f"\n{'='*60}")
-        print(f"[archive] {len(candidates)} candidate(s) → {archive_root}")
+        print(f"[archive] {len(candidates)} candidate(s) -> {archive_root}")
         print(f"{'='*60}\n")
 
-    # ── 2. Archive each cell ─────────────────────────────────────────────────
+    # -- 2. Archive each cell -------------------------------------------------
     results: List[Dict[str, Any]] = []
     for _, row in candidates.iterrows():
         sid = int(row["specimen_id"])
@@ -8626,7 +8626,7 @@ def download_allen_archive(
 
         cell_dir.mkdir(parents=True, exist_ok=True)
         if verbose:
-            print(f"[archive] ═══ specimen {sid} ═══")
+            print(f"[archive] === specimen {sid} ===")
 
         try:
             status = _archive_one_cell(
@@ -8665,7 +8665,7 @@ def download_allen_archive(
                 "status": f"failed: {type(e).__name__}: {e}",
             })
 
-    # ── 3. Save manifest ─────────────────────────────────────────────────────
+    # -- 3. Save manifest -----------------------------------------------------
     manifest = {
         "created": datetime.now().isoformat(),
         "archive_format_version": "1.0",
@@ -8699,7 +8699,7 @@ def download_allen_archive(
             1 for r in results if r["status"].startswith("skipped_multiroot")
         )
         print(f"{'='*60}")
-        print(f"[archive] DONE — ok={n_ok}  partial={n_partial}  "
+        print(f"[archive] DONE -- ok={n_ok}  partial={n_partial}  "
               f"failed={n_fail}  skipped={n_skip}  "
               f"multiroot_skipped={n_multiroot}")
         print(f"{'='*60}")
@@ -8759,10 +8759,10 @@ def _reconstruct_cell_data_for_smoke_test(
     """Build a CellData from the raw pulse/sweep pool (n_avg_groups=1).
 
     This mirrors what the HPC loader will do, but with fixed n_avg_groups=1
-    and standard amplitude filtering — just enough to verify the data is
+    and standard amplitude filtering -- just enough to verify the data is
     usable for Phase 2.
     """
-    # ── SS bundles: average all pulses of each polarity into one bundle ──
+    # -- SS bundles: average all pulses of each polarity into one bundle --
     ss_bundles: List[SweepBundle] = []
     for pol in ("dep", "hyp"):
         group = [w for w in all_pulses if w["polarity"] == pol]
@@ -8794,7 +8794,7 @@ def _reconstruct_cell_data_for_smoke_test(
             )
         )
 
-    # ── LS bundles: group hyp subthreshold sweeps by amplitude ───────────
+    # -- LS bundles: group hyp subthreshold sweeps by amplitude -----------
     #
     # Replicate the same logic as load_allen_data:
     #   1. Keep only hyperpolarising sweeps with |amp| <= 100 pA
@@ -8886,7 +8886,7 @@ def _reconstruct_cell_data_for_smoke_test(
 
 
 # ============================================================================
-# PHASE 0 (a) — morphology repair engine  [from morphology_repair.py]
+# PHASE 0 (a) -- morphology repair engine  [from morphology_repair.py]
 # ============================================================================
 
 # -*- coding: utf-8 -*-
@@ -8904,21 +8904,21 @@ Repair philosophy
 -----------------
 Connectivity is fixed holistically rather than defect-by-defect:
 
-    1. raw-table pre-clean        — drop NaN/inf samples and coincident
+    1. raw-table pre-clean        -- drop NaN/inf samples and coincident
                                     duplicates (also the only way to touch the
                                     files MorphIO refuses to load);
-    2. enforce ONE soma           — promote a soma if none exists, choose a
+    2. enforce ONE soma           -- promote a soma if none exists, choose a
                                     single canonical soma node;
-    3. heal connectivity          — stitch every disconnected component to the
+    3. heal connectivity          -- stitch every disconnected component to the
                                     closest point of the soma-rooted tree
                                     (cKDTree), biased to the soma when within
                                     ``soma_radius_um``; fragments farther than
                                     ``max_stitch_dist_um`` are deemed unrepairable;
-    4. REROOT from the soma       — ``networkx.bfs_tree`` recomputes every parent
+    4. REROOT from the soma       -- ``networkx.bfs_tree`` recomputes every parent
                                     pointer outward from the soma, which also
                                     removes any accidental cycle and yields a
                                     NEURON-friendly parent-before-child ordering;
-    5. geometry                   — z-jump correction (propagated to the whole
+    5. geometry                   -- z-jump correction (propagated to the whole
                                     distal sub-tree) and soma-radius repair.
 
 Because the parent pointers are recomputed in step 4, the closest-point stitch
@@ -8966,9 +8966,9 @@ REPAIRABLE_CHECKS: Set[str] = {
 }
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  CONFIG
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 @dataclass
 class RepairConfig:
     """All thresholds and toggles for the repair, in one place."""
@@ -8977,7 +8977,7 @@ class RepairConfig:
                                         # RepairConfig(soma_radius_um=...) calls work
     max_stitch_dist_um: float = 60.0    # a component whose closest approach to ANY
                                         # other component exceeds this is UNREPAIRABLE
-    z_jump_thr_um: float = 30.0         # |Δz| between consecutive samples to flag
+    z_jump_thr_um: float = 30.0         # |Deltaz| between consecutive samples to flag
     dup_tolerance_um: float = 1e-3      # samples within this of their parent = dup
     soma_radius_floor_um: float = 1.0   # fallback soma radius if degenerate w/o stems
     collapse_flagged_soma: bool = True  # if the soma was FLAGGED (non-conform/missing),
@@ -8987,9 +8987,9 @@ class RepairConfig:
     require_positive_neurite_radii: bool = False   # gate success on radii too?
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  RESULT / DIAGNOSTIC DATACLASSES
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 @dataclass
 class RepairStep:
     """One repair action and what it changed."""
@@ -9049,9 +9049,9 @@ class RepairResult:
         return d
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  NODE-TABLE I/O  (raw substrate — works on files MorphIO cannot load)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  NODE-TABLE I/O  (raw substrate -- works on files MorphIO cannot load)
+# ===============================================================================
 def load_node_table(swc: Path) -> np.ndarray:
     """Parse an SWC into an (N, 7) float array; non-finite coords survive as NaN."""
     rows = []
@@ -9079,9 +9079,9 @@ def save_node_table(T: np.ndarray, out: Path) -> None:
                      f"{r[Z]:.4f} {r[R]:.4f} {int(r[PARENT])}\n")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  GRAPH HELPERS
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 def _build_graph(T: np.ndarray) -> nx.Graph:
     """Undirected graph of samples; edges from parent links."""
     G = nx.Graph()
@@ -9106,14 +9106,14 @@ def _path_length(T: np.ndarray) -> float:
     return total
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  REPAIR PRIMITIVES  (each pure: table/graph in -> table/graph + RepairStep out)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 def _preclean(T: np.ndarray, cfg: RepairConfig) -> Tuple[np.ndarray, List[RepairStep]]:
     """Drop NaN/inf rows (reparent children to nearest finite ancestor) and dedup."""
     steps: List[RepairStep] = []
 
-    # (a) non-finite samples — drop them, then reparent SURVIVING rows whose
+    # (a) non-finite samples -- drop them, then reparent SURVIVING rows whose
     #     parent chain passed through a dropped node up to the nearest finite
     #     ancestor.  (Reparent on the kept array, not a throwaway mask copy.)
     finite = np.all(np.isfinite(T[:, X:R + 1]), axis=1)
@@ -9217,7 +9217,7 @@ def _heal_components(T: np.ndarray, G: nx.Graph, soma_root: int,
 
     This deliberately does NOT privilege the soma-rooted ("main") arbour or the
     orphan's root node: a detached segment is joined to whatever element is
-    nearest — another orphan or the main arbour — at the closest point on each.
+    nearest -- another orphan or the main arbour -- at the closest point on each.
     Topological direction is *not* set here; it is recovered afterwards by
     rerooting outward from the soma (``_reroot_table``).
 
@@ -9359,9 +9359,9 @@ def _fix_soma_radius(T: np.ndarray, cfg: RepairConfig) -> Tuple[np.ndarray, Repa
     return T, RepairStep("fix_soma_radius", True, {"radius_set_um": round(r_new, 3)})
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  POST-REPAIR DIAGNOSTIC  (recomputed from the output — verification, not trust)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  POST-REPAIR DIAGNOSTIC  (recomputed from the output -- verification, not trust)
+# ===============================================================================
 def diagnose(T_before: np.ndarray, T_after: np.ndarray,
              cfg: RepairConfig) -> RepairDiagnostic:
     Gb, Ga = _build_graph(T_before), _build_graph(T_after)
@@ -9424,9 +9424,9 @@ def diagnose(T_before: np.ndarray, T_after: np.ndarray,
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  THE REPAIR CLASS
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 class MorphologyRepair:
     """Polish a flagged morphology into a single soma-rooted tree.
 
@@ -9491,9 +9491,9 @@ class MorphologyRepair:
         )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  STANDALONE TEST HELPER  —  run BEFORE integrating
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  STANDALONE TEST HELPER  --  run BEFORE integrating
+# ===============================================================================
 def repair_and_verify(
     swc_path: str, layer: str = "5", dendrite_type: str = "spiny",
     out_dir: Optional[str] = None, config: RepairConfig = RepairConfig(),
@@ -9541,7 +9541,7 @@ def repair_and_verify(
 
 
 # ============================================================================
-# PHASE 0 (b) — interactive figure + Allen repair loader  [allen_repair_loader.py]
+# PHASE 0 (b) -- interactive figure + Allen repair loader  [allen_repair_loader.py]
 # ============================================================================
 
 # -*- coding: utf-8 -*-
@@ -9550,7 +9550,7 @@ allen_repair_loader.py
 ======================
 Standalone loader (Allen Cell Types) that **repairs the SWC before NEURON imports
 it**, replacing NEURON's opaque ``Import3d_SWC_read`` auto-graft with an explicit,
-inspectable, distance-gated, type-aware re-rooting — then produces an interactive
+inspectable, distance-gated, type-aware re-rooting -- then produces an interactive
 raw-vs-reconstructed 3-D figure and a summary.
 
 Why
@@ -9561,17 +9561,17 @@ fragment to the soma with a non-physical jump.  We instead repair the *file* int
 a single, clean, soma-rooted tree; NEURON then imports it with nothing left to
 graft.
 
-Pipeline (matches the intended order: heal → triage → NEURON check → save)
+Pipeline (matches the intended order: heal -> triage -> NEURON check -> save)
 --------------------------------------------------------------------------
     repair_table_for_import:
-        _preclean → _normalize_soma → [STAGE 1] → _heal_components(STAGE 2)
-        → _reroot_table → _fix_z_jumps → _fix_soma_radius → diagnose
+        _preclean -> _normalize_soma -> [STAGE 1] -> _heal_components(STAGE 2)
+        -> _reroot_table -> _fix_z_jumps -> _fix_soma_radius -> diagnose
 
 STAGE 1  (new here; everything else is reused from ``morphology_repair``):
-    For each orphan whose CLOSEST APPROACH TO THE SOMA ≤ ``soma_attach_radius_um``
+    For each orphan whose CLOSEST APPROACH TO THE SOMA <= ``soma_attach_radius_um``
     (processed closest-first so the tree grows greedily): attach it to the soma,
-    UNLESS — within that radius — a SAME-TYPE segment of the soma-rooted tree
-    (dend↔dend, apic↔apic, axon↔axon) is closer than the soma, in which case
+    UNLESS -- within that radius -- a SAME-TYPE segment of the soma-rooted tree
+    (dend<->dend, apic<->apic, axon<->axon) is closer than the soma, in which case
     attach to that segment instead.  Orphans beyond the soma gate fall through to
     STAGE 2 (``_heal_components``: nearest-pair MST stitch, gated by
     ``max_stitch_dist_um``).
@@ -9617,14 +9617,14 @@ _TYPE_COLOR = {1: "#222222", 2: "#2ca02c", 3: "#1f77b4", 4: "#d62728"}
 _DEFAULT_COLOR = "#ff7f0e"
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  CONFIG / OUTCOME
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 @dataclass
 class SomaGatedRepairConfig:
     """STAGE-1 knobs + the reused ``RepairConfig`` for STAGE 2 / reroot / geometry."""
-    soma_attach_radius_um: float = 60.0    # STAGE-1 gate: orphan→soma closest approach
+    soma_attach_radius_um: float = 60.0    # STAGE-1 gate: orphan->soma closest approach
     stage1_type_aware: bool = True         # prefer a closer same-type segment over soma
     base: RepairConfig = field(default_factory=RepairConfig)
 
@@ -9647,9 +9647,9 @@ class RepairOutcome:
         return bool(self.diagnostic and self.diagnostic.success)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  STAGE 1  —  soma-gated, type-aware attachment   (the only new graph logic)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  STAGE 1  --  soma-gated, type-aware attachment   (the only new graph logic)
+# ===============================================================================
 
 def _component_type(typ: Dict[int, int], node_ids: List[int]) -> int:
     """Modal NEURITE type of a component (soma excluded if any neurite present)."""
@@ -9664,7 +9664,7 @@ def _heal_stage1_soma_gated(
 ) -> Tuple[nx.Graph, RepairStep, List[Dict[str, Any]]]:
     """Attach orphans within ``radius_um`` of the soma; same-type-closer wins.
 
-    Mutates ``G`` (adds edges only — geometry untouched).  Direction is recovered
+    Mutates ``G`` (adds edges only -- geometry untouched).  Direction is recovered
     later by ``_reroot_table``.  Greedy: each pass attaches the orphan with the
     smallest soma approach, so the main component grows and chains resolve.
     """
@@ -9728,9 +9728,9 @@ def _heal_stage1_soma_gated(
     return G, step, attachments
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  ORCHESTRATION  —  mirrors MorphologyRepair.repair with STAGE 1 inserted
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  ORCHESTRATION  --  mirrors MorphologyRepair.repair with STAGE 1 inserted
+# ===============================================================================
 
 def _detect_soma_flagged(T: np.ndarray) -> bool:
     """Heuristic soma flag (no triage report at heal time): missing / zero-radius."""
@@ -9787,9 +9787,9 @@ def repair_swc_file(in_swc: Path | str, out_swc: Path | str,
     return outcome
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  THE "CHANGED Import3d_SWC_read"  —  repair, THEN import the clean tree
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  THE "CHANGED Import3d_SWC_read"  --  repair, THEN import the clean tree
+# ===============================================================================
 
 def import3d_swc_read_repaired(
     swc_path: Path | str, h: Any, cfg: Optional[SomaGatedRepairConfig] = None,
@@ -9798,7 +9798,7 @@ def import3d_swc_read_repaired(
     """Drop-in replacement for the ``Import3d_SWC_read`` step.
 
     Repairs the SWC to a single soma-rooted tree, writes it, and imports the CLEAN
-    file — so NEURON's importer has no orphan to auto-graft.  Returns
+    file -- so NEURON's importer has no orphan to auto-graft.  Returns
     ``(repaired_path, RepairOutcome)``.  Sections are now live in ``h``.
     """
     cfg = cfg or SomaGatedRepairConfig()
@@ -9848,15 +9848,15 @@ def make_repaired_build_fn(cfg: Optional[SomaGatedRepairConfig] = None
     return _build
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  ALLEN LOADER  (Colab; needs allensdk + network)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def load_allen_swc(specimen_id: int, cache_dir: str = "cell_types",
                    ctc: Any = None) -> Path:
     """Download (or cache) one Allen reconstruction and return its SWC path.
 
-    Uses ``allensdk.core.cell_types_cache.CellTypesCache`` — identical convention
+    Uses ``allensdk.core.cell_types_cache.CellTypesCache`` -- identical convention
     to the archive's ``load_allen_data`` (see phase1_data_loader.py):
     * the explicit ``file_name`` kwarg is passed to ``get_reconstruction`` so the
       path on disk is deterministic regardless of AllenSDK manifest layout;
@@ -9884,12 +9884,12 @@ def load_allen_swc(specimen_id: int, cache_dir: str = "cell_types",
     return swc
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  INTERACTIVE FIGURE  (plotly 3-D, raw + reconstructed + repair edges)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def _segments_by_type(T: np.ndarray) -> Dict[int, Tuple[List, List, List]]:
-    """Per-type parent→child line segments as None-separated polyline arrays."""
+    """Per-type parent->child line segments as None-separated polyline arrays."""
     by_id = {int(r[ID]): r for r in T}
     out: Dict[int, Tuple[List, List, List]] = {}
     for r in T:
@@ -9906,7 +9906,7 @@ def _segments_by_type(T: np.ndarray) -> Dict[int, Tuple[List, List, List]]:
 
 
 def _orphan_root_markers(T: np.ndarray) -> Tuple[List, List, List]:
-    """XYZ of non-soma roots (parent == -1) — the visible breaks in the RAW file."""
+    """XYZ of non-soma roots (parent == -1) -- the visible breaks in the RAW file."""
     xs, ys, zs = [], [], []
     for r in T:
         if int(r[PARENT]) == -1 and int(r[TYPE]) != SOMA_TYPE:
@@ -9920,7 +9920,7 @@ def figure_raw_vs_repaired(outcome: RepairOutcome, title: str = "raw vs reconstr
     the explicit REPAIR edges (STAGE 1 soma / same-type, STAGE 2 MST)."""
     fig = go.Figure()
 
-    # --- RAW (grey; off by default — toggle in the legend for before/after) ---
+    # --- RAW (grey; off by default -- toggle in the legend for before/after) ---
     raw_by_t = _segments_by_type(outcome.T_raw)
     rx, ry, rz = [], [], []
     for xs, ys, zs in raw_by_t.values():
@@ -9960,7 +9960,7 @@ def figure_raw_vs_repaired(outcome: RepairOutcome, title: str = "raw vs reconstr
             a, b = e[key_from], e[key_to]
             ex += [a[0], b[0], None]; ey += [a[1], b[1], None]; ez += [a[2], b[2], None]
             gap = e.get("gap_um", "?"); kind = e.get("kind", name)
-            txt += [f"{kind}: gap {gap} µm", f"{kind}: gap {gap} µm", ""]
+            txt += [f"{kind}: gap {gap} um", f"{kind}: gap {gap} um", ""]
         if not ex:
             return None
         return go.Scatter3d(
@@ -9971,8 +9971,8 @@ def figure_raw_vs_repaired(outcome: RepairOutcome, title: str = "raw vs reconstr
     s1_soma = [e for e in outcome.stage1_attachments if e["kind"] == "soma"]
     s1_type = [e for e in outcome.stage1_attachments if e["kind"] == "same_type"]
     for tr in (
-        _edge_trace(s1_soma, "repair: STAGE-1 → soma", "#9467bd"),
-        _edge_trace(s1_type, "repair: STAGE-1 → same-type", "#e377c2"),
+        _edge_trace(s1_soma, "repair: STAGE-1 -> soma", "#9467bd"),
+        _edge_trace(s1_type, "repair: STAGE-1 -> same-type", "#e377c2"),
         _edge_trace(outcome.stage2_grafts, "repair: STAGE-2 MST", "#ff7f0e",
                     key_from="anchor_xyz", key_to="to_xyz"),
     ):
@@ -9981,15 +9981,15 @@ def figure_raw_vs_repaired(outcome: RepairOutcome, title: str = "raw vs reconstr
 
     fig.update_layout(
         title=title, showlegend=True,
-        scene=dict(aspectmode="data", xaxis_title="x (µm)",
-                   yaxis_title="y (µm)", zaxis_title="z (µm)"),
+        scene=dict(aspectmode="data", xaxis_title="x (um)",
+                   yaxis_title="y (um)", zaxis_title="z (um)"),
         margin=dict(l=0, r=0, t=40, b=0), legend=dict(itemsizing="constant"))
     return fig
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  SUMMARY
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def summarize_repair(outcome: RepairOutcome, specimen: Any = None) -> Dict[str, Any]:
     """Compact, JSON-able summary of what the repair did."""
@@ -10043,9 +10043,9 @@ def _summary_text(s: Dict[str, Any]) -> str:
          f"({s['stage1_to_soma']} -> soma, {s['stage1_to_same_type']} -> same-type)",
          f"  STAGE 2   : {s['stage2_mst_grafts']} MST graft(s); "
          f"unrepairable {s['unrepairable_fragments']}",
-         f"  gaps (µm) : min {s['gap_min_um']} / med {s['gap_median_um']} / "
-         f"max {s['gap_max_um']}  added cable {s['added_cable_um']} µm",
-         f"  cable len : {s['path_length_before_um']} -> {s['path_length_after_um']} µm",
+         f"  gaps (um) : min {s['gap_min_um']} / med {s['gap_median_um']} / "
+         f"max {s['gap_max_um']}  added cable {s['added_cable_um']} um",
+         f"  cable len : {s['path_length_before_um']} -> {s['path_length_after_um']} um",
          f"  invariants: single_tree={s['single_tree']} rooted_at_soma="
          f"{s['rooted_at_soma']} acyclic={s['acyclic']}"]
     if not s["repair_success"]:
@@ -10053,15 +10053,15 @@ def _summary_text(s: Dict[str, Any]) -> str:
     return "\n".join(L)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  ORCHESTRATOR  (Colab entry point)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def run(specimen_id: Optional[int] = None, swc_path: Optional[str] = None,
         cfg: Optional[SomaGatedRepairConfig] = None,
         out_dir: str = ".", write_outputs: bool = True,
         cache_dir: str = "cell_types") -> Dict[str, Any]:
-    """Load (Allen or local) → repair → figure + summary.
+    """Load (Allen or local) -> repair -> figure + summary.
 
     Returns a dict with keys: ``outcome``, ``figure`` (plotly), ``summary``
     (dict), ``summary_text`` (str), ``repaired_swc`` (Path|None),
@@ -10079,7 +10079,7 @@ def run(specimen_id: Optional[int] = None, swc_path: Optional[str] = None,
     summary = summarize_repair(outcome, specimen=specimen_id or src.name)
     text = _summary_text(summary)
     fig = figure_raw_vs_repaired(
-        outcome, title=f"{summary['specimen']} — raw vs reconstructed")
+        outcome, title=f"{summary['specimen']} -- raw vs reconstructed")
 
     figure_html = None
     if write_outputs:
@@ -10094,7 +10094,7 @@ def run(specimen_id: Optional[int] = None, swc_path: Optional[str] = None,
 
 
 # ============================================================================
-# PHASE 0 (c) — electrical viability check  [electrical_viability.py]
+# PHASE 0 (c) -- electrical viability check  [electrical_viability.py]
 # ============================================================================
 
 # -*- coding: utf-8 -*-
@@ -10127,16 +10127,16 @@ What it can and cannot detect (established empirically, NEURON 9.0.1)
 * What this check *does* uniquely validate: the morphology **builds without
   raising**, the somatic response is **finite and non-exploding** (no NaN/inf
   from a degenerate soma or singular geometry), current **reaches every sampled
-  segment** (no internal conduction block), and ΔV **attenuates with distance**
+  segment** (no internal conduction block), and DeltaV **attenuates with distance**
   like a passive cable.
 
 Design (decoupled, mirrors the triage module's philosophy)
 ----------------------------------------------------------
-* :class:`ElectricalViabilityConfig` — every threshold / stimulus / build knob,
+* :class:`ElectricalViabilityConfig` -- every threshold / stimulus / build knob,
   documented; no magic numbers buried in the logic.
-* :class:`ElectricalViabilityResult` — the structured verdict + all evidence
-  (per-site ΔV, attenuation profile, dead-segment coordinates, Rin, tau, lambda).
-* :func:`electrical_viability_check` — the public entry point.  ``build_fn`` and
+* :class:`ElectricalViabilityResult` -- the structured verdict + all evidence
+  (per-site DeltaV, attenuation profile, dead-segment coordinates, Rin, tau, lambda).
+* :func:`electrical_viability_check` -- the public entry point.  ``build_fn`` and
   ``h`` are injectable so the core is testable without the (un-importable) archive
   script and so production can pass the real ``build_neuron_model``.
 * The NEURON coupling is confined to :func:`_default_build` and
@@ -10161,23 +10161,23 @@ except Exception:                      # pragma: no cover
     _HAVE_SCIPY = False
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  CONFIG
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 @dataclass
 class ElectricalViabilityConfig:
     """All knobs for the propagation trial.
 
     Passive values are *nominal literature constants* used only to energise the
-    cable for a viability test — no fit exists at triage time.  They are NOT a
+    cable for a viability test -- no fit exists at triage time.  They are NOT a
     claim about the cell's true membrane.
 
     Symbols
     -------
-    cm_uF_per_cm2 : Cm, specific membrane capacitance (µF·cm⁻²).
-    rm_Ohm_cm2    : Rm, specific membrane resistance (Ω·cm²); g_pas = 1 / Rm.
-    ra_Ohm_cm     : Ra, axial resistivity (Ω·cm).
+    cm_uF_per_cm2 : Cm, specific membrane capacitance (uF.cm^-2).
+    rm_Ohm_cm2    : Rm, specific membrane resistance (Ohm.cm^2); g_pas = 1 / Rm.
+    ra_Ohm_cm     : Ra, axial resistivity (Ohm.cm).
     e_pas_mV      : e_pas, passive reversal / resting potential (mV).
     """
     # --- passive membrane (nominal; energise the cable only) ---
@@ -10189,7 +10189,7 @@ class ElectricalViabilityConfig:
     # --- soma current step (IClamp) ---
     stim_amp_pA: float = -50.0          # sign irrelevant for a passive cable
     stim_delay_ms: float = 50.0
-    stim_dur_ms: Optional[float] = None  # None -> auto = settle_tau_multiple · τ (≥ floor)
+    stim_dur_ms: Optional[float] = None  # None -> auto = settle_tau_multiple . tau (>= floor)
     stim_dur_floor_ms: float = 200.0
     settle_tau_multiple: float = 8.0     # ensure even distal tips reach plateau "in time"
     dt_ms: float = 0.025
@@ -10199,27 +10199,27 @@ class ElectricalViabilityConfig:
     axon_replacement: str = "none"       # keep the original reconstructed axon
     use_dlambda: bool = True
     dlambda_freq_hz: float = 100.0
-    dlambda_frac: float = 0.1            # d_lambda = 0.1 -> ≤10% of AC length constant/seg
+    dlambda_frac: float = 0.1            # d_lambda = 0.1 -> <=10% of AC length constant/seg
 
     # --- recording-site sampling ---
     n_random_segments: int = 1000        # capped at the cell's total segment count
     seed: int = 0
 
     # --- thresholds ---
-    reach_tol_mV: float = 1e-4           # |ΔV| below this at steady state ⇒ "not reached"
+    reach_tol_mV: float = 1e-4           # |DeltaV| below this at steady state => "not reached"
     dead_soma_floor_mV: float = 1e-3     # soma must deflect at least this
-    explode_cap_mV: float = 5_000.0      # |v| above this anywhere ⇒ non-physical blow-up
+    explode_cap_mV: float = 5_000.0      # |v| above this anywhere => non-physical blow-up
 
     # --- verdict composition ---
     require_single_swc_root: bool = True       # your "one (electrical) tree" criterion
     require_all_reached: bool = True
     require_monotone_attenuation: bool = True
-    monotone_spearman_max: float = -0.05       # ρ(|ΔV|, distance) must be ≤ this (i.e. negative)
+    monotone_spearman_max: float = -0.05       # rho(|DeltaV|, distance) must be <= this (i.e. negative)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  RESULT
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 @dataclass
 class ElectricalViabilityResult:
@@ -10260,14 +10260,14 @@ class ElectricalViabilityResult:
     def summary(self) -> str:
         verdict = "PASS" if self.electrical_ok else "FAIL"
         rin = f"{self.rin_MOhm:.1f}" if np.isfinite(self.rin_MOhm) else "nan"
-        tau = f"{self.tau_fit_ms:.1f}" if self.tau_fit_ms is not None else "—"
-        rho = f"{self.spearman_dist_dv:+.2f}" if self.spearman_dist_dv is not None else "—"
+        tau = f"{self.tau_fit_ms:.1f}" if self.tau_fit_ms is not None else "--"
+        rho = f"{self.spearman_dist_dv:+.2f}" if self.spearman_dist_dv is not None else "--"
         return (
             f"[electrical:{verdict}] {Path(self.swc_path).name}  "
             f"roots={self.n_swc_roots} graft={self.neuron_grafted_orphans}  "
             f"reached={self.n_reached}/{self.n_sites} dead={self.n_dead}  "
-            f"dVsoma={self.dv_soma_mV:+.3f} mV  Rin={rin} MΩ  τ={tau} ms  "
-            f"ρ(d,|dV|)={rho}"
+            f"dVsoma={self.dv_soma_mV:+.3f} mV  Rin={rin} MOhm  tau={tau} ms  "
+            f"rho(d,|dV|)={rho}"
             + ("" if self.electrical_ok else "  reasons: " + "; ".join(self.reasons))
         )
 
@@ -10277,16 +10277,16 @@ class ElectricalViabilityResult:
         return d
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  PURE HELPERS  (no NEURON — unit-testable)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  PURE HELPERS  (no NEURON -- unit-testable)
+# ===============================================================================
 
 def count_swc_roots(swc_path: Path | str) -> int:
     """Number of topological roots in a raw SWC table.
 
     A sample is a root if its parent id is -1 OR its parent id does not appear as
     any sample id (dangling reference).  This is the file's own statement of how
-    many disconnected trees it contains — computed *before* NEURON's import graft.
+    many disconnected trees it contains -- computed *before* NEURON's import graft.
     """
     ids: set = set()
     rows: List[Tuple[int, int]] = []   # (id, parent)
@@ -10312,11 +10312,11 @@ def count_swc_roots(swc_path: Path | str) -> int:
 
 
 def classify_reached(dv_mV: np.ndarray, reach_tol_mV: float) -> np.ndarray:
-    """Boolean mask: True where |ΔV| exceeds the numerical-reach tolerance.
+    """Boolean mask: True where |DeltaV| exceeds the numerical-reach tolerance.
 
     The discriminator between *connected-but-attenuated* and *unreached* is the
     numerical-zero tolerance, NOT a physiological floor: a genuinely unreached
-    segment sits exactly at e_pas (ΔV == 0 to machine precision), whereas a
+    segment sits exactly at e_pas (DeltaV == 0 to machine precision), whereas a
     legitimately distal tip is small but strictly non-zero.
     """
     return np.abs(np.asarray(dv_mV, dtype=float)) > float(reach_tol_mV)
@@ -10330,7 +10330,7 @@ def is_exploding(v_abs_max_mV: float, dv_soma_mV: float, cap_mV: float) -> bool:
 
 
 def attenuation_spearman(distance_um: np.ndarray, dv_mV: np.ndarray) -> Optional[float]:
-    """Spearman ρ between path distance and |ΔV| (expect negative: farther ⇒ smaller).
+    """Spearman rho between path distance and |DeltaV| (expect negative: farther => smaller).
 
     Falls back to a rank-based Pearson if scipy is unavailable.  Returns ``None``
     when there are too few points to rank.
@@ -10352,7 +10352,7 @@ def attenuation_spearman(distance_um: np.ndarray, dv_mV: np.ndarray) -> Optional
 
 
 def fit_lambda_um(distance_um: np.ndarray, dv_mV: np.ndarray) -> Optional[float]:
-    """Electrotonic length λ from |ΔV(d)| = ΔV0 · exp(-d / λ).  Optional (scipy)."""
+    """Electrotonic length lambda from |DeltaV(d)| = DeltaV0 . exp(-d / lambda).  Optional (scipy)."""
     if not _HAVE_SCIPY:
         return None
     d = np.asarray(distance_um, dtype=float)
@@ -10374,7 +10374,7 @@ def fit_lambda_um(distance_um: np.ndarray, dv_mV: np.ndarray) -> Optional[float]
 
 def fit_tau_ms(t_ms: np.ndarray, v_mV: np.ndarray, e_pas_mV: float,
                t0_ms: float, t1_ms: float) -> Optional[float]:
-    """Membrane τ from the somatic charging transient A·(1 - exp(-(t-t0)/τ)). Optional."""
+    """Membrane tau from the somatic charging transient A.(1 - exp(-(t-t0)/tau)). Optional."""
     if not _HAVE_SCIPY:
         return None
     t = np.asarray(t_ms, dtype=float)
@@ -10392,9 +10392,9 @@ def fit_tau_ms(t_ms: np.ndarray, v_mV: np.ndarray, e_pas_mV: float,
         return None
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  NEURON-COUPLED HELPERS  (the only NEURON-dependent code)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def _get_h():
     """Lazy NEURON handle (mirrors the triage's lazy allensdk import)."""
@@ -10473,7 +10473,7 @@ def _apply_dlambda(h, cfg: ElectricalViabilityConfig) -> None:
     for sec in h.allsec():
         if have_lambda_f:
             lam = h.lambda_f(cfg.dlambda_freq_hz, sec=sec)
-        else:                                    # manual AC length constant (µm)
+        else:                                    # manual AC length constant (um)
             lam = _lambda_f_manual(sec, cfg.dlambda_freq_hz, cfg.cm_uF_per_cm2)
         if lam <= 0 or not math.isfinite(lam):
             continue
@@ -10481,7 +10481,7 @@ def _apply_dlambda(h, cfg: ElectricalViabilityConfig) -> None:
 
 
 def _lambda_f_manual(sec, freq_hz: float, cm_uF_per_cm2: float) -> float:
-    """AC length constant (µm) integrated over pt3d, NEURON's d_lambda formula."""
+    """AC length constant (um) integrated over pt3d, NEURON's d_lambda formula."""
     if sec.n3d() < 2:
         d = sec.diam
         return 1e5 * math.sqrt(d / (4.0 * math.pi * freq_hz * sec.Ra * cm_uF_per_cm2))
@@ -10498,7 +10498,7 @@ def _lambda_f_manual(sec, freq_hz: float, cm_uF_per_cm2: float) -> float:
 
 
 def _seg_xyz(sec, x: float) -> Tuple[float, float, float]:
-    """Interpolated 3-D coordinate (µm) of segment centre ``sec(x)`` from pt3d."""
+    """Interpolated 3-D coordinate (um) of segment centre ``sec(x)`` from pt3d."""
     n = sec.n3d()
     if n == 0:
         return (float("nan"),) * 3
@@ -10541,7 +10541,7 @@ def _select_sites(h, soma, cfg: ElectricalViabilityConfig
 def _simulate_soma_step(h, soma, sites, cfg: ElectricalViabilityConfig
                         ) -> Dict[str, Any]:
     """Set passive params, apply d_lambda, inject the soma step, run to plateau,
-    and read steady-state ΔV at every site (+ full somatic trace)."""
+    and read steady-state DeltaV at every site (+ full somatic trace)."""
     # passive: Ra (section), then nseg, then per-segment cm/g_pas/e_pas
     g_pas = 1.0 / cfg.rm_Ohm_cm2
     for sec in h.allsec():
@@ -10554,7 +10554,7 @@ def _simulate_soma_step(h, soma, sites, cfg: ElectricalViabilityConfig
             seg.g_pas = g_pas
             seg.e_pas = cfg.e_pas_mV
 
-    # τ-aware step duration so even distal sites reach plateau ("propagate in time")
+    # tau-aware step duration so even distal sites reach plateau ("propagate in time")
     tau_ms = cfg.rm_Ohm_cm2 * cfg.cm_uF_per_cm2 * 1e-3
     dur = cfg.stim_dur_ms if cfg.stim_dur_ms is not None else \
         max(cfg.stim_dur_floor_ms, cfg.settle_tau_multiple * tau_ms)
@@ -10573,7 +10573,7 @@ def _simulate_soma_step(h, soma, sites, cfg: ElectricalViabilityConfig
     h.finitialize(cfg.e_pas_mV)
     h.run()
 
-    # steady-state read (state at tstop = plateau); ΔV vs e_pas
+    # steady-state read (state at tstop = plateau); DeltaV vs e_pas
     h.distance(0, soma(0.5))
     dv = np.empty(len(sites), dtype=float)
     dist = np.empty(len(sites), dtype=float)
@@ -10600,9 +10600,9 @@ def _simulate_soma_step(h, soma, sites, cfg: ElectricalViabilityConfig
     }
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  PUBLIC ENTRY POINT
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def electrical_viability_check(
     swc_path: Path | str,
@@ -10638,7 +10638,7 @@ def electrical_viability_check(
         config=asdict(cfg),
     )
 
-    # (0) raw-SWC topology — independent of NEURON's import-time graft
+    # (0) raw-SWC topology -- independent of NEURON's import-time graft
     res.n_swc_roots = count_swc_roots(swc_path)
     res.neuron_grafted_orphans = res.n_swc_roots > 1   # Import3d grafts orphans to soma
 
@@ -10691,7 +10691,7 @@ def electrical_viability_check(
     res.spearman_dist_dv = attenuation_spearman(dist[prof], dv[prof])
     res.lambda_est_um = fit_lambda_um(dist[prof], dv[prof])
 
-    # (3) verdict — compose per config
+    # (3) verdict -- compose per config
     ok = True
     if cfg.require_single_swc_root and res.n_swc_roots > 1:
         ok = False
@@ -10717,7 +10717,7 @@ def electrical_viability_check(
             and res.spearman_dist_dv > cfg.monotone_spearman_max):
         ok = False
         res.reasons.append(
-            f"non_monotone_attenuation: ρ(dist,|dV|)={res.spearman_dist_dv:+.2f} "
+            f"non_monotone_attenuation: rho(dist,|dV|)={res.spearman_dist_dv:+.2f} "
             f"> {cfg.monotone_spearman_max:+.2f}")
 
     res.electrical_ok = ok
@@ -10726,12 +10726,12 @@ def electrical_viability_check(
 
 
 # ============================================================================
-# MERGE — Phase-0 archive integration + merged _archive_one_cell
+# MERGE -- Phase-0 archive integration + merged _archive_one_cell
 # ============================================================================
 
 # -*- coding: utf-8 -*-
 """
-phase0_archive_merge.py — Phase-0 repair + Allen archive saver (MERGED)
+phase0_archive_merge.py -- Phase-0 repair + Allen archive saver (MERGED)
 ======================================================================
 
 This file MERGES the Phase-0 morphology repair / electrical-viability stage into
@@ -10745,9 +10745,9 @@ skip: it counted SWC roots and, if `n_roots > 1`, ABORTED with
 
 This merge REPLACES that skip with the full Phase-0 pipeline:
 
-    raw SWC  →  repair (Stage-1 soma-gated type-aware + Stage-2 MST + reroot)
-             →  electrical viability check (NEURON, on the repaired tree)
-             →  archive the REPAIRED tree as reconstruction.swc
+    raw SWC  ->  repair (Stage-1 soma-gated type-aware + Stage-2 MST + reroot)
+             ->  electrical viability check (NEURON, on the repaired tree)
+             ->  archive the REPAIRED tree as reconstruction.swc
 
 Decisions baked in (per the merge spec):
   * The archived `reconstruction.swc` is the REPAIRED tree.  The verbatim Allen
@@ -10779,9 +10779,9 @@ From the phase0/phase1 monolith, this code references:
     ElectricalViabilityConfig, electrical_viability_check,
   and optionally the static triage:
     run_checks, CATEGORY_CONNECTIVITY, CATEGORY_SOMA, CATEGORY_GEOMETRY,
-    CATEGORY_RADII (all optional — guarded).
+    CATEGORY_RADII (all optional -- guarded).
 
-INTEGRATION — three edits to the monolith
+INTEGRATION -- three edits to the monolith
 -----------------------------------------
 (1) Paste this whole file AFTER the Phase-0 repair layer and the original archive
     cells are defined.
@@ -10794,7 +10794,7 @@ INTEGRATION — three edits to the monolith
 (3) Add the returned `phase0` dict into the `metadata = {...}` block.
 
 A ready-to-run merged `_archive_one_cell` is provided at the bottom as
-`_archive_one_cell` (it supersedes the original — same name, so the last
+`_archive_one_cell` (it supersedes the original -- same name, so the last
 definition in the session wins).
 """
 import json
@@ -10810,9 +10810,9 @@ matplotlib.use("Agg")               # headless: write PNGs without a display
 import matplotlib.pyplot as plt
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  PHASE-0 CONFIG (gathers the repair + electrical knobs in one place)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 # Defaults match the validated Phase-0 modules; override at the call site.
 PHASE0_SOMA_ATTACH_RADIUS_UM = 60.0    # Stage-1 soma gate
@@ -10849,24 +10849,24 @@ def _make_phase0_ev_cfg(
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  ELECTRICAL-TRIAGE PLOT  (the saver originally had no electrical plot)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def plot_electrical_triage(ev_result, swc_name: str = "", save_path: Optional[Path] = None):
     """Two-panel triage figure for an ElectricalViabilityResult.
 
-    LEFT  — attenuation profile: |ΔV| vs path distance from the soma for every
-            reached site, with the Spearman ρ annotated.  A clean passive cable
-            decays monotonically (ρ < 0).
-    RIGHT — reachability bar: reached vs dead sites, plus the verdict banner
-            (Rin, τ, ΔV_soma, root count).
+    LEFT  -- attenuation profile: |DeltaV| vs path distance from the soma for every
+            reached site, with the Spearman rho annotated.  A clean passive cable
+            decays monotonically (rho < 0).
+    RIGHT -- reachability bar: reached vs dead sites, plus the verdict banner
+            (Rin, tau, DeltaV_soma, root count).
 
     Returns the matplotlib Figure (and writes a PNG if `save_path` is given).
     """
     fig, (axL, axR) = plt.subplots(1, 2, figsize=(11, 4.2))
 
-    # ── LEFT: attenuation profile ────────────────────────────────────────────
+    # -- LEFT: attenuation profile --------------------------------------------
     d = np.asarray(ev_result.attenuation_distance_um, dtype=float)
     y = np.abs(np.asarray(ev_result.attenuation_dv_mV, dtype=float))
     if d.size:
@@ -10877,19 +10877,19 @@ def plot_electrical_triage(ev_result, swc_name: str = "", save_path: Optional[Pa
             xs = np.linspace(0, float(d.max()), 100)
             dv0 = float(y.max()) if y.size else 1.0
             axL.plot(xs, dv0 * np.exp(-xs / lam), "r--", lw=1.5,
-                     label=f"exp fit  λ≈{lam:.0f} µm")
+                     label=f"exp fit  lambda~={lam:.0f} um")
             axL.legend(fontsize=8, loc="upper right")
-        rho_s = f"{rho:+.2f}" if rho is not None else "—"
-        axL.set_title(f"Attenuation profile   ρ(d,|ΔV|)={rho_s}", fontsize=10)
+        rho_s = f"{rho:+.2f}" if rho is not None else "--"
+        axL.set_title(f"Attenuation profile   rho(d,|DeltaV|)={rho_s}", fontsize=10)
     else:
         axL.text(0.5, 0.5, "no reached sites", ha="center", va="center",
                  transform=axL.transAxes, color="crimson")
-    axL.set_xlabel("path distance from soma (µm)")
-    axL.set_ylabel("|ΔV| (mV)")
+    axL.set_xlabel("path distance from soma (um)")
+    axL.set_ylabel("|DeltaV| (mV)")
     axL.set_yscale("log")
     axL.grid(alpha=0.25)
 
-    # ── RIGHT: reachability + verdict ────────────────────────────────────────
+    # -- RIGHT: reachability + verdict ----------------------------------------
     reached = int(ev_result.n_reached)
     dead = int(ev_result.n_dead)
     axR.bar(["reached", "dead"], [reached, dead],
@@ -10899,17 +10899,17 @@ def plot_electrical_triage(ev_result, swc_name: str = "", save_path: Optional[Pa
     verdict = "PASS" if ev_result.electrical_ok else "FAIL"
     vcolor = "#2ca02c" if ev_result.electrical_ok else "#d62728"
     rin = f"{ev_result.rin_MOhm:.0f}" if np.isfinite(ev_result.rin_MOhm) else "nan"
-    tau = f"{ev_result.tau_fit_ms:.1f}" if ev_result.tau_fit_ms is not None else "—"
+    tau = f"{ev_result.tau_fit_ms:.1f}" if ev_result.tau_fit_ms is not None else "--"
     axR.set_title(f"electrical: {verdict}", color=vcolor, fontsize=11, fontweight="bold")
     banner = (f"roots={ev_result.n_swc_roots}  graft={ev_result.neuron_grafted_orphans}\n"
-              f"ΔV_soma={ev_result.dv_soma_mV:+.2f} mV   Rin={rin} MΩ   τ={tau} ms")
+              f"DeltaV_soma={ev_result.dv_soma_mV:+.2f} mV   Rin={rin} MOhm   tau={tau} ms")
     if not ev_result.electrical_ok and ev_result.reasons:
         banner += "\nreasons: " + "; ".join(ev_result.reasons)
     axR.set_ylabel("number of sites")
     axR.text(0.5, -0.28, banner, ha="center", va="top", transform=axR.transAxes,
              fontsize=8, family="monospace")
 
-    fig.suptitle(f"Electrical viability — {swc_name}", fontsize=11)
+    fig.suptitle(f"Electrical viability -- {swc_name}", fontsize=11)
     fig.tight_layout(rect=(0, 0.04, 1, 0.97))
 
     if save_path is not None:
@@ -10918,9 +10918,9 @@ def plot_electrical_triage(ev_result, swc_name: str = "", save_path: Optional[Pa
     return fig
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  MEMBRANE-TRACE PLOT  (recorded whole-cell Vm that feeds Phase-2 train/validate)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def plot_membrane_traces(
     all_pulses: List[Dict[str, Any]],
@@ -10935,7 +10935,7 @@ def plot_membrane_traces(
 
     Visualisation only: it reads already-extracted arrays and neither loads
     Allen data nor runs NEURON (separation of concerns). Every trace shown is
-    an experimental whole-cell patch recording — not a model simulation (the
+    an experimental whole-cell patch recording -- not a model simulation (the
     archive path carries no fitted passive parameters yet).
 
     Parameters
@@ -10958,7 +10958,7 @@ def plot_membrane_traces(
         Which square-subthreshold polarity is the *training* target; the other
         polarity becomes held-out validation. For ``fit_target="hyp"``
         (default): hyp -> train, dep -> held-out validation, all long-square
-        sweeps -> validation. This drives the per-polarity role labels only —
+        sweeps -> validation. This drives the per-polarity role labels only --
         every recorded trace is plotted regardless of ``fit_target``.
     cell_name : str
         Title annotation (e.g. the specimen id / SWC name).
@@ -10972,10 +10972,10 @@ def plot_membrane_traces(
 
     Layout
     ------
-    LEFT  — square-subthreshold windows: Vm vs time-from-pulse-onset (ms), one
+    LEFT  -- square-subthreshold windows: Vm vs time-from-pulse-onset (ms), one
             line per recorded pulse, coloured by polarity, with each polarity's
             Phase-2 role (train / validation) shown in the legend.
-    RIGHT — long-square sweeps: Vm vs time-from-sweep-start (s), one line per
+    RIGHT -- long-square sweeps: Vm vs time-from-sweep-start (s), one line per
             sweep, coloured by |step amplitude| (pA).
     """
     fig, (axL, axR) = plt.subplots(1, 2, figsize=(12, 4.4))
@@ -10992,7 +10992,7 @@ def plot_membrane_traces(
 
     polarity_color = {"hyp": "#1f77b4", "dep": "#d62728"}
 
-    # ── LEFT: square-subthreshold training pulses ────────────────────────────
+    # -- LEFT: square-subthreshold training pulses ----------------------------
     if all_pulses:
         labelled = set()
         for w in all_pulses:
@@ -11007,17 +11007,17 @@ def plot_membrane_traces(
                      color=polarity_color.get(polarity, "#555555"), label=label)
         axL.axvline(0.0, color="k", lw=0.7, ls=":", alpha=0.6)   # pulse onset
         axL.legend(fontsize=8, loc="best", title=f"fit_target={fit_target!r}")
-        axL.set_title(f"Square subthreshold — training protocol  "
+        axL.set_title(f"Square subthreshold -- training protocol  "
                       f"(n={len(all_pulses)} pulses)", fontsize=10)
     else:
         axL.text(0.5, 0.5, "no square-subthreshold pulses", ha="center",
                  va="center", transform=axL.transAxes, color="crimson")
-        axL.set_title("Square subthreshold — training protocol", fontsize=10)
+        axL.set_title("Square subthreshold -- training protocol", fontsize=10)
     axL.set_xlabel("time from pulse onset (ms)")
     axL.set_ylabel("Vm (mV, LJP-corrected)")
     axL.grid(alpha=0.25)
 
-    # ── RIGHT: long-square validation sweeps ─────────────────────────────────
+    # -- RIGHT: long-square validation sweeps ---------------------------------
     n_ls = len(ls_sweep_info)
     if n_ls:
         amps_pA = np.array(
@@ -11050,17 +11050,17 @@ def plot_membrane_traces(
             sm.set_array([])
             cbar = fig.colorbar(sm, ax=axR, pad=0.01)
             cbar.set_label("|step amplitude| (pA)", fontsize=8)
-        axR.set_title(f"Long square — validation protocol  "
+        axR.set_title(f"Long square -- validation protocol  "
                       f"(n={n_ls} sweeps)", fontsize=10)
     else:
         axR.text(0.5, 0.5, "no long-square sweeps", ha="center",
                  va="center", transform=axR.transAxes, color="crimson")
-        axR.set_title("Long square — validation protocol", fontsize=10)
+        axR.set_title("Long square -- validation protocol", fontsize=10)
     axR.set_xlabel("time from sweep start (s)")
     axR.set_ylabel("Vm (mV, LJP-corrected)")
     axR.grid(alpha=0.25)
 
-    fig.suptitle(f"Recorded whole-cell membrane traces — {cell_name}", fontsize=11)
+    fig.suptitle(f"Recorded whole-cell membrane traces -- {cell_name}", fontsize=11)
     fig.tight_layout(rect=(0, 0.0, 1, 0.96))
 
     if save_path is not None:
@@ -11069,9 +11069,9 @@ def plot_membrane_traces(
     return fig
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  STATIC TRIAGE (optional — only if morphology_qc_triage is in the namespace)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  STATIC TRIAGE (optional -- only if morphology_qc_triage is in the namespace)
+# ===============================================================================
 
 def _run_static_triage_if_available(raw_swc: Path, cell_dir: Path,
                                     verbose: bool) -> Optional[Dict[str, Any]]:
@@ -11125,9 +11125,9 @@ def _run_static_triage_if_available(raw_swc: Path, cell_dir: Path,
         return {"error": f"{type(e).__name__}: {e}"}
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  THE MERGE CORE  —  repair raw SWC, run electrical check, archive repaired tree
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  THE MERGE CORE  --  repair raw SWC, run electrical check, archive repaired tree
+# ===============================================================================
 
 def _phase0_archive_swc(
     sid: int,
@@ -11153,25 +11153,25 @@ def _phase0_archive_swc(
     Returns
     -------
     (swc_dst, phase0)
-        `swc_dst` is the path to `reconstruction.swc` (the REPAIRED tree) — the
+        `swc_dst` is the path to `reconstruction.swc` (the REPAIRED tree) -- the
         rest of `_archive_one_cell` keeps using this exactly as before.
         `phase0` is the metadata block to fold into metadata.json.
     """
     repair_cfg = repair_cfg or _make_phase0_repair_cfg()
     ev_cfg = ev_cfg or _make_phase0_ev_cfg()
 
-    # ── 1. verbatim raw copy ─────────────────────────────────────────────────
+    # -- 1. verbatim raw copy -------------------------------------------------
     raw_dst = cell_dir / "reconstruction.raw.swc"
     shutil.copy2(raw_swc_cache, raw_dst)
 
     n_roots_raw, root_lines = _count_swc_roots(raw_swc_cache)   # from namespace
     if verbose:
-        print(f"[phase0]   raw SWC: {n_roots_raw} root(s) → {raw_dst.name}")
+        print(f"[phase0]   raw SWC: {n_roots_raw} root(s) -> {raw_dst.name}")
 
     # static triage on the RAW file (optional)
     triage_summary = _run_static_triage_if_available(raw_dst, cell_dir, verbose)
 
-    # ── 2. repair → reconstruction.swc ───────────────────────────────────────
+    # -- 2. repair -> reconstruction.swc ---------------------------------------
     swc_dst = cell_dir / "reconstruction.swc"
     outcome = repair_swc_file(raw_swc_cache, swc_dst, repair_cfg)
 
@@ -11181,19 +11181,19 @@ def _phase0_archive_swc(
     if not repaired_written:
         shutil.copy2(raw_swc_cache, swc_dst)
         if verbose:
-            print(f"[phase0]   repair produced no table — archived RAW as "
+            print(f"[phase0]   repair produced no table -- archived RAW as "
                   f"reconstruction.swc (phase0_passed=False)")
 
     summary = summarize_repair(outcome, specimen=sid)
     if verbose:
-        print(f"[phase0]   repair: {summary['components_before']}→"
+        print(f"[phase0]   repair: {summary['components_before']}->"
               f"{summary['components_after']} comp  "
               f"S1(soma={summary['stage1_to_soma']},type={summary['stage1_to_same_type']})  "
               f"S2={summary['stage2_mst_grafts']}  "
               f"unrepairable={summary['unrepairable_fragments']}  "
               f"success={outcome.success}")
 
-    # ── 3. electrical viability on the repaired tree ─────────────────────────
+    # -- 3. electrical viability on the repaired tree -------------------------
     ev_dict: Dict[str, Any] = {}
     ev_ok = False
     ev_result = None
@@ -11224,13 +11224,13 @@ def _phase0_archive_swc(
         if verbose:
             print(f"[phase0]   electrical check FAILED: {type(e).__name__}: {e}")
 
-    # ── 4. figures ───────────────────────────────────────────────────────────
+    # -- 4. figures -----------------------------------------------------------
     fig_paths: Dict[str, Optional[str]] = {"repair_html": None, "electrical_png": None}
     if write_figures:
         # 4a. interactive raw-vs-repaired 3-D
         try:
             fig = figure_raw_vs_repaired(
-                outcome, title=f"specimen {sid} — raw vs reconstructed")
+                outcome, title=f"specimen {sid} -- raw vs reconstructed")
             html_path = cell_dir / "reconstruction_repair.html"
             fig.write_html(str(html_path), include_plotlyjs="cdn")
             fig_paths["repair_html"] = html_path.name
@@ -11249,7 +11249,7 @@ def _phase0_archive_swc(
                     print(f"[phase0]   electrical figure skipped "
                           f"({type(e).__name__}: {e})")
 
-    # ── repair provenance JSON ───────────────────────────────────────────────
+    # -- repair provenance JSON -----------------------------------------------
     phase0_passed = bool(outcome.success and ev_ok)
     repair_json = {
         "specimen_id": sid,
@@ -11274,7 +11274,7 @@ def _phase0_archive_swc(
     with open(cell_dir / "phase0_repair.json", "w") as fh:
         json.dump(repair_json, fh, indent=2, cls=_NumpyEncoder)
 
-    # ── compact block for metadata.json ──────────────────────────────────────
+    # -- compact block for metadata.json --------------------------------------
     phase0 = {
         "phase0_passed": phase0_passed,
         "repair_success": bool(outcome.success),
@@ -11310,15 +11310,15 @@ def _phase0_archive_swc(
     return swc_dst, phase0
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  MERGED _archive_one_cell  (supersedes the original — same name)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  MERGED _archive_one_cell  (supersedes the original -- same name)
+# ===============================================================================
 #
 # This is the ORIGINAL `_archive_one_cell` with exactly two regions changed:
 #   * Section B/B1: the multi-root SKIP is replaced by `_phase0_archive_swc(...)`.
 #   * Section F:    a `"phase0": phase0` entry is added to `metadata`.
-# Everything else — the SS pulse extraction (C1), LS sweep saving (C2), scalar
-# features (D), smoke test (E), and the .npz/.json writes — is byte-for-byte the
+# Everything else -- the SS pulse extraction (C1), LS sweep saving (C2), scalar
+# features (D), smoke test (E), and the .npz/.json writes -- is byte-for-byte the
 # original.  No cell is ever skipped now; `skip_multiroot_swc` is accepted but
 # IGNORED (kept in the signature for backwards-compatible call sites).
 
@@ -11340,7 +11340,7 @@ def _archive_one_cell(
     fit_target: str,
     verbose: bool,
     skip_multiroot_swc: bool = True,        # accepted but IGNORED (we repair now)
-    # ── Phase-0 knobs (new; optional) ──
+    # -- Phase-0 knobs (new; optional) --
     phase0_repair_cfg=None,
     phase0_ev_cfg=None,
     phase0_write_figures: bool = True,
@@ -11349,18 +11349,18 @@ def _archive_one_cell(
 
     Returns "ok" / "partial" exactly as before, with an additional possible
     suffix note when Phase 0 did not pass (the cell is still archived):
-        "ok"                       — smoke test passed, phase0 passed
-        "partial"                  — smoke test incomplete
-        "ok_phase0_failed"         — smoke test passed but phase0 did NOT
-        "partial_phase0_failed"    — both incomplete
+        "ok"                       -- smoke test passed, phase0 passed
+        "partial"                  -- smoke test incomplete
+        "ok_phase0_failed"         -- smoke test passed but phase0 did NOT
+        "partial_phase0_failed"    -- both incomplete
     """
-    # ── A. CELL METADATA ─────────────────────────────────────────────────────
+    # -- A. CELL METADATA -----------------------------------------------------
     cells = ctc.get_cells(species=[CellTypesApi.HUMAN])
     meta = next((c for c in cells if c["id"] == sid), None)
     if meta is None:
         raise ValueError(f"Specimen {sid} not found among human cells")
 
-    # ── B. MORPHOLOGY — download raw SWC, then PHASE 0 (repair + electrical) ──
+    # -- B. MORPHOLOGY -- download raw SWC, then PHASE 0 (repair + electrical) --
     swc_cache = Path(cache_dir) / f"specimen_{sid}" / "reconstruction.swc"
     swc_cache.parent.mkdir(parents=True, exist_ok=True)
     ctc.get_reconstruction(sid, file_name=str(swc_cache))
@@ -11375,13 +11375,13 @@ def _archive_one_cell(
         write_figures=phase0_write_figures,
         verbose=verbose,
     )
-    # swc_dst now points at the REPAIRED reconstruction.swc — used below unchanged.
+    # swc_dst now points at the REPAIRED reconstruction.swc -- used below unchanged.
 
-    # ── C. ELECTROPHYSIOLOGY — raw waveform extraction ───────────────────────
+    # -- C. ELECTROPHYSIOLOGY -- raw waveform extraction -----------------------
     data_set = ctc.get_ephys_data(sid)
     sweeps_meta = ctc.get_ephys_sweeps(sid)
 
-    # ── C1. Square Subthreshold: individual pulse windows ────────────────────
+    # -- C1. Square Subthreshold: individual pulse windows --------------------
     ss_meta = _select_square_subthreshold(sweeps_meta)
     all_pulses: List[Dict[str, Any]] = []
     ss_sweep_numbers: List[int] = []
@@ -11416,7 +11416,7 @@ def _archive_one_cell(
         if verbose:
             nd = sum(1 for w in windows if w["polarity"] == "dep")
             nh = sum(1 for w in windows if w["polarity"] == "hyp")
-            print(f"[archive]   SS sweep {sn}: {len(pulses_raw)} detected → "
+            print(f"[archive]   SS sweep {sn}: {len(pulses_raw)} detected -> "
                   f"{len(pulses_qc)} QC'd (dep={nd}, hyp={nh})")
 
     n_dep = sum(1 for w in all_pulses if w["polarity"] == "dep")
@@ -11465,7 +11465,7 @@ def _archive_one_cell(
                   f"(dep={n_dep}, hyp={n_hyp}, "
                   f"{'stacked' if ss_stacked else 'indexed'})")
 
-    # ── C2. Long Square: individual sweep traces ─────────────────────────────
+    # -- C2. Long Square: individual sweep traces -----------------------------
     ls_meta_list = _select_long_square_subthreshold(sweeps_meta)
     ls_sweep_info: List[Dict[str, Any]] = []
     ls_arrays: Dict[str, np.ndarray] = {}
@@ -11502,7 +11502,7 @@ def _archive_one_cell(
         if verbose:
             print(f"[archive]   LS saved: {len(ls_sweep_info)} sweeps")
 
-    # ── C3. MEMBRANE-TRACE FIGURE (recorded whole-cell Vm; train + validate) ──
+    # -- C3. MEMBRANE-TRACE FIGURE (recorded whole-cell Vm; train + validate) --
     # Visualises the data extracted in C1 (square subthreshold -> training) and
     # C2 (long square -> validation). Placed here so it runs on already-saved
     # arrays and is independent of the smoke test below; guarded like 4b above.
@@ -11524,7 +11524,7 @@ def _archive_one_cell(
                 print(f"[archive]   membrane-trace figure skipped "
                       f"({type(e).__name__}: {e})")
 
-    # ── D. SCALAR FEATURES ───────────────────────────────────────────────────
+    # -- D. SCALAR FEATURES ---------------------------------------------------
     all_feats = ctc.get_ephys_features()
     feats = next((f for f in all_feats if f.get("specimen_id") == sid), {})
     rin = float(feats.get("input_resistance_mohm", np.nan))
@@ -11535,9 +11535,9 @@ def _archive_one_cell(
     if not np.isnan(vrest):
         vrest += ljp_correction_mV
     if verbose:
-        print(f"[archive]   scalars: Rin={rin:.1f} MΩ  τm={tau:.1f} ms  Vrest={vrest:.1f} mV")
+        print(f"[archive]   scalars: Rin={rin:.1f} MOhm  taum={tau:.1f} ms  Vrest={vrest:.1f} mV")
 
-    # ── E. SMOKE TEST (builds from the REPAIRED swc_dst) ─────────────────────
+    # -- E. SMOKE TEST (builds from the REPAIRED swc_dst) ---------------------
     smoke: Dict[str, Any] = {}
     try:
         cell = build_neuron_model(swc_dst, F=F)
@@ -11570,7 +11570,7 @@ def _archive_one_cell(
             smoke["simulation_note"] = "no train bundles or vrest is NaN"
         if verbose:
             secs = smoke["n_sections"]
-            print(f"[archive]   SMOKE TEST: OK — "
+            print(f"[archive]   SMOKE TEST: OK -- "
                   f"sections={secs['soma']}s/{secs['dend']}d/"
                   f"{secs['apic']}a/{secs['axon']}ax  "
                   f"train={smoke.get('n_train_bundles', '?')}  "
@@ -11580,7 +11580,7 @@ def _archive_one_cell(
         if verbose:
             print(f"[archive]   SMOKE TEST FAILED: {e}")
 
-    # ── F. SAVE METADATA.JSON (now carries the phase0 block) ─────────────────
+    # -- F. SAVE METADATA.JSON (now carries the phase0 block) -----------------
     meta_json: Dict[str, Any] = {}
     for k, v in meta.items():
         if isinstance(v, (int, float, str, bool, type(None))):
@@ -11624,14 +11624,14 @@ def _archive_one_cell(
     with open(cell_dir / "metadata.json", "w") as f:
         json.dump(metadata, f, indent=2, cls=_NumpyEncoder)
 
-    # ── status (never "skipped" now; annotate phase0 outcome) ────────────────
+    # -- status (never "skipped" now; annotate phase0 outcome) ----------------
     base = "ok" if smoke.get("simulation_ok") else "partial"
     status = base if phase0.get("phase0_passed") else f"{base}_phase0_failed"
     if verbose:
-        print(f"[archive]   → status: {status}  (phase0_passed={phase0.get('phase0_passed')})\n")
+        print(f"[archive]   -> status: {status}  (phase0_passed={phase0.get('phase0_passed')})\n")
     return status
 
-# %% Cell 3 — RUN: download + repair + archive ================================
+# %% Cell 3 -- RUN: download + repair + archive ================================
 # Set your selection and run. Each cell is downloaded, repaired (Phase 0),
 # electrically checked, and archived under ARCHIVE_DIR/specimen_<id>/.
 if __name__ == "__main__":
@@ -11654,7 +11654,7 @@ if __name__ == "__main__":
     )
     print("\n=== ARCHIVE RESULTS ===")
     for r in results:
-        print(f"  specimen {r['specimen_id']:>10}  →  {r['status']}")
+        print(f"  specimen {r['specimen_id']:>10}  ->  {r['status']}")
 
     # Per-cell Phase-0 artefacts now live in each specimen_<id>/ folder:
     #   reconstruction.raw.swc        verbatim Allen SWC
@@ -11882,7 +11882,7 @@ def fit_bounded_single_exp(u_ms: np.ndarray, y_mV: np.ndarray, tau_m_ms: float,
 
 
 # =============================================================================
-# Statistic layer (pure) — all operate row-wise on (B, n) so the observed trace
+# Statistic layer (pure) -- all operate row-wise on (B, n) so the observed trace
 # (B=1) and the surrogate ensemble share one code path.
 # =============================================================================
 def decimate_rows(X: np.ndarray, q: int) -> np.ndarray:
@@ -12033,7 +12033,7 @@ def monte_carlo_pvalue(resid_full: np.ndarray, null_paths: np.ndarray,
 
 
 # =============================================================================
-# Orchestration (per pulse) — pure scoring, no plotting / no I/O
+# Orchestration (per pulse) -- pure scoring, no plotting / no I/O
 # =============================================================================
 def _detect_onset_offset(t_s: np.ndarray, i_pA: np.ndarray, stim_duration_s: float):
     """Detect pulse onset / offset sample indices from the command current."""
@@ -12253,7 +12253,7 @@ def plot_accepted_rejected(cell: CellQCResult, path: str, max_each: int = 24):
         ax.set_title(title)
         ax.set_xlabel("time from window start (ms)")
     axes[0].set_ylabel("baseline-subtracted deflection (mV)")
-    fig.suptitle(f"Trace QC — specimen {cell.specimen_id}  "
+    fig.suptitle(f"Trace QC -- specimen {cell.specimen_id}  "
                  f"(dashed = bounded single-exp fit; null='{cell.config['null_generator']}', "
                  f"alpha={cell.config['alpha']})")
     fig.tight_layout()
@@ -12276,8 +12276,8 @@ def plot_null_distribution(result: PulseQCResult, path: str, alpha: float):
                   f"(argmax @ {result.argmax_scale_ms:g} ms)")
     ax.set_ylabel("surrogate count")
     verdict = "REJECT" if not result.passed else "keep"
-    ax.set_title(f"Pulse {result.pulse_index} ({result.polarity}) — "
-                 f"p={result.p_value:.3f} → {verdict}")
+    ax.set_title(f"Pulse {result.pulse_index} ({result.polarity}) -- "
+                 f"p={result.p_value:.3f} -> {verdict}")
     ax.legend(fontsize=8)
     fig.tight_layout()
     fig.savefig(path, dpi=130)
@@ -12437,11 +12437,11 @@ def run_smoke_test(outdir: str = "smoke_out", seed: int = 1) -> dict:
           f"trace_qc_null_rejected.png")
 
     # ---- assertions (loose, demonstrational) ----
-    assert fpr <= 0.13, f"false-positive rate {fpr} too high — null miscalibrated"
-    assert power >= 0.70, f"power {power} too low — test missing the bumps"
+    assert fpr <= 0.13, f"false-positive rate {fpr} too high -- null miscalibrated"
+    assert power >= 0.70, f"power {power} too low -- test missing the bumps"
     assert spike_catch >= 0.90, f"spike gate catch {spike_catch} too low"
     assert cell_few.cell_rejected is True, "cell-level <10 rule did not fire"
-    print("  ALL ASSERTIONS PASSED ✔")
+    print("  ALL ASSERTIONS PASSED [ok]")
     print("======================================================\n")
     return metrics
 
@@ -12466,7 +12466,7 @@ from google.colab import drive
 drive.mount('/content/drive', force_remount=True)
 ARCHIVE_DIR = '/content/drive/MyDrive/Colab Notebooks/Allen_Intitute_Data/SS_Trace_test'
 
-# the cell above already defined these functions — call directly, no import needed
+# the cell above already defined these functions -- call directly, no import needed
 metrics = run_smoke_test(outdir=ARCHIVE_DIR, seed=1)   # prints the assertion block
 
 from IPython.display import Image, display
@@ -12474,7 +12474,7 @@ for fn in ("trace_qc_traces.png", "trace_qc_null_rejected.png", "trace_qc_null_k
     display(Image(filename=f"smoke_out/{fn}"))
 metrics
 
-# ── Reload trace_qc + trace_qc_v2 from Drive ─────────────────────────────────
+# -- Reload trace_qc + trace_qc_v2 from Drive ---------------------------------
 from google.colab import drive
 drive.mount('/content/drive', force_remount=False)   # False = skip if already mounted
 
@@ -12489,7 +12489,7 @@ if TRACE_QC_DIR not in sys.path:
 # Check files exist before trying to import
 for fname in ('trace_qc.py', 'trace_qc_v2.py'):
     p = pathlib.Path(TRACE_QC_DIR) / fname
-    print(f"  {'FOUND' if p.exists() else 'MISSING ←'} {p}")
+    print(f"  {'FOUND' if p.exists() else 'MISSING <-'} {p}")
 
 # Clear stale cached modules
 for m in ('trace_qc_v2', 'trace_qc'):
@@ -12514,7 +12514,7 @@ Original file is located at
     https://colab.research.google.com/drive/15-T5W-UbmMFf-SXKh-oeVOIlMO2xoldY
 """
 
-# === Cell 0 — mount Drive and make trace_qc + trace_qc_v2 importable =========
+# === Cell 0 -- mount Drive and make trace_qc + trace_qc_v2 importable =========
 # Run this cell FIRST, before everything else.
 # Both trace_qc.py and trace_qc_v2.py must be in TRACE_QC_DIR on your Drive.
 from google.colab import drive
@@ -12526,16 +12526,16 @@ TRACE_QC_DIR = '/content/drive/MyDrive/Colab Notebooks/Allen_Intitute_Data'
 if TRACE_QC_DIR not in sys.path:
     sys.path.insert(0, TRACE_QC_DIR)
 
-# ── check the files are actually there before importing ──────────────────────
+# -- check the files are actually there before importing ----------------------
 for _fname in ('trace_qc.py', 'trace_qc_v2.py'):
     _p = pathlib.Path(TRACE_QC_DIR) / _fname
     if not _p.exists():
         print(f"  WARNING: {_fname} NOT FOUND in {TRACE_QC_DIR}")
-        print(f"  → upload it to your Drive folder and re-run this cell")
+        print(f"  -> upload it to your Drive folder and re-run this cell")
     else:
         print(f"  found: {_p}")
 
-# ── import / reload both modules ─────────────────────────────────────────────
+# -- import / reload both modules ---------------------------------------------
 import trace_qc as _tqc_mod
 importlib.reload(_tqc_mod)
 print("trace_qc    OK:", hasattr(_tqc_mod, "run_trace_qc_for_cell"))
@@ -12546,20 +12546,20 @@ try:
     print("trace_qc_v2 OK:", hasattr(_tqc2_mod, "run_trace_qc_for_cell_v2"))
 except Exception as _e:
     print(f"trace_qc_v2 FAILED: {type(_e).__name__}: {_e}")
-    print("  → make sure trace_qc_v2.py is in TRACE_QC_DIR")
+    print("  -> make sure trace_qc_v2.py is in TRACE_QC_DIR")
 
 # Now pip install will find the correct pre-built wheels without crashing!
-!pip install  allensdk neuron scikit-optimize
+#S0.2:T7# !pip install  allensdk neuron scikit-optimize
 
 # -*- coding: utf-8 -*-
 # ============================================================================
-#  Allen Archive + Phase-0 Repair — SELF-CONTAINED COLAB MONOLITH
+#  Allen Archive + Phase-0 Repair -- SELF-CONTAINED COLAB MONOLITH
 # ============================================================================
 #  One file. Run top to bottom in Colab. Downloads Allen human cortical cells,
 #  REPAIRS each morphology (Phase 0: soma-gated type-aware heal + MST + reroot),
 #  runs an electrical-viability check, and ARCHIVES the repaired tree together
 #  with the Square-Subthreshold pulses and Long-Square traces the optimiser
-#  loads — plus full per-cell Phase-0 provenance (JSON + interactive 3-D figure
+#  loads -- plus full per-cell Phase-0 provenance (JSON + interactive 3-D figure
 #  + electrical-triage PNG).
 #
 #  Contains ONLY what the archive merge needs:
@@ -12572,10 +12572,10 @@ except Exception as _e:
 #  included (not on the archive path).
 # ============================================================================
 
-# %% Cell 1 — Colab install (run once, then RESTART runtime) ==================
+# %% Cell 1 -- Colab install (run once, then RESTART runtime) ==================
 # !pip install -q allensdk==2.16.2 neuron plotly kaleido networkx scipy matplotlib
 
-# %% Cell 2 — Imports =========================================================
+# %% Cell 2 -- Imports =========================================================
 from __future__ import annotations
 
 import warnings, json, shutil, math, random, csv
@@ -12615,7 +12615,7 @@ try:
 except Exception:
     _HAVE_SCIPY = False
 
-# ── trace QC (response-shape screen) — optional, additive ────────────────────
+# -- trace QC (response-shape screen) -- optional, additive --------------------
 # Hand-rolled AR / Ljung-Box subthreshold-shape screen (no statsmodels). The
 # module must live next to this notebook (or on sys.path) BEFORE this cell runs;
 # the import is guarded so the archive runs byte-for-byte unchanged if it is
@@ -12644,21 +12644,21 @@ DEFAULT_F = 1.9                   # Eyal 2016 average for human L2/3
 
 # Square Subthreshold protocol (Allen Core 1):
 SQ_SUB_DURATION_S        = 5e-4   # 0.5 ms nominal
-SQ_SUB_DURATION_TOL_S    = 5e-4   # ±0.5 ms tolerance (catches "Short Square" variants)
-SQ_SUB_AMPLITUDE_PA      = 200.0  # ±200 pA nominal
-SQ_SUB_AMPLITUDE_TOL_PA  = 30.0   # ±30 pA tolerance
+SQ_SUB_DURATION_TOL_S    = 5e-4   # +/-0.5 ms tolerance (catches "Short Square" variants)
+SQ_SUB_AMPLITUDE_PA      = 200.0  # +/-200 pA nominal
+SQ_SUB_AMPLITUDE_TOL_PA  = 30.0   # +/-30 pA tolerance
 
-# Long Square subthreshold cutoff (used for Rin / τm validation target):
+# Long Square subthreshold cutoff (used for Rin / taum validation target):
 LONG_SQUARE_MAX_ABS_AMPLITUDE_PA = 100.0
 
 # Passive parameter bounds (pipeline doc, mirrored from Eyal/Markram):
-DEFAULT_CM_BOUNDS = (0.3, 3.0)            # µF/cm²
-DEFAULT_RM_BOUNDS = (1_000.0, 100_000.0)  # Ω·cm²
-DEFAULT_RA_BOUNDS = (50.0, 1_000.0)       # Ω·cm
+DEFAULT_CM_BOUNDS = (0.3, 3.0)            # uF/cm^2
+DEFAULT_RM_BOUNDS = (1_000.0, 100_000.0)  # Ohm.cm^2
+DEFAULT_RA_BOUNDS = (50.0, 1_000.0)       # Ohm.cm
 
 
 # ============================================================================
-# PHASE 1 — data model, Allen loader, NEURON PassiveCell, archive saver
+# PHASE 1 -- data model, Allen loader, NEURON PassiveCell, archive saver
 # ============================================================================
 
 def _simulate_square_subthreshold(
@@ -12730,10 +12730,10 @@ class CellData:
     metadata: Dict[str, Any]               # layer, dendrite_type, donor_id, ...
     swc_path: Path
 
-    # Primary fitting data — from Square Subthreshold sweeps
+    # Primary fitting data -- from Square Subthreshold sweeps
     square_subthreshold: List[SweepBundle]
 
-    # Held-out validation data — from Long Square subthreshold sweeps
+    # Held-out validation data -- from Long Square subthreshold sweeps
     long_square_subthreshold: List[SweepBundle]
 
     # Reference scalars from the Allen Cell Feature Summary (LJP-corrected here)
@@ -12744,7 +12744,7 @@ class CellData:
     ljp_correction_mV: float
     n_avg_groups: int
 
-    # ── PATCH (Phase 3 v3): individual pulse windows for nonparametric bootstrap ──
+    # -- PATCH (Phase 3 v3): individual pulse windows for nonparametric bootstrap --
     # Each dict has keys: t (ndarray, seconds, t=0 at pulse onset),
     # v (ndarray, mV, LJP-corrected), i (ndarray, pA),
     # polarity ("dep"|"hyp"), peak_pA (float), stim_duration_s (float),
@@ -12781,15 +12781,15 @@ class PassiveSearchSpace:
           each axis consistently without manual length-scale tuning.
         * A uniform prior in q = log(p) is equivalent to a log-uniform prior
           in p, which is the correct non-informative prior for scale
-          parameters — it assigns equal probability to each decade.
+          parameters -- it assigns equal probability to each decade.
         * The optimisation landscape is smoother in log-space for passive
           cable parameters because the somatic transient depends on
-          log-linear combinations of these parameters (e.g. τm = Cm × Rm
+          log-linear combinations of these parameters (e.g. taum = Cm x Rm
           is additive in log-space).
         * Positive-definiteness is guaranteed: exp(q) > 0 for all finite q,
           so the optimiser can never propose a non-physical negative value.
 
-        Phase 2's loss function is responsible for converting q → p = exp(q)
+        Phase 2's loss function is responsible for converting q -> p = exp(q)
         before passing the parameters to NEURON.  result.x from gp_minimize
         contains the log-space optima and must likewise be exponentiated.
         """
@@ -12836,7 +12836,7 @@ def list_human_cells_with_morphology(
     Parameters
     ----------
     layer
-        e.g. ``"2/3"``, ``"4"``, ``"5"``, ``"6a"`` — matched against
+        e.g. ``"2/3"``, ``"4"``, ``"5"``, ``"6a"`` -- matched against
         ``structure_layer_name``.
     dendrite_type
         ``"spiny"`` / ``"aspiny"`` / ``"sparsely spiny"``.
@@ -12891,7 +12891,7 @@ def list_human_cells_with_morphology(
             print(f"[list_human_cells]   after structure_area_abbrev={structure_area_abbrev!r}: "
                   f"{len(df)} cells")
 
-    # Protocol availability — needs one network round-trip per cell, so done last
+    # Protocol availability -- needs one network round-trip per cell, so done last
     if require_square_subthreshold or require_long_square:
         ss_flags, ls_flags = [], []
         for sid in df["id"]:
@@ -12948,7 +12948,7 @@ def list_human_cells_with_morphology(
         if patchseq_ttype_csv is None:
             warnings.warn(
                 f"interneuron_subtype={interneuron_subtype!r} was requested but "
-                f"no patchseq_ttype_csv was supplied — filter ignored.")
+                f"no patchseq_ttype_csv was supplied -- filter ignored.")
         else:
             df = df[df["subtype"] == interneuron_subtype]
             if verbose:
@@ -12975,7 +12975,7 @@ def _to_pA_seconds(amp, dur) -> Tuple[float, float]:
     Allen Cell Types data can show up with two unit conventions across SDK
     releases: SI (Amperes, seconds) or mixed (pA, ms).  We auto-detect by
     magnitude.  Missing / non-numeric values (None, NaN, strings) are mapped
-    to NaN — callers must filter NaN before use.
+    to NaN -- callers must filter NaN before use.
     """
     # --- amplitude --------------------------------------------------------
     if amp is None:
@@ -13013,11 +13013,11 @@ def _to_pA_seconds(amp, dur) -> Tuple[float, float]:
 def _select_square_subthreshold(sweeps_meta: List[Dict]) -> List[Dict]:
     """Find Square Subthreshold sweeps by ``stimulus_name`` only.
 
-    The Square Subthreshold protocol stores all 20 ±200 pA pulses **inside a
+    The Square Subthreshold protocol stores all 20 +/-200 pA pulses **inside a
     single sweep** (cf. Allen Cell Types Tech Paper, Appendix p. 15: "0.5 ms
     square current injections to +/- 200 pA, repeated 20 times (200 ms
     intervals). N/A (single sweep)").  This means duration- and amplitude-
-    based filtering on the per-sweep metadata is meaningless here — the sweep
+    based filtering on the per-sweep metadata is meaningless here -- the sweep
     duration covers all 20 repeats, and the polarity alternates within the
     sweep so the average amplitude is ~0.  Pulse identification therefore has
     to happen on the current waveform itself, by ``_detect_pulses_in_current``.
@@ -13033,12 +13033,12 @@ def _select_square_subthreshold(sweeps_meta: List[Dict]) -> List[Dict]:
 def _select_long_square_subthreshold(sweeps_meta: List[Dict]) -> List[Dict]:
     """Select all Long Square sweeps, regardless of metadata amplitude.
 
-    Allen's standard Long Square protocol starts at −110 pA (not −100 pA),
-    and ``stimulus_amplitude`` is frequently ``None`` in the sweep metadata —
+    Allen's standard Long Square protocol starts at -110 pA (not -100 pA),
+    and ``stimulus_amplitude`` is frequently ``None`` in the sweep metadata --
     both issues make metadata-level amplitude filtering unreliable.  We
     therefore return ALL Long Square sweeps and let the caller measure the
     actual step amplitude from the NWB waveform before deciding which sweep
-    to use for τm / Rin validation.
+    to use for taum / Rin validation.
     """
     return [
         s for s in sweeps_meta
@@ -13212,7 +13212,7 @@ def _build_subthreshold_bundles(
             i_full, sr, threshold_pA=pulse_threshold_pA)
 
         # Amplitude / duration QC on each detected pulse: keep only those whose
-        # peak |I| matches the expected ±200 pA within tolerance, and whose
+        # peak |I| matches the expected +/-200 pA within tolerance, and whose
         # duration matches the expected 0.5 ms within tolerance.  This guards
         # against accidental matches in protocols whose name happens to
         # contain "Square" + "Subthreshold" but with different parameters.
@@ -13228,7 +13228,7 @@ def _build_subthreshold_bundles(
         windows = _extract_windows_around_pulses(
             v_full, i_full, sr, pulses_qc, pre_ms=pre_ms, post_ms=post_ms)
 
-        # ── PATCH: tag each window with its sampling rate ──
+        # -- PATCH: tag each window with its sampling rate --
         for w in windows:
             w["sampling_rate_Hz"] = sr
 
@@ -13277,7 +13277,7 @@ def _build_subthreshold_bundles(
                 stimulus_name=stim_name,
             ))
 
-    # ── PATCH: collect ALL individual pulse windows ──
+    # -- PATCH: collect ALL individual pulse windows --
     individual_pulses = all_dep + all_hyp
 
     return bundles, individual_pulses
@@ -13307,7 +13307,7 @@ def _build_bundles_from_group(
         for sn in part:
             sw = data_set.get_sweep(int(sn))
             # index_range clips out the test pulse that Allen prepends to every
-            # sweep — as shown in the official AllenSDK notebook example.
+            # sweep -- as shown in the official AllenSDK notebook example.
             # Default to (0, end) if the key is absent for robustness.
             idx = sw.get("index_range", (0, len(sw["response"]) - 1))
             v_traces.append(sw["response"][idx[0]: idx[1] + 1])   # Volts
@@ -13368,10 +13368,10 @@ def load_allen_data(
         If ``True`` (default), raise :class:`IncompleteDataError` when the cell
         does not yield BOTH at least one Square Subthreshold bundle AND at
         least one Long Square subthreshold bundle.  This keeps Phase 2's
-        validation step (Rin/τm against the held-out Long Square sweep)
+        validation step (Rin/taum against the held-out Long Square sweep)
         well-defined for every cell that propagates downstream.  Set to
-        ``False`` to return ``CellData`` regardless — useful when you want to
-        proceed with Allen's scalar Rin/τm features only and skip the
+        ``False`` to return ``CellData`` regardless -- useful when you want to
+        proceed with Allen's scalar Rin/taum features only and skip the
         waveform-level validation.
 
     Notes
@@ -13408,7 +13408,7 @@ def load_allen_data(
     sweeps_meta = ctc.get_ephys_sweeps(specimen_id)
 
     # --- Square Subthreshold: many pulses per sweep -------------------------
-    # All 20 ±200 pA pulses live inside a SINGLE sweep (Allen Tech Paper
+    # All 20 +/-200 pA pulses live inside a SINGLE sweep (Allen Tech Paper
     # appendix p.15: "N/A (single sweep)").  We therefore find candidate
     # sweeps by name, then identify each individual pulse by thresholding the
     # current waveform.
@@ -13416,7 +13416,7 @@ def load_allen_data(
     if verbose:
         print(f"[load_allen_data]   Square-Subthreshold candidate sweeps: "
               f"{len(ss_meta)}")
-    # ── PATCHED: unpack both bundles AND individual pulse windows ──
+    # -- PATCHED: unpack both bundles AND individual pulse windows --
     ss_bundles, ss_individual_pulses = _build_subthreshold_bundles(
         data_set,
         ss_meta,
@@ -13482,13 +13482,13 @@ def load_allen_data(
                     f"{k:+d}" for k in sorted(amp_groups.keys(), key=abs))
                 print(f"[load_allen_data]   Long-Square bundles loaded "
                       f"({len(ls_bundles)} total): [{amp_keys_str}] pA\n"
-                      f"[load_allen_data]   → ls_bundles[0] "
+                      f"[load_allen_data]   -> ls_bundles[0] "
                       f"({ls_bundles[0].amplitude_pA:+.0f} pA) "
-                      f"is Ih-cleanest; use for τm validation.")
+                      f"is Ih-cleanest; use for taum validation.")
         else:
             if verbose:
                 print("[load_allen_data]   No usable hyperpolarising "
-                      "Long Square sweeps — Phase 2 will validate Rin/τm "
+                      "Long Square sweeps -- Phase 2 will validate Rin/taum "
                       "against the Allen scalar features only.")
 
     # --- Reference scalars --------------------------------------------------
@@ -13506,7 +13506,7 @@ def load_allen_data(
 
     if verbose:
         print(f"[load_allen_data] specimen {specimen_id}: "
-              f"Rin={rin:.1f} MΩ  τm={tau:.1f} ms  "
+              f"Rin={rin:.1f} MOhm  taum={tau:.1f} ms  "
               f"Vrest={vrest:.1f} mV (LJP-corrected)")
         n_ss_sweeps = len(ss_meta) if 'ss_meta' in locals() else 0
         n_dep = sum(b.n_repeats_averaged for b in ss_bundles if b.polarity == "dep")
@@ -13518,7 +13518,7 @@ def load_allen_data(
         print(f"[load_allen_data]   Long Square subthreshold: "
               f"{len(ls_bundles)} bundle(s) pooled from {n_ls_pulses} sweep(s)")
 
-    # ── PATCHED: pass ss_individual_pulses into CellData ──
+    # -- PATCHED: pass ss_individual_pulses into CellData --
     cell_data = CellData(
         specimen_id=specimen_id,
         metadata=meta,
@@ -13556,7 +13556,7 @@ class PassiveCell:
 
     * SWC imported via NEURON's ``Import3d_SWC_read``.
     * Original axon optionally replaced by a Hay-style two-section stub
-      (each 30 µm × 1 µm, 5 segments) attached at soma(1.0).
+      (each 30 um x 1 um, 5 segments) attached at soma(1.0).
     * The passive ``pas`` mechanism is inserted globally.
     * For each segment in dendritic sections (``dend`` + ``apic``), a
       multiplicative factor ``F`` is applied to ``cm`` and ``g_pas`` if the
@@ -13685,7 +13685,7 @@ class PassiveCell:
 
         Returns
         -------
-        (t_ms, v_mV) — both 1-D arrays, sampled every ``dt_ms``.
+        (t_ms, v_mV) -- both 1-D arrays, sampled every ``dt_ms``.
         """
         self._iclamp.delay = float(stim_delay_ms)
         self._iclamp.dur = float(stim_dur_ms)
@@ -13876,7 +13876,7 @@ def load_complete_cells(
 
 
 class _NumpyEncoder(json.JSONEncoder):
-    """JSON encoder that transparently handles numpy scalars and NaN → null."""
+    """JSON encoder that transparently handles numpy scalars and NaN -> null."""
 
     def default(self, obj):
         if isinstance(obj, np.integer):
@@ -13899,7 +13899,7 @@ def download_allen_archive(
     n_cells: Optional[int] = 1,
     archive_dir: str = "allen_archive",
     *,
-    # ── SS pulse-extraction parameters (match phase1 defaults) ──
+    # -- SS pulse-extraction parameters (match phase1 defaults) --
     pre_ms: float = 10.0,
     post_ms: float = 200.0,
     pulse_threshold_pA: float = 50.0,
@@ -13907,22 +13907,22 @@ def download_allen_archive(
     amplitude_tol_pA: float = SQ_SUB_AMPLITUDE_TOL_PA,     # 30.0
     expected_duration_s: float = SQ_SUB_DURATION_S,         # 5e-4
     duration_tol_s: float = SQ_SUB_DURATION_TOL_S,          # 5e-4
-    # ── Smoke-test parameters ──
+    # -- Smoke-test parameters --
     F: float = 1.9,
     fit_target: str = "hyp",
-    # ── General ──
+    # -- General --
     ljp_correction_mV: float = LJP_CORRECTION_MV,           # 14.0
     cache_dir: str = "cell_types",
     skip_existing: bool = True,
     skip_multiroot_swc: bool = True,
     verbose: bool = True,
-    # ── Pass-through to list_human_cells_with_morphology ──
+    # -- Pass-through to list_human_cells_with_morphology --
     require_square_subthreshold: bool = True,
     require_long_square: bool = True,
     patchseq_ttype_csv: Optional[str] = None,
     interneuron_subtype: Optional[str] = None,
     structure_area_abbrev: Optional[str] = None,
-    # ── trace-QC + triage gating (opt-in; defaults preserve legacy behaviour) ──
+    # -- trace-QC + triage gating (opt-in; defaults preserve legacy behaviour) --
     trace_qc_enabled: bool = False,
     trace_qc_polarities: Tuple[str, ...] = ("dep", "hyp"),
     trace_qc_null: str = "ar",
@@ -13932,7 +13932,7 @@ def download_allen_archive(
     trace_qc_tau_fallback_ms: float = 20.0,
     trace_qc_seed: int = 0,
     trace_qc_write_figures: bool = True,
-    # ── trace-QC v2 engine (opt-in; defaults keep legacy v1 behaviour) ──
+    # -- trace-QC v2 engine (opt-in; defaults keep legacy v1 behaviour) --
     trace_qc_engine: str = "v1",
     trace_qc_v2_ar_max_memory_ms: float = 5.0,
     trace_qc_v2_decim_scales_ms: Tuple[float, ...] = (1.0, 2.0, 5.0, 10.0, 20.0),
@@ -13957,13 +13957,13 @@ def download_allen_archive(
         Root directory for the archive.  Created if absent.
     pre_ms, post_ms
         Window around each Square Subthreshold pulse onset (ms before and
-        after).  Baked into the saved pulse windows — choose generously.
+        after).  Baked into the saved pulse windows -- choose generously.
         Default 10/200 ms matches the phase1 extraction.
-    pulse_threshold_pA … duration_tol_s
+    pulse_threshold_pA ... duration_tol_s
         Pulse-detection QC parameters.  Match the phase1 defaults.
     F
         Spine-area correction factor for the smoke test only (not baked
-        into the archive — HPC code sets F independently).
+        into the archive -- HPC code sets F independently).
     fit_target
         Polarity for the smoke test's ``prepare_optimiser_inputs`` call.
     skip_existing
@@ -13989,7 +13989,7 @@ def download_allen_archive(
     archive_root = Path(archive_dir)
     archive_root.mkdir(parents=True, exist_ok=True)
 
-    # ── 1. Discover candidates ───────────────────────────────────────────────
+    # -- 1. Discover candidates -----------------------------------------------
     ctc = CellTypesCache(manifest_file=f"{cache_dir}/manifest.json")
     candidates = list_human_cells_with_morphology(
         layer=layer,
@@ -14007,10 +14007,10 @@ def download_allen_archive(
 
     if verbose:
         print(f"\n{'='*60}")
-        print(f"[archive] {len(candidates)} candidate(s) → {archive_root}")
+        print(f"[archive] {len(candidates)} candidate(s) -> {archive_root}")
         print(f"{'='*60}\n")
 
-    # ── 2. Archive each cell ─────────────────────────────────────────────────
+    # -- 2. Archive each cell -------------------------------------------------
     results: List[Dict[str, Any]] = []
     for _, row in candidates.iterrows():
         sid = int(row["specimen_id"])
@@ -14038,7 +14038,7 @@ def download_allen_archive(
 
         cell_dir.mkdir(parents=True, exist_ok=True)
         if verbose:
-            print(f"[archive] ═══ specimen {sid} ═══")
+            print(f"[archive] === specimen {sid} ===")
 
         try:
             status = _archive_one_cell(
@@ -14099,7 +14099,7 @@ def download_allen_archive(
                 "status": f"failed: {type(e).__name__}: {e}",
             })
 
-    # ── 3. Save manifest ─────────────────────────────────────────────────────
+    # -- 3. Save manifest -----------------------------------------------------
     manifest = {
         "created": datetime.now().isoformat(),
         "archive_format_version": "1.0",
@@ -14151,7 +14151,7 @@ def download_allen_archive(
             1 for r in results if r["status"].startswith("discarded_trace_qc")
         )
         print(f"{'='*60}")
-        print(f"[archive] DONE — ok={n_ok}  partial={n_partial}  "
+        print(f"[archive] DONE -- ok={n_ok}  partial={n_partial}  "
               f"failed={n_fail}  skipped={n_skip}  "
               f"multiroot_skipped={n_multiroot}  "
               f"discarded_triage={n_disc_triage}  "
@@ -14213,10 +14213,10 @@ def _reconstruct_cell_data_for_smoke_test(
     """Build a CellData from the raw pulse/sweep pool (n_avg_groups=1).
 
     This mirrors what the HPC loader will do, but with fixed n_avg_groups=1
-    and standard amplitude filtering — just enough to verify the data is
+    and standard amplitude filtering -- just enough to verify the data is
     usable for Phase 2.
     """
-    # ── SS bundles: average all pulses of each polarity into one bundle ──
+    # -- SS bundles: average all pulses of each polarity into one bundle --
     ss_bundles: List[SweepBundle] = []
     for pol in ("dep", "hyp"):
         group = [w for w in all_pulses if w["polarity"] == pol]
@@ -14248,7 +14248,7 @@ def _reconstruct_cell_data_for_smoke_test(
             )
         )
 
-    # ── LS bundles: group hyp subthreshold sweeps by amplitude ───────────
+    # -- LS bundles: group hyp subthreshold sweeps by amplitude -----------
     #
     # Replicate the same logic as load_allen_data:
     #   1. Keep only hyperpolarising sweeps with |amp| <= 100 pA
@@ -14340,7 +14340,7 @@ def _reconstruct_cell_data_for_smoke_test(
 
 
 # ============================================================================
-# PHASE 0 (a) — morphology repair engine  [from morphology_repair.py]
+# PHASE 0 (a) -- morphology repair engine  [from morphology_repair.py]
 # ============================================================================
 
 # -*- coding: utf-8 -*-
@@ -14358,21 +14358,21 @@ Repair philosophy
 -----------------
 Connectivity is fixed holistically rather than defect-by-defect:
 
-    1. raw-table pre-clean        — drop NaN/inf samples and coincident
+    1. raw-table pre-clean        -- drop NaN/inf samples and coincident
                                     duplicates (also the only way to touch the
                                     files MorphIO refuses to load);
-    2. enforce ONE soma           — promote a soma if none exists, choose a
+    2. enforce ONE soma           -- promote a soma if none exists, choose a
                                     single canonical soma node;
-    3. heal connectivity          — stitch every disconnected component to the
+    3. heal connectivity          -- stitch every disconnected component to the
                                     closest point of the soma-rooted tree
                                     (cKDTree), biased to the soma when within
                                     ``soma_radius_um``; fragments farther than
                                     ``max_stitch_dist_um`` are deemed unrepairable;
-    4. REROOT from the soma       — ``networkx.bfs_tree`` recomputes every parent
+    4. REROOT from the soma       -- ``networkx.bfs_tree`` recomputes every parent
                                     pointer outward from the soma, which also
                                     removes any accidental cycle and yields a
                                     NEURON-friendly parent-before-child ordering;
-    5. geometry                   — z-jump correction (propagated to the whole
+    5. geometry                   -- z-jump correction (propagated to the whole
                                     distal sub-tree) and soma-radius repair.
 
 Because the parent pointers are recomputed in step 4, the closest-point stitch
@@ -14420,9 +14420,9 @@ REPAIRABLE_CHECKS: Set[str] = {
 }
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  CONFIG
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 @dataclass
 class RepairConfig:
     """All thresholds and toggles for the repair, in one place."""
@@ -14431,7 +14431,7 @@ class RepairConfig:
                                         # RepairConfig(soma_radius_um=...) calls work
     max_stitch_dist_um: float = 60.0    # a component whose closest approach to ANY
                                         # other component exceeds this is UNREPAIRABLE
-    z_jump_thr_um: float = 30.0         # |Δz| between consecutive samples to flag
+    z_jump_thr_um: float = 30.0         # |Deltaz| between consecutive samples to flag
     dup_tolerance_um: float = 1e-3      # samples within this of their parent = dup
     soma_radius_floor_um: float = 1.0   # fallback soma radius if degenerate w/o stems
     collapse_flagged_soma: bool = True  # if the soma was FLAGGED (non-conform/missing),
@@ -14441,9 +14441,9 @@ class RepairConfig:
     require_positive_neurite_radii: bool = False   # gate success on radii too?
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  RESULT / DIAGNOSTIC DATACLASSES
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 @dataclass
 class RepairStep:
     """One repair action and what it changed."""
@@ -14503,9 +14503,9 @@ class RepairResult:
         return d
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  NODE-TABLE I/O  (raw substrate — works on files MorphIO cannot load)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  NODE-TABLE I/O  (raw substrate -- works on files MorphIO cannot load)
+# ===============================================================================
 def load_node_table(swc: Path) -> np.ndarray:
     """Parse an SWC into an (N, 7) float array; non-finite coords survive as NaN."""
     rows = []
@@ -14533,9 +14533,9 @@ def save_node_table(T: np.ndarray, out: Path) -> None:
                      f"{r[Z]:.4f} {r[R]:.4f} {int(r[PARENT])}\n")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  GRAPH HELPERS
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 def _build_graph(T: np.ndarray) -> nx.Graph:
     """Undirected graph of samples; edges from parent links."""
     G = nx.Graph()
@@ -14560,14 +14560,14 @@ def _path_length(T: np.ndarray) -> float:
     return total
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  REPAIR PRIMITIVES  (each pure: table/graph in -> table/graph + RepairStep out)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 def _preclean(T: np.ndarray, cfg: RepairConfig) -> Tuple[np.ndarray, List[RepairStep]]:
     """Drop NaN/inf rows (reparent children to nearest finite ancestor) and dedup."""
     steps: List[RepairStep] = []
 
-    # (a) non-finite samples — drop them, then reparent SURVIVING rows whose
+    # (a) non-finite samples -- drop them, then reparent SURVIVING rows whose
     #     parent chain passed through a dropped node up to the nearest finite
     #     ancestor.  (Reparent on the kept array, not a throwaway mask copy.)
     finite = np.all(np.isfinite(T[:, X:R + 1]), axis=1)
@@ -14671,7 +14671,7 @@ def _heal_components(T: np.ndarray, G: nx.Graph, soma_root: int,
 
     This deliberately does NOT privilege the soma-rooted ("main") arbour or the
     orphan's root node: a detached segment is joined to whatever element is
-    nearest — another orphan or the main arbour — at the closest point on each.
+    nearest -- another orphan or the main arbour -- at the closest point on each.
     Topological direction is *not* set here; it is recovered afterwards by
     rerooting outward from the soma (``_reroot_table``).
 
@@ -14813,9 +14813,9 @@ def _fix_soma_radius(T: np.ndarray, cfg: RepairConfig) -> Tuple[np.ndarray, Repa
     return T, RepairStep("fix_soma_radius", True, {"radius_set_um": round(r_new, 3)})
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  POST-REPAIR DIAGNOSTIC  (recomputed from the output — verification, not trust)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  POST-REPAIR DIAGNOSTIC  (recomputed from the output -- verification, not trust)
+# ===============================================================================
 def diagnose(T_before: np.ndarray, T_after: np.ndarray,
              cfg: RepairConfig) -> RepairDiagnostic:
     Gb, Ga = _build_graph(T_before), _build_graph(T_after)
@@ -14878,9 +14878,9 @@ def diagnose(T_before: np.ndarray, T_after: np.ndarray,
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  THE REPAIR CLASS
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 class MorphologyRepair:
     """Polish a flagged morphology into a single soma-rooted tree.
 
@@ -14945,9 +14945,9 @@ class MorphologyRepair:
         )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  STANDALONE TEST HELPER  —  run BEFORE integrating
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  STANDALONE TEST HELPER  --  run BEFORE integrating
+# ===============================================================================
 def repair_and_verify(
     swc_path: str, layer: str = "5", dendrite_type: str = "spiny",
     out_dir: Optional[str] = None, config: RepairConfig = RepairConfig(),
@@ -14995,7 +14995,7 @@ def repair_and_verify(
 
 
 # ============================================================================
-# PHASE 0 (b) — interactive figure + Allen repair loader  [allen_repair_loader.py]
+# PHASE 0 (b) -- interactive figure + Allen repair loader  [allen_repair_loader.py]
 # ============================================================================
 
 # -*- coding: utf-8 -*-
@@ -15004,7 +15004,7 @@ allen_repair_loader.py
 ======================
 Standalone loader (Allen Cell Types) that **repairs the SWC before NEURON imports
 it**, replacing NEURON's opaque ``Import3d_SWC_read`` auto-graft with an explicit,
-inspectable, distance-gated, type-aware re-rooting — then produces an interactive
+inspectable, distance-gated, type-aware re-rooting -- then produces an interactive
 raw-vs-reconstructed 3-D figure and a summary.
 
 Why
@@ -15015,17 +15015,17 @@ fragment to the soma with a non-physical jump.  We instead repair the *file* int
 a single, clean, soma-rooted tree; NEURON then imports it with nothing left to
 graft.
 
-Pipeline (matches the intended order: heal → triage → NEURON check → save)
+Pipeline (matches the intended order: heal -> triage -> NEURON check -> save)
 --------------------------------------------------------------------------
     repair_table_for_import:
-        _preclean → _normalize_soma → [STAGE 1] → _heal_components(STAGE 2)
-        → _reroot_table → _fix_z_jumps → _fix_soma_radius → diagnose
+        _preclean -> _normalize_soma -> [STAGE 1] -> _heal_components(STAGE 2)
+        -> _reroot_table -> _fix_z_jumps -> _fix_soma_radius -> diagnose
 
 STAGE 1  (new here; everything else is reused from ``morphology_repair``):
-    For each orphan whose CLOSEST APPROACH TO THE SOMA ≤ ``soma_attach_radius_um``
+    For each orphan whose CLOSEST APPROACH TO THE SOMA <= ``soma_attach_radius_um``
     (processed closest-first so the tree grows greedily): attach it to the soma,
-    UNLESS — within that radius — a SAME-TYPE segment of the soma-rooted tree
-    (dend↔dend, apic↔apic, axon↔axon) is closer than the soma, in which case
+    UNLESS -- within that radius -- a SAME-TYPE segment of the soma-rooted tree
+    (dend<->dend, apic<->apic, axon<->axon) is closer than the soma, in which case
     attach to that segment instead.  Orphans beyond the soma gate fall through to
     STAGE 2 (``_heal_components``: nearest-pair MST stitch, gated by
     ``max_stitch_dist_um``).
@@ -15071,14 +15071,14 @@ _TYPE_COLOR = {1: "#222222", 2: "#2ca02c", 3: "#1f77b4", 4: "#d62728"}
 _DEFAULT_COLOR = "#ff7f0e"
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  CONFIG / OUTCOME
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 @dataclass
 class SomaGatedRepairConfig:
     """STAGE-1 knobs + the reused ``RepairConfig`` for STAGE 2 / reroot / geometry."""
-    soma_attach_radius_um: float = 60.0    # STAGE-1 gate: orphan→soma closest approach
+    soma_attach_radius_um: float = 60.0    # STAGE-1 gate: orphan->soma closest approach
     stage1_type_aware: bool = True         # prefer a closer same-type segment over soma
     base: RepairConfig = field(default_factory=RepairConfig)
 
@@ -15101,9 +15101,9 @@ class RepairOutcome:
         return bool(self.diagnostic and self.diagnostic.success)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  STAGE 1  —  soma-gated, type-aware attachment   (the only new graph logic)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  STAGE 1  --  soma-gated, type-aware attachment   (the only new graph logic)
+# ===============================================================================
 
 def _component_type(typ: Dict[int, int], node_ids: List[int]) -> int:
     """Modal NEURITE type of a component (soma excluded if any neurite present)."""
@@ -15118,7 +15118,7 @@ def _heal_stage1_soma_gated(
 ) -> Tuple[nx.Graph, RepairStep, List[Dict[str, Any]]]:
     """Attach orphans within ``radius_um`` of the soma; same-type-closer wins.
 
-    Mutates ``G`` (adds edges only — geometry untouched).  Direction is recovered
+    Mutates ``G`` (adds edges only -- geometry untouched).  Direction is recovered
     later by ``_reroot_table``.  Greedy: each pass attaches the orphan with the
     smallest soma approach, so the main component grows and chains resolve.
     """
@@ -15182,9 +15182,9 @@ def _heal_stage1_soma_gated(
     return G, step, attachments
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  ORCHESTRATION  —  mirrors MorphologyRepair.repair with STAGE 1 inserted
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  ORCHESTRATION  --  mirrors MorphologyRepair.repair with STAGE 1 inserted
+# ===============================================================================
 
 def _detect_soma_flagged(T: np.ndarray) -> bool:
     """Heuristic soma flag (no triage report at heal time): missing / zero-radius."""
@@ -15241,9 +15241,9 @@ def repair_swc_file(in_swc: Path | str, out_swc: Path | str,
     return outcome
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  THE "CHANGED Import3d_SWC_read"  —  repair, THEN import the clean tree
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  THE "CHANGED Import3d_SWC_read"  --  repair, THEN import the clean tree
+# ===============================================================================
 
 def import3d_swc_read_repaired(
     swc_path: Path | str, h: Any, cfg: Optional[SomaGatedRepairConfig] = None,
@@ -15252,7 +15252,7 @@ def import3d_swc_read_repaired(
     """Drop-in replacement for the ``Import3d_SWC_read`` step.
 
     Repairs the SWC to a single soma-rooted tree, writes it, and imports the CLEAN
-    file — so NEURON's importer has no orphan to auto-graft.  Returns
+    file -- so NEURON's importer has no orphan to auto-graft.  Returns
     ``(repaired_path, RepairOutcome)``.  Sections are now live in ``h``.
     """
     cfg = cfg or SomaGatedRepairConfig()
@@ -15302,15 +15302,15 @@ def make_repaired_build_fn(cfg: Optional[SomaGatedRepairConfig] = None
     return _build
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  ALLEN LOADER  (Colab; needs allensdk + network)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def load_allen_swc(specimen_id: int, cache_dir: str = "cell_types",
                    ctc: Any = None) -> Path:
     """Download (or cache) one Allen reconstruction and return its SWC path.
 
-    Uses ``allensdk.core.cell_types_cache.CellTypesCache`` — identical convention
+    Uses ``allensdk.core.cell_types_cache.CellTypesCache`` -- identical convention
     to the archive's ``load_allen_data`` (see phase1_data_loader.py):
     * the explicit ``file_name`` kwarg is passed to ``get_reconstruction`` so the
       path on disk is deterministic regardless of AllenSDK manifest layout;
@@ -15338,12 +15338,12 @@ def load_allen_swc(specimen_id: int, cache_dir: str = "cell_types",
     return swc
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  INTERACTIVE FIGURE  (plotly 3-D, raw + reconstructed + repair edges)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def _segments_by_type(T: np.ndarray) -> Dict[int, Tuple[List, List, List]]:
-    """Per-type parent→child line segments as None-separated polyline arrays."""
+    """Per-type parent->child line segments as None-separated polyline arrays."""
     by_id = {int(r[ID]): r for r in T}
     out: Dict[int, Tuple[List, List, List]] = {}
     for r in T:
@@ -15360,7 +15360,7 @@ def _segments_by_type(T: np.ndarray) -> Dict[int, Tuple[List, List, List]]:
 
 
 def _orphan_root_markers(T: np.ndarray) -> Tuple[List, List, List]:
-    """XYZ of non-soma roots (parent == -1) — the visible breaks in the RAW file."""
+    """XYZ of non-soma roots (parent == -1) -- the visible breaks in the RAW file."""
     xs, ys, zs = [], [], []
     for r in T:
         if int(r[PARENT]) == -1 and int(r[TYPE]) != SOMA_TYPE:
@@ -15374,7 +15374,7 @@ def figure_raw_vs_repaired(outcome: RepairOutcome, title: str = "raw vs reconstr
     the explicit REPAIR edges (STAGE 1 soma / same-type, STAGE 2 MST)."""
     fig = go.Figure()
 
-    # --- RAW (grey; off by default — toggle in the legend for before/after) ---
+    # --- RAW (grey; off by default -- toggle in the legend for before/after) ---
     raw_by_t = _segments_by_type(outcome.T_raw)
     rx, ry, rz = [], [], []
     for xs, ys, zs in raw_by_t.values():
@@ -15414,7 +15414,7 @@ def figure_raw_vs_repaired(outcome: RepairOutcome, title: str = "raw vs reconstr
             a, b = e[key_from], e[key_to]
             ex += [a[0], b[0], None]; ey += [a[1], b[1], None]; ez += [a[2], b[2], None]
             gap = e.get("gap_um", "?"); kind = e.get("kind", name)
-            txt += [f"{kind}: gap {gap} µm", f"{kind}: gap {gap} µm", ""]
+            txt += [f"{kind}: gap {gap} um", f"{kind}: gap {gap} um", ""]
         if not ex:
             return None
         return go.Scatter3d(
@@ -15425,8 +15425,8 @@ def figure_raw_vs_repaired(outcome: RepairOutcome, title: str = "raw vs reconstr
     s1_soma = [e for e in outcome.stage1_attachments if e["kind"] == "soma"]
     s1_type = [e for e in outcome.stage1_attachments if e["kind"] == "same_type"]
     for tr in (
-        _edge_trace(s1_soma, "repair: STAGE-1 → soma", "#9467bd"),
-        _edge_trace(s1_type, "repair: STAGE-1 → same-type", "#e377c2"),
+        _edge_trace(s1_soma, "repair: STAGE-1 -> soma", "#9467bd"),
+        _edge_trace(s1_type, "repair: STAGE-1 -> same-type", "#e377c2"),
         _edge_trace(outcome.stage2_grafts, "repair: STAGE-2 MST", "#ff7f0e",
                     key_from="anchor_xyz", key_to="to_xyz"),
     ):
@@ -15435,15 +15435,15 @@ def figure_raw_vs_repaired(outcome: RepairOutcome, title: str = "raw vs reconstr
 
     fig.update_layout(
         title=title, showlegend=True,
-        scene=dict(aspectmode="data", xaxis_title="x (µm)",
-                   yaxis_title="y (µm)", zaxis_title="z (µm)"),
+        scene=dict(aspectmode="data", xaxis_title="x (um)",
+                   yaxis_title="y (um)", zaxis_title="z (um)"),
         margin=dict(l=0, r=0, t=40, b=0), legend=dict(itemsizing="constant"))
     return fig
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  SUMMARY
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def summarize_repair(outcome: RepairOutcome, specimen: Any = None) -> Dict[str, Any]:
     """Compact, JSON-able summary of what the repair did."""
@@ -15497,9 +15497,9 @@ def _summary_text(s: Dict[str, Any]) -> str:
          f"({s['stage1_to_soma']} -> soma, {s['stage1_to_same_type']} -> same-type)",
          f"  STAGE 2   : {s['stage2_mst_grafts']} MST graft(s); "
          f"unrepairable {s['unrepairable_fragments']}",
-         f"  gaps (µm) : min {s['gap_min_um']} / med {s['gap_median_um']} / "
-         f"max {s['gap_max_um']}  added cable {s['added_cable_um']} µm",
-         f"  cable len : {s['path_length_before_um']} -> {s['path_length_after_um']} µm",
+         f"  gaps (um) : min {s['gap_min_um']} / med {s['gap_median_um']} / "
+         f"max {s['gap_max_um']}  added cable {s['added_cable_um']} um",
+         f"  cable len : {s['path_length_before_um']} -> {s['path_length_after_um']} um",
          f"  invariants: single_tree={s['single_tree']} rooted_at_soma="
          f"{s['rooted_at_soma']} acyclic={s['acyclic']}"]
     if not s["repair_success"]:
@@ -15507,15 +15507,15 @@ def _summary_text(s: Dict[str, Any]) -> str:
     return "\n".join(L)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  ORCHESTRATOR  (Colab entry point)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def run(specimen_id: Optional[int] = None, swc_path: Optional[str] = None,
         cfg: Optional[SomaGatedRepairConfig] = None,
         out_dir: str = ".", write_outputs: bool = True,
         cache_dir: str = "cell_types") -> Dict[str, Any]:
-    """Load (Allen or local) → repair → figure + summary.
+    """Load (Allen or local) -> repair -> figure + summary.
 
     Returns a dict with keys: ``outcome``, ``figure`` (plotly), ``summary``
     (dict), ``summary_text`` (str), ``repaired_swc`` (Path|None),
@@ -15533,7 +15533,7 @@ def run(specimen_id: Optional[int] = None, swc_path: Optional[str] = None,
     summary = summarize_repair(outcome, specimen=specimen_id or src.name)
     text = _summary_text(summary)
     fig = figure_raw_vs_repaired(
-        outcome, title=f"{summary['specimen']} — raw vs reconstructed")
+        outcome, title=f"{summary['specimen']} -- raw vs reconstructed")
 
     figure_html = None
     if write_outputs:
@@ -15548,7 +15548,7 @@ def run(specimen_id: Optional[int] = None, swc_path: Optional[str] = None,
 
 
 # ============================================================================
-# PHASE 0 (c) — electrical viability check  [electrical_viability.py]
+# PHASE 0 (c) -- electrical viability check  [electrical_viability.py]
 # ============================================================================
 
 # -*- coding: utf-8 -*-
@@ -15581,16 +15581,16 @@ What it can and cannot detect (established empirically, NEURON 9.0.1)
 * What this check *does* uniquely validate: the morphology **builds without
   raising**, the somatic response is **finite and non-exploding** (no NaN/inf
   from a degenerate soma or singular geometry), current **reaches every sampled
-  segment** (no internal conduction block), and ΔV **attenuates with distance**
+  segment** (no internal conduction block), and DeltaV **attenuates with distance**
   like a passive cable.
 
 Design (decoupled, mirrors the triage module's philosophy)
 ----------------------------------------------------------
-* :class:`ElectricalViabilityConfig` — every threshold / stimulus / build knob,
+* :class:`ElectricalViabilityConfig` -- every threshold / stimulus / build knob,
   documented; no magic numbers buried in the logic.
-* :class:`ElectricalViabilityResult` — the structured verdict + all evidence
-  (per-site ΔV, attenuation profile, dead-segment coordinates, Rin, tau, lambda).
-* :func:`electrical_viability_check` — the public entry point.  ``build_fn`` and
+* :class:`ElectricalViabilityResult` -- the structured verdict + all evidence
+  (per-site DeltaV, attenuation profile, dead-segment coordinates, Rin, tau, lambda).
+* :func:`electrical_viability_check` -- the public entry point.  ``build_fn`` and
   ``h`` are injectable so the core is testable without the (un-importable) archive
   script and so production can pass the real ``build_neuron_model``.
 * The NEURON coupling is confined to :func:`_default_build` and
@@ -15615,23 +15615,23 @@ except Exception:                      # pragma: no cover
     _HAVE_SCIPY = False
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  CONFIG
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 @dataclass
 class ElectricalViabilityConfig:
     """All knobs for the propagation trial.
 
     Passive values are *nominal literature constants* used only to energise the
-    cable for a viability test — no fit exists at triage time.  They are NOT a
+    cable for a viability test -- no fit exists at triage time.  They are NOT a
     claim about the cell's true membrane.
 
     Symbols
     -------
-    cm_uF_per_cm2 : Cm, specific membrane capacitance (µF·cm⁻²).
-    rm_Ohm_cm2    : Rm, specific membrane resistance (Ω·cm²); g_pas = 1 / Rm.
-    ra_Ohm_cm     : Ra, axial resistivity (Ω·cm).
+    cm_uF_per_cm2 : Cm, specific membrane capacitance (uF.cm^-2).
+    rm_Ohm_cm2    : Rm, specific membrane resistance (Ohm.cm^2); g_pas = 1 / Rm.
+    ra_Ohm_cm     : Ra, axial resistivity (Ohm.cm).
     e_pas_mV      : e_pas, passive reversal / resting potential (mV).
     """
     # --- passive membrane (nominal; energise the cable only) ---
@@ -15643,7 +15643,7 @@ class ElectricalViabilityConfig:
     # --- soma current step (IClamp) ---
     stim_amp_pA: float = -50.0          # sign irrelevant for a passive cable
     stim_delay_ms: float = 50.0
-    stim_dur_ms: Optional[float] = None  # None -> auto = settle_tau_multiple · τ (≥ floor)
+    stim_dur_ms: Optional[float] = None  # None -> auto = settle_tau_multiple . tau (>= floor)
     stim_dur_floor_ms: float = 200.0
     settle_tau_multiple: float = 8.0     # ensure even distal tips reach plateau "in time"
     dt_ms: float = 0.025
@@ -15653,27 +15653,27 @@ class ElectricalViabilityConfig:
     axon_replacement: str = "none"       # keep the original reconstructed axon
     use_dlambda: bool = True
     dlambda_freq_hz: float = 100.0
-    dlambda_frac: float = 0.1            # d_lambda = 0.1 -> ≤10% of AC length constant/seg
+    dlambda_frac: float = 0.1            # d_lambda = 0.1 -> <=10% of AC length constant/seg
 
     # --- recording-site sampling ---
     n_random_segments: int = 1000        # capped at the cell's total segment count
     seed: int = 0
 
     # --- thresholds ---
-    reach_tol_mV: float = 1e-4           # |ΔV| below this at steady state ⇒ "not reached"
+    reach_tol_mV: float = 1e-4           # |DeltaV| below this at steady state => "not reached"
     dead_soma_floor_mV: float = 1e-3     # soma must deflect at least this
-    explode_cap_mV: float = 5_000.0      # |v| above this anywhere ⇒ non-physical blow-up
+    explode_cap_mV: float = 5_000.0      # |v| above this anywhere => non-physical blow-up
 
     # --- verdict composition ---
     require_single_swc_root: bool = True       # your "one (electrical) tree" criterion
     require_all_reached: bool = True
     require_monotone_attenuation: bool = True
-    monotone_spearman_max: float = -0.05       # ρ(|ΔV|, distance) must be ≤ this (i.e. negative)
+    monotone_spearman_max: float = -0.05       # rho(|DeltaV|, distance) must be <= this (i.e. negative)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  RESULT
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 @dataclass
 class ElectricalViabilityResult:
@@ -15714,14 +15714,14 @@ class ElectricalViabilityResult:
     def summary(self) -> str:
         verdict = "PASS" if self.electrical_ok else "FAIL"
         rin = f"{self.rin_MOhm:.1f}" if np.isfinite(self.rin_MOhm) else "nan"
-        tau = f"{self.tau_fit_ms:.1f}" if self.tau_fit_ms is not None else "—"
-        rho = f"{self.spearman_dist_dv:+.2f}" if self.spearman_dist_dv is not None else "—"
+        tau = f"{self.tau_fit_ms:.1f}" if self.tau_fit_ms is not None else "--"
+        rho = f"{self.spearman_dist_dv:+.2f}" if self.spearman_dist_dv is not None else "--"
         return (
             f"[electrical:{verdict}] {Path(self.swc_path).name}  "
             f"roots={self.n_swc_roots} graft={self.neuron_grafted_orphans}  "
             f"reached={self.n_reached}/{self.n_sites} dead={self.n_dead}  "
-            f"dVsoma={self.dv_soma_mV:+.3f} mV  Rin={rin} MΩ  τ={tau} ms  "
-            f"ρ(d,|dV|)={rho}"
+            f"dVsoma={self.dv_soma_mV:+.3f} mV  Rin={rin} MOhm  tau={tau} ms  "
+            f"rho(d,|dV|)={rho}"
             + ("" if self.electrical_ok else "  reasons: " + "; ".join(self.reasons))
         )
 
@@ -15731,16 +15731,16 @@ class ElectricalViabilityResult:
         return d
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  PURE HELPERS  (no NEURON — unit-testable)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  PURE HELPERS  (no NEURON -- unit-testable)
+# ===============================================================================
 
 def count_swc_roots(swc_path: Path | str) -> int:
     """Number of topological roots in a raw SWC table.
 
     A sample is a root if its parent id is -1 OR its parent id does not appear as
     any sample id (dangling reference).  This is the file's own statement of how
-    many disconnected trees it contains — computed *before* NEURON's import graft.
+    many disconnected trees it contains -- computed *before* NEURON's import graft.
     """
     ids: set = set()
     rows: List[Tuple[int, int]] = []   # (id, parent)
@@ -15766,11 +15766,11 @@ def count_swc_roots(swc_path: Path | str) -> int:
 
 
 def classify_reached(dv_mV: np.ndarray, reach_tol_mV: float) -> np.ndarray:
-    """Boolean mask: True where |ΔV| exceeds the numerical-reach tolerance.
+    """Boolean mask: True where |DeltaV| exceeds the numerical-reach tolerance.
 
     The discriminator between *connected-but-attenuated* and *unreached* is the
     numerical-zero tolerance, NOT a physiological floor: a genuinely unreached
-    segment sits exactly at e_pas (ΔV == 0 to machine precision), whereas a
+    segment sits exactly at e_pas (DeltaV == 0 to machine precision), whereas a
     legitimately distal tip is small but strictly non-zero.
     """
     return np.abs(np.asarray(dv_mV, dtype=float)) > float(reach_tol_mV)
@@ -15784,7 +15784,7 @@ def is_exploding(v_abs_max_mV: float, dv_soma_mV: float, cap_mV: float) -> bool:
 
 
 def attenuation_spearman(distance_um: np.ndarray, dv_mV: np.ndarray) -> Optional[float]:
-    """Spearman ρ between path distance and |ΔV| (expect negative: farther ⇒ smaller).
+    """Spearman rho between path distance and |DeltaV| (expect negative: farther => smaller).
 
     Falls back to a rank-based Pearson if scipy is unavailable.  Returns ``None``
     when there are too few points to rank.
@@ -15806,7 +15806,7 @@ def attenuation_spearman(distance_um: np.ndarray, dv_mV: np.ndarray) -> Optional
 
 
 def fit_lambda_um(distance_um: np.ndarray, dv_mV: np.ndarray) -> Optional[float]:
-    """Electrotonic length λ from |ΔV(d)| = ΔV0 · exp(-d / λ).  Optional (scipy)."""
+    """Electrotonic length lambda from |DeltaV(d)| = DeltaV0 . exp(-d / lambda).  Optional (scipy)."""
     if not _HAVE_SCIPY:
         return None
     d = np.asarray(distance_um, dtype=float)
@@ -15828,7 +15828,7 @@ def fit_lambda_um(distance_um: np.ndarray, dv_mV: np.ndarray) -> Optional[float]
 
 def fit_tau_ms(t_ms: np.ndarray, v_mV: np.ndarray, e_pas_mV: float,
                t0_ms: float, t1_ms: float) -> Optional[float]:
-    """Membrane τ from the somatic charging transient A·(1 - exp(-(t-t0)/τ)). Optional."""
+    """Membrane tau from the somatic charging transient A.(1 - exp(-(t-t0)/tau)). Optional."""
     if not _HAVE_SCIPY:
         return None
     t = np.asarray(t_ms, dtype=float)
@@ -15846,9 +15846,9 @@ def fit_tau_ms(t_ms: np.ndarray, v_mV: np.ndarray, e_pas_mV: float,
         return None
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  NEURON-COUPLED HELPERS  (the only NEURON-dependent code)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def _get_h():
     """Lazy NEURON handle (mirrors the triage's lazy allensdk import)."""
@@ -15927,7 +15927,7 @@ def _apply_dlambda(h, cfg: ElectricalViabilityConfig) -> None:
     for sec in h.allsec():
         if have_lambda_f:
             lam = h.lambda_f(cfg.dlambda_freq_hz, sec=sec)
-        else:                                    # manual AC length constant (µm)
+        else:                                    # manual AC length constant (um)
             lam = _lambda_f_manual(sec, cfg.dlambda_freq_hz, cfg.cm_uF_per_cm2)
         if lam <= 0 or not math.isfinite(lam):
             continue
@@ -15935,7 +15935,7 @@ def _apply_dlambda(h, cfg: ElectricalViabilityConfig) -> None:
 
 
 def _lambda_f_manual(sec, freq_hz: float, cm_uF_per_cm2: float) -> float:
-    """AC length constant (µm) integrated over pt3d, NEURON's d_lambda formula."""
+    """AC length constant (um) integrated over pt3d, NEURON's d_lambda formula."""
     if sec.n3d() < 2:
         d = sec.diam
         return 1e5 * math.sqrt(d / (4.0 * math.pi * freq_hz * sec.Ra * cm_uF_per_cm2))
@@ -15952,7 +15952,7 @@ def _lambda_f_manual(sec, freq_hz: float, cm_uF_per_cm2: float) -> float:
 
 
 def _seg_xyz(sec, x: float) -> Tuple[float, float, float]:
-    """Interpolated 3-D coordinate (µm) of segment centre ``sec(x)`` from pt3d."""
+    """Interpolated 3-D coordinate (um) of segment centre ``sec(x)`` from pt3d."""
     n = sec.n3d()
     if n == 0:
         return (float("nan"),) * 3
@@ -15995,7 +15995,7 @@ def _select_sites(h, soma, cfg: ElectricalViabilityConfig
 def _simulate_soma_step(h, soma, sites, cfg: ElectricalViabilityConfig
                         ) -> Dict[str, Any]:
     """Set passive params, apply d_lambda, inject the soma step, run to plateau,
-    and read steady-state ΔV at every site (+ full somatic trace)."""
+    and read steady-state DeltaV at every site (+ full somatic trace)."""
     # passive: Ra (section), then nseg, then per-segment cm/g_pas/e_pas
     g_pas = 1.0 / cfg.rm_Ohm_cm2
     for sec in h.allsec():
@@ -16008,7 +16008,7 @@ def _simulate_soma_step(h, soma, sites, cfg: ElectricalViabilityConfig
             seg.g_pas = g_pas
             seg.e_pas = cfg.e_pas_mV
 
-    # τ-aware step duration so even distal sites reach plateau ("propagate in time")
+    # tau-aware step duration so even distal sites reach plateau ("propagate in time")
     tau_ms = cfg.rm_Ohm_cm2 * cfg.cm_uF_per_cm2 * 1e-3
     dur = cfg.stim_dur_ms if cfg.stim_dur_ms is not None else \
         max(cfg.stim_dur_floor_ms, cfg.settle_tau_multiple * tau_ms)
@@ -16027,7 +16027,7 @@ def _simulate_soma_step(h, soma, sites, cfg: ElectricalViabilityConfig
     h.finitialize(cfg.e_pas_mV)
     h.run()
 
-    # steady-state read (state at tstop = plateau); ΔV vs e_pas
+    # steady-state read (state at tstop = plateau); DeltaV vs e_pas
     h.distance(0, soma(0.5))
     dv = np.empty(len(sites), dtype=float)
     dist = np.empty(len(sites), dtype=float)
@@ -16054,9 +16054,9 @@ def _simulate_soma_step(h, soma, sites, cfg: ElectricalViabilityConfig
     }
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  PUBLIC ENTRY POINT
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def electrical_viability_check(
     swc_path: Path | str,
@@ -16092,7 +16092,7 @@ def electrical_viability_check(
         config=asdict(cfg),
     )
 
-    # (0) raw-SWC topology — independent of NEURON's import-time graft
+    # (0) raw-SWC topology -- independent of NEURON's import-time graft
     res.n_swc_roots = count_swc_roots(swc_path)
     res.neuron_grafted_orphans = res.n_swc_roots > 1   # Import3d grafts orphans to soma
 
@@ -16145,7 +16145,7 @@ def electrical_viability_check(
     res.spearman_dist_dv = attenuation_spearman(dist[prof], dv[prof])
     res.lambda_est_um = fit_lambda_um(dist[prof], dv[prof])
 
-    # (3) verdict — compose per config
+    # (3) verdict -- compose per config
     ok = True
     if cfg.require_single_swc_root and res.n_swc_roots > 1:
         ok = False
@@ -16171,7 +16171,7 @@ def electrical_viability_check(
             and res.spearman_dist_dv > cfg.monotone_spearman_max):
         ok = False
         res.reasons.append(
-            f"non_monotone_attenuation: ρ(dist,|dV|)={res.spearman_dist_dv:+.2f} "
+            f"non_monotone_attenuation: rho(dist,|dV|)={res.spearman_dist_dv:+.2f} "
             f"> {cfg.monotone_spearman_max:+.2f}")
 
     res.electrical_ok = ok
@@ -16180,12 +16180,12 @@ def electrical_viability_check(
 
 
 # ============================================================================
-# MERGE — Phase-0 archive integration + merged _archive_one_cell
+# MERGE -- Phase-0 archive integration + merged _archive_one_cell
 # ============================================================================
 
 # -*- coding: utf-8 -*-
 """
-phase0_archive_merge.py — Phase-0 repair + Allen archive saver (MERGED)
+phase0_archive_merge.py -- Phase-0 repair + Allen archive saver (MERGED)
 ======================================================================
 
 This file MERGES the Phase-0 morphology repair / electrical-viability stage into
@@ -16199,9 +16199,9 @@ skip: it counted SWC roots and, if `n_roots > 1`, ABORTED with
 
 This merge REPLACES that skip with the full Phase-0 pipeline:
 
-    raw SWC  →  repair (Stage-1 soma-gated type-aware + Stage-2 MST + reroot)
-             →  electrical viability check (NEURON, on the repaired tree)
-             →  archive the REPAIRED tree as reconstruction.swc
+    raw SWC  ->  repair (Stage-1 soma-gated type-aware + Stage-2 MST + reroot)
+             ->  electrical viability check (NEURON, on the repaired tree)
+             ->  archive the REPAIRED tree as reconstruction.swc
 
 Decisions baked in (per the merge spec):
   * The archived `reconstruction.swc` is the REPAIRED tree.  The verbatim Allen
@@ -16233,9 +16233,9 @@ From the phase0/phase1 monolith, this code references:
     ElectricalViabilityConfig, electrical_viability_check,
   and optionally the static triage:
     run_checks, CATEGORY_CONNECTIVITY, CATEGORY_SOMA, CATEGORY_GEOMETRY,
-    CATEGORY_RADII (all optional — guarded).
+    CATEGORY_RADII (all optional -- guarded).
 
-INTEGRATION — three edits to the monolith
+INTEGRATION -- three edits to the monolith
 -----------------------------------------
 (1) Paste this whole file AFTER the Phase-0 repair layer and the original archive
     cells are defined.
@@ -16248,7 +16248,7 @@ INTEGRATION — three edits to the monolith
 (3) Add the returned `phase0` dict into the `metadata = {...}` block.
 
 A ready-to-run merged `_archive_one_cell` is provided at the bottom as
-`_archive_one_cell` (it supersedes the original — same name, so the last
+`_archive_one_cell` (it supersedes the original -- same name, so the last
 definition in the session wins).
 """
 import json
@@ -16264,9 +16264,9 @@ matplotlib.use("Agg")               # headless: write PNGs without a display
 import matplotlib.pyplot as plt
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  PHASE-0 CONFIG (gathers the repair + electrical knobs in one place)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 # Defaults match the validated Phase-0 modules; override at the call site.
 PHASE0_SOMA_ATTACH_RADIUS_UM = 60.0    # Stage-1 soma gate
@@ -16303,24 +16303,24 @@ def _make_phase0_ev_cfg(
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  ELECTRICAL-TRIAGE PLOT  (the saver originally had no electrical plot)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def plot_electrical_triage(ev_result, swc_name: str = "", save_path: Optional[Path] = None):
     """Two-panel triage figure for an ElectricalViabilityResult.
 
-    LEFT  — attenuation profile: |ΔV| vs path distance from the soma for every
-            reached site, with the Spearman ρ annotated.  A clean passive cable
-            decays monotonically (ρ < 0).
-    RIGHT — reachability bar: reached vs dead sites, plus the verdict banner
-            (Rin, τ, ΔV_soma, root count).
+    LEFT  -- attenuation profile: |DeltaV| vs path distance from the soma for every
+            reached site, with the Spearman rho annotated.  A clean passive cable
+            decays monotonically (rho < 0).
+    RIGHT -- reachability bar: reached vs dead sites, plus the verdict banner
+            (Rin, tau, DeltaV_soma, root count).
 
     Returns the matplotlib Figure (and writes a PNG if `save_path` is given).
     """
     fig, (axL, axR) = plt.subplots(1, 2, figsize=(11, 4.2))
 
-    # ── LEFT: attenuation profile ────────────────────────────────────────────
+    # -- LEFT: attenuation profile --------------------------------------------
     d = np.asarray(ev_result.attenuation_distance_um, dtype=float)
     y = np.abs(np.asarray(ev_result.attenuation_dv_mV, dtype=float))
     if d.size:
@@ -16331,19 +16331,19 @@ def plot_electrical_triage(ev_result, swc_name: str = "", save_path: Optional[Pa
             xs = np.linspace(0, float(d.max()), 100)
             dv0 = float(y.max()) if y.size else 1.0
             axL.plot(xs, dv0 * np.exp(-xs / lam), "r--", lw=1.5,
-                     label=f"exp fit  λ≈{lam:.0f} µm")
+                     label=f"exp fit  lambda~={lam:.0f} um")
             axL.legend(fontsize=8, loc="upper right")
-        rho_s = f"{rho:+.2f}" if rho is not None else "—"
-        axL.set_title(f"Attenuation profile   ρ(d,|ΔV|)={rho_s}", fontsize=10)
+        rho_s = f"{rho:+.2f}" if rho is not None else "--"
+        axL.set_title(f"Attenuation profile   rho(d,|DeltaV|)={rho_s}", fontsize=10)
     else:
         axL.text(0.5, 0.5, "no reached sites", ha="center", va="center",
                  transform=axL.transAxes, color="crimson")
-    axL.set_xlabel("path distance from soma (µm)")
-    axL.set_ylabel("|ΔV| (mV)")
+    axL.set_xlabel("path distance from soma (um)")
+    axL.set_ylabel("|DeltaV| (mV)")
     axL.set_yscale("log")
     axL.grid(alpha=0.25)
 
-    # ── RIGHT: reachability + verdict ────────────────────────────────────────
+    # -- RIGHT: reachability + verdict ----------------------------------------
     reached = int(ev_result.n_reached)
     dead = int(ev_result.n_dead)
     axR.bar(["reached", "dead"], [reached, dead],
@@ -16353,17 +16353,17 @@ def plot_electrical_triage(ev_result, swc_name: str = "", save_path: Optional[Pa
     verdict = "PASS" if ev_result.electrical_ok else "FAIL"
     vcolor = "#2ca02c" if ev_result.electrical_ok else "#d62728"
     rin = f"{ev_result.rin_MOhm:.0f}" if np.isfinite(ev_result.rin_MOhm) else "nan"
-    tau = f"{ev_result.tau_fit_ms:.1f}" if ev_result.tau_fit_ms is not None else "—"
+    tau = f"{ev_result.tau_fit_ms:.1f}" if ev_result.tau_fit_ms is not None else "--"
     axR.set_title(f"electrical: {verdict}", color=vcolor, fontsize=11, fontweight="bold")
     banner = (f"roots={ev_result.n_swc_roots}  graft={ev_result.neuron_grafted_orphans}\n"
-              f"ΔV_soma={ev_result.dv_soma_mV:+.2f} mV   Rin={rin} MΩ   τ={tau} ms")
+              f"DeltaV_soma={ev_result.dv_soma_mV:+.2f} mV   Rin={rin} MOhm   tau={tau} ms")
     if not ev_result.electrical_ok and ev_result.reasons:
         banner += "\nreasons: " + "; ".join(ev_result.reasons)
     axR.set_ylabel("number of sites")
     axR.text(0.5, -0.28, banner, ha="center", va="top", transform=axR.transAxes,
              fontsize=8, family="monospace")
 
-    fig.suptitle(f"Electrical viability — {swc_name}", fontsize=11)
+    fig.suptitle(f"Electrical viability -- {swc_name}", fontsize=11)
     fig.tight_layout(rect=(0, 0.04, 1, 0.97))
 
     if save_path is not None:
@@ -16372,9 +16372,9 @@ def plot_electrical_triage(ev_result, swc_name: str = "", save_path: Optional[Pa
     return fig
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 #  MEMBRANE-TRACE PLOT  (recorded whole-cell Vm that feeds Phase-2 train/validate)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def plot_membrane_traces(
     all_pulses: List[Dict[str, Any]],
@@ -16389,7 +16389,7 @@ def plot_membrane_traces(
 
     Visualisation only: it reads already-extracted arrays and neither loads
     Allen data nor runs NEURON (separation of concerns). Every trace shown is
-    an experimental whole-cell patch recording — not a model simulation (the
+    an experimental whole-cell patch recording -- not a model simulation (the
     archive path carries no fitted passive parameters yet).
 
     Parameters
@@ -16412,7 +16412,7 @@ def plot_membrane_traces(
         Which square-subthreshold polarity is the *training* target; the other
         polarity becomes held-out validation. For ``fit_target="hyp"``
         (default): hyp -> train, dep -> held-out validation, all long-square
-        sweeps -> validation. This drives the per-polarity role labels only —
+        sweeps -> validation. This drives the per-polarity role labels only --
         every recorded trace is plotted regardless of ``fit_target``.
     cell_name : str
         Title annotation (e.g. the specimen id / SWC name).
@@ -16426,10 +16426,10 @@ def plot_membrane_traces(
 
     Layout
     ------
-    LEFT  — square-subthreshold windows: Vm vs time-from-pulse-onset (ms), one
+    LEFT  -- square-subthreshold windows: Vm vs time-from-pulse-onset (ms), one
             line per recorded pulse, coloured by polarity, with each polarity's
             Phase-2 role (train / validation) shown in the legend.
-    RIGHT — long-square sweeps: Vm vs time-from-sweep-start (s), one line per
+    RIGHT -- long-square sweeps: Vm vs time-from-sweep-start (s), one line per
             sweep, coloured by |step amplitude| (pA).
     """
     fig, (axL, axR) = plt.subplots(1, 2, figsize=(12, 4.4))
@@ -16446,7 +16446,7 @@ def plot_membrane_traces(
 
     polarity_color = {"hyp": "#1f77b4", "dep": "#d62728"}
 
-    # ── LEFT: square-subthreshold training pulses ────────────────────────────
+    # -- LEFT: square-subthreshold training pulses ----------------------------
     if all_pulses:
         labelled = set()
         for w in all_pulses:
@@ -16461,17 +16461,17 @@ def plot_membrane_traces(
                      color=polarity_color.get(polarity, "#555555"), label=label)
         axL.axvline(0.0, color="k", lw=0.7, ls=":", alpha=0.6)   # pulse onset
         axL.legend(fontsize=8, loc="best", title=f"fit_target={fit_target!r}")
-        axL.set_title(f"Square subthreshold — training protocol  "
+        axL.set_title(f"Square subthreshold -- training protocol  "
                       f"(n={len(all_pulses)} pulses)", fontsize=10)
     else:
         axL.text(0.5, 0.5, "no square-subthreshold pulses", ha="center",
                  va="center", transform=axL.transAxes, color="crimson")
-        axL.set_title("Square subthreshold — training protocol", fontsize=10)
+        axL.set_title("Square subthreshold -- training protocol", fontsize=10)
     axL.set_xlabel("time from pulse onset (ms)")
     axL.set_ylabel("Vm (mV, LJP-corrected)")
     axL.grid(alpha=0.25)
 
-    # ── RIGHT: long-square validation sweeps ─────────────────────────────────
+    # -- RIGHT: long-square validation sweeps ---------------------------------
     n_ls = len(ls_sweep_info)
     if n_ls:
         amps_pA = np.array(
@@ -16504,17 +16504,17 @@ def plot_membrane_traces(
             sm.set_array([])
             cbar = fig.colorbar(sm, ax=axR, pad=0.01)
             cbar.set_label("|step amplitude| (pA)", fontsize=8)
-        axR.set_title(f"Long square — validation protocol  "
+        axR.set_title(f"Long square -- validation protocol  "
                       f"(n={n_ls} sweeps)", fontsize=10)
     else:
         axR.text(0.5, 0.5, "no long-square sweeps", ha="center",
                  va="center", transform=axR.transAxes, color="crimson")
-        axR.set_title("Long square — validation protocol", fontsize=10)
+        axR.set_title("Long square -- validation protocol", fontsize=10)
     axR.set_xlabel("time from sweep start (s)")
     axR.set_ylabel("Vm (mV, LJP-corrected)")
     axR.grid(alpha=0.25)
 
-    fig.suptitle(f"Recorded whole-cell membrane traces — {cell_name}", fontsize=11)
+    fig.suptitle(f"Recorded whole-cell membrane traces -- {cell_name}", fontsize=11)
     fig.tight_layout(rect=(0, 0.0, 1, 0.96))
 
     if save_path is not None:
@@ -16523,9 +16523,9 @@ def plot_membrane_traces(
     return fig
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  STATIC TRIAGE (optional — only if morphology_qc_triage is in the namespace)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  STATIC TRIAGE (optional -- only if morphology_qc_triage is in the namespace)
+# ===============================================================================
 
 def _run_static_triage_if_available(raw_swc: Path, cell_dir: Path,
                                     verbose: bool) -> Optional[Dict[str, Any]]:
@@ -16579,9 +16579,9 @@ def _run_static_triage_if_available(raw_swc: Path, cell_dir: Path,
         return {"error": f"{type(e).__name__}: {e}"}
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  THE MERGE CORE  —  repair raw SWC, run electrical check, archive repaired tree
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  THE MERGE CORE  --  repair raw SWC, run electrical check, archive repaired tree
+# ===============================================================================
 
 def _phase0_archive_swc(
     sid: int,
@@ -16607,25 +16607,25 @@ def _phase0_archive_swc(
     Returns
     -------
     (swc_dst, phase0)
-        `swc_dst` is the path to `reconstruction.swc` (the REPAIRED tree) — the
+        `swc_dst` is the path to `reconstruction.swc` (the REPAIRED tree) -- the
         rest of `_archive_one_cell` keeps using this exactly as before.
         `phase0` is the metadata block to fold into metadata.json.
     """
     repair_cfg = repair_cfg or _make_phase0_repair_cfg()
     ev_cfg = ev_cfg or _make_phase0_ev_cfg()
 
-    # ── 1. verbatim raw copy ─────────────────────────────────────────────────
+    # -- 1. verbatim raw copy -------------------------------------------------
     raw_dst = cell_dir / "reconstruction.raw.swc"
     shutil.copy2(raw_swc_cache, raw_dst)
 
     n_roots_raw, root_lines = _count_swc_roots(raw_swc_cache)   # from namespace
     if verbose:
-        print(f"[phase0]   raw SWC: {n_roots_raw} root(s) → {raw_dst.name}")
+        print(f"[phase0]   raw SWC: {n_roots_raw} root(s) -> {raw_dst.name}")
 
     # static triage on the RAW file (optional)
     triage_summary = _run_static_triage_if_available(raw_dst, cell_dir, verbose)
 
-    # ── 2. repair → reconstruction.swc ───────────────────────────────────────
+    # -- 2. repair -> reconstruction.swc ---------------------------------------
     swc_dst = cell_dir / "reconstruction.swc"
     outcome = repair_swc_file(raw_swc_cache, swc_dst, repair_cfg)
 
@@ -16635,19 +16635,19 @@ def _phase0_archive_swc(
     if not repaired_written:
         shutil.copy2(raw_swc_cache, swc_dst)
         if verbose:
-            print(f"[phase0]   repair produced no table — archived RAW as "
+            print(f"[phase0]   repair produced no table -- archived RAW as "
                   f"reconstruction.swc (phase0_passed=False)")
 
     summary = summarize_repair(outcome, specimen=sid)
     if verbose:
-        print(f"[phase0]   repair: {summary['components_before']}→"
+        print(f"[phase0]   repair: {summary['components_before']}->"
               f"{summary['components_after']} comp  "
               f"S1(soma={summary['stage1_to_soma']},type={summary['stage1_to_same_type']})  "
               f"S2={summary['stage2_mst_grafts']}  "
               f"unrepairable={summary['unrepairable_fragments']}  "
               f"success={outcome.success}")
 
-    # ── 3. electrical viability on the repaired tree ─────────────────────────
+    # -- 3. electrical viability on the repaired tree -------------------------
     ev_dict: Dict[str, Any] = {}
     ev_ok = False
     ev_result = None
@@ -16678,13 +16678,13 @@ def _phase0_archive_swc(
         if verbose:
             print(f"[phase0]   electrical check FAILED: {type(e).__name__}: {e}")
 
-    # ── 4. figures ───────────────────────────────────────────────────────────
+    # -- 4. figures -----------------------------------------------------------
     fig_paths: Dict[str, Optional[str]] = {"repair_html": None, "electrical_png": None}
     if write_figures:
         # 4a. interactive raw-vs-repaired 3-D
         try:
             fig = figure_raw_vs_repaired(
-                outcome, title=f"specimen {sid} — raw vs reconstructed")
+                outcome, title=f"specimen {sid} -- raw vs reconstructed")
             html_path = cell_dir / "reconstruction_repair.html"
             fig.write_html(str(html_path), include_plotlyjs="cdn")
             fig_paths["repair_html"] = html_path.name
@@ -16703,7 +16703,7 @@ def _phase0_archive_swc(
                     print(f"[phase0]   electrical figure skipped "
                           f"({type(e).__name__}: {e})")
 
-    # ── repair provenance JSON ───────────────────────────────────────────────
+    # -- repair provenance JSON -----------------------------------------------
     phase0_passed = bool(outcome.success and ev_ok)
     repair_json = {
         "specimen_id": sid,
@@ -16728,7 +16728,7 @@ def _phase0_archive_swc(
     with open(cell_dir / "phase0_repair.json", "w") as fh:
         json.dump(repair_json, fh, indent=2, cls=_NumpyEncoder)
 
-    # ── compact block for metadata.json ──────────────────────────────────────
+    # -- compact block for metadata.json --------------------------------------
     phase0 = {
         "phase0_passed": phase0_passed,
         "repair_success": bool(outcome.success),
@@ -16769,7 +16769,7 @@ def _write_discard_sentinel(cell_dir: Path, sid: int, status: str, reason: str,
     """Mark a cell as discarded WITHOUT deleting its Phase-0 provenance.
 
     Writes ``discarded.json`` into ``cell_dir`` recording the verdict and reason,
-    but writes NO ``metadata.json`` — so downstream loaders (which key on
+    but writes NO ``metadata.json`` -- so downstream loaders (which key on
     metadata.json) never pick the cell up, while the repair/electrical artefacts
     (and any ``trace_qc_*`` QC tables/figures already written) remain on disk for
     audit. The
@@ -16791,15 +16791,15 @@ def _write_discard_sentinel(cell_dir: Path, sid: int, status: str, reason: str,
         pass
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  MERGED _archive_one_cell  (supersedes the original — same name)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+#  MERGED _archive_one_cell  (supersedes the original -- same name)
+# ===============================================================================
 #
 # This is the ORIGINAL `_archive_one_cell` with exactly two regions changed:
 #   * Section B/B1: the multi-root SKIP is replaced by `_phase0_archive_swc(...)`.
 #   * Section F:    a `"phase0": phase0` entry is added to `metadata`.
-# Everything else — the SS pulse extraction (C1), LS sweep saving (C2), scalar
-# features (D), smoke test (E), and the .npz/.json writes — is byte-for-byte the
+# Everything else -- the SS pulse extraction (C1), LS sweep saving (C2), scalar
+# features (D), smoke test (E), and the .npz/.json writes -- is byte-for-byte the
 # original.  No cell is ever skipped now; `skip_multiroot_swc` is accepted but
 # IGNORED (kept in the signature for backwards-compatible call sites).
 
@@ -16821,7 +16821,7 @@ def _archive_one_cell(
     fit_target: str,
     verbose: bool,
     skip_multiroot_swc: bool = True,        # accepted but IGNORED (we repair now)
-    # ── trace-QC + triage gating (opt-in; defaults preserve legacy behaviour) ──
+    # -- trace-QC + triage gating (opt-in; defaults preserve legacy behaviour) --
     trace_qc_enabled: bool = False,
     trace_qc_polarities: Tuple[str, ...] = ("dep", "hyp"),
     trace_qc_null: str = "ar",
@@ -16831,7 +16831,7 @@ def _archive_one_cell(
     trace_qc_tau_fallback_ms: float = 20.0,
     trace_qc_seed: int = 0,
     trace_qc_write_figures: bool = True,
-    # ── trace-QC v2 engine (opt-in; defaults keep legacy v1 behaviour) ──
+    # -- trace-QC v2 engine (opt-in; defaults keep legacy v1 behaviour) --
     trace_qc_engine: str = "v1",
     trace_qc_v2_ar_max_memory_ms: float = 5.0,
     trace_qc_v2_decim_scales_ms: Tuple[float, ...] = (1.0, 2.0, 5.0, 10.0, 20.0),
@@ -16845,7 +16845,7 @@ def _archive_one_cell(
     trace_qc_v2_test_window_ms: float | None = None,  # self-cal chunk + scoring window; None -> fit_window
     trace_qc_v2_fit_delay_ms: float = 4.0,            # gap (ms) from pulse offset to fit-window start
     discard_on_triage_fail: bool = False,
-    # ── Phase-0 knobs (new; optional) ──
+    # -- Phase-0 knobs (new; optional) --
     phase0_repair_cfg=None,
     phase0_ev_cfg=None,
     phase0_write_figures: bool = True,
@@ -16854,18 +16854,18 @@ def _archive_one_cell(
 
     Returns "ok" / "partial" exactly as before, with an additional possible
     suffix note when Phase 0 did not pass (the cell is still archived):
-        "ok"                       — smoke test passed, phase0 passed
-        "partial"                  — smoke test incomplete
-        "ok_phase0_failed"         — smoke test passed but phase0 did NOT
-        "partial_phase0_failed"    — both incomplete
+        "ok"                       -- smoke test passed, phase0 passed
+        "partial"                  -- smoke test incomplete
+        "ok_phase0_failed"         -- smoke test passed but phase0 did NOT
+        "partial_phase0_failed"    -- both incomplete
     """
-    # ── A. CELL METADATA ─────────────────────────────────────────────────────
+    # -- A. CELL METADATA -----------------------------------------------------
     cells = ctc.get_cells(species=[CellTypesApi.HUMAN])
     meta = next((c for c in cells if c["id"] == sid), None)
     if meta is None:
         raise ValueError(f"Specimen {sid} not found among human cells")
 
-    # ── B. MORPHOLOGY — download raw SWC, then PHASE 0 (repair + electrical) ──
+    # -- B. MORPHOLOGY -- download raw SWC, then PHASE 0 (repair + electrical) --
     swc_cache = Path(cache_dir) / f"specimen_{sid}" / "reconstruction.swc"
     swc_cache.parent.mkdir(parents=True, exist_ok=True)
     ctc.get_reconstruction(sid, file_name=str(swc_cache))
@@ -16880,9 +16880,9 @@ def _archive_one_cell(
         write_figures=phase0_write_figures,
         verbose=verbose,
     )
-    # swc_dst now points at the REPAIRED reconstruction.swc — used below unchanged.
+    # swc_dst now points at the REPAIRED reconstruction.swc -- used below unchanged.
 
-    # ── GATE 1: morpho/electrical triage discard ─────────────────────────────
+    # -- GATE 1: morpho/electrical triage discard -----------------------------
     # phase0_passed == (morphology repair succeeded) AND (electrical viability
     # OK), both evaluated on the REPAIRED (healed) tree. Opt-in: when
     # discard_on_triage_fail is True, a failing cell is NOT archived (no
@@ -16897,12 +16897,12 @@ def _archive_one_cell(
         _write_discard_sentinel(cell_dir, sid, "discarded_triage", reason,
                                 extra={"phase0": phase0})
         if verbose:
-            print(f"[archive]   GATE 1 — {reason}: cell DISCARDED "
+            print(f"[archive]   GATE 1 -- {reason}: cell DISCARDED "
                   f"(provenance kept, no ephys/metadata)\n")
         return "discarded_triage"
 
-    # ── D′. SCALAR FEATURES — lifted ABOVE section C so the reported τm is ─────
-    #       available to the trace-QC gate (it sets the [0.5·τm, 2·τm] band the
+    # -- D'. SCALAR FEATURES -- lifted ABOVE section C so the reported taum is -----
+    #       available to the trace-QC gate (it sets the [0.5.taum, 2.taum] band the
     #       fitted decay constant may span). rin / tau / vrest are defined here
     #       once and reused by the smoke test (E) and metadata (F) below.
     all_feats = ctc.get_ephys_features()
@@ -16915,13 +16915,13 @@ def _archive_one_cell(
     if not np.isnan(vrest):
         vrest += ljp_correction_mV
     if verbose:
-        print(f"[archive]   scalars: Rin={rin:.1f} MΩ  τm={tau:.1f} ms  Vrest={vrest:.1f} mV")
+        print(f"[archive]   scalars: Rin={rin:.1f} MOhm  taum={tau:.1f} ms  Vrest={vrest:.1f} mV")
 
-    # ── C. ELECTROPHYSIOLOGY — raw waveform extraction ───────────────────────
+    # -- C. ELECTROPHYSIOLOGY -- raw waveform extraction -----------------------
     data_set = ctc.get_ephys_data(sid)
     sweeps_meta = ctc.get_ephys_sweeps(sid)
 
-    # ── C1. Square Subthreshold: individual pulse windows ────────────────────
+    # -- C1. Square Subthreshold: individual pulse windows --------------------
     ss_meta = _select_square_subthreshold(sweeps_meta)
     all_pulses: List[Dict[str, Any]] = []
     ss_sweep_numbers: List[int] = []
@@ -16942,7 +16942,7 @@ def _archive_one_cell(
         pulses_raw = _detect_pulses_in_current(i_full, sr, threshold_pA=pulse_threshold_pA)
         ss_n_raw += len(pulses_raw)
         # III.B (v2): the noise-null baseline pool is the two long signal-free
-        # rest windows of each sweep — BEFORE the first pulse and AFTER the last
+        # rest windows of each sweep -- BEFORE the first pulse and AFTER the last
         # pulse's relaxation has settled. Inter-pulse gaps are NOT harvested.
         # The v2 module trims a short lead (selfcal_lead_trim_ms) internally; here
         # we only apply a brief end-guard before the first onset, and start the
@@ -16952,17 +16952,17 @@ def _archive_one_cell(
             _onsets = [s_i for s_i, _e, _p in pulses_raw]
             first_onset = int(min(_onsets))
             last_onset = int(max(_onsets))
-            _min_epoch = int(round(20.0 * sr / 1e3))            # need ≥ ~20 ms to be useful
+            _min_epoch = int(round(20.0 * sr / 1e3))            # need >= ~20 ms to be useful
             _end_guard = int(round(trace_qc_v2_baseline_guard_ms * sr / 1e3))
             _settle = int(round(post_ms * sr / 1e3))            # post-pulse settle = post_ms
 
-            # (a) pre-first-pulse rest window: [0, first_onset − end_guard)
+            # (a) pre-first-pulse rest window: [0, first_onset - end_guard)
             _pre_end = max(0, first_onset - _end_guard)
             if _pre_end >= _min_epoch:
                 ss_baseline_segments.append(
                     np.asarray(v_full[:_pre_end], dtype=np.float64))
 
-            # (b) post-last-pulse rest window: [last_onset + settle, N − end_guard)
+            # (b) post-last-pulse rest window: [last_onset + settle, N - end_guard)
             _post_start = last_onset + _settle
             _post_end = max(0, len(v_full) - _end_guard)
             if (_post_end - _post_start) >= _min_epoch:
@@ -16986,7 +16986,7 @@ def _archive_one_cell(
         if verbose:
             nd = sum(1 for w in windows if w["polarity"] == "dep")
             nh = sum(1 for w in windows if w["polarity"] == "hyp")
-            print(f"[archive]   SS sweep {sn}: {len(pulses_raw)} detected → "
+            print(f"[archive]   SS sweep {sn}: {len(pulses_raw)} detected -> "
                   f"{len(pulses_qc)} QC'd (dep={nd}, hyp={nh})")
 
     n_dep_raw = sum(1 for w in all_pulses if w["polarity"] == "dep")
@@ -17003,7 +17003,7 @@ def _archive_one_cell(
         else:
             print(f"[archive]   v2 baseline pool: NONE captured")
 
-    # ── GATE 2: trace-QC response-shape screen + per-pulse filtering ──────────
+    # -- GATE 2: trace-QC response-shape screen + per-pulse filtering ----------
     # Each SS pulse (both polarities by default) is tested for a single-
     # exponential subthreshold relaxation against a per-cell noise null; only
     # passing pulses are retained, so ss_pulses.npz, the smoke-test bundles, and
@@ -17012,7 +17012,7 @@ def _archive_one_cell(
     # QC tables/figures are written into the cell folder regardless (audit even
     # for rejected cells).
     #
-    # τm handling: the reported tau sets the [0.5·τm, 2·τm] band the fitted decay
+    # taum handling: the reported tau sets the [0.5.taum, 2.taum] band the fitted decay
     # constant may span. If tau is absent (NaN) we fall back to
     # trace_qc_tau_fallback_ms so a missing scalar does not spuriously fail every
     # fit (this is a data-completeness issue, not contamination).
@@ -17024,11 +17024,11 @@ def _archive_one_cell(
         if tau_fallback_used:
             tau_for_qc = float(trace_qc_tau_fallback_ms)
             if verbose:
-                print(f"[archive]   trace QC: reported τm missing → fallback "
-                      f"τm={tau_for_qc:.1f} ms")
+                print(f"[archive]   trace QC: reported taum missing -> fallback "
+                      f"taum={tau_for_qc:.1f} ms")
 
         if trace_qc_engine == "v2" and _HAVE_TRACE_QC_V2:
-            # ── v2: per-scale self-calibrated AR null (Bonferroni) ──────────
+            # -- v2: per-scale self-calibrated AR null (Bonferroni) ----------
             qc_cfg = QCConfigV2(
                 fit_target=fit_target,
                 qc_polarities=tuple(trace_qc_polarities),
@@ -17079,7 +17079,7 @@ def _archive_one_cell(
                 print(f"[archive]   trace QC v2: kept {qc.n_passed_total}/{qc.n_pulses} "
                       f"pulses  bank={_bank} ms  M*={_M}  self-cal={_sc_s}")
         else:
-            # ── v1 (default): full-rate pooled AR null ───────────────────────
+            # -- v1 (default): full-rate pooled AR null -----------------------
             if trace_qc_engine == "v2" and not _HAVE_TRACE_QC_V2:
                 if verbose:
                     print(f"[archive]   trace_qc_v2 not importable "
@@ -17118,7 +17118,7 @@ def _archive_one_cell(
             _write_discard_sentinel(cell_dir, sid, "discarded_trace_qc", reason,
                                     extra={"trace_qc": trace_qc_meta})
             if verbose:
-                print(f"[archive]   GATE 2 — {reason}: cell DISCARDED "
+                print(f"[archive]   GATE 2 -- {reason}: cell DISCARDED "
                       f"(QC tables/figures + provenance kept, no ephys/metadata)\n")
             return "discarded_trace_qc"
         all_pulses = qc.kept_pulses       # everything below uses the cleaned pool
@@ -17126,7 +17126,7 @@ def _archive_one_cell(
         trace_qc_meta["skipped_reason"] = "trace_qc module not importable"
         if verbose:
             print(f"[archive]   trace QC requested but module unavailable "
-                  f"({_TRACE_QC_IMPORT_ERR!r}) — pulses archived UNFILTERED")
+                  f"({_TRACE_QC_IMPORT_ERR!r}) -- pulses archived UNFILTERED")
 
     # n_dep / n_hyp reflect the (possibly cleaned) pool actually saved below
     n_dep = sum(1 for w in all_pulses if w["polarity"] == "dep")
@@ -17175,7 +17175,7 @@ def _archive_one_cell(
                   f"(dep={n_dep}, hyp={n_hyp}, "
                   f"{'stacked' if ss_stacked else 'indexed'})")
 
-    # ── C2. Long Square: individual sweep traces ─────────────────────────────
+    # -- C2. Long Square: individual sweep traces -----------------------------
     ls_meta_list = _select_long_square_subthreshold(sweeps_meta)
     ls_sweep_info: List[Dict[str, Any]] = []
     ls_arrays: Dict[str, np.ndarray] = {}
@@ -17212,7 +17212,7 @@ def _archive_one_cell(
         if verbose:
             print(f"[archive]   LS saved: {len(ls_sweep_info)} sweeps")
 
-    # ── C3. MEMBRANE-TRACE FIGURE (recorded whole-cell Vm; train + validate) ──
+    # -- C3. MEMBRANE-TRACE FIGURE (recorded whole-cell Vm; train + validate) --
     # Visualises the data extracted in C1 (square subthreshold -> training) and
     # C2 (long square -> validation). Placed here so it runs on already-saved
     # arrays and is independent of the smoke test below; guarded like 4b above.
@@ -17234,10 +17234,10 @@ def _archive_one_cell(
                 print(f"[archive]   membrane-trace figure skipped "
                       f"({type(e).__name__}: {e})")
 
-    # ── D. SCALAR FEATURES — moved to "D′" ABOVE section C (rin/tau/vrest are ──
-    #     already defined there so τm is available to the trace-QC gate). ───────
+    # -- D. SCALAR FEATURES -- moved to "D'" ABOVE section C (rin/tau/vrest are --
+    #     already defined there so taum is available to the trace-QC gate). -------
 
-    # ── E. SMOKE TEST (builds from the REPAIRED swc_dst) ─────────────────────
+    # -- E. SMOKE TEST (builds from the REPAIRED swc_dst) ---------------------
     smoke: Dict[str, Any] = {}
     try:
         cell = build_neuron_model(swc_dst, F=F)
@@ -17270,7 +17270,7 @@ def _archive_one_cell(
             smoke["simulation_note"] = "no train bundles or vrest is NaN"
         if verbose:
             secs = smoke["n_sections"]
-            print(f"[archive]   SMOKE TEST: OK — "
+            print(f"[archive]   SMOKE TEST: OK -- "
                   f"sections={secs['soma']}s/{secs['dend']}d/"
                   f"{secs['apic']}a/{secs['axon']}ax  "
                   f"train={smoke.get('n_train_bundles', '?')}  "
@@ -17280,7 +17280,7 @@ def _archive_one_cell(
         if verbose:
             print(f"[archive]   SMOKE TEST FAILED: {e}")
 
-    # ── F. SAVE METADATA.JSON (now carries the phase0 block) ─────────────────
+    # -- F. SAVE METADATA.JSON (now carries the phase0 block) -----------------
     meta_json: Dict[str, Any] = {}
     for k, v in meta.items():
         if isinstance(v, (int, float, str, bool, type(None))):
@@ -17328,11 +17328,11 @@ def _archive_one_cell(
     with open(cell_dir / "metadata.json", "w") as f:
         json.dump(metadata, f, indent=2, cls=_NumpyEncoder)
 
-    # ── status (never "skipped" now; annotate phase0 outcome) ────────────────
+    # -- status (never "skipped" now; annotate phase0 outcome) ----------------
     base = "ok" if smoke.get("simulation_ok") else "partial"
     status = base if phase0.get("phase0_passed") else f"{base}_phase0_failed"
     if verbose:
-        print(f"[archive]   → status: {status}  (phase0_passed={phase0.get('phase0_passed')})\n")
+        print(f"[archive]   -> status: {status}  (phase0_passed={phase0.get('phase0_passed')})\n")
     return status
 
 #
@@ -17363,7 +17363,7 @@ cells = ctc.get_cells(species=[CellTypesApi.HUMAN], require_reconstruction=True)
 df = pd.DataFrame(cells)
 print(df['structure_area_abbrev'].value_counts().to_string())
 
-# %% Cell 3 — RUN: download + repair + archive ================================
+# %% Cell 3 -- RUN: download + repair + archive ================================
 # Set your selection and run. Each cell is downloaded, repaired (Phase 0),
 # electrically checked, and archived under ARCHIVE_DIR/specimen_<id>/.
 if __name__ == "__main__":
@@ -17376,7 +17376,7 @@ if __name__ == "__main__":
     candidates, results = download_allen_archive(
         layer="4",
         dendrite_type="aspiny",
-        structure_area_abbrev=None,   # ← new knob; None keeps all regions
+        structure_area_abbrev=None,   # <- new knob; None keeps all regions
         n_cells=50,
         archive_dir=ARCHIVE_DIR,
         F=1,
@@ -17390,9 +17390,9 @@ if __name__ == "__main__":
         trace_qc_alpha=0.5,
         trace_qc_B=500,
         trace_qc_seed=0,
-        # ── v2 engine ────────────────────────────────────────────────────────────
+        # -- v2 engine ------------------------------------------------------------
         trace_qc_engine="v2",
-        trace_qc_v2_selfcal_enable=False,       # only 139 ms baseline — skip self-cal
+        trace_qc_v2_selfcal_enable=False,       # only 139 ms baseline -- skip self-cal
         trace_qc_v2_ar_max_memory_ms=5.0,       # fixed AR memory for the per-scale null
         trace_qc_v2_test_window_ms=40.0,        # scoring window fits inside the 70 ms epoch
         trace_qc_v2_decim_scales_ms=(1.0, 2.0, 5.0, 10.0),  # drop 20 ms (too coarse at 40 ms)
@@ -17404,7 +17404,7 @@ if __name__ == "__main__":
     )
     print("\n=== ARCHIVE RESULTS ===")
     for r in results:
-        print(f"  specimen {r['specimen_id']:>10}  →  {r['status']}")
+        print(f"  specimen {r['specimen_id']:>10}  ->  {r['status']}")
 
     # Per-cell Phase-0 artefacts now live in each specimen_<id>/ folder:
 
@@ -17422,5 +17422,5 @@ q = df[df.qced]                                   # only pulses actually tested
 print(q.reason.value_counts())                    # pathological? fit_failed? spike? short_window?
 print("p:", q.p_value.describe()[["min","50%","max"]].round(4).to_dict())
 print("argmax scale (ms):", q.argmax_scale_ms.value_counts().to_dict())
-print("fit_tau range:", np.nanmin(q.fit_tau_ms), np.nanmax(q.fit_tau_ms))  # vs your [0.5·τm, 2·τm] band
+print("fit_tau range:", np.nanmin(q.fit_tau_ms), np.nanmax(q.fit_tau_ms))  # vs your [0.5.taum, 2.taum] band
 print("spike_ratio p95:", np.nanpercentile(q.spike_ratio, 95))

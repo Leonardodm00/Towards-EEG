@@ -1,0 +1,46 @@
+{
+  "stage": "S0.6",
+  "transform_id": "T11",
+  "declaration": "T11 -- declared externalisation of a configuration path literal. Replaces a string literal in a keep-verdict module with a call to towards_eeg.config.resolve(key), where the shipped default towards_eeg/config/paths.json maps key to the literal's exact prior bytes. Per occurrence the transform log records file, pre-edit line number, the exact prior line bytes (base64), the exact replacement line bytes (base64) and the key introduced; per file it records sha256 before and after and any inserted import line. The transform is INVERTIBLE FROM ITS OWN LOG: applying the recorded inverse to the current bytes must reproduce sha256_before exactly. That inversion, not a value comparison, is the behaviour-preservation proof required by TEEG_10 section 3.3.",
+  "scope_decision": "N-18. Scoped to the installed package (towards_eeg/) only. Measured on e6e51ea, 21 July 2026: 6 quoted '/content' lines inside towards_eeg/, 113 in retain-verdict files outside it, 1 in tools/ (a comment, not a literal). The roadmap's 'eight' and Doc 5 E-3's '126' are both counts of earlier trees at earlier layouts; the reconciliation is recorded in s06_exit_scope.json so that 'eight' stops resurfacing. retain-verdict files are not installed and have no consumer; editing 113 literals in superseded forks would be a large byte-changing diff with no beneficiary.",
+  "line_numbers_are": "pre-edit, 1-based, against the bytes at e6e51ea962eb2d9cd366821b8fbab173afb7f877",
+  "files": [
+    {
+      "path": "towards_eeg/connectome/connectivity_buildup.py",
+      "verdict": "keep",
+      "insert_import": {
+        "after_line": 10,
+        "expect_line_text": "import os",
+        "text": "from towards_eeg.config import resolve  #S0.6:T11"
+      },
+      "occurrences": [
+        {"line": 21, "key": "connectomics_dir", "literal": "/content/drive/MyDrive/Colab Notebooks/Connectomics/"},
+        {"line": 554, "key": "connectomics_dir", "literal": "/content/drive/MyDrive/Colab Notebooks/Connectomics/"},
+        {"line": 687, "key": "connectomics_dir", "literal": "/content/drive/MyDrive/Colab Notebooks/Connectomics/"}
+      ]
+    },
+    {
+      "path": "towards_eeg/connectome/usage_example.py",
+      "verdict": "keep",
+      "insert_import": {
+        "after_line": 1,
+        "expect_line_text": "import os",
+        "text": "from towards_eeg.config import resolve  #S0.6:T11"
+      },
+      "occurrences": [
+        {"line": 842, "key": "connectomics_dir", "literal": "/content/drive/MyDrive/Colab Notebooks/Connectomics/"},
+        {"line": 844, "key": "connectomics_output_dir", "literal": "/content/drive/MyDrive/Colab Notebooks/Connectomic_output/"}
+      ]
+    }
+  ],
+  "excluded_in_package": [
+    {
+      "path": "towards_eeg/connectome/connectivity_buildup.py",
+      "line": 14,
+      "text": "drive.mount('/content/drive',force_remount=True)",
+      "reason": "Colab API call, not a configurable path. '/content/drive' is the fixed mount point the google.colab runtime provides, not something a deployment chooses. TEEG_10 section 4.1: count it separately.",
+      "assigned_to": "de-Colab follow-on"
+    }
+  ],
+  "self_verification": "Every entry above is asserted still to apply by tools/test_s0_6_exit.py. A declared occurrence whose literal is no longer present, a declared exclusion whose line no longer matches, or an inserted import that is missing, is a FAILURE and not a harmless leftover (Doc 7 section 3)."
+}

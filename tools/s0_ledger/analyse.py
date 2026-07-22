@@ -1,0 +1,535 @@
+"""
+analyse.py -- pure logic layer of the S0.0 ledger builder.
+
+Responsibility
+--------------
+Turn measurements (scan.FileRecord) plus a declared ancestor map into
+ledger rows.  Performs NO I/O: everything it needs is already measured.
+
+The central idea
+----------------
+The ancestor map DECLARES a relationship ("this local file is byte-identical
+to that repository file").  This module MEASURES the relationship from the
+hashes and compares the two.  A disagreement is not silently resolved in
+favour of either side: the row is marked verdict "unknown", which fails the
+S0.0 exit test.  The ledger is only worth having if it can contradict the
+document that produced it.
+
+Vocabulary
+----------
+relationship
+    origin              file predates S0; it is its own ancestor at pre-s0
+    identical           byte-identical to a declared ancestor
+    mechanical          output of a stated reproducible transform (clause 2
+                        of the byte-identity rule)
+    working_branch_edit hand edit made before S0 on the working branch.  NOT
+                        a mechanical transform, and legitimate only because
+                        S0.1 commits the file, making it an ancestor for
+                        everything downstream
+    new                 new infrastructure nothing pre-existing depends on
+
+verdict
+    keep      survives into the installed package towards_eeg/
+    retain    stays in the repository but outside the installed package
+    discard   removed from the working tree
+    new       created by S0
+
+Note that "retain" is not in the roadmap's vocabulary.  It is introduced
+here because the roadmap simultaneously declares the Colab data-prep scripts
+"not a target" (decision register) and instructs S0.2 to strip magics from
+them.  Both are satisfied if they stay in the tree and out of the package.
+The distinction is recorded, not decided; see the S0.0 report.
+"""
+
+from dataclasses import dataclass, asdict
+from typing import Tuple
+
+RELATIONSHIPS = ("origin", "identical", "mechanical", "working_branch_edit", "new")
+VERDICTS = ("keep", "retain", "discard", "new")
+
+# Sentinel written into hash-chain columns that a later sub-step will fill.
+NOT_YET = "-"
+
+
+@dataclass(frozen=True)
+class LedgerRow:
+    path: str
+    scope: str
+    stage: str
+    verdict: str
+    relationship: str
+    transform_id: str
+    ancestor_path: str
+    ancestor_sha256: str
+    sha256_pre_s0: str
+    sha256_post_s02: str
+    sha256_post_s03: str
+    sha256_post_s04: str
+    sha256_post_s05: str
+    sha256_post_s06: str
+    sha256_post_s07: str
+    sha256_post_s08: str
+    sha256_post_s09: str
+    size_bytes: int
+    is_python: bool
+    parses: bool
+    n_syntax_warnings: int
+    n_crlf: int
+    n_lf: int
+    n_nonascii: int
+    has_cookie: bool
+    rationale: str
+
+    def as_dict(self):
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ShadowedDef:
+    """One module-level name defined more than once in one file (defect O7)."""
+
+    path: str
+    name: str
+    kind: str
+    lines: Tuple[int, ...]
+    effective_line: int
+    dead_lines: Tuple[int, ...]
+
+
+# ---------------------------------------------------------------------------
+# measured relationship
+# ---------------------------------------------------------------------------
+
+def measured_relationship(local, ancestor):
+    """Compare two FileRecords using only their hashes.
+
+    Returns (relationship, transform_id, note).  The lattice is documented in
+    scan.py: each test is a strictly weaker equality than the one above it.
+    """
+    if local.sha256 == ancestor.sha256:
+        return "identical", "T0", "bytes equal"
+    if local.sha256_lf == ancestor.sha256_lf:
+        return "mechanical", "T2", "line endings only (LF <-> CRLF)"
+    if local.sha256_stripped == ancestor.sha256_stripped:
+        return "mechanical", "T1", "trailing newline only (line endings may also differ)"
+    return "working_branch_edit", "", "content differs beyond line endings"
+
+
+# ---------------------------------------------------------------------------
+# defect O7
+# ---------------------------------------------------------------------------
+
+def find_shadowed_defs(records):
+    """Module-level names defined more than once.
+
+    At module scope the LAST definition wins, unconditionally.  In a notebook
+    the winner depends on cell execution order, which version control does not
+    record -- which is why this must be written down before the files move.
+    """
+    out = []
+    for r in records:
+        if not r.is_python or not r.parses:
+            continue
+        by_name = {}
+        for name, lineno, kind in r.toplevel_defs:
+            by_name.setdefault(name, []).append((lineno, kind))
+        for name in sorted(by_name):
+            entries = sorted(by_name[name])
+            if len(entries) < 2:
+                continue
+            lines = tuple(ln for ln, _ in entries)
+            out.append(
+                ShadowedDef(
+                    path=r.path,
+                    name=name,
+                    kind=entries[-1][1],
+                    lines=lines,
+                    effective_line=lines[-1],
+                    dead_lines=lines[:-1],
+                )
+            )
+    out.sort(key=lambda s: (s.path, s.lines[0]))
+    return out
+
+
+def find_duplicate_classes(records):
+    """Top-level class names defined in more than one file.
+
+    Reported for awareness at S0.0; it is smoke-test assertion 6 that acts on
+    it at S0.9.
+    """
+    by_name = {}
+    for r in records:
+        if not r.is_python or not r.parses:
+            continue
+        for name, lineno, kind in r.toplevel_defs:
+            if kind == "class":
+                by_name.setdefault(name, []).append((r.path, lineno))
+    return {k: sorted(v) for k, v in sorted(by_name.items()) if len(v) > 1}
+
+
+# ---------------------------------------------------------------------------
+# scope and payload rules
+# ---------------------------------------------------------------------------
+
+def assign_scope(path, scopes, default="colab"):
+    """First matching prefix wins; declaration order in the spec is therefore
+    significant and is preserved by build_ledger.py."""
+    for scope_name, prefixes in scopes:
+        for prefix in prefixes:
+            if path == prefix or path.startswith(prefix):
+                return scope_name
+    return default
+
+
+def is_payload(path, rule):
+    """True if the file is part of the committed binary payload (D-8, S0.7)."""
+    for ext in rule.get("extensions", []):
+        if path.lower().endswith(ext.lower()):
+            return True
+    for pat in rule.get("suffix_patterns", []):
+        if pat in path:
+            return True
+    return path in set(rule.get("paths", []))
+
+
+# ---------------------------------------------------------------------------
+# the ledger
+# ---------------------------------------------------------------------------
+
+def build_rows(repo_records, local_records, spec, phases=None, as_of="post_s01",
+               moves=None, removed=None):
+    """Assign a verdict to every file.
+
+    repo_records  : FileRecords for the repository tree at pre-s0
+    local_records : FileRecords for the four local working files
+    spec          : the declared ancestor map (see tools/ancestors.json)
+    phases        : optional hash-chain record (see tools/phase_hashes.json,
+                    written by tools/stamp_phase.py).  Without it the chain
+                    columns stay at the NOT_YET sentinel and sha256_pre_s0 is
+                    whatever is on disk -- correct at S0.0 and WRONG from S0.2
+                    onward, because a rescan would overwrite the pre-S0 state
+                    with the post-transform hash.  Pass it after S0.2.
+
+    removed       : optional S0.7 discard manifest (see
+                    tools/s0_transform/s07_discard_manifest.json).  Decision
+                    N-21.  Without it, a file deleted at S0.7 loses its ledger
+                    row -- because this function builds rows by SCANNING THE
+                    TREE, so the row set is a function of what is on disk, and
+                    sha256_pre_s0 vanishes with the file.  That is not
+                    hypothetical: it happened at S0.2 to
+                    Population/population_CHANGED.py, which is declared,
+                    absent, and carries no row and no hash anywhere.  Passing
+                    the manifest re-emits the stored row for every entry whose
+                    file is gone, so the ledger stays the single authority and
+                    S0.9's byte-identity reconstruction assertion keeps its
+                    subject.
+
+    Returns (rows, problems).  problems is a list of human-readable strings;
+    a non-empty list means the ledger disagrees with the documents and S0.0
+    must not be signed off until each entry is resolved.
+    """
+    problems = []
+    by_path = {r.path: r for r in repo_records}
+    chain = (phases or {}).get("phases", {})
+    move_list = (moves or {}).get("moves", [])
+
+    def pre_move_path(path):
+        """Resolve a current path back to where it lived before any T6 move.
+
+        Without this a moved file's row would name itself as its own ancestor,
+        which erases the move from the only regenerable record of it.
+        """
+        for mv in move_list:
+            if mv.get("kind") == "file":
+                if path == mv["to"]:
+                    return mv["from"], True
+            else:
+                prefix = mv["to"].rstrip("/") + "/"
+                if path.startswith(prefix):
+                    return mv["from"].rstrip("/") + "/" + path[len(prefix):], True
+        return path, False
+
+    def post_move_path(path):
+        """Inverse of pre_move_path: a pre-move path -> where it lives now.
+
+        `spec["working_branch"][*]["ancestor"]` names the ancestor by the path
+        it had before S0.4. Looking that up in a tree measured after S0.4
+        finds nothing, and the ledger then reports four declared ancestors as
+        absent from the snapshot -- which reads as a missing file rather than
+        as a move that the ledger itself declared.
+        """
+        for mv in move_list:
+            if mv.get("kind") == "file":
+                if path == mv["from"]:
+                    return mv["to"], True
+            else:
+                prefix = mv["from"].rstrip("/") + "/"
+                if path.startswith(prefix):
+                    return mv["to"].rstrip("/") + "/" + path[len(prefix):], True
+        return path, False
+
+    def chained(path, measured_sha):
+        """(pre_s0, post_s02, post_s03, post_s04, post_s05, post_s06, post_s07, post_s08, post_s09) for one path.
+
+        One column per byte-changing sub-step. S0.5 adds files rather than
+        transforming any, so it contributes a phase but no chain LINK: there
+        is no S0.5 transform log to be equal to. The column exists so that
+        check_07's end-of-chain describes the tree as it now is; without it,
+        files created at S0.5 would be stamped into post_s04 and the
+        regenerable record would say they existed a sub-step earlier than
+        they did. S0.9 is the same shape as S0.5 and S0.8: it adds test
+        infrastructure and edits its own tooling, transforming no pre-existing
+        content, so post_s09 exists to stamp the files it creates or edits at
+        the sub-step they actually appeared, and to let check_17 assert that
+        nothing outside its declared change set moved.
+        """
+        pre = chain.get("pre_s0", {}).get(path, measured_sha)
+        return (pre,
+                chain.get("post_s02", {}).get(path, NOT_YET),
+                chain.get("post_s03", {}).get(path, NOT_YET),
+                chain.get("post_s04", {}).get(path, NOT_YET),
+                chain.get("post_s05", {}).get(path, NOT_YET),
+                chain.get("post_s06", {}).get(path, NOT_YET),
+                chain.get("post_s07", {}).get(path, NOT_YET),
+                chain.get("post_s08", {}).get(path, NOT_YET),
+                chain.get("post_s09", {}).get(path, NOT_YET))
+    local_by_name = {r.path: r for r in local_records}
+
+    scopes = [(k, tuple(v)) for k, v in spec["scopes"]]
+    payload_rule = spec.get("binary_payload", {})
+    discards = {d["path"]: d for d in spec.get("discards", [])}
+
+    # A new-infrastructure entry may be a bare path (created at S0.0, the
+    # original case) or an object declaring its own stage and rationale. The
+    # S0.4 package __init__.py files are clause-(3) new infrastructure but
+    # they are created at S0.4, and stamping them S0.0 would be a lie in the
+    # only regenerable record of when they appeared.
+    DEFAULT_INFRA_WHY = ("new infrastructure (byte-identity rule clause 3): "
+                         "nothing pre-existing depends on it")
+    new_infra = []
+    for _e in spec.get("new_infrastructure", []):
+        if isinstance(_e, dict):
+            new_infra.append((_e["path"], _e.get("stage", "S0.0"),
+                              _e.get("rationale", DEFAULT_INFRA_WHY)))
+        else:
+            new_infra.append((_e, "S0.0", DEFAULT_INFRA_WHY))
+
+    def match_infra(path):
+        for pre, stg, why in new_infra:
+            if path == pre or path.startswith(pre):
+                return stg, why
+        return None
+
+    superseded = {f["path"]: f for f in spec.get("superseded_forks", [])}
+
+    rows = []
+
+    # -- the four local working files, entering the tree at S0.1 ------------
+    declared_ancestors = set()
+    for entry in spec["working_branch"]:
+        name = entry["local"]
+        anc_path = entry["ancestor"]
+        declared_ancestors.add(anc_path)
+
+        loc = local_by_name.get(name)
+        anc_now, _ = post_move_path(anc_path)
+        anc = by_path.get(anc_now)
+        if loc is None:
+            problems.append("working file not measured: %s" % name)
+            continue
+        if anc is None:
+            problems.append(
+                "declared ancestor absent from snapshot: %s (for %s)" % (anc_path, name)
+            )
+            continue
+
+        rel, tid, note = measured_relationship(loc, anc)
+        expected = entry["expected_relationship"]
+        if as_of == "post_s01" and "expected_relationship_post_s01" in entry:
+            # S0.1 wrote the working-branch bytes to the ancestor path, so
+            # from that commit onward the two are the same file. Doc 4 s3
+            # calls this out as expected; declaring it keeps the exit test
+            # meaningful instead of permanently red.
+            expected = entry["expected_relationship_post_s01"]
+        if rel != expected:
+            problems.append(
+                "MISMATCH %s: declared '%s', measured '%s' (%s)"
+                % (name, expected, rel, note)
+            )
+            verdict = "unknown"
+        else:
+            verdict = "keep"
+
+        extra = []
+        if loc.n_crlf and not anc.n_crlf:
+            extra.append("ancestor LF, local CRLF (%d)" % loc.n_crlf)
+        elif anc.n_crlf and not loc.n_crlf:
+            extra.append("ancestor CRLF (%d), local LF" % anc.n_crlf)
+
+        rows.append(
+            LedgerRow(
+                path=name,
+                scope="orchestrator",
+                stage=entry.get("stage", "S0.1"),
+                verdict=verdict,
+                relationship=rel,
+                transform_id=tid,
+                ancestor_path=anc_path,
+                ancestor_sha256=anc.sha256,
+                sha256_pre_s0=chained(name, loc.sha256)[0],
+                sha256_post_s02=chained(name, loc.sha256)[1],
+                sha256_post_s03=chained(name, loc.sha256)[2],
+                sha256_post_s04=chained(name, loc.sha256)[3],
+                sha256_post_s05=chained(name, loc.sha256)[4],
+                sha256_post_s06=chained(name, loc.sha256)[5],
+                sha256_post_s07=chained(name, loc.sha256)[6],
+                sha256_post_s08=chained(name, loc.sha256)[7],
+                sha256_post_s09=chained(name, loc.sha256)[8],
+                size_bytes=loc.size,
+                is_python=loc.is_python,
+                parses=loc.parses,
+                n_syntax_warnings=loc.n_syntax_warnings,
+                n_crlf=loc.n_crlf,
+                n_lf=loc.n_lf,
+                n_nonascii=loc.n_nonascii,
+                has_cookie=loc.has_cookie,
+                rationale="; ".join([entry["rationale"], note] + extra),
+            )
+        )
+
+    # -- every file already in the repository -------------------------------
+    for r in repo_records:
+        # EVERY declaration below -- scopes, discards, payload rules, declared
+        # ancestors, superseded forks -- is keyed by the path the file had
+        # before any T6 move. Deciding on r.path directly would silently
+        # reclassify all nine S0.4 moves: towards_eeg/hybrid/population.py
+        # matches no scope prefix, so it would fall through to "retain" and
+        # its ancestry would vanish from the regenerated ledger.
+        anc_path_r, was_moved = pre_move_path(r.path)
+        scope = assign_scope(anc_path_r, scopes)
+        infra = match_infra(r.path)
+
+        if anc_path_r in discards:
+            d = discards[anc_path_r]
+            verdict, stage, rationale = "discard", d.get("stage", "S0.2"), d["rationale"]
+        elif is_payload(anc_path_r, payload_rule):
+            verdict, stage = "discard", "S0.7"
+            rationale = payload_rule.get(
+                "rationale", "committed binary payload; moves to a separate repository (D-8)"
+            )
+        elif anc_path_r in declared_ancestors:
+            verdict, stage = "keep", "S0.4"
+            rationale = "ancestor of a working-branch file; superseded at S0.1, moved at S0.4"
+        elif infra is not None:
+            verdict = "new"
+            stage, rationale = infra
+            scope = "infrastructure"
+        elif anc_path_r in superseded:
+            # A fork that lost. It is not discarded -- nothing is deleted in
+            # S0 outside the binary payload -- it simply does not enter the
+            # installed package, which is what "retain" means (P-1).
+            f = superseded[anc_path_r]
+            verdict, stage = "retain", "-"
+            rationale = ("superseded fork; survives as %s; stays in the "
+                         "repository outside the installed package; %s"
+                         % (f["superseded_by"], f["rationale"]))
+        elif scope == "orchestrator":
+            verdict, stage = "keep", "S0.4"
+            rationale = "orchestrator source; enters the installed package"
+        else:
+            verdict, stage = "retain", "S0.2" if (r.is_python and not r.parses) else "-"
+            rationale = (
+                "%s scope; stays in the repository, outside the installed package" % scope
+            )
+            if r.is_python and not r.parses:
+                rationale += "; magics stripped at S0.2 so ast.parse succeeds"
+
+        if was_moved:
+            rationale = (rationale + "; moved by T6 (git mv), bytes unchanged")
+        rows.append(
+            LedgerRow(
+                path=r.path,
+                scope=scope,
+                stage=stage,
+                verdict=verdict,
+                relationship="mechanical" if was_moved else "origin",
+                transform_id="T6" if was_moved else "",
+                ancestor_path=anc_path_r,
+                ancestor_sha256=r.sha256,
+                sha256_pre_s0=chained(r.path, r.sha256)[0],
+                sha256_post_s02=chained(r.path, r.sha256)[1],
+                sha256_post_s03=chained(r.path, r.sha256)[2],
+                sha256_post_s04=chained(r.path, r.sha256)[3],
+                sha256_post_s05=chained(r.path, r.sha256)[4],
+                sha256_post_s06=chained(r.path, r.sha256)[5],
+                sha256_post_s07=chained(r.path, r.sha256)[6],
+                sha256_post_s08=chained(r.path, r.sha256)[7],
+                sha256_post_s09=chained(r.path, r.sha256)[8],
+                size_bytes=r.size,
+                is_python=r.is_python,
+                parses=r.parses,
+                n_syntax_warnings=r.n_syntax_warnings,
+                n_crlf=r.n_crlf,
+                n_lf=r.n_lf,
+                n_nonascii=r.n_nonascii,
+                has_cookie=r.has_cookie,
+                rationale=rationale,
+            )
+        )
+
+    # -- S0.7: re-emit a row for every file the discard manifest records ----
+    # Decision N-21.  These rows describe files that are NOT on disk, so every
+    # field comes from the manifest rather than from a measurement; measuring
+    # is exactly what is no longer possible.  sha256_post_s07 is the ABSENT
+    # sentinel, which is the honest value: the file has no post-S0.7 bytes.
+    if removed:
+        seen = set(x.path for x in rows)
+        for entry in removed.get("entries", []):
+            rel = entry["path"]
+            if rel in seen:
+                problems.append(
+                    "%s is declared removed at S0.7 but still has a scanned "
+                    "row; the manifest and the tree disagree" % rel)
+                continue
+            r = entry["row"]
+            rows.append(
+                LedgerRow(
+                    path=rel,
+                    scope=r["scope"],
+                    stage=r["stage"],
+                    verdict=r["verdict"],
+                    relationship=r["relationship"],
+                    transform_id="T12",
+                    ancestor_path=r["ancestor_path"],
+                    ancestor_sha256=r["ancestor_sha256"],
+                    sha256_pre_s0=r["sha256_pre_s0"],
+                    sha256_post_s02=r["sha256_post_s02"],
+                    sha256_post_s03=r["sha256_post_s03"],
+                    sha256_post_s04=r["sha256_post_s04"],
+                    sha256_post_s05=r["sha256_post_s05"],
+                    sha256_post_s06=r["sha256_post_s06"],
+                    sha256_post_s07=NOT_YET,
+                    sha256_post_s08=NOT_YET,
+                    sha256_post_s09=NOT_YET,
+                    size_bytes=int(r["size_bytes"]),
+                    is_python=str(r["is_python"]).lower() in ("true", "1"),
+                    parses=str(r["parses"]).lower() in ("true", "1"),
+                    n_syntax_warnings=int(r["n_syntax_warnings"]),
+                    n_crlf=int(r["n_crlf"]),
+                    n_lf=int(r["n_lf"]),
+                    n_nonascii=int(r["n_nonascii"]),
+                    has_cookie=str(r["has_cookie"]).lower() in ("true", "1"),
+                    rationale=(r["rationale"] + "; REMOVED from the working "
+                               "tree at S0.7 by T12, bytes recorded in "
+                               "tools/s0_transform/s07_discard_manifest.json"),
+                )
+            )
+
+    rows.sort(key=lambda x: (x.scope, x.path))
+
+    unknown = [x.path for x in rows if x.verdict not in VERDICTS]
+    if unknown:
+        problems.append("rows with a non-final verdict: %s" % ", ".join(unknown))
+
+    return rows, problems

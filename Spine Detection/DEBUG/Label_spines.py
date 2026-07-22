@@ -17,19 +17,19 @@ def label_dendritic_spines_robust(neuron_ids, input_dir='/content/drive/MyDrive/
     """
     updated_neurons = {}
 
-    print(f"🔍 Searching for complex dendritic spines across {len(neuron_ids)} neurons (Threshold: {spine_length_threshold_nm} nm)...")
+    print(f" Searching for complex dendritic spines across {len(neuron_ids)} neurons (Threshold: {spine_length_threshold_nm} nm)...")
 
     for nid in neuron_ids:
         filepath = os.path.join(input_dir, f"neuron_{nid}.csv")
 
         if not os.path.exists(filepath):
-            print(f"⚠️ File for neuron {nid} not found. Skipping.")
+            print(f"[WARN] File for neuron {nid} not found. Skipping.")
             continue
 
         df = pd.read_csv(filepath)
 
         if not {'id', 'p', 'x', 'y', 'z', 'annotated_type'}.issubset(df.columns):
-            print(f"⚠️ Missing required columns in neuron {nid}. Skipping.")
+            print(f"[WARN] Missing required columns in neuron {nid}. Skipping.")
             continue
 
         # 1. Build a Directed Graph
@@ -83,7 +83,7 @@ def label_dendritic_spines_robust(neuron_ids, input_dir='/content/drive/MyDrive/
             df.loc[df['id'].isin(spine_nodes), 'annotated_type'] = 'spine'
 
         updated_neurons[nid] = df
-        print(f"✅ Neuron {nid}: Identified and relabeled {len(spine_nodes)} spine nodes (including bifurcations).")
+        print(f"[OK] Neuron {nid}: Identified and relabeled {len(spine_nodes)} spine nodes (including bifurcations).")
 
         if output_dir:
             os.makedirs(output_dir, exist_ok=True)
@@ -119,17 +119,17 @@ def plot_color_coded_neurons(neuron_dict, neuron_ids):
         'unclassified': 'lightgrey'
     }
 
-    print(f"🎨 Plotting {len(neuron_ids)} color-coded neurons...")
+    print(f" Plotting {len(neuron_ids)} color-coded neurons...")
 
     for nid in neuron_ids:
         if nid not in neuron_dict:
-            print(f"⚠️ Neuron {nid} not found in the provided dictionary. Skipping.")
+            print(f"[WARN] Neuron {nid} not found in the provided dictionary. Skipping.")
             continue
 
         df = neuron_dict[nid]
 
         if not {'id', 'p', 'x', 'y', 'z', 'annotated_type'}.issubset(df.columns):
-            print(f"⚠️ Missing required columns in neuron {nid}. Skipping.")
+            print(f"[WARN] Missing required columns in neuron {nid}. Skipping.")
             continue
 
         fig = go.Figure()

@@ -1,0 +1,29 @@
+{
+  "stage": "S0.2",
+  "exit_test": "tools/test_s0_2_exit.py",
+  "required_parse": "all",
+  "note_on_scoping": "Decision B-1 scopes the mechanical assertions to the installed package, with an explicit allowlist rather than a silent skip, so that every exclusion is auditable. B-1' confirms operationally that the Colab and passive trees are never imported or installed by the orchestrator. Every S0.2 target is scope 'colab' or 'passive', verdict 'retain' -- none of them enters the package. ast.parse is nevertheless required of all ten, because a file that does not parse cannot be inspected by any downstream tool, whatever its scope.",
+  "compile_exempt": [
+    {
+      "path": "Passive Features/Allen Institute Data/save_alleninstitute_data (6).py",
+      "defect": "O9",
+      "cause": "non_leading_future_import",
+      "rationale": "Multi-notebook concatenation: ten 'from __future__ import annotations' statements at interior positions and none at module head. Legal in a notebook, where each cell is compiled separately; illegal in a module. The file has never been py_compile-able and is not required to be: passive scope, verdict retain, never imported by the orchestrator and never installed.",
+      "assigned_stage": "S6 (passive sub-project) or a dedicated notebook-split step; NOT S0, because splitting a concatenation is a content operation"
+    },
+    {
+      "path": "Passive Features/Plot/passive_result_plot (5).py",
+      "defect": "O9",
+      "cause": "non_leading_future_import",
+      "rationale": "Same failure mode; five interior future imports.",
+      "assigned_stage": "S6 (passive sub-project) or a dedicated notebook-split step"
+    },
+    {
+      "path": "Passive Features/phase1fittingcolab (2).py",
+      "defect": "O9",
+      "cause": "non_leading_future_import",
+      "rationale": "Same failure mode; four interior future imports.",
+      "assigned_stage": "S6 (passive sub-project) or a dedicated notebook-split step"
+    }
+  ]
+}

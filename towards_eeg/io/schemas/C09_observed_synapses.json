@@ -1,0 +1,80 @@
+{
+  "contract_id": "C-09",
+  "title": "Observed-synapse table (per morphology)",
+  "status_in_repository": "NEEDS-FIX",
+  "status_note": "must be regenerated against the pruned bank.",
+  "key": null,
+  "row_meaning": "one row per observed synapse on morphology nu",
+  "producer": "structure/ (map_synapses_to_segments)",
+  "consumers": [
+    "snap_to_closest_actual_synapses",
+    "evaluate_select_place"
+  ],
+  "source": "TEEG_02_interface_contracts_v3.md C-09",
+  "invariants": [
+    "I-13b"
+  ],
+  "fields": [
+    {
+      "name": "x",
+      "type": "float",
+      "units": "um",
+      "required": true,
+      "meaning": "position in the aligned cell frame; THE DURABLE GROUND TRUTH"
+    },
+    {
+      "name": "y",
+      "type": "float",
+      "units": "um",
+      "required": true
+    },
+    {
+      "name": "z",
+      "type": "float",
+      "units": "um",
+      "required": true
+    },
+    {
+      "name": "synapse_label",
+      "type": "str",
+      "units": null,
+      "required": true,
+      "enum": "sigma_syn",
+      "note": "this is the 'other column'. It lives HERE, not in a section name. Sharing the slot is defect O8."
+    },
+    {
+      "name": "lfpy_idx",
+      "type": "int",
+      "units": null,
+      "required": true,
+      "index_space": "I_seg",
+      "meaning": "s; a CACHED LOOKUP, valid only for the (nu, Lambda) recorded in the same row",
+      "is_key": false,
+      "note": "NOT a key. After pruning and merging one segment hosts many synapses; this is many-to-one and must be recomputed whenever (nu, Lambda) changes."
+    },
+    {
+      "name": "spine_base_section",
+      "type": "str",
+      "units": null,
+      "required": false,
+      "new_in_rev": "3",
+      "meaning": "for a synapse that sat on a pruned spine: the shaft section containing that spine's base, recorded BEFORE pruning",
+      "required_when": "the parent bank has spine_status == 'pruned'",
+      "note": "re-attachment must use this recorded base, never a geometric snap: a spine head sits roughly 2 um from its own shaft and in dense EM neuropil is frequently closer to a DIFFERENT neuron's dendrite, so nearest-neighbour would silently relocate synapses onto the wrong branch and the model would run without complaint."
+    },
+    {
+      "name": "lambda_f",
+      "type": "float",
+      "units": "Hz",
+      "required": true,
+      "note": "must equal the C-08 row for the same nu (I-13b)"
+    },
+    {
+      "name": "nsegs_method",
+      "type": "str",
+      "units": null,
+      "required": true,
+      "note": "must equal the C-08 row for the same nu (I-13b)"
+    }
+  ]
+}

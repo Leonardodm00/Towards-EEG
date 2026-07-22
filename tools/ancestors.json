@@ -1,0 +1,523 @@
+{
+  "schema_version": 1,
+  "snapshot": "github.com/Leonardodm00/Towards-EEG@main",
+  "snapshot_date": "2026-07-19",
+  "note": "Declared ancestry for stage S0.0. Every claim here is CHECKED against measured hashes by analyse.py; a disagreement produces verdict 'unknown' and fails the exit test. Sources: TEEG_01 rev 2 section 3.3 and section 3.2.",
+  "transforms": {
+    "T0": "none; bytes identical to ancestor",
+    "T1": "trailing newline added or removed; no other content differs",
+    "T2": "line endings converted (LF <-> CRLF); no other content differs",
+    "T3": "Colab cell magics commented out (applied at S0.2)",
+    "T4": "non-ASCII characters transliterated to ASCII (applied at S0.3)",
+    "T5": "line endings normalised to LF (applied at S0.3)",
+    "T6": "path change only, via git mv; bytes unchanged (applied at S0.4)",
+    "T7": "Colab notebook magic neutralised in place, prefixed '#S0.2:T7# ' (applied at S0.2)",
+    "T7p": "Colab notebook magic neutralised where the line also carried code (applied at S0.2)",
+    "T8": "declared whitespace correction (applied at S0.2)",
+    "T9": "non-ASCII characters transliterated to ASCII via s03_translit_map.json (applied at S0.3)",
+    "T10": "line endings normalised to LF (applied at S0.3)",
+    "T11": "declared externalisation of a configuration path literal (applied at S0.6): a string literal in a keep-verdict module is replaced by a call to towards_eeg.config.resolve(key), where the shipped default towards_eeg/config/paths.json maps key to the literal's exact prior bytes. Byte-identity rule clause (2). The transform log is INVERTIBLE: applying the recorded inverse to the current bytes reproduces sha256_before exactly, which is the behaviour-preservation proof required by TEEG_10 section 3.3.",
+    "T12": "declared removal of a tracked file that no code path references (applied at S0.7). Admissible under the byte-identity rule read in the removal direction: a file nothing depends on may leave the tree PROVIDED ITS IDENTITY IS PRESERVED OUTSIDE IT. NOT invertible from its log -- the bytes leave -- so every hash is recorded BEFORE deletion in tools/s0_transform/s07_discard_manifest.json, which carries each file's complete ledger row as it stood at the capture commit. build_ledger.py re-emits those rows though the files are absent (N-21). This is the material difference from T11, which is invertible and needs no such record."
+  },
+  "new_infrastructure": [
+    {
+      "path": "towards_eeg/io/schema.py",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "towards_eeg/io/geometry.py",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "towards_eeg/io/invariants.py",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "towards_eeg/io/validate.py",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "towards_eeg/io/schemas/alphabets.json",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "towards_eeg/io/schemas/C08_morphology_bank.json",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "towards_eeg/io/schemas/C09_observed_synapses.json",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "towards_eeg/io/schemas/C14_passive_parameters.json",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "towards_eeg/io/schemas/C15_mechanism_spec.json",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "tools/test_s0_5_exit.py",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "tools/test_s0_5_smoke.py",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "tools/s0_transform/s05_exit_scope.json",
+      "stage": "S0.5",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0.5 pins the C-08, C-09, C-14 and C-15 schemas and registers invariants I-13c and I-14 through I-18; nothing pre-existing depends on it and S0 populates nothing"
+    },
+    {
+      "path": "pyproject.toml",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the packaging declaration. Dependencies deliberately empty until B-4 is answered and S0.8 generates the lockfiles from a real pip freeze."
+    },
+    {
+      "path": ".gitattributes",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/ancestors.json",
+      "stage": "S0.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/apply_moves.py",
+      "stage": "S0.2c",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/build_ledger.py",
+      "stage": "S0.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/path_moves.json",
+      "stage": "S0.2c",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/phase_hashes.json",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_ledger/__init__.py",
+      "stage": "S0.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_ledger/analyse.py",
+      "stage": "S0.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_ledger/render.py",
+      "stage": "S0.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_ledger/scan.py",
+      "stage": "S0.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_paths.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/S02_discard.sh",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/__init__.py",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/asciify.py",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/decolab.py",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/s02_colab_commands.json",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/s02_exit_scope.json",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/s02_targets.json",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/s02_transform_log.json",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/s03_exit_scope.json",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/s03_targets.json",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/s03_transform_log.json",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/s0_transform/s03_translit_map.json",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/stamp_phase.py",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/test_s0_2_exit.py",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/test_s0_3_exit.py",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/test_s0_4_exit.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/test_s0_asciify_smoke.py",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/test_s0_chain.py",
+      "stage": "S0.3",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/test_s0_decolab_smoke.py",
+      "stage": "S0.2",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/test_s0_ledger_smoke.py",
+      "stage": "S0.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    {
+      "path": "tools/test_s0_moves_smoke.py",
+      "stage": "S0.2c",
+      "rationale": "new infrastructure (byte-identity rule clause 3): S0 tooling, created at the stage named here; nothing pre-existing depends on it"
+    },
+    "tools/",
+    "LEDGER.md",
+    "ledger.csv",
+    {
+      "path": "towards_eeg/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/hybrid/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/connectome/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/structure/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/pointnet/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/cosim/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/passive/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/io/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/config/__init__.py",
+      "stage": "S0.4",
+      "rationale": "new infrastructure (byte-identity rule clause 3): package marker created at S0.4 so importlib.import_module can reach the module; nothing pre-existing depends on it"
+    },
+    {
+      "path": "towards_eeg/config/paths.json",
+      "stage": "S0.6",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the shipped DEFAULT path configuration introduced at S0.6. Every value is byte-identical to the literal it replaced, so externalisation is behaviour-preserving under the shipped default (TEEG_10 section 3.3). Nothing pre-existing depends on it: before S0.6 the strings were inline. Decision N-19: JSON, not YAML, because pyproject.toml declares no dependencies pending B-4 and PyYAML is not stdlib."
+    },
+    {
+      "path": "tools/s0_transform/externalise_paths.py",
+      "stage": "S0.6",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the T11 transform tool."
+    },
+    {
+      "path": "tools/s0_transform/s06_targets.json",
+      "stage": "S0.6",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the declared S0.6 target set."
+    },
+    {
+      "path": "tools/s0_transform/s06_transform_log.json",
+      "stage": "S0.6",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the T11 transform log; self-referential."
+    },
+    {
+      "path": "tools/s0_transform/s06_exit_scope.json",
+      "stage": "S0.6",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the declared S0.6 exit scope."
+    },
+    {
+      "path": "tools/test_s0_6_exit.py",
+      "stage": "S0.6",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the S0.6 exit test."
+    },
+    {
+      "path": "tools/test_s0_6_smoke.py",
+      "stage": "S0.6",
+      "rationale": "new infrastructure (byte-identity rule clause 3): mutation harness for the S0.6 exit test."
+    },
+    {
+      "path": "tools/s0_transform/remove_discards.py",
+      "stage": "S0.7",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the T12 transform tool."
+    },
+    {
+      "path": "tools/s0_transform/s07_discard_manifest.json",
+      "stage": "S0.7",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the durable record of the 22 files removed at S0.7, carrying each one's pre-S0 hash and full ledger row. Repairs finding R-7: the ledger is built by scanning the tree, so without this a deleted file loses its row and its sha256_pre_s0."
+    },
+    {
+      "path": "tools/s0_transform/s07_exit_scope.json",
+      "stage": "S0.7",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the declared S0.7 exit scope."
+    },
+    {
+      "path": "tools/test_s0_7_exit.py",
+      "stage": "S0.7",
+      "rationale": "new infrastructure (byte-identity rule clause 3): the S0.7 exit test."
+    },
+    {
+      "path": "tools/test_s0_7_smoke.py",
+      "stage": "S0.7",
+      "rationale": "new infrastructure (byte-identity rule clause 3): mutation harness for the S0.7 exit test."
+    },
+    {
+      "path": "requirements/hybrid_stack.lock",
+      "stage": "S0.8",
+      "rationale": "new infrastructure (clause 3): the pinned reference environment for the hybrid scheme, every entry pinned by version AND sha256. ONE lockfile, not the roadmap's two: finding H-8 shows the stacks do not conflict at current versions, and finding H-10 shows driver.py needs them CO-RESIDENT, so two environments could not run it."
+    },
+    {
+      "path": "requirements/hybrid_stack.validation.json",
+      "stage": "S0.8",
+      "rationale": "new infrastructure (clause 3): the evidence record for the lockfile, produced by actually installing it and actually importing every module. States explicitly that it is NOT the davinci environment, so S0.8 cannot be mistaken for closing B-4."
+    },
+    {
+      "path": "tools/s0_transform/s08_exit_scope.json",
+      "stage": "S0.8",
+      "rationale": "new infrastructure (clause 3): the declared S0.8 exit scope."
+    },
+    {
+      "path": "tools/test_s0_8_exit.py",
+      "stage": "S0.8",
+      "rationale": "new infrastructure (clause 3): the S0.8 exit test."
+    },
+    {
+      "path": "tools/test_s0_8_smoke.py",
+      "stage": "S0.8",
+      "rationale": "new infrastructure (clause 3): mutation harness for the S0.8 exit test."
+    },
+    {
+      "path": "tools/s0_transform/s09_exit_scope.json",
+      "stage": "S0.9",
+      "rationale": "new infrastructure (clause 3): the declared, self-verifying S0.9 exit scope. Carries the three exemptions assertion 3 (O10 + absent-dependency), assertion 6 (duplicate Connectomics) and assertion 8 (self-referential artifacts) assert still apply."
+    },
+    {
+      "path": "tests/test_s0_import_surface.py",
+      "stage": "S0.9",
+      "rationale": "new infrastructure (clause 3): the S0.9 import-surface exit test, eight assertions over the installed package. Dual-mode: a plain --root harness and pytest-collectable."
+    },
+    {
+      "path": "tools/test_s0_9_smoke.py",
+      "stage": "S0.9",
+      "rationale": "new infrastructure (clause 3): mutation harness for the S0.9 exit test."
+    },
+    {
+      "path": "requirements/dev.txt",
+      "stage": "S0.9",
+      "rationale": "new infrastructure (clause 3): pytest declared as a dev-only requirement, leaving pyproject runtime dependencies empty (the pending zero-runtime-dependencies decision undisturbed)."
+    }
+  ],
+  "scopes": [
+    [
+      "orchestrator",
+      [
+        "HybridLFPy Tweaked/",
+        "Population/",
+        "Parames evoked with EEG/",
+        "Classes/"
+      ]
+    ],
+    [
+      "passive",
+      [
+        "Passive Features/"
+      ]
+    ]
+  ],
+  "working_branch": [
+    {
+      "local": "params_evoked_with_EEG_CHANGED.py",
+      "ancestor": "HybridLFPy Tweaked/params_evoked_with_EEG_multiMorph.py",
+      "expected_relationship": "identical",
+      "stage": "S0.1",
+      "rationale": "TEEG_01 rev 2 section 3.3: byte-identical to the snapshot; keep",
+      "expected_relationship_post_s01": "identical",
+      "post_s01_note": "After S0.1 the working-branch content IS the ancestor path's content, so the measured relationship becomes 'identical' for every entry. Declared here so that build_ledger.py remains a green CI gate on a clean checkout; the pre-S0.1 declaration is retained above it and is what the ledger committed at a103146 was checked against."
+    },
+    {
+      "local": "hybrid_sim_evoked_with_EEG_CHANGED.py",
+      "ancestor": "HybridLFPy Tweaked/hybrid_sim_evoked_with_EEG_multiMorph.py",
+      "expected_relationship": "mechanical",
+      "stage": "S0.1",
+      "rationale": "TEEG_01 rev 2 section 3.3: identical modulo a trailing newline; keep",
+      "expected_relationship_post_s01": "identical",
+      "post_s01_note": "After S0.1 the working-branch content IS the ancestor path's content, so the measured relationship becomes 'identical' for every entry. Declared here so that build_ledger.py remains a green CI gate on a clean checkout; the pre-S0.1 declaration is retained above it and is what the ledger committed at a103146 was checked against."
+    },
+    {
+      "local": "population_CHANGED.py",
+      "ancestor": "HybridLFPy Tweaked/Population_multiMorph.py",
+      "expected_relationship": "working_branch_edit",
+      "stage": "S0.1",
+      "rationale": "TEEG_01 rev 2 section 3.3: ancestor plus 7 lines, an empty tonic-inhibition placeholder comment in cellsim; keep. Not a mechanical transform; legitimate because S0.1 commits it, making it the ancestor for everything downstream",
+      "expected_relationship_post_s01": "identical",
+      "post_s01_note": "After S0.1 the working-branch content IS the ancestor path's content, so the measured relationship becomes 'identical' for every entry. Declared here so that build_ledger.py remains a green CI gate on a clean checkout; the pre-S0.1 declaration is retained above it and is what the ledger committed at a103146 was checked against."
+    },
+    {
+      "local": "Utility_fun.py",
+      "ancestor": "HybridLFPy Tweaked/Utility_function.py",
+      "expected_relationship": "working_branch_edit",
+      "stage": "S0.1",
+      "rationale": "TEEG_01 rev 2 section 3.3: ancestor plus three new functions (insert_mechanisms, get_gIhbar_L5_apical, get_gCa_HVA_apical); keep. Carries defects U1-U4, deferred to S3",
+      "expected_relationship_post_s01": "identical",
+      "post_s01_note": "After S0.1 the working-branch content IS the ancestor path's content, so the measured relationship becomes 'identical' for every entry. Declared here so that build_ledger.py remains a green CI gate on a clean checkout; the pre-S0.1 declaration is retained above it and is what the ledger committed at a103146 was checked against."
+    }
+  ],
+  "discards": [
+    {
+      "path": "Population/population_CHANGED.py",
+      "stage": "S0.2",
+      "rationale": "Dead branch. Same filename as the local working file but DIFFERENT ancestry (TEEG_01 rev 2 section 3.3); the eleventh ast.parse failure, an unfinished hand edit. Any tree containing both resolves imports by whichever is seen last"
+    },
+    {
+      "path": "Passive Features/HPC script/passive_fit.e1099100",
+      "stage": "S0.7",
+      "rationale": "PROPOSED ADDITION, not in the TEEG_01 register. Committed PBS job log. These are the logs used to WITHDRAW the encoding-failure claim, so they are evidence: move to the payload repository (D-8), do not delete"
+    },
+    {
+      "path": "Passive Features/HPC script/passive_fit.e1099156",
+      "stage": "S0.7",
+      "rationale": "PROPOSED ADDITION, not in the TEEG_01 register. Committed PBS job log; move to the payload repository (D-8), do not delete"
+    },
+    {
+      "path": "Passive Features/HPC script/passive_fit.e1099215",
+      "stage": "S0.7",
+      "rationale": "PROPOSED ADDITION, not in the TEEG_01 register. Committed PBS job log; move to the payload repository (D-8), do not delete"
+    },
+    {
+      "path": "Passive Features/HPC script/passive_fit.o1099100",
+      "stage": "S0.7",
+      "rationale": "PROPOSED ADDITION, not in the TEEG_01 register. Committed PBS job log; move to the payload repository (D-8), do not delete"
+    },
+    {
+      "path": "Passive Features/HPC script/passive_fit.o1099156",
+      "stage": "S0.7",
+      "rationale": "PROPOSED ADDITION, not in the TEEG_01 register. Committed PBS job log; move to the payload repository (D-8), do not delete"
+    },
+    {
+      "path": "Passive Features/HPC script/passive_fit.o1099215",
+      "stage": "S0.7",
+      "rationale": "PROPOSED ADDITION, not in the TEEG_01 register. Committed PBS job log; move to the payload repository (D-8), do not delete"
+    }
+  ],
+  "binary_payload": {
+    "extensions": [
+      ".zip",
+      ".pdf"
+    ],
+    "paths": [],
+    "rationale": "Committed binary payload. TEEG_01 rev 2 section 3.2: not referenced by any code path. D-8: moves to a separate repository; no history rewriting"
+  },
+  "superseded_forks": [
+    {
+      "path": "Population/Population_multiMorph.py",
+      "superseded_by": "towards_eeg/hybrid/population.py",
+      "rationale": "Two orchestrator-scope forks of the population module carry verdict 'keep'; only one can be hybrid/population.py. This one is the older: last touched 2026-03-13 against 2026-04-01 for the survivor, and it lacks the FastSpikeDatabase class the survivor defines. The survivor is also the file S0.1 wrote the working-branch bytes to, so demoting this one keeps the working branch canonical. Nothing is deleted and no byte changes.",
+      "decided": "2026-07-21"
+    },
+    {
+      "path": "Population/README.md",
+      "superseded_by": "towards_eeg/hybrid/README.md",
+      "rationale": "Documents the superseded population fork and travels with it. Demoted for the same reason, so that the package carries exactly one README per subpackage.",
+      "decided": "2026-07-21"
+    },
+    {
+      "path": "Parames evoked with EEG/Params_evoked_with_EEG_multiMorph.py",
+      "superseded_by": "towards_eeg/hybrid/params.py",
+      "rationale": "The older parameter fork: last touched 2026-03-22 against 2026-04-01, and it still carries the hardcoded Potjans-Diesmann full_scale_num_neurons and conn_probs arrays with the X = ['TC','L23E',...] naming, where the survivor reads column properties from Connectomics(Calculate=False) and uses the L23_exc / L4_ss vocabulary the rest of the project speaks. Demoting it also removes four duplicate top-level class names (general_params, point_neuron_network_params, multicompartment_params, MorphoPath) from the installed package.",
+      "decided": "2026-07-21"
+    }
+  ],
+  "transforms_register_note": "H-5, recorded at S0.6: before this sub-step this register listed T0-T6 only, while T7, T8, T9 and T10 were already in active use in s02_transform_log.json and s03_transform_log.json and were documented only in prose (TEEG_10 section 1). A declaration a tool cannot read is not a declaration. Backfilled here; tools/test_s0_6_exit.py asserts every transform id appearing in any log is registered."
+}

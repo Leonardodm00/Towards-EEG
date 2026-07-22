@@ -202,7 +202,7 @@ def plot_aligned_vs_jittered(df_aligned, df_jittered, jitter_matrix, x_offset=30
     # LAYOUT
     # ---------------------------------------------------------
     fig.update_layout(
-        title=f"Biological Jitter Validation (Offset: {x_offset} µm)",
+        title=f"Biological Jitter Validation (Offset: {x_offset} um)",
         scene=dict(
             xaxis_title="X (um)",
             yaxis_title="Y (um)",

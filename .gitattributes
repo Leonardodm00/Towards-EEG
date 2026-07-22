@@ -1,0 +1,40 @@
+# S0.3 -- line endings are a property of the repository, not of the machine
+# that last touched it. Without this file, core.autocrlf on a Windows clone
+# rewrites the working tree on checkout, so every byte-level tool in tools/
+# compares against digests that no longer describe the bytes on disk.
+#
+# Apply with:  git add --renormalize .
+
+* text=auto eol=lf
+
+*.py    text eol=lf
+*.md    text eol=lf
+*.json  text eol=lf
+*.csv   text eol=lf
+*.txt   text eol=lf
+*.sh    text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.cfg   text eol=lf
+*.toml  text eol=lf
+*.mod   text eol=lf
+*.hoc   text eol=lf
+
+# Binary. Fourteen tracked files contain the byte pair 0x0D 0x0A by
+# coincidence rather than as a line ending; treating them as text corrupts
+# them on checkout.
+*.zip   binary
+*.pdf   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.npy   binary
+*.pkl   binary
+*.tif   binary
+*.tiff  binary
+*.dat   binary
+
+# Committed PBS job logs are evidence (Doc 5 E-10): preserved verbatim,
+# routed to S0.7, never normalised.
+passive_fit.o* -text -diff
+passive_fit.e* -text -diff

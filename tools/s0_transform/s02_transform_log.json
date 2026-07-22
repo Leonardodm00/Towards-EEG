@@ -1,0 +1,359 @@
+{
+  "discards": [
+    {
+      "path": "Population/population_CHANGED.py",
+      "rationale": "Dead branch. The working-branch file of the same name was committed at S0.1 to its own ancestor path; a tree containing both resolves imports by whichever is seen last. Nothing in the tree imports this file. Removed with 'git rm' by S02_discard.sh, not by decolab.py, so that the deletion appears in git history as a deliberate act rather than as a side effect of a transform tool.",
+      "verdict": "discard"
+    }
+  ],
+  "files": [
+    {
+      "colab_commands": [
+        "!pip install -q neuron LFPy"
+      ],
+      "edits": [
+        {
+          "command": "!pip install -q neuron LFPy",
+          "line": 1,
+          "original": "!pip install -q neuron LFPy",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install -q neuron LFPy",
+          "transform": "T7"
+        }
+      ],
+      "n_edits": 1,
+      "n_lines_after": 380,
+      "n_lines_before": 380,
+      "notes": [],
+      "parses_after": true,
+      "parses_before": false,
+      "path": "Align Morphologies/Alignment.py",
+      "sha256_after": "6aa5cda8111d7cae43990ec0f95a1cbdc66706f9d1196e3c3d41a43c33c99a8a",
+      "sha256_before": "153229364d93a182987bfbbc445b7d82bd9779972a9f06e60fa704ce5a2ecf8c",
+      "size_after": 15170,
+      "size_before": 15160
+    },
+    {
+      "colab_commands": [
+        "!pip install neuron"
+      ],
+      "edits": [
+        {
+          "command": "!pip install neuron",
+          "line": 3,
+          "original": "!pip install neuron",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install neuron",
+          "transform": "T7"
+        }
+      ],
+      "n_edits": 1,
+      "n_lines_after": 199,
+      "n_lines_before": 199,
+      "notes": [],
+      "parses_after": true,
+      "parses_before": false,
+      "path": "Morphology Compliance/Compliance_Check.py",
+      "sha256_after": "4310a4dd7a863267124421fd16e6dba99fb1e72595da4f9b5631c8b27b2d73ac",
+      "sha256_before": "babeb0342594840840001c63f494e3d3726345c3a13441526dfe8205951b03b6",
+      "size_after": 8623,
+      "size_before": 8613
+    },
+    {
+      "colab_commands": [
+        "!pip install avro google-cloud-storage pandas"
+      ],
+      "edits": [
+        {
+          "command": "!pip install avro google-cloud-storage pandas",
+          "line": 1,
+          "original": "!pip install avro google-cloud-storage pandas",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install avro google-cloud-storage pandas",
+          "transform": "T7"
+        }
+      ],
+      "n_edits": 1,
+      "n_lines_after": 218,
+      "n_lines_before": 218,
+      "notes": [],
+      "parses_after": true,
+      "parses_before": false,
+      "path": "Synapse Retrival/Extract_synapses.py",
+      "sha256_after": "8aaa7c20b8ad630ac4424a03c4bf30f6a66a89d8d92652bf62462e47fc9ee338",
+      "sha256_before": "2ebf1ef9d73076977a5c289296e52ff22a9e267ceb29a64e6ab57f7cbe6f033e",
+      "size_after": 49456,
+      "size_before": 49446
+    },
+    {
+      "colab_commands": [
+        "!pip install tifffile"
+      ],
+      "edits": [
+        {
+          "command": "!pip install tifffile",
+          "line": 10,
+          "original": "!pip install tifffile",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install tifffile",
+          "transform": "T7"
+        }
+      ],
+      "n_edits": 1,
+      "n_lines_after": 3090,
+      "n_lines_before": 3090,
+      "notes": [],
+      "parses_after": true,
+      "parses_before": false,
+      "path": "Synaptic Placement/synaptic_placement (9).py",
+      "sha256_after": "799c4f7e41706617ff67f79226d5d26d0b0c1f919111a5aedef5e05988fbc896",
+      "sha256_before": "a068ccaba84dc548c92a141e9afa9e45afcb5f864a032f71b3d730ffe24f0b8a",
+      "size_after": 133948,
+      "size_before": 133938
+    },
+    {
+      "colab_commands": [
+        "!pip install -q cloud-volume neuroglancer navis[all] plotly"
+      ],
+      "edits": [
+        {
+          "command": "!pip install -q cloud-volume neuroglancer navis[all] plotly",
+          "line": 11,
+          "original": "!pip install -q cloud-volume neuroglancer navis[all] plotly",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install -q cloud-volume neuroglancer navis[all] plotly",
+          "transform": "T7"
+        }
+      ],
+      "n_edits": 1,
+      "n_lines_after": 262,
+      "n_lines_before": 262,
+      "notes": [],
+      "parses_after": true,
+      "parses_before": false,
+      "path": "automated_reconstruction.py",
+      "sha256_after": "e3ef1b5b95e641e2b55d2be76596e65c14181bd14b7d22a08bf8e69eb5db7a6c",
+      "sha256_before": "463690b3363825591770d9795b6ac56f2782f4cfa197e2cd023af9b85e21016c",
+      "size_after": 18168,
+      "size_before": 18158
+    },
+    {
+      "colab_commands": [
+        "!pip install cloud-volume",
+        "!pip install neuroglancer",
+        "!pip install -q navis[all] plotly",
+        "!pip install navis[all]"
+      ],
+      "edits": [
+        {
+          "command": "!pip install cloud-volume",
+          "line": 12,
+          "original": "!pip install cloud-volume",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install cloud-volume",
+          "transform": "T7"
+        },
+        {
+          "command": "!pip install neuroglancer",
+          "line": 17,
+          "original": "!pip install neuroglancer",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install neuroglancer",
+          "transform": "T7"
+        },
+        {
+          "command": "!pip install -q navis[all] plotly",
+          "line": 1239,
+          "original": "!pip install -q navis[all] plotly",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install -q navis[all] plotly",
+          "transform": "T7"
+        },
+        {
+          "command": "!pip install navis[all]",
+          "line": 1340,
+          "original": "!pip install navis[all]",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install navis[all]",
+          "transform": "T7"
+        }
+      ],
+      "n_edits": 4,
+      "n_lines_after": 4895,
+      "n_lines_before": 4895,
+      "notes": [],
+      "parses_after": true,
+      "parses_before": false,
+      "path": "final_get_comparments_h10.py",
+      "sha256_after": "ed4b5602204872b7a28614ea5d7f0c2935c3c47a0cd37fd033ea5a635fd741a5",
+      "sha256_before": "f967b32cd895d9d3f93c2a9bb45ebfdca6de550c5460da78f74e0e9f3b4bdf89",
+      "size_after": 168045,
+      "size_before": 168005
+    },
+    {
+      "colab_commands": [
+        "!pip install -q -U kaleido"
+      ],
+      "edits": [
+        {
+          "command": "!pip install -q -U kaleido",
+          "line": 16,
+          "original": "!pip install -q -U kaleido",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install -q -U kaleido",
+          "transform": "T7"
+        }
+      ],
+      "n_edits": 1,
+      "n_lines_after": 531,
+      "n_lines_before": 531,
+      "notes": [],
+      "parses_after": true,
+      "parses_before": false,
+      "path": "utility.py",
+      "sha256_after": "2abb6c5f512e66a6e02339c002ffad9ed4ddfcf0c8bfef7f2f9e62cf77652075",
+      "sha256_before": "a20f39eedd3bfd13a1d1c19bb8be7ef1cd71733cc8c856b0b90324f7b117fa3c",
+      "size_after": 18889,
+      "size_before": 18879
+    },
+    {
+      "colab_commands": [
+        "!pip install  allensdk neuron scikit-optimize",
+        "!pip install  allensdk neuron scikit-optimize",
+        "!pip install -q morphio neurom scipy",
+        "!pip install  allensdk neuron scikit-optimize"
+      ],
+      "edits": [
+        {
+          "command": "!pip install  allensdk neuron scikit-optimize",
+          "line": 11,
+          "original": "!pip install  allensdk neuron scikit-optimize",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install  allensdk neuron scikit-optimize",
+          "transform": "T7"
+        },
+        {
+          "command": "!pip install  allensdk neuron scikit-optimize",
+          "line": 1507,
+          "original": "!pip install  allensdk neuron scikit-optimize",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install  allensdk neuron scikit-optimize",
+          "transform": "T7"
+        },
+        {
+          "command": "!pip install -q morphio neurom scipy",
+          "line": 4054,
+          "original": "!pip install -q morphio neurom scipy",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install -q morphio neurom scipy",
+          "transform": "T7"
+        },
+        {
+          "command": "!pip install  allensdk neuron scikit-optimize",
+          "line": 12552,
+          "original": "!pip install  allensdk neuron scikit-optimize",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install  allensdk neuron scikit-optimize",
+          "transform": "T7"
+        },
+        {
+          "command": "",
+          "line": 7228,
+          "original": " from google.colab import drive",
+          "reason": "One stray leading space on a module-level import, masked until now by the earlier !pip parse failure at line 11. Not a notebook magic and not a defect of the algorithm: a single whitespace byte that makes ast.parse fail with 'unexpected indent'. Declared explicitly, matched byte-for-byte before application, and reversible, so it satisfies clause (2) of the byte-identity rule. Ratified as decision E-13 / answer (a) to open question 1 of the S0.2 chat.",
+          "replacement": "from google.colab import drive",
+          "transform": "T8"
+        }
+      ],
+      "n_edits": 5,
+      "n_lines_after": 17426,
+      "n_lines_before": 17426,
+      "notes": [],
+      "parses_after": true,
+      "parses_before": false,
+      "path": "Passive Features/Allen Institute Data/save_alleninstitute_data (6).py",
+      "sha256_after": "84bf34764750b561e7918beb53c96dd2aced1ba2d4782ad7cb6fd4437aa645ab",
+      "sha256_before": "9d8ccf9f56986e39ca95e8c21855fb81347eb4eaf71e9519d149ce3852194d06",
+      "size_after": 776587,
+      "size_before": 776548
+    },
+    {
+      "colab_commands": [
+        "!pip install scikit-optimize",
+        "!pip install scikit-optimize"
+      ],
+      "edits": [
+        {
+          "command": "!pip install scikit-optimize",
+          "line": 10,
+          "original": "!pip install scikit-optimize",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install scikit-optimize",
+          "transform": "T7"
+        },
+        {
+          "command": "!pip install scikit-optimize",
+          "line": 217,
+          "original": "!pip install scikit-optimize",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install scikit-optimize",
+          "transform": "T7"
+        }
+      ],
+      "n_edits": 2,
+      "n_lines_after": 4539,
+      "n_lines_before": 4539,
+      "notes": [
+        "line 51 looks like a magic but lies inside a string literal; left byte-identical",
+        "line 258 looks like a magic but lies inside a string literal; left byte-identical"
+      ],
+      "parses_after": true,
+      "parses_before": false,
+      "path": "Passive Features/Plot/passive_result_plot (5).py",
+      "sha256_after": "5add73afb4b8556217660a474e5e81e3d1e2ed0c03bf36c38e08245635d2f4e7",
+      "sha256_before": "a6b24bc1a3a62cfb1a961e21490c9f722d0857f5c80673b119d6f273a2d0ea54",
+      "size_after": 192545,
+      "size_before": 192525
+    },
+    {
+      "colab_commands": [
+        "!pip install  allensdk neuron scikit-optimize",
+        "!pip install  allensdk neuron scikit-optimize"
+      ],
+      "edits": [
+        {
+          "command": "!pip install  allensdk neuron scikit-optimize",
+          "line": 11,
+          "original": "!pip install  allensdk neuron scikit-optimize",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install  allensdk neuron scikit-optimize",
+          "transform": "T7"
+        },
+        {
+          "command": "!pip install  allensdk neuron scikit-optimize",
+          "line": 32,
+          "original": "!pip install  allensdk neuron scikit-optimize",
+          "reason": "notebook-only syntax; neutralised so the module parses",
+          "replacement": "#S0.2:T7# !pip install  allensdk neuron scikit-optimize",
+          "transform": "T7"
+        }
+      ],
+      "n_edits": 2,
+      "n_lines_after": 5940,
+      "n_lines_before": 5940,
+      "notes": [],
+      "parses_after": true,
+      "parses_before": false,
+      "path": "Passive Features/phase1fittingcolab (2).py",
+      "sha256_after": "7390da6d84fb608ef7ebd5b47a4997126f1d7d39d93d1363d7a5c170a87226d3",
+      "sha256_before": "b47f1f9e552e4be6de016469446ead0016ae14b9f8f1ec34bd548d70626a4958",
+      "size_after": 244872,
+      "size_before": 244852
+    }
+  ],
+  "generated": "2026-07-20 18:35:59 UTC",
+  "root": "/content/Towards-EEG",
+  "stage": "S0.2",
+  "tool": "s0_transform",
+  "version": "1.0.0"
+}

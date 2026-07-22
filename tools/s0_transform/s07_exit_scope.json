@@ -1,0 +1,108 @@
+{
+  "note": "Declared scope for the S0.7 exit test. Every declaration here is self-verifying: tools/test_s0_7_exit.py asserts each one STILL APPLIES, so a stale entry is an error rather than a harmless leftover (Doc 7 section 3, Doc 9 G-5).",
+  "sub_step": "S0.7",
+  "what_s07_claims": "The 22 tracked files carrying verdict 'discard' are removed from the working tree; the tracked tree is under the 20 MB bound; every removed file's identity -- its pre-S0 hash, its size and its complete ledger row -- is preserved in a declared manifest and re-emitted into the ledger; and nothing else was deleted.",
+  "transform_id": "T12",
+  "manifest": "tools/s0_transform/s07_discard_manifest.json",
+  "exit_bound_bytes": 20971520,
+  "measured_at_39cd43a_on_21_july_2026": {
+    "discard_rows": 22,
+    "total_bytes_removed": 83269744,
+    "total_mb_removed": 79.41,
+    "tree_before_mb": 87.16,
+    "tree_after_mb": 7.75,
+    "tracked_paths_before": 208,
+    "tracked_paths_after": 186,
+    "margin_under_bound_mb": 12.25
+  },
+  "erratum_H6": "TEEG_03 section 3.2 states the payload as '~69 MB'. Measured on 39cd43a it is 83269744 bytes = 79.41 MB, roughly 10 MB more. The verdict is unaffected -- the tree clears the bound either way -- but the measured figure is the one to quote. This continues the pattern of count errata recorded in Doc 5, Doc 7 and at S0.6 (H-1).",
+  "finding_H7": {
+    "statement": "The discard set is NOT coextensive with the binary payload, and 'binary payload' is a misnomer for it.",
+    "detail": "Of the 22 members, 16 are .zip/.pdf totalling 79.28 MB, and SIX are plain-text PBS job-output files (passive_fit.e1099100 and five siblings) totalling 0.13 MB, which arrive via the separate 'discards' declaration rather than via the binary_payload extension rule.",
+    "decision": "N-22, 21 July 2026: the six PBS logs are included in this pass. |D| = 22.",
+    "residual_risk": "tools/ancestors.json binary_payload.paths is EMPTY, so membership rests on an extension rule ['.zip', '.pdf']. Any future .pdf added to the repository would be swept into the discard set automatically and silently. The manifest pins the set explicitly, and check_09 asserts the manifest and the rule agree today, so a divergence becomes visible rather than being acted on."
+  },
+  "row_loss_repair": {
+    "finding": "R-7, the principal finding of TEEG_11.",
+    "statement": "tools/s0_ledger/analyse.py builds the ledger by SCANNING THE TREE, so the row set is a function of what is on disk and deleting a file removes its row, taking sha256_pre_s0 with it.",
+    "evidence": "Not hypothetical. Population/population_CHANGED.py was discarded at S0.2. Measured at 39cd43a it is declared in ancestors.json, absent from disk, carries NO ledger row, and its declaration holds only ['path', 'rationale', 'stage'] -- no hash field. None of the seven 'discards' declarations carries a hash.",
+    "consequence_if_unrepaired": "S0.9's eighth assertion is byte-identity reconstruction FROM THE LEDGER. After a naive S0.7 the ledger could no longer testify to sha256_pre_s0 for 79.41 MB of the pre-S0 tree, and the assertion would quietly become a statement about 186 files rather than about the pre-S0 tree. Nothing would go red. That is the failure mode Doc 7 section 3 names: an exemption that only skips is an exemption that hides.",
+    "repair": "Decision N-21. build_ledger.py reads the manifest from its fixed location and passes it to build_rows, which re-emits the stored row for every entry whose file is absent. The manifest carries each file's COMPLETE ledger row, not a subset, so a row rebuilt from it is indistinguishable in shape from every other row; a reader cannot mistake a removed file's record for a truncated one.",
+    "why_the_manifest_is_read_from_a_fixed_path_not_a_flag": "A ledger that could be regenerated WITHOUT the manifest would silently drop the removed rows, and the operator would have no way to tell a correct regeneration from a lossy one. Making it a flag would make losing the rows a matter of forgetting an argument.",
+    "post_s07_value_for_removed_rows": "The '-' sentinel. This is the honest value: an absent file has no post-S0.7 bytes. It is NOT the same as 'not yet stamped', and check_06 asserts no removed row ever acquires a real post_s07 hash."
+  },
+  "t12_is_not_invertible": {
+    "statement": "T12 differs from T11 in the property that matters most about it.",
+    "detail": "T11 (S0.6) is invertible from its own log: the recorded edits reconstruct the prior bytes, so the log proves nothing outside a declared edit changed. T12 removes files, so the bytes leave the tree and no inverse exists. Every hash must therefore be recorded BEFORE the deletion, and the manifest is the only durable record of them outside git history.",
+    "procedural_consequence": "--capture and --apply are separate invocations of remove_discards.py, and --apply refuses to run unless the manifest already exists and agrees byte-for-byte with every file it claims to describe. If the process dies between them, the manifest survives and nothing is lost. Were they one step, a crash after the first unlink would leave files deleted and unrecorded -- the exact state S0.7 exists to prevent. Same reasoning that kept S02_discard.sh out of decolab.py: a tool that records should not also be able to destroy in the same breath."
+  },
+  "statement_about_clone_cost": {
+    "claim_NOT_made": "S0.7 does NOT make cloning cheaper.",
+    "detail": "D-8 forbids history rewriting, so the .git object store is untouched. The tracked tree falls from 87.16 MB to 7.75 MB, but a fresh clone still transfers approximately 82 MB, as observed during the S0.6 push (81.51 MiB).",
+    "why_this_is_stated_loudly": "The natural expectation of 'remove 79 MB of binaries' is that cloning gets cheaper. It does not. Anyone who expects otherwise will read a correct sub-step as a failed one. Making cloning cheap requires a history rewrite, which D-8 forbids and which would invalidate every commit SHA cited in every orchestration document."
+  },
+  "destination_is_a_declared_gap": {
+    "value": "unassigned",
+    "rationale": "Where the payload is preserved, who owns it and how it is cited is an infrastructure decision outside S0's byte-identity discipline. Recording a guessed URL would be worse than recording none, because a wrong destination reads as a settled one. The exit test asserts every entry carries a destination FIELD, not that it carries a resolved value, so filling it in later is an edit rather than a schema change.",
+    "assigned_to": "an infrastructure decision, outside S0"
+  },
+  "clause_3_files_changed_at_s07": {
+    "rationale": "S0.7 also edits its own tooling. Those edits are byte-identity rule clause (3), not T12. Declared here so that test_s0_chain.py's 'every file not removed and not declared is byte-identical across the sub-step' half has a complete set of exceptions.",
+    "paths": [
+      "tools/ancestors.json",
+      "tools/build_ledger.py",
+      "tools/s0_ledger/analyse.py",
+      "tools/s0_ledger/render.py",
+      "tools/stamp_phase.py",
+      "tools/test_s0_chain.py",
+      "tools/test_s0_moves_smoke.py",
+      "tools/s0_transform/remove_discards.py",
+      "tools/s0_transform/s07_discard_manifest.json",
+      "tools/s0_transform/s07_exit_scope.json",
+      "tools/s0_transform/s06_exit_scope.json",
+      "tools/test_s0_7_exit.py",
+      "tools/test_s0_7_smoke.py"
+    ],
+    "self_referential": [
+      "ledger.csv",
+      "LEDGER.md",
+      "tools/phase_hashes.json"
+    ],
+    "s06_exit_scope_note": "s06_exit_scope.json is edited at S0.7 to record ratification N-23. It is a declaration, not a measurement, and the S0.6 exit test asserts its CONTENT still applies rather than its bytes; running test_s0_6_exit.py after this edit is the check that the ratification did not break the declaration."
+  },
+  "ratified_at_s07": {
+    "N-21": "The ledger emits a row per manifest entry even when the file is absent. See row_loss_repair.",
+    "N-22": "The six PBS job-log files are discarded with the rest. |D| = 22. See finding_H7.",
+    "N-23": "Both items S0.6 left pending are ratified: defect class O10 -- module-scope notebook body in a keep-verdict package module -- is assigned to S1/S3; and the 113 path literals in retain-verdict files are assigned to NO STAGE. Recorded in s06_exit_scope.json, which is where a reader of S0.6 will look."
+  },
+  "known_gaps": [
+    {
+      "gap": "the payload's destination repository",
+      "detail": "Declared 'unassigned'. See destination_is_a_declared_gap.",
+      "assigned_to": "an infrastructure decision, outside S0"
+    },
+    {
+      "gap": "the ledger's transform_id column is scalar",
+      "detail": "It holds one id per row. Removed rows now read T12, which is correct for them, but the two files S0.6 edited under T11 still read T6 from their S0.4 move. S0.7 adds a second multi-transform file class and strengthens the case for a list-valued column.",
+      "assigned_to": "S0.9, or a dedicated pass"
+    },
+    {
+      "gap": "provenance.json field list",
+      "detail": "Carried forward unchanged from S0.5 and S0.6. TEEG_02 revision 2 was not available to this chat either.",
+      "assigned_to": "S1, once TEEG_02 revision 2 is to hand"
+    }
+  ],
+  "reference_exempt_record_artefacts": {
+    "rationale": "These files name removed paths BY CONSTRUCTION: they are records of what the tree was, not references to what it is. Pruning them to satisfy a text scan would delete exactly the evidence S0.7 exists to preserve. They are declared as a CLASS rather than exempted one at a time as each failure surfaces, because discovering exemptions reactively is how an exemption set grows past what anyone intended. Adding a new record artefact now requires editing this list, which is visible in review.",
+    "self_verifying": "check_08 asserts every entry here ACTUALLY names a removed file. An exemption that is no longer needed is stale, and a list that can be padded to silence a genuine dangling reference is not an exemption but a mute button.",
+    "paths": {
+      "ledger.csv": "the ledger itself; one row per path, including the removed.",
+      "LEDGER.md": "the rendered ledger; same reason.",
+      "tools/phase_hashes.json": "the durable phase-hash record. Its entries for the removed files are ADDITIONAL preservation of their hashes across pre_s0..post_s06, independent of the manifest.",
+      "tools/ancestors.json": "the declaration spec. It must name the six PBS logs -- they are its 'discards' declarations, and deleting the declaration would destroy the recorded reason each file was removed. check_08a additionally pins WHERE in this file those names may appear.",
+      "tools/s0_transform/s03_targets.json": "a historical transform record. S0.3 really did sweep passive_fit.o1099100, and the target list is the record of that. A transform log naming a file later removed is expected: records accumulate references to things that no longer exist, and that is what makes them records.",
+      "tools/s0_transform/s07_discard_manifest.json": "the manifest; naming them is its job.",
+      "tools/s0_transform/s07_exit_scope.json": "this declaration."
+    }
+  }
+}

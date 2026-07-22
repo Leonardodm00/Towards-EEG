@@ -1,0 +1,82 @@
+{
+  "contract_id": "C-14",
+  "title": "Passive parameter table",
+  "status_in_repository": "PROPOSED",
+  "key": [
+    "layer",
+    "gtype"
+  ],
+  "key_note": "keyed identically to C-15, deliberately",
+  "row_meaning": "one row per (layer, genetic type) class",
+  "source": "TEEG_02_interface_contracts_v3.md C-14",
+  "invariants": [
+    "I-10",
+    "I-17"
+  ],
+  "fields": [
+    {
+      "name": "layer",
+      "type": "str",
+      "units": null,
+      "required": true
+    },
+    {
+      "name": "gtype",
+      "type": "str",
+      "units": null,
+      "required": true
+    },
+    {
+      "name": "cm",
+      "type": "float",
+      "units": "uF cm^-2",
+      "required": true,
+      "minimum": 0.0,
+      "note": "with confidence intervals"
+    },
+    {
+      "name": "rm",
+      "type": "float",
+      "units": "ohm cm^2",
+      "required": true,
+      "minimum": 0.0,
+      "note": "with confidence intervals"
+    },
+    {
+      "name": "ra",
+      "type": "float",
+      "units": "ohm cm",
+      "required": true,
+      "minimum": 0.0,
+      "note": "with confidence intervals"
+    },
+    {
+      "name": "cm_reference",
+      "type": "str",
+      "units": null,
+      "required": true,
+      "enum": "cm_reference",
+      "new_in_rev": "3",
+      "meaning": "which capacitance the stored cm refers to",
+      "note": "the passive-fitting pipeline applies the spine correction INSIDE the model (set_passive sets cm = Cm * F_multiplier), so the optimiser returns the intrinsic, shaft-referenced value. Applying a shaft-referenced cm to a pruned morphology together with F derived from C8.4 is correct and double-counts nothing; applying an EFFECTIVE cm the same way double-counts. The two differ by roughly 1.7 to 2.4 and there is no way to recover which one a bare number is."
+    },
+    {
+      "name": "source",
+      "type": "str",
+      "units": null,
+      "required": true,
+      "enum": "parameter_source"
+    },
+    {
+      "name": "provenance",
+      "type": "str",
+      "units": null,
+      "required": true,
+      "meaning": "citation or fit identifier"
+    }
+  ],
+  "assertions": [
+    "F is applied at model-build time from phi and is never folded into the stored cm (invariant I-17)",
+    "for every passive class: tau_m = C_m R_m in the declared range (invariant I-10)"
+  ]
+}

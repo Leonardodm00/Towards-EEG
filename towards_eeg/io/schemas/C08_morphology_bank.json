@@ -1,0 +1,201 @@
+{
+  "contract_id": "C-08",
+  "title": "Morphology bank",
+  "status_in_repository": "NEEDS-FIX",
+  "status_note": "no manifest exists; the bank must be regenerated (Doc 3 S1). S0.5 pins the schema only.",
+  "key": [
+    "nid"
+  ],
+  "row_meaning": "one row per morphology nid in I_H01",
+  "producer": "structure/",
+  "consumers": [
+    "MorphoPath",
+    "hybrid/population.py",
+    "hybrid/mechanisms.py",
+    "passive/"
+  ],
+  "consumers_note": "hybrid/mechanisms.py does not exist: decision N-6 moved Utility_fun.py as ONE file to hybrid/utility.py and deferred the placement/mechanisms split to S3.",
+  "source": "TEEG_02_interface_contracts_v3.md C-08 and C8.1-C8.4",
+  "invariants": [
+    "I-8",
+    "I-13a",
+    "I-13b",
+    "I-15",
+    "I-16",
+    "I-17",
+    "I-18"
+  ],
+  "fields": [
+    {
+      "name": "nid",
+      "type": "int",
+      "units": null,
+      "required": true,
+      "meaning": "nu; primary key",
+      "index_space": "I_H01"
+    },
+    {
+      "name": "layer",
+      "type": "str",
+      "units": null,
+      "required": true,
+      "meaning": "layer label"
+    },
+    {
+      "name": "layer_source",
+      "type": "str",
+      "units": null,
+      "required": true,
+      "enum": "layer_source"
+    },
+    {
+      "name": "qc_status",
+      "type": "str",
+      "units": null,
+      "required": true,
+      "enum": "qc_status"
+    },
+    {
+      "name": "arbour_length_um",
+      "type": "float",
+      "units": "um",
+      "required": true,
+      "meaning": "total SHAFT cable length after pruning",
+      "minimum": 0.0
+    },
+    {
+      "name": "fa",
+      "type": "float",
+      "units": null,
+      "required": true,
+      "meaning": "fractional anisotropy",
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    {
+      "name": "alignment_reference",
+      "type": "str",
+      "units": null,
+      "required": true,
+      "meaning": "identifier of the k-NN reference set"
+    },
+    {
+      "name": "n_syn_exc",
+      "type": "int",
+      "units": null,
+      "required": true,
+      "minimum": 0
+    },
+    {
+      "name": "n_syn_inh",
+      "type": "int",
+      "units": null,
+      "required": true,
+      "minimum": 0
+    },
+    {
+      "name": "lambda_f",
+      "type": "float",
+      "units": "Hz",
+      "required": true,
+      "meaning": "component of Lambda; required by R3",
+      "minimum": 0.0
+    },
+    {
+      "name": "nsegs_method",
+      "type": "str",
+      "units": null,
+      "required": true,
+      "meaning": "component of Lambda; required by R3"
+    },
+    {
+      "name": "n_seg",
+      "type": "int",
+      "units": null,
+      "required": true,
+      "meaning": "N_seg realised under (nu, Lambda)",
+      "minimum": 1
+    },
+    {
+      "name": "section_vocabulary",
+      "type": "set_of_pairs",
+      "units": null,
+      "required": true,
+      "meaning": "varsigma(nu): the (class, domain) pairs actually present as NEURON sections",
+      "element_enum": "section_vocabulary",
+      "note": "a property of HOW THE FILE WAS PRODUCED, not of modelling intent, hence per morphology"
+    },
+    {
+      "name": "spine_status",
+      "type": "str",
+      "units": null,
+      "required": true,
+      "enum": "spine_status",
+      "new_in_rev": "3"
+    },
+    {
+      "name": "spine_area_density",
+      "type": "path_to_array",
+      "units": "um^2 um^-1",
+      "required": false,
+      "new_in_rev": "3",
+      "symbol": "phi(nu, b, d)",
+      "meaning": "spine membrane area per unit shaft length, per branch, arclength-sampled at the pt3dadd vertices of the pruned shaft, stored piecewise-linear in x together with d_0(nu, b) so path distance is recoverable",
+      "required_when": "spine_status == 'pruned'",
+      "note": "distance dependence is REQUIRED, not optional: spine density is near zero within roughly the proximal 60 um and rises distally, so a distance-resolved phi reproduces that cutoff as an emergent property rather than a hand-set threshold"
+    },
+    {
+      "name": "f_implied",
+      "type": "float",
+      "units": null,
+      "required": false,
+      "new_in_rev": "3",
+      "minimum": 1.0,
+      "meaning": "cell-level (A_shaft + A_spine)/A_shaft",
+      "qc_only": true,
+      "note": "QC ONLY, NEVER A MULTIPLIER. F(nu, s) is derived per segment at model-build time from phi by equation C8.4 and is never stored (rule R7)."
+    },
+    {
+      "name": "exporter_id",
+      "type": "str",
+      "units": null,
+      "required": true,
+      "meaning": "git commit plus function qualname of the exporter",
+      "note": "the July 2026 bank was produced by the definition at L842 of the chosen exporter while the definition at L1331 shadows it at module scope; this field is what makes that recoverable"
+    },
+    {
+      "name": "hoc_path",
+      "type": "str",
+      "units": null,
+      "required": true,
+      "resolved_against": "config/paths.yaml"
+    },
+    {
+      "name": "syn_csv_path",
+      "type": "str",
+      "units": null,
+      "required": true,
+      "resolved_against": "config/paths.yaml"
+    }
+  ],
+  "derived_never_stored": [
+    {
+      "symbol": "F(nu, s)",
+      "equation": "C8.4",
+      "definition": "F(nu, s) = 1 + (integral over [x1(s), x2(s)] of phi(nu, b, d0(nu,b)+x) dx) / A_shaft(nu, s)",
+      "codomain": "[1, inf)",
+      "rule": "R7",
+      "application_convention_C8_4": "F multiplies c_m and multiplies g_pas (equivalently divides R_m), and LEAVES R_a UNCHANGED",
+      "rationale": "storing F per segment would silently expire the moment lambda_f is retuned, and retuning lambda_f is a routine act nobody would treat as invalidating the bank. Storing F per section of the unmerged tree also produced a median of 1.68 with 90th percentile 5.17 and maximum 78.2, a tail arising entirely from very short shaft sections carrying several spines."
+    }
+  ],
+  "derived_quantities": [
+    {
+      "symbol": "psi(nu, b, d)",
+      "equation": "C8.3",
+      "definition": "psi = phi / (pi * delta), where delta is the local shaft diameter",
+      "units": "dimensionless",
+      "note": "the quantity directly comparable to published F-1 values. Only phi is stored; psi is derived."
+    }
+  ]
+}

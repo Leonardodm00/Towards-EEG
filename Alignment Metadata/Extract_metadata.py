@@ -15,25 +15,25 @@ def calculate_dendrite_xy_anisotropy(neuron_ids, input_dir='/content/drive/MyDri
     """
     results = {}
 
-    print(f"📊 Calculating Dendritic XY-Plane Anisotropy for {len(neuron_ids)} neurons...")
+    print(f" Calculating Dendritic XY-Plane Anisotropy for {len(neuron_ids)} neurons...")
 
     for nid in neuron_ids:
         # --- 1. Import Data ---
         filepath = os.path.join(input_dir, f"neuron_{nid}.csv")
 
         if not os.path.exists(filepath):
-            print(f"⚠️ File for neuron {nid} not found. Skipping.")
+            print(f"[WARN] File for neuron {nid} not found. Skipping.")
             continue
 
         df = pd.read_csv(filepath)
 
         if not {'x', 'y'}.issubset(df.columns):
-            print(f"⚠️ Missing 'x' or 'y' columns in neuron {nid}. Skipping.")
+            print(f"[WARN] Missing 'x' or 'y' columns in neuron {nid}. Skipping.")
             continue
 
         # --- 2. Filter for Dendrites ---
         if 'annotated_type' not in df.columns:
-            print(f"⚠️ 'annotated_type' missing for {nid}. Skipping.")
+            print(f"[WARN] 'annotated_type' missing for {nid}. Skipping.")
             continue
 
         # Use the regex from your alignment function to capture dendrites/apical nodes
@@ -41,7 +41,7 @@ def calculate_dendrite_xy_anisotropy(neuron_ids, input_dir='/content/drive/MyDri
         dendrite_df = df[dendrite_mask]
 
         if dendrite_df.empty:
-            print(f"⚠️ No dendritic points found for {nid}. Skipping.")
+            print(f"[WARN] No dendritic points found for {nid}. Skipping.")
             continue
 
         # --- 3. Extract and Mean-Center XY Coordinates (Dendrites Only) ---
@@ -75,7 +75,7 @@ def calculate_dendrite_xy_anisotropy(neuron_ids, input_dir='/content/drive/MyDri
             'center_y': center[1]
         }
 
-        print(f"🔬 Neuron {nid} | Dendritic 2D FA: {fa_2d:.4f} (λ1: {l1:.1f}, λ2: {l2:.1f})")
+        print(f" Neuron {nid} | Dendritic 2D FA: {fa_2d:.4f} (lambda1: {l1:.1f}, lambda2: {l2:.1f})")
 
         # --- 7. Plotting ---
         if show_plot:
@@ -108,7 +108,7 @@ def calculate_dendrite_xy_anisotropy(neuron_ids, input_dir='/content/drive/MyDri
                 x=[center[0], center[0] + v1[0], None, center[0], center[0] - v1[0]],
                 y=[center[1], center[1] + v1[1], None, center[1], center[1] - v1[1]],
                 mode='lines+markers', line=dict(color='crimson', width=4),
-                name=f'Principal Axis 1 (λ1)'
+                name=f'Principal Axis 1 (lambda1)'
             ))
 
             # Draw Secondary Axis (Blue)
@@ -116,7 +116,7 @@ def calculate_dendrite_xy_anisotropy(neuron_ids, input_dir='/content/drive/MyDri
                 x=[center[0], center[0] + v2[0], None, center[0], center[0] - v2[0]],
                 y=[center[1], center[1] + v2[1], None, center[1], center[1] - v2[1]],
                 mode='lines+markers', line=dict(color='royalblue', width=4),
-                name='Principal Axis 2 (λ2)'
+                name='Principal Axis 2 (lambda2)'
             ))
 
             fig.update_layout(
@@ -153,7 +153,7 @@ def calculate_z_alignment_math(neuron_ids, input_dir, percentile=95, show_plot=F
     """
     metadata_records = []
 
-    print(f"📐 Calculating rotation matrices for {len(neuron_ids)} neurons...")
+    print(f" Calculating rotation matrices for {len(neuron_ids)} neurons...")
 
     for nid in neuron_ids:
         filepath = os.path.join(input_dir, f"neuron_{nid}.csv")
@@ -333,7 +333,7 @@ def calculate_z_alignment_math(neuron_ids, input_dir, percentile=95, show_plot=F
             'rotation_matrix': rot_matrix.tolist()
         })
 
-        print(f"✅ Neuron {nid} math calculated.")
+        print(f"[OK] Neuron {nid} math calculated.")
 
         # --- 9. Aggressive Garbage Collection ---
         del df, G, pool_df, coords, relative_coords
@@ -360,20 +360,20 @@ def extract_alignment_metadata(neuron_ids, fa_threshold, input_dir='/content/dri
     3. Calculates soma positions and Z-axis rotation matrices.
     4. Returns a metadata DataFrame containing these values.
     """
-    print(f"🚀 Starting metadata extraction for {len(neuron_ids)} neurons (FA > {fa_threshold})...")
+    print(f" Starting metadata extraction for {len(neuron_ids)} neurons (FA > {fa_threshold})...")
 
     # Step 1: Calculate FA
     fa_df = calculate_dendrite_xy_anisotropy(neuron_ids, input_dir=input_dir, show_plot=False)
     if fa_df.empty:
-        print("⚠️ No FA data could be calculated. Aborting.")
+        print("[WARN] No FA data could be calculated. Aborting.")
         return pd.DataFrame()
 
     # Step 2: Filter neurons
     passed_neurons = fa_df[fa_df['FA_2D'] > fa_threshold].index.tolist()
-    print(f"\n✅ {len(passed_neurons)} neurons passed the FA > {fa_threshold} threshold.")
+    print(f"\n[OK] {len(passed_neurons)} neurons passed the FA > {fa_threshold} threshold.")
 
     if not passed_neurons:
-        print("🛑 No neurons passed. Stopping pipeline.")
+        print("[STOP] No neurons passed. Stopping pipeline.")
         return pd.DataFrame()
 
     # Step 3: Extract Spatial Metadata (RAM Safe)

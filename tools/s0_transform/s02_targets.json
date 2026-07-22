@@ -1,0 +1,32 @@
+{
+  "stage": "S0.2",
+  "provenance": "the eleven rows of ledger.csv carrying stage = S0.2 (commit a103146)",
+  "t7_targets": [
+    "Align Morphologies/Alignment.py",
+    "Morphology Compliance/Compliance_Check.py",
+    "Synapse Retrival/Extract_synapses.py",
+    "Synaptic Placement/synaptic_placement (9).py",
+    "automated_reconstruction.py",
+    "final_get_comparments_h10.py",
+    "utility.py",
+    "Passive Features/Allen Institute Data/save_alleninstitute_data (6).py",
+    "Passive Features/Plot/passive_result_plot (5).py",
+    "Passive Features/phase1fittingcolab (2).py"
+  ],
+  "t8_fixes": [
+    {
+      "path": "Passive Features/Allen Institute Data/save_alleninstitute_data (6).py",
+      "line": 7228,
+      "expect": " from google.colab import drive",
+      "replacement": "from google.colab import drive",
+      "rationale": "One stray leading space on a module-level import, masked until now by the earlier !pip parse failure at line 11. Not a notebook magic and not a defect of the algorithm: a single whitespace byte that makes ast.parse fail with 'unexpected indent'. Declared explicitly, matched byte-for-byte before application, and reversible, so it satisfies clause (2) of the byte-identity rule. Ratified as decision E-13 / answer (a) to open question 1 of the S0.2 chat."
+    }
+  ],
+  "discards": [
+    {
+      "path": "Population/population_CHANGED.py",
+      "verdict": "discard",
+      "rationale": "Dead branch. The working-branch file of the same name was committed at S0.1 to its own ancestor path; a tree containing both resolves imports by whichever is seen last. Nothing in the tree imports this file. Removed with 'git rm' by S02_discard.sh, not by decolab.py, so that the deletion appears in git history as a deliberate act rather than as a side effect of a transform tool."
+    }
+  ]
+}

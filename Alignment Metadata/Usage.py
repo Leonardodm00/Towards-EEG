@@ -10,6 +10,6 @@ metadata_output = extract_alignment_metadata(neuron_ids, fa_threshold=0.75,show_
 if not metadata_output.empty:
     # index=False prevents pandas from writing row numbers into the file
     metadata_output.to_csv(save_path, index=False)
-    print(f"💾 Successfully saved metadata to: {save_path}")
+    print(f" Successfully saved metadata to: {save_path}")
 else:
-    print("⚠️ No data to save. (Either no neurons passed the threshold, or there was an error).")
+    print("[WARN] No data to save. (Either no neurons passed the threshold, or there was an error).")

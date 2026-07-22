@@ -15,8 +15,8 @@
 # because we override the job name on the qsub command line.
 ##########################################################################
 
-# ─── USER CONFIG ────────────────────────────────────────────────────────
-# Must match ARCHIVE_ROOT inside submit_passive_fit.sh — used here only to
+# --- USER CONFIG --------------------------------------------------------
+# Must match ARCHIVE_ROOT inside submit_passive_fit.sh -- used here only to
 # sanity-check that each group directory exists before we waste a qsub.
 ARCHIVE_ROOT="/davinci-1/home/ldellamea/Human Neurons Fitting"
 SUBMIT_SCRIPT="/davinci-1/home/ldellamea/Human Neurons Fitting/submit_passive_fit.sh"
@@ -52,7 +52,7 @@ declare -A F_PER_GROUP=(
     [L6_inh]=1
 )
 
-# ─── Phase 2.5 controls ──────────────────────────────────────────────────
+# --- Phase 2.5 controls --------------------------------------------------
 # Phase 2.5 (fix Ra per group + refit Cm,Rm) runs by default for every group.
 # Its tunables (SKIP_PHASE2P5, N_FLOOR, N_RA_PROFILE) are methodological
 # constants, NOT per-layer quantities like F, so they are NOT mapped per group
@@ -62,7 +62,7 @@ declare -A F_PER_GROUP=(
 SKIP_PHASE2P5=0     # 1 = skip Phase 2.5 everywhere (legacy free-Ra), 0 = run it
 N_FLOOR=3           # min qualifying cells for a cohort-median Ra (else literature)
 N_RA_PROFILE=100     # Ra grid points for the RMSD-vs-Ra profile
-# ────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------
 
 # If groups were passed on the command line, use those; else use defaults.
 if [ "$#" -gt 0 ]; then
@@ -76,7 +76,7 @@ if [ ! -f "$SUBMIT_SCRIPT" ]; then
     exit 1
 fi
 
-echo "Submitting ${#SEL_GROUPS[@]} group(s) — one PBS job each."
+echo "Submitting ${#SEL_GROUPS[@]} group(s) -- one PBS job each."
 echo "Archive root:  $ARCHIVE_ROOT"
 echo "Submit script: $SUBMIT_SCRIPT"
 if [ "$SKIP_PHASE2P5" = "1" ]; then
@@ -90,14 +90,14 @@ n_ok=0
 n_skip=0
 for g in "${SEL_GROUPS[@]}"; do
     if [ ! -d "$ARCHIVE_ROOT/$g" ]; then
-        echo "[skip] $g — directory does not exist: $ARCHIVE_ROOT/$g"
+        echo "[skip] $g -- directory does not exist: $ARCHIVE_ROOT/$g"
         n_skip=$((n_skip + 1))
         continue
     fi
     f="${F_PER_GROUP[$g]}"
     if [ -z "$f" ]; then
         f="$F_FACTOR_DEFAULT"
-        echo "[warn] $g not in F_PER_GROUP — falling back to F=$f"
+        echo "[warn] $g not in F_PER_GROUP -- falling back to F=$f"
     fi
     echo "[submit] $g  (F=$f)"
     qsub -v "GROUP=$g,F_FACTOR=$f,SKIP_PHASE2P5=$SKIP_PHASE2P5,N_FLOOR=$N_FLOOR,N_RA_PROFILE=$N_RA_PROFILE" \

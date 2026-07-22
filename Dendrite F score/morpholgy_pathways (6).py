@@ -29,25 +29,25 @@ def calculate_dendrite_xy_anisotropy(neuron_ids, input_dir='/content/drive/MyDri
     """
     results = {}
 
-    print(f"📊 Calculating Dendritic XY-Plane Anisotropy for {len(neuron_ids)} neurons...")
+    print(f" Calculating Dendritic XY-Plane Anisotropy for {len(neuron_ids)} neurons...")
 
     for nid in neuron_ids:
         # --- 1. Import Data ---
         filepath = os.path.join(input_dir, f"neuron_{nid}.csv")
 
         if not os.path.exists(filepath):
-            print(f"⚠️ File for neuron {nid} not found. Skipping.")
+            print(f"[WARN] File for neuron {nid} not found. Skipping.")
             continue
 
         df = pd.read_csv(filepath)
 
         if not {'x', 'y'}.issubset(df.columns):
-            print(f"⚠️ Missing 'x' or 'y' columns in neuron {nid}. Skipping.")
+            print(f"[WARN] Missing 'x' or 'y' columns in neuron {nid}. Skipping.")
             continue
 
         # --- 2. Filter for Dendrites ---
         if 'annotated_type' not in df.columns:
-            print(f"⚠️ 'annotated_type' missing for {nid}. Skipping.")
+            print(f"[WARN] 'annotated_type' missing for {nid}. Skipping.")
             continue
 
         # Use the regex from your alignment function to capture dendrites/apical nodes
@@ -55,7 +55,7 @@ def calculate_dendrite_xy_anisotropy(neuron_ids, input_dir='/content/drive/MyDri
         dendrite_df = df[dendrite_mask]
 
         if dendrite_df.empty:
-            print(f"⚠️ No dendritic points found for {nid}. Skipping.")
+            print(f"[WARN] No dendritic points found for {nid}. Skipping.")
             continue
 
         # --- 3. Extract and Mean-Center XY Coordinates (Dendrites Only) ---
@@ -89,7 +89,7 @@ def calculate_dendrite_xy_anisotropy(neuron_ids, input_dir='/content/drive/MyDri
             'center_y': center[1]
         }
 
-        print(f"🔬 Neuron {nid} | Dendritic 2D FA: {fa_2d:.4f} (λ1: {l1:.1f}, λ2: {l2:.1f})")
+        print(f" Neuron {nid} | Dendritic 2D FA: {fa_2d:.4f} (lambda1: {l1:.1f}, lambda2: {l2:.1f})")
 
         # --- 7. Plotting ---
         if show_plot:
@@ -122,7 +122,7 @@ def calculate_dendrite_xy_anisotropy(neuron_ids, input_dir='/content/drive/MyDri
                 x=[center[0], center[0] + v1[0], None, center[0], center[0] - v1[0]],
                 y=[center[1], center[1] + v1[1], None, center[1], center[1] - v1[1]],
                 mode='lines+markers', line=dict(color='crimson', width=4),
-                name=f'Principal Axis 1 (λ1)'
+                name=f'Principal Axis 1 (lambda1)'
             ))
 
             # Draw Secondary Axis (Blue)
@@ -130,7 +130,7 @@ def calculate_dendrite_xy_anisotropy(neuron_ids, input_dir='/content/drive/MyDri
                 x=[center[0], center[0] + v2[0], None, center[0], center[0] - v2[0]],
                 y=[center[1], center[1] + v2[1], None, center[1], center[1] - v2[1]],
                 mode='lines+markers', line=dict(color='royalblue', width=4),
-                name='Principal Axis 2 (λ2)'
+                name='Principal Axis 2 (lambda2)'
             ))
 
             fig.update_layout(
@@ -165,13 +165,13 @@ def align_and_plot_neurons_to_z_by_com(neuron_ids, input_dir='/content/drive/MyD
     """
     aligned_neurons = {}
 
-    print(f"📐 Aligning {len(neuron_ids)} neurons (Threshold: Top {100-percentile}% | Filter: Largest Dendritic Arbor | Vector: CoM only)...")
+    print(f" Aligning {len(neuron_ids)} neurons (Threshold: Top {100-percentile}% | Filter: Largest Dendritic Arbor | Vector: CoM only)...")
 
     for nid in neuron_ids:
         filepath = os.path.join(input_dir, f"neuron_{nid}.csv")
 
         if not os.path.exists(filepath):
-            print(f"⚠️ File for neuron {nid} not found. Skipping.")
+            print(f"[WARN] File for neuron {nid} not found. Skipping.")
             continue
 
         df = pd.read_csv(filepath)
@@ -179,7 +179,7 @@ def align_and_plot_neurons_to_z_by_com(neuron_ids, input_dir='/content/drive/MyD
         # --- 1. Center the Neuron ---
         root_rows = df[df['p'] == -1]
         if root_rows.empty:
-            print(f"⚠️ No root node (p=-1) found for {nid}. Skipping.")
+            print(f"[WARN] No root node (p=-1) found for {nid}. Skipping.")
             continue
 
         soma_id = root_rows.iloc[0]['id']
@@ -196,14 +196,14 @@ def align_and_plot_neurons_to_z_by_com(neuron_ids, input_dir='/content/drive/MyD
 
         # --- 3. Filter for Dendrites ---
         if 'annotated_type' not in df.columns:
-            print(f"⚠️ 'annotated_type' missing for {nid}. Skipping.")
+            print(f"[WARN] 'annotated_type' missing for {nid}. Skipping.")
             continue
 
         dendrite_mask = df['annotated_type'].astype(str).str.contains('dendrite|apical|^1$', case=False, regex=True)
         candidate_nodes = set(df[distal_mask & dendrite_mask]['id'].values)
 
         if not candidate_nodes:
-            print(f"⚠️ No distal dendrite points found for {nid}. Skipping.")
+            print(f"[WARN] No distal dendrite points found for {nid}. Skipping.")
             continue
 
         # --- 4. Reconstruct Hierarchy (NetworkX) ---
@@ -223,7 +223,7 @@ def align_and_plot_neurons_to_z_by_com(neuron_ids, input_dir='/content/drive/MyD
                 largest_pool = list(pool)
 
         if len(largest_pool) < 5:
-            print(f"⚠️ Not enough clustered points (<5) in the largest distal arbor for {nid}. Skipping.")
+            print(f"[WARN] Not enough clustered points (<5) in the largest distal arbor for {nid}. Skipping.")
             continue
 
         pool_df = df[df['id'].isin(largest_pool)]
@@ -351,7 +351,7 @@ def align_and_plot_neurons_to_z_by_com(neuron_ids, input_dir='/content/drive/MyD
         df['z'] = rotated_coords[:, 2]
 
         aligned_neurons[nid] = df
-        print(f"✅ Neuron {nid} successfully rotated to Z-axis using CoM.\n")
+        print(f"[OK] Neuron {nid} successfully rotated to Z-axis using CoM.\n")
 
     return aligned_neurons
 
@@ -380,25 +380,25 @@ def calculate_dendrite_xy_anisotropy(neuron_ids, input_dir='/content/drive/MyDri
     """
     results = {}
 
-    print(f"📊 Calculating Dendritic XY-Plane Anisotropy for {len(neuron_ids)} neurons...")
+    print(f" Calculating Dendritic XY-Plane Anisotropy for {len(neuron_ids)} neurons...")
 
     for nid in neuron_ids:
         # --- 1. Import Data ---
         filepath = os.path.join(input_dir, f"neuron_{nid}.csv")
 
         if not os.path.exists(filepath):
-            print(f"⚠️ File for neuron {nid} not found. Skipping.")
+            print(f"[WARN] File for neuron {nid} not found. Skipping.")
             continue
 
         df = pd.read_csv(filepath)
 
         if not {'x', 'y'}.issubset(df.columns):
-            print(f"⚠️ Missing 'x' or 'y' columns in neuron {nid}. Skipping.")
+            print(f"[WARN] Missing 'x' or 'y' columns in neuron {nid}. Skipping.")
             continue
 
         # --- 2. Filter for Dendrites ---
         if 'annotated_type' not in df.columns:
-            print(f"⚠️ 'annotated_type' missing for {nid}. Skipping.")
+            print(f"[WARN] 'annotated_type' missing for {nid}. Skipping.")
             continue
 
         # Use the regex from your alignment function to capture dendrites/apical nodes
@@ -406,7 +406,7 @@ def calculate_dendrite_xy_anisotropy(neuron_ids, input_dir='/content/drive/MyDri
         dendrite_df = df[dendrite_mask]
 
         if dendrite_df.empty:
-            print(f"⚠️ No dendritic points found for {nid}. Skipping.")
+            print(f"[WARN] No dendritic points found for {nid}. Skipping.")
             continue
 
         # --- 3. Extract and Mean-Center XY Coordinates (Dendrites Only) ---
@@ -440,7 +440,7 @@ def calculate_dendrite_xy_anisotropy(neuron_ids, input_dir='/content/drive/MyDri
             'center_y': center[1]
         }
 
-        print(f"🔬 Neuron {nid} | Dendritic 2D FA: {fa_2d:.4f} (λ1: {l1:.1f}, λ2: {l2:.1f})")
+        print(f" Neuron {nid} | Dendritic 2D FA: {fa_2d:.4f} (lambda1: {l1:.1f}, lambda2: {l2:.1f})")
 
         # --- 7. Plotting ---
         if show_plot:
@@ -473,7 +473,7 @@ def calculate_dendrite_xy_anisotropy(neuron_ids, input_dir='/content/drive/MyDri
                 x=[center[0], center[0] + v1[0], None, center[0], center[0] - v1[0]],
                 y=[center[1], center[1] + v1[1], None, center[1], center[1] - v1[1]],
                 mode='lines+markers', line=dict(color='crimson', width=4),
-                name=f'Principal Axis 1 (λ1)'
+                name=f'Principal Axis 1 (lambda1)'
             ))
 
             # Draw Secondary Axis (Blue)
@@ -481,7 +481,7 @@ def calculate_dendrite_xy_anisotropy(neuron_ids, input_dir='/content/drive/MyDri
                 x=[center[0], center[0] + v2[0], None, center[0], center[0] - v2[0]],
                 y=[center[1], center[1] + v2[1], None, center[1], center[1] - v2[1]],
                 mode='lines+markers', line=dict(color='royalblue', width=4),
-                name='Principal Axis 2 (λ2)'
+                name='Principal Axis 2 (lambda2)'
             ))
 
             fig.update_layout(
@@ -518,7 +518,7 @@ def calculate_z_alignment_math(neuron_ids, input_dir, percentile=95, show_plot=F
     """
     metadata_records = []
 
-    print(f"📐 Calculating rotation matrices for {len(neuron_ids)} neurons...")
+    print(f" Calculating rotation matrices for {len(neuron_ids)} neurons...")
 
     for nid in neuron_ids:
         filepath = os.path.join(input_dir, f"neuron_{nid}.csv")
@@ -698,7 +698,7 @@ def calculate_z_alignment_math(neuron_ids, input_dir, percentile=95, show_plot=F
             'rotation_matrix': rot_matrix.tolist()
         })
 
-        print(f"✅ Neuron {nid} math calculated.")
+        print(f"[OK] Neuron {nid} math calculated.")
 
         # --- 9. Aggressive Garbage Collection ---
         del df, G, pool_df, coords, relative_coords
@@ -725,20 +725,20 @@ def extract_alignment_metadata(neuron_ids, fa_threshold, input_dir='/content/dri
     3. Calculates soma positions and Z-axis rotation matrices.
     4. Returns a metadata DataFrame containing these values.
     """
-    print(f"🚀 Starting metadata extraction for {len(neuron_ids)} neurons (FA > {fa_threshold})...")
+    print(f" Starting metadata extraction for {len(neuron_ids)} neurons (FA > {fa_threshold})...")
 
     # Step 1: Calculate FA
     fa_df = calculate_dendrite_xy_anisotropy(neuron_ids, input_dir=input_dir, show_plot=False)
     if fa_df.empty:
-        print("⚠️ No FA data could be calculated. Aborting.")
+        print("[WARN] No FA data could be calculated. Aborting.")
         return pd.DataFrame()
 
     # Step 2: Filter neurons
     passed_neurons = fa_df[fa_df['FA_2D'] > fa_threshold].index.tolist()
-    print(f"\n✅ {len(passed_neurons)} neurons passed the FA > {fa_threshold} threshold.")
+    print(f"\n[OK] {len(passed_neurons)} neurons passed the FA > {fa_threshold} threshold.")
 
     if not passed_neurons:
-        print("🛑 No neurons passed. Stopping pipeline.")
+        print("[STOP] No neurons passed. Stopping pipeline.")
         return pd.DataFrame()
 
     # Step 3: Extract Spatial Metadata (RAM Safe)
@@ -765,9 +765,9 @@ metadata_output = extract_alignment_metadata(neuron_ids, fa_threshold=0.75,show_
 if not metadata_output.empty:
     # index=False prevents pandas from writing row numbers into the file
     metadata_output.to_csv(save_path, index=False)
-    print(f"💾 Successfully saved metadata to: {save_path}")
+    print(f" Successfully saved metadata to: {save_path}")
 else:
-    print("⚠️ No data to save. (Either no neurons passed the threshold, or there was an error).")
+    print("[WARN] No data to save. (Either no neurons passed the threshold, or there was an error).")
 
 """## ROTATE ALL THE CELLS"""
 
@@ -792,7 +792,7 @@ def map_synapses_to_segments(neuron_df, neuron_id, synapses_dir='./h01_extracted
 
     # 1. Check if synapse file exists
     if not os.path.exists(syn_path):
-        print(f"⚠️ Synapses file not found for neuron {neuron_id}: {syn_path}")
+        print(f"[WARN] Synapses file not found for neuron {neuron_id}: {syn_path}")
         return neuron_df # Return the unmodified skeleton
 
     # 2. Load and filter synapse data
@@ -800,7 +800,7 @@ def map_synapses_to_segments(neuron_df, neuron_id, synapses_dir='./h01_extracted
     syn_df = syn_df[syn_df['direction'] == 'incoming'].dropna(subset=['location_x', 'location_y', 'location_z'])
 
     if syn_df.empty:
-        print(f"⚠️ No valid incoming synapses found to map for neuron {neuron_id}.")
+        print(f"[WARN] No valid incoming synapses found to map for neuron {neuron_id}.")
         return neuron_df
 
     # 3. Build a KD-Tree using the RAW neuron coordinates
@@ -835,7 +835,7 @@ def map_synapses_to_segments(neuron_df, neuron_id, synapses_dir='./h01_extracted
 
         neuron_df.at[df_idx, 'synapse_label'] = label
 
-    print(f"✅ Successfully mapped {len(syn_coords)} synapses to neuron {neuron_id}.")
+    print(f"[OK] Successfully mapped {len(syn_coords)} synapses to neuron {neuron_id}.")
 
     return neuron_df
 
@@ -882,7 +882,7 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
 
     root_rows = df[df['p'] == -1]
     if root_rows.empty:
-        print("⚠️ Cannot export to HOC: No root node found.")
+        print("[WARN] Cannot export to HOC: No root node found.")
         return
     root_id = root_rows.iloc[0]['id']
 
@@ -979,7 +979,7 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
 
     # --- 1. Load and Parse Metadata ---
     if not os.path.exists(metadata_filepath):
-        print(f"⚠️ Metadata file not found: {metadata_filepath}")
+        print(f"[WARN] Metadata file not found: {metadata_filepath}")
         return aligned_neurons
 
     metadata_df = pd.read_csv(metadata_filepath)
@@ -989,12 +989,12 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
 
     reference_somas = metadata_df[['soma_x', 'soma_y', 'soma_z']].values
 
-    print(f"🔄 Aligning {len(neuron_ids)} neurons using top {k_neighbors} neighbors from {os.path.basename(metadata_filepath)}...")
+    print(f" Aligning {len(neuron_ids)} neurons using top {k_neighbors} neighbors from {os.path.basename(metadata_filepath)}...")
 
     for nid in neuron_ids:
         filepath = os.path.join(input_dir, f"neuron_{nid}.csv")
         if not os.path.exists(filepath):
-            print(f"⚠️ File for neuron {nid} not found. Skipping.")
+            print(f"[WARN] File for neuron {nid} not found. Skipping.")
             continue
 
         df = pd.read_csv(filepath)
@@ -1005,7 +1005,7 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
         # --- 2. Find Soma and Center the Neuron ---
         root_rows = df[df['p'] == -1]
         if root_rows.empty:
-            print(f"⚠️ No root node found for {nid}. Skipping.")
+            print(f"[WARN] No root node found for {nid}. Skipping.")
             continue
 
         soma_pos = root_rows.iloc[0][['x', 'y', 'z']].values.astype(float)
@@ -1041,7 +1041,7 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
 
 
         mean_dist = np.mean(distances[nearest_indices])
-        print(f"✅ Neuron {nid} aligned and saved to HOC (Mean neighbor distance: {mean_dist:.1f} nm).")
+        print(f"[OK] Neuron {nid} aligned and saved to HOC (Mean neighbor distance: {mean_dist:.1f} nm).")
 
         # --- 6. Plotting ---
         if show_plot:
@@ -1369,7 +1369,7 @@ def export_neuron_to_hoc(aligned_neuron_df, output_filepath):
 
     root_rows = df[df['p'] == -1]
     if root_rows.empty:
-        print("⚠️ Cannot export to HOC: No root node found.")
+        print("[WARN] Cannot export to HOC: No root node found.")
         return
     root_id = root_rows.iloc[0]['id']
 
@@ -1454,7 +1454,7 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
 
     # --- 1. Load and Parse Metadata ---
     if not os.path.exists(metadata_filepath):
-        print(f"⚠️ Metadata file not found: {metadata_filepath}")
+        print(f"[WARN] Metadata file not found: {metadata_filepath}")
         return aligned_neurons
 
     metadata_df = pd.read_csv(metadata_filepath)
@@ -1464,12 +1464,12 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
 
     reference_somas = metadata_df[['soma_x', 'soma_y', 'soma_z']].values
 
-    print(f"🔄 Aligning {len(neuron_ids)} neurons using top {k_neighbors} neighbors from {os.path.basename(metadata_filepath)}...")
+    print(f" Aligning {len(neuron_ids)} neurons using top {k_neighbors} neighbors from {os.path.basename(metadata_filepath)}...")
 
     for nid in neuron_ids:
         filepath = os.path.join(input_dir, f"neuron_{nid}.csv")
         if not os.path.exists(filepath):
-            print(f"⚠️ File for neuron {nid} not found. Skipping.")
+            print(f"[WARN] File for neuron {nid} not found. Skipping.")
             continue
 
         df = pd.read_csv(filepath)
@@ -1477,7 +1477,7 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
         # --- 2. Find Soma and Center the Neuron ---
         root_rows = df[df['p'] == -1]
         if root_rows.empty:
-            print(f"⚠️ No root node found for {nid}. Skipping.")
+            print(f"[WARN] No root node found for {nid}. Skipping.")
             continue
 
         soma_pos = root_rows.iloc[0][['x', 'y', 'z']].values.astype(float)
@@ -1513,7 +1513,7 @@ def align_neurons_to_neighborhood(neuron_ids, metadata_filepath, input_dir='/con
         export_neuron_to_hoc(df, hoc_filename)
 
         mean_dist = np.mean(distances[nearest_indices])
-        print(f"✅ Neuron {nid} aligned and saved to HOC (Mean neighbor distance: {mean_dist:.1f} nm")
+        print(f"[OK] Neuron {nid} aligned and saved to HOC (Mean neighbor distance: {mean_dist:.1f} nm")
 
         # --- 6. Plotting ---
         if show_plot:
@@ -1658,19 +1658,19 @@ def label_dendritic_spines_robust(neuron_ids, input_dir='/content/drive/MyDrive/
     """
     updated_neurons = {}
 
-    print(f"🔍 Searching and quantifying dendritic spines across {len(neuron_ids)} neurons (Threshold: {spine_length_threshold_nm} nm)...")
+    print(f" Searching and quantifying dendritic spines across {len(neuron_ids)} neurons (Threshold: {spine_length_threshold_nm} nm)...")
 
     for nid in neuron_ids:
         filepath = os.path.join(input_dir, f"neuron_{nid}.csv")
 
         if not os.path.exists(filepath):
-            print(f"⚠️ File for neuron {nid} not found. Skipping.")
+            print(f"[WARN] File for neuron {nid} not found. Skipping.")
             continue
 
         df = pd.read_csv(filepath)
 
         if not {'id', 'p', 'x', 'y', 'z', 'annotated_type'}.issubset(df.columns):
-            print(f"⚠️ Missing required columns in neuron {nid}. Skipping.")
+            print(f"[WARN] Missing required columns in neuron {nid}. Skipping.")
             continue
 
         # Ensure radius column exists for morphology
@@ -1813,7 +1813,7 @@ def label_dendritic_spines_robust(neuron_ids, input_dir='/content/drive/MyDrive/
             df.loc[df['id'].isin(final_head), 'annotated_type'] = 'head'
 
         updated_neurons[nid] = df
-        print(f"✅ Neuron {nid}: Identified and relabeled {len(spine_nodes)} spine nodes into Heads/Necks.")
+        print(f"[OK] Neuron {nid}: Identified and relabeled {len(spine_nodes)} spine nodes into Heads/Necks.")
 
         if output_dir:
             os.makedirs(output_dir, exist_ok=True)
@@ -1839,17 +1839,17 @@ def plot_color_coded_neurons(neuron_dict, neuron_ids):
         'unclassified': 'lightgrey'
     }
 
-    print(f"🎨 Plotting {len(neuron_ids)} color-coded neurons...")
+    print(f" Plotting {len(neuron_ids)} color-coded neurons...")
 
     for nid in neuron_ids:
         if nid not in neuron_dict:
-            print(f"⚠️ Neuron {nid} not found in the provided dictionary. Skipping.")
+            print(f"[WARN] Neuron {nid} not found in the provided dictionary. Skipping.")
             continue
 
         df = neuron_dict[nid]
 
         if not {'id', 'p', 'x', 'y', 'z', 'annotated_type'}.issubset(df.columns):
-            print(f"⚠️ Missing required columns in neuron {nid}. Skipping.")
+            print(f"[WARN] Missing required columns in neuron {nid}. Skipping.")
             continue
 
         fig = go.Figure()
@@ -2222,7 +2222,7 @@ def compute_F_factors(target_ids,
     # 1. Load and label every neuron in one batch call                    #
     # ------------------------------------------------------------------- #
     if verbose:
-        print(f"📥 Loading and labelling {len(target_ids)} neurons "
+        print(f" Loading and labelling {len(target_ids)} neurons "
               f"from {input_dir} ...")
     neuron_dict = label_dendritic_spines_robust(
         target_ids,
@@ -2244,7 +2244,7 @@ def compute_F_factors(target_ids,
     for nid in target_ids:
         if nid not in neuron_dict:
             if verbose:
-                print(f"⚠️  Neuron {nid}: no labelled DataFrame returned. "
+                print(f"[WARN]  Neuron {nid}: no labelled DataFrame returned. "
                       f"Skipping.")
             continue
         try:
@@ -2256,7 +2256,7 @@ def compute_F_factors(target_ids,
             )
         except Exception as e:
             if verbose:
-                print(f"⚠️  Neuron {nid}: F computation failed ({e}). "
+                print(f"[WARN]  Neuron {nid}: F computation failed ({e}). "
                       f"Skipping.")
             continue
         per_cell[nid] = res
@@ -2264,10 +2264,10 @@ def compute_F_factors(target_ids,
             extra = ''
             if distance_bins_nm is not None:
                 extra = '  | bins: ' + ', '.join(
-                    f'{e/1000:.0f}um→{v:.2f}'
+                    f'{e/1000:.0f}um->{v:.2f}'
                     for e, v in res['F_by_bin'].items()
                 )
-            print(f"   • neuron {nid}: F = {res['F']:.3f}  "
+            print(f"   * neuron {nid}: F = {res['F']:.3f}  "
                   f"(shaft={res['n_shaft_segments']}, "
                   f"spines={res['n_spine_segments']}){extra}")
 
@@ -2337,10 +2337,10 @@ def compute_F_factors(target_ids,
                      'per_cell_table': df_out}, f)
 
     if verbose:
-        print(f"\n✅ Population F (n={F_n}/{len(target_ids)}): "
-              f"{F_mean:.3f} ± {F_std:.3f} (mean ± SD)")
-        print(f"   Saved per-cell table  → {csv_path}")
-        print(f"   Saved full results    → {pkl_path}")
+        print(f"\n[OK] Population F (n={F_n}/{len(target_ids)}): "
+              f"{F_mean:.3f} +/- {F_std:.3f} (mean +/- SD)")
+        print(f"   Saved per-cell table  -> {csv_path}")
+        print(f"   Saved full results    -> {pkl_path}")
 
     return df_out, summary
 
@@ -2358,19 +2358,19 @@ def label_dendritic_spines_robust(neuron_ids, input_dir='/content/drive/MyDrive/
     """
     updated_neurons = {}
 
-    print(f"🔍 Searching for complex dendritic spines across {len(neuron_ids)} neurons (Threshold: {spine_length_threshold_nm} nm)...")
+    print(f" Searching for complex dendritic spines across {len(neuron_ids)} neurons (Threshold: {spine_length_threshold_nm} nm)...")
 
     for nid in neuron_ids:
         filepath = os.path.join(input_dir, f"neuron_{nid}.csv")
 
         if not os.path.exists(filepath):
-            print(f"⚠️ File for neuron {nid} not found. Skipping.")
+            print(f"[WARN] File for neuron {nid} not found. Skipping.")
             continue
 
         df = pd.read_csv(filepath)
 
         if not {'id', 'p', 'x', 'y', 'z', 'annotated_type'}.issubset(df.columns):
-            print(f"⚠️ Missing required columns in neuron {nid}. Skipping.")
+            print(f"[WARN] Missing required columns in neuron {nid}. Skipping.")
             continue
 
         # 1. Build a Directed Graph
@@ -2424,7 +2424,7 @@ def label_dendritic_spines_robust(neuron_ids, input_dir='/content/drive/MyDrive/
             df.loc[df['id'].isin(spine_nodes), 'annotated_type'] = 'spine'
 
         updated_neurons[nid] = df
-        print(f"✅ Neuron {nid}: Identified and relabeled {len(spine_nodes)} spine nodes (including bifurcations).")
+        print(f"[OK] Neuron {nid}: Identified and relabeled {len(spine_nodes)} spine nodes (including bifurcations).")
 
         if output_dir:
             os.makedirs(output_dir, exist_ok=True)
@@ -2460,17 +2460,17 @@ def plot_color_coded_neurons(neuron_dict, neuron_ids):
         'unclassified': 'lightgrey'
     }
 
-    print(f"🎨 Plotting {len(neuron_ids)} color-coded neurons...")
+    print(f" Plotting {len(neuron_ids)} color-coded neurons...")
 
     for nid in neuron_ids:
         if nid not in neuron_dict:
-            print(f"⚠️ Neuron {nid} not found in the provided dictionary. Skipping.")
+            print(f"[WARN] Neuron {nid} not found in the provided dictionary. Skipping.")
             continue
 
         df = neuron_dict[nid]
 
         if not {'id', 'p', 'x', 'y', 'z', 'annotated_type'}.issubset(df.columns):
-            print(f"⚠️ Missing required columns in neuron {nid}. Skipping.")
+            print(f"[WARN] Missing required columns in neuron {nid}. Skipping.")
             continue
 
         fig = go.Figure()
@@ -2660,7 +2660,7 @@ def sample_and_reconstruct_spines_interpolated(neuron_dict, neuron_id, n_samples
     Extracts spines and reconstructs them using continuous spline interpolation.
     """
     if neuron_id not in neuron_dict:
-        print(f"⚠️ Neuron {neuron_id} not found.")
+        print(f"[WARN] Neuron {neuron_id} not found.")
         return
 
     df = neuron_dict[neuron_id].copy()
@@ -2680,7 +2680,7 @@ def sample_and_reconstruct_spines_interpolated(neuron_dict, neuron_id, n_samples
     ]
 
     if not spine_roots:
-        print(f"🛑 No spines found in Neuron {neuron_id}.")
+        print(f"[STOP] No spines found in Neuron {neuron_id}.")
         return
 
     sampled_roots = random.sample(spine_roots, min(n_samples, len(spine_roots)))
@@ -2843,7 +2843,7 @@ def debug_spine_morphology(neuron_dict, neuron_id, n_samples=3, num_interp_point
     its 1D radius profile. Includes a 1/3 length fallback for plain spines.
     """
     if neuron_id not in neuron_dict:
-        print(f"⚠️ Neuron {neuron_id} not found.")
+        print(f"[WARN] Neuron {neuron_id} not found.")
         return pd.DataFrame()
 
     df = neuron_dict[neuron_id].copy()
@@ -2861,12 +2861,12 @@ def debug_spine_morphology(neuron_dict, neuron_id, n_samples=3, num_interp_point
     ]
 
     if not spine_roots:
-        print(f"🛑 No spines found in Neuron {neuron_id}.")
+        print(f"[STOP] No spines found in Neuron {neuron_id}.")
         return pd.DataFrame()
 
     if n_samples is not None:
         sampled_roots = random.sample(spine_roots, min(n_samples, len(spine_roots)))
-        print(f"🔬 Debug Mode: Analyzing {len(sampled_roots)} randomly sampled spines from {len(spine_roots)} total.")
+        print(f" Debug Mode: Analyzing {len(sampled_roots)} randomly sampled spines from {len(spine_roots)} total.")
     else:
         sampled_roots = spine_roots
 

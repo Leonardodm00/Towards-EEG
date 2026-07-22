@@ -9,7 +9,7 @@ def save_probability_fields(axon_field, dend_field, output_dir, base_name="popul
     Saves 3D probability fields to a specified directory as both .npy and .tif formats.
     """
     if axon_field is None or dend_field is None:
-        print("⚠️ Warning: Empty fields provided. Nothing to save.")
+        print("[WARN] Warning: Empty fields provided. Nothing to save.")
         return
 
     # Ensure the output directory exists
@@ -21,7 +21,7 @@ def save_probability_fields(axon_field, dend_field, output_dir, base_name="popul
     
     np.save(axon_npy_path, axon_field)
     np.save(dend_npy_path, dend_field)
-    print(f"✅ Saved NumPy data:\n  -> {axon_npy_path}\n  -> {dend_npy_path}")
+    print(f"[OK] Saved NumPy data:\n  -> {axon_npy_path}\n  -> {dend_npy_path}")
     
     # --- 2. Save as Multi-page TIFF stacks ---
     if save_tiff:
@@ -37,7 +37,7 @@ def save_probability_fields(axon_field, dend_field, output_dir, base_name="popul
             
             tifffile.imwrite(axon_tif_path, axon_img, imagej=True)
             tifffile.imwrite(dend_tif_path, dend_img, imagej=True)
-            print(f"✅ Saved TIFF stacks:\n  -> {axon_tif_path}\n  -> {dend_tif_path}")
+            print(f"[OK] Saved TIFF stacks:\n  -> {axon_tif_path}\n  -> {dend_tif_path}")
         else:
-            print("⚠️ 'tifffile' library not found. Skipping TIFF export.")
-            print("💡 To enable TIFF export, run: pip install tifffile")
+            print("[WARN] 'tifffile' library not found. Skipping TIFF export.")
+            print("[note] To enable TIFF export, run: pip install tifffile")

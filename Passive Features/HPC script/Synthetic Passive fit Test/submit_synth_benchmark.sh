@@ -7,7 +7,7 @@
 #PBS -k eo
 
 ##########################################################################
-# Synthetic passive-fit BENCHMARK — one PBS job per COHORT ($GROUP).
+# Synthetic passive-fit BENCHMARK -- one PBS job per COHORT ($GROUP).
 #
 # A cohort == a PBS group == the unit Phase 2.5 fixes Ra over (so Ra is
 # shared within a cohort by construction; see synth_gt_grid.py). The job:
@@ -23,14 +23,14 @@
 # between cells), matching the real-data pipeline. N_WORKERS is hard-coded
 # to 1 inside the Python entrypoint.
 #
-# ── Dispatch ────────────────────────────────────────────────────────────
+# -- Dispatch ------------------------------------------------------------
 #     qsub -v GROUP=cohort_0003 submit_synth_benchmark.sh
 # Use submit_all_cohorts.sh to fan out one job per cohort automatically.
 #
 # EDIT THE "USER CONFIG" BLOCK BELOW BEFORE SUBMITTING.
 ##########################################################################
 
-# ─── USER CONFIG ────────────────────────────────────────────────────────
+# --- USER CONFIG --------------------------------------------------------
 # Absolute paths recommended (jobs don't inherit $PWD reliably).
 CODE_DIR="/davinci-1/home/ldellamea/Human Neurons Fitting/Synthetic Test"
 CONDA_ENV="prova"                                 # conda env providing NEURON + python
@@ -46,17 +46,17 @@ ENTRYPOINT="$CODE_DIR/run_synth_benchmark.py"     # the Phase-2 Python driver
 # NEURON mechanisms for I_h generation (compiled here if not already):
 MOD_DIR="$CODE_DIR/mod"                            # contains Ih.mod (+ na.mod/kv.mod if active)
 
-# ─── Generation protocol (run-level; per-cell GT/noise come from MANIFEST) ─
+# --- Generation protocol (run-level; per-cell GT/noise come from MANIFEST) -
 N_AVG_GROUPS=3                 # sweep-average groups per polarity
 SS_N_REPEATS=30               # square-subthreshold repeats
 LS_HYP_AMPS="-10,-30,-50,-70,-90"   # long-square hyperpolarising amplitudes [pA]
 
-# ─── Phase 2 (fit) ──────────────────────────────────────────────────────
+# --- Phase 2 (fit) ------------------------------------------------------
 FIT_TARGET="hyp"              # dep | hyp | both
 N_CALLS=100                   # GP optimiser evaluations per cell
 N_INITIAL=50                  # random initial points before GP takes over
 
-# ─── Interim two-pass auto-tau_w (cm_profile_sweep) ─────────────────────
+# --- Interim two-pass auto-tau_w (cm_profile_sweep) ---------------------
 N_LONG_TRAIN=2                # smallest-|amp| hyp LS steps folded into TRAINING
 LS_DEFLECTION_CAP_MV=12.0     # I_h deflection guard for long-step admission
 R_IN_TARGET="peak"           # peak | steady
@@ -70,12 +70,12 @@ SWEEP_RHO=0.5                 # relative-rise threshold for HW_rho
 SWEEP_N_GRID=41               # log C_m grid points
 # (CM/RM/RA sweep boxes mirror the fit box inside the entrypoint.)
 
-# ─── Phase 2.5 (MANDATORY here: fix Ra per cohort, refit Cm,Rm) ──────────
+# --- Phase 2.5 (MANDATORY here: fix Ra per cohort, refit Cm,Rm) ----------
 SKIP_PHASE2P5=0               # 1 = legacy free-Ra diagnostic; 0 = standard
 N_FLOOR=4                     # min qualifying cells for cohort-median Ra
 N_RA_PROFILE=50               # Ra grid points for the RMSD-vs-Ra profile
 
-# ─── Phase 3 (bootstrap CIs) — SUBSET ONLY (calibration check) ──────────
+# --- Phase 3 (bootstrap CIs) -- SUBSET ONLY (calibration check) ----------
 # Which cells in this cohort get bootstrapped. Examples:
 #   ""          -> none in this cohort
 #   "all"       -> every cell (expensive)
@@ -87,9 +87,9 @@ BOOTSTRAP_MODE="nonparametric"   # parametric | nonparametric
 NOISE_MODE="block"               # iid | ar1 | block  (parametric only)
 BOOTSTRAP_N_CALLS=40
 BOOTSTRAP_N_INITIAL=20
-# ────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------
 
-# ─── Resolve per-job paths from $GROUP ──────────────────────────────────
+# --- Resolve per-job paths from $GROUP ----------------------------------
 if [ -z "${GROUP:-}" ]; then
     echo "[FATAL] \$GROUP is not set. Submit with:" >&2
     echo "    qsub -v GROUP=<cohort_label> submit_synth_benchmark.sh" >&2
@@ -104,13 +104,13 @@ fi
 
 ARCHIVE_DIR="$ARCHIVE_ROOT/$GROUP"
 OUTPUT_DIR="$OUTPUT_ROOT/$GROUP"
-# ────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------
 
 cd "$PBS_O_WORKDIR"
 
 # Activate the conda env (it supplies python, NEURON, and the C++ compiler
 # that nrnivmodl needs). There is NO 'python3' module on this cluster, so we
-# do NOT 'module load python3' — that line previously caused Lmod errors and
+# do NOT 'module load python3' -- that line previously caused Lmod errors and
 # left nrnivmodl without a compiler.
 source "$(conda info --base)/etc/profile.d/conda.sh" \
     || { echo "[FATAL] cannot source conda.sh" >&2; exit 5; }
@@ -119,7 +119,7 @@ conda activate "$CONDA_ENV" \
 
 mkdir -p "$ARCHIVE_DIR" "$OUTPUT_DIR"
 
-# ─── Compile NEURON mechanisms for I_h generation (once per node/workdir) ─
+# --- Compile NEURON mechanisms for I_h generation (once per node/workdir) -
 # Guard on the compiled binary (x86_64/special), NOT just the directory.
 # A directory can exist from a previous failed compilation and be empty/broken;
 # only the binary proves nrnivmodl succeeded. This prevents the "argument not a
@@ -130,11 +130,11 @@ if [ -d "$MOD_DIR" ] && [ ! -x "$CODE_DIR/x86_64/special" ]; then
     # Remove any stale/partial x86_64/ left by a previous failed compilation.
     rm -rf "$CODE_DIR/x86_64"
     if ! command -v nrnivmodl >/dev/null 2>&1; then
-        echo "[FATAL] nrnivmodl not on PATH — is env '$CONDA_ENV' active?" >&2
+        echo "[FATAL] nrnivmodl not on PATH -- is env '$CONDA_ENV' active?" >&2
         exit 4
     fi
     ( cd "$CODE_DIR" && nrnivmodl "$MOD_DIR" ) || {
-        echo "[FATAL] nrnivmodl failed — check $MOD_DIR/*.mod and that the" >&2
+        echo "[FATAL] nrnivmodl failed -- check $MOD_DIR/*.mod and that the" >&2
         echo "        conda env '$CONDA_ENV' provides the C++ compiler." >&2
         exit 4; }
     echo "[mech] compiled OK -> $CODE_DIR/x86_64/special"
@@ -159,7 +159,7 @@ fi
 echo "Phase 3:                subset='$PHASE3_SUBSET'  B=$BOOTSTRAP_B  mode=$BOOTSTRAP_MODE  noise=$NOISE_MODE"
 echo "-----------------------------------------"
 
-# ─── Build the argument list (this IS the entrypoint CLI contract) ───────
+# --- Build the argument list (this IS the entrypoint CLI contract) -------
 ARGS=(
     --manifest            "$MANIFEST"
     --group               "$GROUP"
@@ -201,7 +201,7 @@ ARGS=(
 [ -n "$SS_T0_MS" ]        && ARGS+=(--ss-t0-ms "$SS_T0_MS")
 [ "$SKIP_PHASE2P5" = "1" ] && ARGS+=(--skip-phase2p5)
 
-# ─── Run ────────────────────────────────────────────────────────────────
+# --- Run ----------------------------------------------------------------
 python "$ENTRYPOINT" "${ARGS[@]}"
 status=$?
 

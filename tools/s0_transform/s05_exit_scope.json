@@ -1,0 +1,69 @@
+{
+  "note": "Declared scope for the S0.5 exit test. Every declaration here is self-verifying: tools/test_s0_5_exit.py asserts each one STILL APPLIES, so a stale entry is an error rather than a harmless leftover (Doc 7 section 3, Doc 9 G-5).",
+  "package": "towards_eeg.io",
+  "pinned_contracts": ["C-08", "C-09", "C-14", "C-15"],
+  "schema_files": [
+    "towards_eeg/io/schemas/alphabets.json",
+    "towards_eeg/io/schemas/C08_morphology_bank.json",
+    "towards_eeg/io/schemas/C09_observed_synapses.json",
+    "towards_eeg/io/schemas/C14_passive_parameters.json",
+    "towards_eeg/io/schemas/C15_mechanism_spec.json"
+  ],
+  "registered_invariants": ["I-13c", "I-14", "I-15", "I-16", "I-17", "I-18"],
+  "invariant_scope_rationale": "TEEG_00 section 4 says 'I-13c...I-19'. I-19 DOES NOT EXIST: TEEG_02 section 3.3's table ends at I-18 and Doc 5 E-7 settled the scope at six. I-1 through I-12 are deliberately NOT registered, by decision on 21 July 2026 (N-16): twelve unimplemented entries would be machinery with no test to prove it right, and the honest signal is that the register holds six.",
+  "expected_clause_count": 14,
+  "clauses": {
+    "I-13c": ["mech_dict_domain_within_vocabulary", "passive_mode_implies_empty"],
+    "I-14": ["dt_grid_is_negative_power_of_two", "t_stop_within_binary32_range", "sampled_times_round_trip"],
+    "I-15": ["exactly_one_somatic_calibre_section", "somatic_section_is_root"],
+    "I-16": ["no_synapse_label_in_vocabulary", "vocabulary_within_C8_1"],
+    "I-17": ["phi_present_where_pruned", "cm_is_shaft_referenced_where_F_applied"],
+    "I-18": ["geometry_identification_exists", "name_identification_is_unique", "identifications_agree"]
+  },
+  "clause_rationale": "Four of the six invariants are conjunctions. If a conjunction reported one status, a conjunct that could not be checked would be indistinguishable from one that passed, and the invariant would report PASS having verified part of itself. That is trap T-11. The clause list is pinned here so that a conjunct silently disappearing is a failure of this exit test.",
+  "s0_populates_nothing": {
+    "rule": "No module under towards_eeg/io/ may read a bank, build an instance, parse a .hoc, or write anything.",
+    "forbidden_tokens": ["neuron", "nest", "LFPy", "hybridLFPy", "h.load_file", "pt3dadd", "numpy", "pandas", "scipy"],
+    "forbidden_token_rationale": "TEEG_00 section 4: 'Schemas only -- S0 populates nothing'. The scientific libraries are listed because importing one is the cheapest way for schema code to acquire the ability to read data without anyone noticing. They arrive with S1 and later, in the package's other subpackages, never in io/.",
+    "allowed_write_targets": []
+  },
+  "package_relative_resource_access": {
+    "declared": "towards_eeg/io/schema.py resolves schemas/ from os.path.dirname(__file__).",
+    "rationale": "This is NOT a configuration path and is deliberately not routed through config/paths.yaml. It locates the package's own data inside itself; a package that had to be told where its own schemas live would be misconfigured rather than flexible. Declared here so that S0.6's 'no filesystem path literal outside config/' sweep and smoke assertion 5 do not have to guess. What assertion 5 targets is the 126 '/content/drive/...' style literals measured in Doc 5 E-3, not a package locating its own resources.",
+    "forbidden_in_io": ["/content/", "/mnt/", "/home/", "C:\\\\", "~/"]
+  },
+  "geometry_record": {
+    "declared": "towards_eeg/io/geometry.py defines Section and Geometry, the abstract record I-15 and I-18 are written against.",
+    "rationale": "Decision N-17. I-15 and I-18 are statements about diameters, positions and topology, but TEEG_00 section 1 says the .hoc files are not attached to an S0 chat and belong to S1. Writing the invariants against a minimal abstract record lets them be real, tested functions without a morphology file entering S0. S1 supplies a reader producing this record from a .hoc, and the invariants do not change when it does.",
+    "must_not_grow_to_represent": ["cables", "segments", "mechanisms", "synapses"],
+    "somatic_calibre_ratio_default": 5.0,
+    "somatic_calibre_ratio_rationale": "A DECLARED PARAMETER, not a contract constant. TEEG_02 C8.1 gives the evidence -- the soma of 489469961 is 11.22 um against a median of 0.40 um over all sections, a ratio of about 28 -- but states no threshold. 5.0 sits an order of magnitude below the observed ratio and well above any plausible dendritic trunk, and it is an argument so that a bank which disagrees produces an argument rather than a silent reclassification."
+  },
+  "not_implemented_by_decision": [
+    {
+      "item": "C-15 callable bodies (ih_sigmoid_L5, ca_hotspot)",
+      "status": "signature and constants pinned; bodies deferred",
+      "assigned_to": "S3",
+      "rationale": "TEEG_00 section 2 closes mechanism_mode implementation as deferred to S3. Equations C15.3 and C15.4 are fully specified and their constants are pinned in C15_mechanism_spec.json, so S3 implements against a declaration rather than re-deriving. Every constant carries source and provenance in the table and none is hard-coded in a function signature."
+    },
+    {
+      "item": "the reader that produces a Geometry from a .hoc",
+      "status": "not written",
+      "assigned_to": "S1",
+      "rationale": "S0 does not touch morphology (TEEG_00 section 1)."
+    },
+    {
+      "item": "invariants I-1 through I-12",
+      "status": "not registered",
+      "assigned_to": "later stages, per their contracts",
+      "rationale": "See invariant_scope_rationale above."
+    }
+  ],
+  "known_gaps": [
+    {
+      "gap": "provenance.json field list",
+      "detail": "TEEG_02 section 3.4 states the field list is 'unchanged from revision 2 section 3.4' with the addition of spine_status and exporter_id. Revision 2 was not available to this chat, so the full list could not be pinned. C-08 carries exporter_id and spine_status; the frozen-instance provenance schema is NOT pinned.",
+      "assigned_to": "S0.6 or S1, once TEEG_02 revision 2 is to hand"
+    }
+  ]
+}

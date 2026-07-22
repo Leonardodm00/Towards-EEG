@@ -1,4 +1,4 @@
-!pip install avro google-cloud-storage pandas
+#S0.2:T7# !pip install avro google-cloud-storage pandas
 from google.colab import drive
 
 # This will prompt you to authorize Colab to access your Drive
@@ -21,7 +21,7 @@ def extract_h01_synapses_debug(target_neuron_ids, output_dir='./h01_extracted_sy
     target_set = set(int(nid) for nid in target_neuron_ids).union(
                  set(str(nid) for nid in target_neuron_ids))
 
-    print(f"🔗 Connecting to Google Cloud Storage via GCSFS...")
+    print(f" Connecting to Google Cloud Storage via GCSFS...")
     fs = gcsfs.GCSFileSystem(token='anon')
 
     blob_path = 'h01-release/data/20210729/c3/synapses/exported/*'
@@ -30,14 +30,14 @@ def extract_h01_synapses_debug(target_neuron_ids, output_dir='./h01_extracted_sy
     json_files = [b for b in all_paths if b.endswith('.json') and fs.info(b)['size'] > 0]
 
     if not json_files:
-        print("❌ Found 0 .json shards.")
+        print("[FAIL] Found 0 .json shards.")
         return
 
     # FOR DEBUGGING: Let's only run the first 3 files so we don't wait hours to see if it works.
     # If this works, you can remove the [:3] to run the whole dataset.
     test_files = json_files
 
-    print(f"📂 Found {len(json_files)} JSONL shards. Running DEBUG mode on first {len(test_files)} files...\n")
+    print(f" Found {len(json_files)} JSONL shards. Running DEBUG mode on first {len(test_files)} files...\n")
 
     # --- 1. Disk Writer Thread ---
     write_queue = Queue(maxsize=50000)
@@ -60,7 +60,7 @@ def extract_h01_synapses_debug(target_neuron_ids, output_dir='./h01_extracted_sy
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
                 csv_writers[nid] = writer
-                print(f"💾 [DISK] Created new CSV for neuron {nid}")
+                print(f" [DISK] Created new CSV for neuron {nid}")
 
             csv_writers[nid].writerow(record)
             write_queue.task_done()
@@ -74,7 +74,7 @@ def extract_h01_synapses_debug(target_neuron_ids, output_dir='./h01_extracted_sy
     # --- 2. JSON Streamer (Producer) ---
     def process_shard(file_path):
         filename = file_path.split('/')[-1]
-        print(f"🟢 [START] Opening {filename}...")
+        print(f" [START] Opening {filename}...")
 
         lines_read = 0
         matches_found = 0
@@ -88,7 +88,7 @@ def extract_h01_synapses_debug(target_neuron_ids, output_dir='./h01_extracted_sy
 
                         # DEBUG: Print the first 50 characters of the very first line read
                         if lines_read == 1:
-                            print(f"📄 [READ {filename}] Line 1 snippet: {line[:50]}...")
+                            print(f" [READ {filename}] Line 1 snippet: {line[:50]}...")
 
                         if not line: continue
 
@@ -97,7 +97,7 @@ def extract_h01_synapses_debug(target_neuron_ids, output_dir='./h01_extracted_sy
                         except json.JSONDecodeError as e:
                             # DEBUG: If a line fails to parse, show us why (only for the first few errors to avoid spam)
                             if lines_read < 5:
-                                print(f"⚠️ [JSON ERROR {filename}] Line {lines_read}: {e} | Text: {line[:50]}")
+                                print(f"[WARN] [JSON ERROR {filename}] Line {lines_read}: {e} | Text: {line[:50]}")
                             continue
 
                         pre_id, post_id = None, None
@@ -115,7 +115,7 @@ def extract_h01_synapses_debug(target_neuron_ids, output_dir='./h01_extracted_sy
 
                             # DEBUG: Print the first match we find in this file
                             if matches_found == 1:
-                                print(f"🎯 [FIRST MATCH {filename}] Found synapse for neuron!")
+                                print(f" [FIRST MATCH {filename}] Found synapse for neuron!")
 
                             direction = 'outgoing' if pre_id in target_set else 'incoming'
                             target = int(pre_id) if pre_id in target_set else int(post_id)
@@ -143,10 +143,10 @@ def extract_h01_synapses_debug(target_neuron_ids, output_dir='./h01_extracted_sy
                             }))
 
         except Exception as e:
-            print(f"❌ [CRASH {filename}]: {e}")
+            print(f"[FAIL] [CRASH {filename}]: {e}")
             traceback.print_exc() # Prints the exact line of code that caused the crash
 
-        print(f"🔴 [DONE] {filename} finished. Read {lines_read} lines. Found {matches_found} matches.")
+        print(f" [DONE] {filename} finished. Read {lines_read} lines. Found {matches_found} matches.")
 
     # --- 3. Run Parallel Threads ---
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -158,11 +158,11 @@ def extract_h01_synapses_debug(target_neuron_ids, output_dir='./h01_extracted_sy
     # Shut down safely
     write_queue.put(None)
     writer_thread.join()
-    print(f"\n✅ Debug scan complete! Check the console output above.")
+    print(f"\n[OK] Debug scan complete! Check the console output above.")
     # Shut down safely
     write_queue.put(None)
     writer_thread.join()
-    print(f"\n✅ Debug scan complete! Check the console output above.")
+    print(f"\n[OK] Debug scan complete! Check the console output above.")
 
 
 

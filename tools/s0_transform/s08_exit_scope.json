@@ -1,0 +1,118 @@
+{
+  "note": "Declared scope for the S0.8 exit test. Every declaration here is self-verifying: tools/test_s0_8_exit.py asserts each one STILL APPLIES, so a stale entry is an error rather than a harmless leftover (Doc 7 section 3).",
+  "sub_step": "S0.8",
+  "what_s08_claims": "The dependency graph the package actually imports is resolvable, pinned by version and sha256 in requirements/hybrid_stack.lock, and demonstrated to install and import in a clean environment. It does NOT claim to have closed B-4, which is about the davinci HPC environment specifically.",
+  "lockfile": "requirements/hybrid_stack.lock",
+  "validation_record": "requirements/hybrid_stack.validation.json",
+  "no_transform_id": "S0.8 introduces NO transform. It adds new infrastructure under byte-identity rule clause (3) and changes the content of no pre-existing file except declared tooling. There is nothing to invert and nothing to log, so no T-number is allocated. S0.5 was the same shape.",
+  "finding_H8": {
+    "statement": "The 'historically conflicting pins' the roadmap blocks on DO NOT CONFLICT at current versions.",
+    "evidence": "pip resolves LFPy 2.3.7, hybridLFPy 0.2, neuron 9.0.1 and nest-simulator 3.10.0 into ONE environment; `pip check` reports 'No broken requirements found'; and all eleven third-party modules the package imports load in a single process, in the order driver.py requires. Measured 21 July 2026.",
+    "consequence": "TEEG_03 section 3.2 specifies TWO lockfiles. One is delivered instead. Two would be machinery for a conflict that does not exist, and worse, two environments could not run driver.py at all -- see finding_H10.",
+    "status": "PROPOSED, needs ratification: one lockfile supersedes the roadmap's two.",
+    "caveat": "Measured with PyPI wheels on Ubuntu/glibc2.39. The historical conflict was plausibly a CONDA and build-toolchain conflict on the cluster, which this measurement cannot speak to. H-8 refutes the pip-metadata form of the claim, not the cluster form."
+  },
+  "finding_H9": {
+    "statement": "hybridLFPy 0.2 cannot be installed by a modern pip without two workarounds, and neither is documented upstream.",
+    "detail": "It is sdist-only. Its build backend is poetry.core.masonry.api, but its build path imports numpy while declaring no build requirements. Under PEP-517 isolated builds the install fails with ModuleNotFoundError: No module named 'numpy'; with --no-build-isolation it fails with BackendUnavailable: Cannot import 'poetry.core.masonry.api'.",
+    "recipe": "Install poetry-core, numpy and Cython FIRST, then install with --no-build-isolation. Recorded in the validation record under extra_steps_required and in the lockfile header.",
+    "why_it_matters": "This is a latent blocker that would have surfaced on the cluster, during S1, as an opaque build failure. It is a property of the package, not of any environment, so it applies to davinci too."
+  },
+  "finding_H10": {
+    "statement": "The two simulator stacks are not merely both required; they must be CO-RESIDENT IN ONE PROCESS, in a specified import order.",
+    "evidence": "towards_eeg/hybrid/driver.py imports neuron at L39, nest at L41, hybridLFPy at L43. Its own comments say why: L39 'NEURON compiled with MPI must be imported before NEST and mpi4py', L41 'Import not used, but done in order to ensure correct execution'.",
+    "consequence": "A two-environment split is not merely unnecessary, it is unusable: neither half could run driver.py. This is the strongest argument for the single lockfile, and it is a property of the CODE rather than of any package index, so it holds on the cluster too.",
+    "what_no_lockfile_can_express": "The import ORDER. A lockfile pins what is installed, not the sequence in which a module imports it. The validation record therefore tests the order explicitly."
+  },
+  "b4_what_remains": {
+    "status": "B-4 REMAINS OPEN. S0.8 does not close it.",
+    "why": "The roadmap's exit criterion is met in a clean Linux venv from PyPI wheels. That is not the davinci conda environment, and two entries in the lockfile are actively WRONG for an HPC node.",
+    "entries_wrong_for_hpc": {
+      "openmpi==5.0.10": "A PyPI-wheel MPI runtime. On a cluster MPI comes from a module and must match the interconnect; a pip-installed MPI will not use the high-speed fabric and may not cooperate with the scheduler's mpirun.",
+      "neuron==9.0.1": "The PyPI wheel is NOT built with MPI. driver.py L39 requires NEURON compiled with MPI, so on davinci NEURON is expected to be a module, not this wheel."
+    },
+    "the_three_questions_the_roadmap_blocks_on": {
+      "is NEURON a module or a pip install": "ANSWERED IN PART: it is pip-installable, and the wheel imports. But the wheel is not MPI-enabled, so for THIS code it is very likely a module. Confirm on davinci.",
+      "is NEST reachable": "ANSWERED: yes. nest-simulator 3.10.0 publishes manylinux wheels for cp39-cp313 and installs and imports cleanly. NEST no longer requires a source build.",
+      "the real pip freeze": "STILL OPEN. Only you can run it."
+    },
+    "commands_to_run_on_davinci": [
+      "module avail 2>&1 | grep -i -E 'neuron|nest|openmpi|mpi'",
+      "conda activate <the env>; python -c 'import neuron, nest, LFPy, hybridLFPy, mpi4py; print(neuron.__version__, nest.__version__, LFPy.__version__, mpi4py.__version__)'",
+      "conda activate <the env>; pip freeze | sort",
+      "python -c \"from mpi4py import MPI; print(MPI.Get_library_version())\"   # which MPI is actually linked",
+      "python -c \"import neuron; print(neuron.h.nrnmpi_init)\"                  # is NEURON MPI-enabled"
+    ],
+    "what_to_do_with_the_output": "Paste it into a chat. The lockfile then gains an HPC sibling, and B-4 closes. Until then hybrid_stack.lock is the CI/reference environment and is labelled as such."
+  },
+  "pyproject_still_declares_no_dependencies": {
+    "decision": "PROPOSED, needs ratification: pyproject.toml continues to declare zero runtime dependencies even though a validated set now exists.",
+    "rationale": "Declaring them would make `pip install towards_eeg` attempt to install neuron and nest-simulator from PyPI. On davinci that is the WRONG action -- NEURON is expected to come from a module built with MPI, and a pip wheel would shadow it. A package that forces the wrong simulator build on an HPC node is worse than one that declares nothing and is accompanied by a lockfile.",
+    "alternative_considered": "An optional extra, e.g. [project.optional-dependencies] reference = [...]. Deferred: it would still need a decision about what the default install does, and B-4 is the right place to settle that."
+  },
+  "import_surface": {
+    "rule": "Every third-party top-level module imported anywhere under towards_eeg/ must be covered by the lockfile, or excluded by declaration below.",
+    "measured": [
+      "LFPy",
+      "google",
+      "h5py",
+      "hybridLFPy",
+      "matplotlib",
+      "mpi4py",
+      "nest",
+      "nest_output_processing",
+      "nest_simulation",
+      "neuron",
+      "numpy",
+      "pandas",
+      "params_evoked_with_EEG",
+      "plotly",
+      "scipy"
+    ],
+    "excluded": {
+      "google": "google.colab, imported by towards_eeg/connectome/connectivity_buildup.py. A Colab runtime module, not a deployable dependency; it does not exist on PyPI in the form imported. That file is unimportable by construction anyway -- defect class O10, ratified at S0.7 (N-23) and assigned to S1/S3.",
+      "nest_simulation": "A hybridLFPy EXAMPLE module, not a distribution. Shipped inside the hybridLFPy examples tree, not importable from the installed package. Belongs to the S1/S3 work that untangles driver.py.",
+      "nest_output_processing": "Same as nest_simulation.",
+      "params_evoked_with_EEG": "A sibling module of the pre-S0.4 layout, now towards_eeg/hybrid/params.py. The import is a stale intra-tree reference inside driver.py; rewriting it is a content operation, forbidden in S0. Assigned to S1/S3."
+    },
+    "local_module_note": "The last three are NOT PyPI distributions and no lockfile could carry them. They are recorded here so that a future reader does not go looking for them on an index."
+  },
+  "clause_3_files_changed_at_s08": {
+    "rationale": "S0.8 adds new infrastructure and edits its own tooling. Clause (3), no transform.",
+    "paths": [
+      "tools/ancestors.json",
+      "tools/s0_ledger/analyse.py",
+      "tools/s0_ledger/render.py",
+      "tools/stamp_phase.py",
+      "tools/test_s0_chain.py",
+      "tools/test_s0_moves_smoke.py",
+      "tools/s0_transform/s08_exit_scope.json",
+      "tools/test_s0_8_exit.py",
+      "tools/test_s0_8_smoke.py",
+      "requirements/hybrid_stack.lock",
+      "requirements/hybrid_stack.validation.json"
+    ],
+    "self_referential": [
+      "ledger.csv",
+      "LEDGER.md",
+      "tools/phase_hashes.json"
+    ]
+  },
+  "known_gaps": [
+    {
+      "gap": "B-4, the HPC freeze",
+      "detail": "See b4_what_remains.",
+      "assigned_to": "you, on davinci"
+    },
+    {
+      "gap": "the ledger transform_id column is scalar",
+      "detail": "Carried forward from S0.6 and S0.7.",
+      "assigned_to": "S0.9 or a dedicated pass"
+    },
+    {
+      "gap": "provenance.json field list",
+      "detail": "Carried forward unchanged; TEEG_02 revision 2 still not available.",
+      "assigned_to": "S1"
+    }
+  ]
+}

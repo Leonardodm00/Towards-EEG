@@ -12,14 +12,14 @@
 # EDIT THE VARIABLES IN THE "USER CONFIG" BLOCK BELOW BEFORE SUBMITTING.
 ##########################################################################
 
-# ─── USER CONFIG ────────────────────────────────────────────────────────
+# --- USER CONFIG --------------------------------------------------------
 # Absolute paths recommended (jobs do not always inherit your $PWD nicely).
 
 ARCHIVE_DIR="."     # <-- CHANGE ME
 OUTPUT_DIR="./pipeline_outputs"    # <-- CHANGE ME
 SCRIPT_PATH="./passive_fitting_hpc.py"   # path to the python script
 
-# ─── Phase 1 / Phase 2 parameters ───────────────────────────────────────
+# --- Phase 1 / Phase 2 parameters ---------------------------------------
 N_AVG_GROUPS=3          # sweep-average groups per polarity
 FIT_TARGET="hyp"        # dep | hyp | both
 F_FACTOR=1.9            # spine-area correction (Eyal 2016 L2/3 default)
@@ -27,14 +27,14 @@ N_CALLS=10             # GP optimiser evaluations per cell
 N_INITIAL=5            # random initial points before GP takes over
 MAX_CELLS=""            # max cells to process (empty = all in archive)
  
-# ─── Phase 3 / Bootstrap parameters ─────────────────────────────────────
+# --- Phase 3 / Bootstrap parameters -------------------------------------
 SKIP_PHASE3=0                    # 1 = skip Phase 3 entirely, 0 = run it
-BOOTSTRAP_B=10                  # bootstrap replicates (≥200 for stable BCa)
+BOOTSTRAP_B=10                  # bootstrap replicates (>=200 for stable BCa)
 BOOTSTRAP_MODE="nonparametric"   # parametric | nonparametric
 NOISE_MODE="block"               # iid | ar1 | block  (parametric only)
 BOOTSTRAP_N_CALLS=10             # GP budget per bootstrap replicate
 BOOTSTRAP_N_INITIAL=10           # random initial points per bootstrap replicate
-# ────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------
  
 # Move to the directory from which the job was submitted
 cd "$PBS_O_WORKDIR"
@@ -63,7 +63,7 @@ echo "Phase 2:               n_calls=$N_CALLS  n_initial=$N_INITIAL  [sequential
 echo "Bootstrap:             B=$BOOTSTRAP_B  mode=$BOOTSTRAP_MODE  n_calls=$BOOTSTRAP_N_CALLS  n_initial=$BOOTSTRAP_N_INITIAL  [sequential]"
 echo "-----------------------------------------"
  
-# ─── Build the argument list ────────────────────────────────────────────
+# --- Build the argument list --------------------------------------------
 ARGS=(
     --archive-dir         "$ARCHIVE_DIR"
     --output-dir          "$OUTPUT_DIR"
@@ -89,7 +89,7 @@ if [ "$SKIP_PHASE3" = "1" ]; then
     ARGS+=(--skip-phase3)
 fi
  
-# ─── Run ────────────────────────────────────────────────────────────────
+# --- Run ----------------------------------------------------------------
 python "$SCRIPT_PATH" "${ARGS[@]}"
  
 # Clean up

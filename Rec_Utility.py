@@ -55,7 +55,7 @@ def reorient_fragment_nopr(df, new_root_id):
         return new_df[desired_cols]
 
     except Exception as e:
-        print(f"⚠️ Navis Reroot Failed for ID {new_root_id}: {e}")
+        print(f"[WARN] Navis Reroot Failed for ID {new_root_id}: {e}")
         return df
 
 
@@ -66,7 +66,7 @@ def stitch_neuron_fragments_smart_nopr(neuron_id, skeleton_url):
     3. Treats the largest fragment as Main Arbor (segment_id = 0).
     4. Reroots and stitches all smaller fragments into the Main Arbor.
     """
-    print(f"📥 Fetching skeleton {neuron_id} via CloudVolume...")
+    print(f" Fetching skeleton {neuron_id} via CloudVolume...")
 
     # --- 1. Load Skeleton from Cloud ---
     try:
@@ -77,7 +77,7 @@ def stitch_neuron_fragments_smart_nopr(neuron_id, skeleton_url):
         df = pd.read_csv(io.StringIO(swc_string), delim_whitespace=True, comment='#',
                          names=['id', 'type', 'x', 'y', 'z', 'r', 'p'])
     except Exception as e:
-        print(f"❌ Error loading skeleton from CloudVolume: {e}")
+        print(f"[FAIL] Error loading skeleton from CloudVolume: {e}")
         return None
 
     df['id'] = df['id'].astype(int)
@@ -95,16 +95,16 @@ def stitch_neuron_fragments_smart_nopr(neuron_id, skeleton_url):
     components = list(nx.connected_components(G))
     components.sort(key=len, reverse=True)
 
-    print(f"🧩 Cloud skeleton contains {len(components)} disconnected components.")
+    print(f" Cloud skeleton contains {len(components)} disconnected components.")
 
     # --- 3. Isolate Main Arbor ---
     main_nodes = components[0]
     main_df = df[df['id'].isin(main_nodes)].copy()
     main_df['segment_id'] = 0
-    print(f"🔹 Main Arbor initialized: {len(main_df)} nodes")
+    print(f" Main Arbor initialized: {len(main_df)} nodes")
 
     if len(components) == 1:
-        print("✅ Skeleton is already a single continuous tree.")
+        print("[OK] Skeleton is already a single continuous tree.")
         main_df.reset_index(drop=True, inplace=True)
         return main_df
 
@@ -127,7 +127,7 @@ def stitch_neuron_fragments_smart_nopr(neuron_id, skeleton_url):
         target_main_idx = main_indices[best_idx_in_frag]
         target_parent_id = int(main_df.iloc[target_main_idx]['id'])
 
-        print(f"   🔄 Re-rooting {frag_name}: New Root {new_root_id} -> Connects to Main {target_parent_id} (Dist: {min_dist:.2f} nm)")
+        print(f"    Re-rooting {frag_name}: New Root {new_root_id} -> Connects to Main {target_parent_id} (Dist: {min_dist:.2f} nm)")
 
         # B. RE-ORIENT HIERARCHY
         frag_df = reorient_fragment_nopr(frag_df, new_root_id)
@@ -159,7 +159,7 @@ def stitch_neuron_fragments_smart_nopr(neuron_id, skeleton_url):
 
     # Sanitize IDs to guarantee completely unbroken 1-to-N numbering
     if main_df['id'].duplicated().any() or not (main_df['id'].diff() == 1).all():
-        print("⚠️ Sanitizing IDs...")
+        print("[WARN] Sanitizing IDs...")
         old_ids = main_df['id'].values
         new_ids = np.arange(1, len(main_df) + 1)
         id_map = dict(zip(old_ids, new_ids))
@@ -167,7 +167,7 @@ def stitch_neuron_fragments_smart_nopr(neuron_id, skeleton_url):
         main_df['p'] = main_df['p'].map(id_map).fillna(-1).astype(int)
         main_df['id'] = new_ids
 
-    print(f"✅ Merged {len(main_df)} nodes into a single structure.")
+    print(f"[OK] Merged {len(main_df)} nodes into a single structure.")
     return main_df
 
 
@@ -200,10 +200,10 @@ def annotate_stitched_neuron_nopr(stitched_df, neuron_id, annotation_url=None):
         pd.DataFrame: The original stitched_df with a new 'annotated_type' column.
     """
     if stitched_df is None or stitched_df.empty:
-        print("❌ Input DataFrame is empty.")
+        print("[FAIL] Input DataFrame is empty.")
         return stitched_df
 
-    print(f"📥 Loading Cloud Annotations for Neuron {neuron_id}...")
+    print(f" Loading Cloud Annotations for Neuron {neuron_id}...")
 
     # --- 1. LOAD REFERENCE ANNOTATIONS (The Cloud) ---
     try:
@@ -237,7 +237,7 @@ def annotate_stitched_neuron_nopr(stitched_df, neuron_id, annotation_url=None):
                 continue
 
         if not ann_coords:
-            print("⚠️ No annotation points found for this ID in the cloud.")
+            print("[WARN] No annotation points found for this ID in the cloud.")
             stitched_df['annotated_type'] = "Unknown"
             return stitched_df
 
@@ -249,10 +249,10 @@ def annotate_stitched_neuron_nopr(stitched_df, neuron_id, annotation_url=None):
         ann_range = ann_max - ann_min
         ann_center = ann_arr.mean(axis=0)
 
-        print(f"🔹 Fetched {len(ann_arr)} annotation points from Google Cloud.")
+        print(f" Fetched {len(ann_arr)} annotation points from Google Cloud.")
 
     except Exception as e:
-        print(f"❌ Error loading cloud annotations: {e}")
+        print(f"[FAIL] Error loading cloud annotations: {e}")
         return stitched_df
 
     # --- 2. CALCULATE ALIGNMENT (Source -> Target) ---
@@ -279,10 +279,10 @@ def annotate_stitched_neuron_nopr(stitched_df, neuron_id, annotation_url=None):
     # D. Apply Offset
     aligned_coords += offset
 
-    print(f"✅ Alignment Calculated | Scale: {scale.round(2)}")
+    print(f"[OK] Alignment Calculated | Scale: {scale.round(2)}")
 
     # --- 3. KDTREE NEAREST NEIGHBOR SEARCH ---
-    print("🔍 Mapping labels via KDTree (Max Dist: 5000nm)...")
+    print(" Mapping labels via KDTree (Max Dist: 5000nm)...")
 
     
     
@@ -313,7 +313,7 @@ def annotate_stitched_neuron_nopr(stitched_df, neuron_id, annotation_url=None):
 
     # Stats
     counts = stitched_df['annotated_type'].value_counts()
-    print(f"📊 Annotation Results:\n{counts}")
+    print(f" Annotation Results:\n{counts}")
 
     return stitched_df
 
@@ -334,12 +334,12 @@ def treat_distant_orphans(df_input_, soma_centroid, distance_threshold=25000, le
     """
     df_input = df_input_.copy(deep=True)
     if df_input is None or df_input.empty:
-        print("❌ DataFrame is empty.")
+        print("[FAIL] DataFrame is empty.")
         return None
 
     df = df_input.copy()
 
-    print(f"\n🔭 Treating Distant Orphans (Dist > {distance_threshold} | Len > {length_threshold})...")
+    print(f"\n Treating Distant Orphans (Dist > {distance_threshold} | Len > {length_threshold})...")
 
     # --- 1. SETUP GRAPHS ---
     G_dir = nx.DiGraph()
@@ -354,7 +354,7 @@ def treat_distant_orphans(df_input_, soma_centroid, distance_threshold=25000, le
     orphans = df[(df['p'] == -1) & (df['id'] != 0)]
 
     if orphans.empty:
-        print("   ✅ No orphans found.")
+        print("   [OK] No orphans found.")
         df.loc[df['id'] == 0, 'p'] = -1
         return df
 
@@ -462,7 +462,7 @@ def treat_distant_orphans(df_input_, soma_centroid, distance_threshold=25000, le
 
     # --- 3. NESTED PLOTTING ---
     def plot_distant_decisions(log, full_node_map, orphan_set):
-        print("📊 Plotting Distant Orphan Decisions...")
+        print(" Plotting Distant Orphan Decisions...")
         fig = go.Figure()
 
         # A. Main Skeleton
@@ -530,14 +530,14 @@ def treat_distant_orphans(df_input_, soma_centroid, distance_threshold=25000, le
     # --- 5. CLEANUP ---
     if nodes_to_delete:
         df = df[~df['id'].isin(nodes_to_delete)].copy()
-        print(f"   🗑️ Deleted {len(nodes_to_delete)} distant debris nodes.")
+        print(f"    Deleted {len(nodes_to_delete)} distant debris nodes.")
 
     df.reset_index(drop=True, inplace=True)
 
     # --- CRITICAL: FORCE SOMA (0) TO BE ROOT (-1) ---
     df.loc[df['id'] == 0, 'p'] = -1
 
-    print(f"✅ Distant orphan treatment complete. Final node count: {len(df)}")
+    print(f"[OK] Distant orphan treatment complete. Final node count: {len(df)}")
     return df
 def extract_skeleton_data(neuron_id):
     """
@@ -546,7 +546,7 @@ def extract_skeleton_data(neuron_id):
     3. Aligns Skeleton to Cloud.
     4. Finds nearest Annotation for each Skeleton node (With 5um Max Dist).
     """
-    print(f"📥 Extracting and Mapping data for Neuron {neuron_id}...")
+    print(f" Extracting and Mapping data for Neuron {neuron_id}...")
 
     # --- STEP 1: LOAD REFERENCE CLOUD (Coords + Labels) ---
     try:
@@ -586,7 +586,7 @@ def extract_skeleton_data(neuron_id):
         ann_center = ann_arr.mean(axis=0)
 
     except Exception as e:
-        print(f"❌ Error loading annotations: {e}")
+        print(f"[FAIL] Error loading annotations: {e}")
         return None
 
     # --- STEP 2: LOAD SWC FILES ---
@@ -594,7 +594,7 @@ def extract_skeleton_data(neuron_id):
     files = glob.glob(pattern)
 
     if not files:
-        print("❌ No SWC files found.")
+        print("[FAIL] No SWC files found.")
         return None
 
     dfs = []
@@ -627,10 +627,10 @@ def extract_skeleton_data(neuron_id):
     swc_df['y'] += offset[1]
     swc_df['z'] += offset[2]
 
-    print(f"✅ Aligned Skeleton (Scale: {scale.round(2)})")
+    print(f"[OK] Aligned Skeleton (Scale: {scale.round(2)})")
 
     # --- STEP 4: NEAREST NEIGHBOR MAPPING (FIXED) ---
-    print("🔍 Mapping closest annotations (Max Dist: 5000nm)...")
+    print(" Mapping closest annotations (Max Dist: 5000nm)...")
 
 
 
@@ -673,10 +673,10 @@ def plot_skeleton_dataframe(df, neuron_id="Unknown"):
     colored by the NEAREST ANNOTATION TYPE (Axon, AIS, Myelin, Dendrite, Soma).
     """
     if df is None or df.empty:
-        print("❌ DataFrame is empty.")
+        print("[FAIL] DataFrame is empty.")
         return
 
-    print(f"📊 Plotting Skeleton for Neuron {neuron_id}...")
+    print(f" Plotting Skeleton for Neuron {neuron_id}...")
 
     fig = go.Figure()
 
@@ -697,7 +697,7 @@ def plot_skeleton_dataframe(df, neuron_id="Unknown"):
     # --- 2. PLOT BY ANNOTATED TYPE ---
     # Group by the 'annotated_type' column derived from your annotations
     if 'annotated_type' not in df.columns:
-        print("⚠️ 'annotated_type' column missing. Falling back to original 'type'.")
+        print("[WARN] 'annotated_type' column missing. Falling back to original 'type'.")
         group_col = 'type'
     else:
         group_col = 'annotated_type'
@@ -756,13 +756,13 @@ def visualize_comparison_lines(neuron_id, df_processed):
 
     Fix: Iterates by 'file' to handle duplicate IDs across multiple SWC parts.
     """
-    print(f"👀 Generating Line Comparison for Neuron {neuron_id}...")
+    print(f" Generating Line Comparison for Neuron {neuron_id}...")
 
     # --- 1. LOAD RAW DATA (Original Voxel Space) ---
     pattern = os.path.join(SKELETON_PATH, f"{neuron_id}*.swc")
     files = glob.glob(pattern)
     if not files:
-        print("❌ Original SWC file not found.")
+        print("[FAIL] Original SWC file not found.")
         return
 
     dfs_raw = []
@@ -854,7 +854,7 @@ def visualize_comparison_lines(neuron_id, df_processed):
 
 
 def check_coordinate_consistency():
-    print(f"⚖️ Checking Consistency for Neuron {TARGET_NEURON_ID}...\n")
+    print(f" Checking Consistency for Neuron {TARGET_NEURON_ID}...\n")
 
     # --- A. GET ANNOTATION STATS (The "Cloud") ---
     try:
@@ -870,7 +870,7 @@ def check_coordinate_consistency():
 
         ann_arr = np.array(ann_coords)
 
-        print("🔵 ANNOTATION DATA (Neuroglancer):")
+        print(" ANNOTATION DATA (Neuroglancer):")
         if len(ann_arr) > 0:
             print(f"   Count: {len(ann_arr)} points")
             print(f"   X Range: {ann_arr[:,0].min():.1f} to {ann_arr[:,0].max():.1f}")
@@ -878,11 +878,11 @@ def check_coordinate_consistency():
             print(f"   Z Range: {ann_arr[:,2].min():.1f} to {ann_arr[:,2].max():.1f}")
             print(f"   Sample Point: {ann_arr[0]}")
         else:
-            print("   ❌ No annotation points found.")
+            print("   [FAIL] No annotation points found.")
             return
 
     except Exception as e:
-        print(f"   ❌ Error reading annotations: {e}")
+        print(f"   [FAIL] Error reading annotations: {e}")
         return
 
     print("-" * 40)
@@ -891,7 +891,7 @@ def check_coordinate_consistency():
     pattern = os.path.join(SKELETON_PATH, f"{TARGET_NEURON_ID}*.swc")
     files = glob.glob(pattern)
 
-    print(f"⚫ SKELETON DATA (SWC Files: {len(files)} found):")
+    print(f" SKELETON DATA (SWC Files: {len(files)} found):")
 
     all_swc_coords = []
 
@@ -914,28 +914,28 @@ def check_coordinate_consistency():
         print(f"   Sample Point: {swc_arr[0]}")
 
         # --- C. DIAGNOSIS ---
-        print("\n🧐 DIAGNOSIS:")
+        print("\n DIAGNOSIS:")
 
         # Check X axis ratio
         x_ratio = ann_arr[:,0].mean() / swc_arr[:,0].mean()
         print(f"   Ratio (Annotation / SWC): ~{x_ratio:.2f}")
 
         if 900 < x_ratio < 1100:
-            print("   ⚠️ ISSUE DETECTED: Annotations are in Nanometers, SWC is in Microns.")
-            print("   👉 FIX: Multiply SWC coordinates by 1000.")
+            print("   [WARN] ISSUE DETECTED: Annotations are in Nanometers, SWC is in Microns.")
+            print("    FIX: Multiply SWC coordinates by 1000.")
         elif 3 < x_ratio < 5 or 0.2 < x_ratio < 0.3:
-            print("   ⚠️ ISSUE DETECTED: Likely a Voxel Resolution mismatch.")
-            print("   👉 CHECK: The 'info' file for 'scales'. SWC might be in voxels (e.g. 4nm pixels).")
+            print("   [WARN] ISSUE DETECTED: Likely a Voxel Resolution mismatch.")
+            print("    CHECK: The 'info' file for 'scales'. SWC might be in voxels (e.g. 4nm pixels).")
         elif 0.9 < x_ratio < 1.1:
-            print("   ✅ Coordinates seem consistent (Unit 1:1).")
+            print("   [OK] Coordinates seem consistent (Unit 1:1).")
         else:
-            print("   ⚠️ Complex mismatch. Check if SWC is raw voxels and Annotations are physical nm.")
+            print("   [WARN] Complex mismatch. Check if SWC is raw voxels and Annotations are physical nm.")
 
     else:
-        print("   ❌ No SWC coordinates found.")
+        print("   [FAIL] No SWC coordinates found.")
 
 def load_and_align():
-    print(f"⚖️ Aligning Neuron {TARGET_NEURON_ID}...")
+    print(f" Aligning Neuron {TARGET_NEURON_ID}...")
 
     # --- A. Load Annotations (Target Space) ---
     try:
@@ -970,7 +970,7 @@ def load_and_align():
         ann_arr = np.array(all_ann_coords)
 
     except Exception as e:
-        print(f"❌ Annotation Error: {e}")
+        print(f"[FAIL] Annotation Error: {e}")
         return None, None
 
     # --- B. Load SWC (Source Space) ---
@@ -997,7 +997,7 @@ def load_and_align():
 
     # Scale
     scale = np.divide(ann_range, swc_range, out=np.zeros_like(ann_range), where=swc_range!=0)
-    print(f"📏 Detected Scale Factors: {scale.round(2)}")
+    print(f" Detected Scale Factors: {scale.round(2)}")
 
     swc_df['x'] *= scale[0]; swc_df['y'] *= scale[1]; swc_df['z'] *= scale[2]
 
@@ -1022,10 +1022,10 @@ def plot_soma_skeleton(df, soma_ids, centroid):
     FIXED: Handles duplicate IDs by creating a unique 'file_id' key.
     """
     if df is None or not soma_ids:
-        print("❌ No Soma data to plot.")
+        print("[FAIL] No Soma data to plot.")
         return
 
-    print(f"🧬 Plotting Soma Skeleton ({len(soma_ids)} nodes)...")
+    print(f" Plotting Soma Skeleton ({len(soma_ids)} nodes)...")
 
     # 1. Create a Unique Key for Lookup
     # We combine 'file_source' and 'id' to ensure uniqueness
@@ -1117,14 +1117,14 @@ def find_stable_soma_centroid(df, min_samples=5, step_eps=500, max_eps=25000, RE
     3. PLOTS the Stability Curve (Epsilon vs Size).
     4. Returns centroid of the stable cluster (SNAPPED to the nearest skeleton node).
     """
-    print("📍 Searching for Stable Soma Cluster...")
+    print(" Searching for Stable Soma Cluster...")
 
     # --- 1. Filter Soma Points ---
     soma_df = df[ (df['annotated_type'] == 'Soma') | (df['annotated_type'] == '3') ].copy()
     coords = soma_df[['x', 'y', 'z']].values
 
     if len(coords) < min_samples:
-        print(f"⚠️ Small Soma ({len(coords)} pts). Skipping clustering.")
+        print(f"[WARN] Small Soma ({len(coords)} pts). Skipping clustering.")
         return np.median(coords, axis=0), set(soma_df['id'])
 
     # --- 2. Adaptive Stability Loop ---
@@ -1168,7 +1168,7 @@ def find_stable_soma_centroid(df, min_samples=5, step_eps=500, max_eps=25000, RE
         if stability_count >= REQUIRED_STABILITY and not found_plateau:
             best_eps = eps - (step_eps * REQUIRED_STABILITY)
             best_mask = current_mask
-            print(f"✅ Stable Cluster Found: Eps={best_eps}nm, Size={current_size} nodes")
+            print(f"[OK] Stable Cluster Found: Eps={best_eps}nm, Size={current_size} nodes")
             found_plateau = True
             # We continue the loop briefly just to fill the plot, but result is locked
             if len(history) > 15: break
@@ -1177,7 +1177,7 @@ def find_stable_soma_centroid(df, min_samples=5, step_eps=500, max_eps=25000, RE
 
     # Fallback
     if best_mask is None:
-        print("⚠️ No plateau found. Using largest cluster from max_eps.")
+        print("[WARN] No plateau found. Using largest cluster from max_eps.")
         best_mask = (labels != -1) # Use all non-noise points
         best_eps = max_eps
 
@@ -1226,8 +1226,8 @@ def find_stable_soma_centroid(df, min_samples=5, step_eps=500, max_eps=25000, RE
 
     snapped_centroid = points[closest_idx]
 
-    print(f"📍 Geometric Median: {geo_centroid}")
-    print(f"📍 Snapped Centroid: {snapped_centroid} (Dist: {dists[closest_idx]:.2f} nm)")
+    print(f" Geometric Median: {geo_centroid}")
+    print(f" Snapped Centroid: {snapped_centroid} (Dist: {dists[closest_idx]:.2f} nm)")
 
     return snapped_centroid, set(strict_cluster_df['id'])   
 
@@ -1266,7 +1266,7 @@ def reorient_fragment(df, new_root_id):
         return new_df[desired_cols]
 
     except Exception as e:
-        print(f"⚠️ Navis Reroot Failed for ID {new_root_id}: {e}")
+        print(f"[WARN] Navis Reroot Failed for ID {new_root_id}: {e}")
         # Fallback: Return original if Navis fails (prevents crash)
         return df
 
@@ -1279,7 +1279,7 @@ def stitch_neuron_fragments_smart(neuron_id, skeleton_path):
     # --- 1. Load Main Arbor ---
     main_file = os.path.join(skeleton_path, f"{neuron_id}.0.swc")
     if not os.path.exists(main_file):
-        print(f"❌ Main file missing: {main_file}")
+        print(f"[FAIL] Main file missing: {main_file}")
         return None
 
     main_df = pd.read_csv(main_file, delim_whitespace=True, comment='#',
@@ -1290,7 +1290,7 @@ def stitch_neuron_fragments_smart(neuron_id, skeleton_path):
     # <--- NEW: Tag the Main Arbor as Segment 0
     main_df['segment_id'] = 0
 
-    print(f"🔹 Main Arbor: {len(main_df)} nodes")
+    print(f" Main Arbor: {len(main_df)} nodes")
 
     # --- 2. Find Fragments ---
     pattern = os.path.join(skeleton_path, f"{neuron_id}*.swc")
@@ -1300,7 +1300,7 @@ def stitch_neuron_fragments_smart(neuron_id, skeleton_path):
     if not fragment_files:
         return main_df
 
-    print(f"🧩 Processing {len(fragment_files)} fragments...")
+    print(f" Processing {len(fragment_files)} fragments...")
 
     for i, frag_path in enumerate(fragment_files):
         frag_name = os.path.basename(frag_path)
@@ -1321,7 +1321,7 @@ def stitch_neuron_fragments_smart(neuron_id, skeleton_path):
         target_main_idx = main_indices[best_idx_in_frag]
         target_parent_id = int(main_df.iloc[target_main_idx]['id'])
 
-        print(f"   🔄 Re-rooting {frag_name}: New Root {new_root_id} -> Connects to Main {target_parent_id} (Dist: {min_dist:.2f} nm)")
+        print(f"    Re-rooting {frag_name}: New Root {new_root_id} -> Connects to Main {target_parent_id} (Dist: {min_dist:.2f} nm)")
 
         # --- B. RE-ORIENT HIERARCHY ---
         frag_df = reorient_fragment(frag_df, new_root_id)
@@ -1353,7 +1353,7 @@ def stitch_neuron_fragments_smart(neuron_id, skeleton_path):
     main_df.reset_index(drop=True, inplace=True)
 
     if main_df['id'].duplicated().any():
-        print("⚠️ Sanitizing IDs...")
+        print("[WARN] Sanitizing IDs...")
         old_ids = main_df['id'].values
         new_ids = np.arange(1, len(main_df) + 1)
         id_map = dict(zip(old_ids, new_ids))
@@ -1361,7 +1361,7 @@ def stitch_neuron_fragments_smart(neuron_id, skeleton_path):
         main_df['p'] = main_df['p'].map(id_map).fillna(-1).astype(int)
         main_df['id'] = new_ids
 
-    print(f"✅ Merged {len(main_df)} nodes.")
+    print(f"[OK] Merged {len(main_df)} nodes.")
     return main_df
 
 import plotly.graph_objects as go
@@ -1375,10 +1375,10 @@ def plot_merged_neuron(df, title="Merged Neuron Verification"):
     - MAIN ROOT (Soma) marked with a large GOLD STAR.
     """
     if df is None or df.empty:
-        print("❌ Dataframe is empty.")
+        print("[FAIL] Dataframe is empty.")
         return
 
-    print(f"📊 Plotting Merged Neuron ({len(df)} nodes)...")
+    print(f" Plotting Merged Neuron ({len(df)} nodes)...")
 
     # 1. Build Fast Lookup (Global map)
     coords = df.set_index('id')[['x', 'y', 'z']].to_dict('index')
@@ -1430,7 +1430,7 @@ def plot_merged_neuron(df, title="Merged Neuron Verification"):
     roots = df[df['p'] == -1]
 
     if not roots.empty:
-        print(f"📍 Found {len(roots)} root(s). Highlighting...")
+        print(f" Found {len(roots)} root(s). Highlighting...")
 
         fig.add_trace(go.Scatter3d(
             x=roots['x'], y=roots['y'], z=roots['z'],
@@ -1477,10 +1477,10 @@ def highlight_close_non_adjacent_points(df, threshold=1000, min_graph_hops=5):
       (Prevents highlighting sharp bends or high-curvature segments as "gaps").
     """
     if df is None or df.empty:
-        print("❌ DataFrame is empty.")
+        print("[FAIL] DataFrame is empty.")
         return
 
-    print(f"🔍 Scanning for close but non-adjacent points (< {threshold} nm)...")
+    print(f" Scanning for close but non-adjacent points (< {threshold} nm)...")
 
     # --- 1. BUILD GRAPH (For Topological Distance) ---
     # We need to know if nodes are "neighbors" in the graph sense
@@ -1499,10 +1499,10 @@ def highlight_close_non_adjacent_points(df, threshold=1000, min_graph_hops=5):
     pairs_idx = tree.query_pairs(r=threshold, output_type='ndarray')
 
     if len(pairs_idx) == 0:
-        print("   ✅ No close points found.")
+        print("   [OK] No close points found.")
         return
 
-    print(f"   🔹 Processed {len(pairs_idx)} spatial candidates. Filtering topology...")
+    print(f"    Processed {len(pairs_idx)} spatial candidates. Filtering topology...")
 
     # --- 3. FILTERING ---
     close_calls = []
@@ -1545,7 +1545,7 @@ def highlight_close_non_adjacent_points(df, threshold=1000, min_graph_hops=5):
             'dist': dist_euclid
         })
 
-    print(f"🚀 Found {len(close_calls)} pairs of close non-adjacent points.")
+    print(f" Found {len(close_calls)} pairs of close non-adjacent points.")
 
     # --- 4. VISUALIZATION ---
     fig = go.Figure()
@@ -1622,10 +1622,10 @@ def annotate_stitched_neuron(stitched_df, neuron_id, annotation_url=None):
         pd.DataFrame: The original stitched_df with a new 'annotated_type' column.
     """
     if stitched_df is None or stitched_df.empty:
-        print("❌ Input DataFrame is empty.")
+        print("[FAIL] Input DataFrame is empty.")
         return stitched_df
 
-    print(f"📥 Loading Annotations for Neuron {neuron_id}...")
+    print(f" Loading Annotations for Neuron {neuron_id}...")
 
     # --- 1. LOAD REFERENCE ANNOTATIONS (The Cloud) ---
     try:
@@ -1658,7 +1658,7 @@ def annotate_stitched_neuron(stitched_df, neuron_id, annotation_url=None):
                 continue
 
         if not ann_coords:
-            print("⚠️ No annotation points found for this ID.")
+            print("[WARN] No annotation points found for this ID.")
             stitched_df['annotated_type'] = "Unknown"
             return stitched_df
 
@@ -1670,10 +1670,10 @@ def annotate_stitched_neuron(stitched_df, neuron_id, annotation_url=None):
         ann_range = ann_max - ann_min
         ann_center = ann_arr.mean(axis=0)
 
-        print(f"🔹 Found {len(ann_arr)} annotation points.")
+        print(f" Found {len(ann_arr)} annotation points.")
 
     except Exception as e:
-        print(f"❌ Error loading annotations: {e}")
+        print(f"[FAIL] Error loading annotations: {e}")
         return stitched_df
 
     # --- 2. CALCULATE ALIGNMENT (Source -> Target) ---
@@ -1700,10 +1700,10 @@ def annotate_stitched_neuron(stitched_df, neuron_id, annotation_url=None):
     # D. Apply Offset
     aligned_coords += offset
 
-    print(f"✅ Alignment Calculated | Scale: {scale.round(2)}")
+    print(f"[OK] Alignment Calculated | Scale: {scale.round(2)}")
 
     # --- 3. KDTREE NEAREST NEIGHBOR SEARCH ---
-    print("🔍 Mapping labels (Max Dist: 5000nm)...")
+    print(" Mapping labels (Max Dist: 5000nm)...")
 
     # Build Tree on the Annotation Cloud
     tree = cKDTree(ann_arr)
@@ -1732,7 +1732,7 @@ def annotate_stitched_neuron(stitched_df, neuron_id, annotation_url=None):
 
     # Stats
     counts = stitched_df['annotated_type'].value_counts()
-    print(f"📊 Annotation Results:\n{counts}")
+    print(f" Annotation Results:\n{counts}")
 
     return stitched_df
 
@@ -1750,10 +1750,10 @@ def plot_annotated_neuron(df, title="Annotated Neuron Skeleton"):
     - Unknown: Grey
     """
     if df is None or df.empty:
-        print("❌ Dataframe is empty.")
+        print("[FAIL] Dataframe is empty.")
         return
 
-    print(f"📊 Plotting Annotated Neuron ({len(df)} nodes)...")
+    print(f" Plotting Annotated Neuron ({len(df)} nodes)...")
 
     # 1. Define Color Map
     COLOR_MAP = {
@@ -1846,10 +1846,10 @@ def scale_dataframe_to_nm(df, resolution=[8, 8, 33]):
     Resolution: [res_x, res_y, res_z] in nm/voxel (e.g., [8, 8, 32])
     """
     if df is None or df.empty:
-        print("❌ DataFrame is empty.")
+        print("[FAIL] DataFrame is empty.")
         return df
 
-    print(f"📏 Scaling data by resolution: {resolution} nm/voxel...")
+    print(f" Scaling data by resolution: {resolution} nm/voxel...")
     print(f"   Before (Head): X={df['x'].iloc[0]:.1f}, Y={df['y'].iloc[0]:.1f}, Z={df['z'].iloc[0]:.1f}")
 
     # Create a copy so we don't corrupt the original data
@@ -1875,7 +1875,7 @@ def scale_dataframe_to_nm(df, resolution=[8, 8, 33]):
     df_nm.attrs['resolution'] = resolution
 
     print(f"   After  (Head): X={df_nm['x'].iloc[0]:.1f}, Y={df_nm['y'].iloc[0]:.1f}, Z={df_nm['z'].iloc[0]:.1f}")
-    print("✅ Conversion to Nanometers complete.")
+    print("[OK] Conversion to Nanometers complete.")
 
     return df_nm
 import plotly.graph_objects as go
@@ -1888,10 +1888,10 @@ def plot_voxel_vs_physical(df_voxel, df_physical, title="Voxel vs Physical Space
     to visualize the Anisotropic correction (the "stretching" of Z).
     """
     if df_voxel is None or df_physical is None:
-        print("❌ Missing DataFrames.")
+        print("[FAIL] Missing DataFrames.")
         return
 
-    print("📊 Generating comparison plot...")
+    print(" Generating comparison plot...")
 
     # Create Subplots: 1 Row, 2 Columns
     fig = make_subplots(
@@ -1964,10 +1964,10 @@ def plot_soma_skeleton(df, soma_ids, centroid):
     FIXED: Handles duplicate IDs by creating a unique 'file_id' key.
     """
     if df is None or not soma_ids:
-        print("❌ No Soma data to plot.")
+        print("[FAIL] No Soma data to plot.")
         return
 
-    print(f"🧬 Plotting Soma Skeleton ({len(soma_ids)} nodes)...")
+    print(f" Plotting Soma Skeleton ({len(soma_ids)} nodes)...")
 
     # 1. Create a Unique Key for Lookup
     # We combine 'file_source' and 'id' to ensure uniqueness
@@ -2060,14 +2060,14 @@ def find_stable_soma_centroid(df, min_samples=50, step_eps=100, max_eps=5000, RE
     4. PLOTS the Resulting 3D Cluster + Centroid + Epsilon Sphere.
     5. Returns centroid of the stable cluster (SNAPPED to the nearest skeleton node).
     """
-    print("📍 Searching for Stable Soma Cluster...")
+    print(" Searching for Stable Soma Cluster...")
 
     # --- 1. Filter Soma Points ---
     soma_df = df[ (df['annotated_type'] == 'Soma') | (df['annotated_type'] == '3') ].copy()
     coords = soma_df[['x', 'y', 'z']].values
 
     if len(coords) < min_samples:
-        print(f"⚠️ Small Soma ({len(coords)} pts). Skipping clustering.")
+        print(f"[WARN] Small Soma ({len(coords)} pts). Skipping clustering.")
         return np.median(coords, axis=0), set(soma_df['id'])
 
     # --- 2. Adaptive Stability Loop ---
@@ -2117,7 +2117,7 @@ def find_stable_soma_centroid(df, min_samples=50, step_eps=100, max_eps=5000, RE
             # Important: We must re-run or cache the mask for THIS specific epsilon
             # For simplicity, we assume current_mask is close enough since it's stable
             final_cluster_mask = current_mask
-            print(f"✅ Stable Cluster Found: Eps={best_eps}nm, Size={current_size} nodes")
+            print(f"[OK] Stable Cluster Found: Eps={best_eps}nm, Size={current_size} nodes")
 
             found_plateau = True
             # Continue briefly to show plateau
@@ -2127,7 +2127,7 @@ def find_stable_soma_centroid(df, min_samples=50, step_eps=100, max_eps=5000, RE
 
     # Fallback
     if not found_plateau:
-        print("⚠️ No plateau found. Using max_eps.")
+        print("[WARN] No plateau found. Using max_eps.")
         best_eps = max_eps
         final_cluster_mask = (labels != -1)
 
@@ -2151,7 +2151,7 @@ def find_stable_soma_centroid(df, min_samples=50, step_eps=100, max_eps=5000, RE
     # --- 4. CALCULATE CENTROID ---
     strict_cluster_df = soma_df[final_cluster_mask]
     if strict_cluster_df.empty:
-        print("❌ Error: Cluster Empty.")
+        print("[FAIL] Error: Cluster Empty.")
         return None, set()
 
     points = strict_cluster_df[['x', 'y', 'z']].values
@@ -2163,7 +2163,7 @@ def find_stable_soma_centroid(df, min_samples=50, step_eps=100, max_eps=5000, RE
     snapped_centroid = points[closest_idx]
 
     # --- 5. PLOT 3D RESULT (SOMA + SPHERE) ---
-    print(f"📊 Plotting Result with Epsilon Sphere ({best_eps} nm)...")
+    print(f" Plotting Result with Epsilon Sphere ({best_eps} nm)...")
     fig_3d = go.Figure()
 
     # A. The Soma Points (Green)
@@ -2210,10 +2210,10 @@ def plot_soma_points(df, soma_ids, title="Highlighted Soma Points"):
     Useful for debugging DBSCAN or Expansion results.
     """
     if df is None or not soma_ids:
-        print("❌ Missing data or soma_ids.")
+        print("[FAIL] Missing data or soma_ids.")
         return
 
-    print(f"📍 Plotting {len(soma_ids)} highlighted soma nodes...")
+    print(f" Plotting {len(soma_ids)} highlighted soma nodes...")
 
     # Ensure efficient lookup
     target_ids = set(soma_ids)
@@ -2262,7 +2262,7 @@ def plot_soma_points(df, soma_ids, title="Highlighted Soma Points"):
             customdata=soma_df['annotated_type']
         ))
     else:
-        print("⚠️ None of the provided soma_ids were found in the DataFrame.")
+        print("[WARN] None of the provided soma_ids were found in the DataFrame.")
 
     # --- LAYOUT ---
     fig.update_layout(
@@ -2288,10 +2288,10 @@ def find_exits_by_sphere_intersection(df, centroid, radius, tolerance=2000):
         df (pd.DataFrame): The modified dataframe, re-rooted at the soma center.
     """
     if df is None or df.empty:
-        print("❌ DataFrame is empty.")
+        print("[FAIL] DataFrame is empty.")
         return None, None
 
-    print(f"🔍 Finding exits via Sphere Intersection (Radius: {radius} ± {tolerance} nm)...")
+    print(f" Finding exits via Sphere Intersection (Radius: {radius} +/- {tolerance} nm)...")
 
     # --- 1. SETUP GRAPH ---
     # We use an UNDIRECTED graph to allow traversal regardless of current root
@@ -2314,7 +2314,7 @@ def find_exits_by_sphere_intersection(df, centroid, radius, tolerance=2000):
     shell_ids = node_ids[np.where(mask_shell)[0]]
 
     if len(shell_ids) == 0:
-        print("   ⚠️ No nodes found in shell. Increase tolerance.")
+        print("   [WARN] No nodes found in shell. Increase tolerance.")
         return None, df
 
     # --- 3. CLUSTER & SELECT TARGETS ---
@@ -2327,7 +2327,7 @@ def find_exits_by_sphere_intersection(df, centroid, radius, tolerance=2000):
         comp_dists = [np.linalg.norm(np.array([node_map[n]['x'], node_map[n]['y'], node_map[n]['z']]) - centroid) for n in comp_list]
         targets.append(comp_list[np.argmin(comp_dists)])
 
-    print(f"   🔹 Identified {len(targets)} unique branch crossings.")
+    print(f"    Identified {len(targets)} unique branch crossings.")
 
     # --- 4. TRACE PATHS ---
     exit_candidates = []
@@ -2367,16 +2367,16 @@ def find_exits_by_sphere_intersection(df, centroid, radius, tolerance=2000):
         unique_exits['x'] = unique_exits['id'].apply(lambda x: node_map[x]['x'])
         unique_exits['y'] = unique_exits['id'].apply(lambda x: node_map[x]['y'])
         unique_exits['z'] = unique_exits['id'].apply(lambda x: node_map[x]['z'])
-        print(f"🚀 Found {len(unique_exits)} Unique Branch Starts.")
+        print(f" Found {len(unique_exits)} Unique Branch Starts.")
     else:
-        print("   ⚠️ No transitions found.")
+        print("   [WARN] No transitions found.")
 
     # --- 6. PLOT RESULTS ---
     if not unique_exits.empty:
         plot_sphere_exits(df, unique_exits, centroid, radius, targets)
 
     # --- 7. RE-ROOT DATAFRAME AT SOMA CENTER ---
-    print(f"🔧 Re-rooting DataFrame at closest soma node (ID: {root_id})...")
+    print(f" Re-rooting DataFrame at closest soma node (ID: {root_id})...")
 
     # A. Determine new parentage flow via BFS from new root
     bfs_tree = nx.bfs_tree(G, source=root_id) # Returns a DiGraph rooted at root_id
@@ -2394,7 +2394,7 @@ def find_exits_by_sphere_intersection(df, centroid, radius, tolerance=2000):
     # Explicitly set the new Root's parent to -1
     df.loc[df['id'] == root_id, 'p'] = -1
 
-    print(f"   ✅ Tree topology updated. Node {root_id} is now the Root (p=-1).")
+    print(f"   [OK] Tree topology updated. Node {root_id} is now the Root (p=-1).")
 
     return unique_exits, df
 
@@ -2403,7 +2403,7 @@ def plot_sphere_exits(df, exits, centroid, radius, targets):
     """
     Helper function to visualize the sphere intersection results.
     """
-    print("📊 Plotting Sphere Intersections...")
+    print(" Plotting Sphere Intersections...")
     fig = go.Figure()
 
     # 1. Soma Cloud (Context) - Filter for Soma/1/3
@@ -2477,7 +2477,7 @@ def validate_reconstruction_quality_RAMopt_(df, com_distance_threshold=50000, mi
     Evaluates the quality of the final reconstructed neuron.
     Uses A Priori RAM estimation to prevent Colab crashes.
     """
-    print("\n🔬 Running Quality Assurance Check...")
+    print("\n Running Quality Assurance Check...")
     
     if df is None or df.empty:
         return False
@@ -2496,7 +2496,7 @@ def validate_reconstruction_quality_RAMopt_(df, com_distance_threshold=50000, mi
     print('ESTIMATED RAM')
     print(estimated_peak_gb)
     if estimated_peak_gb > max_ram_gb:
-        print(f"❌ FAIL: Predicted RAM limit exceeded.")
+        print(f"[FAIL] FAIL: Predicted RAM limit exceeded.")
         print(f"  - Neuron has {N:,} nodes.")
         print(f"  - Estimated peak RAM for QA operations: {estimated_peak_gb:.2f} GB (Limit: {max_ram_gb} GB).")
         print("  - Skipping QA check to prevent Colab from crashing.")
@@ -2619,7 +2619,7 @@ def validate_reconstruction_quality_RAMopt_(df, com_distance_threshold=50000, mi
         reasons.append(f"Size Error: Total arbor length ({total_length_nm:,.1f} nm) is below the minimum threshold ({min_arbor_length:,.1f} nm).")
 
     # --- TERMINAL OUTPUT ---
-    print(f"\n📝 QA Result: {'✅ PASS' if is_valid else '❌ FAIL'}")
+    print(f"\n QA Result: {'[OK] PASS' if is_valid else '[FAIL] FAIL'}")
     if not is_valid:
         print("Reasons for failure:")
         for r in reasons:
@@ -2638,7 +2638,7 @@ def validate_reconstruction_quality(df, com_distance_threshold=50000, min_arbor_
       5. Soma is centered within com_distance_threshold (nm) of the entire arbor.
       6. Total arbor length is greater than or equal to min_arbor_length (nm).
     """
-    print("\n🔬 Running Quality Assurance Check...")
+    print("\n Running Quality Assurance Check...")
 
 
      # --- A PRIORI RAM ESTIMATION (NON-LINEAR) ---
@@ -2655,7 +2655,7 @@ def validate_reconstruction_quality(df, com_distance_threshold=50000, min_arbor_
     print('ESTIMATED RAM')
     print(estimated_peak_gb)
     if estimated_peak_gb > max_ram_gb:
-        print(f"❌ FAIL: Predicted RAM limit exceeded.")
+        print(f"[FAIL] FAIL: Predicted RAM limit exceeded.")
         print(f"  - Neuron has {N:,} nodes.")
         print(f"  - Estimated peak RAM for QA operations: {estimated_peak_gb:.2f} GB (Limit: {max_ram_gb} GB).")
         print("  - Skipping QA check to prevent Colab from crashing.")
@@ -2783,7 +2783,7 @@ def validate_reconstruction_quality(df, com_distance_threshold=50000, min_arbor_
         reasons.append(f"Size Error: Total arbor length ({total_length_nm:,.1f} nm) is below the minimum threshold ({min_arbor_length:,.1f} nm).")
 
     # --- TERMINAL OUTPUT ---
-    print(f"\n📝 QA Result: {'✅ PASS' if is_valid else '❌ FAIL'}")
+    print(f"\n QA Result: {'[OK] PASS' if is_valid else '[FAIL] FAIL'}")
     if not is_valid:
         print("Reasons for failure:")
         for r in reasons:
@@ -2862,24 +2862,24 @@ def collapse_soma_to_root(df_, soma_ids, centroid, exit_df):
     """
     df = df_.copy(deep=True)
     if df is None or exit_df is None:
-        print("❌ Missing input DataFrames.")
+        print("[FAIL] Missing input DataFrames.")
         return None
 
-    print(f"📉 Collapsing Soma (Existing Segment Promotion Mode)...")
+    print(f" Collapsing Soma (Existing Segment Promotion Mode)...")
 
 
     # --- 1. Calculate Virtual Radius ---
     exit_coords = exit_df[['x', 'y', 'z']].values
     dists = np.linalg.norm(exit_coords - centroid, axis=1)
     visual_radius = np.mean(dists) if len(dists) > 0 else 500.0
-    print(f"   🔹 Virtual Soma Size: {visual_radius:.2f} nm")
+    print(f"    Virtual Soma Size: {visual_radius:.2f} nm")
 
     # --- 2. FIND CLOSEST SEGMENT (New Step) ---
     # We look for the node within soma_ids that is geometrically closest to the centroid
     soma_nodes = df[df['id'].isin(soma_ids)].copy()
 
     if soma_nodes.empty:
-        print("❌ Error: No soma nodes found in DataFrame.")
+        print("[FAIL] Error: No soma nodes found in DataFrame.")
         return None
 
     # Calculate distance from each soma node to the centroid
@@ -2887,7 +2887,7 @@ def collapse_soma_to_root(df_, soma_ids, centroid, exit_df):
     best_idx = np.argmin(node_dists)
     best_soma_id = soma_nodes.iloc[best_idx]['id']
 
-    print(f"   🎯 Selected existing segment ID {best_soma_id} as the new Root.")
+    print(f"    Selected existing segment ID {best_soma_id} as the new Root.")
 
     # --- 3. Nuclear Deletion (Modified) ---
     ids_to_delete = set(soma_ids)
@@ -2899,7 +2899,7 @@ def collapse_soma_to_root(df_, soma_ids, centroid, exit_df):
     # Safety: Do not delete exits
     ids_to_delete = ids_to_delete - exit_ids
 
-    print(f"   🗑️ Deleting {len(ids_to_delete)} soma nodes.")
+    print(f"    Deleting {len(ids_to_delete)} soma nodes.")
 
     # Create Clean DataFrame
     new_df = df[~df['id'].isin(ids_to_delete)].copy()
@@ -2938,7 +2938,7 @@ def collapse_soma_to_root(df_, soma_ids, centroid, exit_df):
 
     if mask_exits.any():
         new_df.loc[mask_exits, 'p'] = 0
-        print(f"   🔗 Connected {mask_exits.sum()} exit points to Root 0.")
+        print(f"    Connected {mask_exits.sum()} exit points to Root 0.")
 
     # --- 7. Final Merge & Cleanup ---
     collapsed_df = pd.concat([root_df, new_df], ignore_index=True)
@@ -2947,7 +2947,7 @@ def collapse_soma_to_root(df_, soma_ids, centroid, exit_df):
     collapsed_df.reset_index(drop=True, inplace=True)
 
     # --- 8. Reindex (Standardize IDs) ---
-    print("   🔄 Renumbering IDs...")
+    print("    Renumbering IDs...")
     old_ids = collapsed_df['id'].values
     new_ids = np.arange(0, len(collapsed_df)) # Start at 1
 
@@ -2962,7 +2962,7 @@ def collapse_soma_to_root(df_, soma_ids, centroid, exit_df):
     # Ensure Root (ID 1 now) is -1
     collapsed_df.loc[collapsed_df['id'] == 1, 'p'] = -1
 
-    print(f"✅ Soma Collapsed. Final Node Count: {len(collapsed_df)}")
+    print(f"[OK] Soma Collapsed. Final Node Count: {len(collapsed_df)}")
     return collapsed_df
 
 
@@ -2977,10 +2977,10 @@ def plot_collapsed_neuron(df_, title="Collapsed Soma Skeleton"):
     """
     df = df_.copy(deep=True)
     if df is None or df.empty:
-        print("❌ DataFrame is empty.")
+        print("[FAIL] DataFrame is empty.")
         return
 
-    print(f"📊 Plotting Collapsed Neuron ({len(df)} nodes)...")
+    print(f" Plotting Collapsed Neuron ({len(df)} nodes)...")
 
     # --- 1. SETUP COLORS & LOOKUP ---
     COLOR_MAP = {
@@ -3062,7 +3062,7 @@ def plot_collapsed_neuron(df_, title="Collapsed Soma Skeleton"):
 
     # B. Draw Orphans (Other -1s) - Red Crosses
     if not orphans.empty:
-        print(f"   ⚠️ Found {len(orphans)} orphaned roots (disconnected segments).")
+        print(f"   [WARN] Found {len(orphans)} orphaned roots (disconnected segments).")
         fig.add_trace(go.Scatter3d(
             x=orphans['x'], y=orphans['y'], z=orphans['z'],
             mode='markers',
@@ -3114,13 +3114,13 @@ def treat_orphan_roots(df_input_, soma_centroid, distance_threshold=15000, lengt
     """
     df_input = df_input_.copy(deep=True)
     if df_input is None or df_input.empty:
-        print("❌ DataFrame is empty.")
+        print("[FAIL] DataFrame is empty.")
         return None
 
     # --- 0. SAFETY COPY ---
     df = df_input.copy()
 
-    print(f"🔧 Treating Orphans (Dist < {distance_threshold} | Len > {length_threshold})...")
+    print(f" Treating Orphans (Dist < {distance_threshold} | Len > {length_threshold})...")
 
     # --- 1. SETUP GRAPH ---
     G = nx.DiGraph()
@@ -3134,7 +3134,7 @@ def treat_orphan_roots(df_input_, soma_centroid, distance_threshold=15000, lengt
     orphans = df[(df['p'] == -1) & (df['id'] != 0)]
 
     if orphans.empty:
-        print("   ✅ No orphans found.")
+        print("   [OK] No orphans found.")
         # Ensure Soma is valid before returning
         df.loc[df['id'] == 0, 'p'] = -1
         return df
@@ -3200,7 +3200,7 @@ def treat_orphan_roots(df_input_, soma_centroid, distance_threshold=15000, lengt
 
     # --- 3. NESTED PLOTTING ---
     def plot_orphan_decisions(log, full_node_map, all_orphans_set):
-        print("📊 Plotting Skeleton & Decisions...")
+        print(" Plotting Skeleton & Decisions...")
         fig = go.Figure()
 
         # A. Main Skeleton (Grey)
@@ -3256,7 +3256,7 @@ def treat_orphan_roots(df_input_, soma_centroid, distance_threshold=15000, lengt
     # --- 5. CLEANUP ---
     if nodes_to_delete:
         df = df[~df['id'].isin(nodes_to_delete)].copy()
-        print(f"   🗑️ Deleted {len(nodes_to_delete)} nodes (Noise).")
+        print(f"    Deleted {len(nodes_to_delete)} nodes (Noise).")
 
     df.reset_index(drop=True, inplace=True)
 
@@ -3264,7 +3264,7 @@ def treat_orphan_roots(df_input_, soma_centroid, distance_threshold=15000, lengt
     # This guarantees the file topology is valid
     df.loc[df['id'] == 0, 'p'] = -1
 
-    print(f"✅ Orphan treatment complete. Final node count: {len(df)}")
+    print(f"[OK] Orphan treatment complete. Final node count: {len(df)}")
     return df
 
 
@@ -3304,10 +3304,10 @@ def highlight_and_stitch_points(df_, soma_center, threshold=1000, min_graph_hops
     """
     df = df_.copy(deep=True)
     if df is None or df.empty:
-        print("❌ DataFrame is empty.")
+        print("[FAIL] DataFrame is empty.")
         return df
 
-    print(f"🔍 Scanning for close points (< {threshold} nm)...")
+    print(f" Scanning for close points (< {threshold} nm)...")
 
     # Make a copy to modify
     df_stitched = df.copy()
@@ -3327,7 +3327,7 @@ def highlight_and_stitch_points(df_, soma_center, threshold=1000, min_graph_hops
     pairs_idx = tree.query_pairs(r=threshold, output_type='ndarray')
 
     if len(pairs_idx) == 0:
-        print("   ✅ No close points found.")
+        print("   [OK] No close points found.")
         return df_stitched
 
     # --- 3. FILTERING & STITCHING ---
@@ -3394,12 +3394,12 @@ def highlight_and_stitch_points(df_, soma_center, threshold=1000, min_graph_hops
 
                 merges_made.append((pos_a, pos_b))
                 count_stitched += 1
-                print(f"   🔗 Stitched {distal} -> {proximal} (Gap: {dist_euclid:.1f} nm)")
+                print(f"    Stitched {distal} -> {proximal} (Gap: {dist_euclid:.1f} nm)")
 
             except Exception as e:
-                print(f"   ⚠️ Stitch failed: {e}")
+                print(f"   [WARN] Stitch failed: {e}")
 
-    print(f"🚀 Found {len(close_calls)} proximities. Performed {count_stitched} stitches.")
+    print(f" Found {len(close_calls)} proximities. Performed {count_stitched} stitches.")
 
     # --- 4. VISUALIZATION ---
     fig = go.Figure()
@@ -3470,10 +3470,10 @@ def plot_soma_and_roots(df, title="Soma & Disconnected Roots Check"):
     3. The rest of the skeleton as grey lines.
     """
     if df is None or df.empty:
-        print("❌ DataFrame is empty.")
+        print("[FAIL] DataFrame is empty.")
         return
 
-    print(f"📊 Plotting Roots Check ({len(df)} nodes)...")
+    print(f" Plotting Roots Check ({len(df)} nodes)...")
 
     # --- 1. SEPARATE DATA ---
     # Find all roots (parent is -1)
@@ -3523,11 +3523,11 @@ def plot_soma_and_roots(df, title="Soma & Disconnected Roots Check"):
             hovertemplate="<b>Soma Root</b><br>ID: 0<extra></extra>"
         ))
     else:
-        print("⚠️ Warning: No Soma (ID 0) found with p=-1.")
+        print("[WARN] Warning: No Soma (ID 0) found with p=-1.")
 
     # --- 4. PLOT BROKEN ROOTS (Orphans) ---
     if not broken_roots.empty:
-        print(f"   ⚠️ Found {len(broken_roots)} disconnected roots/orphans.")
+        print(f"   [WARN] Found {len(broken_roots)} disconnected roots/orphans.")
         fig.add_trace(go.Scatter3d(
             x=broken_roots['x'], y=broken_roots['y'], z=broken_roots['z'],
             mode='markers',
@@ -3537,7 +3537,7 @@ def plot_soma_and_roots(df, title="Soma & Disconnected Roots Check"):
             text=broken_roots['id']
         ))
     else:
-        print("   ✅ Perfect Topology: No disconnected roots found.")
+        print("   [OK] Perfect Topology: No disconnected roots found.")
 
     # --- 5. LAYOUT ---
     fig.update_layout(
@@ -3563,7 +3563,7 @@ def reroot_entire_neuron_navis(df_):
     """
     df = df_.copy(deep=True)
     if df is None or df.empty:
-        print("❌ DataFrame is empty.")
+        print("[FAIL] DataFrame is empty.")
         return df
 
     # --- 1. FIND & VALIDATE ROOT ---
@@ -3571,18 +3571,18 @@ def reroot_entire_neuron_navis(df_):
     root_rows = df[df['p'] == -1]
 
     if len(root_rows) == 0:
-        print("❌ Error: No root found (No node has p = -1). The skeleton might be a closed loop or empty.")
+        print("[FAIL] Error: No root found (No node has p = -1). The skeleton might be a closed loop or empty.")
         return None
 
     if len(root_rows) > 1:
-        print(f"❌ Error: Multiple roots found ({len(root_rows)}).")
+        print(f"[FAIL] Error: Multiple roots found ({len(root_rows)}).")
         print(f"   Root IDs: {root_rows['id'].tolist()}")
         print("   The skeleton is fragmented (multiple disconnected trees). Please stitch them first.")
         return None
 
     # Extract the single valid Root ID
     root_id = int(root_rows.iloc[0]['id'])
-    print(f"🌲 Identified Single Root ID: {root_id}")
+    print(f" Identified Single Root ID: {root_id}")
     print(f"   Re-orienting entire neuron flow away from ID {root_id}...")
 
     # --- 2. PREPARE DATA FOR NAVIS ---
@@ -3596,16 +3596,16 @@ def reroot_entire_neuron_navis(df_):
         # Navis will automatically preserve extra columns like 'annotated_type' in the .nodes attribute
         n = navis.TreeNeuron(temp_df, name='neuron_clean')
     except Exception as e:
-        print(f"❌ Navis Import Failed: {e}")
+        print(f"[FAIL] Navis Import Failed: {e}")
         return df
 
     # --- 4. EXECUTE REROOT ---
     # This flips any edges that are pointing the "wrong way" (towards the soma)
     try:
         n.reroot(root_id, inplace=True)
-        print(f"✅ Directionality enforced successfully.")
+        print(f"[OK] Directionality enforced successfully.")
     except Exception as e:
-        print(f"❌ Reroot Failed: {e}")
+        print(f"[FAIL] Reroot Failed: {e}")
         return df
 
     # --- 5. RESTORE DATAFRAME FORMAT ---
@@ -3642,10 +3642,10 @@ def plot_final_neuron(df, title="Final Reconstructed Neuron"):
     - Highlights the Root Node (Soma Center).
     """
     if df is None or df.empty:
-        print("❌ DataFrame is empty.")
+        print("[FAIL] DataFrame is empty.")
         return
 
-    print("🎨 Generating Final Skeleton Plot...")
+    print(" Generating Final Skeleton Plot...")
 
     # --- 1. SETUP COLOR MAP ---
     # Standard SWC colors + Custom Types
@@ -3748,14 +3748,14 @@ def clean_branch_labels(df):
     5. Overwrites all nodes in that branch with the predominant label.
     """
     if df is None or df.empty:
-        print("❌ DataFrame is empty.")
+        print("[FAIL] DataFrame is empty.")
         return df
 
     if 'annotated_type' not in df.columns:
-        print("⚠️ 'annotated_type' column missing. Cannot clean labels.")
+        print("[WARN] 'annotated_type' column missing. Cannot clean labels.")
         return df
 
-    print("🧹 Cleaning and unifying branch labels...")
+    print(" Cleaning and unifying branch labels...")
     df_clean = df.copy()
 
     # Ensure string type for labels to avoid mixed-type errors
@@ -3774,14 +3774,14 @@ def clean_branch_labels(df):
     # Since we already ran the Navis reroot, we know exactly where the root is
     root_nodes = df_clean[df_clean['p'] == -1]['id'].values
     if len(root_nodes) == 0:
-        print("❌ Error: No Root node found (p = -1).")
+        print("[FAIL] Error: No Root node found (p = -1).")
         return df_clean
 
     soma_id = root_nodes[0]
 
     # Primary roots are the direct children of the Soma
     primary_roots = df_clean[df_clean['p'] == soma_id]['id'].tolist()
-    print(f"   🌱 Found {len(primary_roots)} primary branches attached to Soma (ID {soma_id}).")
+    print(f"    Found {len(primary_roots)} primary branches attached to Soma (ID {soma_id}).")
 
     # --- 3. EVALUATE AND APPLY PREDOMINANT LABELS ---
     nodes_changed = 0
@@ -3804,9 +3804,9 @@ def clean_branch_labels(df):
         # Apply the winning label to the entire branch
         df_clean.loc[df_clean['id'].isin(branch_nodes), 'annotated_type'] = predominant_label
 
-        print(f"      🔹 Branch at {pr_id}: {len(branch_nodes)} nodes -> Consolidated to '{predominant_label}' ({num_changing} nodes fixed)")
+        print(f"       Branch at {pr_id}: {len(branch_nodes)} nodes -> Consolidated to '{predominant_label}' ({num_changing} nodes fixed)")
 
-    print(f"✅ Label cleaning complete. Unified {nodes_changed} anomalous nodes across all branches.")
+    print(f"[OK] Label cleaning complete. Unified {nodes_changed} anomalous nodes across all branches.")
     return df_clean
 
 
@@ -3816,10 +3816,10 @@ def plot_skeleton_comparison(df_old, df_new, title="Skeleton Comparison: Before 
     Both subplots are color-coded by 'annotated_type'.
     """
     if df_old is None or df_new is None:
-        print("❌ Missing one or both DataFrames.")
+        print("[FAIL] Missing one or both DataFrames.")
         return
 
-    print("📊 Generating side-by-side comparison plot...")
+    print(" Generating side-by-side comparison plot...")
 
     # --- 1. SETUP SUBPLOTS ---
     fig = make_subplots(

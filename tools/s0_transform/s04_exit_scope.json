@@ -1,0 +1,65 @@
+{
+  "note": "Declared scope for the S0.4 exit test. Every exclusion here is self-verifying: tools/test_s0_4_exit.py asserts that each declared item STILL APPLIES, so a stale entry is an error rather than a harmless leftover. Doc 7 s3: an exemption that only skips is an exemption that hides.",
+  "package_root": "towards_eeg",
+  "expected_subpackages": [
+    "towards_eeg",
+    "towards_eeg/hybrid",
+    "towards_eeg/connectome",
+    "towards_eeg/structure",
+    "towards_eeg/pointnet",
+    "towards_eeg/cosim",
+    "towards_eeg/passive",
+    "towards_eeg/io",
+    "towards_eeg/config"
+  ],
+  "empty_by_construction": {
+    "packages": [
+      "towards_eeg/structure",
+      "towards_eeg/pointnet",
+      "towards_eeg/cosim",
+      "towards_eeg/passive",
+      "towards_eeg/config"
+    ],
+    "rationale": "Appendix A's layout names nine subpackages; only hybrid/ and connectome/ have any existing file whose verdict is 'keep'. S0 may only move files, so the rest carry a package marker and nothing else. structure/ is populated in S1, pointnet/ in S4, cosim/ in S5, io/ in S0.5, config/ in S0.6, passive/ by S6. towards_eeg/io was populated at S0.5 and removed from this list on 21 July 2026; check_04 of the S0.4 exit test required the edit rather than tolerating the change, which is the declaration working."
+  },
+  "retired_filename_suffixes": [
+    "_multiMorph",
+    "_CHANGED"
+  ],
+  "duplicate_class_allowlist": [
+    {
+      "name": "Connectomics",
+      "expected_count": 3,
+      "paths": [
+        "towards_eeg/connectome/connectomics.py",
+        "towards_eeg/connectome/usage_example.py",
+        "towards_eeg/hybrid/params.py"
+      ],
+      "rationale": "Smoke assertion 6 (no duplicate top-level class name across the package) cannot be satisfied inside S0. connectomics.py is the canonical copy. usage_example.py carries a second at L6 -- the trap recorded in TEEG_00 s6, kept in the package by decision on 21 July 2026 because it is the only worked end-to-end use of the connectome API. params.py carries a third INLINE, and removing an inlined class from a file is a content operation that the byte-identity rule forbids. Assigned to S1/S3, where U1-U4 are fixed anyway.",
+      "assigned_to": "S1/S3"
+    }
+  ],
+  "duplicate_function_allowlist": [
+    {
+      "name": "extract_macro_populations",
+      "expected_count": 4,
+      "paths": [
+        "towards_eeg/connectome/connectivity_buildup.py",
+        "towards_eeg/connectome/macropopulation.py",
+        "towards_eeg/connectome/usage_example.py",
+        "towards_eeg/hybrid/params.py"
+      ],
+      "rationale": "Same situation as Connectomics and the same resolution. Recorded here even though smoke assertion 6 covers classes only and assertion 7 covers within-file shadowing only, so nothing in the specified smoke test would catch it: an undeclared duplicate is worse than a declared one.",
+      "assigned_to": "S1/S3"
+    }
+  ],
+  "superseded_forks_that_must_remain_in_the_repository": [
+    "Population/Population_multiMorph.py",
+    "Population/README.md",
+    "Parames evoked with EEG/Params_evoked_with_EEG_multiMorph.py"
+  ],
+  "identifier_scope": {
+    "rule": "Every path component under package_root must be a legal Python identifier.",
+    "rationale": "Decision N-12. Trap T-8 read repository-wide would require renaming 28 further directories and 9 further stems, all of them scope colab or passive, verdict retain or discard, never imported by the orchestrator. Under N-5 the mechanical assertions are scoped to the installed package, so the layout move discharges T-8 in full and no rename outside towards_eeg/ is needed. Measured at 6a48b22: 31 illegal directory components and 10 illegal .py stems repository-wide, of which 3 directories and 1 stem were inside the keep set."
+  }
+}
