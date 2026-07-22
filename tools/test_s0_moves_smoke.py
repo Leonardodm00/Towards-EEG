@@ -30,7 +30,7 @@ LEDGER_FIELDS = ["path", "scope", "stage", "verdict", "relationship",
                  "transform_id", "ancestor_path", "ancestor_sha256",
                  "sha256_pre_s0", "sha256_post_s02", "sha256_post_s03",
                  "sha256_post_s04", "sha256_post_s05", "sha256_post_s06",
-                 "sha256_post_s07",
+                 "sha256_post_s07", "sha256_post_s08",
                  "size_bytes", "is_python", "parses",
                  "n_syntax_warnings", "n_crlf", "n_lf", "n_nonascii",
                  "has_cookie", "rationale"]
@@ -62,7 +62,7 @@ def sandbox(dirname="old dir "):
                     "sha256_pre_s0": sha, "sha256_post_s02": sha,
                     "sha256_post_s03": "-", "sha256_post_s04": "-",
                     "sha256_post_s05": "-", "sha256_post_s06": "-",
-                    "sha256_post_s07": "-",
+                    "sha256_post_s07": "-", "sha256_post_s08": "-",
                     "is_python": "True", "parses": "True",
                     "rationale": "fixture"})
         rows.append(row)

@@ -1,0 +1,73 @@
+{
+  "environment": {
+    "is_the_hpc_environment": false,
+    "kind": "clean Linux venv, PyPI wheels",
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "why_this_matters": "B-4 blocks on a freeze from the davinci conda environment. This is NOT that. Treating this record as though it discharged B-4 would be exactly the false confidence the project's measurement discipline exists to prevent."
+  },
+  "extra_steps_required": [
+    "poetry-core must be installed before hybridLFPy",
+    "hybridLFPy must be installed with --no-build-isolation",
+    "LD_LIBRARY_PATH must include the directory holding libmpi.so, supplied here by the openmpi wheel"
+  ],
+  "generated": "2026-07-21T15:34:54Z",
+  "import_order_rationale": "The order driver.py L39-L43 requires. Tested explicitly because the file's own comment states NEURON must be imported before NEST, which is a runtime constraint no lockfile can express.",
+  "import_order_tested": [
+    "neuron",
+    "nest",
+    "mpi4py",
+    "LFPy",
+    "hybridLFPy"
+  ],
+  "modules_imported": {
+    "LFPy": {
+      "ok": true,
+      "version": "2.3.7"
+    },
+    "h5py": {
+      "ok": true,
+      "version": "3.16.0"
+    },
+    "hybridLFPy": {
+      "ok": true,
+      "version": "0.2"
+    },
+    "matplotlib": {
+      "ok": true,
+      "version": "3.11.1"
+    },
+    "mpi4py": {
+      "ok": true,
+      "version": "4.1.2"
+    },
+    "nest": {
+      "ok": true,
+      "version": "3.10.0"
+    },
+    "neuron": {
+      "ok": true,
+      "version": "9.0.1"
+    },
+    "numpy": {
+      "ok": true,
+      "version": "2.5.1"
+    },
+    "pandas": {
+      "ok": true,
+      "version": "3.0.3"
+    },
+    "plotly": {
+      "ok": true,
+      "version": "6.9.0"
+    },
+    "scipy": {
+      "ok": true,
+      "version": "1.18.0"
+    }
+  },
+  "n_packages": 31,
+  "note": "Evidence record for requirements/hybrid_stack.lock. Produced by ACTUALLY installing the lockfile and ACTUALLY importing every module, not by inspecting metadata. TEEG_03's S0.8 exit criterion is 'fresh env from each lockfile imports its stack'; this file is the record of that having been done, and of WHERE it was done.",
+  "pip_check": "No broken requirements found.",
+  "resolution_conflict_between_stacks": false
+}

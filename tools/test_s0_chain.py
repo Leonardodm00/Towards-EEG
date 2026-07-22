@@ -44,9 +44,9 @@ if _HERE not in sys.path:
 
 from s0_paths import Resolver  # noqa: E402
 
-PHASE_COLUMNS = ("sha256_post_s07", "sha256_post_s06", "sha256_post_s05",
-                 "sha256_post_s04", "sha256_post_s03", "sha256_post_s02",
-                 "sha256_pre_s0")
+PHASE_COLUMNS = ("sha256_post_s08", "sha256_post_s07", "sha256_post_s06",
+                 "sha256_post_s05", "sha256_post_s04", "sha256_post_s03",
+                 "sha256_post_s02", "sha256_pre_s0")
 
 
 def end_of_chain(row):
@@ -215,7 +215,15 @@ def run(root):
         with open(_m7, "r", encoding="utf-8") as fh:
             s07_declared |= set(e["path"] for e in json.load(fh)["entries"])
 
-    touched = set(s03) | set(s02 or {}) | SELF_REFERENTIAL | s06_declared | s07_declared
+    s08_declared = set()
+    _s8 = os.path.join(root, "tools", "s0_transform", "s08_exit_scope.json")
+    if os.path.isfile(_s8):
+        with open(_s8, "r", encoding="utf-8") as fh:
+            _d8 = json.load(fh)["clause_3_files_changed_at_s08"]
+        s08_declared = set(_d8["paths"]) | set(_d8["self_referential"])
+
+    touched = (set(s03) | set(s02 or {}) | SELF_REFERENTIAL | s06_declared
+               | s07_declared | s08_declared)
     drifted = []
     for p, row in led.items():
         if p in touched or row["verdict"] == "discard":
@@ -423,6 +431,31 @@ def run(root):
         "every row outside the %d declared path(s) is byte-identical across "
         "S0.7" % len(declared7)
         if not drifted else "changed with no declaration: %r" % drifted[:10])
+
+    # -- link 6: S0.8 -------------------------------------------------------
+    # S0.8 adds files and edits its own tooling; it removes nothing and
+    # transforms nothing. So it has no "half A" -- there is no transform whose
+    # output to check. The whole link IS the "nothing else moved" half, which
+    # is the half that is normally easy to omit, and here it is the only one.
+    s8 = os.path.join(root, "tools", "s0_transform", "s08_exit_scope.json")
+    if os.path.isfile(s8):
+        with open(s8, "r", encoding="utf-8") as fh:
+            scope8 = json.load(fh)
+        d8 = scope8["clause_3_files_changed_at_s08"]
+        declared8 = set(d8["paths"]) | set(d8["self_referential"])
+        drifted = []
+        for p, row in led.items():
+            if p in declared8:
+                continue
+            a, b = row.get("sha256_post_s07", "-"), row.get("sha256_post_s08", "-")
+            if a in ("-", "") or b in ("-", ""):
+                continue
+            if a != b:
+                drifted.append(p)
+        add("check_16_s08_changed_nothing_undeclared", not drifted,
+            "every row outside the %d declared path(s) is byte-identical "
+            "across S0.8" % len(declared8)
+            if not drifted else "changed with no declaration: %r" % drifted[:10])
 
     # -- no logged file may fall out of the checks above ---------------------
     # Every check in this file is of the form "for each entry in a log, look

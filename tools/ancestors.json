@@ -352,6 +352,31 @@
       "path": "tools/test_s0_7_smoke.py",
       "stage": "S0.7",
       "rationale": "new infrastructure (byte-identity rule clause 3): mutation harness for the S0.7 exit test."
+    },
+    {
+      "path": "requirements/hybrid_stack.lock",
+      "stage": "S0.8",
+      "rationale": "new infrastructure (clause 3): the pinned reference environment for the hybrid scheme, every entry pinned by version AND sha256. ONE lockfile, not the roadmap's two: finding H-8 shows the stacks do not conflict at current versions, and finding H-10 shows driver.py needs them CO-RESIDENT, so two environments could not run it."
+    },
+    {
+      "path": "requirements/hybrid_stack.validation.json",
+      "stage": "S0.8",
+      "rationale": "new infrastructure (clause 3): the evidence record for the lockfile, produced by actually installing it and actually importing every module. States explicitly that it is NOT the davinci environment, so S0.8 cannot be mistaken for closing B-4."
+    },
+    {
+      "path": "tools/s0_transform/s08_exit_scope.json",
+      "stage": "S0.8",
+      "rationale": "new infrastructure (clause 3): the declared S0.8 exit scope."
+    },
+    {
+      "path": "tools/test_s0_8_exit.py",
+      "stage": "S0.8",
+      "rationale": "new infrastructure (clause 3): the S0.8 exit test."
+    },
+    {
+      "path": "tools/test_s0_8_smoke.py",
+      "stage": "S0.8",
+      "rationale": "new infrastructure (clause 3): mutation harness for the S0.8 exit test."
     }
   ],
   "scopes": [

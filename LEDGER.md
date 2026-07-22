@@ -1,10 +1,10 @@
 # Towards-EEG -- S0.0 Reconciliation Ledger
 
 **Stage:** S0.0 (roadmap rev 3, section 3.2)  
-**Generated:** 2026-07-21 15:13:42 UTC by `s0_ledger` v1.0.0  
+**Generated:** 2026-07-21 15:39:47 UTC by `s0_ledger` v1.0.0  
 **Snapshot:** `github.com/Leonardodm00/Towards-EEG@main`, 2026-07-19  
 **Tree root:** `<repository root>`  
-**Rows:** 217 (191 repository files + 4 local working files)
+**Rows:** 222 (196 repository files + 4 local working files)
 
 This ledger is the evidence base for the byte-identity rule (handoff
 brief section 3). Every file in the reorganised tree must be (1) byte-identical
@@ -32,7 +32,7 @@ relationship agrees with the measured hashes.
 |--------------|--------|
 | discard      | 22     |
 | keep         | 13     |
-| new          | 70     |
+| new          | 75     |
 | retain       | 112    |
 
 ### By scope
@@ -40,7 +40,7 @@ relationship agrees with the measured hashes.
 | scope          | files  |
 |----------------|--------|
 | colab          | 60     |
-| infrastructure | 70     |
+| infrastructure | 75     |
 | orchestrator   | 18     |
 | passive        | 69     |
 
@@ -49,7 +49,7 @@ relationship agrees with the measured hashes.
 | stage    | files  |
 |----------|--------|
 | -        | 112    |
-| S0.0     | 22     |
+| S0.0     | 25     |
 | S0.1     | 4      |
 | S0.2     | 11     |
 | S0.2c    | 3      |
@@ -58,10 +58,11 @@ relationship agrees with the measured hashes.
 | S0.5     | 12     |
 | S0.6     | 1      |
 | S0.7     | 22     |
+| S0.8     | 2      |
 
 ### Python surface at pre-s0
 
-- python files: **120**
+- python files: **122**
 - failing `ast.parse`: **0**
 - containing bytes >= 0x80: **0**
 - non-ASCII and no PEP 263 cookie: **0**
@@ -389,11 +390,13 @@ that equality IS the exit test for the move.
 | LEDGER.md                                                                    | infrastructure | S0.0   | new      | 5075a5ab0a05  | 0bf  | eaa  | 587  |
 | ledger.csv                                                                   | infrastructure | S0.0   | new      | 8f2951bdd603  | 32b  | 851  | 9d7  |
 | pyproject.toml                                                               | infrastructure | S0.4   | new      | c2a2b175d11e  | -    | -    | 210  |
+| requirements/hybrid_stack.lock                                               | infrastructure | S0.8   | new      | 7b5ff3188de2  | -    | -    | -    |
+| requirements/hybrid_stack.validation.json                                    | infrastructure | S0.8   | new      | 91bb45e7f367  | -    | -    | -    |
 | tools/ancestors.json                                                         | infrastructure | S0.0   | new      | 3a0672db37f8  | 2a3  | 2a3  | 8a0  |
 | tools/apply_moves.py                                                         | infrastructure | S0.2c  | new      | 5615213c62b1  | -    | 5f3  | 561  |
 | tools/build_ledger.py                                                        | infrastructure | S0.0   | new      | afb19b68ac9a  | 0a3  | 2e3  | ebf  |
 | tools/path_moves.json                                                        | infrastructure | S0.2c  | new      | baf9c7926395  | -    | 6e8  | baf  |
-| tools/phase_hashes.json                                                      | infrastructure | S0.2   | new      | a8c6d1eef898  | -    | ab1  | e00  |
+| tools/phase_hashes.json                                                      | infrastructure | S0.2   | new      | 973f19e03375  | -    | ab1  | e00  |
 | tools/s0_ledger/__init__.py                                                  | infrastructure | S0.0   | new      | 7ec4151c2327  | 7ec  | 7ec  | 7ec  |
 | tools/s0_ledger/analyse.py                                                   | infrastructure | S0.0   | new      | 8cb68f8e03ad  | a1f  | 336  | 7d0  |
 | tools/s0_ledger/render.py                                                    | infrastructure | S0.0   | new      | 5ae8d7abf0ce  | 5ae  | 610  | 610  |
@@ -420,7 +423,8 @@ that equality IS the exit test for the move.
 | tools/s0_transform/s06_transform_log.json                                    | infrastructure | S0.0   | new      | 03ec4dbc37e6  | -    | -    | -    |
 | tools/s0_transform/s07_discard_manifest.json                                 | infrastructure | S0.0   | new      | 75d9eb095428  | -    | -    | -    |
 | tools/s0_transform/s07_exit_scope.json                                       | infrastructure | S0.0   | new      | fc66a54b503b  | -    | -    | -    |
-| tools/stamp_phase.py                                                         | infrastructure | S0.2   | new      | cd9b56e9d0cb  | -    | 7ac  | 7ac  |
+| tools/s0_transform/s08_exit_scope.json                                       | infrastructure | S0.0   | new      | 19ff4f3a28d8  | -    | -    | -    |
+| tools/stamp_phase.py                                                         | infrastructure | S0.2   | new      | 381806f34794  | -    | 7ac  | 7ac  |
 | tools/test_s0_2_exit.py                                                      | infrastructure | S0.2   | new      | dc29ec7d7c87  | -    | dc2  | dc2  |
 | tools/test_s0_3_exit.py                                                      | infrastructure | S0.3   | new      | 17df58d01aab  | -    | -    | 17d  |
 | tools/test_s0_4_exit.py                                                      | infrastructure | S0.4   | new      | ddf9ba47b8a6  | -    | -    | 2d8  |
@@ -431,11 +435,13 @@ that equality IS the exit test for the move.
 | tools/test_s0_6_smoke.py                                                     | infrastructure | S0.0   | new      | a2b396dba60e  | -    | -    | -    |
 | tools/test_s0_7_exit.py                                                      | infrastructure | S0.0   | new      | f6443227b303  | -    | -    | -    |
 | tools/test_s0_7_smoke.py                                                     | infrastructure | S0.0   | new      | ddb5e97c474d  | -    | -    | -    |
+| tools/test_s0_8_exit.py                                                      | infrastructure | S0.0   | new      | afd700ffe26c  | -    | -    | -    |
+| tools/test_s0_8_smoke.py                                                     | infrastructure | S0.0   | new      | 3e9ebc419699  | -    | -    | -    |
 | tools/test_s0_asciify_smoke.py                                               | infrastructure | S0.3   | new      | 64f7aebbfd75  | -    | -    | 64f  |
-| tools/test_s0_chain.py                                                       | infrastructure | S0.3   | new      | 296db21fd11d  | -    | -    | a88  |
+| tools/test_s0_chain.py                                                       | infrastructure | S0.3   | new      | 0e61861701f9  | -    | -    | a88  |
 | tools/test_s0_decolab_smoke.py                                               | infrastructure | S0.2   | new      | 49b18e35dbb5  | -    | 49b  | 49b  |
 | tools/test_s0_ledger_smoke.py                                                | infrastructure | S0.0   | new      | 57eae0d12bc9  | 57e  | 57e  | 57e  |
-| tools/test_s0_moves_smoke.py                                                 | infrastructure | S0.2c  | new      | 6c80713272c2  | -    | 42e  | c18  |
+| tools/test_s0_moves_smoke.py                                                 | infrastructure | S0.2c  | new      | b28d2adddb5b  | -    | 42e  | c18  |
 | towards_eeg/__init__.py                                                      | infrastructure | S0.4   | new      | 53378de1aac3  | -    | -    | 533  |
 | towards_eeg/config/__init__.py                                               | infrastructure | S0.4   | new      | fa29f82a9fd1  | -    | -    | edb  |
 | towards_eeg/config/paths.json                                                | infrastructure | S0.6   | new      | 7f6175d97959  | -    | -    | -    |
