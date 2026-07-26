@@ -30,7 +30,17 @@
 #
 # -- Dispatch ------------------------------------------------------------------
 #     qsub -v GROUP=L3_exc submit_biological_fit.sh
+#     qsub -v GROUP=L3_exc,RUN_TAG=freeRa submit_biological_fit.sh
 # Use submit_all_groups_biological.sh to fan out one job per group.
+#
+# -- Multiple concurrent runs --------------------------------------------------
+# RUN_TAG isolates the outputs of independent runs so two configurations can be
+# in flight at the same time WITHOUT editing this file between submissions:
+#     <OUTPUT_BASE>/<RUN_TAG>/<GROUP>/...
+# Every artefact the pipeline writes goes under --output-dir, and CODE_DIR /
+# ARCHIVE_ROOT are read-only during a run, so runs with different RUN_TAGs
+# cannot collide. RUN_TAG also goes into the PBS job name, so the logs in $HOME
+# are distinguishable by run rather than only by job id.
 #
 # EDIT THE "USER CONFIG" BLOCK BELOW BEFORE SUBMITTING.
 ##########################################################################
@@ -40,7 +50,11 @@
 # The per-job archive/output dirs are <ROOT>/<GROUP>.
 CODE_DIR="/davinci-1/home/ldellamea/Human Neurons Fitting"
 ARCHIVE_ROOT="/davinci-1/home/ldellamea/Human Neurons Fitting"
-OUTPUT_ROOT="/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs"
+# Outputs land in <OUTPUT_BASE>/<RUN_TAG>/<GROUP>. Override RUN_TAG at
+# submission time (qsub -v RUN_TAG=...) to keep two runs apart; the default
+# tag "default" reproduces a single-run setup.
+OUTPUT_BASE="/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs"
+RUN_TAG="${RUN_TAG:-default}"
 CONDA_ENV="prova"
 ENTRYPOINT="$CODE_DIR/run_biological_fit.py"
 
@@ -91,15 +105,19 @@ N_RA_PROFILE="${N_RA_PROFILE:-50}"    # Ra grid points for the RMSD-vs-Ra profil
 #   "all"       -> every fittable cell (expensive)
 #   "first:N"   -> first N fittable cells
 #   "frac:F"    -> ~F fraction of fittable cells (deterministic by specimen_id)
+# COST NOTE: Phase 3 dominates wall time. Each bootstrapped cell costs
+# BOOTSTRAP_B * BOOTSTRAP_N_CALLS loss evaluations (here 200*70 = 14,000),
+# vs ~1,000 for the whole of Phase 2. Shrink B or the subset first if a group
+# risks the walltime.
 PHASE3_SUBSET="${PHASE3_SUBSET:-frac:0.5}"
 BOOTSTRAP_B=200                  # replicates (>=200 for stable BCa)
 BOOTSTRAP_MODE="nonparametric"   # nonparametric (resample real pulses) | parametric
 NOISE_MODE="block"               # iid | ar1 | block  (parametric only)
-BOOTSTRAP_N_CALLS=60
+BOOTSTRAP_N_CALLS=70
 BOOTSTRAP_N_INITIAL=20
 # ----------------------------------------------------------------------------
 
-# --- Resolve per-job paths from $GROUP --------------------------------------
+# --- Resolve per-job paths from $GROUP and $RUN_TAG --------------------------
 if [ -z "${GROUP:-}" ]; then
     echo "[FATAL] \$GROUP is not set. Submit with:" >&2
     echo "    qsub -v GROUP=<layer_type> submit_biological_fit.sh" >&2
@@ -107,6 +125,18 @@ if [ -z "${GROUP:-}" ]; then
     exit 2
 fi
 
+# RUN_TAG becomes a path component AND part of the PBS job name, and it travels
+# through the comma-separated `qsub -v` list -- so reject anything that would
+# break any of those (spaces, commas, slashes, quotes).
+case "$RUN_TAG" in
+    ""|*[!A-Za-z0-9_.-]*)
+        echo "[FATAL] RUN_TAG must be non-empty and contain only letters," >&2
+        echo "        digits, '_', '.', '-'  (got: '$RUN_TAG')" >&2
+        exit 4
+        ;;
+esac
+
+OUTPUT_ROOT="$OUTPUT_BASE/$RUN_TAG"
 ARCHIVE_DIR="$ARCHIVE_ROOT/$GROUP"
 OUTPUT_DIR="$OUTPUT_ROOT/$GROUP"
 
@@ -131,6 +161,7 @@ mkdir -p "$OUTPUT_DIR"
 # Sanity prints
 echo "Running on node:        $(hostname)"
 echo "Job ID:                 $PBS_JOBID"
+echo "Run tag:                $RUN_TAG"
 echo "Group:                  $GROUP"
 echo "Working dir:            $PBS_O_WORKDIR"
 echo "Python:                 $(which python)   | conda: $CONDA_DEFAULT_ENV"
@@ -198,6 +229,6 @@ python "$ENTRYPOINT" "${ARGS[@]}"
 status=$?
 
 conda deactivate
-echo "[done] group $GROUP exited with status $status"
+echo "[done] run '$RUN_TAG' group $GROUP exited with status $status"
 sleep 5s
 exit $status
