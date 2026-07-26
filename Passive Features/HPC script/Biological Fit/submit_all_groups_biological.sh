@@ -3,16 +3,27 @@
 # submit_all_groups_biological.sh -- fan out one PBS job per (layer x type)
 # group folder, each pinned to its own node, for the REAL-DATA passive fit.
 #
-# Each job receives $GROUP (+ per-group F and the Phase 2.5 / Phase 3 knobs)
-# via `qsub -v`; submit_biological_fit.sh then loads cells from
-# <ARCHIVE_ROOT>/<GROUP> and writes results into <OUTPUT_ROOT>/<GROUP>.
+# Each job receives $GROUP (+ $RUN_TAG, per-group F, and the Phase 2.5 /
+# Phase 3 knobs) via `qsub -v`; submit_biological_fit.sh then loads cells from
+# <ARCHIVE_ROOT>/<GROUP> and writes results into
+# <OUTPUT_BASE>/<RUN_TAG>/<GROUP>.
 #
 # Usage:
 #     ./submit_all_groups_biological.sh                # every group in DEFAULT_GROUPS
 #     ./submit_all_groups_biological.sh L3_exc L5_exc  # only the named groups
 #
-# Logs (kept in $HOME via `#PBS -k eo`) are named
-#     bio_passive_fit_<group>.o<jobid>   bio_passive_fit_<group>.e<jobid>
+# Two independent runs at the same time, WITHOUT editing any file:
+#     RUN_TAG=fixedRa SKIP_PHASE2P5=0 ./submit_all_groups_biological.sh
+#     RUN_TAG=freeRa  SKIP_PHASE2P5=1 ./submit_all_groups_biological.sh
+# -> outputs in  <OUTPUT_BASE>/fixedRa/<GROUP>  and  <OUTPUT_BASE>/freeRa/<GROUP>
+# -> logs named  bio_fixedRa_<group>.o<jobid>  and  bio_freeRa_<group>.o<jobid>
+#
+# Every setting in the "USER CONFIG" block below marked ${VAR:-default} can be
+# overridden the same way (RUN_TAG, SKIP_PHASE2P5, N_FLOOR, N_RA_PROFILE,
+# PHASE3_SUBSET), so varying a run means prefixing the command, never editing
+# a file that a queued job might still read.
+#
+# Logs are kept in $HOME via `#PBS -k eo`.
 ##########################################################################
 
 set -uo pipefail
@@ -22,6 +33,10 @@ set -uo pipefail
 # sanity-check that each group directory exists before wasting a qsub.
 ARCHIVE_ROOT="/davinci-1/home/ldellamea/Human Neurons Fitting"
 SUBMIT_SCRIPT="/davinci-1/home/ldellamea/Human Neurons Fitting/submit_biological_fit.sh"
+
+# Isolates this run's outputs: <OUTPUT_BASE>/<RUN_TAG>/<GROUP>. OUTPUT_BASE
+# itself lives in submit_biological_fit.sh. Letters/digits/_/./- only.
+RUN_TAG="${RUN_TAG:-default}"
 
 # Default groups to submit when no CLI args are given. Comment out any to skip.
 DEFAULT_GROUPS=(
@@ -45,24 +60,40 @@ declare -A F_PER_GROUP=(
     [L2_inh]=1
     [L3_exc]=1.9
     [L3_inh]=1
-    [L4_exc]=1.5
+    [L4_exc]=1.6
     [L4_inh]=1
-    [L5_exc]=1.5
+    [L5_exc]=1.6
     [L5_inh]=1
-    [L6_exc]=1.5
+    [L6_exc]=1.6
     [L6_inh]=1
 )
 
 # --- Phase 2.5 / Phase 3 controls (methodological constants, not per-group) --
-# Forwarded to every job via `qsub -v`. Edit once for the whole sweep.
-SKIP_PHASE2P5=0     # 1 = skip Phase 2.5 everywhere (legacy free-Ra), 0 = run it
-N_FLOOR=4           # min qualifying cells for a cohort-median Ra; a group with
-                    #   FEWER than this uses the per-(layer,type) LITERATURE Ra
-                    #   fallback. Lower it (e.g. 2) if you trust small-group
-                    #   medians; raise it to be more conservative.
-N_RA_PROFILE=50     # Ra grid points for the RMSD-vs-Ra profile
-PHASE3_SUBSET="frac:0.5"   # none | all | first:N | frac:F  (bootstrap subset)
+# Forwarded to every job via `qsub -v`. Each is env-overridable, so a whole run
+# can be varied from the command line without editing this file.
+#
+# NOTE: N_FLOOR and N_RA_PROFILE only take effect when SKIP_PHASE2P5=0.
+# With SKIP_PHASE2P5=1 Phase 2.5 never runs, so both are inert AND Phase 3
+# bootstraps in full 3-D (Ra free) instead of 2-D -- same cost per replicate,
+# but BOOTSTRAP_N_CALLS is then spread over three parameters instead of two.
+SKIP_PHASE2P5="${SKIP_PHASE2P5:-1}"   # 1 = skip Phase 2.5 everywhere (legacy free-Ra), 0 = run it
+N_FLOOR="${N_FLOOR:-2}"               # min qualifying cells for a cohort-median Ra; a group with
+                                      #   FEWER than this uses the per-(layer,type) LITERATURE Ra
+                                      #   fallback. Lower it (e.g. 2) if you trust small-group
+                                      #   medians; raise it to be more conservative.
+N_RA_PROFILE="${N_RA_PROFILE:-50}"    # Ra grid points for the RMSD-vs-Ra profile
+PHASE3_SUBSET="${PHASE3_SUBSET:-frac:0.5}"   # none | all | first:N | frac:F  (bootstrap subset)
 # ----------------------------------------------------------------------------
+
+# RUN_TAG becomes a path component, part of the PBS job name, and an entry in
+# the comma-separated `qsub -v` list -- reject anything that breaks those.
+case "$RUN_TAG" in
+    ""|*[!A-Za-z0-9_.-]*)
+        echo "[FATAL] RUN_TAG must be non-empty and contain only letters," >&2
+        echo "        digits, '_', '.', '-'  (got: '$RUN_TAG')" >&2
+        exit 4
+        ;;
+esac
 
 # If groups were passed on the command line, use those; else use defaults.
 if [ "$#" -gt 0 ]; then
@@ -77,10 +108,11 @@ if [ ! -f "$SUBMIT_SCRIPT" ]; then
 fi
 
 echo "Submitting ${#SEL_GROUPS[@]} group(s) -- one PBS job each."
+echo "Run tag:       $RUN_TAG   (outputs -> <OUTPUT_BASE>/$RUN_TAG/<GROUP>)"
 echo "Archive root:  $ARCHIVE_ROOT"
 echo "Submit script: $SUBMIT_SCRIPT"
 if [ "$SKIP_PHASE2P5" = "1" ]; then
-    echo "Phase 2.5:     SKIPPED for all groups (legacy free-Ra)"
+    echo "Phase 2.5:     SKIPPED for all groups (legacy free-Ra; N_FLOOR/N_RA_PROFILE inert)"
 else
     echo "Phase 2.5:     ON for all groups (N_FLOOR=$N_FLOOR  N_RA_PROFILE=$N_RA_PROFILE)"
 fi
@@ -101,11 +133,11 @@ for g in "${SEL_GROUPS[@]}"; do
         echo "[warn] $g not in F_PER_GROUP -- falling back to F=$f"
     fi
     echo "[submit] $g  (F=$f)"
-    qsub -v "GROUP=$g,F_FACTOR=$f,SKIP_PHASE2P5=$SKIP_PHASE2P5,N_FLOOR=$N_FLOOR,N_RA_PROFILE=$N_RA_PROFILE,PHASE3_SUBSET=$PHASE3_SUBSET" \
-         -N "bio_passive_fit_${g}" "$SUBMIT_SCRIPT" \
+    qsub -v "GROUP=$g,RUN_TAG=$RUN_TAG,F_FACTOR=$f,SKIP_PHASE2P5=$SKIP_PHASE2P5,N_FLOOR=$N_FLOOR,N_RA_PROFILE=$N_RA_PROFILE,PHASE3_SUBSET=$PHASE3_SUBSET" \
+         -N "bio_${RUN_TAG}_${g}" "$SUBMIT_SCRIPT" \
          || { echo "[WARN] qsub failed for GROUP=$g" >&2; }
     n_ok=$((n_ok + 1))
 done
 
 echo "----------------------------------------"
-echo "Submitted: $n_ok   Skipped: $n_skip"
+echo "Submitted: $n_ok   Skipped: $n_skip   (run tag: $RUN_TAG)"
