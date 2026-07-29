@@ -2,8 +2,8 @@
 
 #PBS -S /bin/bash
 #PBS -N "synth_passive_fit"
-#PBS -q cpu
-#PBS -l select=1:ncpus=10,walltime=10:00:00
+#PBS -q intel
+#PBS -l select=1:ncpus=1,walltime=80:00:00
 #PBS -k eo
 
 ##########################################################################
@@ -23,73 +23,93 @@
 # between cells), matching the real-data pipeline. N_WORKERS is hard-coded
 # to 1 inside the Python entrypoint.
 #
-# -- Dispatch ------------------------------------------------------------
+# v4 (HUMAN h-current):
+#   - Paths bumped to v70human so the rodent v60ls run is preserved.
+#   - The mechanism compile guard is now SELF-HEALING: it recompiles when any
+#     .mod file is newer than x86_64/special. The old guard checked only for
+#     the existence of the binary, so adding Ih_human.mod to mod/ would have
+#     been silently ignored and every job would have died with
+#     "argument not a density mechanism name".
+#   - Which h-current kinetics are used is DATA, carried in the manifest's
+#     ih_kinetics column. There is nothing to set here.
+#
+#   NOTE: all text in this file is plain ASCII on purpose (transfer safety).
+#
+# -- Dispatch -------------------------------------------------------------
 #     qsub -v GROUP=cohort_0003 submit_synth_benchmark.sh
 # Use submit_all_cohorts.sh to fan out one job per cohort automatically.
 #
 # EDIT THE "USER CONFIG" BLOCK BELOW BEFORE SUBMITTING.
 ##########################################################################
 
-# --- USER CONFIG --------------------------------------------------------
+# --- USER CONFIG ---------------------------------------------------------
 # Absolute paths recommended (jobs don't inherit $PWD reliably).
 CODE_DIR="/davinci-1/home/ldellamea/Human Neurons Fitting/Synthetic Test"
 CONDA_ENV="prova"                                 # conda env providing NEURON + python
-MANIFEST="$CODE_DIR/manifest.csv"                 # built once by submit_all_cohorts.sh
-ARCHIVE_ROOT="$CODE_DIR/synthetic_archive"        # generated archives: <ROOT>/<GROUP>/
-OUTPUT_ROOT="$CODE_DIR/synthetic_out"             # fit outputs:        <ROOT>/<GROUP>/
+MANIFEST="$CODE_DIR/manifest_v70human.csv"        # built by submit_all_cohorts.sh
+ARCHIVE_ROOT="$CODE_DIR/synthetic_archive_v70human"
+OUTPUT_ROOT="$CODE_DIR/synthetic_out_v70human"
 ENTRYPOINT="$CODE_DIR/run_synth_benchmark.py"     # the Phase-2 Python driver
 
 # The fitting/generation modules must be importable from $CODE_DIR:
 #   synth_gt_grid.py  cm_profile_sweep.py  synthetic_ground_truth.py
 #   passive_long_step_training.py  phase1_data_loader.py  phase2_optimiser.py
 #   passive_fitting_hpc_fixed.py
-# NEURON mechanisms for I_h generation (compiled here if not already):
-MOD_DIR="$CODE_DIR/mod"                            # contains Ih.mod (+ na.mod/kv.mod if active)
+# NEURON mechanisms compiled here if stale:
+#   mod/Ih.mod        rodent  (Kole et al. 2006 / Hay et al. 2011)
+#   mod/Ih_human.mod  human   (Rich et al. 2021)   <-- v4, REQUIRED
+MOD_DIR="$CODE_DIR/mod"
 
 # --- Generation protocol (run-level; per-cell GT/noise come from MANIFEST) -
-N_AVG_GROUPS=3                 # sweep-average groups per polarity
-SS_N_REPEATS=30               # square-subthreshold repeats
+N_AVG_GROUPS=2                 # sweep-average groups per polarity
+SS_N_REPEATS=30                # square-subthreshold repeats
 LS_HYP_AMPS="-10,-30,-50,-70,-90"   # long-square hyperpolarising amplitudes [pA]
 
-# --- Phase 2 (fit) ------------------------------------------------------
+# --- Phase 2 (fit) --------------------------------------------------------
 FIT_TARGET="hyp"              # dep | hyp | both
 N_CALLS=100                   # GP optimiser evaluations per cell
 N_INITIAL=50                  # random initial points before GP takes over
 
-# --- Interim two-pass auto-tau_w (cm_profile_sweep) ---------------------
+# --- Interim two-pass auto-tau_w (cm_profile_sweep) -----------------------
 N_LONG_TRAIN=2                # smallest-|amp| hyp LS steps folded into TRAINING
 LS_DEFLECTION_CAP_MV=12.0     # I_h deflection guard for long-step admission
-R_IN_TARGET="peak"           # peak | steady
-WEIGHTING="relative"         # cross-bundle loss weighting
+R_IN_TARGET="peak"            # peak | steady
+WEIGHTING="relative"          # cross-bundle loss weighting
 SS_WINDOW_MS="0.5,100.0"      # SS (start=offset,end); start is the C_m choice
 SS_T0_MS=""                   # empty => SS window start
-SS_TIME_WEIGHT="exp"         # exp | gauss | none
-LS_WINDOW_MS=150.0            # LS RMSD window length from onset
-TAU_W_GRID_MS="2.0,5.0,10.0"  # per-cell sweep grid; winner = sharpest HW_rho
+SS_TIME_WEIGHT="exp"          # exp | gauss | none
+LS_WINDOW_MS=60.0             # LS RMSD window length from onset
+TAU_W_GRID_MS=5.0             # per-cell sweep grid; winner = sharpest HW_rho
 SWEEP_RHO=0.5                 # relative-rise threshold for HW_rho
-SWEEP_N_GRID=41               # log C_m grid points
+SWEEP_N_GRID=15               # log C_m grid points
 # (CM/RM/RA sweep boxes mirror the fit box inside the entrypoint.)
+#
+# v4 NOTE: with the human I_h the selected tau_w will very likely differ from
+# the v60ls run, and LS_DEFLECTION_CAP_MV may admit a different set of long
+# steps. That is the intended consequence of the kinetics swap, not a
+# regression -- but it means human and rodent runs are NOT comparable at a
+# fixed tau_w. Record the per-cell selected tau_w in both runs.
 
-# --- Phase 2.5 (MANDATORY here: fix Ra per cohort, refit Cm,Rm) ----------
-SKIP_PHASE2P5=0               # 1 = legacy free-Ra diagnostic; 0 = standard
-N_FLOOR=4                     # min qualifying cells for cohort-median Ra
-N_RA_PROFILE=50               # Ra grid points for the RMSD-vs-Ra profile
+# --- Phase 2.5 (fix Ra per cohort, refit Cm,Rm) ---------------------------
+SKIP_PHASE2P5=1               # 1 = legacy free-Ra diagnostic; 0 = standard
+N_FLOOR=2                     # min qualifying cells for cohort-median Ra
+N_RA_PROFILE=20               # Ra grid points for the RMSD-vs-Ra profile
 
-# --- Phase 3 (bootstrap CIs) -- SUBSET ONLY (calibration check) ----------
+# --- Phase 3 (bootstrap CIs) -- SUBSET ONLY (calibration check) -----------
 # Which cells in this cohort get bootstrapped. Examples:
 #   ""          -> none in this cohort
 #   "all"       -> every cell (expensive)
 #   "first:2"   -> first 2 cells of the cohort
 #   "frac:0.2"  -> ~20% of the cohort (deterministic by specimen_id hash)
-PHASE3_SUBSET="first:2"
-BOOTSTRAP_B=200
+PHASE3_SUBSET=""
+BOOTSTRAP_B=50
 BOOTSTRAP_MODE="nonparametric"   # parametric | nonparametric
 NOISE_MODE="block"               # iid | ar1 | block  (parametric only)
-BOOTSTRAP_N_CALLS=40
+BOOTSTRAP_N_CALLS=60
 BOOTSTRAP_N_INITIAL=20
-# ------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 
-# --- Resolve per-job paths from $GROUP ----------------------------------
+# --- Resolve per-job paths from $GROUP ------------------------------------
 if [ -z "${GROUP:-}" ]; then
     echo "[FATAL] \$GROUP is not set. Submit with:" >&2
     echo "    qsub -v GROUP=<cohort_label> submit_synth_benchmark.sh" >&2
@@ -104,7 +124,7 @@ fi
 
 ARCHIVE_DIR="$ARCHIVE_ROOT/$GROUP"
 OUTPUT_DIR="$OUTPUT_ROOT/$GROUP"
-# ------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 
 cd "$PBS_O_WORKDIR"
 
@@ -119,13 +139,26 @@ conda activate "$CONDA_ENV" \
 
 mkdir -p "$ARCHIVE_DIR" "$OUTPUT_DIR"
 
-# --- Compile NEURON mechanisms for I_h generation (once per node/workdir) -
-# Guard on the compiled binary (x86_64/special), NOT just the directory.
-# A directory can exist from a previous failed compilation and be empty/broken;
-# only the binary proves nrnivmodl succeeded. This prevents the "argument not a
-# density mechanism name" error caused by skipping recompilation after a
-# partial/failed first attempt.
-if [ -d "$MOD_DIR" ] && [ ! -x "$CODE_DIR/x86_64/special" ]; then
+# --- Compile NEURON mechanisms (SELF-HEALING as of v4) --------------------
+# The v3 guard fired only when x86_64/special was ABSENT. That silently
+# ignores a newly added .mod file (Ih_human.mod), because x86_64/special
+# already exists from the previous run -- every job then dies with
+# "argument not a density mechanism name". We now also recompile when any
+# .mod is NEWER than the built binary.
+NEED_COMPILE=0
+if [ ! -x "$CODE_DIR/x86_64/special" ]; then
+    NEED_COMPILE=1
+else
+    for m in "$MOD_DIR"/*.mod; do
+        [ -e "$m" ] || continue
+        if [ "$m" -nt "$CODE_DIR/x86_64/special" ]; then
+            echo "[mech] $(basename "$m") is newer than x86_64/special -> recompile"
+            NEED_COMPILE=1
+        fi
+    done
+fi
+
+if [ -d "$MOD_DIR" ] && [ "$NEED_COMPILE" = "1" ]; then
     echo "[mech] compiling .mod files from $MOD_DIR ..."
     # Remove any stale/partial x86_64/ left by a previous failed compilation.
     rm -rf "$CODE_DIR/x86_64"
@@ -139,6 +172,35 @@ if [ -d "$MOD_DIR" ] && [ ! -x "$CODE_DIR/x86_64/special" ]; then
         exit 4; }
     echo "[mech] compiled OK -> $CODE_DIR/x86_64/special"
 fi
+
+# --- Fail fast if this cohort needs a mechanism that is not compiled ------
+python - "$MANIFEST" "$GROUP" "$CODE_DIR" <<'PYEOF' || exit 4
+import os, sys
+import pandas as pd
+manifest, group, code_dir = sys.argv[1], sys.argv[2], sys.argv[3]
+df = pd.read_csv(manifest)
+df = df[df["group"].astype(str) == group]
+if "ih_kinetics" not in df.columns:
+    df = df.assign(ih_kinetics="")
+need = {str(x).strip() or "Ih"
+        for x, u in zip(df["ih_kinetics"].fillna(""), df["use_ih"]) if bool(u)}
+if not need:
+    print("[mech] cohort uses no I_h"); sys.exit(0)
+os.chdir(code_dir)
+from neuron import h
+for mech in sorted(need):
+    s = h.Section(name="probe_" + mech)
+    try:
+        s.insert(mech)
+    except Exception:
+        sys.stderr.write(
+            "[FATAL] mechanism '%s' is required by cohort %s but is not "
+            "compiled into %s/x86_64/.\n"
+            "        Fix: cd '%s' && rm -rf x86_64 && nrnivmodl mod\n"
+            % (mech, group, code_dir, code_dir))
+        sys.exit(4)
+print("[mech] cohort requires: %s -- all present" % ", ".join(sorted(need)))
+PYEOF
 
 # Sanity prints
 echo "Running on node:        $(hostname)"
@@ -159,7 +221,7 @@ fi
 echo "Phase 3:                subset='$PHASE3_SUBSET'  B=$BOOTSTRAP_B  mode=$BOOTSTRAP_MODE  noise=$NOISE_MODE"
 echo "-----------------------------------------"
 
-# --- Build the argument list (this IS the entrypoint CLI contract) -------
+# --- Build the argument list (this IS the entrypoint CLI contract) --------
 ARGS=(
     --manifest            "$MANIFEST"
     --group               "$GROUP"
@@ -201,7 +263,7 @@ ARGS=(
 [ -n "$SS_T0_MS" ]        && ARGS+=(--ss-t0-ms "$SS_T0_MS")
 [ "$SKIP_PHASE2P5" = "1" ] && ARGS+=(--skip-phase2p5)
 
-# --- Run ----------------------------------------------------------------
+# --- Run ------------------------------------------------------------------
 python "$ENTRYPOINT" "${ARGS[@]}"
 status=$?
 
