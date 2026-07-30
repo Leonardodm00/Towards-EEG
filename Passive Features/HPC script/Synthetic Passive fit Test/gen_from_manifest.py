@@ -52,6 +52,15 @@ def row_to_gt_kwargs(row) -> Dict:
             ehcn_mV=float(row["ih_ehcn_mV"]),
             distribution=str(row["ih_dist"]),
         )
+        # NMODL SUFFIX of the h-current mechanism. Tolerate manifests written
+        # before this column existed: absent/blank -> rodent "Ih" (legacy).
+        try:
+            mech = str(row["ih_kinetics"]).strip()
+        except (KeyError, IndexError, TypeError):
+            mech = ""
+        if mech.lower() in ("", "nan", "none"):
+            mech = "Ih"
+        ih["mechanism"] = mech
     return dict(
         cm_uF_cm2=float(row["cm_true"]),
         rm_Ohm_cm2=float(row["rm_true"]),

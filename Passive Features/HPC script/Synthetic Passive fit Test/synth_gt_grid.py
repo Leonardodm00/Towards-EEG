@@ -55,13 +55,23 @@ PHY_CM_HI_DEFAULT:  float = 1.5    # uF/cm^2
 PHY_TAU_LO_DEFAULT: float = 3.0    # ms
 PHY_TAU_HI_DEFAULT: float = 40.0   # ms
 
+# Ra window for the GROUND-TRUTH draw, human L2/3-L3 pyramidal neurons.
+# Eyal et al. 2016 (eLife 5:e16553) model fits, n=6: Ra 203-384 Ohm*cm,
+# mean 268.5 +/- 30.0. Kalmbach et al. 2018 human deep-L3, uniform-passive
+# variant: Ra = 350.24 Ohm*cm (value as tabulated in Rich et al. 2021 Table 3).
+# The FITTER box stays DEFAULT_RA_BOUNDS = (50, 1000) Ohm*cm, so Ra recovery is
+# still tested against a wide search box; this only narrows what is injected.
+# Opt-in: make_manifest(ra_phys_lo=..., ra_phys_hi=...) / --ra-phys-lo/-hi.
+PHY_RA_LO_DEFAULT: float = 100.0   # Ohm*cm
+PHY_RA_HI_DEFAULT: float = 500.0   # Ohm*cm
+
 SYNTH_ID_BASE: int = 900_000_000   # synthetic specimen IDs never collide w/ Allen
 
 MANIFEST_COLUMNS: List[str] = [
     "specimen_id", "group", "cohort", "morph_name", "swc", "draw_idx",
     "cm_true", "rm_true", "ra_true", "ra_mode", "tau_m_true_ms",
     "e_pas_mV", "F",
-    "use_ih", "ih_gihbar_S_cm2", "ih_ehcn_mV", "ih_dist",
+    "use_ih", "ih_gihbar_S_cm2", "ih_ehcn_mV", "ih_dist", "ih_kinetics",
     "noise_sigma_mV", "noise_baseline_sigma_mV", "noise_drift_sigma_mV",
     "noise_seed",
 ]
@@ -245,6 +255,9 @@ def draw_manifest(
     ih_gihbar_cv: float = 0.5,
     ih_ehcn_mV: float = -45.0,
     ih_dist: str = "hay_exponential",
+    ih_kinetics: str = "Ih",              # "Ih" (rodent) | "Ih_human" (Rich 2021)
+    ra_phys_lo: Optional[float] = None,   # Ohm*cm; None -> full box.ra_bounds
+    ra_phys_hi: Optional[float] = None,   # Ohm*cm; None -> full box.ra_bounds
     # Recording noise (per-cell level jitter via one 'noisiness' factor)
     noise_sigma_nominal_mV: float = 0.05,
     noise_baseline_nominal_mV: float = 0.05,
@@ -305,12 +318,30 @@ def draw_manifest(
     ss = np.random.SeedSequence(int(seed))
     rng_gt, rng_rej, rng_var = (np.random.default_rng(s) for s in ss.spawn(3))
 
+    # --- Ra draw window ------------------------------------------------------
+    # None -> the full fitter box (legacy behaviour, unchanged RNG stream).
+    # Otherwise a physiological sub-window; it must stay INSIDE the fitter box
+    # so assert_bounds_match_phase1 and the per-column invariant checks hold.
+    _ra_lo = float(ra_phys_lo) if ra_phys_lo is not None else box.ra_bounds[0]
+    _ra_hi = float(ra_phys_hi) if ra_phys_hi is not None else box.ra_bounds[1]
+    if _ra_lo < box.ra_bounds[0] - 1e-9 or _ra_hi > box.ra_bounds[1] + 1e-9:
+        raise ValueError(
+            "Ra physiological window [{}, {}] escapes the fitter box "
+            "[{}, {}]; the drawn ground truth would be unreachable by the "
+            "optimiser.".format(_ra_lo, _ra_hi,
+                                box.ra_bounds[0], box.ra_bounds[1]))
+    if not (0.0 < _ra_lo < _ra_hi):
+        raise ValueError(
+            "bad Ra window: need 0 < ra_phys_lo < ra_phys_hi, got "
+            "[{}, {}]".format(_ra_lo, _ra_hi))
+    _ra_draw_bounds = (_ra_lo, _ra_hi)
+
     # --- Ra (rng_gt exclusive) -----------------------------------------------
     if ra_mode == "per_cohort":
-        ra_cohort = _logU(rng_gt, box.ra_bounds, n_cohorts)
+        ra_cohort = _logU(rng_gt, _ra_draw_bounds, n_cohorts)
         ra = ra_cohort[cohort_of]
     else:
-        ra = _logU(rng_gt, box.ra_bounds, n)
+        ra = _logU(rng_gt, _ra_draw_bounds, n)
 
     # --- Cm, Rm (rng_rej, with optional physiological rejection) -------------
     cm, rm = _draw_cm_rm_constrained(
@@ -346,6 +377,7 @@ def draw_manifest(
             ih_gihbar_S_cm2=(float(ih_raw[i]) if use_ih else np.nan),
             ih_ehcn_mV=(float(ih_ehcn_mV) if use_ih else np.nan),
             ih_dist=(str(ih_dist) if use_ih else ""),
+            ih_kinetics=(str(ih_kinetics) if use_ih else ""),
             noise_sigma_mV=float(noise_sigma_nominal_mV) * f,
             noise_baseline_sigma_mV=float(noise_baseline_nominal_mV) * f,
             noise_drift_sigma_mV=float(noise_drift_nominal_mV) * f,
@@ -446,6 +478,13 @@ def save_manifest(df: pd.DataFrame, path: Union[Path, str]) -> None:
 
 def load_manifest(path: Union[Path, str]) -> pd.DataFrame:
     df = pd.read_csv(path)
+    # Backfill columns introduced after some manifests were written. This MUST
+    # run BEFORE the strict schema check below, otherwise every pre-v70
+    # manifest raises KeyError -- including on the login node, where
+    # submit_all_cohorts.sh calls load_manifest just to list cohort labels.
+    # Absent ih_kinetics -> "" -> gen_from_manifest maps it to rodent "Ih".
+    if "ih_kinetics" not in df.columns:
+        df["ih_kinetics"] = ""
     miss = [c for c in MANIFEST_COLUMNS if c not in df.columns]
     if miss:
         raise KeyError(f"manifest {path} missing column(s) {miss}; "
@@ -454,6 +493,7 @@ def load_manifest(path: Union[Path, str]) -> pd.DataFrame:
         df[c] = df[c].astype(int)
     df["use_ih"] = df["use_ih"].astype(bool)
     df["ih_dist"] = df["ih_dist"].fillna("").astype(str)
+    df["ih_kinetics"] = df["ih_kinetics"].fillna("").astype(str)
     df["ra_mode"] = df["ra_mode"].astype(str)
     return df.reindex(columns=MANIFEST_COLUMNS)
 
@@ -504,6 +544,19 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     ap.add_argument("--ih-gihbar-cv", type=float, default=0.5)
     ap.add_argument("--ih-ehcn", type=float, default=-45.0)
     ap.add_argument("--ih-dist", default="hay_exponential")
+    ap.add_argument("--ih-kinetics", default="Ih", choices=["Ih", "Ih_human"],
+                    help="h-current NMODL mechanism. 'Ih' = Kole et al. 2006 "
+                         "rat L5 (Hay 2011, unaltered). 'Ih_human' = Rich et "
+                         "al. 2021 human L5 fitted kinetics; requires "
+                         "Ih_human.mod compiled into x86_64/. (default: Ih)")
+    ap.add_argument("--ra-phys-lo", type=float, default=None,
+                    help="lower Ra bound [Ohm*cm] for the GROUND-TRUTH draw "
+                         "(human L2/3-L3: try {}). Default None = full fitter "
+                         "box.".format(PHY_RA_LO_DEFAULT))
+    ap.add_argument("--ra-phys-hi", type=float, default=None,
+                    help="upper Ra bound [Ohm*cm] for the GROUND-TRUTH draw "
+                         "(human L2/3-L3: try {}). Default None = full fitter "
+                         "box.".format(PHY_RA_HI_DEFAULT))
     ap.add_argument("--noise-sigma", type=float, default=0.05)
     ap.add_argument("--noise-baseline", type=float, default=0.05)
     ap.add_argument("--noise-drift", type=float, default=0.10)
@@ -542,6 +595,11 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         use_ih=not args.no_ih,
         ih_gihbar_nominal_S_cm2=args.ih_gihbar, ih_gihbar_cv=args.ih_gihbar_cv,
         ih_ehcn_mV=args.ih_ehcn, ih_dist=args.ih_dist,
+        # v70: these three were parsed by argparse but never forwarded, so
+        # draw_manifest silently used its defaults ("Ih", None, None) and the
+        # manifest came out with rodent kinetics and a full-box Ra draw.
+        ih_kinetics=args.ih_kinetics,
+        ra_phys_lo=args.ra_phys_lo, ra_phys_hi=args.ra_phys_hi,
         noise_sigma_nominal_mV=args.noise_sigma,
         noise_baseline_nominal_mV=args.noise_baseline,
         noise_drift_nominal_mV=args.noise_drift, noise_cv=args.noise_cv,

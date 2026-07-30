@@ -14,11 +14,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+import sys
+
 from synth_gt_grid import (
     SearchBox, draw_manifest, save_manifest, load_manifest,
     list_groups, group_of, MANIFEST_COLUMNS,
     DEFAULT_CM_BOUNDS, DEFAULT_RM_BOUNDS, DEFAULT_RA_BOUNDS,
 )
+import synth_gt_grid as _sgg_module
 
 FAKE_SWCS = [f"/morph/specimen_{k}/reconstruction.swc" for k in range(8)]
 
@@ -134,6 +137,94 @@ def test_pairing_batching_tau_roundtrip():
     print("[smoke] pairing + cohort partition + tau identity + round-trip  PASS")
 
 
+def test_cli_forwards_every_flag():
+    """Regression guard for the v70 bug: argparse accepted --ih-kinetics,
+    --ra-phys-lo, --ra-phys-hi, but main() never passed them to
+    draw_manifest(), so every manifest silently fell back to rodent Ih
+    kinetics and the full [50,1000] Ra box regardless of the CLI flags
+    (caught on-cluster, not by this suite -- because every other test here
+    calls draw_manifest() directly and never exercises main()/argv at all).
+
+    Every flag below is set to a value DIFFERENT from its argparse default.
+    If any future flag is added to the parser but not forwarded to
+    draw_manifest, the written manifest will show that flag's DEFAULT
+    instead of the value asserted here, and this test fails loudly instead
+    of silently shipping a wrong ground truth.
+    """
+    with tempfile.TemporaryDirectory() as td:
+        morph_root = Path(td) / "morphs"
+        for i in range(10):
+            d = morph_root / f"specimen_{i:03d}"
+            d.mkdir(parents=True)
+            (d / "reconstruction.swc").write_text("")
+        out_csv = Path(td) / "manifest.csv"
+
+        argv = [
+            "--morph-root", str(morph_root),
+            "--morph-glob", "specimen_*/reconstruction.swc",
+            "--out", str(out_csv),
+            "--draws-per-morph", "2",          # default 1
+            "--seed", "7",                     # default 0
+            "--cells-per-cohort", "4",         # default 10
+            "--ra-mode", "per_cell",           # default per_cohort
+            "--e-pas", "-65.0",                # default -70.0
+            "--F", "2.0",                      # default 1.9
+            "--max-cells", "6",                # default None
+            "--ih-gihbar", "1e-4",             # default 2e-4
+            "--ih-gihbar-cv", "0.3",           # default 0.5
+            "--ih-ehcn", "-49.85",             # default -45.0
+            "--ih-dist", "uniform",            # default hay_exponential
+            "--ih-kinetics", "Ih_human",       # default Ih  <- the bug
+            "--ra-phys-lo", "100.0",           # default None <- the bug
+            "--ra-phys-hi", "500.0",           # default None <- the bug
+            "--noise-sigma", "0.07",           # default 0.05
+            "--noise-baseline", "0.08",        # default 0.05
+            "--noise-drift", "0.12",           # default 0.10
+            "--noise-cv", "0.25",              # default 0.3
+            "--cm-phys-lo", "0.35",            # default PHY_CM_LO_DEFAULT
+            "--cm-phys-hi", "1.6",             # default PHY_CM_HI_DEFAULT
+            "--tau-lo-ms", "2.5",              # default PHY_TAU_LO_DEFAULT
+            "--tau-hi-ms", "45.0",             # default PHY_TAU_HI_DEFAULT
+        ]
+
+        old_argv = sys.argv
+        try:
+            sys.argv = ["synth_gt_grid.py"] + argv
+            _sgg_module.main()
+        finally:
+            sys.argv = old_argv
+
+        df = load_manifest(out_csv)
+
+        # the two flags that actually broke:
+        assert set(df["ih_kinetics"]) == {"Ih_human"}, \
+            "CLI --ih-kinetics Ih_human not reflected in manifest"
+        assert df["ra_true"].min() >= 100.0 - 1e-6 and df["ra_true"].max() <= 500.0 + 1e-6, \
+            "CLI --ra-phys-lo/--ra-phys-hi window not respected: got [%.1f, %.1f]" % (
+                df["ra_true"].min(), df["ra_true"].max())
+
+        # everything else that main() is supposed to forward:
+        assert set(df["ih_dist"]) == {"uniform"}
+        assert set(df["ih_ehcn_mV"].dropna()) == {-49.85}
+        assert np.isclose(df["ih_gihbar_S_cm2"].median(), 1e-4, rtol=0.5)
+        assert set(df["e_pas_mV"]) == {-65.0}
+        assert set(df["F"]) == {2.0}
+        assert (df["noise_sigma_mV"] > 0).all()
+        # max_cells caps the TOTAL cell count (n_morph*draws_per_morph, THEN
+        # capped) -- not morphology count before multiplying.
+        assert len(df) == 6              # max_cells=6 directly caps n
+        assert (df["cm_true"] >= 0.35 - 1e-9).all() and (df["cm_true"] <= 1.6 + 1e-9).all()
+        assert (df["tau_m_true_ms"] >= 2.5 - 1e-9).all() and (df["tau_m_true_ms"] <= 45.0 + 1e-9).all()
+        # ra_mode=per_cell -> Ra is NOT shared within a cohort (unlike per_cohort)
+        cohorts = list_groups(df)
+        per_cell_varies = any(
+            df.loc[df["group"] == g, "ra_true"].nunique() > 1 for g in cohorts
+        )
+        assert per_cell_varies, "ra_mode=per_cell not reflected (Ra looks cohort-shared)"
+
+    print("[smoke] CLI (main/argv) forwards every flag to draw_manifest  PASS")
+
+
 if __name__ == "__main__":
     test_determinism_and_stream_isolation()
     test_box_and_loguniform()
@@ -141,4 +232,5 @@ if __name__ == "__main__":
     test_ih_and_noise_jitter()
     test_ih_off_baseline()
     test_pairing_batching_tau_roundtrip()
+    test_cli_forwards_every_flag()
     print("\n[smoke] ALL CHECKS PASSED")

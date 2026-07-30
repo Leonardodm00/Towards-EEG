@@ -97,7 +97,10 @@ class GroundTruthParams:
 
 @dataclass
 class IhConfig:
-    """Hay et al. 2011 / Kole et al. 2006 h-current (the model Eyal 2018 used).
+    """h-current config. Rodent (Hay 2011 / Kole 2006) OR human (Rich 2021).
+
+    Which kinetics are used is set by `mechanism` (see below); this class only
+    carries density, reversal and spatial distribution.
 
     distribution:
         "uniform"         -- gIhbar_S_cm2 in every `regions` segment (robust on
@@ -112,6 +115,15 @@ class IhConfig:
     ehcn_mV: float = -45.0
     distribution: str = "uniform"            # "uniform" | "hay_exponential"
     regions: Tuple[str, ...] = ("soma", "dend", "apic")
+    # NMODL SUFFIX of the h-current mechanism to insert.
+    #   "Ih"       -> Kole, Hallermann & Stuart (2006) rat L5 kinetics, used
+    #                 unaltered in Hay et al. (2011). LEGACY DEFAULT.
+    #   "Ih_human" -> Rich, Moradi Chameh, Sekulic, Valiante & Skinner (2021),
+    #                 Cereb Cortex 31(2):845-872, doi:10.1093/cercor/bhaa261,
+    #                 Eq. (1) + Table 1 "L5 Human model". Needs Ih_human.mod.
+    # Peak activation time constant: rodent ~78 ms, human ~343 ms (at -74 mV).
+    # Default "Ih" keeps every pre-existing manifest reproducing bit-for-bit.
+    mechanism: str = "Ih"
 
 
 @dataclass
@@ -308,17 +320,22 @@ class SyntheticPassiveCell:
             h.distance(0, self.soma[0](0.5))
             apic_d = [h.distance(seg.x, sec=sec) for sec in self.apic for seg in sec]
             d_max = max(apic_d) if apic_d else 0.0
+        # Mechanism SUFFIX is data, not hard-coded: "Ih" (rodent Kole/Hay) or
+        # "Ih_human" (Rich et al. 2021). getattr keeps both interfaces identical
+        # (both expose RANGE gIhbar and ehcn).
+        mech = str(getattr(ih, "mechanism", "Ih") or "Ih")
         for sec in secs:
-            sec.insert("Ih")
+            sec.insert(mech)
             is_apic = sec in self.apic
             for seg in sec:
+                mobj = getattr(seg, mech)
                 if (ih.distribution == "hay_exponential" and is_apic and d_max > 0):
                     d = h.distance(seg.x, sec=sec)
                     factor = -0.8696 + 2.0870 * math.exp(3.6161 * d / d_max)
-                    seg.Ih.gIhbar = float(ih.gIhbar_S_cm2) * max(factor, 0.0)
+                    mobj.gIhbar = float(ih.gIhbar_S_cm2) * max(factor, 0.0)
                 else:
-                    seg.Ih.gIhbar = float(ih.gIhbar_S_cm2)
-                seg.Ih.ehcn = float(ih.ehcn_mV)
+                    mobj.gIhbar = float(ih.gIhbar_S_cm2)
+                mobj.ehcn = float(ih.ehcn_mV)
 
     # ---- public API (identical signature to PassiveCell) ----
     def set_passive(self, Cm: float, Rm: float, Ra: float) -> None:
@@ -518,7 +535,10 @@ def measure_rin_tau_sag(cell, gt: GroundTruthParams, probe_pA: float = -30.0
     sag   : (V_trough - V_ss)/(V_trough - V_rest) on the probe step
             (~0 for passive; >0 with I_h)."""
     has_dyn = bool(gt.active or gt.extra_mechs or gt.ih is not None)
-    settle = 3000.0 if has_dyn else 600.0     # I_h is slow (~100s of ms); settle long
+    # I_h is slow, and every downstream trace is initialised from this resting
+    # state. Rodent (Kole 2006) mTau peaks at ~78 ms; human (Rich 2021) mTau
+    # peaks at ~343 ms near -74 mV. 6000 ms is >17 human time constants.
+    settle = 6000.0 if has_dyn else 600.0
     t_ms, v = cell.simulate(stim_amp_pA=0.0, stim_delay_ms=0.0, stim_dur_ms=0.0,
                             tstop_ms=settle, v_init_mV=gt.e_pas_mV, dt_ms=0.05)
     v_rest = float(v[t_ms >= settle - 20.0].mean())
