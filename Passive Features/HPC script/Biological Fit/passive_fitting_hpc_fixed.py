@@ -567,7 +567,7 @@ Notes for users
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Literal, Tuple
+from typing import Optional, List, Dict, Any, Literal, Tuple, Sequence
 
 import numpy as np
 import pandas as pd
@@ -607,8 +607,65 @@ DEFAULT_CM_BOUNDS = (0.3, 3.0)            # uF/cm^2
 DEFAULT_RM_BOUNDS = (1_000.0, 100_000.0)  # Ohm.cm^2
 DEFAULT_RA_BOUNDS = (50.0, 1_000.0)       # Ohm.cm
 
+# --- Integration time step (see PassiveCell.simulate) -------------------------
+# WHY THESE EXIST AS MODULE GLOBALS RATHER THAN KEYWORD DEFAULTS
+#
+# NEURON's stdrun.hoc rewrites h.dt behind your back. `h.run()` calls
+# `stdinit()` -> `setdt()`, and setdt() is:
+#
+#     proc setdt() {local Dt, dtnew
+#         if (using_cvode_) return
+#         Dt = 1/steps_per_ms
+#         nstep_steprun = int(Dt/dt)
+#         if (nstep_steprun == 0) { nstep_steprun = 1 }
+#         dtnew = Dt/nstep_steprun
+#         if (abs(dt*nstep_steprun*steps_per_ms - 1) > 1e-6) {
+#             print "Changed dt"
+#             dt = dtnew
+#         }
+#     }
+#
+# `steps_per_ms` is a legacy GUI variable -- it is bound in the RunControl
+# panel as "Points plotted/ms" and defaults to 40 (= 1/0.025). The check above
+# is therefore a PLOT-BOOKKEEPING consistency check (does dt divide evenly into
+# the plotting interval?), NOT a numerical-stability guard. With the default
+# steps_per_ms = 40, requesting dt = 0.1 ms gave nstep_steprun = int(0.25) = 0
+# -> 1, |0.1*1*40 - 1| = 3 > 1e-6, so dt was silently reset to 0.025 ms and
+# "Changed dt" was printed on every long-step run. Every `dt_ms=0.1` in this
+# code base was consequently a no-op, at 4x the intended step count.
+#
+# Stability is NOT the reason. The fit model is purely passive (`pas` only) and
+# NEURON's fixed-step solver defaults to backward Euler (secondorder = 0),
+# which is A-stable: for the linear, negative-semidefinite cable system the
+# amplification factor |1/(1 - lambda*dt)| < 1 for ANY dt > 0. A larger dt costs
+# first-order ACCURACY (numerical damping of the fast, Cm-bearing early
+# transient), never stability. Choose dt on an accuracy criterion.
+#
+# These are looked up at CALL time (the simulate helpers below take
+# `dt_ms=None` and resolve against these globals), so a runner can set
+#     mono.DEFAULT_DT_LONG_MS = 0.1
+# once and have it take effect everywhere, including the validation and
+# Phase 2.5 / Phase 3 code paths.
+#
+# DEFAULT VALUES: both are 0.025 ms, i.e. exactly what the pipeline has ALWAYS
+# actually integrated at. Changing DEFAULT_DT_LONG_MS to 0.1 is a real 4x
+# speed-up on the long steps but a genuine numerical change -- validate it
+# against your noise floor first (smoke_dt_enforcement.py, section 3) before
+# adopting it in production.
+DEFAULT_DT_BRIEF_MS = 0.025   # Square Subthreshold replay (0.5 ms pulse)
+DEFAULT_DT_LONG_MS = 0.025    # Long Square step replay
+DT_ENFORCE_RTOL = 1e-6        # relative tolerance of the achieved-dt check
+
 
 # %% Cell 2b -- Custom exceptions ===============================================
+class DtEnforcementError(RuntimeError):
+    """Raised when NEURON did not integrate at the requested ``dt``.
+
+    This is a hard error, never a "penalise and continue" condition: a run at
+    the wrong dt is silently wrong rather than loudly broken, so the loss
+    builders explicitly re-raise this exception instead of folding it into
+    their generic ``except Exception -> 1e6`` guard.
+    """
 class IncompleteDataError(Exception):
     """Raised by ``load_allen_data`` when ``require_complete_data=True`` and
     either the training (Square Subthreshold) or validation (Long Square)
@@ -1629,25 +1686,76 @@ class PassiveCell:
         stim_dur_ms: float,
         tstop_ms: float,
         v_init_mV: float = -70.0,
-        dt_ms: float = 0.025,
+        dt_ms: "Optional[float]" = None,
+        enforce_dt: bool = True,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Inject one IClamp pulse at the soma centre and return the somatic
         voltage trace.
 
+        Parameters
+        ----------
+        dt_ms
+            Integration step, in ms. ``None`` resolves to the module global
+            ``DEFAULT_DT_BRIEF_MS`` at CALL time (so a runner can retune it
+            without re-importing).
+        enforce_dt
+            When True (default) ``steps_per_ms`` is set to ``1/dt_ms`` so that
+            stdrun's ``setdt()`` cannot rewrite ``h.dt``, and the dt NEURON
+            actually used is read back from the recorded time vector and
+            checked. Set False only to reproduce the historical (silently
+            overridden) behaviour for a back-to-back comparison.
+
+        Raises
+        ------
+        DtEnforcementError
+            If the achieved dt differs from the requested one by more than
+            ``DT_ENFORCE_RTOL`` (relative).
+
         Returns
         -------
         (t_ms, v_mV) -- both 1-D arrays, sampled every ``dt_ms``.
         """
+        dt_ms = float(DEFAULT_DT_BRIEF_MS if dt_ms is None else dt_ms)
+        if not (dt_ms > 0.0) or not np.isfinite(dt_ms):
+            raise ValueError(
+                f"dt_ms must be a finite positive number, got {dt_ms!r}")
+
         self._iclamp.delay = float(stim_delay_ms)
         self._iclamp.dur = float(stim_dur_ms)
         self._iclamp.amp = float(stim_amp_pA) * 1e-3   # NEURON IClamp amp is in nA
-        h.dt = float(dt_ms)
+
+        h.dt = dt_ms
+        if enforce_dt:
+            # The whole fix. setdt() rewrites dt unless
+            #     |dt * nstep_steprun * steps_per_ms - 1| <= 1e-6.
+            # Setting steps_per_ms = 1/dt gives Dt = dt, nstep_steprun = 1 and
+            # a residual of ~1e-16, so the condition never fires: dt survives
+            # and "Changed dt" is never printed.
+            h.steps_per_ms = 1.0 / dt_ms
         h.tstop = float(tstop_ms)
         h.v_init = float(v_init_mV)
-        h.finitialize(h.v_init)
+        # h.run() == stdinit() + continuerun(tstop), and stdinit() -> init() ->
+        # finitialize(v_init). The explicit finitialize that used to sit here
+        # was therefore redundant (verified against stdrun.hoc: `proc init()`
+        # is just `finitialize(v_init)`), and has been removed.
         h.run()
-        return np.array(self._t_vec), np.array(self._v_vec)
+
+        t_ms = np.array(self._t_vec)
+        v_mV = np.array(self._v_vec)
+
+        if enforce_dt and t_ms.size >= 2:
+            # The recording vectors are filled at every fadvance, so the first
+            # sample interval IS the integration step that was actually used.
+            dt_achieved = float(t_ms[1] - t_ms[0])
+            if abs(dt_achieved / dt_ms - 1.0) > DT_ENFORCE_RTOL:
+                raise DtEnforcementError(
+                    f"requested dt = {dt_ms:.6g} ms but NEURON integrated at "
+                    f"{dt_achieved:.6g} ms (steps_per_ms = {h.steps_per_ms:.6g}, "
+                    f"cvode active = {bool(h.cvode_active())}). The dt "
+                    f"enforcement in PassiveCell.simulate did not take effect; "
+                    f"do NOT trust any fit produced in this state.")
+        return t_ms, v_mV
 
 
 def build_neuron_model(
@@ -1663,6 +1771,56 @@ def build_neuron_model(
         spine_proximal_cutoff_um=spine_proximal_cutoff_um,
         axon_replacement=axon_replacement,
     )
+
+
+def assert_dt_enforced(
+    cell: PassiveCell,
+    dt_values_ms: "Optional[Sequence[float]]" = None,
+    v_init_mV: float = -70.0,
+    verbose: bool = True,
+) -> "Dict[float, float]":
+    """Fail loud, early, and OUTSIDE any loss ``try/except`` if dt is not honoured.
+
+    Both loss builders wrap their body in ``except Exception -> 1e6``. A
+    ``DtEnforcementError`` raised from inside a loss evaluation would therefore
+    be converted into a finite penalty and the optimisation would proceed on
+    silently wrong simulations. Call this ONCE per cell, before the sweep and
+    the fit, so the failure surfaces as a crash rather than as a bad fit.
+
+    Runs one short, cheap simulation per requested dt (200 ms, one small
+    hyperpolarising pulse) and reads back the dt actually used.
+
+    Parameters
+    ----------
+    dt_values_ms
+        Steps to verify. ``None`` checks the two module defaults.
+
+    Returns
+    -------
+    {dt_requested_ms: dt_achieved_ms}
+
+    Raises
+    ------
+    DtEnforcementError
+        via :meth:`PassiveCell.simulate`, on the first mismatch.
+    """
+    if dt_values_ms is None:
+        dt_values_ms = (DEFAULT_DT_BRIEF_MS, DEFAULT_DT_LONG_MS)
+    seen: "Dict[float, float]" = {}
+    for dt_req in dt_values_ms:
+        dt_req = float(dt_req)
+        if dt_req in seen:
+            continue
+        t_ms, _ = cell.simulate(
+            stim_amp_pA=-10.0, stim_delay_ms=20.0, stim_dur_ms=50.0,
+            tstop_ms=200.0, v_init_mV=float(v_init_mV), dt_ms=dt_req,
+            enforce_dt=True)
+        seen[dt_req] = float(t_ms[1] - t_ms[0]) if t_ms.size >= 2 else float("nan")
+    if verbose:
+        pairs = "  ".join(f"{k:g}->{v:g} ms" for k, v in sorted(seen.items()))
+        print(f"[assert_dt_enforced] dt honoured (requested->achieved): {pairs}"
+              f"   [steps_per_ms={h.steps_per_ms:g}]")
+    return seen
 
 
 # %% Cell 8 -- prepare_optimiser_inputs =========================================
@@ -2532,12 +2690,18 @@ def _simulate_square_subthreshold(
 
 def _simulate_long_square(
     cell: PassiveCell, bundle: SweepBundle, v_rest_mV: float,
-    dt_ms: float = 0.1,
+    dt_ms: Optional[float] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Replay a Long-Square step on the model using the bundle's own
     onset/duration metadata.  Returns ``(t_sim_s, v_sim_mV)`` on the
     simulation's time grid (will be interpolated to the bundle grid by
-    the RMSD helper)."""
+    the RMSD helper).
+
+    NOTE: the former hard-coded ``dt_ms = 0.1`` was a no-op -- stdrun's
+    ``setdt()`` reset it to 0.025 ms on every call (see DEFAULT_DT_LONG_MS).
+    The dt is now resolved at CALL time from ``DEFAULT_DT_LONG_MS`` and is
+    actually enforced by ``PassiveCell.simulate``."""
+    dt_ms = float(DEFAULT_DT_LONG_MS if dt_ms is None else dt_ms)
     delay_ms = bundle.stim_onset_s * 1e3
     dur_ms = bundle.stim_duration_s * 1e3
     tstop_ms = float(bundle.t[-1]) * 1e3
@@ -2715,6 +2879,11 @@ def _build_loss_function(
                     return 1e6   # large but finite: tells GP the region is bad
                 rmsds.append(r)
             return float(np.mean(rmsds))
+        except DtEnforcementError:
+            # NOT a "bad region of parameter space" -- it is a broken
+            # integrator configuration. Penalising it would hide the fact that
+            # every simulation in this run used the wrong dt. Propagate.
+            raise
         except Exception as e:
             # Never let a NEURON exception crash gp_minimize.  Penalise
             # heavily so the surrogate steers away from the offending region.
@@ -4707,7 +4876,7 @@ def _simulate_square_subthreshold(
     cell, bundle, v_rest_mV: float,
     pre_pad_ms: float = 10.0,
     post_pad_ms: float = 100.0,
-    dt_ms: float = 0.025,
+    dt_ms: Optional[float] = None,
 ):
     """Replay a Square-Subthreshold pulse on the NEURON model.
 
@@ -4720,6 +4889,9 @@ def _simulate_square_subthreshold(
     t_sim_s : ndarray   -- seconds, t=0 at pulse onset
     v_sim   : ndarray   -- mV
     """
+    # Resolved at CALL time so a runner can retune DEFAULT_DT_BRIEF_MS once and
+    # have every code path (fit, validation, Phase 2.5, Phase 3) follow.
+    dt_ms = float(DEFAULT_DT_BRIEF_MS if dt_ms is None else dt_ms)
     delay_ms = pre_pad_ms
     dur_ms   = bundle.stim_duration_s * 1e3
     tstop_ms = pre_pad_ms + dur_ms + post_pad_ms

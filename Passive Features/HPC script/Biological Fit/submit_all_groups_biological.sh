@@ -83,6 +83,12 @@ N_FLOOR="${N_FLOOR:-2}"               # min qualifying cells for a cohort-median
                                       #   medians; raise it to be more conservative.
 N_RA_PROFILE="${N_RA_PROFILE:-50}"    # Ra grid points for the RMSD-vs-Ra profile
 PHASE3_SUBSET="${PHASE3_SUBSET:-frac:0.5}"   # none | all | first:N | frac:F  (bootstrap subset)
+# Integration step, forwarded to every job and ENFORCED by the simulator.
+# Both default to 0.025 ms = the step the pipeline has always really used
+# (the old dt=0.1 for long steps was silently overridden by stdrun's
+# setdt()). Override per run, e.g.  DT_LONG_MS=0.1 ./submit_all_groups_biological.sh
+DT_BRIEF_MS="${DT_BRIEF_MS:-0.025}"
+DT_LONG_MS="${DT_LONG_MS:-0.025}"
 # ----------------------------------------------------------------------------
 
 # RUN_TAG becomes a path component, part of the PBS job name, and an entry in
@@ -117,6 +123,7 @@ else
     echo "Phase 2.5:     ON for all groups (N_FLOOR=$N_FLOOR  N_RA_PROFILE=$N_RA_PROFILE)"
 fi
 echo "Phase 3:       subset='$PHASE3_SUBSET' for all groups"
+echo "dt (ENFORCED): brief=${DT_BRIEF_MS}ms  long=${DT_LONG_MS}ms"
 echo "----------------------------------------"
 
 n_ok=0
@@ -133,7 +140,7 @@ for g in "${SEL_GROUPS[@]}"; do
         echo "[warn] $g not in F_PER_GROUP -- falling back to F=$f"
     fi
     echo "[submit] $g  (F=$f)"
-    qsub -v "GROUP=$g,RUN_TAG=$RUN_TAG,F_FACTOR=$f,SKIP_PHASE2P5=$SKIP_PHASE2P5,N_FLOOR=$N_FLOOR,N_RA_PROFILE=$N_RA_PROFILE,PHASE3_SUBSET=$PHASE3_SUBSET" \
+    qsub -v "GROUP=$g,RUN_TAG=$RUN_TAG,F_FACTOR=$f,SKIP_PHASE2P5=$SKIP_PHASE2P5,N_FLOOR=$N_FLOOR,N_RA_PROFILE=$N_RA_PROFILE,PHASE3_SUBSET=$PHASE3_SUBSET,DT_BRIEF_MS=$DT_BRIEF_MS,DT_LONG_MS=$DT_LONG_MS" \
          -N "bio_${RUN_TAG}_${g}" "$SUBMIT_SCRIPT" \
          || { echo "[WARN] qsub failed for GROUP=$g" >&2; }
     n_ok=$((n_ok + 1))
