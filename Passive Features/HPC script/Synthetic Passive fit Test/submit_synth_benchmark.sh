@@ -73,6 +73,38 @@ N_INITIAL=50                  # random initial points before GP takes over
 # --- Interim two-pass auto-tau_w (cm_profile_sweep) -----------------------
 N_LONG_TRAIN=2                # smallest-|amp| hyp LS steps folded into TRAINING
 LS_DEFLECTION_CAP_MV=12.0     # I_h deflection guard for long-step admission
+
+# --- Per-cell I_h sag guard (v4, NEW) -------------------------------------
+# The fixed cap above tests dV = |amp_pA| * R_in[MOhm] * 1e-3 against a fixed
+# mV ceiling. At HUMAN input resistance that ceiling never fires: with
+# R_in ~ 50-120 MOhm (Moradi Chameh et al. 2021: L2&3 83 +/- 38 MOhm) even the
+# -90 pA step reaches only ~10.8 mV, so all five LS_HYP_AMPS pass and the
+# guard is inert -- what actually selects steps is N_LONG_TRAIN.
+#
+# MAX_SAG_AMPLITUDE_MV bounds the estimated I_h sag amplitude instead:
+#     sag_amp = s * dV / (1 - s)        s = cell sag ratio (from the archive)
+# i.e. the part of the trace a purely passive model cannot fit. It adapts per
+# cell: near-passive cells admit large steps, high-sag cells are held to the
+# smallest. Steps that fail are HELD OUT into validation, not discarded, and
+# if every step fails the code falls back to the single smallest-|amp| step.
+#
+# Choice of 0.25 mV, for human L2/3-L3 (sag ~0.07, Moradi Chameh 2021
+# Suppl. Fig. 2a; R_in ~80 MOhm), with NOISE_SIGMA = 0.05 mV:
+#     s=0.07, R_in=80   -> 2 of 5 steps admitted (-10, -30 pA)  <- target
+#     s=0.04, R_in=80   -> 4 of 5   (near-passive cell, more data usable)
+#     s=0.12, R_in=80   -> 1 of 5   (high-sag cell held to the smallest)
+# Tighter (0.10-0.15) starves most cells to a single step; looser (0.40)
+# admits 3-4 steps and defeats the purpose.
+#
+# CAVEAT: s*dV/(1-s) linearly extrapolates a sag ratio measured at one
+# amplitude down to small deflections. Human m_inf is superlinear in the
+# -70 to -90 mV band (steepest at v_h = -90.87 mV), so this OVERESTIMATES sag
+# at small dV -- conservative in the right direction for an admission guard,
+# but treat the numbers above as upper bounds.
+#
+# Empty string = disabled = legacy behaviour (fixed cap only).
+MAX_SAG_AMPLITUDE_MV=0.25     # mV; "" to disable
+NO_LS_DEFLECTION_CAP=0        # 1 = drop the fixed cap, sag guard alone
 R_IN_TARGET="peak"            # peak | steady
 WEIGHTING="relative"          # cross-bundle loss weighting
 SS_WINDOW_MS="0.5,100.0"      # SS (start=offset,end); start is the C_m choice
@@ -218,6 +250,12 @@ if [ "$SKIP_PHASE2P5" = "1" ]; then
 else
     echo "Phase 2.5:              ON  n_floor=$N_FLOOR  n_ra_profile=$N_RA_PROFILE  (Ra fixed at cohort median)"
 fi
+if [ "${NO_LS_DEFLECTION_CAP:-0}" = "1" ]; then
+    _defl="DISABLED"
+else
+    _defl="${LS_DEFLECTION_CAP_MV} mV"
+fi
+echo "LS admission:           n_long_train=$N_LONG_TRAIN  deflection_cap=$_defl  sag_cap=${MAX_SAG_AMPLITUDE_MV:-off}"
 echo "Phase 3:                subset='$PHASE3_SUBSET'  B=$BOOTSTRAP_B  mode=$BOOTSTRAP_MODE  noise=$NOISE_MODE"
 echo "-----------------------------------------"
 

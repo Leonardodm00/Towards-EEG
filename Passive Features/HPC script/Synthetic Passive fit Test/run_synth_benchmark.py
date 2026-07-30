@@ -185,9 +185,28 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
     # ---- 3. PATCH long-step (split is tau_w-independent; placeholder tau_w) --
     log("[2/6] PATCH -- integrate_long_step (train/validation split) ...")
+    # I_h admission guards for folding long steps into TRAINING. Two optional
+    # criteria; when both are active a step must pass BOTH (see
+    # passive_long_step_training.split_train_validation_with_long_step):
+    #   fixed   : |dV| <= --ls-deflection-cap                       [mV]
+    #             with dV = |amp_pA| * R_in[MOhm] * 1e-3
+    #   per-cell: s*dV/(1-s) <= --max-sag-amplitude-mv              [mV]
+    #             s = cell_data.sag_ratio; bounds the estimated I_h sag
+    #             amplitude, i.e. the part a passive model cannot fit.
+    # The fixed cap is a blunt proxy: at human R_in (~50-120 MOhm) a 12 mV
+    # ceiling never fires, because |amp|*R_in*1e-3 <= 10.8 mV even at -90 pA.
+    # The sag criterion adapts per cell and is the one that actually binds.
+    # Both default to legacy behaviour (12.0 / disabled).
+    _defl_cap = None if args.no_ls_deflection_cap else float(args.ls_deflection_cap)
+    _sag_cap = (None if args.max_sag_amplitude_mv is None
+                else float(args.max_sag_amplitude_mv))
+    if _defl_cap is None and _sag_cap is None:
+        log("[2/6] PATCH -- WARNING: both I_h admission guards disabled; "
+            "long steps are selected by |amplitude| rank alone.")
     ls_kwargs = dict(
         n_long_train=args.n_long_train,
-        max_ls_train_deflection_mV=args.ls_deflection_cap,
+        max_ls_train_deflection_mV=_defl_cap,
+        max_sag_amplitude_mV=_sag_cap,
         r_in_target=args.r_in_target, weighting=args.weighting,
         ss_window_ms=ss_window, ss_time_weight=args.ss_time_weight,
         ls_window_ms_after_onset=args.ls_window_ms,
@@ -429,7 +448,23 @@ def _parse_args(argv):
     ap.add_argument("--n-initial", type=int, default=50)
     # interim two-pass auto-tau_w
     ap.add_argument("--n-long-train", type=int, default=2)
-    ap.add_argument("--ls-deflection-cap", type=float, default=12.0)
+    ap.add_argument("--ls-deflection-cap", type=float, default=12.0,
+                    help="fixed ceiling on the estimated steady-state "
+                         "deflection |amp|*R_in*1e-3 [mV] for a long step to "
+                         "enter TRAINING (default 12.0; rarely binds at human "
+                         "R_in)")
+    ap.add_argument("--no-ls-deflection-cap", action="store_true",
+                    help="disable the fixed deflection ceiling entirely so "
+                         "that --max-sag-amplitude-mv alone drives long-step "
+                         "admission (the mode documented in "
+                         "passive_long_step_training)")
+    ap.add_argument("--max-sag-amplitude-mv", type=float, default=None,
+                    help="per-cell ceiling on the estimated I_h sag amplitude "
+                         "s*dV/(1-s) [mV], s = cell sag ratio. Adapts to each "
+                         "cell's I_h instead of using a fixed mV cap. "
+                         "Human L2/3-L3 (sag ~0.07, R_in ~80 MOhm): 0.25 keeps "
+                         "the two smallest hyp steps and holds high-sag cells "
+                         "to one. Default None = disabled (legacy).")
     ap.add_argument("--r-in-target", default="peak", choices=["peak", "steady"])
     ap.add_argument("--weighting", default="relative")
     ap.add_argument("--ss-window-ms", default="0.5,100.0")
