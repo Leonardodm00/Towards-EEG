@@ -595,6 +595,11 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         use_ih=not args.no_ih,
         ih_gihbar_nominal_S_cm2=args.ih_gihbar, ih_gihbar_cv=args.ih_gihbar_cv,
         ih_ehcn_mV=args.ih_ehcn, ih_dist=args.ih_dist,
+        # v70: these three were parsed by argparse but never forwarded, so
+        # draw_manifest silently used its defaults ("Ih", None, None) and the
+        # manifest came out with rodent kinetics and a full-box Ra draw.
+        ih_kinetics=args.ih_kinetics,
+        ra_phys_lo=args.ra_phys_lo, ra_phys_hi=args.ra_phys_hi,
         noise_sigma_nominal_mV=args.noise_sigma,
         noise_baseline_nominal_mV=args.noise_baseline,
         noise_drift_nominal_mV=args.noise_drift, noise_cv=args.noise_cv,
