@@ -55,6 +55,26 @@ import numpy as np
 # Brief vs long discriminator (matches the monolith's _BRIEF_PULSE_MAX_DURATION_S)
 _BRIEF_PULSE_MAX_DURATION_S = 0.01
 
+# ---------------------------------------------------------------------------
+#  Integration time step
+# ---------------------------------------------------------------------------
+# These mirror the monolith's DEFAULT_DT_BRIEF_MS / DEFAULT_DT_LONG_MS. They are
+# duplicated rather than imported because this module is deliberately decoupled
+# from the monolith (it receives `mono` as an argument, never imports it), and
+# they are resolved at CALL time so `integrate_long_step(..., dt_long_ms=...)`
+# can retune them for a whole run.
+#
+# The historical `dt_ms = 0.1` on the long-step replay NEVER took effect:
+# stdrun's setdt() rewrote it to 0.025 ms because the legacy plotting variable
+# steps_per_ms defaults to 40. PassiveCell.simulate now enforces the requested
+# dt, so these values are, for the first time, the values actually integrated
+# at. Both default to 0.025 ms -- i.e. the behaviour every previous run really
+# had -- so adopting this patch alone changes no numbers. Raising
+# DEFAULT_DT_LONG_MS to 0.1 is a real 4x saving on the long steps and a real
+# first-order accuracy change: validate it before using it.
+DEFAULT_DT_BRIEF_MS = 0.025
+DEFAULT_DT_LONG_MS = 0.025
+
 
 # ---------------------------------------------------------------------------
 #  Bundle helpers (duck-typed; SweepBundle satisfies the attribute contract)
@@ -65,8 +85,12 @@ def _is_brief(bundle) -> bool:
 
 def _simulate_brief(cell, b, v_rest_mV: float,
                     pre_pad_ms: float = 10.0, post_pad_ms: float = 100.0,
-                    dt_ms: float = 0.025) -> Tuple[np.ndarray, np.ndarray]:
-    """Replay a brief (Square-Subthreshold) pulse; t=0 at pulse onset."""
+                    dt_ms: Optional[float] = None
+                    ) -> Tuple[np.ndarray, np.ndarray]:
+    """Replay a brief (Square-Subthreshold) pulse; t=0 at pulse onset.
+
+    `dt_ms=None` resolves DEFAULT_DT_BRIEF_MS at call time."""
+    dt_ms = float(DEFAULT_DT_BRIEF_MS if dt_ms is None else dt_ms)
     dur_ms = float(b.stim_duration_s) * 1e3
     tstop_ms = pre_pad_ms + dur_ms + post_pad_ms
     t_ms, v = cell.simulate(
@@ -77,9 +101,15 @@ def _simulate_brief(cell, b, v_rest_mV: float,
 
 
 def _simulate_long(cell, b, v_rest_mV: float,
-                   dt_ms: float = 0.1) -> Tuple[np.ndarray, np.ndarray]:
+                   dt_ms: Optional[float] = None
+                   ) -> Tuple[np.ndarray, np.ndarray]:
     """Replay a long step using the bundle's own onset/duration; t in s on the
-    simulation grid (interpolated to the experimental grid by the RMSD step)."""
+    simulation grid (interpolated to the experimental grid by the RMSD step).
+
+    `dt_ms=None` resolves DEFAULT_DT_LONG_MS at call time. The former default
+    of 0.1 was silently overridden to 0.025 by stdrun's setdt(); PassiveCell
+    .simulate now enforces whatever is requested here."""
+    dt_ms = float(DEFAULT_DT_LONG_MS if dt_ms is None else dt_ms)
     delay_ms = float(b.stim_onset_s) * 1e3
     dur_ms = float(b.stim_duration_s) * 1e3
     tstop_ms = float(b.t[-1]) * 1e3
@@ -189,7 +219,9 @@ def bundle_rmsd(cell, bundle, v_rest_mV: float, *,
                 ls_window_ms_after_onset: float = 150.0,
                 r_in_target: str = "peak",
                 ss_sample_weight_fn: Optional[Callable[[np.ndarray], np.ndarray]]
-                = None) -> Tuple[float, float]:
+                = None,
+                dt_brief_ms: Optional[float] = None,
+                dt_long_ms: Optional[float] = None) -> Tuple[float, float]:
     """Return (rmsd_mV, deflection_mV) for one bundle.
 
     `ss_window_ms` defaults to (0.5, 100.0): the start is the 0.5 ms pulse
@@ -203,12 +235,12 @@ def bundle_rmsd(cell, bundle, v_rest_mV: float, *,
     only for optional relative weighting; it does not change the RMSD itself.
     """
     if _is_brief(bundle):
-        t_s, v = _simulate_brief(cell, bundle, v_rest_mV)
+        t_s, v = _simulate_brief(cell, bundle, v_rest_mV, dt_ms=dt_brief_ms)
         pre_w = (-10e-3, 0.0)
         rmsd_w = (ss_window_ms[0] * 1e-3, ss_window_ms[1] * 1e-3)
         weight_fn = ss_sample_weight_fn
     else:
-        t_s, v = _simulate_long(cell, bundle, v_rest_mV)
+        t_s, v = _simulate_long(cell, bundle, v_rest_mV, dt_ms=dt_long_ms)
         onset = float(bundle.stim_onset_s)
         pre_w = (0.0, onset)
         rmsd_w = (onset, onset + ls_window_ms_after_onset * 1e-3)
@@ -235,6 +267,8 @@ def build_multi_protocol_loss(
     weighting: str = "relative",
     weights: Optional[Sequence[float]] = None,
     ss_sample_weight_fn: Optional[Callable[[np.ndarray], np.ndarray]] = None,
+    dt_brief_ms: Optional[float] = None,
+    dt_long_ms: Optional[float] = None,
 ) -> Callable[[float, float, float], float]:
     """Return loss(cm_log, rm_log, ra_log) -> scalar.
 
@@ -272,7 +306,8 @@ def build_multi_protocol_loss(
                     cell, b, v_rest_mV, ss_window_ms=ss_window_ms,
                     ls_window_ms_after_onset=ls_window_ms_after_onset,
                     r_in_target=r_in_target,
-                    ss_sample_weight_fn=ss_sample_weight_fn)
+                    ss_sample_weight_fn=ss_sample_weight_fn,
+                    dt_brief_ms=dt_brief_ms, dt_long_ms=dt_long_ms)
                 if not np.isfinite(rmsd):
                     return 1e6
                 if weighting == "relative":
@@ -283,7 +318,14 @@ def build_multi_protocol_loss(
             if weighting == "custom":
                 return float(np.sum(w * terms) / np.sum(w))
             return float(np.mean(terms))
-        except Exception:  # noqa: BLE001 - mirror monolith: penalise, never crash
+        except Exception as exc:  # noqa: BLE001 - mirror monolith: penalise
+            # A dt-enforcement failure is a broken integrator configuration,
+            # not a bad region of parameter space. Folding it into the 1e6
+            # penalty would let the whole fit proceed on wrong simulations, so
+            # it is re-raised. Matched by CLASS NAME rather than by import so
+            # this module stays decoupled from the monolith.
+            if type(exc).__name__ == "DtEnforcementError":
+                raise
             return 1e6
 
     return loss
@@ -473,6 +515,8 @@ def integrate_long_step(
     ss_time_weight: str = "exp",
     ss_tau_w_ms: float = 5.0,
     ss_t0_ms: Optional[float] = None,
+    dt_brief_ms: Optional[float] = None,
+    dt_long_ms: Optional[float] = None,
     verbose: bool = True,
 ):
     """Monkeypatch the imported monolith module `mono` so Phase 2 trains on the
@@ -506,6 +550,21 @@ def integrate_long_step(
     OptimiserInputs = mono.OptimiserInputs
     PassiveSearchSpace = mono.PassiveSearchSpace
     orig_prepare = mono.prepare_optimiser_inputs
+
+    # --- dt: one choice, applied to EVERY code path ------------------------
+    # The training loss is not the only thing that simulates. fit_one_cell's
+    # per-bundle VALIDATION replay, Phase 2.5's Ra profile and Phase 3's
+    # bootstrap all go through the monolith's own _simulate_* helpers. Those
+    # now resolve their dt from the monolith's module globals at call time, so
+    # setting them here makes the dt choice global instead of leaving training
+    # and validation free to disagree. This must happen BEFORE any simulation.
+    global DEFAULT_DT_BRIEF_MS, DEFAULT_DT_LONG_MS
+    if dt_brief_ms is not None:
+        DEFAULT_DT_BRIEF_MS = float(dt_brief_ms)
+    if dt_long_ms is not None:
+        DEFAULT_DT_LONG_MS = float(dt_long_ms)
+    mono.DEFAULT_DT_BRIEF_MS = float(DEFAULT_DT_BRIEF_MS)
+    mono.DEFAULT_DT_LONG_MS = float(DEFAULT_DT_LONG_MS)
 
     def _prepare(cell_data, fit_target="hyp",
                  train_window_ms=None, n_long_validation=None):
@@ -556,7 +615,8 @@ def integrate_long_step(
             ss_window_ms=tuple(train_window_ms),
             ls_window_ms_after_onset=ls_window_ms_after_onset,
             r_in_target=r_in_target, weighting=weighting,
-            ss_sample_weight_fn=_make_ss_weight_fn(tuple(train_window_ms)))
+            ss_sample_weight_fn=_make_ss_weight_fn(tuple(train_window_ms)),
+            dt_brief_ms=DEFAULT_DT_BRIEF_MS, dt_long_ms=DEFAULT_DT_LONG_MS)
 
     mono.prepare_optimiser_inputs = _prepare
     mono._build_loss_function = _build_loss
@@ -569,4 +629,7 @@ def integrate_long_step(
               f"{tuple(ss_window_ms)} ms, SS time-weight = {wtag}; "
               f"r_in_target={r_in_target!r}, ls_window={ls_window_ms_after_onset} "
               f"ms, cross-bundle weighting={weighting!r}")
+        print(f"[integrate_long_step] dt ENFORCED: brief="
+              f"{DEFAULT_DT_BRIEF_MS:g} ms, long={DEFAULT_DT_LONG_MS:g} ms "
+              f"(applied to training, validation, Phase 2.5 and Phase 3)")
     return orig_prepare

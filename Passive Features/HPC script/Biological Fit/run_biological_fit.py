@@ -264,6 +264,8 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     log("GROUP {}: archive={}  tau_w grid={}  sweep n_grid={}  n_calls={}"
         .format(group_label, args.archive_dir, tau_grid, args.sweep_n_grid,
                 args.n_calls))
+    log("dt (ENFORCED): brief={} ms  long={} ms"
+        .format(args.dt_brief_ms, args.dt_long_ms))
 
     # ---- 1. PATCH long-step (split is tau_w-independent; placeholder tau_w) --
     log("[1/5] PATCH -- integrate_long_step (train/validation split + loss) ...")
@@ -276,6 +278,8 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         ss_window_ms=ss_window, ss_time_weight=args.ss_time_weight,
         ls_window_ms_after_onset=args.ls_window_ms,
         ss_t0_ms=(None if args.ss_t0_ms is None else float(args.ss_t0_ms)),
+        dt_brief_ms=float(args.dt_brief_ms),
+        dt_long_ms=float(args.dt_long_ms),
     )
     plst.integrate_long_step(mono, ss_tau_w_ms=tau_grid[0], **ls_kwargs,
                              verbose=True)
@@ -308,6 +312,14 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         cell = None
         try:
             cell = mono.build_neuron_model(cd.swc_path, F=args.F)
+            # Hard gate: both loss builders wrap their body in
+            # "except Exception -> 1e6", so a DtEnforcementError raised
+            # inside a loss evaluation would become a finite penalty and
+            # the fit would proceed on wrongly-integrated simulations.
+            # Verify dt here, where nothing can swallow the failure.
+            mono.assert_dt_enforced(
+                cell, dt_values_ms=(args.dt_brief_ms, args.dt_long_ms),
+                v_init_mV=float(oi.v_rest_mV), verbose=(i == 0))
             _assert_loss_live(cps, cell, oi, tau_grid[0], args)
 
             log("  cell {}/{} ({}): SWEEP ({} tau_w x {} Cm pts) ..."
@@ -324,7 +336,9 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                 rho=args.sweep_rho, cm_bounds=cm_bounds, n_grid=args.sweep_n_grid,
                 rm_bounds=rm_bounds, ra_bounds=ra_bounds,
                 r_in_target=args.r_in_target,
-                ls_window_ms_after_onset=args.ls_window_ms, verbose=True)
+                ls_window_ms_after_onset=args.ls_window_ms,
+                dt_brief_ms=float(args.dt_brief_ms),
+                dt_long_ms=float(args.dt_long_ms), verbose=True)
             tau_w_star, reason, winner = pick_winning_tau_w(sweep[sid], tau_grid)
             log("  cell {}/{} ({}): SWEEP done in {:.0f}s -> tau_w*={} ms ({})"
                 .format(i + 1, len(cells_data), sid, time.time() - t_sw,
@@ -497,7 +511,8 @@ def _assert_loss_live(cps, cell, oi, tau_w_ms, args):
     L = cps.build_relative_loss_for_tau_w(
         cell, oi.train_bundles, float(oi.v_rest_mV), tau_w_ms=float(tau_w_ms),
         ss_window_ms=tuple(oi.train_window_ms), shape=args.ss_time_weight,
-        ls_window_ms_after_onset=args.ls_window_ms, r_in_target=args.r_in_target)
+        ls_window_ms_after_onset=args.ls_window_ms, r_in_target=args.r_in_target,
+        dt_brief_ms=float(args.dt_brief_ms), dt_long_ms=float(args.dt_long_ms))
     vals = [float(L(np.log(c), np.log(15000.0), np.log(150.0)))
             for c in (0.5, 1.0, 2.0)]
     if (not np.all(np.isfinite(vals))) or (max(vals) - min(vals) < 1e-9):
@@ -515,7 +530,8 @@ def _verify_tau_w_applied(cps, mono, cell, oi, tau_w_star, args):
         cell, oi.train_bundles, float(oi.v_rest_mV), tau_w_ms=float(tau_w_star),
         ss_window_ms=tuple(oi.train_window_ms), shape=args.ss_time_weight,
         ls_window_ms_after_onset=args.ls_window_ms, r_in_target=args.r_in_target,
-        weighting=args.weighting)
+        weighting=args.weighting,
+        dt_brief_ms=float(args.dt_brief_ms), dt_long_ms=float(args.dt_long_ms))
     pt = (np.log(1.5), np.log(8000.0), np.log(200.0))   # generic off-optimum point
     lp, lr = float(patched(*pt)), float(ref(*pt))
     if (not np.isfinite(lp) or not np.isfinite(lr)
@@ -640,6 +656,14 @@ def _parse_args(argv):
     ap.add_argument("--tau-w-grid-ms", default="5.0")
     ap.add_argument("--sweep-rho", type=float, default=0.5)
     ap.add_argument("--sweep-n-grid", type=int, default=15)
+    # Integration step. These are now ENFORCED (stdrun's setdt() used to
+    # silently rewrite dt=0.1 -> 0.025). Defaults reproduce what the
+    # pipeline has always actually integrated at, so changing nothing else
+    # changes no numbers. See DEFAULT_DT_LONG_MS in the monolith.
+    ap.add_argument("--dt-brief-ms", type=float, default=0.025,
+                    help="integration step for the brief SS replay (ms)")
+    ap.add_argument("--dt-long-ms", type=float, default=0.025,
+                    help="integration step for the Long Square replay (ms)")
     # Phase 2.5
     ap.add_argument("--skip-phase2p5", action="store_true")
     ap.add_argument("--n-floor", type=int, default=4)

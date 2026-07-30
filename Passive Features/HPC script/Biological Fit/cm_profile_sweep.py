@@ -282,6 +282,8 @@ def build_relative_loss_for_tau_w(
     ls_window_ms_after_onset: float = 150.0,
     r_in_target: str = "peak",
     weighting: str = "relative",
+    dt_brief_ms: Optional[float] = None,
+    dt_long_ms: Optional[float] = None,
 ) -> Callable[[float, float, float], float]:
     """Return the loss closure for ONE cell at ONE tau_w, identical to what the
     fit uses, with the SS time-weight fixed to `tau_w_ms` and `shape`.
@@ -308,6 +310,7 @@ def build_relative_loss_for_tau_w(
         ls_window_ms_after_onset=ls_window_ms_after_onset,
         r_in_target=r_in_target, weighting=weighting,
         ss_sample_weight_fn=wfn,
+        dt_brief_ms=dt_brief_ms, dt_long_ms=dt_long_ms,
     )
 
 
@@ -338,6 +341,8 @@ def sweep_tau_w_per_cell(
     ra_bounds: Tuple[float, float] = (50.0, 1000.0),
     r_in_target: str = "peak",
     ls_window_ms_after_onset: float = 150.0,
+    dt_brief_ms: Optional[float] = None,
+    dt_long_ms: Optional[float] = None,
     verbose: bool = True,
 ) -> Dict[int, List[CmProfile]]:
     """For each cell c and each tau_w, compute PL_{tau_w}^{(c)}(C_m) and its
@@ -357,6 +362,7 @@ def sweep_tau_w_per_cell(
                 tau_w_ms=float(tau), ss_window_ms=ci.ss_window_ms,
                 shape=shape, ls_window_ms_after_onset=ls_window_ms_after_onset,
                 r_in_target=r_in_target, weighting="relative",
+                dt_brief_ms=dt_brief_ms, dt_long_ms=dt_long_ms,
             )
             prof = profile_cm(
                 loss, cm_bounds=cm_bounds, n_grid=n_grid,

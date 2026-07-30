@@ -94,6 +94,22 @@ TAU_W_GRID_MS="5.0"      # per-cell sweep grid; winner = sharpest HW_rho.
 SWEEP_RHO=0.5            # relative-rise threshold for HW_rho
 SWEEP_N_GRID=15          # log C_m grid points for the profile
 
+# --- Integration time step (ENFORCED) ---------------------------------------
+# NEURON's stdrun.hoc setdt() silently rewrites h.dt unless it divides evenly
+# into 1/steps_per_ms (a legacy GUI variable, "Points plotted/ms", default 40).
+# The old hard-coded dt=0.1 for Long Square replay was therefore a no-op: every
+# long step really ran at 0.025 ms, at 4x the intended cost, printing
+# "Changed dt" each time. PassiveCell.simulate now sets steps_per_ms=1/dt and
+# VERIFIES the achieved dt, so these values are what is actually integrated.
+#
+# The defaults below (both 0.025) reproduce the historical EFFECTIVE behaviour
+# exactly -- adopting this patch alone changes no fitted numbers, it only makes
+# the choice honest. DT_LONG_MS=0.1 is a real ~4x saving on the long steps and
+# a real first-order accuracy change: run smoke_dt_enforcement.py and check the
+# RMSD delta against your ~0.05 mV noise floor BEFORE enabling it in production.
+DT_BRIEF_MS="${DT_BRIEF_MS:-0.025}"   # Square Subthreshold replay (ms)
+DT_LONG_MS="${DT_LONG_MS:-0.025}"     # Long Square replay (ms)
+
 # --- Phase 2.5 (MANDATORY here: fix Ra per group + refit Cm,Rm) -------------
 SKIP_PHASE2P5="${SKIP_PHASE2P5:-0}"   # 1 = legacy free-Ra diagnostic; 0 = standard
 N_FLOOR="${N_FLOOR:-4}"               # min qualifying cells for cohort-median Ra
@@ -172,6 +188,7 @@ echo "Output dir (this job):  $OUTPUT_DIR"
 echo "Fit:                    target=$FIT_TARGET  F=$F_FACTOR  n_calls=$N_CALLS  n_initial=$N_INITIAL  [sequential]"
 echo "Auto-tau_w:             grid=[$TAU_W_GRID_MS] ms  shape=$SS_TIME_WEIGHT  rho=$SWEEP_RHO  n_grid=$SWEEP_N_GRID"
 echo "Loss:                   n_long_train=$N_LONG_TRAIN  defl_cap=${LS_DEFLECTION_CAP_MV}mV  r_in=$R_IN_TARGET  weighting=$WEIGHTING  ss_window=[$SS_WINDOW_MS]ms"
+echo "dt (ENFORCED):          brief=${DT_BRIEF_MS}ms  long=${DT_LONG_MS}ms"
 if [ "$SKIP_PHASE2P5" = "1" ]; then
     echo "Phase 2.5:              SKIPPED (legacy free-Ra; Phase 3 = full 3-D)"
 else
@@ -204,6 +221,8 @@ ARGS=(
     --tau-w-grid-ms       "$TAU_W_GRID_MS"
     --sweep-rho           "$SWEEP_RHO"
     --sweep-n-grid        "$SWEEP_N_GRID"
+    --dt-brief-ms         "$DT_BRIEF_MS"
+    --dt-long-ms          "$DT_LONG_MS"
     # Phase 2.5
     --n-floor             "$N_FLOOR"
     --n-ra-profile        "$N_RA_PROFILE"
