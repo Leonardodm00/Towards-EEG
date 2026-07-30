@@ -160,6 +160,22 @@ def part_b() -> None:
 
     # ---- B1: mechanism vs Python reference at 11 voltages ------------------
     seg = soma(0.5)
+    h.finitialize(-70.0)
+    if not (hasattr(seg.Ih_human, "mTau") and hasattr(seg.Ih_human, "mInf")):
+        print("  [SKIP] compiled Ih_human does not expose mInf/mTau.")
+        print("         Your Ih_human.mod predates the RANGE fix. It must read:")
+        print("             RANGE gIhbar, gIh, ihcn, ehcn, mTauMin, mInf, mTau")
+        print("         Update mod/Ih_human.mod, then:")
+        print("             rm -rf x86_64 && nrnivmodl mod")
+        _SKIPPED.append("B1 (mInf/mTau not RANGE)")
+    else:
+        _check_b1(h, seg)
+
+    # ---- B2: sag comparison at EQUAL gIhbar --------------------------------
+    _check_b2(h)
+
+
+def _check_b1(h, seg) -> None:
     worst_tau, worst_inf = 0.0, 0.0
     for i in range(11):
         v = -140.0 + 10.0 * i
@@ -178,7 +194,7 @@ def part_b() -> None:
     check("B1b compiled mInf(v) matches reference (rel tol {:g})".format(REL_TOL),
           worst_inf < REL_TOL, "worst {:.3e}".format(worst_inf))
 
-    # ---- B2: sag comparison at EQUAL gIhbar --------------------------------
+def _check_b2(h) -> None:
     def sag_of(mech: str, gbar: float, ehcn: float) -> float:
         """(V_trough - V_ss)/(V_trough - V_rest) for a -50 pA, 1 s step."""
         sec = h.Section(name="s_" + mech)
