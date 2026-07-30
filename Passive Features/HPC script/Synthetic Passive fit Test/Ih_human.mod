@@ -64,7 +64,11 @@ ENDCOMMENT
 NEURON {
     SUFFIX Ih_human
     NONSPECIFIC_CURRENT ihcn
-    RANGE gIhbar, gIh, ihcn, ehcn, mTauMin
+    : mInf and mTau are ASSIGNED, but must ALSO be listed RANGE or NEURON will
+    : not expose them to Python (seg.Ih_human.mTau -> AttributeError).
+    : smoke_test_ih_human.py Part B reads them to check the compiled mechanism
+    : against the Python reference implementation.
+    RANGE gIhbar, gIh, ihcn, ehcn, mTauMin, mInf, mTau
 }
 
 UNITS {
