@@ -19,6 +19,9 @@ Coverage
   E9  a cell with no root fails softly and writes nothing
   E10 REGRESSION: a relabelled glia node stays visible to phi
   E11 mislabels resolve BEFORE labelling; re-classify is mandatory
+  E12 apical/basal split retirement: real export_neuron output is
+      DOM_NONE/'dend' only, and write_hoc raises if ANY section -- however it
+      got there -- carries the array name 'apic_dend' or 'basal_dend'
 """
 
 import json
@@ -382,6 +385,77 @@ def test_E11_resolution_precedes_labelling():
         shutil.rmtree(tmp)
 
 
+def test_E12_apical_basal_split_stays_retired():
+    """The split is retired but its vocabulary is kept, per decision: keep
+    apic_dend/basal_dend in SECTION_ARRAY and ARRAY_ORDER, guarantee they are
+    never populated.
+
+    Two independent checks, matching the two places the guard is wired in:
+
+    (a) SOURCE -- a real export_neuron run on an ordinary cell produces a
+        domain column that is DOM_NONE everywhere and a section_vocabulary
+        whose only dendritic entry is ('dend', 'none'); 'apic_dend' and
+        'basal_dend' never appear as array names in the written .hoc.
+    (b) SINK -- write_hoc raises on ANY sections list containing an
+        apic_dend/basal_dend array, constructed directly and bypassing
+        assign_domain entirely, which is what proves the guard is at the
+        artefact boundary and not merely inside assign_domain.
+    """
+    # (a) source: the real pipeline, end to end
+    df = _prepared()
+    tmp = tempfile.mkdtemp()
+    try:
+        res = mx.export_neuron(df, "E12", tmp, verbose=False)
+        assert res["qc_status"] != se.QC_FAIL, res
+
+        assert set(res["section_vocabulary"]) <= {"soma:none", "dend:none",
+                                                   "axon:none", "ais:none"}, \
+            res["section_vocabulary"]
+        assert not any("apic" in v or "basal" in v
+                      for v in res["section_vocabulary"]), \
+            res["section_vocabulary"]
+
+        hoc_entry = res["files"]["hoc"]
+        hoc_path = hoc_entry if isinstance(hoc_entry, str) else hoc_entry["path"]
+        with open(hoc_path) as fh:
+            hoc_text = fh.read()
+        assert "apic_dend" not in hoc_text and "basal_dend" not in hoc_text, \
+            "retired array name reached the .hoc file"
+
+        sec = pd.read_csv(res["files"]["section_table"])
+        assert set(sec["array"].unique()) <= {"soma", "dend", "axon", "ais"}, \
+            sec["array"].unique()
+    finally:
+        shutil.rmtree(tmp)
+
+    # assign_domain's own output, directly: only DOM_NONE, guard passes
+    labelled = nc.classify_frame(df)
+    labelled, _ = se.enforce_soma(labelled, nid="E12b", verbose=False)
+    dom = mx.assign_domain(labelled, soma_id=None)
+    assert set(dom["domain"].unique()) == {nc.DOM_NONE}, dom["domain"].unique()
+
+    # (b) sink: bypass assign_domain, hand write_hoc a section that IS in the
+    #     retired array. The guard must fire before any content is written.
+    nd = df.set_index("id")[["x", "y", "z", "r"]]
+    node = nd.iloc[0]
+    fake_sections = [{
+        "section_id": 0, "array": "apic_dend", "type_idx": 0,
+        "class": nc.CLS_DEND, "domain": nc.DOM_APICAL,
+        "nodes": [int(nd.index[0])], "parent_sec_id": -1,
+    }]
+    out_path = os.path.join(tempfile.mkdtemp(), "leak.hoc")
+    try:
+        mx.write_hoc(fake_sections, df, out_path)
+    except ValueError as e:
+        assert "apic_dend" in str(e), e
+    else:
+        raise AssertionError(
+            "write_hoc must raise when a section carries a retired array "
+            "name, regardless of how the sections list was built")
+    assert not os.path.exists(out_path), \
+        "write_hoc must not write anything before the guard is checked"
+
+
 # --------------------------------------------------------------------------- #
 def _run_all():
     tests = [
@@ -396,6 +470,7 @@ def _run_all():
         ("E9 no root fails softly, writes nothing", test_E9_no_root_fails_softly),
         ("E10 glia relabel keeps partitions aligned", test_E10_glia_relabel_keeps_partitions_aligned),
         ("E11 resolution precedes labelling", test_E11_resolution_precedes_labelling),
+        ("E12 apical/basal split stays retired", test_E12_apical_basal_split_stays_retired),
     ]
     n_pass = 0
     for name, fn in tests:

@@ -29,6 +29,13 @@ Coverage
       the anchor really is the base node's transformed coordinate
   R7  summarise_audit arithmetic and the by-type breakdown
   R8  the verdict is invariant under a rigid transform, as it must be
+  R9  map_synapses_to_nodes_raw: id-vs-position (the bug it replaces),
+      voxel_res scaling, direction filter, INTEGER exc/inh codes, NaN
+      dropped, and the two column-presence guards
+  R10 INTEGRATION: the label survives write_mapped_synapses. R9 passed on two
+      real cells while every one of their 9360 synapses came out 'unknown',
+      because no test covered the COMPOSITION of the two functions. This is
+      that test.
 """
 
 import math
@@ -36,6 +43,7 @@ import math
 import numpy as np
 import pandas as pd
 
+import node_classify as nc
 import synapse_redirect_audit as sra
 
 
@@ -291,6 +299,160 @@ def test_R8_invariant_under_rigid_transform():
     assert a1.equals(a2), "audit is not deterministic"
 
 
+def test_R9_map_synapses_to_nodes_raw():
+    """The id-vs-position bug, reproduced and fixed, plus the rest of the
+    contract resolve_synapse_anchors depends on.
+
+    THE bug: df_raw['id'] is NOT row position on a real skeleton. Three nodes
+    here are given ids {100, 5, 42} at row positions {0, 1, 2} specifically so
+    that returning the positional index would be caught immediately -- every
+    node_id would be wrong (0/1/2 instead of 100/5/42), not merely offset.
+
+    Synapse types are the REAL H01 encoding: int64, 2 = excitatory,
+    1 = inhibitory. Confirmed against neuron_837776212_synapses.csv, whose
+    synapse_type column is int64 with values {1: 1002, 2: 1652}.
+    """
+    df_raw = pd.DataFrame({
+        "id": [100, 5, 42],
+        "x": [0.0, 1000.0, 2000.0], "y": [0.0, 0.0, 0.0], "z": [0.0, 0.0, 0.0],
+    })
+
+    syn_df = pd.DataFrame({
+        "location_x": [0.0, 100.0, 170.0, 0.0, np.nan],
+        "location_y": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "location_z": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "direction": ["incoming", "incoming", "incoming", "outgoing", "incoming"],
+        "synapse_type": [2, 2, 1, 1, 2],          # int64, as H01 really exports
+    })
+    # nm, at voxel_res=(10,10,10): 0 -> node 100 (d=0); 1000 -> node 5 (d=0);
+    # 1700 -> nearer node 42 (2000, d=300) than node 5 (1000, d=700)
+
+    out = sra.map_synapses_to_nodes_raw(syn_df, df_raw, voxel_res=(10, 10, 10),
+                                        direction="incoming")
+
+    assert len(out) == 3, out
+    assert list(out.columns) == ["node_id", "syn_x_nm", "syn_y_nm", "syn_z_nm",
+                                 "synapse_label", "snap_distance_nm"], out.columns
+
+    # THE regression check: ids, not positions
+    assert list(out["node_id"]) == [100, 5, 42], list(out["node_id"])
+
+    assert np.allclose(out["syn_x_nm"], [0.0, 1000.0, 1700.0]), out["syn_x_nm"]
+    assert np.allclose(out["snap_distance_nm"], [0.0, 0.0, 300.0]), \
+        out["snap_distance_nm"]
+
+    # the SIGMA_SYN vocabulary, not a parallel one
+    assert list(out["synapse_label"]) == ["exc_syn", "exc_syn", "inh_syn"], \
+        list(out["synapse_label"])
+    assert set(out["synapse_label"]) <= set(nc.SIGMA_SYN), out["synapse_label"]
+
+    out_all = sra.map_synapses_to_nodes_raw(syn_df, df_raw,
+                                             voxel_res=(10, 10, 10))
+    assert len(out_all) == 4, out_all
+    assert list(out_all["synapse_label"]) == \
+        ["exc_syn", "exc_syn", "inh_syn", "inh_syn"], list(out_all["synapse_label"])
+
+    no_type = syn_df.drop(columns=["synapse_type"])
+    out_nt = sra.map_synapses_to_nodes_raw(no_type, df_raw,
+                                           voxel_res=(10, 10, 10),
+                                           direction="incoming")
+    assert set(out_nt["synapse_label"]) == {"unknown_syn"}, out_nt["synapse_label"]
+
+    for bad_syn in ("location_x", "location_y", "location_z"):
+        try:
+            sra.map_synapses_to_nodes_raw(syn_df.drop(columns=[bad_syn]), df_raw)
+        except ValueError as e:
+            assert bad_syn in str(e), e
+        else:
+            raise AssertionError("missing %r should raise" % bad_syn)
+
+    for bad_raw in ("id", "x", "y", "z"):
+        try:
+            sra.map_synapses_to_nodes_raw(syn_df, df_raw.drop(columns=[bad_raw]))
+        except ValueError as e:
+            assert bad_raw in str(e), e
+        else:
+            raise AssertionError("missing %r should raise" % bad_raw)
+
+    try:
+        sra.map_synapses_to_nodes_raw(syn_df, df_raw, direction="sideways")
+    except ValueError as e:
+        assert "no synapses left" in str(e), e
+    else:
+        raise AssertionError("a direction matching nothing should raise")
+
+
+def test_R10_label_survives_the_c09_writer():
+    """INTEGRATION. The failure R9 alone could not see.
+
+    write_mapped_synapses DERIVES synapse_type from synapse_label and
+    OVERWRITES whatever synapse_type it was handed. A loader emitting
+    synapse_type instead therefore has its work discarded, and every row is
+    written as 'unknown' -- which is what happened on cells 4683431368 and
+    4683651279 (4785/4785 and 4575/4575 unknown) with R9 passing throughout.
+
+    This asserts the composition, end to end through the real writer.
+    """
+    import os
+    import tempfile
+
+    import alignment as al
+
+    df_raw = pd.DataFrame({
+        "id": [100, 5, 42],
+        "x": [0.0, 1000.0, 2000.0], "y": [0.0, 0.0, 0.0], "z": [0.0, 0.0, 0.0],
+    })
+    syn_df = pd.DataFrame({
+        "location_x": [0.0, 100.0, 170.0],
+        "location_y": [0.0, 0.0, 0.0],
+        "location_z": [0.0, 0.0, 0.0],
+        "synapse_type": [2, 1, 2],
+    })
+    mapped = sra.map_synapses_to_nodes_raw(syn_df, df_raw,
+                                            voxel_res=(10, 10, 10))
+
+    # the columns the snapper adds downstream, stubbed
+    snapped = mapped.copy()
+    snapped["x"] = mapped["syn_x_nm"] / 1000.0
+    snapped["y"] = 0.0
+    snapped["z"] = 0.0
+    snapped["anchor_x"] = snapped["x"]
+    snapped["anchor_y"] = 0.0
+    snapped["anchor_z"] = 0.0
+    snapped["on_pruned_spine"] = False
+    snapped["base_node_id"] = -1
+    snapped["lfpy_idx"] = [0, 1, 2]
+    snapped["lfpy_idx_naive"] = [0, 1, 2]
+    snapped["redirected"] = False
+
+    tmp = tempfile.mkdtemp()
+    try:
+        path = os.path.join(tmp, "c09.csv")
+        rep = al.write_mapped_synapses(snapped, path, cm=0.5, Ra=268.5)
+
+        # nothing was defaulted, because the loader supplied synapse_label
+        assert rep["n_label_defaulted"] == 0, rep
+        assert rep["n_unknown_type"] == 0, rep
+
+        got = pd.read_csv(path)
+        assert list(got["synapse_label"]) == ["exc_syn", "inh_syn", "exc_syn"], \
+            list(got["synapse_label"])
+        # THE assertion: the downstream vocabulary survived the round trip
+        assert list(got["synapse_type"]) == ["exc", "inh", "exc"], \
+            list(got["synapse_type"])
+
+        # and the negative control: WITHOUT synapse_label everything is unknown
+        # and the writer now SAYS SO instead of failing silently
+        blind = snapped.drop(columns=["synapse_label"])
+        rep2 = al.write_mapped_synapses(blind, os.path.join(tmp, "blind.csv"),
+                                        cm=0.5, Ra=268.5)
+        assert rep2["n_label_defaulted"] == 3, rep2
+        assert rep2["n_unknown_type"] == 3, rep2
+    finally:
+        import shutil
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # --------------------------------------------------------------------------- #
 def _run_all():
     tests = [
@@ -302,6 +464,8 @@ def _run_all():
         ("R6 audit detects the foreign snap", test_R6_audit_detects_the_trap),
         ("R7 summary arithmetic", test_R7_summary_arithmetic),
         ("R8 rigid-transform invariance", test_R8_invariant_under_rigid_transform),
+        ("R9 map_synapses_to_nodes_raw", test_R9_map_synapses_to_nodes_raw),
+        ("R10 label survives the C-09 writer", test_R10_label_survives_the_c09_writer),
     ]
     n = 0
     for name, fn in tests:

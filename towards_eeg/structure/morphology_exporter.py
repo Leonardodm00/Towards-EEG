@@ -134,18 +134,24 @@ ARRAY_ORDER = ("soma", "axon", "ais", "dend", "apic_dend", "basal_dend")
 # --------------------------------------------------------------------------- #
 def assign_domain(df, class_column="compartment_class",
                   soma_id=None, out_column="domain"):
-    """Assign (apical / basal / none) to every node. STUB until S1.4.
+    """Assign (apical / basal / none) to every node. RETIRED: always 'none'.
 
-    The final rule (decision D-4) is geometric: after alignment the apical
-    trunk runs along +z by construction, so from the soma the subtree
-    maximising path length and z-extent is apical and the remaining dendrite is
-    basal. It must be deterministic given nu and recorded in exporter_id.
+    Decision (this handoff, superseding D-4): S3 is dropped entirely, every
+    dendrite is mechanism-uniform 'dend'. D-4's geometric rule -- after
+    alignment the apical trunk runs along +z by construction, so from the
+    soma the subtree maximising path length and z-extent is apical and the
+    rest is basal -- is recorded here for history only and will not run.
 
-    Until then every node gets DOM_NONE, so dendrites emit 'dend[k]' -- the same
-    array name the inherited bank uses, so nothing downstream changes shape.
+    Every node gets DOM_NONE, so dendrites emit 'dend[k]', the array name the
+    inherited bank already used. assert_domain_collapsed on the OUTPUT of this
+    function (not on the constant it assigns) is the guard: it is what a
+    future accidental edit to the line below would actually trip, rather than
+    only a docstring saying not to make that edit.
     """
     out = df.copy()
     out[out_column] = nc.DOM_NONE
+    nc.assert_domain_collapsed(out[out_column].unique().tolist(),
+                               "assign_domain output")
     return out
 
 
@@ -404,6 +410,14 @@ def resolve_spine_base_sections(spine_bases, sections, df_pruned):
 def write_hoc(sections, df, path, input_units="nm", header_comment=None):
     """Write a NEURON-compliant .hoc. Conventions preserved from the inherited
     exporter (see module docstring). Coordinates converted to um exactly once.
+
+    Guards two invariants on the array names about to be emitted: I-16 (no
+    synapse label leaks in as a class) and the retirement of the apical/basal
+    split (no section may be routed into apic_dend/basal_dend). The second
+    guard is the SINK: it fires regardless of whether a section got there via
+    assign_domain, a hand-built `sections` list, or anything else, which is
+    what makes it the actual enforcement rather than assign_domain's
+    self-check alone.
     """
     scale = NM_PER_UM if input_units == "nm" else 1.0
     nd = df.set_index("id")[["x", "y", "z", "r"]].to_dict("index")
@@ -411,6 +425,7 @@ def write_hoc(sections, df, path, input_units="nm", header_comment=None):
     counts = defaultdict(int)
     for s in sections:
         counts[s["array"]] = max(counts[s["array"]], s["type_idx"] + 1)
+    nc.assert_domain_collapsed(counts.keys(), "emitted section arrays")
 
     arrays = [a for a in ARRAY_ORDER if counts.get(a, 0) > 0]
     extra = sorted(a for a in counts if a not in ARRAY_ORDER and counts[a] > 0)
@@ -506,6 +521,7 @@ def export_neuron(df_raw,
                   origin_tolerance_nm=None,
                   plot_fn=None,
                   write_files=True,
+                  return_frames=False,
                   verbose=True):
     """Export one morphology: .hoc plus phi plus the C-09-bound tables.
 
@@ -521,6 +537,16 @@ def export_neuron(df_raw,
         align_fn(df, nid) -> df, applied AFTER phi is built. phi depends only on
         path distances and radii, both preserved by a rigid transform, so the
         order is immaterial for phi and required for the .hoc.
+    return_frames : bool
+        When True, res['frames']['labelled'] carries the PRE-PRUNE labelled
+        frame in RAW nm -- classified, mislabels resolved, spine-labelled,
+        re-classified, soma-enforced. This is the exact frame
+        alignment.resolve_synapse_anchors needs. It exists because the
+        alternative is for the caller to replicate steps 2-6 by hand, which is
+        what colab_run_synapse_redirect_audit CELL 6 used to do: two copies of
+        the same six steps, silently diverging the moment the mislabel policy
+        or the spine threshold changes. Off by default because the frame is
+        large and most callers do not need it.
 
     Returns
     -------
@@ -592,6 +618,14 @@ def export_neuron(df_raw,
     res["A_spine_um2"] = float(phi["spine_area_um2"].sum())
     res["n_branches"] = int(phi["branch_id"].nunique())
 
+    # 7b. hand back the pre-prune labelled frame, if asked --------------------
+    #     Taken HERE and not later: after this line prune_spines removes the
+    #     spine geometry, and the anchors resolved downstream are defined
+    #     against nodes that would no longer exist. Still raw nm; the caller's
+    #     transform is applied by resolve_synapse_anchors, not here.
+    if return_frames:
+        res["frames"] = {"labelled": df.copy()}
+
     # 8. prune ---------------------------------------------------------------
     df_pruned, spine_info = prune_spines(df)
     res["spine_report"] = {k: v for k, v in spine_info.items()
@@ -635,7 +669,8 @@ def export_neuron(df_raw,
             res["files"][name] = p
         prov = {
             "exporter_id": exporter_id(label_fn, spine_length_threshold_nm),
-            "record": {k: v for k, v in res.items() if k != "files"},
+            "record": {k: v for k, v in res.items()
+                       if k not in ("files", "frames")},
             "files": {k: (v if isinstance(v, str) else v.get("path"))
                       for k, v in res["files"].items()},
         }

@@ -36,21 +36,177 @@ raw -> aligned coordinate transform are both injected by the caller, so the
 whole module is exercisable against a stub cell with no NEURON installed.
 
 Units: every coordinate ENTERING this module is raw nanometres. Every
-coordinate and distance LEAVING it is aligned micrometres.
+coordinate and distance LEAVING it is aligned micrometres -- with ONE
+exception: map_synapses_to_nodes_raw (Section 0) both takes and returns RAW
+nanometres, because its output feeds alignment.resolve_synapse_anchors, which
+performs the raw -> aligned transform itself, on the anchor coordinate rather
+than the synapse coordinate. See that function's own docstring.
 """
 
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from scipy.spatial import cKDTree
 
 
-MODULE_VERSION = "synapse_redirect_audit-1.0.0"
+MODULE_VERSION = "synapse_redirect_audit-1.2.0"
 
 REL_SAME = "same"
 REL_ANCESTOR = "ancestor"
 REL_DESCENDANT = "descendant"
 REL_FOREIGN = "foreign"
+
+
+# --------------------------------------------------------------------------- #
+#  0. Raw synapse CSV -> the node_id/syn_x_nm/syn_y_nm/syn_z_nm contract        #
+#     alignment.resolve_synapse_anchors requires (O7: promoted from being      #
+#     copy-pasted notebook code in TWO Colab drivers into ONE tested function) #
+# --------------------------------------------------------------------------- #
+def map_synapses_to_nodes_raw(syn_df, df_raw, voxel_res=(8.0, 8.0, 33.0),
+                              direction=None, id_column="id",
+                              xyz_columns=("x", "y", "z"),
+                              type_column="synapse_type"):
+    """Assign each raw synapse to its nearest skeleton node, by NODE ID.
+
+    `syn_df` is the H01 synapse export as it arrives on disk: one row per
+    synapse, voxel-space `location_x/y/z`, and (usually) a `direction` and a
+    `synapse_type` column. `df_raw` is the matching skeleton, unclassified, in
+    the same raw-nm space `export_neuron` takes as input.
+
+    Returns a DataFrame with exactly the columns
+    resolve_synapse_anchors/align_and_export require -- node_id, syn_x_nm,
+    syn_y_nm, syn_z_nm -- plus `synapse_label` (the SIGMA_SYN vocabulary
+    write_mapped_synapses consumes; see classify_synapse_label for why it is
+    the label and NOT synapse_type) and snap_distance_nm for QC. This
+    is NOT the final lfpy_idx assignment: it is the upstream step that turns a
+    voxel coordinate into a node id, which resolve_synapse_anchors then uses to
+    decide whether that node sits on a spine.
+
+    IMPORTANT (the bug this replaces): the KD-tree query returns POSITIONAL
+    indices into `df_raw`. On every real skeleton checked, `id` is NOT equal to
+    row position (e.g. on 794820508, max id 63397 over 63147 rows). Using the
+    positional index as if it were the node id silently mismaps every synapse.
+    This function converts explicitly via `df_raw[id_column].to_numpy()[pos]`.
+
+    Parameters
+    ----------
+    syn_df : DataFrame
+        Raw synapse export. Must have location_x/y/z (voxel units) and,
+        optionally, 'direction' and 'synapse_type'.
+    df_raw : DataFrame
+        The unclassified skeleton, with `xyz_columns` in the SAME raw-nm space
+        as the .hoc that will be built from it.
+    voxel_res : (float, float, float)
+        Voxel size in nm, applied as location_xyz * voxel_res -> nm. H01's
+        default (8, 8, 33) reflects its anisotropic (thin) z-sampling.
+    direction : str or None
+        If given and 'direction' is a column, keep only rows matching it
+        (e.g. 'incoming' for postsynaptic sites on this cell).
+    id_column, xyz_columns : str, (str, str, str)
+        Column names in `df_raw` for the node id and its raw coordinate.
+    type_column : str
+        Column in `syn_df` holding the H01 excitatory/inhibitory code.
+
+    Raises
+    ------
+    ValueError if, after filtering, no synapse has a usable coordinate.
+    """
+    for col in ("location_x", "location_y", "location_z"):
+        if col not in syn_df.columns:
+            raise ValueError("syn_df lacks required column %r" % col)
+    for col in xyz_columns + (id_column,):
+        if col not in df_raw.columns:
+            raise ValueError("df_raw lacks required column %r" % col)
+
+    out = syn_df
+    if direction is not None and "direction" in out.columns:
+        out = out[out["direction"] == direction]
+    out = out.dropna(subset=["location_x", "location_y", "location_z"])
+    if out.empty:
+        raise ValueError(
+            "no synapses left with a usable coordinate (direction=%r on %d "
+            "input rows)" % (direction, len(syn_df)))
+
+    cx, cy, cz = xyz_columns
+    node_coords_nm = df_raw[[cx, cy, cz]].to_numpy(dtype=float)
+    tree = cKDTree(node_coords_nm)
+
+    syn_coords_nm = (out[["location_x", "location_y", "location_z"]]
+                     .to_numpy(dtype=float) * np.asarray(voxel_res, dtype=float))
+    dist_nm, pos_idx = tree.query(syn_coords_nm)
+
+    ids = df_raw[id_column].to_numpy()
+    node_ids = ids[pos_idx]                     # THE fix: id, not position
+
+    return pd.DataFrame({
+        "node_id": node_ids.astype(np.int64),
+        "syn_x_nm": syn_coords_nm[:, 0],
+        "syn_y_nm": syn_coords_nm[:, 1],
+        "syn_z_nm": syn_coords_nm[:, 2],
+        "synapse_label": classify_synapse_label(out, type_column),
+        "snap_distance_nm": dist_nm,
+    }).reset_index(drop=True)
+
+
+def classify_synapse_label(syn_df, type_column="synapse_type"):
+    """H01 synapse_type -> the SIGMA_SYN mapper vocabulary.
+
+    Returns a plain list of 'exc_syn' / 'inh_syn' / 'unknown_syn', which is
+    node_classify.SIGMA_SYN -- the SAME vocabulary map_synapses_to_segments.py
+    produces and the one alignment.write_mapped_synapses consumes. It emits
+    `synapse_label`, NOT `synapse_type`: write_mapped_synapses DERIVES
+    synapse_type from synapse_label via to_downstream_type and overwrites
+    whatever synapse_type it was handed, so a function upstream that emits
+    synapse_type instead has its work silently discarded and every row ends up
+    'unknown'. Exactly one column is authoritative, and it is this one.
+
+    H01 codes the type as an INTEGER, 2 = excitatory (asymmetric),
+    1 = inhibitory (symmetric) -- confirmed on the real export, dtype int64
+    with values {1, 2} only. Integer codes are matched EXACTLY rather than by
+    substring: '12' contains both '1' and '2', so substring matching is only
+    safe while the code alphabet happens to be single-digit, which is not a
+    property of the data worth relying on. Text exports ('asymmetric',
+    'excitatory', ...) still fall through to substring matching, so both
+    conventions are handled.
+
+    An absent column is not an error -- some exports genuinely lack it -- but
+    every row is then 'unknown_syn', and the caller is expected to notice.
+    """
+    if type_column not in syn_df.columns:
+        return ["unknown_syn"] * len(syn_df)
+
+    col = syn_df[type_column]
+    labels = []
+    for v in col.tolist():
+        if v is None or (isinstance(v, float) and np.isnan(v)):
+            labels.append("unknown_syn")
+            continue
+        # exact integer code first
+        code = None
+        try:
+            f = float(v)
+            if f == int(f):
+                code = int(f)
+        except (TypeError, ValueError):
+            code = None
+        if code == 2:
+            labels.append("exc_syn")
+            continue
+        if code == 1:
+            labels.append("inh_syn")
+            continue
+        if code is not None:
+            labels.append("unknown_syn")          # a numeric code we don't know
+            continue
+        s = str(v).lower()
+        if any(k in s for k in ("exc", "asymmetric")):
+            labels.append("exc_syn")
+        elif any(k in s for k in ("inh", "symmetric")):
+            labels.append("inh_syn")
+        else:
+            labels.append("unknown_syn")
+    return labels
 
 
 # --------------------------------------------------------------------------- #

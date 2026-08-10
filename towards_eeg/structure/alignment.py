@@ -41,6 +41,8 @@ from __future__ import annotations
 import ast
 import json
 import os
+import shutil
+import tempfile
 
 import numpy as np
 import pandas as pd
@@ -48,9 +50,10 @@ from scipy.spatial.transform import Rotation as R
 
 import node_classify as nc
 import morphology_exporter as mx
+import hoc_qc as hq
 
 
-MODULE_VERSION = "alignment-1.0.0"
+MODULE_VERSION = "alignment-1.3.0"
 
 # Eyal et al. 2016 (Table 1, n=6) for human L2/3 pyramidal cells. cm is the
 # INTRINSIC, shaft-referenced value: contract C-14 `cm_reference` requires that
@@ -403,9 +406,18 @@ def write_mapped_synapses(snapped_df, path, cm, Ra, lambda_f=100.0,
     Doc 2 rev 4; emitted here so the artefact is self-describing meanwhile.
     """
     out = snapped_df.copy()
+    # `synapse_label` is authoritative and `synapse_type` is DERIVED from it,
+    # overwriting whatever was passed in. An upstream function that emits
+    # synapse_type instead has its work silently discarded here and every row
+    # becomes 'unknown' -- which is exactly what happened on the first two real
+    # cells (4785/4785 and 4575/4575 unknown) while every unit test passed.
+    # n_label_defaulted in the return value makes that visible to the caller.
+    n_label_defaulted = 0
     if "synapse_label" not in out.columns:
+        n_label_defaulted = int(len(out))
         out["synapse_label"] = "unknown_syn"
     out["synapse_type"] = out["synapse_label"].map(to_downstream_type)
+    n_unknown_type = int((out["synapse_type"] == "unknown").sum())
     out["lambda_f"] = float(lambda_f)
     out["nsegs_method"] = str(nsegs_method)
     out["cm"] = float(cm)
@@ -423,6 +435,8 @@ def write_mapped_synapses(snapped_df, path, cm, Ra, lambda_f=100.0,
     out = out[cols + extra]
     out.to_csv(path, index=False)
     return {"path": str(path), "n_rows": int(len(out)),
+            "n_label_defaulted": n_label_defaulted,
+            "n_unknown_type": n_unknown_type,
             "n_redirected": int(out["redirected"].sum())
             if "redirected" in out.columns else 0}
 
@@ -464,20 +478,150 @@ def regression_check(res_unaligned, res_aligned, rtol=0.0, atol=0.0):
 # --------------------------------------------------------------------------- #
 #  7. Orchestrator                                                             #
 # --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+#  6. Staging: nothing reaches output_dir until the gate has passed            #
+# --------------------------------------------------------------------------- #
+def _commit_staged_files(staging_dir, output_dir, files):
+    """Move every staged artefact into output_dir and rewrite the path record.
+
+    Called ONLY after the propagation gate passes, which is the whole point of
+    staging: a cell that does not conduct leaves output_dir exactly as it was.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    committed = {}
+    for key, entry in files.items():
+        path = entry if isinstance(entry, str) else entry.get("path")
+        if not path or not os.path.isfile(path):
+            committed[key] = entry
+            continue
+        dest = os.path.join(output_dir, os.path.basename(path))
+        shutil.move(path, dest)
+        if isinstance(entry, str):
+            committed[key] = dest
+        else:
+            e = dict(entry)
+            e["path"] = dest
+            committed[key] = e
+    # anything the exporter wrote but did not register -- the soma QC plot is
+    # the current example -- must travel too, or it is silently lost.
+    for name in sorted(os.listdir(staging_dir)):
+        src = os.path.join(staging_dir, name)
+        if os.path.isfile(src):
+            shutil.move(src, os.path.join(output_dir, name))
+    return committed
+
+
+def _rewrite_provenance(path, files):
+    """Repoint the exporter's provenance JSON at the committed locations."""
+    if not path or not os.path.isfile(path):
+        return
+    with open(path) as fh:
+        prov = json.load(fh)
+    prov["files"] = {k: (v if isinstance(v, str) else v.get("path"))
+                     for k, v in files.items()}
+    with open(path, "w", newline="\n") as fh:
+        fh.write(json.dumps(prov, indent=2, sort_keys=True, default=str))
+
+
+def _merge_qc(res, qc_rep, prefix="propagation_qc"):
+    """Fold a gate verdict into the per-cell record, Q6 soft policy."""
+    status = qc_rep.get("qc_status", hq.QC_FAIL)
+    reasons = ["%s:%s" % (prefix, r) for r in qc_rep.get("reasons", [])]
+    if status == hq.QC_FAIL:
+        res["qc_status"] = "fail"
+    elif status == hq.QC_LOW and res.get("qc_status") == "pass":
+        res["qc_status"] = "pass_low_confidence"
+    res["reasons"] = list(res.get("reasons", [])) + reasons
+    return res
+
+
+def _write_alignment_provenance(output_dir, nid, res):
+    """Write neuron_{nid}_alignment.json -- res minus files/frames.
+
+    Factored out because it was previously written ONLY after a full synapse
+    redirect ran, silently skipping any cell whose synapse file was missing --
+    exactly the branch CELL 6 takes when a bank cell has no matching entry in
+    SYNAPSES_DIR (a real, expected case at bank scale, not an error). That left
+    the morphology committed to disk with no standalone JSON record at all, and
+    made "does neuron_{nid}_alignment.json exist" unusable as a resume/skip
+    signal for a batch run over dozens of cells.
+
+    Called on every path where res["files"] holds real committed paths -- i.e.
+    NOT on a gate failure, where nothing was written and no provenance file
+    should exist either.
+    """
+    path = os.path.join(output_dir, "neuron_%s_alignment.json" % nid)
+    with open(path, "w", newline="\n") as fh:
+        fh.write(json.dumps({k: v for k, v in res.items()
+                             if k not in ("files", "frames")},
+                            indent=2, sort_keys=True, default=str))
+    res["files"]["alignment_provenance"] = path
+    return path
+
+
 def align_and_export(df_raw, nid, output_dir, metadata_df, cm, Ra,
                      df_labelled=None, syn_df=None, label_fn=None,
                      k_neighbors=3, lambda_f=100.0, d_lambda=0.1,
                      nsegs_method="lambda_f", cell_factory=None,
                      spine_length_threshold_nm=None, mislabel_k=5,
+                     Rm=hq.DEFAULT_RM_OHM_CM2, e_pas=hq.DEFAULT_E_PAS_MV,
+                     qc_propagation=True, qc_kwargs=None, return_frames=False,
                      verbose=True, **export_kwargs):
-    """Run the section 3 pipeline for one neuron.
+    """Run the section 3 pipeline for one neuron, gated on propagation.
 
-    Steps 1-8 and 10 are morphology_exporter.export_neuron, unchanged. Step 9
-    is injected as its `align_fn` hook. Steps 11-12 are the snapper and the
-    C-09 emitter, and run only when `syn_df` and `df_labelled` are supplied.
+    Order (unchanged from TEEG_16 section 3, with one gate inserted):
 
-    `df_labelled` is the PRE-PRUNE labelled frame. export_neuron does not
-    return it, so a caller wanting the redirect must build it and pass it in.
+        1-8  morphology_exporter.export_neuron, into a STAGING directory
+        9    alignment, injected as export_neuron's `align_fn` hook
+       10    reconcile phi <-> hoc
+       11    write the artefacts INTO STAGING
+       12    hoc_qc: build a passive LFPy cell, inject a somatic current step,
+             verify the transient reaches every compartment and decays away
+             from the soma                                       <-- THE GATE
+       13    commit staging -> output_dir, but only if the gate passed
+       14    snapper + C-09 emitter, reusing the SAME cell
+
+    Why staging. LFPy.Cell takes `morphology=<path>`, so the cell cannot exist
+    before a .hoc does; "check before exporting" is therefore implemented as
+    "write somewhere disposable, check, then publish". On a failed gate
+    output_dir is left exactly as it was found.
+
+    Why one cell. The flattened lfpy_idx space is fixed by
+    (cm, Ra, lambda_f, d_lambda, nsegs_method); inserting the passive mechanism
+    does not change nseg. The gate's cell therefore has the identical index
+    space the snapper needs, and building a second one would cost a full NEURON
+    instantiation on a 63k-node morphology for no gain.
+
+    `df_labelled` is no longer required. When `syn_df` is supplied and
+    `df_labelled` is None, the pre-prune labelled frame is taken from
+    `export_neuron(return_frames=True)` -- one construction, one source of
+    truth. Passing it explicitly still works and overrides that, which is only
+    useful for testing against a frame built some other way.
+
+    Parameters specific to the gate
+    -------------------------------
+    Rm : float
+        Specific membrane resistance in Ohm cm^2 for the QC simulation only;
+        g_pas = 1 / Rm. Defaulted (see hoc_qc.DEFAULT_RM_OHM_CM2) because no
+        stage before S5 produces it. cm and Ra are NOT defaulted: they fix the
+        segmentation, so the gate must run on the same discretisation the bank
+        will be used with.
+    qc_propagation : bool
+        Set False to restore the pre-gate behaviour: files are written straight
+        to output_dir and only the snapper builds a cell.
+    qc_kwargs : dict or None
+        Passed through to hoc_qc.check_propagation -- tolerances and windows.
+    return_frames : bool
+        When True, res['frames']['labelled'] survives the call: the pre-prune
+        labelled frame in RAW nm, exactly as the exporter built it -- mislabels
+        resolved, spines labelled, re-classified, soma enforced. Off by default
+        because the frame is large. A caller wanting to PLOT the arbour should
+        use this rather than rebuilding it with classify_frame(df_raw): the
+        rebuild skips mislabel resolution and spine labelling, so the picture
+        would not be of the morphology that was actually exported.
+    cell_factory : callable or None
+        With the gate on, must accept hoc_qc.passive_cell_factory's signature.
+        With the gate off, alignment.default_cell_factory's.
     """
     if spine_length_threshold_nm is None:
         spine_length_threshold_nm = mx.SPINE_LENGTH_THRESHOLD_NM
@@ -485,70 +629,161 @@ def align_and_export(df_raw, nid, output_dir, metadata_df, cm, Ra,
     soma_pos = soma_position_nm(df_raw)
     mean_matrix, diag = neighbourhood_rotation(soma_pos, metadata_df, k_neighbors)
 
-    res = mx.export_neuron(
-        df_raw, nid, output_dir, label_fn=label_fn,
-        spine_length_threshold_nm=spine_length_threshold_nm,
-        align_fn=make_align_fn(soma_pos, mean_matrix),
-        mislabel_k=mislabel_k, verbose=verbose, **export_kwargs)
+    want_frame = bool(return_frames) or (syn_df is not None
+                                         and df_labelled is None)
+    cell = None
 
-    res["alignment"] = dict(diag)
-    res["alignment"]["soma_pos_nm"] = [float(v) for v in soma_pos]
-    res["alignment"]["mean_matrix"] = [[float(v) for v in row]
-                                       for row in mean_matrix]
-    res["segmentation"] = {"cm": float(cm), "Ra": float(Ra),
-                           "lambda_f": float(lambda_f),
-                           "d_lambda": float(d_lambda),
-                           "nsegs_method": str(nsegs_method)}
-    res["module_versions"] = {"alignment": MODULE_VERSION,
-                              "morphology_exporter": mx.MODULE_VERSION}
+    if qc_propagation:
+        parent = os.path.dirname(os.path.abspath(output_dir)) or "."
+        os.makedirs(parent, exist_ok=True)
+        staging = tempfile.mkdtemp(prefix=".s1_stage_%s_" % nid, dir=parent)
+        export_dir = staging
+    else:
+        staging = None
+        export_dir = output_dir
 
-    if res["qc_status"] == "fail" or syn_df is None or df_labelled is None:
-        return res
-
-    anchored = resolve_synapse_anchors(syn_df, df_labelled, soma_pos, mean_matrix)
-    res["n_synapses"] = int(len(anchored))
-    res["n_on_pruned_spine"] = int(anchored["on_pruned_spine"].sum())
-    res["n_unresolved_spine_bases"] = int(
-        anchored.attrs.get("n_unresolved_spine_bases", 0))
-
-    factory = cell_factory or default_cell_factory
-    hoc_entry = res["files"]["hoc"]
-    hoc_path = hoc_entry if isinstance(hoc_entry, str) else hoc_entry["path"]
-    cell = factory(hoc_path, cm=cm, Ra=Ra, lambda_f=lambda_f,
-                   d_lambda=d_lambda, nsegs_method=nsegs_method)
     try:
+        res = mx.export_neuron(
+            df_raw, nid, export_dir, label_fn=label_fn,
+            spine_length_threshold_nm=spine_length_threshold_nm,
+            align_fn=make_align_fn(soma_pos, mean_matrix),
+            mislabel_k=mislabel_k, return_frames=want_frame,
+            verbose=verbose, **export_kwargs)
+
+        res["alignment"] = dict(diag)
+        res["alignment"]["soma_pos_nm"] = [float(v) for v in soma_pos]
+        res["alignment"]["mean_matrix"] = [[float(v) for v in row]
+                                           for row in mean_matrix]
+        res["segmentation"] = {"cm": float(cm), "Ra": float(Ra),
+                               "lambda_f": float(lambda_f),
+                               "d_lambda": float(d_lambda),
+                               "nsegs_method": str(nsegs_method)}
+        res["module_versions"] = {"alignment": MODULE_VERSION,
+                                  "morphology_exporter": mx.MODULE_VERSION,
+                                  "hoc_qc": hq.MODULE_VERSION}
+        # The EXPORTER's own verdict, before the propagation gate or the .hoc
+        # audit can lower it. regression_check compares qc_status (it is in
+        # REGRESSION_KEYS), and the rigidity control is a bare export_neuron
+        # call that never runs the gate -- so comparing the post-gate status
+        # against it reports a spurious "alignment moved a quantity" for every
+        # cell the gate downgrades. A caller doing that comparison must use
+        # THIS field, not res["qc_status"].
+        res["exporter_qc_status"] = res["qc_status"]
+
+        # Take the frame out ONCE, here, above every early return, so no code
+        # path can leak a DataFrame into the JSON-serialised record. It is put
+        # back at the end if and only if the caller asked for it.
+        exported_frame = res.pop("frames", {}).get("labelled")
+        if df_labelled is None:
+            df_labelled = exported_frame
+
+        if res["qc_status"] == "fail":
+            res["files"] = {}
+            if return_frames and exported_frame is not None:
+                res["frames"] = {"labelled": exported_frame}
+            return res
+
+        # ---- 12. the gate -------------------------------------------------- #
+        if qc_propagation:
+            hoc_entry = res["files"]["hoc"]
+            staged_hoc = (hoc_entry if isinstance(hoc_entry, str)
+                          else hoc_entry["path"])
+            sec_table = pd.read_csv(res["files"]["section_table"])
+            qc_rep, cell = hq.gate_hoc(
+                staged_hoc, sec_table, cm=cm, Ra=Ra, Rm=Rm, e_pas=e_pas,
+                lambda_f=lambda_f, d_lambda=d_lambda,
+                nsegs_method=nsegs_method, cell_factory=cell_factory,
+                keep_cell=True, **(qc_kwargs or {}))
+            res["propagation_qc"] = qc_rep
+            _merge_qc(res, qc_rep)
+            if res["qc_status"] == "fail":
+                res["files"] = {}
+                if cell is not None:
+                    hq._release_cell(cell)
+                    cell = None
+                if verbose:
+                    print("[FAIL] neuron %s did not conduct: %s -- nothing "
+                          "written to %s"
+                          % (nid, "; ".join(qc_rep.get("reasons", [])),
+                             output_dir))
+                if return_frames and exported_frame is not None:
+                    res["frames"] = {"labelled": exported_frame}
+                return res
+
+            # ---- 13. commit ------------------------------------------------ #
+            res["files"] = _commit_staged_files(staging, output_dir,
+                                                res["files"])
+            _rewrite_provenance(res["files"].get("provenance"), res["files"])
+    finally:
+        if staging is not None:
+            shutil.rmtree(staging, ignore_errors=True)
+
+    try:
+        if syn_df is None or df_labelled is None:
+            _write_alignment_provenance(output_dir, nid, res)
+            if return_frames and exported_frame is not None:
+                res["frames"] = {"labelled": exported_frame}
+            if verbose:
+                why = ("syn_df not supplied" if syn_df is None
+                      else "df_labelled unavailable")
+                print("[OK] neuron %s aligned (no synapse redirect: %s), "
+                      "totnsegs n/a, qc=%s" % (nid, why, res["qc_status"]))
+            return res
+
+        # ---- 14. anchors, snap, C-09 --------------------------------------- #
+        anchored = resolve_synapse_anchors(syn_df, df_labelled, soma_pos,
+                                           mean_matrix)
+        res["n_synapses"] = int(len(anchored))
+        res["n_on_pruned_spine"] = int(anchored["on_pruned_spine"].sum())
+        res["n_unresolved_spine_bases"] = int(
+            anchored.attrs.get("n_unresolved_spine_bases", 0))
+
+        if cell is None:
+            hoc_entry = res["files"]["hoc"]
+            hoc_path = (hoc_entry if isinstance(hoc_entry, str)
+                        else hoc_entry["path"])
+            factory = cell_factory or default_cell_factory
+            cell = factory(hoc_path, cm=cm, Ra=Ra, lambda_f=lambda_f,
+                           d_lambda=d_lambda, nsegs_method=nsegs_method)
+
         snapped = snap_synapses(anchored, cell)
         res["totnsegs"] = int(getattr(cell, "totnsegs", -1))
+
+        base_map = {}
+        sb = res["files"].get("spine_bases")
+        if isinstance(sb, str) and os.path.isfile(sb):
+            base_map = spine_base_section_map(pd.read_csv(sb))
+
+        out_path = os.path.join(output_dir,
+                                "neuron_%s_mapped_synapses.csv" % nid)
+        c09 = write_mapped_synapses(
+            snapped, out_path, cm=cm, Ra=Ra, lambda_f=lambda_f,
+            d_lambda=d_lambda, nsegs_method=nsegs_method,
+            spine_base_section=base_map)
+        res["files"]["mapped_synapses"] = c09
+        res["n_redirected"] = int(snapped["redirected"].sum())
+        # Diagnostics only: never let a missing counter break the pipeline.
+        _c09 = c09 if isinstance(c09, dict) else {}
+        res["n_unknown_type"] = int(_c09.get("n_unknown_type", 0))
+        res["n_label_defaulted"] = int(_c09.get("n_label_defaulted", 0))
+        # Every synapse unclassified is almost always an upstream contract
+        # mismatch, not real data: soft-flag it rather than let it pass silently.
+        if res["n_synapses"] and res["n_unknown_type"] == res["n_synapses"]:
+            if res["qc_status"] == "pass":
+                res["qc_status"] = "pass_low_confidence"
+            res["reasons"] = list(res.get("reasons", [])) + [
+                "all_%d_synapses_unclassified" % res["n_synapses"]]
     finally:
-        closer = getattr(cell, "__del__", None)
-        if callable(closer):
-            try:
-                closer()
-            except Exception:                          # noqa: BLE001
-                pass
+        if cell is not None:
+            hq._release_cell(cell)
 
-    base_map = {}
-    sb = res["files"].get("spine_bases")
-    if isinstance(sb, str) and os.path.isfile(sb):
-        base_map = spine_base_section_map(pd.read_csv(sb))
-
-    out_path = os.path.join(output_dir,
-                            "neuron_%s_mapped_synapses.csv" % nid)
-    res["files"]["mapped_synapses"] = write_mapped_synapses(
-        snapped, out_path, cm=cm, Ra=Ra, lambda_f=lambda_f,
-        d_lambda=d_lambda, nsegs_method=nsegs_method,
-        spine_base_section=base_map)
-    res["n_redirected"] = int(snapped["redirected"].sum())
-
-    prov_path = os.path.join(output_dir, "neuron_%s_alignment.json" % nid)
-    with open(prov_path, "w", newline="\n") as fh:
-        fh.write(json.dumps({k: v for k, v in res.items() if k != "files"},
-                            indent=2, sort_keys=True, default=str))
-    res["files"]["alignment_provenance"] = prov_path
+    _write_alignment_provenance(output_dir, nid, res)
+    if return_frames and exported_frame is not None:
+        res["frames"] = {"labelled": exported_frame}
 
     if verbose:
         print("[OK] neuron %s aligned: %d synapses, %d on pruned spines, "
-              "%d redirected, totnsegs %s"
+              "%d redirected, totnsegs %s, qc=%s"
               % (nid, res["n_synapses"], res["n_on_pruned_spine"],
-                 res["n_redirected"], res.get("totnsegs")))
+                 res["n_redirected"], res.get("totnsegs"), res["qc_status"]))
     return res

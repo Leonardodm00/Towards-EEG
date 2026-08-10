@@ -18,6 +18,8 @@ Coverage
   N9  REGRESSION: a relabel moves annotated_type too, or phi and the
       exporter silently partition the tree differently
   N10 a spine node votes as dendrite, and 'spine' can never win
+  N11 assert_domain_collapsed: DOM_NONE passes; DOM_APICAL/DOM_BASAL and
+      apic_dend/basal_dend all raise; section_array_name is UNCHANGED by it
 """
 
 import re
@@ -269,6 +271,56 @@ def test_N10_spine_votes_as_dendrite():
         assert nc.classify_node(token) == cls, (cls, token)
 
 
+def test_N11_domain_collapsed_guard():
+    """The apical/basal split is retired but its vocabulary is kept.
+
+    section_array_name / SECTION_ARRAY must keep working exactly as N5 checks
+    -- this test does not touch them. assert_domain_collapsed is a SEPARATE,
+    additional guard: it must accept DOM_NONE and 'dend' (the only values the
+    collapsed pipeline ever actually produces) and raise on every value that
+    would mean the split is running again, from either value space (a node's
+    domain label, or a section's array name).
+    """
+    # the only values a collapsed pipeline ever produces: silent pass
+    assert nc.assert_domain_collapsed([nc.DOM_NONE], "domain") is True
+    assert nc.assert_domain_collapsed(["dend", "soma", "axon", "ais"],
+                                      "section arrays") is True
+    assert nc.assert_domain_collapsed([], "empty") is True
+
+    # domain-label space
+    for bad in (nc.DOM_APICAL, nc.DOM_BASAL):
+        try:
+            nc.assert_domain_collapsed([nc.DOM_NONE, bad], "domain")
+        except ValueError as e:
+            assert bad in str(e), e
+        else:
+            raise AssertionError("%r should have raised" % bad)
+
+    # section-array-name space
+    for bad in ("apic_dend", "basal_dend"):
+        try:
+            nc.assert_domain_collapsed(["dend", bad], "section arrays")
+        except ValueError as e:
+            assert bad in str(e), e
+        else:
+            raise AssertionError("%r should have raised" % bad)
+
+    # both retired values reported together, sorted, when both are present
+    try:
+        nc.assert_domain_collapsed([nc.DOM_APICAL, "basal_dend"], "mixed")
+    except ValueError as e:
+        assert "apical" in str(e) and "basal_dend" in str(e), e
+    else:
+        raise AssertionError("mixed retired values should have raised")
+
+    # the guard is ADDITIVE: the lookup table itself is untouched (same as N5)
+    assert nc.section_array_name(nc.CLS_DEND, nc.DOM_APICAL) == "apic_dend"
+    assert nc.section_array_name(nc.CLS_DEND, nc.DOM_BASAL) == "basal_dend"
+    assert nc.RETIRED_DOMAIN_ARRAYS == frozenset({"apic_dend", "basal_dend"})
+    assert nc.RETIRED_DOMAIN_VALUES == (
+        frozenset({nc.DOM_APICAL, nc.DOM_BASAL}) | nc.RETIRED_DOMAIN_ARRAYS)
+
+
 # --------------------------------------------------------------------------- #
 def _run_all():
     tests = [
@@ -282,6 +334,7 @@ def _run_all():
         ("N8 dend rule is SHAFT_REGEX", test_N8_dend_rule_is_shaft_regex),
         ("N9 relabel rewrites annotation", test_N9_relabel_rewrites_annotation),
         ("N10 spine votes as dendrite", test_N10_spine_votes_as_dendrite),
+        ("N11 domain-collapsed guard", test_N11_domain_collapsed_guard),
     ]
     n_pass = 0
     for name, fn in tests:

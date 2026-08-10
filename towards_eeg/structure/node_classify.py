@@ -73,7 +73,12 @@ CLS_UNKNOWN = "unknown"
 COMPARTMENT_CLASSES = (CLS_SOMA, CLS_AXON, CLS_AIS, CLS_DEND,
                        CLS_SPINE, CLS_GLIA, CLS_UNKNOWN)
 
-# --- domains (S1.4 populates these; everything is 'none' until then) -------
+# --- domains: apical/basal split is RETIRED (decision: S3 dropped entirely,
+#     every dendrite is 'dend'; D-4's geometric rule below will not run).
+#     DOM_APICAL / DOM_BASAL are kept as vocabulary, not deleted, because
+#     SECTION_ARRAY and section_array_name still need them to be complete
+#     lookup tables (see test N5). assert_domain_collapsed, below the class
+#     tables, is the runtime guard that they are never actually ASSIGNED. ---
 DOM_NONE = "none"
 DOM_APICAL = "apical"
 DOM_BASAL = "basal"
@@ -225,6 +230,54 @@ def assert_no_synapse_leakage(values, what="compartment_class"):
     if bad:
         raise ValueError(
             "I-16 violation: synapse label(s) %r appear in %s" % (bad, what))
+    return True
+
+
+# --- The retirement guard for the apical/basal split ------------------------
+#     RETIRED_DOMAIN_VALUES covers BOTH value spaces the split could leak
+#     into: a node's domain label (DOM_APICAL / DOM_BASAL) and a section's
+#     array name (apic_dend / basal_dend). One frozenset, one function, called
+#     from both places, so there is exactly one definition of "the split is
+#     off" rather than two that could drift apart.
+RETIRED_DOMAIN_ARRAYS = frozenset({"apic_dend", "basal_dend"})
+RETIRED_DOMAIN_VALUES = frozenset({DOM_APICAL, DOM_BASAL}) | RETIRED_DOMAIN_ARRAYS
+
+
+def assert_domain_collapsed(values, what="domain"):
+    """Raise if apical/basal domain identification ever actually ran.
+
+    Parameters
+    ----------
+    values : iterable of str
+        Either domain labels (checked against DOM_APICAL / DOM_BASAL) or
+        section-array names (checked against apic_dend / basal_dend).
+    what : str
+        Named in the error message, so a failure identifies WHERE the split
+        leaked back in, not only that it did.
+
+    Raises
+    ------
+    ValueError if any value in RETIRED_DOMAIN_VALUES is present.
+
+    Notes
+    -----
+    This does NOT touch SECTION_ARRAY or section_array_name: those remain a
+    complete, working table on request (test N5 requires
+    section_array_name(CLS_DEND, DOM_APICAL) == 'apic_dend' to keep working).
+    This function guards USE, not DEFINITION. It is called from two places
+    only: assign_domain's own output in morphology_exporter.py (the source --
+    catches a domain column that stops being all-DOM_NONE) and write_hoc's
+    emitted array names (the sink -- catches ANY route to an apic_dend or
+    basal_dend section reaching the .hoc file, independent of how the domain
+    column upstream was produced).
+    """
+    bad = sorted({str(v) for v in values if str(v) in RETIRED_DOMAIN_VALUES})
+    if bad:
+        raise ValueError(
+            "domain identification is retired (S3 dropped; decision D-4 will "
+            "not run): %r appeared in %s. apic_dend/basal_dend are reserved, "
+            "never-populated vocabulary -- see node_classify.SECTION_ARRAY."
+            % (bad, what))
     return True
 
 
