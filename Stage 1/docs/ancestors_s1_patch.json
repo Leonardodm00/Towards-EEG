@@ -1,0 +1,35 @@
+{
+  "_comment": "PATCH FRAGMENT for tools/ancestors.json -- append these four objects to the existing 'new_infrastructure' list. Do NOT replace the list; it currently holds 78 entries and every one of them is load-bearing. The rationale text follows the wording convention already used by the S0.5 entries (byte-identity rule clause 3).",
+  "new_infrastructure_additions": [
+    {
+      "path": "towards_eeg/structure/spine_geometry.py",
+      "stage": "S1.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): per-spine geometry and neck axial conductance factor G(sigma), read-only over the labelled frame; nothing pre-existing depends on it and no existing output changes. Consumed by the R_neck sensitivity sweep and by the spine-resolved export."
+    },
+    {
+      "path": "towards_eeg/structure/truncation_flag.py",
+      "stage": "S1.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): dendrite-tip truncation evidence (terminal taper + pooled boundary proximity), read-only over the labelled frame; nothing pre-existing depends on it and no existing output changes. Addresses the TEEG-18 section 3.4.1 confound."
+    },
+    {
+      "path": "towards_eeg/io/syn_uid.py",
+      "stage": "S1.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): stable content-addressed synapse identifiers assigned at load time, plus the nearest-node collapse audit. Adds a column to the synapse frame; changes no geometry and no existing column."
+    },
+    {
+      "path": "towards_eeg/structure/run_all_tests.py",
+      "stage": "S1.0",
+      "rationale": "new infrastructure (byte-identity rule clause 3): test runner for the S1.0 modules; combines the HPC transfer-safety checks, the import chain, py_compile and the three smoke suites into one gate."
+    }
+  ],
+  "_render_py_change": {
+    "file": "tools/s0_ledger/render.py",
+    "change": "append \"sha256_post_s1\" to CSV_COLUMNS immediately after \"sha256_post_s09\" (currently line 40). CSV_COLUMNS is the single source of truth for both the CSV writer (line 57) and the Markdown table, so no other edit is needed for the column to appear in both artefacts.",
+    "note": "The existing columns are named sha256_post_s02 .. sha256_post_s09 -- two digits, sub-steps of S0. S1 is a stage, not a sub-step, so 'sha256_post_s1' is the consistent name. If S1 later needs sub-step granularity, the column becomes sha256_post_s1N and this one is retired rather than renamed."
+  },
+  "_local_working_files_answer": {
+    "question": "which four files are the --local-dir working set?",
+    "answer": "They are named in ancestors.json['working_branch'] and are HybridLFPy S0.1 working copies, NOT the modules built in this session: params_evoked_with_EEG_CHANGED.py, hybrid_sim_evoked_with_EEG_CHANGED.py, population_CHANGED.py, Utility_fun.py. They live on your machine, not in the repository, which is why build_ledger.py takes --local-dir as a required argument.",
+    "regeneration_command": "python3 tools/build_ledger.py --root . --spec tools/ancestors.json --local-dir <dir containing those four files> --out-dir ."
+  }
+}
