@@ -1,0 +1,86 @@
+#!/bin/bash
+#PBS -N h01probe
+#PBS -q cpu
+#PBS -l select=1:ncpus=2:mem=8gb
+#PBS -l walltime=00:10:00
+#PBS -j oe
+#PBS -o h01probe.log
+# ---------------------------------------------------------------------------
+# Decides Design A vs Design B for the spine-area campaign: can a COMPUTE node
+# reach the public H01 bucket, and can CloudVolume actually read a cutout?
+#
+# Interpreter is invoked by ABSOLUTE PATH rather than `conda activate`: this is
+# a short diagnostic, nothing here needs the env's activate.d hooks, and that
+# sidesteps the `set -u` / _CONDA_SET_ activation failure entirely.
+#
+# Every step prints PROBE <name> : <result> and nothing aborts the script, so
+# one run returns the full picture instead of dying at the first failure.
+# ---------------------------------------------------------------------------
+set -eo pipefail
+
+REPO="/davinci-1/home/ldellamea/TEEG/Spines"
+PY="$HOME/.conda/envs/spine_env/bin/python3"
+set -u
+
+cd "$REPO"
+echo "PROBE host            : $(hostname)"
+echo "PROBE date            : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo "PROBE python          : $PY"
+
+if [ ! -x "$PY" ]; then
+    echo "PROBE FATAL           : interpreter not found -- fix PY and resubmit"
+    exit 1
+fi
+
+# ---- 1. proxy module ------------------------------------------------------
+if module load proxy 2>/dev/null; then
+    echo "PROBE module proxy    : loaded"
+else
+    echo "PROBE module proxy    : LOAD FAILED (continuing unproxied)"
+fi
+echo "PROBE http_proxy      : ${http_proxy:-<unset>}"
+echo "PROBE https_proxy     : ${https_proxy:-<unset>}"
+echo "PROBE no_proxy        : ${no_proxy:-<unset>}"
+
+# ---- 2. raw HTTPS to the bucket ------------------------------------------
+CODE=$(curl -sS -m 30 -o /dev/null -w '%{http_code}' \
+       https://storage.googleapis.com/h01-release/ 2>&1 || echo "curl-failed")
+echo "PROBE curl bucket     : HTTP $CODE   (200 = reachable)"
+
+# ---- 3. the exact object CloudVolume reads first --------------------------
+INFO="https://storage.googleapis.com/h01-release/data/20210601/c3/info"
+CODE2=$(curl -sS -m 30 -o /tmp/h01_info.$$ -w '%{http_code}' "$INFO" 2>&1 || echo "curl-failed")
+echo "PROBE curl c3 info    : HTTP $CODE2  ($(wc -c < /tmp/h01_info.$$ 2>/dev/null || echo 0) bytes)"
+rm -f /tmp/h01_info.$$
+
+# ---- 4. python deps -------------------------------------------------------
+"$PY" - <<'PYEOF' || echo "PROBE deps            : python block FAILED"
+import importlib
+for m in ("numpy", "scipy", "skimage", "pandas", "matplotlib", "cloudvolume"):
+    try:
+        v = getattr(importlib.import_module(m), "__version__", "?")
+        print("PROBE dep %-12s: %s" % (m, v))
+    except Exception as e:
+        print("PROBE dep %-12s: MISSING (%s)" % (m, type(e).__name__))
+PYEOF
+
+# ---- 5. a real CloudVolume cutout -----------------------------------------
+"$PY" - <<'PYEOF' || echo "PROBE cloudvolume     : read block FAILED (see traceback above)"
+import time
+import numpy as np
+try:
+    from cloudvolume import CloudVolume
+except ImportError:
+    print("PROBE cloudvolume     : not installed -- cannot test the read")
+    raise SystemExit(0)
+t0 = time.time()
+cv = CloudVolume("gs://h01-release/data/20210601/c3", mip=0,
+                 use_https=True, progress=False, fill_missing=True)
+lo = np.array([2358000 // 8, 846000 // 8, 104000 // 33], dtype=int)
+a = cv[lo[0]:lo[0] + 64, lo[1]:lo[1] + 64, lo[2]:lo[2] + 8]
+a = np.asarray(a)[..., 0]
+print("PROBE cv read         : OK  shape %s  dtype %s  %d distinct ids  %.1f s"
+      % (a.shape, a.dtype, len(np.unique(a)), time.time() - t0))
+PYEOF
+
+echo "PROBE done            : $(date -u +%Y-%m-%dT%H:%M:%SZ)"

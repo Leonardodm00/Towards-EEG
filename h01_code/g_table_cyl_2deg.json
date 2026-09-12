@@ -1,0 +1,26 @@
+{
+  "module_version": "build_g_table v1.0",
+  "source": "cylinder sweep (h01_cylinder_calibration)",
+  "step_deg": 2.0,
+  "resolution_nm": [
+    8.0,
+    8.0,
+    33.0
+  ],
+  "smoothed": true,
+  "n_files": 40,
+  "n_cylinders": 28000,
+  "n_bins": 1058,
+  "n_bins_covered": 1058,
+  "n_bins_reliable": 1043,
+  "n_bins_outlier_despiked": 25,
+  "n_bins_trusted": 1018,
+  "n_bins_filled": 40,
+  "despike_window": 2,
+  "despike_mad_k": 6.0,
+  "despike_enabled": true,
+  "min_support_nm2": 100000.0,
+  "reliable_area_share": 0.9999974671324662,
+  "area_weighted_mean_g": 1.041471559801612,
+  "note": "binned by MEASURED triangle normal; see build_g_table.py docstring for the support-threshold rationale"
+}

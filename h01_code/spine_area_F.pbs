@@ -1,0 +1,51 @@
+#!/bin/bash
+#PBS -N spineF
+#PBS -q cpu
+#PBS -J 0-39
+#PBS -l select=1:ncpus=2:mem=16gb
+#PBS -l walltime=12:00:00
+#PBS -j oe
+#PBS -o logs/spineF.log
+# ---------------------------------------------------------------------------
+# One array task measures a contiguous block of one cell's spines.
+#
+#   mkdir -p logs && qsub -v CELL=1302789404 spine_area_F.pbs
+#   qsub -v CELL=1302789404,SUBSET=300 spine_area_F.pbs     # staged run first
+#
+# PBS Pro array syntax (-J / PBS_ARRAY_INDEX), matching the cylinder sweep.
+# On Torque use  #PBS -t 0-39  and PBS_ARRAYID; the fallback below covers it.
+#
+# NTASKS must equal the array width above. Change both together or the shards
+# will not tile the spine list, and the merge will report missing tasks.
+# ---------------------------------------------------------------------------
+set -eo pipefail
+set +u                              # BEFORE the hook: the hook itself
+eval "$(conda shell.bash hook)"     # deactivates base and sources activate.d
+conda activate spine_env
+set -u
+
+ROOT="${ROOT:-/davinci-1/home/ldellamea/TEEG/Spines/h01}"
+CODE="${CODE:-/davinci-1/home/ldellamea/TEEG/Spines/h01_code}"
+CELL="${CELL:?set CELL, e.g. qsub -v CELL=1302789404 spine_area_F.pbs}"
+NTASKS="${NTASKS:-40}"
+TASK="${PBS_ARRAY_INDEX:-${PBS_ARRAYID:-0}}"
+
+module load proxy || echo "WARNING: module load proxy failed"
+
+cd "$CODE"
+echo "host $(hostname) | cell $CELL | task $TASK/$NTASKS | $(date -u +%FT%TZ)"
+echo "python $(which python3)"
+
+EXTRA=""
+if [ -n "${SUBSET:-}" ]; then EXTRA="$EXTRA --subset $SUBSET"; fi
+if [ -n "${MIN_SPINE_VALUE:-}" ]; then EXTRA="$EXTRA --min-spine-value $MIN_SPINE_VALUE"; fi
+if [ -n "${DRY_RUN:-}" ]; then EXTRA="$EXTRA --dry-run"; fi
+
+python3 run_spine_area_F.py \
+    --root "$ROOT" \
+    --cell "$CELL" \
+    --task "$TASK" \
+    --ntasks "$NTASKS" \
+    $EXTRA
+
+echo "task $TASK finished $(date -u +%FT%TZ)"

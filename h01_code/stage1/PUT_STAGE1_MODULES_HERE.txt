@@ -1,0 +1,12 @@
+Copy these four files from the Stage 1 Drive folder into this directory:
+
+    spine_density.py
+    spine_labeller.py
+    spine_geometry.py
+    morphology_exporter.py
+
+They are Stage 1's own modules and are deliberately not vendored here: the
+attribution gate exists to check this code against the REAL spine_density, so
+shipping a copy that could drift would defeat it.
+
+run_spine_area_F.py refuses to start without them.
