@@ -111,12 +111,25 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
+import spine_cap as spc
 import spine_density as sd
 import node_classify as nc
 import soma_enforce as se
 
+# Optional: the shaft-continuation correction (step 4b) and its taper vote.
+# Absent in an installation that has not taken them, in which case
+# demote_continuations=True raises rather than silently exporting uncorrected.
+try:
+    import shaft_continuation as shc
+except ImportError:                                            # pragma: no cover
+    shc = None
+try:
+    import continuation_inspect as cinsp
+except ImportError:                                            # pragma: no cover
+    cinsp = None
 
-MODULE_VERSION = "morphology_exporter-1.0.0"
+
+MODULE_VERSION = "morphology_exporter-1.2.0"
 
 # Project setting D-S1.3-d. Chosen between the two shadowed defaults
 # (5000 nm at L1653, 3000 nm at L2353). Passed explicitly at every call site
@@ -491,7 +504,7 @@ def _git_commit():
 def exporter_id(label_fn=None, threshold_nm=SPINE_LENGTH_THRESHOLD_NM):
     """git commit + qualnames + threshold, per S1.0's own exit requirement."""
     parts = [MODULE_VERSION, nc.MODULE_VERSION, se.MODULE_VERSION,
-             sd.MODULE_VERSION]
+             sd.MODULE_VERSION, spc.MODULE_VERSION]
     commit = _git_commit()
     if commit:
         parts.append("git:%s" % commit[:12])
@@ -508,6 +521,125 @@ def exporter_id(label_fn=None, threshold_nm=SPINE_LENGTH_THRESHOLD_NM):
 # --------------------------------------------------------------------------- #
 # The S1.0 entry point                                                        #
 # --------------------------------------------------------------------------- #
+def demote_shaft_continuations_three_vote(
+        df, rho_shaft_min=None, cos_shaft_min=None, min_len_nm=None,
+        bulge_min=None, peak_frac_min=None, require_taper=True,
+        annotation_column="annotated_type"):
+    """Relabel mislabelled shaft branches back to shaft. Returns (df, report).
+
+    Geometry is untouched: only `annotation_column` changes, and each demoted
+    component takes the label its BASE carries when that is a shaft label, so a
+    branch off an apical stays apical. Node ids, coordinates and radii are
+    unchanged, which is what lets the .hoc and phi stay in step.
+
+    require_taper=False reduces this to shaft_continuation's own two-observable
+    rule plus the length floor; the default demands all three.
+    """
+    if shc is None:
+        raise ImportError(
+            "demote_continuations=True needs shaft_continuation.py, which is "
+            "not importable. Put it beside morphology_exporter.py.")
+    if require_taper:
+        if cinsp is None:
+            raise ImportError(
+                "the taper vote needs continuation_inspect.py, which is not "
+                "importable. Put it beside morphology_exporter.py, or pass "
+                "continuation_kw={'require_taper': False} to use rho/cos "
+                "alone.")
+        # Checked HERE, before any work: a stale copy otherwise raises
+        # AttributeError from inside the export, after the labeller has run.
+        _need = ("taper_table", "three_vote", "vote_summary")
+        _missing = [n for n in _need if not hasattr(cinsp, n)]
+        if _missing:
+            raise ImportError(
+                "continuation_inspect at %s is version %r and is missing %s. "
+                "The taper vote needs v1.1 or later. Replace that file with "
+                "the current one, or pass "
+                "continuation_kw={'require_taper': False} to fall back to the "
+                "two-observable rule plus the length floor."
+                % (getattr(cinsp, "__file__", "?"),
+                   getattr(cinsp, "MODULE_VERSION", "unknown"),
+                   ", ".join(_missing)))
+    kw = {}
+    if rho_shaft_min is not None:
+        kw["rho_shaft_min"] = float(rho_shaft_min)
+    if cos_shaft_min is not None:
+        kw["cos_shaft_min"] = float(cos_shaft_min)
+    table, rep = shc.score_spine_roots(df, spine_density=sd, **kw)
+    out = {"applied": True, "module_version": MODULE_VERSION,
+           "scorer_version": getattr(shc, "MODULE_VERSION", None),
+           "inspect_version": getattr(cinsp, "MODULE_VERSION", None),
+           "method": rep["method"], "use_radius": rep["use_radius"],
+           "rho_shaft_min": rep["rho_shaft_min"],
+           "cos_shaft_min": rep["cos_shaft_min"],
+           "require_taper": bool(require_taper),
+           "n_spine_roots": int(rep["n_spine_roots"]),
+           "n_shaft_like_rho_cos": int(rep["n_shaft_like"])}
+    if not len(table):
+        out.update({"n_demoted": 0, "n_nodes_demoted": 0,
+                    "n_rescued_by_taper": 0, "n_undecidable": 0,
+                    "demoted_roots": []})
+        return df, out
+
+    tkw = {k: v for k, v in (("min_len_nm", min_len_nm),
+                             ("bulge_min", bulge_min),
+                             ("peak_frac_min", peak_frac_min)) if v is not None}
+    if require_taper:
+        taper = cinsp.taper_table(df, table["root"], **tkw)
+        voted = cinsp.three_vote(table, taper)
+        vs = cinsp.vote_summary(voted)
+        roots = [int(v) for v in voted.loc[voted["demote"], "root"]]
+        out.update({"n_rescued_by_taper": vs["n_rescued_by_taper"],
+                    "n_undecidable": vs["n_undecidable"],
+                    "n_taper_vs_headlabel_disagree":
+                        vs["n_taper_vs_headlabel_disagree"],
+                    "min_len_nm": float(tkw.get("min_len_nm",
+                                                cinsp.MIN_LEN_NM)),
+                    "bulge_min": float(tkw.get("bulge_min", cinsp.BULGE_MIN))})
+    else:
+        roots = [int(v) for v in table.loc[table["is_shaft"], "root"]]
+        out.update({"n_rescued_by_taper": 0, "n_undecidable": 0})
+
+    df2, n_nodes = _demote_roots(df, roots, annotation_column)
+    out.update({"n_demoted": len(roots), "n_nodes_demoted": int(n_nodes),
+                "demoted_roots": roots,
+                "demoted_by_category": table.loc[
+                    table["root"].isin(roots), "category"].value_counts()
+                .to_dict() if len(roots) else {}})
+    return df2, out
+
+
+def _demote_roots(df, roots, annotation_column="annotated_type"):
+    """Relabel each root's whole spine subtree to its base's label. The same
+    rule as shaft_continuation.demote_shaft_continuations and as
+    check_pruned_hoc.demote_roots, kept here so the exporter has no test-only
+    dependency."""
+    import re
+
+    out = df.copy()
+    col = out.columns.get_loc(annotation_column)
+    ids = out["id"].to_numpy(dtype=np.int64)
+    par = out["p"].to_numpy(dtype=np.int64)
+    pos = {int(v): i for i, v in enumerate(ids)}
+    kids = {}
+    for i, q in enumerate(par):
+        kids.setdefault(int(q), []).append(i)
+    shaft_re = re.compile(sd.SHAFT_REGEX, re.IGNORECASE)
+    n = 0
+    for r in roots:
+        i = pos[int(r)]
+        base = int(par[i])
+        btype = str(out.iloc[pos[base], col]) if base in pos else ""
+        new = btype if shaft_re.search(btype) else "dendrite"
+        stack = [i]
+        while stack:
+            j = stack.pop()
+            out.iloc[j, col] = new
+            n += 1
+            stack.extend(kids.get(int(ids[j]), []))
+    return out, n
+
+
 def export_neuron(df_raw,
                   nid,
                   output_dir,
@@ -522,6 +654,10 @@ def export_neuron(df_raw,
                   plot_fn=None,
                   write_files=True,
                   return_frames=False,
+                  cap_tips=False,
+                  cap_h_um=sd.CAP_H_UM_DEFAULT,
+                  demote_continuations=False,
+                  continuation_kw=None,
                   verbose=True):
     """Export one morphology: .hoc plus phi plus the C-09-bound tables.
 
@@ -537,6 +673,21 @@ def export_neuron(df_raw,
         align_fn(df, nid) -> df, applied AFTER phi is built. phi depends only on
         path distances and radii, both preserved by a rigid transform, so the
         order is immaterial for phi and required for the .hoc.
+    cap_tips : bool
+        Close every true skeleton leaf with a spherical cap of pole height
+        cap_h_um, recovering the membrane lost to the H01 100 nm endpoint
+        erosion (see spine_cap). Applied symmetrically to spine and shaft
+        leaves. Default False, so the uncapped numbers are reproduced exactly
+        unless the caller opts in.
+
+        Whatever this is set to, res carries the FULL BRACKET -- f_implied and
+        F_lit under no cap, flat disc (h = 0) and cap (h = cap_h_um) -- because
+        the cap model is an assumption, not a measurement, and a single number
+        would hide that. The keys f_implied / F_lit / A_spine_um2 / A_shaft_um2
+        hold the mode selected by cap_tips, so downstream consumers and the
+        bank summary are unchanged.
+    cap_h_um : float
+        Pole height of the cap, in um. 0.100 is the documented H01 erosion.
     return_frames : bool
         When True, res['frames']['labelled'] carries the PRE-PRUNE labelled
         frame in RAW nm -- classified, mislabels resolved, spine-labelled,
@@ -586,6 +737,41 @@ def export_neuron(df_raw,
     if label_fn is not None:
         df = label_fn(df, spine_length_threshold_nm)
 
+    # 4b. shaft continuations -------------------------------------------------
+    #    The labeller's ONLY criterion is subtree length <= threshold, so a real
+    #    dendritic branch that happens to end within the threshold is labelled a
+    #    spine, pruned from the cable, and its membrane counted as spine area --
+    #    inflating F. On neuron 15543554616, 312 of 2023 components scored as
+    #    continuations and correcting them moved F_lit from 1.638 to 1.495, 22
+    #    percent of the whole spine contribution.
+    #
+    #    Position is load-bearing. It must follow step 4 (the head/neck labels
+    #    are one of the three votes) and precede step 5 (which would otherwise
+    #    leave compartment_class stale for the demoted nodes) and step 7 (phi
+    #    must be built on the corrected partition, or F_skel and every
+    #    downstream quantity describe a different cell from the .hoc).
+    #
+    #    Three votes must agree, all computed from the skeleton:
+    #      calibre     rho = r(root)/r(branch point) >= RHO_SHAFT_MIN
+    #      direction   cos(angle to the incoming shaft) >= COS_SHAFT_MIN
+    #      taper       the radius never recovers distally -- a branch thins,
+    #                  a spine dips then rises into its head
+    #    A component shorter than the length floor is left ALONE: at ~300 nm
+    #    node spacing neither rho nor cos is measurable over a 60 nm baseline.
+    #    Holding back is the conservative direction -- it leaves membrane in
+    #    the spine bucket rather than moving a protrusion into the cable.
+    if demote_continuations:
+        df, cont_rep = demote_shaft_continuations_three_vote(
+            df, **(continuation_kw or {}))
+        res["continuation_report"] = cont_rep
+        if verbose:
+            print("[OK] neuron %s: %d of %d spine root(s) demoted to shaft "
+                  "(%d held back by taper, %d too short to judge)"
+                  % (nid, cont_rep["n_demoted"], cont_rep["n_spine_roots"],
+                     cont_rep["n_rescued_by_taper"], cont_rep["n_undecidable"]))
+    else:
+        res["continuation_report"] = {"applied": False}
+
     # 5. re-classify ----------------------------------------------------------
     #    MANDATORY, not tidiness. The labeller overwrites 'annotated_type' with
     #    'head' / 'neck' and does NOT touch 'compartment_class', so without this
@@ -610,13 +796,52 @@ def export_neuron(df_raw,
         return res
 
     # 7. phi, on the UNPRUNED frame ------------------------------------------
-    phi = sd.build_phi(df, nid=nid, input_units=input_units, self_check=True)
-    res["f_implied"] = float(sd.cell_f_implied_from_phi(phi))
-    flit = sd.cell_f_beyond_cutoff(phi, cutoff_um=60.0, by="d_from_um")
-    res["F_lit"] = float(flit["F"])
-    res["A_shaft_um2"] = float(phi["shaft_area_um2"].sum())
-    res["A_spine_um2"] = float(phi["spine_area_um2"].sum())
+    #    Built THREE times, cheaply: the cap is an assumption, so the bracket
+    #    is reported whether or not it is switched on. The three differ only in
+    #    the tip closure; every other quantity is identical by construction.
+    _modes = (("nocap", dict(cap_tips=False)),
+              ("disc", dict(cap_tips=True, cap_h_um=0.0)),
+              ("cap", dict(cap_tips=True, cap_h_um=float(cap_h_um))))
+    _phi = {}
+    for _name, _kw in _modes:
+        _p = sd.build_phi(df, nid=nid, input_units=input_units,
+                          self_check=True, **_kw)
+        _phi[_name] = _p
+        _f = float(sd.cell_f_implied_from_phi(_p))
+        _fl = float(sd.cell_f_beyond_cutoff(
+            _p, cutoff_um=60.0, by="d_from_um")["F"])
+        res["f_implied_" + _name] = _f
+        res["F_lit_" + _name] = _fl
+        res["A_spine_um2_" + _name] = float(_p["spine_area_um2"].sum())
+        res["A_shaft_um2_" + _name] = float(_p["shaft_area_um2"].sum())
+
+    _sel = "cap" if cap_tips else "nocap"
+    phi = _phi[_sel]
+    res["cap_tips"] = bool(cap_tips)
+    res["cap_h_um"] = float(cap_h_um) if cap_tips else 0.0
+    res["cap_selected_mode"] = _sel
+    res["spine_cap_version"] = spc.MODULE_VERSION
+    res["total_spine_cap_um2"] = float(phi["spine_cap_um2"].sum())
+    res["total_shaft_cap_um2"] = float(phi["shaft_cap_um2"].sum())
+
+    res["f_implied"] = res["f_implied_" + _sel]
+    res["F_lit"] = res["F_lit_" + _sel]
+    res["A_shaft_um2"] = res["A_shaft_um2_" + _sel]
+    res["A_spine_um2"] = res["A_spine_um2_" + _sel]
     res["n_branches"] = int(phi["branch_id"].nunique())
+
+    # Gate 1: which tips would be capped, and which are label boundaries that
+    # saw no erosion. Recorded ALWAYS, cap on or off, because a large boundary
+    # count invalidates the correction and is worth seeing before enabling it.
+    _node, _children, _root = sd._prepare_nodes(
+        df, sd.SHAFT_REGEX, sd.SPINE_LABELS, sd.DEFAULT_RADIUS_NM, input_units)
+    _audit = spc.audit_tips(_node, _children, root=_root)
+    res["tip_audit"] = {k: v for k, v in _audit.items()
+                        if k not in ("spine_r_tip_um", "other_r_tip_um",
+                                     "spine_label_boundary_ids")}
+    res["tip_audit_summary"] = spc.summarise_audit(
+        _audit, h_um=float(cap_h_um))
+    res["spine_r_tip_um"] = _audit["spine_r_tip_um"]
 
     # 7b. hand back the pre-prune labelled frame, if asked --------------------
     #     Taken HERE and not later: after this line prune_spines removes the
