@@ -27,6 +27,11 @@ WHAT IS CHECKED, AND AGAINST WHAT
       closer with the +res/2 shift than without it
   T13 figure callback inside the batch: PNG written and recorded; a failing
       callback is recorded and does NOT fail the measurement
+  T16 measured base (h01_spine_base): on the realistic phantom the base lands
+      on the shaft surface to within one station, every shaft station's loop
+      touches the cutout box and no spine station's does, the area beyond the
+      base plane matches the analytic neck + head, and the rind cylinder with
+      its one-voxel tolerance agrees with the plane cut
   T15 junction terms: rind area on a cylinder against the exact disc/total
       area, the axial window, NaN with no axis, the base frustum against the
       closed-form frustum on the toy cell, and the kappa variants
@@ -48,8 +53,11 @@ import sys
 import tempfile
 import traceback
 
-import matplotlib
-matplotlib.use("Agg")                     # headless; set before any pyplot import
+try:                                      # headless; set before any pyplot import
+    import matplotlib
+    matplotlib.use("Agg")
+except ImportError:                       # the cluster env has no matplotlib,
+    matplotlib = None                     # and the campaign draws no figures
 import numpy as np
 import pandas as pd
 
@@ -689,7 +697,8 @@ def test_T15_junction_terms():
     ax = lambda r, p=mid: {"point_nm": p, "dir": np.array([0., 0., 1.]), "r_nm": r}
 
     rec, _ = SAF.measure_spine_area(roi_dict(m), const_lookup(1.0),
-                                    dict(B.DEFAULTS), shaft_axis=ax(0.6 * a))
+                                    dict(B.DEFAULTS), shaft_axis=ax(0.6 * a),
+                                    rind_tol_nm=0.0)
     ratio = rec["A_rind_um2"] * 1e6 / (2 * np.pi * (0.6 * a) ** 2)
     check("T15a rind at r=0.6a equals the two end discs (ratio 0.85-1.15)",
           0.85 <= ratio <= 1.15, "%.3f" % ratio)
@@ -705,7 +714,7 @@ def test_T15_junction_terms():
     low = np.array([cx, cy, z0])
     rec3, _ = SAF.measure_spine_area(roi_dict(m), const_lookup(1.0),
                                      dict(B.DEFAULTS), shaft_axis=ax(0.6 * a, low),
-                                     axial_window_nm=0.5 * L)
+                                     axial_window_nm=0.5 * L, rind_tol_nm=0.0)
     half = rec["A_rind_um2"] / 2.0
     check("T15d axial window keeps one disc of the two",
           abs(rec3["A_rind_um2"] / half - 1.0) < 0.15,
@@ -770,6 +779,80 @@ def test_T15_junction_terms():
           "%.4f vs %.4f" % (j["F_lit_mesh_norind"], j["F_lit_mesh"]))
 
 
+def test_T16_measured_base():
+    import h01_spine_base as SB
+    nodes, comp = phantom_nodes()
+    fac = SAF.memoized_reader_factory(stub_factory())
+    roi = SAF.get_spine_roi(nodes, comp, 0, CELL, pad_nm=500.0, reader_factory=fac)
+    sn, bn, _ = SR.spine_subframe(nodes, comp, 0)
+    axis = {"point_nm": ORIGIN + np.array([1500.0, 0.0, 0.0]),
+            "dir": np.array([1.0, 0.0, 0.0]), "r_nm": 300.0}
+    rec, _, det = SAF.measure_spine_area(roi, const_lookup(1.0), dict(B.DEFAULTS),
+                                         cell_id=CELL, return_detail=True,
+                                         shaft_axis=axis)
+    b, prof, meta = SB.measure_base(roi, sn, bn, dict(B.DEFAULTS), detail=det,
+                                    g_lookup=const_lookup(1.0), r_shaft_nm=300.0)
+    check("T16a measured base within one station (25 nm) of the shaft surface",
+          abs(b["s_base_nm"] - 300.0) <= 25.0, "%.1f nm" % b["s_base_nm"])
+    touch = np.array([r["touches_box"] for r in prof])
+    i = b["base_station"]
+    check("T16b every station before the base touches the box, none after",
+          touch[:i].all() and not touch[i:].any(),
+          "%d slab, %d spine" % (touch[:i].sum(), (~touch[i:]).sum()))
+    check("T16c the slab loop spans the cutout (extent ~ 1000 nm)",
+          all(r["extent_max_nm"] > 900.0 for r in prof[:i]))
+    check("T16d area drops >= 5x across the base", b["area_drop_ratio"] >= 5.0,
+          "%.1fx" % b["area_drop_ratio"])
+    check("T16e neck radius at the base ~70 nm", abs(b["r_eq_base_nm"] - 70.0) < 10.0,
+          "%.1f" % b["r_eq_base_nm"])
+    truth = (2 * np.pi * 70.0 * 550.0 + 4 * np.pi * 250.0 ** 2 - np.pi * 70.0 ** 2) / 1e6
+    check("T16f area beyond the base plane within 6% of neck + head",
+          abs(b["A_beyond_um2"] / truth - 1) < 0.06,
+          "%.4f vs %.4f" % (b["A_beyond_um2"], truth))
+    check("T16g beyond + before == A_mesh (bookkeeping)",
+          abs(b["A_beyond_um2"] + b["A_before_base_um2"] - rec["A_mesh_um2"]) < 1e-9)
+    check("T16h rind cylinder (1-voxel tolerance) agrees with the plane cut < 3%",
+          abs(rec["A_mesh_norind_um2"] / b["A_beyond_um2"] - 1) < 0.03,
+          "%.4f vs %.4f" % (rec["A_mesh_norind_um2"], b["A_beyond_um2"]))
+    rec0, _ = SAF.measure_spine_area(roi, const_lookup(1.0), dict(B.DEFAULTS),
+                                     cell_id=CELL, shaft_axis=axis, rind_tol_nm=0.0)
+    check("T16i REGRESSION: without the tolerance the cylinder under-removes",
+          rec0["A_rind_um2"] < 0.8 * rec["A_rind_um2"],
+          "%.4f vs %.4f" % (rec0["A_rind_um2"], rec["A_rind_um2"]))
+    try:
+        import h01_spine_area_F_figures as FIG
+        fig = FIG.union_profile_figure(prof, b)
+        check("T16j interactive union-profile figure builds", len(fig.data) >= 2)
+    except ImportError as exc:
+        skip("T16j union-profile figure", "%s -- figures not in this bundle" % exc)
+    # the batch hook: base lands in the ledger, and assemble_cell picks it up
+    tmp = tempfile.mkdtemp()
+    try:
+        sk_tab = pd.DataFrame({"sigma_id": [0], "r_shaft_nm": [300.0]})
+        cb = SB.make_base_callback(nodes, comp, sk_tab, dict(B.DEFAULTS),
+                                   const_lookup(1.0))
+        roi_fn = lambda sid: SAF.get_spine_roi(nodes, comp, sid, CELL, pad_nm=500.0,
+                                               reader_factory=fac)
+        axes = {0: axis}
+        recs, _ = SAF.measure_all_spines([0], roi_fn, const_lookup(1.0),
+                                         os.path.join(tmp, "l.npz"), cell_id=CELL,
+                                         verbose=False, on_success=cb, shaft_axes=axes)
+        r0 = recs[0]
+        check("T16k base callback writes s_base and A_beyond into the record",
+              abs(r0.get("s_base_nm", 0) - b["s_base_nm"]) < 1e-9
+              and abs(r0.get("A_beyond_um2", 0) - b["A_beyond_um2"]) < 1e-9,
+              r0.get("base_error", ""))
+        recs2, _ = SAF.load_ledger(os.path.join(tmp, "l.npz"))
+        check("T16l ... and it survives the ledger round trip",
+              abs(recs2[0]["s_base_nm"] - b["s_base_nm"]) < 1e-6)
+        chained = SB.chain_callbacks(None, lambda *a: "fig.png", cb)
+        rec_c = {}
+        check("T16m chain_callbacks runs every hook, returns the first figure path",
+              chained(0, roi, rec_c, det) == "fig.png" and "s_base_nm" in rec_c)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_T14_min_length_filter():
     sd = FakeSD()
     df, comp = toy_cell()
@@ -828,7 +911,7 @@ def main():
                test_T9_skeleton_and_F, test_T10_kappa_function,
                test_T11_end_to_end_and_resume, test_T12_figure,
                test_T13_figure_callback, test_T14_min_length_filter,
-               test_T15_junction_terms):
+               test_T15_junction_terms, test_T16_measured_base):
         _run(fn)
     n_fail = sum(1 for _, ok in RESULTS if not ok)
     print("\n%d checks passed, %d failed, %d test(s) skipped"

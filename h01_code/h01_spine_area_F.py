@@ -57,7 +57,7 @@ import traceback
 import numpy as np
 import pandas as pd
 
-MODULE_VERSION = "h01_spine_area_F v1.4"
+MODULE_VERSION = "h01_spine_area_F v1.5"
 
 CLASS_MEMBRANE, CLASS_CUT, CLASS_BRIDGE = 0, 1, 2
 CLASS_BOX, CLASS_CAVITY, CLASS_UNRESOLVED = 3, 4, 5
@@ -297,8 +297,15 @@ def mask_touches_box(mask):
 # 3. One spine                                                                 #
 # --------------------------------------------------------------------------- #
 def rind_area_um2(centroid_nm, area_nm2, g, resolution_nm, shaft_axis,
-                  axial_window_nm=None):
+                  axial_window_nm=None, rind_tol_nm=None):
     """Calibrated counted area lying INSIDE the local shaft envelope, eq. (7).
+
+    rind_tol_nm : added to r_shaft. The meshed shaft surface is not a sharp
+        cylinder: on the phantom it straddles rho in [r - 10, r + 10] nm, and a
+        cut at exactly rho <= r leaves a third of the shaft patch outside
+        (0.074 of 0.228 um2). One in-plane voxel (the default, res[0]) brings
+        the cylinder to within 0.2 percent of the measured base plane
+        (h01_spine_base). Pass 0 to reproduce the v1.4 numbers.
 
     A spine's own membrane is by construction outside the dendrite envelope,
     so counted triangles at radial distance rho_t <= r_shaft from the shaft
@@ -316,7 +323,8 @@ def rind_area_um2(centroid_nm, area_nm2, g, resolution_nm, shaft_axis,
         - np.asarray(shaft_axis["point_nm"], dtype=float)
     along = d @ u
     rho = np.linalg.norm(d - along[:, None] * u[None, :], axis=1)
-    inside = rho <= float(shaft_axis["r_nm"])
+    tol = float(res[0]) if rind_tol_nm is None else float(rind_tol_nm)
+    inside = rho <= float(shaft_axis["r_nm"]) + tol
     if axial_window_nm is not None:
         inside = inside & (np.abs(along) <= float(axial_window_nm))
     a = np.asarray(area_nm2, dtype=float)
@@ -325,11 +333,11 @@ def rind_area_um2(centroid_nm, area_nm2, g, resolution_nm, shaft_axis,
                "rind_axial_max_nm": (float(np.abs(along[inside]).max())
                                      if inside.any() else 0.0),
                "rho_min_nm": float(rho.min()) if len(rho) else np.nan,
-               "r_shaft_nm": float(shaft_axis["r_nm"])}
+               "r_shaft_nm": float(shaft_axis["r_nm"]), "rind_tol_nm": tol}
 
 
 def measure_spine_area(roi, g_lookup, opts, cell_id=None, return_detail=False,
-                       shaft_axis=None, axial_window_nm=None):
+                       shaft_axis=None, axial_window_nm=None, rind_tol_nm=None):
     """Eq. (1) on one ROI. Returns (record, H_counted), plus a detail dict
     (smoothed mesh, per-triangle class, frame) when return_detail=True --
     what the per-spine figures need, so nothing is recomputed to plot it.
@@ -383,7 +391,7 @@ def measure_spine_area(roi, g_lookup, opts, cell_id=None, return_detail=False,
                     "rind_axial_max_nm": np.nan, "r_shaft_nm": np.nan})
     else:
         A_r, diag = rind_area_um2(cl["centroid"][keep], a, g, res, shaft_axis,
-                                  axial_window_nm)
+                                  axial_window_nm, rind_tol_nm)
         rec.update(diag)
         rec["A_rind_um2"] = A_r
         rec["frac_rind"] = A_r / max(rec["A_mesh_um2"], 1e-30)
@@ -393,7 +401,8 @@ def measure_spine_area(roi, g_lookup, opts, cell_id=None, return_detail=False,
                          getattr(g_lookup, "phi_deg", None))
     if return_detail:
         return rec, H, {"verts_nm": verts, "faces": faces, "cls": cl["cls"],
-                        "centroid_nm": cl["centroid"], "lo_vox": lo,
+                        "centroid_nm": cl["centroid"], "area_nm2": cl["area_nm2"],
+                        "normal": cl["normal"], "lo_vox": lo,
                         "resolution_nm": res, "object_mask": U}
     return rec, H
 
@@ -977,12 +986,24 @@ def assemble_cell(sd, labelled, nodes, comp, recs, cell_id,
     sk["A_used_norind_um2"] = np.where(sk["measured_norind"], a_nr,
                                        np.where(np.isfinite(k_hat_nr),
                                                 k_hat_nr * a_sk, a_sk))
+    # Measured-base track (h01_spine_base): the rind removed by the union-mesh
+    # profile instead of the cylinder model. Present only when the base
+    # callback ran; absent columns leave this track NaN and it is skipped.
+    a_by = sk.get("A_beyond_um2", pd.Series(np.nan, index=sk.index)).to_numpy(float)
+    sk["measured_beyond"] = good & np.isfinite(a_by)
+    ktab_by = kappa_function(sk, min_per_bin=min_per_bin, num_col="A_beyond_um2",
+                             measured_col="measured_beyond")
+    k_hat_by = kappa_apply(ktab_by, sk["A_skel_um2"])
+    sk["A_used_beyond_um2"] = np.where(sk["measured_beyond"], a_by,
+                                       np.where(np.isfinite(k_hat_by),
+                                                k_hat_by * a_sk, a_sk))
 
     phis = {"skel": phi_skel,
             "mesh": phi_with_spine_areas(phi_skel, sk, "A_used_kappafill_um2"),
             "mesh_skelfill": phi_with_spine_areas(phi_skel, sk, "A_used_skelfill_um2"),
             "mesh_uncalibrated": phi_with_spine_areas(phi_skel, sk, "A_used_raw_um2"),
-            "mesh_norind": phi_with_spine_areas(phi_skel, sk, "A_used_norind_um2")}
+            "mesh_norind": phi_with_spine_areas(phi_skel, sk, "A_used_norind_um2"),
+            "mesh_beyond": phi_with_spine_areas(phi_skel, sk, "A_used_beyond_um2")}
     F = {}
     for name, ph in phis.items():
         F["F_whole_" + name] = cell_F(ph, 0.0)["F"]
@@ -1012,6 +1033,20 @@ def assemble_cell(sd, labelled, nodes, comp, recs, cell_id,
             if len(meas) else float("nan")),
         "base_frac_of_skel_pooled": _pooled(meas, "A_skel_base_um2", "A_skel_um2"),
     }
+    mby = sk[sk["measured_beyond"].to_numpy(dtype=bool)]
+    junction.update({
+        "n_measured_base": int(len(mby)),
+        "kappa_pooled_beyond": _pooled(mby, "A_beyond_um2", "A_skel_um2"),
+        "s_base_minus_r_shaft_median_nm": (
+            float(mby["s_base_minus_r_shaft_nm"].median())
+            if len(mby) and "s_base_minus_r_shaft_nm" in mby else float("nan")),
+        "s_base_minus_r_shaft_p90_abs_nm": (
+            float(mby["s_base_minus_r_shaft_nm"].abs().quantile(0.9))
+            if len(mby) and "s_base_minus_r_shaft_nm" in mby else float("nan")),
+        "norind_vs_beyond_median_ratio": (
+            float((mby["A_mesh_norind_um2"] / mby["A_beyond_um2"]).median())
+            if len(mby) and "A_mesh_norind_um2" in mby else float("nan")),
+    })
     summary = {"cell_id": int(cell_id), "module_version": MODULE_VERSION,
                "n_spines": int(len(sk)), "n_measured": int(good.sum()),
                "n_failed": int((~sk["ok"].astype("boolean").fillna(True)

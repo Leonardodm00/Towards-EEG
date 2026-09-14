@@ -61,6 +61,10 @@ def build_parser():
                    help="demote spines below this; omit to disable")
     p.add_argument("--axial-window-nm", type=float, default=None,
                    help="cap on |axial offset| for rind triangles; omit = none")
+    p.add_argument("--measure-base", action="store_true",
+                   help="also measure the union-mesh spine base per spine "
+                        "(h01_spine_base): s_base vs the skeleton r_shaft, and "
+                        "A_beyond, the rind removed by measurement not by model")
     p.add_argument("--no-shaft-stub-fix", action="store_true",
                    help="skip shaft_continuation demotion (must match Stage 1)")
     p.add_argument("--dry-run", action="store_true",
@@ -94,6 +98,7 @@ def param_fingerprint(args, sigmas_all):
          "min_spine_value": args.min_spine_value,
          "shaft_stub_fix": not args.no_shaft_stub_fix,
          "pad_nm": args.pad_nm, "axial_window_nm": args.axial_window_nm,
+         "measure_base": bool(getattr(args, "measure_base", False)),
          "g_table_sha": _sha12(args.g_table),
          "sigmas_sha": hashlib.sha256(
              np.asarray(sigmas_all, dtype=np.int64).tobytes()).hexdigest()[:12],
@@ -177,8 +182,8 @@ def import_modules(args):
         if p not in sys.path:
             sys.path.append(p) if p == args.stage1_dir else sys.path.insert(0, p)
     import importlib
-    names = ("h01_spine_area_F", "h01_spine_batch", "h01_spine_roi",
-             "h01_area_calibration", "sma_run", "s0_ingest",
+    names = ("h01_spine_area_F", "h01_spine_base", "h01_spine_batch",
+             "h01_spine_roi", "h01_area_calibration", "sma_run", "s0_ingest",
              "shaft_continuation", "spine_labeller", "spine_density",
              "spine_geometry", "morphology_exporter")
     mods = {}
@@ -247,11 +252,18 @@ def main(argv=None, reader_factory=None):
                                  reader_factory=factory, max_bytes=args.max_bytes,
                                  use_cache=args.roi_cache is not None)
 
+    on_success, need = None, ["A_rind_um2", "rind_tol_nm"]
+    if args.measure_base:
+        SB = mods["h01_spine_base"]
+        on_success = SB.make_base_callback(nodes_d, comp_d, st["sk"],
+                                           dict(mods["h01_spine_batch"].DEFAULTS),
+                                           g_lookup)
+        need.append("s_base_nm")
     recs, _ = SAF.measure_all_spines(
         mine, roi_fn, g_lookup, paths["ledger"], cell_id=args.cell,
         checkpoint_every=args.checkpoint_every, progress_every=args.progress_every,
         shaft_axes=st["axes"], axial_window_nm=args.axial_window_nm,
-        require_keys=("A_rind_um2",))
+        on_success=on_success, require_keys=tuple(need))
     ok = sum(1 for r in recs.values() if r.get("ok"))
     print("task %d done: %d/%d measured, %d failed, %.1f min, ledger %s"
           % (args.task, ok, len(recs), len(recs) - ok, (time.time() - t0) / 60,

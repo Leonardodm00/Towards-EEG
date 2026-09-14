@@ -18,7 +18,6 @@ import os
 import sys
 import time
 
-import numpy as np
 
 MERGER_VERSION = "merge_spine_area_F v1.0"
 
@@ -38,6 +37,8 @@ def build_parser():
     p.add_argument("--min-spine-value", type=float, default=None)
     p.add_argument("--axial-window-nm", type=float, default=None)
     p.add_argument("--no-shaft-stub-fix", action="store_true")
+    p.add_argument("--measure-base", action="store_true",
+                   help="must match the flag the shards ran with")
     p.add_argument("--kappa-min-per-bin", type=int, default=25)
     p.add_argument("--allow-missing", action="store_true",
                    help="proceed even if some shards never wrote a ledger")
