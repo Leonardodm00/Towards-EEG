@@ -9,6 +9,10 @@ REAL morphology_exporter -- once aligned through a genuine rotation, once
 unaligned -- and checks the .hoc round trip. Then it tampers with the file
 and expects the check to notice each edit:
 
+  T0  PREFLIGHT: every module morphology_exporter needs for the three-vote
+      correction is importable from this folder, at an adequate version.
+      Runs first so a missing dependency is caught here, in seconds, rather
+      than 20 minutes into a bank run.
   T1  clean aligned export passes; the soma is the only node the exporter
       touched; the removed nodes are exactly the spine nodes
   T2  unaligned export (no alignment.json) passes with the identity
@@ -185,7 +189,52 @@ class _Done(Exception):
     """Clean exit from the fixture block when an optional module is absent."""
 
 
+def preflight():
+    """T0. The exporter's step-4b dependency closure, checked by import."""
+    import importlib
+
+    need = (("shaft_continuation", "shaft_continuation-1.1.0",
+             "the two-observable scorer. Lives in the Spine Mesh Analysis "
+             "folder; copy it beside morphology_exporter.py"),
+            ("continuation_inspect", "continuation_inspect v1.1",
+             "the taper vote. v1.0 lacks taper_table and is refused"),
+            ("spine_density", "spine_density-1.3.0", "vocabulary and build_phi"),
+            ("node_classify", None, "classify_frame, step 5"),
+            ("soma_enforce", None, "step 6"))
+    ok = True
+    for name, min_ver, why in need:
+        try:
+            m = importlib.import_module(name)
+        except ImportError as exc:
+            ok = check("T0 %s importable" % name, False, "%s -- %s" % (exc, why))
+            continue
+        got = getattr(m, "MODULE_VERSION", None)
+        fine = min_ver is None or (got is not None and str(got) >= min_ver)
+        ok = check("T0 %s %s" % (name, ("(needs >= %s)" % min_ver) if min_ver else ""),
+                   fine, "%s -- %s" % (got, why)) and ok
+    caps = ("taper_table", "three_vote", "vote_summary")
+    try:
+        import continuation_inspect as ci
+        miss = [c for c in caps if not hasattr(ci, c)]
+        check("T0 continuation_inspect exposes the taper vote", not miss,
+              "missing %s" % miss if miss else "")
+    except ImportError:
+        pass
+    try:
+        import morphology_exporter as _mx
+        check("T0 morphology_exporter can reach both", _mx.shc is not None
+              and _mx.cinsp is not None,
+              "shc=%s cinsp=%s" % (_mx.shc is not None, _mx.cinsp is not None))
+    except ImportError as exc:
+        check("T0 morphology_exporter importable", False, str(exc))
+    return ok
+
+
 def main():
+    if not preflight():
+        print("\nPREFLIGHT FAILED -- fix the above before running anything "
+              "else; the remaining tests would fail for the same reason.")
+        return sum(1 for _, o in RESULTS if not o)
     tmp = tempfile.mkdtemp()
     try:
         df = toy_neuron()
