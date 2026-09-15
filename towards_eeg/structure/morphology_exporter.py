@@ -538,7 +538,9 @@ def demote_shaft_continuations_three_vote(
     if shc is None:
         raise ImportError(
             "demote_continuations=True needs shaft_continuation.py, which is "
-            "not importable. Put it beside morphology_exporter.py.")
+            "not importable. It ships with the Spine Mesh Analysis folder, "
+            "not Stage 1 -- copy it beside morphology_exporter.py. It needs "
+            "only spine_labeller, which is already there.")
     if require_taper:
         if cinsp is None:
             raise ImportError(
