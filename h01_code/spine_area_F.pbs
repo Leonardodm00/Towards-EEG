@@ -24,8 +24,8 @@ eval "$(conda shell.bash hook)"     # deactivates base and sources activate.d
 conda activate spine_env
 set -u
 
-ROOT="${ROOT:-/davinci-1/home/ldellamea/TEEG/Spines/h01}"
-CODE="${CODE:-/davinci-1/home/ldellamea/TEEG/Spines/h01_code}"
+ROOT="${ROOT:-/davinci-1/home/ldellamea/TEEG/Towards-EEG/h01}"
+CODE="${CODE:-/davinci-1/home/ldellamea/TEEG/Towards-EEG/h01_code}"
 CELL="${CELL:?set CELL, e.g. qsub -v CELL=1302789404 spine_area_F.pbs}"
 NTASKS="${NTASKS:-40}"
 TASK="${PBS_ARRAY_INDEX:-${PBS_ARRAYID:-0}}"
@@ -43,6 +43,7 @@ if [ -n "${DRY_RUN:-}" ]; then EXTRA="$EXTRA --dry-run"; fi
 
 python3 run_spine_area_F.py \
     --root "$ROOT" \
+    --stage1-dir "$CODE/stage1" \
     --cell "$CELL" \
     --task "$TASK" \
     --ntasks "$NTASKS" \

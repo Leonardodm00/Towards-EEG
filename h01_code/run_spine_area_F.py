@@ -29,7 +29,7 @@ import time
 import numpy as np
 import pandas as pd
 
-RUNNER_VERSION = "run_spine_area_F v1.0"
+RUNNER_VERSION = "run_spine_area_F v1.1"
 DEFAULT_CELLS = (1302789404,)
 
 
@@ -66,7 +66,8 @@ def build_parser():
                         "(h01_spine_base): s_base vs the skeleton r_shaft, and "
                         "A_beyond, the rind removed by measurement not by model")
     p.add_argument("--no-shaft-stub-fix", action="store_true",
-                   help="skip shaft_continuation demotion (must match Stage 1)")
+                   help="skip the three-vote shaft-continuation demotion "
+                        "(must match Stage 1)")
     p.add_argument("--dry-run", action="store_true",
                    help="prepare, shard and report; touch no network, write no ledger")
     return p
@@ -89,14 +90,26 @@ def resolve(args):
     return args
 
 
-def param_fingerprint(args, sigmas_all):
+def param_fingerprint(args, sigmas_all, cont_rep=None):
     """Everything that must agree across shards, as one short hash. The spine
     id list is included, so a shard built from a different CSV or a different
-    minimum-size setting cannot be merged with this one."""
+    minimum-size setting cannot be merged with this one. The partition rule and
+    its thresholds are included too: a shard built with the two-observable rule
+    (runner v1.0) or with different three-vote thresholds is a different
+    partition -- different objects behind the same sigma ids -- and must not
+    merge with this one."""
+    cont_rep = cont_rep or {"applied": False}
+    part = {"rule": ("three_vote" if cont_rep.get("applied") else "none")}
+    for k in ("module_version", "scorer_version", "inspect_version",
+              "rho_shaft_min", "cos_shaft_min", "require_taper",
+              "min_len_nm", "bulge_min"):
+        if k in cont_rep:
+            part[k] = cont_rep[k]
     d = {"runner": RUNNER_VERSION, "cell": args.cell, "subset": args.subset,
          "min_spine_metric": args.min_spine_metric,
          "min_spine_value": args.min_spine_value,
          "shaft_stub_fix": not args.no_shaft_stub_fix,
+         "partition": part,
          "pad_nm": args.pad_nm, "axial_window_nm": args.axial_window_nm,
          "measure_base": bool(getattr(args, "measure_base", False)),
          "g_table_sha": _sha12(args.g_table),
@@ -113,8 +126,10 @@ def _sha12(path):
 
 # --------------------------------------------------------------------------- #
 def prepare_cell(args, mods):
-    """Ingest -> label -> (shaft-stub demotion) -> components. Identical to the
-    Colab CELL 4 + CELL 5 path, so the partition matches Stage 1's."""
+    """Ingest -> label -> three-vote demotion (step 4b) -> components. Routes
+    through morphology_exporter.demote_shaft_continuations_three_vote with
+    Stage 1's defaults, so the partition matches export_neuron's by
+    construction (P0 partition unification)."""
     sr, s0, shc, sl, sd, sg, mx = (mods[k] for k in
                                    ("sma_run", "s0_ingest", "shaft_continuation",
                                     "spine_labeller", "spine_density",
@@ -134,28 +149,44 @@ def prepare_cell(args, mods):
     labelled, _ = sr.label_spines_project(nodes, args.cell, sl, thr,
                                           output_dir=None)
     if not args.no_shaft_stub_fix:
-        labelled, _ = shc.demote_shaft_continuations(
-            nodes, labelled, spine_density=sd, continuation_threshold_nm=thr)
+        # P0 partition unification: the ONE entry point every call site must
+        # use. Same defaults as Stage 1's export_neuron step 4b -- no keyword
+        # overrides here, so the runner's partition is the exporter's by
+        # construction. (The old call, shc.demote_shaft_continuations with the
+        # two-observable rule, demoted strictly more components; shards built
+        # with it carry a different fingerprint and will not merge with these.)
+        #
+        # The taper vote (continuation_inspect._component_paths) reads
+        # compartment_class OR annotated_type to walk spine components. The s0
+        # contract does not carry compartment_class, and the post-labeller
+        # annotated_type is the partition ground truth here, so an empty
+        # column reproduces the exporter's spine set exactly.
+        if "compartment_class" not in labelled.columns:
+            labelled = labelled.assign(compartment_class="")
+        labelled, cont_rep = mx.demote_shaft_continuations_three_vote(labelled)
+    else:
+        cont_rep = {"applied": False}
     nodes["spine_label"] = labelled["annotated_type"].astype(str).str.lower().to_numpy()
     comp = sr.spine_components(
         nodes, sr.spine_mask(nodes, spine_values=voc["spine_labels"]))
-    return nodes, labelled, comp
+    return nodes, labelled, comp, cont_rep
 
 
 def prepare_all(args, mods):
     """Everything before the first network byte. Returns a dict of state."""
     SAF = mods["h01_spine_area_F"]
     sd = mods["spine_density"]
-    nodes, labelled, comp = prepare_cell(args, mods)
+    nodes, labelled, comp, cont_rep = prepare_cell(args, mods)
     sk_all = SAF.skeleton_spine_table(sd, labelled, nodes, comp)
     short = SAF.short_spine_ids(sk_all, args.min_spine_metric, args.min_spine_value)
     labelled_d, nodes_d, comp_d, dprov = SAF.demote_spines(
         labelled, nodes, comp, sk_all, short, sd.SHAFT_REGEX)
     sk = SAF.skeleton_spine_table(sd, labelled_d, nodes_d, comp_d)
     sigmas_all = SAF.choose_sigmas(sk, args.subset, seed=args.cell)
-    fp, fpd = param_fingerprint(args, sigmas_all)
+    fp, fpd = param_fingerprint(args, sigmas_all, cont_rep)
     return {"nodes": nodes_d, "labelled": labelled_d, "comp": comp_d, "sk": sk,
             "sk_all": sk_all, "demoted": dprov, "sigmas_all": sigmas_all,
+            "continuation_report": cont_rep,
             "fingerprint": fp, "fingerprint_detail": fpd,
             "axes": SAF.shaft_axes_from_table(sk)}
 

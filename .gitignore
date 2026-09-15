@@ -2,3 +2,8 @@ __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
+
+# Campaign data root (neurons/, out/, ledgers): data, not code.
+/h01/
+# Per-clone symlink farm assembled by h01_code/stage1_link.sh
+h01_code/stage1/*.py

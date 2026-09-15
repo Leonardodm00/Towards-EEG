@@ -71,9 +71,29 @@ HEAD_LABELS = ("head",)
 NECK_LABELS = ("neck",)
 '''
 
-STUBS["morphology_exporter"] = '''"""Stub morphology_exporter for the HPC runner smoke test."""
+STUBS["morphology_exporter"] = '''"""Stub morphology_exporter for the HPC runner smoke test.
+
+demote_shaft_continuations_three_vote mirrors the real entry point's contract
+(same-frame-out, (df, report) return, report keys the fingerprint reads) and
+demotes nothing: the phantom's spines are genuinely spine-like, which is also
+what the real three-vote rule would decide.
+"""
 MODULE_VERSION = "stub morphology_exporter (smoke test)"
 SPINE_LENGTH_THRESHOLD_NM = 4000.0
+
+
+def demote_shaft_continuations_three_vote(df, **kw):
+    report = {"applied": True, "module_version": MODULE_VERSION,
+              "scorer_version": "stub", "inspect_version": "stub",
+              "method": "stub", "use_radius": True,
+              "rho_shaft_min": 0.50, "cos_shaft_min": 0.70,
+              "require_taper": bool(kw.get("require_taper", True)),
+              "min_len_nm": 150.0, "bulge_min": 1.25,
+              "n_spine_roots": 0, "n_shaft_like_rho_cos": 0,
+              "n_demoted": 0, "n_nodes_demoted": 0,
+              "n_rescued_by_taper": 0, "n_undecidable": 0,
+              "demoted_roots": []}
+    return df, report
 '''
 
 # The real sma_run.label_spines_project writes the node table to a tempdir and
@@ -213,6 +233,21 @@ def main():
         fps = {json.load(open(p["meta"]))["fingerprint"] for p in led}
         check("A6 both shards agree on the parameter fingerprint", len(fps) == 1,
               str(fps))
+        st6 = R.prepare_all(args, R.import_modules(args))
+        part = st6["fingerprint_detail"].get("partition", {})
+        check("A6' fingerprint records the three-vote partition",
+              part.get("rule") == "three_vote"
+              and st6["continuation_report"].get("applied") is True
+              and part.get("rho_shaft_min") == 0.50
+              and part.get("require_taper") is True, str(part))
+        argsx = R.resolve(R.build_parser().parse_args(
+            base_argv(root, 0, 2, "--no-shaft-stub-fix")))
+        stx = R.prepare_all(argsx, R.import_modules(argsx))
+        partx = stx["fingerprint_detail"].get("partition", {})
+        check("A6'' --no-shaft-stub-fix yields partition rule 'none' and a "
+              "DIFFERENT fingerprint",
+              partx.get("rule") == "none"
+              and stx["fingerprint"] != st6["fingerprint"], str(partx))
         SAF = R.import_modules(args)["h01_spine_area_F"]
         ids = set()
         for p in led:

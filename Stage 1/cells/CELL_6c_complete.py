@@ -101,12 +101,12 @@ if not _frames:
 
     _thr = _mx.SPINE_LENGTH_THRESHOLD_NM
     print("rebuilding labelled frames from %s (threshold %.0f nm, through the "
-          "exporter's steps 1-3 + 5, so the partition matches CELL 6) for "
+          "exporter's steps 1-4b + 5, so the partition matches CELL 6) for "
           "%d cell(s)..." % (SKELETONS_DIR, _thr, len(NEURON_IDS)))  # noqa: F821
 
     def _label_like_exporter(_df_raw, _nid):
-        """export_neuron steps 1-5, minus the soma enforcement (step 6, which
-        does not touch spine nodes) and the export itself."""
+        """export_neuron steps 1-5 INCLUDING 4b, minus the soma enforcement
+        (step 6, which does not touch spine nodes) and the export itself."""
         _d = _df_raw.copy()
         _nc.extract_synapse_frame(_d, nid=_nid, input_units="nm")    # step 1
         _d = _nc.classify_frame(_d)                                  # step 2
@@ -122,6 +122,7 @@ if not _frames:
         finally:
             _shutil.rmtree(_tmp, ignore_errors=True)
         _d = _o[_nid] if isinstance(_o, dict) else _o
+        _d, _ = _mx.demote_shaft_continuations_three_vote(_d)        # step 4b
         return _nc.classify_frame(_d)                                # step 5
 
     _frames = {}
