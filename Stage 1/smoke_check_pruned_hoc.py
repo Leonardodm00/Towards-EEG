@@ -28,6 +28,10 @@ and expects the check to notice each edit:
   T8  continuation_inspect: the boundary population, dF-by-band (the single
       occupied band carries the whole shift and equals score_continuations),
       the local skeleton roles, and the stratified gallery
+  T11 REGRESSION: a .hoc exported WITH the correction must be checked with the
+      same export_kw. Without it the rebuild is a different partition and the
+      check reports spurious extra points -- exactly what neuron 15543554616
+      showed (1566 extra, 470 um of cable) on 2026-09-15.
   T10 O-1, the export hook: export_neuron(demote_continuations=True) applies
       the three-vote correction at step 4b -- before the re-classify and
       before phi -- moving area from the spine bucket to the shaft, leaving
@@ -143,7 +147,7 @@ def toy_label_fn(df, threshold_nm):
     return out
 
 
-def export(df, out_dir, aligned=True):
+def export(df, out_dir, aligned=True, extra=None):
     if aligned:
         th = np.radians(37.0)
         M = np.array([[np.cos(th), -np.sin(th), 0.0],
@@ -152,7 +156,8 @@ def export(df, out_dir, aligned=True):
         align_fn = al.make_align_fn(soma, M)
     mx.export_neuron(df, NID, out_dir, label_fn=toy_label_fn,
                      align_fn=align_fn if aligned else None,
-                     write_files=True, return_frames=False, verbose=False)
+                     write_files=True, return_frames=False, verbose=False,
+                     **(extra or {}))
     if aligned:
         with open(os.path.join(out_dir, "neuron_%s_alignment.json" % NID),
                   "w") as fh:
@@ -498,6 +503,34 @@ def main():
         finally:
             for n, v in _saved.items():
                 setattr(_ci, n, v)
+        # ---- T11: the export_kw round trip --------------------------------
+        _d11 = tempfile.mkdtemp()
+        try:
+            _kw = {"demote_continuations": True}
+            export(dfc, _d11, aligned=True, extra=_kw)
+            _bad = CK.check_pruned_hoc(NID, dfc, _d11, mx, al, nc, toy_label_fn)
+            check("T11a WITHOUT export_kw the check reports spurious extras",
+                  (not _bad["ok"]) and _bad["n_extra_in_hoc"] > 0
+                  and _bad["n_missing_in_hoc"] == 0
+                  and not _bad["continuation_applied"],
+                  "extra %d, cable diff %+.3f um"
+                  % (_bad["n_extra_in_hoc"], _bad["cable_diff_um"]))
+            _good = CK.check_pruned_hoc(NID, dfc, _d11, mx, al, nc, toy_label_fn,
+                                        export_kw=_kw)
+            check("T11b WITH export_kw it passes: same partition, 0 extra, "
+                  "cable matches",
+                  _good["ok"] and _good["n_extra_in_hoc"] == 0
+                  and abs(_good["cable_diff_um"]) < 1e-6
+                  and _good["continuation_applied"],
+                  "extra %d, cable diff %.2e, demoted %s"
+                  % (_good["n_extra_in_hoc"], _good["cable_diff_um"],
+                     _good["n_continuations_demoted"]))
+            check("T11c the corrected rebuild has MORE nodes than the "
+                  "uncorrected one, by the demoted branches",
+                  _good["n_pruned_frame"] > _bad["n_pruned_frame"],
+                  "%d vs %d" % (_good["n_pruned_frame"], _bad["n_pruned_frame"]))
+        finally:
+            shutil.rmtree(_d11, ignore_errors=True)
         check("T10h the report records the thresholds actually used",
               r3["require_taper"] and r3["min_len_nm"] == 150.0
               and r3["rho_shaft_min"] == 0.5 and r3["scorer_version"]

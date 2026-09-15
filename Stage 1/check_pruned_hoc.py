@@ -60,7 +60,7 @@ import tempfile
 import numpy as np
 import pandas as pd
 
-MODULE_VERSION = "check_pruned_hoc v1.1"
+MODULE_VERSION = "check_pruned_hoc v1.2"
 NM_PER_UM = 1000.0
 TOL_UM = 1e-6            # 1e-3 nm: only repr round-trip noise is allowed
 
@@ -138,14 +138,22 @@ def hoc_nodes_and_cable(sections):
 # --------------------------------------------------------------------------- #
 # Frames                                                                       #
 # --------------------------------------------------------------------------- #
-def rebuild_frames(df_raw, nid, mx, label_fn, threshold_nm):
-    """The exporter's own labelled and pruned frames, raw nm, no alignment."""
+def rebuild_frames(df_raw, nid, mx, label_fn, threshold_nm, export_kw=None):
+    """The exporter's own labelled and pruned frames, raw nm, no alignment.
+
+    export_kw MUST carry every keyword the committed .hoc was exported with --
+    `cap_tips`, `demote_continuations`, `continuation_kw`. They change the
+    PARTITION, so rebuilding without them compares a corrected .hoc against an
+    uncorrected frame: on neuron 15543554616 that reported 1566 spurious
+    "extra" points and a 470 um cable excess, which were the restored
+    continuation branches, not a defect in the bank."""
     tmp = tempfile.mkdtemp()
     try:
         res = mx.export_neuron(df_raw, nid, tmp, label_fn=label_fn,
                                spine_length_threshold_nm=threshold_nm,
                                align_fn=None, write_files=False,
-                               return_frames=True, verbose=False)
+                               return_frames=True, verbose=False,
+                               **(export_kw or {}))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     if "frames" not in res:
@@ -223,8 +231,11 @@ def pruned_components(labelled, pruned, cls_spine, class_column="compartment_cla
 # The check                                                                    #
 # --------------------------------------------------------------------------- #
 def check_pruned_hoc(nid, df_raw, hoc_dir, mx, al, nc, label_fn,
-                     threshold_nm=None):
-    """Returns a report dict; report['ok'] is the verdict."""
+                     threshold_nm=None, export_kw=None):
+    """Returns a report dict; report['ok'] is the verdict.
+
+    export_kw: the SAME keywords CELL 6 passed to align_and_export. Omitting
+    them silently compares two different partitions -- see rebuild_frames."""
     from scipy.spatial import cKDTree
 
     threshold_nm = (float(mx.SPINE_LENGTH_THRESHOLD_NM) if threshold_nm is None
@@ -236,7 +247,8 @@ def check_pruned_hoc(nid, df_raw, hoc_dir, mx, al, nc, label_fn,
     raw = df_raw.copy()
     raw["annotated_type_raw"] = raw["annotated_type"].astype(str)
     labelled, pruned, info, res = rebuild_frames(df_raw, nid, mx, label_fn,
-                                                 threshold_nm)
+                                                 threshold_nm, export_kw)
+    cont = res.get("continuation_report") or {}
     labelled = labelled.merge(raw[["id", "annotated_type_raw"]], on="id", how="left")
     pruned = pruned.merge(raw[["id", "annotated_type_raw"]], on="id", how="left")
 
@@ -284,6 +296,11 @@ def check_pruned_hoc(nid, df_raw, hoc_dir, mx, al, nc, label_fn,
           and abs(hoc_cable - exp_cable) < 1e-4 and non_spine_removed == 0)
     return {
         "ok": bool(ok), "nid": nid, "hoc": hoc_path, "aligned": aligned,
+        "export_kw": dict(export_kw or {}),
+        "continuation_applied": bool(cont.get("applied")),
+        "n_continuations_demoted": cont.get("n_demoted"),
+        "n_rescued_by_taper": cont.get("n_rescued_by_taper"),
+        "n_continuation_undecidable": cont.get("n_undecidable"),
         "module_version": MODULE_VERSION,
         "exporter_version": getattr(mx, "MODULE_VERSION", None),
         "n_raw": int(len(raw)), "n_labelled": int(len(labelled)),
@@ -413,6 +430,18 @@ def print_report(rep, n_show=8):
     print("%s | exporter %s | neuron %s | %s"
           % (rep["module_version"], rep["exporter_version"], rep["nid"],
              "ALIGNED" if rep["aligned"] else "unaligned"))
+    if rep["continuation_applied"]:
+        print("   rebuilt WITH the three-vote correction: %d demoted, %d held "
+              "back by the taper, %d too short"
+              % (rep["n_continuations_demoted"], rep["n_rescued_by_taper"],
+                 rep["n_continuation_undecidable"]))
+    elif rep["export_kw"]:
+        print("   rebuilt with export_kw=%s" % rep["export_kw"])
+    else:
+        print("   rebuilt with NO export keywords. If the .hoc was exported "
+              "with demote_continuations=True or cap_tips=True, section C "
+              "below is comparing two different partitions and its counts are "
+              "meaningless. Pass export_kw.")
     print("A. raw -> labelled: %d node(s) changed, %d of them non-soma, %d lost"
           % (rep["n_changed_raw_to_labelled"], rep["n_changed_non_soma"],
              len(rep["ids_lost_raw_to_labelled"])))

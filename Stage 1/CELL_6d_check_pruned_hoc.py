@@ -75,6 +75,20 @@ CHECK_HOC_DIR = OUTPUT_DIR                                            # noqa: F8
 CHECK_SUMMARY_CSV = os.path.join(FIGURE_DIR, "pruned_hoc_check.csv")  # noqa: F821
 CHECK_N_SHOW = 8
 
+# The keywords the committed .hoc was exported with. They change the PARTITION,
+# so the reference frames must be rebuilt with the same ones or section C
+# compares a corrected .hoc against an uncorrected frame -- on neuron
+# 15543554616 that reported 1566 spurious "extra" points and a 470 um cable
+# excess, which were the restored continuation branches. _EXPORT_KW is what
+# CELL 6 defines; fall back to an explicit dict if CELL 6 has not run.
+CHECK_EXPORT_KW = globals().get("_EXPORT_KW") or {
+    "cap_tips": globals().get("CAP_TIPS", False),
+    "cap_h_um": globals().get("CAP_H_UM", 0.1),
+    "demote_continuations": globals().get("DEMOTE_CONTINUATIONS", False),
+    "continuation_kw": globals().get("CONTINUATION_KW"),
+}
+print("rebuilding reference frames with export_kw = %s" % CHECK_EXPORT_KW)
+
 # The cells actually on disk, so a gated-out or quarantined neuron is skipped
 # rather than raising. NEURON_IDS is the REQUEST; this is the RESULT.
 _have = sorted(int(f.split("_")[1]) for f in os.listdir(CHECK_HOC_DIR)
@@ -92,7 +106,8 @@ for _nid in CHECK_IDS:
     _raw = pd.read_csv("%s/neuron_%s.csv" % (SKELETONS_DIR, _nid))    # noqa: F821
     _rep = CK.check_pruned_hoc(_nid, _raw, CHECK_HOC_DIR, mx, al, nc,
                                make_label_fn(_nid),                   # noqa: F821
-                               threshold_nm=mx.SPINE_LENGTH_THRESHOLD_NM)
+                               threshold_nm=mx.SPINE_LENGTH_THRESHOLD_NM,
+                               export_kw=CHECK_EXPORT_KW)
     CK.print_report(_rep, n_show=CHECK_N_SHOW)
     _row = {k: v for k, v in _rep.items()
             if not isinstance(v, (pd.DataFrame, list))
