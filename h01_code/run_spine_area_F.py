@@ -29,7 +29,7 @@ import time
 import numpy as np
 import pandas as pd
 
-RUNNER_VERSION = "run_spine_area_F v1.2"
+RUNNER_VERSION = "run_spine_area_F v1.3"
 DEFAULT_CELLS = (1302789404,)
 
 
@@ -295,7 +295,9 @@ def main(argv=None, reader_factory=None):
         on_success = SB.make_base_callback(nodes_d, comp_d, st["sk"],
                                            dict(mods["h01_spine_batch"].DEFAULTS),
                                            g_lookup)
-        need.append("s_base_nm")
+        # base_method / base_verdict: records cached before the shaft-ending
+        # detection (h01_spine_base v1.1) lack them and are re-measured once.
+        need += ["s_base_nm", "base_method", "base_verdict"]
     recs, _ = SAF.measure_all_spines(
         mine, roi_fn, g_lookup, paths["ledger"], cell_id=args.cell,
         checkpoint_every=args.checkpoint_every, progress_every=args.progress_every,

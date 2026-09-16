@@ -57,7 +57,7 @@ import traceback
 import numpy as np
 import pandas as pd
 
-MODULE_VERSION = "h01_spine_area_F v1.6"
+MODULE_VERSION = "h01_spine_area_F v1.7"   # P3 (deliverable/QC/cap) + shaft-ending counters, merged 2026-09-16
 
 CLASS_MEMBRANE, CLASS_CUT, CLASS_BRIDGE = 0, 1, 2
 CLASS_BOX, CLASS_CAVITY, CLASS_UNRESOLVED = 3, 4, 5
@@ -386,9 +386,13 @@ def measure_spine_area(roi, g_lookup, opts, cell_id=None, return_detail=False,
         rec["A_%s_raw_um2" % name] = by[name] / NM2_PER_UM2
         rec["frac_%s" % name] = by[name] / tot
     if shaft_axis is None:
+        # Same key set as the with-axis branch (rind_tol_nm included): the
+        # runner's require_keys names rind_tol_nm, and a record without it is
+        # judged stale and re-measured on EVERY run (2026-09-16 fix).
         rec.update({"A_rind_um2": np.nan, "frac_rind": np.nan,
                     "A_mesh_norind_um2": np.nan, "n_rind_faces": -1,
-                    "rind_axial_max_nm": np.nan, "r_shaft_nm": np.nan})
+                    "rind_axial_max_nm": np.nan, "r_shaft_nm": np.nan,
+                    "rind_tol_nm": np.nan})
     else:
         A_r, diag = rind_area_um2(cl["centroid"][keep], a, g, res, shaft_axis,
                                   axial_window_nm, rind_tol_nm)

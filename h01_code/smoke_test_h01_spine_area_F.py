@@ -1073,12 +1073,34 @@ def test_T18_shaft_ending():
                                          os.path.join(tmp, "l.npz"), cell_id=CELL,
                                          verbose=False, on_success=cb)
         r0 = recs[0]
-        check("T18c the spine is still measured (ok) with verdict recorded",
+        # T18a established that the shaft DOES reach the box on this phantom;
+        # the recorded field must agree with the mask-level fact, not with the
+        # verdict (h01_spine_base v1.1 overwrote it with False -- REGRESSION).
+        check("T18c the spine is still measured (ok) with verdict recorded, and "
+              "shaft_reaches_box keeps its MEASURED value",
               r0["ok"] and r0.get("base_verdict") == "shaft_terminates"
-              and r0.get("shaft_reaches_box") is False,
-              "%s / %s" % (r0.get("base_verdict"), r0.get("shaft_reaches_box")))
+              and r0.get("shaft_reaches_box") is True
+              and r0.get("base_method") == "none",
+              "%s / reaches=%s / method=%s" % (r0.get("base_verdict"),
+                                              r0.get("shaft_reaches_box"),
+                                              r0.get("base_method")))
         check("T18d A_beyond is NaN, not silently the whole mesh",
               np.isnan(r0.get("A_beyond_um2", 0.0)))
+        # REGRESSION: with base_method in require_keys, a flagged record used
+        # to lack the key, be judged stale, and be re-measured on EVERY run.
+        need = ("A_rind_um2", "rind_tol_nm", "s_base_nm", "base_method", "base_verdict")
+        n_fetch = {"n": 0}
+
+        def counting_roi(sid):
+            n_fetch["n"] += 1
+            return roi_fn(sid)
+        for _ in range(3):
+            SAF.measure_all_spines([0], counting_roi, const_lookup(1.0),
+                                   os.path.join(tmp, "l.npz"), cell_id=CELL,
+                                   verbose=False, on_success=cb, require_keys=need)
+        check("T18d' REGRESSION: a flagged record is trusted by require_keys, "
+              "not re-measured every run", n_fetch["n"] == 0,
+              "%d ROI fetches over 3 runs" % n_fetch["n"])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     # and the ordinary phantom, whose shaft DOES cross the box, is unaffected

@@ -52,7 +52,7 @@ imported lazily. Pure ASCII, LF only.
 
 import numpy as np
 
-MODULE_VERSION = "h01_spine_base v1.1"
+MODULE_VERSION = "h01_spine_base v1.2"
 
 BOX_MARGIN_VOX = 2.0       # a loop this close to a cutout face is the shaft
 DROP_MIN = 3.0             # fallback: a neck is a >= 3x drop in section area
@@ -370,13 +370,21 @@ def make_base_callback(nodes, comp, sk, opts, g_lookup, fig_dir=None,
         os.makedirs(fig_dir, exist_ok=True)
 
     def on_success(sid, roi, rec, detail):
+        # The mask-level fact first, on its own: whether the connected shaft
+        # context reaches a cutout face. It is INDEPENDENT of the profile
+        # verdict below and must survive it -- a spine leaving at <30 deg is
+        # flagged shaft_terminates while its dendrite plainly crosses the box,
+        # and this field is what tells that case from a true ending.
+        try:
+            rec["shaft_reaches_box"] = bool(shaft_reaches_box(roi))
+        except Exception as exc:                        # noqa: BLE001
+            rec["shaft_reaches_box"] = None
+            rec["shaft_reaches_box_error"] = "%s: %s" % (type(exc).__name__, exc)
         try:
             sn, bn, _ = SR.spine_subframe(nodes, comp, sid)
-            rec["shaft_reaches_box"] = shaft_reaches_box(roi)
             b, prof, meta = measure_base(roi, sn, bn, opts, detail=detail,
                                          g_lookup=g_lookup,
                                          r_shaft_nm=r_shaft.get(int(sid)))
-            rec["base_verdict"] = "ok"
             for k in ("s_base_nm", "s_base_minus_r_shaft_nm", "A_beyond_um2",
                       "A_before_base_um2", "area_drop_ratio", "n_slab_stations",
                       "r_eq_base_nm", "q_base", "union_faces", "base_method"):
@@ -392,16 +400,21 @@ def make_base_callback(nodes, comp, sk, opts, g_lookup, fig_dir=None,
                     fig.show()
                 return path
         except ShaftTerminates as exc:
+            # shaft_reaches_box is deliberately NOT touched here.
             rec["base_verdict"] = "shaft_terminates"
-            rec["shaft_reaches_box"] = False
+            rec["base_method"] = "none"
             rec["base_error"] = "%s: %s" % (type(exc).__name__, exc)
             rec["s_base_nm"] = np.nan
             rec["A_beyond_um2"] = np.nan
         except Exception as exc:                        # noqa: BLE001
             rec["base_verdict"] = "error"
+            rec["base_method"] = "none"
             rec["base_error"] = "%s: %s" % (type(exc).__name__, exc)
             rec["s_base_nm"] = np.nan
             rec["A_beyond_um2"] = np.nan
+        # Every branch leaves the same key set, so a require_keys list that
+        # names base_method / base_verdict does not mark flagged records as
+        # stale and re-measure them on every run.
         return None
     return on_success
 
