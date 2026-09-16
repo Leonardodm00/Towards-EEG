@@ -32,6 +32,17 @@ WHAT IS CHECKED, AND AGAINST WHAT
       touches the cutout box and no spine station's does, the area beyond the
       base plane matches the analytic neck + head, and the rind cylinder with
       its one-voxel tolerance agrees with the plane cut
+  T18 shaft ending (the sigma-3588 case): a dendrite that ENDS inside the
+      ROI with the spine-labelled component as its tip. Every cross-section
+      misses the cutout box, so the base must NOT default to station 0 --
+      measure_base raises ShaftTerminates, shaft_reaches_box is False, the
+      batch records the verdict, the ordinary phantom still passes both, and
+      a genuine spine at 45 deg (no box contact either) gets its base from
+      the >= 3x area-drop fallback instead of being flagged
+  T17 union-mesh regions: every triangle labelled (0 unresolved), the spine
+      and rind areas reproduce A_beyond and A_before_base computed by the
+      independent plane-integral path, the plane and cylinder rules agree on
+      the phantom, and both figures build
   T15 junction terms: rind area on a cylinder against the exact disc/total
       area, the axial window, NaN with no axis, the base frustum against the
       closed-form frustum on the toy cell, and the kappa variants
@@ -858,6 +869,10 @@ def test_T16_measured_base():
               and abs(r0.get("A_beyond_um2", 0) - b["A_beyond_um2"]) < 1e-9,
               r0.get("base_error", ""))
         recs2, _ = SAF.load_ledger(os.path.join(tmp, "l.npz"))
+        check("T16k' REGRESSION: the happy path sets base_verdict and "
+              "base_method, so require_keys does not re-measure forever",
+              r0.get("base_verdict") == "ok" and r0.get("base_method"),
+              "%s / %s" % (r0.get("base_verdict"), r0.get("base_method")))
         check("T16l ... and it survives the ledger round trip",
               abs(recs2[0]["s_base_nm"] - b["s_base_nm"]) < 1e-6)
         chained = SB.chain_callbacks(None, lambda *a: "fig.png", cb)
@@ -866,6 +881,252 @@ def test_T16_measured_base():
               chained(0, roi, rec_c, det) == "fig.png" and "s_base_nm" in rec_c)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_T17_union_regions():
+    import h01_spine_base as SB
+    nodes, comp = phantom_nodes()
+    fac = SAF.memoized_reader_factory(stub_factory())
+    roi = SAF.get_spine_roi(nodes, comp, 0, CELL, pad_nm=500.0, reader_factory=fac)
+    sn, bn, _ = SR.spine_subframe(nodes, comp, 0)
+    axis = {"point_nm": ORIGIN + np.array([1500.0, 0.0, 0.0]),
+            "dir": np.array([1.0, 0.0, 0.0]), "r_nm": 300.0}
+    rec, _, det = SAF.measure_spine_area(roi, const_lookup(1.0), dict(B.DEFAULTS),
+                                         cell_id=CELL, return_detail=True,
+                                         shaft_axis=axis)
+    b, prof, meta = SB.measure_base(roi, sn, bn, dict(B.DEFAULTS), detail=det,
+                                    g_lookup=const_lookup(1.0), r_shaft_nm=300.0)
+    seg = roi["meta"]["layers"]["seg"]
+    U = meta["union"]
+    reg = SB.classify_union_triangles(
+        U["verts_nm"], U["faces"], roi, seg,
+        base_point_nm=b["base_point_nm"], base_tangent=b["base_tangent"])
+    a = reg["area_um2_by_region"]
+    check("T17a REGRESSION: every union triangle is labelled, 0 unresolved "
+          "(out-of-bounds probes must be retried, not dropped)",
+          reg["n_by_region"]["unresolved"] == 0,
+          str(reg["n_by_region"]["unresolved"]))
+    check("T17b the four regions are all populated",
+          all(a[k] > 0 for k in ("spine", "rind", "shaft")),
+          {k: round(v, 3) for k, v in a.items() if v > 1e-9})
+    check("T17c' RAW areas sit a factor g above the calibrated ones",
+          not reg["calibrated"])
+    regc = SB.classify_union_triangles(
+        U["verts_nm"], U["faces"], roi, seg, base_point_nm=b["base_point_nm"],
+        base_tangent=b["base_tangent"], g_lookup=const_lookup(1.0))
+    check("T17c'' with g_lookup the result says so", regc["calibrated"])
+    check("T17c union 'spine' reproduces A_beyond within 1% -- two independent "
+          "paths, triangle labels vs a plane integral",
+          abs(a["spine"] / b["A_beyond_um2"] - 1) < 0.01,
+          "%.4f vs %.4f" % (a["spine"], b["A_beyond_um2"]))
+    check("T17d union 'rind' reproduces A_before_base within 3%",
+          abs(a["rind"] / b["A_before_base_um2"] - 1) < 0.03,
+          "%.4f vs %.4f" % (a["rind"], b["A_before_base_um2"]))
+    cyl = SB.classify_union_triangles(
+        U["verts_nm"], U["faces"], roi, seg, shaft_axis=axis,
+        rind_rule="cylinder")["area_um2_by_region"]
+    check("T17e plane and cylinder rules agree on the phantom (< 3%)",
+          abs(cyl["rind"] / a["rind"] - 1) < 0.03,
+          "%.4f vs %.4f" % (cyl["rind"], a["rind"]))
+    check("T17f the base plane is exposed for the figure",
+          np.asarray(b["base_point_nm"]).shape == (3,)
+          and abs(np.linalg.norm(b["base_tangent"]) - 1) < 1e-6)
+    try:
+        import h01_spine_area_F_figures as FIG
+        f3 = FIG.union_mesh_3d(U["verts_nm"], U["faces"], reg, base_rec=b,
+                               spine_nodes=sn, base_node=bn)
+        f2 = FIG.union_profile_figure(prof, b, rind_tol_nm=8.0)
+        check("T17g both figures build", len(f3.data) >= 4 and len(f2.data) >= 2,
+              "%d and %d traces" % (len(f3.data), len(f2.data)))
+    except ImportError as exc:
+        skip("T17g figures", "%s -- figures not in this bundle" % exc)
+
+
+# --------------------------------------------------------------------------- #
+# A terminating dendrite, for T18                                              #
+# --------------------------------------------------------------------------- #
+def terminal_nodes():
+    """A short dendrite that ENDS: 6 shaft nodes along +x, then 2 'spine'
+    nodes continuing in the same direction with a terminal bulb. What the
+    skeleton reconstruction did on cell 1302789404 sigma 3588."""
+    rows = []
+    for i in range(6):
+        rows.append(dict(id=i, p=i - 1 if i else -1, x=ORIGIN[0] + 250.0 * i,
+                         y=ORIGIN[1], z=ORIGIN[2], r=200.0,
+                         annotated_type="dendrite"))
+    par = 5
+    for j, (dx, rr) in enumerate(((280.0, 110.0), (560.0, 150.0))):
+        rows.append(dict(id=100 + j, p=par, x=ORIGIN[0] + 1250.0 + dx,
+                         y=ORIGIN[1], z=ORIGIN[2], r=rr, annotated_type="spine"))
+        par = 100 + j
+    df = pd.DataFrame(rows)
+    comp = np.where(df["id"] >= 100, 0, -1).astype(np.int64)
+    return df, comp
+
+
+def terminal_stub_factory():
+    """Segmentation for that phantom: a 200 nm cylinder from x = -600 nm to
+    x = 1250 nm (it BEGINS inside the ROI too, so nothing reaches the box),
+    then a tapering neck to a 150 nm terminal bulb at x = 1810 nm."""
+    def factory(cloudpath, mip=0, **kw):
+        info = {"cloudpath": cloudpath, "mip": 0, "resolution_nm": list(RES),
+                "dtype": "uint64", "bounds_vox": [[0, 0, 0], [10 ** 7] * 3],
+                "available_mips": [0]}
+
+        def reader(lo, hi):
+            lo, hi = np.asarray(lo), np.asarray(hi)
+            X, Y, Z = grid(tuple(int(v) for v in hi - lo), lo)
+            x, y, z = X - ORIGIN[0], Y - ORIGIN[1], Z - ORIGIN[2]
+            rho2 = y ** 2 + z ** 2
+            # a SMOOTH taper, like sigma 3588's profile: 200 nm at x = 1250
+            # down to 110 nm at x = 1660 with no step, then a terminal bulb.
+            # A step would be a neck, and a neck is what a spine has.
+            r_t = 200.0 - 90.0 * np.clip((x - 1250.0) / 410.0, 0.0, 1.0)
+            shaft = (rho2 <= 200.0 ** 2) & (x >= -600.0) & (x <= 1250.0)
+            neck = (rho2 <= r_t ** 2) & (x > 1250.0) & (x <= 1660.0)
+            bulb = (x - 1810.0) ** 2 + rho2 <= 150.0 ** 2
+            a = np.zeros(X.shape, dtype=np.uint64)
+            a[shaft | neck | bulb] = CELL
+            return a
+        return reader, info
+    return factory
+
+
+def oblique_phantom(theta_deg):
+    """Shaft r = 300 nm along x THROUGH the box; a spine leaving at theta_deg
+    from the shaft axis (90 = radial). Neck r = 70 nm to 850 nm, head r = 250
+    nm at 1050 nm, all measured along the departure direction."""
+    th = np.radians(theta_deg)
+    d = np.array([np.cos(th), np.sin(th), 0.0])
+    o = ORIGIN
+    rows = [dict(id=i, p=i - 1 if i else -1, x=o[0] + 250.0 * i, y=o[1], z=o[2],
+                 r=300.0, annotated_type="dendrite") for i in range(13)]
+    par = 6
+    for j, s_ in enumerate((380., 480., 580., 680., 780., 900., 1050., 1200.)):
+        p = o + np.array([1500.0, 0.0, 0.0]) + s_ * d
+        rows.append(dict(id=100 + j, p=par, x=p[0], y=p[1], z=p[2],
+                         r=70.0 if s_ < 850 else 250.0, annotated_type="spine"))
+        par = 100 + j
+    df = pd.DataFrame(rows)
+    comp = np.where(df["id"] >= 100, 0, -1).astype(np.int64)
+
+    def factory(cloudpath, mip=0, **kw):
+        info = {"cloudpath": cloudpath, "mip": 0, "resolution_nm": list(RES),
+                "dtype": "uint64", "bounds_vox": [[0, 0, 0], [10 ** 7] * 3],
+                "available_mips": [0]}
+
+        def reader(lo, hi):
+            lo, hi = np.asarray(lo), np.asarray(hi)
+            X, Y, Z = grid(tuple(int(v) for v in hi - lo), lo)
+            q = np.stack([X - o[0] - 1500.0, Y - o[1], Z - o[2]], -1)
+            along = q @ d
+            perp = np.linalg.norm(q - along[..., None] * d, axis=-1)
+            shaft = ((Y - o[1]) ** 2 + (Z - o[2]) ** 2 <= 300.0 ** 2) \
+                & (X - o[0] >= 0) & (X - o[0] <= 3000.0)
+            neck = (perp <= 70.0) & (along >= 0) & (along <= 850.0)
+            head = np.linalg.norm(q - 1050.0 * d, axis=-1) <= 250.0
+            a = np.zeros(X.shape, dtype=np.uint64)
+            a[shaft | neck | head] = CELL
+            return a
+        return reader, info
+    return df, comp, factory
+
+
+def test_T18_shaft_ending():
+    import h01_spine_base as SB
+    nodes, comp = terminal_nodes()
+    fac = SAF.memoized_reader_factory(terminal_stub_factory())
+    roi = SAF.get_spine_roi(nodes, comp, 0, CELL, pad_nm=500.0, reader_factory=fac)
+    sn, bn, _ = SR.spine_subframe(nodes, comp, 0)
+    # The phantom's dendrite enters the ROI from -x, so the shaft DOES cross
+    # the box -- yet no SECTION touches it, because the component is
+    # collinear with the shaft and every plane cuts it as a disc. Two
+    # different facts; the first attempt at this test conflated them.
+    check("T18a the shaft crosses the box, but the collinear component's "
+          "sections never do", SB.shaft_reaches_box(roi)
+          and not any(r["touches_box"] for r in
+                      SB.union_profile(roi, sn, bn, dict(B.DEFAULTS))[0]))
+    rec, _, det = SAF.measure_spine_area(roi, const_lookup(1.0), dict(B.DEFAULTS),
+                                         cell_id=CELL, return_detail=True)
+    try:
+        SB.measure_base(roi, sn, bn, dict(B.DEFAULTS), detail=det,
+                        g_lookup=const_lookup(1.0), r_shaft_nm=200.0)
+        check("T18b REGRESSION: measure_base raises ShaftTerminates, it does "
+              "NOT default the base to station 0", False, "returned a base")
+    except SB.ShaftTerminates as exc:
+        check("T18b REGRESSION: measure_base raises ShaftTerminates, it does "
+              "NOT default the base to station 0",
+              "largest consecutive area drop" in str(exc), str(exc)[:60])
+    except SB.BaseError as exc:
+        check("T18b REGRESSION: measure_base raises ShaftTerminates, it does "
+              "NOT default the base to station 0", False,
+              "generic BaseError: %s" % exc)
+    # the batch hook records the verdict instead of failing the spine
+    tmp = tempfile.mkdtemp()
+    try:
+        sk_tab = pd.DataFrame({"sigma_id": [0], "r_shaft_nm": [200.0]})
+        cb = SB.make_base_callback(nodes, comp, sk_tab, dict(B.DEFAULTS),
+                                   const_lookup(1.0))
+        roi_fn = lambda sid: SAF.get_spine_roi(nodes, comp, sid, CELL, pad_nm=500.0,
+                                               reader_factory=fac)
+        recs, _ = SAF.measure_all_spines([0], roi_fn, const_lookup(1.0),
+                                         os.path.join(tmp, "l.npz"), cell_id=CELL,
+                                         verbose=False, on_success=cb)
+        r0 = recs[0]
+        # T18a established that the shaft DOES reach the box on this phantom;
+        # the recorded field must agree with the mask-level fact, not with the
+        # verdict (h01_spine_base v1.1 overwrote it with False -- REGRESSION).
+        check("T18c the spine is still measured (ok) with verdict recorded, and "
+              "shaft_reaches_box keeps its MEASURED value",
+              r0["ok"] and r0.get("base_verdict") == "shaft_terminates"
+              and r0.get("shaft_reaches_box") is True
+              and r0.get("base_method") == "none",
+              "%s / reaches=%s / method=%s" % (r0.get("base_verdict"),
+                                              r0.get("shaft_reaches_box"),
+                                              r0.get("base_method")))
+        check("T18d A_beyond is NaN, not silently the whole mesh",
+              np.isnan(r0.get("A_beyond_um2", 0.0)))
+        # REGRESSION: with base_method in require_keys, a flagged record used
+        # to lack the key, be judged stale, and be re-measured on EVERY run.
+        need = ("A_rind_um2", "rind_tol_nm", "s_base_nm", "base_method", "base_verdict")
+        n_fetch = {"n": 0}
+
+        def counting_roi(sid):
+            n_fetch["n"] += 1
+            return roi_fn(sid)
+        for _ in range(3):
+            SAF.measure_all_spines([0], counting_roi, const_lookup(1.0),
+                                   os.path.join(tmp, "l.npz"), cell_id=CELL,
+                                   verbose=False, on_success=cb, require_keys=need)
+        check("T18d' REGRESSION: a flagged record is trusted by require_keys, "
+              "not re-measured every run", n_fetch["n"] == 0,
+              "%d ROI fetches over 3 runs" % n_fetch["n"])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    # and the ordinary phantom, whose shaft DOES cross the box, is unaffected
+    nodes2, comp2 = phantom_nodes()
+    fac2 = SAF.memoized_reader_factory(stub_factory())
+    roi2 = SAF.get_spine_roi(nodes2, comp2, 0, CELL, pad_nm=500.0, reader_factory=fac2)
+    sn2, bn2, _ = SR.spine_subframe(nodes2, comp2, 0)
+    check("T18e the ordinary phantom's shaft reaches the box",
+          SB.shaft_reaches_box(roi2))
+    b2, _, _ = SB.measure_base(roi2, sn2, bn2, dict(B.DEFAULTS), r_shaft_nm=300.0)
+    check("T18f ... and its base is still found at the shaft surface, by "
+          "box contact", abs(b2["s_base_nm"] - 300.0) <= 25.0
+          and b2["base_method"] == "box_contact", "%.0f nm" % b2["s_base_nm"])
+    # A genuine spine at 45 deg from the shaft axis: no section reaches the
+    # box, but the neck is a >= 3x area drop, so the fallback finds the base.
+    df45, comp45, fac45 = oblique_phantom(45.0)
+    roi45 = SAF.get_spine_roi(df45, comp45, 0, CELL, pad_nm=500.0,
+                              reader_factory=SAF.memoized_reader_factory(fac45))
+    sn45, bn45, _ = SR.spine_subframe(df45, comp45, 0)
+    b45, _, _ = SB.measure_base(roi45, sn45, bn45, dict(B.DEFAULTS), r_shaft_nm=300.0)
+    check("T18g a 45-deg spine has NO box-contact station yet gets a base by "
+          "the area-drop fallback (>= 3x)",
+          b45["base_method"] == "area_drop" and b45["area_drop_ratio"] >= 3.0,
+          "%s, drop %.1fx" % (b45["base_method"], b45["area_drop_ratio"]))
+    check("T18h ... near r/sin(45) = 424 nm, not at station 0",
+          350.0 <= b45["s_base_nm"] <= 560.0, "%.0f nm" % b45["s_base_nm"])
 
 
 def test_T14_min_length_filter():
@@ -926,7 +1187,8 @@ def main():
                test_T9_skeleton_and_F, test_T10_kappa_function,
                test_T11_end_to_end_and_resume, test_T12_figure,
                test_T13_figure_callback, test_T14_min_length_filter,
-               test_T15_junction_terms, test_T16_measured_base):
+               test_T15_junction_terms, test_T16_measured_base,
+               test_T17_union_regions, test_T18_shaft_ending):
         _run(fn)
     n_fail = sum(1 for _, ok in RESULTS if not ok)
     print("\n%d checks passed, %d failed, %d test(s) skipped"

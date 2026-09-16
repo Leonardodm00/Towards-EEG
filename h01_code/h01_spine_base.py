@@ -52,14 +52,27 @@ imported lazily. Pure ASCII, LF only.
 
 import numpy as np
 
-MODULE_VERSION = "h01_spine_base v1.0"
+MODULE_VERSION = "h01_spine_base v1.2"
 
 BOX_MARGIN_VOX = 2.0       # a loop this close to a cutout face is the shaft
+DROP_MIN = 3.0             # fallback: a neck is a >= 3x drop in section area
+                           # (genuine spines 13-34x, a taper ~1.4x, on phantoms)
 NM2_PER_UM2 = 1.0e6
 
 
 class BaseError(RuntimeError):
     """Raised when no base can be measured for a spine."""
+
+
+class ShaftTerminates(BaseError):
+    """The dendrite ENDS inside the ROI: no union cross-section ever reaches
+    the cutout box, so there is no shaft slab to anchor the base on. The
+    spine-labelled component is then the tip of a terminating dendrite, not a
+    protrusion from one -- a shaft ending that the skeleton votes (calibre,
+    collinearity, taper) can all miss, because a terminal swelling has a
+    distal radius maximum just as a head does. Cell 1302789404 sigma 3588 is
+    the reference case: base silently placed at s = 0, every triangle counted
+    as spine, verdict 'perfect' by every earlier gate."""
 
 
 # --------------------------------------------------------------------------- #
@@ -100,6 +113,26 @@ def isoperimetric_quotient(area_nm2, perimeter_nm):
     with np.errstate(divide="ignore", invalid="ignore"):
         q = 4.0 * np.pi * a / (p * p)
     return np.where(np.isfinite(q) & (p > 0), q, np.nan)
+
+
+def shaft_reaches_box(roi):
+    """Does the connected shaft context touch any face of the cutout?
+
+    Cheap (masks only, no mesh) and independent of the profile. False means
+    the dendrite ends within the padding, which for a 500 nm pad is a
+    dendritic tip. Reported per spine so the campaign can count shaft endings
+    without building a union mesh for every one of them."""
+    import h01_spine_roi as SR
+    S = np.asarray(roi["mask"], dtype=bool)
+    ctx = roi.get("shaft_context_mask")
+    if ctx is None or not np.asarray(ctx).any():
+        return False
+    Bm = (np.asarray(roi["bridge_mask"], dtype=bool)
+          if roi.get("bridge_mask") is not None else np.zeros_like(S))
+    con, _, _ = SR.split_excluded_by_contact(S | Bm, np.asarray(ctx, dtype=bool))
+    con = np.asarray(con, dtype=bool)
+    return bool(con[0].any() or con[-1].any() or con[:, 0].any()
+                or con[:, -1].any() or con[:, :, 0].any() or con[:, :, -1].any())
 
 
 # --------------------------------------------------------------------------- #
@@ -170,16 +203,60 @@ def loop_touches_box(loop_nm, lo_vox, hi_vox, resolution_nm, margin_vox):
 
 
 def find_base(profile, min_run=2):
-    """First station from the base node whose containing loop is finite and
-    does NOT touch the cutout box, confirmed by the next (min_run - 1)
-    stations, so a single slab station that happens to clear the box cannot
-    pass. Returns (index, info)."""
+    """The base is the first station AFTER THE LAST SHAFT STATION whose
+    containing loop is finite and clear of the cutout box, confirmed by the
+    next (min_run - 1) stations so a single slab station that happens to
+    clear the box cannot pass. Returns (index, info).
+
+    "After the last shaft station" is load-bearing. Anchoring on the FIRST
+    clear station instead accepts station 0 whenever the base node itself
+    sits in a loop that misses the box -- which is exactly what happens when
+    the dendrite ends inside the ROI. That case raises ShaftTerminates; it is
+    a finding about the component, not a failure of the measurement."""
     q = np.array([r["q"] for r in profile], dtype=float)
     a = np.array([r["area_nm2"] for r in profile], dtype=float)
     touch = np.array([bool(r.get("touches_box", True)) for r in profile])
-    ok = np.isfinite(a) & (a > 0) & ~touch
-    n = len(ok)
-    for i in range(n):
+    n = len(touch)
+    fin = np.isfinite(a) & (a > 0)
+    if not touch.any():
+        # No slab: the section planes never cut the dendrite lengthwise. Two
+        # very different reasons, measured on phantoms (2026-09-16):
+        #   a genuine spine leaving at <= 45 deg from the shaft axis -- the
+        #     ellipse it cuts is too short to reach the box, but the neck still
+        #     produces a 13-34x area drop;
+        #   a collinear continuation or terminal ending (sigma 3588) -- the
+        #     dendrite simply tapers, max consecutive drop ~1.4x.
+        # So fall back to the first drop >= DROP_MIN. Below ~30 deg even a
+        # real spine shows no drop (the plane never separates neck from
+        # shaft) and is flagged too: a false positive, but a flagged and
+        # kappa-filled one, not a silent count of the whole mesh as spine.
+        best = 0.0
+        for i in range(1, n - min_run + 1):
+            if fin[i - 1] and all(fin[i:i + min_run]):
+                ratio = a[i - 1] / a[i]
+                best = max(best, ratio)
+                if ratio >= float(DROP_MIN):
+                    prev = profile[i - 1]
+                    return i, {"s_base_nm": float(profile[i]["s_nm"]),
+                               "q_base": float(q[i]),
+                               "area_base_nm2": float(a[i]),
+                               "q_prev": float(prev["q"]),
+                               "area_prev_nm2": float(prev["area_nm2"]),
+                               "n_slab_stations": int(i),
+                               "q_slab_max": float(np.nanmax(q[:i])),
+                               "area_drop_ratio": float(ratio),
+                               "base_method": "area_drop",
+                               "point_nm": np.asarray(profile[i]["point_nm"], float),
+                               "tangent": np.asarray(profile[i]["tangent"], float)}
+        raise ShaftTerminates(
+            "no cross-section reaches the cutout box over %d stations and the "
+            "largest consecutive area drop is %.2fx (< %.1fx): the section "
+            "planes never separate a neck from the dendrite. Either a "
+            "collinear continuation / terminal ending, or a spine leaving at "
+            "<~30 deg from the shaft axis. Flagged, not counted." % (n, best, DROP_MIN))
+    last_shaft = int(np.nonzero(touch)[0].max())
+    ok = fin & ~touch
+    for i in range(last_shaft + 1, n):
         if ok[i] and all(ok[i:i + min_run]) and i + min_run <= n:
             prev = profile[i - 1] if i > 0 else None
             return i, {"s_base_nm": float(profile[i]["s_nm"]),
@@ -191,11 +268,12 @@ def find_base(profile, min_run=2):
                        "q_slab_max": float(np.nanmax(q[:i])) if i else np.nan,
                        "area_drop_ratio": (float(prev["area_nm2"] / a[i])
                                            if prev and a[i] > 0 else np.nan),
+                       "base_method": "box_contact",
                        "point_nm": np.asarray(profile[i]["point_nm"], float),
                        "tangent": np.asarray(profile[i]["tangent"], float)}
-    raise BaseError("every finite station touches the cutout box (%d stations); "
+    raise BaseError("no clear station after the last shaft station (%d of %d); "
                     "the spine itself may reach the box, or the section plane "
-                    "never clears the shaft" % n)
+                    "never clears the shaft" % (last_shaft, n))
 
 
 def area_beyond_plane(centroid_nm, area_nm2, g, resolution_nm, point_nm, tangent):
@@ -232,6 +310,7 @@ def measure_base(roi, spine_nodes, base_node, opts, detail=None, g_lookup=None,
     i, b = find_base(prof)
     rec = {"s_base_nm": b["s_base_nm"], "q_base": b["q_base"],
            "area_drop_ratio": b["area_drop_ratio"],
+           "base_method": b["base_method"],
            "q_prev": b["q_prev"], "q_slab_max": b["q_slab_max"],
            "area_base_nm2": b["area_base_nm2"], "area_prev_nm2": b["area_prev_nm2"],
            "n_slab_stations": b["n_slab_stations"], "base_station": int(i),
@@ -240,7 +319,13 @@ def measure_base(roi, spine_nodes, base_node, opts, detail=None, g_lookup=None,
            "union_faces": int(len(meta["union"]["faces"])),
            "r_shaft_nm": float(r_shaft_nm) if r_shaft_nm is not None else np.nan,
            "s_base_minus_r_shaft_nm": (float(b["s_base_nm"] - r_shaft_nm)
-                                       if r_shaft_nm is not None else np.nan)}
+                                       if r_shaft_nm is not None else np.nan),
+           # The plane itself, so a figure can draw the cut the areas were
+           # split on rather than implying it. make_base_callback does NOT
+           # copy these into the ledger -- they are arrays, and the ledger
+           # holds scalars.
+           "base_point_nm": np.asarray(b["point_nm"], dtype=float),
+           "base_tangent": np.asarray(b["tangent"], dtype=float)}
     if detail is not None:
         import h01_spine_area_F as SAF
         keep = np.isin(np.asarray(detail["cls"]), SAF.COUNTED)
@@ -285,6 +370,16 @@ def make_base_callback(nodes, comp, sk, opts, g_lookup, fig_dir=None,
         os.makedirs(fig_dir, exist_ok=True)
 
     def on_success(sid, roi, rec, detail):
+        # The mask-level fact first, on its own: whether the connected shaft
+        # context reaches a cutout face. It is INDEPENDENT of the profile
+        # verdict below and must survive it -- a spine leaving at <30 deg is
+        # flagged shaft_terminates while its dendrite plainly crosses the box,
+        # and this field is what tells that case from a true ending.
+        try:
+            rec["shaft_reaches_box"] = bool(shaft_reaches_box(roi))
+        except Exception as exc:                        # noqa: BLE001
+            rec["shaft_reaches_box"] = None
+            rec["shaft_reaches_box_error"] = "%s: %s" % (type(exc).__name__, exc)
         try:
             sn, bn, _ = SR.spine_subframe(nodes, comp, sid)
             b, prof, meta = measure_base(roi, sn, bn, opts, detail=detail,
@@ -292,8 +387,9 @@ def make_base_callback(nodes, comp, sk, opts, g_lookup, fig_dir=None,
                                          r_shaft_nm=r_shaft.get(int(sid)))
             for k in ("s_base_nm", "s_base_minus_r_shaft_nm", "A_beyond_um2",
                       "A_before_base_um2", "area_drop_ratio", "n_slab_stations",
-                      "r_eq_base_nm", "q_base", "union_faces"):
+                      "r_eq_base_nm", "q_base", "union_faces", "base_method"):
                 rec[k] = b.get(k, np.nan)
+            rec["base_verdict"] = "ok"
             if fig_dir:
                 import h01_spine_area_F_figures as FIG
                 fig = FIG.union_profile_figure(
@@ -303,10 +399,22 @@ def make_base_callback(nodes, comp, sk, opts, g_lookup, fig_dir=None,
                 if show_inline:
                     fig.show()
                 return path
-        except Exception as exc:                        # noqa: BLE001
+        except ShaftTerminates as exc:
+            # shaft_reaches_box is deliberately NOT touched here.
+            rec["base_verdict"] = "shaft_terminates"
+            rec["base_method"] = "none"
             rec["base_error"] = "%s: %s" % (type(exc).__name__, exc)
             rec["s_base_nm"] = np.nan
             rec["A_beyond_um2"] = np.nan
+        except Exception as exc:                        # noqa: BLE001
+            rec["base_verdict"] = "error"
+            rec["base_method"] = "none"
+            rec["base_error"] = "%s: %s" % (type(exc).__name__, exc)
+            rec["s_base_nm"] = np.nan
+            rec["A_beyond_um2"] = np.nan
+        # Every branch leaves the same key set, so a require_keys list that
+        # names base_method / base_verdict does not mark flagged records as
+        # stale and re-measure them on every run.
         return None
     return on_success
 
@@ -323,3 +431,119 @@ def chain_callbacks(*callbacks):
             out = out or r
         return out
     return on_success
+
+
+# --------------------------------------------------------------------------- #
+# Region labelling of the union mesh, for inspection                           #
+# --------------------------------------------------------------------------- #
+REGION_SPINE, REGION_RIND, REGION_BRIDGE = 0, 1, 2
+REGION_SHAFT, REGION_DETACHED, REGION_UNRESOLVED = 3, 4, 5
+REGION_NAMES = ("spine", "rind", "bridge", "shaft", "detached", "unresolved")
+
+
+def classify_union_triangles(verts_nm, faces, roi, seg_m, base_point_nm=None,
+                             base_tangent=None, shaft_axis=None,
+                             rind_rule="plane", rind_tol_nm=None,
+                             g_lookup=None, step_nm=4.0, max_nm=48.0):
+    """Which region of the cell does each UNION-mesh triangle cover?
+
+    The union mesh wraps spine, bridge and shaft together, so its surface runs
+    continuously from dendrite to spine tip. Each triangle is labelled by
+    walking INWARD along its normal to the first voxel of the union mask and
+    reading which mask that voxel belongs to. The inward walk (not outward as
+    in h01_spine_area_F.classify_triangles) is what makes this a question about
+    the material behind the surface rather than the space in front of it.
+
+    The spine label is then split into SPINE and RIND -- the part of the
+    spine-masked surface that is really dendrite, handed over by the Voronoi
+    cut. Two rules, both available:
+
+        rind_rule="plane"     on the base-node side of the measured base plane
+                              (h01_spine_base). No radius assumed.
+        rind_rule="cylinder"  radial distance <= r_shaft + tol from the shaft
+                              axis (h01_spine_area_F.rind_area_um2).
+
+    They disagreed by about 14 percent on real spines, so showing which rule
+    produced a picture matters. Returns a dict with the per-triangle region,
+    per-region areas in um2, and the inputs echoed back.
+
+    g_lookup: pass the calibration and the areas are de-biased the same way
+    A_mesh and A_beyond are, so the numbers are directly comparable. WITHOUT
+    it they are RAW marching-cubes areas and sit a factor g (about 1.04)
+    above the calibrated ones -- enough to look like a discrepancy when it is
+    only a missing correction. `calibrated` in the result says which.
+    """
+    import h01_spine_area_F as SAF
+    import h01_spine_roi as SR
+
+    res = np.asarray(seg_m["resolution_nm"], dtype=float)
+    lo = np.asarray(seg_m["lo_vox"], dtype=np.int64)
+    S = np.asarray(roi["mask"], dtype=bool)
+    Bm = (np.asarray(roi["bridge_mask"], dtype=bool) & ~S
+          if roi.get("bridge_mask") is not None else np.zeros_like(S))
+    ctx = roi.get("shaft_context_mask")
+    ctx = np.zeros_like(S) if ctx is None else np.asarray(ctx, dtype=bool)
+    con, det, _ = (SR.split_excluded_by_contact(S | Bm, ctx) if ctx.any()
+                   else (np.zeros_like(S), np.zeros_like(S), None))
+    con = np.asarray(con, dtype=bool)
+    det = np.asarray(det, dtype=bool)
+
+    R = np.full(S.shape, REGION_UNRESOLVED, dtype=np.int8)
+    R[det] = REGION_DETACHED
+    R[con] = REGION_SHAFT
+    R[S] = REGION_SPINE
+    R[Bm] = REGION_BRIDGE
+    U = S | Bm | ctx
+
+    cen, area, nrm, _ = SAF.triangle_geometry(verts_nm, faces)
+    reg = np.full(len(area), REGION_UNRESOLVED, dtype=np.int8)
+    pend = np.arange(len(area))
+    shape = np.asarray(S.shape, dtype=np.int64)
+    for k in range(0, int(np.ceil(float(max_nm) / float(step_nm))) + 1):
+        if pend.size == 0:
+            break
+        q = SAF.mesh_point_to_local_voxel(
+            cen[pend] - (k * step_nm) * nrm[pend], lo, res)
+        inside = np.all((q >= 0) & (q < shape), axis=1)
+        # Out-of-bounds probes are SKIPPED, not dropped. surface_from_mask pads
+        # the mask by one voxel, so a triangle on a cutout face starts half a
+        # voxel outside the array; dropping it at k=0 left 3.4 percent of the
+        # union mesh (0.33 um2 on the phantom) unresolved instead of shaft.
+        qi = q[inside]
+        hit_in = U[qi[:, 0], qi[:, 1], qi[:, 2]]
+        idx = pend[inside][hit_in]
+        qh = qi[hit_in]
+        reg[idx] = R[qh[:, 0], qh[:, 1], qh[:, 2]]
+        keep = np.ones(len(pend), dtype=bool)
+        keep[np.nonzero(inside)[0][hit_in]] = False
+        pend = pend[keep]
+
+    rind_from = None
+    is_spine = reg == REGION_SPINE
+    if rind_rule == "plane" and base_point_nm is not None:
+        t = np.asarray(base_tangent, dtype=float)
+        t = t / max(float(np.linalg.norm(t)), 1e-30)
+        d = (cen + 0.5 * res - np.asarray(base_point_nm, dtype=float)) @ t
+        reg[is_spine & (d <= 0.0)] = REGION_RIND
+        rind_from = "plane"
+    elif rind_rule == "cylinder" and shaft_axis is not None:
+        u = np.asarray(shaft_axis["dir"], dtype=float)
+        u = u / max(float(np.linalg.norm(u)), 1e-30)
+        dd = (cen + 0.5 * res) - np.asarray(shaft_axis["point_nm"], dtype=float)
+        along = dd @ u
+        rho = np.linalg.norm(dd - along[:, None] * u[None, :], axis=1)
+        tol = float(res[0]) if rind_tol_nm is None else float(rind_tol_nm)
+        reg[is_spine & (rho <= float(shaft_axis["r_nm"]) + tol)] = REGION_RIND
+        rind_from = "cylinder (r_shaft + %.0f nm)" % tol
+
+    w = area
+    if g_lookup is not None:
+        gg = np.asarray(g_lookup(nrm), dtype=float).ravel()
+        w = area / np.where(gg > 0, gg, 1.0)
+    areas = {n: float(w[reg == i].sum()) / NM2_PER_UM2
+             for i, n in enumerate(REGION_NAMES)}
+    return {"region": reg, "area_nm2": area, "centroid_nm": cen,
+            "area_um2_by_region": areas, "rind_rule": rind_from,
+            "calibrated": g_lookup is not None,
+            "n_by_region": {n: int((reg == i).sum())
+                            for i, n in enumerate(REGION_NAMES)}}
