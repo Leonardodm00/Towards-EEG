@@ -29,7 +29,7 @@ import time
 import numpy as np
 import pandas as pd
 
-RUNNER_VERSION = "run_spine_area_F v1.1"
+RUNNER_VERSION = "run_spine_area_F v1.2"
 DEFAULT_CELLS = (1302789404,)
 
 
@@ -61,10 +61,16 @@ def build_parser():
                    help="demote spines below this; omit to disable")
     p.add_argument("--axial-window-nm", type=float, default=None,
                    help="cap on |axial offset| for rind triangles; omit = none")
-    p.add_argument("--measure-base", action="store_true",
-                   help="also measure the union-mesh spine base per spine "
+    p.add_argument("--measure-base", dest="measure_base", action="store_true",
+                   default=True,
+                   help="measure the union-mesh spine base per spine "
                         "(h01_spine_base): s_base vs the skeleton r_shaft, and "
-                        "A_beyond, the rind removed by measurement not by model")
+                        "A_beyond, the deliverable's spine area. ON by default "
+                        "since 2026-09-15; kept as a flag for old commands")
+    p.add_argument("--no-measure-base", dest="measure_base", action="store_false",
+                   help="skip the base measurement. The deliverable track "
+                        "(mesh_beyond) is then EMPTY and the merge reports "
+                        "qc_status=fail for the cell")
     p.add_argument("--no-shaft-stub-fix", action="store_true",
                    help="skip the three-vote shaft-continuation demotion "
                         "(must match Stage 1)")

@@ -12,6 +12,9 @@
 #   mkdir -p logs && qsub -v CELL=1302789404 spine_area_F.pbs
 #   qsub -v CELL=1302789404,SUBSET=300 spine_area_F.pbs     # staged run first
 #
+# Base measurement (A_beyond, the deliverable's spine area) is ON by default.
+# NO_MEASURE_BASE=1 turns it off, and the merge then reports qc_status=fail.
+#
 # PBS Pro array syntax (-J / PBS_ARRAY_INDEX), matching the cylinder sweep.
 # On Torque use  #PBS -t 0-39  and PBS_ARRAYID; the fallback below covers it.
 #
@@ -40,6 +43,7 @@ EXTRA=""
 if [ -n "${SUBSET:-}" ]; then EXTRA="$EXTRA --subset $SUBSET"; fi
 if [ -n "${MIN_SPINE_VALUE:-}" ]; then EXTRA="$EXTRA --min-spine-value $MIN_SPINE_VALUE"; fi
 if [ -n "${DRY_RUN:-}" ]; then EXTRA="$EXTRA --dry-run"; fi
+if [ -n "${NO_MEASURE_BASE:-}" ]; then EXTRA="$EXTRA --no-measure-base"; fi
 
 python3 run_spine_area_F.py \
     --root "$ROOT" \

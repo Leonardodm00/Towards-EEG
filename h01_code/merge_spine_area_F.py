@@ -19,7 +19,7 @@ import sys
 import time
 
 
-MERGER_VERSION = "merge_spine_area_F v1.0"
+MERGER_VERSION = "merge_spine_area_F v1.1"
 
 
 def build_parser():
@@ -37,8 +37,21 @@ def build_parser():
     p.add_argument("--min-spine-value", type=float, default=None)
     p.add_argument("--axial-window-nm", type=float, default=None)
     p.add_argument("--no-shaft-stub-fix", action="store_true")
-    p.add_argument("--measure-base", action="store_true",
-                   help="must match the flag the shards ran with")
+    p.add_argument("--measure-base", dest="measure_base", action="store_true",
+                   default=True, help="mirror of the runner flag (fingerprint)")
+    p.add_argument("--no-measure-base", dest="measure_base", action="store_false",
+                   help="mirror of the runner flag (fingerprint)")
+    p.add_argument("--deliverable", default="mesh_beyond",
+                   help="which mesh variant is THE F (default mesh_beyond)")
+    p.add_argument("--min-coverage", type=float, default=0.99,
+                   help="measured fraction of spines on the deliverable track "
+                        "below which qc_status is pass_low_confidence")
+    p.add_argument("--no-cap-tips", dest="cap_tips", action="store_false",
+                   default=True,
+                   help="do not cap skeleton leaf tips (spine_density 1.3.0). "
+                        "Default: cap, so A_shaft carries the shaft-side cap")
+    p.add_argument("--cap-h-um", type=float, default=None,
+                   help="cap pole height in um; default spine_density.CAP_H_UM_DEFAULT")
     p.add_argument("--kappa-min-per-bin", type=int, default=25)
     p.add_argument("--allow-missing", action="store_true",
                    help="proceed even if some shards never wrote a ledger")
@@ -69,17 +82,22 @@ def main(argv=None):
         if not os.path.isfile(p["ledger"]):
             missing.append(k)
             continue
-        if os.path.isfile(p["meta"]):
-            fp = json.load(open(p["meta"])).get("fingerprint")
-            if fp != st["fingerprint"]:
-                bad.append((k, fp))
-                continue
+        if not os.path.isfile(p["meta"]):
+            # A ledger without its sidecar cannot prove what it measured.
+            # Accepting it would bypass the parameter gate.
+            bad.append((k, "NO META SIDECAR"))
+            continue
+        fp = json.load(open(p["meta"])).get("fingerprint")
+        if fp != st["fingerprint"]:
+            bad.append((k, fp))
+            continue
         r, h = SAF.load_ledger(p["ledger"])
         recs.update(r)
         H.update(h)
     if bad:
         raise SystemExit(
-            "shard(s) built with different parameters: %s\n  expected %s\n"
+            "shard(s) built with different parameters or without a meta "
+            "sidecar: %s\n  expected %s\n"
             "  Re-run those tasks with the SAME flags, or delete their ledgers."
             % (", ".join("task %d -> %s" % b for b in bad), st["fingerprint"]))
     if missing and not args.allow_missing:
@@ -99,7 +117,10 @@ def main(argv=None):
 
     out = SAF.assemble_cell(sd, st["labelled"], st["nodes"], st["comp"], recs,
                             args.cell, sk=st["sk"],
-                            min_per_bin=args.kappa_min_per_bin)
+                            min_per_bin=args.kappa_min_per_bin,
+                            cap_tips=args.cap_tips, cap_h_um=args.cap_h_um,
+                            deliverable=args.deliverable,
+                            min_coverage=args.min_coverage)
     out["summary"].update({
         "merger_version": MERGER_VERSION, "fingerprint": st["fingerprint"],
         "n_shards_missing": len(missing),
@@ -122,10 +143,22 @@ def main(argv=None):
     print("kappa  raw %.3f | rind removed %.3f | base removed %.3f | both %.3f"
           % (s["kappa_pooled"], s["kappa_pooled_norind"],
              s["kappa_pooled_nobase"], s["kappa_pooled_both"]))
-    for lab in ("skel", "mesh_uncalibrated", "mesh_skelfill", "mesh",
-                "mesh_norind"):
-        print("F_lit %-18s %.4f   F_whole %.4f"
-              % (lab, s["F_lit_" + lab], s["F_whole_" + lab]))
+    dv = s["deliverable_variant"]
+    print("QC %s%s" % (s["qc_status"], (": " + s["qc_reason"]) if s["qc_reason"] else ""))
+    print("deliverable %s: F_lit %.4f  F_whole %.4f | coverage %.3f (%d measured, "
+          "%d fallback: %d kappa, %d raw; %.1f%% of spine area) | cap_tips=%s h=%s um"
+          % (dv, s["F_lit_deliverable"], s["F_whole_deliverable"],
+             s["coverage_count_deliverable"], s["n_measured_" + dv],
+             s["n_fallback_" + dv], s["n_fallback_kappa_" + dv],
+             s["n_fallback_raw_" + dv], 100 * s["fallback_area_frac_deliverable"],
+             s["cap_tips"], s["cap_h_um"]))
+    order = [dv] + [v for v in ("mesh_beyond", "mesh", "mesh_norind",
+                                "mesh_skelfill", "mesh_uncalibrated",
+                                "skel", "skel_nocap") if v != dv]
+    for lab in order:
+        print("F_lit %-18s %.4f   F_whole %.4f%s"
+              % (lab, s["F_lit_" + lab], s["F_whole_" + lab],
+                 "   <- deliverable" if lab == dv else ""))
     print(out["kappa_table"].to_string(index=False))
     print("wrote %s  (%.1f min)" % (json.dumps(paths, indent=1),
                                     (time.time() - t0) / 60))

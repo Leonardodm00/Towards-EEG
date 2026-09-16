@@ -58,6 +58,7 @@ _sd = T.FakeSD()
 SHAFT_REGEX = _sd.SHAFT_REGEX
 SPINE_LABELS = tuple(_sd.SPINE_LABELS)
 DEFAULT_RADIUS_NM = _sd.DEFAULT_RADIUS_NM
+CAP_H_UM_DEFAULT = _sd.CAP_H_UM_DEFAULT
 _prepare_nodes = _sd._prepare_nodes
 _frustum_lateral_area = _sd._frustum_lateral_area
 _segment_length_um = _sd._segment_length_um
@@ -285,6 +286,85 @@ def main():
               np.isfinite(row["kappa_pooled_norind"])
               and np.isfinite(row["base_frac_of_skel_pooled"]),
               "kappa_norind %.3f" % row["kappa_pooled_norind"])
+
+        # ---- P3 (2026-09-15): deliverable, coverage accounting, QC
+        check("A16 deliverable is mesh_beyond, fully covered, qc pass",
+              row["deliverable_variant"] == "mesh_beyond"
+              and row["qc_status"] == "pass"
+              and abs(row["coverage_count_deliverable"] - 1.0) < 1e-12
+              and int(row["n_fallback_mesh_beyond"]) == 0
+              and np.isfinite(row["F_whole_deliverable"])
+              and bool(row["cap_tips"]),
+              "qc=%s cov=%.3f fb=%s F_whole=%.4f" % (
+                  row["qc_status"], row["coverage_count_deliverable"],
+                  row["n_fallback_mesh_beyond"], row["F_whole_deliverable"]))
+        pm = pd.read_csv(os.path.join(root, "out", "neuron_%d_phi_mesh.csv" % CELL))
+        ps = pd.read_csv(os.path.join(root, "out", "neuron_%d_phi_skel.csv" % CELL))
+        check("A16' phi_mesh.csv is the deliverable's phi and phi_skel.csv exists",
+              abs(1.0 + pm["spine_area_um2"].sum() / pm["shaft_area_um2"].sum()
+                  - row["F_whole_deliverable"]) < 1e-9
+              and "spine_cap_um2" in ps.columns and len(ps) == len(pm))
+
+        # Tamper: one spine FAILED, one CLIPPED -> both must fall back to the
+        # skeleton, and the summary must say so.
+        import copy as _copy
+        saved = {}
+        for p in led:
+            r_, h_ = SAF.load_ledger(p["ledger"])
+            saved[p["ledger"]] = (_copy.deepcopy(r_), _copy.deepcopy(h_))
+        sids = sorted(int(s) for p in led for s in SAF.load_ledger(p["ledger"])[0])
+        s_fail, s_clip = sids[0], sids[-1]
+        for p in led:
+            r_, h_ = SAF.load_ledger(p["ledger"])
+            if s_fail in r_:
+                r_[s_fail]["ok"] = False
+            if s_clip in r_:
+                r_[s_clip]["clipped"] = True
+            SAF.save_ledger(p["ledger"], r_, h_)
+        check("A17 tampered merge exits 0", M.main(margv) == 0)
+        row2 = pd.read_csv(os.path.join(root, "out", "spine_area_F_summary.csv")).iloc[-1]
+        check("A17' one failed + one clipped -> 2 on fallback, qc low confidence",
+              int(row2["n_failed"]) == 1 and int(row2["n_clipped"]) == 1
+              and int(row2["n_fallback_mesh_beyond"]) == 2
+              and abs(row2["coverage_count_deliverable"] - (N_SPINES - 2) / N_SPINES) < 1e-12
+              and row2["qc_status"] == "pass_low_confidence"
+              and "fallback" in str(row2["qc_reason"])
+              and 0.0 < row2["fallback_area_frac_deliverable"] < 1.0
+              and np.isfinite(row2["F_whole_deliverable"]),
+              "failed=%s clipped=%s fb=%s cov=%.3f qc=%s area_fb=%.3f" % (
+                  row2["n_failed"], row2["n_clipped"], row2["n_fallback_mesh_beyond"],
+                  row2["coverage_count_deliverable"], row2["qc_status"],
+                  row2["fallback_area_frac_deliverable"]))
+        # Tamper: strip the base measurement from every record -> the
+        # deliverable track is EMPTY -> F NaN and qc fail, never a silent copy.
+        for p in led:
+            r_, h_ = SAF.load_ledger(p["ledger"])
+            for rec in r_.values():
+                rec.pop("A_beyond_um2", None)
+                rec.pop("s_base_nm", None)
+            SAF.save_ledger(p["ledger"], r_, h_)
+        check("A18 empty deliverable track merges (exit 0)", M.main(margv) == 0)
+        row3 = pd.read_csv(os.path.join(root, "out", "spine_area_F_summary.csv")).iloc[-1]
+        check("A18' empty deliverable track -> F NaN and qc fail, mesh track intact",
+              row3["qc_status"] == "fail"
+              and not np.isfinite(row3["F_whole_mesh_beyond"])
+              and int(row3["n_measured_mesh_beyond"]) == 0
+              and np.isfinite(row3["F_whole_mesh"]),
+              "qc=%s F_beyond=%s F_mesh=%.4f" % (row3["qc_status"],
+                                                 row3["F_whole_mesh_beyond"],
+                                                 row3["F_whole_mesh"]))
+        for path_, (r_, h_) in saved.items():
+            SAF.save_ledger(path_, r_, h_)
+        # Sidecar hole: a ledger with no meta must be REFUSED, not accepted.
+        meta_bak = led[1]["meta"] + ".bak"
+        os.rename(led[1]["meta"], meta_bak)
+        try:
+            M.main(margv)
+            check("A19 merge refuses a ledger with no meta sidecar", False, "accepted")
+        except SystemExit as e:
+            check("A19 merge refuses a ledger with no meta sidecar",
+                  "NO META SIDECAR" in str(e), str(e)[:70])
+        os.rename(meta_bak, led[1]["meta"])
 
         # ---- negative paths
         # min-spine-value 1e9 demotes EVERY spine: the merge must reject the
