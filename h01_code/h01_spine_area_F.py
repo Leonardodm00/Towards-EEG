@@ -940,17 +940,86 @@ def kappa_apply(ktab, a_skel):
     return ktab["kappa"].to_numpy(dtype=float)[idx]
 
 
+DELIVERABLE_DEFAULT = "mesh_beyond"
+MESH_VARIANTS = ("mesh_beyond", "mesh", "mesh_norind", "mesh_skelfill",
+                 "mesh_uncalibrated")
+QC_PASS, QC_LOW, QC_FAIL = "pass", "pass_low_confidence", "fail"
+
+
+def _build_phi_skel(sd, labelled, cell_id, cap_tips, cap_h_um):
+    """Stage 1's phi table, with the tip cap when asked for. Fails loudly on a
+    spine_density that cannot cap rather than silently returning an uncapped
+    table: the cap changes A_shaft, and therefore every F."""
+    if not cap_tips:
+        return sd.build_phi(labelled, nid=cell_id, input_units="nm"), 0.0
+    if cap_h_um is None:
+        cap_h_um = getattr(sd, "CAP_H_UM_DEFAULT", None)
+        if cap_h_um is None:
+            raise SpineAreaError(
+                "cap_tips=True but spine_density %s has no CAP_H_UM_DEFAULT; "
+                "spine_density 1.3.0 or later is required, or pass cap_h_um "
+                "explicitly, or cap_tips=False"
+                % getattr(sd, "MODULE_VERSION", "?"))
+    try:
+        phi = sd.build_phi(labelled, nid=cell_id, input_units="nm",
+                           cap_tips=True, cap_h_um=float(cap_h_um))
+    except TypeError as exc:
+        raise SpineAreaError(
+            "cap_tips=True but spine_density %s build_phi does not accept "
+            "cap_tips (%s); spine_density 1.3.0 or later is required"
+            % (getattr(sd, "MODULE_VERSION", "?"), exc))
+    for c in ("spine_cap_um2", "shaft_cap_um2"):
+        if c not in phi.columns:
+            raise SpineAreaError("cap_tips=True but build_phi returned no %r "
+                                 "column; cannot separate cap from area" % c)
+    return phi, float(cap_h_um)
+
+
+def _uncapped(phi_skel):
+    """The same table with BOTH caps taken back out: spine_area_um2 loses
+    spine_cap_um2, shaft_area_um2 loses shaft_cap_um2. The per-spine skeleton
+    table has no cap, so the spine column of this table is what the
+    attribution gate must be compared against; the whole table is the nocap
+    basis (`skel_nocap`) and the nocap basis for kappa."""
+    out = phi_skel.copy()
+    for area, cap in (("spine_area_um2", "spine_cap_um2"),
+                      ("shaft_area_um2", "shaft_cap_um2")):
+        if cap in out.columns:
+            out[area] = (out[area].to_numpy(dtype=float)
+                         - out[cap].to_numpy(dtype=float))
+    return out
+
+
 def assemble_cell(sd, labelled, nodes, comp, recs, cell_id,
-                  cutoff_um=F_CUTOFF_UM, sk=None, min_per_bin=5):
+                  cutoff_um=F_CUTOFF_UM, sk=None, min_per_bin=5,
+                  cap_tips=True, cap_h_um=None,
+                  deliverable=DELIVERABLE_DEFAULT, min_coverage=0.99):
     """phi_skel -> gate -> per-spine join -> phi_mesh -> F. Returns a dict.
 
-    Unmeasured spines (pilot subset, failures, clipped) are filled two ways
-    and both are reported: with their skeleton area (biased by 1/kappa) and
-    with kappa_hat(A_skel) * A_skel. With full coverage the two coincide.
+    Spine area policy (decided 2026-09-15): the MESH is primary and the
+    skeleton is the fallback. Measured spines take their mesh area; unmeasured
+    ones (failures, clipped, pilot subset) take kappa_hat(A_skel) * A_skel, or
+    A_skel itself when kappa cannot be estimated. With full coverage the
+    fallback never fires, and the summary says how often it did.
+
+    cap_tips : cap the skeleton's leaf tips (spine_density 1.3.0). The spine
+        side of the cap is discarded when the mesh replaces the spine column;
+        the SHAFT side survives in the denominator of every mesh variant.
+        `skel` keeps both (Stage 1's basis); `skel_nocap` keeps neither.
+    deliverable : which mesh variant is THE F. Its coverage and fallback
+        statistics drive qc_status.
+    min_coverage : fraction of spines that must be measured on the
+        deliverable track for qc_status 'pass'; below it, 'pass_low_confidence'.
+        A deliverable track with NO measurements is 'fail', and its F is NaN
+        rather than a silent copy of the skeleton value.
     """
-    phi_skel = sd.build_phi(labelled, nid=cell_id, input_units="nm")
+    if deliverable not in MESH_VARIANTS:
+        raise SpineAreaError("deliverable %r is not one of %s"
+                             % (deliverable, MESH_VARIANTS))
+    phi_skel, cap_h_used = _build_phi_skel(sd, labelled, cell_id, cap_tips, cap_h_um)
+    phi_nocap = _uncapped(phi_skel)
     sk = skeleton_spine_table(sd, labelled, nodes, comp) if sk is None else sk.copy()
-    gate = attribution_gate(phi_skel, sk)
+    gate = attribution_gate(phi_nocap, sk)
     if not gate["pass"]:
         raise SpineAreaError("attribution gate FAILED for cell %s: %s"
                              % (cell_id, json.dumps(gate)))
@@ -999,15 +1068,24 @@ def assemble_cell(sd, labelled, nodes, comp, recs, cell_id,
                                                 k_hat_by * a_sk, a_sk))
 
     phis = {"skel": phi_skel,
+            "skel_nocap": phi_nocap,
             "mesh": phi_with_spine_areas(phi_skel, sk, "A_used_kappafill_um2"),
             "mesh_skelfill": phi_with_spine_areas(phi_skel, sk, "A_used_skelfill_um2"),
             "mesh_uncalibrated": phi_with_spine_areas(phi_skel, sk, "A_used_raw_um2"),
             "mesh_norind": phi_with_spine_areas(phi_skel, sk, "A_used_norind_um2"),
             "mesh_beyond": phi_with_spine_areas(phi_skel, sk, "A_used_beyond_um2")}
+    # A mesh track with no measurement at all would otherwise report the
+    # skeleton fallback under a mesh name -- a plausible number that measured
+    # nothing. Empty tracks report NaN.
+    track_measured = {"mesh": good, "mesh_skelfill": good,
+                      "mesh_uncalibrated": good & np.isfinite(a_raw),
+                      "mesh_norind": sk["measured_norind"].to_numpy(dtype=bool),
+                      "mesh_beyond": sk["measured_beyond"].to_numpy(dtype=bool)}
     F = {}
     for name, ph in phis.items():
-        F["F_whole_" + name] = cell_F(ph, 0.0)["F"]
-        F["F_lit_" + name] = cell_F(ph, cutoff_um)["F"]
+        empty = name in track_measured and not track_measured[name].any()
+        F["F_whole_" + name] = float("nan") if empty else cell_F(ph, 0.0)["F"]
+        F["F_lit_" + name] = float("nan") if empty else cell_F(ph, cutoff_um)["F"]
     if hasattr(sd, "cell_f_beyond_cutoff"):
         ref = sd.cell_f_beyond_cutoff(phi_skel, cutoff_um=cutoff_um, by="d_from_um")
         F["F_lit_skel_stage1_fn"] = float(ref["F"])
@@ -1076,11 +1154,71 @@ def assemble_cell(sd, labelled, nodes, comp, recs, cell_id,
                "attribution_gate": gate}
     summary.update(junction)
     summary.update(F)
+
+    # ---- coverage and fallback accounting, per track ---------------------
+    # 'fallback' = spines whose area came from the skeleton, split by whether
+    # kappa could rescale it. Reported by count and by share of the track's
+    # total spine area, so a few large unmeasured spines cannot hide.
+    n_sp = int(len(sk))
+
+    def _track(measured, k_hat_t, used_col):
+        meas_t = np.asarray(measured, dtype=bool)
+        used = sk[used_col].to_numpy(dtype=float) if used_col in sk else np.zeros(n_sp)
+        tot = float(np.nansum(used))
+        fb = ~meas_t
+        fb_kappa = fb & np.isfinite(np.asarray(k_hat_t, dtype=float))
+        return {"n_measured": int(meas_t.sum()),
+                "n_fallback": int(fb.sum()),
+                "n_fallback_kappa": int(fb_kappa.sum()),
+                "n_fallback_raw": int((fb & ~fb_kappa).sum()),
+                "coverage_count": (float(meas_t.sum()) / n_sp) if n_sp else float("nan"),
+                "fallback_area_frac": (float(np.nansum(used[fb])) / tot
+                                       if tot > 0 else float("nan"))}
+
+    tracks = {"mesh": _track(good, k_hat, "A_used_kappafill_um2"),
+              "mesh_norind": _track(sk["measured_norind"], k_hat_nr, "A_used_norind_um2"),
+              "mesh_beyond": _track(sk["measured_beyond"], k_hat_by, "A_used_beyond_um2")}
+    for name, t in tracks.items():
+        for k, v in t.items():
+            summary["%s_%s" % (k, name)] = v
+
+    # ---- the deliverable, and its QC verdict ------------------------------
+    d = tracks.get(deliverable, _track(good, k_hat, "A_used_kappafill_um2"))
+    summary.update({
+        "deliverable_variant": deliverable,
+        "F_lit_deliverable": F["F_lit_" + deliverable],
+        "F_whole_deliverable": F["F_whole_" + deliverable],
+        "coverage_count_deliverable": d["coverage_count"],
+        "fallback_area_frac_deliverable": d["fallback_area_frac"],
+        "min_coverage": float(min_coverage),
+        "cap_tips": bool(cap_tips), "cap_h_um": cap_h_used,
+        "shaft_cap_total_um2": (float(phi_skel["shaft_cap_um2"].sum())
+                                if "shaft_cap_um2" in phi_skel else 0.0),
+        "spine_cap_total_um2_skel": (float(phi_skel["spine_cap_um2"].sum())
+                                     if "spine_cap_um2" in phi_skel else 0.0)})
+    if n_sp == 0:
+        qc, why = QC_FAIL, "no spines on this cell after demotion"
+    elif d["n_measured"] == 0:
+        qc, why = QC_FAIL, ("deliverable track %r has no measured spine; "
+                           "F_lit_%s is NaN (was --no-measure-base passed?)"
+                           % (deliverable, deliverable))
+    elif d["coverage_count"] < float(min_coverage):
+        qc, why = QC_LOW, ("coverage %.3f below floor %.2f on %r: %d of %d "
+                          "spines on skeleton fallback (%.1f%% of spine area)"
+                          % (d["coverage_count"], float(min_coverage),
+                             deliverable, d["n_fallback"], n_sp,
+                             100.0 * d["fallback_area_frac"]))
+    else:
+        qc, why = QC_PASS, ""
+    summary["qc_status"] = qc
+    summary["qc_reason"] = why
     return {"phi": phis, "spines": sk, "kappa_table": ktab, "summary": summary}
 
 
 def write_cell_outputs(out_dir, cell_id, out):
-    """CSV per spine, phi^mesh in Stage 1's schema, kappa table, summary row."""
+    """CSV per spine, phi of the deliverable variant in Stage 1's schema (as
+    neuron_{id}_phi_mesh.csv), phi_skel (the capped skeleton baseline), kappa
+    table, summary row."""
     os.makedirs(out_dir, exist_ok=True)
     cid = int(cell_id)
     paths = {
@@ -1092,7 +1230,10 @@ def write_cell_outputs(out_dir, cell_id, out):
     sp = out["spines"].drop(columns=[c for c in ("traceback",)
                                      if c in out["spines"].columns])
     sp.to_csv(paths["spines"], index=False, lineterminator="\n")
-    out["phi"]["mesh"].to_csv(paths["phi_mesh"], index=False, lineterminator="\n")
+    deliv = out["summary"].get("deliverable_variant", "mesh")
+    out["phi"][deliv].to_csv(paths["phi_mesh"], index=False, lineterminator="\n")
+    paths["phi_skel"] = os.path.join(out_dir, "neuron_%d_phi_skel.csv" % cid)
+    out["phi"]["skel"].to_csv(paths["phi_skel"], index=False, lineterminator="\n")
     out["kappa_table"].to_csv(paths["kappa"], index=False, lineterminator="\n")
     row = {k: v for k, v in out["summary"].items() if k != "attribution_gate"}
     row["gate_max_abs_diff_um2"] = out["summary"]["attribution_gate"]["max_abs_diff_um2"]

@@ -362,7 +362,22 @@ class FakeSD(object):
         root = [i for i, a in node.items() if a["p"] not in node][0]
         return node, children, root
 
-    def build_phi(self, df, nid=None, input_units="nm"):
+    # spine_density 1.3.0 contract: a cap default and cap kwargs. This double
+    # caps NOTHING (zero cap columns), so the cap arithmetic is not tested
+    # here -- that is spine_density's own test -- but the assemble_cell path
+    # that separates cap from area is exercised with the columns present.
+    CAP_H_UM_DEFAULT = 0.1
+
+    def build_phi(self, df, nid=None, input_units="nm", cap_tips=False,
+                  cap_h_um=None):
+        phi = self._build_phi_uncapped(df, nid=nid, input_units=input_units)
+        if cap_tips:
+            import numpy as _np
+            phi["spine_cap_um2"] = _np.zeros(len(phi))
+            phi["shaft_cap_um2"] = _np.zeros(len(phi))
+        return phi
+
+    def _build_phi_uncapped(self, df, nid=None, input_units="nm"):
         node, ch, root = self._prepare_nodes(df, self.SHAFT_REGEX,
                                              self.SPINE_LABELS,
                                              self.DEFAULT_RADIUS_NM, input_units)
