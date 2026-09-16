@@ -30,10 +30,31 @@ set -eo pipefail
 # It exists so this script can be exercised off-cluster before it is shipped;
 # on the cluster, leave it unset so the env is the one the jobs will use.
 if [ -z "${SKIP_CONDA:-}" ]; then
-    set +u                          # BEFORE the hook: the hook itself
-    eval "$(conda shell.bash hook)" # deactivates base and sources activate.d
-    conda activate "${ENV_NAME:-spine_env}"
+    ENV_NAME="${ENV_NAME:-spine_env}"
+    # set +e AS WELL AS set +u. `conda activate` runs the env's activate.d
+    # hooks, and those can return non-zero while still having activated
+    # correctly -- binutils on this cluster prints its INFO block and returns
+    # 1. Under `set -e` that killed the script here, after the INFO block and
+    # before any test ran: no error, no output, exit 1. Verified by
+    # reproduction, 2026-09-16.
+    set +u
+    set +e
+    eval "$(conda shell.bash hook)"
+    conda activate "$ENV_NAME"
+    set -e
     set -u
+    # So trust the OUTCOME, not the status: activation is real only if
+    # python3 now resolves inside the env.
+    case "$(command -v python3 || true)" in
+        *"/envs/$ENV_NAME/"*) ;;
+        *)
+            echo "ERROR: 'conda activate $ENV_NAME' did not take effect."
+            echo "  python3 is $(command -v python3 || echo '<none>')"
+            echo "  Check the env exists:  conda env list"
+            echo "  Or bypass:             SKIP_CONDA=1 bash run_smoke_tests.sh"
+            exit 1
+            ;;
+    esac
 else
     set -u
     echo "SKIP_CONDA set -- using $(which python3) without activating an env"
