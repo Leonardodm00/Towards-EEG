@@ -38,3 +38,7 @@
 # routed to S0.7, never normalised.
 passive_fit.o* -text -diff
 passive_fit.e* -text -diff
+
+# Calibration tables and other NumPy archives are ZIP containers.
+*.npz   binary
+*.pbs   text eol=lf

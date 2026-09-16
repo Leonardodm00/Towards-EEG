@@ -58,6 +58,8 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
+import spine_cap as sc
+
 # --------------------------------------------------------------------------- #
 # Defaults mirror the notebook (morpholgy_pathways__6_.py)                     #
 #   shaft regex: L2009 / L1701 / L1995                                         #
@@ -69,7 +71,11 @@ SPINE_LABELS = ("spine", "head", "neck")
 DEFAULT_RADIUS_NM = 50.0
 NM_PER_UM = 1000.0
 
-MODULE_VERSION = "spine_density-1.2.0"
+MODULE_VERSION = "spine_density-1.3.0"
+
+# Distal tip closure (see spine_cap). cap_tips=False everywhere by default, so
+# 1.3.0 reproduces 1.2.0 bit-for-bit unless the caller opts in.
+CAP_H_UM_DEFAULT = sc.CAP_H_UM_DEFAULT
 
 _REQUIRED_COLUMNS = ("id", "p", "x", "y", "z", "annotated_type")
 
@@ -157,7 +163,7 @@ def _path_distances_um(node, children, root):
 # --------------------------------------------------------------------------- #
 # Spine area attribution (decision 2: attribute to the base segment)          #
 # --------------------------------------------------------------------------- #
-def _attribute_spine_area(node, children):
+def _attribute_spine_area(node, children, cap_h_um=None, return_cap=False):
     """Return dict (parent_id, child_id) -> summed spine membrane area (um^2).
 
     A spine is a maximal terminal subtree of spine-labelled nodes. Its total
@@ -166,6 +172,17 @@ def _attribute_spine_area(node, children):
     (the shaft node the spine hangs off). For a spine sitting directly on the
     root (no incoming shaft segment), it is attributed to the root's first shaft
     child segment instead, so no area is silently dropped.
+
+    cap_h_um : float or None
+        If not None, additionally close every TRUE LEAF of the spine (zero
+        children in the full skeleton) with a spherical cap of pole height
+        cap_h_um, per spine_cap. The cap is folded into the returned area, so
+        downstream consumers of phi need no change. cap_h_um=None (default)
+        reproduces spine_density 1.2.0 exactly.
+    return_cap : bool
+        If True, return (seg_spine_area, dropped, seg_spine_cap) instead of the
+        2-tuple, where seg_spine_cap holds the cap contribution alone so the
+        capped and uncapped totals are always separable after the fact.
     """
     shaft_children = {
         n: [c for c in children.get(n, ()) if node[c]["is_shaft"]] for n in node
@@ -184,6 +201,7 @@ def _attribute_spine_area(node, children):
         return out
 
     seg_spine_area = defaultdict(float)
+    seg_spine_cap = defaultdict(float)
     dropped = 0
     for nid, a in node.items():
         if not a["is_spine"]:
@@ -197,16 +215,27 @@ def _attribute_spine_area(node, children):
         area = 0.0
         for s in subtree:
             sp = node[s]["p"]
+            if sp not in node:
+                continue
             area += _frustum_lateral_area(node[sp]["r"], node[s]["r"],
                                           _segment_length_um(node, sp, s))
+        cap = 0.0
+        if cap_h_um is not None:
+            cap, _n_capped, _n_bad = sc.subtree_cap_area(
+                node, children, subtree, cap_h_um)
+            area += cap
         if base in node and node[base]["p"] in node:
             # base has an incoming shaft segment (parent(base) -> base)
             seg_spine_area[(node[base]["p"], base)] += area
+            seg_spine_cap[(node[base]["p"], base)] += cap
         elif base in node and shaft_children.get(base):
             # base is the root: attribute to its first outgoing shaft segment
             seg_spine_area[(base, shaft_children[base][0])] += area
+            seg_spine_cap[(base, shaft_children[base][0])] += cap
         else:
             dropped += area
+    if return_cap:
+        return seg_spine_area, dropped, seg_spine_cap
     return seg_spine_area, dropped
 
 
@@ -253,7 +282,9 @@ def build_phi(df,
               spine_labels=SPINE_LABELS,
               default_radius_nm=DEFAULT_RADIUS_NM,
               input_units="nm",
-              self_check=True):
+              self_check=True,
+              cap_tips=False,
+              cap_h_um=CAP_H_UM_DEFAULT):
     """Compute phi(nu, b, d) for one spine-labelled neuron.
 
     Parameters
@@ -269,6 +300,16 @@ def build_phi(df,
     self_check : bool
         If True, assert internal invariants (segment coverage; d0 + x == path
         distance). Cheap; leave on.
+    cap_tips : bool
+        If True, close every true skeleton leaf with a spherical cap of pole
+        height cap_h_um (see spine_cap), recovering the membrane lost to the
+        H01 100 nm endpoint erosion. Applied SYMMETRICALLY: spine leaves feed
+        spine_area_um2, shaft leaves feed shaft_area_um2. Capping only the
+        spine side would raise F by construction. Default False, so the
+        uncapped 1.2.0 numbers are reproduced unless opted in.
+    cap_h_um : float
+        Pole height of the cap, in um. 0.100 is the documented H01 erosion.
+        Pass 0.0 for the flat-disc lower bound of the bracket.
 
     Returns
     -------
@@ -278,14 +319,19 @@ def build_phi(df,
         x0_um, x1_um, seg_len_um,       # arclength along the branch
         d0_um, d_from_um, d_to_um,      # path distance from soma
         shaft_diam_um,                  # r_from + r_to (mean diameter of segment)
-        shaft_area_um2, spine_area_um2,
+        shaft_area_um2, spine_area_um2, # INCLUDE the cap when cap_tips=True
+        spine_cap_um2, shaft_cap_um2,   # cap contribution alone (0.0 if off),
+                                        # so the uncapped values are always
+                                        # recoverable as area - cap
         phi_um,                         # spine_area_um2 / seg_len_um  [um^2/um]
         psi                             # phi / (pi * shaft_diam_um), dimensionless
     """
     node, children, root = _prepare_nodes(
         df, shaft_regex, spine_labels, default_radius_nm, input_units)
     path_dist = _path_distances_um(node, children, root)
-    seg_spine_area, dropped = _attribute_spine_area(node, children)
+    h = float(cap_h_um) if cap_tips else None
+    seg_spine_area, dropped, seg_spine_cap = _attribute_spine_area(
+        node, children, cap_h_um=h, return_cap=True)
     branches = _decompose_branches(node, children, root)
 
     rows = []
@@ -303,7 +349,13 @@ def build_phi(df,
             r_a = node[a_id]["r"]
             r_b = node[b_id]["r"]
             shaft_area = _frustum_lateral_area(r_a, r_b, seg_len)
+            # a shaft leaf was eroded exactly like a spine tip; cap it too, or
+            # F rises purely because only one side of the ratio was corrected
+            shaft_cap = (sc.cap_area_for_node(node, children, b_id, h)
+                         if h is not None else 0.0)
+            shaft_area += shaft_cap
             spine_area = seg_spine_area.get((a_id, b_id), 0.0)
+            spine_cap = seg_spine_cap.get((a_id, b_id), 0.0)
             phi = spine_area / seg_len if seg_len > 0 else 0.0
             delta = r_a + r_b
             psi = phi / (math.pi * delta) if delta > 0 else 0.0
@@ -322,6 +374,8 @@ def build_phi(df,
                 "shaft_diam_um": delta,
                 "shaft_area_um2": shaft_area,
                 "spine_area_um2": spine_area,
+                "spine_cap_um2": spine_cap,
+                "shaft_cap_um2": shaft_cap,
                 "phi_um": phi,
                 "psi": psi,
             })
@@ -352,6 +406,13 @@ def build_phi(df,
             % (attributed, recovered))
 
     phi_df.attrs["dropped_spine_area_um2"] = dropped
+    phi_df.attrs["cap_tips"] = bool(cap_tips)
+    phi_df.attrs["cap_h_um"] = float(cap_h_um) if cap_tips else 0.0
+    phi_df.attrs["spine_cap_version"] = sc.MODULE_VERSION
+    phi_df.attrs["total_spine_cap_um2"] = (
+        float(phi_df["spine_cap_um2"].sum()) if len(phi_df) else 0.0)
+    phi_df.attrs["total_shaft_cap_um2"] = (
+        float(phi_df["shaft_cap_um2"].sum()) if len(phi_df) else 0.0)
     return phi_df
 
 

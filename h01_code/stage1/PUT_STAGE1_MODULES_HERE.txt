@@ -1,0 +1,14 @@
+This directory is assembled by  bash ../stage1_link.sh  (run once per clone,
+on the cluster): it symlinks the canonical Stage 1 sources --
+
+    towards_eeg/structure/  morphology_exporter.py  spine_density.py
+                            spine_labeller.py  node_classify.py
+                            soma_enforce.py  spine_cap.py
+    Stage 1/                spine_geometry.py  continuation_inspect.py
+
+-- so the runner imports the REAL modules with no copies to drift. The
+attribution gate exists to check this code against the real spine_density;
+shipping a copy that could drift would defeat it.
+
+run_spine_area_F.py refuses to start without them, and spine_area_F.pbs
+passes --stage1-dir pointing here explicitly.
