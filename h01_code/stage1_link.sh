@@ -26,6 +26,9 @@ declare -A SRC=(
   [node_classify.py]="towards_eeg/structure/node_classify.py"
   [soma_enforce.py]="towards_eeg/structure/soma_enforce.py"
   [spine_cap.py]="towards_eeg/structure/spine_cap.py"
+  [alignment.py]="towards_eeg/structure/alignment.py"
+  [hoc_qc.py]="towards_eeg/structure/hoc_qc.py"
+  [synapse_redirect_audit.py]="towards_eeg/structure/synapse_redirect_audit.py"
   [spine_geometry.py]="Stage 1/spine_geometry.py"
   [continuation_inspect.py]="Stage 1/continuation_inspect.py"
 )
