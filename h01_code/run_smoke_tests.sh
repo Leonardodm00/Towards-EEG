@@ -60,9 +60,25 @@ else
     echo "SKIP_CONDA set -- using $(which python3) without activating an env"
 fi
 
-# When submitted with qsub, start in the directory the job was submitted from;
-# when run directly, in the directory the script lives in.
-CODE="${CODE:-${PBS_O_WORKDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}}"
+# Where the code is. Under qsub the script runs from a spool copy, so
+# BASH_SOURCE points nowhere useful and PBS_O_WORKDIR (the submit directory)
+# is the answer -- but ONLY inside a job. A login shell can carry a stale
+# PBS_O_WORKDIR from an earlier `qsub -I` or a .bashrc export, and trusting it
+# there sent this script into a different project (2026-09-16). PBS_JOBID is
+# only ever set inside a job, so it is the discriminator.
+if [ -n "${CODE:-}" ]; then
+    :
+elif [ -n "${PBS_JOBID:-}" ]; then
+    CODE="${PBS_O_WORKDIR:?PBS_JOBID is set but PBS_O_WORKDIR is not}"
+else
+    CODE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+if [ ! -f "$CODE/stage1_link.sh" ]; then
+    echo "ERROR: $CODE is not h01_code (no stage1_link.sh there)."
+    echo "  PBS_JOBID=${PBS_JOBID:-<unset>}  PBS_O_WORKDIR=${PBS_O_WORKDIR:-<unset>}"
+    echo "  Run from h01_code, or pass CODE=/path/to/h01_code."
+    exit 1
+fi
 cd "$CODE"
 mkdir -p logs
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
