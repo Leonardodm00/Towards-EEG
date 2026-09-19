@@ -10,6 +10,8 @@
 # One array task measures a contiguous block of one cell's spines.
 #
 #   mkdir -p logs && qsub -v CELL=1302789404 spine_area_F.pbs
+#
+# Paths are H01_ROOT / H01_CODE (qsub -v H01_ROOT=..., not ROOT=...).
 #   qsub -v CELL=1302789404,SUBSET=300 spine_area_F.pbs     # staged run first
 #
 # Base measurement (A_beyond, the deliverable's spine area) is ON by default.
@@ -27,15 +29,33 @@ eval "$(conda shell.bash hook)"     # deactivates base and sources activate.d
 conda activate spine_env
 set -u
 
-ROOT="${ROOT:-/davinci-1/home/ldellamea/TEEG/Towards-EEG/h01}"
-CODE="${CODE:-/davinci-1/home/ldellamea/TEEG/Towards-EEG/h01_code}"
+# H01_ROOT / H01_CODE, never the bare ROOT / CODE. Those are names a login
+# shell routinely exports for another project, and a PBS job sources .bashrc,
+# so the bare names would send every array task into the wrong tree. Old-style
+# values are reported and ignored rather than obeyed (2026-09-19).
+for _stale in ROOT CODE; do
+    eval "_v=\${$_stale:-}"
+    if [ -n "$_v" ]; then
+        echo "NOTE: $_stale is set ($_v) and is IGNORED; the knobs are H01_ROOT / H01_CODE."
+    fi
+done
+H01_ROOT="${H01_ROOT:-/davinci-1/home/ldellamea/TEEG/Towards-EEG/h01}"
+H01_CODE="${H01_CODE:-/davinci-1/home/ldellamea/TEEG/Towards-EEG/h01_code}"
+if [ ! -f "$H01_CODE/run_spine_area_F.py" ]; then
+    echo "ERROR: H01_CODE=$H01_CODE is not h01_code (no run_spine_area_F.py)."
+    exit 1
+fi
+if [ ! -d "$H01_ROOT/neurons" ]; then
+    echo "ERROR: H01_ROOT=$H01_ROOT has no neurons/ -- wrong campaign root."
+    exit 1
+fi
 CELL="${CELL:?set CELL, e.g. qsub -v CELL=1302789404 spine_area_F.pbs}"
 NTASKS="${NTASKS:-40}"
 TASK="${PBS_ARRAY_INDEX:-${PBS_ARRAYID:-0}}"
 
 module load proxy || echo "WARNING: module load proxy failed"
 
-cd "$CODE"
+cd "$H01_CODE"
 echo "host $(hostname) | cell $CELL | task $TASK/$NTASKS | $(date -u +%FT%TZ)"
 echo "python $(which python3)"
 
@@ -46,8 +66,8 @@ if [ -n "${DRY_RUN:-}" ]; then EXTRA="$EXTRA --dry-run"; fi
 if [ -n "${NO_MEASURE_BASE:-}" ]; then EXTRA="$EXTRA --no-measure-base"; fi
 
 python3 run_spine_area_F.py \
-    --root "$ROOT" \
-    --stage1-dir "$CODE/stage1" \
+    --root "$H01_ROOT" \
+    --stage1-dir "$H01_CODE/stage1" \
     --cell "$CELL" \
     --task "$TASK" \
     --ntasks "$NTASKS" \

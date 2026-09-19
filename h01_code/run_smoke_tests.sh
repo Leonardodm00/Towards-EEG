@@ -8,6 +8,7 @@
 #   bash run_smoke_tests.sh                 # all suites
 #   bash run_smoke_tests.sh p0 p3           # only suites whose name matches
 #   ENV_NAME=other_env bash run_smoke_tests.sh
+#   H01_CODE=/path/to/h01_code bash run_smoke_tests.sh
 #   qsub run_smoke_tests.sh                 # same script, as a job
 #
 # Exit status 0 only if every selected suite passed. Any failure leaves the
@@ -66,26 +67,34 @@ fi
 # PBS_O_WORKDIR from an earlier `qsub -I` or a .bashrc export, and trusting it
 # there sent this script into a different project (2026-09-16). PBS_JOBID is
 # only ever set inside a job, so it is the discriminator.
+# The knob is H01_CODE, not CODE. `CODE` and `ROOT` are names a login shell
+# routinely exports for some other project -- this one exported
+# CODE=~/"Human Neurons Fitting" -- and a PBS job sources .bashrc, so honouring
+# the bare name silently sent this script into a different tree (2026-09-16).
+# An old-style CODE is reported and ignored rather than obeyed.
 if [ -n "${CODE:-}" ]; then
+    echo "NOTE: CODE is set ($CODE) and is IGNORED; the knob is H01_CODE."
+fi
+if [ -n "${H01_CODE:-}" ]; then
     :
 elif [ -n "${PBS_JOBID:-}" ]; then
-    CODE="${PBS_O_WORKDIR:?PBS_JOBID is set but PBS_O_WORKDIR is not}"
+    H01_CODE="${PBS_O_WORKDIR:?PBS_JOBID is set but PBS_O_WORKDIR is not}"
 else
-    CODE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    H01_CODE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 fi
-if [ ! -f "$CODE/stage1_link.sh" ]; then
-    echo "ERROR: $CODE is not h01_code (no stage1_link.sh there)."
+if [ ! -f "$H01_CODE/stage1_link.sh" ]; then
+    echo "ERROR: $H01_CODE is not h01_code (no stage1_link.sh there)."
     echo "  PBS_JOBID=${PBS_JOBID:-<unset>}  PBS_O_WORKDIR=${PBS_O_WORKDIR:-<unset>}"
-    echo "  Run from h01_code, or pass CODE=/path/to/h01_code."
+    echo "  Run from h01_code, or pass H01_CODE=/path/to/h01_code."
     exit 1
 fi
-cd "$CODE"
+cd "$H01_CODE"
 mkdir -p logs
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 
 echo "==========================================================="
 echo " smoke tests | $(hostname) | $(date -u +%FT%TZ)"
-echo " dir    $CODE"
+echo " dir    $H01_CODE"
 echo " env    ${CONDA_DEFAULT_ENV:-<none>}"
 echo " python $(which python3)  ($(python3 -V 2>&1))"
 echo "==========================================================="
@@ -122,7 +131,7 @@ while IFS= read -r f; do
     [ -n "$f" ] && ALL+=("$f")
 done < <(ls smoke_test_*.py 2>/dev/null | sort)
 if [ "${#ALL[@]}" -eq 0 ]; then
-    echo "no smoke_test_*.py in $CODE"
+    echo "no smoke_test_*.py in $H01_CODE"
     exit 1
 fi
 
@@ -156,7 +165,7 @@ for s in "${SUITES[@]}"; do
         rm -f "$log"
     else
         tail -n 25 "$log" | sed 's/^/  /' || true
-        echo "  FULL LOG: $CODE/$log"
+        echo "  FULL LOG: $H01_CODE/$log"
         FAILED+=("$name")
     fi
 done
