@@ -1,18 +1,29 @@
-# Spine-area campaign on Da-Vinci
+# H01 campaign on Da-Vinci: P1 export and P2 spine area
 
-Calibrated dendritic-spine membrane area from the H01 segmentation, substituted
+Two array jobs live here. **P1** (`run_p1_export.py`, section 8) partitions,
+exports, aligns and gates one cell per array task, headless, from a manifest
+of (cell, layer, exc/inh). **P2** (`run_spine_area_F.py`, sections 3-7) is the
+calibrated dendritic-spine membrane area from the H01 segmentation, substituted
 into Stage 1's phi table, giving a mesh-based `F` per cell.
 
+`run_p1_export v1.0` | `p1_spine_stats v1.0` | `p1_hoc_audit v1.0` | `build_p1_manifest v1.0`
 `h01_spine_area_F v1.7` | `run_spine_area_F v1.3` | `merge_spine_area_F v1.1` | `h01_spine_base v1.2`
 
 ---
 
 ## 1. What is in this bundle, and what is missing
 
-**Included** (the full import closure of the runner, minus the figure stack):
+**Included** (the full import closure of both runners, minus the figure stack):
 
 | file | role |
 |---|---|
+| `run_p1_export.py` | P1: one array task = one cell through `alignment.align_and_export`, plus the controls, audits and tables of section 8 |
+| `build_p1_manifest.py` | writes one manifest per population, checked against the layer's alignment bank |
+| `p1_spine_stats.py` | the per-spine-node and per-spine tables (handoff section 4.1) |
+| `p1_hoc_audit.py` | structural `.hoc` audit, NEURON validation subprocess, quarantine (ports of notebook CELL 6a) |
+| `passive_params.csv` | cm, Ra, gate Rm per (layer, cell_type); **only L2/L3 exc filled** |
+| `p1_export.pbs` | PBS Pro array job for P1, one submission per population |
+| `smoke_test_p1_export.py` | 84 checks: tables on a hand-labelled fixture, the real export end to end, audit, refusals, the job script |
 | `h01_spine_area_F.py` | area, rind, base frustum, kappa, F |
 | `h01_spine_batch.py` | the analysis mesh (14 Taubin iterations) |
 | `h01_spine_roi.py` | per-spine cutout, Voronoi split, bridging |
@@ -32,13 +43,14 @@ into Stage 1's phi table, giving a mesh-based `F` per cell.
 | `g_table_cyl_2deg.npz` + `.json` | the v7 cylinder calibration |
 
 **Not copied -- linked.** The Stage 1 modules (`spine_density`,
-`spine_labeller`, `morphology_exporter`, `spine_geometry`, ...) live in
-`towards_eeg/structure/` and `Stage 1/` of this repo; `stage1_link.sh` fills
-`stage1/` with symlinks to them (once per clone, and after any `git pull` that
-adds a module; `run_smoke_tests.sh` does it for you). The attribution gate
-exists precisely to check this code against the real `spine_density`, so a copy
-or a stub would defeat the point. `run_spine_area_F.py` refuses to start if
-they are absent or if the label vocabulary falls back to `sma_run`'s literals.
+`spine_labeller`, `morphology_exporter`, `alignment`, `hoc_qc`,
+`spine_geometry`, ...) live in `towards_eeg/structure/` and `Stage 1/` of this
+repo; `stage1_link.sh` fills `stage1/` with symlinks to them (once per clone,
+and after any `git pull` that adds a module; `run_smoke_tests.sh` does it for
+you). The attribution gate exists precisely to check this code against the
+real `spine_density`, so a copy or a stub would defeat the point. Both runners
+refuse to start if they are absent; `run_spine_area_F.py` also refuses if the
+label vocabulary falls back to `sma_run`'s literals.
 
 Figures (`h01_spine_area_F_figures.py`, `h01_spine_roi_figures.py`) are
 deliberately absent: they need matplotlib, plotly and IPython, and the campaign
@@ -59,7 +71,10 @@ TEEG/Towards-EEG/                 <- the git repo, branch main
       neurons/neuron_<id>.csv
       synapses/neuron_<id>_synapses.csv
       alignment/alignment_metadata_L{2,3,4,5,6}.csv
-      out/                        <- created by the first shard
+      p1/manifests/<layer>_<type>.csv   <- written by build_p1_manifest.py
+      p1/<cell_id>/               <- P1 output, one directory per cell
+      p1/p1_summary.csv           <- written by run_p1_export.py --summarise
+      out/                        <- P2 output, created by the first shard
 ```
 
 The path knobs are `H01_ROOT` and `H01_CODE` (`qsub -v H01_ROOT=...`); the bare
@@ -77,7 +92,7 @@ is not. Keeping data out of the repo keeps `git status` clean between runs.
 cd h01_code && bash run_smoke_tests.sh
 ```
 
-Expect `passed 4/4` and `ALL SUITES PASSED`. It activates `spine_env`
+Expect `passed 5/5` and `ALL SUITES PASSED`. It activates `spine_env`
 (`H01_ENV=other_env` to choose another; a stale `ENV_NAME` exported by the
 login shell is reported and ignored, like `CODE` and `ROOT`), checks and
 repairs the `stage1/` symlink farm, then runs every `smoke_test_*.py`. All
@@ -169,3 +184,109 @@ high enough that F is measured rather than extrapolated.
 | `--roi-cache DIR` | none | reuse CELL 12 ROIs instead of refetching |
 | `--kappa-min-per-bin` | 25 (merge) | below ~25 per bin the kappa curve fits noise |
 | `--no-shaft-stub-fix` | off | must match how Stage 1 built its own phi |
+
+---
+
+## 8. P1: partition, export, align and gate (one cell per array task)
+
+`run_p1_export.py` is a wrapper over `alignment.align_and_export`, which is
+already the whole single-cell pipeline (export steps 1-8 with the three-vote
+demotion at 4b, alignment at 9, the propagation gate at 12 with staging, the
+synapse snap and the C-09 emitter at 14). The driver supplies what the Colab
+notebook supplies by hand and a cluster cannot: which cell (a manifest row by
+array index), which constants (cm, Ra, gate Rm from `passive_params.csv` by
+(layer, cell_type)), and the controls around the call: rigidity control,
+structural `.hoc` audit with quarantine, arbour angle, the section-4.1 spine
+tables, a parameter fingerprint and one JSON record per cell.
+
+Standing decisions are baked in and fingerprinted: `demote_continuations=True`
+at the default thresholds, `cap_tips=True, cap_h_um=0.1` (the notebook's
+`CAP_TIPS=False` is superseded), propagation gate ON, synapse redirect ON
+whenever the synapse CSV exists, cm shaft-referenced, F never folded in.
+
+**8.1 The label.** A cell carries only `(layer, cell_type)` with
+`layer in {L2..L6}` and `cell_type in {exc, inh}`. Nothing finer exists on the
+cluster. The campaign is ten populations, one manifest and one array job
+each, and each layer has its own bank `alignment/alignment_metadata_L<n>.csv`
+(column `neuron_id`).
+
+**8.2 The passive table.** `passive_params.csv` has one row per population:
+`layer, cell_type, cm_uF_cm2, Ra_ohm_cm, Rm_qc_ohm_cm2, cm_reference, source,
+provenance`. Only `L2 exc` and `L3 exc` are filled (cm 0.50, Ra 268.5,
+Rm_qc 24000, shaft-referenced; Eyal 2016 / Deitcher 2017). The other eight
+rows are blank on purpose: a blank row is **refused before any export**, so a
+population cannot run on a placeholder. `Rm_qc` is the gate's Rm only; it is
+not exported into the `.hoc`.
+
+**8.3 Build the manifest** (one per population; paths inside it are relative
+to `H01_ROOT`, POSIX separators, so it travels between laptop and cluster):
+
+```
+python3 build_p1_manifest.py --root ../h01 --layer L3 --cell-type exc \
+    --ids 1302789404,1317492596,1333261412,1376890291 \
+    --out ../h01/p1/manifests/L3_exc.csv
+```
+
+It refuses an id with no `neurons/neuron_<id>.csv`, and an id absent from the
+layer's bank unless `--allow-unbanked` (then `layer_source` is `manifest`, not
+`bank`). A missing synapse CSV is allowed: the column is left empty, the cell
+is exported without the redirect, and the builder says so. It prints the
+`#PBS -J` width to use. `--ids-file` reads one id per line (what `Save nids`
+writes).
+
+**8.4 Dry run, then submit.** The dry run resolves the manifest row, the
+passive constants, the inputs (with their hashes) and the fingerprint, and
+exports nothing:
+
+```
+python3 run_p1_export.py --root ../h01 --manifest ../h01/p1/manifests/L3_exc.csv --task 0 --dry-run
+```
+
+Then, from `h01_code`, one submission per population with its own name, log
+and width (these override the `#PBS` defaults in the script):
+
+```
+mkdir -p logs
+qsub -N p1_L3exc -o logs/p1_L3exc.log -J 0-3 -v MANIFEST=../h01/p1/manifests/L3_exc.csv p1_export.pbs
+```
+
+`qsub -v` knobs: `MANIFEST` (required; relative paths resolve against
+`H01_CODE`), `H01_ROOT`, `H01_CODE`, `H01_ENV`, and `DRY_RUN=1`, `FORCE=1`,
+`NO_RIGIDITY=1`, `NO_NEURON_VALIDATE=1`. The bare `ROOT` / `CODE` /
+`ENV_NAME` are reported and ignored, as everywhere else here.
+
+**8.5 After the array:**
+
+```
+python3 run_p1_export.py --root ../h01 --summarise --manifest ../h01/p1/manifests/L3_exc.csv
+```
+
+folds every `p1/*/neuron_*_p1.json` into `p1/p1_summary.csv` (one row per
+cell: status, qc_status, gate_status, hoc_verdict, rigidity, quarantine,
+n_sections, F variants, spine and synapse counts, passive constants,
+fingerprint) and, with `--manifest`, lists the manifest cells that have no
+record and exits 1 -- an array narrower than the manifest or a dead task is
+caught here, not discovered later.
+
+**8.6 Outputs**, in `h01/p1/<cell_id>/`:
+
+| file | writer | content |
+|---|---|---|
+| `neuron_<id>_aligned.hoc`, `_phi.csv`, `_segment_map.csv`, `_section_table.csv`, `_spine_bases.csv`, `_synapses.csv`, `_provenance.json`, `_alignment.json`, `_mapped_synapses.csv` | `align_and_export` | the Stage 1 export, committed only on a gate pass |
+| `neuron_<id>_spine_nodes.csv` | `p1_spine_stats` | one row per spine node (`spine_part` head/neck, raw nm, aligned base) |
+| `neuron_<id>_spine_stats.csv` | `p1_spine_stats` | one row per spine, keyed `root_id`: head/neck geometry, base and beyond-shaft lengths, R_neck, path distance, A_skel, section, synapse count, demotion vote |
+| `neuron_<id>_hoc_validation.json` | `p1_hoc_audit` | structural audit + NEURON validation (or `neuron_available: false`) |
+| `neuron_<id>_p1.json` | the driver | the record: manifest row, passive constants, fingerprint, result summary, timings |
+
+A cell the gate rejects gets only the `_p1.json` (status `ok`, `qc_status`
+`fail`, nothing else written; that verdict is final on rerun unless
+`--force`). A cell the structural audit rejects is moved whole into
+`<out>/<cell_id>/_quarantine/` and the record says so. A cell whose synapse
+CSV is empty after the direction filter is exported without the redirect and
+recorded `pass_low_confidence`. A cell with a record whose fingerprint matches
+is skipped (`resumed`); a record with `status: error` is always reprocessed.
+The per-spine key is the root node id: `root_node_id` here, `root_id` in P3's
+`cell<id>_spines.csv`; join on that. The `spine_id` string
+(`"<cell_id>:<root_node_id>"`) is written here as a convenience column only.
+
+**8.7 Not yet written:** P4 (the bank) and the eight blank passive rows.

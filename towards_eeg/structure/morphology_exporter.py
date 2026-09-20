@@ -129,7 +129,7 @@ except ImportError:                                            # pragma: no cove
     cinsp = None
 
 
-MODULE_VERSION = "morphology_exporter-1.2.0"
+MODULE_VERSION = "morphology_exporter-1.2.1"
 
 # Project setting D-S1.3-d. Chosen between the two shadowed defaults
 # (5000 nm at L1653, 3000 nm at L2353). Passed explicitly at every call site
@@ -380,6 +380,10 @@ def build_section_map(sections, phi_df):
     return pd.DataFrame(seg_rows), pd.DataFrame(sec_rows)
 
 
+SPINE_BASES_COLUMNS = ("spine_root_id", "base_node_id", "n_nodes",
+                       "spine_base_section", "section_id")
+
+
 def resolve_spine_base_sections(spine_bases, sections, df_pruned):
     """Attach each pruned spine to the section carrying its base segment.
 
@@ -414,7 +418,11 @@ def resolve_spine_base_sections(spine_bases, sections, df_pruned):
                                    if sec is not None else None),
             "section_id": (sec["section_id"] if sec is not None else -1),
         })
-    return pd.DataFrame(out)
+    # Columns even when there is no spine: a cell with none (every
+    # interneuron, or an excitatory cell whose few candidates were all
+    # demoted) used to write a bare newline that pandas refuses to read,
+    # which crashed align_and_export at the redirect (1.2.1, 2026-09-20).
+    return pd.DataFrame(out, columns=SPINE_BASES_COLUMNS)
 
 
 # --------------------------------------------------------------------------- #

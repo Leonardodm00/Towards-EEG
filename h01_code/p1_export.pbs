@@ -1,0 +1,144 @@
+#!/bin/bash
+#PBS -N p1exp
+#PBS -q cpu
+#PBS -J 0-3
+#PBS -l select=1:ncpus=2:mem=16gb
+#PBS -l walltime=02:00:00
+#PBS -j oe
+#PBS -o logs/p1exp.log
+# ---------------------------------------------------------------------------
+# P1: one array task exports one cell of one population (layer x cell_type).
+#
+#   cd h01_code && mkdir -p logs
+#   qsub -N p1_L3exc -o logs/p1_L3exc.log -J 0-3 \
+#        -v MANIFEST=../h01/p1/manifests/L3_exc.csv p1_export.pbs
+#
+# One qsub per population, each with its own manifest. Give every submission
+# its own -N and -o on the command line (they override the #PBS lines below):
+# with the defaults, ten populations would append into the same
+# logs/p1exp.log. The array width MUST equal the manifest's row count minus
+# one; build_p1_manifest.py prints the -J line to use, and passing it on the
+# command line (as above) overrides the #PBS -J 0-3 default. Submit from
+# h01_code: #PBS -o is relative.
+#
+# Knobs (qsub -v): MANIFEST (required), H01_ROOT, H01_CODE, H01_ENV, and
+#   DRY_RUN=1            resolve inputs and constants, export nothing
+#   FORCE=1              reprocess a cell whose record already matches
+#   NO_RIGIDITY=1        skip the unaligned control export
+#   NO_NEURON_VALIDATE=1 skip the validate_hoc subprocess
+# After the array, per population (exits 1 and lists the ids if any manifest
+# row has no record, i.e. the -J width was too narrow or a task died):
+#   python3 run_p1_export.py --root "$H01_ROOT" --summarise \
+#           --manifest ../h01/p1/manifests/L3_exc.csv
+#
+# No network is needed (no module load proxy). NEURON + LFPy come from the
+# env: the propagation gate and validate_hoc need them.
+#
+# The bare ENV_NAME / CODE / ROOT are NOT read (reported and ignored): the
+# login shell exports them for other projects and a PBS job sources .bashrc.
+# ---------------------------------------------------------------------------
+set -eo pipefail
+
+# Activation block copied from run_smoke_tests.sh (2026-09-20, H01_ENV form),
+# the one form verified to survive this cluster's conda hooks.
+# SKIP_CONDA=1 runs the script against whatever python3 is already on PATH.
+# It exists so this script can be exercised off-cluster before it is shipped;
+# on the cluster, leave it unset so the env is the one the jobs will use.
+if [ -z "${SKIP_CONDA:-}" ]; then
+    # H01_ENV, never the bare ENV_NAME. The login shell exports ENV_NAME for
+    # another project (ENV_NAME=sbi_export, observed 2026-09-20), a PBS job
+    # sources .bashrc, and honouring it activated THAT env while the outcome
+    # check below passed -- python3 did resolve inside envs/$ENV_NAME/. So the
+    # knob is H01_ENV, and a stale ENV_NAME is reported and ignored, exactly
+    # like CODE and ROOT.
+    if [ -n "${ENV_NAME:-}" ]; then
+        echo "NOTE: ENV_NAME is set ($ENV_NAME) and is IGNORED; the knob is H01_ENV."
+    fi
+    H01_ENV="${H01_ENV:-spine_env}"
+    # set +e AS WELL AS set +u. `conda activate` runs the env's activate.d
+    # hooks, and those can return non-zero while still having activated
+    # correctly -- binutils on this cluster prints its INFO block and returns
+    # 1. Under `set -e` that killed the script here, after the INFO block and
+    # before any test ran: no error, no output, exit 1. Verified by
+    # reproduction, 2026-09-16.
+    set +u
+    set +e
+    eval "$(conda shell.bash hook)"
+    conda activate "$H01_ENV"
+    set -e
+    set -u
+    # So trust the OUTCOME, not the status: activation is real only if
+    # python3 now resolves inside the env.
+    case "$(command -v python3 || true)" in
+        *"/envs/$H01_ENV/"*) ;;
+        *)
+            echo "ERROR: 'conda activate $H01_ENV' did not take effect."
+            echo "  python3 is $(command -v python3 || echo '<none>')"
+            echo "  Check the env exists:  conda env list"
+            exit 1
+            ;;
+    esac
+else
+    set -u
+    echo "SKIP_CONDA set -- using $(which python3) without activating an env"
+fi
+
+# H01_ROOT / H01_CODE, never the bare ROOT / CODE. Those are names a login
+# shell routinely exports for another project, and a PBS job sources .bashrc,
+# so the bare names would send every array task into the wrong tree. Old-style
+# values are reported and ignored rather than obeyed (2026-09-19).
+for _stale in ROOT CODE; do
+    eval "_v=\${$_stale:-}"
+    if [ -n "$_v" ]; then
+        echo "NOTE: $_stale is set ($_v) and is IGNORED; the knobs are H01_ROOT / H01_CODE."
+    fi
+done
+H01_ROOT="${H01_ROOT:-/davinci-1/home/ldellamea/TEEG/Towards-EEG/h01}"
+H01_CODE="${H01_CODE:-/davinci-1/home/ldellamea/TEEG/Towards-EEG/h01_code}"
+if [ ! -f "$H01_CODE/run_p1_export.py" ]; then
+    echo "ERROR: H01_CODE=$H01_CODE is not h01_code (no run_p1_export.py)."
+    exit 1
+fi
+if [ ! -d "$H01_ROOT/neurons" ]; then
+    echo "ERROR: H01_ROOT=$H01_ROOT has no neurons/ -- wrong campaign root."
+    exit 1
+fi
+if [ ! -f "$H01_CODE/passive_params.csv" ]; then
+    echo "ERROR: passive table missing: $H01_CODE/passive_params.csv"
+    exit 1
+fi
+if [ ! -d "$H01_CODE/stage1" ]; then
+    echo "ERROR: symlink farm missing: $H01_CODE/stage1 (run: bash stage1_link.sh)"
+    exit 1
+fi
+MANIFEST="${MANIFEST:?set MANIFEST, e.g. qsub -v MANIFEST=../h01/p1/manifests/L3_exc.csv p1_export.pbs}"
+case "$MANIFEST" in
+    /*) ;;
+    *) MANIFEST="$H01_CODE/$MANIFEST" ;;
+esac
+if [ ! -f "$MANIFEST" ]; then
+    echo "ERROR: MANIFEST does not exist: $MANIFEST"
+    exit 1
+fi
+TASK="${PBS_ARRAY_INDEX:-${PBS_ARRAYID:-0}}"
+
+cd "$H01_CODE"
+echo "host $(hostname) | manifest $(basename "$MANIFEST") | task $TASK | $(date -u +%FT%TZ)"
+echo "python $(which python3)"
+
+EXTRA=""
+if [ -n "${DRY_RUN:-}" ]; then EXTRA="$EXTRA --dry-run"; fi
+if [ -n "${FORCE:-}" ]; then EXTRA="$EXTRA --force"; fi
+if [ -n "${NO_RIGIDITY:-}" ]; then EXTRA="$EXTRA --no-rigidity-control"; fi
+if [ -n "${NO_NEURON_VALIDATE:-}" ]; then EXTRA="$EXTRA --no-neuron-validate"; fi
+
+python3 run_p1_export.py \
+    --root "$H01_ROOT" \
+    --stage1-dir "$H01_CODE/stage1" \
+    --passive-table "$H01_CODE/passive_params.csv" \
+    --manifest "$MANIFEST" \
+    --task "$TASK" \
+    -v \
+    $EXTRA
+
+echo "task $TASK finished $(date -u +%FT%TZ)"

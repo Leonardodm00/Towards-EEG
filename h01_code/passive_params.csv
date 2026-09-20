@@ -1,0 +1,11 @@
+layer,cell_type,cm_uF_cm2,Ra_ohm_cm,Rm_qc_ohm_cm2,cm_reference,source,provenance
+L2,exc,0.50,268.5,24000.0,shaft,literature,Eyal et al. 2016 Table 1 (human L2/3 pyramidal; n=6; cm intrinsic shaft-referenced; Ra mean of six cells); Rm_qc = tau_m 12.03 ms (Deitcher et al. 2017) / cm -- gate only; same constants as alignment.CM_EYAL_L23 / RA_EYAL_L23
+L3,exc,0.50,268.5,24000.0,shaft,literature,Eyal et al. 2016 Table 1 (human L2/3 pyramidal; n=6; cm intrinsic shaft-referenced; Ra mean of six cells); Rm_qc = tau_m 12.03 ms (Deitcher et al. 2017) / cm -- gate only; same constants as alignment.CM_EYAL_L23 / RA_EYAL_L23
+L2,inh,,,,,,TO BE FILLED by the user before the L2 inh run (a blank row is refused by run_p1_export.py)
+L3,inh,,,,,,TO BE FILLED by the user before the L3 inh run
+L4,exc,,,,,,TO BE FILLED by the user before the L4 exc run
+L4,inh,,,,,,TO BE FILLED by the user before the L4 inh run
+L5,exc,,,,,,TO BE FILLED by the user before the L5 exc run (pending choice: Rich et al. 2021 cm 1.0 / Ra 495.7 vs Guet-McCreight et al. 2023 cm 0.9 / Ra 100)
+L5,inh,,,,,,TO BE FILLED by the user before the L5 inh run
+L6,exc,,,,,,TO BE FILLED by the user before the L6 exc run
+L6,inh,,,,,,TO BE FILLED by the user before the L6 inh run
