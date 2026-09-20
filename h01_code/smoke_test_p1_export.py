@@ -7,8 +7,10 @@ p1_spine_stats.py, p1_hoc_audit.py, passive_params.csv, p1_export.pbs.
 
 Sections
   A  passive table: resolution, refusal of a blank / missing / non-shaft row
-  B  manifest builder: bank membership, missing skeleton, missing synapse
-     file, --allow-unbanked, duplicate ids; manifest loader refusals
+  B  manifest builder: bank DISCOVERY (neurons/ vs alignment/, --bank,
+     --bank-dir, the both-present warning, refusal naming every path
+     tried), bank membership, missing skeleton, missing synapse file,
+     --allow-unbanked, duplicate ids; manifest loader refusals
   C  section 4.1 tables on the HAND-LABELLED fixture the handoff specifies
      (spine A: 3-node neck [60, 40, 80] nm + 2-node head; spine B: stubby,
      1-node neck + 1 head; three synapses): neck_r_min == 40,
@@ -175,8 +177,17 @@ def aspiny_cell():
     return pd.DataFrame(rows, columns=["id", "p", "x", "y", "z", "r", "annotated_type"])
 
 
+def bank_path_of(root, subdir="neurons", layer="L3"):
+    return os.path.join(root, subdir, "alignment_metadata_%s.csv" % layer)
+
+
 def campaign_tree(tmp, cell_ids=(CELL,), with_synapses=True, bank_ids=None,
-                  rotation=None, cell_frames=None):
+                  rotation=None, cell_frames=None, bank_subdir="neurons"):
+    """A campaign root. The bank goes in neurons/ by default, because that is
+    where extract_alignment_metadata writes it -- its output_directory is its
+    own input_dir, the folder of neuron_<id>.csv (Alignment Metadata/Usage.py;
+    confirmed on the cluster by the user, 2026-09-20). `bank_subdir` moves it,
+    for the discovery cases in section B."""
     root = os.path.join(tmp, "h01")
     for d in ("neurons", "synapses", "alignment"):
         os.makedirs(os.path.join(root, d), exist_ok=True)
@@ -203,7 +214,8 @@ def campaign_tree(tmp, cell_ids=(CELL,), with_synapses=True, bank_ids=None,
                          "soma_z": np.zeros(n),
                          "rotation_matrix": [R.tolist()] * n,
                          "FA_2D": [0.9] * n, "angle_from_mean": [1.0] * n})
-    bank.to_csv(os.path.join(root, "alignment", "alignment_metadata_L3.csv"), index=False)
+    os.makedirs(os.path.join(root, bank_subdir), exist_ok=True)
+    bank.to_csv(bank_path_of(root, bank_subdir), index=False)
     return root
 
 
@@ -254,7 +266,7 @@ def section_b(R, B, tmp):
     check("B1 manifest: two rows, relative paths, layer_source bank",
           len(m) == 2 and list(m["cell_id"]) == [CELL, 4243]
           and m["neuron_csv"].iloc[0] == os.path.join("neurons", "neuron_%d.csv" % CELL)
-          and m["alignment_metadata"].iloc[0] == os.path.join("alignment", "alignment_metadata_L3.csv")
+          and m["alignment_metadata"].iloc[0] == "neurons/alignment_metadata_L3.csv"
           and set(m["layer_source"]) == {"bank"}, m.to_string())
     check("B1' missing synapse file -> empty synapse_csv, not a refusal",
           m["synapse_csv"].iloc[0] != "" and m["synapse_csv"].iloc[1] == "")
@@ -295,6 +307,60 @@ def section_b(R, B, tmp):
             check("B6 loader refuses %s" % why, False, "accepted")
         except SystemExit as e:
             check("B6 loader refuses %s" % why, True, str(e)[:60])
+
+    # ---- B7: where the bank lives is SEARCHED, never assumed ---------------
+    # It moved once already (docs said alignment/, the script writes it beside
+    # the skeletons in neurons/), so each branch is pinned here.
+    p, note = B.resolve_bank(root, "L3")
+    check("B7 bank found in neurons/ (the extraction script's own output dir)",
+          p == os.path.abspath(bank_path_of(root, "neurons")) and "neurons/" in note, note)
+
+    alt = os.path.join(tmp, "b7alt")
+    root_alt = campaign_tree(alt, cell_ids=(CELL,), bank_subdir="alignment")
+    p2, note2 = B.resolve_bank(root_alt, "L3")
+    check("B7' bank found in alignment/ when that is where it is",
+          p2 == os.path.abspath(bank_path_of(root_alt, "alignment"))
+          and "alignment/" in note2, note2)
+    m_alt = B.build_manifest(root_alt, "L3", "exc", [CELL])
+    check("B7'' the manifest carries the path actually found, not a fixed one",
+          m_alt["alignment_metadata"].iloc[0] == "alignment/alignment_metadata_L3.csv",
+          m_alt["alignment_metadata"].iloc[0])
+
+    # the same name in two searched places: neurons/ wins, loudly
+    both = pd.read_csv(bank_path_of(root, "neurons")).copy()
+    both.loc[both.index[0], "soma_x"] = -1.0
+    both.to_csv(bank_path_of(root, "alignment"), index=False)
+    p3, note3 = B.resolve_bank(root, "L3")
+    check("B7''' same bank name in two places -> first wins, WARNING names the other",
+          p3 == os.path.abspath(bank_path_of(root, "neurons"))
+          and "WARNING" in note3 and "alignment" in note3, note3)
+    p4, note4 = B.resolve_bank(root, "L3", bank=os.path.join("alignment",
+                                                             "alignment_metadata_L3.csv"))
+    check("B7'''' --bank disambiguates (relative resolves against --root)",
+          p4 == os.path.abspath(bank_path_of(root, "alignment")) and note4 == "--bank", note4)
+    p5, note5 = B.resolve_bank(root, "L3", bank_dir="alignment")
+    check("B7''''' --bank-dir picks the directory",
+          p5 == os.path.abspath(bank_path_of(root, "alignment")), note5)
+    os.remove(bank_path_of(root, "alignment"))
+
+    empty = os.path.join(tmp, "b7none", "h01")
+    os.makedirs(os.path.join(empty, "neurons"), exist_ok=True)
+    try:
+        B.resolve_bank(empty, "L5")
+        check("B8 no bank anywhere -> refusal naming every path tried", False, "accepted")
+    except SystemExit as e:
+        s = str(e)
+        check("B8 no bank anywhere -> refusal naming every path tried",
+              "alignment_metadata_L5.csv" in s and s.count("alignment_metadata_L5.csv") >= 3
+              and "--bank" in s, s[:120])
+    for kw, why in (({"bank": "nope.csv"}, "--bank missing"),
+                    ({"bank_dir": "nowhere"}, "--bank-dir missing"),
+                    ({"bank": "a.csv", "bank_dir": "b"}, "both given")):
+        try:
+            B.resolve_bank(root, "L3", **kw)
+            check("B8' refuses: %s" % why, False, "accepted")
+        except SystemExit as e:
+            check("B8' refuses: %s" % why, True, str(e)[:70])
     return root
 
 
@@ -641,7 +707,7 @@ def section_d(R, B, tmp):
         check("D14' the exporter (1.2.1) writes a header-only spine_bases.csv for it",
               os.path.getsize(sb2) > 1 and list(pd.read_csv(sb2).columns) == list(R.SPINE_BASES_COLUMNS))
         # ---- a regenerated input changes the fingerprint (bank rewritten)
-        bank_p = os.path.join(root, "alignment", "alignment_metadata_L3.csv")
+        bank_p = bank_path_of(root, "neurons")
         bank = pd.read_csv(bank_p)
         bank.loc[bank.index[-1], "soma_x"] += 1.0
         bank.to_csv(bank_p, index=False)

@@ -6,7 +6,7 @@ of (cell, layer, exc/inh). **P2** (`run_spine_area_F.py`, sections 3-7) is the
 calibrated dendritic-spine membrane area from the H01 segmentation, substituted
 into Stage 1's phi table, giving a mesh-based `F` per cell.
 
-`run_p1_export v1.0` | `p1_spine_stats v1.0` | `p1_hoc_audit v1.0` | `build_p1_manifest v1.0`
+`run_p1_export v1.0` | `p1_spine_stats v1.0` | `p1_hoc_audit v1.0` | `build_p1_manifest v1.1`
 `h01_spine_area_F v1.7` | `run_spine_area_F v1.3` | `merge_spine_area_F v1.1` | `h01_spine_base v1.2`
 
 ---
@@ -18,12 +18,12 @@ into Stage 1's phi table, giving a mesh-based `F` per cell.
 | file | role |
 |---|---|
 | `run_p1_export.py` | P1: one array task = one cell through `alignment.align_and_export`, plus the controls, audits and tables of section 8 |
-| `build_p1_manifest.py` | writes one manifest per population, checked against the layer's alignment bank |
+| `build_p1_manifest.py` | writes one manifest per population, checked against the layer's alignment bank, whose directory it searches (8.1) |
 | `p1_spine_stats.py` | the per-spine-node and per-spine tables (handoff section 4.1) |
 | `p1_hoc_audit.py` | structural `.hoc` audit, NEURON validation subprocess, quarantine (ports of notebook CELL 6a) |
 | `passive_params.csv` | cm, Ra, gate Rm per (layer, cell_type); **only L2/L3 exc filled** |
 | `p1_export.pbs` | PBS Pro array job for P1, one submission per population |
-| `smoke_test_p1_export.py` | 84 checks: tables on a hand-labelled fixture, the real export end to end, audit, refusals, the job script |
+| `smoke_test_p1_export.py` | 94 checks: bank discovery, tables on a hand-labelled fixture, the real export end to end, audit, refusals, the job script |
 | `h01_spine_area_F.py` | area, rind, base frustum, kappa, F |
 | `h01_spine_batch.py` | the analysis mesh (14 Taubin iterations) |
 | `h01_spine_roi.py` | per-spine cutout, Voronoi split, bridging |
@@ -70,7 +70,9 @@ TEEG/Towards-EEG/                 <- the git repo, branch main
   h01/                            <- H01_ROOT: the campaign root, gitignored
       neurons/neuron_<id>.csv
       synapses/neuron_<id>_synapses.csv
-      alignment/alignment_metadata_L{2,3,4,5,6}.csv
+      neurons/alignment_metadata_L{2,3,4,5,6}.csv  <- the banks live beside
+                                      the skeletons (the extraction script
+                                      writes them there); searched, not assumed
       p1/manifests/<layer>_<type>.csv   <- written by build_p1_manifest.py
       p1/<cell_id>/               <- P1 output, one directory per cell
       p1/p1_summary.csv           <- written by run_p1_export.py --summarise
@@ -204,11 +206,27 @@ at the default thresholds, `cap_tips=True, cap_h_um=0.1` (the notebook's
 `CAP_TIPS=False` is superseded), propagation gate ON, synapse redirect ON
 whenever the synapse CSV exists, cm shaft-referenced, F never folded in.
 
-**8.1 The label.** A cell carries only `(layer, cell_type)` with
-`layer in {L2..L6}` and `cell_type in {exc, inh}`. Nothing finer exists on the
-cluster. The campaign is ten populations, one manifest and one array job
-each, and each layer has its own bank `alignment/alignment_metadata_L<n>.csv`
+**8.1 The label, and the bank.** A cell carries only `(layer, cell_type)`
+with `layer in {L2..L6}` and `cell_type in {exc, inh}`. Nothing finer exists
+on the cluster. The campaign is ten populations, one manifest and one array
+job each, and each layer has its own bank `alignment_metadata_L<n>.csv`
 (column `neuron_id`).
+
+The bank's directory is searched, not assumed: `<root>/neurons/`, then
+`<root>/alignment/`, then `<root>/`. `neurons/` comes first because that is
+where the extraction script puts it -- `Alignment Metadata/Usage.py` saves
+into its own `input_dir`, the folder of `neuron_<id>.csv`. `--bank <file>` or
+`--bank-dir <dir>` overrides the search; the same filename in two searched
+places is a warning naming both, with the first used. Whatever path is found
+is what the manifest's `alignment_metadata` column carries, so the driver
+follows the builder rather than a second hard-coded guess.
+
+The bank is used for two different things, and only one of them is this
+label: `build_p1_manifest.py` reads the `neuron_id` column to decide which
+layer a cell belongs to, while `alignment.neighbourhood_rotation` aligns each
+exported cell by the rotation-group mean of its **k = 3 spatially nearest
+bank rows** (`--k-neighbors`). A cell therefore does not need to be in the
+bank to be exported -- it needs bank members near it in space.
 
 **8.2 The passive table.** `passive_params.csv` has one row per population:
 `layer, cell_type, cm_uF_cm2, Ra_ohm_cm, Rm_qc_ohm_cm2, cm_reference, source,
@@ -227,12 +245,14 @@ python3 build_p1_manifest.py --root ../h01 --layer L3 --cell-type exc \
     --out ../h01/p1/manifests/L3_exc.csv
 ```
 
+It prints the bank it used and where it found it, then the `#PBS -J` width.
 It refuses an id with no `neurons/neuron_<id>.csv`, and an id absent from the
 layer's bank unless `--allow-unbanked` (then `layer_source` is `manifest`, not
 `bank`). A missing synapse CSV is allowed: the column is left empty, the cell
-is exported without the redirect, and the builder says so. It prints the
-`#PBS -J` width to use. `--ids-file` reads one id per line (what `Save nids`
-writes).
+is exported without the redirect, and the builder says so. `--ids-file` reads
+one id per line (what `Save nids` writes). If it refuses with `alignment bank
+... not found`, the message lists every directory it looked in -- pass
+`--bank-dir` with the right one rather than moving the file.
 
 **8.4 Dry run, then submit.** The dry run resolves the manifest row, the
 passive constants, the inputs (with their hashes) and the fingerprint, and
