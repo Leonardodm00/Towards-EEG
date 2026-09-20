@@ -7,7 +7,7 @@
 #   cd h01_code
 #   bash run_smoke_tests.sh                 # all suites
 #   bash run_smoke_tests.sh p0 p3           # only suites whose name matches
-#   ENV_NAME=other_env bash run_smoke_tests.sh
+#   H01_ENV=other_env bash run_smoke_tests.sh   # not ENV_NAME: reported, ignored
 #   H01_CODE=/path/to/h01_code bash run_smoke_tests.sh
 #   qsub run_smoke_tests.sh                 # same script, as a job
 #
@@ -31,7 +31,16 @@ set -eo pipefail
 # It exists so this script can be exercised off-cluster before it is shipped;
 # on the cluster, leave it unset so the env is the one the jobs will use.
 if [ -z "${SKIP_CONDA:-}" ]; then
-    ENV_NAME="${ENV_NAME:-spine_env}"
+    # H01_ENV, never the bare ENV_NAME. The login shell exports ENV_NAME for
+    # another project (ENV_NAME=sbi_export, observed 2026-09-20), a PBS job
+    # sources .bashrc, and honouring it activated THAT env while the outcome
+    # check below passed -- python3 did resolve inside envs/$ENV_NAME/. So the
+    # knob is H01_ENV, and a stale ENV_NAME is reported and ignored, exactly
+    # like CODE and ROOT.
+    if [ -n "${ENV_NAME:-}" ]; then
+        echo "NOTE: ENV_NAME is set ($ENV_NAME) and is IGNORED; the knob is H01_ENV."
+    fi
+    H01_ENV="${H01_ENV:-spine_env}"
     # set +e AS WELL AS set +u. `conda activate` runs the env's activate.d
     # hooks, and those can return non-zero while still having activated
     # correctly -- binutils on this cluster prints its INFO block and returns
@@ -41,15 +50,15 @@ if [ -z "${SKIP_CONDA:-}" ]; then
     set +u
     set +e
     eval "$(conda shell.bash hook)"
-    conda activate "$ENV_NAME"
+    conda activate "$H01_ENV"
     set -e
     set -u
     # So trust the OUTCOME, not the status: activation is real only if
     # python3 now resolves inside the env.
     case "$(command -v python3 || true)" in
-        *"/envs/$ENV_NAME/"*) ;;
+        *"/envs/$H01_ENV/"*) ;;
         *)
-            echo "ERROR: 'conda activate $ENV_NAME' did not take effect."
+            echo "ERROR: 'conda activate $H01_ENV' did not take effect."
             echo "  python3 is $(command -v python3 || echo '<none>')"
             echo "  Check the env exists:  conda env list"
             echo "  Or bypass:             SKIP_CONDA=1 bash run_smoke_tests.sh"

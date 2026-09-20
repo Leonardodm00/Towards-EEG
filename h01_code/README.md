@@ -27,7 +27,7 @@ into Stage 1's phi table, giving a mesh-based `F` per cell.
 | `run_smoke_tests.sh` | runs every `smoke_test_*.py`, on the login node or via `qsub` |
 | `stage1_link.sh` | assembles `stage1/` as symlinks to the canonical Stage 1 modules |
 | `smoke_test_h01_spine_area_F.py` | 112 checks (4 skip without the figure module) |
-| `smoke_test_hpc_runner.py` | 30 checks runner + merger end to end, plus section B: the job scripts parsed and run against a fixture |
+| `smoke_test_hpc_runner.py` | 57 checks: runner + merger end to end, plus section B: the job scripts parsed and run against a fixture with a stub conda |
 | `smoke_test_p0_partition.py`, `smoke_test_p3_assemble.py` | 9 and 14 checks |
 | `g_table_cyl_2deg.npz` + `.json` | the v7 cylinder calibration |
 
@@ -77,9 +77,13 @@ is not. Keeping data out of the repo keeps `git status` clean between runs.
 cd h01_code && bash run_smoke_tests.sh
 ```
 
-Expect `passed 4/4` and `ALL SUITES PASSED`. It activates `spine_env`, checks
-and repairs the `stage1/` symlink farm, then runs every `smoke_test_*.py`. All
-suites are offline: no network, no bucket.
+Expect `passed 4/4` and `ALL SUITES PASSED`. It activates `spine_env`
+(`H01_ENV=other_env` to choose another; a stale `ENV_NAME` exported by the
+login shell is reported and ignored, like `CODE` and `ROOT`), checks and
+repairs the `stage1/` symlink farm, then runs every `smoke_test_*.py`. All
+suites are offline: no network, no bucket. The report header must say
+`env    spine_env`; if it names another env, the wrong interpreter is running
+and skimage / cloudvolume will be missing.
 
 Then a dry run, which prepares, shards and reports without touching the
 network or writing a ledger:

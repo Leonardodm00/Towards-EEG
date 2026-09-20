@@ -15,13 +15,16 @@ Negative paths are tested too: a missing CSV, a bad --task, shards built with
 different parameters, and a missing shard.
 
 Section B (2026-09-20) tests the JOB SCRIPTS, which the Python checks above
-cannot see: spine_area_F.pbs is parsed for its two guards (the --g-table flag
-that points at H01_CODE, and the activation block that trusts the outcome of
-`conda activate` rather than its exit status) and is then RUN with bash
-against a fixture tree, with stub python3 / conda / curl on PATH, asserting on
-the argv the stub interpreter received and on every refusal path. probe_net.pbs
-gets the same treatment. Needs bash on PATH (the cluster and the sandbox both
-have it); no network.
+cannot see: spine_area_F.pbs is parsed for its three guards (the --g-table
+flag that points at H01_CODE; the activation block that trusts the outcome of
+`conda activate` rather than its exit status; the env knob H01_ENV, with a
+stale ENV_NAME from the login shell reported and ignored) and is then RUN with
+bash against a fixture tree, with stub python3 / conda / curl on PATH -- the
+conda stub installs a real shell function through the hook, so activation
+changes PATH as the real one does -- asserting on the argv the stub interpreter
+received, on which env's interpreter ran, and on every refusal path.
+run_smoke_tests.sh gets the text checks, probe_net.pbs the same treatment.
+Needs bash on PATH (the cluster and the sandbox both have it); no network.
 
 Pure ASCII, LF only.
 """
@@ -206,16 +209,21 @@ def base_argv(root, task, ntasks, *extra):
 
 
 # ---------------------------------------------------------------------------
-# Section B: the job scripts. Two defects shipped in spine_area_F.pbs that no
+# Section B: the job scripts. Three defects shipped in the job scripts that no
 # Python suite could catch -- the runner's --g-table default resolves into
 # H01_ROOT while the table is tracked in H01_CODE (every array task died at
-# resolve() after the queue wait), and the activation block obeyed the exit
+# resolve() after the queue wait); the activation block obeyed the exit
 # status of `conda activate`, which is 1 on this cluster while activation is
-# real (binutils activate.d hook). Both live in bash, so both are tested in
-# bash: text checks for the guards, then real runs against a fixture.
+# real (binutils activate.d hook); and the env knob was the bare ENV_NAME,
+# which the login shell exports for another project (sbi_export), so the
+# scripts activated THAT env and the outcome check passed (2026-09-20). All
+# live in bash, so all are tested in bash: text checks for the guards, then
+# real runs against a fixture with a stub conda whose hook installs a real
+# shell function, so activation changes PATH the way the real one does.
 # ---------------------------------------------------------------------------
 PBS = "spine_area_F.pbs"
 PROBE = "probe_net.pbs"
+RUNNER_SH = "run_smoke_tests.sh"
 JOB_CELL = 424242
 _ARGV_N = [0]
 
@@ -225,14 +233,30 @@ printf '%s\\n' "$@" >> "$STUB_ARGV_OUT"
 exit 0
 """
 
-# The hook evaluates to nothing; `activate` prints an INFO line and returns 1,
-# which is exactly what the binutils hook does on the cluster while the env
-# HAS been activated. Whether it "took effect" is decided by where python3
-# resolves, which the test controls through PATH.
-STUB_CONDA = """#!/bin/bash
+# `conda shell.bash hook` prints a conda() function, as the real hook does.
+# `conda activate <env>` prepends $STUB_ENVS/<env>/bin to PATH when that env
+# exists, sets CONDA_DEFAULT_ENV, prints an INFO line and RETURNS 1 -- which
+# is what the binutils activate.d hook does on the cluster while the env HAS
+# been activated. An env that does not exist changes nothing (and returns 1).
+# The heredoc is unquoted so $STUB_ENVS is baked in at hook time; the \\$ are
+# what keep $1, $2 and $PATH for the function body.
+STUB_CONDA = r"""#!/bin/bash
 case "$1" in
-    shell) exit 0 ;;
-    activate) echo "INFO: stub activate.d hook"; exit 1 ;;
+    shell.bash)
+        cat <<EOF
+conda() {
+    if [ "\$1" = activate ]; then
+        echo "INFO: stub activate.d hook (\$2)"
+        if [ -d "$STUB_ENVS/\$2/bin" ]; then
+            export PATH="$STUB_ENVS/\$2/bin:\$PATH"
+            export CONDA_DEFAULT_ENV="\$2"
+        fi
+        return 1
+    fi
+    return 0
+}
+EOF
+        ;;
 esac
 exit 0
 """
@@ -241,6 +265,8 @@ STUB_CURL = """#!/bin/bash
 printf '000'
 exit 0
 """
+
+FIXTURE_ENVS = ("spine_env", "sbi_export", "other_env")
 
 
 def _write_exec(path, text):
@@ -251,16 +277,17 @@ def _write_exec(path, text):
 
 def job_fixture(tmp, with_table=True):
     """A tree shaped like the cluster: H01_CODE with the runner file and the g
-    table, H01_ROOT with neurons/, bin/ with the stubs, envs/spine_env/bin and
-    home/.conda/envs/spine_env/bin each with a python3 stub."""
+    table, H01_ROOT with neurons/, bin/ with the stubs and a python3 that is
+    in NO env, envs/<name>/bin/python3 for each of FIXTURE_ENVS, and
+    home/.conda/envs/spine_env/bin/python3 for probe_net.pbs."""
     fx = os.path.join(tmp, "jobfix")
     shutil.rmtree(fx, ignore_errors=True)
     code = os.path.join(fx, "h01_code")
     root = os.path.join(fx, "h01")
-    pydirs = (os.path.join(fx, "bin"),
-              os.path.join(fx, "envs", "spine_env", "bin"),
-              os.path.join(fx, "home", ".conda", "envs", "spine_env", "bin"))
-    for d in (os.path.join(code, "stage1"), os.path.join(root, "neurons")) + pydirs:
+    pydirs = [os.path.join(fx, "bin"),
+              os.path.join(fx, "home", ".conda", "envs", "spine_env", "bin")]
+    pydirs += [os.path.join(fx, "envs", e, "bin") for e in FIXTURE_ENVS]
+    for d in [os.path.join(code, "stage1"), os.path.join(root, "neurons")] + pydirs:
         os.makedirs(d, exist_ok=True)
     open(os.path.join(code, "run_spine_area_F.py"), "w").close()
     if with_table:
@@ -272,23 +299,23 @@ def job_fixture(tmp, with_table=True):
     return fx, code, root
 
 
-def run_job(script, fx, code, root, extra_env, env_python=False):
-    """bash <script> with a scrubbed environment: no inherited CODE/ROOT/H01_*/
-    PBS_*/CONDA*, HOME inside the fixture, the stub bin first on PATH and, when
-    env_python, the envs/spine_env/bin stub ahead of it. Returns (rc, stdout,
-    argv), argv being what the stub interpreter received ([] if never run)."""
+def run_job(script, fx, code, root, extra_env):
+    """bash <script> with a scrubbed environment: no inherited CODE/ROOT/
+    ENV_NAME/H01_*/PBS_*/CONDA*, HOME inside the fixture, the stub bin first
+    on PATH. Returns (rc, stdout, argv), argv being what the stub interpreter
+    received ([] if never run)."""
     _ARGV_N[0] += 1
     argv_out = os.path.join(fx, "argv_%d.txt" % _ARGV_N[0])
     path = os.path.join(fx, "bin") + os.pathsep + os.environ.get("PATH", "")
-    if env_python:
-        path = os.path.join(fx, "envs", "spine_env", "bin") + os.pathsep + path
     drop = ("CODE", "ROOT", "CELL", "SUBSET", "NTASKS", "DRY_RUN", "SKIP_CONDA",
-            "ENV_NAME", "MIN_SPINE_VALUE", "NO_MEASURE_BASE", "STUB_ARGV_OUT")
+            "ENV_NAME", "MIN_SPINE_VALUE", "NO_MEASURE_BASE", "STUB_ARGV_OUT",
+            "STUB_ENVS")
     env = {k: v for k, v in os.environ.items()
            if not (k in drop or k.startswith("H01_") or k.startswith("PBS_")
                    or k.startswith("CONDA"))}
     env.update({"PATH": path, "HOME": os.path.join(fx, "home"),
-                "H01_CODE": code, "H01_ROOT": root, "STUB_ARGV_OUT": argv_out})
+                "H01_CODE": code, "H01_ROOT": root, "STUB_ARGV_OUT": argv_out,
+                "STUB_ENVS": os.path.join(fx, "envs")})
     env.update(extra_env)
     p = subprocess.run(["bash", script], cwd=fx, env=env,
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -325,11 +352,19 @@ def _argval(argv, flag):
     return None
 
 
+def _ran_python_from(out, fx, env_name):
+    """The .pbs echoes `python <path>` after activation; True if that path is
+    the fixture's envs/<env_name>/bin/python3."""
+    want = "python " + os.path.join(fx, "envs", env_name, "bin", "python3")
+    return any(ln.strip() == want for ln in out.splitlines())
+
+
 def job_script_checks(code_dir, tmp):
     pbs_path = os.path.join(code_dir, PBS)
     probe_path = os.path.join(code_dir, PROBE)
     text = open(pbs_path).read()
     lines = text.splitlines()
+    rtext = open(os.path.join(code_dir, RUNNER_SH)).read()
 
     # ---- B1 text: the g-table flag and its preflight
     inv = pbs_python_invocation(text)
@@ -338,9 +373,10 @@ def job_script_checks(code_dir, tmp):
     check("B1' .pbs checks the g table exists before starting python",
           'if [ ! -f "$H01_CODE/g_table_cyl_2deg.npz" ]' in text)
 
-    # ---- B2 text: activation trusts the OUTCOME, guards in the right order
+    # ---- B2 text: activation trusts the OUTCOME, guards in the right order,
+    # env knob is H01_ENV in BOTH scripts and ENV_NAME is reported, not read
     i_hook = _first_line(lines, 'eval "$(conda shell.bash hook)"')
-    i_act = _first_line(lines, 'conda activate "$ENV_NAME"', i_hook + 1)
+    i_act = _first_line(lines, 'conda activate "$H01_ENV"', i_hook + 1)
     i_pe = _first_line(lines, "set +e")
     i_pu = _first_line(lines, "set +u")
     i_me = _first_line(lines, "set -e", i_act + 1)
@@ -350,10 +386,16 @@ def job_script_checks(code_dir, tmp):
           and i_act < i_me and i_act < i_mu,
           "+u %d +e %d hook %d act %d -e %d -u %d" % (i_pu, i_pe, i_hook, i_act, i_me, i_mu))
     check("B2' activation verified by where python3 resolves, not by exit status",
-          '*"/envs/$ENV_NAME/"*)' in text and "did not take effect" in text)
+          '*"/envs/$H01_ENV/"*)' in text and "did not take effect" in text)
     check("B2'' path knobs are H01_ROOT / H01_CODE and stale CODE/ROOT are reported",
           '"${H01_CODE:-' in text and '"${H01_ROOT:-' in text
           and "for _stale in ROOT CODE" in text)
+    for name, t in ((PBS, text), (RUNNER_SH, rtext)):
+        check("B2''' %s: env knob is H01_ENV; ENV_NAME reported and ignored" % name,
+              'H01_ENV="${H01_ENV:-spine_env}"' in t
+              and "NOTE: ENV_NAME is set" in t
+              and "${ENV_NAME:-spine_env}" not in t
+              and 'conda activate "$ENV_NAME"' not in t)
 
     # ---- B3 text: probe_net.pbs no longer points at the retired repo
     ptext = open(probe_path).read()
@@ -365,7 +407,7 @@ def job_script_checks(code_dir, tmp):
           and "$CODE" not in ptext)
 
     # ---- B4 syntax and bytes of every shell script shipped
-    for name in (PBS, PROBE, "run_smoke_tests.sh", "stage1_link.sh"):
+    for name in (PBS, PROBE, RUNNER_SH, "stage1_link.sh"):
         fp = os.path.join(code_dir, name)
         rc = subprocess.run(["bash", "-n", fp], stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, universal_newlines=True)
@@ -398,21 +440,42 @@ def job_script_checks(code_dir, tmp):
           rc == 0 and _argval(argv, "--task") == "5" and "--subset" not in argv
           and "--dry-run" not in argv)
 
-    # ---- B6 the activation block, positive and negative
-    # Positive: the stub `conda activate` RETURNS 1 (as binutils does) but
-    # python3 resolves under envs/spine_env/bin -> the job must proceed.
-    rc, out, argv = run_job(pbs_path, fx, code, root, {"CELL": str(JOB_CELL)},
-                            env_python=True)
-    check("B6 conda activate returning 1 with python3 inside the env: job PROCEEDS",
-          rc == 0 and "INFO: stub activate.d hook" in out
+    # ---- B6 the activation block, through the stub hook
+    # Positive: `conda activate spine_env` RETURNS 1 (as binutils does) but
+    # python3 now resolves under envs/spine_env/bin -> the job must proceed,
+    # and the interpreter that ran must be the env's.
+    rc, out, argv = run_job(pbs_path, fx, code, root, {"CELL": str(JOB_CELL)})
+    check("B6 conda activate returning 1 with the env really activated: job PROCEEDS "
+          "under envs/spine_env",
+          rc == 0 and "INFO: stub activate.d hook (spine_env)" in out
+          and _ran_python_from(out, fx, "spine_env")
           and argv[:1] == ["run_spine_area_F.py"],
-          "rc=%d\n%s" % (rc, out[-400:]) if rc else "")
-    # Negative: same hook, but python3 does NOT resolve inside the env.
-    rc, out, argv = run_job(pbs_path, fx, code, root, {"CELL": str(JOB_CELL)},
-                            env_python=False)
+          "rc=%d\n%s" % (rc, out[-500:]) if rc else "")
+    # Negative: an env that does not exist -> PATH unchanged -> refused.
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            {"CELL": str(JOB_CELL), "H01_ENV": "no_such_env"})
     check("B6' activation that did not take effect: job REFUSES before python",
           rc != 0 and "did not take effect" in out and argv == [],
           "rc=%d" % rc)
+    # The 2026-09-20 collision: ENV_NAME=sbi_export in the environment and an
+    # sbi_export env that exists. The scripts must NOT activate it: NOTE line,
+    # spine_env activated, the env's interpreter ran.
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            {"CELL": str(JOB_CELL), "ENV_NAME": "sbi_export"})
+    check("B6'' stale ENV_NAME=sbi_export in the environment: reported, IGNORED, "
+          "spine_env activated",
+          rc == 0 and "NOTE: ENV_NAME is set (sbi_export)" in out
+          and "INFO: stub activate.d hook (spine_env)" in out
+          and "hook (sbi_export)" not in out
+          and _ran_python_from(out, fx, "spine_env")
+          and argv[:1] == ["run_spine_area_F.py"],
+          "rc=%d\n%s" % (rc, out[-500:]))
+    # The real knob still works.
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            {"CELL": str(JOB_CELL), "H01_ENV": "other_env"})
+    check("B6''' H01_ENV=other_env selects that env",
+          rc == 0 and "hook (other_env)" in out and _ran_python_from(out, fx, "other_env")
+          and argv[:1] == ["run_spine_area_F.py"], "rc=%d" % rc)
 
     # ---- B7 the other refusals, each before the interpreter starts
     rc, out, argv = run_job(pbs_path, fx, code, root, {"SKIP_CONDA": "1"})

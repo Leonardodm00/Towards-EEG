@@ -23,10 +23,11 @@
 # Base measurement (A_beyond, the deliverable's spine area) is ON by default.
 # NO_MEASURE_BASE=1 turns it off, and the merge then reports qc_status=fail.
 #
-# ENV_NAME=other_env selects the conda env (default spine_env). SKIP_CONDA=1
-# runs against whatever python3 is on PATH and exists ONLY so this script can
-# be exercised off-cluster by smoke_test_hpc_runner.py; never set it in the
-# qsub -v list.
+# H01_ENV selects the conda env (default spine_env; qsub -v H01_ENV=...). The
+# bare ENV_NAME is NOT read: the login shell exports it for another project
+# and a PBS job sources .bashrc (2026-09-20). SKIP_CONDA=1 runs against
+# whatever python3 is on PATH and exists ONLY so this script can be exercised
+# off-cluster by smoke_test_hpc_runner.py; never set it in the qsub -v list.
 #
 # PBS Pro array syntax (-J / PBS_ARRAY_INDEX), matching the cylinder sweep.
 # On Torque use  #PBS -t 0-39  and PBS_ARRAYID; the fallback below covers it.
@@ -36,13 +37,22 @@
 # ---------------------------------------------------------------------------
 set -eo pipefail
 
-# Activation block copied from run_smoke_tests.sh (2026-09-20), which is the
-# one form verified to survive this cluster's conda hooks.
+# Activation block copied from run_smoke_tests.sh (2026-09-20, H01_ENV form),
+# the one form verified to survive this cluster's conda hooks.
 # SKIP_CONDA=1 runs the script against whatever python3 is already on PATH.
 # It exists so this script can be exercised off-cluster before it is shipped;
 # on the cluster, leave it unset so the env is the one the jobs will use.
 if [ -z "${SKIP_CONDA:-}" ]; then
-    ENV_NAME="${ENV_NAME:-spine_env}"
+    # H01_ENV, never the bare ENV_NAME. The login shell exports ENV_NAME for
+    # another project (ENV_NAME=sbi_export, observed 2026-09-20), a PBS job
+    # sources .bashrc, and honouring it activated THAT env while the outcome
+    # check below passed -- python3 did resolve inside envs/$ENV_NAME/. So the
+    # knob is H01_ENV, and a stale ENV_NAME is reported and ignored, exactly
+    # like CODE and ROOT.
+    if [ -n "${ENV_NAME:-}" ]; then
+        echo "NOTE: ENV_NAME is set ($ENV_NAME) and is IGNORED; the knob is H01_ENV."
+    fi
+    H01_ENV="${H01_ENV:-spine_env}"
     # set +e AS WELL AS set +u. `conda activate` runs the env's activate.d
     # hooks, and those can return non-zero while still having activated
     # correctly -- binutils on this cluster prints its INFO block and returns
@@ -52,15 +62,15 @@ if [ -z "${SKIP_CONDA:-}" ]; then
     set +u
     set +e
     eval "$(conda shell.bash hook)"
-    conda activate "$ENV_NAME"
+    conda activate "$H01_ENV"
     set -e
     set -u
     # So trust the OUTCOME, not the status: activation is real only if
     # python3 now resolves inside the env.
     case "$(command -v python3 || true)" in
-        *"/envs/$ENV_NAME/"*) ;;
+        *"/envs/$H01_ENV/"*) ;;
         *)
-            echo "ERROR: 'conda activate $ENV_NAME' did not take effect."
+            echo "ERROR: 'conda activate $H01_ENV' did not take effect."
             echo "  python3 is $(command -v python3 || echo '<none>')"
             echo "  Check the env exists:  conda env list"
             exit 1
