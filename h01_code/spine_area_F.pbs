@@ -14,8 +14,19 @@
 # Paths are H01_ROOT / H01_CODE (qsub -v H01_ROOT=..., not ROOT=...).
 #   qsub -v CELL=1302789404,SUBSET=300 spine_area_F.pbs     # staged run first
 #
+# The calibration table is READ FROM H01_CODE (g_table_cyl_2deg.npz, tracked
+# in git next to this script), never from H01_ROOT: the runner's own default
+# is <root>/g_table_cyl_2deg.npz, which does not exist in the campaign root,
+# so the flag below is what keeps every array task from dying at resolve()
+# after the queue wait (2026-09-20).
+#
 # Base measurement (A_beyond, the deliverable's spine area) is ON by default.
 # NO_MEASURE_BASE=1 turns it off, and the merge then reports qc_status=fail.
+#
+# ENV_NAME=other_env selects the conda env (default spine_env). SKIP_CONDA=1
+# runs against whatever python3 is on PATH and exists ONLY so this script can
+# be exercised off-cluster by smoke_test_hpc_runner.py; never set it in the
+# qsub -v list.
 #
 # PBS Pro array syntax (-J / PBS_ARRAY_INDEX), matching the cylinder sweep.
 # On Torque use  #PBS -t 0-39  and PBS_ARRAYID; the fallback below covers it.
@@ -24,10 +35,41 @@
 # will not tile the spine list, and the merge will report missing tasks.
 # ---------------------------------------------------------------------------
 set -eo pipefail
-set +u                              # BEFORE the hook: the hook itself
-eval "$(conda shell.bash hook)"     # deactivates base and sources activate.d
-conda activate spine_env
-set -u
+
+# Activation block copied from run_smoke_tests.sh (2026-09-20), which is the
+# one form verified to survive this cluster's conda hooks.
+# SKIP_CONDA=1 runs the script against whatever python3 is already on PATH.
+# It exists so this script can be exercised off-cluster before it is shipped;
+# on the cluster, leave it unset so the env is the one the jobs will use.
+if [ -z "${SKIP_CONDA:-}" ]; then
+    ENV_NAME="${ENV_NAME:-spine_env}"
+    # set +e AS WELL AS set +u. `conda activate` runs the env's activate.d
+    # hooks, and those can return non-zero while still having activated
+    # correctly -- binutils on this cluster prints its INFO block and returns
+    # 1. Under `set -e` that killed the script here, after the INFO block and
+    # before any test ran: no error, no output, exit 1. Verified by
+    # reproduction, 2026-09-16.
+    set +u
+    set +e
+    eval "$(conda shell.bash hook)"
+    conda activate "$ENV_NAME"
+    set -e
+    set -u
+    # So trust the OUTCOME, not the status: activation is real only if
+    # python3 now resolves inside the env.
+    case "$(command -v python3 || true)" in
+        *"/envs/$ENV_NAME/"*) ;;
+        *)
+            echo "ERROR: 'conda activate $ENV_NAME' did not take effect."
+            echo "  python3 is $(command -v python3 || echo '<none>')"
+            echo "  Check the env exists:  conda env list"
+            exit 1
+            ;;
+    esac
+else
+    set -u
+    echo "SKIP_CONDA set -- using $(which python3) without activating an env"
+fi
 
 # H01_ROOT / H01_CODE, never the bare ROOT / CODE. Those are names a login
 # shell routinely exports for another project, and a PBS job sources .bashrc,
@@ -49,6 +91,13 @@ if [ ! -d "$H01_ROOT/neurons" ]; then
     echo "ERROR: H01_ROOT=$H01_ROOT has no neurons/ -- wrong campaign root."
     exit 1
 fi
+# Checked here, before the interpreter starts, so the failure names the path
+# instead of surfacing as a resolve() SystemExit deep in the log.
+if [ ! -f "$H01_CODE/g_table_cyl_2deg.npz" ]; then
+    echo "ERROR: calibration table missing: $H01_CODE/g_table_cyl_2deg.npz"
+    echo "  It is tracked in git next to this script; git pull, or check H01_CODE."
+    exit 1
+fi
 CELL="${CELL:?set CELL, e.g. qsub -v CELL=1302789404 spine_area_F.pbs}"
 NTASKS="${NTASKS:-40}"
 TASK="${PBS_ARRAY_INDEX:-${PBS_ARRAYID:-0}}"
@@ -68,6 +117,7 @@ if [ -n "${NO_MEASURE_BASE:-}" ]; then EXTRA="$EXTRA --no-measure-base"; fi
 python3 run_spine_area_F.py \
     --root "$H01_ROOT" \
     --stage1-dir "$H01_CODE/stage1" \
+    --g-table "$H01_CODE/g_table_cyl_2deg.npz" \
     --cell "$CELL" \
     --task "$TASK" \
     --ntasks "$NTASKS" \

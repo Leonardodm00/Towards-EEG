@@ -3,7 +3,7 @@
 Calibrated dendritic-spine membrane area from the H01 segmentation, substituted
 into Stage 1's phi table, giving a mesh-based `F` per cell.
 
-`h01_spine_area_F v1.4` | `run_spine_area_F v1.0` | `merge_spine_area_F v1.0`
+`h01_spine_area_F v1.7` | `run_spine_area_F v1.3` | `merge_spine_area_F v1.1` | `h01_spine_base v1.2`
 
 ---
 
@@ -22,22 +22,23 @@ into Stage 1's phi table, giving a mesh-based `F` per cell.
 | `sma_run.py`, `s0_ingest.py`, `shaft_continuation.py` | Stage 0/1 glue |
 | `run_spine_area_F.py` | one array task |
 | `merge_spine_area_F.py` | union the shards, assemble F |
-| `spine_area_F.pbs` | PBS Pro array job |
-| `smoke_test_h01_spine_area_F.py` | 91 checks (2 skip without the figure module) |
-| `smoke_test_hpc_runner.py` | 20 checks, runner + merger end to end |
+| `spine_area_F.pbs` | PBS Pro array job; reads the g table from `h01_code`, activation block copied from `run_smoke_tests.sh` |
+| `probe_net.pbs` | compute-node network diagnostic (absolute interpreter path) |
+| `run_smoke_tests.sh` | runs every `smoke_test_*.py`, on the login node or via `qsub` |
+| `stage1_link.sh` | assembles `stage1/` as symlinks to the canonical Stage 1 modules |
+| `smoke_test_h01_spine_area_F.py` | 112 checks (4 skip without the figure module) |
+| `smoke_test_hpc_runner.py` | 30 checks runner + merger end to end, plus section B: the job scripts parsed and run against a fixture |
+| `smoke_test_p0_partition.py`, `smoke_test_p3_assemble.py` | 9 and 14 checks |
 | `g_table_cyl_2deg.npz` + `.json` | the v7 cylinder calibration |
 
-**NOT included -- you must copy these from the Stage 1 Drive folder into
-`stage1/`:**
-
-```
-spine_density.py  spine_labeller.py  spine_geometry.py  morphology_exporter.py
-```
-
-They are Stage 1's own modules. The attribution gate exists precisely to check
-this code against the real `spine_density`, so a stub would defeat the point.
-`run_spine_area_F.py` refuses to start if they are absent or if the label
-vocabulary falls back to `sma_run`'s literals.
+**Not copied -- linked.** The Stage 1 modules (`spine_density`,
+`spine_labeller`, `morphology_exporter`, `spine_geometry`, ...) live in
+`towards_eeg/structure/` and `Stage 1/` of this repo; `stage1_link.sh` fills
+`stage1/` with symlinks to them (once per clone, and after any `git pull` that
+adds a module; `run_smoke_tests.sh` does it for you). The attribution gate
+exists precisely to check this code against the real `spine_density`, so a copy
+or a stub would defeat the point. `run_spine_area_F.py` refuses to start if
+they are absent or if the label vocabulary falls back to `sma_run`'s literals.
 
 Figures (`h01_spine_area_F_figures.py`, `h01_spine_roi_figures.py`) are
 deliberately absent: they need matplotlib, plotly and IPython, and the campaign
@@ -48,37 +49,43 @@ draws none. Pilot QC figures stay in Colab.
 ## 2. Layout on the cluster
 
 ```
-TEEG/Spines/
-  h01_code/                     <- this bundle (the git repo)
-      *.py  *.pbs  README.md
-      stage1/                   <- the four Stage 1 modules (see above)
-      logs/                     <- mkdir this; PBS writes here
-  h01/                          <- the campaign root, NOT in git
-      neurons/neuron_1302789404.csv   (and the other three cells)
-      g_table_cyl_2deg.npz + .json
-      out/                      <- created automatically
+TEEG/Towards-EEG/                 <- the git repo, branch main
+  h01_code/                       <- H01_CODE: this directory
+      *.py  *.pbs  *.sh  README.md
+      g_table_cyl_2deg.npz + .json   <- the calibration table lives HERE
+      stage1/                     <- symlink farm, built by stage1_link.sh (gitignored)
+      logs/                       <- mkdir this; PBS writes here
+  h01/                            <- H01_ROOT: the campaign root, gitignored
+      neurons/neuron_<id>.csv
+      synapses/neuron_<id>_synapses.csv
+      alignment/alignment_metadata_L{2,3,4,5,6}.csv
+      out/                        <- created by the first shard
 ```
 
-`--root` points at `h01/`, the job's `CODE` at `h01_code/`. Keeping data out of
-the repo keeps `git status` clean between runs.
+The path knobs are `H01_ROOT` and `H01_CODE` (`qsub -v H01_ROOT=...`); the bare
+`ROOT` / `CODE` are names the login shell exports for another project and every
+script here reports and ignores them. `spine_area_F.pbs` passes
+`--g-table "$H01_CODE/g_table_cyl_2deg.npz"` explicitly, because the runner's
+own default (`<root>/g_table_cyl_2deg.npz`) points into `h01/`, where the table
+is not. Keeping data out of the repo keeps `git status` clean between runs.
 
 ---
 
 ## 3. Before submitting anything
 
 ```
-cd h01_code && python3 smoke_test_h01_spine_area_F.py && python3 smoke_test_hpc_runner.py
+cd h01_code && bash run_smoke_tests.sh
 ```
 
-Expect `91 checks passed, 0 failed` (or 82 with 2 skipped if the figure module
-is absent) and `20 checks passed, 0 failed`. Both are fully offline: no
-network, no Drive, no Stage 1 folder needed.
+Expect `passed 4/4` and `ALL SUITES PASSED`. It activates `spine_env`, checks
+and repairs the `stage1/` symlink farm, then runs every `smoke_test_*.py`. All
+suites are offline: no network, no bucket.
 
 Then a dry run, which prepares, shards and reports without touching the
 network or writing a ledger:
 
 ```
-python3 run_spine_area_F.py --root ../h01 --cell 1302789404 --task 0 --ntasks 40 --dry-run
+python3 run_spine_area_F.py --root ../h01 --stage1-dir stage1 --g-table g_table_cyl_2deg.npz --cell 1302789404 --task 0 --ntasks 40 --dry-run
 ```
 
 It prints the g-table hash and axes, the spine count, and the parameter

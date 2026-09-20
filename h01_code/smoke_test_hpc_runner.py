@@ -14,12 +14,22 @@ validate the science (smoke_test_h01_spine_area_F.py does that) and the Stage
 Negative paths are tested too: a missing CSV, a bad --task, shards built with
 different parameters, and a missing shard.
 
+Section B (2026-09-20) tests the JOB SCRIPTS, which the Python checks above
+cannot see: spine_area_F.pbs is parsed for its two guards (the --g-table flag
+that points at H01_CODE, and the activation block that trusts the outcome of
+`conda activate` rather than its exit status) and is then RUN with bash
+against a fixture tree, with stub python3 / conda / curl on PATH, asserting on
+the argv the stub interpreter received and on every refusal path. probe_net.pbs
+gets the same treatment. Needs bash on PATH (the cluster and the sandbox both
+have it); no network.
+
 Pure ASCII, LF only.
 """
 
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import traceback
@@ -192,6 +202,251 @@ def base_argv(root, task, ntasks, *extra):
     return (["--root", root, "--cell", str(CELL), "--task", str(task),
              "--ntasks", str(ntasks), "--stage1-dir", os.path.join(root, "stage1")]
             + list(extra))
+
+
+
+# ---------------------------------------------------------------------------
+# Section B: the job scripts. Two defects shipped in spine_area_F.pbs that no
+# Python suite could catch -- the runner's --g-table default resolves into
+# H01_ROOT while the table is tracked in H01_CODE (every array task died at
+# resolve() after the queue wait), and the activation block obeyed the exit
+# status of `conda activate`, which is 1 on this cluster while activation is
+# real (binutils activate.d hook). Both live in bash, so both are tested in
+# bash: text checks for the guards, then real runs against a fixture.
+# ---------------------------------------------------------------------------
+PBS = "spine_area_F.pbs"
+PROBE = "probe_net.pbs"
+JOB_CELL = 424242
+_ARGV_N = [0]
+
+STUB_PY = """#!/bin/bash
+# stub python3 for the job-script test: records argv, runs nothing
+printf '%s\\n' "$@" >> "$STUB_ARGV_OUT"
+exit 0
+"""
+
+# The hook evaluates to nothing; `activate` prints an INFO line and returns 1,
+# which is exactly what the binutils hook does on the cluster while the env
+# HAS been activated. Whether it "took effect" is decided by where python3
+# resolves, which the test controls through PATH.
+STUB_CONDA = """#!/bin/bash
+case "$1" in
+    shell) exit 0 ;;
+    activate) echo "INFO: stub activate.d hook"; exit 1 ;;
+esac
+exit 0
+"""
+
+STUB_CURL = """#!/bin/bash
+printf '000'
+exit 0
+"""
+
+
+def _write_exec(path, text):
+    with open(path, "w") as fh:
+        fh.write(text)
+    os.chmod(path, 0o755)
+
+
+def job_fixture(tmp, with_table=True):
+    """A tree shaped like the cluster: H01_CODE with the runner file and the g
+    table, H01_ROOT with neurons/, bin/ with the stubs, envs/spine_env/bin and
+    home/.conda/envs/spine_env/bin each with a python3 stub."""
+    fx = os.path.join(tmp, "jobfix")
+    shutil.rmtree(fx, ignore_errors=True)
+    code = os.path.join(fx, "h01_code")
+    root = os.path.join(fx, "h01")
+    pydirs = (os.path.join(fx, "bin"),
+              os.path.join(fx, "envs", "spine_env", "bin"),
+              os.path.join(fx, "home", ".conda", "envs", "spine_env", "bin"))
+    for d in (os.path.join(code, "stage1"), os.path.join(root, "neurons")) + pydirs:
+        os.makedirs(d, exist_ok=True)
+    open(os.path.join(code, "run_spine_area_F.py"), "w").close()
+    if with_table:
+        open(os.path.join(code, "g_table_cyl_2deg.npz"), "w").close()
+    for d in pydirs:
+        _write_exec(os.path.join(d, "python3"), STUB_PY)
+    _write_exec(os.path.join(fx, "bin", "conda"), STUB_CONDA)
+    _write_exec(os.path.join(fx, "bin", "curl"), STUB_CURL)
+    return fx, code, root
+
+
+def run_job(script, fx, code, root, extra_env, env_python=False):
+    """bash <script> with a scrubbed environment: no inherited CODE/ROOT/H01_*/
+    PBS_*/CONDA*, HOME inside the fixture, the stub bin first on PATH and, when
+    env_python, the envs/spine_env/bin stub ahead of it. Returns (rc, stdout,
+    argv), argv being what the stub interpreter received ([] if never run)."""
+    _ARGV_N[0] += 1
+    argv_out = os.path.join(fx, "argv_%d.txt" % _ARGV_N[0])
+    path = os.path.join(fx, "bin") + os.pathsep + os.environ.get("PATH", "")
+    if env_python:
+        path = os.path.join(fx, "envs", "spine_env", "bin") + os.pathsep + path
+    drop = ("CODE", "ROOT", "CELL", "SUBSET", "NTASKS", "DRY_RUN", "SKIP_CONDA",
+            "ENV_NAME", "MIN_SPINE_VALUE", "NO_MEASURE_BASE", "STUB_ARGV_OUT")
+    env = {k: v for k, v in os.environ.items()
+           if not (k in drop or k.startswith("H01_") or k.startswith("PBS_")
+                   or k.startswith("CONDA"))}
+    env.update({"PATH": path, "HOME": os.path.join(fx, "home"),
+                "H01_CODE": code, "H01_ROOT": root, "STUB_ARGV_OUT": argv_out})
+    env.update(extra_env)
+    p = subprocess.run(["bash", script], cwd=fx, env=env,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                       universal_newlines=True, timeout=120)
+    argv = open(argv_out).read().splitlines() if os.path.isfile(argv_out) else []
+    return p.returncode, p.stdout, argv
+
+
+def pbs_python_invocation(text):
+    """The `python3 run_spine_area_F.py ...` command with its backslash
+    continuations joined into one line, or '' if absent."""
+    lines = text.splitlines()
+    for i, ln in enumerate(lines):
+        if ln.strip().startswith("python3 run_spine_area_F.py"):
+            parts = []
+            for j in range(i, len(lines)):
+                parts.append(lines[j].rstrip().rstrip("\\").strip())
+                if not lines[j].rstrip().endswith("\\"):
+                    break
+            return " ".join(parts)
+    return ""
+
+
+def _first_line(lines, needle, start=0):
+    for i in range(start, len(lines)):
+        if lines[i].strip() == needle:
+            return i
+    return -1
+
+
+def _argval(argv, flag):
+    if flag in argv and argv.index(flag) + 1 < len(argv):
+        return argv[argv.index(flag) + 1]
+    return None
+
+
+def job_script_checks(code_dir, tmp):
+    pbs_path = os.path.join(code_dir, PBS)
+    probe_path = os.path.join(code_dir, PROBE)
+    text = open(pbs_path).read()
+    lines = text.splitlines()
+
+    # ---- B1 text: the g-table flag and its preflight
+    inv = pbs_python_invocation(text)
+    check("B1 .pbs passes --g-table under H01_CODE to the runner",
+          '--g-table "$H01_CODE/g_table_cyl_2deg.npz"' in inv, inv[:90])
+    check("B1' .pbs checks the g table exists before starting python",
+          'if [ ! -f "$H01_CODE/g_table_cyl_2deg.npz" ]' in text)
+
+    # ---- B2 text: activation trusts the OUTCOME, guards in the right order
+    i_hook = _first_line(lines, 'eval "$(conda shell.bash hook)"')
+    i_act = _first_line(lines, 'conda activate "$ENV_NAME"', i_hook + 1)
+    i_pe = _first_line(lines, "set +e")
+    i_pu = _first_line(lines, "set +u")
+    i_me = _first_line(lines, "set -e", i_act + 1)
+    i_mu = _first_line(lines, "set -u", i_act + 1)
+    check("B2 activation: set +u and set +e BEFORE the hook, -e/-u restored AFTER activate",
+          0 <= i_pu < i_hook and 0 <= i_pe < i_hook and i_hook < i_act
+          and i_act < i_me and i_act < i_mu,
+          "+u %d +e %d hook %d act %d -e %d -u %d" % (i_pu, i_pe, i_hook, i_act, i_me, i_mu))
+    check("B2' activation verified by where python3 resolves, not by exit status",
+          '*"/envs/$ENV_NAME/"*)' in text and "did not take effect" in text)
+    check("B2'' path knobs are H01_ROOT / H01_CODE and stale CODE/ROOT are reported",
+          '"${H01_CODE:-' in text and '"${H01_ROOT:-' in text
+          and "for _stale in ROOT CODE" in text)
+
+    # ---- B3 text: probe_net.pbs no longer points at the retired repo
+    ptext = open(probe_path).read()
+    plines = [ln for ln in ptext.splitlines() if not ln.lstrip().startswith("#")]
+    check("B3 probe_net.pbs has no live reference to TEEG/Spines",
+          not any("TEEG/Spines" in ln for ln in plines))
+    check("B3' probe_net.pbs uses the H01_CODE knob with the Towards-EEG default",
+          'H01_CODE="${H01_CODE:-/davinci-1/home/ldellamea/TEEG/Towards-EEG/h01_code}"' in ptext
+          and "$CODE" not in ptext)
+
+    # ---- B4 syntax and bytes of every shell script shipped
+    for name in (PBS, PROBE, "run_smoke_tests.sh", "stage1_link.sh"):
+        fp = os.path.join(code_dir, name)
+        rc = subprocess.run(["bash", "-n", fp], stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, universal_newlines=True)
+        raw = open(fp, "rb").read()
+        check("B4 %s: bash -n passes, LF only, pure ASCII" % name,
+              rc.returncode == 0 and b"\r" not in raw and all(b < 128 for b in raw),
+              rc.stdout.strip()[:80])
+
+    # ---- B5 run spine_area_F.pbs: the positive path, no conda
+    fx, code, root = job_fixture(tmp)
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            {"SKIP_CONDA": "1", "CELL": str(JOB_CELL),
+                             "PBS_ARRAY_INDEX": "3", "SUBSET": "7", "DRY_RUN": "1"})
+    check("B5 .pbs runs to completion and invokes the runner",
+          rc == 0 and argv[:1] == ["run_spine_area_F.py"],
+          "rc=%d argv=%s\n%s" % (rc, argv[:2], out[-400:]) if rc else "")
+    check("B5' the runner receives --g-table = H01_CODE/g_table_cyl_2deg.npz",
+          _argval(argv, "--g-table") == os.path.join(code, "g_table_cyl_2deg.npz"),
+          str(_argval(argv, "--g-table")))
+    check("B5'' --root, --stage1-dir, --cell, --task, --ntasks, --subset, --dry-run as set",
+          _argval(argv, "--root") == root
+          and _argval(argv, "--stage1-dir") == os.path.join(code, "stage1")
+          and _argval(argv, "--cell") == str(JOB_CELL)
+          and _argval(argv, "--task") == "3" and _argval(argv, "--ntasks") == "40"
+          and _argval(argv, "--subset") == "7" and "--dry-run" in argv
+          and "task 3/40" in out, str(argv))
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            {"SKIP_CONDA": "1", "CELL": str(JOB_CELL), "PBS_ARRAYID": "5"})
+    check("B5''' Torque fallback: PBS_ARRAYID sets --task when PBS_ARRAY_INDEX is unset",
+          rc == 0 and _argval(argv, "--task") == "5" and "--subset" not in argv
+          and "--dry-run" not in argv)
+
+    # ---- B6 the activation block, positive and negative
+    # Positive: the stub `conda activate` RETURNS 1 (as binutils does) but
+    # python3 resolves under envs/spine_env/bin -> the job must proceed.
+    rc, out, argv = run_job(pbs_path, fx, code, root, {"CELL": str(JOB_CELL)},
+                            env_python=True)
+    check("B6 conda activate returning 1 with python3 inside the env: job PROCEEDS",
+          rc == 0 and "INFO: stub activate.d hook" in out
+          and argv[:1] == ["run_spine_area_F.py"],
+          "rc=%d\n%s" % (rc, out[-400:]) if rc else "")
+    # Negative: same hook, but python3 does NOT resolve inside the env.
+    rc, out, argv = run_job(pbs_path, fx, code, root, {"CELL": str(JOB_CELL)},
+                            env_python=False)
+    check("B6' activation that did not take effect: job REFUSES before python",
+          rc != 0 and "did not take effect" in out and argv == [],
+          "rc=%d" % rc)
+
+    # ---- B7 the other refusals, each before the interpreter starts
+    rc, out, argv = run_job(pbs_path, fx, code, root, {"SKIP_CONDA": "1"})
+    check("B7 unset CELL: refused, python never invoked",
+          rc != 0 and "CELL" in out and argv == [], "rc=%d" % rc)
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            {"SKIP_CONDA": "1", "CELL": str(JOB_CELL),
+                             "CODE": "/nowhere/other_project", "ROOT": "/nowhere/else"})
+    check("B7' stale CODE / ROOT in the environment: reported, ignored, run proceeds",
+          rc == 0 and "NOTE: CODE is set" in out and "NOTE: ROOT is set" in out
+          and _argval(argv, "--root") == root
+          and _argval(argv, "--g-table") == os.path.join(code, "g_table_cyl_2deg.npz"))
+    rc, out, argv = run_job(pbs_path, fx, code, os.path.join(fx, "not_a_root"),
+                            {"SKIP_CONDA": "1", "CELL": str(JOB_CELL)})
+    check("B7'' H01_ROOT without neurons/: refused",
+          rc != 0 and "neurons/" in out and argv == [])
+    fx2, code2, root2 = job_fixture(tmp, with_table=False)
+    rc, out, argv = run_job(pbs_path, fx2, code2, root2,
+                            {"SKIP_CONDA": "1", "CELL": str(JOB_CELL)})
+    check("B7''' missing g table: refused with the path named, python never invoked",
+          rc != 0 and "calibration table missing" in out
+          and os.path.join(code2, "g_table_cyl_2deg.npz") in out and argv == [],
+          "rc=%d" % rc)
+
+    # ---- B8 probe_net.pbs runs offline against the fixture (stub curl, stub
+    # interpreter under HOME/.conda) and refuses a wrong H01_CODE
+    fx, code, root = job_fixture(tmp)
+    rc, out, argv = run_job(probe_path, fx, code, root, {})
+    check("B8 probe_net.pbs runs to 'PROBE done' from H01_CODE",
+          rc == 0 and "PROBE done" in out and "PROBE code dir" in out,
+          "rc=%d\n%s" % (rc, out[-300:]) if rc else "")
+    rc, out, argv = run_job(probe_path, fx, os.path.join(fx, "nope"), root, {})
+    check("B8' probe_net.pbs refuses an H01_CODE that is not h01_code",
+          rc != 0 and "PROBE FATAL" in out)
 
 
 def main():
@@ -400,6 +655,9 @@ def main():
                 check("A15 runner refuses: %s" % why, False, "accepted")
             except SystemExit:
                 check("A15 runner refuses: %s" % why, True)
+
+        # ---- Section B: the job scripts
+        job_script_checks(code_dir, tmp)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

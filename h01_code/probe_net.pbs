@@ -15,14 +15,24 @@
 #
 # Every step prints PROBE <name> : <result> and nothing aborts the script, so
 # one run returns the full picture instead of dying at the first failure.
+#
+# H01_CODE is the same knob as in spine_area_F.pbs (qsub -v H01_CODE=...); the
+# bare CODE is a name the login shell exports for another project and is not
+# read here. Until 2026-09-20 this file still pointed at the retired
+# TEEG/Spines repo.
 # ---------------------------------------------------------------------------
 set -eo pipefail
 
-REPO="/davinci-1/home/ldellamea/TEEG/Spines"
+H01_CODE="${H01_CODE:-/davinci-1/home/ldellamea/TEEG/Towards-EEG/h01_code}"
 PY="$HOME/.conda/envs/spine_env/bin/python3"
 set -u
 
-cd "$REPO"
+if [ ! -f "$H01_CODE/run_spine_area_F.py" ]; then
+    echo "PROBE FATAL           : H01_CODE=$H01_CODE is not h01_code (no run_spine_area_F.py)"
+    exit 1
+fi
+cd "$H01_CODE"
+echo "PROBE code dir        : $H01_CODE"
 echo "PROBE host            : $(hostname)"
 echo "PROBE date            : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "PROBE python          : $PY"
@@ -43,14 +53,14 @@ echo "PROBE https_proxy     : ${https_proxy:-<unset>}"
 echo "PROBE no_proxy        : ${no_proxy:-<unset>}"
 
 # ---- 2. raw HTTPS to the bucket ------------------------------------------
-CODE=$(curl -sS -m 30 -o /dev/null -w '%{http_code}' \
+HTTP1=$(curl -sS -m 30 -o /dev/null -w '%{http_code}' \
        https://storage.googleapis.com/h01-release/ 2>&1 || echo "curl-failed")
-echo "PROBE curl bucket     : HTTP $CODE   (200 = reachable)"
+echo "PROBE curl bucket     : HTTP $HTTP1   (200 = reachable)"
 
 # ---- 3. the exact object CloudVolume reads first --------------------------
 INFO="https://storage.googleapis.com/h01-release/data/20210601/c3/info"
-CODE2=$(curl -sS -m 30 -o /tmp/h01_info.$$ -w '%{http_code}' "$INFO" 2>&1 || echo "curl-failed")
-echo "PROBE curl c3 info    : HTTP $CODE2  ($(wc -c < /tmp/h01_info.$$ 2>/dev/null || echo 0) bytes)"
+HTTP2=$(curl -sS -m 30 -o /tmp/h01_info.$$ -w '%{http_code}' "$INFO" 2>&1 || echo "curl-failed")
+echo "PROBE curl c3 info    : HTTP $HTTP2  ($(wc -c < /tmp/h01_info.$$ 2>/dev/null || echo 0) bytes)"
 rm -f /tmp/h01_info.$$
 
 # ---- 4. python deps -------------------------------------------------------
