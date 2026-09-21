@@ -6,7 +6,9 @@ p1_spine_stats.py, p1_hoc_audit.py, passive_params.csv, p1_export.pbs.
   python3 smoke_test_p1_export.py -v     (every check)
 
 Sections
-  A  passive table: resolution, refusal of a blank / missing / non-shaft row
+  A  passive table: resolution, refusal of a blank / missing / non-shaft row;
+     the two shipped INH variant tables (SST cm 1.0, PV/VIP cm 2.0), inh-only
+     so an exc population is refused against them
   B  manifest builder: bank DISCOVERY (neurons/ vs alignment/, --bank,
      --bank-dir, the both-present warning, refusal naming every path
      tried), bank membership, missing skeleton, missing synapse file,
@@ -22,13 +24,16 @@ Sections
      modules from the symlink farm) on a synthetic cell, with ONLY
      hoc_qc.gate_hoc stubbed (no NEURON in the sandbox): every artefact
      written, spine tables consistent with spine_bases and the C-09 file,
-     record + fingerprint, resume, --force, --dry-run, --summarise
+     record + fingerprint, resume, --force, --dry-run, --summarise; the same
+     cell under BOTH passive variants into two trees, records naming their
+     table, fingerprint on values not names (D16)
   E  structural audit: the emitted .hoc passes; a tampered .hoc (orphan
      section) fails and is quarantined, record says so, exit 0
   F  refusals: bad --task, cell not in manifest, blank passive row for a
      manifest population
   G  p1_export.pbs: text guards, bash -n, LF/ASCII, run with stub python3 /
-     conda -> argv, MANIFEST required, wrong H01_CODE refused
+     conda -> argv, MANIFEST required, wrong H01_CODE refused, the
+     PASSIVE_TABLE / OUT_DIR variant knobs (relative, absolute, missing)
 
 Pure ASCII, LF only. No network.
 """
@@ -63,6 +68,14 @@ def check(name, ok, detail=""):
 # --------------------------------------------------------------------------- #
 # Fixtures                                                                    #
 # --------------------------------------------------------------------------- #
+def _refused(fn):
+    try:
+        fn()
+        return False
+    except SystemExit:
+        return True
+
+
 def passive_csv(tmp, blank_l3=False):
     rows = [
         "layer,cell_type,cm_uF_cm2,Ra_ohm_cm,Rm_qc_ohm_cm2,cm_reference,source,provenance",
@@ -254,6 +267,32 @@ def section_a(R, tmp):
                 n_blank += 1
     check("A3 shipped passive_params.csv: L2/L3 exc resolve, the other 8 are refused",
           ok and n_blank == 8, "blank refused: %d" % n_blank)
+
+    # ---- A4: the two INH variant tables (decision D-003) -------------------
+    # inh-only on purpose: an exc manifest pointed at a variant is refused,
+    # so exc cells can never be exported into an inh variant tree by mistake.
+    want = {"passive_params_inh_SST.csv": (1.0, 100.0, 43103.0),
+            "passive_params_inh_PVVIP.csv": (2.0, 100.0, 38760.0)}
+    for fname, (cm, ra, rm) in want.items():
+        vt = R.load_passive_table(os.path.join(HERE, fname))
+        got = [R.resolve_passive(vt, lay, "inh") for lay in ("L2", "L3")]
+        check("A4 %s: L2 and L3 inh resolve to cm %.1f Ra %.0f Rm_qc %.0f" % (fname, cm, ra, rm),
+              all(g["cm"] == cm and g["Ra"] == ra and g["Rm_qc"] == rm
+                  and g["cm_reference"] == "shaft" for g in got),
+              str([(g["cm"], g["Ra"], g["Rm_qc"]) for g in got]))
+        try:
+            R.resolve_passive(vt, "L2", "exc")
+            check("A4' %s refuses an EXC population (inh-only by design)" % fname, False, "accepted")
+        except SystemExit as e:
+            check("A4' %s refuses an EXC population (inh-only by design)" % fname,
+                  "no row" in str(e), str(e)[:60])
+        n_blank = sum(1 for lay in ("L4", "L5", "L6")
+                      if _refused(lambda: R.resolve_passive(vt, lay, "inh")))
+        check("A4'' %s: L4-L6 inh still blank and refused" % fname, n_blank == 3)
+    s_cm = R.resolve_passive(R.load_passive_table(os.path.join(HERE, "passive_params_inh_SST.csv")), "L2", "inh")["cm"]
+    p_cm = R.resolve_passive(R.load_passive_table(os.path.join(HERE, "passive_params_inh_PVVIP.csv")), "L2", "inh")["cm"]
+    check("A5 the two variants differ in cm (1.0 vs 2.0), so their fingerprints differ",
+          s_cm != p_cm, "%s vs %s" % (s_cm, p_cm))
 
 
 # --------------------------------------------------------------------------- #
@@ -714,6 +753,67 @@ def section_d(R, B, tmp):
         rc, out = run_driver(R, base + ["--task", "0", "--dry-run"])
         check("D15 a regenerated bank changes the fingerprint (input identity is fingerprinted)",
               rc == 0 and "reprocessing" in out, out[-300:])
+
+        # ---- D16: PASSIVE VARIANTS (decision D-003) -------------------------
+        # The same cell, exported under two passive tables into two trees.
+        # Both must exist afterwards, name their table, differ in fingerprint,
+        # and the fingerprint must NOT depend on the table's name -- only on
+        # its values -- or two identically-filled tables would never resume.
+        vroot = campaign_tree(os.path.join(tmp, "variants"), cell_ids=(CELL,))
+        vman = os.path.join(vroot, "p1", "manifests", "L3_inh.csv")
+        os.makedirs(os.path.dirname(vman), exist_ok=True)
+        B.build_manifest(vroot, "L3", "exc", [CELL]).assign(cell_type="inh").to_csv(vman, index=False)
+        sst = os.path.join(HERE, "passive_params_inh_SST.csv")
+        pvv = os.path.join(HERE, "passive_params_inh_PVVIP.csv")
+        trees = {}
+        for name, table in (("p1_inh_SST", sst), ("p1_inh_PVVIP", pvv)):
+            od = os.path.join(vroot, name)
+            rc, out = run_driver(R, ["--root", vroot, "--manifest", vman, "--stage1-dir", STAGE1,
+                                     "--passive-table", table, "--out-dir", od,
+                                     "--no-neuron-validate", "--task", "0"])
+            recp = os.path.join(od, str(CELL), "neuron_%d_p1.json" % CELL)
+            trees[name] = (rc, out, json.load(open(recp)) if os.path.isfile(recp) else None)
+        a, b = trees["p1_inh_SST"][2], trees["p1_inh_PVVIP"][2]
+        check("D16 the same cell exports under BOTH variants, each into its own tree",
+              a is not None and b is not None and a["status"] == "ok" and b["status"] == "ok",
+              "rc=%s/%s" % (trees["p1_inh_SST"][0], trees["p1_inh_PVVIP"][0]))
+        if a and b:
+            check("D16a each record names its passive table and carries its sha",
+                  a["passive"]["passive_table"] == "passive_params_inh_SST.csv"
+                  and b["passive"]["passive_table"] == "passive_params_inh_PVVIP.csv"
+                  and len(a["passive"]["passive_table_sha"]) == 12
+                  and a["passive"]["passive_table_sha"] != b["passive"]["passive_table_sha"])
+            check("D16b cm 1.0 vs 2.0 -> different fingerprints, so neither resumes into the other",
+                  a["passive"]["cm"] == 1.0 and b["passive"]["cm"] == 2.0
+                  and a["fingerprint"] != b["fingerprint"],
+                  "%s vs %s" % (a["fingerprint"], b["fingerprint"]))
+            check("D16c the fingerprint hashes the VALUES only: no table name inside it",
+                  "passive_table" not in a["fingerprint_detail"]["passive"]
+                  and "passive_table_sha" not in a["fingerprint_detail"]["passive"]
+                  and set(a["fingerprint_detail"]["passive"]) == {"cm", "Ra", "Rm_qc", "cm_reference"},
+                  str(sorted(a["fingerprint_detail"]["passive"])))
+            # a COPY of the SST table under another name must resume, not reprocess
+            sst_copy = os.path.join(tmp, "renamed_sst.csv")
+            shutil.copy(sst, sst_copy)
+            rc, out = run_driver(R, ["--root", vroot, "--manifest", vman, "--stage1-dir", STAGE1,
+                                     "--passive-table", sst_copy,
+                                     "--out-dir", os.path.join(vroot, "p1_inh_SST"),
+                                     "--no-neuron-validate", "--task", "0"])
+            check("D16d an identically-filled table under another NAME resumes (values, not names)",
+                  rc == 0 and "resumed" in out, out[-200:])
+            # the summary of each tree names the table
+            for name in ("p1_inh_SST", "p1_inh_PVVIP"):
+                rc, out = run_driver(R, ["--root", vroot, "--out-dir", os.path.join(vroot, name),
+                                         "--summarise"])
+                sm = pd.read_csv(os.path.join(vroot, name, "p1_summary.csv"))
+                check("D16e %s/p1_summary.csv carries passive_table" % name,
+                      rc == 0 and "passive_table" in sm.columns
+                      and str(sm["passive_table"].iloc[0]).endswith(name.replace("p1_inh_", "") + ".csv"),
+                      str(sm.get("passive_table", pd.Series()).tolist()))
+        # an EXC manifest against an inh-only variant table is refused
+        rc, out = run_driver(R, base + ["--task", "0", "--dry-run", "--passive-table", sst])
+        check("D16f an exc manifest against an inh-only variant table is refused",
+              isinstance(rc, tuple) and "no row" in rc[1], str(rc)[:120])
     finally:
         hq.gate_hoc = saved
     return root, mp, ptab
@@ -839,7 +939,9 @@ def section_g(tmp):
           rc.returncode == 0 and b"\r" not in raw and all(b < 128 for b in raw))
     check("G2 text guards: H01_ENV knob, ENV_NAME/CODE/ROOT reported, passive table + farm checked",
           'H01_ENV="${H01_ENV:-spine_env}"' in text and "NOTE: ENV_NAME is set" in text
-          and "for _stale in ROOT CODE" in text and 'passive_params.csv" ]' in text
+          and "for _stale in ROOT CODE" in text and '[ ! -f "$PASSIVE_TABLE" ]' in text
+          and 'PASSIVE_TABLE="${PASSIVE_TABLE:-$H01_CODE/passive_params.csv}"' in text
+          and 'OUT_DIR="${OUT_DIR:-$H01_ROOT/p1}"' in text
           and '"$H01_CODE/stage1" ]' in text and "${MANIFEST:?" in text)
     # fixture
     fx = os.path.join(tmp, "jobfix")
@@ -861,7 +963,8 @@ def section_g(tmp):
         argv_out = os.path.join(fx, "argv_%d.txt" % len(RESULTS))
         env = {k: v for k, v in os.environ.items()
                if not (k in ("CODE", "ROOT", "ENV_NAME", "SKIP_CONDA", "MANIFEST", "DRY_RUN",
-                             "FORCE", "NO_RIGIDITY", "NO_NEURON_VALIDATE")
+                             "FORCE", "NO_RIGIDITY", "NO_NEURON_VALIDATE",
+                             "PASSIVE_TABLE", "OUT_DIR")
                        or k.startswith("H01_") or k.startswith("PBS_") or k.startswith("CONDA"))}
         env.update({"PATH": os.path.join(fx, "bin") + os.pathsep + os.environ.get("PATH", ""),
                     "HOME": fx, "H01_CODE": code_dir, "H01_ROOT": root,
@@ -885,6 +988,7 @@ def section_g(tmp):
           argval(argv, "--manifest") == man and argval(argv, "--task") == "2"
           and argval(argv, "--passive-table") == os.path.join(code, "passive_params.csv")
           and argval(argv, "--stage1-dir") == os.path.join(code, "stage1")
+          and argval(argv, "--out-dir") == os.path.join(root, "p1")
           and "--dry-run" in argv and "--no-rigidity-control" in argv
           and "--force" not in argv, str(argv))
     rc, out, argv = run({"MANIFEST": os.path.join("..", "h01", "p1", "manifests", "L3_exc.csv"),
@@ -901,6 +1005,30 @@ def section_g(tmp):
     os.remove(os.path.join(code, "passive_params.csv"))
     rc, out, argv = run({"SKIP_CONDA": "1", "MANIFEST": man})
     check("G5''' missing passive table: refused before python", rc != 0 and "passive table missing" in out and argv == [])
+    # ---- G6: the PASSIVE_TABLE / OUT_DIR knobs (decision D-003) -------------
+    open(os.path.join(code, "passive_params.csv"), "w").close()   # restore for G6
+    open(os.path.join(code, "passive_params_inh_SST.csv"), "w").close()
+    rc, out, argv = run({"SKIP_CONDA": "1", "MANIFEST": man})
+    check("G6 defaults: --passive-table <code>/passive_params.csv, --out-dir <root>/p1",
+          rc == 0 and argval(argv, "--passive-table") == os.path.join(code, "passive_params.csv")
+          and argval(argv, "--out-dir") == os.path.join(root, "p1"), str(argv))
+    rc, out, argv = run({"SKIP_CONDA": "1", "MANIFEST": man,
+                         "PASSIVE_TABLE": "passive_params_inh_SST.csv", "OUT_DIR": "p1_inh_SST"})
+    check("G6a relative PASSIVE_TABLE resolves against H01_CODE, relative OUT_DIR against H01_ROOT",
+          rc == 0 and argval(argv, "--passive-table") == os.path.join(code, "passive_params_inh_SST.csv")
+          and argval(argv, "--out-dir") == os.path.join(root, "p1_inh_SST")
+          and "passive passive_params_inh_SST.csv | out " + os.path.join(root, "p1_inh_SST") in out,
+          "rc=%d %s" % (rc, out[-300:]))
+    abs_tab = os.path.join(fx, "elsewhere.csv")
+    open(abs_tab, "w").close()
+    rc, out, argv = run({"SKIP_CONDA": "1", "MANIFEST": man,
+                         "PASSIVE_TABLE": abs_tab, "OUT_DIR": os.path.join(fx, "abs_out")})
+    check("G6b absolute PASSIVE_TABLE and OUT_DIR pass through unchanged",
+          rc == 0 and argval(argv, "--passive-table") == abs_tab
+          and argval(argv, "--out-dir") == os.path.join(fx, "abs_out"), str(argv))
+    rc, out, argv = run({"SKIP_CONDA": "1", "MANIFEST": man, "PASSIVE_TABLE": "nope.csv"})
+    check("G6c a missing PASSIVE_TABLE is refused before python, naming the resolved path",
+          rc != 0 and "passive table missing" in out and "nope.csv" in out and argv == [])
 
 
 # --------------------------------------------------------------------------- #

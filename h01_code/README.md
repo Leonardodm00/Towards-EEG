@@ -6,7 +6,7 @@ of (cell, layer, exc/inh). **P2** (`run_spine_area_F.py`, sections 3-7) is the
 calibrated dendritic-spine membrane area from the H01 segmentation, substituted
 into Stage 1's phi table, giving a mesh-based `F` per cell.
 
-`run_p1_export v1.0` | `p1_spine_stats v1.0` | `p1_hoc_audit v1.0` | `build_p1_manifest v1.1` | `soma_census v1.0`
+`run_p1_export v1.0` (rev 1.0.1) | `p1_spine_stats v1.0` | `p1_hoc_audit v1.0` | `build_p1_manifest v1.1` | `soma_census v1.0`
 `h01_spine_area_F v1.7` | `run_spine_area_F v1.3` | `merge_spine_area_F v1.1` | `h01_spine_base v1.2`
 
 ---
@@ -21,11 +21,12 @@ into Stage 1's phi table, giving a mesh-based `F` per cell.
 | `build_p1_manifest.py` | writes one manifest per population, checked against the layer's alignment bank, whose directory it searches (8.1) |
 | `p1_spine_stats.py` | the per-spine-node and per-spine tables (handoff section 4.1) |
 | `p1_hoc_audit.py` | structural `.hoc` audit, NEURON validation subprocess, quarantine (ports of notebook CELL 6a) |
-| `passive_params.csv` | cm, Ra, gate Rm per (layer, cell_type); **only L2/L3 exc filled** |
+| `passive_params.csv` | cm, Ra, gate Rm per (layer, cell_type); **L2/L3 exc filled, every inh row blank** |
+| `passive_params_inh_SST.csv`, `passive_params_inh_PVVIP.csv` | the two interneuron variants (cm 1.0 / 2.0), inh-only; decision D-003, section 8.2 |
 | `p1_export.pbs` | PBS Pro array job for P1, one submission per population |
 | `soma_census.py` | soma-radius census over the campaign skeletons, without running P1: how many cells carry a soma that passes `soma_enforce`'s completeness gate (section 9) |
 | `smoke_test_soma_census.py` | 25 checks, incl. the two cells `soma_enforce` documents by name |
-| `smoke_test_p1_export.py` | 94 checks: bank discovery, tables on a hand-labelled fixture, the real export end to end, audit, refusals, the job script |
+| `smoke_test_p1_export.py` | 113 checks: bank discovery, the passive variants, tables on a hand-labelled fixture, the real export end to end, audit, refusals, the job script |
 | `h01_spine_area_F.py` | area, rind, base frustum, kappa, F |
 | `h01_spine_batch.py` | the analysis mesh (14 Taubin iterations) |
 | `h01_spine_roi.py` | per-spine cutout, Voronoi split, bridging |
@@ -230,13 +231,37 @@ exported cell by the rotation-group mean of its **k = 3 spatially nearest
 bank rows** (`--k-neighbors`). A cell therefore does not need to be in the
 bank to be exported -- it needs bank members near it in space.
 
-**8.2 The passive table.** `passive_params.csv` has one row per population:
-`layer, cell_type, cm_uF_cm2, Ra_ohm_cm, Rm_qc_ohm_cm2, cm_reference, source,
-provenance`. Only `L2 exc` and `L3 exc` are filled (cm 0.50, Ra 268.5,
-Rm_qc 24000, shaft-referenced; Eyal 2016 / Deitcher 2017). The other eight
-rows are blank on purpose: a blank row is **refused before any export**, so a
-population cannot run on a placeholder. `Rm_qc` is the gate's Rm only; it is
-not exported into the `.hoc`.
+**8.2 The passive tables, and what cm is for here.** `cm` and `Ra` are not
+written into the `.hoc` -- the exported geometry is passive-free. They fix
+the **lfpy_idx segmentation** (nseg per section by the lambda_f rule) and
+therefore every compartment index in `mapped_synapses.csv`; the simulation
+must rebuild each cell with the same `(cm, Ra, lambda_f, d_lambda)` or the
+mapped synapses land in the wrong compartments. `Rm_qc` is the gate's Rm
+only.
+
+Three tables, one row per `(layer, cell_type)` with columns `cm_uF_cm2,
+Ra_ohm_cm, Rm_qc_ohm_cm2, cm_reference, source, provenance`:
+
+| table | rows filled | values |
+|---|---|---|
+| `passive_params.csv` | `L2 exc`, `L3 exc` | cm 0.50, Ra 268.5, Rm_qc 24000 (Eyal 2016 / Deitcher 2017); **every `inh` row deliberately blank** |
+| `passive_params_inh_SST.csv` | `L2 inh`, `L3 inh` | cm **1.0**, Ra 100, Rm_qc 43103 (Yao 2022 SST) |
+| `passive_params_inh_PVVIP.csv` | `L2 inh`, `L3 inh` | cm **2.0**, Ra 100, Rm_qc 38760 (Yao 2022 PV/VIP; VIP's g_pas) |
+
+A blank row is **refused before any export**, so a population cannot run on a
+placeholder, and the variant tables are **inh-only**, so an exc manifest
+pointed at one is refused with `no row for (L2, exc)` rather than exported
+into the wrong tree.
+
+**Why two inh tables (decision D-003).** The label is two-level, so every
+interneuron in a layer gets one `cm`, yet Yao 2022's SST model has cm 1.0 and
+its PV/VIP models 2.0 -- and the authors of the L5 analogue describe their
+PV cm=2 as a fit compensation for dendritic-diameter errors, not a
+measurement. Rather than choose now, **interneurons are exported under both
+sets, into separate trees, and the choice is made downstream.** The record
+and `p1_summary.csv` name the table (`passive_table`); the fingerprint hashes
+the values, so the two trees never resume into each other, and an
+identically-filled table under another name does resume.
 
 **8.3 Build the manifest** (one per population; paths inside it are relative
 to `H01_ROOT`, POSIX separators, so it travels between laptop and cluster):
@@ -273,20 +298,39 @@ qsub -N p1_L3exc -o logs/p1_L3exc.log -J 0-3 -v MANIFEST=../h01/p1/manifests/L3_
 ```
 
 `qsub -v` knobs: `MANIFEST` (required; relative paths resolve against
-`H01_CODE`), `H01_ROOT`, `H01_CODE`, `H01_ENV`, and `DRY_RUN=1`, `FORCE=1`,
+`H01_CODE`), `PASSIVE_TABLE` (default `passive_params.csv`; relative against
+`H01_CODE`), `OUT_DIR` (default `p1`; relative against `H01_ROOT`),
+`H01_ROOT`, `H01_CODE`, `H01_ENV`, and `DRY_RUN=1`, `FORCE=1`,
 `NO_RIGIDITY=1`, `NO_NEURON_VALIDATE=1`. The bare `ROOT` / `CODE` /
 `ENV_NAME` are reported and ignored, as everywhere else here.
+
+An inhibitory population is two submissions, one per variant, each into its
+own tree:
+
+```
+qsub -N p1_L2inh_SST   -o logs/p1_L2inh_SST.log   -J 0-217 \
+     -v MANIFEST=../h01/p1/manifests/L2_inh.csv,PASSIVE_TABLE=passive_params_inh_SST.csv,OUT_DIR=p1_inh_SST \
+     p1_export.pbs
+qsub -N p1_L2inh_PVVIP -o logs/p1_L2inh_PVVIP.log -J 0-217 \
+     -v MANIFEST=../h01/p1/manifests/L2_inh.csv,PASSIVE_TABLE=passive_params_inh_PVVIP.csv,OUT_DIR=p1_inh_PVVIP \
+     p1_export.pbs
+```
+
+Excitatory populations use the defaults and land in `p1/`. The layout is
+therefore `h01/p1/` (exc), `h01/p1_inh_SST/`, `h01/p1_inh_PVVIP/`, each with
+its own `p1_summary.csv` (`--summarise --out-dir <tree>`).
 
 **8.5 After the array:**
 
 ```
 python3 run_p1_export.py --root ../h01 --summarise --manifest ../h01/p1/manifests/L3_exc.csv
+python3 run_p1_export.py --root ../h01 --out-dir ../h01/p1_inh_SST --summarise --manifest ../h01/p1/manifests/L2_inh.csv
 ```
 
-folds every `p1/*/neuron_*_p1.json` into `p1/p1_summary.csv` (one row per
-cell: status, qc_status, gate_status, hoc_verdict, rigidity, quarantine,
-n_sections, F variants, spine and synapse counts, passive constants,
-fingerprint) and, with `--manifest`, lists the manifest cells that have no
+folds every `<tree>/*/neuron_*_p1.json` into `<tree>/p1_summary.csv` (one
+row per cell: status, qc_status, gate_status, hoc_verdict, rigidity,
+quarantine, n_sections, F variants, spine and synapse counts, passive
+constants and the table they came from, fingerprint) and, with `--manifest`, lists the manifest cells that have no
 record and exits 1 -- an array narrower than the manifest or a dead task is
 caught here, not discovered later.
 

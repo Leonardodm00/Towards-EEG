@@ -16,9 +16,16 @@ supplies what the Colab notebook supplies by hand and a cluster cannot:
                    tasks and the cell list is data, not code (build it with
                    build_p1_manifest.py);
   WHICH CONSTANTS  cm, Ra and the gate's Rm resolved from the cell's (layer,
-                   cell_type) in passive_params.csv -- align_and_export
-                   refuses to default them because they fix the lfpy_idx
-                   index space, and they differ by population;
+                   cell_type) in a passive table -- align_and_export refuses
+                   to default them because they fix the lfpy_idx index space,
+                   and they differ by population. PASSIVE VARIANTS (D-003):
+                   the same population may be exported under more than one
+                   table -- e.g. interneurons under the SST set and under the
+                   PV/VIP set, cm 1.0 vs 2.0 -- by pointing --passive-table
+                   and --out-dir at a variant table and a separate tree. The
+                   record and p1_summary.csv name the table; the fingerprint
+                   hashes the values, so the two trees never resume into each
+                   other;
   WHAT ELSE        the rigidity control, the structural .hoc audit with
                    quarantine, the arbour angle, the per-spine tables of
                    handoff section 4.1, a parameter fingerprint and one JSON
@@ -67,6 +74,11 @@ import numpy as np
 import pandas as pd
 
 DRIVER_VERSION = "run_p1_export v1.0"
+# DRIVER_VERSION is fingerprinted: bumping it reprocesses every cell. The
+# revision below is NOT fingerprinted. It is bumped for changes that leave the
+# exported artefacts byte-identical and only add to the record -- so a campaign
+# in flight under the previous revision stays valid and resumes.
+DRIVER_REVISION = "1.0.1"   # 2026-09-21: passive_table named in record + summary
 
 MANIFEST_COLUMNS = ("cell_id", "layer", "cell_type", "neuron_csv",
                     "alignment_metadata", "synapse_csv", "layer_source")
@@ -618,7 +630,8 @@ SUMMARY_KEYS = (
     "n_undecidable", "n_spines", "n_spine_nodes", "n_spines_with_synapses",
     "n_synapses", "n_on_pruned_spine", "n_redirected", "n_unresolved_spine_bases",
     "n_unknown_type", "totnsegs", "angle_from_z_deg", "soma_diameter_um",
-    "total_length_um", "cm", "Ra", "Rm_qc", "fingerprint", "seconds", "written_utc")
+    "total_length_um", "cm", "Ra", "Rm_qc", "passive_table", "fingerprint", "seconds",
+    "written_utc")
 
 
 def summary_row(rec):
@@ -648,6 +661,7 @@ def summary_row(rec):
            "cm": (rec.get("passive") or {}).get("cm"),
            "Ra": (rec.get("passive") or {}).get("Ra"),
            "Rm_qc": (rec.get("passive") or {}).get("Rm_qc"),
+           "passive_table": (rec.get("passive") or {}).get("passive_table"),
            "fingerprint": rec.get("fingerprint"), "seconds": rec.get("seconds"),
            "written_utc": rec.get("written_utc")}
     for k in ("n_sections", "n_branches", "f_implied", "F_lit", "f_implied_nocap",
@@ -714,6 +728,13 @@ def main(argv=None):
     cid = int(row["cell_id"])
     ptab = load_passive_table(args.passive_table)
     params = resolve_passive(ptab, row["layer"], row["cell_type"])
+    # Which TABLE the constants came from, for provenance. Deliberately not in
+    # the fingerprint: that hashes the values, so two tables carrying the same
+    # row are the same export. Two tables carrying different rows for the same
+    # population (the inh variants, decision D-003) differ in cm/Ra/Rm_qc and
+    # therefore in fingerprint already; the name is for the reader.
+    params["passive_table"] = os.path.basename(args.passive_table)
+    params["passive_table_sha"] = _sha12(args.passive_table)
     out_dir = os.path.join(args.out_dir, str(cid))
 
     df_raw, metadata_df, syn_df, inputs = load_inputs(
@@ -724,10 +745,11 @@ def main(argv=None):
     inputs["bank_sha"] = _sha12(inputs["alignment_metadata"])
     fp, fpd = p1_fingerprint(args, params, mods, inputs)
 
-    print("%s | cell %d (%s %s) | row %d/%d | cm %.3g Ra %.4g Rm_qc %.4g | fp %s"
-          % (DRIVER_VERSION, cid, row["layer"], row["cell_type"],
+    print("%s r%s | cell %d (%s %s) | row %d/%d | cm %.3g Ra %.4g Rm_qc %.4g (%s) | fp %s"
+          % (DRIVER_VERSION, DRIVER_REVISION, cid, row["layer"], row["cell_type"],
              int(manifest.index[manifest["cell_id"] == cid][0]), len(manifest),
-             params["cm"], params["Ra"], params["Rm_qc"], fp))
+             params["cm"], params["Ra"], params["Rm_qc"], params["passive_table"], fp))
+    print("  out %s" % out_dir)
     print("  %d nodes | bank %s: %d references | %s"
           % (len(df_raw), os.path.basename(inputs["alignment_metadata"]),
              len(metadata_df), inputs["synapse_note"]))
