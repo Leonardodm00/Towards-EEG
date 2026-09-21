@@ -6,7 +6,7 @@ of (cell, layer, exc/inh). **P2** (`run_spine_area_F.py`, sections 3-7) is the
 calibrated dendritic-spine membrane area from the H01 segmentation, substituted
 into Stage 1's phi table, giving a mesh-based `F` per cell.
 
-`run_p1_export v1.0` | `p1_spine_stats v1.0` | `p1_hoc_audit v1.0` | `build_p1_manifest v1.1`
+`run_p1_export v1.0` | `p1_spine_stats v1.0` | `p1_hoc_audit v1.0` | `build_p1_manifest v1.1` | `soma_census v1.0`
 `h01_spine_area_F v1.7` | `run_spine_area_F v1.3` | `merge_spine_area_F v1.1` | `h01_spine_base v1.2`
 
 ---
@@ -23,6 +23,8 @@ into Stage 1's phi table, giving a mesh-based `F` per cell.
 | `p1_hoc_audit.py` | structural `.hoc` audit, NEURON validation subprocess, quarantine (ports of notebook CELL 6a) |
 | `passive_params.csv` | cm, Ra, gate Rm per (layer, cell_type); **only L2/L3 exc filled** |
 | `p1_export.pbs` | PBS Pro array job for P1, one submission per population |
+| `soma_census.py` | soma-radius census over the campaign skeletons, without running P1: how many cells carry a soma that passes `soma_enforce`'s completeness gate (section 9) |
+| `smoke_test_soma_census.py` | 25 checks, incl. the two cells `soma_enforce` documents by name |
 | `smoke_test_p1_export.py` | 94 checks: bank discovery, tables on a hand-labelled fixture, the real export end to end, audit, refusals, the job script |
 | `h01_spine_area_F.py` | area, rind, base frustum, kappa, F |
 | `h01_spine_batch.py` | the analysis mesh (14 Taubin iterations) |
@@ -94,7 +96,7 @@ is not. Keeping data out of the repo keeps `git status` clean between runs.
 cd h01_code && bash run_smoke_tests.sh
 ```
 
-Expect `passed 5/5` and `ALL SUITES PASSED`. It activates `spine_env`
+Expect `passed 6/6` and `ALL SUITES PASSED`. It activates `spine_env`
 (`H01_ENV=other_env` to choose another; a stale `ENV_NAME` exported by the
 login shell is reported and ignored, like `CODE` and `ROOT`), checks and
 repairs the `stage1/` symlink farm, then runs every `smoke_test_*.py`. All
@@ -310,3 +312,37 @@ The per-spine key is the root node id: `root_node_id` here, `root_id` in P3's
 (`"<cell_id>:<root_node_id>"`) is written here as a convenience column only.
 
 **8.7 Not yet written:** P4 (the bank) and the eight blank passive rows.
+
+---
+
+## 9. Soma census: which cells carry a complete soma
+
+`soma_enforce.py` gates on the soma's radius, and that test is a
+**cell-completeness** check, not a formality: its own docstring records
+`neuron_606394351` (soma radius 331.9 nm) as "a truncated arbour fragment
+with a promoted root" against the intact `neuron_794820508` at 5325.5 nm.
+A cell below the floor still exports -- decision D-002 keeps the flag and
+filters downstream -- but you want to know how many there are before
+committing to ten populations.
+
+```
+python3 soma_census.py --neurons-dir ../h01/neurons --stage1-dir stage1 --limit 50
+python3 soma_census.py --neurons-dir ../h01/neurons --stage1-dir stage1 --out ../h01/soma_census.csv
+```
+
+It reads six columns per skeleton and runs no simulation, so it is I/O bound;
+it calls `soma_enforce.identify_soma_by_geometry` itself, with the module's
+thresholds passed explicitly, rather than restating the test. One row per
+cell, and a verdict:
+
+| verdict | meaning |
+|---|---|
+| `ok` | the root passes the 2000 nm floor and is the thickest node -- high confidence |
+| `below_floor` | a soma by name, too thin to be one |
+| `geometry_disagrees` | a thicker node exists elsewhere in the cell |
+| `both` | below the floor AND the geometry disagrees |
+| `no_root`, `no_r_column`, `missing:...`, `unreadable` | the skeleton could not be read as a tree |
+
+The summary prints the percentage that would survive a high-confidence
+filter, plus root-diameter quantiles. That percentage is the number that
+decides whether D-002's downstream filter is a filter or a decimation.
