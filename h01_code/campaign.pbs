@@ -73,6 +73,16 @@
 #                        then reports qc_status=fail, by design)
 #   MIN_COVERAGE=<f>     P3 --min-coverage (default the merger's 0.99)
 #
+# ALLOCATION (D-008, 2026-09-22 [user]): 200 CPUs usable at once and a
+# walltime ceiling of 300 h. At the select= line above (ncpus=2) that is 100
+# subjobs running concurrently, so a 537-cell population at SHARDS=1 runs in
+# about 6 waves; exceeding it does not refuse a subjob, it queues it. The
+# 12 h walltime below is per SUBJOB and is a guess until the per-spine rate
+# is measured -- override it per submission, up to the ceiling, with
+#   qsub -l walltime=48:00:00 ...
+# which overrides the #PBS -l line. campaign_queue_check.py reads ncpus and
+# walltime from THIS file and turns them into a wall-clock estimate.
+#
 # What is deliberately NOT a knob: --deliverable (always mesh_beyond, D-004)
 # and the merger's allow-missing switch (never passed: a dead shard must fail
 # the merge, not silently bias F downward). smoke_test_hpc_runner.py C1c

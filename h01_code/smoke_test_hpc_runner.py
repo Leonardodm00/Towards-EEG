@@ -586,6 +586,7 @@ def _scripts(calls):
 
 
 def campaign_checks(code_dir, tmp):
+    import run_spine_area_F as R          # for C13's resolve(), shared by P2 and P3
     pbs_path = os.path.join(code_dir, CAMPAIGN)
     text = open(pbs_path).read()
     lines = text.splitlines()
@@ -842,6 +843,63 @@ def campaign_checks(code_dir, tmp):
                             dict(base, MANIFEST=man, SHARDS="8", PBS_ARRAY_INDEX="24"))
     check("C12a ...and index 24 (row 3 of 3) is refused naming -J 0-23",
           rc != 0 and "-J 0-23" in out and argv == [])
+
+    # ---- C13 the drivers ACCEPT what the script sends, and their path
+    # resolution succeeds on it. A stub interpreter proves campaign.pbs EMITS
+    # an argv; it does not prove the real parsers TAKE it. The handoff sketch's
+    # omission of --g-table from the merge was exactly this class of bug -- the
+    # argv looked right and merge_spine_area_F's resolve() would have raised
+    # SystemExit on every cell, after P2 had already paid for the measurement.
+    # So the argv captured from a real run is fed to each driver's own parser,
+    # and then to the resolve() both measurement stages share.
+    fx, code, root, man = campaign_fixture(tmp)
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            dict(base, MANIFEST=man, PBS_ARRAY_INDEX="0"))
+    calls = split_calls(argv)
+    import run_p1_export as P1D
+    import merge_spine_area_F as M3
+    parsers = {"run_p1_export.py": P1D.build_parser,
+               "run_spine_area_F.py": R.build_parser,
+               "merge_spine_area_F.py": M3.build_parser}
+    parsed, rejected = {}, []
+    for c in calls:
+        try:
+            parsed[c[0]] = parsers[c[0]]().parse_args(c[1:])
+        except SystemExit as ex:                                 # argparse error
+            rejected.append("%s: %s" % (c[0], ex))
+    check("C13 every argv campaign.pbs emits is ACCEPTED by that driver's own parser",
+          len(calls) == 3 and not rejected and len(parsed) == 3,
+          "; ".join(rejected) if rejected else "%d calls" % len(calls))
+    if len(parsed) == 3:
+        n1, n2, n3 = (parsed["run_p1_export.py"], parsed["run_spine_area_F.py"],
+                      parsed["merge_spine_area_F.py"])
+        check("C13a the flags land on the attributes the drivers read",
+              n1.task == 0 and n1.manifest == man
+              and n2.cell == int(CAMPAIGN_CELLS[0]) and n2.task == 0 and n2.ntasks == 1
+              and n3.cell == int(CAMPAIGN_CELLS[0]) and n3.ntasks == 1
+              and n3.deliverable == "mesh_beyond",
+              "p1.task=%s p2.cell=%s p3.cell=%s p3.deliv=%s"
+              % (n1.task, n2.cell, n3.cell, n3.deliverable))
+        # resolve(): P2 directly; P3 the way merge_spine_area_F.main() does it
+        # (task 0, then the SAME R.resolve). This is the check that would have
+        # caught the missing --g-table.
+        errs = []
+        try:
+            R.resolve(R.build_parser().parse_args(calls[1][1:]))
+        except SystemExit as ex:
+            errs.append("P2 resolve: %s" % ex)
+        try:
+            n3b = M3.build_parser().parse_args(calls[2][1:])
+            n3b.task, n3b.ntasks_check = 0, n3b.ntasks
+            R.resolve(n3b)
+        except SystemExit as ex:
+            errs.append("P3 resolve: %s" % ex)
+        check("C13b resolve() succeeds for P2 AND P3 on that argv (stage1-dir and "
+              "g-table both found under H01_CODE)",
+              not errs, "; ".join(errs))
+    else:
+        check("C13a (skipped: a parser rejected the argv)", False)
+        check("C13b (skipped: a parser rejected the argv)", False)
 
 
 def main():

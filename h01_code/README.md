@@ -44,12 +44,15 @@ two stage scripts remain for re-running one stage by hand.
 | `campaign.pbs` | **the population launcher**: one PBS array runs P1, P2 and P3 per cell (index = row x shard); D-004, section 11 |
 | `campaign_join.py` | one table per (cell, passive tree) with `F_lit_skel_p1` AND `F_lit_deliverable` side by side, never confused (section 11.3) |
 | `smoke_test_campaign_join.py` | 22 checks: the join, NaN where no P3, both inh trees to one mesh F, refusals |
+| `campaign_policy_report.py` | how much of the reported spine area is mesh and how much is kappa fill, per cell and pooled, from P3's own CSVs (D-008; section 11.5) |
+| `campaign_queue_check.py` | reads the queue caps from `qstat`, and the 200-CPU / 300-h allocation budget (D-008), and says whether an N x SHARDS array fits and how long it will take (section 11.4); standard library only |
+| `smoke_test_campaign_policy.py` | 47 checks: both of the above, against a hand-computed fixture and captured qstat text |
 | `spine_area_F.pbs` | PBS Pro array job; reads the g table from `h01_code`, activation block copied from `run_smoke_tests.sh` |
 | `probe_net.pbs` | compute-node network diagnostic (absolute interpreter path) |
 | `run_smoke_tests.sh` | runs every `smoke_test_*.py`, on the login node or via `qsub` |
 | `stage1_link.sh` | assembles `stage1/` as symlinks to the canonical Stage 1 modules |
 | `smoke_test_h01_spine_area_F.py` | 112 checks (4 skip without the figure module) |
-| `smoke_test_hpc_runner.py` | 98 checks: runner + merger end to end, section B: the job scripts parsed and run against a fixture with a stub conda, section C: `campaign.pbs` at non-trivial (N, S) with the argv of all three stages asserted |
+| `smoke_test_hpc_runner.py` | 101 checks: runner + merger end to end, section B: the job scripts parsed and run against a fixture with a stub conda, section C: `campaign.pbs` at non-trivial (N, S) with the argv of all three stages asserted |
 | `smoke_test_p0_partition.py`, `smoke_test_p3_assemble.py` | 9 and 14 checks |
 | `g_table_cyl_2deg.npz` + `.json` | the v7 cylinder calibration |
 
@@ -105,7 +108,7 @@ is not. Keeping data out of the repo keeps `git status` clean between runs.
 cd h01_code && bash run_smoke_tests.sh
 ```
 
-Expect `passed 8/8` and `ALL SUITES PASSED`. It activates `spine_env`
+Expect `passed 9/9` and `ALL SUITES PASSED`. It activates `spine_env`
 (`H01_ENV=other_env` to choose another; a stale `ENV_NAME` exported by the
 login shell is reported and ignored, like `CODE` and `ROOT`), checks and
 repairs the `stage1/` symlink farm, then runs every `smoke_test_*.py`. All
@@ -599,7 +602,84 @@ Then per-cell wall time = spines x rate / S, against the 12 h walltime;
 `p1_summary.csv`'s `n_spines` gives the spine counts. Check the queue caps
 (`qstat -Qf cpu | grep -i max`) before the first `N*S` array.
 
-What the orchestrator does NOT decide (D-004, open): the coverage policy for
-a cell whose `fallback_area_frac_deliverable` is high (a hybrid, not a
-measurement; `--min-coverage` 0.99 only flags it), and the
-`shaft_terminates` policy. Both live in P3's numbers, not in the launch.
+Before the first full-population submission, check the array fits:
+
+```
+python3 campaign_queue_check.py --manifest ../h01/p1/manifests/L3_exc.csv --shards 1
+```
+
+It checks two different things, which fail differently.
+
+**Queue limits**, read from `qstat -Qf <queue>` and `qstat -Bf`
+(`max_array_size`, `max_queued` / `max_user_queued`, `max_run`), unwrapping
+PBS's 80-column line folding, which a plain grep truncates. These can REFUSE
+or block a submission, so they set the exit status: 0 fits, 1 does not (and
+it prints the largest submission that does), **2 means no limit could be read
+-- UNKNOWN, not yes**, with the two commands to read them by hand.
+
+**The CPU budget** (D-008: **200 CPUs at once, walltime ceiling 300 h**),
+which cannot refuse anything -- it decides concurrency and therefore how long
+the campaign takes. `ncpus` and the walltime are read from `campaign.pbs`'s
+own `#PBS -l` directives, so this check cannot drift from the script it is
+checking. At `ncpus=2` the allocation runs **100 subjobs at once**, so 537
+cells at `SHARDS=1` is 6 waves. With the measured per-cell time it becomes an
+estimate:
+
+```
+python3 campaign_queue_check.py --manifest ../h01/p1/manifests/L3_exc.csv --hours-per-task 3.5
+```
+
+prints `about 21.0 h wall clock (3759 CPU-hours)`, and warns if the per-cell
+time exceeds the 12 h the script requests -- raise that per submission with
+`qsub -l walltime=48:00:00 ...`, up to the 300 h ceiling. Standard library
+only, so it runs on the login node with no env activated, and it submits
+nothing.
+
+### 11.5 Mesh coverage of the reported spine area (D-008)
+
+**Decision D-008 (2026-09-22)** closed the two policies D-004 had left open:
+
+- **Coverage.** The kappa fill **stays**. No cell is dropped and no threshold
+  is set; `--min-coverage` (0.99) remains a flag on `qc_status` and nothing
+  more. What is required instead is that the **fraction of the reported spine
+  area that did not come from the mesh is reported** alongside $F$.
+- **`shaft_terminates`.** Those components are **kept as spines**, carrying
+  their kappa-filled skeleton area -- which is what the code already does.
+  They are not demoted.
+
+So nothing in the measurement changes. `campaign_policy_report.py` produces
+the number D-008 asks for, exactly and post-hoc, from the two CSVs P3 already
+writes -- `cell<id>_spines.csv` (which carries `seg_from` / `seg_to`) and
+`neuron_<id>_phi_mesh.csv` -- using the same attribution the assembler uses
+(`phi_with_spine_areas` + `cell_F`). Nothing is re-measured and no
+measurement module is imported.
+
+```
+python3 campaign_policy_report.py --root ../h01
+```
+
+Every cell is checked first: the $F$ the script reconstructs with all spines
+kept must equal the `F_lit_deliverable` P3 recorded, by two independent
+routes. A cell that fails is excluded and named -- its numbers would be
+meaningless. The rest get a row in `out/campaign_policy_report.csv`.
+
+**Two fractions, named apart** (they are different quantities and must not be
+swapped):
+
+| column | over what |
+|---|---|
+| `frac_area_filled_beyond` | spine area on segments **beyond the 60 um cutoff** -- the only area $F_{\rm lit}$ sees. Computed here |
+| `fallback_area_frac_deliverable` | **every spine of the cell**, as P3 records it in its own summary |
+
+The campaign figure is **pooled** -- sum of filled area over sum of total
+area, never a mean of per-cell ratios, for the same reason kappa itself is a
+ratio of sums (`h01_spine_area_F.kappa_function`): otherwise a tiny cell with
+one unmeasured spine would weigh as much as a large one.
+
+The report also prints **comparison brackets**: what $F$ would be with the
+fill removed (`drop_unmeasured`), with `shaft_terminates` components demoted
+(`drop_shaft_terminates` -- **not** the policy, D-008 keeps them), or with
+components whose shaft never crosses the ROI box removed. A bracket is never
+the reported $F$, and none of them licenses a re-merge: they are
+counterfactuals on the recorded areas, not re-measurements. `--tol` only sets
+the label at which a bracket is called material.
