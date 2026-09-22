@@ -26,6 +26,8 @@ into Stage 1's phi table, giving a mesh-based `F` per cell.
 | `p1_export.pbs` | PBS Pro array job for P1, one submission per population |
 | `soma_census.py` | soma-radius census over the campaign skeletons, without running P1: how many cells carry a soma that passes `soma_enforce`'s completeness gate (section 9) |
 | `smoke_test_soma_census.py` | 25 checks, incl. the two cells `soma_enforce` documents by name |
+| `p1_plots.py` | figures from a P1 tree: aligned skeleton before/after pruning, raw skeleton vs d_lambda compartments with exc/inh synapses, spine and arbour statistics per cell, population summary, paired SST vs PV/VIP (section 10) |
+| `smoke_test_p1_plots.py` | 31 checks: loaders and transforms against a real fixture export, every figure rendered on Agg, the LFPy path through a fake cell |
 | `smoke_test_p1_export.py` | 113 checks: bank discovery, the passive variants, tables on a hand-labelled fixture, the real export end to end, audit, refusals, the job script |
 | `h01_spine_area_F.py` | area, rind, base frustum, kappa, F |
 | `h01_spine_batch.py` | the analysis mesh (14 Taubin iterations) |
@@ -97,7 +99,7 @@ is not. Keeping data out of the repo keeps `git status` clean between runs.
 cd h01_code && bash run_smoke_tests.sh
 ```
 
-Expect `passed 6/6` and `ALL SUITES PASSED`. It activates `spine_env`
+Expect `passed 7/7` and `ALL SUITES PASSED`. It activates `spine_env`
 (`H01_ENV=other_env` to choose another; a stale `ENV_NAME` exported by the
 login shell is reported and ignored, like `CODE` and `ROOT`), checks and
 repairs the `stage1/` symlink farm, then runs every `smoke_test_*.py`. All
@@ -390,3 +392,33 @@ cell, and a verdict:
 The summary prints the percentage that would survive a high-confidence
 filter, plus root-diameter quantiles. That percentage is the number that
 decides whether D-002's downstream filter is a filter or a decimation.
+
+## 10. Looking at the results: `p1_plots.py`
+
+Everything below reads only what P1 wrote under `<out_dir>/<cell_id>/` plus
+the raw skeleton, and never re-runs the exporter. Figures land in `--fig-dir`
+as PNG, named `<tree>_<cell>_<figure>[_<proj>].png`, in the ALIGNED frame
+(micrometres, soma at the origin, +z the cortical axis of the bank).
+
+```
+python3 p1_plots.py --root ../h01 --out-dir ../h01/p1_inh_SST --cell 489469961 --fig-dir ../h01/figures
+python3 p1_plots.py --root ../h01 --out-dir ../h01/p1 --cell 1317492596 --cell 1333261412 --fig-dir ../h01/figures --proj yz
+python3 p1_plots.py --root ../h01 --out-dir ../h01/p1_inh_SST --population --compare ../h01/p1_inh_PVVIP --fig-dir ../h01/figures
+```
+
+| figure | what it shows | reads |
+|---|---|---|
+| `pruning` | the aligned skeleton with the pruned spine nodes in violet next to the pruned skeleton alone (demoted continuations stay, as in the export) | `neurons/neuron_<id>.csv`, `_alignment.json` (the cell's own `soma_pos_nm`, `mean_matrix`), `_spine_nodes.csv` |
+| `downsampling` | the raw skeleton next to the LFPy compartments the d_lambda rule produced, width ~ diameter, alternating shades so every compartment is visible; each incoming synapse at its aligned position, exc orange / inh blue, hollow triangle if it sat on a pruned spine, joined by a thin line to the compartment its `lfpy_idx` names (from the anchor when redirected) | `_aligned.hoc` rebuilt through `alignment.default_cell_factory` with the record's `result.segmentation`, `_mapped_synapses.csv`. **Needs NEURON + LFPy (spine_env)**; skipped with a message otherwise. The rebuilt compartment count is checked against the record's `totnsegs` and a mismatch is a WARNING -- it means the (cm, Ra, lambda_f, d_lambda) did not reproduce the export |
+| `spines` | neck radius (min over neck nodes), head radius (max), neck length, `R_neck` from skeleton frustums at Ra = 100 (log axis when the spread earns it), spine density per um of shaft along the path distance (60 um F gate marked), synapses per spine split by partition source | `_spine_stats.csv`, `_phi.csv` |
+| `arbour` | per path-distance bin: shaft cable, length-weighted mean shaft diameter, shaft + spine membrane area, and their ratio (the local `A_spine / A_shaft` that `F_lit` integrates beyond 60 um) | `_phi.csv`, `_p1.json` |
+| `population` | from `p1_summary.csv`: `F_lit`, spines vs cable, soma diameter, arbour angle from +z, qc verdicts, compartments per cell | `p1_summary.csv` (run `--summarise` first) |
+| `population_vs_<tree>` | with `--compare`: the same, but the last two panels are paired by cell: `totnsegs` tree A vs tree B against the identity and the sqrt(2) line, and the `qc_status` cross-tab -- the D-003 comparison | both trees' `p1_summary.csv` |
+
+Bin width for the profiles is `--bin-um` (20). The palette is fixed, not
+cycled: exc `#eb6834`, inh `#2a78d6`, pruned spine `#4a3aa7`, shaft grey.
+
+`compartments_from_cell` handles LFPy >= 2.2 (`cell.x` of shape
+`(totnsegs, 2)`) and the older `xstart / xend` layout; the cluster's LFPy
+2.3.7 was not exercised from the sandbox (no NEURON there), so the first run
+on the cluster is where that branch is confirmed.
