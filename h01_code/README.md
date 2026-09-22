@@ -26,8 +26,8 @@ into Stage 1's phi table, giving a mesh-based `F` per cell.
 | `p1_export.pbs` | PBS Pro array job for P1, one submission per population |
 | `soma_census.py` | soma-radius census over the campaign skeletons, without running P1: how many cells carry a soma that passes `soma_enforce`'s completeness gate (section 9) |
 | `smoke_test_soma_census.py` | 25 checks, incl. the two cells `soma_enforce` documents by name |
-| `p1_plots.py` | figures from a P1 tree: aligned skeleton before/after pruning, raw skeleton vs d_lambda compartments with exc/inh synapses, spine and arbour statistics per cell, population summary, paired SST vs PV/VIP (section 10) |
-| `smoke_test_p1_plots.py` | 31 checks: loaders and transforms against a real fixture export, every figure rendered on Agg, the LFPy path through a fake cell |
+| `p1_plots.py` | v1.2. figures from a P1 tree: aligned skeleton before/after pruning, raw skeleton vs d_lambda compartments with exc/inh synapses, spine and arbour statistics per cell, population summary, paired SST vs PV/VIP (section 10) |
+| `smoke_test_p1_plots.py` | 50 checks: loaders and transforms against a real fixture export, every figure rendered on Agg, the LFPy path through a fake cell |
 | `smoke_test_p1_export.py` | 113 checks: bank discovery, the passive variants, tables on a hand-labelled fixture, the real export end to end, audit, refusals, the job script |
 | `h01_spine_area_F.py` | area, rind, base frustum, kappa, F |
 | `h01_spine_batch.py` | the analysis mesh (14 Taubin iterations) |
@@ -397,12 +397,25 @@ decides whether D-002's downstream filter is a filter or a decimation.
 
 Everything below reads only what P1 wrote under `<out_dir>/<cell_id>/` plus
 the raw skeleton, and never re-runs the exporter. Figures land in `--fig-dir`
-as PNG, named `<tree>_<cell>_<figure>[_<proj>].png`, in the ALIGNED frame
-(micrometres, soma at the origin, +z the cortical axis of the bank).
+as PNG at **220 dpi** (`--dpi`), named `<tree>_<cell>_<figure>[_<proj>].png`,
+in the ALIGNED frame (micrometres, soma at the origin, +z the cortical axis
+of the bank).
+
+**Projection.** `--proj xz` (default), `yz`, `xy` flatten the aligned frame;
+**`--proj 3d`** draws the arbour in three dimensions on a cubic box -- both
+panels share one cube of the largest range, so no axis is silently stretched
+-- viewed from `--elev` / `--azim` (default 18 deg, -70 deg).
+
+**Mark sizes** live in one `STYLE` dict and are tuned with two knobs:
+`--lw-scale` multiplies every skeleton and compartment line width, and
+`--syn-size` sets the synapse marker **diameter in points** (default 2.2; the
+pruned-spine triangle keeps its 1.6 ratio to it). Note matplotlib's `s` is an
+area in points squared, which the code squares for you -- passing `--syn-size 9`
+would give a very large marker, not v1.0's.
 
 ```
 python3 p1_plots.py --root ../h01 --out-dir ../h01/p1_inh_SST --cell 489469961 --fig-dir ../h01/figures
-python3 p1_plots.py --root ../h01 --out-dir ../h01/p1 --cell 1317492596 --cell 1333261412 --fig-dir ../h01/figures --proj yz
+python3 p1_plots.py --root ../h01 --out-dir ../h01/p1 --cell 1317492596 --cell 1333261412 --fig-dir ../h01/figures --proj 3d --dpi 300
 python3 p1_plots.py --root ../h01 --out-dir ../h01/p1_inh_SST --population --compare ../h01/p1_inh_PVVIP --fig-dir ../h01/figures
 ```
 
@@ -411,7 +424,7 @@ python3 p1_plots.py --root ../h01 --out-dir ../h01/p1_inh_SST --population --com
 | `pruning` | the aligned skeleton with the pruned spine nodes in violet next to the pruned skeleton alone (demoted continuations stay, as in the export) | `neurons/neuron_<id>.csv`, `_alignment.json` (the cell's own `soma_pos_nm`, `mean_matrix`), `_spine_nodes.csv` |
 | `downsampling` | the raw skeleton next to the LFPy compartments the d_lambda rule produced, width ~ diameter, alternating shades so every compartment is visible; each incoming synapse at its aligned position, exc orange / inh blue, hollow triangle if it sat on a pruned spine, joined by a thin line to the compartment its `lfpy_idx` names (from the anchor when redirected) | `_aligned.hoc` rebuilt through `alignment.default_cell_factory` with the record's `result.segmentation`, `_mapped_synapses.csv`. **Needs NEURON + LFPy (spine_env)**; skipped with a message otherwise. The rebuilt compartment count is checked against the record's `totnsegs` and a mismatch is a WARNING -- it means the (cm, Ra, lambda_f, d_lambda) did not reproduce the export |
 | `spines` | neck radius (min over neck nodes), head radius (max), neck length, `R_neck` from skeleton frustums at Ra = 100 (log axis when the spread earns it), spine density per um of shaft along the path distance (60 um F gate marked), synapses per spine split by partition source | `_spine_stats.csv`, `_phi.csv` |
-| `arbour` | per path-distance bin: shaft cable, length-weighted mean shaft diameter, shaft + spine membrane area, and their ratio (the local `A_spine / A_shaft` that `F_lit` integrates beyond 60 um) | `_phi.csv`, `_p1.json` |
+| `arbour` | per path-distance bin: shaft cable, length-weighted mean shaft diameter, shaft + spine membrane area, and their ratio (the local `A_spine / A_shaft` that `F` integrates beyond 60 um). **Which spine-area model it draws is named in every panel and in the file name** -- see below | `<root>/out/neuron_<id>_phi_mesh.csv` when it exists, else `_phi.csv`; `_p1.json` |
 | `population` | from `p1_summary.csv`: `F_lit`, spines vs cable, soma diameter, arbour angle from +z, qc verdicts, compartments per cell | `p1_summary.csv` (run `--summarise` first) |
 | `population_vs_<tree>` | with `--compare`: the same, but the last two panels are paired by cell: `totnsegs` tree A vs tree B against the identity and the sqrt(2) line, and the `qc_status` cross-tab -- the D-003 comparison | both trees' `p1_summary.csv` |
 
@@ -422,3 +435,42 @@ cycled: exc `#eb6834`, inh `#2a78d6`, pruned spine `#4a3aa7`, shaft grey.
 `(totnsegs, 2)`) and the older `xstart / xend` layout; the cluster's LFPy
 2.3.7 was not exercised from the sandbox (no NEURON there), so the first run
 on the cluster is where that branch is confirmed.
+
+### 10.1 Which phi the arbour figure draws -- mesh, or the skeleton fallback
+
+Two tables carry the name `phi`, and they are not interchangeable:
+
+| file | written by | `spine_area_um2` is | its F |
+|---|---|---|---|
+| `<out_dir>/<id>/neuron_<id>_phi.csv` | P1 | **skeleton frustums** -- the FALLBACK model | `F_lit` in the record, i.e. `F_skel` |
+| `<root>/out/neuron_<id>_phi_mesh.csv` | P3 | **the mesh measurement** (`h01_spine_area_F.phi_with_spine_areas`, variant `mesh_beyond`); the value it replaced is kept as `spine_area_skel_um2` | the deliverable F |
+
+The standing decision is **spine area from the mesh, skeleton only as a
+fallback; shaft area ALWAYS from skeleton frustums** -- `phi_with_spine_areas`
+swaps one column and leaves `shaft_area_um2`, `d_from_um` and the row set
+untouched. So the two left-hand panels of the figure (cable, shaft diameter)
+are identical either way, and only the two right-hand ones change.
+
+**`--phi mesh` is the default**, because F is reported from the `mesh_beyond`
+variant by decision and the other variants exist for comparison only. With no
+P3 table the arbour figure is **skipped, with the reason printed** -- the other
+figures are still written. `--phi auto` permits the skeleton bracket as a
+fallback and `--phi skel` forces it; both label it a fallback, in the file
+name and on every panel.
+The choice is written into the file name (`..._arbour_mesh.png` /
+`..._arbour_skel.png`), into the title, into the stacked-bar legend and into
+the ratio panel's axis label, and the fallback is labelled a fallback rather
+than presented as the spine area. F in the title is computed **from the phi
+actually drawn**, through `spine_density.cell_f_beyond_cutoff` -- the same
+function the exporter calls, never a reimplementation; on P1's table it
+reproduces the record's `F_lit` exactly (check M6).
+
+**Today no cell has a mesh measurement**: `h01/out/` has never been created,
+so with the default the arbour figure is skipped for every cell and you must
+pass `--phi skel` explicitly to see the skeleton bracket. The mesh path is
+wired and tested against a synthetic P3 table (checks M3-M8), not against real
+P2 output.
+
+The population figure's `F_lit` panel is P1's skeleton F for the same reason,
+and its axis says so. The deliverable F is `F_lit_deliverable` in P3's
+`spine_area_F_summary.csv`, never this column.

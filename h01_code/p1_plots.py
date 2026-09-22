@@ -21,6 +21,26 @@ Three families of figure, from the files `run_p1_export.py` writes under
                 figure from p1_summary.csv, optionally paired against a second
                 tree's summary (the D-003 SST / PV-VIP comparison)
 
+WHICH phi THE ARBOUR FIGURE DRAWS. Two different tables carry the name:
+
+  <out_dir>/<id>/neuron_<id>_phi.csv        P1, spine area from SKELETON
+                                            frustums -- the FALLBACK model;
+                                            its F is F_skel
+  <root>/out/neuron_<id>_phi_mesh.csv       P3, the DELIVERABLE: same rows,
+                                            same shaft areas (always skeleton
+                                            frustums), spine_area_um2 REPLACED
+                                            by the mesh measurement
+                                            (h01_spine_area_F.phi_with_spine_areas,
+                                            variant mesh_beyond); its F is the
+                                            deliverable F
+
+The standing decision is spine area from the MESH, skeleton only as fallback,
+shaft area ALWAYS from skeleton frustums. `--phi auto` (the default) therefore
+uses the P3 mesh table when it exists and falls back to P1's skeleton table
+when it does not; every panel and the title say WHICH, and the fallback is
+labelled as a fallback rather than as the spine area. `--phi skel` / `--phi
+mesh` force the choice (mesh is refused if the file is absent).
+
 Layout of this file: loaders (I/O only) -> transforms (pure functions on
 frames) -> plotting (matplotlib only) -> CLI. Nothing in the plotting layer
 reads a file; nothing in the loaders knows about axes.
@@ -34,7 +54,10 @@ Usage (from h01_code, env spine_env):
 
 Coordinates: every skeleton figure is in the ALIGNED frame, micrometres,
 soma at the origin, +z the cortical axis the alignment bank defines
-(alignment.aligned_um). `--proj xz` (default) shows the depth axis vertical.
+(alignment.aligned_um). `--proj xz` (default) shows the depth axis vertical;
+`--proj 3d` draws the arbour in three dimensions on a cubic box, viewed from
+(`--elev`, `--azim`). Mark sizes come from STYLE and are tuned with
+`--lw-scale` and `--syn-size`; the default output is 220 dpi.
 """
 from __future__ import print_function
 
@@ -47,7 +70,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-PLOTS_VERSION = "p1_plots v1.0"
+PLOTS_VERSION = "p1_plots v1.2"
 
 # --------------------------------------------------------------------------- #
 # palette -- categorical hues in fixed order (validated: all-pairs, light)     #
@@ -60,7 +83,33 @@ COL_AXON = "#b0afa8"    # light grey
 COL_COMP = ("#52514e", "#a09f99")   # alternating compartments
 COL_SOMA = "#0b0b0b"
 
-PROJECTIONS = {"xz": ("x", "z"), "yz": ("y", "z"), "xy": ("x", "y")}
+PROJECTIONS = {"xz": ("x", "z"), "yz": ("y", "z"), "xy": ("x", "y"), "3d": None}
+_AXIS = {"x": 0, "y": 1, "z": 2}
+
+# Mark sizes, in one place. `--lw-scale` multiplies every line width and
+# `--syn-size` sets the shaft-synapse marker (the pruned-spine marker keeps
+# its ratio to it), so the balance between skeleton and synapses is one knob
+# each rather than a hunt through the plotting code.
+STYLE = {"lw_shaft": 1.1, "lw_spine": 1.9, "lw_axon": 0.7, "lw_conn": 0.4,
+         # syn_size is a marker DIAMETER in points; matplotlib's `s` is an
+         # AREA in points^2, so the plotting code squares it. v1.0 passed
+         # s = 9 / 16 directly, i.e. diameters 3.0 / 4.0 -- these are smaller.
+         "syn_size": 2.2, "syn_spine_ratio": 1.6, "soma_size": 5.0,
+         "comp_lw_scale": 2.0, "comp_lw_min": 0.8, "comp_lw_max": 7.0,
+         "elev": 18.0, "azim": -70.0}
+
+
+def resolve_style(**over):
+    """STYLE with overrides; `lw_scale` multiplies every line width."""
+    st = dict(STYLE)
+    scale = float(over.pop("lw_scale", 1.0) or 1.0)
+    for k, v in over.items():
+        if v is not None:
+            st[k] = v
+    for k in ("lw_shaft", "lw_spine", "lw_axon", "lw_conn", "comp_lw_scale",
+              "comp_lw_min", "comp_lw_max"):
+        st[k] = float(st[k]) * scale
+    return st
 
 
 # --------------------------------------------------------------------------- #
@@ -111,7 +160,41 @@ def load_mapped_synapses(out_dir, cid):
 
 
 def load_phi(out_dir, cid):
+    """P1's phi: spine area from SKELETON frustums (the fallback model)."""
     return pd.read_csv(_artefact(out_dir, cid, "phi.csv"))
+
+
+def load_phi_mesh(root, cid, out_subdir="out"):
+    """P3's deliverable phi (`<root>/out/neuron_<id>_phi_mesh.csv`), or None if
+    P2/P3 have not run for this cell. Same rows and the same shaft areas as
+    P1's table; `spine_area_um2` is the MESH measurement and the skeleton
+    value it replaced is kept as `spine_area_skel_um2`
+    (h01_spine_area_F.phi_with_spine_areas)."""
+    p = os.path.join(root, out_subdir, "neuron_%d_phi_mesh.csv" % int(cid))
+    return pd.read_csv(p) if os.path.isfile(p) else None
+
+
+def resolve_phi(root, out_dir, cid, mode="mesh"):
+    """(phi, label, is_mesh) for the arbour figure. `mode` is auto | mesh | skel.
+    A mesh table missing its marker column is refused rather than drawn as
+    though it were one."""
+    if mode not in ("auto", "mesh", "skel"):
+        raise SystemExit("--phi must be auto, mesh or skel")
+    if mode != "skel":
+        m = load_phi_mesh(root, cid)
+        if m is not None:
+            if "spine_area_skel_um2" not in m.columns:
+                raise SystemExit(
+                    "phi_mesh for cell %d has no spine_area_skel_um2 column -- "
+                    "it was not produced by phi_with_spine_areas" % int(cid))
+            return m, "mesh (P3 deliverable, mesh_beyond)", True
+        if mode == "mesh":
+            raise SystemExit(
+                "no P3 phi_mesh for cell %d under %s/out. F is reported from the "
+                "mesh_beyond variant by decision; the skeleton table is a comparison "
+                "bracket, not the deliverable. Run P2/P3, or pass --phi skel to see "
+                "the bracket, labelled as one." % (int(cid), root))
+    return load_phi(out_dir, cid), "SKELETON FALLBACK (P1; mesh not measured yet)", False
 
 
 def load_summary(out_dir):
@@ -293,134 +376,205 @@ def _mpl():
     return plt, LineCollection
 
 
-def _proj_cols(proj, prefix="", suffix="_al_um"):
-    a, b = PROJECTIONS[proj]
-    return prefix + a + suffix, prefix + b + suffix
+def is3d(proj):
+    return proj == "3d"
+
+
+def _panels(fig, ncols, proj):
+    """One row of `ncols` panels, 3-D when asked. 3-D axes cannot come from
+    fig.subplots, and they do not share limits, so `_equalise` sets both."""
+    if is3d(proj):
+        return [fig.add_subplot(1, ncols, i + 1, projection="3d")
+                for i in range(ncols)]
+    return list(np.atleast_1d(fig.subplots(1, ncols, sharex=True, sharey=True)))
 
 
 def _lc(ax, segs, proj, color, lw, alpha=1.0, zorder=1, **kw):
-    """Draw (N,2,3) segments projected onto `proj`."""
-    _, LineCollection = _mpl()
-    ia, ib = ("xyz".index(c) for c in PROJECTIONS[proj])
+    """Draw (N, 2, 3) segments: all three coordinates in 3-D, two of them
+    otherwise."""
     if len(segs) == 0:
         return
-    lc = LineCollection(segs[:, :, [ia, ib]], colors=color, linewidths=lw,
-                        alpha=alpha, zorder=zorder, **kw)
+    if is3d(proj):
+        from mpl_toolkits.mplot3d.art3d import Line3DCollection
+        lc = Line3DCollection(np.asarray(segs, float), colors=color,
+                              linewidths=lw, alpha=alpha, zorder=zorder, **kw)
+        ax.add_collection3d(lc)
+        return
+    _, LineCollection = _mpl()
+    ia, ib = (_AXIS[c] for c in PROJECTIONS[proj])
+    lc = LineCollection(np.asarray(segs, float)[:, :, [ia, ib]], colors=color,
+                        linewidths=lw, alpha=alpha, zorder=zorder, **kw)
     ax.add_collection(lc)
 
 
-def plot_pruning(kept, pruned, proj, cid, record, fig=None):
-    """Two panels, same limits: aligned skeleton with the pruned spine nodes
-    highlighted, and the pruned skeleton alone."""
-    plt, _ = _mpl()
-    fig = fig or plt.figure(figsize=(11, 5.5))
-    axes = fig.subplots(1, 2, sharex=True, sharey=True)
+def _points(ax, xyz, proj, **kw):
+    """Scatter (N, 3) points in whichever projection is in force."""
+    xyz = np.asarray(xyz, float).reshape(-1, 3)
+    if len(xyz) == 0:
+        return None
+    if is3d(proj):
+        kw.setdefault("depthshade", False)
+        return ax.scatter(xyz[:, 0], xyz[:, 1], xyz[:, 2], **kw)
+    ia, ib = (_AXIS[c] for c in PROJECTIONS[proj])
+    return ax.scatter(xyz[:, ia], xyz[:, ib], **kw)
+
+
+def _label_axes(ax, proj, ylabel=True):
+    if is3d(proj):
+        ax.set_xlabel("x (um)", labelpad=-4)
+        ax.set_ylabel("y (um)", labelpad=-4)
+        ax.set_zlabel("z (um, cortical axis)", labelpad=-4)
+        ax.tick_params(labelsize=7, pad=-2)
+        return
     a, b = PROJECTIONS[proj]
+    ax.set_xlabel("%s (um, aligned)" % a)
+    if ylabel:
+        ax.set_ylabel("%s (um, aligned)" % b)
+
+
+def _equalise(axes, pts, proj, style, pad_frac=0.03):
+    """Isotropic limits over every panel, from the (N, 3) point cloud `pts`.
+    In 3-D a cube of the largest range, so no axis is silently stretched."""
+    pts = np.asarray(pts, float).reshape(-1, 3)
+    lo, hi = pts.min(axis=0), pts.max(axis=0)
+    if is3d(proj):
+        ctr = (lo + hi) / 2.0
+        half = max(float((hi - lo).max()), 1.0) * (1.0 + pad_frac) / 2.0
+        for ax in axes:
+            ax.set_xlim(ctr[0] - half, ctr[0] + half)
+            ax.set_ylim(ctr[1] - half, ctr[1] + half)
+            ax.set_zlim(ctr[2] - half, ctr[2] + half)
+            ax.set_box_aspect((1.0, 1.0, 1.0))
+            ax.view_init(elev=float(style["elev"]), azim=float(style["azim"]))
+        return
+    ia, ib = (_AXIS[c] for c in PROJECTIONS[proj])
+    pad = pad_frac * max(hi[ia] - lo[ia], hi[ib] - lo[ib], 1.0)
+    for ax in axes:
+        ax.set_aspect("equal")
+    axes[0].set_xlim(lo[ia] - pad, hi[ia] + pad)
+    axes[0].set_ylim(lo[ib] - pad, hi[ib] + pad)
+
+
+def _soma(ax, proj, style):
+    _points(ax, [[0.0, 0.0, 0.0]], proj, s=float(style["soma_size"]) ** 2,
+            c=COL_SOMA, edgecolors="none", zorder=7)
+
+
+def _xyz(df, cols=("x_al_um", "y_al_um", "z_al_um")):
+    return df[list(cols)].to_numpy(float)
+
+
+def plot_pruning(kept, pruned, proj, cid, record, style=None, fig=None):
+    """Two panels on identical limits: the aligned skeleton with the pruned
+    spine nodes highlighted, and the pruned skeleton alone. `proj` is one of
+    xz / yz / xy / 3d."""
+    plt, _ = _mpl()
+    style = style or resolve_style()
+    fig = fig or plt.figure(figsize=(12, 5.8) if is3d(proj) else (11, 5.5))
+    axes = _panels(fig, 2, proj)
     full = pd.concat([kept, pruned])
     segs_all, child = frame_segments(full)
     is_axon = child["annotated_type"].astype(str).str.lower().str.startswith("axon").to_numpy()
     segs_kept, child_k = frame_segments(kept)
     axon_k = child_k["annotated_type"].astype(str).str.lower().str.startswith("axon").to_numpy()
-    # spine segments: parent may be a shaft node (in `full`), so take them from `full`
+    # spine segments: the parent of a spine root is a shaft node, so they are
+    # taken from `full` rather than from `pruned` alone
     spine_ids = set(pruned["id"].tolist())
     is_spine = child["id"].isin(spine_ids).to_numpy()
+    _lc(axes[0], segs_all[is_axon], proj, COL_AXON, style["lw_axon"], zorder=1)
+    _lc(axes[0], segs_all[~is_axon & ~is_spine], proj, COL_SHAFT, style["lw_shaft"], zorder=2)
+    _lc(axes[0], segs_all[is_spine], proj, COL_SPINE, style["lw_spine"], zorder=3)
+    _lc(axes[1], segs_kept[axon_k], proj, COL_AXON, style["lw_axon"], zorder=1)
+    _lc(axes[1], segs_kept[~axon_k], proj, COL_SHAFT, style["lw_shaft"], zorder=2)
     for ax in axes:
-        ax.set_aspect("equal")
-        ax.set_xlabel("%s (um, aligned)" % a)
-    axes[0].set_ylabel("%s (um, aligned)" % b)
-    _lc(axes[0], segs_all[is_axon], proj, COL_AXON, 0.4, zorder=1)
-    _lc(axes[0], segs_all[~is_axon & ~is_spine], proj, COL_SHAFT, 0.6, zorder=2)
-    _lc(axes[0], segs_all[is_spine], proj, COL_SPINE, 1.4, zorder=3)
-    _lc(axes[1], segs_kept[axon_k], proj, COL_AXON, 0.4, zorder=1)
-    _lc(axes[1], segs_kept[~axon_k], proj, COL_SHAFT, 0.6, zorder=2)
-    for ax in axes:
-        ax.plot([0], [0], "o", color=COL_SOMA, ms=5, zorder=4)
+        _soma(ax, proj, style)
+        _label_axes(ax, proj, ylabel=(ax is axes[0]) or is3d(proj))
     n_sp = int((record.get("spine_tables") or {}).get("n_spines", len(pruned)))
-    axes[0].set_title("cell %d, before pruning: %d nodes, %d spine nodes in %d spines"
-                      % (cid, len(full), len(pruned), n_sp), fontsize=9)
+    axes[0].set_title("before pruning: %d nodes, %d spine nodes in %d spines"
+                      % (len(full), len(pruned), n_sp), fontsize=9)
     axes[1].set_title("after pruning: %d nodes kept (demoted continuations stay)"
                       % len(kept), fontsize=9)
-    xs = full[a + "_al_um"]; ys = full[b + "_al_um"]
-    pad = 0.03 * max(xs.max() - xs.min(), ys.max() - ys.min(), 1.0)
-    axes[0].set_xlim(xs.min() - pad, xs.max() + pad)
-    axes[0].set_ylim(ys.min() - pad, ys.max() + pad)
+    _equalise(axes, _xyz(full), proj, style)
     from matplotlib.lines import Line2D
-    axes[0].legend(handles=[Line2D([], [], color=COL_SHAFT, lw=1.5, label="shaft (kept)"),
+    axes[0].legend(handles=[Line2D([], [], color=COL_SHAFT, lw=2, label="shaft (kept)"),
                             Line2D([], [], color=COL_SPINE, lw=2, label="spine nodes (pruned)"),
-                            Line2D([], [], color=COL_AXON, lw=1.5, label="axon")],
-                   loc="best", frameon=False)
-    fig.suptitle("P1 pruning, aligned frame (%s projection); F_lit %.3f"
-                 % (proj, float((record.get("result") or {}).get("F_lit", float("nan")))),
-                 fontsize=10)
-    fig.tight_layout(rect=(0, 0.02, 1, 0.97))
+                            Line2D([], [], color=COL_AXON, lw=2, label="axon")],
+                   loc="upper left", frameon=False, fontsize=8)
+    fig.suptitle("cell %d -- P1 pruning, aligned frame (%s)" % (cid, proj), fontsize=10)
+    fig.tight_layout(rect=(0, 0.02, 1, 0.96))
     return fig
 
 
-def _draw_synapses(ax, syn, proj, connectors=None):
-    plt, _ = _mpl()
-    a, b = PROJECTIONS[proj]
+def _draw_synapses(ax, syn, proj, style, connectors=None):
+    """Incoming synapses at their aligned positions: filled disc on the shaft,
+    hollow triangle when the synapse sat on a spine that pruning removed. With
+    `connectors`, the thin lines to the compartment each was snapped to."""
     if connectors is not None and len(connectors):
-        _lc(ax, connectors, proj, "#7a7975", 0.5, alpha=0.8, zorder=5)
+        _lc(ax, connectors, proj, "#7a7975", style["lw_conn"], alpha=0.8, zorder=5)
+    if not len(syn):
+        return
+    s_shaft = float(style["syn_size"]) ** 2
+    s_spine = (float(style["syn_size"]) * float(style["syn_spine_ratio"])) ** 2
     for label, col in (("exc", COL_EXC), ("inh", COL_INH)):
-        s = syn[syn["synapse_type"].astype(str) == label]
-        if len(s) == 0:
+        sel = syn[syn["synapse_type"].astype(str) == label]
+        if not len(sel):
             continue
-        on = s["on_pruned_spine"].astype(bool).to_numpy() if "on_pruned_spine" in s else np.zeros(len(s), bool)
-        ax.scatter(s.loc[~on, a], s.loc[~on, b], s=9, c=col, edgecolors="none", zorder=6,
-                   label="%s on shaft (%d)" % (label, int((~on).sum())))
+        on = (sel["on_pruned_spine"].astype(bool).to_numpy()
+              if "on_pruned_spine" in sel else np.zeros(len(sel), bool))
+        xyz = sel[["x", "y", "z"]].to_numpy(float)
+        _points(ax, xyz[~on], proj, s=s_shaft, c=col, edgecolors="none", zorder=6,
+                label="%s on shaft (%d)" % (label, int((~on).sum())))
         if on.any():
-            ax.scatter(s.loc[on, a], s.loc[on, b], s=16, facecolors="none", edgecolors=col,
-                       linewidths=0.8, marker="^", zorder=6,
-                       label="%s on pruned spine (%d)" % (label, int(on.sum())))
+            _points(ax, xyz[on], proj, s=s_spine, facecolors="none", edgecolors=col,
+                    linewidths=0.7, marker="^", zorder=6,
+                    label="%s on pruned spine (%d)" % (label, int(on.sum())))
 
 
-def plot_downsampling(raw_al, comps, syn, proj, cid, segmentation, fig=None):
-    """Left: raw aligned skeleton (every node) with synapses. Right: the
-    LFPy compartments of the exported .hoc under the record's (cm, Ra,
-    lambda_f, d_lambda), width ~ diameter, alternating colour so each
-    compartment is visible, with every synapse joined to its lfpy_idx."""
+def plot_downsampling(raw_al, comps, syn, proj, cid, segmentation, style=None, fig=None):
+    """Left: the raw aligned skeleton, every node, with the incoming synapses.
+    Right: the LFPy compartments the d_lambda rule produced from the exported
+    .hoc under the record's (cm, Ra, lambda_f, d_lambda) -- line width scaled
+    by compartment diameter, alternating shades so each is visible -- with
+    every synapse joined to the compartment its lfpy_idx names."""
     plt, _ = _mpl()
-    fig = fig or plt.figure(figsize=(12, 6))
-    axes = fig.subplots(1, 2, sharex=True, sharey=True)
-    a, b = PROJECTIONS[proj]
+    style = style or resolve_style()
+    fig = fig or plt.figure(figsize=(13, 6.0) if is3d(proj) else (12, 6))
+    axes = _panels(fig, 2, proj)
     segs, child = frame_segments(raw_al)
     is_axon = child["annotated_type"].astype(str).str.lower().str.startswith("axon").to_numpy()
-    _lc(axes[0], segs[is_axon], proj, COL_AXON, 0.4)
-    _lc(axes[0], segs[~is_axon], proj, COL_SHAFT, 0.6, zorder=2)
-    _draw_synapses(axes[0], syn, proj)
-    axes[0].set_title("raw skeleton, %d nodes; %d incoming synapses" % (len(raw_al), len(syn)),
-                      fontsize=9)
+    _lc(axes[0], segs[is_axon], proj, COL_AXON, style["lw_axon"], zorder=1)
+    _lc(axes[0], segs[~is_axon], proj, COL_SHAFT, style["lw_shaft"], zorder=2)
+    _draw_synapses(axes[0], syn, proj, style)
+    axes[0].set_title("raw skeleton, %d nodes; %d incoming synapses"
+                      % (len(raw_al), len(syn)), fontsize=9)
     csegs = np.stack([comps[["x0", "y0", "z0"]].to_numpy(float),
                       comps[["x1", "y1", "z1"]].to_numpy(float)], axis=1)
     is_ax_c = comps["sec"].astype(str).str.startswith("axon").to_numpy()
-    lw = np.clip(comps["d"].to_numpy(float) * 1.5, 0.5, 6.0)
-    lw = np.where(is_ax_c, 0.5, lw)
+    lw = np.clip(comps["d"].to_numpy(float) * style["comp_lw_scale"],
+                 style["comp_lw_min"], style["comp_lw_max"])
+    lw = np.where(is_ax_c, style["lw_axon"], lw)
     colors = np.where(np.arange(len(comps)) % 2 == 0, COL_COMP[0], COL_COMP[1])
     colors = np.where(is_ax_c, COL_AXON, colors)
     _lc(axes[1], csegs, proj, list(colors), lw, zorder=2, capstyle="butt")
     mids = compartment_midpoints(comps)
     conn, s_used = synapse_connectors(syn, mids)
-    _draw_synapses(axes[1], s_used, proj, connectors=conn)
-    axes[1].set_title("d_lambda compartments: %d segs (cm %.3g, Ra %.4g, lambda_f %.0f Hz, d_lambda %.2g)"
+    _draw_synapses(axes[1], s_used, proj, style, connectors=conn)
+    axes[1].set_title("d_lambda compartments: %d segs (cm %.3g, Ra %.4g, "
+                      "lambda_f %.0f Hz, d_lambda %.2g)"
                       % (len(comps), float(segmentation["cm"]), float(segmentation["Ra"]),
                          float(segmentation.get("lambda_f", 100.0)),
                          float(segmentation.get("d_lambda", 0.1))), fontsize=9)
     for ax in axes:
-        ax.set_aspect("equal")
-        ax.set_xlabel("%s (um, aligned)" % a)
-        ax.plot([0], [0], "o", color=COL_SOMA, ms=5, zorder=7)
-    axes[0].set_ylabel("%s (um, aligned)" % b)
-    xs = raw_al[a + "_al_um"]; ys = raw_al[b + "_al_um"]
-    pad = 0.03 * max(xs.max() - xs.min(), ys.max() - ys.min(), 1.0)
-    axes[0].set_xlim(xs.min() - pad, xs.max() + pad)
-    axes[0].set_ylim(ys.min() - pad, ys.max() + pad)
-    h, l = axes[1].get_legend_handles_labels()
+        _soma(ax, proj, style)
+        _label_axes(ax, proj, ylabel=(ax is axes[0]) or is3d(proj))
+    _equalise(axes, _xyz(raw_al), proj, style)
+    h, lb = axes[1].get_legend_handles_labels()
     if h:
-        axes[1].legend(h, l, loc="best", frameon=False, fontsize=8)
-    fig.suptitle("cell %d: raw skeleton vs exported compartments (%s projection); "
-                 "connectors join a synapse (its anchor if on a pruned spine) to its lfpy_idx"
+        axes[1].legend(h, lb, loc="upper left", frameon=False, fontsize=8)
+    fig.suptitle("cell %d -- raw skeleton vs exported compartments (%s); a connector "
+                 "joins each synapse (its anchor if it sat on a pruned spine) to its lfpy_idx"
                  % (cid, proj), fontsize=10)
-    fig.tight_layout(rect=(0, 0.02, 1, 0.97))
+    fig.tight_layout(rect=(0, 0.02, 1, 0.96))
     return fig
 
 
@@ -486,10 +640,16 @@ def plot_spine_stats(spine_stats, density, cid, fig=None):
     return fig
 
 
-def plot_arbour(profile, phi, cid, record, fig=None):
+def plot_arbour(profile, phi, cid, record, phi_label, is_mesh, F_value=None, fig=None):
     """Four panels along the path distance: shaft cable per bin, mean shaft
     diameter, spine and shaft area per bin, their ratio (the local
-    A_spine / A_shaft that F_lit integrates beyond 60 um)."""
+    A_spine / A_shaft that F integrates beyond 60 um).
+
+    `phi_label` names WHICH spine-area model the two right-hand panels show
+    (mesh deliverable or skeleton fallback) and is written into their axis
+    labels and the title; `F_value` is the F computed from THIS phi. The two
+    left-hand panels are identical either way -- shaft cable and shaft
+    diameter never come from the mesh."""
     plt, _ = _mpl()
     fig = fig or plt.figure(figsize=(12, 3.6))
     axes = fig.subplots(1, 4)
@@ -502,22 +662,24 @@ def plot_arbour(profile, phi, cid, record, fig=None):
     axes[2].bar(x, profile["A_shaft_um2"], width=w, color=COL_SHAFT, edgecolor="white",
                 linewidth=0.4, label="shaft")
     axes[2].bar(x, profile["A_spine_um2"], width=w, bottom=profile["A_shaft_um2"], color=COL_SPINE,
-                edgecolor="white", linewidth=0.4, label="spine")
+                edgecolor="white", linewidth=0.4,
+                label="spine, %s" % ("mesh" if is_mesh else "skeleton fallback"))
     axes[2].set_ylabel("membrane area per bin (um2)")
     axes[2].legend(frameon=False, fontsize=8)
     axes[3].plot(x, profile["A_spine_over_A_shaft"], color=COL_SPINE, lw=1.5)
-    axes[3].set_ylabel("A_spine / A_shaft per bin")
+    axes[3].set_ylabel("A_spine / A_shaft per bin\n(spine area: %s)"
+                       % ("mesh" if is_mesh else "SKELETON FALLBACK"))
     res = record.get("result") or {}
     for ax in axes:
         ax.set_xlabel("path distance from soma (um)")
         ax.axvline(60.0, color=COL_EXC, lw=1.0, ls="--")
-    fig.suptitle("cell %d arbour: %d branches, %d sections, %.0f um cable; F_lit %.3f, f_implied %.3f, "
-                 "A_shaft %.0f um2, A_spine %.0f um2"
+    fig.suptitle("cell %d arbour: %d branches, %d sections, %.0f um cable | spine area from %s: "
+                 "F(d > 60 um) %s, A_shaft %.0f um2, A_spine %.0f um2"
                  % (cid, int(res.get("n_branches", 0)), int(res.get("n_sections", 0)),
-                    float(phi["seg_len_um"].sum()), float(res.get("F_lit", float("nan"))),
-                    float(res.get("f_implied", float("nan"))),
-                    float(res.get("A_shaft_um2", float("nan"))),
-                    float(res.get("A_spine_um2", float("nan")))), fontsize=9)
+                    float(phi["seg_len_um"].sum()), phi_label,
+                    ("%.3f" % F_value) if F_value is not None else "n/a",
+                    float(phi["shaft_area_um2"].sum()),
+                    float(phi["spine_area_um2"].sum())), fontsize=9)
     fig.tight_layout(rect=(0, 0.02, 1, 0.97))
     return fig
 
@@ -531,7 +693,8 @@ def plot_population(summary, label, compare=None, compare_label=None, fig=None):
     ok = summary[summary["status"] == "ok"]
     fig = fig or plt.figure(figsize=(12, 7))
     axes = fig.subplots(2, 3).ravel()
-    _hist(axes[0], ok["F_lit"], 30, "F_lit (mesh-free, skeleton)")
+    _hist(axes[0], ok["F_lit"], 30,
+          "F_lit from P1: SKELETON FALLBACK\n(not the deliverable; that is P3 mesh_beyond)")
     ax = axes[1]
     ax.scatter(ok["total_length_um"], ok["n_spines"], s=8, c=COL_SHAFT, edgecolors="none")
     ax.set_xlabel("total cable (um)"); ax.set_ylabel("pruned spines")
@@ -580,8 +743,21 @@ def plot_population(summary, label, compare=None, compare_label=None, fig=None):
 # --------------------------------------------------------------------------- #
 # 4. CLI                                                                       #
 # --------------------------------------------------------------------------- #
+def F_beyond(phi, stage1_dir=None, cutoff_um=60.0):
+    """F = 1 + sum A_spine / sum A_shaft beyond the cutoff, from THIS phi,
+    through spine_density.cell_f_beyond_cutoff -- the same function the
+    exporter uses, never a reimplementation. None if that module is absent."""
+    if stage1_dir and stage1_dir not in sys.path:
+        sys.path.insert(0, stage1_dir)
+    try:
+        import spine_density as sd
+    except ImportError:
+        return None
+    return float(sd.cell_f_beyond_cutoff(phi, cutoff_um=cutoff_um, by="d_from_um")["F"])
+
+
 def cell_figures(root, out_dir, cid, fig_dir, proj="xz", bin_um=20.0, stage1_dir=None,
-                 skip_lfpy=False, dpi=150):
+                 skip_lfpy=False, dpi=220, phi_mode="mesh", style=None):
     """Produce the per-cell figures; returns {name: path}. The downsampling
     figure is skipped (with a message) when LFPy cannot be imported."""
     os.makedirs(fig_dir, exist_ok=True)
@@ -594,20 +770,34 @@ def cell_figures(root, out_dir, cid, fig_dir, proj="xz", bin_um=20.0, stage1_dir
     sn = load_spine_nodes(out_dir, cid)
     kept, pruned = split_pruned(raw_al, sn)
     stats = load_spine_stats(out_dir, cid)
-    phi = load_phi(out_dir, cid)
     syn = load_mapped_synapses(out_dir, cid)
+    style = style or resolve_style()
     out = {}
-    fig = plot_pruning(kept, pruned, proj, int(cid), rec)
+    fig = plot_pruning(kept, pruned, proj, int(cid), rec, style)
     out["pruning"] = os.path.join(fig_dir, "%s_pruning_%s.png" % (tag, proj))
     fig.savefig(out["pruning"], dpi=dpi); _close(fig)
-    dens = spine_density_profile(stats, phi, bin_um)
+    # The spine density profile needs phi only for the SHAFT cable denominator,
+    # which is identical in the two tables, so it is drawn from P1's either way.
+    phi_skel = load_phi(out_dir, cid)
+    dens = spine_density_profile(stats, phi_skel, bin_um)
     fig = plot_spine_stats(stats, dens, int(cid))
     out["spines"] = os.path.join(fig_dir, "%s_spines.png" % tag)
     fig.savefig(out["spines"], dpi=dpi); _close(fig)
-    prof = arbour_profile(phi, bin_um)
-    fig = plot_arbour(prof, phi, int(cid), rec)
-    out["arbour"] = os.path.join(fig_dir, "%s_arbour.png" % tag)
-    fig.savefig(out["arbour"], dpi=dpi); _close(fig)
+    # The arbour figure reports F, so it is drawn ONLY from the spine-area
+    # model asked for: with the default (mesh_beyond, the deliverable) and no
+    # P3 table, the figure is SKIPPED with the reason rather than quietly
+    # falling back to the skeleton bracket.
+    try:
+        phi, phi_label, is_mesh = resolve_phi(root, out_dir, cid, phi_mode)
+    except SystemExit as e:
+        print("arbour figure skipped: %s" % e)
+    else:
+        prof = arbour_profile(phi, bin_um)
+        fig = plot_arbour(prof, phi, int(cid), rec, phi_label, is_mesh,
+                          F_beyond(phi, stage1_dir))
+        out["arbour"] = os.path.join(fig_dir, "%s_arbour_%s.png"
+                                     % (tag, "mesh" if is_mesh else "skel"))
+        fig.savefig(out["arbour"], dpi=dpi); _close(fig)
     seg = (rec.get("result") or {}).get("segmentation") or {}
     if skip_lfpy:
         print("downsampling figure skipped (--skip-lfpy)")
@@ -626,13 +816,13 @@ def cell_figures(root, out_dir, cid, fig_dir, proj="xz", bin_um=20.0, stage1_dir
                 print("WARNING: rebuilt %d compartments but the record says totnsegs %d -- "
                       "the (cm, Ra, lambda_f, d_lambda) do not reproduce the export"
                       % (len(comps), want))
-            fig = plot_downsampling(raw_al, comps, syn, proj, int(cid), seg)
+            fig = plot_downsampling(raw_al, comps, syn, proj, int(cid), seg, style)
             out["downsampling"] = os.path.join(fig_dir, "%s_downsampling_%s.png" % (tag, proj))
             fig.savefig(out["downsampling"], dpi=dpi); _close(fig)
     return out
 
 
-def population_figure(out_dir, fig_dir, compare=None, dpi=150):
+def population_figure(out_dir, fig_dir, compare=None, dpi=220):
     os.makedirs(fig_dir, exist_ok=True)
     label = os.path.basename(os.path.normpath(out_dir))
     s = load_summary(out_dir)
@@ -657,18 +847,34 @@ def main(argv=None):
     ap.add_argument("--cell", type=int, action="append", default=[], help="cell id (repeatable)")
     ap.add_argument("--population", action="store_true", help="population figure from p1_summary.csv")
     ap.add_argument("--compare", default=None, help="second tree whose p1_summary.csv is paired by cell")
-    ap.add_argument("--proj", default="xz", choices=sorted(PROJECTIONS))
+    ap.add_argument("--proj", default="xz", choices=sorted(PROJECTIONS),
+                    help="xz / yz / xy project the aligned frame; 3d draws it in 3-D "
+                         "(--elev, --azim set the view)")
     ap.add_argument("--bin-um", type=float, default=20.0)
+    ap.add_argument("--phi", default="mesh", choices=("mesh", "auto", "skel"),
+                    help="spine-area model for the arbour figure. DEFAULT mesh: the "
+                         "P3 mesh_beyond deliverable, and the figure is skipped with "
+                         "a reason if P2/P3 have not run. auto falls back to P1's "
+                         "skeleton bracket; skel forces it. Both label it a fallback")
+    ap.add_argument("--dpi", type=int, default=220)
+    ap.add_argument("--lw-scale", type=float, default=1.0,
+                    help="multiply every skeleton / compartment line width")
+    ap.add_argument("--syn-size", type=float, default=None,
+                    help="synapse marker size (default %.3g); the pruned-spine "
+                         "marker keeps its ratio to it" % STYLE["syn_size"])
+    ap.add_argument("--elev", type=float, default=None, help="3d elevation, deg")
+    ap.add_argument("--azim", type=float, default=None, help="3d azimuth, deg")
     ap.add_argument("--stage1-dir", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "stage1"))
     ap.add_argument("--skip-lfpy", action="store_true")
-    ap.add_argument("--dpi", type=int, default=150)
     a = ap.parse_args(argv)
     if not a.cell and not a.population:
         ap.error("give --cell <id> and/or --population")
     print(PLOTS_VERSION)
+    style = resolve_style(lw_scale=a.lw_scale, syn_size=a.syn_size,
+                          elev=a.elev, azim=a.azim)
     for cid in a.cell:
         out = cell_figures(a.root, a.out_dir, cid, a.fig_dir, a.proj, a.bin_um, a.stage1_dir,
-                           a.skip_lfpy, a.dpi)
+                           a.skip_lfpy, a.dpi, a.phi, style)
         for k, v in out.items():
             print("  %-13s %s" % (k, v))
     if a.population:
