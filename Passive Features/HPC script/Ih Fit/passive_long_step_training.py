@@ -75,6 +75,10 @@ _BRIEF_PULSE_MAX_DURATION_S = 0.01
 DEFAULT_DT_BRIEF_MS = 0.025
 DEFAULT_DT_LONG_MS = 0.025
 
+# Set by integrate_long_step; the spec the patched loss falls back to
+# when fit_one_cell does not pass one (Stage 3/4).
+_INTEGRATE_SPEC = None
+
 
 # ---------------------------------------------------------------------------
 #  Bundle helpers (duck-typed; SweepBundle satisfies the attribute contract)
@@ -214,9 +218,53 @@ def _peak_deflection(bundle, pre_window_s, win_s) -> float:
 # ---------------------------------------------------------------------------
 #  Per-bundle RMSD with protocol-appropriate window
 # ---------------------------------------------------------------------------
+LS_WINDOW_MODES = ("after_onset", "step", "sweep")
+
+
+def ls_rmsd_window_s(bundle, mode: str, ls_window_ms_after_onset: float
+                     ) -> Tuple[float, float]:
+    """RMSD window [s] of ONE long-square bundle, by mode.
+
+      "after_onset"  [t_on, t_on + ls_window_ms_after_onset]   (legacy; the
+                     truncation that kept I_h OUT of the passive loss)
+      "step"         [t_on, t_off]                             (D-006 default
+                     for the I_h fit: the whole step, so the sag and its
+                     amplitude dependence are IN the loss)
+      "sweep"        [t_on, t_end]                             (adds the
+                     post-offset rebound; excluded from TRAINING by D-006
+                     because the conductances that shape the post-inhibitory
+                     rebound are not in this model, and reported instead)
+    """
+    if mode not in LS_WINDOW_MODES:
+        raise ValueError("ls_window mode must be one of %s, got %r"
+                         % (LS_WINDOW_MODES, mode))
+    onset = float(bundle.stim_onset_s)
+    if mode == "after_onset":
+        return (onset, onset + float(ls_window_ms_after_onset) * 1e-3)
+    if mode == "step":
+        return (onset, onset + float(bundle.stim_duration_s))
+    return (onset, float(np.asarray(bundle.t)[-1]))
+
+
+def ls_subwindows_s(bundle, *, charge_ms: float = 150.0
+                    ) -> "Dict[str, Tuple[float, float]]":
+    """The three diagnostic sub-windows of a long step, reported per bundle
+    and never minimised (plan section 7): charging (where tau_m and C_m act),
+    sag (where gbar and dv_h act), rebound (after the offset, where kappa_tau
+    acts most cleanly because no stimulus is on)."""
+    onset = float(bundle.stim_onset_s)
+    off = onset + float(bundle.stim_duration_s)
+    end = float(np.asarray(bundle.t)[-1])
+    charge_end = min(onset + float(charge_ms) * 1e-3, off)
+    return {"charge": (onset, charge_end),
+            "sag": (charge_end, off),
+            "rebound": (off, end)}
+
+
 def bundle_rmsd(cell, bundle, v_rest_mV: float, *,
                 ss_window_ms: Tuple[float, float] = (0.5, 100.0),
                 ls_window_ms_after_onset: float = 150.0,
+                ls_window_mode: str = "after_onset",
                 r_in_target: str = "peak",
                 ss_sample_weight_fn: Optional[Callable[[np.ndarray], np.ndarray]]
                 = None,
@@ -243,7 +291,7 @@ def bundle_rmsd(cell, bundle, v_rest_mV: float, *,
         t_s, v = _simulate_long(cell, bundle, v_rest_mV, dt_ms=dt_long_ms)
         onset = float(bundle.stim_onset_s)
         pre_w = (0.0, onset)
-        rmsd_w = (onset, onset + ls_window_ms_after_onset * 1e-3)
+        rmsd_w = ls_rmsd_window_s(bundle, ls_window_mode, ls_window_ms_after_onset)
         weight_fn = None                      # time-weight is SS-only by design
     rmsd = _baseline_subtracted_rmsd(
         np.asarray(bundle.t), np.asarray(bundle.v_mV), t_s, v, pre_w, rmsd_w,
@@ -263,14 +311,20 @@ def build_multi_protocol_loss(
     cell, train_bundles: Sequence, v_rest_mV: float, *,
     ss_window_ms: Tuple[float, float] = (0.5, 100.0),
     ls_window_ms_after_onset: float = 150.0,
+    ls_window_mode: str = "after_onset",
     r_in_target: str = "peak",
     weighting: str = "relative",
     weights: Optional[Sequence[float]] = None,
     ss_sample_weight_fn: Optional[Callable[[np.ndarray], np.ndarray]] = None,
     dt_brief_ms: Optional[float] = None,
     dt_long_ms: Optional[float] = None,
-) -> Callable[[float, float, float], float]:
-    """Return loss(cm_log, rm_log, ra_log) -> scalar.
+    spec: Optional[object] = None,
+) -> Callable[..., float]:
+    """Return loss(*q) -> scalar, q in the spec's axis order.
+
+    `spec` is a param_spec.ParamSpec. None means the 3-D passive spec, for
+    which the signature is loss(cm_log, rm_log, ra_log) -- the legacy one,
+    unchanged, so every existing call site keeps working (Stage 3, D-005).
 
     ss_sample_weight_fn:
       Per-sample time-weight (see exp_time_weight) applied to BRIEF bundles
@@ -293,18 +347,19 @@ def build_multi_protocol_loss(
         if weights is None or len(weights) != len(train_bundles):
             raise ValueError("weighting='custom' needs weights of matching length")
         w = np.asarray(weights, dtype=float)
+    if spec is None:
+        import param_spec as _ps
+        spec = _ps.PASSIVE_3D
 
-    def loss(cm_log: float, rm_log: float, ra_log: float) -> float:
+    def loss(*q: float) -> float:
         try:
-            cell.set_passive(Cm=float(np.exp(cm_log)),
-                             Rm=float(np.exp(rm_log)),
-                             Ra=float(np.exp(ra_log)))
-            cell.set_e_pas(v_rest_mV)
+            spec.apply_q(cell, q, v_rest_mV)
             terms = []
             for b in train_bundles:
                 rmsd, defl = bundle_rmsd(
                     cell, b, v_rest_mV, ss_window_ms=ss_window_ms,
                     ls_window_ms_after_onset=ls_window_ms_after_onset,
+                    ls_window_mode=ls_window_mode,
                     r_in_target=r_in_target,
                     ss_sample_weight_fn=ss_sample_weight_fn,
                     dt_brief_ms=dt_brief_ms, dt_long_ms=dt_long_ms)
@@ -500,10 +555,175 @@ def split_train_validation_with_long_step(
 
 
 # ---------------------------------------------------------------------------
+#  The I_h campaign's role assignment (Stage 4; D-006 Q6/Q7/Q12, D-007)
+# ---------------------------------------------------------------------------
+#  Every device the passive loss used to keep I_h OUT of the fit is removed
+#  here -- the 12 mV deflection cap, the "two smallest steps" rule, the
+#  60/150 ms truncation -- because with I_h in the model each of them deletes
+#  the signal that identifies it. What replaces them is an explicit role per
+#  sweep, recorded per cell so that a result can be read without guessing
+#  which trace did what:
+#
+#    TRAIN        the SS hyperpolarising pulses (they carry C_m; nothing else
+#                 does) + h_2 .. h_{n-1}, each on its whole step window.
+#    VALIDATE     the spike-free depolarising long steps (I_h DE-activation,
+#                 a regime never trained on) + h_1 (the weakest step) + the
+#                 SS depolarising pulses.
+#    REPORT ONLY  h_n, the strongest step, withheld because the conductances
+#                 that shape the post-inhibitory rebound are not modelled;
+#                 and every long step's post-offset window, for the same
+#                 reason. Their residuals are WRITTEN, so the exclusion is
+#                 checked rather than assumed.
+#
+#  Ordering convention used throughout: h_1 .. h_n are the hyperpolarising
+#  long-square bundles sorted by INCREASING |amplitude|, so h_1 is the
+#  weakest step and h_n the strongest.
+
+def assign_ls_roles(cell_data, *, n_drop_weakest: int = 1,
+                    n_drop_strongest: int = 1,
+                    dep_n_validation: Optional[int] = 3,
+                    v_trough_min_mV: Optional[float] = None,
+                    train_all_hyp: bool = False,
+                    verbose: bool = True) -> Dict[str, object]:
+    """Assign every long-square bundle of one cell to train / validate /
+    report, per D-006. Returns a dict with the three bundle lists and a
+    per-bundle record for the log.
+
+    n_drop_weakest / n_drop_strongest
+        How many of the extreme hyperpolarising amplitudes are withheld from
+        training. The D-006 defaults are 1 and 1, i.e. train on h_2..h_{n-1}.
+    dep_n_validation
+        Keep at most this many of the SMALLEST spike-free depolarising steps
+        as validation (None = all of them). The loader has already excluded
+        spiking sweeps and applied its own amplitude cap.
+    v_trough_min_mV
+        Optional floor on V_trough: a training step whose trough is BELOW
+        this voltage is demoted to report-only. Off by default; it exists for
+        a low-R_in cell whose h_{n-1} is itself very deep.
+    train_all_hyp
+        The labelled opt-in of D-007: train on every hyperpolarising step,
+        h_1 and h_n included. Off by default.
+    """
+    hyp = sorted(list(getattr(cell_data, "long_square_subthreshold", [])),
+                 key=lambda b: abs(float(b.amplitude_pA)))
+    dep = sorted(list(getattr(cell_data, "long_square_depolarising", [])),
+                 key=lambda b: abs(float(b.amplitude_pA)))
+    n = len(hyp)
+    records: List[Dict[str, object]] = []
+
+    if train_all_hyp:
+        lo, hi = 0, n
+    else:
+        lo = min(int(n_drop_weakest), max(n - 1, 0))
+        hi = max(n - int(n_drop_strongest), lo)
+    # A cell with too few steps to drop any: train on what there is rather
+    # than on nothing. Recorded in the reason string, never silent.
+    if hi <= lo and n:
+        lo, hi = 0, n
+
+    train_ls: List = []
+    valid_ls: List = []
+    report_ls: List = []
+    for i, b in enumerate(hyp):
+        trough = _trough_mV(b)
+        if lo <= i < hi:
+            role, why = "train", "h_%d of %d" % (i + 1, n)
+            if (v_trough_min_mV is not None and np.isfinite(trough)
+                    and trough < float(v_trough_min_mV)):
+                role, why = "report", ("V_trough %.1f mV below floor %.1f"
+                                       % (trough, float(v_trough_min_mV)))
+        elif i < lo:
+            role, why = "validate", "weakest step (held out)"
+        else:
+            role, why = "report", "strongest step (PIR conductances unmodelled)"
+        {"train": train_ls, "validate": valid_ls, "report": report_ls}[role].append(b)
+        records.append({"amplitude_pA": float(b.amplitude_pA), "polarity": "hyp",
+                        "role": role, "reason": why, "v_trough_mV": trough})
+
+    dep_keep = dep if dep_n_validation is None else dep[:int(dep_n_validation)]
+    for b in dep:
+        keep = any(b is k for k in dep_keep)
+        records.append({"amplitude_pA": float(b.amplitude_pA), "polarity": "dep",
+                        "role": "validate" if keep else "unused",
+                        "reason": "spike-free depolarising step"
+                                  if keep else "beyond dep_n_validation",
+                        "v_trough_mV": float("nan")})
+    valid_ls.extend(dep_keep)
+
+    if verbose:
+        def _fmt(bs):
+            return "[" + ", ".join("%+.0f" % float(b.amplitude_pA) for b in bs) + "]"
+        print("[roles] LS train %s pA | validate %s pA | report-only %s pA"
+              % (_fmt(train_ls), _fmt(valid_ls), _fmt(report_ls)))
+        if not dep:
+            print("[roles] WARNING: no depolarising validation steps for this "
+                  "cell -- was the loader called with load_depolarising_ls=True?")
+    return {"train": train_ls, "validate": valid_ls, "report": report_ls,
+            "records": records, "n_hyp": n, "n_dep": len(dep)}
+
+
+def _trough_mV(bundle, baseline_guard_s: float = 5e-3) -> float:
+    """Minimum voltage during the step (duck-typed copy of the monolith's
+    bundle_trough_mV, so this module stays importable without it)."""
+    if _is_brief(bundle):
+        return float("nan")
+    t = np.asarray(bundle.t, dtype=float)
+    v = np.asarray(bundle.v_mV, dtype=float)
+    on = float(bundle.stim_onset_s) + float(baseline_guard_s)
+    off = float(bundle.stim_onset_s) + float(bundle.stim_duration_s)
+    m = (t >= on) & (t <= off)
+    return float(np.min(v[m])) if m.any() else float("nan")
+
+
+def split_train_validation_ih(cell_data, *, fit_target: str = "hyp",
+                              n_drop_weakest: int = 1, n_drop_strongest: int = 1,
+                              dep_n_validation: Optional[int] = 3,
+                              v_trough_min_mV: Optional[float] = None,
+                              train_all_hyp: bool = False,
+                              verbose: bool = True):
+    """(train, validation, report, roles) for the I_h campaign.
+
+    Brief SS pulses follow `fit_target` exactly as before; the long steps
+    follow assign_ls_roles. This REPLACES split_train_validation_with_long_step
+    for the I_h arms; that function is untouched and still serves the run-B
+    reproduction (regression_passive_identity.py).
+    """
+    ss = list(cell_data.square_subthreshold)
+    if fit_target == "hyp":
+        train_ss = [b for b in ss if b.polarity == "hyp"]
+        held_ss = [b for b in ss if b.polarity == "dep"]
+    elif fit_target == "dep":
+        train_ss = [b for b in ss if b.polarity == "dep"]
+        held_ss = [b for b in ss if b.polarity == "hyp"]
+    elif fit_target == "both":
+        train_ss, held_ss = list(ss), []
+    else:
+        raise ValueError("fit_target must be 'hyp'|'dep'|'both', got %r" % fit_target)
+
+    roles = assign_ls_roles(cell_data, n_drop_weakest=n_drop_weakest,
+                            n_drop_strongest=n_drop_strongest,
+                            dep_n_validation=dep_n_validation,
+                            v_trough_min_mV=v_trough_min_mV,
+                            train_all_hyp=train_all_hyp, verbose=verbose)
+    return (train_ss + list(roles["train"]),
+            held_ss + list(roles["validate"]),
+            list(roles["report"]),
+            roles)
+
+
+# ---------------------------------------------------------------------------
 #  Decoupled integration into the monolith (no hand-editing of 7,500 lines)
 # ---------------------------------------------------------------------------
 def integrate_long_step(
     mono, *,
+    spec: Optional[object] = None,
+    ih_protocol: bool = False,
+    ls_window_mode: str = "after_onset",
+    n_drop_weakest: int = 1,
+    n_drop_strongest: int = 1,
+    dep_n_validation: Optional[int] = 3,
+    v_trough_min_mV: Optional[float] = None,
+    train_all_hyp: bool = False,
     n_long_train: int = 2,
     max_ls_train_deflection_mV: Optional[float] = 12.0,
     max_sag_amplitude_mV: Optional[float] = None,
@@ -570,12 +790,22 @@ def integrate_long_step(
                  train_window_ms=None, n_long_validation=None):
         if train_window_ms is None:           # default to the [0.5,100] window
             train_window_ms = ss_window_ms
-        train, validation = split_train_validation_with_long_step(
-            cell_data, fit_target=fit_target, n_long_train=n_long_train,
-            max_ls_train_deflection_mV=max_ls_train_deflection_mV,
-            max_sag_amplitude_mV=max_sag_amplitude_mV,
-            max_ls_train_amplitude_pA=max_ls_train_amplitude_pA,
-            verbose=verbose)
+        report: List = []
+        roles = None
+        if ih_protocol:
+            train, validation, report, roles = split_train_validation_ih(
+                cell_data, fit_target=fit_target,
+                n_drop_weakest=n_drop_weakest, n_drop_strongest=n_drop_strongest,
+                dep_n_validation=dep_n_validation,
+                v_trough_min_mV=v_trough_min_mV,
+                train_all_hyp=train_all_hyp, verbose=verbose)
+        else:
+            train, validation = split_train_validation_with_long_step(
+                cell_data, fit_target=fit_target, n_long_train=n_long_train,
+                max_ls_train_deflection_mV=max_ls_train_deflection_mV,
+                max_sag_amplitude_mV=max_sag_amplitude_mV,
+                max_ls_train_amplitude_pA=max_ls_train_amplitude_pA,
+                verbose=verbose)
         if n_long_validation is not None and n_long_validation >= 0:
             briefs = [b for b in validation
                       if float(b.stim_duration_s) < _BRIEF_PULSE_MAX_DURATION_S]
@@ -583,9 +813,11 @@ def integrate_long_step(
                      if float(b.stim_duration_s) >= _BRIEF_PULSE_MAX_DURATION_S]
             validation = briefs + longs[:int(n_long_validation)]
         space = PassiveSearchSpace()
-        return OptimiserInputs(
+        dims = (spec.as_skopt_dimensions() if spec is not None
+                else space.as_skopt_dimensions())
+        oi = OptimiserInputs(
             search_space=space,
-            skopt_dimensions=space.as_skopt_dimensions(),
+            skopt_dimensions=dims,
             train_bundles=train,
             train_window_ms=tuple(train_window_ms),
             validation_bundles=validation,
@@ -593,6 +825,15 @@ def integrate_long_step(
             tau_ms=cell_data.tau_ms,
             v_rest_mV=cell_data.v_rest_mV,
         )
+        # Attached rather than passed positionally so an OptimiserInputs from
+        # an older monolith (no param_spec field) still works.
+        try:
+            oi.param_spec = spec
+        except Exception:                      # pragma: no cover
+            pass
+        oi.report_bundles = report
+        oi.ls_roles = roles
+        return oi
 
     def _make_ss_weight_fn(win_ms):
         """Build the per-sample SS time-weight; t0 defaults to the window start
@@ -609,15 +850,23 @@ def integrate_long_step(
                          f"got {ss_time_weight!r}")
 
     def _build_loss(cell, train_bundles, v_rest_mV, train_window_ms,
-                    pre_window_ms=(-10.0, 0.0)):
+                    pre_window_ms=(-10.0, 0.0), spec=None):
+        # `spec` arrives from fit_one_cell (Stage 3). A spec passed there wins
+        # over the one integrate_long_step was configured with, so a single
+        # patched monolith can fit a 3-D control arm and a 6-D I_h arm in the
+        # same process.
         return build_multi_protocol_loss(
             cell, train_bundles, v_rest_mV,
             ss_window_ms=tuple(train_window_ms),
             ls_window_ms_after_onset=ls_window_ms_after_onset,
+            ls_window_mode=ls_window_mode,
             r_in_target=r_in_target, weighting=weighting,
             ss_sample_weight_fn=_make_ss_weight_fn(tuple(train_window_ms)),
-            dt_brief_ms=DEFAULT_DT_BRIEF_MS, dt_long_ms=DEFAULT_DT_LONG_MS)
+            dt_brief_ms=DEFAULT_DT_BRIEF_MS, dt_long_ms=DEFAULT_DT_LONG_MS,
+            spec=(spec if spec is not None else globals().get("_INTEGRATE_SPEC")))
 
+    global _INTEGRATE_SPEC
+    _INTEGRATE_SPEC = spec
     mono.prepare_optimiser_inputs = _prepare
     mono._build_loss_function = _build_loss
     if verbose:

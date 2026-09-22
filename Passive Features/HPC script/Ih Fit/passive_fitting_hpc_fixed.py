@@ -99,12 +99,132 @@ accidentally call them without AllenSDK installed.
 # ===============================================================================
 
 # %% Cell -- HPC archive loader ================================================
+# %% Cell 3b -- Long Square helpers for the I_h campaign (Stage 2, D-006/D-007)
+# Added 2026-09-22 in the "Ih Fit" copy. The legacy passive path does not call
+# any of these; load_cell_from_archive keeps its old defaults so
+# regression_passive_identity.py stays a meaningful gate.
+
+DEFAULT_SPIKE_V_THRESHOLD_MV = -20.0      # a sweep whose peak exceeds this spiked
+DEFAULT_SPIKE_DVDT_MV_PER_MS = 10.0       # ... or whose max dV/dt exceeds this
+
+
+def sweep_has_spike(v_mV: np.ndarray, sampling_rate_Hz: float, *,
+                    v_threshold_mV: float = DEFAULT_SPIKE_V_THRESHOLD_MV,
+                    dvdt_threshold_mV_per_ms: float = DEFAULT_SPIKE_DVDT_MV_PER_MS
+                    ) -> bool:
+    """True if this sweep contains an action potential.
+
+    Two criteria, either sufficient: an absolute peak above `v_threshold_mV`
+    (default -20 mV), and a maximum dV/dt above `dvdt_threshold_mV_per_ms`
+    (default 10 mV/ms). The second catches a spike that is clipped or that
+    rides on a hyperpolarised baseline; the first catches a broad
+    depolarisation whose upstroke is slow. Both thresholds are far outside the
+    subthreshold regime this pipeline fits, so a subthreshold step never
+    triggers either.
+
+    Used only to keep spiking Long Square sweeps out of the depolarising
+    VALIDATION bundles (D-006 Q7); the hyperpolarising path never needs it.
+    """
+    v = np.asarray(v_mV, dtype=float)
+    if v.size < 3 or not np.all(np.isfinite(v)):
+        return True                        # unusable -> treat as unusable
+    if float(np.max(v)) > float(v_threshold_mV):
+        return True
+    dt_ms = 1e3 / float(sampling_rate_Hz)
+    dvdt = np.diff(v) / dt_ms
+    return bool(np.max(np.abs(dvdt)) > float(dvdt_threshold_mV_per_ms))
+
+
+def bundle_trough_mV(bundle: "SweepBundle", *,
+                     baseline_guard_s: float = 5e-3) -> float:
+    """Minimum voltage reached DURING the step, for each long-square bundle.
+
+    V_trough is what decides how much I_h a step recruits (I_h is voltage-
+    gated, so the depth reached matters, not the current injected), and it is
+    what the optional --v-trough-min guard of the I_h campaign cuts on. For a
+    brief pulse the notion does not apply and NaN is returned.
+    """
+    if _is_brief_pulse(bundle):
+        return float("nan")
+    t = np.asarray(bundle.t, dtype=float)
+    v = np.asarray(bundle.v_mV, dtype=float)
+    on = float(bundle.stim_onset_s) + float(baseline_guard_s)
+    off = float(bundle.stim_onset_s) + float(bundle.stim_duration_s)
+    m = (t >= on) & (t <= off)
+    return float(np.min(v[m])) if m.any() else float("nan")
+
+
+def _ls_bundles_from_sweep_info(ls_npz, infos: List[Dict[str, Any]],
+                                polarity: str) -> List["SweepBundle"]:
+    """Group Long Square sweeps by amplitude (nearest 10 pA), average within a
+    group, detect onset/duration from the averaged current, and return one
+    SweepBundle per amplitude, sorted by |amplitude|.
+
+    Extracted verbatim from the body of load_cell_from_archive so that the
+    hyperpolarising and depolarising paths share one implementation; the
+    hyperpolarising output is byte-for-byte what the previous inline code
+    produced (pinned by smoke check S7).
+    """
+    amp_groups: Dict[int, List[Dict[str, Any]]] = {}
+    for info in infos:
+        key = int(round(info["detected_amplitude_pA"] / 10.0) * 10)
+        amp_groups.setdefault(key, []).append(info)
+
+    out: List[SweepBundle] = []
+    for amp_key in sorted(amp_groups.keys(), key=abs):
+        grp = amp_groups[amp_key]
+
+        # Load per-sweep arrays
+        vs = [ls_npz[f"v_{info['index']}"] for info in grp]
+        is_ = [ls_npz[f"i_{info['index']}"] for info in grp]
+        srs = [info["sampling_rate_Hz"] for info in grp]
+
+        # Average (clip to shortest if lengths differ)
+        n_min = min(len(v) for v in vs)
+        v_avg = np.mean([v[:n_min] for v in vs], axis=0)
+        i_avg = np.mean([i[:n_min] for i in is_], axis=0)
+        sr = srs[0]
+        t = np.arange(n_min) / sr
+
+        # Detect stim onset/duration from averaged current
+        thr = 0.5 * np.max(np.abs(i_avg))
+        active = np.abs(i_avg) > thr
+        if active.any():
+            on_idx = int(np.argmax(active))
+            off_idx = len(active) - int(np.argmax(active[::-1]))
+            stim_onset = float(t[on_idx])
+            stim_dur = float(t[off_idx - 1] - t[on_idx])
+            amp_pA = float(np.sign(i_avg[on_idx]) * np.max(np.abs(i_avg)))
+        else:
+            stim_onset = stim_dur = amp_pA = 0.0
+
+        out.append(SweepBundle(
+            polarity=polarity,
+            amplitude_pA=amp_pA,
+            t=t,
+            v_mV=v_avg,
+            i_pA=i_avg,
+            stim_onset_s=stim_onset,
+            stim_duration_s=stim_dur,
+            n_repeats_averaged=len(grp),
+            sweep_numbers=[info["sweep_number"] for info in grp],
+            sampling_rate_Hz=sr,
+            stimulus_name="Long Square",
+        ))
+    return out
+
+
 def load_cell_from_archive(
     specimen_dir: "str | Path",
     *,
     n_avg_groups: int = 1,
-    ls_max_amplitude_pA: float = 100.0,
+    ls_max_amplitude_pA: "Optional[float]" = 100.0,
     ls_fallback_amplitude_pA: float = 300.0,
+    load_depolarising_ls: bool = False,
+    ls_dep_max_amplitude_pA: "Optional[float]" = 100.0,
+    spike_v_threshold_mV: float = DEFAULT_SPIKE_V_THRESHOLD_MV,
+    spike_dvdt_mV_per_ms: float = DEFAULT_SPIKE_DVDT_MV_PER_MS,
+    swc_dir: "Optional[str | Path]" = None,
     verbose: bool = True,
 ) -> "CellData":
     """Load one cell from a Phase 0 archive directory.
@@ -133,6 +253,31 @@ def load_cell_from_archive(
     ls_fallback_amplitude_pA
         If no sweeps pass the ``ls_max_amplitude_pA`` filter, widen to
         this threshold.  Default 300 pA matches the original fallback.
+        Unused when ``ls_max_amplitude_pA`` is None.
+    load_depolarising_ls
+        I_h campaign (D-006 Q7).  When True, the spike-free DEPOLARISING
+        Long Square sweeps are also built into bundles and returned on
+        ``CellData.long_square_depolarising``.  They are the held-out
+        validation set of the I_h fit: a depolarising step probes I_h
+        DE-activation, a regime the training set never visits.  Default
+        False keeps the legacy CellData exactly as it was.
+    ls_dep_max_amplitude_pA
+        Amplitude ceiling for those depolarising bundles (None = no cap).
+        Default 100 pA: "the small ones" of D-006, far enough below rheobase
+        in most cells that the conductances this model omits (persistent Na
+        above all) stay small.  Spiking sweeps are excluded regardless, by
+        ``sweep_has_spike``.
+    spike_v_threshold_mV, spike_dvdt_mV_per_ms
+        Spike-detection thresholds for that exclusion; see
+        ``sweep_has_spike``.
+    swc_dir
+        I_h campaign (D-006 Q10).  When given, the morphology is read from
+        ``<swc_dir>/<specimen_id>.swc`` (falling back to
+        ``<swc_dir>/specimen_<id>.swc``, then ``<swc_dir>/reconstruction.swc``
+        inside a per-specimen subdirectory) instead of the archive's own
+        ``reconstruction.swc``.  This is the hook for the diameter-corrected
+        arbours; the archive is never modified.  A missing file is a loud
+        failure, never a silent fallback to the uncorrected morphology.
     verbose
         Print a one-line summary of what was loaded.
 
@@ -150,6 +295,20 @@ def load_cell_from_archive(
 
     sid = int(meta["specimen_id"])
     swc_path = specimen_dir / "reconstruction.swc"
+    if swc_dir is not None:
+        swc_dir = Path(swc_dir)
+        candidates = [swc_dir / f"{sid}.swc",
+                      swc_dir / f"specimen_{sid}.swc",
+                      swc_dir / f"specimen_{sid}" / "reconstruction.swc"]
+        hit = next((c for c in candidates if c.exists()), None)
+        if hit is None:
+            raise FileNotFoundError(
+                f"swc_dir={swc_dir} given but no morphology for specimen {sid}; "
+                f"tried {[str(c) for c in candidates]}. Refusing to fall back to "
+                f"the archive's uncorrected reconstruction.swc.")
+        swc_path = hit
+        if verbose:
+            print(f"[load_archive]   morphology override: {swc_path}")
 
     # -- 2. Read SS individual pulses from ss_pulses.npz ------------------
     all_pulses: List[Dict[str, Any]] = []
@@ -249,77 +408,32 @@ def load_cell_from_archive(
     # 4. Detect stim onset/duration from averaged current
 
     ls_bundles: List[SweepBundle] = []
+    ls_dep_bundles: List[SweepBundle] = []
     ls_sweep_info = meta.get("ls_sweeps", [])
     ls_file = specimen_dir / "ls_sweeps.npz"
 
     if ls_sweep_info and ls_file.exists():
         ls_npz = np.load(ls_file)
 
-        # Filter to hyperpolarising subthreshold sweeps
-        hyp_ls = [
-            info for info in ls_sweep_info
-            if info["detected_amplitude_pA"] is not None
-            and info["detected_amplitude_pA"] < -5.0
-            and abs(info["detected_amplitude_pA"]) <= ls_max_amplitude_pA
-        ]
-        if not hyp_ls:
+        # Filter to hyperpolarising subthreshold sweeps.
+        # ls_max_amplitude_pA=None removes the current ceiling entirely, which
+        # is what the I_h campaign uses (D-007): the amplitude dependence of
+        # the sag across steps is the strongest constraint on gbar, so every
+        # recorded hyperpolarising amplitude is a candidate. The default 100 pA
+        # preserves the legacy passive behaviour.
+        def _hyp_ok(info, cap):
+            return (info["detected_amplitude_pA"] is not None
+                    and info["detected_amplitude_pA"] < -5.0
+                    and (cap is None
+                         or abs(info["detected_amplitude_pA"]) <= cap))
+
+        hyp_ls = [i for i in ls_sweep_info if _hyp_ok(i, ls_max_amplitude_pA)]
+        if not hyp_ls and ls_max_amplitude_pA is not None:
             # Fallback to wider threshold
-            hyp_ls = [
-                info for info in ls_sweep_info
-                if info["detected_amplitude_pA"] is not None
-                and info["detected_amplitude_pA"] < -5.0
-                and abs(info["detected_amplitude_pA"])
-                    <= ls_fallback_amplitude_pA
-            ]
+            hyp_ls = [i for i in ls_sweep_info
+                      if _hyp_ok(i, ls_fallback_amplitude_pA)]
 
-        # Group by amplitude (round to nearest 10 pA)
-        amp_groups: Dict[int, List[Dict[str, Any]]] = {}
-        for info in hyp_ls:
-            key = int(round(info["detected_amplitude_pA"] / 10.0) * 10)
-            amp_groups.setdefault(key, []).append(info)
-
-        for amp_key in sorted(amp_groups.keys(), key=abs):
-            grp = amp_groups[amp_key]
-
-            # Load per-sweep arrays
-            vs = [ls_npz[f"v_{info['index']}"] for info in grp]
-            is_ = [ls_npz[f"i_{info['index']}"] for info in grp]
-            srs = [info["sampling_rate_Hz"] for info in grp]
-
-            # Average (clip to shortest if lengths differ)
-            n_min = min(len(v) for v in vs)
-            v_avg = np.mean([v[:n_min] for v in vs], axis=0)
-            i_avg = np.mean([i[:n_min] for i in is_], axis=0)
-            sr = srs[0]
-            t = np.arange(n_min) / sr
-
-            # Detect stim onset/duration from averaged current
-            thr = 0.5 * np.max(np.abs(i_avg))
-            active = np.abs(i_avg) > thr
-            if active.any():
-                on_idx = int(np.argmax(active))
-                off_idx = len(active) - int(np.argmax(active[::-1]))
-                stim_onset = float(t[on_idx])
-                stim_dur = float(t[off_idx - 1] - t[on_idx])
-                amp_pA = float(
-                    np.sign(i_avg[on_idx]) * np.max(np.abs(i_avg))
-                )
-            else:
-                stim_onset = stim_dur = amp_pA = 0.0
-
-            ls_bundles.append(SweepBundle(
-                polarity="hyp",
-                amplitude_pA=amp_pA,
-                t=t,
-                v_mV=v_avg,
-                i_pA=i_avg,
-                stim_onset_s=stim_onset,
-                stim_duration_s=stim_dur,
-                n_repeats_averaged=len(grp),
-                sweep_numbers=[info["sweep_number"] for info in grp],
-                sampling_rate_Hz=sr,
-                stimulus_name="Long Square",
-            ))
+        ls_bundles = _ls_bundles_from_sweep_info(ls_npz, hyp_ls, "hyp")
 
         if verbose and ls_bundles:
             amps_str = ", ".join(
@@ -329,6 +443,37 @@ def load_cell_from_archive(
                 f"[load_archive]   Long Square bundles: "
                 f"{len(ls_bundles)} ([{amps_str}] pA)"
             )
+
+        # -- 4b. Depolarising Long Square (I_h campaign validation set) ----
+        # Opt-in (D-006 Q7). Spiking sweeps are excluded by waveform, not by
+        # trusting a metadata amplitude: the Allen protocol runs up to
+        # rheobase + 160 pA, so most depolarising sweeps DO spike.
+        if load_depolarising_ls:
+            dep_info = []
+            for info in ls_sweep_info:
+                amp = info["detected_amplitude_pA"]
+                if amp is None or amp <= 5.0:
+                    continue
+                if (ls_dep_max_amplitude_pA is not None
+                        and abs(amp) > ls_dep_max_amplitude_pA):
+                    continue
+                v_k = ls_npz[f"v_{info['index']}"]
+                if sweep_has_spike(v_k, info["sampling_rate_Hz"],
+                                   v_threshold_mV=spike_v_threshold_mV,
+                                   dvdt_threshold_mV_per_ms=spike_dvdt_mV_per_ms):
+                    continue
+                dep_info.append(info)
+            ls_dep_bundles = _ls_bundles_from_sweep_info(ls_npz, dep_info, "dep")
+            if verbose:
+                if ls_dep_bundles:
+                    amps_str = ", ".join(
+                        f"{b.amplitude_pA:+.0f}" for b in ls_dep_bundles)
+                    print(f"[load_archive]   Long Square DEP bundles "
+                          f"(spike-free): {len(ls_dep_bundles)} "
+                          f"([{amps_str}] pA)")
+                else:
+                    print("[load_archive]   Long Square DEP bundles: none "
+                          "(every depolarising sweep spiked or exceeded the cap)")
 
     # -- 5. Scalar features -----------------------------------------------
     rin = (
@@ -375,6 +520,9 @@ def load_cell_from_archive(
         ljp_correction_mV=ljp,
         n_avg_groups=n_avg_groups,
         ss_individual_pulses=all_pulses,
+        long_square_depolarising=ls_dep_bundles,
+        sag_ratio=float(meta.get("sag_ratio", float("nan"))
+                        if meta.get("sag_ratio") is not None else float("nan")),
     )
 
     if verbose:
@@ -406,8 +554,11 @@ def load_cells_from_archive(
     archive_dir: "str | Path",
     *,
     n_avg_groups: int = 1,
-    ls_max_amplitude_pA: float = 100.0,
+    ls_max_amplitude_pA: "Optional[float]" = 100.0,
     ls_fallback_amplitude_pA: float = 300.0,
+    load_depolarising_ls: bool = False,
+    ls_dep_max_amplitude_pA: "Optional[float]" = 100.0,
+    swc_dir: "Optional[str | Path]" = None,
     specimen_ids: "Optional[List[int]]" = None,
     max_cells: "Optional[int]" = None,
     verbose: bool = True,
@@ -467,6 +618,9 @@ def load_cells_from_archive(
                 n_avg_groups=n_avg_groups,
                 ls_max_amplitude_pA=ls_max_amplitude_pA,
                 ls_fallback_amplitude_pA=ls_fallback_amplitude_pA,
+                load_depolarising_ls=load_depolarising_ls,
+                ls_dep_max_amplitude_pA=ls_dep_max_amplitude_pA,
+                swc_dir=swc_dir,
                 verbose=verbose,
             )
             # Completeness check (mirrors load_complete_cells behaviour)
@@ -732,6 +886,21 @@ class CellData:
     # all existing code that constructs CellData without this field still works.
     ss_individual_pulses: List[Dict[str, Any]] = field(default_factory=list)
 
+    # -- I_h campaign (Stage 2, D-006 Q7 / D-007) -------------------------
+    # Spike-free DEPOLARISING Long Square bundles, the held-out validation
+    # set of the I_h fit (a depolarising step probes I_h de-activation, a
+    # regime the training set never visits). Empty unless the loader was
+    # called with load_depolarising_ls=True, so every existing construction
+    # of CellData and every legacy code path is unaffected.
+    long_square_depolarising: List[SweepBundle] = field(default_factory=list)
+
+    # Allen's `sag` feature for this cell, when the archive carries it. NaN
+    # otherwise. passive_long_step_training reads it via getattr for its
+    # optional sag-gated guard, which has been inert because the field did
+    # not exist; it is carried now so the guard is usable and so the sag
+    # screen can be run per cell without a second API call.
+    sag_ratio: float = float("nan")
+
 
 @dataclass
 class PassiveSearchSpace:
@@ -795,6 +964,11 @@ class OptimiserInputs:
     rin_MOhm: float = np.nan
     tau_ms: float = np.nan
     v_rest_mV: float = np.nan
+
+    # Stage 3 (D-005): the parameter vector this cell is to be fitted with.
+    # None -> fit_one_cell falls back to the 3-D passive spec, i.e. the
+    # legacy behaviour. Set by the I_h orchestrator.
+    param_spec: Optional[Any] = None
 
 
 # %% Cell 4 -- Helper: list_human_cells_with_morphology =========================
@@ -2544,6 +2718,20 @@ class PassiveFitResult:
     neuron_cell: Optional[Any] = field(default=None, repr=False)
     opt_inputs: Optional[Any] = field(default=None, repr=False)
 
+    # -- generic parameter vector (Stage 3, D-005) ------------------------
+    # `params` is the fitted theta keyed by the spec's own names, e.g.
+    # {"Cm":..., "Rm":..., "Ra":..., "gbar":..., "dv_h":..., "kappa_tau":...}.
+    # cm_uF_per_cm2 / rm_Ohm_cm2 / ra_Ohm_cm above remain the passive triple
+    # so every existing consumer (results_to_dataframe, Phase 2.5, the
+    # plots) keeps working; they are NaN only if a spec omits those axes.
+    # `sigmas_by_name` is keyed "<name>_sigma"; for a log axis the value is a
+    # log-space (multiplicative) sigma, for a linear axis an additive one in
+    # that axis's unit.
+    params: Dict[str, float] = field(default_factory=dict)
+    sigmas_by_name: Dict[str, float] = field(default_factory=dict)
+    param_spec: Optional[Any] = field(default=None, repr=False)
+    ih_summary: Dict[str, float] = field(default_factory=dict)
+
 
 # %% Cell 5 -- RMSD helpers =====================================================
 def _estimate_residual_noise_at_mle(
@@ -2555,6 +2743,8 @@ def _estimate_residual_noise_at_mle(
     ra_mle: float,
     train_window_ms: Sequence[float],
     pre_stim_window_ms: Optional[Sequence[float]] = None,
+    spec: "Optional[Any]" = None,
+    theta_mle: "Optional[Mapping[str, float]]" = None,
 ) -> Tuple[float, float]:
     """Pool residuals from (pre-stim baseline + post-stim training window)
     at MLE and return (sigma, rho_lag1).
@@ -2566,8 +2756,15 @@ def _estimate_residual_noise_at_mle(
     PassiveCell exposes a different method name or signature.
     """
     # -- Set MLE state ------------------------------------------------
-    cell.set_passive(cm_mle, rm_mle, ra_mle)
-    cell.set_e_pas(v_rest_mV)
+    # Stage 3 (D-005): with a spec, the model state is applied through it, so
+    # an I_h fit's residuals are computed with I_h inserted and the rest
+    # balance applied -- exactly the state the loss was evaluated in. Without
+    # one, the legacy two lines.
+    if spec is not None and theta_mle is not None:
+        spec.apply(cell, theta_mle, v_rest_mV)
+    else:
+        cell.set_passive(cm_mle, rm_mle, ra_mle)
+        cell.set_e_pas(v_rest_mV)
 
     # -- Window definitions in seconds --------------------------------
     train_t0_s, train_t1_s = (np.asarray(train_window_ms) * 1e-3).tolist()
@@ -2849,23 +3046,26 @@ def _build_loss_function(
     v_rest_mV: float,
     train_window_ms: Tuple[float, float],
     pre_window_ms: Tuple[float, float] = (-10.0, 0.0),
-) -> Callable[[float, float, float], float]:
+    spec: "Optional[Any]" = None,
+) -> Callable[..., float]:
     """Return a function ``loss(Cm, Rm, Ra) -> RMSD_mV`` that gp_minimize
     can call.  The loss is the mean baseline-subtracted RMSD over all
     training bundles (averaging gives equal weight regardless of polarity
     when ``fit_target='both'``)."""
     pre_window_s = (pre_window_ms[0] * 1e-3, pre_window_ms[1] * 1e-3)
     train_window_s = (train_window_ms[0] * 1e-3, train_window_ms[1] * 1e-3)
+    if spec is None:
+        import param_spec as _ps
+        spec = _ps.PASSIVE_3D
 
-    def loss(cm_log: float, rm_log: float, ra_log: float) -> float:
-        # The optimiser works in log-space (q = log(p)).  Convert back to
-        # physical units before calling NEURON: p = exp(q).
+    def loss(*q_log: float) -> float:
+        # The optimiser works in q-space (q = log(p) for a positive
+        # parameter, q = p for a linear one); the spec converts back before
+        # NEURON is touched, and applies the parameters in the order the
+        # model requires (Stage 3, D-005).
         try:
-            cm = float(np.exp(cm_log))
-            rm = float(np.exp(rm_log))
-            ra = float(np.exp(ra_log))
-            cell.set_passive(Cm=cm, Rm=rm, Ra=ra)
-            cell.set_e_pas(v_rest_mV)
+            cell_theta = spec.apply_q(cell, q_log, v_rest_mV)
+            del cell_theta
             rmsds = []
             for b in train_bundles:
                 t_sim_s, v_sim = _simulate_square_subthreshold(
@@ -2900,9 +3100,11 @@ def _build_loss_function(
                     location = line.strip()
                     break
             warnings.warn(
-                f"Loss eval crashed: {type(e).__name__}: {e!s} | "
-                f"params (log): Cm={cm_log:.3g} Rm={rm_log:.3g} "
-                f"Ra={ra_log:.3g} | {location}"
+                "Loss eval crashed: %s: %s | params (q): %s | %s" % (
+                    type(e).__name__, e,
+                    ", ".join("%s=%.3g" % (n, v)
+                              for n, v in zip(spec.names, q_log)),
+                    location)
             )
             return 1e6
 
@@ -2915,6 +3117,7 @@ def _gp_parameter_uncertainty(
     delta_mV: float,
     n_samples: int,
     seed: int,
+    spec: "Optional[Any]" = None,
 ) -> Dict[str, float]:
     """Extract per-parameter uncertainty from the trained Gaussian-process
     surrogate.
@@ -2946,9 +3149,13 @@ def _gp_parameter_uncertainty(
     function never raises, because the optimiser is more important than
     the uncertainty estimate.
     """
-    nan_result = {"cm_sigma": float("nan"),
-                  "rm_sigma": float("nan"),
-                  "ra_sigma": float("nan")}
+    # Stage 3 (D-005): the key set follows the spec, so a 6-D fit reports
+    # six sigmas. `spec=None` keeps the legacy three keys verbatim.
+    if spec is None:
+        import param_spec as _ps
+        spec = _ps.PASSIVE_3D
+    _sig_keys = ["%s_sigma" % n.lower() for n in spec.names]
+    nan_result = {k: float("nan") for k in _sig_keys}
     try:
         gp = optim_result.models[-1]
         space = optim_result.space
@@ -2974,7 +3181,7 @@ def _gp_parameter_uncertainty(
     if len(kept) < 5:
         # Surrogate too sharp around the optimum; return zero rather than
         # an unstable estimate.
-        return {"cm_sigma": 0.0, "rm_sigma": 0.0, "ra_sigma": 0.0}
+        return {k: 0.0 for k in _sig_keys}
 
     # kept[:, i] are log-space values, so std is a log-space standard
     # deviation.  Interpretation: the physical parameter lies in the
@@ -2982,11 +3189,11 @@ def _gp_parameter_uncertainty(
     # equivalently [p_opt * exp(-sigma), p_opt * exp(+sigma)].
     # This is a multiplicative (log-normal) uncertainty, which is the
     # natural representation for positive scale parameters.
-    return {
-        "cm_sigma": float(np.std(kept[:, 0], ddof=1)),
-        "rm_sigma": float(np.std(kept[:, 1], ddof=1)),
-        "ra_sigma": float(np.std(kept[:, 2], ddof=1)),
-    }
+    # NOTE on the linear axes of a 6-D spec (dv_h): its "sigma" is then an
+    # ADDITIVE standard deviation in mV, not a multiplicative one. The unit
+    # of each entry is the unit of that axis's coordinate q, which
+    # ParamSpec.axis(name).log tells you.
+    return {k: float(np.std(kept[:, i], ddof=1)) for i, k in enumerate(_sig_keys)}
 
 
 # %% Cell 9 -- Validation status classifier =====================================
@@ -3034,6 +3241,7 @@ def fit_one_cell(
     cell_data: CellData,
     opt_in: OptimiserInputs,
     *,
+    spec: "Optional[Any]" = None,
     F: float = 1.9,
     n_calls: int = DEFAULT_N_CALLS,
     n_initial: int = DEFAULT_N_INITIAL,
@@ -3099,21 +3307,37 @@ def fit_one_cell(
         print(f"[fit_one_cell] specimen {sid} (L{layer} {dt_type}, F={F}): "
               f"fit_target={fit_target}, n_calls={n_calls}")
 
+    # --- Resolve the parameter vector (Stage 3, D-005) ---------------------
+    # `spec` wins; then a spec carried on the OptimiserInputs (what the I_h
+    # orchestrator sets); then the 3-D passive default, which reproduces the
+    # legacy behaviour exactly.
+    if spec is None:
+        spec = getattr(opt_in, "param_spec", None)
+    if spec is None:
+        import param_spec as _ps
+        spec = _ps.PASSIVE_3D
+
     # --- Build loss --------------------------------------------------------
     loss_raw = _build_loss_function(
         cell=cell,
         train_bundles=opt_in.train_bundles,
         v_rest_mV=opt_in.v_rest_mV,
         train_window_ms=opt_in.train_window_ms,
+        spec=spec,
     )
 
     # gp_minimize expects a function taking a list of params; use_named_args
-    # bridges to the named-Real dimensions.
+    # bridges to the named-Real dimensions. The dimensions come from the spec
+    # unless the OptimiserInputs already carries a matching set (the legacy
+    # 3-D path, where they are byte-identical).
     dims = opt_in.skopt_dimensions
+    if [getattr(d, "name", None) for d in dims] != list(spec.names):
+        dims = spec.as_skopt_dimensions()
+    _names = list(spec.names)
 
     @use_named_args(dims)
     def objective(**params) -> float:
-        return loss_raw(params["Cm"], params["Rm"], params["Ra"])
+        return loss_raw(*[params[n] for n in _names])
 
     # --- Run gp_minimize ---------------------------------------------------
     try:
@@ -3142,16 +3366,17 @@ def fit_one_cell(
             error_message=f"gp_minimize crashed: {type(e).__name__}: {e}",
         )
 
-    # result.x contains the log-space optima: exp() to recover physical units.
-    cm_opt = float(np.exp(result.x[0]))
-    rm_opt = float(np.exp(result.x[1]))
-    ra_opt = float(np.exp(result.x[2]))
+    # result.x holds the q-space optimum; the spec converts it back.
+    theta_opt = spec.to_physical(result.x)
+    cm_opt = float(theta_opt.get("Cm", float("nan")))
+    rm_opt = float(theta_opt.get("Rm", float("nan")))
+    ra_opt = float(theta_opt.get("Ra", float("nan")))
     train_rmsd = float(result.fun)
     if verbose:
-        print(f"[fit_one_cell]   best fit: Cm={cm_opt:.3f}  "
-              f"Rm={rm_opt:.0f}  Ra={ra_opt:.0f}  train RMSD={train_rmsd:.4f} mV"
-              f"  [log-space: {result.x[0]:.3f}, {result.x[1]:.3f}, "
-              f"{result.x[2]:.3f}]")
+        print("[fit_one_cell]   best fit: %s  train RMSD=%.4f mV  [q-space: %s]"
+              % (", ".join("%s=%.4g" % (n, theta_opt[n]) for n in spec.names),
+                 train_rmsd,
+                 ", ".join("%.3f" % float(x) for x in result.x)))
 
     # --- Noise estimation on TRAINING bundles -----------------------------
     # Computed once after the fit (not used by gp_minimize itself); needed
@@ -3194,8 +3419,7 @@ def fit_one_cell(
     valid_per_bundle: List[Tuple[str, float]] = []
     if opt_in.validation_bundles:
         try:
-            cell.set_passive(Cm=cm_opt, Rm=rm_opt, Ra=ra_opt)
-            cell.set_e_pas(opt_in.v_rest_mV)
+            spec.apply(cell, theta_opt, opt_in.v_rest_mV)
             for vb in opt_in.validation_bundles:
                 try:
                     r = _rmsd_for_validation_bundle(
@@ -3234,7 +3458,7 @@ def fit_one_cell(
     # docstring for the reason.
     sigmas = _gp_parameter_uncertainty(
         result, delta_mV=uncertainty_delta_mV,
-        n_samples=uncertainty_n_samples, seed=seed + 1,
+        n_samples=uncertainty_n_samples, seed=seed + 1, spec=spec,
     )
 
     # Convergence trace for plotting (running min of loss)
@@ -3250,6 +3474,7 @@ def fit_one_cell(
             cm_mle=cm_opt, rm_mle=rm_opt, ra_mle=ra_opt,
             train_window_ms=opt_in.train_window_ms,
             pre_stim_window_ms=getattr(opt_in, "pre_stim_window_ms", None),
+            spec=spec, theta_mle=theta_opt,
         )
     except Exception as _e:
         warnings.warn(f"[fit_one_cell] residual-noise estimation failed: {_e}")
@@ -3262,9 +3487,9 @@ def fit_one_cell(
         specimen_id=sid, layer=layer, dendrite_type=dt_type, F=F,
         fit_target=fit_target,
         cm_uF_per_cm2=cm_opt, rm_Ohm_cm2=rm_opt, ra_Ohm_cm=ra_opt,
-        cm_sigma=sigmas["cm_sigma"],
-        rm_sigma=sigmas["rm_sigma"],
-        ra_sigma=sigmas["ra_sigma"],
+        cm_sigma=sigmas.get("cm_sigma", float("nan")),
+        rm_sigma=sigmas.get("rm_sigma", float("nan")),
+        ra_sigma=sigmas.get("ra_sigma", float("nan")),
         train_rmsd_mV=train_rmsd,
         valid_rmsd_mV=valid_rmsd,
         valid_to_train_ratio=ratio,
@@ -3284,6 +3509,10 @@ def fit_one_cell(
         n_validation_bundles=len(valid_per_bundle),
         residuals_sigma_mV=residuals_sigma_mV,
         residuals_rho_lag1=residuals_rho_lag1,
+        # ----- generic parameter vector (Stage 3, D-005) -----
+        params=dict(theta_opt),
+        sigmas_by_name=dict(sigmas),
+        param_spec=spec,
         # ----- Phase-3 hand-off -----
         gp_result=result,
         neuron_cell=cell,

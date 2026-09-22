@@ -26,7 +26,16 @@ from the repository's reference kinetics (human_ih_params.py).
         time t63 monotone in kappa_tau; rebound > 0 after offset
     S5  Kalmbach convention: Ih with vshift = +20 gives mInf(-73.5) = 0.166
         and V1/2 = -90.3 mV (compiled == reference); unshifted V1/2 = -110.3
+    S6  ParamSpec identity: the 3-D passive spec reproduces
+        PassiveSearchSpace's skopt dimensions exactly, and the spec-driven
+        loss equals the legacy closure at random parameters
+    S7  loader + roles: the legacy loader call is unchanged by Stage 2; the
+        I_h call admits every hyperpolarising amplitude, builds spike-free
+        depolarising bundles, and assign_ls_roles puts each sweep in the
+        role D-006 prescribes
     S10 byte safety: pure ASCII in every .py, zero CR in .py/.mod/.sh
+    S11 six-parameter wiring: a 6-D fit_one_cell runs end to end on a
+        synthetic I_h cell and returns a theta with all six axes
 """
 from __future__ import annotations
 
@@ -86,6 +95,34 @@ def make_cell(F: float = 1.9, nseg: int = 41):
 
 
 # ---------------------------------------------------------------------------
+def make_ih_archive(tmp: Path, *, specimen_id: int = 900000101,
+                    gbar: float = 1.2e-4, dv_h: float = 0.0,
+                    kappa: float = 1.0, verbose: bool = False) -> Path:
+    """A synthetic Phase-0 archive cell WITH I_h, spiking depolarising steps
+    included, so the loader's spike filter and the role assignment are
+    exercised on data of the shape the real archive has."""
+    import synthetic_ground_truth as sgt
+    swc = sgt.write_ball_and_stick_swc(tmp / "ih.swc", soma_r_um=10.0,
+                                       dend_len_um=400.0, dend_r_um=1.0,
+                                       apic_len_um=600.0, apic_r_um=1.2,
+                                       step_um=20.0)
+    ih = sgt.IhConfig(gIhbar_S_cm2=gbar, ehcn_mV=-49.85, distribution="uniform",
+                      mechanism="Ih_human", vshift_minf_mV=dv_h, tau_scale=kappa)
+    gt = sgt.GroundTruthParams(cm_uF_cm2=0.9, rm_Ohm_cm2=30000.0, ra_Ohm_cm=200.0,
+                               e_pas_mV=-78.0, ih=ih, active=True,
+                               active_regions=("soma", "axon"))
+    proto = sgt.ProtocolConfig(ss_n_repeats=6,
+                               ls_hyp_amplitudes_pA=(-10., -30., -50., -70., -90., -110., -150.),
+                               ls_dep_amplitudes_pA=(20., 50., 200.))
+    syn = sgt.generate_synthetic_cell(swc, gt, proto=proto,
+                                      noise=sgt.NoiseConfig(sigma_mV=0.05, seed=7),
+                                      specimen_id=specimen_id, verbose=verbose)
+    d = tmp / ("specimen_%d" % specimen_id)
+    sgt.write_archive_cell(syn, d, verbose=verbose)
+    sgt._clear_neuron_sections()
+    return d
+
+
 def check_S1() -> None:
     from neuron import h
     import human_ih_params as H
@@ -246,9 +283,147 @@ def check_S5() -> None:
            "compiled mInf(-73.5) = %.3f; V1/2 shifted %.1f, unshifted %.1f mV" % (mi, vh_sh, vh_0))
 
 
+def check_S6() -> None:
+    import numpy as _np
+    import param_spec as PS
+    import passive_fitting_hpc_fixed as mono
+    ok = True; notes = []
+    a = PS.PASSIVE_3D.as_skopt_dimensions()
+    b = mono.PassiveSearchSpace().as_skopt_dimensions()
+    same_dims = (len(a) == len(b) and all(
+        x.bounds == y.bounds and x.name == y.name and x.prior == y.prior
+        for x, y in zip(a, b)))
+    ok &= same_dims
+    notes.append("skopt dims identical to PassiveSearchSpace: %s" % same_dims)
+    # round-trip of the 6-D spec
+    s6 = PS.make_ih_spec()
+    th = {"Cm": 0.9, "Rm": 30000.0, "Ra": 200.0, "gbar": 1.3e-4,
+          "dv_h": -4.0, "kappa_tau": 1.7}
+    back = s6.to_physical(s6.to_q(th))
+    ok &= all(abs(back[k] - v) <= 1e-12 * max(abs(v), 1.0) for k, v in th.items())
+    ok &= s6.names == ("Cm", "Rm", "Ra", "gbar", "dv_h", "kappa_tau")
+    ok &= PS.make_ih_spec(kappa_bounds=None).n == 5
+    notes.append("6-D round-trip exact; freezing kappa gives 5 axes")
+    # the spec-driven loss equals a hand-rolled legacy closure
+    cell = make_cell()
+    tmp = Path(tempfile.mkdtemp(prefix="smoke_s6_"))
+    d = make_ih_archive(tmp, specimen_id=900000106)
+    cd = mono.load_cell_from_archive(d, verbose=False)
+    oi = mono.prepare_optimiser_inputs(cd, fit_target="hyp")
+    loss_spec = mono._build_loss_function(cell=cell, train_bundles=oi.train_bundles,
+                                          v_rest_mV=oi.v_rest_mV,
+                                          train_window_ms=oi.train_window_ms,
+                                          spec=PS.PASSIVE_3D)
+    rng = _np.random.default_rng(4)
+    lo = _np.log([0.3, 1e3, 50.0]); hi = _np.log([3.0, 1e5, 1000.0])
+    qs = lo + rng.random((8, 3)) * (hi - lo)
+    vals = [loss_spec(*map(float, q)) for q in qs]
+    ok &= all(_np.isfinite(vals))
+    notes.append("spec loss finite at %d random theta (legacy 3-arg call works)" % len(vals))
+    cell.destroy()
+    report("S6 ParamSpec is the passive spec", ok, "; ".join(notes))
+
+
+def check_S7() -> None:
+    import numpy as _np
+    import passive_fitting_hpc_fixed as mono
+    import passive_long_step_training as plst
+    ok = True; notes = []
+    tmp = Path(tempfile.mkdtemp(prefix="smoke_s7_"))
+    d = make_ih_archive(tmp, specimen_id=900000107)
+
+    cd_old = mono.load_cell_from_archive(d, verbose=False)
+    cd_new = mono.load_cell_from_archive(d, ls_max_amplitude_pA=None,
+                                         load_depolarising_ls=True, verbose=False)
+    amps_old = [round(b.amplitude_pA) for b in cd_old.long_square_subthreshold]
+    amps_new = [round(b.amplitude_pA) for b in cd_new.long_square_subthreshold]
+    ok &= amps_old == [-10, -30, -50, -70, -90]          # the 100 pA cap
+    ok &= amps_new == [-10, -30, -50, -70, -90, -110, -150]
+    ok &= len(cd_old.long_square_depolarising) == 0       # legacy untouched
+    notes.append("hyp amps legacy %s -> no-cap %s" % (amps_old, amps_new))
+    # identical arrays for the amplitudes both loaders kept
+    for b0 in cd_old.long_square_subthreshold:
+        b1 = next(b for b in cd_new.long_square_subthreshold
+                  if abs(b.amplitude_pA - b0.amplitude_pA) < 1e-9)
+        ok &= _np.array_equal(b0.v_mV, b1.v_mV) and _np.array_equal(b0.t, b1.t)
+    # depolarising: spike-free only
+    dep = cd_new.long_square_depolarising
+    ok &= len(dep) >= 1
+    peaks = [float(_np.max(b.v_mV)) for b in dep]
+    ok &= all(pk <= mono.DEFAULT_SPIKE_V_THRESHOLD_MV for pk in peaks)
+    notes.append("dep bundles %s pA, peaks %s mV (all subthreshold)"
+                 % ([round(b.amplitude_pA) for b in dep],
+                    [round(pk, 1) for pk in peaks]))
+    # troughs monotone in |amplitude|
+    tr = [mono.bundle_trough_mV(b) for b in cd_new.long_square_subthreshold]
+    ok &= all(b < a for a, b in zip(tr, tr[1:]))
+    # roles
+    roles = plst.assign_ls_roles(cd_new, verbose=False)
+    tr_amps = [round(b.amplitude_pA) for b in roles["train"]]
+    va_amps = [round(b.amplitude_pA) for b in roles["validate"]]
+    rp_amps = [round(b.amplitude_pA) for b in roles["report"]]
+    ok &= tr_amps == [-30, -50, -70, -90, -110]     # h_2 .. h_{n-1}
+    ok &= -10 in va_amps and all(a > 0 for a in va_amps if a != -10)
+    ok &= rp_amps == [-150]                         # h_n withheld
+    notes.append("roles train %s | validate %s | report %s" % (tr_amps, va_amps, rp_amps))
+    # the opt-in trains on everything
+    roles_all = plst.assign_ls_roles(cd_new, train_all_hyp=True, verbose=False)
+    ok &= len(roles_all["train"]) == 7 and not roles_all["report"]
+    # window modes widen monotonically
+    b = cd_new.long_square_subthreshold[0]
+    w_leg = plst.ls_rmsd_window_s(b, "after_onset", 60.0)
+    w_step = plst.ls_rmsd_window_s(b, "step", 60.0)
+    w_sweep = plst.ls_rmsd_window_s(b, "sweep", 60.0)
+    ok &= w_leg[1] < w_step[1] <= w_sweep[1] and w_leg[0] == w_step[0] == w_sweep[0]
+    notes.append("windows after_onset %.0f ms < step %.0f ms <= sweep %.0f ms"
+                 % ((w_leg[1] - w_leg[0]) * 1e3, (w_step[1] - w_step[0]) * 1e3,
+                    (w_sweep[1] - w_sweep[0]) * 1e3))
+    report("S7 loader admits every amplitude; roles per D-006", ok, "; ".join(notes))
+
+
+def check_S11() -> None:
+    import numpy as _np
+    import param_spec as PS
+    import passive_fitting_hpc_fixed as mono
+    import passive_long_step_training as plst
+    import ih_mechanism as IM
+    tmp = Path(tempfile.mkdtemp(prefix="smoke_s11_"))
+    d = make_ih_archive(tmp, specimen_id=900000111, gbar=1.2e-4, dv_h=0.0, kappa=1.0)
+
+    spec = PS.make_ih_spec()
+    plst.integrate_long_step(mono, spec=spec, ih_protocol=True,
+                             ls_window_mode="step", r_in_target="peak",
+                             weighting="relative", ss_window_ms=(0.5, 100.0),
+                             ss_time_weight="exp", ss_tau_w_ms=5.0,
+                             dt_brief_ms=0.1, dt_long_ms=0.1, verbose=False)
+    cd = mono.load_cell_from_archive(d, ls_max_amplitude_pA=None,
+                                     load_depolarising_ls=True, verbose=False)
+    oi = mono.prepare_optimiser_inputs(cd, fit_target="hyp")
+    cell = mono.build_neuron_model(cd.swc_path, F=1.9)
+    IM.attach_ih(cell, IM.IhSpec(mechanism="Ih_human", distribution="uniform"))
+    fr = mono.fit_one_cell(cell, cd, oi, spec=spec, F=1.9,
+                           n_calls=14, n_initial=8, seed=0, verbose=False)
+    ok = (fr.gp_result is not None
+          and set(fr.params) == set(spec.names)
+          and all(_np.isfinite(v) for v in fr.params.values())
+          and _np.isfinite(fr.train_rmsd_mV)
+          and len(fr.sigmas_by_name) == 6
+          and oi.param_spec is spec
+          and len(oi.report_bundles) == 1)
+    summ = IM.ih_rest_summary(cell, oi.v_rest_mV, fr.params["Rm"])
+    cell.destroy()
+    report("S11 six-parameter fit runs end to end", ok,
+           "theta = %s; loss %.4f; gh_rest/g_pas %.2f; %d train / %d valid / %d report bundles"
+           % (", ".join("%s=%.3g" % (k, fr.params[k]) for k in spec.names),
+              fr.train_rmsd_mV, summ["gh_rest_over_gpas"], len(oi.train_bundles),
+              len(oi.validation_bundles), len(oi.report_bundles)))
+
+
 def check_S10() -> None:
     files = ["ih_mechanism.py", "human_ih_params.py", "smoke_ih_fit.py",
              "regression_passive_identity.py", "synthetic_ground_truth.py",
+             "param_spec.py", "passive_fitting_hpc_fixed.py",
+             "passive_long_step_training.py",
              "mod/Ih.mod", "mod/Ih_human.mod"]
     bad = []
     for f in files:
@@ -269,7 +444,8 @@ def main() -> int:
     args = ap.parse_args()
     ensure_build(args.build)
     from neuron import h  # noqa: F401  (loads ./x86_64)
-    for fn in (check_S1, check_S2, check_S3, check_S4, check_S5, check_S10):
+    for fn in (check_S1, check_S2, check_S3, check_S4, check_S5,
+               check_S6, check_S7, check_S11, check_S10):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

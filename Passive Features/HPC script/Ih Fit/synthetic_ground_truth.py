@@ -115,6 +115,17 @@ class IhConfig:
     ehcn_mV: float = -45.0
     distribution: str = "uniform"            # "uniform" | "hay_exponential"
     regions: Tuple[str, ...] = ("soma", "dend", "apic")
+    # -- the three RANGE knobs of the campaign mod files (Stage 1, D-005) --
+    # Defaults reproduce the published kinetics exactly, so every manifest
+    # written before 2026-09-22 generates the same ground truth as before.
+    #   vshift_mV      configuration shift of BOTH curves (+20 on "Ih"
+    #                  reproduces Kalmbach 2018); NOT a fitted parameter
+    #   vshift_minf_mV the ground-truth Delta v_h: shift of the ACTIVATION
+    #                  curve only, positive = more activation at a given v
+    #   tau_scale      the ground-truth kappa_tau on mTau
+    vshift_mV: float = 0.0
+    vshift_minf_mV: float = 0.0
+    tau_scale: float = 1.0
     # NMODL SUFFIX of the h-current mechanism to insert.
     #   "Ih"       -> Kole, Hallermann & Stuart (2006) rat L5 kinetics, used
     #                 unaltered in Hay et al. (2011). LEGACY DEFAULT.
@@ -336,6 +347,14 @@ class SyntheticPassiveCell:
                 else:
                     mobj.gIhbar = float(ih.gIhbar_S_cm2)
                 mobj.ehcn = float(ih.ehcn_mV)
+                # The campaign mod files expose three extra RANGE knobs; an
+                # older Ih.mod has none of them, so each is set only if the
+                # compiled mechanism actually carries it.
+                for _attr, _val in (("vshift", getattr(ih, "vshift_mV", 0.0)),
+                                    ("vshift_minf", getattr(ih, "vshift_minf_mV", 0.0)),
+                                    ("tau_scale", getattr(ih, "tau_scale", 1.0))):
+                    if hasattr(mobj, _attr):
+                        setattr(mobj, _attr, float(_val))
 
     # ---- public API (identical signature to PassiveCell) ----
     def set_passive(self, Cm: float, Rm: float, Ra: float) -> None:
