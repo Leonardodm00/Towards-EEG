@@ -4,7 +4,10 @@ Two array jobs live here. **P1** (`run_p1_export.py`, section 8) partitions,
 exports, aligns and gates one cell per array task, headless, from a manifest
 of (cell, layer, exc/inh). **P2** (`run_spine_area_F.py`, sections 3-7) is the
 calibrated dendritic-spine membrane area from the H01 segmentation, substituted
-into Stage 1's phi table, giving a mesh-based `F` per cell.
+into Stage 1's phi table, giving a mesh-based `F` per cell. **`campaign.pbs`
+(section 11) runs P1 -> P2 -> P3 for every cell of a population from ONE
+submission** (decision D-004): that is the way to launch a population; the
+two stage scripts remain for re-running one stage by hand.
 
 `run_p1_export v1.0` (rev 1.0.1) | `p1_spine_stats v1.0` | `p1_hoc_audit v1.0` | `build_p1_manifest v1.1` | `soma_census v1.0`
 `h01_spine_area_F v1.7` | `run_spine_area_F v1.3` | `merge_spine_area_F v1.1` | `h01_spine_base v1.2`
@@ -38,12 +41,15 @@ into Stage 1's phi table, giving a mesh-based `F` per cell.
 | `sma_run.py`, `s0_ingest.py`, `shaft_continuation.py` | Stage 0/1 glue |
 | `run_spine_area_F.py` | one array task |
 | `merge_spine_area_F.py` | union the shards, assemble F |
+| `campaign.pbs` | **the population launcher**: one PBS array runs P1, P2 and P3 per cell (index = row x shard); D-004, section 11 |
+| `campaign_join.py` | one table per (cell, passive tree) with `F_lit_skel_p1` AND `F_lit_deliverable` side by side, never confused (section 11.3) |
+| `smoke_test_campaign_join.py` | 22 checks: the join, NaN where no P3, both inh trees to one mesh F, refusals |
 | `spine_area_F.pbs` | PBS Pro array job; reads the g table from `h01_code`, activation block copied from `run_smoke_tests.sh` |
 | `probe_net.pbs` | compute-node network diagnostic (absolute interpreter path) |
 | `run_smoke_tests.sh` | runs every `smoke_test_*.py`, on the login node or via `qsub` |
 | `stage1_link.sh` | assembles `stage1/` as symlinks to the canonical Stage 1 modules |
 | `smoke_test_h01_spine_area_F.py` | 112 checks (4 skip without the figure module) |
-| `smoke_test_hpc_runner.py` | 57 checks: runner + merger end to end, plus section B: the job scripts parsed and run against a fixture with a stub conda |
+| `smoke_test_hpc_runner.py` | 98 checks: runner + merger end to end, section B: the job scripts parsed and run against a fixture with a stub conda, section C: `campaign.pbs` at non-trivial (N, S) with the argv of all three stages asserted |
 | `smoke_test_p0_partition.py`, `smoke_test_p3_assemble.py` | 9 and 14 checks |
 | `g_table_cyl_2deg.npz` + `.json` | the v7 cylinder calibration |
 
@@ -99,7 +105,7 @@ is not. Keeping data out of the repo keeps `git status` clean between runs.
 cd h01_code && bash run_smoke_tests.sh
 ```
 
-Expect `passed 7/7` and `ALL SUITES PASSED`. It activates `spine_env`
+Expect `passed 8/8` and `ALL SUITES PASSED`. It activates `spine_env`
 (`H01_ENV=other_env` to choose another; a stale `ENV_NAME` exported by the
 login shell is reported and ignored, like `CODE` and `ROOT`), checks and
 repairs the `stage1/` symlink farm, then runs every `smoke_test_*.py`. All
@@ -474,3 +480,126 @@ P2 output.
 The population figure's `F_lit` panel is P1's skeleton F for the same reason,
 and its axis says so. The deliverable F is `F_lit_deliverable` in P3's
 `spine_area_F_summary.csv`, never this column.
+
+---
+
+## 11. The campaign: one submission per population (`campaign.pbs`, D-004)
+
+**Decision D-004 (2026-09-22):** launching one job must run the whole
+pipeline -- P1, then P2, then P3 -- for every cell of the population, and the
+spine area of every cell is the **mesh** measurement, `mesh_beyond`. The other
+variants are comparison only. Running the stages as three separate
+submissions is how the skeleton bracket ended up reported as F; this script
+removes that path.
+
+### 11.1 How the array is laid out
+
+`campaign.pbs` decomposes `PBS_ARRAY_INDEX` over (manifest row, shard):
+
+```
+N = manifest rows, S = SHARDS (default 1)       qsub -J 0-(N*S-1)
+ROW   = index / S     the cell (0-based manifest row = P1 --task)
+SHARD = index % S     the P2 shard of that cell (= P2 --task, --ntasks S)
+```
+
+| stage | runs on | argv it receives |
+|---|---|---|
+| P1 `run_p1_export.py` | shard 0 of every cell | `--task ROW --manifest M --passive-table --out-dir`, `--stage1-dir $H01_CODE/stage1` |
+| P2 `run_spine_area_F.py` | every shard | `--cell <row's cell_id> --task SHARD --ntasks S`, `--stage1-dir` and `--g-table` under `$H01_CODE` |
+| P3 `merge_spine_area_F.py` | the same task when S = 1; a dependent array with `PHASE=merge` when S > 1 | `--cell --ntasks S --deliverable mesh_beyond`, `--stage1-dir` and `--g-table` under `$H01_CODE` (its `resolve()` needs both -- the handoff sketch omitted `--g-table` and would have died there) |
+
+The cell id of every stage is read from the same manifest row, so P1's
+`--task` and P2/P3's `--cell` cannot drift. `module load proxy` runs once,
+between P1 and P2. A P1 error stops that cell before P2 (exit 1, cell
+named); a P2 error stops it before P3, so no merge ever runs on a dead
+shard. `--allow-missing` is never passed. All three stages resume, so
+re-submitting an index after a walltime kill is nearly free.
+
+**Start with S = 1** (one task per cell, everything in it, no dependent
+job). Move to S > 1 only if section 11.4's arithmetic says a cell does not
+fit the 12 h walltime.
+
+### 11.2 Submitting
+
+Per population, from `h01_code`, with its own `-N`, `-o` and `-J`:
+
+```
+python3 build_p1_manifest.py --root ../h01 --layer L3 --cell-type exc --ids-file populations/L3_exc.txt --allow-unbanked --out ../h01/p1/manifests/L3_exc.csv   # prints -J 0-536
+qsub -N camp_L3exc -o logs/camp_L3exc.log -J 0-536 -v MANIFEST=../h01/p1/manifests/L3_exc.csv campaign.pbs
+```
+
+With `SHARDS=4` the array is `-J 0-2147` and the merge follows as a
+dependent array of the same script:
+
+```
+qsub -N camp_L3exc  -o logs/camp_L3exc.log  -J 0-2147 -v MANIFEST=../h01/p1/manifests/L3_exc.csv,SHARDS=4 campaign.pbs
+qsub -N merge_L3exc -o logs/merge_L3exc.log -J 0-536  -W depend=afterokarray:<jobid[]> -v MANIFEST=../h01/p1/manifests/L3_exc.csv,SHARDS=4,PHASE=merge campaign.pbs
+```
+
+**Interneurons (D-003 x D-004).** Spine area is geometry and does not depend
+on (cm, Ra), so P2/P3 run **once per cell** into `h01/out/`, whichever P1
+tree they were launched with. Submit ONE variant through `campaign.pbs` and
+the other through `p1_export.pbs` (P1 only):
+
+```
+qsub -N camp_L2inh_SST -o logs/camp_L2inh_SST.log -J 0-217 -v MANIFEST=../h01/p1/manifests/L2_inh.csv,PASSIVE_TABLE=passive_params_inh_SST.csv,OUT_DIR=p1_inh_SST campaign.pbs
+qsub -N p1_L2inh_PVVIP -o logs/p1_L2inh_PVVIP.log -J 0-217 -v MANIFEST=../h01/p1/manifests/L2_inh.csv,PASSIVE_TABLE=passive_params_inh_PVVIP.csv,OUT_DIR=p1_inh_PVVIP p1_export.pbs
+```
+
+Knobs: `MANIFEST` (required), `SHARDS`, `PHASE=all|merge`, `PASSIVE_TABLE`,
+`OUT_DIR` (P1 only), `DRY_RUN=1` (P1 and P2 dry-run, P3 skipped),
+`FORCE=1`, `NO_RIGIDITY=1`, `NO_NEURON_VALIDATE=1` (P1 only), `SUBSET`,
+`MIN_SPINE_VALUE`, `NO_MEASURE_BASE` (P2 **and** P3 -- fingerprint knobs),
+`MIN_COVERAGE` (P3), plus `H01_ROOT`, `H01_CODE`, `H01_ENV`. A task whose
+row is past the manifest refuses and prints the `-J` width to use.
+
+Dry run first, one index in the foreground (no queue slot):
+
+```
+PBS_ARRAY_INDEX=0 DRY_RUN=1 MANIFEST=../h01/p1/manifests/L3_exc.csv bash campaign.pbs
+```
+
+Expect the banner `index 0 -> row 0 shard 0/1 | cell 1302789404`, then
+`=== P1 export`, `DRY RUN: inputs and constants resolved`, `=== P2 measure`,
+the P2 dry-run shard plan with g-table sha `b4daf2f6815d`, and
+`=== P3 merge SKIPPED (DRY_RUN)`.
+
+### 11.3 Which F is which, and the join
+
+| file | written by | its F |
+|---|---|---|
+| `<tree>/<id>/neuron_<id>_phi.csv`, `..._p1.json`, `<tree>/p1_summary.csv` | P1 | `F_lit` = **skeleton frustums**, the comparison bracket; never updated by P3 |
+| `out/neuron_<id>_phi_mesh.csv`, `out/spine_area_F_summary.csv` | P3 | `F_lit_deliverable` (`deliverable_variant = mesh_beyond`) -- **the F** |
+
+`p1_summary.csv`'s `F_lit` will always be the skeleton. So after the array:
+
+```
+python3 run_p1_export.py --root ../h01 --summarise --manifest ../h01/p1/manifests/L3_exc.csv    # per tree: --out-dir ../h01/p1_inh_SST
+python3 campaign_join.py --root ../h01 --require-complete
+```
+
+`campaign_join.py` writes `out/campaign_F.csv`, one row per (cell, P1 tree),
+with `F_lit_skel_p1` and `F_lit_deliverable` side by side and `p3_present`
+saying which cells have a mesh F. Where P3 is absent `F_lit_deliverable` is
+NaN -- it is never filled from the skeleton. A P3 row whose variant is not
+`mesh_beyond` is refused outright (`--deliverable` to change the expectation,
+never to mix). `--require-complete` exits 1 listing the cells still without
+a P3 row. An interneuron's one P3 row joins to both of its trees.
+
+### 11.4 Sizing S and the walltime (still open)
+
+Seconds per spine on a warm ROI cache has never been measured; the 2.3 s on
+record is a cold block read. Measure it with one cell first:
+
+```
+qsub -N p2_probe -o logs/p2_probe.log -J 0-0 -v MANIFEST=../h01/p1/manifests/L3_exc.csv,SUBSET=300 campaign.pbs
+```
+
+Then per-cell wall time = spines x rate / S, against the 12 h walltime;
+`p1_summary.csv`'s `n_spines` gives the spine counts. Check the queue caps
+(`qstat -Qf cpu | grep -i max`) before the first `N*S` array.
+
+What the orchestrator does NOT decide (D-004, open): the coverage policy for
+a cell whose `fallback_area_frac_deliverable` is high (a hybrid, not a
+measurement; `--min-coverage` 0.99 only flags it), and the
+`shaft_terminates` policy. Both live in P3's numbers, not in the launch.

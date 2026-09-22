@@ -26,6 +26,16 @@ received, on which env's interpreter ran, and on every refusal path.
 run_smoke_tests.sh gets the text checks, probe_net.pbs the same treatment.
 Needs bash on PATH (the cluster and the sandbox both have it); no network.
 
+Section C (2026-09-22, decision D-004) tests campaign.pbs, the orchestrator
+that runs P1 -> P2 -> P3 for every cell of a population from ONE submission:
+the (row, shard) decomposition of PBS_ARRAY_INDEX, P1 on shard 0 only, the
+cell id of every stage read from the same manifest row, --stage1-dir and
+--g-table under H01_CODE in every call, --deliverable mesh_beyond explicit
+and --allow-missing absent, the fingerprint knobs mirrored to P2 and P3, the
+deferred merge (SHARDS > 1) and PHASE=merge, DRY_RUN, a P1 failure stopping
+the cell before P2, and every refusal (MANIFEST, SHARDS, PHASE, an index
+past the manifest, a non-integer cell id, a bad first column).
+
 Pure ASCII, LF only.
 """
 
@@ -228,8 +238,20 @@ JOB_CELL = 424242
 _ARGV_N = [0]
 
 STUB_PY = """#!/bin/bash
-# stub python3 for the job-script test: records argv, runs nothing
+# stub python3 for the job-script test: records argv, runs nothing.
+# STUB_FAIL_ON=<script.py> makes that one invocation exit 1 (section C).
 printf '%s\\n' "$@" >> "$STUB_ARGV_OUT"
+if [ -n "${STUB_FAIL_ON:-}" ] && [ "$1" = "$STUB_FAIL_ON" ]; then
+    echo "STUB: failing $1 on request"
+    exit 1
+fi
+exit 0
+"""
+
+# `module load proxy` on a compute node; here a stub that only says it ran,
+# so section C can assert it precedes P2 and nothing else.
+STUB_MODULE = """#!/bin/bash
+echo "STUB module $*"
 exit 0
 """
 
@@ -296,6 +318,7 @@ def job_fixture(tmp, with_table=True):
         _write_exec(os.path.join(d, "python3"), STUB_PY)
     _write_exec(os.path.join(fx, "bin", "conda"), STUB_CONDA)
     _write_exec(os.path.join(fx, "bin", "curl"), STUB_CURL)
+    _write_exec(os.path.join(fx, "bin", "module"), STUB_MODULE)
     return fx, code, root
 
 
@@ -309,7 +332,9 @@ def run_job(script, fx, code, root, extra_env):
     path = os.path.join(fx, "bin") + os.pathsep + os.environ.get("PATH", "")
     drop = ("CODE", "ROOT", "CELL", "SUBSET", "NTASKS", "DRY_RUN", "SKIP_CONDA",
             "ENV_NAME", "MIN_SPINE_VALUE", "NO_MEASURE_BASE", "STUB_ARGV_OUT",
-            "STUB_ENVS")
+            "STUB_ENVS", "STUB_FAIL_ON", "MANIFEST", "SHARDS", "PHASE",
+            "PASSIVE_TABLE", "OUT_DIR", "FORCE", "NO_RIGIDITY",
+            "NO_NEURON_VALIDATE", "MIN_COVERAGE")
     env = {k: v for k, v in os.environ.items()
            if not (k in drop or k.startswith("H01_") or k.startswith("PBS_")
                    or k.startswith("CONDA"))}
@@ -510,6 +535,313 @@ def job_script_checks(code_dir, tmp):
     rc, out, argv = run_job(probe_path, fx, os.path.join(fx, "nope"), root, {})
     check("B8' probe_net.pbs refuses an H01_CODE that is not h01_code",
           rc != 0 and "PROBE FATAL" in out)
+
+
+# ---------------------------------------------------------------------------
+# Section C: campaign.pbs (decision D-004, 2026-09-22). One submission must
+# leave every cell of a population complete -- P1, P2 and P3 -- with the mesh
+# spine area as THE F. The script decomposes PBS_ARRAY_INDEX into (manifest
+# row, shard), so the checks below assert the argv of all three interpreter
+# calls at non-trivial (N, S), not merely that bash exited 0.
+# ---------------------------------------------------------------------------
+CAMPAIGN = "campaign.pbs"
+CAMPAIGN_CELLS = (1302789404, 1317492596, 1333261412)
+CAMPAIGN_SCRIPTS = ("run_p1_export.py", "run_spine_area_F.py", "merge_spine_area_F.py")
+
+
+def campaign_fixture(tmp, cells=CAMPAIGN_CELLS, first_col="cell_id"):
+    """job_fixture plus what campaign.pbs checks for: the two other drivers,
+    a passive table, and a three-row manifest under H01_ROOT/p1/manifests."""
+    fx, code, root = job_fixture(tmp)
+    for name in ("run_p1_export.py", "merge_spine_area_F.py"):
+        open(os.path.join(code, name), "w").close()
+    with open(os.path.join(code, "passive_params.csv"), "w") as fh:
+        fh.write("layer,cell_type,cm_uF_cm2,Ra_ohm_cm\nL3,exc,0.5,268.5\n")
+    mdir = os.path.join(root, "p1", "manifests")
+    os.makedirs(mdir, exist_ok=True)
+    man = os.path.join(mdir, "L3_exc.csv")
+    with open(man, "w") as fh:
+        fh.write("%s,layer,cell_type,neuron_csv,alignment_metadata,synapse_csv,layer_source\n"
+                 % first_col)
+        for c in cells:
+            fh.write("%s,L3,exc,neurons/neuron_%s.csv,neurons/alignment_metadata_L3.csv,"
+                     "synapses/neuron_%s_synapses.csv,bank\n" % (c, c, c))
+    return fx, code, root, man
+
+
+def split_calls(argv):
+    """The stub appends every invocation's argv to one file; split it back
+    into one list per interpreter call, keyed by script name (in order)."""
+    calls = []
+    for a in argv:
+        if a in CAMPAIGN_SCRIPTS:
+            calls.append([a])
+        elif calls:
+            calls[-1].append(a)
+    return calls
+
+
+def _scripts(calls):
+    return [c[0] for c in calls]
+
+
+def campaign_checks(code_dir, tmp):
+    pbs_path = os.path.join(code_dir, CAMPAIGN)
+    text = open(pbs_path).read()
+    lines = text.splitlines()
+    live = [ln for ln in lines if not ln.lstrip().startswith("#")]
+
+    # ---- C1 text: the same three guards as spine_area_F.pbs / p1_export.pbs
+    i_hook = _first_line(lines, 'eval "$(conda shell.bash hook)"')
+    i_act = _first_line(lines, 'conda activate "$H01_ENV"', i_hook + 1)
+    i_pe = _first_line(lines, "set +e")
+    i_pu = _first_line(lines, "set +u")
+    i_me = _first_line(lines, "set -e", i_act + 1)
+    i_mu = _first_line(lines, "set -u", i_act + 1)
+    check("C1 campaign.pbs activation block: +u/+e before the hook, -e/-u after activate",
+          0 <= i_pu < i_hook and 0 <= i_pe < i_hook and i_hook < i_act
+          and i_act < i_me and i_act < i_mu)
+    check("C1a campaign.pbs: outcome check, H01_ENV knob, ENV_NAME reported not read",
+          '*"/envs/$H01_ENV/"*)' in text and "did not take effect" in text
+          and 'H01_ENV="${H01_ENV:-spine_env}"' in text
+          and "NOTE: ENV_NAME is set" in text
+          and "${ENV_NAME:-spine_env}" not in text
+          and 'conda activate "$ENV_NAME"' not in text)
+    check("C1b campaign.pbs: path knobs H01_ROOT / H01_CODE, stale CODE/ROOT reported",
+          '"${H01_CODE:-' in text and '"${H01_ROOT:-' in text
+          and "for _stale in ROOT CODE" in text)
+    check("C1c campaign.pbs: --allow-missing appears NOWHERE (a dead shard fails the merge)",
+          "--allow-missing" not in text)
+    check("C1d campaign.pbs: --deliverable is mesh_beyond, explicitly, in live code (D-004)",
+          any("--deliverable mesh_beyond" in ln for ln in live)
+          and not any("--deliverable" in ln and "mesh_beyond" not in ln for ln in live))
+    check("C1e campaign.pbs: g table checked before python, MANIFEST is :? required",
+          'if [ ! -f "$H01_CODE/g_table_cyl_2deg.npz" ]' in text
+          and 'MANIFEST="${MANIFEST:?' in text)
+    rc = subprocess.run(["bash", "-n", pbs_path], stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT, universal_newlines=True)
+    raw = open(pbs_path, "rb").read()
+    check("C1f campaign.pbs: bash -n passes, LF only, pure ASCII",
+          rc.returncode == 0 and b"\r" not in raw and all(b < 128 for b in raw),
+          rc.stdout.strip()[:80])
+
+    # ---- C2 the decomposition at (N=3, S=4): index 5 -> row 1, shard 1
+    fx, code, root, man = campaign_fixture(tmp)
+    stage1 = os.path.join(code, "stage1")
+    gtab = os.path.join(code, "g_table_cyl_2deg.npz")
+    base = {"SKIP_CONDA": "1", "MANIFEST": man}
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            dict(base, SHARDS="4", PBS_ARRAY_INDEX="5"))
+    calls = split_calls(argv)
+    check("C2 (N=3,S=4) index 5 -> row 1 shard 1: P2 only, cell = manifest row 1",
+          rc == 0 and _scripts(calls) == ["run_spine_area_F.py"]
+          and _argval(calls[0], "--cell") == str(CAMPAIGN_CELLS[1])
+          and _argval(calls[0], "--task") == "1" and _argval(calls[0], "--ntasks") == "4"
+          and "row 1 shard 1/4" in out,
+          "rc=%d scripts=%s\n%s" % (rc, _scripts(calls), out[-400:]))
+    check("C2a P1 does NOT run on shard 1", "run_p1_export.py" not in _scripts(calls))
+    check("C2b with S > 1 the merge is deferred; the hint names PHASE=merge and -J 0-2",
+          "merge_spine_area_F.py" not in _scripts(calls)
+          and "P3 merge deferred" in out and "PHASE=merge" in out and "-J 0-2" in out)
+    # index 8 -> row 2, shard 0: P1 then P2, same cell in both, P3 deferred
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            dict(base, SHARDS="4", PBS_ARRAY_INDEX="8"))
+    calls = split_calls(argv)
+    p1 = calls[0] if calls else []
+    p2 = calls[1] if len(calls) > 1 else []
+    check("C3 (N=3,S=4) index 8 -> row 2 shard 0: P1 then P2, in that order",
+          rc == 0 and _scripts(calls) == ["run_p1_export.py", "run_spine_area_F.py"],
+          "rc=%d scripts=%s\n%s" % (rc, _scripts(calls), out[-400:]))
+    check("C3a P1 --task is the manifest row (2) and P2 --cell is that row's cell id",
+          _argval(p1, "--task") == "2" and _argval(p1, "--manifest") == man
+          and _argval(p2, "--cell") == str(CAMPAIGN_CELLS[2])
+          and _argval(p2, "--task") == "0" and _argval(p2, "--ntasks") == "4",
+          "p1=%s p2=%s" % (p1, p2))
+    check("C3b P1 receives --root, --stage1-dir under H01_CODE, the passive table, --out-dir root/p1, -v",
+          _argval(p1, "--root") == root and _argval(p1, "--stage1-dir") == stage1
+          and _argval(p1, "--passive-table") == os.path.join(code, "passive_params.csv")
+          and _argval(p1, "--out-dir") == os.path.join(root, "p1") and "-v" in p1
+          and "--force" not in p1 and "--dry-run" not in p1)
+    check("C3c P2 receives --stage1-dir and --g-table under H01_CODE, no --subset/--dry-run",
+          _argval(p2, "--root") == root and _argval(p2, "--stage1-dir") == stage1
+          and _argval(p2, "--g-table") == gtab
+          and "--subset" not in p2 and "--dry-run" not in p2)
+    o_lines = out.splitlines()
+    i_p1 = next((i for i, ln in enumerate(o_lines) if ln.startswith("=== P1 export")), -1)
+    i_mod = next((i for i, ln in enumerate(o_lines) if ln.startswith("STUB module load proxy")), -1)
+    i_p2 = next((i for i, ln in enumerate(o_lines) if ln.startswith("=== P2 measure")), -1)
+    check("C3d module load proxy runs after P1 and before P2 (once)",
+          0 <= i_p1 < i_p2 <= i_mod
+          and sum(1 for ln in o_lines if ln.startswith("STUB module load proxy")) == 1,
+          "p1 %d p2 %d module %d" % (i_p1, i_p2, i_mod))
+
+    # ---- C4 S=1 (the default): P1, P2, P3 in one task, all on the same cell
+    rc, out, argv = run_job(pbs_path, fx, code, root, dict(base, PBS_ARRAY_INDEX="1"))
+    calls = split_calls(argv)
+    check("C4 SHARDS unset -> S=1: P1, P2, P3 run in one task, in order",
+          rc == 0 and _scripts(calls) == list(CAMPAIGN_SCRIPTS),
+          "rc=%d scripts=%s\n%s" % (rc, _scripts(calls), out[-400:]))
+    if len(calls) == 3:
+        p1, p2, p3 = calls
+        check("C4a the same cell in all three: P1 row 1, P2/P3 --cell = that row's id",
+              _argval(p1, "--task") == "1"
+              and _argval(p2, "--cell") == str(CAMPAIGN_CELLS[1])
+              and _argval(p3, "--cell") == str(CAMPAIGN_CELLS[1])
+              and _argval(p2, "--ntasks") == "1" and _argval(p3, "--ntasks") == "1")
+        check("C4b P3 receives --stage1-dir AND --g-table under H01_CODE (its resolve() needs both), "
+              "--deliverable mesh_beyond, no --allow-missing, no --min-coverage unless asked",
+              _argval(p3, "--root") == root and _argval(p3, "--stage1-dir") == stage1
+              and _argval(p3, "--g-table") == gtab
+              and _argval(p3, "--deliverable") == "mesh_beyond"
+              and "--allow-missing" not in p3 and "--min-coverage" not in p3, str(p3))
+    else:
+        check("C4a (skipped: three calls expected)", False)
+        check("C4b (skipped: three calls expected)", False)
+
+    # ---- C5 the fingerprint knobs reach P2 AND P3; P1-only knobs stay on P1
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            dict(base, PBS_ARRAY_INDEX="0", SUBSET="300",
+                                 MIN_SPINE_VALUE="1.5", NO_MEASURE_BASE="1",
+                                 MIN_COVERAGE="0.9", FORCE="1", NO_RIGIDITY="1",
+                                 NO_NEURON_VALIDATE="1"))
+    calls = split_calls(argv)
+    if rc == 0 and len(calls) == 3:
+        p1, p2, p3 = calls
+        check("C5 SUBSET / MIN_SPINE_VALUE / NO_MEASURE_BASE mirrored to P2 and P3 identically",
+              all(_argval(c, "--subset") == "300" and _argval(c, "--min-spine-value") == "1.5"
+                  and "--no-measure-base" in c for c in (p2, p3))
+              and "--subset" not in p1)
+        check("C5a MIN_COVERAGE reaches P3 only; FORCE / NO_RIGIDITY / NO_NEURON_VALIDATE reach P1 only",
+              _argval(p3, "--min-coverage") == "0.9" and "--min-coverage" not in p2
+              and "--force" in p1 and "--no-rigidity-control" in p1
+              and "--no-neuron-validate" in p1
+              and not any("--force" in c or "--no-rigidity-control" in c for c in (p2, p3)))
+    else:
+        check("C5 (run failed: rc=%d, %d calls)" % (rc, len(calls)), False, out[-300:])
+        check("C5a (run failed)", False)
+
+    # ---- C6 DRY_RUN: --dry-run to P1 and P2, P3 skipped with a reason
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            dict(base, PBS_ARRAY_INDEX="0", DRY_RUN="1"))
+    calls = split_calls(argv)
+    check("C6 DRY_RUN=1: P1 and P2 get --dry-run, P3 is skipped and says why",
+          rc == 0 and _scripts(calls) == ["run_p1_export.py", "run_spine_area_F.py"]
+          and all("--dry-run" in c for c in calls) and "P3 merge SKIPPED (DRY_RUN)" in out,
+          "rc=%d scripts=%s" % (rc, _scripts(calls)))
+
+    # ---- C7 PHASE=merge: index = row, P3 only, --ntasks = SHARDS
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            dict(base, SHARDS="4", PHASE="merge", PBS_ARRAY_INDEX="2"))
+    calls = split_calls(argv)
+    check("C7 PHASE=merge, S=4, index 2: P3 only, --cell = row 2, --ntasks 4, no module load",
+          rc == 0 and _scripts(calls) == ["merge_spine_area_F.py"]
+          and _argval(calls[0], "--cell") == str(CAMPAIGN_CELLS[2])
+          and _argval(calls[0], "--ntasks") == "4"
+          and _argval(calls[0], "--deliverable") == "mesh_beyond"
+          and "STUB module" not in out,
+          "rc=%d scripts=%s\n%s" % (rc, _scripts(calls), out[-300:]))
+
+    # ---- C8 a P1 failure stops the cell before P2 (and the task exits 1)
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            dict(base, PBS_ARRAY_INDEX="0", STUB_FAIL_ON="run_p1_export.py"))
+    calls = split_calls(argv)
+    check("C8 P1 exits 1 -> the task exits non-zero, names the cell, and P2/P3 never run",
+          rc != 0 and _scripts(calls) == ["run_p1_export.py"]
+          and "P1 export failed for cell %d" % CAMPAIGN_CELLS[0] in out,
+          "rc=%d scripts=%s" % (rc, _scripts(calls)))
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            dict(base, PBS_ARRAY_INDEX="0", STUB_FAIL_ON="run_spine_area_F.py"))
+    calls = split_calls(argv)
+    check("C8a P2 exits 1 -> the task exits non-zero and P3 never runs (no silent merge)",
+          rc != 0 and _scripts(calls) == ["run_p1_export.py", "run_spine_area_F.py"],
+          "rc=%d scripts=%s" % (rc, _scripts(calls)))
+
+    # ---- C9 refusals, each before any interpreter call
+    rc, out, argv = run_job(pbs_path, fx, code, root, {"SKIP_CONDA": "1"})
+    check("C9 unset MANIFEST: refused naming the knob, python never invoked",
+          rc != 0 and "MANIFEST" in out and argv == [], "rc=%d" % rc)
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            dict(base, MANIFEST=os.path.join(root, "nope.csv")))
+    check("C9a missing manifest file: refused", rc != 0 and "does not exist" in out and argv == [])
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            dict(base, SHARDS="4", PBS_ARRAY_INDEX="12"))
+    check("C9b index past the manifest (N=3,S=4, index 12): refused, names -J 0-11",
+          rc != 0 and "-J 0-11" in out and argv == [], out[-200:])
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            dict(base, SHARDS="4", PHASE="merge", PBS_ARRAY_INDEX="3"))
+    check("C9c PHASE=merge index past N: refused", rc != 0 and argv == [])
+    for bad, why in (("0", "SHARDS=0"), ("x", "SHARDS=x")):
+        rc, out, argv = run_job(pbs_path, fx, code, root, dict(base, SHARDS=bad))
+        check("C9d %s: refused" % why, rc != 0 and "SHARDS" in out and argv == [])
+    rc, out, argv = run_job(pbs_path, fx, code, root, dict(base, PHASE="later"))
+    check("C9e PHASE=later: refused", rc != 0 and "PHASE" in out and argv == [])
+    fxb, codeb, rootb, manb = campaign_fixture(tmp, cells=("12ab",))
+    rc, out, argv = run_job(pbs_path, fxb, codeb, rootb, {"SKIP_CONDA": "1", "MANIFEST": manb})
+    check("C9f non-integer cell_id in the manifest row: refused", rc != 0
+          and "not an integer" in out and argv == [])
+    fxc, codec, rootc, manc = campaign_fixture(tmp, first_col="neuron_id")
+    rc, out, argv = run_job(pbs_path, fxc, codec, rootc, {"SKIP_CONDA": "1", "MANIFEST": manc})
+    check("C9g manifest whose first column is not cell_id: refused", rc != 0
+          and "expected cell_id" in out and argv == [])
+    for missing in ("run_p1_export.py", "merge_spine_area_F.py"):
+        fxd, coded, rootd, mand = campaign_fixture(tmp)
+        os.remove(os.path.join(coded, missing))
+        rc, out, argv = run_job(pbs_path, fxd, coded, rootd, {"SKIP_CONDA": "1", "MANIFEST": mand})
+        check("C9h H01_CODE without %s: refused" % missing,
+              rc != 0 and missing in out and argv == [])
+
+    # ---- C10 the environment collisions, same as B6''/B7'
+    fx, code, root, man = campaign_fixture(tmp)
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            {"MANIFEST": man, "ENV_NAME": "sbi_export",
+                             "CODE": "/nowhere/other", "ROOT": "/nowhere/else"})
+    calls = split_calls(argv)
+    check("C10 stale ENV_NAME / CODE / ROOT: NOTEs printed, spine_env activated, right root used",
+          rc == 0 and "NOTE: ENV_NAME is set (sbi_export)" in out
+          and "NOTE: CODE is set" in out and "NOTE: ROOT is set" in out
+          and "hook (sbi_export)" not in out and _ran_python_from(out, fx, "spine_env")
+          and len(calls) == 3 and all(_argval(c, "--root") == root for c in calls),
+          "rc=%d\n%s" % (rc, out[-400:]))
+    rc, out, argv = run_job(pbs_path, fx, code, root, {"MANIFEST": man, "H01_ENV": "no_such_env"})
+    check("C10a activation that did not take effect: refused before python",
+          rc != 0 and "did not take effect" in out and argv == [])
+
+    # ---- C11 relative MANIFEST / PASSIVE_TABLE / OUT_DIR resolve like p1_export.pbs
+    rel_man = os.path.relpath(man, code)
+    with open(os.path.join(code, "passive_params_inh_SST.csv"), "w") as fh:
+        fh.write("layer,cell_type,cm_uF_cm2,Ra_ohm_cm\nL3,inh,1.0,100\n")
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            dict(base, MANIFEST=rel_man, PASSIVE_TABLE="passive_params_inh_SST.csv",
+                                 OUT_DIR="p1_inh_SST", PBS_ARRAY_INDEX="0"))
+    calls = split_calls(argv)
+    p1 = calls[0] if calls else []
+    check("C11 relative MANIFEST (vs H01_CODE), PASSIVE_TABLE (vs H01_CODE), OUT_DIR (vs H01_ROOT)",
+          rc == 0 and len(calls) == 3
+          and os.path.normpath(_argval(p1, "--manifest") or "") == os.path.normpath(man)
+          and _argval(p1, "--passive-table") == os.path.join(code, "passive_params_inh_SST.csv")
+          and _argval(p1, "--out-dir") == os.path.join(root, "p1_inh_SST"),
+          "rc=%d p1=%s" % (rc, p1))
+    check("C11a P2/P3 outputs are NOT per passive tree: no --out-dir passed to P2 or P3 (D-004 item 2)",
+          len(calls) == 3 and all("--out-dir" not in c for c in calls[1:]))
+
+    # ---- C12 a manifest that crossed a Windows boundary: CRLF and a blank
+    # line. Rows are counted as pandas counts them (blank lines skipped), the
+    # CR never reaches the cell id, and zero-padded knobs are decimal.
+    fx, code, root, man = campaign_fixture(tmp)
+    with open(man, "wb") as fh:
+        fh.write(b"cell_id,layer,cell_type,neuron_csv,alignment_metadata,synapse_csv,layer_source\r\n"
+                 b"111,L3,exc,a,b,,bank\r\n\r\n222,L3,exc,a,b,,bank\r\n333,L3,exc,a,b,,bank\r\n")
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            dict(base, MANIFEST=man, SHARDS="08", PBS_ARRAY_INDEX="09"))
+    calls = split_calls(argv)
+    check("C12 CRLF manifest with a blank line, SHARDS=08, index 09: row 1 shard 1/8, cell 222, no CR",
+          rc == 0 and _scripts(calls) == ["run_spine_area_F.py"]
+          and _argval(calls[0], "--cell") == "222" and _argval(calls[0], "--ntasks") == "8"
+          and "row 1 shard 1/8" in out, "rc=%d %s\n%s" % (rc, _scripts(calls), out[-300:]))
+    rc, out, argv = run_job(pbs_path, fx, code, root,
+                            dict(base, MANIFEST=man, SHARDS="8", PBS_ARRAY_INDEX="24"))
+    check("C12a ...and index 24 (row 3 of 3) is refused naming -J 0-23",
+          rc != 0 and "-J 0-23" in out and argv == [])
 
 
 def main():
@@ -721,6 +1053,8 @@ def main():
 
         # ---- Section B: the job scripts
         job_script_checks(code_dir, tmp)
+        # ---- Section C: the campaign orchestrator (D-004)
+        campaign_checks(code_dir, tmp)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
