@@ -335,9 +335,14 @@ def run_job(script, fx, code, root, extra_env):
             "STUB_ENVS", "STUB_FAIL_ON", "MANIFEST", "SHARDS", "PHASE",
             "PASSIVE_TABLE", "OUT_DIR", "FORCE", "NO_RIGIDITY",
             "NO_NEURON_VALIDATE", "MIN_COVERAGE")
+    # BASH_FUNC_* are exported shell functions and BASH_ENV/ENV are sourced
+    # by every non-interactive bash: on a login node Lmod / Environment
+    # Modules define `module` through them, and a function beats the stub on
+    # PATH, so the real module command would run instead of the fixture's.
+    drop += ("BASH_ENV", "ENV")
     env = {k: v for k, v in os.environ.items()
            if not (k in drop or k.startswith("H01_") or k.startswith("PBS_")
-                   or k.startswith("CONDA"))}
+                   or k.startswith("CONDA") or k.startswith("BASH_FUNC_"))}
     env.update({"PATH": path, "HOME": os.path.join(fx, "home"),
                 "H01_CODE": code, "H01_ROOT": root, "STUB_ARGV_OUT": argv_out,
                 "STUB_ENVS": os.path.join(fx, "envs")})
