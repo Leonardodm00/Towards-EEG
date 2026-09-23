@@ -34,6 +34,11 @@ from the repository's reference kinetics (human_ih_params.py).
         depolarising bundles, and assign_ls_roles puts each sweep in the
         role D-006 prescribes
     S10 byte safety: pure ASCII in every .py, zero CR in .py/.mod/.sh
+    S8  Phase 3 over the generic vector: a 3-D bootstrap still yields three
+        correctly named columns, a 6-D one yields six, and the LINEAR axis
+        (dv_h) is stored through its own transform rather than exp() -- the
+        one place where a silent bug would have produced plausible, wrong
+        confidence intervals
     S11 six-parameter wiring: a 6-D fit_one_cell runs end to end on a
         synthetic I_h cell and returns a theta with all six axes
 """
@@ -54,6 +59,11 @@ sys.path.insert(0, str(HERE))
 import numpy as np                 # noqa: E402
 
 RESULTS = []
+
+
+#: The value both loss builders return when a simulation raises.
+#: It is FINITE, so `isfinite` is never enough to prove a loss is live.
+_LOSS_CRASH_PENALTY = 1e6
 
 
 def report(name: str, ok: bool, evidence: str) -> None:
@@ -304,10 +314,19 @@ def check_S6() -> None:
     ok &= s6.names == ("Cm", "Rm", "Ra", "gbar", "dv_h", "kappa_tau")
     ok &= PS.make_ih_spec(kappa_bounds=None).n == 5
     notes.append("6-D round-trip exact; freezing kappa gives 5 axes")
-    # the spec-driven loss equals a hand-rolled legacy closure
-    cell = make_cell()
+    # The spec-driven loss, called with the legacy 3 positional args.
+    #
+    # ORDER MATTERS: make_ih_archive() runs the synthetic generator, which
+    # builds its OWN NEURON cell and clears h.allsec(). A cell built BEFORE it
+    # keeps a Python handle to an IClamp whose section no longer exists, so
+    # every simulate() raises "point process not located in a section", the
+    # loss builder swallows it and returns its 1e6 penalty -- which is finite.
+    # The archive is therefore generated first, and the check below asserts
+    # the loss is BELOW the penalty and VARIES, because `isfinite` alone
+    # passes on 1e6 and would hide exactly this.
     tmp = Path(tempfile.mkdtemp(prefix="smoke_s6_"))
     d = make_ih_archive(tmp, specimen_id=900000106)
+    cell = make_cell()
     cd = mono.load_cell_from_archive(d, verbose=False)
     oi = mono.prepare_optimiser_inputs(cd, fit_target="hyp")
     loss_spec = mono._build_loss_function(cell=cell, train_bundles=oi.train_bundles,
@@ -317,9 +336,13 @@ def check_S6() -> None:
     rng = _np.random.default_rng(4)
     lo = _np.log([0.3, 1e3, 50.0]); hi = _np.log([3.0, 1e5, 1000.0])
     qs = lo + rng.random((8, 3)) * (hi - lo)
-    vals = [loss_spec(*map(float, q)) for q in qs]
-    ok &= all(_np.isfinite(vals))
-    notes.append("spec loss finite at %d random theta (legacy 3-arg call works)" % len(vals))
+    vals = [float(loss_spec(*map(float, q))) for q in qs]
+    live = (all(_np.isfinite(vals)) and max(vals) < _LOSS_CRASH_PENALTY
+            and (max(vals) - min(vals)) > 1e-9)
+    ok &= live
+    notes.append("spec loss live at %d random theta: range %.4f..%.4f "
+                 "(no 1e6 penalty; legacy 3-arg call works)"
+                 % (len(vals), min(vals), max(vals)))
     cell.destroy()
     report("S6 ParamSpec is the passive spec", ok, "; ".join(notes))
 
@@ -406,7 +429,10 @@ def check_S11() -> None:
     ok = (fr.gp_result is not None
           and set(fr.params) == set(spec.names)
           and all(_np.isfinite(v) for v in fr.params.values())
+          # below the penalty, not merely finite: a fit whose every simulation
+          # raised would report 1e6 and pass an isfinite test
           and _np.isfinite(fr.train_rmsd_mV)
+          and float(fr.train_rmsd_mV) < _LOSS_CRASH_PENALTY
           and len(fr.sigmas_by_name) == 6
           and oi.param_spec is spec
           and len(oi.report_bundles) == 1)
@@ -419,11 +445,210 @@ def check_S11() -> None:
               len(oi.validation_bundles), len(oi.report_bundles)))
 
 
+def _fit_for_bootstrap(d: Path, spec, *, n_calls: int, seed: int = 0):
+    """A short fit on one archive cell, set up so Phase 3 can run on it."""
+    import passive_fitting_hpc_fixed as mono
+    import passive_long_step_training as plst
+    import ih_mechanism as IM
+    import param_spec as PS
+    is_ih = spec.n > 3
+    plst.integrate_long_step(mono, spec=spec, ih_protocol=is_ih,
+                             ls_window_mode="step" if is_ih else "after_onset",
+                             ls_window_ms_after_onset=60.0,
+                             r_in_target="peak", weighting="relative",
+                             ss_window_ms=(0.5, 100.0), ss_time_weight="exp",
+                             ss_tau_w_ms=5.0, dt_brief_ms=0.1, dt_long_ms=0.1,
+                             verbose=False)
+    cd = mono.load_cell_from_archive(
+        d, ls_max_amplitude_pA=(None if is_ih else 100.0),
+        load_depolarising_ls=is_ih, verbose=False)
+    oi = mono.prepare_optimiser_inputs(cd, fit_target="hyp")
+    cell = mono.build_neuron_model(cd.swc_path, F=1.9)
+    if is_ih:
+        IM.attach_ih(cell, IM.IhSpec(mechanism="Ih_human", distribution="uniform"))
+    fr = mono.fit_one_cell(cell, cd, oi, spec=spec, F=1.9, n_calls=n_calls,
+                           n_initial=max(n_calls // 2, 4), seed=seed, verbose=False)
+    return mono, cd, oi, cell, fr
+
+
+def check_S8() -> None:
+    import numpy as _np
+    import param_spec as PS
+    tmp = Path(tempfile.mkdtemp(prefix="smoke_s8_"))
+    d = make_ih_archive(tmp, specimen_id=900000108)
+    ok = True; notes = []
+
+    # --- 3-D: the legacy shape, still three correctly named columns -------
+    spec3 = PS.PASSIVE_3D
+    mono, cd, oi, cell, fr = _fit_for_bootstrap(d, spec3, n_calls=12)
+    b3 = mono.bootstrap_ci_for_cell(
+        fit_result=fr, bootstrap_mode="nonparametric", B=14, fit_mode="fast",
+        n_calls=8, n_initial=3, seed=1, fix_ra=False, verbose=False,
+        pulse_pool=cd.ss_individual_pulses, root_dir=str(tmp),
+        n_pulses_per_replicate=len(cd.ss_individual_pulses),
+        save_pickle=False, save_plots=False)
+    ok &= tuple(b3.param_names) == ("Cm", "Rm", "Ra")
+    ok &= b3.samples.shape[1] == 3 and set(b3.ci_bca) == {"Cm", "Rm", "Ra"}
+    ok &= _np.allclose(b3.samples, _np.exp(b3.samples_log))   # all-log spec
+    notes.append("3-D: %s, samples %s, exp() still exact"
+                 % (tuple(b3.param_names), b3.samples.shape))
+    cell.destroy()
+
+    # --- 6-D: six columns, and dv_h NOT exponentiated ---------------------
+    spec6 = PS.make_ih_spec()
+    mono, cd, oi, cell, fr = _fit_for_bootstrap(d, spec6, n_calls=14)
+    b6 = mono.bootstrap_ci_for_cell(
+        fit_result=fr, bootstrap_mode="nonparametric", B=14, fit_mode="fast",
+        n_calls=8, n_initial=3, seed=1, fix_ra=False, verbose=False,
+        pulse_pool=cd.ss_individual_pulses, root_dir=str(tmp),
+        n_pulses_per_replicate=len(cd.ss_individual_pulses),
+        save_pickle=False, save_plots=False)
+    names = tuple(b6.param_names)
+    ok &= names == spec6.names and b6.samples.shape[1] == 6
+    ok &= set(b6.ci_bca) == set(spec6.names)
+    i_dv = names.index("dv_h")
+    lo, hi = spec6.axis("dv_h").lo, spec6.axis("dv_h").hi
+    dv_col = b6.samples[:, i_dv]
+    ok &= bool(_np.all(dv_col >= lo - 1e-9) and _np.all(dv_col <= hi + 1e-9))
+    # ... and it is NOT the exponential of the q column
+    ok &= not _np.allclose(dv_col, _np.exp(b6.samples_log[:, i_dv]))
+    # the log axes ARE
+    i_g = names.index("gbar")
+    ok &= _np.allclose(b6.samples[:, i_g], _np.exp(b6.samples_log[:, i_g]))
+    notes.append("6-D: %d columns; dv_h in [%.1f, %.1f] mV (range %.2f..%.2f), "
+                 "not exp'd; gbar is" % (b6.samples.shape[1], lo, hi,
+                                         float(dv_col.min()), float(dv_col.max())))
+    cell.destroy()
+    report("S8 Phase 3 follows the spec, linear axis included", ok, "; ".join(notes))
+
+
+def check_S12() -> None:
+    """Stage 6: the arm table, the spec builder, and one end-to-end run of the
+    orchestrator that writes the three CSVs a campaign is read from."""
+    import pandas as _pd
+    import run_ih_fit as R
+    ok = True; notes = []
+
+    # --- (a) the arm table, PURE ------------------------------------------
+    base = ["--archive-dir", "/a", "--output-dir", "/o", "--code-dir", "."]
+    expect = {
+        "baseline_runB":    (("Cm", "Rm", "Ra"), False, False, "after_onset",
+                             60.0, 100.0, False, "legacy_early"),
+        "passive_fullstep": (("Cm", "Rm", "Ra"), False, True, "step",
+                             150.0, None, True, "same_window"),
+        "ih6":              (R.IH6_NAMES, True, True, "step",
+                             150.0, None, True, "same_window"),
+    }
+    for arm, exp in expect.items():
+        c = R.resolve_arm_config(R._parse_args(base + ["--arm", arm]))
+        got = (c.fit_params, c.attach_ih, c.ih_protocol, c.ls_window_mode,
+               c.ls_window_ms, c.ls_max_amplitude_pA, c.load_depolarising_ls,
+               c.gate_valid_via)
+        if got != exp:
+            ok = False; notes.append("arm %s: %s != %s" % (arm, got, exp))
+    # --fit-params drops the mechanism with gbar, and brings it back with it
+    c4 = R.resolve_arm_config(R._parse_args(
+        base + ["--arm", "ih6", "--fit-params", "Cm,Rm,Ra,gbar"]))
+    c3 = R.resolve_arm_config(R._parse_args(
+        base + ["--arm", "ih6", "--fit-params", "Cm,Rm,Ra"]))
+    if not (c4.attach_ih and not c3.attach_ih):
+        ok = False; notes.append("--fit-params did not re-derive attach_ih")
+
+    # --- (b) the spec builder accepts 4 shapes and rejects the rest --------
+    bnd = dict(cm_bounds=(0.3, 3.0), rm_bounds=(1e3, 1e5), ra_bounds=(50., 1e3),
+               gbar_bounds=(1e-6, 1e-3), dvh_bounds=(-10., 10.),
+               kappa_bounds=(0.5, 2.0))
+    for nm, n_exp in ((("Cm", "Rm", "Ra"), 3), (("Cm", "Rm", "Ra", "gbar"), 4),
+                      (("Cm", "Rm", "Ra", "gbar", "dv_h"), 5),
+                      (R.IH6_NAMES, 6)):
+        if R.build_param_spec(nm, **bnd).n != n_exp:
+            ok = False; notes.append("spec %s wrong n" % (nm,))
+    for bad in (("Cm", "Ra", "Rm"), ("Cm", "Rm", "Ra", "dv_h"),
+                ("Cm", "Rm", "Ra", "gbarr")):
+        try:
+            R.build_param_spec(bad, **bnd)
+            ok = False; notes.append("accepted bad axis list %s" % (bad,))
+        except ValueError:
+            pass
+    # a tau_w GRID must be refused, not silently collapsed to its first entry
+    try:
+        R._resolve_scalar_tau_w("3,5,7")
+        ok = False; notes.append("a tau_w grid was accepted")
+    except SystemExit:
+        pass
+
+    # --- (c) end to end: ih6 on one synthetic I_h cell ---------------------
+    tmp = Path(tempfile.mkdtemp(prefix="smoke_s12_"))
+    make_ih_archive(tmp, specimen_id=900000112, gbar=1.2e-4, dv_h=0.0, kappa=1.0)
+    out = tmp / "out"
+    R.main(["--archive-dir", str(tmp), "--output-dir", str(out),
+            "--code-dir", str(HERE), "--arm", "ih6",
+            "--n-calls", "14", "--n-initial", "8", "--phase3-subset", "none",
+            "--dt-brief-ms", "0.1", "--dt-long-ms", "0.1"])
+
+    res = _pd.read_csv(out / "phase2_results.csv")
+    roles = _pd.read_csv(out / "ls_roles.csv")
+    diag = _pd.read_csv(out / "ls_diagnostics.csv")
+
+    # every fitted axis is a column, and named as the spec names it
+    missing = [n for n in R.IH6_NAMES if n not in res.columns]
+    if missing:
+        ok = False; notes.append("theta columns missing: %s" % missing)
+    if "rail_gbar" not in res.columns:
+        ok = False; notes.append("rail_gbar missing (a railed gbar would be "
+                                 "unreadable from the value alone)")
+    # the derived I_h quantities are written EXACTLY once
+    for col in ("m_inf_at_rest", "gh_rest_over_gpas", "e_pas_soma_mV",
+                "rest_drift_mV"):
+        if col not in res.columns:
+            ok = False; notes.append("%s missing" % col)
+        if ("ih_" + col) in res.columns:
+            ok = False; notes.append("%s duplicated with an ih_ prefix" % col)
+    if str(res["arm"].iloc[0]) != "ih6" or "Ih_human" not in str(res["ih_label"].iloc[0]):
+        ok = False; notes.append("arm / ih_label not stamped on the row")
+    if float(res["tau_w_chosen_ms"].iloc[0]) != 5.0 \
+            or str(res["tau_w_reason"].iloc[0]) != "fixed_by_cli":
+        ok = False; notes.append("tau_w provenance not recorded")
+    # the fit actually simulated: below the crash penalty, not merely finite
+    if float(res["train_rel_loss"].iloc[0]) >= _LOSS_CRASH_PENALTY:
+        ok = False; notes.append("training loss sat at the 1e6 crash penalty")
+    # the D-006 role split, audited
+    got_roles = {(int(r.amplitude_pA), r.role) for r in roles.itertuples()}
+    for amp, role in ((-10, "validate"), (-30, "train"), (-110, "train"),
+                      (-150, "report"), (20, "validate"), (50, "validate")):
+        if (amp, role) not in got_roles:
+            ok = False; notes.append("role %s pA -> %s not recorded" % (amp, role))
+    # one diagnostic row per LONG bundle, with model AND data sag side by side
+    if len(diag) != len(roles):
+        ok = False; notes.append("ls_diagnostics %d rows vs %d long bundles"
+                                 % (len(diag), len(roles)))
+    for col in ("exp_sag_fraction", "sim_sag_fraction", "sag_fraction_error",
+                "rmsd_charge_mV", "rmsd_sag_mV", "rmsd_rebound_mV"):
+        if col not in diag.columns or not np.isfinite(diag[col]).all():
+            ok = False; notes.append("%s absent or non-finite" % col)
+    rep = diag[diag["role"] == "report"]
+    if len(rep) != 1:
+        ok = False; notes.append("expected exactly one report-only step")
+
+    notes.append("theta = %s" % ", ".join(
+        "%s=%.4g" % (n, float(res[n].iloc[0])) for n in R.IH6_NAMES))
+    notes.append("gh/g_pas=%.3f, drift=%.1e mV"
+                 % (float(res["gh_rest_over_gpas"].iloc[0]),
+                    float(res["rest_drift_mV"].iloc[0])))
+    notes.append("report-only %+.0f pA: sag exp %.3f vs sim %.3f"
+                 % (float(rep["amplitude_pA"].iloc[0]),
+                    float(rep["exp_sag_fraction"].iloc[0]),
+                    float(rep["sim_sag_fraction"].iloc[0])))
+    report("S12 orchestrator: arms, spec builder, end-to-end CSVs", ok,
+           "; ".join(notes))
+
+
 def check_S10() -> None:
     files = ["ih_mechanism.py", "human_ih_params.py", "smoke_ih_fit.py",
              "regression_passive_identity.py", "synthetic_ground_truth.py",
              "param_spec.py", "passive_fitting_hpc_fixed.py",
              "passive_long_step_training.py",
+             "run_ih_fit.py",
              "mod/Ih.mod", "mod/Ih_human.mod"]
     bad = []
     for f in files:
@@ -445,7 +670,8 @@ def main() -> int:
     ensure_build(args.build)
     from neuron import h  # noqa: F401  (loads ./x86_64)
     for fn in (check_S1, check_S2, check_S3, check_S4, check_S5,
-               check_S6, check_S7, check_S11, check_S10):
+               check_S6, check_S7, check_S8, check_S11, check_S12,
+               check_S10):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

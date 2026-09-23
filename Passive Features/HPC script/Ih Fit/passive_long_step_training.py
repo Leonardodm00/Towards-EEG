@@ -870,8 +870,15 @@ def integrate_long_step(
     mono.prepare_optimiser_inputs = _prepare
     mono._build_loss_function = _build_loss
     if verbose:
-        ntrain = "SS-only" if int(n_long_train) == 0 \
-            else f"brief + {n_long_train} long step(s)"
+        if ih_protocol:
+            # n_long_train does not apply: assign_ls_roles decides per cell.
+            ntrain = (f"brief + long steps by role (D-006: drop "
+                      f"{n_drop_weakest} weakest / {n_drop_strongest} "
+                      f"strongest)" if not train_all_hyp
+                      else "brief + EVERY hyperpolarising long step")
+        else:
+            ntrain = "SS-only" if int(n_long_train) == 0 \
+                else f"brief + {n_long_train} long step(s)"
         wtag = (f"{ss_time_weight}(tau_w={ss_tau_w_ms} ms)"
                 if ss_time_weight != "none" else "uniform")
         print(f"[integrate_long_step] training = {ntrain}; SS window "

@@ -4885,25 +4885,101 @@ CI_STYLES = {
 #  GP-diagnostic helper functions (called by gp_diagnostic_for_cell below)
 #  These mirror the Phase-2 originals so this module is self-contained.
 # ===============================================================================
+#
+#  Stage 5 (D-005/D-006 Q8): everything below used to assume the parameter
+#  vector was exactly (Cm, Rm, Ra) -- `PARAM_NAMES`, `nc = {"Cm":0,...}`,
+#  `loss_fn(x[0], x[1], x[2])`, `np.exp(samples_log)`. Each is now resolved
+#  from the fit's own ParamSpec, so a 4/5/6-D bootstrap reports the axes it
+#  actually fitted. Two properties are preserved exactly for a 3-D spec, and
+#  are what smoke check S8 pins:
+#    * the candidate grid of _build_gp_profile is the same meshgrid;
+#    * exp() is still the physical transform, because all three passive axes
+#      are log axes. For a 6-D spec dv_h is LINEAR, so the transform is the
+#      spec's, never a bare exp -- that is the one place where a silent bug
+#      would have produced plausible, wrong confidence intervals.
 
-def _other_axes_log_grid(opt_inputs, pinned_name, inner_grid_per_axis):
-    """Uniform log-space grid over the two parameters that are NOT pinned.
+
+def _resolve_spec(*candidates):
+    """First ParamSpec found on any of `candidates` (a fit result, an
+    OptimiserInputs, a spec itself), else the 3-D passive spec."""
+    for c in candidates:
+        if c is None:
+            continue
+        if hasattr(c, "as_skopt_dimensions") and hasattr(c, "names"):
+            return c
+        got = getattr(c, "param_spec", None)
+        if got is not None:
+            return got
+    import param_spec as _ps
+    return _ps.PASSIVE_3D
+
+
+def _spec_names(spec) -> Tuple[str, ...]:
+    return tuple(spec.names)
+
+
+def _theta_of(fit_result, spec) -> Dict[str, float]:
+    """Physical MLE as a dict, from the generic `params` when present and
+    from the legacy passive triple otherwise."""
+    params = dict(getattr(fit_result, "params", {}) or {})
+    if params and all(n in params for n in spec.names):
+        return params
+    return {"Cm": float(fit_result.cm_uF_per_cm2),
+            "Rm": float(fit_result.rm_Ohm_cm2),
+            "Ra": float(fit_result.ra_Ohm_cm)}
+
+
+def _q_to_phys_cols(spec, q_arr: np.ndarray) -> np.ndarray:
+    """Column-wise q -> physical for a (n, p) array, honouring each axis's
+    own transform. For an all-log spec this equals np.exp(q_arr)."""
+    q_arr = np.asarray(q_arr, dtype=float)
+    out = np.empty_like(q_arr)
+    for i, a in enumerate(spec.axes):
+        out[:, i] = np.exp(q_arr[:, i]) if a.log else q_arr[:, i]
+    return out
+
+
+def _other_axes_log_grid(opt_inputs, pinned_name, inner_grid_per_axis,
+                         spec=None, seed: int = 0):
+    """Candidate coordinates for every axis that is NOT pinned.
 
     Returns
     -------
-    A, B : ndarray (inner_grid_per_axis^2,)
-        Ravelled meshgrid coordinates for the two free axes.
-    other : tuple[str, str]
-        Names of the two free parameters, in the order (A, B).
+    cols : ndarray (M, p-1)   q-space coordinates, one column per free axis
+    other : tuple[str, ...]   names of those axes, in column order
+
+    For p = 3 this is EXACTLY the old behaviour: the full
+    inner_grid_per_axis^2 meshgrid over the two free axes, in the same order,
+    so a 3-D profile is unchanged to the last bit.
+
+    For p > 3 a full grid is not an option -- 30^5 is 24 million points per
+    grid node -- so the same BUDGET of M = inner_grid_per_axis^2 points is
+    drawn quasi-uniformly over the free axes instead (fixed seed, so the
+    profile is reproducible). The reduction applied downstream is a minimum
+    over those candidates, i.e. a profile likelihood over the GP surrogate;
+    with sampling it is an upper bound on that profile, which is the honest
+    weakening and is recorded as such rather than hidden behind a coarser
+    grid that would have silently changed the 3-D result too.
     """
-    other = tuple(n for n in ("Cm", "Rm", "Ra") if n != pinned_name)
+    spec = _resolve_spec(spec, opt_inputs)
+    names = _spec_names(spec)
+    other = tuple(n for n in names if n != pinned_name)
     name_to_dim = {d.name: d for d in opt_inputs.skopt_dimensions}
     bounds = [(float(name_to_dim[n].low), float(name_to_dim[n].high))
               for n in other]
-    a = np.linspace(*bounds[0], inner_grid_per_axis)
-    b = np.linspace(*bounds[1], inner_grid_per_axis)
-    A, B = np.meshgrid(a, b, indexing="ij")
-    return A.ravel(), B.ravel(), other
+    M = int(inner_grid_per_axis) ** 2
+    if len(other) == 2:
+        a = np.linspace(*bounds[0], inner_grid_per_axis)
+        b = np.linspace(*bounds[1], inner_grid_per_axis)
+        A, B = np.meshgrid(a, b, indexing="ij")
+        return np.column_stack([A.ravel(), B.ravel()]), other
+    rng = np.random.default_rng(int(seed))
+    cols = np.empty((M, len(other)))
+    for j, (lo, hi) in enumerate(bounds):
+        # stratified (Latin-hypercube) draw: one point per stratum, shuffled
+        u = (np.arange(M) + rng.random(M)) / M
+        cols[:, j] = lo + rng.permutation(u) * (hi - lo)
+    return cols, other
 
 
 def _build_log_grid(fit_result, opt_inputs, param_name, n_grid):
@@ -4955,18 +5031,20 @@ def _build_gp_profile(
     n_grid = len(grid_log)
     M2     = inner_grid_per_axis ** 2
 
-    other_A, other_B, (nA, nB) = _other_axes_log_grid(
-        opt_inputs, param_name, inner_grid_per_axis)
+    spec = _resolve_spec(opt_inputs)
+    names = _spec_names(spec)
+    other_cols, other_names = _other_axes_log_grid(
+        opt_inputs, param_name, inner_grid_per_axis, spec=spec)
 
-    nc = {"Cm": 0, "Rm": 1, "Ra": 2}
-    pc, cA, cB = nc[param_name], nc[nA], nc[nB]
+    nc = {n: i for i, n in enumerate(names)}
+    pc = nc[param_name]
 
-    cands = np.empty((n_grid * M2, 3))
+    cands = np.empty((n_grid * M2, len(names)))
     for i, pv in enumerate(grid_log):
         sl = slice(i * M2, (i + 1) * M2)
         cands[sl, pc] = pv
-        cands[sl, cA] = other_A
-        cands[sl, cB] = other_B
+        for j, nm in enumerate(other_names):
+            cands[sl, nc[nm]] = other_cols[:, j]
 
     mu_flat, sig_flat = gp.predict(
         space.transform(cands.tolist()), return_std=True)
@@ -5015,27 +5093,26 @@ def _validate_at_param_value(
     if not np.isfinite(theta_phys):
         return []
 
-    nc = {"Cm": 0, "Rm": 1, "Ra": 2}
-    pc = nc[param_name]
-
-    mle_log = np.array([
-        np.log(fit_result.cm_uF_per_cm2),
-        np.log(fit_result.rm_Ohm_cm2),
-        np.log(fit_result.ra_Ohm_cm),
-    ])
-    centre = mle_log.copy()
-    centre[pc] = float(np.log(theta_phys))
-
     opt_inputs = fit_result.opt_inputs
+    spec = _resolve_spec(fit_result, opt_inputs)
+    names = _spec_names(spec)
+    nc = {n: i for i, n in enumerate(names)}
+    pc = nc[param_name]
+    npar = len(names)
+
+    mle_log = np.array(spec.to_q(_theta_of(fit_result, spec)), dtype=float)
+    centre = mle_log.copy()
+    # the pinned axis's own transform, so a LINEAR axis is not log'd
+    centre[pc] = float(spec.axes[pc].to_q(theta_phys))
     lows  = np.array([float(d.low)  for d in opt_inputs.skopt_dimensions])
     highs = np.array([float(d.high) for d in opt_inputs.skopt_dimensions])
 
     n_validation = int(n_validation)
-    samples = np.empty((n_validation, 3))
+    samples = np.empty((n_validation, npar))
     samples[0] = centre
     if n_validation > 1:
         samples[1:] = centre + rng.normal(
-            0.0, ball_log_radius, size=(n_validation - 1, 3))
+            0.0, ball_log_radius, size=(n_validation - 1, npar))
     samples = np.clip(samples, lows, highs)
 
     gp    = fit_result.gp_result.models[-1]
@@ -5048,16 +5125,17 @@ def _validate_at_param_value(
         train_bundles=opt_inputs.train_bundles,
         v_rest_mV=opt_inputs.v_rest_mV,
         train_window_ms=opt_inputs.train_window_ms,
+        spec=spec,
     )
 
     out = []
     for k, (s, mu_s, sig_s) in enumerate(zip(samples, mu_p, sig_p)):
         try:
-            rmsd_real = float(loss(s[0], s[1], s[2]))
+            rmsd_real = float(loss(*s))
         except Exception as e:
             _warnings.warn(f"NEURON validation crashed at {s}: {e}")
             rmsd_real = float("nan")
-        phys_k = theta_phys if k == 0 else float(np.exp(s[pc]))
+        phys_k = theta_phys if k == 0 else float(spec.axes[pc].to_physical(s[pc]))
         out.append((phys_k, rmsd_real, float(mu_s), float(sig_s)))
     return out
 
@@ -5146,8 +5224,16 @@ def _simulate_square_subthreshold(
 class BootstrapCIResult:
     """Bootstrap CIs for one cell (v3 -- no joint-projected CI).
 
-    ``samples`` is the (n_kept, 3) array of bootstrap parameter
-    estimates in **physical units**, columns ordered (Cm, Rm, Ra).
+    ``samples`` is the (n_kept, p) array of bootstrap parameter estimates in
+    **physical units**, with one column per axis of the fit's ParamSpec, in
+    spec order. ``param_names`` records that order, so every consumer (the
+    summary CSV, the histogram and pairwise plots, the replot bundle) reads
+    the axes the fit actually had instead of assuming (Cm, Rm, Ra). For a
+    passive fit p = 3 and the order is (Cm, Rm, Ra), as before.
+
+    A LINEAR axis (dv_h) is stored in ``samples`` through its own transform,
+    NOT through exp(); ``samples_log`` is the q-space matrix whose columns
+    follow each axis's own coordinate.
     """
     specimen_id:   int
     B_requested:   int
@@ -5182,6 +5268,11 @@ class BootstrapCIResult:
     pulse_pool_size:        Optional[int] = None
 
     notes: List[str] = field(default_factory=list)
+
+    # Stage 5 (D-005): axis order of `samples` / `samples_log` / `mle_*`.
+    # Defaults to the passive triple so an unpickled pre-2026-09-22 result
+    # still reads correctly.
+    param_names: Tuple[str, ...] = ("Cm", "Rm", "Ra")
 
 
 @dataclass
@@ -5406,13 +5497,17 @@ def _run_one_parametric_iteration(
         )
         synthetic_bundles.append(dc_replace(b, v_mV=synthetic_v))
 
+    # Stage 5: the axis set travels on the OptimiserInputs the task already
+    # carries, so no extra field is needed in the (pickled) task tuple. With
+    # a legacy OptimiserInputs param_spec is None and _resolve_spec returns
+    # the 3-D passive spec, i.e. exactly the previous behaviour.
     return _refit_from_bundles(
         cell=cell, bundles=synthetic_bundles,
         v_rest_mV=v_rest_mV, train_window_ms=train_window_ms,
         mle_log=mle_log, dims=opt_inputs.skopt_dimensions,
         fit_mode=fit_mode, n_calls=n_calls, n_initial=n_initial,
         ball_radius=ball_radius, seed=seed, rng=rng,
-        ra_fixed_log=ra_fixed_log,
+        ra_fixed_log=ra_fixed_log, spec=_resolve_spec(opt_inputs),
     )
 
 
@@ -5490,7 +5585,7 @@ def _run_one_nonparametric_iteration(
         mle_log=mle_log, dims=opt_inputs.skopt_dimensions,
         fit_mode=fit_mode, n_calls=n_calls, n_initial=n_initial,
         ball_radius=ball_radius, seed=seed, rng=rng,
-        ra_fixed_log=ra_fixed_log,
+        ra_fixed_log=ra_fixed_log, spec=_resolve_spec(opt_inputs),
     )
 
 
@@ -5501,7 +5596,7 @@ def _run_one_nonparametric_iteration(
 def _refit_from_bundles(
     *, cell, bundles, v_rest_mV, train_window_ms,
     mle_log, dims, fit_mode, n_calls, n_initial, ball_radius,
-    seed, rng, ra_fixed_log=None,
+    seed, rng, ra_fixed_log=None, spec=None,
 ) -> Dict[str, float]:
     """Build loss from bundles -> run gp_minimize -> return fitted params.
 
@@ -5515,31 +5610,45 @@ def _refit_from_bundles(
     If ``ra_fixed_log`` is None, behaviour is identical to the original 3-D
     refit (full backward compatibility).
     """
+    spec = _resolve_spec(spec)
+    names = _spec_names(spec)
+    npar = len(names)
     fn = _locate_build_loss_function()
     loss_fn = fn(
         cell=cell, train_bundles=bundles,
         v_rest_mV=v_rest_mV, train_window_ms=train_window_ms,
+        spec=spec,
     )
 
     fix_ra = ra_fixed_log is not None
     if fix_ra:
+        # Pin by NAME, not by position: in a 6-D spec Ra is still index 2, but
+        # nothing guarantees that for a spec with a frozen kinetic knob, and a
+        # positional assumption here would pin the wrong axis silently.
+        ra_i = names.index("Ra")
         ra_const = float(ra_fixed_log)
-        # 2-D space over (Cm, Rm): reuse the Cm/Rm dims from the 3-D space.
-        dims_use = [dims[0], dims[1]]
-        ndim = 2
+        free_idx = [i for i in range(npar) if i != ra_i]
+        dims_use = [dims[i] for i in free_idx]
+        ndim = len(free_idx)
 
         def wrapped(x):
-            return float(loss_fn(x[0], x[1], ra_const))
+            full = [0.0] * npar
+            full[ra_i] = ra_const
+            for j, i in enumerate(free_idx):
+                full[i] = x[j]
+            return float(loss_fn(*full))
     else:
-        dims_use = dims
-        ndim = 3
+        ra_i = None
+        free_idx = list(range(npar))
+        dims_use = list(dims)
+        ndim = npar
 
         def wrapped(x):
-            return float(loss_fn(x[0], x[1], x[2]))
+            return float(loss_fn(*x))
 
     if fit_mode == "fast":
         # Centre the fast-mode ball on the MLE, dropping Ra when it is pinned.
-        mle_arr = np.asarray(mle_log)[:ndim]
+        mle_arr = np.asarray(mle_log, dtype=float)[free_idx]
         lows  = np.array([float(d.low)  for d in dims_use])
         highs = np.array([float(d.high) for d in dims_use])
         x0 = [mle_arr.tolist()]
@@ -5561,15 +5670,29 @@ def _refit_from_bundles(
     else:
         raise ValueError(f"Unknown fit_mode: {fit_mode!r}")
 
-    cm_log, rm_log = float(res.x[0]), float(res.x[1])
-    ra_log = ra_const if fix_ra else float(res.x[2])
-    return {
-        "cm_log": cm_log, "rm_log": rm_log, "ra_log": ra_log,
-        "cm": float(np.exp(cm_log)),
-        "rm": float(np.exp(rm_log)),
-        "ra": float(np.exp(ra_log)),
-        "rmsd": float(res.fun),
-    }
+    # Re-assemble the FULL q-vector in spec order (the pinned axis included).
+    q_full = [0.0] * npar
+    if fix_ra:
+        q_full[ra_i] = ra_const
+    for j, i in enumerate(free_idx):
+        q_full[i] = float(res.x[j])
+    theta = spec.to_physical(q_full)
+
+    out = {"q_log": q_full, "theta": theta, "rmsd": float(res.fun)}
+    # Legacy keys, so every existing consumer keeps working on a 3-D spec.
+    # NaN rather than absent when a spec omits an axis, so a downstream
+    # `["cm_log"]` fails visibly as NaN instead of raising far from the cause.
+    for legacy, name in (("cm", "Cm"), ("rm", "Rm"), ("ra", "Ra")):
+        if name in theta:
+            out[legacy] = float(theta[name])
+            out[legacy + "_log"] = float(q_full[names.index(name)])
+        else:
+            out[legacy] = float("nan")
+            out[legacy + "_log"] = float("nan")
+    # Generic per-name q, which the bootstrap assembles its sample matrix from.
+    for i, n in enumerate(names):
+        out["q_" + n] = float(q_full[i])
+    return out
 
 
 def _locate_build_loss_function():
@@ -5766,15 +5889,20 @@ def bootstrap_ci_for_cell(
     else:
         raise ValueError(f"fit_mode must be 'fast' or 'rigorous'")
 
-    mle_phys = (fit_result.cm_uF_per_cm2,
-                fit_result.rm_Ohm_cm2,
-                fit_result.ra_Ohm_cm)
-    mle_log_t = tuple(float(np.log(x)) for x in mle_phys)
+    # Stage 5: the axis set is the fit's own (D-005). For a 3-D fit these
+    # three lines are what they always were.
+    _spec = _resolve_spec(fit_result, getattr(fit_result, "opt_inputs", None))
+    _names = _spec_names(_spec)
+    _theta = _theta_of(fit_result, _spec)
+    mle_phys = tuple(float(_theta[n]) for n in _names)
+    mle_log_t = tuple(float(v) for v in _spec.to_q(_theta))
 
     # Phase 2.5 coupling: when fixing Ra, pin every replicate at the MLE Ra
     # (= the per-group constant Phase 2.5 wrote into fit_result.ra_Ohm_cm).
-    ra_fixed_log = float(mle_log_t[2]) if fix_ra else None
-    ra_fixed_idx = PARAM_NAMES.index("Ra") if fix_ra else None
+    ra_fixed_idx = _names.index("Ra") if (fix_ra and "Ra" in _names) else None
+    ra_fixed_log = float(mle_log_t[ra_fixed_idx]) if ra_fixed_idx is not None else None
+    if fix_ra and ra_fixed_idx is None:
+        raise ValueError("fix_ra=True but this fit has no Ra axis: %s" % (_names,))
 
     if verbose:
         print(
@@ -5921,8 +6049,12 @@ def bootstrap_ci_for_cell(
         raise RuntimeError(
             f"Bootstrap aborted: only {len(successes)}/{B} succeeded.")
 
+    # One column per axis of the spec, in spec order (Stage 5). The workers
+    # write a "q_<name>" key per axis; the legacy cm/rm/ra_log keys are still
+    # there but are not what is read, so a 6-D fit cannot silently lose three
+    # of its columns.
     samples_log = np.array(
-        [[r[1]["cm_log"], r[1]["rm_log"], r[1]["ra_log"]] for r in successes])
+        [[float(r[1]["q_" + n]) for n in _names] for r in successes])
     rmsds = np.array([r[1]["rmsd"] for r in successes])
 
     # -- RMSD outlier rejection --
@@ -5942,13 +6074,15 @@ def bootstrap_ci_for_cell(
     n_kept = samples_log.shape[0]
     if n_kept < 10:
         raise RuntimeError(f"After rejection only {n_kept} samples remain.")
-    samples_phys = np.exp(samples_log)
+    # Per-axis transform, NOT a bare exp: dv_h is a linear axis, and
+    # exponentiating it would have produced plausible, wrong intervals.
+    samples_phys = _q_to_phys_cols(_spec, samples_log)
 
     # -- Compute CIs (library-backed) --
     ci_perc:   Dict[str, Tuple[float, float]] = {}
     ci_bca:    Dict[str, Tuple[float, float]] = {}
     ci_normal: Dict[str, Tuple[float, float]] = {}
-    for i, p in enumerate(PARAM_NAMES):
+    for i, p in enumerate(_names):
         if fix_ra and i == ra_fixed_idx:
             # Ra was pinned: every replicate shares one value, so the only
             # honest interval is the degenerate point [Ra_fixed, Ra_fixed].
@@ -5967,8 +6101,8 @@ def bootstrap_ci_for_cell(
     cov_log = np.cov(samples_log, rowvar=False)
 
     if verbose:
-        for p in PARAM_NAMES:
-            idx = PARAM_NAMES.index(p)
+        for p in _names:
+            idx = _names.index(p)
             print(
                 f"[bootstrap]   {p}: MLE={mle_phys[idx]:.4g}"
                 f"  perc={ci_perc[p][0]:.4g}...{ci_perc[p][1]:.4g}"
@@ -5986,6 +6120,7 @@ def bootstrap_ci_for_cell(
         ci_percentile=ci_perc,
         ci_bca=ci_bca,
         ci_normal=ci_normal,
+        param_names=tuple(_names),
         threshold_alpha=float(alpha),
         bootstrap_mode=str(bootstrap_mode),
         noise_mode=str(noise_mode) if bootstrap_mode == "parametric" else "n/a",
@@ -6021,7 +6156,7 @@ def bootstrap_ci_for_cell(
 def _save_bootstrap_summary_csv(r: BootstrapCIResult, out_dir: Path):
     """Write a tidy CSV with one row per parameter."""
     rows = []
-    for i, p in enumerate(PARAM_NAMES):
+    for i, p in enumerate(getattr(r, "param_names", PARAM_NAMES)):
         corr_log = r.cov_log.copy()
         d = np.sqrt(np.diag(corr_log))
         d[d == 0] = 1
@@ -6102,18 +6237,20 @@ def gp_diagnostic_for_cell(
         ci_dict_map["bca"]        = bootstrap_result.ci_bca
         ci_dict_map["normal"]     = bootstrap_result.ci_normal
 
-    for p in PARAM_NAMES:
+    _spec = _resolve_spec(fit_result, getattr(fit_result, "opt_inputs", None))
+    _names = _spec_names(_spec)
+    _theta = _theta_of(fit_result, _spec)
+    for p in _names:
         grid_log = _build_log_grid(fit_result, fit_result.opt_inputs, p, n_grid)
-        grid_phy = np.exp(grid_log)
+        _ax = _spec.axes[_names.index(p)]
+        grid_phy = np.exp(grid_log) if _ax.log else np.asarray(grid_log, float)
         mu, sig = _build_gp_profile(
             gp_result=fit_result.gp_result,
             opt_inputs=fit_result.opt_inputs,
             param_name=p, grid_log=grid_log,
             inner_grid_per_axis=inner_grid_per_axis,
         )
-        mle_val = {"Cm": fit_result.cm_uF_per_cm2,
-                   "Rm": fit_result.rm_Ohm_cm2,
-                   "Ra": fit_result.ra_Ohm_cm}[p]
+        mle_val = float(_theta[p])
 
         # -- Validate at each CI boundary --
         validation_pts: Dict[str, List[Tuple[float, float, float, float]]] = {}
@@ -6223,7 +6360,7 @@ def plot_bootstrap_histograms(
         "normal":     r.ci_normal,
     }
 
-    for i, p in enumerate(PARAM_NAMES):
+    for i, p in enumerate(getattr(r, "param_names", PARAM_NAMES)):
         s = r.samples[:, i]
         fig, ax = plt.subplots(figsize=(7.0, 4.6))
         ax.hist(s, bins=40, density=True, color="tab:blue",
@@ -6270,11 +6407,16 @@ def plot_bootstrap_pairwise(
     r: BootstrapCIResult,
     out_dir,
 ) -> List[Path]:
-    """Three pairwise scatter plots with covariance ellipse."""
+    """Pairwise scatter plots with covariance ellipse, one per axis pair.
+
+    Three panels for a passive fit; C(p,2) = 15 for a six-parameter one.
+    """
     out_dir = Path(out_dir)
     saved = []
-    nc = {"Cm": 0, "Rm": 1, "Ra": 2}
-    pairs = [("Cm", "Rm"), ("Cm", "Ra"), ("Rm", "Ra")]
+    nc = {n: i for i, n in enumerate(getattr(r, "param_names", PARAM_NAMES))}
+    import itertools as _it
+    _pn = list(getattr(r, "param_names", PARAM_NAMES))
+    pairs = list(_it.combinations(_pn, 2))
 
     for (px, py) in pairs:
         ix, iy = nc[px], nc[py]
@@ -7405,7 +7547,7 @@ def replot_bootstrap_pairwise(
         raise ValueError("param_x and param_y must differ")
 
     r = bundle.bootstrap_result
-    nc = {"Cm": 0, "Rm": 1, "Ra": 2}
+    nc = {n: i for i, n in enumerate(getattr(r, "param_names", PARAM_NAMES))}
     ix, iy = nc[param_x], nc[param_y]
 
     if ax is None:

@@ -593,7 +593,9 @@ def _run_phase3_subset(mono, results, cells_data, subset_ids,
                                     F_used=float(fr.F), root_dir=str(out),
                                     verbose=True)
             b = p3.bootstrap
-            for ip, p in enumerate(("Cm", "Rm", "Ra")):
+            # Stage 5: the axes the bootstrap actually had, not an assumed
+            # triple (a 6-D result would otherwise lose three columns here).
+            for ip, p in enumerate(getattr(b, "param_names", ("Cm", "Rm", "Ra"))):
                 rows.append(dict(specimen_id=sid, parameter=p,
                                  mle=b.mle_physical[ip],
                                  ci_bca_lo=b.ci_bca[p][0], ci_bca_hi=b.ci_bca[p][1],
