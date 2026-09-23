@@ -410,7 +410,16 @@ if [ "${DRY_RUN:-0}" = "1" ]; then
     echo "[DRY RUN] would run:"
     echo "  python $ENTRYPOINT \\"
     printf '    %s\n' "${ARGS[@]}"
-    echo "[DRY RUN] env + mechanisms verified; no fit was run."
+    # The CLI contract, checked rather than printed: the entrypoint's OWN
+    # parser reads exactly these arguments. A renamed or mistyped flag then
+    # fails here, in seconds, instead of after the job has queued.
+    python - "${ARGS[@]}" <<'PYEOF' || { echo "[FATAL] run_ih_fit's parser REFUSED the arguments above" >&2; conda deactivate; exit 2; }
+import sys
+import run_ih_fit as _E
+_E._parse_args(sys.argv[1:])
+print("[DRY RUN] CLI contract: run_ih_fit's own parser accepts every argument")
+PYEOF
+    echo "[DRY RUN] env + mechanisms + CLI verified; no fit was run."
     conda deactivate
     exit 0
 fi

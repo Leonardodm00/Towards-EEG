@@ -576,15 +576,64 @@ def check_S12() -> None:
         ok = False; notes.append("a tau_w grid was accepted")
     except SystemExit:
         pass
+    # skopt refuses n_calls < n_initial; the parser must, before any cell
+    _base = ["--archive-dir", "/a", "--output-dir", "/o", "--code-dir", "."]
+    for _bad in (["--n-calls", "20"],                        # 100 initial > 20
+                 ["--bootstrap-n-calls", "10"]):             # 30 initial > 10
+        try:
+            R._parse_args(_base + _bad)
+            ok = False; notes.append("parser accepted %s" % " ".join(_bad))
+        except SystemExit:
+            pass
+    R._parse_args(_base + ["--n-calls", "20", "--n-initial", "10"])
 
     # --- (c) end to end: ih6 on one synthetic I_h cell ---------------------
     tmp = Path(tempfile.mkdtemp(prefix="smoke_s12_"))
     make_ih_archive(tmp, specimen_id=900000112, gbar=1.2e-4, dv_h=0.0, kappa=1.0)
     out = tmp / "out"
-    R.main(["--archive-dir", str(tmp), "--output-dir", str(out),
-            "--code-dir", str(HERE), "--arm", "ih6",
-            "--n-calls", "14", "--n-initial", "8", "--phase3-subset", "none",
-            "--dt-brief-ms", "0.1", "--dt-long-ms", "0.1"])
+    # Capture every loss the orchestrator builds, to check the SS pulses are
+    # trained on WITH their exponential time-weight -- asserted on the program
+    # the campaign runs, not on a hand-built loss.
+    import passive_long_step_training as _plst
+    _orig_bmpl = _plst.build_multi_protocol_loss
+    _built = []
+
+    def _spy(cell, train_bundles, v_rest_mV, **kw):
+        _built.append((list(train_bundles), kw.get("ss_sample_weight_fn"),
+                       tuple(kw.get("ss_window_ms", ()))))
+        return _orig_bmpl(cell, train_bundles, v_rest_mV, **kw)
+    _plst.build_multi_protocol_loss = _spy
+    try:
+        R.main(["--archive-dir", str(tmp), "--output-dir", str(out),
+                "--code-dir", str(HERE), "--arm", "ih6",
+                "--n-calls", "14", "--n-initial", "8", "--phase3-subset", "none",
+                "--dt-brief-ms", "0.1", "--dt-long-ms", "0.1"])
+    finally:
+        _plst.build_multi_protocol_loss = _orig_bmpl
+    # (d) the SS pulses are in the training set, exponentially weighted
+    if not _built:
+        ok = False; notes.append("no loss was built through build_multi_protocol_loss")
+    for _tb, _w, _win in _built:
+        _ss = [b for b in _tb if _plst._is_brief(b) and b.polarity == "hyp"]
+        _ls = [b for b in _tb if not _plst._is_brief(b)]
+        if not (_ss and _ls):
+            ok = False; notes.append("training set lacks SS hyp pulses or long "
+                                     "steps (%d SS, %d LS)" % (len(_ss), len(_ls)))
+        if _w is None:
+            ok = False; notes.append("SS time-weight is None (uniform)")
+            continue
+        _t0 = _win[0] * 1e-3
+        _v = _w(np.array([_t0, _t0 + 5e-3, _t0 + 50e-3]))
+        if not (abs(_v[0] - 1.0) < 1e-12 and abs(_v[1] - np.exp(-1.0)) < 1e-12
+                and abs(_v[2] - np.exp(-10.0)) < 1e-15):
+            ok = False; notes.append("SS weight is not exp(-(t-t0)/5 ms): %s" % _v)
+    if _built:
+        notes.append("SS weight exp(-(t-%.1f ms)/5 ms) on %d SS hyp bundle(s) "
+                     "beside %d long step(s), in all %d loss build(s)"
+                     % (_built[0][2][0],
+                        len([b for b in _built[0][0] if _plst._is_brief(b)]),
+                        len([b for b in _built[0][0] if not _plst._is_brief(b)]),
+                        len(_built)))
 
     res = _pd.read_csv(out / "phase2_results.csv")
     roles = _pd.read_csv(out / "ls_roles.csv")
@@ -606,6 +655,9 @@ def check_S12() -> None:
             ok = False; notes.append("%s duplicated with an ih_ prefix" % col)
     if str(res["arm"].iloc[0]) != "ih6" or "Ih_human" not in str(res["ih_label"].iloc[0]):
         ok = False; notes.append("arm / ih_label not stamped on the row")
+    # D-013: which arbours the fit was run on is a column, not a log line
+    if str(res.get("morphology_source", _pd.Series([""])).iloc[0]) != "archive":
+        ok = False; notes.append("morphology_source not 'archive' on a raw-SWC fit")
     if float(res["tau_w_chosen_ms"].iloc[0]) != 5.0 \
             or str(res["tau_w_reason"].iloc[0]) != "fixed_by_cli":
         ok = False; notes.append("tau_w provenance not recorded")

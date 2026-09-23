@@ -17,12 +17,13 @@ Files that are NEW relative to `Biological Fit/` (Stage 0-1):
 | `smoke_ih_fit.py` | smoke suite S1-S8, S10-S12 |
 | `run_ih_fit.py` | **the entrypoint**: one arm x one group. Arms, the I_h configuration, the D-006 protocol, and the three CSVs a campaign is read from |
 | `submit_ih_fit.sh` | PBS wrapper: `qsub -v GROUP=L3_exc,ARM=ih6`. Idempotent mtime-aware `nrnivmodl` guard, mechanism verification, `DRY_RUN=1` |
-| `synth_gt_grid.py` | the synthetic cohort's manifest: per-cell ground truth, incl. the two fitted kinetic knobs, the false-positive control, and the noise level read out of a real run |
+| `synth_gt_grid.py` | the synthetic cohort's manifest: per-cell ground truth, incl. the two fitted kinetic knobs, the false-positive control, and each cell's per-sweep noise (sigma, rho) inherited from the real cell whose morphology it borrows |
+| `noise_calibration.py` | per-sweep recording noise of REAL archive cells (sigma, lag-1 rho, sampling rate, pulses per polarity, window length), read with the fitter's own estimator on single sweeps only. Stand-alone: `python noise_calibration.py --group-dir <ARCHIVE_ROOT>/L3_exc --out noise_table.csv` |
 | `gen_from_manifest.py` | manifest row -> Phase-0 archive (pure mapping + a NEURON-side generator) |
 | `ih_recovery_report.py` | **pure**: truth vs estimate, the recovery table, the C_m inflation, the false-positive table, the gate |
 | `run_ih_recovery.py` | **Stage 7's entrypoint**: draw -> generate -> fit (via `run_ih_fit.main`) -> report -> gate. Exit 0 = gate passed, 2 = gate failed |
-| `submit_ih_recovery.sh` | PBS wrapper for Stage 7: `qsub -v MORPH_ROOT=...,NOISE_FROM_RESULTS=...` |
-| `smoke_ih_recovery.py` | Stage 7's smoke suite R1-R9 |
+| `submit_ih_recovery.sh` | PBS wrapper for Stage 7: `qsub -v MAX_CELLS=...,RUN_TAG=...`; noise is measured from `MORPH_ROOT`'s own cells |
+| `smoke_ih_recovery.py` | Stage 7's smoke suite R1-R13 |
 | `regression_passive_identity.py` | Stage 0 gate: passive 3-D path identical to `Biological Fit/` |
 
 Files EDITED relative to `Biological Fit/` (Stages 2-4) -- all with legacy
@@ -67,7 +68,7 @@ is taken from `$PBS_O_WORKDIR`: its path contains a space.
     cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/HPC script/Ih Fit"
     nrnivmodl mod                          # once per architecture; creates x86_64/
     python smoke_ih_fit.py                 # expect "smoke_ih_fit: 11/11 passed"
-    python smoke_ih_recovery.py            # expect "smoke_ih_recovery: 9/9 passed"
+    python smoke_ih_recovery.py            # expect "smoke_ih_recovery: 13/13 passed"
     python regression_passive_identity.py --ref-dir "../Biological Fit" \
         --archive-cell "/davinci-1/home/ldellamea/Human Neurons Fitting/L3_exc/specimen_<id>"
                                            # expect "regression_passive_identity: PASS (...)"
@@ -99,17 +100,49 @@ Nothing in Stage 8 should run before this has passed: until it does, a fitted
 Submit from this folder; `MORPH_ROOT` defaults to `$IH_ARCHIVE_ROOT/L3_exc`.
 
     qsub -v DRY_RUN=1 submit_ih_recovery.sh
-    qsub -v MAX_CELLS=2,N_CALLS=20,RUN_TAG=pilot submit_ih_recovery.sh
+    qsub -v MAX_CELLS=2,N_CALLS=20,N_INITIAL=10,RUN_TAG=pilot submit_ih_recovery.sh
                                            # shakedown; its verdict is NOT a verdict
-    qsub -v NOISE_FROM_RESULTS=/path/to/runB/phase2_results.csv submit_ih_recovery.sh
+    qsub submit_ih_recovery.sh             # the gate: 20 cells, measured noise
 
 Read the **exit status**: `0` the gate passed, `2` it failed (and
 `gate_verdict.csv` names the axis), `1` the run broke before a verdict.
 
-`NOISE_FROM_RESULTS` is not optional in spirit. Without it the cohort is
-generated at the benchmark's 0.05 mV, and a gate that passes on data cleaner
-than the campaign's says nothing about the campaign. The run header prints
-`*** BENCHMARK DEFAULT, NOT MEASURED ***` when it is missing.
+**Noise is measured, not configured.** Step 0 reads every real cell under
+`MORPH_ROOT` with the fitter's own estimator, on SINGLE sweeps only (one Long
+Square sweep; one SS pulse), and writes `noise_table.csv`. Each synthetic cell
+is then the twin of the real cell whose morphology it borrows:
+
+* **per-protocol noise** (`NOISE_PROTOCOL=per_protocol`, the default): its
+  Long Square sweeps carry the real cell's LS-measured per-sweep sigma and
+  lag-1 rho, its SS pulses the SS-measured pair (`noise_source`,
+  `noise_ss_source` in the manifest). `ls` / `ss` use one pair for both.
+* **acquisition twin**: it is generated at the real cell's own sampling
+  rates and SS pulse count (`acq_*` in the manifest). rho is a correlation
+  between successive SAMPLES, and the archive mixes 200 kHz and 50 kHz
+  recordings, so rho only transfers with the rate it was measured at. The
+  cohort protocol in `run_config.json` is the fallback for cells without a
+  twin; `SS_N_REPEATS`, `SS_FS_HZ`, `LS_FS_HZ` force a value on every cell
+  (a forced rate that differs from a cell's own is reported).
+
+Run B's `noise_sigma_mV` is NOT used: it is measured on AVERAGED bundles and
+mixes protocols (CHANGELOG, 2026-09-23). A cell with no usable single sweep
+falls back to the nominal level and is labelled `nominal`.
+
+**Is AR(1) enough?** The table also carries, per protocol, the measured
+autocorrelation at 0.1 ms and 1 ms (`acf_*`) beside what AR(1) implies there
+(`ar1_*`, rho^L). Measured >> AR(1) at 1 ms means slow correlated noise the
+generator does not reproduce -- synthetic data then more informative than
+real. Reported in the log, used by nothing downstream.
+
+The loss is the campaign's: SS pulses exponentially weighted
+(`SS_TIME_WEIGHT=exp`, `SS_TAU_W_MS=5.0`, `SS_WINDOW_MS=0.5,100.0`, as in
+`submit_ih_fit.sh`), passed explicitly.
+
+To look at the noise before spending walltime (seconds per cell, no NEURON
+simulation):
+
+    python noise_calibration.py \
+        --group-dir "/davinci-1/home/ldellamea/Human Neurons Fitting/L3_exc" --out noise_L3.csv
 
 On a failure, D-005 says to FREEZE the failing kinetic knob rather than carry
 it: `--fit-params Cm,Rm,Ra,gbar` (drop both) or `Cm,Rm,Ra,gbar,dv_h` (keep the

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-smoke_ih_recovery.py -- Stage 7's own smoke suite.
+smoke_ih_recovery.py -- Stage 7's own smoke suite (R1-R13).
 
 Stage 7 produces a VERDICT, so its arithmetic has to be checked against
 fixtures whose answer is known by construction, not merely inspected. Nine
@@ -26,6 +26,7 @@ Run:  python smoke_ih_recovery.py            (add --build for nrnivmodl)
 """
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -77,6 +78,41 @@ def _swcs(tmp: Path, n: int = 2):
     return out
 
 
+def _archive_cell(tmp: Path, sid: int, *, sigma: float, rho: float,
+                  ss_sigma: float = None, ss_rho: float = None,
+                  ss_n: int = 8, fs: float = 50000.0, dend_len: float = 300.0):
+    """A synthetic stand-in for a REAL archive cell: specimen_<sid>/ holding
+    reconstruction.swc and the sweeps, generated with KNOWN per-sweep noise --
+    (sigma, rho) on the Long Square sweeps and, when given, a DIFFERENT
+    (ss_sigma, ss_rho) on the SS pulses, all at sampling rate `fs`.
+    Passive, so it generates in seconds; the noise is what is being tested."""
+    import synthetic_ground_truth as sgt
+    import passive_fitting_hpc_fixed as mono
+    swc_tmp = tmp / ("_swc_%d.swc" % sid)
+    sgt.write_ball_and_stick_swc(swc_tmp, soma_r_um=10.0, dend_len_um=dend_len,
+                                 dend_r_um=1.0, apic_len_um=500.0,
+                                 apic_r_um=1.2, step_um=20.0)
+    gt = sgt.GroundTruthParams(cm_uF_cm2=0.9, rm_Ohm_cm2=30000.0,
+                               ra_Ohm_cm=200.0, e_pas_mV=-73.5)
+    proto = sgt.ProtocolConfig(ss_n_repeats=ss_n,
+                               ls_hyp_amplitudes_pA=(-30.0, -70.0, -110.0),
+                               ss_sampling_rate_Hz=fs, ls_sampling_rate_Hz=fs)
+    kw = {}
+    if ss_sigma is not None:
+        kw["ss_noise"] = sgt.NoiseConfig(
+            sigma_mV=ss_sigma, rho_lag1=(rho if ss_rho is None else ss_rho),
+            seed=sid % 1000)
+    syn = sgt.generate_synthetic_cell(
+        swc_tmp, gt, proto=proto,
+        noise=sgt.NoiseConfig(sigma_mV=sigma, rho_lag1=rho, seed=sid % 1000),
+        specimen_id=sid, passive_cell_factory=mono.build_neuron_model,
+        verbose=False, **kw)
+    d = tmp / ("specimen_%d" % sid)
+    sgt.write_archive_cell(syn, d, verbose=False)
+    sgt._clear_neuron_sections()
+    return d
+
+
 # ===========================================================================
 def check_R1() -> None:
     """The new stream is APPENDED, so nothing drawn before Stage 7 moves."""
@@ -103,7 +139,9 @@ def check_R1() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="smoke_r1_"))
     swcs = _swcs(tmp, 3)
     legacy_cols = ["specimen_id", "cm_true", "rm_true", "ra_true",
-                   "ih_gihbar_S_cm2", "noise_sigma_mV", "noise_seed"]
+                   "ih_gihbar_S_cm2", "noise_sigma_mV",
+                   "noise_baseline_sigma_mV", "noise_drift_sigma_mV",
+                   "noise_seed"]
     new = G.draw_manifest(swcs, seed=7, cells_per_cohort=2, use_ih=True)
     ok_oracle, note = True, "oracle not present; compared streams only"
     spec_path = ORACLE / "synth_gt_grid.py"
@@ -482,40 +520,565 @@ def check_R7() -> None:
            ok, "; ".join(notes))
 
 
-def check_R8() -> None:
-    """End to end on a 4-cell cohort at a toy budget: draw, generate, fit two
-    arms through the campaign's own entrypoint, report, gate."""
+def _estimator_band(n: int, m: int, rho: float, *, reps: int = 2000,
+                    seed: int = 0, q: float = 0.001):
+    """Sampling distribution of the calibration estimator under the
+    generator's own noise law, for a window of `n` samples and `m` traces:
+    median over traces of std(ddof=1), and of the lag-1 autocorrelation, of a
+    stationary AR(1) with unit variance -- exactly what
+    sgt.add_recording_noise injects and mono._estimate_noise reads.
+    Returns ((sigma_lo, sigma_hi), (rho_lo, rho_hi), sigma_mean): the [q, 1-q]
+    quantiles of sigma_hat/sigma and of rho_hat.
+
+    Why not a fixed tolerance: demeaning a short, strongly correlated window
+    biases sigma_hat LOW (the window mean absorbs part of the variance that
+    ddof=1 only corrects for independent samples), and the scatter grows as
+    rho -> 1. A 10 ms SS window at 50 kHz and rho = 0.9 has a mean bias of a
+    few per cent and a 99.8 % band about 17 % wide; a hand-picked 6 % would
+    fail a correct estimator. The band is the estimator's, not a choice."""
+    from scipy.signal import lfilter
+    rng = np.random.default_rng(seed)
+    r = float(np.clip(rho, -0.999, 0.999))
+    s_med = np.empty(reps); r_med = np.empty(reps)
+    for k in range(reps):
+        x = rng.normal(0.0, np.sqrt(1.0 - r * r), size=(m, n))
+        x[:, 0] = rng.normal(0.0, 1.0, size=m)          # stationary start
+        x = lfilter([1.0], [1.0, -r], x, axis=1)
+        c = x - x.mean(axis=1, keepdims=True)
+        s_med[k] = np.median(x.std(axis=1, ddof=1))
+        r_med[k] = np.median((c[:, 1:] * c[:, :-1]).mean(axis=1)
+                             / (c * c).mean(axis=1))
+    return ((float(np.quantile(s_med, q)), float(np.quantile(s_med, 1 - q))),
+            (float(np.quantile(r_med, q)), float(np.quantile(r_med, 1 - q))),
+            float(s_med.mean()))
+
+
+def _acf_gap_band(n: int, m: int, rho: float, lags, *, reps: int = 2000,
+                  seed: int = 0, q: float = 0.001):
+    """Sampling distribution, under the generator's AR(1) law, of the adequacy
+    diagnostic noise_calibration writes for one protocol: the median over the
+    m traces of the lag-L autocorrelation MINUS the median over traces of
+    rho1_hat^L. Zero in expectation only asymptotically; this band is what a
+    correct diagnostic on genuinely AR(1) noise of that window length and
+    trace count produces. Returns {L: (lo, hi)}, the [q, 1-q] quantiles."""
+    from scipy.signal import lfilter
+    rng = np.random.default_rng(seed)
+    r = float(np.clip(rho, -0.999, 0.999))
+    gaps = {int(L): np.empty(reps) for L in lags}
+    for k in range(reps):
+        x = rng.normal(0.0, np.sqrt(1.0 - r * r), size=(m, n))
+        x[:, 0] = rng.normal(0.0, 1.0, size=m)
+        x = lfilter([1.0], [1.0, -r], x, axis=1)
+        c = x - x.mean(axis=1, keepdims=True)
+        v = (c * c).mean(axis=1)
+        r1 = (c[:, 1:] * c[:, :-1]).mean(axis=1) / v
+        for L in gaps:
+            rl = (c[:, L:] * c[:, :-L]).mean(axis=1) / v
+            gaps[L][k] = np.median(rl) - np.median(r1 ** L)
+    return {L: (float(np.quantile(g, q)), float(np.quantile(g, 1 - q)))
+            for L, g in gaps.items()}
+
+
+def check_R10() -> None:
+    """CLOSURE: inject known per-sweep (sigma, rho), write an archive, read it
+    back with noise_calibration. The measurement is only worth anything if it
+    is the inverse of the injection -- within the estimator's own sampling
+    distribution at the window length and trace count actually used."""
+    import passive_fitting_hpc_fixed as mono
+    import noise_calibration as NC
+    tmp = Path(tempfile.mkdtemp(prefix="smoke_r10_"))
+    ok, notes = True, []
+    for sid, sig, rho in ((900000701, 0.05, 0.0), (900000702, 0.08, 0.7),
+                          (900000703, 0.12, 0.9)):
+        d = _archive_cell(tmp, sid, sigma=sig, rho=rho)
+        r = NC.measure_specimen_noise(d, mono=mono)
+        # the window the estimator read, against the protocol that wrote it:
+        # SS pre-pad 10 ms, LS onset 100 ms less the 5 ms guard, at 50 kHz
+        if not (int(r["n_pre_ss"]) == 500 and int(r["n_pre_ls"]) == 4750
+                and int(r["n_ls_single"]) == 3 and int(r["n_ss_pulses"]) == 16):
+            ok = False
+            notes.append("%s: windows %s/%s samples, %s LS sweeps, %s pulses "
+                         "(expect 4750/500, 3, 16)" % (sid, r["n_pre_ls"],
+                         r["n_pre_ss"], r["n_ls_single"], r["n_ss_pulses"]))
+        nm = {"ls": (int(r["n_pre_ls"]), int(r["n_ls_single"])),
+              "ss": (int(r["n_pre_ss"]), int(r["n_ss_pulses"]))}
+        for proto in ("ls", "ss"):
+            n_, m_ = nm[proto]
+            (slo, shi), (rlo, rhi), smean = _estimator_band(
+                n_, m_, rho, seed=sid % 1000)
+            s_hat = float(r["sigma_%s_mV" % proto]) / sig
+            r_hat = float(r["rho_%s" % proto])
+            inside = (slo <= s_hat <= shi) and (rlo <= r_hat <= rhi)
+            ok &= inside
+            notes.append("%s rho %.1f: sigma x%.3f in [%.3f, %.3f] (mean %.3f), "
+                         "rho %.3f in [%.3f, %.3f] over %d x %d samples%s"
+                         % (proto.upper(), rho, s_hat, slo, shi, smean, r_hat,
+                            rlo, rhi, m_, n_, "" if inside else "  <-- OUTSIDE"))
+        if int(r["n_ss_hyp"]) != 8 or float(r["fs_ls_Hz"]) != 50000.0:
+            ok = False
+            notes.append("%s: SS per polarity %s (expect 8), LS fs %s"
+                         % (sid, r["n_ss_hyp"], r["fs_ls_Hz"]))
+        # the AR(1) adequacy diagnostic is SILENT on AR(1) noise: measured
+        # minus AR(1)-implied autocorrelation inside its own sampling band
+        lags = {NC._lag_tag(l): int(round(l * 1e-3 * 50000.0))
+                for l in NC.ACF_LAGS_MS}
+        for proto in ("ls", "ss"):
+            n_, m_ = nm[proto]
+            band = _acf_gap_band(n_, m_, rho, sorted(set(lags.values())),
+                                 seed=sid % 1000 + 7)
+            for tag, L in lags.items():
+                gap = (float(r["acf_%s_%s" % (proto, tag)])
+                       - float(r["ar1_%s_%s" % (proto, tag)]))
+                lo, hi = band[L]
+                if not (lo <= gap <= hi):
+                    ok = False
+                    notes.append("%s rho %.1f %s lag %s: acf-AR(1) gap %.3f "
+                                 "outside [%.3f, %.3f]  <-- OUTSIDE"
+                                 % (sid, rho, proto.upper(), tag, gap, lo, hi))
+        notes.append("rho %.1f: AR(1) diagnostic gaps LS %s | SS %s (all in band)"
+                     % (rho, " ".join("%+.3f" % (float(r["acf_ls_" + t])
+                                                  - float(r["ar1_ls_" + t]))
+                                      for t in lags),
+                        " ".join("%+.3f" % (float(r["acf_ss_" + t])
+                                            - float(r["ar1_ss_" + t]))
+                                 for t in lags)))
+    # the diagnostic's lag-1 IS the fitter's rho, sweep by sweep
+    d = tmp / "specimen_900000703"
+    cd = NC.load_for_noise(d, mono=mono)
+    sweeps = ([b for b in cd.long_square_subthreshold
+               if int(getattr(b, "n_repeats_averaged", 1)) == 1]
+              + [NC._pulse_as_bundle(mono, p) for p in cd.ss_individual_pulses])
+    worst = max(abs(NC.lag_autocorr(NC.pre_window_samples(mono, b), 1)
+                    - mono._estimate_noise(b)[1]) for b in sweeps)
+    if not worst <= 1e-12:
+        ok = False
+    notes.append("lag_autocorr(.,1) vs the fitter's rho over %d sweeps: worst "
+                 "|diff| %.1e" % (len(sweeps), worst))
+    # the generator's legacy path is untouched: no ss_noise == ss_noise=None
+    # == the same law passed explicitly, bit for bit, SS and LS alike
+    import synthetic_ground_truth as sgt
+    swc = tmp / "_swc_legacy.swc"
+    sgt.write_ball_and_stick_swc(swc, soma_r_um=10.0, dend_len_um=300.0,
+                                 dend_r_um=1.0, apic_len_um=500.0,
+                                 apic_r_um=1.2, step_um=20.0)
+    gt = sgt.GroundTruthParams(cm_uF_cm2=0.9, rm_Ohm_cm2=30000.0,
+                               ra_Ohm_cm=200.0, e_pas_mV=-73.5)
+    pr = sgt.ProtocolConfig(ss_n_repeats=3, ls_hyp_amplitudes_pA=(-50.0,))
+    law = sgt.NoiseConfig(sigma_mV=0.08, rho_lag1=0.7, seed=5)
+
+    def _gen(**kw):
+        syn = sgt.generate_synthetic_cell(
+            swc, gt, proto=pr, noise=law, specimen_id=1,
+            passive_cell_factory=mono.build_neuron_model, verbose=False, **kw)
+        sgt._clear_neuron_sections()
+        return ([np.asarray(q["v"]) for q in syn.ss_individual_pulses]
+                + [np.asarray(b.v_mV) for b in syn.long_square_subthreshold])
+    t0, t1, t2 = _gen(), _gen(ss_noise=None), _gen(ss_noise=law)
+    same = (len(t0) == len(t1) == len(t2)
+            and all(np.array_equal(a, b) and np.array_equal(a, c)
+                    for a, b, c in zip(t0, t1, t2)))
+    if not same:
+        ok = False
+    notes.append("generator: no ss_noise == ss_noise=None == same law explicit, "
+                 "bit for bit over %d traces: %s" % (len(t0), same))
+    # and the object the fitter REPORTS is not this one: an averaged SS
+    # bundle carries sigma/sqrt(N), which is why run B's number is not used
+    d = tmp / "specimen_900000702"
+    cd = mono.load_cell_from_archive(d, verbose=False)
+    avg = [mono._estimate_noise(b)[0] for b in cd.square_subthreshold
+           if b.polarity == "hyp"]
+    if not (avg and avg[0] < 0.08 / 2.0):
+        ok = False; notes.append("averaged SS bundle sigma is not the "
+                                 "per-sweep 0.08 / sqrt(8)")
+    notes.append("averaged SS bundle reads %.4f mV against per-sweep 0.08 "
+                 "(0.08/sqrt(8) = %.4f): the two objects differ by sqrt(N)"
+                 % (avg[0] if avg else float("nan"), 0.08 / np.sqrt(8.0)))
+    report("R10 noise calibration inverts the generator's injection", ok,
+           "; ".join(notes))
+
+
+def check_R11() -> None:
+    """Each synthetic cell inherits the noise of the real cell whose
+    morphology it borrows; a cell with no row falls back and says so; and
+    switching the table on moves no ground-truth draw."""
+    import synth_gt_grid as G
+    tmp = Path(tempfile.mkdtemp(prefix="smoke_r11_"))
+    ok, notes = True, []
+    swcs = []
+    for sid in (900000801, 900000802, 900000803):
+        d = tmp / ("specimen_%d" % sid)
+        d.mkdir()
+        import synthetic_ground_truth as sgt
+        swcs.append(sgt.write_ball_and_stick_swc(
+            d / "reconstruction.swc", soma_r_um=10.0, dend_len_um=300.0,
+            dend_r_um=1.0, apic_len_um=500.0, apic_r_um=1.2, step_um=20.0))
+    # 801: LS + its own SS noise + acquisition; 802: LS + acquisition only
+    # (its SS pulses inherit); 803: absent (nominal)
+    table = {900000801: {"sigma_mV": 0.071, "rho_lag1": 0.62,
+                         "ss_sigma_mV": 0.103, "ss_rho_lag1": 0.88,
+                         "fs_ss_Hz": 200000.0, "fs_ls_Hz": 200000.0,
+                         "ss_n_repeats": 12.0},
+             900000802: {"sigma_mV": 0.094, "rho_lag1": 0.81,
+                         "fs_ss_Hz": 50000.0, "fs_ls_Hz": 50000.0,
+                         "ss_n_repeats": 20.0}}
+    kw = dict(seed=5, cells_per_cohort=2, draws_per_morph=2, use_ih=True,
+              ih_kinetics="Ih_human", ih_dist="uniform", ih_ehcn_mV=-49.85,
+              ih_gbar_range_S_cm2=(2e-5, 3e-4), ih_dvh_range_mV=(-5.0, 5.0),
+              ih_kappa_range=(0.7, 1.4), fp_control_frac=0.25)
+    a = G.draw_manifest(swcs, noise_table=table, noise_rho_nominal=0.3, **kw)
+    b = G.draw_manifest(swcs, **kw)                       # no table
+    # per-cell assignment, by the specimen id in the morphology path
+    for sid, want in table.items():
+        rows = a[a["swc"].str.contains("specimen_%d" % sid)]
+        if not (len(rows) == 2 and (rows["noise_source"] == "measured").all()
+                and np.allclose(rows["noise_sigma_mV"], want["sigma_mV"])
+                and np.allclose(rows["noise_rho_lag1"], want["rho_lag1"])):
+            ok = False; notes.append("specimen %d not assigned its own noise" % sid)
+    miss = a[a["swc"].str.contains("specimen_900000803")]
+    if not ((miss["noise_source"] == "nominal").all()
+            and np.allclose(miss["noise_rho_lag1"], 0.3)):
+        ok = False; notes.append("a cell with no table row did not fall back")
+    # D-014: the SS pulses' own noise and the acquisition twin
+    r1 = a[a["swc"].str.contains("specimen_900000801")]
+    r2 = a[a["swc"].str.contains("specimen_900000802")]
+    if not ((r1["noise_ss_source"] == "measured").all()
+            and np.allclose(r1["noise_ss_sigma_mV"], 0.103)
+            and np.allclose(r1["noise_ss_rho_lag1"], 0.88)
+            and np.allclose(r1["acq_fs_ss_Hz"], 200000.0)
+            and np.allclose(r1["acq_ss_n_repeats"], 12.0)):
+        ok = False; notes.append("801's SS noise / acquisition not carried")
+    if not ((r2["noise_ss_source"] == "inherits").all()
+            and r2["noise_ss_sigma_mV"].isna().all()
+            and np.allclose(r2["acq_fs_ls_Hz"], 50000.0)):
+        ok = False; notes.append("802 (no SS measurement) not labelled 'inherits'")
+    if not ((miss["noise_ss_source"] == "inherits").all()
+            and miss["acq_fs_ls_Hz"].isna().all()):
+        ok = False; notes.append("a nominal cell acquired a twin's acquisition")
+    notes.append("SS noise measured for %d, inherited for %d; acquisition twin "
+                 "on %d cells" % ((a["noise_ss_source"] == "measured").sum(),
+                                  (a["noise_ss_source"] == "inherits").sum(),
+                                  a["acq_fs_ls_Hz"].notna().sum()))
+    notes.append("%d measured, %d nominal (fallback labelled)"
+                 % ((a["noise_source"] == "measured").sum(),
+                    (a["noise_source"] == "nominal").sum()))
+    # the table moves no ground-truth draw
+    for c in ("cm_true", "rm_true", "ra_true", "ih_gihbar_S_cm2", "ih_dvh_mV",
+              "ih_kappa_tau", "is_fp_control", "noise_seed"):
+        if not np.array_equal(a[c].to_numpy(), b[c].to_numpy()):
+            ok = False; notes.append("the noise table moved %s" % c)
+    notes.append("every ground-truth column identical with and without the table")
+    # a pre-calibration manifest loads as white, nominal noise
+    pth = tmp / "m.csv"
+    G.save_manifest(b, pth)
+    legacy = pd.read_csv(pth).drop(columns=[
+        "noise_rho_lag1", "noise_source", "noise_ss_sigma_mV",
+        "noise_ss_rho_lag1", "noise_ss_source", "acq_ss_n_repeats",
+        "acq_fs_ss_Hz", "acq_fs_ls_Hz"])
+    legacy.to_csv(pth, index=False)
+    back = G.load_manifest(pth)
+    if not (np.allclose(back["noise_rho_lag1"], 0.0)
+            and (back["noise_source"] == "nominal").all()
+            and (back["noise_ss_source"] == "inherits").all()
+            and back["noise_ss_sigma_mV"].isna().all()
+            and back["acq_fs_ls_Hz"].isna().all()):
+        ok = False; notes.append("legacy manifest did not back-fill to one "
+                                 "white nominal law at the cohort protocol")
+    # a noise table survives a CSV round trip: an empty `error` cell reads
+    # back as NaN, which is truthy -- the lookup must not drop every cell
+    import noise_calibration as NC
+    nt = pd.DataFrame([{**{c: np.nan for c in NC.NOISE_TABLE_COLUMNS},
+                        "specimen_id": 11, "sigma_ls_mV": 0.07, "rho_ls": 0.6,
+                        "sigma_ss_mV": 0.09, "rho_ss": 0.8, "fs_ls_Hz": 5e4,
+                        "fs_ss_Hz": 5e4, "n_ss_hyp": 10, "error": ""},
+                       {**{c: np.nan for c in NC.NOISE_TABLE_COLUMNS},
+                        "specimen_id": 12, "sigma_ls_mV": 0.08, "rho_ls": 0.7,
+                        "error": ""},
+                       {**{c: np.nan for c in NC.NOISE_TABLE_COLUMNS},
+                        "specimen_id": 13, "sigma_ls_mV": 0.08, "rho_ls": 0.7,
+                        "error": "OSError: unreadable"}],
+                      columns=NC.NOISE_TABLE_COLUMNS)
+    ntp = tmp / "noise_table.csv"
+    nt.to_csv(ntp, index=False)
+    nt_back = pd.read_csv(ntp)
+    for mode in NC.NOISE_PROTOCOLS:
+        mem, disk = NC.noise_lookup(nt, protocol=mode), NC.noise_lookup(nt_back, protocol=mode)
+        if mem != disk:
+            ok = False; notes.append("%s lookup changes across a CSV round "
+                                     "trip: %s vs %s" % (mode, mem, disk))
+    pp = NC.noise_lookup(nt_back)
+    if not (sorted(pp) == [11, 12] and "ss_sigma_mV" in pp[11]
+            and "ss_sigma_mV" not in pp[12] and pp[11]["ss_n_repeats"] == 10.0):
+        ok = False; notes.append("per_protocol lookup after reload: %s" % pp)
+    notes.append("noise table: lookup identical in memory and after a CSV "
+                 "round trip in all %d modes; the errored cell dropped"
+                 % len(NC.NOISE_PROTOCOLS))
+    report("R11 each synthetic cell inherits its real cell's noise", ok,
+           "; ".join(notes))
+
+
+def check_R12() -> None:
+    """rho and the sampling rates reach the generator; the protocol constants
+    resolve CLI > measured > generator default, and say which."""
+    import gen_from_manifest as GM
+    import synthetic_ground_truth as sgt
     import run_ih_recovery as RIR
+    ok, notes = True, []
+    row = dict(noise_sigma_mV=0.07, noise_baseline_sigma_mV=0.07,
+               noise_drift_sigma_mV=0.14, noise_seed=3, noise_rho_lag1=0.66)
+    if GM.row_to_noise_kwargs(row)["rho_lag1"] != 0.66:
+        ok = False; notes.append("rho_lag1 did not reach NoiseConfig")
+    legacy = {k: v for k, v in row.items() if k != "noise_rho_lag1"}
+    if GM.row_to_noise_kwargs(legacy)["rho_lag1"] != 0.0:
+        ok = False; notes.append("a legacy row is no longer white noise")
+    GM.build_noise(sgt, GM.row_to_noise_kwargs(row))       # constructs
+    p = GM.build_proto(sgt, ss_n_repeats=5, ls_hyp_amplitudes_pA=(-50.0,),
+                       ss_sampling_rate_Hz=200000.0, ls_sampling_rate_Hz=50000.0)
+    q = GM.build_proto(sgt, ss_n_repeats=5, ls_hyp_amplitudes_pA=(-50.0,))
+    d = sgt.ProtocolConfig()
+    if not (p.ss_sampling_rate_Hz == 200000.0 and p.ls_sampling_rate_Hz == 50000.0
+            and q.ss_sampling_rate_Hz == d.ss_sampling_rate_Hz
+            and q.ls_sampling_rate_Hz == d.ls_sampling_rate_Hz):
+        ok = False; notes.append("sampling rates not forwarded / defaults moved")
+    notes.append("rho and both fs reach the generator; defaults unchanged")
+    # D-014: the SS pulses' own noise, and the acquisition twin
+    ssrow = dict(row, noise_ss_sigma_mV=0.11, noise_ss_rho_lag1=0.9)
+    sk = GM.row_to_ss_noise_kwargs(ssrow)
+    if not (sk and sk["sigma_mV"] == 0.11 and sk["rho_lag1"] == 0.9
+            and sk["baseline_sigma_mV"] == 0.07 and sk["seed"] == 3):
+        ok = False; notes.append("SS noise kwargs wrong: %s" % sk)
+    if (GM.row_to_ss_noise_kwargs(row) is not None
+            or GM.row_to_ss_noise_kwargs(dict(ssrow, noise_ss_rho_lag1=np.nan))
+            is not None):
+        ok = False; notes.append("a row without SS noise did not inherit")
+    acq = GM.row_to_acquisition(dict(acq_ss_n_repeats=12.0,
+                                     acq_fs_ss_Hz=200000.0,
+                                     acq_fs_ls_Hz=np.nan))
+    if acq != {"ss_n_repeats": 12, "ss_sampling_rate_Hz": 200000.0}:
+        ok = False; notes.append("acquisition mapping wrong: %s" % acq)
+    if GM.row_to_acquisition(row) != {}:
+        ok = False; notes.append("a legacy row gained an acquisition")
+    notes.append("SS noise kwargs and the acquisition twin map as specified")
+    # CLI > measured, cell by cell; a forced rate that differs is reported
+    look = {1: {"sigma_mV": .07, "rho_lag1": .6, "fs_ss_Hz": 2e5,
+                "fs_ls_Hz": 2e5, "ss_n_repeats": 12.0},
+            2: {"sigma_mV": .08, "rho_lag1": .7, "fs_ss_Hz": 5e4,
+                "fs_ls_Hz": 5e4, "ss_n_repeats": 20.0}}
+    base_ = ["--output-dir", "/o", "--code-dir", ".", "--morph-root", "/m"]
+    same, w0 = RIR.apply_cli_acquisition(look, RIR._parse_args(base_))
+    forced, w1 = RIR.apply_cli_acquisition(look, RIR._parse_args(
+        base_ + ["--ss-sampling-rate-hz", "50000", "--ss-n-repeats", "8"]))
+    if not (same == look and not w0
+            and all("fs_ss_Hz" not in e and "ss_n_repeats" not in e
+                    and "fs_ls_Hz" in e for e in forced.values())
+            and len(w1) == 1 and "1 cell(s)" in w1[0]):
+        ok = False; notes.append("CLI precedence per cell wrong: %s | %s"
+                                 % (forced, w1))
+    notes.append("CLI overrides the twin cell by cell; forcing 50 kHz on the "
+                 "200 kHz cell is reported")
+    base = ["--output-dir", "/o", "--code-dir", ".", "--morph-root", "/m"]
+    meas = {"n_ss_per_polarity": 5.0, "fs_ss_Hz": 200000.0, "fs_ls_Hz": 50000.0}
+    r1 = RIR.resolve_protocol(RIR._parse_args(base), meas)
+    r2 = RIR.resolve_protocol(RIR._parse_args(base + ["--ss-n-repeats", "12"]), meas)
+    r3 = RIR.resolve_protocol(RIR._parse_args(base), {})
+    if not (r1["ss_n_repeats"] == 5 and r1["ss_n_repeats_source"] == "measured"
+            and r2["ss_n_repeats"] == 12 and r2["ss_n_repeats_source"] == "cli"
+            and r3["ss_n_repeats"] == 30
+            and r3["ss_n_repeats_source"] == "generator default"
+            and r1["ls_sampling_rate_Hz"] == 50000.0):
+        ok = False; notes.append("protocol precedence wrong: %s | %s | %s"
+                                 % (r1, r2, r3))
+    notes.append("precedence cli > measured > default, source recorded")
+    try:                           # skopt refuses n_calls < n_initial
+        RIR._parse_args(base + ["--n-calls", "20"])
+        ok = False; notes.append("n_initial 100 > n_calls 20 accepted")
+    except SystemExit:
+        notes.append("n_initial > n_calls refused at parse time")
+    report("R12 rho and the real protocol reach the generator", ok,
+           "; ".join(notes))
+
+
+def check_R13() -> None:
+    """The AR(1) adequacy diagnostic can FAIL: silent on an AR(1) trace, it
+    flags a trace carrying the same fast AR(1) plus a slow component that an
+    exponential fitted at lag 1 cannot represent. NumPy only."""
+    import noise_calibration as NC
+    from scipy.signal import lfilter
+    ok, notes = True, []
+    rng = np.random.default_rng(13)
+    fs, n = 50000.0, 50000                   # 1 s window at 50 kHz
+    lag = int(round(1.0e-3 * fs))            # 1 ms = 50 samples
+
+    def ar1(rho, size, sd):
+        e = rng.normal(0.0, sd * np.sqrt(1.0 - rho * rho), size)
+        e[0] = rng.normal(0.0, sd)
+        return lfilter([1.0], [1.0, -rho], e)
+    fast = ar1(0.8, n, 0.05)                 # correlation time ~ 0.09 ms
+    slow = ar1(np.exp(-1.0 / (0.005 * fs)), n, 0.05)   # OU, tau = 5 ms
+    for label, x, want_flag in (("AR(1) alone", fast, False),
+                                ("AR(1) + 5 ms OU", fast + slow, True)):
+        r1 = NC.lag_autocorr(x, 1)
+        acf, ar1_implied = NC.lag_autocorr(x, lag), r1 ** lag
+        flagged = (acf - ar1_implied) > 0.1
+        if flagged != want_flag:
+            ok = False
+        notes.append("%s: rho1 %.3f, acf(1 ms) %.3f vs AR(1) %.3f -> %s"
+                     % (label, r1, acf, ar1_implied,
+                        "FLAGGED" if flagged else "silent"))
+    report("R13 the AR(1) adequacy diagnostic flags a second timescale", ok,
+           "; ".join(notes))
+
+
+def check_R8() -> None:
+    """End to end on a 4-cell cohort at a toy budget, and a CLOSURE through
+    the whole chain: two real-like cells recorded with KNOWN, protocol-
+    specific noise at DIFFERENT sampling rates and SS pulse counts are
+    measured; each synthetic twin is generated at its real cell's
+    acquisition with per-protocol noise; two arms are fitted through the
+    campaign's own entrypoint (SS pulses exponentially weighted); the report
+    and gate are written -- and then the SYNTHETIC archives are measured
+    again and must carry the noise and acquisition of their real twins."""
+    import run_ih_recovery as RIR
+    import noise_calibration as NC
+    import passive_fitting_hpc_fixed as mono
+    import passive_long_step_training as _plst
     tmp = Path(tempfile.mkdtemp(prefix="smoke_r8_"))
-    swcs = _swcs(tmp, 2)
-    morph_root = tmp
+    real = {900000901: dict(ls=(0.07, 0.60), ss=(0.10, 0.80), fs=50000.0,
+                            n=6, dl=300.0),
+            900000902: dict(ls=(0.09, 0.75), ss=(0.06, 0.50), fs=100000.0,
+                            n=4, dl=400.0)}
+    for sid, c in real.items():
+        _archive_cell(tmp, sid, sigma=c["ls"][0], rho=c["ls"][1],
+                      ss_sigma=c["ss"][0], ss_rho=c["ss"][1],
+                      ss_n=c["n"], fs=c["fs"], dend_len=c["dl"])
     out = tmp / "out"
-    rc = RIR.main([
-        "--output-dir", str(out), "--code-dir", str(HERE),
-        "--morph-root", str(morph_root), "--morph-glob", "m*/reconstruction.swc",
-        "--draws-per-morph", "2", "--cells-per-cohort", "2", "--max-cells", "4",
-        "--seed", "11", "--fp-control-frac", "0.25",
-        # '=' form: argparse reads a bare '-10,...' as an option, not a value
-        "--ls-hyp-amps=-10,-30,-50,-70,-90,-110,-150",
-        "--ls-dep-amps=20,50", "--ss-n-repeats", "4",
-        "--arms", "passive_fullstep,ih6",
-        "--n-calls", "14", "--n-initial", "8",
-        "--dt-brief-ms", "0.1", "--dt-long-ms", "0.1",
-        "--phase3-subset", "none", "--no-plot", "--clean-archive"])
+    _orig = _plst.build_multi_protocol_loss
+    _built = []
+
+    def _spy(cell, train_bundles, v_rest_mV, **kw):
+        _built.append((kw.get("ss_sample_weight_fn"),
+                       tuple(kw.get("ss_window_ms", ())),
+                       sum(1 for x in train_bundles if _plst._is_brief(x))))
+        return _orig(cell, train_bundles, v_rest_mV, **kw)
+    _plst.build_multi_protocol_loss = _spy
+    try:
+        rc = RIR.main([
+            "--output-dir", str(out), "--code-dir", str(HERE),
+            "--morph-root", str(tmp),
+            "--morph-glob", "specimen_*/reconstruction.swc",
+            "--draws-per-morph", "2", "--cells-per-cohort", "2",
+            "--max-cells", "4", "--seed", "11", "--fp-control-frac", "0.25",
+            # '=' form: argparse reads a bare '-10,...' as an option
+            "--ls-hyp-amps=-10,-30,-50,-70,-90,-110,-150",
+            "--ls-dep-amps=20,50",
+            "--arms", "passive_fullstep,ih6",
+            "--n-calls", "14", "--n-initial", "8",
+            "--dt-brief-ms", "0.1", "--dt-long-ms", "0.1",
+            "--phase3-subset", "none", "--no-plot"])
+    finally:
+        _plst.build_multi_protocol_loss = _orig
     ok, notes = True, []
     man = pd.read_csv(out / "manifest.csv")
     # phase_manifest must hand every later phase the frame it READ BACK from
-    # this file, not the in-memory draw, so a re-run with --manifest generates
-    # the same ground truth to the last bit.
+    # this file, so a re-run with --manifest generates the same ground truth
     import synth_gt_grid as _G
-
-    class _A:
-        manifest = str(out / "manifest.csv")
     reread = _G.load_manifest(out / "manifest.csv")
     if not np.allclose(reread["ih_dvh_mV"].to_numpy(dtype=float),
                        man["ih_dvh_mV"].to_numpy(dtype=float),
                        rtol=0, atol=0, equal_nan=True):
         ok = False; notes.append("the written manifest does not re-read equal")
+    if not (out / "noise_table.csv").exists():
+        ok = False; notes.append("noise_table.csv not written")
+    nt = pd.read_csv(out / "noise_table.csv")
+
+    def _twin(swc):
+        return next(s_ for s_ in real if ("specimen_%d" % s_) in str(swc))
+
+    def _in_band(r_, proto, sig, rho, seed):
+        n_ = int(r_["n_pre_" + proto])
+        m_ = int(r_["n_ls_single"] if proto == "ls" else r_["n_ss_pulses"])
+        (slo, shi), (rlo, rhi), _m = _estimator_band(n_, m_, rho, seed=seed)
+        sh, rh = float(r_["sigma_%s_mV" % proto]) / sig, float(r_["rho_" + proto])
+        return (slo <= sh <= shi) and (rlo <= rh <= rhi), sh, rh
+
+    # (1) the REAL cells were read right: noise per protocol, and acquisition
+    for sid, c in real.items():
+        r_ = nt[nt["specimen_id"] == sid].iloc[0]
+        for proto in ("ls", "ss"):
+            inside, sh, rh = _in_band(r_, proto, c[proto][0], c[proto][1],
+                                      sid % 1000)
+            if not inside:
+                ok = False; notes.append("real %d %s read (x%.3f, %.3f) outside "
+                                         "its band" % (sid, proto, sh, rh))
+        if not (float(r_["fs_ls_Hz"]) == c["fs"] == float(r_["fs_ss_Hz"])
+                and int(r_["n_ss_hyp"]) == c["n"]):
+            ok = False; notes.append("real %d acquisition read as %s/%s Hz, "
+                                     "SS x%s" % (sid, r_["fs_ls_Hz"],
+                                                 r_["fs_ss_Hz"], r_["n_ss_hyp"]))
+    # (2) the manifest hands each twin its real cell's numbers, per protocol
+    if not ((man["noise_source"] == "measured").all()
+            and (man["noise_ss_source"] == "measured").all()):
+        ok = False; notes.append("sources: %s / %s"
+                                 % (man["noise_source"].value_counts().to_dict(),
+                                    man["noise_ss_source"].value_counts().to_dict()))
+    for _, mr in man.iterrows():
+        sid = _twin(mr["swc"])
+        r_ = nt[nt["specimen_id"] == sid].iloc[0]
+        want = ((mr["noise_sigma_mV"], r_["sigma_ls_mV"]),
+                (mr["noise_rho_lag1"], r_["rho_ls"]),
+                (mr["noise_ss_sigma_mV"], r_["sigma_ss_mV"]),
+                (mr["noise_ss_rho_lag1"], r_["rho_ss"]),
+                (mr["acq_fs_ls_Hz"], real[sid]["fs"]),
+                (mr["acq_fs_ss_Hz"], real[sid]["fs"]),
+                (mr["acq_ss_n_repeats"], real[sid]["n"]))
+        if not all(np.isclose(float(x), float(y), rtol=1e-12, atol=0)
+                   for x, y in want):
+            ok = False; notes.append("synthetic %d does not carry twin %d's "
+                                     "measurement" % (mr["specimen_id"], sid))
+    # (3) the SYNTHETIC archives: generated at the twin's acquisition, and
+    # measured back at the twin's per-protocol noise
+    n_checked = 0
+    for _, mr in man.iterrows():
+        sid = _twin(mr["swc"])
+        d = out / "archive" / ("specimen_%d" % int(mr["specimen_id"]))
+        r_ = NC.measure_specimen_noise(d, mono=mono)
+        if not (float(r_["fs_ls_Hz"]) == real[sid]["fs"]
+                and float(r_["fs_ss_Hz"]) == real[sid]["fs"]
+                and int(r_["n_ss_hyp"]) == real[sid]["n"]):
+            ok = False; notes.append("synthetic %d generated at %s Hz, SS x%s; "
+                                     "its twin at %s Hz, SS x%s"
+                                     % (mr["specimen_id"], r_["fs_ls_Hz"],
+                                        r_["n_ss_hyp"], real[sid]["fs"],
+                                        real[sid]["n"]))
+        for proto, sig, rho in (("ls", mr["noise_sigma_mV"], mr["noise_rho_lag1"]),
+                                ("ss", mr["noise_ss_sigma_mV"],
+                                 mr["noise_ss_rho_lag1"])):
+            inside, sh, rh = _in_band(r_, proto, float(sig), float(rho),
+                                      int(mr["specimen_id"]) % 1000)
+            if not inside:
+                ok = False; notes.append("synthetic %d %s reads (x%.3f, %.3f) "
+                                         "against injected (%.4f, %.3f)"
+                                         % (mr["specimen_id"], proto, sh, rh,
+                                            sig, rho))
+        n_checked += 1
+    notes.append("closure real -> measure -> twin -> measure: %d synthetic "
+                 "archives at their twin's rate (50 / 100 kHz) and SS count "
+                 "(6 / 4), LS and SS noise each in band" % n_checked)
+    # (4) every fit trained the SS pulses with the exponential weight
+    bad = [w for w, win, nss in _built
+           if w is None or nss == 0
+           or abs(w(np.array([win[0] * 1e-3 + 5e-3]))[0] - np.exp(-1.0)) > 1e-12]
+    if not _built or bad:
+        ok = False; notes.append("%d of %d loss builds lack the exp SS weight"
+                                 % (len(bad), len(_built)))
+    notes.append("SS pulses exp-weighted (tau_w 5 ms) in all %d loss builds"
+                 % len(_built))
+    # (5) the cohort protocol is only the fallback: median of the twins
+    cfg = json.loads((out / "run_config.json").read_text())
+    if not (cfg["protocol"]["ss_n_repeats"] == 5
+            and cfg["protocol"]["ss_n_repeats_source"] == "measured"
+            and cfg["noise_protocol"] == "per_protocol"):
+        ok = False; notes.append("cohort fallback / mode: %s, %s"
+                                 % (cfg["protocol"], cfg.get("noise_protocol")))
     if int(man["is_fp_control"].sum()) != 1:
         ok = False; notes.append("expected exactly 1 FP control, got %d"
                                  % man["is_fp_control"].sum())
@@ -546,12 +1109,12 @@ def check_R8() -> None:
         notes.append("gate exit code %d (%s)"
                      % (rc, (out / "gate_verdict.txt").read_text().splitlines()[0]))
         notes.append("%d per-cell rows over %d cells" % (len(per), len(man)))
-    report("R8 end to end: draw, generate, fit two arms, report", ok,
+    report("R8 end to end: measure, twin, generate, fit two arms, report", ok,
            "; ".join(notes))
 
 
 def check_R9() -> None:
-    files = ["synth_gt_grid.py", "gen_from_manifest.py",
+    files = ["synth_gt_grid.py", "gen_from_manifest.py", "noise_calibration.py",
              "ih_recovery_report.py", "run_ih_recovery.py",
              "smoke_ih_recovery.py", "submit_ih_recovery.sh"]
     bad = []
@@ -578,7 +1141,7 @@ def main() -> int:
     ensure_build(args.build)
     from neuron import h  # noqa: F401  (loads ./x86_64)
     checks = [check_R1, check_R2, check_R3, check_R4, check_R5, check_R6,
-              check_R7]
+              check_R7, check_R10, check_R11, check_R12, check_R13]
     if not args.quick:
         checks.append(check_R8)
     checks.append(check_R9)

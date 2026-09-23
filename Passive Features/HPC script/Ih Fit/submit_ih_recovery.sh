@@ -22,8 +22,8 @@
 #     1  the run itself broke before a verdict existed
 #
 # -- Dispatch ------------------------------------------------------------------
-#     qsub -v MORPH_ROOT=/path/to/L3_exc submit_ih_recovery.sh
-#     qsub -v MORPH_ROOT=...,RUN_TAG=pilot,MAX_CELLS=4,N_CALLS=40 submit_ih_recovery.sh
+#     qsub submit_ih_recovery.sh                 # L3_exc, noise measured
+#     qsub -v MORPH_ROOT=...,RUN_TAG=pilot,MAX_CELLS=4,N_CALLS=40,N_INITIAL=20 submit_ih_recovery.sh
 #     qsub -v MANIFEST=/path/manifest.csv,SKIP_GENERATE=1,ARCHIVE_DIR=... \
 #          submit_ih_recovery.sh          # re-fit a cohort already generated
 #
@@ -31,7 +31,8 @@
 # MAX_CELLS x |ARMS| fits at N_CALLS/N_INITIAL. The default is 20 x 4 at
 # 200/100 = 80 fits. The budget is deliberately NOT reduced: a recovery
 # failure at 60 calls would say nothing about a campaign that runs at 200.
-# Shake the pipeline down with MAX_CELLS=2,N_CALLS=20 first, then run the real
+# Shake the pipeline down with MAX_CELLS=2,N_CALLS=20,N_INITIAL=10 first (the
+# parser refuses N_INITIAL > N_CALLS, and N_INITIAL defaults to 100), then run the real
 # cohort -- and note that the pilot's verdict is not a verdict.
 ##########################################################################
 
@@ -88,11 +89,22 @@ fi
 MORPH_ROOT="${MORPH_ROOT:-$ARCHIVE_ROOT/L3_exc}"
 MORPH_GLOB="${MORPH_GLOB:-specimen_*/reconstruction.swc}"
 
-# RUN B's results, from which the synthetic noise level is taken. WITHOUT IT
-# the cohort is generated at the benchmark default, which may be cleaner than
-# any real recording -- and a gate that passes on cleaner data than the
-# campaign's says nothing about the campaign.
-NOISE_FROM_RESULTS="${NOISE_FROM_RESULTS:-}"
+# NOISE is measured, not configured. MORPH_ROOT is a real archive group, so
+# each specimen_<id>/ holds both the SWC the cohort borrows and the sweeps it
+# was recorded with; noise_calibration reads the per-sweep sigma and AR(1)
+# rho of every one of those cells from its single sweeps, with the fitter's
+# own estimator, and each synthetic cell inherits the noise of the real cell
+# whose arbour it uses. The SS repeat count and both sampling rates are set
+# from the same measurement. Result: noise_table.csv next to the manifest.
+# NO_MEASURE_NOISE=1 falls back to a nominal level -- labelled 'nominal' in
+# the manifest and announced in the log, because a gate that passes on
+# cleaner noise than the bench says nothing about the campaign.
+NO_MEASURE_NOISE="${NO_MEASURE_NOISE:-0}"
+# per_protocol (D-014): LS sweeps carry the real cell's LS noise, SS pulses
+# its SS noise. ls | ss: one measurement for both (D-012). In every mode each
+# synthetic cell is generated at its real twin's own sampling rates and SS
+# pulse count -- rho is a correlation between successive SAMPLES.
+NOISE_PROTOCOL="${NOISE_PROTOCOL:-per_protocol}"
 
 # Reuse an existing cohort instead of drawing one.
 MANIFEST="${MANIFEST:-}"
@@ -122,7 +134,11 @@ KAPPA_RANGE="${KAPPA_RANGE:-0.7,1.4}"         # inside the fit box [0.5,2]
 # --- The generated protocol --------------------------------------------------
 LS_HYP_AMPS="${LS_HYP_AMPS:--10,-30,-50,-70,-90,-110,-150}"
 LS_DEP_AMPS="${LS_DEP_AMPS:-20,50}"           # the D-006 validation set
-SS_N_REPEATS="${SS_N_REPEATS:-30}"
+# Empty = measured from the real cells (median SS pulses per polarity; both
+# sampling rates likewise). Set only to override the measurement.
+SS_N_REPEATS="${SS_N_REPEATS:-}"
+SS_FS_HZ="${SS_FS_HZ:-}"
+LS_FS_HZ="${LS_FS_HZ:-}"
 
 # --- The fit (identical to the campaign's) ----------------------------------
 ARMS="${ARMS:-baseline_runB,passive_fullstep,ih4,ih6}"
@@ -132,6 +148,11 @@ N_INITIAL="${N_INITIAL:-100}"
 DT_BRIEF_MS="${DT_BRIEF_MS:-0.1}"
 DT_LONG_MS="${DT_LONG_MS:-0.1}"
 PHASE3_SUBSET="${PHASE3_SUBSET:-none}"
+# The SS pulses' exponential time-weight in the LOSS -- the same defaults as
+# submit_ih_fit.sh, passed explicitly so the gate runs the campaign's loss.
+SS_TIME_WEIGHT="${SS_TIME_WEIGHT:-exp}"
+SS_TAU_W_MS="${SS_TAU_W_MS:-5.0}"
+SS_WINDOW_MS="${SS_WINDOW_MS:-0.5,100.0}"
 
 # --- The gate (the tolerances are the assistant's PROPOSAL, plan section 8) --
 GATE_ARM="${GATE_ARM:-ih6}"
@@ -160,10 +181,6 @@ if [ -z "$MANIFEST" ] && [ ! -d "$MORPH_ROOT" ]; then
 fi
 if [ -n "$MANIFEST" ] && [ ! -f "$MANIFEST" ]; then
     echo "[FATAL] MANIFEST does not exist: $MANIFEST" >&2
-    exit 3
-fi
-if [ -n "$NOISE_FROM_RESULTS" ] && [ ! -f "$NOISE_FROM_RESULTS" ]; then
-    echo "[FATAL] NOISE_FROM_RESULTS does not exist: $NOISE_FROM_RESULTS" >&2
     exit 3
 fi
 
@@ -236,15 +253,18 @@ echo "Morphologies:           ${MANIFEST:-$MORPH_ROOT/$MORPH_GLOB}"
 echo "Cohort:                 max $MAX_CELLS cell(s), seed $SEED, FP fraction $FP_CONTROL_FRAC"
 echo "I_h truth:              $IH_MECHANISM / $IH_DISTRIBUTION / regions=$IH_REGIONS"
 echo "                        gbar [$GBAR_RANGE]  dv_h [$DVH_RANGE] mV  kappa [$KAPPA_RANGE]"
-echo "Generated protocol:     LS hyp [$LS_HYP_AMPS] pA, LS dep [$LS_DEP_AMPS] pA, SS x$SS_N_REPEATS"
-if [ -n "$NOISE_FROM_RESULTS" ]; then
-    echo "Noise:                  MEASURED, from $NOISE_FROM_RESULTS"
+echo "Generated protocol:     LS hyp [$LS_HYP_AMPS] pA, LS dep [$LS_DEP_AMPS] pA"
+echo "                        SS x${SS_N_REPEATS:-<per cell>}  SS fs ${SS_FS_HZ:-<per cell>}  LS fs ${LS_FS_HZ:-<per cell>}"
+if [ "$NO_MEASURE_NOISE" = "1" ]; then
+    echo "Noise:                  *** NOMINAL, NOT MEASURED (NO_MEASURE_NOISE=1) ***"
+    echo "                        The gate then passes on noise that is not the bench's."
+elif [ -n "$MANIFEST" ]; then
+    echo "Noise:                  as recorded in the reused manifest (noise_source column)"
 else
-    echo "Noise:                  *** BENCHMARK DEFAULT, NOT MEASURED ***"
-    echo "                        Pass NOISE_FROM_RESULTS=<run B phase2_results.csv>"
-    echo "                        or the gate passes on data cleaner than the campaign's."
+    echo "Noise:                  MEASURED per cell from the real sweeps under $MORPH_ROOT ($NOISE_PROTOCOL)"
 fi
 echo "Arms:                   $ARMS   at $N_CALLS/$N_INITIAL, dt ${DT_LONG_MS}ms"
+echo "Loss (SS pulses):       $SS_TIME_WEIGHT weight, tau_w=${SS_TAU_W_MS}ms, window [$SS_WINDOW_MS] ms"
 echo "Gate arm:               $GATE_ARM"
 echo "-----------------------------------------"
 
@@ -267,7 +287,10 @@ ARGS=(
     "--kappa-range=$KAPPA_RANGE"
     "--ls-hyp-amps=$LS_HYP_AMPS"
     "--ls-dep-amps=$LS_DEP_AMPS"
-    --ss-n-repeats       "$SS_N_REPEATS"
+    --noise-protocol     "$NOISE_PROTOCOL"
+    --ss-time-weight     "$SS_TIME_WEIGHT"
+    --ss-tau-w-ms        "$SS_TAU_W_MS"
+    --ss-window-ms       "$SS_WINDOW_MS"
     --arms               "$ARMS"
     --F                  "$F_FACTOR"
     --n-calls            "$N_CALLS"
@@ -287,7 +310,10 @@ ARGS=(
 [ -n "$MANIFEST" ]           && ARGS+=(--manifest "$MANIFEST")
 [ -z "$MANIFEST" ]           && ARGS+=(--morph-root "$MORPH_ROOT")
 [ -n "$ARCHIVE_DIR" ]        && ARGS+=(--archive-dir "$ARCHIVE_DIR")
-[ -n "$NOISE_FROM_RESULTS" ] && ARGS+=(--noise-from-results "$NOISE_FROM_RESULTS")
+[ "$NO_MEASURE_NOISE" = "1" ] && ARGS+=(--no-measure-noise)
+[ -n "$SS_N_REPEATS" ]       && ARGS+=(--ss-n-repeats "$SS_N_REPEATS")
+[ -n "$SS_FS_HZ" ]           && ARGS+=(--ss-sampling-rate-hz "$SS_FS_HZ")
+[ -n "$LS_FS_HZ" ]           && ARGS+=(--ls-sampling-rate-hz "$LS_FS_HZ")
 [ -n "$EHCN" ]               && ARGS+=("--ehcn=$EHCN")
 [ "$SKIP_GENERATE" = "1" ]   && ARGS+=(--skip-generate)
 [ "$OVERWRITE" = "1" ]       && ARGS+=(--overwrite)
@@ -297,7 +323,16 @@ if [ "${DRY_RUN:-0}" = "1" ]; then
     echo "[DRY RUN] would run:"
     echo "  python $ENTRYPOINT \\"
     printf '    %s\n' "${ARGS[@]}"
-    echo "[DRY RUN] env + mechanisms verified; nothing generated, nothing fitted."
+    # The CLI contract, checked rather than printed: the entrypoint's OWN
+    # parser reads exactly these arguments. A renamed or mistyped flag then
+    # fails here, in seconds, instead of after the job has queued.
+    python - "${ARGS[@]}" <<'PYEOF' || { echo "[FATAL] run_ih_recovery's parser REFUSED the arguments above" >&2; conda deactivate; exit 2; }
+import sys
+import run_ih_recovery as _E
+_E._parse_args(sys.argv[1:])
+print("[DRY RUN] CLI contract: run_ih_recovery's own parser accepts every argument")
+PYEOF
+    echo "[DRY RUN] env + mechanisms + CLI verified; nothing generated, nothing fitted."
     conda deactivate
     exit 0
 fi

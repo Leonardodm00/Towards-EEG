@@ -600,17 +600,29 @@ def _fit_tau_onset(t_ms, v, base, onset_ms, win_ms=150.0) -> float:
 def generate_synthetic_cell(
     swc_path: Path, gt: GroundTruthParams, *,
     proto: Optional[ProtocolConfig] = None, noise: Optional[NoiseConfig] = None,
+    ss_noise: Optional[NoiseConfig] = None,
     specimen_id: Optional[int] = None, passive_cell_factory: Optional[Callable] = None,
     verbose: bool = True,
 ) -> SyntheticCell:
+    """`noise` is the recording noise of the Long Square sweeps and, unless
+    `ss_noise` is given, of the Square Subthreshold pulses too (the legacy
+    behaviour, bit for bit). `ss_noise`, when given, is the noise of the SS
+    pulses alone: the fast per-sweep level and lag-1 correlation measured on
+    the real cell's own SS pulses (Stage 7, D-014). Its `seed` is not used:
+    one generator, seeded from `noise.seed`, draws every sweep of the cell in
+    the same order as before. The LS realisations are therefore NOT invariant
+    to `ss_noise` -- an AR(1) sweep consumes one draw more than a white one, so
+    a different SS law shifts the stream the LS sweeps read from.
+    Reproducibility is per configuration, which is what the manifest pins."""
     proto = proto or ProtocolConfig()
     noise = noise or NoiseConfig()
     rng = np.random.default_rng(noise.seed)
     cell = build_synthetic_cell(Path(swc_path), gt, passive_cell_factory)
 
     v_rest, rin, tau, sag = measure_rin_tau_sag(cell, gt)
-    ss_bundles, ss_individuals = simulate_ss_protocol(cell, gt, proto, noise, rng,
-                                                      v_init_mV=v_rest)
+    ss_bundles, ss_individuals = simulate_ss_protocol(
+        cell, gt, proto, (ss_noise if ss_noise is not None else noise), rng,
+        v_init_mV=v_rest)
     ls_hyp = simulate_ls_protocol(cell, gt, proto, noise, rng,
                                   proto.ls_hyp_amplitudes_pA, "hyp",
                                   v_init_mV=v_rest)

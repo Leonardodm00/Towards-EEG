@@ -146,7 +146,139 @@ def _is_note(line: str) -> bool:
 # ===========================================================================
 #  Phases
 # ===========================================================================
-def phase_manifest(args, out: Path) -> pd.DataFrame:
+def phase_noise(args, out: Path) -> Tuple[Dict[int, Dict[str, float]],
+                                            Dict[str, float]]:
+    """Measure the per-sweep recording noise of the REAL cells whose
+    morphologies the cohort is drawn on (noise_calibration). Writes
+    noise_table.csv and returns (per-specimen lookup, cohort summary).
+
+    The morphology root IS a real archive group -- `specimen_<id>/` holds the
+    SWC and the sweeps side by side -- so the morphologies and the noise come
+    from the same cells, and each synthetic cell inherits the noise of the
+    real cell whose arbour it borrows. Nothing to configure.
+
+    Returns ({}, {}) when there is nothing to measure (a manifest reused
+    without a morph root, --no-measure-noise, or morphologies that are not
+    archive cells, as in the smoke suite), and the manifest then falls back
+    to the nominal level with a loud label.
+    """
+    import synth_gt_grid as G
+    import noise_calibration as NC
+    if args.no_measure_noise or not args.morph_root:
+        log("[0/3] NOISE -- not measured (%s)"
+            % ("--no-measure-noise" if args.no_measure_noise else "no --morph-root"))
+        return {}, {}
+    import passive_fitting_hpc_fixed as mono
+    swcs = G._resolve_swcs(args.morph_root, args.morph_glob)
+    dirs = []
+    for sw in swcs:
+        if NC.specimen_id_of(sw) is not None and sw.parent not in dirs:
+            dirs.append(sw.parent)
+    if args.max_cells is not None:
+        dirs = dirs[:max(1, int(args.max_cells))]
+    if not dirs:
+        log("[0/3] NOISE -- no specimen_<id>/ directories under {}; the "
+            "morphologies are not archive cells, so there is nothing to "
+            "measure".format(args.morph_root))
+        return {}, {}
+    log("[0/3] NOISE -- per-sweep noise of {} real cell(s), read from their "
+        "single sweeps with the fitter's own estimator".format(len(dirs)))
+    rows = [NC.measure_specimen_noise(d, mono=mono) for d in dirs]
+    table = pd.DataFrame(rows, columns=NC.NOISE_TABLE_COLUMNS)
+    table.to_csv(out / "noise_table.csv", index=False)
+    summ = NC.summarise_noise_table(table)
+    lookup = NC.noise_lookup(table, protocol=args.noise_protocol)
+    lookup, warns = apply_cli_acquisition(lookup, args)
+    for w in warns:
+        log("[0/3] NOISE -- WARNING: " + w)
+    log("[0/3] NOISE -- {} usable of {}: LS sigma {:.4f} mV rho {:.3f} @ {:.0f} Hz"
+        " | SS sigma {:.4f} mV rho {:.3f} @ {:.0f} Hz | SS pulses/polarity {:.0f}"
+        " | LS rho > 0.5 in {:.0f}% of cells -> noise_table.csv"
+        .format(len(lookup), len(table), summ["sigma_ls_mV"], summ["rho_ls"],
+                summ["fs_ls_Hz"], summ["sigma_ss_mV"], summ["rho_ss"],
+                summ["fs_ss_Hz"], summ["n_ss_per_polarity"],
+                100.0 * summ["frac_rho_ls_gt_0p5"]))
+    # AR(1) adequacy: measured autocorrelation at fixed physical lags beside
+    # what AR(1) implies there. measured >> AR(1) at 1 ms = slow correlated
+    # power the generator does not reproduce (synthetic data then more
+    # informative than real). Reported, never acted on.
+    for p in ("ls", "ss"):
+        log("[0/3] NOISE -- AR(1) adequacy {}: ".format(p.upper()) + " | ".join(
+            "lag {}: measured {:.3f} vs AR(1) {:.3f}".format(
+                NC._lag_tag(l), summ["acf_%s_%s" % (p, NC._lag_tag(l))],
+                summ["ar1_%s_%s" % (p, NC._lag_tag(l))])
+            for l in NC.ACF_LAGS_MS))
+    log("[0/3] NOISE -- mode {}: {} cell(s) carry their SS pulses' own noise"
+        .format(args.noise_protocol,
+                sum(1 for v in lookup.values() if "ss_sigma_mV" in v)))
+    return lookup, summ
+
+
+def apply_cli_acquisition(lookup: Dict[int, Dict[str, float]], args
+                          ) -> Tuple[Dict[int, Dict[str, float]], List[str]]:
+    """PURE. Keep the precedence command line > measured > default at the
+    level of each cell: a protocol constant given on the command line removes
+    the corresponding per-cell acquisition key, so the cohort value (the
+    command line's) applies to every cell. Returns (new lookup, warnings).
+
+    Forcing a SAMPLING RATE that differs from the one a cell's rho was
+    measured at re-creates the transplant D-014 removes -- rho is per
+    sample -- so that case is allowed (it is an explicit instruction) and
+    reported, cell count and rates included."""
+    cli = {"ss_n_repeats": getattr(args, "ss_n_repeats", None),
+           "fs_ss_Hz": getattr(args, "ss_sampling_rate_hz", None),
+           "fs_ls_Hz": getattr(args, "ls_sampling_rate_hz", None)}
+    out: Dict[int, Dict[str, float]] = {}
+    clash = {"fs_ss_Hz": 0, "fs_ls_Hz": 0}
+    for sid, e in lookup.items():
+        e2 = dict(e)
+        for key, val in cli.items():
+            if val is None or key not in e2:
+                continue
+            if key in clash and abs(float(e2[key]) - float(val)) > 1e-6:
+                clash[key] += 1
+            e2.pop(key)
+        out[sid] = e2
+    warns = ["--%s %g forced on %d cell(s) whose rho was measured at another "
+             "rate: their noise is then NOT the recorded noise (rho is per "
+             "sample)" % ({"fs_ss_Hz": "ss-sampling-rate-hz",
+                            "fs_ls_Hz": "ls-sampling-rate-hz"}[k],
+                           float(cli[k]), n)
+             for k, n in clash.items() if n]
+    return out, warns
+
+
+def resolve_protocol(args, summ: Dict[str, float]) -> Dict[str, object]:
+    """PURE. The COHORT protocol's constants, each with where it came from:
+    the command line first, then the measured cohort, then the generator's
+    own default. Since D-014 these are the FALLBACK: a synthetic cell whose
+    real twin was measured is generated at that twin's own sampling rates and
+    SS pulse count (manifest columns acq_*), and only a cell without one uses
+    these. The sampling rates matter because a lag-1 correlation read
+    at one rate is a different noise at another; the SS repeat count because
+    it sets how much the SS bundle's noise is averaged down."""
+    out: Dict[str, object] = {}
+
+    def pick(name, cli, measured, default, cast):
+        if cli is not None:
+            out[name], out[name + "_source"] = cast(cli), "cli"
+        elif measured is not None and np.isfinite(measured) and measured > 0:
+            out[name], out[name + "_source"] = cast(measured), "measured"
+        else:
+            out[name], out[name + "_source"] = default, "generator default"
+
+    pick("ss_n_repeats", args.ss_n_repeats, summ.get("n_ss_per_polarity"),
+         30, lambda v: max(1, int(round(float(v)))))
+    pick("ss_sampling_rate_Hz", args.ss_sampling_rate_hz,
+         summ.get("fs_ss_Hz"), None, float)
+    pick("ls_sampling_rate_Hz", args.ls_sampling_rate_hz,
+         summ.get("fs_ls_Hz"), None, float)
+    return out
+
+
+def phase_manifest(args, out: Path,
+                   noise_lookup: Optional[Dict[int, Dict[str, float]]] = None
+                   ) -> pd.DataFrame:
     """Draw the cohort, or load one already drawn. Writes manifest.csv."""
     import synth_gt_grid as G
     dest = out / "manifest.csv"
@@ -163,19 +295,11 @@ def phase_manifest(args, out: Path) -> pd.DataFrame:
     sigma = float(args.noise_sigma)
     baseline = float(args.noise_baseline)
     drift = float(args.noise_drift)
-    if args.noise_from_results:
-        st = G.noise_sigma_from_results(args.noise_from_results)
-        scale = st["median"] / max(sigma, 1e-12)
-        log("[1/3] MANIFEST -- noise from {}: median sigma {:.4f} mV over "
-            "{:.0f} cell(s) (IQR {:.4f}-{:.4f}); baseline and drift scaled "
-            "{:.2f}x".format(args.noise_from_results, st["median"], st["n"],
-                             st["q25"], st["q75"], scale))
-        sigma, baseline, drift = st["median"], baseline * scale, drift * scale
-    else:
-        log("[1/3] MANIFEST -- WARNING: noise is the BENCHMARK DEFAULT "
-            "(sigma={:.4f} mV), not measured. The gate then passes on data "
-            "cleaner than the campaign's. Pass --noise-from-results <run B "
-            "phase2_results.csv>.".format(sigma))
+    if not noise_lookup:
+        log("[1/3] MANIFEST -- WARNING: noise is NOMINAL (sigma {:.4f} mV per "
+            "sweep, rho {:.2f}), NOT MEASURED. A gate that passes on cleaner "
+            "noise than the bench says nothing about the campaign."
+            .format(sigma, args.noise_rho))
 
     df = G.draw_manifest(
         swcs, draws_per_morph=args.draws_per_morph, seed=args.seed,
@@ -196,6 +320,7 @@ def phase_manifest(args, out: Path) -> pd.DataFrame:
         ra_phys_lo=args.ra_phys_lo, ra_phys_hi=args.ra_phys_hi,
         noise_sigma_nominal_mV=sigma, noise_baseline_nominal_mV=baseline,
         noise_drift_nominal_mV=drift, noise_cv=args.noise_cv,
+        noise_table=noise_lookup, noise_rho_nominal=args.noise_rho,
         id_base=args.id_base)
     G.save_manifest(df, dest)
     # Re-read rather than return the in-memory draw. A CSV is decimal text, so
@@ -206,8 +331,10 @@ def phase_manifest(args, out: Path) -> pd.DataFrame:
     # every phase reads -- including this one.
     df = G.load_manifest(dest)
     n_fp = int(df["is_fp_control"].sum())
+    n_meas = int((df["noise_source"] == "measured").sum())
     log("[1/3] MANIFEST -- {} cell(s), {} with I_h, {} false-positive "
-        "control(s) -> {}".format(len(df), len(df) - n_fp, n_fp, dest))
+        "control(s); noise MEASURED for {} of them -> {}"
+        .format(len(df), len(df) - n_fp, n_fp, n_meas, dest))
     return df
 
 
@@ -220,7 +347,8 @@ def _ehcn_for_truth(args) -> float:
     return float(hip.ehcn_default_mV(args.ih_mechanism))
 
 
-def phase_generate(args, manifest: pd.DataFrame, archive: Path) -> pd.DataFrame:
+def phase_generate(args, manifest: pd.DataFrame, archive: Path,
+                   protocol: Optional[Dict[str, object]] = None) -> pd.DataFrame:
     """Write one Phase-0 archive per manifest row (NEURON-side)."""
     import gen_from_manifest as GM
     import synthetic_ground_truth as sgt
@@ -233,13 +361,27 @@ def phase_generate(args, manifest: pd.DataFrame, archive: Path) -> pd.DataFrame:
 
     hyp = tuple(float(a) for a in str(args.ls_hyp_amps).split(",") if a.strip())
     dep = tuple(float(a) for a in str(args.ls_dep_amps).split(",") if a.strip())
-    log("[2/3] GENERATE -- {} cell(s); LS hyp {} pA, LS dep {} pA, "
-        "SS repeats {}".format(len(manifest), list(hyp), list(dep),
-                               args.ss_n_repeats))
+    proto = dict(protocol or resolve_protocol(args, {}))
+    n_twin = int(np.isfinite(pd.to_numeric(
+        manifest.get("acq_fs_ls_Hz", pd.Series(dtype=float)),
+        errors="coerce")).sum())
+    n_ss_own = int((manifest.get("noise_ss_source", pd.Series(dtype=str))
+                    == "measured").sum())
+    log("[2/3] GENERATE -- {} of {} cell(s) at their real twin's own sampling "
+        "rates and SS pulse count; {} with the SS pulses' own measured noise"
+        .format(n_twin, len(manifest), n_ss_own))
+    log("[2/3] GENERATE -- {} cell(s); LS hyp {} pA, LS dep {} pA; cohort "
+        "fallback: SS x{} ({}), SS fs {} ({}), LS fs {} ({})".format(
+            len(manifest), list(hyp), list(dep),
+            proto["ss_n_repeats"], proto["ss_n_repeats_source"],
+            proto["ss_sampling_rate_Hz"], proto["ss_sampling_rate_Hz_source"],
+            proto["ls_sampling_rate_Hz"], proto["ls_sampling_rate_Hz_source"]))
     meta = GM.generate_group(manifest, archive, sgt=sgt, mono=mono,
-                             ss_n_repeats=args.ss_n_repeats,
+                             ss_n_repeats=int(proto["ss_n_repeats"]),
                              ls_hyp_amplitudes_pA=hyp,
                              ls_dep_amplitudes_pA=dep,
+                             ss_sampling_rate_Hz=proto["ss_sampling_rate_Hz"],
+                             ls_sampling_rate_Hz=proto["ls_sampling_rate_Hz"],
                              clear_fn=_clear, verbose=args.verbose_generate)
     n_ok = int(meta["ok"].sum()) if len(meta) else 0
     if n_ok == 0:
@@ -266,6 +408,9 @@ def phase_fit(args, archive: Path, out: Path, arms: Sequence[str]
         argv = ["--archive-dir", str(archive), "--output-dir", str(arm_out),
                 "--code-dir", str(args.code_dir), "--arm", arm_flag,
                 "--F", str(args.F), "--fit-target", args.fit_target,
+                "--ss-time-weight", args.ss_time_weight,
+                "--ss-tau-w-ms", str(args.ss_tau_w_ms),
+                "--ss-window-ms", str(args.ss_window_ms),
                 "--n-calls", str(args.n_calls),
                 "--n-initial", str(args.n_initial),
                 "--ih-mechanism", args.ih_mechanism,
@@ -356,7 +501,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     log("STAGE 7 -- synthetic recovery | arms {} | budget {}/{} | out {}"
         .format(arms, args.n_calls, args.n_initial, out))
 
-    manifest = phase_manifest(args, out)
+    noise_lookup, noise_summary = phase_noise(args, out)
+    protocol = resolve_protocol(args, noise_summary)
+    manifest = phase_manifest(args, out, noise_lookup)
 
     problems = check_consistency(manifest, args)
     notes = [p for p in problems if _is_note(p)]
@@ -374,11 +521,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                              "purpose (the result is then labelled as such).")
         log("[WARN] MISSPECIFICATION ON PURPOSE: " + msg)
     (out / "run_config.json").write_text(json.dumps(
-        {**vars(args), "arms": arms, "misspecification": hard}, indent=2,
+        {**vars(args), "arms": arms, "misspecification": hard,
+         "protocol": protocol, "noise_summary": noise_summary}, indent=2,
         default=str))
 
     if not args.skip_generate:
-        phase_generate(args, manifest, archive)
+        phase_generate(args, manifest, archive, protocol)
     else:
         log("[2/3] GENERATE -- skipped (--skip-generate); using {}"
             .format(archive))
@@ -438,7 +586,14 @@ def _parse_args(argv):
                          "the false-positive control. 0 disables it.")
     ap.add_argument("--gbar-floor", type=float, default=1e-6)
     # --- the protocol generated --------------------------------------------
-    ap.add_argument("--ss-n-repeats", type=int, default=30)
+    ap.add_argument("--ss-n-repeats", type=int, default=None,
+                    help="SS pulses averaged per polarity in the GENERATED "
+                         "bundle. Default: the real cells' median (measured), "
+                         "else the generator's 30.")
+    ap.add_argument("--ss-sampling-rate-hz", type=float, default=None,
+                    help="default: the real cells' median, else 50 kHz")
+    ap.add_argument("--ls-sampling-rate-hz", type=float, default=None,
+                    help="default: the real cells' median, else 20 kHz")
     ap.add_argument("--ls-hyp-amps", default="-10,-30,-50,-70,-90,-110,-150",
                     help="hyperpolarising Long Square amplitudes to GENERATE. "
                          "Must be long enough for the D-006 role split to have "
@@ -447,9 +602,21 @@ def _parse_args(argv):
                     help="spike-free depolarising steps: the D-006 validation "
                          "set. An empty list leaves the I_h arms with nothing "
                          "held out.")
-    ap.add_argument("--noise-from-results", default=None,
-                    help="run B's phase2_results.csv; its median "
-                         "noise_sigma_mV sets the synthetic noise level.")
+    ap.add_argument("--no-measure-noise", action="store_true",
+                    help="do NOT read the real cells' per-sweep noise from "
+                         "--morph-root; generate at the nominal level instead "
+                         "(labelled 'nominal' in the manifest).")
+    ap.add_argument("--noise-protocol", default="per_protocol",
+                    choices=["per_protocol", "ls", "ss"],
+                    help="per_protocol (default, D-014): LS sweeps carry the "
+                         "real cell's LS measurement and SS pulses its SS "
+                         "measurement. ls / ss: one measurement for both "
+                         "(D-012's form). In every mode each synthetic cell "
+                         "is generated at its real twin's sampling rates and "
+                         "SS pulse count.")
+    ap.add_argument("--noise-rho", type=float, default=0.0,
+                    help="nominal AR(1) coefficient for a cell with no "
+                         "measured noise.")
     ap.add_argument("--noise-sigma", type=float, default=0.05)
     ap.add_argument("--noise-baseline", type=float, default=0.05)
     ap.add_argument("--noise-drift", type=float, default=0.10)
@@ -458,6 +625,14 @@ def _parse_args(argv):
     # --- the fit (must match run_ih_fit's own defaults) ---------------------
     ap.add_argument("--arms", default="baseline_runB,passive_fullstep,ih4,ih6")
     ap.add_argument("--fit-target", default="hyp", choices=["dep", "hyp", "both"])
+    # The SS pulses' exponential time-weight in the LOSS, forwarded to
+    # run_ih_fit explicitly (its defaults, and submit_ih_fit.sh's) so the gate
+    # is run on the loss the campaign runs, and a change to one is visible in
+    # the other's run_config.json rather than silently inherited.
+    ap.add_argument("--ss-time-weight", default="exp",
+                    choices=["exp", "gauss", "none"])
+    ap.add_argument("--ss-tau-w-ms", default="5.0")
+    ap.add_argument("--ss-window-ms", default="0.5,100.0")
     ap.add_argument("--F", type=float, default=1.9)
     ap.add_argument("--n-calls", type=int, default=200)
     ap.add_argument("--n-initial", type=int, default=100)
@@ -502,6 +677,14 @@ def _parse_args(argv):
     if not args.manifest and not args.morph_root:
         raise SystemExit("[FATAL] give --morph-root (to draw a cohort) or "
                          "--manifest (to reuse one).")
+    # skopt refuses n_calls < n_initial_points; caught HERE, before any cell
+    # is generated, because inside the per-cell fit loop the ValueError would
+    # be logged and swallowed cell by cell and the run would end with no
+    # fits and no verdict.
+    if args.n_initial > args.n_calls:
+        ap.error("--n-initial (%d) exceeds --n-calls (%d): gp_minimize refuses "
+                 "this. For a shakedown lower both, e.g. N_CALLS=20,N_INITIAL=10."
+                 % (args.n_initial, args.n_calls))
     return args
 
 

@@ -339,7 +339,8 @@ _STR_FIELDS = {
 }
 
 def results_to_dataframe(results: Sequence, *, arm: str = "",
-                         ih_label: str = "") -> pd.DataFrame:
+                         ih_label: str = "",
+                         morphology_source: str = "") -> pd.DataFrame:
     """One row per fit result: the legacy scalar block, then the arm's OWN
     parameter columns, then the derived I_h quantities.
 
@@ -354,6 +355,11 @@ def results_to_dataframe(results: Sequence, *, arm: str = "",
 
     A 3-D arm therefore has no I_h columns at all rather than a column of
     NaN. Merging arms across CSVs is pandas' problem, not this writer's.
+
+    `morphology_source` is "archive" (the raw reconstruction.swc) or the
+    --swc-dir the arbours were read from (D-013). It is a column, not only a
+    log line, because a fit on the diameter-corrected arbours and one on the
+    raw ones are otherwise the same CSV with different numbers in it.
     """
     import param_spec as PS
     rows = []
@@ -364,11 +370,13 @@ def results_to_dataframe(results: Sequence, *, arm: str = "",
             row[f] = ("" if f in _STR_FIELDS else np.nan) if val is None else val
         row["arm"] = arm
         row["ih_label"] = ih_label
+        row["morphology_source"] = morphology_source
         row.update(PS.flatten_result_params(r))
         rows.append(row)
     if not rows:
-        return pd.DataFrame(columns=_RESULT_FIELDS + ["arm", "ih_label"])
-    cols = list(_RESULT_FIELDS) + ["arm", "ih_label"]
+        return pd.DataFrame(columns=_RESULT_FIELDS
+                            + ["arm", "ih_label", "morphology_source"])
+    cols = list(_RESULT_FIELDS) + ["arm", "ih_label", "morphology_source"]
     for row in rows:                      # stable order, no duplicates
         for k in row:
             if k not in cols:
@@ -597,8 +605,10 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         log("[3/5] FIT -- {} cell(s) FAILED (see failed_cells.txt): {}"
             .format(len(failed_ids), failed_ids))
 
-    results_to_dataframe(results, arm=cfg.name, ih_label=ih_label).to_csv(
-        out / "phase2_results.csv", index=False)
+    results_to_dataframe(
+        results, arm=cfg.name, ih_label=ih_label,
+        morphology_source=(str(args.swc_dir) if args.swc_dir else "archive"),
+    ).to_csv(out / "phase2_results.csv", index=False)
     if diag_rows:
         pd.DataFrame(diag_rows).to_csv(out / "ls_diagnostics.csv", index=False)
         log("[3/5] FIT -- per-step residuals + sag -> ls_diagnostics.csv")
@@ -1138,7 +1148,17 @@ def _parse_args(argv):
     ap.add_argument("--ball-radius-log", type=float, default=0.2)
     ap.add_argument("--gp-n-grid", type=int, default=80)
     ap.add_argument("--gp-inner-grid", type=int, default=30)
-    return ap.parse_args(argv)
+    args = ap.parse_args(argv)
+    # skopt refuses n_calls < n_initial_points. Inside the per-cell loop that
+    # ValueError is logged and the loop moves on, so a whole group would end
+    # as failed_cells.txt; refuse the configuration before any cell is read.
+    for calls, init, name in ((args.n_calls, args.n_initial, ""),
+                              (args.bootstrap_n_calls, args.bootstrap_n_initial,
+                               "bootstrap-")):
+        if init > calls:
+            ap.error("--%sn-initial (%d) exceeds --%sn-calls (%d): gp_minimize "
+                     "refuses this." % (name, init, name, calls))
+    return args
 
 
 if __name__ == "__main__":

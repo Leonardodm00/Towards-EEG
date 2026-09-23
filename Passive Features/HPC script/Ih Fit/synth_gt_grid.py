@@ -79,6 +79,17 @@ MANIFEST_COLUMNS: List[str] = [
     "ih_regions", "ih_vshift_base_mV", "ih_dvh_mV", "ih_kappa_tau",
     "is_fp_control",
     "noise_sigma_mV", "noise_baseline_sigma_mV", "noise_drift_sigma_mV",
+    # AR(1) coefficient of the per-sweep fast noise, and where the level came
+    # from: "measured" = the real cell whose morphology this is, read from
+    # its single sweeps by noise_calibration; "nominal" = a configured level.
+    "noise_rho_lag1", "noise_source",
+    # D-014: the SS pulses' OWN fast noise (NaN -> the SS pulses carry the
+    # noise above), and the ACQUISITION TWIN -- the real cell's SS pulses per
+    # polarity and its two sampling rates (NaN -> the cohort protocol). rho is
+    # a correlation between successive samples, so it only transfers together
+    # with the sampling interval it was measured at.
+    "noise_ss_sigma_mV", "noise_ss_rho_lag1", "noise_ss_source",
+    "acq_ss_n_repeats", "acq_fs_ss_Hz", "acq_fs_ls_Hz",
     "noise_seed",
 ]
 
@@ -91,6 +102,16 @@ _STAGE7_DEFAULTS = {
     "ih_dvh_mV": 0.0,
     "ih_kappa_tau": 1.0,
     "is_fp_control": False,
+    # every manifest written before the noise calibration had white noise
+    "noise_rho_lag1": 0.0,
+    "noise_source": "nominal",
+    # ... and one noise law for both protocols, at the cohort's protocol
+    "noise_ss_sigma_mV": float("nan"),
+    "noise_ss_rho_lag1": float("nan"),
+    "noise_ss_source": "inherits",
+    "acq_ss_n_repeats": float("nan"),
+    "acq_fs_ss_Hz": float("nan"),
+    "acq_fs_ls_Hz": float("nan"),
 }
 
 _GENERIC_STEMS = {"reconstruction", "morphology", "morph", "cell"}
@@ -291,6 +312,15 @@ def draw_manifest(
     # randomness and does not shift any stream.
     fp_control_frac: float = 0.0,
     ih_gbar_floor_S_cm2: float = 1e-6,
+    # --- per-cell MEASURED noise (noise_calibration.noise_lookup) ----------
+    # specimen_id -> {"sigma_mV", "rho_lag1"}, both PER SWEEP. A cell whose
+    # morphology path carries a specimen id found here gets that real cell's
+    # noise; any other cell gets the nominal level below and is labelled so.
+    # Optional keys per entry (D-014): "ss_sigma_mV", "ss_rho_lag1" (the SS
+    # pulses' own noise) and "fs_ss_Hz", "fs_ls_Hz", "ss_n_repeats" (the real
+    # cell's acquisition, which the synthetic twin is then generated at).
+    noise_table: Optional[Dict[int, Dict[str, float]]] = None,
+    noise_rho_nominal: float = 0.0,
     ra_phys_lo: Optional[float] = None,   # Ohm*cm; None -> full box.ra_bounds
     ra_phys_hi: Optional[float] = None,   # Ohm*cm; None -> full box.ra_bounds
     # Recording noise (per-cell level jitter via one 'noisiness' factor)
@@ -440,6 +470,55 @@ def draw_manifest(
 
     _ih_regions_str = ",".join(str(r) for r in ih_regions)
 
+    # --- per-cell noise: measured where the table has the cell, else nominal.
+    # `noise_factor` was already drawn from rng_var above and is drawn whether
+    # or not it is used, so switching the table on or off moves no stream.
+    # The two slow components (per-sweep DC offset and drift) are not read
+    # off the recordings; they are scaled with the fast level so the ratio
+    # between the three components -- the character of the noise -- is kept.
+    import noise_calibration as _NC           # local: keeps this module light
+    _table = dict(noise_table or {})
+
+    def _fin(d, k):
+        try:
+            v = float(d.get(k, float("nan")))
+        except (TypeError, ValueError):
+            return float("nan")
+        return v if np.isfinite(v) else float("nan")
+
+    n_sig = np.empty(n); n_rho = np.empty(n); _ratio = np.empty(n); n_src = []
+    ss_sig = np.full(n, np.nan); ss_rho = np.full(n, np.nan); ss_src = []
+    acq_n = np.full(n, np.nan); acq_fss = np.full(n, np.nan)
+    acq_fls = np.full(n, np.nan)
+    for _i in range(n):
+        _sid = _NC.specimen_id_of(swcs[_i // int(draws_per_morph)])
+        _hit = _table.get(_sid) if _sid is not None else None
+        if _hit is not None:
+            n_sig[_i] = float(_hit["sigma_mV"])
+            n_rho[_i] = float(_hit["rho_lag1"])
+            _ratio[_i] = n_sig[_i] / max(float(noise_sigma_nominal_mV), 1e-12)
+            n_src.append("measured")
+            # the SS pulses' own noise, when the twin had usable SS pulses
+            _s, _r = _fin(_hit, "ss_sigma_mV"), _fin(_hit, "ss_rho_lag1")
+            if np.isfinite(_s) and np.isfinite(_r):
+                ss_sig[_i], ss_rho[_i] = _s, _r
+                ss_src.append("measured")
+            else:
+                ss_src.append("inherits")
+            # the twin's acquisition; NaN leaves the cohort protocol in force
+            acq_n[_i] = _fin(_hit, "ss_n_repeats")
+            acq_fss[_i] = _fin(_hit, "fs_ss_Hz")
+            acq_fls[_i] = _fin(_hit, "fs_ls_Hz")
+        else:
+            # EXACTLY the pre-calibration expressions, so a manifest drawn
+            # without a table is bit-identical to one drawn before it existed
+            # (not (sigma*f)/sigma, which can differ from f in the last bit).
+            n_sig[_i] = float(noise_sigma_nominal_mV) * float(noise_factor[_i])
+            n_rho[_i] = float(noise_rho_nominal)
+            _ratio[_i] = float(noise_factor[_i])
+            n_src.append("nominal")
+            ss_src.append("inherits")
+
     nsb = int(seed if noise_seed_base is None else noise_seed_base)
     morph_names = _unique_morph_names(swcs)
 
@@ -469,9 +548,17 @@ def draw_manifest(
             ih_dvh_mV=(float(dvh[i]) if use_ih else np.nan),
             ih_kappa_tau=(float(kappa[i]) if use_ih else np.nan),
             is_fp_control=bool(fp[i]),
-            noise_sigma_mV=float(noise_sigma_nominal_mV) * f,
-            noise_baseline_sigma_mV=float(noise_baseline_nominal_mV) * f,
-            noise_drift_sigma_mV=float(noise_drift_nominal_mV) * f,
+            noise_sigma_mV=float(n_sig[i]),
+            noise_baseline_sigma_mV=float(noise_baseline_nominal_mV) * float(_ratio[i]),
+            noise_drift_sigma_mV=float(noise_drift_nominal_mV) * float(_ratio[i]),
+            noise_rho_lag1=float(n_rho[i]),
+            noise_source=n_src[i],
+            noise_ss_sigma_mV=float(ss_sig[i]),
+            noise_ss_rho_lag1=float(ss_rho[i]),
+            noise_ss_source=ss_src[i],
+            acq_ss_n_repeats=float(acq_n[i]),
+            acq_fs_ss_Hz=float(acq_fss[i]),
+            acq_fs_ls_Hz=float(acq_fls[i]),
             noise_seed=nsb + i,
         ))
     df = pd.DataFrame(rows, columns=MANIFEST_COLUMNS)
@@ -593,41 +680,23 @@ def load_manifest(path: Union[Path, str]) -> pd.DataFrame:
     df["ih_kinetics"] = df["ih_kinetics"].fillna("").astype(str)
     df["ih_regions"] = df["ih_regions"].fillna("").astype(str)
     df["is_fp_control"] = df["is_fp_control"].fillna(False).astype(bool)
+    df["noise_source"] = df["noise_source"].fillna("nominal").astype(str)
+    df["noise_ss_source"] = df["noise_ss_source"].fillna("inherits").astype(str)
     df["ra_mode"] = df["ra_mode"].astype(str)
     return df.reindex(columns=MANIFEST_COLUMNS)
 
 
 # ===========================================================================
-#  Noise level from a real run (Stage 7): the gate is only meaningful if the
-#  synthetic cells are as noisy as the cells the campaign will fit.
+#  Noise: measured per sweep from real archives by noise_calibration.py.
+#
+#  An earlier helper here, noise_sigma_from_results, read the median
+#  `noise_sigma_mV` of a completed run's phase2_results.csv and used it as the
+#  generator's per-sweep level. That column is the SD of AVERAGED training
+#  bundles, averaged again over a protocol-dependent set of bundles -- a
+#  different object from NoiseConfig.sigma_mV, which is added to each sweep
+#  before averaging. It was removed before it was ever run; see
+#  noise_calibration.py for the measurement that replaces it.
 # ===========================================================================
-def noise_sigma_from_results(csv_path: Union[Path, str],
-                             *, column: str = "noise_sigma_mV") -> Dict[str, float]:
-    """Median per-cell recording noise from a completed run's phase2_results.csv.
-
-    PURE (pandas only, no NEURON). `column` is what `fit_one_cell` wrote as
-    `noise_sigma_mV`: the pre-pulse residual sigma estimated per training
-    bundle and averaged, i.e. the same quantity the generator's
-    `NoiseConfig.sigma_mV` injects.
-
-    Returns {"median", "mean", "q25", "q75", "n"} in mV. Raises if the column
-    is absent or has no finite entry -- a silently-defaulted noise level is
-    exactly the failure this function exists to prevent: the recovery gate
-    would then pass on data cleaner than anything on the bench.
-    """
-    df = pd.read_csv(csv_path)
-    if column not in df.columns:
-        raise KeyError("{} has no column {!r}; available={}"
-                       .format(csv_path, column, sorted(df.columns)))
-    v = pd.to_numeric(df[column], errors="coerce").to_numpy(dtype=float)
-    v = v[np.isfinite(v) & (v > 0.0)]
-    if v.size == 0:
-        raise ValueError("{}[{!r}] has no finite positive entry; cannot set "
-                         "the synthetic noise level from it."
-                         .format(csv_path, column))
-    return {"median": float(np.median(v)), "mean": float(np.mean(v)),
-            "q25": float(np.percentile(v, 25)),
-            "q75": float(np.percentile(v, 75)), "n": float(v.size)}
 
 
 def list_groups(df: pd.DataFrame) -> List[str]:
@@ -727,16 +796,24 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     ap.add_argument("--ih-gbar-floor", type=float, default=1e-6,
                     help="gbar of a false-positive-control cell (S/cm^2); "
                          "the fitter box floor by default.")
-    # --- Stage 7: noise level taken from a real run ------------------------
-    ap.add_argument("--noise-from-results", default=None,
-                    help="phase2_results.csv of a completed run (e.g. run B). "
-                         "Its MEDIAN noise_sigma_mV becomes --noise-sigma, and "
-                         "--noise-baseline / --noise-drift are scaled by the "
-                         "same ratio so the character of the noise is kept. "
-                         "Without this the cohort is generated at the "
-                         "benchmark default, which may be cleaner than any "
-                         "real recording -- and a gate that passes on cleaner "
-                         "data than the campaign's says nothing about it.")
+    # --- per-cell measured noise ---------------------------------------------
+    ap.add_argument("--noise-protocol", default="per_protocol",
+                    choices=["per_protocol", "ls", "ss"],
+                    help="with --noise-table: per_protocol (default, D-014) "
+                         "gives the SS pulses the real cell's SS noise and the "
+                         "LS sweeps its LS noise; ls / ss use one for both. "
+                         "Every mode also carries the real cell's sampling "
+                         "rates and SS pulse count (the acquisition twin).")
+    ap.add_argument("--noise-table", default=None,
+                    help="noise table CSV from noise_calibration.py (per-sweep "
+                         "sigma and rho_lag1 of each REAL specimen). Each "
+                         "synthetic cell drawn on specimen X's morphology gets "
+                         "specimen X's noise. Without it the cohort is "
+                         "generated at the nominal level below -- white noise "
+                         "unless --noise-rho is set -- and labelled 'nominal'.")
+    ap.add_argument("--noise-rho", type=float, default=0.0,
+                    help="nominal AR(1) coefficient for cells with no "
+                         "measured noise.")
     ap.add_argument("--noise-sigma", type=float, default=0.05)
     ap.add_argument("--noise-baseline", type=float, default=0.05)
     ap.add_argument("--noise-drift", type=float, default=0.10)
@@ -765,28 +842,21 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         cm_lo, cm_hi = args.cm_phys_lo, args.cm_phys_hi
         tau_lo, tau_hi = args.tau_lo_ms, args.tau_hi_ms
 
-    # Noise level: measured if a real run's CSV is given, else the benchmark
-    # default -- and say loudly which, because it decides whether the gate
-    # transfers to real cells.
     _sigma = float(args.noise_sigma)
     _baseline = float(args.noise_baseline)
     _drift = float(args.noise_drift)
-    if args.noise_from_results:
-        stats = noise_sigma_from_results(args.noise_from_results)
-        scale = stats["median"] / max(_sigma, 1e-12)
-        print("[manifest] noise from {}: median sigma = {:.4f} mV over {:.0f} "
-              "cell(s) (IQR {:.4f}-{:.4f}); scaling baseline and drift by "
-              "{:.2f}x to keep the noise character."
-              .format(args.noise_from_results, stats["median"], stats["n"],
-                      stats["q25"], stats["q75"], scale))
-        _sigma = stats["median"]
-        _baseline *= scale
-        _drift *= scale
+    _table = None
+    if args.noise_table:
+        import noise_calibration as _NC
+        _table = _NC.noise_lookup(pd.read_csv(args.noise_table),
+                                  protocol=args.noise_protocol)
+        print("[manifest] measured per-sweep noise for %d specimen(s) from %s"
+              % (len(_table), args.noise_table))
     else:
-        print("[manifest] WARNING: noise level is the BENCHMARK DEFAULT "
-              "(sigma = {:.4f} mV), not a measured one. Pass "
-              "--noise-from-results <run B phase2_results.csv> if the gate is "
-              "meant to transfer to real recordings.".format(_sigma))
+        print("[manifest] WARNING: noise is NOMINAL (sigma %.4f mV per sweep, "
+              "rho %.2f), not measured. Pass --noise-table from "
+              "noise_calibration.py if the gate is meant to transfer to real "
+              "recordings." % (_sigma, args.noise_rho))
 
     df = draw_manifest(
         swcs,
@@ -813,6 +883,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         ih_gbar_floor_S_cm2=args.ih_gbar_floor,
         noise_sigma_nominal_mV=_sigma, noise_baseline_nominal_mV=_baseline,
         noise_drift_nominal_mV=_drift, noise_cv=args.noise_cv,
+        noise_table=_table, noise_rho_nominal=args.noise_rho,
     )
     save_manifest(df, args.out)
     groups = list_groups(df)
