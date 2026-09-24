@@ -41,6 +41,13 @@ from the repository's reference kinetics (human_ih_params.py).
         confidence intervals
     S11 six-parameter wiring: a 6-D fit_one_cell runs end to end on a
         synthetic I_h cell and returns a theta with all six axes
+    S12 the campaign entrypoint trains the SS pulses with the exponential
+        time-weight and records where the morphology came from
+    S13 the depolarising-sweep spike screen (D-016): noise at 50-200 kHz and
+        a bridge-balance step are not spikes, an action potential peaking
+        below the -20 mV catch-all is; the rule it replaced flags the noise;
+        the loader and the role assignment report why a sweep was dropped;
+        check_dep_sweeps.py reports both screens
 """
 from __future__ import annotations
 
@@ -695,12 +702,225 @@ def check_S12() -> None:
            "; ".join(notes))
 
 
+def _ar1_noise(n: int, sigma: float, rho: float, rng) -> "np.ndarray":
+    """Stationary AR(1) noise (scipy.signal.lfilter), for the S13 fixtures."""
+    from scipy.signal import lfilter
+    if rho == 0.0:
+        return rng.normal(0.0, sigma, n)
+    x = rng.normal(0.0, sigma * math.sqrt(1.0 - rho * rho), n)
+    x[0] = rng.normal(0.0, sigma)
+    return lfilter([1.0], [1.0, -rho], x)
+
+
+def _passive_dep_sweep(fs: float, amp_mV: float = 15.0, tau_ms: float = 20.0,
+                       onset_ms: float = 100.0, dur_ms: float = 1000.0,
+                       post_ms: float = 200.0, v0: float = -73.5):
+    """A clean subthreshold depolarising step response (single exponential),
+    1.3 s long like the generator's Long Square sweep."""
+    t = np.arange(0.0, (onset_ms + dur_ms + post_ms) * 1e-3, 1.0 / fs) * 1e3
+    v = np.full(t.size, v0)
+    on = (t >= onset_ms) & (t < onset_ms + dur_ms)
+    v[on] += amp_mV * (1.0 - np.exp(-(t[on] - onset_ms) / tau_ms))
+    off = t >= onset_ms + dur_ms
+    v[off] += (amp_mV * (1.0 - math.exp(-dur_ms / tau_ms))
+               * np.exp(-(t[off] - onset_ms - dur_ms) / tau_ms))
+    return t, v, on
+
+
+def _dep_archive(tmp: Path, sid: int, *, fs: float, sigma: float, rho: float) -> Path:
+    """An ACTIVE archive cell with I_h, recorded at `fs` with AR(1) noise:
+    +20 and +50 pA are subthreshold, +200 pA fires."""
+    import synthetic_ground_truth as sgt
+    swc = sgt.write_ball_and_stick_swc(tmp / ("dep_%d.swc" % sid), soma_r_um=10.0,
+                                       dend_len_um=400.0, dend_r_um=1.0,
+                                       apic_len_um=600.0, apic_r_um=1.2,
+                                       step_um=20.0)
+    ih = sgt.IhConfig(gIhbar_S_cm2=1.2e-4, ehcn_mV=-49.85, distribution="uniform",
+                      mechanism="Ih_human", vshift_minf_mV=0.0, tau_scale=1.0)
+    gt = sgt.GroundTruthParams(cm_uF_cm2=0.9, rm_Ohm_cm2=30000.0, ra_Ohm_cm=200.0,
+                               e_pas_mV=-78.0, ih=ih, active=True,
+                               active_regions=("soma", "axon"))
+    proto = sgt.ProtocolConfig(ss_n_repeats=4, ls_hyp_amplitudes_pA=(-30.0, -70.0),
+                               ls_dep_amplitudes_pA=(20.0, 50.0, 200.0),
+                               ss_sampling_rate_Hz=fs, ls_sampling_rate_Hz=fs)
+    syn = sgt.generate_synthetic_cell(swc, gt, proto=proto,
+                                      noise=sgt.NoiseConfig(sigma_mV=sigma,
+                                                            rho_lag1=rho, seed=sid % 1000),
+                                      specimen_id=sid, verbose=False)
+    d = tmp / ("specimen_%d" % sid)
+    sgt.write_archive_cell(syn, d, verbose=False)
+    sgt._clear_neuron_sections()
+    return d
+
+
+def check_S13() -> None:
+    """D-016: the depolarising-sweep spike screen. Noise cannot pass it at
+    any sampling rate the Allen data use, a bridge-balance step cannot, an
+    action potential cannot evade it; the rule it replaced fails the noise
+    case; the loader and the role assignment say WHY a sweep was dropped;
+    check_dep_sweeps.py reports both screens."""
+    import contextlib
+    import io
+    import passive_fitting_hpc_fixed as mono
+    import passive_long_step_training as plst
+    import check_dep_sweeps as CDS
+    ok, notes = True, []
+    rng = np.random.default_rng(20260923)
+
+    # (a) noise alone, on a subthreshold step: L3_exc medians at 50 kHz, the
+    # same process at 200 kHz (rho transferred as an OU: rho ** (1/4)), R8's
+    # 100 kHz twin, and white 0.07 mV at 200 kHz
+    cases = [(50e3, 0.0594, 0.668, False), (200e3, 0.0594, 0.668 ** 0.25, True),
+             (100e3, 0.064, 0.80, True), (200e3, 0.07, 0.0, True)]
+    worst_filt = 0.0
+    for fs, sig, rho, legacy_must_flag in cases:
+        new_flags = old_flags = 0
+        for _ in range(8):
+            _t, v, _on = _passive_dep_sweep(fs)
+            v = v + _ar1_noise(v.size, sig, rho, rng)
+            new_flags += int(mono.sweep_has_spike(v, fs))
+            old_flags += int(mono.sweep_has_spike_legacy(v, fs))
+            d, filt = mono.filtered_dvdt_mV_per_ms(v, fs)
+            ok &= bool(filt)
+            worst_filt = max(worst_filt, float(np.max(d)))
+        ok &= new_flags == 0
+        if legacy_must_flag:
+            ok &= old_flags == 8
+        notes.append("%.0f kHz noise: new %d/8, old %d/8 flagged"
+                     % (fs / 1e3, new_flags, old_flags))
+    ok &= worst_filt < 0.5 * mono.DEFAULT_SPIKE_DVDT_MV_PER_MS
+    notes.append("max filtered dV/dt of noise %.1f mV/ms (threshold %g)"
+                 % (worst_filt, mono.DEFAULT_SPIKE_DVDT_MV_PER_MS))
+
+    # (b) a bridge-balance step: 3 mV instantaneous jump for the whole step,
+    # at rest and on a step that plateaus at -28 mV. The second crosses the
+    # dV/dt threshold AND has a sweep maximum above -30 mV, so only the 5 ms
+    # time test keeps it out (without it -- max_interval huge -- it is an AP)
+    for amp_mV in (15.0, 45.5):
+        _t, v, on = _passive_dep_sweep(50e3, amp_mV=amp_mV)
+        v = v + _ar1_noise(v.size, 0.0594, 0.668, rng)
+        v[on] += 3.0
+        why = mono.sweep_spike_reason(v, 50e3)
+        why_nowin = mono.sweep_spike_reason(v, 50e3, max_interval_ms=1e9)
+        ok &= why == "" and mono.sweep_has_spike_legacy(v, 50e3)
+        if amp_mV > 40.0:
+            ok &= why_nowin == "action_potential" and float(np.max(v)) > -30.0
+        notes.append("3 mV bridge step, plateau %.0f mV: new '%s' (no time test: "
+                     "'%s'), legacy flagged" % (-73.5 + amp_mV, why, why_nowin))
+    # (b2) the height rule and the dV/dt < 0 rule, noise-free so each is
+    # decided by the rule alone. A fast 1.8 mV step on a -28 mV plateau
+    # crosses 20 mV/ms but rises < 2 mV: not an AP; 2.6 mV is. At 20 kHz (no
+    # filter, raw differences): two 1.2 mV one-sample jumps with a flat run
+    # between are ONE event of 2.4 mV (the second crossing is dropped: dV/dt
+    # never fell below 0) -> AP; with a 0.1 mV dip between they are two
+    # events of 1.2 mV -> not an AP.
+    t, v0, _on = _passive_dep_sweep(50e3, amp_mV=45.5)
+    for jump, want in ((1.8, ""), (2.6, "action_potential")):
+        v = v0.copy()
+        v[t >= 600.0] += jump
+        d, _f = mono.filtered_dvdt_mV_per_ms(v, 50e3)
+        ok &= float(np.max(d)) >= mono.DEFAULT_SPIKE_DVDT_MV_PER_MS
+        ok &= mono.sweep_spike_reason(v, 50e3) == want
+    v = np.full(400, -31.0)
+    v[200:] += 1.2
+    v[205:] += 1.2
+    ok &= mono.sweep_spike_reason(v, 20e3) == "action_potential"
+    v = np.full(400, -31.0)
+    v[200:] += 1.2
+    v[202:] -= 0.1
+    v[205:] += 1.2
+    ok &= mono.sweep_spike_reason(v, 20e3) == ""
+    notes.append("height rule 1.8 / 2.6 mV and the dV/dt < 0 rule decide as specified")
+
+    # (c) action potentials: one overshooting to ~+25 mV (reported as an AP,
+    # not as the catch-all), one peaking at -25 mV (below the catch-all, so
+    # only the event can catch it); at 50 kHz and at 20 kHz, where the 10 kHz
+    # filter cannot apply (unfiltered path)
+    for fs in (50e3, 20e3):
+        for peak_mV in (25.0, -25.0):
+            t, v, _on = _passive_dep_sweep(fs)
+            base = float(v[np.argmin(np.abs(t - 600.0))])
+            rise = (t >= 599.5) & (t < 600.0)
+            fall = (t >= 600.0) & (t < 601.5)
+            h = peak_mV - base
+            v[rise] += h * (t[rise] - 599.5) / 0.5
+            v[fall] += h * (1.0 - (t[fall] - 600.0) / 1.5)
+            why = mono.sweep_spike_reason(v, fs)
+            _d, filt = mono.filtered_dvdt_mV_per_ms(v, fs)
+            ok &= why == "action_potential" and filt == (fs > 20e3)
+            notes.append("AP peaking at %.1f mV, %.0f kHz: '%s' (filtered=%s)"
+                         % (float(np.max(v)), fs / 1e3, why, filt))
+
+    # (d) the loader on ACTIVE archive cells with realistic noise: +20/+50 kept,
+    # +200 dropped (by the cap by default, as an action potential without it)
+    tmp = Path(tempfile.mkdtemp(prefix="smoke_s13_"))
+    d50 = _dep_archive(tmp, 900000131, fs=50e3, sigma=0.0594, rho=0.668)
+    d100 = _dep_archive(tmp, 900000132, fs=100e3, sigma=0.064, rho=0.80)
+    for dd in (d50, d100):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cd = mono.load_cell_from_archive(dd, ls_max_amplitude_pA=None,
+                                             load_depolarising_ls=True, verbose=True)
+            cd_nocap = mono.load_cell_from_archive(dd, ls_max_amplitude_pA=None,
+                                                   load_depolarising_ls=True,
+                                                   ls_dep_max_amplitude_pA=None,
+                                                   verbose=False)
+        amps = [round(b.amplitude_pA) for b in cd.long_square_depolarising]
+        sc, sc2 = cd.ls_dep_screen, cd_nocap.ls_dep_screen
+        ok &= amps == [20, 50]
+        ok &= (sc.get("n_depolarising") == 3 and sc.get("n_above_cap") == 1
+               and sc.get("n_kept") == 2)
+        ok &= (sc2.get("n_kept") == 2 and sc2.get("n_above_cap") == 0
+               and sc2.get("n_action_potential", 0) == 1
+               and sc2.get("n_peak_above_threshold", 0) == 0)
+        ok &= "2 kept" in buf.getvalue()
+        notes.append("%s: dep kept %s; no cap -> +200 pA reported as %d AP"
+                     % (dd.name, amps, sc2.get("n_action_potential", 0)))
+    # (e) the role assignment names the cause
+    import copy
+    cd_none = copy.copy(cd)
+    cd_none.long_square_depolarising = []
+    cd_none.ls_dep_screen = dict(cd.ls_dep_screen, n_kept=0, n_action_potential=2)
+    msgs = []
+    cd_unasked = copy.copy(cd_none)
+    cd_unasked.ls_dep_screen = {}
+    cd_empty = copy.copy(cd_none)
+    cd_empty.ls_dep_screen = {"n_depolarising": 0, "n_above_cap": 0, "n_kept": 0}
+    for obj in (cd_none, cd_unasked, cd_empty):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            plst.assign_ls_roles(obj, verbose=True)
+        msgs.append(buf.getvalue())
+    ok &= ("screened out" in msgs[0] and "action potential" in msgs[0]
+           and "not asked" in msgs[1] and "holds no depolarising" in msgs[2])
+    notes.append("roles warning names the cause")
+    # (f) check_dep_sweeps on the same two cells: the new screen keeps +20/+50
+    # in both, the legacy screen loses the 100 kHz pair
+    out_csv = tmp / "dep_screen.csv"
+    with contextlib.redirect_stdout(io.StringIO()):
+        rc = CDS.main(["--group-dir", str(tmp), "--out", str(out_csv),
+                       "--code-dir", str(HERE)])
+    import pandas as _pd
+    df = _pd.read_csv(out_csv)
+    ok &= rc == 0 and list(df.columns) == CDS.SWEEP_COLUMNS
+    under = df[df["above_cap"].astype(str) == "False"]
+    ok &= len(under) == 4 and (under["kept_new"].astype(str) == "True").all()
+    ok &= (under["reason"] == "subthreshold").all()   # a plain CSV read, no NaN
+    k100 = under[under["specimen_id"] == 900000132]
+    ok &= (k100["kept_legacy"].astype(str) == "False").all()
+    notes.append("check_dep_sweeps: new keeps %d/4, legacy keeps %d/4"
+                 % ((under["kept_new"].astype(str) == "True").sum(),
+                    (under["kept_legacy"].astype(str) == "True").sum()))
+    report("S13 spike screen (D-016): noise and bridge steps pass, APs caught, "
+           "causes reported", ok, "; ".join(notes))
+
+
 def check_S10() -> None:
     files = ["ih_mechanism.py", "human_ih_params.py", "smoke_ih_fit.py",
              "regression_passive_identity.py", "synthetic_ground_truth.py",
              "param_spec.py", "passive_fitting_hpc_fixed.py",
              "passive_long_step_training.py",
-             "run_ih_fit.py",
+             "run_ih_fit.py", "check_dep_sweeps.py",
              "mod/Ih.mod", "mod/Ih_human.mod"]
     bad = []
     for f in files:
@@ -723,7 +943,7 @@ def main() -> int:
     from neuron import h  # noqa: F401  (loads ./x86_64)
     for fn in (check_S1, check_S2, check_S3, check_S4, check_S5,
                check_S6, check_S7, check_S8, check_S11, check_S12,
-               check_S10):
+               check_S13, check_S10):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

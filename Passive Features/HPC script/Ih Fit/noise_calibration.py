@@ -109,6 +109,20 @@ for _p in ("ls", "ss"):
     for _l in ACF_LAGS_MS:
         NOISE_TABLE_COLUMNS += ["acf_%s_%s" % (_p, _lag_tag(_l)),
                                 "ar1_%s_%s" % (_p, _lag_tag(_l))]
+
+#: Long Square pre-window STRUCTURE (D-016): where in the window the variance
+#: sits, whether it repeats from sweep to sweep, and how it decorrelates in
+#: the window's quiet end. Segment lengths in ms; each is capped at half the
+#: window, so a short (synthetic) window still yields two disjoint segments.
+LS_EARLY_MS = 50.0
+LS_LATE_MS = 500.0
+LS_LATE_LAGS_MS = (0.1, 1.0, 10.0, 100.0)
+NOISE_TABLE_COLUMNS += ["ls_pre_ms", "ls_early_ms", "ls_late_ms",
+                        "sigma_ls_early_mV", "sigma_ls_late_mV",
+                        "rho_ls_late", "ls_trend_share", "ls_locked_share"]
+for _l in LS_LATE_LAGS_MS:
+    NOISE_TABLE_COLUMNS += ["acf_ls_late_%s" % _lag_tag(_l),
+                            "ar1_ls_late_%s" % _lag_tag(_l)]
 NOISE_TABLE_COLUMNS.append("error")
 
 _SPECIMEN_RE = re.compile(r"specimen_(\d+)")
@@ -217,6 +231,115 @@ def _acf_diagnostic(mono, bundles: Sequence, fs_of) -> Dict[str, float]:
     return out
 
 
+def _early_late(x: np.ndarray, fs: float):
+    """The first LS_EARLY_MS and the last LS_LATE_MS of one pre-window, each
+    at most half of it, so the two never overlap."""
+    n = int(x.size)
+    ne = min(int(round(LS_EARLY_MS * 1e-3 * fs)), n // 2)
+    nl = min(int(round(LS_LATE_MS * 1e-3 * fs)), n // 2)
+    return x[:ne], x[n - nl:]
+
+
+def _sd1(x: np.ndarray) -> float:
+    """SD with ddof=1, the fitter's convention; NaN below 3 samples."""
+    return float(np.std(x, ddof=1)) if x.size >= 3 else float("nan")
+
+
+def trend_share(x: np.ndarray) -> float:
+    """Share of one window's variance that a straight line explains:
+    1 - var(linearly detrended x) / var(x). 0 for a trendless window, 1 for a
+    pure ramp. scipy.signal.detrend does the least-squares line."""
+    from scipy.signal import detrend
+    u = np.asarray(x, dtype=float)
+    if u.size < 10:
+        return float("nan")
+    v = float(np.var(u))
+    return 1.0 - float(np.var(detrend(u, type="linear"))) / v if v > 0 else float("nan")
+
+
+def locked_share(windows: Sequence[np.ndarray]) -> float:
+    """Share of the pre-window variance that REPEATS from sweep to sweep.
+
+    Model: sweep k's demeaned window is x_k = s + e_k, with s the same in
+    every sweep (a transient locked to the sweep start, e.g. the recovery
+    from the test pulse that opens every Allen data sweep) and e_k
+    independent across sweeps. Then E[var(mean_k x_k)] = v_s + v_e / K and
+    E[mean_k var(x_k)] = v_s + v_e, so
+        v_s = (var(mean_k x_k) - vbar / K) / (1 - 1/K),
+    returned as v_s / vbar. 0 when nothing repeats, 1 when the sweeps are
+    identical; a small negative value is sampling noise and is kept, not
+    clipped. Windows are aligned at their first sample (the start of the
+    stored sweep) and cut to the shortest. NaN with fewer than 2 sweeps."""
+    ws = [np.asarray(w, dtype=float) for w in windows]
+    k = len(ws)
+    if k < 2:
+        return float("nan")
+    n = min(w.size for w in ws)
+    if n < 10:
+        return float("nan")
+    x = np.stack([w[:n] - w[:n].mean() for w in ws])
+    vbar = float(np.mean(np.var(x, axis=1)))
+    if not vbar > 0.0:
+        return float("nan")
+    vm = float(np.var(x.mean(axis=0)))
+    return (vm - vbar / k) / (vbar * (1.0 - 1.0 / k))
+
+
+def _ls_structure_diagnostic(mono, bundles: Sequence) -> Dict[str, float]:
+    """Where the Long Square pre-window variance comes from (D-016).
+
+    Three readings of the same window, per sweep, then the median over the
+    cell's single sweeps:
+      * sigma over its first LS_EARLY_MS against its last LS_LATE_MS (each
+        demeaned on its own): a transient at the start of the stored sweep
+        shows as early >> late;
+      * the share of variance a straight line explains (drift);
+      * the share that repeats across the cell's sweeps (locked_share).
+    And, on the late segment only, the autocorrelation at LS_LATE_LAGS_MS
+    beside the AR(1) value rho_late^L, so the fast-noise question is asked of
+    the part of the window a start-of-sweep transient cannot reach."""
+    out: Dict[str, float] = {}
+    early_sd, late_sd, late_r1, trend, pre_ms = [], [], [], [], []
+    early_ms, late_ms = [], []
+    acf = {l: [] for l in LS_LATE_LAGS_MS}
+    ar1 = {l: [] for l in LS_LATE_LAGS_MS}
+    windows = []
+    for b in bundles:
+        fs = float(b.sampling_rate_Hz)
+        if not (np.isfinite(fs) and fs > 0):
+            continue
+        x = pre_window_samples(mono, b)
+        if x.size < 20:
+            continue
+        windows.append(x)
+        pre_ms.append(1e3 * x.size / fs)
+        e, l = _early_late(x, fs)
+        early_ms.append(1e3 * e.size / fs)
+        late_ms.append(1e3 * l.size / fs)
+        early_sd.append(_sd1(e))
+        late_sd.append(_sd1(l))
+        r1 = lag_autocorr(l, 1)
+        late_r1.append(r1)
+        trend.append(trend_share(x))
+        for lag_ms in LS_LATE_LAGS_MS:
+            lag = int(round(lag_ms * 1e-3 * fs))
+            acf[lag_ms].append(lag_autocorr(l, lag))
+            ar1[lag_ms].append(r1 ** lag if np.isfinite(r1) else float("nan"))
+    out["ls_pre_ms"] = _median(pre_ms)
+    # the segment lengths actually used (each capped at half the window)
+    out["ls_early_ms"] = _median(early_ms)
+    out["ls_late_ms"] = _median(late_ms)
+    out["sigma_ls_early_mV"] = _median(early_sd)
+    out["sigma_ls_late_mV"] = _median(late_sd)
+    out["rho_ls_late"] = _median(late_r1)
+    out["ls_trend_share"] = _median(trend)
+    out["ls_locked_share"] = locked_share(windows)
+    for lag_ms in LS_LATE_LAGS_MS:
+        out["acf_ls_late_" + _lag_tag(lag_ms)] = _median(acf[lag_ms])
+        out["ar1_ls_late_" + _lag_tag(lag_ms)] = _median(ar1[lag_ms])
+    return out
+
+
 def load_for_noise(specimen_dir: Union[str, Path], *, mono):
     """The one way this module loads a cell: every hyperpolarising Long
     Square amplitude (no current ceiling -- the PRE-step window is what is
@@ -265,6 +388,7 @@ def measure_specimen_noise(specimen_dir: Union[str, Path], *, mono,
     row["n_ls_multi_skipped"] = len(ls_all) - len(ls_single)
     row["fs_ls_Hz"] = _median([float(b.sampling_rate_Hz) for b in ls_single])
     row["n_pre_ls"] = _median([_pre_window_n(mono, b) for b in ls_single])
+    row.update(_ls_structure_diagnostic(mono, ls_single))
 
     pulses = list(getattr(cd, "ss_individual_pulses", []) or [])
     ss_bundles = [_pulse_as_bundle(mono, p) for p in pulses]
@@ -322,6 +446,10 @@ def summarise_noise_table(df: pd.DataFrame) -> Dict[str, float]:
     ok = df[[not _has_error(e) for e in df["error"]]]
 
     def med(c):
+        # a table written before a column existed (e.g. a pre-D-016 CSV)
+        # summarises to NaN for it instead of raising
+        if c not in ok.columns:
+            return float("nan")
         v = pd.to_numeric(ok[c], errors="coerce").to_numpy(dtype=float)
         v = v[np.isfinite(v)]
         return float(np.median(v)) if v.size else float("nan")
@@ -339,6 +467,11 @@ def summarise_noise_table(df: pd.DataFrame) -> Dict[str, float]:
         # the AR(1) adequacy diagnostic, cohort medians
         **{c: med(c) for c in NOISE_TABLE_COLUMNS
            if c.startswith(("acf_", "ar1_"))},
+        # the LS pre-window structure (D-016), cohort medians
+        **{c: med(c) for c in ("ls_pre_ms", "ls_early_ms", "ls_late_ms",
+                               "sigma_ls_early_mV",
+                               "sigma_ls_late_mV", "rho_ls_late",
+                               "ls_trend_share", "ls_locked_share")},
     }
 
 
@@ -429,6 +562,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "lag %s: measured %.3f vs AR(1) %.3f"
             % (_lag_tag(l), s["acf_%s_%s" % (p, _lag_tag(l))],
                s["ar1_%s_%s" % (p, _lag_tag(l))]) for l in ACF_LAGS_MS))
+    print("[noise] LS pre-window structure: window %.0f ms | sigma first %.0f ms "
+          "%.4f mV vs last %.0f ms %.4f mV | locked share %.2f | "
+          "linear-trend share %.2f"
+          % (s["ls_pre_ms"], s["ls_early_ms"], s["sigma_ls_early_mV"],
+             s["ls_late_ms"], s["sigma_ls_late_mV"], s["ls_locked_share"],
+             s["ls_trend_share"]))
+    print("[noise] AR(1) adequacy, LS late window (rho %.3f; nan where the "
+          "segment is shorter than the lag): " % s["rho_ls_late"]
+          + " | ".join("lag %s: measured %.3f vs AR(1) %.3f"
+                       % (_lag_tag(l), s["acf_ls_late_" + _lag_tag(l)],
+                          s["ar1_ls_late_" + _lag_tag(l)])
+                       for l in LS_LATE_LAGS_MS))
     return 0
 
 

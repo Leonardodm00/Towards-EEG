@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-smoke_ih_recovery.py -- Stage 7's own smoke suite (R1-R13).
+smoke_ih_recovery.py -- Stage 7's own smoke suite (R1-R14).
 
 Stage 7 produces a VERDICT, so its arithmetic has to be checked against
-fixtures whose answer is known by construction, not merely inspected. Nine
-checks:
+fixtures whose answer is known by construction, not merely inspected.
+Fourteen checks:
 
     R1  the fourth RNG stream does not move the first three, and a legacy
         manifest still draws exactly what the untouched oracle draws
@@ -19,8 +19,19 @@ checks:
     R5  the C_m-inflation read-out and the false-positive table
     R6  the gate, in all four of its outcomes
     R7  the consistency check refuses a truth/fit mismatch, item by item
-    R8  end to end: draw, generate, fit two arms, report
+    R8  end to end: draw, generate, fit two arms, report; the closure
+        real -> measure -> twin -> measure; every twin keeps its spike-free
+        depolarising steps (D-016)
     R9  byte safety
+    R10 the noise estimator: injected (sigma, rho) come back inside their
+        Monte Carlo band, the AR(1) diagnostic stays silent on AR(1) noise,
+        the lag-1 statistic is the fitter's own, and the generator's legacy
+        path is unchanged bit for bit
+    R11 the manifest's noise and acquisition columns, and the CSV round trip
+    R12 the manifest-to-generator mappings and their per-cell precedence
+    R13 the AR(1) adequacy diagnostic can fail (a hidden slow component)
+    R14 the Long Square pre-window structure diagnostic (D-016) separates a
+        start-of-sweep transient, a stationary slow process and a drift
 
 Run:  python smoke_ih_recovery.py            (add --build for nrnivmodl)
 """
@@ -960,6 +971,16 @@ def check_R8() -> None:
                        sum(1 for x in train_bundles if _plst._is_brief(x))))
         return _orig(cell, train_bundles, v_rest_mV, **kw)
     _plst.build_multi_protocol_loss = _spy
+    # D-016: every twin must reach the role assignment WITH its spike-free
+    # depolarising steps (the pre-D-016 screen dropped them all on noise)
+    _orig_roles = _plst.assign_ls_roles
+    _roles_seen = []
+
+    def _spy_roles(cell_data, **kw):
+        _roles_seen.append(sorted(round(float(b.amplitude_pA)) for b in
+                                  getattr(cell_data, "long_square_depolarising", [])))
+        return _orig_roles(cell_data, **kw)
+    _plst.assign_ls_roles = _spy_roles
     try:
         rc = RIR.main([
             "--output-dir", str(out), "--code-dir", str(HERE),
@@ -976,7 +997,14 @@ def check_R8() -> None:
             "--phase3-subset", "none", "--no-plot"])
     finally:
         _plst.build_multi_protocol_loss = _orig
+        _plst.assign_ls_roles = _orig_roles
     ok, notes = True, []
+    if not _roles_seen or any(a != [20, 50] for a in _roles_seen):
+        ok = False; notes.append("depolarising steps at the role assignment: %s"
+                                 % _roles_seen)
+    else:
+        notes.append("all %d role assignments kept the twins' +20/+50 pA steps"
+                     % len(_roles_seen))
     man = pd.read_csv(out / "manifest.csv")
     # phase_manifest must hand every later phase the frame it READ BACK from
     # this file, so a re-run with --manifest generates the same ground truth
@@ -1113,6 +1141,86 @@ def check_R8() -> None:
            "; ".join(notes))
 
 
+def check_R14() -> None:
+    """D-016: the Long Square pre-window STRUCTURE diagnostic tells apart the
+    four ways a pre-window can hold more than fast noise -- nothing (AR(1)
+    only), a transient locked to the sweep start, a stationary slow process,
+    a random linear drift -- and the archive path fills the new columns.
+
+    Thresholds are separation margins, not estimator tolerances: over 40
+    seeds (2026-09-23) the statistics they bound ranged as follows --
+    locked share A [-0.003, 0.004], B [0.598, 0.604], C [-0.056, 0.086];
+    early/late SD ratio A [0.98, 1.01], B [3.27, 3.36]; late acf minus its
+    AR(1) value at 1 ms A [-0.008, 0.007], B [-0.009, 0.006], C [0.377, 0.570],
+    at 10 ms C [0.174, 0.449]; trend share C [0.002, 0.033], D [0.710, 0.870]."""
+    import passive_fitting_hpc_fixed as mono
+    import noise_calibration as NC
+    from scipy.signal import lfilter
+    fs, t_pre, k_sw = 50e3, 1.0, 5
+    n = int((t_pre + 0.05) * fs)
+    t_ms = np.arange(n) / fs * 1e3
+    rng = np.random.default_rng(1414)
+
+    def ar1(s_, r_):
+        x = rng.normal(0.0, s_ * np.sqrt(1.0 - r_ * r_), n)
+        x[0] = rng.normal(0.0, s_)
+        return lfilter([1.0], [1.0, -r_], x)
+
+    def bundle(v):
+        return mono.SweepBundle(polarity="hyp", amplitude_pA=-50.0,
+                                t=np.arange(n) / fs, v_mV=v - 73.0,
+                                i_pA=np.zeros(n), stim_onset_s=t_pre + 5e-3,
+                                stim_duration_s=1.0, n_repeats_averaged=1,
+                                sweep_numbers=[0], sampling_rate_Hz=fs)
+    ou_rho = float(np.exp(-(1e3 / fs) / 30.0))
+    scen = {
+        "A": [ar1(0.04, 0.25) for _ in range(k_sw)],
+        "B": [ar1(0.04, 0.25) + 0.5 * np.exp(-t_ms / 20.0) for _ in range(k_sw)],
+        "C": [ar1(0.04, 0.25) + ar1(0.045, ou_rho) for _ in range(k_sw)],
+        "D": [ar1(0.04, 0.25) + rng.choice([-1.0, 1.0]) * rng.uniform(0.2, 0.4)
+              * (t_ms / 1e3) for _ in range(k_sw)],
+    }
+    d = {k: NC._ls_structure_diagnostic(mono, [bundle(v) for v in vs])
+         for k, vs in scen.items()}
+
+    def gap(r, lag):
+        return r["acf_ls_late_" + lag] - r["ar1_ls_late_" + lag]
+
+    def ratio(r):
+        return r["sigma_ls_early_mV"] / r["sigma_ls_late_mV"]
+    ok = True
+    ok &= abs(d["A"]["ls_locked_share"]) < 0.05 and d["A"]["ls_trend_share"] < 0.05
+    ok &= 0.9 < ratio(d["A"]) < 1.1 and abs(gap(d["A"], "1ms")) < 0.03
+    ok &= abs(gap(d["A"], "10ms")) < 0.03
+    ok &= d["B"]["ls_locked_share"] > 0.4 and ratio(d["B"]) > 2.0
+    ok &= abs(gap(d["B"], "1ms")) < 0.03
+    ok &= abs(d["C"]["ls_locked_share"]) < 0.2 and d["C"]["ls_trend_share"] < 0.1
+    ok &= gap(d["C"], "1ms") > 0.2 and gap(d["C"], "10ms") > 0.1
+    ok &= d["D"]["ls_trend_share"] > 0.5
+    notes = ["%s: locked %+.2f, early/late %.2f, trend %.2f, late acf-AR(1) "
+             "1 ms %+.3f, 10 ms %+.3f"
+             % (k, r["ls_locked_share"], ratio(r), r["ls_trend_share"],
+                gap(r, "1ms"), gap(r, "10ms")) for k, r in d.items()]
+    # the archive path: a real-format cell fills every new column that its
+    # window can support (95 ms here, so the 100 ms lag is NaN by design)
+    tmp = Path(tempfile.mkdtemp(prefix="smoke_r14_"))
+    cell = _archive_cell(tmp, 900000141, sigma=0.05, rho=0.6)
+    row = NC.measure_specimen_noise(cell, mono=mono)
+    new_cols = [c for c in NC.NOISE_TABLE_COLUMNS
+                if c.startswith(("ls_", "sigma_ls_early", "sigma_ls_late",
+                                 "rho_ls_late", "acf_ls_late", "ar1_ls_late"))]
+    finite_expected = [c for c in new_cols if not c.endswith("100ms")]
+    ok &= all(c in row for c in new_cols)
+    ok &= all(np.isfinite(float(row[c])) for c in finite_expected)
+    ok &= not np.isfinite(float(row["acf_ls_late_100ms"]))
+    ok &= abs(float(row["ls_pre_ms"]) - 95.0) < 0.5
+    notes.append("archive row: %d new columns, window %.1f ms, locked %+.2f"
+                 % (len(new_cols), float(row["ls_pre_ms"]),
+                    float(row["ls_locked_share"])))
+    report("R14 LS pre-window structure (D-016): transient / slow / drift "
+           "told apart", ok, "; ".join(notes))
+
+
 def check_R9() -> None:
     files = ["synth_gt_grid.py", "gen_from_manifest.py", "noise_calibration.py",
              "ih_recovery_report.py", "run_ih_recovery.py",
@@ -1141,7 +1249,7 @@ def main() -> int:
     ensure_build(args.build)
     from neuron import h  # noqa: F401  (loads ./x86_64)
     checks = [check_R1, check_R2, check_R3, check_R4, check_R5, check_R6,
-              check_R7, check_R10, check_R11, check_R12, check_R13]
+              check_R7, check_R10, check_R11, check_R12, check_R13, check_R14]
     if not args.quick:
         checks.append(check_R8)
     checks.append(check_R9)

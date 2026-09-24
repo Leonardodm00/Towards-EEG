@@ -14,7 +14,7 @@ Files that are NEW relative to `Biological Fit/` (Stage 0-1):
 | `ih_mechanism.py` | `IhSpec`, `attach_ih`, `set_ih`, `balance_e_pas` (rest balance, plan Eq. 11.3), `ih_rest_summary`, `rest_drift`, `sag_metrics` |
 | `synthetic_ground_truth.py` | copied from the synthetic benchmark: ball-and-stick SWC, archive-format cell writer (fixtures; Stage 7 extends it) |
 | `param_spec.py` | `ParamSpec`: which parameters are fitted, in which order and coordinates, and how they are applied to a cell. `PASSIVE_3D` (legacy) and `make_ih_spec()` (4/5/6-D) |
-| `smoke_ih_fit.py` | smoke suite S1-S8, S10-S12 |
+| `smoke_ih_fit.py` | smoke suite S1-S8, S10-S13 |
 | `run_ih_fit.py` | **the entrypoint**: one arm x one group. Arms, the I_h configuration, the D-006 protocol, and the three CSVs a campaign is read from |
 | `submit_ih_fit.sh` | PBS wrapper: `qsub -v GROUP=L3_exc,ARM=ih6`. Idempotent mtime-aware `nrnivmodl` guard, mechanism verification, `DRY_RUN=1` |
 | `synth_gt_grid.py` | the synthetic cohort's manifest: per-cell ground truth, incl. the two fitted kinetic knobs, the false-positive control, and each cell's per-sweep noise (sigma, rho) inherited from the real cell whose morphology it borrows |
@@ -23,7 +23,8 @@ Files that are NEW relative to `Biological Fit/` (Stage 0-1):
 | `ih_recovery_report.py` | **pure**: truth vs estimate, the recovery table, the C_m inflation, the false-positive table, the gate |
 | `run_ih_recovery.py` | **Stage 7's entrypoint**: draw -> generate -> fit (via `run_ih_fit.main`) -> report -> gate. Exit 0 = gate passed, 2 = gate failed |
 | `submit_ih_recovery.sh` | PBS wrapper for Stage 7: `qsub -v MAX_CELLS=...,RUN_TAG=...`; noise is measured from `MORPH_ROOT`'s own cells |
-| `smoke_ih_recovery.py` | Stage 7's smoke suite R1-R13 |
+| `smoke_ih_recovery.py` | Stage 7's smoke suite R1-R14 |
+| `check_dep_sweeps.py` | which depolarising Long Square sweeps of a REAL group reach the validation set under the spike screen (D-016) and under the rule it replaced, sweep by sweep. Stand-alone: `python check_dep_sweeps.py --group-dir <ARCHIVE_ROOT>/L3_exc --out dep_screen_L3.csv` |
 | `regression_passive_identity.py` | Stage 0 gate: passive 3-D path identical to `Biological Fit/` |
 
 Files EDITED relative to `Biological Fit/` (Stages 2-4) -- all with legacy
@@ -31,7 +32,7 @@ defaults, so every existing call behaves exactly as before:
 
 | file | change |
 |---|---|
-| `passive_fitting_hpc_fixed.py` | loader: `ls_max_amplitude_pA=None`, depolarising bundles, `swc_dir`, `sweep_has_spike`, `bundle_trough_mV`; fit: `spec=` through `fit_one_cell`, `_build_loss_function`, `_gp_parameter_uncertainty`, `_estimate_residual_noise_at_mle`; `PassiveFitResult.params` / `.sigmas_by_name` / `.param_spec`; `OptimiserInputs.param_spec` |
+| `passive_fitting_hpc_fixed.py` | loader: `ls_max_amplitude_pA=None`, depolarising bundles, `swc_dir`, the spike screen (`sweep_spike_reason` / `sweep_has_spike`, Allen white-paper rule since D-016; `CellData.ls_dep_screen` says why each depolarising sweep was kept or dropped), `bundle_trough_mV`; fit: `spec=` through `fit_one_cell`, `_build_loss_function`, `_gp_parameter_uncertainty`, `_estimate_residual_noise_at_mle`; `PassiveFitResult.params` / `.sigmas_by_name` / `.param_spec`; `OptimiserInputs.param_spec` |
 | `passive_long_step_training.py` | `ls_window_mode` (`after_onset` / `step` / `sweep`), `assign_ls_roles`, `split_train_validation_ih`, variadic `loss(*q)`, `integrate_long_step(spec=, ih_protocol=, ...)` |
 | `passive_fitting_hpc_fixed.py` (Phase 3) | the bootstrap and the GP diagnostic key on the result's own `ParamSpec` instead of a module `PARAM_NAMES` triple; `BootstrapCIResult.param_names`; per-axis q -> physical transform |
 | `synthetic_ground_truth.py` | `IhConfig.vshift_mV` / `.vshift_minf_mV` / `.tau_scale` |
@@ -67,11 +68,11 @@ is taken from `$PBS_O_WORKDIR`: its path contains a space.
 
     cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/HPC script/Ih Fit"
     nrnivmodl mod                          # once per architecture; creates x86_64/
-    python smoke_ih_fit.py                 # expect "smoke_ih_fit: 11/11 passed"
-    python smoke_ih_recovery.py            # expect "smoke_ih_recovery: 13/13 passed"
+    python smoke_ih_fit.py                 # expect "smoke_ih_fit: 12/12 passed"
+    python smoke_ih_recovery.py            # expect "smoke_ih_recovery: 14/14 passed"
     python regression_passive_identity.py --ref-dir "../Biological Fit" \
-        --archive-cell "/davinci-1/home/ldellamea/Human Neurons Fitting/L3_exc/specimen_<id>"
-                                           # expect "regression_passive_identity: PASS (...)"
+        --archive-cell "/davinci-1/home/ldellamea/Human Neurons Fitting/L3_exc/specimen_508282493"
+                                           # any real cell; expect "regression_passive_identity: PASS (...)"
 
 Then, before committing walltime to anything (submit FROM this folder):
 
@@ -134,6 +135,22 @@ autocorrelation at 0.1 ms and 1 ms (`acf_*`) beside what AR(1) implies there
 generator does not reproduce -- synthetic data then more informative than
 real. Reported in the log, used by nothing downstream.
 
+**Where the Long Square pre-window variance sits (D-016).** Every Allen data
+sweep opens with a test pulse, and the archive stores each sweep from what
+AllenSDK documents as the end of that pulse (`index_range`), so a recovery
+transient may sit at the start of the LS pre-window (`ls_pre_ms` gives the
+window's length). The table therefore also reports: sigma over the window's first
+50 ms against its last 500 ms (`sigma_ls_early_mV`, `sigma_ls_late_mV`); the
+share of the window's variance that repeats from sweep to sweep
+(`ls_locked_share`) and that a straight line explains (`ls_trend_share`); and
+the autocorrelation of the late segment at 0.1, 1, 10 and 100 ms beside its
+AR(1) value (`acf_ls_late_*`, `ar1_ls_late_*`; NaN where the segment is shorter
+than the lag). Each segment is capped at half the window; the lengths used are
+`ls_early_ms`, `ls_late_ms`. A transient after the test
+pulse reads as early >> late, a large locked share, and a late window that
+AR(1) fits; stationary slow noise as early ~ late, no locked share, and late
+acf >> AR(1); drift as a large trend share. Diagnostic only.
+
 The loss is the campaign's: SS pulses exponentially weighted
 (`SS_TIME_WEIGHT=exp`, `SS_TAU_W_MS=5.0`, `SS_WINDOW_MS=0.5,100.0`, as in
 `submit_ih_fit.sh`), passed explicitly.
@@ -143,6 +160,20 @@ simulation):
 
     python noise_calibration.py \
         --group-dir "/davinci-1/home/ldellamea/Human Neurons Fitting/L3_exc" --out noise_L3.csv
+
+**The depolarising validation set (D-016).** A depolarising Long Square
+sweep is kept when it is at most `--ls-dep-max-amplitude-pA` (100 pA) and has
+no action potential by the Allen white paper's rule: dV/dt after a 10 kHz
+4-pole Bessel filter >= 20 mV/ms, with a peak >= -30 mV at least 2 mV above
+the crossing, reached within 5 ms of it; plus a -20 mV catch-all. The levels
+are compared with the archive's LJP-corrected voltage, so they are 14 mV
+stricter than the Allen's own spike labels. The rule it replaced (raw sample
+differences > 10 mV/ms) was crossed by recording noise alone at 50 kHz and
+above, so every synthetic twin lost its depolarising steps, and real cells
+probably did too. To see both screens on the real sweeps:
+
+    python check_dep_sweeps.py \
+        --group-dir "/davinci-1/home/ldellamea/Human Neurons Fitting/L3_exc" --out dep_screen_L3.csv
 
 On a failure, D-005 says to FREEZE the failing kinetic knob rather than carry
 it: `--fit-params Cm,Rm,Ra,gbar` (drop both) or `Cm,Rm,Ra,gbar,dv_h` (keep the

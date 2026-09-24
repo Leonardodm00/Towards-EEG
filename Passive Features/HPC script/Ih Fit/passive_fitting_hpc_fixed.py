@@ -104,35 +104,229 @@ accidentally call them without AllenSDK installed.
 # any of these; load_cell_from_archive keeps its old defaults so
 # regression_passive_identity.py stays a meaningful gate.
 
-DEFAULT_SPIKE_V_THRESHOLD_MV = -20.0      # a sweep whose peak exceeds this spiked
-DEFAULT_SPIKE_DVDT_MV_PER_MS = 10.0       # ... or whose max dV/dt exceeds this
+DEFAULT_SPIKE_V_THRESHOLD_MV = -20.0      # catch-all: a sweep peaking above this is not subthreshold
+DEFAULT_SPIKE_DVDT_MV_PER_MS = 20.0       # Allen white paper: FILTERED dV/dt >= 20 mV/ms (D-016)
+DEFAULT_SPIKE_FILTER_KHZ = 10.0           # ... after a 4-pole Bessel low-pass at 10 kHz
+DEFAULT_SPIKE_MIN_PEAK_MV = -30.0         # ... an event is an AP only if its peak is >= -30 mV
+DEFAULT_SPIKE_MIN_HEIGHT_MV = 2.0         # ... and it rises >= 2 mV above its crossing point
+DEFAULT_SPIKE_MAX_INTERVAL_MS = 5.0       # ... and does both within 5 ms of the crossing
+                                          # (IPFX's max_interval; the white paper says 2 ms)
+# The voltages these thresholds are compared with are the ARCHIVE's, i.e.
+# LJP-corrected (recorded + ljp_correction_mV, +14 mV for the Allen cells);
+# the Allen compared its -30 mV with the RECORDED voltage, so this screen's
+# level test is 14 mV stricter than the Allen's own spike labels (D-016).
+# The rule this replaced (D-016): max |raw sample difference| / dt > 10 mV/ms.
+# Kept ONLY so check_dep_sweeps.py can report what the old rule did; nothing
+# in the pipeline calls it.
+LEGACY_SPIKE_DVDT_MV_PER_MS = 10.0
+
+SPIKE_REASONS = ("unusable", "peak_above_threshold", "action_potential")
+
+
+def filtered_dvdt_mV_per_ms(v_mV: np.ndarray, sampling_rate_Hz: float, *,
+                            filter_kHz: "Optional[float]" = DEFAULT_SPIKE_FILTER_KHZ
+                            ) -> "Tuple[np.ndarray, bool]":
+    """dV/dt (mV/ms) of one sweep as the Allen feature extraction computes it.
+
+    A 4-pole Bessel low-pass at ``filter_kHz`` is applied forward and backward
+    (``scipy.signal.bessel(4, Wn, "low")`` + ``filtfilt``, Wn the cutoff as a
+    fraction of the Nyquist frequency, scipy's default phase normalisation),
+    then the point-by-point difference is divided by the sampling interval.
+    This is ``ipfx.time_series_utils.calculate_dvdt`` (IPFX 2.1.2, read from
+    source), which implements the white paper's "smoothed with a digital
+    four-pole Bessel filter with a cutoff frequency of 10 kHz" [KB].
+
+    One deviation: where the cutoff is not below the Nyquist frequency
+    (``sampling_rate_Hz <= 2 * filter_kHz * 1e3``, e.g. 20 kHz synthetic data)
+    or the trace is too short for ``filtfilt``, IPFX raises; here the trace is
+    differentiated unfiltered instead. The second return value says which.
+
+    Returns ``(dvdt, filtered)``; ``dvdt`` has ``len(v_mV) - 1`` samples,
+    ``dvdt[j] = (v[j+1] - v[j]) / dt`` on the (filtered) trace.
+    """
+    v = np.asarray(v_mV, dtype=float)
+    fs = float(sampling_rate_Hz)
+    wn = (float(filter_kHz) * 1e3) / (fs / 2.0) if filter_kHz else 0.0
+    filtered = bool(filter_kHz) and (0.0 < wn < 1.0) and v.size > 15
+    if filtered:
+        from scipy import signal as _sig
+        b, a = _sig.bessel(4, wn, "low")
+        v = _sig.filtfilt(b, a, v)
+    return np.diff(v) / (1e3 / fs), filtered
+
+
+def spike_events(v_mV: np.ndarray, sampling_rate_Hz: float, *,
+                 dvdt_threshold_mV_per_ms: float = DEFAULT_SPIKE_DVDT_MV_PER_MS,
+                 filter_kHz: "Optional[float]" = DEFAULT_SPIKE_FILTER_KHZ,
+                 min_peak_mV: float = DEFAULT_SPIKE_MIN_PEAK_MV,
+                 min_height_mV: float = DEFAULT_SPIKE_MIN_HEIGHT_MV,
+                 max_interval_ms: float = DEFAULT_SPIKE_MAX_INTERVAL_MS
+                 ) -> "List[Tuple[int, int]]":
+    """Action potentials in one sweep, by the Allen white paper's rule.
+
+    The white paper [KB, "Action Potential Identification"]: putative events
+    where the filtered dV/dt exceeds 20 mV/ms, a later one counted only if
+    dV/dt returned below 0 in between; the peak of each is the maximum
+    voltage before the next event; an event is rejected if its threshold-to-
+    peak time exceeds 2 ms, if its peak is less than 2 mV above its
+    threshold, or if its peak is below -30 mV.
+
+    Steps 1-3 are IPFX 2.1.2's own code paths (read from source), step 4 is a
+    simplification of its ``check_thresholds_and_peaks``:
+
+    1. putative events: ``detect_putative_spikes`` -- upward crossings of the
+       threshold by the filtered dV/dt, the index being the last sample below
+       it; a later crossing kept only if dV/dt fell below 0 since the
+       previous one;
+    2. peaks: ``find_peak_indexes`` -- the largest voltage from each crossing
+       to the next (or to the last sample, excluded);
+    3. ``filter_putative_spikes`` -- consecutive events with no negative
+       dV/dt between a peak and the next crossing are merged (first crossing,
+       second peak); then peak >= ``min_peak_mV`` and peak - v(crossing) >=
+       ``min_height_mV``, the voltage at the crossing standing for the
+       threshold as it does at that stage of IPFX;
+    4. the same two conditions must hold for the largest voltage within
+       ``max_interval_ms`` of the crossing. IPFX instead re-estimates the
+       threshold (5 % of the mean upstroke) and re-searches the peak within
+       twice the interval, and its default interval is 5 ms where the white
+       paper says 2 ms: the sources disagree, 5 ms is used. Without this step
+       a crossing made by a bridge-balance step at the current onset is
+       paired with the sweep's maximum up to a second later.
+
+    Voltages are compared as given; the archive's are LJP-corrected, so the
+    -30 mV level is 14 mV stricter than the Allen's own labels (see the
+    constants above).
+
+    Returns the accepted events as ``(crossing_index, peak_index)`` pairs,
+    ``peak_index`` the maximum within ``max_interval_ms`` of the crossing.
+    """
+    v = np.asarray(v_mV, dtype=float)
+    dvdt, _ = filtered_dvdt_mV_per_ms(v, sampling_rate_Hz, filter_kHz=filter_kHz)
+    above = (dvdt >= float(dvdt_threshold_mV_per_ms)).astype(int)
+    cross = np.flatnonzero(np.diff(above) == 1)
+    if cross.size > 1:
+        cross = np.asarray([cross[0]] + [s for k, s in enumerate(cross[1:])
+                                         if np.any(dvdt[cross[k]:s] < 0)])
+    if cross.size == 0:
+        return []
+    end = v.size - 1
+    bounds = list(cross[1:]) + [end]
+    peaks = np.asarray([int(c) + int(np.argmax(v[int(c):int(b)]))
+                        for c, b in zip(cross, bounds)])
+    if cross.size > 1:
+        merged = [bool(np.any(dvdt[int(pk):int(c)] < 0))
+                  for pk, c in zip(peaks[:-1], cross[1:])]
+        peaks = peaks[np.asarray(merged + [True])]
+        cross = cross[np.asarray([True] + merged)]
+    keep = ((v[peaks] >= float(min_peak_mV))
+            & (v[peaks] - v[cross] >= float(min_height_mV)))
+    w = max(1, int(round(float(max_interval_ms) * 1e-3 * float(sampling_rate_Hz))))
+    events: "List[Tuple[int, int]]" = []
+    for c, pk in zip(cross[keep], peaks[keep]):
+        c, pk = int(c), int(pk)
+        seg = v[c:min(c + w + 1, pk + 1)]
+        pw = c + int(np.argmax(seg))
+        if v[pw] >= float(min_peak_mV) and v[pw] - v[c] >= float(min_height_mV):
+            events.append((c, pw))
+    return events
+
+
+def sweep_spike_reason(v_mV: np.ndarray, sampling_rate_Hz: float, *,
+                       v_threshold_mV: float = DEFAULT_SPIKE_V_THRESHOLD_MV,
+                       dvdt_threshold_mV_per_ms: float = DEFAULT_SPIKE_DVDT_MV_PER_MS,
+                       filter_kHz: "Optional[float]" = DEFAULT_SPIKE_FILTER_KHZ,
+                       min_peak_mV: float = DEFAULT_SPIKE_MIN_PEAK_MV,
+                       min_height_mV: float = DEFAULT_SPIKE_MIN_HEIGHT_MV,
+                       max_interval_ms: float = DEFAULT_SPIKE_MAX_INTERVAL_MS
+                       ) -> str:
+    """Why a sweep is NOT subthreshold, or "" if it is. Checked in this order:
+
+    "unusable"             fewer than 3 samples, or a non-finite sample;
+    "action_potential"     at least one event of ``spike_events``;
+    "peak_above_threshold" no such event, but the voltage exceeds
+                           ``v_threshold_mV`` somewhere (catch-all for a
+                           broad depolarisation too slow to be an event).
+    """
+    v = np.asarray(v_mV, dtype=float)
+    if v.size < 3 or not np.all(np.isfinite(v)):
+        return "unusable"
+    if spike_events(v, sampling_rate_Hz,
+                    dvdt_threshold_mV_per_ms=dvdt_threshold_mV_per_ms,
+                    filter_kHz=filter_kHz, min_peak_mV=min_peak_mV,
+                    min_height_mV=min_height_mV, max_interval_ms=max_interval_ms):
+        return "action_potential"
+    if float(np.max(v)) > float(v_threshold_mV):
+        return "peak_above_threshold"
+    return ""
 
 
 def sweep_has_spike(v_mV: np.ndarray, sampling_rate_Hz: float, *,
                     v_threshold_mV: float = DEFAULT_SPIKE_V_THRESHOLD_MV,
-                    dvdt_threshold_mV_per_ms: float = DEFAULT_SPIKE_DVDT_MV_PER_MS
+                    dvdt_threshold_mV_per_ms: float = DEFAULT_SPIKE_DVDT_MV_PER_MS,
+                    filter_kHz: "Optional[float]" = DEFAULT_SPIKE_FILTER_KHZ,
+                    min_peak_mV: float = DEFAULT_SPIKE_MIN_PEAK_MV,
+                    min_height_mV: float = DEFAULT_SPIKE_MIN_HEIGHT_MV,
+                    max_interval_ms: float = DEFAULT_SPIKE_MAX_INTERVAL_MS
                     ) -> bool:
-    """True if this sweep contains an action potential.
-
-    Two criteria, either sufficient: an absolute peak above `v_threshold_mV`
-    (default -20 mV), and a maximum dV/dt above `dvdt_threshold_mV_per_ms`
-    (default 10 mV/ms). The second catches a spike that is clipped or that
-    rides on a hyperpolarised baseline; the first catches a broad
-    depolarisation whose upstroke is slow. Both thresholds are far outside the
-    subthreshold regime this pipeline fits, so a subthreshold step never
-    triggers either.
+    """True if this sweep is not subthreshold (see ``sweep_spike_reason``).
 
     Used only to keep spiking Long Square sweeps out of the depolarising
     VALIDATION bundles (D-006 Q7); the hyperpolarising path never needs it.
+
+    D-016 replaced the previous rule, max |raw sample difference| / dt
+    > 10 mV/ms, because recording noise alone crosses it. The sample
+    differences of a stationary window with SD sigma and lag-1 correlation
+    rho have SD sigma * sqrt(2 (1 - rho)); at the L3_exc medians (0.0594 mV,
+    0.668, 50 kHz) that is 2.42 mV/ms, and the maximum over one 1.3 s sweep
+    is about 10 mV/ms [verified by running it]. After the 10 kHz filter the
+    noise stays below 5 mV/ms at 50-200 kHz (S13), a quarter of the 20 mV/ms
+    threshold. A bridge-balance step at the current onset can cross the
+    threshold (above about 1.4 mV at 50 kHz), but qualifies only if the
+    voltage within ``max_interval_ms`` of it reaches ``min_peak_mV``.
     """
+    return bool(sweep_spike_reason(
+        v_mV, sampling_rate_Hz, v_threshold_mV=v_threshold_mV,
+        dvdt_threshold_mV_per_ms=dvdt_threshold_mV_per_ms,
+        filter_kHz=filter_kHz, min_peak_mV=min_peak_mV,
+        min_height_mV=min_height_mV, max_interval_ms=max_interval_ms))
+
+
+def sweep_has_spike_legacy(v_mV: np.ndarray, sampling_rate_Hz: float, *,
+                           v_threshold_mV: float = DEFAULT_SPIKE_V_THRESHOLD_MV,
+                           dvdt_threshold_mV_per_ms: float = LEGACY_SPIKE_DVDT_MV_PER_MS
+                           ) -> bool:
+    """The pre-D-016 rule, verbatim: peak above ``v_threshold_mV`` or
+    max |raw sample difference| / dt above ``dvdt_threshold_mV_per_ms``.
+    Kept for ``check_dep_sweeps.py`` and the smoke checks that show why it
+    was replaced; the loader no longer calls it."""
     v = np.asarray(v_mV, dtype=float)
     if v.size < 3 or not np.all(np.isfinite(v)):
-        return True                        # unusable -> treat as unusable
+        return True
     if float(np.max(v)) > float(v_threshold_mV):
         return True
     dt_ms = 1e3 / float(sampling_rate_Hz)
     dvdt = np.diff(v) / dt_ms
     return bool(np.max(np.abs(dvdt)) > float(dvdt_threshold_mV_per_ms))
+
+
+def _dep_screen_summary(screen: "Dict[str, Any]") -> str:
+    """One line saying what happened to a cell's depolarising sweeps."""
+    if not screen:
+        return "depolarising sweeps not requested"
+    cap = screen.get("cap_pA")
+    parts = ["%d depolarising sweep(s)" % int(screen.get("n_depolarising", 0))]
+    if cap is not None:
+        parts.append("%d above the %g pA cap" % (int(screen.get("n_above_cap", 0)), float(cap)))
+    parts.append("%d with an action potential" % int(screen.get("n_action_potential", 0)))
+    if screen.get("n_peak_above_threshold", 0):
+        parts.append("%d peaking above %g mV without an AP event"
+                     % (int(screen["n_peak_above_threshold"]),
+                        float(screen.get("v_threshold_mV",
+                                         DEFAULT_SPIKE_V_THRESHOLD_MV))))
+    if screen.get("n_unusable", 0):
+        parts.append("%d unusable" % int(screen["n_unusable"]))
+    parts.append("%d kept" % int(screen.get("n_kept", 0)))
+    return ", ".join(parts)
 
 
 def bundle_trough_mV(bundle: "SweepBundle", *,
@@ -269,7 +463,10 @@ def load_cell_from_archive(
         ``sweep_has_spike``.
     spike_v_threshold_mV, spike_dvdt_mV_per_ms
         Spike-detection thresholds for that exclusion; see
-        ``sweep_has_spike``.
+        ``sweep_spike_reason``. Since D-016 the dV/dt threshold applies to
+        the 10 kHz Bessel-filtered derivative (Allen white paper, 20 mV/ms),
+        not to raw sample differences. Why each depolarising sweep was kept
+        or dropped is recorded on ``CellData.ls_dep_screen``.
     swc_dir
         I_h campaign (D-006 Q10).  When given, the morphology is read from
         ``<swc_dir>/<specimen_id>.swc`` (falling back to
@@ -409,6 +606,14 @@ def load_cell_from_archive(
 
     ls_bundles: List[SweepBundle] = []
     ls_dep_bundles: List[SweepBundle] = []
+    # Empty ONLY when depolarising sweeps were not requested (D-016): the
+    # role assignment reads "empty" as "not asked".
+    ls_dep_screen: Dict[str, Any] = (
+        {"n_depolarising": 0, "n_above_cap": 0, "n_kept": 0,
+         **{"n_" + r: 0 for r in SPIKE_REASONS},
+         "cap_pA": ls_dep_max_amplitude_pA,
+         "v_threshold_mV": spike_v_threshold_mV}
+        if load_depolarising_ls else {})
     ls_sweep_info = meta.get("ls_sweeps", [])
     ls_file = specimen_dir / "ls_sweeps.npz"
 
@@ -450,30 +655,44 @@ def load_cell_from_archive(
         # rheobase + 160 pA, so most depolarising sweeps DO spike.
         if load_depolarising_ls:
             dep_info = []
+            # Why each depolarising sweep was or was not kept (D-016): the
+            # counts travel on CellData.ls_dep_screen so the role assignment
+            # can name the cause instead of guessing it.
+            screen = {"n_depolarising": 0, "n_above_cap": 0, "n_kept": 0}
+            screen.update({"n_" + r: 0 for r in SPIKE_REASONS})
             for info in ls_sweep_info:
                 amp = info["detected_amplitude_pA"]
                 if amp is None or amp <= 5.0:
                     continue
+                screen["n_depolarising"] += 1
                 if (ls_dep_max_amplitude_pA is not None
                         and abs(amp) > ls_dep_max_amplitude_pA):
+                    screen["n_above_cap"] += 1
                     continue
                 v_k = ls_npz[f"v_{info['index']}"]
-                if sweep_has_spike(v_k, info["sampling_rate_Hz"],
-                                   v_threshold_mV=spike_v_threshold_mV,
-                                   dvdt_threshold_mV_per_ms=spike_dvdt_mV_per_ms):
+                why = sweep_spike_reason(
+                    v_k, info["sampling_rate_Hz"],
+                    v_threshold_mV=spike_v_threshold_mV,
+                    dvdt_threshold_mV_per_ms=spike_dvdt_mV_per_ms)
+                if why:
+                    screen["n_" + why] += 1
                     continue
+                screen["n_kept"] += 1
                 dep_info.append(info)
             ls_dep_bundles = _ls_bundles_from_sweep_info(ls_npz, dep_info, "dep")
+            ls_dep_screen = dict(screen, cap_pA=ls_dep_max_amplitude_pA,
+                                 v_threshold_mV=spike_v_threshold_mV)
             if verbose:
+                why_str = _dep_screen_summary(ls_dep_screen)
                 if ls_dep_bundles:
                     amps_str = ", ".join(
                         f"{b.amplitude_pA:+.0f}" for b in ls_dep_bundles)
                     print(f"[load_archive]   Long Square DEP bundles "
                           f"(spike-free): {len(ls_dep_bundles)} "
-                          f"([{amps_str}] pA)")
+                          f"([{amps_str}] pA) -- {why_str}")
                 else:
-                    print("[load_archive]   Long Square DEP bundles: none "
-                          "(every depolarising sweep spiked or exceeded the cap)")
+                    print(f"[load_archive]   Long Square DEP bundles: none -- "
+                          f"{why_str}")
 
     # -- 5. Scalar features -----------------------------------------------
     rin = (
@@ -521,6 +740,7 @@ def load_cell_from_archive(
         n_avg_groups=n_avg_groups,
         ss_individual_pulses=all_pulses,
         long_square_depolarising=ls_dep_bundles,
+        ls_dep_screen=ls_dep_screen,
         sag_ratio=float(meta.get("sag_ratio", float("nan"))
                         if meta.get("sag_ratio") is not None else float("nan")),
     )
@@ -893,6 +1113,13 @@ class CellData:
     # called with load_depolarising_ls=True, so every existing construction
     # of CellData and every legacy code path is unaffected.
     long_square_depolarising: List[SweepBundle] = field(default_factory=list)
+
+    # How the loader screened this cell's depolarising Long Square sweeps
+    # (D-016): counts of sweeps seen, above the amplitude cap, rejected for
+    # each reason of sweep_spike_reason, and kept, plus the cap. Empty when
+    # the loader was not asked for depolarising sweeps, which is how the role
+    # assignment tells "not requested" from "none survived".
+    ls_dep_screen: Dict[str, Any] = field(default_factory=dict)
 
     # Allen's `sag` feature for this cell, when the archive carries it. NaN
     # otherwise. passive_long_step_training reads it via getattr for its

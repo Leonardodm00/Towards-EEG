@@ -657,9 +657,34 @@ def assign_ls_roles(cell_data, *, n_drop_weakest: int = 1,
               % (_fmt(train_ls), _fmt(valid_ls), _fmt(report_ls)))
         if not dep:
             print("[roles] WARNING: no depolarising validation steps for this "
-                  "cell -- was the loader called with load_depolarising_ls=True?")
+                  "cell -- " + _dep_absence_reason(cell_data))
     return {"train": train_ls, "validate": valid_ls, "report": report_ls,
             "records": records, "n_hyp": n, "n_dep": len(dep)}
+
+
+def _dep_absence_reason(cell_data) -> str:
+    """Why a cell has no depolarising validation step, read from the loader's
+    screen (``CellData.ls_dep_screen``, D-016) rather than guessed. An empty
+    screen means the loader was not asked for depolarising sweeps."""
+    screen = getattr(cell_data, "ls_dep_screen", None) or {}
+    if not screen:
+        return ("the loader was not asked for them "
+                "(load_depolarising_ls=False)")
+    n = int(screen.get("n_depolarising", 0))
+    if n == 0:
+        return "the archive holds no depolarising Long Square sweep"
+    cap = screen.get("cap_pA")
+    bits = []
+    if screen.get("n_above_cap", 0):
+        bits.append("%d above the %s pA cap" % (int(screen["n_above_cap"]),
+                                              "%g" % cap if cap is not None else "?"))
+    for key, label in (("n_action_potential", "with an action potential"),
+                       ("n_peak_above_threshold", "peaking above the catch-all voltage"),
+                       ("n_unusable", "unusable")):
+        if screen.get(key, 0):
+            bits.append("%d %s" % (int(screen[key]), label))
+    return ("all %d depolarising sweep(s) were screened out: %s"
+            % (n, ", ".join(bits) if bits else "reason not recorded"))
 
 
 def _trough_mV(bundle, baseline_guard_s: float = 5e-3) -> float:
