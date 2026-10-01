@@ -25,6 +25,8 @@ Files that are NEW relative to `Biological Fit/` (Stage 0-1):
 | `submit_ih_recovery.sh` | PBS wrapper for Stage 7: `qsub -v MAX_CELLS=...,RUN_TAG=...`; noise is measured from `MORPH_ROOT`'s own cells |
 | `smoke_ih_recovery.py` | Stage 7's smoke suite R1-R14 |
 | `check_dep_sweeps.py` | which depolarising Long Square sweeps of a REAL group reach the validation set under the spike screen (D-016) and under the rule it replaced, sweep by sweep. Stand-alone: `python check_dep_sweeps.py --group-dir <ARCHIVE_ROOT>/L3_exc --out dep_screen_L3.csv` |
+| `ls_baseline_qc.py` | does the Long Square baseline change across a sweep (D-017 (a), (c))? Per hyperpolarising single LS sweep of a REAL group: the stored tail after the step and the SIGNED change between the fitter's pre-window and the sweep's last 500 ms, beside what a creep continuing at the pre-window's slope would give (archive, no network); optionally the Allen Institute's own per-sweep QC features (`vm_delta_mv`, `slow_noise_rms_mv`, ...) from the public API, joined by sweep number and cached. Stand-alone: `python ls_baseline_qc.py --group-dir <ARCHIVE_ROOT>/L3_exc --out lsqc_L3.csv [--allen fetch]` |
+| `smoke_ls_baseline_qc.py` | its smoke suite L1-L10 (no network, no simulation) |
 | `regression_passive_identity.py` | Stage 0 gate: passive 3-D path identical to `Biological Fit/` |
 
 Files EDITED relative to `Biological Fit/` (Stages 2-4) -- all with legacy
@@ -174,6 +176,23 @@ probably did too. To see both screens on the real sweeps:
 
     python check_dep_sweeps.py \
         --group-dir "/davinci-1/home/ldellamea/Human Neurons Fitting/L3_exc" --out dep_screen_L3.csv
+
+**Creep or wander? (D-017 (a), (c)).** The LS pre-window (265 ms on L3_exc)
+cannot tell a creep of the baseline, which continues through the step, from a
+slow stationary wander, which does not. `ls_baseline_qc.py` reads longer
+records of the same sweeps: from the archive, the change between the
+pre-window and the last 500 ms of the stored sweep (`delta_end_mV`, signed)
+beside `creep_pred_mV` (the pre-window slope carried to the end window), with
+`tail_ms` / `end_gap_ms` / `end_slope_mV_per_s` to judge the rebound after the
+step; and, with `--allen fetch`, the Allen QC features of the same sweeps
+(`vm_delta_mv` = |mean of the 500 ms before the stimulus - mean of the last
+500 ms of the recording|, criterion < 1 mV). The API needs network: on the
+cluster `module load proxy` first; the raw JSON is cached, so a re-run needs
+`--allen cache` only, and `--print-urls` lists the URLs for a manual download
+when no machine with the archive has network. Diagnostic only.
+
+    module load proxy && python ls_baseline_qc.py \
+        --group-dir "/davinci-1/home/ldellamea/Human Neurons Fitting/L3_exc" --out lsqc_L3.csv --allen fetch
 
 On a failure, D-005 says to FREEZE the failing kinetic knob rather than carry
 it: `--fit-params Cm,Rm,Ra,gbar` (drop both) or `Cm,Rm,Ra,gbar,dv_h` (keep the
