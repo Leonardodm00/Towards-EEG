@@ -1,7 +1,7 @@
 # The physics of the 63× oil-immersion brightfield microscope
 
 **Date:** 2026-10-04 (v1, revised the same day after an independent review;
-see §5, "Revision record"). **Project:** Towards EEG, diameter re-measurement
+v1.1 the same day adds diffraction, §3.4–3.5; see §5, "Revision record"). **Project:** Towards EEG, diameter re-measurement
 from the Allen 63× brightfield stacks. **Companion documents:**
 `claude/TEEG_diameter_bias_table_procedure_2026-10-04.md` ("procedure §n /
 Eq. (n)") and `claude/TEEG_diameter_bias_table_mathematics_2026-10-04.md`
@@ -45,6 +45,10 @@ Allen-specific fact is sourced and every gap marked.
 | $\varphi$ | tilt of a branch out of the image plane (handoff Eq. 5) | $[0, \pi/2)$ | rad | 3.3 |
 | $\lambda$ | vacuum wavelength of the light | $\mathbb{R}_{>0}$ | µm | 3.4 |
 | $(x, y)$ | lateral position in the image frame, specimen-referred | $\mathbb{R}^2$ | µm | 3.4 |
+| $k_x(\vartheta)$ | lateral spatial frequency (phase advance per unit $x$ along the focal plane) of a plane wave at angle $\vartheta$ | $\mathbb{R}_{\ge 0}$ | rad µm⁻¹ | 3.4 |
+| $\Lambda(\vartheta)$ | spacing of that wave's crests along the focal plane, $2\pi/k_x$ | $(0, \infty]$ | µm | 3.4 |
+| $\Lambda_{\min,I}$ | finest period the intensity image can contain (Abbe), $\lambda/(2\,\mathrm{NA})$ | $\mathbb{R}_{>0}$ | µm | 3.4 |
+| $\Delta\phi_{\max}(\delta)$ | largest phase error across the pupil caused by defocus $\delta$ | $\mathbb{R}_{\ge 0}$ | rad | 3.5 |
 | $v$ | position across a branch (handoff measuring axis) | $\mathbb{R}$ | µm | 3.4 |
 | $h_\delta(x, y)$ | intensity point-spread function at defocus $\delta$; $h_0$ in focus | function $\mathbb{R}^2 \to \mathbb{R}_{\ge 0}$, unit integral | µm⁻² | 3.4 |
 | $\mathrm{LSF}_\delta(v)$ | line-spread function, PSF summed along a line | function $\mathbb{R} \to \mathbb{R}_{\ge 0}$ | µm⁻¹ | 3.4 |
@@ -131,8 +135,28 @@ terms have an everyday meaning that differs from the technical one.
   (the Airy pattern).
 - **Line-spread function (LSF)** (§3.4). The image of a thin line; the PSF
   summed along the line.
+- **Diffraction** (§3.4). The spreading of a wave that has been cut off by a
+  finite aperture. It is why a lens makes a spot, not a point. *Not* the same
+  as refraction (bending at a change of index) or scattering (redirection by
+  irregularities); it happens in vacuum too.
+- **Huygens principle** (§3.4). Every point of a wavefront acts as a source of
+  secondary waves; the field further on is their sum, with phases.
+- **Lateral spatial frequency** (§3.4). How fast a wave's phase oscillates
+  along a line in the focal plane. A tilted plane wave cuts that plane
+  obliquely, so its crests fall at regular spacing $\Lambda$ across it; a wave
+  along the axis has none.
+- **Abbe limit** (§3.4). The finest period an image can contain, about
+  $\lambda/(2\,\mathrm{NA})$ when condenser NA = objective NA. A resolution
+  limit for periodic objects.
 - **Resolution** (§3.4). *Flagged:* in optics, the smallest separation at which
-  two points can be told apart, not the pixel count.
+  two points can be told apart, not the pixel count. Distinct from the width of
+  the spot the lens forms.
+- **Rayleigh criterion** (§3.4). Two points count as resolved when the peak of
+  one sits on the first dark ring of the other, a separation of
+  $0.61\,\lambda/\mathrm{NA}$.
+- **Rayleigh quarter-wave tolerance** (§3.5). A wavefront whose phase error
+  stays below a quarter of a wavelength ($\pi/2$) still gives an essentially
+  perfect focal spot.
 - **Defocus** (§3.5). A point not in the focal plane; it images as a spread-out
   spot whose size grows with distance from focus.
 - **Electric field / intensity** (§3.6). Light is an oscillating electric field
@@ -293,6 +317,70 @@ constants textbook]**:
 (µm). The handoff's "FWHM ≈ 0.24 µm" is the first dark ring, not the FWHM
 (already corrected in D-018's status note and notes §2).
 
+**Why a lens cannot focus to a point: diffraction** (added 2026-10-04, v1.1).
+Geometric optics says that rays converging at the focus meet in a point; the
+table above says the spot is about 0.2 µm wide. The gap is diffraction: the
+spreading of light that comes from its being a wave cut off by a finite
+aperture. It is **not** the same as refraction (bending at a change of index,
+§3.2) or scattering (redirection by irregularities in the medium); it happens
+even in a perfectly uniform medium or in vacuum **[textbook, from memory]**.
+
+- *Huygens picture.* Each point of the wavefront leaving the objective acts as
+  a small source. At the focus these contributions add with their phases.
+  Only on the optical axis are they all in phase; a little way off axis, the
+  waves from opposite edges of the aperture begin to cancel, so the bright
+  region has a finite width.
+- *Plane-wave picture.* The same field can be written as a sum of plane waves,
+  one per direction the lens supplies. A plane wave travelling at angle
+  $\vartheta$ to the axis in a medium of index $n$ cuts the focal plane
+  obliquely, so along $x$ its phase advances at the lateral spatial frequency
+  $$k_x(\vartheta) = \frac{2\pi n}{\lambda}\sin\vartheta, \tag{5a}$$
+  i.e. its crests meet the focal plane every
+  $$\Lambda(\vartheta) = \frac{2\pi}{k_x(\vartheta)} = \frac{\lambda}{n\sin\vartheta}. \tag{5b}$$
+  A wave along the axis ($\vartheta = 0$) has $k_x = 0$: it is the same all
+  across the plane and carries no pattern. The steepest wave the objective
+  accepts has $n\sin\vartheta = \mathrm{NA}$, so the finest ripple available
+  in the **field** has period $\lambda/\mathrm{NA} = 0.39$ µm at
+  $\lambda = 0.55$ µm, NA 1.4 **[arithmetic]**. (Analogy: waves reaching a
+  beach at an angle show crests along the shoreline spaced by
+  $\lambda/\sin\vartheta$; waves arriving head-on hit the whole shore at once.)
+- *Why that limits the spot.* The focal field is the Fourier sum of these
+  plane waves (equivalently, the Fourier transform of the pupil). A field
+  built only from lateral frequencies up to $2\pi\,\mathrm{NA}/\lambda$ cannot
+  vary faster than that. The camera records the intensity $|E|^2$, and
+  squaring doubles the highest frequency present, so the finest period the
+  **intensity** can contain is
+  $$\Lambda_{\min,I} = \frac{\lambda}{2\,\mathrm{NA}} = 0.196\ \text{µm} \quad (\lambda = 0.55\ \text{µm},\ \mathrm{NA} = 1.4), \tag{5c}$$
+  which is Abbe's limit **[textbook, from memory]**. The index $n$ enters
+  only through the shorter wavelength in the medium, $\lambda/n$; it is what
+  lets an oil objective reach NA > 1.
+
+**Forming is not resolving (rule R6).** Four widths are easily confused
+**[textbook, from memory; Airy constants run, `psf_check.py`]**:
+
+| Quantity | Meaning | At NA 1.4, $\lambda$ = 0.55 µm |
+|---|---|---|
+| finest ripple in the field | period of the steepest accepted plane wave across the focal plane, $\lambda/\mathrm{NA}$ (Eq. 5b) | 0.39 µm |
+| finest ripple in the intensity | Abbe limit for a periodic object, $\lambda/(2\,\mathrm{NA})$ (Eq. 5c), with condenser NA = objective NA | 0.196 µm |
+| narrowest spot formed | image of one point, Airy FWHM $0.514\,\lambda/\mathrm{NA}$ | 0.20 µm |
+| smallest resolvable separation of two points | Rayleigh criterion: one peak on the other's first dark ring, $0.61\,\lambda/\mathrm{NA}$ | 0.24 µm |
+
+*Forming* is about the system's output: how wide the image of a single point
+is. *Resolving* is about telling two things apart, which needs a visible dip
+between them, and so takes a separation somewhat larger than one spot width.
+[corrected 2026-10-04: a chat answer said "the narrowest feature it can form
+is about half of $\lambda/\mathrm{NA}$". As stated that is wrong:
+$\lambda/(2\,\mathrm{NA})$ is the finest period of the intensity image, a
+resolution limit, not the width of a spot; the spot's FWHM happens to be
+numerically close, $0.514\,\lambda/\mathrm{NA}$.]
+
+**For the pipeline:** neither number is the limit of the diameter
+measurement. Measuring the width of one tube of known shape is an
+**estimation** problem, not a resolution problem: the model fit of handoff
+Eq. 11 can recover widths below 0.2 µm, provided the blur model and the bias
+correction are right. There, noise and model error set the limit
+**[reasoning]**.
+
 **Across a branch, the LSF acts.** Summing the PSF along a straight branch
 gives the LSF (mathematics Eq. (9)). Its Gaussian-core width
 $\sigma_{\rm core}(0)$ (least-squares fit within one FWHM) is 0.080 µm (Debye)
@@ -372,12 +460,40 @@ bright: a bundle of steep rays lands on a larger area (the area grows as
 $1/\cos^3\vartheta$), so the rim is dim.] Which weighting fits a condenser-lit
 absorber is not established; the calibration measures the real growth.
 
-**Where geometry fails.** Near focus, diffraction dominates: the spot cannot
-shrink below the Airy pattern of §3.4. The Debye LSF's core width is 0.080,
-0.086, 0.122, 0.262, 0.438, 0.603 µm at $\delta$ = 0, 0.14, 0.28, 0.42, 0.56,
-0.84 µm **[run, `defocus_forms.py`]**: almost unchanged within half a plane of
-focus, then growing quickly, and by 0.84 µm close to the $0.79|\delta| =
-0.66$ µm of its own geometric limit.
+**Where geometry fails: near focus, diffraction dominates.** Eq. (6) says the
+spot shrinks to nothing as $\delta \to 0$; diffraction (§3.4) says it can never
+be smaller than the Airy pattern. Near focus the geometric spot is the smaller
+of the two, so diffraction sets the size. The wave picture gives the
+crossover (expanded 2026-10-04, v1.1). Defocus adds a phase error across the
+pupil, largest for the steepest rays; for an ideal, index-matched objective,
+
+$$\Delta\phi_{\max}(\delta) = \frac{2\pi n}{\lambda}\,\delta\,\big(1 - \cos\theta_{\rm obj}\big) \approx 10.7\ \mathrm{rad\,µm^{-1}} \times \delta \tag{6a}$$
+
+($n = 1.515$, $\lambda = 0.55$ µm, $\theta_{\rm obj} = 67.5°$; **[textbook formula,
+from memory; arithmetic]**), where $\delta$ is here the true defocus in the
+index-matched medium. $\Delta\phi_{\max}$ reaches $\pi/2$ — a quarter of a
+wavelength, the Rayleigh tolerance **[textbook, from memory]** — at
+$|\delta| \approx 0.15$ µm. Below it the wavefront is close enough to perfect
+that the spot is essentially the in-focus Airy pattern; beyond it the spot
+starts to grow, and the growth eventually approaches the geometric law of
+Eq. (6).
+
+**What stays flat** is the width of the blur as a function of defocus within
+about half a plane of focus. The Debye LSF's core width **[run,
+`defocus_forms.py`]**:
+
+| $\delta$ (µm) | 0 | 0.14 | 0.28 | 0.42 | 0.56 | 0.84 |
+|---|---|---|---|---|---|---|
+| $\sigma_{\rm core}(\delta)$ (µm) | 0.080 | 0.086 | 0.122 | 0.262 | 0.438 | 0.603 |
+
+From 0 to 0.14 µm the width changes by +8 %; between 0.28 and 0.42 µm it more
+than doubles; by 0.84 µm it is close to the $0.79|\delta| = 0.66$ µm of the
+model's own geometric limit. That shape — flat, then steep — is why a parabola
+in $\delta$ cannot fit the growth and why the calibration tabulates it plane by
+plane (procedure §3.4). In plain words: very close to focus the blur is
+already as small as a wave can make it, so stepping slightly out of focus
+changes almost nothing; only past about a quarter-wave of error does the
+out-of-focus cone start to show.
 
 **For the pipeline:** this is the physics of the rendering kernel $K_\delta$
 (procedure §3.4). Because the cone depends on the unrecorded condenser setting
@@ -554,6 +670,9 @@ into one map from optics to pipeline.
 | (4)–(5) | $\mathrm{NA} = n\sin\theta_{\rm obj}$; oil lets NA reach 1.4; $\theta_{\rm obj} = 67.5°$ in oil | §3.3 |
 | — | For a point inside the specimen, away from the coverslip, the usable NA cannot exceed the lowest index between it and the lens (Kner 2010) | §3.3 |
 | — | Airy first ring 0.240 µm, FWHM 0.202 µm, LSF core 0.080 µm at 550 nm; axial first minimum ≈ 0.60 µm (paraxial 0.85), axial FWHM 0.53 µm (paraxial 0.75) | §3.4 |
+| (5a)–(5c) | A plane wave at angle $\vartheta$ ripples across the focal plane with period $\lambda/(n\sin\vartheta)$; finest field ripple $\lambda/\mathrm{NA}$ = 0.39 µm, finest intensity period (Abbe) $\lambda/(2\,\mathrm{NA})$ = 0.196 µm | §3.4 |
+| — | Forming is not resolving: spot FWHM 0.20 µm vs Rayleigh separation 0.24 µm; the diameter fit is an estimation problem, not limited by either | §3.4 |
+| (6a) | Defocus phase error $\approx 10.7$ rad µm⁻¹ × $\delta$; reaches $\lambda/4$ at $|\delta| \approx 0.15$ µm, inside which the blur stays flat (core width +8 % at 0.14 µm) | §3.5 |
 | (6) | Defocus spot radius $|\delta|\tan(\text{cone})$; in brightfield the cone is set by both condenser and objective; RMS growth $\gamma_\omega|\delta|$ with $\gamma_\omega$ = 0.79–1.21 depending on the angular weighting | §3.5 |
 | (7)–(8) | Coherent: fields add, interference term; incoherent: intensities add | §3.6 |
 | — | Wide condenser aperture → $I \approx B(T * h_0)$ to first order in the absorbance; Allen's diaphragm setting unknown | §3.6 |
@@ -593,6 +712,15 @@ labelled heuristic; "cleared" was removed from the specimen description;
 the McGorty quotation is now verbatim with elisions marked; memory-based
 statements and inferences are tagged; the notation table was completed.
 
+**Revision record, v1.1 (2026-10-04, at the user's request).** Added the
+explanations given in chat after v1: what diffraction is and how it differs
+from refraction and scattering; the Huygens and plane-wave pictures, with the
+lateral spatial frequency of a tilted wave (Eqs. 5a–5c); the distinction
+between the spot a lens forms and the separation it resolves, including the
+correction of a chat sentence that conflated them (§3.4); and why the blur
+stays flat near focus, via the defocus phase error and the quarter-wave
+tolerance (Eq. 6a, §3.5). No earlier statement changed.
+
 ## 6. References and sources
 
 **PubMed, full text read (2026-10-04):**
@@ -625,7 +753,8 @@ statements and inferences are tagged; the notation table was completed.
 *Rev Sci Instrum*, [DOI](https://doi.org/10.1063/1.5020249) — index mismatch
 between oil and aqueous media in STED; returned by the search, not needed.
 
-**Searches that returned nothing (2026-10-04):** PubMed "partial coherence
+**Searches that returned nothing (2026-10-04):** PubMed "Abbe diffraction
+limit Rayleigh criterion resolution optical microscopy review" (0); "partial coherence
 brightfield condenser numerical aperture image formation" (0); "numerical
 aperture immersion objective resolution tutorial microscopy" (0); "Gibson
 Lanni point spread function model widefield microscope" (0); "Koehler
@@ -646,7 +775,11 @@ data terms of use apply; cite the Allen Cell Types Database and Berg et al.
 reviewer's runs (2026-10-04): `ax2.py` (axial first minimum; stage-unit growth
 for $n_{\rm m} \le 1.4$).
 
-**Textbook, from memory (not checked against a source):** refractive-index
+**Textbook, from memory (not checked against a source):** diffraction and the
+Huygens principle; plane-wave (Fourier) decomposition of the focal field and
+the lateral wavenumber $k_x = (2\pi n/\lambda)\sin\vartheta$; the Abbe limit
+and the Rayleigh resolution criterion; the defocus phase error of Eq. (6a) and
+the Rayleigh quarter-wave tolerance; refractive-index
 values of glass and oil; Snell's law; total internal reflection; Airy-pattern
 constants 0.61 and 0.514; $\lambda/\mathrm{NA}$ scaling of resolution; Köhler
 illumination; Hopkins' partial-coherence theory and the weak-object limit;
