@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diffraction: why a lens makes a spot, not a point</title>
+<style>
+:root{--text-primary:#1f1e1c;--text-secondary:#6b6964;--border:#d9d6cf;--border-strong:#a9a59c;--surface-1:#f4f2ee;--surface-0:#fbfaf8;--radius:8px;--t:#6b6964;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--text-primary:#ece9e3;--text-secondary:#a9a59c;--border:#3a3935;--border-strong:#5c5a55;--surface-1:#26251f;--surface-0:#1b1a17;--t:#a9a59c;}}
+:root[data-theme="dark"]{--text-primary:#ece9e3;--text-secondary:#a9a59c;--border:#3a3935;--border-strong:#5c5a55;--surface-1:#26251f;--surface-0:#1b1a17;--t:#a9a59c;}
+body{margin:0;padding:16px;background:var(--surface-0);color:var(--text-primary);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.5;}
+main{max-width:680px;margin:0 auto;}
+h1{font-size:18px;font-weight:500;margin:0 0 4px;}
+p.note{font-size:13px;color:var(--text-secondary);margin:0 0 16px;}
+input[type=range]{width:100%;}
+button{font:inherit;background:transparent;border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:4px 10px;color:var(--text-primary);cursor:pointer;}
+svg text.th{font-size:14px;font-weight:500;fill:var(--text-primary);}
+svg text.ts,svg text.t{font-size:12px;fill:var(--text-secondary);}
+</style>
+</head>
+<body>
+<main>
+<h1>Diffraction: why a lens makes a spot, not a point</h1>
+<p class="note">2-D scalar plane-wave sum, lambda = 0.55 um, n = 1.515, equal weights. Spec: figure 2.</p>
+<div style="display:flex;align-items:center;gap:12px;margin:0 0 0.75rem;">
+<label style="font-size:14px;color:var(--text-secondary);min-width:150px;">Numerical aperture</label>
+<input type="range" min="0.2" max="1.4" step="0.05" value="1.4" id="na" style="flex:1;" />
+<span style="font-size:14px;font-weight:500;min-width:40px;" id="naOut">1.40</span>
+</div>
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin:0 0 1rem;">
+<div style="background:var(--surface-1);border-radius:var(--radius);padding:0.6rem 1rem;flex:1;min-width:140px;"><div style="font-size:13px;color:var(--text-secondary);">cone half-angle in oil</div><div style="font-size:20px;font-weight:500;" id="thOut"></div></div>
+<div style="background:var(--surface-1);border-radius:var(--radius);padding:0.6rem 1rem;flex:1;min-width:140px;"><div style="font-size:13px;color:var(--text-secondary);">λ / (2 NA), λ = 0.55 µm</div><div style="font-size:20px;font-weight:500;" id="abOut"></div></div>
+<div style="background:var(--surface-1);border-radius:var(--radius);padding:0.6rem 1rem;flex:1;min-width:140px;"><div style="font-size:13px;color:var(--text-secondary);">spot FWHM (this model)</div><div style="font-size:20px;font-weight:500;" id="fwOut"></div></div>
+</div>
+<canvas id="cv" width="680" height="300" style="width:100%;height:auto;display:block;"></canvas>
+<canvas id="pf" width="680" height="170" style="width:100%;height:auto;display:block;margin-top:0.5rem;"></canvas>
+<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--text-secondary);margin-top:0.5rem;">
+<span><span style="display:inline-block;width:12px;height:2px;background:#378ADD;vertical-align:middle;margin-right:6px;"></span>geometric rays: meet at one point</span>
+<span><span style="display:inline-block;width:12px;height:10px;background:rgba(216,90,48,0.8);vertical-align:middle;margin-right:6px;"></span>wave intensity: a finite spot</span>
+</div>
+<script>
+const N=1.515,LAM=0.55,K=2*Math.PI*N/LAM;
+const cv=document.getElementById('cv'),cx=cv.getContext('2d');
+const pf=document.getElementById('pf'),px=pf.getContext('2d');
+const css=getComputedStyle(document.documentElement);
+const TXT=(css.getPropertyValue('--text-secondary')||'#888').trim()||'#888';
+const BRD=(css.getPropertyValue('--border-strong')||'#999').trim()||'#999';
+const XR=1.2,ZR=1.6;
+const HX0=300,HW=360,HY0=20,HH=260;
+const NX=150,NZ=110,NA_ANG=121;
+function field(na){
+ const th=Math.asin(na/N);
+ const s=[],c=[];
+ for(let m=0;m<NA_ANG;m++){const a=-th+2*th*m/(NA_ANG-1);s.push(Math.sin(a));c.push(Math.cos(a));}
+ const I=new Float32Array(NX*NZ);let mx=0;
+ for(let iz=0;iz<NZ;iz++){const z=-ZR+2*ZR*iz/(NZ-1);
+  for(let ix=0;ix<NX;ix++){const x=-XR+2*XR*ix/(NX-1);let re=0,im=0;
+   for(let m=0;m<NA_ANG;m++){const p=K*(x*s[m]+z*c[m]);re+=Math.cos(p);im+=Math.sin(p);}
+   const v=re*re+im*im;I[iz*NX+ix]=v;if(v>mx)mx=v;}}
+ for(let i=0;i<I.length;i++)I[i]/=mx;
+ return {I,th};
+}
+function profile(na){
+ const th=Math.asin(na/N),M=401,xs=[],ys=[];let mx=0;
+ for(let i=0;i<M;i++){const x=-XR+2*XR*i/(M-1);let re=0,im=0;
+  for(let m=0;m<NA_ANG;m++){const a=-th+2*th*m/(NA_ANG-1);const p=K*x*Math.sin(a);re+=Math.cos(p);im+=Math.sin(p);}
+  const v=re*re+im*im;xs.push(x);ys.push(v);if(v>mx)mx=v;}
+ for(let i=0;i<M;i++)ys[i]/=mx;
+ let j=(M-1)/2;while(j<M-1&&ys[j]>=0.5)j++;
+ const xh=xs[j-1]+(0.5-ys[j-1])*(xs[j]-xs[j-1])/(ys[j]-ys[j-1]);
+ return {xs,ys,fw:2*xh};
+}
+function draw(){
+ const na=parseFloat(document.getElementById('na').value);
+ const {I,th}=field(na);const P=profile(na);
+ document.getElementById('naOut').textContent=na.toFixed(2);
+ document.getElementById('thOut').textContent=(th*180/Math.PI).toFixed(1)+'°';
+ document.getElementById('abOut').textContent=(LAM/(2*na)).toFixed(3)+' µm';
+ document.getElementById('fwOut').textContent=P.fw.toFixed(3)+' µm';
+ cx.clearRect(0,0,680,300);
+ cx.fillStyle=TXT;cx.font='13px sans-serif';
+ const ox=150,oy=150,L=120;
+ cx.strokeStyle=BRD;cx.lineWidth=1;cx.beginPath();cx.moveTo(ox-130,oy);cx.lineTo(ox+40,oy);cx.stroke();
+ cx.strokeStyle='#378ADD';cx.lineWidth=1.2;
+ for(let m=0;m<9;m++){const a=-th+2*th*m/8;cx.beginPath();cx.moveTo(ox-L*Math.cos(a),oy-L*Math.sin(a));cx.lineTo(ox,oy);cx.stroke();}
+ cx.fillStyle='#378ADD';cx.beginPath();cx.arc(ox,oy,3,0,2*Math.PI);cx.fill();
+ cx.fillStyle=TXT;cx.fillText('directions the lens supplies',20,30);
+ cx.fillText('(up to ±'+(th*180/Math.PI).toFixed(0)+'° from the axis)',20,48);
+ cx.fillText('optical axis',ox-120,oy+18);
+ const img=cx.createImageData(NZ,NX);
+ for(let ix=0;ix<NX;ix++)for(let iz=0;iz<NZ;iz++){const v=I[iz*NX+ix];const k=4*(ix*NZ+iz);img.data[k]=216;img.data[k+1]=90;img.data[k+2]=48;img.data[k+3]=Math.round(255*Math.pow(v,0.6));}
+ const tmp=document.createElement('canvas');tmp.width=NZ;tmp.height=NX;tmp.getContext('2d').putImageData(img,0,0);
+ cx.imageSmoothingEnabled=true;cx.drawImage(tmp,HX0,HY0,HW,HH);
+ cx.strokeStyle=BRD;cx.strokeRect(HX0,HY0,HW,HH);
+ const fx=HX0+HW/2,fy=HY0+HH/2,sx=HW/(2*ZR),sy=HH/(2*XR);
+ cx.strokeStyle='#378ADD';cx.lineWidth=1;cx.setLineDash([4,4]);
+ for(const sg of [-1,1]){const t=Math.tan(th);const zl=ZR;let xl=t*zl;let ze=zl,xe=xl;if(xe>XR){xe=XR;ze=XR/t;}
+  cx.beginPath();cx.moveTo(fx-ze*sx,fy-sg*xe*sy);cx.lineTo(fx+ze*sx,fy+sg*xe*sy);cx.stroke();}
+ cx.setLineDash([]);
+ cx.fillStyle=TXT;cx.fillText('focal region (x across, z along the axis)',HX0,HY0-6);
+ cx.fillText('z ±'+ZR+' µm',HX0+HW-70,HY0+HH+16);cx.fillText('x ±'+XR+' µm',HX0-70,HY0+HH-4);
+ px.clearRect(0,0,680,170);
+ const L0=60,R0=660,T0=15,B0=135,X=x=>L0+(x+XR)/(2*XR)*(R0-L0),Y=y=>B0-y*(B0-T0);
+ px.strokeStyle=BRD;px.lineWidth=1;px.beginPath();px.moveTo(L0,B0);px.lineTo(R0,B0);px.stroke();
+ px.strokeStyle='#378ADD';px.lineWidth=2;px.beginPath();px.moveTo(X(0),B0);px.lineTo(X(0),T0);px.stroke();
+ px.strokeStyle='#D85A30';px.lineWidth=2;px.beginPath();P.xs.forEach((x,i)=>{const a=X(x),b=Y(P.ys[i]);i?px.lineTo(a,b):px.moveTo(a,b);});px.stroke();
+ px.strokeStyle=TXT;px.lineWidth=1;px.setLineDash([3,3]);px.beginPath();px.moveTo(X(-P.fw/2),Y(0.5));px.lineTo(X(P.fw/2),Y(0.5));px.stroke();px.setLineDash([]);
+ px.fillStyle=TXT;px.font='13px sans-serif';
+ px.fillText('intensity across the focus (z = 0)',L0,T0-2);
+ px.fillText('FWHM',X(P.fw/2)+6,Y(0.5)+4);
+ [-1,-0.5,0,0.5,1].forEach(v=>{px.fillText((v===0?'0':v.toFixed(1)),X(v)-8,B0+16);});
+ px.fillText('x (µm)',R0-40,B0+32);
+}
+document.getElementById('na').addEventListener('input',draw);
+draw();
+</script>
+</main>
+</body>
+</html>

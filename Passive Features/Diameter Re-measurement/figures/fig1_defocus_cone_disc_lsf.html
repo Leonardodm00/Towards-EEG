@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Defocus: cone, disc and the dip across a branch</title>
+<style>
+:root{--text-primary:#1f1e1c;--text-secondary:#6b6964;--border:#d9d6cf;--border-strong:#a9a59c;--surface-1:#f4f2ee;--surface-0:#fbfaf8;--radius:8px;--t:#6b6964;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--text-primary:#ece9e3;--text-secondary:#a9a59c;--border:#3a3935;--border-strong:#5c5a55;--surface-1:#26251f;--surface-0:#1b1a17;--t:#a9a59c;}}
+:root[data-theme="dark"]{--text-primary:#ece9e3;--text-secondary:#a9a59c;--border:#3a3935;--border-strong:#5c5a55;--surface-1:#26251f;--surface-0:#1b1a17;--t:#a9a59c;}
+body{margin:0;padding:16px;background:var(--surface-0);color:var(--text-primary);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.5;}
+main{max-width:680px;margin:0 auto;}
+h1{font-size:18px;font-weight:500;margin:0 0 4px;}
+p.note{font-size:13px;color:var(--text-secondary);margin:0 0 16px;}
+input[type=range]{width:100%;}
+button{font:inherit;background:transparent;border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:4px 10px;color:var(--text-primary);cursor:pointer;}
+svg text.th{font-size:14px;font-weight:500;fill:var(--text-primary);}
+svg text.ts,svg text.t{font-size:12px;fill:var(--text-secondary);}
+</style>
+</head>
+<body>
+<main>
+<h1>Defocus: cone, disc and the dip across a branch</h1>
+<p class="note">Geometric-optics illustration (uniform disc). Reproduction spec: docs/TEEG_interactive_figures_spec_2026-10-04.md, figure 1. The RMS readout is the uniform-disc value and is an upper bound; realistic angular weighting gives 0.79-0.90 |dz|.</p>
+<svg width="100%" viewBox="0 0 680 400" role="img" id="fig">
+<title>Defocus: cone of light, disc at a defocused plane, and the dip across the branch</title>
+<desc>Left: side view of the cone of light converging to the focus with half-angle theta; a plane at distance delta z cuts it in a disc of radius R. Right top: that disc seen from above, with the branch direction. Right bottom: the disc summed along the branch gives a semicircular dip across the branch.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+
+<text class="th" x="40" y="40">Side view (x–z)</text>
+<text class="ts" x="195" y="80">optical axis (z)</text>
+<line x1="185" y1="66" x2="185" y2="290" stroke="var(--t)" stroke-width="0.5" stroke-dasharray="4 4"/>
+<line x1="45" y1="162" x2="325" y2="278" stroke="#BA7517" stroke-width="1.5"/>
+<line x1="325" y1="162" x2="45" y2="278" stroke="#BA7517" stroke-width="1.5"/>
+<line x1="70" y1="120" x2="110" y2="137" stroke="#BA7517" stroke-width="1" marker-end="url(#arrow)"/>
+<line x1="300" y1="120" x2="260" y2="137" stroke="#BA7517" stroke-width="1" marker-end="url(#arrow)"/>
+<text class="ts" x="45" y="108">marginal rays from the objective</text>
+<line x1="45" y1="220" x2="325" y2="220" stroke="var(--t)" stroke-width="0.5"/>
+<text class="ts" x="45" y="214">focal plane</text>
+<circle cx="185" cy="220" r="2.5" fill="#BA7517"/>
+<path d="M185 190 A30 30 0 0 0 157.3 208.5" fill="none" stroke="var(--t)" stroke-width="1"/>
+<text class="ts" x="160" y="186">θ</text>
+<line id="dzline" x1="45" y1="247.5" x2="325" y2="247.5" stroke="#1D9E75" stroke-width="0.8" stroke-dasharray="5 4"/>
+<line id="dzseg" x1="151.8" y1="247.5" x2="218.2" y2="247.5" stroke="#1D9E75" stroke-width="4" stroke-linecap="round"/>
+<text class="ts" x="45" y="310" id="t1">defocused plane: Δz = 0.50 µm</text>
+<text class="ts" x="45" y="328" id="t2">disc radius R = |Δz| tan θ = 1.21 µm</text>
+<text class="ts" x="45" y="346">θ = 67.5°, from NA = n sin θ (1.4 = 1.515 sin θ)</text>
+
+<text class="th" x="410" y="40">Top view of that plane</text>
+<line x1="520" y1="62" x2="520" y2="218" stroke="var(--t)" stroke-width="0.5" stroke-dasharray="4 4"/>
+<circle id="disc" cx="520" cy="140" r="33.8" fill="#FAC775" fill-opacity="0.55" stroke="#BA7517" stroke-width="1"/>
+<line x1="432" y1="140" x2="600" y2="140" stroke="var(--t)" stroke-width="0.8" marker-end="url(#arrow)"/>
+<text class="ts" x="606" y="144">v</text>
+<text class="ts" x="520" y="236" text-anchor="middle">branch direction (summed over)</text>
+
+<text class="th" x="410" y="266">Dip across the branch</text>
+<line x1="430" y1="372" x2="610" y2="372" stroke="var(--t)" stroke-width="0.8" marker-end="url(#arrow)"/>
+<text class="ts" x="614" y="376">v</text>
+<path id="prof" d="" fill="#FAC775" fill-opacity="0.45" stroke="#BA7517" stroke-width="1.2"/>
+</svg>
+<div style="display:flex;align-items:center;gap:12px;margin:8px 0 0;font-size:14px;color:var(--text-secondary)">
+  <label for="dz">Defocus Δz</label>
+  <input type="range" id="dz" min="0" max="1" step="0.02" value="0.5" style="flex:1">
+  <span id="out" style="min-width:250px;color:var(--text-primary)"></span>
+</div>
+<script>
+const TAN = Math.tan(67.5*Math.PI/180), S0 = 0.08;
+const fz = 55, fd = 28, fp = 28;
+function update(){
+  const dz = parseFloat(document.getElementById('dz').value);
+  const R = dz*TAN, y = 220 + fz*dz, hx = TAN*fz*dz;
+  const L = document.getElementById('dzline'); L.setAttribute('y1',y); L.setAttribute('y2',y);
+  const G = document.getElementById('dzseg'); G.setAttribute('y1',y); G.setAttribute('y2',y);
+  G.setAttribute('x1',185-hx); G.setAttribute('x2',185+hx);
+  document.getElementById('disc').setAttribute('r', Math.max(R*fd, 2.5));
+  document.getElementById('t1').textContent = 'defocused plane: Δz = ' + dz.toFixed(2) + ' µm';
+  document.getElementById('t2').textContent = 'disc radius R = |Δz| tan θ = ' + R.toFixed(2) + ' µm';
+  const vs=[], ys=[]; let mx=0;
+  for(let v=-3; v<=3.0001; v+=0.02){
+    let s=0;
+    for(let u=-3; u<=3.0001; u+=0.01){
+      const semi = R>0 ? Math.sqrt(Math.max(0,R*R-u*u)) : (Math.abs(u)<0.006?1:0);
+      if(semi>0) s += semi*Math.exp(-(v-u)*(v-u)/(2*S0*S0));
+    }
+    vs.push(v); ys.push(s); if(s>mx) mx=s;
+  }
+  let d = 'M' + (520-3*fp) + ' 372';
+  for(let i=0;i<vs.length;i++) d += ' L' + (520+vs[i]*fp).toFixed(1) + ' ' + (372 - 78*ys[i]/mx).toFixed(1);
+  d += ' L' + (520+3*fp) + ' 372 Z';
+  document.getElementById('prof').setAttribute('d', d);
+  const sg = R/2, st = Math.sqrt(S0*S0 + R*R/4);
+  document.getElementById('out').textContent = 'Δz ' + dz.toFixed(2) + ' µm · R ' + R.toFixed(2) + ' µm · RMS (uniform disc, upper bound) ≈ ' + st.toFixed(2) + ' µm';
+}
+document.getElementById('dz').addEventListener('input', update);
+update();
+</script>
+</main>
+</body>
+</html>

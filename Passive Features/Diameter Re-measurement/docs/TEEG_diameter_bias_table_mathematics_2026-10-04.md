@@ -1,7 +1,8 @@
 # The mathematics behind the diameter bias factor $b(d, \varphi \mid \mathcal{C})$
 
 **Date:** 2026-10-04 (v1, revised the same day after an independent review;
-see §5, "Revision record"). **Project:** Towards EEG, diameter re-measurement
+v1.1 the same day adds the Beer–Lambert law, the slab, and absorbance versus
+absorbed fraction; see §5, "Revision record"). **Project:** Towards EEG, diameter re-measurement
 from the Allen 63× brightfield stacks. **Companion documents:**
 `claude/TEEG_diameter_bias_table_procedure_2026-10-04.md` (cited as
 "procedure §n / procedure Eq. (n)") and
@@ -47,6 +48,11 @@ imaging theory, which this project does not use.
 | $\varphi$ | tilt of the tube axis out of the image plane | $[0, \pi/2)$ | rad | 3.1 |
 | $\mu$ | absorption coefficient of the stained cytoplasm | $\mathbb{R}_{\ge 0}$ | µm⁻¹ | 3.1 |
 | $\ell(v)$ | stained path length of the vertical ray at offset $v$ (handoff Eq. 10) | $\mathbb{R}_{\ge 0}$ | µm | 3.1 |
+| $\ell'$ | path coordinate along a ray (Beer–Lambert law only) | $[0, \ell]$ | µm | 3.1 |
+| $I_0$, $I(\ell)$ | intensity entering an absorber; after a path $\ell$ | $\mathbb{R}_{>0}$ | arbitrary | 3.1 |
+| $a$ | absorbance of a path, $\int \mu\,d\ell'$ (natural log) | $\mathbb{R}_{\ge 0}$ | dimensionless | 3.1 |
+| $A_{10}$, $\varepsilon_{\rm mol}$, $c_{\rm mol}$ | decadic absorbance; molar absorptivity; concentration (chemistry convention only) | $\mathbb{R}_{\ge 0}$; $\mathbb{R}_{>0}$; $\mathbb{R}_{\ge 0}$ | dimensionless; M⁻¹ µm⁻¹; M | 3.1 |
+| $\delta\zeta$ | slab thickness | $\mathbb{R}_{>0}$ | µm | 3.2 |
 | $s_d(v)$ | dome profile $\sqrt{1 - (2v/d)^2}$ for $|v| \le d/2$, else 0 | $[0, 1]$ | dimensionless | 3.1 |
 | $\alpha$ | centre-line absorbance $\mu d / \cos\varphi$ | $\mathbb{R}_{\ge 0}$ | dimensionless | 3.1 |
 | $v_0$ | lateral position of the tube axis on the measuring line | $\mathbb{R}$ | µm | 3.1 |
@@ -163,7 +169,12 @@ Ordered by first appearance.
   ($\mu\ell \ll 1$), so that $e^{-\mu\ell} \approx 1 - \mu\ell$ and its effect
   on the image is linear.
 - **Slab** (§3.2). A thin layer of the object perpendicular to the optical
-  axis. *Not* an image plane.
+  axis, thin enough to be treated as lying at one depth. *Not* an image plane.
+- **Absorbance vs absorbed fraction** (§3.2). *Flagged:* absorbance $a = \mu\ell$
+  is an exponent, additive and unbounded; absorbed fraction is the share of
+  the light actually removed, between 0 and 1. They agree only for faint
+  stain.
+- **Transmittance** (§3.1). The fraction of light that passes, $T = e^{-a}$.
 - **Absorbed-light partition** (§3.2). A rule assigning to each slab the
   fraction of light it absorbs, given what the slabs before it let through.
 - **Raw moment / squared width** (§3.3). Weighted averages of $v^p$ over a
@@ -204,6 +215,26 @@ Ordered by first appearance.
 This section establishes the model the fit uses and the step, the
 line-spread function, that turns a 2-D blur into the 1-D one across the
 branch. Everything later is measured against it.
+
+**The Beer–Lambert law** (added v1.1). Light crossing an absorbing medium
+loses, per unit path length, a fixed fraction of the intensity that reaches
+that point. Along a straight ray with path coordinate $\ell' \in [0, \ell]$
+(µm) and absorption coefficient $\mu$ (µm⁻¹),
+
+$$\frac{dI}{d\ell'} = -\mu\,I \quad\Longrightarrow\quad I(\ell) = I_0\,e^{-\mu\ell}, \qquad T = \frac{I(\ell)}{I_0} = e^{-a}, \quad a = \mu\ell,$$
+
+with $I_0$ the intensity entering the medium, $T \in (0, 1]$ the
+transmittance and $a \ge 0$ the absorbance (natural-log convention); if
+$\mu$ varies along the ray, $a = \int_0^\ell \mu(\ell')\,d\ell'$, which is why
+the absorbances of successive slabs add (§3.2). Chemists write the same law in
+base 10, $A_{10} = -\log_{10} T = \varepsilon_{\rm mol}\,c_{\rm mol}\,\ell$,
+so $\mu = \ln(10)\,\varepsilon_{\rm mol}\,c_{\rm mol}$ **[textbook, from
+memory]**. *Hypotheses:* absorption only (no scattering), monochromatic light
+(one $\mu$), linear absorption (no saturation), a straight ray. The DAB stain
+is brown and the lamp a broadband LED, so "one $\mu$" holds only
+approximately, one reason $\mu$ is fitted per node (D-019). Plainly: every
+micrometre of stain passes the same fraction of whatever light reaches it, so
+doubling the thickness squares the transmitted fraction.
 
 **Absorption.** A vertical ray through the point at offset $v$ from the axis
 of a round tube of radius $r$, tilted by $\varphi$, crosses stained cytoplasm
@@ -251,6 +282,20 @@ axis, and a tilted tube also reaches other depths along $u$.
 §3.1's model has one depth; this section builds the image of a tube that
 spans several, and shows where an approximation enters.
 
+**What a slab is** (added v1.1). A slab is a thin horizontal layer of the
+phantom object, the part of the tube between two depths,
+$\{(x, y, z) : \zeta_j - \delta\zeta/2 \le z < \zeta_j + \delta\zeta/2\} \cap
+\text{tube}$, with mid-depth $\zeta_j$ and thickness $\delta\zeta$ (µm). It
+exists because the blur depends on depth: a thick tube has no single defocus,
+but a thin enough slab can be given one, $\delta = \zeta_j - z_k$, and one
+kernel. A slab is **not** an image plane: image planes $z_k$ are the recorded
+or rendered pictures, 0.28 µm apart; slabs are pieces of the object, much
+thinner (≤ 0.05 µm in the procedure, settled by convergence), and every slab
+contributes to every image plane, each time with a different blur. As
+$\delta\zeta \to 0$ the sums over $j$ below become integrals over $z$.
+Plainly: slice the fake dendrite horizontally like a loaf; blur each slice by
+its distance from the focus; stack the slices back into one picture.
+
 **First order in the absorbance.** Cut the object into slabs $j$ at depths
 $\zeta_j$ with absorbances $a_j(x, y)$. If the total $\sum_j a_j$ is small, the
 transmitted fraction of each column is $1 - \sum_j a_j$ to first order, and
@@ -290,6 +335,37 @@ Three properties, each proved in one line:
    column absorbance $\alpha s_d$ placed at one depth, $K$ a Gaussian).
 3. **Faint limit gives Eq. (11).** $\Delta A_j = a_j + O\big(a_j \sum_{j' \le j} a_{j'}\big)$,
    so Eq. (13) agrees with Eq. (11) to first order when $K_\delta = h_\delta$.
+
+**Absorbance versus absorbed fraction (rule R6; added v1.1).** The two are
+different objects and coincide only for a faint stain. The absorbance $a_j$ is
+an exponent: dimensionless, in $[0, \infty)$, additive along the ray. The
+absorbed fraction $\Delta A_j$ of Eq. (12) is a share of the light incident on
+the column, in $[0, 1]$: the light still present when the ray reaches slab
+$j$, $T_{<j}$, times the fraction of it that slab $j$ removes,
+$1 - e^{-a_j}$. What darkens the image is the absorbed fraction, so that is
+what Eq. (13) blurs and sums. Three equal slabs, light entering from below
+**[arithmetic]**:
+
+| | slab 1 (bottom) | slab 2 | slab 3 (top) | total |
+|---|---|---|---|---|
+| dark: absorbance $a_j$ | 0.5 | 0.5 | 0.5 | 1.5 (as a share it would read "150 % absorbed") |
+| dark: absorbed fraction $\Delta A_j$ | 0.393 | 0.239 | 0.145 | 0.777 $= 1 - e^{-1.5}$ |
+| faint: absorbance $a_j$ | 0.05 | 0.05 | 0.05 | 0.150 |
+| faint: absorbed fraction $\Delta A_j$ | 0.049 | 0.046 | 0.044 | 0.139 $= 1 - e^{-0.15}$ |
+
+Identical slabs get unequal shares: the bottom one sees the full light, the
+top one only what is left. For a faint stain $e^{-a} \approx 1 - a$ and
+$T_{<j} \approx 1$, so $\Delta A_j \approx a_j$, which is why the linear sum
+of Eq. (11) works there and fails for a dark stain. Plainly: absorbance says
+how strongly a layer would block the full beam; the absorbed fraction says
+how much it actually blocks, given what the layers below have already taken.
+
+**Interactive figure.** `../figures/fig4_slab_rendering_one_output_plane.html`
+draws Eqs. (12)–(13) for a flat tube with 12 slabs: slab shading by sharpness
+relative to a movable plane $k$, each slab's blurred share (grey), their sum
+(orange, $I_k/\bar B$), and the linear sum of Eq. (11) (blue dashed). Its
+blur widths are illustrative ideal-Debye values; its specification is
+`TEEG_interactive_figures_spec_2026-10-04.md`, figure 4.
 
 **How much it matters** ($d = 0.5$ µm, $\varphi = 0$, nine slabs, illustrative
 slab blur $0.08 + 1.2|\zeta_j - z_{\rm axis}|$ µm) **[run, C3]**:
@@ -711,6 +787,13 @@ wrong quantity; the selection event $\mathcal{S}$ was added (§3.6);
 hypotheses were added for vertical rays, partial coherence, the phase term,
 and the area diagnostic; the symbols $s$, $e$, $n$ (refractive index) were
 renamed $\tau$, $\beta$, $n_{\rm oil}$ to remove clashes.
+
+**Revision record, v1.1 (2026-10-04, at the user's request).** Added, from
+the chat explanations of the same day: the Beer–Lambert law with its
+hypotheses and the chemistry convention (§3.1); what a slab is (§3.2); the
+distinction between absorbance and absorbed fraction with a worked
+three-slab example (§3.2); a pointer to the interactive slab-rendering figure
+and its specification. No earlier statement changed.
 
 ## 6. References and sources
 

@@ -39,14 +39,30 @@ that say `claude/<name>` mean the same file name in this folder.
 | File | What it is |
 |---|---|
 | `handoff_diameter_remeasurement.md` | The design handoff (2026-09-30): data access, Eqs. 1-13, local decisions D1-D7, next actions. The source of the equation numbers "handoff Eq. n". Copied unchanged. |
-| `TEEG_diameter_bias_table_procedure_2026-10-04.md` | **How the bias table b(d, phi \| C) is tabulated**: configuration, defocus-kernel calibration, phantom rendering, measurement, estimation, inversion, flags, falsification checks. |
-| `TEEG_diameter_bias_table_mathematics_2026-10-04.md` | **The mathematics behind it**: forward model, LSF, slab rendering with the absorbed-light partition, squared-width additivity, defocused LSF, calibration identifiability, bias statistics and inversion. |
-| `TEEG_microscope_optics_oil_immersion_2026-10-04.md` | **The physics of the microscope** (v1.1): light path, refraction, oil immersion and NA, diffraction and the in-focus blur, forming vs resolving, defocus and why the blur stays flat near focus, condenser and coherence, mounting-medium index mismatch. |
+| `TEEG_diameter_bias_table_procedure_2026-10-04.md` | **How the bias table b(d, phi \| C) is tabulated** (v1.1): configuration, defocus-kernel calibration, phantom rendering (with a walkthrough of one output plane on figure 4), measurement, estimation, inversion, flags, falsification checks. |
+| `TEEG_diameter_bias_table_mathematics_2026-10-04.md` | **The mathematics behind it** (v1.1): forward model, Beer-Lambert law, LSF, slabs and slab rendering with the absorbed-light partition, absorbance vs absorbed fraction, squared-width additivity, defocused LSF, calibration identifiability, bias statistics and inversion. |
+| `TEEG_microscope_optics_oil_immersion_2026-10-04.md` | **The physics of the microscope** (v1.2, with pointers to figures 1-3): light path, refraction, oil immersion and NA, diffraction and the in-focus blur, forming vs resolving, defocus and why the blur stays flat near focus, condenser and coherence, mounting-medium index mismatch. |
+| `TEEG_interactive_figures_spec_2026-10-04.md` | **Instructions for Claude Design to reproduce the four interactive figures**: shared design rules, and per figure the claim, layout, controls, model equations, acceptance values and a paste-ready prompt; known gaps. |
 | `TEEG_diameter_optics_notes.md` | Running notes (v2, 2026-10-04) summarising the chat explanations, with corrections marked "[corrected <date>]". |
 
 The three 2026-10-04 documents were independently reviewed and revised the same
 day; each ends with a revision record. Decisions D-018 and D-019 are recorded in
 the project's decision log (`TEEG_decisions_and_ideas_log.md`, project knowledge).
+
+### `figures/`
+
+Standalone interactive HTML pages (open in any browser; no build step, no
+external data). Their behaviour and acceptance values are specified in
+`docs/TEEG_interactive_figures_spec_2026-10-04.md`. The blur widths and
+kernels in them are illustrative ideal-objective values, not the calibrated
+kernel.
+
+| File | Shows | Used in |
+|---|---|---|
+| `fig1_defocus_cone_disc_lsf.html` | cone of light, spot at a movable defocus, spot summed across a branch (uniformly bright spot: upper-bound RMS) | optics §3.5 |
+| `fig2_diffraction_focal_spot_vs_na.html` | plane waves from a cone interfering into a spot; spot width vs NA (2-D scalar model; axis drawn horizontal) | optics §3.4 |
+| `fig3_tilted_plane_wave_lateral_frequency.html` | one tilted plane wave and its lateral period lambda/(n sin theta) | optics §3.4 |
+| `fig4_slab_rendering_one_output_plane.html` | a tube cut into slabs, absorbed-light partition, per-slab blur and the summed profile of one output plane, vs the linear sum | mathematics §3.2, procedure §3.6 |
 
 ### `checks/`
 

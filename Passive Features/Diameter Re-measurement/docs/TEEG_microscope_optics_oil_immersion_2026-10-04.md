@@ -1,7 +1,8 @@
 # The physics of the 63× oil-immersion brightfield microscope
 
 **Date:** 2026-10-04 (v1, revised the same day after an independent review;
-v1.1 the same day adds diffraction, §3.4–3.5; see §5, "Revision record"). **Project:** Towards EEG, diameter re-measurement
+v1.1 the same day adds diffraction, §3.4–3.5; v1.2 adds pointers to the
+interactive figures; see §5, "Revision record"). **Project:** Towards EEG, diameter re-measurement
 from the Allen 63× brightfield stacks. **Companion documents:**
 `claude/TEEG_diameter_bias_table_procedure_2026-10-04.md` ("procedure §n /
 Eq. (n)") and `claude/TEEG_diameter_bias_table_mathematics_2026-10-04.md`
@@ -419,6 +420,20 @@ they were variances), about 0.099 µm at 550 nm (notes §2; **[run,
 not a theorem. The simulator uses the optical part only, $\sigma_{\rm r}(0)$
 (procedure §3.4).
 
+**Interactive figures for this section** (added v1.2). Two standalone pages in
+`../figures/` illustrate §3.4; their reproduction instructions are in
+`TEEG_interactive_figures_spec_2026-10-04.md`.
+`fig2_diffraction_focal_spot_vs_na.html`: an NA slider drives the cone
+half-angle, the Abbe limit $\lambda/(2\mathrm{NA})$ and the Airy FWHM at
+0.55 µm (reference readouts at NA 1.4: 67.5°, 0.196 µm, 0.155 µm as drawn
+**[run, Playwright probe]**; the figure's FWHM comes from a 2-D scalar fan of
+equal-weight plane waves, so the 3-D Airy table above is the reference and the
+figure shows the trend with NA). It is drawn with the optical axis
+horizontal, unlike the other figures (spec, known gaps).
+`fig3_tilted_plane_wave_lateral_frequency.html`: one tilted plane wave in oil
+and its lateral period $\Lambda = \lambda/(n\sin\theta)$ (Eq. 5b), 0.393 µm at
+$\theta = 67.5°$ **[run, Playwright probe]**.
+
 ### 3.5 Defocus: the cone and the spot
 
 §3.4 described a point in the focal plane. This section describes a point
@@ -448,6 +463,13 @@ and the depth of field larger.
 The cone is symmetric about its apex, so the spot is the same size above and
 below focus, **if** the system is index-matched and free of other spherical
 aberration (§3.7).
+
+**Interactive figure** (added v1.2):
+`../figures/fig1_defocus_cone_disc_lsf.html` draws the cone, the spot at a
+movable defocus $\Delta z$, and the spot summed along one direction. Its spot
+is **uniformly bright**, so its RMS readout is the upper-bound coefficient 1.21
+of the next paragraph, combined with a 0.08 µm in-focus core (at
+$\Delta z = 0.28$ µm: $R = 0.68$ µm, RMS 0.35 µm **[run, Playwright probe]**).
 
 **Across a branch, and the brightness of the spot.** Summing the spot along
 one direction gives the LSF. Its RMS width grows as $\gamma_\omega|\delta|$,
@@ -720,6 +742,11 @@ between the spot a lens forms and the separation it resolves, including the
 correction of a chat sentence that conflated them (§3.4); and why the blur
 stays flat near focus, via the defocus phase error and the quarter-wave
 tolerance (Eq. 6a, §3.5). No earlier statement changed.
+
+**Revision record, v1.2 (2026-10-04, at the user's request).** Added pointers
+to the interactive figures 1–3 in `../figures/`, with their reference readouts
+and the figure-1 caveat (uniformly bright spot, upper-bound coefficient).
+No earlier statement changed.
 
 ## 6. References and sources
 

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A tilted plane wave ripples across the focal plane</title>
+<style>
+:root{--text-primary:#1f1e1c;--text-secondary:#6b6964;--border:#d9d6cf;--border-strong:#a9a59c;--surface-1:#f4f2ee;--surface-0:#fbfaf8;--radius:8px;--t:#6b6964;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--text-primary:#ece9e3;--text-secondary:#a9a59c;--border:#3a3935;--border-strong:#5c5a55;--surface-1:#26251f;--surface-0:#1b1a17;--t:#a9a59c;}}
+:root[data-theme="dark"]{--text-primary:#ece9e3;--text-secondary:#a9a59c;--border:#3a3935;--border-strong:#5c5a55;--surface-1:#26251f;--surface-0:#1b1a17;--t:#a9a59c;}
+body{margin:0;padding:16px;background:var(--surface-0);color:var(--text-primary);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.5;}
+main{max-width:680px;margin:0 auto;}
+h1{font-size:18px;font-weight:500;margin:0 0 4px;}
+p.note{font-size:13px;color:var(--text-secondary);margin:0 0 16px;}
+input[type=range]{width:100%;}
+button{font:inherit;background:transparent;border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:4px 10px;color:var(--text-primary);cursor:pointer;}
+svg text.th{font-size:14px;font-weight:500;fill:var(--text-primary);}
+svg text.ts,svg text.t{font-size:12px;fill:var(--text-secondary);}
+</style>
+</head>
+<body>
+<main>
+<h1>A tilted plane wave ripples across the focal plane</h1>
+<p class="note">Crest spacing along x is lambda/(n sin theta). Spec: figure 3.</p>
+<div style="display:flex;align-items:center;gap:12px;margin:0 0 0.75rem;">
+<label style="font-size:14px;color:var(--text-secondary);min-width:120px;">Tilt angle θ</label>
+<input type="range" min="0" max="67.5" step="0.5" value="30" id="th" style="flex:1;" />
+<span style="font-size:14px;font-weight:500;min-width:52px;" id="thOut">30.0°</span>
+<button id="pp" style="min-width:80px;">Pause</button>
+</div>
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin:0 0 1rem;">
+<div style="background:var(--surface-1);border-radius:var(--radius);padding:0.6rem 1rem;flex:1;min-width:150px;"><div style="font-size:13px;color:var(--text-secondary);">wavelength in oil, λ/n</div><div style="font-size:20px;font-weight:500;">0.363 µm</div></div>
+<div style="background:var(--surface-1);border-radius:var(--radius);padding:0.6rem 1rem;flex:1;min-width:150px;"><div style="font-size:13px;color:var(--text-secondary);">crest spacing along x, Λ = λ/(n sin θ)</div><div style="font-size:20px;font-weight:500;" id="LOut"></div></div>
+<div style="background:var(--surface-1);border-radius:var(--radius);padding:0.6rem 1rem;flex:1;min-width:150px;"><div style="font-size:13px;color:var(--text-secondary);">n sin θ</div><div style="font-size:20px;font-weight:500;" id="nsOut"></div></div>
+</div>
+<canvas id="cv" width="680" height="340" style="width:100%;height:auto;display:block;"></canvas>
+<canvas id="pf" width="680" height="150" style="width:100%;height:auto;display:block;margin-top:0.25rem;"></canvas>
+<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--text-secondary);margin-top:0.5rem;">
+<span><span style="display:inline-block;width:14px;height:2px;background:#378ADD;vertical-align:middle;margin-right:6px;"></span>wave crests (wavefronts)</span>
+<span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#D85A30;vertical-align:middle;margin-right:6px;"></span>where a crest meets the focal plane</span>
+</div>
+<script>
+const N=1.515,LAM=0.55,LN=LAM/N;
+const cv=document.getElementById('cv'),c=cv.getContext('2d');
+const pf=document.getElementById('pf'),p=pf.getContext('2d');
+const css=getComputedStyle(document.documentElement);
+const TXT=(css.getPropertyValue('--text-secondary')||'#888').trim()||'#888';
+const BRD=(css.getPropertyValue('--border-strong')||'#999').trim()||'#999';
+const XR=2.0,ZR=1.0,W=680,H=340,cx0=W/2,cz0=H/2,S=(W-80)/(2*XR);
+let t=0,run=true;
+const X=x=>cx0+x*S,Z=z=>cz0-z*S;
+function frame(){
+ const deg=parseFloat(document.getElementById('th').value),th=deg*Math.PI/180;
+ const s=Math.sin(th),co=Math.cos(th);
+ document.getElementById('thOut').textContent=deg.toFixed(1)+'°';
+ document.getElementById('nsOut').textContent=(N*s).toFixed(2);
+ document.getElementById('LOut').textContent=s<1e-3?'∞ (no pattern)':(LN/s).toFixed(3)+' µm';
+ const ph=(t*0.25)%1;
+ c.clearRect(0,0,W,H);
+ c.save();c.beginPath();c.rect(40,10,W-80,H-20);c.clip();
+ c.strokeStyle='#378ADD';c.lineWidth=1.5;
+ for(let m=-20;m<=20;m++){const d=(m+ph)*LN;
+  c.beginPath();
+  if(co>1e-6){const za=(d-(-XR-1)*s)/co,zb=(d-(XR+1)*s)/co;c.moveTo(X(-XR-1),Z(za));c.lineTo(X(XR+1),Z(zb));}
+  c.stroke();}
+ c.restore();
+ c.strokeStyle=BRD;c.lineWidth=1.5;c.beginPath();c.moveTo(40,cz0);c.lineTo(W-40,cz0);c.stroke();
+ c.fillStyle=TXT;c.font='13px sans-serif';c.fillText('focal plane (z = 0), x across',46,cz0-8);
+ c.fillText('z',W-30,22);c.fillText('x',W-30,cz0+4);
+ c.strokeStyle=BRD;c.lineWidth=1;c.beginPath();c.moveTo(W-34,cz0+60);c.lineTo(W-34,30);c.stroke();
+ if(s>1e-3){c.fillStyle='#D85A30';
+  for(let m=-40;m<=40;m++){const x=(m+ph)*LN/s;if(Math.abs(x)<=XR){c.beginPath();c.arc(X(x),cz0,4.5,0,2*Math.PI);c.fill();}}
+  const L=LN/s;if(L<2*XR){const xa=(Math.ceil(-ph)+ph)*LN/s,xb=xa+L;
+   if(xb<=XR){c.strokeStyle=TXT;c.lineWidth=1;c.beginPath();c.moveTo(X(xa),cz0+18);c.lineTo(X(xb),cz0+18);c.stroke();
+    c.beginPath();c.moveTo(X(xa),cz0+13);c.lineTo(X(xa),cz0+23);c.moveTo(X(xb),cz0+13);c.lineTo(X(xb),cz0+23);c.stroke();
+    c.fillStyle=TXT;c.fillText('Λ',(X(xa)+X(xb))/2-4,cz0+36);}}}
+ const ax=90,az=H-55,al=55;c.strokeStyle='#D85A30';c.lineWidth=2;c.beginPath();c.moveTo(ax,az);c.lineTo(ax+al*s,az-al*co);c.stroke();
+ c.fillStyle='#D85A30';c.beginPath();const ex=ax+al*s,ez=az-al*co,a=Math.atan2(-co,s);c.moveTo(ex,ez);c.lineTo(ex-9*Math.cos(a-0.4),ez-9*Math.sin(a-0.4));c.lineTo(ex-9*Math.cos(a+0.4),ez-9*Math.sin(a+0.4));c.fill();
+ c.strokeStyle=BRD;c.setLineDash([3,3]);c.beginPath();c.moveTo(ax,az);c.lineTo(ax,az-al-5);c.stroke();c.setLineDash([]);
+ c.fillStyle=TXT;c.fillText('travel direction, θ from the axis',ax+12,az+22);
+ p.clearRect(0,0,W,150);
+ const T0=22,B0=118,mid=(T0+B0)/2,amp=(B0-T0)/2;
+ p.strokeStyle=BRD;p.lineWidth=1;p.beginPath();p.moveTo(40,mid);p.lineTo(W-40,mid);p.stroke();
+ p.strokeStyle='#D85A30';p.lineWidth=2;p.beginPath();
+ for(let i=0;i<=600;i++){const x=-XR+2*XR*i/600;const v=Math.cos(2*Math.PI*(x*s/LN-ph));const px=X(x),py=mid-amp*v;i?p.lineTo(px,py):p.moveTo(px,py);}
+ p.stroke();
+ p.fillStyle=TXT;p.font='13px sans-serif';p.fillText('field along the focal plane, Re E(x) at this instant',40,14);
+ [-2,-1,0,1,2].forEach(v=>p.fillText(String(v),X(v)-4,B0+20));p.fillText('x (µm)',W-80,B0+20);
+ if(run)t+=1/60;requestAnimationFrame(frame);
+}
+document.getElementById('pp').addEventListener('click',e=>{run=!run;e.target.textContent=run?'Pause':'Play';});
+requestAnimationFrame(frame);
+</script>
+</main>
+</body>
+</html>

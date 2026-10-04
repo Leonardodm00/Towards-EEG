@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rendering one image plane from object slabs</title>
+<style>
+:root{--text-primary:#1f1e1c;--text-secondary:#6b6964;--border:#d9d6cf;--border-strong:#a9a59c;--surface-1:#f4f2ee;--surface-0:#fbfaf8;--radius:8px;--t:#6b6964;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--text-primary:#ece9e3;--text-secondary:#a9a59c;--border:#3a3935;--border-strong:#5c5a55;--surface-1:#26251f;--surface-0:#1b1a17;--t:#a9a59c;}}
+:root[data-theme="dark"]{--text-primary:#ece9e3;--text-secondary:#a9a59c;--border:#3a3935;--border-strong:#5c5a55;--surface-1:#26251f;--surface-0:#1b1a17;--t:#a9a59c;}
+body{margin:0;padding:16px;background:var(--surface-0);color:var(--text-primary);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.5;}
+main{max-width:680px;margin:0 auto;}
+h1{font-size:18px;font-weight:500;margin:0 0 4px;}
+p.note{font-size:13px;color:var(--text-secondary);margin:0 0 16px;}
+input[type=range]{width:100%;}
+button{font:inherit;background:transparent;border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:4px 10px;color:var(--text-primary);cursor:pointer;}
+svg text.th{font-size:14px;font-weight:500;fill:var(--text-primary);}
+svg text.ts,svg text.t{font-size:12px;fill:var(--text-secondary);}
+</style>
+</head>
+<body>
+<main>
+<h1>Rendering one image plane from object slabs</h1>
+<p class="note">Absorbed-light partition vs plain linear sum; illustrative ideal-Debye blur widths. Spec: figure 4.</p>
+<div style="display:grid;grid-template-columns:150px 1fr 64px;gap:8px 12px;align-items:center;margin:0 0 0.75rem;font-size:14px;">
+<label style="color:var(--text-secondary);">Output plane z_k</label><input type="range" min="-1.2" max="1.2" step="0.02" value="0" id="zk"/><span id="zkO" style="font-weight:500;"></span>
+<label style="color:var(--text-secondary);">Tube diameter d</label><input type="range" min="0.3" max="2" step="0.05" value="1" id="d"/><span id="dO" style="font-weight:500;"></span>
+<label style="color:var(--text-secondary);">Stain μ (per µm)</label><input type="range" min="0.1" max="5" step="0.1" value="1.5" id="mu"/><span id="muO" style="font-weight:500;"></span>
+</div>
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin:0 0 0.75rem;">
+<div style="background:var(--surface-1);border-radius:var(--radius);padding:0.5rem 1rem;flex:1;min-width:150px;"><div style="font-size:13px;color:var(--text-secondary);">centre-line absorbance μd</div><div style="font-size:20px;font-weight:500;" id="aO"></div></div>
+<div style="background:var(--surface-1);border-radius:var(--radius);padding:0.5rem 1rem;flex:1;min-width:150px;"><div style="font-size:13px;color:var(--text-secondary);">dip depth, partition</div><div style="font-size:20px;font-weight:500;" id="pO"></div></div>
+<div style="background:var(--surface-1);border-radius:var(--radius);padding:0.5rem 1rem;flex:1;min-width:150px;"><div style="font-size:13px;color:var(--text-secondary);">dip depth, plain linear sum</div><div style="font-size:20px;font-weight:500;" id="lO"></div></div>
+</div>
+<canvas id="cv" width="680" height="330" style="width:100%;height:auto;display:block;"></canvas>
+<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--text-secondary);margin-top:0.5rem;">
+<span><span style="display:inline-block;width:12px;height:10px;background:rgba(29,158,117,0.7);vertical-align:middle;margin-right:6px;"></span>object slabs (darker = closer to plane k = sharper)</span>
+<span><span style="display:inline-block;width:14px;height:2px;background:#D85A30;vertical-align:middle;margin-right:6px;"></span>plane k and its rendered profile</span>
+<span><span style="display:inline-block;width:14px;height:0;border-top:2px dashed #378ADD;vertical-align:middle;margin-right:6px;"></span>plain linear sum (over-counts when dark)</span>
+<span><span style="display:inline-block;width:14px;height:1px;background:#888;vertical-align:middle;margin-right:6px;"></span>each slab's blurred share</span>
+</div>
+<script>
+const css=getComputedStyle(document.documentElement);
+const TXT=(css.getPropertyValue('--text-secondary')||'#888').trim()||'#888';
+const BRD=(css.getPropertyValue('--border-strong')||'#999').trim()||'#999';
+const cv=document.getElementById('cv'),c=cv.getContext('2d');
+const DZ=[0,0.14,0.28,0.42,0.56,0.84],SG=[0.080,0.086,0.122,0.262,0.438,0.603];
+function sig(dl){const a=Math.abs(dl);if(a>=0.84)return 0.603+0.79*(a-0.84);for(let i=0;i<5;i++){if(a<=DZ[i+1]){const t=(a-DZ[i])/(DZ[i+1]-DZ[i]);return SG[i]+t*(SG[i+1]-SG[i]);}}}
+const NX=241,XR=1.6,xs=[];for(let i=0;i<NX;i++)xs.push(-XR+2*XR*i/(NX-1));const dx=xs[1]-xs[0];
+function blur(f,s){const out=new Float64Array(NX);const h=Math.ceil(4*s/dx);const w=[];let ws=0;for(let m=-h;m<=h;m++){const v=Math.exp(-0.5*(m*dx/s)**2);w.push(v);ws+=v;}
+ for(let i=0;i<NX;i++){let a=0;for(let m=-h;m<=h;m++){const j=i+m;if(j>=0&&j<NX)a+=f[j]*w[m+h];}out[i]=a/ws;}return out;}
+function draw(){
+ const zk=+document.getElementById('zk').value,d=+document.getElementById('d').value,mu=+document.getElementById('mu').value,r=d/2;
+ document.getElementById('zkO').textContent=(zk>=0?'+':'')+zk.toFixed(2)+' µm';
+ document.getElementById('dO').textContent=d.toFixed(2)+' µm';
+ document.getElementById('muO').textContent=mu.toFixed(1);
+ document.getElementById('aO').textContent=(mu*d).toFixed(2);
+ const J=12,dz=d/J,zc=[];for(let j=0;j<J;j++)zc.push(-r+dz*(j+0.5));
+ const A=[];for(let j=0;j<J;j++){const lo=zc[j]-dz/2,hi=zc[j]+dz/2;const a=new Float64Array(NX);
+  for(let i=0;i<NX;i++){const x=xs[i];if(Math.abs(x)<r){const hh=Math.sqrt(r*r-x*x);const L=Math.max(0,Math.min(hi,hh)-Math.max(lo,-hh));a[i]=mu*L;}}A.push(a);}
+ const Tp=new Float64Array(NX).fill(1);const parts=[],lin=new Float64Array(NX),tot=new Float64Array(NX);
+ for(let j=0;j<J;j++){const dA=new Float64Array(NX);for(let i=0;i<NX;i++){dA[i]=Tp[i]*(1-Math.exp(-A[j][i]));Tp[i]*=Math.exp(-A[j][i]);}
+  const s=sig(zc[j]-zk);const b=blur(dA,s),bl=blur(A[j],s);parts.push({b,s});for(let i=0;i<NX;i++){tot[i]+=b[i];lin[i]+=bl[i];}}
+ let pm=0,lm=0;for(let i=0;i<NX;i++){pm=Math.max(pm,tot[i]);lm=Math.max(lm,lin[i]);}
+ document.getElementById('pO').textContent=pm.toFixed(3);
+ document.getElementById('lO').textContent=lm.toFixed(3)+(lm>1?' (impossible)':'');
+ c.clearRect(0,0,680,330);c.font='13px sans-serif';
+ const L0=20,W0=270,T0=30,H0=270,S=W0/(2*XR),X=x=>L0+(x+XR)*S,Z=z=>T0+H0/2-z*S;
+ c.strokeStyle=BRD;c.lineWidth=1;c.strokeRect(L0,T0,W0,H0);
+ for(let j=0;j<J;j++){const s=parts[j].s;const al=Math.max(0.12,Math.min(0.9,0.09/s));
+  c.fillStyle='rgba(29,158,117,'+al.toFixed(2)+')';const lo=zc[j]-dz/2,hi=zc[j]+dz/2;
+  c.beginPath();let first=true;
+  for(let i=0;i<NX;i++){const x=xs[i];if(Math.abs(x)>=r)continue;const hh=Math.sqrt(r*r-x*x);const a=Math.max(lo,-hh),b2=Math.min(hi,hh);if(b2<=a)continue;c.fillRect(X(x)-dx*S/2,Z(b2),dx*S+0.5,(b2-a)*S);}}
+ c.strokeStyle=TXT;c.lineWidth=1;c.beginPath();c.arc(X(0),Z(0),r*S,0,2*Math.PI);c.stroke();
+ c.strokeStyle='#D85A30';c.lineWidth=2;c.setLineDash([6,4]);c.beginPath();c.moveTo(L0,Z(zk));c.lineTo(L0+W0,Z(zk));c.stroke();c.setLineDash([]);
+ c.fillStyle='#D85A30';c.fillText('plane k',L0+W0-56,Z(zk)-6);
+ c.fillStyle=TXT;c.fillText('phantom cross-section (x across, z up)',L0,T0-10);
+ c.fillText('light',L0+6,T0+H0-8);c.strokeStyle=TXT;c.beginPath();c.moveTo(L0+50,T0+H0-6);c.lineTo(L0+50,T0+H0-30);c.stroke();
+ c.beginPath();c.moveTo(L0+46,T0+H0-24);c.lineTo(L0+50,T0+H0-30);c.lineTo(L0+54,T0+H0-24);c.stroke();
+ const L1=330,W1=340,T1=30,H1=270,PX=x=>L1+(x+XR)/(2*XR)*W1,PY=v=>T1+v*H1*0.9;
+ c.strokeStyle=BRD;c.strokeRect(L1,T1,W1,H1);
+ c.fillStyle=TXT;c.fillText('rendered profile I_k / B̄ across the tube',L1,T1-10);
+ c.fillText('1',L1-12,PY(0)+4);c.fillText('0',L1-12,PY(1)+4);
+ c.strokeStyle=BRD;c.setLineDash([2,3]);c.beginPath();c.moveTo(L1,PY(0));c.lineTo(L1+W1,PY(0));c.stroke();c.beginPath();c.moveTo(L1,PY(1));c.lineTo(L1+W1,PY(1));c.stroke();c.setLineDash([]);
+ c.strokeStyle='rgba(136,136,136,0.6)';c.lineWidth=1;
+ for(const p of parts){c.beginPath();for(let i=0;i<NX;i++){const px=PX(xs[i]),py=PY(p.b[i]);i?c.lineTo(px,py):c.moveTo(px,py);}c.stroke();}
+ c.strokeStyle='#378ADD';c.lineWidth=1.5;c.setLineDash([5,4]);c.beginPath();for(let i=0;i<NX;i++){const px=PX(xs[i]),py=PY(Math.min(lin[i],1.1));i?c.lineTo(px,py):c.moveTo(px,py);}c.stroke();c.setLineDash([]);
+ c.strokeStyle='#D85A30';c.lineWidth=2.5;c.beginPath();for(let i=0;i<NX;i++){const px=PX(xs[i]),py=PY(tot[i]);i?c.lineTo(px,py):c.moveTo(px,py);}c.stroke();
+ c.fillStyle=TXT;[-1.5,-1,-0.5,0,0.5,1,1.5].forEach(v=>c.fillText(String(v),PX(v)-8,T1+H1+16));c.fillText('x (µm)',L1+W1-42,T1+H1+30);
+}
+['zk','d','mu'].forEach(id=>document.getElementById(id).addEventListener('input',draw));
+draw();
+</script>
+</main>
+</body>
+</html>

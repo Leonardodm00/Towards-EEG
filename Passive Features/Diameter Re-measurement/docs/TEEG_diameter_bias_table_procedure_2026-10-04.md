@@ -1,7 +1,8 @@
 # How the diameter bias factor $b(d, \varphi \mid \mathcal{C})$ is tabulated
 
 **Date:** 2026-10-04 (v1, revised the same day after an independent review;
-see §5, "Revision record"). **Project:** Towards EEG, diameter re-measurement
+v1.1 the same day adds a walkthrough of one output plane with an interactive
+figure, §3.6; see §5, "Revision record"). **Project:** Towards EEG, diameter re-measurement
 from the Allen 63× brightfield stacks (first specimen 529878215).
 **Companion documents:** `claude/TEEG_diameter_bias_table_mathematics_2026-10-04.md`
 ("mathematics §n / Eq. (n)") and
@@ -506,6 +507,38 @@ lower slabs is ignored), and it traces absorption along **vertical** rays,
 while under an NA 1.4 condenser the light crosses the specimen at up to 67.5°,
 on longer, laterally displaced paths (mathematics §5).
 
+**Walkthrough of one output plane, with the interactive figure** (added v1.1).
+`../figures/fig4_slab_rendering_one_output_plane.html` draws steps 3–4 for a
+flat tube ($\varphi = 0$) cut into 12 slabs, with the diameter $d$, the
+absorption coefficient $\mu$ and the output plane $z_k$ as sliders. Read it in
+this order:
+
+1. **Slice the object** (left panel). The circle is the tube's cross-section;
+   the horizontal bands are the slabs $j$, each with its exact chord through
+   the circle (step 2). The dashed line is the output plane $z_k$; a slab's
+   shading says how sharp it will be in that plane, darkest at $\zeta_j = z_k$.
+2. **Partition the light, from below** (step 3, Eq. 5). The bottom slab takes
+   its share of the full beam; each slab above takes its share of what is left.
+   Equal slabs therefore get unequal shares (mathematics §3.2, worked table).
+3. **Blur each share by its own distance** to the plane, $K_{\zeta_j - z_k}$
+   (the grey curves in the right panel): narrow and tall for slabs near the
+   plane, wide and low for slabs far from it.
+4. **Sum** (Eq. 6): the orange curve is $I_k/B$, the profile that plane $k$
+   records before the camera chain. The blue dashed curve is the linear sum of
+   blurred slab absorbances; the gap between the two is the error the partition
+   removes, and it grows with $\mu d$.
+5. **Move the plane and repeat** (step 5). Dragging $z_k$ re-weights the same
+   slabs with new kernels; nothing from the previous plane is reused.
+6. **Camera chain** (step 6) is not in the figure.
+
+Reference readouts of the figure, centre-line absorbance $\mu d$ and dip depth
+($1 - I_k/B$ at the centre) with the partition and with the linear sum, are
+**[run, Playwright probe of the figure, 2026-10-04]**: $z_k = 0$, $d = 1$ µm,
+$\mu = 1.5$ µm⁻¹ → 1.50, 0.691, 1.328; $\mu = 0.1$ µm⁻¹ → 0.10, 0.084, 0.089.
+The figure's blur widths are illustrative ideal-Debye values, not the
+calibrated kernel of §3.4. Its reproduction instructions are in
+`TEEG_interactive_figures_spec_2026-10-04.md`, figure 4.
+
 ### 3.7 Step D — measuring the phantoms with the real pipeline, unchanged
 
 The stack now looks like Allen's; this section runs it through exactly the
@@ -682,6 +715,10 @@ noise matching, the nuisance-distribution hypothesis, the exact slab chords,
 the filter boundary mode, and the use of $B$ (not $\bar B$) in the renderer were
 corrected; $\mathcal{C}$ was completed; notation was made consistent with the
 mathematics document ($\tau$, $\beta$, $d^\star_i$, $\tilde d_i$).
+
+**Revision record, v1.1 (2026-10-04, at the user's request).** Added the
+walkthrough of one output plane tied to the interactive figure 4, with its
+reference readouts (§3.6). No earlier statement changed.
 
 ## 6. References and sources
 
