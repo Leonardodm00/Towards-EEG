@@ -1,0 +1,20 @@
+dz   sigma   D
+0.00 0.0802 0.00000
+0.07 0.0815 0.00021
+0.14 0.0861 0.00098
+0.21 0.0966 0.00291
+0.28 0.1222 0.00850
+0.42 0.2617 0.06206
+0.56 0.4376 0.18507
+0.70 0.5403 0.28552
+0.84 0.6026 0.35672
+
+fit on dz <= 0.28; rms error on all points (um^2):
+  k2 dz^2                params [0.0959]  rms_all 0.13602  pred@0.84 0.0677 (true 0.3567)
+  k2 dz^2 + l dz^4       params [0.0194 1.1303]  rms_all 0.07706  pred@0.84 0.5764 (true 0.3567)
+  k2 dz^4/(dz^2+a^2)     params [0.4008 0.4605]  rms_all 0.07778  pred@0.84 0.2175 (true 0.3567)
+
+fit on dz <= 0.84; rms error on all points (um^2):
+  k2 dz^2                params [0.5268]  rms_all 0.02083  pred@0.84 0.3717 (true 0.3567)
+  k2 dz^2 + l dz^4       params [ 0.5296 -0.0049]  rms_all 0.02082  pred@0.84 0.3712 (true 0.3567)
+  k2 dz^4/(dz^2+a^2)     params [0.5739 0.2108]  rms_all 0.01816  pred@0.84 0.3809 (true 0.3567)
