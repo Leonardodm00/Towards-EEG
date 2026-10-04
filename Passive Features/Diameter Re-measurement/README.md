@@ -22,6 +22,16 @@ the line fit, decision D-019). The fitted diameter is then corrected for the
 optical bias of the whole chain with a table b(d, phi | C) built from synthetic
 stacks of known geometry, and flagged nodes are filled from neighbours.
 
+## Where the documents live (decision of 2026-10-04)
+
+The documents of this workstream are kept **here**, in `docs/`, on `main`:
+new documents and updates are committed and pushed to this folder, and the
+assistant reads and cites them from the repository [user, 2026-10-04 12:47;
+recorded as D-020]. Older copies of the procedure and mathematics documents and
+of the optics notes also sit in the claude.ai project knowledge under
+`claude/`; they are not the reference. Cross-references inside the documents
+that say `claude/<name>` mean the same file name in this folder.
+
 ## Contents
 
 ### `docs/`
@@ -31,7 +41,7 @@ stacks of known geometry, and flagged nodes are filled from neighbours.
 | `handoff_diameter_remeasurement.md` | The design handoff (2026-09-30): data access, Eqs. 1-13, local decisions D1-D7, next actions. The source of the equation numbers "handoff Eq. n". Copied unchanged. |
 | `TEEG_diameter_bias_table_procedure_2026-10-04.md` | **How the bias table b(d, phi \| C) is tabulated**: configuration, defocus-kernel calibration, phantom rendering, measurement, estimation, inversion, flags, falsification checks. |
 | `TEEG_diameter_bias_table_mathematics_2026-10-04.md` | **The mathematics behind it**: forward model, LSF, slab rendering with the absorbed-light partition, squared-width additivity, defocused LSF, calibration identifiability, bias statistics and inversion. |
-| `TEEG_microscope_optics_oil_immersion_2026-10-04.md` | **The physics of the microscope**: light path, refraction, oil immersion and NA, in-focus blur, defocus, condenser and coherence, mounting-medium index mismatch. |
+| `TEEG_microscope_optics_oil_immersion_2026-10-04.md` | **The physics of the microscope** (v1.1): light path, refraction, oil immersion and NA, diffraction and the in-focus blur, forming vs resolving, defocus and why the blur stays flat near focus, condenser and coherence, mounting-medium index mismatch. |
 | `TEEG_diameter_optics_notes.md` | Running notes (v2, 2026-10-04) summarising the chat explanations, with corrections marked "[corrected <date>]". |
 
 The three 2026-10-04 documents were independently reviewed and revised the same
