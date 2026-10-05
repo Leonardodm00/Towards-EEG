@@ -2,7 +2,8 @@
 
 **Date:** 2026-10-04 (v1, revised the same day after an independent review;
 v1.1 the same day adds the Beer–Lambert law, the slab, and absorbance versus
-absorbed fraction; see §5, "Revision record"). **Project:** Towards EEG, diameter re-measurement
+absorbed fraction; v1.2 (2026-10-05) adds why near slabs dominate a plane
+although every slab's blurred share keeps its area; see §5, "Revision record"). **Project:** Towards EEG, diameter re-measurement
 from the Allen 63× brightfield stacks. **Companion documents:**
 `claude/TEEG_diameter_bias_table_procedure_2026-10-04.md` (cited as
 "procedure §n / procedure Eq. (n)") and
@@ -72,6 +73,8 @@ imaging theory, which this project does not use.
 | $a_j(x, y)$ | absorbance of slab $j$ along the vertical ray through $(x, y)$ | $\mathbb{R}_{\ge 0}$ | dimensionless | 3.2 |
 | $T_{<j}(x, y)$ | fraction of light reaching slab $j$, $\exp(-\sum_{j' < j} a_{j'})$ | $(0, 1]$ | dimensionless | 3.2 |
 | $\Delta A_j(x, y)$ | fraction of the light incident on the column that is absorbed in slab $j$ (*not* a difference of the area $A$) | $[0, 1]$ | dimensionless | 3.2 |
+| $m_j$ | area of slab $j$'s share across the branch, $\int \Delta A_j(v)\,dv$; independent of the output plane $k$ | $\mathbb{R}_{\ge 0}$ | µm | 3.2 |
+| $g_{j,k}(v)$ | slab $j$'s share smoothed by the kernel for plane $k$ (a grey curve of figure 4) | function $\mathbb{R} \to \mathbb{R}_{\ge 0}$ | dimensionless | 3.2 |
 | $f$, $g$ | non-negative integrable profiles | $L^1(\mathbb{R})$, $\ge 0$ | any | 3.3 |
 | $M_p[f]$ | $p$-th raw moment $\int v^p f(v)\,dv$, $p \in \{0, 1, 2\}$ | $\mathbb{R} \cup \{+\infty\}$ for $p = 2$ | µm$^{p}$ × units of $f$ | 3.3 |
 | $A[f]$ | area $M_0[f]$ | $\mathbb{R}_{>0}$ | units of $f$ × µm | 3.3 |
@@ -359,6 +362,40 @@ $T_{<j} \approx 1$, so $\Delta A_j \approx a_j$, which is why the linear sum
 of Eq. (11) works there and fails for a dark stain. Plainly: absorbance says
 how strongly a layer would block the full beam; the absorbed fraction says
 how much it actually blocks, given what the layers below have already taken.
+
+**Same light, different smoothing: why near slabs dominate a plane** (added
+v1.2). For each fixed slab $j$, its share $\Delta A_j$ is the same for every
+output plane $k$: Eq. (12) contains no $z_k$. What changes from plane to plane
+is only the kernel it is smoothed with, $K_{\zeta_j - z_k}$; and within one
+plane, different slabs get different kernels. Each kernel has unit integral
+(defocus moves light sideways, it neither creates nor destroys it; incoherent
+model, no light lost outside the aperture), so smoothing keeps the area of the
+share and changes only its shape. Across a straight branch, with $v$ the
+offset across it (µm), write the share's area and the blurred share as
+
+$$m_j = \int_{\mathbb{R}} \Delta A_j(v)\,dv \ \text{(µm, the same for every plane } k\text{)}, \qquad g_{j,k}(v) = \big(\Delta A_j * K_{\zeta_j - z_k}\big)(v), \qquad \int_{\mathbb{R}} g_{j,k}(v)\,dv = m_j \ \text{for all } k. \tag{13a}$$
+
+The area being fixed, the only thing defocus can change is how that area is
+spread, so the difference between a near and a far slab is in **height** and
+**steepness**. For a 1-D Gaussian kernel of width $\sigma_{\rm r}(\zeta_j - z_k)$
+and a slab much thinner than that width, centred at $v_0$, so that
+$g_{j,k}(v) \approx m_j\,\exp\!\big(-(v - v_0)^2 / [2\sigma_{\rm r}(\zeta_j - z_k)^2]\big)/[\sqrt{2\pi}\,\sigma_{\rm r}(\zeta_j - z_k)]$
+**[textbook, from memory]**:
+
+$$\max_v g_{j,k}(v) = \frac{m_j}{\sqrt{2\pi}\,\sigma_{\rm r}(\zeta_j - z_k)}, \qquad \max_v \Big|\frac{d g_{j,k}}{dv}(v)\Big| = \frac{m_j\,e^{-1/2}}{\sqrt{2\pi}\,\sigma_{\rm r}(\zeta_j - z_k)^{2}} \ \text{(at } |v - v_0| = \sigma_{\rm r}(\zeta_j - z_k)\text{)}. \tag{13b}$$
+
+Depth falls as $1/\sigma_{\rm r}$, edge slope as $1/\sigma_{\rm r}^2$. With the
+ideal-Debye core widths of §3.4 (0.080 µm in focus, 0.603 µm at
+$\delta = 0.84$ µm, three planes off; not calibrated), two slabs of equal $m_j$
+differ by 7.5× in dip depth and 57× in edge slope **[arithmetic]**. The fit
+reads mostly the dip's width and edges, so near slabs set the measured
+diameter, while far slabs add a broad, shallow pedestal, part of what the
+bias table corrects. For a tube wider than $\sigma_{\rm r}$ the near-slab depth
+saturates at about $\max_v \Delta A_j(v)$, so the depth contrast shrinks; the
+slope contrast remains. Plainly: every slab removes the same amount of light
+in every plane; out of focus that loss is smeared over a wider strip, like the
+same ink spread over a bigger sheet, paler and without a sharp outline, so it
+says little about where the dendrite's edges are.
 
 **Interactive figure.** `../figures/fig4_slab_rendering_one_output_plane.html`
 draws Eqs. (12)–(13) for a flat tube with 12 slabs: slab shading by sharpness
@@ -794,6 +831,13 @@ hypotheses and the chemistry convention (§3.1); what a slab is (§3.2); the
 distinction between absorbance and absorbed fraction with a worked
 three-slab example (§3.2); a pointer to the interactive slab-rendering figure
 and its specification. No earlier statement changed.
+
+**Revision record, v1.2 (2026-10-05, at the user's request).** Added the
+paragraph "Same light, different smoothing" (§3.2, Eqs. 13a–13b): each slab's
+absorbed share is the same in every plane and only its smoothing changes, so
+area is conserved and defocus acts through height ($\propto 1/\sigma_{\rm r}$)
+and steepness ($\propto 1/\sigma_{\rm r}^2$). Notation rows $m_j$, $g_{j,k}$.
+No earlier statement changed.
 
 ## 6. References and sources
 
