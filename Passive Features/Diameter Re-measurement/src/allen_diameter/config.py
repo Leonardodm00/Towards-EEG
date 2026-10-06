@@ -52,6 +52,7 @@ RESPONSE_ESTIMATORS = ("tps_spline", "local_linear", "grid_mean")  # D-024
 PHANTOM_DESIGNS = ("random", "grid")                           # D-024
 END_CUTS = ("axial", "vertical")                               # Block 2 (provisional default, see RendererConfig.end_cut)
 FIT_START_RULES = ("profile", "fixed")                         # Block 3 (provisional default, see MeasureConfig.fit_start_rule)
+RENDER_BACKENDS = ("fft", "direct")                            # Block 4: fft = impl-handoff FFT form; direct = reference
 TABLE_STATISTICS = ("mean", "median")                          # procedure s.3.8
 FILL_POLICIES = ("same_branch_then_allen", "allen_only", "none")  # D5 / handoff step 6
 
@@ -156,6 +157,10 @@ class RendererConfig:
     cross_section_aspect: float = 1.0  # source: procedure s.3.5 (round); a value k != 1 squashes a round tube along global z by k (mounting shrinkage); checked at bracketing k
     pad_um: float = 2.0                # source: PROVISIONAL: padding of the fine grid beyond the block, >= 3 sigma_r of the farthest slab
     backend: str = "fft"               # source: PROVISIONAL: "fft" (impl-handoff FFT form) or "direct" (reference, slow)
+    fft_wrap_sigmas: float = 6.0       # source: PROVISIONAL (Block 4): zero padding >= this x sigma_max / h, so periodic images sit >= 6 sigma away (wrap error < exp(-18))
+    direct_truncate: float = 8.0       # source: PROVISIONAL (Block 4): truncate of scipy.ndimage.gaussian_filter in the reference backend (tail mass < 1e-15)
+    fft_split_sigma_um: float = 0.5    # source: PROVISIONAL (Block 4): (slab, plane) pairs with a wider kernel go to the far-field path (coarse output grid, exact object); 0.5 was faster than 1.0 on a steep and a flat case
+    far_grid_per_sigma: float = 8.0    # source: PROVISIONAL (Block 4): far-field output spacing <= smallest far sigma / this (cubic interpolation error ~ (1/8)^4 / 384)
     # -- camera chain (procedure s.3.6 step 6)
     background_B_gl: float = 210.0     # source: PROVISIONAL (blur_chain_check.py illustrative); NEEDS REAL DATA
     black_level_gl: float = 0.0        # source: NOT VERIFIED (Allen camera chain unknown)
@@ -231,6 +236,21 @@ class DiameterConfig:
         _check_in(c.fill_policy, FILL_POLICIES, "correction.fill_policy")
         _check_in(p.design, PHANTOM_DESIGNS, "phantom.design")
         _check_in(r.end_cut, END_CUTS, "renderer.end_cut")
+        _check_in(r.backend, RENDER_BACKENDS, "renderer.backend")
+        if r.kernel_table_sigma_um[0] != r.sigma_r0_um:
+            raise ValueError("renderer.sigma_r0_um must equal kernel_table_sigma_um[0] (one number, two names)")
+        if any(not (s > 0) for s in r.kernel_table_sigma_um) or not (r.kernel_continuation_slope >= 0):
+            raise ValueError("renderer kernel table: sigma must be > 0 and the continuation slope >= 0")
+        if not (r.fft_wrap_sigmas > 0 and r.direct_truncate > 0 and r.fft_split_sigma_um > 0 and r.far_grid_per_sigma >= 2):
+            raise ValueError("renderer.fft_wrap_sigmas, direct_truncate, fft_split_sigma_um must be > 0 and far_grid_per_sigma >= 2")
+        for name, h in (("renderer.h_g_um_thin", r.h_g_um_thin), ("renderer.h_g_um_thick", r.h_g_um_thick)):
+            f = self.acquisition.res0_um / h if h > 0 else 0.0
+            if not (h > 0) or round(f) < 1 or abs(f - round(f)) > 1e-9 * f:
+                raise ValueError("%s must divide res0_um into a whole number of samples" % name)
+        if r.bit_depth not in (8, 16) or (r.jpeg and r.bit_depth != 8):
+            raise ValueError("renderer.bit_depth must be 8 or 16, and 8 when jpeg is on")
+        if not (0 < r.jpeg_quality <= 100) or r.noise_sd_gl < 0 or not (r.gain > 0) or not (r.background_B_gl > 0):
+            raise ValueError("renderer camera settings out of range")
         if not (r.cross_section_aspect > 0):
             raise ValueError("renderer.cross_section_aspect must be > 0")
         if m.fit_quad_min_nodes < 8 or not (m.fit_quad_nodes_per_sigma > 0):
