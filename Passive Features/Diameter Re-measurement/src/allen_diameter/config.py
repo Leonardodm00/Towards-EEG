@@ -86,6 +86,7 @@ class MeasureConfig:
     focus_bg_rule: str = "profile_ends_median"  # source: D-023 (closes D-018 (c))
     focus_bg_ends_um: float = 1.5     # source: handoff Eq. 1 (|v| > 1.5 um)
     subplane_depth: bool = True       # source: handoff Eq. 2 ("optional"), PROVISIONAL on
+    focus_plateau_rel: float = 0.02   # source: PROVISIONAL (Block 5): planes with F >= (1 - this) F_max next to k* form the plateau; 3 or more -> its middle (handoff Eq. 2 note)
     # -- path, handoff Eqs. 3-5
     line_fit_window_um: float = 4.0   # source: handoff Next actions 4 (L = 4 um)
     direction_redraws: int = 1        # source: handoff step 3 (raw SWC direction, then one redraw)
@@ -96,6 +97,7 @@ class MeasureConfig:
     # -- background, D-018
     bbar_region: str = "block_masked"  # source: D-023 (closes D-018 (a))
     bbar_mask_margin_um: float = 1.0  # source: D-018 (a) recommendation: Allen radius + 1 um around any SWC segment
+    bbar_min_unmasked_frac: float = 0.2  # source: PROVISIONAL (Block 5): fewer unmasked block pixels than this fraction flags 'bbar_few'
     # -- fit, D-018.2 / D-019.1
     sigma_fit_um: float = 0.099       # source: D-023, deliverable value, PROVISIONAL (notes s.2 heuristic budget)
     sigma_fit_study_um: Tuple[float, ...] = (0.080, 0.099, 0.125)  # source: D-023 (study axis), PROVISIONAL set = handoff Eq. 12 bracket + budget
@@ -117,6 +119,7 @@ class MeasureConfig:
     steep_tan_diagnostic: float = 0.58  # source: handoff, old tool STEEP_TAN; DIAGNOSTIC COLUMN ONLY, never a selection rule (D-024)
     phi_vertical_deg: float = 85.0    # source: PROVISIONAL (D-024): above this the heading is taken from the neighbours and the node is flagged 'vertical'
     second_dip_rel: float = 0.5       # source: PROVISIONAL: a second minimum deeper than this fraction of the main dip flags 'crossing'
+    second_dip_min_sep_um: float = 1.0  # source: PROVISIONAL (Block 5): ... at least this far from the main minimum
     edge_margin_planes: int = 1       # source: PROVISIONAL: k* within this many planes of the stack ends flags 'stack_edge'
     faint_min_dip_gl: float = 6.0     # source: PROVISIONAL: dip depth (grey levels) below which the node is flagged 'faint'
 
@@ -256,6 +259,11 @@ class DiameterConfig:
         if m.fit_quad_min_nodes < 8 or not (m.fit_quad_nodes_per_sigma > 0):
             raise ValueError("measure.fit_quad_* out of range")
         _check_in(m.fit_start_rule, FIT_START_RULES, "measure.fit_start_rule")
+        if not (0 <= m.focus_plateau_rel < 1 and 0 <= m.bbar_min_unmasked_frac <= 1 and m.second_dip_min_sep_um >= 0
+                and 0 < m.second_dip_rel <= 1 and m.planes_half >= 1 and m.direction_redraws >= 0
+                and m.line_fit_window_um > 0 and m.profile_step_um > 0 and m.profile_half_um > m.profile_step_um
+                and m.along_branch_avg_um >= 0 and m.focus_smooth_px >= 0 and m.block_half_um > 0):
+            raise ValueError("measure: per-node chain settings out of range")
         if not (m.fit_d_bounds_um[0] <= m.fit_d0_um <= m.fit_d_bounds_um[1]):
             raise ValueError("measure.fit_d0_um must lie within fit_d_bounds_um")
         if not (0 < m.fit_tol < 1e-3) or m.fit_max_nfev < 1 or not (0 < m.fit_at_bound_rel_tol < 0.5):
