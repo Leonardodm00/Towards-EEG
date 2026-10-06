@@ -32,7 +32,10 @@ Checks
                         this clone (no pull): sys.path and imports
     test_determinism    skipped: deterministic wiring over tested blocks
     test_edge_cases     an empty cache: no tables, a note; run_node with node
-                        ids on no stretch: no rows, n_nodes 0; the bootstrap
+                        ids on no stretch: no rows, n_nodes 0; a registration
+                        entry with null s* and dz* (a NOT ON node, as the
+                        survey writes it): NaN columns and the node out of S;
+                        the bootstrap
                         without a clone and clone=False: FileNotFoundError
 
 Run
@@ -217,6 +220,13 @@ def test_edge_cases():
         provider = run_cell.real_provider(fetcher, planes, cfg.acquisition.res0_um)
         rows, summ = run_node.run(swc, provider, cfg, os.path.join(tmp, "pilot"), "1", only={12345}, log=lambda m: None)
         assert rows == [] and summ["n_nodes"] == 0
+        # a registration file as registration_survey writes it for a NOT ON node: s* and dz* are null
+        regs = {4: dict(verdict="NOT ON A VISIBLE PROCESS (p=0.300 > 0.05): wrong structure",
+                        lateral_offset_um=None, z_offset_um=None)}
+        rows, _ = run_node.run(swc, provider, cfg, os.path.join(tmp, "pilot2"), "1", regs=regs, only={4},
+                               log=lambda m: None)
+        r4 = [r for r in rows if r["node_id"] == 4][0]
+        assert math.isnan(r4["s_star_um"]) and "registration:NOT_ON" in r4["reject"], r4
         try:
             CB.bootstrap(repo_dir=os.path.join(tmp, "nothing"), pull=False, clone=False, verbose=False)
         except FileNotFoundError:

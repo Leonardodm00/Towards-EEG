@@ -187,6 +187,11 @@ def _profile_flags(I, v, B_bar, m):
     return flags
 
 
+def _num(x):
+    """A registration value as float: None (JSON null, e.g. s* of a NOT ON node) and a missing key are NaN."""
+    return float("nan") if x is None else float(x)
+
+
 def measure_node(branch, i, provider, cfg, reg=None):
     """Measure node i of a Branch with one provider call (see the module docstring).
 
@@ -255,8 +260,8 @@ def measure_node(branch, i, provider, cfg, reg=None):
     xyz = branch.xyz_um[i]
     return NodeResult(
         node_id=int(branch.ids[i]), type=int(branch.types[i]), x_um=float(xyz[0]), y_um=float(xyz[1]),
-        z_um=float(xyz[2]), path_um=float(branch.s_um[i]), reg_verdict=str(reg.get("verdict", "")),
-        s_star_um=float(reg.get("lateral_offset_um", nan)), dz_star_um=float(reg.get("z_offset_um", nan)),
+        z_um=float(xyz[2]), path_um=float(branch.s_um[i]), reg_verdict=str(reg.get("verdict") or ""),
+        s_star_um=_num(reg.get("lateral_offset_um")), dz_star_um=_num(reg.get("z_offset_um")),
         k_star=-1 if last.k_star is None else int(last.k_star), z_sub_um=float(last.z_sub),
         cx_um=float(last.centre[0]), cy_um=float(last.centre[1]), cz_um=float(last.centre[2]),
         theta_rad=float(theta), phi_rad=float(phi), steep=bool(steep), vertical=bool(vertical),

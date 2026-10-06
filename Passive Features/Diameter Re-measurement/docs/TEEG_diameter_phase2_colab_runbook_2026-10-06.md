@@ -143,7 +143,7 @@ The estimator hash names the table. A real fit refuses a table with a different 
 
 ## Cell 9: the production table (davinci, not Colab)
 
-The table is built with `scripts/pbs/build_table.pbs`: 100 tasks of 20 replicates, one core and 4 GB each, then the merge on the login node. Copy `config_production.json` to the cluster and pass it as `DIAM_CONFIG_JSON`. The commands are in SPEC §6.
+The table is built with `scripts/pbs/build_table.pbs`: 100 tasks of 20 replicates, one core and 4 GB each, then the merge on the login node. Copy `config_production.json` to the cluster, to a path **without spaces** (for example `$HOME/diam/config_production.json`; `qsub -v` takes a comma-separated list, and a value with a space is fragile there), and pass it as `DIAM_CONFIG_JSON`. The commands are in SPEC §6.
 
 Probe first:
 
