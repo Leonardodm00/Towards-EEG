@@ -7,3 +7,8 @@ __pycache__/
 /h01/
 # Per-clone symlink farm assembled by h01_code/stage1_link.sh
 h01_code/stage1/*.py
+
+# Diameter re-measurement (sci/diameter-pipeline): smoke-test artifacts and scratch outputs
+Passive Features/Diameter Re-measurement/tests/smoke/artifacts/
+Passive Features/Diameter Re-measurement/scripts/allen_swc_cache/
+Passive Features/Diameter Re-measurement/scripts/*.csv

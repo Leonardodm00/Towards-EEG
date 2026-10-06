@@ -11,7 +11,18 @@ measurement pipeline is coded yet.** The image-access code (`allen_image_io.py`,
 `robustness_registration.py`) lives in the user's Google Drive
 (`MyDrive/Colab Notebooks/Allen Slices/Codes`) and is not in this folder yet.
 
-**Status (2026-10-06):** still nothing coded. By D-021 [user, 2026-10-06 14:30]
+**Status (2026-10-06, implementation chat):** coding started on branch
+`sci/diameter-pipeline` (decisions D-021 to D-024). Done: Block 0 (the six
+2026-09-23 image modules imported byte-identical into `src/` and `tests/smoke/`,
+suites 20/20 and 40/40 re-run), Block 1 (`src/allen_diameter/config.py`, every
+parameter with its source), the SWC loader/writer of Block 8
+(`src/allen_diameter/loading/swc_io.py`) and `scripts/allen_radius_distribution.py`.
+The spec is the root-level `specs/SPEC.md` (Coverage = this folder). Run the
+smoke tests from this folder: `python tests/smoke/test_smoke_config.py`,
+`python tests/smoke/test_smoke_swc_io.py`; the imported suites with
+`cd tests/smoke && PYTHONPATH=../../src python smoke_allen_image.py`.
+
+**Status (2026-10-06, earlier):** still nothing coded. By D-021 [user, 2026-10-06 14:30]
 the whole pipeline is now implemented in a separate chat, in parallel with the
 theory study. Unsettled method choices enter the code as named configuration
 parameters with labelled provisional defaults, confirmed in one batch. Start
@@ -141,4 +152,5 @@ implementation handoff). Step 1 is Phase II of that plan.
 
 | Date | Change |
 |---|---|
+| 2026-10-06 (later) | Implementation started (branch `sci/diameter-pipeline`): `src/`, `scripts/`, `tests/smoke/` added; root `specs/SPEC.md`; the 2026-09-23 modules imported byte-identical. Decisions D-022 to D-024 in the project log. |
 | 2026-10-06 | Added the implementation handoff (D-021) to the contents and status. Corrected the Drive statement: only the 2026-09-22 module versions are there (Drive listing, 2026-10-06). Noted which decision-log copy is live (project_read of both copies, 2026-10-06). Added four check scripts with reference outputs (`*.out`, re-run 2026-10-06, identical to the original runs). Marked next steps 2-3 as handled by D-021. |
