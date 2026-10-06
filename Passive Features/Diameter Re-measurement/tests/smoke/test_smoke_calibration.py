@@ -67,19 +67,19 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 WS = HERE.parent.parent
 SRC = WS / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+for _p in (SRC, HERE):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 from allen_diameter.analysis import calibration as CAL  # noqa: E402
 from allen_diameter.analysis import profiles  # noqa: E402
 from allen_diameter.loading import calibration_io as CIO  # noqa: E402
-from allen_diameter.loading import swc_io  # noqa: E402
-from allen_diameter.model import camera  # noqa: E402
 from allen_diameter.analysis.node_pipeline import Branch, NodeResult  # noqa: E402
 from allen_diameter.config import default_config  # noqa: E402
 from allen_diameter.model import geometry as G  # noqa: E402
 from allen_diameter.model import kernel as K  # noqa: E402
 from allen_diameter.model import render as R  # noqa: E402
+from fixtures_cell import synthetic_cell  # noqa: E402
 
 SEED = 20261006
 REPORT_PACKAGES = ("numpy", "scipy", "Pillow")
@@ -303,45 +303,6 @@ def test_invariants():
         raise AssertionError("knot_step_um < dz_um must be refused")
 
 
-def synthetic_cell(tmp, cfg, d_true=0.2, mu=1.5, n_nodes=6, step=1.18, theta=0.3):
-    """Soma + one thin flat dendrite; planes rendered over the region and served through
-    allen_image_io.fetch_zblock by plane index (the Phase II path in miniature)."""
-    import allen_image_io as aio
-    import pandas as pd
-    px = cfg.acquisition.res0_um
-    c0 = np.array([6.0, 0.03, 0.05])
-    t = np.array([math.cos(theta), math.sin(theta), 0.0])
-    pts = c0[None, :] + (np.arange(n_nodes) * step)[:, None] * t[None, :]
-    path = os.path.join(tmp, "cell.swc")
-    with open(path, "w") as f:
-        f.write("# synthetic\n1 1 0.0 0.0 0.0 4.0 -1\n")
-        for k, q in enumerate(pts):
-            f.write("%d 3 %.4f %.4f %.4f 0.1000 %d\n" % (k + 2, q[0], q[1], q[2], k + 1))
-    mid = pts.mean(axis=0)
-    tube = G.Tube(tuple(mid), 0.5 * d_true, 0.0, theta, 1.0, 0.5 * (n_nodes - 1) * step + 6.0, "axial")
-    lo = np.floor((pts[:, :2].min(axis=0) - 6.0) / px).astype(int)
-    hi = np.ceil((pts[:, :2].max(axis=0) + 6.0) / px).astype(int)
-    left, top, width, height = int(lo[0]), int(lo[1]), int(hi[0] - lo[0]), int(hi[1] - lo[1])
-    ks = np.arange(-7, 8)
-    f8 = R.fine_factor(d_true, cfg.renderer, px)
-    grid, inner = R.block_fine_grid(left, top, width, height, px, f8, 8)
-    res = R.render_transmittance(tube, mu, ks * cfg.acquisition.dz_um, grid, cfg.renderer, +1,
-                                 reduce=lambda pl: R.pixel_integrate(pl[inner[0], inner[1]], f8))
-    planes8 = camera.camera_chain(res.tau, cfg.renderer, np.random.default_rng(SEED))
-
-    class PlaneFetcher(aio.ImageFetcher):
-        def get(self, image_id, left_, top_, width_, height_, downsample=0):
-            out = np.full((height_, width_), 255, dtype=np.uint8)
-            img = planes8[int(image_id) - int(ks[0])]
-            x0, y0 = max(left_, left), max(top_, top)
-            x1, y1 = min(left_ + width_, left + width), min(top_ + height_, top + height)
-            if x1 > x0 and y1 > y0:
-                out[y0 - top_:y1 - top_, x0 - left_:x1 - left_] = img[y0 - top:y1 - top, x0 - left:x1 - left]
-            return out
-
-    return swc_io.read_swc(path), PlaneFetcher(), pd.DataFrame({"plane_index": ks, "id": ks})
-
-
 def test_contract():
     cfg = default_config()
     # kernel_from_growth round trip on plane-offset knots
@@ -389,7 +350,7 @@ def test_contract():
     import run_cell
     with tempfile.TemporaryDirectory() as tmp:
         cfg_cell = dataclasses.replace(cfg, measure=dataclasses.replace(cfg.measure, block_half_um=3.5))
-        swc, fetcher, planes = synthetic_cell(tmp, cfg_cell)
+        swc, fetcher, planes, _ = synthetic_cell(tmp, cfg_cell, d_true=0.2, mu=1.5, allen_radius=0.1)
         provider = run_cell.real_provider(fetcher, planes, cfg.acquisition.res0_um)
         out = CAL.scan_cell(swc, provider, cfg_cell, candidates={4, 5, 6})
         assert [o[0] for o in out] == [4, 5, 6], [o[0] for o in out]

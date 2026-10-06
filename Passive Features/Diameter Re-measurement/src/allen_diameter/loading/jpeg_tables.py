@@ -54,3 +54,21 @@ def load_qtables(path):
     if isinstance(data, dict):
         data = [data[k] for k in sorted(data, key=lambda s: int(s))]
     return _check_tables(data)
+
+
+def collect_qtables(paths):
+    """Distinct table sets among JPEG files, most common first: a list of
+    (tables, count, first path). Files that are not JPEGs with quantization
+    tables are counted under tables None (an HttpFetcher cache holds the
+    bytes as served, so every crop of one stack should carry one set)."""
+    groups = {}
+    for p in paths:
+        try:
+            key = tuple(tuple(t) for t in qtables_from_jpeg(p))
+        except (ValueError, OSError):
+            key = None
+        if key not in groups:
+            groups[key] = [0, p]
+        groups[key][0] += 1
+    out = [(None if k is None else [list(t) for t in k], n, first) for k, (n, first) in groups.items()]
+    return sorted(out, key=lambda x: (x[0] is None, -x[1]))
