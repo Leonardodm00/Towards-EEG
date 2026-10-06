@@ -63,12 +63,23 @@ def run(cfg, start, stop, out_dir, workers=1, seed=None, backend=None):
     os.makedirs(out_dir, exist_ok=True)
     jobs = [(cfg, seed, n, backend) for n in range(int(start), int(stop))]
     t0 = time.perf_counter()
+    rows = []
+
+    def note(row):
+        rows.append(row)
+        print("replicate %d: d %.3f um, phi %.1f deg -> d_hat/d %.4f, %s, %.1f s (%d/%d)"
+              % (row["index"], row["d_um"], row["phi_rad"] * 57.29577951308232, row["ratio"],
+                 "in S" if row["in_S"] else "out (%s)" % row["reject"], row["seconds"], len(rows), len(jobs)),
+              flush=True)
+
     if workers > 1:
         import multiprocessing
         with multiprocessing.Pool(workers) as pool:
-            rows = pool.map(_one, jobs, chunksize=1)
+            for row in pool.imap(_one, jobs, chunksize=1):
+                note(row)
     else:
-        rows = [_one(j) for j in jobs]
+        for j in jobs:
+            note(_one(j))
     path = os.path.join(out_dir, "rows_%s_%06d_%06d.csv" % (cfg.signature_hash("estimator"), start, stop))
     table_io.write_rows(rows, path)
     kept = sum(1 for r in rows if r["in_S"])
