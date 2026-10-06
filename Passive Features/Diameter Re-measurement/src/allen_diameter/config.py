@@ -131,6 +131,7 @@ class CorrectionConfig:
     response_estimator: str = "tps_spline"   # source: D-024 (smoothing thin-plate spline for m_hat)
     spline_smoothing: str = "cv"             # source: D-024; "cv" = k-fold cross-validation, or a float
     spline_cv_folds: int = 5                 # source: PROVISIONAL
+    spline_smoothing_grid: Tuple[float, ...] = (1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, 10.0, 100.0)  # source: PROVISIONAL (Block 6): RBFInterpolator smoothing values tried by k-fold CV
     tau_kernel_bandwidth: Tuple[float, float] = (0.15, 5.0)  # source: PROVISIONAL (log d, deg) for the local tau_hat and failure rate
     table_statistic: str = "mean"            # source: procedure Eq. 2 (mean); median = labelled comparison
     bias_flag_threshold: float = 0.2         # source: D5, confirmed by D-024 (|b_hat - 1| > 0.2)
@@ -304,6 +305,11 @@ class DiameterConfig:
                 raise ValueError("%s must be > 0, got %r" % (name, v))
         if self.acquisition.light_direction not in (+1, -1):
             raise ValueError("acquisition.light_direction must be +1 or -1")
+        if c.spline_cv_folds < 2 or len(c.spline_smoothing_grid) < 1 or any(not (x >= 0) for x in c.spline_smoothing_grid) \
+                or any(not (b > 0) for b in c.tau_kernel_bandwidth) or len(c.tau_kernel_bandwidth) != 2:
+            raise ValueError("correction: spline CV folds >= 2, smoothing values >= 0, two positive bandwidths")
+        if p.n_replicates < 1 or p.nodes_each_way < 1 or not (p.phantom_node_step_um > 0) or p.jitter_xy_um < 0 or p.jitter_z_um < 0:
+            raise ValueError("phantom: n_replicates, nodes_each_way >= 1, node step > 0, jitter >= 0")
         if not (0 < c.bias_flag_threshold) or not (0 <= c.max_failure_rate <= 1):
             raise ValueError("correction thresholds out of range")
 

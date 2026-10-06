@@ -112,7 +112,9 @@ guard, Block 3).
 Selection $\mathcal S$ (procedure s.3.2; D-024), applied identically to
 phantoms and real nodes: converged, no parameter at a bound, registration
 verdict on the branch (real data only), not `faint`, no second dip
-(`crossing`), not `stack_edge`, $\hat\alpha_i \le$ `alpha_dark_flag`.
+(`crossing`), not `stack_edge`, $\hat\alpha_i \le$ `alpha_dark_flag`, a sound
+$\bar B_i$ (not `bbar_few`) and a complete profile (not `profile_nan`)
+[the last two added 2026-10-06, Block 6, PROVISIONAL].
 **Tilt is never a selection criterion** (D-024); `steep`
 ($\tan\varphi_i \ge$ `steep_tan_diagnostic`) and `vertical`
 ($\varphi_i >$ `phi_vertical_deg`) are reported columns.
@@ -167,11 +169,19 @@ $m(d, \varphi \mid \mathcal C) = \mathbb E_\xi[\hat D \mid d, \varphi, \mathcal 
 and $b = m/d$. Design (D-024): $N$ independent replicates with
 $\log d \sim U[\log d_{\min}, \log d_{\max}]$, $\varphi \sim U[0, 90°)$,
 $\theta \sim U[0, \pi)$, $\log\mu \sim U[\log\mu_{\min}, \log\mu_{\max}]$,
-from one `numpy.random.Generator(seed)`. Estimator: the smoothing thin-plate
-spline $\hat m(\log d, \varphi)$ through the retained $(\log d_n, \varphi_n, \hat d_n)$
-(`scipy.interpolate.RBFInterpolator`, `kernel="thin_plate_spline"`,
-smoothing by k-fold cross-validation); $\hat\tau$ and the failure rate from
-Gaussian kernel weights of bandwidth `tau_kernel_bandwidth`. Correction at a
+replicate $n$ drawing from `numpy.random.default_rng([seed, n])` (reproducible
+whatever the chunking). Estimator: the smoothing thin-plate spline
+$\hat b(\ln d, \varphi)$ through the retained $(\ln d_n, \varphi_n, \hat d_n/d_n)$
+(`scipy.interpolate.RBFInterpolator`, `kernel="thin_plate_spline"`, inputs
+$(\ln d / \text{um}, \varphi / \text{rad})$, smoothing chosen by k-fold
+cross-validation over `spline_smoothing_grid`), and
+$\hat m(d, \varphi \mid \mathcal C) = d\,\hat b(\ln d, \varphi)$ -- the procedure's
+Eq. (7) works on the ratios $\hat d_n/d$ too, and their scatter is roughly
+constant in $d$ [corrected 2026-10-06: the spline was written on $\hat d_n$];
+$\hat\tau$ (kernel-weighted SD of the ratios about $\hat b$), the failure rate
+(kernel-weighted share of replicates outside $\mathcal S$) and
+$\mathrm{SE} = \hat\tau/\sqrt{N_{\rm eff}}$ ($N_{\rm eff} = (\sum w)^2/\sum w^2$)
+from Gaussian weights with bandwidths `tau_kernel_bandwidth` ($\ln d$, degrees). Correction at a
 real node: $\tilde d_i$ solves $\hat m(d, \varphi_i \mid \mathcal C) = \hat d_i$
 by `brentq` on $d \in [d_{\min}, d_{\max}]$, requiring $\hat m(\cdot, \varphi_i)$
 strictly increasing there (else flag `non_monotone`) and
@@ -347,19 +357,22 @@ degrees in config and CSV column names ending `_deg`.
 - Confirmed: yes for Eqs. 1-5, 9 and D-018/D-023/D-024; the raw-direction rule, the pass radii, the plateau rule, the crossing rule, the vertical-node heading, the per-node plane range within one shared fetch, `bbar_min_unmasked_frac` and the phantom mask radius are the assistant's, PROVISIONAL (2026-10-06)
 - Status: smoke-tested 2026-10-06 (6 pass, 1 skip). Gate 1 holds with margin: $\hat d/d$ = 1.003, 1.000, 1.001 at $d$ = 0.5, 0.75, 1 um (4 random headings and offsets each; $\hat\mu/\mu$ = 0.98-1.00): the budget $\sigma_{\rm fit}^2 = \sigma_{\rm r}(0)^2 + p_{\rm x}^2/4$ is consistent with the renderer, pixel integration, 8-bit rounding and the bilinear profile. With the default kernel (block 10 um, pad 2 um, full camera chain): $\hat d/d$ = 1.093 ($d$ = 1, flat), 1.108 ($d$ = 1, 15 deg), 1.043 ($d$ = 0.5, flat); $\theta$ within 0.1 deg; the sub-plane depth of the dark $d$ = 1 um tube sits 0.15 um toward the light (the partition's focus shift, impl-handoff Findings (2)). 11-34 s per node on one core
 
-### Block 6: phantoms and the bias table (procedure s.3.5, 3.8; D-024)
+### Block 6: phantoms and the bias table (procedure s.3.5, 3.7, 3.8; D-024)
 
-- Module: `src/allen_diameter/analysis/phantoms.py`, `analysis/table.py`, `scripts/build_table.py`
-- Public API (planned): `draw_replicates(cfg, rng, n) -> list of Phantom + nuisances`; `run_replicate(phantom, cfg, rng) -> ReplicateRow`; `fit_table(rows, cfg) -> BiasTable(m_hat spline, tau_hat, failure_rate, C)`; `BiasTable.save(path)`, `load(path)`; `BiasTable.b_hat(d, phi)`, `m_hat(d, phi)`, `tau_hat(d, phi)`, `failure(d, phi)`
-- Inputs: config; rng; replicate rows
-- Outputs: `npz` + JSON (Section 3)
-- Parameters: `PhantomConfig`, `CorrectionConfig.response_estimator`, `spline_*`, `tau_kernel_bandwidth`, `table_statistic`
-- Library calls relied on: `scipy.interpolate.RBFInterpolator`, numpy; `multiprocessing` for the sandbox, a PBS array on davinci (D-022)
-- Custom code: the local kernel estimates of $\hat\tau$ and the failure rate (no library gives them under one weighting)
-- Test oracles: seed determinism (bit-identical rows); nuisance laws by Kolmogorov-Smirnov on 2000 draws; on a fixture with known $m$ (synthetic $\hat d_n = m(d, \varphi) + \tau\epsilon_n$) the spline recovers $m$ within 2 SE and $\hat\tau$ within 15 %; `grid` design as a labelled comparison agrees with `random` within SE; the table refuses a mismatched $\mathcal C$; file round trip
-- Data flow: consumes Blocks 4, 5; feeds Block 7, 11
-- Confirmed: yes (D-024)
-- Status: drafted
+- Modules: `src/allen_diameter/analysis/phantoms.py` (draws, phantom branch, one replicate), `src/allen_diameter/analysis/table.py` (estimator), `src/allen_diameter/loading/table_io.py` (files), `scripts/build_table.py` (entry point: chunks for a PBS array or a local pool, then a merge)
+- Draws, per replicate $n$, in this order from `numpy.random.default_rng([seed, n])`: $d$ (log-uniform on `d_range_um` if `d_log_uniform`, else uniform), $\varphi$ (uniform on `phi_range_deg`, upper end excluded), $\theta$ (uniform on `theta_range_rad`), $\mu$ (log-uniform on `mu_range_per_um` if `mu_log_uniform`), the lateral offset of the node from the pixel centre (uniform on $[-p_{\rm x}/2, p_{\rm x}/2)$ in $x$ and $y$ if `subpixel_offset`, else 0), the axis depth (uniform on $[-\Delta z/2, \Delta z/2)$ about plane 0 if `axis_depth_jitter`, else 0), the node jitter (normal, SD `jitter_xy_um` in $x, y$ and `jitter_z_um` in $z$, per node); the same generator then feeds the camera noise. `design = "grid"` (labelled comparison) cycles $(d, \varphi)$ over `grid_d_um` x `grid_phi_deg` and draws the rest
+- Phantom: Block 2 `Tube(c, d/2, phi, theta, cross_section_aspect, U_um, end_cut)` with $c$ = (offset, depth); its branch has `nodes_each_way` nodes on each side of $c$ every `phantom_node_step_um` along $\hat t$ (plus jitter), radius $d/2$ (the mask of D-018.1 around the known axis); the measured node is the middle one; provider = Block 4 `synthetic_block` with `pad_px` = ceil(`pad_um`/$p_{\rm x}$)
+- Replicate row: the draws, the `NodeResult` columns, `in_S` and `reject` (the failed criteria of $\mathcal S$, `;`-joined), the seed, the index and the wall time. $\mathcal S$: `fit_status == "converged"` (excludes bounds and failures) and none of the flags `faint`, `crossing`, `stack_edge`, `dark`, `bbar_few`, `profile_nan` (tilt never, D-024)
+- Table (`response_estimator = "tps_spline"`, `table_statistic = "mean"`; other choices raise NotImplementedError): Section 2.4; `BiasTable` holds the retained inputs and ratios, the chosen smoothing, every replicate's inputs and $\mathcal S$ outcome, the ranges, `config.full_signature()` and `signature_hash("estimator")`; it rebuilds the spline on load (deterministic). Methods: `b_hat(d, phi)`, `m_hat(d, phi)`, `tau_hat`, `se_hat`, `failure_rate`, `n_eff` (vectorised over arrays of $d$ um and $\varphi$ rad); `check_estimator(cfg)` raises ValueError when the fit's estimator signature differs (procedure s.3.11)
+- Files: replicate rows as CSV (one file per chunk, `rows_<hash>_<start>_<stop>.csv`); the table as `bias_table_<hash>.npz` (arrays) + `.json` (signature, ranges, smoothing, counts), `<hash>` = `signature_hash("estimator")`
+- Parameters: `PhantomConfig`, `CorrectionConfig` (`response_estimator`, `table_statistic`, `spline_smoothing`, `spline_cv_folds`, `spline_smoothing_grid`, `tau_kernel_bandwidth`), `RendererConfig.pad_um`
+- Public API: `phantoms.draw_replicate(cfg, seed, index) -> (Draw, generator)`; `phantoms.phantom_tube(draw, cfg)`; `phantoms.phantom_branch(draw, cfg, rng) -> Branch`; `phantoms.reject_reasons(NodeResult) -> list`; `phantoms.run_replicate(cfg, seed, index, backend=None) -> dict`; `table.table_inputs(d, phi) -> (n, 2)`; `table.choose_smoothing(X, y, grid, folds, seed) -> (smoothing, scores)`; `table.fit_table(rows, cfg) -> BiasTable`; `table_io.write_rows`, `read_rows`, `save_table(table, stem)`, `load_table(stem)`; `scripts/build_table.py run --start --stop --out-dir [--workers --seed --config-json --backend]`, `merge --out-dir [--config-json]`
+- Library calls relied on: `numpy.random.default_rng`, `scipy.interpolate.RBFInterpolator`, `multiprocessing` (sandbox), `csv`, `json`, `numpy.savez`
+- Custom code: the k-fold choice of the smoothing and the kernel-weighted $\hat\tau$, SE and failure rate (no library gives them under one weighting)
+- Test oracles (`tests/smoke/test_smoke_table.py`): draws are reproducible per $(seed, n)$ and independent of chunking; their laws by Kolmogorov-Smirnov (`scipy.stats.kstest`) on 2000 draws ($p > 10^{-3}$); the phantom branch lies on the tube's axis at the configured spacing; on a fixture ($b = 1 + 0.06/d + 0.15\sin^2\varphi$, $\tau = 0.03$, rejection 50 % above 45 deg, 1500 draws) the spline recovers $b$ within 4 SE at every query point and within 2 SE at 85 % of them, the median $\hat\tau$ is within 10 % of $\tau$, the failure rate within 4 SD of its expectation given the draws; the SE halves when $N$ quadruples (within 25 %); $\hat m = d\,\hat b$; the file round trip reproduces $\hat b$ exactly; a changed estimator setting is refused; two real replicates (rendered) run end to end with the row contract and are bit-identical when repeated
+- Data flow: consumes Blocks 2, 4, 5; feeds Block 7 and the production run (davinci, D-022)
+- Confirmed: yes (D-024: random design, ranges, TPS); fitting the ratio, the input scaling (ln d, rad), the smoothing grid, `bbar_few` and `profile_nan` in $\mathcal S$ and the file layout are the assistant's, PROVISIONAL (2026-10-06)
+- Status: smoke-tested 2026-10-06 (7 pass). Fixture: CV picks smoothing 1 (CV error 0.00094 = $\tau^2$ 0.0009), max error/SE 2.4-2.6 over three seeds, median $\hat\tau$ 0.028-0.029. Two rendered replicates and the CLI (2 chunks + merge) run end to end. The production table (2000 replicates) has not been run: davinci (D-022)
 
 ### Block 7: inversion, flags, fill (procedure Eq. 1, s.3.9; mathematics Eqs. 20-21; D5)
 
@@ -425,7 +438,8 @@ degrees in config and CSV column names ending `_deg`.
 | `cd tests/smoke && PYTHONPATH=../../src python smoke_allen_image.py` | Block 0 (2026-09-23 modules) | none | 30 s |
 | `cd tests/smoke && PYTHONPATH=../../src python robustness_registration.py` | Block 0 robustness | none | 2-3 min |
 | `python scripts/allen_radius_distribution.py --swc FILE` | Allen radius distribution (D-024) | any SWC file | 1 s |
-| planned: `scripts/build_table.py --n 50 --sandbox` | reduced table | `n_replicates=50` | minutes |
+| `python tests/smoke/test_smoke_table.py` | Block 6 checks (renders 8 replicates) | none | 90 s |
+| `python scripts/build_table.py run --start 0 --stop 40 --workers 2 --out-dir DIR [--config-json CFG]` then `merge --out-dir DIR` | (reduced) bias table | a config JSON with narrow ranges | 10-30 s per replicate and core |
 | planned: `scripts/end_to_end.py --generator ray_world` | gate 2 | small $d$ set | minutes |
 
 All commands run from `Passive Features/Diameter Re-measurement/`.
