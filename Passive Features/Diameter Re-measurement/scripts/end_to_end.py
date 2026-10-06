@@ -16,7 +16,7 @@ simulator (procedure s.3.10).
 Examples
     python scripts/build_table.py run --start 0 --stop 300 --workers 2 --out-dir T --config-json gate2.json
     python scripts/build_table.py merge --out-dir T --config-json gate2.json
-    python scripts/end_to_end.py phantoms --d 0.5,1,2,3 --reps 8 --seed 777 --out T/test.csv --config-json gate2.json
+    python scripts/end_to_end.py phantoms --d 0.5,1,2,3 --reps 8 --seed 777 --alpha-range 0.15,0.9 --out T/test.csv --config-json gate2.json
     python scripts/end_to_end.py evaluate --table T/bias_table_<hash> --rows T/test.csv --config-json gate2.json
 
 Pure ASCII, for the cluster (hpc-python-compat).
@@ -24,6 +24,7 @@ Pure ASCII, for the cluster (hpc-python-compat).
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import math
 import os
 import sys
@@ -47,8 +48,18 @@ def _one(args):
     return row
 
 
-def run_phantoms(cfg, diameters, reps, seed, out, workers=1):
-    jobs = [(cfg, seed, k * reps + r, d) for k, d in enumerate(diameters) for r in range(reps)]
+def phantom_config(cfg, d, alpha_range=None):
+    """cfg, or, with alpha_range = (lo, hi), cfg with mu drawn on [lo / d, hi / d]: test phantoms of diameter
+    d whose mu d stays in alpha_range (below the dark flag, as the nodes the table corrects)."""
+    if alpha_range is None:
+        return cfg
+    lo, hi = alpha_range
+    return dataclasses.replace(cfg, phantom=dataclasses.replace(cfg.phantom, mu_range_per_um=(lo / d, hi / d)))
+
+
+def run_phantoms(cfg, diameters, reps, seed, out, workers=1, alpha_range=None):
+    jobs = [(phantom_config(cfg, d, alpha_range), seed, k * reps + r, d) for k, d in enumerate(diameters)
+            for r in range(reps)]
     if workers > 1:
         import multiprocessing
         with multiprocessing.Pool(workers) as pool:
@@ -90,6 +101,7 @@ def main(argv=None):
     p.add_argument("--seed", type=int, required=True)
     p.add_argument("--out", required=True)
     p.add_argument("--workers", type=int, default=1)
+    p.add_argument("--alpha-range", default="", help="lo,hi: draw mu on [lo/d, hi/d] for each diameter d")
     e = sub.add_parser("evaluate")
     e.add_argument("--table", required=True, help="table stem (without .npz/.json)")
     e.add_argument("--rows", required=True)
@@ -99,7 +111,8 @@ def main(argv=None):
     a = ap.parse_args(argv)
     cfg = load_config(a.config_json)
     if a.cmd == "phantoms":
-        run_phantoms(cfg, [float(x) for x in a.d.split(",")], a.reps, a.seed, a.out, a.workers)
+        ar = tuple(float(x) for x in a.alpha_range.split(",")) if a.alpha_range else None
+        run_phantoms(cfg, [float(x) for x in a.d.split(",")], a.reps, a.seed, a.out, a.workers, ar)
         return 0
     return 0 if evaluate(cfg, a.table, a.rows, a.tol) else 1
 

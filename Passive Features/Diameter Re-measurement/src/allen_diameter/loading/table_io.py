@@ -58,7 +58,8 @@ def save_table(table, stem):
              ok_all=table.ok_all, cv_grid=table.cv_grid, cv_scores=table.cv_scores)
     meta = dict(smoothing=table.smoothing, bandwidth=list(table.bandwidth), d_range=list(table.d_range),
                 phi_range_rad=list(table.phi_range_rad), estimator_hash=table.estimator_hash,
-                n_all=int(table.X_all.shape[0]), n_kept=int(table.X_kept.shape[0]), signature=table.signature)
+                n_all=int(table.n_rows), n_failure_counted=int(table.X_all.shape[0]),
+                n_kept=int(table.X_kept.shape[0]), signature=table.signature)
     with open(stem + ".json", "w") as f:
         json.dump(meta, f, sort_keys=True, indent=1)
 
@@ -69,4 +70,4 @@ def load_table(stem):
     a = np.load(stem + ".npz")
     return BiasTable(a["X_kept"], a["ratio_kept"], a["X_all"], a["ok_all"], meta["smoothing"], meta["bandwidth"],
                      meta["d_range"], meta["phi_range_rad"], meta["signature"], meta["estimator_hash"],
-                     a["cv_grid"], a["cv_scores"])
+                     a["cv_grid"], a["cv_scores"], n_rows=meta.get("n_all"))

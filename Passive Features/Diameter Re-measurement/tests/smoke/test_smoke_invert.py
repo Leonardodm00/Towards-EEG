@@ -10,7 +10,8 @@ Checks
     test_convergence    skipped: no discretisation parameter
     test_invariants     m_hat(d_tilde) = d_hat at every inverted node
     test_contract       Inversion fields; correct_nodes keeps the selection
-                        reasons of nodes outside S
+                        reasons of nodes outside S; end_to_end.phantom_config
+                        draws mu on [lo / d, hi / d] (gate 2's --alpha-range)
     test_determinism    skipped: deterministic closed forms and root finding
     test_edge_cases     non-monotone table, out-of-domain d_hat, large
                         correction, high failure rate, tilt outside the table,
@@ -134,6 +135,12 @@ def test_contract():
     assert isinstance(out[0], IV.Inversion) and abs(out[0].d_tilde_um - 1.0) <= 1e-3 and out[0].flags == ()
     assert math.isnan(out[1].d_tilde_um) and out[1].flags == ("faint",)
     assert math.isnan(out[2].d_tilde_um) and out[2].flags == ("status:none",)
+    # gate 2's test phantoms: --alpha-range lo,hi draws mu on [lo / d, hi / d] for each diameter
+    sys.path.insert(0, str(WS / "scripts"))
+    import end_to_end
+    base = default_config()
+    c2 = end_to_end.phantom_config(base, 2.0, (0.15, 0.9))
+    assert c2.phantom.mu_range_per_um == (0.075, 0.45) and end_to_end.phantom_config(base, 2.0) is base
 
 
 def test_determinism():

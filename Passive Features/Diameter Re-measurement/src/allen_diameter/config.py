@@ -140,6 +140,7 @@ class CorrectionConfig:
     table_statistic: str = "mean"            # source: procedure Eq. 2 (mean); median = labelled comparison
     bias_flag_threshold: float = 0.2         # source: D5, confirmed by D-024 (|b_hat - 1| > 0.2)
     max_failure_rate: float = 0.2            # source: impl-handoff, PROVISIONAL (local failure rate above which the region is flagged)
+    failure_rate_ignore: Tuple[str, ...] = ("dark",)  # source: PROVISIONAL (gate 2, 2026-10-06): replicates failing any of these screens leave the failure rate, which becomes conditional on passing them (a real node applies them to itself: its own alpha_hat); with the provisional mu range the dark share made every d >= 1 um node high_failure
     inversion_method: str = "brentq"         # source: procedure s.3.9
     inversion_grid_points: int = 256         # source: PROVISIONAL (Block 7): log-spaced diameters on which m_hat - d_hat is bracketed
     table_phi_axis: str = "true"             # source: procedure Eq. 2 (true tilt); "measured" = index phantoms by their line-fit tilt (mathematics s.3.7), labelled comparison
@@ -346,6 +347,8 @@ class DiameterConfig:
             raise ValueError("correction: spline CV folds >= 2, smoothing values >= 0, two positive bandwidths")
         if p.n_replicates < 1 or p.nodes_each_way < 1 or not (p.phantom_node_step_um > 0) or p.jitter_xy_um < 0 or p.jitter_z_um < 0:
             raise ValueError("phantom: n_replicates, nodes_each_way >= 1, node step > 0, jitter >= 0")
+        if not all(isinstance(x, str) and x for x in c.failure_rate_ignore):
+            raise ValueError("correction.failure_rate_ignore must hold non-empty reason names (e.g. 'dark')")
         if not (0 < c.bias_flag_threshold) or not (0 <= c.max_failure_rate <= 1):
             raise ValueError("correction thresholds out of range")
 

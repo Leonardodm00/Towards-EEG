@@ -10,7 +10,8 @@ w_n = exp(-((ln d_n - ln d)/h_d)^2 / 2 - ((phi_n - phi)/h_phi)^2 / 2) give
 
     tau_hat^2 = sum w r^2 / sum w * N_eff / (N_eff - 1),  r_n = ratio_n - b_hat(x_n),
     N_eff = (sum w)^2 / sum w^2,  SE = tau_hat / sqrt(N_eff)          (retained replicates)
-    failure rate = sum w (1 - in_S) / sum w                           (all replicates)
+    failure rate = sum w (1 - in_S) / sum w      (replicates that pass the screens named in
+                                                  correction.failure_rate_ignore)
 
 Pure ASCII, for the cluster (hpc-python-compat).
 """
@@ -63,7 +64,7 @@ class BiasTable:
     """b_hat, m_hat, tau_hat, SE and failure rate of one configuration C."""
 
     def __init__(self, X_kept, ratio_kept, X_all, ok_all, smoothing, bandwidth, d_range, phi_range_rad,
-                 signature, estimator_hash, cv_grid=(), cv_scores=()):
+                 signature, estimator_hash, cv_grid=(), cv_scores=(), n_rows=None):
         self.X_kept = np.asarray(X_kept, dtype=float)
         self.ratio_kept = np.asarray(ratio_kept, dtype=float)
         self.X_all = np.asarray(X_all, dtype=float)
@@ -76,6 +77,8 @@ class BiasTable:
         self.estimator_hash = str(estimator_hash)
         self.cv_grid = np.asarray(cv_grid, dtype=float)
         self.cv_scores = np.asarray(cv_scores, dtype=float)
+        # every replicate row the table was fitted from; X_all / ok_all hold those counted in the failure rate
+        self.n_rows = int(self.X_all.shape[0] if n_rows is None else n_rows)
         self._rbf = _spline(self.X_kept, self.ratio_kept, self.smoothing)
         self._resid = self.ratio_kept - self._rbf(self.X_kept)
 
@@ -122,7 +125,10 @@ class BiasTable:
 
 def fit_table(rows, cfg):
     """BiasTable from replicate rows (dicts with d_um, phi_rad or meas_phi_rad -- by
-    correction.table_phi_axis -- ratio, in_S)."""
+    correction.table_phi_axis -- ratio, in_S, and optionally reject, the ';'-joined
+    reasons). A row rejected by any screen named in correction.failure_rate_ignore
+    is left out of the failure rate (X_all, ok_all): the rate is conditional on
+    passing those screens; every other row is counted."""
     c = cfg.correction
     if c.response_estimator != "tps_spline" or c.table_statistic != "mean":
         raise NotImplementedError("response_estimator %r / table_statistic %r: only tps_spline / mean in Block 6"
@@ -134,12 +140,18 @@ def fit_table(rows, cfg):
     ok = np.array([bool(r["in_S"]) for r in rows]) & np.isfinite(ratio) & np.isfinite(phi)
     phi = np.where(np.isfinite(phi), phi, 0.0)       # rows without a measured tilt are outside S anyway
     X = table_inputs(d, phi)
+    # the failure rate is conditional on passing the screens a real node applies to itself (its own
+    # alpha_hat for "dark"): a replicate rejected by any of them leaves it, whatever else it failed
+    ignore = set(c.failure_rate_ignore)
+    reasons = [set(x for x in str(r.get("reject", "")).split(";") if x) for r in rows]
+    counted = np.array([bool(ok_n) or not (rs & ignore) for ok_n, rs in zip(ok, reasons)])
     if c.spline_smoothing == "cv":
         lam, scores = choose_smoothing(X[ok], ratio[ok], c.spline_smoothing_grid, c.spline_cv_folds, cfg.phantom.seed)
         grid = c.spline_smoothing_grid
     else:
         lam, scores, grid = float(c.spline_smoothing), (), ()
     ph = cfg.phantom
-    return BiasTable(X[ok], ratio[ok], X, ok, lam, (c.tau_kernel_bandwidth[0], math.radians(c.tau_kernel_bandwidth[1])),
+    return BiasTable(X[ok], ratio[ok], X[counted], ok[counted], lam,
+                     (c.tau_kernel_bandwidth[0], math.radians(c.tau_kernel_bandwidth[1])),
                      ph.d_range_um, (math.radians(ph.phi_range_deg[0]), math.radians(ph.phi_range_deg[1])),
-                     cfg.full_signature(), cfg.signature_hash("estimator"), grid, scores)
+                     cfg.full_signature(), cfg.signature_hash("estimator"), grid, scores, n_rows=len(rows))
