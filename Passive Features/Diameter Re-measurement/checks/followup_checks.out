@@ -1,0 +1,14 @@
+convergence d=0.5 phi=45 (0.79 rule, halved grid): d^/d 1.334, dip 0.548
+convergence d=2.0 phi=20 (0.79 rule, halved grid): d^/d 1.154, dip 0.781
+ray world, d=1, node plane, centre point: share of ray weight entering above the axis (W) 0.000
+   mu*d=  1.5: centre dip, partition P* 0.641, true history Gv* 0.695
+   mu*d=  3.0: centre dip, partition P* 0.772, true history Gv* 0.900
+   mu*d= 10.0: centre dip, partition P* 0.736, true history Gv* 0.999
+   mu*d= 50.0: centre dip, partition P* 0.699, true history Gv* 1.000
+focus curve d=0.5 mu*d=0.50: F(-1,0,+1) = 0.323, 0.382, 0.302; sub-plane depth -0.020 um (negative = toward the light)
+focus curve d=1.0 mu*d=1.50: F(-1,0,+1) = 1.227, 1.166, 0.927; sub-plane depth -0.235 um (negative = toward the light)
+focus curve d=2.0 mu*d=2.00: F(-1,0,+1) = 1.478, 1.349, 1.220; sub-plane depth +212.347 um (negative = toward the light)
+focus curve d=2.0 mu*d=0.20: F(-1,0,+1) = 0.167, 0.168, 0.165; sub-plane depth -0.095 um (negative = toward the light)
+renderer (Debye kernel), flat d=0.5, axis plane, centre: mu*d=0.5: dip 0.362 (column 0.393); mu*d=1.5: dip 0.728 (column 0.777); mu*d=3: dip 0.899 (column 0.950); mu*d=10: dip 0.931 (column 1.000); mu*d=50: dip 0.910 (column 1.000)
+renderer (Debye kernel), flat d=1.0, axis plane, centre: mu*d=0.5: dip 0.350 (column 0.393); mu*d=1.5: dip 0.692 (column 0.777); mu*d=3: dip 0.831 (column 0.950); mu*d=10: dip 0.788 (column 1.000); mu*d=50: dip 0.723 (column 1.000)
+renderer (Debye kernel), flat d=2.0, axis plane, centre: mu*d=0.5: dip 0.338 (column 0.393); mu*d=1.5: dip 0.668 (column 0.777); mu*d=3: dip 0.805 (column 0.950); mu*d=10: dip 0.785 (column 1.000); mu*d=50: dip 0.763 (column 1.000)

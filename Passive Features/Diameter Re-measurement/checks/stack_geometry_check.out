@@ -1,0 +1,29 @@
+G1 closed-form interval vs 3-D membership: worst mismatch fraction 0
+G2 slab chord vs brute force (20001 z-samples per slab): worst |error| 2.46e-06 um
+G2 sum over slabs - mu*l(v): worst |error| 1.42e-13 (absorbance)
+E1 r=0.25 um, phi=20 deg, theta=30 deg, mu=1 um^-1 (illustrative):
+   alpha = mu d / cos phi = 0.532;  l(0) = 0.532 um = 1.90 plane spacings = 10.6 slabs of 0.05 um
+   rise tan(phi) = 0.364 um per um in-plane; depth span over L=4 um of path = 1.368 um = 4.89 planes
+   planes needed (node z +- (L/2) sin phi +- l(0)/2 +- 3 dz): [-1.790, 1.790] um -> 13 planes
+   tube depth range across the 10x10 um block (axis + l(0)) = 5.50 um -> 110 slabs; largest slab defocus from the node plane ~ 2.75 um, sigma_r there 1.98 um -> 3 sigma margin 5.9 um
+   phi=20: block depth range  5.50 um,  110 slabs, sigma_r(range/2) 1.98 um
+   phi=40: block depth range 12.12 um,  242 slabs, sigma_r(range/2) 4.35 um
+   phi=60: block depth range 24.66 um,  493 slabs, sigma_r(range/2) 8.85 um
+   RMS-width crossover gamma*tan(phi)=1 at phi = 51.7 deg (Debye cos^4)
+   RMS-width crossover gamma*tan(phi)=1 at phi = 48.0 deg (isotropic)
+   RMS-width crossover gamma*tan(phi)=1 at phi = 39.6 deg (uniform disc)
+R2 truncation: dip at node (v=0) and haze at the flank (v=2.5 um), node plane z_k = axis depth
+   phi=20: U= 2.0: dip 0.3910, flank 0.0000; U= 4.0: dip 0.3913, flank 0.0000; U= 6.0: dip 0.3913, flank 0.0000; U=10.0: dip 0.3913, flank 0.0000; U=15.0: dip 0.3914, flank 0.0000
+   phi=45: U= 2.0: dip 0.5319, flank 0.0016; U= 4.0: dip 0.5439, flank 0.0068; U= 6.0: dip 0.5480, flank 0.0099; U=10.0: dip 0.5512, flank 0.0128; U=15.0: dip 0.5528, flank 0.0144
+   phi=60: U= 2.0: dip 0.5569, flank 0.0078; U= 4.0: dip 0.5664, flank 0.0151; U= 6.0: dip 0.5702, flank 0.0181; U=10.0: dip 0.5724, flank 0.0207; U=15.0: dip 0.5736, flank 0.0220
+R1 finite tube r=0.25, phi=20, U=3.5 um; node-plane dip depth (fine, theta=0) = 0.3891
+   h_g = p_x/ 8, theta= 30: fine max|diff| = 2.36e-03 (0.61% of dip); pixel-integrated max|diff| = 1.18e-02 (3.04% of dip)
+   h_g = p_x/ 8, theta= 45: fine max|diff| = 2.03e-03 (0.52% of dip); pixel-integrated max|diff| = 1.08e-02 (2.77% of dip)
+   h_g = p_x/16, theta= 30: fine max|diff| = 2.81e-04 (0.07% of dip); pixel-integrated max|diff| = 9.95e-03 (2.56% of dip)
+   discretisation check, theta=0: |profile(p_x/8) - profile(p_x/16)| max = 2.56e-03
+   dip 1 - I/B at node: h_g = p_x/ 8, theta=  0: fine 0.3891, pixel-integrated 0.3843
+   dip 1 - I/B at node: h_g = p_x/ 8, theta= 30: fine 0.3892, pixel-integrated 0.3811
+   dip 1 - I/B at node: h_g = p_x/ 8, theta= 45: fine 0.3892, pixel-integrated 0.3781
+   dip 1 - I/B at node: h_g = p_x/16, theta=  0: fine 0.3893, pixel-integrated 0.3843
+   dip 1 - I/B at node: h_g = p_x/16, theta= 30: fine 0.3892, pixel-integrated 0.3810
+   reference: column absorbed fraction 1 - exp(-alpha) = 0.4126 (alpha = 0.5321)
