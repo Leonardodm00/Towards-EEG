@@ -1,8 +1,9 @@
 """Reach of faint thick calibration nodes beyond the +-3 planes of the thin ones, and the
 tilt range a calibrated depth range covers (decision D-026, comments (c) and (h)).
 
-Part 1 (comment (c)). How many planes from focus a faint dendrite of diameter 0.8 um keeps
-a centre dip at least as deep as a 0.3 um dendrite has 3 planes (0.84 um) from focus.
+Part 1 (comment (c); 0.5 um nodes for the ladder of comment (g), added later on 2026-10-06).
+How many planes from focus a faint dendrite of diameter 0.8 um (and 0.5 um) keeps a centre
+dip at least as deep as a 0.3 um dendrite has 3 planes (0.84 um) from focus.
 Model: the partition renderer of procedure Eqs. 5-6 as implemented in
 optics_points_check.py (circular Gaussian kernels; illustrative ideal-Debye core table,
 continued linearly beyond 0.84 um with slope 0.79 or 1.21), flat tube (phi = 0),
@@ -38,7 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from optics_points_check import DZ, render_partition_points, sigma_r  # noqa: E402
 
 D_REF, MU_REF, N_REF = 0.3, 0.6, 3      # thin reference node: um, 1/um, planes from focus
-THICK = ((0.8, 0.6), (0.8, 0.3))        # (d in um, mu in 1/um) of the thick nodes
+THICK = ((0.8, 0.6), (0.8, 0.3), (0.5, 0.6), (0.5, 0.3))  # (d in um, mu in 1/um) of the thicker nodes
 RULES = ("debye_0.79", "disc_1.21")     # continuation slopes 0.79 and 1.21 beyond 0.84 um
 N_MAX = 30                              # planes scanned (8.4 um)
 U_PHANTOM = 10.0                        # D-024 phantom half-length, um

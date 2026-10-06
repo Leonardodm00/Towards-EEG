@@ -1,0 +1,20 @@
+Part 1. Windowed second moment
+  (i) toy core + |v|^-2 tail, W = 0.75 um: sqrt(V_W) = 0.092 um
+  (i) toy core + |v|^-2 tail, W = 1.5 um: sqrt(V_W) = 0.110 um
+  (i) toy core + |v|^-2 tail, W = 3.0 um: sqrt(V_W) = 0.138 um
+  (i) toy core + |v|^-2 tail, W = 6.0 um: sqrt(V_W) = 0.181 um
+  (ii) Gaussian dip sigma 0.110 um, area 0.0424 B*um, offset 0.0000 B, W = 1.5 um: sqrt(V_W) = 0.110 um
+  (ii) Gaussian dip sigma 0.110 um, area 0.0424 B*um, offset 0.0000 B, W = 3.0 um: sqrt(V_W) = 0.110 um
+  (ii) Gaussian dip sigma 0.110 um, area 0.0424 B*um, offset 0.0025 B, W = 1.5 um: sqrt(V_W) = 0.351 um
+  (ii) Gaussian dip sigma 0.110 um, area 0.0424 B*um, offset 0.0025 B, W = 3.0 um: sqrt(V_W) = 0.890 um
+  (ii) Gaussian dip sigma 0.110 um, area 0.0424 B*um, offset 0.0050 B, W = 1.5 um: sqrt(V_W) = 0.453 um
+  (ii) Gaussian dip sigma 0.110 um, area 0.0424 B*um, offset 0.0050 B, W = 3.0 um: sqrt(V_W) = 1.118 um
+Part 2. Tilted thin node: width ratio tilted / flat (sqrt of 2nd moment ; core width)
+  plane 1 (|delta| = 0.28 um; flat: sqrt(m2) 0.167 um, core 0.148 um):  5 deg: 1.011 ; 1.002 | 10 deg: 1.046 ; 1.008 | 20 deg: 1.172 ; 1.030 | 30 deg: 1.320 ; 1.054
+  plane 2 (|delta| = 0.56 um; flat: sqrt(m2) 0.426 um, core 0.394 um):  5 deg: 1.009 ; 0.997 | 10 deg: 1.038 ; 0.990 | 20 deg: 1.250 ; 0.973 | 30 deg: 1.589 ; 0.939
+  plane 3 (|delta| = 0.84 um; flat: sqrt(m2) 0.614 um, core 0.604 um):  5 deg: 1.012 ; 1.002 | 10 deg: 1.052 ; 1.007 | 20 deg: 1.269 ; 1.023 | 30 deg: 1.546 ; 1.020
+  plane 6 (|delta| = 1.68 um; flat: sqrt(m2) 1.268 um, core 1.261 um):  5 deg: 1.012 ; 1.000 | 10 deg: 1.054 ; 1.001 | 20 deg: 1.234 ; 0.994 | 30 deg: 1.444 ; 0.959
+  plane 9 (|delta| = 2.52 um; flat: sqrt(m2) 1.930 um, core 1.925 um):  5 deg: 1.012 ; 1.000 | 10 deg: 1.049 ; 0.999 | 20 deg: 1.184 ; 0.985 | 30 deg: 1.347 ; 0.944
+Part 3. Same profile, two windows (plane 1, 30 deg vs flat)
+  window |v| <= 0.61 um: sqrt(m2) ratio 1.320; core ratio 1.054
+  window |v| <= 1.00 um: sqrt(m2) ratio 1.777; core ratio 1.054

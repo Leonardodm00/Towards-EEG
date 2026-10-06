@@ -1,8 +1,9 @@
-# Decision-log additions pending for the project log: D-025, D-026, I-002 (2026-10-06)
+# Decision-log additions pending for the project log: D-025 to D-027, I-002 (2026-10-06)
 
 | Date | Change |
 |---|---|
 | 2026-10-06 | Created by the theory chat. The project log `TEEG_decisions_and_ideas_log.md` (claude.ai project knowledge, root copy) could not be written: `project_write` refused the merged log (55,308 tokens) because project knowledge stood at 1,954,553 of 2,000,000 (`project_info`, 2026-10-06). The refusal implies that any rewrite of the log, even unchanged, exceeds the free space **[inferred from those two numbers]**, so freeing space needs the user's OK. Until then this file holds the text of the three entries, written after re-reading the log (D-001 to D-024, I-001; no D-025 or I-002 there). |
+| 2026-10-06 (later) | Adds **D-027** (user, 18:12): calibration first on flat branches, near and far; tilted branches later. Adds its index and log-changelog rows and annotates D-026's status. Comments rest on `checks/calib_width_check.py` (run 2026-10-06). The project log is still not written. |
 
 **Status: pending.** When the project log is written, append these pieces
 verbatim at the anchors below, re-read the log first (merge, never
@@ -14,23 +15,25 @@ without the user's OK.
 | Piece | Anchor in the project log |
 |---|---|
 | changelog row | a new line after the row starting `\| 2026-10-06 (later) \| Logs **D-022**` |
-| index rows D-025, D-026 | new lines after the row starting `\| D-024 \| 2026-10-06 \|` |
+| index rows D-025, D-026, D-027 | new lines after the row starting `\| D-024 \| 2026-10-06 \|` |
 | index row I-002 | a new line after the row starting `\| I-001 \| 2026-09-19 \|` |
 | D-024 index status | replace `jitter knob at 0 until cell 13 \| active \|` by `jitter knob at 0 until cell 13 \| active; **(i)'s configured $\gamma$ to be measured -- D-026** \|` |
 | D-024 status note | a new paragraph after D-024's status line ending `survives as a reported diagnostic column, \`steep\`).` |
-| entries D-025, D-026 | before the heading `## Ideas for future parts` |
+| entries D-025, D-026, D-027 | before the heading `## Ideas for future parts` |
 | entry I-002 | at the end of the log, after I-001 |
 
-## Changelog row
+## Changelog rows
 
 | 2026-10-06 (later, 2) | Logs **D-025** (user, 17:01): the image noise of the real stacks is measured on clean background patches -- in every plane, at several positions per plane and in several stacks -- through its second moment, and its distribution is examined. Logs **D-026** (user, 17:01): the defocus-kernel calibration is extended beyond the ±0.84 µm that thin nodes reach, using dendrites whose Allen diameter is just under 0.8 µm, read on their planes beyond 0.84 µm; the near-focus law is continued there and adjusted, and the kernel stays Gaussian for now -- D-024 (i)'s configured slope $\gamma$ becomes a measured one. Logs idea **I-002** (user, 17:01, "to discuss further"): a non-Gaussian kernel family with the Gaussian as a special case. The assistant's comments on each are recorded in the entries as open points, not yet answered; the numbers behind D-026's comments come from `checks/calib_reach_check.py` (repo, `main`). Written by the theory chat after re-reading this log, whose D-022 to D-024 the implementation chat had added the same afternoon. |
+| 2026-10-06 (later, 3) | Logs **D-027** (user, 18:12): the defocus calibration starts with flat branches only, for the near (thin) and far (thick) planes; tilted branches come later, to see whether the profile widths change. Refines D-026, whose status is annotated. The assistant's comments -- tilt changes the second moment much more than the core width, so tilted data are compared with the renderer's prediction -- rest on `checks/calib_width_check.py`. |
 
 ## Index rows
 
 | ID | Date | Binds | One line | Status |
 |---|---|---|---|---|
 | D-025 | 2026-10-06 | the noise step of the renderer's camera chain (procedure §3.6 step 6), the nuisance "noise" (procedure §3.5), `RendererConfig.noise_sd_gl`, the configuration $\mathcal C$ of every table | the real stacks' noise is measured on clean background patches, in every plane, at several positions and in several stacks: its second moment (D-025.1) first, then its distribution | active; the assistant's comments (a)-(f) await the user |
-| D-026 | 2026-10-06 | the kernel calibration (procedure §3.4, Eq. 4; block 10), `kernel_continuation` and its slope $\gamma$ (D-024 (i)), the choice of calibration nodes | beyond ±0.84 µm the kernel is calibrated on dendrites just under 0.8 µm (Allen diameter), read on their planes beyond 0.84 µm; the near law is continued (D-026.1) with $\gamma$ fitted, other terms only if the residuals need them; Gaussian for now | active; replaces D-024 (i)'s configured $\gamma$ once run; the assistant's comments (a)-(h) await the user |
+| D-026 | 2026-10-06 | the kernel calibration (procedure §3.4, Eq. 4; block 10), `kernel_continuation` and its slope $\gamma$ (D-024 (i)), the choice of calibration nodes | beyond ±0.84 µm the kernel is calibrated on dendrites just under 0.8 µm (Allen diameter), read on their planes beyond 0.84 µm; the near law is continued (D-026.1) with $\gamma$ fitted, other terms only if the residuals need them; Gaussian for now | active; replaces D-024 (i)'s configured $\gamma$ once run; the assistant's comments (a)-(h) await the user; **refined by D-027 (flat nodes first)** |
+| D-027 | 2026-10-06 | the choice of calibration nodes (procedure §3.4 thin set; D-026 thick set); block 10; a later tilt study | the calibration starts with flat branches only ($\hat\varphi_i \approx 0$), near and far from focus; tilted branches come later and are compared with the renderer's prediction | active; refines D-026; the assistant's comments (a)-(d) await the user |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled |
 
 ## Note for D-024's status
@@ -320,7 +323,83 @@ D-019 (a), D-023, D-024 (this log). Comments (c), (h):
 part 3 of the same script.
 
 **Status:** active; replaces D-024 (i)'s configured $\gamma$ once the
-calibration has run. Comments (a)-(h) await the user.
+calibration has run. Comments (a)-(h) await the user. **Refined 2026-10-06
+18:12 by D-027:** both calibration sets start with flat nodes; tilted nodes
+come later, as a test against the renderer.
+---
+
+## D-027 -- The defocus calibration starts with flat branches only, near and far from focus; tilted branches come later, as a test
+
+**Date:** 2026-10-06, 18:12. **Binds:** the choice of calibration nodes in
+procedure §3.4 (thin set, "$\varphi \lesssim 10°$") and in D-026 (thick set,
+no tilt criterion); block 10 of the implementation handoff
+(`CalibrationConfig` on `sci/diameter-pipeline`); a later tilt study.
+
+**Decision [user].** "For the calibration of the defocus second moments I
+would use initially only branches that have zero tilt angle for near and far
+off focus layers. The if possible construct the same but finding braches with
+several different tilt angles and studying if the second moments change in
+the profile"
+
+**Statement.** The first calibration of $\Delta\sigma^2(\delta)$ -- the thin
+set for $\lvert\delta\rvert \le 0.84$ µm and the thick set of D-026 beyond --
+uses only nodes whose tilt $\hat\varphi_i$ from the local line fit (handoff
+Eq. 5) is zero within a tolerance $\varphi_{\rm tol}$ (open). Afterwards,
+where enough nodes exist, the same plane scans are repeated on nodes binned by
+tilt, and their width curves are compared.
+
+**Why.** At $\varphi = 0$ a node's profile in plane $k$ holds a single
+defocus, up to the node's own depth extent, which is what Eq. (4) and D-026
+comment (b) assume **[KB-repo; reasoning]**.
+
+**The assistant's comments, recorded with the decision; not yet answered
+[reasoning unless tagged].**
+
+- (a) **What a tilt study can show.** A tilted branch's profile at a node also
+  collects light from the neighbouring stretches of the branch, which lie at
+  other depths, so the profile changes with $\varphi$ even when the kernel
+  depends on depth only. In the model **[run, `checks/calib_width_check.py`
+  part 2: thin node, depth-only Gaussian kernel, planes 1-9]** the square root
+  of the second moment over $\pm 5\sigma_{\rm r}$ grows by 4-5 % at 10°,
+  17-27 % at 20° and 32-59 % at 30°, while the Gaussian-core width changes by
+  at most 1 %, 3 % and 6 %. The comparison is therefore between the tilted
+  measurements and the renderer's prediction from the flat calibration
+  (procedure §3.10, "Real vs synthetic profiles"), not between tilted and flat
+  numbers; a mismatch then means that the kernel is not depth-only or that the
+  renderer misses something (oblique illumination, the partition).
+- (b) **The statistic.** The second moment's sensitivity in (a) is the
+  mechanism of D-026 comment (a): broad, faint contributions dominate it, so it
+  also moves with the window. For the same profile (plane 1, 30°) its ratio is
+  1.32 over $\pm 0.61$ µm and 1.78 over $\pm 1.0$ µm, while the core ratio is
+  1.054 over both **[run, part 3]**. The core width is the statistic for the
+  tilt study as well.
+- (c) **"Zero" needs a tolerance.** At 5° the core width changes by at most
+  0.3 % (the second moment by 0.9-1.2 %) in the same run, so a tolerance of
+  about 5° costs little with the core width; it must also exceed the error of
+  $\hat\varphi_i$ from the line fit, which is not measured.
+- (d) **How many nodes.** Flat thick dendrites (Allen diameter just under
+  0.8 µm, faint, isolated, $\hat\varphi_i \approx 0$) may be few in one cell;
+  their count decides whether more specimens are needed **[open]**.
+
+**What it implies for code and tables.** `CalibrationConfig` gains a tilt
+tolerance applied to both sets (e.g. `phi_tol_deg`, provisional 5°) and a
+tilt-binned mode for the later study, whose output is labelled as a comparison
+with the renderer's prediction.
+
+**What it does not decide [open].** $\varphi_{\rm tol}$; the tilt bins; the
+number of nodes per bin.
+
+**Sources.** **[user]**, 2026-10-06 18:12. Procedure §3.4, §3.10; handoff
+Eq. 5; D-026 (this file). Comments (a)-(c): `checks/calib_width_check.py` with
+`calib_width_check.out`, run 2026-10-06 **[run]**. Searches 2026-10-06:
+PubMed, 3 queries (the second moment of a PSF with heavy tails and windowing;
+tilted-fibre defocus PSF calibration in brightfield; orientation bias of
+neurite diameters), 0 records each.
+
+**Status:** active. Refines D-026 (adds a tilt criterion to both calibration
+sets) and procedure §3.4's thin-set criterion ($\varphi \lesssim 10°$ becomes
+$\hat\varphi_i \approx 0$). Comments (a)-(d) await the user.
+
 ---
 
 ## I-002 -- A non-Gaussian defocus kernel, with the Gaussian as a special case
