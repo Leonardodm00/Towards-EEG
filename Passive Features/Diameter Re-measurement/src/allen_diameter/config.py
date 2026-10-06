@@ -169,6 +169,11 @@ class RendererConfig:
     fft_split_sigma_um: float = 0.5    # source: PROVISIONAL (Block 4): (slab, plane) pairs with a wider kernel go to the far-field path (coarse output grid, exact object); 0.5 was faster than 1.0 on a steep and a flat case
     far_grid_per_sigma: float = 8.0    # source: PROVISIONAL (Block 4): far-field output spacing <= smallest far sigma / this (cubic interpolation error ~ (1/8)^4 / 384)
     max_fft_accumulator_mb: float = 256.0  # source: PROVISIONAL (Block 4): spectral accumulators per plane chunk; a 2-worker run was OOM-killed at 3.5 GB per worker without it
+    ray_na: float = 1.4                # source: impl-handoff (S6): condenser NA (evenly filled, sine condition)
+    ray_n_oil: float = 1.515           # source: impl-handoff (S6): immersion index (index-matched)
+    ray_n_rho: int = 16                # source: PROVISIONAL (Block 9): Gauss-Legendre nodes in rho^2 (checks/optics_points_check.py used 48)
+    ray_n_psi: int = 32                # source: PROVISIONAL (Block 9): azimuths (the check script used 96)
+    ray_post_sigma_um: float = 0.08    # source: checks/optics_points_check.py (post blur standing in for diffraction near focus)
     # -- camera chain (procedure s.3.6 step 6)
     background_B_gl: float = 210.0     # source: PROVISIONAL (blur_chain_check.py illustrative); NEEDS REAL DATA
     black_level_gl: float = 0.0        # source: NOT VERIFIED (Allen camera chain unknown)
@@ -253,8 +258,10 @@ class DiameterConfig:
         if any(not (s > 0) for s in r.kernel_table_sigma_um) or not (r.kernel_continuation_slope >= 0):
             raise ValueError("renderer kernel table: sigma must be > 0 and the continuation slope >= 0")
         if not (r.fft_wrap_sigmas > 0 and r.direct_truncate > 0 and r.fft_split_sigma_um > 0 and r.far_grid_per_sigma >= 2
-                and r.max_fft_accumulator_mb > 0):
-            raise ValueError("renderer.fft_wrap_sigmas, direct_truncate, fft_split_sigma_um must be > 0 and far_grid_per_sigma >= 2")
+                and r.max_fft_accumulator_mb > 0 and 0 < r.ray_na < r.ray_n_oil and r.ray_n_rho >= 1
+                and r.ray_n_psi >= 1 and r.ray_post_sigma_um >= 0):
+            raise ValueError("renderer: fft_wrap_sigmas, direct_truncate, fft_split_sigma_um, max_fft_accumulator_mb must be > 0, "
+                             "far_grid_per_sigma >= 2, 0 < ray_na < ray_n_oil, ray_n_rho and ray_n_psi >= 1, ray_post_sigma_um >= 0")
         for name, h in (("renderer.h_g_um_thin", r.h_g_um_thin), ("renderer.h_g_um_thick", r.h_g_um_thick)):
             f = self.acquisition.res0_um / h if h > 0 else 0.0
             if not (h > 0) or round(f) < 1 or abs(f - round(f)) > 1e-9 * f:

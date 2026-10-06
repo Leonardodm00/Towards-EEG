@@ -318,12 +318,17 @@ def test_edge_cases():
         except ValueError:
             continue
         raise AssertionError("invalid input %d accepted" % k)
-    for call in (lambda: R.render_transmittance(tube, 1.0, [0.0], g, rcfg(absorption="ray_world")),
-                 lambda: K.sigma_r(0.1, rcfg(kernel_family="empirical"))):
-        try:
-            call()
-        except NotImplementedError:
-            continue
+    try:
+        R.absorbed_fractions(tube, 1.0, g, np.array([0.0]), 0.02, +1, "ray_world")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("absorbed fractions are not defined in the ray world")
+    try:
+        K.sigma_r(0.1, rcfg(kernel_family="empirical"))
+    except NotImplementedError:
+        pass
+    else:
         raise AssertionError("a planned option must raise NotImplementedError")
 
 

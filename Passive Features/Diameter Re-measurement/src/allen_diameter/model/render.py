@@ -47,7 +47,7 @@ from scipy.interpolate import RectBivariateSpline
 from . import camera, geometry
 from .kernel import sigma_r
 
-ABSORPTIONS_RENDERED = ("partition_vertical", "linear")   # "ray_world" is Block 9
+ABSORPTIONS_RENDERED = ("partition_vertical", "linear")   # "ray_world": model/ray_world.py (Block 9)
 _SQRT_2PI = math.sqrt(2.0 * math.pi)
 BACKENDS = ("fft", "direct")
 
@@ -137,9 +137,11 @@ def slab_grid(tube, grid, dzeta):
     return geometry.slab_centres(float(z_lo[inside].min()), float(z_hi[inside].max()), dzeta)
 
 
-def _check_absorption(absorption):
+def _check_absorption(absorption, allow_ray_world=False):
+    if absorption == "ray_world" and allow_ray_world:
+        return
     if absorption == "ray_world":
-        raise NotImplementedError("absorption 'ray_world' is the Block 9 generator")
+        raise ValueError("absorbed fractions are not defined in the ray world (Block 9)")
     if absorption not in ABSORPTIONS_RENDERED:
         raise ValueError("unknown absorption %r" % (absorption,))
 
@@ -194,7 +196,7 @@ def render_transmittance(tube, mu, z_planes, grid, rcfg, light_direction=+1, bac
     backend = rcfg.backend if backend is None else backend
     if backend not in BACKENDS:
         raise ValueError("unknown backend %r" % (backend,))
-    _check_absorption(rcfg.absorption)
+    _check_absorption(rcfg.absorption, allow_ray_world=True)
     mu = float(mu)
     if not (math.isfinite(mu) and mu >= 0):
         raise ValueError("mu must be finite and >= 0")
@@ -204,6 +206,10 @@ def render_transmittance(tube, mu, z_planes, grid, rcfg, light_direction=+1, bac
     if z_planes.ndim != 1 or not np.all(np.isfinite(z_planes)):
         raise ValueError("z_planes must be a 1-D array of finite depths")
     reduce = (lambda plane: plane) if reduce is None else reduce
+    if rcfg.absorption == "ray_world":          # the independent generator of Block 9 (no slabs, no kernel)
+        from . import ray_world
+        return RenderResult(ray_world.render_planes(tube, mu, z_planes, grid, rcfg, reduce), np.empty(0), 0, 0.0,
+                            None, "ray_world", 0, 0, None)
     n_planes, ny, nx, h = z_planes.size, grid.ny, grid.nx, grid.h
     dzeta = float(rcfg.dzeta_um)
 
