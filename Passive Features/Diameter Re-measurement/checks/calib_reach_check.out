@@ -1,0 +1,14 @@
+Part 1. Reference: d=0.3 um, mu=0.6/um, 3 planes from focus: centre dip 0.0258 B
+  debye_0.79: d=0.8 mu=0.6 (mu*d=0.48): in-focus dip 0.3479; dip >= reference out to plane 16 (|delta| = 4.48 um), sigma_r there 3.48 um; dips at planes 3/6/10/15: 0.1642/0.0795/0.0462/0.0286
+  debye_0.79: d=0.8 mu=0.3 (mu*d=0.24): in-focus dip 0.1942; dip >= reference out to plane 9 (|delta| = 2.52 um), sigma_r there 1.93 um; dips at planes 3/6/10/15: 0.0893/0.0434/0.0253/0.0157
+  disc_1.21: d=0.8 mu=0.6 (mu*d=0.48): in-focus dip 0.3479; dip >= reference out to plane 11 (|delta| = 3.08 um), sigma_r there 3.31 um; dips at planes 3/6/10/15: 0.1600/0.0631/0.0323/0.0172
+  disc_1.21: d=0.8 mu=0.3 (mu*d=0.24): in-focus dip 0.1942; dip >= reference out to plane 7 (|delta| = 1.96 um), sigma_r there 1.96 um; dips at planes 3/6/10/15: 0.0868/0.0344/0.0177/0.0094
+Part 2. Largest tilt covered, U = 10.0 um, plane through the node's axis:
+  d=0.3 um: R=0.84 um -> 3.9 deg, R=1.96 um -> 10.2 deg, R=2.52 um -> 13.3 deg, R=3.08 um -> 16.3 deg, R=4.48 um -> 23.3 deg
+  d=0.5 um: R=0.84 um -> 3.4 deg, R=1.96 um -> 9.7 deg, R=2.52 um -> 12.8 deg, R=3.08 um -> 15.7 deg, R=4.48 um -> 22.8 deg
+  d=0.8 um: R=0.84 um -> 2.5 deg, R=1.96 um -> 8.8 deg, R=2.52 um -> 11.9 deg, R=3.08 um -> 14.9 deg, R=4.48 um -> 22.0 deg
+Part 3. Comment (b), faint flat round tube, linear kernel law:
+  (i) delta_0=1.5 um: mixture variance 1.329239 um^2, r^2/4 + sigma^2 + g^2 r^2/4 = 1.329239 um^2, difference -1.5e-07
+  (i) delta_0=3.0 um: mixture variance 5.398292 um^2, r^2/4 + sigma^2 + g^2 r^2/4 = 5.398292 um^2, difference -1.5e-07
+  (i) delta_0=4.5 um: mixture variance 12.275795 um^2, r^2/4 + sigma^2 + g^2 r^2/4 = 12.275795 um^2, difference -1.5e-07
+  (ii) axis error s=0.07 um vs anchor shifted by g*s: max |difference| of squared widths 2.7e-15 um^2

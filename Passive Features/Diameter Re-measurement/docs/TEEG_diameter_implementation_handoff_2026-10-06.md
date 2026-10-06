@@ -4,6 +4,7 @@
 |---|---|
 | 2026-10-06 | v1. Written at the user's request (14:30 Europe/Rome): the whole diameter-estimation pipeline is implemented now, in a separate chat, while the theory study continues in the chat that wrote this file (decision D-021, below). For everything that is code, this file supersedes the "Next actions" of `TEEG_diameter_remeasurement_handoff_2026-10-05.md`; that file and the design handoff `handoff_diameter_remeasurement.md` stay the references for data access, method and equation numbers. Before commit, every number under "Findings" was re-run from the four scripts committed with this file (`checks/*.out`, identical to the original runs), and every cited parameter was re-read from its source document. |
 | 2026-10-06 (later) | v1.1. The truncation check is now stated as procedure §3.10 writes it: frozen ($\gamma=0$) and proportional ($\gamma=\sigma_{\rm r}(0.84)/0.84\approx0.72$). The runs at $\gamma$ = 0.79 and 1.21 are labelled as a proposed addition. Two places are marked [corrected 2026-10-06]. Evidence: procedure §3.10, "Truncation" row, re-read. |
+| 2026-10-06 (later, 2) | v1.2. Adds the method changes made after v1.1 -- D-025 (the stacks' noise is measured on clean background patches), D-026 (the kernel beyond ±0.84 µm is calibrated on dendrites just under 0.8 µm, $\gamma$ measured, Gaussian kept) and idea I-002 (a non-Gaussian kernel family) -- with their code consequences (section "Method changes after v1.1"). Their full text is in `docs/TEEG_decision_log_additions_2026-10-06.md`, because the project log could not be written (project knowledge full). New "Findings" row from `checks/calib_reach_check.py`, added with this version. Marks where the D-021 batch (D-022 to D-024) superseded provisional defaults of "Configuration", and corrects the stale statements about the log and the project-knowledge limit. Evidence: the project log re-read 2026-10-06 (D-001 to D-024, I-001); `config.py` on `sci/diameter-pipeline` (e908969) read; the new script run. |
 
 Paths are relative to `Passive Features/Diameter Re-measurement/` in the repo
 `Leonardodm00/Towards-EEG` unless they start with `claude/` (project knowledge).
@@ -20,7 +21,7 @@ Paths are relative to `Passive Features/Diameter Re-measurement/` in the repo
 | Image-access modules | **verified 2026-10-06**. The Drive connector shows only the 2026-09-22 versions in the `Allen Slices/Codes` folder (`allen_image_io.py` 15664 B, `allen_image_align.py` 7139 B, `allen_image_plot.py` 7807 B, `smoke_allen_image.py` 11739 B, `allen_image_measure.py` 5373 B, all modified 2026-09-22; no `robustness_registration.py`). The only known copies of the 2026-09-23 versions are the files delivered in the design chat (claude.ai chat `126e0cd6…`, 2026-09-23 -> 09-30, also packed in its `allen_slice_viewer.tar.gz`). The user may hold others locally; that was not checked. The project-knowledge snapshot `claude/allen_viewer_code_2026-09-23.md` named in both earlier handoffs is **not** in the project (project_info, 2026-10-06). |
 | Allen API from the Claude sandbox | **blocked, re-tested 2026-10-06**: `http://api.brain-map.org` returns 403, and `https` is refused at CONNECT by the egress policy. All real-data code runs in Colab. |
 | Allen facts for 529878215 (ids, sizes, pixel size, plane step) | from the design handoff (live queries before 2026-09-30); **not re-queried** |
-| Decision-log facts | **read 2026-10-06** from project knowledge: the root-level `TEEG_decisions_and_ideas_log.md` holds D-001 to D-019 and I-001; `claude/TEEG_decisions_and_ideas_log.md` holds only D-001 and I-001 (last change 2026-09-19) |
+| Decision-log facts | **read 2026-10-06** from project knowledge: the root-level `TEEG_decisions_and_ideas_log.md` holds D-001 to D-019 and I-001; `claude/TEEG_decisions_and_ideas_log.md` holds only D-001 and I-001 (last change 2026-09-19). **[corrected 2026-10-06, v1.2]** Since then the root log holds D-001 to D-024 and I-001 (re-read 2026-10-06); the `claude/` copy was deleted with the user's OK; D-025, D-026 and I-002 are pending in `docs/TEEG_decision_log_additions_2026-10-06.md` |
 | Repo visibility | **public** (GitHub repository listing, 2026-10-06), so Colab can clone without a token |
 | Equations (S1)-(S10) | derived in the theory chat (2026-10-05/06). (S1)-(S4) and the ray-world chord were checked numerically **[run]**; (S9) and (S10) checked by quadrature **[run]** (scripts in `checks/`, see "Findings"). |
 | Numbers under "Findings" | **[run]** with the *illustrative* ideal-Debye kernel or the ray world (geometric optics). No Allen data was used. Reproduced 2026-10-06 from the committed scripts; reference outputs `checks/*.out`. |
@@ -37,7 +38,12 @@ Paths are relative to `Passive Features/Diameter Re-measurement/` in the repo
 - A method change arrives as a doc commit plus a decision ID. The implementation chat pulls `main` at the start of each session and reads the changed sections (`git log --stat origin/main -- "Passive Features/Diameter Re-measurement/docs"`).
 - By D-021, such a change should normally cost a configuration value or one block, not the architecture. If it cannot, change `specs/SPEC.md` first and name the blocks affected (scientific-coding skill, block protocol).
 
-## D-021 (new; not yet in the project decision log, which cannot be written: project knowledge is full)
+## D-021 (in the project log since 2026-10-06)
+
+**[corrected 2026-10-06, v1.2]** v1's heading said "new; not yet in the
+project decision log, which cannot be written: project knowledge is full".
+D-020 and D-021 were appended to the root log the same day, after the stale
+`claude/` copies were deleted with the user's OK.
 
 **Date:** 2026-10-06, 14:30 **[user]**. **Binds:** the whole diameter-estimation
 code (`src/`, `specs/SPEC.md`, the smoke suites); how open method choices enter
@@ -72,17 +78,38 @@ D5; D7), and where the code lives (section "Proposed layout").
 
 **Status:** active. To be appended to the project log `TEEG_decisions_and_ideas_log.md`
 (root-level copy; see "Admin") when space exists, together with D-020.
+**[corrected 2026-10-06, v1.2]** Appended; the batch was answered by D-022 to
+D-024.
 
 ## Decisions in force (read before coding anything they bind)
 
 | ID | Where the full text is | One line | Open sub-points |
 |---|---|---|---|
-| D1-D7 | design handoff §Method/Decisions | D2: width read across the branch in the sharpest plane; D3: local 3-D path from several planes; D4: blurred-tube Beer-Lambert fit (amended by D-018, D-019); D6: compute in the global frame in µm, never fit a direction in px/plane units; **D5** (bias table + flag \|b-1\| > 0.2) and **D7** (start with 529878215) are "proposed, **confirm**" | D5, D7 |
+| D1-D7 | design handoff §Method/Decisions | D2: width read across the branch in the sharpest plane; D3: local 3-D path from several planes; D4: blurred-tube Beer-Lambert fit (amended by D-018, D-019); D6: compute in the global frame in µm, never fit a direction in px/plane units; **D5** (bias table + flag \|b-1\| > 0.2) and **D7** (start with 529878215) are "proposed, **confirm**" | D5, D7 -- **confirmed by D-024 (vi)** |
 | D-013 | project log (root copy) | corrected morphologies = one SWC per specimen, archive format; `run_ih_fit.py --swc-dir` refuses a missing file | where the files live |
-| D-018 | project log (root copy) | background $B$ of the fit fixed to a median $\bar B_i$ of the focal plane $k^*_i$ (D-018.1); $\sigma$ fixed | (a) region $\mathcal R_i$; (b) stained-fraction bias; (c) focus-score background |
-| D-019 | project log (root copy) | fitted darkness is $\mu$ (µm⁻¹); $\alpha=\mu d/\cos\varphi_i$ with $\varphi_i$ from the line fit (D-019.1) | (a) $\mu$ per node or shared; (b) whether the vertical path $d/\cos\varphi_i$ holds for thick or steep branches (see "Findings": the partition and vertical rays); (c) one table per estimator variant |
+| D-018 | project log (root copy) | background $B$ of the fit fixed to a median $\bar B_i$ of the focal plane $k^*_i$ (D-018.1); $\sigma$ fixed | (a) region $\mathcal R_i$; (b) stained-fraction bias; (c) focus-score background -- **(a), (c) closed by D-023** |
+| D-019 | project log (root copy) | fitted darkness is $\mu$ (µm⁻¹); $\alpha=\mu d/\cos\varphi_i$ with $\varphi_i$ from the line fit (D-019.1) | (a) $\mu$ per node or shared; (b) whether the vertical path $d/\cos\varphi_i$ holds for thick or steep branches (see "Findings": the partition and vertical rays); (c) one table per estimator variant -- **(a) closed by D-023 (per node)** |
 | D-020 | this folder's `README.md` | documents live in `docs/` on `main`, updated by commit and push | — |
-| D-021 | this file | implement now; open choices as provisional config defaults, confirmed in one batch | — |
+| D-021 | this file; project log | implement now; open choices as provisional config defaults, confirmed in one batch | — |
+| D-022 | project log (root copy) | code in this folder on branch `sci/diameter-pipeline`; root `specs/SPEC.md`; the 2026-09-23 modules byte-identical; production table on davinci (PBS) | root `tests/smoke` redirect; PBS array layout |
+| D-023 | project log (root copy) | $\mu$ per node; $\bar B_i$ over the block, traced path masked; focus score keeps the profile-ends median; $\sigma_{\rm fit}$ a study axis $\{0.080, 0.099, 0.125\}$ µm, deliverable 0.099 | the study set and the deliverable value |
+| D-024 | project log (root copy) | partition renderer and linear continuation $\gamma=0.79$ "for now"; dark flag $\hat\alpha>1.0$; random phantom design over ranges, $U=10$ µm, $\varphi\in[0°,90°)$; no tilt exclusion; thin-plate spline; D5, D7 confirmed; jitter 0 until cell 13 | $d_{\max}$, $\mu$ range, flag threshold, replicates, jitter; **(i)'s $\gamma$ to be measured, D-026** |
+| D-025 | `docs/TEEG_decision_log_additions_2026-10-06.md` (pending in the project log) | the stacks' noise is measured on clean background patches, in every plane, at several positions and in several stacks: second moment first, then its distribution | patch size and margin; level dependence; injection route |
+| D-026 | same file | beyond ±0.84 µm the kernel is calibrated on dendrites just under 0.8 µm (Allen diameter), read beyond 0.84 µm; (D-026.1) with $\gamma$ fitted; Gaussian kept | thick-set selection; windows; "other terms"; joint or sequential fit |
+| I-002 | same file | idea: a non-Gaussian kernel family with the Gaussian as a special case | to discuss |
+
+## Method changes after v1.1 (D-025, D-026, I-002)
+
+The decisions above settle what v1.1 left provisional; these three change
+what blocks 4, 10 and 11 must do. Full text, the assistant's comments and the
+sources: `docs/TEEG_decision_log_additions_2026-10-06.md`. The code
+consequences are proposals; names are fixed in `specs/SPEC.md`.
+
+| ID | What changes | Code consequence |
+|---|---|---|
+| D-025 | the camera chain's noise is measured, not configured | Phase-II script, one row per clean background patch: stack, plane, position, size, mean $m$, detrended variance (D-025.1), autocovariance at 1-8 px in $x$ and $y$, plane-difference variance, clean-column criterion. `RendererConfig.noise_sd_gl` (3.0, provisional) gives way to a noise-model selector whose parameters come from that table (e.g. `"gaussian_after_chain"`, `"empirical_patches"`). A clean column has no stained structure on either side of the plane within about $3\sigma_{\rm r}(\delta)$. |
+| D-026 | $\gamma$ of `kernel_continuation = "linear"` is measured | Block 10 takes a calibration-node table with a diameter class per node: thin ($\hat d\lesssim0.3$ µm) and thick (Allen diameter just under 0.8 µm, faint, $\hat\alpha\lesssim0.5$). Each class has its own plane window; the thick class is read beyond 0.84 µm, on both sides of the axis where possible. For the thick class the profile and the block widen to about $\pm3\sigma_{\rm r}$ ($\sigma_{\rm r}\approx$ 2-3.5 µm there), with a background trend term, and $z_{{\rm ax},i}$ comes from the node's own focus search instead of Eq. 4, because an axis-depth error mimics a change of the anchor $\sigma_{\rm r}(0.84)$. Output: the tabulated $\Delta\sigma^2$, its measured range (an element of $\mathcal C$) and $\hat\gamma$. Phase-I oracle: synthetic thick-node scans with a known $\gamma$ return it. |
+| I-002 | nothing to code now | `kernel_family` is already a configuration name, so a new family can be added as one component |
 
 ## What "the whole pipeline" is
 
@@ -183,7 +210,7 @@ Phase I runs entirely in the sandbox on synthetic data. Phase II needs Colab and
 | 7 | inversion, flags, fill | `analysis/invert.py`, `fill.py` | procedure Eq. 1, §3.9; mathematics Eqs. 20-21 | root vs shortcut error $\approx-\beta(b-1)$; non-monotone and out-of-domain tables flagged; fill rules; after correction, synthetic stacks recover $d$ within ~10 % for $d\in\{0.5,1,2,3\}$ µm and $\varphi\le20°$ (design handoff Next action 5) |
 | 8 | cell level | `analysis/cell.py`, `loading/swc_io.py` | handoff step 7; D-013 | SWC round trip byte-for-byte apart from radii; frustum area of known cylinders and cones |
 | 9 | ray-world generator + §3.10 checks | `model/ray_world.py`, `scripts/` | (S6), chord formula | reproduces `checks/optics_points_check.py` self-checks; faint-limit match (S10) |
-| 10 | kernel calibration | `analysis/calibration.py` | procedure Eq. 4, §3.4; mathematics §3.5 | synthetic plane scans with a known growth recovered up to the common shift (Phase I); real nodes in Phase II |
+| 10 | kernel calibration | `analysis/calibration.py` | procedure Eq. 4, §3.4; mathematics §3.5; **[2026-10-06]** D-026 (thick set, measured $\gamma$) | synthetic plane scans with a known growth recovered up to the common shift (Phase I); synthetic thick-node scans with a known $\gamma$ return it (D-026); real nodes in Phase II |
 | 11 | real-data runs (Phase II) | `scripts/` | design handoff Next actions 1-3, 7 | cell 13 on node 4505 + 5-10 stretches; camera-model calibration; $\hat\mu_i$ distribution; table; apply to 529878215 |
 
 **Per-node CSV columns** (from D-018, D-019 and handoff step 7):
@@ -265,6 +292,16 @@ What follows from it, with hypotheses:
 
 All values are **provisional (assistant)** unless the Source column cites a decision. Confirm them in one batch.
 
+**[corrected 2026-10-06, v1.2]** The batch was answered by D-022 to D-024,
+and D-025 and D-026 followed. Where they differ from the tables below, the
+decisions and `config.py` / `specs/SPEC.md` on `sci/diameter-pipeline` are
+authoritative. Rows superseded so far, each also marked in place:
+`sigma_fit_um` (a study axis, D-023), the selection $\mathcal S$ (no tilt
+criterion, D-024 (iv)), `U_um` (10 µm, D-024 (iii)), `grid_d_um` and
+`grid_phi_deg` (a random design over ranges, D-024 (iii)), the camera-chain
+noise (measured, D-025), `kernel_continuation` and the kernel calibration
+(thick set, measured $\gamma$, D-026).
+
 **Acquisition (facts, not choices)**
 
 | Parameter | Value | Source |
@@ -287,10 +324,10 @@ All values are **provisional (assistant)** unless the Source column cites a deci
 | `profile_half_um`, `profile_step_um` | 3.0, 0.1144 | handoff Eq. 9 |
 | `along_branch_avg_um` | 0.5 (on) | handoff Eq. 9 "optional"; the table absorbs it if phantoms use the same value |
 | `bbar_region` | `"block_masked"`: node's block in plane $k^*_i$, pixels within Allen radius + 1 µm of any SWC segment masked | D-018 (a), assistant's recommendation |
-| `sigma_fit_um` | 0.099 | procedure §3.3 heuristic budget; bracket handoff Eq. 12 |
+| `sigma_fit_um` | 0.099 | procedure §3.3 heuristic budget; bracket handoff Eq. 12. **[2026-10-06]** a study axis $\{0.080, 0.099, 0.125\}$ µm, deliverable 0.099 (D-023) |
 | `mu_mode` | `"per_node"`; `"shared"` as labelled comparison | D-019 (a): two-stage route, stage 1 |
 | fit bounds | $d\in[0.05, 6]$ µm, $\mu\in[0, 20]$ µm⁻¹, $v_0\in[-1,1]$ µm; multi-start $d_0\times\{0.7,1,1.4\}$ | assistant |
-| selection $\mathcal S$ | converged, no parameter at a bound, registration verdict "branch found" (the actual labels of `registration_check` are **not verified**), not steep ($\tan\varphi<0.58$, old tool's `STEEP_TAN`), not faint, no second dip in the window, not at the stack edge | procedure §3.2 (definition); flag details assistant |
+| selection $\mathcal S$ | converged, no parameter at a bound, registration verdict "branch found" (the actual labels of `registration_check` are **not verified**), not steep ($\tan\varphi<0.58$, old tool's `STEEP_TAN`), not faint, no second dip in the window, not at the stack edge | procedure §3.2 (definition); flag details assistant. **[corrected 2026-10-06]** no tilt criterion (D-024 (iv)); dark flag $\hat\alpha>1.0$ added (D-024 (ii)) |
 | dark-tube flag | $\hat\alpha_i=\hat\mu_i\hat d_i/\cos\varphi_i>1.0$ | **new**, from "Findings" (4). The partition breaks between true $\mu d$ = 0.5 and 1.5 in the ray world (flat $d=1$ µm), where the fit's $\hat\alpha$ is 0.57 and 1.61. Threshold to be set on data. |
 
 **Correction (procedure §3.9; handoff step 6)**
@@ -309,23 +346,23 @@ All values are **provisional (assistant)** unless the Source column cites a deci
 |---|---|---|
 | `kernel_family` | `"gaussian_table"`; `"empirical"` later | procedure §3.4 |
 | `kernel_table` ($\delta$ → $\sigma_{\rm r}$, µm) | 0 → 0.080, 0.14 → 0.086, 0.28 → 0.122, 0.42 → 0.262, 0.56 → 0.438, 0.84 → 0.603 (ideal Debye, 550 nm; **not calibrated**) | mathematics §3.4; replaced by block 10 |
-| `kernel_continuation` | linear beyond 0.84 µm with slope $\gamma=0.79$. All options are one family, $\sigma_{\rm r}(\delta)=\sigma_{\rm r}(0.84)+\gamma(\lvert\delta\rvert-0.84)$: `"frozen"` ($\gamma=0$) and `"proportional"` ($\gamma=\sigma_{\rm r}(0.84)/0.84$, i.e. 0.72 with the illustrative table) are procedure §3.10's two truncation rules, and proportional is also the rule of `checks/stack_geometry_check.py`; $\gamma$ = 0.79 and 1.21 are the textbook slopes | mathematics Eq. 17; procedure §3.10; see "Findings" |
+| `kernel_continuation` | linear beyond 0.84 µm with slope $\gamma=0.79$. All options are one family, $\sigma_{\rm r}(\delta)=\sigma_{\rm r}(0.84)+\gamma(\lvert\delta\rvert-0.84)$: `"frozen"` ($\gamma=0$) and `"proportional"` ($\gamma=\sigma_{\rm r}(0.84)/0.84$, i.e. 0.72 with the illustrative table) are procedure §3.10's two truncation rules, and proportional is also the rule of `checks/stack_geometry_check.py`; $\gamma$ = 0.79 and 1.21 are the textbook slopes | mathematics Eq. 17; procedure §3.10; see "Findings". **[2026-10-06]** 0.79 "for now" (D-024 (i)); to be measured on the thick calibration set (D-026) |
 | `sigma_r0_um` | 0.080 (configured; never identified by the stacks) | procedure §3.4 |
 | `absorption` | `"partition_vertical"` (procedure Eqs. 5-6); options `"linear"` (mathematics Eq. 11), `"ray_world"` (S6, alternative generator) | procedure §3.6; "Findings" |
 | `light_direction` | +1 = light travels toward increasing plane index | **not verified**; matters only through the partition (dark tubes) |
 | `h_g_um` (fine grid) | $p_{\rm x}/16$ for $d\le0.5$ µm, else $p_{\rm x}/8$ | "Findings" (convergence) |
 | `dzeta_um` (slab thickness) | 0.02 | procedure §3.6 ($\le0.05$); convergence test |
-| `U_um` (phantom half-length along $u$) | 8.0, cut at $\lvert u\rvert\le U$, tube drawn into the padding | "Findings"; convergence test, essential above 30° |
+| `U_um` (phantom half-length along $u$) | 8.0, cut at $\lvert u\rvert\le U$, tube drawn into the padding | "Findings"; convergence test, essential above 30°. **[corrected 2026-10-06]** 10 µm (D-024 (iii)) |
 | `cross_section_aspect` | 1.0 (round) | procedure §3.5; squashed as a check |
 | background $B$ | from real block medians | **needs real data** |
-| camera chain | block-average to $p_{\rm x}$; black level and grey mapping **unknown**; Gaussian noise matched to the real background SD **after** the chain; 8-bit; JPEG with Allen's own tables read from fetched crops (`Image.open(f).quantization`) | procedure §3.6 step 6; Pillow API verified 2026-10-06 |
+| camera chain | block-average to $p_{\rm x}$; black level and grey mapping **unknown**; Gaussian noise matched to the real background SD **after** the chain; 8-bit; JPEG with Allen's own tables read from fetched crops (`Image.open(f).quantization`) | procedure §3.6 step 6; Pillow API verified 2026-10-06. **[2026-10-06]** the noise is measured on clean background patches (D-025) |
 
 **Phantoms and table (procedure §3.5, §3.8)**
 
 | Parameter | Provisional default | Source / status |
 |---|---|---|
 | `grid_d_um` | 0.2, 0.3, 0.4, 0.5, 0.7, 1.0, 1.4, 2.0, 2.8, 4.0 | procedure §3.5 (proposal) |
-| `grid_phi_deg` | 0, 5, 10, 15, 20, 25, 30, 40, 50, 60 | procedure §3.5 (proposal) |
+| `grid_phi_deg` | 0, 5, 10, 15, 20, 25, 30, 40, 50, 60 | procedure §3.5 (proposal). **[corrected 2026-10-06]** both grids superseded by a random design over ranges, $\varphi\in[0°,90°)$ (D-024 (iii)) |
 | phantom $\mu$ | matched to the real $\hat\mu_i$ distribution through the fitted statistic; until real data: 0.6 and 3.0 µm⁻¹ | procedure §3.5; D-019 test values |
 | nuisances $\xi$ | $\theta\sim U[0,\pi)$; lateral offset uniform within a pixel; axis depth uniform on $[-\Delta z/2,\Delta z/2]$; noise per camera model | procedure §3.5 |
 | `n_pilot`, `eps_mc` | 50 at a few grid corners; $N_{\mathcal S}=(\hat\tau/0.005)^2$ | procedure §3.8 (both "e.g.") |
@@ -336,8 +373,8 @@ All values are **provisional (assistant)** unless the Source column cites a deci
 
 | Parameter | Provisional default | Source / status |
 |---|---|---|
-| node selection | $\hat d\lesssim0.3$ µm, faint, $\varphi\lesssim10°$, isolated | procedure §3.4 |
-| offsets | ±3 planes (±0.84 µm); trust beyond ±2 only after a residual check | procedure §3.4 |
+| node selection | $\hat d\lesssim0.3$ µm, faint, $\varphi\lesssim10°$, isolated | procedure §3.4. **[2026-10-06]** plus a thick set: Allen diameter just under 0.8 µm, faint (D-026) |
+| offsets | ±3 planes (±0.84 µm); trust beyond ±2 only after a residual check | procedure §3.4. **[2026-10-06]** thick set: planes beyond 0.84 µm (D-026) |
 | statistic $\omega_{i,k}$ | squared Gaussian-core width of the dip (windowed $V$ as cross-check) | procedure §3.4 [corrected 2026-10-04] |
 | origin convention | symmetric $\Delta\sigma^2(\delta)=\Delta\sigma^2(-\delta)$; signs fitted separately as a check | mathematics §3.5 |
 
@@ -361,6 +398,7 @@ These numbers show mechanisms and sensitivities. They are **not** values of $b$.
 | The kernel's far field moves $\hat d$ for steep or thick tubes | Setup: $\mu=1$ µm⁻¹, $U=6$ µm, profile in the plane through the node's axis depth. $\hat d/d$ with continuation $\gamma$ = 0 (frozen) / 0.79 / 1.21: <br>$d$ = 0.5 µm: 1.041 for all three at 0°; 1.062 / 1.063 / 1.066 at 20°; 1.266 / 1.334 / 1.323 at 45°; 1.444 / 1.464 / 1.415 at 60°. <br>$d$ = 2 µm: 1.126 / 1.128 / 1.130 at 0°; 1.138 / 1.154 / 1.166 at 20°. <br>Grid convergence checked at (0.5 µm, 45°) and (2 µm, 20°) under $\gamma=0.79$. (`optics_points_check.py A`, `followup_checks.py`) | continuation rule as config. Run procedure §3.10's truncation check as written: frozen ($\gamma=0$) and proportional ($\gamma=\sigma_{\rm r}(0.84)/0.84\approx0.72$), and flag where $\hat b$ moves. Proposed addition: $\gamma$ = 0.79 and 1.21, the textbook far-field slopes for the full NA 1.4 cone (mathematics Eq. 17). **[corrected 2026-10-06]** v1 said "with $\gamma\in[0.79,1.21]$, and frozen as a stress test", as if the procedure named those slopes. |
 | The focus-search planes depend on the extrapolated kernel | Flat $d=2$ µm, $\mu=1$ µm⁻¹, centre dip (frozen / 0.79 / 1.21): 0.76 / 0.62 / 0.57 at $z_k=c_z+3\Delta z$ (away from the light), 0.86 / 0.82 / 0.80 at $c_z-3\Delta z$. At $d=0.5$ µm the three rules differ by at most 0.01. (`optics_points_check.py A`) | compare $k^*$ between real and synthetic stacks |
 | Thin calibration nodes fade fast | $d=0.3$ µm, $\mu=0.6$ µm⁻¹, flat, planes on the light side, $\gamma=0.79$ beyond 3 planes: dip ÷ in-focus dip = 0.75, 0.29, 0.19, 0.14, 0.11 at 1-5 planes (`optics_points_check.py A`) | calibration window ±3 planes; read the real noise first |
+| Faint thick nodes reach further; what a calibrated range covers (added v1.2) | Partition renderer, flat tube, planes on the light side, noise-free; reference = the centre dip of a 0.3 µm node at $\mu=0.6$ µm⁻¹, 3 planes out (0.0258 $B$, slope 0.79). A 0.8 µm node at $\mu=0.6$ µm⁻¹ stays at or above it out to plane 16 (4.48 µm, $\sigma_{\rm r}$ 3.48 µm) with $\gamma=0.79$ and plane 11 (3.08 µm, 3.31 µm) with $\gamma=1.21$; at $\mu=0.3$ µm⁻¹, planes 9 and 7. By (S5) with $U=10$ µm, the plane through the axis of a 0.5 µm phantom needs kernels beyond 0.84 µm from $\varphi\approx3.4°$ on; a calibrated range of 3.08-4.48 µm covers it up to 15.7-22.8°. (`calib_reach_check.py`, parts 1-2) | D-026: thick calibration set, windows of about $\pm3\sigma_{\rm r}$; steeper phantoms still use the extrapolated kernel |
 | **The partition fails qualitatively for dark, thick tubes** | **(1) In-focus centre gets lighter as the stain darkens.** Debye kernel ($\gamma=0.79$), flat $d=1$ µm: centre dip 0.831 / 0.788 / 0.723 at $\mu d$ = 3 / 10 / 50, while a vertical ray through the centre absorbs 0.950-1.000. For $d=2$ µm: 0.805 / 0.785 / 0.763. For $d=0.5$ µm it rises to 0.931 at $\mu d=10$, then falls to 0.910 at 50. (`followup_checks.py` §4) <br>**(2) The focus curve peaks toward the light.** Peak at plane −1 for $d=1$ µm, $\mu d=1.5$; at −3 for $d=2$ µm, $\mu d=2$; at 0 for the faint $d=2$ µm, $\mu d=0.2$. (`focus_scan.py`, ±6-plane scan, negative = light side) <br>**(3) The ray world shows neither artefact.** Its truth is symmetric: the dips at ±3Δz are equal to four decimals in every case run. With the true history, the opaque in-focus centre is black (Gv* 1.000 at $\mu d=50$). The partition's centre dip at $\mu d=50$ is 0.699, against 0.691 from (S9). (`optics_points_check.py BC, matched`; `followup_checks.py`; `focus_scan.py`) <br>**(4) $\hat\mu$ becomes unreachable.** With the kernel of the same rays and $\mu$ matched through $\hat\mu$ (procedure §3.5), no $\mu_{\rm ph}\in[0.5\mu,8\mu]$ lets the partition renderer reach the truth's $\hat\mu$ at $\mu d$ = 1.5 or 3 ($d=1$ µm, flat). It does reach it at $\mu d\le0.5$. (`optics_points_check.py matched`) | dark-tube flag; `absorption` and `light_direction` as config; ray-world generator for the end-to-end check |
 | Faint stain is fine; vertical rays only rescale $\mu$ | Ray world, $\mu$ matched through $\hat\mu$. <br>Partition renderer: $\mu_{\rm ph}/\mu$ = 1.450 at $\mu d=0.05$, against 1.447 from (S10). Its $\hat d/d$ differs from the truth's by −0.002 there and by −0.005 at $\mu d=0.5$. <br>Same rays with the true history but vertical path elements: +0.009 / +0.021 / +0.050 at $\mu d$ = 0.5 / 1.5 / 3 ($d=1$ µm, flat), and +0.026 at $d=0.5$ µm, 20°, $\mu d=0.5$. <br>The ray world's own $\hat d/d$ (1.20-1.32) is not a $b$: the ray world has no diffraction. (`optics_points_check.py matched`) | report $\hat\mu$ as effective; phantom $\mu$ matched via $\hat\mu$ |
 | Coherence is not modelled anywhere | optics §3.6; the ray world has no coherence either | listed as a gap; nothing to code now |
@@ -387,7 +425,7 @@ These numbers show mechanisms and sensitivities. They are **not** values of $b$.
 - Allen's camera chain: black level, grey mapping, noise after JPEG, JPEG tables. The tables are readable from any fetched crop; the rest needs real blocks.
 - Mounting medium and its index (optics §3.7); aperture-diaphragm setting, which sets the cone width and the coherence (optics §3.6); the light direction relative to Allen's plane index (listed as unverified in the 2026-10-05 handoff, "Open choices").
 - Real $\hat\mu_i$ distribution (phantom $\mu$); uniformity of the stain along branches (D-019 (a)).
-- Real noise level, and therefore the usable calibration range in planes.
+- Real noise level, and therefore the usable calibration range in planes. **[2026-10-06]** To be measured on clean background patches by D-025's Phase-II script (not yet written).
 - Cell 13 (registration on node 4505 and on 5-10 stretches) has not been run (design handoff Next actions 1-3), so the snap radius is unknown.
 - Older tools named in the design handoff (`allen_stack_radius_refit.py`, `allen_projection_radius_refit.py`, `README_stack_refit.md`): exist per that handoff; location **not checked**.
 
@@ -445,6 +483,7 @@ These numbers show mechanisms and sensitivities. They are **not** values of $b$.
 ## Admin left open
 
 - **Project knowledge is full** (1,997,337 of 2,000,000 bytes, 2026-10-06). D-020 and D-021 cannot be appended to the project log until space is freed. Deletion needs the user's explicit OK. Candidates: the `claude/` copies of the procedure, mathematics and optics notes (stale per D-020), and `claude/TEEG_decisions_and_ideas_log.md`.
+  **[corrected 2026-10-06, v1.2]** Resolved for D-020 to D-024: the user approved deleting those `claude/` copies, and the log was written. **Open again:** with project knowledge at 1,954,553 of 2,000,000 (`project_info`, 2026-10-06), the project refused the log with D-025, D-026 and I-002 (55,308 tokens). Any rewrite of the log, even unchanged, appears to exceed the free space **[inferred from those two numbers]**, so space must be freed first, with the user's OK. Until then the entries wait in `docs/TEEG_decision_log_additions_2026-10-06.md`.
 - **[corrected 2026-10-06]** The 2026-10-05 handoff says D-018 and D-019 are in `claude/TEEG_decisions_and_ideas_log.md`. They are not: that copy holds only D-001 and I-001 (last change 2026-09-19). The live log with D-001 to D-019 is the root-level `TEEG_decisions_and_ideas_log.md`, so it must **not** be deleted, although the 2026-10-05 handoff lists it among the deletion candidates. D-020 and D-021 belong in it. The 2026-10-05 handoff carries the same correction marks as of this commit.
 - The theory chat offered (2026-10-06) to push corrections to procedure §3.6 step 3 and mathematics §3.2, §3.5:
   - the light-direction dependence and the dark-node axis shift are artefacts of the partition, not physics in the ray limit;
@@ -452,3 +491,4 @@ These numbers show mechanisms and sensitivities. They are **not** values of $b$.
   - $\hat\mu$ is an effective coefficient.
 
   These are awaiting the user's OK. Until then, "Findings" above is the reference.
+  **[2026-10-06, v1.2]** Also offered, also awaiting the user's OK: D-025 and D-026 into procedure §3.4 (calibration) and §3.6 step 6 (camera-chain noise).
