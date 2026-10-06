@@ -137,6 +137,9 @@ def _bbar(block2d, frame, o, branch, m):
     return B, ok
 
 
+node_background = _bbar   # public name (Block 10's plane scan applies the same rule in every plane)
+
+
 def _node_pass(blk, branch, j, t, m, dz):
     block, ks, valid, frame = blk
     theta, phi, y_hat, e_u = path.angles(t)

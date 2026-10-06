@@ -56,6 +56,9 @@ FIT_START_RULES = ("profile", "fixed")                         # Block 3 (provis
 RENDER_BACKENDS = ("fft", "direct")                            # Block 4: fft = impl-handoff FFT form; direct = reference
 TABLE_STATISTICS = ("mean", "median")                          # procedure s.3.8
 FILL_POLICIES = ("same_branch_then_allen", "allen_only", "none")  # D5 / handoff step 6
+CALIBRATION_STATISTICS = ("gaussian_core_width2", "windowed_variance")  # procedure s.3.4 [corrected 2026-10-04]: core width drives
+ORIGIN_CONVENTIONS = ("symmetric", "min_origin")               # mathematics s.3.5: the growth is identified up to a common shift
+GROWTH_INTERPS = ("cubic", "linear")                           # Block 10 (provisional default, see CalibrationConfig.growth_interp)
 
 
 @dataclass(frozen=True)
@@ -219,7 +222,14 @@ class CalibrationConfig:
     trust_planes: int = 2             # source: procedure s.3.4 (trust beyond +-2 only after a residual check)
     statistic: str = "gaussian_core_width2"  # source: procedure s.3.4 [corrected 2026-10-04]; windowed V as cross-check
     origin_convention: str = "symmetric"     # source: mathematics s.3.5 (identified up to a common shift)
-    core_fit_fwhm_factor: float = 1.0        # source: procedure s.3.4 (Gaussian fitted within about one FWHM)
+    core_fit_fwhm_factor: float = 1.0        # source: procedure s.3.4 (Gaussian fitted within about one FWHM): samples with |v - v_peak| <= this x FWHM
+    node_alpha_max: float = 0.5              # source: PROVISIONAL (Block 10): "faint" calibration node, alpha_hat <= this (the dark flag is 1.0)
+    window_half_um: float = 1.5              # source: PROVISIONAL (Block 10): half-window of V_W and A_W about the core centre (the focus score's ends rule)
+    min_window_samples: int = 5              # source: PROVISIONAL (Block 10): fewest samples in the core-fit window (3 parameters)
+    knot_step_um: float = 0.28               # source: procedure s.3.4 ("tabulated per plane offset"); Block 10: knots finer than dz are not identified (a zig-zag of period 2 x step is absorbed by the c_i)
+    z_ax_bound_um: float = 0.28              # source: PROVISIONAL (Block 10): the fitted axis depth stays within this of the node's sub-plane depth
+    min_planes_per_node: int = 3             # source: PROVISIONAL (Block 10): a node enters the growth fit with at least this many finite omega
+    growth_interp: str = "cubic"             # source: PROVISIONAL (Block 10): between the plane-offset knots; linear made G(1 plane) < 0 on rendered thin phantoms (convex curve)
 
 
 @dataclass(frozen=True)
@@ -312,6 +322,17 @@ class DiameterConfig:
             raise ValueError("phantom.phi_range_deg must lie within [0, 90]")
         if p.d_range_um[0] <= 0 or p.mu_range_per_um[0] < 0:
             raise ValueError("phantom ranges: d must be > 0 and mu >= 0")
+        cal = self.calibration
+        _check_in(cal.statistic, CALIBRATION_STATISTICS, "calibration.statistic")
+        _check_in(cal.origin_convention, ORIGIN_CONVENTIONS, "calibration.origin_convention")
+        _check_in(cal.growth_interp, GROWTH_INTERPS, "calibration.growth_interp")
+        if not (cal.node_dhat_max_um > 0 and 0 <= cal.node_phi_max_deg <= 90 and cal.offsets_planes >= 1
+                and 0 <= cal.trust_planes <= cal.offsets_planes and cal.core_fit_fwhm_factor > 0
+                and cal.node_alpha_max > 0 and cal.window_half_um > 0 and cal.min_window_samples >= 4
+                and cal.knot_step_um >= self.acquisition.dz_um - 1e-12 and cal.z_ax_bound_um > 0
+                and cal.min_planes_per_node >= 3):
+            raise ValueError("calibration settings out of range (knot_step_um must be >= dz_um: finer knots "
+                             "are not identified by plane scans)")
         for name, v in (("renderer.dzeta_um", r.dzeta_um), ("renderer.U_um", r.U_um),
                         ("renderer.h_g_um_thin", r.h_g_um_thin), ("renderer.h_g_um_thick", r.h_g_um_thick),
                         ("measure.sigma_fit_um", m.sigma_fit_um), ("renderer.sigma_r0_um", r.sigma_r0_um),
