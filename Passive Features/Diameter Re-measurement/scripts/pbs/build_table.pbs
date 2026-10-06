@@ -1,0 +1,130 @@
+#!/bin/bash
+#PBS -S /bin/bash
+#PBS -N diam_table
+#PBS -q cpu
+#PBS -l select=1:ncpus=1:mem=4gb,walltime=12:00:00
+#PBS -J 0-99
+#PBS -k eo
+
+##########################################################################
+# Bias table b(d, phi | C) of the diameter pipeline -- one PBS array task
+# renders and measures a chunk of replicates (Block 6, specs/SPEC.md;
+# decision D-022: production table on davinci).
+#
+# Replicate n always draws from numpy.random.default_rng([seed, n]), so the
+# chunking does not change the table. Task i runs replicates
+# [i * CHUNK, min(N_TOTAL, (i + 1) * CHUNK)), CHUNK = ceil(N_TOTAL / N_TASKS),
+# and writes rows_<hash>_<start>_<stop>.csv into DIAM_OUT. When every task is
+# done, merge on the login node (about a minute):
+#
+#   cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/Diameter Re-measurement" && \
+#     python3 scripts/build_table.py merge --out-dir "$DIAM_OUT" [--config-json CFG]
+#
+# SUBMIT FROM THE WORKSTREAM DIRECTORY (the one holding scripts/build_table.py):
+#
+#   cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/Diameter Re-measurement"
+#   qsub -v DIAM_DRYRUN=1 scripts/pbs/build_table.pbs          # prints the commands only
+#   qsub -J 0-1 -v DIAM_N_TOTAL=2,DIAM_N_TASKS=2,RUN_TAG=probe scripts/pbs/build_table.pbs
+#   qsub -v RUN_TAG=v1 scripts/pbs/build_table.pbs             # 2000 replicates, 100 tasks
+#
+# Knobs (qsub -v NAME=value,...); every one has a default:
+#   DIAM_CODE         workstream directory   (default: where qsub was run)
+#   DIAM_ENV          conda env              (default: spine_env)
+#   DIAM_OUT          output directory       (default: <archive>/diameter_tables/<RUN_TAG>)
+#   DIAM_CONFIG_JSON  a full_signature() JSON (default: none = the default config)
+#   DIAM_N_TOTAL      replicates             (default: 2000 = PhantomConfig.n_replicates)
+#   DIAM_N_TASKS      array size; MUST match -J 0-(N_TASKS-1)   (default: 100)
+#   DIAM_SEED         master seed            (default: none = PhantomConfig.seed)
+#   RUN_TAG           letters, digits, _ . - (default: default)
+#   DIAM_DRYRUN       1 = print, do not run  (default: 0)
+# Reserved names: the login shell exports CODE and ENV_NAME, and PBS jobs
+# source .bashrc (paths reference, sections 8.2 and 8.4); a set CODE, ROOT or
+# ENV_NAME is reported and IGNORED.
+##########################################################################
+
+set -eo pipefail
+
+for _n in CODE ROOT ENV_NAME; do
+    eval "_v=\${$_n:-}"
+    if [ -n "$_v" ]; then
+        echo "NOTE: $_n is set ($_v) and is IGNORED; the knobs are DIAM_CODE, DIAM_ENV, DIAM_OUT."
+    fi
+done
+unset _n _v
+
+DIAM_CODE="${DIAM_CODE:-${PBS_O_WORKDIR:-$(pwd)}}"
+DIAM_ENV="${DIAM_ENV:-spine_env}"
+RUN_TAG="${RUN_TAG:-default}"
+DIAM_OUT="${DIAM_OUT:-/davinci-1/home/ldellamea/Human Neurons Fitting/diameter_tables/$RUN_TAG}"
+DIAM_CONFIG_JSON="${DIAM_CONFIG_JSON:-}"
+DIAM_N_TOTAL="${DIAM_N_TOTAL:-2000}"
+DIAM_N_TASKS="${DIAM_N_TASKS:-100}"
+DIAM_SEED="${DIAM_SEED:-}"
+DIAM_DRYRUN="${DIAM_DRYRUN:-0}"
+TASK="${PBS_ARRAY_INDEX:-0}"
+
+case "$RUN_TAG" in
+    ""|*[!A-Za-z0-9_.-]*) echo "[FATAL] RUN_TAG must be letters, digits, '_', '.', '-' (got '$RUN_TAG')" >&2; exit 4 ;;
+esac
+case "$DIAM_N_TOTAL$DIAM_N_TASKS$TASK" in
+    *[!0-9]*) echo "[FATAL] DIAM_N_TOTAL, DIAM_N_TASKS and PBS_ARRAY_INDEX must be integers" >&2; exit 4 ;;
+esac
+if [ ! -f "$DIAM_CODE/scripts/build_table.py" ]; then
+    echo "[FATAL] scripts/build_table.py not found under DIAM_CODE=$DIAM_CODE" >&2
+    echo "        Submit from the workstream directory:" >&2
+    echo "          cd \"/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/Diameter Re-measurement\"" >&2
+    echo "          qsub scripts/pbs/build_table.pbs   (or qsub -v DIAM_CODE=...)" >&2
+    exit 2
+fi
+if [ -n "$DIAM_CONFIG_JSON" ] && [ ! -f "$DIAM_CONFIG_JSON" ]; then
+    echo "[FATAL] DIAM_CONFIG_JSON set but missing: $DIAM_CONFIG_JSON" >&2
+    exit 3
+fi
+if [ "$TASK" -ge "$DIAM_N_TASKS" ]; then
+    echo "[FATAL] PBS_ARRAY_INDEX=$TASK but DIAM_N_TASKS=$DIAM_N_TASKS: -J and DIAM_N_TASKS disagree" >&2
+    exit 4
+fi
+CHUNK=$(( (DIAM_N_TOTAL + DIAM_N_TASKS - 1) / DIAM_N_TASKS ))
+START=$(( TASK * CHUNK ))
+STOP=$(( START + CHUNK ))
+if [ "$STOP" -gt "$DIAM_N_TOTAL" ]; then STOP="$DIAM_N_TOTAL"; fi
+
+ARGS=(scripts/build_table.py run --start "$START" --stop "$STOP" --out-dir "$DIAM_OUT")
+if [ -n "$DIAM_CONFIG_JSON" ]; then ARGS+=(--config-json "$DIAM_CONFIG_JSON"); fi
+if [ -n "$DIAM_SEED" ]; then ARGS+=(--seed "$DIAM_SEED"); fi
+
+echo "[diam-table] task $TASK of $DIAM_N_TASKS: replicates $START-$STOP of $DIAM_N_TOTAL"
+echo "[diam-table] code   $DIAM_CODE"
+echo "[diam-table] out    $DIAM_OUT"
+echo "[diam-table] env    $DIAM_ENV"
+echo "[diam-table] config ${DIAM_CONFIG_JSON:-<default>}"
+if [ "$START" -ge "$STOP" ]; then
+    echo "[diam-table] nothing to do for this task"
+    exit 0
+fi
+if [ "$DIAM_DRYRUN" = "1" ]; then
+    echo "[diam-table] DRYRUN: python3 ${ARGS[*]}"
+    exit 0
+fi
+
+# Environment. On davinci `conda activate spine_env` returns non-zero (a
+# binutils activate.d hook exits 1) while activating correctly, and foreign
+# deactivate.d hooks are not `set -u` clean (paths reference, section 9):
+# bracket the activation, then check the OUTCOME, not the exit status.
+set +eu
+eval "$(conda shell.bash hook 2>/dev/null)"
+conda activate "$DIAM_ENV" >/dev/null 2>&1
+set -eu
+PY="$(command -v python3 || true)"
+case "$PY" in
+    */envs/"$DIAM_ENV"/bin/python3) ;;
+    *) echo "[FATAL] conda env '$DIAM_ENV' not active: python3 resolves to '${PY:-nothing}'" >&2; exit 5 ;;
+esac
+echo "[diam-table] python $PY"
+"$PY" -c "import numpy, scipy, PIL, pandas; print('[diam-table] numpy', numpy.__version__, 'scipy', scipy.__version__, 'Pillow', PIL.__version__, 'pandas', pandas.__version__)"
+echo "[diam-table] commit $(git -C "$DIAM_CODE" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+
+mkdir -p "$DIAM_OUT"
+cd "$DIAM_CODE"
+"$PY" "${ARGS[@]}"
+echo "[diam-table] task $TASK done"
