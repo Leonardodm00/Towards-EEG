@@ -155,7 +155,7 @@ class RendererConfig:
     kernel_continuation_slope: float = 0.79  # source: D-024 / mathematics Eq. 17 (Debye cos^4 weighting); 1.21 = uniform disc, 0.72 = proportional
     sigma_r0_um: float = 0.080         # source: procedure s.3.4 (configured; never identified by the stacks)
     absorption: str = "partition_vertical"  # source: D-024 ("for now"); procedure Eqs. 5-6
-    h_g_um_thin: float = 0.1144 / 16.0  # source: impl-handoff Findings (grid convergence): p_x/16 for d <= 0.5 um
+    h_g_um_thin: float = 0.1144 / 8.0   # source: PROVISIONAL (Block 4, 2026-10-06): d_hat after pixel integration agrees to 1e-5 at p_x/8, /16, /32 (d 0.3-0.5 um, phi 5-20 deg) and to 0.7 % at d 0.3 um, phi 45 deg (b = 1.87, flagged); impl-handoff Findings proposed p_x/16 from fine-grid profiles [corrected 2026-10-06]
     h_g_um_thick: float = 0.1144 / 8.0  # source: impl-handoff Findings: p_x/8 above 0.5 um
     h_g_switch_d_um: float = 0.5       # source: impl-handoff Findings
     dzeta_um: float = 0.02             # source: procedure s.3.6 (<= 0.05 um); impl-handoff; convergence test
