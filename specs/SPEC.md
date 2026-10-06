@@ -376,17 +376,18 @@ degrees in config and CSV column names ending `_deg`.
 
 ### Block 7: inversion, flags, fill (procedure Eq. 1, s.3.9; mathematics Eqs. 20-21; D5)
 
-- Module: `src/allen_diameter/analysis/invert.py`, `analysis/fill.py`
-- Public API (planned): `invert(d_hat, phi, table, cfg) -> (d_tilde, b_hat_at_solution, flags)`; `correct_nodes(node_results, table, cfg) -> rows with d_tilde, flags`; `fill_and_smooth(rows, swc, cfg) -> d_final, filled_from`
-- Inputs: `NodeResult` rows; a `BiasTable`; the SWC (branch structure)
-- Outputs: the correction columns of Block 8
-- Parameters: `CorrectionConfig`
-- Library calls relied on: `scipy.optimize.brentq`, `scipy.ndimage.median_filter` per branch
-- Custom code: none beyond orchestration
-- Test oracles: on a synthetic table with $b(d) = 1 + c_0/d$ the root solution differs from the shortcut by $-\beta(b - 1)$ to first order (mathematics Eq. 21); non-monotone and out-of-domain cases flagged; fill rules on a hand-made branch; the mismatched-$\mathcal C$ refusal; **gate 2**: synthetic stacks from independent seeds recover $d$ within 10 % for $d \in \{0.5, 1, 2, 3\}$ um, $\varphi \le 20°$
+- Modules: `src/allen_diameter/analysis/invert.py`, `src/allen_diameter/analysis/fill.py`
+- Inversion (mathematics Eq. 20; procedure s.3.9): for a node with $\hat d_i$ and $\varphi_i$, $\tilde d_i$ solves $\hat m(d, \varphi_i \mid \mathcal C) = \hat d_i$ on $[d_{\min}, d_{\max}]$ (the table's `d_range`). $\hat m(\cdot, \varphi_i)$ is evaluated on `inversion_grid_points` log-spaced diameters; no sign change of $\hat m - \hat d_i$: flag `out_of_domain` (as procedure s.3.9 step 2: $\hat d_i \notin [\hat m(d_{\min}), \hat m(d_{\max})]$); more than one: flag `non_monotone`; exactly one: `scipy.optimize.brentq` in that grid bracket. $\varphi_i$ outside the table's tilt range: flag `phi_out_of_domain`. At the solution: `large_correction` when $|\hat b(\tilde d_i, \varphi_i) - 1| >$ `bias_flag_threshold` (D5), `high_failure` when the local failure rate $>$ `max_failure_rate`. A flagged inversion leaves $\tilde d_i$ = NaN. The table's axis is set by `table_phi_axis`: `"true"` (procedure Eq. 2: phantoms indexed by their true tilt, real nodes by the line-fit tilt) or `"measured"` (phantoms indexed by their line-fit tilt, mathematics s.3.7: the only way the table also corrects the tilt estimate's error)
+- `correct_nodes(results, table, cfg)`: refuses a table whose estimator signature differs from `cfg`'s (ValueError); a node outside $\mathcal S$ (Block 6 `reject_reasons`, the same rule as the phantoms) is not inverted and carries its reasons as flags
+- Fill (D5, `fill_policy`), along one unbranched stretch ordered proximal to distal: `"same_branch_then_allen"`: a node without $\tilde d$ takes the median of the nearest node with $\tilde d$ on each side (one or two values), else Allen's diameter $2r$; `"allen_only"`: Allen's diameter; `"none"`: NaN stays. Then a running median of `median_window_nodes` nodes (`scipy.ndimage.median_filter`, `mode="nearest"`) over the filled values gives $d_{{\rm final}, i}$; `filled_from` $\in$ {`self`, `neighbours`, `allen`, `none`}
+- Public API: `invert.invert_node(d_hat, phi, table, cfg) -> Inversion(d_tilde_um, d_root_um, b_hat, flags)` (`d_root_um`: the root even when flagged, for diagnostics; `d_tilde_um` is NaN when flagged); `invert.correct_nodes(results, table, cfg) -> list of Inversion`; `invert.shortcut(d_hat, phi, table) -> d_hat / b_hat(d_hat, phi)` (the handoff's form, for comparison only); `fill.fill_stretch(d_tilde, allen_diameter, cfg) -> (d_final, filled_from)`
+- Parameters: `CorrectionConfig` (`bias_flag_threshold`, `max_failure_rate`, `fill_policy`, `median_window_nodes`, `inversion_method`, `inversion_grid_points`, `table_phi_axis`)
+- Library calls relied on: `scipy.optimize.brentq`, `scipy.ndimage.median_filter`
+- Custom code: the root bracketing on the grid and the fill rule (orchestration)
+- Test oracles (`tests/smoke/test_smoke_invert.py`): on a table whose spline is fitted to an exact $b = 1 + c_0/d$ ($c_0$ = 0.1 um, no scatter), $\tilde d$ recovers $d$ to 1e-3, the shortcut's relative error equals its closed form $c_0^2/(d(d + 2c_0))$ to 1e-3 and Eq. 21 to first order (within $2(b^\star - 1)^2$; Eq. 21 is a first-order expansion); $\hat m(\tilde d) = \hat d$ to 1e-9 on a smooth table; a non-monotone table and a $\hat d$ outside the range are flagged; `large_correction` fires above 0.2; the mismatched-$\mathcal C$ refusal; fill rules on hand-made stretches (interior gap, end gap, whole stretch flagged, each policy) and the median filter's spike removal; **gate 2** (procedure s.3.10, end-to-end, reduced): a table of rendered phantoms on $d \in [0.4, 3.5]$ um, $\varphi \le 20°$, then independent-seed phantoms at $d \in \{0.5, 1, 2, 3\}$ um corrected within 10 % -- run by `scripts/end_to_end.py` (hours on 2 cores; recorded, not part of the smoke suite)
 - Data flow: consumes Blocks 5, 6; feeds Block 8
-- Confirmed: yes (D5 confirmed by D-024)
-- Status: drafted
+- Confirmed: yes (D5 confirmed by D-024; Eq. 20 rather than the shortcut, D5/D6); the grid bracketing, the neighbour-median fill and `table_phi_axis` are the assistant's, PROVISIONAL (2026-10-06)
+- Status: smoke-tested 2026-10-06 (5 pass, 2 skip); gate 2 not yet run
 
 ### Block 8: cell level -- SWC I/O, per-node CSV, membrane area (handoff step 7; D-013)
 
@@ -439,6 +440,7 @@ degrees in config and CSV column names ending `_deg`.
 | `cd tests/smoke && PYTHONPATH=../../src python robustness_registration.py` | Block 0 robustness | none | 2-3 min |
 | `python scripts/allen_radius_distribution.py --swc FILE` | Allen radius distribution (D-024) | any SWC file | 1 s |
 | `python tests/smoke/test_smoke_table.py` | Block 6 checks (renders 8 replicates) | none | 90 s |
+| `python tests/smoke/test_smoke_invert.py` | Block 7 checks | none | 30 s |
 | `python scripts/build_table.py run --start 0 --stop 40 --workers 2 --out-dir DIR [--config-json CFG]` then `merge --out-dir DIR` | (reduced) bias table | a config JSON with narrow ranges | 10-30 s per replicate and core |
 | planned: `scripts/end_to_end.py --generator ray_world` | gate 2 | small $d$ set | minutes |
 

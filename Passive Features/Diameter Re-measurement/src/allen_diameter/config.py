@@ -51,6 +51,7 @@ KERNEL_CONTINUATIONS = ("linear", "frozen", "proportional")    # D-024 / mathema
 RESPONSE_ESTIMATORS = ("tps_spline", "local_linear", "grid_mean")  # D-024
 PHANTOM_DESIGNS = ("random", "grid")                           # D-024
 END_CUTS = ("axial", "vertical")                               # Block 2 (provisional default, see RendererConfig.end_cut)
+TABLE_PHI_AXES = ("true", "measured")                          # Block 7 (procedure Eq. 2 / mathematics s.3.7)
 FIT_START_RULES = ("profile", "fixed")                         # Block 3 (provisional default, see MeasureConfig.fit_start_rule)
 RENDER_BACKENDS = ("fft", "direct")                            # Block 4: fft = impl-handoff FFT form; direct = reference
 TABLE_STATISTICS = ("mean", "median")                          # procedure s.3.8
@@ -137,6 +138,8 @@ class CorrectionConfig:
     bias_flag_threshold: float = 0.2         # source: D5, confirmed by D-024 (|b_hat - 1| > 0.2)
     max_failure_rate: float = 0.2            # source: impl-handoff, PROVISIONAL (local failure rate above which the region is flagged)
     inversion_method: str = "brentq"         # source: procedure s.3.9
+    inversion_grid_points: int = 256         # source: PROVISIONAL (Block 7): log-spaced diameters on which m_hat - d_hat is bracketed
+    table_phi_axis: str = "true"             # source: procedure Eq. 2 (true tilt); "measured" = index phantoms by their line-fit tilt (mathematics s.3.7), labelled comparison
     fill_policy: str = "same_branch_then_allen"  # source: D5 / handoff step 6, confirmed by D-024
     median_window_nodes: int = 3             # source: handoff Next actions 4 (spine median window)
 
@@ -238,6 +241,9 @@ class DiameterConfig:
         _check_in(c.response_estimator, RESPONSE_ESTIMATORS, "correction.response_estimator")
         _check_in(c.table_statistic, TABLE_STATISTICS, "correction.table_statistic")
         _check_in(c.fill_policy, FILL_POLICIES, "correction.fill_policy")
+        _check_in(c.table_phi_axis, TABLE_PHI_AXES, "correction.table_phi_axis")
+        if c.inversion_method != "brentq" or c.inversion_grid_points < 8 or c.median_window_nodes < 1:
+            raise ValueError("correction: inversion_method brentq, inversion_grid_points >= 8, median_window_nodes >= 1")
         _check_in(p.design, PHANTOM_DESIGNS, "phantom.design")
         _check_in(r.end_cut, END_CUTS, "renderer.end_cut")
         _check_in(r.backend, RENDER_BACKENDS, "renderer.backend")

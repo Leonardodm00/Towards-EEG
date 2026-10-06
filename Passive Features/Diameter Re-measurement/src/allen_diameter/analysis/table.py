@@ -121,15 +121,18 @@ class BiasTable:
 
 
 def fit_table(rows, cfg):
-    """BiasTable from replicate rows (dicts with d_um, phi_rad, ratio, in_S)."""
+    """BiasTable from replicate rows (dicts with d_um, phi_rad or meas_phi_rad -- by
+    correction.table_phi_axis -- ratio, in_S)."""
     c = cfg.correction
     if c.response_estimator != "tps_spline" or c.table_statistic != "mean":
         raise NotImplementedError("response_estimator %r / table_statistic %r: only tps_spline / mean in Block 6"
                                   % (c.response_estimator, c.table_statistic))
     d = np.array([float(r["d_um"]) for r in rows])
-    phi = np.array([float(r["phi_rad"]) for r in rows])
+    phi_key = {"true": "phi_rad", "measured": "meas_phi_rad"}[c.table_phi_axis]
+    phi = np.array([float(r[phi_key]) for r in rows])
     ratio = np.array([float(r["ratio"]) for r in rows])
-    ok = np.array([bool(r["in_S"]) for r in rows]) & np.isfinite(ratio)
+    ok = np.array([bool(r["in_S"]) for r in rows]) & np.isfinite(ratio) & np.isfinite(phi)
+    phi = np.where(np.isfinite(phi), phi, 0.0)       # rows without a measured tilt are outside S anyway
     X = table_inputs(d, phi)
     if c.spline_smoothing == "cv":
         lam, scores = choose_smoothing(X[ok], ratio[ok], c.spline_smoothing_grid, c.spline_cv_folds, cfg.phantom.seed)
