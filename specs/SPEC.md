@@ -124,9 +124,13 @@ $c$, and every $(x, y, z)$: $u = (x - c_x)\cos\theta + (y - c_y)\sin\theta$,
 $v = -(x - c_x)\sin\theta + (y - c_y)\cos\theta$, $w = z - c_z$ (S1);
 membership $v^2 + (w\cos\varphi - u\sin\varphi)^2 \le r^2$ (S2). The
 vertical line through $(x, y)$ is inside the tube iff $|v| \le r$ (and
-$|u| \le U$ for a tube cut at `U_um`) and
+inside the end cut at half-length $U$ = `U_um`: $|u| \le U$ for
+`end_cut = "vertical"`, the axial arc length $|u\cos\varphi + w\sin\varphi| \le U$
+for `"axial"`; Block 2) and
 $z \in [z_{\rm lo}, z_{\rm hi}]$, $z_{\rm lo/hi} = c_z + u\tan\varphi \mp \ell(v)/2$,
-$\ell(v) = 2\sqrt{r^2 - v^2}/\cos\varphi$ (S3). Slab $j$ spans
+$\ell(v) = 2\sqrt{r^2 - v^2}/\cos\varphi$ (S3). These are the round-section
+forms ($k$ = `cross_section_aspect` = 1); Block 2 states the squashed-section
+generalisation $k \ne 1$. Slab $j$ spans
 $[\zeta_j - \delta\zeta/2, \zeta_j + \delta\zeta/2]$; its absorbance along the
 vertical ray and the light reaching it (slabs numbered in the light's
 direction, `light_direction`):
@@ -252,7 +256,7 @@ degrees in config and CSV column names ending `_deg`.
 - Public API: `default_config() -> DiameterConfig`; `DiameterConfig.validate() -> None` (raises ValueError); `estimator_signature() -> dict`; `full_signature() -> dict`; `signature_hash(which) -> str` (16 hex); `to_json() -> str`; `config_from_dict(d) -> DiameterConfig`; `with_sigma_fit(cfg, sigma) -> DiameterConfig`
 - Inputs: none (defaults) or a signature dict
 - Outputs: frozen dataclasses `AcquisitionConfig`, `MeasureConfig`, `CorrectionConfig`, `RendererConfig`, `PhantomConfig`, `CalibrationConfig` inside `DiameterConfig`; canonical ASCII JSON
-- Parameters: every pipeline parameter, with its `# source:` tag (D-021); the choice tuples `MU_MODES`, `BBAR_REGIONS`, `FOCUS_BG_RULES`, `ABSORPTIONS`, `KERNEL_FAMILIES`, `KERNEL_CONTINUATIONS`, `RESPONSE_ESTIMATORS`, `PHANTOM_DESIGNS`, `TABLE_STATISTICS`, `FILL_POLICIES`, first entry = deliverable default
+- Parameters: every pipeline parameter, with its `# source:` tag (D-021); the choice tuples `MU_MODES`, `BBAR_REGIONS`, `FOCUS_BG_RULES`, `ABSORPTIONS`, `KERNEL_FAMILIES`, `KERNEL_CONTINUATIONS`, `RESPONSE_ESTIMATORS`, `PHANTOM_DESIGNS`, `TABLE_STATISTICS`, `FILL_POLICIES`, `END_CUTS`, first entry = deliverable default
 - Library calls relied on: dataclasses, json, hashlib
 - Custom code: none
 - Test oracles (`tests/smoke/test_smoke_config.py`): the defaults equal the decided values (D-018, D-019, D-023, D-024, D5, D7; exact equality); every field line of the source carries `# source:` (parsed from the file; count = number of fields); `sigma_fit_study_um` is not in the estimator signature and `sigma_fit_um` is; a renderer change leaves the estimator hash unchanged, a `sigma_fit` change changes it; JSON round trip is identity; frozen; ASCII; `validate()` refuses the illegal values listed in the test; `with_sigma_fit` refuses a value outside the study set
@@ -260,19 +264,22 @@ degrees in config and CSV column names ending `_deg`.
 - Confirmed: yes 2026-10-06 (values from the D-021 batch, D-022 to D-024; provisional ones tagged PROVISIONAL)
 - Status: smoke-tested 2026-10-06 (6 pass, 1 skip)
 
-### Block 2: geometry (S1)-(S5)
+### Block 2: geometry (S1)-(S6)
 
 - Module: `src/allen_diameter/model/geometry.py`
-- Public API (planned): `local_uv(x, y, c, theta) -> (u, v)`; `ray_interval(x, y, c, r, phi, theta, U=None) -> (z_lo, z_hi, inside)`; `inside_tube(p, c, r, t_hat) -> bool array`; `slab_absorbance(z_lo, z_hi, inside, zeta, dzeta, mu) -> a_j`; `light_reaching(z_lo, z_hi, inside, zeta, dzeta, mu, light_direction) -> T_<j`; `depth_reach(c, r, phi, U, z_k) -> float` (S5)
-- Inputs: arrays of positions (um), tube parameters (um, rad, 1/um)
-- Outputs: float64 arrays of the input shape; absorbances dimensionless
-- Parameters: `RendererConfig.U_um`, `dzeta_um`, `AcquisitionConfig.light_direction`
+- Public API: `Tube(c, r, phi, theta, aspect=1.0, half_length=None, end_cut="axial")` (frozen; properties `d`, `phi0`, `e_u`, `e_v`, `t_hat`, `t_hat0`, `half_chord_factor`); `axis_direction(phi, theta) -> (3,)`; `to_local(x, y, z, tube) -> (u, v, w)`; `inside_tube(x, y, z, tube) -> bool array`; `column_interval(x, y, tube) -> (z_lo, z_hi, inside)`; `depth_extent(tube) -> (z_min, z_max)`; `lateral_half_extent(tube) -> (along e_u, along e_v)`; `slab_centres(z_min, z_max, dzeta) -> zeta (J,)`; `slab_absorbance(z_lo, z_hi, zeta, dzeta, mu) -> a_j`; `transmitted_before(z_lo, z_hi, zeta, dzeta, mu, light_direction) -> T_<j`; `line_interval(P, s, tube) -> (t1, t2, hit)`
+- Inputs: positions in um (x, y specimen-referred; z stage units), broadcasting arrays; `r` um > 0; `phi` rad in [0, pi/2) (observed tilt); `theta` rad; `aspect` k > 0; `half_length` U um > 0 or None; `mu` 1/um >= 0; `light_direction` +1 (light toward +z) or -1
+- Outputs: float64 arrays of the broadcast input shape (absorbances dimensionless, lengths um); `z_lo = z_hi = c_z` and `inside = False` where a vertical line misses (never NaN); `line_interval` returns line parameters, arc length = (t2 - t1)|s|
+- Generalisations of impl-handoff (S1)-(S6), both reducing to the handoff at k = 1:
+  - squashed cross-section: the phantom is a round tube of radius r in unsquashed space mapped by S = diag(1, 1, k) about c (mounting shrinkage along global z, procedure s.3.5); unsquashed tilt phi0 = arctan(tan(phi)/k); the vertical-line half-chord is h(v) = sqrt(r^2 - v^2) sqrt(k^2 + tan^2 phi); the width along e_v stays d for every phi and k (handoff Eq. 7);
+  - end cut `RendererConfig.end_cut`: `"vertical"` keeps |u| <= U (impl-handoff (S5)); `"axial"` keeps |s0| <= U with s0 = u cos(phi0) + (w/k) sin(phi0) the unsquashed arc length along the axis, so the depth span stays bounded for every phi < 90 deg. Depth extent: vertical c_z -+ (U tan phi + r sqrt(k^2 + tan^2 phi)); axial c_z -+ k (U sin phi0 + r cos phi0).
+- Parameters: `RendererConfig.U_um`, `end_cut` (default `"axial"`, PROVISIONAL, to be confirmed), `cross_section_aspect`, `dzeta_um`; `AcquisitionConfig.light_direction`
 - Library calls relied on: numpy
-- Custom code: the closed forms (S1)-(S5) (no library); reference = brute-force membership sampling
-- Test oracles: membership (S3) vs (S2) on random tubes, 0 mismatches; slab chords vs brute force z-sampling, |error| <= the sampling step; $\sum_j a_j = \mu\ell(v)$ to 1e-12; $T_{<j}$ vs cumulative product of $e^{-a_{j'}}$ to 1e-12 for both light directions; (S5) bounds every slab centre to within $\delta\zeta/2$
-- Data flow: feeds Block 4 and Block 9
-- Confirmed: yes (equations from impl-handoff (S1)-(S5), themselves checked by `checks/stack_geometry_check.py`)
-- Status: drafted
+- Custom code: all (the closed forms of the spec; no library computes tube chords)
+- Test oracles (`tests/smoke/test_smoke_geometry.py`): width along e_v = d to 1e-12 for random phi <= 85 deg, k in [0.4, 1.6], all cuts; handoff Eq. 8 oblique cut to 1e-10 relative and its 1.265 d example; vertical line through c = 2 r sqrt(k^2 + tan^2 phi) (or the cap-limited length) to 1e-10; a line along the axis with axial caps has length 2U/|S^-1 t_hat| to 1e-9; column intervals vs an independent (S2) membership and vs handoff Eq. 6: 0 mismatches away from 1e-9 of the ends; slab chords vs 20001-sample brute force to 2 sampling steps; line chords vs 2e-4 um sampling to 4 steps; identical to `checks/stack_geometry_check.py` (`ray_interval`, `inside_3d`) to 1e-12 at k = 1; sum_j a_j = mu (z_hi - z_lo) to 1e-12; T_<j = cumulative product of exp(-a) for both light directions to 1e-12; sum_j T_<j (1 - e^{-a_j}) = 1 - e^{-sum a_j} (C1) to 1e-12; the depth extent bounds every column and is attained at its extreme point (to 1e-9 (1 + tan phi)); rotation by pi with theta -> theta + pi is a symmetry (S3); tangent and on-surface lines miss; invalid tubes raise ValueError
+- Data flow: feeds Block 4 (renderer) and Block 9 (ray world)
+- Confirmed: yes (S1)-(S6) as written in the impl-handoff; the squash and the axial cut are the assistant's generalisations, the axial default PROVISIONAL (2026-10-06)
+- Status: smoke-tested 2026-10-06 (5 pass, 2 skip)
 
 ### Block 3: forward model and fitter (handoff Eqs. 10-11; D-018.2; D-019.1)
 

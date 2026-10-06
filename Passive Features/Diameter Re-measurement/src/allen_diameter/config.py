@@ -50,6 +50,7 @@ KERNEL_FAMILIES = ("gaussian_table", "empirical")              # procedure s.3.4
 KERNEL_CONTINUATIONS = ("linear", "frozen", "proportional")    # D-024 / mathematics Eq. 17
 RESPONSE_ESTIMATORS = ("tps_spline", "local_linear", "grid_mean")  # D-024
 PHANTOM_DESIGNS = ("random", "grid")                           # D-024
+END_CUTS = ("axial", "vertical")                               # Block 2 (provisional default, see RendererConfig.end_cut)
 TABLE_STATISTICS = ("mean", "median")                          # procedure s.3.8
 FILL_POLICIES = ("same_branch_then_allen", "allen_only", "none")  # D5 / handoff step 6
 
@@ -102,7 +103,8 @@ class MeasureConfig:
     fit_mu_bounds_per_um: Tuple[float, float] = (0.0, 20.0)  # source: impl-handoff, PROVISIONAL
     fit_v0_bounds_um: Tuple[float, float] = (-1.0, 1.0)    # source: impl-handoff, PROVISIONAL
     fit_multistart_factors: Tuple[float, ...] = (0.7, 1.0, 1.4)  # source: impl-handoff, PROVISIONAL (d0 x factors)
-    fit_oversample: int = 16          # source: PROVISIONAL (model evaluated on a grid profile_step/oversample before the blur)
+    fit_quad_min_nodes: int = 64      # source: PROVISIONAL; Gauss-Legendre nodes of the model quadrature (Block 3), at least this many
+    fit_quad_nodes_per_sigma: float = 6.0  # source: PROVISIONAL; and at least this many per sigma_fit across the largest diameter allowed (accuracy asserted in the Block 3 smoke test)
     # -- selection S and flags (procedure s.3.2; D-024)
     alpha_dark_flag: float = 1.0      # source: D-024 (impl-handoff Findings (4)); threshold to be set on real alpha_hat
     steep_tan_diagnostic: float = 0.58  # source: handoff, old tool STEEP_TAN; DIAGNOSTIC COLUMN ONLY, never a selection rule (D-024)
@@ -143,8 +145,9 @@ class RendererConfig:
     h_g_um_thick: float = 0.1144 / 8.0  # source: impl-handoff Findings: p_x/8 above 0.5 um
     h_g_switch_d_um: float = 0.5       # source: impl-handoff Findings
     dzeta_um: float = 0.02             # source: procedure s.3.6 (<= 0.05 um); impl-handoff; convergence test
-    U_um: float = 10.0                 # source: D-024 ("up to 10 half length is ok"); cut at |u| <= U, never by the block
-    cross_section_aspect: float = 1.0  # source: procedure s.3.5 (round); squashed as a check
+    U_um: float = 10.0                 # source: D-024 ("up to 10 half length is ok"); the tube is cut by end_cut, never by the block
+    end_cut: str = "axial"             # source: PROVISIONAL (D-024 'half length'): "axial" = caps perpendicular to the axis at |s| <= U_um (bounded depth span for every phi < 90 deg); "vertical" = |u| <= U_um (impl-handoff (S5), its Findings; depth span 2 U tan(phi) diverges as phi -> 90 deg)
+    cross_section_aspect: float = 1.0  # source: procedure s.3.5 (round); a value k != 1 squashes a round tube along global z by k (mounting shrinkage); checked at bracketing k
     pad_um: float = 2.0                # source: PROVISIONAL: padding of the fine grid beyond the block, >= 3 sigma_r of the farthest slab
     backend: str = "fft"               # source: PROVISIONAL: "fft" (impl-handoff FFT form) or "direct" (reference, slow)
     # -- camera chain (procedure s.3.6 step 6)
@@ -221,6 +224,11 @@ class DiameterConfig:
         _check_in(c.table_statistic, TABLE_STATISTICS, "correction.table_statistic")
         _check_in(c.fill_policy, FILL_POLICIES, "correction.fill_policy")
         _check_in(p.design, PHANTOM_DESIGNS, "phantom.design")
+        _check_in(r.end_cut, END_CUTS, "renderer.end_cut")
+        if not (r.cross_section_aspect > 0):
+            raise ValueError("renderer.cross_section_aspect must be > 0")
+        if m.fit_quad_min_nodes < 8 or not (m.fit_quad_nodes_per_sigma > 0):
+            raise ValueError("measure.fit_quad_* out of range")
         if m.fit_params != ("d", "mu", "v0"):
             raise ValueError("measure.fit_params must be ('d', 'mu', 'v0'): B is fixed (D-018) "
                              "and the darkness parameter is mu (D-019); got %r" % (m.fit_params,))
