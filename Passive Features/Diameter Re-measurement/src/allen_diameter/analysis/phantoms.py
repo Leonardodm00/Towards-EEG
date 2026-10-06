@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import math
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 
 import numpy as np
 
@@ -88,18 +88,23 @@ def phantom_branch(draw, cfg, rng):
 
 
 def reject_reasons(result):
-    """The criteria of the selection S a NodeResult fails (empty: retained)."""
+    """The criteria of the selection S a NodeResult fails (empty: retained). A
+    registration verdict other than ON fails S (real nodes; phantoms have none)."""
     out = [] if result.fit_status == "converged" else ["status:" + result.fit_status]
+    if result.reg_verdict and result.reg_verdict != "ON":
+        out.append("registration:" + result.reg_verdict)
     return out + [f for f in SELECTION_FLAGS if f in result.flags]
 
 
-def run_replicate(cfg, seed, index, backend=None):
+def run_replicate(cfg, seed, index, backend=None, d_override_um=None):
     """Render and measure replicate index; returns a flat dict (one CSV row): the
     draw (true d, phi, theta, mu, node centre), the chain's outputs (meas_* for
     the measured centre and angles), flags, in_S, reject, ratio = d_hat / d and
     the wall time. The table is indexed by the TRUE (d, phi) (procedure Eq. 2)."""
     t0 = time.perf_counter()
     draw, rng = draw_replicate(cfg, seed, index)
+    if d_override_um is not None:      # end-to-end checks at fixed diameters (scripts/end_to_end.py)
+        draw = replace(draw, d_um=float(d_override_um))
     tube = phantom_tube(draw, cfg)
     branch = phantom_branch(draw, cfg, rng)
     pad_px = int(math.ceil(cfg.renderer.pad_um / cfg.acquisition.res0_um))

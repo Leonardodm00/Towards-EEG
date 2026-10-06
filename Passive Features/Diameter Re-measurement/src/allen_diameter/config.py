@@ -168,6 +168,7 @@ class RendererConfig:
     direct_truncate: float = 8.0       # source: PROVISIONAL (Block 4): truncate of scipy.ndimage.gaussian_filter in the reference backend (tail mass < 1e-15)
     fft_split_sigma_um: float = 0.5    # source: PROVISIONAL (Block 4): (slab, plane) pairs with a wider kernel go to the far-field path (coarse output grid, exact object); 0.5 was faster than 1.0 on a steep and a flat case
     far_grid_per_sigma: float = 8.0    # source: PROVISIONAL (Block 4): far-field output spacing <= smallest far sigma / this (cubic interpolation error ~ (1/8)^4 / 384)
+    max_fft_accumulator_mb: float = 256.0  # source: PROVISIONAL (Block 4): spectral accumulators per plane chunk; a 2-worker run was OOM-killed at 3.5 GB per worker without it
     # -- camera chain (procedure s.3.6 step 6)
     background_B_gl: float = 210.0     # source: PROVISIONAL (blur_chain_check.py illustrative); NEEDS REAL DATA
     black_level_gl: float = 0.0        # source: NOT VERIFIED (Allen camera chain unknown)
@@ -251,7 +252,8 @@ class DiameterConfig:
             raise ValueError("renderer.sigma_r0_um must equal kernel_table_sigma_um[0] (one number, two names)")
         if any(not (s > 0) for s in r.kernel_table_sigma_um) or not (r.kernel_continuation_slope >= 0):
             raise ValueError("renderer kernel table: sigma must be > 0 and the continuation slope >= 0")
-        if not (r.fft_wrap_sigmas > 0 and r.direct_truncate > 0 and r.fft_split_sigma_um > 0 and r.far_grid_per_sigma >= 2):
+        if not (r.fft_wrap_sigmas > 0 and r.direct_truncate > 0 and r.fft_split_sigma_um > 0 and r.far_grid_per_sigma >= 2
+                and r.max_fft_accumulator_mb > 0):
             raise ValueError("renderer.fft_wrap_sigmas, direct_truncate, fft_split_sigma_um must be > 0 and far_grid_per_sigma >= 2")
         for name, h in (("renderer.h_g_um_thin", r.h_g_um_thin), ("renderer.h_g_um_thick", r.h_g_um_thick)):
             f = self.acquisition.res0_um / h if h > 0 else 0.0

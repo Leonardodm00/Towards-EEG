@@ -20,9 +20,11 @@ Backends:
             per slab, the Gaussian transfer function per pair, one irfft2 per
             plane, zero padding of at least fft_wrap_sigmas * sigma / h
             samples (a source's periodic images stay that far from every
-            output sample). Wider pairs (far defocus, steep or long tubes):
-            the sampled object summed against the continuous Gaussian on a
-            coarse output grid (spacing <= smallest far sigma /
+            output sample); planes are processed in depth-ordered chunks
+            whose accumulators fit max_fft_accumulator_mb. Wider pairs (far
+            defocus, steep or long tubes): the sampled object summed against
+            the continuous Gaussian on coarse output grids, one per octave of
+            sigma above the split (spacing <= the octave's smallest sigma /
             far_grid_per_sigma), then bicubic-spline interpolated to the
             fine grid. Without the split the padding would grow with the
             widest kernel (several um for steep tubes).
@@ -82,15 +84,15 @@ class FineGrid:
 
 @dataclass(frozen=True)
 class RenderResult:
-    tau: np.ndarray                 # (n_planes, ny, nx) transmittance I_k / B on the grid
+    tau: np.ndarray                 # (n_planes, ...) transmittance I_k / B per plane: (ny, nx) on the grid, or reduced
     zeta: np.ndarray                # (J,) slab centres, um
-    n_slabs_used: int               # slabs with some absorbed light on the grid
+    n_slabs_used: int               # slabs with some absorbed light on the grid (distinct)
     sigma_max_um: float             # largest kernel width used (0 when nothing was drawn)
     fft_shape: Optional[Tuple[int, int]]  # padded FFT shape of the near-field path, else None
     backend: str
     n_near_pairs: int               # (slab, plane) pairs through the FFT (all of them for "direct")
     n_far_pairs: int                # (slab, plane) pairs through the far-field path
-    far_shape: Optional[Tuple[int, int]]  # coarse output grid of the far-field path, else None
+    far_shape: Optional[Tuple[int, int]]  # largest coarse output grid of the far-field path, else None
 
 
 def block_fine_grid(left, top, width, height, p_x, factor, pad_px=0):
@@ -142,10 +144,12 @@ def _check_absorption(absorption):
         raise ValueError("unknown absorption %r" % (absorption,))
 
 
-def _slabs(z_lo, z_hi, inside, zeta, dzeta, mu, light_direction, absorption):
+def _slabs(z_lo, z_hi, inside, zeta, dzeta, mu, light_direction, absorption, subset=None):
     """Yield (j, row slice, column slice, Delta A_j on that box) for every slab
-    with absorbed light on the grid."""
-    for j, zj in enumerate(zeta):
+    (of subset, when given) with absorbed light on the grid."""
+    for j in (range(len(zeta)) if subset is None else subset):
+        j = int(j)
+        zj = zeta[j]
         hit = inside & (z_lo < zj + 0.5 * dzeta) & (z_hi > zj - 0.5 * dzeta)
         if not hit.any():
             continue
@@ -173,16 +177,19 @@ def absorbed_fractions(tube, mu, grid, zeta, dzeta, light_direction=+1, absorpti
     return out
 
 
-def render_transmittance(tube, mu, z_planes, grid, rcfg, light_direction=+1, backend=None):
-    """tau_k = I_k / B on the grid for every plane depth in z_planes (procedure Eq. 6).
+def render_transmittance(tube, mu, z_planes, grid, rcfg, light_direction=+1, backend=None, reduce=None):
+    """tau_k = I_k / B for every plane depth in z_planes (procedure Eq. 6).
 
     tube: geometry.Tube; mu (1/um) >= 0; z_planes: depths (um, stage units);
     grid: FineGrid; rcfg: RendererConfig (kernel, absorption, dzeta_um,
     fft_wrap_sigmas, fft_split_sigma_um, far_grid_per_sigma,
-    direct_truncate); light_direction +1 or -1; backend "fft" or "direct"
-    (default rcfg.backend). The grid must resolve the narrowest kernel,
-    h <= sigma_min / 2 (spectral truncation below exp(-(pi^2/2) 4) = 3e-9);
-    ValueError otherwise.
+    max_fft_accumulator_mb, direct_truncate); light_direction +1 or -1;
+    backend "fft" or "direct" (default rcfg.backend); reduce: an optional
+    function applied to each finished plane (ny, nx) -- e.g. crop and
+    pixel-integrate -- so that only reduced planes are kept (memory).
+    RenderResult.tau stacks the (reduced) planes in the order of z_planes.
+    The grid must resolve the narrowest kernel, h <= sigma_min / 2 (spectral
+    truncation below exp(-(pi^2/2) 4) = 3e-9); ValueError otherwise.
     """
     backend = rcfg.backend if backend is None else backend
     if backend not in BACKENDS:
@@ -196,78 +203,101 @@ def render_transmittance(tube, mu, z_planes, grid, rcfg, light_direction=+1, bac
     z_planes = np.atleast_1d(np.asarray(z_planes, dtype=float))
     if z_planes.ndim != 1 or not np.all(np.isfinite(z_planes)):
         raise ValueError("z_planes must be a 1-D array of finite depths")
+    reduce = (lambda plane: plane) if reduce is None else reduce
     n_planes, ny, nx, h = z_planes.size, grid.ny, grid.nx, grid.h
     dzeta = float(rcfg.dzeta_um)
 
     X, Y = grid.mesh()
     z_lo, z_hi, inside = geometry.column_interval(X, Y, tube)
+    del X, Y
     if mu == 0 or not inside.any():
-        return RenderResult(np.ones((n_planes, ny, nx)), np.empty(0), 0, 0.0, None, backend, 0, 0, None)
+        one = reduce(np.ones((ny, nx)))
+        return RenderResult(np.stack([one] * n_planes), np.empty(0), 0, 0.0, None, backend, 0, 0, None)
     zeta = geometry.slab_centres(float(z_lo[inside].min()), float(z_hi[inside].max()), dzeta)
     sig = sigma_r(zeta[:, None] - z_planes[None, :], rcfg)          # (J, n_planes), um
     sigma_max = float(sig.max())
     if float(sig.min()) < 2.0 * h:
         raise ValueError("grid step h = %g um does not resolve the narrowest kernel (sigma = %g um): need h <= sigma / 2"
                          % (h, float(sig.min())))
+    args = (z_lo, z_hi, inside, zeta, dzeta, mu, light_direction, rcfg.absorption)
     work = np.zeros((ny, nx))
-    used = 0
+    used = set()
+    out = [None] * n_planes
 
-    if backend == "fft":
-        near = sig <= rcfg.fft_split_sigma_um               # (J, n_planes): FFT path
-        far = ~near                                         # coarse-output path
-        tau = np.ones((n_planes, ny, nx))
-        shape = far_shape = None
-        if near.any():
-            pad = int(math.ceil(rcfg.fft_wrap_sigmas * float(sig[near].max()) / h))
-            shape = (sfft.next_fast_len(ny + pad, real=True), sfft.next_fast_len(nx + pad, real=True))
-            fy2 = 2.0 * math.pi ** 2 * sfft.fftfreq(shape[0], d=h) ** 2
-            fx2 = 2.0 * math.pi ** 2 * sfft.rfftfreq(shape[1], d=h) ** 2
-            acc = np.zeros((n_planes, shape[0], shape[1] // 2 + 1), dtype=complex)
-        if far.any():
-            if nx < 4 or ny < 4:
-                raise ValueError("the far-field path needs a grid of at least 4 x 4 samples")
-            spacing = float(sig[far].min()) / rcfg.far_grid_per_sigma
+    if backend == "direct":
+        for k in range(n_planes):
+            total = np.zeros((ny, nx))
+            for j, rs, cs, dA in _slabs(*args):
+                used.add(j)
+                work[rs, cs] = dA
+                total += ndimage.gaussian_filter(work, sig[j, k] / h, mode="constant", cval=0.0,
+                                                 truncate=rcfg.direct_truncate)
+                work[rs, cs] = 0.0
+            out[k] = reduce(1.0 - total)
+        return RenderResult(np.stack(out), zeta, len(used), sigma_max, None, backend, int(sig.size), 0, None)
+
+    near = sig <= rcfg.fft_split_sigma_um               # (J, n_planes): FFT path
+    far = ~near                                         # coarse-output path
+    xs, ys = grid.xs, grid.ys
+    far_shape = None
+    levels = {}
+    if far.any():
+        # Custom: separable sum of the sampled object against the continuous Gaussian on coarse
+        # output grids (the result is smooth at scale sigma), one grid per octave of sigma above
+        # the split (spacing <= the octave's smallest sigma / far_grid_per_sigma), one pass.
+        if nx < 4 or ny < 4:
+            raise ValueError("the far-field path needs a grid of at least 4 x 4 samples")
+        octave = np.where(far, np.floor(np.log2(np.maximum(sig, 1e-300) / rcfg.fft_split_sigma_um)), -1).astype(int)
+        for L in np.unique(octave[far]):
+            spacing = rcfg.fft_split_sigma_um * 2.0 ** int(L) / rcfg.far_grid_per_sigma
             xc = np.linspace(grid.x0, grid.x0 + (nx - 1) * h, max(4, int(math.ceil((nx - 1) * h / spacing)) + 1))
             yc = np.linspace(grid.y0, grid.y0 + (ny - 1) * h, max(4, int(math.ceil((ny - 1) * h / spacing)) + 1))
-            far_shape = (yc.size, xc.size)
-            far_acc = np.zeros((n_planes,) + far_shape)
-        xs, ys = grid.xs, grid.ys
-        for j, rs, cs, dA in _slabs(z_lo, z_hi, inside, zeta, dzeta, mu, light_direction, rcfg.absorption):
-            used += 1
-            near_k, far_k = np.flatnonzero(near[j]), np.flatnonzero(far[j])
-            if near_k.size:
+            levels[int(L)] = (xc, yc, np.zeros((n_planes, yc.size, xc.size)))
+        far_shape = max((v[1].size, v[0].size) for v in levels.values())
+        for j, rs, cs, dA in _slabs(*args, subset=np.flatnonzero(far.any(axis=1))):
+            used.add(j)
+            for k in np.flatnonzero(far[j]):
+                xc, yc, acc_L = levels[int(octave[j, k])]
+                sk = sig[j, k]
+                gy = (h / (sk * _SQRT_2PI)) * np.exp(-0.5 * ((yc[:, None] - ys[rs][None, :]) / sk) ** 2)
+                gx = (h / (sk * _SQRT_2PI)) * np.exp(-0.5 * ((xc[:, None] - xs[cs][None, :]) / sk) ** 2)
+                acc_L[k] += gy @ dA @ gx.T
+
+    def finish(k, tau_k):
+        for L, (xc, yc, acc_L) in levels.items():
+            if np.any(octave[:, k] == L):
+                tau_k -= RectBivariateSpline(yc, xc, acc_L[k], kx=3, ky=3, s=0)(ys, xs)
+        out[k] = reduce(tau_k)
+
+    shape = None
+    if not near.any():
+        for k in range(n_planes):
+            finish(k, np.ones((ny, nx)))
+    else:
+        pad = int(math.ceil(rcfg.fft_wrap_sigmas * float(sig[near].max()) / h))
+        shape = (sfft.next_fast_len(ny + pad, real=True), sfft.next_fast_len(nx + pad, real=True))
+        fy2 = 2.0 * math.pi ** 2 * sfft.fftfreq(shape[0], d=h) ** 2
+        fx2 = 2.0 * math.pi ** 2 * sfft.rfftfreq(shape[1], d=h) ** 2
+        spec_mb = shape[0] * (shape[1] // 2 + 1) * 16 / 2.0 ** 20
+        per_chunk = max(1, int(rcfg.max_fft_accumulator_mb // spec_mb))
+        order = np.argsort(z_planes, kind="stable")     # depth order: a slab is near few, adjacent planes
+        for c0 in range(0, n_planes, per_chunk):
+            ks = order[c0:c0 + per_chunk]
+            acc = np.zeros((ks.size, shape[0], shape[1] // 2 + 1), dtype=complex)
+            for j, rs, cs, dA in _slabs(*args, subset=np.flatnonzero(near[:, ks].any(axis=1))):
+                used.add(j)
                 work[rs, cs] = dA
                 spec = sfft.rfft2(work, s=shape)
                 work[rs, cs] = 0.0
-                for k in near_k:
-                    s2 = sig[j, k] ** 2
-                    acc[k] += (spec * np.exp(-s2 * fy2)[:, None]) * np.exp(-s2 * fx2)[None, :]
-            if far_k.size:
-                # Custom: separable sum of the sampled object against the continuous Gaussian,
-                # evaluated on a coarse output grid (the result is smooth at scale sigma).
-                dy = yc[:, None] - ys[rs][None, :]
-                dx = xc[:, None] - xs[cs][None, :]
-                for k in far_k:
-                    sk = sig[j, k]
-                    gy = (h / (sk * _SQRT_2PI)) * np.exp(-0.5 * (dy / sk) ** 2)
-                    gx = (h / (sk * _SQRT_2PI)) * np.exp(-0.5 * (dx / sk) ** 2)
-                    far_acc[k] += gy @ dA @ gx.T
-        for k in range(n_planes):
-            if shape is not None:
-                tau[k] -= sfft.irfft2(acc[k], s=shape)[:ny, :nx]
-            if far_shape is not None and far[:, k].any():
-                tau[k] -= RectBivariateSpline(yc, xc, far_acc[k], kx=3, ky=3, s=0)(ys, xs)
-        return RenderResult(tau, zeta, used, sigma_max, shape, backend, int(near.sum()), int(far.sum()), far_shape)
-
-    total = np.zeros((n_planes, ny, nx))
-    for j, rs, cs, dA in _slabs(z_lo, z_hi, inside, zeta, dzeta, mu, light_direction, rcfg.absorption):
-        used += 1
-        work[rs, cs] = dA
-        for k in range(n_planes):
-            total[k] += ndimage.gaussian_filter(work, sig[j, k] / h, mode="constant", cval=0.0,
-                                                truncate=rcfg.direct_truncate)
-        work[rs, cs] = 0.0
-    return RenderResult(1.0 - total, zeta, used, sigma_max, None, backend, int(sig.size), 0, None)
+                for ci, k in enumerate(ks):
+                    if near[j, k]:
+                        s2 = sig[j, k] ** 2
+                        acc[ci] += (spec * np.exp(-s2 * fy2)[:, None]) * np.exp(-s2 * fx2)[None, :]
+            for ci, k in enumerate(ks):
+                finish(k, 1.0 - sfft.irfft2(acc[ci], s=shape)[:ny, :nx])
+            del acc
+    return RenderResult(np.stack(out), zeta, len(used), sigma_max, shape, backend, int(near.sum()), int(far.sum()),
+                        far_shape)
 
 
 def pixel_integrate(fine, factor):
@@ -295,7 +325,7 @@ def synthetic_block(tube, mu, ks, left, top, width, height, cfg, rng, pad_px, qt
     ks = np.asarray(ks, dtype=int).reshape(-1)
     f = fine_factor(tube.d, rcfg, acq.res0_um)
     grid, inner = block_fine_grid(left, top, width, height, acq.res0_um, f, pad_px)
-    res = render_transmittance(tube, mu, ks * acq.dz_um, grid, rcfg, acq.light_direction, backend)
-    tau_px = pixel_integrate(res.tau[:, inner[0], inner[1]], f)
-    block = camera.camera_chain(tau_px, rcfg, rng, qtables)
+    res = render_transmittance(tube, mu, ks * acq.dz_um, grid, rcfg, acq.light_direction, backend,
+                               reduce=lambda plane: pixel_integrate(plane[inner[0], inner[1]], f))
+    block = camera.camera_chain(res.tau, rcfg, rng, qtables)
     return block, ks, np.ones(ks.size, dtype=bool), CropFrame(int(left), int(top), 0, float(acq.res0_um))
