@@ -51,6 +51,7 @@ KERNEL_CONTINUATIONS = ("linear", "frozen", "proportional")    # D-024 / mathema
 RESPONSE_ESTIMATORS = ("tps_spline", "local_linear", "grid_mean")  # D-024
 PHANTOM_DESIGNS = ("random", "grid")                           # D-024
 END_CUTS = ("axial", "vertical")                               # Block 2 (provisional default, see RendererConfig.end_cut)
+FIT_START_RULES = ("profile", "fixed")                         # Block 3 (provisional default, see MeasureConfig.fit_start_rule)
 TABLE_STATISTICS = ("mean", "median")                          # procedure s.3.8
 FILL_POLICIES = ("same_branch_then_allen", "allen_only", "none")  # D5 / handoff step 6
 
@@ -103,8 +104,13 @@ class MeasureConfig:
     fit_mu_bounds_per_um: Tuple[float, float] = (0.0, 20.0)  # source: impl-handoff, PROVISIONAL
     fit_v0_bounds_um: Tuple[float, float] = (-1.0, 1.0)    # source: impl-handoff, PROVISIONAL
     fit_multistart_factors: Tuple[float, ...] = (0.7, 1.0, 1.4)  # source: impl-handoff, PROVISIONAL (d0 x factors)
+    fit_start_rule: str = "profile"   # source: PROVISIONAL (Block 3): d0 = half-depth width of the dip with the blur FWHM removed in quadrature; "fixed" = fit_d0_um
+    fit_d0_um: float = 1.0            # source: PROVISIONAL: d0 of the "fixed" rule, and the fallback of "profile" when the half-depth width is undefined
+    fit_tol: float = 1e-10            # source: PROVISIONAL: ftol = xtol = gtol of scipy.optimize.least_squares (noise-free recovery 1e-13 observed)
+    fit_max_nfev: int = 300           # source: scipy default for method trf (100 x 3 parameters)
+    fit_at_bound_rel_tol: float = 1e-6  # source: PROVISIONAL: a parameter within this fraction of its bound range of a bound is reported at_bound
     fit_quad_min_nodes: int = 64      # source: PROVISIONAL; Gauss-Legendre nodes of the model quadrature (Block 3), at least this many
-    fit_quad_nodes_per_sigma: float = 6.0  # source: PROVISIONAL; and at least this many per sigma_fit across the largest diameter allowed (accuracy asserted in the Block 3 smoke test)
+    fit_quad_nodes_per_sigma: float = 6.0  # source: PROVISIONAL; and N >= this x d_hi / sigma_fit (error < 1e-13 B at 3.4 per sigma, Block 3 smoke test)
     # -- selection S and flags (procedure s.3.2; D-024)
     alpha_dark_flag: float = 1.0      # source: D-024 (impl-handoff Findings (4)); threshold to be set on real alpha_hat
     steep_tan_diagnostic: float = 0.58  # source: handoff, old tool STEEP_TAN; DIAGNOSTIC COLUMN ONLY, never a selection rule (D-024)
@@ -229,6 +235,15 @@ class DiameterConfig:
             raise ValueError("renderer.cross_section_aspect must be > 0")
         if m.fit_quad_min_nodes < 8 or not (m.fit_quad_nodes_per_sigma > 0):
             raise ValueError("measure.fit_quad_* out of range")
+        _check_in(m.fit_start_rule, FIT_START_RULES, "measure.fit_start_rule")
+        if not (m.fit_d_bounds_um[0] <= m.fit_d0_um <= m.fit_d_bounds_um[1]):
+            raise ValueError("measure.fit_d0_um must lie within fit_d_bounds_um")
+        if not (0 < m.fit_tol < 1e-3) or m.fit_max_nfev < 1 or not (0 < m.fit_at_bound_rel_tol < 0.5):
+            raise ValueError("measure.fit_tol / fit_max_nfev / fit_at_bound_rel_tol out of range")
+        if len(m.fit_multistart_factors) < 1 or any(not (f > 0) for f in m.fit_multistart_factors):
+            raise ValueError("measure.fit_multistart_factors must be positive and non-empty")
+        if m.fit_d_bounds_um[0] <= 0 or m.fit_mu_bounds_per_um[0] < 0:
+            raise ValueError("measure fit bounds: d must be > 0 and mu >= 0")
         if m.fit_params != ("d", "mu", "v0"):
             raise ValueError("measure.fit_params must be ('d', 'mu', 'v0'): B is fixed (D-018) "
                              "and the darkness parameter is mu (D-019); got %r" % (m.fit_params,))
