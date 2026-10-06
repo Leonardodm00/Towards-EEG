@@ -24,6 +24,7 @@ import numpy as np
 
 from ..model import geometry, render
 from .node_pipeline import Branch, measure_node
+from .registration import registration_category
 
 SELECTION_FLAGS = ("faint", "crossing", "stack_edge", "dark", "bbar_few", "profile_nan")
 
@@ -89,10 +90,13 @@ def phantom_branch(draw, cfg, rng):
 
 def reject_reasons(result):
     """The criteria of the selection S a NodeResult fails (empty: retained). A
-    registration verdict other than ON fails S (real nodes; phantoms have none)."""
+    registration category other than ON fails S (real nodes; phantoms have no
+    verdict); the category is read from the registration_check sentence by
+    registration.registration_category."""
     out = [] if result.fit_status == "converged" else ["status:" + result.fit_status]
-    if result.reg_verdict and result.reg_verdict != "ON":
-        out.append("registration:" + result.reg_verdict)
+    cat = registration_category(result.reg_verdict)
+    if cat and cat != "ON":
+        out.append("registration:" + cat)
     return out + [f for f in SELECTION_FLAGS if f in result.flags]
 
 
