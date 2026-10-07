@@ -11,8 +11,10 @@ positions in the node's window) on the nodes within (R + 1) L/2 of node i;
 pass p redraws from the line through the pass p-1 centres on the nodes within
 (R + 1 - p) L/2; node i's final direction is the line through the pass-R
 centres in its window. Each pass at node j: focus scores over the node's
-planes (Eq. 1), k* and sub-plane depth (Eq. 2), B_bar in k* (D-018.1), the
-Eq. 9 profile through the node fitted (Block 3), centre c_j (Eq. 3).
+planes (the configured rule, D-030, and the dip depth of handoff Eq. 1 beside
+it as a diagnostic), k* and sub-plane depth (Eq. 2) from the configured rule,
+B_bar in k* (D-018.1), the Eq. 9 profile through the node fitted (Block 3),
+centre c_j (Eq. 3).
 
 Pure ASCII, for the cluster (hpc-python-compat).
 """
@@ -68,7 +70,9 @@ class _Pass:
     bbar_ok: bool = False
     centre: Optional[np.ndarray] = None
     fit: Optional[FitResult] = None
-    F: np.ndarray = field(default_factory=lambda: np.empty(0))
+    kk: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=int))   # the node's planes
+    F: np.ndarray = field(default_factory=lambda: np.empty(0))   # configured focus rule (D-030)
+    D: np.ndarray = field(default_factory=lambda: np.empty(0))   # dip depth (handoff Eq. 1), diagnostic
 
 
 @dataclass(frozen=True)
@@ -100,7 +104,11 @@ class NodeResult:
     fit_status: str
     flags: Tuple[str, ...]
     fit: Optional[FitResult]
-    focus_F: np.ndarray
+    focus_rule: str                  # measure.focus_rule of the run (D-030)
+    focus_planes: np.ndarray         # plane indices of the final pass's focus curves
+    focus_score: np.ndarray          # the configured rule's score on those planes (k* is its argmax)
+    focus_depth: np.ndarray          # the dip depth (handoff Eq. 1) on the same planes, diagnostic
+    k_star_depth: int                # argmax plane of focus_depth (-1 when none), diagnostic
 
 
 def _raw_direction(branch, j, L):
@@ -149,14 +157,17 @@ def _node_pass(blk, branch, j, t, m, dz):
     k_lo, k_hi = _plane_range(branch.xyz_um[j, 2], phi, m, dz)
     k_lo, k_hi = max(k_lo, int(ks[0])), min(k_hi, int(ks[-1]))
     kk = np.arange(k_lo, k_hi + 1)          # empty when the node's planes miss the block
-    F = np.full(kk.size, np.nan)
+    F = np.full(kk.size, np.nan)            # the configured rule (D-030)
+    D = np.full(kk.size, np.nan)            # the dip depth of handoff Eq. 1, diagnostic
+    radius = float(branch.radius_um[j])
     for n, k in enumerate(kk):
         idx = int(k - ks[0])
         if valid[idx]:
             B_ovr = _bbar(block[idx], frame, o, branch, m)[0] if m.focus_bg_rule == "same_as_bbar" else None
             I = profiles.sample_profile(block[idx], frame, o, y_hat, e_u, v)
-            F[n] = focus.focus_score(I, v, m, B_ovr)[0]
-    out.F = F
+            scores = focus.plane_scores(I, v, m, B_ovr, radius)
+            F[n], D[n] = scores[m.focus_rule], scores["dip_depth"]
+    out.kk, out.F, out.D = kk, F, D
     n_star, z_sub, _plateau, at_edge = focus.best_plane(F, kk * dz, m, dz)
     if n_star is None:
         out.centre = np.array([o[0], o[1], branch.xyz_um[j, 2]])
@@ -258,6 +269,7 @@ def measure_node(branch, i, provider, cfg, reg=None):
     nan = float("nan")
     reg = reg or {}
     xyz = branch.xyz_um[i]
+    k_depth = int(last.kk[int(np.nanargmax(last.D))]) if np.any(np.isfinite(last.D)) else -1
     return NodeResult(
         node_id=int(branch.ids[i]), type=int(branch.types[i]), x_um=float(xyz[0]), y_um=float(xyz[1]),
         z_um=float(xyz[2]), path_um=float(branch.s_um[i]), reg_verdict=str(reg.get("verdict") or ""),
@@ -268,4 +280,5 @@ def measure_node(branch, i, provider, cfg, reg=None):
         B_bar=float(last.B_bar), B_bar_region=str(m.bbar_region),
         d_hat_um=nan if fit is None else fit.d_hat_um, mu_hat_per_um=nan if fit is None else fit.mu_hat_per_um,
         v0_hat_um=nan if fit is None else fit.v0_hat_um, alpha_hat=nan if fit is None else fit.alpha_hat,
-        fit_status="none" if fit is None else fit.status, flags=tuple(flags), fit=fit, focus_F=last.F)
+        fit_status="none" if fit is None else fit.status, flags=tuple(flags), fit=fit, focus_rule=str(m.focus_rule),
+        focus_planes=np.asarray(last.kk, dtype=int), focus_score=last.F, focus_depth=last.D, k_star_depth=k_depth)

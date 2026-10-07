@@ -96,12 +96,12 @@ ALIGN = ["--shift-x", SHIFT_X, "--shift-y", SHIFT_Y, "--z0", Z0] + ([] if FLIP_H
 # ====================================================================================================
 # ===== CELL 2
 # ====================================================================================================
-# CELL 2: SMOKE TESTS ON THIS RUNTIME (ABOUT 30 S)
-# Expect `-- ... 0 fail, 0 error, 0 todo ...` five times. `test_smoke_camera_tables` checks that Allen's JPEG
+# CELL 2: SMOKE TESTS ON THIS RUNTIME (ABOUT 1 MIN)
+# Expect `-- ... 0 fail, 0 error, 0 todo ...` six times. `test_smoke_camera_tables` checks that Allen's JPEG
 # tables reach the renderer and that this Pillow orders them as the tables in the configuration (8.3 or
-# newer).
+# newer). `test_smoke_focus` checks the focus rule of D-030 on closed forms and on rendered planes.
 for t in ("test_smoke_config", "test_smoke_geometry", "test_smoke_fit", "test_smoke_camera_tables",
-          "test_smoke_stretches"):
+          "test_smoke_stretches", "test_smoke_focus"):
     run("tests/smoke/%s.py" % t)
 
 # ====================================================================================================
@@ -179,25 +179,46 @@ run("scripts/run_node.py", "--specimen", SPECIMEN, "--nodes", 4505, "--cache-dir
 # Feeds the phantom mu range (`suggested_phantom_mu_range_per_um`, the 10th-90th percentile of mu over the
 # nodes in S, procedure s.3.10), the dark-flag threshold (alpha percentiles, `dark_share_of_converged`) and
 # the number of calibration nodes (Cell 7).
+#
+# Since D-030 (2026-10-07) the sharpest plane k* is the plane of maximum gradient energy of the profile,
+# G = B^-2 * integral over |v| <= r + 0.5 um of (dI~/dv)^2 dv; the dip depth, the old rule, is computed on the
+# same planes and recorded as `k_star_depth`. Each figure draws both curves against the plane index, with k*
+# (red), the dip depth's choice (grey) and the SWC's own plane (dotted). Cell 4c lists the nodes where the two
+# rules differ and shows their figures first; put node ids in `SHOW_NODES` to see others first.
 run("scripts/run_node.py", "--specimen", SPECIMEN, "--nodes", NODES, "--cache-dir", CACHE_DIR,
     "--out-dir", OUT + "/pilot", "--registration-json", REG_JSON, "--figures", "--background", *ALIGN)
 
 # ====================================================================================================
 # ===== CELL 4c
 # ====================================================================================================
-# Cell 4c: what the pilot says, and the first node figures (focus curve; profile with the fitted model)
-import glob, json
+# CELL 4C: WHAT THE PILOT SAYS, AND THE NODE FIGURES
+# Expect the summary fields, among them `focus_rule gradient_energy`, `k_star_vs_dip_depth {...}` and
+# `estimator_hash 6f0397236447fe6f` (the default configuration since D-030), then `N nodes where the
+# gradient energy (k_star) and the dip depth (k_star_depth) pick different planes`, their table, and the
+# figures.
+# Cell 4c: what the pilot says, and the node figures (focus curves; profile with the fitted model)
+# Re-run Cell 4b after pulling: a pilot written before D-030 has no k_star_depth column.
+import glob, json, os
+import pandas as pd
 from IPython.display import Image, display
 with open("%s/pilot/pilot_summary_%d.json" % (OUT, SPECIMEN)) as f:
     PILOT = json.load(f)
 for k in ("n_nodes", "n_in_S", "reject_counts", "suggested_phantom_mu_range_per_um", "dark_share_of_converged",
-          "n_calibration_nodes", "background"):
+          "n_calibration_nodes", "background", "focus_rule", "k_star_vs_dip_depth", "estimator_hash"):
     print("%-36s %s" % (k, PILOT.get(k)))
 for k in ("d_hat_um", "mu_hat_per_um", "alpha_hat", "d_hat_over_allen_d", "phi_deg"):
     print("%-20s %s" % (k, {q: round(v, 3) for q, v in PILOT.get(k, {}).items()}))
-figs = sorted(glob.glob(OUT + "/pilot/figures/node_*.png"))
-print(len(figs), "node figures; the first 6:")
-for p in figs[:6]:
+rows = pd.read_csv("%s/pilot/pilot_%d.csv" % (OUT, SPECIMEN))
+moved = rows[rows["z_sub_um"].notna() & (rows["k_star"] != rows["k_star_depth"])]
+print(len(moved), "nodes where the gradient energy (k_star) and the dip depth (k_star_depth) pick different planes")
+display(moved[["node_id", "k_star", "k_star_depth", "z_um", "d_hat_um", "allen_radius_um", "in_S", "flags"]].head(30))
+SHOW_NODES = []          # node ids whose figures come first, e.g. [8441]
+ids = list(SHOW_NODES) + [int(n) for n in moved["node_id"] if int(n) not in SHOW_NODES]
+figs = [p for p in (OUT + "/pilot/figures/node_%d.png" % n for n in ids) if os.path.exists(p)][:12]
+figs += [p for p in sorted(glob.glob(OUT + "/pilot/figures/node_*.png")) if p not in figs][:max(0, 6 - len(figs))]
+print(len(figs), "node figures:")
+for p in figs:
+    print(os.path.basename(p))
     display(Image(filename=p))
 
 # ====================================================================================================
@@ -398,7 +419,8 @@ for s in (0.080, 0.125):
 # ====================================================================================================
 # WHAT TO SEND BACK
 # - Cell 3b: the per-node verdict lines and `registration_summary_529878215.json`.
-# - Cell 4b/4c: `pilot_summary_529878215.json`, the minutes per stretch, and two or three node figures.
+# - Cell 4b/4c: `pilot_summary_529878215.json` (with `k_star_vs_dip_depth`), the minutes per stretch, the
+# table of nodes where the two focus rules differ, and two or three node figures (node 8441's among them).
 # - Cell 5: the `"renderer"` block without the tables, `table_sets`, `pillow_version`, `notes`.
 # - Cell 6: the `pooled dendrite diameter` line.
 # - Cell 7: the growth-fit report.

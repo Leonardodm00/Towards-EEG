@@ -45,6 +45,8 @@ from typing import Any, Dict, Tuple
 MU_MODES = ("per_node", "shared_branch", "shared_cell")        # D-023 / D-019 (a)
 BBAR_REGIONS = ("block_masked", "block", "plane_downsampled")  # D-023 / D-018 (a)
 FOCUS_BG_RULES = ("profile_ends_median", "same_as_bbar")       # D-023 / D-018 (c)
+FOCUS_RULES = ("gradient_energy", "dip_depth")                 # D-030: gradient energy; dip depth = handoff Eq. 1, comparison
+FOCUS_GRAD_WINDOWS = ("radius_margin", "whole_profile")        # D-030 (provisional default, see MeasureConfig.focus_grad_window)
 ABSORPTIONS = ("partition_vertical", "linear", "ray_world")    # D-024 / procedure s.3.6
 KERNEL_FAMILIES = ("gaussian_table", "empirical")              # procedure s.3.4
 KERNEL_CONTINUATIONS = ("linear", "frozen", "proportional")    # D-024 / mathematics Eq. 17
@@ -85,7 +87,10 @@ class MeasureConfig:
     block_half_um: float = 5.0        # source: handoff step 1 (~10 x 10 um block)
     planes_half: int = 3              # source: handoff step 1 (+-3 planes around the node)
     planes_widen_for_tilt: bool = True  # source: impl-handoff, PROVISIONAL (widen by ceil((L/2) sin(phi) / dz) for steep pieces)
-    # -- focus score, handoff Eq. 1-2
+    # -- focus score, D-030 (handoff Eq. 1 = the "dip_depth" comparison) and handoff Eq. 2
+    focus_rule: str = "gradient_energy"  # source: D-030 (user, 2026-10-07): gradient energy of the profile replaces the dip depth of handoff Eq. 1
+    focus_grad_window: str = "radius_margin"  # source: PROVISIONAL (D-030, assistant): integrate over |v| <= node radius + focus_grad_margin_um; "whole_profile" = every sample
+    focus_grad_margin_um: float = 0.5  # source: PROVISIONAL (D-030): margin beyond the node radius (Allen's on real nodes, the true one on phantoms)
     focus_smooth_px: float = 1.0      # source: handoff Eq. 1 (Gaussian weights, s ~ 1 px)
     focus_bg_rule: str = "profile_ends_median"  # source: D-023 (closes D-018 (c))
     focus_bg_ends_um: float = 1.5     # source: handoff Eq. 1 (|v| > 1.5 um)
@@ -252,6 +257,11 @@ class DiameterConfig:
         _check_in(m.mu_mode, MU_MODES, "measure.mu_mode")
         _check_in(m.bbar_region, BBAR_REGIONS, "measure.bbar_region")
         _check_in(m.focus_bg_rule, FOCUS_BG_RULES, "measure.focus_bg_rule")
+        _check_in(m.focus_rule, FOCUS_RULES, "measure.focus_rule")
+        _check_in(m.focus_grad_window, FOCUS_GRAD_WINDOWS, "measure.focus_grad_window")
+        if not (m.focus_grad_margin_um >= m.profile_step_um):
+            raise ValueError("measure.focus_grad_margin_um must be >= profile_step_um, so that the window holds "
+                             "at least three samples")
         _check_in(r.absorption, ABSORPTIONS, "renderer.absorption")
         _check_in(r.kernel_family, KERNEL_FAMILIES, "renderer.kernel_family")
         _check_in(r.kernel_continuation, KERNEL_CONTINUATIONS, "renderer.kernel_continuation")

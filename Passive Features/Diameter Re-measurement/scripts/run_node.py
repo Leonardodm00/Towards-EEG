@@ -15,7 +15,10 @@ Measures every node of the dendrite stretches that hold the given node ids
                                     they suggest (10th-90th percentile of mu_hat,
                                     procedure s.3.10); the dark-flag share; the
                                     number of calibration nodes
-    figures/node_<id>.png           with --figures: focus score and fitted profile
+    figures/node_<id>.png           with --figures: the focus curves (the
+                                    configured rule and the dip depth, D-030)
+                                    with k*, the dip depth's choice and the
+                                    SWC's plane; the fitted profile
 
 Example (Colab, after the bootstrap cell)
     python scripts/run_node.py --specimen 529878215 --nodes 4505,4506 --cache-dir /content/drive/MyDrive/allen_cache \
@@ -68,7 +71,7 @@ def run(swc, provider, cfg, out_dir, specimen, transform=None, regs=None, only=N
             if not math.isfinite(res.z_sub_um):
                 continue
             v, I, model = survey.profile_at_node(provider, res, cfg)
-            fig = fg.node_figure(res, v, I, model)
+            fig = fg.node_figure(res, v, I, model, k_swc=int(round(res.z_um / cfg.acquisition.dz_um)))
             fig.savefig(os.path.join(out_dir, "figures", "node_%d.png" % res.node_id), dpi=110)
             plt.close(fig)
     return rows, summary

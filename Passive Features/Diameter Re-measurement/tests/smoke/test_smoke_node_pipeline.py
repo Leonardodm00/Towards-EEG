@@ -10,12 +10,19 @@ Checks
                         phantoms, phi = 0, sigma_fit^2 = sigma_r(0)^2 + p_x^2/4
                         give d_hat / d within 2 % of 1
     test_reference      sample_profile vs allen_image_measure.line_profile at
-                        the same points; focus_score vs the formula written out
+                        the same points; dip_depth vs the formula written out
+                        (the scores themselves: test_smoke_focus.py)
     test_convergence    skipped: Block 5 has no discretisation parameter
     test_invariants     D6 guard (pixel/plane units change the tilt); rendered
                         phantoms with the default kernel: theta within 2 deg,
-                        phi within 4 deg, d_hat / d in a plausible band
-    test_contract       NodeResult carries the Block 8 columns with their types
+                        phi within 4 deg, d_hat / d in a plausible band; the
+                        configured focus rule sets k* (D-030): on a dark tube
+                        whose dip depth is pulled one plane toward the light,
+                        k* is the tube's plane under gradient_energy and the
+                        shifted plane under dip_depth, and k_star_depth is the
+                        shifted plane under both
+    test_contract       NodeResult carries the Block 8 columns with their types,
+                        and the focus curves on the node's planes
     test_determinism    one seed, one result
     test_edge_cases     empty tissue -> faint; a second tube -> crossing; planes
                         missing below the node -> stack_edge; a near-vertical
@@ -186,7 +193,7 @@ def test_reference():
     assert np.max(np.abs(mine - theirs)) <= 1e-4, np.max(np.abs(mine - theirs))   # they interpolate in float32
     m = default_config().measure
     I = 200.0 - 80.0 * np.exp(-0.5 * (v / 0.3) ** 2) + rng.normal(0, 2.0, v.size)
-    F, I_min, B = FO.focus_score(I, v, m)
+    F, I_min, B = FO.dip_depth(I, v, m)
     w = np.exp(-0.5 * (np.arange(-4, 5) / m.focus_smooth_px) ** 2)
     smooth = np.convolve(np.pad(I, 4, mode="edge"), w / w.sum(), mode="valid")
     B_want = float(np.median(I[np.abs(v) > m.focus_bg_ends_um]))
@@ -214,6 +221,26 @@ def test_invariants():
         # (handoff Eq. 2 note); phi = arcsin|t_z| is folded at 0, so a flat tube reads slightly tilted
         assert abs(dth) <= 2.0 and abs(math.degrees(res.phi_rad) - phi_deg) <= 4.0, (d, phi_deg, dth, math.degrees(res.phi_rad))
         assert 0.95 <= res.d_hat_um / d <= 1.25 and res.fit_status == "converged", (d, phi_deg, res.d_hat_um, res.flags)
+    # D-030: the configured rule sets k*; the dip depth is recorded beside it. A dark flat tube (d 1.5 um,
+    # mu 1/um, centre in plane 0) pulls the dip depth one plane toward the light (test_smoke_focus.py)
+    c = (0.03, -0.02, 0.05)
+    tube = G.Tube(c, 0.75, 0.0, 0.5, 1.0, 6.0, "axial")
+    cache = {}
+    base = make_provider([tube], [1.0], cfg, 1)
+
+    def provider(*args):
+        if args not in cache:
+            cache[args] = base(*args)
+        return cache[args]
+    br = phantom_branch(c, 0.0, 0.5, 0.75)
+    ge = NP.measure_node(br, 4, provider, cfg)
+    dd = NP.measure_node(br, 4, provider, dataclasses.replace(cfg, measure=dataclasses.replace(cfg.measure, focus_rule="dip_depth")))
+    assert ge.focus_rule == "gradient_energy" and dd.focus_rule == "dip_depth"
+    assert ge.k_star == 0 and ge.k_star_depth == -1 and dd.k_star == -1 and dd.k_star_depth == -1, \
+        (ge.k_star, ge.k_star_depth, dd.k_star, dd.k_star_depth)
+    # each curve is the one its name says: the maxima of the recorded curves are those planes
+    peak = lambda curve: int(ge.focus_planes[int(np.nanargmax(curve))])  # noqa: E731
+    assert peak(ge.focus_score) == 0 and peak(ge.focus_depth) == -1, (ge.focus_score, ge.focus_depth)
 
 
 def test_contract():
@@ -228,7 +255,12 @@ def test_contract():
         assert isinstance(getattr(res, name), float), name
     assert isinstance(res.k_star, int) and isinstance(res.flags, tuple) and all(isinstance(f, str) for f in res.flags)
     assert isinstance(res.steep, bool) and isinstance(res.vertical, bool) and res.B_bar_region == "block_masked"
-    assert res.fit is not None and res.focus_F.ndim == 1 and math.isnan(res.s_star_um) and res.reg_verdict == ""
+    assert res.fit is not None and math.isnan(res.s_star_um) and res.reg_verdict == ""
+    n = res.focus_planes.size
+    assert res.focus_rule == "gradient_energy" and n >= 7 and res.focus_planes.dtype.kind == "i"
+    assert res.focus_score.shape == (n,) and res.focus_depth.shape == (n,) and isinstance(res.k_star_depth, int)
+    assert res.k_star == int(res.focus_planes[int(np.nanargmax(res.focus_score))])
+    assert res.k_star_depth == int(res.focus_planes[int(np.nanargmax(res.focus_depth))])
 
 
 def test_determinism():
@@ -252,7 +284,7 @@ def test_edge_cases():
     tube = G.Tube((0.0, 0.0, 0.05), 0.4, 0.0, th, 1.0, 6.0, "axial")
     br = phantom_branch((0.0, 0.0, 0.05), 0.0, th, 0.4)
     res = NP.measure_node(br, 4, make_provider([tube], [1.0], cfg, 1, invalid_below=0), cfg)
-    assert "stack_edge" in res.flags, (res.flags, res.focus_F)
+    assert "stack_edge" in res.flags, (res.flags, res.focus_score)
     res = NP.measure_node(br, 4, make_provider([tube], [1.0], cfg, 1, invalid_below=99), cfg)
     assert res.k_star == -1 and res.fit_status == "none"
     # a near-vertical tube

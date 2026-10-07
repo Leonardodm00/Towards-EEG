@@ -12,7 +12,7 @@ measurement pipeline is coded yet.** The image-access code (`allen_image_io.py`,
 (`MyDrive/Colab Notebooks/Allen Slices/Codes`) and is not in this folder yet.
 
 **Status (2026-10-06, implementation chat):** coding started on branch
-`sci/diameter-pipeline` (decisions D-021 to D-024). Done: Block 0 (the six
+`sci/diameter-pipeline` (decisions D-021 to D-024; the focus rule since 2026-10-07: D-030). Done: Block 0 (the six
 2026-09-23 image modules imported byte-identical into `src/` and `tests/smoke/`,
 suites 20/20 and 40/40 re-run), Block 1 (`src/allen_diameter/config.py`, every
 parameter with its source), the SWC loader/writer of Block 8
@@ -160,6 +160,7 @@ implementation handoff). Step 1 is Phase II of that plan.
 
 | Date | Change |
 |---|---|
+| 2026-10-07 (later) | The focus rule is the gradient energy of the profile (D-030): `src/allen_diameter/analysis/focus.py`, new suite `tests/smoke/test_smoke_focus.py`; the dip depth of the design handoff's Eq. 1 stays as the labelled comparison `dip_depth`. Runbook v3 and notebook Cells 2, 4b, 4c updated. Spec: `specs/SPEC.md` sections 2.2, 4, 8 and Blocks 1, 5, 11. |
 | 2026-10-07 | Listed the Phase II runbook (v2) and the new `notebooks/phase2_colab.ipynb`; pointed next step 1 at its Cells 3a-3b. Added `notebooks/phase2_colab.py`, the same cells as plain Python. |
 | 2026-10-06 (later) | Implementation started (branch `sci/diameter-pipeline`): `src/`, `scripts/`, `tests/smoke/` added; root `specs/SPEC.md`; the 2026-09-23 modules imported byte-identical. Decisions D-022 to D-024 in the project log. |
 | 2026-10-06 | Added the implementation handoff (D-021) to the contents and status. Corrected the Drive statement: only the 2026-09-22 module versions are there (Drive listing, 2026-10-06). Noted which decision-log copy is live (project_read of both copies, 2026-10-06). Added four check scripts with reference outputs (`*.out`, re-run 2026-10-06, identical to the original runs). Marked next steps 2-3 as handled by D-021. |

@@ -74,7 +74,8 @@ def exact_table(b_fn, n=600, seed=SEED, fail_fn=None, cfg=None):
 def node(d_hat, phi, status="converged", flags=()):
     nan = float("nan")
     return NodeResult(0, 3, 0.0, 0.0, 0.0, 0.0, "", nan, nan, 0, 0.0, 0.0, 0.0, 0.0, 0.0, phi, False, False, 200.0,
-                      "block_masked", d_hat, 1.0, 0.0, 1.0, status, tuple(flags), None, np.empty(0))
+                      "block_masked", d_hat, 1.0, 0.0, 1.0, status, tuple(flags),
+                      None, "gradient_energy", np.empty(0, dtype=int), np.empty(0), np.empty(0), -1)
 
 
 # ---------------------------------------------------------------- checks ---

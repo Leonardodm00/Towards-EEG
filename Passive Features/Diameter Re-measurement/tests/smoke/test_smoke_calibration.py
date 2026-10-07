@@ -95,7 +95,8 @@ def fake_node(cx, cy, z_ax, theta, d, mu, z_sub=None):
     """A NodeResult carrying the true line of a phantom (the scan needs centre, heading, k*, z_sub)."""
     z_sub = z_ax if z_sub is None else z_sub
     return NodeResult(0, 3, cx, cy, z_ax, 0.0, "", NAN, NAN, 0, z_sub, cx, cy, z_ax, theta, 0.0, False, False,
-                      NAN, "block_masked", d, mu, 0.0, mu * d, "converged", (), None, np.empty(0))
+                      NAN, "block_masked", d, mu, 0.0, mu * d, "converged", (),
+                      None, "gradient_energy", np.empty(0, dtype=int), np.empty(0), np.empty(0), -1)
 
 
 def scan_phantom(cfg, d, mu, theta, cx, cy, z_ax, rng):

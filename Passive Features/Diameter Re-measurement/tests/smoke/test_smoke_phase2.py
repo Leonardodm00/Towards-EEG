@@ -20,6 +20,7 @@ Checks
     test_convergence    skipped: no discretisation parameter
     test_invariants     skipped: wiring of tested blocks
     test_contract       run_node.run on the synthetic cell: the CSV and summary
+                        (with the focus rule and k_star_vs_dip_depth, D-030)
                         files, every node measured, the background median
                         within 4 grey levels of background_B_gl and its clipped
                         SD within 15 % of a flat field's post-chain SD; a
@@ -111,7 +112,8 @@ def test_known_answer():
 
     def node(verdict):
         return NodeResult(1, 3, 0.0, 0.0, 0.0, 0.0, verdict, nan, nan, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, False, False,
-                          200.0, "block_masked", 1.0, 0.5, 0.0, 0.5, "converged", (), None, np.empty(0))
+                          200.0, "block_masked", 1.0, 0.5, 0.0, 0.5, "converged", (),
+                          None, "gradient_energy", np.empty(0, dtype=int), np.empty(0), np.empty(0), -1)
     assert reject_reasons(node("ON THE PROCESS (lateral offset +0.12 um)")) == []
     assert reject_reasons(node("")) == []
     assert reject_reasons(node("ALONGSIDE: a ridge +1.20 um to the side -- snap needed before measuring")) == \
@@ -168,6 +170,12 @@ def test_contract():
         with open(os.path.join(out, "pilot_summary_999.json")) as f:
             js = json.load(f)
         assert js["estimator_hash"] == cfg.signature_hash("estimator") and "suggested_phantom_mu_range_per_um" in js
+        # D-030: every row carries the focus rule and the dip depth's plane; the summary counts where they differ
+        assert all(r["focus_rule"] == cfg.measure.focus_rule and isinstance(r["k_star_depth"], int) for r in back)
+        found = [r for r in rows if math.isfinite(r["z_sub_um"])]
+        agree = js["k_star_vs_dip_depth"]
+        assert js["focus_rule"] == "gradient_energy" and agree["n_nodes"] == len(found), agree
+        assert agree["n_differ"] == sum(1 for r in found if r["k_star"] != r["k_star_depth"]), agree
         bg = summ["background"]
         assert abs(bg["B_bar_gl"]["p50"] - cfg.renderer.background_B_gl) <= 4.0, bg
         # the background is read after JPEG: its clipped SD is the flat field's post-chain SD, not the

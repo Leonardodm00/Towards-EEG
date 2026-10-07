@@ -62,6 +62,10 @@ def test_known_answer():
     assert m.mu_mode == "per_node", m.mu_mode
     assert m.bbar_region == "block_masked", m.bbar_region
     assert m.focus_bg_rule == "profile_ends_median", m.focus_bg_rule
+    # D-030: gradient energy is the focus rule; its window (radius + 0.5 um) is PROVISIONAL
+    assert m.focus_rule == "gradient_energy" and C.FOCUS_RULES[0] == "gradient_energy" and "dip_depth" in C.FOCUS_RULES
+    assert m.focus_grad_window == "radius_margin" and m.focus_grad_margin_um == 0.5, (m.focus_grad_window,
+                                                                                      m.focus_grad_margin_um)
     assert m.sigma_fit_um == 0.099 and 0.080 in m.sigma_fit_study_um and 0.125 in m.sigma_fit_study_um
     # D-024
     assert r.absorption == "partition_vertical", r.absorption
@@ -244,6 +248,9 @@ def test_edge_cases():
     refuses(measure=dict(fit_params=("d", "mu", "v0", "B")))        # D-018
     refuses(measure=dict(sigma_fit_um=0.2))                          # D-023: not in the study set
     refuses(measure=dict(bbar_region="whole_plane"))
+    refuses(measure=dict(focus_rule="tenengrad"))                    # D-030: the rules are named
+    refuses(measure=dict(focus_grad_window="core"))
+    refuses(measure=dict(focus_grad_margin_um=0.05))                 # fewer than 3 samples in the window
     refuses(renderer=dict(absorption="partition_oblique"))
     refuses(renderer=dict(kernel_continuation="quadratic"))
     refuses(renderer=dict(kernel_table_delta_um=(0.0, 0.28, 0.14)))

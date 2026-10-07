@@ -4,12 +4,15 @@ specs/SPEC.md (design handoff Next actions 2-3 and 7; procedure s.3.5, s.3.10).
   measure_nodes      the per-node chain (Block 5) on the dendrite stretches
                      that hold the requested node ids; no correction
   pilot_row          one CSV row: the NodeResult columns, Allen's radius,
-                     sigma_fit, membership of the selection S and its reasons
+                     sigma_fit, membership of the selection S and its reasons,
+                     the focus rule and the plane the dip depth would have
+                     chosen (k_star_depth, D-030 diagnostic)
   summarize          what the pilot is for: percentiles of d_hat, mu_hat,
                      alpha_hat and d_hat / (2 r_Allen) over the nodes in S,
                      the phantom mu range they suggest (procedure s.3.10: the
                      10th and 90th percentiles of the real mu_hat), the share
-                     the dark flag removes, and the calibration candidates
+                     the dark flag removes, the calibration candidates, and
+                     how often the focus rule and the dip depth disagree
   profile_at_node    the fitted profile of a measured node, re-sampled from a
                      fresh block (for figures)
   background_stats   per node: the masked median, the robust SD (1.4826 x MAD)
@@ -66,8 +69,25 @@ def pilot_row(result, allen_radius_um, cfg):
     reasons = phantoms.reject_reasons(result)
     row.update(allen_radius_um=float(allen_radius_um), sigma_fit_um=float(cfg.measure.sigma_fit_um),
                in_S=not reasons, reject=";".join(reasons),
-               calibration_node=not calibration.calibration_reasons(result, cfg))
+               calibration_node=not calibration.calibration_reasons(result, cfg),
+               focus_rule=str(result.focus_rule), k_star_depth=int(result.k_star_depth))
     return row
+
+
+def focus_agreement(rows):
+    """Over the rows with a sharpest plane (finite z_sub_um; both scores are
+    then finite on the same planes, so k_star_depth is defined): how many, how
+    many have k_star != k_star_depth, the largest |k_star - k_star_depth| and
+    the count per difference in planes (D-030 diagnostic). Rows without the
+    D-030 columns (a pilot written before 2026-10-07) are not counted."""
+    diffs = [abs(int(r["k_star"]) - int(r["k_star_depth"])) for r in rows
+             if "k_star_depth" in r and math.isfinite(float(r.get("z_sub_um", float("nan"))))]
+    counts: Dict[str, int] = {}
+    for d in diffs:
+        if d:
+            counts[str(d)] = counts.get(str(d), 0) + 1
+    return dict(n_nodes=len(diffs), n_differ=sum(1 for d in diffs if d), max_abs_planes=max(diffs) if diffs else 0,
+                counts_by_planes=counts)
 
 
 def _pct(x):
@@ -99,7 +119,8 @@ def summarize(rows, cfg):
                                        if float(r["allen_radius_um"]) > 0),
                phi_deg=_pct(math.degrees(float(r["phi_rad"])) for r in inS),
                dark_share_of_converged=(dark / len(converged)) if converged else float("nan"),
-               n_calibration_nodes=sum(1 for r in rows if r.get("calibration_node")))
+               n_calibration_nodes=sum(1 for r in rows if r.get("calibration_node")),
+               focus_rule=str(cfg.measure.focus_rule), k_star_vs_dip_depth=focus_agreement(rows))
     if mu:
         out["suggested_phantom_mu_range_per_um"] = [mu["p10"], mu["p90"]]
     return out
