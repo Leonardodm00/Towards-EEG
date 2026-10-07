@@ -327,31 +327,19 @@ for s in cfg.measure.sigma_fit_study_um:           # D-023: one table per in-foc
 # folder whose path has no spaces, e.g. `~/diam/`. `qsub -v` takes a comma-separated list, and a value with a
 # space is fragile there.
 # 2. Update the code, check Pillow (8.3 or newer: the JPEG tables' order) and run the two new suites:
-# ```
-# cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/Diameter Re-measurement" && git fetch origin
-# && git checkout sci/diameter-pipeline && git pull --ff-only && conda activate spine_env && python -c "import
-# PIL; print('Pillow', PIL.__version__)" && python tests/smoke/test_smoke_config.py && python
-# tests/smoke/test_smoke_camera_tables.py
-# ```
+#     cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/Diameter Re-measurement" && git fetch origin && git checkout sci/diameter-pipeline && git pull --ff-only && conda activate spine_env && python -c "import PIL; print('Pillow', PIL.__version__)" && python tests/smoke/test_smoke_config.py && python tests/smoke/test_smoke_camera_tables.py
 # 3. Dry run, two-replicate probe, then the full array (from the same directory):
-# ```
-# qsub -v DIAM_DRYRUN=1,RUN_TAG=v1,DIAM_CONFIG_JSON=HOME/diam/config_production.json
-# scripts/pbs/build_table.pbs
-# qsub -J 0-1 -v DIAM_N_TOTAL=2,DIAM_N_TASKS=2,RUN_TAG=probe,DIAM_CONFIG_JSON=HOME/diam/config_production.json
-# scripts/pbs/build_table.pbs
-# qsub -v RUN_TAG=v1,DIAM_CONFIG_JSON=HOME/diam/config_production.json scripts/pbs/build_table.pbs
-# ```
-# Expect in every `.o` file in `HOME`: `[diam-table] env    spine_env`, a `Pillow` version line, `[diam-table]
-# task <i> done`. `DIAM_N_TOTAL` (default 2000) sets the number of replicates; `phantom.n_replicates` in the
-# configuration is a record only.
+#     qsub -v DIAM_DRYRUN=1,RUN_TAG=v1,DIAM_CONFIG_JSON=$HOME/diam/config_production.json scripts/pbs/build_table.pbs
+#     qsub -J 0-1 -v DIAM_N_TOTAL=2,DIAM_N_TASKS=2,RUN_TAG=probe,DIAM_CONFIG_JSON=$HOME/diam/config_production.json scripts/pbs/build_table.pbs
+#     qsub -v RUN_TAG=v1,DIAM_CONFIG_JSON=$HOME/diam/config_production.json scripts/pbs/build_table.pbs
+# Expect in every `.o` file in `$HOME`: `[diam-table] env    spine_env`, a `Pillow` version line,
+# `[diam-table] task <i> done`. `DIAM_N_TOTAL` (default 2000) sets the number of replicates;
+# `phantom.n_replicates` in the configuration is a record only.
 #
 # 4. Merge with the same configuration, with `spine_env` active. Every row records the configuration it was
 # rendered under, and the merge stops with `merge refused` when it is given another one; without
 # `--config-json` it assumes the default configuration:
-# ```
-# python scripts/build_table.py merge --out-dir "/davinci-1/home/ldellamea/Human Neurons
-# Fitting/diameter_tables/v1" --config-json HOME/diam/config_production.json
-# ```
+#     python scripts/build_table.py merge --out-dir "/davinci-1/home/ldellamea/Human Neurons Fitting/diameter_tables/v1" --config-json $HOME/diam/config_production.json
 # Expect `... rows from 100 files, <n> in S; smoothing <s> -> .../bias_table_<hash>.npz/.json`, with the hash
 # Cell 8 printed for `config_production.json`.
 #
