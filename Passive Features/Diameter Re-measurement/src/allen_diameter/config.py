@@ -186,7 +186,7 @@ class RendererConfig:
     bit_depth: int = 8                 # source: handoff (8-bit JPEG crops)
     jpeg: bool = True                  # source: procedure s.3.6 step 6
     jpeg_quality: int = 85             # source: PROVISIONAL; replaced by Allen's own tables read from fetched crops (Image.open(f).quantization)
-    jpeg_qtables_file: str = ""        # source: Phase II: path of a JSON with Allen's quantization tables; "" = use jpeg_quality
+    jpeg_qtables: Tuple[Tuple[int, ...], ...] = ()  # source: Phase II (scripts/camera_calibration.py): Allen's JPEG quantization tables, 64 integers each in natural order (Pillow >= 8.3); () = use jpeg_quality [corrected 2026-10-07: was jpeg_qtables_file, a path nothing read]
 
 
 @dataclass(frozen=True)
@@ -281,6 +281,7 @@ class DiameterConfig:
             raise ValueError("renderer.bit_depth must be 8 or 16, and 8 when jpeg is on")
         if not (0 < r.jpeg_quality <= 100) or r.noise_sd_gl < 0 or not (r.gain > 0) or not (r.background_B_gl > 0):
             raise ValueError("renderer camera settings out of range")
+        _check_qtables(r.jpeg_qtables)
         if not (r.cross_section_aspect > 0):
             raise ValueError("renderer.cross_section_aspect must be > 0")
         if m.fit_quad_min_nodes < 8 or not (m.fit_quad_nodes_per_sigma > 0):
@@ -369,10 +370,23 @@ class DiameterConfig:
         d["correction"] = _asdict(self.correction)
         return d
 
+    def simulation_signature(self) -> Dict[str, Any]:
+        """What a replicate's rendering and measurement depend on: the full
+        signature without the correction settings, which only the merge reads.
+        Every replicate row carries its hash, and the merge refuses rows
+        rendered under another one (2026-10-07)."""
+        d = self.full_signature()
+        d.pop("correction")
+        return d
+
     def signature_hash(self, which: str = "estimator") -> str:
-        """sha256[:16] of the canonical JSON of a signature; used in file names."""
-        sig = self.estimator_signature() if which == "estimator" else self.full_signature()
-        return hashlib.sha256(canonical_json(sig).encode("ascii")).hexdigest()[:16]
+        """sha256[:16] of the canonical JSON of a signature ("estimator",
+        "simulation" or "full"); used in file names and row provenance."""
+        sigs = {"estimator": self.estimator_signature, "simulation": self.simulation_signature,
+                "full": self.full_signature}
+        if which not in sigs:
+            raise ValueError("signature %r is not one of %s" % (which, sorted(sigs)))
+        return hashlib.sha256(canonical_json(sigs[which]()).encode("ascii")).hexdigest()[:16]
 
     def to_json(self) -> str:
         return canonical_json(self.full_signature())
@@ -384,8 +398,29 @@ def _check_in(value: str, allowed: Tuple[str, ...], name: str) -> None:
         raise ValueError("%s = %r is not one of %r" % (name, value, allowed))
 
 
+def _check_qtables(tables: Any) -> None:
+    """renderer.jpeg_qtables: () or 1-4 tuples of 64 integers in [1, 65535].
+    Tuples, not lists: the configuration is frozen and must stay hashable."""
+    if not isinstance(tables, tuple) or len(tables) > 4:
+        raise ValueError("renderer.jpeg_qtables must be a tuple of at most 4 tables (got %s); build it with "
+                         "tuple(tuple(t) for t in tables)" % type(tables).__name__)
+    for t in tables:
+        if not (isinstance(t, tuple) and len(t) == 64
+                and all(isinstance(x, int) and not isinstance(x, bool) and 1 <= x <= 65535 for x in t)):
+            raise ValueError("renderer.jpeg_qtables: every table is a tuple of 64 integers in [1, 65535]")
+
+
 def _asdict(obj: Any) -> Dict[str, Any]:
     return {f.name: getattr(obj, f.name) for f in fields(obj)}
+
+
+def _tuplify(value: Any) -> Any:
+    """JSON lists back to tuples, nested lists included (renderer.jpeg_qtables)."""
+    return tuple(_tuplify(v) for v in value) if isinstance(value, list) else value
+
+
+# keys of older configuration files that no longer exist, with what replaced them
+_LEGACY_KEYS = {("renderer", "jpeg_qtables_file"): "renderer.jpeg_qtables"}
 
 
 def canonical_json(obj: Any) -> str:
@@ -394,14 +429,21 @@ def canonical_json(obj: Any) -> str:
 
 
 def config_from_dict(d: Dict[str, Any]) -> DiameterConfig:
-    """Rebuild a DiameterConfig from ``full_signature()`` (tuples restored)."""
+    """Rebuild a DiameterConfig from ``full_signature()`` (tuples restored,
+    nested ones included). A legacy key is dropped when it is empty (it had
+    no effect) and refused otherwise [2026-10-07: renderer.jpeg_qtables_file
+    was a path the renderer never read]."""
     kwargs = {}
     for f in fields(DiameterConfig):
-        sub = d.get(f.name, {})
+        sub = dict(d.get(f.name, {}))
+        for (section, key), new in _LEGACY_KEYS.items():
+            if section == f.name and key in sub:
+                if sub.pop(key):
+                    raise ValueError("%s.%s is no longer read (it never was by the renderer): put the tables "
+                                     "themselves in %s (camera_<specimen>.json, 'renderer')" % (section, key, new))
         cls = f.default_factory  # type: ignore[attr-defined]
         tuple_fields = {g.name for g in fields(cls) if str(g.type).startswith("Tuple")}
-        kwargs[f.name] = cls(**{k: (tuple(v) if k in tuple_fields and isinstance(v, list) else v)
-                                for k, v in sub.items()})
+        kwargs[f.name] = cls(**{k: (_tuplify(v) if k in tuple_fields else v) for k, v in sub.items()})
     cfg = DiameterConfig(**kwargs)
     cfg.validate()
     return cfg
@@ -417,5 +459,41 @@ def with_sigma_fit(cfg: DiameterConfig, sigma_fit_um: float) -> DiameterConfig:
     """The study variant of D-023: the same configuration at another in-focus
     blur. The value must be in the study set, so a stray value cannot enter."""
     new = dataclasses.replace(cfg, measure=dataclasses.replace(cfg.measure, sigma_fit_um=float(sigma_fit_um)))
+    new.validate()
+    return new
+
+
+def _coerce(annotation: str, value: Any) -> Any:
+    """An override in the field's declared form: lists to tuples (nested ones
+    included), and an integer given for a float field to a float, so that 0 and
+    0.0 give one configuration and one hash."""
+    value = _tuplify(list(value)) if isinstance(value, tuple) else _tuplify(value)
+
+    def num(x: Any) -> Any:
+        return float(x) if isinstance(x, int) and not isinstance(x, bool) else x
+    if annotation == "float":
+        return num(value)
+    if annotation.startswith("Tuple[float") and isinstance(value, tuple):
+        return tuple(num(x) for x in value)
+    return value
+
+
+def with_overrides(cfg: DiameterConfig, overrides: Dict[str, Any]) -> DiameterConfig:
+    """A copy of cfg with dotted fields replaced, for example
+    {"phantom.d_range_um": [0.2, 6.0], "renderer.jpeg_qtables": [[...64...]]}:
+    values are put in the field's declared form (_coerce), an unknown section or
+    field raises ValueError naming it, and the result is validated. Used by the
+    Colab notebook to write the production configuration (2026-10-07)."""
+    sections = [f.name for f in fields(DiameterConfig)]
+    new = cfg
+    for key, value in overrides.items():
+        section, _, name = str(key).partition(".")
+        if section not in sections or not name:
+            raise ValueError("override %r: expected 'section.field' with a section in %s" % (key, sections))
+        sub = getattr(new, section)
+        declared = {f.name: str(f.type) for f in fields(sub)}
+        if name not in declared:
+            raise ValueError("override %r: %s has no field %r" % (key, type(sub).__name__, name))
+        new = dataclasses.replace(new, **{section: dataclasses.replace(sub, **{name: _coerce(declared[name], value)})})
     new.validate()
     return new

@@ -38,7 +38,7 @@ if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
 from allen_diameter.analysis import phantoms  # noqa: E402
-from allen_diameter.analysis.table import fit_table  # noqa: E402
+from allen_diameter.analysis.table import check_rows_config, fit_table, row_provenance  # noqa: E402
 from allen_diameter.config import config_from_dict, default_config  # noqa: E402
 from allen_diameter.loading import table_io  # noqa: E402
 
@@ -65,7 +65,10 @@ def run(cfg, start, stop, out_dir, workers=1, seed=None, backend=None):
     t0 = time.perf_counter()
     rows = []
 
+    provenance = row_provenance(cfg)
+
     def note(row):
+        row["sim_hash"] = provenance             # the merge refuses rows rendered under another configuration
         rows.append(row)
         print("replicate %d: d %.3f um, phi %.1f deg -> d_hat/d %.4f, %s, %.1f s (%d/%d)"
               % (row["index"], row["d_um"], row["phi_rad"] * 57.29577951308232, row["ratio"],
@@ -93,6 +96,13 @@ def merge(cfg, out_dir):
     if not paths:
         sys.exit("no rows_%s_*.csv in %s" % (h, out_dir))
     rows = table_io.read_rows(paths)
+    try:
+        unchecked = check_rows_config(rows, cfg)
+    except ValueError as exc:
+        sys.exit("merge refused: %s" % exc)
+    if unchecked:
+        print("note: %d of %d rows carry no sim_hash (written before 2026-10-07): their configuration is not checked"
+              % (unchecked, len(rows)))
     table = fit_table(rows, cfg)
     stem = os.path.join(out_dir, "bias_table_%s" % h)
     table_io.save_table(table, stem)

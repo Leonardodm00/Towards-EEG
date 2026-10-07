@@ -57,6 +57,8 @@ def jpeg_roundtrip(img8, quality=None, qtables=None):
     buf = io.BytesIO()
     image = Image.fromarray(np.ascontiguousarray(a))
     if qtables is not None:
+        from ..loading.jpeg_tables import check_pillow_table_order   # a version check, no file I/O
+        check_pillow_table_order()
         image.save(buf, format="JPEG", qtables=qtables)
     else:
         if quality is None or not (0 < int(quality) <= 100):
@@ -72,10 +74,14 @@ def camera_chain(tau_px, rcfg, rng, qtables=None):
 
     tau_px: (n_planes, H, W) or (H, W) pixel-integrated transmittance.
     rng: numpy.random.Generator for the noise (used when noise_sd_gl > 0).
-    qtables: Allen's quantization tables (loading.jpeg_tables), or None to
-    use rcfg.jpeg_quality. Returns uint8 (uint16 when bit_depth = 16 and no
-    JPEG) of the shape of tau_px.
+    qtables: Allen's quantization tables (loading.jpeg_tables); None means
+    rcfg.jpeg_qtables when that is non-empty, else rcfg.jpeg_quality
+    [corrected 2026-10-07: None always meant jpeg_quality, and no table build
+    passed tables]. Returns uint8 (uint16 when bit_depth = 16 and no JPEG) of
+    the shape of tau_px.
     """
+    if qtables is None and rcfg.jpeg_qtables:
+        qtables = [list(t) for t in rcfg.jpeg_qtables]
     signal = grey_mapping(tau_px, rcfg)
     if rcfg.noise_sd_gl > 0:
         signal = signal + rng.normal(0.0, rcfg.noise_sd_gl, size=signal.shape)

@@ -54,7 +54,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from allen_diameter.analysis import phantoms as PH  # noqa: E402
-from allen_diameter.analysis.table import fit_table, table_inputs  # noqa: E402
+from allen_diameter.analysis.table import check_rows_config, fit_table, row_provenance, table_inputs  # noqa: E402
 from allen_diameter.config import default_config, with_sigma_fit  # noqa: E402
 from allen_diameter.loading import table_io  # noqa: E402
 from allen_diameter.model import geometry as G  # noqa: E402
@@ -203,6 +203,24 @@ def test_contract():
         h = cfgf.signature_hash("estimator")
         meta = json.load(open(os.path.join(out, "bias_table_%s.json" % h)))
         assert meta["n_all"] == 4 and meta["estimator_hash"] == h, meta["n_all"]
+        # 2026-10-07: every row carries the simulation hash, and the merge refuses rows rendered under another
+        # simulation configuration -- the dangerous case is the same estimator hash, so the row files are found --
+        # while a change of the correction settings, which only the merge reads, is accepted
+        import glob as _glob
+        rows4 = table_io.read_rows(sorted(_glob.glob(os.path.join(out, "rows_*.csv"))))
+        assert {r["sim_hash"] for r in rows4} == {row_provenance(cfgf)}, {r["sim_hash"] for r in rows4}
+        other = dataclasses.replace(cfgf, phantom=dataclasses.replace(cfgf.phantom, d_range_um=(0.5, 2.0)))
+        corr = dataclasses.replace(cfgf, correction=dataclasses.replace(cfgf.correction, spline_smoothing="2.0"))
+        assert other.signature_hash("estimator") == h and corr.signature_hash("estimator") == h
+        for c, ok in ((other, False), (corr, True)):
+            cj2 = os.path.join(tmp, "cfg2.json")
+            with open(cj2, "w") as f:
+                f.write(c.to_json())
+            res = subprocess.run([sys.executable, script, "merge", "--out-dir", out, "--config-json", cj2],
+                                 capture_output=True, text=True)
+            assert (res.returncode == 0) == ok, (ok, res.returncode, res.stderr[-300:])
+            if not ok:
+                assert "merge refused" in res.stderr and "--config-json" in res.stderr, res.stderr[-300:]
 
 
 def test_determinism():
@@ -213,6 +231,22 @@ def test_determinism():
 
 
 def test_edge_cases():
+    # row provenance (2026-10-07): rows without the column (older runs) are counted, not refused; one row from
+    # another configuration refuses the lot; the prefix keeps a numeric-looking hash a string through the CSV
+    cfg0 = default_config()
+    good = row_provenance(cfg0)
+    assert check_rows_config([dict(sim_hash=good), dict(sim_hash=good)], cfg0) == 0
+    assert check_rows_config([dict(sim_hash=good), dict(), dict(sim_hash="")], cfg0) == 2
+    try:
+        check_rows_config([dict(sim_hash=good), dict(sim_hash="sim-0000000000000000")], cfg0)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("rows from another configuration were accepted")
+    with tempfile.TemporaryDirectory() as tmp:
+        p = os.path.join(tmp, "r.csv")
+        table_io.write_rows([dict(sim_hash="sim-1234567890123456"), dict(sim_hash="sim-1e10000000000000")], p)
+        assert [r["sim_hash"] for r in table_io.read_rows(p)] == ["sim-1234567890123456", "sim-1e10000000000000"]
     rows = fixture(200, SEED)[0]
     for change in (dict(response_estimator="local_linear"), dict(table_statistic="median")):
         cfg = default_config()

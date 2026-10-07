@@ -71,7 +71,7 @@ for _p in (SRC, HERE, WS / "scripts"):
 from allen_diameter.analysis import camera_fit, survey  # noqa: E402
 from allen_diameter.analysis.phantoms import reject_reasons  # noqa: E402
 from allen_diameter.analysis.node_pipeline import NodeResult  # noqa: E402
-from allen_diameter.config import default_config  # noqa: E402
+from allen_diameter.config import config_from_dict, default_config  # noqa: E402
 from allen_diameter.loading import jpeg_tables, table_io  # noqa: E402
 from fixtures_cell import synthetic_cell  # noqa: E402
 
@@ -189,7 +189,14 @@ def test_contract():
         with open(os.path.join(cache, "bad.img"), "wb") as f:
             f.write(b"not a jpeg")
         res = CC.run(cache, os.path.join(tmp, "camera"), "999", os.path.join(out, "pilot_summary_999.json"))
-        assert jpeg_tables.load_qtables(res["renderer"]["jpeg_qtables_file"]) == tables
+        # the tables themselves are suggested for the configuration [corrected 2026-10-07: a file path was
+        # suggested, which the renderer never read]; the JSON file stays as a record
+        assert res["renderer"]["jpeg_qtables"] == tables
+        assert jpeg_tables.load_qtables(res["jpeg_qtables_file"]) == tables and res["pillow_version"]
+        sig = json.loads(cfg.to_json())
+        sig["renderer"].update({k: v for k, v in res["renderer"].items()})
+        cfg_cam = config_from_dict(sig)
+        assert cfg_cam.renderer.jpeg_qtables == tuple(tuple(t) for t in tables), cfg_cam.renderer.jpeg_qtables
         assert res["table_sets"][0]["count"] == 3 and res["table_sets"][-1]["n_tables"] is None
         assert res["renderer"]["background_B_gl"] == bg["B_bar_gl"]["p50"]
         # closed loop through the camera chain: with the fixture's own JPEG (no cache tables) the matched

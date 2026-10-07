@@ -123,6 +123,27 @@ class BiasTable:
                              "matching configuration" % (self.estimator_hash, h))
 
 
+SIM_PREFIX = "sim-"       # keeps the hash a string in the CSV (table_io parses numeric-looking cells)
+
+
+def row_provenance(cfg):
+    """The value of the sim_hash column of a replicate row rendered under cfg."""
+    return SIM_PREFIX + cfg.signature_hash("simulation")
+
+
+def check_rows_config(rows, cfg):
+    """ValueError unless every replicate row that carries a sim_hash was rendered
+    under cfg's simulation settings (build_table.run writes the column since
+    2026-10-07; the correction settings may differ: only the merge reads them).
+    Returns the number of rows without the column (older runs: not checked)."""
+    want = row_provenance(cfg)
+    seen = {str(r["sim_hash"]) for r in rows if str(r.get("sim_hash", "")) not in ("", "None", "nan")}
+    if seen - {want}:
+        raise ValueError("the rows were rendered under %s, the merge was given %s: pass the --config-json the "
+                         "run used (without it the default configuration is assumed)" % (sorted(seen), want))
+    return sum(1 for r in rows if str(r.get("sim_hash", "")) in ("", "None", "nan"))
+
+
 def fit_table(rows, cfg):
     """BiasTable from replicate rows (dicts with d_um, phi_rad or meas_phi_rad -- by
     correction.table_phi_axis -- ratio, in_S, and optionally reject, the ';'-joined

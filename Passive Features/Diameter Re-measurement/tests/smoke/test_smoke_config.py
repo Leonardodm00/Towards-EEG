@@ -117,6 +117,29 @@ def test_reference():
     n_fields = sum(len(dataclasses.fields(k)) for k in (C.AcquisitionConfig, C.MeasureConfig, C.CorrectionConfig,
                                                         C.RendererConfig, C.PhantomConfig, C.CalibrationConfig))
     assert n_tagged == n_fields, (n_tagged, n_fields)
+    # every field is read by some code outside config.py (attribute access or getattr, parsed with ast,
+    # so a docstring naming a field does not count) [added 2026-10-07: renderer.jpeg_qtables_file was
+    # read by nothing]; the exceptions are records and declarations that validate() checks
+    import ast
+    records = {"acquisition.specimen_id", "measure.node_step", "measure.fit_params", "measure.sigma_fit_study_um",
+               "correction.inversion_method", "phantom.n_replicates"}
+    read = set()
+    roots = (SRC / "allen_diameter", SRC.parent / "scripts")
+    for root in roots:
+        for path in root.rglob("*.py"):
+            if path.name == "config.py" and path.parent.name == "allen_diameter":
+                continue
+            for node in ast.walk(ast.parse(path.read_text(encoding="ascii"))):
+                if isinstance(node, ast.Attribute):
+                    read.add(node.attr)
+                elif (isinstance(node, ast.Call) and getattr(node.func, "id", "") == "getattr"
+                      and len(node.args) > 1 and isinstance(node.args[1], ast.Constant)):
+                    read.add(str(node.args[1].value))
+    cfg = C.default_config()
+    unread = sorted("%s.%s" % (s.name, f.name) for s in dataclasses.fields(cfg)
+                    for f in dataclasses.fields(getattr(cfg, s.name)) if f.name not in read)
+    assert set(unread) == records, "config fields no code reads: %s (declared records: %s)" % (
+        sorted(set(unread) - records), sorted(records - set(unread)))
 
 
 def test_convergence():
@@ -135,6 +158,18 @@ def test_invariants():
     cfg_r = dataclasses.replace(cfg, renderer=dataclasses.replace(cfg.renderer, U_um=8.0))
     assert cfg_r.signature_hash("estimator") == cfg.signature_hash("estimator")
     assert cfg_r.signature_hash("full") != cfg.signature_hash("full")
+    # the simulation signature (2026-10-07): the full one without the correction settings
+    assert set(cfg.simulation_signature()) == {"acquisition", "measure", "renderer", "phantom"}
+    cfg_c = dataclasses.replace(cfg, correction=dataclasses.replace(cfg.correction, spline_cv_folds=4))
+    assert cfg_c.signature_hash("simulation") == cfg.signature_hash("simulation")
+    assert cfg_c.signature_hash("full") != cfg.signature_hash("full")
+    assert cfg_r.signature_hash("simulation") != cfg.signature_hash("simulation")
+    try:
+        cfg.signature_hash("bogus")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("signature_hash accepted an unknown signature name")
     cfg_s = C.with_sigma_fit(cfg, 0.125)
     assert cfg_s.signature_hash("estimator") != cfg.signature_hash("estimator")
     assert cfg_s.measure.sigma_fit_um == 0.125 and cfg_s.measure.sigma_fit_study_um == cfg.measure.sigma_fit_study_um
@@ -161,6 +196,29 @@ def test_contract():
             assert not isinstance(v, list), "%s: lists are mutable; use tuples" % f.name
             if isinstance(v, (int, float)) and not isinstance(v, bool):
                 assert np.isfinite(v), f.name
+    # Allen's JPEG tables travel inside the configuration (2026-10-07): nested tuples survive the JSON
+    # round trip, the configuration stays hashable, and the full hash is reproduced
+    tables = (tuple(range(1, 65)), tuple(64 - j for j in range(64)))
+    cfg_q = dataclasses.replace(cfg, renderer=dataclasses.replace(cfg.renderer, jpeg_qtables=tables))
+    cfg_q.validate()
+    back = C.config_from_dict(json.loads(cfg_q.to_json()))
+    assert back == cfg_q and back.renderer.jpeg_qtables == tables
+    assert all(isinstance(t, tuple) for t in back.renderer.jpeg_qtables)
+    assert hash(back) == hash(cfg_q) and back.signature_hash("full") == cfg_q.signature_hash("full")
+    assert cfg_q.signature_hash("full") != cfg.signature_hash("full"), "the tables must enter the table's signature"
+    assert cfg_q.signature_hash("estimator") == cfg.signature_hash("estimator"), "the renderer is not the estimator"
+    # with_overrides (2026-10-07): JSON-like values are put in the declared form, so the same values give
+    # the same configuration and hash (0 and 0.0, a list and a tuple)
+    assert C.with_overrides(cfg, {}) == cfg
+    same = C.with_overrides(cfg, {"phantom.jitter_xy_um": 0, "phantom.d_range_um": [0.2, 4],
+                                  "correction.failure_rate_ignore": ["dark"]})
+    assert same == cfg and same.signature_hash("full") == cfg.signature_hash("full")
+    assert isinstance(same.phantom.jitter_xy_um, float) and isinstance(same.phantom.d_range_um[1], float)
+    got = C.with_overrides(cfg, {"renderer.jpeg_qtables": [list(range(1, 65))], "phantom.d_range_um": (0.2, 6.0),
+                                 "renderer.noise_sd_gl": 1.4})
+    assert got.renderer.jpeg_qtables == (tuple(range(1, 65)),) and got.phantom.d_range_um == (0.2, 6.0)
+    assert got.renderer.noise_sd_gl == 1.4 and cfg.phantom.d_range_um == (0.2, 4.0), "the input was modified"
+    assert C.config_from_dict(json.loads(got.to_json())) == got
 
 
 def test_determinism():
@@ -211,6 +269,35 @@ def test_edge_cases():
         pass
     else:
         raise AssertionError("config_from_dict accepted a bad mu_mode")
+    # JPEG tables (2026-10-07): lists, wrong length, out-of-range entries, too many tables are refused
+    good = tuple(range(1, 65))
+    refuses(renderer=dict(jpeg_qtables=(list(good),)))
+    refuses(renderer=dict(jpeg_qtables=[good]))
+    refuses(renderer=dict(jpeg_qtables=(good[:63],)))
+    refuses(renderer=dict(jpeg_qtables=((0,) + good[1:],)))
+    refuses(renderer=dict(jpeg_qtables=((1.5,) + good[1:],)))
+    refuses(renderer=dict(jpeg_qtables=(good,) * 5))
+    # the legacy key: an empty jpeg_qtables_file (it had no effect) is dropped, a path is refused by name
+    d = json.loads(cfg.to_json())
+    del d["renderer"]["jpeg_qtables"]
+    d["renderer"]["jpeg_qtables_file"] = ""
+    assert C.config_from_dict(d) == cfg
+    d["renderer"]["jpeg_qtables_file"] = "/content/drive/MyDrive/diameters/camera/jpeg_qtables_1.json"
+    try:
+        C.config_from_dict(d)
+    except ValueError as exc:
+        assert "jpeg_qtables" in str(exc) and "never" in str(exc), exc
+    else:
+        raise AssertionError("config_from_dict accepted a jpeg_qtables_file path that nothing would read")
+    # with_overrides refuses an unknown section or field by name, and an illegal value through validate()
+    for bad in ({"phantom.d_max_um": 6.0}, {"render.U_um": 8.0}, {"U_um": 8.0}, {"phantom.d_range_um": [6.0, 0.2]},
+                {"renderer.jpeg_qtables": [[1] * 63]}):
+        try:
+            C.with_overrides(cfg, bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("with_overrides accepted %r" % (bad,))
 
 
 # ---------------------------------------------------------------- runner ---

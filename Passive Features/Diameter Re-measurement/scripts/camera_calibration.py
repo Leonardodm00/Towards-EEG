@@ -4,7 +4,11 @@
 
   JPEG tables   read from the crops an HttpFetcher cached (bytes as served):
                 the distinct table sets and their counts; the most common set
-                is written as JSON for RendererConfig.jpeg_qtables_file
+                is suggested as RendererConfig.jpeg_qtables (the tables
+                themselves, so the configuration JSON is self-contained on
+                davinci) and written to jpeg_qtables_<specimen>.json for
+                reference [corrected 2026-10-07: it was suggested as
+                jpeg_qtables_file, a path the renderer never read]
   background    from a run_node.py --background summary: the median over
                 nodes of the masked block median (-> background_B_gl), and
                 the injected noise SD whose post-chain SD on a flat field
@@ -55,9 +59,11 @@ def run(cache_dir, out_dir, specimen, pilot_summary=None, max_files=500, cfg=Non
     cfg = default_config() if cfg is None else cfg
     real = [(t, n) for t, n, _ in groups if t is not None]
     if real:
+        import PIL
         qpath = os.path.join(out_dir, "jpeg_qtables_%s.json" % specimen)
         jpeg_tables.save_qtables(real[0][0], qpath)
-        out["renderer"]["jpeg_qtables_file"] = qpath
+        out["renderer"]["jpeg_qtables"] = [list(t) for t in real[0][0]]
+        out.update(jpeg_qtables_file=qpath, pillow_version=str(PIL.__version__))
         if len(real) > 1:
             out["notes"].append("%d distinct table sets: the most common (%d of %d files) was written"
                                 % (len(real), real[0][1], sum(n for _, n in real)))
