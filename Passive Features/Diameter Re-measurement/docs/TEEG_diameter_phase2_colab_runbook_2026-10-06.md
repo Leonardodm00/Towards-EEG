@@ -37,13 +37,17 @@ Expect: `[cell 0] specimen 529878215 | cache ... | outputs ...`.
 ## Cell 1: bootstrap (clone or update, `sys.path`) and `run()`
 
 ```python
-import os, shlex, subprocess, sys, time
+import importlib, os, shlex, subprocess, sys, time
 REPO, BRANCH = "/content/Towards-EEG", "sci/diameter-pipeline"
 if not os.path.isdir(REPO):
     subprocess.run(["git", "clone", "--depth", "50", "-b", BRANCH,
                     "https://github.com/Leonardodm00/Towards-EEG.git", REPO], check=True)
+else:      # a clone made earlier in this runtime: update it before importing anything from it
+    for step in (["fetch", "--depth", "50", "origin", BRANCH], ["checkout", BRANCH], ["merge", "--ff-only", "FETCH_HEAD"]):
+        subprocess.run(["git", "-C", REPO] + step, check=True)
 sys.path.insert(0, os.path.join(REPO, "Passive Features", "Diameter Re-measurement", "scripts"))
 import colab_bootstrap
+colab_bootstrap = importlib.reload(colab_bootstrap)   # this pull's version, if an older one was imported
 ENV = colab_bootstrap.bootstrap(REPO, BRANCH)      # fetch + fast-forward, sys.path, versions, commit
 WS = ENV["workstream"]
 
@@ -78,7 +82,7 @@ ALIGN = ["--shift-x", SHIFT_X, "--shift-y", SHIFT_Y, "--z0", Z0] + ([] if FLIP_H
 
 Expect: `[diameter] commit <hash> on sci/diameter-pipeline`. The hash should match the branch head on GitHub.
 
-[corrected 2026-10-07: v1's `run()` captured the output and printed stdout, or stderr only when stdout was empty, so a traceback after any printed line was hidden, and a failing script did not stop the notebook. The new `run()` streams both, raises on a non-zero exit, and counts the fetcher's one-line-per-crop messages instead of printing them.]
+[corrected 2026-10-07: v1's `run()` captured the output and printed stdout, or stderr only when stdout was empty, so a traceback after any printed line was hidden, and a failing script did not stop the notebook. The new `run()` streams both, raises on a non-zero exit, and counts the fetcher's one-line-per-crop messages instead of printing them. v1 also imported `colab_bootstrap` from an existing clone before pulling, so a clone older than the bootstrap failed at the import (seen in the sandbox on a clone at `bd8b2b6`); an existing clone is now fast-forwarded first.]
 
 ## Cell 2: smoke tests in Colab (about 30 s)
 
