@@ -75,6 +75,7 @@ that say `claude/<name>` mean the same file name in this folder.
 | File | What it is |
 |---|---|
 | `phase2_colab.ipynb` | The runbook's cells as a Colab notebook (2026-10-07), same numbers, same code. Open it in Colab from GitHub (File > Open notebook > GitHub, branch `sci/diameter-pipeline`). |
+| `phase2_colab.py` | The same cells as plain Python (2026-10-07), one block per Colab cell between `# ===== CELL` banners, labelled with the runbook's numbers. |
 
 The three 2026-10-04 documents were independently reviewed and revised the same
 day; each ends with a revision record. Decisions D-018 and D-019 are recorded in
@@ -159,6 +160,6 @@ implementation handoff). Step 1 is Phase II of that plan.
 
 | Date | Change |
 |---|---|
-| 2026-10-07 | Listed the Phase II runbook (v2) and the new `notebooks/phase2_colab.ipynb`; pointed next step 1 at its Cells 3a-3b. |
+| 2026-10-07 | Listed the Phase II runbook (v2) and the new `notebooks/phase2_colab.ipynb`; pointed next step 1 at its Cells 3a-3b. Added `notebooks/phase2_colab.py`, the same cells as plain Python. |
 | 2026-10-06 (later) | Implementation started (branch `sci/diameter-pipeline`): `src/`, `scripts/`, `tests/smoke/` added; root `specs/SPEC.md`; the 2026-09-23 modules imported byte-identical. Decisions D-022 to D-024 in the project log. |
 | 2026-10-06 | Added the implementation handoff (D-021) to the contents and status. Corrected the Drive statement: only the 2026-09-22 module versions are there (Drive listing, 2026-10-06). Noted which decision-log copy is live (project_read of both copies, 2026-10-06). Added four check scripts with reference outputs (`*.out`, re-run 2026-10-06, identical to the original runs). Marked next steps 2-3 as handled by D-021. |
