@@ -12,11 +12,22 @@ Checks
                         share is counted over the converged nodes; the
                         registration summary's robust SD is 1.4826 x MAD;
                         the selection S reads registration_check sentences by
-                        category (ON passes; ALONGSIDE, NOT_ON fail)
+                        category (ON passes; ALONGSIDE, NOT_ON fail); plane
+                        montage (2026-10-07): the image extent puts a pixel's
+                        centre exactly where analysis.profiles.sample_profile
+                        reads it, depth_alpha at its closed-form points, the
+                        node selection ('differ': k_star != k_star_depth) and
+                        the pilot comparison on hand-made rows
     test_reference      the registration survey on the synthetic cell's own
                         traced path (the 2026-09-23 registration_check): ON,
                         |s*| <= 0.2 um, |dz*| <= 0.3 um; JSON as run_cell.py
-                        reads it
+                        reads it; survey.node_planes equals the pilot's
+                        measurement of the node (survey.measure_nodes) field by
+                        field and makes the same provider request; on the
+                        fixture's known geometry, the darkness centroid across
+                        the tube in plane k*, with pixels placed by the
+                        montage's extent, lies on Allen's centre line within
+                        0.05 um
     test_convergence    skipped: no discretisation parameter
     test_invariants     skipped: wiring of tested blocks
     test_contract       run_node.run on the synthetic cell: the CSV and summary
@@ -30,12 +41,20 @@ Checks
                         carried into the suggested fields, and the injected
                         noise matched back through the camera chain to within
                         15 % of the fixture's 3 grey levels; the bootstrap on
-                        this clone (no pull): sys.path and imports
+                        this clone (no pull): sys.path and imports;
+                        node_planes.run: one PNG per node, the record says
+                        'same as the pilot', the montage has one image panel
+                        per valid focus plane, the segments (n, 9) flag the
+                        stretch's own segments and give the soma's child its
+                        own radius at both ends
     test_determinism    skipped: deterministic wiring over tested blocks
     test_edge_cases     an empty cache: no tables, a note; run_node with node
                         ids on no stretch: no rows, n_nodes 0; a registration
                         entry with null s* and dz* (a NOT ON node, as the
                         survey writes it): NaN columns and the node out of S;
+                        node_planes on the soma and on a missing id: refused,
+                        and node_planes.run records them as skipped; a missing
+                        plane is drawn as a 'missing' panel without an image;
                         the bootstrap
                         without a clone and clone=False: FileNotFoundError
 
@@ -73,7 +92,9 @@ from allen_diameter.analysis import camera_fit, survey  # noqa: E402
 from allen_diameter.analysis.phantoms import reject_reasons  # noqa: E402
 from allen_diameter.analysis.node_pipeline import NodeResult  # noqa: E402
 from allen_diameter.config import config_from_dict, default_config  # noqa: E402
+from allen_diameter.analysis import profiles  # noqa: E402
 from allen_diameter.loading import jpeg_tables, table_io  # noqa: E402
+from allen_diameter.plotting import figures  # noqa: E402
 from fixtures_cell import synthetic_cell  # noqa: E402
 
 SEED = 20261006
@@ -83,6 +104,21 @@ REPORT_PACKAGES = ("numpy", "scipy", "pandas", "Pillow", "matplotlib")
 def cell_cfg():
     base = default_config()
     return dataclasses.replace(base, measure=dataclasses.replace(base.measure, block_half_um=3.5))
+
+
+def _same_value(a, b):
+    """Field-by-field equality of two results: dataclasses recursively, arrays element-wise (NaN equal
+    to NaN for float arrays), floats with NaN equal to NaN, anything else by ==."""
+    if dataclasses.is_dataclass(a) and dataclasses.is_dataclass(b):
+        return type(a) is type(b) and all(_same_value(getattr(a, f.name), getattr(b, f.name))
+                                          for f in dataclasses.fields(a))
+    if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
+        a, b = np.asarray(a), np.asarray(b)
+        floats = a.dtype.kind in "fc" and b.dtype.kind in "fc"
+        return a.shape == b.shape and bool(np.array_equal(a, b, equal_nan=floats))
+    if isinstance(a, float) and isinstance(b, float):
+        return (math.isnan(a) and math.isnan(b)) or a == b
+    return a == b
 
 
 # ---------------------------------------------------------------- checks ---
@@ -126,6 +162,46 @@ def test_known_answer():
     x = np.array([-0.3, 0.1, 0.2, 0.5, 0.05])
     assert summ["verdicts"] == {"ON": 5, "NOT_ON": 1}
     assert abs(summ["lateral_offset_um"]["robust_sd"] - 1.4826 * np.median(np.abs(x - np.median(x)))) <= 1e-15
+    # plane montage. The extent puts pixel (row, col) at ((left + col) p, (top + row) p): one dark pixel,
+    # sampled by profiles.sample_profile at the centre the extent gives it, is read back as itself
+    # (bilinear interpolation at a pixel centre; 1e-6 gl covers the float64 rounding of the coordinate,
+    # ~1e-15 px times the 183 gl step). Half a pixel off would read (17 + 200) / 2.
+    from allen_image_io import CropFrame
+    p = cfg.acquisition.res0_um
+    fr = CropFrame(37, -12, 0, p)
+    img = np.full((5, 7), 200.0)
+    img[3, 4] = 17.0
+    ext = figures.image_extent_um(fr, img.shape)
+    assert np.allclose(ext, [36.5 * p, 43.5 * p, -7.5 * p, -12.5 * p], rtol=0, atol=1e-12), ext
+    at = (ext[0] + 4.5 * (ext[1] - ext[0]) / 7, ext[3] + 3.5 * (ext[2] - ext[3]) / 5)
+    got = profiles.sample_profile(img, fr, at, (0.0, 1.0), (1.0, 0.0), np.zeros(1))
+    assert abs(got[0] - 17.0) <= 1e-6, got
+    # depth_alpha at its closed-form points: inside the segment's depth range and at solid_um 1, half-way
+    # to fade_um 1 - 0.8 / 2, beyond fade_um the floor; the order of the ends does not matter
+    da = figures.depth_alpha
+    assert da(0.0, 0.5, 0.3, 1.0, 3.0) == 1.0 and da(0.0, 0.0, 1.0, 1.0, 3.0) == 1.0
+    assert abs(da(0.0, 0.0, 2.0, 1.0, 3.0) - 0.6) <= 1e-12 and abs(da(0.5, 0.0, -2.0, 1.0, 3.0) - 0.6) <= 1e-12
+    assert da(0.0, 0.0, 5.0, 1.0, 3.0) == 0.2
+    # node selection and the pilot comparison of scripts/node_planes.py
+    import node_planes as NP
+    prow = [dict(node_id=10, z_sub_um=0.1, k_star=5, k_star_depth=6), dict(node_id=11, z_sub_um=nan, k_star=-1,
+                                                                            k_star_depth=3),
+            dict(node_id=12, z_sub_um=0.2, k_star=7, k_star_depth=7), dict(node_id=13, z_sub_um=0.0, k_star=2,
+                                                                            k_star_depth=0)]
+    assert NP.select_nodes("differ", prow, 6) == [10, 13] and NP.select_nodes("differ", prow, 1) == [10]
+    assert NP.select_nodes(" 13, 4,", None, 6) == [13, 4]
+    for rows_bad in (None, [dict(node_id=1, z_sub_um=0.0, k_star=1)]):
+        try:
+            NP.select_nodes("differ", rows_bad, 6)
+        except ValueError:
+            continue
+        raise AssertionError("'differ' without pilot rows carrying k_star_depth must be refused")
+    nr = node("")
+    row = dict(k_star=0, k_star_depth=-1, z_sub_um=0.0, d_hat_um=1.0, mu_hat_per_um=0.5, focus_rule="gradient_energy")
+    assert NP.compare_with_pilot(nr, row) == []
+    assert NP.compare_with_pilot(nr, dict(row, d_hat_um=1.0 + 1e-6, k_star=1)) == ["k_star", "d_hat_um"]
+    assert NP.compare_with_pilot(dataclasses.replace(nr, d_hat_um=nan), dict(row, d_hat_um=nan)) == []
+    assert NP.compare_with_pilot(nr, dict(row, d_hat_um=nan, focus_rule="dip_depth")) == ["d_hat_um", "focus_rule"]
 
 
 def test_reference():
@@ -142,6 +218,55 @@ def test_reference():
         with open(os.path.join(tmp, "reg", "registration_999.json")) as f:
             back = {int(k): v for k, v in json.load(f).items()}
         assert set(back[5]) >= {"verdict", "lateral_offset_um", "z_offset_um"} and summ["verdicts"] == {"ON": 1}
+    # plane montage: node_planes measures the node as the pilot does (survey.measure_nodes), with the same
+    # single provider request -- hence, on real data, a block served by the image cache
+    import run_cell
+    with tempfile.TemporaryDirectory() as tmp:
+        swc, fetcher, planes, _ = synthetic_cell(tmp, cfg, d_true=0.8, mu=1.0)
+        provider = run_cell.real_provider(fetcher, planes, cfg.acquisition.res0_um)
+        calls = []
+
+        def recorder(*args):
+            calls.append(args)
+            return provider(*args)
+        meas = survey.measure_nodes(swc, recorder, cfg, only={4})
+        assert len(calls) == len(meas)                     # one request per measured node
+        at = [i for i, m in enumerate(meas) if m[0].node_id == 4][0]
+        pilot_call, pilot_res = calls[at], meas[at][0]
+        del calls[:]
+        pl = survey.node_planes(swc, recorder, cfg, 4)
+        assert calls == [pilot_call], (calls, pilot_call)
+        bad = [f.name for f in dataclasses.fields(pilot_res)
+               if not _same_value(getattr(pl["result"], f.name), getattr(pilot_res, f.name))]
+        assert not bad, bad
+        assert pl["index"] == meas[at][3] and pl["allen_radius_um"] == meas[at][1]
+        # the same with a global alignment (2 px in x): node_planes passes it on, so the request moves
+        shift = dict(shift_full_px=(2.0, 0.0))
+        del calls[:]
+        meas_s = survey.measure_nodes(swc, recorder, cfg, shift, only={4})
+        call_s = calls[at]
+        del calls[:]
+        pl_s = survey.node_planes(swc, recorder, cfg, 4, shift)
+        assert calls == [call_s] and call_s != pilot_call and _same_value(pl_s["result"], meas_s[at][0]), (calls, call_s)
+        # alignment through the montage's extent, on the fixture's known geometry (the tube is rendered on
+        # the traced path at heading 0.3 rad): in plane k*, the darkness-weighted mean of the offset across
+        # the path, over the pixels within 1 um along and 1.5 um across the path of node 4, placed by
+        # image_extent_um, is 0. Tolerance 0.05 um: below half a pixel (0.057 um), above the centroid's noise;
+        # the half-pixel convention itself is pinned exactly in test_known_answer.
+        res = pl["result"]
+        assert math.isfinite(res.z_sub_um), res
+        img = np.asarray(pl["block"][int(res.k_star) - int(pl["ks"][0])], dtype=float)
+        ext = figures.image_extent_um(pl["frame"], img.shape)
+        H, W = img.shape
+        XX, YY = np.meshgrid(ext[0] + (np.arange(W) + 0.5) * (ext[1] - ext[0]) / W,
+                             ext[3] + (np.arange(H) + 0.5) * (ext[2] - ext[3]) / H)
+        th = 0.3
+        u = (XX - res.x_um) * math.cos(th) + (YY - res.y_um) * math.sin(th)
+        v = -(XX - res.x_um) * math.sin(th) + (YY - res.y_um) * math.cos(th)
+        sel = (np.abs(u) <= 1.0) & (np.abs(v) <= 1.5)
+        w = np.clip(np.median(img) - img, 0.0, None)[sel]
+        v_bar = float(np.sum(w * v[sel]) / np.sum(w))
+        assert abs(v_bar) <= 0.05, v_bar
 
 
 def test_convergence():
@@ -186,6 +311,32 @@ def test_contract():
         pngs = [p for p in os.listdir(os.path.join(out, "figures")) if p.endswith(".png")]
         assert len(pngs) == sum(1 for r in rows if math.isfinite(r["z_sub_um"])) and all(
             os.path.getsize(os.path.join(out, "figures", p)) > 1000 for p in pngs)
+        # plane montage of node 4 (scripts/node_planes.py): a PNG, a record that says the re-measurement
+        # equals the pilot row, one image panel per valid focus plane, the segments of the trace
+        import node_planes as NP
+        import matplotlib.pyplot as plt
+        recs = NP.run(swc, provider, cfg, [4], os.path.join(tmp, "planes"), "999", pilot_rows=back,
+                      log=lambda m: None)
+        assert recs[0]["pilot"] == "same" and os.path.getsize(recs[0]["png"]) > 1000, recs
+        with open(os.path.join(tmp, "planes", "planes_999.json")) as f:
+            assert json.load(f)[0]["node_id"] == 4
+        pl = survey.node_planes(swc, provider, cfg, 4)
+        fk = np.asarray(pl["result"].focus_planes, dtype=int)
+        fig = figures.plane_montage(pl, cfg.acquisition.dz_um, cfg.measure.profile_half_um)
+        n_valid = int(np.sum(pl["valid"][fk - int(pl["ks"][0])]))
+        assert fk.size >= 7 and sum(1 for ax in fig.axes if ax.images) == n_valid == fk.size, (fk, n_valid)
+        plt.close(fig)
+        seg, br = pl["segments"], pl["branch"]
+        own = seg[:, 8] > 0.5
+        # the fixture's straight stretch lies inside the block: its len - 1 segments are the stretch's own,
+        # each from one Branch node to the next (parent end first); the soma's child segment (soma at the
+        # origin) is not, and carries the child's radius at both ends (the soma's 4 um is not a neurite's)
+        assert seg.shape == (len(br.ids), 9) and int(own.sum()) == len(br.ids) - 1, seg
+        for row_ in seg[own]:
+            i0 = int(np.flatnonzero(np.all(np.abs(br.xyz_um - row_[0:3]) <= 1e-12, axis=1))[0])
+            assert np.all(np.abs(br.xyz_um[i0 + 1] - row_[3:6]) <= 1e-12) and row_[6] == row_[7] == 0.3
+        soma = seg[np.all(np.abs(seg[:, 0:3]) <= 1e-12, axis=1)]
+        assert soma.shape[0] == 1 and soma[0, 8] == 0.0 and soma[0, 6] == soma[0, 7] == 0.3, soma
         # camera inputs: a cache of JPEGs saved with known tables, and one file that is not a JPEG
         from PIL import Image
         cache = os.path.join(tmp, "cache")
@@ -242,6 +393,37 @@ def test_edge_cases():
                                log=lambda m: None)
         r4 = [r for r in rows if r["node_id"] == 4][0]
         assert math.isnan(r4["s_star_um"]) and "registration:NOT_ON" in r4["reject"], r4
+        # plane montage: the soma (id 1) and an id not in the SWC are refused, and node_planes.run records
+        # them as skipped; the planes outside the 5-plane stack (and one made invalid here) are drawn as
+        # 'missing' panels with no image; a downsampled frame is refused by the extent
+        for bad_id in (1, 12345):
+            try:
+                survey.node_planes(swc, provider, cfg, bad_id)
+            except ValueError:
+                continue
+            raise AssertionError("node_planes(%d) must be refused" % bad_id)
+        import node_planes as NP
+        import matplotlib.pyplot as plt
+        recs = NP.run(swc, provider, cfg, [1, 12345], os.path.join(tmp, "planes"), "1", log=lambda m: None)
+        assert all(r.get("skipped") for r in recs) and not any("png" in r for r in recs), recs
+        pl = survey.node_planes(swc, provider, cfg, 4)
+        fk = np.asarray(pl["result"].focus_planes, dtype=int)
+        valid = np.array(pl["valid"], dtype=bool)
+        valid[int(fk[len(fk) // 2]) - int(pl["ks"][0])] = False
+        pl["valid"] = valid
+        fig = figures.plane_montage(pl, cfg.acquisition.dz_um, cfg.measure.profile_half_um)
+        n_valid = int(np.sum(valid[fk - int(pl["ks"][0])]))
+        n_missing = sum(1 for ax in fig.axes for t in ax.texts if t.get_text() == "missing")
+        assert sum(1 for ax in fig.axes if ax.images) == n_valid and n_missing == fk.size - n_valid >= 3, \
+            (fk, n_valid, n_missing)
+        plt.close(fig)
+        from allen_image_io import CropFrame
+        try:
+            figures.image_extent_um(CropFrame(0, 0, 1, cfg.acquisition.res0_um), (4, 4))
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("a downsampled frame must be refused by image_extent_um")
         try:
             CB.bootstrap(repo_dir=os.path.join(tmp, "nothing"), pull=False, clone=False, verbose=False)
         except FileNotFoundError:

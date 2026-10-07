@@ -15,6 +15,9 @@ specs/SPEC.md (design handoff Next actions 2-3 and 7; procedure s.3.5, s.3.10).
                      how often the focus rule and the dip depth disagree
   profile_at_node    the fitted profile of a measured node, re-sampled from a
                      fresh block (for figures)
+  node_planes        one node measured again exactly as in the pilot, with the
+                     block it was measured on and Allen's traced segments in
+                     that block (for the plane montage, 2026-10-07)
   background_stats   per node: the masked median, the robust SD (1.4826 x MAD)
                      and the clipped SD (analysis.camera_fit) of the unmasked
                      pixels of its block in plane k*
@@ -150,6 +153,66 @@ def profile_at_node(provider, result, cfg):
         model = tube_model.model_profile(v, f.d_hat_um, f.alpha_hat, f.v0_hat_um, m.sigma_fit_um, result.B_bar,
                                          f.n_nodes)
     return v, I, model
+
+
+def node_planes(swc, provider, cfg, node_id, transform=None):
+    """What the plane montage of one node draws (Block 11, 2026-10-07).
+
+    The node is measured again by Block 5 on its own stretch, as measure_nodes
+    measures it in the pilot: the same Branch, hence the same single provider
+    request, so a real block comes back from the fetcher's cache and the result
+    equals the pilot's for an unchanged configuration. Returns a dict:
+      result, branch, index    NodeResult, its Branch, the node's index in it
+      block, ks, valid, frame  the block it was measured on (fetch_zblock contract)
+      k_swc                    round(z / dz) of the node, the centre of its plane range
+      allen_radius_um          Allen's radius at the node
+      segments                 (n, 9), one row per SWC segment whose child is a
+                               dendrite node and whose xy bounding box meets the
+                               block: x0, y0, z0 (parent end), x1, y1, z1 (child
+                               end), in um, image frame (cell.to_image_um, the
+                               frame of the Branch); r0, r1, Allen's radii (um) at
+                               the parent and child ends (the SWC frustum), r0 =
+                               r1 when the parent is not a dendrite node (the
+                               soma's radius is not a neurite's); in_stretch, 1.0
+                               when both ends belong to the Branch, else 0.0
+    """
+    types = cfg.acquisition.dendrite_swc_types
+    xyz_img = cell.to_image_um(swc.xyz, cfg.acquisition.res0_um, **(transform or {}))
+    rows = np.flatnonzero(swc.ids == int(node_id))
+    if rows.size != 1:
+        raise ValueError("node %d is not in the SWC" % int(node_id))
+    for run in cell.stretches(swc, types):
+        hit = np.flatnonzero(run == rows[0])
+        if hit.size:
+            break
+    else:
+        raise ValueError("node %d is not a dendrite node (types %s)" % (int(node_id), tuple(types)))
+    branch, off = cell.stretch_branch(swc, run, xyz_img)
+    index = off + int(hit[0])
+    got = []
+
+    def recording(*args):
+        got.append(provider(*args))
+        return got[-1]
+    result = measure_node(branch, index, recording, cfg)
+    block, ks, valid, frame = got[0]
+    pidx = swc.parent_index()
+    child = np.flatnonzero(swc.dendrite_mask(types) & (pidx >= 0))
+    par = pidx[child]
+    a, b = xyz_img[par], xyz_img[child]
+    p = float(frame.res_um_px)
+    x_lo, x_hi = (frame.left - 0.5) * p, (frame.left + block.shape[2] - 0.5) * p
+    y_lo, y_hi = (frame.top - 0.5) * p, (frame.top + block.shape[1] - 0.5) * p
+    meets = ((np.maximum(a[:, 0], b[:, 0]) >= x_lo) & (np.minimum(a[:, 0], b[:, 0]) <= x_hi)
+             & (np.maximum(a[:, 1], b[:, 1]) >= y_lo) & (np.minimum(a[:, 1], b[:, 1]) <= y_hi))
+    in_branch = {int(x) for x in branch.ids}
+    own = np.array([float(int(swc.ids[c]) in in_branch and int(swc.ids[q]) in in_branch) for c, q in zip(child, par)])
+    r1 = np.asarray(swc.radius[child], dtype=float)
+    r0 = np.where(swc.dendrite_mask(types)[par], np.asarray(swc.radius[par], dtype=float), r1)
+    segments = np.column_stack([a, b, r0, r1, own])[meets] if child.size else np.empty((0, 9))
+    return dict(result=result, branch=branch, index=index, block=block, ks=ks, valid=valid, frame=frame,
+                k_swc=int(round(float(branch.xyz_um[index, 2]) / cfg.acquisition.dz_um)),
+                allen_radius_um=float(branch.radius_um[index]), segments=segments)
 
 
 def background_stats(provider, result, branch, cfg):

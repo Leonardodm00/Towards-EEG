@@ -222,6 +222,38 @@ for p in figs:
     display(Image(filename=p))
 
 # ====================================================================================================
+# ===== CELL 4d
+# ====================================================================================================
+# CELL 4D: THE PLANES OF A NODE, WITH ALLEN'S RECONSTRUCTION DRAWN ON THEM
+# Run after Cell 4c: it takes the nodes of `SHOW_NODES`, then those of Cell 4c's table, at most 6 (if the two
+# focus rules agree everywhere, the first three measured nodes). One figure per node, one panel per plane the
+# focus rule scored (the SWC's own plane +-3, widened for tilt), all on one grey scale. On each panel: Allen's
+# traced centre lines with their +-r outline (the SWC frustum), cyan for the measured stretch and amber for
+# the other dendrites in the block, fainter the farther a segment's depth is from the plane's; the SWC node
+# and the fit's profile line (black); in plane k* (red frame) the fitted edges (red ticks); the dip depth's
+# plane in a grey dashed frame. Each panel title gives the plane, its depth minus the node's, and the two
+# focus scores G and F.
+#
+# Each node is measured again exactly as in Cell 4b, so its crops come from the cache. Expect one `[planes]
+# node N: ... | same as the pilot` line per node, then `[planes] wrote N montages (0 skipped) ...; crops: ...
+# from the cache, 0 downloaded`. `DIFFERS from the pilot` means the pilot was measured with another
+# configuration or code version: re-run Cell 4b.
+# Cell 4d: the planes of a node with Allen's reconstruction drawn on them (run Cell 4c first)
+import os
+from IPython.display import Image, display
+PLANE_NODES = (list(SHOW_NODES) + [int(n) for n in moved["node_id"] if int(n) not in SHOW_NODES])[:6]
+if not PLANE_NODES:       # the two focus rules agree on every node: the first measured nodes instead
+    PLANE_NODES = [int(n) for n in rows.loc[rows["z_sub_um"].notna(), "node_id"][:3]]
+run("scripts/node_planes.py", "--specimen", SPECIMEN, "--nodes", ",".join(str(n) for n in PLANE_NODES),
+    "--cache-dir", CACHE_DIR, "--pilot-csv", "%s/pilot/pilot_%d.csv" % (OUT, SPECIMEN),
+    "--out-dir", OUT + "/pilot/planes", *ALIGN)
+for n in PLANE_NODES:
+    p = "%s/pilot/planes/planes_%d.png" % (OUT, n)
+    if os.path.exists(p):
+        print(os.path.basename(p))
+        display(Image(filename=p))
+
+# ====================================================================================================
 # ===== CELL 5
 # ====================================================================================================
 # CELL 5: CAMERA-CHAIN INPUTS
@@ -421,6 +453,8 @@ for s in (0.080, 0.125):
 # - Cell 3b: the per-node verdict lines and `registration_summary_529878215.json`.
 # - Cell 4b/4c: `pilot_summary_529878215.json` (with `k_star_vs_dip_depth`), the minutes per stretch, the
 # table of nodes where the two focus rules differ, and two or three node figures (node 8441's among them).
+# - Cell 4d: the `[planes]` lines, and the montages of two or three nodes: one where the two focus rules
+# differ, one trunk node (large Allen radius).
 # - Cell 5: the `"renderer"` block without the tables, `table_sets`, `pillow_version`, `notes`.
 # - Cell 6: the `pooled dendrite diameter` line.
 # - Cell 7: the growth-fit report.
