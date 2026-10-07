@@ -2,13 +2,16 @@
 
 | Date | Change |
 |---|---|
-| 2026-10-06 | Created by the theory chat. The project log `TEEG_decisions_and_ideas_log.md` (claude.ai project knowledge, root copy) could not be written: `project_write` refused the merged log (55,308 tokens) because project knowledge stood at 1,954,553 of 2,000,000 (`project_info`, 2026-10-06). The refusal implies that any rewrite of the log, even unchanged, exceeds the free space **[inferred from those two numbers]**, so freeing space needs the user's OK. Until then this file holds the text of the three entries, written after re-reading the log (D-001 to D-024, I-001; no D-025 or I-002 there). |
+| 2026-10-06 | Created by the theory chat. The project log `TEEG_decisions_and_ideas_log.md` (claude.ai project knowledge, root copy) could not be written: `project_write` refused the merged log (55,308 tokens) because project knowledge stood at 1,954,553 of 2,000,000 (`project_info`, 2026-10-06). The refusal implies that any rewrite of the log, even unchanged, exceeds the free space **[inferred from those two numbers]**, so freeing space needs the user's OK. Until then this file holds the text of the three entries, written after re-reading the log (D-001 to D-024, I-001; no D-025 or I-002 there). **[corrected 2026-10-07]** The size inference was not borne out: the log was rewritten on 2026-10-07 by the Ih Fit chat (D-028, D-029) and again, larger, by the merge of this file; whether space was freed in between was not checked, so why the 2026-10-06 write was refused is not established. |
 | 2026-10-06 (later) | Adds **D-027** (user, 18:12): calibration first on flat branches, near and far; tilted branches later. Adds its index and log-changelog rows and annotates D-026's status. Comments rest on `checks/calib_width_check.py` (run 2026-10-06). The project log is still not written. |
+| 2026-10-07 | **Merged** into the project log `TEEG_decisions_and_ideas_log.md` (root) at 13:48 UTC, after re-reading it at 13:46 UTC; it then held D-028 and D-029 from the Ih Fit chat and a row reserving D-025 to D-027 and I-002. Entries and index rows verbatim; anchors adapted (note under the anchor table). Status set to merged; the size inference of the first row marked [corrected 2026-10-07]. The project log is now the reference; this file keeps the text as written on 2026-10-06. Evidence: `project_read` and `project_write` (`replaced: true`), 2026-10-07. |
 
-**Status: pending.** When the project log is written, append these pieces
-verbatim at the anchors below, re-read the log first (merge, never
-overwrite), then mark this file "merged <date>" here; do not delete it
-without the user's OK.
+**Status: merged 2026-10-07** into the project log (its changelog row
+2026-10-07 (later, 3)); the project log is now the reference.
+~~**Status: pending.**~~ **[corrected 2026-10-07]** When the project log is
+written, append these pieces verbatim at the anchors below, re-read the log
+first (merge, never overwrite), then mark this file "merged <date>" here; do
+not delete it without the user's OK.
 
 ## Where each piece goes in the project log
 
@@ -21,6 +24,14 @@ without the user's OK.
 | D-024 status note | a new paragraph after D-024's status line ending `survives as a reported diagnostic column, \`steep\`).` |
 | entries D-025, D-026, D-027 | before the heading `## Ideas for future parts` |
 | entry I-002 | at the end of the log, after I-001 |
+
+**[corrected 2026-10-07] Anchors used in the merge.** The log had changed
+(D-028 and D-029 after D-024's entry; changelog rows 2026-10-07 to
+2026-10-07 (later, 2)), so: the two changelog rows below became one log row,
+2026-10-07 (later, 3), after the row `| 2026-10-07 (later, 2) |`; the entries
+D-025 to D-027 went before `## D-028 --`, not before `## Ideas for future
+parts`, to keep numeric order; the D-024 index status and the D-024 note also
+name D-027. Index rows and entries verbatim.
 
 ## Changelog rows
 
