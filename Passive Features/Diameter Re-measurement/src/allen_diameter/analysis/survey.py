@@ -15,6 +15,11 @@ specs/SPEC.md (design handoff Next actions 2-3 and 7; procedure s.3.5, s.3.10).
   background_stats   per node: the masked median, the robust SD (1.4826 x MAD)
                      and the clipped SD (analysis.camera_fit) of the unmasked
                      pixels of its block in plane k*
+  stretch_table      one row per unbranched dendrite stretch (type, nodes,
+                     length, path distance, order, Allen's diameter, node ids)
+  suggest_nodes      a deterministic node list for the registration survey and
+                     the pilot: per SWC type, stretches spread over path
+                     distance (2026-10-07)
 
 Pure ASCII, for the cluster (hpc-python-compat).
 """
@@ -27,6 +32,7 @@ import numpy as np
 
 from . import background, calibration, camera_fit, cell, phantoms, profiles
 from .node_pipeline import measure_node
+from ..loading import swc_io
 from ..model import tube_model
 
 PERCENTILES = (5, 10, 25, 50, 75, 90, 95)
@@ -156,3 +162,107 @@ def background_summary(stats: List[tuple]):
     """Percentiles over nodes of the masked median, the robust SD, the clipped SD and the unmasked fraction."""
     return dict(B_bar_gl=_pct(s[0] for s in stats), robust_sd_gl=_pct(s[1] for s in stats),
                 clipped_sd_gl=_pct(s[2] for s in stats), unmasked_frac=_pct(s[3] for s in stats))
+
+
+def path_distance_um(swc):
+    """(N,) path distance (um) along the SWC from each node's tree root (roots 0)."""
+    pidx = swc.parent_index()
+    seg = swc_io.segment_lengths_um(swc)
+    children: Dict[int, List[int]] = {}
+    for i, p in enumerate(pidx):
+        children.setdefault(int(p), []).append(i)
+    dist = np.full(len(swc), np.nan)
+    stack = list(children.get(-1, []))
+    for i in stack:
+        dist[i] = 0.0
+    while stack:
+        i = stack.pop()
+        for c in children.get(i, []):
+            if not np.isnan(dist[c]):
+                raise ValueError("SWC node %d is reached twice: the parent links contain a cycle" % int(swc.ids[c]))
+            dist[c] = dist[i] + seg[c]
+            stack.append(c)
+    if np.isnan(dist).any():
+        raise ValueError("SWC nodes %s are not connected to a root (a cycle in the parent links)"
+                         % [int(x) for x in swc.ids[np.isnan(dist)][:5]])
+    return dist
+
+
+def stretch_table(swc, types=(3, 4)):
+    """One dict per unbranched dendrite stretch, in the order of cell.stretches:
+    stretch, type (of its first node), n_nodes, first_node, mid_node (index
+    n // 2), last_node, length_um (the stretch's node-to-parent segments, the
+    first node's link included), path_start_um (path distance from the root to
+    the first node), order (ancestor stretches), allen_diameter_um (median 2 r),
+    terminal (the last node has no dendrite child)."""
+    runs = cell.stretches(swc, types)
+    pidx = swc.parent_index()
+    dend = swc.dendrite_mask(types)
+    seg = swc_io.segment_lengths_um(swc)
+    dist = path_distance_um(swc)
+    n_dend_children = np.zeros(len(swc), dtype=int)
+    for i in np.flatnonzero(dend):
+        if pidx[i] >= 0:
+            n_dend_children[pidx[i]] += 1
+    owner = {int(r): s for s, run in enumerate(runs) for r in run}
+    parent_of = []
+    for run in runs:
+        p = int(pidx[int(run[0])])
+        parent_of.append(owner.get(p) if p >= 0 and dend[p] else None)
+    rows = []
+    for s, run in enumerate(runs):
+        order, q = 0, parent_of[s]
+        while q is not None:
+            order, q = order + 1, parent_of[q]
+            if order > len(runs):
+                raise ValueError("stretch %d: the stretch tree contains a cycle" % s)
+        first, last = int(run[0]), int(run[-1])
+        rows.append(dict(stretch=s, type=int(swc.types[first]), n_nodes=int(len(run)), first_node=int(swc.ids[first]),
+                         mid_node=int(swc.ids[int(run[len(run) // 2])]), last_node=int(swc.ids[last]),
+                         length_um=float(seg[run].sum()), path_start_um=float(dist[first]), order=int(order),
+                         allen_diameter_um=float(np.median(2.0 * swc.radius[run])),
+                         terminal=bool(n_dend_children[last] == 0)))
+    return rows
+
+
+def suggest_nodes(swc, types=(3, 4), per_type=3, min_nodes=10, include=()):
+    """Node ids for the registration survey and the pilot (SPEC Block 11, stretch
+    list): the ids of `include` first, each standing for its own stretch; then,
+    per SWC type in ascending order, among the stretches with at least
+    min_nodes nodes sorted by path_start_um (ties by index), those at ranks
+    floor(j (m - 1) / (per_type - 1) + 1/2), j = 0 .. per_type - 1 (all when
+    m <= per_type; rank (m - 1) // 2 when per_type = 1), each by its mid node,
+    skipping a stretch already represented. ValueError for an include id that
+    is not a dendrite node."""
+    if int(per_type) < 1 or int(min_nodes) < 1:
+        raise ValueError("per_type and min_nodes must be >= 1")
+    per_type = int(per_type)
+    rows = stretch_table(swc, types)
+    of_id = {int(swc.ids[r]): s for s, run in enumerate(cell.stretches(swc, types)) for r in run}
+    out, taken = [], set()
+    for nid in include:
+        nid = int(nid)
+        if nid not in of_id:
+            raise ValueError("node %d is not a dendrite node (SWC types %s) of this file" % (nid, list(types)))
+        if nid not in out:
+            out.append(nid)
+        taken.add(of_id[nid])
+    for t in sorted({r["type"] for r in rows}):
+        elig = sorted((r for r in rows if r["type"] == t and r["n_nodes"] >= int(min_nodes)),
+                      key=lambda r: (r["path_start_um"], r["stretch"]))
+        for k in spread_ranks(len(elig), per_type):
+            if elig[k]["stretch"] not in taken:
+                taken.add(elig[k]["stretch"])
+                out.append(elig[k]["mid_node"])
+    return out
+
+
+def spread_ranks(m, k):
+    """k ranks spread evenly over 0 .. m - 1: all of them when m <= k, (m - 1) // 2
+    when k = 1, else floor(j (m - 1) / (k - 1) + 1/2) for j = 0 .. k - 1 (distinct,
+    since the step exceeds 1)."""
+    if m <= k:
+        return list(range(m))
+    if k == 1:
+        return [(m - 1) // 2]
+    return sorted({int(math.floor(j * (m - 1) / (k - 1) + 0.5)) for j in range(k)})

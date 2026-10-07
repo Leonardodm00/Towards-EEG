@@ -68,6 +68,13 @@ that say `claude/<name>` mean the same file name in this folder.
 | `TEEG_microscope_optics_oil_immersion_2026-10-04.md` | **The physics of the microscope** (v1.2, with pointers to figures 1-3): light path, refraction, oil immersion and NA, diffraction and the in-focus blur, forming vs resolving, defocus and why the blur stays flat near focus, condenser and coherence, mounting-medium index mismatch. |
 | `TEEG_interactive_figures_spec_2026-10-04.md` | **Instructions for Claude Design to reproduce the four interactive figures**: shared design rules, and per figure the claim, layout, controls, model equations, acceptance values and a paste-ready prompt; known gaps. |
 | `TEEG_diameter_optics_notes.md` | Running notes (v2, 2026-10-04) summarising the chat explanations, with corrections marked "[corrected <date>]". |
+| `TEEG_diameter_phase2_colab_runbook_2026-10-06.md` | **The real-data steps in Colab** (v2, 2026-10-07): Cells 0-10 in order (bootstrap, node list, registration, pilot, camera inputs, radius distribution, kernel calibration, production configuration, the davinci table, apply to the cell), each with the line that must appear and the decisions it feeds. [added 2026-10-07: the runbook was not listed here] |
+
+### `notebooks/`
+
+| File | What it is |
+|---|---|
+| `phase2_colab.ipynb` | The runbook's cells as a Colab notebook (2026-10-07), same numbers, same code. Open it in Colab from GitHub (File > Open notebook > GitHub, branch `sci/diameter-pipeline`). |
 
 The three 2026-10-04 documents were independently reviewed and revised the same
 day; each ends with a revision record. Decisions D-018 and D-019 are recorded in
@@ -138,7 +145,7 @@ configuration parameters, confirmed in one batch at the start of the
 implementation chat. The code is built block by block (blocks 0-11 of the
 implementation handoff). Step 1 is Phase II of that plan.
 
-1. Run cell 13 (local registration) on node 4505 and on 5-10 stretches.
+1. Run cell 13 (local registration) on node 4505 and on 5-10 stretches. **[2026-10-07]** Cells 3a-3b of `notebooks/phase2_colab.ipynb`.
 2. Settle the open choices: B_bar region (D-018 (a)), mu per node or shared
    (D-019 (a)), sigma_fit, kernel family, grid and N, selection rule.
 3. Write `allen_image_diameter.py` with its smoke suite. **[corrected 2026-10-06]**
@@ -152,5 +159,6 @@ implementation handoff). Step 1 is Phase II of that plan.
 
 | Date | Change |
 |---|---|
+| 2026-10-07 | Listed the Phase II runbook (v2) and the new `notebooks/phase2_colab.ipynb`; pointed next step 1 at its Cells 3a-3b. |
 | 2026-10-06 (later) | Implementation started (branch `sci/diameter-pipeline`): `src/`, `scripts/`, `tests/smoke/` added; root `specs/SPEC.md`; the 2026-09-23 modules imported byte-identical. Decisions D-022 to D-024 in the project log. |
 | 2026-10-06 | Added the implementation handoff (D-021) to the contents and status. Corrected the Drive statement: only the 2026-09-22 module versions are there (Drive listing, 2026-10-06). Noted which decision-log copy is live (project_read of both copies, 2026-10-06). Added four check scripts with reference outputs (`*.out`, re-run 2026-10-06, identical to the original runs). Marked next steps 2-3 as handled by D-021. |
