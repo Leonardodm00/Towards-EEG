@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="460" viewBox="0 0 680 460" role="img" font-family="Helvetica, Arial, sans-serif">
+<title>Ray world versus partition: where the light reaching a slice is computed</title>
+<desc>Two cross-sections of the same stained tube, cut into horizontal slices and lit from below by one oblique condenser ray that crosses slice j at a dot. Left, ray world: the light reaching the dot is reduced by the stain along the ray's own oblique path, which runs through the thick middle of the tube. Right, partition: the light reaching the dot is computed from the stain on the vertical line straight below the dot, which crosses only the thin edge.</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#378ADD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+<clipPath id="tubes"><circle cx="170" cy="200" r="90"/><circle cx="510" cy="200" r="90"/></clipPath>
+</defs>
+<rect x="0" y="0" width="680" height="460" fill="#FFFFFF"/>
+<text x="170" y="50" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#2C2C2A">Ray world (S6)</text>
+<text x="510" y="50" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#2C2C2A">Partition (Eqs. 5–6)</text>
+<text x="340" y="80" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5F5E5A">One oblique condenser ray (blue) crosses slice j (shaded) at the dot</text>
+<circle cx="170" cy="200" r="90" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.75"/>
+<circle cx="510" cy="200" r="90" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.75"/>
+<rect x="70" y="170" width="540" height="20" fill="#EF9F27" fill-opacity="0.45" clip-path="url(#tubes)"/>
+<g clip-path="url(#tubes)" stroke="#BA7517" stroke-width="0.5" stroke-opacity="0.7">
+<line x1="70" y1="130" x2="610" y2="130"/><line x1="70" y1="150" x2="610" y2="150"/><line x1="70" y1="170" x2="610" y2="170"/><line x1="70" y1="190" x2="610" y2="190"/><line x1="70" y1="210" x2="610" y2="210"/><line x1="70" y1="230" x2="610" y2="230"/><line x1="70" y1="250" x2="610" y2="250"/><line x1="70" y1="270" x2="610" y2="270"/>
+</g>
+<line x1="140" y1="330" x2="287" y2="120" stroke="#378ADD" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="480" y1="330" x2="627" y2="120" stroke="#378ADD" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="168" y1="290" x2="245" y2="180" stroke="#D85A30" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="585" y1="249.75" x2="585" y2="180" stroke="#D85A30" stroke-width="3.5" stroke-dasharray="6 4"/>
+<circle cx="245" cy="180" r="5" fill="#2C2C2A"/>
+<circle cx="585" cy="180" r="5" fill="#2C2C2A"/>
+<text x="170" y="356" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5F5E5A">Light at the dot is reduced by</text>
+<text x="170" y="376" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5F5E5A">the stain along the ray (solid)</text>
+<text x="510" y="356" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5F5E5A">Light at the dot is reduced by</text>
+<text x="510" y="376" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5F5E5A">the stain straight below it (dashed)</text>
+<text x="340" y="414" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5F5E5A">Faint stain: both reductions are tiny, so the two images agree</text>
+<text x="340" y="434" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5F5E5A">Dark stain: they differ, and the partition misplaces absorption</text>
+</svg>
