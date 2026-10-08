@@ -807,12 +807,14 @@ run]**.
   the weak-object approximation neglects the interference of scattered light
   with scattered light (first Born); at $S\ge1$ the weak-object transfer
   function is the pupil autocorrelation (no phase contrast), full incoherence
-  only as $S\to\infty$. Searches of 2026-10-08: PubMed, 14 queries (weak-object
+  only as $S\to\infty$. Searches of 2026-10-08: PubMed, 15 queries (weak-object
   transfer function; partially coherent absorption and phase transfer
-  functions; first Born and intensity diffraction tomography; transport of
-  intensity; transmission cross-coefficient; condenser aperture and contrast;
-  Fourier ptychography; DAB as a light scatterer; strongly absorbing objects;
-  brightfield dendrite diameters), 0-10 records each; the PMC records of Li
+  functions; first Born and intensity diffraction tomography, twice; transport
+  of intensity, twice; 3-D differential phase contrast; transmission
+  cross-coefficient; condenser aperture and contrast; Fourier ptychography;
+  image simulation of thin specimens; DAB as a light scatterer, twice;
+  strongly absorbing objects; brightfield dendrite diameters), 0-10 records
+  each; the PMC records of Li
   et al. 2017, Chen et al. 2016 and Mehta & Oldenbourg 2014 (*Biomed Opt
   Express*) returned no body text, so they were not used.
 

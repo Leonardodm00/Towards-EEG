@@ -99,7 +99,7 @@ In the order the theory chat would take it; the user decides.
    profiles. No bright-field source found (PubMed, 5 queries, 2026-10-07);
    the literature search could be widened.
    **[2026-10-08, explained in the new theory chat]** Literature widened:
-   PubMed, 14 queries; one full text, Zuo et al. 2017 (*Sci Rep* 7:7654,
+   PubMed, 15 queries; one full text, Zuo et al. 2017 (*Sci Rep* 7:7654,
    PMC5550517): under Köhler illumination the image is an incoherent sum of
    the coherent images from the source points; at $S\ge1$ the weak-object
    transfer function is the pupil autocorrelation (absorption imaged as by an
