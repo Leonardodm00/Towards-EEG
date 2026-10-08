@@ -21,6 +21,16 @@ normalised).
 I_{k+1} - I_k over the pixels of the square, its mean S+ and the mean S- of
 the negative part (focus.plane_differences), with the dip of S+.
 
+--evaluation entropy (the proposal of 17:07): in every plane, the Shannon
+entropy (bits) of the grey-level histogram, one bin per grey level
+(focus.plane_entropies), of two sample sets: the bilinear samples along the
+measuring line (the profile of the profile evaluation), and the pixels of the
+strip centred on the line: within the line's half-length across the branch
+and within S = --stripe-half-um (default 1 um) along it (profiles.stripe_mask).
+The plane of each entropy's dip (focus.difference_dip: the minimum between
+its two largest maxima) is framed (blue: line; amber: strip). Writes
+planeentropy_<id>.png and planeentropy_<specimen>.json instead of planediff_*.
+
 Each node is located as the pilot measures it (survey.node_planes: the same
 stretch and block request, so with the pilot's image cache its planes come
 from disk); the planes outside the pilot's range are fetched, one crop each.
@@ -30,6 +40,8 @@ Writes, in --out-dir: planediff_<id>.png and planediff_<specimen>.json.
 Example (Colab, after Cells 0 and 1)
     python scripts/plane_differences.py --specimen 529878215 --nodes 2,3 \
         --cache-dir /content/drive/MyDrive/allen_cache --out-dir /content/drive/MyDrive/diameters/pilot/planediff
+    python scripts/plane_differences.py --specimen 529878215 --nodes 2,3 --evaluation entropy \
+        --cache-dir /content/drive/MyDrive/allen_cache --out-dir /content/drive/MyDrive/diameters/pilot/planeentropy
 
 Pure ASCII, for the cluster (hpc-python-compat).
 """
@@ -64,6 +76,9 @@ _MARKS_PIPELINE = (("k_star", "#ff1744", "-", "k*", "k* (gradient energy, D-030)
                    ("k_swc", "#1a1a19", ":", "SWC", "the SWC node's plane"))
 _MARKS_AREA = (("k_min_area", "#2a78d6", "-", "minA", "smallest area under the profile, as measured"),
                ("k_min_area_norm", "#4a3aa7", "--", "minA/B", "smallest area, background-normalised"))
+_MARKS_ENTROPY = (("k_dip_h_line", "#2a78d6", "-", "Hl", "dip of the entropy along the measuring line"),
+                  ("k_dip_h_strip", "#eda100", "--", "Hs", "dip of the entropy in the strip"))
+_PREFIX = {"profile": "planediff", "image": "planediff", "entropy": "planeentropy"}
 
 
 def node_stack(swc, provider, cfg, node_id, transform=None, planes_half=6, half_um=None, band_um=0.0):
@@ -138,9 +153,11 @@ def plane_background(block, valid, far, min_frac=0.05):
     return B
 
 
-def profile_evaluation(st, cfg, profile_half_um=None, bg_margin_um=4.0):
-    """Profiles along the node's measuring line in every plane, their areas as
-    measured and background-normalised, and each plane's background B_k."""
+def line_profiles(st, cfg, profile_half_um=None):
+    """The node's measuring line (through the node, across its fitted heading,
+    |v| <= h, h = profile_half_um or the measurement's) and the bilinear
+    profile I_k(v) on it in every valid plane of node_stack's square (NaN rows
+    for the invalid planes). Returns (h, v, y_hat, e_u, prof (n, M))."""
     m = cfg.measure
     h = float(m.profile_half_um if profile_half_um is None else profile_half_um)
     v = profiles.profile_offsets(dataclasses.replace(m, profile_half_um=h))
@@ -151,6 +168,14 @@ def profile_evaluation(st, cfg, profile_half_um=None, bg_margin_um=4.0):
     for k in range(stack.shape[0]):
         if valid[k]:
             prof[k] = profiles.sample_profile(stack[k], fr, st["o"], y_hat, e_u, v)
+    return h, v, y_hat, e_u, prof
+
+
+def profile_evaluation(st, cfg, profile_half_um=None, bg_margin_um=4.0):
+    """Profiles along the node's measuring line in every plane, their areas as
+    measured and background-normalised, and each plane's background B_k."""
+    h, v, y_hat, e_u, prof = line_profiles(st, cfg, profile_half_um)
+    valid = st["valid"]
     # the margin shrinks (4, 3, 2, 1, 0.5 um, never above the one asked) until 5 % of the block's pixels are far:
     # next to the soma a wide margin leaves no pixel
     margins = [float(bg_margin_um)] + [x for x in (3.0, 2.0, 1.0, 0.5) if x < float(bg_margin_um)]
@@ -170,9 +195,39 @@ def profile_evaluation(st, cfg, profile_half_um=None, bg_margin_um=4.0):
                 bg_frac=float(far.mean()), bg_margin_used=margin if np.isfinite(B).any() else None)
 
 
+def entropy_evaluation(st, cfg, profile_half_um=None, stripe_half_um=1.0, bin_width=1.0):
+    """The entropies of the grey-level histograms, plane by plane, of the
+    samples along the node's measuring line and of the pixels of its strip
+    (|v| <= h across the branch, |u| <= stripe_half_um along it, in the square
+    of node_stack), with the histograms themselves and the strip's outline.
+    ValueError when the strip holds no pixel of the square."""
+    if not stripe_half_um > 0:
+        raise ValueError("stripe_half_um must be > 0, got %r" % (stripe_half_um,))
+    h, v, y_hat, e_u, prof = line_profiles(st, cfg, profile_half_um)
+    stack, valid, fr, o = st["stack"], st["valid"], st["frame"], st["o"]
+    strip = profiles.stripe_mask(stack.shape[1:], fr, o, y_hat, e_u, h, stripe_half_um)
+    if not strip.any():
+        raise ValueError("the strip (+-%g um across, +-%g um along) holds no pixel of the square" % (h, stripe_half_um))
+    ent = focus.plane_entropies(prof, stack, strip, valid, bin_width)
+    hist_line = [focus.grey_histogram(prof[k], bin_width) if np.isfinite(ent["h_line"][k]) else None
+                 for k in range(stack.shape[0])]
+    hist_strip = [focus.grey_histogram(stack[k][strip], bin_width) if np.isfinite(ent["h_strip"][k]) else None
+                  for k in range(stack.shape[0])]
+    corners = np.array([o + a * h * y_hat + c * float(stripe_half_um) * e_u
+                        for a, c in ((-1, -1), (1, -1), (1, 1), (-1, 1), (-1, -1))])
+    ent.update(v=v, prof=prof, line=(o - h * y_hat, o + h * y_hat), half_um=h, stripe_half_um=float(stripe_half_um),
+               bin_width=float(bin_width), strip=strip, outline=corners, hist_line=hist_line, hist_strip=hist_strip)
+    return ent
+
+
 def _argmin_plane(ks, A):
     A = np.asarray(A, dtype=float)
     return None if not np.isfinite(A).any() else int(ks[int(np.nanargmin(A))])
+
+
+def _dip_plane(ks, S):
+    d = focus.difference_dip(S)
+    return None if d is None else int(ks[d])
 
 
 def _marks(at, specs):
@@ -193,12 +248,15 @@ def _pipeline_at(res, k_swc):
 
 
 def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_half=6, half_um=None, band_um=0.0,
-        evaluation="profile", profile_half_um=None, bg_margin_um=4.0, dpi=110, log=print):
-    """One figure per node id; returns the per-node records (also written to planediff_<specimen>.json)."""
+        evaluation="profile", profile_half_um=None, bg_margin_um=4.0, dpi=110, log=print, stripe_half_um=1.0,
+        entropy_bin_gl=1.0):
+    """One figure per node id; returns the per-node records (also written to
+    planediff_<specimen>.json, or planeentropy_<specimen>.json for the entropy
+    evaluation)."""
     from allen_diameter.plotting import figures as fg
     import matplotlib.pyplot as plt
-    if evaluation not in ("profile", "image"):
-        raise ValueError("evaluation must be 'profile' or 'image', got %r" % (evaluation,))
+    if evaluation not in _PREFIX:
+        raise ValueError("evaluation must be one of %s, got %r" % (", ".join(sorted(_PREFIX)), evaluation))
     os.makedirs(out_dir, exist_ok=True)
     records = []
     for nid in node_ids:
@@ -239,6 +297,34 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
                    % (na(at["k_min_area"]), na(at["k_min_area_norm"]),
                       "%.1f..%.1f gl (margin %g um)" % (fin.min(), fin.max(), ev["bg_margin_used"]) if fin.size
                       else "n/a (no pixel far from the traced dendrites)"))
+        elif evaluation == "entropy":
+            ev = entropy_evaluation(st, cfg, profile_half_um, stripe_half_um, entropy_bin_gl)
+            at.update(k_dip_h_line=_dip_plane(ks, ev["h_line"]), k_dip_h_strip=_dip_plane(ks, ev["h_strip"]))
+            frames, lines = _marks(at, _MARKS_ENTROPY + _MARKS_PIPELINE)
+            na = lambda x: "n/a" if x is None else "%d" % x  # noqa: E731
+            n_line = int(ev["n_line"].max())
+            n_strip = int(ev["n_strip"].max())
+            label = ("node %d: planes %d..%d; line +-%.1f um across heading %.0f deg (%d samples), strip +-%.1f um "
+                     "along it (%d pixels); entropy dip at k %s (line), k %s (strip); k* %d, dip-depth plane %d, "
+                     "SWC plane %d" % (nid, ks[0], ks[-1], ev["half_um"], math.degrees(st["theta"]), n_line,
+                                       ev["stripe_half_um"], n_strip, na(at["k_dip_h_line"]),
+                                       na(at["k_dip_h_strip"]), r.k_star, r.k_star_depth, st["k_swc"]))
+            d_line, d_strip = focus.difference_dip(ev["h_line"]), focus.difference_dip(ev["h_strip"])
+            fig = fg.entropy_figure([dict(label=label, stack=st["stack"], ks=ks, valid=st["valid"], extent=st["extent"],
+                                          line=ev["line"], outline=ev["outline"], frames=frames, lines=lines,
+                                          hist_line=ev["hist_line"], hist_strip=ev["hist_strip"],
+                                          h_line=ev["h_line"], h_strip=ev["h_strip"], dip_line=d_line,
+                                          dip_strip=d_strip, n_line=n_line, n_strip=n_strip, k_ref=st["k_swc"])],
+                                    "Entropy of the grey levels along the measuring line and in its strip, specimen %s"
+                                    % specimen)
+            rec.update(profile_half_um=ev["half_um"], stripe_half_um=ev["stripe_half_um"],
+                       entropy_bin_gl=ev["bin_width"], theta_rad=st["theta"],
+                       h_line=[float(x) for x in ev["h_line"]], h_strip=[float(x) for x in ev["h_strip"]],
+                       n_line=[int(x) for x in ev["n_line"]], n_strip=[int(x) for x in ev["n_strip"]],
+                       m_line=[int(x) for x in ev["m_line"]], m_strip=[int(x) for x in ev["m_strip"]],
+                       k_dip_h_line=at["k_dip_h_line"], k_dip_h_strip=at["k_dip_h_strip"])
+            msg = ("entropy dip at k %s along the line (%d samples), k %s in the strip (%d pixels)"
+                   % (na(at["k_dip_h_line"]), n_line, na(at["k_dip_h_strip"]), n_strip))
         else:
             res = focus.plane_differences(st["stack"], st["valid"], st["mask"])
             dip = focus.difference_dip(res["pos"])
@@ -254,14 +340,14 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
                        n_pixels=int(st["mask"].sum()), band_um=float(band_um))
             msg = "%d pixels; dip of S+ at %s" % (rec["n_pixels"], "none" if dip is None else
                                                  "%d->%d" % tuple(rec["dip_pair"]))
-        path = os.path.join(out_dir, "planediff_%d.png" % nid)
+        path = os.path.join(out_dir, "%s_%d.png" % (_PREFIX[evaluation], nid))
         fig.savefig(path, dpi=dpi)
         plt.close(fig)
         rec["png"] = path
         log("[planediff] node %d: planes %d..%d (%d missing); %s; k* %d, dip-depth plane %d, SWC plane %d"
             % (nid, ks[0], ks[-1], rec["n_missing"], msg, rec["k_star"], rec["k_star_depth"], rec["k_swc"]))
         records.append(rec)
-    with open(os.path.join(out_dir, "planediff_%s.json" % specimen), "w") as f:
+    with open(os.path.join(out_dir, "%s_%s.json" % (_PREFIX[evaluation], specimen)), "w") as f:
         json.dump(records, f, indent=1, sort_keys=True, allow_nan=True)
     return records
 
@@ -271,10 +357,15 @@ def main(argv=None):
     ap.add_argument("--specimen", required=True)
     ap.add_argument("--nodes", required=True, help="comma-separated node ids")
     ap.add_argument("--out-dir", required=True)
-    ap.add_argument("--evaluation", choices=("profile", "image"), default="profile")
+    ap.add_argument("--evaluation", choices=("profile", "image", "entropy"), default="profile")
     ap.add_argument("--planes-half", type=int, default=6, help="planes on each side of the SWC plane")
     ap.add_argument("--profile-half-um", type=float, default=None,
-                    help="profile evaluation: half-length of the measuring line, um (default: profile_half_um)")
+                    help="profile and entropy evaluations: half-length of the measuring line, um "
+                         "(default: profile_half_um)")
+    ap.add_argument("--stripe-half-um", type=float, default=1.0,
+                    help="entropy evaluation: half-width of the strip along the branch, um")
+    ap.add_argument("--entropy-bin-gl", type=float, default=1.0,
+                    help="entropy evaluation: width of a histogram bin, grey levels")
     ap.add_argument("--bg-margin-um", type=float, default=4.0,
                     help="profile evaluation: B_k uses the block's pixels farther than Allen's radius + this from "
                          "every traced dendrite")
@@ -306,7 +397,7 @@ def main(argv=None):
     recs = run(swc, provider, cfg, node_ids, a.out_dir, a.specimen,
                dict(shift_full_px=(a.shift_x, a.shift_y), flip_y_full_h=a.flip_h, z0_um=a.z0),
                a.planes_half, a.half_um, a.band_um, a.evaluation, a.profile_half_um, a.bg_margin_um,
-               log=lambda m: print(m, flush=True))
+               log=lambda m: print(m, flush=True), stripe_half_um=a.stripe_half_um, entropy_bin_gl=a.entropy_bin_gl)
     n_ok = sum(1 for r in recs if "png" in r)
     print("[planediff] wrote %d figures (%d skipped) in %s; crops: %d from the cache, %d downloaded (%.1f MB); %.1f min"
           % (n_ok, len(recs) - n_ok, a.out_dir, fetcher.n_cache_hits, fetcher.n_requests,

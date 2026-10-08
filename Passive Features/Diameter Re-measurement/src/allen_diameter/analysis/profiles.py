@@ -53,3 +53,21 @@ def sample_profile(plane, frame, origin_xy, y_hat, e_u, v, n_avg=0, step=0.0):
         cols, rows = x / p - frame.left, y / p - frame.top
         total += ndimage.map_coordinates(img, [rows, cols], order=1, mode="constant", cval=np.nan)
     return total / (2 * int(n_avg) + 1)
+
+
+def stripe_mask(shape, frame, origin_xy, y_hat, e_u, half_v_um, half_u_um):
+    """(H, W) bool: the pixels whose centres lie in the strip of a measuring
+    line -- within +-half_v_um of the origin along the line (y_hat) and within
+    +-half_u_um across it, along the branch (e_u). Pixel (row, col) of a plane
+    with this frame is centred at ((left + col) p, (top + row) p), p the pixel
+    size (the convention of sample_profile)."""
+    H, W = int(shape[0]), int(shape[1])
+    p = float(frame.res_um_px)
+    rows, cols = np.mgrid[0:H, 0:W]
+    dx = (frame.left + cols) * p - float(origin_xy[0])
+    dy = (frame.top + rows) * p - float(origin_xy[1])
+    yh = np.asarray(y_hat, dtype=float)
+    eu = np.asarray(e_u, dtype=float)
+    tol = 1e-9
+    return (np.abs(dx * yh[0] + dy * yh[1]) <= float(half_v_um) + tol) & \
+        (np.abs(dx * eu[0] + dy * eu[1]) <= float(half_u_um) + tol)

@@ -501,3 +501,123 @@ def profile_area_figure(blocks, title=""):
     if title:
         fig.suptitle(title, y=1.0 - 0.80 / H, fontsize=10)
     return fig
+
+
+# entropy along the measuring line (blue) and in its strip (amber: light on white, so its markers carry a dark edge
+# and its line is dashed; blue, amber and the red of k* pass the dataviz palette checks, all pairs, light surface)
+_HLINE, _HSTRIP, _EDGE = "#2a78d6", "#eda100", "#1a1a19"
+
+
+def entropy_figure(blocks, title=""):
+    """Histogram entropies around a node, plane by plane
+    (focus.plane_entropies). Per block (one node): the planes on one grey
+    scale with the measuring line, the outline of its strip and frames;
+    below, the grey-level histograms of the line's samples and of the strip's
+    pixels, coloured by plane (blue below the reference plane, red above,
+    darker nearer), and the two entropies on one axis with their dips.
+
+    blocks: list of dicts with
+      label, stack (n, H, W), ks (n,), valid (n,), extent (image_extent_um), line ((x0, y0), (x1, y1)) in um,
+      outline (q, 2) the strip's corners in um, closed, frames {k: (colour, linestyle, tag)},
+      lines [(k, colour, linestyle, label)], hist_line and hist_strip: per plane (centres, counts) or None,
+      h_line (n,), h_strip (n,) in bits, dip_line and dip_strip (an index into ks, or None),
+      n_line and n_strip (the samples behind a finite entropy), k_ref (the colour reference plane)
+    Presentation only. Returns the Figure."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.patheffects as pe
+    halo = [pe.Stroke(linewidth=3.0, foreground="white"), pe.Normal()]
+    side, gap, left, right = 0.95, 0.08, 0.75, 0.25
+    col = side + gap
+    n_max = max(len(b["ks"]) for b in blocks)
+    W = max(left + n_max * col - gap + right, 13.0)
+    heights = (0.34, 0.34, side, 0.62, 2.3, 0.62)
+    top_band = 1.25
+    H = top_band + len(blocks) * sum(heights)
+    fig = plt.figure(figsize=(W, H))
+
+    def ax_at(x_in, y_top_in, w_in, h_in):
+        return fig.add_axes([x_in / W, 1.0 - (y_top_in + h_in) / H, w_in / W, h_in / H])
+
+    lines_seen = {}
+    y = top_band
+    for b in blocks:
+        ks = np.asarray(b["ks"])
+        n = ks.size
+        stack = np.asarray(b["stack"], dtype=float)
+        valid = np.asarray(b["valid"], dtype=bool)
+        fig.text(left / W, 1.0 - (y + 0.26) / H, b["label"], fontsize=10, fontweight="bold", ha="left")
+        y += heights[0]
+        shown = stack[valid] if valid.any() else stack
+        lo, hi = np.percentile(shown, [1.0, 99.5])
+        (x0, y0), (x1, y1) = b["line"]
+        out = np.asarray(b["outline"], dtype=float)
+        for j in range(n):
+            ax = ax_at(left + j * col, y + heights[1], side, side)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            k = int(ks[j])
+            if valid[j]:
+                ax.imshow(stack[j], cmap="gray", vmin=lo, vmax=hi, extent=b.get("extent"), origin="upper",
+                          interpolation="nearest")
+                ax.plot(out[:, 0], out[:, 1], color=_HSTRIP, lw=1.0, ls="--", path_effects=halo)
+                ax.plot([x0, x1], [y0, y1], color="black", lw=1.0, path_effects=halo)
+            else:
+                ax.set_facecolor("0.85")
+                ax.text(0.5, 0.5, "missing", ha="center", va="center", fontsize=8, transform=ax.transAxes)
+            tag = ""
+            if k in b.get("frames", {}):
+                colour, ls, tag = b["frames"][k]
+                ax.add_patch(plt.Rectangle((0.01, 0.01), 0.98, 0.98, transform=ax.transAxes, fill=False,
+                                           edgecolor=colour, lw=2.6, ls=ls, clip_on=False))
+            ax.set_title("k %d%s" % (k, ("\n" + tag) if tag else ""), fontsize=7.5, pad=2)
+        y += heights[1] + heights[2] + heights[3]
+        w3 = (W - left - right - 2 * 0.7) / 3.0
+        a1 = ax_at(left, y, w3, heights[4])
+        a2 = ax_at(left + w3 + 0.7, y, w3, heights[4])
+        a3 = ax_at(left + 2 * (w3 + 0.7), y, w3, heights[4])
+        order = sorted(range(n), key=lambda j: -abs(int(ks[j]) - int(b["k_ref"])))
+        for ax, key, what in ((a1, "hist_line", "the %d samples along the measuring line" % int(b["n_line"])),
+                              (a2, "hist_strip", "the %d pixels of the strip" % int(b["n_strip"]))):
+            hists = b.get(key) or [None] * n
+            for j in order:
+                if valid[j] and hists[j] is not None and len(hists[j][1]):
+                    c, cnt = np.asarray(hists[j][0], dtype=float), np.asarray(hists[j][1], dtype=float)
+                    dk = int(ks[j]) - int(b["k_ref"])
+                    ax.step(c, cnt / cnt.sum(), where="mid", color=_plane_colour(dk), lw=2.0 if dk == 0 else 1.0)
+            ax.set_title("grey-level histogram of %s\n(dark: plane %d; blue below, red above; darker = nearer)"
+                         % (what, int(b["k_ref"])), fontsize=8.5)
+            ax.set_xlabel("grey level", fontsize=8.5)
+            ax.set_ylabel("fraction per grey level", fontsize=8.5)
+        for k, colour, ls, label in b.get("lines", []):
+            a3.axvline(k, color=colour, ls=ls, lw=1.1, zorder=1)
+            lines_seen[label] = (colour, ls)
+        for key, dkey, colour, style in (("h_line", "dip_line", _HLINE, "o-"), ("h_strip", "dip_strip", _HSTRIP, "s--")):
+            h = np.asarray(b[key], dtype=float)
+            a3.plot(ks, h, style, color=colour, ms=4.5, lw=1.8, mec=_EDGE if colour == _HSTRIP else colour, mew=0.8,
+                    zorder=3)
+            if b.get(dkey) is not None:
+                d = int(b[dkey])
+                a3.plot([ks[d]], [h[d]], style[0], ms=11, mfc=colour, mec=_EDGE if colour == _HSTRIP else "white",
+                        mew=1.5, zorder=4)
+        a3.set_title("entropy of each histogram (dips marked)", fontsize=8.5)
+        a3.set_xlabel("plane k", fontsize=8.5)
+        a3.set_ylabel("H (bits)", fontsize=8.5)
+        a3.set_xlim(ks[0] - 0.5, ks[-1] + 0.5)
+        for ax in (a1, a2, a3):
+            ax.tick_params(labelsize=7.5)
+            ax.grid(axis="y", color="#e6e5e0", lw=0.6)
+            for s in ("top", "right"):
+                ax.spines[s].set_visible(False)
+        y += heights[4] + heights[5]
+    handles = [plt.Line2D([], [], color=_HLINE, marker="o", lw=1.8,
+                          label="H along the measuring line (bilinear samples); blue frame Hl: its dip"),
+               plt.Line2D([], [], color=_HSTRIP, marker="s", mec=_EDGE, ls="--", lw=1.8,
+                          label="H of the strip's pixels (outlined on the planes); amber frame Hs: its dip")]
+    handles += [plt.Line2D([], [], color=c, ls=ls, lw=2.0, label="frame and line: " + t)
+                for t, (c, ls) in lines_seen.items() if c not in (_HLINE, _HSTRIP)]
+    fig.legend(handles=handles, loc="upper center", ncol=3, fontsize=8, frameon=False, bbox_to_anchor=(0.5, 1.0 - 0.02 / H))
+    if title:
+        fig.suptitle(title, y=1.0 - 0.80 / H, fontsize=10)
+    return fig

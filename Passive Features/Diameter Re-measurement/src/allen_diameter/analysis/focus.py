@@ -210,14 +210,99 @@ def profile_areas(profiles, v, valid=None):
     return dict(area=area, d_area=np.diff(area))
 
 
+def grey_histogram(values, bin_width=1.0):
+    """The finite values counted in bins of width w = bin_width centred on the
+    multiples of w: value x goes to bin j = floor(x / w + 1/2), the half-open
+    interval [(j - 1/2) w, (j + 1/2) w). Returns (centres (m,) = j w, counts (m,))
+    from the lowest to the highest occupied bin, empty bins in between
+    included; two empty arrays when no value is finite."""
+    # Custom: bins centred on the grey levels, half-open on every side. Checked: numpy.histogram (its last bin is
+    # closed, and edges at half-integers in floating point are what this avoids); numpy.bincount does the counting.
+    if not bin_width > 0:
+        raise ValueError("grey_histogram: bin_width must be > 0, got %r" % (bin_width,))
+    x = np.asarray(values, dtype=float).ravel()
+    x = x[np.isfinite(x)]
+    if x.size == 0:
+        return np.empty(0), np.empty(0, dtype=np.int64)
+    idx = np.floor(x / float(bin_width) + 0.5).astype(np.int64)
+    lo = int(idx.min())
+    counts = np.bincount(idx - lo)
+    return (lo + np.arange(counts.size)) * float(bin_width), counts
+
+
+def histogram_entropy(values, bin_width=1.0):
+    """Shannon entropy of the grey-level histogram of `values` (the user's
+    proposal of 2026-10-08, 17:07; a diagnostic). Returns (H in bits, N, m).
+
+    With the bins of grey_histogram (for 8-bit grey levels and bin_width 1,
+    one bin per grey level; a bilinear sample goes to the nearest level),
+    p_j = n_j / N over the N finite values and
+
+        H = -sum over occupied bins j of p_j log2 p_j       [bits]
+
+    (scipy.stats.entropy, base 2): the plug-in estimate of the entropy of the
+    distribution the values were drawn from, biased low when N is not large
+    against the number m of occupied bins. Non-finite values are dropped;
+    (NaN, 0, 0) when none is left. Adding a multiple of bin_width to every
+    value, or permuting the values, leaves H unchanged."""
+    from scipy import stats
+    _, counts = grey_histogram(values, bin_width)
+    occupied = counts[counts > 0]
+    if occupied.size == 0:
+        return float("nan"), 0, 0
+    return float(stats.entropy(occupied, base=2)), int(occupied.sum()), int(occupied.size)
+
+
+def plane_entropies(profiles, stack, strip, valid=None, bin_width=1.0):
+    """Histogram entropies plane by plane (the user's proposal of 2026-10-08,
+    17:07; a diagnostic): of the samples along the measuring line and of the
+    pixels in the strip around it.
+
+    profiles: (n, M) I_k(v_m), the bilinear samples along the measuring line in
+    plane k (profiles.sample_profile; grey levels); stack: (n, H, W) the planes;
+    strip: (H, W) bool, the pixels of the strip (profiles.stripe_mask), at
+    least one; valid: (n,) bool or None (all valid). For each plane k:
+
+        H_line_k  = histogram_entropy(I_k(v_1), ..., I_k(v_M))      [bits]
+        H_strip_k = histogram_entropy(I_k(p), p in the strip)        [bits]
+
+    A plane that is invalid, or holds a non-finite value among the samples a
+    quantity uses, has that quantity NaN (and N, m = 0), so that every finite
+    entropy rests on the same number of samples. Returns dict(h_line, n_line,
+    m_line, h_strip, n_strip, m_strip), each (n,)."""
+    P = np.asarray(profiles, dtype=float)
+    S = np.asarray(stack, dtype=float)
+    m = np.asarray(strip, dtype=bool)
+    if P.ndim != 2 or S.ndim != 3 or P.shape[0] != S.shape[0]:
+        raise ValueError("plane_entropies: profiles (n, M) and stack (n, H, W) must have one row per plane")
+    if m.shape != S.shape[1:] or not m.any():
+        raise ValueError("plane_entropies: strip must be (H, W) with at least one pixel")
+    ok = np.ones(S.shape[0], dtype=bool) if valid is None else np.asarray(valid, dtype=bool)
+    if ok.shape != (S.shape[0],):
+        raise ValueError("plane_entropies: valid must have one entry per plane")
+    out = {key: np.full(S.shape[0], np.nan) for key in ("h_line", "h_strip")}
+    out.update({key: np.zeros(S.shape[0], dtype=int) for key in ("n_line", "m_line", "n_strip", "m_strip")})
+    for k in range(S.shape[0]):
+        if not ok[k]:
+            continue
+        for name, x in (("line", P[k]), ("strip", S[k][m])):
+            if np.all(np.isfinite(x)):
+                out["h_" + name][k], out["n_" + name][k], out["m_" + name][k] = histogram_entropy(x, bin_width)
+    return out
+
+
 def difference_dip(S):
-    """Index of the dip of a difference curve S (n,) (plane_differences' pos or
-    neg): the minimum between its two largest local maxima, the two ends
-    counting as local maxima; the global minimum when fewer than two maxima
-    exist or the two are adjacent; None when S has no finite value. NaN
-    entries are skipped. The reading of the proposal (PROVISIONAL, assistant's):
-    far from focus consecutive planes differ little, each side of focus has a
-    maximum of change, and the focal pair is the dip between the two."""
+    """Index of the dip of a curve S (n,) over consecutive planes or plane
+    pairs (plane_differences' pos or neg; plane_entropies' h_line or h_strip):
+    the minimum between its two largest local maxima, the two ends counting as
+    local maxima; the global minimum when fewer than two maxima exist or the
+    two are adjacent; None when S has no finite value. NaN entries are skipped.
+    The readings (PROVISIONAL, assistant's): far from focus consecutive planes
+    differ little, each side of focus has a maximum of change, and the focal
+    pair is the dip between the two; the entropy of a dark tube's
+    neighbourhood is lowest in focus, rises on both sides as the blur spreads
+    the tube's grey levels over more pixels, and falls again far out as the
+    tube fades into the background noise (synthetic tubes, 2026-10-08)."""
     S = np.asarray(S, dtype=float)
     idx = np.flatnonzero(np.isfinite(S))
     if idx.size == 0:

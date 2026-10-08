@@ -8,6 +8,7 @@
 | 2026-10-07 (later, 2) | v4. Added Cell 4d: plane montages of chosen nodes with Allen's reconstruction drawn on them (`scripts/node_planes.py`, SPEC Block 11); each node is measured again as in Cell 4b, so its crops come from the cache. Evidence: `test_smoke_phase2.py` 4 pass, 3 skip with the montage checks (the re-measurement equals the pilot's and makes the same request; the image extent agrees with the profile sampler to 1e-6 grey levels; the drawn trace lies on the rendered tube within 0.05 um), nine mutants of the new code killed, every suite re-run **[run, sandbox]**; not yet run on Allen's data. |
 | 2026-10-08 | v5. Added Cell 4e: consecutive-plane differences around chosen nodes, the user's proposal of 2026-10-08, as a diagnostic (`scripts/plane_differences.py`, SPEC Block 11). Evidence: `test_smoke_plane_diff.py` 7 pass, 1 skip; seven mutants of the new code killed; every suite re-run; the cell ran on the synthetic cell with the fixture in place of Allen's server **[run, sandbox]**; not yet run on Allen's data. |
 | 2026-10-08 (later) | v6. Cell 4e evaluates, by default, the area under the profile along the measuring line, plane by plane, and its change between consecutive planes (the user's evaluation, D-036), with the same areas background-normalised and each plane's background level beside them; the pixel-difference version stays as `--evaluation image`. Evidence: `test_smoke_plane_diff.py` 7 pass, 1 skip with the profile checks; nine mutants of the new code killed; every suite re-run **[run, sandbox]**; not yet run on Allen's data. |
+| 2026-10-08 (evening) | v7. Added Cell 4f: the entropy of the grey-level histogram, plane by plane, of the samples along the measuring line and of the pixels of a strip around it (the user's proposal of 17:07; `scripts/plane_differences.py --evaluation entropy`, SPEC Block 11), with the dip of each curve framed. Evidence: `test_smoke_plane_entropy.py` 8 pass; fifteen mutants of the new code killed; every suite re-run; the cell ran on the synthetic cell with the fixture in place of Allen's server **[run, sandbox]**; not yet run on Allen's data. |
 
 This runbook covers the real-data steps, in order. Each cell names the line that must **appear** in its output. A missing line means the cell did not get as far as the code that prints it. Each step lists the decisions it feeds; those stay yours. Nothing in these scripts changes the configuration on its own.
 
@@ -207,6 +208,29 @@ The evaluation proposed on 2026-10-08, as a diagnostic that changes no measureme
 Expect one `[planediff] node N: planes ... (0 missing); smallest area at k ..., normalised k ...; background ... gl; k* ..., dip-depth plane ..., SWC plane ...` line per node, then `[planediff] wrote N figures (0 skipped) ...`. Add `"--evaluation", "image"` to the command for the pixel-difference version (the positive part of $I_{k+1} - I_k$ over the 10 x 10 um square).
 
 What to expect (synthetic tubes, SPEC Block 11): blur moves light but does not remove it, so the area of a profile does not change while the dip stays inside the line; for a 0.5 um or a 1.5 um tube the smallest area falls at random. For a 5 um tube, whose blurred edges leave the +-3 um line, it falls within one plane of the centre in 6 of 8 noise draws. A step in $B_k$ (a whole plane brighter or darker) moves the smallest raw area onto that plane; the normalised curve does not follow it.
+
+### Cell 4f: entropy of the grey levels around a node [added 2026-10-08, evening]
+
+```python
+# Cell 4f: entropy of the grey levels around a node (needs Cells 0 and 1 only)
+import os
+from IPython.display import Image, display
+ENTROPY_NODES = [2, 3]    # node ids; 2 and 3 are trunk nodes of the pilot
+run("scripts/plane_differences.py", "--specimen", SPECIMEN, "--nodes", ",".join(str(n) for n in ENTROPY_NODES),
+    "--evaluation", "entropy", "--planes-half", 6, "--stripe-half-um", 1.0, "--cache-dir", CACHE_DIR,
+    "--out-dir", OUT + "/pilot/planeentropy", *ALIGN)
+for n in ENTROPY_NODES:
+    p = "%s/pilot/planeentropy/planeentropy_%d.png" % (OUT, n)
+    if os.path.exists(p):
+        print(os.path.basename(p))
+        display(Image(filename=p))
+```
+
+The user's proposal of 2026-10-08 (17:07), as a diagnostic that changes no measurement. For each node, the planes $k_{\rm SWC} - 6$ to $k_{\rm SWC} + 6$ of its block, and in every plane the Shannon entropy $H$ (bits) of the grey-level histogram, one bin per grey level, of two sets of values: the 53 bilinear samples along the node's measuring line (the line of Cell 4e, $|v| \le 3$ um), and the pixels of a strip centred on that line, 6 um across the dendrite and 2 um along it (about 900 pixels; `--stripe-half-um` sets the half-width along it). The figure shows the planes with the line and the strip's outline (frames: the dip of the line's entropy blue, the dip of the strip's entropy amber, $k^*$ red, the dip depth's plane grey dashed, the SWC plane dotted), the histograms of both sets coloured by plane, and the two entropy curves.
+
+Expect one `[planediff] node N: planes ... (0 missing); entropy dip at k ... along the line (53 samples), k ... in the strip (... pixels); k* ..., dip-depth plane ..., SWC plane ...` line per node, with about 900 pixels, then `[planediff] wrote N figures (0 skipped) ...`. The files are `planeentropy_<id>.png` and `planeentropy_529878215.json`.
+
+What to expect (synthetic tubes, SPEC Block 11): the entropy is lowest in focus, where most of the strip sits at the ground level and the tube covers few pixels; it rises on both sides as the blur spreads the tube's darkness over more pixels and more grey levels, and falls again far out as the tube fades into the noise. For a 0.5 um and a 1.5 um tube the strip's dip fell within one plane of the centre in 8 of 8 noise draws, the line's in 7 and 8 of 8. For a faint 5 um tube both curves were flat and the dips fell at random, as for every other score. A whole plane brighter or darker by whole grey levels keeps its entropy (the area of Cell 4e moves with it). The line's 53 samples give a lower and noisier entropy than the strip's pixels: on flat ground with 3 grey levels of noise, 0.25 bits low with a spread of 0.13 bits, against 0.02 and 0.03.
 
 ## Cell 5: camera-chain inputs
 
