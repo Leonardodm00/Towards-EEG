@@ -520,8 +520,9 @@ def entropy_figure(blocks, title=""):
       label, stack (n, H, W), ks (n,), valid (n,), extent (image_extent_um), line ((x0, y0), (x1, y1)) in um,
       outline (q, 2) the strip's corners in um, closed, frames {k: (colour, linestyle, tag)},
       lines [(k, colour, linestyle, label)], hist_line and hist_strip: per plane (centres, counts) or None,
-      h_line (n,), h_strip (n,) in bits, dip_line and dip_strip (an index into ks, or None),
-      n_line and n_strip (the samples behind a finite entropy), k_ref (the colour reference plane)
+      h_line (n,), h_strip (n,) in bits, dip_line and dip_strip (the picked plane of each curve: an index into
+      ks, or None), pick_word (optional: what the pick is, e.g. "lowest entropy"), n_line and n_strip (the
+      samples behind a finite entropy), k_ref (the colour reference plane)
     Presentation only. Returns the Figure."""
     import matplotlib
     matplotlib.use("Agg")
@@ -601,7 +602,7 @@ def entropy_figure(blocks, title=""):
                 d = int(b[dkey])
                 a3.plot([ks[d]], [h[d]], style[0], ms=11, mfc=colour, mec=_EDGE if colour == _HSTRIP else "white",
                         mew=1.5, zorder=4)
-        a3.set_title("entropy of each histogram (dips marked)", fontsize=8.5)
+        a3.set_title("entropy of each histogram\n(marked: %s)" % b.get("pick_word", "the picked plane"), fontsize=8.5)
         a3.set_xlabel("plane k", fontsize=8.5)
         a3.set_ylabel("H (bits)", fontsize=8.5)
         a3.set_xlim(ks[0] - 0.5, ks[-1] + 0.5)
@@ -611,10 +612,11 @@ def entropy_figure(blocks, title=""):
             for s in ("top", "right"):
                 ax.spines[s].set_visible(False)
         y += heights[4] + heights[5]
+    pick_word = blocks[0].get("pick_word", "the picked plane") if blocks else "the picked plane"
     handles = [plt.Line2D([], [], color=_HLINE, marker="o", lw=1.8,
-                          label="H along the measuring line (bilinear samples); blue frame Hl: its dip"),
+                          label="H along the measuring line (bilinear samples); blue frame Hl: %s" % pick_word),
                plt.Line2D([], [], color=_HSTRIP, marker="s", mec=_EDGE, ls="--", lw=1.8,
-                          label="H of the strip's pixels (outlined on the planes); amber frame Hs: its dip")]
+                          label="H of the strip's pixels (outlined on the planes); amber frame Hs: %s" % pick_word)]
     handles += [plt.Line2D([], [], color=c, ls=ls, lw=2.0, label="frame and line: " + t)
                 for t, (c, ls) in lines_seen.items() if c not in (_HLINE, _HSTRIP)]
     fig.legend(handles=handles, loc="upper center", ncol=3, fontsize=8, frameon=False, bbox_to_anchor=(0.5, 1.0 - 0.02 / H))

@@ -259,36 +259,47 @@ for n in PLANE_NODES:
 # CELL 4E: PLANE-TO-PLANE EVALUATION AROUND A NODE
 # The evaluation proposed on 2026-10-08, as a diagnostic that changes no measurement. For each node, the
 # planes k_SWC - 6 to k_SWC + 6 of its block. In every plane, the profile I_k(v) along the node's measuring
-# line (the line the focus scores use: through the SWC node, across its fitted heading, |v| <= 3 um,
-# bilinear), the area under it A_k = int I_k dv, and the difference A_(k+1) - A_k between consecutive planes.
-# Beside it, the same areas with each plane divided by its own background level B_k (the interquartile mean of
-# the block's pixels more than Allen's radius + 4 um from every traced dendrite and the soma) and multiplied
-# by the planes' mean, so that a change of a whole plane's brightness drops out. The figure shows the planes
-# with the measuring line (frames: smallest area blue, smallest normalised area violet, k* red, the dip
-# depth's plane grey dashed, the SWC plane dotted), the profiles, the two area curves, their differences, and
-# B_k.
+# line (the line the focus scores use: through the SWC node, across its fitted heading, |v| <= h, bilinear),
+# the area under it A_k = int I_k dv, and the difference A_(k+1) - A_k between consecutive planes. Beside it,
+# the same areas with each plane divided by its own background level B_k (the interquartile mean of the
+# block's pixels more than Allen's radius + 4 um from every traced dendrite and the soma) and multiplied by
+# the planes' mean, so that a change of a whole plane's brightness drops out. The figure shows the planes with
+# the measuring line (frames: smallest area blue, smallest normalised area violet, k* red, the dip depth's
+# plane grey dashed, the SWC plane dotted), the profiles, the two area curves, their differences, and B_k.
 #
-# Expect one `[planediff] node N: planes ... (0 missing); smallest area at k ..., normalised k ...; background
-# ... gl; k* ..., dip-depth plane ..., SWC plane ...` line per node, then `[planediff] wrote N figures (0
-# skipped) ...`. Add `"--evaluation", "image"` to the command for the pixel-difference version (the positive
-# part of I_(k+1) - I_k over the 10 x 10 um square).
+# `LINE_HALF_UMS` runs the evaluation once per half-length h of the line, each into its own folder
+# (`pilot/planediff/line_3um`, `line_5um`) [added 2026-10-08, evening: the user's proposal to enlarge the
+# line]. The pipeline's line is +-3 um. The square around the node grows to hold a longer line; at +-5 um it
+# reaches past the pilot's block, so its planes are fetched again (13 new crops per node). The JSON also holds
+# every plane's profile (`v_um`, `profiles`).
+#
+# Expect, for each h, one `[planediff] node N: planes ... (0 missing); smallest area at k ..., normalised k
+# ...; background ... gl; k* ..., dip-depth plane ..., SWC plane ...` line per node, then `[planediff] wrote N
+# figures (0 skipped) ...`. Add `"--evaluation", "image"` to the command for the pixel-difference version (the
+# positive part of I_(k+1) - I_k over the 10 x 10 um square).
 #
 # What to expect (synthetic tubes, SPEC Block 11): blur moves light but does not remove it, so the area of a
 # profile does not change while the dip stays inside the line; for a 0.5 um or a 1.5 um tube the smallest area
-# falls at random. For a 5 um tube, whose blurred edges leave the +-3 um line, it falls within one plane of
-# the centre in 6 of 8 noise draws. A step in B_k (a whole plane brighter or darker) moves the smallest raw
-# area onto that plane; the normalised curve does not follow it.
+# falls at random. For a tube wider than the line, defocus pulls background light into the line, so the area
+# is smallest in focus: for a 5 um tube and a +-3 um line, within one plane of the centre in 6 of 8 noise
+# draws. A line long enough to hold the blurred tube keeps all its light, and that signal fades: on the 5 um
+# tube the area's range shrinks from 9.0 to 5.0 to 2.5 grey levels x um at +-3, +-4 and +-5 um. A step in B_k
+# (a whole plane brighter or darker) moves the smallest raw area onto that plane; the normalised curve does
+# not follow it.
 # Cell 4e: plane-to-plane evaluation around a node (needs Cells 0 and 1 only)
 import os
 from IPython.display import Image, display
 DIFF_NODES = [2, 3]       # node ids; 2 and 3 are trunk nodes of the pilot
-run("scripts/plane_differences.py", "--specimen", SPECIMEN, "--nodes", ",".join(str(n) for n in DIFF_NODES),
-    "--planes-half", 6, "--cache-dir", CACHE_DIR, "--out-dir", OUT + "/pilot/planediff", *ALIGN)
-for n in DIFF_NODES:
-    p = "%s/pilot/planediff/planediff_%d.png" % (OUT, n)
-    if os.path.exists(p):
-        print(os.path.basename(p))
-        display(Image(filename=p))
+LINE_HALF_UMS = [3, 5]    # half-lengths of the measuring line to compare, um (the pipeline's line is +-3 um)
+for h in LINE_HALF_UMS:
+    out = "%s/pilot/planediff/line_%gum" % (OUT, h)
+    run("scripts/plane_differences.py", "--specimen", SPECIMEN, "--nodes", ",".join(str(n) for n in DIFF_NODES),
+        "--planes-half", 6, "--profile-half-um", h, "--cache-dir", CACHE_DIR, "--out-dir", out, *ALIGN)
+    for n in DIFF_NODES:
+        p = "%s/planediff_%d.png" % (out, n)
+        if os.path.exists(p):
+            print("line +-%g um: %s" % (h, os.path.basename(p)))
+            display(Image(filename=p))
 
 # ====================================================================================================
 # ===== CELL 4f
@@ -296,38 +307,50 @@ for n in DIFF_NODES:
 # CELL 4F: ENTROPY OF THE GREY LEVELS AROUND A NODE
 # The user's proposal of 2026-10-08 (17:07), as a diagnostic that changes no measurement. For each node, the
 # planes k_SWC - 6 to k_SWC + 6 of its block, and in every plane the Shannon entropy H (bits) of the
-# grey-level histogram, one bin per grey level, of two sets of values: the 53 bilinear samples along the
-# node's measuring line (the line of Cell 4e, |v| <= 3 um), and the pixels of a strip centred on that line, 6
-# um across the dendrite and 2 um along it (about 900 pixels; `--stripe-half-um` sets the half-width along
-# it). The figure shows the planes with the line and the strip's outline (frames: the dip of the line's
-# entropy blue, the dip of the strip's entropy amber, k* red, the dip depth's plane grey dashed, the SWC plane
-# dotted), the histograms of both sets coloured by plane, and the two entropy curves.
+# grey-level histogram, one bin per grey level, of two sets of values: the bilinear samples along the node's
+# measuring line (the line of Cell 4e, |v| <= h: 53 samples at h = 3 um, 89 at 5 um), and the pixels of a
+# strip centred on that line, as long as the line across the dendrite and 2 um along it (`--stripe-half-um`
+# sets the half-width along it). The figure shows the planes with the line and the strip's outline (frames:
+# the plane the line's entropy picks blue, the strip's amber, k* red, the dip depth's plane grey dashed, the
+# SWC plane dotted), the histograms of both sets coloured by plane, and the two entropy curves.
 #
-# Expect one `[planediff] node N: planes ... (0 missing); entropy dip at k ... along the line (53 samples), k
-# ... in the strip (... pixels); k* ..., dip-depth plane ..., SWC plane ...` line per node, with about 900
-# pixels, then `[planediff] wrote N figures (0 skipped) ...`. The files are `planeentropy_<id>.png` and
-# `planeentropy_529878215.json`.
+# Each curve picks its global minimum (`--entropy-pick min`) [changed 2026-10-08, evening: on nodes 2 and 3
+# the curves have no W shape, and the earlier rule, the minimum between the two largest maxima
+# (`--entropy-pick dip`), skipped node 2's lowest plane]. `LINE_HALF_UMS` runs the evaluation once per
+# half-length, as in Cell 4e, into `pilot/planeentropy/line_3um` and `line_5um`.
 #
-# What to expect (synthetic tubes, SPEC Block 11): the entropy is lowest in focus, where most of the strip
-# sits at the ground level and the tube covers few pixels; it rises on both sides as the blur spreads the
-# tube's darkness over more pixels and more grey levels, and falls again far out as the tube fades into the
-# noise. For a 0.5 um and a 1.5 um tube the strip's dip fell within one plane of the centre in 8 of 8 noise
-# draws, the line's in 7 and 8 of 8. For a faint 5 um tube both curves were flat and the dips fell at random,
-# as for every other score. A whole plane brighter or darker by whole grey levels keeps its entropy (the area
-# of Cell 4e moves with it). The line's 53 samples give a lower and noisier entropy than the strip's pixels:
-# on flat ground with 3 grey levels of noise, 0.25 bits low with a spread of 0.13 bits, against 0.02 and 0.03.
+# Expect, for each h, one `[planediff] node N: planes ... (0 missing); lowest entropy at k ... along the line
+# (53 samples), k ... in the strip (... pixels); k* ..., dip-depth plane ..., SWC plane ...` line per node (89
+# samples and about 1500 pixels at 5 um), then `[planediff] wrote N figures (0 skipped) ...`. The files are
+# `planeentropy_<id>.png` and `planeentropy_529878215.json`.
+#
+# What to expect (synthetic tubes, SPEC Block 11): the entropy is lowest in focus, where most of the
+# neighbourhood sits at the ground level and the tube covers few pixels; it rises on both sides as the blur
+# spreads the tube's darkness over more pixels and more grey levels, and falls again far out as a thin tube
+# fades into the noise. With a +-3 um line that last fall can put the strip's lowest entropy on an end plane
+# (0.5 um tube, 7 of 8 noise draws); with +-4 or +-5 um the global minima of both curves fall within one plane
+# of the centre in 8 of 8 draws for the 0.5 um tube, and for the 1.5 um tube in 8 of 8 (strip) and 7 or 8 of 8
+# (line). For a faint 5 um tube both curves stay flat at every length, as every other score does. A whole
+# plane brighter or darker by whole grey levels keeps its entropy (the area of Cell 4e moves with it). With
+# the earlier dip rule and a +-3 um line (the default until 2026-10-08, evening), the strip's pick fell within
+# one plane of the centre in 8 of 8 noise draws for the 0.5 um and the 1.5 um tube, and the line's in 7 and 8
+# of 8. The line's 53 samples give a lower and noisier entropy than the strip's pixels: on flat ground with 3
+# grey levels of noise, 0.25 bits low with a spread of 0.13 bits, against 0.02 and 0.03.
 # Cell 4f: entropy of the grey levels around a node (needs Cells 0 and 1 only)
 import os
 from IPython.display import Image, display
 ENTROPY_NODES = [2, 3]    # node ids; 2 and 3 are trunk nodes of the pilot
-run("scripts/plane_differences.py", "--specimen", SPECIMEN, "--nodes", ",".join(str(n) for n in ENTROPY_NODES),
-    "--evaluation", "entropy", "--planes-half", 6, "--stripe-half-um", 1.0, "--cache-dir", CACHE_DIR,
-    "--out-dir", OUT + "/pilot/planeentropy", *ALIGN)
-for n in ENTROPY_NODES:
-    p = "%s/pilot/planeentropy/planeentropy_%d.png" % (OUT, n)
-    if os.path.exists(p):
-        print(os.path.basename(p))
-        display(Image(filename=p))
+LINE_HALF_UMS = [3, 5]    # half-lengths of the measuring line (and of the strip across the dendrite), um
+for h in LINE_HALF_UMS:
+    out = "%s/pilot/planeentropy/line_%gum" % (OUT, h)
+    run("scripts/plane_differences.py", "--specimen", SPECIMEN, "--nodes", ",".join(str(n) for n in ENTROPY_NODES),
+        "--evaluation", "entropy", "--planes-half", 6, "--profile-half-um", h, "--stripe-half-um", 1.0,
+        "--entropy-pick", "min", "--cache-dir", CACHE_DIR, "--out-dir", out, *ALIGN)
+    for n in ENTROPY_NODES:
+        p = "%s/planeentropy_%d.png" % (out, n)
+        if os.path.exists(p):
+            print("line +-%g um: %s" % (h, os.path.basename(p)))
+            display(Image(filename=p))
 
 # ====================================================================================================
 # ===== CELL 5
@@ -532,7 +555,8 @@ for s in (0.080, 0.125):
 # - Cell 4d: the `[planes]` lines, and the montages of two or three nodes: one where the two focus rules
 # differ, one trunk node (large Allen radius).
 # - Cell 4e: the `[planediff]` lines and the figures of nodes 2 and 3.
-# - Cell 4f: the `[planediff]` lines and the entropy figures of nodes 2 and 3.
+# - Cells 4e and 4f: the `[planediff]` lines and the figures of nodes 2 and 3 at both line lengths; the
+# JSONs now carry the profiles, so the files themselves are enough.
 # - Cell 5: the `"renderer"` block without the tables, `table_sets`, `pillow_version`, `notes`.
 # - Cell 6: the `pooled dendrite diameter` line.
 # - Cell 7: the growth-fit report.

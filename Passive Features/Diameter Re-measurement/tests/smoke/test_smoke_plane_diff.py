@@ -56,7 +56,11 @@ Checks
                         planes, B_k flat within 1 grey level; with one plane
                         made 2 % darker after the camera, the smallest raw area
                         moves to that plane while the normalised areas are the
-                        unchanged run's times one common factor (to 1e-9)
+                        unchanged run's times one common factor (to 1e-9);
+                        the record carries the 53-sample profiles; with a
+                        +-5 um line the square outgrows the block and is
+                        fetched, and every valid plane keeps a finite area
+                        over 89 samples
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -282,6 +286,15 @@ def test_edge_cases():
         assert np.nanmax(B) - np.nanmin(B) < 1.0 and pr["bg_frac"] >= 0.05, (B, pr["bg_frac"])
         assert np.all(np.abs(An[1:-1] / A[1:-1] - 1.0) < 0.01), "the normalised areas keep the units of the raw ones"
         assert os.path.exists(pr["png"]) and pr["k_min_area"] in pr["ks"]
+        prof = np.array(pr["profiles"], dtype=float)
+        assert prof.shape == (17, 53) and len(pr["v_um"]) == 53 and np.all(np.isnan(prof[-1])), prof.shape
+        assert np.allclose(np.trapezoid(prof[1:-1], pr["v_um"], axis=1), A[1:-1], rtol=0, atol=0.02 * 6.0), \
+            "the saved profiles (2 decimals) integrate back to the areas"
+        p5 = PD.run(swc, prov, ccfg, [4], os.path.join(tmp, "prof5"), "999", planes_half=8, profile_half_um=5.0,
+                    log=lambda m: None)[0]
+        A5 = np.array(p5["area"], dtype=float)
+        assert p5["square_fetched"] is True and np.all(np.isfinite(A5[1:-1])) and len(p5["v_um"]) == 89, \
+            (p5["square_fetched"], A5)
 
         def stepped(left, top, w, h, k_lo, k_hi):            # plane +2 made 2 % darker after the camera
             block, ks, valid, frame = prov(left, top, w, h, k_lo, k_hi)

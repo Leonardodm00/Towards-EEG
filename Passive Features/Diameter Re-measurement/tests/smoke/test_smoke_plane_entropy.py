@@ -8,11 +8,16 @@ with n_j values in bin j and p_j = n_j / N,
 (focus.histogram_entropy, the plug-in estimate). focus.plane_entropies takes,
 plane by plane, H of the bilinear samples along the measuring line and H of
 the pixels of the strip around it (profiles.stripe_mask: |v| <= h across the
-branch, |u| <= s along it); the script frames each curve's dip
+branch, |u| <= s along it); the script frames the plane each curve picks:
+its global minimum (default) or its dip between the two largest maxima
 (focus.difference_dip).
 
 Checks
-    test_known_answer   eight distinct levels: 3 bits; one level: 0; two
+    test_known_answer   the pick rules on node 2's line-entropy curve of
+                        2026-10-08 (planes 113-125; Drive JSON): the global
+                        minimum is plane 114, the dip rule plane 121; ties
+                        go to the first; nothing finite gives None;
+                        eight distinct levels: 3 bits; one level: 0; two
                         levels 1:3: 0.811278 bits (closed form); bins by
                         hand at the half-integer boundaries (0.5 goes up,
                         -0.5 goes up) and with w = 2; grey_histogram's centres
@@ -43,8 +48,13 @@ Checks
                         entropy on the synthetic cell (fixtures_cell): planes
                         +-8 with the two missing ones NaN, 53 samples and 917
                         pixels in every other plane, planeentropy_*.png and
-                        .json, both dips at plane 0 (k* is 0 there), the soma
-                        refused; a plane shifted by +3 or -5 grey levels after
+                        .json, both picks at plane 0 (k* is 0 there, and
+                        the dip rule agrees), the 53-sample profiles in the
+                        record (NaN rows for the missing planes), the soma
+                        refused; with a +-5 um line the square outgrows the
+                        block (+-3.5 um + 1 px in this fixture) and is
+                        fetched: 89 samples in every valid plane, none NaN;
+                        a plane shifted by +3 or -5 grey levels after
                         the camera leaves every entropy unchanged (exactly);
                         made 2 % darker it moves the strip's entropy by less
                         than 0.05 bits; a strip of half-width 0.5 um holds
@@ -112,6 +122,19 @@ def _discretised_gaussian_entropy(mu, s, w=1.0):
 
 
 def test_known_answer():
+    import plane_differences as PD
+    # node 2's line entropy, planes 113..125 (planeentropy_529878215.json, 2026-10-08): maxima 124 and 119 bracket
+    # 120..123, so the dip rule takes 121, while the global minimum is 114
+    h2 = [3.1518, 2.9017, 3.2505, 3.4724, 3.6764, 3.4685, 3.7989, 3.4994, 3.4128, 3.4727, 3.7934, 3.9678, 3.8601]
+    assert PD.entropy_pick(h2, "min") == 1 and PD.entropy_pick(h2, "dip") == 8
+    assert PD.entropy_pick([2.0, 1.0, 1.0, 3.0]) == 1                 # ties: the first
+    assert PD.entropy_pick([float("nan")] * 3) is None and PD.entropy_pick([float("nan"), 2.0, 1.0]) == 2
+    try:
+        PD.entropy_pick(h2, "max")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("entropy_pick accepted rule 'max'")
     assert FO.histogram_entropy(np.arange(8)) == (3.0, 8, 8)
     assert FO.histogram_entropy([5.0, 5.0, 5.0]) == (0.0, 3, 1)
     h, n, m = FO.histogram_entropy([0.0, 1.0, 1.0, 1.0])
@@ -307,7 +330,11 @@ def test_edge_cases():
         assert np.all(np.isfinite(hl[1:-1])) and np.all(np.isfinite(hs[1:-1]))
         assert set(rec["n_line"][1:-1]) == {53} and rec["n_line"][0] == 0, rec["n_line"]
         assert set(rec["n_strip"][1:-1]) == {917} and rec["n_strip"][-1] == 0, rec["n_strip"]
-        assert rec["k_dip_h_line"] == 0 and rec["k_dip_h_strip"] == 0 and rec["k_star"] == 0, rec
+        assert rec["k_h_line"] == 0 and rec["k_h_strip"] == 0 and rec["k_star"] == 0 and rec["entropy_pick"] == "min"
+        prof = np.array(rec["profiles"], dtype=float)
+        assert prof.shape == (17, 53) and len(rec["v_um"]) == 53 and np.all(np.isnan(prof[0])) and \
+            np.all(np.isfinite(prof[1:-1])), prof.shape
+        assert rec["square_fetched"] is False and rec["half_um"] == 3.5, (rec["square_fetched"], rec["half_um"])
         assert os.path.basename(rec["png"]) == "planeentropy_4.png" and os.path.exists(rec["png"])
         assert "skipped" in skip and skip["node_id"] == 1
         with open(os.path.join(out, "planeentropy_999.json")) as f:
@@ -336,6 +363,18 @@ def test_edge_cases():
         rn = PD.run(swc, prov, ccfg, [4], os.path.join(tmp, "narrow"), "999", planes_half=8, evaluation="entropy",
                     stripe_half_um=0.5, log=lambda m: None)[0]
         assert 0 < max(rn["n_strip"]) < 917 and rn["stripe_half_um"] == 0.5, rn["n_strip"]
+        # a +-5 um line: the block reaches +-3.5 um + 1 px here, so the square (+-5 um + 2 px) is fetched as such
+        r5 = PD.run(swc, prov, ccfg, [4], os.path.join(tmp, "line5"), "999", planes_half=8, evaluation="entropy",
+                    profile_half_um=5.0, log=lambda m: None)[0]
+        p5 = np.array(r5["profiles"], dtype=float)
+        assert r5["square_fetched"] is True and r5["half_um"] >= 5.0 + 2 * 0.1144 - 1e-9, (r5["square_fetched"],
+                                                                                          r5["half_um"])
+        assert set(r5["n_line"][1:-1]) == {89} and p5.shape == (17, 89) and np.all(np.isfinite(p5[1:-1])), \
+            (r5["n_line"], p5.shape)
+        assert r5["k_h_line"] in r5["ks"] and r5["k_h_strip"] in r5["ks"]
+        rd = PD.run(swc, prov, ccfg, [4], os.path.join(tmp, "dip"), "999", planes_half=8, evaluation="entropy",
+                    entropy_pick_rule="dip", log=lambda m: None)[0]
+        assert rd["entropy_pick"] == "dip" and rd["k_h_line"] == 0, rd["k_h_line"]
 
 
 # ---------------------------------------------------------------- runner ---
