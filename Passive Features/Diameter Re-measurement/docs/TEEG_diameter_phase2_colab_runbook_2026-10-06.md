@@ -6,6 +6,7 @@
 | 2026-10-07 | v2. The cells now exist as a notebook, `notebooks/phase2_colab.ipynb`, with the same numbers; the code below is the notebook's. Corrections: `CACHE_DIR` is not the cache of cells 1-12 (Drive folder listing); Cell 5 suggests `renderer.jpeg_qtables`, the tables themselves, because the old `jpeg_qtables_file` was read by nothing (SPEC Blocks 1, 4, 11); Cell 6 writes its per-node CSV to Drive (it went into the clone). Added: Cell 3a, the node list (`scripts/list_stretches.py`); Cell 4 split into a one-stretch timing run and the full pilot; a streaming `run()` that stops "Run all" on a failure; Cell 8 through `config.with_overrides`, writing one configuration per in-focus blur of D-023; Cell 9's Pillow check and the merge with the same configuration, which the merge now enforces (every replicate row carries `sim_hash`); Cell 10's $\sigma_{\rm fit}$ runs. Evidence: the notebook's offline cells ran in the sandbox against a stub `google.colab`, and every command it builds parsed with its script's own parser **[run, sandbox]**; the cells that reach api.brain-map.org have still not run anywhere. |
 | 2026-10-07 (later) | v3. The focus rule is the gradient energy (D-030): Cell 2 runs `test_smoke_focus` too; Cells 4b/4c describe and show both focus curves, the summary's `k_star_vs_dip_depth` and the nodes where the two rules differ; the default estimator hash is now 6f0397236447fe6f. Evidence: `test_smoke_focus.py` 7 pass and every suite of the workstream re-run in the sandbox **[run, sandbox]**; the cells that reach api.brain-map.org have still not run here. |
 | 2026-10-07 (later, 2) | v4. Added Cell 4d: plane montages of chosen nodes with Allen's reconstruction drawn on them (`scripts/node_planes.py`, SPEC Block 11); each node is measured again as in Cell 4b, so its crops come from the cache. Evidence: `test_smoke_phase2.py` 4 pass, 3 skip with the montage checks (the re-measurement equals the pilot's and makes the same request; the image extent agrees with the profile sampler to 1e-6 grey levels; the drawn trace lies on the rendered tube within 0.05 um), nine mutants of the new code killed, every suite re-run **[run, sandbox]**; not yet run on Allen's data. |
+| 2026-10-08 | v5. Added Cell 4e: consecutive-plane differences around chosen nodes, the user's proposal of 2026-10-08, as a diagnostic (`scripts/plane_differences.py`, SPEC Block 11). Evidence: `test_smoke_plane_diff.py` 7 pass, 1 skip; seven mutants of the new code killed; every suite re-run; the cell ran on the synthetic cell with the fixture in place of Allen's server **[run, sandbox]**; not yet run on Allen's data. |
 
 This runbook covers the real-data steps, in order. Each cell names the line that must **appear** in its output. A missing line means the cell did not get as far as the code that prints it. Each step lists the decisions it feeds; those stay yours. Nothing in these scripts changes the configuration on its own.
 
@@ -183,6 +184,28 @@ Run after Cell 4c: it takes the nodes of `SHOW_NODES`, then those of Cell 4c's t
 Each node is measured again exactly as in Cell 4b, so its crops come from the cache. Expect one `[planes] node N: ... | same as the pilot` line per node, then `[planes] wrote N montages (0 skipped) ...; crops: ... from the cache, 0 downloaded`. `DIFFERS from the pilot` means the pilot was measured with another configuration or code version: re-run Cell 4b.
 
 Use it to judge, node by node, three things the numbers of Cell 4c cannot show: whether Allen's trace sits on the dendrite in the image (a lateral offset is a registration matter, Cell 3b); whether $k^*$ is the plane where the dendrite's edges are sharpest; and whether another neurite crosses the profile line near $k^*$ (D-030 open point on overlaps).
+
+### Cell 4e: consecutive-plane differences around a node [added 2026-10-08]
+
+```python
+# Cell 4e: consecutive-plane differences around a node (needs Cells 0 and 1 only)
+import os
+from IPython.display import Image, display
+DIFF_NODES = [2, 3]       # node ids; 2 and 3 are trunk nodes of the pilot
+run("scripts/plane_differences.py", "--specimen", SPECIMEN, "--nodes", ",".join(str(n) for n in DIFF_NODES),
+    "--planes-half", 6, "--cache-dir", CACHE_DIR, "--out-dir", OUT + "/pilot/planediff", *ALIGN)
+for n in DIFF_NODES:
+    p = "%s/pilot/planediff/planediff_%d.png" % (OUT, n)
+    if os.path.exists(p):
+        print(os.path.basename(p))
+        display(Image(filename=p))
+```
+
+The proposal of 2026-10-08, as a diagnostic that changes no measurement. For each node, the planes $k_{\rm SWC} - 6$ to $k_{\rm SWC} + 6$ of its block, cropped to the 10 x 10 um square about the node. Between each pair of consecutive planes the difference $D = I_{k+1} - I_k$ is formed, its negative values are set to zero, and $S^+$ is the mean of what remains over the pixels of the square (grey levels per pixel); $S^-$, the mean of the negative part, is the same measure taken from the other end of the stack. The figure shows the planes (frames: $k^*$ red, the dip depth's plane grey dashed, the SWC plane dotted), the positive part of each difference (blue), and the two curves, with the dip of $S^+$ between its two largest maxima.
+
+Each node is located as the pilot measures it, so the pilot's planes come from the cache; the planes beyond them are fetched, one crop each. Expect one `[planediff] node N: planes ... (0 missing), ... pixels; dip of S+ at a->b; k* ..., dip-depth plane ..., SWC plane ...` line per node, then `[planediff] wrote N figures (0 skipped) ...`. Add `"--band-um", 3.5` to the command to count only the pixels within 3.5 um of the traced stretch.
+
+What to expect (synthetic tubes, SPEC Block 11): the dip falls on a pair next to the tube's centre for a 0.5 um and a 1.5 um tube, with or without the camera's noise; for a faint 5 um tube it does only without noise, because the change between its planes is smaller than the noise. Read a trunk's curve with that in mind.
 
 ## Cell 5: camera-chain inputs
 

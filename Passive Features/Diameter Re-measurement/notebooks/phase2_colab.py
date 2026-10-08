@@ -1,7 +1,7 @@
 # Diameter pipeline, Phase II (Colab), specimen 529878215: the cells of notebooks/phase2_colab.ipynb as plain
 # Python. Paste each block between two '# ===== CELL' banners into its own Colab cell and run them in order.
 # Cell 9 runs on davinci, not in Colab: its commands are in the comment block before Cell 10.
-# Same code as the notebook and the runbook (2026-10-07). Pure ASCII.
+# Same code as the notebook and the runbook (2026-10-08). Pure ASCII.
 
 # ====================================================================================================
 # ===== CELL 0
@@ -254,6 +254,39 @@ for n in PLANE_NODES:
         display(Image(filename=p))
 
 # ====================================================================================================
+# ===== CELL 4e
+# ====================================================================================================
+# CELL 4E: CONSECUTIVE-PLANE DIFFERENCES AROUND A NODE
+# The proposal of 2026-10-08, as a diagnostic that changes no measurement. For each node, the planes k_SWC - 6
+# to k_SWC + 6 of its block, cropped to the 10 x 10 um square about the node. Between each pair of consecutive
+# planes the difference D = I_(k+1) - I_k is formed, its negative values are set to zero, and S+ is the mean
+# of what remains over the pixels of the square (grey levels per pixel); S-, the mean of the negative part, is
+# the same measure taken from the other end of the stack. The figure shows the planes (frames: k* red, the dip
+# depth's plane grey dashed, the SWC plane dotted), the positive part of each difference (blue), and the two
+# curves, with the dip of S+ between its two largest maxima.
+#
+# Each node is located as the pilot measures it, so the pilot's planes come from the cache; the planes beyond
+# them are fetched, one crop each. Expect one `[planediff] node N: planes ... (0 missing), ... pixels; dip of
+# S+ at a->b; k* ..., dip-depth plane ..., SWC plane ...` line per node, then `[planediff] wrote N figures (0
+# skipped) ...`. Add `"--band-um", 3.5` to the command to count only the pixels within 3.5 um of the traced
+# stretch.
+#
+# What to expect (synthetic tubes, SPEC Block 11): the dip falls on a pair next to the tube's centre for a 0.5
+# um and a 1.5 um tube, with or without the camera's noise; for a faint 5 um tube it does only without noise,
+# because the change between its planes is smaller than the noise. Read a trunk's curve with that in mind.
+# Cell 4e: consecutive-plane differences around a node (needs Cells 0 and 1 only)
+import os
+from IPython.display import Image, display
+DIFF_NODES = [2, 3]       # node ids; 2 and 3 are trunk nodes of the pilot
+run("scripts/plane_differences.py", "--specimen", SPECIMEN, "--nodes", ",".join(str(n) for n in DIFF_NODES),
+    "--planes-half", 6, "--cache-dir", CACHE_DIR, "--out-dir", OUT + "/pilot/planediff", *ALIGN)
+for n in DIFF_NODES:
+    p = "%s/pilot/planediff/planediff_%d.png" % (OUT, n)
+    if os.path.exists(p):
+        print(os.path.basename(p))
+        display(Image(filename=p))
+
+# ====================================================================================================
 # ===== CELL 5
 # ====================================================================================================
 # CELL 5: CAMERA-CHAIN INPUTS
@@ -455,6 +488,7 @@ for s in (0.080, 0.125):
 # table of nodes where the two focus rules differ, and two or three node figures (node 8441's among them).
 # - Cell 4d: the `[planes]` lines, and the montages of two or three nodes: one where the two focus rules
 # differ, one trunk node (large Allen radius).
+# - Cell 4e: the `[planediff]` lines and the figures of nodes 2 and 3.
 # - Cell 5: the `"renderer"` block without the tables, `table_sets`, `pillow_version`, `notes`.
 # - Cell 6: the `pooled dendrite diameter` line.
 # - Cell 7: the growth-fit report.

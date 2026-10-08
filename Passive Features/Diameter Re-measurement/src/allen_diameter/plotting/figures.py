@@ -238,3 +238,122 @@ def plane_montage(planes, dz_um, profile_half_um, view_half_um=None, ncol=6, dep
                  "node and the fit's profile line; red ticks: the fitted edges (v0_hat +- d_hat/2)",
                  fontsize=7.5, y=1.0 - 0.06 / H, va="top")
     return fig
+
+
+_SPOS, _SNEG = "#2a78d6", "#7a7a7a"     # S+ blue (the proposal's measure), S- grey dashed
+
+
+def plane_difference_figure(blocks, title=""):
+    """Consecutive-plane differences (focus.plane_differences), one block of
+    three rows per stack: the planes (one grey scale), the positive part of
+    D_n = I_{k+1} - I_k between each pair (one blue scale from 0), and the
+    curves S+ (the mean of that positive part over the pixels) and S- (the
+    mean of the negative part: S+ taken from the other end of the stack) at the
+    pair midpoints, aligned under the pairs.
+
+    blocks: list of dicts with
+      label   heading of the block
+      stack   (n, H, W) the planes differenced (grey levels)
+      ks      (n,) consecutive plane indices
+      valid   (n,) bool
+      res     the dict of focus.plane_differences(stack, valid, ...)
+      dip     focus.difference_dip(res["pos"]), or None
+      frames  {k: (colour, linestyle, tag)}: a frame on plane k's panel, the short
+              tag in its title
+      lines   [(k, colour, linestyle, label)]: a vertical line on the curve; the
+              legend names each style once, for the frame and the line
+      extent  imshow extent of a plane in um (image_extent_um), or None
+    Presentation parameters only; nothing scientific is computed. Returns the Figure."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    side, gap, left, right = 0.95, 0.08, 0.75, 0.25
+    col = side + gap
+    n_max = max(len(b["ks"]) for b in blocks)
+    W = left + n_max * col - gap + right
+    heights = (0.34, 0.32, side, 0.24, side, 0.30, 1.55, 0.50)
+    top_band = 0.95
+    H = top_band + len(blocks) * sum(heights)
+    fig = plt.figure(figsize=(W, H))
+
+    def ax_at(x_in, y_top_in, w_in, h_in):
+        return fig.add_axes([x_in / W, 1.0 - (y_top_in + h_in) / H, w_in / W, h_in / H])
+
+    lines_seen = {}
+    y = top_band
+    for b in blocks:
+        ks = np.asarray(b["ks"])
+        n = ks.size
+        stack = np.asarray(b["stack"], dtype=float)
+        valid = np.asarray(b["valid"], dtype=bool)
+        res = b["res"]
+        fig.text(left / W, 1.0 - (y + 0.26) / H, b["label"], fontsize=10, fontweight="bold", ha="left")
+        y += heights[0]
+        shown = stack[valid] if valid.any() else stack
+        lo, hi = np.percentile(shown, [1.0, 99.5])
+        for j in range(n):
+            ax = ax_at(left + j * col, y + heights[1], side, side)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            k = int(ks[j])
+            if valid[j]:
+                ax.imshow(stack[j], cmap="gray", vmin=lo, vmax=hi, extent=b.get("extent"), origin="upper",
+                          interpolation="nearest")
+            else:
+                ax.set_facecolor("0.85")
+                ax.text(0.5, 0.5, "missing", ha="center", va="center", fontsize=8, transform=ax.transAxes)
+            tag = ""
+            if k in b.get("frames", {}):
+                colour, ls, tag = b["frames"][k]
+                ax.add_patch(plt.Rectangle((0.01, 0.01), 0.98, 0.98, transform=ax.transAxes, fill=False,
+                                           edgecolor=colour, lw=2.6, ls=ls, clip_on=False))
+            ax.set_title("k %d%s" % (k, ("\n" + tag) if tag else ""), fontsize=7.5, pad=2)
+        y += heights[1] + heights[2]
+        dpos = np.clip(res["diff"], 0.0, None)
+        vmax = np.nanpercentile(dpos, 99.5) if np.isfinite(dpos).any() else 1.0
+        vmax = vmax if vmax > 0 else 1.0
+        for j in range(n - 1):
+            ax = ax_at(left + j * col + col / 2.0, y + heights[3], side, side)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            if np.isfinite(res["pos"][j]):
+                ax.imshow(dpos[j], cmap="Blues", vmin=0.0, vmax=vmax, extent=b.get("extent"), origin="upper",
+                          interpolation="nearest")
+            else:
+                ax.set_facecolor("0.85")
+                ax.text(0.5, 0.5, "n/a", ha="center", va="center", fontsize=8, transform=ax.transAxes)
+            ax.set_title("%d->%d" % (int(ks[j]), int(ks[j + 1])), fontsize=7.5, pad=2)
+        y += heights[3] + heights[4] + heights[5]
+        ax = ax_at(left - gap / 2.0, y, n * col, heights[6])
+        mid = ks[:-1] + 0.5
+        for k, colour, ls, label in b.get("lines", []):
+            ax.axvline(k, color=colour, ls=ls, lw=1.2, zorder=1)
+            lines_seen[label] = (colour, ls)
+        ax.plot(mid, res["pos"], "o-", color=_SPOS, ms=4.5, lw=2.0, zorder=3)
+        ax.plot(mid, res["neg"], "s--", color=_SNEG, ms=3.5, lw=1.3, zorder=2)
+        if b.get("dip") is not None:
+            d = int(b["dip"])
+            ax.plot([mid[d]], [res["pos"][d]], "o", ms=12, mfc=_SPOS, mec="white", mew=1.5, zorder=4)
+            ax.annotate("dip %d->%d" % (int(ks[d]), int(ks[d + 1])), (mid[d], res["pos"][d]), textcoords="offset points",
+                        xytext=(0, -16), ha="center", fontsize=8)
+        ax.set_xlim(ks[0] - 0.5, ks[-1] + 0.5)
+        ax.set_xticks(ks)
+        ax.tick_params(labelsize=7.5)
+        ax.grid(axis="y", color="#e6e5e0", lw=0.6)
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+        ax.set_ylabel("grey levels\nper pixel", fontsize=8.5)
+        ax.set_xlabel("plane k (the curve's points sit between the two planes they compare)", fontsize=8.5)
+        y += heights[6] + heights[7]
+    handles = [plt.Line2D([], [], color=_SPOS, marker="o", lw=2.0, label="S+  mean over the pixels of max(I_k+1 - I_k, 0)"),
+               plt.Line2D([], [], color=_SNEG, marker="s", ls="--", lw=1.3,
+                          label="S-  mean of max(I_k - I_k+1, 0): S+ taken from the other end of the stack"),
+               plt.Line2D([], [], color=_SPOS, marker="o", ms=10, ls="none", mec="white",
+                          label="dip between the two largest maxima of S+")]
+    handles += [plt.Line2D([], [], color=c, ls=ls, lw=2.0, label="frame and line: " + t)
+                for t, (c, ls) in lines_seen.items()]
+    fig.legend(handles=handles, loc="upper center", ncol=3, fontsize=8, frameon=False,
+               bbox_to_anchor=(0.5, 1.0 - 0.02 / H))
+    if title:
+        fig.suptitle(title, y=1.0 - 0.66 / H, fontsize=10)
+    return fig

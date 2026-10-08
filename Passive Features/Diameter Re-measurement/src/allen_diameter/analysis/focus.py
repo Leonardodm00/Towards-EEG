@@ -140,3 +140,63 @@ def best_plane(F, z, cfg, dz):
         return k, float(z[k]), False, at_edge
     shift = float(np.clip(0.5 * (Fm - Fp) / den, -0.5, 0.5))
     return k, float(z[k] + dz * shift), False, at_edge
+
+
+def plane_differences(stack, valid=None, mask=None):
+    """Consecutive-plane differences of a z-stack (the user's proposal of
+    2026-10-08; a diagnostic, not a focus rule).
+
+    stack: (n, H, W) planes in increasing plane index, consecutive planes dz
+    apart, grey levels; valid: (n,) bool or None (all valid); mask: (H, W)
+    bool or None (every pixel), the pixels counted. For n = 0 .. n-2:
+
+        D_n(p) = I_{n+1}(p) - I_n(p)
+        S+_n   = (1/N) * sum over p of max(D_n(p), 0)     [grey levels per pixel]
+        S-_n   = (1/N) * sum over p of max(-D_n(p), 0)
+
+    with N the number of pixels counted. A pair touching an invalid plane, or
+    with a non-finite sample among the counted pixels, is NaN. Reversing the
+    plane order swaps S+ and S-; S+_n - S-_n is the mean of D_n. Returns
+    dict(diff=(n-1, H, W) float, D_n with NaN planes for unusable pairs,
+    pos=(n-1,) S+, neg=(n-1,) S-).
+    """
+    a = np.asarray(stack, dtype=float)
+    if a.ndim != 3 or a.shape[0] < 2:
+        raise ValueError("plane_differences: stack must be (n >= 2, H, W), got shape %r" % (a.shape,))
+    ok = np.ones(a.shape[0], dtype=bool) if valid is None else np.asarray(valid, dtype=bool)
+    if ok.shape != (a.shape[0],):
+        raise ValueError("plane_differences: valid must have one entry per plane")
+    m = np.ones(a.shape[1:], dtype=bool) if mask is None else np.asarray(mask, dtype=bool)
+    if m.shape != a.shape[1:] or not m.any():
+        raise ValueError("plane_differences: mask must be (H, W) with at least one pixel counted")
+    d = np.diff(a, axis=0)
+    inside = d[:, m]                                       # (n-1, N)
+    use = ok[:-1] & ok[1:] & np.all(np.isfinite(inside), axis=1)
+    pos = np.full(d.shape[0], np.nan)
+    neg = np.full(d.shape[0], np.nan)
+    pos[use] = np.clip(inside[use], 0.0, None).mean(axis=1)
+    neg[use] = np.clip(-inside[use], 0.0, None).mean(axis=1)
+    d[~use] = np.nan
+    return dict(diff=d, pos=pos, neg=neg)
+
+
+def difference_dip(S):
+    """Index of the dip of a difference curve S (n,) (plane_differences' pos or
+    neg): the minimum between its two largest local maxima, the two ends
+    counting as local maxima; the global minimum when fewer than two maxima
+    exist or the two are adjacent; None when S has no finite value. NaN
+    entries are skipped. The reading of the proposal (PROVISIONAL, assistant's):
+    far from focus consecutive planes differ little, each side of focus has a
+    maximum of change, and the focal pair is the dip between the two."""
+    S = np.asarray(S, dtype=float)
+    idx = np.flatnonzero(np.isfinite(S))
+    if idx.size == 0:
+        return None
+    s = S[idx]
+    n = s.size
+    peaks = [i for i in range(n) if (i == 0 or s[i] >= s[i - 1]) and (i == n - 1 or s[i] >= s[i + 1])]
+    top2 = sorted(sorted(peaks, key=lambda i: (-s[i], i))[:2])
+    if len(top2) < 2 or top2[1] - top2[0] < 2:
+        return int(idx[int(np.argmin(s))])
+    a, b = top2
+    return int(idx[a + 1 + int(np.argmin(s[a + 1:b]))])
