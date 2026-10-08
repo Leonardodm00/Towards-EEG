@@ -180,6 +180,36 @@ def plane_differences(stack, valid=None, mask=None):
     return dict(diff=d, pos=pos, neg=neg)
 
 
+def profile_areas(profiles, v, valid=None):
+    """Area under each plane's profile and its change between consecutive
+    planes (the user's evaluation of 2026-10-08, 16:26; a diagnostic).
+
+    profiles: (n, M) I_k(v_m), the profile of plane k along the measuring line
+    (grey levels), planes in increasing, consecutive index; v: (M,) offsets in
+    um, increasing; valid: (n,) bool or None.
+
+        A_k  = integral over v of I_k(v) dv     (trapezoid; grey levels x um)
+        dA_n = A_{k_n + 1} - A_{k_n}
+
+    A plane that is invalid or holds a non-finite sample has A_k = NaN, and so
+    have the two differences that touch it. Returns dict(area=(n,), d_area=(n-1,)).
+    Under a blur that conserves the light of each plane (a normalised kernel,
+    no truncation by the window) A_k does not change with the plane; what it
+    sees is light leaving or entering the window and changes of the whole
+    plane's brightness."""
+    P = np.asarray(profiles, dtype=float)
+    v = np.asarray(v, dtype=float)
+    if P.ndim != 2 or v.ndim != 1 or P.shape[1] != v.size or v.size < 2 or np.any(np.diff(v) <= 0):
+        raise ValueError("profile_areas: profiles must be (n, M) with v (M,) increasing, M >= 2")
+    ok = np.ones(P.shape[0], dtype=bool) if valid is None else np.asarray(valid, dtype=bool)
+    if ok.shape != (P.shape[0],):
+        raise ValueError("profile_areas: valid must have one entry per profile")
+    ok = ok & np.all(np.isfinite(P), axis=1)
+    area = np.full(P.shape[0], np.nan)
+    area[ok] = integrate.trapezoid(P[ok], v, axis=1)
+    return dict(area=area, d_area=np.diff(area))
+
+
 def difference_dip(S):
     """Index of the dip of a difference curve S (n,) (plane_differences' pos or
     neg): the minimum between its two largest local maxima, the two ends

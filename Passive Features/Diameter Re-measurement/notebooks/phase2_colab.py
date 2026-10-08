@@ -256,25 +256,29 @@ for n in PLANE_NODES:
 # ====================================================================================================
 # ===== CELL 4e
 # ====================================================================================================
-# CELL 4E: CONSECUTIVE-PLANE DIFFERENCES AROUND A NODE
-# The proposal of 2026-10-08, as a diagnostic that changes no measurement. For each node, the planes k_SWC - 6
-# to k_SWC + 6 of its block, cropped to the 10 x 10 um square about the node. Between each pair of consecutive
-# planes the difference D = I_(k+1) - I_k is formed, its negative values are set to zero, and S+ is the mean
-# of what remains over the pixels of the square (grey levels per pixel); S-, the mean of the negative part, is
-# the same measure taken from the other end of the stack. The figure shows the planes (frames: k* red, the dip
-# depth's plane grey dashed, the SWC plane dotted), the positive part of each difference (blue), and the two
-# curves, with the dip of S+ between its two largest maxima.
+# CELL 4E: PLANE-TO-PLANE EVALUATION AROUND A NODE
+# The evaluation proposed on 2026-10-08, as a diagnostic that changes no measurement. For each node, the
+# planes k_SWC - 6 to k_SWC + 6 of its block. In every plane, the profile I_k(v) along the node's measuring
+# line (the line the focus scores use: through the SWC node, across its fitted heading, |v| <= 3 um,
+# bilinear), the area under it A_k = int I_k dv, and the difference A_(k+1) - A_k between consecutive planes.
+# Beside it, the same areas with each plane divided by its own background level B_k (the interquartile mean of
+# the block's pixels more than Allen's radius + 4 um from every traced dendrite and the soma) and multiplied
+# by the planes' mean, so that a change of a whole plane's brightness drops out. The figure shows the planes
+# with the measuring line (frames: smallest area blue, smallest normalised area violet, k* red, the dip
+# depth's plane grey dashed, the SWC plane dotted), the profiles, the two area curves, their differences, and
+# B_k.
 #
-# Each node is located as the pilot measures it, so the pilot's planes come from the cache; the planes beyond
-# them are fetched, one crop each. Expect one `[planediff] node N: planes ... (0 missing), ... pixels; dip of
-# S+ at a->b; k* ..., dip-depth plane ..., SWC plane ...` line per node, then `[planediff] wrote N figures (0
-# skipped) ...`. Add `"--band-um", 3.5` to the command to count only the pixels within 3.5 um of the traced
-# stretch.
+# Expect one `[planediff] node N: planes ... (0 missing); smallest area at k ..., normalised k ...; background
+# ... gl; k* ..., dip-depth plane ..., SWC plane ...` line per node, then `[planediff] wrote N figures (0
+# skipped) ...`. Add `"--evaluation", "image"` to the command for the pixel-difference version (the positive
+# part of I_(k+1) - I_k over the 10 x 10 um square).
 #
-# What to expect (synthetic tubes, SPEC Block 11): the dip falls on a pair next to the tube's centre for a 0.5
-# um and a 1.5 um tube, with or without the camera's noise; for a faint 5 um tube it does only without noise,
-# because the change between its planes is smaller than the noise. Read a trunk's curve with that in mind.
-# Cell 4e: consecutive-plane differences around a node (needs Cells 0 and 1 only)
+# What to expect (synthetic tubes, SPEC Block 11): blur moves light but does not remove it, so the area of a
+# profile does not change while the dip stays inside the line; for a 0.5 um or a 1.5 um tube the smallest area
+# falls at random. For a 5 um tube, whose blurred edges leave the +-3 um line, it falls within one plane of
+# the centre in 6 of 8 noise draws. A step in B_k (a whole plane brighter or darker) moves the smallest raw
+# area onto that plane; the normalised curve does not follow it.
+# Cell 4e: plane-to-plane evaluation around a node (needs Cells 0 and 1 only)
 import os
 from IPython.display import Image, display
 DIFF_NODES = [2, 3]       # node ids; 2 and 3 are trunk nodes of the pilot

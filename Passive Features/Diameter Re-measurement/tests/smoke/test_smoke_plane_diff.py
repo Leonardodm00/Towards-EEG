@@ -1,5 +1,14 @@
-"""Smoke test for the consecutive-plane differences -- Block 11 in specs/SPEC.md
-(the user's proposal of 2026-10-08; a diagnostic, not a focus rule).
+"""Smoke test for the plane-to-plane evaluations -- Block 11 in specs/SPEC.md
+(the user's proposals of 2026-10-08; diagnostics, not focus rules).
+
+Profile evaluation (16:26): for the profile I_k(v) along the measuring line in
+plane k (v in um, increasing),
+    A_k  = integral of I_k(v) dv (trapezoid),   dA_n = A_{k_n + 1} - A_{k_n};
+the script also divides each plane by its own background B_k (interquartile
+mean of the block's pixels far from every traced dendrite and the soma) and
+multiplies by the planes' mean background.
+
+Image evaluation (15:45):
 
 For planes I_k in increasing plane index and the pixels p counted (N of them):
     D_n(p) = I_{n+1}(p) - I_n(p)
@@ -10,22 +19,30 @@ count as maxima), else its global minimum.
 
 Checks
     test_known_answer   a 3-plane 2 x 2 stack worked by hand (S+ 0.75, S- 0.5;
-                        S+ 0, S- 0.25); the dip of hand-made curves, with NaN
-    test_reference      a random stack with a pixel mask against loops written
-                        out by hand
+                        S+ 0, S- 0.25); the dip of hand-made curves, with NaN;
+                        areas of linear profiles (exact under the trapezoid);
+                        the interquartile mean and the far-pixel mask by hand
+    test_reference      a random stack with a pixel mask, and random profiles,
+                        against loops written out by hand
     test_convergence    skipped: nothing is discretised (the measure is exact
                         on the samples)
     test_invariants     reversing the plane order swaps S+ and S-; a constant
                         added to every plane changes nothing; a gain a > 0
                         scales both by a; S+ - S- equals the mean of D_n; a
                         blur that conserves each plane's total (Gaussian, wrap
-                        boundary) gives S+ = S- to roundoff
+                        boundary) gives S+ = S- to roundoff; the area of a
+                        Gaussian dip blurred by Gaussians of any width (closed
+                        form, window +-12 widths) does not change (light is
+                        conserved), and a constant c added to a profile adds
+                        c x window length
     test_noise_floor    planes of white Gaussian noise of SD s: S+ and S- are
                         s / sqrt(pi) within 5 standard errors (the mean of the
                         positive part of a N(0, 2 s^2) variable)
     test_contract       shapes and NaN: an invalid plane makes its two pairs
                         NaN; a non-finite pixel counts only inside the mask;
-                        refusals of a single plane, a bad valid, an empty mask
+                        refusals of a single plane, a bad valid, an empty mask;
+                        profile_areas: NaN for an invalid or non-finite profile,
+                        refusals of a v that does not increase or does not match
     test_determinism    a pure function: equal inputs, equal outputs
     test_edge_cases     a rendered thin tube (Block 4 renderer, no noise, d
                         0.5 um, centre in plane 0): the dip of S+ is a pair
@@ -34,7 +51,12 @@ Checks
                         SWC plane with the two missing ones NaN, a PNG and a
                         record per node, the dip next to plane 0, the soma
                         refused and recorded as skipped, --band-um counts fewer
-                        pixels
+                        pixels (image evaluation); the profile evaluation on the
+                        same cell: one area per plane, NaN for the missing
+                        planes, B_k flat within 1 grey level; with one plane
+                        made 2 % darker after the camera, the smallest raw area
+                        moves to that plane while the normalised areas are the
+                        unchanged run's times one common factor (to 1e-9)
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -91,6 +113,23 @@ def test_known_answer():
     assert FO.difference_dip([3.0, float("nan"), 1.0, 4.0]) == 2      # NaN skipped
     assert FO.difference_dip([2.0, 2.0]) == 0                          # adjacent maxima: the global minimum (first)
     assert FO.difference_dip([float("nan")] * 3) is None
+    # areas: linear profiles a + b v over [-1, 1] integrate to 2 a under the trapezoid, whatever b
+    v = np.array([-1.0, 0.0, 1.0])
+    prof = np.array([[3.0 + 5.0 * x for x in v], [7.0 - 2.0 * x for x in v], [1.0 for x in v]])
+    pa = FO.profile_areas(prof, v)
+    assert np.array_equal(pa["area"], [6.0, 14.0, 2.0]) and np.array_equal(pa["d_area"], [8.0, -12.0]), pa
+    # the background of the script: interquartile mean, far-pixel mask
+    import plane_differences as PD
+    from allen_image_io import CropFrame
+    vals = np.array([12.0, 1.0, 100.0, 4.0, 3.0, 9.0, 2.0, 5.0])     # sorted 1 2 3 4 5 9 12 100: median 4.5, mean 17
+    blk = np.stack([vals[None, :], vals[None, :]])                   # (2, 1, 8)
+    B = PD.plane_background(blk, np.array([True, False]), np.ones((1, 8), bool), min_frac=0.05)
+    assert B[0] == 5.25 and np.isnan(B[1]), B                        # interquartile mean: sorted indices 2..5 -> 3, 4, 5, 9
+    # pixel centres x = 0..9 on one row; a degenerate segment at x 0 (r 0.5) and the soma at x 9 (r 0.5), margin 1:
+    # near means within 1.5 um, so x 0, 1 and 8, 9 are near
+    far2 = PD.far_from_dendrites((1, 10), CropFrame(0, 0, 0, 1.0), np.array([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 1.0]]),
+                                 1.0, discs=[(9.0, 0.0, 0.5)])
+    assert far2.tolist() == [[False, False, True, True, True, True, True, True, False, False]], far2
 
 
 def test_reference():
@@ -109,6 +148,12 @@ def test_reference():
                     sn += -d if d < 0 else 0.0
                     cnt += 1
         assert abs(r["pos"][n] - sp / cnt) < 1e-12 and abs(r["neg"][n] - sn / cnt) < 1e-12, (n, r["pos"][n], sp / cnt)
+    v = np.sort(rng.uniform(-3.0, 3.0, size=11))
+    prof = rng.normal(100.0, 5.0, size=(4, 11))
+    pa = FO.profile_areas(prof, v)
+    for k in range(4):
+        a = sum(0.5 * (prof[k, m] + prof[k, m + 1]) * (v[m + 1] - v[m]) for m in range(10))
+        assert abs(pa["area"][k] - a) < 1e-9, (k, pa["area"][k], a)
 
 
 def test_convergence():
@@ -132,6 +177,15 @@ def test_invariants():
     planes = np.stack([ndimage.gaussian_filter(X, s, mode="wrap") for s in (0.5, 1.0, 2.0, 3.0, 2.0, 1.0)])
     b = FO.plane_differences(planes)
     assert np.allclose(b["pos"], b["neg"], rtol=1e-9, atol=0), (b["pos"], b["neg"])
+    # light is conserved under blur: a Gaussian dip of width w blurred by sigma keeps its area (window +-12 widths)
+    v = np.linspace(-12.0, 12.0, 4801)
+    w, Dd, Bk = 0.3, 0.6, 200.0
+    prof = np.array([Bk - Bk * Dd * w / math.sqrt(w * w + s * s) * np.exp(-0.5 * v ** 2 / (w * w + s * s))
+                     for s in (0.0, 0.1, 0.3, 0.6, 1.0)])
+    pa = FO.profile_areas(prof, v)
+    assert np.allclose(pa["area"], pa["area"][0], rtol=1e-9, atol=0), pa["area"]
+    pa2 = FO.profile_areas(prof + 3.0, v)
+    assert np.allclose(pa2["area"] - pa["area"], 3.0 * 24.0, rtol=1e-12), pa2["area"] - pa["area"]
 
 
 def test_noise_floor():
@@ -163,6 +217,19 @@ def test_contract():
         except ValueError:
             continue
         raise AssertionError("plane_differences accepted %r" % (list(bad),))
+    v = np.array([0.0, 1.0, 2.0])
+    prof = np.ones((4, 3))
+    prof[2, 1] = np.nan
+    pa = FO.profile_areas(prof, v, valid=[True, False, True, True])
+    assert pa["area"][0] == 2.0 and np.isnan(pa["area"][1]) and np.isnan(pa["area"][2]) and pa["area"][3] == 2.0
+    assert np.isnan(pa["d_area"][0]) and np.isnan(pa["d_area"][1]) and np.isnan(pa["d_area"][2]), pa["d_area"]
+    for bad in (dict(profiles=prof, v=v[::-1]), dict(profiles=prof, v=v[:2]), dict(profiles=prof[0], v=v),
+                dict(profiles=prof, v=v, valid=[True])):
+        try:
+            FO.profile_areas(**bad)
+        except ValueError:
+            continue
+        raise AssertionError("profile_areas accepted %r" % (list(bad),))
 
 
 def test_determinism():
@@ -196,7 +263,7 @@ def test_edge_cases():
         swc, fetcher, planes, _ = synthetic_cell(tmp, ccfg, d_true=0.8, mu=1.0)
         prov = run_cell.real_provider(fetcher, planes, ccfg.acquisition.res0_um)
         out = os.path.join(tmp, "pd")
-        recs = PD.run(swc, prov, ccfg, [4, 1], out, "999", planes_half=8, log=lambda m: None)
+        recs = PD.run(swc, prov, ccfg, [4, 1], out, "999", planes_half=8, evaluation="image", log=lambda m: None)
         rec, skip = recs
         assert rec["ks"] == list(range(-8, 9)) and rec["n_missing"] == 2 and rec["valid"][0] is False, rec["ks"]
         assert math.isnan(rec["pos"][0]) and math.isnan(rec["pos"][-1]) and all(math.isfinite(x) for x in rec["pos"][1:-1])
@@ -205,8 +272,26 @@ def test_edge_cases():
         with open(os.path.join(out, "planediff_999.json")) as f:
             assert len(json.load(f)) == 2
         band = PD.run(swc, prov, ccfg, [4], os.path.join(tmp, "band"), "999", planes_half=3, band_um=1.0,
-                      log=lambda m: None)[0]
+                      evaluation="image", log=lambda m: None)[0]
         assert 0 < band["n_pixels"] < rec["n_pixels"], (band["n_pixels"], rec["n_pixels"])
+        # the profile evaluation (default): one area per plane, NaN for the missing planes, a flat background
+        pr = PD.run(swc, prov, ccfg, [4], os.path.join(tmp, "prof"), "999", planes_half=8, log=lambda m: None)[0]
+        A, An, B = (np.array(pr[k], dtype=float) for k in ("area", "area_norm", "background"))
+        assert pr["evaluation"] == "profile" and A.size == 17 and np.isnan(A[0]) and np.isnan(A[-1]) and \
+            np.all(np.isfinite(A[1:-1])) and np.all(np.isfinite(An[1:-1])), A
+        assert np.nanmax(B) - np.nanmin(B) < 1.0 and pr["bg_frac"] >= 0.05, (B, pr["bg_frac"])
+        assert np.all(np.abs(An[1:-1] / A[1:-1] - 1.0) < 0.01), "the normalised areas keep the units of the raw ones"
+        assert os.path.exists(pr["png"]) and pr["k_min_area"] in pr["ks"]
+
+        def stepped(left, top, w, h, k_lo, k_hi):            # plane +2 made 2 % darker after the camera
+            block, ks, valid, frame = prov(left, top, w, h, k_lo, k_hi)
+            block = block.astype(float)
+            block[ks == 2] *= 0.98
+            return block, ks, valid, frame
+        ps = PD.run(swc, stepped, ccfg, [4], os.path.join(tmp, "step"), "999", planes_half=8, log=lambda m: None)[0]
+        assert ps["k_min_area"] == 2, ("the darker plane should hold the smallest raw area", ps["area"])
+        ratio = np.array(ps["area_norm"], dtype=float)[1:-1] / An[1:-1]
+        assert np.allclose(ratio, ratio[0], rtol=1e-9), ratio
 
 
 # ---------------------------------------------------------------- runner ---

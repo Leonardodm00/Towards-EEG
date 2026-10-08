@@ -357,3 +357,147 @@ def plane_difference_figure(blocks, title=""):
     if title:
         fig.suptitle(title, y=1.0 - 0.66 / H, fontsize=10)
     return fig
+
+
+_ARAW, _ANORM = "#2a78d6", "#4a3aa7"     # area under the profile: as measured (blue), background-normalised (violet)
+
+
+def _plane_colour(dk):
+    """Blue below the reference plane, red above, darker nearer; dark at it; light grey beyond 4 planes."""
+    blue, red = ("#1c5cab", "#2a78d6", "#5598e7", "#86b6ef"), ("#9e3432", "#c74845", "#dd716a", "#ea9a93")
+    if dk == 0:
+        return "#1a1a19"
+    if abs(dk) > 4:
+        return "#d6d6d1"
+    return blue[abs(dk) - 1] if dk < 0 else red[dk - 1]
+
+
+def profile_area_figure(blocks, title=""):
+    """The area under the profile along the measuring line, plane by plane
+    (focus.profile_areas). Per block (one node): the planes on one grey scale
+    with the measuring line drawn and frames; below, the profiles I_k(v)
+    coloured by plane (blue below the reference plane, red above), the areas
+    A_k as measured and background-normalised on one axis with their minima,
+    and their differences between consecutive planes.
+
+    blocks: list of dicts with
+      label, stack (n, H, W), ks (n,), valid (n,), extent (image_extent_um), line ((x0, y0), (x1, y1)) in um,
+      frames {k: (colour, linestyle, tag)}, lines [(k, colour, linestyle, label)],
+      v (M,), prof (n, M), area (n,), area_norm (n,) or None, background (n,) or None (each plane's
+      background level, drawn in a fourth panel), k_ref (the colour reference plane)
+    Presentation only. Returns the Figure."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.patheffects as pe
+    halo = [pe.Stroke(linewidth=3.0, foreground="white"), pe.Normal()]
+    side, gap, left, right = 0.95, 0.08, 0.75, 0.25
+    col = side + gap
+    n_max = max(len(b["ks"]) for b in blocks)
+    W = max(left + n_max * col - gap + right, 13.0)
+    heights = (0.34, 0.34, side, 0.62, 2.3, 0.62)
+    top_band = 1.25
+    H = top_band + len(blocks) * sum(heights)
+    fig = plt.figure(figsize=(W, H))
+
+    def ax_at(x_in, y_top_in, w_in, h_in):
+        return fig.add_axes([x_in / W, 1.0 - (y_top_in + h_in) / H, w_in / W, h_in / H])
+
+    lines_seen = {}
+    y = top_band
+    for b in blocks:
+        ks = np.asarray(b["ks"])
+        n = ks.size
+        stack = np.asarray(b["stack"], dtype=float)
+        valid = np.asarray(b["valid"], dtype=bool)
+        fig.text(left / W, 1.0 - (y + 0.26) / H, b["label"], fontsize=10, fontweight="bold", ha="left")
+        y += heights[0]
+        shown = stack[valid] if valid.any() else stack
+        lo, hi = np.percentile(shown, [1.0, 99.5])
+        (x0, y0), (x1, y1) = b["line"]
+        for j in range(n):
+            ax = ax_at(left + j * col, y + heights[1], side, side)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            k = int(ks[j])
+            if valid[j]:
+                ax.imshow(stack[j], cmap="gray", vmin=lo, vmax=hi, extent=b.get("extent"), origin="upper",
+                          interpolation="nearest")
+                ax.plot([x0, x1], [y0, y1], color="black", lw=1.0, path_effects=halo)
+            else:
+                ax.set_facecolor("0.85")
+                ax.text(0.5, 0.5, "missing", ha="center", va="center", fontsize=8, transform=ax.transAxes)
+            tag = ""
+            if k in b.get("frames", {}):
+                colour, ls, tag = b["frames"][k]
+                ax.add_patch(plt.Rectangle((0.01, 0.01), 0.98, 0.98, transform=ax.transAxes, fill=False,
+                                           edgecolor=colour, lw=2.6, ls=ls, clip_on=False))
+            ax.set_title("k %d%s" % (k, ("\n" + tag) if tag else ""), fontsize=7.5, pad=2)
+        y += heights[1] + heights[2] + heights[3]
+        npan = 4 if b.get("background") is not None else 3
+        w3 = (W - left - right - (npan - 1) * 0.7) / float(npan)
+        a1 = ax_at(left, y, w3, heights[4])
+        a2 = ax_at(left + w3 + 0.7, y, w3, heights[4])
+        a3 = ax_at(left + 2 * (w3 + 0.7), y, w3, heights[4])
+        a4 = ax_at(left + 3 * (w3 + 0.7), y, w3, heights[4]) if npan == 4 else None
+        v, prof = np.asarray(b["v"]), np.asarray(b["prof"], dtype=float)
+        order = sorted(range(n), key=lambda j: -abs(int(ks[j]) - int(b["k_ref"])))
+        for j in order:
+            if valid[j]:
+                dk = int(ks[j]) - int(b["k_ref"])
+                a1.plot(v, prof[j], color=_plane_colour(dk), lw=2.2 if dk == 0 else 1.1)
+        a1.set_xlim(v[0], v[-1])
+        a1.set_title("profiles along the measuring line\n(dark: plane %d; blue below, red above; darker = nearer)"
+                     % int(b["k_ref"]), fontsize=8.5)
+        a1.set_xlabel("v (um)", fontsize=8.5)
+        a1.set_ylabel("grey level", fontsize=8.5)
+        mid = ks[:-1] + 0.5
+        for ax in (a2, a3):
+            for k, colour, ls, label in b.get("lines", []):
+                ax.axvline(k, color=colour, ls=ls, lw=1.1, zorder=1)
+                lines_seen[label] = (colour, ls)
+        curves = [(np.asarray(b["area"], dtype=float), _ARAW, "o-")]
+        if b.get("area_norm") is not None:
+            curves.append((np.asarray(b["area_norm"], dtype=float), _ANORM, "s--"))
+        for A, colour, style in curves:
+            a2.plot(ks, A, style, color=colour, ms=4.5, lw=1.8, zorder=3)
+            if np.isfinite(A).any():
+                j = int(np.nanargmin(A))
+                a2.plot([ks[j]], [A[j]], "o", ms=11, mfc=colour, mec="white", mew=1.5, zorder=4)
+            a3.plot(mid, np.diff(A), style, color=colour, ms=4.5, lw=1.8, zorder=3)
+        a3.axhline(0.0, color="#1a1a19", lw=0.8)
+        if a4 is not None:
+            for k, colour, ls, label in b.get("lines", []):
+                a4.axvline(k, color=colour, ls=ls, lw=1.1, zorder=1)
+            bk = np.asarray(b["background"], dtype=float)
+            a4.plot(ks, bk, "D-", color="#7a7a7a", ms=4, lw=1.5, zorder=3)
+            if not np.isfinite(bk).any():
+                a4.text(0.5, 0.5, "no pixel far from the traced dendrites", ha="center", va="center", fontsize=8,
+                        transform=a4.transAxes)
+            a4.set_title("B_k: each plane's background level\n(a step here is a change of the whole plane's brightness)",
+                         fontsize=8.5)
+            a4.set_xlabel("plane k", fontsize=8.5)
+            a4.set_ylabel("grey level", fontsize=8.5)
+            a4.set_xlim(ks[0] - 0.5, ks[-1] + 0.5)
+        a2.set_title("A_k: area under the profile (minimum marked)", fontsize=8.5)
+        a3.set_title("A_(k+1) - A_k between consecutive planes", fontsize=8.5)
+        a2.set_xlabel("plane k", fontsize=8.5)
+        a3.set_xlabel("pair midpoint (k + 0.5)", fontsize=8.5)
+        a2.set_ylabel("grey level x um", fontsize=8.5)
+        for ax in (a1, a2, a3) + ((a4,) if a4 is not None else ()):
+            ax.tick_params(labelsize=7.5)
+            ax.grid(axis="y", color="#e6e5e0", lw=0.6)
+            for s in ("top", "right"):
+                ax.spines[s].set_visible(False)
+        for ax in (a2, a3):
+            ax.set_xlim(ks[0] - 0.5, ks[-1] + 0.5)
+        y += heights[4] + heights[5]
+    handles = [plt.Line2D([], [], color=_ARAW, marker="o", lw=1.8, label="A_k as measured (the proposal); blue frame: its minimum"),
+               plt.Line2D([], [], color=_ANORM, marker="s", ls="--", lw=1.8,
+                          label="A_k with each plane divided by its own background (x their mean); violet frame: its minimum")]
+    handles += [plt.Line2D([], [], color=c, ls=ls, lw=2.0, label="frame and line: " + t)
+                for t, (c, ls) in lines_seen.items() if c not in (_ARAW, _ANORM)]
+    fig.legend(handles=handles, loc="upper center", ncol=3, fontsize=8, frameon=False, bbox_to_anchor=(0.5, 1.0 - 0.02 / H))
+    if title:
+        fig.suptitle(title, y=1.0 - 0.80 / H, fontsize=10)
+    return fig

@@ -7,6 +7,7 @@
 | 2026-10-07 (later) | v3. The focus rule is the gradient energy (D-030): Cell 2 runs `test_smoke_focus` too; Cells 4b/4c describe and show both focus curves, the summary's `k_star_vs_dip_depth` and the nodes where the two rules differ; the default estimator hash is now 6f0397236447fe6f. Evidence: `test_smoke_focus.py` 7 pass and every suite of the workstream re-run in the sandbox **[run, sandbox]**; the cells that reach api.brain-map.org have still not run here. |
 | 2026-10-07 (later, 2) | v4. Added Cell 4d: plane montages of chosen nodes with Allen's reconstruction drawn on them (`scripts/node_planes.py`, SPEC Block 11); each node is measured again as in Cell 4b, so its crops come from the cache. Evidence: `test_smoke_phase2.py` 4 pass, 3 skip with the montage checks (the re-measurement equals the pilot's and makes the same request; the image extent agrees with the profile sampler to 1e-6 grey levels; the drawn trace lies on the rendered tube within 0.05 um), nine mutants of the new code killed, every suite re-run **[run, sandbox]**; not yet run on Allen's data. |
 | 2026-10-08 | v5. Added Cell 4e: consecutive-plane differences around chosen nodes, the user's proposal of 2026-10-08, as a diagnostic (`scripts/plane_differences.py`, SPEC Block 11). Evidence: `test_smoke_plane_diff.py` 7 pass, 1 skip; seven mutants of the new code killed; every suite re-run; the cell ran on the synthetic cell with the fixture in place of Allen's server **[run, sandbox]**; not yet run on Allen's data. |
+| 2026-10-08 (later) | v6. Cell 4e evaluates, by default, the area under the profile along the measuring line, plane by plane, and its change between consecutive planes (the user's evaluation, D-036), with the same areas background-normalised and each plane's background level beside them; the pixel-difference version stays as `--evaluation image`. Evidence: `test_smoke_plane_diff.py` 7 pass, 1 skip with the profile checks; nine mutants of the new code killed; every suite re-run **[run, sandbox]**; not yet run on Allen's data. |
 
 This runbook covers the real-data steps, in order. Each cell names the line that must **appear** in its output. A missing line means the cell did not get as far as the code that prints it. Each step lists the decisions it feeds; those stay yours. Nothing in these scripts changes the configuration on its own.
 
@@ -185,10 +186,10 @@ Each node is measured again exactly as in Cell 4b, so its crops come from the ca
 
 Use it to judge, node by node, three things the numbers of Cell 4c cannot show: whether Allen's trace sits on the dendrite in the image (a lateral offset is a registration matter, Cell 3b); whether $k^*$ is the plane where the dendrite's edges are sharpest; and whether another neurite crosses the profile line near $k^*$ (D-030 open point on overlaps).
 
-### Cell 4e: consecutive-plane differences around a node [added 2026-10-08]
+### Cell 4e: plane-to-plane evaluation around a node [added 2026-10-08; profile evaluation the default since 2026-10-08, 16:26]
 
 ```python
-# Cell 4e: consecutive-plane differences around a node (needs Cells 0 and 1 only)
+# Cell 4e: plane-to-plane evaluation around a node (needs Cells 0 and 1 only)
 import os
 from IPython.display import Image, display
 DIFF_NODES = [2, 3]       # node ids; 2 and 3 are trunk nodes of the pilot
@@ -201,11 +202,11 @@ for n in DIFF_NODES:
         display(Image(filename=p))
 ```
 
-The proposal of 2026-10-08, as a diagnostic that changes no measurement. For each node, the planes $k_{\rm SWC} - 6$ to $k_{\rm SWC} + 6$ of its block, cropped to the 10 x 10 um square about the node. Between each pair of consecutive planes the difference $D = I_{k+1} - I_k$ is formed, its negative values are set to zero, and $S^+$ is the mean of what remains over the pixels of the square (grey levels per pixel); $S^-$, the mean of the negative part, is the same measure taken from the other end of the stack. The figure shows the planes (frames: $k^*$ red, the dip depth's plane grey dashed, the SWC plane dotted), the positive part of each difference (blue), and the two curves, with the dip of $S^+$ between its two largest maxima.
+The evaluation proposed on 2026-10-08, as a diagnostic that changes no measurement. For each node, the planes $k_{\rm SWC} - 6$ to $k_{\rm SWC} + 6$ of its block. In every plane, the profile $I_k(v)$ along the node's measuring line (the line the focus scores use: through the SWC node, across its fitted heading, $|v| \le 3$ um, bilinear), the area under it $A_k = \int I_k\,dv$, and the difference $A_{k+1} - A_k$ between consecutive planes. Beside it, the same areas with each plane divided by its own background level $B_k$ (the interquartile mean of the block's pixels more than Allen's radius + 4 um from every traced dendrite and the soma) and multiplied by the planes' mean, so that a change of a whole plane's brightness drops out. The figure shows the planes with the measuring line (frames: smallest area blue, smallest normalised area violet, $k^*$ red, the dip depth's plane grey dashed, the SWC plane dotted), the profiles, the two area curves, their differences, and $B_k$.
 
-Each node is located as the pilot measures it, so the pilot's planes come from the cache; the planes beyond them are fetched, one crop each. Expect one `[planediff] node N: planes ... (0 missing), ... pixels; dip of S+ at a->b; k* ..., dip-depth plane ..., SWC plane ...` line per node, then `[planediff] wrote N figures (0 skipped) ...`. Add `"--band-um", 3.5` to the command to count only the pixels within 3.5 um of the traced stretch.
+Expect one `[planediff] node N: planes ... (0 missing); smallest area at k ..., normalised k ...; background ... gl; k* ..., dip-depth plane ..., SWC plane ...` line per node, then `[planediff] wrote N figures (0 skipped) ...`. Add `"--evaluation", "image"` to the command for the pixel-difference version (the positive part of $I_{k+1} - I_k$ over the 10 x 10 um square).
 
-What to expect (synthetic tubes, SPEC Block 11): the dip falls on a pair next to the tube's centre for a 0.5 um and a 1.5 um tube, with or without the camera's noise; for a faint 5 um tube it does only without noise, because the change between its planes is smaller than the noise. Read a trunk's curve with that in mind.
+What to expect (synthetic tubes, SPEC Block 11): blur moves light but does not remove it, so the area of a profile does not change while the dip stays inside the line; for a 0.5 um or a 1.5 um tube the smallest area falls at random. For a 5 um tube, whose blurred edges leave the +-3 um line, it falls within one plane of the centre in 6 of 8 noise draws. A step in $B_k$ (a whole plane brighter or darker) moves the smallest raw area onto that plane; the normalised curve does not follow it.
 
 ## Cell 5: camera-chain inputs
 
