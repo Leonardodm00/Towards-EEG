@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-04 (v1, revised the same day after an independent review;
 v1.1 the same day adds diffraction, §3.4–3.5; v1.2 adds pointers to the
-interactive figures; see §5, "Revision record"). **Project:** Towards EEG, diameter re-measurement
+interactive figures; v1.3 on 2026-10-08 marks a correction in §3.6; see §5, "Revision record"). **Project:** Towards EEG, diameter re-measurement
 from the Allen 63× brightfield stacks. **Companion documents:**
 `claude/TEEG_diameter_bias_table_procedure_2026-10-04.md` ("procedure §n /
 Eq. (n)") and `claude/TEEG_diameter_bias_table_mathematics_2026-10-04.md`
@@ -562,7 +562,15 @@ illumination at the specimen.
   $I = B\,(T * h_0)$ holds only **to first order in the specimen's absorbance**
   (weak object) **[textbook, from memory: Hopkins' theory; no full-text source
   found]**. Dark DAB dendrites are not weak, so for them it is an approximation
-  of unchecked size.
+  of unchecked size. **[2026-10-08: full-text source now, Zuo et al. 2017
+  (PubMed, PMC5550517): at $S\ge1$ the weak-object transfer function is the
+  autocorrelation of the pupil, so absorption is transferred as by an
+  incoherent microscope and phase is not, and full incoherence requires
+  $S\to\infty$. For a thin object at $S=1$ (aperture evenly filled) the exact
+  difference is: true image $= B\,(T*h_0)\ -$ the specimen's dark-field image
+  from the illumination directions outside the objective's aperture, a term
+  $\ge0$ and quadratic in $1-t$ **[reasoning, theory chat 2026-10-08; theory
+  handoff, Open work 2]**.]**
 - **Narrow condenser cone** (aperture diaphragm closed down): the specimen is
   lit by nearly one plane wave, which is coherent; fields add (Eq. 7), edges
   show fringes and ringing, and the image is no longer a blur of $T$, so
@@ -586,7 +594,12 @@ Eq. 11, the squared-width additivity (mathematics §3.3), the slab rendering
 are too dark for the weak-object approximation, all of these are
 approximations of unknown quality. A data check: coherent edges ring, so a
 systematic bright fringe beside dark branches in the real profiles is a
-warning sign **[reasoning]**.
+warning sign **[reasoning]**. **[corrected 2026-10-08: the check detects $S$
+well below 1 (or an unevenly filled aperture, or refraction in thick nodes),
+not darkness at $S=1$. For a thin
+passive object at $S=1$, $I\le B\,(T*h_0)\le B$ everywhere, so the dark-node
+error cannot make a fringe above background, and the absence of fringes does
+not clear it **[reasoning]**.]**
 
 ### 3.7 The mounting medium and index mismatch
 
@@ -748,6 +761,15 @@ to the interactive figures 1–3 in `../figures/`, with their reference readouts
 and the figure-1 caveat (uniformly bright spot, upper-bound coefficient).
 No earlier statement changed.
 
+**Revision record, v1.3 (2026-10-08, document upkeep by the theory chat).**
+§3.6: a full-text source for the weak-object statements (Zuo et al. 2017) and
+the exact $S=1$ difference between the incoherent form and the true image are
+noted beside the bullet "Wide condenser cone"; the data check under "For the
+pipeline" is marked [corrected 2026-10-08] (it tests $S<1$, not the dark-node
+error at $S=1$). No other statement changed. Evidence: Zuo et al. 2017, PubMed
+full text; the derivation in the theory chat of 2026-10-08 **[reasoning, not
+run]**.
+
 ## 6. References and sources
 
 **PubMed, full text read (2026-10-04):**
@@ -775,6 +797,24 @@ No earlier statement changed.
   super-resolution microscopy. *Opt Lett*. PMC4030053.
   [DOI](https://doi.org/10.1364/OL.39.000275). Focal shift into an aqueous
   medium; spherical aberration broadening the PSF with depth.
+
+**PubMed, full text read (2026-10-08):**
+- Zuo C. et al. (2017) High-resolution transport-of-intensity quantitative
+  phase microscopy with annular illumination. *Sci Rep* 7:7654. PMC5550517.
+  [DOI](https://doi.org/10.1038/s41598-017-06837-1). Köhler image as an
+  incoherent superposition of the coherent images from all source points;
+  bilinear dependence on the transmittance (transmission cross-coefficient);
+  the weak-object approximation neglects the interference of scattered light
+  with scattered light (first Born); at $S\ge1$ the weak-object transfer
+  function is the pupil autocorrelation (no phase contrast), full incoherence
+  only as $S\to\infty$. Searches of 2026-10-08: PubMed, 14 queries (weak-object
+  transfer function; partially coherent absorption and phase transfer
+  functions; first Born and intensity diffraction tomography; transport of
+  intensity; transmission cross-coefficient; condenser aperture and contrast;
+  Fourier ptychography; DAB as a light scatterer; strongly absorbing objects;
+  brightfield dendrite diameters), 0-10 records each; the PMC records of Li
+  et al. 2017, Chen et al. 2016 and Mehta & Oldenbourg 2014 (*Biomed Opt
+  Express*) returned no body text, so they were not used.
 
 **PubMed, abstract only (not used for any claim):** Heine J. et al. (2018)
 *Rev Sci Instrum*, [DOI](https://doi.org/10.1063/1.5020249) — index mismatch

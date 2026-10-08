@@ -3,6 +3,7 @@
 | Date | Change |
 |---|---|
 | 2026-10-07 | Created at the user's request (18:17 Europe/Rome), for study on 2026-10-08. Copies two answers of the theory chat of 2026-10-07 (claude.ai session `session_01VvzYj2wa7J3oP8EEw71KEg`): the answer of 17:02 to "give a context on this and explain better" and the answers of 18:01 to questions 1-5. Text unchanged except that housekeeping lines (docs written, push status) are removed and later outcomes are marked in brackets. The figure is a standalone copy of the one shown in the chat. |
+| 2026-10-08 | Two bracketed notes added by the next theory chat (session `session_017oQJ14njZ9i5nSBhHUDoMh`) after it explained the weak-object approximation: under Part 1's "Where each effect stands" (what the fringe check tests) and under Part 2, answer 4 (the direction index, the sign of the $w^2$ difference at $S=1$, and what the model does with the $w^2$ terms). The copied text is otherwise unchanged. Evidence: derivation in that chat **[reasoning, not run]**; Zuo et al. 2017, PubMed full text. |
 
 Status of what these notes discuss: D-030, D-031 and D-032 are in the
 project log `TEEG_decisions_and_ideas_log.md`; the code consequences are in
@@ -125,7 +126,11 @@ Where each effect stands:
   for how absorption is treated.
 - **Effect 3** is open, with one indirect check on real data. Coherent edges
   ring, so a bright fringe beside dark branches in the real profiles is a
-  warning sign (optics §3.6).
+  warning sign (optics §3.6). **[Qualified 2026-10-08: at $S=1$ effect 3 only
+  darkens the image of a thin node, so it cannot make a fringe above
+  background. A fringe signals a stopped-down or unevenly filled condenser
+  aperture, or refraction in thick nodes, and no fringe does not clear
+  effect 3 (theory handoff, Open work 2).]**
 
 With D-030 in force, and the partition still the table's renderer
 (D-024 (i)), effects 2 and 3 pass into the final diameters of dark nodes. So
@@ -304,6 +309,16 @@ and adds the shadows up. That works while the shadows are pale. When they are
 dark, light diffracted around different parts of the node interferes, and the
 shadows no longer simply add. (Optics §3.6; Hopkins' theory, textbook, from
 memory.)
+
+**[Explained further on 2026-10-08 by the next theory chat; see the theory
+handoff, Open work 2.]** (1) $B\,|t*h_a|^2$ is the image for the axial
+direction only; for a plane wave of transverse frequency $\mathbf q$ it is
+$B\,|(t\,e_{\mathbf q})*h_a|^2$, with $e_{\mathbf q}(\mathbf x)=e^{2\pi i\,\mathbf q\cdot\mathbf x}$.
+(2) At $S=1$ the $w^2$ difference has a sign. The model is brighter than the
+true image, everywhere, by the dark-field image of the stain from the
+illumination directions outside the objective's aperture **[reasoning]**.
+(3) For faint nodes the model does not drop the $w^2$ terms. It keeps their
+incoherent version, and the error is the difference between the two.
 
 **5) Ray world vs partition.**
 

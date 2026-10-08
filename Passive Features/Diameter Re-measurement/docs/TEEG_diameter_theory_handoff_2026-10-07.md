@@ -3,6 +3,7 @@
 | Date | Change |
 |---|---|
 | 2026-10-07 | v1. Written at the user's request (18:17 Europe/Rome) so that a new theory chat can take over on 2026-10-08 from the theory chat of 2026-10-05 to 2026-10-07 (claude.ai session `session_01VvzYj2wa7J3oP8EEw71KEg`). State after D-032. Evidence: the project log re-read and written on 2026-10-07 (D-025 to D-027 merged; D-030, D-031, D-032 added); `main` at `ff1028f` before this file; numbers below re-read today from the committed `checks/*.out` and the implementation handoff's "Findings". |
+| 2026-10-08 | v1.1, by the new theory chat (session `session_017oQJ14njZ9i5nSBhHUDoMh`), after its first answer (the weak-object approximation). Open work 2 gains a dated note: the literature search widened (one full-text source), the exact $S=1$ difference between the incoherent form and the true image, and a correction of what the fringe check tests. "Next free IDs" marked [corrected 2026-10-08]. Evidence: the project log read 2026-10-08 (`project_read`, D-019 to D-037, I-002); Zuo et al. 2017, PubMed full text (PMC5550517); derivation in the chat **[reasoning, not run]**. |
 
 Paths are relative to `Passive Features/Diameter Re-measurement/` in the repo
 `Leonardodm00/Towards-EEG` (canonical URL
@@ -63,7 +64,11 @@ waiting for the user.
 | D-032 | tilt-specific tables are dropped, as kernel and as test | does it also withdraw D-027's tilt-binned study? (the theory chat's reading: yes; not yet confirmed) |
 | I-002 | idea: a non-Gaussian kernel family with the Gaussian as a special case | to discuss |
 
-Next free IDs in the log: D-033, I-003.
+Next free IDs in the log: D-033, I-003. **[corrected 2026-10-08]** The log
+now also holds D-033 and D-034 (Stage 7 noise, another workstream) and D-035
+to D-037 (this workstream's implementation chat, logged 2026-10-08: D-035 the
+focus plane by gradient energy, which the repository cites as "D-030"; D-036
+and D-037 plane-to-plane diagnostics). Next free IDs: D-038, I-003.
 
 ## Findings the theory rests on
 
@@ -93,6 +98,31 @@ In the order the theory chat would take it; the user decides.
    Unmeasured. Data check: bright fringes beside dark branches in real
    profiles. No bright-field source found (PubMed, 5 queries, 2026-10-07);
    the literature search could be widened.
+   **[2026-10-08, explained in the new theory chat]** Literature widened:
+   PubMed, 14 queries; one full text, Zuo et al. 2017 (*Sci Rep* 7:7654,
+   PMC5550517): under Köhler illumination the image is an incoherent sum of
+   the coherent images from the source points; at $S\ge1$ the weak-object
+   transfer function is the pupil autocorrelation (absorption imaged as by an
+   incoherent microscope, phase not imaged), while full incoherence needs
+   $S\to\infty$. No source on dark absorbers. Derived **[reasoning, not
+   run]**, for a thin object, scalar optics, $S=1$ with the aperture evenly
+   filled, $\mathbf q$ the transverse frequency of one illuminating plane wave
+   $e_{\mathbf q}$ and $\Omega_{\rm obj}$ the objective's aperture:
+   $I_{\rm model}(\mathbf x)-I_{\rm true}(\mathbf x)=\frac{B}{\int|h_a|^2}\int_{\mathbb R^2\setminus\Omega_{\rm obj}}\big|\big((w\,e_{\mathbf q})*h_a\big)(\mathbf x)\big|^2\,d^2\mathbf q\ \ge0$.
+   The model is too bright, everywhere, by the stain's dark-field image from
+   the directions the condenser does not supply; the difference has no
+   constant or linear term in $w$ (hence the first-order agreement). Integrated
+   over the image it equals $B\int|\tilde W(\mathbf m)|^2\,[1-\Lambda(\mathbf m)]\,d^2\mathbf m$
+   (unapodised pupil; $\Lambda$ the normalised overlap of two aperture discs),
+   whatever the focus: the light the stain diffracts out of the aperture,
+   which the model keeps. **[corrected 2026-10-08]** The data check above does
+   not test this term: at $S=1$ a thin passive object gives
+   $I_{\rm true}\le I_{\rm model}\le B$, so a fringe above background signals
+   that the premise failed ($S<1$, or an unevenly filled aperture) or
+   refraction in thick nodes, and its absence does not bound effect 3. The effect on $\hat d$ is still
+   uncomputed; a direct check would render thin-object phantoms by the sum
+   over condenser directions and by $B\,(T*h_0)$, fit both and compare
+   $\hat d$.
 3. **D-032 confirmation.** Does dropping tilt-specific tables also withdraw
    D-027's tilt-binned study? Ask the user; correct the log if the reading is
    wrong.
