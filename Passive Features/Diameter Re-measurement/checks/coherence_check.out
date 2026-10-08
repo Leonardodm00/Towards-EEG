@@ -1,0 +1,8 @@
+smoke: 3 checks passed (weak limit: max |koehler - model| = 2.7e-06, dip 0.0084)
+per method: centre dip 1-I(0) ; brightest point outside the branch, I-1 ; dip FWHM (um)
+d=0.5 um, mu*d=0.1: coherent 0.104 ; +0.004 ; 0.366 | koehler S=1 0.080 ; -0.000 ; 0.425 | model B(T*h0) 0.080 ; -0.000 ; 0.425 || model brighter than koehler by at most 0.0002 B
+d=0.5 um, mu*d=1.0: coherent 0.679 ; +0.039 ; 0.405 | koehler S=1 0.552 ; -0.000 ; 0.454 | model B(T*h0) 0.543 ; -0.000 ; 0.444 || model brighter than koehler by at most 0.0131 B
+d=0.5 um, mu*d=3.0: coherent 0.982 ; +0.094 ; 0.483 | koehler S=1 0.870 ; -0.000 ; 0.498 | model B(T*h0) 0.838 ; -0.000 ; 0.479 || model brighter than koehler by at most 0.0603 B
+d=1.0 um, mu*d=0.1: coherent 0.093 ; +0.005 ; 0.830 | koehler S=1 0.088 ; -0.000 ; 0.845 | model B(T*h0) 0.088 ; -0.000 ; 0.845 || model brighter than koehler by at most 0.0001 B
+d=1.0 um, mu*d=1.0: coherent 0.620 ; +0.043 ; 0.884 | koehler S=1 0.592 ; -0.000 ; 0.894 | model B(T*h0) 0.588 ; -0.000 ; 0.884 || model brighter than koehler by at most 0.0089 B
+d=1.0 um, mu*d=3.0: coherent 0.941 ; +0.108 ; 0.967 | koehler S=1 0.911 ; -0.001 ; 0.962 | model B(T*h0) 0.894 ; -0.000 ; 0.942 || model brighter than koehler by at most 0.0446 B

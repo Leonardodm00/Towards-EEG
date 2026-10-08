@@ -4,6 +4,7 @@
 |---|---|
 | 2026-10-07 | v1. Written at the user's request (18:17 Europe/Rome) so that a new theory chat can take over on 2026-10-08 from the theory chat of 2026-10-05 to 2026-10-07 (claude.ai session `session_01VvzYj2wa7J3oP8EEw71KEg`). State after D-032. Evidence: the project log re-read and written on 2026-10-07 (D-025 to D-027 merged; D-030, D-031, D-032 added); `main` at `ff1028f` before this file; numbers below re-read today from the committed `checks/*.out` and the implementation handoff's "Findings". |
 | 2026-10-08 | v1.1, by the new theory chat (session `session_017oQJ14njZ9i5nSBhHUDoMh`), after its first answer (the weak-object approximation). Open work 2 gains a dated note: the literature search widened (one full-text source), the exact $S=1$ difference between the incoherent form and the true image, and a correction of what the fringe check tests. "Next free IDs" marked [corrected 2026-10-08]. Evidence: the project log read 2026-10-08 (`project_read`, D-019 to D-037, I-002); Zuo et al. 2017, PubMed full text (PMC5550517); derivation in the chat **[reasoning, not run]**. |
+| 2026-10-08 (later) | v1.2, by the previous theory chat's session (`session_01VvzYj2wa7J3oP8EEw71KEg`), answering the user on coherent vs incoherent illumination. Open work 2 gains a dated note with the numbers of the new `checks/coherence_check.py`: the $S=1$ image is never brighter than $B\,(T*h_0)$ (the sign derived in v1.1, confirmed numerically) and the in-focus size of the difference for $d$ = 0.5 and 1 µm at $\mu d$ = 0.1, 1, 3. Evidence: the script and its reference output, run 2026-10-08 **[run]**. |
 
 Paths are relative to `Passive Features/Diameter Re-measurement/` in the repo
 `Leonardodm00/Towards-EEG` (canonical URL
@@ -123,6 +124,20 @@ In the order the theory chat would take it; the user decides.
    uncomputed; a direct check would render thin-object phantoms by the sum
    over condenser directions and by $B\,(T*h_0)$, fit both and compare
    $\hat d$.
+   **[2026-10-08, run in the previous theory chat's session, answering the
+   user]** `checks/coherence_check.py` (+ `.out`) renders a straight branch in
+   focus as a thin object, scalar optics, $\lambda=0.55$ µm, NA 1.4, three ways:
+   coherent (one plane wave), the sum over condenser directions at $S=1$, and
+   $B\,(T*h_0)$. It confirms the sign above numerically (smoke check:
+   $I_{S=1}\le I_{\rm model}\le B$ everywhere, with the aperture sampled at the
+   FFT grid spacing). The model is brighter by at most 0.013 $B$ ($\mu d=1$)
+   and 0.060 $B$ ($\mu d=3$) for $d=0.5$ µm, and 0.009 / 0.045 $B$ for
+   $d=1$ µm; the dip FWHM at $S=1$ exceeds the model's by 2.3 % / 4.0 %
+   ($d=0.5$ µm) and 1.1 % / 2.1 % ($d=1$ µm) at $\mu d$ = 1 / 3, and the two
+   agree at $\mu d=0.1$. Coherent illumination gives a bright fringe of
+   +0.04 $B$ ($\mu d=1$) to +0.11 $B$ ($\mu d=3$) and, for $d=0.5$ µm, a
+   narrower dip (FWHM 0.405 against 0.454 µm at $\mu d=1$). Widths of the dip,
+   not fitted $\hat d$; no defocus, no depth extent, no camera **[run]**.
 3. **D-032 confirmation.** Does dropping tilt-specific tables also withdraw
    D-027's tilt-binned study? Ask the user; correct the log if the reading is
    wrong.
