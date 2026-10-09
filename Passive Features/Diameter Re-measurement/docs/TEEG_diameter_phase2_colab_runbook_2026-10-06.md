@@ -12,6 +12,7 @@
 | 2026-10-08 (evening, 2) | v8. Cells 4e and 4f run over `LINE_HALF_UMS` = [3, 5], the half-length of the measuring line (the user's proposal to enlarge it; the pipeline's line stays +-3 um), each length into its own folder; the square around the node grows with the line and is fetched when it outgrows the pilot's block. Cell 4f picks each curve's global minimum (`--entropy-pick min`): on nodes 2 and 3 (run of 2026-10-08, 17:56 UTC) the curves had no W and the dip rule skipped node 2's lowest plane. The JSONs carry every plane's profile. Evidence: `test_smoke_plane_entropy.py` 8 pass and `test_smoke_plane_diff.py` 7 pass, 1 skip with the new checks; mutants of the new code killed; the cells ran on the synthetic cell **[run, sandbox]**; nodes 2 and 3 at +-3 um ran on Allen's data **[user]**. |
 | 2026-10-09 | v9. Added Cell 4g: the entropy along a +-5 um line on thin dendrites, the user's request after the trunk runs (D-039): `--nodes thin` picks up to 12 pilot nodes (in S, Allen 2r <= 0.6 um, fitted d <= 1.0 um, k* equal to the dip depth's plane, flat; up to 3 per stretch), and the script writes a summary CSV and a summary figure of the picks against k*. Evidence: `test_smoke_plane_entropy.py` 8 pass with the selection worked out by hand on a seven-stretch SWC; the cell ran on the synthetic cell with the fixture in place of Allen's server **[run, sandbox]**; not yet run on Allen's data. |
 | 2026-10-09 (afternoon) | v10. Cell 4g shows each node's figure after the summary, as Cell 4f does, and draws its planes without the measuring line and the strip's outline (`--hide-line`, new in `scripts/plane_differences.py`; the user's request of 14:53, to judge the focus by eye). The records do not change. Evidence: `test_smoke_plane_entropy.py` 8 pass and `test_smoke_plane_diff.py` 7 pass, 1 skip, with the lines on the plane panels counted and the flag followed from the command line to the figure; thirteen mutants of the new code each failed a check; the cell ran on the synthetic cell with the fixture in place of Allen's server **[run, sandbox]**; not yet run on Allen's data. |
+| 2026-10-09 (evening) | v11. Added Cells 4h and 4i, the user's request of 16:19 (D-040). Cell 4h: the gradient energy over the whole line on three lines, +-3 um, +-5 um and the d-line +-m d_hat / 2 sized from the pilot's fitted diameter (m = `LINE_MULT` = 2), with one background per plane from the block, on nodes spread over bins of d_hat (`--nodes bydiameter`) plus the trunks 2 and 3. Cell 4i, on the same nodes and the d-line: G alone, the strip's entropy alone, and their min-max blend J = w g + (1 - w) eta with w(d_hat) = 1 / (1 + exp((d_hat - 1.5 um) / 0.3 um)). Evidence: `test_smoke_plane_gradient.py` 8 pass; 45 of 47 mutants of the new code each failed a check, and the other two are equivalent (a guard that `focus.gradient_energy` repeats, and a mask that the NaN profile rows of the missing planes already apply); every suite re-run (19, no failure); both cells ran on two synthetic cells (tubes of 0.8 and 3.0 um, Allen radius 0.3 um) with pilot tables made from those cells, the fixture in place of Allen's server **[run, sandbox]**; not yet run on Allen's data. |
 
 This runbook covers the real-data steps, in order. Each cell names the line that must **appear** in its output. A missing line means the cell did not get as far as the code that prints it. Each step lists the decisions it feeds; those stay yours. Nothing in these scripts changes the configuration on its own.
 
@@ -285,6 +286,93 @@ Output in `pilot/planeentropy/thin_line_5um/`: one figure per node, as in Cell 4
 Expect `[planediff] thin nodes (...): <ids>`, one `[planediff] node N: ...` line per node, then `[planediff] summary over N nodes: k_h_line within 1 plane of k* in a of N (median |diff| ... planes); k_h_strip within 1 plane of k* in b of N (...)` and `[planediff] wrote N figures (0 skipped) ...`; about 13 new crops per node (the $\pm 5$ um square).
 
 What to expect (synthetic tubes, SPEC Block 11): with a $\pm 5$ um line the global minimum of both curves fell within one plane of the centre in 8 of 8 noise draws for a 0.5 um tube. If the thin nodes agree with $k^*$ too, the entropy works on both kinds of node; where it does not, the panels show how it parts from $k^*$ (a neighbouring neurite inside the line or the strip is the first thing to look for).
+
+### Cell 4h: the gradient energy over the whole line, on three lines, across diameters [added 2026-10-09, evening]
+
+```python
+# Cell 4h: the gradient energy over the whole line, on three lines, across diameters (needs Cells 0 and 1 and the pilot's CSV of Cell 4b)
+import json
+import os
+import pandas as pd
+from IPython.display import Image, display
+BYDIAM = dict(dhat_bins="0.8,1.0,1.5,2.0,3.0", per_bin=2, add_nodes="2,3")   # the choice of nodes by d_hat
+GRAD_LINES_UM = "3,5"   # half-lengths of the fixed lines, um
+LINE_MULT = 2.0         # the d-line's full width in units of d_hat (2: the line [-d_hat, d_hat])
+out = OUT + "/pilot/planegrad/bydiameter"
+run("scripts/plane_differences.py", "--specimen", SPECIMEN, "--nodes", "bydiameter",
+    "--pilot-csv", "%s/pilot/pilot_%d.csv" % (OUT, SPECIMEN), "--dhat-bins", BYDIAM["dhat_bins"],
+    "--per-bin", BYDIAM["per_bin"], "--add-nodes", BYDIAM["add_nodes"], "--evaluation", "gradient",
+    "--grad-lines-um", GRAD_LINES_UM, "--line-mult", LINE_MULT, "--planes-half", 6,
+    "--cache-dir", CACHE_DIR, "--out-dir", out, *ALIGN)
+summ = "%s/planegrad_summary_%d.csv" % (out, SPECIMEN)
+if os.path.exists(summ):
+    print(pd.read_csv(summ).to_string(index=False))
+p = "%s/planegrad_summary_%d.png" % (out, SPECIMEN)
+if os.path.exists(p):
+    display(Image(filename=p))
+recs = "%s/planegrad_%d.json" % (out, SPECIMEN)
+if os.path.exists(recs):
+    with open(recs) as f:
+        nodes = [r["node_id"] for r in json.load(f) if "skipped" not in r]
+    for n in nodes:       # each node's figure, in order of d_hat; its planes drawn without any line
+        p = "%s/planegrad_%d.png" % (out, n)
+        if os.path.exists(p):
+            print(os.path.basename(p))
+            display(Image(filename=p))
+```
+
+The comparison asked for on 2026-10-09 (16:19), a diagnostic that changes no measurement (D-040). On the trunk nodes 2 and 3 the pipeline's focus rule, $k^*$, integrates $(\partial_v \tilde I_k)^2$ only over $|v| \le r_{\rm Allen} + 0.5$ um, about 1.6 um, while the fitted diameter $\hat d$ there is about 5 um: the window ends inside the dark core and sees neither edge. Here the gradient energy of plane $k$, $G_k = B_k^{-2} \int (\partial_v \tilde I_k)^2 \, dv$, is integrated over the whole of each of three lines through the node, across the dendrite: $\pm 3$ um, $\pm 5$ um, and the d-line $\pm m \hat d / 2$, sized from the pilot's fitted diameter $\hat d$ of the node (full width $m \hat d$; `LINE_MULT` sets $m$, and 2 gives the line $[-\hat d, \hat d]$). $\tilde I_k$ is the profile along the line, smoothed by one sample; $B_k$ is the plane's background, the interquartile mean of the block's pixels far from every traced dendrite (as in Cell 4e), the same for the three lines. Each line picks the plane of its largest $G_k$.
+
+The nodes come from the pilot's table (`--nodes bydiameter`): the rows with a converged fit, a finite $z_{\rm sub}$, a finite positive $\hat d$, not steep and without the `crossing` flag, split by $\hat d$ into the bins $(0, 0.8]$, $(0.8, 1.0]$, $(1.0, 1.5]$, $(1.5, 2.0]$, $(2.0, 3.0]$ and $(3.0, \infty)$ um; up to 2 per bin, spread along the stretches; then the trunk nodes 2 and 3, whatever their row says; all ordered by $\hat d$. The bins and the counts are the assistant's provisional choice; `BYDIAM` sets them. Each node is measured again on its cached crops, so the $\hat d$ of its d-line equals the pilot's for an unchanged configuration.
+
+Output in `pilot/planegrad/bydiameter/`: one figure per node, `planegrad_<id>.png`: the planes on one grey scale without any line, framed at each line's pick (blue G3, violet G5, aqua Gd) and at $k^*$ (red), the dip depth's plane (grey, dashed) and the SWC plane (black, dotted); below, every plane's profile along the longest line with each line's extent dashed, each line's $G_k$ relative to its own maximum with its pick, and $B_k$. `planegrad_summary_529878215.png`: one panel per node, the three curves rescaled 0-1 against $k - k_{\rm SWC}$, with the picks and each pick minus $k^*$ in the panel's title; `planegrad_summary_529878215.csv`: per node the type, Allen's $2r$, $\hat d$, the d-line's half-length, the planes and each pick minus $k^*$, printed by the cell. The cell then shows each node's figure, in order of $\hat d$.
+
+Expect `[planediff] nodes by diameter (...): <id> (<d_hat> um), ...`, one `[planediff] node N: planes ... (0 missing); d_hat ... um; G picks: +-3 um k ..., +-5 um k ..., +-... um (d-line) k ...; k* ..., dip-depth plane ..., SWC plane ...` line per node, then `[planediff] summary over N nodes: k_G3 within 1 plane of k* in a of N (median |diff| ... planes); k_G5 ...; k_Gd ...` and `[planediff] wrote N figures (0 skipped) ...`. A node whose d-line would hold fewer than 3 samples keeps the two fixed lines, and its line says `no d-line: ...`.
+
+What to expect (synthetic tubes, SPEC Block 11): on a 0.8 um tube (Allen radius 0.3 um) the three lines and $k^*$ pick the in-focus plane on every node; on a 3.0 um tube with the same Allen radius, so that $k^*$'s window ends 0.8 um from the axis, $k^*$ falls four planes from the tube's axis (flagged `stack_edge`), while the three lines agree with each other on every node and pick a plane one or two planes (0.28-0.56 um) from the axis, where $G_k$ stays within 3 % of its maximum over two planes; $\hat d$ there is about 2.7 um, fitted at $k^*$. On Allen's data, if the d-line agrees with $\pm 3$ um on the thin nodes and with $\pm 5$ um on the thick ones, one rule sized from $\hat d$ covers both kinds of node with no threshold. A wrong $\hat d$ (a neighbouring neurite inside the fit) gives a wrong d-line; the profile panel shows its extent against the dendrite.
+
+### Cell 4i: the d-line across diameters: gradient energy, sigmoid-weighted blend, strip entropy [added 2026-10-09, evening]
+
+```python
+# Cell 4i: the d-line across diameters: gradient energy, sigmoid-weighted blend, strip entropy (needs Cells 0 and 1 and the pilot's CSV of Cell 4b)
+import json
+import os
+import pandas as pd
+from IPython.display import Image, display
+BYDIAM = dict(dhat_bins="0.8,1.0,1.5,2.0,3.0", per_bin=2, add_nodes="2,3")   # the same nodes as Cell 4h
+LINE_MULT = 2.0                        # the d-line's full width in units of d_hat, as in Cell 4h
+SIGMOID = dict(d0_um=1.5, s_um=0.3)    # the weight of G: w(d_hat) = 1 / (1 + exp((d_hat - d0) / s))
+STRIPE_HALF_UM = 1.0                   # the strip's half-width along the dendrite, um (as in Cells 4f and 4g)
+out = OUT + "/pilot/planeblend/bydiameter"
+run("scripts/plane_differences.py", "--specimen", SPECIMEN, "--nodes", "bydiameter",
+    "--pilot-csv", "%s/pilot/pilot_%d.csv" % (OUT, SPECIMEN), "--dhat-bins", BYDIAM["dhat_bins"],
+    "--per-bin", BYDIAM["per_bin"], "--add-nodes", BYDIAM["add_nodes"], "--evaluation", "blend",
+    "--line-mult", LINE_MULT, "--sigmoid-d0-um", SIGMOID["d0_um"], "--sigmoid-s-um", SIGMOID["s_um"],
+    "--stripe-half-um", STRIPE_HALF_UM, "--planes-half", 6, "--cache-dir", CACHE_DIR, "--out-dir", out, *ALIGN)
+summ = "%s/planeblend_summary_%d.csv" % (out, SPECIMEN)
+if os.path.exists(summ):
+    print(pd.read_csv(summ).to_string(index=False))
+p = "%s/planeblend_summary_%d.png" % (out, SPECIMEN)
+if os.path.exists(p):
+    display(Image(filename=p))
+recs = "%s/planeblend_%d.json" % (out, SPECIMEN)
+if os.path.exists(recs):
+    with open(recs) as f:
+        nodes = [r["node_id"] for r in json.load(f) if "skipped" not in r]
+    for n in nodes:       # each node's figure, in order of d_hat; its planes drawn without the line
+        p = "%s/planeblend_%d.png" % (out, n)
+        if os.path.exists(p):
+            print(os.path.basename(p))
+            display(Image(filename=p))
+```
+
+The second comparison asked for on 2026-10-09 (16:19) (D-040), on the nodes of Cell 4h and on the d-line only, $\pm m \hat d / 2$ (`LINE_MULT` = $m$ = 2): three ways to pick the plane. (i) $G_k$ alone over the whole d-line, as in Cell 4h. (ii) The strip's entropy alone, $H_k$: the Shannon entropy of the grey levels of the pixels within $|v| \le m \hat d / 2$ across the dendrite and $|u| \le$ `STRIPE_HALF_UM` along it, the plane of its lowest value (as in Cells 4f and 4g). (iii) Their blend, the user's proposal of 15:40: over the planes where both curves are finite, each is min-max rescaled so that 1 marks the best plane for it, $g_k = (G_k - \min G) / (\max G - \min G)$ and $\eta_k = (\max H - H_k) / (\max H - \min H)$, and $J_k = w \, g_k + (1 - w) \, \eta_k$, with the weight of $G$ falling with the diameter, $w(\hat d) = 1 / (1 + e^{(\hat d - d_0) / s})$, $d_0$ = 1.5 um and $s$ = 0.3 um (the user's choice; `SIGMOID` sets them): $w$ is 1/2 at $\hat d = d_0$, 0.97 at 0.5 um and 0.03 at 2.5 um. The blend picks the plane of its largest $J_k$. A flat curve scores 0 on every plane, so it leaves the choice to the other.
+
+Output in `pilot/planeblend/bydiameter/`: one figure per node, `planeblend_<id>.png`: the planes without the line, framed at the three picks (aqua Gd, green J, yellow Hs) and at the pipeline's planes; below, the profiles along the d-line, $g_k$ and $\eta_k$ with their picks, and $J_k$ with its pick and $w$. `planeblend_summary_529878215.png`: one panel per node with the three curves rescaled 0-1 (the entropy inverted, lowest on top) and $w$ in its title; `planeblend_summary_529878215.csv`: per node $\hat d$, the d-line's half-length, $w$, the planes and each pick minus $k^*$, printed by the cell. The cell then shows each node's figure, in order of $\hat d$.
+
+Expect the node list of Cell 4h, one `[planediff] node N: planes ... (0 missing); d_hat ... um, line +-... um (... samples), strip ... pixels; w ...; G k ..., blend k ..., strip entropy k ...; k* ..., dip-depth plane ..., SWC plane ...` line per node, then `[planediff] summary over N nodes: k_Gd within 1 plane of k* in a of N (...); k_blend ...; k_Hd ...` and `[planediff] wrote N figures (0 skipped) ...`. A node whose d-line would hold fewer than 3 samples is skipped, with the reason.
+
+What to expect (synthetic tubes, SPEC Block 11): on a 0.8 um tube $w$ = 0.90 and the blend picks the in-focus plane with $G_k$, while the strip's entropy alone picks the end plane 6 planes away on every node: on so short a line ($\pm 0.85$ um) the strip is mostly dendrite, so the entropy's premise (most of the neighbourhood at the ground level in focus) fails; the entropy is highest one plane either side of focus (about 6.1 bits), where the tube's edges spread over many grey levels, dips slightly at the focal plane (about 5.8 bits), and is lowest on the end planes (about 3.3 bits), where the blurred tube is nearly uniform. On a 3.0 um tube $w$ = 0.02: the blend follows the strip's entropy, which picks the plane next to the axis on every node, while $G_k$ alone picks one or two planes from it; $k^*$ is four planes off. Between $G$'s pick $p$ and the entropy's pick $q$, the blend takes $p$ when $w$ exceeds $w^* = (1 - \eta_p) / ((1 - \eta_p) + (1 - g_q))$ and $q$ below it (SPEC Block 11), so the summary's $w$ beside the three picks says which curve decided.
 
 ## Cell 5: camera-chain inputs
 

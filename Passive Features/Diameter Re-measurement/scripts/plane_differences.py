@@ -34,6 +34,19 @@ between its two largest maxima (focus.difference_dip; the W of thin tubes,
 whose far planes fade into the noise). Writes planeentropy_<id>.png and
 planeentropy_<specimen>.json instead of planediff_*.
 
+--evaluation gradient (D-040, the user's request of 2026-10-09, 16:19): the
+gradient energy G = B_k^-2 * integral of (dI~/dv)^2 over the whole line
+(focus.plane_gradient_energies), with B_k each plane's background of the
+profile evaluation, on the lines of half-length --grad-lines-um (3, 5) and on
+the line sized from the node's fitted diameter, --line-mult x d_hat / 2 (2:
+[-d_hat, d_hat]); each line frames its maximum. Writes planegrad_*.
+--evaluation blend (D-040): on that d-line, G, the strip's entropy and their
+min-max blend J = w g + (1 - w) eta, w = 1 / (1 + exp((d_hat - d0) / s)) with
+d0 = --sigmoid-d0-um (1.5) and s = --sigmoid-s-um (0.3); frames the planes G,
+J and the entropy pick. Writes planeblend_*. The planes of both figures are
+drawn without the line. --nodes bydiameter --pilot-csv takes the nodes from
+bins of the pilot's d_hat (--dhat-bins, --per-bin, --add-nodes).
+
 Each node is located as the pilot measures it (survey.node_planes: the same
 stretch and block request, so with the pilot's image cache its planes come
 from disk); the planes outside the pilot's range are fetched, one crop each.
@@ -88,7 +101,8 @@ _MARKS_PIPELINE = (("k_star", "#ff1744", "-", "k*", "k* (gradient energy, D-030)
 _MARKS_AREA = (("k_min_area", "#2a78d6", "-", "minA", "smallest area under the profile, as measured"),
                ("k_min_area_norm", "#4a3aa7", "--", "minA/B", "smallest area, background-normalised"))
 _PICK_WORDS = {"min": "lowest entropy", "dip": "entropy dip (between its two largest maxima)"}
-_PREFIX = {"profile": "planediff", "image": "planediff", "entropy": "planeentropy"}
+_PREFIX = {"profile": "planediff", "image": "planediff", "entropy": "planeentropy", "gradient": "planegrad",
+           "blend": "planeblend"}
 
 
 def _marks_entropy(pick):
@@ -113,14 +127,16 @@ def entropy_pick(S, rule="min"):
 
 
 def node_stack(swc, provider, cfg, node_id, transform=None, planes_half=6, half_um=None, band_um=0.0,
-               line_half_um=None):
+               line_half_um=None, d_line_mult=None):
     """The planes k_swc - planes_half .. k_swc + planes_half of node node_id's
     block, cropped to the square +-half um about the node, with what the
     evaluations need: the pixel mask (all True, or within band_um of the traced
     stretch when band_um > 0), the crop's frame and extent, the node's xy and
     heading, the stretch's traced path and radii. half = half_um (default
     block_half_um), raised to line_half_um + 2 pixels when a measuring line of
-    that half-length must fit in the square. The square is cut from the
+    that half-length must fit in the square, and to d_line_mult * d_hat / 2 + 2
+    pixels for the line sized from the node's fitted diameter (D-040; when
+    d_hat is finite and positive). The square is cut from the
     pilot's block (from the cache on real data) when it lies inside it, and
     requested from the provider otherwise (new crops on real data); the pilot's
     block is returned as well, for the background levels. ValueError for a
@@ -136,6 +152,10 @@ def node_stack(swc, provider, cfg, node_id, transform=None, planes_half=6, half_
     half = float(cfg.measure.block_half_um if half_um is None else half_um)
     if line_half_um is not None:
         half = max(half, float(line_half_um) + 2.0 * p)
+    if d_line_mult is not None:
+        d = float(pl["result"].d_hat_um)
+        if math.isfinite(d) and d > 0:
+            half = max(half, 0.5 * float(d_line_mult) * d + 2.0 * p)
     o = np.asarray(pl["branch"].xyz_um[pl["index"], :2], dtype=float)
     c0 = int(math.ceil((o[0] - half) / p - frame.left))
     c1 = int(math.floor((o[0] + half) / p - frame.left)) + 1
@@ -221,19 +241,40 @@ def line_profiles(st, cfg, profile_half_um=None):
     return h, v, y_hat, e_u, prof
 
 
-def profile_evaluation(st, cfg, profile_half_um=None, bg_margin_um=4.0):
-    """Profiles along the node's measuring line in every plane, their areas as
-    measured and background-normalised, and each plane's background B_k."""
-    h, v, y_hat, e_u, prof = line_profiles(st, cfg, profile_half_um)
-    valid = st["valid"]
-    # the margin shrinks (4, 3, 2, 1, 0.5 um, never above the one asked) until 5 % of the block's pixels are far:
-    # next to the soma a wide margin leaves no pixel
+def block_background(st, bg_margin_um=4.0):
+    """Each plane's background B_k (the profile evaluation's, D-036): plane_background
+    over the pilot block's pixels farther than Allen's radius + the margin from
+    every traced dendrite segment and from the soma. The margin shrinks
+    (bg_margin_um, then 3, 2, 1, 0.5 um below it) until 5 % of the block's
+    pixels are far: next to the soma a wide margin leaves no pixel. Returns
+    (B (n,), the far fraction, the margin used or None when no plane has a
+    background)."""
     margins = [float(bg_margin_um)] + [x for x in (3.0, 2.0, 1.0, 0.5) if x < float(bg_margin_um)]
     for margin in margins:
         far = far_from_dendrites(st["block"].shape[1:], st["block_frame"], st["segments"], margin, st["soma"])
         if far.mean() >= 0.05:
             break
-    B = plane_background(st["block"], valid, far)
+    B = plane_background(st["block"], st["valid"], far)
+    return B, float(far.mean()), (margin if np.isfinite(B).any() else None)
+
+
+def d_line_half_um(d_hat_um, mult):
+    """Half-length of the measuring line sized from the fitted diameter (D-040):
+    mult * d_hat / 2, so that mult = 2 gives the line [-d_hat, d_hat].
+    ValueError unless d_hat and mult are finite and positive."""
+    d, m = float(d_hat_um), float(mult)
+    if not (math.isfinite(d) and d > 0 and math.isfinite(m) and m > 0):
+        raise ValueError("the d-line needs a finite positive d_hat and multiplier, got d_hat=%r, mult=%r"
+                         % (d_hat_um, mult))
+    return 0.5 * m * d
+
+
+def profile_evaluation(st, cfg, profile_half_um=None, bg_margin_um=4.0):
+    """Profiles along the node's measuring line in every plane, their areas as
+    measured and background-normalised, and each plane's background B_k."""
+    h, v, y_hat, e_u, prof = line_profiles(st, cfg, profile_half_um)
+    valid = st["valid"]
+    B, bg_frac, margin_used = block_background(st, bg_margin_um)
     area = focus.profile_areas(prof, v, valid)["area"]
     ok = valid & np.isfinite(B) & (B > 0)
     area_norm = np.full_like(area, np.nan)
@@ -242,7 +283,7 @@ def profile_evaluation(st, cfg, profile_half_um=None, bg_margin_um=4.0):
         area_norm = focus.profile_areas(prof * scale[:, None], v, ok)["area"]
     line = (st["o"] - h * y_hat, st["o"] + h * y_hat)
     return dict(v=v, prof=prof, area=area, area_norm=area_norm, background=B, line=line, half_um=h,
-                bg_frac=float(far.mean()), bg_margin_used=margin if np.isfinite(B).any() else None)
+                bg_frac=bg_frac, bg_margin_used=margin_used)
 
 
 def entropy_evaluation(st, cfg, profile_half_um=None, stripe_half_um=1.0, bin_width=1.0):
@@ -267,6 +308,82 @@ def entropy_evaluation(st, cfg, profile_half_um=None, stripe_half_um=1.0, bin_wi
                         for a, c in ((-1, -1), (1, -1), (1, 1), (-1, 1), (-1, -1))])
     ent.update(v=v, prof=prof, line=(o - h * y_hat, o + h * y_hat), half_um=h, stripe_half_um=float(stripe_half_um),
                bin_width=float(bin_width), strip=strip, outline=corners, hist_line=hist_line, hist_strip=hist_strip)
+    return ent
+
+
+# the colours of the gradient energy's fixed lines, in order (at most three, each its own colour), and of the d-line
+_GRAD_FIXED_COLOURS = (("#2a78d6", "o-", "-"), ("#4a3aa7", "s--", "--"), ("#008300", "D:", ":"))
+_GRAD_D_COLOUR = ("#1baf7a", "^-", "-.")
+
+
+def _d_line_or_error(st, cfg, line_mult):
+    """(d_hat, h) for the line sized from the fitted diameter, h = line_mult * d_hat / 2; ValueError when d_hat is
+    unusable or the line would hold fewer than 3 samples."""
+    d = float(st["result"].d_hat_um)
+    h = d_line_half_um(d, line_mult)
+    if int(round(h / float(cfg.measure.profile_step_um))) < 1:
+        raise ValueError("the d-line (+-%.3g um) holds fewer than 3 samples" % h)
+    return d, h
+
+
+def fixed_lines_um(lines_um):
+    """The gradient evaluation's fixed half-lengths as floats: at most three
+    (one colour each), distinct, finite and positive; none is allowed (the
+    d-line alone). ValueError otherwise."""
+    out = [float(h) for h in lines_um]
+    if len(out) > len(_GRAD_FIXED_COLOURS) or len(set(out)) != len(out) or \
+            any(not (math.isfinite(h) and h > 0) for h in out):
+        raise ValueError("lines_um: at most %d distinct positive half-lengths, got %r" % (len(_GRAD_FIXED_COLOURS),
+                                                                                          list(lines_um)))
+    return out
+
+
+def gradient_evaluation(st, cfg, lines_um=(3.0, 5.0), line_mult=2.0, bg_margin_um=4.0):
+    """The gradient energy over the whole line, plane by plane
+    (focus.plane_gradient_energies; D-040), for the lines of half-length
+    lines_um and for the line sized from the node's fitted diameter, h_d =
+    line_mult * d_hat / 2 (key "Gd"), every line with each plane's background
+    of block_background. A node without a usable d-line keeps the fixed lines,
+    and d_line_note says why; ValueError when no line is left. Returns
+    dict(lines=[dict(key, half_um, v, prof, G)], background, bg_frac,
+    bg_margin_used, d_hat_um, d_line_half_um or None, d_line_note or None)."""
+    lines_um = fixed_lines_um(lines_um)
+    B, bg_frac, margin_used = block_background(st, bg_margin_um)
+    specs, note, hd = [("G%g" % h, h) for h in lines_um], None, None
+    try:
+        hd = _d_line_or_error(st, cfg, line_mult)[1]
+        specs.append(("Gd", hd))
+    except ValueError as e:
+        note = str(e)
+    if not specs:
+        raise ValueError("no line to evaluate: no fixed line, and no d-line (%s)" % note)
+    lines = []
+    for key, h in specs:
+        _h, v, _y, _e, prof = line_profiles(st, cfg, h)
+        lines.append(dict(key=key, half_um=h, v=v, prof=prof,
+                          G=focus.plane_gradient_energies(prof, v, B, cfg.measure, st["valid"])))
+    return dict(lines=lines, background=B, bg_frac=bg_frac, bg_margin_used=margin_used,
+                d_hat_um=float(st["result"].d_hat_um), d_line_half_um=hd, d_line_note=note)
+
+
+def blend_evaluation(st, cfg, line_mult=2.0, stripe_half_um=1.0, bin_width=1.0, d0_um=1.5, s_um=0.3, bg_margin_um=4.0):
+    """On the line sized from the node's fitted diameter, h = line_mult * d_hat
+    / 2 (D-040): the gradient energy over the whole line (with each plane's
+    background of block_background), the entropy of the strip's pixels
+    (entropy_evaluation: |v| <= h across, |u| <= stripe_half_um along), and
+    their min-max blend J = w g + (1 - w) eta with w = focus.sigmoid_weight(
+    d_hat, d0_um, s_um) (focus.blend_scores). ValueError without a usable
+    d-line or with an empty strip. Returns entropy_evaluation's dict with G,
+    g, eta, J, V, w, background, bg_frac, bg_margin_used, d_hat_um, line_mult,
+    d0_um, s_um."""
+    d, h = _d_line_or_error(st, cfg, line_mult)
+    w = focus.sigmoid_weight(d, d0_um, s_um)
+    ent = entropy_evaluation(st, cfg, h, stripe_half_um, bin_width)
+    B, bg_frac, margin_used = block_background(st, bg_margin_um)
+    G = focus.plane_gradient_energies(ent["prof"], ent["v"], B, cfg.measure, st["valid"])
+    ent.update(focus.blend_scores(G, ent["h_strip"], w))
+    ent.update(G=G, w=w, background=B, bg_frac=bg_frac, bg_margin_used=margin_used, d_hat_um=d,
+               line_mult=float(line_mult), d0_um=float(d0_um), s_um=float(s_um))
     return ent
 
 
@@ -301,25 +418,77 @@ def select_thin_nodes(swc, rows, max_2r_um=0.6, max_dhat_um=1.0, per_stretch=3, 
     return [picked[j] for j in survey.spread_ranks(len(picked), int(max_nodes))] if picked else []
 
 
-_PICK_KEYS = {"entropy": ("k_h_line", "k_h_strip"), "profile": ("k_min_area", "k_min_area_norm"), "image": ()}
+def diameter_candidate(r):
+    """Whether a pilot row may enter the comparison across diameters (D-040;
+    PROVISIONAL, the assistant's): fit_status converged, a finite z_sub_um, a
+    finite positive d_hat_um, steep false and no flag 'crossing' (a crossing
+    neurite widens the fit). A row lacking a field does not qualify."""
+    try:
+        d = float(r["d_hat_um"])
+        flags = r.get("flags")
+        flags = [] if flags is None or (isinstance(flags, float) and math.isnan(flags)) else str(flags).split(";")
+        return (str(r["fit_status"]) == "converged" and math.isfinite(float(r["z_sub_um"])) and math.isfinite(d)
+                and d > 0 and not _truthy(r["steep"]) and "crossing" not in flags)
+    except (KeyError, TypeError, ValueError):
+        return False
 
 
-def pick_summary(records, evaluation):
+def select_nodes_by_diameter(swc, rows, bins_um=(0.8, 1.0, 1.5, 2.0, 3.0), per_bin=2, add_nodes=(2, 3), types=(3, 4)):
+    """Node ids for the comparison across diameters (D-040; PROVISIONAL, the
+    assistant's): the pilot rows passing diameter_candidate, in stretch order
+    (cell.stretches, proximal first, then along each stretch), split by their
+    d_hat into the bins (0, e_1], (e_1, e_2], ..., (e_n, inf) for the strictly
+    increasing edges bins_um; per bin up to per_bin of them spread evenly over
+    that order (survey.spread_ranks); then the ids of add_nodes the pilot holds,
+    whatever their row says. Returned by increasing pilot d_hat, ties by id."""
+    edges = [float(e) for e in bins_um]
+    if not edges or any(not (math.isfinite(e) and e > 0) for e in edges) or any(b <= a for a, b in zip(edges, edges[1:])):
+        raise ValueError("bins_um must be positive, finite and strictly increasing, got %r" % (bins_um,))
+    if int(per_bin) < 0:
+        raise ValueError("per_bin must be >= 0, got %r" % (per_bin,))
+    by_id = {int(r["node_id"]): r for r in rows}
+    order = [int(swc.ids[i]) for run in cell.stretches(swc, types) for i in run]
+    cand = [n for n in order if n in by_id and diameter_candidate(by_id[n])]
+    bounds = [0.0] + edges + [float("inf")]
+    picked = []
+    for lo, hi in zip(bounds[:-1], bounds[1:]):
+        inbin = [n for n in cand if lo < float(by_id[n]["d_hat_um"]) <= hi]
+        picked += [inbin[j] for j in survey.spread_ranks(len(inbin), int(per_bin))] if inbin else []
+    picked += [int(n) for n in add_nodes if int(n) in by_id and int(n) not in picked]
+
+    def by_dhat(n):
+        try:
+            d = float(by_id[n]["d_hat_um"])
+        except (KeyError, TypeError, ValueError):
+            d = float("nan")
+        return (d if math.isfinite(d) else float("inf"), n)
+    return sorted(picked, key=by_dhat)
+
+
+_PICK_KEYS = {"entropy": ("k_h_line", "k_h_strip"), "profile": ("k_min_area", "k_min_area_norm"), "image": (),
+              "blend": ("k_Gd", "k_blend", "k_Hd"), "gradient": ()}   # gradient: the keys depend on the lines
+
+
+def pick_summary(records, evaluation, keys=None, extra=()):
     """(rows, agreement): one row per measured node -- id, SWC type, Allen's 2r, the fitted d, the SWC plane,
-    k*, the dip depth's plane, the evaluation's picked planes and each pick minus k* (planes) -- and, per pick,
-    dict(n, within_1, median_abs) over the nodes with both planes."""
+    k*, the dip depth's plane, the evaluation's picked planes (keys, default _PICK_KEYS[evaluation]) and each
+    pick minus k* (planes), and the record's fields named in extra -- and, per pick, dict(n, within_1,
+    median_abs) over the nodes with both planes."""
+    keys = _PICK_KEYS[evaluation] if keys is None else tuple(keys)
     rows = []
     for r in records:
         if "skipped" in r:
             continue
         row = dict(node_id=r["node_id"], node_type=r.get("node_type"), allen_2r_um=2.0 * r.get("allen_radius_um", np.nan),
                    d_hat_um=r.get("d_hat_um"), k_swc=r["k_swc"], k_star=r["k_star"], k_star_depth=r["k_star_depth"])
-        for key in _PICK_KEYS[evaluation]:
+        for key in keys:
             row[key] = r.get(key)
             row[key + "_minus_k_star"] = None if r.get(key) is None else int(r[key]) - int(r["k_star"])
+        for x in extra:
+            row[x] = r.get(x)
         rows.append(row)
     agreement = {}
-    for key in _PICK_KEYS[evaluation]:
+    for key in keys:
         d = np.array([abs(x[key + "_minus_k_star"]) for x in rows if x[key + "_minus_k_star"] is not None], dtype=float)
         agreement[key] = dict(n=int(d.size), within_1=int((d <= 1).sum()),
                               median_abs=float(np.median(d)) if d.size else float("nan"))
@@ -329,6 +498,32 @@ def pick_summary(records, evaluation):
 def _argmin_plane(ks, A):
     A = np.asarray(A, dtype=float)
     return None if not np.isfinite(A).any() else int(ks[int(np.nanargmin(A))])
+
+
+def _argmax_plane(ks, A):
+    """The plane of the largest finite value of A (the first of equal values); None without a finite value."""
+    A = np.asarray(A, dtype=float)
+    return None if not np.isfinite(A).any() else int(ks[int(np.nanargmax(A))])
+
+
+def _gradient_line_specs(lines, line_mult):
+    """(key, colour, curve style, frame linestyle, tag, legend label) of each line of gradient_evaluation."""
+    out, n_fixed = [], 0
+    for ln in lines:
+        if ln["key"] == "Gd":
+            colour, style, ls = _GRAD_D_COLOUR
+            label = "G over the whole d-line, full width %g x d_hat" % float(line_mult)
+        else:
+            colour, style, ls = _GRAD_FIXED_COLOURS[n_fixed]
+            n_fixed += 1
+            label = "G over the whole +-%g um line" % ln["half_um"]
+        out.append((ln["key"], colour, style, ls, ln["key"], label))
+    return out
+
+
+_MARKS_BLEND = (("k_Gd", _GRAD_D_COLOUR[0], "-.", "Gd", "G alone, over the whole d-line"),
+                ("k_blend", "#008300", "-", "J", "the blend J = w g + (1 - w) eta"),
+                ("k_Hd", "#eda100", "--", "Hs", "the strip's entropy alone (lowest), on the d-line"))
 
 
 def _profile_record(v, prof):
@@ -357,12 +552,16 @@ def _pipeline_at(res, k_swc):
 
 def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_half=6, half_um=None, band_um=0.0,
         evaluation="profile", profile_half_um=None, bg_margin_um=4.0, dpi=110, log=print, stripe_half_um=1.0,
-        entropy_bin_gl=1.0, entropy_pick_rule="min", show_line=True):
+        entropy_bin_gl=1.0, entropy_pick_rule="min", show_line=True, grad_lines_um=(3.0, 5.0), line_mult=2.0,
+        sigmoid_d0_um=1.5, sigmoid_s_um=0.3):
     """One figure per node id; returns the per-node records (also written to
-    planediff_<specimen>.json, or planeentropy_<specimen>.json for the entropy
-    evaluation). show_line=False: the profile and entropy figures draw the
-    planes without the measuring line and the strip's outline (presentation
-    only; the records do not change)."""
+    <prefix>_<specimen>.json: planediff for the profile and image evaluations,
+    planeentropy, planegrad, planeblend). show_line=False: the profile and
+    entropy figures draw the planes without the measuring line and the strip's
+    outline (presentation only; the records do not change); the gradient and
+    blend figures always do. grad_lines_um, line_mult: the gradient
+    evaluation's fixed half-lengths and the d-line's multiplier (D-040);
+    sigmoid_d0_um, sigmoid_s_um: the blend's weight w(d_hat)."""
     from allen_diameter.plotting import figures as fg
     import matplotlib.pyplot as plt
     if evaluation not in _PREFIX:
@@ -370,14 +569,20 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
     if entropy_pick_rule not in _PICK_WORDS:
         raise ValueError("entropy_pick_rule must be one of %s, got %r" % (", ".join(sorted(_PICK_WORDS)),
                                                                          entropy_pick_rule))
-    line_h = None
+    focus.sigmoid_weight(sigmoid_d0_um, sigmoid_d0_um, sigmoid_s_um)        # refuses s <= 0 before any node
+    grad_lines_um = fixed_lines_um(grad_lines_um) if evaluation == "gradient" else grad_lines_um   # before any node
+    line_h, d_mult = None, None
     if evaluation in ("profile", "entropy"):       # the square must hold the measuring line
         line_h = float(cfg.measure.profile_half_um if profile_half_um is None else profile_half_um)
+    elif evaluation == "gradient":
+        line_h, d_mult = max(grad_lines_um, default=None), float(line_mult)
+    elif evaluation == "blend":
+        d_mult = float(line_mult)
     os.makedirs(out_dir, exist_ok=True)
     records = []
     for nid in node_ids:
         try:
-            st = node_stack(swc, provider, cfg, nid, transform, planes_half, half_um, band_um, line_h)
+            st = node_stack(swc, provider, cfg, nid, transform, planes_half, half_um, band_um, line_h, d_mult)
         except ValueError as e:
             log("[planediff] node %d skipped: %s" % (nid, e))
             records.append(dict(node_id=int(nid), skipped=str(e)))
@@ -449,6 +654,83 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
             msg = ("%s at k %s along the line (%d samples), k %s in the strip (%d pixels)"
                    % (_PICK_WORDS[entropy_pick_rule].split(" (")[0], na(at["k_h_line"]), n_line, na(at["k_h_strip"]),
                       n_strip))
+        elif evaluation == "gradient":
+            try:
+                ev = gradient_evaluation(st, cfg, grad_lines_um, line_mult, bg_margin_um)
+            except ValueError as e:                 # no fixed line and no d-line for this node
+                log("[planediff] node %d skipped: %s" % (nid, e))
+                records.append(dict(node_id=int(nid), skipped=str(e)))
+                continue
+            specs = _gradient_line_specs(ev["lines"], line_mult)
+            for ln in ev["lines"]:
+                at["k_" + ln["key"]] = _argmax_plane(ks, ln["G"])
+            frames, lines = _marks(at, [("k_" + key, colour, ls, tag, label)
+                                        for key, colour, _st, ls, tag, label in specs] + list(_MARKS_PIPELINE))
+            na = lambda x: "n/a" if x is None else "%d" % x  # noqa: E731
+            longest = max(ev["lines"], key=lambda x: x["half_um"])
+            picks = ", ".join("%s k %s" % ("+-%.2f um (d-line)" % ln["half_um"] if ln["key"] == "Gd" else
+                                           "+-%g um" % ln["half_um"], na(at["k_" + ln["key"]])) for ln in ev["lines"])
+            if ev["d_line_note"]:
+                picks += "; no d-line: " + ev["d_line_note"]
+            label = ("node %d: planes %d..%d; d_hat %.2f um; G over the whole line: %s; k* %d, dip-depth plane %d, "
+                     "SWC plane %d" % (nid, ks[0], ks[-1], ev["d_hat_um"], picks, r.k_star, r.k_star_depth, st["k_swc"]))
+            variants = [dict(key=key, label=label_, colour=colour, style=style, half_um=ln["half_um"], G=ln["G"],
+                             pick=None if at["k_" + key] is None else int(at["k_" + key]) - int(ks[0]))
+                        for (key, colour, style, _ls, _tag, label_), ln in zip(specs, ev["lines"])]
+            fig = fg.gradient_lines_figure([dict(label=label, stack=st["stack"], ks=ks, valid=st["valid"],
+                                                 extent=st["extent"], frames=frames, lines=lines, variants=variants,
+                                                 v=longest["v"], prof=longest["prof"], background=ev["background"],
+                                                 k_ref=st["k_swc"])],
+                                           "Gradient energy over the whole measuring line: fixed lines and the line "
+                                           "sized from d_hat, specimen %s" % specimen)
+            rec.update(lines_um=[float(h) for h in grad_lines_um], line_mult=float(line_mult), theta_rad=st["theta"],
+                       d_line_half_um=ev["d_line_half_um"], d_line_note=ev["d_line_note"],
+                       background=[float(x) for x in ev["background"]], bg_frac=ev["bg_frac"],
+                       bg_margin_um=float(bg_margin_um), bg_margin_used=ev["bg_margin_used"],
+                       pick_keys=["k_" + ln["key"] for ln in ev["lines"]],
+                       **{"G_" + ln["key"]: [float(x) for x in ln["G"]] for ln in ev["lines"]},
+                       **{"k_" + ln["key"]: at["k_" + ln["key"]] for ln in ev["lines"]},
+                       **_profile_record(longest["v"], longest["prof"]))
+            msg = "d_hat %.2f um; G picks: %s" % (ev["d_hat_um"], picks)
+        elif evaluation == "blend":
+            try:
+                ev = blend_evaluation(st, cfg, line_mult, stripe_half_um, entropy_bin_gl, sigmoid_d0_um, sigmoid_s_um,
+                                      bg_margin_um)
+            except ValueError as e:
+                log("[planediff] node %d skipped: %s" % (nid, e))
+                records.append(dict(node_id=int(nid), skipped=str(e)))
+                continue
+            at.update(k_Gd=_argmax_plane(ks, ev["G"]), k_blend=_argmax_plane(ks, ev["J"]),
+                      k_Hd=_argmin_plane(ks, ev["h_strip"]))
+            frames, lines = _marks(at, _MARKS_BLEND + _MARKS_PIPELINE)
+            na = lambda x: "n/a" if x is None else "%d" % x  # noqa: E731
+            n_line, n_strip = int(ev["n_line"].max()), int(ev["n_strip"].max())
+            idx = lambda k: None if k is None else int(k) - int(ks[0])  # noqa: E731
+            label = ("node %d: planes %d..%d; d_hat %.2f um, line +-%.2f um (%d samples), strip +-%.1f um along it (%d "
+                     "pixels); w %.2f; G k %s, blend k %s, strip entropy k %s; k* %d, dip-depth plane %d, SWC plane %d"
+                     % (nid, ks[0], ks[-1], ev["d_hat_um"], ev["half_um"], n_line, ev["stripe_half_um"], n_strip,
+                        ev["w"], na(at["k_Gd"]), na(at["k_blend"]), na(at["k_Hd"]), r.k_star, r.k_star_depth,
+                        st["k_swc"]))
+            fig = fg.blend_figure([dict(label=label, stack=st["stack"], ks=ks, valid=st["valid"], extent=st["extent"],
+                                        frames=frames, lines=lines, v=ev["v"], prof=ev["prof"], half_um=ev["half_um"],
+                                        g=ev["g"], eta=ev["eta"], J=ev["J"], w=ev["w"], d_hat_um=ev["d_hat_um"],
+                                        d0_um=ev["d0_um"], s_um=ev["s_um"], pick_g=idx(at["k_Gd"]),
+                                        pick_eta=idx(at["k_Hd"]), pick_J=idx(at["k_blend"]), k_ref=st["k_swc"])],
+                                  "The line sized from d_hat: gradient energy, sigmoid-weighted min-max blend and strip "
+                                  "entropy, specimen %s" % specimen)
+            rec.update(profile_half_um=ev["half_um"], d_line_half_um=ev["half_um"], line_mult=ev["line_mult"],
+                       stripe_half_um=ev["stripe_half_um"], entropy_bin_gl=ev["bin_width"], theta_rad=st["theta"],
+                       w=ev["w"], d0_um=ev["d0_um"], s_um=ev["s_um"],
+                       G_Gd=[float(x) for x in ev["G"]], h_strip=[float(x) for x in ev["h_strip"]],
+                       n_strip=[int(x) for x in ev["n_strip"]], g=[float(x) for x in ev["g"]],
+                       eta=[float(x) for x in ev["eta"]], J=[float(x) for x in ev["J"]],
+                       background=[float(x) for x in ev["background"]], bg_frac=ev["bg_frac"],
+                       bg_margin_um=float(bg_margin_um), bg_margin_used=ev["bg_margin_used"],
+                       pick_keys=list(_PICK_KEYS["blend"]), k_Gd=at["k_Gd"], k_blend=at["k_blend"], k_Hd=at["k_Hd"],
+                       **_profile_record(ev["v"], ev["prof"]))
+            msg = ("d_hat %.2f um, line +-%.2f um (%d samples), strip %d pixels; w %.2f; G k %s, blend k %s, strip "
+                   "entropy k %s" % (ev["d_hat_um"], ev["half_um"], n_line, n_strip, ev["w"], na(at["k_Gd"]),
+                                     na(at["k_blend"]), na(at["k_Hd"])))
         else:
             res = focus.plane_differences(st["stack"], st["valid"], st["mask"])
             dip = focus.difference_dip(res["pos"])
@@ -474,17 +756,41 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
     with open(os.path.join(out_dir, "%s_%s.json" % (_PREFIX[evaluation], specimen)), "w") as f:
         json.dump(records, f, indent=1, sort_keys=True, allow_nan=True)
     done = [x for x in records if "png" in x]
-    if len(done) > 1 and _PICK_KEYS[evaluation]:
+    keys = list(_PICK_KEYS[evaluation])
+    if evaluation == "gradient":                    # every key any node has, in the order of the lines
+        keys = [k for k in ["k_G%g" % float(h) for h in grad_lines_um] + ["k_Gd"]
+                if any(k in x.get("pick_keys", ()) for x in done)]
+    if len(done) > 1 and keys:
         from allen_diameter.loading import table_io
-        rows, agreement = pick_summary(records, evaluation)
+        extra = {"gradient": ("d_line_half_um",), "blend": ("d_line_half_um", "w")}.get(evaluation, ())
+        rows, agreement = pick_summary(records, evaluation, keys, extra)
         table_io.write_rows(rows, os.path.join(out_dir, "%s_summary_%s.csv" % (_PREFIX[evaluation], specimen)))
         log("[planediff] summary over %d nodes: %s" % (len(rows), "; ".join(
             "%s within 1 plane of k* in %d of %d (median |diff| %.1f planes)"
             % (key, a["within_1"], a["n"], a["median_abs"]) for key, a in agreement.items())))
+        fig = None
         if evaluation == "entropy":
             fig = fg.entropy_summary_figure(done, "Entropy picks against k* on %d nodes, specimen %s (%s)"
                                             % (len(done), specimen, _PICK_WORDS[entropy_pick_rule].split(" (")[0]))
-            fig.savefig(os.path.join(out_dir, "planeentropy_summary_%s.png" % specimen), dpi=dpi)
+        elif evaluation == "gradient":
+            meta = [dict(key="G%g" % float(h), half_um=float(h)) for h in grad_lines_um] + [dict(key="Gd", half_um=None)]
+            specs = _gradient_line_specs([x for x in meta if "k_" + x["key"] in keys], line_mult)
+            series = [dict(curve="G_" + key, pick="k_" + key, label=label, colour=colour, style=style)
+                      for key, colour, style, _ls, _tag, label in specs]
+            fig = fg.picks_summary_figure(done, series, "Gradient energy over the whole line: the plane each line "
+                                                        "picks, on %d nodes by d_hat, specimen %s" % (len(done), specimen))
+        elif evaluation == "blend":
+            series = [dict(curve="G_Gd", pick="k_Gd", label="G alone, over the whole d-line", colour=_GRAD_D_COLOUR[0],
+                           style=_GRAD_D_COLOUR[1]),
+                      dict(curve="J", pick="k_blend", label="the blend J = w g + (1 - w) eta", colour="#008300",
+                           style="D-"),
+                      dict(curve="h_strip", pick="k_Hd", label="the strip's entropy alone (inverted: lowest on top)",
+                           colour="#eda100", style="s--", lower_is_better=True)]
+            fig = fg.picks_summary_figure(done, series, "The d-line: the plane each method picks, on %d nodes by d_hat "
+                                                        "(w = sigmoid weight of G), specimen %s" % (len(done), specimen),
+                                          weight_key="w")
+        if fig is not None:
+            fig.savefig(os.path.join(out_dir, "%s_summary_%s.png" % (_PREFIX[evaluation], specimen)), dpi=dpi)
             plt.close(fig)
     return records
 
@@ -492,15 +798,30 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--specimen", required=True)
-    ap.add_argument("--nodes", required=True, help="comma-separated node ids, or 'thin' (needs --pilot-csv): thin "
-                                                    "nodes where k* and the dip depth agree, spread over the stretches")
-    ap.add_argument("--pilot-csv", default="", help="the pilot's per-node CSV (pilot_<specimen>.csv), for --nodes thin")
+    ap.add_argument("--nodes", required=True, help="comma-separated node ids; 'thin' (needs --pilot-csv): thin "
+                                                    "nodes where k* and the dip depth agree, spread over the stretches; "
+                                                    "'bydiameter' (needs --pilot-csv): nodes spread over bins of d_hat")
+    ap.add_argument("--pilot-csv", default="", help="the pilot's per-node CSV (pilot_<specimen>.csv), for --nodes thin "
+                                                    "or bydiameter")
     ap.add_argument("--max-nodes", type=int, default=12, help="--nodes thin: at most this many nodes")
     ap.add_argument("--per-stretch", type=int, default=3, help="--nodes thin: at most this many per stretch")
     ap.add_argument("--thin-max-2r-um", type=float, default=0.6, help="--nodes thin: Allen's 2r at most, um")
     ap.add_argument("--thin-max-dhat-um", type=float, default=1.0, help="--nodes thin: the pilot's fitted d at most, um")
+    ap.add_argument("--dhat-bins", default="0.8,1.0,1.5,2.0,3.0",
+                    help="--nodes bydiameter: increasing bin edges of d_hat, um (bins (0, e1], ..., (e_n, inf))")
+    ap.add_argument("--per-bin", type=int, default=2, help="--nodes bydiameter: at most this many nodes per bin")
+    ap.add_argument("--add-nodes", default="2,3",
+                    help="--nodes bydiameter: node ids always added (default: the trunks 2 and 3); '' for none")
     ap.add_argument("--out-dir", required=True)
-    ap.add_argument("--evaluation", choices=("profile", "image", "entropy"), default="profile")
+    ap.add_argument("--evaluation", choices=("profile", "image", "entropy", "gradient", "blend"), default="profile")
+    ap.add_argument("--grad-lines-um", default="3,5",
+                    help="gradient evaluation: half-lengths of the fixed lines, um (at most 3)")
+    ap.add_argument("--line-mult", type=float, default=2.0,
+                    help="gradient and blend evaluations: the d-line's full width in units of d_hat (2: [-d_hat, d_hat])")
+    ap.add_argument("--sigmoid-d0-um", type=float, default=1.5,
+                    help="blend evaluation: d_hat at which the gradient energy's weight is 1/2, um")
+    ap.add_argument("--sigmoid-s-um", type=float, default=0.3,
+                    help="blend evaluation: width of the sigmoid w(d) = 1 / (1 + exp((d - d0) / s)), um")
     ap.add_argument("--planes-half", type=int, default=6, help="planes on each side of the SWC plane")
     ap.add_argument("--profile-half-um", type=float, default=None,
                     help="profile and entropy evaluations: half-length of the measuring line, um "
@@ -531,11 +852,18 @@ def main(argv=None):
     ap.add_argument("--config-json", default="")
     a = ap.parse_args(argv)
     cfg = load_config(a.config_json)
-    thin = a.nodes.strip().lower() == "thin"
-    if thin and not a.pilot_csv:
-        ap.error("--nodes thin needs --pilot-csv")
-    node_ids = [] if thin else [int(x) for x in a.nodes.split(",") if x.strip()]
-    if not thin and not node_ids:
+    mode = a.nodes.strip().lower()
+    thin, bydiam = mode == "thin", mode == "bydiameter"
+    if (thin or bydiam) and not a.pilot_csv:
+        ap.error("--nodes %s needs --pilot-csv" % mode)
+    try:
+        grad_lines = [float(x) for x in a.grad_lines_um.split(",") if x.strip()]
+        dhat_bins = [float(x) for x in a.dhat_bins.split(",") if x.strip()]
+        add_nodes = [int(x) for x in a.add_nodes.split(",") if x.strip()]
+    except ValueError as e:
+        ap.error("--grad-lines-um, --dhat-bins and --add-nodes take comma-separated numbers: %s" % e)
+    node_ids = [] if (thin or bydiam) else [int(x) for x in a.nodes.split(",") if x.strip()]
+    if not (thin or bydiam) and not node_ids:
         print("[planediff] no node given: nothing to do", flush=True)
         return 0
     import allen_image_io as aio
@@ -550,6 +878,17 @@ def main(argv=None):
                                                   ",".join(str(n) for n in node_ids) or "none"), flush=True)
         if not node_ids:
             return 0
+    if bydiam:
+        rows = table_io.read_rows([a.pilot_csv])
+        node_ids = select_nodes_by_diameter(swc, rows, dhat_bins, a.per_bin, add_nodes, cfg.acquisition.dendrite_swc_types)
+        dh = {int(r["node_id"]): r.get("d_hat_um") for r in rows}
+        fmt = lambda x: "%.2f" % float(x) if isinstance(x, (int, float)) else "n/a"  # noqa: E731
+        print("[planediff] nodes by diameter (bins of d_hat at %s um, up to %d per bin, converged, flat, not crossing; "
+              "plus %s): %s" % (",".join("%g" % e for e in dhat_bins), a.per_bin,
+                                ",".join(str(n) for n in add_nodes) or "none",
+                                ", ".join("%d (%s um)" % (n, fmt(dh.get(n))) for n in node_ids) or "none"), flush=True)
+        if not node_ids:
+            return 0
     fetcher = aio.HttpFetcher(cache_dir=a.cache_dir)
     planes = aio.plane_table(aio.list_images(int(a.specimen)))
     provider = run_cell.real_provider(fetcher, planes, cfg.acquisition.res0_um)
@@ -558,7 +897,8 @@ def main(argv=None):
                dict(shift_full_px=(a.shift_x, a.shift_y), flip_y_full_h=a.flip_h, z0_um=a.z0),
                a.planes_half, a.half_um, a.band_um, a.evaluation, a.profile_half_um, a.bg_margin_um,
                log=lambda m: print(m, flush=True), stripe_half_um=a.stripe_half_um, entropy_bin_gl=a.entropy_bin_gl,
-               entropy_pick_rule=a.entropy_pick, show_line=not a.hide_line)
+               entropy_pick_rule=a.entropy_pick, show_line=not a.hide_line, grad_lines_um=grad_lines,
+               line_mult=a.line_mult, sigmoid_d0_um=a.sigmoid_d0_um, sigmoid_s_um=a.sigmoid_s_um)
     n_ok = sum(1 for r in recs if "png" in r)
     print("[planediff] wrote %d figures (%d skipped) in %s; crops: %d from the cache, %d downloaded (%.1f MB); %.1f min"
           % (n_ok, len(recs) - n_ok, a.out_dir, fetcher.n_cache_hits, fetcher.n_requests,

@@ -315,3 +315,84 @@ def difference_dip(S):
         return int(idx[int(np.argmin(s))])
     a, b = top2
     return int(idx[a + 1 + int(np.argmin(s[a + 1:b]))])
+
+
+# ---- the gradient energy over the whole line and its blend with the strip entropy (D-040, 2026-10-09) ----
+
+def plane_gradient_energies(profiles, v, B, cfg, valid=None):
+    """G_k = B_k^-2 * integral over the whole line of (dI~_k/dv)^2 dv, plane
+    by plane (D-040, a diagnostic): gradient_energy with focus_grad_window
+    "whole_profile" and focus_bg_rule "same_as_bbar", B_k given as the
+    override, so that between two lines of one node only the line differs.
+
+    profiles: (n, M) I_k(v_m), grey levels; v: (M,) um, strictly increasing,
+    M >= 3; B: (n,) each plane's background, grey levels; cfg: MeasureConfig
+    (focus_smooth_px is used); valid: (n,) bool or None (all valid). A plane
+    that is invalid, holds a non-finite sample, or has B_k not finite and
+    positive gets NaN. Returns (n,) in 1/um."""
+    import dataclasses
+    P = np.asarray(profiles, dtype=float)
+    v = np.asarray(v, dtype=float)
+    B = np.asarray(B, dtype=float)
+    if P.ndim != 2 or v.ndim != 1 or P.shape[1] != v.size or B.shape != (P.shape[0],):
+        raise ValueError("plane_gradient_energies: profiles (n, M), v (M,) and B (n,) must agree")
+    if v.size < 3 or np.any(np.diff(v) <= 0):
+        raise ValueError("plane_gradient_energies: v must increase strictly and hold at least 3 samples")
+    ok = np.ones(P.shape[0], dtype=bool) if valid is None else np.asarray(valid, dtype=bool)
+    if ok.shape != (P.shape[0],):
+        raise ValueError("plane_gradient_energies: valid must have one entry per plane")
+    whole = dataclasses.replace(cfg, focus_grad_window="whole_profile", focus_bg_rule="same_as_bbar")
+    G = np.full(P.shape[0], np.nan)
+    for k in range(P.shape[0]):
+        if ok[k] and math.isfinite(B[k]) and B[k] > 0:
+            G[k] = gradient_energy(P[k], v, whole, B_override=float(B[k]))[0]
+    return G
+
+
+def sigmoid_weight(d_um, d0_um, s_um):
+    """w(d) = 1 / (1 + exp((d - d0) / s)) (D-040): the gradient energy's weight
+    in the blend, 1/2 at d = d0, going from 1 (thin) to 0 (thick) over a few
+    s; scipy.special.expit((d0 - d) / s). s must be finite and > 0, d0 finite;
+    NaN for a non-finite d."""
+    from scipy.special import expit
+    s, d0 = float(s_um), float(d0_um)
+    if not (math.isfinite(s) and s > 0 and math.isfinite(d0)):
+        raise ValueError("sigmoid_weight: s must be finite and > 0 and d0 finite, got s=%r, d0=%r" % (s_um, d0_um))
+    d = float(d_um)
+    return float(expit((d0 - d) / s)) if math.isfinite(d) else float("nan")
+
+
+def minmax_scores(S, valid=None, higher_is_better=True):
+    """A curve rescaled to [0, 1] over its usable entries (finite, and valid
+    when given): (S - min) / (max - min), or (max - S) / (max - min) when lower
+    is better (the entropy); every usable entry 0 when the curve is flat there
+    (it carries no information); NaN elsewhere. Returns (n,)."""
+    S = np.asarray(S, dtype=float)
+    use = np.isfinite(S) if valid is None else (np.isfinite(S) & np.asarray(valid, dtype=bool))
+    out = np.full(S.shape, np.nan)
+    if not use.any():
+        return out
+    lo, hi = float(S[use].min()), float(S[use].max())
+    if hi > lo:
+        out[use] = (S[use] - lo) / (hi - lo) if higher_is_better else (hi - S[use]) / (hi - lo)
+    else:
+        out[use] = 0.0
+    return out
+
+
+def blend_scores(G, H, w):
+    """The min-max blend of the gradient energy and the entropy (D-040): over
+    V, the planes where both G and H are finite, g = minmax_scores(G) and
+    eta = minmax_scores(H, lower is better), J = w g + (1 - w) eta; NaN
+    outside V. w in [0, 1]. Returns dict(g, eta, J, V), V a bool mask."""
+    G = np.asarray(G, dtype=float)
+    H = np.asarray(H, dtype=float)
+    if G.ndim != 1 or G.shape != H.shape:
+        raise ValueError("blend_scores: G and H must be 1-D of the same length")
+    w = float(w)
+    if not 0.0 <= w <= 1.0:
+        raise ValueError("blend_scores: w must lie in [0, 1], got %r" % (w,))
+    V = np.isfinite(G) & np.isfinite(H)
+    g = minmax_scores(G, V)
+    eta = minmax_scores(H, V, higher_is_better=False)
+    return dict(g=g, eta=eta, J=np.where(V, w * g + (1.0 - w) * eta, np.nan), V=V)

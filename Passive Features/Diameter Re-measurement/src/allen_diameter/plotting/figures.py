@@ -716,3 +716,332 @@ def entropy_figure(blocks, title="", show_line=True):
     if title:
         fig.suptitle(title, y=1.0 - 0.80 / H, fontsize=10)
     return fig
+
+
+# ---- the gradient energy along lines of three lengths, and the blend with the strip entropy (D-040) ----
+# colours (dataviz validator, light surface, all pairs with the red of k*: hard checks pass; red-aqua deutan 7.5 sits
+# in the 6-8 band, so every series also has its own marker, line style and frame tag): G on fixed lines blue, violet
+# (green for a third), G on the d-line aqua, the blend green, the strip entropy yellow; aqua and yellow markers
+# carry a dark edge (below 3:1 on white)
+_GD, _BLEND = "#1baf7a", "#008300"
+_LIGHT = ("#1baf7a", "#eda100")
+
+
+def _planes_row(plt, ax_at, b, y_top, left, col, side):
+    """The planes of block b on one grey scale (1st to 99.5th percentile of the
+    valid planes), drawn without any line, with b's frames and the plane index
+    (and the frame's tags) as titles."""
+    ks = np.asarray(b["ks"])
+    stack = np.asarray(b["stack"], dtype=float)
+    valid = np.asarray(b["valid"], dtype=bool)
+    shown = stack[valid] if valid.any() else stack
+    lo, hi = np.percentile(shown, [1.0, 99.5])
+    for j in range(ks.size):
+        ax = ax_at(left + j * col, y_top, side, side)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        k = int(ks[j])
+        if valid[j]:
+            ax.imshow(stack[j], cmap="gray", vmin=lo, vmax=hi, extent=b.get("extent"), origin="upper",
+                      interpolation="nearest")
+        else:
+            ax.set_facecolor("0.85")
+            ax.text(0.5, 0.5, "missing", ha="center", va="center", fontsize=8, transform=ax.transAxes)
+        tag = ""
+        if k in b.get("frames", {}):
+            colour, ls, tag = b["frames"][k]
+            ax.add_patch(plt.Rectangle((0.01, 0.01), 0.98, 0.98, transform=ax.transAxes, fill=False,
+                                       edgecolor=colour, lw=2.6, ls=ls, clip_on=False))
+        ax.set_title("k %d%s" % (k, ("\n" + tag) if tag else ""), fontsize=7.5, pad=2)
+
+
+def _profiles_panel(ax, v, prof, ks, valid, k_ref, spans, title):
+    """Every valid plane's profile along the line, coloured by plane (blue below
+    k_ref, red above, darker nearer, dark at k_ref), and dashed verticals at
+    +-half for each (half, colour, linestyle) of spans."""
+    v, prof = np.asarray(v, dtype=float), np.asarray(prof, dtype=float)
+    order = sorted(range(len(ks)), key=lambda j: -abs(int(ks[j]) - int(k_ref)))
+    for j in order:
+        if valid[j] and np.isfinite(prof[j]).all():
+            dk = int(ks[j]) - int(k_ref)
+            ax.plot(v, prof[j], color=_plane_colour(dk), lw=2.2 if dk == 0 else 1.1)
+    for half, colour, ls in spans:
+        for s in (-1.0, 1.0):
+            ax.axvline(s * float(half), color=colour, ls=ls, lw=1.4, zorder=1)
+    ax.set_xlim(v[0], v[-1])
+    ax.set_title(title, fontsize=8.5)
+    ax.set_xlabel("v (um)", fontsize=8.5)
+    ax.set_ylabel("grey level", fontsize=8.5)
+
+
+def _style_axes(axes):
+    for ax in axes:
+        ax.tick_params(labelsize=7.5)
+        ax.grid(axis="y", color="#e6e5e0", lw=0.6)
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+
+
+def _bare_layout(plt, blocks):
+    side, gap, left, right = 0.95, 0.08, 0.75, 0.25
+    col = side + gap
+    n_max = max(len(b["ks"]) for b in blocks)
+    W = max(left + n_max * col - gap + right, 13.0)
+    heights = (0.34, 0.34, side, 0.62, 2.3, 0.62)
+    top_band = 1.25
+    H = top_band + len(blocks) * sum(heights)
+    fig = plt.figure(figsize=(W, H))
+
+    def ax_at(x_in, y_top_in, w_in, h_in):
+        return fig.add_axes([x_in / W, 1.0 - (y_top_in + h_in) / H, w_in / W, h_in / H])
+    return fig, ax_at, dict(side=side, gap=gap, left=left, right=right, col=col, W=W, H=H, heights=heights,
+                            top_band=top_band)
+
+
+def _pipeline_lines(ax, b, exclude_colours):
+    for k, colour, ls, label in b.get("lines", []):
+        if colour not in exclude_colours:
+            ax.axvline(k, color=colour, ls=ls, lw=1.1, zorder=1)
+
+
+def _pipeline_handles(plt, blocks, exclude_colours):
+    seen = {}
+    for b in blocks:
+        for k, colour, ls, label in b.get("lines", []):
+            if colour not in exclude_colours:
+                seen[label] = (colour, ls)
+    return [plt.Line2D([], [], color=c, ls=ls, lw=2.0, label="frame and line: " + t) for t, (c, ls) in seen.items()]
+
+
+def gradient_lines_figure(blocks, title=""):
+    """The gradient energy over the whole line, for lines of several lengths
+    (D-040; focus.plane_gradient_energies). Per block (one node): the planes on
+    one grey scale, without the lines, framed at each line's pick and at the
+    pipeline's planes; below, every plane's profile along the longest line
+    with each line's extent dashed, each line's G relative to its own maximum
+    with its pick, and each plane's background B_k.
+
+    blocks: list of dicts with
+      label, stack (n, H, W), ks (n,), valid (n,), extent, frames {k: (colour, linestyle, tag)},
+      lines [(k, colour, linestyle, label)] (the variants' picks and the pipeline's planes),
+      variants [dict(key, label, colour, style, half_um, G (n,), pick: an index into ks or None)],
+      v (M,), prof (n, M) of the longest line, background (n,), k_ref
+    Presentation only. Returns the Figure."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    fig, ax_at, L = _bare_layout(plt, blocks)
+    y = L["top_band"]
+    vcols = set()
+    for b in blocks:
+        ks = np.asarray(b["ks"])
+        valid = np.asarray(b["valid"], dtype=bool)
+        fig.text(L["left"] / L["W"], 1.0 - (y + 0.26) / L["H"], b["label"], fontsize=10, fontweight="bold", ha="left")
+        y += L["heights"][0]
+        _planes_row(plt, ax_at, b, y + L["heights"][1], L["left"], L["col"], L["side"])
+        y += L["heights"][1] + L["heights"][2] + L["heights"][3]
+        w3 = (L["W"] - L["left"] - L["right"] - 2 * 0.7) / 3.0
+        a1 = ax_at(L["left"], y, w3, L["heights"][4])
+        a2 = ax_at(L["left"] + w3 + 0.7, y, w3, L["heights"][4])
+        a3 = ax_at(L["left"] + 2 * (w3 + 0.7), y, w3, L["heights"][4])
+        spans = [(x["half_um"], x["colour"], "--") for x in b["variants"]]
+        _profiles_panel(a1, b["v"], b["prof"], ks, valid, b["k_ref"], spans,
+                        "profiles along the longest line, each line's extent dashed\n(dark: plane %d; blue below, red "
+                        "above; darker = nearer)" % int(b["k_ref"]))
+        vcols |= {x["colour"] for x in b["variants"]}
+        _pipeline_lines(a2, b, vcols)
+        for x in b["variants"]:
+            G = np.asarray(x["G"], dtype=float)
+            rel = G / np.nanmax(G) if np.isfinite(G).any() and np.nanmax(G) > 0 else G
+            edge = "#1a1a19" if x["colour"] in _LIGHT else x["colour"]
+            a2.plot(ks, rel, x["style"], color=x["colour"], mec=edge, mew=0.8, ms=4.5, lw=1.8, zorder=3)
+            if x.get("pick") is not None:
+                d = int(x["pick"])
+                a2.plot([ks[d]], [rel[d]], x["style"][0], ms=11, mfc=x["colour"],
+                        mec="#1a1a19" if x["colour"] in _LIGHT else "white", mew=1.5, zorder=4)
+        a2.set_title("G of each line relative to its own maximum\n(marked: each line's maximum)", fontsize=8.5)
+        a2.set_xlabel("plane k", fontsize=8.5)
+        a2.set_ylabel("G / max G", fontsize=8.5)
+        a2.set_xlim(ks[0] - 0.5, ks[-1] + 0.5)
+        _pipeline_lines(a3, b, vcols)
+        bk = np.asarray(b["background"], dtype=float)
+        a3.plot(ks, bk, "D-", color="#7a7a7a", ms=4, lw=1.5, zorder=3)
+        if not np.isfinite(bk).any():
+            a3.text(0.5, 0.5, "no pixel far from the traced dendrites", ha="center", va="center", fontsize=8,
+                    transform=a3.transAxes)
+        a3.set_title("B_k: each plane's background, the same for every line\n(far from every traced dendrite)",
+                     fontsize=8.5)
+        a3.set_xlabel("plane k", fontsize=8.5)
+        a3.set_ylabel("grey level", fontsize=8.5)
+        a3.set_xlim(ks[0] - 0.5, ks[-1] + 0.5)
+        _style_axes((a1, a2, a3))
+        y += L["heights"][4] + L["heights"][5]
+    handles, seen = [], set()
+    for b in blocks:
+        for x in b["variants"]:
+            if x["key"] not in seen:
+                seen.add(x["key"])
+                handles.append(plt.Line2D([], [], color=x["colour"], marker=x["style"][0], ls=x["style"][1:] or "-",
+                                          mec="#1a1a19" if x["colour"] in _LIGHT else x["colour"], lw=1.8,
+                                          label="%s; frame %s" % (x["label"], x["key"])))
+    handles += _pipeline_handles(plt, blocks, vcols)
+    handles.append(_no_line_note(plt, "any line"))
+    fig.legend(handles=handles, loc="upper center", ncol=3, fontsize=8, frameon=False,
+               bbox_to_anchor=(0.5, 1.0 - 0.02 / L["H"]))
+    if title:
+        fig.suptitle(title, y=1.0 - 0.80 / L["H"], fontsize=10)
+    return fig
+
+
+def blend_figure(blocks, title=""):
+    """On the line sized from d_hat (D-040): the gradient energy, the strip
+    entropy and their min-max blend J = w g + (1 - w) eta (focus.blend_scores).
+    Per block (one node): the planes on one grey scale, without the line,
+    framed at the three picks and at the pipeline's planes; below, every
+    plane's profile along the d-line, the rescaled scores g and eta with their
+    picks, and J with its pick and the weight w.
+
+    blocks: list of dicts with
+      label, stack, ks, valid, extent, frames, lines (as gradient_lines_figure), v (M,), prof (n, M), half_um,
+      g (n,), eta (n,), J (n,), w, d_hat_um, d0_um, s_um, pick_g, pick_eta, pick_J (indices into ks or None), k_ref
+    Presentation only. Returns the Figure."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    fig, ax_at, L = _bare_layout(plt, blocks)
+    y = L["top_band"]
+    mine = {_GD, _BLEND, "#eda100"}
+    for b in blocks:
+        ks = np.asarray(b["ks"])
+        valid = np.asarray(b["valid"], dtype=bool)
+        fig.text(L["left"] / L["W"], 1.0 - (y + 0.26) / L["H"], b["label"], fontsize=10, fontweight="bold", ha="left")
+        y += L["heights"][0]
+        _planes_row(plt, ax_at, b, y + L["heights"][1], L["left"], L["col"], L["side"])
+        y += L["heights"][1] + L["heights"][2] + L["heights"][3]
+        w3 = (L["W"] - L["left"] - L["right"] - 2 * 0.7) / 3.0
+        a1 = ax_at(L["left"], y, w3, L["heights"][4])
+        a2 = ax_at(L["left"] + w3 + 0.7, y, w3, L["heights"][4])
+        a3 = ax_at(L["left"] + 2 * (w3 + 0.7), y, w3, L["heights"][4])
+        _profiles_panel(a1, b["v"], b["prof"], ks, valid, b["k_ref"], [(b["half_um"], _GD, "--")],
+                        "profiles along the d-line, +-%.2f um\n(dark: plane %d; blue below, red above; darker = "
+                        "nearer)" % (float(b["half_um"]), int(b["k_ref"])))
+        for ax, curves in ((a2, (("g", "pick_g", _GD, "^-"), ("eta", "pick_eta", "#eda100", "s--"))),
+                           (a3, (("J", "pick_J", _BLEND, "D-"),))):
+            _pipeline_lines(ax, b, mine)
+            for key, pick, colour, style in curves:
+                c = np.asarray(b[key], dtype=float)
+                edge = "#1a1a19" if colour in _LIGHT else colour
+                ax.plot(ks, c, style, color=colour, mec=edge, mew=0.8, ms=4.5, lw=1.8, zorder=3)
+                if b.get(pick) is not None:
+                    d = int(b[pick])
+                    ax.plot([ks[d]], [c[d]], style[0], ms=11, mfc=colour,
+                            mec="#1a1a19" if colour in _LIGHT else "white", mew=1.5, zorder=4)
+            ax.set_xlim(ks[0] - 0.5, ks[-1] + 0.5)
+            ax.set_ylim(-0.08, 1.08)
+            ax.set_xlabel("plane k", fontsize=8.5)
+        a2.set_title("min-max rescaled: g from G, eta from the strip entropy\n(eta = 1 at the lowest entropy; "
+                     "marked: each one's pick)", fontsize=8.5)
+        a2.set_ylabel("rescaled score", fontsize=8.5)
+        a3.set_title("J = w g + (1 - w) eta, w = %.2f at d_hat %.2f um\n(w = 1 / (1 + exp((d_hat - %.2g) / %.2g)); "
+                     "marked: its maximum)" % (float(b["w"]), float(b["d_hat_um"]), float(b["d0_um"]),
+                                               float(b["s_um"])), fontsize=8.5)
+        a3.set_ylabel("J", fontsize=8.5)
+        _style_axes((a1, a2, a3))
+        y += L["heights"][4] + L["heights"][5]
+    handles = [plt.Line2D([], [], color=_GD, marker="^", mec="#1a1a19", lw=1.8,
+                          label="g: G over the whole d-line, rescaled; frame Gd: its maximum"),
+               plt.Line2D([], [], color="#eda100", marker="s", mec="#1a1a19", ls="--", lw=1.8,
+                          label="eta: the strip's entropy, rescaled and inverted; frame Hs: lowest entropy"),
+               plt.Line2D([], [], color=_BLEND, marker="D", lw=1.8, label="J, the blend; frame J: its maximum")]
+    handles += _pipeline_handles(plt, blocks, mine)
+    handles.append(_no_line_note(plt, "the line"))
+    fig.legend(handles=handles, loc="upper center", ncol=3, fontsize=8, frameon=False,
+               bbox_to_anchor=(0.5, 1.0 - 0.02 / L["H"]))
+    if title:
+        fig.suptitle(title, y=1.0 - 0.80 / L["H"], fontsize=10)
+    return fig
+
+
+def picks_summary_figure(records, series, title="", weight_key=None):
+    """Small multiples over several nodes (D-040): one panel per node (in the
+    records' order), each series' curve rescaled to 0 .. 1 (min-max; inverted
+    when lower is better, so that every curve peaks at its pick) against the
+    plane offset k - k_SWC, with k* (red), the dip depth's plane (grey dashed),
+    the SWC plane (dotted) and each series' pick (a large marker).
+
+    records: per-node dicts with node_id, node_type, allen_radius_um, d_hat_um, ks, k_swc, k_star, k_star_depth,
+      and the series' curves and picks; series: [dict(curve, pick, label, colour, style, lower_is_better=False,
+      tag=None)]; weight_key: a record field shown as w in each panel's title, or None.
+    Presentation only. Returns the Figure."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    n = len(records)
+    ncol = max(1, min(4, n))
+    nrow = int(math.ceil(n / float(ncol)))
+    H = 2.75 * nrow + 1.9
+    fig, axes = plt.subplots(nrow, ncol, figsize=(3.7 * ncol, H), squeeze=False)
+    names = {3: "basal", 4: "apical"}
+
+    def unit(c, lower):
+        c = np.asarray(c, dtype=float)
+        if not np.isfinite(c).any():
+            return c
+        lo, hi = np.nanmin(c), np.nanmax(c)
+        if not hi > lo:
+            return np.zeros_like(c)
+        return (hi - c) / (hi - lo) if lower else (c - lo) / (hi - lo)
+
+    for i, r in enumerate(records):
+        ax = axes[i // ncol, i % ncol]
+        ks = np.asarray(r["ks"])
+        off = ks - int(r["k_swc"])
+        for kk, colour, ls in ((r.get("k_star"), "#ff1744", "-"), (r.get("k_star_depth"), "#7a7a7a", "--"),
+                               (r.get("k_swc"), "#1a1a19", ":")):
+            if kk is not None:
+                ax.axvline(int(kk) - int(r["k_swc"]), color=colour, ls=ls, lw=1.2, zorder=1)
+        parts = []
+        for s in series:
+            if s["curve"] not in r:
+                continue
+            u = unit(r[s["curve"]], s.get("lower_is_better", False))
+            edge = "#1a1a19" if s["colour"] in _LIGHT else s["colour"]
+            ax.plot(off, u, s["style"], color=s["colour"], mec=edge, mew=0.7, ms=3.5, lw=1.5, zorder=3)
+            k = r.get(s["pick"])
+            tag = s.get("tag") or s["pick"][2:]
+            if k is not None:
+                j = int(k) - int(ks[0])
+                ax.plot([off[j]], [u[j]], s["style"][0], ms=10, mfc=s["colour"],
+                        mec="#1a1a19" if s["colour"] in _LIGHT else "white", mew=1.3, zorder=4)
+                parts.append("%s %+d" % (tag, int(k) - int(r["k_star"])))
+            else:
+                parts.append("%s n/a" % tag)
+        head = "node %d (%s), d_hat %.2f um, Allen 2r %.2f um" % (
+            int(r["node_id"]), names.get(r.get("node_type"), "type %s" % r.get("node_type")),
+            float(r.get("d_hat_um", float("nan"))), 2.0 * float(r.get("allen_radius_um", float("nan"))))
+        if weight_key is not None and r.get(weight_key) is not None:
+            head += ", w %.2f" % float(r[weight_key])
+        ax.set_title(head + "\npick minus k*: " + ", ".join(parts), fontsize=8)
+        ax.set_ylim(-0.12, 1.12)
+        ax.set_xlim(off.min() - 0.5, off.max() + 0.5)
+        ax.tick_params(labelsize=7.5)
+        ax.grid(axis="y", color="#e6e5e0", lw=0.6)
+        for side in ("top", "right"):
+            ax.spines[side].set_visible(False)
+        if i % ncol == 0:
+            ax.set_ylabel("rescaled 0-1, pick on top", fontsize=8.5)
+        if i // ncol == nrow - 1 or i + ncol >= n:
+            ax.set_xlabel("plane k - k_SWC", fontsize=8.5)
+    for j in range(n, nrow * ncol):
+        axes[j // ncol, j % ncol].axis("off")
+    handles = [plt.Line2D([], [], color=s["colour"], marker=s["style"][0], ls=s["style"][1:] or "-",
+                          mec="#1a1a19" if s["colour"] in _LIGHT else s["colour"], lw=1.5, label=s["label"])
+               for s in series]
+    handles += [plt.Line2D([], [], color="#ff1744", lw=1.2, label="k* (gradient energy, D-030)"),
+                plt.Line2D([], [], color="#7a7a7a", ls="--", lw=1.2, label="plane of the dip depth"),
+                plt.Line2D([], [], color="#1a1a19", ls=":", lw=1.2, label="the SWC node's plane")]
+    fig.legend(handles=handles, loc="upper center", ncol=3, fontsize=8, frameon=False, bbox_to_anchor=(0.5, 0.995))
+    if title:
+        fig.suptitle(title, y=1.0 - 0.80 / H, fontsize=10)
+    fig.subplots_adjust(top=1.0 - 1.70 / H, bottom=0.55 / H, left=0.06, right=0.99, hspace=0.75, wspace=0.18)
+    return fig
