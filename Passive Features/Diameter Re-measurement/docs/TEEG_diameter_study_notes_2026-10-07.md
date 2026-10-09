@@ -4,6 +4,7 @@
 |---|---|
 | 2026-10-07 | Created at the user's request (18:17 Europe/Rome), for study on 2026-10-08. Copies two answers of the theory chat of 2026-10-07 (claude.ai session `session_01VvzYj2wa7J3oP8EEw71KEg`): the answer of 17:02 to "give a context on this and explain better" and the answers of 18:01 to questions 1-5. Text unchanged except that housekeeping lines (docs written, push status) are removed and later outcomes are marked in brackets. The figure is a standalone copy of the one shown in the chat. |
 | 2026-10-08 | Two bracketed notes added by the next theory chat (session `session_017oQJ14njZ9i5nSBhHUDoMh`) after it explained the weak-object approximation: under Part 1's "Where each effect stands" (what the fringe check tests) and under Part 2, answer 4 (the direction index, the sign of the $w^2$ difference at $S=1$, and what the model does with the $w^2$ terms). The copied text is otherwise unchanged. Evidence: derivation in that chat **[reasoning, not run]**; Zuo et al. 2017, PubMed full text. |
+| 2026-10-09 | One bracketed note by the same theory chat, under Part 1's "What this does to a dark node's diameter": a partition-vs-ray-world difference is like-for-like only under three conditions (same rays, $1/\cos\vartheta$ weighting, $\mu$ matched through $\hat\mu$). Evidence: `checks/kernel_confound_check.py` (+ `.out`) **[run]**. |
 
 Status of what these notes discuss: D-030, D-031 and D-032 are in the
 project log `TEEG_decisions_and_ideas_log.md`; the code consequences are in
@@ -209,6 +210,13 @@ computed. Two checks:
 - Render the same phantom draws with `ray_world` and compare their $\hat d$
   with the partition's. Compare differences only: the ray world has no
   diffraction, so its own $\hat d/d$ (1.20–1.32) is not a bias.
+  **[Qualified 2026-10-09: differences are like-for-like only with the
+  partition rendered on the ray world's own rays, weighted by
+  $1/\cos\vartheta$, and with $\mu$ matched through $\hat\mu$, as in
+  `checks/optics_points_check.py matched`. With the Gaussian kernel the
+  difference is a blur gap of about −0.11 ($d=1$ µm, flat, every darkness)
+  to −0.25 ($d=0.5$ µm, 20°), which hides the dark failure
+  (`checks/kernel_confound_check.py`; theory handoff, Open work 1).]**
 - For effect 3, look for bright fringes beside dark branches in the real
   profiles.
 

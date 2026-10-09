@@ -1,0 +1,8 @@
+fit: sigma_fit 0.080 um, Bbar = B; node plane; same true mu for both renderers
+case                     partition (Gaussian Debye kernel) | ray world G       | gap
+                         d^/d    mu^/mu                    | d^/d    mu^/mu    | partition - ray
+d=1.0 phi= 0 mu*d=0.05      1.094   0.829                    |  1.202   0.960    | -0.108
+d=1.0 phi= 0 mu*d=0.50      1.092   0.817                    |  1.206   0.939    | -0.114
+d=1.0 phi= 0 mu*d=1.50      1.095   0.766                    |  1.207   0.895    | -0.112
+d=1.0 phi= 0 mu*d=3.00      1.110   0.642                    |  1.216   0.776    | -0.106
+d=0.5 phi=20 mu*d=0.50      1.063   0.923                    |  1.317   0.840    | -0.254

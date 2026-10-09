@@ -108,6 +108,7 @@ python followup_checks.py; python focus_scan.py      # import optics_points_chec
 python calib_reach_check.py                          # imports optics_points_check (seconds)
 python calib_width_check.py                          # imports optics_points_check (seconds)
 python coherence_check.py                            # standalone (~4 min)
+python kernel_confound_check.py                      # imports optics_points_check (~1 min)
 ```
 
 | Script | Verifies |
@@ -131,6 +132,7 @@ python coherence_check.py                            # standalone (~4 min)
 | `calib_reach_check.py` (+ `.out`) | 2026-10-06, D-026 comments (b), (c), (h): <br>- how far a faint 0.8 µm (and 0.5 µm) node keeps a centre dip as deep as a 0.3 µm node's 3 planes out (far slopes 0.79 and 1.21); <br>- the tilt range a calibrated depth range covers at $U$ = 10 µm, by (S5); <br>- the depth-extent constant $\gamma^2 r^2/4$ and the axis-error/anchor confound, checked numerically. |
 | `calib_width_check.py` (+ `.out`) | 2026-10-06, D-026 comment (a) and D-027: <br>- why a windowed second moment depends on the window ($\lvert v\rvert^{-2}$ tails; a background offset weighted by $v^2$); <br>- how tilt changes the second moment and the core width of a thin node's profile with a depth-only kernel. |
 | `coherence_check.py` (+ `.out`) | 2026-10-08, theory handoff Open work 2 (weak-object approximation): a straight branch in focus, thin object, scalar optics, imaged coherently (one plane wave), by the sum over condenser directions at $S=1$, and by $B\,(T*h_0)$; smoke checks for the empty field, the weak-object limit and the sign $I_{S=1}\le I_{\rm model}\le B$; reports dip depth, bright fringe and FWHM for $d$ = 0.5 and 1 µm at $\mu d$ = 0.1, 1, 3. |
+| `kernel_confound_check.py` (+ `.out`) | 2026-10-09, theory handoff Open work 1 (the D-024 (i) study): the partition with the production-like Gaussian Debye-table kernel vs the ray world, same fit, same true $\mu$, no matching. The gap in $\hat d/d$ is set by the blur, about −0.11 for $d=1$ µm flat at every $\mu d$ from 0.05 to 3 and −0.25 at $d=0.5$ µm, 20°, so an unmatched comparison cannot see the absorption treatment (compare `optics_points_check.py matched`). |
 
 All numbers in these scripts describe an ideal, index-matched objective at one
 wavelength (0.55 um); they are orders of magnitude, not inputs to the bias table.
@@ -165,3 +167,4 @@ implementation handoff). Step 1 is Phase II of that plan.
 | 2026-10-07 (later, 3) | Theory chat, at the user's request: new `docs/TEEG_diameter_theory_handoff_2026-10-07.md` (start of a new theory chat on 2026-10-08, with its start prompt), `docs/TEEG_diameter_study_notes_2026-10-07.md` and the figure `docs/TEEG_ray_world_vs_partition_2026-10-07.svg`; contents rows added, the 2026-10-05 handoff's "start here" marked. |
 | 2026-10-08 | New theory chat, after explaining the weak-object approximation: the optics document is v1.3 (§3.6 gains a full-text source, Zuo et al. 2017, and the exact $S=1$ difference between the incoherent form and the true image; its fringe check is marked [corrected 2026-10-08]: it tests $S<1$, not the dark-node error at $S=1$); the theory handoff (Open work 2, next free IDs D-038 and I-003) and the study notes carry dated notes. |
 | 2026-10-08 (later) | Previous theory chat's session, answering the user on coherent vs incoherent illumination: new `checks/coherence_check.py` with its reference output (run 2026-10-08); the theory handoff is v1.2 (a dated note under Open work 2 with its numbers). |
+| 2026-10-09 | Theory chat, after the user asked what the ray world is used for. New `checks/kernel_confound_check.py` with its reference output (run 2026-10-09). The theory handoff is v1.3: Open work 1 now states the conditions of a like-for-like comparison with the ray world, and the next free IDs are D-039, I-003. The implementation handoff is v1.7, with a note on its end-to-end validation row. The study notes carry one bracketed note. |

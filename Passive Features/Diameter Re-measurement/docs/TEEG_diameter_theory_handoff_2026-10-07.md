@@ -5,6 +5,7 @@
 | 2026-10-07 | v1. Written at the user's request (18:17 Europe/Rome) so that a new theory chat can take over on 2026-10-08 from the theory chat of 2026-10-05 to 2026-10-07 (claude.ai session `session_01VvzYj2wa7J3oP8EEw71KEg`). State after D-032. Evidence: the project log re-read and written on 2026-10-07 (D-025 to D-027 merged; D-030, D-031, D-032 added); `main` at `ff1028f` before this file; numbers below re-read today from the committed `checks/*.out` and the implementation handoff's "Findings". |
 | 2026-10-08 | v1.1, by the new theory chat (session `session_017oQJ14njZ9i5nSBhHUDoMh`), after its first answer (the weak-object approximation). Open work 2 gains a dated note: the literature search widened (one full-text source), the exact $S=1$ difference between the incoherent form and the true image, and a correction of what the fringe check tests. "Next free IDs" marked [corrected 2026-10-08]. Evidence: the project log read 2026-10-08 (`project_read`, D-019 to D-037, I-002); Zuo et al. 2017, PubMed full text (PMC5550517); derivation in the chat **[reasoning, not run]**. |
 | 2026-10-08 (later) | v1.2, by the previous theory chat's session (`session_01VvzYj2wa7J3oP8EEw71KEg`), answering the user on coherent vs incoherent illumination. Open work 2 gains a dated note with the numbers of the new `checks/coherence_check.py`: the $S=1$ image is never brighter than $B\,(T*h_0)$ (the sign derived in v1.1, confirmed numerically) and the in-focus size of the difference for $d$ = 0.5 and 1 µm at $\mu d$ = 0.1, 1, 3. Evidence: the script and its reference output, run 2026-10-08 **[run]**. |
+| 2026-10-09 | v1.3, by the theory chat of `session_017oQJ14njZ9i5nSBhHUDoMh`, after the user asked what the ray world is used for. Open work 1 gains a dated note: the three conditions of a like-for-like comparison, which the branch cannot meet yet (no cone kernel), the size of the blur confound without them, and the evidential strength of "no $\mu_{\rm ph}$ reaches $\hat\mu$". "Next free IDs" marked [corrected 2026-10-09]. Evidence: `checks/optics_points_check.py` and `.out` read; the new `checks/kernel_confound_check.py` (+ `.out`) **[run]**; `sci/diameter-pipeline` at `3084991` read (`model/ray_world.py`, `config.py`, `scripts/end_to_end.py`, `specs/SPEC.md` Block 9 and open questions) **[src]**; the project log read 2026-10-09 (D-038 added by the implementation chat). |
 
 Paths are relative to `Passive Features/Diameter Re-measurement/` in the repo
 `Leonardodm00/Towards-EEG` (canonical URL
@@ -70,6 +71,9 @@ now also holds D-033 and D-034 (Stage 7 noise, another workstream) and D-035
 to D-037 (this workstream's implementation chat, logged 2026-10-08: D-035 the
 focus plane by gradient energy, which the repository cites as "D-030"; D-036
 and D-037 plane-to-plane diagnostics). Next free IDs: D-038, I-003.
+**[corrected 2026-10-09]** D-038 (the measuring line enlarged beyond
+±3 µm, to ±4 or ±5 µm) was logged by the implementation chat on 2026-10-08.
+Next free IDs: D-039, I-003.
 
 ## Findings the theory rests on
 
@@ -95,6 +99,40 @@ In the order the theory chat would take it; the user decides.
    `ray_world`, fit both, and report $\Delta\hat d/d$ against $\hat\alpha$
    (differences only: the ray world has no diffraction). Decide whether dark
    nodes need another renderer, e.g. the history computed along the rays.
+   **[2026-10-09, theory chat; the user asked what the ray world is used
+   for]** "Differences only" is not enough. A like-for-like comparison needs
+   three conditions, all met by `checks/optics_points_check.py matched` (its
+   P*): (a) the partition is rendered with the kernel of the ray world's own
+   rays, (b) weighted by $1/\cos\vartheta$, which is what a faint-node
+   calibration would deliver in a ray-world microscope, and (c) $\mu$ matched
+   through $\hat\mu$ (procedure §3.5). Then the two renderers agree to first
+   order in the absorbance for any geometry, and what differs is the
+   bookkeeping alone (history along the vertical; vertical path element)
+   **[reasoning; run: −0.002 / −0.005 at $\mu d$ = 0.05 / 0.5]**. The branch
+   cannot meet (a)-(b) yet: its ray world (Block 9) has no kernel, the
+   partition has only the Gaussian table, and `specs/SPEC.md` lists the cone
+   kernel as not built (Block 9) **[src, `3084991`]**. Without the
+   conditions the comparison measures blur: with the Gaussian Debye-table
+   kernel, the partition's $\hat d/d$ minus the ray world's is −0.108 /
+   −0.114 / −0.112 / −0.106 at $\mu d$ = 0.05 / 0.5 / 1.5 / 3 ($d=1$ µm,
+   flat) and −0.254 at $d=0.5$ µm, 20°, $\mu d=0.5$ (new
+   `checks/kernel_confound_check.py`, **[run]**). That gap is set by the
+   geometry and moves by less than 0.01 with darkness, so it would hide the
+   failure the matched comparison shows. The study therefore runs either at
+   profile level with the `checks/` functions over the design's draws, or on
+   the branch after Block 4 gains the cone kernel family. It should also
+   report which $\hat\mu$ (and $\hat\alpha$) the partition can reach at all
+   (D-031 coverage): the statement "no $\mu_{\rm ph}\in[0.5\mu,8\mu]$ reaches
+   the ray world's $\hat\mu$ at $\mu d$ = 1.5 or 3" rests on the bracket's
+   end points only. At the four values probed for the $d=1$ µm flat tube
+   ($\mu_{\rm ph}$ = 0.75, 1.5, 12, 24 µm⁻¹) the partition's $\hat\mu$ is
+   0.47-1.03 µm⁻¹, against the ray world's 1.333 and 2.327 µm⁻¹ **[run;
+   arithmetic from the bracket values in `optics_points_check.out`]**. A scan
+   over $\mu_{\rm ph}$ would turn that into a statement. For the end-to-end
+   acceptance (procedure §3.10, last row), `specs/SPEC.md` proposes the
+   empirical kernel, not the ray world, as the alternative generator, and
+   keeps the ray world for absorption checks (open questions, raised
+   2026-10-06).
 2. **Coherence (weak-object approximation), effect 3 of the study notes.**
    Unmeasured. Data check: bright fringes beside dark branches in real
    profiles. No bright-field source found (PubMed, 5 queries, 2026-10-07);
