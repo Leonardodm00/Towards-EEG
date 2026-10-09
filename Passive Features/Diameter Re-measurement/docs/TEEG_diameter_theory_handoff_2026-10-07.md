@@ -7,6 +7,7 @@
 | 2026-10-08 (later) | v1.2, by the previous theory chat's session (`session_01VvzYj2wa7J3oP8EEw71KEg`), answering the user on coherent vs incoherent illumination. Open work 2 gains a dated note with the numbers of the new `checks/coherence_check.py`: the $S=1$ image is never brighter than $B\,(T*h_0)$ (the sign derived in v1.1, confirmed numerically) and the in-focus size of the difference for $d$ = 0.5 and 1 µm at $\mu d$ = 0.1, 1, 3. Evidence: the script and its reference output, run 2026-10-08 **[run]**. |
 | 2026-10-09 | v1.3, by the theory chat of `session_017oQJ14njZ9i5nSBhHUDoMh`, after the user asked what the ray world is used for. Open work 1 gains a dated note: the three conditions of a like-for-like comparison, which the branch cannot meet yet (no cone kernel), the size of the blur confound without them, and the evidential strength of "no $\mu_{\rm ph}$ reaches $\hat\mu$". "Next free IDs" marked [corrected 2026-10-09]. Evidence: `checks/optics_points_check.py` and `.out` read; the new `checks/kernel_confound_check.py` (+ `.out`) **[run]**; `sci/diameter-pipeline` at `3084991` read (`model/ray_world.py`, `config.py`, `scripts/end_to_end.py`, `specs/SPEC.md` Block 9 and open questions) **[src]**; the project log read 2026-10-09 (D-038 added by the implementation chat). |
 | 2026-10-09 (later) | v1.4, same chat, after the user asked whether the ray world could build the table for thick or heavily stained dendrites. One sentence added to the Open work 1 note: what leaving out diffraction costs a ray-world table for thick flat tubes. Evidence: `checks/kernel_confound_check.py` extended to $d$ = 2, 3 µm **[run]**. |
+| 2026-10-09 (later, 2) | v1.5, same chat. The user proposed the hybrid explicitly: ray-world absorption (NA 1.4, $n_{\rm oil}$ 1.515), each image plane rendered with the kernel. A dated note under Open work 1 records how far it goes, and qualifies the v1.4 sentence "supports the hybrid". Evidence: new `checks/hybrid_absorption_check.py` (+ `.out`) **[run]**. |
 
 Paths are relative to `Passive Features/Diameter Re-measurement/` in the repo
 `Leonardodm00/Towards-EEG` (canonical URL
@@ -148,6 +149,40 @@ In the order the theory chat would take it; the user decides.
    the bookkeeping error needs dark paths and sits in the interior. This
    supports the hybrid above (history along the rays, measured kernel), not
    the ray world as it is **[reasoning]**.
+   **[qualified 2026-10-09, later; the user's proposal]** The hybrid has three parts:
+   - absorption computed with the ray world's geometry (NA 1.4,
+     $n_{\rm oil}$ 1.515, evenly filled cone);
+   - every image plane rendered with the kernel, slice by slice (Eq. 6
+     unchanged; only Eq. 5's $\Delta A_j$ is replaced);
+   - the ray world's own cone spread dropped (blurring its finished planes
+     would blur twice).
+
+   A kernel does not know a ray's direction, so each slice point's absorbed
+   light is averaged over the directions arriving there before it is spread:
+   $\Delta A_j(\mathbf x)=\delta\zeta\,\big\langle(\mu/\cos\vartheta)\,
+   e^{-\mu\ell_{\rm back}(\mathbf x,\zeta_j;\hat s)}\big\rangle_W$ inside
+   the tube, where $\ell_{\rm back}$ is the path back along the ray to the
+   tube's entry.
+
+   It was tested where the answer is exact: in the ray world, with the
+   cone's own $W^*$-weighted kernel (new `checks/hybrid_absorption_check.py`,
+   **[run]**). For a flat 1 µm tube at the node plane, the hybrid's centre
+   dip against the ray world's is 0.057 / 0.057, 0.450 / 0.441,
+   0.845 / 0.820 and 0.961 / 0.965 at $\mu d$ = 0.05 / 0.5 / 1.5 / 3. It is
+   first-order exact, and much closer than the partition. At $\mu d$ = 10
+   and 50, however, it gives 0.811 and 0.732 against 1.000, a leak like the
+   partition's (0.736, 0.699).
+
+   Booking light per point and then spreading it without the ray's direction
+   is the partition's own structure, and near the opaque limit it gives the
+   skin-crossing factor of (S9) **[reasoning]**. Keeping each ray's history
+   together with its own landing point is what makes the ray world black. A
+   kernel narrower than the cone near focus cannot keep that pairing.
+
+   So the hybrid fixes the dark range up to about $\mu d$ = 3 and not
+   near-opaque nodes. The real $\hat\mu_i$ / $\hat\alpha_i$ distribution
+   (D-024 open point) decides whether that range is enough. Not yet tested:
+   its fitted $\hat d$ (only centre dips so far), tilted tubes, and its cost.
 2. **Coherence (weak-object approximation), effect 3 of the study notes.**
    Unmeasured. Data check: bright fringes beside dark branches in real
    profiles. No bright-field source found (PubMed, 5 queries, 2026-10-07);
