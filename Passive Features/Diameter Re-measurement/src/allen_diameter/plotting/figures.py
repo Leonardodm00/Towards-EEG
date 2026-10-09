@@ -503,6 +503,77 @@ def profile_area_figure(blocks, title=""):
     return fig
 
 
+def entropy_summary_figure(records, title=""):
+    """Small multiples of the entropy evaluation over several nodes: one panel per node, the line's and the
+    strip's entropy against the plane offset k - k_SWC, each rescaled to 0 (its minimum) .. 1 (its maximum) so
+    that both share the axis, with k* (red), the dip depth's plane (grey dashed), the SWC plane (dotted) and
+    the planes the two curves picked (large markers at 0).
+
+    records: the per-node dicts of scripts/plane_differences.run (entropy evaluation): node_id, node_type,
+    allen_radius_um, d_hat_um, ks, h_line, h_strip, k_swc, k_star, k_star_depth, k_h_line, k_h_strip.
+    Presentation only. Returns the Figure."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    n = len(records)
+    ncol = max(1, min(4, n))
+    nrow = int(math.ceil(n / float(ncol)))
+    H = 2.75 * nrow + 1.7
+    fig, axes = plt.subplots(nrow, ncol, figsize=(3.7 * ncol, H), squeeze=False)
+    names = {3: "basal", 4: "apical"}
+
+    def unit(h):
+        h = np.asarray(h, dtype=float)
+        if not np.isfinite(h).any():
+            return h
+        lo, hi = np.nanmin(h), np.nanmax(h)
+        return (h - lo) / (hi - lo) if hi > lo else np.zeros_like(h)
+
+    for i, r in enumerate(records):
+        ax = axes[i // ncol, i % ncol]
+        off = np.asarray(r["ks"]) - int(r["k_swc"])
+        for kk, colour, ls in ((r.get("k_star"), "#ff1744", "-"), (r.get("k_star_depth"), "#7a7a7a", "--"),
+                               (r.get("k_swc"), "#1a1a19", ":")):
+            if kk is not None:
+                ax.axvline(int(kk) - int(r["k_swc"]), color=colour, ls=ls, lw=1.2, zorder=1)
+        for key, pick, colour, style in (("h_line", "k_h_line", _HLINE, "o-"), ("h_strip", "k_h_strip", _HSTRIP, "s--")):
+            mec = _EDGE if colour == _HSTRIP else colour
+            ax.plot(off, unit(r[key]), style, color=colour, mec=mec, mew=0.7, ms=3.5, lw=1.5, zorder=3)
+            if r.get(pick) is not None:
+                ax.plot([int(r[pick]) - int(r["k_swc"])], [0.0], style[0], ms=10, mfc=colour,
+                        mec=_EDGE if colour == _HSTRIP else "white", mew=1.3, zorder=4)
+        dl = None if r.get("k_h_line") is None else int(r["k_h_line"]) - int(r["k_star"])
+        dsx = None if r.get("k_h_strip") is None else int(r["k_h_strip"]) - int(r["k_star"])
+        fmt = lambda x: "n/a" if x is None else "%+d" % x  # noqa: E731
+        ax.set_title("node %d (%s), Allen 2r %.2f um, d %.2f um\npick minus k*: line %s, strip %s"
+                     % (int(r["node_id"]), names.get(r.get("node_type"), "type %s" % r.get("node_type")),
+                        2.0 * float(r.get("allen_radius_um", float("nan"))), float(r.get("d_hat_um", float("nan"))),
+                        fmt(dl), fmt(dsx)), fontsize=8.5)
+        ax.set_ylim(-0.12, 1.12)
+        ax.set_xlim(off.min() - 0.5, off.max() + 0.5)
+        ax.tick_params(labelsize=7.5)
+        ax.grid(axis="y", color="#e6e5e0", lw=0.6)
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+        if i % ncol == 0:
+            ax.set_ylabel("H, rescaled 0-1", fontsize=8.5)
+        if i // ncol == nrow - 1 or i + ncol >= n:
+            ax.set_xlabel("plane k - k_SWC", fontsize=8.5)
+    for j in range(n, nrow * ncol):
+        axes[j // ncol, j % ncol].axis("off")
+    handles = [plt.Line2D([], [], color=_HLINE, marker="o", lw=1.5, label="H along the measuring line"),
+               plt.Line2D([], [], color=_HSTRIP, marker="s", mec=_EDGE, ls="--", lw=1.5, label="H of the strip's pixels"),
+               plt.Line2D([], [], color=_HLINE, marker="o", ms=9, ls="none", mec="white", label="the plane each curve picks"),
+               plt.Line2D([], [], color="#ff1744", lw=1.2, label="k* (gradient energy, D-030)"),
+               plt.Line2D([], [], color="#7a7a7a", ls="--", lw=1.2, label="plane of the dip depth"),
+               plt.Line2D([], [], color="#1a1a19", ls=":", lw=1.2, label="the SWC node's plane")]
+    fig.legend(handles=handles, loc="upper center", ncol=3, fontsize=8, frameon=False, bbox_to_anchor=(0.5, 0.995))
+    if title:
+        fig.suptitle(title, y=1.0 - 0.72 / H, fontsize=10)
+    fig.subplots_adjust(top=1.0 - 1.55 / H, bottom=0.55 / H, left=0.06, right=0.99, hspace=0.75, wspace=0.18)
+    return fig
+
+
 # entropy along the measuring line (blue) and in its strip (amber: light on white, so its markers carry a dark edge
 # and its line is dashed; blue, amber and the red of k* pass the dataviz palette checks, all pairs, light surface)
 _HLINE, _HSTRIP, _EDGE = "#2a78d6", "#eda100", "#1a1a19"

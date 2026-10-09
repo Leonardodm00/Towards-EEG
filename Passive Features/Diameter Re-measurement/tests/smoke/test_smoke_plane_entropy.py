@@ -16,7 +16,13 @@ Checks
     test_known_answer   the pick rules on node 2's line-entropy curve of
                         2026-10-08 (planes 113-125; Drive JSON): the global
                         minimum is plane 114, the dip rule plane 121; ties
-                        go to the first; nothing finite gives None;
+                        go to the first; nothing finite gives None; the
+                        thin-node selection on the hand-built SWC of
+                        test_smoke_stretches (seven stretches) with rows made
+                        to fail one criterion each: the qualifying ids per
+                        stretch and the final spread worked out by hand, for
+                        3 per stretch / 12 in all and 1 per stretch;
+                        pick_summary's offsets and agreement counts by hand;
                         eight distinct levels: 3 bits; one level: 0; two
                         levels 1:3: 0.811278 bits (closed form); bins by
                         hand at the half-integer boundaries (0.5 goes up,
@@ -54,7 +60,9 @@ Checks
                         refused; with a +-5 um line the square outgrows the
                         block (+-3.5 um + 1 px in this fixture) and is
                         fetched: 89 samples in every valid plane, none NaN;
-                        a plane shifted by +3 or -5 grey levels after
+                        three nodes in one run: the summary CSV (one row per
+                        node, picks minus k*) and the summary figure (one
+                        panel per node); a plane shifted by +3 or -5 grey levels after
                         the camera leaves every entropy unchanged (exactly);
                         made 2 % darker it moves the strip's entropy by less
                         than 0.05 bits; a strip of half-width 0.5 um holds
@@ -121,6 +129,49 @@ def _discretised_gaussian_entropy(mu, s, w=1.0):
     return float(-(pj * np.log2(pj)).sum())
 
 
+def _check_thin_selection(PD):
+    import test_smoke_stretches as TS
+    good = dict(in_S=True, allen_radius_um=0.25, d_hat_um=0.8, z_sub_um=1.0, k_star=0, k_star_depth=0, steep=False)
+    rows = {n: dict(good, node_id=n) for n in range(2, 61) if not 35 <= n <= 44}      # stretch T2 (35-44): no rows
+    rows[5].update(in_S=False)
+    rows[6].update(allen_radius_um=0.35)          # 2r 0.7 > 0.6
+    rows[7].update(d_hat_um=1.2)
+    rows[8].update(k_star_depth=1)                # the two focus rules disagree
+    rows[9].update(steep=True)
+    rows[10].update(z_sub_um=float("nan"))
+    del rows[11]["steep"]                         # a missing field does not qualify
+    for n in range(19, 25):                       # stretch T1 (19-24): thick
+        rows[n].update(allen_radius_um=0.75)
+    rows[3].update(in_S="True", steep="False")    # strings as a CSV reader without parsing gives them
+    assert [n for n in range(2, 14) if PD.thin_reference_node(rows[n])] == [2, 3, 4, 12, 13]
+    with tempfile.TemporaryDirectory() as tmp:
+        swc = TS.fixture_swc(tmp)
+    # per stretch, spread_ranks(m, 3): A [2,3,4,12,13] -> 2,4,13; B [14..18] -> 14,16,18; O [25..34] -> 25,30,34;
+    # L [45..56] -> 45,51,56; R [57..60] -> 57,59,60; then spread_ranks(15, 12) -> indices 0,1,3,4,5,6,8,9,10,11,13,14
+    got = PD.select_thin_nodes(swc, list(rows.values()))
+    assert got == [2, 4, 14, 16, 18, 25, 34, 45, 51, 56, 59, 60], got
+    # one per stretch: the middle candidate, (m - 1) // 2
+    assert PD.select_thin_nodes(swc, list(rows.values()), per_stretch=1) == [4, 16, 29, 50, 58]
+    assert PD.select_thin_nodes(swc, list(rows.values()), max_2r_um=0.4) == []
+    assert PD.select_thin_nodes(swc, []) == []
+
+
+def _check_pick_summary(PD):
+    recs = [dict(node_id=4, node_type=3, allen_radius_um=0.3, d_hat_um=0.8, k_swc=0, k_star=0, k_star_depth=0,
+                 k_h_line=1, k_h_strip=-2),
+            dict(node_id=1, skipped="not a dendrite node"),
+            dict(node_id=5, node_type=4, allen_radius_um=0.25, d_hat_um=0.7, k_swc=3, k_star=4, k_star_depth=4,
+                 k_h_line=4, k_h_strip=None),
+            dict(node_id=6, node_type=4, allen_radius_um=0.2, d_hat_um=0.6, k_swc=0, k_star=-1, k_star_depth=0,
+                 k_h_line=3, k_h_strip=-1)]
+    rows, agree = PD.pick_summary(recs, "entropy")
+    assert [r["node_id"] for r in rows] == [4, 5, 6] and abs(rows[0]["allen_2r_um"] - 0.6) < 1e-12
+    assert [r["k_h_line_minus_k_star"] for r in rows] == [1, 0, 4]
+    assert [r["k_h_strip_minus_k_star"] for r in rows] == [-2, None, 0]
+    assert agree["k_h_line"] == dict(n=3, within_1=2, median_abs=1.0), agree
+    assert agree["k_h_strip"] == dict(n=2, within_1=1, median_abs=1.0), agree
+
+
 def test_known_answer():
     import plane_differences as PD
     # node 2's line entropy, planes 113..125 (planeentropy_529878215.json, 2026-10-08): maxima 124 and 119 bracket
@@ -135,6 +186,8 @@ def test_known_answer():
         pass
     else:
         raise AssertionError("entropy_pick accepted rule 'max'")
+    _check_thin_selection(PD)
+    _check_pick_summary(PD)
     assert FO.histogram_entropy(np.arange(8)) == (3.0, 8, 8)
     assert FO.histogram_entropy([5.0, 5.0, 5.0]) == (0.0, 3, 1)
     h, n, m = FO.histogram_entropy([0.0, 1.0, 1.0, 1.0])
@@ -375,6 +428,20 @@ def test_edge_cases():
         rd = PD.run(swc, prov, ccfg, [4], os.path.join(tmp, "dip"), "999", planes_half=8, evaluation="entropy",
                     entropy_pick_rule="dip", log=lambda m: None)[0]
         assert rd["entropy_pick"] == "dip" and rd["k_h_line"] == 0, rd["k_h_line"]
+        # three nodes: the summary CSV and figure
+        logs = []
+        out3 = os.path.join(tmp, "three")
+        recs3 = PD.run(swc, prov, ccfg, [3, 4, 5], out3, "999", planes_half=4, evaluation="entropy", log=logs.append)
+        from allen_diameter.loading import table_io
+        summ = table_io.read_rows([os.path.join(out3, "planeentropy_summary_999.csv")])
+        assert [r["node_id"] for r in summ] == [3, 4, 5] and all(r["node_type"] == 3 for r in summ), summ
+        assert all(r["k_h_line_minus_k_star"] == r["k_h_line"] - r["k_star"] for r in summ)
+        assert all(abs(r["allen_2r_um"] - 2 * x["allen_radius_um"]) < 1e-12 for r, x in zip(summ, recs3))
+        assert os.path.exists(os.path.join(out3, "planeentropy_summary_999.png"))
+        assert any(m.startswith("[planediff] summary over 3 nodes: k_h_line within 1 plane of k* in") for m in logs), logs
+        from allen_diameter.plotting import figures as FG
+        fig = FG.entropy_summary_figure(recs3 + recs3[:2], "five panels")
+        assert sum(1 for ax in fig.axes if ax.axison) == 5 and len(fig.axes) == 8, len(fig.axes)
 
 
 # ---------------------------------------------------------------- runner ---

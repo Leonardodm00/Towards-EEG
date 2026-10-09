@@ -163,7 +163,8 @@ def node_stack(swc, provider, cfg, node_id, transform=None, planes_half=6, half_
                 extent=image_extent_um(sub, stack.shape[1:]), k_swc=k_swc, result=pl["result"], o=o,
                 theta=float(pl["result"].theta_rad), xyz=xyz, radius=radius, block=np.asarray(block, dtype=float),
                 block_frame=frame, segments=np.asarray(pl["segments"], dtype=float), soma=soma,
-                square_half_um=half, square_fetched=bool(fetched))
+                square_half_um=half, square_fetched=bool(fetched), allen_radius_um=float(pl["allen_radius_um"]),
+                node_type=int(np.asarray(swc.types)[np.flatnonzero(np.asarray(swc.ids) == int(node_id))[0]]))
 
 
 def far_from_dendrites(shape, frame, segments, margin_um, discs=()):
@@ -266,6 +267,62 @@ def entropy_evaluation(st, cfg, profile_half_um=None, stripe_half_um=1.0, bin_wi
     return ent
 
 
+def _truthy(x):
+    return x is True or (isinstance(x, str) and x.strip() == "True") or (isinstance(x, (int, np.integer)) and x == 1)
+
+
+def thin_reference_node(r, max_2r_um=0.6, max_dhat_um=1.0):
+    """Whether a pilot row is a thin node on which the pipeline's two focus rules agree: in_S true,
+    2 * allen_radius_um <= max_2r_um, d_hat_um <= max_dhat_um, a finite z_sub_um, k_star == k_star_depth and
+    steep false. A row lacking a field does not qualify."""
+    try:
+        return (_truthy(r["in_S"]) and 2.0 * float(r["allen_radius_um"]) <= float(max_2r_um)
+                and float(r["d_hat_um"]) <= float(max_dhat_um) and math.isfinite(float(r["z_sub_um"]))
+                and int(r["k_star"]) == int(r["k_star_depth"]) and not _truthy(r["steep"]))
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def select_thin_nodes(swc, rows, max_2r_um=0.6, max_dhat_um=1.0, per_stretch=3, max_nodes=12, types=(3, 4)):
+    """Node ids for the thin-dendrite test of the entropy (the user's request of 2026-10-09: where the
+    gradient energy works). The pilot rows that pass thin_reference_node; in each unbranched stretch
+    (cell.stretches, in its order, proximal first) up to per_stretch of them spread evenly along it
+    (survey.spread_ranks over the stretch's qualifying nodes); of those, over all stretches in order, at most
+    max_nodes spread evenly. Thresholds PROVISIONAL, the assistant's."""
+    by_id = {int(r["node_id"]): r for r in rows}
+    picked = []
+    for run in cell.stretches(swc, types):
+        cand = [int(swc.ids[i]) for i in run if int(swc.ids[i]) in by_id
+                and thin_reference_node(by_id[int(swc.ids[i])], max_2r_um, max_dhat_um)]
+        picked += [cand[j] for j in survey.spread_ranks(len(cand), int(per_stretch))] if cand else []
+    return [picked[j] for j in survey.spread_ranks(len(picked), int(max_nodes))] if picked else []
+
+
+_PICK_KEYS = {"entropy": ("k_h_line", "k_h_strip"), "profile": ("k_min_area", "k_min_area_norm"), "image": ()}
+
+
+def pick_summary(records, evaluation):
+    """(rows, agreement): one row per measured node -- id, SWC type, Allen's 2r, the fitted d, the SWC plane,
+    k*, the dip depth's plane, the evaluation's picked planes and each pick minus k* (planes) -- and, per pick,
+    dict(n, within_1, median_abs) over the nodes with both planes."""
+    rows = []
+    for r in records:
+        if "skipped" in r:
+            continue
+        row = dict(node_id=r["node_id"], node_type=r.get("node_type"), allen_2r_um=2.0 * r.get("allen_radius_um", np.nan),
+                   d_hat_um=r.get("d_hat_um"), k_swc=r["k_swc"], k_star=r["k_star"], k_star_depth=r["k_star_depth"])
+        for key in _PICK_KEYS[evaluation]:
+            row[key] = r.get(key)
+            row[key + "_minus_k_star"] = None if r.get(key) is None else int(r[key]) - int(r["k_star"])
+        rows.append(row)
+    agreement = {}
+    for key in _PICK_KEYS[evaluation]:
+        d = np.array([abs(x[key + "_minus_k_star"]) for x in rows if x[key + "_minus_k_star"] is not None], dtype=float)
+        agreement[key] = dict(n=int(d.size), within_1=int((d <= 1).sum()),
+                              median_abs=float(np.median(d)) if d.size else float("nan"))
+    return rows, agreement
+
+
 def _argmin_plane(ks, A):
     A = np.asarray(A, dtype=float)
     return None if not np.isfinite(A).any() else int(ks[int(np.nanargmin(A))])
@@ -325,7 +382,8 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
         rec = dict(node_id=int(nid), evaluation=evaluation, ks=[int(k) for k in ks],
                    valid=[bool(x) for x in st["valid"]], k_star=int(r.k_star), k_star_depth=int(r.k_star_depth),
                    k_swc=int(st["k_swc"]), z_sub_um=float(r.z_sub_um), n_missing=int((~st["valid"]).sum()),
-                   half_um=float(st["square_half_um"]), square_fetched=st["square_fetched"])
+                   half_um=float(st["square_half_um"]), square_fetched=st["square_fetched"],
+                   node_type=st["node_type"], allen_radius_um=st["allen_radius_um"], d_hat_um=float(r.d_hat_um))
         if evaluation == "profile":
             ev = profile_evaluation(st, cfg, profile_half_um, bg_margin_um)
             at.update(k_min_area=_argmin_plane(ks, ev["area"]), k_min_area_norm=_argmin_plane(ks, ev["area_norm"]))
@@ -409,13 +467,32 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
         records.append(rec)
     with open(os.path.join(out_dir, "%s_%s.json" % (_PREFIX[evaluation], specimen)), "w") as f:
         json.dump(records, f, indent=1, sort_keys=True, allow_nan=True)
+    done = [x for x in records if "png" in x]
+    if len(done) > 1 and _PICK_KEYS[evaluation]:
+        from allen_diameter.loading import table_io
+        rows, agreement = pick_summary(records, evaluation)
+        table_io.write_rows(rows, os.path.join(out_dir, "%s_summary_%s.csv" % (_PREFIX[evaluation], specimen)))
+        log("[planediff] summary over %d nodes: %s" % (len(rows), "; ".join(
+            "%s within 1 plane of k* in %d of %d (median |diff| %.1f planes)"
+            % (key, a["within_1"], a["n"], a["median_abs"]) for key, a in agreement.items())))
+        if evaluation == "entropy":
+            fig = fg.entropy_summary_figure(done, "Entropy picks against k* on %d nodes, specimen %s (%s)"
+                                            % (len(done), specimen, _PICK_WORDS[entropy_pick_rule].split(" (")[0]))
+            fig.savefig(os.path.join(out_dir, "planeentropy_summary_%s.png" % specimen), dpi=dpi)
+            plt.close(fig)
     return records
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--specimen", required=True)
-    ap.add_argument("--nodes", required=True, help="comma-separated node ids")
+    ap.add_argument("--nodes", required=True, help="comma-separated node ids, or 'thin' (needs --pilot-csv): thin "
+                                                    "nodes where k* and the dip depth agree, spread over the stretches")
+    ap.add_argument("--pilot-csv", default="", help="the pilot's per-node CSV (pilot_<specimen>.csv), for --nodes thin")
+    ap.add_argument("--max-nodes", type=int, default=12, help="--nodes thin: at most this many nodes")
+    ap.add_argument("--per-stretch", type=int, default=3, help="--nodes thin: at most this many per stretch")
+    ap.add_argument("--thin-max-2r-um", type=float, default=0.6, help="--nodes thin: Allen's 2r at most, um")
+    ap.add_argument("--thin-max-dhat-um", type=float, default=1.0, help="--nodes thin: the pilot's fitted d at most, um")
     ap.add_argument("--out-dir", required=True)
     ap.add_argument("--evaluation", choices=("profile", "image", "entropy"), default="profile")
     ap.add_argument("--planes-half", type=int, default=6, help="planes on each side of the SWC plane")
@@ -445,14 +522,25 @@ def main(argv=None):
     ap.add_argument("--config-json", default="")
     a = ap.parse_args(argv)
     cfg = load_config(a.config_json)
-    node_ids = [int(x) for x in a.nodes.split(",") if x.strip()]
-    if not node_ids:
+    thin = a.nodes.strip().lower() == "thin"
+    if thin and not a.pilot_csv:
+        ap.error("--nodes thin needs --pilot-csv")
+    node_ids = [] if thin else [int(x) for x in a.nodes.split(",") if x.strip()]
+    if not thin and not node_ids:
         print("[planediff] no node given: nothing to do", flush=True)
         return 0
     import allen_image_io as aio
     import run_cell
-    from allen_diameter.loading import swc_io
+    from allen_diameter.loading import swc_io, table_io
     swc = swc_io.read_swc(a.swc or aio.fetch_swc(int(a.specimen), a.cache_dir))
+    if thin:
+        node_ids = select_thin_nodes(swc, table_io.read_rows([a.pilot_csv]), a.thin_max_2r_um, a.thin_max_dhat_um,
+                                     a.per_stretch, a.max_nodes, cfg.acquisition.dendrite_swc_types)
+        print("[planediff] thin nodes (in S, Allen 2r <= %g um, fitted d <= %g um, k* = dip-depth plane, flat; up to "
+              "%d per stretch, %d in all): %s" % (a.thin_max_2r_um, a.thin_max_dhat_um, a.per_stretch, a.max_nodes,
+                                                  ",".join(str(n) for n in node_ids) or "none"), flush=True)
+        if not node_ids:
+            return 0
     fetcher = aio.HttpFetcher(cache_dir=a.cache_dir)
     planes = aio.plane_table(aio.list_images(int(a.specimen)))
     provider = run_cell.real_provider(fetcher, planes, cfg.acquisition.res0_um)

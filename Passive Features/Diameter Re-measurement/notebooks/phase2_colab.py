@@ -353,6 +353,50 @@ for h in LINE_HALF_UMS:
             display(Image(filename=p))
 
 # ====================================================================================================
+# ===== CELL 4g
+# ====================================================================================================
+# CELL 4G: THE ENTROPY ON THIN DENDRITES, LINE +-5 UM
+# The test asked for on 2026-10-09 (14:30): the entropy along a +-5 um line, which picked planes 114 and 115
+# on the trunk nodes 2 and 3 where k* picked 123, is run on thin dendrites, where the gradient energy is
+# thought to work. The nodes come from the pilot's table (`--nodes thin`): in S, Allen's 2r <= 0.6 um, a
+# fitted d <= 1.0 um, k* equal to the dip depth's plane (the pipeline's two focus rules agree, so k* is a
+# credible reference), not steep; up to 3 per unbranched stretch, spread along it, and 12 in all, spread over
+# the stretches. The thresholds are the assistant's provisional choice; `THIN` sets them.
+#
+# Output in `pilot/planeentropy/thin_line_5um/`: one figure per node, as in Cell 4f;
+# `planeentropy_summary_529878215.png`, one panel per node with both entropy curves rescaled 0-1 against k -
+# k_SWC, k*, the dip depth's plane, the SWC plane and the two picks; and `planeentropy_summary_529878215.csv`,
+# per node the type, Allen's 2r, the fitted d, the planes and each pick minus k*, printed by the cell.
+#
+# Expect `[planediff] thin nodes (...): <ids>`, one `[planediff] node N: ...` line per node, then `[planediff]
+# summary over N nodes: k_h_line within 1 plane of k* in a of N (median |diff| ... planes); k_h_strip within 1
+# plane of k* in b of N (...)` and `[planediff] wrote N figures (0 skipped) ...`; about 13 new crops per node
+# (the +-5 um square).
+#
+# What to expect (synthetic tubes, SPEC Block 11): with a +-5 um line the global minimum of both curves fell
+# within one plane of the centre in 8 of 8 noise draws for a 0.5 um tube. If the thin nodes agree with k* too,
+# the entropy works on both kinds of node; where it does not, the panels show how it parts from k* (a
+# neighbouring neurite inside the line or the strip is the first thing to look for).
+# Cell 4g: the entropy on thin dendrites, line +-5 um (needs Cells 0 and 1 and the pilot's CSV of Cell 4b)
+import os
+import pandas as pd
+from IPython.display import Image, display
+THIN = dict(max_nodes=12, per_stretch=3, max_2r_um=0.6, max_dhat_um=1.0)   # the choice of thin reference nodes
+out = OUT + "/pilot/planeentropy/thin_line_5um"
+run("scripts/plane_differences.py", "--specimen", SPECIMEN, "--nodes", "thin",
+    "--pilot-csv", "%s/pilot/pilot_%d.csv" % (OUT, SPECIMEN), "--max-nodes", THIN["max_nodes"],
+    "--per-stretch", THIN["per_stretch"], "--thin-max-2r-um", THIN["max_2r_um"],
+    "--thin-max-dhat-um", THIN["max_dhat_um"], "--evaluation", "entropy", "--planes-half", 6,
+    "--profile-half-um", 5, "--stripe-half-um", 1.0, "--entropy-pick", "min",
+    "--cache-dir", CACHE_DIR, "--out-dir", out, *ALIGN)
+summ = "%s/planeentropy_summary_%d.csv" % (out, SPECIMEN)
+if os.path.exists(summ):
+    print(pd.read_csv(summ).to_string(index=False))
+p = "%s/planeentropy_summary_%d.png" % (out, SPECIMEN)
+if os.path.exists(p):
+    display(Image(filename=p))
+
+# ====================================================================================================
 # ===== CELL 5
 # ====================================================================================================
 # CELL 5: CAMERA-CHAIN INPUTS
@@ -557,6 +601,7 @@ for s in (0.080, 0.125):
 # - Cell 4e: the `[planediff]` lines and the figures of nodes 2 and 3.
 # - Cells 4e and 4f: the `[planediff]` lines and the figures of nodes 2 and 3 at both line lengths; the
 # JSONs now carry the profiles, so the files themselves are enough.
+# - Cell 4g: the `[planediff]` lines (the thin nodes and the summary line) and the summary figure.
 # - Cell 5: the `"renderer"` block without the tables, `table_sets`, `pillow_version`, `notes`.
 # - Cell 6: the `pooled dendrite diameter` line.
 # - Cell 7: the growth-fit report.
