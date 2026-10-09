@@ -43,7 +43,10 @@ entropy evaluations; a square reaching beyond the pilot's block is fetched as
 such (one new crop per plane). The records of the profile and entropy
 evaluations carry the line's offsets and every plane's profile (v_um,
 profiles). Writes, in --out-dir: planediff_<id>.png and
-planediff_<specimen>.json.
+planediff_<specimen>.json. --hide-line (profile and entropy evaluations)
+draws the planes without the measuring line and the strip's outline, so that
+the focus can be judged by eye (the user's request of 2026-10-09); the frames
+stay, and nothing measured changes.
 
 Example (Colab, after Cells 0 and 1)
     python scripts/plane_differences.py --specimen 529878215 --nodes 2,3 \
@@ -354,10 +357,12 @@ def _pipeline_at(res, k_swc):
 
 def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_half=6, half_um=None, band_um=0.0,
         evaluation="profile", profile_half_um=None, bg_margin_um=4.0, dpi=110, log=print, stripe_half_um=1.0,
-        entropy_bin_gl=1.0, entropy_pick_rule="min"):
+        entropy_bin_gl=1.0, entropy_pick_rule="min", show_line=True):
     """One figure per node id; returns the per-node records (also written to
     planediff_<specimen>.json, or planeentropy_<specimen>.json for the entropy
-    evaluation)."""
+    evaluation). show_line=False: the profile and entropy figures draw the
+    planes without the measuring line and the strip's outline (presentation
+    only; the records do not change)."""
     from allen_diameter.plotting import figures as fg
     import matplotlib.pyplot as plt
     if evaluation not in _PREFIX:
@@ -397,7 +402,8 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
                                                extent=st["extent"], line=ev["line"], frames=frames, lines=lines,
                                                v=ev["v"], prof=ev["prof"], area=ev["area"], area_norm=ev["area_norm"],
                                                background=ev["background"], k_ref=st["k_swc"])],
-                                         "Area under the profile along the measuring line, specimen %s" % specimen)
+                                         "Area under the profile along the measuring line, specimen %s" % specimen,
+                                         show_line=show_line)
             B = ev["background"]
             rec.update(profile_half_um=ev["half_um"], theta_rad=st["theta"], area=[float(x) for x in ev["area"]],
                        area_norm=[float(x) for x in ev["area_norm"]], background=[float(x) for x in B],
@@ -432,7 +438,7 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
                                           dip_strip=d_strip, n_line=n_line, n_strip=n_strip, k_ref=st["k_swc"],
                                           pick_word=word)],
                                     "Entropy of the grey levels along the measuring line and in its strip, specimen %s"
-                                    % specimen)
+                                    % specimen, show_line=show_line)
             rec.update(profile_half_um=ev["half_um"], stripe_half_um=ev["stripe_half_um"],
                        entropy_bin_gl=ev["bin_width"], theta_rad=st["theta"],
                        h_line=[float(x) for x in ev["h_line"]], h_strip=[float(x) for x in ev["h_strip"]],
@@ -506,6 +512,9 @@ def main(argv=None):
     ap.add_argument("--entropy-pick", choices=("min", "dip"), default="min",
                     help="entropy evaluation: the plane framed on each curve -- its global minimum (default), or "
                          "its dip between the two largest maxima")
+    ap.add_argument("--hide-line", action="store_true",
+                    help="profile and entropy evaluations: draw the planes without the measuring line and the "
+                         "strip's outline, to judge the focus by eye (the frames stay; nothing measured changes)")
     ap.add_argument("--bg-margin-um", type=float, default=4.0,
                     help="profile evaluation: B_k uses the block's pixels farther than Allen's radius + this from "
                          "every traced dendrite")
@@ -549,7 +558,7 @@ def main(argv=None):
                dict(shift_full_px=(a.shift_x, a.shift_y), flip_y_full_h=a.flip_h, z0_um=a.z0),
                a.planes_half, a.half_um, a.band_um, a.evaluation, a.profile_half_um, a.bg_margin_um,
                log=lambda m: print(m, flush=True), stripe_half_um=a.stripe_half_um, entropy_bin_gl=a.entropy_bin_gl,
-               entropy_pick_rule=a.entropy_pick)
+               entropy_pick_rule=a.entropy_pick, show_line=not a.hide_line)
     n_ok = sum(1 for r in recs if "png" in r)
     print("[planediff] wrote %d figures (%d skipped) in %s; crops: %d from the cache, %d downloaded (%.1f MB); %.1f min"
           % (n_ok, len(recs) - n_ok, a.out_dir, fetcher.n_cache_hits, fetcher.n_requests,

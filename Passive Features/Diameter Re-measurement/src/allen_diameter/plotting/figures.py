@@ -362,6 +362,13 @@ def plane_difference_figure(blocks, title=""):
 _ARAW, _ANORM = "#2a78d6", "#4a3aa7"     # area under the profile: as measured (blue), background-normalised (violet)
 
 
+def _no_line_note(plt, what):
+    """A text-only legend entry for planes drawn with show_line=False: the
+    square is cut about the SWC node (plane_differences.node_stack), so the
+    node sits at the centre of every panel, to within half a pixel."""
+    return plt.Line2D([], [], color="none", label="planes drawn without %s: the node is at the centre of each" % what)
+
+
 def _plane_colour(dk):
     """Blue below the reference plane, red above, darker nearer; dark at it; light grey beyond 4 planes."""
     blue, red = ("#1c5cab", "#2a78d6", "#5598e7", "#86b6ef"), ("#9e3432", "#c74845", "#dd716a", "#ea9a93")
@@ -372,18 +379,20 @@ def _plane_colour(dk):
     return blue[abs(dk) - 1] if dk < 0 else red[dk - 1]
 
 
-def profile_area_figure(blocks, title=""):
+def profile_area_figure(blocks, title="", show_line=True):
     """The area under the profile along the measuring line, plane by plane
     (focus.profile_areas). Per block (one node): the planes on one grey scale
     with the measuring line drawn and frames; below, the profiles I_k(v)
     coloured by plane (blue below the reference plane, red above), the areas
     A_k as measured and background-normalised on one axis with their minima,
-    and their differences between consecutive planes.
+    and their differences between consecutive planes. show_line=False draws the
+    planes without the line (the frames stay), so that the focus can be judged
+    by eye (the user's request of 2026-10-09).
 
     blocks: list of dicts with
-      label, stack (n, H, W), ks (n,), valid (n,), extent (image_extent_um), line ((x0, y0), (x1, y1)) in um,
-      frames {k: (colour, linestyle, tag)}, lines [(k, colour, linestyle, label)],
-      v (M,), prof (n, M), area (n,), area_norm (n,) or None, background (n,) or None (each plane's
+      label, stack (n, H, W), ks (n,), valid (n,), extent (image_extent_um), line ((x0, y0), (x1, y1)) in um
+      (not read when show_line is False), frames {k: (colour, linestyle, tag)}, lines [(k, colour, linestyle,
+      label)], v (M,), prof (n, M), area (n,), area_norm (n,) or None, background (n,) or None (each plane's
       background level, drawn in a fourth panel), k_ref (the colour reference plane)
     Presentation only. Returns the Figure."""
     import matplotlib
@@ -414,7 +423,8 @@ def profile_area_figure(blocks, title=""):
         y += heights[0]
         shown = stack[valid] if valid.any() else stack
         lo, hi = np.percentile(shown, [1.0, 99.5])
-        (x0, y0), (x1, y1) = b["line"]
+        if show_line:
+            (x0, y0), (x1, y1) = b["line"]
         for j in range(n):
             ax = ax_at(left + j * col, y + heights[1], side, side)
             ax.set_xticks([])
@@ -423,7 +433,8 @@ def profile_area_figure(blocks, title=""):
             if valid[j]:
                 ax.imshow(stack[j], cmap="gray", vmin=lo, vmax=hi, extent=b.get("extent"), origin="upper",
                           interpolation="nearest")
-                ax.plot([x0, x1], [y0, y1], color="black", lw=1.0, path_effects=halo)
+                if show_line:
+                    ax.plot([x0, x1], [y0, y1], color="black", lw=1.0, path_effects=halo)
             else:
                 ax.set_facecolor("0.85")
                 ax.text(0.5, 0.5, "missing", ha="center", va="center", fontsize=8, transform=ax.transAxes)
@@ -497,6 +508,8 @@ def profile_area_figure(blocks, title=""):
                           label="A_k with each plane divided by its own background (x their mean); violet frame: its minimum")]
     handles += [plt.Line2D([], [], color=c, ls=ls, lw=2.0, label="frame and line: " + t)
                 for t, (c, ls) in lines_seen.items() if c not in (_ARAW, _ANORM)]
+    if not show_line:
+        handles.append(_no_line_note(plt, "the measuring line"))
     fig.legend(handles=handles, loc="upper center", ncol=3, fontsize=8, frameon=False, bbox_to_anchor=(0.5, 1.0 - 0.02 / H))
     if title:
         fig.suptitle(title, y=1.0 - 0.80 / H, fontsize=10)
@@ -579,17 +592,21 @@ def entropy_summary_figure(records, title=""):
 _HLINE, _HSTRIP, _EDGE = "#2a78d6", "#eda100", "#1a1a19"
 
 
-def entropy_figure(blocks, title=""):
+def entropy_figure(blocks, title="", show_line=True):
     """Histogram entropies around a node, plane by plane
     (focus.plane_entropies). Per block (one node): the planes on one grey
     scale with the measuring line, the outline of its strip and frames;
     below, the grey-level histograms of the line's samples and of the strip's
     pixels, coloured by plane (blue below the reference plane, red above,
     darker nearer), and the two entropies on one axis with their dips.
+    show_line=False draws the planes without the line and the strip's outline
+    (the frames stay), so that the focus can be judged by eye (the user's
+    request of 2026-10-09); the legend says so.
 
     blocks: list of dicts with
       label, stack (n, H, W), ks (n,), valid (n,), extent (image_extent_um), line ((x0, y0), (x1, y1)) in um,
-      outline (q, 2) the strip's corners in um, closed, frames {k: (colour, linestyle, tag)},
+      outline (q, 2) the strip's corners in um, closed (line and outline not read when show_line is False),
+      frames {k: (colour, linestyle, tag)},
       lines [(k, colour, linestyle, label)], hist_line and hist_strip: per plane (centres, counts) or None,
       h_line (n,), h_strip (n,) in bits, dip_line and dip_strip (the picked plane of each curve: an index into
       ks, or None), pick_word (optional: what the pick is, e.g. "lowest entropy"), n_line and n_strip (the
@@ -623,8 +640,9 @@ def entropy_figure(blocks, title=""):
         y += heights[0]
         shown = stack[valid] if valid.any() else stack
         lo, hi = np.percentile(shown, [1.0, 99.5])
-        (x0, y0), (x1, y1) = b["line"]
-        out = np.asarray(b["outline"], dtype=float)
+        if show_line:
+            (x0, y0), (x1, y1) = b["line"]
+            out = np.asarray(b["outline"], dtype=float)
         for j in range(n):
             ax = ax_at(left + j * col, y + heights[1], side, side)
             ax.set_xticks([])
@@ -633,8 +651,9 @@ def entropy_figure(blocks, title=""):
             if valid[j]:
                 ax.imshow(stack[j], cmap="gray", vmin=lo, vmax=hi, extent=b.get("extent"), origin="upper",
                           interpolation="nearest")
-                ax.plot(out[:, 0], out[:, 1], color=_HSTRIP, lw=1.0, ls="--", path_effects=halo)
-                ax.plot([x0, x1], [y0, y1], color="black", lw=1.0, path_effects=halo)
+                if show_line:
+                    ax.plot(out[:, 0], out[:, 1], color=_HSTRIP, lw=1.0, ls="--", path_effects=halo)
+                    ax.plot([x0, x1], [y0, y1], color="black", lw=1.0, path_effects=halo)
             else:
                 ax.set_facecolor("0.85")
                 ax.text(0.5, 0.5, "missing", ha="center", va="center", fontsize=8, transform=ax.transAxes)
@@ -687,9 +706,12 @@ def entropy_figure(blocks, title=""):
     handles = [plt.Line2D([], [], color=_HLINE, marker="o", lw=1.8,
                           label="H along the measuring line (bilinear samples); blue frame Hl: %s" % pick_word),
                plt.Line2D([], [], color=_HSTRIP, marker="s", mec=_EDGE, ls="--", lw=1.8,
-                          label="H of the strip's pixels (outlined on the planes); amber frame Hs: %s" % pick_word)]
+                          label="H of the strip's pixels%s; amber frame Hs: %s"
+                          % (" (outlined on the planes)" if show_line else "", pick_word))]
     handles += [plt.Line2D([], [], color=c, ls=ls, lw=2.0, label="frame and line: " + t)
                 for t, (c, ls) in lines_seen.items() if c not in (_HLINE, _HSTRIP)]
+    if not show_line:
+        handles.append(_no_line_note(plt, "the measuring line and the strip's outline"))
     fig.legend(handles=handles, loc="upper center", ncol=3, fontsize=8, frameon=False, bbox_to_anchor=(0.5, 1.0 - 0.02 / H))
     if title:
         fig.suptitle(title, y=1.0 - 0.80 / H, fontsize=10)

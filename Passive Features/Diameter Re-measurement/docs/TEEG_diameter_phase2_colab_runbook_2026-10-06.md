@@ -11,6 +11,7 @@
 | 2026-10-08 (evening) | v7. Added Cell 4f: the entropy of the grey-level histogram, plane by plane, of the samples along the measuring line and of the pixels of a strip around it (the user's proposal of 17:07; `scripts/plane_differences.py --evaluation entropy`, SPEC Block 11), with the dip of each curve framed. Evidence: `test_smoke_plane_entropy.py` 8 pass; fifteen mutants of the new code killed; every suite re-run; the cell ran on the synthetic cell with the fixture in place of Allen's server **[run, sandbox]**; not yet run on Allen's data. |
 | 2026-10-08 (evening, 2) | v8. Cells 4e and 4f run over `LINE_HALF_UMS` = [3, 5], the half-length of the measuring line (the user's proposal to enlarge it; the pipeline's line stays +-3 um), each length into its own folder; the square around the node grows with the line and is fetched when it outgrows the pilot's block. Cell 4f picks each curve's global minimum (`--entropy-pick min`): on nodes 2 and 3 (run of 2026-10-08, 17:56 UTC) the curves had no W and the dip rule skipped node 2's lowest plane. The JSONs carry every plane's profile. Evidence: `test_smoke_plane_entropy.py` 8 pass and `test_smoke_plane_diff.py` 7 pass, 1 skip with the new checks; mutants of the new code killed; the cells ran on the synthetic cell **[run, sandbox]**; nodes 2 and 3 at +-3 um ran on Allen's data **[user]**. |
 | 2026-10-09 | v9. Added Cell 4g: the entropy along a +-5 um line on thin dendrites, the user's request after the trunk runs (D-039): `--nodes thin` picks up to 12 pilot nodes (in S, Allen 2r <= 0.6 um, fitted d <= 1.0 um, k* equal to the dip depth's plane, flat; up to 3 per stretch), and the script writes a summary CSV and a summary figure of the picks against k*. Evidence: `test_smoke_plane_entropy.py` 8 pass with the selection worked out by hand on a seven-stretch SWC; the cell ran on the synthetic cell with the fixture in place of Allen's server **[run, sandbox]**; not yet run on Allen's data. |
+| 2026-10-09 (afternoon) | v10. Cell 4g shows each node's figure after the summary, as Cell 4f does, and draws its planes without the measuring line and the strip's outline (`--hide-line`, new in `scripts/plane_differences.py`; the user's request of 14:53, to judge the focus by eye). The records do not change. Evidence: `test_smoke_plane_entropy.py` 8 pass and `test_smoke_plane_diff.py` 7 pass, 1 skip, with the lines on the plane panels counted and the flag followed from the command line to the figure; thirteen mutants of the new code each failed a check; the cell ran on the synthetic cell with the fixture in place of Allen's server **[run, sandbox]**; not yet run on Allen's data. |
 
 This runbook covers the real-data steps, in order. Each cell names the line that must **appear** in its output. A missing line means the cell did not get as far as the code that prints it. Each step lists the decisions it feeds; those stay yours. Nothing in these scripts changes the configuration on its own.
 
@@ -244,10 +245,11 @@ Expect, for each $h$, one `[planediff] node N: planes ... (0 missing); lowest en
 
 What to expect (synthetic tubes, SPEC Block 11): the entropy is lowest in focus, where most of the neighbourhood sits at the ground level and the tube covers few pixels; it rises on both sides as the blur spreads the tube's darkness over more pixels and more grey levels, and falls again far out as a thin tube fades into the noise. With a $\pm 3$ um line that last fall can put the strip's lowest entropy on an end plane (0.5 um tube, 7 of 8 noise draws); with $\pm 4$ or $\pm 5$ um the global minima of both curves fall within one plane of the centre in 8 of 8 draws for the 0.5 um tube, and for the 1.5 um tube in 8 of 8 (strip) and 7 or 8 of 8 (line). For a faint 5 um tube both curves stay flat at every length, as every other score does. A whole plane brighter or darker by whole grey levels keeps its entropy (the area of Cell 4e moves with it). With the earlier dip rule and a $\pm 3$ um line (the default until 2026-10-08, evening), the strip's pick fell within one plane of the centre in 8 of 8 noise draws for the 0.5 um and the 1.5 um tube, and the line's in 7 and 8 of 8. The line's 53 samples give a lower and noisier entropy than the strip's pixels: on flat ground with 3 grey levels of noise, 0.25 bits low with a spread of 0.13 bits, against 0.02 and 0.03.
 
-### Cell 4g: the entropy on thin dendrites, line +-5 um [added 2026-10-09]
+### Cell 4g: the entropy on thin dendrites, line +-5 um [added 2026-10-09; updated 2026-10-09, afternoon]
 
 ```python
 # Cell 4g: the entropy on thin dendrites, line +-5 um (needs Cells 0 and 1 and the pilot's CSV of Cell 4b)
+import json
 import os
 import pandas as pd
 from IPython.display import Image, display
@@ -257,7 +259,7 @@ run("scripts/plane_differences.py", "--specimen", SPECIMEN, "--nodes", "thin",
     "--pilot-csv", "%s/pilot/pilot_%d.csv" % (OUT, SPECIMEN), "--max-nodes", THIN["max_nodes"],
     "--per-stretch", THIN["per_stretch"], "--thin-max-2r-um", THIN["max_2r_um"],
     "--thin-max-dhat-um", THIN["max_dhat_um"], "--evaluation", "entropy", "--planes-half", 6,
-    "--profile-half-um", 5, "--stripe-half-um", 1.0, "--entropy-pick", "min",
+    "--profile-half-um", 5, "--stripe-half-um", 1.0, "--entropy-pick", "min", "--hide-line",
     "--cache-dir", CACHE_DIR, "--out-dir", out, *ALIGN)
 summ = "%s/planeentropy_summary_%d.csv" % (out, SPECIMEN)
 if os.path.exists(summ):
@@ -265,11 +267,20 @@ if os.path.exists(summ):
 p = "%s/planeentropy_summary_%d.png" % (out, SPECIMEN)
 if os.path.exists(p):
     display(Image(filename=p))
+recs = "%s/planeentropy_%d.json" % (out, SPECIMEN)
+if os.path.exists(recs):
+    with open(recs) as f:
+        nodes = [r["node_id"] for r in json.load(f) if "skipped" not in r]
+    for n in nodes:       # each node's figure, as in Cell 4f; its planes drawn without the line (--hide-line)
+        p = "%s/planeentropy_%d.png" % (out, n)
+        if os.path.exists(p):
+            print(os.path.basename(p))
+            display(Image(filename=p))
 ```
 
 The test asked for on 2026-10-09 (14:30): the entropy along a $\pm 5$ um line, which picked planes 114 and 115 on the trunk nodes 2 and 3 where $k^*$ picked 123, is run on thin dendrites, where the gradient energy is thought to work. The nodes come from the pilot's table (`--nodes thin`): in S, Allen's $2r \le 0.6$ um, a fitted $d \le 1.0$ um, $k^*$ equal to the dip depth's plane (the pipeline's two focus rules agree, so $k^*$ is a credible reference), not steep; up to 3 per unbranched stretch, spread along it, and 12 in all, spread over the stretches. The thresholds are the assistant's provisional choice; `THIN` sets them.
 
-Output in `pilot/planeentropy/thin_line_5um/`: one figure per node, as in Cell 4f; `planeentropy_summary_529878215.png`, one panel per node with both entropy curves rescaled 0-1 against $k - k_{\rm SWC}$, $k^*$, the dip depth's plane, the SWC plane and the two picks; and `planeentropy_summary_529878215.csv`, per node the type, Allen's $2r$, the fitted $d$, the planes and each pick minus $k^*$, printed by the cell.
+Output in `pilot/planeentropy/thin_line_5um/`: one figure per node, as in Cell 4f; `planeentropy_summary_529878215.png`, one panel per node with both entropy curves rescaled 0-1 against $k - k_{\rm SWC}$, $k^*$, the dip depth's plane, the SWC plane and the two picks; and `planeentropy_summary_529878215.csv`, per node the type, Allen's $2r$, the fitted $d$, the planes and each pick minus $k^*$, printed by the cell. [added 2026-10-09, afternoon: the user's request] The cell then shows each node's figure, in the summary's order, with the planes drawn without the measuring line and the strip's outline (`--hide-line`), so that the focus can be judged by eye; the node is at the centre of every panel and the line runs across the dendrite through it. Cells 4e and 4f still draw the line; `--hide-line` works there too.
 
 Expect `[planediff] thin nodes (...): <ids>`, one `[planediff] node N: ...` line per node, then `[planediff] summary over N nodes: k_h_line within 1 plane of k* in a of N (median |diff| ... planes); k_h_strip within 1 plane of k* in b of N (...)` and `[planediff] wrote N figures (0 skipped) ...`; about 13 new crops per node (the $\pm 5$ um square).
 

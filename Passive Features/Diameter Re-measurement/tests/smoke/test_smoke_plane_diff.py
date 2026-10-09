@@ -60,7 +60,12 @@ Checks
                         the record carries the 53-sample profiles; with a
                         +-5 um line the square outgrows the block and is
                         fetched, and every valid plane keeps a finite area
-                        over 89 samples
+                        over 89 samples; --hide-line (2026-10-09): on a
+                        hand-built three-plane block the plane panels carry
+                        the line by default and none with show_line=False,
+                        the images and the frame kept, the legend saying so;
+                        run() hands show_line to the figure and its record is
+                        the same either way
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -97,6 +102,45 @@ from allen_diameter.analysis import focus as FO  # noqa: E402
 
 SEED = 20261008
 REPORT_PACKAGES = ("numpy", "scipy", "matplotlib")
+
+
+def _check_hide_line_profile(PD, swc, prov, ccfg, tmp):
+    """--hide-line for the area figure (the user's request of 2026-10-09): no line on the planes, the frames
+    and images kept, the legend saying so; run() passes show_line on; the record does not change."""
+    import matplotlib.pyplot as plt
+    from allen_diameter.plotting import figures as FG
+    st = np.arange(3 * 8 * 8, dtype=float).reshape(3, 8, 8)
+    hand = dict(label="hand block", stack=st, ks=np.array([0, 1, 2]), valid=np.array([True, False, True]),
+                extent=(-0.5, 7.5, 7.5, -0.5), frames={0: ("#2a78d6", "-", "minA")}, lines=[(0, "#ff1744", "-", "k*")],
+                v=np.linspace(-1.0, 1.0, 5), prof=np.ones((3, 5)), area=[2.0, float("nan"), 2.0], area_norm=None,
+                background=None, k_ref=1)
+    note = "planes drawn without the measuring line: the node is at the centre of each"
+    panels = lambda f: [ax for ax in f.axes if ax.get_title().startswith("k ")]  # noqa: E731
+    texts = lambda f: [t.get_text() for lg in f.legends for t in lg.get_texts()]  # noqa: E731
+    fig = FG.profile_area_figure([dict(hand, line=((1.0, 4.0), (7.0, 4.0)))], "shown")
+    assert [len(ax.get_lines()) for ax in panels(fig)] == [1, 0, 1] and note not in texts(fig)
+    plt.close(fig)
+    fig = FG.profile_area_figure([hand], "hidden", show_line=False)      # no line given: not needed
+    pa = panels(fig)
+    assert [len(ax.get_lines()) for ax in pa] == [0, 0, 0] and [len(ax.images) for ax in pa] == [1, 0, 1], \
+        [len(ax.get_lines()) for ax in pa]
+    assert len(pa[0].patches) == 1 and note in texts(fig), texts(fig)
+    plt.close(fig)
+    orig, seen = FG.profile_area_figure, []
+
+    def spy(blocks, title="", **kw):
+        seen.append(kw.get("show_line", True))
+        return orig(blocks, title, **kw)
+    FG.profile_area_figure = spy
+    try:
+        a = PD.run(swc, prov, ccfg, [4], os.path.join(tmp, "p_shown"), "999", planes_half=2, log=lambda m: None)[0]
+        b = PD.run(swc, prov, ccfg, [4], os.path.join(tmp, "p_hidden"), "999", planes_half=2, show_line=False,
+                   log=lambda m: None)[0]
+    finally:
+        FG.profile_area_figure = orig
+    assert seen == [True, False], seen
+    same = lambda r: json.dumps({k: v for k, v in r.items() if k != "png"}, sort_keys=True)  # noqa: E731
+    assert same(a) == same(b) and os.path.exists(b["png"]), "hiding the line changed the record"
 
 
 def _hand_stack():
@@ -305,6 +349,7 @@ def test_edge_cases():
         assert ps["k_min_area"] == 2, ("the darker plane should hold the smallest raw area", ps["area"])
         ratio = np.array(ps["area_norm"], dtype=float)[1:-1] / An[1:-1]
         assert np.allclose(ratio, ratio[0], rtol=1e-9), ratio
+        _check_hide_line_profile(PD, swc, prov, ccfg, tmp)
 
 
 # ---------------------------------------------------------------- runner ---

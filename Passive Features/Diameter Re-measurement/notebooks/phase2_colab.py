@@ -366,7 +366,11 @@ for h in LINE_HALF_UMS:
 # Output in `pilot/planeentropy/thin_line_5um/`: one figure per node, as in Cell 4f;
 # `planeentropy_summary_529878215.png`, one panel per node with both entropy curves rescaled 0-1 against k -
 # k_SWC, k*, the dip depth's plane, the SWC plane and the two picks; and `planeentropy_summary_529878215.csv`,
-# per node the type, Allen's 2r, the fitted d, the planes and each pick minus k*, printed by the cell.
+# per node the type, Allen's 2r, the fitted d, the planes and each pick minus k*, printed by the cell. [added
+# 2026-10-09, afternoon: the user's request] The cell then shows each node's figure, in the summary's order,
+# with the planes drawn without the measuring line and the strip's outline (`--hide-line`), so that the focus
+# can be judged by eye; the node is at the centre of every panel and the line runs across the dendrite through
+# it. Cells 4e and 4f still draw the line; `--hide-line` works there too.
 #
 # Expect `[planediff] thin nodes (...): <ids>`, one `[planediff] node N: ...` line per node, then `[planediff]
 # summary over N nodes: k_h_line within 1 plane of k* in a of N (median |diff| ... planes); k_h_strip within 1
@@ -378,6 +382,7 @@ for h in LINE_HALF_UMS:
 # the entropy works on both kinds of node; where it does not, the panels show how it parts from k* (a
 # neighbouring neurite inside the line or the strip is the first thing to look for).
 # Cell 4g: the entropy on thin dendrites, line +-5 um (needs Cells 0 and 1 and the pilot's CSV of Cell 4b)
+import json
 import os
 import pandas as pd
 from IPython.display import Image, display
@@ -387,7 +392,7 @@ run("scripts/plane_differences.py", "--specimen", SPECIMEN, "--nodes", "thin",
     "--pilot-csv", "%s/pilot/pilot_%d.csv" % (OUT, SPECIMEN), "--max-nodes", THIN["max_nodes"],
     "--per-stretch", THIN["per_stretch"], "--thin-max-2r-um", THIN["max_2r_um"],
     "--thin-max-dhat-um", THIN["max_dhat_um"], "--evaluation", "entropy", "--planes-half", 6,
-    "--profile-half-um", 5, "--stripe-half-um", 1.0, "--entropy-pick", "min",
+    "--profile-half-um", 5, "--stripe-half-um", 1.0, "--entropy-pick", "min", "--hide-line",
     "--cache-dir", CACHE_DIR, "--out-dir", out, *ALIGN)
 summ = "%s/planeentropy_summary_%d.csv" % (out, SPECIMEN)
 if os.path.exists(summ):
@@ -395,6 +400,15 @@ if os.path.exists(summ):
 p = "%s/planeentropy_summary_%d.png" % (out, SPECIMEN)
 if os.path.exists(p):
     display(Image(filename=p))
+recs = "%s/planeentropy_%d.json" % (out, SPECIMEN)
+if os.path.exists(recs):
+    with open(recs) as f:
+        nodes = [r["node_id"] for r in json.load(f) if "skipped" not in r]
+    for n in nodes:       # each node's figure, as in Cell 4f; its planes drawn without the line (--hide-line)
+        p = "%s/planeentropy_%d.png" % (out, n)
+        if os.path.exists(p):
+            print(os.path.basename(p))
+            display(Image(filename=p))
 
 # ====================================================================================================
 # ===== CELL 5
@@ -602,6 +616,7 @@ for s in (0.080, 0.125):
 # - Cells 4e and 4f: the `[planediff]` lines and the figures of nodes 2 and 3 at both line lengths; the
 # JSONs now carry the profiles, so the files themselves are enough.
 # - Cell 4g: the `[planediff]` lines (the thin nodes and the summary line) and the summary figure.
+# - Cell 4g (2026-10-09, afternoon): the figures of the nodes where a pick lies more than one plane from k*.
 # - Cell 5: the `"renderer"` block without the tables, `table_sets`, `pillow_version`, `notes`.
 # - Cell 6: the `pooled dendrite diameter` line.
 # - Cell 7: the growth-fit report.

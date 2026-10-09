@@ -66,7 +66,14 @@ Checks
                         the camera leaves every entropy unchanged (exactly);
                         made 2 % darker it moves the strip's entropy by less
                         than 0.05 bits; a strip of half-width 0.5 um holds
-                        fewer pixels
+                        fewer pixels; --hide-line (2026-10-09): on a hand-built
+                        three-plane block the plane panels carry the line and
+                        the outline (2 lines each, none on the missing plane)
+                        by default and no line with show_line=False, the
+                        images and the frame kept, the legend saying which;
+                        run() hands show_line to the figure and its record is
+                        the same either way; the CLI flag reaches run() (the
+                        server stubbed)
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -170,6 +177,83 @@ def _check_pick_summary(PD):
     assert [r["k_h_strip_minus_k_star"] for r in rows] == [-2, None, 0]
     assert agree["k_h_line"] == dict(n=3, within_1=2, median_abs=1.0), agree
     assert agree["k_h_strip"] == dict(n=2, within_1=1, median_abs=1.0), agree
+
+
+def _plane_axes(fig):
+    """The plane panels of an entropy or area figure (their titles start with 'k ')."""
+    return [ax for ax in fig.axes if ax.get_title().startswith("k ")]
+
+
+def _legend_texts(fig):
+    return [t.get_text() for lg in fig.legends for t in lg.get_texts()]
+
+
+def _check_hide_line(PD, swc, prov, ccfg, swc_path, tmp):
+    """--hide-line (the user's request of 2026-10-09): the planes without the measuring line and the strip's
+    outline, the frames kept, the legend saying so; run() and the CLI pass it on; the records do not change."""
+    import contextlib
+    import io
+    import matplotlib.pyplot as plt
+    from allen_diameter.plotting import figures as FG
+    st = np.arange(3 * 8 * 8, dtype=float).reshape(3, 8, 8)
+    hand = dict(label="hand block", stack=st, ks=np.array([0, 1, 2]), valid=np.array([True, False, True]),
+                extent=(-0.5, 7.5, 7.5, -0.5), frames={0: ("#2a78d6", "-", "Hl")}, lines=[(0, "#ff1744", "-", "k*")],
+                hist_line=None, hist_strip=None, h_line=[1.0, float("nan"), 2.0], h_strip=[2.0, float("nan"), 1.0],
+                dip_line=0, dip_strip=2, n_line=5, n_strip=9, k_ref=1, pick_word="lowest entropy")
+    shown = dict(hand, line=((1.0, 4.0), (7.0, 4.0)), outline=np.array([[1, 3], [7, 3], [7, 5], [1, 5], [1, 3]], float))
+    fig = FG.entropy_figure([shown], "shown")
+    pa = _plane_axes(fig)
+    assert [len(ax.get_lines()) for ax in pa] == [2, 0, 2] and [len(ax.images) for ax in pa] == [1, 0, 1], \
+        [len(ax.get_lines()) for ax in pa]
+    tx = _legend_texts(fig)
+    assert any("(outlined on the planes)" in t for t in tx) and not any(t.startswith("planes drawn without") for t in tx)
+    plt.close(fig)
+    fig = FG.entropy_figure([hand], "hidden", show_line=False)     # no line or outline given: not needed
+    pa = _plane_axes(fig)
+    assert [len(ax.get_lines()) for ax in pa] == [0, 0, 0] and [len(ax.images) for ax in pa] == [1, 0, 1], \
+        [len(ax.get_lines()) for ax in pa]
+    assert len(pa[0].patches) == 1, "the frame of the picked plane stays"
+    tx = _legend_texts(fig)
+    assert "planes drawn without the measuring line and the strip's outline: the node is at the centre of each" in tx, tx
+    assert not any("(outlined on the planes)" in t for t in tx), tx
+    plt.close(fig)
+    # run() passes it to the figure, and the record is the same either way
+    orig, seen = FG.entropy_figure, []
+
+    def spy(blocks, title="", **kw):
+        seen.append(kw.get("show_line", True))
+        return orig(blocks, title, **kw)
+    FG.entropy_figure = spy
+    try:
+        a = PD.run(swc, prov, ccfg, [4], os.path.join(tmp, "line_shown"), "999", planes_half=2, evaluation="entropy",
+                   profile_half_um=5.0, log=lambda m: None)[0]
+        b = PD.run(swc, prov, ccfg, [4], os.path.join(tmp, "line_hidden"), "999", planes_half=2, evaluation="entropy",
+                   profile_half_um=5.0, show_line=False, log=lambda m: None)[0]
+    finally:
+        FG.entropy_figure = orig
+    assert seen == [True, False], seen
+    same = lambda r: json.dumps({k: v for k, v in r.items() if k != "png"}, sort_keys=True)  # noqa: E731
+    assert same(a) == same(b) and os.path.exists(b["png"]), "hiding the line changed the record"
+    # the CLI: --hide-line reaches run() as show_line=False (Allen's server stubbed, run() replaced by a spy)
+    import allen_image_io as aio
+    import run_cell
+
+    class _Fetcher:
+        def __init__(self, cache_dir="", verbose=True):
+            self.n_cache_hits, self.n_requests, self.bytes_downloaded = 0, 0, 0
+    saved = (aio.HttpFetcher, aio.list_images, aio.plane_table, run_cell.real_provider, PD.run)
+    calls = []
+    try:
+        aio.HttpFetcher, aio.list_images, aio.plane_table = _Fetcher, (lambda specimen: None), (lambda images: None)
+        run_cell.real_provider = lambda *x, **k: None
+        PD.run = lambda *x, **k: calls.append(k.get("show_line")) or []
+        args = ["--specimen", "999", "--nodes", "4", "--out-dir", os.path.join(tmp, "cli"), "--swc", swc_path,
+                "--evaluation", "entropy"]
+        with contextlib.redirect_stdout(io.StringIO()):
+            assert PD.main(args) == 0 and PD.main(args + ["--hide-line"]) == 0
+    finally:
+        aio.HttpFetcher, aio.list_images, aio.plane_table, run_cell.real_provider, PD.run = saved
+    assert calls == [True, False], calls
 
 
 def test_known_answer():
@@ -373,7 +457,7 @@ def test_edge_cases():
     base = default_config()
     ccfg = dataclasses.replace(base, measure=dataclasses.replace(base.measure, block_half_um=3.5))
     with tempfile.TemporaryDirectory() as tmp:
-        swc, fetcher, planes, _ = synthetic_cell(tmp, ccfg, d_true=0.8, mu=1.0)
+        swc, fetcher, planes, swc_path = synthetic_cell(tmp, ccfg, d_true=0.8, mu=1.0)
         prov = run_cell.real_provider(fetcher, planes, ccfg.acquisition.res0_um)
         out = os.path.join(tmp, "ent")
         rec, skip = PD.run(swc, prov, ccfg, [4, 1], out, "999", planes_half=8, evaluation="entropy", log=lambda m: None)
@@ -442,6 +526,7 @@ def test_edge_cases():
         from allen_diameter.plotting import figures as FG
         fig = FG.entropy_summary_figure(recs3 + recs3[:2], "five panels")
         assert sum(1 for ax in fig.axes if ax.axison) == 5 and len(fig.axes) == 8, len(fig.axes)
+        _check_hide_line(PD, swc, prov, ccfg, swc_path, tmp)
 
 
 # ---------------------------------------------------------------- runner ---
