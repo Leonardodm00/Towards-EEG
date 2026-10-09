@@ -6,6 +6,7 @@
 | 2026-10-08 | v1.1, by the new theory chat (session `session_017oQJ14njZ9i5nSBhHUDoMh`), after its first answer (the weak-object approximation). Open work 2 gains a dated note: the literature search widened (one full-text source), the exact $S=1$ difference between the incoherent form and the true image, and a correction of what the fringe check tests. "Next free IDs" marked [corrected 2026-10-08]. Evidence: the project log read 2026-10-08 (`project_read`, D-019 to D-037, I-002); Zuo et al. 2017, PubMed full text (PMC5550517); derivation in the chat **[reasoning, not run]**. |
 | 2026-10-08 (later) | v1.2, by the previous theory chat's session (`session_01VvzYj2wa7J3oP8EEw71KEg`), answering the user on coherent vs incoherent illumination. Open work 2 gains a dated note with the numbers of the new `checks/coherence_check.py`: the $S=1$ image is never brighter than $B\,(T*h_0)$ (the sign derived in v1.1, confirmed numerically) and the in-focus size of the difference for $d$ = 0.5 and 1 µm at $\mu d$ = 0.1, 1, 3. Evidence: the script and its reference output, run 2026-10-08 **[run]**. |
 | 2026-10-09 | v1.3, by the theory chat of `session_017oQJ14njZ9i5nSBhHUDoMh`, after the user asked what the ray world is used for. Open work 1 gains a dated note: the three conditions of a like-for-like comparison, which the branch cannot meet yet (no cone kernel), the size of the blur confound without them, and the evidential strength of "no $\mu_{\rm ph}$ reaches $\hat\mu$". "Next free IDs" marked [corrected 2026-10-09]. Evidence: `checks/optics_points_check.py` and `.out` read; the new `checks/kernel_confound_check.py` (+ `.out`) **[run]**; `sci/diameter-pipeline` at `3084991` read (`model/ray_world.py`, `config.py`, `scripts/end_to_end.py`, `specs/SPEC.md` Block 9 and open questions) **[src]**; the project log read 2026-10-09 (D-038 added by the implementation chat). |
+| 2026-10-09 (later) | v1.4, same chat, after the user asked whether the ray world could build the table for thick or heavily stained dendrites. One sentence added to the Open work 1 note: what leaving out diffraction costs a ray-world table for thick flat tubes. Evidence: `checks/kernel_confound_check.py` extended to $d$ = 2, 3 µm **[run]**. |
 
 Paths are relative to `Passive Features/Diameter Re-measurement/` in the repo
 `Leonardodm00/Towards-EEG` (canonical URL
@@ -133,6 +134,20 @@ In the order the theory chat would take it; the user decides.
    empirical kernel, not the ray world, as the alternative generator, and
    keeps the ray world for absorption checks (open questions, raised
    2026-10-06).
+   **[2026-10-09, later]** Could the ray world itself build the table for
+   thick or dark nodes? Its missing diffraction costs less as $d$ grows but
+   not as the stain darkens: the gap above is −0.058 / −0.048 at $d=2$ µm and
+   −0.050 / −0.040 at $d=3$ µm ($\mu d$ = 0.5 / 3; flat, in focus,
+   ideal-Debye kernel as the stand-in for the real blur) **[run]**. A
+   ray-world table would then return thick faint nodes about 4-5 % too small
+   ($\hat b$ 1.126 / 1.183 at 2 µm, 1.127 / 1.177 at 3 µm), against a whole
+   correction of about 13 %. It would also bypass the kernel calibration
+   (D-026, D-027), since the ray world has no kernel. A round tube's edges
+   lie at its axis depth, where the chord, and so the stain along it, goes to
+   zero. They are drawn by the near-focus blur, which is diffraction, while
+   the bookkeeping error needs dark paths and sits in the interior. This
+   supports the hybrid above (history along the rays, measured kernel), not
+   the ray world as it is **[reasoning]**.
 2. **Coherence (weak-object approximation), effect 3 of the study notes.**
    Unmeasured. Data check: bright fringes beside dark branches in real
    profiles. No bright-field source found (PubMed, 5 queries, 2026-10-07);
