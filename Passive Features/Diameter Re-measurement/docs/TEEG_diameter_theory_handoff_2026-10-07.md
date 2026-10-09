@@ -8,13 +8,15 @@
 | 2026-10-09 | v1.3, by the theory chat of `session_017oQJ14njZ9i5nSBhHUDoMh`, after the user asked what the ray world is used for. Open work 1 gains a dated note: the three conditions of a like-for-like comparison, which the branch cannot meet yet (no cone kernel), the size of the blur confound without them, and the evidential strength of "no $\mu_{\rm ph}$ reaches $\hat\mu$". "Next free IDs" marked [corrected 2026-10-09]. Evidence: `checks/optics_points_check.py` and `.out` read; the new `checks/kernel_confound_check.py` (+ `.out`) **[run]**; `sci/diameter-pipeline` at `3084991` read (`model/ray_world.py`, `config.py`, `scripts/end_to_end.py`, `specs/SPEC.md` Block 9 and open questions) **[src]**; the project log read 2026-10-09 (D-038 added by the implementation chat). |
 | 2026-10-09 (later) | v1.4, same chat, after the user asked whether the ray world could build the table for thick or heavily stained dendrites. One sentence added to the Open work 1 note: what leaving out diffraction costs a ray-world table for thick flat tubes. Evidence: `checks/kernel_confound_check.py` extended to $d$ = 2, 3 µm **[run]**. |
 | 2026-10-09 (later, 2) | v1.5, same chat. The user proposed the hybrid explicitly: ray-world absorption (NA 1.4, $n_{\rm oil}$ 1.515), each image plane rendered with the kernel. A dated note under Open work 1 records how far it goes, and qualifies the v1.4 sentence "supports the hybrid". Evidence: new `checks/hybrid_absorption_check.py` (+ `.out`) **[run]**. |
+| 2026-10-09 (later, 3) | v1.6, same chat, after writing the renderers document at the user's request. "Study material" lists it. Two statements of the v1.5 note are marked [corrected 2026-10-09]: the production kernel is narrower than the cone beyond about 0.1 µm of defocus, not "near focus"; and the hybrid books each direction's light where that direction enters the tube, so its near-opaque factor is like (S9)'s but not (S9)'s, and its leak moves light without losing it. "Next free IDs" and the implementation handoff's version are marked [corrected 2026-10-09]. Evidence: `docs/TEEG_diameter_renderers_partition_ray_world_hybrid_2026-10-09.md` §3.6, §3.8–3.9, independently reviewed; `checks/hybrid_absorption_check.py` extended and re-run (+ `.out`) **[run]**; the project log read 2026-10-09 (D-039, D-040 added by the diameter chat). |
 
 Paths are relative to `Passive Features/Diameter Re-measurement/` in the repo
 `Leonardodm00/Towards-EEG` (canonical URL
 `https://github.com/Leonardodm00/Towards-EEG.git`; the lowercase URL
 redirects). "The log" = the project-knowledge file
 `TEEG_decisions_and_ideas_log.md` (root). "Implementation handoff" =
-`docs/TEEG_diameter_implementation_handoff_2026-10-06.md` (v1.6).
+`docs/TEEG_diameter_implementation_handoff_2026-10-06.md` (v1.6). **[corrected
+2026-10-09]** v1.7 since 2026-10-09.
 
 ## Start prompt for the new chat
 
@@ -76,6 +78,10 @@ and D-037 plane-to-plane diagnostics). Next free IDs: D-038, I-003.
 **[corrected 2026-10-09]** D-038 (the measuring line enlarged beyond
 ±3 µm, to ±4 or ±5 µm) was logged by the implementation chat on 2026-10-08.
 Next free IDs: D-039, I-003.
+**[corrected 2026-10-09, later]** D-039 (14:30, the entropy at ±5 µm carried
+forward and tested on thin dendrites) and D-040 (16:19, the gradient energy on
+three line lengths and its blend with the strip entropy) were logged by the
+diameter chat on 2026-10-09. Next free IDs: D-041, I-003.
 
 ## Findings the theory rests on
 
@@ -175,9 +181,24 @@ In the order the theory chat would take it; the user decides.
 
    Booking light per point and then spreading it without the ray's direction
    is the partition's own structure, and near the opaque limit it gives the
-   skin-crossing factor of (S9) **[reasoning]**. Keeping each ray's history
+   skin-crossing factor of (S9) **[reasoning]**. **[corrected 2026-10-09,
+   later 3]** It gives a factor like (S9)'s, not (S9)'s: the hybrid books each
+   direction's light where that direction enters the tube (10.3 % of it above
+   the axis depth at $\mu d=50$), not at the lower skin, and its total booking
+   equals the ray world's total shadow (1.240 against 1.238 µm per unit length
+   at $\mu d=50$, equal within the grid error), so the centre's leak is light
+   moved, not lost
+   (renderers document §3.9; `checks/hybrid_absorption_check.out`) **[run]**.
+   Keeping each ray's history
    together with its own landing point is what makes the ray world black. A
    kernel narrower than the cone near focus cannot keep that pairing.
+   **[corrected 2026-10-09, later 3]** The production kernel is narrower than
+   the cone beyond about 0.1 µm of defocus (0.093 µm under $W^*$, 0.107 µm
+   under $W$) and wider within it. Since variances add under convolution, a
+   kernel narrower than the cone cannot be the cone plus a per-ray blur, so
+   the direction average is forced for every slice farther than about 0.1 µm
+   from the plane; within 0.1 µm the variance argument does not decide
+   (renderers document §3.8, Eq. 15) **[reasoning; arithmetic]**.
 
    So the hybrid fixes the dark range up to about $\mu d$ = 3 and not
    near-opaque nodes. The real $\hat\mu_i$ / $\hat\alpha_i$ distribution
@@ -246,6 +267,14 @@ asked to study: the explanation of D-030 and of what happens near
 $\alpha\approx1$ (17:02), and the answers to questions 1-5 of 18:01 (D-031,
 D-032, $\hat\tau$ as uncertainty, the weak-object approximation, ray world vs
 partition with the figure).
+
+**[added 2026-10-09, v1.6]**
+`docs/TEEG_diameter_renderers_partition_ray_world_hybrid_2026-10-09.md`, written
+at the user's request and independently reviewed: how the partition and the ray
+world differ (one formula, two substitutions), what each gets right and wrong
+for thick and dark dendrites, why a comparison must share the blur, and the
+user's hybrid (its formula, why it must average over directions, how well it
+does, and what is untested).
 
 ## Admin notes
 
