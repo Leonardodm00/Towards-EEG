@@ -782,13 +782,13 @@ def _style_axes(axes):
             ax.spines[s].set_visible(False)
 
 
-def _bare_layout(plt, blocks):
+def _bare_layout(plt, blocks, top_band=1.25):
     side, gap, left, right = 0.95, 0.08, 0.75, 0.25
     col = side + gap
     n_max = max(len(b["ks"]) for b in blocks)
     W = max(left + n_max * col - gap + right, 13.0)
     heights = (0.62, 0.34, side, 0.62, 2.3, 0.62)            # the label row holds two lines (_block_label)
-    top_band = 1.25
+    top_band = float(top_band)                                # the legend's rows and the suptitle (0.45 in above)
     H = top_band + len(blocks) * sum(heights)
     fig = plt.figure(figsize=(W, H))
 
@@ -980,7 +980,162 @@ def blend_figure(blocks, title=""):
     return fig
 
 
-def picks_summary_figure(records, series, title="", weight_key=None):
+# ---- the Allen-guided iteration of the gradient energy (D-042) ----
+# colours (dataviz validator, light surface): round 1, on the line sized from Allen's 2r, yellow; the later rounds a
+# blue ordinal ramp, darker = later (--ordinal: monotone lightness, one hue, light end 2.50:1 on white); the line
+# sized from the pilot's d_hat aqua (Cell 4h's Gd); the last plane's frame blue. Every cross pair of the ramp with
+# yellow, aqua, the red of k* and the grey of the dip passes (normal vision >= 16.3, CVD >= 15.0); yellow-red and
+# yellow-aqua pass as well, red-aqua stays at deutan 7.5 (D-040), so every series keeps its own marker, line style
+# and frame tag. Yellow, aqua and the lightest blue (below 3:1 on white) carry a dark marker edge.
+_ITER_ALLEN = "#eda100"
+_ITER_RAMP = ("#6da7ec", "#2a78d6", "#1c5cab", "#0d366b")
+_ITER_MARKERS = ("o", "s", "D", "^", "v")
+_ITER_LAST = "#2a78d6"
+_ITER_LIGHT = ("#eda100", "#1baf7a", "#6da7ec")
+
+
+def iteration_style(i):
+    """(colour, curve style) of round i >= 1 of the Allen-guided iteration
+    (D-042): round 1 yellow, dashed, circles; round i >= 2 the blue ramp's
+    step i - 2 (its darkest from round 5 on), solid, a marker of its own."""
+    i = int(i)
+    if i <= 1:
+        return _ITER_ALLEN, "o--"
+    return _ITER_RAMP[min(i - 2, len(_ITER_RAMP) - 1)], _ITER_MARKERS[min(i - 1, len(_ITER_MARKERS) - 1)] + "-"
+
+
+def _iter_edge(colour):
+    return "#1a1a19" if colour in _ITER_LIGHT else colour
+
+
+def iteration_figure(blocks, title=""):
+    """The Allen-guided iteration of the gradient energy (D-042). Per block
+    (one node): the planes on one grey scale, without any line, framed at the
+    iteration's last plane, round 1's plane, the pick of the line sized from
+    the pilot's d_hat and the pipeline's planes; below, every plane's profile
+    along the longest line used, with round 1's, the last round's and the
+    pilot d-line's extents dashed; each round's G relative to its own maximum,
+    with its pick (and the pilot d-line's G, aqua); and the trajectory: the
+    diameter sizing each round's line -- Allen's 2r, then the fit at the plane
+    each round picked, labelled with that plane (hollow: a plane picked again,
+    its fit reused) -- against the pilot's d_hat (the fit at k*, red dashed).
+
+    blocks: list of dicts with
+      label, stack, ks, valid, extent, frames, lines (as gradient_lines_figure), v (M,), prof (n, M) along the
+      longest line, rounds [dict(round, half_um, G (n,), pick: an index into ks or None)] (the rounds that
+      evaluated G), gd (dict(half_um, G, pick) or None), d_start_um, fits [(round, k, d_hat_um, refit)] (the
+      rounds that picked a plane), status, n_rounds, d_pilot_um, k_star, k_ref
+    Presentation only. Returns the Figure."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    n_rounds_max = max([x["round"] for b in blocks for x in b["rounds"]] + [1])
+    n_entries = n_rounds_max + 1 + 1 + 1 + 3 + 1          # rounds, Gd, frame it, trajectory, pipeline, note
+    rows = int(math.ceil(n_entries / 3.0))
+    fig, ax_at, L = _bare_layout(plt, blocks, top_band=1.25 + 0.17 * max(0, rows - 3))
+    y = L["top_band"]
+    mine = {_ITER_ALLEN, _ITER_LAST, _GD}
+    for b in blocks:
+        ks = np.asarray(b["ks"])
+        valid = np.asarray(b["valid"], dtype=bool)
+        _block_label(fig, L, y, b["label"])
+        y += L["heights"][0]
+        _planes_row(plt, ax_at, b, y + L["heights"][1], L["left"], L["col"], L["side"])
+        y += L["heights"][1] + L["heights"][2] + L["heights"][3]
+        w3 = (L["W"] - L["left"] - L["right"] - 2 * 0.7) / 3.0
+        a1 = ax_at(L["left"], y, w3, L["heights"][4])
+        a2 = ax_at(L["left"] + w3 + 0.7, y, w3, L["heights"][4])
+        a3 = ax_at(L["left"] + 2 * (w3 + 0.7), y, w3, L["heights"][4])
+        rounds = list(b["rounds"])
+        spans = []
+        if rounds:
+            spans.append((rounds[0]["half_um"], iteration_style(rounds[0]["round"])[0], "--"))
+        if len(rounds) > 1:
+            spans.append((rounds[-1]["half_um"], iteration_style(rounds[-1]["round"])[0], "--"))
+        if b.get("gd") is not None:
+            spans.append((b["gd"]["half_um"], _GD, "-."))
+        if np.asarray(b["v"]).size >= 2:
+            _profiles_panel(a1, b["v"], b["prof"], ks, valid, b["k_ref"], spans,
+                            "profiles along the longest line; dashed: the\nextents of round 1's, the last round's and "
+                            "the pilot's d-line")
+            a1.set_xlim(-1.04 * max(h for h, _c, _l in spans), 1.04 * max(h for h, _c, _l in spans))
+        else:
+            a1.text(0.5, 0.5, "no line evaluated", ha="center", va="center", fontsize=8, transform=a1.transAxes)
+        # each round's G relative to its own maximum, and the pilot d-line's
+        _pipeline_lines(a2, b, mine)
+        curves = [(iteration_style(x["round"]), x["G"], x.get("pick")) for x in rounds]
+        if b.get("gd") is not None:
+            curves.append(((_GD, "^-."), b["gd"]["G"], b["gd"].get("pick")))
+        for (colour, style), G, pick in curves:
+            G = np.asarray(G, dtype=float)
+            rel = G / np.nanmax(G) if np.isfinite(G).any() and np.nanmax(G) > 0 else G
+            a2.plot(ks, rel, style, color=colour, mec=_iter_edge(colour), mew=0.8, ms=4.5, lw=1.8, zorder=3)
+            if pick is not None:
+                d = int(pick)
+                a2.plot([ks[d]], [rel[d]], style[0], ms=11, mfc=colour,
+                        mec="#1a1a19" if colour in _ITER_LIGHT else "white", mew=1.5, zorder=4)
+        a2.set_title("G over each round's whole line, relative to its\nmaximum (marked: each round's pick)",
+                     fontsize=8.5)
+        a2.set_xlabel("plane k", fontsize=8.5)
+        a2.set_ylabel("G / max G", fontsize=8.5)
+        a2.set_xlim(ks[0] - 0.5, ks[-1] + 0.5)
+        # the trajectory of the diameter that sizes the lines
+        xs, ds = [0], [float(b["d_start_um"])]
+        a3.plot([0], [ds[0]], "s", ms=8, mfc=_ITER_ALLEN, mec="#1a1a19", mew=1.0, zorder=4)
+        a3.annotate("Allen", (0, ds[0]), textcoords="offset points", xytext=(0, 7), ha="center", fontsize=7.5)
+        for rnd, k, d, refit in b["fits"]:
+            colour, style = iteration_style(rnd)
+            if math.isfinite(d):
+                xs.append(rnd)
+                ds.append(d)
+                a3.plot([rnd], [d], style[0], ms=8, mfc=colour if refit else "white",
+                        mec=_iter_edge(colour) if refit else colour, mew=1.4, zorder=4)
+                a3.annotate("k %d" % k, (rnd, d), textcoords="offset points", xytext=(0, 7), ha="center",
+                            fontsize=7.5)
+            else:
+                a3.annotate("k %d:\nno fit" % k, (rnd, 0.0), textcoords="offset points", xytext=(0, 4), ha="center",
+                            va="bottom", fontsize=7.5)
+        a3.plot(xs, ds, "-", color="#9a9994", lw=1.0, zorder=2)
+        dp = float(b["d_pilot_um"])
+        if math.isfinite(dp):
+            a3.axhline(dp, color="#ff1744", ls="--", lw=1.2, zorder=1)
+        top = max([x for x in ds + [dp] if math.isfinite(x)] + [0.1])
+        a3.set_ylim(0.0, 1.3 * top)
+        n = max([int(b.get("n_rounds", 0))] + xs)
+        a3.set_xlim(-0.5, n + 0.5)
+        a3.set_xticks(list(range(n + 1)))
+        a3.set_xticklabels(["2r"] + [str(i) for i in range(1, n + 1)])
+        a3.set_xlabel("round whose plane was fitted (0: Allen's 2r)", fontsize=8.5)
+        a3.set_ylabel("d (um)", fontsize=8.5)
+        a3.set_title("d sizing each line: Allen's 2r, then the fit at\neach round's plane; red dashed: the pilot's "
+                     "d_hat", fontsize=8.5)
+        nr = int(b.get("n_rounds", 0))
+        a3.text(0.98, 0.04, "%s after %d round%s" % (b.get("status", ""), nr, "" if nr == 1 else "s"),
+                transform=a3.transAxes, ha="right", va="bottom", fontsize=7.5)
+        _style_axes((a1, a2, a3))
+        y += L["heights"][4] + L["heights"][5]
+    handles = []
+    for i in range(1, n_rounds_max + 1):
+        colour, style = iteration_style(i)
+        what = ("G on the line sized from Allen's 2r; frame A: its pick" if i == 1 else
+                "G on the line sized from round %d's fit" % (i - 1))
+        handles.append(plt.Line2D([], [], color=colour, marker=style[0], ls=style[1:], mec=_iter_edge(colour), lw=1.8,
+                                  label="round %d: %s" % (i, what)))
+    handles += [plt.Line2D([], [], color=_GD, marker="^", ls="-.", mec="#1a1a19", lw=1.8,
+                           label="G on the line sized from the pilot's d_hat (Cell 4h); frame Gd: its pick"),
+                plt.Line2D([], [], color=_ITER_LAST, lw=2.6, label="frame it: the iteration's last plane"),
+                plt.Line2D([], [], color="#ff1744", ls="--", lw=1.2, marker="o", mfc="white", mec="#7a7a7a",
+                           label="right panel: the pilot's d_hat (dashed); hollow: a plane picked again")]
+    handles += _pipeline_handles(plt, blocks, mine)
+    handles.append(_no_line_note(plt, "any line"))
+    fig.legend(handles=handles, loc="upper center", ncol=3, fontsize=8, frameon=False,
+               bbox_to_anchor=(0.5, 1.0 - 0.02 / L["H"]))
+    if title:
+        fig.suptitle(title, y=1.0 - (L["top_band"] - 0.45) / L["H"], fontsize=10)
+    return fig
+
+
+def picks_summary_figure(records, series, title="", weight_key=None, note_key=None):
     """Small multiples over several nodes (D-040): one panel per node (in the
     records' order), each series' curve rescaled to 0 .. 1 (min-max) and drawn
     as it is (since D-041 never inverted: a series that picks its lowest value
@@ -990,7 +1145,8 @@ def picks_summary_figure(records, series, title="", weight_key=None):
 
     records: per-node dicts with node_id, node_type, allen_radius_um, d_hat_um, ks, k_swc, k_star, k_star_depth,
       and the series' curves and picks; series: [dict(curve, pick, label, colour, style, tag=None)]; weight_key: a
-      record field shown as w in each panel's title, or None.
+      record field shown as w in each panel's title, or None; note_key: a record field holding a short text added
+      as a third title line (D-042), or None. A series whose curve the record lacks, or holds as None, is not drawn.
     Presentation only. Returns the Figure."""
     import matplotlib
     matplotlib.use("Agg")
@@ -1021,7 +1177,7 @@ def picks_summary_figure(records, series, title="", weight_key=None):
                 ax.axvline(int(kk) - int(r["k_swc"]), color=colour, ls=ls, lw=1.2, zorder=1)
         parts = []
         for s in series:
-            if s["curve"] not in r:
+            if r.get(s["curve"]) is None:
                 continue
             u = unit(r[s["curve"]])
             edge = "#1a1a19" if s["colour"] in _LIGHT else s["colour"]
@@ -1040,7 +1196,8 @@ def picks_summary_figure(records, series, title="", weight_key=None):
             float(r.get("d_hat_um", float("nan"))), 2.0 * float(r.get("allen_radius_um", float("nan"))))
         if weight_key is not None and r.get(weight_key) is not None:
             head += ", w %.2f" % float(r[weight_key])
-        ax.set_title(head + "\npick minus k*: " + ", ".join(parts), fontsize=8)
+        note = ("\n" + str(r[note_key])) if note_key is not None and r.get(note_key) else ""
+        ax.set_title(head + "\npick minus k*: " + ", ".join(parts) + note, fontsize=8)
         ax.set_ylim(-0.12, 1.12)
         ax.set_xlim(off.min() - 0.5, off.max() + 0.5)
         ax.tick_params(labelsize=7.5)

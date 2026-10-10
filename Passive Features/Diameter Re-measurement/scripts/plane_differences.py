@@ -45,9 +45,17 @@ the line sized from the node's fitted diameter, --line-mult x d_hat / 2 (2:
 blend J = w g - (1 - w) h (g: G rescaled, 1 at its maximum; h: the entropy
 rescaled, 0 at its minimum), w = 1 / (1 + exp((d_hat - d0) / s)) with d0 =
 --sigmoid-d0-um (1.5) and s = --sigmoid-s-um (0.3); frames the planes G, J and
-the entropy pick. Writes planeblend_*. The planes of both figures are drawn
-without the line. --nodes bydiameter --pilot-csv takes the nodes from bins of
-the pilot's d_hat (--dhat-bins, --per-bin, --add-nodes).
+the entropy pick. Writes planeblend_*.
+--evaluation iterate (D-042, the user's request of 2026-10-10, 15:30): G over
+the whole line, first on the line sized from Allen's diameter (half-length
+--line-mult x Allen's radius), then on the line sized from the diameter
+fitted at the plane the previous line picked (--line-mult x d / 2; Block 5's
+fit at that plane, every other input the pilot's), until the plane repeats or
+after --max-rounds (5) rounds; frames round 1's plane, the last plane and the
+pick of the line sized from the pilot's d_hat (Cell 4h's d-line). Writes
+planeiter_*. The planes of these three figures are drawn without the line.
+--nodes bydiameter --pilot-csv takes the nodes from bins of the pilot's d_hat
+(--dhat-bins, --per-bin, --add-nodes).
 
 Each node is located as the pilot measures it (survey.node_planes: the same
 stretch and block request, so with the pilot's image cache its planes come
@@ -104,7 +112,7 @@ _MARKS_AREA = (("k_min_area", "#2a78d6", "-", "minA", "smallest area under the p
                ("k_min_area_norm", "#4a3aa7", "--", "minA/B", "smallest area, background-normalised"))
 _PICK_WORDS = {"min": "lowest entropy", "dip": "entropy dip (between its two largest maxima)"}
 _PREFIX = {"profile": "planediff", "image": "planediff", "entropy": "planeentropy", "gradient": "planegrad",
-           "blend": "planeblend"}
+           "blend": "planeblend", "iterate": "planeiter"}
 
 
 def _marks_entropy(pick):
@@ -129,20 +137,22 @@ def entropy_pick(S, rule="min"):
 
 
 def node_stack(swc, provider, cfg, node_id, transform=None, planes_half=6, half_um=None, band_um=0.0,
-               line_half_um=None, d_line_mult=None):
+               line_half_um=None, d_line_mult=None, allen_line_mult=None):
     """The planes k_swc - planes_half .. k_swc + planes_half of node node_id's
     block, cropped to the square +-half um about the node, with what the
     evaluations need: the pixel mask (all True, or within band_um of the traced
     stretch when band_um > 0), the crop's frame and extent, the node's xy and
-    heading, the stretch's traced path and radii. half = half_um (default
-    block_half_um), raised to line_half_um + 2 pixels when a measuring line of
-    that half-length must fit in the square, and to d_line_mult * d_hat / 2 + 2
-    pixels for the line sized from the node's fitted diameter (D-040; when
-    d_hat is finite and positive). The square is cut from the
+    heading, the stretch's traced path and radii, its Branch. half = half_um
+    (default block_half_um), raised to line_half_um + 2 pixels when a measuring
+    line of that half-length must fit in the square, to d_line_mult * d_hat / 2
+    + 2 pixels for the line sized from the node's fitted diameter (D-040; when
+    d_hat is finite and positive), and to allen_line_mult * Allen's radius + 2
+    pixels for the line sized from Allen's diameter (D-042; when the radius is
+    finite and positive). The square is cut from the
     pilot's block (from the cache on real data) when it lies inside it, and
     requested from the provider otherwise (new crops on real data); the pilot's
-    block is returned as well, for the background levels. ValueError for a
-    node survey.node_planes refuses."""
+    block is returned as well, for the background levels and the fits at other
+    planes. ValueError for a node survey.node_planes refuses."""
     from allen_image_io import CropFrame
     from allen_diameter.plotting.figures import image_extent_um
     pl = survey.node_planes(swc, provider, cfg, node_id, transform)
@@ -158,6 +168,10 @@ def node_stack(swc, provider, cfg, node_id, transform=None, planes_half=6, half_
         d = float(pl["result"].d_hat_um)
         if math.isfinite(d) and d > 0:
             half = max(half, 0.5 * float(d_line_mult) * d + 2.0 * p)
+    if allen_line_mult is not None:
+        ra = float(pl["allen_radius_um"])
+        if math.isfinite(ra) and ra > 0:
+            half = max(half, float(allen_line_mult) * ra + 2.0 * p)
     o = np.asarray(pl["branch"].xyz_um[pl["index"], :2], dtype=float)
     c0 = int(math.ceil((o[0] - half) / p - frame.left))
     c1 = int(math.floor((o[0] + half) / p - frame.left)) + 1
@@ -189,7 +203,8 @@ def node_stack(swc, provider, cfg, node_id, transform=None, planes_half=6, half_
                 theta=float(pl["result"].theta_rad), xyz=xyz, radius=radius, block=np.asarray(block, dtype=float),
                 block_frame=frame, segments=np.asarray(pl["segments"], dtype=float), soma=soma,
                 square_half_um=half, square_fetched=bool(fetched), allen_radius_um=float(pl["allen_radius_um"]),
-                node_type=int(np.asarray(swc.types)[np.flatnonzero(np.asarray(swc.ids) == int(node_id))[0]]))
+                node_type=int(np.asarray(swc.types)[np.flatnonzero(np.asarray(swc.ids) == int(node_id))[0]]),
+                branch=pl["branch"])
 
 
 def far_from_dendrites(shape, frame, segments, margin_um, discs=()):
@@ -398,6 +413,185 @@ def blend_evaluation(st, cfg, line_mult=2.0, entropy_half_um=5.0, stripe_half_um
     return ent
 
 
+# how the Allen-guided iteration ends (D-042): a plane picked again (the previous round's, or an earlier one), the
+# round limit, or a round that cannot go on
+ITER_STATUSES = ("converged", "cycle", "max_rounds", "fit_failed", "no_plane", "line_short", "square_small")
+
+
+def check_iteration(line_mult, max_rounds):
+    """(line_mult as float, max_rounds as int) of the Allen-guided iteration;
+    ValueError unless line_mult is finite and positive and max_rounds an
+    integer >= 1 (5 and 5.0 pass; 5.5, True, "5" do not)."""
+    m = float(line_mult)
+    if not (math.isfinite(m) and m > 0):
+        raise ValueError("the iteration's line multiplier must be finite and > 0, got %r" % (line_mult,))
+    try:
+        R = int(max_rounds)
+        ok = not isinstance(max_rounds, (bool, str)) and R == max_rounds and R >= 1
+    except (TypeError, ValueError, OverflowError):
+        ok = False
+    if not ok:
+        raise ValueError("max_rounds must be an integer >= 1, got %r" % (max_rounds,))
+    return m, R
+
+
+def iterate_planes(d_start_um, line_mult, plane_of, fit_at, max_rounds=5):
+    """The Allen-guided iteration's rule (D-042), on two callables so that it
+    can be checked by hand. Round i = 1..max_rounds: the line of half-length
+    h_i = line_mult * d_{i-1} / 2, d_0 = d_start_um; (k_i, info) = plane_of(h_i),
+    k_i the plane that line picks, or None with info["stop"] (default
+    "no_plane") saying why. If k_i was picked in an earlier round the iteration
+    stops, "converged" when it is the previous round's plane and "cycle"
+    otherwise, and the fit made there is reused; else fit = fit_at(k_i), a dict
+    with d_hat_um, and d_i = d_hat_um sizes the next line ("fit_failed" when it
+    is not finite and positive). "max_rounds" after max_rounds rounds without a
+    repeat. ValueError unless d_start_um and line_mult are finite and positive
+    and max_rounds is an integer >= 1. Returns dict(rounds: [dict(round,
+    d_in_um, d_in_k (None in round 1, else the plane whose fit sized the line),
+    half_um, k, **info, **fit, refit)], status, n_rounds, k_first, k_final (the
+    plane of the last round that picked one, or None), d_final_um (the fit
+    there; NaN when it failed or there is none))."""
+    # Custom: the loop ends on a repeated plane, a discrete event. Checked: scipy.optimize.fixed_point (Steffensen
+    # acceleration of a continuous map; this map is piecewise constant in d, its value set by a discrete plane).
+    m, R = check_iteration(line_mult, max_rounds)
+    d = float(d_start_um)
+    if not (math.isfinite(d) and d > 0):
+        raise ValueError("the iteration needs a finite positive starting diameter, got %r" % (d_start_um,))
+    rounds, fits, status, d_k = [], {}, "max_rounds", None
+    for i in range(1, R + 1):
+        h = 0.5 * m * d
+        k, info = plane_of(h)
+        rnd = dict(round=i, d_in_um=d, d_in_k=d_k, half_um=h, k=None if k is None else int(k))
+        rnd.update(info or {})
+        stop = rnd.pop("stop", None)
+        rounds.append(rnd)
+        if k is None:
+            status = stop or "no_plane"
+            break
+        k = int(k)
+        if k in fits:                           # the plane repeats: its fit is known
+            rnd.update(fits[k], refit=False)
+            status = "converged" if k == rounds[-2]["k"] else "cycle"
+            break
+        fits[k] = dict(fit_at(k))
+        rnd.update(fits[k], refit=True)
+        d, d_k = float(fits[k].get("d_hat_um", float("nan"))), k
+        if not (math.isfinite(d) and d > 0):
+            status = "fit_failed"
+            break
+    last = [r for r in rounds if r["k"] is not None]
+    return dict(rounds=rounds, status=status, n_rounds=len(rounds), k_first=rounds[0]["k"],
+                k_final=last[-1]["k"] if last else None,
+                d_final_um=float(last[-1].get("d_hat_um", float("nan"))) if last else float("nan"))
+
+
+def refit_at_plane(st, cfg, k):
+    """Block 5's final fit (fit.fit_profile, D-019.1) at plane k of
+    node_stack's block (D-042), every other input the pilot's: the
+    measurement's offsets (profiles.profile_offsets), the profile through the
+    pilot's fitted centre (cx_um, cy_um) across its heading theta_rad, averaged
+    over 2 A + 1 lines along the branch (profiles.sample_profile with
+    profiles.n_along and profile_step_um), its tilt phi_rad, and B_bar =
+    node_pipeline.node_background of plane k (the masked median of the node's
+    block about the SWC node, D-018.1). At k = k* these are the pilot's own
+    inputs, so d_hat is the pilot's. Returns dict(d_hat_um, fit_status,
+    v0_hat_um, mu_hat_per_um, B_bar, bbar_ok); without a fit d_hat_um is NaN
+    and fit_status says why: "no_plane" (k not among the block's planes, or
+    missing), "profile_nan" (a sample outside the block), "bbar_nonpositive"."""
+    from allen_diameter.analysis import node_pipeline
+    from allen_diameter.analysis.fit import fit_profile
+    m, r, nan = cfg.measure, st["result"], float("nan")
+    out = dict(d_hat_um=nan, fit_status="no_plane", v0_hat_um=nan, mu_hat_per_um=nan, B_bar=nan, bbar_ok=False)
+    ks = np.asarray(st["ks"])
+    j = int(k) - int(ks[0])
+    if not (0 <= j < ks.size and int(ks[j]) == int(k) and bool(st["valid"][j])):
+        return out
+    plane, frame = st["block"][j], st["block_frame"]
+    B_bar, ok = node_pipeline.node_background(plane, frame, st["o"], st["branch"], m)
+    th = float(r.theta_rad)
+    y_hat, e_u = np.array([-math.sin(th), math.cos(th)]), np.array([math.cos(th), math.sin(th)])
+    v = profiles.profile_offsets(m)
+    I = profiles.sample_profile(plane, frame, np.array([float(r.cx_um), float(r.cy_um)]), y_hat, e_u, v,
+                                profiles.n_along(m), m.profile_step_um)
+    out.update(B_bar=float(B_bar), bbar_ok=bool(ok))
+    if not np.all(np.isfinite(I)):
+        out["fit_status"] = "profile_nan"
+    elif not B_bar > 0:
+        out["fit_status"] = "bbar_nonpositive"
+    else:
+        fit = fit_profile(v, I, float(r.phi_rad), float(B_bar), m)
+        out.update(d_hat_um=float(fit.d_hat_um), fit_status=str(fit.status), v0_hat_um=float(fit.v0_hat_um),
+                   mu_hat_per_um=float(fit.mu_hat_per_um))
+    return out
+
+
+def gradient_iteration(st, cfg, d_start_um=None, line_mult=2.0, max_rounds=5, bg_margin_um=4.0, restack=None):
+    """The Allen-guided iteration of the gradient energy (D-042, the user's
+    choice of 2026-10-10): iterate_planes from d_0 = d_start_um (default
+    Allen's diameter, 2 x allen_radius_um), with plane_of(h) the plane of the
+    largest G over the whole line of half-length h (line_profiles and
+    focus.plane_gradient_energies with block_background's B_k, the same in
+    every round; the first of equal values; "line_short" for fewer than 3
+    samples) and fit_at = refit_at_plane. A line reaching closer than 2 pixels
+    to the square's edge makes restack(h) build a larger square (a node_stack
+    dict of the same node and planes; on real data cut from the cached block
+    when it lies inside it); without restack, or when the new square is still
+    too small, the round stops with "square_small". Returns iterate_planes'
+    dict with background, bg_frac, bg_margin_used, st (the last square used),
+    n_restacks, d_start_um. ValueError as iterate_planes, or when restack
+    returns other planes."""
+    d0 = 2.0 * float(st["allen_radius_um"]) if d_start_um is None else float(d_start_um)
+    B, bg_frac, margin_used = block_background(st, bg_margin_um)
+    step = float(cfg.measure.profile_step_um)
+    box = dict(st=st, n_restacks=0)
+
+    def fits_in(cur, h):
+        return h + 2.0 * float(cur["frame"].res_um_px) <= float(cur["square_half_um"]) + 1e-9
+
+    def plane_of(h):
+        if int(round(h / step)) < 1:
+            return None, dict(stop="line_short", n_samples=2 * int(round(h / step)) + 1)
+        cur = box["st"]
+        if not fits_in(cur, h):
+            if restack is None:
+                return None, dict(stop="square_small")
+            cur = restack(h)
+            if not np.array_equal(np.asarray(cur["ks"]), np.asarray(st["ks"])):
+                raise ValueError("restack returned planes %r, not %r" % (list(cur["ks"]), list(st["ks"])))
+            box["st"], box["n_restacks"] = cur, box["n_restacks"] + 1
+            if not fits_in(cur, h):
+                return None, dict(stop="square_small")
+        _h, v, _y, _e, prof = line_profiles(cur, cfg, h)
+        G = focus.plane_gradient_energies(prof, v, B, cfg.measure, cur["valid"])
+        k = _argmax_plane(cur["ks"], G)
+        info = dict(G=G, n_samples=int(v.size))
+        if k is None:
+            info["stop"] = "no_plane"
+        return k, info
+
+    res = iterate_planes(d0, line_mult, plane_of, lambda k: refit_at_plane(box["st"], cfg, k), max_rounds)
+    res.update(background=B, bg_frac=bg_frac, bg_margin_used=margin_used, st=box["st"],
+               n_restacks=box["n_restacks"], d_start_um=d0)
+    return res
+
+
+def trajectory_text(res):
+    """The iteration in one line without commas (for the CSV): the starting
+    diameter, per round the line's half-length, the plane it picks and the fit
+    there (marked "repeat" when reused), and the status."""
+    na = lambda x: "n/a" if x is None else "%d" % x  # noqa: E731
+    parts = ["start d %.2f um" % float(res["d_start_um"])]
+    for x in res["rounds"]:
+        p = "r%d +-%.2f um k %s" % (x["round"], x["half_um"], na(x["k"]))
+        if x["k"] is not None:
+            d = float(x.get("d_hat_um", float("nan")))
+            p += " d %.2f um" % d if math.isfinite(d) else " no fit (%s)" % x.get("fit_status")
+            if x.get("refit") is False:
+                p += " repeat"
+        parts.append(p)
+    return " | ".join(parts + [res["status"]])
+
+
 def _truthy(x):
     return x is True or (isinstance(x, str) and x.strip() == "True") or (isinstance(x, (int, np.integer)) and x == 1)
 
@@ -477,7 +671,8 @@ def select_nodes_by_diameter(swc, rows, bins_um=(0.8, 1.0, 1.5, 2.0, 3.0), per_b
 
 
 _PICK_KEYS = {"entropy": ("k_h_line", "k_h_strip"), "profile": ("k_min_area", "k_min_area_norm"), "image": (),
-              "blend": ("k_Gd", "k_blend", "k_Hs"), "gradient": ()}   # gradient: the keys depend on the lines
+              "blend": ("k_Gd", "k_blend", "k_Hs"), "gradient": (),    # gradient: the keys depend on the lines
+              "iterate": ("k_allen", "k_iter", "k_Gd")}
 
 
 def pick_summary(records, evaluation, keys=None, extra=()):
@@ -535,6 +730,11 @@ def _gradient_line_specs(lines, line_mult):
 _MARKS_BLEND = (("k_Gd", _GRAD_D_COLOUR[0], "-.", "Gd", "G alone, over the whole d-line"),
                 ("k_blend", "#008300", "-", "J", "the blend J = w g - (1 - w) h"),
                 ("k_Hs", "#eda100", "--", "Hs", "the strip's entropy alone (lowest)"))
+# the Allen-guided iteration (D-042): its last plane blue, round 1's plane yellow, the pilot d-line's pick aqua (the
+# colours of figures.iteration_figure)
+_MARKS_ITER = (("k_iter", "#2a78d6", "-", "it", "the iteration's last plane"),
+               ("k_allen", "#eda100", "--", "A", "round 1: G on the line sized from Allen's 2r"),
+               ("k_Gd", _GRAD_D_COLOUR[0], "-.", "Gd", "G on the line sized from the pilot's d_hat (Cell 4h)"))
 
 
 def _profile_record(v, prof):
@@ -564,16 +764,18 @@ def _pipeline_at(res, k_swc):
 def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_half=6, half_um=None, band_um=0.0,
         evaluation="profile", profile_half_um=None, bg_margin_um=4.0, dpi=110, log=print, stripe_half_um=1.0,
         entropy_bin_gl=1.0, entropy_pick_rule="min", show_line=True, grad_lines_um=(3.0, 5.0), line_mult=2.0,
-        sigmoid_d0_um=1.5, sigmoid_s_um=0.3, entropy_half_um=5.0):
+        sigmoid_d0_um=1.5, sigmoid_s_um=0.3, entropy_half_um=5.0, max_rounds=5):
     """One figure per node id; returns the per-node records (also written to
     <prefix>_<specimen>.json: planediff for the profile and image evaluations,
-    planeentropy, planegrad, planeblend). show_line=False: the profile and
-    entropy figures draw the planes without the measuring line and the strip's
-    outline (presentation only; the records do not change); the gradient and
-    blend figures always do. grad_lines_um, line_mult: the gradient
-    evaluation's fixed half-lengths and the d-line's multiplier (D-040);
-    sigmoid_d0_um, sigmoid_s_um: the blend's weight w(d_hat); entropy_half_um:
-    the half-length across of the blend's entropy strip (D-041)."""
+    planeentropy, planegrad, planeblend, planeiter). show_line=False: the
+    profile and entropy figures draw the planes without the measuring line and
+    the strip's outline (presentation only; the records do not change); the
+    gradient, blend and iterate figures always do. grad_lines_um, line_mult:
+    the gradient evaluation's fixed half-lengths and the d-line's multiplier
+    (D-040; line_mult also sizes the iteration's lines, D-042); sigmoid_d0_um,
+    sigmoid_s_um: the blend's weight w(d_hat); entropy_half_um: the half-length
+    across of the blend's entropy strip (D-041); max_rounds: the iteration's
+    round limit (D-042)."""
     from allen_diameter.plotting import figures as fg
     import matplotlib.pyplot as plt
     if evaluation not in _PREFIX:
@@ -583,7 +785,7 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
                                                                          entropy_pick_rule))
     focus.sigmoid_weight(sigmoid_d0_um, sigmoid_d0_um, sigmoid_s_um)        # refuses s <= 0 before any node
     grad_lines_um = fixed_lines_um(grad_lines_um) if evaluation == "gradient" else grad_lines_um   # before any node
-    line_h, d_mult = None, None
+    line_h, d_mult, allen_mult = None, None, None
     if evaluation in ("profile", "entropy"):       # the square must hold the measuring line
         line_h = float(cfg.measure.profile_half_um if profile_half_um is None else profile_half_um)
     elif evaluation == "gradient":
@@ -592,11 +794,14 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
         line_h, d_mult = float(entropy_half_um), float(line_mult)
         if not (math.isfinite(line_h) and line_h > 0):
             raise ValueError("entropy_half_um must be finite and > 0, got %r" % (entropy_half_um,))
+    elif evaluation == "iterate":                  # the square holds the Allen line and the pilot's d-line
+        d_mult = allen_mult = check_iteration(line_mult, max_rounds)[0]       # refuses them before any node
     os.makedirs(out_dir, exist_ok=True)
     records = []
     for nid in node_ids:
         try:
-            st = node_stack(swc, provider, cfg, nid, transform, planes_half, half_um, band_um, line_h, d_mult)
+            st = node_stack(swc, provider, cfg, nid, transform, planes_half, half_um, band_um, line_h, d_mult,
+                            allen_mult)
         except ValueError as e:
             log("[planediff] node %d skipped: %s" % (nid, e))
             records.append(dict(node_id=int(nid), skipped=str(e)))
@@ -748,6 +953,80 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
                        **_profile_record(ev["v"], ev["prof"]))
             msg = ("d_hat %.2f um; G on the d-line +-%.2f um (%d samples), entropy on the strip +-%.1f um (%d pixels); %s"
                    % (ev["d_hat_um"], ev["d_line_half_um"], n_dline, ev["half_um"], n_strip, picks))
+        elif evaluation == "iterate":
+            def restack(h, nid=nid):                # a larger square for a longer line (same node, same planes)
+                return node_stack(swc, provider, cfg, nid, transform, planes_half, half_um, band_um, h, d_mult,
+                                  allen_mult)
+            try:
+                ev = gradient_iteration(st, cfg, line_mult=line_mult, max_rounds=max_rounds,
+                                        bg_margin_um=bg_margin_um, restack=restack)
+            except ValueError as e:                 # no usable Allen radius
+                log("[planediff] node %d skipped: %s" % (nid, e))
+                records.append(dict(node_id=int(nid), skipped=str(e)))
+                continue
+            st = ev["st"]
+            try:                                    # the line sized from the pilot's d_hat (Cell 4h's d-line)
+                gd = gradient_evaluation(st, cfg, lines_um=(), line_mult=line_mult, bg_margin_um=bg_margin_um)
+                gd = dict(gd["lines"][0], note=None)
+            except ValueError as e:
+                gd = dict(key="Gd", half_um=None, G=None, note=str(e))
+            picked = [x for x in ev["rounds"] if x["k"] is not None]
+            at.update(k_allen=ev["k_first"], k_iter=ev["k_final"],
+                      k_Gd=None if gd["G"] is None else _argmax_plane(ks, gd["G"]))
+            frames, lines = _marks(at, _MARKS_ITER + _MARKS_PIPELINE)
+            na = lambda x: "n/a" if x is None else "%d" % x  # noqa: E731
+            traj = trajectory_text(ev)
+            d_it = ev["d_final_um"]
+            note = ("iteration: %s after %d round%s; d %s at k %s"
+                    % (ev["status"], ev["n_rounds"], "" if ev["n_rounds"] == 1 else "s",
+                       "%.2f um" % d_it if math.isfinite(d_it) else "n/a", na(at["k_iter"])))
+            gd_text = ("the pilot's d-line +-%.2f um k %s" % (gd["half_um"], na(at["k_Gd"])) if gd["G"] is not None
+                       else "no pilot d-line (%s)" % gd["note"])
+            label = ("node %d: planes %d..%d; Allen 2r %.2f um, pilot d_hat %.2f um; %s; round 1 (Allen's line "
+                     "+-%.2f um) k %s; %s; k* %d, dip-depth plane %d, SWC plane %d"
+                     % (nid, ks[0], ks[-1], ev["d_start_um"], float(r.d_hat_um), note, ev["rounds"][0]["half_um"],
+                        na(at["k_allen"]), gd_text, r.k_star, r.k_star_depth, st["k_swc"]))
+            h_long = max([x["half_um"] for x in ev["rounds"] if "G" in x] +
+                         ([gd["half_um"]] if gd["G"] is not None else []), default=None)
+            v_long, prof_long = np.zeros(0), np.zeros((ks.size, 0))
+            if h_long is not None:                  # every plane's profile along the longest line used
+                _h, v_long, _y, _e, prof_long = line_profiles(st, cfg, h_long)
+            idx = lambda k: None if k is None else int(k) - int(ks[0])  # noqa: E731
+            fig = fg.iteration_figure([dict(label=label, stack=st["stack"], ks=ks, valid=st["valid"],
+                                            extent=st["extent"], frames=frames, lines=lines, v=v_long, prof=prof_long,
+                                            rounds=[dict(round=x["round"], half_um=x["half_um"], G=x["G"],
+                                                         pick=idx(x["k"])) for x in ev["rounds"] if "G" in x],
+                                            gd=None if gd["G"] is None else dict(half_um=gd["half_um"], G=gd["G"],
+                                                                                 pick=idx(at["k_Gd"])),
+                                            d_start_um=ev["d_start_um"],
+                                            fits=[(x["round"], x["k"], float(x.get("d_hat_um", float("nan"))),
+                                                   bool(x.get("refit"))) for x in picked],
+                                            status=ev["status"], n_rounds=ev["n_rounds"], d_pilot_um=float(r.d_hat_um),
+                                            k_star=int(r.k_star), k_ref=st["k_swc"])],
+                                      "G over the whole line sized from Allen's 2r, then from the fit at the plane it "
+                                      "picks, until the plane repeats, specimen %s" % specimen)
+            fl = lambda x: float(x) if x is not None else float("nan")  # noqa: E731
+            rec.update(line_mult=float(line_mult), max_rounds=int(max_rounds), d_start_um=ev["d_start_um"],
+                       theta_rad=st["theta"], iter_status=ev["status"], n_rounds=ev["n_rounds"],
+                       k_allen=at["k_allen"], k_iter=at["k_iter"], d_iter_um=d_it, k_Gd=at["k_Gd"],
+                       G_allen=[float(g) for g in ev["rounds"][0]["G"]] if "G" in ev["rounds"][0] else None,
+                       G_iter=[float(g) for g in picked[-1]["G"]] if picked else None,
+                       G_Gd=None if gd["G"] is None else [float(g) for g in gd["G"]],
+                       d_line_half_um=gd["half_um"], d_line_note=gd["note"], trajectory=traj, iter_note=note,
+                       n_restacks=ev["n_restacks"], half_um=float(st["square_half_um"]),
+                       square_fetched=st["square_fetched"],
+                       rounds=[dict(round=x["round"], d_in_um=x["d_in_um"], d_in_k=x["d_in_k"],
+                                    half_um=x["half_um"], n_samples=x.get("n_samples"), k=x["k"],
+                                    G=[float(g) for g in x["G"]] if "G" in x else None,
+                                    d_hat_um=fl(x.get("d_hat_um")), fit_status=x.get("fit_status"),
+                                    v0_hat_um=fl(x.get("v0_hat_um")), mu_hat_per_um=fl(x.get("mu_hat_per_um")),
+                                    B_bar=fl(x.get("B_bar")), bbar_ok=x.get("bbar_ok"), refit=x.get("refit"))
+                               for x in ev["rounds"]],
+                       background=[float(x) for x in ev["background"]], bg_frac=ev["bg_frac"],
+                       bg_margin_um=float(bg_margin_um), bg_margin_used=ev["bg_margin_used"],
+                       pick_keys=list(_PICK_KEYS["iterate"]), profile_half_um=h_long,
+                       **_profile_record(v_long, prof_long))
+            msg = "Allen 2r %.2f um; %s; %s" % (ev["d_start_um"], traj, gd_text)
         else:
             res = focus.plane_differences(st["stack"], st["valid"], st["mask"])
             dip = focus.difference_dip(res["pos"])
@@ -779,12 +1058,17 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
                 if any(k in x.get("pick_keys", ()) for x in done)]
     if len(done) > 1 and keys:
         from allen_diameter.loading import table_io
-        extra = {"gradient": ("d_line_half_um",), "blend": ("d_line_half_um", "w")}.get(evaluation, ())
+        extra = {"gradient": ("d_line_half_um",), "blend": ("d_line_half_um", "w"),
+                 "iterate": ("d_iter_um", "iter_status", "n_rounds", "n_restacks", "trajectory")}.get(evaluation, ())
         rows, agreement = pick_summary(records, evaluation, keys, extra)
         table_io.write_rows(rows, os.path.join(out_dir, "%s_summary_%s.csv" % (_PREFIX[evaluation], specimen)))
         log("[planediff] summary over %d nodes: %s" % (len(rows), "; ".join(
             "%s within 1 plane of k* in %d of %d (median |diff| %.1f planes)"
             % (key, a["within_1"], a["n"], a["median_abs"]) for key, a in agreement.items())))
+        if evaluation == "iterate":
+            log("[planediff] iteration endings: %s" % ", ".join(
+                "%s %d" % (s, sum(1 for x in done if x["iter_status"] == s)) for s in ITER_STATUSES
+                if any(x["iter_status"] == s for x in done)))
         fig = None
         if evaluation == "entropy":
             fig = fg.entropy_summary_figure(done, "Entropy picks against k* on %d nodes, specimen %s (%s)"
@@ -808,6 +1092,17 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
                                                         "blend: the plane each picks, on %d nodes by d_hat (w = sigmoid "
                                                         "weight of G), specimen %s"
                                           % (float(entropy_half_um), len(done), specimen), weight_key="w")
+        elif evaluation == "iterate":
+            series = [dict(curve="G_allen", pick="k_allen", tag="A", colour=fg.iteration_style(1)[0],
+                           style=fg.iteration_style(1)[1], label="round 1: G on the line sized from Allen's 2r (its "
+                                                                 "pick: the largest)"),
+                      dict(curve="G_iter", pick="k_iter", tag="it", colour=_MARKS_ITER[0][1], style="s-",
+                           label="the last round's G (its pick: the iteration's last plane)"),
+                      dict(curve="G_Gd", pick="k_Gd", tag="Gd", colour=_GRAD_D_COLOUR[0], style="^-.",
+                           label="G on the line sized from the pilot's d_hat (Cell 4h)")]
+            fig = fg.picks_summary_figure(done, series, "G on lines sized from Allen's 2r and then from the fit at "
+                                                        "the plane each picks: the planes, on %d nodes by d_hat, "
+                                                        "specimen %s" % (len(done), specimen), note_key="iter_note")
         if fig is not None:
             fig.savefig(os.path.join(out_dir, "%s_summary_%s.png" % (_PREFIX[evaluation], specimen)), dpi=dpi)
             plt.close(fig)
@@ -832,17 +1127,21 @@ def main(argv=None):
     ap.add_argument("--add-nodes", default="2,3",
                     help="--nodes bydiameter: node ids always added (default: the trunks 2 and 3); '' for none")
     ap.add_argument("--out-dir", required=True)
-    ap.add_argument("--evaluation", choices=("profile", "image", "entropy", "gradient", "blend"), default="profile")
+    ap.add_argument("--evaluation", choices=("profile", "image", "entropy", "gradient", "blend", "iterate"),
+                    default="profile")
     ap.add_argument("--grad-lines-um", default="3,5",
                     help="gradient evaluation: half-lengths of the fixed lines, um (at most 3)")
     ap.add_argument("--line-mult", type=float, default=2.0,
-                    help="gradient and blend evaluations: the d-line's full width in units of d_hat (2: [-d_hat, d_hat])")
+                    help="gradient, blend and iterate evaluations: a line's full width in units of the diameter "
+                         "sizing it (2: [-d, d])")
     ap.add_argument("--sigmoid-d0-um", type=float, default=1.5,
                     help="blend evaluation: d_hat at which the gradient energy's weight is 1/2, um")
     ap.add_argument("--sigmoid-s-um", type=float, default=0.3,
                     help="blend evaluation: width of the sigmoid w(d) = 1 / (1 + exp((d - d0) / s)), um")
     ap.add_argument("--entropy-half-um", type=float, default=5.0,
                     help="blend evaluation: half-length across the branch of the entropy's strip, um (D-041)")
+    ap.add_argument("--max-rounds", type=int, default=5,
+                    help="iterate evaluation: at most this many rounds, round 1 on Allen's line (D-042)")
     ap.add_argument("--planes-half", type=int, default=6, help="planes on each side of the SWC plane")
     ap.add_argument("--profile-half-um", type=float, default=None,
                     help="profile and entropy evaluations: half-length of the measuring line, um "
@@ -920,7 +1219,7 @@ def main(argv=None):
                log=lambda m: print(m, flush=True), stripe_half_um=a.stripe_half_um, entropy_bin_gl=a.entropy_bin_gl,
                entropy_pick_rule=a.entropy_pick, show_line=not a.hide_line, grad_lines_um=grad_lines,
                line_mult=a.line_mult, sigmoid_d0_um=a.sigmoid_d0_um, sigmoid_s_um=a.sigmoid_s_um,
-               entropy_half_um=a.entropy_half_um)
+               entropy_half_um=a.entropy_half_um, max_rounds=a.max_rounds)
     n_ok = sum(1 for r in recs if "png" in r)
     print("[planediff] wrote %d figures (%d skipped) in %s; crops: %d from the cache, %d downloaded (%.1f MB); %.1f min"
           % (n_ok, len(recs) - n_ok, a.out_dir, fetcher.n_cache_hits, fetcher.n_requests,
