@@ -1,6 +1,8 @@
 """Smoke test for the gradient energy along lines of three lengths and its
 sigmoid-weighted blend with the strip entropy -- Block 11 in specs/SPEC.md
-(D-040, the user's request of 2026-10-09, 16:19; diagnostics, not focus rules).
+(D-040, the user's request of 2026-10-09, 16:19; D-041, 2026-10-10: the
+entropy on the +-5 um strip and J written as w g - (1 - w) h; diagnostics,
+not focus rules).
 
 For node j and plane k, with the profile I_{j,k}(v_n), v_n = n * Delta,
 |n| <= N = round(h / Delta), along a line of half-length h, smoothed to
@@ -8,14 +10,15 @@ I~ by focus_smooth_px samples, and B_{j,k} the plane's background:
     G^(h)_{j,k} = B_{j,k}^-2 * trapezoid over the whole line of (dI~/dv)^2
 (focus.plane_gradient_energies: focus.gradient_energy with the window
 "whole_profile" and B as the override). The lines: h = 3, 5 um and the
-d-line h_d = m * d_hat / 2 (m = 2: [-d_hat, d_hat]). On the d-line, over V,
-the planes where G and the strip entropy H are both finite:
-    g   = (G - min_V G) / (max_V G - min_V G)
-    eta = (max_V H - H) / (max_V H - min_V H)
-    w   = 1 / (1 + exp((d_hat - d0) / s))          (d0 = 1.5, s = 0.3 um)
-    J   = w g + (1 - w) eta
+d-line h_d = m * d_hat / 2 (m = 2: [-d_hat, d_hat]). The blend takes G on
+the d-line and H, the entropy of the strip |v| <= h_H (5 um) across and
+|u| <= 1 um along; over V, the planes where both are finite:
+    g = (G - min_V G) / (max_V G - min_V G)      1 at the largest G
+    h = (H - min_V H) / (max_V H - min_V H)      0 at the lowest entropy
+    w = 1 / (1 + exp((d_hat - d0) / s))          (d0 = 1.5, s = 0.3 um)
+    J = w g - (1 - w) h
 Picks: argmax G per line, argmax J, argmin H. The blend's choice between
-G's pick p and H's pick q flips at w* = (1 - eta_p) / ((1 - eta_p) + (1 - g_q)).
+G's pick p and H's pick q flips at w* = h_p / (h_p + (1 - g_q)).
 
 Checks
     test_known_answer   the sigmoid at d0 (1/2) and at d0 +- s ln 3 (1/4,
@@ -29,13 +32,15 @@ Checks
                         d_hat, the refusals)
     test_reference      plane_gradient_energies against focus.gradient_energy
                         called plane by plane with the window and background
-                        rules replaced; blend_scores against a loop by hand
+                        rules replaced; blend_scores against a loop by hand;
+                        J against the form of D-040, w g + (1 - w)(1 - h),
+                        which it differs from by the constant 1 - w
     test_convergence    G of a Gaussian dip, smoothing off, against the
                         integral A^2 sqrt(pi) / (2 sigma B^2): halving the
                         step divides the error by 3.5 to 4.5 (second order)
     test_invariants     a gain on one plane (profile and background) leaves
                         its G unchanged; positive affine maps of G and of H
-                        leave g, eta and J unchanged; w(d0 + x) + w(d0 - x) = 1
+                        leave g, h and J unchanged; w(d0 + x) + w(d0 - x) = 1
                         and w decreases; w = 1 picks G's plane, w = 0 the
                         entropy's
     test_noise_floor    flat ground with white noise of SD s, smoothing off:
@@ -54,10 +59,14 @@ Checks
                         NaN, the background equals the profile evaluation's;
                         a node without d_hat keeps the fixed lines (gradient)
                         and is refused (blend); the blend evaluation: w from
-                        d_hat, J from g and eta, the summary CSV and figure;
-                        the gradient summary; the per-node figure draws no
-                        line on the planes; the CLI passes the node choice and
-                        the parameters on (server stubbed, run replaced)
+                        d_hat, G from the d-line's profiles, H from the +-5 um
+                        strip (89 samples, its square fetched), J from g and
+                        h, the summary CSV and figure; the gradient summary;
+                        the per-node figures draw no line on the planes, draw
+                        h as it is (not inverted), keep every text inside the
+                        figure; the summary figure draws the entropy's pick at
+                        the bottom; the CLI passes the node choice and the
+                        parameters on (server stubbed, run replaced)
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -159,17 +168,18 @@ def test_known_answer():
     assert list(out[:2]) == [0.0, 0.0] and math.isnan(out[2])
     out = FO.minmax_scores([1.0, 5.0, 9.0], valid=[True, False, True])
     assert out[0] == 0.0 and math.isnan(out[1]) and out[2] == 1.0
-    # the blend by hand: G = 1, 3, 2 and H = 5, 4, 3 give g = 0, 1, 1/2 and eta = 0, 1/2, 1
+    # the blend by hand: G = 1, 3, 2 and H = 5, 4, 3 give g = 0, 1, 1/2 and h = 1, 1/2, 0; at w = 1/2,
+    # J = w g - (1 - w) h = -1/2, 1/4, 1/4
     b = FO.blend_scores([1.0, 3.0, 2.0], [5.0, 4.0, 3.0], 0.5)
-    assert list(b["g"]) == [0.0, 1.0, 0.5] and list(b["eta"]) == [0.0, 0.5, 1.0] and list(b["J"]) == [0.0, 0.75, 0.75]
-    # G's pick p = 1, H's pick q = 2: w* = (1 - 1/2) / ((1 - 1/2) + (1 - 1/2)) = 1/2; a tie goes to the first plane
+    assert list(b["g"]) == [0.0, 1.0, 0.5] and list(b["h"]) == [1.0, 0.5, 0.0] and list(b["J"]) == [-0.5, 0.25, 0.25]
+    # G's pick p = 1, H's pick q = 2: w* = h_p / (h_p + (1 - g_q)) = (1/2) / (1/2 + 1/2) = 1/2; a tie goes to the first
     ks = np.array([10, 11, 12])
     assert PD._argmax_plane(ks, b["J"]) == 11
     assert PD._argmax_plane(ks, FO.blend_scores([1.0, 3.0, 2.0], [5.0, 4.0, 3.0], 0.6)["J"]) == 11
     assert PD._argmax_plane(ks, FO.blend_scores([1.0, 3.0, 2.0], [5.0, 4.0, 3.0], 0.4)["J"]) == 12
     nb = FO.blend_scores([1.0, 3.0, 2.0], [float("nan"), 4.0, 3.0], 0.5)       # plane 0 leaves V
     assert list(nb["V"]) == [False, True, True] and math.isnan(nb["J"][0]) and list(nb["g"][1:]) == [1.0, 0.0] and \
-        list(nb["eta"][1:]) == [0.0, 1.0], nb
+        list(nb["h"][1:]) == [1.0, 0.0], nb
     # G of a linear ramp, smoothing off: the slope alpha everywhere, so G = alpha^2 * 2 N Delta / B^2
     N = 26
     v = np.arange(-N, N + 1) * DELTA
@@ -232,10 +242,12 @@ def test_reference():
     for k in range(9):
         if k in V:
             g = (Gc[k] - g_lo) / (g_hi - g_lo)
-            e = (h_hi - Hc[k]) / (h_hi - h_lo)
-            assert abs(b["J"][k] - (w * g + (1.0 - w) * e)) <= 1e-15, k
+            h = (Hc[k] - h_lo) / (h_hi - h_lo)
+            assert abs(b["J"][k] - (w * g - (1.0 - w) * h)) <= 1e-15, k
+            # the form of D-040, w g + (1 - w)(1 - h), is J + (1 - w): the same maximum for every w
+            assert abs((b["J"][k] + (1.0 - w)) - (w * g + (1.0 - w) * (1.0 - h))) <= 1e-15, k
         else:
-            assert math.isnan(b["J"][k]) and math.isnan(b["g"][k]) and math.isnan(b["eta"][k]), k
+            assert math.isnan(b["J"][k]) and math.isnan(b["g"][k]) and math.isnan(b["h"][k]), k
 
 
 def test_convergence():
@@ -269,7 +281,7 @@ def test_invariants():
     Hc = rng.uniform(3.0, 5.0, 11)
     b1 = FO.blend_scores(Gc, Hc, 0.3)
     b2 = FO.blend_scores(7.0 * Gc + 2.0, 0.5 * Hc - 1.0, 0.3)
-    for key in ("g", "eta", "J"):
+    for key in ("g", "h", "J"):
         assert np.allclose(b1[key], b2[key], rtol=0, atol=1e-12), key
     for x in (0.0, 0.1, 0.7, 3.0):
         assert abs(FO.sigmoid_weight(1.5 + x, 1.5, 0.3) + FO.sigmoid_weight(1.5 - x, 1.5, 0.3) - 1.0) <= 1e-15
@@ -361,6 +373,21 @@ def test_determinism():
 
 def _plane_axes(fig):
     return [ax for ax in fig.axes if ax.get_title().startswith("k ")]
+
+
+def _texts_inside(fig):
+    """Every figure-level text (the block labels, the suptitle, the legends' entries) and every axes title lies
+    inside the figure's width, to the pixel."""
+    fig.canvas.draw()
+    ren = fig.canvas.get_renderer()
+    texts = list(fig.texts) + [ax.title for ax in fig.axes]
+    texts += [t for leg in fig.legends for t in leg.get_texts()]
+    if getattr(fig, "_suptitle", None) is not None:
+        texts.append(fig._suptitle)
+    for t in texts:
+        if t.get_text():
+            bb = t.get_window_extent(renderer=ren)
+            assert bb.x0 >= -1.0 and bb.x1 <= fig.bbox.width + 1.0, (t.get_text()[:60], bb.x0, bb.x1, fig.bbox.width)
 
 
 def test_edge_cases():
@@ -466,29 +493,86 @@ def test_edge_cases():
             assert not os.path.exists(bad_dir)
         else:
             raise AssertionError("run accepted four fixed lines")
-        # the blend evaluation on three nodes: w from d_hat, J from g and eta, the summary CSV and figure
+        # the blend: G on the d-line, H on the +-5 um strip (D-041); a strip not finite and positive is refused before
+        # any node and before the output folder is made
+        bad_dir = os.path.join(tmp, "blend_bad")
+        for bad in (0.0, -1.0, float("nan")):
+            try:
+                PD.run(swc, prov, ccfg, [4], bad_dir, "999", evaluation="blend", entropy_half_um=bad, log=lambda m: None)
+            except ValueError:
+                assert not os.path.exists(bad_dir)
+                continue
+            raise AssertionError("run accepted entropy_half_um=%r" % bad)
+        try:
+            PD.blend_evaluation(st, ccfg, entropy_half_um=0.0)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("blend_evaluation accepted entropy_half_um=0")
+        # three nodes in one run: w from d_hat, J = w g - (1 - w) h, the summary CSV and figure
         logs = []
         out3 = os.path.join(tmp, "blend")
         recs = PD.run(swc, prov, ccfg, [3, 4, 5], out3, "999", planes_half=4, evaluation="blend", log=logs.append)
+        n5 = 2 * int(round(5.0 / DELTA)) + 1
         for r in recs:
             assert abs(r["w"] - FO.sigmoid_weight(r["d_hat_um"], 1.5, 0.3)) <= 1e-15
-            J = np.array(r["J"], dtype=float)
-            ref = r["w"] * np.array(r["g"], dtype=float) + (1.0 - r["w"]) * np.array(r["eta"], dtype=float)
-            assert np.allclose(J, ref, rtol=0, atol=1e-15, equal_nan=True)
             G, Hs = np.array(r["G_Gd"], dtype=float), np.array(r["h_strip"], dtype=float)
-            V = np.isfinite(G) & np.isfinite(Hs)       # g from G on the d-line, eta from the strip's entropy, over V
-            assert np.array_equal(np.array(r["g"], dtype=float), FO.minmax_scores(G, V), equal_nan=True)
-            assert np.array_equal(np.array(r["eta"], dtype=float), FO.minmax_scores(Hs, V, higher_is_better=False),
-                                  equal_nan=True)
+            V = np.isfinite(G) & np.isfinite(Hs)       # g from G on the d-line, h from the strip's entropy, over V
+            g, h, J = (np.array(r[key], dtype=float) for key in ("g", "h_norm", "J"))
+            assert np.array_equal(g, FO.minmax_scores(G, V), equal_nan=True)
+            assert np.array_equal(h, FO.minmax_scores(Hs, V), equal_nan=True)
+            assert np.allclose(J, r["w"] * g - (1.0 - r["w"]) * h, rtol=0, atol=1e-15, equal_nan=True)
             assert r["k_blend"] == r["ks"][int(np.nanargmax(J))] and r["k_Gd"] == r["ks"][int(np.nanargmax(G))] == 0 \
-                and r["k_Hd"] == r["ks"][int(np.nanargmin(Hs))], (r["k_blend"], r["k_Gd"], r["k_Hd"])
-            assert r["d_line_half_um"] == r["profile_half_um"] == r["d_hat_um"]
+                and r["k_Hs"] == r["ks"][int(np.nanargmin(Hs))], (r["k_blend"], r["k_Gd"], r["k_Hs"])
+            assert r["entropy_half_um"] == r["profile_half_um"] == 5.0 and r["d_line_half_um"] == r["d_hat_um"]
+            n_valid = [n for n, ok in zip(r["n_strip"], r["valid"]) if ok]
+            assert len(r["v_um"]) == n5 and r["square_fetched"] is True and min(n_valid) > 1000, \
+                (len(r["v_um"]), r["square_fetched"], n_valid)
+            assert r["pick_keys"] == ["k_Gd", "k_blend", "k_Hs"]
+        assert [m[0] for m in PD._MARKS_BLEND] == list(PD._PICK_KEYS["blend"])     # every pick framed on the planes
+        r4 = recs[1]                     # node 4: G from the d-line's own profiles, H from the +-5 um strip, as run cuts it
+        st5 = PD.node_stack(swc, prov, ccfg, 4, None, 4, None, 0.0, 5.0, 2.0)
+        _h, v_d, _y, _e, prof_d = PD.line_profiles(st5, ccfg, r4["d_line_half_um"])
+        assert v_d.size == 2 * int(round(r4["d_line_half_um"] / DELTA)) + 1
+        assert np.array_equal(np.array(r4["G_Gd"]), FO.plane_gradient_energies(prof_d, v_d, np.array(r4["background"]),
+                                                                              ccfg.measure, st5["valid"]), equal_nan=True)
+        assert np.array_equal(np.array(r4["h_strip"]), PD.entropy_evaluation(st5, ccfg, 5.0, 1.0, 1.0)["h_strip"],
+                              equal_nan=True)
+        h_dline = PD.entropy_evaluation(st5, ccfg, r4["d_line_half_um"], 1.0, 1.0)["h_strip"]
+        assert not np.allclose(np.array(r4["h_strip"]), h_dline, equal_nan=True), "the entropy came from the d-line"
         summ = table_io.read_rows([os.path.join(out3, "planeblend_summary_999.csv")])
         assert [r["node_id"] for r in summ] == [3, 4, 5]
-        assert all(r["k_blend_minus_k_star"] == r["k_blend"] - r["k_star"] for r in summ)
+        assert all(r["k_blend_minus_k_star"] == r["k_blend"] - r["k_star"] and
+                   r["k_Hs_minus_k_star"] == r["k_Hs"] - r["k_star"] for r in summ)
         assert all(abs(r["w"] - x["w"]) <= 1e-12 for r, x in zip(summ, recs))
         assert os.path.exists(os.path.join(out3, "planeblend_summary_999.png"))
         assert any(m.startswith("[planediff] summary over 3 nodes: k_Gd within 1 plane of k*") for m in logs), logs
+        # the blend figure: no line on the planes, h drawn as it is (not inverted), J on its range -(1 - w) .. w, and
+        # every text inside the figure (a label of 300 characters wraps)
+        at = lambda k: int(k) - int(r4["ks"][0])  # noqa: E731
+        blk = dict(label="node 4: " + "a label that wraps; " * 15, stack=np.zeros((len(r4["ks"]), 9, 9)),
+                   ks=r4["ks"], valid=r4["valid"], extent=None, frames={0: ("#008300", "-", "Gd J")},
+                   lines=[(0, "#ff1744", "-", "k*")], v=r4["v_um"], prof=r4["profiles"], half_um=5.0,
+                   d_half_um=r4["d_line_half_um"], g=r4["g"], h=r4["h_norm"], J=r4["J"], w=r4["w"],
+                   d_hat_um=r4["d_hat_um"], d0_um=1.5, s_um=0.3, pick_g=at(r4["k_Gd"]), pick_h=at(r4["k_Hs"]),
+                   pick_J=at(r4["k_blend"]), k_ref=0)
+        fig = FG.blend_figure([blk], "t")
+        pa = _plane_axes(fig)
+        assert len(pa) == len(r4["ks"]) and all(len(ax.get_lines()) == 0 for ax in pa)
+        a2 = [ax for ax in fig.axes if ax.get_title().startswith("min-max rescaled")][0]
+        curve = [ln for ln in a2.get_lines() if ln.get_color() == "#eda100" and len(ln.get_ydata()) == len(r4["ks"])]
+        assert len(curve) == 1 and np.array_equal(np.asarray(curve[0].get_ydata(), dtype=float),
+                                                  np.array(r4["h_norm"], dtype=float), equal_nan=True)
+        a3 = [ax for ax in fig.axes if ax.get_title().startswith("J = w g - (1 - w) h")][0]
+        assert np.allclose(a3.get_ylim(), (-(1.0 - r4["w"]) - 0.08, r4["w"] + 0.08), rtol=0, atol=1e-12)
+        _texts_inside(fig)
+        plt.close(fig)
+        # the summary figure draws every curve as it is: the entropy's pick (its lowest) sits at 0
+        fig = FG.picks_summary_figure(recs, [dict(curve="h_strip", pick="k_Hs", label="h", colour="#eda100",
+                                                  style="s--")], "t")
+        big = [ln for ln in fig.axes[0].get_lines() if ln.get_markersize() == 10]
+        assert len(big) == 1 and float(big[0].get_ydata()[0]) == 0.0, [ln.get_ydata() for ln in big]
+        plt.close(fig)
         # the gradient summary
         out_g3 = os.path.join(tmp, "grad3")
         recs_g = PD.run(swc, prov, ccfg, [3, 4, 5], out_g3, "999", planes_half=4, evaluation="gradient",
@@ -503,12 +587,14 @@ def test_edge_cases():
         stk = np.zeros((len(r0["ks"]), 9, 9))
         variants = [dict(key=k[2:], label=k, colour=c, style=s, half_um=1.0, G=r0["G_" + k[2:]], pick=None)
                     for k, c, s in (("k_G3", "#2a78d6", "o-"), ("k_Gd", "#1baf7a", "^-"))]
-        fig = FG.gradient_lines_figure([dict(label="x", stack=stk, ks=r0["ks"], valid=r0["valid"], extent=None,
+        fig = FG.gradient_lines_figure([dict(label="node 4: " + "a label that wraps; " * 15, stack=stk, ks=r0["ks"],
+                                             valid=r0["valid"], extent=None,
                                              frames={0: ("#2a78d6", "-", "G3")}, lines=[(0, "#ff1744", "-", "k*")],
                                              variants=variants, v=r0["v_um"], prof=r0["profiles"],
                                              background=r0["background"], k_ref=0)], "t")
         pa = _plane_axes(fig)
         assert len(pa) == len(r0["ks"]) and all(len(ax.get_lines()) == 0 for ax in pa)
+        _texts_inside(fig)
         plt.close(fig)
         moved = dict(recs_g[1], k_star=1)              # the title's offsets are against k*, not the SWC plane
         fig = FG.picks_summary_figure([moved] + recs_g + recs_g[:1], [dict(curve="G_G3", pick="k_G3", label="a",
@@ -543,7 +629,7 @@ def _check_cli(PD, swc_path, tmp):
         args = ["--specimen", "999", "--nodes", "bydiameter", "--pilot-csv", pilot, "--out-dir",
                 os.path.join(tmp, "cli"), "--swc", swc_path, "--evaluation", "blend", "--dhat-bins", "0.7,2",
                 "--per-bin", "3", "--add-nodes", "2", "--line-mult", "3", "--sigmoid-d0-um", "1.2",
-                "--sigmoid-s-um", "0.4", "--grad-lines-um", "2.5,4"]
+                "--sigmoid-s-um", "0.4", "--grad-lines-um", "2.5,4", "--entropy-half-um", "4"]
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             assert PD.main(args) == 0
             try:
@@ -560,7 +646,7 @@ def _check_cli(PD, swc_path, tmp):
     got = inspect.signature(PD.run).bind(*x, **k).arguments          # by name: the call's positions may change
     assert got["node_ids"] == [4] and got["evaluation"] == "blend" and got["planes_half"] == 6 and \
         got["line_mult"] == 3.0 and got["sigmoid_d0_um"] == 1.2 and got["sigmoid_s_um"] == 0.4 and \
-        got["grad_lines_um"] == [2.5, 4.0] and got["stripe_half_um"] == 1.0, got
+        got["grad_lines_um"] == [2.5, 4.0] and got["stripe_half_um"] == 1.0 and got["entropy_half_um"] == 4.0, got
 
 
 # ---------------------------------------------------------------- runner ---

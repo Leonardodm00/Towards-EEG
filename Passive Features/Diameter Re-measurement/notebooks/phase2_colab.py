@@ -488,58 +488,67 @@ if os.path.exists(recs):
 # ====================================================================================================
 # ===== CELL 4i
 # ====================================================================================================
-# CELL 4I: THE D-LINE ACROSS DIAMETERS: GRADIENT ENERGY, SIGMOID-WEIGHTED BLEND, STRIP ENTROPY
-# The second comparison asked for on 2026-10-09 (16:19) (D-040), on the nodes of Cell 4h and on the d-line
-# only, +-m d_hat / 2 (`LINE_MULT` = m = 2): three ways to pick the plane. (i) G_k alone over the whole
-# d-line, as in Cell 4h. (ii) The strip's entropy alone, H_k: the Shannon entropy of the grey levels of the
-# pixels within |v| <= m d_hat / 2 across the dendrite and |u| <= `STRIPE_HALF_UM` along it, the plane of its
-# lowest value (as in Cells 4f and 4g). (iii) Their blend, the user's proposal of 15:40: over the planes where
-# both curves are finite, each is min-max rescaled so that 1 marks the best plane for it, g_k = (G_k - min G)
-# / (max G - min G) and eta_k = (max H - H_k) / (max H - min H), and J_k = w g_k + (1 - w) eta_k, with the
-# weight of G falling with the diameter, w(d_hat) = 1 / (1 + exp((d_hat - d0) / s)), d0 = 1.5 um and s = 0.3
-# um (the user's choice; `SIGMOID` sets them): w is 1/2 at d_hat = d0, 0.97 at 0.5 um and 0.03 at 2.5 um. The
-# blend picks the plane of its largest J_k. A flat curve scores 0 on every plane, so it leaves the choice to
-# the other.
+# CELL 4I: G ON THE D-LINE, THE ENTROPY OF THE +-5 UM STRIP AND THEIR BLEND, ACROSS DIAMETERS
+# The second comparison of 2026-10-09 (16:19, D-040), changed on 2026-10-10 (D-041), on the nodes of Cell 4h:
+# three ways to pick the plane. (i) G_k alone, over the whole d-line +-m d_hat / 2 (`LINE_MULT` = m = 2), as
+# in Cell 4h. (ii) The strip's entropy alone, H_k: the Shannon entropy of the grey levels of the pixels within
+# |v| <= `ENTROPY_HALF_UM` (5 um) across the dendrite and |u| <= `STRIPE_HALF_UM` (1 um) along it, the plane
+# of its lowest value (as in Cells 4f and 4g). (iii) Their blend, in the user's form (D-041): over the planes
+# where both curves are finite, each is min-max rescaled, g_k = (G_k - min G) / (max G - min G) (1 at the
+# largest G) and h_k = (H_k - min H) / (max H - min H) (0 at the lowest H), and J_k = w g_k - (1 - w) h_k,
+# largest where G is high and H low, with the weight of G falling with the diameter, w(d_hat) = 1 / (1 +
+# exp((d_hat - d0) / s)), d0 = 1.5 um and s = 0.3 um (`SIGMOID`): w is 1/2 at d_hat = d0, 0.97 at 0.5 um and
+# 0.03 at 2.5 um. The blend picks the plane of its largest J_k; a flat curve scores 0 on every plane and
+# leaves the choice to the other.
 #
-# Output in `pilot/planeblend/bydiameter/`: one figure per node, `planeblend_<id>.png`: the planes without the
-# line, framed at the three picks (aqua Gd, green J, yellow Hs) and at the pipeline's planes; below, the
-# profiles along the d-line, g_k and eta_k with their picks, and J_k with its pick and w.
-# `planeblend_summary_529878215.png`: one panel per node with the three curves rescaled 0-1 (the entropy
-# inverted, lowest on top) and w in its title; `planeblend_summary_529878215.csv`: per node d_hat, the
-# d-line's half-length, w, the planes and each pick minus k*, printed by the cell. The cell then shows each
-# node's figure, in order of d_hat.
+# Why the entropy's strip is +-5 um and not the d-line (D-041): in the first run (2026-10-09, the entropy on
+# the d-line, outputs kept in `pilot/planeblend/bydiameter/`) the entropy was highest in focus, and its
+# minimum fell on the last plane or the one next to it on all 11 non-trunk nodes, so wherever w < 1/2 the
+# blend followed it away from focus; on the trunks, where the d-line is itself about +-5 um, it agreed with
+# the planes judged right. The form J_k = w g_k - (1 - w) h_k replaces w g_k + (1 - w)(1 - h_k), which differs
+# from it by 1 - w, the same on every plane of a node, so that form picked the same planes.
 #
-# Expect the node list of Cell 4h, one `[planediff] node N: planes ... (0 missing); d_hat ... um, line +-...
-# um (... samples), strip ... pixels; w ...; G k ..., blend k ..., strip entropy k ...; k* ..., dip-depth
-# plane ..., SWC plane ...` line per node, then `[planediff] summary over N nodes: k_Gd within 1 plane of k*
-# in a of N (...); k_blend ...; k_Hd ...` and `[planediff] wrote N figures (0 skipped) ...`. A node whose
+# Output in `pilot/planeblend/bydiameter_strip5um/`: one figure per node, `planeblend_<id>.png`: the planes
+# without any line, framed at the three picks (aqua Gd, green J, yellow Hs) and at the pipeline's planes;
+# below, every plane's profile along the +-5 um line with the d-line's extent dashed, g_k and h_k with their
+# picks (h drawn as it is: its pick is its lowest point), and J_k with its pick and w, on the axis -(1 - w) ..
+# w that J spans. `planeblend_summary_529878215.png`: one panel per node with the three curves rescaled 0-1
+# and drawn as they are (the entropy's pick at the bottom), w in each title;
+# `planeblend_summary_529878215.csv`: per node d_hat, the d-line's half-length, w, the planes and each pick
+# minus k* (`k_Gd`, `k_blend`, `k_Hs`), printed by the cell. The cell then shows each node's figure, in order
+# of d_hat.
+#
+# Expect the node list of Cell 4h, one `[planediff] node N: planes ... (0 missing); d_hat ... um; G on the
+# d-line +-... um (... samples), entropy on the strip +-5.0 um (... pixels); w ...; G k ..., blend k ...,
+# strip entropy k ...; k* ..., dip-depth plane ..., SWC plane ...` line per node, then `[planediff] summary
+# over N nodes: k_Gd within 1 plane of k* in a of N (...); k_blend ...; k_Hs ...` and `[planediff] wrote N
+# figures (0 skipped) ...`; about 13 new crops per node (the +-5 um square, as in Cell 4g). A node whose
 # d-line would hold fewer than 3 samples is skipped, with the reason.
 #
-# What to expect (synthetic tubes, SPEC Block 11): on a 0.8 um tube w = 0.90 and the blend picks the in-focus
-# plane with G_k, while the strip's entropy alone picks the end plane 6 planes away on every node: on so short
-# a line (+-0.85 um) the strip is mostly dendrite, so the entropy's premise (most of the neighbourhood at the
-# ground level in focus) fails; the entropy is highest one plane either side of focus (about 6.1 bits), where
-# the tube's edges spread over many grey levels, dips slightly at the focal plane (about 5.8 bits), and is
-# lowest on the end planes (about 3.3 bits), where the blurred tube is nearly uniform. On a 3.0 um tube w =
-# 0.02: the blend follows the strip's entropy, which picks the plane next to the axis on every node, while G_k
-# alone picks one or two planes from it; k* is four planes off. Between G's pick p and the entropy's pick q,
-# the blend takes p when w exceeds w* = (1 - eta_p) / ((1 - eta_p) + (1 - g_q)) and q below it (SPEC Block
-# 11), so the summary's w beside the three picks says which curve decided.
-# Cell 4i: the d-line across diameters: gradient energy, sigmoid-weighted blend, strip entropy (needs Cells 0 and 1 and the pilot's CSV of Cell 4b)
+# What to expect (synthetic tubes, SPEC Block 11): on a 0.8 um tube w = 0.90, and G_k, the +-5 um strip's
+# entropy and the blend all pick the in-focus plane on every node; on a 3.0 um tube whose Allen radius is 0.3
+# um, so that k* falls four planes from the axis, w = 0.02: the +-5 um entropy picks the plane next to the
+# axis on every node and the blend follows it, while G_k alone picks one or two planes from the axis. On
+# Allen's data the +-5 um strip's entropy fell within one plane of k* on 1 of 12 thin nodes in Cell 4g, but
+# there w is about 0.9 and G_k decides; what this run adds is the nodes of 1.5-3 um, where w < 1/2 and the +-5
+# um entropy decides.
+# Cell 4i: G on the d-line, the entropy of the +-5 um strip and their blend, across diameters (needs Cells 0 and 1 and the pilot's CSV of Cell 4b)
 import json
 import os
 import pandas as pd
 from IPython.display import Image, display
 BYDIAM = dict(dhat_bins="0.8,1.0,1.5,2.0,3.0", per_bin=2, add_nodes="2,3")   # the same nodes as Cell 4h
-LINE_MULT = 2.0                        # the d-line's full width in units of d_hat, as in Cell 4h
+LINE_MULT = 2.0                        # G's line: full width LINE_MULT x d_hat, as in Cell 4h
+ENTROPY_HALF_UM = 5.0                  # the entropy's strip: +-5 um across the dendrite (D-041) ...
+STRIPE_HALF_UM = 1.0                   # ... and +-1 um along it (as in Cells 4f and 4g)
 SIGMOID = dict(d0_um=1.5, s_um=0.3)    # the weight of G: w(d_hat) = 1 / (1 + exp((d_hat - d0) / s))
-STRIPE_HALF_UM = 1.0                   # the strip's half-width along the dendrite, um (as in Cells 4f and 4g)
-out = OUT + "/pilot/planeblend/bydiameter"
+out = OUT + "/pilot/planeblend/bydiameter_strip%gum" % ENTROPY_HALF_UM
 run("scripts/plane_differences.py", "--specimen", SPECIMEN, "--nodes", "bydiameter",
     "--pilot-csv", "%s/pilot/pilot_%d.csv" % (OUT, SPECIMEN), "--dhat-bins", BYDIAM["dhat_bins"],
     "--per-bin", BYDIAM["per_bin"], "--add-nodes", BYDIAM["add_nodes"], "--evaluation", "blend",
-    "--line-mult", LINE_MULT, "--sigmoid-d0-um", SIGMOID["d0_um"], "--sigmoid-s-um", SIGMOID["s_um"],
-    "--stripe-half-um", STRIPE_HALF_UM, "--planes-half", 6, "--cache-dir", CACHE_DIR, "--out-dir", out, *ALIGN)
+    "--line-mult", LINE_MULT, "--entropy-half-um", ENTROPY_HALF_UM, "--stripe-half-um", STRIPE_HALF_UM,
+    "--sigmoid-d0-um", SIGMOID["d0_um"], "--sigmoid-s-um", SIGMOID["s_um"], "--planes-half", 6,
+    "--cache-dir", CACHE_DIR, "--out-dir", out, *ALIGN)
 summ = "%s/planeblend_summary_%d.csv" % (out, SPECIMEN)
 if os.path.exists(summ):
     print(pd.read_csv(summ).to_string(index=False))
@@ -550,7 +559,7 @@ recs = "%s/planeblend_%d.json" % (out, SPECIMEN)
 if os.path.exists(recs):
     with open(recs) as f:
         nodes = [r["node_id"] for r in json.load(f) if "skipped" not in r]
-    for n in nodes:       # each node's figure, in order of d_hat; its planes drawn without the line
+    for n in nodes:       # each node's figure, in order of d_hat; its planes drawn without any line
         p = "%s/planeblend_%d.png" % (out, n)
         if os.path.exists(p):
             print(os.path.basename(p))
@@ -766,6 +775,8 @@ for s in (0.080, 0.125):
 # - Cells 4h and 4i (2026-10-09, evening): the `[planediff]` lines (the nodes by diameter and the summary
 # lines), both summary CSVs and figures, and the figures of the trunk nodes and of the nodes where the picks
 # part; the JSONs carry the curves and the profiles, so the files themselves are enough.
+# - Cell 4i (2026-10-10, the entropy on the +-5 um strip): the `[planediff]` summary line, the summary CSV and
+# figure, and the figures of the nodes with d_hat between 1.5 and 3.5 um, where the entropy decides.
 # - Cell 5: the `"renderer"` block without the tables, `table_sets`, `pillow_version`, `notes`.
 # - Cell 6: the `pooled dendrite diameter` line.
 # - Cell 7: the growth-fit report.

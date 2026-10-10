@@ -364,9 +364,10 @@ def sigmoid_weight(d_um, d0_um, s_um):
 
 def minmax_scores(S, valid=None, higher_is_better=True):
     """A curve rescaled to [0, 1] over its usable entries (finite, and valid
-    when given): (S - min) / (max - min), or (max - S) / (max - min) when lower
-    is better (the entropy); every usable entry 0 when the curve is flat there
-    (it carries no information); NaN elsewhere. Returns (n,)."""
+    when given): (S - min) / (max - min), or (max - S) / (max - min) when
+    higher_is_better is False (the curve inverted); every usable entry 0 when
+    the curve is flat there (it carries no information); NaN elsewhere.
+    Returns (n,)."""
     S = np.asarray(S, dtype=float)
     use = np.isfinite(S) if valid is None else (np.isfinite(S) & np.asarray(valid, dtype=bool))
     out = np.full(S.shape, np.nan)
@@ -381,10 +382,12 @@ def minmax_scores(S, valid=None, higher_is_better=True):
 
 
 def blend_scores(G, H, w):
-    """The min-max blend of the gradient energy and the entropy (D-040): over
-    V, the planes where both G and H are finite, g = minmax_scores(G) and
-    eta = minmax_scores(H, lower is better), J = w g + (1 - w) eta; NaN
-    outside V. w in [0, 1]. Returns dict(g, eta, J, V), V a bool mask."""
+    """The min-max blend of the gradient energy and the entropy (D-040; the
+    form of D-041): over V, the planes where both G and H are finite,
+    g = minmax_scores(G) (1 at the largest gradient energy) and
+    h = minmax_scores(H) (0 at the lowest entropy), J = w g - (1 - w) h,
+    largest where G is high and H low; NaN outside V. w in [0, 1]. Returns
+    dict(g, h, J, V), V a bool mask."""
     G = np.asarray(G, dtype=float)
     H = np.asarray(H, dtype=float)
     if G.ndim != 1 or G.shape != H.shape:
@@ -394,5 +397,5 @@ def blend_scores(G, H, w):
         raise ValueError("blend_scores: w must lie in [0, 1], got %r" % (w,))
     V = np.isfinite(G) & np.isfinite(H)
     g = minmax_scores(G, V)
-    eta = minmax_scores(H, V, higher_is_better=False)
-    return dict(g=g, eta=eta, J=np.where(V, w * g + (1.0 - w) * eta, np.nan), V=V)
+    h = minmax_scores(H, V)
+    return dict(g=g, h=h, J=np.where(V, w * g - (1.0 - w) * h, np.nan), V=V)

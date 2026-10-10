@@ -40,12 +40,14 @@ gradient energy G = B_k^-2 * integral of (dI~/dv)^2 over the whole line
 profile evaluation, on the lines of half-length --grad-lines-um (3, 5) and on
 the line sized from the node's fitted diameter, --line-mult x d_hat / 2 (2:
 [-d_hat, d_hat]); each line frames its maximum. Writes planegrad_*.
---evaluation blend (D-040): on that d-line, G, the strip's entropy and their
-min-max blend J = w g + (1 - w) eta, w = 1 / (1 + exp((d_hat - d0) / s)) with
-d0 = --sigmoid-d0-um (1.5) and s = --sigmoid-s-um (0.3); frames the planes G,
-J and the entropy pick. Writes planeblend_*. The planes of both figures are
-drawn without the line. --nodes bydiameter --pilot-csv takes the nodes from
-bins of the pilot's d_hat (--dhat-bins, --per-bin, --add-nodes).
+--evaluation blend (D-040, D-041): G on that d-line, the entropy of the strip
++---entropy-half-um (5) across and +---stripe-half-um along, and their min-max
+blend J = w g - (1 - w) h (g: G rescaled, 1 at its maximum; h: the entropy
+rescaled, 0 at its minimum), w = 1 / (1 + exp((d_hat - d0) / s)) with d0 =
+--sigmoid-d0-um (1.5) and s = --sigmoid-s-um (0.3); frames the planes G, J and
+the entropy pick. Writes planeblend_*. The planes of both figures are drawn
+without the line. --nodes bydiameter --pilot-csv takes the nodes from bins of
+the pilot's d_hat (--dhat-bins, --per-bin, --add-nodes).
 
 Each node is located as the pilot measures it (survey.node_planes: the same
 stretch and block request, so with the pilot's image cache its planes come
@@ -366,24 +368,33 @@ def gradient_evaluation(st, cfg, lines_um=(3.0, 5.0), line_mult=2.0, bg_margin_u
                 d_hat_um=float(st["result"].d_hat_um), d_line_half_um=hd, d_line_note=note)
 
 
-def blend_evaluation(st, cfg, line_mult=2.0, stripe_half_um=1.0, bin_width=1.0, d0_um=1.5, s_um=0.3, bg_margin_um=4.0):
-    """On the line sized from the node's fitted diameter, h = line_mult * d_hat
-    / 2 (D-040): the gradient energy over the whole line (with each plane's
-    background of block_background), the entropy of the strip's pixels
-    (entropy_evaluation: |v| <= h across, |u| <= stripe_half_um along), and
-    their min-max blend J = w g + (1 - w) eta with w = focus.sigmoid_weight(
-    d_hat, d0_um, s_um) (focus.blend_scores). ValueError without a usable
-    d-line or with an empty strip. Returns entropy_evaluation's dict with G,
-    g, eta, J, V, w, background, bg_frac, bg_margin_used, d_hat_um, line_mult,
-    d0_um, s_um."""
-    d, h = _d_line_or_error(st, cfg, line_mult)
+def blend_evaluation(st, cfg, line_mult=2.0, entropy_half_um=5.0, stripe_half_um=1.0, bin_width=1.0, d0_um=1.5,
+                     s_um=0.3, bg_margin_um=4.0):
+    """The gradient energy over the whole line sized from the node's fitted
+    diameter, h_d = line_mult * d_hat / 2 (D-040; each plane's background of
+    block_background), the entropy of the strip's pixels |v| <= entropy_half_um
+    across and |u| <= stripe_half_um along (entropy_evaluation; D-041: the
+    strip on which the entropy's minimum held on the trunks, not the d-line),
+    and their min-max blend J = w g - (1 - w) h with w =
+    focus.sigmoid_weight(d_hat, d0_um, s_um) (focus.blend_scores). ValueError
+    without a usable d-line, for entropy_half_um not finite and positive, or
+    with an empty strip. Returns entropy_evaluation's dict (its v, prof along
+    the +-entropy_half_um line) with G, g, h, J, V, w, v_d, prof_d (the
+    d-line), d_line_half_um, background, bg_frac, bg_margin_used, d_hat_um,
+    line_mult, d0_um, s_um."""
+    d, h_d = _d_line_or_error(st, cfg, line_mult)
+    h_e = float(entropy_half_um)
+    if not (math.isfinite(h_e) and h_e > 0):
+        raise ValueError("entropy_half_um must be finite and > 0, got %r" % (entropy_half_um,))
     w = focus.sigmoid_weight(d, d0_um, s_um)
-    ent = entropy_evaluation(st, cfg, h, stripe_half_um, bin_width)
+    ent = entropy_evaluation(st, cfg, h_e, stripe_half_um, bin_width)
     B, bg_frac, margin_used = block_background(st, bg_margin_um)
-    G = focus.plane_gradient_energies(ent["prof"], ent["v"], B, cfg.measure, st["valid"])
+    _h, v_d, _y, _e, prof_d = line_profiles(st, cfg, h_d)
+    G = focus.plane_gradient_energies(prof_d, v_d, B, cfg.measure, st["valid"])
     ent.update(focus.blend_scores(G, ent["h_strip"], w))
-    ent.update(G=G, w=w, background=B, bg_frac=bg_frac, bg_margin_used=margin_used, d_hat_um=d,
-               line_mult=float(line_mult), d0_um=float(d0_um), s_um=float(s_um))
+    ent.update(G=G, w=w, v_d=v_d, prof_d=prof_d, d_line_half_um=h_d, background=B, bg_frac=bg_frac,
+               bg_margin_used=margin_used, d_hat_um=d, line_mult=float(line_mult), d0_um=float(d0_um),
+               s_um=float(s_um))
     return ent
 
 
@@ -466,7 +477,7 @@ def select_nodes_by_diameter(swc, rows, bins_um=(0.8, 1.0, 1.5, 2.0, 3.0), per_b
 
 
 _PICK_KEYS = {"entropy": ("k_h_line", "k_h_strip"), "profile": ("k_min_area", "k_min_area_norm"), "image": (),
-              "blend": ("k_Gd", "k_blend", "k_Hd"), "gradient": ()}   # gradient: the keys depend on the lines
+              "blend": ("k_Gd", "k_blend", "k_Hs"), "gradient": ()}   # gradient: the keys depend on the lines
 
 
 def pick_summary(records, evaluation, keys=None, extra=()):
@@ -522,8 +533,8 @@ def _gradient_line_specs(lines, line_mult):
 
 
 _MARKS_BLEND = (("k_Gd", _GRAD_D_COLOUR[0], "-.", "Gd", "G alone, over the whole d-line"),
-                ("k_blend", "#008300", "-", "J", "the blend J = w g + (1 - w) eta"),
-                ("k_Hd", "#eda100", "--", "Hs", "the strip's entropy alone (lowest), on the d-line"))
+                ("k_blend", "#008300", "-", "J", "the blend J = w g - (1 - w) h"),
+                ("k_Hs", "#eda100", "--", "Hs", "the strip's entropy alone (lowest)"))
 
 
 def _profile_record(v, prof):
@@ -553,7 +564,7 @@ def _pipeline_at(res, k_swc):
 def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_half=6, half_um=None, band_um=0.0,
         evaluation="profile", profile_half_um=None, bg_margin_um=4.0, dpi=110, log=print, stripe_half_um=1.0,
         entropy_bin_gl=1.0, entropy_pick_rule="min", show_line=True, grad_lines_um=(3.0, 5.0), line_mult=2.0,
-        sigmoid_d0_um=1.5, sigmoid_s_um=0.3):
+        sigmoid_d0_um=1.5, sigmoid_s_um=0.3, entropy_half_um=5.0):
     """One figure per node id; returns the per-node records (also written to
     <prefix>_<specimen>.json: planediff for the profile and image evaluations,
     planeentropy, planegrad, planeblend). show_line=False: the profile and
@@ -561,7 +572,8 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
     outline (presentation only; the records do not change); the gradient and
     blend figures always do. grad_lines_um, line_mult: the gradient
     evaluation's fixed half-lengths and the d-line's multiplier (D-040);
-    sigmoid_d0_um, sigmoid_s_um: the blend's weight w(d_hat)."""
+    sigmoid_d0_um, sigmoid_s_um: the blend's weight w(d_hat); entropy_half_um:
+    the half-length across of the blend's entropy strip (D-041)."""
     from allen_diameter.plotting import figures as fg
     import matplotlib.pyplot as plt
     if evaluation not in _PREFIX:
@@ -576,8 +588,10 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
         line_h = float(cfg.measure.profile_half_um if profile_half_um is None else profile_half_um)
     elif evaluation == "gradient":
         line_h, d_mult = max(grad_lines_um, default=None), float(line_mult)
-    elif evaluation == "blend":
-        d_mult = float(line_mult)
+    elif evaluation == "blend":                    # the square holds the entropy's strip and the d-line
+        line_h, d_mult = float(entropy_half_um), float(line_mult)
+        if not (math.isfinite(line_h) and line_h > 0):
+            raise ValueError("entropy_half_um must be finite and > 0, got %r" % (entropy_half_um,))
     os.makedirs(out_dir, exist_ok=True)
     records = []
     for nid in node_ids:
@@ -694,43 +708,46 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
             msg = "d_hat %.2f um; G picks: %s" % (ev["d_hat_um"], picks)
         elif evaluation == "blend":
             try:
-                ev = blend_evaluation(st, cfg, line_mult, stripe_half_um, entropy_bin_gl, sigmoid_d0_um, sigmoid_s_um,
-                                      bg_margin_um)
+                ev = blend_evaluation(st, cfg, line_mult=line_mult, entropy_half_um=entropy_half_um,
+                                      stripe_half_um=stripe_half_um, bin_width=entropy_bin_gl, d0_um=sigmoid_d0_um,
+                                      s_um=sigmoid_s_um, bg_margin_um=bg_margin_um)
             except ValueError as e:
                 log("[planediff] node %d skipped: %s" % (nid, e))
                 records.append(dict(node_id=int(nid), skipped=str(e)))
                 continue
             at.update(k_Gd=_argmax_plane(ks, ev["G"]), k_blend=_argmax_plane(ks, ev["J"]),
-                      k_Hd=_argmin_plane(ks, ev["h_strip"]))
+                      k_Hs=_argmin_plane(ks, ev["h_strip"]))
             frames, lines = _marks(at, _MARKS_BLEND + _MARKS_PIPELINE)
             na = lambda x: "n/a" if x is None else "%d" % x  # noqa: E731
-            n_line, n_strip = int(ev["n_line"].max()), int(ev["n_strip"].max())
+            n_dline, n_strip = int(ev["v_d"].size), int(ev["n_strip"].max())
             idx = lambda k: None if k is None else int(k) - int(ks[0])  # noqa: E731
-            label = ("node %d: planes %d..%d; d_hat %.2f um, line +-%.2f um (%d samples), strip +-%.1f um along it (%d "
-                     "pixels); w %.2f; G k %s, blend k %s, strip entropy k %s; k* %d, dip-depth plane %d, SWC plane %d"
-                     % (nid, ks[0], ks[-1], ev["d_hat_um"], ev["half_um"], n_line, ev["stripe_half_um"], n_strip,
-                        ev["w"], na(at["k_Gd"]), na(at["k_blend"]), na(at["k_Hd"]), r.k_star, r.k_star_depth,
-                        st["k_swc"]))
+            picks = ("w %.2f; G k %s, blend k %s, strip entropy k %s"
+                     % (ev["w"], na(at["k_Gd"]), na(at["k_blend"]), na(at["k_Hs"])))
+            label = ("node %d: planes %d..%d; d_hat %.2f um; G on the d-line +-%.2f um (%d samples); entropy of the "
+                     "strip +-%.1f um across, +-%.1f um along (%d pixels); %s; k* %d, dip-depth plane %d, SWC plane %d"
+                     % (nid, ks[0], ks[-1], ev["d_hat_um"], ev["d_line_half_um"], n_dline, ev["half_um"],
+                        ev["stripe_half_um"], n_strip, picks, r.k_star, r.k_star_depth, st["k_swc"]))
             fig = fg.blend_figure([dict(label=label, stack=st["stack"], ks=ks, valid=st["valid"], extent=st["extent"],
                                         frames=frames, lines=lines, v=ev["v"], prof=ev["prof"], half_um=ev["half_um"],
-                                        g=ev["g"], eta=ev["eta"], J=ev["J"], w=ev["w"], d_hat_um=ev["d_hat_um"],
-                                        d0_um=ev["d0_um"], s_um=ev["s_um"], pick_g=idx(at["k_Gd"]),
-                                        pick_eta=idx(at["k_Hd"]), pick_J=idx(at["k_blend"]), k_ref=st["k_swc"])],
-                                  "The line sized from d_hat: gradient energy, sigmoid-weighted min-max blend and strip "
-                                  "entropy, specimen %s" % specimen)
-            rec.update(profile_half_um=ev["half_um"], d_line_half_um=ev["half_um"], line_mult=ev["line_mult"],
+                                        d_half_um=ev["d_line_half_um"], g=ev["g"], h=ev["h"], J=ev["J"], w=ev["w"],
+                                        d_hat_um=ev["d_hat_um"], d0_um=ev["d0_um"], s_um=ev["s_um"],
+                                        pick_g=idx(at["k_Gd"]), pick_h=idx(at["k_Hs"]), pick_J=idx(at["k_blend"]),
+                                        k_ref=st["k_swc"])],
+                                  "G on the line sized from d_hat, the entropy of the +-%g um strip, and their "
+                                  "sigmoid-weighted min-max blend, specimen %s" % (ev["half_um"], specimen))
+            rec.update(profile_half_um=ev["half_um"], entropy_half_um=ev["half_um"],
+                       d_line_half_um=ev["d_line_half_um"], line_mult=ev["line_mult"],
                        stripe_half_um=ev["stripe_half_um"], entropy_bin_gl=ev["bin_width"], theta_rad=st["theta"],
                        w=ev["w"], d0_um=ev["d0_um"], s_um=ev["s_um"],
                        G_Gd=[float(x) for x in ev["G"]], h_strip=[float(x) for x in ev["h_strip"]],
                        n_strip=[int(x) for x in ev["n_strip"]], g=[float(x) for x in ev["g"]],
-                       eta=[float(x) for x in ev["eta"]], J=[float(x) for x in ev["J"]],
+                       h_norm=[float(x) for x in ev["h"]], J=[float(x) for x in ev["J"]],
                        background=[float(x) for x in ev["background"]], bg_frac=ev["bg_frac"],
                        bg_margin_um=float(bg_margin_um), bg_margin_used=ev["bg_margin_used"],
-                       pick_keys=list(_PICK_KEYS["blend"]), k_Gd=at["k_Gd"], k_blend=at["k_blend"], k_Hd=at["k_Hd"],
+                       pick_keys=list(_PICK_KEYS["blend"]), k_Gd=at["k_Gd"], k_blend=at["k_blend"], k_Hs=at["k_Hs"],
                        **_profile_record(ev["v"], ev["prof"]))
-            msg = ("d_hat %.2f um, line +-%.2f um (%d samples), strip %d pixels; w %.2f; G k %s, blend k %s, strip "
-                   "entropy k %s" % (ev["d_hat_um"], ev["half_um"], n_line, n_strip, ev["w"], na(at["k_Gd"]),
-                                     na(at["k_blend"]), na(at["k_Hd"])))
+            msg = ("d_hat %.2f um; G on the d-line +-%.2f um (%d samples), entropy on the strip +-%.1f um (%d pixels); %s"
+                   % (ev["d_hat_um"], ev["d_line_half_um"], n_dline, ev["half_um"], n_strip, picks))
         else:
             res = focus.plane_differences(st["stack"], st["valid"], st["mask"])
             dip = focus.difference_dip(res["pos"])
@@ -780,15 +797,17 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
             fig = fg.picks_summary_figure(done, series, "Gradient energy over the whole line: the plane each line "
                                                         "picks, on %d nodes by d_hat, specimen %s" % (len(done), specimen))
         elif evaluation == "blend":
-            series = [dict(curve="G_Gd", pick="k_Gd", label="G alone, over the whole d-line", colour=_GRAD_D_COLOUR[0],
-                           style=_GRAD_D_COLOUR[1]),
-                      dict(curve="J", pick="k_blend", label="the blend J = w g + (1 - w) eta", colour="#008300",
-                           style="D-"),
-                      dict(curve="h_strip", pick="k_Hd", label="the strip's entropy alone (inverted: lowest on top)",
-                           colour="#eda100", style="s--", lower_is_better=True)]
-            fig = fg.picks_summary_figure(done, series, "The d-line: the plane each method picks, on %d nodes by d_hat "
-                                                        "(w = sigmoid weight of G), specimen %s" % (len(done), specimen),
-                                          weight_key="w")
+            series = [dict(curve="G_Gd", pick="k_Gd", label="G alone, over the whole d-line (its pick: the largest)",
+                           colour=_GRAD_D_COLOUR[0], style=_GRAD_D_COLOUR[1]),
+                      dict(curve="J", pick="k_blend", label="the blend J = w g - (1 - w) h (its pick: the largest)",
+                           colour="#008300", style="D-"),
+                      dict(curve="h_strip", pick="k_Hs", label="the entropy of the +-%g um strip alone (its pick: the "
+                                                                 "lowest)" % float(entropy_half_um),
+                           colour="#eda100", style="s--")]
+            fig = fg.picks_summary_figure(done, series, "G on the d-line, the entropy of the +-%g um strip and their "
+                                                        "blend: the plane each picks, on %d nodes by d_hat (w = sigmoid "
+                                                        "weight of G), specimen %s"
+                                          % (float(entropy_half_um), len(done), specimen), weight_key="w")
         if fig is not None:
             fig.savefig(os.path.join(out_dir, "%s_summary_%s.png" % (_PREFIX[evaluation], specimen)), dpi=dpi)
             plt.close(fig)
@@ -822,6 +841,8 @@ def main(argv=None):
                     help="blend evaluation: d_hat at which the gradient energy's weight is 1/2, um")
     ap.add_argument("--sigmoid-s-um", type=float, default=0.3,
                     help="blend evaluation: width of the sigmoid w(d) = 1 / (1 + exp((d - d0) / s)), um")
+    ap.add_argument("--entropy-half-um", type=float, default=5.0,
+                    help="blend evaluation: half-length across the branch of the entropy's strip, um (D-041)")
     ap.add_argument("--planes-half", type=int, default=6, help="planes on each side of the SWC plane")
     ap.add_argument("--profile-half-um", type=float, default=None,
                     help="profile and entropy evaluations: half-length of the measuring line, um "
@@ -898,7 +919,8 @@ def main(argv=None):
                a.planes_half, a.half_um, a.band_um, a.evaluation, a.profile_half_um, a.bg_margin_um,
                log=lambda m: print(m, flush=True), stripe_half_um=a.stripe_half_um, entropy_bin_gl=a.entropy_bin_gl,
                entropy_pick_rule=a.entropy_pick, show_line=not a.hide_line, grad_lines_um=grad_lines,
-               line_mult=a.line_mult, sigmoid_d0_um=a.sigmoid_d0_um, sigmoid_s_um=a.sigmoid_s_um)
+               line_mult=a.line_mult, sigmoid_d0_um=a.sigmoid_d0_um, sigmoid_s_um=a.sigmoid_s_um,
+               entropy_half_um=a.entropy_half_um)
     n_ok = sum(1 for r in recs if "png" in r)
     print("[planediff] wrote %d figures (%d skipped) in %s; crops: %d from the cache, %d downloaded (%.1f MB); %.1f min"
           % (n_ok, len(recs) - n_ok, a.out_dir, fetcher.n_cache_hits, fetcher.n_requests,
