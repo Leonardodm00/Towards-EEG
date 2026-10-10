@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-04 (v1, revised the same day after an independent review;
 v1.1 the same day adds diffraction, §3.4–3.5; v1.2 adds pointers to the
-interactive figures; v1.3 on 2026-10-08 marks a correction in §3.6; v1.4 on 2026-10-10 adds the Allen morphology white paper, §3.1 and §3.7; see §5, "Revision record"). **Project:** Towards EEG, diameter re-measurement
+interactive figures; v1.3 on 2026-10-08 marks a correction in §3.6; v1.4 on 2026-10-10 adds the Allen morphology white paper, §3.1 and §3.7; v1.5 the same day adds ZEISS's documentation and the condenser-setting sensitivity, §3.1 and §3.6; see §5, "Revision record"). **Project:** Towards EEG, diameter re-measurement
 from the Allen 63× brightfield stacks. **Companion documents:**
 `claude/TEEG_diameter_bias_table_procedure_2026-10-04.md` ("procedure §n /
 Eq. (n)") and `claude/TEEG_diameter_bias_table_mathematics_2026-10-04.md`
@@ -234,6 +234,38 @@ up to 125 characters; the PDF could not be downloaded here. The image series of
 our stack is named `H301-Ax.160726_03_A04_529878215` (Allen API
 `DataSet/546735464`, **metadata only**); reading "Ax" as AxioImager is an
 inference from the name, not a documented fact.
+
+**[added 2026-10-10, v1.5]** ZEISS's own documentation (read through the
+web-fetch tool; §6 lists the documents):
+- **Objective.** The Plan-Apochromat 63×/1.4 Oil DIC M27 (420782-9900-000) has
+  a free working distance of 0.19 mm, is corrected for 0.17 mm cover glass, is
+  apochromatic and infinity-corrected (ICS), and ships with Immersol 518 F. The
+  product page gives no PSF, resolution or depth-of-field data, and says "the
+  given values are typical only and not guaranteed". Allen names only "Plan
+  APOCHROMAT 63X/1.4 oil"; ZEISS sells more than one variant (e.g. DIC M27,
+  Iris M27), and which one Allen used is not reported.
+- **Immersion oil.** Immersol 518 F has $n_e = 1.518$ at 23 °C (ZEISS
+  immersion-media page). This document's $n_{\rm oil} = 1.515$ is from memory,
+  and Allen's oil is not reported. Using 1.518 instead changes the cone little
+  **[arithmetic]**: $s_m$ 0.9223 against 0.9241, the per-axis RMS slope under
+  the aplanatic weighting 0.786 against 0.792, $\langle1/\cos\vartheta\rangle$
+  1.442 against 1.447.
+- **Focus drive.** The Axio Imager.Z2's stepper motor has a mean step of 10 nm
+  (operating manual M70-2-0020 e, 06/2009, p. 31). The Axio Imager 2 brochure
+  gives a repeatability of ±10 nm for the high-performance focus. One 0.28 µm
+  plane step is about 28 motor steps **[arithmetic]**.
+- **Condensers.** The 2009 manual's equipment pages list the achromatic-aplanatic
+  universal condenser 0.9 H D Ph DIC (NA 0.9), coded or motorized; the NA 1.4
+  oil condenser that Allen reports is not in the pages read. The brochure says
+  the light and contrast managers can save objective-specific aperture settings
+  and reload them.
+- **Camera.** The Axiocam 506 mono (ZEISS brochure) has a Sony ICX694 CCD,
+  2752 × 2208 pixels of 4.54 µm, 14 bit, a read noise of 6.0–6.5 e⁻, a full
+  well of 15 000 e⁻, and Peltier cooling to 18 °C. Allen exported 8-bit files
+  (white paper).
+- **PSF and test specimens.** No ZEISS document read gives a measured PSF or a
+  bead or test-specimen procedure; the manual mentions stage micrometers, for
+  length calibration only.
 
 **For the pipeline:** the elements after the specimen (oil, objective, camera)
 shape the blur; the condenser shapes how the specimen is lit, which decides
@@ -608,6 +640,30 @@ is not reported in the sources read. Closing it to gain contrast is common
 practice **[from memory]**; it would lower $S$, make the illumination more
 coherent, and narrow the defocus cone (§3.5).
 
+**[added 2026-10-10, v1.5]** ZEISS's own guidance (ZEISS "Foundational
+knowledge: Köhler illumination", read through the web-fetch tool), for
+transmitted brightfield with objectives of 10× and higher:
+- for visual microscopy, "the condenser aperture stop is closed by 20-25 % of
+  the back focal plane diameter";
+- for digital imaging, "the condenser aperture stop is opened more to achieve a
+  better resolution".
+
+The back-focal-plane radius is proportional to the NA (sine condition)
+**[reasoning]**, so the visual default means $\mathrm{NA}_{\rm cond} \approx$
+0.75–0.80 × 1.4 = 1.05–1.12, that is $S \approx$ 0.75–0.80. The defocus cone is
+very sensitive to this setting. For an evenly filled condenser cone in oil of
+1.518 **[arithmetic]**:
+
+| $\mathrm{NA}_{\rm cond}$ | $\tan\theta_{\max}$ | per-axis RMS slope, aplanatic weighting |
+|---|---|---|
+| 1.40 (fully open) | 2.39 | 0.79 |
+| 1.12 (80 %) | 1.09 | 0.47 |
+| 1.05 (75 %) | 0.96 | 0.42 |
+
+So the geometric growth of the shadow's blur with defocus, and the cone of the
+ray world, could be about half of the fully open values. Allen's setting stays
+unreported; the Z2's light manager can store one per objective (brochure).
+
 **For the pipeline:** the incoherent form $B\,(T * h_0)$ underlies handoff
 Eq. 11, the squared-width additivity (mathematics §3.3), the slab rendering
 (procedure §3.6) and the bias table. If $S$ is well below 1, or the dendrites
@@ -750,7 +806,12 @@ into one map from optics to pipeline.
   index is given (§3.7).
 - **Condenser aperture-diaphragm setting**: not reported (§3.6); it changes both
   the coherence and the defocus cone (§3.5). **[updated 2026-10-10]** Not in the
-  Allen white paper v.7 either.
+  Allen white paper v.7 either. **[updated 2026-10-10, v1.5]** ZEISS recommends
+  75–80 % of the back focal plane for visual work and more for digital imaging
+  (§3.6 note). Between fully open and 75–80 %, the cone's RMS slope changes by a
+  factor of about 2. Because the far-defocus growth of the shadow's blur is set
+  by that cone, the kernel calibrated on thin dendrites (D-026, D-027) could
+  reveal the effective setting **[reasoning]**.
 - **Weak-object approximation**: the incoherent blur form is first order in the
   absorbance; dark dendrites exceed it (§3.6).
 - **Angular weighting of the defocused shadow**: not established (§3.5).
@@ -758,7 +819,10 @@ into one map from optics to pipeline.
   sensitivity): not known (§3.4).
 - **Coverslip thickness and oil type**: not reported (nor in the Allen white
   paper v.7, checked 2026-10-10); a mismatch with the objective's design adds
-  spherical aberration **[textbook, from memory]**.
+  spherical aberration **[textbook, from memory]**. **[updated 2026-10-10,
+  v1.5]** The objective is designed for 0.17 mm cover glass and ships with
+  Immersol 518 F, $n_e = 1.518$ at 23 °C (§3.1 note); what Allen used is still
+  not reported.
 - **Scalar model**: polarisation effects at NA 1.4 are ignored.
 - **Transfer from fluorescence to brightfield** of the index-mismatch results
   (§3.7): reasonable on the shared detection path, not checked.
@@ -813,6 +877,16 @@ information. §5 and §6 updated; the §6 statement that the white paper could n
 be found is marked [corrected 2026-10-10]. No other statement changed.
 Evidence: the white paper, read through the web-fetch tool; Berg 2021, PubMed
 full text, re-read; the Allen API (metadata only).
+
+**Revision record, v1.5 (2026-10-10, document upkeep by the theory chat, after
+the user asked for the microscope's technical documentation).** §3.1 gains a
+dated note with ZEISS's specifications of the objective, the immersion oil, the
+focus drive, the condensers and the camera. §3.6 gains ZEISS's Köhler guidance
+and the sensitivity of the defocus cone to the condenser setting. §5 and §6
+updated. No earlier statement changed; the from-memory $n_{\rm oil} = 1.515$
+stays where it is used, with ZEISS's 1.518 and its effect noted beside it.
+Evidence: ZEISS documents read through the web-fetch tool (§6); arithmetic in a
+scratch script.
 
 ## 6. References and sources
 
@@ -872,6 +946,50 @@ full text, re-read; the Allen API (metadata only).
   and §3.7 notes.
 - Berg et al. 2021 (entry above), re-read in full through PubMed Central on
   2026-10-10 for its imaging paragraph; it agrees with the entry above.
+
+**ZEISS technical documentation, read 2026-10-10 through the web-fetch tool
+(manufacturer's documents, not peer-reviewed; values "typical only"):**
+- Objective Plan-Apochromat 63x/1.4 Oil DIC M27, product page
+  (https://www.micro-shop.zeiss.com/en/us/shop/objectives/420782-9900-000).
+- Immersion media, product page
+  (https://www.zeiss.com/microscopy/en/products/accessories/microscopy-consumables/immersion-media.html).
+- "Foundational knowledge: Köhler illumination"
+  (https://www.zeiss.com/microscopy/en/resources/insights-hub/foundational-knowledge/koehler-illumination.html).
+- Axio Imager operating manual M70-2-0020 e, 06/2009
+  (https://ueb-api.ssc.avcr.cz/uploads/Axio_Imager_manual_de3ed4df62.pdf); the
+  fetched text stops after section 3.42, so its Köhler section (4.9.1) and its
+  Light Manager section (4.7) were not read.
+- Axio Imager 2 brochure
+  (https://ueb-api.ssc.avcr.cz/uploads/Brochure_Axio_Imager_2_BIO_46165aa180.pdf);
+  its technical-data tables were not in the fetched text.
+- Axiocam 506 mono brochure
+  (https://ueb-api.ssc.avcr.cz/uploads/Brochure_Axio_Cam_506_mono_9f9d06312c.pdf).
+
+**PubMed, abstract only (2026-10-10; full text not accessible, no numbers
+used):** Oberlaender M. et al. (2007) *J Biomed Opt* 12:064029,
+[DOI](https://doi.org/10.1117/1.2815693) — tracing of biocytin-filled neurons
+by transmitted-light brightfield mosaic microscopy, with deconvolution "based on
+experimentally verified assumptions about the optical system". Oberlaender M.
+et al. (2009) *J Microsc* 233:275–89, [DOI](https://doi.org/10.1111/j.1365-2818.2009.03118.x)
+— Shack-Hartmann wavefront measurements in Mowiol-embedded cortical tissue with
+an oil objective; the index treated as homogeneous, spherical aberration
+relatively low, a model PSF from refraction plus 3-D diffraction. Tadrous P. J.
+(2010) *J Microsc* 237:192–9, [DOI](https://doi.org/10.1111/j.1365-2818.2009.03323.x)
+— in brightfield a bead PSF suffers from low signal-to-noise and from
+absorptive, refractive and dispersal effects; the PSF is extracted instead from
+a Z-stack through a thin sample. Holmes T. J. and O'Connor N. J. (2000)
+*J Microsc* 200:114–27, [DOI](https://doi.org/10.1046/j.1365-2818.2000.00751.x)
+— blind deconvolution of transmitted-light brightfield stacks of HRP-stained
+pyramidal neurons, avoiding a measured PSF.
+
+**Searches of 2026-10-10:** PubMed, 7 queries: brightfield PSF measured with
+beads for deconvolution (0); Oberlaender transmitted-light brightfield
+deconvolution of biocytin (2); brightfield PSF of absorbing microspheres (0);
+brightfield deconvolution PSF of absorbing specimens in 3-D (0); transmitted-
+light PSF from gold nanoparticles with defocus (0); brightfield microscopy point
+spread function (16; four relevant, listed above); condenser aperture, defocus
+blur and depth of field under partial coherence (0). bioRxiv, bioengineering
+and neuroscience, last 30 days (30 preprints each): nothing relevant.
 
 **Data repository, metadata only (2026-10-10):** Allen Brain Map API
 `DataSet/546735464` (our stack; its name is `H301-Ax.160726_03_A04_529878215`;
