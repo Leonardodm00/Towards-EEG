@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-04 (v1, revised the same day after an independent review;
 v1.1 the same day adds diffraction, §3.4–3.5; v1.2 adds pointers to the
-interactive figures; v1.3 on 2026-10-08 marks a correction in §3.6; see §5, "Revision record"). **Project:** Towards EEG, diameter re-measurement
+interactive figures; v1.3 on 2026-10-08 marks a correction in §3.6; v1.4 on 2026-10-10 adds the Allen morphology white paper, §3.1 and §3.7; see §5, "Revision record"). **Project:** Towards EEG, diameter re-measurement
 from the Allen 63× brightfield stacks. **Companion documents:**
 `claude/TEEG_diameter_bias_table_procedure_2026-10-04.md` ("procedure §n /
 Eq. (n)") and `claude/TEEG_diameter_bias_table_mathematics_2026-10-04.md`
@@ -214,6 +214,26 @@ Optivar is an inference, reasoning]**. Both papers report $\Delta z = 0.28$ µm
 for the 1.4 NA objective; Berg 2021 also reports 0.44 µm for an alternative
 63×/1.2 objective, so our stack's 0.28 µm step points to the 1.4 NA one
 **[reasoning]**.
+
+**[added 2026-10-10, v1.4]** The Allen Cell Types Database technical white
+paper *Cell Morphology and Histology* (v.7, June 2018), whose overview covers
+biocytin-filled cells "from either human or mouse specimens", states the same
+chain:
+- an upright brightfield and fluorescence AxioImager Z2 with an Axiocam 506
+  monochrome camera ("6 megapixels with a 4.54 µm per pixel size") behind a
+  0.63× camera mount adapter;
+- for single cells, a Zeiss Plan APOCHROMAT 63×/1.4 oil ("39.69x total
+  magnification") with an oil-immersion condenser, NA 1.4;
+- 0.114 µm effective pixels and 0.28 µm steps along z;
+- the Tl VIS-LED lamp, at least 20 ms exposure, 8-bit BigTIFF export from ZEN.
+
+It does not mention the 63×/1.2 objective of Berg 2021, the coverslip, the oil
+type, or a condenser aperture or Köhler setting, and it gives no start date for
+the 63× set-up. It was read through the web-fetch tool, which allows quotes of
+up to 125 characters; the PDF could not be downloaded here. The image series of
+our stack is named `H301-Ax.160726_03_A04_529878215` (Allen API
+`DataSet/546735464`, **metadata only**); reading "Ax" as AxioImager is an
+inference from the name, not a documented fact.
 
 **For the pipeline:** the elements after the specimen (oil, objective, camera)
 shape the blur; the condenser shapes how the specimen is lit, which decides
@@ -619,6 +639,14 @@ verified.** The sources read give no index for these media; that
 glycerol-based media lie below glass is from memory and is not used
 quantitatively.
 
+**[updated 2026-10-10, v1.4]** The Allen white paper *Cell Morphology and
+Histology* (v.7, June 2018; §3.1 note) names "glycerol-based Mowiol mounting
+media" in its imaging section (p. 7) and does not mention Aqua-Poly/Mount. It
+also names DPX on p. 3, in a context not read here. Its overview covers human
+and mouse specimens, but the Mowiol sentence names no species or date. The
+medium of our 2016 human cell therefore remains not verified, and no
+refractive index is given.
+
 **What changes when $n_{\rm m} < n_{\rm oil}$, and in which units.** Take an
 object point at true depth $D$ below the coverslip, and the focus drive at
 nominal (stage-referred) depth $s$. A ray that leaves the point at angle
@@ -716,16 +744,21 @@ into one map from optics to pipeline.
 ## 5. Open points, caveats, and assumptions
 
 - **Mounting medium of 529878215** and its refractive index: not verified
-  (§3.7); Gouwens 2019 describes the mouse pipeline.
+  (§3.7); Gouwens 2019 describes the mouse pipeline. **[updated 2026-10-10]**
+  The Allen white paper v.7 (2018) names Mowiol for the database's biocytin
+  cells, without species or date; still not verified for this cell, and no
+  index is given (§3.7).
 - **Condenser aperture-diaphragm setting**: not reported (§3.6); it changes both
-  the coherence and the defocus cone (§3.5).
+  the coherence and the defocus cone (§3.5). **[updated 2026-10-10]** Not in the
+  Allen white paper v.7 either.
 - **Weak-object approximation**: the incoherent blur form is first order in the
   absorbance; dark dendrites exceed it (§3.6).
 - **Angular weighting of the defocused shadow**: not established (§3.5).
 - **Effective wavelength** (LED spectrum × DAB absorption × camera
   sensitivity): not known (§3.4).
-- **Coverslip thickness and oil type**: not reported; a mismatch with the
-  objective's design adds spherical aberration **[textbook, from memory]**.
+- **Coverslip thickness and oil type**: not reported (nor in the Allen white
+  paper v.7, checked 2026-10-10); a mismatch with the objective's design adds
+  spherical aberration **[textbook, from memory]**.
 - **Scalar model**: polarisation effects at NA 1.4 are ignored.
 - **Transfer from fluorescence to brightfield** of the index-mismatch results
   (§3.7): reasonable on the shared detection path, not checked.
@@ -769,6 +802,17 @@ pipeline" is marked [corrected 2026-10-08] (it tests $S<1$, not the dark-node
 error at $S=1$). No other statement changed. Evidence: Zuo et al. 2017, PubMed
 full text; the derivation in the theory chat of 2026-10-08 **[reasoning, not
 run]**.
+
+**Revision record, v1.4 (2026-10-10, document upkeep by the theory chat, after
+the user asked which microscope Allen used).** §3.1 and §3.7 gain dated notes
+from the Allen white paper *Cell Morphology and Histology* (v.7, June 2018),
+found on the Allen community forum. It gives the same microscope, objective,
+condenser, camera and step as Berg 2021 and Gouwens 2019, names Mowiol as the
+mounting medium, and has no coverslip, oil-type or condenser-aperture
+information. §5 and §6 updated; the §6 statement that the white paper could not
+be found is marked [corrected 2026-10-10]. No other statement changed.
+Evidence: the white paper, read through the web-fetch tool; Berg 2021, PubMed
+full text, re-read; the Allen API (metadata only).
 
 ## 6. References and sources
 
@@ -818,6 +862,23 @@ run]**.
   et al. 2017, Chen et al. 2016 and Mehta & Oldenbourg 2014 (*Biomed Opt
   Express*) returned no body text, so they were not used.
 
+**Allen technical documentation, read 2026-10-10:**
+- Allen Institute for Brain Science. *Allen Cell Types Database Technical White
+  Paper: Cell Morphology and Histology*, v.7, June 2018. Attached as "Morphology
+  and Histology Overview" to the forum topic "Documentation: Cell Types
+  Database" (https://community.brain-map.org/t/documentation-cell-types-database/2845).
+  Read through the web-fetch tool (quotes limited to 125 characters); the PDF
+  could not be downloaded into the sandbox (proxy 403). Content as in the §3.1
+  and §3.7 notes.
+- Berg et al. 2021 (entry above), re-read in full through PubMed Central on
+  2026-10-10 for its imaging paragraph; it agrees with the entry above.
+
+**Data repository, metadata only (2026-10-10):** Allen Brain Map API
+`DataSet/546735464` (our stack; its name is `H301-Ax.160726_03_A04_529878215`;
+no microscope, objective or acquisition-date fields) and
+`Specimen/529878215?include=donor(organism)` (Homo sapiens; donor H16.06.010).
+bioRxiv, neuroscience, last 30 days (30 preprints): nothing relevant.
+
 **PubMed, abstract only (not used for any claim):** Heine J. et al. (2018)
 *Rev Sci Instrum*, [DOI](https://doi.org/10.1063/1.5020249) — index mismatch
 between oil and aqueous media in STED; returned by the search, not needed.
@@ -831,7 +892,9 @@ illumination condenser aperture coherence transmitted light microscope" (0);
 "Allen Cell Types biocytin brightfield 63x reconstruction mounting medium
 human neurons" (0). bioRxiv bioengineering, last 30 days: nothing relevant.
 The Allen Cell Types morphology white-paper URL redirected to a forum page
-without the document.
+without the document. **[corrected 2026-10-10]** The white paper is attached to
+the forum topic "Documentation: Cell Types Database" (entry under "Allen
+technical documentation" above).
 
 **Data repository, data inspected:** Allen Brain Map API `Specimen/529878215`
 and `Treatment/680087734` (2026-10-04): no mounting or imaging fields. Allen
