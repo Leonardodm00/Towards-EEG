@@ -983,10 +983,10 @@ def blend_figure(blocks, title=""):
 # ---- the Allen-guided iteration of the gradient energy (D-042) ----
 # colours (dataviz validator, light surface): round 1, on the line sized from Allen's 2r, yellow; the later rounds a
 # blue ordinal ramp, darker = later (--ordinal: monotone lightness, one hue, light end 2.50:1 on white); the line
-# sized from the pilot's d_hat aqua (Cell 4h's Gd); the last plane's frame blue. Every cross pair of the ramp with
-# yellow, aqua, the red of k* and the grey of the dip passes (normal vision >= 16.3, CVD >= 15.0); yellow-red and
-# yellow-aqua pass as well, red-aqua stays at deutan 7.5 (D-040), so every series keeps its own marker, line style
-# and frame tag. Yellow, aqua and the lightest blue (below 3:1 on white) carry a dark marker edge.
+# sized from the pilot's d_hat aqua (at the same multiplier); the last plane's frame blue. Every cross pair of the
+# ramp with yellow, aqua, the red of k* and the grey of the dip passes (normal vision >= 16.3, CVD >= 15.0);
+# yellow-red and yellow-aqua pass as well, red-aqua stays at deutan 7.5 (D-040), so every series keeps its own marker,
+# line style and frame tag. Yellow, aqua and the lightest blue (below 3:1 on white) carry a dark marker edge.
 _ITER_ALLEN = "#eda100"
 _ITER_RAMP = ("#6da7ec", "#2a78d6", "#1c5cab", "#0d366b")
 _ITER_MARKERS = ("o", "s", "D", "^", "v")
@@ -1122,7 +1122,7 @@ def iteration_figure(blocks, title=""):
         handles.append(plt.Line2D([], [], color=colour, marker=style[0], ls=style[1:], mec=_iter_edge(colour), lw=1.8,
                                   label="round %d: %s" % (i, what)))
     handles += [plt.Line2D([], [], color=_GD, marker="^", ls="-.", mec="#1a1a19", lw=1.8,
-                           label="G on the line sized from the pilot's d_hat (Cell 4h); frame Gd: its pick"),
+                           label="G on the line sized from the pilot's d_hat, same multiplier; frame Gd: its pick"),
                 plt.Line2D([], [], color=_ITER_LAST, lw=2.6, label="frame it: the iteration's last plane"),
                 plt.Line2D([], [], color="#ff1744", ls="--", lw=1.2, marker="o", mfc="white", mec="#7a7a7a",
                            label="right panel: the pilot's d_hat (dashed); hollow: a plane picked again")]

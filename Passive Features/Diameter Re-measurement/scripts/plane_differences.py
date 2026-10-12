@@ -46,14 +46,17 @@ blend J = w g - (1 - w) h (g: G rescaled, 1 at its maximum; h: the entropy
 rescaled, 0 at its minimum), w = 1 / (1 + exp((d_hat - d0) / s)) with d0 =
 --sigmoid-d0-um (1.5) and s = --sigmoid-s-um (0.3); frames the planes G, J and
 the entropy pick. Writes planeblend_*.
---evaluation iterate (D-042, the user's request of 2026-10-10, 15:30): G over
-the whole line, first on the line sized from Allen's diameter (half-length
---line-mult x Allen's radius), then on the line sized from the diameter
-fitted at the plane the previous line picked (--line-mult x d / 2; Block 5's
-fit at that plane, every other input the pilot's), until the plane repeats or
-after --max-rounds (5) rounds; frames round 1's plane, the last plane and the
-pick of the line sized from the pilot's d_hat (Cell 4h's d-line). Writes
-planeiter_*. The planes of these three figures are drawn without the line.
+--evaluation iterate (D-042, the user's request of 2026-10-10, 15:30; the
+method carried forward, D-043): G over the whole line, first on the line
+sized from Allen's diameter (half-length --line-mult x Allen's radius), then
+on the line sized from the diameter fitted at the plane the previous line
+picked (--line-mult x d / 2; Block 5's fit at that plane, every other input
+the pilot's), until the plane repeats or after --max-rounds (5) rounds;
+frames round 1's plane, the last plane and the pick of the line sized from
+the pilot's d_hat at the same multiplier. --line-mult defaults to 3 here
+(D-044: lines +-1.5 d) and to 2 for the gradient and blend evaluations
+(D-040: the d-line [-d_hat, d_hat]). Writes planeiter_*. The planes of
+these three figures are drawn without the line.
 --nodes bydiameter --pilot-csv takes the nodes from bins of the pilot's d_hat
 (--dhat-bins, --per-bin, --add-nodes).
 
@@ -103,6 +106,12 @@ from allen_diameter.analysis import focus  # noqa: E402
 from allen_diameter.analysis import profiles  # noqa: E402
 from allen_diameter.analysis import survey  # noqa: E402
 from build_table import load_config  # noqa: E402
+
+# the line multiplier m, a line's full width in units of the diameter sizing it: the d-line of the gradient and blend
+# evaluations (D-040: m = 2, the line [-d_hat, d_hat]) and the lines of the Allen-guided iteration (D-044, the user's
+# choice of 2026-10-12: m = 3, the lines +-1.5 d); each evaluation's default
+D_LINE_MULT = 2.0
+ITER_LINE_MULT = 3.0
 
 # (key, colour, linestyle, short tag on the panel, legend label); the order is the order of precedence of a frame
 _MARKS_PIPELINE = (("k_star", "#ff1744", "-", "k*", "k* (gradient energy, D-030)"),
@@ -355,7 +364,7 @@ def fixed_lines_um(lines_um):
     return out
 
 
-def gradient_evaluation(st, cfg, lines_um=(3.0, 5.0), line_mult=2.0, bg_margin_um=4.0):
+def gradient_evaluation(st, cfg, lines_um=(3.0, 5.0), line_mult=D_LINE_MULT, bg_margin_um=4.0):
     """The gradient energy over the whole line, plane by plane
     (focus.plane_gradient_energies; D-040), for the lines of half-length
     lines_um and for the line sized from the node's fitted diameter, h_d =
@@ -383,8 +392,8 @@ def gradient_evaluation(st, cfg, lines_um=(3.0, 5.0), line_mult=2.0, bg_margin_u
                 d_hat_um=float(st["result"].d_hat_um), d_line_half_um=hd, d_line_note=note)
 
 
-def blend_evaluation(st, cfg, line_mult=2.0, entropy_half_um=5.0, stripe_half_um=1.0, bin_width=1.0, d0_um=1.5,
-                     s_um=0.3, bg_margin_um=4.0):
+def blend_evaluation(st, cfg, line_mult=D_LINE_MULT, entropy_half_um=5.0, stripe_half_um=1.0, bin_width=1.0,
+                     d0_um=1.5, s_um=0.3, bg_margin_um=4.0):
     """The gradient energy over the whole line sized from the node's fitted
     diameter, h_d = line_mult * d_hat / 2 (D-040; each plane's background of
     block_background), the entropy of the strip's pixels |v| <= entropy_half_um
@@ -525,11 +534,13 @@ def refit_at_plane(st, cfg, k):
     return out
 
 
-def gradient_iteration(st, cfg, d_start_um=None, line_mult=2.0, max_rounds=5, bg_margin_um=4.0, restack=None):
+def gradient_iteration(st, cfg, d_start_um=None, line_mult=ITER_LINE_MULT, max_rounds=5, bg_margin_um=4.0,
+                       restack=None):
     """The Allen-guided iteration of the gradient energy (D-042, the user's
     choice of 2026-10-10): iterate_planes from d_0 = d_start_um (default
-    Allen's diameter, 2 x allen_radius_um), with plane_of(h) the plane of the
-    largest G over the whole line of half-length h (line_profiles and
+    Allen's diameter, 2 x allen_radius_um) and the multiplier line_mult
+    (default ITER_LINE_MULT = 3, the lines +-1.5 d, D-044), with plane_of(h)
+    the plane of the largest G over the whole line of half-length h (line_profiles and
     focus.plane_gradient_energies with block_background's B_k, the same in
     every round; the first of equal values; "line_short" for fewer than 3
     samples) and fit_at = refit_at_plane. A line reaching closer than 2 pixels
@@ -734,7 +745,7 @@ _MARKS_BLEND = (("k_Gd", _GRAD_D_COLOUR[0], "-.", "Gd", "G alone, over the whole
 # colours of figures.iteration_figure)
 _MARKS_ITER = (("k_iter", "#2a78d6", "-", "it", "the iteration's last plane"),
                ("k_allen", "#eda100", "--", "A", "round 1: G on the line sized from Allen's 2r"),
-               ("k_Gd", _GRAD_D_COLOUR[0], "-.", "Gd", "G on the line sized from the pilot's d_hat (Cell 4h)"))
+               ("k_Gd", _GRAD_D_COLOUR[0], "-.", "Gd", "G on the line sized from the pilot's d_hat, same multiplier"))
 
 
 def _profile_record(v, prof):
@@ -763,7 +774,7 @@ def _pipeline_at(res, k_swc):
 
 def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_half=6, half_um=None, band_um=0.0,
         evaluation="profile", profile_half_um=None, bg_margin_um=4.0, dpi=110, log=print, stripe_half_um=1.0,
-        entropy_bin_gl=1.0, entropy_pick_rule="min", show_line=True, grad_lines_um=(3.0, 5.0), line_mult=2.0,
+        entropy_bin_gl=1.0, entropy_pick_rule="min", show_line=True, grad_lines_um=(3.0, 5.0), line_mult=None,
         sigmoid_d0_um=1.5, sigmoid_s_um=0.3, entropy_half_um=5.0, max_rounds=5):
     """One figure per node id; returns the per-node records (also written to
     <prefix>_<specimen>.json: planediff for the profile and image evaluations,
@@ -772,7 +783,9 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
     the strip's outline (presentation only; the records do not change); the
     gradient, blend and iterate figures always do. grad_lines_um, line_mult:
     the gradient evaluation's fixed half-lengths and the d-line's multiplier
-    (D-040; line_mult also sizes the iteration's lines, D-042); sigmoid_d0_um,
+    (D-040; line_mult also sizes the iteration's lines, D-042), None for each
+    evaluation's default: ITER_LINE_MULT (3) for iterate (D-044), D_LINE_MULT
+    (2) for the gradient and blend evaluations (D-040); sigmoid_d0_um,
     sigmoid_s_um: the blend's weight w(d_hat); entropy_half_um: the half-length
     across of the blend's entropy strip (D-041); max_rounds: the iteration's
     round limit (D-042)."""
@@ -783,6 +796,8 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
     if entropy_pick_rule not in _PICK_WORDS:
         raise ValueError("entropy_pick_rule must be one of %s, got %r" % (", ".join(sorted(_PICK_WORDS)),
                                                                          entropy_pick_rule))
+    if line_mult is None:                           # each evaluation's own default (D-040, D-044)
+        line_mult = ITER_LINE_MULT if evaluation == "iterate" else D_LINE_MULT
     focus.sigmoid_weight(sigmoid_d0_um, sigmoid_d0_um, sigmoid_s_um)        # refuses s <= 0 before any node
     grad_lines_um = fixed_lines_um(grad_lines_um) if evaluation == "gradient" else grad_lines_um   # before any node
     line_h, d_mult, allen_mult = None, None, None
@@ -965,7 +980,7 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
                 records.append(dict(node_id=int(nid), skipped=str(e)))
                 continue
             st = ev["st"]
-            try:                                    # the line sized from the pilot's d_hat (Cell 4h's d-line)
+            try:                                    # the line sized from the pilot's d_hat, at the same multiplier
                 gd = gradient_evaluation(st, cfg, lines_um=(), line_mult=line_mult, bg_margin_um=bg_margin_um)
                 gd = dict(gd["lines"][0], note=None)
             except ValueError as e:
@@ -1099,7 +1114,7 @@ def run(swc, provider, cfg, node_ids, out_dir, specimen, transform=None, planes_
                       dict(curve="G_iter", pick="k_iter", tag="it", colour=_MARKS_ITER[0][1], style="s-",
                            label="the last round's G (its pick: the iteration's last plane)"),
                       dict(curve="G_Gd", pick="k_Gd", tag="Gd", colour=_GRAD_D_COLOUR[0], style="^-.",
-                           label="G on the line sized from the pilot's d_hat (Cell 4h)")]
+                           label="G on the line sized from the pilot's d_hat, at the same multiplier")]
             fig = fg.picks_summary_figure(done, series, "G on lines sized from Allen's 2r and then from the fit at "
                                                         "the plane each picks: the planes, on %d nodes by d_hat, "
                                                         "specimen %s" % (len(done), specimen), note_key="iter_note")
@@ -1131,9 +1146,10 @@ def main(argv=None):
                     default="profile")
     ap.add_argument("--grad-lines-um", default="3,5",
                     help="gradient evaluation: half-lengths of the fixed lines, um (at most 3)")
-    ap.add_argument("--line-mult", type=float, default=2.0,
+    ap.add_argument("--line-mult", type=float, default=None,
                     help="gradient, blend and iterate evaluations: a line's full width in units of the diameter "
-                         "sizing it (2: [-d, d])")
+                         "sizing it; default 2 for gradient and blend ([-d_hat, d_hat], D-040), 3 for iterate "
+                         "(+-1.5 d, D-044)")
     ap.add_argument("--sigmoid-d0-um", type=float, default=1.5,
                     help="blend evaluation: d_hat at which the gradient energy's weight is 1/2, um")
     ap.add_argument("--sigmoid-s-um", type=float, default=0.3,

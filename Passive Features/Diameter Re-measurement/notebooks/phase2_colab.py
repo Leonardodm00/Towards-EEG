@@ -573,34 +573,37 @@ if os.path.exists(recs):
 # re-run of 13:20 UTC included): G_k over the whole d-line was judged the best of the plane rules, but its
 # line is sized from the pilot's d_hat, which is itself fitted at k*, the plane under test. Here the first
 # line comes from Allen's diameter instead, and the diameter is then refined (D-042, the option "Allen first,
-# then refine"). Round 1: the line +-m r_Allen through the node, across the dendrite (full width m times
-# Allen's 2r; `LINE_MULT` = m = 2), and the plane k_1 of its largest G_k = B_k^-2 * integral of (dI~_k/dv)^2
-# dv, with the background B_k of Cell 4h. Block 5's fit at plane k_1 (the pipeline's own fit with only the
-# plane changed: the pilot's centre, heading, tilt and offsets, and B_bar of that plane; at k* it returns the
-# pilot's d_hat to the last digit) gives d_1. Round 2 takes the line +-m d_1 / 2 and its plane k_2, the fit
-# there gives d_2, and so on. The iteration stops when a plane comes up again (`converged` when it is the
-# previous round's plane, `cycle` when it is an earlier one; the fit made there is reused), after `MAX_ROUNDS`
-# = 5 rounds (`max_rounds`), or when a fit fails (`fit_failed`). That "the plane repeats" covers any earlier
-# plane, and what the fit holds fixed, are the assistant's reading of the option, PROVISIONAL.
+# then refine"; the method carried forward, D-043). Round 1: the line +-m r_Allen through the node, across the
+# dendrite (full width m times Allen's 2r; `LINE_MULT` = m = 3, the user's choice of 2026-10-12 after the run
+# at m = 2, D-044), and the plane k_1 of its largest G_k = B_k^-2 * integral of (dI~_k/dv)^2 dv, with the
+# background B_k of Cell 4h. Block 5's fit at plane k_1 (the pipeline's own fit with only the plane changed:
+# the pilot's centre, heading, tilt and offsets, and B_bar of that plane; at k* it returns the pilot's d_hat
+# to the last digit) gives d_1. Round 2 takes the line +-m d_1 / 2 and its plane k_2, the fit there gives d_2,
+# and so on. The iteration stops when a plane comes up again (`converged` when it is the previous round's
+# plane, `cycle` when it is an earlier one; the fit made there is reused), after `MAX_ROUNDS` = 5 rounds
+# (`max_rounds`), or when a fit fails (`fit_failed`). That "the plane repeats" covers any earlier plane, and
+# what the fit holds fixed, are the assistant's reading of the option, PROVISIONAL.
 #
 # The nodes are Cell 4h's (`--nodes bydiameter`, `BYDIAM`), so the three cells compare node by node. The
-# square around each node holds round 1's line and the pilot's d-line, and is made again, larger, when a later
-# round's line does not fit; up to about +-4.7 um it is cut from the pilot's cached block, so most nodes need
-# no new crop.
+# square around each node holds round 1's line and the line sized from the pilot's d_hat at the same m, and is
+# made again, larger, when a later round's line does not fit; up to about +-4.7 um it is cut from the pilot's
+# cached block, beyond that it is fetched as new crops. From the fits of the run at m = 2, only the trunks'
+# lines pass that limit at m = 3 (nodes 2 and 3, about +-8-9 um); theirs passed it at m = 2 too.
 #
-# Output in `pilot/planeiter/bydiameter/`: one figure per node, `planeiter_<id>.png`: the planes without any
-# line, framed at the iteration's last plane (blue, it), round 1's plane (yellow, dashed, A), the pick of the
-# line sized from the pilot's d_hat (aqua, Gd; Cell 4h's d-line) and the pipeline's planes; below, every
-# plane's profile along the longest line used, with round 1's, the last round's and the pilot d-line's extents
-# dashed; each round's G_k relative to its own maximum with its pick (round 1 yellow, the later rounds blue,
-# darker = later; the pilot d-line aqua); and the trajectory: the diameter sizing each line (Allen's 2r, then
-# the fit at each round's plane, labelled with the plane; hollow: a plane picked again) against the pilot's
-# d_hat (red, dashed). `planeiter_summary_529878215.png`: one panel per node with round 1's curve, the last
-# round's and the pilot d-line's, rescaled 0-1, each pick minus k* and the iteration's ending in the title;
-# `planeiter_summary_529878215.csv`: per node the type, Allen's 2r, d_hat, k*, the three planes (`k_allen`,
-# `k_iter`, `k_Gd`) and each minus k*, `d_iter_um` (the fit at the last plane), `iter_status`, `n_rounds`,
-# `n_restacks` and the trajectory, which the cell prints one line per node. The cell then shows each node's
-# figure, in order of d_hat.
+# Output in `pilot/planeiter/bydiameter_m3/` (the folder carries m, so the run at m = 2 stays in
+# `pilot/planeiter/bydiameter/`): one figure per node, `planeiter_<id>.png`: the planes without any line,
+# framed at the iteration's last plane (blue, it), round 1's plane (yellow, dashed, A), the pick of the line
+# sized from the pilot's d_hat at the same m (aqua, Gd; at m = 2 it is Cell 4h's d-line) and the pipeline's
+# planes; below, every plane's profile along the longest line used, with round 1's, the last round's and the
+# pilot d-line's extents dashed; each round's G_k relative to its own maximum with its pick (round 1 yellow,
+# the later rounds blue, darker = later; the pilot d-line aqua); and the trajectory: the diameter sizing each
+# line (Allen's 2r, then the fit at each round's plane, labelled with the plane; hollow: a plane picked again)
+# against the pilot's d_hat (red, dashed). `planeiter_summary_529878215.png`: one panel per node with round
+# 1's curve, the last round's and the pilot d-line's, rescaled 0-1, each pick minus k* and the iteration's
+# ending in the title; `planeiter_summary_529878215.csv`: per node the type, Allen's 2r, d_hat, k*, the three
+# planes (`k_allen`, `k_iter`, `k_Gd`) and each minus k*, `d_iter_um` (the fit at the last plane),
+# `iter_status`, `n_rounds`, `n_restacks` and the trajectory, which the cell prints one line per node. The
+# cell then shows each node's figure, in order of d_hat.
 #
 # Expect the node list of Cell 4h, one `[planediff] node N: planes ... (0 missing); Allen 2r ... um; start d
 # ... um | r1 +-... um k ... d ... um | r2 ... | converged; the pilot's d-line +-... um k ...; k* ...,
@@ -608,28 +611,33 @@ if os.path.exists(recs):
 # plane of k* in a of N (...); k_iter ...; k_Gd ...`, `[planediff] iteration endings: converged ...` and
 # `[planediff] wrote N figures (0 skipped) ...`. A node without Allen's radius is skipped, with the reason.
 #
-# What to expect (synthetic tubes, SPEC Block 11): on a 0.8 um tube with Allen's radius 0.3 um, round 1's line
-# (+-0.6 um) already reaches the tube's edges: every node picks the in-focus plane in round 1, the fit there
-# is the pilot's d_hat (0.84-0.86 um), and round 2 picks the same plane (converged in 2 rounds). On a 3.0 um
-# tube with the same Allen radius, round 1's line lies inside the tube and picks the end plane of the range
-# (-6), where the blurred profile fits 2.7-2.8 um; round 2's line picks a plane one or two from the axis (-1
-# or -2), the fit there gives 3.0-3.2 um, and round 3 picks it again (converged in 3 rounds on every node):
-# the iteration recovers from an Allen diameter five times too small and ends on the plane the pilot's d-line
-# picks, while k* stays four planes from the axis. On Allen's data Allen's 2r is about 0.5 um in every bin of
-# d_hat, so round 1 tests a start that knows nothing of the fit: on the thick nodes its line lies inside the
-# dendrite, as on the 3.0 um tube. What to look at: whether `k_iter` agrees with Cell 4h's `k_Gd` node by
-# node; whether the trunks (nodes 2 and 3) end near Cell 4h's planes (113 and 116, each one plane from 114 and
-# 115, where the +-5 um entropy was judged right in D-039), now without the pilot's d_hat; and `d_iter_um`,
-# the diameter fitted at the last plane, beside the pilot's d_hat, fitted at k*.
+# What to expect (synthetic tubes, SPEC Block 11, at m = 3): on a 0.8 um tube with Allen's radius 0.3 um,
+# round 1's line (+-0.9 um) already reaches the tube's edges: every node picks the in-focus plane in round 1,
+# the fit there is the pilot's d_hat (0.84-0.86 um), and round 2 picks the same plane (converged in 2 rounds).
+# On a 3.0 um tube with the same Allen radius, round 1's line (+-0.9 um) lies inside the tube and picks the
+# end plane of the range (-6), where the blurred profile fits 2.7-2.8 um; round 2's line (+-4.1-4.2 um) picks
+# a plane one or two from the axis (-1 or -2), the fit there gives 3.0-3.2 um, and round 3 picks it again
+# (converged in 3 rounds on every node, the square made again twice): the iteration recovers from an Allen
+# diameter five times too small and ends on the plane the pilot's d-line picks, while k* stays four planes
+# from the axis. On both tubes m = 3 ends on the plane of m = 2 with the same diameter; only the lines are
+# longer. On Allen's data (the run at m = 2) Allen's 2r is 0.45-0.76 um on the 11 nodes of the bins and
+# 2.0-2.2 um on the trunks, so round 1 tests a start that knows little of the fit: on the thick nodes its line
+# lies inside the dendrite, as on the 3.0 um tube. What to look at, node by node: whether `k_iter` and
+# `d_iter_um` move from the run at m = 2 (`pilot/planeiter/bydiameter/`: all 13 nodes converged, `k_iter`
+# equal to `k_Gd` on all 13 and within one plane of k* on 10 of the 11 nodes of the bins); whether `k_iter`
+# still agrees with `k_Gd`, now both at m = 3; and the trunks (nodes 2 and 3): at m = 2 they ended on 113 and
+# 115, beside the planes 114 and 115 where the +-5 um entropy was judged right (D-039), node 2 on the range's
+# end plane (113 of 113..125) with d at the fit's 6 um bound; the longer lines may now reach neighbouring
+# neurites.
 # Cell 4j: G on lines sized from Allen's diameter, then from the fit at the plane each picks (needs Cells 0 and 1 and the pilot's CSV of Cell 4b)
 import json
 import os
 import pandas as pd
 from IPython.display import Image, display
 BYDIAM = dict(dhat_bins="0.8,1.0,1.5,2.0,3.0", per_bin=2, add_nodes="2,3")   # the same nodes as Cells 4h and 4i
-LINE_MULT = 2.0     # each line's full width in units of the diameter sizing it (2: [-d, d]); round 1: d = Allen's 2r
+LINE_MULT = 3.0     # each line's full width in units of the diameter sizing it (3: +-1.5 d, D-044; round 1: Allen's 2r)
 MAX_ROUNDS = 5      # at most this many rounds, round 1 included; the iteration stops earlier when a plane repeats
-out = OUT + "/pilot/planeiter/bydiameter"
+out = OUT + "/pilot/planeiter/bydiameter_m%g" % LINE_MULT    # bydiameter_m3; the run at m = 2 stays in bydiameter
 run("scripts/plane_differences.py", "--specimen", SPECIMEN, "--nodes", "bydiameter",
     "--pilot-csv", "%s/pilot/pilot_%d.csv" % (OUT, SPECIMEN), "--dhat-bins", BYDIAM["dhat_bins"],
     "--per-bin", BYDIAM["per_bin"], "--add-nodes", BYDIAM["add_nodes"], "--evaluation", "iterate",
@@ -866,9 +874,10 @@ for s in (0.080, 0.125):
 # part; the JSONs carry the curves and the profiles, so the files themselves are enough.
 # - Cell 4i (2026-10-10, the entropy on the +-5 um strip): the `[planediff]` summary line, the summary CSV and
 # figure, and the figures of the nodes with d_hat between 1.5 and 3.5 um, where the entropy decides.
-# - Cell 4j (2026-10-10, the Allen-guided iteration): the `[planediff]` lines (the trajectories and the
-# endings), the summary CSV and figure, and the figures of the trunks and of the nodes whose last plane
-# differs from Cell 4h's Gd pick; the JSON carries every round, so the files themselves are enough.
+# - Cell 4j (the Allen-guided iteration; at m = 3 since 2026-10-12, D-044, in
+# `pilot/planeiter/bydiameter_m3/`): the `[planediff]` lines (the trajectories and the endings), the summary
+# CSV and figure, and the figures of the trunks and of the nodes whose last plane differs from the run at m =
+# 2 or from the Gd pick; the JSON carries every round, so the files themselves are enough.
 # - Cell 5: the `"renderer"` block without the tables, `table_sets`, `pillow_version`, `notes`.
 # - Cell 6: the `pooled dendrite diameter` line.
 # - Cell 7: the growth-fit report.

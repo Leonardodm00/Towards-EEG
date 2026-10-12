@@ -2,8 +2,8 @@
 11 in specs/SPEC.md (D-042, the user's request of 2026-10-10, 15:30, and the
 option chosen: "Allen first, then refine"; a diagnostic, not a focus rule).
 
-For node j with Allen's radius r_A, the multiplier m (2) and at most R (5)
-rounds: d_0 = 2 r_A; round i = 1..R takes the line of half-length
+For node j with Allen's radius r_A, the multiplier m (3, D-044, the user's
+choice of 2026-10-12; 2 before) and at most R (5) rounds: d_0 = 2 r_A; round i = 1..R takes the line of half-length
 h_i = m d_{i-1} / 2 through the SWC node across the fitted heading, the
 gradient energy over the whole line
     G^(h_i)_k = B_k^-2 * trapezoid over the line of (dI~_k/dv)^2
@@ -33,16 +33,21 @@ Checks
                         plane range); B_bar is the plane's own (a gain on one
                         plane scales its B_bar, not d); started from the
                         pilot's d_hat, round
-                        1's G and pick equal gradient_evaluation's d-line
-                        (Cell 4h); every round's G equals its definition
-    test_convergence    on synthetic tubes: 0.8 um (Allen 2r 0.6 um) converges
-                        in 2 rounds at the in-focus plane with the pilot's
-                        d_hat; 3.0 um (Allen's 0.6 um line inside the tube)
-                        ends within one plane of the axis plane, converged in
-                        at most 4 rounds, d within 20 % of 3.0 um, although
-                        k* is 4 planes off; the restack path gives the same
-                        planes and fits as a square large from the start (G to
-                        1e-12), and run() restacks once with m = 4
+                        1's G and pick equal gradient_evaluation's d-line at
+                        the same m (2: Cell 4h's d-line; 3: the iterate
+                        evaluation's Gd); every round's G equals its definition
+    test_convergence    on synthetic tubes, at m = 2 and at m = 3 (the
+                        default), squares and restacks as run() makes them:
+                        0.8 um (Allen 2r 0.6 um) converges in 2 rounds at the
+                        in-focus plane with the pilot's d_hat; 3.0 um (Allen's
+                        line inside the tube) ends within one plane of the
+                        axis plane, converged in at most 4 rounds, d within
+                        20 % of 3.0 um, although k* is 4 planes off, and m = 3
+                        ends on m = 2's plane with m = 2's diameter
+                        (restacking at least once); the
+                        restack path gives the same planes and fits as a
+                        square large from the start (G to 1e-12), and run()
+                        restacks once with m = 4
     test_invariants     a gain on every plane leaves the trajectory unchanged
                         (planes equal, G to 1e-12, d to 1e-6 um); h_i = m
                         d_{i-1} / 2 and d_in of round i + 1 = the fit of round
@@ -52,16 +57,20 @@ Checks
                         fit's endings ("no_plane", "profile_nan",
                         "bbar_nonpositive"); "square_small" without restack;
                         a restack returning other planes refused; "line_short"
-                        in round 1
+                        in round 1 (m = 3: d_0 0.03 um; 0.05 um gives 3
+                        samples)
     test_determinism    two runs of gradient_iteration: equal records
     test_edge_cases     scripts/plane_differences.run --evaluation iterate on
                         the 0.8 um cell: the records (keys, values, the soma
                         skipped), the JSON, the summary CSV and figure, the
                         per-node figure (no line on the planes, every text
                         inside the figure, the note line in the summary);
-                        picks_summary_figure skips a curve held as None; the
-                        CLI passes --evaluation iterate, --max-rounds and
-                        --line-mult on (server stubbed, run replaced)
+                        picks_summary_figure skips a curve held as None;
+                        line_mult left None resolves to 3 for iterate (D-044)
+                        and to 2 for gradient (D-040); the CLI passes
+                        --evaluation iterate, --max-rounds and --line-mult on,
+                        and None when --line-mult is absent (server stubbed,
+                        run replaced)
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -237,12 +246,14 @@ def test_reference():
         a, b = PD.refit_at_plane(st, cfg, k), PD.refit_at_plane(dict(st, block=dim), cfg, k)
         assert abs(b["B_bar"] - 0.8 * a["B_bar"]) <= 1e-12 * a["B_bar"] and abs(b["d_hat_um"] - a["d_hat_um"]) <= 1e-6, \
             (a, b)
-        # started from the pilot's d_hat, round 1 is Cell 4h's d-line: the same G and pick
-        it = PD.gradient_iteration(st, cfg, d_start_um=float(r.d_hat_um), max_rounds=1)
-        gd = PD.gradient_evaluation(st, cfg, lines_um=())["lines"][0]
-        assert gd["key"] == "Gd" and it["rounds"][0]["half_um"] == gd["half_um"]
-        assert np.array_equal(it["rounds"][0]["G"], gd["G"], equal_nan=True)
-        assert it["k_first"] == PD._argmax_plane(st["ks"], gd["G"])
+        # started from the pilot's d_hat, round 1 is the d-line at the same m: the same G and pick (m = 2: Cell 4h's
+        # d-line, D-040; m = 3: the iterate evaluation's Gd, D-044)
+        for m in (2.0, 3.0):
+            it = PD.gradient_iteration(st, cfg, d_start_um=float(r.d_hat_um), line_mult=m, max_rounds=1)
+            gd = PD.gradient_evaluation(st, cfg, lines_um=(), line_mult=m)["lines"][0]
+            assert gd["key"] == "Gd" and it["rounds"][0]["half_um"] == gd["half_um"] == 0.5 * m * float(r.d_hat_um)
+            assert np.array_equal(it["rounds"][0]["G"], gd["G"], equal_nan=True)
+            assert it["k_first"] == PD._argmax_plane(st["ks"], gd["G"])
         # every round's G is its definition: plane_gradient_energies on that line's profiles with the block background
         it = PD.gradient_iteration(st, cfg)
         B = PD.block_background(st)[0]
@@ -257,21 +268,38 @@ def test_reference():
 
 def test_convergence():
     import plane_differences as PD
+    def iterate_as_run(swc, prov, cfg, m):              # the square and the restack of run(): both lines held
+        st = PD.node_stack(swc, prov, cfg, 4, None, 6, None, 0.0, None, m, m)
+        return st, PD.gradient_iteration(st, cfg, line_mult=m, restack=lambda h: PD.node_stack(
+            swc, prov, cfg, 4, None, 6, None, 0.0, h, m, m))
     with tempfile.TemporaryDirectory() as tmp:          # 0.8 um: Allen's 0.6 um line already sees the edges
         cfg, swc, prov, _ = _cell(tmp, 0.8)
-        st = PD.node_stack(swc, prov, cfg, 4, None, 6, None, 0.0, None, 2.0, 2.0)
-        it = PD.gradient_iteration(st, cfg)
-        assert it["status"] == "converged" and it["n_rounds"] == 2 and it["k_first"] == 0 and it["k_final"] == 0
-        assert it["d_final_um"] == st["result"].d_hat_um and it["rounds"][0]["half_um"] == 0.6
+        for m in (2.0, 3.0):
+            st, it = iterate_as_run(swc, prov, cfg, m)
+            assert it["status"] == "converged" and it["n_rounds"] == 2 and it["k_first"] == 0 and \
+                it["k_final"] == 0, (m, it["status"])
+            assert it["d_final_um"] == st["result"].d_hat_um and it["rounds"][0]["half_um"] == 0.5 * m * 0.6
+        # the default multiplier is 3 (D-044): round 1's line is +-0.9 um
+        assert PD.gradient_iteration(st, cfg)["rounds"][0]["half_um"] == 0.5 * 3.0 * 0.6
     with tempfile.TemporaryDirectory() as tmp:          # 3.0 um: Allen's 0.6 um line lies inside the tube
         cfg, swc, prov, _ = _cell(tmp, 3.0)
-        st = PD.node_stack(swc, prov, cfg, 4, None, 6, None, 0.0, None, 2.0, 2.0)
-        it = PD.gradient_iteration(st, cfg)
-        # the axis plane is 0 (z 0.05 um, dz 0.28 um); k* of the pipeline misses it by 4 planes on this tube
-        assert abs(int(st["result"].k_star)) >= 3, st["result"].k_star
-        assert it["status"] == "converged" and it["n_rounds"] <= 4 and abs(it["k_final"]) <= 1, it["status"]
-        # 20 %: the fit's own error one plane from the axis on a 3 um tube (the pilot's d_hat is 9 % low at k*)
-        assert abs(it["d_final_um"] - 3.0) <= 0.6, it["d_final_um"]
+        runs = {}
+        for m in (2.0, 3.0):
+            st, it = runs[m] = iterate_as_run(swc, prov, cfg, m)
+            # the axis plane is 0 (z 0.05 um, dz 0.28 um); k* of the pipeline misses it by 4 planes on this tube
+            assert abs(int(st["result"].k_star)) >= 3, st["result"].k_star
+            assert it["status"] == "converged" and it["n_rounds"] <= 4 and abs(it["k_final"]) <= 1, (m, it["status"])
+            # 20 %: the fit's own error one plane from the axis on a 3 um tube (the pilot's d_hat is 9 % low at k*)
+            assert abs(it["d_final_um"] - 3.0) <= 0.6, (m, it["d_final_um"])
+        # m = 3 ends on m = 2's plane with the same diameter (the fit does not depend on the line), and its later
+        # lines (+-1.5 d, about 4-5 um) outgrow the first square, so it restacks. Round 1's line lies inside the
+        # tube at both m and may pick another end plane (here -5 at m = 3, -6 at m = 2, their G within 2 %); from
+        # round 2 on both lines cover the blurred tube. Observed in the runs of 2026-10-12 (this node and the dry
+        # runs of Cell 4j), not a theorem
+        (_s2, it2), (_s3, it3) = runs[2.0], runs[3.0]
+        assert it3["k_final"] == it2["k_final"] and it3["d_final_um"] == it2["d_final_um"], (it2["rounds"],
+                                                                                            it3["rounds"])
+        assert it3["n_restacks"] >= 1 and it2["n_restacks"] == 0, (it2["n_restacks"], it3["n_restacks"])
         # the restack path: a square too small for the later lines is made again, with the same planes and fits as a
         # square large from the start (G to 1e-12: the two squares' frames differ, so the bilinear weights differ
         # in the last bits)
@@ -358,14 +386,19 @@ def test_contract():
         dark[list(st["ks"]).index(0)] = 0.0
         f = PD.refit_at_plane(dict(st, block=dark), cfg, 0)
         assert f["fit_status"] == "bbar_nonpositive" and f["B_bar"] == 0.0 and math.isnan(f["d_hat_um"])
-        # a square too small without restack: the round stops, the iteration stands at the last plane picked
+        # a square too small without restack: the round stops, the iteration stands at the last plane picked (m = 2:
+        # round 1's +-0.6 um line fits, round 2's does not)
         st_small = PD.node_stack(swc, prov, cfg, 4, None, 3, 0.3, 0.0, None, None, 2.0)
         assert abs(st_small["square_half_um"] - (0.6 + 2 * DELTA)) <= 1e-12
-        it = PD.gradient_iteration(st_small, cfg)
+        it = PD.gradient_iteration(st_small, cfg, line_mult=2.0)
         assert it["status"] == "square_small" and it["n_rounds"] == 2 and it["k_final"] == it["k_first"] == 0, it
         assert "G" not in it["rounds"][1] and it["n_restacks"] == 0
+        # at the default m = 3 round 1's line (+-0.9 um) does not fit already: nothing is picked
+        it = PD.gradient_iteration(st_small, cfg)
+        assert it["status"] == "square_small" and it["n_rounds"] == 1 and it["k_final"] is None, it
         # round 2's line (about +-0.85 um) lies inside a +-0.9 um square but closer than 2 pixels to its edge: stopped
-        it = PD.gradient_iteration(PD.node_stack(swc, prov, cfg, 4, None, 3, 0.9, 0.0, None, None, 2.0), cfg)
+        it = PD.gradient_iteration(PD.node_stack(swc, prov, cfg, 4, None, 3, 0.9, 0.0, None, None, 2.0), cfg,
+                                   line_mult=2.0)
         assert it["status"] == "square_small" and it["n_rounds"] == 2 and 0.9 - 2 * DELTA < it["rounds"][1]["half_um"]
         # a restack returning other planes is refused, by the check on the planes
         try:
@@ -375,9 +408,11 @@ def test_contract():
             assert "restack returned planes" in str(e), e
         else:
             raise AssertionError("a restack with other planes accepted")
-        # a starting line of fewer than 3 samples
-        it = PD.gradient_iteration(st, cfg, d_start_um=0.05)
+        # a starting line of fewer than 3 samples (m = 3: h = 0.045 um, under half a 0.1144 um step); from 0.05 um
+        # the line (h = 0.075 um) holds 3 samples
+        it = PD.gradient_iteration(st, cfg, d_start_um=0.03)
         assert it["status"] == "line_short" and it["k_final"] is None and it["n_rounds"] == 1
+        assert PD.gradient_iteration(st, cfg, d_start_um=0.05, max_rounds=1)["rounds"][0]["n_samples"] == 3
 
 
 def test_determinism():
@@ -437,13 +472,14 @@ def test_edge_cases():
         for rec in recs[:2]:
             assert all(k in rec for k in RECORD_KEYS), [k for k in RECORD_KEYS if k not in rec]
             assert all(set(ROUND_KEYS) == set(x) for x in rec["rounds"]), rec["rounds"][0].keys()
-            assert rec["d_start_um"] == 0.6 and rec["line_mult"] == 2.0 and rec["max_rounds"] == 5
+            assert rec["d_start_um"] == 0.6 and rec["line_mult"] == 3.0 and rec["max_rounds"] == 5     # D-044
             assert rec["iter_status"] == "converged" and rec["n_rounds"] == 2 and rec["n_restacks"] == 0
             assert rec["k_allen"] == rec["k_iter"] == rec["k_Gd"] == rec["k_star"] == 0
-            assert rec["d_iter_um"] == rec["d_hat_um"] and rec["d_line_half_um"] == rec["d_hat_um"]
+            # Gd at the iteration's own multiplier: the pilot's d-line +-1.5 d_hat
+            assert rec["d_iter_um"] == rec["d_hat_um"] and rec["d_line_half_um"] == 0.5 * 3.0 * rec["d_hat_um"]
             assert rec["pick_keys"] == ["k_allen", "k_iter", "k_Gd"] and rec["G_allen"] == rec["rounds"][0]["G"]
             assert rec["G_iter"] == rec["rounds"][1]["G"] and rec["rounds"][1]["refit"] is False
-            assert rec["half_um"] >= max(0.6, rec["d_hat_um"]) + 2 * DELTA - 1e-9    # the square holds both lines
+            assert rec["half_um"] >= 1.5 * max(0.6, rec["d_hat_um"]) + 2 * DELTA - 1e-9   # the square holds both lines
             assert rec["profile_half_um"] == max(x["half_um"] for x in rec["rounds"]) and \
                 len(rec["v_um"]) == 2 * int(round(rec["profile_half_um"] / DELTA)) + 1
             assert "," not in rec["trajectory"] and rec["trajectory"].endswith("| converged")
@@ -491,21 +527,29 @@ def test_edge_cases():
         assert len(t0) == 3 and t0[2] == recs[0]["iter_note"] and t0[1] == "pick minus k*: A +0", t0
         assert len([ln for ln in fig.axes[0].get_lines() if len(ln.get_ydata()) == ks.size]) == 1
         plt.close(fig)
-        # Allen's radius 1.0 um: round 1's line (+-2 um) is the longest, and the first square holds it (no restack)
+        # Allen's radius 1.0 um: round 1's line (+-3 um at m = 3) is the longest, and the first square holds it (no
+        # restack)
         import copy
         swc_r = copy.deepcopy(swc)
         swc_r.radius[:] = 1.0
         rec = PD.run(swc_r, prov, cfg, [4], os.path.join(tmp, "r1"), "999", planes_half=3, half_um=0.3,
                      evaluation="iterate", log=lambda m: None)[0]
-        assert rec["d_start_um"] == 2.0 and rec["rounds"][0]["half_um"] == 2.0 and rec["n_restacks"] == 0
-        assert rec["half_um"] >= 2.0 + 2 * DELTA - 1e-9, rec["half_um"]
-        # Allen's radius 0.02 um: round 1's line holds fewer than 3 samples; nothing is picked, the figure is drawn
-        swc_r.radius[:] = 0.02
+        assert rec["d_start_um"] == 2.0 and rec["rounds"][0]["half_um"] == 0.5 * 3.0 * 2.0 and rec["n_restacks"] == 0
+        assert rec["half_um"] >= 3.0 + 2 * DELTA - 1e-9, rec["half_um"]
+        # Allen's radius 0.01 um: round 1's line (+-0.03 um) holds fewer than 3 samples; nothing is picked, the
+        # figure is drawn
+        swc_r.radius[:] = 0.01
         rec = PD.run(swc_r, prov, cfg, [4], os.path.join(tmp, "r002"), "999", planes_half=3, evaluation="iterate",
                      log=lambda m: None)[0]
         assert rec["iter_status"] == "line_short" and rec["k_allen"] is None and rec["k_iter"] is None
         assert rec["G_allen"] is None and rec["G_iter"] is None and math.isnan(rec["d_iter_um"]) and \
             rec["n_rounds"] == 1 and rec["k_Gd"] is not None and os.path.exists(rec["png"])
+        # line_mult left None: each evaluation's own default, 3 for iterate (above) and 2 for gradient (D-040)
+        assert PD.ITER_LINE_MULT == 3.0 and PD.D_LINE_MULT == 2.0
+        rec = PD.run(swc, prov, cfg, [4], os.path.join(tmp, "grad"), "999", planes_half=3, evaluation="gradient",
+                     log=lambda m: None)[0]
+        assert rec["line_mult"] == 2.0 and rec["d_line_half_um"] == rec["d_hat_um"], (rec["line_mult"],
+                                                                                      rec["d_line_half_um"])
         _check_cli(PD, swc_path, tmp)
 
 
@@ -533,8 +577,8 @@ def _check_cli(PD, swc_path, tmp):
     got = inspect.signature(PD.run).bind(*x1, **k1).arguments          # by name: the call's positions may change
     assert got["node_ids"] == [4, 5] and got["evaluation"] == "iterate" and got["max_rounds"] == 3 and \
         got["line_mult"] == 3.0, got
-    got = inspect.signature(PD.run).bind(*x2, **k2).arguments
-    assert got["max_rounds"] == 5 and got["line_mult"] == 2.0, got
+    got = inspect.signature(PD.run).bind(*x2, **k2).arguments          # None: run resolves it per evaluation
+    assert got["max_rounds"] == 5 and got["line_mult"] is None, got
 
 
 # ---------------------------------------------------------------- runner ---

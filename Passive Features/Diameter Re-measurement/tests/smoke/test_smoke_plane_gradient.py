@@ -58,8 +58,12 @@ Checks
                         fetched for the +-5 um line, the missing planes are
                         NaN, the background equals the profile evaluation's;
                         a node without d_hat keeps the fixed lines (gradient)
-                        and is refused (blend); the blend evaluation: w from
-                        d_hat, G from the d-line's profiles, H from the +-5 um
+                        and is refused (blend); gradient_evaluation's and
+                        blend_evaluation's own multiplier is 2, the d-line
+                        [-d_hat, d_hat] (D_LINE_MULT, D-040; the iteration's
+                        3 of D-044 does not reach them); the blend
+                        evaluation: w from d_hat, G from the d-line's
+                        profiles, H from the +-5 um
                         strip (89 samples, its square fetched), J from g and
                         h, the summary CSV and figure; the gradient summary;
                         the per-node figures draw no line on the planes, draw
@@ -509,6 +513,11 @@ def test_edge_cases():
             pass
         else:
             raise AssertionError("blend_evaluation accepted entropy_half_um=0")
+        # each evaluation's own multiplier: the d-line [-d_hat, d_hat] (D-040), not the iteration's 3 (D-044)
+        ev_b = PD.blend_evaluation(st, ccfg)
+        assert ev_b["line_mult"] == 2.0 and ev_b["d_line_half_um"] == ev_b["d_hat_um"], (ev_b["line_mult"],
+                                                                                        ev_b["d_line_half_um"])
+        assert [x["half_um"] for x in PD.gradient_evaluation(st, ccfg, lines_um=())["lines"]] == [ev_b["d_hat_um"]]
         # three nodes in one run: w from d_hat, J = w g - (1 - w) h, the summary CSV and figure
         logs = []
         out3 = os.path.join(tmp, "blend")
