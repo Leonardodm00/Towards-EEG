@@ -9,6 +9,7 @@
 | 2026-10-09 (later) | v1.4, same chat, after the user asked whether the ray world could build the table for thick or heavily stained dendrites. One sentence added to the Open work 1 note: what leaving out diffraction costs a ray-world table for thick flat tubes. Evidence: `checks/kernel_confound_check.py` extended to $d$ = 2, 3 µm **[run]**. |
 | 2026-10-09 (later, 2) | v1.5, same chat. The user proposed the hybrid explicitly: ray-world absorption (NA 1.4, $n_{\rm oil}$ 1.515), each image plane rendered with the kernel. A dated note under Open work 1 records how far it goes, and qualifies the v1.4 sentence "supports the hybrid". Evidence: new `checks/hybrid_absorption_check.py` (+ `.out`) **[run]**. |
 | 2026-10-09 (later, 3) | v1.6, same chat, after writing the renderers document at the user's request. "Study material" lists it. Two statements of the v1.5 note are marked [corrected 2026-10-09]: the production kernel is narrower than the cone beyond about 0.1 µm of defocus, not "near focus"; and the hybrid books each direction's light where that direction enters the tube, so its near-opaque factor is like (S9)'s but not (S9)'s, and its leak moves light without losing it. "Next free IDs" and the implementation handoff's version are marked [corrected 2026-10-09]. Evidence: `docs/TEEG_diameter_renderers_partition_ray_world_hybrid_2026-10-09.md` §3.6, §3.8–3.9, independently reviewed; `checks/hybrid_absorption_check.py` extended and re-run (+ `.out`) **[run]**; the project log read 2026-10-09 (D-039, D-040 added by the diameter chat). |
+| 2026-10-12 | v1.7, same chat, after writing the sine-condition document at the user's request. "Study material" lists it. Nothing else changed: no decision was made and the open work is as in v1.6. Evidence: `docs/TEEG_diameter_sine_condition_and_W_2026-10-12.md` and its three checks, run 2026-10-12 **[run]**. |
 
 Paths are relative to `Passive Features/Diameter Re-measurement/` in the repo
 `Leonardodm00/Towards-EEG` (canonical URL
@@ -275,6 +276,22 @@ world differ (one formula, two substitutions), what each gets right and wrong
 for thick and dark dendrites, why a comparison must share the blur, and the
 user's hybrid (its formula, why it must average over directions, how well it
 does, and what is untested).
+
+**[added 2026-10-12, v1.7]**
+`docs/TEEG_diameter_sine_condition_and_W_2026-10-12.md`, written at the user's
+request, with seven figures in
+`figures/TEEG_diameter_sine_condition_and_W_2026-10-12/`. It explains:
+- why the ray world's $W$ is uniform in the direction sines on the disc of
+  radius $s_m=\mathrm{NA}_c/n_{\rm oil}$: the sine condition of an aplanatic
+  condenser, used under Köhler illumination;
+- what $s_m$ represents and how it depends on the unreported condenser
+  setting;
+- $W$ against $W^*$;
+- what breaks the construction.
+
+The user's reminder of 2026-10-11 (delivered 2026-10-12) named two items:
+the user's own reading of the renderers document from §3.3, the ray world
+(Eq. (3) onward); and going deeper into $W$. This document covers the second.
 
 ## Admin notes
 
