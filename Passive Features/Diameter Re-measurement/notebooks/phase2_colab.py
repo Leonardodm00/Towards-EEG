@@ -663,6 +663,66 @@ if os.path.exists(recs):
             display(Image(filename=p))
 
 # ====================================================================================================
+# ===== CELL 4k
+# ====================================================================================================
+# CELL 4K: THE PLANE EACH NODE'S ITERATION CHOSE, WITH THE LINE THAT CHOSE IT AND THE DIAMETER FITTED THERE
+# The user's request of 2026-10-12 (17:58): for each node, the plane the Allen-guided iteration chose (k_iter,
+# Cell 4j), drawn with the line that chose it and the diameter fitted there (D-045). The line is the one of
+# the last round that picked a plane -- at convergence the repeat round, sized from d_iter itself: +-m d_iter
+# / 2 through the SWC node, across the pilot's heading (m = 3, D-044). The diameter is Block 5's fit redone at
+# k_iter; its two edges, v0_hat +- d_iter / 2 from the pilot's fitted centre, are drawn on that line as a
+# caliper (blue). The fit's own line passes through the fitted centre, parallel to the drawn one; how far
+# apart the two lie along the branch is printed per node (`u_um`).
+#
+# Nothing is measured anew: the cell reads Cell 4j's `planeiter_529878215.json` in `ITER_DIR`, rebuilds each
+# node's last square from the cached crops, and redoes the fit at k_iter only to draw it. The fit must give
+# Cell 4j's `d_iter_um` to the last digit and the square Cell 4j's half-width; a difference is printed in the
+# node's notes, not hidden. Set `ITER_DIR` to `OUT + "/pilot/planeiter/bydiameter"` to draw the run at m = 2.
+#
+# Output in `ITER_DIR/fits/`: `planefit_overview_529878215.png`, every node's plane with the line (black) and
+# the caliper (blue), in Cell 4j's order; one figure per node, `planefit_<id>.png`: on the left the plane
+# k_iter on its own grey scale with the line, the caliper, the SWC node (+) and a scale bar; on the right,
+# against the position v along the line (0 at the SWC node), the plane's profile along the line (grey), the
+# fit's profile (black dots: 9 parallel lines averaged along the branch through the fitted centre, over the
+# fit's +-3 um window, shaded), the fitted model (blue), B_bar (dashed) and the edges (blue verticals, d
+# between them); `planefit_529878215.json`: per node k_iter, k*, the fit (`d_refit_um`, `fit_status`,
+# `v0_hat_um`), `s_um` and `u_um`, the caliper's ends (`edges_v_um` along the line, `edges_xy_um` in the
+# image), the line (`line_xy_um`, `sel_round`, `sel_half_um`) and the notes. The cell prints one line per node
+# and shows the overview, then each node's figure.
+#
+# Expect one `[planefit] node N: k_iter K (k* K*); line +-H um (round R); d D um, edges at v -E and +E um from
+# the SWC node` line per node, then `[planefit] 13 nodes drawn, 0 skipped; the fit redone at k_iter equals
+# Cell 4j's d_iter on 13 of 13` and `[planefit] files in ...; crops: ... from the cache, 0 downloaded`: the
+# crops are those Cell 4j fetched.
+#
+# What to expect (synthetic tubes, SPEC Block 11): on a 0.8 um tube the caliper lies on the tube, its middle
+# within 0.004 um of the SWC node (the tube's axis passes through it), with d 0.84-0.86 um; on a 3.0 um tube d
+# is 3.03-3.24 um and the profile panel shows B_bar 4 to 12 grey levels under the profile's plateau, so the
+# model cannot reach it: B_bar comes from the block's pixels outside Allen's radius + 1 um (0.3 + 1 um), which
+# on this tube still holds its edges. What to look at, node by node: whether the caliper spans the dendrite as
+# you see it in the plane; on the trunks (nodes 2 and 3), whether the edges lie inside the fit's +-3 um window
+# (at d = 6 um they reach its ends) and where B_bar lies against the plateau.
+# Cell 4k: the plane each node's iteration chose, with the line that chose it and the diameter fitted there (needs Cells 0 and 1 and Cell 4j's output)
+import json
+import os
+from IPython.display import Image, display
+ITER_DIR = OUT + "/pilot/planeiter/bydiameter_m3"   # Cell 4j's run at m = 3 (D-044); ".../bydiameter" for its run at m = 2
+out = ITER_DIR + "/fits"
+run("scripts/iteration_fits.py", "--specimen", SPECIMEN, "--iter-json", "%s/planeiter_%d.json" % (ITER_DIR, SPECIMEN),
+    "--cache-dir", CACHE_DIR, "--out-dir", out, *ALIGN)
+p = "%s/planefit_overview_%d.png" % (out, SPECIMEN)
+if os.path.exists(p):
+    display(Image(filename=p))
+recs = "%s/planefit_%d.json" % (out, SPECIMEN)
+if os.path.exists(recs):
+    with open(recs) as f:
+        drawn = [r for r in json.load(f) if "skipped" not in r]
+    for r in drawn:       # each node's figure, in Cell 4j's order (the pilot's d_hat)
+        print("node %d: k_iter %d (k* %d), d %.2f um, %s%s" % (r["node_id"], r["k_iter"], r["k_star"], r["d_refit_um"],
+                                                             r["fit_status"], "".join("; " + n for n in r["notes"])))
+        display(Image(filename=r["png"]))
+
+# ====================================================================================================
 # ===== CELL 5
 # ====================================================================================================
 # CELL 5: CAMERA-CHAIN INPUTS
@@ -878,6 +938,8 @@ for s in (0.080, 0.125):
 # `pilot/planeiter/bydiameter_m3/`): the `[planediff]` lines (the trajectories and the endings), the summary
 # CSV and figure, and the figures of the trunks and of the nodes whose last plane differs from the run at m =
 # 2 or from the Gd pick; the JSON carries every round, so the files themselves are enough.
+# - Cell 4k (2026-10-12, the planes the iteration chose): the `[planefit]` lines and the overview, and the
+# figures of the trunks and of any node with a note; the JSON in `fits/` carries every caliper.
 # - Cell 5: the `"renderer"` block without the tables, `table_sets`, `pillow_version`, `notes`.
 # - Cell 6: the `pooled dendrite diameter` line.
 # - Cell 7: the growth-fit report.

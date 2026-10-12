@@ -494,7 +494,7 @@ def iterate_planes(d_start_um, line_mult, plane_of, fit_at, max_rounds=5):
                 d_final_um=float(last[-1].get("d_hat_um", float("nan"))) if last else float("nan"))
 
 
-def refit_at_plane(st, cfg, k):
+def refit_at_plane(st, cfg, k, with_profile=False):
     """Block 5's final fit (fit.fit_profile, D-019.1) at plane k of
     node_stack's block (D-042), every other input the pilot's: the
     measurement's offsets (profiles.profile_offsets), the profile through the
@@ -506,11 +506,17 @@ def refit_at_plane(st, cfg, k):
     inputs, so d_hat is the pilot's. Returns dict(d_hat_um, fit_status,
     v0_hat_um, mu_hat_per_um, B_bar, bbar_ok); without a fit d_hat_um is NaN
     and fit_status says why: "no_plane" (k not among the block's planes, or
-    missing), "profile_nan" (a sample outside the block), "bbar_nonpositive"."""
+    missing), "profile_nan" (a sample outside the block), "bbar_nonpositive".
+    with_profile=True (Cell 4k, D-045) also returns what drawing the fit
+    needs: v_um (the offsets) and profile (the samples; both None without a
+    plane), phi_rad, and the fit's alpha_hat and n_nodes (NaN and None
+    without a fit), for tube_model.model_profile."""
     from allen_diameter.analysis import node_pipeline
     from allen_diameter.analysis.fit import fit_profile
     m, r, nan = cfg.measure, st["result"], float("nan")
     out = dict(d_hat_um=nan, fit_status="no_plane", v0_hat_um=nan, mu_hat_per_um=nan, B_bar=nan, bbar_ok=False)
+    if with_profile:
+        out.update(v_um=None, profile=None, phi_rad=float(r.phi_rad), alpha_hat=nan, n_nodes=None)
     ks = np.asarray(st["ks"])
     j = int(k) - int(ks[0])
     if not (0 <= j < ks.size and int(ks[j]) == int(k) and bool(st["valid"][j])):
@@ -523,6 +529,8 @@ def refit_at_plane(st, cfg, k):
     I = profiles.sample_profile(plane, frame, np.array([float(r.cx_um), float(r.cy_um)]), y_hat, e_u, v,
                                 profiles.n_along(m), m.profile_step_um)
     out.update(B_bar=float(B_bar), bbar_ok=bool(ok))
+    if with_profile:
+        out.update(v_um=v, profile=I)
     if not np.all(np.isfinite(I)):
         out["fit_status"] = "profile_nan"
     elif not B_bar > 0:
@@ -531,6 +539,8 @@ def refit_at_plane(st, cfg, k):
         fit = fit_profile(v, I, float(r.phi_rad), float(B_bar), m)
         out.update(d_hat_um=float(fit.d_hat_um), fit_status=str(fit.status), v0_hat_um=float(fit.v0_hat_um),
                    mu_hat_per_um=float(fit.mu_hat_per_um))
+        if with_profile:
+            out.update(alpha_hat=float(fit.alpha_hat), n_nodes=int(fit.n_nodes))
     return out
 
 

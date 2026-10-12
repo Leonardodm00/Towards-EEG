@@ -1221,3 +1221,164 @@ def picks_summary_figure(records, series, title="", weight_key=None, note_key=No
         fig.suptitle(title, y=1.0 - 0.80 / H, fontsize=10)
     fig.subplots_adjust(top=1.0 - 1.70 / H, bottom=0.55 / H, left=0.06, right=0.99, hspace=0.75, wspace=0.18)
     return fig
+
+
+# ---- Cell 4k: the iteration's planes with the line that chose them and the diameter fitted there (D-045) ----
+# One accent hue: blue (the iteration's last-plane blue) is the fit -- the caliper on the image, the model and the
+# edges on the profile; the data are neutral ink: the line that chose the plane black (white halo, as the measuring
+# lines of Cells 4e-4g), its profile grey, the fit's samples near-black dots. The validator's categorical checks pass
+# for the blue against both neutrals (CVD >= 15.1, normal vision >= 16.3, contrast >= 3:1); its lightness and chroma
+# checks do not apply to neutral ink, which differs from the fit by mark (line, dots) as well as colour.
+_FIT = "#2a78d6"
+_SEL_GREY = "#7a7a7a"
+_INK = "#1a1a19"
+
+
+def _scale_bar(ax, extent, pe):
+    """A white bar of 1, 2, 5 or 10 um (the longest within 30 % of the image's width) at its lower left."""
+    x0, x1, yb, yt = (float(x) for x in extent)
+    width = x1 - x0
+    L = max([x for x in (1.0, 2.0, 5.0, 10.0) if x <= 0.3 * width] or [0.5])
+    xa, ya = x0 + 0.06 * width, yb - 0.07 * (yb - yt)
+    dark = [pe.Stroke(linewidth=4.5, foreground="#1a1a19"), pe.Normal()]
+    ax.plot([xa, xa + L], [ya, ya], color="white", lw=2.5, solid_capstyle="butt", path_effects=dark, zorder=5)
+    ax.text(xa + 0.5 * L, ya - 0.035 * (yb - yt), "%g um" % L, color="white", fontsize=7.5, ha="center", va="bottom",
+            path_effects=[pe.Stroke(linewidth=2.2, foreground="#1a1a19"), pe.Normal()], zorder=5)
+
+
+def _draw_fit_on_plane(ax, b, pe, tick_um, lw_line=1.2, lw_cal=2.8):
+    """The plane on its own grey scale (1st-99.5th percentile), the line that chose it, the caliper (when there is
+    a diameter) with end ticks along the branch, and the SWC node."""
+    img = np.asarray(b["plane"], dtype=float)
+    lo, hi = np.nanpercentile(img, [1.0, 99.5])
+    ax.imshow(img, cmap="gray", vmin=lo, vmax=hi, extent=b["extent"], origin="upper", interpolation="nearest")
+    halo = [pe.Stroke(linewidth=lw_line + 2.2, foreground="white"), pe.Normal()]
+    L = np.asarray(b["line_xy"], dtype=float)
+    ax.plot(L[:, 0], L[:, 1], color="black", lw=lw_line, path_effects=halo, zorder=3)
+    if b.get("edges_xy") is not None:
+        E = np.asarray(b["edges_xy"], dtype=float)
+        e_u = np.asarray(b["e_u"], dtype=float)
+        cal = [pe.Stroke(linewidth=lw_cal + 2.0, foreground="white"), pe.Normal()]
+        ax.plot(E[:, 0], E[:, 1], color=_FIT, lw=lw_cal, solid_capstyle="butt", path_effects=cal, zorder=4)
+        for P in E:
+            T = np.array([P - 0.5 * tick_um * e_u, P + 0.5 * tick_um * e_u])
+            ax.plot(T[:, 0], T[:, 1], color=_FIT, lw=0.75 * lw_cal, solid_capstyle="butt", path_effects=cal, zorder=4)
+    o = np.asarray(b["o"], dtype=float)
+    ax.plot([o[0]], [o[1]], marker="+", ms=9, mew=1.6, color="black", zorder=6,
+            path_effects=[pe.Stroke(linewidth=3.4, foreground="white"), pe.Normal()])
+    x0, x1, yb, yt = (float(x) for x in b["extent"])
+    ax.set_xlim(x0, x1)
+    ax.set_ylim(yb, yt)
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+
+def iteration_fit_figure(block, title=""):
+    """One node of Cell 4k (D-045). Left: the plane the iteration chose, with
+    the line that chose it (black), the diameter fitted there as a caliper
+    between its two edges (blue) and the SWC node (+). Right: against v along
+    that line (0 at the SWC node), the plane's profile along it (grey), the
+    fit's profile (black dots, the average of parallel lines through the
+    fitted centre, drawn at s + v), the fitted model (blue), B_bar (dashed),
+    the edges (blue verticals, with d between them) and the fit's window
+    (shaded).
+
+    block: dict with label, sublabel, plane (H, W), extent (image_extent_um), o (2,), e_u (2,), line_xy (2, 2) um,
+    edges_xy (2, 2) or None, edges_v (2,) or None, d (um, NaN without a fit), v_sel (M,), prof_sel (M,), s_um,
+    v_fit (N,) or None (already shifted by s), prof_fit (N,) or None, model (N,) or None, B_bar, fit_half_um.
+    Presentation only. Returns the Figure."""
+    import textwrap
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.patheffects as pe
+    import matplotlib.transforms as mtransforms
+    W, H = 12.0, 6.7
+    fig = plt.figure(figsize=(W, H))
+
+    def ax_at(x_in, y_top_in, w_in, h_in):
+        return fig.add_axes([x_in / W, 1.0 - (y_top_in + h_in) / H, w_in / W, h_in / H])
+
+    if title:
+        fig.text(0.5, 1.0 - 0.12 / H, title, fontsize=10, ha="center", va="top")
+    fig.text(0.4 / W, 1.0 - 0.45 / H, "\n".join(textwrap.wrap(block["label"], 118)), fontsize=9.5,
+             fontweight="bold", ha="left", va="top", linespacing=1.15)
+    fig.text(0.4 / W, 1.0 - 0.92 / H, "\n".join(textwrap.wrap(block["sublabel"], 150)), fontsize=8.5, ha="left",
+             va="top", linespacing=1.15, color="#3d3d3a")
+    side = 4.1
+    a_img = ax_at(0.4, 1.65, side, side)
+    x0, x1 = (float(x) for x in block["extent"][:2])
+    _draw_fit_on_plane(a_img, block, pe, tick_um=max(0.25, 0.045 * (x1 - x0)))
+    _scale_bar(a_img, block["extent"], pe)
+    a_img.set_title("the plane, the line that chose it, the diameter (blue)", fontsize=8.5, pad=4)
+    ax = ax_at(5.55, 1.65, 6.15, 3.45)
+    h_fit, s = float(block["fit_half_um"]), float(block["s_um"])
+    span = max(float(np.max(np.abs(block["v_sel"]))) if np.size(block["v_sel"]) else 0.0, abs(s) + h_fit)
+    ax.axvspan(s - h_fit, s + h_fit, color="#efeeea", zorder=0, lw=0)
+    ax.plot(block["v_sel"], block["prof_sel"], color=_SEL_GREY, lw=1.4, zorder=2)
+    if block.get("prof_fit") is not None:
+        ax.plot(block["v_fit"], block["prof_fit"], "o", ms=3.2, color=_INK, zorder=3)
+    if block.get("model") is not None:
+        ax.plot(block["v_fit"], block["model"], color=_FIT, lw=2.0, zorder=4)
+    if block.get("B_bar") is not None and math.isfinite(float(block["B_bar"])):
+        ax.axhline(float(block["B_bar"]), color=_SEL_GREY, ls="--", lw=0.9, zorder=1)
+    if block.get("edges_v") is not None:
+        ev = [float(x) for x in block["edges_v"]]
+        for x in ev:
+            ax.axvline(x, color=_FIT, lw=1.1, zorder=4)
+        tr = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
+        ax.annotate("", xy=(ev[0], 1.04), xytext=(ev[1], 1.04), xycoords=tr, textcoords=tr,
+                    arrowprops=dict(arrowstyle="<->", color=_FIT, lw=1.2, shrinkA=0, shrinkB=0), annotation_clip=False)
+        ax.text(0.5 * (ev[0] + ev[1]), 1.06, "d = %.2f um" % float(block["d"]), transform=tr, fontsize=8.5,
+                ha="center", va="bottom", color=_INK)
+    ax.set_xlim(-1.04 * span, 1.04 * span)
+    ax.set_xlabel("v along the line that chose the plane (um; 0 = the SWC node)", fontsize=8.5)
+    ax.set_ylabel("grey level", fontsize=8.5)
+    _style_axes([ax])
+    handles = [plt.Line2D([], [], color=_SEL_GREY, lw=1.4, label="right: the plane along the line that chose it"),
+               plt.Line2D([], [], color=_INK, marker="o", ms=3.2, ls="none",
+                          label="right: the fit's profile (parallel lines averaged along the branch, through the "
+                                "fitted centre)"),
+               plt.Line2D([], [], color=_FIT, lw=2.0, label="right: the fitted model; blue verticals: its edges, d apart"),
+               plt.Line2D([], [], color=_SEL_GREY, ls="--", lw=0.9, label="right: B_bar, the fit's background"),
+               plt.Rectangle((0, 0), 1, 1, color="#efeeea",
+                             label="right: the fit's window (+-%g um about the fitted centre)" % h_fit),
+               plt.Line2D([], [], color="black", marker="+", ms=8, mew=1.5, ls="none", label="left: the SWC node")]
+    fig.legend(handles=handles, loc="upper left", ncol=2, fontsize=7.5, frameon=False,
+               bbox_to_anchor=(0.35 / W, 1.0 - 5.93 / H))
+    return fig
+
+
+def iteration_fits_overview(blocks, title="", ncol=5):
+    """Every node of Cell 4k (D-045) at a glance: per node the plane the
+    iteration chose with the line that chose it (black), the diameter fitted
+    there as a caliper (blue) and the SWC node (+), in the order given.
+
+    blocks: list of dicts with label (two short lines), plane, extent, o, e_u, line_xy, edges_xy or None.
+    Presentation only. Returns the Figure."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.patheffects as pe
+    ncol = max(1, min(int(ncol), len(blocks)))
+    rows = int(math.ceil(len(blocks) / float(ncol)))
+    side, gap, head, left, top = 2.35, 0.25, 0.55, 0.35, 0.85
+    W = max(2 * left + ncol * side + (ncol - 1) * gap, 8.0)
+    H = top + rows * (head + side) + 0.25
+    fig = plt.figure(figsize=(W, H))
+    for i, b in enumerate(blocks):
+        r, c = divmod(i, ncol)
+        y_top = top + r * (head + side) + head
+        ax = fig.add_axes([(left + c * (side + gap)) / W, 1.0 - (y_top + side) / H, side / W, side / H])
+        x0, x1 = (float(x) for x in b["extent"][:2])
+        _draw_fit_on_plane(ax, b, pe, tick_um=max(0.25, 0.06 * (x1 - x0)), lw_line=1.0, lw_cal=2.4)
+        _scale_bar(ax, b["extent"], pe)
+        ax.set_title(b["label"], fontsize=8, pad=3, linespacing=1.1)
+    handles = [plt.Line2D([], [], color="black", lw=1.2, label="the line that chose the plane"),
+               plt.Line2D([], [], color=_FIT, lw=2.8, label="the diameter fitted there (its two edges)"),
+               plt.Line2D([], [], color="black", marker="+", ms=9, mew=1.6, ls="none", label="the SWC node")]
+    fig.legend(handles=handles, loc="upper center", ncol=3, fontsize=8, frameon=False,
+               bbox_to_anchor=(0.5, 1.0 - 0.5 / H))
+    if title:
+        fig.text(0.5, 1.0 - 0.12 / H, title, fontsize=10, ha="center", va="top")
+    return fig
