@@ -11,6 +11,7 @@
 | 2026-10-09 (later, 3) | v1.6, same chat, after writing the renderers document at the user's request. "Study material" lists it. Two statements of the v1.5 note are marked [corrected 2026-10-09]: the production kernel is narrower than the cone beyond about 0.1 µm of defocus, not "near focus"; and the hybrid books each direction's light where that direction enters the tube, so its near-opaque factor is like (S9)'s but not (S9)'s, and its leak moves light without losing it. "Next free IDs" and the implementation handoff's version are marked [corrected 2026-10-09]. Evidence: `docs/TEEG_diameter_renderers_partition_ray_world_hybrid_2026-10-09.md` §3.6, §3.8–3.9, independently reviewed; `checks/hybrid_absorption_check.py` extended and re-run (+ `.out`) **[run]**; the project log read 2026-10-09 (D-039, D-040 added by the diameter chat). |
 | 2026-10-12 | v1.7, same chat, after writing the sine-condition document at the user's request. "Study material" lists it. Nothing else changed: no decision was made and the open work is as in v1.6. Evidence: `docs/TEEG_diameter_sine_condition_and_W_2026-10-12.md` and its three checks, run 2026-10-12 **[run]**. |
 | 2026-10-12 (later) | v1.8, same chat. "Study material" lists the microscope schematic drawn at the user's request. Nothing else changed. Evidence: `figures/TEEG_microscope_schematic_2026-10-12.png` and its conjugate checks, run 2026-10-12 **[run]**. |
+| 2026-10-12 (later, 2) | v1.9, same chat. "Study material" lists the direction-sines figure and records where the user's study of the sine-condition document stands: resume at §3.4, §3.4 included (reminder set for 2026-10-13). Nothing else changed. Evidence: `figures/TEEG_direction_sines_2026-10-12.png` and its geometric checks, run 2026-10-12 **[run]**. |
 
 Paths are relative to `Passive Features/Diameter Re-measurement/` in the repo
 `Leonardodm00/Towards-EEG` (canonical URL
@@ -302,6 +303,21 @@ drawn at the user's request. It shows:
 
 Reuse it rather than redrawing it. Its script is with the user and is not in
 the repository.
+
+**[added 2026-10-12, v1.9]** `figures/TEEG_direction_sines_2026-10-12.png`,
+drawn at the user's request. It shows why $\mathbf s=(s_x,s_y)$ has two
+components and $s_z$ is derived, following one ray from the diaphragm point
+$\mathbf h$ to the disc of direction sines and up to the hemisphere. Its
+script is with the user.
+
+**Where the study stands (2026-10-12).** The user has worked through the
+sine-condition document up to §3.3 and resumes at §3.4 ("Köhler illumination:
+from positions in the diaphragm to directions"), §3.4 included. A reminder is
+set for 2026-10-13. Still awaiting the user's answer:
+- fixing the document's wording "the rays bend on that sphere" (§3.2 and the
+  Figure 2 caption), to say they behave as if they bent there;
+- renumbering the figures in reading order;
+- adding the figure and check scripts to `checks/`.
 
 ## Admin notes
 
