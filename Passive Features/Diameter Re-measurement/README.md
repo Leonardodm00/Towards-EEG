@@ -84,7 +84,8 @@ external data). Their behaviour and acceptance values are specified in
 `docs/TEEG_interactive_figures_spec_2026-10-04.md`. The blur widths and
 kernels in them are illustrative ideal-objective values, not the calibrated
 kernel. **[added 2026-10-12]** The folder also holds one subfolder of static
-PNG figures, described after the table.
+PNG figures, described after the table. **[added 2026-10-12, later]** It also
+holds one standalone schematic PNG, described there too.
 
 | File | Shows | Used in |
 |---|---|---|
@@ -99,6 +100,22 @@ holds the seven static PNG figures (`fig01` to `fig07`) of
 the sine rule against the tangent rule, the map and its Jacobian, $W$ against
 $W^*$, obliquity, the shifted-source derivation, index mismatch. Each caption
 in the document says whether it is schematic or computed.
+
+**[added 2026-10-12, later]** `figures/TEEG_microscope_schematic_2026-10-12.png`
+is a schematic of Allen's transmitted-light microscope, drawn at the user's
+request. It has two panels:
+- (a) the light path from lamp to camera, with the two sets of Köhler
+  conjugate planes. The path runs: lamp, collector, field diaphragm, aperture
+  diaphragm, condenser, the specimen stack, the objective and its back focal
+  plane, tube lens with the 0.63× adapter, camera.
+- (b) the specimen region around a point F, with the cone of light: 67.5° in
+  oil with the condenser fully open, 43.9°–47.7° at ZEISS's setting for visual
+  work.
+
+The component values come from the optics document §3.1. The conjugate planes
+drawn in (a) were checked by computation: a ray trace and ray-transfer
+matrices, 11 checks, all PASS. No document uses the figure yet. Its script was
+delivered to the user as a file and is not in the repository.
 
 ### `checks/`
 
@@ -188,3 +205,4 @@ implementation handoff). Step 1 is Phase II of that plan.
 | 2026-10-10 (later) | Theory chat, after the user asked for the microscope's technical documentation: the optics document is v1.5. It adds ZEISS's specifications of the objective (no PSF data), the oil (Immersol 518 F, $n_e$ 1.518 at 23 °C), the Z2 focus drive (10 nm steps), the condensers and the Axiocam 506 mono. It also adds ZEISS's Köhler guidance (aperture closed by 20–25 % for visual work, more open for digital imaging) and what that does to the defocus cone (RMS slope 0.79 fully open, 0.42–0.47 at 75–80 %). Four brightfield-PSF papers are listed, abstract only; no ZEISS or Allen document mentions beads, phantoms or a measured PSF. |
 | 2026-10-10 (later, 2) | Theory chat, at the user's request: new `docs/TEEG_diameter_presentation_ideas_2026-10-10.md`, a running list of presentation ideas. Idea 1 is the user's three-domain view of the defocus kernel and its figure: the branch across depth, coloured by the kernel domain each slab falls in, beside $\sigma_{\rm r}(\delta)$. Contents row added. |
 | 2026-10-12 | Theory chat, at the user's request: new `docs/TEEG_diameter_sine_condition_and_W_2026-10-12.md` (the sine condition, Köhler illumination and the ray world's $W$), with its seven figures in the new `figures/TEEG_diameter_sine_condition_and_W_2026-10-12/`. Evidence: two PubMed full texts (PMC10674246, PMC4030053); `model/ray_world.py` and `config.py` at `3084991` read; three checks by computation run 2026-10-12, all PASS, one of them on a copy of `directions()` matched bit for bit to the branch function **[run]**. The scripts were delivered to the user as files, not committed. Contents rows added (`docs/`, `figures/`). |
+| 2026-10-12 (later) | Theory chat, at the user's request: new `figures/TEEG_microscope_schematic_2026-10-12.png`, a schematic of Allen's microscope. It shows the light path with the Köhler conjugate planes, and the cone of light at a specimen point F. Evidence: component values from `docs/TEEG_microscope_optics_oil_immersion_2026-10-04.md` §3.1 and §3.6; angles from Eqs. (2) and (6) of the sine-condition document; the drawn conjugates checked by computation, 11 checks PASS **[run]**. The script was delivered to the user, not committed. `figures/` description updated. |

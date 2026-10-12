@@ -10,6 +10,7 @@
 | 2026-10-09 (later, 2) | v1.5, same chat. The user proposed the hybrid explicitly: ray-world absorption (NA 1.4, $n_{\rm oil}$ 1.515), each image plane rendered with the kernel. A dated note under Open work 1 records how far it goes, and qualifies the v1.4 sentence "supports the hybrid". Evidence: new `checks/hybrid_absorption_check.py` (+ `.out`) **[run]**. |
 | 2026-10-09 (later, 3) | v1.6, same chat, after writing the renderers document at the user's request. "Study material" lists it. Two statements of the v1.5 note are marked [corrected 2026-10-09]: the production kernel is narrower than the cone beyond about 0.1 µm of defocus, not "near focus"; and the hybrid books each direction's light where that direction enters the tube, so its near-opaque factor is like (S9)'s but not (S9)'s, and its leak moves light without losing it. "Next free IDs" and the implementation handoff's version are marked [corrected 2026-10-09]. Evidence: `docs/TEEG_diameter_renderers_partition_ray_world_hybrid_2026-10-09.md` §3.6, §3.8–3.9, independently reviewed; `checks/hybrid_absorption_check.py` extended and re-run (+ `.out`) **[run]**; the project log read 2026-10-09 (D-039, D-040 added by the diameter chat). |
 | 2026-10-12 | v1.7, same chat, after writing the sine-condition document at the user's request. "Study material" lists it. Nothing else changed: no decision was made and the open work is as in v1.6. Evidence: `docs/TEEG_diameter_sine_condition_and_W_2026-10-12.md` and its three checks, run 2026-10-12 **[run]**. |
+| 2026-10-12 (later) | v1.8, same chat. "Study material" lists the microscope schematic drawn at the user's request. Nothing else changed. Evidence: `figures/TEEG_microscope_schematic_2026-10-12.png` and its conjugate checks, run 2026-10-12 **[run]**. |
 
 Paths are relative to `Passive Features/Diameter Re-measurement/` in the repo
 `Leonardodm00/Towards-EEG` (canonical URL
@@ -292,6 +293,15 @@ request, with seven figures in
 The user's reminder of 2026-10-11 (delivered 2026-10-12) named two items:
 the user's own reading of the renderers document from §3.3, the ray world
 (Eq. (3) onward); and going deeper into $W$. This document covers the second.
+
+**[added 2026-10-12, v1.8]** `figures/TEEG_microscope_schematic_2026-10-12.png`,
+drawn at the user's request. It shows:
+- Allen's light path from lamp to camera, with the Köhler conjugate planes;
+- the cone of light at a specimen point F: 67.5° with the condenser fully
+  open, 43.9°–47.7° at ZEISS's setting for visual work.
+
+Reuse it rather than redrawing it. Its script is with the user and is not in
+the repository.
 
 ## Admin notes
 
