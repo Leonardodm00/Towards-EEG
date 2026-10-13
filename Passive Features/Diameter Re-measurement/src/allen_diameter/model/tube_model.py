@@ -144,3 +144,40 @@ def model_profile(v, d, alpha, v0, sigma, B_bar, n_nodes):
         g = np.exp(-0.5 * (z / sigma) ** 2) / (sigma * _SQRT_2PI)
         dip[start:start + _ROWS_PER_CHUNK] = g @ kern
     return (B_bar * (1.0 - dip)).reshape(v_arr.shape)
+
+
+def model_profile_kernel(v, d, alpha, v0, g, B_bar, n_nodes):
+    """(B3.1) with the Gaussian g_sigma replaced by a kernel g (D-046, the fit
+    variants; Block 5 keeps model_profile): g is a vectorised callable of the
+    offset z (um, array in, array of the same shape out) with unit integral,
+    e.g. blur_kernels.kernel_pdf(family, fwhm_um, shape). The substitution
+    behind (B3.1) needs only the unit integral, so
+
+        I_model(v) = B_bar [1 - (d/2) Int_{-pi/2}^{pi/2} (1 - exp(-alpha cos psi))
+                              cos(psi) g(v - v0 - (d/2) sin psi) dpsi]
+
+    evaluated with the same n_nodes-point Gauss-Legendre rule, memory tiles
+    and units as model_profile; with g the Gaussian of standard deviation
+    sigma the two agree to roundoff. For g >= 0 the result lies in (0, B_bar]
+    up to quadrature error, which grows where g varies on the scale of the
+    nodes' spacing (a narrow or cusped kernel needs more nodes).
+    """
+    d, alpha = _check_shape_params(d, alpha)
+    v0 = _finite_scalar(v0, "v0")
+    B_bar = _finite_scalar(B_bar, "B_bar")
+    if not B_bar > 0:
+        raise ValueError("B_bar must be > 0")
+    if not callable(g):
+        raise TypeError("g must be a callable kernel, got %r" % (type(g).__name__,))
+    v_arr = np.asarray(v, dtype=float)
+    if not np.all(np.isfinite(v_arr)):
+        raise ValueError("v must be finite")
+    sin_psi, cos_psi, w = quadrature_rule(n_nodes)
+    kern = (0.5 * d) * w * cos_psi * (-np.expm1(-alpha * cos_psi))
+    shift = (0.5 * d) * sin_psi
+    flat = v_arr.reshape(-1)
+    dip = np.empty(flat.shape, dtype=float)
+    for start in range(0, flat.size, _ROWS_PER_CHUNK):
+        z = (flat[start:start + _ROWS_PER_CHUNK, None] - v0) - shift[None, :]
+        dip[start:start + _ROWS_PER_CHUNK] = np.asarray(g(z), dtype=float) @ kern
+    return (B_bar * (1.0 - dip)).reshape(v_arr.shape)

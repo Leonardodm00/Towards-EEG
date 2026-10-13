@@ -1382,3 +1382,312 @@ def iteration_fits_overview(blocks, title="", ncol=5):
     if title:
         fig.text(0.5, 1.0 - 0.12 / H, title, fontsize=10, ha="center", va="top")
     return fig
+
+
+# ---- Cell 4l: fit variants at the iteration's plane (D-046) ----
+# Kernel families take the categorical slots in fixed order (validated 2026-10-13: adjacent CVD >= 9.1, normal vision
+# >= 19.6; aqua, yellow and magenta below 3:1 on the surface, so every curve is also named by its line style, the
+# caliper rows' direct labels and the table). Shapes are told apart by line style (fixed solid, a second fixed member
+# dash-dot, fitted dotted). The weighting is an ordinal blue ramp from step 250 (lambda = 2 um, the weakest) to 700
+# (0.25 um, the strongest), validated --ordinal; unweighted is ink. The table's ratio is diverging blue <-> red about
+# a neutral grey (blue: smaller than the baseline).
+FAMILY_COLOURS = {"gauss": "#2a78d6", "lorentz": "#eb6834", "voigt": "#1baf7a", "student": "#eda100",
+                  "gennorm": "#e87ba4", "skewnorm": "#008300"}
+_LAM_RAMP = {0.25: "#0d366b", 0.5: "#1c5cab", 1.0: "#3987e5", 2.0: "#86b6ef"}
+_DIV = ("#1c5cab", "#f0efec", "#e34948")
+_FLAG_NOTE = ("* a parameter at its bound; x failed; ~ IRLS not settled in 30 iterations; dashed box: the least residual "
+              "among the unweighted fits at that width (more fitted parameters can only lower it)")
+
+
+def kernel_style(family, shape_fitted, second_fixed=False):
+    """(colour, line style) of a kernel configuration in the Cell 4l figures."""
+    ls = ":" if shape_fitted else ("-." if second_fixed else "-")
+    return FAMILY_COLOURS[family], ls
+
+
+def lam_colour(lam_um):
+    """The weighting's colour: ink unweighted, else the ramp's step (grey for a lambda off the scan)."""
+    if lam_um is None:
+        return _INK
+    return _LAM_RAMP.get(float(lam_um), _SEL_GREY)
+
+
+def _caliper_rows(ax, rows, title):
+    """Horizontal segments v0 -+ d/2, one row per item (top to bottom), each
+    labelled at its left with its text; rows: dicts label, d, v0, colour, ls."""
+    n = len(rows)
+    lo, hi = [], []
+    for r in rows:
+        if r["d"] is not None and math.isfinite(r["d"]):
+            lo.append(r["v0"] - 0.5 * r["d"])
+            hi.append(r["v0"] + 0.5 * r["d"])
+    if lo:
+        a, b = min(lo), max(hi)
+        pad = 0.35 * (b - a) + 0.05
+        ax.set_xlim(a - 1.6 * pad, b + 0.4 * pad)
+    for i, r in enumerate(rows):
+        y = n - 1 - i
+        if r["d"] is not None and math.isfinite(r["d"]):
+            x0, x1 = r["v0"] - 0.5 * r["d"], r["v0"] + 0.5 * r["d"]
+            ax.plot([x0, x1], [y, y], color=r["colour"], ls=r["ls"], lw=2.2, solid_capstyle="butt")
+            ax.plot([x0, x0], [y - 0.28, y + 0.28], color=r["colour"], lw=1.2)
+            ax.plot([x1, x1], [y - 0.28, y + 0.28], color=r["colour"], lw=1.2)
+        ax.text(0.005, y, r["label"], transform=ax.get_yaxis_transform(), fontsize=6.6, ha="left", va="center",
+                color=_INK)
+    ax.set_ylim(-0.7, n - 0.3)
+    ax.set_yticks([])
+    ax.tick_params(axis="x", labelsize=6.8, top=True, labeltop=True, bottom=False, labelbottom=False, pad=1)
+    for s in ("left", "right", "bottom"):
+        ax.spines[s].set_visible(False)
+    ax.set_title(title, fontsize=8, pad=14)
+
+
+def fit_variants_node_figure(block, title=""):
+    """One node of Cell 4l (D-046). Three columns of the profile at k_iter
+    against v (um from the fitted centre): every kernel unweighted at the
+    fixed width; every kernel unweighted at a fitted width; the Gaussian at
+    the fixed width, unweighted and for each lambda, with the weights below.
+    Above each, the fits' edges v0 -+ d/2 as stacked calipers (zoomed, with
+    their d). Below, d of every variant as a table coloured by d / d_base on a
+    log scale (the baseline outlined).
+
+    block: dict with label, sublabel, v (N,), I (N,), B_bar, v_fine (M,), fixed and fitted (lists of dicts label,
+    family, ls, curve (M,) or None, d, v0, flag, w), lam (list of dicts lam (None or um), curve, d, v0, flag,
+    weights (N,) or None), table dict(rows (R labels), row_colours, row_ls, cols (C (width mode, weight label)),
+    d (R, C), ratio (R, C), flags (R, C) str, base (r, c) or None), fixed_fwhm_um.
+    Presentation only. Returns the Figure."""
+    import textwrap
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import LinearSegmentedColormap
+    t = block["table"]
+    R, C = len(t["rows"]), len(t["cols"])
+    cal_top, cal_h, prof_top, prof_h = 2.0, 1.55, 3.8, 2.55
+    tab_top, cell_h, lab_w = 8.6, 0.25, 1.75
+    tab_h = max(cell_h * R, 1.3)                         # room for the colour bar under a short table
+    W, H = 15.6, tab_top + tab_h + 1.55
+    fig = plt.figure(figsize=(W, H))
+
+    def ax_at(x_in, y_top_in, w_in, h_in):
+        return fig.add_axes([x_in / W, 1.0 - (y_top_in + h_in) / H, w_in / W, h_in / H])
+
+    if title:
+        fig.text(0.5, 1.0 - 0.12 / H, title, fontsize=10, ha="center", va="top")
+    fig.text(0.45 / W, 1.0 - 0.45 / H, "\n".join(textwrap.wrap(block["label"], 150)), fontsize=9.5,
+             fontweight="bold", ha="left", va="top", linespacing=1.15)
+    fig.text(0.45 / W, 1.0 - 0.80 / H, "\n".join(textwrap.wrap(block["sublabel"], 190)), fontsize=8.3, ha="left",
+             va="top", linespacing=1.15, color="#3d3d3a")
+    v, I, B = np.asarray(block["v"]), np.asarray(block["I"]), float(block["B_bar"])
+    vf = np.asarray(block["v_fine"])
+    colw, gap, left = 4.55, 0.62, 0.62
+    w_fix = float(block["fixed_fwhm_um"])
+    titles = ("every kernel, fixed width (FWHM %.3f um), unweighted" % w_fix,
+              "every kernel, width fitted, unweighted",
+              "Gaussian, fixed width: unweighted and centre-weighted")
+    prof_axes = []
+    for c, key in enumerate(("fixed", "fitted", "lam")):
+        x = left + c * (colw + gap)
+        a_cal = ax_at(x, cal_top, colw, cal_h)
+        a_pro = ax_at(x, prof_top, colw, prof_h)
+        prof_axes.append(a_pro)
+        a_pro.plot(v, I, "o", ms=3.0, color=_INK, zorder=3)
+        a_pro.axhline(B, color=_SEL_GREY, ls="--", lw=0.9, zorder=1)
+        rows = []
+        for item in block[key]:
+            if key == "lam":
+                colour, ls = lam_colour(item["lam"]), "-"
+                lab = "none" if item["lam"] is None else "lambda %g um" % item["lam"]
+            else:
+                colour, ls = FAMILY_COLOURS[item["family"]], item["ls"]
+                lab = item["label"]
+                if key == "fitted" and item.get("w") is not None and math.isfinite(item["w"]):
+                    lab += ", w %.2f" % item["w"]
+            if item.get("curve") is not None:
+                a_pro.plot(vf, item["curve"], color=colour, ls=ls, lw=1.3, zorder=4)
+            d = item.get("d")
+            text = "%s: %s%s" % (lab, "n/a" if d is None or not math.isfinite(d) else "%.2f" % d, item.get("flag", ""))
+            rows.append(dict(label=text, d=d, v0=item.get("v0"), colour=colour, ls=ls))
+        _caliper_rows(a_cal, rows, titles[c] + "\nedges v0 -+ d/2 (um, zoomed), d in um")
+        a_pro.set_xlim(v[0] - 0.1, v[-1] + 0.1)
+        a_pro.set_xlabel("v (um from the fitted centre, across the branch)", fontsize=8)
+        if c == 0:
+            a_pro.set_ylabel("grey level", fontsize=8.5)
+        _style_axes([a_pro])
+    # the weights under the lambda column
+    a_w = ax_at(left + 2 * (colw + gap), prof_top + prof_h + 0.62, colw, 0.75)
+    for item in block["lam"]:
+        if item["lam"] is not None and item.get("weights") is not None:
+            a_w.plot(v, item["weights"], "-", color=lam_colour(item["lam"]), lw=1.3)
+    a_w.set_xlim(prof_axes[2].get_xlim())
+    a_w.set_ylim(0, 1.05)
+    a_w.set_ylabel("weight", fontsize=8)
+    a_w.set_xlabel("v (um); the weights exp(-|v - v0| / lambda) at the fit's v0", fontsize=7.5)
+    _style_axes([a_w])
+    # the table
+    tab_w = W - left - lab_w - 2.9
+    a_t = ax_at(left + lab_w, tab_top, tab_w, cell_h * R)
+    ratio = np.asarray(t["ratio"], dtype=float)
+    lim = math.log2(1.5)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        z = np.clip(np.log2(ratio), -lim, lim)
+    cmap = LinearSegmentedColormap.from_list("div", list(_DIV))
+    cmap.set_bad("#ffffff")
+    a_t.imshow(np.ma.masked_invalid(z), cmap=cmap, vmin=-lim, vmax=lim, aspect="auto", interpolation="nearest")
+    for r in range(R):
+        for c in range(C):
+            d = t["d"][r][c]
+            txt = "n/a" if d is None or not math.isfinite(d) else "%.2f" % d
+            dark = np.isfinite(z[r, c]) and abs(z[r, c]) > 0.75 * lim
+            a_t.text(c, r, txt + t["flags"][r][c], ha="center", va="center", fontsize=7,
+                     color="white" if dark else _INK)
+    if t.get("base") is not None:
+        rb, cb = t["base"]
+        a_t.add_patch(plt.Rectangle((cb - 0.5, rb - 0.5), 1, 1, fill=False, ec=_INK, lw=1.8))
+    for rb, cb in t.get("best") or []:                    # the least residual among the unweighted fits, per width
+        a_t.add_patch(plt.Rectangle((cb - 0.42, rb - 0.4), 0.84, 0.8, fill=False, ec=_INK, lw=1.2, ls="--"))
+    a_t.set_yticks(range(R))
+    a_t.set_yticklabels(t["rows"], fontsize=7.5, color=_INK)
+    for r in range(R):                                   # a swatch of each kernel's curve, between its name and the row
+        a_t.plot([-0.5 - 0.5, -0.5 - 0.1], [r, r], color=t["row_colours"][r], ls=t["row_ls"][r], lw=1.6,
+                 clip_on=False)
+    a_t.set_xlim(-0.5, C - 0.5)
+    a_t.set_xticks(range(C))
+    a_t.set_xticklabels([w for _, w in t["cols"]], fontsize=7.2)
+    a_t.tick_params(length=0, labelsize=7.2)
+    a_t.tick_params(axis="y", pad=42)
+    for s in a_t.spines.values():
+        s.set_visible(False)
+    groups = []
+    for c, (mode, _) in enumerate(t["cols"]):
+        if not groups or groups[-1][0] != mode:
+            groups.append([mode, c, c])
+        else:
+            groups[-1][2] = c
+    for mode, c0, c1 in groups:
+        a_t.text(0.5 * (c0 + c1), -0.75, "%s width" % mode, ha="center", va="bottom", fontsize=8, color=_INK,
+                 fontweight="bold")
+        if c0 > 0:
+            a_t.axvline(c0 - 0.5, color="white", lw=3)
+    a_t.set_title("d (um) of every variant; colour d / d_base (the Gaussian, fixed width, unweighted, outlined = "
+                  "Block 5's fit)", fontsize=8.5, pad=20)
+    # colour bar, ratio ticks
+    a_cb = ax_at(left + lab_w + tab_w + 0.45, tab_top + 0.3, 0.18, tab_h - 0.5)
+    ramp = np.linspace(-lim, lim, 101)[:, None]
+    a_cb.imshow(ramp[::-1], cmap=cmap, vmin=-lim, vmax=lim, aspect="auto",
+                extent=(0, 1, -lim, lim))
+    ticks = [2.0 / 3.0, 0.8, 1.0, 1.25, 1.5]
+    a_cb.set_yticks([math.log2(x) for x in ticks])
+    a_cb.set_yticklabels(["%.2f" % x for x in ticks], fontsize=7)
+    a_cb.yaxis.tick_right()
+    a_cb.set_xticks([])
+    a_cb.set_title("d / d_base", fontsize=7.5, pad=4)
+    # legend
+    handles = [plt.Line2D([], [], color=_INK, marker="o", ms=3.0, ls="none", label="the profile at k_iter (Block 5's)"),
+               plt.Line2D([], [], color=_SEL_GREY, ls="--", lw=0.9, label="B_bar")]
+    seen = set()
+    for item in block["fixed"]:
+        if item["family"] not in seen:
+            seen.add(item["family"])
+            handles.append(plt.Line2D([], [], color=FAMILY_COLOURS[item["family"]], lw=1.6, label=item["family"]))
+    handles += [plt.Line2D([], [], color=_SEL_GREY, ls="-", lw=1.4, label="fixed shape"),
+                plt.Line2D([], [], color=_SEL_GREY, ls="-.", lw=1.4, label="second fixed shape"),
+                plt.Line2D([], [], color=_SEL_GREY, ls=":", lw=1.4, label="shape fitted")]
+    handles += [plt.Line2D([], [], color=lam_colour(item["lam"]), lw=1.6,
+                           label="unweighted" if item["lam"] is None else "lambda %g um" % item["lam"])
+                for item in block["lam"]]
+    fig.legend(handles=handles, loc="upper left", ncol=8, fontsize=7.3, frameon=False,
+               bbox_to_anchor=(0.4 / W, 1.0 - (tab_top + tab_h + 0.55) / H))
+    fig.text(0.45 / W, 1.0 - (tab_top + tab_h + 1.12) / H, _FLAG_NOTE, fontsize=7.5, ha="left", va="top",
+             color="#3d3d3a")
+    return fig
+
+
+def fit_variants_summary_figure(records, kernels, title=""):
+    """Every node of Cell 4l (D-046) at a glance: one panel per kernel and
+    width mode (fixed width in the upper half, fitted below), d / d_base
+    against d_base (both log), one series per weighting (unweighted ink,
+    lambda the blue ramp), hollow where the fit is flagged.
+
+    records: per node dicts node_id, d_base, and ratio / flag dicts keyed by (kernel label, width mode, weight
+    label); kernels: kernel labels in order; weights are read from the records' keys, unweighted first.
+    Presentation only. Returns the Figure."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import FixedLocator, NullLocator
+    modes = ("fixed", "fitted")
+    weights = []
+    for r in records:
+        for (_, _, wl) in r["ratio"]:
+            if wl not in weights:
+                weights.append(wl)
+    weights.sort(key=lambda s: (s != "none", float(s.split("=")[1]) if s != "none" else 0.0))
+    ncol = min(5, max(1, len(kernels)))
+    nrow_half = int(math.ceil(len(kernels) / float(ncol)))
+    nrow = 2 * nrow_half
+    H = 2.35 * nrow + 1.6
+    fig, axes = plt.subplots(nrow, ncol, figsize=(3.25 * ncol, H), squeeze=False, sharex=True, sharey=True)
+    xs = [float(r["d_base"]) for r in records if math.isfinite(float(r["d_base"]))]
+    ys = [float(x) for r in records for x in r["ratio"].values() if x is not None and math.isfinite(float(x))]
+    order = sorted(range(len(records)), key=lambda i: float(records[i]["d_base"]))
+    for m, mode in enumerate(modes):
+        for k, kern in enumerate(kernels):
+            ax = axes[m * nrow_half + k // ncol, k % ncol]
+            ax.axhline(1.0, color=_SEL_GREY, lw=0.9, zorder=1)
+            for wl in weights:
+                lam = None if wl == "none" else float(wl.split("=")[1])
+                colour = lam_colour(lam)
+                xx, yy, hollow = [], [], []
+                for i in order:
+                    r = records[i]
+                    y = r["ratio"].get((kern, mode, wl))
+                    if y is None or not math.isfinite(float(y)):
+                        continue
+                    xx.append(float(r["d_base"]))
+                    yy.append(float(y))
+                    hollow.append(bool(r["flag"].get((kern, mode, wl))))
+                if not xx:
+                    continue
+                ax.plot(xx, yy, "-", color=colour, lw=1.0, zorder=2)
+                xx, yy, hollow = np.array(xx), np.array(yy), np.array(hollow)
+                ax.plot(xx[~hollow], yy[~hollow], "o", ms=4.2, color=colour, mec="white", mew=0.5, zorder=3)
+                ax.plot(xx[hollow], yy[hollow], "o", ms=4.2, mfc="white", mec=colour, mew=1.1, zorder=3)
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            ax.set_title("%s, %s width" % (kern, mode), fontsize=8)
+            _style_axes([ax])
+            ax.grid(axis="x", color="#e6e5e0", lw=0.6)
+            if k % ncol == 0:
+                ax.set_ylabel("d / d_base", fontsize=8)
+            if m == 1 and k // ncol == nrow_half - 1:
+                ax.set_xlabel("d_base (um, Block 5 at k_iter)", fontsize=8)
+        for k in range(len(kernels), nrow_half * ncol):
+            axes[m * nrow_half + k // ncol, k % ncol].axis("off")
+    if xs:
+        ax0 = axes[0, 0]
+        ax0.set_xlim(min(xs) / 1.25, max(xs) * 1.25)
+        xt = [x for x in (0.25, 0.5, 1.0, 2.0, 4.0, 8.0) if min(xs) / 1.25 <= x <= max(xs) * 1.25]
+        ax0.xaxis.set_major_locator(FixedLocator(xt))
+        ax0.xaxis.set_minor_locator(NullLocator())
+        ax0.set_xticklabels(["%g" % x for x in xt])
+    if ys:
+        lo, hi = max(min(ys), 0.2), min(max(ys), 5.0)
+        lo, hi = min(lo, 0.8), max(hi, 1.25)
+        ax0 = axes[0, 0]
+        ax0.set_ylim(lo / 1.1, hi * 1.1)
+        yt = [y for y in (0.25, 0.5, 0.67, 0.8, 1.0, 1.25, 1.5, 2.0, 4.0) if lo / 1.1 <= y <= hi * 1.1]
+        ax0.yaxis.set_major_locator(FixedLocator(yt))
+        ax0.yaxis.set_minor_locator(NullLocator())
+        ax0.set_yticklabels(["%g" % y for y in yt])
+    handles = [plt.Line2D([], [], color=lam_colour(None if wl == "none" else float(wl.split("=")[1])), marker="o",
+                          ms=4.2, lw=1.0, label="unweighted" if wl == "none" else "lambda %s um" % wl.split("=")[1])
+               for wl in weights]
+    handles.append(plt.Line2D([], [], color=_SEL_GREY, marker="o", mfc="white", ms=4.2, ls="none",
+                              label="hollow: at a bound, failed, or IRLS not settled"))
+    fig.legend(handles=handles, loc="upper center", ncol=len(handles), fontsize=8, frameon=False,
+               bbox_to_anchor=(0.5, 1.0 - 0.42 / H))
+    if title:
+        fig.text(0.5, 1.0 - 0.12 / H, title, fontsize=10, ha="center", va="top")
+    fig.subplots_adjust(top=1.0 - 1.05 / H, bottom=0.6 / H, left=0.06, right=0.99, hspace=0.42, wspace=0.12)
+    return fig

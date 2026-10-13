@@ -723,6 +723,87 @@ if os.path.exists(recs):
         display(Image(filename=r["png"]))
 
 # ====================================================================================================
+# ===== CELL 4l
+# ====================================================================================================
+# CELL 4L: FIT VARIANTS AT THE PLANE EACH NODE'S ITERATION CHOSE: OTHER BLUR KERNELS AND CENTRE WEIGHTS
+# The user's request of 2026-10-13 (14:50), on seeing Cell 4k: the thin dendrites look hugely overestimated,
+# so try a fit whose weights fall exponentially from the dip's centre, and other families of the blur kernel,
+# with and without the weights (D-046). A diagnostic: nothing in the measurement changes, Block 5's fit keeps
+# its Gaussian (D-026). At each node's plane k_iter (Cell 4j, not re-chosen) the profile Block 5 fitted there
+# is fitted again 100 ways: 10 kernels (Gaussian, Lorentzian, Voigt r = 1, Student nu = 3, generalized normal
+# beta = 1 and 4, and the Voigt, Student and generalized normal with their shape fitted, and a skew-normal
+# with its skew fitted), each at the width of Block 5's Gaussian (FWHM 0.233 um) and with the width fitted
+# (0.1-2 um), each unweighted and with the weights exp(-|v - v0| / lambda), lambda = 0.25, 0.5, 1, 2 um. The
+# weights follow the fit's own centre v0: fit, re-centre the weights on the new v0, fit again, until v0 and d
+# move by less than 1e-4 um (at most 30 rounds). Every kernel has unit area and its peak at v0; its width is
+# its FWHM, so a kernel and the Gaussian compared at the same width have the same half-maximum width.
+#
+# Nothing is fetched: the cell reads Cell 4j's `planeiter_529878215.json` in `ITER_DIR` and rebuilds each
+# node's square from the cached crops. The Gaussian at the fixed width, unweighted, is Block 5's fit itself
+# and must give Cell 4j's `d_iter_um`; a difference is printed in the node's notes. To try fewer variants, add
+# for instance `"--families", "lorentz,gennorm"`, `"--lambdas", "0.5"` or `"--width-modes", "fixed"` to the
+# `run(...)` call (the Gaussian is always kept); `"--nodes", "8497,3856"` for some nodes only.
+#
+# Output in `ITER_DIR/fitvar/`: `fitvar_summary_529878215.png`, for every kernel and width mode d / d_base
+# against d_base (Block 5's d), one series per weighting, hollow where a fit is flagged; one figure per node,
+# `fitvar_<id>.png`: three columns of the profile at k_iter against v (um from the fitted centre) with the
+# fits: every kernel unweighted at the fixed width, every kernel unweighted at a fitted width, the Gaussian at
+# the fixed width unweighted and for each lambda (with the weights drawn below); above each column the fits'
+# edges v0 +- d/2 as stacked calipers with their d; below, d of all 100 variants as a table coloured by d /
+# d_base (blue: smaller than Block 5's), flagged * at a bound, x failed, ~ weights not settled in 30 rounds;
+# `fitvar_529878215.csv`, one row per node and variant (`d_um`, `fwhm_um`, `shape`, `v0_um`, `status`,
+# `ratio`, the residual sums with and without the weights, ...) and `fitvar_529878215.json` with the profiles.
+# The cell shows the summary, a table of eight variants' d per node, then each node's figure.
+#
+# Expect one `[fitvar] node N: k_iter K (k* K*); Block 5 d D um (converged); Gaussian centre-weighted d ...
+# (lambda 0.25/0.5/1/2 um); unweighted kernels: fixed width d A-B, fitted width d C-E, the Gaussian's fitted
+# FWHM W um; smallest d ...; 100 variants, F flagged; T s` line per node, then `[fitvar] 13 nodes fitted, 0
+# skipped; 100 variants per node; the baseline equals Cell 4j's d_iter on 13 of 13` and `[fitvar] files in
+# ...; crops: ... from the cache, 0 downloaded`. It takes 25-75 s per node on one CPU of the sandbox (the
+# longer on thick dendrites), some 10-15 minutes for the 13 nodes.
+#
+# What to expect (synthetic profiles, SPEC Block 11; one noise draw each, so indicative): when the true blur
+# is a Gaussian of FWHM 0.5 um, twice Block 5's, Block 5 gives 0.82 um for a 0.6 um tube and 1.47 um for a 1.4
+# um one; the Gaussian of fitted width gives 0.70 and 1.39 um (its FWHM 0.43 and 0.50 um), the heavy-tailed
+# kernels at the fixed width (Lorentzian, generalized normal beta = 1) 0.67-0.69 um on the thin tube, and the
+# weights change d by a few hundredths on a clean single dip; the 3.0 um tube is near 3.0 um for every
+# variant. Shapes often run to a bound (a Student nu of 100 or a Voigt r of 0.01 is the Gaussian again; a skew
+# of 10 at the fixed width widens the kernel on one side): the flag says so. Where a darker neighbour merges
+# with the dip, the unweighted fit takes both as one tube and the re-centred weights at lambda = 0.25 um can
+# move onto the neighbour: check v0 in the calipers. What to look at: on the thin nodes, which variants bring
+# d down and whether their curves still follow the profile; whether the fitted widths agree across nodes (a
+# common width would point at the blur rather than at the dendrites); on the trunks, whether the variants
+# agree.
+# Cell 4l: fit variants at the plane each node's iteration chose: other blur kernels and centre weights (needs Cells 0 and 1 and Cell 4j's output; 25-75 s per node)
+import json
+import os
+import pandas as pd
+from IPython.display import Image, display
+ITER_DIR = OUT + "/pilot/planeiter/bydiameter_m3"   # Cell 4j's run at m = 3 (D-044)
+out = ITER_DIR + "/fitvar"
+run("scripts/fit_variants.py", "--specimen", SPECIMEN, "--iter-json", "%s/planeiter_%d.json" % (ITER_DIR, SPECIMEN),
+    "--cache-dir", CACHE_DIR, "--out-dir", out, *ALIGN)
+p = "%s/fitvar_summary_%d.png" % (out, SPECIMEN)
+if os.path.exists(p):
+    display(Image(filename=p))
+p = "%s/fitvar_%d.csv" % (out, SPECIMEN)
+if os.path.exists(p):           # d (um) of a few variants per node, in Cell 4j's order; the CSV holds all 100
+    t = pd.read_csv(p)
+    keys = ["gauss|w fixed|none", "gauss|w fixed|lam=0.25", "gauss|w fixed|lam=0.5", "gauss|w fixed|lam=1",
+            "gauss|w fixed|lam=2", "gauss|w fitted|none", "lorentz|w fixed|none", "gennorm beta=1|w fixed|none"]
+    keys = [k for k in keys if k in set(t["variant"])]
+    tab = t[t["variant"].isin(keys)].pivot(index="node_id", columns="variant", values="d_um")
+    display(tab.loc[list(dict.fromkeys(t["node_id"])), keys].round(2))
+p = "%s/fitvar_%d.json" % (out, SPECIMEN)
+if os.path.exists(p):
+    with open(p) as f:
+        done = [r for r in json.load(f) if "skipped" not in r]
+    for r in done:       # each node's figure, in Cell 4j's order (the pilot's d_hat)
+        print("node %d: k_iter %d (k* %d), Block 5's d %.2f um%s" % (r["node_id"], r["k_iter"], r["k_star"],
+                                                                   r["d_base_um"], "".join("; " + n for n in r["notes"])))
+        display(Image(filename=r["png"]))
+
+# ====================================================================================================
 # ===== CELL 5
 # ====================================================================================================
 # CELL 5: CAMERA-CHAIN INPUTS
@@ -940,6 +1021,9 @@ for s in (0.080, 0.125):
 # 2 or from the Gd pick; the JSON carries every round, so the files themselves are enough.
 # - Cell 4k (2026-10-12, the planes the iteration chose): the `[planefit]` lines and the overview, and the
 # figures of the trunks and of any node with a note; the JSON in `fits/` carries every caliper.
+# - Cell 4l (2026-10-13, the fit variants): the `[fitvar]` lines, the summary figure, the table of eight
+# variants, and the figures of the thin nodes (d_base under 1 um) and of the trunks; the CSV in `fitvar/`
+# holds all 100 variants per node.
 # - Cell 5: the `"renderer"` block without the tables, `table_sets`, `pillow_version`, `notes`.
 # - Cell 6: the `pooled dendrite diameter` line.
 # - Cell 7: the growth-fit report.
