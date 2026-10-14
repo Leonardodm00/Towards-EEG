@@ -45,7 +45,8 @@ Checks
     test_wiring         the starts of each unweighted variant (Block 5's 3, then
                         the warm ones it lists); every weighted fit is
                         fit_weighted from the unweighted fit of the same kernel
-                        and width mode (identical numbers)
+                        and width mode (identical numbers); PlaneFits keeps two
+                        weightings of one kernel apart
     test_determinism    two fit_grid runs: identical numbers
     test_edge_cases     run() end to end on the 0.8 um synthetic cell from
                         Cell 4j's JSON (a reduced grid): one figure per node,
@@ -437,6 +438,14 @@ def test_wiring():
     FV.fit_grid(v, I, phi, B, cfg, specs, log=lambda s, f: unw.setdefault(s.key, f))
     assert unw["gennorm beta fit|w fitted|none"].n_starts == 3 + 1 and unw["lorentz|w fitted|none"].n_starts == 4
     assert unw["gennorm beta=1|w fixed|none"].n_starts == 3 and base.n_starts == 3
+    # two weightings of one kernel are kept apart: each is fit_weighted from the kernel's unweighted fit
+    pf = FV.PlaneFits(v, I, phi, B, cfg)
+    lam1, lam2 = FV.VariantSpec("student", 3.0, False, True, 0.25), FV.VariantSpec("student", 3.0, False, True, 2.0)
+    f1, f2 = pf.fit(lam1), pf.fit(lam2)
+    u = pf.unweighted(lam1.kernel, True)
+    for spec, f in ((lam1, f1), (lam2, f2)):
+        ref = FV.fit_weighted(v, I, phi, B, cfg, spec, u)
+        assert FV.variant_row(ref, u) == FV.variant_row(f, u) and pf.fit(spec) is f, spec.key
     # a weighted fit is fit_weighted from the unweighted fit of the same kernel and width mode
     for f in fits[1:]:
         ref = FV.fit_weighted(v, I, phi, B, cfg, f.spec, unw[f.spec.unweighted().key])

@@ -1691,3 +1691,235 @@ def fit_variants_summary_figure(records, kernels, title=""):
         fig.text(0.5, 1.0 - 0.12 / H, title, fontsize=10, ha="center", va="top")
     fig.subplots_adjust(top=1.0 - 1.05 / H, bottom=0.6 / H, left=0.06, right=0.99, hspace=0.42, wspace=0.12)
     return fig
+
+
+# ---- Cell 4m: each fit variant's own iteration (D-047) ----
+# The kernels keep Cell 4l's colours and line styles; the reference (Cell 4j's own iteration, Block 5's fit) is ink.
+_KSTAR = "#ff1744"
+
+
+def variant_stack_figure(block, title=""):
+    """One node of Cell 4m (D-047): one row per variant (the reference, Cell
+    4j's own iteration with Block 5's fit, first), each with its label and d,
+    its fitted edges v0 -+ d/2 at the plane its own iteration chose (um from
+    the pilot's fitted centre), and the planes its rounds picked (grey, in
+    order) ending on k_iter (filled), against k* (red) and the SWC plane
+    (dotted).
+
+    block: dict with label, sublabel, rows (dicts label, d, v0, colour, ls, planes (list of k or None), k_iter, flag,
+    reference), ks, k_star, k_swc. Presentation only. Returns the Figure."""
+    import textwrap
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    rows = block["rows"]
+    n = len(rows)
+    row_h, top, left = 0.172, 1.55, 0.35
+    W = 14.0
+    H = top + n * row_h + 1.25
+    fig = plt.figure(figsize=(W, H))
+
+    def ax_at(x_in, y_top_in, w_in, h_in):
+        return fig.add_axes([x_in / W, 1.0 - (y_top_in + h_in) / H, w_in / W, h_in / H])
+
+    if title:
+        fig.text(0.5, 1.0 - 0.12 / H, title, fontsize=10, ha="center", va="top")
+    fig.text(left / W, 1.0 - 0.45 / H, "\n".join(textwrap.wrap(block["label"], 160)), fontsize=9.2,
+             fontweight="bold", ha="left", va="top", linespacing=1.15)
+    fig.text(left / W, 1.0 - 0.85 / H, "\n".join(textwrap.wrap(block["sublabel"], 190)), fontsize=8.2, ha="left",
+             va="top", linespacing=1.15, color="#3d3d3a")
+    h_axes = n * row_h
+    a_lab = ax_at(left, top, 3.1, h_axes)
+    a_cal = ax_at(left + 3.25, top, 6.0, h_axes)
+    a_pl = ax_at(left + 9.55, top, 3.9, h_axes)
+    ys = [n - 1 - i for i in range(n)]
+    lo, hi = [], []
+    for r in rows:
+        if r["d"] is not None and math.isfinite(r["d"]) and math.isfinite(r["v0"]):
+            lo.append(r["v0"] - 0.5 * r["d"])
+            hi.append(r["v0"] + 0.5 * r["d"])
+    span = (max(hi) - min(lo)) if lo else 1.0
+    for a in (a_lab, a_cal, a_pl):
+        a.set_ylim(-0.7, n - 0.3)
+        a.set_yticks([])
+        for sp in ("left", "right", "top"):
+            a.spines[sp].set_visible(False)
+    for r, y in zip(rows, ys):
+        dtxt = "n/a" if r["d"] is None or not math.isfinite(r["d"]) else "%.2f" % r["d"]
+        a_lab.text(0.0, y, r["label"], fontsize=6.9, ha="left", va="center", color=_INK,
+                   fontweight="bold" if r.get("reference") else "normal")
+        a_lab.text(1.0, y, "d %s%s" % (dtxt, r.get("flag", "")), fontsize=6.9, ha="right", va="center", color=_INK,
+                   fontweight="bold" if r.get("reference") else "normal")
+        if r["d"] is not None and math.isfinite(r["d"]) and math.isfinite(r["v0"]):
+            x0, x1 = r["v0"] - 0.5 * r["d"], r["v0"] + 0.5 * r["d"]
+            a_cal.plot([x0, x1], [y, y], color=r["colour"], ls=r["ls"], lw=2.0, solid_capstyle="butt")
+            a_cal.plot([x0, x0], [y - 0.3, y + 0.3], color=r["colour"], lw=1.1)
+            a_cal.plot([x1, x1], [y - 0.3, y + 0.3], color=r["colour"], lw=1.1)
+        ks = [k for k in r["planes"] if k is not None]
+        if ks:
+            xs = np.arange(len(ks), dtype=float)
+            jitter = 0.18 * (xs - 0.5 * (len(ks) - 1)) / max(len(ks) - 1, 1)
+            a_pl.plot(np.asarray(ks, dtype=float), y + jitter, "-", color="#c9c8c3", lw=0.8, zorder=1)
+            a_pl.plot(ks[:-1], (y + jitter)[:-1], "o", ms=3.0, color=_SEL_GREY, zorder=2)
+        if r["k_iter"] is not None:
+            a_pl.plot([r["k_iter"]], [y], "o", ms=5.5, mfc=r["colour"], mec=_INK if r["colour"] in _LIGHT + (
+                "#e87ba4",) else r["colour"], mew=0.7, zorder=3)
+    # kernel groups: a rule between groups, a heavier one under the reference
+    prev = None
+    for i, r in enumerate(rows):
+        key = "ref" if r.get("reference") else r.get("kernel")
+        if prev is not None and key != prev:
+            for a in (a_lab, a_cal, a_pl):
+                a.axhline(ys[i] + 0.5, color="#1a1a19" if prev == "ref" else "#d9d8d3",
+                          lw=1.0 if prev == "ref" else 0.6, zorder=0)
+        prev = key
+    a_lab.set_xlim(0, 1)
+    a_lab.set_xticks([])
+    a_lab.spines["bottom"].set_visible(False)
+    a_cal.axvline(0.0, color="#d9d8d3", lw=0.8, zorder=0)
+    if lo:
+        pad = 0.08 * span + 0.05
+        a_cal.set_xlim(min(lo) - pad, max(hi) + pad)
+    a_cal.set_xlabel("edges v0 -+ d/2 (um from the pilot's fitted centre, across the branch), at each variant's "
+                     "plane", fontsize=8)
+    a_cal.tick_params(labelsize=7.5)
+    kk = [int(k) for k in block["ks"]]
+    a_pl.axvline(block["k_star"], color=_KSTAR, lw=1.1, zorder=0)
+    a_pl.axvline(block["k_swc"], color=_INK, ls=":", lw=1.0, zorder=0)
+    used = [k for r in rows for k in r["planes"] if k is not None] + [block["k_star"], block["k_swc"]]
+    a_pl.set_xlim(min(used) - 1.0, max(used) + 1.0)
+    a_pl.set_xticks([k for k in kk if min(used) - 1 <= k <= max(used) + 1])
+    a_pl.tick_params(labelsize=7.5)
+    a_pl.set_xlabel("plane k: each round's pick (grey), k_iter (filled)", fontsize=8)
+    for a in (a_cal, a_pl):
+        a.grid(axis="x", color="#eeede9", lw=0.6)
+    a_lab.set_title("variant (kernel, weighting): d_iter (um)", fontsize=8, loc="left", pad=4)
+    present = {r["colour"] for r in rows if not r.get("reference")}
+    handles = [plt.Line2D([], [], color=_INK, lw=2.0, label="Cell 4j's own iteration (Block 5's fit)")]
+    handles += [plt.Line2D([], [], color=c, lw=2.0, label=f) for f, c in FAMILY_COLOURS.items() if c in present]
+    handles += [plt.Line2D([], [], color=_SEL_GREY, ls="-", lw=1.4, label="fixed shape"),
+                plt.Line2D([], [], color=_SEL_GREY, ls="-.", lw=1.4, label="second fixed shape"),
+                plt.Line2D([], [], color=_SEL_GREY, ls=":", lw=1.4, label="shape fitted"),
+                plt.Line2D([], [], color=_KSTAR, lw=1.1, label="k* (Block 5's focus)"),
+                plt.Line2D([], [], color=_INK, ls=":", lw=1.0, label="SWC plane")]
+    fig.legend(handles=handles, loc="upper left", ncol=6, fontsize=7.3, frameon=False,
+               bbox_to_anchor=(left / W, 1.0 - (top + h_axes + 0.5) / H))
+    fig.text(left / W, 1.0 - (top + h_axes + 1.0) / H, "* a fit parameter at its bound; x no fit or failed; ~ IRLS "
+             "not settled in 30 iterations", fontsize=7.3, ha="left", va="top", color="#3d3d3a")
+    return fig
+
+
+def _view_limits(img, extent, view):
+    """The 1st and 99.5th percentiles of the plane's pixels inside view (x0, x1, y_bottom, y_top), for its grey scale."""
+    x0e, x1e, ybe, yte = (float(x) for x in extent)
+    H, W = img.shape
+    cols = x0e + (np.arange(W) + 0.5) * (x1e - x0e) / W
+    rows = yte + (np.arange(H) + 0.5) * (ybe - yte) / H
+    inx = (cols >= min(view[0], view[1])) & (cols <= max(view[0], view[1]))
+    iny = (rows >= min(view[2], view[3])) & (rows <= max(view[2], view[3]))
+    sel = img[np.ix_(iny, inx)] if (inx.any() and iny.any()) else img
+    return np.nanpercentile(sel, [1.0, 99.5])
+
+
+def _draw_fitted_dendrite(ax, b, pe, colour, view, edge_half_um, lw_line=0.9, lw_edge=1.5):
+    """A Cell 4m panel: the plane on the grey scale of the pixels in view, the line that chose it (black), the
+    fitted dendrite's two edges as lines along the branch (e_u), of half-length edge_half_um about the points where
+    they cross the line, and the SWC node (+); the axes limited to the view."""
+    img = np.asarray(b["plane"], dtype=float)
+    lo, hi = _view_limits(img, b["extent"], view)
+    ax.imshow(img, cmap="gray", vmin=lo, vmax=hi, extent=b["extent"], origin="upper", interpolation="nearest")
+    if b.get("line_xy") is not None:
+        L = np.asarray(b["line_xy"], dtype=float)
+        ax.plot(L[:, 0], L[:, 1], color="black", lw=lw_line, zorder=3,
+                path_effects=[pe.Stroke(linewidth=lw_line + 1.8, foreground="white"), pe.Normal()])
+    if b.get("edges_xy") is not None:
+        e_u = np.asarray(b["e_u"], dtype=float)
+        halo = [pe.Stroke(linewidth=lw_edge + 1.8, foreground="white"), pe.Normal()]
+        for P in np.asarray(b["edges_xy"], dtype=float):
+            T = np.array([P - edge_half_um * e_u, P + edge_half_um * e_u])
+            ax.plot(T[:, 0], T[:, 1], color=colour, lw=lw_edge, solid_capstyle="butt", path_effects=halo, zorder=4)
+    o = np.asarray(b["o"], dtype=float)
+    ax.plot([o[0]], [o[1]], marker="+", ms=6, mew=1.2, color="black", zorder=6,
+            path_effects=[pe.Stroke(linewidth=2.8, foreground="white"), pe.Normal()])
+    ax.set_xlim(float(view[0]), float(view[1]))
+    ax.set_ylim(float(view[2]), float(view[3]))
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+
+def variant_planes_figure(block, title=""):
+    """One node of Cell 4m (D-047): for every variant, the plane its own
+    iteration chose, with the line that chose it (black, through the SWC node
+    +) and the fitted dendrite: its two edges, v = s + v0 -+ d / 2 on that line,
+    drawn as lines along the branch (the kernel's colour); each panel titled
+    with k_iter and d. The reference (Cell 4j's own iteration, Block 5's fit)
+    on top, then one row per kernel and one column per weighting, every panel
+    on the same view.
+
+    block: dict with label, sublabel, panels (dicts as variant_stack_figure's rows plus plane (H, W) or None,
+    line_xy, edges_xy, title), extent, o, e_u, view (x0, x1, y_bottom, y_top), kernels (row labels in order),
+    weights (column labels in order). Presentation only. Returns the Figure."""
+    import textwrap
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.patheffects as pe
+    panels = block["panels"]
+    kernels, weights = list(block["kernels"]), list(block["weights"])
+    side, gap, head, lab_w, left, top, hdr = 1.55, 0.12, 0.30, 1.45, 0.3, 1.45, 0.42
+    ncol = max(len(weights), 1)
+    W = max(left + lab_w + ncol * side + (ncol - 1) * gap + 0.3, 9.0)
+    H = top + (head + side) + hdr + len(kernels) * (head + side) + 0.95
+    fig = plt.figure(figsize=(W, H))
+
+    def ax_at(x_in, y_top_in, w_in, h_in):
+        return fig.add_axes([x_in / W, 1.0 - (y_top_in + h_in) / H, w_in / W, h_in / H])
+
+    def panel_top(r):                                   # row 0: the reference; rows 1..: the kernels, under the header
+        return top + head + (0.0 if r == 0 else (head + side) + hdr + (r - 1) * (head + side))
+
+    if title:
+        fig.text(0.5, 1.0 - 0.12 / H, title, fontsize=10, ha="center", va="top")
+    fig.text(left / W, 1.0 - 0.45 / H, "\n".join(textwrap.wrap(block["label"], 118)), fontsize=8.6,
+             fontweight="bold", ha="left", va="top", linespacing=1.15)
+    fig.text(left / W, 1.0 - 0.95 / H, "\n".join(textwrap.wrap(block["sublabel"], 140)), fontsize=7.6, ha="left",
+             va="top", linespacing=1.15, color="#3d3d3a")
+    view = block["view"]
+    edge_half = 0.42 * abs(float(view[1]) - float(view[0])) / 2.0
+    ref_ax = None
+    for p in panels:
+        if p.get("reference"):
+            r, c = 0, 0
+        else:
+            r, c = 1 + kernels.index(p["kernel"]), weights.index(p["weight"])
+        ax = ax_at(left + lab_w + c * (side + gap), panel_top(r), side, side)
+        if p.get("plane") is None:
+            ax.text(0.5, 0.5, "no plane", ha="center", va="center", fontsize=7, transform=ax.transAxes)
+            ax.set_xticks([])
+            ax.set_yticks([])
+        else:
+            b = dict(plane=p["plane"], extent=block["extent"], o=block["o"], e_u=block["e_u"],
+                     line_xy=p.get("line_xy"), edges_xy=p.get("edges_xy"))
+            _draw_fitted_dendrite(ax, b, pe, _INK if p.get("reference") else p["colour"], view, edge_half)
+        ax.set_title(p["title"], fontsize=7.2, pad=2)
+        if p.get("reference"):
+            ref_ax = ax
+            ax.text(1.08, 0.5, "Cell 4j's own iteration\n(Block 5's fit: Gaussian at its\nfixed width, unweighted)",
+                    transform=ax.transAxes, fontsize=7.5, ha="left", va="center", color=_INK)
+    if ref_ax is not None:
+        _scale_bar(ref_ax, view, pe)                     # every panel has the same view
+    y_hdr = panel_top(1) - head - 0.08
+    for c, wl in enumerate(weights):
+        fig.text((left + lab_w + c * (side + gap) + 0.5 * side) / W, 1.0 - y_hdr / H,
+                 "unweighted" if wl == "none" else wl.replace("lam=", "lambda ") + " um", fontsize=8, ha="center",
+                 va="bottom", fontweight="bold", color=_INK)
+    for r, kl in enumerate(kernels):
+        y_mid = panel_top(1 + r) + 0.5 * side
+        fig.text((left + lab_w - 0.08) / W, 1.0 - y_mid / H, kl, fontsize=7.8, ha="right", va="center", color=_INK)
+    note = ("Every panel: the plane k_iter of that variant's own iteration; the line that chose it (black, +-m d / 2 "
+            "through the SWC node, +); the fitted dendrite's edges, v = s + v0 -+ d / 2 on that line, drawn along the "
+            "branch (the kernel's colour); titled k_iter and d (um). * a fit parameter at its bound; x no fit or "
+            "failed; ~ IRLS not settled.")
+    fig.text(left / W, 1.0 - (H - 0.85) / H, "\n".join(textwrap.wrap(note, int(13.5 * (W - 2 * left)))), fontsize=7.3,
+             ha="left", va="top", color="#3d3d3a", linespacing=1.2)
+    return fig

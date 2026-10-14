@@ -337,36 +337,56 @@ def _warm_starts(spec, fits_of):
     return []
 
 
+class PlaneFits:
+    """The variants' fits on one profile (one plane's Block 5 inputs), made on
+    demand and kept: the unweighted fit once per kernel and width mode, with
+    the warm starts _warm_starts lists (made first, and kept too), and a
+    weighted fit once per spec, from the unweighted fit of its kernel and width
+    mode. log(spec, fit) is called after each fit made, when given."""
+
+    def __init__(self, v, I, phi, B_bar, cfg, log=None):
+        self.v, self.I, self.phi, self.B_bar, self.cfg, self.log = v, I, phi, B_bar, cfg, log
+        self._unweighted, self._weighted = {}, {}
+
+    def unweighted(self, kern, width_fitted):
+        """The unweighted VariantFit of kernel kern (family, shape, shape_fitted) at the width mode."""
+        k = (tuple(kern), bool(width_fitted))
+        if k not in self._unweighted:
+            spec = check_spec(VariantSpec(kern[0], kern[1], kern[2], bool(width_fitted), None))
+            warm = _warm_starts(spec, self.unweighted)
+            self._unweighted[k] = fit_unweighted(self.v, self.I, self.phi, self.B_bar, self.cfg, spec, warm)
+            if self.log is not None:
+                self.log(spec, self._unweighted[k])
+        return self._unweighted[k]
+
+    def fit(self, spec):
+        """spec's VariantFit (unweighted, or re-weighted from the unweighted fit of its kernel and width mode)."""
+        spec = check_spec(spec)
+        u = self.unweighted(spec.kernel, spec.width_fitted)
+        if spec.lam_um is None:
+            return u
+        if spec not in self._weighted:
+            self._weighted[spec] = fit_weighted(self.v, self.I, self.phi, self.B_bar, self.cfg, spec, u)
+            if self.log is not None:
+                self.log(spec, self._weighted[spec])
+        return self._weighted[spec]
+
+    @property
+    def base(self):
+        """The unweighted fixed-width Gaussian: Block 5's fit."""
+        return self.unweighted(BASE_KERNEL, False)
+
+
 def fit_grid(v, I, phi, B_bar, cfg, specs=None, log=None):
     """Every variant of specs (default variant_grid()) on one profile; returns
     (fits in specs' order, base), base the unweighted fixed-width Gaussian
     fit (computed whether or not specs holds it). An unweighted fit is made
     once per kernel and width mode and seeds the weighted ones; log(spec, fit)
-    is called after each fit when given."""
+    is called after each fit when given (PlaneFits)."""
     specs = variant_grid() if specs is None else [check_spec(s) for s in specs]
-    cache = {}
-
-    def fits_of(kern, width_fitted):
-        k = (kern, bool(width_fitted))
-        if k not in cache:
-            spec = VariantSpec(kern[0], kern[1], kern[2], bool(width_fitted), None)
-            cache[k] = fit_unweighted(v, I, phi, B_bar, cfg, spec, _warm_starts(spec, fits_of))
-            if log is not None:
-                log(spec, cache[k])
-        return cache[k]
-
-    base = fits_of(BASE_KERNEL, False)
-    out = []
-    for spec in specs:
-        u = fits_of(spec.kernel, spec.width_fitted)
-        if spec.lam_um is None:
-            out.append(u)
-        else:
-            f = fit_weighted(v, I, phi, B_bar, cfg, spec, u)
-            if log is not None:
-                log(spec, f)
-            out.append(f)
-    return out, base
+    pf = PlaneFits(v, I, phi, B_bar, cfg, log)
+    base = pf.base
+    return [pf.fit(spec) for spec in specs], base
 
 
 def variant_curve(fit, v, phi, B_bar):

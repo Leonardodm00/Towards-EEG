@@ -545,7 +545,7 @@ def refit_at_plane(st, cfg, k, with_profile=False):
 
 
 def gradient_iteration(st, cfg, d_start_um=None, line_mult=ITER_LINE_MULT, max_rounds=5, bg_margin_um=4.0,
-                       restack=None):
+                       restack=None, fit_at=None):
     """The Allen-guided iteration of the gradient energy (D-042, the user's
     choice of 2026-10-10): iterate_planes from d_0 = d_start_um (default
     Allen's diameter, 2 x allen_radius_um) and the multiplier line_mult
@@ -557,8 +557,10 @@ def gradient_iteration(st, cfg, d_start_um=None, line_mult=ITER_LINE_MULT, max_r
     to the square's edge makes restack(h) build a larger square (a node_stack
     dict of the same node and planes; on real data cut from the cached block
     when it lies inside it); without restack, or when the new square is still
-    too small, the round stops with "square_small". Returns iterate_planes'
-    dict with background, bg_frac, bg_margin_used, st (the last square used),
+    too small, the round stops with "square_small". fit_at(st, k), when given,
+    replaces refit_at_plane(st, cfg, k) (the fit variants' own iterations,
+    D-047; st the square in use). Returns iterate_planes' dict with
+    background, bg_frac, bg_margin_used, st (the last square used),
     n_restacks, d_start_um. ValueError as iterate_planes, or when restack
     returns other planes."""
     d0 = 2.0 * float(st["allen_radius_um"]) if d_start_um is None else float(d_start_um)
@@ -590,7 +592,10 @@ def gradient_iteration(st, cfg, d_start_um=None, line_mult=ITER_LINE_MULT, max_r
             info["stop"] = "no_plane"
         return k, info
 
-    res = iterate_planes(d0, line_mult, plane_of, lambda k: refit_at_plane(box["st"], cfg, k), max_rounds)
+    if fit_at is None:
+        def fit_at(cur, k):
+            return refit_at_plane(cur, cfg, k)
+    res = iterate_planes(d0, line_mult, plane_of, lambda k: fit_at(box["st"], k), max_rounds)
     res.update(background=B, bg_frac=bg_frac, bg_margin_used=margin_used, st=box["st"],
                n_restacks=box["n_restacks"], d_start_um=d0)
     return res
