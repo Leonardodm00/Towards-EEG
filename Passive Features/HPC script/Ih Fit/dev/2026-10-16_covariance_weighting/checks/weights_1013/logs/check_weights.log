@@ -1,0 +1,26 @@
+[binding function: 62 s]
+[cells simulated: 94 s]
+
+== SE of each median-of-6 statistic at the truth vs the hand-set omega_m
+  sd 265        SE = 0.0039   omega = 0.005   omega/SE = 1.30
+  acf .02 265   SE = 0.0442   omega = 0.050   omega/SE = 1.13
+  acf .1 265    SE = 0.0540   omega = 0.050   omega/SE = 0.93
+  acf 1 265     SE = 0.0563   omega = 0.050   omega/SE = 0.89
+  sd first50    SE = 0.0027   omega = 0.005   omega/SE = 1.85
+  sd last132    SE = 0.0039   omega = 0.005   omega/SE = 1.29
+  acf .02 last  SE = 0.0561   omega = 0.050   omega/SE = 0.89
+  acf .1 last   SE = 0.0687   omega = 0.050   omega/SE = 0.73
+  acf 1 last    SE = 0.0709   omega = 0.050   omega/SE = 0.70
+  acf 10 last   SE = 0.0773   omega = 0.050   omega/SE = 0.65
+  largest |corr| between medians: acf .02 265~acf .1 265 1.00, acf .1 265~acf 1 265 1.00, acf .02 265~acf 1 265 1.00, acf .02 last~acf .1 last 0.99, acf .1 last~acf 1 last 0.99
+  condition number of Sigma: 6.7e+04
+
+== fits of 1500 replicate cells, tau_s0 = 39.74 ms (grid 10-200 ms)
+  hand median 39.02 ms, mean 42.56 ms, SD 17.88 ms, robust SD 16.98 ms, 10-90% [23.2, 66.7] ms, at grid edge 0.000 -> P1 True
+  diag median 38.90 ms, mean 41.81 ms, SD 16.57 ms, robust SD 15.53 ms, 10-90% [23.8, 63.7] ms, at grid edge 0.000 -> P1 True
+  full median 38.79 ms, mean 40.45 ms, SD 9.40 ms, robust SD 7.57 ms, 10-90% [31.9, 51.3] ms, at grid edge 0.000 -> P1 True
+  P2 robust SD full 7.57 vs diag 15.53, hand 16.98 ms -> True
+  P3 minimised cost with W = Sigma^-1: mean 9.22, median 7.51 (chi2_9: 9.00, 8.34) -> True
+
+ALL PREDICTIONS: {'P1_hand': True, 'P1_diag': True, 'P1_full': True, 'P2': True, 'P3': True}
+saved /tmp/claude-0/-home-claude/4dacd987-cfb0-50ae-8790-08f2eca0a708/scratchpad/weights_1013/results/weights.npz | total 96 s

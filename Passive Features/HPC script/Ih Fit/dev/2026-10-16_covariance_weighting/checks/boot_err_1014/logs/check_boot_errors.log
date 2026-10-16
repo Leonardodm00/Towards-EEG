@@ -1,0 +1,15 @@
+cells 3333 of K = 6 windows; SD_true (SD of the cell median over cells) = 0.0558; 462 count vectors, weights sum 1.000000000000
+P0 enumeration vs 1e6-replicate Monte Carlo, three cells: relative differences [-9.4129e-04  3.4337e-05  7.8771e-05] -> True
+sampling part: SE_inf / SD_true over cells: median 0.990, 10% 0.582, 90% 1.523; SD over cells 0.365
+B =    25: internal part RMS 0.1748 (mean -0.0166); Var(SE_B/SD) 0.1658 vs Var(SE_inf/SD) + mean int^2 0.1641
+B =   100: internal part RMS 0.0868 (mean -0.0019); Var(SE_B/SD) 0.1393 vs Var(SE_inf/SD) + mean int^2 0.1411
+B =   400: internal part RMS 0.0430 (mean -0.0000); Var(SE_B/SD) 0.1355 vs Var(SE_inf/SD) + mean int^2 0.1354
+B =  1600: internal part RMS 0.0214 (mean -0.0003); Var(SE_B/SD) 0.1344 vs Var(SE_inf/SD) + mean int^2 0.1340
+B =  2000: internal part RMS 0.0192 (mean -0.0001); Var(SE_B/SD) 0.1342 vs Var(SE_inf/SD) + mean int^2 0.1339
+          SE_B / SD_true at B = 2000: median 0.993, 10% 0.579, 90% 1.518 (E2: 0.989, 0.584, 1.523)
+          E&N jackknife (J = 10): RMS jacksd / SD_true 0.0192 vs RMS internal part 0.0192 (ratio 1.00) -> P4 True
+P1 RMS internal B = 100 / B = 1600 = 4.05 (1/sqrt(B) predicts 4) -> True
+P2 RMS internal at B = 2000, 0.0192, vs SD of the sampling part 0.365 -> True
+P3 total variance = sampling + internal within 10 % at every B -> True
+
+ALL PREDICTIONS: {'P0': True, 'P4': True, 'P1': True, 'P2': True, 'P3': True}

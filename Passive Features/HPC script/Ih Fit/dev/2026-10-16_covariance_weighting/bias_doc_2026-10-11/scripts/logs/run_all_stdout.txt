@@ -1,0 +1,65 @@
+[theta_sim]  rho(1 ms | theta) = 0.654351
+  M =   200: mean T = 0.5286  bias = -0.1258  (MC SE 0.0076)
+  M =   800: mean T = 0.5399  bias = -0.1144  (MC SE 0.0041)
+  M =  2000: mean T = 0.5444  bias = -0.1100  (MC SE 0.0026)
+  M =  3200: mean T = 0.5462  bias = -0.1082  (MC SE 0.0021)
+  nested check: mean(first 200) - mean(all 3200) = -0.0176, SE of that difference 0.0080, ratio -2.21
+  median T (M = 3200) = 0.5469;  median bias = -0.1074
+  closed form q_cf = 0.5801;  q_cf - rho = -0.0742  (69 % of the MC bias);  q_cf - mean T = +0.0340;  q_cf - median T = +0.0332
+  identity (8): covariance term Cov(S0,T)/E[S0] (MC) = +0.0339 against q_cf - mean T = +0.0340;  MC ratio of means mean(S_L)/mean(S_0) = 0.5801 (SE 0.0025) vs q_cf 0.5801 from TD (9): difference in SE units -0.01
+  TD eq. (9) S_0: analytic 48.96968 mV^2, MC mean 48.94911 mV^2, difference in SE units -0.08
+  TD eq. (9) S_L: analytic 28.40957 mV^2, MC mean 28.39679 mV^2, difference in SE units -0.05
+  single-window error t(x) - rho: 10/50/90 % = -0.261 / -0.107 / +0.046;  share of windows above the target = 0.191 (first 2000: 0.1815);  min/max = -0.504 / +0.214
+  SD(T) = 0.1165;  MSE split, one window: bias^2 = 0.01170, Var = 0.01358 (bias^2 share 0.46);  mean of K = 6: Var/K = 0.00226 (bias^2 share 0.84)
+[theta_cf]  rho(1 ms | theta) = 0.623928
+  M =  6400: mean T = 0.5213  bias = -0.1027  (MC SE 0.0014)
+  median T (M = 6400) = 0.5209;  median bias = -0.1030
+  closed form q_cf = 0.5535;  q_cf - rho = -0.0704  (69 % of the MC bias);  q_cf - mean T = +0.0322;  q_cf - median T = +0.0326
+  identity (8): covariance term Cov(S0,T)/E[S0] (MC) = +0.0306 against q_cf - mean T = +0.0322;  MC ratio of means mean(S_L)/mean(S_0) = 0.5518 (SE 0.0017) vs q_cf 0.5535 from TD (9): difference in SE units -0.97
+  TD eq. (9) S_0: analytic 45.18284 mV^2, MC mean 45.02162 mV^2, difference in SE units -1.00
+  TD eq. (9) S_L: analytic 25.00807 mV^2, MC mean 24.84407 mV^2, difference in SE units -1.02
+  bias at theta_sim minus bias at theta_cf = -0.0055 (SE 0.0025; -2.2 SE)
+[best single AR(1), a wrong law]  rho(1 ms | theta) = 0.000004
+  M =  1600: mean T = -0.0014  bias = -0.0014  (MC SE 0.0004)
+  median T (M = 1600) = -0.0018;  median bias = -0.0018
+  closed form q_cf = -0.0006;  q_cf - rho = -0.0006  (45 % of the MC bias);  q_cf - mean T = +0.0008;  q_cf - median T = +0.0012
+  identity (8): covariance term Cov(S0,T)/E[S0] (MC) = +0.0000 against q_cf - mean T = +0.0008;  MC ratio of means mean(S_L)/mean(S_0) = -0.0014 (SE 0.0004) vs q_cf -0.0006 from TD (9): difference in SE units -1.74
+  TD eq. (9) S_0: analytic 33.77018 mV^2, MC mean 33.75921 mV^2, difference in SE units -0.51
+  TD eq. (9) S_L: analytic -0.02042 mV^2, MC mean -0.04582 mV^2, difference in SE units -1.74
+theta_sim: sums over L = 1..n-1: -0.500000000000, -0.500000000000, -0.500000000000, -0.500000000000, -0.500000000000
+AR(1) best: sums over L = 1..n-1: -0.500000000000, -0.500000000000, -0.500000000000, -0.500000000000, -0.500000000000
+white noise: sums over L = 1..n-1: -0.500000000000, -0.500000000000, -0.500000000000, -0.500000000000, -0.500000000000
+largest |sum + 1/2| = 7.11e-14
+(a) toy (OU, tau 40 ms, n 663, L 50): exact E[T] = 0.44963 (quad err 1.1e-14); Monte Carlo mean over 200000 windows = 0.44901 (SE 0.00045); difference -1.37 SE
+(a) theta_sim, 50 ms (n 2500, L 50): exact E[T] = 0.30597 (quad err 2.7e-11); Monte Carlo mean over 40000 windows = 0.30480 (SE 0.00073); difference -1.59 SE; ratio of expectations q_cf = 0.34730
+(b) own window mean (the recipe): mean T = 0.5462 (SE 0.0021); bias = -0.1082; ratio of expectations 0.5801 -> its gap to rho -0.0742; mean T minus it -0.0340
+(b) true mean 0: mean T = 0.6131 (SE 0.0021); bias = -0.0413; ratio of expectations 0.6519 -> its gap to rho -0.0025; mean T minus it -0.0388
+(b) per-window difference own - true mean: mean -0.0669 (SE 0.0013); share of the recipe's bias removed by a known mean = 0.619 (delta-method MC SE 0.014)
+(b) the same with fresh windows (seed 20261016, M 3200): bias -0.1105, known-mean bias -0.0420, share removed 0.620 (SE 0.014); difference between the two runs +0.05 SE
+(c) toy, exact bias (3) via (11): 10 ms: E[T] 0.1978, rho 0.3679, bias -0.170; 20 ms: E[T] 0.3501, rho 0.6065, bias -0.256; 40 ms: E[T] 0.4496, rho 0.7788, bias -0.329; 80 ms: E[T] 0.5012, rho 0.8825, bias -0.381; 150 ms: E[T] 0.5240, rho 0.9355, bias -0.411
+rho(1 ms|theta_sim) 0.6544; bias -0.1082 (SE 0.0021); 10-90 % [-0.261, +0.046]; share above target 0.191; first windows' errors -0.064, -0.185, -0.262
+M 3200; rho 0.6544; mean T 0.5462; median T 0.5469; role-1 bias -0.1082
+rho(1 ms|theta_sim) = 0.6544;  SD(T) one 265 ms window = 0.1165
+(a) K =  1: mean 0.5462  bias -0.1082  SD 0.1165  (SD(T)/sqrt(K) = 0.1165)
+(a) K =  6: mean 0.5465  bias -0.1079  SD 0.0476  (SD(T)/sqrt(K) = 0.0476)
+(a) K = 36: mean 0.5463  bias -0.1081  SD 0.0194  (SD(T)/sqrt(K) = 0.0194)
+(b)   50.0 ms (n =  2500): mean 0.3081  bias -0.3463 (MC SE 0.0026)  median 0.2905  SD 0.1453  closed form q_cf 0.3473 (q_cf - rho -0.3070; closed form's share of the bias 88.7 %; q_cf - mean +0.0392)
+(b)  132.5 ms (n =  6625): mean 0.4640  bias -0.1903 (MC SE 0.0025)  median 0.4593  SD 0.1403  closed form q_cf 0.5100 (q_cf - rho -0.1444; closed form's share of the bias 75.9 %; q_cf - mean +0.0459)
+(b)  265.0 ms (n = 13250): mean 0.5462  bias -0.1082 (MC SE 0.0021)  median 0.5469  SD 0.1165  closed form q_cf 0.5801 (q_cf - rho -0.0742; closed form's share of the bias 68.6 %; q_cf - mean +0.0340)
+(b)  530.0 ms (n = 26500): mean 0.5966  bias -0.0577 (MC SE 0.0016)  median 0.5985  SD 0.0881  closed form q_cf 0.6175 (q_cf - rho -0.0368; closed form's share of the bias 63.8 %; q_cf - mean +0.0209)
+(b) 1060.0 ms (n = 53000): mean 0.6257  bias -0.0287 (MC SE 0.0011)  median 0.6282  SD 0.0622  closed form q_cf 0.6361 (q_cf - rho -0.0182; closed form's share of the bias 63.7 %; q_cf - mean +0.0104)
+grid: 150 tau from 5.0 to 300.0 ms; increasing: q_sim True, q_cf True
+at tau0 = 40 ms: rho(10 ms|tau0) = 0.7788; q_sim = 0.4737; q_cf = 0.5396; delta = q_cf - q_sim = +0.0660; pool median (P = 100000) = 0.4750; pool mean = 0.4502
+slope dq_sim/dtau at tau0 = 2.900 per s
+limits as K -> inf: tau_inf (closed form) = 26.17 ms; simulated medians -> 40.47 ms (tau0 + Monte Carlo errors)
+reference median from 1000000 fresh windows (seed 4): q(tau0) = 0.4747 (SE 0.0003); mean 0.4499 (SE 0.0002)
+offset of the simulated-medians limit, +0.47 ms = q_sim's error +0.38 ms (q_sim(tau0) - q_ref = -0.0011) + the pool's error +0.09 ms (pool median - q_ref = +0.0003); 1 SE of q_ref is 0.09 ms
+closed-form limit against the reference: q_cf^-1(q_ref) = 26.14 ms
+median deviation of T from the law's autocorrelation, q_sim(tau) - rho(10 ms | tau), on the grid: 10 ms -0.167; 20 ms -0.242; 40 ms -0.305; 80 ms -0.352; 150 ms -0.378
+K =    25: sim: median  40.62 ms, 10-90 % [ 24.26,  97.43], Pr(<= tau0) 0.487, clipped below/above 0.000/0.023 | cf: median  26.24 ms, 10-90 % [ 18.30,  40.24], Pr(<= tau0) 0.897, clipped below/above 0.000/0.000
+K =   125: sim: median  39.97 ms, 10-90 % [ 31.33,  55.85], Pr(<= tau0) 0.504, clipped below/above 0.000/0.000 | cf: median  25.97 ms, 10-90 % [ 22.10,  31.43], Pr(<= tau0) 0.998, clipped below/above 0.000/0.000
+K =   625: sim: median  40.33 ms, 10-90 % [ 36.00,  45.87], Pr(<= tau0) 0.467, clipped below/above 0.000/0.000 | cf: median  26.12 ms, 10-90 % [ 24.28,  28.27], Pr(<= tau0) 1.000, clipped below/above 0.000/0.000
+K =  3125: sim: median  40.41 ms, 10-90 % [ 38.43,  42.68], Pr(<= tau0) 0.414, clipped below/above 0.000/0.000 | cf: median  26.15 ms, 10-90 % [ 25.32,  27.09], Pr(<= tau0) 1.000, clipped below/above 0.000/0.000
+K = 15625: sim: median  40.48 ms, 10-90 % [ 39.43,  41.42], Pr(<= tau0) 0.283, clipped below/above 0.000/0.000 | cf: median  26.18 ms, 10-90 % [ 25.76,  26.58], Pr(<= tau0) 1.000, clipped below/above 0.000/0.000
+all done
+exit 0

@@ -1,0 +1,7 @@
+(a) toy (OU, tau 40 ms, n 663, L 50): exact E[T] = 0.44963 (quad err 1.1e-14); Monte Carlo mean over 200000 windows = 0.44901 (SE 0.00045); difference -1.37 SE
+(a) theta_sim, 50 ms (n 2500, L 50): exact E[T] = 0.30597 (quad err 2.7e-11); Monte Carlo mean over 40000 windows = 0.30480 (SE 0.00073); difference -1.59 SE; ratio of expectations q_cf = 0.34730
+(b) own window mean (the recipe): mean T = 0.5462 (SE 0.0021); bias = -0.1082; ratio of expectations 0.5801 -> its gap to rho -0.0742; mean T minus it -0.0340
+(b) true mean 0: mean T = 0.6131 (SE 0.0021); bias = -0.0413; ratio of expectations 0.6519 -> its gap to rho -0.0025; mean T minus it -0.0388
+(b) per-window difference own - true mean: mean -0.0669 (SE 0.0013); share of the recipe's bias removed by a known mean = 0.619 (delta-method MC SE 0.014)
+(b) the same with fresh windows (seed 20261016, M 3200): bias -0.1105, known-mean bias -0.0420, share removed 0.620 (SE 0.014); difference between the two runs +0.05 SE
+(c) toy, exact bias (3) via (11): 10 ms: E[T] 0.1978, rho 0.3679, bias -0.170; 20 ms: E[T] 0.3501, rho 0.6065, bias -0.256; 40 ms: E[T] 0.4496, rho 0.7788, bias -0.329; 80 ms: E[T] 0.5012, rho 0.8825, bias -0.381; 150 ms: E[T] 0.5240, rho 0.9355, bias -0.411

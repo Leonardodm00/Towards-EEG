@@ -1,0 +1,56 @@
+[E0 done, 29 s]
+[E1 done, 192 s]
+[E2 done, 200 s]
+
+== E0: true law of T = rho_hat(1 ms), n = 13250, M = 20000 windows per theta
+  theta_sim g = 0.6544  E[T] = 0.5481  SD(T) = 0.1153  med(T) = 0.5500  bias = -0.1062 (SE 0.0008)
+  theta_cf  g = 0.6239  E[T] = 0.5248  SD(T) = 0.1136  med(T) = 0.5251  bias = -0.0992 (SE 0.0008)
+  P6 theta_sim: bias vs bias doc -0.108: z = +0.87 -> True
+  P6 theta_cf: bias vs bias doc -0.103: z = +2.19 -> True
+
+== E1: bootstrap worlds built from one window (40 windows, B = 500 each)
+  observed T over the windows: mean 0.5340, SD 0.1200
+  iid: mean T* in [-0.00084, 0.00068]; SD(T*) in [0.00805, 0.00940] vs 1/sqrt(n) = 0.00869 -> P1 True
+  P2 cbb join identity: max|z| SL~ 2.32, S0~ 2.59 -> True
+  P3 sb  join identity: max|z| SL~ 2.86, S0~ 2.58 -> True
+  true law (E0, theta_sim): SD(T) = 0.1153, bias = -0.1062;  parametric at theta_cf: SD 0.1136, bias -0.0992
+  per scheme and block length: median [10%%, 90%%] over windows of SD(T*) and of mean(T*) - T(x)
+   iid b =     1 (   0.0 ms): SD(T*) 0.0087 [0.0084, 0.0090]   bias* -0.5496 [-0.6783, -0.3610]
+   mbb b =    50 (   1.0 ms): SD(T*) 0.0362 [0.0259, 0.0420]   bias* -0.5512 [-0.6819, -0.3637]
+   mbb b =   125 (   2.5 ms): SD(T*) 0.0288 [0.0243, 0.0330]   bias* -0.2239 [-0.2743, -0.1464]
+   mbb b =   250 (   5.0 ms): SD(T*) 0.0353 [0.0308, 0.0443]   bias* -0.1156 [-0.1438, -0.0787]
+   mbb b =   530 (  10.6 ms): SD(T*) 0.0502 [0.0407, 0.0661]   bias* -0.0673 [-0.0871, -0.0442]
+   mbb b =  1325 (  26.5 ms): SD(T*) 0.0681 [0.0515, 0.0980]   bias* -0.0513 [-0.0787, -0.0253]
+   mbb b =  2650 (  53.0 ms): SD(T*) 0.0743 [0.0506, 0.1137]   bias* -0.0463 [-0.1045, -0.0092]
+   mbb b =  6625 ( 132.5 ms): SD(T*) 0.0499 [0.0251, 0.1161]   bias* -0.0375 [-0.1351, +0.0173]
+   cbb b =    50 (   1.0 ms): SD(T*) 0.0350 [0.0249, 0.0429]   bias* -0.5507 [-0.6803, -0.3633]
+   cbb b =   125 (   2.5 ms): SD(T*) 0.0288 [0.0249, 0.0325]   bias* -0.2220 [-0.2744, -0.1495]
+   cbb b =   250 (   5.0 ms): SD(T*) 0.0352 [0.0311, 0.0454]   bias* -0.1184 [-0.1419, -0.0810]
+   cbb b =   530 (  10.6 ms): SD(T*) 0.0499 [0.0400, 0.0676]   bias* -0.0674 [-0.0824, -0.0435]
+   cbb b =  1325 (  26.5 ms): SD(T*) 0.0701 [0.0485, 0.0945]   bias* -0.0493 [-0.0629, -0.0312]
+   cbb b =  2650 (  53.0 ms): SD(T*) 0.0774 [0.0544, 0.1166]   bias* -0.0473 [-0.0700, -0.0260]
+   cbb b =  6625 ( 132.5 ms): SD(T*) 0.0717 [0.0421, 0.1060]   bias* -0.0336 [-0.0540, -0.0162]
+   sb  b =    50 (   1.0 ms): SD(T*) 0.0361 [0.0282, 0.0446]   bias* -0.3533 [-0.4360, -0.2336]
+   sb  b =   125 (   2.5 ms): SD(T*) 0.0447 [0.0357, 0.0560]   bias* -0.1909 [-0.2362, -0.1278]
+   sb  b =   250 (   5.0 ms): SD(T*) 0.0519 [0.0408, 0.0659]   bias* -0.1163 [-0.1403, -0.0792]
+   sb  b =   530 (  10.6 ms): SD(T*) 0.0623 [0.0443, 0.0801]   bias* -0.0729 [-0.0906, -0.0462]
+   sb  b =  1325 (  26.5 ms): SD(T*) 0.0711 [0.0488, 0.0979]   bias* -0.0517 [-0.0676, -0.0328]
+   sb  b =  2650 (  53.0 ms): SD(T*) 0.0709 [0.0476, 0.1068]   bias* -0.0441 [-0.0600, -0.0239]
+   sb  b =  6625 ( 132.5 ms): SD(T*) 0.0613 [0.0375, 0.0920]   bias* -0.0278 [-0.0459, -0.0144]
+  cbb bias* split, median over windows: total = join part + rest
+   b =    50 (   1.0 ms): total -0.5507 = join -0.5491 + rest -0.0022
+   b =   125 (   2.5 ms): total -0.2220 = join -0.2180 + rest -0.0046
+   b =   250 (   5.0 ms): total -0.1184 = join -0.1083 + rest -0.0080
+   b =   530 (  10.6 ms): total -0.0674 = join -0.0509 + rest -0.0143
+   b =  1325 (  26.5 ms): total -0.0493 = join -0.0203 + rest -0.0290
+   b =  2650 (  53.0 ms): total -0.0473 = join -0.0102 + rest -0.0360
+   b =  6625 ( 132.5 ms): total -0.0336 = join -0.0042 + rest -0.0289
+
+== E2: window-level bootstrap, cells of K = 6 windows (3333 cells, B = 2000 each)
+  mean of K: true SD 0.0466 (= SD(T)/sqrt(K) 0.0471); SE_boot/true: median 0.864, 10% 0.529, 90% 1.239 -> P4 True
+  median of K: true SD 0.0558; SE_boot/true: median 0.989, 10% 0.584, 90% 1.523
+  distinct bootstrap medians per cell: max 21, median 21 -> P5 True
+  95% percentile-interval coverage: median of K covers med(T) in 0.936 of cells; mean of K covers E[T] in 0.859
+
+ALL PREDICTIONS: {'P6_sim': np.True_, 'P6_cf': np.True_, 'P1': True, 'P2': True, 'P3': True, 'P4': True, 'P5': True}
+saved /tmp/claude-0/-home-claude/4dacd987-cfb0-50ae-8790-08f2eca0a708/scratchpad/boot_1013/results/boot_types.npz | total 200 s

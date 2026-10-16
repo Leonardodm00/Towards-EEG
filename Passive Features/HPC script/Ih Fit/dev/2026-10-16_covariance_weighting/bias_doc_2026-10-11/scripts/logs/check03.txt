@@ -1,0 +1,13 @@
+grid: 150 tau from 5.0 to 300.0 ms; increasing: q_sim True, q_cf True
+at tau0 = 40 ms: rho(10 ms|tau0) = 0.7788; q_sim = 0.4737; q_cf = 0.5396; delta = q_cf - q_sim = +0.0660; pool median (P = 100000) = 0.4750; pool mean = 0.4502
+slope dq_sim/dtau at tau0 = 2.900 per s
+limits as K -> inf: tau_inf (closed form) = 26.17 ms; simulated medians -> 40.47 ms (tau0 + Monte Carlo errors)
+reference median from 1000000 fresh windows (seed 4): q(tau0) = 0.4747 (SE 0.0003); mean 0.4499 (SE 0.0002)
+offset of the simulated-medians limit, +0.47 ms = q_sim's error +0.38 ms (q_sim(tau0) - q_ref = -0.0011) + the pool's error +0.09 ms (pool median - q_ref = +0.0003); 1 SE of q_ref is 0.09 ms
+closed-form limit against the reference: q_cf^-1(q_ref) = 26.14 ms
+median deviation of T from the law's autocorrelation, q_sim(tau) - rho(10 ms | tau), on the grid: 10 ms -0.167; 20 ms -0.242; 40 ms -0.305; 80 ms -0.352; 150 ms -0.378
+K =    25: sim: median  40.62 ms, 10-90 % [ 24.26,  97.43], Pr(<= tau0) 0.487, clipped below/above 0.000/0.023 | cf: median  26.24 ms, 10-90 % [ 18.30,  40.24], Pr(<= tau0) 0.897, clipped below/above 0.000/0.000
+K =   125: sim: median  39.97 ms, 10-90 % [ 31.33,  55.85], Pr(<= tau0) 0.504, clipped below/above 0.000/0.000 | cf: median  25.97 ms, 10-90 % [ 22.10,  31.43], Pr(<= tau0) 0.998, clipped below/above 0.000/0.000
+K =   625: sim: median  40.33 ms, 10-90 % [ 36.00,  45.87], Pr(<= tau0) 0.467, clipped below/above 0.000/0.000 | cf: median  26.12 ms, 10-90 % [ 24.28,  28.27], Pr(<= tau0) 1.000, clipped below/above 0.000/0.000
+K =  3125: sim: median  40.41 ms, 10-90 % [ 38.43,  42.68], Pr(<= tau0) 0.414, clipped below/above 0.000/0.000 | cf: median  26.15 ms, 10-90 % [ 25.32,  27.09], Pr(<= tau0) 1.000, clipped below/above 0.000/0.000
+K = 15625: sim: median  40.48 ms, 10-90 % [ 39.43,  41.42], Pr(<= tau0) 0.283, clipped below/above 0.000/0.000 | cf: median  26.18 ms, 10-90 % [ 25.76,  26.58], Pr(<= tau0) 1.000, clipped below/above 0.000/0.000

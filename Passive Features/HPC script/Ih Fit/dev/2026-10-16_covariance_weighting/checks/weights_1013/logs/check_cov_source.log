@@ -1,0 +1,13 @@
+[cells: 5 s]
+[Sigma on the grid: 162 s]
+[fits: 164 s]
+
+  hand    median 38.18 ms, robust SD 17.08 ms, 10-90% [22.0, 65.8] ms
+  diag    median 37.90 ms, robust SD 15.61 ms, 10-90% [22.9, 62.9] ms
+  oracle  median 38.70 ms, robust SD 7.61 ms, 10-90% [31.4, 50.9] ms
+  twostep median 36.86 ms, robust SD 7.25 ms, 10-90% [30.9, 49.5] ms
+  boot    median 39.70 ms, robust SD 16.33 ms, 10-90% [26.8, 68.6] ms
+  plain per-cell sample covariance (K = 6 windows): rank max 5, min 5
+  per-cell bootstrap covariance of the medians: condition number median 8.2e+06, 10-90% [5.8e+05, 1.2e+17] (oracle Sigma: 6.7e+04)
+
+ALL PREDICTIONS: {'P4': True, 'P5': True, 'P6': True} | total 164 s

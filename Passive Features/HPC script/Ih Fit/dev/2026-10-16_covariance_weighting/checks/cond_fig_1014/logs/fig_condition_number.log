@@ -1,0 +1,5 @@
+2x2, c = 0.99: lambda = [0.01 1.99], kappa = 199.0000 ((1+c)/(1-c) = 199.0000) -> Q1 True
+  E = -0.005 u_min u_min^T: eps = 0.00251, kappa*eps = 0.5000, lambda_min 0.0100 -> 0.0050, weight 1/lambda_min 100.0 -> 200.0; rel. change of inverse 1.000000 vs bound 1.000000 -> Q2 True
+correlation matrix of the ten LS medians: kappa 2599; eps = 0.5/kappa = 0.000192 (0.019 % of ||C||): rel. change of C^-1 1.000000 -> Q3 True
+saved /tmp/claude-0/-home-claude/4dacd987-cfb0-50ae-8790-08f2eca0a708/scratchpad/cond_fig_1014/figures/fig01_condition_number.png
+ALL CHECKS: {'Q1': True, 'Q2': True, 'Q3': True}

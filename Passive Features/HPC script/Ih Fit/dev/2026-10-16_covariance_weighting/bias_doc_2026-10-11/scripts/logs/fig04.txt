@@ -1,0 +1,9 @@
+rho(1 ms|theta_sim) = 0.6544;  SD(T) one 265 ms window = 0.1165
+(a) K =  1: mean 0.5462  bias -0.1082  SD 0.1165  (SD(T)/sqrt(K) = 0.1165)
+(a) K =  6: mean 0.5465  bias -0.1079  SD 0.0476  (SD(T)/sqrt(K) = 0.0476)
+(a) K = 36: mean 0.5463  bias -0.1081  SD 0.0194  (SD(T)/sqrt(K) = 0.0194)
+(b)   50.0 ms (n =  2500): mean 0.3081  bias -0.3463 (MC SE 0.0026)  median 0.2905  SD 0.1453  closed form q_cf 0.3473 (q_cf - rho -0.3070; closed form's share of the bias 88.7 %; q_cf - mean +0.0392)
+(b)  132.5 ms (n =  6625): mean 0.4640  bias -0.1903 (MC SE 0.0025)  median 0.4593  SD 0.1403  closed form q_cf 0.5100 (q_cf - rho -0.1444; closed form's share of the bias 75.9 %; q_cf - mean +0.0459)
+(b)  265.0 ms (n = 13250): mean 0.5462  bias -0.1082 (MC SE 0.0021)  median 0.5469  SD 0.1165  closed form q_cf 0.5801 (q_cf - rho -0.0742; closed form's share of the bias 68.6 %; q_cf - mean +0.0340)
+(b)  530.0 ms (n = 26500): mean 0.5966  bias -0.0577 (MC SE 0.0016)  median 0.5985  SD 0.0881  closed form q_cf 0.6175 (q_cf - rho -0.0368; closed form's share of the bias 63.8 %; q_cf - mean +0.0209)
+(b) 1060.0 ms (n = 53000): mean 0.6257  bias -0.0287 (MC SE 0.0011)  median 0.6282  SD 0.0622  closed form q_cf 0.6361 (q_cf - rho -0.0182; closed form's share of the bias 63.7 %; q_cf - mean +0.0104)

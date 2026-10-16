@@ -1,0 +1,11 @@
+== A. more information (K windows), same plug-in rule (window-level resampling), B = 2000
+  K =  6 (3333 cells): SD_true 0.0558; SE_B/SD_true median 0.992, 10% 0.582, 90% 1.524; SD over cells 0.366
+  K = 24 ( 833 cells): SD_true 0.0308; SE_B/SD_true median 0.990, 10% 0.658, 90% 1.433; SD over cells 0.295
+  PA spread K = 24 / K = 6 = 0.81
+
+== B. same data, wrong plug-in rule (iid resampling of one window's samples), B = 200
+  n =  13250: true SD(T) 0.1159 (M = 2000); iid world SD(T*) median 0.0085 over 10 windows (1/sqrt(n) = 0.0087); ratio 13.6
+  n =  53000: true SD(T) 0.0636 (M = 2000); iid world SD(T*) median 0.0043 over 10 windows (1/sqrt(n) = 0.0043); ratio 14.7
+  PB ratio at n = 53000 / ratio at n = 13250 = 1.08
+
+ALL PREDICTIONS: {'PA': True, 'PB': True}

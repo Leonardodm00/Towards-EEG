@@ -1,0 +1,28 @@
+[theta_sim]  rho(1 ms | theta) = 0.654351
+  M =   200: mean T = 0.5286  bias = -0.1258  (MC SE 0.0076)
+  M =   800: mean T = 0.5399  bias = -0.1144  (MC SE 0.0041)
+  M =  2000: mean T = 0.5444  bias = -0.1100  (MC SE 0.0026)
+  M =  3200: mean T = 0.5462  bias = -0.1082  (MC SE 0.0021)
+  nested check: mean(first 200) - mean(all 3200) = -0.0176, SE of that difference 0.0080, ratio -2.21
+  median T (M = 3200) = 0.5469;  median bias = -0.1074
+  closed form q_cf = 0.5801;  q_cf - rho = -0.0742  (69 % of the MC bias);  q_cf - mean T = +0.0340;  q_cf - median T = +0.0332
+  identity (8): covariance term Cov(S0,T)/E[S0] (MC) = +0.0339 against q_cf - mean T = +0.0340;  MC ratio of means mean(S_L)/mean(S_0) = 0.5801 (SE 0.0025) vs q_cf 0.5801 from TD (9): difference in SE units -0.01
+  TD eq. (9) S_0: analytic 48.96968 mV^2, MC mean 48.94911 mV^2, difference in SE units -0.08
+  TD eq. (9) S_L: analytic 28.40957 mV^2, MC mean 28.39679 mV^2, difference in SE units -0.05
+  single-window error t(x) - rho: 10/50/90 % = -0.261 / -0.107 / +0.046;  share of windows above the target = 0.191 (first 2000: 0.1815);  min/max = -0.504 / +0.214
+  SD(T) = 0.1165;  MSE split, one window: bias^2 = 0.01170, Var = 0.01358 (bias^2 share 0.46);  mean of K = 6: Var/K = 0.00226 (bias^2 share 0.84)
+[theta_cf]  rho(1 ms | theta) = 0.623928
+  M =  6400: mean T = 0.5213  bias = -0.1027  (MC SE 0.0014)
+  median T (M = 6400) = 0.5209;  median bias = -0.1030
+  closed form q_cf = 0.5535;  q_cf - rho = -0.0704  (69 % of the MC bias);  q_cf - mean T = +0.0322;  q_cf - median T = +0.0326
+  identity (8): covariance term Cov(S0,T)/E[S0] (MC) = +0.0306 against q_cf - mean T = +0.0322;  MC ratio of means mean(S_L)/mean(S_0) = 0.5518 (SE 0.0017) vs q_cf 0.5535 from TD (9): difference in SE units -0.97
+  TD eq. (9) S_0: analytic 45.18284 mV^2, MC mean 45.02162 mV^2, difference in SE units -1.00
+  TD eq. (9) S_L: analytic 25.00807 mV^2, MC mean 24.84407 mV^2, difference in SE units -1.02
+  bias at theta_sim minus bias at theta_cf = -0.0055 (SE 0.0025; -2.2 SE)
+[best single AR(1), a wrong law]  rho(1 ms | theta) = 0.000004
+  M =  1600: mean T = -0.0014  bias = -0.0014  (MC SE 0.0004)
+  median T (M = 1600) = -0.0018;  median bias = -0.0018
+  closed form q_cf = -0.0006;  q_cf - rho = -0.0006  (45 % of the MC bias);  q_cf - mean T = +0.0008;  q_cf - median T = +0.0012
+  identity (8): covariance term Cov(S0,T)/E[S0] (MC) = +0.0000 against q_cf - mean T = +0.0008;  MC ratio of means mean(S_L)/mean(S_0) = -0.0014 (SE 0.0004) vs q_cf -0.0006 from TD (9): difference in SE units -1.74
+  TD eq. (9) S_0: analytic 33.77018 mV^2, MC mean 33.75921 mV^2, difference in SE units -0.51
+  TD eq. (9) S_L: analytic -0.02042 mV^2, MC mean -0.04582 mV^2, difference in SE units -1.74

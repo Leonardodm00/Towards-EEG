@@ -1,0 +1,24 @@
+C: mu_max 6.470, mu_min 0.0025, tr(C^-1) 1139.1; nominal SD with W = Sigma_used^-1: 5.07 ms
+
+s2 = 0.000 (+0.0 % variance on each statistic): weight used/right on the thinnest axis 1.00, on the widest 1.0000; exact E[J(tau_s0)] with W = Sigma_used^-1: 10.00 (10 without the noise)
+  W = used   robust SD(tau_hat) 6.27 ms, median 39.52 ms, mean minimised cost 8.93
+  W = oracle robust SD(tau_hat) 6.27 ms, median 39.52 ms, mean minimised cost 8.93
+  W = diag   robust SD(tau_hat) 16.62 ms, median 39.52 ms, mean minimised cost 4.88
+
+s2 = 0.001 (+0.1 % variance on each statistic): weight used/right on the thinnest axis 1.40, on the widest 1.0002; exact E[J(tau_s0)] with W = Sigma_used^-1: 11.14 (10 without the noise)
+  W = used   robust SD(tau_hat) 6.66 ms, median 39.52 ms, mean minimised cost 9.81
+  W = oracle robust SD(tau_hat) 6.70 ms, median 39.52 ms, mean minimised cost 8.85
+  W = diag   robust SD(tau_hat) 16.74 ms, median 39.25 ms, mean minimised cost 5.08
+
+s2 = 0.010 (+1.0 % variance on each statistic): weight used/right on the thinnest axis 5.02, on the widest 1.0015; exact E[J(tau_s0)] with W = Sigma_used^-1: 21.39 (10 without the noise)
+  W = used   robust SD(tau_hat) 8.65 ms, median 39.76 ms, mean minimised cost 18.83
+  W = oracle robust SD(tau_hat) 7.83 ms, median 39.76 ms, mean minimised cost 8.97
+  W = diag   robust SD(tau_hat) 16.47 ms, median 39.88 ms, mean minimised cost 5.09
+  nominal SD reported with W = Sigma_used^-1: 5.07 ms (any s2); obtained 8.65 ms here vs 6.27 ms at s2 = 0
+
+s2 = 0.100 (+10.0 % variance on each statistic): weight used/right on the thinnest axis 41.18, on the widest 1.0155; exact E[J(tau_s0)] with W = Sigma_used^-1: 123.91 (10 without the noise)
+  W = used   robust SD(tau_hat) 24.34 ms, median 40.66 ms, mean minimised cost 112.30
+  W = oracle robust SD(tau_hat) 10.07 ms, median 39.34 ms, mean minimised cost 9.07
+  W = diag   robust SD(tau_hat) 16.01 ms, median 39.40 ms, mean minimised cost 5.82
+
+ALL PREDICTIONS: {'PM1': True, 'PM2': True, 'PM3': True}

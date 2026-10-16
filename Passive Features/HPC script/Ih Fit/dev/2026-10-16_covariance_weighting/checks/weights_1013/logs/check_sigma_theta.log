@@ -1,0 +1,9 @@
+  true tau_s  20.0 ms: SE med sd265 0.0032 mV, SE med acf1ms265 0.0416, kappa(Sigma) 7.3e+04
+  true tau_s  39.7 ms: SE med sd265 0.0040 mV, SE med acf1ms265 0.0589, kappa(Sigma) 6.5e+04
+  true tau_s  80.0 ms: SE med sd265 0.0038 mV, SE med acf1ms265 0.0668, kappa(Sigma) 8.8e+04
+  P7 max/min SE(acf 1 ms, 265) = 1.61 -> True
+  kappa(Sigma) = 6.67e+04 (largest/smallest eigenvalue); kappa(correlation matrix) = 2.60e+03
+  1 % perturbation: relative change of Sigma^-1 / relative change of Sigma: median 214, 10-90% [60, 1271] (bound kappa = 66737) -> P8 True
+  P9 2x2 identity, c = 0.99: max |difference| 5.7e-13; weight on difference / weight on sum = 199 -> True
+
+ALL PREDICTIONS: {'P7': True, 'P8': True, 'P9': True}

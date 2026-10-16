@@ -1,0 +1,8 @@
+Sigma (mixed units)              eigenvalues [2.0405e-02 5.5144e-03 9.4139e-04 2.9181e-05 2.0106e-05 1.0121e-05
+ 7.0028e-06 6.1779e-06 5.4013e-07 3.0575e-07]
+                                 kappa = 6.67e+04
+correlation matrix (unit-free)   eigenvalues [6.4699e+00 2.3364e+00 9.5178e-01 1.8046e-01 2.7703e-02 1.5766e-02
+ 6.7373e-03 5.3340e-03 3.3924e-03 2.4891e-03]
+                                 kappa = 2.6e+03
+Sigma  eps = 1e-04: rel. change of inverse median 1.59e+00, max 2.94e+03; bound kappa*eps = 6.67e+00 -> False
+corr   eps = 1e-04: rel. change of inverse median 7.67e-02, max 2.43e-01; bound kappa*eps = 2.60e-01 -> True

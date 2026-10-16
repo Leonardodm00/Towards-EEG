@@ -1,0 +1,57 @@
+== A. Monte Carlo error of Sigma_hat vs condition number (kappa(Sigma) = 6.67e+04, m = 10)
+  R =  600: per-entry SD of Sigma_hat over replicates / formula sd_jk: median 0.999, range [0.965, 1.049]
+  R =  600: sampling error -> rel. error of inverse median 0.072, 95% 0.144 (tol 0.39); kappa*eps median 3683
+            cost ratio r'Sh^-1 r / r'S^-1 r over all r: 2.5% of minima 0.760, 97.5% of maxima 1.355
+            independent entry errors, same per-entry SD -> not positive definite 300/300; rel. error of inverse median inf (finite cases: median nan)
+  R = 3000: per-entry SD of Sigma_hat over replicates / formula sd_jk: median 1.007, range [0.975, 1.043]
+  R = 3000: sampling error -> rel. error of inverse median 0.029, 95% 0.058 (tol 0.17); kappa*eps median 1489
+            cost ratio r'Sh^-1 r / r'S^-1 r over all r: 2.5% of minima 0.880, 97.5% of maxima 1.141
+            independent entry errors, same per-entry SD -> not positive definite 300/300; rel. error of inverse median inf (finite cases: median nan)
+
+== B. linearised fit at tau_s0 = 39.74 ms
+  G = dq/dtau_s at tau_s0 (per ms): sd 265 -1.57e-04, acf .02 265 -1.99e-03, acf .1 265 -2.30e-03, acf 1 265 -1.80e-03, sd first50 -1.58e-04, sd last132 -1.97e-04, acf .02 last -3.13e-03, acf .1 last -3.55e-03, acf 1 last -3.16e-03, acf 10 last -4.56e-04
+  full linearised SD 5.07 ms vs simulated robust SD 7.57 ms (ratio 0.67)
+  diag linearised SD 15.97 ms vs simulated robust SD 15.53 ms (ratio 1.03)
+  hand linearised SD 18.22 ms vs simulated robust SD 16.98 ms (ratio 1.07)
+  diag naive SD (statistics treated as independent) 7.01 ms vs its sandwich SD 15.97 ms (ratio 0.44)
+  eigen-directions of the correlation matrix (widest first): mu, share of optimal information, share of the diagonal weighting's 'information'
+    mu =   6.4699      6.3 %     77.8 %
+    mu =   2.3364      0.1 %      0.6 %
+    mu =   0.9518      7.8 %     14.1 %
+    mu =   0.1805     19.7 %      6.8 %
+    mu =   0.0277      0.1 %      0.0 %
+    mu =   0.0158      0.2 %      0.0 %
+    mu =   0.0067     33.4 %      0.4 %
+    mu =   0.0053      0.1 %      0.0 %
+    mu =   0.0034     31.8 %      0.2 %
+    mu =   0.0025      0.6 %      0.0 %
+  widest   direction loadings: sd 265 +0.32, acf .02 265 +0.32, acf .1 265 +0.32, acf 1 265 +0.32, sd last132 +0.35, acf .02 last +0.35, acf .1 last +0.35, acf 1 last +0.35, acf 10 last +0.32
+  thinnest direction loadings: acf .02 265 -0.57, acf .1 265 +0.71, acf 1 265 -0.17, acf .02 last +0.23, acf .1 last -0.30
+
+== C. model error of one SE in one statistic (noise-free input)
+  unbiased input: tau_hat full 39.76 ms, diag 39.76 ms, hand 39.76 ms
+    +1 SE in sd 265       : full   -0.24 ms  diag   -1.98 ms  hand   -1.12 ms   | min cost under Sigma^-1 42.6
+    +1 SE in acf .02 265  : full  -16.92 ms  diag   -2.26 ms  hand   -1.63 ms   | min cost under Sigma^-1 197.0
+    +1 SE in acf .1 265   : full  -21.38 ms  diag   -1.86 ms  hand   -2.03 ms   | min cost under Sigma^-1 238.2
+    +1 SE in acf 1 265    : full  +56.50 ms  diag   -1.75 ms  hand   -2.03 ms   | min cost under Sigma^-1 150.7
+    +1 SE in sd first50   : full   -1.46 ms  diag   -2.70 ms  hand   -0.77 ms   | min cost under Sigma^-1 1.0
+    +1 SE in sd last132   : full   -0.47 ms  diag   -2.48 ms  hand   -1.40 ms   | min cost under Sigma^-1 33.8
+    +1 SE in acf .02 last : full   -6.34 ms  diag   -2.65 ms  hand   -3.04 ms   | min cost under Sigma^-1 130.6
+    +1 SE in acf .1 last  : full   -5.53 ms  diag   -2.76 ms  hand   -4.70 ms   | min cost under Sigma^-1 138.9
+    +1 SE in acf 1 last   : full  +31.89 ms  diag   -2.20 ms  hand   -3.91 ms   | min cost under Sigma^-1 113.1
+    +1 SE in acf 10 last  : full   +7.34 ms  diag   -0.30 ms  hand   -0.77 ms   | min cost under Sigma^-1 4.1
+    +1 SE in pair acf .02 : full  -19.44 ms  diag   -4.65 ms  hand   -4.65 ms   | min cost under Sigma^-1 233.7
+  ten single-statistic biases: root-sum-square shift full 71.27, diag 6.97, hand 7.87 ms; largest |shift| full 56.50, diag 2.76, hand 4.70 ms
+
+== D. Gaussian inputs with the same nonlinear fit (diagnosis of P12 for Sigma^-1)
+  full Gaussian inputs: median 39.82 ms, robust SD 6.38 ms, SD 6.39 ms
+  P15 robust SD 6.38 vs linearised 5.07 ms (ratio 1.26)
+  diag Gaussian inputs: median 39.88 ms, robust SD 15.95 ms, SD 16.97 ms
+  hand Gaussian inputs: median 40.24 ms, robust SD 17.29 ms, SD 18.36 ms
+
+== E. units and correlations (measured)
+  kappa(Sigma): SDs in mV 6.67e+04, SDs in microvolt 3.61e+06; kappa(correlation matrix) 2.6e+03 (unit-free)
+  largest correlations: acf .02 265~acf .1 265 0.997, acf .1 265~acf 1 265 0.997, acf .02 265~acf 1 265 0.996, acf .02 last~acf .1 last 0.995, acf .1 last~acf 1 last 0.994, acf .02 last~acf 1 last 0.993
+  participation ratio (sum mu)^2 / sum mu^2 = 2.07 of 10
+
+ALL PREDICTIONS: {'P10_R600': True, 'P11_R600': True, 'P16_R600': True, 'P10_R3000': True, 'P11_R3000': True, 'P16_R3000': True, 'P12_full': False, 'P12_diag': True, 'P12_hand': True, 'P13': True, 'P14': True, 'P15': False}

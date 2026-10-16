@@ -1,0 +1,1 @@
+M 3200; rho 0.6544; mean T 0.5462; median T 0.5469; role-1 bias -0.1082
