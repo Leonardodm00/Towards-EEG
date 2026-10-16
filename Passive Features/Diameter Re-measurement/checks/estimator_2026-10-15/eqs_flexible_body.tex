@@ -1,0 +1,31 @@
+\textbf{(1) The family: skewed generalized $t$, two-piece form}, family $F=\mathrm{sgt}$ with shape $\kappa=(\beta,\xi,\zeta)$, written as in (E3) of \texttt{objective\_E1\_E4.png} (mode $m_F=0$):
+\begin{gather*}
+g_{F,w,\kappa}(z)=\frac{W_F(\kappa)}{w}\,f_F\Bigl(\frac{W_F(\kappa)}{w}\,z;\,\kappa\Bigr),\qquad
+f_F(x;\kappa)=\frac{2}{\zeta+1/\zeta}\begin{cases}h_{\beta,\xi}(x/\zeta), & x\ge0,\\ h_{\beta,\xi}(\zeta x), & x<0,\end{cases}\\[4pt]
+h_{\beta,\xi}(x)=\frac{\beta\,\xi^{1/\beta}}{2\,B(1/\beta,1/\xi)}\Bigl(1+\xi\lvert x\rvert^{\beta}\Bigr)^{-\left(\frac1\xi+\frac1\beta\right)}\ \ (\xi>0),\qquad
+h_{\beta,0}(x)=\frac{\beta}{2\,\Gamma(1/\beta)}\,e^{-\lvert x\rvert^{\beta}},\\[4pt]
+W_F(\kappa)=\Bigl(\zeta+\frac1\zeta\Bigr)\Bigl(\frac{2^{\xi\beta/(\beta+\xi)}-1}{\xi}\Bigr)^{1/\beta}\ \ (\xi>0),\qquad
+W_F(\beta,0,\zeta)=\Bigl(\zeta+\frac1\zeta\Bigr)(\ln2)^{1/\beta}.
+\end{gather*}
+$\beta$ shapes the peak and shoulders, $\xi$ the tails (power law $\lvert z\rvert^{-(1+\beta/\xi)}$ for $\xi>0$), $\zeta$ the asymmetry (right/left half-width ratio $\zeta^{2}$). Members, checked numerically: $(2,0,1)$ Gaussian; $(1,0,1)$ Laplace; $(2,2/\nu,1)$ Student $t_\nu$, so $(2,2,1)$ Lorentzian; $(\beta,0,1)$ the pipeline's generalized normal, box-like as $\beta$ grows; $\zeta\neq1$ their skewed versions. Box: $\beta\in[1,10]$, $\xi\in[0,2]$, $\zeta\in[0.50,2.01]$. Notation: $\kappa$ is the shape of \texttt{objective\_E1\_E4.png}; the $\kappa_2,\kappa_4$ of \texttt{eqs\_identifiability.png} were cumulants, another object under the same letter.
+
+\medskip
+\textbf{(2) The test}, as before but with the whole shape free:
+\begin{equation*}
+\Delta\chi^2_{\min}(d\mid\theta_{\mathrm{true}},\sigma_\varepsilon)=\min_{(\mu,\,v_0,\,w,\,\kappa)\in\Theta_{-d}}\ \frac{1}{\sigma_\varepsilon^{2}}\sum_{n=1}^{53}\Bigl[\Imod\bigl(v_n\mid d,\mu,v_0,w,\kappa;\varphi,\bar B\bigr)-\Imod\bigl(v_n\mid\theta_{\mathrm{true}};\varphi,\bar B\bigr)\Bigr]^{2},
+\end{equation*}
+with $\varphi=0.2$ rad, $\bar B=180$ gl, and the criteria of \texttt{eqs\_identifiability.png} (2), fixed before the run.
+
+\medskip
+\textbf{(3) Nesting (exact).} If every kernel of a family $F_1$ is a kernel of $F_2$, with the same box for $(\mu,v_0,w)$, then for every $d$, every truth and every $\sigma_\varepsilon$
+\begin{equation*}
+\Delta\chi^2_{\min,F_2}(d\mid\theta_{\mathrm{true}},\sigma_\varepsilon)\ \le\ \Delta\chi^2_{\min,F_1}(d\mid\theta_{\mathrm{true}},\sigma_\varepsilon),
+\end{equation*}
+a minimum over a larger set is not larger. Student $t_\nu=\mathrm{sgt}(2,2/\nu,1)$, so every impostor of the Student run is an impostor here: more shape parameters can only add impostors, never remove one.
+
+\medskip
+\textbf{(4) The fit tested}, all seven parameters free, $\theta=(d,\mu,v_0,w,\beta,\xi,\zeta)$:
+\begin{equation*}
+\hat\theta=\argmin_{\theta\in\Theta}\ \frac12\sum_{n=1}^{53}\omega_n\Bigl[\frac{\Imod\bigl(v_n\mid\theta;\varphi,\bar B\bigr)-I(v_n)}{\bar B}\Bigr]^{2},
+\end{equation*}
+$\omega_n\equiv1$, or $\omega_n=\exp(-\lvert v_n-v_0\rvert/\lambda)$ with $\lambda=0.5\um$, re-centred by IRLS (D-046); $d\in[0.05,6]\um$, $\mu\in[0,20]\,\upmu\mathrm{m}^{-1}$, $v_0\in[-1,1]\um$, $w\in[0.1,2]\um$. Pinned variant: $(w,\kappa)$ fixed at the values this fit returns on one thick node, $(d,\mu,v_0)$ fitted.

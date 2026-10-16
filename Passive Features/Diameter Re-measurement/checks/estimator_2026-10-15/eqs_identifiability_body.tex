@@ -1,0 +1,34 @@
+\textbf{(1) The flexible kernel: Student's $t$ with $\nu$ degrees of freedom}, one shape parameter on top of the FWHM $w$; unit area, maximum at $z=0$; $\nu=1$ is the Lorentzian, $\nu\to\infty$ the Gaussian (the pipeline's range, D-046: $\nu\in[1,100]$):
+\begin{gather*}
+g_{w,\nu}(z)=\frac{W_\nu}{w}\,f_\nu\Bigl(\frac{W_\nu}{w}\,z\Bigr),\qquad
+f_\nu(x)=\frac{\Gamma\bigl(\tfrac{\nu+1}{2}\bigr)}{\sqrt{\nu\pi}\;\Gamma\bigl(\tfrac{\nu}{2}\bigr)}\Bigl(1+\frac{x^{2}}{\nu}\Bigr)^{-\frac{\nu+1}{2}},\\
+W_\nu=2\sqrt{\nu\bigl(2^{2/(\nu+1)}-1\bigr)}\quad(\text{the FWHM of } f_\nu;\ W_1=2,\ W_\nu\to2\sqrt{2\ln2}\ \text{as}\ \nu\to\infty).
+\end{gather*}
+
+\medskip
+\textbf{(2) The test.} One simulated profile: Block 5's offsets $v_n$ ($n=1,\dots,53$), tilt $\varphi=0.2$ rad, background $\bar B=180$ gl. For a noise-free truth $\theta_{\mathrm{true}}=(d_{\mathrm{true}},\mu_{\mathrm{true}},v_{0,\mathrm{true}},w_{\mathrm{true}},\nu_{\mathrm{true}})$ and each fixed $d\neq d_{\mathrm{true}}$, the best impostor's distance from the truth in noise units:
+\begin{equation*}
+\Delta\chi^2_{\min}(d\mid\theta_{\mathrm{true}},\sigma_\varepsilon)=\min_{(\mu,\,v_0,\,w,\,\nu)\in\Theta_{-d}}\ \frac{1}{\sigma_\varepsilon^{2}}\sum_{n=1}^{53}\Bigl[\Imod\bigl(v_n\mid d,\mu,v_0,w,\nu;\varphi,\bar B\bigr)-\Imod\bigl(v_n\mid\theta_{\mathrm{true}};\varphi,\bar B\bigr)\Bigr]^{2},
+\end{equation*}
+$\Theta_{-d}$ the pipeline's box for the other four parameters. This is the profile of $d$ on a noise-free profile with Gaussian noise of SD $\sigma_\varepsilon$ per sample assumed: $\{d:\Delta\chi^2_{\min}<1\}$ is its 68\,\% profile-likelihood interval for $d$, $<3.84$ the 95\,\% one (one degree of freedom, $\chi^2$ calibration of a regular problem). Criterion fixed before the run: your thesis is refuted in practice if $\Delta\chi^2_{\min}(d\mid\theta_{\mathrm{true}},1\ \mathrm{gl})<1$ for some $\lvert d/d_{\mathrm{true}}-1\rvert\ge0.2$, and exactly if that impostor also has $\max_n\lvert\Delta I_n\rvert<10^{-6}$ gl.
+
+\medskip
+\textbf{(3) Why, to leading order} (a faint tube, $\alpha=\mu d/\cos\varphi\ll1$; $\nu>4$ so that $\kappa_4(g_{w,\nu})$ exists). The dip is a convolution of the chord profile $s_d(u)=\sqrt{1-(2u/d)^{2}}$, $\lvert u\rvert\le d/2$, with the kernel,
+\begin{equation*}
+D(v\mid\theta)=1-\frac{\Imod(v\mid\theta;\varphi,\bar B)}{\bar B}\approx\alpha\,\bigl(s_d*g_{w,\nu}\bigr)(v-v_0),
+\end{equation*}
+so its area is $\pi\mu d^{2}/(4\cos\varphi)$, its centre $v_0$, and its cumulants add:
+\begin{gather*}
+\kappa_2(D)=\frac{d^{2}}{16}+\kappa_2(g_{w,\nu}),\qquad
+\kappa_4(D)=-\frac{d^{4}}{256}+\kappa_4(g_{w,\nu}),\\
+\kappa_2(g_{w,\nu})=\Bigl(\frac{w}{W_\nu}\Bigr)^{2}\frac{\nu}{\nu-2},\qquad
+\kappa_4(g_{w,\nu})=\frac{6\,\kappa_2(g_{w,\nu})^{2}}{\nu-4}.
+\end{gather*}
+Area and width fix only $\mu d^{2}$ and $d^{2}/16+\kappa_2(g_{w,\nu})$, so $\mu$ and $w$ absorb a change of $d$; $d$ is left to the shape beyond the width, e.g.\ the excess kurtosis $\kappa_4(D)/\kappa_2(D)^{2}$. On the exact noise-free dips ($\nu_{\mathrm{true}}=100$, $\alpha=0.61$ and $1.53$, so the formulas only guide) it is $-0.09$ at $d_{\mathrm{true}}=0.6\um$ against $-0.65$ at $1.5\um$. A Student kernel only adds positive $\kappa_4$: $\nu$ can serve an impostor thicker than the truth, never a thinner one at the Gaussian end, yet the thinner side is the flatter one; terms beyond $\kappa_4$ (not analysed) set that asymmetry.
+
+\medskip
+\textbf{(4) The kernel pinned}, the check of what does identify a thin $d$: $(w,\nu)$ fixed at $(\hat w_{\mathrm{cal}},\hat\nu_{\mathrm{cal}})$, the free Student fit of one thick node ($d_{\mathrm{true}}=1.5\um$, same kernel, its own noise draw), then, with $I(v_n)$ the noisy thin profile,
+\begin{equation*}
+(\hat d,\hat\mu,\hat v_0)=\argmin_{(d,\mu,v_0)\in\Theta}\ \frac12\sum_{n=1}^{53}\omega_n\Bigl[\frac{\Imod\bigl(v_n\mid d,\mu,v_0,\hat w_{\mathrm{cal}},\hat\nu_{\mathrm{cal}};\varphi,\bar B\bigr)-I(v_n)}{\bar B}\Bigr]^{2},
+\end{equation*}
+$\omega_n\equiv1$, or the centre weights $\omega_n=\exp(-\lvert v_n-v_0\rvert/\lambda)$ re-centred by IRLS as in D-046.
