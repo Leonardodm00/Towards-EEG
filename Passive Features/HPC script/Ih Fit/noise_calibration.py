@@ -73,6 +73,10 @@ than real data. Diagnostic only: nothing downstream reads these columns.
 Smoke: smoke_ih_recovery.py R10 closes the loop -- it generates a synthetic
 archive with KNOWN per-sweep (sigma, rho), measures it back with this module,
 and requires the injected values to come out.
+
+Estimator convention (D-028, D-029): every autocorrelation in this module is
+the textbook sample autocorrelation, computed by statsmodels through
+noise_stats.sample_acf -- the same call the fitter makes.
 """
 
 import argparse
@@ -83,6 +87,8 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
+
+from noise_stats import sample_acf   # D-028: the one autocorrelation estimator of Ih Fit/
 
 
 #: The per-specimen columns written by measure_group_noise, in order.
@@ -188,27 +194,18 @@ def _pre_window_n(mono, bundle) -> int:
 
 
 def lag_autocorr(x: np.ndarray, lag: int) -> float:
-    """Sample autocorrelation of one window at `lag` samples, in the SAME
-    convention as the fitter's lag-1 statistic (mono._estimate_noise):
-    demean the window, then the mean of the n - lag available products over
-    the mean square of all n samples. lag = 1 therefore reproduces the
-    fitter's rho_lag1 exactly (smoke R10 asserts it). NaN when fewer than 10
-    products are available or the window is flat.
+    """Textbook sample autocorrelation of one window at `lag` samples
+    (D-028, D-029): sum of the n - lag lag products over the sum of all n
+    squared deviations, computed by statsmodels through noise_stats.sample_acf,
+    the one autocorrelation estimator of Ih Fit/. lag = 1 reproduces the
+    fitter's rho_lag1 exactly, because both call sample_acf (smoke R10 asserts
+    it). NaN when fewer than 10 products are available (n - lag < 10), when
+    lag < 1, or when the window is flat or has a non-finite sample.
 
-    Written out in numpy rather than taken from statsmodels.tsa.acf, whose
-    normalisation (a sum over n - lag products divided by n times the
-    variance) is a different estimator and would not reproduce the fitter's
-    rho at lag 1."""
-    u = np.asarray(x, dtype=float)
-    n = int(u.size)
-    lag = int(lag)
-    if lag < 1 or n - lag < 10:
-        return float("nan")
-    u = u - u.mean()
-    var = float(np.mean(u * u))
-    if not var > 0.0:
-        return float("nan")
-    return float(np.mean(u[lag:] * u[:-lag]) / var)
+    Values measured before D-028 with the adjusted form (mean of the n - lag
+    products over the mean square of n samples) convert exactly, window by
+    window, by textbook = (n - lag)/n * adjusted (D-028.2)."""
+    return float(sample_acf(x, int(lag))[0])
 
 
 def _acf_diagnostic(mono, bundles: Sequence, fs_of) -> Dict[str, float]:
@@ -257,6 +254,7 @@ def trend_share(x: np.ndarray) -> float:
     return 1.0 - float(np.var(detrend(u, type="linear"))) / v if v > 0 else float("nan")
 
 
+# Custom: project-specific statistic (D-016.4); no library equivalent.
 def locked_share(windows: Sequence[np.ndarray]) -> float:
     """Share of the pre-window variance that REPEATS from sweep to sweep.
 

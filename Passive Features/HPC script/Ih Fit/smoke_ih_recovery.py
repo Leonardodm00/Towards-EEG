@@ -50,6 +50,9 @@ import pandas as pd
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+
+from noise_stats import sample_acf  # noqa: E402  (D-028: the bands use the pipeline's estimator)
+
 #: The untouched synthetic benchmark, used by R1 to prove a legacy manifest
 #: still draws what it always drew. It sits beside this folder in the repo;
 #: IH_ORACLE_DIR overrides that for a checkout where it does not.
@@ -555,10 +558,10 @@ def _estimator_band(n: int, m: int, rho: float, *, reps: int = 2000,
         x = rng.normal(0.0, np.sqrt(1.0 - r * r), size=(m, n))
         x[:, 0] = rng.normal(0.0, 1.0, size=m)          # stationary start
         x = lfilter([1.0], [1.0, -r], x, axis=1)
-        c = x - x.mean(axis=1, keepdims=True)
         s_med[k] = np.median(x.std(axis=1, ddof=1))
-        r_med[k] = np.median((c[:, 1:] * c[:, :-1]).mean(axis=1)
-                             / (c * c).mean(axis=1))
+        # the band is computed with the pipeline's own estimator (D-028), so
+        # that data and band use the same statistic
+        r_med[k] = np.median([sample_acf(row, 1)[0] for row in x])
     return ((float(np.quantile(s_med, q)), float(np.quantile(s_med, 1 - q))),
             (float(np.quantile(r_med, q)), float(np.quantile(r_med, 1 - q))),
             float(s_med.mean()))
@@ -580,12 +583,11 @@ def _acf_gap_band(n: int, m: int, rho: float, lags, *, reps: int = 2000,
         x = rng.normal(0.0, np.sqrt(1.0 - r * r), size=(m, n))
         x[:, 0] = rng.normal(0.0, 1.0, size=m)
         x = lfilter([1.0], [1.0, -r], x, axis=1)
-        c = x - x.mean(axis=1, keepdims=True)
-        v = (c * c).mean(axis=1)
-        r1 = (c[:, 1:] * c[:, :-1]).mean(axis=1) / v
-        for L in gaps:
-            rl = (c[:, L:] * c[:, :-L]).mean(axis=1) / v
-            gaps[L][k] = np.median(rl) - np.median(r1 ** L)
+        # one sample_acf call per trace at lag 1 and every requested lag (D-028)
+        acfs = np.array([sample_acf(row, [1] + [int(L) for L in gaps]) for row in x])
+        r1 = acfs[:, 0]
+        for j, L in enumerate(gaps):
+            gaps[L][k] = np.median(acfs[:, 1 + j]) - np.median(r1 ** L)
     return {L: (float(np.quantile(g, q)), float(np.quantile(g, 1 - q)))
             for L, g in gaps.items()}
 

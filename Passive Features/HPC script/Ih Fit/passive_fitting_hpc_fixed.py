@@ -946,6 +946,9 @@ from typing import Optional, List, Dict, Any, Literal, Tuple, Sequence
 import numpy as np
 import pandas as pd
 
+# D-028: the one autocorrelation estimator of Ih Fit/ (textbook, statsmodels)
+from noise_stats import sample_acf
+
 # AllenSDK -- optional; not needed on HPC (use load_cell_from_archive)
 try:
     from allensdk.core.cell_types_cache import CellTypesCache
@@ -3031,8 +3034,9 @@ def _estimate_residual_noise_at_mle(
         return float("nan"), float("nan")
 
     sigma = float(np.std(pool, ddof=1))
-    c     = pool - pool.mean()
-    rho   = float(np.sum(c[:-1] * c[1:]) / (np.sum(c**2) + 1e-12))
+    # textbook lag-1 through noise_stats.sample_acf (D-028); a flat pool gives
+    # NaN (its readers fall back on NaN) instead of the old 0.0
+    rho   = float(sample_acf(pool, 1)[0])
     return sigma, rho
 def _crop_window(t: np.ndarray, v: np.ndarray,
                  t_start_s: float, t_end_s: float) -> np.ndarray:
@@ -3221,13 +3225,14 @@ def _estimate_noise(
 
     sigma_mV = float(np.std(samples, ddof=1))
 
-    # Lag-1 autocorrelation
+    # Lag-1 autocorrelation: the textbook estimator through noise_stats.sample_acf
+    # (D-028, D-029). NaN for a flat or non-finite window (D-029 (iii)).
     s_centered = samples - samples.mean()
     var = float(np.mean(s_centered * s_centered))
     if var <= 0:
         rho_lag1 = float("nan")
     else:
-        rho_lag1 = float(np.mean(s_centered[1:] * s_centered[:-1]) / var)
+        rho_lag1 = float(sample_acf(samples, 1)[0])
 
     is_correlated = (not np.isnan(rho_lag1)) and (rho_lag1 > rho_threshold)
     return sigma_mV, rho_lag1, is_correlated
