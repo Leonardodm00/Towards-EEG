@@ -27,6 +27,29 @@ on each side of the mode). m_F(s) is 0 except for skewnorm, where it is the
 root of d/dz ln f = -z + a phi(a z) / Phi(a z) (scipy.optimize.brentq; phi,
 Phi the standard normal density and distribution).
 
+The skewed generalized t (SGT, D-052.1; Block 12, 2026-10-18) is the kernel
+of the deliverable fit (analysis/fit_sgt.py). Its shape is a VECTOR
+kappa = (beta, xi, zeta), so it has its own functions below and is not one
+of FAMILIES (the D-046 grid's one-shape families, unchanged). With B the beta
+and Gamma the gamma function, for beta > 0, xi >= 0, zeta > 0 and every x:
+
+    h(x) = beta xi^(1/beta) / (2 B(1/beta, 1/xi)) (1 + xi |x|^beta)^-(1/xi + 1/beta)   (xi > 0)
+    h(x) = beta / (2 Gamma(1/beta)) exp(-|x|^beta)                                    (xi = 0)   (H1)
+    f(x | kappa) = 2 / (zeta + 1/zeta) h(x / zeta)  (x >= 0),   h(zeta x)  (x < 0)               (H2)
+    W(kappa) = (zeta + 1/zeta) ((2^e - 1) / xi)^(1/beta),  e = xi beta / (beta + xi)  (xi > 0)
+    W(kappa) = (zeta + 1/zeta) (ln 2)^(1/beta)                                         (xi = 0)
+    g(z) = (W / w) f(W z / w | kappa)      (the kernel of FWHM w, um)                            (H3)
+
+f has unit integral, its mode at 0 and right-to-left half-width ratio
+zeta^2. Members: (2, 0, 1) Gaussian, (1, 0, 1) Laplace, (2, 2/nu, 1) Student
+t_nu, (2, 2, 1) Lorentzian, (beta, 0, 1) generalized normal. xi at or below
+SGT_XI_ZERO is the xi = 0 form; 2^e - 1 is computed as expm1(e ln 2), which
+keeps W continuous as xi -> 0 (the naive form loses about 1e-7 relative at
+small xi). Ported from checks/estimator_2026-10-15/sgt_kernel.py (shapes
+named (p, r, gamma) there), with the same arithmetic. Custom: scipy.stats
+has no generalized t and no SGT (checked there: t, gennorm, genhyperbolic,
+jf_skew_t, johnsonsu, pearson3).
+
 Pure ASCII, for the cluster (hpc-python-compat).
 """
 from __future__ import annotations
@@ -175,3 +198,81 @@ def kernel_label(family, shape=None, shape_fitted=False):
     if shape_fitted:
         return "%s %s fit" % (family, sym[family])
     return "%s %s=%g" % (family, sym[family], shape)
+
+
+# ---------------------------------------------------- the SGT (D-052.1) --
+SGT = "sgt"              # the family's name (not in FAMILIES: its shape is the vector (beta, xi, zeta))
+SGT_XI_ZERO = 1e-12      # xi at or below this is the generalized-normal limit xi = 0, (H1) second form
+
+
+def check_sgt_shape(beta, xi, zeta):
+    """(beta, xi, zeta) as floats; ValueError unless all three are finite,
+    beta > 0, xi >= 0 and zeta > 0 (the family's domain; the fit's box is
+    narrower, MeasureConfig.sgt_*_bounds)."""
+    b, x, z = float(beta), float(xi), float(zeta)
+    if not (math.isfinite(b) and math.isfinite(x) and math.isfinite(z)) or not (b > 0 and x >= 0 and z > 0):
+        raise ValueError("SGT shape needs finite beta > 0, xi >= 0, zeta > 0; got %r" % ((beta, xi, zeta),))
+    return b, x, z
+
+
+def _sgt_log_c(beta, xi):
+    """ln of the core's normaliser: beta xi^(1/beta) / (2 B(1/beta, 1/xi)), or
+    beta / (2 Gamma(1/beta)) in the xi = 0 form."""
+    if xi <= SGT_XI_ZERO:
+        return math.log(beta) - math.log(2.0) - special.gammaln(1.0 / beta)
+    return math.log(beta) + math.log(xi) / beta - math.log(2.0) - special.betaln(1.0 / beta, 1.0 / xi)
+
+
+def _sgt_log_core(x, beta, xi):
+    """ln of (1 + xi |x|^beta)^-(1/xi + 1/beta), or -|x|^beta in the xi = 0 form (x array)."""
+    ax = np.abs(x)
+    if xi <= SGT_XI_ZERO:
+        return -(ax ** beta)
+    return -(1.0 / xi + 1.0 / beta) * np.log1p(xi * ax ** beta)
+
+
+def sgt_core_hwhm(beta, xi):
+    """Half width at half maximum of the symmetric core h at unit scale:
+    (expm1(e ln 2) / xi)^(1/beta), e = 1 / (1/xi + 1/beta) = xi beta / (beta + xi),
+    or (ln 2)^(1/beta) in the xi = 0 form."""
+    beta, xi, _ = check_sgt_shape(beta, xi, 1.0)
+    if xi <= SGT_XI_ZERO:
+        return math.log(2.0) ** (1.0 / beta)
+    e = 1.0 / (1.0 / xi + 1.0 / beta)
+    return (math.expm1(e * math.log(2.0)) / xi) ** (1.0 / beta)
+
+
+def sgt_unit_fwhm(beta, xi, zeta):
+    """W(kappa) of (H3): the FWHM of f( . | kappa), (zeta + 1/zeta) x sgt_core_hwhm(beta, xi)."""
+    beta, xi, zeta = check_sgt_shape(beta, xi, zeta)
+    return sgt_core_hwhm(beta, xi) * (zeta + 1.0 / zeta)
+
+
+def sgt_unit_pdf(x, beta, xi, zeta):
+    """f(x | kappa) of (H2) at x (array or scalar): unit integral, mode 0."""
+    beta, xi, zeta = check_sgt_shape(beta, xi, zeta)
+    s = zeta + 1.0 / zeta
+    x = np.asarray(x, dtype=float)
+    u = np.where(x >= 0.0, x / zeta, x * zeta)
+    return np.exp(_sgt_log_c(beta, xi) + math.log(2.0 / s) + _sgt_log_core(u, beta, xi))
+
+
+def sgt_kernel_pdf(fwhm_um, beta, xi, zeta):
+    """g of (H3): the SGT kernel of FWHM fwhm_um (um) and shape (beta, xi,
+    zeta), a vectorised function of the offset z (um, array in, array of the
+    same shape out, 1/um) with unit integral and its maximum at z = 0.
+    ValueError for a FWHM that is not finite and positive, and as
+    check_sgt_shape."""
+    beta, xi, zeta = check_sgt_shape(beta, xi, zeta)
+    w = float(fwhm_um)
+    if not (math.isfinite(w) and w > 0):
+        raise ValueError("the kernel's FWHM must be finite and > 0, got %r" % (fwhm_um,))
+    s = zeta + 1.0 / zeta
+    a = w / (sgt_core_hwhm(beta, xi) * s)
+    log_lead = _sgt_log_c(beta, xi) + math.log(2.0 / s) - math.log(a)
+
+    def g(z):
+        x = np.asarray(z, dtype=float) / a
+        u = np.where(x >= 0.0, x / zeta, x * zeta)
+        return np.exp(log_lead + _sgt_log_core(u, beta, xi))
+    return g

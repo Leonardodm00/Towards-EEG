@@ -123,6 +123,18 @@ class MeasureConfig:
     fit_at_bound_rel_tol: float = 1e-6  # source: PROVISIONAL: a parameter within this fraction of its bound range of a bound is reported at_bound
     fit_quad_min_nodes: int = 64      # source: PROVISIONAL; Gauss-Legendre nodes of the model quadrature (Block 3), at least this many
     fit_quad_nodes_per_sigma: float = 6.0  # source: PROVISIONAL; and N >= this x d_hi / sigma_fit (error < 1e-13 B at 3.4 per sigma, Block 3 smoke test)
+    # -- the fit at a plane, D-052.2 (Block 12): skewed generalized-t kernel, w and (beta, xi, zeta) fitted, IRLS
+    sgt_w_bounds_um: Tuple[float, float] = (0.1, 2.0)  # source: D-052.2 (the kernel's FWHM w, um; = fit_variants.FITTED_FWHM_BOUNDS_UM of D-046)
+    sgt_beta_bounds: Tuple[float, float] = (1.0, 10.0)  # source: D-052.2 (searched in log10 beta)
+    sgt_xi_bounds: Tuple[float, float] = (0.0, 2.0)  # source: D-052.2 (xi = 0 is the generalized-normal edge, a member)
+    sgt_ln_zeta_bounds: Tuple[float, float] = (-0.7, 0.7)  # source: D-052.2 (zeta in [e^-0.7, e^0.7] = [0.497, 2.014], searched in ln zeta)
+    sgt_lambda_um: float = 0.5        # source: D-052 (user, 2026-10-16): centre weights exp(-|v - v0| / lambda), re-centred by IRLS
+    sgt_irls_tol_um: float = 1e-4     # source: D-052.2 / D-046: the IRLS stops when d and v0 both move by at most this (um)
+    sgt_irls_max_iter: int = 30       # source: D-052.2 / D-046, PROVISIONAL (D-052 (h)): at most this many weighted solves
+    sgt_max_nfev: int = 3000          # source: D-054 (iv) (user, 2026-10-18): max_nfev of every least_squares solve of the SGT fit
+    sgt_start_shapes: Tuple[Tuple[float, float, float], ...] = ((2.0, 0.0, 1.0), (1.0, 0.0, 1.0), (5.0, 0.0, 1.0), (2.0, 1.0, 1.0))  # source: D-052.2, PROVISIONAL (the sandbox check's): (beta, xi, zeta) started from the Gaussian of fitted width
+    sgt_start_w_um: float = 0.7       # source: D-052.2, PROVISIONAL: the width of the start from Block 5's (d, mu, v0)
+    sgt_base_start_shape: Tuple[float, float, float] = (2.0, 0.0, 1.0)  # source: D-052.2, PROVISIONAL: the shape of that start (Gaussian)
     # -- selection S and flags (procedure s.3.2; D-024)
     alpha_dark_flag: float = 1.0      # source: D-024 (impl-handoff Findings (4)); threshold to be set on real alpha_hat
     steep_tan_diagnostic: float = 0.58  # source: handoff, old tool STEEP_TAN; DIAGNOSTIC COLUMN ONLY, never a selection rule (D-024)
@@ -313,6 +325,7 @@ class DiameterConfig:
         if m.fit_params != ("d", "mu", "v0"):
             raise ValueError("measure.fit_params must be ('d', 'mu', 'v0'): B is fixed (D-018) "
                              "and the darkness parameter is mu (D-019); got %r" % (m.fit_params,))
+        _check_sgt(m)
         if m.sigma_fit_um not in m.sigma_fit_study_um:
             raise ValueError("measure.sigma_fit_um (%g) must be one of sigma_fit_study_um %r (D-023)"
                              % (m.sigma_fit_um, m.sigma_fit_study_um))
@@ -408,6 +421,33 @@ def _check_in(value: str, allowed: Tuple[str, ...], name: str) -> None:
         raise ValueError("%s = %r is not one of %r" % (name, value, allowed))
 
 
+def _check_sgt(m: "MeasureConfig") -> None:
+    """The SGT fit's settings (D-052.2, Block 12): ordered finite bounds with
+    0 < w_lo, 0 < beta_lo and 0 <= xi_lo; positive lambda and IRLS tolerance;
+    a cap and a budget of at least 1; at least one start shape; every start
+    shape (beta, xi, zeta) and the start width inside the box."""
+    (w_lo, w_hi), (b_lo, b_hi), (x_lo, x_hi), (z_lo, z_hi) = (m.sgt_w_bounds_um, m.sgt_beta_bounds,
+                                                            m.sgt_xi_bounds, m.sgt_ln_zeta_bounds)
+    edges = (w_lo, w_hi, b_lo, b_hi, x_lo, x_hi, z_lo, z_hi)
+    if not all(math.isfinite(e) for e in edges) or not (0 < w_lo < w_hi and 0 < b_lo < b_hi and 0 <= x_lo < x_hi
+                                                         and z_lo < z_hi):
+        raise ValueError("measure.sgt_*_bounds: need finite 0 < w_lo < w_hi, 0 < beta_lo < beta_hi, "
+                         "0 <= xi_lo < xi_hi and ln_zeta_lo < ln_zeta_hi")
+    if not (m.sgt_lambda_um > 0 and m.sgt_irls_tol_um > 0) or m.sgt_irls_max_iter < 1 or m.sgt_max_nfev < 1:
+        raise ValueError("measure: sgt_lambda_um and sgt_irls_tol_um must be > 0, sgt_irls_max_iter and "
+                         "sgt_max_nfev >= 1")
+    shapes = tuple(m.sgt_start_shapes) + (m.sgt_base_start_shape,)
+    ok = len(m.sgt_start_shapes) >= 1 and all(len(s) == 3 for s in shapes)
+    if ok:
+        ok = all(b_lo <= s[0] <= b_hi and x_lo <= s[1] <= x_hi and s[2] > 0 and z_lo <= math.log(s[2]) <= z_hi
+                 for s in shapes)
+    if not ok:
+        raise ValueError("measure.sgt_start_shapes / sgt_base_start_shape: at least one (beta, xi, zeta), each "
+                         "inside sgt_beta_bounds, sgt_xi_bounds and exp(sgt_ln_zeta_bounds)")
+    if not (w_lo <= m.sgt_start_w_um <= w_hi):
+        raise ValueError("measure.sgt_start_w_um must lie within sgt_w_bounds_um")
+
+
 def _check_qtables(tables: Any) -> None:
     """renderer.jpeg_qtables: () or 1-4 tuples of 64 integers in [1, 65535].
     Tuples, not lists: the configuration is frozen and must stay hashable."""
@@ -485,6 +525,8 @@ def _coerce(annotation: str, value: Any) -> Any:
         return num(value)
     if annotation.startswith("Tuple[float") and isinstance(value, tuple):
         return tuple(num(x) for x in value)
+    if annotation.startswith("Tuple[Tuple[float") and isinstance(value, tuple):   # measure.sgt_start_shapes
+        return tuple(tuple(num(x) for x in row) if isinstance(row, tuple) else row for row in value)
     return value
 
 
