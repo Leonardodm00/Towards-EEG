@@ -1,0 +1,4 @@
+order 2.0: integral of w over [0, 60] = 1.0000; negative mass -0.1935
+order 2.5: integral of w over [0, 60] = 1.0000; negative mass -0.3273
+order 3.0: integral of w over [0, 60] = 1.0000; negative mass -0.4701
+wrote ../figures/fig01_order_filters.png

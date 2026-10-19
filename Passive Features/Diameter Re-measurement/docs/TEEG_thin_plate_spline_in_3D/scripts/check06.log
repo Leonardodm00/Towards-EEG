@@ -1,0 +1,15 @@
+thin_plate_spline: A = 118.4353, 2m = 5, lambda at nu_c = 15: 0.46789
+   lambda x0.1 : sum l = 1.0000; RMS(binned N l - k)/k(0) = 0.014; first zero theory 0.182, empirical 0.189; depth min/k(0) theory -0.011, empirical -0.013; k(0) = 449.7; df = 455.3
+   lambda x1   : sum l = 1.0000; RMS(binned N l - k)/k(0) = 0.005 PASS; first zero theory 0.288, empirical 0.294; depth min/k(0) theory -0.011, empirical -0.011; k(0) = 113.0; df = 132.1
+      negative mass (sum of negative weights): theory, all r: -0.3273; theory r <= 0.5: -0.3089; empirical r <= 0.5: -0.3007
+   lambda x10  : sum l = 1.0000; RMS(binned N l - k)/k(0) = 0.016; first zero theory 0.457, empirical nan; depth min/k(0) theory -0.011, empirical +0.008; k(0) = 28.4; df = 38.3
+   widths: 10^(1/2m) = 1.585; theory ratios ['1.585', '1.585']; empirical ratios ['1.557', 'nan']
+   df: ['455.3', '132.1', '38.3']; exponent of df - 4 against lambda = -0.560 (continuum -3/2m = -0.600); of df itself -0.538
+linear: A = 25.1327, 2m = 4, lambda at nu_c = 15: 1.48935
+   lambda x0.1 : sum l = 1.0000; RMS(binned N l - k)/k(0) = 0.010; first zero theory 0.167, empirical 0.184; depth min/k(0) theory -0.004, empirical -0.004; k(0) = 1067.9; df = 867.0
+   lambda x1   : sum l = 1.0000; RMS(binned N l - k)/k(0) = 0.005 PASS; first zero theory 0.296, empirical 0.307; depth min/k(0) theory -0.004, empirical -0.003; k(0) = 189.9; df = 197.3
+      negative mass (sum of negative weights): theory, all r: -0.1935; theory r <= 0.5: -0.1745; empirical r <= 0.5: -0.1692
+   lambda x10  : sum l = 1.0000; RMS(binned N l - k)/k(0) = 0.011; first zero theory 0.527, empirical nan; depth min/k(0) theory -0.003, empirical +0.017; k(0) = 33.8; df = 39.9
+   widths: 10^(1/2m) = 1.778; theory ratios ['1.778', '1.778']; empirical ratios ['1.668', 'nan']
+   df: ['867.0', '197.3', '39.9']; exponent of df - 4 against lambda = -0.691 (continuum -3/2m = -0.750); of df itself -0.669
+overall: PASS

@@ -1,0 +1,3 @@
+pop       classical        MC SE inverse est.        MC SE
+thin       -0.00035      0.00046     -0.03966      0.00039   classical unbiased (PASS), inverse biased
+thick      +0.00003      0.00002     +0.00008      0.00002   classical unbiased (PASS), inverse biased

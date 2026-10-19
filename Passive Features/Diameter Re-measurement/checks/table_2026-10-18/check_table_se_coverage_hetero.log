@@ -1,0 +1,43 @@
+C1 linear smoother: |L y - RBFInterpolator| = 6.7e-15, |sum l - 1| = 4.0e-15  -> PASS
+  batch  0: smoothing 10  (17 s)
+  batch  1: smoothing 10  (52 s)
+  batch  2: smoothing 10  (85 s)
+  batch  3: smoothing 10  (144 s)
+  batch  4: smoothing 10  (162 s)
+  batch  5: smoothing 1  (200 s)
+  batch  6: smoothing 10  (218 s)
+  batch  7: smoothing 10  (246 s)
+  batch  8: smoothing 0.1  (266 s)
+  batch  9: smoothing 10  (292 s)
+  batch 10: smoothing 10  (306 s)
+  batch 11: smoothing 10  (336 s)
+  batch 12: smoothing 10  (349 s)
+  batch 13: smoothing 10  (362 s)
+  batch 14: smoothing 1  (398 s)
+  batch 15: smoothing 10  (419 s)
+  batch 16: smoothing 100  (456 s)
+  batch 17: smoothing 1  (483 s)
+  batch 18: smoothing 1  (498 s)
+  batch 19: smoothing 10  (526 s)
+
+C2/C3 per query point (d um, phi deg, alpha), 20 tables of N_S = 1500; smoothing chosen: [0.1, 1.0, 10.0, 100.0]
+query                     b    tau(d)   tau_hat N_eff kern N_eff spl    SE rep    sd spl    sd emp      bias sd emp/SE
+(0.25, 5, 0.1)       1.1260    0.3000    0.2941      12.1      88.7    0.0852    0.0345    0.0520   -0.0149      0.61
+(0.3, 20, 0.25)      1.1482    0.3000    0.2937      23.8     215.6    0.0608    0.0222    0.0215   +0.0080      0.35
+(0.6, 10, 0.6)       1.0790    0.1801    0.2072      24.1     228.6    0.0425    0.0153    0.0178   +0.0053      0.42
+(1, 30, 1.2)         1.1066    0.0339    0.0438      24.2     322.5    0.0090    0.0050    0.0069   +0.0051      0.77
+(2, 10, 2)           1.0692    0.0090    0.0105      25.7     206.3    0.0021    0.0017    0.0022   +0.0004      1.06
+(3, 45, 4)           1.1643    0.0090    0.0106      22.9     225.4    0.0023    0.0011    0.0030   -0.0029      1.33
+(1, 70, 3)           1.2474    0.0339    0.0431      26.2     287.7    0.0085    0.0053    0.0053   +0.0001      0.62
+
+C4 kernel mass at the replicates (leave-one-out): 5th percentile 3.06, median 6.83
+   slices at phi = 10 deg (the inversion searches d over [0.2, 4] um at fixed alpha_hat):
+   alpha_hat  0.10: band d in [0.20, 0.33] um =  17 % of the bracket | max |b_hat - b| in 0.0785, out 0.0785 | N_eff min in 11.1, min out 1.4 | mass min in 3.00, max out 2.854
+   alpha_hat  0.30: band d in [0.20, 0.98] um =  53 % of the bracket | max |b_hat - b| in 0.0506, out 0.0229 | N_eff min in 10.0, min out 2.5 | mass min in 3.70, max out 5.022
+   alpha_hat  1.00: band d in [0.33, 3.28] um =  77 % of the bracket | max |b_hat - b| in 0.0243, out 0.0224 | N_eff min in 5.9, min out 3.2 | mass min in 2.98, max out 2.843
+   alpha_hat  3.00: band d in [0.98, 4.00] um =  47 % of the bracket | max |b_hat - b| in 0.0119, out 0.0285 | N_eff min in 10.7, min out 2.1 | mass min in 4.29, max out 4.207
+   alpha_hat 10.00: band d in [3.28, 4.00] um =   7 % of the bracket | max |b_hat - b| in 0.0142, out 0.0426 | N_eff min in 5.1, min out 2.3 | mass min in 1.08, max out 2.258
+
+C5 dark thin node: true d 0.50 um, mu 4.0 /um, alpha 2.03, d_hat 0.5800 um; crossings 1; root 0.4921 um (error -0.0079 um); at the root N_eff 9.6, SE 0.1098, kernel mass 2.046 (replicates' 5th percentile 3.06); the band at this alpha starts at d = 0.67 um
+
+(527 s)

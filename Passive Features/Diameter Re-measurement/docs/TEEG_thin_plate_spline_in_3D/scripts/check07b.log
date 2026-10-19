@@ -1,0 +1,20 @@
+per-table df at the CV smoothing (tps, linear deg1, linear deg0):
+  table 0: lam [10.0, 10.0, 10.0] -> df [13.4 25.5 24.9]
+  table 1: lam [10.0, 10.0, 10.0] -> df [13.2 25.2 24.6]
+  table 2: lam [10.0, 10.0, 10.0] -> df [13.1 25.  24.3]
+  table 3: lam [10.0, 10.0, 10.0] -> df [12.9 24.7 24.1]
+  table 4: lam [10.0, 10.0, 1.0] -> df [ 12.9  24.7 112.7]
+  table 5: lam [1.0, 1.0, 1.0] -> df [ 40.2 117.5 117.3]
+  table 6: lam [10.0, 10.0, 10.0] -> df [13.  24.9 24.3]
+  table 7: lam [10.0, 10.0, 10.0] -> df [13.5 25.7 25.2]
+  table 8: lam [0.1, 1.0, 1.0] -> df [122.7 112.5 112.2]
+  table 9: lam [10.0, 10.0, 10.0] -> df [13.  24.8 24.2]
+median df: [13.2 25.1 24.7] ; mean df: [26.8 43.  51.4]
+tps medians over tables: RMS 0.0176, slope RMS 0.0445
+linear/deg1    RMS      : differences to tps [0.0008, 0.0015, 0.0007, 0.0006, 0.0018, 0.008, 0.0015, 0.0013, -0.0131, 0.0015]; tps lower in 9 of 10 tables, sign test p = 0.021; median difference +0.0014 (8 % of the tps median)
+linear/deg1    slope RMS: differences to tps [0.007, 0.004, 0.003, 0.004, 0.005, 0.038, 0.008, 0.004, -0.052, 0.006]; tps lower in 9 of 10 tables, sign test p = 0.021; median difference +0.0045 (10 % of the tps median)
+linear/deg0    RMS      : differences to tps [0.0071, 0.0058, 0.0024, 0.0094, 0.0113, 0.0067, 0.0085, 0.0087, -0.0127, 0.0095]; tps lower in 9 of 10 tables, sign test p = 0.021; median difference +0.0078 (44 % of the tps median)
+linear/deg0    slope RMS: differences to tps [0.019, 0.016, 0.015, 0.018, 0.047, 0.037, 0.019, 0.015, -0.054, 0.018]; tps lower in 9 of 10 tables, sign test p = 0.021; median difference +0.0180 (40 % of the tps median)
+tps RMS where CV chose 0.1: [0.0447]; mean of the other tables 0.0175; ratio 2.56
+table 5, thin_plate_spline refitted: RMS at lambda 0.1 / 1 / 10 = 0.0424 / 0.0241 / 0.0182; CV chose 1, its RMS is 1.32 times that at lambda 10
+table 8, thin_plate_spline refitted: RMS at lambda 0.1 / 1 / 10 = 0.0447 / 0.0212 / 0.0130; CV chose 0.1, its RMS is 3.45 times that at lambda 10

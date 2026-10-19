@@ -1,0 +1,11 @@
+check                    pass  detail
+C1 d=0.5 tau=0.03        PASS  E[d~]/d-1 = -0.00009 (MC SE 0.00014); Jensen -0.00002
+C2 d=0.5 tau=0.03        PASS  SD(d~)/d = 0.02812; tau/[b(1+beta)] = 0.02822
+C1 d=0.5 tau=0.20        PASS  E[d~]/d-1 = -0.00120 (MC SE 0.00095); Jensen -0.00083
+C2 d=0.5 tau=0.20        PASS  SD(d~)/d = 0.18905; tau/[b(1+beta)] = 0.18813  (not tested at tau 0.2)
+C1 d=1.5 tau=0.03        PASS  E[d~]/d-1 = -0.00014 (MC SE 0.00013); Jensen -0.00004
+C2 d=1.5 tau=0.03        PASS  SD(d~)/d = 0.02574; tau/[b(1+beta)] = 0.02579
+C1 d=1.5 tau=0.20        PASS  E[d~]/d-1 = -0.00208 (MC SE 0.00086); Jensen -0.00191
+C2 d=1.5 tau=0.20        PASS  SD(d~)/d = 0.17237; tau/[b(1+beta)] = 0.17195  (not tested at tau 0.2)
+C3 shortcut d=0.5        PASS  (d_s - d*)/d* = +0.01085; Eq. 21 +0.01314 (first order +0.01297); tol (b-1)^2 = 0.02500
+C3 shortcut d=1.5        PASS  (d_s - d*)/d* = -0.00447; Eq. 21 -0.00396 (first order -0.00397); tol (b-1)^2 = 0.01641

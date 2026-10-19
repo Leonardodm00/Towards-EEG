@@ -1,0 +1,7 @@
+check                                      pass   detail
+C1 isotropic c=7, s=10 vs s/c^2            PASS   max|delta| = 2.34e-13
+C2 phi-axis x10, same smoothing            PASS   max|delta| = 0.055
+C3 raw: CV smoothing, test RMS             PASS   s = 1, CV err = 0.00093, RMS vs truth = 0.0101
+C3 range-normalised: same                  PASS   s = 0.316228, CV err = 0.00092, RMS vs truth = 0.0073
+C4 CV over per-axis scales (option B)      PASS   scales (phi, ln alpha) = (0.5, 0.25), s = 0.316228, CV err = 0.00089, RMS vs truth = 0.0062
+   noise floor tau^2                       PASS   0.00090

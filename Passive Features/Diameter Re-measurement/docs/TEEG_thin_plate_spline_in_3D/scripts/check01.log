@@ -1,0 +1,18 @@
+(a)-(b) Delta^m phi away from the centre, and the point-source strength C
+  d=1  phi=|x|       m=1: Delta^m phi (r>0) = 0       C = 2        predicted 2        PASS
+  d=1  phi=|x|^3     m=2: Delta^m phi (r>0) = 0       C = 12       predicted 12       PASS
+  d=2  phi=r^2 ln r  m=2: Delta^m phi (r>0) = 0       C = 8*pi     predicted 8*pi     PASS
+  d=3  phi=r         m=2: Delta^m phi (r>0) = 0       C = -8*pi    predicted -8*pi    PASS
+  d=3  phi=r^3       m=3: Delta^m phi (r>0) = 0       C = -96*pi   predicted -96*pi   PASS
+(c) r^2 ln r on R^3
+  Delta^1 (r^2 ln r) = 6*log(r) + 5
+  Delta^2 (r^2 ln r) = 6/r**2
+  Delta^3 (r^2 ln r) = 12/r**4
+  Delta^4 (r^2 ln r) = 144/r**6
+  Delta^2 = 6/r^2 and point-source strength of Delta^2 = 0 (predicted 0) PASS
+  for contrast, 2-D: Delta^2 (r^2 ln r) = 0
+(d) regularity at the centre: limits as r -> 0+ of phi', phi'', phi'''
+  r^2 ln r  phi'(0+) = 0    phi''(0+) = -oo   phi'''(0+) = oo
+  r         phi'(0+) = 1    phi''(0+) = 0     phi'''(0+) = 0
+  r^3       phi'(0+) = 0    phi''(0+) = 0     phi'''(0+) = 6
+overall: PASS

@@ -1,0 +1,11 @@
+toy: d 0.60 um, phi 30 deg, ln alpha design range [-1.571, 0.732]; G 200000 draws x k 5; bin |ln a_hat - l| < 0.025
+formula check: truncated-normal mean vs scipy truncnorm.mean, max |diff| = 5.6e-17 (PASS)
+interior  l = -0.420: closed form b = 1.1165, b_draws = 1.1165 (gap b - b_draws +0.0000)
+   T1 all realizations   : mean y - b over  17259 rows = -0.0019 (SE 0.0015) PASS
+   T1 first realizations : mean y - b over   3507 rows = +0.0010 (SE 0.0031) PASS
+   T2 rows' draw means   : mean E[y|c_g] - b_draws        = -0.0002 (SE 0.0002) PASS
+top edge  l = 0.732: closed form b = 1.0289, b_draws = 1.1581 (gap b - b_draws -0.1293)
+   T1 all realizations   : mean y - b over   8656 rows = +0.0010 (SE 0.0014) PASS
+   T1 first realizations : mean y - b over   1687 rows = -0.0016 (SE 0.0031) PASS
+   T2 rows' draw means   : mean E[y|c_g] - b_draws        = +0.0002 (SE 0.0003) PASS
+overall: PASS

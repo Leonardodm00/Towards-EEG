@@ -1,0 +1,15 @@
+batch-0 table: N_S = 1500, CV smoothing 10; u_x = [0.537 0.333 0.304]; s_0 (order-5/2 first zero, scale-free) = 4.3250
+  local density, ball radius 0.10: 22 points -> rho = 5252 per unit volume (cube average 1500)
+  local density, ball radius 0.15: 76 points -> rho = 5376 per unit volume (cube average 1500)
+  local density, ball radius 0.20: 144 points -> rho = 4297 per unit volume (cube average 1500)
+  lambda_s = 1   : nu_c = 14.41; first zero predicted 0.300, empirical 0.299 (rel diff 0.00) PASS; negative sum -0.192
+  lambda_s = 10  : nu_c = 9.09; first zero predicted 0.476, empirical 0.463 (rel diff 0.03) PASS; negative sum -0.121
+  (rho above is the median of the three ball estimates)
+  sensitivity, rho from the ball of radius 0.10 (5252): lambda 1: predicted 0.300 (empirical 0.299, rel diff +0.00); lambda 10: predicted 0.476 (empirical 0.463, rel diff +0.03)
+  sensitivity, rho from the ball of radius 0.15 (5376): lambda 1: predicted 0.299 (empirical 0.299, rel diff -0.00); lambda 10: predicted 0.473 (empirical 0.463, rel diff +0.02)
+  sensitivity, rho from the ball of radius 0.20 (4297): lambda 1: predicted 0.312 (empirical 0.299, rel diff +0.04); lambda 10: predicted 0.495 (empirical 0.463, rel diff +0.07)
+  width ratio lambda 10 / lambda 1: predicted 1.585, empirical 1.549
+  T4 df: exponent of (df - 4) between lambda 0.1 and 1: -0.546 (continuum -0.6)
+  T4 df: exponent of (df - 4) between lambda 1 and 10: -0.586 (continuum -0.6)
+  T4 df: exponent of (df - 4) between lambda 10 and 100: -0.718 (continuum -0.6)
+overall: PASS

@@ -1,0 +1,22 @@
+(a) FT of |x|^-2 on R^3 = 2*pi**2/nu  (predicted 2 pi^2/nu) PASS
+(b) R3 r^2 ln r  derived 12*pi**2/nu**5   recalled (Wendland) 12*pi**2/nu**5   PASS
+(b) R3 -r        derived 8*pi/nu**4       recalled (Wendland) 8*pi/nu**4       PASS
+(b) R2 r^2 ln r  derived 8*pi/nu**4       recalled (Wendland) 8*pi/nu**4       PASS
+(c) trial 0 R3 r^2 ln r  c^T K c = +2.02654180   Fourier integral = +2.02654171   rel diff 4.5e-08 PASS
+(c) trial 0 R3 -r        c^T K c = +0.62149326   Fourier integral = +0.62149357   rel diff 4.9e-07 PASS
+(c) trial 0 R2 r^2 ln r  c^T K c = +0.33354711   Fourier integral = +0.33354724   rel diff 3.8e-07 PASS
+(c) trial 1 R3 r^2 ln r  c^T K c = +0.21520013   Fourier integral = +0.21520013   rel diff 2.8e-08 PASS
+(c) trial 1 R3 -r        c^T K c = +1.04197968   Fourier integral = +1.04197980   rel diff 1.1e-07 PASS
+(c) trial 1 R2 r^2 ln r  c^T K c = +1.19356511   Fourier integral = +1.19356519   rel diff 7.2e-08 PASS
+(c) trial 2 R3 r^2 ln r  c^T K c = +1.36342592   Fourier integral = +1.36342585   rel diff 5.0e-08 PASS
+(c) trial 2 R3 -r        c^T K c = +0.79839409   Fourier integral = +0.79839345   rel diff 8.1e-07 PASS
+(c) trial 2 R2 r^2 ln r  c^T K c = +0.60262065   Fourier integral = +0.60262062   rel diff 4.8e-08 PASS
+(d) only sum c = 0 (affine moments not zero): sum c_n u_n = [-0.592 -0.361 -1.798]
+    nu_min 1e-01: int S nu^-3 (r^2 ln r) = +2.8245 | int S nu^-2 (-r) = +1.096603
+    nu_min 1e-02: int S nu^-3 (r^2 ln r) = +5.6751  increment per decade 2.8506 | int S nu^-2 (-r) = +1.208016
+    nu_min 1e-03: int S nu^-3 (r^2 ln r) = +8.5260  increment per decade 2.8509 | int S nu^-2 (-r) = +1.219159
+    nu_min 1e-04: int S nu^-3 (r^2 ln r) = +11.3769  increment per decade 2.8509 | int S nu^-2 (-r) = +1.220274
+    predicted increment per decade for r^2 ln r: -(sum c c r^2 / 6) ln 10 = +2.8509
+(e) C(3, 1/2) = 2 int (1 - cos xi_1)/|xi|^4 dxi = 19.73920880 ; 2 pi^2 = 19.73920880 PASS
+    Gaussian g: LHS = 124.02510672 (4 pi^3 = 124.02510672), (2 pi)^-3 int |nu| |g_hat|^2 = 6.28318531 (2 pi = 6.28318531), ratio 19.73920880 vs 2 pi^2 19.73920880 PASS
+overall: PASS

@@ -1,0 +1,11 @@
+table 0: ln alpha span 9.42 (max tilt 89.866 deg); 1-99 percentile span / span = 0.69; rows with u3 < 0.5: 87 %
+table 1: ln alpha span 10.57 (max tilt 89.936 deg); 1-99 percentile span / span = 0.63; rows with u3 < 0.5: 92 %
+table 2: ln alpha span 11.67 (max tilt 89.998 deg); 1-99 percentile span / span = 0.61; rows with u3 < 0.5: 95 %
+table 3: ln alpha span 11.96 (max tilt 89.989 deg); 1-99 percentile span / span = 0.52; rows with u3 < 0.5: 97 %
+table 4: ln alpha span 12.47 (max tilt 89.991 deg); 1-99 percentile span / span = 0.55; rows with u3 < 0.5: 97 %
+table 5: ln alpha span 9.88 (max tilt 89.948 deg); 1-99 percentile span / span = 0.71; rows with u3 < 0.5: 91 %
+table 6: ln alpha span 11.08 (max tilt 89.985 deg); 1-99 percentile span / span = 0.57; rows with u3 < 0.5: 95 %
+table 7: ln alpha span 8.93 (max tilt 89.977 deg); 1-99 percentile span / span = 0.77; rows with u3 < 0.5: 86 %
+table 8: ln alpha span 11.97 (max tilt 89.995 deg); 1-99 percentile span / span = 0.50; rows with u3 < 0.5: 98 %
+table 9: ln alpha span 11.31 (max tilt 89.923 deg); 1-99 percentile span / span = 0.59; rows with u3 < 0.5: 95 %
+over tables: span 8.93-12.47; percentile share 0.50-0.77; rows with u3 < 0.5: 86-98 %

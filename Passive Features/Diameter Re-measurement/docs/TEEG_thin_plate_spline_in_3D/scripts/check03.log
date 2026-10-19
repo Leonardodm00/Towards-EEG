@@ -1,0 +1,7 @@
+1-D |x|  : int f'^2 = 0.9133232076   2 c^T K c = 0.9133232076   rel 1.2e-16 PASS
+1-D |x|^3: int f''^2 = 0.6093442013  12 c^T K c = 0.6093442013  rel 0.0e+00 (f'' outside the hull: 5.7e-15) PASS
+1-D |x|  : int f'^2 = 2.8002469042   2 c^T K c = 2.8002469042   rel 1.6e-16 PASS
+1-D |x|^3: int f''^2 = 0.2231229191  12 c^T K c = 0.2231229191  rel 2.5e-16 (f'' outside the hull: 3.7e-15) PASS
+2-D r^2 ln r: bending energy = 3.51098276 (near 3.390244 + far 1.21e-01)   8 pi c^T K c = 3.51098276   rel 4.8e-12 PASS
+2-D r^2 ln r: bending energy = 4.32702688 (near 4.220407 + far 1.07e-01)   8 pi c^T K c = 4.32702688   rel 5.7e-12 PASS
+overall: PASS

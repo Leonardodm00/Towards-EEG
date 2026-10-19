@@ -1,0 +1,28 @@
+table 0: thin_plate_spline/deg1 lam 10 rms 0.0198 slope 0.042 | linear/deg1 lam 10 rms 0.0206 slope 0.049 | linear/deg0 lam 10 rms 0.0269 slope 0.061
+table 1: thin_plate_spline/deg1 lam 10 rms 0.0150 slope 0.039 | linear/deg1 lam 10 rms 0.0165 slope 0.043 | linear/deg0 lam 10 rms 0.0208 slope 0.055
+table 2: thin_plate_spline/deg1 lam 10 rms 0.0173 slope 0.045 | linear/deg1 lam 10 rms 0.0180 slope 0.048 | linear/deg0 lam 10 rms 0.0197 slope 0.060
+table 3: thin_plate_spline/deg1 lam 10 rms 0.0202 slope 0.047 | linear/deg1 lam 10 rms 0.0208 slope 0.051 | linear/deg0 lam 10 rms 0.0296 slope 0.065
+table 4: thin_plate_spline/deg1 lam 10 rms 0.0131 slope 0.036 | linear/deg1 lam 10 rms 0.0149 slope 0.041 | linear/deg0 lam 1 rms 0.0244 slope 0.083
+table 5: thin_plate_spline/deg1 lam 1 rms 0.0241 slope 0.043 | linear/deg1 lam 1 rms 0.0321 slope 0.081 | linear/deg0 lam 1 rms 0.0308 slope 0.080
+table 6: thin_plate_spline/deg1 lam 10 rms 0.0145 slope 0.044 | linear/deg1 lam 10 rms 0.0160 slope 0.052 | linear/deg0 lam 10 rms 0.0230 slope 0.063
+table 7: thin_plate_spline/deg1 lam 10 rms 0.0152 slope 0.052 | linear/deg1 lam 10 rms 0.0165 slope 0.056 | linear/deg0 lam 10 rms 0.0239 slope 0.067
+table 8: thin_plate_spline/deg1 lam 0.1 rms 0.0447 slope 0.153 | linear/deg1 lam 1 rms 0.0316 slope 0.101 | linear/deg0 lam 1 rms 0.0320 slope 0.099
+table 9: thin_plate_spline/deg1 lam 10 rms 0.0179 slope 0.054 | linear/deg1 lam 10 rms 0.0194 slope 0.060 | linear/deg0 lam 10 rms 0.0274 slope 0.072
+
+mean over 10 tables (SE):
+  thin_plate_spline/deg1 lambda [0.1, 1.0, 10.0] | df 26.8 | RMS all 0.0202 (0.0029) thin 0.0316 thick 0.0065 | slope RMS 0.055 (0.011) thick 0.0154
+  linear/deg1            lambda [1.0, 10.0] | df 43.0 | RMS all 0.0206 (0.0020) thin 0.0324 thick 0.0068 | slope RMS 0.058 (0.006) thick 0.0199
+  linear/deg0            lambda [1.0, 10.0] | df 51.4 | RMS all 0.0258 (0.0013) thin 0.0384 thick 0.0127 | slope RMS 0.071 (0.004) thick 0.0148
+paired difference to thin_plate_spline (mean, SE):
+  linear/deg1            rms              +0.0004 (0.0017)
+  linear/deg1            rms_thick        +0.0002 (0.0001)
+  linear/deg1            slope_rms        +0.0028 (0.0069)
+  linear/deg1            slope_rms_thick  +0.0046 (0.0005)
+  linear/deg0            rms              +0.0057 (0.0022)
+  linear/deg0            rms_thick        +0.0061 (0.0017)
+  linear/deg0            slope_rms        +0.0152 (0.0083)
+  linear/deg0            slope_rms_thick  -0.0006 (0.0016)
+
+real	10m16.040s
+user	19m14.278s
+sys	0m4.463s
