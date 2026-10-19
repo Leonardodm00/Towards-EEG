@@ -2,6 +2,7 @@
 
 | Date | Change |
 |---|---|
+| 2026-10-19 (later) | Pushed as `6a8dbf4` on `sci/diameter-pipeline` with `checks/table_2026-10-18/` and `docs/TEEG_thin_plate_spline_in_3D/` at the user's agreement; a fresh clone of the pushed branch has the tree of the tested working copy, pure-ASCII `.py`, LF shell and PBS files, a clean `compileall`, the two hashes of §1 and `test_smoke_config` 6 pass 1 skip **[run, sandbox]**. The clone URL of §1 corrected to the repository's current name, `Towards-EEG` (the push reported that the lowercase name moved); §1's head and §2's repository row updated. |
 | 2026-10-19 | Created at the close of the table chat (2026-10-16 to 2026-10-19), for the chat that implements Blocks 13-14. As the statement of the current state it supersedes §1, §2, §5, §7, §8, §10 and §11 of `TEEG_diameter_correction_table_handoff_2026-10-16.md`; that file's §3 (the estimator in full notation, (H1)-(H6)), §4 (the evidence behind D-052), §6 (where the node's radius enters) and §9 (the files of `checks/estimator_2026-10-15/`) stay the reference, and the parts of its superseded sections cited below (the gate commands of its §8.4, the real-data check at the end of its §7, the references of its §10) stay valid as cited. Code facts read on `sci/diameter-pipeline` at `d643aaf` **[src]**; the 24 smoke suites run there on 2026-10-19 **[run, sandbox]**; the numbers of §5 and §8 re-read from the logs of the table chat's checks; seven of the checks re-run from their copies in `checks/table_2026-10-18/` the same day: three reproduced their logs byte for byte, three agree with the numbers recorded before (the two scaling checks with D-054's Why, the quadrature check with SPEC Block 12's status), and `check_inverse_vs_classical.py` had no earlier record **[run, sandbox]**; decisions read from the log the same day, unchanged since the table chat's last write (2026-10-18, row "(later, 6)") **[KB]**. Fact-checked the same day by an independent agent against the code, SPEC, the log and the check logs; its corrections are in (the SPEC §8 bullets to read, the range-setting draw of $\ln\hat\alpha$, the plane counts of today's provider call, the diagnostics and flags Block 13 changes (§5.1 (c), (d)), the PROVISIONAL iteration settings, the full list of the $\sigma_{\rm fit}$ study's code, the B/B2 tolerances, the classical inverse's scope, a `bbar_few` row's fit, Block 10's dark nodes, D-020's `main`, the tags of SPEC claims, the notation clashes). |
 
 Basis tags: **[src]** read in the named file at `d643aaf`; **[run, sandbox]**
@@ -39,10 +40,11 @@ through gate 2 and onto davinci.
 2. Get the branch (in an existing clone, `git pull --ff-only` instead):
 
    ```
-   cd /home/claude && git clone https://github.com/Leonardodm00/towards-eeg.git towards-eeg && cd towards-eeg && git checkout sci/diameter-pipeline && git log --oneline -3
+   cd /home/claude && git clone https://github.com/Leonardodm00/Towards-EEG.git towards-eeg && cd towards-eeg && git checkout sci/diameter-pipeline && git log --oneline -3
    ```
 
-   Head: `d643aaf`, plus the commit carrying this file and `checks/table_2026-10-18/` if the user agreed to push them.
+   Head: `6a8dbf4` (the commit that added this file, `checks/table_2026-10-18/` and the thin-plate document on top of
+   `d643aaf`) or the later one that corrected this file, or newer.
 3. Run every suite once before changing anything, and print the hashes:
 
    ```
@@ -61,7 +63,7 @@ through gate 2 and onto davinci.
 
 | What | Where | Note |
 |---|---|---|
-| Repository | `Leonardodm00/towards-eeg`, branch `sci/diameter-pipeline` | head `d643aaf`, equal to `origin` (`git ls-remote`, 2026-10-19) **[run]** |
+| Repository | `Leonardodm00/Towards-EEG`, branch `sci/diameter-pipeline` (the lowercase URL `.../towards-eeg` redirects: GitHub reports the repository moved) | code at `d643aaf`, equal to `origin` before this handoff's commit `6a8dbf4` (`git ls-remote`, 2026-10-19), which changed no code **[run]** |
 | Workstream | `Passive Features/Diameter Re-measurement/` | `src/allen_diameter/`, `scripts/`, `tests/smoke/`, `configs/gate2_reduced.json`, `docs/`, `checks/`, `notebooks/` |
 | Spec | `specs/SPEC.md` (repository root) | §2.4 table and correction; §4 the binding decisions to D-060 and the ID note; Block 6 = phantoms and table, Block 7 = inversion, flags, fill, Block 12 = the SGT fit; §8 open questions, the first four (l. 611-620) raised by the table chat |
 | Decision log | project knowledge, `TEEG_decisions_and_ideas_log.md` | D-001 to D-060; next free D-061, I-003 (2026-10-19) **[KB]** |
