@@ -1,4 +1,4 @@
-# SPEC -- Ih Fit / Stage-7 per-cell noise-law fit (D-017, D-048 to D-056)
+# SPEC -- Ih Fit / Stage-7 per-cell noise-law fit (D-017, D-034, D-048 to D-056)
 
 Single source of truth for what the noise-fit code of `Passive Features/HPC
 script/Ih Fit/` must do. The code follows this file; when the two disagree,
@@ -30,7 +30,8 @@ Paths this spec covers (relative to `Passive Features/HPC script/Ih Fit/`):
   `_estimator_band`, `_acf_gap_band` of `smoke_ih_recovery.py` (Block 1)
 - `noise_calibration.lag_autocorr` (Block 1); the rest of
   `noise_calibration.py` is NOT yet covered
-- (to be added block by block) `noise_law.py`, `noise_windows.py`,
+- `noise_law.py`, `smoke_noise_law.py` (Block 2)
+- (to be added block by block) `noise_windows.py`,
   `noise_fit.py`, `run_noise_fit.py`, `smoke_noise_fit.py`, the `sens_*.py`
   scripts, the OU term of `synthetic_ground_truth.add_recording_noise`
 
@@ -131,8 +132,13 @@ Jacobian, three starts (closed form; tau_s/2; 2 tau_s), lowest J kept.
 
 V_hat_c(h) = half the mean squared difference of two enlarged-window means h
 apart in one sweep, same polarity (computed level); V(h | theta, 0) the same
-quantity under the stationary part of (L1) (closed form, topic doc eq. 25);
-h* = 0.8 s PROVISIONAL (D-051). Alternated with theta_hat at every iteration.
+quantity under the stationary part of (L1), computed EXACTLY for the sampled
+law (`noise_law.semivariogram`: (1/2)[Var(x_bar_1) + Var(x_bar_2) - 2 Cov]
+with (7a)-type sums over the sample pairs of the two windows; topic doc eq.
+(25) is its continuous-time form, kept as `semivariogram_continuous` for the
+tests, equal to it within O(Delta_t/tau_s) for the slow component -- Block 2
+refinement, no decision changed); h* = 0.8 s PROVISIONAL (D-051). Alternated
+with theta_hat at every iteration.
 
 ### Notation
 
@@ -147,7 +153,11 @@ h* = 0.8 s PROVISIONAL (D-051). Alternated with theta_hat at every iteration.
 | L | lag | int in [1, n-1] | samples |
 | sigma_hat, rho_hat(L) | window SD (ddof 1); textbook autocorrelation | float | mV; -- |
 | rho_adj(L) | the pre-D-028 estimator (test oracle only) | float | -- |
-| theta | (sigma_f, rho_f, sigma_s, tau_s) | float[4] | mV, --, mV, s |
+| theta | (sigma_f, rho_f, sigma_s, tau_s); `noise_law.NoiseLaw` | float[4] | mV, --, mV, s |
+| xi | unit (standard-normal) draws of the simulator: fast, slow (n_traces, n); tilt, offset (n_traces,); `noise_law.UnitDraws` | float arrays | -- |
+| E[S_0 \| theta, n], E[S_L \| theta, n], Var(x_bar \| theta, n) | closed-form moments of a demeaned window, topic doc (7a), (7b), (9) | float | mV^2 |
+| q_cf_m(theta \| n_m) | closed-form statistic: sqrt(E[S_0]/(n-1)) for an SD, E[S_L]/E[S_0] for an autocorrelation (eq. 10); the fit's starting point only | float | mV; -- |
+| V(h \| theta, sigma_b) | semivariogram of two window means h apart in one trace (T1) | float | mV^2 |
 | gamma(k \| theta) | autocovariance (L3) | float | mV^2 |
 | a, b, sigma_b(c) | per-sweep offset, tilt, the tilt's SD | float | mV, mV/s, mV/s |
 | q_hat(c), q_sim(theta), q_m(theta \| n_m) | the cell's statistic vector; its model estimate; the analytic single-window median | float[d]; float[d]; float | mixed |
@@ -190,11 +200,26 @@ h* = 0.8 s PROVISIONAL (D-051). Alternated with theta_hat at every iteration.
 - Confirmed: yes, 2026-10-07 (D-028, D-029 by the user) and 2026-10-16 (never applied: ships here).
 - Status: smoke-tested 2026-10-18 (sandbox: N1-N6 6/6, mutation-tested; `smoke_ls_baseline_qc` 10/10, `smoke_ih_fit` 12/12, `smoke_ih_recovery` 14/14; skipped: `regression_passive_identity.py`, oracle folder and archive on the cluster).
 
+### Block 2: the noise law -- simulator from unit draws and closed-form moments (D-017, D-034, D-056 (i))
+
+- Module: `noise_law.py` (model layer: no I/O, no plotting, no module-level RNG); smoke `smoke_noise_law.py`.
+- Public API: `NoiseLaw(sigma_f, rho_f, sigma_s, tau_s)` (frozen dataclass; `validate` in `__post_init__`; `as_array`/`from_array`; `rho_s(dt)`, `tau_f(dt)`); `autocovariance(law, dt, lags) -> float[len(lags)]` (L3); `draw_units(rng, n_traces, n_samples) -> UnitDraws` (fast, slow (n_traces, n); tilt, offset (n_traces,); drawn in that fixed order); `simulate_traces(law, dt, xi_fast, xi_slow, *, xi_tilt=None, sigma_b=0.0, xi_offset=None, sigma_a=0.0) -> float64[n_traces, n]` (L1)-(L2); `simulate_sweep(law, dt, n_samples, units, index, *, sigma_b, sigma_a) -> float64[n]` (one continuous trace, D-056 (i)); `var_window_mean(law, dt, n)` (7a); `expected_s0(law, dt, n)` (7b); `expected_sl(law, dt, n, lags)` (9); `closed_form_sd(law, dt, n)`; `closed_form_acf(law, dt, n, lags)` (10); `visible_share(z)` (8); `window_mean_cov(law, dt, n1, n2, offset)`; `semivariogram(law, dt, n1, n2, offset, sigma_b=0.0)` (T1's V, exact for the sampled law); `semivariogram_continuous(law, dt, T1, T2, h, sigma_b=0.0)` (topic doc eq. 25 as written; oracle).
+- Inputs: theta in mV, --, mV, s with rho_f the lag-1 coefficient AT the `dt` passed (D-014; the transfer between sampling rates, D-017 (f), is not done here); dt in s; unit draws float (n_traces, n >= 2); sigma_b in mV/s, sigma_a in mV; lags and offsets in samples.
+- Outputs: traces in mV, float64, (n_traces, n); each recursion started in its stationary law (e_0 = sigma xi_0); the tilt of trace r is sigma_b xi_tilt[r] (t_j - t_bar), t_bar = (n-1) dt / 2 the trace's own mid-time, so it sums to zero over the trace (any constant is invisible to every demeaned statistic and to the within-trace semivariogram); moments in mV^2; `expected_sl`/`closed_form_acf` NaN outside 1 <= L <= n-1.
+- Parameters: none (no knob; sizes come from the caller's config, Block 4).
+- Library calls relied on: `scipy.signal.lfilter([1], [1, -rho], eta, axis=-1)` for both AR(1) recursions; `numpy.expm1` for 1 - rho_s^2 and z - 1 + e^{-z}.
+- Custom code (marked `# Custom:` at the definition): the exact first moments (7a), (7b), (9) of a demeaned window (zeta_j from the cumulative sum of gamma, O(n)); the window-mean covariance by lag counts over sample pairs (O(n1 + n2)). No library computes either.
+- Test oracles (`smoke_noise_law.py`, M1-M9): M1 brute force -- (7a), (7b), (9) against the full n x n covariance matrix (E[S_L] = sum_j (P Gamma P)_{j,j+L}) at n = 240, 5 lags, 3 laws, 1e-10 relative; M2 Monte Carlo (4000 traces x 2000 samples, cohort law) -- mean S_0, S_1, S_50 and the across-trace autocovariance at lags 0, 1, 50 within 3.5 SE of the closed forms; M3 stationarity -- first- and last-sample variance equal gamma(0) within 3.5 SE; M4 window means -- `window_mean_cov` equals brute force (1e-10; overlapping, disjoint, negative offset), the Monte Carlo covariance of two 190 ms means 200 ms apart within 3.5 SE, exact-discrete V against eq. (25) within 3 dt/tau_s (slow-only law); M5 tilt -- Monte Carlo V equals V(h|theta,0) + sigma_b^2 h^2/2 within 3.5 SE, the tilt sums to 0; M6 contract -- shapes, float64, finite, bit-identical on the same draws, different on others, `simulate_sweep` == a row of `simulate_traces`, six invalid laws refused, draw order fixed; M7 visible share -- E[S_0]/(n gamma(0)) equals v(z) within 2z/n at z in {0.25, 1.26, 6.67}; M8 regression -- q_cf at theta_cf = (0.0380 mV, 0.175, 0.0508 mV, 36.6 ms) reproduces the 14 q^cf values of topic doc 3.5.3 within 3e-4 mV and 3e-3; M9 ASCII/LF. Mutation-tested 2026-10-19: a non-stationary start (M2, M3 fail), the Var term dropped from (9) (M1, M2, M8), an uncentred tilt (M5), 1 - rho_s in place of 1 - rho_s^2 (M2, M4, M5), an off-by-one pair count (M4 brute force) each FAIL.
+- Data flow: consumed by Block 3 (`noise_windows` cuts the enlarged SS and LS windows from traces of this simulator at the real sweep structure), Block 4 (`noise_fit`: binding function and Sigma_hat from `simulate_traces` on frozen `UnitDraws`; `closed_form_sd`/`closed_form_acf` for the start; `semivariogram` for (T1)), Block 5 (the generator's OU term through the same simulator).
+- Confirmed: yes -- D-017, D-034, D-056 (i) (user); the exact-discrete V in place of eq. (25)'s continuous form is the assistant's refinement, recorded in 2.4 and in the decision log's changelog (2026-10-19).
+- Status: smoke-tested 2026-10-19 (sandbox: M1-M9 9/9, about 5 s; mutation-tested as above).
+
 ## 6. Pipeline entry points
 
 | Command | Purpose | Minimal configuration for testing | Expected runtime |
 |---|---|---|---|
 | `python smoke_noise_stats.py` | Block 1 smoke (N1-N6) | none | seconds |
+| `python smoke_noise_law.py` | Block 2 smoke (M1-M9) | none | about 5 s |
 | `python smoke_ih_recovery.py`, `python smoke_ih_fit.py`, `python smoke_ls_baseline_qc.py` | existing suites, re-run after Block 1 (R8/R10 bands now through `sample_acf`) | NEURON + compiled `mod/` | minutes |
 | `python regression_passive_identity.py --ref-dir "../Biological Fit" --archive-cell <dir>` | bit-for-bit gate against the oracle folder | the oracle folder and one archive cell | minutes |
 

@@ -20,6 +20,8 @@ Files that are NEW relative to `Biological Fit/` (Stage 0-1):
 | `synth_gt_grid.py` | the synthetic cohort's manifest: per-cell ground truth, incl. the two fitted kinetic knobs, the false-positive control, and each cell's per-sweep noise (sigma, rho) inherited from the real cell whose morphology it borrows |
 | `noise_stats.py` | `sample_acf`: the ONE autocorrelation estimator of this folder -- the textbook sample autocorrelation through `statsmodels.tsa.stattools.acf(adjusted=False)` (D-028, D-029); NaN with fewer than 10 lag products, for a flat or non-finite window. Needs `statsmodels` (>= 0.12) in the env |
 | `smoke_noise_stats.py` | its smoke suite N1-N6 (seconds; no NEURON) |
+| `noise_law.py` | the Stage-7 noise law (D-017, D-034): `NoiseLaw`, the simulator from unit draws (`draw_units`, `simulate_traces`, `simulate_sweep`; one continuous trace per sweep, D-056 (i)), the closed-form moments of a demeaned window (`expected_s0`, `expected_sl`, `closed_form_sd`, `closed_form_acf`, `visible_share`) and the window-mean semivariogram (`semivariogram`, exact for the sampled law). Model layer only; Block 2 of `specs/SPEC.md` |
+| `smoke_noise_law.py` | its smoke suite M1-M9 (about 5 s; no NEURON) |
 | `noise_calibration.py` | per-sweep recording noise of REAL archive cells (sigma, lag-1 rho, sampling rate, pulses per polarity, window length), read with the fitter's own estimator on single sweeps only; every autocorrelation through `noise_stats.sample_acf`. Stand-alone: `python noise_calibration.py --group-dir <ARCHIVE_ROOT>/L3_exc --out noise_table.csv` |
 | `gen_from_manifest.py` | manifest row -> Phase-0 archive (pure mapping + a NEURON-side generator) |
 | `ih_recovery_report.py` | **pure**: truth vs estimate, the recovery table, the C_m inflation, the false-positive table, the gate |
@@ -75,6 +77,7 @@ is taken from `$PBS_O_WORKDIR`: its path contains a space.
     python -c "import statsmodels; print(statsmodels.__version__)"
     nrnivmodl mod                          # once per architecture; creates x86_64/
     python smoke_noise_stats.py            # expect "SMOKE noise_stats: 6/6 passed"
+    python smoke_noise_law.py              # expect "SMOKE noise_law: 9/9 passed"
     python smoke_ih_fit.py                 # expect "smoke_ih_fit: 12/12 passed"
     python smoke_ih_recovery.py            # expect "smoke_ih_recovery: 14/14 passed"
     python regression_passive_identity.py --ref-dir "../Biological Fit" \
