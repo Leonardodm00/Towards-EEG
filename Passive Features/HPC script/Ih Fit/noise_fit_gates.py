@@ -43,7 +43,8 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 # Shortest overlap accepted as adjacency (samples): at 50 kHz 2 ms; the
-# writer's (-10, +200) ms windows 200 ms apart overlap by 500 samples there.
+# writer's (-10, +200) ms windows overlap by 475 samples there, their onsets
+# being 200.5 ms apart in the archive's SS sweeps (G12 on the cluster, 2026-10-20).
 MIN_OVERLAP = 100
 
 
