@@ -27,6 +27,7 @@ import numpy as np
 from ..loading import swc_io
 from . import fill, invert
 from .node_pipeline import Branch, measure_node
+from .plane_iteration import Scene
 
 
 def stretches(swc, types=(3, 4)):
@@ -58,6 +59,30 @@ def to_image_um(xyz_swc, res0_um, shift_full_px=(0.0, 0.0), flip_y_full_h=None, 
         y = flip_y_full_h - y
     y = y + shift_full_px[1]
     return np.column_stack([x * p, y * p, P[:, 2] - z0_um])
+
+
+def cell_scene(swc, types, res0_um, transform=None):
+    """The scene of a cell (Block 13.2, D-064): every SWC segment whose child
+    is a dendrite node of `types` -- its parent end and child end in the image
+    frame (to_image_um with the transform), Allen's radii r0, r1 at the two
+    ends (r0 = r1 when the parent is not a dendrite node, so the soma's radius
+    is not a neurite's), the child's and the parent's ids -- and the soma discs
+    (the type-1 nodes' x, y and radius). The rule of survey.node_planes'
+    segments, which calls it through plane_iteration.scene_segments."""
+    xyz_img = to_image_um(swc.xyz, res0_um, **(transform or {}))
+    pidx = swc.parent_index()
+    dend = swc.dendrite_mask(types)
+    child = np.flatnonzero(dend & (pidx >= 0))
+    par = pidx[child]
+    r1 = np.asarray(swc.radius[child], dtype=float)
+    r0 = np.where(dend[par], np.asarray(swc.radius[par], dtype=float), r1)
+    som = np.asarray(swc.types) == 1
+    soma = (np.column_stack([xyz_img[som][:, :2], np.asarray(swc.radius, dtype=float)[som]]) if som.any()
+            else np.empty((0, 3)))
+    if not child.size:
+        return Scene(np.empty((0, 6)), np.empty((0, 2)), np.empty((0, 2), dtype=np.int64), soma)
+    return Scene(np.column_stack([xyz_img[par], xyz_img[child]]), np.column_stack([r0, r1]),
+                 np.column_stack([np.asarray(swc.ids)[child], np.asarray(swc.ids)[par]]).astype(np.int64), soma)
 
 
 def stretch_branch(swc, rows, xyz_img):

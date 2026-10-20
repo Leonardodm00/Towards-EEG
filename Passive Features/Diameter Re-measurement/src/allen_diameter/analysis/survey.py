@@ -36,7 +36,7 @@ from typing import Dict, List
 
 import numpy as np
 
-from . import background, calibration, camera_fit, cell, phantoms, profiles
+from . import background, calibration, camera_fit, cell, phantoms, plane_iteration, profiles
 from .node_pipeline import measure_node
 from ..loading import swc_io
 from ..model import tube_model
@@ -175,6 +175,9 @@ def node_planes(swc, provider, cfg, node_id, transform=None):
                                r1 when the parent is not a dendrite node (the
                                soma's radius is not a neurite's); in_stretch, 1.0
                                when both ends belong to the Branch, else 0.0
+                               (plane_iteration.scene_segments of scene)
+      scene                    the cell's plane_iteration.Scene (cell.cell_scene;
+                               Block 13.2: the iteration's background masks it)
     """
     types = cfg.acquisition.dendrite_swc_types
     xyz_img = cell.to_image_um(swc.xyz, cfg.acquisition.res0_um, **(transform or {}))
@@ -196,23 +199,11 @@ def node_planes(swc, provider, cfg, node_id, transform=None):
         return got[-1]
     result = measure_node(branch, index, recording, cfg)
     block, ks, valid, frame = got[0]
-    pidx = swc.parent_index()
-    child = np.flatnonzero(swc.dendrite_mask(types) & (pidx >= 0))
-    par = pidx[child]
-    a, b = xyz_img[par], xyz_img[child]
-    p = float(frame.res_um_px)
-    x_lo, x_hi = (frame.left - 0.5) * p, (frame.left + block.shape[2] - 0.5) * p
-    y_lo, y_hi = (frame.top - 0.5) * p, (frame.top + block.shape[1] - 0.5) * p
-    meets = ((np.maximum(a[:, 0], b[:, 0]) >= x_lo) & (np.minimum(a[:, 0], b[:, 0]) <= x_hi)
-             & (np.maximum(a[:, 1], b[:, 1]) >= y_lo) & (np.minimum(a[:, 1], b[:, 1]) <= y_hi))
-    in_branch = {int(x) for x in branch.ids}
-    own = np.array([float(int(swc.ids[c]) in in_branch and int(swc.ids[q]) in in_branch) for c, q in zip(child, par)])
-    r1 = np.asarray(swc.radius[child], dtype=float)
-    r0 = np.where(swc.dendrite_mask(types)[par], np.asarray(swc.radius[par], dtype=float), r1)
-    segments = np.column_stack([a, b, r0, r1, own])[meets] if child.size else np.empty((0, 9))
+    scene = cell.cell_scene(swc, types, cfg.acquisition.res0_um, transform)          # Block 13.2: one rule
+    segments = plane_iteration.scene_segments(scene, frame, block.shape[1:], branch)
     return dict(result=result, branch=branch, index=index, block=block, ks=ks, valid=valid, frame=frame,
                 k_swc=int(round(float(branch.xyz_um[index, 2]) / cfg.acquisition.dz_um)),
-                allen_radius_um=float(branch.radius_um[index]), segments=segments)
+                allen_radius_um=float(branch.radius_um[index]), segments=segments, scene=scene)
 
 
 def background_stats(provider, result, branch, cfg):

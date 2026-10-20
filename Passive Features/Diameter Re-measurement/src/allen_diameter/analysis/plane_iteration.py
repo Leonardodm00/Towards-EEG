@@ -19,11 +19,17 @@ and the fit made there is reused; else d_i is the fit at k_i (fit_at; by
 default refit_at_plane, Block 5's Gaussian fit with every other input the
 pilot's: the diagnostics' fit). Other endings: ITER_STATUSES.
 
-The functions read a state dict st (built by scripts/plane_differences.
-node_stack): stack, ks, valid, frame (the square about the node), o (the SWC
-node's xy, um), theta (the pilot's heading), block, block_frame (the pilot's
-block over the same planes), segments (n, 9), soma (m, 3), square_half_um,
-allen_radius_um, result (the pilot's NodeResult), branch.
+The functions read a state dict st (iteration_state, Block 13.2; built by
+scripts/plane_differences.node_stack for the diagnostics and by measure_node
+for the measurement): stack, ks, valid, frame (the square about the node), o
+(the SWC node's xy, um), theta (the pilot's heading), block, block_frame (the
+pilot's block over the same planes), segments (n, 9), soma (m, 3),
+square_half_um, allen_radius_um, result (the pilot's: cx_um, cy_um, theta_rad,
+phi_rad), branch.
+
+Block 13.2 adds the scene the background masks (Scene, scene_segments;
+D-064) and the square about the node (cut_square), the rules that
+survey.node_planes and node_stack used, now shared with the measurement.
 
 Pure ASCII, for the cluster (hpc-python-compat).
 """
@@ -31,6 +37,7 @@ from __future__ import annotations
 
 import dataclasses
 import math
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -292,3 +299,120 @@ def gradient_iteration(st, cfg, d_start_um=None, line_mult=ITER_LINE_MULT, max_r
     res.update(background=B, bg_frac=bg_frac, bg_margin_used=margin_used, st=box["st"],
                n_restacks=box["n_restacks"], d_start_um=d0)
     return res
+
+
+# ------------------------------------------------------------------------------------------------ Block 13.2 ---
+# the scene the iteration's background masks (D-064), and the square about the node (node_stack's rule), shared by
+# the diagnostics (scripts/plane_differences.node_stack, survey.node_planes) and the measurement (measure_node)
+
+@dataclass(frozen=True)
+class Scene:
+    """The traced structures the iteration's background B_k masks (D-064).
+
+    seg_xyz (n, 6) float, um: each segment's parent end x0, y0, z0 and child
+    end x1, y1, z1 in the image frame of the Branch; seg_radius (n, 2) float,
+    um: Allen's radii r0, r1 at the parent and child ends (r0 = r1 when the
+    parent is not a dendrite node: the soma's radius is not a neurite's);
+    seg_ids (n, 2) int: the child's and the parent's node id; soma (m, 3)
+    float, um: the soma discs x, y, r. Built from an SWC by
+    analysis.cell.cell_scene (real data), or from a Branch by from_branch (its
+    consecutive nodes, no soma: a phantom's own tube, and what a missing scene
+    means). ValueError for inconsistent shapes or non-finite entries."""
+
+    seg_xyz: np.ndarray
+    seg_radius: np.ndarray
+    seg_ids: np.ndarray
+    soma: np.ndarray
+
+    def __post_init__(self):
+        n = int(np.shape(self.seg_xyz)[0]) if np.ndim(self.seg_xyz) == 2 else -1
+        if n < 0 or np.shape(self.seg_xyz) != (n, 6) or np.shape(self.seg_radius) != (n, 2) \
+                or np.shape(self.seg_ids) != (n, 2) or np.ndim(self.soma) != 2 or np.shape(self.soma)[1] != 3:
+            raise ValueError("Scene: seg_xyz (n, 6), seg_radius (n, 2), seg_ids (n, 2) and soma (m, 3) must agree")
+        if not (np.all(np.isfinite(self.seg_xyz)) and np.all(np.isfinite(self.seg_radius))
+                and np.all(np.isfinite(self.soma))):
+            raise ValueError("Scene: coordinates and radii must be finite")
+
+    @staticmethod
+    def from_branch(branch):
+        """The scene of a lone branch: one segment per pair of consecutive nodes (parent = the proximal one), the
+        branch's radii, no soma."""
+        xyz = np.asarray(branch.xyz_um, dtype=float)
+        r = np.asarray(branch.radius_um, dtype=float)
+        ids = np.asarray(branch.ids)
+        return Scene(np.column_stack([xyz[:-1], xyz[1:]]), np.column_stack([r[:-1], r[1:]]),
+                     np.column_stack([ids[1:], ids[:-1]]).astype(np.int64), np.empty((0, 3)))
+
+
+def scene_segments(scene, frame, shape, branch):
+    """The segment rows of survey.node_planes for a block: (n', 9) float64,
+    one row per segment of the scene whose xy bounding box meets the block
+    [(left - 1/2) p, (left + W - 1/2) p] x [(top - 1/2) p, (top + H - 1/2) p]
+    (frame: the block's CropFrame, p = frame.res_um_px; shape: (H, W)), in the
+    scene's order: x0, y0, z0, x1, y1, z1, r0, r1, in_stretch (1.0 when both
+    ends' ids are among branch.ids)."""
+    H, W = int(shape[0]), int(shape[1])
+    if scene.seg_xyz.shape[0] == 0:
+        return np.empty((0, 9))
+    p = float(frame.res_um_px)
+    a, b = scene.seg_xyz[:, :3], scene.seg_xyz[:, 3:]
+    x_lo, x_hi = (frame.left - 0.5) * p, (frame.left + W - 0.5) * p
+    y_lo, y_hi = (frame.top - 0.5) * p, (frame.top + H - 0.5) * p
+    meets = ((np.maximum(a[:, 0], b[:, 0]) >= x_lo) & (np.minimum(a[:, 0], b[:, 0]) <= x_hi)
+             & (np.maximum(a[:, 1], b[:, 1]) >= y_lo) & (np.minimum(a[:, 1], b[:, 1]) <= y_hi))
+    in_branch = {int(x) for x in branch.ids}
+    own = np.array([float(int(c) in in_branch and int(q) in in_branch) for c, q in scene.seg_ids])
+    return np.column_stack([a, b, scene.seg_radius[:, 0], scene.seg_radius[:, 1], own])[meets]
+
+
+def cut_square(block, ks, valid, frame, o, half_um, provider, label="node"):
+    """The square +-half_um about o (um, xy) over the block's planes, by
+    node_stack's rule: columns c0 = ceil((o_x - h)/p - left), c1 =
+    floor((o_x + h)/p - left) + 1, rows likewise; cut from the block when
+    0 <= c0, 0 <= r0, c1 <= W and r1 <= H, else requested from
+    provider(left + c0, top + r0, c1 - c0, r1 - r0, ks[0], ks[-1]) and its
+    valid ANDed with the block's. Returns (stack (n, h, w) float64, valid (n,)
+    bool, the square's CropFrame, fetched). ValueError below 2 x 2 pixels, or
+    when the provider returns other planes (label prefixes the messages)."""
+    from allen_image_io import CropFrame
+    H, W = np.shape(block)[1:]
+    p = float(frame.res_um_px)
+    half = float(half_um)
+    c0 = int(math.ceil((o[0] - half) / p - frame.left))
+    c1 = int(math.floor((o[0] + half) / p - frame.left)) + 1
+    r0 = int(math.ceil((o[1] - half) / p - frame.top))
+    r1 = int(math.floor((o[1] + half) / p - frame.top)) + 1
+    if c1 - c0 < 2 or r1 - r0 < 2:
+        raise ValueError("%s: the square +-%g um about the node holds fewer than 2 x 2 pixels" % (label, half))
+    fetched = not (c0 >= 0 and r0 >= 0 and c1 <= W and r1 <= H)
+    valid = np.asarray(valid, dtype=bool)
+    if fetched:
+        square, ks_sq, valid_sq, _ = provider(int(frame.left + c0), int(frame.top + r0), c1 - c0, r1 - r0,
+                                              int(ks[0]), int(ks[-1]))
+        if not np.array_equal(np.asarray(ks_sq), np.asarray(ks)):
+            raise ValueError("%s: the square's planes differ from the block's" % label)
+        stack = np.asarray(square, dtype=float)
+        valid = valid & np.asarray(valid_sq, dtype=bool)
+    else:
+        stack = np.asarray(block[:, r0:r1, c0:c1], dtype=float)
+    return stack, valid, CropFrame(int(frame.left + c0), int(frame.top + r0), 0, p), bool(fetched)
+
+
+def iteration_state(block, ks, valid, frame, branch, index, theta, result, segments, soma, half_um, provider,
+                    k_swc, label="node"):
+    """The state dict the functions of this module read, for node `index`
+    of branch: the square +-half_um about the SWC node (cut_square), the
+    block over the same planes (block, ks, valid, frame: the fetch_zblock
+    contract), the heading theta (rad), result (the pilot's: cx_um, cy_um,
+    theta_rad, phi_rad are read by refit_at_plane), segments (n, 9) and soma
+    (m, 3) for block_background, k_swc (the SWC node's plane). Keys: stack,
+    ks, valid, frame, o, theta, result, block, block_frame, segments, soma,
+    square_half_um, square_fetched, allen_radius_um (branch.radius_um[index]),
+    branch, index, k_swc."""
+    o = np.asarray(branch.xyz_um[int(index), :2], dtype=float)
+    stack, valid_sq, sub, fetched = cut_square(block, ks, valid, frame, o, half_um, provider, label)
+    return dict(stack=stack, ks=np.asarray(ks), valid=valid_sq, frame=sub, o=o, theta=float(theta), result=result,
+                block=np.asarray(block, dtype=float), block_frame=frame, segments=np.asarray(segments, dtype=float),
+                soma=np.asarray(soma, dtype=float), square_half_um=float(half_um), square_fetched=fetched,
+                allen_radius_um=float(branch.radius_um[int(index)]), branch=branch, index=int(index),
+                k_swc=int(k_swc))

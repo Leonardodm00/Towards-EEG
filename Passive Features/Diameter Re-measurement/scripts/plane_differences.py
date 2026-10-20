@@ -106,7 +106,7 @@ from allen_diameter.analysis import profiles  # noqa: E402
 from allen_diameter.analysis import survey  # noqa: E402
 from allen_diameter.analysis.plane_iteration import (  # noqa: E402,F401  (Block 13.1: moved there and re-exported)
     ITER_LINE_MULT, ITER_STATUSES, _argmax_plane, block_background, check_iteration, far_from_dendrites,
-    gradient_iteration, iterate_planes, line_profiles, plane_background, refit_at_plane)
+    gradient_iteration, iteration_state, iterate_planes, line_profiles, plane_background, refit_at_plane)
 from build_table import load_config  # noqa: E402
 
 # the line multiplier m, a line's full width in units of the diameter sizing it: the d-line of the gradient and blend
@@ -162,8 +162,9 @@ def node_stack(swc, provider, cfg, node_id, transform=None, planes_half=6, half_
     pilot's block (from the cache on real data) when it lies inside it, and
     requested from the provider otherwise (new crops on real data); the pilot's
     block is returned as well, for the background levels and the fits at other
-    planes. ValueError for a node survey.node_planes refuses."""
-    from allen_image_io import CropFrame
+    planes. ValueError for a node survey.node_planes refuses. The square and the
+    dict are plane_iteration.cut_square's and iteration_state's (Block 13.2),
+    with the diagnostics' keys mask, extent, xyz, radius and node_type."""
     from allen_diameter.plotting.figures import image_extent_um
     pl = survey.node_planes(swc, provider, cfg, node_id, transform)
     frame, (H, W) = pl["frame"], pl["block"].shape[1:]
@@ -182,39 +183,17 @@ def node_stack(swc, provider, cfg, node_id, transform=None, planes_half=6, half_
         ra = float(pl["allen_radius_um"])
         if math.isfinite(ra) and ra > 0:
             half = max(half, float(allen_line_mult) * ra + 2.0 * p)
-    o = np.asarray(pl["branch"].xyz_um[pl["index"], :2], dtype=float)
-    c0 = int(math.ceil((o[0] - half) / p - frame.left))
-    c1 = int(math.floor((o[0] + half) / p - frame.left)) + 1
-    r0 = int(math.ceil((o[1] - half) / p - frame.top))
-    r1 = int(math.floor((o[1] + half) / p - frame.top)) + 1
-    if c1 - c0 < 2 or r1 - r0 < 2:
-        raise ValueError("node %d: the square +-%g um about the node holds fewer than 2 x 2 pixels" % (node_id, half))
-    fetched = not (c0 >= 0 and r0 >= 0 and c1 <= W and r1 <= H)
-    if fetched:
-        square, ks_sq, valid_sq, _ = provider(int(frame.left + c0), int(frame.top + r0), c1 - c0, r1 - r0, k_lo, k_hi)
-        if not np.array_equal(np.asarray(ks_sq), np.asarray(ks)):
-            raise ValueError("node %d: the square's planes differ from the block's" % node_id)
-        stack = np.asarray(square, dtype=float)
-        valid = np.asarray(valid, dtype=bool) & np.asarray(valid_sq, dtype=bool)
-    else:
-        stack = np.asarray(block[:, r0:r1, c0:c1], dtype=float)
-    sub = CropFrame(int(frame.left + c0), int(frame.top + r0), 0, p)
+    st = iteration_state(block, ks, valid, frame, pl["branch"], pl["index"], pl["result"].theta_rad, pl["result"],
+                         pl["segments"], pl["scene"].soma, half, provider, k_swc, label="node %d" % node_id)
+    sub, shape = st["frame"], st["stack"].shape[1:]
     xyz, radius = pl["branch"].xyz_um, np.asarray(pl["branch"].radius_um, dtype=float)
-    som = np.asarray(swc.types) == 1
-    soma = np.column_stack([cell.to_image_um(swc.xyz[som], cfg.acquisition.res0_um, **(transform or {}))[:, :2],
-                            np.asarray(swc.radius, dtype=float)[som]]) if som.any() else np.empty((0, 3))
     if band_um and band_um > 0:
-        mask = background.mask_near_branch(stack.shape[1:], sub.left, sub.top, p, xyz, np.zeros(xyz.shape[0]),
-                                           float(band_um))
+        mask = background.mask_near_branch(shape, sub.left, sub.top, p, xyz, np.zeros(xyz.shape[0]), float(band_um))
     else:
-        mask = np.ones(stack.shape[1:], dtype=bool)
-    return dict(stack=stack, ks=np.asarray(ks), valid=np.asarray(valid, dtype=bool), mask=mask, frame=sub,
-                extent=image_extent_um(sub, stack.shape[1:]), k_swc=k_swc, result=pl["result"], o=o,
-                theta=float(pl["result"].theta_rad), xyz=xyz, radius=radius, block=np.asarray(block, dtype=float),
-                block_frame=frame, segments=np.asarray(pl["segments"], dtype=float), soma=soma,
-                square_half_um=half, square_fetched=bool(fetched), allen_radius_um=float(pl["allen_radius_um"]),
-                node_type=int(np.asarray(swc.types)[np.flatnonzero(np.asarray(swc.ids) == int(node_id))[0]]),
-                branch=pl["branch"])
+        mask = np.ones(shape, dtype=bool)
+    st.update(mask=mask, extent=image_extent_um(sub, shape), xyz=xyz, radius=radius,
+              node_type=int(np.asarray(swc.types)[np.flatnonzero(np.asarray(swc.ids) == int(node_id))[0]]))
+    return st
 
 
 def d_line_half_um(d_hat_um, mult):
