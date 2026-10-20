@@ -1,0 +1,11 @@
+d 0.3 um phi  0 deg (mu 0.71 /um):    5.0 s = render    3.7 s (1 calls) + SGT fits   1.0 s (1 fits) + rest   0.3 s | k* -1, k_iter -1, converged, 2 rounds, 0 restacks, d_hat/d 1.270, converged
+d 0.3 um phi 45 deg (mu 0.71 /um):   53.5 s = render   46.1 s (1 calls) + SGT fits   6.8 s (1 fits) + rest   0.5 s | k* -1, k_iter -1, converged, 2 rounds, 0 restacks, d_hat/d 1.089, converged
+d 0.6 um phi  0 deg (mu 0.71 /um):    8.4 s = render    6.9 s (1 calls) + SGT fits   1.2 s (1 fits) + rest   0.4 s | k* -1, k_iter -1, converged, 2 rounds, 0 restacks, d_hat/d 1.038, converged
+d 0.6 um phi 45 deg (mu 0.71 /um):   51.6 s = render   48.3 s (1 calls) + SGT fits   2.6 s (1 fits) + rest   0.6 s | k* -1, k_iter -1, converged, 2 rounds, 0 restacks, d_hat/d 0.943, converged
+d 1.2 um phi  0 deg (mu 0.71 /um):   14.8 s = render   13.7 s (1 calls) + SGT fits   0.8 s (1 fits) + rest   0.3 s | k* -1, k_iter -1, converged, 2 rounds, 0 restacks, d_hat/d 1.070, converged
+d 1.2 um phi 45 deg (mu 0.71 /um):   53.2 s = render   50.6 s (1 calls) + SGT fits   1.8 s (1 fits) + rest   0.7 s | k* -1, k_iter -1, converged, 2 rounds, 0 restacks, d_hat/d 0.951, converged
+d 2.4 um phi  0 deg (mu 0.71 /um):   29.0 s = render   26.3 s (1 calls) + SGT fits   2.2 s (1 fits) + rest   0.5 s | k* -1, k_iter -1, converged, 2 rounds, 0 restacks, d_hat/d 1.092, at_bound
+d 2.4 um phi 45 deg (mu 0.71 /um):   63.7 s = render   60.4 s (1 calls) + SGT fits   2.0 s (1 fits) + rest   1.3 s | k* -3, k_iter -3, converged, 2 rounds, 0 restacks, d_hat/d 1.024, at_bound
+d 3.5 um phi  0 deg (mu 0.71 /um):  132.2 s = render   34.6 s (1 calls) + SGT fits  96.8 s (1 fits) + rest   0.7 s | k* -3, k_iter -2, converged, 2 rounds, 1 restacks, d_hat/d 0.982, failed
+d 3.5 um phi 45 deg (mu 0.71 /um):   72.2 s = render   67.7 s (1 calls) + SGT fits   3.1 s (1 fits) + rest   1.4 s | k* -3, k_iter -4, converged, 2 rounds, 2 restacks, d_hat/d 1.049, failed
+over 10 phantoms: mean 48.4 s per realization (render 35.8, SGT 11.8, rest 0.7), median 52.4 s, max 132.2 s
