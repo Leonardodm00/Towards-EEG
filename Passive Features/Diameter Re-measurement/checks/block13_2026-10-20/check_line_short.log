@@ -1,0 +1,6 @@
+r_crit = 0.01907 um (line of < 3 samples)
+d = 0.2 um: P(line_short) exact 0.0496, Monte Carlo 0.0500 (n = 200000)
+d = 0.3 um: P(line_short) exact 0.0384, Monte Carlo 0.0381 (n = 200000)
+d = 0.4 um: P(line_short) exact 0.0287, Monte Carlo 0.0290 (n = 200000)
+d = 0.6 um: P(line_short) exact 0.0142, Monte Carlo 0.0137 (n = 200000)
+d = 1.0 um: P(line_short) exact 0.0019, Monte Carlo 0.0018 (n = 200000)

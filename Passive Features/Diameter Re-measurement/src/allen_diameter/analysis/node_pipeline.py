@@ -1,9 +1,13 @@
-"""The per-node chain -- Block 5 in specs/SPEC.md (handoff steps 1-5, Eqs. 1-5, 9).
+"""The per-node chain -- Blocks 5 and 13 in specs/SPEC.md (handoff steps 1-5,
+Eqs. 1-5, 9; D-052.3, D-061).
 
 ONE function, measure_node, for real and synthetic blocks: the block provider
 is either allen_image_io.fetch_zblock (real, Colab) or model/render.py's
 synthetic_block (phantoms), so the bias table measures the bias of the code
-actually used on real nodes (procedure s.3.7).
+actually used on real nodes (procedure s.3.7). Since Block 13 measure_node is
+the pilot (Block 5, below; measure_pilot alone, for the diagnostics) followed
+by the Allen-guided plane iteration and Block 12's fit at the plane it ends
+on (analysis/plane_iteration.py); both make node_request's one request.
 
 Passes (direction_redraws = R, line_fit_window_um = L): pass 0 draws each
 node's measuring line from the raw SWC direction (the line through the raw
@@ -20,6 +24,7 @@ Pure ASCII, for the cluster (hpc-python-compat).
 """
 from __future__ import annotations
 
+import dataclasses
 import math
 from dataclasses import dataclass, field
 from typing import Optional, Tuple
@@ -29,6 +34,7 @@ from scipy import ndimage
 
 from . import background, focus, path, profiles
 from .fit import FitResult, fit_profile
+from .plane_iteration import Scene, gradient_iteration, iteration_state, scene_segments, sgt_at_plane
 
 
 @dataclass(frozen=True)
@@ -109,6 +115,27 @@ class NodeResult:
     focus_score: np.ndarray          # the configured rule's score on those planes (k* is its argmax)
     focus_depth: np.ndarray          # the dip depth (handoff Eq. 1) on the same planes, diagnostic
     k_star_depth: int                # argmax plane of focus_depth (-1 when none), diagnostic
+    # Block 13 (D-052.3, D-061): the iteration, the SGT fit's shape at k_iter and the pilot's columns (pilot_view);
+    # the defaults are a pilot's, so that a NodeResult built before Block 13 stays valid
+    k_iter: int = -1                 # the deliverable's plane, the iteration's last pick; -1 without one
+    iter_status: str = ""            # plane_iteration.ITER_STATUSES; "" when no iteration ran (a pilot)
+    n_rounds: int = 0
+    n_restacks: int = 0              # squares rebuilt for longer lines (cut from the block, or one provider call)
+    w_hat_um: float = float("nan")   # the SGT fit at k_iter: the kernel's FWHM and shape (D-052.1-2)
+    beta_hat: float = float("nan")
+    xi_hat: float = float("nan")
+    zeta_hat: float = float("nan")
+    irls_ok: Optional[bool] = None
+    at_bound: Tuple[str, ...] = ()
+    d_pilot_um: float = float("nan")      # the pilot's Block 3 fit at k* (the fitted columns of measure_pilot)
+    mu_pilot_per_um: float = float("nan")
+    v0_pilot_um: float = float("nan")
+    alpha_pilot: float = float("nan")
+    B_bar_pilot: float = float("nan")
+    pilot_status: str = ""           # the pilot's fit_status; "" in a pilot itself
+    pilot_flags: Tuple[str, ...] = ()
+    plane_fit: Optional[object] = field(default=None, compare=False, repr=False)   # fit_sgt.PlaneSGT at k_iter
+    iteration: Optional[dict] = field(default=None, compare=False, repr=False)     # gradient_iteration's record, no squares
 
 
 def _raw_direction(branch, j, L):
@@ -203,25 +230,61 @@ def _num(x):
     return float("nan") if x is None else float(x)
 
 
-def measure_node(branch, i, provider, cfg, reg=None):
-    """Measure node i of a Branch with one provider call (see the module docstring).
-
-    provider(left, top, width, height, k_lo, k_hi) -> (block, ks, valid, frame);
-    cfg: DiameterConfig; reg: optional dict returned by
-    allen_image_align.registration_check (keys verdict, lateral_offset_um,
-    z_offset_um are read) -- real data only. Returns NodeResult.
-    """
-    m, p, dz = cfg.measure, cfg.acquisition.res0_um, cfg.acquisition.dz_um
+def _window(branch, i, m):
+    """The pilot's window: the nodes within (R + 1) L / 2 of node i along the path and their raw SWC directions."""
     R, L = int(m.direction_redraws), float(m.line_fit_window_um)
     nodes = path.window(branch.s_um, i, 0.5 * (R + 1) * L)
-    t_raw = {int(j): _raw_direction(branch, int(j), L) for j in nodes}
-    P = branch.xyz_um[nodes]
+    return nodes, {int(j): _raw_direction(branch, int(j), L) for j in nodes}
+
+
+def _pilot_planes(branch, nodes, t_raw, cfg):
+    """(k_lo, k_hi): Block 5's planes, the lowest to the highest of the window
+    nodes' pilot ranges from their raw directions -- the planes the pilot reads
+    (D-061.2: the pilot unchanged; a pass whose redrawn direction widens its
+    range is clipped to them, as Block 5's own request clipped it)."""
+    m, dz = cfg.measure, cfg.acquisition.dz_um
     ranges = [_plane_range(branch.xyz_um[j, 2], path.angles(t_raw[int(j)])[1], m, dz) for j in nodes]
+    return min(r[0] for r in ranges), max(r[1] for r in ranges)
+
+
+def _request(branch, i, nodes, t_raw, cfg):
+    m, p, dz = cfg.measure, cfg.acquisition.res0_um, cfg.acquisition.dz_um
+    P = branch.xyz_um[nodes]
+    lo, hi = _pilot_planes(branch, nodes, t_raw, cfg)
+    k_swc = int(round(float(branch.xyz_um[i, 2]) / dz))
     left = int(math.floor((P[:, 0].min() - m.block_half_um) / p)) - 1
     top = int(math.floor((P[:, 1].min() - m.block_half_um) / p)) - 1
     width = int(math.ceil((P[:, 0].max() + m.block_half_um) / p)) + 2 - left
     height = int(math.ceil((P[:, 1].max() + m.block_half_um) / p)) + 2 - top
-    blk = provider(left, top, width, height, min(r[0] for r in ranges), max(r[1] for r in ranges))
+    return (left, top, width, height, min(lo, k_swc - int(m.iter_planes_half)),
+            max(hi, k_swc + int(m.iter_planes_half)))
+
+
+def _planes_of(blk, lo, hi):
+    """The block blk = (block, ks, valid, frame) restricted to its planes lo..hi."""
+    block, ks, valid, frame = blk
+    ks = np.asarray(ks)
+    sel = (ks >= int(lo)) & (ks <= int(hi))
+    return np.asarray(block)[sel], ks[sel], np.asarray(valid, dtype=bool)[sel], frame
+
+
+def node_request(branch, i, cfg):
+    """(left, top, width, height, k_lo, k_hi): node i's one provider request
+    (D-061.1; Block 13.3b), made by measure_pilot and measure_node alike: Block
+    5's xy block (block_half_um about the pilot's window nodes, full-resolution
+    pixels) over the planes from the lowest to the highest of Block 5's planes
+    (their pilot ranges, +-planes_half widened for tilt by their raw
+    directions) and of K_i = k_SWC +- iter_planes_half, k_SWC = round(z_i /
+    dz). The pilot reads Block 5's planes of it, the iteration K_i."""
+    nodes, t_raw = _window(branch, i, cfg.measure)
+    return _request(branch, i, nodes, t_raw, cfg)
+
+
+def _pilot(branch, i, blk, nodes, t_raw, cfg, reg):
+    """Block 5 on the block blk (the module docstring's passes, unchanged): the
+    pilot's NodeResult, the Block 13 fields at their defaults."""
+    m, dz = cfg.measure, cfg.acquisition.dz_um
+    R, L = int(m.direction_redraws), float(m.line_fit_window_um)
     passes = {int(j): _node_pass(blk, branch, int(j), t_raw[int(j)], m, dz) for j in nodes}
     for q in range(1, R + 1):
         current = path.window(branch.s_um, i, 0.5 * (R + 1 - q) * L)
@@ -282,3 +345,147 @@ def measure_node(branch, i, provider, cfg, reg=None):
         v0_hat_um=nan if fit is None else fit.v0_hat_um, alpha_hat=nan if fit is None else fit.alpha_hat,
         fit_status="none" if fit is None else fit.status, flags=tuple(flags), fit=fit, focus_rule=str(m.focus_rule),
         focus_planes=np.asarray(last.kk, dtype=int), focus_score=last.F, focus_depth=last.D, k_star_depth=k_depth)
+
+
+def measure_pilot(branch, i, provider, cfg, reg=None):
+    """The pilot of node i of a Branch (Block 5; D-035, D-061.2): with one
+    provider call, node_request's (the request measure_node makes, so the
+    diagnostics that call this are served from the image cache), the passes of
+    the module docstring on Block 5's planes of the block (_pilot_planes: the
+    planes beyond them are not read, so the pilot is Block 5's), k* by the
+    configured focus rule, the centre, the heading, the tilt, and Block 3's
+    Gaussian fit at k* with its flags.
+
+    provider(left, top, width, height, k_lo, k_hi) -> (block, ks, valid, frame);
+    cfg: DiameterConfig; reg: optional dict returned by
+    allen_image_align.registration_check (keys verdict, lateral_offset_um,
+    z_offset_um are read) -- real data only. Returns NodeResult with the Block
+    13 fields at their defaults (pilot_status "": pilot_view is the identity).
+    """
+    nodes, t_raw = _window(branch, i, cfg.measure)
+    blk = provider(*_request(branch, i, nodes, t_raw, cfg))
+    return _pilot(branch, i, _planes_of(blk, *_pilot_planes(branch, nodes, t_raw, cfg)), nodes, t_raw, cfg, reg)
+
+
+# the NodeResult fields Block 13 added, at their defaults in a pilot
+ITER_FIELDS = ("k_iter", "iter_status", "n_rounds", "n_restacks", "w_hat_um", "beta_hat", "xi_hat", "zeta_hat",
+               "irls_ok", "at_bound", "d_pilot_um", "mu_pilot_per_um", "v0_pilot_um", "alpha_pilot", "B_bar_pilot",
+               "pilot_status", "pilot_flags", "plane_fit", "iteration")
+
+
+def pilot_view(result):
+    """The pilot's NodeResult of a measured node (Block 13.3b): result with
+    its fitted columns, status, flags and B_bar replaced by the pilot's
+    (d_pilot_um, mu_pilot_per_um, v0_pilot_um, alpha_pilot, pilot_status,
+    pilot_flags, B_bar_pilot) and the Block 13 fields at their defaults, i.e.
+    what measure_pilot returns for the same node and block; result itself when
+    pilot_status is "" (a pilot, or a NodeResult built before Block 13)."""
+    if not result.pilot_status:
+        return result
+    defaults = {f.name: f.default for f in dataclasses.fields(NodeResult) if f.name in ITER_FIELDS}
+    return dataclasses.replace(result, d_hat_um=result.d_pilot_um, mu_hat_per_um=result.mu_pilot_per_um,
+                               v0_hat_um=result.v0_pilot_um, alpha_hat=result.alpha_pilot,
+                               fit_status=result.pilot_status, flags=result.pilot_flags, B_bar=result.B_bar_pilot,
+                               **defaults)
+
+
+def _iter_at_edge(rec, ks, k, margin):
+    """Block 5's stack_edge rule (focus.best_plane) on the iteration's curve: k within margin planes of the first
+    or last plane with a finite G in the round rec that picked it."""
+    ok = np.flatnonzero(np.isfinite(np.asarray(rec.get("G"), dtype=float)))
+    if not ok.size:
+        return False
+    n = int(k) - int(ks[0])
+    return n - int(ok[0]) < margin or int(ok[-1]) - n < margin
+
+
+def deliverable_flags(pilot, rec, ks, m):
+    """The flags of the selection S at the deliverable's plane (D-061.3), Block
+    5's rules and order applied to the record rec of the round that picked
+    k_iter (plane_iteration.sgt_at_plane's keys, with the round's G over the
+    planes ks), or None when no round picked a plane: vertical (the pilot's);
+    profile_nan when the profile there holds a NaN, else, with a fit, faint and
+    crossing from it and its B_bar; stack_edge (_iter_at_edge); bbar_few when
+    the plane's B_bar is flagged (and when there is no plane, as Block 5 without
+    k*); steep (the pilot's); dark when the fit's alpha_hat > alpha_dark_flag;
+    the fit's status when it is not converged. Returns a tuple."""
+    flags = ["vertical"] if pilot.vertical else []
+    fitted = rec is not None and rec.get("plane_fit") is not None
+    if rec is not None and rec.get("profile") is not None:
+        I, v = np.asarray(rec["profile"], dtype=float), np.asarray(rec["v_um"], dtype=float)
+        if not np.all(np.isfinite(I)):
+            flags.append("profile_nan")
+        elif fitted:
+            flags += _profile_flags(I, v, float(rec["B_bar"]), m)
+    if rec is not None and _iter_at_edge(rec, ks, rec["k"], m.edge_margin_planes):
+        flags.append("stack_edge")
+    if rec is None or not rec["bbar_ok"]:
+        flags.append("bbar_few")
+    if pilot.steep:
+        flags.append("steep")
+    if fitted and rec["alpha_hat"] > m.alpha_dark_flag:
+        flags.append("dark")
+    if fitted and rec["fit_status"] != "converged":
+        flags.append(str(rec["fit_status"]))
+    return tuple(flags)
+
+
+def measure_node(branch, i, provider, cfg, reg=None, scene=None):
+    """Measure node i of a Branch (Block 13.3b; D-052.3, D-061): the
+    deliverable, the same function for phantoms and real nodes (D-057 (iii)).
+
+    One provider call, node_request's, and one more per restack that leaves
+    the block (D-061.1). (1) The pilot on that block (as measure_pilot). (2)
+    The Allen-guided iteration (plane_iteration.gradient_iteration; D-042,
+    D-044) on the block's planes K_i = k_SWC +- iter_planes_half, from d_0 =
+    2 branch.radius_um[i] (Allen's on a real node, the phantom's on a phantom),
+    with line_mult = iter_line_mult, max_rounds = iter_max_rounds, bg_margin_um
+    = iter_bg_margin_um, the square +-block_half_um about the SWC node, a
+    restack of half-width h + 2 pixels, and fit_at = plane_iteration.
+    sgt_at_plane (Block 12's fit, D-052.2); the background masks the scene's
+    segments and soma (D-064; scene None: Scene.from_branch(branch), a
+    phantom's own tube). (3) k_iter = the last plane picked; the deliverable is
+    the fit of the round that picked it, the flags deliverable_flags'.
+
+    Returns NodeResult: the centre, heading, tilt, k*, sub-plane depth,
+    steep, vertical, the focus curves and `fit` (Block 3's at k*) are the
+    pilot's; d_hat_um, mu_hat_per_um, v0_hat_um, alpha_hat, B_bar (of k_iter),
+    fit_status (the SGT fit's, "none" without one) and flags are the
+    deliverable's; the Block 13 fields hold the iteration, the SGT fit's shape
+    and the pilot's columns (pilot_view). provider, cfg, reg: as measure_pilot.
+    """
+    m = cfg.measure
+    nodes, t_raw = _window(branch, i, m)
+    blk = provider(*_request(branch, i, nodes, t_raw, cfg))
+    pilot = _pilot(branch, i, _planes_of(blk, *_pilot_planes(branch, nodes, t_raw, cfg)), nodes, t_raw, cfg, reg)
+    k_swc = int(round(float(branch.xyz_um[i, 2]) / cfg.acquisition.dz_um))
+    bb, kb, vb, frame = _planes_of(blk, k_swc - int(m.iter_planes_half), k_swc + int(m.iter_planes_half))
+    scene = Scene.from_branch(branch) if scene is None else scene
+    segments = scene_segments(scene, frame, np.shape(bb)[1:], branch)
+    px = float(frame.res_um_px)
+
+    def square(half_um):
+        return iteration_state(bb, kb, vb, frame, branch, i, pilot.theta_rad, pilot, segments, scene.soma, half_um,
+                               provider, k_swc, label="node %d" % int(branch.ids[i]))
+    res = gradient_iteration(square(float(m.block_half_um)), cfg, d_start_um=2.0 * float(branch.radius_um[i]),
+                             line_mult=m.iter_line_mult, max_rounds=m.iter_max_rounds,
+                             bg_margin_um=m.iter_bg_margin_um, restack=lambda h: square(float(h) + 2.0 * px),
+                             fit_at=lambda cur, k: sgt_at_plane(cur, cfg, k))
+    picked = [r for r in res["rounds"] if r["k"] is not None]
+    rec = picked[-1] if picked else None
+    fitted = rec is not None and rec.get("plane_fit") is not None
+    nan = float("nan")
+
+    def num(key):
+        return float(rec[key]) if fitted else nan
+    return dataclasses.replace(
+        pilot, B_bar=nan if rec is None else float(rec["B_bar"]), d_hat_um=num("d_hat_um"),
+        mu_hat_per_um=num("mu_hat_per_um"), v0_hat_um=num("v0_hat_um"), alpha_hat=num("alpha_hat"),
+        fit_status=str(rec["fit_status"]) if fitted else "none", flags=deliverable_flags(pilot, rec, kb, m),
+        k_iter=-1 if rec is None else int(rec["k"]), iter_status=str(res["status"]), n_rounds=int(res["n_rounds"]),
+        n_restacks=int(res["n_restacks"]), w_hat_um=num("w_hat_um"), beta_hat=num("beta_hat"), xi_hat=num("xi_hat"),
+        zeta_hat=num("zeta_hat"), irls_ok=rec["irls_ok"] if fitted else None,
+        at_bound=tuple(rec["at_bound"]) if fitted else (), d_pilot_um=pilot.d_hat_um,
+        mu_pilot_per_um=pilot.mu_hat_per_um, v0_pilot_um=pilot.v0_hat_um, alpha_pilot=pilot.alpha_hat,
+        B_bar_pilot=pilot.B_bar, pilot_status=pilot.fit_status, pilot_flags=pilot.flags,
+        plane_fit=rec["plane_fit"] if fitted else None, iteration={k: v for k, v in res.items() if k != "st"})

@@ -21,9 +21,10 @@ Checks
     test_reference      the registration survey on the synthetic cell's own
                         traced path (the 2026-09-23 registration_check): ON,
                         |s*| <= 0.2 um, |dz*| <= 0.3 um; JSON as run_cell.py
-                        reads it; survey.node_planes equals the pilot's
-                        measurement of the node (survey.measure_nodes) field by
-                        field and makes the same provider request; on the
+                        reads it; survey.node_planes equals the pilot of the
+                        pilot run's measurement of the node (pilot_view of
+                        survey.measure_nodes', Block 13) field by field and
+                        makes the same provider request; on the
                         fixture's known geometry, the darkness centroid across
                         the tube in plane k*, with pixels placed by the
                         montage's extent, lies on Allen's centre line within
@@ -90,7 +91,7 @@ for _p in (SRC, HERE, WS / "scripts"):
 
 from allen_diameter.analysis import camera_fit, survey  # noqa: E402
 from allen_diameter.analysis.phantoms import reject_reasons  # noqa: E402
-from allen_diameter.analysis.node_pipeline import NodeResult  # noqa: E402
+from allen_diameter.analysis.node_pipeline import NodeResult, pilot_view  # noqa: E402
 from allen_diameter.config import config_from_dict, default_config  # noqa: E402
 from allen_diameter.analysis import profiles  # noqa: E402
 from allen_diameter.loading import jpeg_tables, table_io  # noqa: E402
@@ -218,8 +219,9 @@ def test_reference():
         with open(os.path.join(tmp, "reg", "registration_999.json")) as f:
             back = {int(k): v for k, v in json.load(f).items()}
         assert set(back[5]) >= {"verdict", "lateral_offset_um", "z_offset_um"} and summ["verdicts"] == {"ON": 1}
-    # plane montage: node_planes measures the node as the pilot does (survey.measure_nodes), with the same
-    # single provider request -- hence, on real data, a block served by the image cache
+    # plane montage: node_planes measures the node's pilot as the pilot run does (survey.measure_nodes, whose
+    # measure_node starts with that pilot; Block 13), with the same single provider request -- hence, on real
+    # data, a block served by the image cache -- and its result is pilot_view of the pilot run's
     import run_cell
     with tempfile.TemporaryDirectory() as tmp:
         swc, fetcher, planes, _ = synthetic_cell(tmp, cfg, d_true=0.8, mu=1.0)
@@ -237,8 +239,9 @@ def test_reference():
         pl = survey.node_planes(swc, recorder, cfg, 4)
         assert calls == [pilot_call], (calls, pilot_call)
         bad = [f.name for f in dataclasses.fields(pilot_res)
-               if not _same_value(getattr(pl["result"], f.name), getattr(pilot_res, f.name))]
+               if not _same_value(getattr(pl["result"], f.name), getattr(pilot_view(pilot_res), f.name))]
         assert not bad, bad
+        assert pilot_res.iter_status and pilot_res.pilot_status and not pl["result"].pilot_status
         assert pl["index"] == meas[at][3] and pl["allen_radius_um"] == meas[at][1]
         # the same with a global alignment (2 px in x): node_planes passes it on, so the request moves
         shift = dict(shift_full_px=(2.0, 0.0))
@@ -247,7 +250,8 @@ def test_reference():
         call_s = calls[at]
         del calls[:]
         pl_s = survey.node_planes(swc, recorder, cfg, 4, shift)
-        assert calls == [call_s] and call_s != pilot_call and _same_value(pl_s["result"], meas_s[at][0]), (calls, call_s)
+        assert calls == [call_s] and call_s != pilot_call and _same_value(pl_s["result"], pilot_view(meas_s[at][0])), \
+            (calls, call_s)
         # alignment through the montage's extent, on the fixture's known geometry (the tube is rendered on
         # the traced path at heading 0.3 rad): in plane k*, the darkness-weighted mean of the offset across
         # the path, over the pixels within 1 um along and 1.5 um across the path of node 4, placed by

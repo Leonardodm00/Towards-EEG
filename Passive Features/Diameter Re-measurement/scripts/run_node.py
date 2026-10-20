@@ -3,7 +3,8 @@
 specs/SPEC.md (design handoff Next actions 2-3, 7; procedure s.3.5, s.3.10).
 
 Measures every node of the dendrite stretches that hold the given node ids
-(Block 5, the same chain the table is built with) and writes, in --out-dir:
+(Block 13's measure_node, the same chain the table is built with) and writes,
+in --out-dir:
 
     pilot_<specimen>.csv            NodeResult columns, Allen's radius, sigma_fit,
                                     in_S, reject, calibration_node (and, with
@@ -18,7 +19,9 @@ Measures every node of the dendrite stretches that hold the given node ids
     figures/node_<id>.png           with --figures: the focus curves (the
                                     configured rule and the dip depth, D-030)
                                     with k*, the dip depth's choice and the
-                                    SWC's plane; the fitted profile
+                                    SWC's plane; the pilot's fitted profile at
+                                    k* (the CSV's fitted columns are the
+                                    deliverable's at k_iter, Block 13)
 
 Example (Colab, after the bootstrap cell)
     python scripts/run_node.py --specimen 529878215 --nodes 4505,4506 --cache-dir /content/drive/MyDrive/allen_cache \
@@ -67,11 +70,13 @@ def run(swc, provider, cfg, out_dir, specimen, transform=None, regs=None, only=N
         from allen_diameter.plotting import figures as fg
         os.makedirs(os.path.join(out_dir, "figures"), exist_ok=True)
         import matplotlib.pyplot as plt
+        from allen_diameter.analysis.node_pipeline import pilot_view
         for res, _, _, _ in meas:
             if not math.isfinite(res.z_sub_um):
                 continue
-            v, I, model = survey.profile_at_node(provider, res, cfg)
-            fig = fg.node_figure(res, v, I, model, k_swc=int(round(res.z_um / cfg.acquisition.dz_um)))
+            pilot = pilot_view(res)             # the figure draws the pilot: k*, its fit and its B_bar (Block 13)
+            v, I, model = survey.profile_at_node(provider, pilot, cfg)
+            fig = fg.node_figure(pilot, v, I, model, k_swc=int(round(res.z_um / cfg.acquisition.dz_um)))
             fig.savefig(os.path.join(out_dir, "figures", "node_%d.png" % res.node_id), dpi=110)
             plt.close(fig)
     return rows, summary

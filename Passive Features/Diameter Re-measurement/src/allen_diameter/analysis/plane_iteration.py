@@ -31,6 +31,11 @@ Block 13.2 adds the scene the background masks (Scene, scene_segments;
 D-064) and the square about the node (cut_square), the rules that
 survey.node_planes and node_stack used, now shared with the measurement.
 
+Block 13.3a adds the deliverable's fit at a plane: plane_inputs (the inputs
+refit_at_plane used, factored out of it) and sgt_at_plane (the skewed
+generalized-t fit of Block 12 on them, D-052.2), the fit_at of the
+measurement's iteration.
+
 Pure ASCII, for the cluster (hpc-python-compat).
 """
 from __future__ import annotations
@@ -41,7 +46,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from . import background, focus, profiles
+from . import background, fit_sgt, focus, profiles
 
 # the line multiplier of the Allen-guided iteration, a line's full width in units of the diameter sizing it (D-044,
 # the user's choice of 2026-10-12: m = 3, the lines +-1.5 d)
@@ -194,29 +199,24 @@ def _argmax_plane(ks, A):
     return None if not np.isfinite(A).any() else int(ks[int(np.nanargmax(A))])
 
 
-def refit_at_plane(st, cfg, k, with_profile=False):
-    """Block 5's final fit (fit.fit_profile, D-019.1) at plane k of
-    node_stack's block (D-042), every other input the pilot's: the
-    measurement's offsets (profiles.profile_offsets), the profile through the
-    pilot's fitted centre (cx_um, cy_um) across its heading theta_rad, averaged
-    over 2 A + 1 lines along the branch (profiles.sample_profile with
-    profiles.n_along and profile_step_um), its tilt phi_rad, and B_bar =
-    node_pipeline.node_background of plane k (the masked median of the node's
-    block about the SWC node, D-018.1). At k = k* these are the pilot's own
-    inputs, so d_hat is the pilot's. Returns dict(d_hat_um, fit_status,
-    v0_hat_um, mu_hat_per_um, B_bar, bbar_ok); without a fit d_hat_um is NaN
-    and fit_status says why: "no_plane" (k not among the block's planes, or
-    missing), "profile_nan" (a sample outside the block), "bbar_nonpositive".
-    with_profile=True (Cell 4k, D-045) also returns what drawing the fit
-    needs: v_um (the offsets) and profile (the samples; both None without a
-    plane), phi_rad, and the fit's alpha_hat and n_nodes (NaN and None
-    without a fit), for tube_model.model_profile."""
+def plane_inputs(st, cfg, k):
+    """The inputs of a fit at plane k of the block (D-042; factored out of
+    refit_at_plane by Block 13.3a), every one but the plane the pilot's: the
+    measurement's offsets v (profiles.profile_offsets), the profile through
+    the pilot's fitted centre (cx_um, cy_um) across its heading theta_rad,
+    averaged over 2 A + 1 lines along the branch (profiles.sample_profile with
+    profiles.n_along and profile_step_um), the pilot's tilt phi_rad, and
+    B_bar = node_pipeline.node_background of plane k (the masked median of
+    the node's block about the SWC node, D-018.1) with its ok. At k = k*
+    these are Block 5's final-fit inputs. Returns dict(status, v_um, profile,
+    phi_rad, B_bar, bbar_ok); status "ok", or why no fit can be made:
+    "no_plane" (k not among the block's valid planes; v_um and profile None,
+    B_bar NaN, bbar_ok False), "profile_nan" (a sample outside the block),
+    "bbar_nonpositive" (B_bar <= 0)."""
     from allen_diameter.analysis import node_pipeline
-    from allen_diameter.analysis.fit import fit_profile
-    m, r, nan = cfg.measure, st["result"], float("nan")
-    out = dict(d_hat_um=nan, fit_status="no_plane", v0_hat_um=nan, mu_hat_per_um=nan, B_bar=nan, bbar_ok=False)
-    if with_profile:
-        out.update(v_um=None, profile=None, phi_rad=float(r.phi_rad), alpha_hat=nan, n_nodes=None)
+    m, r = cfg.measure, st["result"]
+    out = dict(status="no_plane", v_um=None, profile=None, phi_rad=float(r.phi_rad), B_bar=float("nan"),
+               bbar_ok=False)
     ks = np.asarray(st["ks"])
     j = int(k) - int(ks[0])
     if not (0 <= j < ks.size and int(ks[j]) == int(k) and bool(st["valid"][j])):
@@ -228,19 +228,77 @@ def refit_at_plane(st, cfg, k, with_profile=False):
     v = profiles.profile_offsets(m)
     I = profiles.sample_profile(plane, frame, np.array([float(r.cx_um), float(r.cy_um)]), y_hat, e_u, v,
                                 profiles.n_along(m), m.profile_step_um)
-    out.update(B_bar=float(B_bar), bbar_ok=bool(ok))
-    if with_profile:
-        out.update(v_um=v, profile=I)
+    out.update(v_um=v, profile=I, B_bar=float(B_bar), bbar_ok=bool(ok))
     if not np.all(np.isfinite(I)):
-        out["fit_status"] = "profile_nan"
+        out["status"] = "profile_nan"
     elif not B_bar > 0:
-        out["fit_status"] = "bbar_nonpositive"
+        out["status"] = "bbar_nonpositive"
     else:
-        fit = fit_profile(v, I, float(r.phi_rad), float(B_bar), m)
+        out["status"] = "ok"
+    return out
+
+
+def refit_at_plane(st, cfg, k, with_profile=False):
+    """Block 5's final fit (fit.fit_profile, D-019.1) at plane k of
+    node_stack's block (D-042) on plane_inputs(st, cfg, k): the profile
+    through the pilot's fitted centre across its heading, its tilt, and the
+    masked median B_bar of plane k (D-018.1). At k = k* these are the pilot's
+    own inputs, so d_hat is the pilot's. Returns dict(d_hat_um, fit_status,
+    v0_hat_um, mu_hat_per_um, B_bar, bbar_ok); without a fit d_hat_um is NaN
+    and fit_status says why: "no_plane" (k not among the block's planes, or
+    missing), "profile_nan" (a sample outside the block), "bbar_nonpositive".
+    with_profile=True (Cell 4k, D-045) also returns what drawing the fit
+    needs: v_um (the offsets) and profile (the samples; both None without a
+    plane), phi_rad, and the fit's alpha_hat and n_nodes (NaN and None
+    without a fit), for tube_model.model_profile."""
+    from allen_diameter.analysis.fit import fit_profile
+    m, nan = cfg.measure, float("nan")
+    inp = plane_inputs(st, cfg, k)
+    out = dict(d_hat_um=nan, fit_status="no_plane", v0_hat_um=nan, mu_hat_per_um=nan, B_bar=nan, bbar_ok=False)
+    if with_profile:
+        out.update(v_um=None, profile=None, phi_rad=inp["phi_rad"], alpha_hat=nan, n_nodes=None)
+    if inp["status"] == "no_plane":
+        return out
+    out.update(B_bar=inp["B_bar"], bbar_ok=inp["bbar_ok"])
+    if with_profile:
+        out.update(v_um=inp["v_um"], profile=inp["profile"])
+    if inp["status"] != "ok":
+        out["fit_status"] = inp["status"]
+    else:
+        fit = fit_profile(inp["v_um"], inp["profile"], inp["phi_rad"], inp["B_bar"], m)
         out.update(d_hat_um=float(fit.d_hat_um), fit_status=str(fit.status), v0_hat_um=float(fit.v0_hat_um),
                    mu_hat_per_um=float(fit.mu_hat_per_um))
         if with_profile:
             out.update(alpha_hat=float(fit.alpha_hat), n_nodes=int(fit.n_nodes))
+    return out
+
+
+def sgt_at_plane(st, cfg, k):
+    """The deliverable's fit at plane k (D-052.2, Block 13.3a): Block 12's
+    fit_sgt.fit_plane(v, I, phi, B_bar, cfg.measure) on plane_inputs(st, cfg,
+    k), its final (IRLS) fit the node's fit at the plane; the fit_at of the
+    measurement's iteration, whose next line d_hat_um sizes whatever the
+    status (D-052, as Cell 4m runs it per variant, D-047). Returns dict:
+    d_hat_um, fit_status (the final fit's: converged, at_bound or failed, D-053
+    (ii); without inputs the inputs' status: no_plane, profile_nan,
+    bbar_nonpositive), v0_hat_um (relative to the pilot's centre, as Block
+    5's), mu_hat_per_um, B_bar, bbar_ok, w_hat_um, beta_hat, xi_hat,
+    zeta_hat, alpha_hat (mu d / cos phi), irls_ok, at_bound (the final fit's),
+    plane_fit (fit_sgt.PlaneSGT; None without inputs), v_um and profile (the
+    inputs; None without a plane). The numbers are NaN without inputs."""
+    inp = plane_inputs(st, cfg, k)
+    nan = float("nan")
+    out = dict(d_hat_um=nan, fit_status=inp["status"], v0_hat_um=nan, mu_hat_per_um=nan, B_bar=inp["B_bar"],
+               bbar_ok=inp["bbar_ok"], w_hat_um=nan, beta_hat=nan, xi_hat=nan, zeta_hat=nan, alpha_hat=nan,
+               irls_ok=None, at_bound=(), plane_fit=None, v_um=inp["v_um"], profile=inp["profile"])
+    if inp["status"] != "ok":
+        return out
+    pf = fit_sgt.fit_plane(inp["v_um"], inp["profile"], inp["phi_rad"], inp["B_bar"], cfg.measure)
+    f = pf.final
+    out.update(d_hat_um=float(f.d_um), fit_status=str(f.status), v0_hat_um=float(f.v0_um),
+               mu_hat_per_um=float(f.mu_per_um), w_hat_um=float(f.w_um), beta_hat=float(f.beta), xi_hat=float(f.xi),
+               zeta_hat=float(f.zeta), alpha_hat=float(f.alpha_hat), irls_ok=f.irls_ok, at_bound=tuple(f.at_bound),
+               plane_fit=pf)
     return out
 
 

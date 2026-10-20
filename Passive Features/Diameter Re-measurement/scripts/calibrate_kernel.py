@@ -46,7 +46,7 @@ SRC = os.path.join(os.path.dirname(HERE), "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
-from allen_diameter.analysis import calibration, phantoms  # noqa: E402
+from allen_diameter.analysis import calibration, cell, phantoms  # noqa: E402
 from allen_diameter.loading import calibration_io, table_io  # noqa: E402
 from allen_diameter.model import render  # noqa: E402
 from build_table import load_config  # noqa: E402
@@ -114,10 +114,11 @@ def run_synthetic(cfg, n, seed, out, d_range, alpha_range, phi_max, workers=1):
 
 def candidates_from_rows(rows, cfg):
     """Node ids of a run_cell.py table that can be calibration nodes (the rule of calibration_reasons on the
-    CSV columns); they are re-measured before the scan, so this only saves fetches."""
+    CSV columns, the pilot's: cell.pilot_row_view, Block 13); they are re-measured before the scan, so this only
+    saves fetches."""
     cal = cfg.calibration
     out = set()
-    for r in rows:
+    for r in (cell.pilot_row_view(x) for x in rows):
         flags = [f for f in str(r.get("flags", "")).split(";") if f]
         try:
             ok = (r["fit_status"] == "converged" and not any(f in phantoms.SELECTION_FLAGS for f in flags)

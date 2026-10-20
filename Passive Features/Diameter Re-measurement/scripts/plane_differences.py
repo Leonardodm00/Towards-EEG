@@ -948,16 +948,17 @@ def main(argv=None):
     import run_cell
     from allen_diameter.loading import swc_io, table_io
     swc = swc_io.read_swc(a.swc or aio.fetch_swc(int(a.specimen), a.cache_dir))
-    if thin:
-        node_ids = select_thin_nodes(swc, table_io.read_rows([a.pilot_csv]), a.thin_max_2r_um, a.thin_max_dhat_um,
-                                     a.per_stretch, a.max_nodes, cfg.acquisition.dendrite_swc_types)
+    if thin:          # the pilot's columns (cell.pilot_row_view: Block 13's rows carry the deliverable's beside them)
+        node_ids = select_thin_nodes(swc, [cell.pilot_row_view(r) for r in table_io.read_rows([a.pilot_csv])],
+                                     a.thin_max_2r_um, a.thin_max_dhat_um, a.per_stretch, a.max_nodes,
+                                     cfg.acquisition.dendrite_swc_types)
         print("[planediff] thin nodes (in S, Allen 2r <= %g um, fitted d <= %g um, k* = dip-depth plane, flat; up to "
               "%d per stretch, %d in all): %s" % (a.thin_max_2r_um, a.thin_max_dhat_um, a.per_stretch, a.max_nodes,
                                                   ",".join(str(n) for n in node_ids) or "none"), flush=True)
         if not node_ids:
             return 0
     if bydiam:
-        rows = table_io.read_rows([a.pilot_csv])
+        rows = [cell.pilot_row_view(r) for r in table_io.read_rows([a.pilot_csv])]
         node_ids = select_nodes_by_diameter(swc, rows, dhat_bins, a.per_bin, add_nodes, cfg.acquisition.dendrite_swc_types)
         dh = {int(r["node_id"]): r.get("d_hat_um") for r in rows}
         fmt = lambda x: "%.2f" % float(x) if isinstance(x, (int, float)) else "n/a"  # noqa: E731

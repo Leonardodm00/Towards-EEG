@@ -9,6 +9,10 @@ the script at 84ea91f (read with `git show`) and of the current script (whose
 iteration functions are imported from the package) return equal records --
 every key, every array bit for bit (NaN equal to NaN), every float equal.
 Also: the current script's iteration names are the package's objects.
+[2026-10-20, Block 13.3a] The square dict may carry the keys added since 13.1
+(ADDED_KEYS: "index", from 13.2's iteration_state); every key of 84ea91f's
+dict is still compared. Re-run after 13.3a factored refit_at_plane's inputs
+into plane_inputs.
 
 Run (from the workstream folder, in a git clone that holds 84ea91f):
     python checks/block13_2026-10-20/check_13_1_move.py
@@ -38,6 +42,8 @@ OLD_COMMIT = "84ea91f"
 NAMES = ("ITER_LINE_MULT", "ITER_STATUSES", "check_iteration", "iterate_planes", "far_from_dendrites",
          "plane_background", "block_background", "line_profiles", "refit_at_plane", "gradient_iteration",
          "_argmax_plane")
+# keys the square dict gained after 13.1 (Block 13.2's iteration_state: the node's index in its branch)
+ADDED_KEYS = ("index",)
 
 
 def load_old_script(tmp):
@@ -116,8 +122,9 @@ def main():
                             swc, prov, cfg, nid, None, 6, None, 0.0, h, m, m))
                         out.append((st, it))
                     (st0, it0), (st1, it1) = out
-                    d = equal(it0, it1, "iteration") or equal({k: v for k, v in it0["st"].items() if k not in ("result", "branch")},
-                                                             {k: v for k, v in it1["st"].items() if k not in ("result", "branch")},
+                    skip = ("result", "branch") + ADDED_KEYS
+                    d = equal(it0, it1, "iteration") or equal({k: v for k, v in it0["st"].items() if k not in skip},
+                                                             {k: v for k, v in it1["st"].items() if k not in skip},
                                                              "last square") \
                         or equal(it0["st"]["result"], it1["st"]["result"], "result")
                     n_runs += 2

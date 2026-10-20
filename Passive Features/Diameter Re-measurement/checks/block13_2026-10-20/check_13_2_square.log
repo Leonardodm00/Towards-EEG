@@ -23,7 +23,3 @@ d 3.0 um node 5 node_planes: equal (6 segments)
    iteration: equal (status converged, k_final -1, d 3.2335 um, restacks 1)
    node_stack half None line 4.0 mult None: equal (fetched False, half 4.229 um)
 PASS (24 comparisons equal)
-
-real	1m42.977s
-user	1m41.577s
-sys	0m2.648s

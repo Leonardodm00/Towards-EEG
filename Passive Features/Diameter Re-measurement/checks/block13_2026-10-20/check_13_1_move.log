@@ -7,7 +7,3 @@ d 3.0 um node 3 m 3: equal; status converged, rounds 3, k_final -1, d_final 3.22
 d 3.0 um node 5 m 2: equal; status converged, rounds 3, k_final -1, d_final 3.2335 um, restacks 0
 d 3.0 um node 5 m 3: equal; status converged, rounds 3, k_final -1, d_final 3.2335 um, restacks 1
 PASS (16 runs equal)
-
-real	0m52.491s
-user	1m1.562s
-sys	0m2.726s

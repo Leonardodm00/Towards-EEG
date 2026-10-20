@@ -13,6 +13,11 @@ the block, a square fetched (half 5 um > block_half_um 3.5 um) and one sized
 by a measuring line (4 um) -- every key of the old dict, arrays bit for bit;
 and gradient_iteration on each pair of squares (m = 3, with restacks) --
 equal records.
+[2026-10-20, Block 13.3b] The old survey's measure_node was Block 5's chain,
+today's node_pipeline.measure_pilot (check_13_3_pilot.py), while the name
+measure_node is Block 13's chain since 13.3b: the old module is bound to
+measure_pilot, so that its node_planes measures as it did; both then make
+node_request's one request. Re-run after 13.3.
 
 Run (from the workstream folder, in a git clone that holds 84ea91f):
     python checks/block13_2026-10-20/check_13_2_square.py
@@ -24,7 +29,6 @@ from __future__ import annotations
 
 import dataclasses
 import importlib.util
-import math
 import os
 import subprocess
 import sys
@@ -80,6 +84,8 @@ def main():
         SV_OLD = load("survey_84ea91f", git_show("src/allen_diameter/analysis/survey.py"), tmp, "allen_diameter.analysis")
         PD_OLD = load("pd_84ea91f", git_show("scripts/plane_differences.py"), tmp)
         PD_OLD.survey = SV_OLD                     # the old node_stack on the old node_planes
+        from allen_diameter.analysis import node_pipeline as NP
+        SV_OLD.measure_node = NP.measure_pilot     # Block 5's chain under its 13.3b name (see the docstring)
         base = default_config()
         cfg = dataclasses.replace(base, measure=dataclasses.replace(base.measure, block_half_um=3.5))
         for d_true in (0.8, 3.0):

@@ -126,11 +126,45 @@ def area_ratio(swc, radius_new, types=(3, 4)):
     return dendrite_area_um2(swc, radius_new, types) / dendrite_area_um2(swc, None, types)
 
 
+# the NodeResult columns Block 13 added (the iteration, the SGT fit's shape, the pilot's), after Block 8's
+ITER_COLUMNS = ("k_iter", "iter_status", "n_rounds", "n_restacks", "w_hat_um", "beta_hat", "xi_hat", "zeta_hat",
+                "irls_ok", "at_bound", "d_pilot_um", "mu_pilot_per_um", "v0_pilot_um", "alpha_pilot", "B_bar_pilot",
+                "pilot_status", "pilot_flags")
 CSV_COLUMNS = ("node_id", "type", "x_um", "y_um", "z_um", "path_um", "reg_verdict", "s_star_um", "dz_star_um",
                "k_star", "z_sub_um", "cx_um", "cy_um", "cz_um", "theta_rad", "phi_rad", "steep", "vertical", "B_bar",
                "B_bar_region", "d_hat_um", "mu_hat_per_um", "v0_hat_um", "alpha_hat", "fit_status", "b_hat",
                "d_tilde_um", "flags", "filled_from", "d_final_um", "allen_radius_um", "sigma_fit_um",
-               "d_tilde_sigma_spread_um")
+               "d_tilde_sigma_spread_um") + ITER_COLUMNS
+
+
+def iter_columns(result):
+    """The ITER_COLUMNS of a NodeResult for a CSV row, its tuples joined by ';'."""
+    out = {c: getattr(result, c) for c in ITER_COLUMNS}
+    out.update(at_bound=";".join(result.at_bound), pilot_flags=";".join(result.pilot_flags))
+    return out
+
+
+# (column, the pilot's column standing for it): pilot_row_view
+PILOT_COLUMNS = (("d_hat_um", "d_pilot_um"), ("mu_hat_per_um", "mu_pilot_per_um"), ("v0_hat_um", "v0_pilot_um"),
+                 ("alpha_hat", "alpha_pilot"), ("B_bar", "B_bar_pilot"), ("fit_status", "pilot_status"),
+                 ("flags", "pilot_flags"), ("in_S", "in_S_pilot"), ("reject", "reject_pilot"))
+
+
+def pilot_row_view(row):
+    """A per-node CSV row (Block 8's, or the pilot run's) as the pilot's: the
+    columns of PILOT_COLUMNS replaced by the pilot's where the row holds them
+    (the row analogue of node_pipeline.pilot_view, for the diagnostics that
+    select or compare nodes by the pilot, D-061.2); a copy of the row itself
+    when its pilot_status is missing or empty (a pilot, or a row written
+    before Block 13)."""
+    out = dict(row)
+    status = row.get("pilot_status")
+    if status is None or (isinstance(status, float) and math.isnan(status)) or not str(status):
+        return out
+    for col, pcol in PILOT_COLUMNS:
+        if pcol in row:
+            out[col] = row[pcol]
+    return out
 
 
 def node_row(result, inversion, d_final, filled_from, allen_radius, sigma_fit, spread=float("nan")):
@@ -140,24 +174,27 @@ def node_row(result, inversion, d_final, filled_from, allen_radius, sigma_fit, s
     row.update(b_hat=inversion.b_hat, d_tilde_um=inversion.d_tilde_um, flags=";".join(flags),
                filled_from=str(filled_from), d_final_um=float(d_final), allen_radius_um=float(allen_radius),
                sigma_fit_um=float(sigma_fit), d_tilde_sigma_spread_um=float(spread))
+    row.update(iter_columns(result))
     return row
 
 
 def measure_cell(swc, provider, table, cfg, transform=None, regs=None, only=None, log=None):
     """Every dendrite node of the cell (or the stretches holding the node ids in
-    `only`): measure (Block 5), correct (Block 7), fill per stretch. transform:
+    `only`): measure (Block 13's measure_node, the cell's scene masking the
+    iteration's background), correct (Block 7), fill per stretch. transform:
     keyword arguments of to_image_um (shift_full_px, flip_y_full_h, z0_um);
     regs: {node_id: registration dict}. Returns (CSV rows, new radii (N,) --
     Allen's where nothing was measured or the fill left NaN --, area ratio)."""
     types = cfg.acquisition.dendrite_swc_types
     xyz_img = to_image_um(swc.xyz, cfg.acquisition.res0_um, **(transform or {}))
+    scene = cell_scene(swc, types, cfg.acquisition.res0_um, transform)      # Block 13: the background's mask
     radius_new = swc.radius.astype(float).copy()
     rows = []
     for run in stretches(swc, types):
         if only is not None and not any(int(swc.ids[r]) in only for r in run):
             continue
         branch, off = stretch_branch(swc, run, xyz_img)
-        results = [measure_node(branch, off + t, provider, cfg, (regs or {}).get(int(swc.ids[r])))
+        results = [measure_node(branch, off + t, provider, cfg, (regs or {}).get(int(swc.ids[r])), scene)
                    for t, r in enumerate(run)]
         invs = invert.correct_nodes(results, table, cfg)
         d_final, src = fill.fill_stretch([x.d_tilde_um for x in invs], 2.0 * swc.radius[run], cfg)

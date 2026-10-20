@@ -46,7 +46,7 @@ for p in (SRC, HERE):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from allen_diameter.analysis import survey  # noqa: E402
+from allen_diameter.analysis import cell, survey  # noqa: E402
 from allen_diameter.loading import table_io  # noqa: E402
 from build_table import load_config  # noqa: E402
 
@@ -80,10 +80,14 @@ def _same(x, y):
 
 
 def compare_with_pilot(result, row):
-    """The COMPARED fields where the re-measured NodeResult differs from the
-    pilot CSV row (a CSV float is written by repr, so it reads back exactly;
-    1e-9 relative leaves room for nothing but a change of code, configuration
-    or library). Fields the row lacks are skipped."""
+    """The COMPARED fields where the re-measured NodeResult (survey.node_planes:
+    the pilot) differs from the pilot CSV row read as the pilot's
+    (cell.pilot_row_view: since Block 13 the row's fitted columns are the
+    deliverable's at k_iter, the pilot's beside them). A CSV float is written
+    by repr, so it reads back exactly; 1e-9 relative leaves room for nothing
+    but a change of code, configuration or library. Fields the row lacks are
+    skipped."""
+    row = cell.pilot_row_view(row)
     return [c for c in COMPARED if c in row and not _same(getattr(result, c), row[c])]
 
 

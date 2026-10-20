@@ -43,7 +43,7 @@ from scipy.optimize import least_squares, lsq_linear
 
 from . import cell, phantoms, profiles
 from .fit import half_depth_width
-from .node_pipeline import measure_node, node_background
+from .node_pipeline import measure_pilot, node_background, pilot_view
 
 STATUS_OK = "ok"
 
@@ -203,8 +203,10 @@ def plane_scan(blk, node, branch, cfg):
 
 def calibration_reasons(result, cfg):
     """Why a NodeResult is not a calibration node (empty: it is one): outside
-    the selection S (Block 6's rule), or not thin, flat and faint."""
+    the selection S (Block 6's rule), or not thin, flat and faint -- all read
+    from the pilot (pilot_view; Block 13.3b, D-061.2)."""
     cal = cfg.calibration
+    result = pilot_view(result)
     out = phantoms.reject_reasons(result)
     if not result.d_hat_um <= cal.node_dhat_max_um:
         out.append("not_thin")
@@ -216,10 +218,11 @@ def calibration_reasons(result, cfg):
 
 
 def scan_node(branch, i, provider, cfg, reg=None):
-    """Measure node i (Block 5) and, when it is a calibration node, fetch its
-    block over k* - P .. k* + P (a second provider call) and scan it.
-    Returns (NodeResult, PlaneScan or None, reasons)."""
-    res = measure_node(branch, i, provider, cfg, reg)
+    """Measure node i's pilot (measure_pilot: Block 5, D-061.2) and, when it is
+    a calibration node, fetch its block over k* - P .. k* + P (a second
+    provider call) and scan it. Returns (NodeResult, PlaneScan or None,
+    reasons)."""
+    res = measure_pilot(branch, i, provider, cfg, reg)
     reasons = calibration_reasons(res, cfg)
     if reasons:
         return res, None, reasons

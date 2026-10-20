@@ -103,8 +103,13 @@ def reject_reasons(result):
 def run_replicate(cfg, seed, index, backend=None, d_override_um=None):
     """Render and measure replicate index; returns a flat dict (one CSV row): the
     draw (true d, phi, theta, mu, node centre), the chain's outputs (meas_* for
-    the measured centre and angles), flags, in_S, reject, ratio = d_hat / d and
-    the wall time. The table is indexed by the TRUE (d, phi) (procedure Eq. 2)."""
+    the measured centre and angles; since Block 13 the deliverable's fit at
+    k_iter, the iteration's k_iter, iter_status, n_rounds, n_restacks, the SGT
+    fit's w, beta, xi, zeta, irls_ok and at_bound, and the pilot's d_pilot_um,
+    alpha_pilot, pilot_status), flags, in_S, reject, ratio = d_hat / d and the
+    wall time. The table is indexed by the TRUE (d, phi) (procedure Eq. 2). A
+    phantom passes no scene to measure_node: its background masks its own
+    tube (D-064)."""
     t0 = time.perf_counter()
     draw, rng = draw_replicate(cfg, seed, index)
     if d_override_um is not None:      # end-to-end checks at fixed diameters (scripts/end_to_end.py)
@@ -123,6 +128,9 @@ def run_replicate(cfg, seed, index, backend=None, d_override_um=None):
     for name in ("k_star", "z_sub_um", "cx_um", "cy_um", "cz_um", "theta_rad", "phi_rad", "steep", "vertical",
                  "B_bar", "d_hat_um", "mu_hat_per_um", "v0_hat_um", "alpha_hat", "fit_status"):
         row[("meas_" if name in ("cx_um", "cy_um", "cz_um", "theta_rad", "phi_rad") else "") + name] = getattr(res, name)
-    row.update(flags=";".join(res.flags), in_S=not reasons, reject=";".join(reasons),
-               ratio=res.d_hat_um / draw.d_um, seconds=time.perf_counter() - t0)
+    for name in ("k_iter", "iter_status", "n_rounds", "n_restacks", "w_hat_um", "beta_hat", "xi_hat", "zeta_hat",
+                 "irls_ok", "d_pilot_um", "alpha_pilot", "pilot_status"):     # Block 13: the iteration, the pilot
+        row[name] = getattr(res, name)
+    row.update(at_bound=";".join(res.at_bound), flags=";".join(res.flags), in_S=not reasons,
+               reject=";".join(reasons), ratio=res.d_hat_um / draw.d_um, seconds=time.perf_counter() - t0)
     return row

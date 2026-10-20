@@ -1,5 +1,8 @@
 """Smoke test for the per-node chain -- Block 5 in specs/SPEC.md
-(handoff Eqs. 1-5, 9; D-018.1; D-023; D-024).
+(handoff Eqs. 1-5, 9; D-018.1; D-023; D-024). Since Block 13 the chain of
+Block 5 is the pilot, node_pipeline.measure_pilot, which these checks call;
+measure_node (the pilot, the iteration and Block 12's fit) is checked in
+test_smoke_block13.py.
 
 Checks
     test_known_answer   bilinear profiles of a linear ramp are exact, and NaN
@@ -17,7 +20,8 @@ Checks
                         phantoms with the default kernel: theta within 2 deg,
                         phi within 4 deg, d_hat / d in a plausible band; the
                         configured focus rule sets k* (D-030): on a dark tube
-                        whose dip depth is pulled one plane toward the light,
+                        whose dip depth is pulled toward the light (one or two
+                        planes, by the noise draw of the planes requested),
                         k* is the tube's plane under gradient_energy and the
                         shifted plane under dip_depth, and k_star_depth is the
                         shifted plane under both
@@ -118,7 +122,7 @@ def make_provider(tubes, mus, cfg, seed, pad_px=8, invalid_below=None):
 def run_phantom(d, phi_deg, theta, cfg, seed=1, mu=1.0, c=(0.03, -0.02, 0.05), U=6.0, **kw):
     phi = math.radians(phi_deg)
     tube = G.Tube(c, 0.5 * d, phi, theta, 1.0, U, "axial")
-    return NP.measure_node(phantom_branch(c, phi, theta, 0.5 * d), 4, make_provider([tube], [mu], cfg, seed, **kw), cfg)
+    return NP.measure_pilot(phantom_branch(c, phi, theta, 0.5 * d), 4, make_provider([tube], [mu], cfg, seed, **kw), cfg)
 
 
 # ---------------------------------------------------------------- checks ---
@@ -222,7 +226,9 @@ def test_invariants():
         assert abs(dth) <= 2.0 and abs(math.degrees(res.phi_rad) - phi_deg) <= 4.0, (d, phi_deg, dth, math.degrees(res.phi_rad))
         assert 0.95 <= res.d_hat_um / d <= 1.25 and res.fit_status == "converged", (d, phi_deg, res.d_hat_um, res.flags)
     # D-030: the configured rule sets k*; the dip depth is recorded beside it. A dark flat tube (d 1.5 um,
-    # mu 1/um, centre in plane 0) pulls the dip depth one plane toward the light (test_smoke_focus.py)
+    # mu 1/um, centre in plane 0) pulls the dip depth off its plane toward the light (test_smoke_focus.py): one
+    # plane under Block 5's own request, two since Block 13's request spans K = k_SWC +- 6 (13 planes rendered,
+    # so every plane's camera noise is another draw); the gradient energy stays on plane 0 under both
     c = (0.03, -0.02, 0.05)
     tube = G.Tube(c, 0.75, 0.0, 0.5, 1.0, 6.0, "axial")
     cache = {}
@@ -233,14 +239,14 @@ def test_invariants():
             cache[args] = base(*args)
         return cache[args]
     br = phantom_branch(c, 0.0, 0.5, 0.75)
-    ge = NP.measure_node(br, 4, provider, cfg)
-    dd = NP.measure_node(br, 4, provider, dataclasses.replace(cfg, measure=dataclasses.replace(cfg.measure, focus_rule="dip_depth")))
+    ge = NP.measure_pilot(br, 4, provider, cfg)
+    dd = NP.measure_pilot(br, 4, provider, dataclasses.replace(cfg, measure=dataclasses.replace(cfg.measure, focus_rule="dip_depth")))
     assert ge.focus_rule == "gradient_energy" and dd.focus_rule == "dip_depth"
-    assert ge.k_star == 0 and ge.k_star_depth == -1 and dd.k_star == -1 and dd.k_star_depth == -1, \
+    assert ge.k_star == 0 and ge.k_star_depth in (-1, -2) and dd.k_star == dd.k_star_depth == ge.k_star_depth, \
         (ge.k_star, ge.k_star_depth, dd.k_star, dd.k_star_depth)
     # each curve is the one its name says: the maxima of the recorded curves are those planes
     peak = lambda curve: int(ge.focus_planes[int(np.nanargmax(curve))])  # noqa: E731
-    assert peak(ge.focus_score) == 0 and peak(ge.focus_depth) == -1, (ge.focus_score, ge.focus_depth)
+    assert peak(ge.focus_score) == 0 and peak(ge.focus_depth) == ge.k_star_depth, (ge.focus_score, ge.focus_depth)
 
 
 def test_contract():
@@ -278,14 +284,14 @@ def test_edge_cases():
     c1 = np.array([0.03, -0.02, 0.05])
     c2 = c1 + 1.8 * np.array([-math.sin(th), math.cos(th), 0.0])
     tubes = [G.Tube(tuple(c1), 0.4, 0.0, th, 1.0, 6.0, "axial"), G.Tube(tuple(c2), 0.4, 0.0, th, 1.0, 6.0, "axial")]
-    res = NP.measure_node(phantom_branch(c1, 0.0, th, 0.4), 4, make_provider(tubes, [1.0, 1.0], cfg, 1), cfg)
+    res = NP.measure_pilot(phantom_branch(c1, 0.0, th, 0.4), 4, make_provider(tubes, [1.0, 1.0], cfg, 1), cfg)
     assert "crossing" in res.flags, res.flags
     # planes below the node missing: the focus search is cut short
     tube = G.Tube((0.0, 0.0, 0.05), 0.4, 0.0, th, 1.0, 6.0, "axial")
     br = phantom_branch((0.0, 0.0, 0.05), 0.0, th, 0.4)
-    res = NP.measure_node(br, 4, make_provider([tube], [1.0], cfg, 1, invalid_below=0), cfg)
+    res = NP.measure_pilot(br, 4, make_provider([tube], [1.0], cfg, 1, invalid_below=0), cfg)
     assert "stack_edge" in res.flags, (res.flags, res.focus_score)
-    res = NP.measure_node(br, 4, make_provider([tube], [1.0], cfg, 1, invalid_below=99), cfg)
+    res = NP.measure_pilot(br, 4, make_provider([tube], [1.0], cfg, 1, invalid_below=99), cfg)
     assert res.k_star == -1 and res.fit_status == "none"
     # a near-vertical tube
     res = run_phantom(0.8, 88.0, 0.5, small_cfg(), U=2.5)

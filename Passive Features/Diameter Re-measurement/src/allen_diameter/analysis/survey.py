@@ -1,8 +1,9 @@
 """Pilot measurements on real cells, before a bias table exists -- Block 11 in
 specs/SPEC.md (design handoff Next actions 2-3 and 7; procedure s.3.5, s.3.10).
 
-  measure_nodes      the per-node chain (Block 5) on the dendrite stretches
-                     that hold the requested node ids; no correction
+  measure_nodes      the per-node chain (Block 13's measure_node) on the
+                     dendrite stretches that hold the requested node ids; no
+                     correction
   pilot_row          one CSV row: the NodeResult columns, Allen's radius,
                      sigma_fit, membership of the selection S and its reasons,
                      the focus rule and the plane the dip depth would have
@@ -37,7 +38,7 @@ from typing import Dict, List
 import numpy as np
 
 from . import background, calibration, camera_fit, cell, phantoms, plane_iteration, profiles
-from .node_pipeline import measure_node
+from .node_pipeline import measure_node, measure_pilot, pilot_view
 from ..loading import swc_io
 from ..model import tube_model
 
@@ -46,10 +47,12 @@ PERCENTILES = (5, 10, 25, 50, 75, 90, 95)
 
 def measure_nodes(swc, provider, cfg, transform=None, regs=None, only=None, log=None):
     """Every node of the dendrite stretches holding a node id of `only` (None:
-    every dendrite node), measured (Block 5) and not corrected. Returns a list
-    of (NodeResult, Allen radius um, Branch, index in the branch)."""
+    every dendrite node), measured (Block 13's measure_node, the cell's scene
+    masking the iteration's background) and not corrected. Returns a list of
+    (NodeResult, Allen radius um, Branch, index in the branch)."""
     types = cfg.acquisition.dendrite_swc_types
     xyz_img = cell.to_image_um(swc.xyz, cfg.acquisition.res0_um, **(transform or {}))
+    scene = cell.cell_scene(swc, types, cfg.acquisition.res0_um, transform)
     out = []
     for run in cell.stretches(swc, types):
         if only is not None and not any(int(swc.ids[r]) in only for r in run):
@@ -57,7 +60,7 @@ def measure_nodes(swc, provider, cfg, transform=None, regs=None, only=None, log=
         branch, off = cell.stretch_branch(swc, run, xyz_img)
         for t, r in enumerate(run):
             nid = int(swc.ids[r])
-            out.append((measure_node(branch, off + t, provider, cfg, (regs or {}).get(nid)),
+            out.append((measure_node(branch, off + t, provider, cfg, (regs or {}).get(nid), scene),
                         float(swc.radius[r]), branch, off + t))
         if log is not None:
             log("stretch of %d nodes from node %d measured" % (len(run), int(swc.ids[run[0]])))
@@ -66,7 +69,10 @@ def measure_nodes(swc, provider, cfg, transform=None, regs=None, only=None, log=
 
 def pilot_row(result, allen_radius_um, cfg):
     """The NodeResult columns of the per-node CSV (Block 8, before the
-    correction), plus allen_radius_um, sigma_fit_um, in_S and reject."""
+    correction), plus allen_radius_um, sigma_fit_um, in_S and reject, the
+    calibration flag (of the pilot, Block 10), the focus columns of D-030,
+    Block 13's columns (cell.ITER_COLUMNS) and the pilot's membership of S
+    (in_S_pilot, reject_pilot; cell.pilot_row_view reads them)."""
     row = {c: getattr(result, c) for c in cell.CSV_COLUMNS[:25]}
     row["flags"] = ";".join(result.flags)
     reasons = phantoms.reject_reasons(result)
@@ -74,6 +80,9 @@ def pilot_row(result, allen_radius_um, cfg):
                in_S=not reasons, reject=";".join(reasons),
                calibration_node=not calibration.calibration_reasons(result, cfg),
                focus_rule=str(result.focus_rule), k_star_depth=int(result.k_star_depth))
+    row.update(cell.iter_columns(result))
+    pilot_reasons = phantoms.reject_reasons(pilot_view(result))     # the pilot's S, for the diagnostics (D-061.2)
+    row.update(in_S_pilot=not pilot_reasons, reject_pilot=";".join(pilot_reasons))
     return row
 
 
@@ -133,7 +142,9 @@ def profile_at_node(provider, result, cfg):
     """(v (n,) um, I (n,) grey levels, model (n,) grey levels or None) of a
     measured node: the Eq. 9 profile through its centre along its final line
     in plane k*, from a fresh one-plane block (cached for real data), and the
-    fitted model at the same offsets."""
+    pilot's fitted model at the same offsets (Block 3's fit at k*, with the
+    pilot's B_bar: pilot_view, Block 13)."""
+    result = pilot_view(result)
     m, p = cfg.measure, cfg.acquisition.res0_um
     if not math.isfinite(result.z_sub_um):
         raise ValueError("profile_at_node: the node has no sharpest plane")
@@ -158,11 +169,12 @@ def profile_at_node(provider, result, cfg):
 def node_planes(swc, provider, cfg, node_id, transform=None):
     """What the plane montage of one node draws (Block 11, 2026-10-07).
 
-    The node is measured again by Block 5 on its own stretch, as measure_nodes
-    measures it in the pilot: the same Branch, hence the same single provider
-    request, so a real block comes back from the fetcher's cache and the result
-    equals the pilot's for an unchanged configuration. Returns a dict:
-      result, branch, index    NodeResult, its Branch, the node's index in it
+    The node's pilot is measured again on its own stretch (measure_pilot,
+    D-061.2), as measure_nodes measures it: the same Branch, hence the same
+    single provider request (node_request's), so a real block comes back from
+    the fetcher's cache and the result equals pilot_view of the pilot run's
+    for an unchanged configuration. Returns a dict:
+      result, branch, index    the pilot's NodeResult, its Branch, the node's index in it
       block, ks, valid, frame  the block it was measured on (fetch_zblock contract)
       k_swc                    round(z / dz) of the node, the centre of its plane range
       allen_radius_um          Allen's radius at the node
@@ -197,7 +209,7 @@ def node_planes(swc, provider, cfg, node_id, transform=None):
     def recording(*args):
         got.append(provider(*args))
         return got[-1]
-    result = measure_node(branch, index, recording, cfg)
+    result = measure_pilot(branch, index, recording, cfg)          # D-061.2: the diagnostics read the pilot
     block, ks, valid, frame = got[0]
     scene = cell.cell_scene(swc, types, cfg.acquisition.res0_um, transform)          # Block 13.2: one rule
     segments = plane_iteration.scene_segments(scene, frame, block.shape[1:], branch)

@@ -135,6 +135,11 @@ class MeasureConfig:
     sgt_start_shapes: Tuple[Tuple[float, float, float], ...] = ((2.0, 0.0, 1.0), (1.0, 0.0, 1.0), (5.0, 0.0, 1.0), (2.0, 1.0, 1.0))  # source: D-052.2, PROVISIONAL (the sandbox check's): (beta, xi, zeta) started from the Gaussian of fitted width
     sgt_start_w_um: float = 0.7       # source: D-052.2, PROVISIONAL: the width of the start from Block 5's (d, mu, v0)
     sgt_base_start_shape: Tuple[float, float, float] = (2.0, 0.0, 1.0)  # source: D-052.2, PROVISIONAL: the shape of that start (Gaussian)
+    # -- the Allen-guided plane iteration, the deliverable's plane (D-042, D-044, D-052.3; Block 13)
+    iter_line_mult: float = 3.0       # source: D-044 (user, 2026-10-12): round i's line is +-iter_line_mult d_(i-1) / 2 (+-1.5 d)
+    iter_max_rounds: int = 5          # source: D-042 (user, 2026-10-10), PROVISIONAL reading (D-052 (h)): at most this many rounds
+    iter_planes_half: int = 6         # source: D-052.3 / D-042: the planes K = k_SWC +- this
+    iter_bg_margin_um: float = 4.0    # source: D-036, PROVISIONAL (D-052 (h)): B_k from pixels farther than Allen's radius + this from every traced segment and the soma
     # -- selection S and flags (procedure s.3.2; D-024)
     alpha_dark_flag: float = 1.0      # source: D-024 (impl-handoff Findings (4)); threshold to be set on real alpha_hat
     steep_tan_diagnostic: float = 0.58  # source: handoff, old tool STEEP_TAN; DIAGNOSTIC COLUMN ONLY, never a selection rule (D-024)
@@ -326,6 +331,7 @@ class DiameterConfig:
             raise ValueError("measure.fit_params must be ('d', 'mu', 'v0'): B is fixed (D-018) "
                              "and the darkness parameter is mu (D-019); got %r" % (m.fit_params,))
         _check_sgt(m)
+        _check_iteration(m)
         if m.sigma_fit_um not in m.sigma_fit_study_um:
             raise ValueError("measure.sigma_fit_um (%g) must be one of sigma_fit_study_um %r (D-023)"
                              % (m.sigma_fit_um, m.sigma_fit_study_um))
@@ -446,6 +452,26 @@ def _check_sgt(m: "MeasureConfig") -> None:
                          "inside sgt_beta_bounds, sgt_xi_bounds and exp(sgt_ln_zeta_bounds)")
     if not (w_lo <= m.sgt_start_w_um <= w_hi):
         raise ValueError("measure.sgt_start_w_um must lie within sgt_w_bounds_um")
+
+
+def _check_iteration(m: "MeasureConfig") -> None:
+    """The iteration's settings (D-042, D-044, D-052.3, Block 13): a finite
+    line multiplier > 0; a round limit and a plane half-range that are
+    integers >= 1 (5 and 5.0 pass; 5.5, True and "5" do not, as
+    plane_iteration.check_iteration); a finite background margin >= 0."""
+    def whole(x):
+        return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x) and float(x).is_integer()
+    mult = m.iter_line_mult
+    if not (isinstance(mult, (int, float)) and not isinstance(mult, bool) and math.isfinite(mult) and mult > 0):
+        raise ValueError("measure.iter_line_mult must be finite and > 0, got %r" % (mult,))
+    if not (whole(m.iter_max_rounds) and m.iter_max_rounds >= 1 and whole(m.iter_planes_half)
+            and m.iter_planes_half >= 1):
+        raise ValueError("measure.iter_max_rounds and iter_planes_half must be integers >= 1, got %r and %r"
+                         % (m.iter_max_rounds, m.iter_planes_half))
+    margin = m.iter_bg_margin_um
+    if not (isinstance(margin, (int, float)) and not isinstance(margin, bool) and math.isfinite(margin)
+            and margin >= 0):
+        raise ValueError("measure.iter_bg_margin_um must be finite and >= 0, got %r" % (margin,))
 
 
 def _check_qtables(tables: Any) -> None:
