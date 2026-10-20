@@ -17,7 +17,9 @@ the entry was written before the code; `smoke-tested <date>` means the block's
 smoke suite passed in the sandbox on that date.
 
 Last reviewed at commit: (branch `sci/noise-fit`, baseline `9ed4da4` = the
-content of `IhFit_main_2026-10-16.zip`, a git archive of `main`)
+content of `IhFit_main_2026-10-16.zip`, a git archive of `main`; Block 1 reached
+`main` as `e8ed84e`, and Block 2 and the tools below were verified with `git am`
+on `main` at `e8ed84e` on 2026-10-20)
 
 ## 0. Coverage
 
@@ -31,6 +33,8 @@ Paths this spec covers (relative to `Passive Features/HPC script/Ih Fit/`):
 - `noise_calibration.lag_autocorr` (Block 1); the rest of
   `noise_calibration.py` is NOT yet covered
 - `noise_law.py`, `smoke_noise_law.py` (Block 2)
+- `noise_fit_gates.py`, `smoke_noise_fit_gates.py`, `cluster_gates_noise_fit.sh`
+  (tools: the cluster-side checks and the archive inspection, section 5)
 - (to be added block by block) `noise_windows.py`,
   `noise_fit.py`, `run_noise_fit.py`, `smoke_noise_fit.py`, the `sens_*.py`
   scripts, the OU term of `synthetic_ground_truth.add_recording_noise`
@@ -214,21 +218,36 @@ with theta_hat at every iteration.
 - Confirmed: yes -- D-017, D-034, D-056 (i) (user); the exact-discrete V in place of eq. (25)'s continuous form is the assistant's refinement, recorded in 2.4 and in the decision log's changelog (2026-10-19).
 - Status: smoke-tested 2026-10-19 (sandbox: M1-M9 9/9, about 5 s; mutation-tested as above).
 
+### Tools (not blocks): cluster-side checks and the SS archive inspection
+
+- Files: `noise_fit_gates.py` (read-only helpers), `cluster_gates_noise_fit.sh` (the runner), `smoke_noise_fit_gates.py` (T1-T8).
+- `python noise_fit_gates.py bytes [--folder DIR]` -> `BYTES: ok|FAIL (...)`, exit 0/1: top-level `*.py` pure ASCII; `*.sh`, `*.pbs`, `mod/*.mod` without CR.
+- `python noise_fit_gates.py compile [--folder DIR]` -> `COMPILE: ok|FAIL (...)`, exit 0/1: every top-level `*.py` compiles in memory (no `.pyc`).
+- `python noise_fit_gates.py ss-pulses DIR [DIR ...]` -> per specimen: the keys, dtypes and shapes of `ss_pulses.npz` (Format A or B); per sweep number (or, without one, per chain of adjacent windows) the window count, the polarity string (`+` dep, `-` hyp), the adjacent consecutive pairs and their onset spacing in ms, the gaps; the `metadata.json` keys about SS; then one line per cell, `SS_PULSES <id>: format=A|B sweep_number=yes|no n_pulses=.. n_sweeps|n_chains=.. per_sweep|per_chain=.. adjacent=a/b opposite_polarity_adjacent=c/a spacing_ms=.. fs_Hz=.. window_ms=..`; exit 0 when every cell was read and carries sweep numbers, else 1. Adjacency: windows k, k+1 of one sweep whose onsets are D samples apart (D < window length n) agree exactly on n - D samples of voltage and of current; the smallest D >= 1 with at least `MIN_OVERLAP` = 100 agreeing samples is the spacing (custom: no library function; a 16-sample vectorised pre-filter keeps it fast on ADC-quantised traces, where single values recur).
+- `bash cluster_gates_noise_fit.sh` (FULL) or `QUICK=1 bash ...`: one `PASS|FAIL|SKIP  <check>  -- <seen>` line per check -- G0 interpreter, G1 numpy/scipy/statsmodels, G2 Blocks 1-2 committed and no tracked file of the folder modified, G3 bytes, G4 compile, G5 `smoke_noise_stats` 6/6, G6 `smoke_noise_law` 9/9, and in FULL mode G7 NEURON/skopt and `x86_64/special` (built with `nrnivmodl mod` under the submit scripts' `.nrnivmodl.lock` only when missing or older than `mod/*.mod`), G8 `smoke_ih_fit` 12/12, G9 `smoke_ls_baseline_qc` 10/10, G10 `smoke_ih_recovery` 14/14, G11 `regression_passive_identity.py` PASS on `$IH_ARCHIVE_GROUP/specimen_$REG_SPECIMEN`, G12 `noise_fit_gates.py ss-pulses` on `$NPZ_SPECIMENS`; then `GATES noise-fit: p passed, f failed, s skipped` and `VERDICT: SETTLED|NOT SETTLED -- <reason>` (SETTLED only in FULL mode with nothing failed or skipped). A check passes only on a line it must see (the suite's own summary line), never on an exit status. Logs in `$GATE_LOG_DIR` (default `~/ih_fit_gate_logs/<date_time>/`), never in the repository; no tracked file is written. Exit 0 iff nothing failed.
+- Defaults: `IH_ARCHIVE_GROUP=/davinci-1/home/ldellamea/Human Neurons Fitting/L3_exc`, `REG_SPECIMEN=508282493`, `NPZ_SPECIMENS="508282493 569844159"`, `PYTHON=python`.
+- Test oracles (`smoke_noise_fit_gates.py`): T1 planted CR and non-ASCII files flagged, nothing else; T2 a syntax error named, no `.pyc`; T3 a writer-like Format-A fixture (two sweeps of an ADC-quantised trace, spacings 200.000 and 200.040 ms, one pulse dropped) gives the exact expected summary and the gap; T4 Format B the same; T5 no `sweep_number`: three adjacency chains; T6 no false adjacency in 200 independent quantised pairs, a 50-sample overlap refused unless the minimum is lowered; T7 the runner's QUICK mode passes G0, G1, G3-G6 and cannot settle, a bad interpreter fails G0 with exit 1; T8 ASCII/LF. Mutation-tested 2026-10-20 (no overlap minimum, sweep numbers ignored, a wrong ms scale, `mod/` not scanned, a check certified on exit status: each caught).
+- Status: smoke-tested 2026-10-20 (sandbox: T1-T8 8/8). The FULL runner was run in the sandbox on `main` + Block 2 + these tools, with `Biological Fit/` and `Synthetic Passive fit Test/` from `main` and a synthetic archive group; its result is in the decision log's changelog of 2026-10-20. Not run here: G11 on a real cell and G12 on the real archive (cluster).
+
 ## 6. Pipeline entry points
 
 | Command | Purpose | Minimal configuration for testing | Expected runtime |
 |---|---|---|---|
 | `python smoke_noise_stats.py` | Block 1 smoke (N1-N6) | none | seconds |
 | `python smoke_noise_law.py` | Block 2 smoke (M1-M9) | none | about 5 s |
+| `python smoke_noise_fit_gates.py` | tools smoke (T1-T8) | none | about 15 s |
+| `bash cluster_gates_noise_fit.sh` (`QUICK=1` for the fast half) | every cluster-side check of Blocks 1-2 and the SS archive read, one PASS/FAIL/SKIP line each and a VERDICT | the conda env active; on the cluster nothing else | about 15 min (QUICK < 1 min) |
 | `python smoke_ih_recovery.py`, `python smoke_ih_fit.py`, `python smoke_ls_baseline_qc.py` | existing suites, re-run after Block 1 (R8/R10 bands now through `sample_acf`) | NEURON + compiled `mod/` | minutes |
 | `python regression_passive_identity.py --ref-dir "../Biological Fit" --archive-cell <dir>` | bit-for-bit gate against the oracle folder | the oracle folder and one archive cell | minutes |
 
 ## 7. Not executable in the sandbox
 
 - `regression_passive_identity.py`: `Biological Fit/` is not in the zip baseline and the archive is on the cluster; skipped here, to be run on the cluster (command in README).
-- Anything reading the real archive (`noise_calibration.py --group-dir`, S3).
+- Anything reading the real archive (`noise_calibration.py --group-dir`, S3, G12 of `cluster_gates_noise_fit.sh`).
+- G11 of `cluster_gates_noise_fit.sh` on a real archive cell (here only on a synthetic cell, with `Biological Fit/` from `main`).
 
 ## 8. Open questions
 
-- Does `ss_pulses.npz` carry sweep numbers? The loader reads none (D-056 open point; cluster check requested 2026-10-18).
+- ~~Does `ss_pulses.npz` carry sweep numbers? The loader reads none (D-056 open point; cluster check requested 2026-10-18).~~ [answered at source 2026-10-20; confirmation on the files pending: G12 of `cluster_gates_noise_fit.sh`] The archive writer (`Passive Features/Allen Institute Data/save_alleninstitute_data (6).py`, `_archive_one_cell`, every copy in that file) stores `sweep_number` (int64, one per pulse) in Format A and B; a sweep's windows in onset order (`_detect_pulses_in_current` scans the current trace); each window (-10, +200) ms around its onset; pulses failing the amplitude/duration QC (200 +/- 30 pA, 0.5 +/- 0.5 ms) or too close to a trace boundary dropped silently; onset times not stored. Its docstring, citing the Allen tech paper: all 20 pulses of the SS protocol, alternating polarity, 200 ms apart, lie in ONE sweep. Adjacency and the true onset spacing follow from the exact overlap of consecutive windows (tools, section 5).
+- Block 5 (the twins' generator): `synthetic_ground_truth.simulate_ss_protocol` gives every SS pulse its own sweep number and independent noise. Under D-017 (per-sweep offset and tilt) and D-056 (i) (continuous sweeps in the fit's simulator), the twins' SS sweeps should carry the real sweep structure -- 20 pulses per sweep with the slow component and the tilt continuous across them -- or the twins' SS windows (and the SS bundles the I_h fit averages) are independent where the real cells' are not. To settle with the user when Block 5 is specified.
 - Root `specs/SPEC.md` Coverage pointing to this file (user's call, D-056 (ii)).

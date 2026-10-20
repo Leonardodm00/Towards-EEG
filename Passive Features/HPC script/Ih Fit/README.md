@@ -22,6 +22,9 @@ Files that are NEW relative to `Biological Fit/` (Stage 0-1):
 | `smoke_noise_stats.py` | its smoke suite N1-N6 (seconds; no NEURON) |
 | `noise_law.py` | the Stage-7 noise law (D-017, D-034): `NoiseLaw`, the simulator from unit draws (`draw_units`, `simulate_traces`, `simulate_sweep`; one continuous trace per sweep, D-056 (i)), the closed-form moments of a demeaned window (`expected_s0`, `expected_sl`, `closed_form_sd`, `closed_form_acf`, `visible_share`) and the window-mean semivariogram (`semivariogram`, exact for the sampled law). Model layer only; Block 2 of `specs/SPEC.md` |
 | `smoke_noise_law.py` | its smoke suite M1-M9 (about 5 s; no NEURON) |
+| `cluster_gates_noise_fit.sh` | the cluster-side checks of the noise-fit blocks (G0-G12: env, bytes, syntax, every suite, the regression gate on a real cell, the SS archive's sweep structure); one PASS/FAIL/SKIP line each, a VERDICT; writes only its logs |
+| `noise_fit_gates.py` | its read-only helpers: `bytes`, `compile`, `ss-pulses <specimen_dir>...` (what `ss_pulses.npz` holds: sweep numbers, polarity order, adjacency and true onset spacing of the stored windows) |
+| `smoke_noise_fit_gates.py` | their smoke suite T1-T8 (about 15 s; no NEURON) |
 | `noise_calibration.py` | per-sweep recording noise of REAL archive cells (sigma, lag-1 rho, sampling rate, pulses per polarity, window length), read with the fitter's own estimator on single sweeps only; every autocorrelation through `noise_stats.sample_acf`. Stand-alone: `python noise_calibration.py --group-dir <ARCHIVE_ROOT>/L3_exc --out noise_table.csv` |
 | `gen_from_manifest.py` | manifest row -> Phase-0 archive (pure mapping + a NEURON-side generator) |
 | `ih_recovery_report.py` | **pure**: truth vs estimate, the recovery table, the C_m inflation, the false-positive table, the gate |
@@ -71,6 +74,15 @@ or keep the path out of `-v` -- which is the other reason the code directory
 is taken from `$PBS_O_WORKDIR`: its path contains a space.
 
 ## First run on the cluster (login node, conda env `prova`)
+
+One command runs every check below and prints one PASS/FAIL/SKIP line per
+check, a summary and a VERDICT (logs in `~/ih_fit_gate_logs/`):
+
+    module load proxy && python -m pip install statsmodels   # once (D-029 (v))
+    bash cluster_gates_noise_fit.sh        # about 15 min; QUICK=1 for the fast half
+                                           # expect "VERDICT: SETTLED -- ..."
+
+The same checks by hand:
 
     cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/HPC script/Ih Fit"
     module load proxy && python -m pip install statsmodels   # once (D-029 (v)); or conda install -c conda-forge statsmodels
