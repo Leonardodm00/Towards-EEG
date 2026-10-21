@@ -10,7 +10,8 @@ Checks
     test_convergence    skipped: no discretisation parameter
     test_invariants     m_hat(d_tilde) = d_hat at every inverted node
     test_contract       Inversion fields; correct_nodes keeps the selection
-                        reasons of nodes outside S; end_to_end.phantom_config
+                        reasons of nodes outside S and inverts a dark node
+                        (D-030: a label, Block 14.1); end_to_end.phantom_config
                         draws mu on [lo / d, hi / d] (gate 2's --alpha-range)
     test_determinism    skipped: deterministic closed forms and root finding
     test_edge_cases     non-monotone table, out-of-domain d_hat, large
@@ -131,11 +132,12 @@ def test_invariants():
 
 def test_contract():
     T, cfg = exact_table(lambda d, p: 1.0 + 0.05 / d)
-    out = IV.correct_nodes([node(1.05, 0.2), node(1.05, 0.2, flags=("faint",)), node(float("nan"), 0.2, status="none")],
-                           T, cfg)
+    out = IV.correct_nodes([node(1.05, 0.2), node(1.05, 0.2, flags=("faint",)), node(float("nan"), 0.2, status="none"),
+                            node(1.05, 0.2, flags=("dark", "steep"))], T, cfg)
     assert isinstance(out[0], IV.Inversion) and abs(out[0].d_tilde_um - 1.0) <= 1e-3 and out[0].flags == ()
     assert math.isnan(out[1].d_tilde_um) and out[1].flags == ("faint",)
     assert math.isnan(out[2].d_tilde_um) and out[2].flags == ("status:none",)
+    assert out[3].d_tilde_um == out[0].d_tilde_um and out[3].flags == (), out[3]       # D-030: dark is a label
     # gate 2's test phantoms: --alpha-range lo,hi draws mu on [lo / d, hi / d] for each diameter
     sys.path.insert(0, str(WS / "scripts"))
     import end_to_end

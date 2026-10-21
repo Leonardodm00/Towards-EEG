@@ -17,10 +17,11 @@ Checks
                         merges; a changed estimator setting is refused
     test_determinism    a rendered replicate repeats bit for bit
     test_edge_cases     unsupported estimators raise; too few rows; bad inputs;
-                        failure_rate_ignore: a replicate failing the dark
-                        screen leaves the failure rate whatever else it failed
-                        ("stack_edge;dark" too); "crossing" and an unlabelled
-                        rejection count as failures; () counts all
+                        failure_rate_ignore: () (the default, D-057.1)
+                        counts every row; a named screen ("dark" or
+                        "stack_edge") removes the rows it rejected, whatever
+                        else they failed; "crossing" and an unlabelled
+                        rejection count as failures
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -258,19 +259,21 @@ def test_edge_cases():
         except NotImplementedError:
             continue
         raise AssertionError("unsupported estimator accepted: %r" % change)
-    # failure_rate_ignore = ("dark",): a replicate failing the dark screen leaves the failure rate,
-    # whatever else it failed; one failing other screens, or with no reason given, is a failure
+    # failure_rate_ignore: the default () counts every row (D-057.1); a named screen removes the rows it rejected,
+    # whatever else they failed; a row failing other screens, or with no reason given, is a failure
     cfg = default_config()
+    assert cfg.correction.failure_rate_ignore == ()
     base = [dict(r, reject="") for r in rows]
     t0 = fit_table(base, cfg)
     extra = [dict(d_um=1.0, phi_rad=0.2, ratio=float("nan"), in_S=False, reject=why) for why in
              ("dark", "dark", "stack_edge;dark", "crossing", "")]
-    t1 = fit_table(base + extra, cfg)
-    assert t1.X_all.shape[0] == t0.X_all.shape[0] + 2 and int((~t1.ok_all).sum()) == int((~t0.ok_all).sum()) + 2
-    assert t1.n_rows == len(base) + 5
-    t2 = fit_table(base + extra, dataclasses.replace(cfg, correction=dataclasses.replace(cfg.correction,
-                                                                                        failure_rate_ignore=())))
-    assert t2.X_all.shape[0] == t0.X_all.shape[0] + 5
+    t2 = fit_table(base + extra, cfg)
+    assert t2.X_all.shape[0] == t0.X_all.shape[0] + 5 and int((~t2.ok_all).sum()) == int((~t0.ok_all).sum()) + 5
+    assert t2.n_rows == len(base) + 5
+    for named, left in ((("dark",), 2), (("stack_edge",), 4)):
+        t1 = fit_table(base + extra, dataclasses.replace(cfg, correction=dataclasses.replace(
+            cfg.correction, failure_rate_ignore=named)))
+        assert t1.X_all.shape[0] == t0.X_all.shape[0] + left, (named, t1.X_all.shape[0] - t0.X_all.shape[0])
     for bad in (lambda: fit_table(rows[:6], default_config()), lambda: table_inputs([0.0], [0.1]),
                 lambda: table_inputs([1.0], [np.nan])):
         try:

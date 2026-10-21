@@ -162,7 +162,7 @@ class CorrectionConfig:
     table_statistic: str = "mean"            # source: procedure Eq. 2 (mean); median = labelled comparison
     bias_flag_threshold: float = 0.2         # source: D5, confirmed by D-024 (|b_hat - 1| > 0.2)
     max_failure_rate: float = 0.2            # source: impl-handoff, PROVISIONAL (local failure rate above which the region is flagged)
-    failure_rate_ignore: Tuple[str, ...] = ("dark",)  # source: PROVISIONAL (gate 2, 2026-10-06): replicates failing any of these screens leave the failure rate, which becomes conditional on passing them (a real node applies them to itself: its own alpha_hat); with the provisional mu range the dark share made every d >= 1 um node high_failure
+    failure_rate_ignore: Tuple[str, ...] = ()  # source: D-057 (D-057.1): every row enters the failure count; a screen named here still removes the rows it rejected [was ("dark",), PROVISIONAL, gate 2 2026-10-06]
     inversion_method: str = "brentq"         # source: procedure s.3.9
     inversion_grid_points: int = 256         # source: PROVISIONAL (Block 7): log-spaced diameters on which m_hat - d_hat is bracketed
     table_phi_axis: str = "true"             # source: procedure Eq. 2 (true tilt); "measured" = index phantoms by their line-fit tilt (mathematics s.3.7), labelled comparison

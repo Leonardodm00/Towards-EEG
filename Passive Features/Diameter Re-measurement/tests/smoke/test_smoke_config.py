@@ -221,7 +221,7 @@ def test_contract():
     # the same configuration and hash (0 and 0.0, a list and a tuple)
     assert C.with_overrides(cfg, {}) == cfg
     same = C.with_overrides(cfg, {"phantom.jitter_xy_um": 0, "phantom.d_range_um": [0.2, 4],
-                                  "correction.failure_rate_ignore": ["dark"]})
+                                  "correction.failure_rate_ignore": []})
     assert same == cfg and same.signature_hash("full") == cfg.signature_hash("full")
     assert isinstance(same.phantom.jitter_xy_um, float) and isinstance(same.phantom.d_range_um[1], float)
     got = C.with_overrides(cfg, {"renderer.jpeg_qtables": [list(range(1, 65))], "phantom.d_range_um": (0.2, 6.0),

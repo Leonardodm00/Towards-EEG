@@ -237,9 +237,9 @@ def test_known_answer():
         assert CAL.calibration_reasons(thin_fit, cfg, bad) == ["allen_diameter_missing"], bad
     worst = dataclasses.replace(base, fit_status="at_bound", reg_verdict="FAR: nearest matching ridge 2 um",
                                 flags=("dark", "crossing", "steep"), phi_rad=0.5, alpha_hat=0.9)
-    want = ["status:at_bound", "registration:FAR", "crossing", "dark", "allen_diameter_out", "not_flat", "not_faint"]
+    want = ["status:at_bound", "registration:FAR", "crossing", "allen_diameter_out", "not_flat", "not_faint"]   # dark: a label
     assert CAL.calibration_reasons(worst, cfg, 1.0) == want, CAL.calibration_reasons(worst, cfg, 1.0)
-    assert CAL.criteria_reasons(0.5, 0.9, 1.0, cfg) == want[4:]
+    assert CAL.criteria_reasons(0.5, 0.9, 1.0, cfg) == want[3:]
     assert CAL.criteria_reasons(NAN, NAN, 0.3, cfg) == ["not_flat", "not_faint"]
     # every criterion but Allen's diameter reads the pilot (pilot_view): a deliverable failing everything with a
     # passing pilot passes; a pilot failing one criterion gives that reason whatever the deliverable
@@ -421,7 +421,7 @@ def test_contract():
     cases = [(dict(), 0.2), (dict(), 0.35), (dict(), 0.5), (dict(), NAN), (dict(phi_rad=0.5), 0.2),
              (dict(alpha_hat=0.9), 0.2), (dict(fit_status="at_bound"), 0.2), (dict(flags=("crossing",)), 0.2),
              (dict(pil), 0.2), (dict(pil, alpha_pilot=0.9), 0.2), (dict(pil, pilot_status="failed"), 0.35),
-             (dict(pil, pilot_flags=("dark",)), 0.2), (dict(pil, alpha_hat=0.9, fit_status="failed"), 0.35),
+             (dict(pil, pilot_flags=("stack_edge",)), 0.2), (dict(pil, alpha_hat=0.9, fit_status="failed"), 0.35),
              (dict(pil, flags=("bbar_few",)), 0.2)]
     rows, want = [], set()
     for n, (change, r_a) in enumerate(cases):

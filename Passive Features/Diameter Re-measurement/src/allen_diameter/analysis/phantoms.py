@@ -26,7 +26,9 @@ from ..model import geometry, render
 from .node_pipeline import Branch, measure_node
 from .registration import registration_category
 
-SELECTION_FLAGS = ("faint", "crossing", "stack_edge", "dark", "bbar_few", "profile_nan")
+# the flags that fail the selection S (Block 6); "dark" is a label only since Block 14.1 (D-030): a dark node is
+# retained, inverted and keeps the label
+SELECTION_FLAGS = ("faint", "crossing", "stack_edge", "bbar_few", "profile_nan")
 
 
 @dataclass(frozen=True)
