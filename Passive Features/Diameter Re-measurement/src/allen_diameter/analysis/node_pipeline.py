@@ -399,7 +399,7 @@ def _iter_at_edge(rec, ks, k, margin):
     return n - int(ok[0]) < margin or int(ok[-1]) - n < margin
 
 
-def deliverable_flags(pilot, rec, ks, m):
+def deliverable_flags(pilot, rec, ks, m, ending=None):
     """The flags of the selection S at the deliverable's plane (D-061.3), Block
     5's rules and order applied to the record rec of the round that picked
     k_iter (plane_iteration.sgt_at_plane's keys, with the round's G over the
@@ -408,7 +408,10 @@ def deliverable_flags(pilot, rec, ks, m):
     crossing from it and its B_bar; stack_edge (_iter_at_edge); bbar_few when
     the plane's B_bar is flagged (and when there is no plane, as Block 5 without
     k*); steep (the pilot's); dark when the fit's alpha_hat > alpha_dark_flag;
-    the fit's status when it is not converged. Returns a tuple."""
+    the fit's status when it is not converged; and, last, the label
+    iter_<ending> when the iteration's ending (plane_iteration.ITER_STATUSES)
+    is given and is not converged (D-068: a label, not in
+    phantoms.SELECTION_FLAGS). Returns a tuple."""
     flags = ["vertical"] if pilot.vertical else []
     fitted = rec is not None and rec.get("plane_fit") is not None
     if rec is not None and rec.get("profile") is not None:
@@ -427,6 +430,8 @@ def deliverable_flags(pilot, rec, ks, m):
         flags.append("dark")
     if fitted and rec["fit_status"] != "converged":
         flags.append(str(rec["fit_status"]))
+    if ending is not None and ending != "converged":
+        flags.append("iter_%s" % ending)                # D-068: kept, flagged
     return tuple(flags)
 
 
@@ -440,12 +445,14 @@ def measure_node(branch, i, provider, cfg, reg=None, scene=None):
     D-044) on the block's planes K_i = k_SWC +- iter_planes_half, from d_0 =
     2 branch.radius_um[i] (Allen's on a real node, the phantom's on a phantom),
     with line_mult = iter_line_mult, max_rounds = iter_max_rounds, bg_margin_um
-    = iter_bg_margin_um, the square +-block_half_um about the SWC node, a
+    = iter_bg_margin_um, round 1's line at least iter_min_first_samples
+    samples (D-069), the square +-block_half_um about the SWC node, a
     restack of half-width h + 2 pixels, and fit_at = plane_iteration.
     sgt_at_plane (Block 12's fit, D-052.2); the background masks the scene's
     segments and soma (D-064; scene None: Scene.from_branch(branch), a
     phantom's own tube). (3) k_iter = the last plane picked; the deliverable is
-    the fit of the round that picked it, the flags deliverable_flags'.
+    the fit of the round that picked it, whatever the iteration's ending, the
+    flags deliverable_flags' with the label of a non-converged ending (D-068).
 
     Returns NodeResult: the centre, heading, tilt, k*, sub-plane depth,
     steep, vertical, the focus curves and `fit` (Block 3's at k*) are the
@@ -470,7 +477,8 @@ def measure_node(branch, i, provider, cfg, reg=None, scene=None):
     res = gradient_iteration(square(float(m.block_half_um)), cfg, d_start_um=2.0 * float(branch.radius_um[i]),
                              line_mult=m.iter_line_mult, max_rounds=m.iter_max_rounds,
                              bg_margin_um=m.iter_bg_margin_um, restack=lambda h: square(float(h) + 2.0 * px),
-                             fit_at=lambda cur, k: sgt_at_plane(cur, cfg, k))
+                             fit_at=lambda cur, k: sgt_at_plane(cur, cfg, k),
+                             min_first_samples=m.iter_min_first_samples)
     picked = [r for r in res["rounds"] if r["k"] is not None]
     rec = picked[-1] if picked else None
     fitted = rec is not None and rec.get("plane_fit") is not None
@@ -481,7 +489,8 @@ def measure_node(branch, i, provider, cfg, reg=None, scene=None):
     return dataclasses.replace(
         pilot, B_bar=nan if rec is None else float(rec["B_bar"]), d_hat_um=num("d_hat_um"),
         mu_hat_per_um=num("mu_hat_per_um"), v0_hat_um=num("v0_hat_um"), alpha_hat=num("alpha_hat"),
-        fit_status=str(rec["fit_status"]) if fitted else "none", flags=deliverable_flags(pilot, rec, kb, m),
+        fit_status=str(rec["fit_status"]) if fitted else "none",
+        flags=deliverable_flags(pilot, rec, kb, m, str(res["status"])),
         k_iter=-1 if rec is None else int(rec["k"]), iter_status=str(res["status"]), n_rounds=int(res["n_rounds"]),
         n_restacks=int(res["n_restacks"]), w_hat_um=num("w_hat_um"), beta_hat=num("beta_hat"), xi_hat=num("xi_hat"),
         zeta_hat=num("zeta_hat"), irls_ok=rec["irls_ok"] if fitted else None,

@@ -11,7 +11,9 @@ and sgt_at_plane (Block 12's fit on them, D-052.2). 13.3b: the chain,
 node_pipeline.measure_node (the pilot, the iteration, the SGT fit at k_iter)
 with measure_pilot, node_request, pilot_view and deliverable_flags; the
 iteration's configuration; the CSV columns (cell.ITER_COLUMNS,
-pilot_row_view). The pilot against Block 5 at 84ea91f is
+pilot_row_view). 13.6: D-068 (a non-converged iteration keeps its fit,
+flagged iter_<ending>) and D-069 (round 1's line at least
+iter_min_first_samples = 3 samples). The pilot against Block 5 at 84ea91f is
 checks/block13_2026-10-20/check_13_3_pilot.py (it needs the history).
 
 Checks
@@ -31,7 +33,9 @@ Checks
                         iteration with fit_at = sgt_at_plane leaves it, ends
                         converged and reports the fit of its last plane; the
                         edge rule on the iteration's curve and the flags of
-                        deliverable_flags on hand-made records
+                        deliverable_flags on hand-made records; the first
+                        line's floor on iterate_planes' callables (round 1
+                        only) and its refusals
     test_reference      on the synthetic cell (fixtures_cell, d 0.8 um):
                         survey.node_planes' segments equal the rule of
                         84ea91f written out here (bit for bit), and
@@ -46,7 +50,9 @@ Checks
                         (the cell, and a rendered phantom with noise and JPEG);
                         with Block 5's fit in its place measure_node's iteration
                         is Cell 4j's on the 3.0 um tube (planes, B_k and fits
-                        bit for bit, G to 1e-12 relative: the squares differ)
+                        bit for bit, G to 1e-12 relative: the squares differ);
+                        a start too thin for 3 samples ends line_short without
+                        the floor and picks a plane with it
     test_convergence    not a discretisation (skipped)
     test_invariants     every row of a lone branch's scene is in_stretch; a
                         permuted scene gives the permuted rows; a missing
@@ -66,9 +72,9 @@ Checks
                         carries a pilot's defaults; measure_node's fields and
                         types, its deliverable and flags read from the record
                         of the round that picked k_iter; the iteration's
-                        defaults and validate's refusals; the estimator hash
-                        moved and a table of the older hashes is refused; the
-                        CSV columns and pilot_row_view
+                        defaults and validate's refusals (13.6's floor too);
+                        the estimator hash moved and a table of the older
+                        hashes is refused; the CSV columns and pilot_row_view
     test_determinism    sgt_at_plane twice on one node: bit-identical fits; a
                         rendered phantom through run_replicate twice: the same
                         row (its d_hat / d printed)
@@ -83,7 +89,10 @@ Checks
                         plus one per restack leaving the block; the flags are
                         k_iter's (the pilot's stack_edge gone); every section
                         missing: no plane, k_iter -1, fit_status none; a
-                        profile leaving the block at k_iter: fit_failed, none
+                        profile leaving the block at k_iter: fit_failed, none;
+                        a branch of radius 0.01 um measured from a 3-sample
+                        first line; an iteration ending max_rounds kept in S
+                        and flagged iter_max_rounds, a converged one unflagged
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -430,6 +439,22 @@ def test_known_answer():
     holed = dict(ok, profile=np.where(v > 2.5, np.nan, dip), plane_fit=None, fit_status="profile_nan")
     assert NP.deliverable_flags(flat, holed, ks13, m) == ("profile_nan",)
     assert NP.deliverable_flags(flat, None, ks13, m) == ("bbar_few",)     # no plane: as Block 5 without k*
+    # 13.6 (D-069): the first line's floor, by hand on iterate_planes' callables: round 1 at max(m d0 / 2, floor),
+    # the later rounds never floored; without the floor, round 1 at m d0 / 2
+    for floor, first in ((0.1144, 0.1144), (None, 0.015)):
+        seen = []
+
+        def plane_of(h, seen=seen):
+            seen.append(h)
+            return 0, {}
+        out = PI.iterate_planes(0.01, 3.0, plane_of, lambda k: dict(d_hat_um=0.02), 5, floor)
+        assert seen == [first, 0.5 * 3.0 * 0.02] and out["status"] == "converged", (floor, seen, out["status"])
+    for bad in (-0.1, float("nan"), float("inf")):
+        try:
+            PI.iterate_planes(0.01, 3.0, lambda h: (0, {}), lambda k: dict(d_hat_um=1.0), 5, bad)
+        except ValueError:
+            continue
+        raise AssertionError("a first-line floor of %r was accepted" % bad)
 
 
 def test_reference():
@@ -532,6 +557,23 @@ def test_reference():
     b = NP.measure_node(br, 4, T5.make_provider([tube], [1.0], pcfg, 5), pcfg)
     bad = _fields_equal(a, NP.pilot_view(b))
     assert not bad and b.iter_status in PI.ITER_STATUSES, (bad, b.iter_status)
+    # 13.6 (D-069): on the fixture, a start too thin for 3 samples (d0 = 0.02 um: round 1's line +-0.03 um) ends
+    # line_short without the floor; with min_first_samples = 3 round 1's line is one profile step, 3 samples, and
+    # picks a plane
+    st8, restack8 = _fixture_state(cfg, swc, prov, 4)
+    step = cfg.measure.profile_step_um
+    bare = PI.gradient_iteration(st8, cfg, d_start_um=0.02, line_mult=3.0, restack=restack8)
+    floored = PI.gradient_iteration(st8, cfg, d_start_um=0.02, line_mult=3.0, restack=restack8, min_first_samples=3)
+    assert bare["status"] == "line_short" and bare["k_final"] is None, (bare["status"], bare["rounds"])
+    r1 = floored["rounds"][0]
+    assert r1["half_um"] == step and r1["n_samples"] == 3 and r1["k"] is not None, r1
+    assert floored["rounds"][1]["half_um"] == 0.5 * 3.0 * floored["rounds"][0]["d_hat_um"], floored["rounds"][1]
+    for bad in (2, 4, 1, 3.5, True, "3"):
+        try:
+            PI.gradient_iteration(st8, cfg, d_start_um=0.02, line_mult=3.0, min_first_samples=bad)
+        except ValueError:
+            continue
+        raise AssertionError("min_first_samples %r accepted" % (bad,))
 
 
 def test_convergence():
@@ -696,6 +738,16 @@ def test_contract():
     for legacy_row in (dict(d_hat_um=1.0, fit_status="converged"), dict(row, pilot_status="")):
         back = cell.pilot_row_view(legacy_row)
         assert back == legacy_row and back is not legacy_row
+    # 13.6: the first line's floor in the configuration (D-069), validate's refusals, the hash moved again
+    assert m.iter_min_first_samples == 3, m.iter_min_first_samples
+    for value in (1, 2, 4, 3.5, True, "3", float("nan")):
+        try:
+            dataclasses.replace(base, measure=dataclasses.replace(m, iter_min_first_samples=value)).validate()
+        except ValueError:
+            continue
+        raise AssertionError("validate accepted iter_min_first_samples = %r" % (value,))
+    dataclasses.replace(base, measure=dataclasses.replace(m, iter_min_first_samples=5)).validate()
+    assert h != "1654924e11020dd9", h
 
 
 def test_determinism():
@@ -833,6 +885,24 @@ def test_edge_cases():
     rs = NP.measure_node(branch, off + 3, prov, small, None, scene)
     assert rs.iter_status == "fit_failed" and rs.k_iter != -1 and rs.fit_status == "none", (rs.iter_status, rs.k_iter)
     assert math.isnan(rs.d_hat_um) and "profile_nan" in rs.flags and math.isfinite(rs.B_bar), (rs.flags, rs.B_bar)
+    # 13.6 (D-069): a branch whose radius is too thin for a 3-sample first line (0.01 um) measures: round 1's line
+    # is one profile step, 3 samples, and the node gets a plane
+    thin = dataclasses.replace(branch, radius_um=np.full_like(np.asarray(branch.radius_um, dtype=float), 0.01))
+    rt = NP.measure_node(thin, off + 3, prov, cfg, None, scene)
+    first = rt.iteration["rounds"][0]
+    assert first["half_um"] == cfg.measure.profile_step_um and first["n_samples"] == 3, first
+    assert rt.k_iter != -1 and not any(f.startswith("iter_line_short") for f in rt.flags), (rt.k_iter, rt.flags)
+    # 13.6 (D-068): an iteration that ends without converging keeps its fit, stays in S and is flagged; a converged
+    # one carries no label
+    from allen_diameter.analysis import phantoms
+    one = dataclasses.replace(cfg, measure=dataclasses.replace(cfg.measure, iter_max_rounds=1))
+    rm = NP.measure_node(branch, off + 3, prov, one, None, scene)
+    assert rm.iter_status == "max_rounds" and rm.flags[-1] == "iter_max_rounds", (rm.iter_status, rm.flags)
+    assert rm.fit_status == "converged" and math.isfinite(rm.d_hat_um) and phantoms.reject_reasons(rm) == [], \
+        (rm.fit_status, rm.d_hat_um, phantoms.reject_reasons(rm))
+    assert "iter_max_rounds" not in phantoms.SELECTION_FLAGS
+    assert not any(f.startswith("iter_") for f in r.flags) and r.iter_status == "converged", r.flags
+    assert "iter_no_plane" in r0.flags and "iter_fit_failed" in rs.flags, (r0.flags, rs.flags)
 
 
 # ---------------------------------------------------------------- runner ---

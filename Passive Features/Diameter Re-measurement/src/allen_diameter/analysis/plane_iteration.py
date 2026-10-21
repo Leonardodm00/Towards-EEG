@@ -75,18 +75,21 @@ def check_iteration(line_mult, max_rounds):
     return m, R
 
 
-def iterate_planes(d_start_um, line_mult, plane_of, fit_at, max_rounds=5):
+def iterate_planes(d_start_um, line_mult, plane_of, fit_at, max_rounds=5, min_first_half_um=None):
     """The Allen-guided iteration's rule (D-042), on two callables so that it
     can be checked by hand. Round i = 1..max_rounds: the line of half-length
-    h_i = line_mult * d_{i-1} / 2, d_0 = d_start_um; (k_i, info) = plane_of(h_i),
+    h_i = line_mult * d_{i-1} / 2, d_0 = d_start_um, except that round 1's is
+    at least min_first_half_um when given (D-069: the first line's floor; the
+    later rounds are never floored); (k_i, info) = plane_of(h_i),
     k_i the plane that line picks, or None with info["stop"] (default
     "no_plane") saying why. If k_i was picked in an earlier round the iteration
     stops, "converged" when it is the previous round's plane and "cycle"
     otherwise, and the fit made there is reused; else fit = fit_at(k_i), a dict
     with d_hat_um, and d_i = d_hat_um sizes the next line ("fit_failed" when it
     is not finite and positive). "max_rounds" after max_rounds rounds without a
-    repeat. ValueError unless d_start_um and line_mult are finite and positive
-    and max_rounds is an integer >= 1. Returns dict(rounds: [dict(round,
+    repeat. ValueError unless d_start_um and line_mult are finite and positive,
+    max_rounds is an integer >= 1 and min_first_half_um, when given, is finite
+    and >= 0. Returns dict(rounds: [dict(round,
     d_in_um, d_in_k (None in round 1, else the plane whose fit sized the line),
     half_um, k, **info, **fit, refit)], status, n_rounds, k_first, k_final (the
     plane of the last round that picked one, or None), d_final_um (the fit
@@ -97,9 +100,14 @@ def iterate_planes(d_start_um, line_mult, plane_of, fit_at, max_rounds=5):
     d = float(d_start_um)
     if not (math.isfinite(d) and d > 0):
         raise ValueError("the iteration needs a finite positive starting diameter, got %r" % (d_start_um,))
+    h_min = None if min_first_half_um is None else float(min_first_half_um)
+    if h_min is not None and not (math.isfinite(h_min) and h_min >= 0):
+        raise ValueError("the first line's floor must be finite and >= 0, got %r" % (min_first_half_um,))
     rounds, fits, status, d_k = [], {}, "max_rounds", None
     for i in range(1, R + 1):
         h = 0.5 * m * d
+        if i == 1 and h_min is not None:
+            h = max(h, h_min)
         k, info = plane_of(h)
         rnd = dict(round=i, d_in_um=d, d_in_k=d_k, half_um=h, k=None if k is None else int(k))
         rnd.update(info or {})
@@ -303,7 +311,7 @@ def sgt_at_plane(st, cfg, k):
 
 
 def gradient_iteration(st, cfg, d_start_um=None, line_mult=ITER_LINE_MULT, max_rounds=5, bg_margin_um=4.0,
-                       restack=None, fit_at=None):
+                       restack=None, fit_at=None, min_first_samples=None):
     """The Allen-guided iteration of the gradient energy (D-042, the user's
     choice of 2026-10-10): iterate_planes from d_0 = d_start_um (default
     Allen's diameter, 2 x allen_radius_um) and the multiplier line_mult
@@ -317,13 +325,22 @@ def gradient_iteration(st, cfg, d_start_um=None, line_mult=ITER_LINE_MULT, max_r
     when it lies inside it); without restack, or when the new square is still
     too small, the round stops with "square_small". fit_at(st, k), when given,
     replaces refit_at_plane(st, cfg, k) (the fit variants' own iterations,
-    D-047; st the square in use). Returns iterate_planes' dict with
-    background, bg_frac, bg_margin_used, st (the last square used),
-    n_restacks, d_start_um. ValueError as iterate_planes, or when restack
-    returns other planes."""
+    D-047; st the square in use). min_first_samples n (D-069; None, the
+    default, as before): round 1's line holds at least n samples, its
+    half-length at least (n - 1) / 2 profile steps (iterate_planes'
+    min_first_half_um); ValueError unless n is an odd integer >= 3. Returns
+    iterate_planes' dict with background, bg_frac, bg_margin_used, st (the
+    last square used), n_restacks, d_start_um. ValueError as iterate_planes,
+    or when restack returns other planes."""
     d0 = 2.0 * float(st["allen_radius_um"]) if d_start_um is None else float(d_start_um)
-    B, bg_frac, margin_used = block_background(st, bg_margin_um)
     step = float(cfg.measure.profile_step_um)
+    h_min = None
+    if min_first_samples is not None:
+        n = min_first_samples
+        if isinstance(n, bool) or not isinstance(n, (int, float)) or not float(n).is_integer() or n < 3 or int(n) % 2 != 1:
+            raise ValueError("min_first_samples must be an odd integer >= 3, got %r" % (min_first_samples,))
+        h_min = 0.5 * (int(n) - 1) * step
+    B, bg_frac, margin_used = block_background(st, bg_margin_um)
     box = dict(st=st, n_restacks=0)
 
     def fits_in(cur, h):
@@ -353,7 +370,7 @@ def gradient_iteration(st, cfg, d_start_um=None, line_mult=ITER_LINE_MULT, max_r
     if fit_at is None:
         def fit_at(cur, k):
             return refit_at_plane(cur, cfg, k)
-    res = iterate_planes(d0, line_mult, plane_of, lambda k: fit_at(box["st"], k), max_rounds)
+    res = iterate_planes(d0, line_mult, plane_of, lambda k: fit_at(box["st"], k), max_rounds, h_min)
     res.update(background=B, bg_frac=bg_frac, bg_margin_used=margin_used, st=box["st"],
                n_restacks=box["n_restacks"], d_start_um=d0)
     return res

@@ -140,6 +140,7 @@ class MeasureConfig:
     iter_max_rounds: int = 5          # source: D-042 (user, 2026-10-10), PROVISIONAL reading (D-052 (h)): at most this many rounds
     iter_planes_half: int = 6         # source: D-052.3 / D-042: the planes K = k_SWC +- this
     iter_bg_margin_um: float = 4.0    # source: D-036, PROVISIONAL (D-052 (h)): B_k from pixels farther than Allen's radius + this from every traced segment and the soma
+    iter_min_first_samples: int = 3   # source: D-069 (user, 2026-10-21): round 1's line holds at least this many samples (its half-length at least (n - 1) / 2 profile steps)
     # -- selection S and flags (procedure s.3.2; D-024)
     alpha_dark_flag: float = 1.0      # source: D-024 (impl-handoff Findings (4)); threshold to be set on real alpha_hat
     steep_tan_diagnostic: float = 0.58  # source: handoff, old tool STEEP_TAN; DIAGNOSTIC COLUMN ONLY, never a selection rule (D-024)
@@ -455,10 +456,11 @@ def _check_sgt(m: "MeasureConfig") -> None:
 
 
 def _check_iteration(m: "MeasureConfig") -> None:
-    """The iteration's settings (D-042, D-044, D-052.3, Block 13): a finite
-    line multiplier > 0; a round limit and a plane half-range that are
+    """The iteration's settings (D-042, D-044, D-052.3, D-069, Block 13): a
+    finite line multiplier > 0; a round limit and a plane half-range that are
     integers >= 1 (5 and 5.0 pass; 5.5, True and "5" do not, as
-    plane_iteration.check_iteration); a finite background margin >= 0."""
+    plane_iteration.check_iteration); a finite background margin >= 0; the
+    first line's sample floor an odd integer >= 3."""
     def whole(x):
         return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x) and float(x).is_integer()
     mult = m.iter_line_mult
@@ -472,6 +474,9 @@ def _check_iteration(m: "MeasureConfig") -> None:
     if not (isinstance(margin, (int, float)) and not isinstance(margin, bool) and math.isfinite(margin)
             and margin >= 0):
         raise ValueError("measure.iter_bg_margin_um must be finite and >= 0, got %r" % (margin,))
+    n = m.iter_min_first_samples
+    if not (whole(n) and n >= 3 and int(n) % 2 == 1):
+        raise ValueError("measure.iter_min_first_samples must be an odd integer >= 3, got %r" % (n,))
 
 
 def _check_qtables(tables: Any) -> None:
