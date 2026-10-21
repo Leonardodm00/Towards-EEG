@@ -6,14 +6,15 @@ What it checks (strongest first)
     test_reference      every parameter line of config.py carries a
                         '# source:' tag (D-021), read from the source file
     test_convergence    skipped: no discretisation
-    test_invariants     signatures: deterministic, the study set is not an
-                        estimator setting, the renderer is not either, a
-                        different sigma_fit is a different estimator
+    test_invariants     signatures: deterministic, the renderer is not an
+                        estimator setting, a different sigma_fit is a
+                        different estimator (the study set is removed,
+                        D-057 (ii))
     test_contract       JSON round trip, frozen dataclasses, ASCII output
     test_determinism    two constructions give the same hashes
     test_edge_cases     validate() refuses every illegal name or range named
-                        in the spec; with_sigma_fit refuses a value outside
-                        the study set
+                        in the spec (sigma_fit_um <= 0 among them; any
+                        positive value is accepted since D-057 (ii))
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -66,7 +67,8 @@ def test_known_answer():
     assert m.focus_rule == "gradient_energy" and C.FOCUS_RULES[0] == "gradient_energy" and "dip_depth" in C.FOCUS_RULES
     assert m.focus_grad_window == "radius_margin" and m.focus_grad_margin_um == 0.5, (m.focus_grad_window,
                                                                                       m.focus_grad_margin_um)
-    assert m.sigma_fit_um == 0.099 and 0.080 in m.sigma_fit_study_um and 0.125 in m.sigma_fit_study_um
+    # D-057 (ii): one in-focus blur, the study set and its helper removed
+    assert m.sigma_fit_um == 0.099 and not hasattr(m, "sigma_fit_study_um") and not hasattr(C, "with_sigma_fit")
     # D-067.4 (S2.1): Block 10's calibration nodes by Allen's diameter, PROVISIONAL values; the d_hat threshold is gone
     cal = C.default_config().calibration
     assert cal.node_allen_diameter_max_um == 0.6 and cal.far_field_allen_diameter_um == (0.6, 0.8), cal
@@ -129,7 +131,7 @@ def test_reference():
     # so a docstring naming a field does not count) [added 2026-10-07: renderer.jpeg_qtables_file was
     # read by nothing]; the exceptions are records and declarations that validate() checks
     import ast
-    records = {"acquisition.specimen_id", "measure.node_step", "measure.fit_params", "measure.sigma_fit_study_um",
+    records = {"acquisition.specimen_id", "measure.node_step", "measure.fit_params",
                "correction.inversion_method", "phantom.n_replicates"}
     read = set()
     roots = (SRC / "allen_diameter", SRC.parent / "scripts")
@@ -157,7 +159,6 @@ def test_convergence():
 def test_invariants():
     cfg = C.default_config()
     e1 = cfg.estimator_signature()
-    assert "sigma_fit_study_um" not in e1["measure"], "the study set is not an estimator setting (D-023)"
     assert "sigma_fit_um" in e1["measure"]
     assert set(e1) == {"acquisition", "measure"}
     f1 = cfg.full_signature()
@@ -178,9 +179,10 @@ def test_invariants():
         pass
     else:
         raise AssertionError("signature_hash accepted an unknown signature name")
-    cfg_s = C.with_sigma_fit(cfg, 0.125)
+    cfg_s = dataclasses.replace(cfg, measure=dataclasses.replace(cfg.measure, sigma_fit_um=0.125))
+    cfg_s.validate()
     assert cfg_s.signature_hash("estimator") != cfg.signature_hash("estimator")
-    assert cfg_s.measure.sigma_fit_um == 0.125 and cfg_s.measure.sigma_fit_study_um == cfg.measure.sigma_fit_study_um
+    assert cfg_s.measure.sigma_fit_um == 0.125 and cfg.measure.sigma_fit_um == 0.099
     assert len(cfg.signature_hash()) == 16 and re.fullmatch(r"[0-9a-f]{16}", cfg.signature_hash())
 
 
@@ -250,7 +252,7 @@ def test_edge_cases():
     refuses(measure=dict(mu_mode="per_cell"))
     refuses(measure=dict(fit_params=("d", "alpha", "v0")))          # D-019
     refuses(measure=dict(fit_params=("d", "mu", "v0", "B")))        # D-018
-    refuses(measure=dict(sigma_fit_um=0.2))                          # D-023: not in the study set
+    refuses(measure=dict(sigma_fit_um=0.0))                          # must be > 0 (no study set since D-057 (ii))
     refuses(measure=dict(bbar_region="whole_plane"))
     refuses(measure=dict(focus_rule="tenengrad"))                    # D-030: the rules are named
     refuses(measure=dict(focus_grad_window="core"))
@@ -265,12 +267,8 @@ def test_edge_cases():
     refuses(phantom=dict(design="latin_hypercube"))
     refuses(correction=dict(fill_policy="interpolate"))
     refuses(acquisition=dict(light_direction=0))
-    try:
-        C.with_sigma_fit(cfg, 0.2)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("with_sigma_fit accepted a value outside the study set")
+    # D-057 (ii): any positive sigma_fit_um is valid (it was refused outside the study set)
+    dataclasses.replace(cfg, measure=dataclasses.replace(cfg.measure, sigma_fit_um=0.2)).validate()
     # config_from_dict on a signature with a bad name refuses too
     d = json.loads(cfg.to_json())
     d["measure"]["mu_mode"] = "nonsense"

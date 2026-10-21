@@ -133,8 +133,7 @@ ITER_COLUMNS = ("k_iter", "iter_status", "n_rounds", "n_restacks", "w_hat_um", "
 CSV_COLUMNS = ("node_id", "type", "x_um", "y_um", "z_um", "path_um", "reg_verdict", "s_star_um", "dz_star_um",
                "k_star", "z_sub_um", "cx_um", "cy_um", "cz_um", "theta_rad", "phi_rad", "steep", "vertical", "B_bar",
                "B_bar_region", "d_hat_um", "mu_hat_per_um", "v0_hat_um", "alpha_hat", "fit_status", "b_hat",
-               "d_tilde_um", "flags", "filled_from", "d_final_um", "allen_radius_um", "sigma_fit_um",
-               "d_tilde_sigma_spread_um") + ITER_COLUMNS
+               "d_tilde_um", "flags", "filled_from", "d_final_um", "allen_radius_um", "sigma_fit_um") + ITER_COLUMNS
 
 
 def iter_columns(result):
@@ -167,13 +166,13 @@ def pilot_row_view(row):
     return out
 
 
-def node_row(result, inversion, d_final, filled_from, allen_radius, sigma_fit, spread=float("nan")):
+def node_row(result, inversion, d_final, filled_from, allen_radius, sigma_fit):
     """One per-node CSV row (Block 8 columns) from a NodeResult and an Inversion."""
     row = {c: getattr(result, c) for c in CSV_COLUMNS[:25]}
     flags = list(result.flags) + [f for f in inversion.flags if f not in result.flags]
     row.update(b_hat=inversion.b_hat, d_tilde_um=inversion.d_tilde_um, flags=";".join(flags),
                filled_from=str(filled_from), d_final_um=float(d_final), allen_radius_um=float(allen_radius),
-               sigma_fit_um=float(sigma_fit), d_tilde_sigma_spread_um=float(spread))
+               sigma_fit_um=float(sigma_fit))
     row.update(iter_columns(result))
     return row
 

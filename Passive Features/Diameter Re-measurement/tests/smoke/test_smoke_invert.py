@@ -47,7 +47,7 @@ from allen_diameter.analysis import fill as FI  # noqa: E402
 from allen_diameter.analysis import invert as IV  # noqa: E402
 from allen_diameter.analysis.node_pipeline import NodeResult  # noqa: E402
 from allen_diameter.analysis.table import fit_table  # noqa: E402
-from allen_diameter.config import default_config, with_sigma_fit  # noqa: E402
+from allen_diameter.config import default_config  # noqa: E402
 
 SEED = 20261006
 REPORT_PACKAGES = ("numpy", "scipy")
@@ -165,7 +165,8 @@ def test_edge_cases():
     assert "high_failure" in IV.invert_node(1.0, math.radians(80.0), T, cfg).flags
     assert "high_failure" not in IV.invert_node(1.0, math.radians(20.0), T, cfg).flags
     try:
-        IV.correct_nodes([node(1.0, 0.2)], T, with_sigma_fit(cfg, 0.125))
+        IV.correct_nodes([node(1.0, 0.2)], T, dataclasses.replace(cfg, measure=dataclasses.replace(
+            cfg.measure, sigma_fit_um=0.125)))       # another estimator (sigma_fit_um is in its signature)
     except ValueError:
         pass
     else:

@@ -55,7 +55,7 @@ if str(SRC) not in sys.path:
 
 from allen_diameter.analysis import phantoms as PH  # noqa: E402
 from allen_diameter.analysis.table import check_rows_config, fit_table, row_provenance, table_inputs  # noqa: E402
-from allen_diameter.config import default_config, with_sigma_fit  # noqa: E402
+from allen_diameter.config import default_config  # noqa: E402
 from allen_diameter.loading import table_io  # noqa: E402
 from allen_diameter.model import geometry as G  # noqa: E402
 
@@ -182,7 +182,9 @@ def test_contract():
         assert np.array_equal(T.b_hat(D, P), T2.b_hat(D, P)) and T2.estimator_hash == T.estimator_hash
         T2.check_estimator(default_config())
         try:
-            T2.check_estimator(with_sigma_fit(default_config(), 0.125))
+            base = default_config()
+            T2.check_estimator(dataclasses.replace(base, measure=dataclasses.replace(base.measure,
+                                                                                     sigma_fit_um=0.125)))
         except ValueError:
             pass
         else:

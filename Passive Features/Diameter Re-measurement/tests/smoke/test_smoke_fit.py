@@ -217,7 +217,9 @@ def test_reference():
 
 
 def test_convergence():
-    cfg = cfg_measure(sigma_fit_um=min(cfg_measure().sigma_fit_study_um))
+    # the narrowest in-focus blur ever considered (0.080 um, the lower end of D-023's former study bracket, handoff
+    # Eq. 12): the quadrature's worst case
+    cfg = cfg_measure(sigma_fit_um=0.080)
     N = fit_nodes(cfg)
     d, sigma = cfg.fit_d_bounds_um[1], cfg.sigma_fit_um
     v = np.linspace(-0.5 * d - 0.5, 0.5 * d + 0.5, 101) + 0.0123

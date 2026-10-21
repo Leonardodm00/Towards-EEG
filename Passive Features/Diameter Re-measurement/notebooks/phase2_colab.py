@@ -941,10 +941,9 @@ if rc == 0:
 # what you have decided; record each choice as a decision before the table is built on it. `with_overrides`
 # checks every name and value, and turns JSON lists into the tuples the configuration holds.
 #
-# It writes one configuration per in-focus blur of the D-023 study: `config_production.json` (the deliverable,
-# sigma_fit = 0.099 um) and `config_sigma0.080.json`, `config_sigma0.125.json`. Expect three lines `... ->
-# table bias_table_<hash>`: the hash names the table, and a real fit refuses a table with another hash
-# (procedure s.3.11).
+# It writes one configuration, `config_production.json` (sigma_fit = 0.099 um; the sigma_fit study of D-023 is
+# dropped, D-057 (ii)). Expect one line `config_production.json ... -> table bias_table_<hash>`: the hash names
+# the table, and a real fit refuses a table with another hash (procedure s.3.11).
 import importlib, json
 import pandas as pd
 import allen_diameter.config as C
@@ -992,12 +991,10 @@ PENDING = ("phantom.d_range_um", "phantom.mu_range_per_um", "phantom.jitter_xy_u
            "renderer.background_B_gl", "renderer.noise_sd_gl", "renderer.jpeg_qtables")
 left = [k for k in PENDING if k not in DECIDED]
 print("\nstill at the provisional default: %s" % (", ".join(left) if left else "none"))
-for s in cfg.measure.sigma_fit_study_um:           # D-023: one table per in-focus blur
-    c = C.with_sigma_fit(cfg, s)
-    name = "config_production.json" if s == cfg.measure.sigma_fit_um else "config_sigma%.3f.json" % s
-    with open("%s/%s" % (OUT, name), "w") as f:
-        f.write(c.to_json())
-    print("%-24s sigma_fit %.3f um -> table bias_table_%s" % (name, s, c.signature_hash("estimator")))
+with open("%s/config_production.json" % OUT, "w") as f:      # one configuration, sigma_fit 0.099 um (D-057 ii)
+    f.write(cfg.to_json())
+print("config_production.json   sigma_fit %.3f um -> table bias_table_%s"
+      % (cfg.measure.sigma_fit_um, cfg.signature_hash("estimator")))
 
 # ====================================================================================================
 # ===== CELL 9: DAVINCI, NOT COLAB (nothing to paste here)
@@ -1006,7 +1003,7 @@ for s in cfg.measure.sigma_fit_study_um:           # D-023: one table per in-foc
 # `scripts/pbs/build_table.pbs`: 100 tasks of 20 replicates, one core and 4 GB each; then the merge on the
 # login node.
 #
-# 1. Copy `MyDrive/diameters/config_production.json` (and the two `config_sigma*.json`) to davinci into a
+# 1. Copy `MyDrive/diameters/config_production.json` to davinci into a
 # folder whose path has no spaces, e.g. `~/diam/`. `qsub -v` takes a comma-separated list, and a value with a
 # space is fragile there.
 # 2. Update the code, check Pillow (8.3 or newer: the JPEG tables' order) and run the two new suites:
@@ -1027,9 +1024,6 @@ for s in cfg.measure.sigma_fit_study_um:           # D-023: one table per in-foc
 # Cell 8 printed for `config_production.json`.
 #
 # 5. Copy `bias_table_<hash>.npz` and `bias_table_<hash>.json` to `MyDrive/diameters/tables/`.
-#
-# The sigma_fit study (D-023): repeat 3-5 with `RUN_TAG=v1_s0080` and `config_sigma0.080.json`, then
-# `RUN_TAG=v1_s0125` and `config_sigma0.125.json`.
 
 # ====================================================================================================
 # ===== CELL 10
@@ -1058,23 +1052,6 @@ run("scripts/run_cell.py", "--specimen", SPECIMEN, "--table", TABLE, "--out-dir"
 # Cell 10b: every dendrite node of the cell (long: every node fetches its own crops)
 run("scripts/run_cell.py", "--specimen", SPECIMEN, "--table", TABLE, "--out-dir", OUT + "/cell",
     "--cache-dir", CACHE_DIR, "--config-json", CFG, "--registration-json", REG_JSON, *ALIGN)
-
-# ====================================================================================================
-# ===== CELL 10c
-# ====================================================================================================
-# Cell 10c: the sigma_fit study (D-023), one run per study table that is on Drive; each writes its own folder.
-# The per-node spread across the three runs (column d_tilde_sigma_spread_um) is not filled by any script yet:
-# compare the three nodes_<specimen>.csv by node_id.
-for s in (0.080, 0.125):
-    cfg_path = "%s/config_sigma%.3f.json" % (OUT, s)
-    with open(cfg_path) as f:
-        h = C.config_from_dict(json.load(f)).signature_hash("estimator")
-    table = "%s/tables/bias_table_%s" % (OUT, h)
-    if not os.path.exists(table + ".npz"):
-        print("sigma_fit %.3f: bias_table_%s is not on Drive yet; skipped" % (s, h))
-        continue
-    run("scripts/run_cell.py", "--specimen", SPECIMEN, "--table", table, "--out-dir", "%s/cell_sigma%.3f" % (OUT, s),
-        "--cache-dir", CACHE_DIR, "--config-json", cfg_path, "--registration-json", REG_JSON, *ALIGN)
 
 # ====================================================================================================
 # ===== CELL end of session (optional)

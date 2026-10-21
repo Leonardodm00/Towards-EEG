@@ -108,8 +108,7 @@ class MeasureConfig:
     bbar_mask_margin_um: float = 1.0  # source: D-018 (a) recommendation: Allen radius + 1 um around any SWC segment
     bbar_min_unmasked_frac: float = 0.2  # source: PROVISIONAL (Block 5): fewer unmasked block pixels than this fraction flags 'bbar_few'
     # -- fit, D-018.2 / D-019.1
-    sigma_fit_um: float = 0.099       # source: D-023, deliverable value, PROVISIONAL (notes s.2 heuristic budget)
-    sigma_fit_study_um: Tuple[float, ...] = (0.080, 0.099, 0.125)  # source: D-023 (study axis), PROVISIONAL set = handoff Eq. 12 bracket + budget
+    sigma_fit_um: float = 0.099       # source: D-023, deliverable value, PROVISIONAL (notes s.2 heuristic budget); the one value, D-057 (ii) dropped the study
     mu_mode: str = "per_node"         # source: D-023 (closes D-019 (a))
     fit_params: Tuple[str, ...] = ("d", "mu", "v0")  # source: D-018 (no fitted B) + D-019 (mu, not alpha)
     fit_d_bounds_um: Tuple[float, float] = (0.05, 6.0)     # source: impl-handoff, PROVISIONAL
@@ -334,9 +333,6 @@ class DiameterConfig:
                              "and the darkness parameter is mu (D-019); got %r" % (m.fit_params,))
         _check_sgt(m)
         _check_iteration(m)
-        if m.sigma_fit_um not in m.sigma_fit_study_um:
-            raise ValueError("measure.sigma_fit_um (%g) must be one of sigma_fit_study_um %r (D-023)"
-                             % (m.sigma_fit_um, m.sigma_fit_study_um))
         if len(r.kernel_table_delta_um) != len(r.kernel_table_sigma_um):
             raise ValueError("renderer kernel table: delta and sigma lengths differ")
         if any(b <= a for a, b in zip(r.kernel_table_delta_um[:-1], r.kernel_table_delta_um[1:])):
@@ -394,9 +390,7 @@ class DiameterConfig:
         """The estimator part of C (procedure s.3.3, 'shared by real and
         synthetic runs'): a real fit and the table that corrects it must agree
         on every key here."""
-        d = {"acquisition": _asdict(self.acquisition), "measure": _asdict(self.measure)}
-        d["measure"].pop("sigma_fit_study_um", None)   # the study set is not an estimator setting; sigma_fit_um is
-        return d
+        return {"acquisition": _asdict(self.acquisition), "measure": _asdict(self.measure)}
 
     def full_signature(self) -> Dict[str, Any]:
         """Estimator + simulator settings; stored with every table."""
@@ -540,14 +534,6 @@ def default_config() -> DiameterConfig:
     cfg = DiameterConfig()
     cfg.validate()
     return cfg
-
-
-def with_sigma_fit(cfg: DiameterConfig, sigma_fit_um: float) -> DiameterConfig:
-    """The study variant of D-023: the same configuration at another in-focus
-    blur. The value must be in the study set, so a stray value cannot enter."""
-    new = dataclasses.replace(cfg, measure=dataclasses.replace(cfg.measure, sigma_fit_um=float(sigma_fit_um)))
-    new.validate()
-    return new
 
 
 def _coerce(annotation: str, value: Any) -> Any:

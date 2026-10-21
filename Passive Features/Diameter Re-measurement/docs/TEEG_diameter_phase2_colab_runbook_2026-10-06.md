@@ -20,6 +20,7 @@
 | 2026-10-13 | v16. Added Cell 4l, the user's request of 14:50 (D-046): at each node's plane of Cell 4j's run, Block 5's profile fitted 100 ways, 10 blur kernels (scipy families: Gaussian, Lorentzian, Voigt, Student, generalized normal, skew-normal; shapes fixed or fitted) x the width fixed at Block 5's or fitted x unweighted or with centre weights exp(-|v - v0| / lambda) re-centred on the fit's own v0, lambda 0.25-2 um (`scripts/fit_variants.py`, into `ITER_DIR/fitvar/`). Evidence: `test_smoke_fit_variants.py` 8 pass; 30 of 30 mutants of the new code each failed a check (26 at the first run; the re-weighting's stopping rule, the warm starts, the re-weighting's start and a skipped record's reason then got checks of their own); every suite re-run (22, no failure); Cells 4j, 4k and 4l ran from the notebook's own code on two synthetic cells (tubes of 0.8 and 3.0 um): 3 of 3 nodes fitted per cell, the baseline equal to Cell 4j's d_iter on 3 of 3, 0 downloads, 25-72 s per node **[run, sandbox]**; not yet run on Allen's data. |
 | 2026-10-14 | v17. Added Cell 4m, the user's request of 15:35 (D-047): each of the 50 fit variants at the fitted width (10 kernels x unweighted and 4 centre weightings) runs its own Allen-guided iteration with Cell 4j's LINE_MULT and MAX_ROUNDS read from its records, Cell 4j's own iteration redone first as the reference; per node a 50-row stack of the edges v0 +- d/2 with the planes picked, and each variant's plane with its line, the fitted dendrite's edges and d (`scripts/variant_iteration.py`, into `ITER_DIR/variter/`). Evidence: `test_smoke_variant_iteration.py` 6 pass, 1 skip (`test_convergence`: nothing new iterates); 19 of 20 mutants of the new code each failed a check (the 20th, a record's planes with a gap accepted, is refused anyway by the square's own plane check); every suite re-run (23, no failure); Cells 4j to 4m ran from the notebook's own code on two synthetic cells (tubes of 0.8 and 3.0 um): Cell 4j's iteration redone identically on 3 of 3 nodes per cell, every variant ending on Cell 4j's plane, 0 downloads, 18-21 s per node on the 0.8 um tube and 2.4-3.8 min on the 3.0 um tube (other jobs running) **[run, sandbox]**; not yet run on Allen's data. |
 | 2026-10-21 | v18. Cell 7's calibration nodes are chosen by Allen's diameter (S2.1 of the 2026-10-20 plan; D-061.4, D-067.4): the near-field set (2r ≤ 0.6 µm) is scanned, the far-field set (0.6-0.8 µm) is counted, not scanned; in S, flat and faint read from the pilot's columns; the cell's text and expected lines updated, the code unchanged. Evidence: `test_smoke_calibration.py` 7 pass with the S2.1 checks **[run, sandbox]**; not run on Allen's data. |
+| 2026-10-21 (later) | v19. The σ_fit study is removed (S2.2 of the 2026-10-20 plan; D-057 (ii), the user, 2026-10-18): Cell 8 writes `config_production.json` only, Cell 9 builds one table, Cell 10c is gone, and the per-node CSV loses `d_tilde_sigma_spread_um`; the superseded text is struck through and kept. Evidence: the suites `test_smoke_config`, `invert`, `table`, `fit`, `cell` re-run, the estimator and simulation hashes unchanged by the removal **[run, sandbox]**; not run on Allen's data. |
 
 This runbook covers the real-data steps, in order. Each cell names the line that must **appear** in its output. A missing line means the cell did not get as far as the code that prints it. Each step lists the decisions it feeds; those stay yours. Nothing in these scripts changes the configuration on its own.
 
@@ -652,15 +653,13 @@ PENDING = ("phantom.d_range_um", "phantom.mu_range_per_um", "phantom.jitter_xy_u
            "renderer.background_B_gl", "renderer.noise_sd_gl", "renderer.jpeg_qtables")
 left = [k for k in PENDING if k not in DECIDED]
 print("\nstill at the provisional default: %s" % (", ".join(left) if left else "none"))
-for s in cfg.measure.sigma_fit_study_um:           # D-023: one table per in-focus blur
-    c = C.with_sigma_fit(cfg, s)
-    name = "config_production.json" if s == cfg.measure.sigma_fit_um else "config_sigma%.3f.json" % s
-    with open("%s/%s" % (OUT, name), "w") as f:
-        f.write(c.to_json())
-    print("%-24s sigma_fit %.3f um -> table bias_table_%s" % (name, s, c.signature_hash("estimator")))
+with open("%s/config_production.json" % OUT, "w") as f:      # one configuration, sigma_fit 0.099 um (D-057 ii)
+    f.write(cfg.to_json())
+print("config_production.json   sigma_fit %.3f um -> table bias_table_%s"
+      % (cfg.measure.sigma_fit_um, cfg.signature_hash("estimator")))
 ```
 
-`config.with_overrides` [added 2026-10-07] checks every name, validates the result, and puts each value in the field's declared form: a JSON list becomes the tuple the configuration holds, and an integer given for a float field becomes a float, so the same value always gives the same hash. The cell writes one configuration per in-focus blur of the D-023 study: `config_production.json` (the deliverable, σ_fit = 0.099 µm), `config_sigma0.080.json` and `config_sigma0.125.json`. Expect three lines `... -> table bias_table_<hash>`.
+`config.with_overrides` [added 2026-10-07] checks every name, validates the result, and puts each value in the field's declared form: a JSON list becomes the tuple the configuration holds, and an integer given for a float field becomes a float, so the same value always gives the same hash. ~~The cell writes one configuration per in-focus blur of the D-023 study: `config_production.json` (the deliverable, σ_fit = 0.099 µm), `config_sigma0.080.json` and `config_sigma0.125.json`. Expect three lines `... -> table bias_table_<hash>`.~~ [corrected 2026-10-21, S2.2: D-057 (ii) drops the σ_fit study; the cell writes one configuration, `config_production.json` (σ_fit = 0.099 µm). Expect one line `config_production.json ... -> table bias_table_<hash>`.]
 
 The estimator hash names the table. A real fit refuses a table with a different hash (procedure §3.11).
 
@@ -688,7 +687,7 @@ Merge with the **same** configuration [added 2026-10-07]. Without `--config-json
 python scripts/build_table.py merge --out-dir "/davinci-1/home/ldellamea/Human Neurons Fitting/diameter_tables/v1" --config-json $HOME/diam/config_production.json
 ```
 
-Copy `bias_table_<hash>.npz` and `bias_table_<hash>.json` to `MyDrive/diameters/tables/`. For the σ_fit study, repeat with `RUN_TAG=v1_s0080` and `config_sigma0.080.json`, then `RUN_TAG=v1_s0125` and `config_sigma0.125.json`.
+Copy `bias_table_<hash>.npz` and `bias_table_<hash>.json` to `MyDrive/diameters/tables/`. ~~For the σ_fit study, repeat with `RUN_TAG=v1_s0080` and `config_sigma0.080.json`, then `RUN_TAG=v1_s0125` and `config_sigma0.125.json`.~~ [corrected 2026-10-21, S2.2: the study is dropped, D-057 (ii); one table.]
 
 ## Cell 10: apply to the cell
 
@@ -712,4 +711,4 @@ Outputs:
 - `specimen_<specimen>/reconstruction.swc`, with radius = d_final / 2 on dendrite nodes and every other byte unchanged (D-013);
 - `summary_<specimen>.json`, with the membrane-area ratio against Allen's radii.
 
-Run it on a few stretches first, with `--nodes` (above); the notebook's Cell 10b then runs every dendrite node (the same command without `--nodes`), and Cell 10c runs each σ_fit study table that is on Drive into `cell_sigma<value>/`. No script yet joins the three runs into the `d_tilde_sigma_spread_um` column (SPEC §8): compare the three `nodes_<specimen>.csv` by `node_id`.
+Run it on a few stretches first, with `--nodes` (above); the notebook's Cell 10b then runs every dendrite node (the same command without `--nodes`), ~~and Cell 10c runs each σ_fit study table that is on Drive into `cell_sigma<value>/`. No script yet joins the three runs into the `d_tilde_sigma_spread_um` column (SPEC §8): compare the three `nodes_<specimen>.csv` by `node_id`.~~ [corrected 2026-10-21, S2.2: Cell 10c and the column are removed with the σ_fit study, D-057 (ii).]
