@@ -1018,14 +1018,18 @@ print("config_production.json   sigma_fit %.3f um -> table bias_table_%s"
 # `DIAM_DRAW_OFFSET` where it starts; every draw is rendered `phantom.n_realizations` times; `phantom.n_draws` in the
 # configuration is a record only.
 #
-# 4. Merge with the same configuration, with `spine_env` active. Every row records the configuration it was
-# rendered under, and the merge stops with `merge refused` when it is given another one; without
-# `--config-json` it assumes the default configuration:
+# 4. Merge with the same configuration, with `spine_env` active, in a job or an interactive session, not on the
+# login node: at 10^6 rows the fit takes of order 20 min and a few hundred MB (Block 14.4). Every row records the
+# configuration it was rendered under, and the merge stops with `merge refused` when it is given another one, or
+# when a (draw, realization) occurs twice; without `--config-json` it assumes the default configuration:
 #     python scripts/build_table.py merge --out-dir "/davinci-1/home/ldellamea/Human Neurons Fitting/diameter_tables/v1" --config-json $HOME/diam/config_production.json
-# Expect `... rows from 100 files, <n> in S; smoothing <s> -> .../bias_table_<hash>.npz/.json`, with the hash
-# Cell 8 printed for `config_production.json`.
+# Expect `<N> rows of <G> draws from <T> files (phantom.n_draws records <G>)`, a `note:` line for any draw with
+# fewer than `n_realizations` rows, then `<n> in S; local_linear, multiplier <c>, grid ... ->
+# .../bias_table_<hash>.npz/.json and draws_<hash>.csv`, with the hash Cell 8 printed for `config_production.json`;
+# a `WARNING` line means the cross-validated multiplier sits at an end of `bandwidth_cv_grid`.
 #
-# 5. Copy `bias_table_<hash>.npz` and `bias_table_<hash>.json` to `MyDrive/diameters/tables/`.
+# 5. Copy `bias_table_<hash>.npz`, `bias_table_<hash>.json` and `draws_<hash>.csv` (the per-draw table,
+# D-060.2) to `MyDrive/diameters/tables/`.
 
 # ====================================================================================================
 # ===== CELL 10

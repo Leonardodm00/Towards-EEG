@@ -5,19 +5,23 @@
             other draws of the design (tilt, heading, mu, offsets) from a seed
             independent of the table's; rows to --out (CSV)
   evaluate  invert every retained test phantom with a bias table (its
-            line-fit tilt, as at a real node) and report d_tilde / d per
-            diameter; the gate passes when every mean is within --tol of 1
+            line-fit tilt and its fitted mu_hat d_hat, as at a real node;
+            Block 14.5) and report d_tilde / d per diameter; the gate passes
+            when every mean is within --tol of 1
 
 The test phantoms come from the same renderer as the table unless another
 generator is chosen (the ray world, Block 9); with the same generator the
 check tests the Monte Carlo, the estimator and the inversion, not the
 simulator (procedure s.3.10).
 
-Examples
-    python scripts/build_table.py run --start 0 --stop 300 --workers 2 --out-dir T --config-json gate2.json
-    python scripts/build_table.py merge --out-dir T --config-json gate2.json
-    python scripts/end_to_end.py phantoms --d 0.5,1,2,3 --reps 8 --seed 777 --alpha-range 0.15,0.9 --out T/test.csv --config-json gate2.json
-    python scripts/end_to_end.py evaluate --table T/bias_table_<hash> --rows T/test.csv --config-json gate2.json
+Examples (gate 2 since Block 14.6: draws x realizations, and no --alpha-range,
+since a dark node is inverted like any other, D-030)
+    python scripts/build_table.py run --draw-start 1 --draw-stop 49 --workers 2 --out-dir T --config-json configs/gate2_reduced.json
+    python scripts/build_table.py merge --out-dir T --config-json configs/gate2_reduced.json
+    python scripts/end_to_end.py phantoms --d 0.5,1,2,3 --reps 8 --seed 777 --out T/test.csv --config-json configs/gate2_reduced.json
+    python scripts/end_to_end.py evaluate --table T/bias_table_<hash> --rows T/test.csv --config-json configs/gate2_reduced.json
+
+--alpha-range lo,hi (draw mu on [lo/d, hi/d]) stays for a labelled comparison.
 
 Pure ASCII, for the cluster (hpc-python-compat).
 """
@@ -79,7 +83,8 @@ def evaluate(cfg, table_stem, rows_path, tol):
     for d in sorted({float(r["d_target_um"]) for r in rows}):
         sub = [r for r in rows if float(r["d_target_um"]) == d]
         kept = [r for r in sub if r["in_S"]]
-        inv = [invert.invert_node(r["d_hat_um"], r["meas_phi_rad"], table, cfg) for r in kept]
+        inv = [invert.invert_node(r["d_hat_um"], r["meas_phi_rad"], r["mu_hat_per_um"], table, cfg)
+               for r in kept]                   # the node's own (d_hat, phi_hat, mu_hat), Block 14.5
         ratios = np.array([x.d_tilde_um / d for x in inv if math.isfinite(x.d_tilde_um)])
         raw = np.array([r["d_hat_um"] / d for r in kept])
         mean = float(ratios.mean()) if ratios.size else float("nan")

@@ -1,0 +1,5 @@
+d=0.2 um: P(r_br<=0)=0.309  mean shift of r_br: closed form 0.1018 um, MC 0.1019 um (PASS); mean start diameter 2 E[r_br] = 0.404 um (true 0.2)
+d=0.3 um: P(r_br<=0)=0.227  mean shift of r_br: closed form 0.0779 um, MC 0.0779 um (PASS); mean start diameter 2 E[r_br] = 0.456 um (true 0.3)
+d=0.4 um: P(r_br<=0)=0.159  mean shift of r_br: closed form 0.0575 um, MC 0.0575 um (PASS); mean start diameter 2 E[r_br] = 0.515 um (true 0.4)
+d=0.6 um: P(r_br<=0)=0.067  mean shift of r_br: closed form 0.0278 um, MC 0.0276 um (PASS); mean start diameter 2 E[r_br] = 0.656 um (true 0.6)
+d=1.0 um: P(r_br<=0)=0.006  mean shift of r_br: closed form 0.0035 um, MC 0.0034 um (PASS); mean start diameter 2 E[r_br] = 1.007 um (true 1.0)

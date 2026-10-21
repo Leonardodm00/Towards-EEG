@@ -1,0 +1,5 @@
+seed 0, 1320 points: noise z SD 1.088, share > 2 0.070, max 4.49 | bias max 0.0022 (1.31 SE) | z vs b: share > 2 0.085, max 3.91
+seed 1, 1320 points: noise z SD 1.023, share > 2 0.055, max 3.31 | bias max 0.0021 (0.98 SE) | z vs b: share > 2 0.101, max 2.95
+seed 2, 1320 points: noise z SD 0.867, share > 2 0.055, max 3.19 | bias max 0.0021 (1.14 SE) | z vs b: share > 2 0.191, max 3.45
+seed 3, 1320 points: noise z SD 1.058, share > 2 0.051, max 3.62 | bias max 0.0023 (1.30 SE) | z vs b: share > 2 0.082, max 3.35
+seed 4, 1320 points: noise z SD 1.098, share > 2 0.095, max 3.61 | bias max 0.0023 (1.09 SE) | z vs b: share > 2 0.151, max 4.36

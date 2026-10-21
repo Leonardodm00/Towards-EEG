@@ -20,7 +20,9 @@
 # than one array goes in several submissions with DIAM_DRAW_OFFSET. The
 # walltime per task is draws x n_realizations x the time of one realization
 # (about 50 s in the sandbox, Block 13.5): size DIAM_N_TASKS and -J from the
-# davinci pilot (S6). When every task is done, merge on the login node:
+# davinci pilot (S6). When every task is done, merge -- in an interactive
+# job (qsub -I), not on the login node: at 10^6 rows the fit takes of
+# order 20 min and a few hundred MB (Block 14.4, 14.6):
 #
 #   cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/Diameter Re-measurement" && \
 #     python3 scripts/build_table.py merge --out-dir "$DIAM_OUT" [--config-json CFG]

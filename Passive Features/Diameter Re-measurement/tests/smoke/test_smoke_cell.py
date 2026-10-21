@@ -48,7 +48,7 @@ for p in (str(SRC), str(WS / "scripts")):
 
 import allen_image_io as aio  # noqa: E402
 from allen_diameter.analysis import cell as CE  # noqa: E402
-from allen_diameter.analysis.table import fit_table  # noqa: E402
+from allen_diameter.analysis import table as TB  # noqa: E402
 from allen_diameter.config import default_config  # noqa: E402
 from allen_diameter.loading import swc_io  # noqa: E402
 from allen_diameter.model import camera, geometry, render  # noqa: E402
@@ -56,6 +56,16 @@ from allen_diameter.model import camera, geometry, render  # noqa: E402
 SEED = 20261006
 REPORT_PACKAGES = ("numpy", "scipy", "pandas")
 PX = 0.1144
+
+
+def unit_table(cfg):
+    """A BiasTable of b = 1 on the grid of the design's ranges, everywhere supported, mass 1000 > q_loo, failure
+    rate 0 (the cell's checks test the cell, not an estimator)."""
+    axes = TB.grid_axes(np.empty((0, 3)), cfg, 1.0)
+    ones = np.ones(tuple(a.size for a in axes))
+    arrays = dict(b_hat=ones, se_hat=0.01 * ones, se_indep=0.01 * ones, tau_hat=0.03 * ones, n_eff=100 * ones,
+                  mass=1000 * ones, p_fail=0 * ones)
+    return TB.BiasTable(axes, arrays, ones > 0, dict(q_loo=10.0, estimator_hash=cfg.signature_hash("estimator")))
 
 
 def write_swc_text(path, rows):
@@ -166,17 +176,13 @@ def test_contract():
     import run_cell
     base = default_config()
     cfg = dataclasses.replace(base, measure=dataclasses.replace(base.measure, block_half_um=3.5))
-    rng = np.random.default_rng(SEED)
-    n = 300                                            # an exact b = 1 table over the default design
-    d = np.exp(rng.uniform(math.log(0.2), math.log(4.0), n))
-    phi = np.radians(rng.uniform(0, 90, n))
-    table = fit_table([dict(d_um=a, phi_rad=b, ratio=1.0, in_S=True) for a, b in zip(d, phi)],
-                      dataclasses.replace(cfg, correction=dataclasses.replace(cfg.correction, spline_smoothing="1e-8")))
+    table = unit_table(cfg)                            # an exact b = 1 table over the default design (Block 14.4)
     with tempfile.TemporaryDirectory() as tmp:
         swc, fetcher, planes = _synthetic_cell(tmp, cfg)
         provider = run_cell.real_provider(fetcher, planes, PX)
         rows, radius_new, ratio = CE.measure_cell(swc, provider, table, cfg)
         assert len(rows) == 6 and all(tuple(r.keys()) == CE.CSV_COLUMNS for r in rows)
+        assert all(r["mu_d_hat"] == r["mu_hat_per_um"] * r["d_hat_um"] or math.isnan(r["mu_d_hat"]) for r in rows)
         kept = [r for r in rows if r["filled_from"] == "self"]
         assert len(kept) >= 4, [r["flags"] for r in rows]
         dh = np.array([r["d_hat_um"] for r in kept])

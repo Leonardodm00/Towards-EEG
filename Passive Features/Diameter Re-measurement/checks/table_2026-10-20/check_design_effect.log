@@ -1,0 +1,5 @@
+config: {'G': 2000, 'n': 10, 's_u': 0.1, 's_e': 0.2, 'R': 5000, 'seed': 20261020}
+rho = 0.2000  design effect 1+(n-1)rho = 2.8000
+Var(ybar): MC 7.0125e-06 | formula 7.0000e-06 | naive (independent rows) 2.5000e-06
+MC / formula = 1.0018 (MC relative SE 0.020);  MC / naive = 2.805
+PASS (within 3 relative SE of the formula)

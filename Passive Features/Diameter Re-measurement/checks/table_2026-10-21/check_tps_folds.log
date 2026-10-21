@@ -1,0 +1,4 @@
+seed 0: folds by draw choose 10000 (at the grid's end: True), folds by row 0.01
+seed 1: folds by draw choose 10000 (at the grid's end: True), folds by row 0.01
+seed 2: folds by draw choose 10000 (at the grid's end: True), folds by row 0.001
+seed 3: folds by draw choose 10000 (at the grid's end: True), folds by row 0.01

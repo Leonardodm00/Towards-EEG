@@ -1,0 +1,8 @@
+(1) dense fit: N=3000 1.69 s, N=6000 18.28 s, exponent 3.43
+    N=1e+05: time ~ 79.6 h (extrapolated at exponent 3.43), dense system memory 8 N^2 = 80 GB
+    N=1e+06: time ~ 2.16e+05 h (extrapolated at exponent 3.43), dense system memory 8 N^2 = 8e+03 GB
+    handoff's T6 (table chat): 0.27, 2.85, 24.8 s at 1500, 3000, 6000, exponent 3.1 [KB]
+(2) d=1 um, 30 deg, alpha=1.2      mean weight/row 5.60e-03 -> kernel mass at N=1e6: 5598; N_eff(local) at N=1e6 ~ 16060
+(2) d=0.5 um, 10 deg, alpha=0.3    mean weight/row 5.40e-03 -> kernel mass at N=1e6: 5396; N_eff(local) at N=1e6 ~ 14744
+(2) d=3 um, 45 deg, alpha=4        mean weight/row 5.41e-03 -> kernel mass at N=1e6: 5413; N_eff(local) at N=1e6 ~ 15139
+(3) support bracket in ln d at fixed (phi, alpha_hat): ln(mu_max/mu_min)/ln(d_max/d_min) = 0.769

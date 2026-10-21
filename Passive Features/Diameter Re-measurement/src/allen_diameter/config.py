@@ -50,7 +50,7 @@ FOCUS_GRAD_WINDOWS = ("radius_margin", "whole_profile")        # D-030 (provisio
 ABSORPTIONS = ("partition_vertical", "linear", "ray_world")    # D-024 / procedure s.3.6
 KERNEL_FAMILIES = ("gaussian_table", "empirical")              # procedure s.3.4
 KERNEL_CONTINUATIONS = ("linear", "frozen", "proportional")    # D-024 / mathematics Eq. 17
-RESPONSE_ESTIMATORS = ("tps_spline", "local_linear", "grid_mean")  # D-024
+RESPONSE_ESTIMATORS = ("local_linear", "tps_spline", "grid_mean")  # D-024, D-063.2, D-067.3 (grid_mean: not built)
 PHANTOM_DESIGNS = ("random", "grid")                           # D-024
 END_CUTS = ("axial", "vertical")                               # Block 2 (provisional default, see RendererConfig.end_cut)
 TABLE_PHI_AXES = ("true", "measured")                          # Block 7 (procedure Eq. 2 / mathematics s.3.7)
@@ -154,11 +154,15 @@ class MeasureConfig:
 class CorrectionConfig:
     """Bias-table estimation, inversion, flags and fill (procedure s.3.8-3.9; D5)."""
 
-    response_estimator: str = "tps_spline"   # source: D-024 (smoothing thin-plate spline for m_hat)
-    spline_smoothing: str = "cv"             # source: D-024; "cv" = k-fold cross-validation, or a float
-    spline_cv_folds: int = 5                 # source: PROVISIONAL
-    spline_smoothing_grid: Tuple[float, ...] = (1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, 10.0, 100.0)  # source: PROVISIONAL (Block 6): RBFInterpolator smoothing values tried by k-fold CV
-    tau_kernel_bandwidth: Tuple[float, float] = (0.15, 5.0)  # source: PROVISIONAL (log d, deg) for the local tau_hat and failure rate
+    response_estimator: str = "local_linear"  # source: D-063 (D-063.2), D-067.3: local linear kernel regression on a grid [was "tps_spline", D-024]
+    spline_smoothing: str = "cv"             # source: D-024; "cv" = k-fold cross-validation, or a float (tps_spline only)
+    spline_cv_folds: int = 5                 # source: PROVISIONAL; the folds are over the draws, draw g in fold (g - 1) mod K (D-062.3)
+    spline_smoothing_grid: Tuple[float, ...] = (1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, 10.0, 100.0, 1e3, 1e4)  # source: PROVISIONAL (Block 6), extended by 1e3, 1e4 (D-062.4): RBFInterpolator smoothing values tried by k-fold CV (tps_spline only)
+    tau_kernel_bandwidth: Tuple[float, float, float] = (0.15, 5.0, 0.3)  # source: D-054 (ii), D-063.1, PROVISIONAL: (h1, h2, h3) in ln d, deg, ln(mu_hat d_hat), the kernel of the estimator and of its statistics
+    bandwidth_cv_grid: Tuple[float, ...] = (0.5, 0.7071, 1.0, 1.4142, 2.0)  # source: D-071 (D-071.1): the multiplier c of tau_kernel_bandwidth, chosen by k-fold CV with folds by draw; values PROVISIONAL; one value fixes c
+    min_neff: float = 10.0                   # source: PROVISIONAL (Block 14.4): the support floor, N_eff of the rows in S below which a grid point holds no estimate
+    loo_mass_percentile: float = 5.0         # source: D-063 (D-063.4), PROVISIONAL: off_support below this percentile of the rows' leave-one-out kernel masses
+    tps_max_rows: int = 3000                 # source: D-063.2, D-067.3: the dense tps_spline refuses more rows in S (value PROVISIONAL)
     table_statistic: str = "mean"            # source: procedure Eq. 2 (mean); median = labelled comparison
     bias_flag_threshold: float = 0.2         # source: D5, confirmed by D-024 (|b_hat - 1| > 0.2)
     max_failure_rate: float = 0.2            # source: impl-handoff, PROVISIONAL (local failure rate above which the region is flagged)
@@ -377,9 +381,18 @@ class DiameterConfig:
                 raise ValueError("%s must be > 0, got %r" % (name, v))
         if self.acquisition.light_direction not in (+1, -1):
             raise ValueError("acquisition.light_direction must be +1 or -1")
-        if c.spline_cv_folds < 2 or len(c.spline_smoothing_grid) < 1 or any(not (x >= 0) for x in c.spline_smoothing_grid) \
-                or any(not (b > 0) for b in c.tau_kernel_bandwidth) or len(c.tau_kernel_bandwidth) != 2:
-            raise ValueError("correction: spline CV folds >= 2, smoothing values >= 0, two positive bandwidths")
+        if c.spline_cv_folds < 2 or len(c.spline_smoothing_grid) < 1 or any(not (x >= 0) for x in c.spline_smoothing_grid):
+            raise ValueError("correction: spline CV folds >= 2 and smoothing values >= 0")
+        if len(c.tau_kernel_bandwidth) != 3 or not all(math.isfinite(b) and b > 0 for b in c.tau_kernel_bandwidth):
+            raise ValueError("correction.tau_kernel_bandwidth needs three positive finite values (ln d, deg, "
+                             "ln(mu_hat d_hat); D-063.1), got %r: a configuration written before Block 14.3 has two "
+                             "-- make it again" % (c.tau_kernel_bandwidth,))
+        if len(c.bandwidth_cv_grid) < 1 or not all(math.isfinite(x) and x > 0 for x in c.bandwidth_cv_grid):
+            raise ValueError("correction.bandwidth_cv_grid needs at least one positive finite multiplier")
+        if not (math.isfinite(c.min_neff) and c.min_neff >= 2) or not (0 <= c.loo_mass_percentile <= 100) \
+                or not (isinstance(c.tps_max_rows, int) and not isinstance(c.tps_max_rows, bool) and c.tps_max_rows >= 1):
+            raise ValueError("correction: min_neff finite and >= 2, loo_mass_percentile in [0, 100], tps_max_rows an "
+                             "integer >= 1")
         if p.n_draws < 1 or p.n_realizations < 1 or p.nodes_each_way < 1 or not (p.phantom_node_step_um > 0) \
                 or p.jitter_xy_um < 0 or p.jitter_z_um < 0 or not (math.isfinite(p.radius_noise_sd_um)
                                                                    and p.radius_noise_sd_um >= 0):

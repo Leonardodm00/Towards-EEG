@@ -84,7 +84,11 @@ def test_known_answer():
     # D-062 (Block 14.2): the design G x n_real and the branch radius's noise; n_replicates retired
     assert p.n_draws == 100000 and p.n_realizations == 10 and p.radius_noise_sd_um == 0.2
     assert not hasattr(p, "n_replicates")
-    assert c.response_estimator == "tps_spline"
+    # D-063, D-067.3, D-071 (Block 14.3-14.4): the local linear estimator, three bandwidths, the multiplier's CV grid,
+    # the support floor, the off_support percentile, the dense spline's cap, the smoothing grid extended (D-062.4)
+    assert c.response_estimator == "local_linear" and c.tau_kernel_bandwidth == (0.15, 5.0, 0.3)
+    assert c.bandwidth_cv_grid == (0.5, 0.7071, 1.0, 1.4142, 2.0) and c.min_neff == 10.0
+    assert c.loo_mass_percentile == 5.0 and c.tps_max_rows == 3000 and c.spline_smoothing_grid[-2:] == (1e3, 1e4)
     # D5, D7 (confirmed by D-024)
     assert c.bias_flag_threshold == 0.2
     assert c.fill_policy == "same_branch_then_allen"
@@ -135,7 +139,7 @@ def test_reference():
     # read by nothing]; the exceptions are records and declarations that validate() checks
     import ast
     records = {"acquisition.specimen_id", "measure.node_step", "measure.fit_params",
-               "correction.inversion_method", "phantom.n_draws"}
+               "correction.inversion_method"}          # phantom.n_draws: the merge reports it (Block 14.6)
     read = set()
     roots = (SRC / "allen_diameter", SRC.parent / "scripts")
     for root in roots:
@@ -269,6 +273,14 @@ def test_edge_cases():
     refuses(phantom=dict(d_range_um=(4.0, 0.2)))
     refuses(phantom=dict(design="latin_hypercube"))
     refuses(correction=dict(fill_policy="interpolate"))
+    refuses(correction=dict(tau_kernel_bandwidth=(0.15, 5.0)))      # a configuration from before Block 14.3
+    refuses(correction=dict(tau_kernel_bandwidth=(0.15, 5.0, 0.0)))
+    refuses(correction=dict(tau_kernel_bandwidth=(0.15, float("nan"), 0.3)))
+    refuses(correction=dict(bandwidth_cv_grid=()))
+    refuses(correction=dict(bandwidth_cv_grid=(1.0, -0.5)))
+    refuses(correction=dict(min_neff=1.0))
+    refuses(correction=dict(loo_mass_percentile=101.0))
+    refuses(correction=dict(tps_max_rows=0))
     refuses(acquisition=dict(light_direction=0))
     # D-057 (ii): any positive sigma_fit_um is valid (it was refused outside the study set)
     dataclasses.replace(cfg, measure=dataclasses.replace(cfg.measure, sigma_fit_um=0.2)).validate()
