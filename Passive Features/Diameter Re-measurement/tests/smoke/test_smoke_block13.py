@@ -768,7 +768,7 @@ def test_determinism():
     pcfg = dataclasses.replace(base, measure=dataclasses.replace(base.measure, block_half_um=3.5),
                                renderer=dataclasses.replace(base.renderer, h_g_um_thin=0.1144 / 8),
                                phantom=dataclasses.replace(base.phantom, d_range_um=(0.6, 1.2), phi_range_deg=(0.0, 10.0)))
-    a, b = phantoms.run_replicate(pcfg, SEED, 0), phantoms.run_replicate(pcfg, SEED, 0)
+    a, b = phantoms.run_replicate(pcfg, SEED, 1, 1), phantoms.run_replicate(pcfg, SEED, 1, 1)     # draw 1, realization 1
     for key in a:
         if key != "seconds":
             _same(a[key], b[key], "run_replicate[%r]" % key)

@@ -3,7 +3,9 @@ sizing), on rendered phantoms over d and phi at the default configuration.
 
 For each (d, phi) of the grid, replicate 0's draw of phantoms.draw_replicate
 with d and phi set (theta, mu, the sub-pixel offset and the depth jitter
-drawn as the table draws them, seed SEED), the phantom tube and branch of
+drawn as the table draws them, seed SEED) [2026-10-21, Block 14.2: draw 1,
+realization 1 of the new design, its branch radius set to d/2 as in 13.5's
+run -- the timings of the .log were taken before 14.2], the phantom tube and branch of
 Block 6, and measure_node through a provider that renders with
 render.synthetic_block -- run_replicate's chain, timed in parts: the
 rendering (the provider calls: the one request and the restacks), the SGT
@@ -56,8 +58,8 @@ def main():
     try:
         for d in D_UM:
             for phi_deg in PHI_DEG:
-                draw, rng = phantoms.draw_replicate(cfg, SEED, 0)
-                draw = dataclasses.replace(draw, d_um=float(d), phi_rad=math.radians(phi_deg))
+                draw, rng = phantoms.draw_replicate(cfg, SEED, 1, 1)
+                draw = dataclasses.replace(draw, d_um=float(d), phi_rad=math.radians(phi_deg), radius_um=0.5 * float(d))
                 tube = phantoms.phantom_tube(draw, cfg)
                 branch = phantoms.phantom_branch(draw, cfg, rng)
                 pad_px = int(math.ceil(cfg.renderer.pad_um / cfg.acquisition.res0_um))

@@ -148,7 +148,7 @@ def test_reference():
     small.validate()
     CAM.jpeg_roundtrip = recorder
     try:
-        phantoms.run_replicate(small, SEED, 0)
+        phantoms.run_replicate(small, SEED, 1, 1)
     finally:
         CAM.jpeg_roundtrip = original
     assert seen, "run_replicate encoded no plane"

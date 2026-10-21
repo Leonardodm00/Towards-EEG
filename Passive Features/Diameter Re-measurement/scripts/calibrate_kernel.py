@@ -74,7 +74,9 @@ def calibration_phantom(cfg, seed, index, d_range, alpha_range, phi_max_deg):
     p, dz = cfg.acquisition.res0_um, cfg.acquisition.dz_um
     cx, cy = rng.uniform(-0.5 * p, 0.5 * p, 2)
     cz = rng.uniform(-0.5 * dz, 0.5 * dz)
-    return phantoms.Draw(int(index), int(seed), d, phi, theta, mu, float(cx), float(cy), float(cz)), rng
+    # the branch carries the true radius d/2 (no D-062.1 noise): Allen's diameter of a calibration phantom is d
+    return phantoms.Draw(int(index) + 1, 1, int(seed), d, phi, theta, mu, float(cx), float(cy), float(cz), 0.5 * d,
+                         0), rng
 
 
 def _one_synthetic(args):
@@ -105,12 +107,12 @@ def run_synthetic(cfg, n, seed, out, d_range, alpha_range, phi_max, workers=1):
     scans = [s for _, _, s, _ in results if s is not None]
     meta = dict(source="synthetic", seed=int(seed), n=int(n), d_range_um=list(d_range), alpha_range=list(alpha_range),
                 phi_max_deg=phi_max, config=json.loads(cfg.to_json()), calibration=dataclasses.asdict(cfg.calibration),
-                truth=[dict(index=dr.index, d_um=dr.d_um, mu_per_um=dr.mu_per_um, phi_rad=dr.phi_rad, cz_um=dr.cz_um,
+                truth=[dict(index=dr.draw_index - 1, d_um=dr.d_um, mu_per_um=dr.mu_per_um, phi_rad=dr.phi_rad, cz_um=dr.cz_um,
                             scanned=s is not None, reasons=";".join(rs)) for dr, _, s, rs in results])
     calibration_io.save_scans(scans, out, meta)
     for dr, res, s, rs in results:
         print("phantom %d: d %.3f um, alpha %.2f -> d_hat %.3f, %s" % (
-            dr.index, dr.d_um, dr.mu_per_um * dr.d_um / math.cos(dr.phi_rad), res.d_hat_um,
+            dr.draw_index - 1, dr.d_um, dr.mu_per_um * dr.d_um / math.cos(dr.phi_rad), res.d_hat_um,
             calibration.scan_verdict(s, rs)))
     print("%d of %d phantoms scanned -> %s" % (len(scans), len(results), out))
     return out

@@ -42,8 +42,8 @@ from build_table import load_config  # noqa: E402
 
 
 def _one(args):
-    cfg, seed, index, d = args
-    row = phantoms.run_replicate(cfg, seed, index, d_override_um=d)
+    cfg, seed, g, d = args
+    row = phantoms.run_replicate(cfg, seed, g, 1, d_override_um=d)    # one realization per test phantom (Block 14.2)
     row["d_target_um"] = d
     return row
 
@@ -58,8 +58,8 @@ def phantom_config(cfg, d, alpha_range=None):
 
 
 def run_phantoms(cfg, diameters, reps, seed, out, workers=1, alpha_range=None):
-    jobs = [(phantom_config(cfg, d, alpha_range), seed, k * reps + r, d) for k, d in enumerate(diameters)
-            for r in range(reps)]
+    jobs = [(phantom_config(cfg, d, alpha_range), seed, k * reps + r + 1, d) for k, d in enumerate(diameters)
+            for r in range(reps)]                       # draws from 1 (D-062's keys)
     if workers > 1:
         import multiprocessing
         with multiprocessing.Pool(workers) as pool:

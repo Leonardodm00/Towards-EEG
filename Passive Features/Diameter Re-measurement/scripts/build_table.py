@@ -3,10 +3,13 @@
 
 Two steps:
 
-  run    render and measure replicates [start, stop) of the random design and
-         write their rows to <out-dir>/rows_<hash>_<start>_<stop>.csv; a PBS
-         array runs one chunk per job (replicate n always draws from
-         numpy.random.default_rng([seed, n]), so the chunking does not matter)
+  run    render and measure draws g = start .. stop - 1 (start >= 1), every
+         realization r = 1 .. n_realizations of each (Block 14.2, D-059,
+         D-062), and write their rows to
+         <out-dir>/rows_<hash>_<start>_<stop>.csv; a PBS array runs one chunk
+         of draws per task (a draw's features come from
+         numpy.random.default_rng([seed, g]) and a realization's nuisances from
+         default_rng([seed, g, r]), so the chunking does not matter)
   merge  read every rows_<hash>_*.csv of <out-dir>, fit the table and write
          <out-dir>/bias_table_<hash>.npz/.json
 
@@ -15,11 +18,10 @@ default one unless --config-json gives a full_signature() JSON (a labelled
 variant: reduced ranges for the sandbox, another sigma_fit, another kernel).
 
 Examples
-    # sandbox, 40 replicates on 2 cores, then the table
-    python scripts/build_table.py run --start 0 --stop 40 --workers 2 --out-dir tables/reduced
+    # sandbox, draws 1-8 (each with its n_realizations realizations) on 2 cores, then the table
+    python scripts/build_table.py run --draw-start 1 --draw-stop 9 --workers 2 --out-dir tables/reduced
     python scripts/build_table.py merge --out-dir tables/reduced
-    # davinci, one PBS array job per 20 replicates
-    python scripts/build_table.py run --start $((20*PBS_ARRAY_INDEX)) --stop $((20*PBS_ARRAY_INDEX+20)) --out-dir "$OUT"
+    # davinci: scripts/pbs/build_table.pbs runs one chunk of draws per array task
 
 Pure ASCII, for the cluster (hpc-python-compat).
 """
@@ -54,14 +56,19 @@ def load_config(path):
 
 
 def _one(args):
-    cfg, seed, index, backend = args
-    return phantoms.run_replicate(cfg, seed, index, backend)
+    cfg, seed, g, r, backend = args
+    return phantoms.run_replicate(cfg, seed, g, r, backend)
 
 
 def run(cfg, start, stop, out_dir, workers=1, seed=None, backend=None):
+    """Draws g = start .. stop - 1 (start >= 1), each with its realizations r = 1 .. n_realizations."""
     seed = cfg.phantom.seed if seed is None else int(seed)
+    start, stop = phantoms.check_index("--draw-start", start), int(stop)
+    if stop <= start:
+        raise ValueError("--draw-stop (%d) must exceed --draw-start (%d)" % (stop, start))
     os.makedirs(out_dir, exist_ok=True)
-    jobs = [(cfg, seed, n, backend) for n in range(int(start), int(stop))]
+    jobs = [(cfg, seed, g, r, backend) for g in range(start, stop)
+            for r in range(1, int(cfg.phantom.n_realizations) + 1)]
     t0 = time.perf_counter()
     rows = []
 
@@ -70,8 +77,9 @@ def run(cfg, start, stop, out_dir, workers=1, seed=None, backend=None):
     def note(row):
         row["sim_hash"] = provenance             # the merge refuses rows rendered under another configuration
         rows.append(row)
-        print("replicate %d: d %.3f um, phi %.1f deg -> d_hat/d %.4f, %s, %.1f s (%d/%d)"
-              % (row["index"], row["d_um"], row["phi_rad"] * 57.29577951308232, row["ratio"],
+        print("draw %d realization %d: d %.3f um, phi %.1f deg -> d_hat/d %.4f, %s, %.1f s (%d/%d)"
+              % (row["draw_index"], row["realization_index"], row["d_um"], row["phi_rad"] * 57.29577951308232,
+                 row["ratio"],
                  "in S" if row["in_S"] else "out (%s)" % row["reject"], row["seconds"], len(rows), len(jobs)),
               flush=True)
 
@@ -86,7 +94,8 @@ def run(cfg, start, stop, out_dir, workers=1, seed=None, backend=None):
     path = os.path.join(out_dir, "rows_%s_%06d_%06d.csv" % (cfg.signature_hash("estimator"), start, stop))
     table_io.write_rows(rows, path)
     kept = sum(1 for r in rows if r["in_S"])
-    print("%d replicates (%d in S) in %.1f s -> %s" % (len(rows), kept, time.perf_counter() - t0, path))
+    print("%d draws x %d realizations = %d rows (%d in S) in %.1f s -> %s"
+          % (stop - start, int(cfg.phantom.n_realizations), len(rows), kept, time.perf_counter() - t0, path))
     return path
 
 
@@ -115,8 +124,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
-    r.add_argument("--start", type=int, required=True)
-    r.add_argument("--stop", type=int, required=True)
+    r.add_argument("--draw-start", type=int, required=True, help="first draw g (>= 1)")
+    r.add_argument("--draw-stop", type=int, required=True, help="one past the last draw")
     r.add_argument("--workers", type=int, default=1)
     r.add_argument("--seed", type=int, default=None)
     r.add_argument("--backend", default=None, choices=(None, "fft", "direct"))
@@ -126,7 +135,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
     cfg = load_config(a.config_json)
     if a.cmd == "run":
-        run(cfg, a.start, a.stop, a.out_dir, a.workers, a.seed, a.backend)
+        run(cfg, a.draw_start, a.draw_stop, a.out_dir, a.workers, a.seed, a.backend)
     else:
         merge(cfg, a.out_dir)
     return 0

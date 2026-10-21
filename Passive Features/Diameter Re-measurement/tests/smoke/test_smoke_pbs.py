@@ -6,9 +6,11 @@ and RETURNS 1 (davinci's binutils hook does exactly that while activating
 correctly), a stub python3 that records its argv, a decoy HOME.
 
 Checks
-    test_known_answer   the chunk arithmetic: task 7 of 100 over 2000 runs
-                        replicates 140-160; the last task of an uneven split
-                        stops at N_TOTAL
+    test_known_answer   the chunk arithmetic by draw (Block 14.2): task 7 of
+                        100 over 100000 draws runs draws 7001-8000 (draws
+                        start at 1); the last task of an uneven split stops at
+                        N_DRAWS; DIAM_DRAW_OFFSET shifts a submission; a task
+                        past the draws has nothing to do
     test_reference      the real path: activation's non-zero status tolerated,
                         the env's python runs build_table.py with the expected argv
     test_contract       the header lines that must appear ([diam-table] ...)
@@ -98,18 +100,28 @@ def test_known_answer():
     with tempfile.TemporaryDirectory() as tmp:
         rc, out, err, _calls, _code, outdir = run(tmp, {"DIAM_DRYRUN": "1"})
         assert rc == 0, (rc, out, err)
-        assert "[diam-table] task 7 of 100: replicates 140-160 of 2000" in out, out
-        assert "DRYRUN: python3 scripts/build_table.py run --start 140 --stop 160 --out-dir %s" % outdir in out, out
+        assert "[diam-table] task 7 of 100: draws 7001-8000 of 100000 (offset 0)" in out, out
+        assert "DRYRUN: python3 scripts/build_table.py run --draw-start 7001 --draw-stop 8001 --out-dir %s" % outdir \
+            in out, out
     with tempfile.TemporaryDirectory() as tmp:
-        rc, out, err, *_ = run(tmp, {"DIAM_DRYRUN": "1", "DIAM_N_TOTAL": "10", "DIAM_N_TASKS": "3", "PBS_ARRAY_INDEX": "2"})
-        assert rc == 0 and "replicates 8-10 of 10" in out and "--start 8 --stop 10" in out, (rc, out, err)
+        rc, out, err, *_ = run(tmp, {"DIAM_DRYRUN": "1", "DIAM_N_DRAWS": "10", "DIAM_N_TASKS": "3", "PBS_ARRAY_INDEX": "2"})
+        assert rc == 0 and "draws 9-10 of 10" in out and "--draw-start 9 --draw-stop 11" in out, (rc, out, err)
+    with tempfile.TemporaryDirectory() as tmp:
+        rc, out, err, *_ = run(tmp, {"DIAM_DRYRUN": "1", "DIAM_N_DRAWS": "1000", "DIAM_N_TASKS": "10",
+                                     "DIAM_DRAW_OFFSET": "50000", "PBS_ARRAY_INDEX": "3"})
+        assert rc == 0 and "draws 50301-50400 of 1000 (offset 50000)" in out and \
+            "--draw-start 50301 --draw-stop 50401" in out, (rc, out, err)
+    with tempfile.TemporaryDirectory() as tmp:
+        rc, out, err, calls, *_ = run(tmp, {"DIAM_N_DRAWS": "5", "DIAM_N_TASKS": "4", "PBS_ARRAY_INDEX": "3"})
+        assert rc == 0 and "nothing to do" in out and not any("build_table.py run" in c for c in calls), (out, calls)
 
 
 def test_reference():
     with tempfile.TemporaryDirectory() as tmp:
         rc, out, err, calls, code, outdir = run(tmp, {"DIAM_CONFIG_JSON": __file__, "DIAM_SEED": "11"})
         assert rc == 0, (rc, out, err)
-        want = "STUB-PY: scripts/build_table.py run --start 140 --stop 160 --out-dir %s --config-json %s --seed 11" % (outdir, __file__)
+        want = "STUB-PY: scripts/build_table.py run --draw-start 7001 --draw-stop 8001 --out-dir %s --config-json %s " \
+               "--seed 11" % (outdir, __file__)
         assert calls[-1] == want, calls
         assert "[diam-table] task 7 done" in out and outdir.is_dir(), out
 
@@ -143,7 +155,10 @@ def test_edge_cases():
              ({"RUN_TAG": "a b"}, 4, "RUN_TAG must be"),
              ({"PBS_ARRAY_INDEX": "100"}, 4, "-J and DIAM_N_TASKS disagree"),
              ({"DIAM_CONFIG_JSON": "/nonexistent.json"}, 3, "DIAM_CONFIG_JSON set but missing"),
-             ({"DIAM_ENV": "no_such_env"}, 5, "not active")]
+             ({"DIAM_ENV": "no_such_env"}, 5, "not active"),
+             ({"DIAM_N_DRAWS": "1e5"}, 4, "must be integers"),
+             ({"DIAM_DRAW_OFFSET": "-3"}, 4, "must be integers"),
+             ({"DIAM_N_TASKS": "0", "PBS_ARRAY_INDEX": "0"}, 4, "must be >= 1")]
     for extra, code, msg in cases:
         with tempfile.TemporaryDirectory() as tmp:
             rc, out, err, calls, *_ = run(tmp, extra)

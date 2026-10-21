@@ -81,6 +81,9 @@ def test_known_answer():
     assert p.design == "random"
     assert p.phi_range_deg == (0.0, 90.0), p.phi_range_deg
     assert p.jitter_xy_um == 0.0 and p.jitter_z_um == 0.0
+    # D-062 (Block 14.2): the design G x n_real and the branch radius's noise; n_replicates retired
+    assert p.n_draws == 100000 and p.n_realizations == 10 and p.radius_noise_sd_um == 0.2
+    assert not hasattr(p, "n_replicates")
     assert c.response_estimator == "tps_spline"
     # D5, D7 (confirmed by D-024)
     assert c.bias_flag_threshold == 0.2
@@ -132,7 +135,7 @@ def test_reference():
     # read by nothing]; the exceptions are records and declarations that validate() checks
     import ast
     records = {"acquisition.specimen_id", "measure.node_step", "measure.fit_params",
-               "correction.inversion_method", "phantom.n_replicates"}
+               "correction.inversion_method", "phantom.n_draws"}
     read = set()
     roots = (SRC / "allen_diameter", SRC.parent / "scripts")
     for root in roots:
@@ -286,6 +289,19 @@ def test_edge_cases():
     refuses(renderer=dict(jpeg_qtables=((0,) + good[1:],)))
     refuses(renderer=dict(jpeg_qtables=((1.5,) + good[1:],)))
     refuses(renderer=dict(jpeg_qtables=(good,) * 5))
+    # Block 14.2: phantom.n_replicates is retired (D-062); a configuration file that still holds it is refused by name
+    d = json.loads(cfg.to_json())
+    d["phantom"]["n_replicates"] = 2000
+    try:
+        C.config_from_dict(d)
+    except ValueError as exc:
+        assert "n_replicates" in str(exc) and "n_draws" in str(exc), exc
+    else:
+        raise AssertionError("config_from_dict accepted the retired phantom.n_replicates")
+    refuses(phantom=dict(n_realizations=0))
+    refuses(phantom=dict(n_draws=0))
+    refuses(phantom=dict(radius_noise_sd_um=-0.1))
+    refuses(phantom=dict(radius_noise_sd_um=float("nan")))
     # the legacy key: an empty jpeg_qtables_file (it had no effect) is dropped, a path is refused by name
     d = json.loads(cfg.to_json())
     del d["renderer"]["jpeg_qtables"]

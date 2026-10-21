@@ -8,10 +8,23 @@ Checks
                         median tau_hat within 10 % of tau, the failure rate
                         within 4 SD of its expectation given the draws;
                         m_hat = d * b_hat
-    test_reference      the draws follow their laws (Kolmogorov-Smirnov on 2000)
+    test_reference      the draws follow their laws (Kolmogorov-Smirnov on 2000
+                        draws g = 1..2000, realization 1); Block 14.2: the
+                        branch radius's noise at d = 0.2 um follows the normal
+                        truncated below at -d/2 (KS against scipy.stats.truncnorm,
+                        4000 realizations) and the rejections per kept draw
+                        average Phi(-d/2s) / (1 - Phi(-d/2s)) within 4 SE;
+                        D-062's keys and draw orders, recomputed from NumPy
+                        alone, give the same features, nuisances and radius
     test_convergence    the SE falls as 1/sqrt(N): N = 500 vs 2000
-    test_invariants     a replicate's draw depends only on (seed, n); the phantom
+    test_invariants     Block 14.2: a draw depends only on (seed, g) and a
+                        realization only on (seed, g, r), in any order; a draw's
+                        realizations share its features and differ in their
+                        nuisances; the feature, nuisance and radius streams
+                        differ for g, r in 1..3; index 0 is refused; the phantom
                         branch lies on the tube's axis at the configured spacing
+                        and carries radius_um at every node; sd 0 gives d/2;
+                        the grid design visits cell (g - 1) mod (n_d n_phi)
     test_contract       two rendered replicates end to end: row contract; CSV
                         and table files round trip exactly; the CLI runs and
                         merges; a changed estimator setting is refused
@@ -82,12 +95,12 @@ def fixture(n, seed, tau=0.03):
 
 
 def small_cfg(**phantom):
-    """Short rendered replicates: low tilts, short tubes, smaller block, p_x/8 everywhere."""
+    """Short rendered replicates: low tilts, short tubes, smaller block, p_x/8 everywhere; 2 realizations a draw."""
     base = default_config()
     rc = dataclasses.replace(base.renderer, U_um=4.0, pad_um=1.0, h_g_um_thin=PX / 8)
     ms = dataclasses.replace(base.measure, block_half_um=3.5)
     ph = dataclasses.replace(base.phantom, phi_range_deg=(0.0, 30.0), d_range_um=(0.5, 1.2), nodes_each_way=4,
-                             **phantom)
+                             n_realizations=2, **phantom)
     return dataclasses.replace(base, renderer=rc, measure=ms, phantom=ph)
 
 
@@ -116,7 +129,7 @@ def test_known_answer():
 def test_reference():
     cfg = default_config()
     ph, acq = cfg.phantom, cfg.acquisition
-    draws = [PH.draw_replicate(cfg, SEED, n)[0] for n in range(2000)]
+    draws = [PH.draw_replicate(cfg, SEED, g, 1)[0] for g in range(1, 2001)]
     lo, hi = ph.d_range_um
     mlo, mhi = ph.mu_range_per_um
     laws = {
@@ -131,6 +144,37 @@ def test_reference():
     for name, u in laws.items():
         p = stats.kstest(u, "uniform").pvalue
         assert p > 1e-3, (name, p)
+    # Block 14.2 (D-062.1): r_br = d/2 + eps, eps ~ N(0, sd^2) redrawn until positive; at d = 0.2 um, sd = 0.2 um a
+    # draw is rejected with probability Phi(-0.5) = 0.31, so the kept eps follow the normal truncated below at -d/2
+    d0, sd = 0.2, ph.radius_noise_sd_um
+    reals = [PH.draw_replicate(cfg, SEED, g, 1, d_override_um=d0)[0] for g in range(1, 4001)]
+    eps = np.array([x.radius_um - 0.5 * d0 for x in reals])
+    p = stats.kstest(eps, stats.truncnorm(-0.5 * d0 / sd, np.inf, loc=0.0, scale=sd).cdf).pvalue
+    assert p > 0.01 and np.all(eps > -0.5 * d0), ("radius law", p)
+    q = 1.0 - stats.norm.cdf(-0.5 * d0 / sd)             # the probability that a draw is kept
+    n_rej = np.array([x.radius_redraws for x in reals], dtype=float)
+    mean, se = (1 - q) / q, math.sqrt((1 - q) / q ** 2 / n_rej.size)
+    assert abs(n_rej.mean() - mean) <= 4 * se, ("rejections per kept draw", n_rej.mean(), mean, se)
+    # D-062's keys and orders, recomputed from NumPy alone: the features of draw g from default_rng([seed, g]) in
+    # the order d, phi, theta, mu; the nuisances of realization r from default_rng([seed, g, r]) in the order
+    # (cx, cy), cz, the returned generator positioned after them; the radius from default_rng([seed, g, r, 1])
+    assert ph.d_log_uniform and ph.mu_log_uniform and ph.subpixel_offset and ph.axis_depth_jitter
+    for g, r in ((1, 1), (5, 3), (12, 10)):
+        x, gen = PH.draw_replicate(cfg, SEED, g, r)
+        f = np.random.default_rng([SEED, g])
+        want = (math.exp(f.uniform(math.log(lo), math.log(hi))), math.radians(f.uniform(*ph.phi_range_deg)),
+                f.uniform(*ph.theta_range_rad), math.exp(f.uniform(math.log(mlo), math.log(mhi))))
+        assert (x.d_um, x.phi_rad, x.theta_rad, x.mu_per_um) == want, ("feature key", g, r)
+        n = np.random.default_rng([SEED, g, r])
+        off = n.uniform(-0.5 * acq.res0_um, 0.5 * acq.res0_um, 2)
+        cz = n.uniform(-0.5 * acq.dz_um, 0.5 * acq.dz_um)
+        assert (x.cx_um, x.cy_um, x.cz_um) == (off[0], off[1], cz) and gen.random() == n.random(), ("nuisance key", g, r)
+        e = np.random.default_rng([SEED, g, r, 1])
+        for k in range(100):
+            rb = 0.5 * want[0] + ph.radius_noise_sd_um * e.standard_normal()
+            if rb > 0:
+                break
+        assert (x.radius_um, x.radius_redraws) == (rb, k), ("radius key", g, r)
 
 
 def test_convergence():
@@ -144,13 +188,44 @@ def test_convergence():
 
 def test_invariants():
     cfg = default_config()
-    a = PH.draw_replicate(cfg, SEED, 7)[0]
-    for n in (3, 11, 0):
-        PH.draw_replicate(cfg, SEED, n)
-    assert PH.draw_replicate(cfg, SEED, 7)[0] == a
-    assert PH.draw_replicate(cfg, SEED + 1, 7)[0] != a
-    draw, rng = PH.draw_replicate(cfg, SEED, 5)
+    a = PH.draw_replicate(cfg, SEED, 7, 2)[0]
+    for g, r in ((3, 1), (11, 4), (7, 1), (1, 1)):
+        PH.draw_replicate(cfg, SEED, g, r)
+    assert PH.draw_replicate(cfg, SEED, 7, 2)[0] == a
+    assert PH.draw_replicate(cfg, SEED + 1, 7, 2)[0] != a
+    # a draw's realizations share its features and differ in their nuisances and radius
+    reals = [PH.draw_replicate(cfg, SEED, 7, r)[0] for r in (1, 2, 3)]
+    assert len({(x.d_um, x.phi_rad, x.theta_rad, x.mu_per_um) for x in reals}) == 1
+    assert len({(x.cx_um, x.cy_um, x.cz_um) for x in reals}) == 3 and len({x.radius_um for x in reals}) == 3
+    assert PH.draw_features(cfg, SEED, 7) == (a.d_um, a.phi_rad, a.theta_rad, a.mu_per_um)
+    # the streams of D-062's keys are distinct for indices from 1 (NumPy pads a key with zeros: [s, g, 0] = [s, g])
+    first = {}
+    for g in (1, 2, 3):
+        first[(g,)] = np.random.default_rng([SEED, g]).random()
+        for r in (1, 2, 3):
+            first[(g, r)] = np.random.default_rng([SEED, g, r]).random()
+            first[(g, r, 1)] = np.random.default_rng([SEED, g, r, 1]).random()
+    assert len(set(first.values())) == len(first), "two generator keys give one stream"
+    assert np.random.default_rng([SEED, 7, 0]).random() == np.random.default_rng([SEED, 7]).random()  # why from 1
+    for bad in ((0, 1), (1, 0), (-2, 1), (1.5, 1)):
+        try:
+            PH.draw_replicate(cfg, SEED, *bad)
+        except ValueError:
+            continue
+        raise AssertionError("index %r accepted" % (bad,))
+    zero = dataclasses.replace(cfg, phantom=dataclasses.replace(cfg.phantom, radius_noise_sd_um=0.0))
+    z = PH.draw_replicate(zero, SEED, 7, 2)[0]
+    assert z.radius_um == 0.5 * z.d_um and z.radius_redraws == 0 and (z.cx_um, z.cz_um) == (a.cx_um, a.cz_um)
+    # the grid design (an option; D-024 is random): draw g takes cell (g - 1) mod (n_d n_phi), d-major, so the
+    # draws 1..n_d n_phi visit every cell once, in order, and draw n_d n_phi + 1 starts again
+    grid = dataclasses.replace(cfg, phantom=dataclasses.replace(cfg.phantom, design="grid"))
+    gd, gp = grid.phantom.grid_d_um, grid.phantom.grid_phi_deg
+    cells = [PH.draw_features(grid, SEED, g)[:2] for g in range(1, len(gd) * len(gp) + 2)]
+    want = [(float(x), math.radians(y)) for x in gd for y in gp]
+    assert cells[:-1] == want and cells[-1] == want[0], "grid design cells"
+    draw, rng = PH.draw_replicate(cfg, SEED, 5, 1)
     br = PH.phantom_branch(draw, cfg, rng)
+    assert np.all(np.asarray(br.radius_um) == draw.radius_um) and draw.radius_um > 0
     tube = PH.phantom_tube(draw, cfg)
     q = br.xyz_um - np.array(tube.c)
     t = tube.t_hat
@@ -161,13 +236,16 @@ def test_invariants():
 
 def test_contract():
     cfg = small_cfg()
-    rows = [PH.run_replicate(cfg, SEED, n) for n in range(2)]
+    rows = [PH.run_replicate(cfg, SEED, 1, r) for r in (1, 2)]
     for r in rows:
-        for k in ("index", "seed", "d_um", "phi_rad", "theta_rad", "mu_per_um", "cx_um", "cy_um", "cz_um", "d_hat_um",
-                  "mu_hat_per_um", "fit_status", "flags", "in_S", "reject", "ratio", "meas_phi_rad", "seconds"):
+        for k in ("draw_index", "realization_index", "seed", "d_um", "phi_rad", "theta_rad", "mu_per_um", "cx_um",
+                  "cy_um", "cz_um", "radius_um", "radius_redraws", "d_hat_um", "mu_hat_per_um", "fit_status", "flags",
+                  "in_S", "reject", "ratio", "meas_phi_rad", "seconds"):
             assert k in r, k
         assert isinstance(r["in_S"], bool) and r["in_S"] == (r["reject"] == "")
         assert abs(r["ratio"] - r["d_hat_um"] / r["d_um"]) <= 1e-15 * abs(r["ratio"])
+    assert [(r["draw_index"], r["realization_index"]) for r in rows] == [(1, 1), (1, 2)]
+    assert rows[0]["d_um"] == rows[1]["d_um"] and rows[0]["radius_um"] != rows[1]["radius_um"]
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "rows.csv")
         table_io.write_rows(rows, path)
@@ -198,9 +276,12 @@ def test_contract():
             f.write(cfgf.to_json())
         script = str(WS / "scripts" / "build_table.py")
         out = os.path.join(tmp, "tab")
-        for a, b in ((0, 2), (2, 4)):
-            subprocess.run([sys.executable, script, "run", "--start", str(a), "--stop", str(b), "--out-dir", out,
-                            "--config-json", cj], check=True, capture_output=True)
+        for a, b in ((1, 2), (2, 3)):             # two draws x 2 realizations (small_cfg)
+            subprocess.run([sys.executable, script, "run", "--draw-start", str(a), "--draw-stop", str(b), "--out-dir",
+                            out, "--config-json", cj], check=True, capture_output=True)
+        refused = subprocess.run([sys.executable, script, "run", "--draw-start", "0", "--draw-stop", "1", "--out-dir",
+                                  out, "--config-json", cj], capture_output=True, text=True)
+        assert refused.returncode != 0 and "--draw-start" in refused.stderr, refused.stderr[-300:]
         subprocess.run([sys.executable, script, "merge", "--out-dir", out, "--config-json", cj], check=True,
                        capture_output=True)
         h = cfgf.signature_hash("estimator")
@@ -228,7 +309,7 @@ def test_contract():
 
 def test_determinism():
     cfg = small_cfg()
-    a, b = PH.run_replicate(cfg, SEED, 3), PH.run_replicate(cfg, SEED, 3)
+    a, b = PH.run_replicate(cfg, SEED, 3, 2), PH.run_replicate(cfg, SEED, 3, 2)
     a.pop("seconds"), b.pop("seconds")
     assert a == b or all((a[k] == b[k]) or (isinstance(a[k], float) and math.isnan(a[k]) and math.isnan(b[k])) for k in a)
 

@@ -216,7 +216,9 @@ class PhantomConfig:
     """Phantom design and nuisance draws (procedure s.3.5; D-024)."""
 
     design: str = "random"             # source: D-024 (random search over ranges, not a grid)
-    n_replicates: int = 2000           # source: PROVISIONAL; set by the spline's SE at the davinci budget
+    n_draws: int = 100000              # source: D-062 (D-062.2): G, "100,000 or more"; a record of the production's size (the run's draw range sets what is rendered) [replaces n_replicates]
+    n_realizations: int = 10           # source: D-062 (D-062.2): n_real realizations of every draw (D-059.2)
+    radius_noise_sd_um: float = 0.2    # source: D-062 (D-062.1): the branch radius d/2 + eps, eps ~ N(0, sd^2) redrawn until positive, per realization (D-058)
     d_range_um: Tuple[float, float] = (0.2, 4.0)  # source: D-024, TEMPORARY until scripts/allen_radius_distribution.py sets d_max
     d_log_uniform: bool = True         # source: PROVISIONAL (b changes fastest at small d)
     phi_range_deg: Tuple[float, float] = (0.0, 90.0)  # source: D-024 ("all the angles without redundancy"); upper end exclusive
@@ -378,8 +380,11 @@ class DiameterConfig:
         if c.spline_cv_folds < 2 or len(c.spline_smoothing_grid) < 1 or any(not (x >= 0) for x in c.spline_smoothing_grid) \
                 or any(not (b > 0) for b in c.tau_kernel_bandwidth) or len(c.tau_kernel_bandwidth) != 2:
             raise ValueError("correction: spline CV folds >= 2, smoothing values >= 0, two positive bandwidths")
-        if p.n_replicates < 1 or p.nodes_each_way < 1 or not (p.phantom_node_step_um > 0) or p.jitter_xy_um < 0 or p.jitter_z_um < 0:
-            raise ValueError("phantom: n_replicates, nodes_each_way >= 1, node step > 0, jitter >= 0")
+        if p.n_draws < 1 or p.n_realizations < 1 or p.nodes_each_way < 1 or not (p.phantom_node_step_um > 0) \
+                or p.jitter_xy_um < 0 or p.jitter_z_um < 0 or not (math.isfinite(p.radius_noise_sd_um)
+                                                                   and p.radius_noise_sd_um >= 0):
+            raise ValueError("phantom: n_draws, n_realizations, nodes_each_way >= 1, node step > 0, jitter >= 0, "
+                             "radius_noise_sd_um finite and >= 0")
         if not all(isinstance(x, str) and x for x in c.failure_rate_ignore):
             raise ValueError("correction.failure_rate_ignore must hold non-empty reason names (e.g. 'dark')")
         if not (0 < c.bias_flag_threshold) or not (0 <= c.max_failure_rate <= 1):
@@ -500,8 +505,13 @@ def _tuplify(value: Any) -> Any:
     return tuple(_tuplify(v) for v in value) if isinstance(value, list) else value
 
 
-# keys of older configuration files that no longer exist, with what replaced them
-_LEGACY_KEYS = {("renderer", "jpeg_qtables_file"): "renderer.jpeg_qtables"}
+# keys of older configuration files that no longer exist, with why and what replaced them
+_LEGACY_KEYS = {
+    ("renderer", "jpeg_qtables_file"): "it never was by the renderer: put the tables themselves in "
+                                        "renderer.jpeg_qtables (camera_<specimen>.json, 'renderer')",
+    ("phantom", "n_replicates"): "retired by D-062 (Block 14.2): the design is phantom.n_draws draws x "
+                                 "phantom.n_realizations realizations; make the configuration again",
+}
 
 
 def canonical_json(obj: Any) -> str:
@@ -512,16 +522,15 @@ def canonical_json(obj: Any) -> str:
 def config_from_dict(d: Dict[str, Any]) -> DiameterConfig:
     """Rebuild a DiameterConfig from ``full_signature()`` (tuples restored,
     nested ones included). A legacy key is dropped when it is empty (it had
-    no effect) and refused otherwise [2026-10-07: renderer.jpeg_qtables_file
-    was a path the renderer never read]."""
+    no effect) and refused otherwise, with why [2026-10-07: renderer.jpeg_qtables_file
+    was a path the renderer never read; 2026-10-21: phantom.n_replicates, Block 14.2]."""
     kwargs = {}
     for f in fields(DiameterConfig):
         sub = dict(d.get(f.name, {}))
-        for (section, key), new in _LEGACY_KEYS.items():
+        for (section, key), why in _LEGACY_KEYS.items():
             if section == f.name and key in sub:
                 if sub.pop(key):
-                    raise ValueError("%s.%s is no longer read (it never was by the renderer): put the tables "
-                                     "themselves in %s (camera_<specimen>.json, 'renderer')" % (section, key, new))
+                    raise ValueError("%s.%s is no longer read (%s)" % (section, key, why))
         cls = f.default_factory  # type: ignore[attr-defined]
         tuple_fields = {g.name for g in fields(cls) if str(g.type).startswith("Tuple")}
         kwargs[f.name] = cls(**{k: (_tuplify(v) if k in tuple_fields else v) for k, v in sub.items()})

@@ -21,6 +21,7 @@
 | 2026-10-14 | v17. Added Cell 4m, the user's request of 15:35 (D-047): each of the 50 fit variants at the fitted width (10 kernels x unweighted and 4 centre weightings) runs its own Allen-guided iteration with Cell 4j's LINE_MULT and MAX_ROUNDS read from its records, Cell 4j's own iteration redone first as the reference; per node a 50-row stack of the edges v0 +- d/2 with the planes picked, and each variant's plane with its line, the fitted dendrite's edges and d (`scripts/variant_iteration.py`, into `ITER_DIR/variter/`). Evidence: `test_smoke_variant_iteration.py` 6 pass, 1 skip (`test_convergence`: nothing new iterates); 19 of 20 mutants of the new code each failed a check (the 20th, a record's planes with a gap accepted, is refused anyway by the square's own plane check); every suite re-run (23, no failure); Cells 4j to 4m ran from the notebook's own code on two synthetic cells (tubes of 0.8 and 3.0 um): Cell 4j's iteration redone identically on 3 of 3 nodes per cell, every variant ending on Cell 4j's plane, 0 downloads, 18-21 s per node on the 0.8 um tube and 2.4-3.8 min on the 3.0 um tube (other jobs running) **[run, sandbox]**; not yet run on Allen's data. |
 | 2026-10-21 | v18. Cell 7's calibration nodes are chosen by Allen's diameter (S2.1 of the 2026-10-20 plan; D-061.4, D-067.4): the near-field set (2r ≤ 0.6 µm) is scanned, the far-field set (0.6-0.8 µm) is counted, not scanned; in S, flat and faint read from the pilot's columns; the cell's text and expected lines updated, the code unchanged. Evidence: `test_smoke_calibration.py` 7 pass with the S2.1 checks **[run, sandbox]**; not run on Allen's data. |
 | 2026-10-21 (later) | v19. The σ_fit study is removed (S2.2 of the 2026-10-20 plan; D-057 (ii), the user, 2026-10-18): Cell 8 writes `config_production.json` only, Cell 9 builds one table, Cell 10c is gone, and the per-node CSV loses `d_tilde_sigma_spread_um`; the superseded text is struck through and kept. Evidence: the suites `test_smoke_config`, `invert`, `table`, `fit`, `cell` re-run, the estimator and simulation hashes unchanged by the removal **[run, sandbox]**; not run on Allen's data. |
+| 2026-10-21 (later, 2) | v20. Cell 9's job chunks by draw (Block 14.2; D-059, D-062): the knobs `DIAM_N_DRAWS`, `DIAM_N_TASKS`, `DIAM_DRAW_OFFSET` replace `DIAM_N_TOTAL`; `phantom.n_replicates` is retired (`n_draws`, `n_realizations`). Evidence: `test_smoke_pbs.py` 4 pass, 3 skip **[run, sandbox]**; not run on davinci. |
 
 This runbook covers the real-data steps, in order. Each cell names the line that must **appear** in its output. A missing line means the cell did not get as far as the code that prints it. Each step lists the decisions it feeds; those stay yours. Nothing in these scripts changes the configuration on its own.
 
@@ -665,7 +666,7 @@ The estimator hash names the table. A real fit refuses a table with a different 
 
 ## Cell 9: the production table (davinci, not Colab)
 
-The table is built with `scripts/pbs/build_table.pbs`: 100 tasks of 20 replicates, one core and 4 GB each, then the merge on the login node. Copy `config_production.json` to the cluster, to a path **without spaces** (for example `$HOME/diam/config_production.json`; `qsub -v` takes a comma-separated list, and a value with a space is fragile there), and pass it as `DIAM_CONFIG_JSON`. The commands are in SPEC §6 and in the paths reference (project knowledge, `claude/TEEG_diameter_HPC_paths_reference.md`).
+The table is built with `scripts/pbs/build_table.pbs`: ~~100 tasks of 20 replicates~~ [corrected 2026-10-21, Block 14.2: an array of tasks, each rendering a chunk of draws with every realization, $G$ draws x `phantom.n_realizations`, sized from the davinci pilot], one core and 4 GB each, then the merge on the login node. Copy `config_production.json` to the cluster, to a path **without spaces** (for example `$HOME/diam/config_production.json`; `qsub -v` takes a comma-separated list, and a value with a space is fragile there), and pass it as `DIAM_CONFIG_JSON`. The commands are in SPEC §6 and in the paths reference (project knowledge, `claude/TEEG_diameter_HPC_paths_reference.md`).
 
 Update the code and check Pillow first [added 2026-10-07: 8.3 or newer, the order of the JPEG tables]:
 
@@ -676,10 +677,10 @@ cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/Diameter Re-meas
 Probe first:
 
 ```
-qsub -J 0-1 -v DIAM_N_TOTAL=2,DIAM_N_TASKS=2,RUN_TAG=probe,DIAM_CONFIG_JSON=<path> scripts/pbs/build_table.pbs
+qsub -J 0-1 -v DIAM_N_DRAWS=2,DIAM_N_TASKS=2,RUN_TAG=probe,DIAM_CONFIG_JSON=<path> scripts/pbs/build_table.pbs
 ```
 
-Each replicate takes 10-140 s (sandbox timing). `DIAM_N_TOTAL` (default 2000) sets the number of replicates; `phantom.n_replicates` in the configuration is a record only.
+Each replicate takes 10-140 s (sandbox timing). ~~`DIAM_N_TOTAL` (default 2000) sets the number of replicates; `phantom.n_replicates` in the configuration is a record only.~~ [corrected 2026-10-21, Block 14.2: `DIAM_N_DRAWS` (default 100000) sets the draws of a submission and `DIAM_DRAW_OFFSET` where it starts; every draw is rendered `phantom.n_realizations` times; `phantom.n_draws` is a record only. One realization of Block 13's chain took 5-132 s, mean 48 s, in the sandbox.]
 
 Merge with the **same** configuration [added 2026-10-07]. Without `--config-json` the merge assumes the default configuration. When the estimator hashes agree, the row files are then found, and before 2026-10-07 the default ranges and signature would have been written into the table. Since 2026-10-07 every row records the configuration it was rendered under (`sim_hash`), and the merge stops with `merge refused` when it is given another one (SPEC Block 6):
 

@@ -1000,8 +1000,9 @@ print("config_production.json   sigma_fit %.3f um -> table bias_table_%s"
 # ===== CELL 9: DAVINCI, NOT COLAB (nothing to paste here)
 # ====================================================================================================
 # CELL 9: THE PRODUCTION TABLE ON DAVINCI (NOT COLAB)
-# `scripts/pbs/build_table.pbs`: 100 tasks of 20 replicates, one core and 4 GB each; then the merge on the
-# login node.
+# `scripts/pbs/build_table.pbs`: an array of tasks, each rendering a chunk of draws with every realization (Block
+# 14.2: G draws x phantom.n_realizations), one core and 4 GB each; the array's size and walltime come from the
+# davinci pilot (S6). Then the merge on the login node.
 #
 # 1. Copy `MyDrive/diameters/config_production.json` to davinci into a
 # folder whose path has no spaces, e.g. `~/diam/`. `qsub -v` takes a comma-separated list, and a value with a
@@ -1010,11 +1011,12 @@ print("config_production.json   sigma_fit %.3f um -> table bias_table_%s"
 #     cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/Diameter Re-measurement" && git fetch origin && git checkout sci/diameter-pipeline && git pull --ff-only && conda activate spine_env && python -c "import PIL; print('Pillow', PIL.__version__)" && python tests/smoke/test_smoke_config.py && python tests/smoke/test_smoke_camera_tables.py
 # 3. Dry run, two-replicate probe, then the full array (from the same directory):
 #     qsub -v DIAM_DRYRUN=1,RUN_TAG=v1,DIAM_CONFIG_JSON=$HOME/diam/config_production.json scripts/pbs/build_table.pbs
-#     qsub -J 0-1 -v DIAM_N_TOTAL=2,DIAM_N_TASKS=2,RUN_TAG=probe,DIAM_CONFIG_JSON=$HOME/diam/config_production.json scripts/pbs/build_table.pbs
-#     qsub -v RUN_TAG=v1,DIAM_CONFIG_JSON=$HOME/diam/config_production.json scripts/pbs/build_table.pbs
+#     qsub -J 0-1 -v DIAM_N_DRAWS=2,DIAM_N_TASKS=2,RUN_TAG=probe,DIAM_CONFIG_JSON=$HOME/diam/config_production.json scripts/pbs/build_table.pbs
+#     qsub -J 0-<T-1> -v RUN_TAG=v1,DIAM_N_DRAWS=<G>,DIAM_N_TASKS=<T>,DIAM_CONFIG_JSON=$HOME/diam/config_production.json scripts/pbs/build_table.pbs
 # Expect in every `.o` file in `$HOME`: `[diam-table] env    spine_env`, a `Pillow` version line,
-# `[diam-table] task <i> done`. `DIAM_N_TOTAL` (default 2000) sets the number of replicates;
-# `phantom.n_replicates` in the configuration is a record only.
+# `[diam-table] task <i> done`. `DIAM_N_DRAWS` (default 100000) sets the draws of a submission and
+# `DIAM_DRAW_OFFSET` where it starts; every draw is rendered `phantom.n_realizations` times; `phantom.n_draws` in the
+# configuration is a record only.
 #
 # 4. Merge with the same configuration, with `spine_env` active. Every row records the configuration it was
 # rendered under, and the merge stops with `merge refused` when it is given another one; without

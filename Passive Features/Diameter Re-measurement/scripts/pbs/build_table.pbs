@@ -7,15 +7,20 @@
 #PBS -k eo
 
 ##########################################################################
-# Bias table b(d, phi | C) of the diameter pipeline -- one PBS array task
-# renders and measures a chunk of replicates (Block 6, specs/SPEC.md;
-# decision D-022: production table on davinci).
+# Bias table of the diameter pipeline -- one PBS array task renders and
+# measures a chunk of draws, every realization of each (Blocks 6 and 14.2,
+# specs/SPEC.md; D-022: the production on davinci; D-059, D-062: G draws x
+# n_realizations realizations).
 #
-# Replicate n always draws from numpy.random.default_rng([seed, n]), so the
-# chunking does not change the table. Task i runs replicates
-# [i * CHUNK, min(N_TOTAL, (i + 1) * CHUNK)), CHUNK = ceil(N_TOTAL / N_TASKS),
-# and writes rows_<hash>_<start>_<stop>.csv into DIAM_OUT. When every task is
-# done, merge on the login node (about a minute):
+# Draw g takes its features from numpy.random.default_rng([seed, g]) and its
+# realization r its nuisances from default_rng([seed, g, r]), so the chunking
+# does not change the table. Task i runs draws OFFSET + i * CHUNK + 1 ..
+# OFFSET + min(N_DRAWS, (i + 1) * CHUNK), CHUNK = ceil(N_DRAWS / N_TASKS),
+# and writes rows_<hash>_<start>_<stop>.csv into DIAM_OUT; a production larger
+# than one array goes in several submissions with DIAM_DRAW_OFFSET. The
+# walltime per task is draws x n_realizations x the time of one realization
+# (about 50 s in the sandbox, Block 13.5): size DIAM_N_TASKS and -J from the
+# davinci pilot (S6). When every task is done, merge on the login node:
 #
 #   cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/Diameter Re-measurement" && \
 #     python3 scripts/build_table.py merge --out-dir "$DIAM_OUT" [--config-json CFG]
@@ -24,16 +29,17 @@
 #
 #   cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/Diameter Re-measurement"
 #   qsub -v DIAM_DRYRUN=1 scripts/pbs/build_table.pbs          # prints the commands only
-#   qsub -J 0-1 -v DIAM_N_TOTAL=2,DIAM_N_TASKS=2,RUN_TAG=probe scripts/pbs/build_table.pbs
-#   qsub -v RUN_TAG=v1 scripts/pbs/build_table.pbs             # 2000 replicates, 100 tasks
+#   qsub -J 0-1 -v DIAM_N_DRAWS=2,DIAM_N_TASKS=2,RUN_TAG=probe scripts/pbs/build_table.pbs
+#   qsub -J 0-9999 -v RUN_TAG=v1,DIAM_N_DRAWS=100000,DIAM_N_TASKS=10000 scripts/pbs/build_table.pbs
 #
 # Knobs (qsub -v NAME=value,...); every one has a default:
 #   DIAM_CODE         workstream directory   (default: where qsub was run)
 #   DIAM_ENV          conda env              (default: spine_env)
 #   DIAM_OUT          output directory       (default: <archive>/diameter_tables/<RUN_TAG>)
 #   DIAM_CONFIG_JSON  a full_signature() JSON (default: none = the default config)
-#   DIAM_N_TOTAL      replicates             (default: 2000 = PhantomConfig.n_replicates)
+#   DIAM_N_DRAWS      draws G of this submission (default: 100000 = PhantomConfig.n_draws)
 #   DIAM_N_TASKS      array size; MUST match -J 0-(N_TASKS-1)   (default: 100)
+#   DIAM_DRAW_OFFSET  draws before this submission's first     (default: 0)
 #   DIAM_SEED         master seed            (default: none = PhantomConfig.seed)
 #   RUN_TAG           letters, digits, _ . - (default: default)
 #   DIAM_DRYRUN       1 = print, do not run  (default: 0)
@@ -57,8 +63,9 @@ DIAM_ENV="${DIAM_ENV:-spine_env}"
 RUN_TAG="${RUN_TAG:-default}"
 DIAM_OUT="${DIAM_OUT:-/davinci-1/home/ldellamea/Human Neurons Fitting/diameter_tables/$RUN_TAG}"
 DIAM_CONFIG_JSON="${DIAM_CONFIG_JSON:-}"
-DIAM_N_TOTAL="${DIAM_N_TOTAL:-2000}"
+DIAM_N_DRAWS="${DIAM_N_DRAWS:-100000}"
 DIAM_N_TASKS="${DIAM_N_TASKS:-100}"
+DIAM_DRAW_OFFSET="${DIAM_DRAW_OFFSET:-0}"
 DIAM_SEED="${DIAM_SEED:-}"
 DIAM_DRYRUN="${DIAM_DRYRUN:-0}"
 TASK="${PBS_ARRAY_INDEX:-0}"
@@ -66,9 +73,12 @@ TASK="${PBS_ARRAY_INDEX:-0}"
 case "$RUN_TAG" in
     ""|*[!A-Za-z0-9_.-]*) echo "[FATAL] RUN_TAG must be letters, digits, '_', '.', '-' (got '$RUN_TAG')" >&2; exit 4 ;;
 esac
-case "$DIAM_N_TOTAL$DIAM_N_TASKS$TASK" in
-    *[!0-9]*) echo "[FATAL] DIAM_N_TOTAL, DIAM_N_TASKS and PBS_ARRAY_INDEX must be integers" >&2; exit 4 ;;
+case "$DIAM_N_DRAWS$DIAM_N_TASKS$DIAM_DRAW_OFFSET$TASK" in
+    *[!0-9]*) echo "[FATAL] DIAM_N_DRAWS, DIAM_N_TASKS, DIAM_DRAW_OFFSET and PBS_ARRAY_INDEX must be integers" >&2; exit 4 ;;
 esac
+if [ "$DIAM_N_DRAWS" -lt 1 ] || [ "$DIAM_N_TASKS" -lt 1 ]; then
+    echo "[FATAL] DIAM_N_DRAWS and DIAM_N_TASKS must be >= 1" >&2; exit 4
+fi
 if [ ! -f "$DIAM_CODE/scripts/build_table.py" ]; then
     echo "[FATAL] scripts/build_table.py not found under DIAM_CODE=$DIAM_CODE" >&2
     echo "        Submit from the workstream directory:" >&2
@@ -84,16 +94,18 @@ if [ "$TASK" -ge "$DIAM_N_TASKS" ]; then
     echo "[FATAL] PBS_ARRAY_INDEX=$TASK but DIAM_N_TASKS=$DIAM_N_TASKS: -J and DIAM_N_TASKS disagree" >&2
     exit 4
 fi
-CHUNK=$(( (DIAM_N_TOTAL + DIAM_N_TASKS - 1) / DIAM_N_TASKS ))
-START=$(( TASK * CHUNK ))
-STOP=$(( START + CHUNK ))
-if [ "$STOP" -gt "$DIAM_N_TOTAL" ]; then STOP="$DIAM_N_TOTAL"; fi
+CHUNK=$(( (DIAM_N_DRAWS + DIAM_N_TASKS - 1) / DIAM_N_TASKS ))
+LO=$(( TASK * CHUNK ))
+HI=$(( LO + CHUNK ))
+if [ "$HI" -gt "$DIAM_N_DRAWS" ]; then HI="$DIAM_N_DRAWS"; fi
+START=$(( DIAM_DRAW_OFFSET + LO + 1 ))          # draws are numbered from 1 (D-062's keys)
+STOP=$(( DIAM_DRAW_OFFSET + HI + 1 ))
 
-ARGS=(scripts/build_table.py run --start "$START" --stop "$STOP" --out-dir "$DIAM_OUT")
+ARGS=(scripts/build_table.py run --draw-start "$START" --draw-stop "$STOP" --out-dir "$DIAM_OUT")
 if [ -n "$DIAM_CONFIG_JSON" ]; then ARGS+=(--config-json "$DIAM_CONFIG_JSON"); fi
 if [ -n "$DIAM_SEED" ]; then ARGS+=(--seed "$DIAM_SEED"); fi
 
-echo "[diam-table] task $TASK of $DIAM_N_TASKS: replicates $START-$STOP of $DIAM_N_TOTAL"
+echo "[diam-table] task $TASK of $DIAM_N_TASKS: draws $START-$(( STOP - 1 )) of $DIAM_N_DRAWS (offset $DIAM_DRAW_OFFSET)"
 echo "[diam-table] code   $DIAM_CODE"
 echo "[diam-table] out    $DIAM_OUT"
 echo "[diam-table] env    $DIAM_ENV"
