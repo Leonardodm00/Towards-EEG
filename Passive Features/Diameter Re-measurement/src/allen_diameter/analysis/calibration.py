@@ -1,6 +1,16 @@
 """Defocus-kernel calibration, first stage -- Block 10 in specs/SPEC.md
 (procedure Eq. 4 and s.3.4; mathematics Eq. 18 and s.3.5).
 
+  calibration_reasons the selection of the calibration nodes (D-061.4,
+                      D-067.4): Allen's diameter D_A = 2 x the branch radius
+                      at the node puts a node in the near-field set (D_A <=
+                      node_allen_diameter_max_um, scanned up to +-P planes)
+                      or the far-field set (lo < D_A <= hi,
+                      far_field_allen_diameter_um; the offsets beyond, D-026);
+                      in S, flat and faint are read from the pilot
+                      (pilot_view). The fit's d_hat is no criterion. The
+                      far-field scan is not built: such a node is selected and
+                      reported, not scanned (FAR_FIELD_NOT_BUILT)
   plane_scan          at one thin, faint, flat calibration node the measuring
                       line is kept fixed in (x, y) and the planes
                       k* - P .. k* + P are stepped through (P = offsets_planes).
@@ -201,31 +211,83 @@ def plane_scan(blk, node, branch, cfg):
                      cols["area_gl_um"], cols["depth_gl"], cols["B_bar"], tuple(status))
 
 
-def calibration_reasons(result, cfg):
-    """Why a NodeResult is not a calibration node (empty: it is one): outside
-    the selection S (Block 6's rule), or not thin, flat and faint -- all read
-    from the pilot (pilot_view; Block 13.3b, D-061.2)."""
+CALIBRATION_SETS = ("near", "far")      # D-067.4: the near-field (thin) set and the far-field set (D-026)
+FAR_FIELD_NOT_BUILT = "far_field_scan_not_built"    # scan_node's reason for a far-field node (SPEC s.8)
+
+
+def calibration_set(allen_diameter_um, cfg):
+    """The calibration set of a node by Allen's diameter D_A = allen_diameter_um
+    (um; D-061.4, D-067.4): "near" when 0 < D_A <= node_allen_diameter_max_um,
+    "far" when lo < D_A <= hi with (lo, hi) = far_field_allen_diameter_um, ""
+    otherwise (D_A not finite or <= 0 included). validate() keeps the two sets
+    disjoint."""
     cal = cfg.calibration
-    result = pilot_view(result)
-    out = phantoms.reject_reasons(result)
-    if not result.d_hat_um <= cal.node_dhat_max_um:
-        out.append("not_thin")
-    if not result.phi_rad <= math.radians(cal.node_phi_max_deg):
+    d = float(allen_diameter_um)
+    if not (math.isfinite(d) and d > 0):
+        return ""
+    if d <= cal.node_allen_diameter_max_um:
+        return "near"
+    lo, hi = cal.far_field_allen_diameter_um
+    return "far" if lo < d <= hi else ""
+
+
+def criteria_reasons(phi_rad, alpha_hat, allen_diameter_um, cfg):
+    """The calibration criteria other than S, on numbers (D-067.4), in this
+    order: Allen's diameter (allen_diameter_missing when it is not finite or
+    <= 0, allen_diameter_out when it is in neither set), flat (phi_rad <=
+    node_phi_max_deg, else not_flat), faint (alpha_hat <= node_alpha_max, else
+    not_faint); a NaN fails its criterion. Empty: all met."""
+    cal = cfg.calibration
+    d = float(allen_diameter_um)
+    out = []
+    if not (math.isfinite(d) and d > 0):
+        out.append("allen_diameter_missing")
+    elif not calibration_set(d, cfg):
+        out.append("allen_diameter_out")
+    if not float(phi_rad) <= math.radians(cal.node_phi_max_deg):
         out.append("not_flat")
-    if not result.alpha_hat <= cal.node_alpha_max:
+    if not float(alpha_hat) <= cal.node_alpha_max:
         out.append("not_faint")
     return out
 
 
+def calibration_reasons(result, cfg, allen_diameter_um):
+    """Why a NodeResult is not a calibration node (empty: it is one, of the set
+    calibration_set(allen_diameter_um, cfg)): outside the selection S (Block 6's
+    rule), then criteria_reasons -- every criterion read from the pilot
+    (pilot_view; Block 13.3b, D-061.2, D-067.4) except Allen's diameter
+    allen_diameter_um (um; 2 x the branch radius at the node, D-061.4). The fit's
+    d_hat is no criterion: the kernel being calibrated must not choose its own
+    nodes."""
+    view = pilot_view(result)
+    return phantoms.reject_reasons(view) + criteria_reasons(view.phi_rad, view.alpha_hat, allen_diameter_um, cfg)
+
+
+def scan_verdict(scan, reasons):
+    """The log phrase of a scan_node result: scanned (near field), a far-field
+    calibration node not scanned, or not a calibration node with its reasons."""
+    if scan is not None:
+        return "scanned (near field)"
+    if list(reasons) == [FAR_FIELD_NOT_BUILT]:
+        return "far-field calibration node, not scanned (the far-field scan is not built)"
+    return "not a calibration node (%s)" % ";".join(reasons)
+
+
 def scan_node(branch, i, provider, cfg, reg=None):
-    """Measure node i's pilot (measure_pilot: Block 5, D-061.2) and, when it is
-    a calibration node, fetch its block over k* - P .. k* + P (a second
-    provider call) and scan it. Returns (NodeResult, PlaneScan or None,
-    reasons)."""
+    """Measure node i's pilot (measure_pilot: Block 5, D-061.2) and select it by
+    calibration_reasons with Allen's diameter 2 x branch.radius_um[i] (D-061.4,
+    D-067.4). A calibration node of the near-field set: fetch its block over
+    k* - P .. k* + P (a second provider call) and scan it. A calibration node of
+    the far-field set is not scanned -- its scan beyond the near field is not
+    built (SPEC s.8) --: no second call, reasons [FAR_FIELD_NOT_BUILT]. Returns
+    (NodeResult, PlaneScan or None, reasons)."""
     res = measure_pilot(branch, i, provider, cfg, reg)
-    reasons = calibration_reasons(res, cfg)
+    allen_d = 2.0 * float(branch.radius_um[i])
+    reasons = calibration_reasons(res, cfg, allen_d)
     if reasons:
         return res, None, reasons
+    if calibration_set(allen_d, cfg) != "near":
+        return res, None, [FAR_FIELD_NOT_BUILT]
     m, p, P = cfg.measure, cfg.acquisition.res0_um, cfg.calibration.offsets_planes
     left = int(math.floor((res.cx_um - m.block_half_um) / p)) - 1
     top = int(math.floor((res.cy_um - m.block_half_um) / p)) - 1
@@ -240,7 +302,9 @@ def scan_cell(swc, provider, cfg, transform=None, regs=None, candidates=None, lo
     (Block 8) holding a node id of `candidates` (None: every dendrite node) is
     built in the image frame (transform: keyword arguments of cell.to_image_um)
     and each such node goes through scan_node (regs: {node_id: registration
-    dict}). Returns a list of (node_id, NodeResult, PlaneScan or None, reasons)."""
+    dict}; Allen's diameter from the SWC radius the branch carries). Returns a
+    list of (node_id, NodeResult, PlaneScan or None, reasons); log, when given,
+    gets one scan_verdict line per node."""
     types = cfg.acquisition.dendrite_swc_types
     xyz_img = cell.to_image_um(swc.xyz, cfg.acquisition.res0_um, **(transform or {}))
     out = []
@@ -255,8 +319,7 @@ def scan_cell(swc, provider, cfg, transform=None, regs=None, candidates=None, lo
             res, scan, reasons = scan_node(branch, off + t, provider, cfg, (regs or {}).get(nid))
             out.append((nid, res, scan, reasons))
             if log is not None:
-                log("node %d: %s" % (nid, "scanned" if scan is not None else "not a calibration node (%s)"
-                                     % ";".join(reasons)))
+                log("node %d: %s" % (nid, scan_verdict(scan, reasons)))
     return out
 
 

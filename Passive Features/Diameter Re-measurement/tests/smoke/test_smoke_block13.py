@@ -869,7 +869,7 @@ def test_edge_cases():
     assert pil3.k_star == -4 and int(np.min(pil3.focus_planes)) == -4, (pil3.k_star, pil3.focus_planes)  # Block 5's
     row = survey.pilot_row(r3, 0.3, cfg3)
     assert "stack_edge" in row["reject_pilot"] and "stack_edge" not in row["reject"], (row["reject"], row["reject_pilot"])
-    assert calibration.calibration_reasons(r3, cfg3) == calibration.calibration_reasons(pil3, cfg3)
+    assert calibration.calibration_reasons(r3, cfg3, 0.6) == calibration.calibration_reasons(pil3, cfg3, 0.6)
     _same(survey.profile_at_node(prov3, r3, cfg3)[2], survey.profile_at_node(prov3, pil3, cfg3)[2], "drawn model")
     # no plane at all (every section missing): no fit and k_iter -1, the flags of Block 5 without k*
     def missing(*args):

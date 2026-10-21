@@ -6,8 +6,12 @@
              configuration's kernel, measure each (Block 5) and scan its
              planes k* - P .. k* + P along the fixed line -> scans JSON
   real       Phase II (Colab: api.brain-map.org): the candidates of a
-             previous run_cell.py table (converged, in S, thin, flat, faint)
-             are re-measured and scanned on Allen's planes -> scans JSON
+             previous run_cell.py or run_node.py table -- by Allen's diameter
+             in the near-field or the far-field set of D-067.4, and in S,
+             flat and faint by the pilot's columns -- are re-measured and the
+             near-field nodes scanned on Allen's planes -> scans JSON (the
+             far-field nodes are counted, not scanned: their scan is not
+             built)
   fit        Eq. (4) over the scans; the first-stage Gaussian table
              sigma_r(delta_m) = sqrt(sigma_r(0)^2 + G(delta_m)), sigma_r(0)
              configured (not identified) -> calibration JSON, and a report:
@@ -100,31 +104,31 @@ def run_synthetic(cfg, n, seed, out, d_range, alpha_range, phi_max, workers=1):
         results = [_one_synthetic(j) for j in jobs]
     scans = [s for _, _, s, _ in results if s is not None]
     meta = dict(source="synthetic", seed=int(seed), n=int(n), d_range_um=list(d_range), alpha_range=list(alpha_range),
-                phi_max_deg=phi_max, config=json.loads(cfg.to_json()),
+                phi_max_deg=phi_max, config=json.loads(cfg.to_json()), calibration=dataclasses.asdict(cfg.calibration),
                 truth=[dict(index=dr.index, d_um=dr.d_um, mu_per_um=dr.mu_per_um, phi_rad=dr.phi_rad, cz_um=dr.cz_um,
                             scanned=s is not None, reasons=";".join(rs)) for dr, _, s, rs in results])
     calibration_io.save_scans(scans, out, meta)
     for dr, res, s, rs in results:
         print("phantom %d: d %.3f um, alpha %.2f -> d_hat %.3f, %s" % (
             dr.index, dr.d_um, dr.mu_per_um * dr.d_um / math.cos(dr.phi_rad), res.d_hat_um,
-            "scanned" if s is not None else "not a calibration node (%s)" % ";".join(rs)))
+            calibration.scan_verdict(s, rs)))
     print("%d of %d phantoms scanned -> %s" % (len(scans), len(results), out))
     return out
 
 
 def candidates_from_rows(rows, cfg):
-    """Node ids of a run_cell.py table that can be calibration nodes (the rule of calibration_reasons on the
-    CSV columns, the pilot's: cell.pilot_row_view, Block 13); they are re-measured before the scan, so this only
-    saves fetches."""
-    cal = cfg.calibration
+    """Node ids of a run_cell.py or run_node.py table that can be calibration nodes of either set: the rule of
+    calibration.calibration_reasons on the CSV columns read as the pilot's (cell.pilot_row_view, Block 13) --
+    in S by fit_status and the flags of SELECTION_FLAGS, and calibration.criteria_reasons on phi_rad, alpha_hat
+    and Allen's diameter 2 x allen_radius_um (D-061.4, D-067.4). The registration is checked when the node is
+    re-measured before the scan, so this only saves fetches."""
     out = set()
     for r in (cell.pilot_row_view(x) for x in rows):
         flags = [f for f in str(r.get("flags", "")).split(";") if f]
         try:
             ok = (r["fit_status"] == "converged" and not any(f in phantoms.SELECTION_FLAGS for f in flags)
-                  and float(r["d_hat_um"]) <= cal.node_dhat_max_um
-                  and float(r["phi_rad"]) <= math.radians(cal.node_phi_max_deg)
-                  and float(r["alpha_hat"]) <= cal.node_alpha_max)
+                  and not calibration.criteria_reasons(float(r["phi_rad"]), float(r["alpha_hat"]),
+                                                       2.0 * float(r["allen_radius_um"]), cfg))
         except (KeyError, ValueError, TypeError):
             ok = False
         if ok:
@@ -149,9 +153,16 @@ def run_real(cfg, a):
     out = calibration.scan_cell(swc, provider, cfg, dict(shift_full_px=(a.shift_x, a.shift_y), flip_y_full_h=a.flip_h,
                                                         z0_um=a.z0), regs, cand, log=lambda m: print(m, flush=True))
     scans = [s for _, _, s, _ in out if s is not None]
+    allen_d = {int(i): 2.0 * float(r) for i, r in zip(swc.ids, swc.radius)}
+    nodes = [dict(node_id=int(nid), allen_diameter_um=allen_d[int(nid)] if math.isfinite(allen_d[int(nid)]) else None,
+                  set=calibration.calibration_set(allen_d[int(nid)], cfg), reasons=";".join(rs), scanned=s is not None)
+             for nid, _, s, rs in out]             # the scans file is strict JSON (allow_nan=False)
+    n_far = sum(1 for _, _, _, rs in out if list(rs) == [calibration.FAR_FIELD_NOT_BUILT])
     calibration_io.save_scans(scans, a.out, dict(source="real", specimen=str(a.specimen), n_candidates=len(cand),
-                                                 config=json.loads(cfg.to_json())))
-    print("%d of %d candidates scanned in %.1f min -> %s" % (len(scans), len(out), (time.perf_counter() - t0) / 60, a.out))
+                                                 config=json.loads(cfg.to_json()),
+                                                 calibration=dataclasses.asdict(cfg.calibration), nodes=nodes))
+    print("%d of %d candidates scanned (near field), %d far-field calibration nodes not scanned (the far-field scan "
+          "is not built), in %.1f min -> %s" % (len(scans), len(out), n_far, (time.perf_counter() - t0) / 60, a.out))
     return a.out
 
 
@@ -198,8 +209,8 @@ def main(argv=None):
     s.add_argument("--n", type=int, required=True)
     s.add_argument("--seed", type=int, required=True)
     s.add_argument("--d-range", type=_pair, default=(0.15, 0.25),
-                   help="true d, um, comma-separated (thin flat tubes read 5-25 %% wide, and the node must "
-                        "read d_hat <= node_dhat_max_um)")
+                   help="true d, um, comma-separated (a phantom's branch radius is d/2, so its Allen diameter is d: "
+                        "a scanned, near-field node needs d <= node_allen_diameter_max_um)")
     s.add_argument("--alpha-range", type=_pair, default=(0.15, 0.4))
     s.add_argument("--phi-max", type=float, default=5.0, help="deg")
     s.add_argument("--workers", type=int, default=1)

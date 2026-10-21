@@ -910,11 +910,16 @@ run("scripts/allen_radius_distribution.py", "--fetch", SPECIMEN, "--cache-dir", 
 # ===== CELL 7
 # ====================================================================================================
 # CELL 7: KERNEL CALIBRATION, FIRST STAGE (DIAGNOSTIC ONLY)
-# The calibration nodes of the pilot (thin, faint, flat:  d <= 0.3 um, phi <= 10 deg, alpha <= 0.5) are
-# re-measured and scanned plane by plane, then the growth of the core width is fitted. Expect `N candidate
-# nodes`, `growth fit (gaussian_core_width2, symmetric, cubic): N nodes`, the knot table and `residual RMS by
-# |k - k*|`. Fewer than two candidates: measure more stretches in Cell 4b. A failure here does not stop the
-# notebook.
+# The calibration nodes of the pilot are chosen by Allen's diameter D_A = 2 r_A, not by the fitted d_hat (D-061.4,
+# D-067.4; thresholds PROVISIONAL): the near-field set, D_A <= 0.6 um, is re-measured and scanned plane by plane
+# over k* +- 3 (offsets up to 0.84 um); the far-field set, 0.6 < D_A <= 0.8 um, for the offsets beyond 0.84 um
+# (D-026), is selected and counted but not scanned: its scan is not built yet. Both must be in S, flat
+# (phi <= 10 deg) and faint (alpha <= 0.5), read from the pilot's columns. The growth of the core width is then
+# fitted on the near-field scans. Expect `N candidate nodes`, one line per node (`scanned (near field)`,
+# `far-field calibration node, not scanned (...)` or `not a calibration node (...)`), `... candidates scanned
+# (near field), M far-field calibration nodes not scanned ...`, then `growth fit (gaussian_core_width2,
+# symmetric, cubic): N nodes`, the knot table and `residual RMS by |k - k*|`. Fewer than two near-field nodes:
+# measure more stretches in Cell 4b. A failure here does not stop the notebook.
 #
 # The first-stage table is not a calibrated kernel: on rendered thin phantoms its growth is about 0.01 um^2
 # low within two planes, and it came out non-monotone near focus (SPEC Block 10). Keep the default kernel for

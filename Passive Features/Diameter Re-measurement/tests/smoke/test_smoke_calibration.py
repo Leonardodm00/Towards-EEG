@@ -4,7 +4,11 @@ specs/SPEC.md (procedure Eq. 4, s.3.4; mathematics Eq. 18, s.3.5).
 Checks
     test_known_answer   dip statistics of a sampled Gaussian dip: omega = s^2
                         to 1e-12 relative; with a window of 10 s, A_W =
-                        a s sqrt(2 pi) and V_W = s^2 to 1e-9 relative
+                        a s sqrt(2 pi) and V_W = s^2 to 1e-9 relative;
+                        S2.1 (D-061.4, D-067.4): calibration_set at the edges
+                        of the two sets of Allen's diameter; Allen's diameter
+                        selects, not d_hat; the reasons and their order;
+                        every other criterion read from the pilot
     test_reference      (a) the growth fit recovers c_i, z_ax,i, the knot
                         values and the curve from exact Eq. (4) data of its
                         family, both conventions, cubic and linear, to 1e-9;
@@ -33,12 +37,18 @@ Checks
                         returns a NodeResult and a PlaneScan; the scans file
                         round trip; scan_cell on a synthetic cell served
                         through fetch_zblock (three candidates, >= 2 scanned,
-                        fitted); the command line synthetic -> fit
+                        fitted); the command line synthetic -> fit; S2.1: a
+                        near-field node makes two provider calls, a far-field
+                        phantom one and is not scanned (FAR_FIELD_NOT_BUILT);
+                        candidates_from_rows on pilot rows equals
+                        calibration_reasons == []
     test_determinism    the growth fit and a rendered scan repeat bit for bit
     test_edge_cases     flat profile -> no_dip; a dip wider than the profile
                         -> no_fwhm; one usable node -> ValueError; min_origin
                         or sigma_r(0)^2 + G <= 0 -> kernel_from_growth refuses;
-                        a node without a sharpest plane -> plane_scan refuses
+                        a node without a sharpest plane -> plane_scan refuses;
+                        S2.1: validate() refuses overlapping, reversed, empty,
+                        non-finite or mis-sized sets of Allen's diameter
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -208,6 +218,40 @@ def test_known_answer():
         # h = 0.1144) and the window |v - v_c| <= 2.9 holds >= 10 s
         assert abs(st["area_gl_um"] / (a * s * math.sqrt(2 * math.pi)) - 1) <= 1e-9, (s, st["area_gl_um"])
         assert abs(st["vw_um2"] / s ** 2 - 1) <= 1e-9, (s, st["vw_um2"])
+    # S2.1 (D-061.4, D-067.4): the two sets of Allen's diameter at their edges, the defaults 0.6 and (0.6, 0.8] um;
+    # 2 x 0.3 and 2 x 0.4 are exactly 0.6 and 0.8 in binary (doubling is exact), so radii written with one
+    # decimal fall on the side the decision names
+    eps = 1e-9
+    for d_a, want in ((0.05, "near"), (0.6, "near"), (2 * 0.3, "near"), (0.6 + eps, "far"), (0.7, "far"),
+                      (0.8, "far"), (2 * 0.4, "far"), (0.8 + eps, ""), (5.0, ""), (0.0, ""), (-0.1, ""), (NAN, ""),
+                      (float("inf"), "")):
+        assert CAL.calibration_set(d_a, cfg) == want, (d_a, CAL.calibration_set(d_a, cfg), want)
+        assert want == "" or want in CAL.CALIBRATION_SETS
+    assert CAL.CALIBRATION_SETS == ("near", "far")
+    # Allen's diameter selects, not the fit's d_hat; the order of the reasons
+    base = fake_node(0.0, 0.0, 0.0, 0.0, 2.0, 0.1)                       # d_hat 2 um, alpha 0.2, flat, converged
+    thin_fit = fake_node(0.0, 0.0, 0.0, 0.0, 0.1, 2.0)                   # d_hat 0.1 um, alpha 0.2
+    assert CAL.calibration_reasons(base, cfg, 0.4) == [] and CAL.calibration_reasons(thin_fit, cfg, 0.7) == []
+    assert CAL.calibration_reasons(thin_fit, cfg, 1.0) == ["allen_diameter_out"]
+    for bad in (NAN, 0.0, -1.0, float("inf")):
+        assert CAL.calibration_reasons(thin_fit, cfg, bad) == ["allen_diameter_missing"], bad
+    worst = dataclasses.replace(base, fit_status="at_bound", reg_verdict="FAR: nearest matching ridge 2 um",
+                                flags=("dark", "crossing", "steep"), phi_rad=0.5, alpha_hat=0.9)
+    want = ["status:at_bound", "registration:FAR", "crossing", "dark", "allen_diameter_out", "not_flat", "not_faint"]
+    assert CAL.calibration_reasons(worst, cfg, 1.0) == want, CAL.calibration_reasons(worst, cfg, 1.0)
+    assert CAL.criteria_reasons(0.5, 0.9, 1.0, cfg) == want[4:]
+    assert CAL.criteria_reasons(NAN, NAN, 0.3, cfg) == ["not_flat", "not_faint"]
+    # every criterion but Allen's diameter reads the pilot (pilot_view): a deliverable failing everything with a
+    # passing pilot passes; a pilot failing one criterion gives that reason whatever the deliverable
+    passing_pilot = dict(pilot_status="converged", pilot_flags=(), d_pilot_um=0.3, mu_pilot_per_um=1.0,
+                         v0_pilot_um=0.0, alpha_pilot=0.3, B_bar_pilot=200.0)
+    bad_fit = dataclasses.replace(base, fit_status="failed", flags=("crossing", "dark"), alpha_hat=0.9,
+                                  **passing_pilot)
+    assert CAL.calibration_reasons(bad_fit, cfg, 0.4) == [], CAL.calibration_reasons(bad_fit, cfg, 0.4)
+    for change, reason in ((dict(alpha_pilot=0.9), "not_faint"), (dict(pilot_status="at_bound"), "status:at_bound"),
+                           (dict(pilot_flags=("stack_edge",)), "stack_edge"), (dict(alpha_pilot=NAN), "not_faint")):
+        node = dataclasses.replace(base, **dict(passing_pilot, **change))
+        assert CAL.calibration_reasons(node, cfg, 0.4) == [reason], (change, CAL.calibration_reasons(node, cfg, 0.4))
 
 
 def test_reference():
@@ -333,7 +377,10 @@ def test_contract():
                             0.5 * d)
     pad = int(math.ceil(cfg.renderer.pad_um / cfg.acquisition.res0_um))
 
+    calls = []
+
     def provider(left, top, width, height, k_lo, k_hi):
+        calls.append((k_lo, k_hi))
         return R.synthetic_block(tube, mu, np.arange(k_lo, k_hi + 1), left, top, width, height, cfg, rng, pad)
     res, scan, reasons = CAL.scan_node(br, 6, provider, cfg)
     assert isinstance(res, NodeResult)
@@ -341,6 +388,51 @@ def test_contract():
     assert scan is not None, ("a thin faint flat phantom must be a calibration node", reasons, res.d_hat_um,
                               res.alpha_hat)
     assert scan.k_star == res.k_star and np.sum(np.isfinite(scan.omega_um2)) >= 5, scan.status
+    assert len(calls) == 2 and calls[1] == (res.k_star - P, res.k_star + P), calls      # the pilot's, then the scan's
+    # S2.1: a far-field phantom (Allen's diameter = its branch's 2 r = d = 0.7 um, alpha 0.35, flat) is selected and
+    # not scanned: the pilot's one provider call only, no scan, the one reason FAR_FIELD_NOT_BUILT
+    d_far, mu_far = 0.7, 0.5
+    tube_far = G.Tube((0.02, -0.03, 0.04), 0.5 * d_far, 0.0, theta, 1.0, cfg.renderer.U_um, cfg.renderer.end_cut)
+    br_far = Branch.from_points(np.array([0.02, -0.03, 0.04])[None, :] + np.arange(-6, 7)[:, None] * 1.18 * t[None, :],
+                                0.5 * d_far)
+    calls_far = []
+
+    def provider_far(left, top, width, height, k_lo, k_hi):
+        calls_far.append((k_lo, k_hi))
+        return R.synthetic_block(tube_far, mu_far, np.arange(k_lo, k_hi + 1), left, top, width, height, cfg, rng, pad)
+    res_far, scan_far, reasons_far = CAL.scan_node(br_far, 6, provider_far, cfg)
+    assert CAL.calibration_set(2.0 * br_far.radius_um[6], cfg) == "far"
+    assert CAL.calibration_reasons(res_far, cfg, 2.0 * br_far.radius_um[6]) == [], \
+        ("the far-field phantom must pass S, flat and faint", res_far.fit_status, res_far.flags, res_far.alpha_hat)
+    assert scan_far is None and reasons_far == [CAL.FAR_FIELD_NOT_BUILT] and len(calls_far) == 1, (reasons_far,
+                                                                                                    calls_far)
+    assert CAL.scan_verdict(scan_far, reasons_far).startswith("far-field calibration node, not scanned")
+    assert CAL.scan_verdict(scan, []) == "scanned (near field)"
+    assert CAL.scan_verdict(None, ["not_flat"]) == "not a calibration node (not_flat)"
+    # the CSV readers' rule (calibrate_kernel.candidates_from_rows on survey.pilot_row rows) holds a node exactly
+    # when calibration_reasons is empty -- pilots and deliverables, both sets, every criterion (no registration
+    # verdict: the CSV rule leaves the registration to the re-measurement)
+    sys.path.insert(0, str(WS / "scripts"))
+    import calibrate_kernel
+    from allen_diameter.analysis import survey
+    base = fake_node(0.0, 0.0, 0.0, 0.0, 2.0, 0.1)
+    pil = dict(pilot_status="converged", pilot_flags=(), d_pilot_um=0.3, mu_pilot_per_um=1.0, v0_pilot_um=0.0,
+               alpha_pilot=0.3, B_bar_pilot=200.0)
+    cases = [(dict(), 0.2), (dict(), 0.35), (dict(), 0.5), (dict(), NAN), (dict(phi_rad=0.5), 0.2),
+             (dict(alpha_hat=0.9), 0.2), (dict(fit_status="at_bound"), 0.2), (dict(flags=("crossing",)), 0.2),
+             (dict(pil), 0.2), (dict(pil, alpha_pilot=0.9), 0.2), (dict(pil, pilot_status="failed"), 0.35),
+             (dict(pil, pilot_flags=("dark",)), 0.2), (dict(pil, alpha_hat=0.9, fit_status="failed"), 0.35),
+             (dict(pil, flags=("bbar_few",)), 0.2)]
+    rows, want = [], set()
+    for n, (change, r_a) in enumerate(cases):
+        node = dataclasses.replace(base, node_id=100 + n, **change)
+        rows.append(survey.pilot_row(node, r_a, cfg))
+        if not CAL.calibration_reasons(node, cfg, 2.0 * r_a):
+            want.add(100 + n)
+    got = calibrate_kernel.candidates_from_rows(rows, cfg)
+    assert got == want and want == {100, 101, 108, 112, 113}, (sorted(got), sorted(want))
+    assert [r["calibration_set"] for r in rows[:4]] == ["near", "far", "", ""] and rows[2]["calibration_node"] is False
+    assert rows[4]["calibration_set"] == "" and rows[4]["calibration_node"] is False      # Allen near, not flat
     # the scans file round trip (NaN <-> null)
     back = CIO.scan_from_dict(json.loads(json.dumps(CIO.scan_to_dict(scan))))
     for name in ("ks", "z_um", "omega_um2", "vw_um2", "area_gl_um", "depth_gl", "B_bar"):
@@ -412,6 +504,20 @@ def test_edge_cases():
         except ValueError:
             continue
         raise AssertionError("kernel_from_growth accepted an invalid growth")
+    # S2.1: validate() keeps the two sets of Allen's diameter disjoint, finite and of two band values
+    for bad in (dict(node_allen_diameter_max_um=0.7), dict(far_field_allen_diameter_um=(0.8, 0.6)),
+                dict(far_field_allen_diameter_um=(0.6, 0.6)), dict(far_field_allen_diameter_um=(0.6,)),
+                dict(far_field_allen_diameter_um=(0.6, 0.7, 0.8)), dict(node_allen_diameter_max_um=0.0),
+                dict(node_allen_diameter_max_um=-0.1), dict(far_field_allen_diameter_um=(0.6, NAN)),
+                dict(node_allen_diameter_max_um=NAN), dict(far_field_allen_diameter_um=(0.6, float("inf")))):
+        try:
+            cfg_with(**bad).validate()
+        except ValueError:
+            continue
+        raise AssertionError("validate() accepted %r" % (bad,))
+    cfg_with(node_allen_diameter_max_um=0.5).validate()                  # a gap between the sets is allowed
+    gap = cfg_with(node_allen_diameter_max_um=0.5)
+    assert [CAL.calibration_set(x, gap) for x in (0.5, 0.55, 0.6, 0.6 + 1e-9)] == ["near", "", "", "far"]
     node = fake_node(0.0, 0.0, NAN, 0.0, 0.25, 1.0)
     try:
         CAL.plane_scan((np.zeros((1, 4, 4)), np.array([0]), np.array([True]), None), node, None, cfg)

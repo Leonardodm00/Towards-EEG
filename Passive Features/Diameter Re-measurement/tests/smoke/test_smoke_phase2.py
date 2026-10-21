@@ -144,6 +144,18 @@ def test_known_answer():
     assert s["suggested_phantom_mu_range_per_um"] == [float(np.percentile(mus, 10)), float(np.percentile(mus, 90))]
     conv = [r for r in rows if r["fit_status"] == "converged"]
     assert s["dark_share_of_converged"] == sum(1 for r in conv if r["alpha_hat"] > cfg.measure.alpha_dark_flag) / len(conv)
+    assert s["n_calibration_nodes"] == 0 and s["n_calibration_by_set"] == {}, s["n_calibration_by_set"]
+    # S2.1 (Block 10's two sets): the calibration nodes counted per set; a row without calibration_set, or read back
+    # as NaN, counts under ""
+    marks = [(True, "near"), (True, "far"), (True, "near"), (False, ""), (True, None), (True, float("nan"))]
+    few = []
+    for r, (c, k) in zip(rows, marks):
+        x = dict(r, calibration_node=c)
+        if k is not None:
+            x["calibration_set"] = k
+        few.append(x)
+    s6 = survey.summarize(few, cfg)
+    assert s6["n_calibration_nodes"] == 5 and s6["n_calibration_by_set"] == {"near": 2, "far": 1, "": 2}, s6
     # the selection reads the registration_check sentences by category
     nan = float("nan")
 
@@ -295,10 +307,13 @@ def test_contract():
                                   log=lambda m: None)
         assert len(rows) == 6 and summ["n_nodes"] == 6 and summ["n_in_S"] >= 4, (summ, [r["reject"] for r in rows])
         back = table_io.read_rows([os.path.join(out, "pilot_999.csv")])
-        assert len(back) == 6 and {"in_S", "reject", "calibration_node", "bg_median_gl", "allen_radius_um"} <= set(back[0])
+        assert len(back) == 6 and {"in_S", "reject", "calibration_node", "calibration_set", "bg_median_gl",
+                                   "allen_radius_um"} <= set(back[0])
         with open(os.path.join(out, "pilot_summary_999.json")) as f:
             js = json.load(f)
         assert js["estimator_hash"] == cfg.signature_hash("estimator") and "suggested_phantom_mu_range_per_um" in js
+        assert js["n_calibration_by_set"] == {k: sum(1 for r in rows if r["calibration_node"] and
+                                                     r["calibration_set"] == k) for k in js["n_calibration_by_set"]}
         # D-030: every row carries the focus rule and the dip depth's plane; the summary counts where they differ
         assert all(r["focus_rule"] == cfg.measure.focus_rule and isinstance(r["k_star_depth"], int) for r in back)
         found = [r for r in rows if math.isfinite(r["z_sub_um"])]

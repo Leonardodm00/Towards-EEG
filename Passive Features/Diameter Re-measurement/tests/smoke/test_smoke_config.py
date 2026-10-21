@@ -67,6 +67,10 @@ def test_known_answer():
     assert m.focus_grad_window == "radius_margin" and m.focus_grad_margin_um == 0.5, (m.focus_grad_window,
                                                                                       m.focus_grad_margin_um)
     assert m.sigma_fit_um == 0.099 and 0.080 in m.sigma_fit_study_um and 0.125 in m.sigma_fit_study_um
+    # D-067.4 (S2.1): Block 10's calibration nodes by Allen's diameter, PROVISIONAL values; the d_hat threshold is gone
+    cal = C.default_config().calibration
+    assert cal.node_allen_diameter_max_um == 0.6 and cal.far_field_allen_diameter_um == (0.6, 0.8), cal
+    assert not hasattr(cal, "node_dhat_max_um")
     # D-024
     assert r.absorption == "partition_vertical", r.absorption
     assert r.kernel_continuation == "linear" and abs(r.kernel_continuation_slope - 0.79) < 1e-12

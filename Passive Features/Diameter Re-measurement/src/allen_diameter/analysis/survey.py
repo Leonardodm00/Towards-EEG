@@ -12,8 +12,9 @@ specs/SPEC.md (design handoff Next actions 2-3 and 7; procedure s.3.5, s.3.10).
                      alpha_hat and d_hat / (2 r_Allen) over the nodes in S,
                      the phantom mu range they suggest (procedure s.3.10: the
                      10th and 90th percentiles of the real mu_hat), the share
-                     the dark flag removes, the calibration candidates, and
-                     how often the focus rule and the dip depth disagree
+                     the dark flag removes, the calibration candidates (in all
+                     and per set of Allen's diameter, Block 10), and how often
+                     the focus rule and the dip depth disagree
   profile_at_node    the fitted profile of a measured node, re-sampled from a
                      fresh block (for figures)
   node_planes        one node measured again exactly as in the pilot, with the
@@ -70,15 +71,19 @@ def measure_nodes(swc, provider, cfg, transform=None, regs=None, only=None, log=
 def pilot_row(result, allen_radius_um, cfg):
     """The NodeResult columns of the per-node CSV (Block 8, before the
     correction), plus allen_radius_um, sigma_fit_um, in_S and reject, the
-    calibration flag (of the pilot, Block 10), the focus columns of D-030,
-    Block 13's columns (cell.ITER_COLUMNS) and the pilot's membership of S
-    (in_S_pilot, reject_pilot; cell.pilot_row_view reads them)."""
+    calibration columns (Block 10: calibration_node, a calibration node of
+    either set by Allen's diameter 2 x allen_radius_um and the pilot's values;
+    calibration_set, "near", "far" or "" when it is none), the focus columns of
+    D-030, Block 13's columns (cell.ITER_COLUMNS) and the pilot's membership of
+    S (in_S_pilot, reject_pilot; cell.pilot_row_view reads them)."""
     row = {c: getattr(result, c) for c in cell.CSV_COLUMNS[:25]}
     row["flags"] = ";".join(result.flags)
     reasons = phantoms.reject_reasons(result)
+    allen_d = 2.0 * float(allen_radius_um)
+    cal_reasons = calibration.calibration_reasons(result, cfg, allen_d)
     row.update(allen_radius_um=float(allen_radius_um), sigma_fit_um=float(cfg.measure.sigma_fit_um),
-               in_S=not reasons, reject=";".join(reasons),
-               calibration_node=not calibration.calibration_reasons(result, cfg),
+               in_S=not reasons, reject=";".join(reasons), calibration_node=not cal_reasons,
+               calibration_set="" if cal_reasons else calibration.calibration_set(allen_d, cfg),
                focus_rule=str(result.focus_rule), k_star_depth=int(result.k_star_depth))
     row.update(cell.iter_columns(result))
     pilot_reasons = phantoms.reject_reasons(pilot_view(result))     # the pilot's S, for the diagnostics (D-061.2)
@@ -123,6 +128,12 @@ def summarize(rows, cfg):
     converged = [r for r in rows if r["fit_status"] == "converged"]
     dark = sum(1 for r in converged if float(r["alpha_hat"]) > cfg.measure.alpha_dark_flag)
     mu = _pct(float(r["mu_hat_per_um"]) for r in inS)
+    by_set: Dict[str, int] = {}
+    for r in rows:
+        if r.get("calibration_node"):
+            key = r.get("calibration_set", "")
+            key = key if isinstance(key, str) else ""          # a row without the column, or read back as NaN
+            by_set[key] = by_set.get(key, 0) + 1
     out = dict(n_nodes=n, n_in_S=len(inS), reject_counts=reasons,
                d_hat_um=_pct(float(r["d_hat_um"]) for r in inS),
                mu_hat_per_um=mu,
@@ -131,7 +142,7 @@ def summarize(rows, cfg):
                                        if float(r["allen_radius_um"]) > 0),
                phi_deg=_pct(math.degrees(float(r["phi_rad"])) for r in inS),
                dark_share_of_converged=(dark / len(converged)) if converged else float("nan"),
-               n_calibration_nodes=sum(1 for r in rows if r.get("calibration_node")),
+               n_calibration_nodes=sum(1 for r in rows if r.get("calibration_node")), n_calibration_by_set=by_set,
                focus_rule=str(cfg.measure.focus_rule), k_star_vs_dip_depth=focus_agreement(rows))
     if mu:
         out["suggested_phantom_mu_range_per_um"] = [mu["p10"], mu["p90"]]

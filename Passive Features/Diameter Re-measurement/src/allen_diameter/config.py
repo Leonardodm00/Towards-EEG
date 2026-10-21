@@ -240,8 +240,9 @@ class PhantomConfig:
 class CalibrationConfig:
     """Defocus-kernel calibration on thin real nodes (procedure s.3.4, Eq. 4)."""
 
-    node_dhat_max_um: float = 0.3     # source: procedure s.3.4 (thin)
-    node_phi_max_deg: float = 10.0    # source: procedure s.3.4 (flat)
+    node_allen_diameter_max_um: float = 0.6  # source: D-067 (D-067.4, D-061.4), PROVISIONAL: the near-field (thin) set, Allen's diameter 2 r_A <= this (um), scanned up to offsets_planes
+    far_field_allen_diameter_um: Tuple[float, float] = (0.6, 0.8)  # source: D-067 (D-067.4, D-026), PROVISIONAL: the far-field set, lo < 2 r_A <= hi (um), for the offsets beyond offsets_planes (its scan is not built)
+    node_phi_max_deg: float = 10.0    # source: procedure s.3.4 (flat); both sets (D-067.4); D-027's tolerance open
     offsets_planes: int = 3           # source: procedure s.3.4 (+-3 planes = +-0.84 um)
     trust_planes: int = 2             # source: procedure s.3.4 (trust beyond +-2 only after a residual check)
     statistic: str = "gaussian_core_width2"  # source: procedure s.3.4 [corrected 2026-10-04]; windowed V as cross-check
@@ -358,7 +359,12 @@ class DiameterConfig:
         _check_in(cal.statistic, CALIBRATION_STATISTICS, "calibration.statistic")
         _check_in(cal.origin_convention, ORIGIN_CONVENTIONS, "calibration.origin_convention")
         _check_in(cal.growth_interp, GROWTH_INTERPS, "calibration.growth_interp")
-        if not (cal.node_dhat_max_um > 0 and 0 <= cal.node_phi_max_deg <= 90 and cal.offsets_planes >= 1
+        thin, band = cal.node_allen_diameter_max_um, tuple(cal.far_field_allen_diameter_um)
+        if not (len(band) == 2 and all(math.isfinite(x) for x in (thin,) + band) and 0 < thin <= band[0] < band[1]):
+            raise ValueError("calibration: 0 < node_allen_diameter_max_um <= far_field_allen_diameter_um[0] < "
+                             "far_field_allen_diameter_um[1], all finite (D-067.4: two disjoint sets of Allen's "
+                             "diameter)")
+        if not (0 <= cal.node_phi_max_deg <= 90 and cal.offsets_planes >= 1
                 and 0 <= cal.trust_planes <= cal.offsets_planes and cal.core_fit_fwhm_factor > 0
                 and cal.node_alpha_max > 0 and cal.window_half_um > 0 and cal.min_window_samples >= 4
                 and cal.knot_step_um >= self.acquisition.dz_um - 1e-12 and cal.z_ax_bound_um > 0

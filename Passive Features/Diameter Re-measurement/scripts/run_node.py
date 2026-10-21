@@ -7,7 +7,9 @@ Measures every node of the dendrite stretches that hold the given node ids
 in --out-dir:
 
     pilot_<specimen>.csv            NodeResult columns, Allen's radius, sigma_fit,
-                                    in_S, reject, calibration_node (and, with
+                                    in_S, reject, calibration_node and
+                                    calibration_set (Block 10: by Allen's
+                                    diameter, "near" or "far") (and, with
                                     --background, the block's masked median and
                                     robust SD in plane k*)
     pilot_summary_<specimen>.json   counts, rejection reasons, percentiles over
@@ -15,7 +17,8 @@ in --out-dir:
                                     d_hat / (2 r_Allen), phi; the phantom mu range
                                     they suggest (10th-90th percentile of mu_hat,
                                     procedure s.3.10); the dark-flag share; the
-                                    number of calibration nodes
+                                    number of calibration nodes, in all and per
+                                    set
     figures/node_<id>.png           with --figures: the focus curves (the
                                     configured rule and the dip depth, D-030)
                                     with k*, the dip depth's choice and the
