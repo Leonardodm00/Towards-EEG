@@ -2,6 +2,7 @@
 
 | Date | Change |
 |---|---|
+| 2026-10-22 (later) | Pushed to `sci/diameter-pipeline` at the user's agreement, merged with the remote's roadmap commit `9112bf3`. §3's roadmap row now names theory stage T7, the optics of the hybrid plane absorption (I-004), added at the user's request; §1 gives the next free IDs, D-075 and I-005. |
 | 2026-10-22 | Created at the user's request (15:09) for a new chat that tackles the construction of the renderer's defocus kernel with deep-learning methods, logged as **I-003**. State described: `sci/diameter-pipeline` at `825bef1` (on the remote), estimator hash `0508e7ff12f48728`, simulation hash `0ea5a6d2ec069c68` (the rows carry `sim-0ea5a6d2ec069c68`), 25 of 25 smoke suites passing **[run, sandbox, 2026-10-22]**; S2b (the far-field calibration) designed, its fit not decided (D-074); Block 10 never run on Allen's data. Committed to `docs/` on `sci/diameter-pipeline` as a local commit (pushed only at the user's agreement). A project-knowledge copy under `claude/` was refused because the project is at its size limit, so this repository file is the one to read (D-020: the workstream's documents live in the repository). |
 
 Basis tags: **[src]** read in the named file at `825bef1`; **[run, sandbox]** executed in the
@@ -48,7 +49,7 @@ it), and what the classical route already achieves on simulated data (§6), the 
    any network.
 5. The decision log is shared with the implementation chat and the noise chat: re-read it from the project
    before every write (on 2026-10-21 an entry was renumbered to D-074 after a collision). Next free IDs
-   after this handoff: **D-075, I-004**.
+   after this handoff: **D-075, I-005** (I-004, the hybrid renderer, was logged the same day).
 
 ## 2. Scope questions for the user, before any logic
 
@@ -80,7 +81,7 @@ The assistant's proposals, recommendation first **[reasoning]**; none is decided
 | Image noise | the renderer's 3.0 gl is provisional; D-025's measurement on clean background patches not run | D-025 **[KB]**; `config.py` **[src]** |
 | Allen's camera chain | black level, gain, noise after JPEG and the light direction are unknown; the JPEG tables are read from the cached crops (Cell 5) | SPEC §8 **[src]** |
 | Above/below and depth dependence | checks planned (per-sign Eq. 4, shallow vs deep nodes), not run; the renderer's kernel is even in $\delta$ and `kernel_from_growth` refuses a two-sided growth | procedure §3.10 **[doc]**; SPEC Block 10 **[src]** |
-| Roadmap | `specs/roadmap/diameter-pipeline.md` (generated from its YAML, created 2026-10-22): theory stage T6 "Far-field calibration" studying, implementation stage I15 (Block 15) planned; a stage for this work is added there only at the user's word (the subproject-roadmap skill) | `9112bf3` **[src]** |
+| Roadmap | `specs/roadmap/diameter-pipeline.md` (generated from its YAML, created 2026-10-22): theory stage T6 "Far-field calibration" studying, implementation stage I15 (Block 15) planned, and T7 "Optics of the hybrid plane absorption and the defocus kernel" open (added the same day at the user's request, I-004). The hybrid of the 2026-10-09 theory document (`TEEG_diameter_renderers_partition_ray_world_hybrid_2026-10-09.md` §3.8-3.9, on `main`) takes each slice's absorbed light from the condenser's rays and then applies the defocus kernel, so a forward model fitted to real profiles (C3, C4) inherits whichever absorption the renderer uses. A stage for the DL work itself is added only at the user's word (the subproject-roadmap skill) | `9112bf3` and the commit that added T7 **[src]**; I-004 **[KB]** |
 
 ## 4. The kernel in the code, in full notation
 
