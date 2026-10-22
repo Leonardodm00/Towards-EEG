@@ -2,15 +2,19 @@
 # and the theory statuses; the implementation statuses are computed by
 # specs/roadmap/roadmap.py (never written by hand).
 #
-# Drafted by `roadmap.py init` from specs/SPEC.md on 2026-10-22 and curated
-# once: the theory stages follow SPEC section 2 plus the two topics of
-# Blocks 12-15. Lines marked DRAFT are guesses to confirm.
+# Drafted by `roadmap.py init` from specs/SPEC.md on 2026-10-22 and curated:
+# the theory stages follow SPEC section 2 plus the two topics of Blocks
+# 12-15; the groups (G1-G5, and I4 holding I9) are a first reading of the
+# pipeline's structure, to confirm. Lines marked DRAFT are guesses.
 #
 # Theory status: open | studying | closed  (set with
 #   python specs/roadmap/roadmap.py set --yaml specs/roadmap/diameter-pipeline.yaml T6 closed --decision D-nnn)
-# Implementation stages: block = the SPEC.md block; needs_hpc = green only
-# after an HPC run marked by specs/roadmap/hpc_status.sh; jobs = job script
-# paths or PBS job names (-N) whose markers belong to the stage.
+# Implementation stages: block = the SPEC.md block; parent = the group the
+# stage belongs to (a stage with members is drawn as a frame around them;
+# a stage without a block is a pure group); needs_hpc = green only after an
+# HPC run marked by specs/roadmap/hpc_status.sh; jobs = job script paths or
+# PBS job names (-N) whose markers belong to the stage; summary = what the
+# stage is about, in plain words.
 schema: 1
 name: diameter-pipeline
 title: "Allen dendrite-diameter re-measurement (allen_diameter)"
@@ -80,114 +84,174 @@ theory:
     note: "No SPEC block yet: Block 4 renders with the partition (D-024 (i), for now); a hybrid would be a new absorption mode inside the simulation hash."
 
 implementation:
+  # ---- groups (no block of their own; coloured by their least advanced member)
+  - id: G1
+    title: "Foundations"
+    summary: "The image-access modules imported from the 2026-09-23 code and the configuration every block reads."
+    depends_on: []
+    needs_theory: []
+  - id: G2
+    title: "Synthetic image model"
+    summary: "Everything that turns a tube geometry into a rendered brightfield stack: geometry, blur kernel, JPEG tables, FFT renderer and the ray-world alternative."
+    depends_on: []           # the members' own dependencies draw the arrows
+    needs_theory: [T3]
+  - id: G3
+    title: "Diameter measurement on real data"
+    summary: "The per-node chain from an Allen stack to a diameter: profiles, focus, path, background, the tube fit, the SGT plane fit, the Allen-guided plane iteration, the cell-level run and the Phase II tools."
+    depends_on: []           # the members' own dependencies draw the arrows
+    needs_theory: [T2, T5]
+  - id: G4
+    title: "Bias table and correction"
+    summary: "Rendered phantoms, the bias table, its inversion and the corrected diameters; the production table runs on davinci."
+    depends_on: []           # the members' own dependencies draw the arrows
+    needs_theory: [T4]
+  - id: G5
+    title: "Kernel calibration"
+    summary: "The calibration of the blur kernel on real nodes: first stage on the pilot, then the far-field scan and fit."
+    depends_on: []           # the members' own dependencies draw the arrows
+    needs_theory: [T3, T6]
+
+  # ---- stages (one SPEC block each)
   - id: I0
     title: "Scaffolding and the 2026-09-23 image modules"
+    summary: "Package layout and the four image modules (fetch, align, measure, plot) imported byte-identical from the September code, with their own test suites."
     block: 0
+    parent: G1
     depends_on: []
     needs_theory: []
     needs_hpc: false
     jobs: []
   - id: I1
     title: "Configuration"
+    summary: "The dataclasses that hold every parameter of the pipeline, their defaults from the decisions, validation and the JSON round trip."
     block: 1
+    parent: G1
     depends_on: []
     needs_theory: []
     needs_hpc: false
     jobs: []
   - id: I2
     title: "Geometry"
+    summary: "Tube geometry in the stack frame: axes, headings, offsets and the sections a phantom is built from (S1-S6)."
     block: 2
+    parent: G2
     depends_on: []
     needs_theory: [T1, T3]
     needs_hpc: false
     jobs: []
   - id: I3
     title: "Forward model and fitter"
+    summary: "The analytic profile of a blurred tube (handoff Eqs. 10-11) and the least-squares fitter that recovers diameter, centre and background from a measured profile."
     block: 3
+    parent: G3
     depends_on: []           # also consumes Block 5's profile (a loop), not drawn
     needs_theory: [T2]
     needs_hpc: false
     jobs: []
   - id: I4
     title: "Renderer"
+    summary: "Renders a geometry into a synthetic stack: the defocusing kernel, the camera model, the JPEG tables and the FFT convolution; the ray-world generator (I9) is its alternative absorption model."
     block: 4
+    parent: G2
     depends_on: [I2, I3]
     needs_theory: [T3]
     needs_hpc: false
     jobs: []
   - id: I5
     title: "The shared per-node chain"
+    summary: "The chain run on every node, real or synthetic: profile sampling, focus rule, path, background estimate and the fit, orchestrated by node_pipeline."
     block: 5
+    parent: G3
     depends_on: [I0, I3, I4]
     needs_theory: [T2]
     needs_hpc: false
     jobs: []
   - id: I6
     title: "Phantoms and the bias table"
+    summary: "Draws phantom tubes, renders and measures them, and estimates the bias table from the replicates; the production table is a PBS array on davinci."
     block: 6
+    parent: G4
     depends_on: [I2, I4, I5]
     needs_theory: [T4]
     needs_hpc: true          # the production table runs on davinci (D-022)
     jobs: [diam_table, scripts/pbs/build_table.pbs]
   - id: I7
     title: "Inversion, flags, fill"
+    summary: "Inverts the bias table to correct a measured diameter, flags the nodes the table cannot correct, and fills them from their neighbours."
     block: 7
+    parent: G4
     depends_on: [I5, I6]
     needs_theory: [T4]
     needs_hpc: false
     jobs: []
   - id: I8
     title: "Cell level: SWC I/O, stretches, per-node CSV, membrane area"
+    summary: "Runs a whole cell: reads the Allen SWC, picks the stretches, measures every node, writes the per-node CSV and the corrected SWC, and compares the membrane area with Allen's radii."
     block: 8
+    parent: G3
     depends_on: [I5, I6, I7]
     needs_theory: []
     needs_hpc: false
     jobs: []
   - id: I9
     title: "Ray-world generator"
+    summary: "The ray-tracing absorption model selected by RendererConfig.absorption = ray_world, an independent check of the analytic renderer."
     block: 9
+    parent: I4
     depends_on: [I2]
     needs_theory: [T3]
     needs_hpc: false
     jobs: []
   - id: I10
     title: "Kernel calibration, first stage"
+    summary: "Fits the growth of the core width with distance from focus on thin real nodes, to calibrate the renderer's kernel (procedure Eq. 4)."
     block: 10
+    parent: G5
     depends_on: [I3, I5, I6, I8]
     needs_theory: [T3]
     needs_hpc: false
     jobs: []
   - id: I11
     title: "Phase II tools: pilot, registration survey, camera inputs, Colab bootstrap"
+    summary: "The tools that prepare the production run on real data: the pilot measurement, the registration survey, the camera and JPEG-table inputs, and the Colab notebook bootstrap."
     block: 11
+    parent: G3
     depends_on: [I0, I4, I5, I6, I7, I8, I10]
     needs_theory: []
     needs_hpc: false         # Colab, not the cluster
     jobs: []
   - id: I12
     title: "SGT kernel and the seven-parameter fit at a plane"
+    summary: "The skewed generalized-t blur family and the seven-parameter fit of a single plane's profile (D-052 to D-054)."
     block: 12
+    parent: G3
     depends_on: [I5]
     needs_theory: [T5]
     needs_hpc: false
     jobs: []
   - id: I13
     title: "Allen-guided plane and the SGT fit inside the per-node chain"
+    summary: "The plane iteration guided by Allen's diameter, the shared scene and square, and the SGT fit at the chosen plane, wired into measure_node."
     block: 13
+    parent: G3
     depends_on: [I3, I5, I11, I12]
     needs_theory: [T5]
     needs_hpc: false
     jobs: []
   - id: I14
     title: "The table under D-058 to D-063: design, coordinates, estimator, inversion, jobs"
+    summary: "The redesigned bias table: the draw design and coordinates, the local linear estimator, the inversion, and the PBS array that produces it."
     block: 14
+    parent: G4
     depends_on: [I6, I7, I13]
     needs_theory: [T4]
     needs_hpc: true          # the PBS array of scripts/pbs/build_table.pbs
     jobs: [diam_table, scripts/pbs/build_table.pbs]
   - id: I15
     title: "Far-field calibration"
+    summary: "The far scan over nodes far from focus and the far fit that fix the kernel's continuation slope (S2b, D-026)."
     block: 15
+    parent: G5
     depends_on: [I5, I10, I13]
     needs_theory: [T6]
     needs_hpc: false

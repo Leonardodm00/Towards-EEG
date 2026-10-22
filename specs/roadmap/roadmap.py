@@ -46,6 +46,13 @@ prerequisites are not satisfied (a theory stage not closed, an
 implementation stage not done) is reported with blocked_by; the renderers
 draw it with a dashed border.
 
+Groups: a stage with `parent: <id>` is a member of that stage, to any
+depth. A stage with members is drawn as a frame around them, coloured by
+its least advanced member (failing < planned < local < pushed < testing <
+tested < running < done; open < studying < closed), with its own node
+inside when it has a block of its own. An implementation stage without a
+block is a pure group: it has no state of its own and is not counted.
+
 Exit codes: 0 on success, 1 on a validation error, 2 if git fails.
 """
 from __future__ import annotations
@@ -183,11 +190,15 @@ def load_roadmap(path):
         stage["status"] = stage.get("status") or "open"
         stage["depends_on"] = as_list(stage.get("depends_on"))
         stage["refs"] = as_list(stage.get("refs"))
+        stage["summary"] = stage.get("summary") or ""
+        stage["parent"] = stage.get("parent") or None
     for stage in data["implementation"]:
         stage["depends_on"] = as_list(stage.get("depends_on"))
         stage["needs_theory"] = as_list(stage.get("needs_theory"))
         stage["needs_hpc"] = bool(stage.get("needs_hpc"))
         stage["jobs"] = as_list(stage.get("jobs"))
+        stage["summary"] = stage.get("summary") or ""
+        stage["parent"] = stage.get("parent") or None
         blocks = stage.get("blocks")
         if blocks is None:
             block = stage.get("block")
@@ -247,6 +258,12 @@ def check_roadmap(data):
                                     % (sid, ref, kind))
                 elif ref == sid:
                     problems.append("%s depends on itself" % sid)
+            parent = stage.get("parent")
+            if parent is not None:
+                if parent not in pool:
+                    problems.append("%s parent %s: no such %s stage" % (sid, parent, kind))
+                elif parent == sid:
+                    problems.append("%s is its own parent" % sid)
     if set(theory) & set(impl):
         problems.append("ids shared between theory and implementation: %s"
                         % sorted(set(theory) & set(impl)))
@@ -254,6 +271,14 @@ def check_roadmap(data):
         cycle = find_cycle({k: as_list(v.get("depends_on")) for k, v in pool.items()})
         if cycle:
             problems.append("%s dependencies form a cycle: %s" % (kind, " -> ".join(cycle)))
+        cycle = find_cycle({k: ([v["parent"]] if v.get("parent") else [])
+                            for k, v in pool.items()})
+        if cycle:
+            problems.append("%s parents form a cycle: %s" % (kind, " -> ".join(cycle)))
+        for sid, stage in pool.items():
+            parent = stage.get("parent")
+            if parent in pool and parent in as_list(stage.get("depends_on")):
+                problems.append("%s depends on its own group %s" % (sid, parent))
     return problems
 
 
@@ -713,10 +738,12 @@ def compute_status(data, root, fetch=True, source="chat"):
             "summary": stage.get("summary", ""),
             "refs": as_list(stage.get("refs")),
             "depends_on": as_list(stage.get("depends_on")),
+            "parent": stage.get("parent"),
             "status": stage.get("status", "open"),
             "closed_on": str(stage.get("closed_on") or ""),
             "decision": str(stage.get("decision") or ""),
             "note": stage.get("note", ""),
+            "has_own": True,
         }
 
     impl = {}
@@ -725,6 +752,10 @@ def compute_status(data, root, fetch=True, source="chat"):
             stage, data, root, head, remote_head, worktree_is_branch, dirty,
             blocks, coverage, paths, reports, runs, markers, now, stale_hours,
             last_finished)
+
+    # groups: children, depth, and the aggregate of the descendants' states
+    attach_groups(theory, "theory")
+    attach_groups(impl, "implementation")
 
     # blocked_by: unmet prerequisites (does not change the colour)
     for sid, stage in impl.items():
@@ -735,7 +766,7 @@ def compute_status(data, root, fetch=True, source="chat"):
         for ref in stage["depends_on"]:
             if ref in impl and impl[ref]["status"] != "done":
                 blocked.append(ref)
-        stage["blocked_by"] = blocked
+        stage["blocked_by"] = blocked if stage["has_own"] else []
     for sid, stage in theory.items():
         stage["blocked_by"] = [ref for ref in stage["depends_on"]
                                if ref in theory and theory[ref]["status"] != "closed"]
@@ -743,7 +774,8 @@ def compute_status(data, root, fetch=True, source="chat"):
 
     counts = {s: 0 for s in IMPL_STATES}
     for stage in impl.values():
-        counts[stage["status"]] = counts.get(stage["status"], 0) + 1
+        if stage["has_own"]:
+            counts[stage["status"]] = counts.get(stage["status"], 0) + 1
     tcounts = {s: 0 for s in THEORY_STATES}
     for stage in theory.values():
         tcounts[stage["status"]] = tcounts.get(stage["status"], 0) + 1
@@ -790,6 +822,63 @@ def compute_status(data, root, fetch=True, source="chat"):
     }
 
 
+# least advanced first; a group takes the colour of its least advanced member
+AGGREGATE_ORDER = {
+    "implementation": ["failing", "planned", "local", "pushed", "testing",
+                       "tested", "running", "done"],
+    "theory": ["open", "studying", "closed"],
+}
+
+
+def attach_groups(stages, kind):
+    """Fill parent/children/depth and, for stages with children, aggregate.
+
+    aggregate = {"worst": state, "counts": {state: n}} over every descendant
+    that has a state of its own (has_own), the stage's own state included.
+    A stage without a state of its own (an implementation group with no
+    block) takes the aggregate as its status, so it can be drawn.
+    """
+    order = AGGREGATE_ORDER[kind]
+    children = {sid: [] for sid in stages}
+    for sid, stage in stages.items():
+        parent = stage.get("parent")
+        if parent in stages and parent != sid:
+            children[parent].append(sid)
+        else:
+            stage["parent"] = None
+    for sid, stage in stages.items():
+        stage["children"] = children[sid]
+        depth, cur, seen = 0, stage.get("parent"), set()
+        while cur in stages and cur not in seen:
+            seen.add(cur)
+            depth += 1
+            cur = stages[cur].get("parent")
+        stage["depth"] = depth
+
+    def own_states(sid, seen):
+        if sid in seen:
+            return []
+        seen.add(sid)
+        found = [stages[sid]["status"]] if stages[sid]["has_own"] else []
+        for child in children[sid]:
+            found += own_states(child, seen)
+        return found
+
+    for sid, stage in stages.items():
+        if not children[sid]:
+            stage["aggregate"] = None
+            continue
+        states = own_states(sid, set())
+        counts = {}
+        for state in states:
+            counts[state] = counts.get(state, 0) + 1
+        worst = min(states, key=lambda s: order.index(s) if s in order else -1) if states else None
+        stage["aggregate"] = {"worst": worst, "counts": counts, "n": len(states)}
+        if not stage["has_own"] and worst:
+            stage["status"] = worst
+            stage["reason"] = "group: least advanced member is %s" % worst
+
+
 def doc_key(data):
     repo = (data.get("repo") or "repo").split("/")[-1].lower()
     return "%s:%s" % (repo, data["name"])
@@ -802,13 +891,19 @@ def evaluate_stage(stage, data, root, head, remote_head, worktree_is_branch,
     result = {
         "id": sid,
         "title": stage.get("title", sid),
+        "summary": stage.get("summary", ""),
         "blocks": stage["blocks"],
         "depends_on": as_list(stage.get("depends_on")),
         "needs_theory": as_list(stage.get("needs_theory")),
         "needs_hpc": bool(stage.get("needs_hpc")),
         "jobs": as_list(stage.get("jobs")),
         "note": stage.get("note", ""),
+        "parent": stage.get("parent"),
+        # a stage has a state of its own when it has a block or a manual
+        # status; otherwise it is a pure group and takes its members' aggregate
+        "has_own": bool(stage["blocks"]) or bool(stage.get("manual_status")),
         "modules": [],
+        "unresolved_modules": [],
         "spec_status": "",
         "last_change": "",
         "last_change_date": "",
@@ -839,7 +934,7 @@ def evaluate_stage(stage, data, root, head, remote_head, worktree_is_branch,
         result["reason"] = "set by hand: %s" % stage.get("manual_reason", "no reason given")
         return result
     if not stage["blocks"]:
-        result["reason"] = "no SPEC block assigned"
+        result["reason"] = "no SPEC block assigned (a group, if it has members)"
         return result
     if missing_blocks and len(missing_blocks) == len(stage["blocks"]):
         result["reason"] = "no entry in SPEC.md for Block %s" % ", ".join(map(str, missing_blocks))
@@ -1008,34 +1103,73 @@ def mermaid(data, status):
     for state, (fill, text) in colors.items():
         lines.append("    classDef %s fill:%s,color:%s,stroke:%s" % (state, fill, text, fill))
     lines.append("    classDef blocked stroke-dasharray:5 3,stroke:#333")
+    styles = []
+
+    def node_label(stage, kind):
+        if kind == "theory":
+            label = "%s %s" % (stage["id"], stage["title"])
+            if stage["closed_on"]:
+                label += "<br/>closed %s" % stage["closed_on"]
+            return label
+        blocks = ("Block %s" % ", ".join(map(str, stage["blocks"]))) if stage["blocks"] else ""
+        return "%s %s<br/>%s %s" % (stage["id"], stage["title"], blocks, stage["status"])
+
+    def emit(stages, kind, parent, indent):
+        pad = "    " * indent
+        for stage in stages:
+            if stage["parent"] != parent:
+                continue
+            if stage["children"]:
+                agg = stage.get("aggregate") or {}
+                counts = ", ".join("%d %s" % (n, s) for s, n in sorted(
+                    agg.get("counts", {}).items(), key=lambda kv: -kv[1]))
+                title = "%s %s" % (stage["id"], stage["title"])
+                if counts:
+                    title += " (" + counts + ")"
+                lines.append('%ssubgraph grp_%s["%s"]' % (pad, stage["id"], esc(title)))
+                lines.append("%s    direction TB" % pad)
+                if stage["has_own"]:
+                    lines.append('%s    %s["%s"]:::%s' % (
+                        pad, stage["id"], esc(node_label(stage, kind)), stage["status"]))
+                emit(stages, kind, stage["id"], indent + 1)
+                lines.append("%send" % pad)
+                worst = agg.get("worst") or stage["status"]
+                styles.append("    style grp_%s stroke:%s,stroke-width:3px"
+                              % (stage["id"], colors.get(worst, ("#8d99ae",))[0]))
+            else:
+                lines.append('%s%s["%s"]:::%s' % (
+                    pad, stage["id"], esc(node_label(stage, kind)), stage["status"]))
+
+    def endpoint(stage_map, sid):
+        stage = stage_map.get(sid)
+        if stage and stage["children"] and not stage["has_own"]:
+            return "grp_" + sid
+        return sid
+
+    tmap = {s["id"]: s for s in status["theory"]}
+    imap = {s["id"]: s for s in status["implementation"]}
     lines.append('    subgraph theory["Theory"]')
     lines.append("        direction TB")
-    for stage in status["theory"]:
-        label = "%s %s" % (stage["id"], stage["title"])
-        if stage["closed_on"]:
-            label += "<br/>closed %s" % stage["closed_on"]
-        lines.append('        %s["%s"]:::%s' % (stage["id"], esc(label), stage["status"]))
+    emit(status["theory"], "theory", None, 2)
     for stage in status["theory"]:
         for ref in stage["depends_on"]:
-            lines.append("        %s --> %s" % (ref, stage["id"]))
+            lines.append("        %s --> %s" % (endpoint(tmap, ref), endpoint(tmap, stage["id"])))
     lines.append("    end")
     lines.append('    subgraph impl["Implementation"]')
     lines.append("        direction TB")
-    for stage in status["implementation"]:
-        blocks = ("Block %s" % ", ".join(map(str, stage["blocks"]))) if stage["blocks"] else ""
-        label = "%s %s<br/>%s %s" % (stage["id"], stage["title"], blocks, stage["status"])
-        lines.append('        %s["%s"]:::%s' % (stage["id"], esc(label), stage["status"]))
+    emit(status["implementation"], "implementation", None, 2)
     for stage in status["implementation"]:
         for ref in stage["depends_on"]:
-            lines.append("        %s --> %s" % (ref, stage["id"]))
+            lines.append("        %s --> %s" % (endpoint(imap, ref), endpoint(imap, stage["id"])))
     lines.append("    end")
     for stage in status["implementation"]:
         for ref in stage["needs_theory"]:
-            lines.append("    %s -.-> %s" % (ref, stage["id"]))
+            lines.append("    %s -.-> %s" % (endpoint(tmap, ref), endpoint(imap, stage["id"])))
     blocked = [s["id"] for s in status["theory"] + status["implementation"]
-               if s.get("blocked_by")]
+               if s.get("blocked_by") and (s["has_own"] or not s["children"])]
     if blocked:
         lines.append("    class %s blocked" % ",".join(blocked))
+    lines.extend(styles)
     return "\n".join(lines)
 
 
@@ -1069,32 +1203,37 @@ def render_markdown(data, status):
     out.append("")
     out.append("## Theory")
     out.append("")
-    out.append("| Stage | Status | Closed | Decision | Depends on | Feeds |")
-    out.append("|---|---|---|---|---|---|")
+    out.append("| Stage | Group | Status | Closed | Decision | Depends on | Feeds | Summary |")
+    out.append("|---|---|---|---|---|---|---|---|")
     for stage in status["theory"]:
-        out.append("| %s %s | %s | %s | %s | %s | %s |" % (
-            stage["id"], stage["title"], stage["status"], stage["closed_on"],
-            stage["decision"], ", ".join(stage["depends_on"]), ", ".join(stage["feeds"])))
+        out.append("| %s %s | %s | %s | %s | %s | %s | %s | %s |" % (
+            stage["id"], stage["title"], stage["parent"] or "", stage["status"],
+            stage["closed_on"], stage["decision"], ", ".join(stage["depends_on"]),
+            ", ".join(stage["feeds"]), cell(stage["summary"])))
     out.append("")
     out.append("## Implementation")
     out.append("")
-    out.append("| Stage | Blocks | Status | Why | Last change | Tester | HPC | Needs |")
-    out.append("|---|---|---|---|---|---|---|---|")
+    out.append("| Stage | Group | Blocks | Status | Why | Last change | Tester | HPC | Needs | Summary |")
+    out.append("|---|---|---|---|---|---|---|---|---|---|")
     for stage in status["implementation"]:
         tester = stage["tester"]
         hpc = stage["hpc"]
         needs = ", ".join(stage["needs_theory"] + stage["depends_on"])
-        out.append("| %s %s | %s | %s | %s | %s | %s | %s | %s |" % (
-            stage["id"], stage["title"],
+        out.append("| %s %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
+            stage["id"], stage["title"], stage["parent"] or "",
             ", ".join(map(str, stage["blocks"])),
-            stage["status"], stage["reason"].replace("|", "/"),
+            stage["status"], cell(stage["reason"]),
             (stage["last_change"][:7] + " " + stage["last_change_date"][:10]).strip(),
             ((tester.get("verdict", "") + " " + tester.get("commit", "")).strip()
              + (" (outdated)" if tester.get("outdated") else "")) if tester else "",
             ((hpc.get("state", "") + " " + (hpc.get("job") or "")).strip()) if hpc else "",
-            needs))
+            needs, cell(stage["summary"])))
     out.append("")
     return "\n".join(out) + "\n"
+
+
+def cell(text):
+    return str(text or "").replace("|", "/").replace("\n", " ")
 
 
 # -------------------------------------------------------------------- set ---
@@ -1206,6 +1345,7 @@ def init_roadmap(root, name, branch, repo=None, spec="specs/SPEC.md", out=None, 
             "    title: %s" % yaml_scalar(short),
             "    summary: \"DRAFT: from SPEC section 2.%s\"" % num,
             "    refs: []",
+            "    parent:                 # id of the group stage this belongs to, if any",
             "    depends_on: %s" % ("[]" if k == 1 else "[T%d]" % (k - 1)),
             "    status: open",
             "    closed_on:",
@@ -1228,7 +1368,9 @@ def init_roadmap(root, name, branch, repo=None, spec="specs/SPEC.md", out=None, 
         lines += [
             "  - id: I%d" % number,
             "    title: %s" % yaml_scalar(short),
+            "    summary: %s" % yaml_scalar("DRAFT: " + short),
             "    block: %d" % number,
+            "    parent:                 # id of the group stage this belongs to, if any",
             "    depends_on: [%s]" % ", ".join("I%d" % n for n in deps)
             + ("   # DRAFT: also consumes later Block %s (loop), not drawn"
                % ", ".join(map(str, dropped)) if dropped else ""),
