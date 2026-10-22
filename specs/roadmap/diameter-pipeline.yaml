@@ -1,0 +1,185 @@
+# Roadmap of the subproject diameter-pipeline. Source of truth for the stages
+# and the theory statuses; the implementation statuses are computed by
+# specs/roadmap/roadmap.py (never written by hand).
+#
+# Drafted by `roadmap.py init` from specs/SPEC.md on 2026-10-22 and curated
+# once: the theory stages follow SPEC section 2 plus the two topics of
+# Blocks 12-15. Lines marked DRAFT are guesses to confirm.
+#
+# Theory status: open | studying | closed  (set with
+#   python specs/roadmap/roadmap.py set --yaml specs/roadmap/diameter-pipeline.yaml T6 closed --decision D-nnn)
+# Implementation stages: block = the SPEC.md block; needs_hpc = green only
+# after an HPC run marked by specs/roadmap/hpc_status.sh; jobs = job script
+# paths or PBS job names (-N) whose markers belong to the stage.
+schema: 1
+name: diameter-pipeline
+title: "Allen dendrite-diameter re-measurement (allen_diameter)"
+repo: Leonardodm00/Towards-EEG
+branch: sci/diameter-pipeline
+spec: specs/SPEC.md
+hpc_branch: hpc-status
+stale_after_hours: 48      # a running HPC marker older than this is reported as failing
+
+theory:
+  - id: T1
+    title: "Frames and objects"
+    summary: "Stack, node and camera frames; the objects the measurement works on (SPEC 2.1)."
+    refs: [SPEC 2.1, handoff_diameter_remeasurement.md]
+    depends_on: []
+    status: closed        # DRAFT: Blocks 2-5 confirmed and smoke-tested; confirm or reopen
+    closed_on: 2026-10-06
+    decision:
+  - id: T2
+    title: "Per-node measurement"
+    summary: "Profile sampling, focus rule, path, background and the tube fit at a node (SPEC 2.2, handoff Eqs. 1-5, 9)."
+    refs: [SPEC 2.2, D-018, D-019, D-030]
+    depends_on: [T1]
+    status: closed        # DRAFT
+    closed_on: 2026-10-07
+    decision: D-030
+  - id: T3
+    title: "Phantom geometry and rendering"
+    summary: "Synthetic tubes, the blur kernel, the JPEG tables and the FFT renderer (SPEC 2.3, impl-handoff S1-S5, procedure Eqs. 5-6)."
+    refs: [SPEC 2.3]
+    depends_on: [T1]
+    status: closed        # DRAFT
+    closed_on: 2026-10-06
+    decision:
+  - id: T4
+    title: "Bias table and correction"
+    summary: "The table design, the local linear estimator and the inversion (SPEC 2.4, procedure Eqs. 1-3, 7, mathematics Eqs. 19-21)."
+    refs: [SPEC 2.4, D-024, D-057, D-058, D-059, D-060, D-061, D-062, D-063, D-071]
+    depends_on: [T2, T3]
+    status: closed        # DRAFT: D-071 settled the [to confirm] items of Block 14
+    closed_on: 2026-10-21
+    decision: D-071
+  - id: T5
+    title: "Skewed generalized-t kernel and the plane fit"
+    summary: "The SGT family, the seven-parameter fit at a plane and the Allen-guided plane iteration (Blocks 12-13)."
+    refs: [D-052, D-053, D-054, D-061, D-064]
+    depends_on: [T2]
+    status: closed        # DRAFT
+    closed_on: 2026-10-20
+    decision: D-064
+  - id: T6
+    title: "Far-field calibration"
+    summary: "The far scan and far fit that give Block 4's kernel its continuation slope (Block 15, S2b of the 2026-10-20 plan)."
+    refs: [D-026, D-026.1, D-027, D-067.4, D-070, D-071.5]
+    depends_on: [T3, T5]
+    status: studying      # DRAFT: Block 15 is drafted with [to confirm] items
+    closed_on:
+    decision:
+
+implementation:
+  - id: I0
+    title: "Scaffolding and the 2026-09-23 image modules"
+    block: 0
+    depends_on: []
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: I1
+    title: "Configuration"
+    block: 1
+    depends_on: []
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: I2
+    title: "Geometry"
+    block: 2
+    depends_on: []
+    needs_theory: [T1, T3]
+    needs_hpc: false
+    jobs: []
+  - id: I3
+    title: "Forward model and fitter"
+    block: 3
+    depends_on: []           # also consumes Block 5's profile (a loop), not drawn
+    needs_theory: [T2]
+    needs_hpc: false
+    jobs: []
+  - id: I4
+    title: "Renderer"
+    block: 4
+    depends_on: [I2, I3]
+    needs_theory: [T3]
+    needs_hpc: false
+    jobs: []
+  - id: I5
+    title: "The shared per-node chain"
+    block: 5
+    depends_on: [I0, I3, I4]
+    needs_theory: [T2]
+    needs_hpc: false
+    jobs: []
+  - id: I6
+    title: "Phantoms and the bias table"
+    block: 6
+    depends_on: [I2, I4, I5]
+    needs_theory: [T4]
+    needs_hpc: true          # the production table runs on davinci (D-022)
+    jobs: [diam_table, scripts/pbs/build_table.pbs]
+  - id: I7
+    title: "Inversion, flags, fill"
+    block: 7
+    depends_on: [I5, I6]
+    needs_theory: [T4]
+    needs_hpc: false
+    jobs: []
+  - id: I8
+    title: "Cell level: SWC I/O, stretches, per-node CSV, membrane area"
+    block: 8
+    depends_on: [I5, I6, I7]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: I9
+    title: "Ray-world generator"
+    block: 9
+    depends_on: [I2]
+    needs_theory: [T3]
+    needs_hpc: false
+    jobs: []
+  - id: I10
+    title: "Kernel calibration, first stage"
+    block: 10
+    depends_on: [I3, I5, I6, I8]
+    needs_theory: [T3]
+    needs_hpc: false
+    jobs: []
+  - id: I11
+    title: "Phase II tools: pilot, registration survey, camera inputs, Colab bootstrap"
+    block: 11
+    depends_on: [I0, I4, I5, I6, I7, I8, I10]
+    needs_theory: []
+    needs_hpc: false         # Colab, not the cluster
+    jobs: []
+  - id: I12
+    title: "SGT kernel and the seven-parameter fit at a plane"
+    block: 12
+    depends_on: [I5]
+    needs_theory: [T5]
+    needs_hpc: false
+    jobs: []
+  - id: I13
+    title: "Allen-guided plane and the SGT fit inside the per-node chain"
+    block: 13
+    depends_on: [I3, I5, I11, I12]
+    needs_theory: [T5]
+    needs_hpc: false
+    jobs: []
+  - id: I14
+    title: "The table under D-058 to D-063: design, coordinates, estimator, inversion, jobs"
+    block: 14
+    depends_on: [I6, I7, I13]
+    needs_theory: [T4]
+    needs_hpc: true          # the PBS array of scripts/pbs/build_table.pbs
+    jobs: [diam_table, scripts/pbs/build_table.pbs]
+  - id: I15
+    title: "Far-field calibration"
+    block: 15
+    depends_on: [I5, I10, I13]
+    needs_theory: [T6]
+    needs_hpc: false
+    jobs: []

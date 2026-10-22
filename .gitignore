@@ -12,3 +12,5 @@ h01_code/stage1/*.py
 Passive Features/Diameter Re-measurement/tests/smoke/artifacts/
 Passive Features/Diameter Re-measurement/scripts/allen_swc_cache/
 Passive Features/Diameter Re-measurement/scripts/*.csv
+# roadmap: the cluster-side state of hpc_status.sh
+.roadmap/
