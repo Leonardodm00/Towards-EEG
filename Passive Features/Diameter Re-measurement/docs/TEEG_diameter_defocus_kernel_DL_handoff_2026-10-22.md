@@ -2,7 +2,7 @@
 
 | Date | Change |
 |---|---|
-| 2026-10-22 | Created at the user's request (15:09) for a new chat that tackles the construction of the renderer's defocus kernel with deep-learning methods, logged as **I-003**. State described: `sci/diameter-pipeline` at `825bef1` (on the remote), estimator hash `0508e7ff12f48728`, simulation hash `0ea5a6d2ec069c68` (the rows carry `sim-0ea5a6d2ec069c68`), 25 of 25 smoke suites passing **[run, sandbox, 2026-10-22]**; S2b (the far-field calibration) designed, its fit not decided (D-074); Block 10 never run on Allen's data. Committed to `docs/` on `sci/diameter-pipeline` as a local commit (pushed only at the user's agreement); project copy `claude/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md`. |
+| 2026-10-22 | Created at the user's request (15:09) for a new chat that tackles the construction of the renderer's defocus kernel with deep-learning methods, logged as **I-003**. State described: `sci/diameter-pipeline` at `825bef1` (on the remote), estimator hash `0508e7ff12f48728`, simulation hash `0ea5a6d2ec069c68` (the rows carry `sim-0ea5a6d2ec069c68`), 25 of 25 smoke suites passing **[run, sandbox, 2026-10-22]**; S2b (the far-field calibration) designed, its fit not decided (D-074); Block 10 never run on Allen's data. Committed to `docs/` on `sci/diameter-pipeline` as a local commit (pushed only at the user's agreement). A project-knowledge copy under `claude/` was refused because the project is at its size limit, so this repository file is the one to read (D-020: the workstream's documents live in the repository). |
 
 Basis tags: **[src]** read in the named file at `825bef1`; **[run, sandbox]** executed in the
 assistant's sandbox (Python 3.13.16, NumPy 2.5.3, SciPy 1.18.1), on the renderer's own model unless
@@ -40,7 +40,9 @@ it), and what the classical route already achieves on simulated data (§6), the 
    - the optics document **v1.5** §3.5-3.7, on `origin/main` only (the branch holds an older copy;
      command in §11).
 2. Clone, run the suites, print the hashes (§11). At `825bef1`: 25 suites pass and the hashes are
-   `0508e7ff12f48728 0ea5a6d2ec069c68` **[run, sandbox, 2026-10-22]**.
+   `0508e7ff12f48728 0ea5a6d2ec069c68` **[run, sandbox, 2026-10-22]**. The remote head moved to `9112bf3`
+   at 15:19 the same day (the roadmap under `specs/roadmap/` and one `.gitignore` line, no code change), so
+   the same results are expected there **[run: `git fetch`; reasoning for the expectation]**.
 3. Settle §2's questions with the user before writing computational logic (scientific-coding §2).
 4. Build the synthetic benchmark of §9 and reproduce the classical baseline of §6 on it before training
    any network.
@@ -78,6 +80,7 @@ The assistant's proposals, recommendation first **[reasoning]**; none is decided
 | Image noise | the renderer's 3.0 gl is provisional; D-025's measurement on clean background patches not run | D-025 **[KB]**; `config.py` **[src]** |
 | Allen's camera chain | black level, gain, noise after JPEG and the light direction are unknown; the JPEG tables are read from the cached crops (Cell 5) | SPEC §8 **[src]** |
 | Above/below and depth dependence | checks planned (per-sign Eq. 4, shallow vs deep nodes), not run; the renderer's kernel is even in $\delta$ and `kernel_from_growth` refuses a two-sided growth | procedure §3.10 **[doc]**; SPEC Block 10 **[src]** |
+| Roadmap | `specs/roadmap/diameter-pipeline.md` (generated from its YAML, created 2026-10-22): theory stage T6 "Far-field calibration" studying, implementation stage I15 (Block 15) planned; a stage for this work is added there only at the user's word (the subproject-roadmap skill) | `9112bf3` **[src]** |
 
 ## 4. The kernel in the code, in full notation
 
