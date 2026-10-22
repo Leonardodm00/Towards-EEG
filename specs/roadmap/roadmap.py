@@ -187,6 +187,9 @@ def load_roadmap(path):
     data.setdefault("theory", [])
     data.setdefault("implementation", [])
     for stage in data["theory"]:
+        # a theory stage with members and no status of its own is a pure
+        # group: its colour is its least advanced member's
+        stage["status_given"] = bool(stage.get("status"))
         stage["status"] = stage.get("status") or "open"
         stage["depends_on"] = as_list(stage.get("depends_on"))
         stage["refs"] = as_list(stage.get("refs"))
@@ -743,8 +746,16 @@ def compute_status(data, root, fetch=True, source="chat"):
             "closed_on": str(stage.get("closed_on") or ""),
             "decision": str(stage.get("decision") or ""),
             "note": stage.get("note", ""),
-            "has_own": True,
+            "has_own": stage.get("status_given", True),
         }
+    # a theory stage without members always has a status of its own
+    members_of = {}
+    for stage in data["theory"]:
+        if stage.get("parent") in theory:
+            members_of.setdefault(stage["parent"], []).append(stage["id"])
+    for sid, stage in theory.items():
+        if sid not in members_of:
+            stage["has_own"] = True
 
     impl = {}
     for stage in data["implementation"]:
@@ -769,7 +780,8 @@ def compute_status(data, root, fetch=True, source="chat"):
         stage["blocked_by"] = blocked if stage["has_own"] else []
     for sid, stage in theory.items():
         stage["blocked_by"] = [ref for ref in stage["depends_on"]
-                               if ref in theory and theory[ref]["status"] != "closed"]
+                               if ref in theory and theory[ref]["status"] != "closed"
+                               ] if stage["has_own"] else []
         stage["feeds"] = [i for i, s in impl.items() if sid in s["needs_theory"]]
 
     counts = {s: 0 for s in IMPL_STATES}
@@ -778,7 +790,8 @@ def compute_status(data, root, fetch=True, source="chat"):
             counts[stage["status"]] = counts.get(stage["status"], 0) + 1
     tcounts = {s: 0 for s in THEORY_STATES}
     for stage in theory.values():
-        tcounts[stage["status"]] = tcounts.get(stage["status"], 0) + 1
+        if stage["has_own"]:
+            tcounts[stage["status"]] = tcounts.get(stage["status"], 0) + 1
 
     warnings = []
     if shallow:

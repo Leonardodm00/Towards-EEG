@@ -3,9 +3,9 @@
 # specs/roadmap/roadmap.py (never written by hand).
 #
 # Drafted by `roadmap.py init` from specs/SPEC.md on 2026-10-22 and curated:
-# the theory stages follow SPEC section 2 plus the two topics of Blocks
-# 12-15; the groups (G1-G5, and I4 holding I9) are a first reading of the
-# pipeline's structure, to confirm. Lines marked DRAFT are guesses.
+# the theory stages follow SPEC section 2 plus the topics of Blocks 12-15
+# and the hybrid optics; the groups (TG1-TG3; G1-G5, and I4 holding I9) are
+# a first reading of the structure, to confirm. Lines marked DRAFT are guesses.
 #
 # Theory status: open | studying | closed  (set with
 #   python specs/roadmap/roadmap.py set --yaml specs/roadmap/diameter-pipeline.yaml T6 closed --decision D-nnn)
@@ -25,10 +25,29 @@ hpc_branch: hpc-status
 stale_after_hours: 48      # a running HPC marker older than this is reported as failing
 
 theory:
+  # ---- groups (no status of their own; coloured by their least advanced member)
+  - id: TG1
+    title: "Image formation"
+    summary: "How a dendrite in the stack becomes the image we measure: frames, the phantom and its rendering, and the optics of absorption and defocus."
+    refs: []
+    depends_on: []
+  - id: TG2
+    title: "Measuring a diameter at a node"
+    summary: "What is extracted from the image at one node and how: the per-node chain, the tube fit and the SGT plane fit."
+    refs: []
+    depends_on: []
+  - id: TG3
+    title: "Correction and calibration"
+    summary: "How a measured diameter is corrected and the kernel calibrated: the bias table and inversion, the far-field calibration."
+    refs: []
+    depends_on: []
+
+  # ---- topics
   - id: T1
     title: "Frames and objects"
     summary: "Stack, node and camera frames; the objects the measurement works on (SPEC 2.1)."
     refs: [SPEC 2.1, handoff_diameter_remeasurement.md]
+    parent: TG1
     depends_on: []
     status: closed        # DRAFT: Blocks 2-5 confirmed and smoke-tested; confirm or reopen
     closed_on: 2026-10-06
@@ -37,6 +56,7 @@ theory:
     title: "Per-node measurement"
     summary: "Profile sampling, focus rule, path, background and the tube fit at a node (SPEC 2.2, handoff Eqs. 1-5, 9)."
     refs: [SPEC 2.2, D-018, D-019, D-030]
+    parent: TG2
     depends_on: [T1]
     status: closed        # DRAFT
     closed_on: 2026-10-07
@@ -45,6 +65,7 @@ theory:
     title: "Phantom geometry and rendering"
     summary: "Synthetic tubes, the blur kernel, the JPEG tables and the FFT renderer (SPEC 2.3, impl-handoff S1-S5, procedure Eqs. 5-6)."
     refs: [SPEC 2.3]
+    parent: TG1
     depends_on: [T1]
     status: closed        # DRAFT
     closed_on: 2026-10-06
@@ -53,6 +74,7 @@ theory:
     title: "Bias table and correction"
     summary: "The table design, the local linear estimator and the inversion (SPEC 2.4, procedure Eqs. 1-3, 7, mathematics Eqs. 19-21)."
     refs: [SPEC 2.4, D-024, D-057, D-058, D-059, D-060, D-061, D-062, D-063, D-071]
+    parent: TG3
     depends_on: [T2, T3]
     status: closed        # DRAFT: D-071 settled the [to confirm] items of Block 14
     closed_on: 2026-10-21
@@ -61,6 +83,7 @@ theory:
     title: "Skewed generalized-t kernel and the plane fit"
     summary: "The SGT family, the seven-parameter fit at a plane and the Allen-guided plane iteration (Blocks 12-13)."
     refs: [D-052, D-053, D-054, D-061, D-064]
+    parent: TG2
     depends_on: [T2]
     status: closed        # DRAFT
     closed_on: 2026-10-20
@@ -69,6 +92,7 @@ theory:
     title: "Far-field calibration"
     summary: "The far scan and far fit that give Block 4's kernel its continuation slope (Block 15, S2b of the 2026-10-20 plan)."
     refs: [D-026, D-026.1, D-027, D-067.4, D-070, D-071.5]
+    parent: TG3
     depends_on: [T3, T5]
     status: studying
     closed_on:
@@ -78,6 +102,7 @@ theory:
     title: "Optics of the hybrid plane absorption and the defocus kernel"
     summary: "The optics needed to build the hybrid renderer: each slice's absorbed light taken from the condenser's rays (NA 1.4, n_oil 1.515, averaged over directions), then every image plane rendered by applying the defocus kernel to it, and the chain after it (I-004)."
     refs: [renderers doc 2026-10-09 s.3.8-3.9 Eqs. 13-14 on main, optics v1.5 s.3.3-3.7 on main, sine condition and W 2026-10-12 on main, procedure s.3.4 and s.3.6, D-024 (i), D-067.2, I-002, I-003, I-004]
+    parent: TG1
     depends_on: [T3]
     status: open          # added 2026-10-22 at the user's request ("I need to study all the optics theory to construct the hybrid plane absorption ...")
     closed_on:
