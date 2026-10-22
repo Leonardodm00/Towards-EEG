@@ -70,9 +70,10 @@ theory:
     summary: "The far scan and far fit that give Block 4's kernel its continuation slope (Block 15, S2b of the 2026-10-20 plan)."
     refs: [D-026, D-026.1, D-027, D-067.4, D-070, D-071.5]
     depends_on: [T3, T5]
-    status: studying      # DRAFT: Block 15 is drafted with [to confirm] items
+    status: studying
     closed_on:
     decision:
+    note: "To study, in this order (the user, 2026-10-22): (1) 'S2b, the far-field calibration: how I would proceed', from its CONTEXT (diameter implementation chat, 2026-10-21; figures fig1_far_line, fig2_far_fit); (2) the explanation of its Statistic step, the two-pass core fit and the predicted-dip SNR rule (2026-10-22; figures fig1_twopass, fig2_selection); (3) the answer on the three roles of gamma, c and s in the far fit (F2) (2026-10-22)."
   - id: T7
     title: "Optics of the hybrid plane absorption and the defocus kernel"
     summary: "The optics needed to build the hybrid renderer: each slice's absorbed light taken from the condenser's rays (NA 1.4, n_oil 1.515, averaged over directions), then every image plane rendered by applying the defocus kernel to it, and the chain after it (I-004)."
