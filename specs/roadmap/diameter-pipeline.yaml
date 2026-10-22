@@ -69,6 +69,15 @@ theory:
     status: studying      # DRAFT: Block 15 is drafted with [to confirm] items
     closed_on:
     decision:
+  - id: T7
+    title: "Optics of the hybrid plane absorption and the defocus kernel"
+    summary: "The optics needed to build the hybrid renderer: each slice's absorbed light taken from the condenser's rays (NA 1.4, n_oil 1.515, averaged over directions), then every image plane rendered by applying the defocus kernel to it, and the chain after it (I-004)."
+    refs: [renderers doc 2026-10-09 s.3.8-3.9 Eqs. 13-14 on main, optics v1.5 s.3.3-3.7 on main, sine condition and W 2026-10-12 on main, procedure s.3.4 and s.3.6, D-024 (i), D-067.2, I-002, I-003, I-004]
+    depends_on: [T3]
+    status: open          # added 2026-10-22 at the user's request ("I need to study all the optics theory to construct the hybrid plane absorption ...")
+    closed_on:
+    decision:
+    note: "No SPEC block yet: Block 4 renders with the partition (D-024 (i), for now); a hybrid would be a new absorption mode inside the simulation hash."
 
 implementation:
   - id: I0
