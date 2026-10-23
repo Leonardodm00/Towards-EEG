@@ -1,0 +1,518 @@
+# Roadmap of the subproject allen-mtg-fit: the optimisation pipeline that fits
+# the Allen Institute MTG cells (passive fit, I_h fit, recording-noise law,
+# synthetic recovery gate, campaign). Source of truth for the stages and the
+# theory statuses; the implementation statuses are computed by
+# specs/roadmap/roadmap.py (never written by hand) -- except the legacy stages
+# marked manual_status below, which predate the SPEC: their status is the
+# snapshot of 2026-10-23, with the evidence in manual_reason, and it stays
+# until the SPEC gets an entry for them (then the manual lines go).
+#
+# Drafted on 2026-10-23 from Passive Features/HPC script/Ih Fit/specs/SPEC.md
+# (Blocks 1-2), claude/TEEG_Ih_fit_staged_plan.md (Stages 0-9), the decision
+# log (D-005 to D-017, D-028 to D-034, D-048 to D-056, D-072, D-073) and the
+# cluster runs of 2026-10-20/21, and curated by the noise-fit chat. Lines
+# marked DRAFT are the assistant's guesses for the user to confirm.
+#
+# Theory status: open | studying | closed  (set with
+#   python specs/roadmap/roadmap.py set --yaml specs/roadmap/allen-mtg-fit.yaml T5 closed --decision D-nnn)
+# Implementation stages: block = the SPEC.md block; parent = the group the
+# stage belongs to (a stage with members is drawn as a frame around them; a
+# stage without a block is a pure group); needs_hpc = green only after an HPC
+# run marked by specs/roadmap/hpc_status.sh; jobs = job script paths (from the
+# repository root) or PBS job names (-N) whose markers belong to the stage;
+# summary = what the stage is about, in plain words.
+schema: 1
+name: allen-mtg-fit
+title: "Allen MTG cell fitting: passive fit, I_h fit, noise law, recovery gate (Passive Features/HPC script)"
+repo: Leonardodm00/Towards-EEG
+branch: main
+spec: Passive Features/HPC script/Ih Fit/specs/SPEC.md
+hpc_branch: hpc-status
+stale_after_hours: 72      # a running HPC marker older than this is reported as failing (the gate run is hours, the campaign days)
+
+theory:
+  # ---- groups (no status of their own; coloured by their least advanced member)
+  - id: TG1
+    title: "Passive fit"
+    summary: "The passive cable model and how its three parameters are fitted to the Allen recordings: the model, the data, the optimiser and its uncertainty, the validation gate."
+    refs: []
+    depends_on: []
+  - id: TG2
+    title: "Recording noise"
+    summary: "The noise each real sweep carries and how a synthetic twin gets the same: the law, the window statistics, the indirect-inference fit, the tilt, the per-sweep calibration, the archive's own selection."
+    refs: []
+    depends_on: []
+  - id: TG3
+    title: "I_h fit"
+    summary: "Adding the h-current to the fitted model: kinetics and their two fitted knobs, rest balance and dendritic distribution, the six-parameter protocol and loss, identifiability and the recovery gate."
+    refs: []
+    depends_on: []
+  - id: TG4
+    title: "Not yet tackled"
+    summary: "Topics the chats have named but never studied: temperature transfer of the kinetics, the corrected morphologies as the fit's input, and how the campaign's arms are compared."
+    refs: []
+    depends_on: []
+
+  # ---- passive fit (all studied, per the user 2026-10-23)
+  - id: T1
+    title: "Passive cable model and the three parameters"
+    summary: "What C_m, R_m and R_a mean on a reconstructed arbour, the spine factor F on the distal membrane (F = 1.9 for L2/L3), and why a brief pulse carries C_m while a long step carries R_m and the time constant."
+    refs: [Eyal 2016 (KB), D-004, D-007 C4, plan s.1 and s.6.3, phase1_conceptual_guide.md]
+    parent: TG1
+    depends_on: []
+    status: closed        # the user, 2026-10-23: everything about the passive fit is studied
+    closed_on: 2026-10-23
+    decision:
+  - id: T2
+    title: "The Allen recordings and the archive"
+    summary: "The Square Subthreshold and Long Square protocols, the liquid-junction correction, what the Phase-0 writer stores per cell, and how sweeps become bundles and roles."
+    refs: [Allen white paper (KB), phase1_function_reference.md, D-006, D-007 C2, D-016]
+    parent: TG1
+    depends_on: []
+    status: closed
+    closed_on: 2026-10-23
+    decision:
+  - id: T3
+    title: "Bayesian optimisation, likelihood profile and bootstrap intervals"
+    summary: "How the fit searches the three log-parameters with a Gaussian-process optimiser, how a profile over one axis reads the loss landscape, and how Phase 3's bootstrap gives each parameter an interval."
+    refs: ["Bayesian Optimisation and Likelihood Profile.md (KB)", "bootstrap CI papers (KB)", D-007 C5, D-010 (i)]
+    parent: TG1
+    depends_on: [T1, T2]
+    status: closed
+    closed_on: 2026-10-23
+    decision:
+  - id: T4
+    title: "The validation gate"
+    summary: "The absolute-mV gate that compares a held-out step with the training fit, why its two sides must use the same window, and what Allen's own R_in and tau_m can and cannot confirm."
+    refs: [Biological_Passive_Fit_HPC_Guide.md s.8, D-010 (ii)]
+    parent: TG1
+    depends_on: [T3]
+    status: closed
+    closed_on: 2026-10-23
+    decision:
+
+  # ---- recording noise (studying now)
+  - id: T5
+    title: "The noise law"
+    summary: "A fast AR(1) part, a slow Ornstein-Uhlenbeck part, and a per-sweep offset and tilt: what each term is, its autocovariance, and what the 265 ms and SS windows can and cannot see of it."
+    refs: [SPEC 2.1, D-017, D-034, noise model doc s.3.3 and s.3.6]
+    parent: TG2
+    depends_on: [T2]
+    status: studying
+    closed_on:
+    decision:
+  - id: T6
+    title: "Window statistics are not parameters"
+    summary: "Why a window's SD and textbook autocorrelation depend on the window length and the estimator, the visible share of a slow component, and the closed-form moments that start the fit."
+    refs: [SPEC 2.2, D-028, D-029, noise model doc s.3.4, topic doc eqs. 7-10]
+    parent: TG2
+    depends_on: [T5]
+    status: studying
+    closed_on:
+    decision:
+  - id: T7
+    title: "Indirect inference with simulated weights"
+    summary: "Matching the cell's statistics to the medians of simulated windows, with the inverse of the simulated covariance as weight, iterated to a fixed point; what the S0-S3 checks test about it."
+    refs: [SPEC 2.3, D-033, D-048, D-049, D-050, D-051, D-055, D-056]
+    parent: TG2
+    depends_on: [T6]
+    status: studying
+    closed_on:
+    decision:
+  - id: T8
+    title: "The tilt and the semivariogram"
+    summary: "Why the variance at seconds is carried by a per-sweep linear tilt rather than a third noise component, and how its spread is read from the window-mean semivariogram at one lag (4 periods, 0.802 s)."
+    refs: [SPEC 2.4, D-034, D-051 (iii), topic doc eq. 25]
+    parent: TG2
+    depends_on: [T5, T6]
+    status: studying
+    closed_on:
+    decision:
+  - id: T9
+    title: "Per-sweep calibration and shrinkage"
+    summary: "What one sweep can identify of the law (the fast pair well, the slow SD roughly, the slow timescale not), and how a random-effects shrinkage lets each twin sweep carry its own real sweep's noise."
+    refs: [D-073, sweep_identifiability.py, shrink_check.py, DerSimonian and Laird 2015 (PubMed full text)]
+    parent: TG2
+    depends_on: [T7, T8]
+    status: studying      # explained 2026-10-21 and 2026-10-23; the per-sweep form is the user's open choice
+    closed_on:
+    decision:
+  - id: T10
+    title: "The archive's SS layout and the trace-QC selection"
+    summary: "Each SS sweep is a 37-pulse train, 200.5 ms onset to onset; the stored windows are those that passed the writer's shape test; what that selection does to the noise statistics and why no shape test is added."
+    refs: [D-072, SPEC 3 and 8, sqc_trace_qc_selection.py]
+    parent: TG2
+    depends_on: [T2]
+    status: closed
+    closed_on: 2026-10-21
+    decision: D-072
+
+  # ---- I_h fit (open)
+  - id: T11
+    title: "I_h kinetics and the two fitted knobs"
+    summary: "The Kole/Hay and the Rich (human) activation curves, the shift of the activation curve and the scale of its time constant as fitted parameters, and what the published values anchor."
+    refs: [plan s.6.1 and s.11.1, D-005, D-007 C1, Rich 2021 (KB), Kalmbach 2018 (PMC)]
+    parent: TG3
+    depends_on: [T1]
+    status: open
+    closed_on:
+    decision:
+  - id: T12
+    title: "Rest balance and the dendritic distribution"
+    summary: "Why the leak reversal is shifted so that the resting potential is an exact stationary state once I_h is inserted, and the uniform law against the Eyal/Hay exponential law."
+    refs: [plan s.6.2, s.6.4, eqs. 11.2-11.3, D-005 Q2 and Q5]
+    parent: TG3
+    depends_on: [T11]
+    status: open
+    closed_on:
+    decision:
+  - id: T13
+    title: "The six-parameter protocol and loss"
+    summary: "The role table of the Long Square steps, the full-step window, the sag fraction as the signal that separates R_m from the h-conductance, and the loss's finite crash penalty."
+    refs: [plan s.5, s.7, s.11.4-11.5, D-006, D-010]
+    parent: TG3
+    depends_on: [T2, T11]
+    status: open
+    closed_on:
+    decision:
+  - id: T14
+    title: "Identifiability and the recovery gate"
+    summary: "Whether six parameters are identified from these protocols, and the gate that tests it on synthetic twins: the error measures, the tolerances (the assistant's, unowned) and the cohort size (20, no power calculation)."
+    refs: [plan s.12 and eq. 11.6, D-011, D-015, D-055]
+    parent: TG3
+    depends_on: [T13, T5]
+    status: open
+    closed_on:
+    decision:
+
+  # ---- not yet tackled (DRAFT: proposed by the assistant 2026-10-23; keep, merge or drop)
+  - id: T15
+    title: "Temperature and the transfer of kinetics"
+    summary: "The Allen recordings are at 34 C, the human kinetics come from 32-34 C recordings and neither .mod file has a Q10: what a temperature mismatch does to the fitted time-constant scale."
+    refs: [plan s.3 item 3]
+    parent: TG4
+    depends_on: [T11]
+    status: open          # DRAFT
+    closed_on:
+    decision:
+  - id: T16
+    title: "Corrected morphologies as the fit's input"
+    summary: "How the diameter-corrected arbours (the diameter-pipeline roadmap) change membrane area, electrotonic distance and therefore C_m and the sag, and whether F = 1.9 still holds on them."
+    refs: [D-007 C4, D-013, plan s.12 bullet on morphologies]
+    parent: TG4
+    depends_on: [T1]
+    status: open          # DRAFT
+    closed_on:
+    decision:
+  - id: T17
+    title: "Comparing the campaign's arms"
+    summary: "How to decide that I_h improved the fit: baseline run B against the passive full-step control and the six-parameter arm on the identical protocol, with Phase-3 intervals, and what the population read-out may claim."
+    refs: [plan s.5 (passive control arm), s.8 Stage 8 read-out, D-010 (ii)]
+    parent: TG4
+    depends_on: [T13, T14]
+    status: open          # DRAFT
+    closed_on:
+    decision:
+
+implementation:
+  # ---- groups (no block of their own; coloured by their least advanced member)
+  - id: G1
+    title: "Data archive (Phase 0)"
+    summary: "The Colab writer that downloads each Allen cell, repairs its morphology, extracts the SS pulses and LS sweeps and applies the trace QC."
+    depends_on: []
+    needs_theory: [T2]
+  - id: G2
+    title: "Passive fit (Biological Fit, Phases 1-3)"
+    summary: "The production passive fit: loader, Bayesian-optimisation fit with the gate, Phase 2.5 and the bootstrap, and the synthetic benchmark that tested it."
+    depends_on: []
+    needs_theory: [T1, T3, T4]
+  - id: G3
+    title: "I_h fitter (Ih Fit, Stages 0-6)"
+    summary: "The six-parameter fitter built as an edited copy of the monolith: the regression harness, the mechanism layer, the loader, the parameter vector, the protocol, Phase 3 and the orchestrator."
+    depends_on: []
+    needs_theory: [T11, T12, T13]
+  - id: G4
+    title: "Noise fit (SPEC Blocks 1-7)"
+    summary: "The per-cell and per-sweep fit of the recording-noise law that the twins inject: statistics, simulator, windows, fit, generator term, driver and record."
+    depends_on: []
+    needs_theory: [T5, T6, T7, T8, T9, T10]
+  - id: G5
+    title: "Recovery gate and campaign (Stages 7-9)"
+    summary: "The synthetic twins and the gate that decides whether the fitter recovers a known truth, then the campaign on the real cells and its record."
+    depends_on: []
+    needs_theory: [T14]
+
+  # ---- Phase 0
+  - id: I0
+    title: "Phase-0 archive writer"
+    summary: "Downloads a cell with AllenSDK, repairs the SWC, checks electrical viability, cuts the SS pulse windows and LS sweeps, runs the trace QC and writes specimen_<id>/ (ss_pulses.npz, ls_sweeps.npz, metadata.json, trace_qc_*)."
+    parent: G1
+    depends_on: []
+    needs_theory: [T2]
+    needs_hpc: false      # Colab, not the cluster
+    jobs: []
+    note: "Passive Features/Allen Institute Data/save_alleninstitute_data (6).py, trace_qc (1).py, trace_qc_v2.py. The L3_exc archive (18 cells) was written 2026-06-19; its SS layout and QC tables were read on 2026-10-20/21 (D-072). No SPEC entry: status set by hand."
+    manual_status: done
+    manual_reason: "the archive exists on davinci and Drive (18 L3_exc cells, 2026-06-19) and every cell carries its QC table (cluster check 2026-10-21, D-072); no SPEC entry"
+
+  # ---- passive fit
+  - id: I1
+    title: "Loader (Phase 1)"
+    summary: "Reads a specimen folder into CellData: LJP-corrected bundles of SS pulses by polarity and LS sweeps by amplitude, the NEURON model from the SWC with the spine factor."
+    parent: G2
+    depends_on: [I0]
+    needs_theory: [T2]
+    needs_hpc: false
+    jobs: []
+    note: "load_cell_from_archive and the model builder in Passive Features/HPC script/Biological Fit/passive_fitting_hpc_fixed.py; the oracle the regression harness (I5) compares against."
+    manual_status: done
+    manual_reason: "used by run B and byte-identical oracle of the regression gate (PASS on a real cell, davinci 2026-10-20); no SPEC entry"
+  - id: I2
+    title: "Phase 2: Bayesian-optimisation fit with the gate (run B)"
+    summary: "Fits (C_m, R_m, R_a) per cell with skopt's Gaussian-process optimiser on the SS pulses and the two smallest hyperpolarising steps (dt 0.1 ms, 60 ms window), applies the absolute-mV gate and writes phase2_results.csv."
+    parent: G2
+    depends_on: [I1]
+    needs_theory: [T1, T3, T4]
+    needs_hpc: true
+    jobs: ["Passive Features/HPC script/Biological Fit/submit_biological_fit.sh", "Passive Features/HPC script/Biological Fit/submit_all_groups_biological.sh"]
+    note: "run_biological_fit.py, passive_long_step_training.py; run B = pipeline_outputs/dt01ls60/<GROUP>/phase2_results.csv on davinci (D-006 Q9). The dt-enforcement fix (fix/enforce-neuron-dt, smoke_dt_enforcement.py) is merged."
+    manual_status: done
+    manual_reason: "run B produced on davinci (pipeline_outputs/dt01ls60, D-006 Q9, D-012 Sources); no SPEC entry"
+  - id: I3
+    title: "Phase 2.5 and Phase 3"
+    summary: "Phase 2.5 refits C_m and R_m with R_a fixed at the cohort median; Phase 3 gives bootstrap confidence intervals on a subset of cells (B = 200, local GP refits)."
+    parent: G2
+    depends_on: [I2]
+    needs_theory: [T3]
+    needs_hpc: true
+    jobs: ["Passive Features/HPC script/Biological Fit/submit_biological_fit.sh"]
+    note: "In the monolith and run_biological_fit.py; run A = pipeline_outputs/dt01ls60ph25. Phase 2.5 is off for the I_h arms (D-006 Q8); Phase 3 is kept and generalised in I10."
+    manual_status: done
+    manual_reason: "run A (dt01ls60ph25) on davinci with Phase 2.5; Phase 3 in the monolith (D-006 Q8, D-007 C5); no SPEC entry"
+  - id: I4
+    title: "Synthetic passive benchmark"
+    summary: "Generates synthetic cells of known passive parameters on real morphologies, fits them with the production fitter and aggregates the recovery; the source of the Stage-7 generator."
+    parent: G2
+    depends_on: [I1, I2]
+    needs_theory: [T1]
+    needs_hpc: true
+    jobs: ["Passive Features/HPC script/Synthetic Passive fit Test/submit_synth_benchmark.sh", "Passive Features/HPC script/Synthetic Passive fit Test/submit_all_cohorts.sh"]
+    note: "Passive Features/HPC script/Synthetic Passive fit Test/: synthetic_ground_truth.py, synth_gt_grid.py, gen_from_manifest.py, run_synth_benchmark.py, aggregate_synth_results.py and their smoke suites. DRAFT: no cluster run of the benchmark is recorded in the decision log or the plan; the user may know of one."
+    manual_status: tested
+    manual_reason: "smoke suites in the folder; no cluster run recorded in the decision log or the staged plan (DRAFT, to confirm); no SPEC entry"
+
+  # ---- I_h fitter, Stages 0-6
+  - id: I5
+    title: "Stage 0: regression harness"
+    summary: "Fits the same archived cell with the old and the new folder under run B's configuration and asserts the loss, the optimiser's x and fun identical to 1e-12; re-run after every stage."
+    parent: G3
+    depends_on: [I2]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+    note: "Passive Features/HPC script/Ih Fit/regression_passive_identity.py; G11 of cluster_gates_noise_fit.sh runs it on specimen 508282493."
+    manual_status: done
+    manual_reason: "PASS bit-for-bit on the real cell 508282493 on davinci 2026-10-20 (max|dL| = 0 over 20 points, x and fun identical) and after every stage in the sandbox; no SPEC entry"
+  - id: I6
+    title: "Stage 1: mechanism layer"
+    summary: "The two h-current mechanisms with the shift and scale knobs (mod/Ih.mod, mod/Ih_human.mod), the Python reference kinetics, attach/set/balance helpers and the sag metrics."
+    parent: G3
+    depends_on: [I5]
+    needs_theory: [T11, T12]
+    needs_hpc: false
+    jobs: []
+    note: "ih_mechanism.py, human_ih_params.py, mod/; smoke S1-S5, S10."
+    manual_status: tested
+    manual_reason: "smoke_ih_fit S1-S13 12/12 on davinci 2026-10-20 (G8); never used on a real cell in a campaign; no SPEC entry"
+  - id: I7
+    title: "Stage 2: loader for the I_h protocol"
+    summary: "The loader admits every hyperpolarising step, builds the spike-free depolarising steps as the validation set (the Allen action-potential rule, D-016), records V_trough and takes an optional corrected-SWC folder."
+    parent: G3
+    depends_on: [I1, I5]
+    needs_theory: [T2, T13]
+    needs_hpc: false
+    jobs: []
+    note: "load_cell_from_archive in Ih Fit/passive_fitting_hpc_fixed.py; smoke S7, S13. check_dep_sweeps.py (old against new screen on a real group) was delivered but never run on real sweeps (plan s.12)."
+    manual_status: tested
+    manual_reason: "smoke S7 and S13 on davinci 2026-10-20 (G8); check_dep_sweeps.py never run on real sweeps; no SPEC entry"
+  - id: I8
+    title: "Stage 3: parameter vector"
+    summary: "ParamSpec: the ordered axes, boxes, per-axis log or linear coordinate, the skopt dimensions and the apply step (passive, I_h, rest balance in that order); the 3-D spec reproduces the old search space exactly."
+    parent: G3
+    depends_on: [I6]
+    needs_theory: [T11]
+    needs_hpc: false
+    jobs: []
+    note: "param_spec.py; smoke S6."
+    manual_status: tested
+    manual_reason: "smoke S6 on davinci 2026-10-20 (G8), regression gate still bit-for-bit; no SPEC entry"
+  - id: I9
+    title: "Stage 4: protocol and windows"
+    summary: "The LS role table (train, validate, report-only), the step and sweep windows and the sub-window RMSDs; the legacy cap and window survive only as the run-B path."
+    parent: G3
+    depends_on: [I7, I8]
+    needs_theory: [T13]
+    needs_hpc: false
+    jobs: []
+    note: "passive_long_step_training.py (ls_rmsd_window_s, assign_ls_roles, split_train_validation_ih); smoke S7, S11."
+    manual_status: tested
+    manual_reason: "smoke S7, S11 on davinci 2026-10-20 (G8); no SPEC entry"
+  - id: I10
+    title: "Stage 5: Phase 3 over the generic parameter vector"
+    summary: "The bootstrap and the profile keyed on the result's own ParamSpec, so the linear axis is not exponentiated and the spec reaches the workers; the profile in more than three dimensions is an upper bound."
+    parent: G3
+    depends_on: [I3, I8]
+    needs_theory: [T3]
+    needs_hpc: false
+    jobs: []
+    note: "Phase 3 block of Ih Fit/passive_fitting_hpc_fixed.py; smoke S8."
+    manual_status: tested
+    manual_reason: "smoke S8 on davinci 2026-10-20 (G8); no SPEC entry"
+  - id: I11
+    title: "Stage 6: orchestrator and submission"
+    summary: "run_ih_fit.py with the three arms (baseline_runB, passive_fullstep, ih6), the per-cell liveness check of the loss, ls_roles.csv and ls_diagnostics.csv, and submit_ih_fit.sh with the nrnivmodl guard."
+    parent: G3
+    depends_on: [I5, I8, I9, I10]
+    needs_theory: [T13]
+    needs_hpc: false      # the campaign run is S8
+    jobs: []
+    note: "run_ih_fit.py, submit_ih_fit.sh; smoke S11, S12."
+    manual_status: tested
+    manual_reason: "smoke S11, S12 on davinci 2026-10-20 (G8); runs end to end on synthetic cells (R8); no real cell fitted yet; no SPEC entry"
+
+  # ---- noise fit (SPEC blocks; computed statuses)
+  - id: N1
+    title: "Block 1: textbook sample autocorrelation"
+    summary: "One wrapper, noise_stats.sample_acf, computes the textbook autocorrelation through statsmodels; the fitter's two lag-1 estimators and the noise table go through it (D-028, D-029)."
+    block: 1
+    parent: G4
+    depends_on: [I11]
+    needs_theory: [T6]
+    needs_hpc: false
+    jobs: []
+    note: "On main as e8ed84e; smoke N1-N6 6/6 on davinci 2026-10-20 (G5). No night-tester report covers it, so the tool says pushed."
+  - id: N2
+    title: "Block 2: the noise law"
+    summary: "The law's simulator from unit draws (continuous sweeps, tilt and offset) and its closed-form moments, the exact window-mean semivariogram and the continuous oracle (noise_law.py)."
+    block: 2
+    parent: G4
+    depends_on: []
+    needs_theory: [T5, T8]
+    needs_hpc: false
+    jobs: []
+    note: "On main as 36ba658; smoke M1-M9 9/9 on davinci 2026-10-20 (G6)."
+  - id: NT
+    title: "Cluster gates and the archive inspection (tools)"
+    summary: "cluster_gates_noise_fit.sh runs every cluster-side check of the noise-fit blocks (G0-G12) and prints a verdict; noise_fit_gates.py reads the SS sweep structure of the archive."
+    parent: G4
+    depends_on: [N1, N2]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+    note: "On main as ca028ea; a SPEC section, not a block. FULL run on davinci 2026-10-20: 13 passed, VERDICT SETTLED."
+    manual_status: done
+    manual_reason: "13/13, VERDICT SETTLED on davinci 2026-10-20 (logs ~/ih_fit_gate_logs/20261020_175303); smoke T1-T8; a SPEC tools section, not a block"
+  - id: N3
+    title: "Block 3: windows and statistics"
+    summary: "Cuts the enlarged SS windows and the LS windows of a real cell at the archive's own layout (D-072), subtracts the per-polarity mean response and computes the D-051 statistics per window, per sweep and per cell."
+    block: 3
+    parent: G4
+    depends_on: [N1, N2, I0]
+    needs_theory: [T6, T10]
+    needs_hpc: false
+    jobs: []
+    note: "noise_windows.py; next to write. Waits on the user's choice of the t_SS floor (D-072 open point)."
+  - id: N4
+    title: "Block 4: the per-cell fit"
+    summary: "Indirect inference per cell: the Harrell-Davis binding function on simulated continuous sweeps, the iterated inverse-covariance weights, the tilt's SD alternated with the law, three starts (D-048 to D-051, D-056)."
+    block: 4
+    parent: G4
+    depends_on: [N2, N3]
+    needs_theory: [T7, T8]
+    needs_hpc: false
+    jobs: []
+    note: "noise_fit.py."
+  - id: N5
+    title: "Block 5: the generator's law and the per-sweep twins"
+    summary: "The OU term and the tilt in synthetic_ground_truth.add_recording_noise, each twin sweep calibrated on its own real sweep (D-073) with the real cell's LS amplitudes and 37-pulse SS sweeps at the stored positions; manifest columns back-filled."
+    block: 5
+    parent: G4
+    depends_on: [N2, N4, I12]
+    needs_theory: [T5, T9]
+    needs_hpc: false
+    jobs: []
+    note: "Form of the per-sweep calibration open (D-073 comments (a)-(d))."
+  - id: N6
+    title: "Block 6: driver, the S0-S3 checks and the PBS job"
+    summary: "run_noise_fit.py fits the law for every cell of a group and writes the noise table; the sens_* scripts run the in-silico checks S0-S3 with their fixed predictions (D-055); one PBS job on davinci."
+    block: 6
+    parent: G4
+    depends_on: [N3, N4, N5]
+    needs_theory: [T7]
+    needs_hpc: true
+    jobs: ["Passive Features/HPC script/Ih Fit/submit_noise_fit.sh", noise_fit]
+    note: "The job script gets the roadmap marker lines when written."
+  - id: N7
+    title: "Block 7: the record"
+    summary: "The fitted laws and flags written into the Stage-7 manifest and the noise table, the S0-S3 report, and the decision-log and plan entries that close the noise prerequisite."
+    block: 7
+    parent: G4
+    depends_on: [N6]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+
+  # ---- recovery gate and campaign
+  - id: I12
+    title: "Stage 7 as built: twins, report and driver"
+    summary: "The manifest with the kinetic truths and the false-positive control, the generator at each twin's real acquisition, the pure recovery report with the gate arithmetic, and run_ih_recovery.py which fits through run_ih_fit.main() itself (D-011 to D-016)."
+    parent: G5
+    depends_on: [I4, I11]
+    needs_theory: [T14]
+    needs_hpc: false      # the run is S7
+    jobs: []
+    note: "synth_gt_grid.py, gen_from_manifest.py, ih_recovery_report.py, run_ih_recovery.py; smoke R1-R14. Changes with N5 (the generator's law, per-sweep twins)."
+    manual_status: tested
+    manual_reason: "smoke_ih_recovery R1-R14 14/14 on davinci 2026-10-20 (G10); the gate itself never run; no SPEC entry"
+  - id: I13
+    title: "Noise table and LS baseline diagnostics (D-012 to D-017)"
+    summary: "noise_calibration.py measures each real cell's per-sweep noise and the LS pre-window structure; ls_baseline_qc.py reads the baseline across the sweep (creep or wander); both ran on L3_exc and shaped the law."
+    parent: G5
+    depends_on: [I1]
+    needs_theory: [T5]
+    needs_hpc: false
+    jobs: []
+    note: "noise_L3.csv (2026-09-23), noise_L3_v2.csv (2026-09-28), lsqc_L3.csv (2026-10-01) on davinci. The per-cell law fit replaces the table's AR(1) pair (N4, N7)."
+    manual_status: done
+    manual_reason: "run on L3_exc on davinci (noise tables 2026-09-23 and 09-28, lsqc 2026-10-01; D-016, D-017, handoff s.4.6); no SPEC entry"
+  - id: S7
+    title: "Stage 7: the recovery gate run (Block 8, to specify)"
+    summary: "Generate the twins of the L3_exc cells with their fitted noise, fit every twin with the four arms on davinci, and apply the gate: a pass opens the campaign, a failing kinetic knob is frozen, a failing C_m or g_h is not."
+    block: 8
+    parent: G5
+    depends_on: [I12, N5, N7]
+    needs_theory: [T14]
+    needs_hpc: true
+    jobs: ["Passive Features/HPC script/Ih Fit/submit_ih_recovery.sh", ih_recovery]
+    note: "DRAFT: Block 8 is the assistant's proposed SPEC entry for the gate run (the recovery driver under D-073, the submit script with the marker lines); no entry yet, so the tool says planned. Dry run, pilot (MAX_CELLS=2) and the full run (README, Stage 7)."
+  - id: S8
+    title: "Stage 8: campaign"
+    summary: "The three arms on the real cells, first the diameter-corrected ones (one-cell dry run, then the set), then every excitatory group; per-cell parameters, gate columns, Phase-3 intervals and the population read-out."
+    parent: G5
+    depends_on: [S7]
+    needs_theory: [T14, T16, T17]
+    needs_hpc: true
+    jobs: ["Passive Features/HPC script/Ih Fit/submit_ih_fit.sh", ih_fit]
+    note: "Blocked on S7's verdict and on the corrected SWC files (D-013), which the diameter-pipeline roadmap produces (its I7/I8)."
+    manual_status: planned
+    manual_reason: "not started: waits for the gate's verdict and the diameter-corrected SWCs (D-013); no SPEC entry"
+  - id: S9
+    title: "Stage 9: record"
+    summary: "The decision naming the estimate of record, the guide updated, the plan's 'I_h as nuisance' paragraph retired."
+    parent: G5
+    depends_on: [S8]
+    needs_theory: [T17]
+    needs_hpc: false
+    jobs: []
+    manual_status: planned
+    manual_reason: "not started"

@@ -7,3 +7,5 @@ __pycache__/
 /h01/
 # Per-clone symlink farm assembled by h01_code/stage1_link.sh
 h01_code/stage1/*.py
+# roadmap: the cluster-side state of hpc_status.sh
+.roadmap/
