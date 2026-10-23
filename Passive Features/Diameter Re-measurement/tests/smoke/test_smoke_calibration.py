@@ -48,7 +48,20 @@ Checks
                         or sigma_r(0)^2 + G <= 0 -> kernel_from_growth refuses;
                         a node without a sharpest plane -> plane_scan refuses;
                         S2.1: validate() refuses overlapping, reversed, empty,
-                        non-finite or mis-sized sets of Allen's diameter
+                        non-finite or mis-sized sets of Allen's diameter;
+                        2026-10-23: validate() refuses a table cut off the
+                        knots and far settings out of range
+    test_patch_scan     2026-10-23 (10.P, 10.I, 10.A; D-078 to D-081): the
+                        patch scan's omega equals the block-median scan's on
+                        the same rendered draw within 5 % (the background
+                        within 0.1 gl); node_phi_max_deg = 5 rejects a 7 deg
+                        pilot of either set; calibration_reasons adds
+                        not_straight and not_isolated in that order after
+                        not_faint; anchor_from_growth equals the cut table's
+                        last value; bootstrap_sigma0's SE within 30 % of the
+                        SD over regenerated data sets; example_node picks the
+                        node planted on the median; the scans JSON round trip
+                        with the new fields and a file without them
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -82,7 +95,9 @@ for _p in (SRC, HERE):
         sys.path.insert(0, str(_p))
 
 from allen_diameter.analysis import calibration as CAL  # noqa: E402
+from allen_diameter.analysis import calibration_scene as CS  # noqa: E402
 from allen_diameter.analysis import profiles  # noqa: E402
+from allen_diameter.analysis.plane_iteration import Scene  # noqa: E402
 from allen_diameter.loading import calibration_io as CIO  # noqa: E402
 from allen_diameter.analysis.node_pipeline import Branch, NodeResult  # noqa: E402
 from allen_diameter.config import default_config  # noqa: E402
@@ -109,19 +124,25 @@ def fake_node(cx, cy, z_ax, theta, d, mu, z_sub=None):
                       None, "gradient_energy", np.empty(0, dtype=int), np.empty(0), np.empty(0), -1)
 
 
-def scan_phantom(cfg, d, mu, theta, cx, cy, z_ax, rng):
-    """Render a flat phantom over planes -P..P about plane 0 and scan it along its true line."""
+PATCH_HALF_TEST = 8.0   # um: the patch of these checks (the default 25 um costs 30 s of rendering per thin phantom)
+
+
+def scan_phantom(cfg, d, mu, theta, cx, cy, z_ax, rng, keep_images=False):
+    """Render a flat phantom over planes -P..P about plane 0 on the +-PATCH_HALF_TEST patch and scan it along its
+    true line against the planar far-pixel background (10.P), the branch's own scene."""
+    if cfg.calibration.patch_half_um > PATCH_HALF_TEST:
+        cfg = dataclasses.replace(cfg, calibration=dataclasses.replace(cfg.calibration, patch_half_um=PATCH_HALF_TEST))
     tube = G.Tube((cx, cy, z_ax), 0.5 * d, 0.0, theta, 1.0, cfg.renderer.U_um, cfg.renderer.end_cut)
     t = G.axis_direction(0.0, theta)
-    br = Branch.from_points(np.array([cx, cy, z_ax])[None, :] + np.arange(-6, 7)[:, None] * 1.18 * t[None, :], 0.5 * d)
-    p, m, P = cfg.acquisition.res0_um, cfg.measure, cfg.calibration.offsets_planes
-    left = int(math.floor((cx - m.block_half_um) / p)) - 1
-    top = int(math.floor((cy - m.block_half_um) / p)) - 1
-    width = int(math.ceil((cx + m.block_half_um) / p)) + 2 - left
-    height = int(math.ceil((cy + m.block_half_um) / p)) + 2 - top
-    blk = R.synthetic_block(tube, mu, np.arange(-P, P + 1), left, top, width, height, cfg, rng,
-                            int(math.ceil(cfg.renderer.pad_um / p)))
-    return CAL.plane_scan(blk, fake_node(cx, cy, z_ax, theta, d, mu), br, cfg)
+    # the trace must cover the rendered tube (U_um = 10 um half-length): a shadow beyond the trace's end is not masked
+    br = Branch.from_points(np.array([cx, cy, z_ax])[None, :] + np.arange(-10, 11)[:, None] * 1.18 * t[None, :], 0.5 * d)
+    p, P = cfg.acquisition.res0_um, cfg.calibration.offsets_planes
+    pad = int(math.ceil(cfg.renderer.pad_um / p))
+
+    def provider(left, top, width, height, k_lo, k_hi):
+        return R.synthetic_block(tube, mu, np.arange(k_lo, k_hi + 1), left, top, width, height, cfg, rng, pad)
+    patch = CS.fetch_patch(provider, cx, cy, cfg.calibration.patch_half_um, -P, P, p)
+    return CAL.plane_scan(patch, fake_node(cx, cy, z_ax, theta, d, mu), br, Scene.from_branch(br), cfg, keep_images)
 
 
 def semicircle_growth(delta, r, rc, n=64):
@@ -373,40 +394,46 @@ def test_contract():
     d, mu, theta = 0.2, 1.5, 0.7
     tube = G.Tube((0.02, -0.03, 0.04), 0.5 * d, 0.0, theta, 1.0, cfg.renderer.U_um, cfg.renderer.end_cut)
     t = G.axis_direction(0.0, theta)
-    br = Branch.from_points(np.array([0.02, -0.03, 0.04])[None, :] + np.arange(-6, 7)[:, None] * 1.18 * t[None, :],
+    br = Branch.from_points(np.array([0.02, -0.03, 0.04])[None, :] + np.arange(-10, 11)[:, None] * 1.18 * t[None, :],
                             0.5 * d)
     pad = int(math.ceil(cfg.renderer.pad_um / cfg.acquisition.res0_um))
 
     calls = []
+    cfg_near = cfg_with(patch_half_um=PATCH_HALF_TEST)
 
     def provider(left, top, width, height, k_lo, k_hi):
-        calls.append((k_lo, k_hi))
+        calls.append((left, top, width, height, k_lo, k_hi))
         return R.synthetic_block(tube, mu, np.arange(k_lo, k_hi + 1), left, top, width, height, cfg, rng, pad)
-    res, scan, reasons = CAL.scan_node(br, 6, provider, cfg)
+    res, scan, reasons = CAL.scan_node(br, 10, provider, cfg_near)
     assert isinstance(res, NodeResult)
     assert (scan is None) == bool(reasons), reasons
     assert scan is not None, ("a thin faint flat phantom must be a calibration node", reasons, res.d_hat_um,
                               res.alpha_hat)
     assert scan.k_star == res.k_star and np.sum(np.isfinite(scan.omega_um2)) >= 5, scan.status
-    assert len(calls) == 2 and calls[1] == (res.k_star - P, res.k_star + P), calls      # the pilot's, then the scan's
-    # S2.1: a far-field phantom (Allen's diameter = its branch's 2 r = d = 0.7 um, alpha 0.35, flat) is selected and
-    # not scanned: the pilot's one provider call only, no scan, the one reason FAR_FIELD_NOT_BUILT
+    assert scan.set == "near" and scan.w_gl.shape == (2 * P + 1, scan.v_um.size) and scan.b_coef.shape == (2 * P + 1, 3)
+    assert len(calls) == 2 and calls[1][4:] == (res.k_star - P, res.k_star + P), calls   # the pilot's, then the patch
+    assert calls[1][:4] == CS.patch_bounds(res.cx_um, res.cy_um, PATCH_HALF_TEST, cfg.acquisition.res0_um), calls[1]
+    # 2026-10-23: a far-field phantom (Allen's diameter = its branch's 2 r = d = 0.7 um, alpha 0.35, flat) is selected
+    # AND scanned by Block 15.1 on its patch (12 um and +-8 planes here, for time): two provider calls, a far scan
+    cfg_far = cfg_with(patch_half_um=12.0, far_offsets_planes=8)
     d_far, mu_far = 0.7, 0.5
     tube_far = G.Tube((0.02, -0.03, 0.04), 0.5 * d_far, 0.0, theta, 1.0, cfg.renderer.U_um, cfg.renderer.end_cut)
-    br_far = Branch.from_points(np.array([0.02, -0.03, 0.04])[None, :] + np.arange(-6, 7)[:, None] * 1.18 * t[None, :],
+    br_far = Branch.from_points(np.array([0.02, -0.03, 0.04])[None, :] + np.arange(-10, 11)[:, None] * 1.18 * t[None, :],
                                 0.5 * d_far)
     calls_far = []
 
     def provider_far(left, top, width, height, k_lo, k_hi):
         calls_far.append((k_lo, k_hi))
-        return R.synthetic_block(tube_far, mu_far, np.arange(k_lo, k_hi + 1), left, top, width, height, cfg, rng, pad)
-    res_far, scan_far, reasons_far = CAL.scan_node(br_far, 6, provider_far, cfg)
-    assert CAL.calibration_set(2.0 * br_far.radius_um[6], cfg) == "far"
-    assert CAL.calibration_reasons(res_far, cfg, 2.0 * br_far.radius_um[6]) == [], \
-        ("the far-field phantom must pass S, flat and faint", res_far.fit_status, res_far.flags, res_far.alpha_hat)
-    assert scan_far is None and reasons_far == [CAL.FAR_FIELD_NOT_BUILT] and len(calls_far) == 1, (reasons_far,
-                                                                                                    calls_far)
-    assert CAL.scan_verdict(scan_far, reasons_far).startswith("far-field calibration node, not scanned")
+        return R.synthetic_block(tube_far, mu_far, np.arange(k_lo, k_hi + 1), left, top, width, height, cfg_far, rng,
+                                 pad)
+    res_far, scan_far, reasons_far = CAL.scan_node(br_far, 10, provider_far, cfg_far)
+    assert CAL.calibration_set(2.0 * br_far.radius_um[10], cfg) == "far"
+    assert reasons_far == [] and scan_far is not None and scan_far.set == "far", \
+        ("the far-field phantom must pass S, flat, faint, straight and isolated", reasons_far, res_far.fit_status,
+         res_far.flags, res_far.alpha_hat)
+    assert len(calls_far) == 2 and calls_far[1] == (res_far.k_star - 8, res_far.k_star + 8), calls_far
+    assert scan_far.ks.size == 17 and np.sum(np.array(scan_far.status) == "ok") >= 12, scan_far.status
+    assert CAL.scan_verdict(scan_far, []) == "scanned (far field)"
     assert CAL.scan_verdict(scan, []) == "scanned (near field)"
     assert CAL.scan_verdict(None, ["not_flat"]) == "not a calibration node (not_flat)"
     # the CSV readers' rule (calibrate_kernel.candidates_from_rows on survey.pilot_row rows) holds a node exactly
@@ -435,14 +462,23 @@ def test_contract():
     assert rows[4]["calibration_set"] == "" and rows[4]["calibration_node"] is False      # Allen near, not flat
     # the scans file round trip (NaN <-> null)
     back = CIO.scan_from_dict(json.loads(json.dumps(CIO.scan_to_dict(scan))))
-    for name in ("ks", "z_um", "omega_um2", "vw_um2", "area_gl_um", "depth_gl", "B_bar"):
+    for name in ("ks", "z_um", "omega_um2", "vw_um2", "area_gl_um", "depth_gl", "B_bar", "se_omega_um2", "amp_gl",
+                 "v_c_um", "rms_gl", "n_win", "passes", "window_half_um", "b_coef", "v_um", "w_gl", "bhat_gl"):
         assert np.array_equal(getattr(back, name), getattr(scan, name), equal_nan=True), name
     assert back.status == scan.status and back.node_id == scan.node_id and back.k_star == scan.k_star
+    assert back.set == "near" and back.line_end_gl is None and back.images is None
+    old = {k: v for k, v in CIO.scan_to_dict(scan).items() if k in ("node_id", "d_hat_um", "phi_rad", "alpha_hat", "k_star",
+           "z_sub_um", "ks", "z_um", "omega_um2", "vw_um2", "area_gl_um", "depth_gl", "B_bar", "status")}
+    legacy = CIO.scan_from_dict(json.loads(json.dumps(old)))          # a scans file written before 2026-10-23
+    assert legacy.set == "near" and legacy.w_gl is None and np.array_equal(legacy.omega_um2, scan.omega_um2, equal_nan=True)
     # the Phase II path in miniature: a cell served through fetch_zblock, three candidate nodes
     sys.path.insert(0, str(WS / "scripts"))
     import run_cell
     with tempfile.TemporaryDirectory() as tmp:
-        cfg_cell = dataclasses.replace(cfg, measure=dataclasses.replace(cfg.measure, block_half_um=3.5))
+        # the fixture's soma (radius 4 um at the origin) is 4.9 um from the first node's patch and its predicted
+        # shadow fails the 0.03 gl rule, which test_patch_scan tests on its own: relaxed here (the image is small)
+        cfg_cell = dataclasses.replace(cfg_with(patch_half_um=3.5, isolation_depth_gl=50.0),
+                                       measure=dataclasses.replace(cfg.measure, block_half_um=3.5))
         swc, fetcher, planes, _ = synthetic_cell(tmp, cfg_cell, d_true=0.2, mu=1.5, allen_radius=0.1)
         provider = run_cell.real_provider(fetcher, planes, cfg.acquisition.res0_um)
         out = CAL.scan_cell(swc, provider, cfg_cell, candidates={4, 5, 6})
@@ -455,15 +491,24 @@ def test_contract():
         sp = os.path.join(tmp, "scans.json")
         cp = os.path.join(tmp, "calibration.json")
         run = [sys.executable, str(WS / "scripts" / "calibrate_kernel.py")]
-        p1 = subprocess.run(run + ["synthetic", "--n", "2", "--seed", "5", "--out", sp], capture_output=True, text=True,
-                            timeout=900)
+        cj = os.path.join(tmp, "config.json")
+        cfg_cli = cfg_with(patch_half_um=PATCH_HALF_TEST, bootstrap_resamples=8)
+        with open(cj, "w") as f:      # to_json holds no calibration section; config_from_dict reads one when present
+            json.dump(dict(json.loads(cfg_cli.to_json()), calibration=dataclasses.asdict(cfg_cli.calibration)), f)
+        p1 = subprocess.run(run + ["synthetic", "--set", "near", "--n", "2", "--seed", "5", "--out", sp,
+                                   "--config-json", cj], capture_output=True, text=True, timeout=900)
         assert p1.returncode == 0 and "2 of 2 phantoms scanned" in p1.stdout, (p1.stdout, p1.stderr)
-        p2 = subprocess.run(run + ["fit", "--scans", sp, "--out", cp], capture_output=True, text=True, timeout=300)
+        p2 = subprocess.run(run + ["fit", "--scans", sp, "--out", cp, "--config-json", cj, "--seed", "1"],
+                            capture_output=True, text=True, timeout=600)
         assert p2.returncode == 0 and "growth fit (gaussian_core_width2, symmetric, cubic): 2 nodes" in p2.stdout, \
             (p2.stdout, p2.stderr)
         with open(cp) as f:
             obj = json.load(f)
         assert obj["growth"]["knots_um"][0] == 0.0 and ("kernel" in obj) != ("kernel_error" in obj), sorted(obj)
+        if "kernel" in obj:
+            assert abs(obj["kernel"]["kernel_table_delta_um"][-1] - 0.84) <= 1e-9, obj["kernel"]   # D-080.1: the cut
+            assert obj["anchor"]["sigma0_um"] == obj["kernel"]["kernel_table_sigma_um"][-1]
+        assert "anchor" in obj and obj["anchor"]["n_resamples"] == 8, obj.get("anchor")
 
 
 def test_determinism():
@@ -515,15 +560,101 @@ def test_edge_cases():
         except ValueError:
             continue
         raise AssertionError("validate() accepted %r" % (bad,))
+    for bad in (dict(table_max_delta_um=0.9), dict(far_min_k_offset=20), dict(far_core_width_bounds=(1.5, 4.0)),
+                dict(far_area_offsets=(6, 4)), dict(far_offsets_planes=2), dict(background_min_far_frac=0.0),
+                dict(bootstrap_resamples=1), dict(far_core_max_passes=0)):
+        try:
+            cfg_with(**bad).validate()
+        except ValueError:
+            continue
+        raise AssertionError("validate() accepted %r" % (bad,))
     cfg_with(node_allen_diameter_max_um=0.5).validate()                  # a gap between the sets is allowed
     gap = cfg_with(node_allen_diameter_max_um=0.5)
     assert [CAL.calibration_set(x, gap) for x in (0.5, 0.55, 0.6, 0.6 + 1e-9)] == ["near", "", "", "far"]
     node = fake_node(0.0, 0.0, NAN, 0.0, 0.25, 1.0)
     try:
-        CAL.plane_scan((np.zeros((1, 4, 4)), np.array([0]), np.array([True]), None), node, None, cfg)
+        CAL.plane_scan((np.zeros((1, 4, 4)), np.array([0]), np.array([True]), None), node, None, None, cfg)
     except ValueError:
         return
     raise AssertionError("a node without a sharpest plane must be refused")
+
+
+def test_patch_scan():
+    """2026-10-23: the patch scan against the block-median scan, the new criteria, the anchor and its SE, the example."""
+    cfg = cfg_with(patch_half_um=PATCH_HALF_TEST)
+    m = cfg.measure
+    # (a) the same rendered draw scanned both ways: the planar background within 0.1 gl of the block median (the
+    # phantom's background is flat), omega within 5 % (a 0.1 gl background difference moves omega by about
+    # 2.3 x 0.1 / depth, under 5 % while the dip is deeper than 5 gl; the outer planes of a 0.2 um tube are)
+    d, mu, theta, cx, cy, z_ax = 0.2, 1.5, 0.7, 0.02, -0.03, 0.04
+    tube = G.Tube((cx, cy, z_ax), 0.5 * d, 0.0, theta, 1.0, cfg.renderer.U_um, cfg.renderer.end_cut)
+    t = G.axis_direction(0.0, theta)
+    br = Branch.from_points(np.array([cx, cy, z_ax])[None, :] + np.arange(-10, 11)[:, None] * 1.18 * t[None, :], 0.5 * d)
+    P, p = cfg.calibration.offsets_planes, cfg.acquisition.res0_um
+    rng = np.random.default_rng(SEED)
+    pad = int(math.ceil(cfg.renderer.pad_um / p))
+    kept = {}
+
+    def provider(left, top, width, height, k_lo, k_hi):
+        kept["blk"] = R.synthetic_block(tube, mu, np.arange(k_lo, k_hi + 1), left, top, width, height, cfg, rng, pad)
+        return kept["blk"]
+    node = fake_node(cx, cy, z_ax, theta, d, mu)
+    patch = CS.fetch_patch(provider, cx, cy, PATCH_HALF_TEST, -P, P, p)
+    sc = CAL.plane_scan(patch, node, br, Scene.from_branch(br), cfg)
+    block, ks, valid, frame = patch
+    o, y_hat, e_u = CAL.line_geometry(node)
+    v = profiles.profile_offsets(m)
+    from allen_diameter.analysis.node_pipeline import node_background
+    for q, k in enumerate(sc.ks):
+        plane = block[int(k - ks[0])]
+        B, ok = node_background(plane, frame, o, br, m)
+        I = profiles.sample_profile(plane, frame, o, y_hat, e_u, v, profiles.n_along(m), m.profile_step_um)
+        st = CAL.dip_statistics(v, I, B, m, cfg.calibration)
+        assert sc.status[q] == "ok" and st["status"] == "ok", (q, sc.status[q], st["status"])
+        assert abs(sc.B_bar[q] - B) <= 0.1, (q, sc.B_bar[q], B)
+        assert abs(sc.omega_um2[q] / st["omega_um2"] - 1.0) <= 0.05, (q, sc.omega_um2[q], st["omega_um2"])
+    # (b) node_phi_max_deg = 5 deg rejects a 7 deg pilot of either set; 4 deg passes
+    for d_a in (0.4, 0.7):
+        assert CAL.criteria_reasons(math.radians(7.0), 0.3, d_a, cfg) == ["not_flat"]
+        assert CAL.criteria_reasons(math.radians(4.0), 0.3, d_a, cfg) == []
+    assert cfg.calibration.node_phi_max_deg == 5.0
+    # (c) calibration_reasons adds not_straight and not_isolated, in that order, after not_faint
+    x = np.linspace(-12, 12, 25)
+    bent = Branch.from_points(np.c_[x, 0.4 * (1 - np.cos(np.pi * x / 10.0)) * (np.abs(x) <= 10), np.zeros(25)], 0.2,
+                              ids=np.arange(100, 125))
+    other = Branch.from_points(np.c_[np.linspace(-8, 8, 5), np.full(5, 3.0), np.zeros(5)], 0.3, ids=np.arange(200, 205))
+    s1, s2 = Scene.from_branch(bent), Scene.from_branch(other)
+    scene = Scene(np.vstack([s1.seg_xyz, s2.seg_xyz]), np.vstack([s1.seg_radius, s2.seg_radius]),
+                  np.vstack([s1.seg_ids, s2.seg_ids]), np.empty((0, 3)))
+    pil = dataclasses.replace(fake_node(0.0, 0.0, 0.0, 0.0, 0.4, 1.0), B_bar=200.0, mu_hat_per_um=1.0, alpha_hat=0.9)
+    planes_z = np.arange(-3, 4) * cfg.acquisition.dz_um
+    assert CAL.calibration_reasons(pil, cfg, 0.4, bent, 12, scene, planes_z) == ["not_faint", "not_straight",
+                                                                                 "not_isolated"]
+    assert CAL.calibration_reasons(pil, cfg, 0.4, bent, 12, Scene.from_branch(bent), planes_z) == ["not_faint",
+                                                                                                    "not_straight"]
+    straight = Branch.from_points(np.c_[x, np.zeros(25), np.zeros(25)], 0.2, ids=np.arange(100, 125))
+    good = dataclasses.replace(pil, alpha_hat=0.3)
+    assert CAL.calibration_reasons(good, cfg, 0.4, straight, 12, Scene.from_branch(straight), planes_z) == []
+    assert CAL.calibration_reasons(good, cfg, 0.4) == []                 # without the trace: the old rule
+    # (d) the anchor equals the cut table's last value, at 0.84 um; the SE of a node bootstrap on noisy Eq. (4) data
+    # within 30 % of the SD over 40 regenerated data sets (the SPEC's tolerance: 40 sets give a 11 % SE of the SD)
+    knots, curve = table_curve(cfg)
+    scans, _, _ = eq4_scans(cfg, curve, 10, np.random.default_rng(SEED), noise=3e-3)
+    g = CAL.fit_growth(scans, cfg)
+    rc = CAL.kernel_from_growth(g, cfg.renderer, max_delta_um=0.84)
+    assert abs(rc.kernel_table_delta_um[-1] - 0.84) <= 1e-12 and CAL.anchor_from_growth(g, cfg) == rc.kernel_table_sigma_um[-1]
+    se, n_ok, draws = CAL.bootstrap_sigma0(scans, cfg, np.random.default_rng(SEED + 1), n_resamples=60)
+    assert n_ok >= 50 and draws.shape == (n_ok,), (n_ok, se)
+    reps = []
+    for r_ in range(40):
+        sc_r, _, _ = eq4_scans(cfg, curve, 10, np.random.default_rng(SEED + 100 + r_), noise=3e-3)
+        reps.append(CAL.anchor_from_growth(CAL.fit_growth(sc_r, cfg), cfg))
+    sd = float(np.std(reps, ddof=1))
+    assert abs(se / sd - 1.0) <= 0.3, (se, sd)
+    # (e) example_node: the node planted on the median by offset is the example
+    med = CAL.median_by_offset(scans)
+    planted = dataclasses.replace(scans[0], node_id=999, omega_um2=np.array([med[int(o)] for o in scans[0].offsets()]))
+    assert CAL.example_node(scans + [planted]) == 999 and sorted(med) == list(range(-P, P + 1))
 
 
 # ---------------------------------------------------------------- runner ---

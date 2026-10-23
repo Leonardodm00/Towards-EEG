@@ -247,7 +247,7 @@ class CalibrationConfig:
 
     node_allen_diameter_max_um: float = 0.6  # source: D-067 (D-067.4, D-061.4), PROVISIONAL: the near-field (thin) set, Allen's diameter 2 r_A <= this (um), scanned up to offsets_planes
     far_field_allen_diameter_um: Tuple[float, float] = (0.6, 0.8)  # source: D-067 (D-067.4, D-026), PROVISIONAL: the far-field set, lo < 2 r_A <= hi (um), for the offsets beyond offsets_planes (its scan is not built)
-    node_phi_max_deg: float = 10.0    # source: procedure s.3.4 (flat); both sets (D-067.4); D-027's tolerance open
+    node_phi_max_deg: float = 5.0     # source: D-081.3 [user, 2026-10-23]: flat, both sets, <= 5 deg (was 10, procedure s.3.4); exposed
     offsets_planes: int = 3           # source: procedure s.3.4 (+-3 planes = +-0.84 um)
     trust_planes: int = 2             # source: procedure s.3.4 (trust beyond +-2 only after a residual check)
     statistic: str = "gaussian_core_width2"  # source: procedure s.3.4 [corrected 2026-10-04]; windowed V as cross-check
@@ -260,6 +260,32 @@ class CalibrationConfig:
     z_ax_bound_um: float = 0.28              # source: PROVISIONAL (Block 10): the fitted axis depth stays within this of the node's sub-plane depth
     min_planes_per_node: int = 3             # source: PROVISIONAL (Block 10): a node enters the growth fit with at least this many finite omega
     growth_interp: str = "cubic"             # source: PROVISIONAL (Block 10): between the plane-offset knots; linear made G(1 plane) < 0 on rendered thin phantoms (convex curve)
+    # 2026-10-23, D-078 to D-081 (Block 10.P, 10.I, 10.A): the patch, its planar background, isolation, straightness,
+    # the anchor's SE and the table cut -- both calibration sets. None of these is in a signature.
+    patch_half_um: float = 25.0              # source: D-078.1 [user]: the +-25 um square about the pilot's centre, fetched over the stage's planes; the background is fitted on its far pixels
+    far_pixel_sigmas: float = 3.0            # source: D-078.1 [user]: a far pixel lies beyond r_q + this x sigma_r(delta_q,k) of every traced segment q and of the soma
+    background_min_far_frac: float = 0.05    # source: PROVISIONAL (Block 10.P): fewer far pixels than this fraction of the patch -> plane status bg_few
+    background_trim_sigmas: float = 3.0      # source: PROVISIONAL (Block 10.P): the plane is refitted once without the pixels beyond this x 1.4826 MAD of the first fit's residuals (untraced debris)
+    isolation_depth_gl: float = 0.03         # source: D-081.1 [user]: a traced neighbour (not the node's own branch) whose predicted shadow reaches the patch deeper than this (gl) in a scanned plane fails the node (not_isolated)
+    node_straight_half_um: float = 10.0      # source: D-081.3 (proposal accepted), PROVISIONAL: the trace within +-this (um) along the branch must stay near the node's straight line
+    node_straight_tol_radii: float = 1.0     # source: D-081.3, PROVISIONAL: ... within this x (Allen's diameter / 2) of the line, else not_straight
+    bootstrap_resamples: int = 1000          # source: D-081.7 [user]: node resamples for the SE of the anchor (10.A) and of the far slope (15.5)
+    table_max_delta_um: float = 0.84         # source: D-080.1 [user]: every table written for rendering ends here, so the renderer's linear continuation starts at the anchor
+    # Block 15, the far-field calibration (D-074, D-077, D-078, D-081)
+    far_offsets_planes: int = 16             # source: D-074.1 [user]: the far scan reads k* +- this (4.48 um on both sides of focus)
+    far_profile_half_um: float = 10.0        # source: D-074.2 [user]: half-length of the far line (um); a calibration setting, not MeasureConfig's
+    far_min_snr: float = 3.0                 # source: D-074.1 [user]: a plane enters the far fit when its PREDICTED dip A_j / (sqrt(2 pi) sigma_p) >= this x RMS_j (D-078.3)
+    far_min_k_offset: int = 5                # source: PROVISIONAL (D-026 (g)): planes with |k - k*| >= this enter the far fit (x >= 0.4 um >= r_j)
+    far_area_offsets: Tuple[int, int] = (4, 6)  # source: PROVISIONAL (S2b checks): the node's dip area A_j is the median of a s sqrt(2 pi) over the ok planes with |k - k*| in this range
+    far_min_planes_per_node: int = 6         # source: PROVISIONAL: a far node enters the fit with at least this many selected planes
+    far_core_max_passes: int = 10            # source: D-078.2 / D-081.4 [user]: N, the cap on the iterative core fit's passes (exposed)
+    far_core_stop_tol: float = 1.0           # source: D-078.2 [user]: kappa, the stop |ds| <= kappa SE(s) between passes
+    far_core_width_bounds: Tuple[float, float] = (0.25, 4.0)  # source: PROVISIONAL (S2b checks): the core SD bounded to this x sigma_p; a fit at a bound ends the plane
+    far_line_end_fwhm_factor: float = 2.0    # source: PROVISIONAL (D-078.1's check): the line-end zone |v - v_c| >= this x FWHM
+    far_line_end_min_samples: int = 4        # source: PROVISIONAL: samples per side the line-end zone needs
+    far_irls_rounds: int = 3                 # source: D-078.3 [user; the S2b checks' code]: refits with the model weights frozen at the previous round
+    far_gamma_max: float = 5.0               # source: PROVISIONAL: upper bound of gamma in the far fit; a fit at it fails
+    anchor_sensitivity_step_um: float = 0.01  # source: D-081.7 [user]: half-step of the central difference d gamma_hat / d sigma_0
 
 
 @dataclass(frozen=True)
@@ -373,6 +399,21 @@ class DiameterConfig:
                 and cal.min_planes_per_node >= 3):
             raise ValueError("calibration settings out of range (knot_step_um must be >= dz_um: finer knots "
                              "are not identified by plane scans)")
+        wb, ao = tuple(cal.far_core_width_bounds), tuple(cal.far_area_offsets)
+        if not (cal.patch_half_um > 0 and cal.far_pixel_sigmas >= 0 and 0 < cal.background_min_far_frac <= 1
+                and cal.background_trim_sigmas > 0 and cal.isolation_depth_gl >= 0 and cal.node_straight_half_um > 0
+                and cal.node_straight_tol_radii > 0 and cal.bootstrap_resamples >= 2 and cal.table_max_delta_um > 0
+                and cal.far_offsets_planes >= cal.offsets_planes and cal.far_profile_half_um > 0
+                and cal.far_min_snr >= 0 and 1 <= cal.far_min_k_offset <= cal.far_offsets_planes
+                and len(ao) == 2 and 1 <= ao[0] <= ao[1] <= cal.far_offsets_planes and cal.far_min_planes_per_node >= 2
+                and cal.far_core_max_passes >= 1 and cal.far_core_stop_tol >= 0
+                and len(wb) == 2 and 0 < wb[0] < 1 < wb[1] and cal.far_line_end_fwhm_factor > 0
+                and cal.far_line_end_min_samples >= 1 and cal.far_irls_rounds >= 0 and cal.far_gamma_max > 0
+                and cal.anchor_sensitivity_step_um > 0):
+            raise ValueError("calibration: patch, background, isolation, straightness, bootstrap, table cut or far-field "
+                             "settings out of range (Block 10.P/10.I/10.A, Block 15; D-078 to D-081)")
+        if abs(cal.table_max_delta_um - round(cal.table_max_delta_um / cal.knot_step_um) * cal.knot_step_um) > 1e-9:
+            raise ValueError("calibration.table_max_delta_um must be a multiple of knot_step_um (the table ends on a knot)")
         for name, v in (("renderer.dzeta_um", r.dzeta_um), ("renderer.U_um", r.U_um),
                         ("renderer.h_g_um_thin", r.h_g_um_thin), ("renderer.h_g_um_thick", r.h_g_um_thick),
                         ("measure.sigma_fit_um", m.sigma_fit_um), ("renderer.sigma_r0_um", r.sigma_r0_um),

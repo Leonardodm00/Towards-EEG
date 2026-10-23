@@ -43,41 +43,65 @@ Pure ASCII, for the cluster (hpc-python-compat).
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, replace
-from typing import Dict, List, Tuple
+from dataclasses import dataclass, field, replace
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from scipy import ndimage
 from scipy.interpolate import CubicSpline
 from scipy.optimize import least_squares, lsq_linear
 
-from . import cell, phantoms, profiles
+from . import calibration_scene, cell, phantoms, profiles
 from .fit import half_depth_width
 from .node_pipeline import measure_pilot, node_background, pilot_view
+from .plane_iteration import Scene
+from ..model.kernel import sigma_r
 
 STATUS_OK = "ok"
 
 
 # ------------------------------------------------------------ one plane ---
 
-def _core_fit(v, w, depth, v_peak, fwhm):
-    """Least-squares Gaussian a exp(-(v - c)^2 / (2 s^2)) through the samples
-    (v, w); returns (a, c, s) or None."""
-    s0 = fwhm / math.sqrt(8.0 * math.log(2.0))
+FW = math.sqrt(8.0 * math.log(2.0))          # FWHM / SD of a Gaussian
 
+
+def gaussian_core_fit(v, w, q0, lo, hi):
+    """Least-squares Gaussian a exp(-(v - c)^2 / (2 s^2)) through the samples
+    (v, w) from the start q0 = (a, c, s) within bounds lo, hi (scipy
+    least_squares, trf, tolerances 1e-12). Returns None on failure, else a dict:
+    a, c, s, se_s (the Gauss-Newton SE of s: RMS x [(J^T J)^-1]_ss^(1/2)),
+    rms (the residual RMS with n - 3 degrees of freedom, gl), n, at_bound
+    (s at either bound). Shared by Block 10's dip_statistics and Block 15's
+    iterative core fit."""
     def resid(q):
         return q[0] * np.exp(-0.5 * ((v - q[1]) / q[2]) ** 2) - w
 
-    lo = [0.0, v_peak - fwhm, 1e-3 * s0]
-    hi = [np.inf, v_peak + fwhm, 1e3 * s0]
     try:
-        r = least_squares(resid, [depth, v_peak, s0], bounds=(lo, hi), method="trf", x_scale="jac",
+        r = least_squares(resid, q0, bounds=(lo, hi), method="trf", x_scale="jac",
                           ftol=1e-12, xtol=1e-12, gtol=1e-12, max_nfev=200)
     except ValueError:
         return None
     if r.status <= 0 or not np.all(np.isfinite(r.x)):
         return None
-    return float(r.x[0]), float(r.x[1]), float(r.x[2])
+    a, c, s = (float(x) for x in r.x)
+    e = np.exp(-0.5 * ((v - c) / s) ** 2)
+    J = np.column_stack([e, a * e * (v - c) / s ** 2, a * e * (v - c) ** 2 / s ** 3])
+    n = int(v.size)
+    s2 = float(np.sum(resid(r.x) ** 2)) / max(n - 3, 1)
+    try:
+        cov = np.linalg.inv(J.T @ J) * s2
+        se_s = math.sqrt(max(float(cov[2, 2]), 0.0))
+    except np.linalg.LinAlgError:
+        se_s = float("nan")
+    at_bound = bool(np.isclose(s, lo[2], rtol=1e-6, atol=0.0) or np.isclose(s, hi[2], rtol=1e-6, atol=0.0))
+    return dict(a=a, c=c, s=s, se_s=se_s, rms=math.sqrt(s2), n=n, at_bound=at_bound)
+
+
+def _core_fit(v, w, depth, v_peak, fwhm):
+    """Block 10's core fit: start at the dip's depth, peak and FWHM; the width
+    free within 1e-3 .. 1e3 of its start. Returns gaussian_core_fit's dict or None."""
+    s0 = fwhm / FW
+    return gaussian_core_fit(v, w, [depth, v_peak, s0], [0.0, v_peak - fwhm, 1e-3 * s0], [np.inf, v_peak + fwhm, 1e3 * s0])
 
 
 def dip_statistics(v, I, B_bar, mcfg, cal):
@@ -95,7 +119,9 @@ def dip_statistics(v, I, B_bar, mcfg, cal):
     v = np.asarray(v, dtype=float)
     I = np.asarray(I, dtype=float)
     nan = float("nan")
-    out = dict(omega_um2=nan, vw_um2=nan, area_gl_um=nan, depth_gl=nan, v_c_um=nan, status=STATUS_OK)
+    out = dict(omega_um2=nan, vw_um2=nan, area_gl_um=nan, depth_gl=nan, v_c_um=nan, status=STATUS_OK,
+               amp_gl=nan, sigma_um=nan, se_omega_um2=nan, rms_gl=nan, n_win=0, window_half_um=nan, fwhm_um=nan,
+               passes=0)
     sm = ndimage.gaussian_filter1d(I, mcfg.focus_smooth_px, mode="nearest") if mcfg.focus_smooth_px > 0 else I
     lo, hi = mcfg.fit_v0_bounds_um
     cand = np.flatnonzero((v >= lo) & (v <= hi))
@@ -113,7 +139,10 @@ def dip_statistics(v, I, B_bar, mcfg, cal):
     if fwhm is None:
         out["status"] = "no_fwhm"
     else:
+        out["fwhm_um"] = float(fwhm)
+        out["window_half_um"] = float(cal.core_fit_fwhm_factor * fwhm)
         win = np.abs(v - v[n0]) <= cal.core_fit_fwhm_factor * fwhm
+        out["n_win"] = int(win.sum())
         if int(win.sum()) < cal.min_window_samples:
             out["status"] = "few_samples"
         else:
@@ -121,8 +150,11 @@ def dip_statistics(v, I, B_bar, mcfg, cal):
             if core is None:
                 out["status"] = "fit_failed"
             else:
-                out["omega_um2"] = core[2] ** 2
-                v_c = core[1]
+                out["omega_um2"] = core["s"] ** 2
+                out["amp_gl"], out["sigma_um"], out["rms_gl"] = core["a"], core["s"], core["rms"]
+                out["se_omega_um2"] = 2.0 * core["s"] * core["se_s"]
+                out["passes"] = 1
+                v_c = core["c"]
     out["v_c_um"] = v_c
     win2 = np.abs(v - v_c) <= cal.window_half_um
     step = (v[-1] - v[0]) / (v.size - 1)
@@ -153,8 +185,24 @@ class PlaneScan:
     vw_um2: np.ndarray        # (n,) windowed variance
     area_gl_um: np.ndarray    # (n,) windowed area (grey levels x um)
     depth_gl: np.ndarray      # (n,) depth of the smoothed dip
-    B_bar: np.ndarray         # (n,) background in plane k
+    B_bar: np.ndarray         # (n,) background in plane k: the planar background at the line's origin (10.P)
     status: Tuple[str, ...]   # (n,) "ok" or the reason the plane has no omega
+    # 2026-10-23 (10.P, D-075, Block 15): the set, the core fit's details and the per-plane profiles; defaults keep
+    # older constructions and files valid. images: the patch stack, only when the scan was asked to keep it
+    set: str = "near"
+    se_omega_um2: Optional[np.ndarray] = None    # (n,) SE of omega from the plane's own fit (2 s SE(s))
+    amp_gl: Optional[np.ndarray] = None          # (n,) fitted core amplitude
+    v_c_um: Optional[np.ndarray] = None          # (n,) fitted core centre
+    rms_gl: Optional[np.ndarray] = None          # (n,) residual RMS of the core fit
+    n_win: Optional[np.ndarray] = None           # (n,) samples in the last window
+    passes: Optional[np.ndarray] = None          # (n,) core-fit passes (1 for Block 10's statistic)
+    window_half_um: Optional[np.ndarray] = None  # (n,) half-width of the last window
+    line_end_gl: Optional[np.ndarray] = None     # (n,) line-end mean of the dip (the background check), far scans
+    b_coef: Optional[np.ndarray] = None          # (n, 3) the planar background's b0, bx, by
+    v_um: Optional[np.ndarray] = None            # (n_v,) the line's offsets
+    w_gl: Optional[np.ndarray] = None            # (n, n_v) the dip B_hat(line(v)) - I(v)
+    bhat_gl: Optional[np.ndarray] = None         # (n, n_v) the background along the line
+    images: Optional[dict] = field(default=None, compare=False, repr=False)
 
     def values(self, statistic):
         if statistic == "gaussian_core_width2":
@@ -163,56 +211,133 @@ class PlaneScan:
             return self.vw_um2
         raise ValueError("unknown statistic %r" % (statistic,))
 
+    def offsets(self):
+        """k - k* per plane."""
+        return np.asarray(self.ks) - int(self.k_star)
 
-def plane_scan(blk, node, branch, cfg):
-    """Scan the planes k* - P .. k* + P of a measured node along its fixed line.
 
-    blk = (block, ks, valid, frame) in the fetch_zblock contract; node a Block 5
-    NodeResult with a sharpest plane (finite z_sub_um); branch the node's Branch (the background mask); cfg a
-    DiameterConfig. The line: origin (cx, cy) um, measuring axis
-    (-sin theta, cos theta), along-branch axis (cos theta, sin theta); the
-    profile is sampled as the fit's (Eq. 9, along-branch averaging on)."""
-    block, ks, valid, frame = blk
+def line_geometry(node):
+    """(origin (2,), y_hat (2,), e_u (2,)) of a node's fixed measuring line: the
+    pilot's centre, the measuring axis (-sin theta, cos theta) and the
+    along-branch axis (cos theta, sin theta)."""
+    th = float(node.theta_rad)
+    return (np.array([node.cx_um, node.cy_um]), np.array([-math.sin(th), math.cos(th)]),
+            np.array([math.cos(th), math.sin(th)]))
+
+
+def stage_planes(node, cfg, which):
+    """The plane indices a stage scans about the node's sharpest plane: k* +-
+    offsets_planes ("near") or +- far_offsets_planes ("far")."""
+    P = cfg.calibration.offsets_planes if which == "near" else cfg.calibration.far_offsets_planes
+    return np.arange(int(node.k_star) - P, int(node.k_star) + P + 1)
+
+
+def patch_planes(patch, kk, node, branch, scene, cfg):
+    """The per-plane preparation shared by the near and the far scan (10.P):
+    for each plane k of kk, its index in the patch (or None), the far-pixel
+    mask and the planar background. Returns (ks_index (n,) int, -1 when the
+    plane is not in the patch or not valid; far (n, H, W) bool; b (n, 3); ok
+    (n,) bool; frame)."""
+    block, ks, valid, frame = patch
+    cal, dz = cfg.calibration, cfg.acquisition.dz_um
+    ks = np.asarray(ks)
+    z = np.asarray(kk, dtype=float) * dz
+    H, W = np.shape(block)[1:]
+    # the lateral reach of any segment's margin: its radius plus n_sigma sigma_r at the largest defocus any segment
+    # end has from any scanned plane (a deep segment far outside the patch can still shade it)
+    seg_z = scene.seg_xyz[:, [2, 5]].ravel() if scene.seg_xyz.shape[0] else np.array([float(node.z_sub_um)])
+    d_max = float(np.max(np.abs(seg_z[:, None] - z[None, :])))
+    reach = (float(np.max(np.concatenate([scene.seg_radius.ravel(), [0.0]])))
+             + cal.far_pixel_sigmas * float(sigma_r(d_max, cfg.renderer)))
+    rows = calibration_scene.segment_rows(scene, frame, (H, W), branch, reach)
+    far = calibration_scene.far_pixel_mask((H, W), frame, rows, scene.soma, z, cfg)
+    idx = np.full(len(kk), -1, dtype=int)
+    b = np.full((len(kk), 3), np.nan)
+    ok = np.zeros(len(kk), dtype=bool)
+    for q, k in enumerate(kk):
+        i = int(k - ks[0])
+        if 0 <= i < ks.size and bool(valid[i]):
+            idx[q] = i
+            b[q], _n, ok[q] = calibration_scene.planar_background(block[i], far[q], frame, node.cx_um, node.cy_um,
+                                                                  cal.background_trim_sigmas, cal.background_min_far_frac)
+    return idx, far, b, ok, frame
+
+
+def patch_images(patch, idx, far, kk, node):
+    """The images record of a scan that keeps them (never written to the scans JSON): the patch stack (uint8),
+    the far masks, the frame and the line's geometry (the pilot's centre and heading)."""
+    block, ks, valid, frame = patch
+    keep = idx >= 0
+    return dict(ks=np.asarray(kk)[keep], stack=np.asarray(block, dtype=np.uint8)[idx[keep]], far=far[keep],
+                left=int(frame.left), top=int(frame.top), res_um_px=float(frame.res_um_px),
+                cx_um=float(node.cx_um), cy_um=float(node.cy_um), theta_rad=float(node.theta_rad))
+
+
+def plane_scan(patch, node, branch, scene, cfg, keep_images=False):
+    """Scan the planes k* - P .. k* + P of a measured node along its fixed line
+    on the +-patch_half_um patch (10.P; D-078.1, D-081.2).
+
+    patch = (block, ks, valid, frame) in the fetch_zblock contract, over the
+    planes stage_planes(node, cfg, "near") about the pilot's centre; node a
+    Block 5 NodeResult with a sharpest plane (finite z_sub_um); branch the
+    node's Branch; scene the cell's Scene (Block 13.2; the far pixels mask
+    every traced segment, the node's own included); cfg a DiameterConfig. In
+    plane k: the far pixels and the planar background B_hat_k (10.P); the
+    Eq. 9 profile I_k(v) along the line (origin (cx, cy), measuring axis
+    (-sin theta, cos theta), along-branch averaging on); the flattened profile
+    I'(v) = I(v) - B_hat(line(v)) + B_hat(line(0)); dip_statistics(v, I',
+    B_hat(line(0))), unchanged inside. Per plane the scan keeps the dip
+    w = B_hat(line(v)) - I(v) and the background along the line (D-075)."""
+    block, ks, valid, frame = patch
     m, cal, dz = cfg.measure, cfg.calibration, cfg.acquisition.dz_um
     # NodeResult.k_star is -1 when no plane was found, but -1 is also a plane of a phantom
     # stack (planes numbered about 0), so the test is on the sub-plane depth
     if not (math.isfinite(node.z_sub_um) and math.isfinite(node.cx_um) and math.isfinite(node.cy_um)):
         raise ValueError("plane_scan: the node has no sharpest plane")
-    th = float(node.theta_rad)
-    y_hat, e_u = np.array([-math.sin(th), math.cos(th)]), np.array([math.cos(th), math.sin(th)])
-    o = np.array([node.cx_um, node.cy_um])
+    o, y_hat, e_u = line_geometry(node)
     v = profiles.profile_offsets(m)
-    kk = np.arange(node.k_star - cal.offsets_planes, node.k_star + cal.offsets_planes + 1)
+    kk = stage_planes(node, cfg, "near")
     n = kk.size
-    cols = {name: np.full(n, np.nan) for name in ("omega_um2", "vw_um2", "area_gl_um", "depth_gl", "B_bar")}
+    idx, far, bco, bok, frame = patch_planes(patch, kk, node, branch, scene, cfg)
+    names = ("omega_um2", "vw_um2", "area_gl_um", "depth_gl", "B_bar", "se_omega_um2", "amp_gl", "v_c_um", "rms_gl",
+             "window_half_um")
+    cols = {name: np.full(n, np.nan) for name in names}
+    n_win, passes = np.zeros(n, dtype=int), np.zeros(n, dtype=int)
+    w_gl, bhat = np.full((n, v.size), np.nan), np.full((n, v.size), np.nan)
     status = []
-    ks = np.asarray(ks)
+    xy = o[None, :] + v[:, None] * y_hat[None, :]
     for q, k in enumerate(kk):
-        idx = int(k - ks[0])
-        if not (0 <= idx < ks.size) or not bool(valid[idx]):
+        if idx[q] < 0:
             status.append("invalid_plane")
             continue
-        plane = block[idx]
-        B, ok = node_background(plane, frame, o, branch, m)
-        cols["B_bar"][q] = B
-        if not ok or not (B > 0):
-            status.append("bbar_few")
+        if not bok[q] or not (bco[q, 0] > 0):
+            status.append("bg_few")
             continue
+        plane = block[idx[q]]
+        B_line = calibration_scene.background_on_line(bco[q], node.cx_um, node.cy_um, xy)
+        B0 = float(bco[q, 0])
+        cols["B_bar"][q] = B0
+        bhat[q] = B_line
         I = profiles.sample_profile(plane, frame, o, y_hat, e_u, v, profiles.n_along(m), m.profile_step_um)
         if not np.all(np.isfinite(I)):
             status.append("profile_nan")
             continue
-        st = dip_statistics(v, I, B, m, cal)
-        for name in ("omega_um2", "vw_um2", "area_gl_um", "depth_gl"):
-            cols[name][q] = st[name]
+        w_gl[q] = B_line - I
+        st = dip_statistics(v, I - B_line + B0, B0, m, cal)
+        for name in names:
+            if name != "B_bar":
+                cols[name][q] = st[name]
+        n_win[q], passes[q] = st["n_win"], st["passes"]
         status.append(st["status"])
     return PlaneScan(int(node.node_id), float(node.d_hat_um), float(node.phi_rad), float(node.alpha_hat),
                      int(node.k_star), float(node.z_sub_um), kk, kk * dz, cols["omega_um2"], cols["vw_um2"],
-                     cols["area_gl_um"], cols["depth_gl"], cols["B_bar"], tuple(status))
+                     cols["area_gl_um"], cols["depth_gl"], cols["B_bar"], tuple(status), "near",
+                     cols["se_omega_um2"], cols["amp_gl"], cols["v_c_um"], cols["rms_gl"], n_win, passes,
+                     cols["window_half_um"], None, bco, v, w_gl, bhat,
+                     patch_images(patch, idx, far, kk, node) if keep_images else None)
 
 
 CALIBRATION_SETS = ("near", "far")      # D-067.4: the near-field (thin) set and the far-field set (D-026)
-FAR_FIELD_NOT_BUILT = "far_field_scan_not_built"    # scan_node's reason for a far-field node (SPEC s.8)
 
 
 def calibration_set(allen_diameter_um, cfg):
@@ -251,62 +376,99 @@ def criteria_reasons(phi_rad, alpha_hat, allen_diameter_um, cfg):
     return out
 
 
-def calibration_reasons(result, cfg, allen_diameter_um):
+def trace_reasons(view, cfg, allen_diameter_um, branch, index, scene, planes_z):
+    """The criteria read from the trace and the pilot (10.I; D-081.1, D-081.3),
+    in this order: not_straight -- the branch's points within +-
+    node_straight_half_um along the trace stray farther than
+    node_straight_tol_radii x (Allen's diameter / 2) from their own
+    total-least-squares line; not_isolated -- a traced neighbour (not
+    the node's own branch; the soma included) throws a shadow deeper than
+    isolation_depth_gl into the +-patch_half_um patch about the pilot's centre
+    in some plane of planes_z (depths, um), under the renderer's current law,
+    with the pilot's B_bar and mu. The isolation test is skipped (no reason)
+    when the pilot's centre, B_bar or mu is not finite: such a node fails S
+    already."""
+    cal = cfg.calibration
+    out = []
+    excess = calibration_scene.straightness_excess(branch, index, cal.node_straight_half_um)
+    r = 0.5 * float(allen_diameter_um)
+    if math.isfinite(excess) and not (math.isfinite(r) and r > 0 and excess <= cal.node_straight_tol_radii * r):
+        out.append("not_straight")
+    if scene is not None and all(math.isfinite(float(x)) for x in (view.cx_um, view.cy_um, view.B_bar,
+                                                                    view.mu_hat_per_um)):
+        depth, _who = calibration_scene.isolation_depth(branch, index, scene, view.cx_um, view.cy_um,
+                                                        cal.patch_half_um, planes_z, view.B_bar, view.mu_hat_per_um,
+                                                        cfg)
+        if depth > cal.isolation_depth_gl:
+            out.append("not_isolated")
+    return out
+
+
+def calibration_reasons(result, cfg, allen_diameter_um, branch=None, index=None, scene=None, planes_z=None):
     """Why a NodeResult is not a calibration node (empty: it is one, of the set
     calibration_set(allen_diameter_um, cfg)): outside the selection S (Block 6's
     rule), then criteria_reasons -- every criterion read from the pilot
     (pilot_view; Block 13.3b, D-061.2, D-067.4) except Allen's diameter
-    allen_diameter_um (um; 2 x the branch radius at the node, D-061.4). The fit's
-    d_hat is no criterion: the kernel being calibrated must not choose its own
-    nodes."""
+    allen_diameter_um (um; 2 x the branch radius at the node, D-061.4) --,
+    then, when branch and index are given, trace_reasons (10.I: not_straight;
+    not_isolated when scene and planes_z are given too). The fit's d_hat is no
+    criterion: the kernel being calibrated must not choose its own nodes."""
     view = pilot_view(result)
-    return phantoms.reject_reasons(view) + criteria_reasons(view.phi_rad, view.alpha_hat, allen_diameter_um, cfg)
+    out = phantoms.reject_reasons(view) + criteria_reasons(view.phi_rad, view.alpha_hat, allen_diameter_um, cfg)
+    if branch is not None and index is not None:
+        if planes_z is None:
+            scene = None
+        out += trace_reasons(view, cfg, allen_diameter_um, branch, int(index), scene, planes_z)
+    return out
 
 
 def scan_verdict(scan, reasons):
-    """The log phrase of a scan_node result: scanned (near field), a far-field
-    calibration node not scanned, or not a calibration node with its reasons."""
+    """The log phrase of a scan_node result: scanned (near or far field), or
+    not a calibration node with its reasons."""
     if scan is not None:
-        return "scanned (near field)"
-    if list(reasons) == [FAR_FIELD_NOT_BUILT]:
-        return "far-field calibration node, not scanned (the far-field scan is not built)"
+        return "scanned (%s field)" % scan.set
     return "not a calibration node (%s)" % ";".join(reasons)
 
 
-def scan_node(branch, i, provider, cfg, reg=None):
+def scan_node(branch, i, provider, cfg, reg=None, scene=None, keep_images=False):
     """Measure node i's pilot (measure_pilot: Block 5, D-061.2) and select it by
     calibration_reasons with Allen's diameter 2 x branch.radius_um[i] (D-061.4,
-    D-067.4). A calibration node of the near-field set: fetch its block over
-    k* - P .. k* + P (a second provider call) and scan it. A calibration node of
-    the far-field set is not scanned -- its scan beyond the near field is not
-    built (SPEC s.8) --: no second call, reasons [FAR_FIELD_NOT_BUILT]. Returns
+    D-067.4) and the trace criteria of 10.I (scene: the cell's Scene, Block
+    13.2; None: Scene.from_branch(branch), a phantom's own tube). A calibration
+    node: fetch its patch (+-patch_half_um about the pilot's centre, one
+    provider call) over the stage's planes and scan it -- the near set by
+    plane_scan, the far set by far_field.far_plane_scan (Block 15.1). Returns
     (NodeResult, PlaneScan or None, reasons)."""
+    from . import far_field
     res = measure_pilot(branch, i, provider, cfg, reg)
     allen_d = 2.0 * float(branch.radius_um[i])
-    reasons = calibration_reasons(res, cfg, allen_d)
+    scene = Scene.from_branch(branch) if scene is None else scene
+    which = calibration_set(allen_d, cfg) or "near"
+    dz = cfg.acquisition.dz_um
+    planes_z = stage_planes(res, cfg, which) * dz if math.isfinite(res.z_sub_um) else None
+    reasons = calibration_reasons(res, cfg, allen_d, branch, i, scene, planes_z)
     if reasons:
         return res, None, reasons
-    if calibration_set(allen_d, cfg) != "near":
-        return res, None, [FAR_FIELD_NOT_BUILT]
-    m, p, P = cfg.measure, cfg.acquisition.res0_um, cfg.calibration.offsets_planes
-    left = int(math.floor((res.cx_um - m.block_half_um) / p)) - 1
-    top = int(math.floor((res.cy_um - m.block_half_um) / p)) - 1
-    width = int(math.ceil((res.cx_um + m.block_half_um) / p)) + 2 - left
-    height = int(math.ceil((res.cy_um + m.block_half_um) / p)) + 2 - top
-    blk = provider(left, top, width, height, res.k_star - P, res.k_star + P)
-    return res, plane_scan(blk, res, branch, cfg), []
+    kk = stage_planes(res, cfg, which)
+    patch = calibration_scene.fetch_patch(provider, res.cx_um, res.cy_um, cfg.calibration.patch_half_um, kk[0], kk[-1],
+                                          cfg.acquisition.res0_um)
+    if which == "near":
+        return res, plane_scan(patch, res, branch, scene, cfg, keep_images), []
+    return res, far_field.far_plane_scan(patch, res, branch, scene, cfg, keep_images), []
 
 
-def scan_cell(swc, provider, cfg, transform=None, regs=None, candidates=None, log=None):
-    """Plane scans of one cell's calibration nodes. Every dendrite stretch
-    (Block 8) holding a node id of `candidates` (None: every dendrite node) is
-    built in the image frame (transform: keyword arguments of cell.to_image_um)
-    and each such node goes through scan_node (regs: {node_id: registration
-    dict}; Allen's diameter from the SWC radius the branch carries). Returns a
-    list of (node_id, NodeResult, PlaneScan or None, reasons); log, when given,
-    gets one scan_verdict line per node."""
+def scan_cell(swc, provider, cfg, transform=None, regs=None, candidates=None, log=None, keep_images=False):
+    """Plane scans of one cell's calibration nodes, both sets. Every dendrite
+    stretch (Block 8) holding a node id of `candidates` (None: every dendrite
+    node) is built in the image frame (transform: keyword arguments of
+    cell.to_image_um) and each such node goes through scan_node with the
+    cell's scene (cell.cell_scene, D-064; regs: {node_id: registration dict};
+    Allen's diameter from the SWC radius the branch carries). Returns a list of
+    (node_id, NodeResult, PlaneScan or None, reasons); log, when given, gets one
+    scan_verdict line per node."""
     types = cfg.acquisition.dendrite_swc_types
     xyz_img = cell.to_image_um(swc.xyz, cfg.acquisition.res0_um, **(transform or {}))
+    scene = cell.cell_scene(swc, types, cfg.acquisition.res0_um, transform)
     out = []
     for run in cell.stretches(swc, types):
         ids = [int(swc.ids[r]) for r in run]
@@ -316,11 +478,41 @@ def scan_cell(swc, provider, cfg, transform=None, regs=None, candidates=None, lo
         for t, nid in enumerate(ids):
             if candidates is not None and nid not in candidates:
                 continue
-            res, scan, reasons = scan_node(branch, off + t, provider, cfg, (regs or {}).get(nid))
+            res, scan, reasons = scan_node(branch, off + t, provider, cfg, (regs or {}).get(nid), scene, keep_images)
             out.append((nid, res, scan, reasons))
             if log is not None:
                 log("node %d: %s" % (nid, scan_verdict(scan, reasons)))
     return out
+
+
+def median_by_offset(scans, which=None):
+    """{k - k*: median over the nodes of omega_hat at that offset} over the scans
+    of set `which` (None: all), finite values only."""
+    acc: Dict[int, List[float]] = {}
+    for sc in scans:
+        if which is not None and sc.set != which:
+            continue
+        for o, w in zip(sc.offsets(), sc.omega_um2):
+            if np.isfinite(w):
+                acc.setdefault(int(o), []).append(float(w))
+    return {o: float(np.median(v)) for o, v in sorted(acc.items())}
+
+
+def example_node(scans, which=None):
+    """The node nearest the median width by plane (10.F, D-081.5): the scan of
+    set `which` whose mean relative deviation |omega_hat - median_offset| /
+    median_offset over its finite planes is smallest (at least two such
+    planes). Returns its node_id, or None."""
+    med = median_by_offset(scans, which)
+    best, best_id = None, None
+    for sc in scans:
+        if which is not None and sc.set != which:
+            continue
+        dev = [abs(w - med[int(o)]) / med[int(o)] for o, w in zip(sc.offsets(), sc.omega_um2)
+               if np.isfinite(w) and int(o) in med and med[int(o)] > 0]
+        if len(dev) >= 2 and (best is None or float(np.mean(dev)) < best):
+            best, best_id = float(np.mean(dev)), int(sc.node_id)
+    return best_id
 
 
 def area_ratio_by_offset(scans):
@@ -560,3 +752,41 @@ def kernel_from_growth(growth, rcfg, sigma_r0_um=None, max_delta_um=None):
     return replace(rcfg, kernel_family="gaussian_table", sigma_r0_um=s0,
                    kernel_table_delta_um=tuple(float(x) for x in growth.knots_um[keep]),
                    kernel_table_sigma_um=tuple(float(x) for x in sig))
+
+
+# ------------------------------------------------------------ the anchor --
+
+def anchor_from_growth(growth, cfg, sigma_r0_um=None):
+    """The anchor sigma_0_hat = sigma_r(table_max_delta_um) (um) of a growth fit
+    (10.A): the last value of the renderer table kernel_from_growth builds with
+    the cut at cfg.calibration.table_max_delta_um -- (sigma_r(0)^2 +
+    G_hat(delta_0))^(1/2) with sigma_r(0) configured or given. ValueError when
+    that knot is not identified (NaN) or the table is refused."""
+    k = kernel_from_growth(growth, cfg.renderer, sigma_r0_um, max_delta_um=cfg.calibration.table_max_delta_um)
+    if abs(k.kernel_table_delta_um[-1] - cfg.calibration.table_max_delta_um) > 1e-9:
+        raise ValueError("anchor_from_growth: the growth has no knot at table_max_delta_um = %g um"
+                         % cfg.calibration.table_max_delta_um)
+    return float(k.kernel_table_sigma_um[-1])
+
+
+def bootstrap_sigma0(scans, cfg, rng, sigma_r0_um=None, n_resamples=None):
+    """(se_um, n_ok, draws): the SE of the anchor by a node bootstrap (10.A,
+    D-081.7) -- n_resamples (default cfg.calibration.bootstrap_resamples)
+    resamples of the scans with replacement (rng: numpy Generator), each
+    refitted by fit_growth and read by anchor_from_growth; a resample with
+    fewer than two usable nodes, a failed fit or an unidentified anchor is
+    dropped (n_ok counts the kept ones). se_um is NaN below two kept draws."""
+    n = int(cfg.calibration.bootstrap_resamples if n_resamples is None else n_resamples)
+    scans = list(scans)
+    draws = []
+    for _ in range(n):
+        pick = rng.integers(0, len(scans), len(scans))
+        sample = [replace(scans[j], node_id=1000000 + t) for t, j in enumerate(pick)]
+        try:
+            g = fit_growth(sample, cfg)
+            draws.append(anchor_from_growth(g, cfg, sigma_r0_um))
+        except ValueError:
+            continue
+    draws = np.array(draws, dtype=float)
+    se = float(np.std(draws, ddof=1)) if draws.size >= 2 else float("nan")
+    return se, int(draws.size), draws
