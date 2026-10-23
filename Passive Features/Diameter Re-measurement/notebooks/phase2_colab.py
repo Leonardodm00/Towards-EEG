@@ -909,29 +909,53 @@ run("scripts/allen_radius_distribution.py", "--fetch", SPECIMEN, "--cache-dir", 
 # ====================================================================================================
 # ===== CELL 7
 # ====================================================================================================
-# CELL 7: KERNEL CALIBRATION, FIRST STAGE (DIAGNOSTIC ONLY)
+# CELL 7: KERNEL CALIBRATION -- NEAR FIELD (BLOCK 10), FAR FIELD (BLOCK 15), FIGURES
 # The calibration nodes of the pilot are chosen by Allen's diameter D_A = 2 r_A, not by the fitted d_hat (D-061.4,
-# D-067.4; thresholds PROVISIONAL): the near-field set, D_A <= 0.6 um, is re-measured and scanned plane by plane
-# over k* +- 3 (offsets up to 0.84 um); the far-field set, 0.6 < D_A <= 0.8 um, for the offsets beyond 0.84 um
-# (D-026), is selected and counted but not scanned: its scan is not built yet. Both must be in S, flat
-# (phi <= 10 deg) and faint (alpha <= 0.5), read from the pilot's columns. The growth of the core width is then
-# fitted on the near-field scans. Expect `N candidate nodes`, one line per node (`scanned (near field)`,
-# `far-field calibration node, not scanned (...)` or `not a calibration node (...)`), `... candidates scanned
-# (near field), M far-field calibration nodes not scanned ...`, then `growth fit (gaussian_core_width2,
-# symmetric, cubic): N nodes`, the knot table and `residual RMS by |k - k*|`. Fewer than two near-field nodes:
-# measure more stretches in Cell 4b. A failure here does not stop the notebook.
+# D-067.4; thresholds PROVISIONAL): the near-field set, D_A <= 0.6 um, is scanned plane by plane over k* +- 3
+# (offsets up to 0.84 um); the far-field set, 0.6 < D_A <= 0.8 um, over k* +- 16 (offsets to 4.5 um, D-026,
+# D-078). Both must be in S, flat (phi <= 5 deg, D-081.3) and faint (alpha <= 0.5) by the pilot's columns, and
+# then, on the trace (D-079, D-081): straight (within one radius of its own line over +-10 um) and isolated (no
+# other dendrite or the soma casts a predicted shadow deeper than 0.03 grey levels inside the +-25 um patch, in
+# any scanned plane). Each scan reads a +-25 um patch per plane, fits a planar background to the pixels far from
+# every traced segment (D-078.1) and fits the dip's Gaussian core iteratively (up to 10 passes, stop at 1 SE of
+# the width; D-077, D-078.2). `real` prints `N candidate nodes`, one line per node (`scanned (near field)`,
+# `scanned (far field)` or `not a calibration node (...)` with the reasons), `... candidates scanned: n near-
+# field, m far-field; reasons {...}` and the example nodes whose patch images are kept (`patches -> ...`).
+# `fit` (near field): `growth fit (gaussian_core_width2, symmetric, cubic): N nodes`, the knot table, the
+# residual RMS by |k - k*|, the table cut at 0.84 um (D-080.1) and `anchor sigma_0_hat = ... um, SE ... um
+# (node bootstrap, ...)` (D-081.7). `far-fit` (far field, needs the anchor): `far planes: J nodes kept ...`,
+# `far fit: gamma_hat = ... +- ... (bootstrap ..., anchor term ...), t_{J-1} interval [...]`, the per-sign and
+# the quadratic comparison (gamma_2, labelled comparison, D-081.6), and `production kernel: table to 0.84 um,
+# continuation linear with slope ...` -- the value for `renderer.kernel_continuation_slope` in Cell 8, yours to
+# decide. `figures` writes `width_by_plane_near.png` / `_far.png` (every node light grey, the median in colour,
+# the fitted law), `example_near.png` / `_far.png` (the node nearest the median with its plane images) and
+# `kernel_law.png` into OUT/calibration/figures (D-080.2, D-081.5): judge there whether the straight line
+# holds before you set the slope. Fewer than two near-field nodes stop `fit`; fewer than two far-field nodes
+# with 6 kept planes each stop `far-fit`: measure more stretches in Cell 4b. With the 0.03 grey-level isolation
+# rule the sets may be small on a dense cell: the `reasons {...}` counts say which rule removed the nodes. A
+# failure here does not stop the notebook.
 #
-# The first-stage table is not a calibrated kernel: on rendered thin phantoms its growth is about 0.01 um^2
-# low within two planes, and it came out non-monotone near focus (SPEC Block 10). Keep the default kernel for
-# the production table until step 2 of procedure s.3.4 exists.
-os.makedirs(OUT + "/calibration", exist_ok=True)
+# The first-stage table is not a calibrated kernel on its own: on rendered thin phantoms its growth is about
+# 0.01 um^2 low within two planes (SPEC Block 10). Keep the default kernel for the production table until you
+# have read the width-by-plane figures and the far fit.
+os.makedirs(OUT + "/calibration/figures", exist_ok=True)
 SCANS = "%s/calibration/scans_%d.json" % (OUT, SPECIMEN)
+CALIB = "%s/calibration/calibration_%d.json" % (OUT, SPECIMEN)
+FARFIT = "%s/calibration/far_fit_%d.json" % (OUT, SPECIMEN)
+PATCHES = "%s/calibration/patches_%d.npz" % (OUT, SPECIMEN)
 rc = run("scripts/calibrate_kernel.py", "real", "--specimen", SPECIMEN, "--nodes-csv",
          "%s/pilot/pilot_%d.csv" % (OUT, SPECIMEN), "--cache-dir", CACHE_DIR, "--out", SCANS,
          "--registration-json", REG_JSON, *ALIGN, check=False)
 if rc == 0:
-    run("scripts/calibrate_kernel.py", "fit", "--scans", SCANS,
-        "--out", "%s/calibration/calibration_%d.json" % (OUT, SPECIMEN), check=False)
+    rc = run("scripts/calibrate_kernel.py", "fit", "--scans", SCANS, "--out", CALIB, check=False)
+if rc == 0:
+    run("scripts/calibrate_kernel.py", "far-fit", "--scans", SCANS, "--calibration", CALIB, "--out", FARFIT, check=False)
+    fig_args = ["--scans", SCANS, "--calibration", CALIB, "--out-dir", OUT + "/calibration/figures"]
+    if os.path.exists(FARFIT):
+        fig_args += ["--far-fit", FARFIT]
+    if os.path.exists(PATCHES):
+        fig_args += ["--patches", PATCHES]
+    run("scripts/calibrate_kernel.py", "figures", *fig_args, check=False)
 
 # ====================================================================================================
 # ===== CELL 8
@@ -1092,7 +1116,7 @@ run("scripts/run_cell.py", "--specimen", SPECIMEN, "--table", TABLE, "--out-dir"
 # holds every variant's trajectory.
 # - Cell 5: the `"renderer"` block without the tables, `table_sets`, `pillow_version`, `notes`.
 # - Cell 6: the `pooled dendrite diameter` line.
-# - Cell 7: the growth-fit report.
+# - Cell 7: the growth-fit report, the far fit (gamma_hat and its interval) and the width-by-plane figures.
 #
 # These decide the open items of SPEC section 8: d_max, the mu range, the jitter amplitudes, the camera fields
 # and the dark-flag threshold.

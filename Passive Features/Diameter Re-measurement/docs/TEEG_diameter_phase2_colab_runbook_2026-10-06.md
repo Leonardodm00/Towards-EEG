@@ -23,6 +23,7 @@
 | 2026-10-21 (later) | v19. The σ_fit study is removed (S2.2 of the 2026-10-20 plan; D-057 (ii), the user, 2026-10-18): Cell 8 writes `config_production.json` only, Cell 9 builds one table, Cell 10c is gone, and the per-node CSV loses `d_tilde_sigma_spread_um`; the superseded text is struck through and kept. Evidence: the suites `test_smoke_config`, `invert`, `table`, `fit`, `cell` re-run, the estimator and simulation hashes unchanged by the removal **[run, sandbox]**; not run on Allen's data. |
 | 2026-10-21 (later, 2) | v20. Cell 9's job chunks by draw (Block 14.2; D-059, D-062): the knobs `DIAM_N_DRAWS`, `DIAM_N_TASKS`, `DIAM_DRAW_OFFSET` replace `DIAM_N_TOTAL`; `phantom.n_replicates` is retired (`n_draws`, `n_realizations`). Evidence: `test_smoke_pbs.py` 4 pass, 3 skip **[run, sandbox]**; not run on davinci. |
 | 2026-10-21 (later, 3) | v21. Cell 9's merge (Blocks 14.4-14.6): the table is the local linear fit on a three-axis grid; the merge reads only the columns it needs, refuses a (draw, realization) seen twice, notes the draws short of `n_realizations`, writes the per-draw table `draws_<hash>.csv` beside the table, and at $10^6$ rows takes of order 20 min and a few hundred MB, so it runs in a job, not on the login node; the expected lines updated. A `config_production.json` written before Block 14.3 (two bandwidths) is refused: make it again with Cell 8. Evidence: `test_smoke_table.py` 7 pass, the merge's refusal and notes included **[run, sandbox]**; not run on davinci. |
+| 2026-10-23 | v22. Cell 7 runs the whole kernel calibration (Blocks 10 and 15; D-074 to D-081): `real` scans both sets on ±25 µm patches with a planar far-pixel background, the iterative core fit, the straightness and the 0.03 grey-level isolation rule (φ ≤ 5° for both sets), and keeps the example nodes' patch images; `fit` cuts the table at 0.84 µm and bootstraps the anchor's SE; the new `far-fit` fits the far slope γ̂ with its t interval, the per-sign and the quadratic comparison, and writes the production kernel's continuation slope; the new `figures` writes the width-by-plane, example-node and kernel-law figures. Evidence: `test_smoke_calibration.py` 8 pass, `test_smoke_calibration_scene.py` 6 pass 1 skip, `test_smoke_far_field.py` 6 pass 1 skip, `test_smoke_calibration_figures.py` 6 pass 1 skip; on rendered far phantoms γ̂ within 1 % noise-free and 0.83 ± 0.02 against 0.79 with camera noise (4 nodes) **[run, sandbox]**; not run on Allen's data. |
 
 This runbook covers the real-data steps, in order. Each cell names the line that must **appear** in its output. A missing line means the cell did not get as far as the code that prints it. Each step lists the decisions it feeds; those stay yours. Nothing in these scripts changes the configuration on its own.
 
@@ -174,7 +175,7 @@ The notebook's Cell 4c prints the summary's key fields, among them `focus_rule g
 This step feeds:
 - the phantom μ range: `suggested_phantom_mu_range_per_um`, the 10th-90th percentile of μ̂ over the nodes in S (procedure §3.10);
 - the dark-flag threshold: `alpha_hat` percentiles and `dark_share_of_converged`;
-- the number of calibration nodes, `n_calibration_nodes` (Cell 7).
+- the number of calibration nodes, `n_calibration_nodes` (Cell 7; since 2026-10-23 the per-set counts and the `reasons {...}` line of `real`).
 
 ### Cell 4d: the planes of a node, with Allen's reconstruction drawn on them [added 2026-10-07]
 
@@ -580,22 +581,40 @@ Expect `pooled dendrite diameter (um): p0=..., ..., p100=...`, a text histogram 
 
 This step feeds `phantom.d_range_um`, which is temporary until now (D-024 (iii), SPEC §8).
 
-## Cell 7: kernel calibration, first stage (diagnostic)
+## Cell 7: kernel calibration -- near field (Block 10), far field (Block 15), figures
+
+[rewritten 2026-10-23, v22; the v18 text is kept in the changelog row]
 
 ```python
-os.makedirs(OUT + "/calibration", exist_ok=True)
+os.makedirs(OUT + "/calibration/figures", exist_ok=True)
 SCANS = "%s/calibration/scans_%d.json" % (OUT, SPECIMEN)
+CALIB = "%s/calibration/calibration_%d.json" % (OUT, SPECIMEN)
+FARFIT = "%s/calibration/far_fit_%d.json" % (OUT, SPECIMEN)
+PATCHES = "%s/calibration/patches_%d.npz" % (OUT, SPECIMEN)
 rc = run("scripts/calibrate_kernel.py", "real", "--specimen", SPECIMEN, "--nodes-csv",
          "%s/pilot/pilot_%d.csv" % (OUT, SPECIMEN), "--cache-dir", CACHE_DIR, "--out", SCANS,
          "--registration-json", REG_JSON, *ALIGN, check=False)
 if rc == 0:
-    run("scripts/calibrate_kernel.py", "fit", "--scans", SCANS,
-        "--out", "%s/calibration/calibration_%d.json" % (OUT, SPECIMEN), check=False)
+    rc = run("scripts/calibrate_kernel.py", "fit", "--scans", SCANS, "--out", CALIB, check=False)
+if rc == 0:
+    run("scripts/calibrate_kernel.py", "far-fit", "--scans", SCANS, "--calibration", CALIB, "--out", FARFIT, check=False)
+    fig_args = ["--scans", SCANS, "--calibration", CALIB, "--out-dir", OUT + "/calibration/figures"]
+    if os.path.exists(FARFIT):
+        fig_args += ["--far-fit", FARFIT]
+    if os.path.exists(PATCHES):
+        fig_args += ["--patches", PATCHES]
+    run("scripts/calibrate_kernel.py", "figures", *fig_args, check=False)
 ```
 
-Expect `N candidate nodes`, one line per node (`scanned (near field)`, `far-field calibration node, not scanned (...)` or `not a calibration node (...)`), `... candidates scanned (near field), M far-field calibration nodes not scanned ...`, then `growth fit (gaussian_core_width2, symmetric, cubic): N nodes`, the table of knots, and `residual RMS by |k - k*|`. ~~You need at least two thin, faint, flat nodes (d̂ ≤ 0.3 µm, φ ≤ 10°, α̂ ≤ 0.5).~~ [corrected 2026-10-21, S2.1: the calibration nodes are chosen by Allen's diameter D_A = 2 r_A, not by d̂ (D-061.4, D-067.4; thresholds PROVISIONAL): the near-field set, D_A ≤ 0.6 µm, is scanned over k* ± 3; the far-field set, 0.6 < D_A ≤ 0.8 µm (D-026), is counted but not scanned, its scan not being built; both in S, flat (φ ≤ 10°) and faint (α̂ ≤ 0.5) by the pilot's columns.] You need at least two near-field nodes. Measure more stretches in Cell 4 if there are fewer. A failure here does not stop the notebook (`check=False`): the step is a diagnostic.
+The calibration nodes are chosen by Allen's diameter $D_{\rm A} = 2 r_{\rm A}$ (D-061.4, D-067.4; thresholds PROVISIONAL): the near-field set, $D_{\rm A} \le 0.6$ µm, is scanned over $k^* \pm 3$ (offsets to 0.84 µm); the far-field set, $0.6 < D_{\rm A} \le 0.8$ µm, over $k^* \pm 16$ (offsets to 4.5 µm; D-026, D-078). Both sets must be in S, flat ($\varphi \le 5°$ for both, `node_phi_max_deg`, D-081.3) and faint ($\hat\alpha \le 0.5$) by the pilot's columns, and then on the trace (D-079, D-081): straight (within one radius of the trace's own TLS line over ±10 µm) and isolated (no other traced segment or the soma casts a predicted shadow deeper than `isolation_depth_gl` = 0.03 grey levels inside the ±25 µm patch in any scanned plane; the node's own branch is exempt). Each scan reads a ±25 µm patch per plane, fits a planar background $\hat B_k(x, y)$ to the pixels farther than $r + 3\sigma_{\rm r}(\delta)$ from every traced segment (D-078.1) and fits the dip's Gaussian core iteratively, up to `far_core_max_passes` = 10 passes, stopping when the width moves by less than `far_core_stop_tol` = 1 SE (D-077, D-078.2).
 
-The first-stage table is **not** a calibrated kernel. On rendered thin phantoms its growth is about 0.01 µm² low within two planes of focus, and the table came out non-monotone near focus (SPEC Block 10). Read it next to the default table and keep the default for the production table until step 2 of procedure §3.4 exists.
+Expect from `real`: `N candidate nodes`, one line per node (`node i: scanned (near field)`, `scanned (far field)` or `not a calibration node (...)` with the reasons: the selection flags of Block 6 (`status`, `crossing`, `stack_edge`, `dark`, ...), `allen_diameter_missing` / `allen_diameter_out`, `not_flat`, `not_faint`, `not_straight`, `not_isolated`), then `n of N candidates scanned: a near-field, b far-field; reasons {...}; in ... min -> ...`, `example near-field node i: patch images kept` (and the far one) and `patches -> .../patches_<specimen>.npz`. From `fit`: `growth fit (gaussian_core_width2, symmetric, cubic): N nodes`, the knot table, `residual RMS by |k - k*|`, `table (cut at 0.84 um, D-080.1)` with its `sigma` row (`increasing` or `NOT increasing`) and `anchor sigma_0_hat = ... um, SE ... um (node bootstrap, n of 1000 resamples, seed 0)` (D-081.7). From `far-fit`: `far planes: J nodes kept ([planes per node]), d dropped {...}; P planes; ... not converged, ... below the SNR rule`, `far fit: gamma_hat = ... +- ... (bootstrap ... over n resamples, anchor term ... x ...), t_{J-1} interval [lo, hi]; range ... um; 3 IRLS rounds, success`, the per-node $c_j$ and $s_j$, the residual RMS by |k − k*|, `per-sign: gamma_+ ..., gamma_- ...; quadratic comparison: gamma ..., gamma_2 ... per um (labelled comparison, D-081.6)` and `production kernel: table to 0.84 um, continuation linear with slope ...`. From `figures`: `wrote .../width_by_plane_near.png`, `width_by_plane_far.png`, `example_near.png`, `example_far.png`, `kernel_law.png` and one `gaussians/<set>_node_<id>.png` per scanned node.
+
+What to read, in order (D-080.2, D-081.5): the width-by-plane figures -- every node's $\hat\omega_{j,k} - \hat c_j$ in light grey, the median in colour, the fitted law (near: $\hat G$; far: $(\hat\sigma_0 + \hat\gamma x)^2$) -- say whether the near table and the far straight line hold; the example figures show the node nearest the median with its plane images, the far-pixel mask and the fitted window; the quadratic comparison's $\gamma_2$ is printed as a comparison only. The slope for the production kernel, `renderer.kernel_continuation_slope` in Cell 8, is yours to set from `far fit: gamma_hat`; the default 0.79 stays until you do.
+
+Fewer than two near-field nodes stop `fit` (`fit: need at least two nodes ...`); fewer than two far-field nodes with `far_min_planes_per_node` = 6 kept planes each stop `far-fit`. Measure more stretches in Cell 4b if so. With the 0.03 grey-level isolation rule the sets may be small on a dense cell: the `reasons {...}` counts say which rule removed the nodes; relaxing `isolation_depth_gl` is a decision, not a default. A failure here does not stop the notebook (`check=False`).
+
+The first-stage table is **not** a calibrated kernel on its own: on rendered thin phantoms its growth is about 0.01 µm² low within two planes of focus (SPEC Block 10). Read it next to the default table; the renderer's law is the near table to 0.84 µm continued linearly with the far slope (D-080.1).
 
 ## Cell 8: the production configuration (your decisions)
 
