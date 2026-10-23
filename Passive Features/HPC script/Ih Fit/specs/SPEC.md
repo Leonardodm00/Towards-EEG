@@ -132,10 +132,33 @@ MEAN is Block 3's reading of D-051's "|r_odd| in 5 ms bins"), with r_odd(t) =
 (each minus its own pre-pulse mean), sigma_SS(c) the median pre-pulse SD,
 kappa_tr = 0.1 PROVISIONAL (D-051 (iv)). Found by the smoke (W2, fixture of 63
 windows at the cohort law): r_odd's own noise floor is 0.17 sigma_SS, above
-kappa_tr sigma_SS, so the test as written fails on noise alone; the option
+kappa_tr sigma_SS, so the test as written fails on noise alone [corrected
+2026-10-23: 0.17 sigma_SS is the option's floor estimate below (the per-sample
+SD of r_even over t >= 0) on one fixture realisation, not the SD of the test's
+statistic; see the next sentence]. Simulation 2026-10-23 (standalone
+`check_findings_2026-10-23.py`, not in the repository; theta_cf, 200 cells
+per layout, the archive's layout): under noise alone the SD of a 5 ms bin mean
+of r_odd in [100, 200) ms is about sigma_s sqrt(2 / K) (the slow component,
+5 ms << tau_s; x sqrt(2) from the pre-pulse baseline), simulated 0.30, 0.24,
+0.15 and 0.11 sigma_SS at K = 40, 63, 199 and 348 -- at or above kappa_tr
+sigma_SS at every L3_exc window count (passing on noise needs K >> 2
+(sigma_s / (kappa_tr sigma_SS))^2, about 320) -- and the test as written puts
+t_SS >= 190 ms (`ss_enlarged_none`) in 51-90 % of noise-only cells; even
+without noise the fixture's RC response (113 MOhm, 28.1 ms) falls below 0.1
+sigma_SS only at 130 ms. The option
 `WindowConfig.transient_floor_z` raises the threshold to z x the per-sample
 SD of the even part r_even = (r_dep + r_hyp) / 2 over t >= 0 (same noise, no
-response); default None (D-051 as written), the user's call. The subtracted quantity (D-051.1)
+response); default None (D-051 as written), the user's call. [corrected
+2026-10-23: r_even does not carry r_odd's noise near the window end -- a
+window's last ~40 ms correlate, through the slow component and the 9.5 ms
+overlap, with the next (opposite-polarity) window's pre-pulse baseline, which
+inflates r_odd's noise there and deflates r_even's (per-bin SD at 195 ms
+0.28 against 0.08 sigma_SS at K = 63, sigma_b = 0), and r_even carries the
+tilt's ramp; with z = 3 the option still puts t_SS >= 190 ms in 4-13 % of
+noise-only cells. A per-bin threshold max(kappa_tr sigma_SS, z x the SD of
+r_odd's bin mean simulated at the cell's layout and law) gives at z = 3.5 at
+most 0.3 % (K = 63 and 348, the true law), t_SS 80 ms (K = 63) and about
+100 ms (K = 348) on the fixture's response. Open (section 8).] The subtracted quantity (D-051.1)
 is the per-polarity MEAN WINDOW -- for each sample j, the mean over that
 polarity's K_p windows -- a vector over time, computed over the whole cell
 and subtracted from every window of that polarity (D-076 (ii), confirmed by
@@ -408,5 +431,5 @@ same-polarity ones even multiples; h* = 0.8 s is realised as 4 periods,
 - Block 5 (the twins' generator): `synthetic_ground_truth.simulate_ss_protocol` gives every SS pulse its own sweep number and independent noise. Under D-017 (per-sweep offset and tilt) and D-056 (i) (continuous sweeps in the fit's simulator), the twins' SS sweeps should carry the real sweep structure -- 20 pulses per sweep [corrected 2026-10-20: 37 pulses, 200.5 ms onset to onset, section 3] with the slow component and the tilt continuous across them -- or the twins' SS windows (and the SS bundles the I_h fit averages) are independent where the real cells' are not. To settle with the user when Block 5 is specified.
 - Root `specs/SPEC.md` Coverage pointing to this file (user's call, D-056 (ii)).
 - (added 2026-10-20) The stored SS windows are a selected subset: they passed the writer's trace QC (section 3), a test on the lag-1 structure of each pulse's residual after a bounded single-exponential fit over [offset + 2 ms, + 40 ms], the timescales of the law's slow part. The fit's simulator does not apply it. Check SQC (standalone script `sqc_trace_qc_selection.py`, not in the repository; the repository's `trace_qc_v2.py` with the archive's configuration on 2-sweep cells simulated with the Block-2 law, RC response 113 MOhm / 28.1 ms) compared the D-051 SS statistics of the kept windows with a random subset of the same per-polarity counts: Gaussian noise of the law alone makes the QC drop 12.9 % of pulses (theta_cf) and 12.0 % (sigma_s = 0.025 mV); the selection shifts the medians by -0.17 to -0.19 per-cell SD at t_SS = 40 ms, by at most 0.09 SD at t_SS = 80 ms and 0.08 SD at 120 ms, and V_hat at 4 periods by at most 0.07 SD (for a 10-sweep cell the SD is about 2.2 times smaller). The archive's own drop rate in 508282493 (46 %) is far above the noise-only rate, so most of its drops remove structure the law does not have; the check does not cover those. [decided 2026-10-21, D-072: no shape test anywhere in the noise fit; every L3_exc cell's layout is reconstructable, so no fallback is needed and Block 3 refuses a cell whose table, counts or polarity sequence disagree.] Still open: the floor t_SS(c) >= 80 ms and the per-cell excess-drop label (the assistant's proposal).
-- (added 2026-10-23, Block 4) The tilt sigma_b(c) of a 2-sweep cell (14 of 18) is estimated from two draws of b (2.3 (h)): keep per cell as D-034 says (and report its uncertainty), pool the tilt across cells (a cohort sigma_b or a shrinkage towards it, as D-076 does for sigma_s per sweep), or draw on the LS sweeps' slopes as well (each LS pre-window is 265 ms: a slope of 0.1 mV/s moves its mean by 0.027 mV, within the pre-window SD; weak)? The user's call. Also open: the batched FFT autocorrelation and the Markov-jump simulator of 2.3 (h), both unneeded at the measured cost.
+- (added 2026-10-23, Block 4) The tilt sigma_b(c) of a 2-sweep cell (14 of 18) is estimated from two draws of b (2.3 (h)): keep per cell as D-034 says (and report its uncertainty), pool the tilt across cells (a cohort sigma_b or a shrinkage towards it, as D-076 does for sigma_s per sweep), or draw on the LS sweeps' slopes as well (each LS pre-window is 265 ms: a slope of 0.1 mV/s moves its mean by 0.027 mV, within the pre-window SD; weak)? [corrected 2026-10-23: the LS pre-window slopes are not an option -- excluded by D-034's status (D-017 note 4: a tilt calibrated from pre-window slopes would be too large by more than an order of magnitude).] The user's call. Simulation 2026-10-23 (`check_findings_2026-10-23.py`; theta_cf, sigma_b = 0.1 mV/s, t_SS = 80 ms, (T1) at the true law): sigma_b_hat / sigma_b has 95 % range 0.00-1.95 with 2 sweeps (clipped at 0 in 3.5-4.9 % of cells), 0.42-1.56 with 6 and 0.59-1.44 with 10 -- the spread of sqrt(chi^2_S / S) from the S realised tilts, plus the noise term in the lower tail -- and sigma_b_hat^2 is unbiased (mean ratio 0.97-1.01); pooled over the cohort's 64 SS sweeps under a common sigma_b, 0.82-1.17. A sigma_b error of that size (0 or 0.17 in the simulator for a cell at 0.1) moves u_hat by at most 0.18 of its SD (linearised at theta_cf, fixture layout): what is at stake is the twins' tilt, not theta_hat. Also open: the batched FFT autocorrelation and the Markov-jump simulator of 2.3 (h), both unneeded at the measured cost.
 - (added 2026-10-21) D-073's per-sweep calibration: which of (sigma_f, rho_f, sigma_s, tau_s, sigma_b) are estimated per sweep and which per cell; raw or partially pooled per-sweep values; the twins' protocol twinning (LS amplitudes of the real cell instead of the cohort's `--ls-hyp-amps`; SS sweeps as 37-pulse trains at the real stored positions). Evidence for the proposal: `sweep_identifiability.py` (standalone, not in the repository): from one sweep at theta_cf the fast pair is identified to 1-3 % (sigma_f) and +/-0.012-0.014 (rho_f), sigma_s to 18-30 % (6-13 % with tau_s held), tau_s only within a factor of about 2 (log-SD 0.49-0.72).

@@ -54,6 +54,9 @@ class WindowConfig:
                                        # from the EVEN part r_even = (r_dep + r_hyp) / 2, which carries the
                                        # same noise and no pulse response (assistant's proposal 2026-10-23,
                                        # the user's call: with few windows the test's own noise fails it)
+                                       # [corrected 2026-10-23: not in the window's last ~40 ms, where the
+                                       # next window's baseline inflates r_odd's noise and deflates r_even's;
+                                       # z = 3 still fails 4-13 % of noise-only cells; SPEC 2.2]
     ss_pre_ms: float = 10.0            # the writer's pre-pulse part of each stored window
     ls_pre_gap_ms: float = 5.0         # the LS pre-window ends this long before the step onset
     ls_first_ms: float = 50.0          # D-051: LS first segment
@@ -270,7 +273,9 @@ def transient_start(ss: SSWindows, cfg: WindowConfig = WindowConfig()) -> Transi
     correlated samples would exceed any threshold near the noise level).
     With cfg.transient_floor_z the threshold is raised to z x the per-sample
     SD of r_even = (mean over dep + mean over hyp) / 2 over t >= 0, the odd
-    part's own noise floor (r_even carries the same noise and no response). Flags: 'transient_fail' (no clean bin boundary before the
+    part's own noise floor (r_even carries the same noise and no response --
+    except in the window's last ~40 ms and for the tilt's ramp, corrected
+    2026-10-23, SPEC 2.2). Flags: 'transient_fail' (no clean bin boundary before the
     end), 'ss_enlarged_none' (t_SS >= fallback_t_ms), 'one_polarity' (r_odd
     from one polarity only), 'floor_binds' (t_tr < t_floor),
     'noise_floor_threshold' (cfg.transient_floor_z raised the threshold).
