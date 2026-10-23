@@ -233,13 +233,14 @@ def _t7():
         bad = subprocess.run(["bash", str(script)], capture_output=True, text=True, env=env_bad, cwd=tmp)
     out = good.stdout
     need = ("PASS  G0 interpreter", "PASS  G1 numpy, scipy, statsmodels", "PASS  G3 bytes", "PASS  G4 syntax",
-            "PASS  G5 smoke_noise_stats (Block 1)", "PASS  G6 smoke_noise_law (Block 2)")
+            "PASS  G5 smoke_noise_stats (Block 1)", "PASS  G6 smoke_noise_law (Block 2)",
+            "PASS  G6b smoke_noise_windows (Block 3)")
     good_ok = all(any(ln.startswith(n) for ln in out.splitlines()) for n in need)
     tail_ok = "GATES noise-fit:" in out and "VERDICT: NOT SETTLED" in out and "VERDICT: SETTLED" not in out
     bad_ok = (bad.returncode == 1 and any(ln.startswith("FAIL  G0 interpreter") for ln in bad.stdout.splitlines())
               and "GATES noise-fit:" in bad.stdout)
     missing = [n for n in need if not any(ln.startswith(n) for ln in out.splitlines())]
-    report("T7 gate script: bash -n; QUICK run passes G0, G1, G3-G6 and cannot settle; a bad PYTHON fails G0, exit 1",
+    report("T7 gate script: bash -n; QUICK run passes G0, G1, G3-G6b and cannot settle; a bad PYTHON fails G0, exit 1",
            syntax and good_ok and tail_ok and bad_ok,
            "missing %s; bad-python exit %d" % (missing or "none", bad.returncode))
 

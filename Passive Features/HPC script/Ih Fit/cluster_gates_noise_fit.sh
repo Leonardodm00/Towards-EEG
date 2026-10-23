@@ -1,7 +1,7 @@
 #!/bin/bash
 ##########################################################################
 # cluster_gates_noise_fit.sh -- the cluster-side checks of the noise-fit
-# code (specs/SPEC.md Blocks 1-2) and of the archive input Block 3 reads.
+# code (specs/SPEC.md Blocks 1-3) and of the archive input Block 3 reads.
 #
 # Run on the LOGIN NODE, from this folder, after `git pull`, with the conda
 # env already active (conda activate prova). Nothing to edit:
@@ -96,23 +96,25 @@ fi
 
 # --- G2 the code under test is the committed code ------------------------------
 subjects="$(git log --format=%s -n 40 -- . 2>/dev/null)"
-b1=no; b2=no
+b1=no; b2=no; b3=no
 case "$subjects" in *"block 1: textbook sample autocorrelation"*) b1=yes ;; esac
 case "$subjects" in *"block 2: the noise law"*) b2=yes ;; esac
+case "$subjects" in *"block 3: windows and statistics"*) b3=yes ;; esac
 modified="$(git status --porcelain --untracked-files=no -- . 2>/dev/null | cut -c4- | head -n 5 | tr '\n' ';')"
-if [ "$b1" = yes ] && [ "$b2" = yes ] && [ -z "$modified" ]; then
-    report PASS "G2 git" "HEAD $(git rev-parse --short HEAD 2>/dev/null); Blocks 1 and 2 committed; no tracked file of this folder modified"
+if [ "$b1" = yes ] && [ "$b2" = yes ] && [ "$b3" = yes ] && [ -z "$modified" ]; then
+    report PASS "G2 git" "HEAD $(git rev-parse --short HEAD 2>/dev/null); Blocks 1-3 committed; no tracked file of this folder modified"
 else
-    report FAIL "G2 git" "block 1 committed: $b1, block 2 committed: $b2, tracked files modified here: ${modified:-none} -- git pull on main; restore or commit local edits"
+    report FAIL "G2 git" "block 1 committed: $b1, block 2 committed: $b2, block 3 committed: $b3, tracked files modified here: ${modified:-none} -- git pull on main; restore or commit local edits"
 fi
 
 # --- G3 bytes, G4 syntax (hpc-python-compat) -----------------------------------
 run_check "G3 bytes" g3_bytes "BYTES: ok" "$PY" noise_fit_gates.py bytes
 run_check "G4 syntax" g4_compile "COMPILE: ok" "$PY" noise_fit_gates.py compile
 
-# --- G5, G6 the noise-fit suites (no NEURON) -----------------------------------
+# --- G5, G6, G6b the noise-fit suites (no NEURON) -----------------------------------
 run_check "G5 smoke_noise_stats (Block 1)" g5_noise_stats "SMOKE noise_stats: 6/6 passed" "$PY" smoke_noise_stats.py
 run_check "G6 smoke_noise_law (Block 2)" g6_noise_law "SMOKE noise_law: 9/9 passed" "$PY" smoke_noise_law.py
+run_check "G6b smoke_noise_windows (Block 3)" g6b_noise_windows "SMOKE noise_windows: 10/10 passed" "$PY" smoke_noise_windows.py
 
 if [ "$QUICK" != "1" ]; then
     # --- G7 NEURON, skopt and the compiled mechanisms --------------------------
@@ -195,7 +197,7 @@ elif [ "$QUICK" = "1" ]; then
 elif [ "$N_SKIP" -gt 0 ]; then
     verdict="NOT SETTLED -- $N_SKIP check(s) skipped; read the SKIP lines"
 else
-    verdict="SETTLED -- Blocks 1-2 verified on this machine and the SS sweep structure read"
+    verdict="SETTLED -- Blocks 1-3 verified on this machine and the SS sweep structure read"
 fi
 echo "VERDICT: $verdict" | tee -a "$LOG_DIR/summary.txt"
 [ "$N_FAIL" -eq 0 ]
