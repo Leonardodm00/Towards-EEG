@@ -509,6 +509,16 @@ def test_contract():
             assert abs(obj["kernel"]["kernel_table_delta_um"][-1] - 0.84) <= 1e-9, obj["kernel"]   # D-080.1: the cut
             assert obj["anchor"]["sigma0_um"] == obj["kernel"]["kernel_table_sigma_um"][-1]
         assert "anchor" in obj and obj["anchor"]["n_resamples"] == 8, obj.get("anchor")
+        # the figures (10.F) from the same files: the example node's patches were written by `synthetic`
+        pp = calibrate_kernel.patches_name(sp)
+        assert os.path.exists(pp), pp
+        fd = os.path.join(tmp, "figures")
+        p3 = subprocess.run(run + ["figures", "--scans", sp, "--calibration", cp, "--patches", pp, "--out-dir", fd,
+                                   "--config-json", cj], capture_output=True, text=True, timeout=600)
+        assert p3.returncode == 0, (p3.stdout, p3.stderr)
+        made = sorted(os.path.relpath(os.path.join(r, f), fd) for r, _, fs in os.walk(fd) for f in fs)
+        assert "width_by_plane_near.png" in made and "example_near.png" in made and \
+            any(m.startswith("gaussians") for m in made), made
 
 
 def test_determinism():
