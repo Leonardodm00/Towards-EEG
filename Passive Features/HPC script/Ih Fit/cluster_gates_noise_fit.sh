@@ -1,12 +1,12 @@
 #!/bin/bash
 ##########################################################################
 # cluster_gates_noise_fit.sh -- the cluster-side checks of the noise-fit
-# code (specs/SPEC.md Blocks 1-3) and of the archive input Block 3 reads.
+# code (specs/SPEC.md Blocks 1-4) and of the archive input Block 3 reads.
 #
 # Run on the LOGIN NODE, from this folder, after `git pull`, with the conda
 # env already active (conda activate prova). Nothing to edit:
 #
-#   bash cluster_gates_noise_fit.sh            # every check, about 15 min
+#   bash cluster_gates_noise_fit.sh            # every check, about 17 min
 #   QUICK=1 bash cluster_gates_noise_fit.sh    # bytes, imports, fast suites, < 1 min
 #
 # It never edits a tracked file and never submits a job. It may build
@@ -96,15 +96,16 @@ fi
 
 # --- G2 the code under test is the committed code ------------------------------
 subjects="$(git log --format=%s -n 40 -- . 2>/dev/null)"
-b1=no; b2=no; b3=no
+b1=no; b2=no; b3=no; b4=no
 case "$subjects" in *"block 1: textbook sample autocorrelation"*) b1=yes ;; esac
 case "$subjects" in *"block 2: the noise law"*) b2=yes ;; esac
 case "$subjects" in *"block 3: windows and statistics"*) b3=yes ;; esac
+case "$subjects" in *"block 4: the per-cell fit"*) b4=yes ;; esac
 modified="$(git status --porcelain --untracked-files=no -- . 2>/dev/null | cut -c4- | head -n 5 | tr '\n' ';')"
-if [ "$b1" = yes ] && [ "$b2" = yes ] && [ "$b3" = yes ] && [ -z "$modified" ]; then
-    report PASS "G2 git" "HEAD $(git rev-parse --short HEAD 2>/dev/null); Blocks 1-3 committed; no tracked file of this folder modified"
+if [ "$b1" = yes ] && [ "$b2" = yes ] && [ "$b3" = yes ] && [ "$b4" = yes ] && [ -z "$modified" ]; then
+    report PASS "G2 git" "HEAD $(git rev-parse --short HEAD 2>/dev/null); Blocks 1-4 committed; no tracked file of this folder modified"
 else
-    report FAIL "G2 git" "block 1 committed: $b1, block 2 committed: $b2, block 3 committed: $b3, tracked files modified here: ${modified:-none} -- git pull on main; restore or commit local edits"
+    report FAIL "G2 git" "block 1 committed: $b1, block 2 committed: $b2, block 3 committed: $b3, block 4 committed: $b4, tracked files modified here: ${modified:-none} -- git pull on main; restore or commit local edits"
 fi
 
 # --- G3 bytes, G4 syntax (hpc-python-compat) -----------------------------------
@@ -117,6 +118,9 @@ run_check "G6 smoke_noise_law (Block 2)" g6_noise_law "SMOKE noise_law: 9/9 pass
 run_check "G6b smoke_noise_windows (Block 3)" g6b_noise_windows "SMOKE noise_windows: 10/10 passed" "$PY" smoke_noise_windows.py
 
 if [ "$QUICK" != "1" ]; then
+    # --- G6c the Block 4 suite (no NEURON; about 2 min, so FULL mode only) ------
+    run_check "G6c smoke_noise_fit (Block 4)" g6c_noise_fit "SMOKE noise_fit: 10/10 passed" "$PY" smoke_noise_fit.py
+
     # --- G7 NEURON, skopt and the compiled mechanisms --------------------------
     if out="$("$PY" -c 'import neuron, skopt; print("neuron %s, skopt %s" % (neuron.__version__, skopt.__version__))' 2>&1)"; then
         need_build=0
@@ -197,7 +201,7 @@ elif [ "$QUICK" = "1" ]; then
 elif [ "$N_SKIP" -gt 0 ]; then
     verdict="NOT SETTLED -- $N_SKIP check(s) skipped; read the SKIP lines"
 else
-    verdict="SETTLED -- Blocks 1-3 verified on this machine and the SS sweep structure read"
+    verdict="SETTLED -- Blocks 1-4 verified on this machine and the SS sweep structure read"
 fi
 echo "VERDICT: $verdict" | tee -a "$LOG_DIR/summary.txt"
 [ "$N_FAIL" -eq 0 ]

@@ -101,8 +101,9 @@ def rc_response(i_pA, r_mohm=R_IN_MOHM, tau_ms=TAU_M_MS):
     return lfilter([r_mohm * 1e-3 * (1.0 - a)], [1.0, -a], i_pA)      # MOhm * pA = uV -> mV
 
 
-def make_ss_sweep(law, rng, with_response=True):
-    """One continuous SS sweep: (v, i, onsets, polarity list, noise, response)."""
+def make_ss_sweep(law, rng, with_response=True, sigma_b=0.0):
+    """One continuous SS sweep: (v, i, onsets, polarity list, noise, response);
+    sigma_b (mV/s) plants a per-sweep tilt (0 = none, as Block 3's checks use)."""
     n = REST_N + (TRAIN - 1) * PERIOD + TAIL_N
     onsets = REST_N + PERIOD * np.arange(TRAIN)
     pol = [k % 2 == 0 for k in range(TRAIN)]                     # dep first, alternating
@@ -111,20 +112,21 @@ def make_ss_sweep(law, rng, with_response=True):
         i[s:s + PULSE_N] = 200.0 if dep else -200.0
     resp = rc_response(i) if with_response else np.zeros(n)
     units = nl.draw_units(rng, 1, n)
-    noise = nl.simulate_sweep(law, DT, n, units, 0, sigma_b=0.0, sigma_a=0.0)
+    noise = nl.simulate_sweep(law, DT, n, units, 0, sigma_b=sigma_b, sigma_a=0.0)
     return -60.0 + resp + noise, i, onsets, pol, noise, resp
 
 
 def write_fixture(d, rng, law=THETA_CF, with_response=True, dropped=DROPPED, sweeps=(92, 93),
-                  ls_amps=(-110.0, -90.0, -70.0, 20.0, 50.0, 0.0)):
+                  ls_amps=(-110.0, -90.0, -70.0, 20.0, 50.0, 0.0), sigma_b=0.0):
     """Writes ss_pulses.npz (Format A), trace_qc_results.csv, metadata.json and
-    ls_sweeps.npz as the Phase-0 writer does. Returns the planted truth."""
+    ls_sweeps.npz as the Phase-0 writer does. Returns the planted truth.
+    sigma_b (mV/s): a per-sweep tilt in the SS and LS sweeps (Block 4's smoke)."""
     d = Path(d)
     d.mkdir(parents=True, exist_ok=True)
     t_win = (np.arange(PRE_N + POST_N) - PRE_N) / FS
     v_rows, i_rows, pol_rows, sw_rows, pos_rows, noise_rows, resp_rows, qc_rows = [], [], [], [], [], [], [], []
     for sw in sweeps:
-        v, i, onsets, pol, noise, resp = make_ss_sweep(law, rng, with_response)
+        v, i, onsets, pol, noise, resp = make_ss_sweep(law, rng, with_response, sigma_b)
         drop = set(dropped.get(sw, ()))
         for k, (s, dep) in enumerate(zip(onsets, pol)):
             passed = k not in drop
@@ -150,7 +152,7 @@ def write_fixture(d, rng, law=THETA_CF, with_response=True, dropped=DROPPED, swe
     n_pre, n_step, n_tail = 13500, 50000, 25000
     n_ls = n_pre + n_step + n_tail
     units = nl.draw_units(rng, len(ls_amps), n_ls)
-    ls_noise = nl.simulate_traces(law, DT, units.fast, units.slow)
+    ls_noise = nl.simulate_traces(law, DT, units.fast, units.slow, xi_tilt=units.tilt, sigma_b=sigma_b)
     ls_data, ls_info = {}, []
     for k, amp in enumerate(ls_amps):
         i = np.zeros(n_ls); i[n_pre:n_pre + n_step] = amp

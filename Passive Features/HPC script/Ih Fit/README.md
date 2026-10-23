@@ -25,6 +25,8 @@ Files that are NEW relative to `Biological Fit/` (Stage 0-1):
 | `noise_windows.py` | Block 3, data layer (D-051, D-072, D-076): `load_ss_windows` places every stored SS window in its sweep's 37-pulse train from `trace_qc_results.csv` and `metadata.json` and measures the onset period (10025 samples at 50 kHz); `transient_start` (t_SS(c) = max(80 ms, the transient test; option `transient_floor_z`), `enlarged_windows` ([t_SS, 200) ms), `subtract_mean_response` (D-051.1, the per-polarity mean window), `load_ls_prewindows` (every LS sweep's [t_0, t_on - 5 ms), the fitter's rule), `ls_segments`. No NEURON import |
 | `noise_cell_stats.py` | Block 3, analysis layer: the D-051 statistics per window (`window_stats`, `ss_window_stats`, `ls_window_stats`), the cell vector q_hat(c) (`statistic_vector`, 15 labelled entries with n and K), the per-sweep vectors (`per_sweep_vectors`, D-076), the window-level bootstrap SE (`bootstrap_median_se`, W_0 of the fit) and the data semivariogram of the window means at 4 periods (`window_mean_semivariogram`) |
 | `smoke_noise_windows.py` | its smoke suite W1-W10 (about 20 s; W4's monolith oracle needs NEURON, else skipped) |
+| `noise_fit.py` | Block 4, the per-cell fit (D-033, D-048 to D-051, D-056): `CellLayout` (the real cell's SS trains and LS pre-windows for the simulator), `simulate_cell_windows` (one replicate cell at the real layout, continuous sweeps, the mean window subtracted), `binding_function` (q_sim(theta): Harrell-Davis medians over M = 3000 common-random-number windows), `simulated_covariance` (Sigma_hat from R replicate cells, with the per-sweep vectors), `tilt_from_semivariogram` ((T1)), `solve_inner` (`least_squares` on the whitened residual), `fit_cell` (W_0 bootstrap -> closed-form start -> Sigma_hat-weighted solves with the tilt re-read -> final step at R = 3000: theta_hat, sigma_b_hat, J, kappa, chi-square tail, per-sweep covariances for Block 4b) |
+| `smoke_noise_fit.py` | its smoke suite F1-F10 at reduced M and R (about 100 s; `python smoke_noise_fit.py F1,F5` runs a subset) |
 | `cluster_gates_noise_fit.sh` | the cluster-side checks of the noise-fit blocks (G0-G12: env, bytes, syntax, every suite, the regression gate on a real cell, the SS archive's sweep structure); one PASS/FAIL/SKIP line each, a VERDICT; writes only its logs |
 | `noise_fit_gates.py` | its read-only helpers: `bytes`, `compile`, `ss-pulses <specimen_dir>...` (what `ss_pulses.npz` holds: sweep numbers, polarity order, adjacency and true onset spacing of the stored windows) |
 | `smoke_noise_fit_gates.py` | their smoke suite T1-T8 (about 15 s; no NEURON) |
@@ -94,6 +96,7 @@ The same checks by hand:
     python smoke_noise_stats.py            # expect "SMOKE noise_stats: 6/6 passed"
     python smoke_noise_law.py              # expect "SMOKE noise_law: 9/9 passed"
     python smoke_noise_windows.py          # expect "SMOKE noise_windows: 10/10 passed"
+    python smoke_noise_fit.py              # expect "SMOKE noise_fit: 10/10 passed" (about 100 s)
     python smoke_ih_fit.py                 # expect "smoke_ih_fit: 12/12 passed"
     python smoke_ih_recovery.py            # expect "smoke_ih_recovery: 14/14 passed"
     python regression_passive_identity.py --ref-dir "../Biological Fit" \
