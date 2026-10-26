@@ -94,8 +94,8 @@ theory:
     refs: [D-026, D-026.1, D-027, D-067.4, D-070, D-071.5]
     parent: TG3
     depends_on: [T3, T5]
-    status: studying
-    closed_on:
+    status: closed
+    closed_on: 2026-10-26
     decision:
     note: "To study, in this order (the user, 2026-10-22): (1) 'S2b, the far-field calibration: how I would proceed', from its CONTEXT (diameter implementation chat, 2026-10-21; figures fig1_far_line, fig2_far_fit); (2) the explanation of its Statistic step, the two-pass core fit and the predicted-dip SNR rule (2026-10-22; figures fig1_twopass, fig2_selection); (3) the answer on the three roles of gamma, c and s in the far fit (F2) (2026-10-22)."
   - id: T7
