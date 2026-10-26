@@ -7,7 +7,8 @@ Checks
                         warning at the default page size) give the human
                         cells with a reconstruction and nothing else; the
                         SDK's simplified names give the same records; groups
-                        of 8, 5, 3, 2 and 6 cells give 5, 5, 3, 2 and 5; the
+                        of 8, 5, 3, 2, 6 and 4 cells give 5, 5, 3, 2, 5 and 4
+                        (sparsely spiny a third class, D-087); the
                         acquisition record of canned NeuronReconstruction and
                         SubImage rows -- the real list_images and plane_table
                         reached through a substituted api_query -- reads the
@@ -226,8 +227,13 @@ def test_known_answer():
     assert CP.pool_records(sdk_rows()) == pool, "the SDK's simplified names must give the same records"
     sel = CS.select_cells(pool, cfg)
     assert {k: v for k, v in sel.groups.items()} == {"exc|2": (8, 5), "exc|3": (5, 5), "exc|5": (3, 3),
-                                                     "inh|2": (2, 2), "inh|3": (6, 5)}, sel.groups
-    assert len(sel.selected) == 20 and sum(1 for v in sel.excluded.values() if v == "no_class") == 4
+                                                     "inh|2": (2, 2), "inh|3": (6, 5),
+                                                     "sparsely_spiny|3": (4, 4)}, sel.groups   # D-087: a third class
+    assert len(sel.selected) == 24 and not sel.excluded, sel.excluded
+    # without the third class in the map (the draft's default) its cells have no class and stay out
+    two = dataclasses.replace(cfg, survey=dataclasses.replace(cfg.survey, class_map=cfg.survey.class_map[:2]))
+    sel2 = CS.select_cells(pool, two)
+    assert len(sel2.selected) == 20 and sum(1 for v in sel2.excluded.values() if v == "no_class") == 4
     # the acquisition record through the real list_images / plane_table / reconstruction_info
     recs = with_fake_api(acquisition_cells(), lambda: [CP.acquisition_record(s) for s in sorted(acquisition_cells())])
     r11, r12, r13, r14, r15, r16 = recs
@@ -370,7 +376,8 @@ def test_edge_cases():
     nolayer = [dict(pool[0], layer=None)] + pool[1:]
     sel = CS.select_cells(nolayer, cfg)
     assert sel.excluded[pool[0]["specimen_id"]] == "no_layer"
-    assert CS.neuron_class("Sparsely Spiny", cfg.survey.class_map) is None
+    assert CS.neuron_class("Sparsely Spiny", cfg.survey.class_map) == "sparsely_spiny"           # D-087
+    assert CS.neuron_class("pyramidal", cfg.survey.class_map) is None
     assert CS.neuron_class(" Spiny ", cfg.survey.class_map) == "exc" and CS.neuron_class(None, cfg.survey.class_map) is None
     try:
         CS.select_cells(pool, cfg, None, require_match=True)
@@ -399,8 +406,16 @@ def test_edge_cases():
         rows = sdk_rows()
         CP.write_table(sdk_csv, rows, tuple(rows[0]))
         p = _run_script(["pool", "--from-csv", sdk_csv, "--out", os.path.join(tmp, "pool2.csv")], tmp)
-        assert p.returncode == 0 and "pool: 28 Homo Sapiens cells" in p.stdout and "sparsely spiny" in p.stdout, \
-            (p.stdout, p.stderr)
+        assert p.returncode == 0 and "pool: 28 Homo Sapiens cells" in p.stdout and "sparsely_spiny|3 4" in p.stdout \
+            and "(left out of the selection): none" in p.stdout, (p.stdout, p.stderr)
+        # a map without the third class, in a hand-written --config-json (to_json writes the signatures only, so
+        # the survey section is given by hand, as the runbook says; the other sections take their defaults)
+        two_json = os.path.join(tmp, "two_classes.json")
+        with open(two_json, "w") as f:
+            json.dump({"survey": {"class_map": [list(x) for x in cfg.survey.class_map[:2]]}}, f)
+        p = _run_script(["pool", "--from-csv", sdk_csv, "--out", os.path.join(tmp, "pool3.csv"), "--config-json",
+                         two_json], tmp)
+        assert p.returncode == 0 and "{'sparsely spiny': 4}" in p.stdout, (p.stdout, p.stderr)
         back = CP.read_table(os.path.join(tmp, "pool2.csv"), CP.POOL_TYPES)
         assert [r["specimen_id"] for r in back] == [r["specimen_id"] for r in pool]
         acq_csv = os.path.join(tmp, "acq2.csv")
@@ -413,7 +428,8 @@ def test_edge_cases():
         assert p.returncode == 0 and "select: " in p.stdout and "acquisition_mismatch:pixel" in p.stdout, \
             (p.stdout, p.stderr)
         sel = CP.read_table(os.path.join(tmp, "sel.csv"), CP.SELECTION_TYPES)
-        assert all(r["rank"] < 2 for r in sel) and len(sel) <= 2 * 5
+        n_groups = len({r["group"] for r in sel})
+        assert all(r["rank"] < 2 for r in sel) and n_groups <= 6 and len(sel) <= 2 * n_groups, (n_groups, len(sel))
         bad = {r["specimen_id"] for i, r in enumerate(back) if i % 3 == 0}
         assert not bad & {r["specimen_id"] for r in sel}
         for args in (["pool", "--help"], ["check", "--help"], ["select", "--help"]):

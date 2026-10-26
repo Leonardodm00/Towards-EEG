@@ -295,7 +295,7 @@ class SurveyConfig:
 
     species: str = "Homo Sapiens"            # source: D-085.1; the Allen SDK's CellTypesApi.HUMAN, the pool of the passive-fit pipeline
     cells_per_group: int = 5                 # source: D-085.1 [user]: 5 cells per neuron class and layer, all of a smaller group
-    class_map: Tuple[Tuple[str, str], ...] = (("spiny", "exc"), ("aspiny", "inh"))  # source: D-085.1, PROVISIONAL: Allen's dendrite type -> class; unmapped types (sparsely spiny) are left out
+    class_map: Tuple[Tuple[str, str], ...] = (("spiny", "exc"), ("aspiny", "inh"), ("sparsely spiny", "sparsely_spiny"))  # source: D-085.1 (spiny exc, aspiny inh: PROVISIONAL reading), D-087 [user]: sparsely spiny a third class (its name the assistant's); an unmapped or missing type is left out
     selection_seed: int = 20261026           # source: PROVISIONAL: seed of the per-group permutations (Block 16.1 (d))
     acquisition_rel_tol: float = 1e-3        # source: PROVISIONAL: relative tolerance of a cell's plane spacing and pixel size against acquisition (D-085.3)
     pool_page_rows: int = 10000              # source: PROVISIONAL: rows per page of the ApiCellTypesSpecimenDetail query; large, so the model comes in one page (the SDK asks num_rows 'all'; pages without an order may skip rows)

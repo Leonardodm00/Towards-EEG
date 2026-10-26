@@ -1090,9 +1090,10 @@ run("scripts/run_cell.py", "--specimen", SPECIMEN, "--table", TABLE, "--out-dir"
 # S3 runs the real-data surveys over many Allen cells, not 529878215 alone (D-065, D-085). This cell needs Cells 0
 # and 1 only. (1) `pool`: every human cell with a reconstruction in Allen's database. Expect `pool: N Homo Sapiens
 # cells with a reconstruction (M rows read, api:...)`, the counts by class and layer (exc = spiny, inh = aspiny,
-# PROVISIONAL) and the dendrite types left without a class (sparsely spiny). A failure that names missing fields
-# prints the keys Allen's rows hold: send them back. A warning `... without an order` means the query needed more
-# than one page: raise survey.pool_page_rows in a --config-json and run the cell again. (2) `check`, over the
+# PROVISIONAL; sparsely_spiny = sparsely spiny, a third class, D-087) and the dendrite types left without a class
+# (none expected). A failure that names missing fields prints the keys Allen's rows hold: send them back. A warning
+# `... without an order` means the query needed more than one page: write {"survey": {"pool_page_rows": 50000}}
+# to a JSON file, pass it as --config-json to `pool`, and run the cell again. (2) `check`, over the
 # WHOLE pool first (D-085.3): each cell's
 # plane spacing (NeuronReconstruction.scale_factor_z), pixel size and usable planes; one line per cell, then
 # `check: N cells, k failed; dz (um): {...}; pixel (um): {...}; m match the configuration (dz 0.2800 um, pixel
