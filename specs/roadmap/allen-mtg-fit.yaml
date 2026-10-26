@@ -12,6 +12,8 @@
 # log (D-005 to D-017, D-028 to D-034, D-048 to D-056, D-072, D-073) and the
 # cluster runs of 2026-10-20/21, and curated by the noise-fit chat. Lines
 # marked DRAFT are the assistant's guesses for the user to confirm.
+# 2026-10-26: S7 restated as the user asked (D-083), I4 done on the user's
+# statement, N4b added (D-082), N3/N4 notes brought up to date.
 #
 # Theory status: open | studying | closed  (set with
 #   python specs/roadmap/roadmap.py set --yaml specs/roadmap/allen-mtg-fit.yaml T5 closed --decision D-nnn)
@@ -297,9 +299,9 @@ implementation:
     needs_theory: [T1]
     needs_hpc: true
     jobs: ["Passive Features/HPC script/Synthetic Passive fit Test/submit_synth_benchmark.sh", "Passive Features/HPC script/Synthetic Passive fit Test/submit_all_cohorts.sh"]
-    note: "Passive Features/HPC script/Synthetic Passive fit Test/: synthetic_ground_truth.py, synth_gt_grid.py, gen_from_manifest.py, run_synth_benchmark.py, aggregate_synth_results.py and their smoke suites. DRAFT: no cluster run of the benchmark is recorded in the decision log or the plan; the user may know of one."
-    manual_status: tested
-    manual_reason: "smoke suites in the folder; no cluster run recorded in the decision log or the staged plan (DRAFT, to confirm); no SPEC entry"
+    note: "Passive Features/HPC script/Synthetic Passive fit Test/: synthetic_ground_truth.py, synth_gt_grid.py, gen_from_manifest.py, run_synth_benchmark.py, aggregate_synth_results.py and their smoke suites. The user ran this synthetic check of the passive fit (statement of 2026-10-26, D-083); its results are not in the decision log. S7 is its six-parameter analogue."
+    manual_status: done
+    manual_reason: "the user ran the passive-only synthetic recovery (2026-10-26: 'the same synthetic check ... that I've done with the passive parameters only', D-083); no SPEC entry"
 
   # ---- I_h fitter, Stages 0-6
   - id: I5
@@ -421,7 +423,7 @@ implementation:
     needs_theory: [T6, T10]
     needs_hpc: false
     jobs: []
-    note: "noise_windows.py; next to write. Waits on the user's choice of the t_SS floor (D-072 open point)."
+    note: "noise_windows.py, noise_cell_stats.py; written 2026-10-23 on sci/noise-fit (smoke W1-W10 10/10, eight mutations caught) and delivered as patches on main 64fb8c5, not yet pushed, so on main the tool still says planned. Window-start rule open (D-076 (ii) floor 80 ms; the transient test as written is noise-limited, options (a)-(c) put to the user 2026-10-23)."
   - id: N4
     title: "Block 4: the per-cell fit"
     summary: "Indirect inference per cell: the Harrell-Davis binding function on simulated continuous sweeps, the iterated inverse-covariance weights, the tilt's SD alternated with the law, three starts (D-048 to D-051, D-056)."
@@ -431,13 +433,22 @@ implementation:
     needs_theory: [T7, T8]
     needs_hpc: false
     jobs: []
-    note: "noise_fit.py."
+    note: "noise_fit.py; written 2026-10-23 on sci/noise-fit (smoke F1-F10 10/10, ten mutations caught) and delivered as patches, not yet pushed. The estimator of the tilt's SD for 2-sweep cells is open (per cell, cohort, or shrunk; put to the user 2026-10-23)."
+  - id: N4b
+    title: "Block 4b: the per-sweep stage"
+    summary: "For each real sweep, the fast pair and the slow SD estimated on that sweep alone (the slow timescale held at the cell's), the slow SD shrunk towards the cell by the random-effects weight; the laws each twin sweep will carry (D-076 (i))."
+    parent: G4
+    depends_on: [N4]
+    needs_theory: [T9]
+    needs_hpc: false
+    jobs: []
+    note: "noise_sweep_fit.py, named in the Block 4 SPEC entry; added 2026-10-26 under D-082 (every step still to do is on the roadmap with its theory part). No block field: the tool reads integer block numbers, and the SPEC entry gets its number when written."
   - id: N5
     title: "Block 5: the generator's law and the per-sweep twins"
     summary: "The OU term and the tilt in synthetic_ground_truth.add_recording_noise, each twin sweep calibrated on its own real sweep (D-073) with the real cell's LS amplitudes and 37-pulse SS sweeps at the stored positions; manifest columns back-filled."
     block: 5
     parent: G4
-    depends_on: [N2, N4, I12]
+    depends_on: [N2, N4, N4b, I12]
     needs_theory: [T5, T9]
     needs_hpc: false
     jobs: []
@@ -447,7 +458,7 @@ implementation:
     summary: "run_noise_fit.py fits the law for every cell of a group and writes the noise table; the sens_* scripts run the in-silico checks S0-S3 with their fixed predictions (D-055); one PBS job on davinci."
     block: 6
     parent: G4
-    depends_on: [N3, N4, N5]
+    depends_on: [N3, N4, N4b, N5]
     needs_theory: [T7]
     needs_hpc: true
     jobs: ["Passive Features/HPC script/Ih Fit/submit_noise_fit.sh", noise_fit]
@@ -486,15 +497,15 @@ implementation:
     manual_status: done
     manual_reason: "run on L3_exc on davinci (noise tables 2026-09-23 and 09-28, lsqc 2026-10-01; D-016, D-017, handoff s.4.6); no SPEC entry"
   - id: S7
-    title: "Stage 7: the recovery gate run (Block 8, to specify)"
-    summary: "Generate the twins of the L3_exc cells with their fitted noise, fit every twin with the four arms on davinci, and apply the gate: a pass opens the campaign, a failing kinetic knob is frozen, a failing C_m or g_h is not."
+    title: "Stage 7: synthetic recovery of the six parameters on davinci -- the gate before any real-cell fit (Block 8, to specify)"
+    summary: "Twins of the L3_exc cells, each on its own real morphology, with its own fitted recording noise and its own stimulation protocol, are given chosen values of the six parameters (C_m, R_m, R_a, g_h, the activation shift and the time-constant scale; a quarter with no I_h as a false-positive control); the same fitter and optimiser are run on them on davinci and the gate checks that the chosen values come back. It is the six-parameter version of the passive-only synthetic check (I4); no real cell is fitted with the six parameters before its verdict (D-083)."
     block: 8
     parent: G5
     depends_on: [I12, N5, N7]
     needs_theory: [T14]
     needs_hpc: true
     jobs: ["Passive Features/HPC script/Ih Fit/submit_ih_recovery.sh", ih_recovery]
-    note: "DRAFT: Block 8 is the assistant's proposed SPEC entry for the gate run (the recovery driver under D-073, the submit script with the marker lines); no entry yet, so the tool says planned. Dry run, pilot (MAX_CELLS=2) and the full run (README, Stage 7)."
+    note: "Requested by the user 2026-10-26 (D-083), restating Stage 7 of the plan. Design in force: D-011 (real archive morphologies, false-positive control by index, error in the search coordinate, railed axes counted), D-073 and D-076 (each twin sweep with its real sweep's noise; the real cell's own LS amplitudes and SS trains), D-005 and D-011 (the gate applies to the ih6 arm; a failing kinetic knob is frozen for the campaign, a failing C_m or g_h is not). Open: the tolerances (the assistant's proposal, unowned), the cohort size, raw against corrected SWCs (D-013). DRAFT: Block 8 is the assistant's proposed SPEC entry for the gate run (the recovery driver under D-073, the submit script with the marker lines); no entry yet, so the tool says planned. Dry run, pilot (MAX_CELLS=2) and the full run (README, Stage 7)."
   - id: S8
     title: "Stage 8: campaign"
     summary: "The three arms on the real cells, first the diameter-corrected ones (one-cell dry run, then the set), then every excitatory group; per-cell parameters, gate columns, Phase-3 intervals and the population read-out."
@@ -503,7 +514,7 @@ implementation:
     needs_theory: [T14, T16, T17]
     needs_hpc: true
     jobs: ["Passive Features/HPC script/Ih Fit/submit_ih_fit.sh", ih_fit]
-    note: "Blocked on S7's verdict and on the corrected SWC files (D-013), which the diameter-pipeline roadmap produces (its I7/I8)."
+    note: "Blocked on S7's verdict -- no real cell is fitted with the six parameters, the one-cell dry run included, before S7 has run (D-083) -- and on the corrected SWC files (D-013), which the diameter-pipeline roadmap produces (its I7/I8)."
     manual_status: planned
     manual_reason: "not started: waits for the gate's verdict and the diameter-corrected SWCs (D-013); no SPEC entry"
   - id: S9
