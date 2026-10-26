@@ -291,7 +291,8 @@ class CalibrationConfig:
 @dataclass(frozen=True)
 class SurveyConfig:
     """S3 across cells (Block 16; D-065, D-085): the cell pool, the acquisition
-    check and the stratified selection. None of these is in a signature."""
+    check and the stratified selection (16.1); each cell's global alignment
+    (16.2). None of these is in a signature."""
 
     species: str = "Homo Sapiens"            # source: D-085.1; the Allen SDK's CellTypesApi.HUMAN, the pool of the passive-fit pipeline
     cells_per_group: int = 5                 # source: D-085.1 [user]: 5 cells per neuron class and layer, all of a smaller group
@@ -299,6 +300,18 @@ class SurveyConfig:
     selection_seed: int = 20261026           # source: PROVISIONAL: seed of the per-group permutations (Block 16.1 (d))
     acquisition_rel_tol: float = 1e-3        # source: PROVISIONAL: relative tolerance of a cell's plane spacing and pixel size against acquisition (D-085.3)
     pool_page_rows: int = 10000              # source: PROVISIONAL: rows per page of the ApiCellTypesSpecimenDetail query; large, so the model comes in one page (the SDK asks num_rows 'all'; pages without an order may skip rows)
+    # Block 16.2, each cell's global alignment (D-085.2): coarse on the minimum-intensity projection, then fine
+    align_downsample: int = 4                # source: D-085.2 [user]: the projection's downsample level for the coarse alignment (1.83 um/px), as cell 11 did for 529878215
+    align_max_shift_um: float = 250.0        # source: PROVISIONAL: half-window of the coarse search (allen_image_align.align_translation's default)
+    align_null_n: int = 50                   # source: PROVISIONAL: block-shuffled darkness maps in the null of the score ratio
+    align_null_block_um: float = 30.0        # source: PROVISIONAL: side of the shuffled tiles (um; 16 px at level 4)
+    align_min_score_ratio: float = 2.0       # source: PROVISIONAL: a cell whose coarse score is below this multiple of the null's median is set aside (D-085.2)
+    align_fine_downsample: int = 1           # source: PROVISIONAL (the assistant's fine stage): the finest level tried for the fine crop (0.23 um/px)
+    align_fine_margin_um: float = 20.0       # source: PROVISIONAL: margin of the fine crop around the skeleton's bounding box (um)
+    align_fine_max_shift_um: float = 5.0     # source: PROVISIONAL: half-window of the fine direct search (um)
+    align_fine_ridge_um: float = 6.0         # source: PROVISIONAL: widest dark feature kept by the fine stage's ridge darkness (um; the soma is removed)
+    align_z0_um: float = 0.0                 # source: PROVISIONAL: depth of plane index 0 (um), as 529878215 (plane index = z / dz); checked by S3b's registration offsets
+    projection_size_rel_tol: float = 0.02    # source: PROVISIONAL: an xy projection's width and height lie within this of the planes' median
 
 
 @dataclass(frozen=True)
@@ -436,6 +449,15 @@ class DiameterConfig:
                 and sv.acquisition_rel_tol >= 0 and math.isfinite(sv.acquisition_rel_tol) and sv.pool_page_rows >= 1):
             raise ValueError("survey: species, cells_per_group >= 1, class_map (unique dendrite types -> non-empty "
                              "classes), acquisition_rel_tol >= 0 or pool_page_rows >= 1 out of range (Block 16.1, D-085)")
+        if not (0 <= sv.align_fine_downsample < sv.align_downsample <= 6 and sv.align_max_shift_um > 0
+                and sv.align_null_n >= 10 and sv.align_null_block_um > 0
+                and sv.align_min_score_ratio > 0 and sv.align_fine_margin_um >= 0 and sv.align_fine_max_shift_um > 0
+                and sv.align_fine_ridge_um > 0 and math.isfinite(sv.align_z0_um)
+                and 0 < sv.projection_size_rel_tol < 1):
+            raise ValueError("survey: 0 <= align_fine_downsample < align_downsample <= 6, align_max_shift_um > 0, "
+                             "align_null_n >= 10, align_null_block_um > 0, align_min_score_ratio > 0, fine "
+                             "margin >= 0, fine shift and ridge > 0, align_z0_um finite, 0 < projection_size_rel_tol "
+                             "< 1 (Block 16.2, D-085.2)")
         for name, v in (("renderer.dzeta_um", r.dzeta_um), ("renderer.U_um", r.U_um),
                         ("renderer.h_g_um_thin", r.h_g_um_thin), ("renderer.h_g_um_thick", r.h_g_um_thick),
                         ("measure.sigma_fit_um", m.sigma_fit_um), ("renderer.sigma_r0_um", r.sigma_r0_um),

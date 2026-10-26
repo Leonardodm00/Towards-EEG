@@ -26,6 +26,7 @@
 | 2026-10-23 | v22. Cell 7 runs the whole kernel calibration (Blocks 10 and 15; D-074 to D-081): `real` scans both sets on ±25 µm patches with a planar far-pixel background, the iterative core fit, the straightness and the 0.03 grey-level isolation rule (φ ≤ 5° for both sets), and keeps the example nodes' patch images; `fit` cuts the table at 0.84 µm and bootstraps the anchor's SE; the new `far-fit` fits the far slope γ̂ with its t interval, the per-sign and the quadratic comparison, and writes the production kernel's continuation slope; the new `figures` writes the width-by-plane, example-node and kernel-law figures. Evidence: `test_smoke_calibration.py` 8 pass, `test_smoke_calibration_scene.py` 6 pass 1 skip, `test_smoke_far_field.py` 6 pass 1 skip, `test_smoke_calibration_figures.py` 6 pass 1 skip; on rendered far phantoms γ̂ within 1 % noise-free and 0.83 ± 0.02 against 0.79 with camera noise (4 nodes) **[run, sandbox]**; not run on Allen's data. |
 | 2026-10-26 | v23. Added Cell 11, S3's step 0 (Block 16.1; D-065, D-085): `scripts/cell_pool.py pool` lists the human cells with a reconstruction (Allen's `ApiCellTypesSpecimenDetail`, filtered as the Allen SDK filters it), `check` reads each cell's plane spacing, pixel size and usable planes over the whole pool and compares them with the configuration (0.28 µm, 0.1144 µm/px), `select` draws 5 cells per neuron class and layer (all of a smaller group) by a seeded permutation, among the matching cells only when `REQUIRE_MATCH`. Evidence: `test_smoke_cell_pool.py` 6 pass, 1 skip, on canned API rows and a substituted `api_query`; 17 of 17 mutants of the new code each failed a check **[run, sandbox]**; the raw field names read from the Allen SDK's source (allensdk 2.16.2, `cell_types_api.py`), not from the live API; not run against Allen's server. |
 | 2026-10-26 (later) | v24. Cell 11: sparsely spiny cells are a third class, `sparsely_spiny` (D-087, the user's answer of 17:59), selected 5 per layer like `exc` and `inh`; the `--config-json` that raises the page size is written by hand (`{"survey": {...}}`). Evidence: `test_smoke_cell_pool.py` 6 pass, 1 skip with the changed oracles **[run, sandbox]**; not run against Allen's server. |
+| 2026-10-26 (later, 2) | v25. Added Cell 12, S3's step 1 (Block 16.2; D-085.2, D-085.12): `scripts/survey_cells.py run --steps align` aligns every selected cell -- Allen's minimum-intensity xy projection at level 4 and `align_translation` with both flips (the user's method), the score ratio against block-shuffled images, a fine stage at level 1 on the cell's box (the assistant's addition) -- one folder per cell, resumable, a cell set aside below the ratio threshold (2, PROVISIONAL) for the user to look at, a manual alignment file to fix it. Evidence: `test_smoke_cell_alignment.py` 6 pass, 1 skip on painted synthetic cells (the shift within 2.5 full-res px, R about 7; an empty field R 1.08, set aside); 20 of 20 mutants each failed a check **[run, sandbox]**; not run against Allen's server. |
 
 This runbook covers the real-data steps, in order. Each cell names the line that must **appear** in its output. A missing line means the cell did not get as far as the code that prints it. Each step lists the decisions it feeds; those stay yours. Nothing in these scripts changes the configuration on its own.
 
@@ -767,3 +768,42 @@ Expect from `check`: `check: N cells in the pool, 0 already checked, N to check`
 Expect from `select`: `select: G groups, S cells selected (seed 20261026, 5 per group); left out {...} -> ...`, then one line per group, `exc|3   5 of  n: <ids>`. `selection.json` holds the seed, the rule, each group's counts and every cell left out with its reason (`no_class`, `no_layer`, `acquisition_missing`, `acquisition_mismatch:dz`, `:pixel`, `:dz;pixel`, `:error`, `:no_planes`).
 
 Decisions it feeds: whether the cells whose plane spacing or pixel size differ stay out (D-085.3: `REQUIRE_MATCH`, read `acquisition.json` first; `True` is the cell's default, not a decision); the selected cells are the input of S3a-S3d (Blocks 16.2-20). Send back the `pool:` lines, the `check:` summary line with `acquisition.json`, and the `select:` lines.
+
+## Cell 12: S3 across cells, step 1 -- every selected cell's global alignment (Block 16.2)
+
+[added 2026-10-26, v25; D-085.2, D-085.12. Needs Cells 0, 1 and 11.]
+
+```python
+SURVEY = OUT + "/survey"
+run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
+    "--cache-dir", CACHE_DIR, "--steps", "align")
+run("scripts/survey_cells.py", "status", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv")
+```
+
+(The notebook's cell then shows the overlay of every set-aside cell.)
+
+What it does, per selected cell (`survey/<specimen>/align/`):
+
+| Stage | What | Who chose it |
+|---|---|---|
+| projection | Allen's xy projections (SubImages other than Primary with the planes' size within 2 %), each fetched whole at level 4; the darkest (lowest median grey) is the minimum-intensity projection | the rule PROVISIONAL |
+| coarse | `align_translation` on it: FFT cross-correlation of the darkness map with the skeleton (SWC types 3, 4), both y-flips, a ±250 µm window, ±2 px refinement; 1.83 µm/px | the user (D-085.2) |
+| score ratio | the same search's best score, against its best score on 50 copies of the image with its 30 µm tiles shuffled: R = observed / null median | PROVISIONAL |
+| fine | the skeleton's box plus 20 µm at level 1 (0.23 µm/px; level 2 if too large), a direct search over ±5 µm on the ridge darkness | the assistant's addition, PROVISIONAL |
+| verdict | set aside when R < 2, or a search ends on its window's edge | the threshold PROVISIONAL |
+
+Writes `alignment_<id>.json` (the shifts in full-res px, the flip height, `z0_um` = 0 as for 529878215, every stage's numbers, the projection chosen and its candidates, `set_aside` and the reasons) and `overlay_<id>.png` (the projection with the skeleton; the fine crop with the coarse skeleton in grey and the final in orange). Each finished step leaves a marker in `survey/<id>/done/`; a failure is written to `survey/<id>/errors.log` and the next cell starts. `survey/status.csv` holds every cell's state.
+
+Expect `survey: S cells, steps align -> .../survey`, one line per cell, `[i/S] <id> align: shift (x, y) px, no flip, ratio R, auto (t s)` or with `; SET ASIDE (low_score_ratio)`, or `FAILED align: <error>`, then `survey: align done n, ... -> .../status.csv`. `status` prints one line per cell and `status: S cells -> .../status.csv`. Resumable: run the cell again after a disconnection; an aligned cell is not fetched again.
+
+A set-aside cell: read its overlay. If the skeleton sits on the cell after all, or you can see the shift, write `survey/<id>/align/alignment_manual.json`:
+
+```json
+{"shift_x_px": 0.0, "shift_y_px": 0.0, "flip_h_px": null, "z0_um": 0.0}
+```
+
+(full-res pixels; `flip_h_px` the full-res height when y is flipped) and run `survey_cells.py run ... --cells <id> --force align`: the manual alignment is used as given and the cell is no longer set aside. `--force` also clears the markers of the steps after the forced one. Later steps skip set-aside cells unless `--include-set-aside`.
+
+The synthetic check (sandbox): on painted cells the final shift came within 2.5 full-res px (0.29 µm) of the truth and R was about 7; an empty field with dark specks gave R = 1.08 and was set aside. On Allen's cells R is not known yet: the threshold 2 is to be read again on the first run's `status.csv` and overlays.
+
+Decisions it feeds: the threshold (PROVISIONAL) and which set-aside cells to fix or drop. Send back the `survey:` summary line, `status.csv` and the overlays of the set-aside cells.

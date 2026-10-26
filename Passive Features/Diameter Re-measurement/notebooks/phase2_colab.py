@@ -1111,6 +1111,32 @@ run("scripts/cell_pool.py", "select", "--pool", SURVEY + "/pool.csv", "--acquisi
     *(["--require-match"] if REQUIRE_MATCH else []), "--out", SURVEY + "/selection.csv")
 
 # ====================================================================================================
+# ===== CELL 12
+# ====================================================================================================
+# CELL 12: S3 ACROSS CELLS -- STEP 1: EVERY SELECTED CELL'S GLOBAL ALIGNMENT (Block 16.2; D-085.2, D-085.12)
+# Needs Cells 0, 1 and 11 (its selection.csv). For each selected cell: the SWC, the minimum-intensity xy projection at
+# level 4, align_translation with both flips (D-085.2), the score ratio against a null of block-shuffled images, then a
+# fine stage at level 1 on the cell's box; one folder per cell under survey/<specimen>/. Expect `survey: S cells,
+# steps align -> ...`, one line per cell `[i/S] <id> align: shift (x, y) px, no flip, ratio R, auto (t s)` -- or
+# `SET ASIDE (reasons)` -- and `survey: align done ... -> .../status.csv`. Resumable: a cell already aligned is
+# skipped, so after a disconnection run the cell again. A SET-ASIDE cell: look at survey/<id>/align/overlay_<id>.png;
+# to align it by hand write survey/<id>/align/alignment_manual.json with {"shift_x_px": .., "shift_y_px": ..,
+# "flip_h_px": null, "z0_um": 0.0} and run again with "--cells", "<id>", "--force", "align". Send back the
+# summary line, status.csv and the overlays of the set-aside cells.
+SURVEY = OUT + "/survey"
+run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
+    "--cache-dir", CACHE_DIR, "--steps", "align")
+run("scripts/survey_cells.py", "status", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv")
+import glob, json as _json
+from IPython.display import Image, display
+for path in sorted(glob.glob(SURVEY + "/*/align/alignment_*.json")):
+    with open(path) as f:
+        rec = _json.load(f)
+    if rec.get("set_aside"):
+        print("set aside: %s %s" % (rec["specimen_id"], rec["reasons"]))
+        display(Image(filename=path.replace("alignment_", "overlay_").replace(".json", ".png")))
+
+# ====================================================================================================
 # ===== CELL end of session (optional)
 # ====================================================================================================
 # WHAT TO SEND BACK
@@ -1145,6 +1171,7 @@ run("scripts/cell_pool.py", "select", "--pool", SURVEY + "/pool.csv", "--acquisi
 # - Cell 6: the `pooled dendrite diameter` line.
 # - Cell 7: the growth-fit report, the far fit (gamma_hat and its interval) and the width-by-plane figures.
 # - Cell 11 (S3, step 0): the `pool:` and `check:` summary lines, acquisition.json, and the `select:` lines.
+# - Cell 12 (S3, step 1): the `survey:` summary line, status.csv, and the overlays of the set-aside cells.
 #
 # These decide the open items of SPEC section 8: d_max, the mu range, the jitter amplitudes, the camera fields
 # and the dark-flag threshold.
