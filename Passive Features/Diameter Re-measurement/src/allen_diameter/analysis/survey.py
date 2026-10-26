@@ -46,25 +46,34 @@ from ..model import tube_model
 PERCENTILES = (5, 10, 25, 50, 75, 90, 95)
 
 
-def measure_nodes(swc, provider, cfg, transform=None, regs=None, only=None, log=None):
+def measure_nodes(swc, provider, cfg, transform=None, regs=None, only=None, log=None, whole_stretches=True):
     """Every node of the dendrite stretches holding a node id of `only` (None:
     every dendrite node), measured (Block 13's measure_node, the cell's scene
-    masking the iteration's background) and not corrected. Returns a list of
-    (NodeResult, Allen radius um, Branch, index in the branch)."""
+    masking the iteration's background) and not corrected; with
+    whole_stretches=False only the nodes of `only` themselves, each with its
+    stretch's geometry (Block 17.2). Returns a list of (NodeResult, Allen
+    radius um, Branch, index in the branch)."""
     types = cfg.acquisition.dendrite_swc_types
     xyz_img = cell.to_image_um(swc.xyz, cfg.acquisition.res0_um, **(transform or {}))
     scene = cell.cell_scene(swc, types, cfg.acquisition.res0_um, transform)
+    only = None if only is None else set(int(i) for i in only)
     out = []
     for run in cell.stretches(swc, types):
         if only is not None and not any(int(swc.ids[r]) in only for r in run):
             continue
         branch, off = cell.stretch_branch(swc, run, xyz_img)
+        n = 0
         for t, r in enumerate(run):
             nid = int(swc.ids[r])
+            if not whole_stretches and nid not in only:
+                continue
             out.append((measure_node(branch, off + t, provider, cfg, (regs or {}).get(nid), scene),
                         float(swc.radius[r]), branch, off + t))
-        if log is not None:
+            n += 1
+        if log is not None and whole_stretches:
             log("stretch of %d nodes from node %d measured" % (len(run), int(swc.ids[run[0]])))
+        elif log is not None:
+            log("%d of the %d nodes of the stretch from node %d measured" % (n, len(run), int(swc.ids[run[0]])))
     return out
 
 

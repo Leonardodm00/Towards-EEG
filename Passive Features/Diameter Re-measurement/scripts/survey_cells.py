@@ -12,6 +12,8 @@ api.brain-map.org is blocked from the sandbox.
           later steps are skipped, and the next cell starts
   status  the table of every cell's steps, rebuilt from the markers
 
+  pool    the pooled analyses over the cells: --what coverage (Block 17.3-17.5)
+
 Steps (in their order)
   align   the cell's global alignment (Block 16.2): the minimum-intensity
           projection at level 4, align_translation with both flips, the
@@ -19,11 +21,17 @@ Steps (in their order)
           set aside below the ratio threshold or on a search edge.
           <sid>/align/alignment_<sid>.json and overlay_<sid>.png; a hand-made
           <sid>/align/alignment_manual.json is used as given
+  nodes   S3a's node sample and Block 13's measurement of it (Block 17.1-17.2):
+          survey.nodes_mode, stratified (20 per bin of Allen's 2r, round-robin
+          over the stretches) or all; <sid>/nodes/pilot_<sid>.csv (the per-node
+          CSV with the background statistics) and pilot_summary_<sid>.json
 
 Example (Colab, after Cell 11)
     python scripts/survey_cells.py run --selection .../survey/selection.csv --out-dir .../survey \
         --cache-dir /content/drive/MyDrive/allen_cache --steps align
     python scripts/survey_cells.py status --out-dir .../survey
+    python scripts/survey_cells.py run ... --steps align,nodes
+    python scripts/survey_cells.py pool --out-dir .../survey --what coverage
 
 Pure ASCII, for the cluster (hpc-python-compat).
 """
@@ -62,6 +70,9 @@ class AllenSource:
 
     def images(self, sid):
         return aio.list_images(int(sid))
+
+    def planes(self, sid):
+        return aio.plane_table(self.images(sid))
 
 
 class Context:
@@ -132,6 +143,40 @@ def step_align(ctx, cfg):
                 reasons=rec["reasons"])
 
 
+def step_nodes(ctx, cfg):
+    """Block 17.1-17.2: the node sample and its measurement (D-065.1, D-085.4)."""
+    import run_cell
+    from allen_diameter.analysis import s3_nodes, survey
+    from allen_diameter.loading import swc_io, table_io
+    sid = ctx.sid
+    swc = swc_io.read_swc(ctx.data["swc_path"])
+    transform = cell_alignment.full_transform(ctx.alignment)
+    ids, counts = s3_nodes.sample_nodes(swc, cfg, sid)
+    if not ids:
+        raise RuntimeError("no dendrite node sampled in %d (mode %s)" % (sid, cfg.survey.nodes_mode))
+    planes = ctx.source.planes(sid)
+    provider = run_cell.real_provider(ctx.source.fetcher, planes, cfg.acquisition.res0_um)
+    meas = survey.measure_nodes(swc, provider, cfg, transform, None, ids, None, whole_stretches=False)
+    rows = [survey.pilot_row(res, r_allen, cfg) for res, r_allen, _, _ in meas]
+    stats = [survey.background_stats(provider, res, br, cfg) for res, _, br, _ in meas]
+    for row, st in zip(rows, stats):
+        row.update(bg_median_gl=st[0], bg_robust_sd_gl=st[1], bg_clipped_sd_gl=st[2], bg_unmasked_frac=st[3])
+    summary = survey.summarize(rows, cfg)
+    summary["background"] = survey.background_summary(stats)
+    summary.update(specimen=str(sid), mode=cfg.survey.nodes_mode, n_sampled=len(ids), transform=transform,
+                   sample_counts={str(b): list(v) for b, v in counts.items()},
+                   estimator_hash=cfg.signature_hash("estimator"))
+    out_csv = ctx.cell.path_of("nodes", "pilot_%d.csv" % sid)
+    table_io.write_rows(rows, out_csv)
+    survey_io.write_json(ctx.cell.path_of("nodes", "pilot_summary_%d.json" % sid), summary)
+    return dict(mode=cfg.survey.nodes_mode, n_sampled=len(ids), n_measured=len(rows),
+                n_in_S=sum(1 for r in rows if r["in_S"]), csv=out_csv)
+
+
+def _say_nodes(s):
+    return "%s: %d sampled, %d measured, %d in S" % (s["mode"], s["n_sampled"], s["n_measured"], s["n_in_S"])
+
+
 def _say_align(s):
     return "shift (%.1f, %.1f) px, %s, ratio %s, %s%s" % (
         s["shift_x_px"], s["shift_y_px"], "flip" if s["flip_h_px"] is not None else "no flip",
@@ -139,9 +184,9 @@ def _say_align(s):
         "; SET ASIDE (%s)" % ",".join(s["reasons"]) if s["set_aside"] else "")
 
 
-STEPS = {"align": step_align}                 # Blocks 17-19 add theirs, in this order
-ORDER = ("align",)
-SAY = {"align": _say_align}
+STEPS = {"align": step_align, "nodes": step_nodes}          # Blocks 18-19 add theirs, in this order
+ORDER = ("align", "nodes")
+SAY = {"align": _say_align, "nodes": _say_nodes}
 
 
 # ----------------------------------------------------------------- runner ---
@@ -237,6 +282,95 @@ def status(out_dir, selection_path="", log=print):
     return rows
 
 
+# ------------------------------------------------------------ pooled ---
+
+def _cells(out_dir, selection_path=""):
+    """The (cell folder, selection record) of the selection's cells, or of every cell folder in out_dir."""
+    if selection_path:
+        recs = survey_io.read_selection(selection_path)
+    else:
+        recs = [dict(specimen_id=int(d)) for d in sorted(os.listdir(out_dir))
+                if d.isdigit() and os.path.isdir(os.path.join(out_dir, d))]
+    out = []
+    for rec in recs:
+        cell = survey_io.CellDir(out_dir, rec["specimen_id"])
+        sel = cell.context().get("selection") or rec
+        out.append((cell, dict(sel, specimen_id=cell.sid)))
+    return out
+
+
+def read_phantom_rows(paths):
+    """The phantoms' fitted d_hat and mu_hat d_hat in S (Block 6's replicate CSVs), for Block 17.3's band."""
+    from allen_diameter.loading import table_io
+    c = table_io.read_columns(list(paths), ("d_hat_um", "mu_hat_per_um", "in_S"))
+    d, m = c["d_hat_um"], c["mu_hat_per_um"]
+    ok = c["in_S"] & np.isfinite(d) & np.isfinite(m) & (d > 0) & (m > 0)
+    return dict(d_hat=d[ok], mud=(m * d)[ok])
+
+
+def _flat(row, key, prefix):
+    from allen_diameter.analysis.coverage import QUANTILES
+    return {"q%02d_%s" % (round(100 * q), prefix): v for q, v in zip(QUANTILES, row.pop(key))}
+
+
+def pool_coverage(cfg, out_dir, selection_path="", phantom_paths=(), log=print):
+    """Block 17.3-17.5 over the cells with a `nodes` marker."""
+    from allen_diameter.analysis import coverage
+    from allen_diameter.loading import table_io
+    from allen_diameter.plotting import survey_figures
+    import matplotlib.pyplot as plt
+    rows_by_cell, per_cell = [], {}
+    for cell, rec in _cells(out_dir, selection_path):
+        if not cell.done("nodes"):
+            continue
+        rows = table_io.read_rows(cell.path_of("nodes", "pilot_%d.csv" % cell.sid))
+        rows_by_cell.append((rec, rows))
+        per_cell[str(cell.sid)] = dict(group=rec.get("group"), n=len(rows),
+                                       n_in_S=sum(1 for r in rows if coverage._true(r.get("in_S"))))
+    if not rows_by_cell:
+        raise RuntimeError("pool coverage: no cell under %s has finished the step nodes" % out_dir)
+    nodes = coverage.node_table(rows_by_cell)
+    phantom = read_phantom_rows(phantom_paths) if phantom_paths else None
+    bins = coverage.coverage_table(nodes, cfg, phantom)
+    ver = coverage.verdict(bins, cfg)
+    dia = coverage.diameter_table(nodes)
+    s3a = os.path.join(out_dir, "s3a")
+    os.makedirs(s3a, exist_ok=True)
+    flat = []
+    for b in bins:
+        b = dict(b)
+        b.update(_flat(b, "q_ln_mud", "ln_mud"))
+        b.update(_flat(b, "q_ln_alpha", "ln_alpha"))
+        flat.append(b)
+    table_io.write_rows(flat, os.path.join(s3a, "coverage.csv"))
+    dflat = []
+    for d in dia:
+        d = dict(d)
+        d.update(_flat(d, "q_d_hat", "d_hat_um"))
+        d.update(_flat(d, "q_D_allen", "D_allen_um"))
+        dflat.append(d)
+    table_io.write_rows(dflat, os.path.join(s3a, "diameters.csv"))
+    survey_io.write_json(os.path.join(s3a, "coverage.json"), dict(
+        bins=bins, verdict=ver, per_cell=per_cell, outside_S=coverage.outside_counts(nodes),
+        mu_range_per_um=list(cfg.phantom.mu_range_per_um), dhat_bins_um=list(cfg.survey.coverage_dhat_bins_um),
+        phantom_rows=list(phantom_paths), n_phantom_rows=None if phantom is None else int(phantom["d_hat"].size)))
+    figs = survey_figures.coverage_figures(nodes, bins, cfg, phantom)
+    figs["diameters"] = survey_figures.diameter_figure(nodes)
+    for name, fig in figs.items():
+        fig.savefig(os.path.join(s3a, "%s.png" % name), dpi=110)
+        plt.close(fig)
+    log("coverage: %d cells, %d nodes, %d in S and usable" % (len(rows_by_cell), len(nodes), ver["n_nodes"]))
+    for b in bins:
+        log("  d_hat %-8s n %5d (%3d cells)  inside %s  below %s  above %s  %s%s" % (
+            b["bin"], b["n"], b["n_cells"], *("%.3f" % v if v == v else "  nan" for v in
+                                               (b["share_inside"], b["share_below"], b["share_above"])),
+            b["status"], "; phantoms %s" % b["status_phantom"] if b["status_phantom"] else ""))
+    log("coverage: %s -- %s%s -> %s" % ("PASS" if ver["passed"] else "FAIL in %s" % ",".join(ver["failing"]),
+                                       ver["rule"], "; too few in %s" % ",".join(ver["too_few"]) if ver["too_few"] else "",
+                                       s3a))
+    return bins, ver
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -252,9 +386,18 @@ def main(argv=None):
     s = sub.add_parser("status")
     s.add_argument("--out-dir", required=True)
     s.add_argument("--selection", default="")
+    q = sub.add_parser("pool")
+    q.add_argument("--out-dir", required=True)
+    q.add_argument("--what", required=True, choices=("coverage",))
+    q.add_argument("--selection", default="")
+    q.add_argument("--phantom-rows", nargs="*", default=[], help="Block 6 replicate CSVs: the phantoms' band")
+    q.add_argument("--config-json", default="")
     a = ap.parse_args(argv)
     if a.cmd == "status":
         status(a.out_dir, a.selection)
+        return 0
+    if a.cmd == "pool":
+        pool_coverage(load_config(a.config_json), a.out_dir, a.selection, a.phantom_rows)
         return 0
     cfg = load_config(a.config_json)
     split = (lambda text: [x.strip() for x in text.split(",") if x.strip()])

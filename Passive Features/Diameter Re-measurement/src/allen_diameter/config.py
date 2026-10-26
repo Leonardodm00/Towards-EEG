@@ -288,6 +288,8 @@ class CalibrationConfig:
     anchor_sensitivity_step_um: float = 0.01  # source: D-081.7 [user]: half-step of the central difference d gamma_hat / d sigma_0
 
 
+NODES_MODES = ("stratified", "all")    # Block 17 (D-085.4)
+
 @dataclass(frozen=True)
 class SurveyConfig:
     """S3 across cells (Block 16; D-065, D-085): the cell pool, the acquisition
@@ -312,6 +314,14 @@ class SurveyConfig:
     align_fine_ridge_um: float = 6.0         # source: PROVISIONAL: widest dark feature kept by the fine stage's ridge darkness (um; the soma is removed)
     align_z0_um: float = 0.0                 # source: PROVISIONAL: depth of plane index 0 (um), as 529878215 (plane index = z / dz); checked by S3b's registration offsets
     projection_size_rel_tol: float = 0.02    # source: PROVISIONAL: an xy projection's width and height lie within this of the planes' median
+    # Block 17, S3a: the node sample and the coverage of the phantoms' band (D-065.1, D-085.4, D-085.5)
+    nodes_mode: str = "stratified"           # source: D-085.4 [user]: "all" (every dendrite node) or "stratified"; the default PROVISIONAL
+    nodes_per_bin: int = 20                  # source: D-085.4 [user, the proposal accepted]: nodes per bin of Allen's diameter in the stratified sample
+    nodes_allen_bins_um: Tuple[float, ...] = (0.4, 0.6, 0.8, 1.2, 2.0)  # source: D-085.4 [user, the proposal accepted]: inner edges of the bins of Allen's 2r (um), [0, 0.4) ... [2, inf)
+    coverage_dhat_bins_um: Tuple[float, ...] = (0.2, 0.4, 0.6, 0.8, 1.2, 2.0, 4.0)  # source: PROVISIONAL: edges of the bins of d_hat (um) for the coverage, plus the open bins below and above
+    coverage_pass_share: float = 0.95        # source: D-085.5 [user]: share inside the band each counted bin must reach
+    coverage_min_nodes: int = 20             # source: D-085.5 [user]: a bin with fewer nodes is too_few, not failing
+    coverage_phantom_quantiles: Tuple[float, float] = (0.005, 0.995)  # source: PROVISIONAL: the phantoms' band per bin from their fitted ln(mu_hat d_hat)
 
 
 @dataclass(frozen=True)
@@ -458,6 +468,14 @@ class DiameterConfig:
                              "align_null_n >= 10, align_null_block_um > 0, align_min_score_ratio > 0, fine "
                              "margin >= 0, fine shift and ridge > 0, align_z0_um finite, 0 < projection_size_rel_tol "
                              "< 1 (Block 16.2, D-085.2)")
+        nb, cb, pq = sv.nodes_allen_bins_um, sv.coverage_dhat_bins_um, sv.coverage_phantom_quantiles
+        if not (sv.nodes_mode in NODES_MODES and sv.nodes_per_bin >= 1 and len(nb) >= 1 and nb[0] > 0
+                and all(b > a for a, b in zip(nb, nb[1:])) and len(cb) >= 2 and cb[0] > 0
+                and all(b > a for a, b in zip(cb, cb[1:])) and 0 < sv.coverage_pass_share <= 1
+                and sv.coverage_min_nodes >= 1 and len(pq) == 2 and 0 <= pq[0] < pq[1] <= 1):
+            raise ValueError("survey: nodes_mode in %s, nodes_per_bin >= 1, increasing positive bin edges, "
+                             "0 < coverage_pass_share <= 1, coverage_min_nodes >= 1, 0 <= phantom quantiles "
+                             "increasing <= 1 (Block 17, D-085.4-5)" % (NODES_MODES,))
         for name, v in (("renderer.dzeta_um", r.dzeta_um), ("renderer.U_um", r.U_um),
                         ("renderer.h_g_um_thin", r.h_g_um_thin), ("renderer.h_g_um_thick", r.h_g_um_thick),
                         ("measure.sigma_fit_um", m.sigma_fit_um), ("renderer.sigma_r0_um", r.sigma_r0_um),

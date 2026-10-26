@@ -27,6 +27,7 @@
 | 2026-10-26 | v23. Added Cell 11, S3's step 0 (Block 16.1; D-065, D-085): `scripts/cell_pool.py pool` lists the human cells with a reconstruction (Allen's `ApiCellTypesSpecimenDetail`, filtered as the Allen SDK filters it), `check` reads each cell's plane spacing, pixel size and usable planes over the whole pool and compares them with the configuration (0.28 µm, 0.1144 µm/px), `select` draws 5 cells per neuron class and layer (all of a smaller group) by a seeded permutation, among the matching cells only when `REQUIRE_MATCH`. Evidence: `test_smoke_cell_pool.py` 6 pass, 1 skip, on canned API rows and a substituted `api_query`; 17 of 17 mutants of the new code each failed a check **[run, sandbox]**; the raw field names read from the Allen SDK's source (allensdk 2.16.2, `cell_types_api.py`), not from the live API; not run against Allen's server. |
 | 2026-10-26 (later) | v24. Cell 11: sparsely spiny cells are a third class, `sparsely_spiny` (D-087, the user's answer of 17:59), selected 5 per layer like `exc` and `inh`; the `--config-json` that raises the page size is written by hand (`{"survey": {...}}`). Evidence: `test_smoke_cell_pool.py` 6 pass, 1 skip with the changed oracles **[run, sandbox]**; not run against Allen's server. |
 | 2026-10-26 (later, 2) | v25. Added Cell 12, S3's step 1 (Block 16.2; D-085.2, D-085.12): `scripts/survey_cells.py run --steps align` aligns every selected cell -- Allen's minimum-intensity xy projection at level 4 and `align_translation` with both flips (the user's method), the score ratio against block-shuffled images, a fine stage at level 1 on the cell's box (the assistant's addition) -- one folder per cell, resumable, a cell set aside below the ratio threshold (2, PROVISIONAL) for the user to look at, a manual alignment file to fix it. Evidence: `test_smoke_cell_alignment.py` 6 pass, 1 skip on painted synthetic cells (the shift within 2.5 full-res px, R about 7; an empty field R 1.08, set aside); 20 of 20 mutants each failed a check **[run, sandbox]**; not run against Allen's server. |
+| 2026-10-26 (later, 3) | v26. Added Cell 13, S3a (Block 17; D-065.1, D-085.4-5): `survey_cells.py run --steps align,nodes` measures each aligned cell's node sample with Block 13's chain -- stratified, up to 20 nodes per bin of Allen's 2r round-robin over the stretches (the default, PROVISIONAL), or every dendrite node -- and `pool --what coverage` draws the coverage of the phantoms' band per bin of d_hat with the pass rule of D-085.5 and the diameters by layer and class. Evidence: `test_smoke_s3a.py` 6 pass, 1 skip (the step on the synthetic cell through `fetch_zblock`, the pooled coverage over it); 16 of 16 mutants each failed a check **[run, sandbox]**; not run on Allen's cells. |
 
 This runbook covers the real-data steps, in order. Each cell names the line that must **appear** in its output. A missing line means the cell did not get as far as the code that prints it. Each step lists the decisions it feeds; those stay yours. Nothing in these scripts changes the configuration on its own.
 
@@ -807,3 +808,40 @@ A set-aside cell: read its overlay. If the skeleton sits on the cell after all, 
 The synthetic check (sandbox): on painted cells the final shift came within 2.5 full-res px (0.29 µm) of the truth and R was about 7; an empty field with dark specks gave R = 1.08 and was set aside. On Allen's cells R is not known yet: the threshold 2 is to be read again on the first run's `status.csv` and overlays.
 
 Decisions it feeds: the threshold (PROVISIONAL) and which set-aside cells to fix or drop. Send back the `survey:` summary line, `status.csv` and the overlays of the set-aside cells.
+
+## Cell 13: S3a -- the node survey across cells and the coverage of the phantoms' band (Block 17)
+
+[added 2026-10-26, v26; D-059.1, D-065.1, D-085.4-6, D-087. Needs Cells 0, 1, 11 and 12.]
+
+```python
+import json
+SURVEY = OUT + "/survey"
+NODES_MODE = "stratified"      # or "all" (D-085.4)
+PHANTOM_ROWS = []              # e.g. [OUT + "/tables/rows_<hash>_0_1000.csv"]
+CFG_S3 = SURVEY + "/survey_config.json"
+with open(CFG_S3, "w") as f:
+    json.dump({"survey": {"nodes_mode": NODES_MODE}}, f)
+run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
+    "--cache-dir", CACHE_DIR, "--steps", "align,nodes", "--config-json", CFG_S3)
+run("scripts/survey_cells.py", "pool", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv",
+    "--what", "coverage", "--config-json", CFG_S3, *(["--phantom-rows"] + PHANTOM_ROWS if PHANTOM_ROWS else []))
+```
+
+(The notebook's cell then shows the four figures.)
+
+| Part | What | Who chose it |
+|---|---|---|
+| sample, `stratified` | per bin of Allen's 2r -- [0, 0.4), [0.4, 0.6), [0.6, 0.8), [0.8, 1.2), [1.2, 2), [2, ∞) µm -- up to 20 nodes, taken in turn from the cell's stretches (each stretch's first node, then each one's second, ...), in seeded orders | the user (D-085.4); the round-robin and the default mode PROVISIONAL |
+| sample, `all` | every dendrite node: thousands per cell, each with 7-23 crops | the user (D-085.4) |
+| measurement | Block 13's chain at each node (the pilot, the Allen-guided iteration, the SGT fit at its plane), the cell's alignment, no table; the background statistics for S3b's camera | D-065.1 |
+| coverage | per bin of d_hat (<0.2, 0.2-0.4, 0.4-0.6, 0.6-0.8, 0.8-1.2, 1.2-2, 2-4, ≥4 µm), the nodes in S: the share with mu_hat in the phantoms' range [0.3, 3] /µm -- the analytic band ln(mu d) of D-065.1 at the node's own d_hat -- and the shares below and above; the quantiles of ln(mu_hat d_hat) and ln alpha_hat; with `PHANTOM_ROWS`, the phantoms' own fitted band (their 0.5-99.5 % in the bin) | the band D-065.1; the bins PROVISIONAL |
+| pass rule | every bin with ≥ 20 nodes has ≥ 95 % inside; fewer than 20: `too_few`, not failing | the user (D-085.5) |
+| diameters | d_hat (in S; fitted, not corrected) and Allen's 2r, per (class, layer), per class, per layer | the user (D-085.5, D-087) |
+
+No thick-node check (D-085.6: the renderer is not the final one).
+
+Expect, per cell, `[i/S] <id> nodes: stratified: n sampled, n measured, k in S (t s)` (a set-aside cell: `skipped:set_aside` in `status.csv`), then `coverage: C cells, N nodes, M in S and usable`, one line per bin (`d_hat 0.4-0.6  n ... inside 0.97 ... pass`) and `coverage: PASS -- every bin of d_hat with >= 20 nodes in S has >= 95 % of them inside the band (D-085.5) -> .../survey/s3a` or `coverage: FAIL in <bins> -- ...`. Files in `survey/<id>/nodes/` (`pilot_<id>.csv`, `pilot_summary_<id>.json`) and `survey/s3a/` (`coverage.csv`, `coverage.json`, `diameters.csv`, `coverage_mud.png`, `coverage_share.png`, `coverage_alpha.png`, `diameters.png`).
+
+Switching `NODES_MODE` after a run: add `"--force", "nodes"` to the `run` call (the marker does not record the mode). A failing bin is reported, not acted on: widening the mu range is your decision (D-065.1).
+
+Decisions it feeds: the mu range (D-065.1), with the figures and the failing bins. Send back the coverage lines, `survey/s3a/coverage.json`, `diameters.csv` and the four figures.
