@@ -19,6 +19,8 @@ Usage
                              [--depends-on T1] [--status open|studying|closed]
     python roadmap.py add    --yaml specs/roadmap/N.yaml step   ID --title T
                              [--summary S] [--theory S2] [--depends-on S1] [--needs-hpc]
+    python roadmap.py revise --yaml specs/roadmap/N.yaml STAGE --from OTHER
+                             [--decision D-nnn] [--note TEXT]   |  STAGE --clear
     python roadmap.py check  --yaml specs/roadmap/N.yaml [--root PATH]
     python roadmap.py status --yaml specs/roadmap/N.yaml [--root PATH]
                              [--json OUT] [--no-fetch] [--source LABEL]
@@ -49,10 +51,24 @@ take them from STATES below):
     done      green    pushed, tested, and (if needs_hpc) the HPC run
                        finished on the current code
 
-Theory states: open (grey), studying (blue), closed (green). A stage whose
-prerequisites are not satisfied (a theory stage not closed, an
-implementation stage not done) is reported with blocked_by; the renderers
-draw it with a dashed border.
+Theory states: open (grey), studying (blue), closed (green).
+
+Theory and implementation progress independently: a topic can be closed
+before its block exists, a block can be done while its topic is still open.
+The two sides are linked, not conditioned on each other: an implementation
+stage names the topics it rests on (needs_theory, inherited from its step),
+a topic names the stages its outcome shapes (affects); both appear as
+theory_links / theory_open on the stage and as dotted edges. blocked_by
+(dashed border) is reported only within a side: an implementation stage
+whose dependency's code is not in place (planned, local, failing), a topic
+whose prerequisite topic is not closed.
+
+Revisions carry a decision across the sides: `revise I4 --from T7
+--decision D-082 --note ...` flags I4 as having to change because of T7 (the
+flag is drawn on the node and listed in the detail); it clears by itself
+when I4's code changes after the flag's commit, or with `revise I4 --clear`.
+A topic can be flagged from a block the same way; its flag clears when the
+topic's status changes.
 
 Groups: a stage with `parent: <id>` is a member of that stage, to any
 depth. A stage with members is drawn as a frame around them, coloured by
@@ -61,22 +77,25 @@ tested < running < done; open < studying < closed), with its own node
 inside when it has a block of its own. An implementation stage without a
 block is a pure group: it has no state of its own and is not counted.
 
-Plan first: a project starts as a coarse list of steps, each with the
-theory it needs, and the blocks of a step are defined while the step is
-carried out. `init --plan PLAN.yaml` writes each step S<k> as an
-implementation group with no blocks yet (drawn planned, red, until its
-first block arrives) and a paired theory group TS<k> (`needs_theory:
-[TS<k>]` on the step); `add block` / `add topic` then hang a SPEC block or
-a topic under its step as the work proceeds. PLAN.yaml:
+Plan first: a project starts as a coarse list of steps, and the blocks
+of a step are defined while the step is carried out. `init --plan
+PLAN.yaml` writes each step S<k> as an implementation group with no blocks
+yet (drawn planned, red, until its first block arrives). A theory group
+TS<k> is created only for a step whose plan entry names the concepts it
+rests on (`theory:`, mathematics, physics, biology, engineering); routines
+(I/O, configuration, production runs, acceptance tests) have no theory
+counterpart, and several blocks may rest on one theory stage. `add block`
+/ `add topic` then hang a SPEC block or a topic under its group as the
+work proceeds. PLAN.yaml:
 
     steps:
       - id: S1
-        title: Image access
+        title: Forward model
         summary: what the step delivers
-        theory: what has to be understood for it     # the paired group's summary
-        depends_on: [S0]                             # other steps
+        theory: the mathematics or physics underlying it   # omit for a routine
+        depends_on: [S0]                                   # other steps
         needs_hpc: false
-        blocks: [0, 1]                               # SPEC blocks already written, if any
+        blocks: [0, 1]                                     # SPEC blocks already written, if any
 
 Exit codes: 0 on success, 1 on a validation error, 2 if git fails.
 """
@@ -220,6 +239,8 @@ def load_roadmap(path):
         stage["refs"] = as_list(stage.get("refs"))
         stage["summary"] = stage.get("summary") or ""
         stage["parent"] = stage.get("parent") or None
+        stage["affects"] = as_list(stage.get("affects"))
+    data["revisions"] = [r for r in (data.get("revisions") or []) if isinstance(r, dict)]
     for stage in data["implementation"]:
         stage["depends_on"] = as_list(stage.get("depends_on"))
         stage["needs_theory"] = as_list(stage.get("needs_theory"))
@@ -270,6 +291,10 @@ def check_roadmap(data):
             if kind == "theory" and stage["status"] not in THEORY_STATES:
                 problems.append("%s: status %r not in %s"
                                 % (sid, stage["status"], THEORY_STATES))
+            if kind == "theory":
+                for ref in as_list(stage.get("affects")):
+                    if ref not in impl:
+                        problems.append("%s affects %s: no such implementation stage" % (sid, ref))
             if kind == "implementation":
                 manual = stage.get("manual_status")
                 if manual is not None and manual not in IMPL_STATES:
@@ -295,6 +320,9 @@ def check_roadmap(data):
     if set(theory) & set(impl):
         problems.append("ids shared between theory and implementation: %s"
                         % sorted(set(theory) & set(impl)))
+    for rev in data.get("revisions", []):
+        if rev.get("stage") not in theory and rev.get("stage") not in impl:
+            problems.append("revision of unknown stage %r" % rev.get("stage"))
     for kind, pool in (("theory", theory), ("implementation", impl)):
         cycle = find_cycle({k: as_list(v.get("depends_on")) for k, v in pool.items()})
         if cycle:
@@ -771,6 +799,7 @@ def compute_status(data, root, fetch=True, source="chat"):
             "closed_on": str(stage.get("closed_on") or ""),
             "decision": str(stage.get("decision") or ""),
             "note": stage.get("note", ""),
+            "affects": as_list(stage.get("affects")),
             "has_own": stage.get("status_given", True),
         }
     # a theory stage without members always has a status of its own
@@ -793,8 +822,12 @@ def compute_status(data, root, fetch=True, source="chat"):
     attach_groups(theory, "theory")
     attach_groups(impl, "implementation")
 
-    # blocked_by: unmet prerequisites (does not change the colour). A member
-    # inherits the theory its step (and the step's groups) needs.
+    # Theory and implementation progress independently: a topic can be
+    # closed before its block is written, a block done before its topic is
+    # closed. The links between the two sides are information, never a
+    # block. A link exists when the implementation side names the topic
+    # (needs_theory, own or inherited from the step) or the theory side
+    # names the stage (affects).
     def inherited_theory(stage):
         needs, cur, seen = list(stage["needs_theory"]), stage.get("parent"), set()
         while cur in impl and cur not in seen:
@@ -804,19 +837,25 @@ def compute_status(data, root, fetch=True, source="chat"):
         return needs
 
     for sid, stage in impl.items():
-        blocked = []
-        for ref in inherited_theory(stage):
-            if ref in theory and theory[ref]["status"] != "closed":
-                blocked.append(ref)
-        for ref in stage["depends_on"]:
-            if ref in impl and impl[ref]["status"] != "done":
-                blocked.append(ref)
+        links = inherited_theory(stage)
+        links += [t for t, ts in theory.items() if sid in ts["affects"] and t not in links]
+        stage["theory_links"] = [t for t in links if t in theory]
+        stage["theory_open"] = [t for t in stage["theory_links"] if theory[t]["status"] != "closed"]
+        # blocked_by: a dependency whose code is not in place (planned,
+        # local, failing). Not "not done": done also needs the tester and
+        # the cluster, and a block can be used long before that.
+        blocked = [ref for ref in stage["depends_on"]
+                   if ref in impl and impl[ref]["status"] in ("planned", "local", "failing")]
         stage["blocked_by"] = blocked if stage["has_own"] else []
     for sid, stage in theory.items():
         stage["blocked_by"] = [ref for ref in stage["depends_on"]
                                if ref in theory and theory[ref]["status"] != "closed"
                                ] if stage["has_own"] else []
-        stage["feeds"] = [i for i, s in impl.items() if sid in s["needs_theory"]]
+        feeds = [i for i, s in impl.items() if sid in s["theory_links"]]
+        stage["feeds"] = feeds
+
+    # revisions: a decision on one side that the other side has to absorb
+    attach_revisions(data, theory, impl, root)
 
     counts = {s: 0 for s in IMPL_STATES}
     for stage in impl.values():
@@ -924,6 +963,120 @@ def attach_groups(stages, kind):
         if not stage["has_own"] and worst:
             stage["status"] = worst
             stage["reason"] = "group: least advanced member is %s" % worst
+
+
+def attach_revisions(data, theory, impl, root):
+    """Attach the pending revisions to their stages.
+
+    A revision says: stage X has to change because of Y (a decision taken
+    while studying a topic, or a finding made while implementing). For an
+    implementation stage it stays pending until the stage's code changes
+    after the flag (the flag records the branch commit) or until it is
+    cleared by hand; for a theory stage, until the topic's status changes
+    from what it was when flagged, or until cleared.
+    """
+    for stage in list(theory.values()) + list(impl.values()):
+        stage["revisions"] = []
+    for rev in data.get("revisions", []):
+        sid = rev.get("stage")
+        target = impl.get(sid) or theory.get(sid)
+        if target is None or rev.get("cleared"):
+            continue
+        entry = {
+            "from": str(rev.get("from") or ""),
+            "on": str(rev.get("on") or ""),
+            "decision": str(rev.get("decision") or ""),
+            "note": str(rev.get("note") or ""),
+            "at": str(rev.get("at") or "")[:7],
+            "pending": True,
+            "why_pending": "",
+        }
+        if sid in impl:
+            last = target.get("last_change") or ""
+            at = resolve_rev(root, rev.get("at")) if rev.get("at") else None
+            if last and at and not is_ancestor(root, last, at):
+                entry["pending"] = False   # the code changed after the flag
+            else:
+                entry["why_pending"] = ("no code change since %s" % entry["at"]
+                                        if at else "pending until cleared")
+        else:
+            status_at = str(rev.get("status_at") or "")
+            if status_at and target["status"] != status_at:
+                entry["pending"] = False   # the topic moved on since the flag
+            else:
+                entry["why_pending"] = ("status still %s" % status_at if status_at
+                                        else "pending until cleared")
+        if entry["pending"]:
+            target["revisions"].append(entry)
+    for stage in list(theory.values()) + list(impl.values()):
+        stage["revision_pending"] = bool(stage["revisions"])
+
+
+def add_revision(path, stage_id, source, decision=None, note=None, root=None, status_now=None):
+    """Append a revision flag to the yaml's top-level `revisions:` list."""
+    data = load_roadmap(path)
+    kinds = {s["id"]: "implementation" for s in data["implementation"]}
+    kinds.update({s["id"]: "theory" for s in data["theory"]})
+    if stage_id not in kinds:
+        raise RoadmapError("stage %s not found in %s" % (stage_id, path))
+    if source and source not in kinds:
+        raise RoadmapError("source stage %s not found in %s" % (source, path))
+    with open(path, "r", encoding="utf-8") as fh:
+        text = fh.read()
+    lines = text.splitlines(True)
+    if lines and not lines[-1].endswith("\n"):
+        lines[-1] += "\n"
+    if not any(re.match(r"^revisions:\s*$", line) for line in lines):
+        lines.append("\n# Revisions: a change one side has to absorb because of the other\n"
+                     "# (roadmap.py revise). An implementation stage's flag clears when its\n"
+                     "# code changes after the flag's commit; a topic's when its status\n"
+                     "# changes; or by hand (revise --clear).\n")
+        lines.append("revisions:\n")
+    entry = ["  - stage: %s\n" % stage_id,
+             "    from: %s\n" % (source or ""),
+             "    on: %s\n" % dt.date.today().isoformat()]
+    if kinds[stage_id] == "implementation":
+        at = resolve_rev(root, data["branch"]) if root else None
+        entry.append("    at: %s\n" % (at or ""))
+    else:
+        entry.append("    status_at: %s\n" % (status_now or ""))
+    entry.append("    decision: %s\n" % (decision or ""))
+    entry.append("    note: %s\n" % (yaml_scalar(note) if note else ""))
+    entry.append("    cleared:\n")
+    # the revisions list is the last top-level key: append at the end
+    idx = max(i for i, line in enumerate(lines) if re.match(r"^revisions:\s*$", line))
+    insert_at = len(lines)
+    for j in range(idx + 1, len(lines)):
+        if lines[j].strip() and not lines[j].startswith((" ", "#")):
+            insert_at = j
+            break
+    lines[insert_at:insert_at] = entry
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("".join(lines))
+
+
+def clear_revisions(path, stage_id):
+    """Set `cleared:` on every open revision of a stage; returns how many."""
+    with open(path, "r", encoding="utf-8") as fh:
+        lines = fh.read().splitlines(True)
+    count, i = 0, 0
+    while i < len(lines):
+        if re.match(r"^  - stage:\s*%s\s*$" % re.escape(stage_id), lines[i]):
+            j = i + 1
+            cleared_line = None
+            while j < len(lines) and lines[j].startswith("    "):
+                if re.match(r"^    cleared:\s*$", lines[j]):
+                    cleared_line = j
+                j += 1
+            if cleared_line is not None:
+                lines[cleared_line] = "    cleared: %s\n" % dt.date.today().isoformat()
+                count += 1
+            i = j
+        else:
+            i += 1
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("".join(lines))
+    return count
 
 
 def doc_key(data):
@@ -1158,9 +1311,12 @@ def mermaid(data, status):
             label = "%s %s" % (stage["id"], stage["title"])
             if stage["closed_on"]:
                 label += "<br/>closed %s" % stage["closed_on"]
-            return label
-        blocks = ("Block %s " % ", ".join(map(str, stage["blocks"]))) if stage["blocks"] else ""
-        return "%s %s<br/>%s%s" % (stage["id"], stage["title"], blocks, stage["status"])
+        else:
+            blocks = ("Block %s " % ", ".join(map(str, stage["blocks"]))) if stage["blocks"] else ""
+            label = "%s %s<br/>%s%s" % (stage["id"], stage["title"], blocks, stage["status"])
+        if stage.get("revisions"):
+            label += "<br/>REVISE: from %s" % ", ".join(r["from"] or "?" for r in stage["revisions"])
+        return label
 
     def emit(stages, kind, parent, indent):
         pad = "    " * indent
@@ -1210,9 +1366,16 @@ def mermaid(data, status):
         for ref in stage["depends_on"]:
             lines.append("        %s --> %s" % (endpoint(imap, ref), endpoint(imap, stage["id"])))
     lines.append("    end")
+    drawn = set()
     for stage in status["implementation"]:
-        for ref in stage["needs_theory"]:
-            lines.append("    %s -.-> %s" % (endpoint(tmap, ref), endpoint(imap, stage["id"])))
+        # own links only: a link inherited from the step is drawn at the step
+        own = list(stage["needs_theory"]) + [t for t in stage.get("theory_links", [])
+                                            if stage["id"] in tmap.get(t, {}).get("affects", [])]
+        for ref in own:
+            edge = (endpoint(tmap, ref), endpoint(imap, stage["id"]))
+            if ref in tmap and edge not in drawn:
+                drawn.add(edge)
+                lines.append("    %s -.-> %s" % edge)
     blocked = [s["id"] for s in status["theory"] + status["implementation"]
                if s.get("blocked_by") and (s["has_own"] or not s["children"])]
     if blocked:
@@ -1246,28 +1409,32 @@ def render_markdown(data, status):
         for state, color, _, meaning in STATES[kind]:
             out.append("| %s (%s) | %s | %s |" % (state, kind, color, meaning))
     out.append("")
-    out.append("A dashed border marks a stage whose prerequisites are not met "
-               "(theory not closed, or an earlier implementation stage not done).")
+    out.append("A dashed border marks a stage whose dependency is not in place (a "
+               "block that is planned, local or failing; a topic not closed). Theory "
+               "and implementation progress independently: the dotted edges between "
+               "them are links, not conditions. REVISE marks a stage that has to "
+               "change because of a decision taken on the other side.")
     out.append("")
     out.append("## Theory")
     out.append("")
-    out.append("| Stage | Group | Status | Closed | Decision | Depends on | Feeds | Summary |")
-    out.append("|---|---|---|---|---|---|---|---|")
+    out.append("| Stage | Group | Status | Closed | Decision | Depends on | Linked blocks | Revise | Summary |")
+    out.append("|---|---|---|---|---|---|---|---|---|")
     for stage in status["theory"]:
-        out.append("| %s %s | %s | %s | %s | %s | %s | %s | %s |" % (
+        out.append("| %s %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
             stage["id"], stage["title"], stage["parent"] or "", stage["status"],
             stage["closed_on"], stage["decision"], ", ".join(stage["depends_on"]),
-            ", ".join(stage["feeds"]), cell(stage["summary"])))
+            ", ".join(stage["feeds"]), revise_cell(stage), cell(stage["summary"])))
     out.append("")
     out.append("## Implementation")
     out.append("")
-    out.append("| Stage | Group | Blocks | Status | Why | Last change | Tester | HPC | Needs | Summary |")
-    out.append("|---|---|---|---|---|---|---|---|---|---|")
+    out.append("| Stage | Group | Blocks | Status | Why | Last change | Tester | HPC | Depends on | Theory (open) | Revise | Summary |")
+    out.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
     for stage in status["implementation"]:
         tester = stage["tester"]
         hpc = stage["hpc"]
-        needs = ", ".join(stage["needs_theory"] + stage["depends_on"])
-        out.append("| %s %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
+        theory_cell = ", ".join(t + (" (open)" if t in stage.get("theory_open", []) else "")
+                                for t in stage.get("theory_links", []))
+        out.append("| %s %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
             stage["id"], stage["title"], stage["parent"] or "",
             ", ".join(map(str, stage["blocks"])),
             stage["status"], cell(stage["reason"]),
@@ -1275,9 +1442,15 @@ def render_markdown(data, status):
             ((tester.get("verdict", "") + " " + tester.get("commit", "")).strip()
              + (" (outdated)" if tester.get("outdated") else "")) if tester else "",
             ((hpc.get("state", "") + " " + (hpc.get("job") or "")).strip()) if hpc else "",
-            needs, cell(stage["summary"])))
+            ", ".join(stage["depends_on"]), theory_cell, revise_cell(stage), cell(stage["summary"])))
     out.append("")
     return "\n".join(out) + "\n"
+
+
+def revise_cell(stage):
+    return "; ".join("from %s%s%s" % (r["from"] or "?", (" " + r["decision"]) if r["decision"] else "",
+                                      (": " + r["note"]) if r["note"] else "")
+                     for r in stage.get("revisions", [])).replace("|", "/")
 
 
 def cell(text):
@@ -1443,7 +1616,8 @@ def load_plan(path):
         step["depends_on"] = as_list(step.get("depends_on"))
         step["needs_hpc"] = bool(step.get("needs_hpc"))
         step["blocks"] = [int(b) for b in as_list(step.get("blocks"))]
-        step["theory_id"] = step.get("theory_id") or ("T" + step["id"])
+        step["theory_id"] = (step.get("theory_id") or ("T" + step["id"])) if (
+            step["theory"] or step.get("theory_id")) else None
     for step in steps:
         for ref in step["depends_on"]:
             if ref not in seen:
@@ -1499,8 +1673,11 @@ def init_roadmap(root, name, branch, repo=None, spec="specs/SPEC.md", out=None, 
     section_blocks = {}
     block_parent = {}
     if steps:
-        # one theory group per step; its topics come later (add topic)
+        # a theory group for the steps that rest on concepts the plan names
+        # (`theory:`); routines get none. Topics come later (add topic).
         for step in steps:
+            if not step["theory_id"]:
+                continue
             lines += [
                 "  - id: %s" % step["theory_id"],
                 "    title: %s" % yaml_scalar(step["theory_title"]),
@@ -1509,6 +1686,7 @@ def init_roadmap(root, name, branch, repo=None, spec="specs/SPEC.md", out=None, 
                 "    depends_on: []",
                 "    # no status line: a group, coloured by its topics (add topic ... --parent %s)" % step["theory_id"],
             ]
+        for step in steps:
             for number in step["blocks"]:
                 block_parent[number] = step["id"]
     else:
@@ -1545,7 +1723,7 @@ def init_roadmap(root, name, branch, repo=None, spec="specs/SPEC.md", out=None, 
                 "    title: %s" % yaml_scalar(step["title"]),
                 "    summary: %s" % yaml_scalar(step["summary"] or ("DRAFT: " + step["title"])),
                 "    depends_on: [%s]" % ", ".join(step["depends_on"]),
-                "    needs_theory: [%s]" % step["theory_id"],
+                "    needs_theory: [%s]" % (step["theory_id"] or ""),
                 "    needs_hpc: %s" % ("true" if step["needs_hpc"] else "false"),
             ]
         if blocks:
@@ -1643,9 +1821,20 @@ def main(argv=None):
     p.add_argument("--refs", default=None, help="comma-separated references (topic)")
     p.add_argument("--status", default="open", choices=THEORY_STATES, help="topic only")
     p.add_argument("--theory", default=None,
-                   help="step only: id of the paired theory group to create (default T<step id>); "
-                        "'none' for no paired group")
-    p.add_argument("--theory-summary", default=None, help="step only: the paired group's summary")
+                   help="step only: id of a theory group to create for the step's concepts "
+                        "(default T<step id> when --theory-summary is given; none otherwise)")
+    p.add_argument("--theory-summary", default=None,
+                   help="step only: the concepts (mathematics, physics, biology, engineering) "
+                        "the step rests on; creates the theory group")
+
+    p = sub.add_parser("revise", help="flag a stage that has to change because of another")
+    p.add_argument("--yaml", required=True)
+    p.add_argument("stage", help="the stage that has to change (implementation or theory)")
+    p.add_argument("--from", dest="source", default=None, help="the stage whose outcome requires it")
+    p.add_argument("--decision", default=None)
+    p.add_argument("--note", default=None)
+    p.add_argument("--clear", action="store_true", help="clear the stage's open revisions instead")
+    p.add_argument("--root", default=None)
 
     p = sub.add_parser("check", help="validate a roadmap file")
     p.add_argument("--yaml", required=True)
@@ -1696,6 +1885,17 @@ def run(args):
         return 0
     if args.command == "add":
         return run_add(args)
+    if args.command == "revise":
+        if args.clear:
+            n = clear_revisions(args.yaml, args.stage)
+            print("%d revision(s) of %s cleared" % (n, args.stage))
+            return 0
+        data = load_roadmap(args.yaml)
+        status_now = next((s["status"] for s in data["theory"] if s["id"] == args.stage), None)
+        add_revision(args.yaml, args.stage, args.source, args.decision, args.note,
+                     root=root, status_now=status_now)
+        print("%s flagged for revision%s" % (args.stage, (" from %s" % args.source) if args.source else ""))
+        return 0
     data = load_roadmap(args.yaml)
     if args.command == "set":
         set_theory_status(args.yaml, args.stage, args.status, args.note,
@@ -1771,7 +1971,9 @@ def run_add(args):
         print("added topic %s (%s) under %s" % (args.id, args.status, args.parent))
         return 0
     # step: an implementation group plus, by default, a paired theory group
-    theory_id = args.theory or ("T" + args.id)
+    # a theory group only when the step rests on concepts the user named
+    # (--theory-summary, or --theory <id>); routines get none
+    theory_id = args.theory or (("T" + args.id) if args.theory_summary else "none")
     needs = split_list(args.needs_theory)
     if theory_id.lower() != "none":
         # a sub-step's theory group nests under the parent step's, when that exists
