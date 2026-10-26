@@ -934,6 +934,11 @@ run("scripts/allen_radius_distribution.py", "--fetch", SPECIMEN, "--cache-dir", 
 # with 6 kept planes each stop `far-fit`: measure more stretches in Cell 4b. With the 0.03 grey-level isolation
 # rule the sets may be small on a dense cell: the `reasons {...}` counts say which rule removed the nodes. A
 # failure here does not stop the notebook.
+# [2026-10-26, D-088.3, Block 19] Each set holds at most 30 scanned nodes (the candidates taken in a seeded order;
+# the rest `set_full`, not measured) and needs at least 10: below, `fit` prints `INSUFFICIENT: J near-field nodes
+# < 10 (D-088.3) ...`, `far-fit` writes no production kernel (`no production kernel: insufficient ...`) and the fits
+# are diagnostics. One kernel for every cell (D-088.1): this cell is the test on the pilot cell (D-088.2); Cell 15
+# pools the nodes across the survey's cells.
 #
 # The first-stage table is not a calibrated kernel on its own: on rendered thin phantoms its growth is about
 # 0.01 um^2 low within two planes (SPEC Block 10). Keep the default kernel for the production table until you
@@ -1194,6 +1199,33 @@ from IPython.display import Image, display
 display(Image(filename=SURVEY + "/s3b/inputs.png"))
 
 # ====================================================================================================
+# ===== CELL 15
+# ====================================================================================================
+# CELL 15: S3c -- ONE DEFOCUS KERNEL CALIBRATED ON NODES POOLED ACROSS CELLS (Block 19; D-088). Needs Cells 0, 1,
+# 11-13. Per aligned cell: the calibration candidates of its node sample (in S, flat, faint, Allen's 2r in a set),
+# scanned in a seeded order, at most survey.calib_scans_per_cell (5) per set (the step `calibration`). Then the pool:
+# per set, the cells' scans taken in turn across the cells up to 30, at least 10 for the production kernel (D-088.3),
+# then Cell 7's fit, far-fit and figures on the pooled scans: one kernel (D-088.1). Expect per cell `calibration: n
+# candidates: a near-field, b far-field scans; reasons {...}`, then `pooled near field: k of n scans taken (at most
+# 30) from c cells {...} -- sufficient` (or `INSUFFICIENT`), the same for the far field, Cell 7's fit and far-fit
+# lines and `pool calibration -> .../survey/s3c`. For now the test is Cell 7 on the pilot cell (D-088.2): run this
+# cell when the survey has run. Send back the pooled lines, the fit and far-fit lines and the figures.
+import json
+SURVEY = OUT + "/survey"
+CFG_S3 = SURVEY + "/survey_config.json"            # Cell 13's (the node mode); written here if Cell 13 did not run
+if not os.path.exists(CFG_S3):
+    with open(CFG_S3, "w") as f:
+        json.dump({"survey": {"nodes_mode": "stratified"}}, f)
+run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
+    "--cache-dir", CACHE_DIR, "--steps", "align,nodes,calibration", "--config-json", CFG_S3)
+run("scripts/survey_cells.py", "pool", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv",
+    "--what", "calibration", "--config-json", CFG_S3)
+from IPython.display import Image, display
+for name in ("width_by_plane_near", "width_by_plane_far", "kernel_law"):
+    if os.path.exists("%s/s3c/figures/%s.png" % (SURVEY, name)):
+        display(Image(filename="%s/s3c/figures/%s.png" % (SURVEY, name)))
+
+# ====================================================================================================
 # ===== CELL end of session (optional)
 # ====================================================================================================
 # WHAT TO SEND BACK
@@ -1231,6 +1263,7 @@ display(Image(filename=SURVEY + "/s3b/inputs.png"))
 # - Cell 12 (S3, step 1): the `survey:` summary line, status.csv, and the overlays of the set-aside cells.
 # - Cell 13 (S3a): the coverage lines, survey/s3a/coverage.json, diameters.csv and the four figures.
 # - Cell 14 (S3b): the `inputs:` lines, survey/s3b/inputs.json, inputs_per_cell.csv and inputs.png.
+# - Cell 15 (S3c): the pooled lines, the fit and far-fit lines and the figures in survey/s3c/figures.
 #
 # These decide the open items of SPEC section 8: d_max, the mu range, the jitter amplitudes, the camera fields
 # and the dark-flag threshold.

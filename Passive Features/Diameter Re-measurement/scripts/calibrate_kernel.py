@@ -63,6 +63,7 @@ if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
 from allen_diameter.analysis import calibration, cell, far_field, phantoms  # noqa: E402
+from allen_diameter.analysis import calibration_pool  # noqa: E402
 from allen_diameter.loading import calibration_io, table_io  # noqa: E402
 from allen_diameter.model import render  # noqa: E402
 from build_table import load_config  # noqa: E402
@@ -184,7 +185,10 @@ def run_real(cfg, a):
     print("%d candidate nodes" % len(cand), flush=True)
     t0 = time.perf_counter()
     transform = dict(shift_full_px=(a.shift_x, a.shift_y), flip_y_full_h=a.flip_h, z0_um=a.z0)
-    out = calibration.scan_cell(swc, provider, cfg, transform, regs, cand, log=lambda m: print(m, flush=True))
+    cal = cfg.calibration          # Block 19.1 (D-088.3): a seeded order, at most calib_max_nodes_per_set per set
+    out = calibration.scan_cell(swc, provider, cfg, transform, regs, cand, log=lambda m: print(m, flush=True),
+                                order_rng=np.random.default_rng([int(cal.calib_order_seed), int(a.specimen)]),
+                                max_per_set=int(cal.calib_max_nodes_per_set))
     scans = [s for _, _, s, _ in out if s is not None]
     allen_d = {int(i): 2.0 * float(r) for i, r in zip(swc.ids, swc.radius)}
     nodes = [dict(node_id=int(nid), allen_diameter_um=allen_d[int(nid)] if math.isfinite(allen_d[int(nid)]) else None,
@@ -200,8 +204,9 @@ def run_real(cfg, a):
                                                  config=json.loads(cfg.to_json()),
                                                  calibration=dataclasses.asdict(cfg.calibration), nodes=nodes,
                                                  reasons_count=reasons_count))
-    print("%d of %d candidates scanned: %d near-field, %d far-field; reasons %s; in %.1f min -> %s"
-          % (len(scans), len(out), n_near, n_far, reasons_count, (time.perf_counter() - t0) / 60, a.out))
+    print("%d of %d candidates scanned: %d near-field, %d far-field (at most %d each, D-088.3); reasons %s; in %.1f "
+          "min -> %s" % (len(scans), len(out), n_near, n_far, cal.calib_max_nodes_per_set, reasons_count,
+                         (time.perf_counter() - t0) / 60, a.out))
     # the example nodes, re-scanned with their patch images (served from the cache)
     records = {}
     for which in calibration.CALIBRATION_SETS:
@@ -240,9 +245,10 @@ def run_fit(cfg, scans_path, out, sigma_r0=None, seed=0):
                       n_resamples=int(cfg.calibration.bootstrap_resamples), seed=int(seed),
                       delta0_um=float(cfg.calibration.table_max_delta_um))
     ratio = calibration.area_ratio_by_offset(near)
+    suff = calibration_pool.sufficiency(g.node_ids.size, cfg)              # Block 19.2 (D-088.3)
     calibration_io.save_calibration(out, g, kernel, err, ratio,
                                     dict(scans=scans_path, scans_meta_source=meta.get("source", ""),
-                                         config=json.loads(cfg.to_json())), anchor)
+                                         config=json.loads(cfg.to_json()), sufficiency=suff), anchor)
     trust = (cfg.calibration.trust_planes + 0.5) * cfg.acquisition.dz_um
     print("growth fit (%s, %s, %s): %d nodes, %d dropped, cost %.3g, %s"
           % (g.statistic, g.convention, g.interp, g.node_ids.size, len(g.dropped_nodes), g.cost, g.message))
@@ -263,6 +269,9 @@ def run_fit(cfg, scans_path, out, sigma_r0=None, seed=0):
               % (anchor["sigma0_um"], anchor["se_um"], anchor["n_boot_ok"], anchor["n_resamples"], seed))
     else:
         print("  no table: %s" % err)
+    if not suff["sufficient"]:
+        print("  INSUFFICIENT: %d near-field nodes < %d (D-088.3): a diagnostic, not the production kernel's table"
+              % (suff["n_nodes"], suff["min_nodes"]))
     print("-> %s" % out)
     return out
 
@@ -289,6 +298,8 @@ def run_far_fit(cfg, scans_path, calibration_path, out, seed=0):
     se_boot, n_ok, _ = far_field.bootstrap_gamma(sel, sigma0, cfg, np.random.default_rng(int(seed)))
     dg = far_field.anchor_sensitivity(sel, sigma0, cfg)
     summary = far_field.far_fit_summary(sel, fit, fit_sign, fit_quad, se_boot, n_ok, dg, sigma0, se_sigma0, cfg, seed)
+    suff = dict(near=calibration_pool.sufficiency(len(calib.get("growth", {}).get("node_ids", [])), cfg),
+                far=calibration_pool.sufficiency(sel.node_ids.size, cfg))         # Block 19.2 (D-088.3)
     kernel, err = None, ""
     if "kernel" in calib:
         kd = calib["kernel"]
@@ -300,8 +311,12 @@ def run_far_fit(cfg, scans_path, calibration_path, out, seed=0):
             kernel, err = None, "the far fit did not succeed (%s%s)" % (fit.message, "; gamma at a bound" if fit.at_bound else "")
     else:
         err = "the calibration file holds no table: %s" % calib.get("kernel_error", "")
+    short = [s for s in ("near", "far") if not suff[s]["sufficient"]]
+    if kernel is not None and short:
+        kernel, err = None, "insufficient: %s (D-088.3: at least %d nodes per set; the fits are diagnostics)" % (
+            ", ".join("%d %s-field nodes" % (suff[s]["n_nodes"], s) for s in short), suff["far"]["min_nodes"])
     calibration_io.save_far_fit(out, summary, kernel, err, dict(scans=scans_path, calibration=calibration_path,
-                                                                config=json.loads(cfg.to_json())))
+                                                                config=json.loads(cfg.to_json()), sufficiency=suff))
     print("far fit: gamma_hat = %.4f +- %.4f (bootstrap %.4f over %d resamples, anchor term %.4f x %.4f), "
           "t_%d interval [%s, %s]; range %.2f um; %d IRLS rounds, %s" % (
               fit.gamma, summary["se"] or float("nan"), se_boot, n_ok, dg, se_sigma0, sel.node_ids.size - 1,

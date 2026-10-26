@@ -29,6 +29,7 @@
 | 2026-10-26 (later, 2) | v25. Added Cell 12, S3's step 1 (Block 16.2; D-085.2, D-085.12): `scripts/survey_cells.py run --steps align` aligns every selected cell -- Allen's minimum-intensity xy projection at level 4 and `align_translation` with both flips (the user's method), the score ratio against block-shuffled images, a fine stage at level 1 on the cell's box (the assistant's addition) -- one folder per cell, resumable, a cell set aside below the ratio threshold (2, PROVISIONAL) for the user to look at, a manual alignment file to fix it. Evidence: `test_smoke_cell_alignment.py` 6 pass, 1 skip on painted synthetic cells (the shift within 2.5 full-res px, R about 7; an empty field R 1.08, set aside); 20 of 20 mutants each failed a check **[run, sandbox]**; not run against Allen's server. |
 | 2026-10-26 (later, 3) | v26. Added Cell 13, S3a (Block 17; D-065.1, D-085.4-5): `survey_cells.py run --steps align,nodes` measures each aligned cell's node sample with Block 13's chain -- stratified, up to 20 nodes per bin of Allen's 2r round-robin over the stretches (the default, PROVISIONAL), or every dendrite node -- and `pool --what coverage` draws the coverage of the phantoms' band per bin of d_hat with the pass rule of D-085.5 and the diameters by layer and class. Evidence: `test_smoke_s3a.py` 6 pass, 1 skip (the step on the synthetic cell through `fetch_zblock`, the pooled coverage over it); 16 of 16 mutants each failed a check **[run, sandbox]**; not run on Allen's cells. |
 | 2026-10-26 (later, 4) | v27. Added Cell 14, S3b (Block 18; D-065.2-3, D-085.8-9, D-086): the steps `radius`, `registration` and `camera` per cell and `pool --what inputs` -- d_max the largest Allen 2r over the cells, the jitter the pooled robust SDs of the ON nodes' offsets, one camera setting (the most common table set, the medians of B and the noise SD) -- as suggestions for Cell 8. Evidence: `test_smoke_s3b.py` 6 pass, 1 skip (the three steps on the synthetic cell, the pool over it and over hand-written folders); 13 of 13 mutants each failed a check **[run, sandbox]**; not run on Allen's cells. |
+| 2026-10-26 (later, 5) | v28. Cell 7 (D-088.3, Block 19): at most 30 nodes per calibration set, in a seeded order, at least 10 for a production kernel (below, the fits are diagnostics and `far-fit` withholds the kernel). Added Cell 15, S3c (Block 19; D-088): the step `calibration` per cell (at most 5 scans per set) and `pool --what calibration` -- the cells' scans taken in turn across the cells up to 30 per set, then Cell 7's fit, far-fit and figures on them: one kernel. Evidence: `test_smoke_s3c.py` 6 pass, 1 skip (the cap and order of `scan_cell` with a counting provider, far-fit's kernel only with both sets sufficient on analytic far scans, the steps and the pool on the synthetic cell); 11 of 11 mutants each failed a check; `test_smoke_far_field.py` 6 pass, 1 skip with its CLI check's minimum lowered to 2 **[run, sandbox]**; not run on Allen's data. |
 
 This runbook covers the real-data steps, in order. Each cell names the line that must **appear** in its output. A missing line means the cell did not get as far as the code that prints it. Each step lists the decisions it feeds; those stay yours. Nothing in these scripts changes the configuration on its own.
 
@@ -621,6 +622,8 @@ Fewer than two near-field nodes stop `fit` (`fit: need at least two nodes ...`);
 
 The first-stage table is **not** a calibrated kernel on its own: on rendered thin phantoms its growth is about 0.01 µm² low within two planes of focus (SPEC Block 10). Read it next to the default table; the renderer's law is the near table to 0.84 µm continued linearly with the far slope (D-080.1).
 
+[added 2026-10-26, v28; D-088, Block 19] **10 to 30 nodes per set.** `real` takes the candidates in a seeded order (`calib_order_seed` with the specimen) and stops each set at 30 scanned nodes (`calib_max_nodes_per_set`, D-088.3): the rest are `not a calibration node (set_full)`, never measured. The scan line reads `n of N candidates scanned: a near-field, b far-field (at most 30 each, D-088.3); reasons {...}`. Below 10 nodes in a set (`calib_min_nodes_per_set`) the set is insufficient: `fit` prints `INSUFFICIENT: J near-field nodes < 10 (D-088.3): a diagnostic, not the production kernel's table`, `far-fit` prints `no production kernel: insufficient: ...`, and both files record `meta.sufficiency`. One kernel for every cell (D-088.1): this cell, on the pilot cell, is the test for now (D-088.2); Cell 15 pools the nodes of the survey's cells.
+
 ## Cell 8: the production configuration (your decisions)
 
 Copy the default configuration and change only the fields you have decided:
@@ -877,3 +880,35 @@ Expect per cell `radius: n nodes, max 2r ... um (node ...), p99 ... um`, `regist
 A cell flagged `z0` has |median dz*| above 1 µm (PROVISIONAL): the plane origin `z0_um` = 0 of its alignment (Cell 12) may be off; its overlay and registration figures say more. One thick node -- a trunk near the soma, or a tracing error -- sets d_max for every cell (D-086): read the cell and node it names before you write it into `DECIDED`.
 
 Decisions it feeds: Cell 8's `phantom.d_range_um`, `jitter_xy_um`, `jitter_z_um`, `renderer.background_B_gl`, `noise_sd_gl`, `jpeg_qtables` -- each a value you write, never taken automatically (D-065). Send back the `inputs:` lines, `survey/s3b/inputs.json`, `inputs_per_cell.csv` and `inputs.png`.
+
+## Cell 15: S3c -- one defocus kernel calibrated on nodes pooled across cells (Block 19)
+
+[added 2026-10-26, v28; D-088 (supersedes D-085.10). Needs Cells 0, 1, 11-13.]
+
+```python
+import json
+SURVEY = OUT + "/survey"
+CFG_S3 = SURVEY + "/survey_config.json"            # Cell 13's (the node mode); written here if Cell 13 did not run
+if not os.path.exists(CFG_S3):
+    with open(CFG_S3, "w") as f:
+        json.dump({"survey": {"nodes_mode": "stratified"}}, f)
+run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
+    "--cache-dir", CACHE_DIR, "--steps", "align,nodes,calibration", "--config-json", CFG_S3)
+run("scripts/survey_cells.py", "pool", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv",
+    "--what", "calibration", "--config-json", CFG_S3)
+```
+
+For now the calibration is tested on the pilot cell with Cell 7 (D-088.2); this cell is for when the survey has run.
+
+| Part | What | Who chose it |
+|---|---|---|
+| one kernel | the near table to 0.84 µm and the far slope, fitted once on nodes of several cells; one production configuration, one table | the user (D-088.1) |
+| per cell (`calibration`) | the candidates of the cell's node sample (Cell 13's CSV: in S, flat, faint, Allen's 2r in a set), scanned in a seeded order, at most 5 per set; `survey/<id>/calibration/scans_<id>.json` | the order and the per-cell quota PROVISIONAL |
+| the pool | per set, the cells in increasing specimen id, each cell's first scan, then each one's second, ... up to 30; node ids qualified as specimen × 10⁶ + node (two cells can share a node id) | the cap the user's (D-088.3); the round-robin PROVISIONAL |
+| sufficiency | at least 10 nodes per set; below, the fits run as diagnostics and no production kernel is written | the minimum the user's (D-088.3); the rule below it PROVISIONAL |
+
+Expect per cell `[i/S] <id> calibration: n candidates: a near-field, b far-field scans; reasons {...}`; then `pooled near field: k of n scans taken (at most 30) from c cells {...} -- sufficient` (or `INSUFFICIENT (< 10, D-088.3)`), the same for the far field, Cell 7's `fit` and `far-fit` report on the pooled scans, `wrote ...` for the figures, and `pool calibration -> .../survey/s3c`. Files in `survey/s3c/`: `scans_pooled.json` (its `meta` holds the counts per set and cell, the sufficiency and the id map), `calibration_pooled.json`, `far_fit_pooled.json`, `figures/`.
+
+What to read: as Cell 7 -- the width-by-plane figures first, then the far fit -- and the counts per cell: a kernel resting mostly on one cell is a pooled kernel in name only. Too few nodes in a set: raise `calib_scans_per_cell` (in `CFG_S3`: `{"survey": {..., "calib_scans_per_cell": 10}}`) and run again with `--force calibration`.
+
+Decisions it feeds: Cell 8's `renderer.kernel_table_*` and `kernel_continuation_slope` -- yours to write once the pooled sets are sufficient. Send back the pooled lines, the fit and far-fit lines and the figures.

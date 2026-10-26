@@ -328,6 +328,9 @@ def test_contract():
         dataclasses.replace(cfg, renderer=kernel).validate()
         # the command line: near phantoms -> fit (the anchor), far phantoms -> far-fit, on the reduced configuration
         cfg_cli = far_cfg(0.79)
+        # 2 near and 3 far phantoms are below D-088.3's minimum of 10 per set (Block 19.2): lowered here so that the
+        # production path runs; test_smoke_s3c.py checks the minimum itself
+        cfg_cli = dataclasses.replace(cfg_cli, calibration=dataclasses.replace(cfg_cli.calibration, calib_min_nodes_per_set=2))
         cj = os.path.join(tmp, "config.json")
         with open(cj, "w") as f:
             json.dump(dict(json.loads(cfg_cli.to_json()), calibration=dataclasses.asdict(cfg_cli.calibration)), f)

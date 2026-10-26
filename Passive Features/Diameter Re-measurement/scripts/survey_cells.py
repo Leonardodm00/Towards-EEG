@@ -13,7 +13,7 @@ api.brain-map.org is blocked from the sandbox.
   status  the table of every cell's steps, rebuilt from the markers
 
   pool    the pooled analyses over the cells: --what coverage (Block 17.3-17.5),
-          --what inputs (Block 18.4-18.5)
+          --what inputs (Block 18.4-18.5), --what calibration (Block 19.4)
 
 Steps (in their order)
   align   the cell's global alignment (Block 16.2): the minimum-intensity
@@ -31,6 +31,10 @@ Steps (in their order)
                 <sid>/registration/ (s*, dz* and the verdict per node)
   camera        the camera inputs from the nodes' background (Block 18.3; after
                 nodes): <sid>/camera/camera_<sid>.json
+  calibration   the kernel calibration's scans of the cell (Block 19.3; after
+                nodes): its candidates from the per-node CSV, a seeded order, at
+                most survey.calib_scans_per_cell per set (D-088):
+                <sid>/calibration/scans_<sid>.json
 
 Example (Colab, after Cell 11)
     python scripts/survey_cells.py run --selection .../survey/selection.csv --out-dir .../survey \
@@ -237,6 +241,47 @@ def step_camera(ctx, cfg):
                 has_tables="jpeg_qtables" in r, notes=out.get("notes", []))
 
 
+def step_calibration(ctx, cfg):
+    """Block 19.3: the cell's calibration scans for the pooled kernel (D-088)."""
+    import dataclasses
+    import calibrate_kernel
+    import run_cell
+    from allen_diameter.analysis import calibration
+    from allen_diameter.loading import calibration_io, swc_io, table_io
+    sid = ctx.sid
+    if not ctx.cell.done("nodes"):
+        raise RuntimeError("calibration needs the step nodes of %d (its per-node CSV)" % sid)
+    cand = calibrate_kernel.candidates_from_rows(table_io.read_rows(ctx.cell.path_of("nodes", "pilot_%d.csv" % sid)), cfg)
+    path = ctx.cell.path_of("calibration", "scans_%d.json" % sid)
+    meta = dict(source="survey", specimen=str(sid), n_candidates=len(cand), calibration=dataclasses.asdict(cfg.calibration),
+                max_per_set=int(cfg.survey.calib_scans_per_cell))
+    if not cand:
+        calibration_io.save_scans([], path, dict(meta, nodes=[], reasons_count={}))
+        return dict(n_candidates=0, n_near=0, n_far=0, reasons={})
+    swc = swc_io.read_swc(ctx.data["swc_path"])
+    provider = run_cell.real_provider(ctx.source.fetcher, ctx.source.planes(sid), cfg.acquisition.res0_um)
+    out = calibration.scan_cell(swc, provider, cfg, cell_alignment.full_transform(ctx.alignment), None, cand,
+                                order_rng=np.random.default_rng([int(cfg.calibration.calib_order_seed), int(sid)]),
+                                max_per_set=int(cfg.survey.calib_scans_per_cell))
+    scans = [sc for _, _, sc, _ in out if sc is not None]
+    reasons = {}
+    for _, _, _, rs in out:
+        for r in rs:
+            reasons[r] = reasons.get(r, 0) + 1
+    allen_d = {int(i): 2.0 * float(r) for i, r in zip(swc.ids, swc.radius)}
+    nodes = [dict(node_id=int(nid), allen_diameter_um=allen_d[int(nid)] if np.isfinite(allen_d[int(nid)]) else None,
+                  set=calibration.calibration_set(allen_d[int(nid)], cfg), reasons=";".join(rs), scanned=sc is not None)
+             for nid, _, sc, rs in out]
+    calibration_io.save_scans(scans, path, dict(meta, nodes=nodes, reasons_count=reasons))
+    return dict(n_candidates=len(cand), n_near=sum(1 for x in scans if x.set == "near"),
+                n_far=sum(1 for x in scans if x.set == "far"), reasons=reasons)
+
+
+def _say_calibration(s):
+    return "%d candidates: %d near-field, %d far-field scans; reasons %s" % (s["n_candidates"], s["n_near"], s["n_far"],
+                                                                          s["reasons"])
+
+
 def _say_radius(s):
     return "%d nodes, max 2r %.2f um (node %d), p99 %.2f um" % (s["n"], s["max_um"], s["max_node_id"], s["p99_um"])
 
@@ -259,10 +304,10 @@ def _say_align(s):
 
 
 STEPS = {"align": step_align, "nodes": step_nodes, "radius": step_radius, "registration": step_registration,
-         "camera": step_camera}                                 # Block 19 adds its own, in this order
-ORDER = ("align", "nodes", "radius", "registration", "camera")
+         "camera": step_camera, "calibration": step_calibration}
+ORDER = ("align", "nodes", "radius", "registration", "camera", "calibration")
 SAY = {"align": _say_align, "nodes": _say_nodes, "radius": _say_radius, "registration": _say_registration,
-       "camera": _say_camera}
+       "camera": _say_camera, "calibration": _say_calibration}
 
 
 # ----------------------------------------------------------------- runner ---
@@ -511,6 +556,48 @@ def pool_inputs(cfg, out_dir, selection_path="", log=print):
     return sug
 
 
+def pool_calibration(cfg, out_dir, selection_path="", log=print):
+    """Block 19.4: the cells' scans pooled round-robin up to the cap per set, then Block 10's fit, Block 15's
+    far-fit and the figures on the pooled scans: one kernel (D-088.1)."""
+    import argparse as _ap
+    import calibrate_kernel
+    from allen_diameter.analysis import calibration_pool
+    from allen_diameter.loading import calibration_io
+    per_cell = []
+    for cell, rec in _cells(out_dir, selection_path):
+        if cell.done("calibration"):
+            per_cell.append((cell.sid, calibration_io.load_scans(cell.path_of("calibration", "scans_%d.json" % cell.sid))[0]))
+    if not per_cell:
+        raise RuntimeError("pool calibration: no cell under %s has finished the step calibration" % out_dir)
+    pooled, meta = calibration_pool.pool_scans(per_cell, cfg)
+    s3c = os.path.join(out_dir, "s3c")
+    os.makedirs(s3c, exist_ok=True)
+    sp, cp, fp = (os.path.join(s3c, x) for x in ("scans_pooled.json", "calibration_pooled.json", "far_fit_pooled.json"))
+    calibration_io.save_scans(pooled, sp, dict(meta, source="pooled", cells=[s for s, _ in per_cell]))
+    for which in ("near", "far"):
+        m = meta["sets"][which]
+        log("pooled %s field: %d of %d scans taken (at most %d) from %d cells %s -- %s" % (
+            which, m["taken"], m["available"], m["max_nodes"], len(m["by_cell"]), m["by_cell"],
+            "sufficient" if m["sufficient"] else "INSUFFICIENT (< %d, D-088.3)" % m["min_nodes"]))
+    done = dict(fit=False, far_fit=False)
+    for name, call in (("fit", lambda: calibrate_kernel.run_fit(cfg, sp, cp)),
+                       ("far_fit", lambda: calibrate_kernel.run_far_fit(cfg, sp, cp, fp))):
+        if name == "far_fit" and not done["fit"]:
+            log("pooled far-fit not run: the near-field fit did not run")
+            continue
+        try:
+            call()
+            done[name] = True
+        except SystemExit as exc:                     # run_fit and run_far_fit exit on a fit they cannot do
+            log("pooled %s: %s" % (name, exc))
+    if done["fit"]:
+        calibrate_kernel.run_figures(cfg, _ap.Namespace(scans=[sp], calibration=cp, far_fit=fp if done["far_fit"] else "",
+                                                        patches=[], out_dir=os.path.join(s3c, "figures"),
+                                                        no_node_figures=False))
+    log("pool calibration -> %s" % s3c)
+    return meta, done
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -528,7 +615,7 @@ def main(argv=None):
     s.add_argument("--selection", default="")
     q = sub.add_parser("pool")
     q.add_argument("--out-dir", required=True)
-    q.add_argument("--what", required=True, choices=("coverage", "inputs"))
+    q.add_argument("--what", required=True, choices=("coverage", "inputs", "calibration"))
     q.add_argument("--selection", default="")
     q.add_argument("--phantom-rows", nargs="*", default=[], help="Block 6 replicate CSVs: the phantoms' band")
     q.add_argument("--config-json", default="")
@@ -539,8 +626,11 @@ def main(argv=None):
     if a.cmd == "pool" and a.what == "coverage":
         pool_coverage(load_config(a.config_json), a.out_dir, a.selection, a.phantom_rows)
         return 0
-    if a.cmd == "pool":
+    if a.cmd == "pool" and a.what == "inputs":
         pool_inputs(load_config(a.config_json), a.out_dir, a.selection)
+        return 0
+    if a.cmd == "pool":
+        pool_calibration(load_config(a.config_json), a.out_dir, a.selection)
         return 0
     cfg = load_config(a.config_json)
     split = (lambda text: [x.strip() for x in text.split(",") if x.strip()])

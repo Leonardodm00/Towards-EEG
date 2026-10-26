@@ -457,31 +457,48 @@ def scan_node(branch, i, provider, cfg, reg=None, scene=None, keep_images=False)
     return res, far_field.far_plane_scan(patch, res, branch, scene, cfg, keep_images), []
 
 
-def scan_cell(swc, provider, cfg, transform=None, regs=None, candidates=None, log=None, keep_images=False):
+def scan_cell(swc, provider, cfg, transform=None, regs=None, candidates=None, log=None, keep_images=False,
+              order_rng=None, max_per_set=None):
     """Plane scans of one cell's calibration nodes, both sets. Every dendrite
     stretch (Block 8) holding a node id of `candidates` (None: every dendrite
     node) is built in the image frame (transform: keyword arguments of
     cell.to_image_um) and each such node goes through scan_node with the
     cell's scene (cell.cell_scene, D-064; regs: {node_id: registration dict};
-    Allen's diameter from the SWC radius the branch carries). Returns a list of
-    (node_id, NodeResult, PlaneScan or None, reasons); log, when given, gets one
-    scan_verdict line per node."""
+    Allen's diameter from the SWC radius the branch carries). Block 19.1
+    (D-088.3): with order_rng the nodes are taken in the order of
+    order_rng.permutation over them (the SWC's order without it); with
+    max_per_set a node whose set (by Allen's diameter, calibration_set)
+    already holds max_per_set scans is not measured, reason set_full.
+    Returns a list of (node_id, NodeResult or None, PlaneScan or None,
+    reasons); log, when given, gets one scan_verdict line per node."""
     types = cfg.acquisition.dendrite_swc_types
     xyz_img = cell.to_image_um(swc.xyz, cfg.acquisition.res0_um, **(transform or {}))
     scene = cell.cell_scene(swc, types, cfg.acquisition.res0_um, transform)
-    out = []
+    work = []
     for run in cell.stretches(swc, types):
         ids = [int(swc.ids[r]) for r in run]
         if candidates is not None and not any(i in candidates for i in ids):
             continue
         branch, off = cell.stretch_branch(swc, run, xyz_img)
         for t, nid in enumerate(ids):
-            if candidates is not None and nid not in candidates:
-                continue
-            res, scan, reasons = scan_node(branch, off + t, provider, cfg, (regs or {}).get(nid), scene, keep_images)
-            out.append((nid, res, scan, reasons))
+            if candidates is None or nid in candidates:
+                work.append((nid, branch, off + t))
+    if order_rng is not None:
+        work = [work[k] for k in order_rng.permutation(len(work))]
+    counts, out = {}, []
+    for nid, branch, i in work:
+        which = calibration_set(2.0 * float(branch.radius_um[i]), cfg)
+        if max_per_set is not None and which is not None and counts.get(which, 0) >= int(max_per_set):
+            out.append((nid, None, None, ["set_full"]))
             if log is not None:
-                log("node %d: %s" % (nid, scan_verdict(scan, reasons)))
+                log("node %d: %s" % (nid, scan_verdict(None, ["set_full"])))
+            continue
+        res, scan, reasons = scan_node(branch, i, provider, cfg, (regs or {}).get(nid), scene, keep_images)
+        if scan is not None:
+            counts[scan.set] = counts.get(scan.set, 0) + 1
+        out.append((nid, res, scan, reasons))
+        if log is not None:
+            log("node %d: %s" % (nid, scan_verdict(scan, reasons)))
     return out
 
 

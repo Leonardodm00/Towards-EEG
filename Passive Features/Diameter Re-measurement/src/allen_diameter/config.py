@@ -286,6 +286,10 @@ class CalibrationConfig:
     far_irls_rounds: int = 3                 # source: D-078.3 [user; the S2b checks' code]: refits with the model weights frozen at the previous round
     far_gamma_max: float = 5.0               # source: PROVISIONAL: upper bound of gamma in the far fit; a fit at it fails
     anchor_sensitivity_step_um: float = 0.01  # source: D-081.7 [user]: half-step of the central difference d gamma_hat / d sigma_0
+    # Block 19 (D-088.3): the nodes per calibration set ("per type" read as per set, PROVISIONAL)
+    calib_min_nodes_per_set: int = 10        # source: D-088.3 [user]: below this a set is insufficient: its fit a diagnostic, no production kernel
+    calib_max_nodes_per_set: int = 30        # source: D-088.3 [user]: a set stops at this many scanned nodes (one cell: Cell 7; pooled: S3c)
+    calib_order_seed: int = 20261026         # source: PROVISIONAL: seed of the candidates' scan order (with the specimen id)
 
 
 NODES_MODES = ("stratified", "all")    # Block 17 (D-085.4)
@@ -326,6 +330,8 @@ class SurveyConfig:
     registration_per_type: int = 3           # source: D-085.8 [user]: list_stretches' suggestion (Cell 3a's rule), stretches per type
     registration_min_nodes: int = 10         # source: D-085.8 [user]: list_stretches' suggestion, nodes a stretch needs
     inputs_z0_flag_um: float = 1.0           # source: PROVISIONAL: a cell whose median dz* exceeds this (um) is flagged z0
+    # Block 19, S3c (D-088)
+    calib_scans_per_cell: int = 5            # source: PROVISIONAL: per cell and set, the scans S3c's step takes before the pooled round-robin
 
 
 @dataclass(frozen=True)
@@ -480,6 +486,9 @@ class DiameterConfig:
             raise ValueError("survey: nodes_mode in %s, nodes_per_bin >= 1, increasing positive bin edges, "
                              "0 < coverage_pass_share <= 1, coverage_min_nodes >= 1, 0 <= phantom quantiles "
                              "increasing <= 1 (Block 17, D-085.4-5)" % (NODES_MODES,))
+        if not (1 <= cal.calib_min_nodes_per_set <= cal.calib_max_nodes_per_set and sv.calib_scans_per_cell >= 1):
+            raise ValueError("calibration: 1 <= calib_min_nodes_per_set <= calib_max_nodes_per_set; survey: "
+                             "calib_scans_per_cell >= 1 (Block 19, D-088.3)")
         if not (sv.registration_per_type >= 1 and sv.registration_min_nodes >= 2 and sv.inputs_z0_flag_um > 0):
             raise ValueError("survey: registration_per_type >= 1, registration_min_nodes >= 2, inputs_z0_flag_um > 0 "
                              "(Block 18, D-085.8)")
