@@ -123,13 +123,14 @@ theory:
     decision:
   - id: T8
     title: "The tilt and the semivariogram"
-    summary: "Why the variance at seconds is carried by a per-sweep linear tilt rather than a third noise component, and how its spread is read from the window-mean semivariogram at one lag (4 periods, 0.802 s)."
-    refs: [SPEC 2.4, D-034, D-051 (iii), topic doc eq. 25]
+    summary: "Why the variance at seconds is carried by a per-sweep linear tilt rather than a third noise component; how its spread sigma_b(c) is read from the window-mean semivariogram at one lag (4 periods, 0.802 s) and why that lag matches the Long Square step; why two SS sweeps fix sigma_b(c) only to about a factor 2 (two tilt draws), and what per-cell, cohort and partially pooled (DerSimonian-Laird) values do for the twins."
+    refs: [SPEC 2.4, SPEC s.8, D-034, D-051 (iii), D-076 (i), topic doc eq. 25, TEEG_tilt_sigma_b_2026-10-26.md, check_findings_2026-10-23.py]
     parent: TG2
     depends_on: [T5, T6]
-    status: studying
+    status: open
     closed_on:
     decision:
+    note: "To study (user, 2026-10-26: not read yet). Study document TEEG_tilt_sigma_b_2026-10-26.md delivered with its checks (check01-05): what (T1) estimates, h* = 4 periods also right for 120 ms windows, the two-draw limit of 2-sweep cells, and the per-cell / cohort / partial-pooling options. Option choice open (SPEC s.8)."
   - id: T9
     title: "Per-sweep calibration and shrinkage"
     summary: "What one sweep can identify of the law (the fast pair well, the slow SD roughly, the slow timescale not), and how a random-effects shrinkage lets each twin sweep carry its own real sweep's noise."
