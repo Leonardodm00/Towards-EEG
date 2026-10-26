@@ -322,6 +322,10 @@ class SurveyConfig:
     coverage_pass_share: float = 0.95        # source: D-085.5 [user]: share inside the band each counted bin must reach
     coverage_min_nodes: int = 20             # source: D-085.5 [user]: a bin with fewer nodes is too_few, not failing
     coverage_phantom_quantiles: Tuple[float, float] = (0.005, 0.995)  # source: PROVISIONAL: the phantoms' band per bin from their fitted ln(mu_hat d_hat)
+    # Block 18, S3b: the simulator's inputs across cells (D-065.2-3, D-085.8-9, D-086)
+    registration_per_type: int = 3           # source: D-085.8 [user]: list_stretches' suggestion (Cell 3a's rule), stretches per type
+    registration_min_nodes: int = 10         # source: D-085.8 [user]: list_stretches' suggestion, nodes a stretch needs
+    inputs_z0_flag_um: float = 1.0           # source: PROVISIONAL: a cell whose median dz* exceeds this (um) is flagged z0
 
 
 @dataclass(frozen=True)
@@ -476,6 +480,9 @@ class DiameterConfig:
             raise ValueError("survey: nodes_mode in %s, nodes_per_bin >= 1, increasing positive bin edges, "
                              "0 < coverage_pass_share <= 1, coverage_min_nodes >= 1, 0 <= phantom quantiles "
                              "increasing <= 1 (Block 17, D-085.4-5)" % (NODES_MODES,))
+        if not (sv.registration_per_type >= 1 and sv.registration_min_nodes >= 2 and sv.inputs_z0_flag_um > 0):
+            raise ValueError("survey: registration_per_type >= 1, registration_min_nodes >= 2, inputs_z0_flag_um > 0 "
+                             "(Block 18, D-085.8)")
         for name, v in (("renderer.dzeta_um", r.dzeta_um), ("renderer.U_um", r.U_um),
                         ("renderer.h_g_um_thin", r.h_g_um_thin), ("renderer.h_g_um_thick", r.h_g_um_thick),
                         ("measure.sigma_fit_um", m.sigma_fit_um), ("renderer.sigma_r0_um", r.sigma_r0_um),

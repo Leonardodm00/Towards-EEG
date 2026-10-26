@@ -28,6 +28,7 @@
 | 2026-10-26 (later) | v24. Cell 11: sparsely spiny cells are a third class, `sparsely_spiny` (D-087, the user's answer of 17:59), selected 5 per layer like `exc` and `inh`; the `--config-json` that raises the page size is written by hand (`{"survey": {...}}`). Evidence: `test_smoke_cell_pool.py` 6 pass, 1 skip with the changed oracles **[run, sandbox]**; not run against Allen's server. |
 | 2026-10-26 (later, 2) | v25. Added Cell 12, S3's step 1 (Block 16.2; D-085.2, D-085.12): `scripts/survey_cells.py run --steps align` aligns every selected cell -- Allen's minimum-intensity xy projection at level 4 and `align_translation` with both flips (the user's method), the score ratio against block-shuffled images, a fine stage at level 1 on the cell's box (the assistant's addition) -- one folder per cell, resumable, a cell set aside below the ratio threshold (2, PROVISIONAL) for the user to look at, a manual alignment file to fix it. Evidence: `test_smoke_cell_alignment.py` 6 pass, 1 skip on painted synthetic cells (the shift within 2.5 full-res px, R about 7; an empty field R 1.08, set aside); 20 of 20 mutants each failed a check **[run, sandbox]**; not run against Allen's server. |
 | 2026-10-26 (later, 3) | v26. Added Cell 13, S3a (Block 17; D-065.1, D-085.4-5): `survey_cells.py run --steps align,nodes` measures each aligned cell's node sample with Block 13's chain -- stratified, up to 20 nodes per bin of Allen's 2r round-robin over the stretches (the default, PROVISIONAL), or every dendrite node -- and `pool --what coverage` draws the coverage of the phantoms' band per bin of d_hat with the pass rule of D-085.5 and the diameters by layer and class. Evidence: `test_smoke_s3a.py` 6 pass, 1 skip (the step on the synthetic cell through `fetch_zblock`, the pooled coverage over it); 16 of 16 mutants each failed a check **[run, sandbox]**; not run on Allen's cells. |
+| 2026-10-26 (later, 4) | v27. Added Cell 14, S3b (Block 18; D-065.2-3, D-085.8-9, D-086): the steps `radius`, `registration` and `camera` per cell and `pool --what inputs` -- d_max the largest Allen 2r over the cells, the jitter the pooled robust SDs of the ON nodes' offsets, one camera setting (the most common table set, the medians of B and the noise SD) -- as suggestions for Cell 8. Evidence: `test_smoke_s3b.py` 6 pass, 1 skip (the three steps on the synthetic cell, the pool over it and over hand-written folders); 13 of 13 mutants each failed a check **[run, sandbox]**; not run on Allen's cells. |
 
 This runbook covers the real-data steps, in order. Each cell names the line that must **appear** in its output. A missing line means the cell did not get as far as the code that prints it. Each step lists the decisions it feeds; those stay yours. Nothing in these scripts changes the configuration on its own.
 
@@ -845,3 +846,34 @@ Expect, per cell, `[i/S] <id> nodes: stratified: n sampled, n measured, k in S (
 Switching `NODES_MODE` after a run: add `"--force", "nodes"` to the `run` call (the marker does not record the mode). A failing bin is reported, not acted on: widening the mu range is your decision (D-065.1).
 
 Decisions it feeds: the mu range (D-065.1), with the figures and the failing bins. Send back the coverage lines, `survey/s3a/coverage.json`, `diameters.csv` and the four figures.
+
+## Cell 14: S3b -- the simulator's inputs across cells: d_max, the node jitter, the camera (Block 18)
+
+[added 2026-10-26, v27; D-065.2-3, D-085.8-9, D-086. Needs Cells 0, 1, 11-13.]
+
+```python
+import json
+SURVEY = OUT + "/survey"
+CFG_S3 = SURVEY + "/survey_config.json"            # Cell 13's (the node mode); written here if Cell 13 did not run
+if not os.path.exists(CFG_S3):
+    with open(CFG_S3, "w") as f:
+        json.dump({"survey": {"nodes_mode": "stratified"}}, f)
+run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
+    "--cache-dir", CACHE_DIR, "--steps", "align,nodes,radius,registration,camera", "--config-json", CFG_S3)
+run("scripts/survey_cells.py", "pool", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv",
+    "--what", "inputs", "--config-json", CFG_S3)
+```
+
+(The notebook's cell then prints the suggestions and shows `inputs.png`.)
+
+| Input | Per cell | Pooled suggestion | Who chose the rule |
+|---|---|---|---|
+| `phantom.d_range_um`'s upper end, d_max | `radius`: Allen's dendrite 2r (SWC types 3, 4), its maximum and the node | the largest over the cells, with the cell and node; p99 and p99.5 beside it as comparisons | the user (D-086) |
+| `phantom.jitter_xy_um`, `jitter_z_um` | `registration`: the registration survey (Cell 3b's check) on list_stretches' suggestion (3 stretches of ≥ 10 nodes per type): s* and dz* per node | 1.4826 × MAD of the ON nodes' s* and dz*, pooled across the cells; per cell the same and the medians | the user (D-085.8) |
+| the camera fields | `camera`: Cell 5's computation on the cell's nodes' background (from `nodes`) and the cache's JPEG tables | the most common table set; the medians of B and of the noise SD over the cells (the noise SD an upper bound) | the user (D-085.9) |
+
+Expect per cell `radius: n nodes, max 2r ... um (node ...), p99 ... um`, `registration: k nodes, verdicts {...}, robust SD xy ..., z ...`, `camera: B ... gl, noise SD ... gl, tables yes`; then `inputs: d_max ... um (cell ..., node ...; p99 ..., p99.5 ... um); jitter xy ... um, z ... um[ (z0 flagged: [...])]; background ... gl, noise SD ... gl, n table set(s), the most common in m cells` and `inputs: suggestions only (Cell 8 decides) -> .../survey/s3b`. Files in `survey/<id>/radius/`, `registration/`, `camera/`, and `survey/s3b/` (`inputs.json` with `suggested`, `inputs_per_cell.csv`, `inputs.png`).
+
+A cell flagged `z0` has |median dz*| above 1 µm (PROVISIONAL): the plane origin `z0_um` = 0 of its alignment (Cell 12) may be off; its overlay and registration figures say more. One thick node -- a trunk near the soma, or a tracing error -- sets d_max for every cell (D-086): read the cell and node it names before you write it into `DECIDED`.
+
+Decisions it feeds: Cell 8's `phantom.d_range_um`, `jitter_xy_um`, `jitter_z_um`, `renderer.background_B_gl`, `noise_sd_gl`, `jpeg_qtables` -- each a value you write, never taken automatically (D-065). Send back the `inputs:` lines, `survey/s3b/inputs.json`, `inputs_per_cell.csv` and `inputs.png`.

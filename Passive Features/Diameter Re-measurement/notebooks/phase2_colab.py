@@ -1165,6 +1165,35 @@ for name in ("coverage_mud", "coverage_share", "coverage_alpha", "diameters"):
     display(Image(filename="%s/s3a/%s.png" % (SURVEY, name)))
 
 # ====================================================================================================
+# ===== CELL 14
+# ====================================================================================================
+# CELL 14: S3b -- THE SIMULATOR'S INPUTS ACROSS CELLS: d_max, THE NODE JITTER, THE CAMERA (Block 18; D-065.2-3,
+# D-085.8-9, D-086). Needs Cells 0, 1, 11-13. Per aligned cell: Allen's dendrite diameters (radius), the registration
+# survey on list_stretches' suggestion (registration: s* and dz* per node), the camera inputs from the nodes'
+# background (camera). Then the pooled suggestions: d_max = the largest Allen 2r over the cells (D-086), the jitter =
+# the robust SDs of the ON nodes' s* and dz* pooled (D-085.8), one camera setting = the most common JPEG table set and
+# the medians of B and the noise SD (D-085.9). Expect one line per cell and step, then `inputs: d_max ... um (cell,
+# node; p99, p99.5); jitter xy ... um, z ... um; background ... gl, noise SD ... gl, ...` and `inputs: suggestions
+# only (Cell 8 decides)`. A cell flagged z0 has a median dz* above 1 um: its plane origin may be off. These are
+# suggestions: write the ones you accept into Cell 8's DECIDED. Send back the `inputs:` lines, survey/s3b/inputs.json,
+# inputs_per_cell.csv and inputs.png.
+import json
+SURVEY = OUT + "/survey"
+CFG_S3 = SURVEY + "/survey_config.json"            # Cell 13's (the node mode); written here if Cell 13 did not run
+if not os.path.exists(CFG_S3):
+    with open(CFG_S3, "w") as f:
+        json.dump({"survey": {"nodes_mode": "stratified"}}, f)
+run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
+    "--cache-dir", CACHE_DIR, "--steps", "align,nodes,radius,registration,camera", "--config-json", CFG_S3)
+run("scripts/survey_cells.py", "pool", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv",
+    "--what", "inputs", "--config-json", CFG_S3)
+with open(SURVEY + "/s3b/inputs.json") as f:
+    INPUTS = json.load(f)["suggested"]
+print({k: v for k, v in INPUTS.items() if k != "jpeg_qtables"})
+from IPython.display import Image, display
+display(Image(filename=SURVEY + "/s3b/inputs.png"))
+
+# ====================================================================================================
 # ===== CELL end of session (optional)
 # ====================================================================================================
 # WHAT TO SEND BACK
@@ -1201,6 +1230,7 @@ for name in ("coverage_mud", "coverage_share", "coverage_alpha", "diameters"):
 # - Cell 11 (S3, step 0): the `pool:` and `check:` summary lines, acquisition.json, and the `select:` lines.
 # - Cell 12 (S3, step 1): the `survey:` summary line, status.csv, and the overlays of the set-aside cells.
 # - Cell 13 (S3a): the coverage lines, survey/s3a/coverage.json, diameters.csv and the four figures.
+# - Cell 14 (S3b): the `inputs:` lines, survey/s3b/inputs.json, inputs_per_cell.csv and inputs.png.
 #
 # These decide the open items of SPEC section 8: d_max, the mu range, the jitter amplitudes, the camera fields
 # and the dark-flag threshold.

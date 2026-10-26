@@ -12,7 +12,8 @@ api.brain-map.org is blocked from the sandbox.
           later steps are skipped, and the next cell starts
   status  the table of every cell's steps, rebuilt from the markers
 
-  pool    the pooled analyses over the cells: --what coverage (Block 17.3-17.5)
+  pool    the pooled analyses over the cells: --what coverage (Block 17.3-17.5),
+          --what inputs (Block 18.4-18.5)
 
 Steps (in their order)
   align   the cell's global alignment (Block 16.2): the minimum-intensity
@@ -25,6 +26,11 @@ Steps (in their order)
           survey.nodes_mode, stratified (20 per bin of Allen's 2r, round-robin
           over the stretches) or all; <sid>/nodes/pilot_<sid>.csv (the per-node
           CSV with the background statistics) and pilot_summary_<sid>.json
+  radius        Allen's dendrite diameters of the cell's SWC (Block 18.1): <sid>/radius/
+  registration  the registration survey on list_stretches' suggestion (Block 18.2):
+                <sid>/registration/ (s*, dz* and the verdict per node)
+  camera        the camera inputs from the nodes' background (Block 18.3; after
+                nodes): <sid>/camera/camera_<sid>.json
 
 Example (Colab, after Cell 11)
     python scripts/survey_cells.py run --selection .../survey/selection.csv --out-dir .../survey \
@@ -177,6 +183,74 @@ def _say_nodes(s):
     return "%s: %d sampled, %d measured, %d in S" % (s["mode"], s["n_sampled"], s["n_measured"], s["n_in_S"])
 
 
+def step_radius(ctx, cfg):
+    """Block 18.1: Allen's dendrite diameters of the cell's SWC (D-065.2, D-086)."""
+    import allen_radius_distribution as ard
+    sid = ctx.sid
+    nodes, files = ard.collect([ctx.data["swc_path"]], tuple(cfg.acquisition.dendrite_swc_types))
+    for r in nodes + files:
+        r["specimen"] = str(sid)
+    ard.write_csv(ctx.cell.path_of("radius", "radius_nodes_%d.csv" % sid), nodes)
+    ard.write_csv(ctx.cell.path_of("radius", "radius_summary_%d.csv" % sid), files)
+    D = np.array([r["diameter_um"] for r in nodes], dtype=float)
+    ok = np.isfinite(D)
+    if not ok.any():
+        raise RuntimeError("no dendrite node with a finite radius in %d" % sid)
+    k = int(np.argmax(np.where(ok, D, -np.inf)))
+    return dict(n=int(ok.sum()), max_um=float(D[k]), max_node_id=int(nodes[k]["node_id"]),
+                p99_um=float(np.percentile(D[ok], 99.0)))
+
+
+def step_registration(ctx, cfg):
+    """Block 18.2: the registration survey on list_stretches' suggestion (D-085.8)."""
+    import list_stretches
+    import registration_survey
+    from allen_diameter.loading import swc_io
+    sid, sv = ctx.sid, cfg.survey
+    out_dir = os.path.dirname(ctx.cell.path_of("registration", "x"))
+    swc = swc_io.read_swc(ctx.data["swc_path"])
+    _rows, info = list_stretches.run(swc, out_dir, sid, types=tuple(cfg.acquisition.dendrite_swc_types),
+                                     per_type=sv.registration_per_type, min_nodes=sv.registration_min_nodes,
+                                     log=lambda m: None)
+    nodes = [int(n) for n in info["suggested_nodes"]]
+    if not nodes:
+        raise RuntimeError("no stretch of at least %d nodes to register in %d" % (sv.registration_min_nodes, sid))
+    t = cell_alignment.full_transform(ctx.alignment)
+    _res, summ = registration_survey.run(aip.read_swc(ctx.data["swc_path"]), ctx.source.fetcher, ctx.source.planes(sid),
+                                         nodes, out_dir, sid, cfg.acquisition.res0_um, cfg.acquisition.dz_um,
+                                         shift_full_px=t["shift_full_px"], flip_y_full_h=t["flip_y_full_h"],
+                                         z0_um=t["z0_um"], log=lambda m: None)
+    return dict(n_nodes=len(nodes), verdicts=summ.get("verdicts", {}), jitter=summ.get("suggested_jitter_um"))
+
+
+def step_camera(ctx, cfg):
+    """Block 18.3: the camera inputs from the nodes' background statistics (D-085.9)."""
+    import camera_calibration
+    sid = ctx.sid
+    if not ctx.cell.done("nodes"):
+        raise RuntimeError("camera needs the step nodes of %d (its background statistics)" % sid)
+    out_dir = os.path.dirname(ctx.cell.path_of("camera", "x"))
+    out = camera_calibration.run(ctx.source.cache_dir, out_dir, sid,
+                                 pilot_summary=ctx.cell.path_of("nodes", "pilot_summary_%d.json" % sid), cfg=cfg)
+    r = out.get("renderer", {})
+    return dict(background_B_gl=r.get("background_B_gl"), noise_sd_gl=r.get("noise_sd_gl"),
+                has_tables="jpeg_qtables" in r, notes=out.get("notes", []))
+
+
+def _say_radius(s):
+    return "%d nodes, max 2r %.2f um (node %d), p99 %.2f um" % (s["n"], s["max_um"], s["max_node_id"], s["p99_um"])
+
+
+def _say_registration(s):
+    j = s.get("jitter") or {}
+    return "%d nodes, verdicts %s, robust SD xy %s, z %s" % (s["n_nodes"], s["verdicts"], j.get("jitter_xy_um"),
+                                                              j.get("jitter_z_um"))
+
+
+def _say_camera(s):
+    return "B %s gl, noise SD %s gl, tables %s" % (s["background_B_gl"], s["noise_sd_gl"], "yes" if s["has_tables"] else "no")
+
+
 def _say_align(s):
     return "shift (%.1f, %.1f) px, %s, ratio %s, %s%s" % (
         s["shift_x_px"], s["shift_y_px"], "flip" if s["flip_h_px"] is not None else "no flip",
@@ -184,9 +258,11 @@ def _say_align(s):
         "; SET ASIDE (%s)" % ",".join(s["reasons"]) if s["set_aside"] else "")
 
 
-STEPS = {"align": step_align, "nodes": step_nodes}          # Blocks 18-19 add theirs, in this order
-ORDER = ("align", "nodes")
-SAY = {"align": _say_align, "nodes": _say_nodes}
+STEPS = {"align": step_align, "nodes": step_nodes, "radius": step_radius, "registration": step_registration,
+         "camera": step_camera}                                 # Block 19 adds its own, in this order
+ORDER = ("align", "nodes", "radius", "registration", "camera")
+SAY = {"align": _say_align, "nodes": _say_nodes, "radius": _say_radius, "registration": _say_registration,
+       "camera": _say_camera}
 
 
 # ----------------------------------------------------------------- runner ---
@@ -371,6 +447,70 @@ def pool_coverage(cfg, out_dir, selection_path="", phantom_paths=(), log=print):
     return bins, ver
 
 
+def pool_inputs(cfg, out_dir, selection_path="", log=print):
+    """Block 18.4-18.5 over the cells with the markers radius, registration, camera."""
+    import matplotlib.pyplot as plt
+    from allen_diameter.analysis import s3_inputs
+    from allen_diameter.analysis.registration import registration_category
+    from allen_diameter.loading import table_io
+    from allen_diameter.plotting import survey_figures
+    rad, jit, cam = [], [], []
+    for cell, rec in _cells(out_dir, selection_path):
+        if cell.done("radius"):
+            rows = table_io.read_rows(cell.path_of("radius", "radius_nodes_%d.csv" % cell.sid))
+            rad.append(dict(specimen_id=cell.sid, node_ids=[int(r["node_id"]) for r in rows],
+                            D_allen=[float(r["diameter_um"]) for r in rows]))
+        if cell.done("registration"):
+            res = survey_io.read_json(cell.path_of("registration", "registration_%d.json" % cell.sid))
+            on = [v for v in res.values() if registration_category(v.get("verdict")) == "ON"]
+            num = (lambda v: float("nan") if v is None else float(v))
+            jit.append(dict(specimen_id=cell.sid, s_star=[num(v.get("lateral_offset_um")) for v in on],
+                            dz_star=[num(v.get("z_offset_um")) for v in on]))
+        if cell.done("camera"):
+            r = survey_io.read_json(cell.path_of("camera", "camera_%d.json" % cell.sid)).get("renderer", {})
+            cam.append(dict(specimen_id=cell.sid, background_B_gl=r.get("background_B_gl"),
+                            noise_sd_gl=r.get("noise_sd_gl"), jpeg_qtables=r.get("jpeg_qtables")))
+    if not (rad or jit or cam):
+        raise RuntimeError("pool inputs: no cell under %s has finished radius, registration or camera" % out_dir)
+    sug = dict(d_max=s3_inputs.d_max(rad) if rad else dict(value_um=None, note="no cell has finished radius"),
+               jitter=s3_inputs.jitter(jit, cfg.survey.inputs_z0_flag_um) if jit else
+               dict(jitter_xy_um=None, jitter_z_um=None, note="no cell has finished registration"),
+               camera=s3_inputs.camera(cam) if cam else dict(background_B_gl=None, noise_sd_gl=None,
+                                                             note="no cell has finished camera"))
+    s3b = os.path.join(out_dir, "s3b")
+    os.makedirs(s3b, exist_ok=True)
+    per = {}
+    for r in (sug["d_max"].get("per_cell") or []):
+        per.setdefault(r["specimen_id"], {}).update(max_2r_um=r["max_um"], max_node_id=r["node_id"], n_radius=r["n"])
+    for r in (sug["jitter"].get("per_cell") or []):
+        per.setdefault(r["specimen_id"], {}).update(n_on=r["n_on"], sd_xy_um=r["sd_xy_um"], sd_z_um=r["sd_z_um"],
+                                                    median_dz_um=r["median_dz_um"], z0_flag=r["z0_flag"])
+    for c in cam:
+        per.setdefault(c["specimen_id"], {}).update(background_B_gl=c["background_B_gl"], noise_sd_gl=c["noise_sd_gl"],
+                                                    has_tables=c["jpeg_qtables"] is not None)
+    table_io.write_rows([dict(specimen_id=k, **v) for k, v in sorted(per.items())], os.path.join(s3b, "inputs_per_cell.csv"))
+    survey_io.write_json(os.path.join(s3b, "inputs.json"), dict(
+        suggested=dict(phantom_d_max_um=sug["d_max"].get("value_um"), jitter_xy_um=sug["jitter"].get("jitter_xy_um"),
+                       jitter_z_um=sug["jitter"].get("jitter_z_um"),
+                       background_B_gl=sug["camera"].get("background_B_gl"),
+                       noise_sd_gl=sug["camera"].get("noise_sd_gl"), jpeg_qtables=sug["camera"].get("jpeg_qtables")),
+        d_max=sug["d_max"], jitter=sug["jitter"], camera=sug["camera"],
+        note="suggestions only: Cell 8's DECIDED takes a value when the user writes it (D-065)"))
+    fig = survey_figures.inputs_figure(rad, jit, cam, sug)
+    fig.savefig(os.path.join(s3b, "inputs.png"), dpi=110)
+    plt.close(fig)
+    dm, jt, cm = sug["d_max"], sug["jitter"], sug["camera"]
+    log("inputs: d_max %s um%s; jitter xy %s um, z %s um%s; background %s gl, noise SD %s gl, %s"
+        % (dm.get("value_um"), " (cell %s, node %s; p99 %.2f, p99.5 %.2f um)" % (
+            dm["specimen_id"], dm["node_id"], dm["p99_um"], dm["p99_5_um"]) if dm.get("value_um") is not None else "",
+           jt.get("jitter_xy_um"), jt.get("jitter_z_um"),
+           " (z0 flagged: %s)" % jt["z0_flagged"] if jt.get("z0_flagged") else "",
+           cm.get("background_B_gl"), cm.get("noise_sd_gl"),
+           "%d table set(s), the most common in %d cells" % (cm.get("n_table_sets", 0), len(cm.get("jpeg_cells", [])))))
+    log("inputs: suggestions only (Cell 8 decides) -> %s" % s3b)
+    return sug
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -388,7 +528,7 @@ def main(argv=None):
     s.add_argument("--selection", default="")
     q = sub.add_parser("pool")
     q.add_argument("--out-dir", required=True)
-    q.add_argument("--what", required=True, choices=("coverage",))
+    q.add_argument("--what", required=True, choices=("coverage", "inputs"))
     q.add_argument("--selection", default="")
     q.add_argument("--phantom-rows", nargs="*", default=[], help="Block 6 replicate CSVs: the phantoms' band")
     q.add_argument("--config-json", default="")
@@ -396,8 +536,11 @@ def main(argv=None):
     if a.cmd == "status":
         status(a.out_dir, a.selection)
         return 0
-    if a.cmd == "pool":
+    if a.cmd == "pool" and a.what == "coverage":
         pool_coverage(load_config(a.config_json), a.out_dir, a.selection, a.phantom_rows)
+        return 0
+    if a.cmd == "pool":
+        pool_inputs(load_config(a.config_json), a.out_dir, a.selection)
         return 0
     cfg = load_config(a.config_json)
     split = (lambda text: [x.strip() for x in text.split(",") if x.strip()])

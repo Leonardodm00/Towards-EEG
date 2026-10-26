@@ -8,6 +8,8 @@ prepared; nothing scientific is computed here.
   coverage_figures   S3a (Block 17.5): ln(mu_hat d_hat) against ln d_hat with
                      the band; the share inside per bin; ln alpha_hat per bin
   diameter_figure    S3a (Block 17.5): d_hat and Allen's 2r per layer, by class
+  inputs_figure      S3b (Block 18.5): Allen's 2r pooled with d_max; the ON
+                     nodes' offsets with their robust SDs; each cell's camera
 
 Colours: the palette of the project's figures. Pure ASCII, for the cluster
 (hpc-python-compat).
@@ -163,5 +165,62 @@ def diameter_figure(nodes):
         ax.set_title(title, fontsize=10)
         ax.legend(fontsize=8)
     fig.suptitle("S3a: dendrite diameters per layer and class (D-085.5)", fontsize=11)
+    fig.tight_layout()
+    return fig
+
+
+def inputs_figure(rad, jit, cam, sug):
+    """Block 18.5: rad, jit, cam the per-cell records of s3_inputs; sug the
+    suggestions {d_max, jitter, camera}."""
+    plt = _plt()
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
+    ax = axes[0]
+    D = np.concatenate([np.asarray(c["D_allen"], dtype=float) for c in rad]) if rad else np.zeros(0)
+    D = D[np.isfinite(D) & (D > 0)]
+    if D.size:
+        ax.hist(np.log10(D), bins=40, color=BLUE, alpha=0.7)
+        dm = sug["d_max"]
+        for key, ls, lab in (("value_um", "-", "d_max (max, D-086)"), ("p99_um", "--", "p99"), ("p99_5_um", ":", "p99.5")):
+            if dm.get(key):
+                ax.axvline(math.log10(dm[key]), color=ORANGE if key == "value_um" else INK, ls=ls, label="%s %.2f um"
+                           % (lab, dm[key]))
+        for r in dm.get("per_cell", []):
+            ax.plot(math.log10(r["max_um"]), 0, marker="|", color=INK, ms=12)
+        ax.legend(fontsize=8)
+    ax.set_xlabel("log10 Allen's dendrite 2r (um); ticks: each cell's maximum")
+    ax.set_title("d_max", fontsize=10)
+    ax = axes[1]
+    for key, col, lab in (("s_star", BLUE, "s* lateral"), ("dz_star", ORANGE, "dz* depth")):
+        x = np.concatenate([np.asarray(c[key], dtype=float) for c in jit]) if jit else np.zeros(0)
+        x = x[np.isfinite(x)]
+        if x.size:
+            ax.hist(x, bins=30, color=col, alpha=0.5, label="%s (%d ON nodes)" % (lab, x.size))
+    jt = sug["jitter"]
+    for key, col in (("jitter_xy_um", BLUE), ("jitter_z_um", ORANGE)):
+        if jt.get(key):
+            ax.axvline(jt[key], color=col, ls="--")
+            ax.axvline(-jt[key], color=col, ls="--")
+    ax.legend(fontsize=8)
+    ax.set_xlabel("offset (um); dashed: +- the pooled robust SD (D-085.8)")
+    ax.set_title("node jitter", fontsize=10)
+    ax = axes[2]
+    ids = [c["specimen_id"] for c in cam]
+    B = [c["background_B_gl"] if c["background_B_gl"] is not None else np.nan for c in cam]
+    N = [c["noise_sd_gl"] if c["noise_sd_gl"] is not None else np.nan for c in cam]
+    xs = np.arange(len(ids))
+    ax.plot(xs - 0.15, B, "o", color=BLUE, label="background B (gl)")
+    ax2 = ax.twinx()
+    ax2.plot(xs + 0.15, N, "s", color=ORANGE, label="noise SD (gl, upper bound)")
+    cm = sug["camera"]
+    if cm.get("background_B_gl") is not None:
+        ax.axhline(cm["background_B_gl"], color=BLUE, ls="--")
+    if cm.get("noise_sd_gl") is not None:
+        ax2.axhline(cm["noise_sd_gl"], color=ORANGE, ls="--")
+    ax.set_xticks(xs)
+    ax.set_xticklabels([str(i) for i in ids], rotation=90, fontsize=7)
+    ax.set_title("camera per cell; dashed: the medians (D-085.9)", fontsize=10)
+    ax.legend(loc="upper left", fontsize=8)
+    ax2.legend(loc="upper right", fontsize=8)
+    fig.suptitle("S3b: the simulator's inputs across cells -- suggestions, not decisions", fontsize=11)
     fig.tight_layout()
     return fig
