@@ -24,6 +24,7 @@
 | 2026-10-21 (later, 2) | v20. Cell 9's job chunks by draw (Block 14.2; D-059, D-062): the knobs `DIAM_N_DRAWS`, `DIAM_N_TASKS`, `DIAM_DRAW_OFFSET` replace `DIAM_N_TOTAL`; `phantom.n_replicates` is retired (`n_draws`, `n_realizations`). Evidence: `test_smoke_pbs.py` 4 pass, 3 skip **[run, sandbox]**; not run on davinci. |
 | 2026-10-21 (later, 3) | v21. Cell 9's merge (Blocks 14.4-14.6): the table is the local linear fit on a three-axis grid; the merge reads only the columns it needs, refuses a (draw, realization) seen twice, notes the draws short of `n_realizations`, writes the per-draw table `draws_<hash>.csv` beside the table, and at $10^6$ rows takes of order 20 min and a few hundred MB, so it runs in a job, not on the login node; the expected lines updated. A `config_production.json` written before Block 14.3 (two bandwidths) is refused: make it again with Cell 8. Evidence: `test_smoke_table.py` 7 pass, the merge's refusal and notes included **[run, sandbox]**; not run on davinci. |
 | 2026-10-23 | v22. Cell 7 runs the whole kernel calibration (Blocks 10 and 15; D-074 to D-081): `real` scans both sets on ±25 µm patches with a planar far-pixel background, the iterative core fit, the straightness and the 0.03 grey-level isolation rule (φ ≤ 5° for both sets), and keeps the example nodes' patch images; `fit` cuts the table at 0.84 µm and bootstraps the anchor's SE; the new `far-fit` fits the far slope γ̂ with its t interval, the per-sign and the quadratic comparison, and writes the production kernel's continuation slope; the new `figures` writes the width-by-plane, example-node and kernel-law figures. Evidence: `test_smoke_calibration.py` 8 pass, `test_smoke_calibration_scene.py` 6 pass 1 skip, `test_smoke_far_field.py` 6 pass 1 skip, `test_smoke_calibration_figures.py` 6 pass 1 skip; on rendered far phantoms γ̂ within 1 % noise-free and 0.83 ± 0.02 against 0.79 with camera noise (4 nodes) **[run, sandbox]**; not run on Allen's data. |
+| 2026-10-26 | v23. Added Cell 11, S3's step 0 (Block 16.1; D-065, D-085): `scripts/cell_pool.py pool` lists the human cells with a reconstruction (Allen's `ApiCellTypesSpecimenDetail`, filtered as the Allen SDK filters it), `check` reads each cell's plane spacing, pixel size and usable planes over the whole pool and compares them with the configuration (0.28 µm, 0.1144 µm/px), `select` draws 5 cells per neuron class and layer (all of a smaller group) by a seeded permutation, among the matching cells only when `REQUIRE_MATCH`. Evidence: `test_smoke_cell_pool.py` 6 pass, 1 skip, on canned API rows and a substituted `api_query`; 17 of 17 mutants of the new code each failed a check **[run, sandbox]**; the raw field names read from the Allen SDK's source (allensdk 2.16.2, `cell_types_api.py`), not from the live API; not run against Allen's server. |
 
 This runbook covers the real-data steps, in order. Each cell names the line that must **appear** in its output. A missing line means the cell did not get as far as the code that prints it. Each step lists the decisions it feeds; those stay yours. Nothing in these scripts changes the configuration on its own.
 
@@ -733,3 +734,35 @@ Outputs:
 - `summary_<specimen>.json`, with the membrane-area ratio against Allen's radii.
 
 Run it on a few stretches first, with `--nodes` (above); the notebook's Cell 10b then runs every dendrite node (the same command without `--nodes`), ~~and Cell 10c runs each σ_fit study table that is on Drive into `cell_sigma<value>/`. No script yet joins the three runs into the `d_tilde_sigma_spread_um` column (SPEC §8): compare the three `nodes_<specimen>.csv` by `node_id`.~~ [corrected 2026-10-21, S2.2: Cell 10c and the column are removed with the σ_fit study, D-057 (ii).]
+
+## Cell 11: S3 across cells, step 0 -- the cell pool, the acquisition check, the selection (Block 16.1)
+
+[added 2026-10-26, v23; D-065, D-085. Needs Cells 0 and 1 only.]
+
+```python
+SURVEY = OUT + "/survey"
+os.makedirs(SURVEY, exist_ok=True)
+run("scripts/cell_pool.py", "pool", "--out", SURVEY + "/pool.csv")
+run("scripts/cell_pool.py", "check", "--pool", SURVEY + "/pool.csv", "--out", SURVEY + "/acquisition.csv")
+REQUIRE_MATCH = True          # decide after reading the check (D-085.3)
+run("scripts/cell_pool.py", "select", "--pool", SURVEY + "/pool.csv", "--acquisition", SURVEY + "/acquisition.csv",
+    *(["--require-match"] if REQUIRE_MATCH else []), "--out", SURVEY + "/selection.csv")
+```
+
+S3 runs the real-data surveys (S3a-S3d) over many Allen cells instead of 529878215 alone. This cell picks the cells; nothing here measures a node.
+
+| Step | What it does | Writes |
+|---|---|---|
+| `pool` | every row of Allen's `ApiCellTypesSpecimenDetail`, kept when the species is Homo Sapiens and a reconstruction exists (the Allen SDK's own filter, `CellTypesApi.filter_cells_api`); one record per specimen | `survey/pool.csv` |
+| `check` | per pool cell: the plane spacing (`NeuronReconstruction.scale_factor_z`), the pixel size (the Primary planes' `resolution`, µm/px at downsample 0), the usable and failed planes; compared with `acquisition.dz_um` = 0.28 µm and `res0_um` = 0.1144 µm/px at a relative tolerance of 1e-3 (PROVISIONAL) | `survey/acquisition.csv`, `survey/acquisition.json` |
+| `select` | per (class, layer): the cells in increasing specimen id, permuted by `default_rng([20261026, crc32("class|layer")])`, the first 5, or all of a smaller group (D-085.1); with `--require-match`, only the cells whose plane spacing and pixel size match | `survey/selection.csv`, `survey/selection.json` |
+
+Class (D-085.1; the mapping PROVISIONAL): spiny = exc, aspiny = inh. Sparsely spiny cells, and cells without a dendrite type, have no class: they are listed by `pool` and never selected. Layer: Allen's label as given.
+
+Expect from `pool`: `pool: N Homo Sapiens cells with a reconstruction (M rows read, api:model::ApiCellTypesSpecimenDetail) -> .../survey/pool.csv`, then `by class and layer: exc|2 n, ...` and `dendrite types without a class (left out of the selection): {...}`. A `ValueError` naming a missing field prints the keys Allen's rows hold: send them back (the field names come from the SDK's source, not from the live API). A `RuntimeWarning` ending `raise survey.pool_page_rows above ...` means the query needed more than one page, and pages without an order may skip rows: set `survey.pool_page_rows` above the row count in a `--config-json` and run again.
+
+Expect from `check`: `check: N cells in the pool, 0 already checked, N to check`, one line per cell (`<id>: dz <value> um, pixel <value> um, <n> planes`, with `; ERROR ...` when a query failed), then `check: N cells, k failed; dz (um): {...}; pixel (um): {...}; m match the configuration (dz 0.2800 um, pixel 0.1144 um, relative tolerance 0.001) -> ...`. It writes the table every 10 cells and skips the cells already in it, so after a disconnection run the cell again (`--fresh` checks every cell again). The time per cell against Allen's server is not measured: about four queries per cell.
+
+Expect from `select`: `select: G groups, S cells selected (seed 20261026, 5 per group); left out {...} -> ...`, then one line per group, `exc|3   5 of  n: <ids>`. `selection.json` holds the seed, the rule, each group's counts and every cell left out with its reason (`no_class`, `no_layer`, `acquisition_missing`, `acquisition_mismatch:dz`, `:pixel`, `:dz;pixel`, `:error`, `:no_planes`).
+
+Decisions it feeds: whether the cells whose plane spacing or pixel size differ stay out (D-085.3: `REQUIRE_MATCH`, read `acquisition.json` first; `True` is the cell's default, not a decision); the selected cells are the input of S3a-S3d (Blocks 16.2-20). Send back the `pool:` lines, the `check:` summary line with `acquisition.json`, and the `select:` lines.

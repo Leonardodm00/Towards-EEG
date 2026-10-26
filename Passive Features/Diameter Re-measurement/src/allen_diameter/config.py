@@ -289,6 +289,19 @@ class CalibrationConfig:
 
 
 @dataclass(frozen=True)
+class SurveyConfig:
+    """S3 across cells (Block 16; D-065, D-085): the cell pool, the acquisition
+    check and the stratified selection. None of these is in a signature."""
+
+    species: str = "Homo Sapiens"            # source: D-085.1; the Allen SDK's CellTypesApi.HUMAN, the pool of the passive-fit pipeline
+    cells_per_group: int = 5                 # source: D-085.1 [user]: 5 cells per neuron class and layer, all of a smaller group
+    class_map: Tuple[Tuple[str, str], ...] = (("spiny", "exc"), ("aspiny", "inh"))  # source: D-085.1, PROVISIONAL: Allen's dendrite type -> class; unmapped types (sparsely spiny) are left out
+    selection_seed: int = 20261026           # source: PROVISIONAL: seed of the per-group permutations (Block 16.1 (d))
+    acquisition_rel_tol: float = 1e-3        # source: PROVISIONAL: relative tolerance of a cell's plane spacing and pixel size against acquisition (D-085.3)
+    pool_page_rows: int = 10000              # source: PROVISIONAL: rows per page of the ApiCellTypesSpecimenDetail query; large, so the model comes in one page (the SDK asks num_rows 'all'; pages without an order may skip rows)
+
+
+@dataclass(frozen=True)
 class DiameterConfig:
     """The whole configuration. Build with ``DiameterConfig()`` for the
     deliverable defaults, or ``dataclasses.replace`` for a labelled variant."""
@@ -299,6 +312,7 @@ class DiameterConfig:
     renderer: RendererConfig = field(default_factory=RendererConfig)
     phantom: PhantomConfig = field(default_factory=PhantomConfig)
     calibration: CalibrationConfig = field(default_factory=CalibrationConfig)
+    survey: SurveyConfig = field(default_factory=SurveyConfig)
 
     # ------------------------------------------------------------ checks --
     def validate(self) -> None:
@@ -414,6 +428,14 @@ class DiameterConfig:
                              "settings out of range (Block 10.P/10.I/10.A, Block 15; D-078 to D-081)")
         if abs(cal.table_max_delta_um - round(cal.table_max_delta_um / cal.knot_step_um) * cal.knot_step_um) > 1e-9:
             raise ValueError("calibration.table_max_delta_um must be a multiple of knot_step_um (the table ends on a knot)")
+        sv = self.survey
+        types = [str(t).strip().lower() for t, _ in sv.class_map] if all(len(x) == 2 for x in sv.class_map) else None
+        if not (isinstance(sv.species, str) and sv.species.strip() and sv.cells_per_group >= 1
+                and types is not None and all(types) and len(set(types)) == len(types)
+                and all(isinstance(c, str) and c.strip() for _, c in sv.class_map)
+                and sv.acquisition_rel_tol >= 0 and math.isfinite(sv.acquisition_rel_tol) and sv.pool_page_rows >= 1):
+            raise ValueError("survey: species, cells_per_group >= 1, class_map (unique dendrite types -> non-empty "
+                             "classes), acquisition_rel_tol >= 0 or pool_page_rows >= 1 out of range (Block 16.1, D-085)")
         for name, v in (("renderer.dzeta_um", r.dzeta_um), ("renderer.U_um", r.U_um),
                         ("renderer.h_g_um_thin", r.h_g_um_thin), ("renderer.h_g_um_thick", r.h_g_um_thick),
                         ("measure.sigma_fit_um", m.sigma_fit_um), ("renderer.sigma_r0_um", r.sigma_r0_um),

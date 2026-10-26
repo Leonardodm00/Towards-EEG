@@ -1084,6 +1084,32 @@ run("scripts/run_cell.py", "--specimen", SPECIMEN, "--table", TABLE, "--out-dir"
     "--cache-dir", CACHE_DIR, "--config-json", CFG, "--registration-json", REG_JSON, *ALIGN)
 
 # ====================================================================================================
+# ===== CELL 11
+# ====================================================================================================
+# CELL 11: S3 ACROSS CELLS -- STEP 0: THE CELL POOL, THE ACQUISITION CHECK, THE SELECTION (Block 16.1; D-085)
+# S3 runs the real-data surveys over many Allen cells, not 529878215 alone (D-065, D-085). This cell needs Cells 0
+# and 1 only. (1) `pool`: every human cell with a reconstruction in Allen's database. Expect `pool: N Homo Sapiens
+# cells with a reconstruction (M rows read, api:...)`, the counts by class and layer (exc = spiny, inh = aspiny,
+# PROVISIONAL) and the dendrite types left without a class (sparsely spiny). A failure that names missing fields
+# prints the keys Allen's rows hold: send them back. A warning `... without an order` means the query needed more
+# than one page: raise survey.pool_page_rows in a --config-json and run the cell again. (2) `check`, over the
+# WHOLE pool first (D-085.3): each cell's
+# plane spacing (NeuronReconstruction.scale_factor_z), pixel size and usable planes; one line per cell, then
+# `check: N cells, k failed; dz (um): {...}; pixel (um): {...}; m match the configuration (dz 0.2800 um, pixel
+# 0.1144 um, ...)`. It resumes where it stopped if Colab disconnects: run the cell again. Send back the summary
+# line and acquisition.json. (3) `select`: 5 cells per neuron class and layer, all of a smaller group (D-085.1),
+# drawn by a seeded permutation. Whether the cells whose plane spacing or pixel size differ stay out is your call on
+# the check's report (D-085.3): set REQUIRE_MATCH. Expect `select: G groups, S cells selected (seed 20261026, 5 per
+# group); left out {...}` and one line per group with its specimen ids.
+SURVEY = OUT + "/survey"
+os.makedirs(SURVEY, exist_ok=True)
+run("scripts/cell_pool.py", "pool", "--out", SURVEY + "/pool.csv")
+run("scripts/cell_pool.py", "check", "--pool", SURVEY + "/pool.csv", "--out", SURVEY + "/acquisition.csv")
+REQUIRE_MATCH = True          # decide after reading the check (D-085.3)
+run("scripts/cell_pool.py", "select", "--pool", SURVEY + "/pool.csv", "--acquisition", SURVEY + "/acquisition.csv",
+    *(["--require-match"] if REQUIRE_MATCH else []), "--out", SURVEY + "/selection.csv")
+
+# ====================================================================================================
 # ===== CELL end of session (optional)
 # ====================================================================================================
 # WHAT TO SEND BACK
@@ -1117,6 +1143,7 @@ run("scripts/run_cell.py", "--specimen", SPECIMEN, "--table", TABLE, "--out-dir"
 # - Cell 5: the `"renderer"` block without the tables, `table_sets`, `pillow_version`, `notes`.
 # - Cell 6: the `pooled dendrite diameter` line.
 # - Cell 7: the growth-fit report, the far fit (gamma_hat and its interval) and the width-by-plane figures.
+# - Cell 11 (S3, step 0): the `pool:` and `check:` summary lines, acquisition.json, and the `select:` lines.
 #
 # These decide the open items of SPEC section 8: d_max, the mu range, the jitter amplitudes, the camera fields
 # and the dark-flag threshold.
