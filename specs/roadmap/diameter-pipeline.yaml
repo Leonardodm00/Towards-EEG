@@ -10,6 +10,13 @@
 # step with `roadmap.py add block`, new topics under their group with
 # `roadmap.py add topic`. Lines marked DRAFT are guesses.
 #
+# 2026-10-26: the steps still to do added with `roadmap.py add step`, DRAFT
+# until the user confirms them: S3 (with S3a-S3d), S5, S6, S7, S8 and S9 from
+# the plan of 2026-10-20 (D-065, D-067), and NS1-NS2, not scheduled. Each step
+# has a theory part of its own, its paired group TS<k> (NS2: T7) -- the
+# user's rule of 2026-10-26 (D-082). A step without blocks is drawn planned
+# until its first block (`add block`) arrives.
+#
 # Theory status: open | studying | closed  (set with
 #   python specs/roadmap/roadmap.py set --yaml specs/roadmap/diameter-pipeline.yaml T6 closed --decision D-nnn)
 # Implementation stages: block = the SPEC.md block; parent = the group the
@@ -111,6 +118,72 @@ theory:
     closed_on:
     decision:
     note: "No SPEC block yet: Block 4 renders with the partition (D-024 (i), for now); a hybrid would be a new absorption mode inside the simulation hash."
+  - id: TS3
+    title: "Theory of Phase II on Allen's data (Colab)"
+    summary: "What the real cells must tell us before the table is built: whether the phantoms cover them, the simulator's inputs, the kernel on real nodes, and which values freeze the final configuration."
+    refs: []
+    parent:
+    depends_on: []
+  - id: TS3a
+    title: "Theory of Real-cell survey without a table"
+    summary: "Whether the phantoms cover the real nodes -- the share of each bin of d_hat whose mu_hat d_hat and alpha_hat fall inside the phantoms' band, with the pass rule fixed before the run -- and whether the SGT fit's shape on thick nodes in focus matches rendered phantoms of the same size."
+    refs: []
+    parent: TS3
+    depends_on: []
+  - id: TS3b
+    title: "Theory of Simulator inputs from the real cells"
+    summary: "How the phantoms' ranges and nuisances are read from real data: d_max and the line and block lengths from Allen's radii, the jitter of the trace from the registration offsets, the camera chain and its JPEG tables."
+    refs: []
+    parent: TS3
+    depends_on: []
+  - id: TS3c
+    title: "Theory of Kernel calibration on Allen's data"
+    summary: "How to read the calibration on real nodes: the width-by-plane figures, whether the near table and the far straight line hold, the anchor's and the slope's SE, and what the selection's counts say about the two sets (D-074, D-077 to D-081)."
+    refs: []
+    parent: TS3
+    depends_on: []
+  - id: TS3d
+    title: "Theory of The final configuration"
+    summary: "Which values enter the production configuration and its simulation and estimator hashes, what freezes the table, and when it has to be rebuilt (D-061 (f), D-067.1, procedure s.3.11)."
+    refs: []
+    parent: TS3
+    depends_on: []
+  - id: TS5
+    title: "Theory of Gate 2 under the new design (sandbox)"
+    summary: "What gate 2 tests -- rendered phantoms of known d corrected by a table built with the same simulator -- and what it cannot test: the simulator itself (procedure s.3.10)."
+    refs: []
+    parent:
+    depends_on: []
+  - id: TS6
+    title: "Theory of davinci pilot"
+    summary: "How the pilot's time per realization sizes the array (draws per task, walltime), and how its failure-rate curve by region sets max_failure_rate (D-054 (iii), D-062.2)."
+    refs: []
+    parent:
+    depends_on: []
+  - id: TS7
+    title: "Theory of Production table and its acceptance tests"
+    summary: "Reading the full table -- the bias factor with its SE by draw, the scatter, the failure rate, the support and the off-support flags -- and what can falsify it: blur consistency, sigma_r(0), kernel shape and truncation, above and below focus, depth, cross-section, mu, heading, real against synthetic profiles, end to end with an alternative generator."
+    refs: []
+    parent:
+    depends_on: []
+  - id: TS8
+    title: "Theory of Inversion of the real cells"
+    summary: "What the inversion gives on Allen's nodes and how far to trust it: the flags (out of domain, off support, high failure), the fill from the neighbours, the corrected diameter's uncertainty (D5, D-030, D-063)."
+    refs: []
+    parent:
+    depends_on: []
+  - id: TS9
+    title: "Theory of Corrected SWCs into the passive refit"
+    summary: "The subproject's question: run B gives L2/L3 membrane capacitance 2-3 times the reference value, Allen's radii being suspected too thin; how the corrected area enters the refit, and what else could produce the excess (SPEC section 1)."
+    refs: []
+    parent:
+    depends_on: []
+  - id: TNS1
+    title: "Theory of Kernel calibration, step 2"
+    summary: "The width-diameter trade-off the first stage leaves, what to match (the mean profiles or the core widths) and at which d and mu to render each calibration node (procedure s.3.4 step 2, SPEC section 8)."
+    refs: []
+    parent:
+    depends_on: []
 
 implementation:
   # ---- groups (no block of their own; coloured by their least advanced member)
@@ -285,3 +358,94 @@ implementation:
     needs_theory: [T6]
     needs_hpc: false
     jobs: []
+  - id: S3
+    title: "Phase II on Allen's data (Colab)"
+    summary: "The runs on the real cells that come before the production table (S3 of the plan of 2026-10-20; D-065, D-067): the coverage survey, the simulator's inputs, the kernel calibration on Allen's nodes and the final configuration."
+    parent:
+    depends_on: []
+    needs_theory: [TS3]
+    needs_hpc: false
+  - id: S3a
+    title: "Real-cell survey without a table"
+    summary: "Block 13's chain on every cell in Colab, without a table: mu_hat d_hat and alpha_hat per bin of d_hat against the phantoms' band, and the thick-node check of the SGT fit against rendered phantoms; decides the mu range (D-065, D-059.1). The survey cell is still to write."
+    parent: S3
+    depends_on: [G3]
+    needs_theory: [TS3a]
+    needs_hpc: false
+  - id: S3b
+    title: "Simulator inputs from the real cells"
+    summary: "Allen's radii across cells for d_max and the line and block lengths, the registration offsets for the trace's jitter, the camera chain and its JPEG tables (Cells 3b, 5 and 6 over the cells; D-024 (iii) and (vii), D-065)."
+    parent: S3
+    depends_on: [G3]
+    needs_theory: [TS3b]
+    needs_hpc: false
+  - id: S3c
+    title: "Kernel calibration on Allen's data"
+    summary: "Cell 7 on the real nodes (Blocks 10 and 15): the near table to 0.84 um with its anchor and SE, the far slope with its interval, and the figures read before the slope is set."
+    parent: S3
+    depends_on: [G5]
+    needs_theory: [TS3c]
+    needs_hpc: false
+  - id: S3d
+    title: "The final configuration"
+    summary: "The decisions of the real-data runs written into config_production.json (Cell 8): the mu range, d_max and the lengths, the jitter, the camera chain, the kernel table and its slope; the production table is built on it alone (D-067.1)."
+    parent: S3
+    depends_on: [S3a, S3b, S3c]
+    needs_theory: [TS3d]
+    needs_hpc: false
+  - id: S5
+    title: "Gate 2 under the new design (sandbox)"
+    summary: "A reduced table with Block 14's design, then phantoms from independent seeds corrected by it: every mean d_tilde / d within 0.10 of 1 (configs/gate2_reduced.json; gate 2 last passed 2026-10-06 under the old estimator)."
+    parent:
+    depends_on: [G4]
+    needs_theory: [TS5]
+    needs_hpc: false
+  - id: S6
+    title: "davinci pilot"
+    summary: "The table job on the cluster for the first time: byte checks, the dry run, the two-draw probe, then about 20 draws x 10 realizations on a provisional configuration -- the time per realization, the array sizing and the failure-rate curve."
+    parent:
+    depends_on: [S5]
+    needs_theory: [TS6]
+    needs_hpc: true
+  - id: S7
+    title: "Production table and its acceptance tests"
+    summary: "The full table on davinci on the final configuration (about 10^5 draws x 10 realizations, the merge, the per-draw file), then the checks of procedure s.3.10 that can falsify it and the coverage of the real survey (D-062.2, D-067.1)."
+    parent:
+    depends_on: [S3, S6]
+    needs_theory: [TS7]
+    needs_hpc: true
+  - id: S8
+    title: "Inversion of the real cells"
+    summary: "run_cell.py with the production table on every cell: each node corrected at its own (phi, mu_hat d_hat), flagged where the table cannot correct it and filled from its neighbours; the per-node CSV and the shares flagged and filled per cell (the code is Blocks 7 and 14.5)."
+    parent:
+    depends_on: [S7]
+    needs_theory: [TS8]
+    needs_hpc: false
+  - id: S9
+    title: "Corrected SWCs into the passive refit"
+    summary: "The corrected reconstruction.swc of every cell, with its membrane-area ratio against Allen's radii, handed to the I_h fitter's --swc-dir for the Cm refit (D-013); the refit itself runs in the passive-fit pipeline."
+    parent:
+    depends_on: [S8]
+    needs_theory: [TS9]
+    needs_hpc: false
+  - id: NS
+    title: "Not scheduled: refinements and ideas"
+    summary: "Steps the plan does not schedule yet, kept apart so that the scheduled steps keep their colours."
+    parent:
+    depends_on: []
+    needs_theory: []
+    needs_hpc: false
+  - id: NS1
+    title: "Kernel calibration, step 2"
+    summary: "Tune sigma_r at the plane offsets so that rendered thin phantoms reproduce the real profiles (procedure s.3.4 step 2, not built); whether it is needed is decided after the calibration on Allen's data."
+    parent: NS
+    depends_on: [S3c]
+    needs_theory: [TNS1]
+    needs_hpc: false
+  - id: NS2
+    title: "Hybrid absorption renderer"
+    summary: "A new absorption mode for Block 4: each slice's absorbed light from the condenser's rays, then the defocus kernel on every image plane (I-004); inside the simulation hash."
+    parent: NS
+    depends_on: [G2]
+    needs_theory: [T7]
+    needs_hpc: false
