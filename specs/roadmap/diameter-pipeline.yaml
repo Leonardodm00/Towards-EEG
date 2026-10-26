@@ -5,7 +5,10 @@
 # Drafted by `roadmap.py init` from specs/SPEC.md on 2026-10-22 and curated:
 # the theory stages follow SPEC section 2 plus the topics of Blocks 12-15
 # and the hybrid optics; the groups (TG1-TG3; G1-G5, and I4 holding I9) are
-# a first reading of the structure, to confirm. Lines marked DRAFT are guesses.
+# a first reading of the structure, to confirm. Each implementation step
+# (G2-G5) names its theory group in needs_theory; new blocks go under their
+# step with `roadmap.py add block`, new topics under their group with
+# `roadmap.py add topic`. Lines marked DRAFT are guesses.
 #
 # Theory status: open | studying | closed  (set with
 #   python specs/roadmap/roadmap.py set --yaml specs/roadmap/diameter-pipeline.yaml T6 closed --decision D-nnn)
@@ -120,22 +123,22 @@ implementation:
     title: "Synthetic image model"
     summary: "Everything that turns a tube geometry into a rendered brightfield stack: geometry, blur kernel, JPEG tables, FFT renderer and the ray-world alternative."
     depends_on: []           # the members' own dependencies draw the arrows
-    needs_theory: [T3]
+    needs_theory: [TG1]     # the step's theory group
   - id: G3
     title: "Diameter measurement on real data"
     summary: "The per-node chain from an Allen stack to a diameter: profiles, focus, path, background, the tube fit, the SGT plane fit, the Allen-guided plane iteration, the cell-level run and the Phase II tools."
     depends_on: []           # the members' own dependencies draw the arrows
-    needs_theory: [T2, T5]
+    needs_theory: [TG2]     # the step's theory group
   - id: G4
     title: "Bias table and correction"
     summary: "Rendered phantoms, the bias table, its inversion and the corrected diameters; the production table runs on davinci."
     depends_on: []           # the members' own dependencies draw the arrows
-    needs_theory: [T4]
+    needs_theory: [TG3]     # the step's theory group
   - id: G5
     title: "Kernel calibration"
     summary: "The calibration of the blur kernel on real nodes: first stage on the pilot, then the far-field scan and fit."
     depends_on: []           # the members' own dependencies draw the arrows
-    needs_theory: [T3, T6]
+    needs_theory: [TG3]     # the step's theory group
 
   # ---- stages (one SPEC block each)
   - id: I0

@@ -10,7 +10,15 @@ the HPC job markers on the hpc-status branch.
 
 Usage
     python roadmap.py init   --name N --branch B [--repo OWNER/NAME]
-                             [--spec specs/SPEC.md] [--root PATH]
+                             [--plan PLAN.yaml] [--spec specs/SPEC.md] [--root PATH]
+    python roadmap.py add    --yaml specs/roadmap/N.yaml block  ID --block N
+                             --title T --parent STEP [--summary S]
+                             [--depends-on I1,I2] [--needs-theory T1] [--needs-hpc]
+    python roadmap.py add    --yaml specs/roadmap/N.yaml topic  ID --title T
+                             --parent TSTEP [--summary S] [--refs R1,R2]
+                             [--depends-on T1] [--status open|studying|closed]
+    python roadmap.py add    --yaml specs/roadmap/N.yaml step   ID --title T
+                             [--summary S] [--theory S2] [--depends-on S1] [--needs-hpc]
     python roadmap.py check  --yaml specs/roadmap/N.yaml [--root PATH]
     python roadmap.py status --yaml specs/roadmap/N.yaml [--root PATH]
                              [--json OUT] [--no-fetch] [--source LABEL]
@@ -52,6 +60,23 @@ its least advanced member (failing < planned < local < pushed < testing <
 tested < running < done; open < studying < closed), with its own node
 inside when it has a block of its own. An implementation stage without a
 block is a pure group: it has no state of its own and is not counted.
+
+Plan first: a project starts as a coarse list of steps, each with the
+theory it needs, and the blocks of a step are defined while the step is
+carried out. `init --plan PLAN.yaml` writes each step S<k> as an
+implementation group with no blocks yet (drawn planned, red, until its
+first block arrives) and a paired theory group TS<k> (`needs_theory:
+[TS<k>]` on the step); `add block` / `add topic` then hang a SPEC block or
+a topic under its step as the work proceeds. PLAN.yaml:
+
+    steps:
+      - id: S1
+        title: Image access
+        summary: what the step delivers
+        theory: what has to be understood for it     # the paired group's summary
+        depends_on: [S0]                             # other steps
+        needs_hpc: false
+        blocks: [0, 1]                               # SPEC blocks already written, if any
 
 Exit codes: 0 on success, 1 on a validation error, 2 if git fails.
 """
@@ -768,10 +793,19 @@ def compute_status(data, root, fetch=True, source="chat"):
     attach_groups(theory, "theory")
     attach_groups(impl, "implementation")
 
-    # blocked_by: unmet prerequisites (does not change the colour)
+    # blocked_by: unmet prerequisites (does not change the colour). A member
+    # inherits the theory its step (and the step's groups) needs.
+    def inherited_theory(stage):
+        needs, cur, seen = list(stage["needs_theory"]), stage.get("parent"), set()
+        while cur in impl and cur not in seen:
+            seen.add(cur)
+            needs += [t for t in impl[cur]["needs_theory"] if t not in needs]
+            cur = impl[cur].get("parent")
+        return needs
+
     for sid, stage in impl.items():
         blocked = []
-        for ref in stage["needs_theory"]:
+        for ref in inherited_theory(stage):
             if ref in theory and theory[ref]["status"] != "closed":
                 blocked.append(ref)
         for ref in stage["depends_on"]:
@@ -947,7 +981,8 @@ def evaluate_stage(stage, data, root, head, remote_head, worktree_is_branch,
         result["reason"] = "set by hand: %s" % stage.get("manual_reason", "no reason given")
         return result
     if not stage["blocks"]:
-        result["reason"] = "no SPEC block assigned (a group, if it has members)"
+        result["reason"] = ("step of the plan: no blocks defined yet "
+                            "(roadmap.py add block ... --parent %s)" % sid)
         return result
     if missing_blocks and len(missing_blocks) == len(stage["blocks"]):
         result["reason"] = "no entry in SPEC.md for Block %s" % ", ".join(map(str, missing_blocks))
@@ -1124,8 +1159,8 @@ def mermaid(data, status):
             if stage["closed_on"]:
                 label += "<br/>closed %s" % stage["closed_on"]
             return label
-        blocks = ("Block %s" % ", ".join(map(str, stage["blocks"]))) if stage["blocks"] else ""
-        return "%s %s<br/>%s %s" % (stage["id"], stage["title"], blocks, stage["status"])
+        blocks = ("Block %s " % ", ".join(map(str, stage["blocks"]))) if stage["blocks"] else ""
+        return "%s %s<br/>%s%s" % (stage["id"], stage["title"], blocks, stage["status"])
 
     def emit(stages, kind, parent, indent):
         pad = "    " * indent
@@ -1307,9 +1342,117 @@ def yaml_scalar(value):
     return json.dumps(text)
 
 
+# -------------------------------------------------------------------- add ---
+
+def add_stage(path, kind, sid, fields):
+    """Append a stage entry to the theory or implementation list of the yaml.
+
+    kind: "topic" (theory list), "block" or "step" (implementation list).
+    fields: ordered (key, value) pairs; a None value is written as an empty
+    field, a list as [a, b]. The entry goes at the end of its list, so the
+    rest of the file (comments included) is untouched. The parent, the
+    dependencies and the id are validated against the file first.
+    """
+    data = load_roadmap(path)
+    pool = data["theory"] if kind == "topic" else data["implementation"]
+    other = data["implementation"] if kind == "topic" else data["theory"]
+    ids = {s["id"] for s in pool}
+    if not re.match(r"^[A-Za-z][A-Za-z0-9_.-]*$", sid):
+        raise RoadmapError("id %r: letters, digits, _ . - only, starting with a letter" % sid)
+    if sid in ids or sid in {s["id"] for s in other}:
+        raise RoadmapError("id %s already exists in %s" % (sid, path))
+    parent = dict(fields).get("parent")
+    if parent and parent not in ids:
+        raise RoadmapError("parent %s: no such %s stage" % (parent, "theory" if kind == "topic" else "implementation"))
+    for ref in as_list(dict(fields).get("depends_on")):
+        if ref not in ids:
+            raise RoadmapError("depends_on %s: no such stage" % ref)
+    if kind != "topic":
+        tids = {s["id"] for s in data["theory"]}
+        for ref in as_list(dict(fields).get("needs_theory")):
+            if ref not in tids:
+                raise RoadmapError("needs_theory %s: no such theory stage" % ref)
+    if kind == "block":
+        used = {b: s["id"] for s in data["implementation"] for b in s["blocks"]}
+        wanted = as_list(dict(fields).get("blocks")) + as_list(dict(fields).get("block"))
+        for b in wanted:
+            if int(b) in used:
+                raise RoadmapError("Block %s already belongs to %s" % (b, used[int(b)]))
+
+    with open(path, "r", encoding="utf-8") as fh:
+        text = fh.read()
+    lines = text.splitlines(True)
+    entry = ["  - id: %s\n" % sid]
+    for key, value in fields:
+        if value is None or value == "":
+            entry.append("    %s:\n" % key)
+        elif isinstance(value, list):
+            entry.append("    %s: [%s]\n" % (key, ", ".join(yaml_scalar(v) for v in value)))
+        elif isinstance(value, bool):
+            entry.append("    %s: %s\n" % (key, "true" if value else "false"))
+        else:
+            entry.append("    %s: %s\n" % (key, yaml_scalar(value)))
+    if kind == "topic":
+        # before the top-level "implementation:" line
+        idx = next((i for i, line in enumerate(lines) if re.match(r"^implementation:\s*$", line)), None)
+        if idx is None:
+            raise RoadmapError("no top-level 'implementation:' key in %s" % path)
+        # keep one blank line between the lists
+        insert_at = idx
+        while insert_at > 0 and not lines[insert_at - 1].strip():
+            insert_at -= 1
+        lines[insert_at:insert_at] = entry
+    else:
+        if lines and not lines[-1].endswith("\n"):
+            lines[-1] += "\n"
+        lines.extend(entry)
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("".join(lines))
+    problems = check_roadmap(load_roadmap(path))
+    if problems:
+        # roll back rather than leave a broken file
+        with open(path, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(text)
+        raise RoadmapError("not added: " + "; ".join(problems))
+
+
+def split_list(value):
+    return [v.strip() for v in (value or "").split(",") if v.strip()]
+
+
 # ------------------------------------------------------------------- init ---
 
-def init_roadmap(root, name, branch, repo=None, spec="specs/SPEC.md", out=None, title=None):
+def load_plan(path):
+    need_yaml()
+    with open(path, "r", encoding="utf-8") as fh:
+        plan = yaml.safe_load(fh) or {}
+    steps = plan.get("steps") or []
+    if not steps:
+        raise RoadmapError("%s has no steps" % path)
+    seen = set()
+    for k, step in enumerate(steps, start=1):
+        step.setdefault("id", "S%d" % k)
+        if not re.match(r"^[A-Za-z][A-Za-z0-9_.-]*$", str(step["id"])) or step["id"] in seen:
+            raise RoadmapError("plan step %r: invalid or duplicate id" % step.get("id"))
+        seen.add(step["id"])
+        if not step.get("title"):
+            raise RoadmapError("plan step %s has no title" % step["id"])
+        step["summary"] = step.get("summary") or ""
+        step["theory"] = step.get("theory") or ""
+        step["theory_title"] = step.get("theory_title") or ("Theory of " + step["title"])
+        step["depends_on"] = as_list(step.get("depends_on"))
+        step["needs_hpc"] = bool(step.get("needs_hpc"))
+        step["blocks"] = [int(b) for b in as_list(step.get("blocks"))]
+        step["theory_id"] = step.get("theory_id") or ("T" + step["id"])
+    for step in steps:
+        for ref in step["depends_on"]:
+            if ref not in seen:
+                raise RoadmapError("plan step %s depends on unknown step %s" % (step["id"], ref))
+    return steps
+
+
+def init_roadmap(root, name, branch, repo=None, spec="specs/SPEC.md", out=None, title=None,
+                 plan=None):
     head = resolve_rev(root, branch) or resolve_rev(root, "origin/" + branch)
     if head is None:
         raise GitError("branch %s not found" % branch)
@@ -1321,14 +1464,27 @@ def init_roadmap(root, name, branch, repo=None, spec="specs/SPEC.md", out=None, 
         url = git(root, "remote", "get-url", "origin", check=False).strip()
         match = re.search(r"github\.com[:/]([^/]+/[^/.]+)", url)
         repo = match.group(1) if match else ""
+    steps = load_plan(plan) if plan else None
     lines = [
         "# Roadmap of the subproject %s. Source of truth for the stages and the" % name,
         "# theory statuses; the implementation statuses are computed by",
         "# specs/roadmap/roadmap.py (never written by hand).",
         "#",
-        "# Drafted by `roadmap.py init` from %s: review every stage, the" % spec,
-        "# dependencies and needs_hpc, and replace the theory stages with the",
-        "# topics you actually have to study. Lines marked DRAFT are guesses.",
+    ]
+    if steps:
+        lines += [
+            "# Drafted by `roadmap.py init --plan`: one implementation step S<k> per",
+            "# plan step (a group; its blocks are added while the step is carried out,",
+            "# with `roadmap.py add block`) and one theory group TS<k> per step (its",
+            "# topics with `roadmap.py add topic`). Lines marked DRAFT are guesses.",
+        ]
+    else:
+        lines += [
+            "# Drafted by `roadmap.py init` from %s: review every stage, the" % spec,
+            "# dependencies and needs_hpc, and replace the theory stages with the",
+            "# topics you actually have to study. Lines marked DRAFT are guesses.",
+        ]
+    lines += [
         "schema: %d" % SCHEMA_VERSION,
         "name: %s" % name,
         "title: %s" % yaml_scalar(title),
@@ -1340,32 +1496,61 @@ def init_roadmap(root, name, branch, repo=None, spec="specs/SPEC.md", out=None, 
         "",
         "theory:",
     ]
-    # theory stages drafted from the subsections of the mathematical
-    # formulation ("### 2.k Title (Blocks n, m; ...)"): one stage each, fed
-    # to the blocks its heading names
-    sections = re.findall(r"^###\s+2\.(\d+)\s+(.*?)\s*$", spec_text, re.MULTILINE)
-    if not sections:
-        sections = [("1", "DRAFT: first topic to study")]
     section_blocks = {}
-    for k, (num, heading) in enumerate(sections, start=1):
-        sid = "T%d" % k
-        # the blocks a section covers sit in its parentheses:
-        # "### 2.2 Per-node measurement (Blocks 3, 5; handoff Eqs. 1-5)"
-        section_blocks[sid] = block_refs(heading.replace("(", " ").replace(")", " "))
-        short = re.sub(r"\s*\(.*?\)\s*$", "", heading)
-        lines += [
-            "  - id: %s" % sid,
-            "    title: %s" % yaml_scalar(short),
-            "    summary: \"DRAFT: from SPEC section 2.%s\"" % num,
-            "    refs: []",
-            "    parent:                 # id of the group stage this belongs to, if any",
-            "    depends_on: %s" % ("[]" if k == 1 else "[T%d]" % (k - 1)),
-            "    status: open",
-            "    closed_on:",
-            "    decision:",
-        ]
+    block_parent = {}
+    if steps:
+        # one theory group per step; its topics come later (add topic)
+        for step in steps:
+            lines += [
+                "  - id: %s" % step["theory_id"],
+                "    title: %s" % yaml_scalar(step["theory_title"]),
+                "    summary: %s" % yaml_scalar(step["theory"] or ("DRAFT: what has to be understood for " + step["title"])),
+                "    refs: []",
+                "    depends_on: []",
+                "    # no status line: a group, coloured by its topics (add topic ... --parent %s)" % step["theory_id"],
+            ]
+            for number in step["blocks"]:
+                block_parent[number] = step["id"]
+    else:
+        # theory stages drafted from the subsections of the mathematical
+        # formulation ("### 2.k Title (Blocks n, m; ...)"): one stage each,
+        # fed to the blocks its heading names
+        sections = re.findall(r"^###\s+2\.(\d+)\s+(.*?)\s*$", spec_text, re.MULTILINE)
+        if not sections:
+            sections = [("1", "DRAFT: first topic to study")]
+        for k, (num, heading) in enumerate(sections, start=1):
+            sid = "T%d" % k
+            # the blocks a section covers sit in its parentheses:
+            # "### 2.2 Per-node measurement (Blocks 3, 5; handoff Eqs. 1-5)"
+            section_blocks[sid] = block_refs(heading.replace("(", " ").replace(")", " "))
+            short = re.sub(r"\s*\(.*?\)\s*$", "", heading)
+            lines += [
+                "  - id: %s" % sid,
+                "    title: %s" % yaml_scalar(short),
+                "    summary: \"DRAFT: from SPEC section 2.%s\"" % num,
+                "    refs: []",
+                "    parent:                 # id of the group stage this belongs to, if any",
+                "    depends_on: %s" % ("[]" if k == 1 else "[T%d]" % (k - 1)),
+                "    status: open",
+                "    closed_on:",
+                "    decision:",
+            ]
     lines.append("")
     lines.append("implementation:")
+    if steps:
+        lines.append("  # ---- steps of the plan (groups; blocks are added under them as they are written)")
+        for step in steps:
+            lines += [
+                "  - id: %s" % step["id"],
+                "    title: %s" % yaml_scalar(step["title"]),
+                "    summary: %s" % yaml_scalar(step["summary"] or ("DRAFT: " + step["title"])),
+                "    depends_on: [%s]" % ", ".join(step["depends_on"]),
+                "    needs_theory: [%s]" % step["theory_id"],
+                "    needs_hpc: %s" % ("true" if step["needs_hpc"] else "false"),
+            ]
+        if blocks:
+            lines.append("")
+            lines.append("  # ---- blocks already in SPEC.md (parent = the step each belongs to)")
     for number in sorted(blocks):
         block = blocks[number]
         consumed = sorted(n for n in consumed_blocks(block) if n in blocks and n != number)
@@ -1378,12 +1563,14 @@ def init_roadmap(root, name, branch, repo=None, spec="specs/SPEC.md", out=None, 
         header = block["name"]
         needs_theory = [sid for sid, nums in section_blocks.items() if number in nums]
         short = re.sub(r"\s*\(.*$", "", header).strip()
+        parent = block_parent.get(number)
         lines += [
             "  - id: I%d" % number,
             "    title: %s" % yaml_scalar(short),
             "    summary: %s" % yaml_scalar("DRAFT: " + short),
             "    block: %d" % number,
-            "    parent:                 # id of the group stage this belongs to, if any",
+            ("    parent: %s" % parent) if parent else
+            "    parent:                 # DRAFT: the step (or group) this block belongs to",
             "    depends_on: [%s]" % ", ".join("I%d" % n for n in deps)
             + ("   # DRAFT: also consumes later Block %s (loop), not drawn"
                % ", ".join(map(str, dropped)) if dropped else ""),
@@ -1431,14 +1618,34 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p = sub.add_parser("init", help="draft a roadmap from SPEC.md")
+    p = sub.add_parser("init", help="draft a roadmap from a plan and/or SPEC.md")
     p.add_argument("--name", required=True)
     p.add_argument("--branch", required=True)
     p.add_argument("--repo", default=None, help="owner/name on GitHub")
+    p.add_argument("--plan", default=None, help="PLAN.yaml with the coarse steps (see the module docstring)")
     p.add_argument("--spec", default="specs/SPEC.md")
     p.add_argument("--title", default=None)
     p.add_argument("--out", default=None)
     p.add_argument("--root", default=None)
+
+    p = sub.add_parser("add", help="add a block, a topic or a step to a roadmap")
+    p.add_argument("--yaml", required=True)
+    p.add_argument("what", choices=["block", "topic", "step"])
+    p.add_argument("id")
+    p.add_argument("--title", required=True)
+    p.add_argument("--summary", default=None)
+    p.add_argument("--parent", default=None, help="the step (block, topic) or group this belongs to")
+    p.add_argument("--block", default=None, help="SPEC block number(s), comma-separated (block only)")
+    p.add_argument("--depends-on", default=None, help="comma-separated ids of the same kind")
+    p.add_argument("--needs-theory", default=None, help="comma-separated theory ids (block, step)")
+    p.add_argument("--needs-hpc", action="store_true")
+    p.add_argument("--jobs", default=None, help="comma-separated job names or script paths (block)")
+    p.add_argument("--refs", default=None, help="comma-separated references (topic)")
+    p.add_argument("--status", default="open", choices=THEORY_STATES, help="topic only")
+    p.add_argument("--theory", default=None,
+                   help="step only: id of the paired theory group to create (default T<step id>); "
+                        "'none' for no paired group")
+    p.add_argument("--theory-summary", default=None, help="step only: the paired group's summary")
 
     p = sub.add_parser("check", help="validate a roadmap file")
     p.add_argument("--yaml", required=True)
@@ -1481,12 +1688,14 @@ def run(args):
     root = find_root(args)
     if args.command == "init":
         out = init_roadmap(root, args.name, args.branch, args.repo, args.spec,
-                           args.out, args.title)
+                           args.out, args.title, args.plan)
         print("wrote %s" % out)
         data = load_roadmap(out)
         for problem in check_roadmap(data):
             print("warning: %s" % problem)
         return 0
+    if args.command == "add":
+        return run_add(args)
     data = load_roadmap(args.yaml)
     if args.command == "set":
         set_theory_status(args.yaml, args.stage, args.status, args.note,
@@ -1523,6 +1732,69 @@ def run(args):
         print("wrote %s: %s" % (out, summary(status)))
         return 0
     return 1
+
+
+def run_add(args):
+    if args.what == "block":
+        if not args.block:
+            raise RoadmapError("add block needs --block N (the SPEC block number)")
+        if not args.parent:
+            raise RoadmapError("add block needs --parent STEP (the step or group it belongs to)")
+        blocks = [int(b) for b in split_list(args.block)]
+        fields = [
+            ("title", args.title),
+            ("summary", args.summary or ("DRAFT: " + args.title)),
+            ("blocks" if len(blocks) > 1 else "block", blocks if len(blocks) > 1 else blocks[0]),
+            ("parent", args.parent),
+            ("depends_on", split_list(args.depends_on)),
+            ("needs_theory", split_list(args.needs_theory)),
+            ("needs_hpc", bool(args.needs_hpc)),
+            ("jobs", split_list(args.jobs)),
+        ]
+        add_stage(args.yaml, "block", args.id, fields)
+        print("added block stage %s (Block %s) under %s" % (args.id, args.block, args.parent))
+        return 0
+    if args.what == "topic":
+        if not args.parent:
+            raise RoadmapError("add topic needs --parent TSTEP (the theory group it belongs to)")
+        fields = [
+            ("title", args.title),
+            ("summary", args.summary or ("DRAFT: " + args.title)),
+            ("refs", split_list(args.refs)),
+            ("parent", args.parent),
+            ("depends_on", split_list(args.depends_on)),
+            ("status", args.status),
+            ("closed_on", dt.date.today().isoformat() if args.status == "closed" else None),
+            ("decision", None),
+        ]
+        add_stage(args.yaml, "topic", args.id, fields)
+        print("added topic %s (%s) under %s" % (args.id, args.status, args.parent))
+        return 0
+    # step: an implementation group plus, by default, a paired theory group
+    theory_id = args.theory or ("T" + args.id)
+    needs = split_list(args.needs_theory)
+    if theory_id.lower() != "none":
+        # a sub-step's theory group nests under the parent step's, when that exists
+        theory_ids = {s["id"] for s in load_roadmap(args.yaml)["theory"]}
+        theory_parent = ("T" + args.parent) if args.parent and ("T" + args.parent) in theory_ids else None
+        add_stage(args.yaml, "topic", theory_id, [
+            ("title", "Theory of " + args.title),
+            ("summary", args.theory_summary or ("DRAFT: what has to be understood for " + args.title)),
+            ("refs", []),
+            ("parent", theory_parent),
+            ("depends_on", []),
+        ])
+        needs = needs + [theory_id]
+    add_stage(args.yaml, "step", args.id, [
+        ("title", args.title),
+        ("summary", args.summary or ("DRAFT: " + args.title)),
+        ("parent", args.parent),
+        ("depends_on", split_list(args.depends_on)),
+        ("needs_theory", needs),
+        ("needs_hpc", bool(args.needs_hpc)),
+    ])
+    print("added step %s%s" % (args.id, (" with theory group %s" % theory_id) if theory_id.lower() != "none" else ""))
+    return 0
 
 
 def summary(status):
