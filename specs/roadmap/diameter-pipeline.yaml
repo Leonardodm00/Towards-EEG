@@ -130,7 +130,7 @@ theory:
     status: open          # added 2026-10-22 at the user's request ("I need to study all the optics theory to construct the hybrid plane absorption ...")
     closed_on:
     decision:
-    note: "No SPEC block yet: Block 4 renders with the partition (D-024 (i), for now); a hybrid would be a new absorption mode inside the simulation hash."
+    note: "Built as SPEC Block 21 (I21, 2026-10-27, D-092); the default renderer is still the partition (D-084.2). Questions the build left for this topic: the hybrid conserves light per direction, not per column, so its planes go below zero in dark stain (SPEC Block 21 findings, section 8); whether the calibrated kernel carries over in dark stain (D-084). [note updated 2026-10-27; status unchanged, the user's]"
   - id: T8
     title: "Uncertainty and flags of the corrected diameter"
     summary: "What the inversion gives on Allen's nodes and how far to trust it: the flags (out of domain, off support, high failure), the fill from the neighbours, the corrected diameter's uncertainty (D5, D-030, D-063)."
