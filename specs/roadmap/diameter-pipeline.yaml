@@ -13,9 +13,18 @@
 # 2026-10-26: the steps still to do added with `roadmap.py add step`, DRAFT
 # until the user confirms them: S3 (with S3a-S3d), S5, S6, S7, S8 and S9 from
 # the plan of 2026-10-20 (D-065, D-067), and NS1-NS2, not scheduled. Each step
-# has a theory part of its own, its paired group TS<k> (NS2: T7) -- the
+# has a theory part of its own, its paired group TS<k> (NS2, now HR: T7) -- the
 # user's rule of 2026-10-26 (D-082). A step without blocks is drawn planned
 # until its first block (`add block`) arrives.
+#
+# 2026-10-27 (D-091, the user: "the roadmap is not updated, you should do
+# this automatically"): S3's built blocks hang under their steps -- I16
+# (Block 16: pool, acquisition check, selection, alignment, projection
+# check) under S3, I17 (Block 17) under S3a, I18 (Block 18) under S3b, I19
+# (Block 19) under S3c; every new SPEC block is added here in the same turn
+# from now on. The hybrid renderer leaves "not scheduled" (D-084; the user:
+# "GO on with the hybrid renderer"): NS2 is now HR, a step of its own, and
+# S3d waits for it (D-085.11).
 #
 # Theory status: open | studying | closed  (set with
 #   python specs/roadmap/roadmap.py set --yaml specs/roadmap/diameter-pipeline.yaml T6 closed --decision D-nnn)
@@ -328,21 +337,21 @@ implementation:
     needs_hpc: false
   - id: S3a
     title: "Real-cell survey without a table"
-    summary: "Block 13's chain on every cell in Colab, without a table: mu_hat d_hat and alpha_hat per bin of d_hat against the phantoms' band, and the thick-node check of the SGT fit against rendered phantoms; decides the mu range (D-065, D-059.1). The survey cell is still to write."
+    summary: "Block 13's chain on each selected cell's node sample in Colab (Cell 13): mu_hat d_hat and alpha_hat per bin of d_hat against the phantoms' band, the share inside, and the diameters by layer and class; decides the mu range (D-065, D-059.1, D-085.4-5). The thick-node check is dropped until the renderer is the right one (D-085.6)."
     parent: S3
     depends_on: [G3]
     needs_theory: []
     needs_hpc: false
   - id: S3b
     title: "Simulator inputs from the real cells"
-    summary: "Allen's radii across cells for d_max and the line and block lengths, the registration offsets for the trace's jitter, the camera chain and its JPEG tables (Cells 3b, 5 and 6 over the cells; D-024 (iii) and (vii), D-065)."
+    summary: "Over the selected cells in Colab (Cell 14): d_max as the largest Allen dendrite diameter (D-086), the trace's jitter from the registration offsets (D-085.8), one camera setting (D-085.9) -- suggestions for Cell 8."
     parent: S3
     depends_on: [G3]
     needs_theory: []
     needs_hpc: false
   - id: S3c
     title: "Kernel calibration on Allen's data"
-    summary: "Cell 7 on the real nodes (Blocks 10 and 15): the near table to 0.84 um with its anchor and SE, the far slope with its interval, and the figures read before the slope is set."
+    summary: "One defocus kernel calibrated on near- and far-field nodes pooled across cells, 10 to 30 per set (D-088; Cell 15), tested first on the pilot with Cell 7 (D-088.2); the near table to 0.84 um with its anchor and SE, the far slope with its interval, the points and residuals by cell (D-090.2)."
     parent: S3
     depends_on: [G5]
     needs_theory: [T6]
@@ -351,7 +360,7 @@ implementation:
     title: "The final configuration"
     summary: "The decisions of the real-data runs written into config_production.json (Cell 8): the mu range, d_max and the lengths, the jitter, the camera chain, the kernel table and its slope; the production table is built on it alone (D-067.1)."
     parent: S3
-    depends_on: [S3a, S3b, S3c]
+    depends_on: [S3a, S3b, S3c, HR]
     needs_theory: []
     needs_hpc: false
   - id: S5
@@ -403,10 +412,46 @@ implementation:
     depends_on: [S3c]
     needs_theory: [T10]
     needs_hpc: false
-  - id: NS2
+  - id: HR
     title: "Hybrid absorption renderer"
-    summary: "A new absorption mode for Block 4: each slice's absorbed light from the condenser's rays, then the defocus kernel on every image plane (I-004); inside the simulation hash."
-    parent: NS
+    summary: "The renderer actually used (D-084), scheduled 2026-10-27 (D-091; was NS2): a new absorption mode for Block 4 -- each slice's absorbed light from the condenser's rays (NA 1.4, n_oil 1.515, averaged over directions), then the calibrated defocus kernel on every image plane (I-004); inside the simulation hash, so every table is rendered with it; S3d waits for it (D-085.11)."
+    parent:
     depends_on: [G2]
     needs_theory: [T7]
     needs_hpc: false
+  - id: I16
+    title: "S3's cell programme: pool, acquisition check, selection, alignment, projection check"
+    summary: "Allen's human cells with a reconstruction, each cell's plane spacing and pixel size checked, 5 cells per class and layer (16.1); every selected cell's global alignment and the resumable per-cell runner (16.2); what Allen's projections are, checked in Colab (16.3, D-090.1)."
+    block: 16
+    parent: S3
+    depends_on: [I0, I11]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: I17
+    title: "S3a: node sample, coverage of the phantoms' band, diameters by layer and class"
+    summary: "Each aligned cell's node sample (stratified by Allen's 2r, or every dendrite node) measured by Block 13's chain; the share of nodes inside the phantoms' band per bin of d_hat; the diameters by layer and class (D-085.4-6)."
+    block: 17
+    parent: S3a
+    depends_on: [I16, I13]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: I18
+    title: "S3b: d_max, the node jitter and the camera across cells"
+    summary: "Allen's dendrite diameters per cell and d_max (D-086), the registration survey's offsets pooled into the jitter SDs (D-085.8), the camera setting from the nodes' background (D-085.9): suggestions for Cell 8."
+    block: 18
+    parent: S3b
+    depends_on: [I16, I17, I11]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: I19
+    title: "S3c: one defocus kernel pooled across cells; the law by cell"
+    summary: "Each cell's calibration scans (at most 5 per set), pooled round-robin to 30 per set with at least 10 (D-088, D-089); Block 10's and 15's fits on the pool; the near and far points and their residuals by cell (19.5, D-090.2)."
+    block: 19
+    parent: S3c
+    depends_on: [I16, I17, I10, I15]
+    needs_theory: [T6]
+    needs_hpc: false
+    jobs: []
