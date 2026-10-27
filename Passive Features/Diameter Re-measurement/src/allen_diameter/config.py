@@ -47,7 +47,7 @@ BBAR_REGIONS = ("block_masked", "block", "plane_downsampled")  # D-023 / D-018 (
 FOCUS_BG_RULES = ("profile_ends_median", "same_as_bbar")       # D-023 / D-018 (c)
 FOCUS_RULES = ("gradient_energy", "dip_depth")                 # D-030: gradient energy; dip depth = handoff Eq. 1, comparison
 FOCUS_GRAD_WINDOWS = ("radius_margin", "whole_profile")        # D-030 (provisional default, see MeasureConfig.focus_grad_window)
-ABSORPTIONS = ("partition_vertical", "linear", "ray_world")    # D-024 / procedure s.3.6
+ABSORPTIONS = ("partition_vertical", "linear", "ray_world", "hybrid")    # D-024 / procedure s.3.6; "hybrid": Block 21 (D-084, D-092)
 KERNEL_FAMILIES = ("gaussian_table", "empirical")              # procedure s.3.4
 KERNEL_CONTINUATIONS = ("linear", "frozen", "proportional")    # D-024 / mathematics Eq. 17
 RESPONSE_ESTIMATORS = ("local_linear", "tps_spline", "grid_mean")  # D-024, D-063.2, D-067.3 (grid_mean: not built)
@@ -184,7 +184,7 @@ class RendererConfig:
     kernel_continuation: str = "linear"  # source: D-024 ("for now")
     kernel_continuation_slope: float = 0.79  # source: D-024 / mathematics Eq. 17 (Debye cos^4 weighting); 1.21 = uniform disc, 0.72 = proportional
     sigma_r0_um: float = 0.080         # source: procedure s.3.4 (configured; never identified by the stacks)
-    absorption: str = "partition_vertical"  # source: D-024 ("for now"); procedure Eqs. 5-6
+    absorption: str = "partition_vertical"  # source: D-024 ("for now"); procedure Eqs. 5-6; "hybrid" (Block 21) is the renderer to use (D-084), the default switched only on the user's word (D-084.2, D-092)
     h_g_um_thin: float = 0.1144 / 8.0   # source: PROVISIONAL (Block 4, 2026-10-06): d_hat after pixel integration agrees to 1e-5 at p_x/8, /16, /32 (d 0.3-0.5 um, phi 5-20 deg) and to 0.7 % at d 0.3 um, phi 45 deg (b = 1.87, flagged); impl-handoff Findings proposed p_x/16 from fine-grid profiles [corrected 2026-10-06]
     h_g_um_thick: float = 0.1144 / 8.0  # source: impl-handoff Findings: p_x/8 above 0.5 um
     h_g_switch_d_um: float = 0.5       # source: impl-handoff Findings
@@ -199,10 +199,10 @@ class RendererConfig:
     fft_split_sigma_um: float = 0.5    # source: PROVISIONAL (Block 4): (slab, plane) pairs with a wider kernel go to the far-field path (coarse output grid, exact object); 0.5 was faster than 1.0 on a steep and a flat case
     far_grid_per_sigma: float = 8.0    # source: PROVISIONAL (Block 4): far-field output spacing <= smallest far sigma / this (cubic interpolation error ~ (1/8)^4 / 384)
     max_fft_accumulator_mb: float = 256.0  # source: PROVISIONAL (Block 4): spectral accumulators per plane chunk; a 2-worker run was OOM-killed at 3.5 GB per worker without it
-    ray_na: float = 1.4                # source: impl-handoff (S6): condenser NA (evenly filled, sine condition)
-    ray_n_oil: float = 1.515           # source: impl-handoff (S6): immersion index (index-matched)
-    ray_n_rho: int = 16                # source: PROVISIONAL (Block 9): Gauss-Legendre nodes in rho^2 (checks/optics_points_check.py used 48)
-    ray_n_psi: int = 32                # source: PROVISIONAL (Block 9): azimuths (the check script used 96)
+    ray_na: float = 1.4                # source: impl-handoff (S6): condenser NA (evenly filled, sine condition); also the hybrid's condenser (Block 21, PROVISIONAL D-092)
+    ray_n_oil: float = 1.515           # source: impl-handoff (S6): immersion index (index-matched); also the hybrid's (Block 21)
+    ray_n_rho: int = 16                # source: PROVISIONAL (Block 9): Gauss-Legendre nodes in rho^2 (checks/optics_points_check.py used 48); also the hybrid's quadrature (Block 21, D-092)
+    ray_n_psi: int = 32                # source: PROVISIONAL (Block 9): azimuths (the check script used 96); also the hybrid's (Block 21; even: the light/mirror symmetry)
     ray_post_sigma_um: float = 0.08    # source: checks/optics_points_check.py (post blur standing in for diffraction near focus)
     # -- camera chain (procedure s.3.6 step 6)
     background_B_gl: float = 210.0     # source: PROVISIONAL (blur_chain_check.py illustrative); NEEDS REAL DATA

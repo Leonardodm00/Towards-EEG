@@ -26,6 +26,10 @@
 # "GO on with the hybrid renderer"): NS2 is now HR, a step of its own, and
 # S3d waits for it (D-085.11).
 #
+# 2026-10-27 (later): the hybrid built as SPEC Block 21 (Block 20 is S3d's),
+# entered as I21 under HR in the same turn (D-091, D-092). T7 stays open (the
+# user's to set).
+#
 # Theory status: open | studying | closed  (set with
 #   python specs/roadmap/roadmap.py set --yaml specs/roadmap/diameter-pipeline.yaml T6 closed --decision D-nnn)
 # Implementation stages: block = the SPEC.md block; parent = the group the
@@ -414,7 +418,7 @@ implementation:
     needs_hpc: false
   - id: HR
     title: "Hybrid absorption renderer"
-    summary: "The renderer actually used (D-084), scheduled 2026-10-27 (D-091; was NS2): a new absorption mode for Block 4 -- each slice's absorbed light from the condenser's rays (NA 1.4, n_oil 1.515, averaged over directions), then the calibrated defocus kernel on every image plane (I-004); inside the simulation hash, so every table is rendered with it; S3d waits for it (D-085.11)."
+    summary: "The renderer actually used (D-084), scheduled 2026-10-27 (D-091; was NS2): a new absorption mode for Block 4 -- each slice's absorbed light from the condenser's rays (NA 1.4, n_oil 1.515, averaged over directions), then the calibrated defocus kernel on every image plane (I-004); inside the simulation hash, so every table is rendered with it; S3d waits for it (D-085.11). Built 2026-10-27 as Block 21 (I21), the default not switched: its dark-stain planes go below zero (D-092, SPEC section 8)."
     parent:
     depends_on: [G2]
     needs_theory: [T7]
@@ -453,5 +457,14 @@ implementation:
     parent: S3c
     depends_on: [I16, I17, I10, I15]
     needs_theory: [T6]
+    needs_hpc: false
+    jobs: []
+  - id: I21
+    title: "Hybrid absorption: each slab's light from the condenser's rays, then the kernel"
+    summary: "Block 4's absorption mode 'hybrid' (Block 21; the renderers doc's Eqs. 13-14; D-084, D-092): every ray's own history and path per unit depth, averaged over Block 9's NA 1.4 cone at the middle of each slab's inside part, then the calibrated kernel. Smoke-tested; the default is still the partition. Its planes go below zero in dark stain and it costs 4-50 times the partition per phantom, so the switch waits for the user (SPEC section 8)."
+    block: 21
+    parent: HR
+    depends_on: [I4, I9]
+    needs_theory: [T7]
     needs_hpc: false
     jobs: []

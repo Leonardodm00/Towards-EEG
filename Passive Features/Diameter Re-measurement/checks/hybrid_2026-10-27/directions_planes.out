@@ -1,0 +1,4 @@
+phi  0 mu 1: max |dtau| 16x32 7.6e-07 (7 s), 8x16 1.8e-06 (3 s); 32x64 28 s
+phi  0 mu 3: max |dtau| 16x32 6.3e-06 (7 s), 8x16 8.2e-06 (2 s); 32x64 28 s
+phi 40 mu 1: max |dtau| 16x32 2.9e-04 (11 s), 8x16 1.2e-03 (3 s); 32x64 35 s
+phi 40 mu 3: max |dtau| 16x32 3.1e-04 (11 s), 8x16 9.8e-04 (2 s); 32x64 35 s

@@ -1,0 +1,5 @@
+grid 968 x 968 samples, h = 0.0143 um, 7 planes
+d 0.3 um, phi  0 deg: 2.57e+05 slab points; partition 2.8 s, hybrid 11.8 s (68 ns per point-direction)
+d 1.0 um, phi  0 deg: 2.85e+06 slab points; partition 6.0 s, hybrid 95.8 s (62 ns per point-direction)
+d 1.0 um, phi 45 deg: 3.84e+06 slab points; partition 9.0 s, hybrid 193.5 s (94 ns per point-direction)
+d 2.0 um, phi  0 deg: 1.14e+07 slab points; partition 8.6 s, hybrid 432.0 s (73 ns per point-direction)

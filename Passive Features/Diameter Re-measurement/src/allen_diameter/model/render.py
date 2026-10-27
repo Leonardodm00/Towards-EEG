@@ -7,9 +7,13 @@ and for each plane k at depth z_k:
 
     Delta A_j = T_<j (1 - exp(-a_j))                (partition_vertical, Eq. 5)
     Delta A_j = a_j                                 (linear, mathematics Eq. 11)
+    Delta A_j = a_j < exp(-mu l_back) / s_z >_W     (hybrid, Block 21: the condenser's
+                at the middle of the slab's inside   rays' own histories, model/hybrid.py)
     tau_k = I_k / B = 1 - sum_j (Delta A_j * G_{sigma_r(zeta_j - z_k)})     (Eq. 6 / B)
 
-on a fine grid of sample centres. The object is drawn on every sample of the
+on a fine grid of sample centres; the hybrid's slabs are computed once per
+call and reused for every plane (they cost far more than the partition's).
+The object is drawn on every sample of the
 grid and nowhere else: the caller sizes the grid (Block 6 uses the block, a
 padding and the tube's footprint). Depth z is in stage units; with
 light_direction = +1 the light travels toward increasing z (and increasing
@@ -45,9 +49,10 @@ from scipy import ndimage
 from scipy.interpolate import RectBivariateSpline
 
 from . import camera, geometry
+from . import hybrid as _hybrid
 from .kernel import sigma_r
 
-ABSORPTIONS_RENDERED = ("partition_vertical", "linear")   # "ray_world": model/ray_world.py (Block 9)
+ABSORPTIONS_RENDERED = ("partition_vertical", "linear", "hybrid")   # "ray_world": model/ray_world.py (Block 9)
 _SQRT_2PI = math.sqrt(2.0 * math.pi)
 BACKENDS = ("fft", "direct")
 
@@ -146,9 +151,13 @@ def _check_absorption(absorption, allow_ray_world=False):
         raise ValueError("unknown absorption %r" % (absorption,))
 
 
-def _slabs(z_lo, z_hi, inside, zeta, dzeta, mu, light_direction, absorption, subset=None):
+def _slabs(z_lo, z_hi, inside, zeta, dzeta, mu, light_direction, absorption, subset=None, hybrid=None):
     """Yield (j, row slice, column slice, Delta A_j on that box) for every slab
-    (of subset, when given) with absorbed light on the grid."""
+    (of subset, when given) with absorbed light on the grid. hybrid: for
+    absorption "hybrid" (Block 21), (tube, xs, ys, S, W) -- the tube, the
+    grid's sample coordinates and the condenser's directions and weights."""
+    if absorption == "hybrid" and hybrid is None:
+        raise ValueError("the hybrid absorption needs (tube, xs, ys, S, W)")
     for j in (range(len(zeta)) if subset is None else subset):
         j = int(j)
         zj = zeta[j]
@@ -159,6 +168,12 @@ def _slabs(z_lo, z_hi, inside, zeta, dzeta, mu, light_direction, absorption, sub
         cols = np.flatnonzero(hit.any(axis=0))
         rs, cs = slice(int(rows[0]), int(rows[-1]) + 1), slice(int(cols[0]), int(cols[-1]) + 1)
         zl, zh = z_lo[rs, cs], z_hi[rs, cs]
+        if absorption == "hybrid":
+            tube, xs, ys, S, W = hybrid
+            dA = _hybrid.slab_absorbed(xs[cs][None, :], ys[rs][:, None], zl, zh, zj, dzeta, mu, tube, S, W,
+                                       light_direction)
+            yield j, rs, cs, dA
+            continue
         a = geometry.slab_absorbance(zl, zh, zj, dzeta, mu)
         if absorption == "partition_vertical":
             dA = geometry.transmitted_before(zl, zh, zj, dzeta, mu, light_direction) * (-np.expm1(-a))
@@ -167,14 +182,47 @@ def _slabs(z_lo, z_hi, inside, zeta, dzeta, mu, light_direction, absorption, sub
         yield j, rs, cs, dA
 
 
-def absorbed_fractions(tube, mu, grid, zeta, dzeta, light_direction=+1, absorption="partition_vertical"):
-    """Delta A_j on the whole grid, (J, ny, nx) -- for tests and small cases."""
+class _SlabCache:
+    """Every slab's Delta A_j computed once, kept as its box and the box's
+    nonzero entries, and served again for any subset in increasing j (the
+    order _slabs yields them in): the hybrid's slabs cost far more than the
+    partition's, and the direct backend asks for them once per plane, the FFT
+    path once per plane chunk and once more for the far pairs."""
+
+    def __init__(self, slabs):
+        self._items = {}
+        for j, rs, cs, dA in slabs:
+            flat = dA.ravel()
+            nz = np.flatnonzero(flat)
+            idx = nz.astype(np.int32) if flat.size < 2 ** 31 else nz
+            self._items[int(j)] = (rs, cs, dA.shape, idx, flat[nz].copy())
+
+    def __call__(self, subset=None):
+        js = sorted(self._items) if subset is None else [int(j) for j in subset if int(j) in self._items]
+        for j in js:
+            rs, cs, shape, idx, vals = self._items[j]
+            flat = np.zeros(int(shape[0]) * int(shape[1]))
+            flat[idx] = vals
+            yield j, rs, cs, flat.reshape(shape)
+
+
+def absorbed_fractions(tube, mu, grid, zeta, dzeta, light_direction=+1, absorption="partition_vertical",
+                       directions=None):
+    """Delta A_j on the whole grid, (J, ny, nx) -- for tests and small cases.
+    directions: (S, W), the condenser's directions and weights (Block 9's
+    ray_world.directions), required for absorption "hybrid" (Block 21)."""
     _check_absorption(absorption)
+    hyb = None
+    if absorption == "hybrid":
+        if directions is None:
+            raise ValueError("absorbed_fractions: the hybrid needs directions=(S, W) (ray_world.directions)")
+        S, W = directions
+        hyb = (tube, grid.xs, grid.ys, np.asarray(S, dtype=float), np.asarray(W, dtype=float))
     X, Y = grid.mesh()
     z_lo, z_hi, inside = geometry.column_interval(X, Y, tube)
     out = np.zeros((len(zeta), grid.ny, grid.nx))
     for j, rs, cs, dA in _slabs(z_lo, z_hi, inside, np.asarray(zeta, dtype=float), dzeta, mu,
-                                light_direction, absorption):
+                                light_direction, absorption, hybrid=hyb):
         out[j, rs, cs] = dA
     return out
 
@@ -185,7 +233,8 @@ def render_transmittance(tube, mu, z_planes, grid, rcfg, light_direction=+1, bac
     tube: geometry.Tube; mu (1/um) >= 0; z_planes: depths (um, stage units);
     grid: FineGrid; rcfg: RendererConfig (kernel, absorption, dzeta_um,
     fft_wrap_sigmas, fft_split_sigma_um, far_grid_per_sigma,
-    max_fft_accumulator_mb, direct_truncate); light_direction +1 or -1;
+    max_fft_accumulator_mb, direct_truncate; for "hybrid" also ray_na,
+    ray_n_oil, ray_n_rho, ray_n_psi, Block 21); light_direction +1 or -1;
     backend "fft" or "direct" (default rcfg.backend); reduce: an optional
     function applied to each finished plane (ny, nx) -- e.g. crop and
     pixel-integrate -- so that only reduced planes are kept (memory).
@@ -226,6 +275,13 @@ def render_transmittance(tube, mu, z_planes, grid, rcfg, light_direction=+1, bac
         raise ValueError("grid step h = %g um does not resolve the narrowest kernel (sigma = %g um): need h <= sigma / 2"
                          % (h, float(sig.min())))
     args = (z_lo, z_hi, inside, zeta, dzeta, mu, light_direction, rcfg.absorption)
+    if rcfg.absorption == "hybrid":             # Block 21: every slab once, from the condenser's rays
+        from . import ray_world
+        S, W = ray_world.directions(rcfg.ray_n_rho, rcfg.ray_n_psi, rcfg.ray_na, rcfg.ray_n_oil)
+        slabs = _SlabCache(_slabs(*args, hybrid=(tube, grid.xs, grid.ys, S, W)))
+    else:
+        def slabs(subset=None):
+            return _slabs(*args, subset=subset)
     work = np.zeros((ny, nx))
     used = set()
     out = [None] * n_planes
@@ -233,7 +289,7 @@ def render_transmittance(tube, mu, z_planes, grid, rcfg, light_direction=+1, bac
     if backend == "direct":
         for k in range(n_planes):
             total = np.zeros((ny, nx))
-            for j, rs, cs, dA in _slabs(*args):
+            for j, rs, cs, dA in slabs():
                 used.add(j)
                 work[rs, cs] = dA
                 total += ndimage.gaussian_filter(work, sig[j, k] / h, mode="constant", cval=0.0,
@@ -260,7 +316,7 @@ def render_transmittance(tube, mu, z_planes, grid, rcfg, light_direction=+1, bac
             yc = np.linspace(grid.y0, grid.y0 + (ny - 1) * h, max(4, int(math.ceil((ny - 1) * h / spacing)) + 1))
             levels[int(L)] = (xc, yc, np.zeros((n_planes, yc.size, xc.size)))
         far_shape = max((v[1].size, v[0].size) for v in levels.values())
-        for j, rs, cs, dA in _slabs(*args, subset=np.flatnonzero(far.any(axis=1))):
+        for j, rs, cs, dA in slabs(subset=np.flatnonzero(far.any(axis=1))):
             used.add(j)
             for k in np.flatnonzero(far[j]):
                 xc, yc, acc_L = levels[int(octave[j, k])]
@@ -290,7 +346,7 @@ def render_transmittance(tube, mu, z_planes, grid, rcfg, light_direction=+1, bac
         for c0 in range(0, n_planes, per_chunk):
             ks = order[c0:c0 + per_chunk]
             acc = np.zeros((ks.size, shape[0], shape[1] // 2 + 1), dtype=complex)
-            for j, rs, cs, dA in _slabs(*args, subset=np.flatnonzero(near[:, ks].any(axis=1))):
+            for j, rs, cs, dA in slabs(subset=np.flatnonzero(near[:, ks].any(axis=1))):
                 used.add(j)
                 work[rs, cs] = dA
                 spec = sfft.rfft2(work, s=shape)
