@@ -377,11 +377,12 @@ def criteria_reasons(phi_rad, alpha_hat, allen_diameter_um, cfg):
 
 
 def trace_reasons(view, cfg, allen_diameter_um, branch, index, scene, planes_z):
-    """The criteria read from the trace and the pilot (10.I; D-081.1, D-081.3),
-    in this order: not_straight -- the branch's points within +-
-    node_straight_half_um along the trace stray farther than
-    node_straight_tol_radii x (Allen's diameter / 2) from their own
-    total-least-squares line; not_isolated -- a traced neighbour (not
+    """The criteria read from the trace and the pilot (10.I; D-081.1, D-081.3,
+    D-093), in this order: not_straight -- only when node_straight_check (off
+    by default, D-093: the calibration evaluates only the measuring line) --
+    the branch's points within +- node_straight_half_um along the trace stray
+    farther than node_straight_tol_radii x (Allen's diameter / 2) from their
+    own total-least-squares line; not_isolated -- a traced neighbour (not
     the node's own branch; the soma included) throws a shadow deeper than
     isolation_depth_gl into the +-patch_half_um patch about the pilot's centre
     in some plane of planes_z (depths, um), under the renderer's current law,
@@ -390,10 +391,11 @@ def trace_reasons(view, cfg, allen_diameter_um, branch, index, scene, planes_z):
     already."""
     cal = cfg.calibration
     out = []
-    excess = calibration_scene.straightness_excess(branch, index, cal.node_straight_half_um)
-    r = 0.5 * float(allen_diameter_um)
-    if math.isfinite(excess) and not (math.isfinite(r) and r > 0 and excess <= cal.node_straight_tol_radii * r):
-        out.append("not_straight")
+    if cal.node_straight_check:
+        excess = calibration_scene.straightness_excess(branch, index, cal.node_straight_half_um)
+        r = 0.5 * float(allen_diameter_um)
+        if math.isfinite(excess) and not (math.isfinite(r) and r > 0 and excess <= cal.node_straight_tol_radii * r):
+            out.append("not_straight")
     if scene is not None and all(math.isfinite(float(x)) for x in (view.cx_um, view.cy_um, view.B_bar,
                                                                     view.mu_hat_per_um)):
         depth, _who = calibration_scene.isolation_depth(branch, index, scene, view.cx_um, view.cy_um,
@@ -410,8 +412,9 @@ def calibration_reasons(result, cfg, allen_diameter_um, branch=None, index=None,
     rule), then criteria_reasons -- every criterion read from the pilot
     (pilot_view; Block 13.3b, D-061.2, D-067.4) except Allen's diameter
     allen_diameter_um (um; 2 x the branch radius at the node, D-061.4) --,
-    then, when branch and index are given, trace_reasons (10.I: not_straight;
-    not_isolated when scene and planes_z are given too). The fit's d_hat is no
+    then, when branch and index are given, trace_reasons (10.I: not_straight
+    with node_straight_check, D-093; not_isolated when scene and planes_z are
+    given too). The fit's d_hat is no
     criterion: the kernel being calibrated must not choose its own nodes."""
     view = pilot_view(result)
     out = phantoms.reject_reasons(view) + criteria_reasons(view.phi_rad, view.alpha_hat, allen_diameter_um, cfg)

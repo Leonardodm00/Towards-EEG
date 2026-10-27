@@ -127,7 +127,7 @@ if os.path.exists(pilot):
     print("[preflight] pilot rows %d; columns missing: %s; candidates %d by set %s" % (
         len(rows), missing or "none", len(cand), by))
     print("[preflight] a production kernel needs at least 10 scanned nodes per set (D-088.3); the scan drops some "
-          "(not straight, not isolated)")
+          "(not isolated; straightness is not tested since D-093)")
 """
 subprocess.run([sys.executable, "-c", PREFLIGHT, OUT, str(SPECIMEN), REG_JSON], cwd=WS, check=False)
 
@@ -136,7 +136,8 @@ subprocess.run([sys.executable, "-c", PREFLIGHT, OUT, str(SPECIMEN), REG_JSON], 
 # ## Cell 7: the kernel calibration on the pilot -- near field (Block 10), far field (Block 15), figures
 # The test on one pilot cell (D-088.2, 529878215 confirmed in D-089.8). Calibration nodes chosen by Allen's diameter:
 # near field 2r <= 0.6 um scanned over k* +- 3, far field 0.6-0.8 um over k* +- 16, each on a +-25 um patch per plane;
-# a node must be in S, flat (phi <= 5 deg), faint, straight and isolated. At most 30 scanned nodes per set (seeded
+# a node must be in S, flat (phi <= 5 deg), faint and isolated -- not screened for straightness since D-093 (the
+# calibration evaluates only the measuring line). At most 30 scanned nodes per set (seeded
 # order; the rest `set_full`), at least 10 for a production kernel (D-088.3).
 #
 # Expect from `real`: `N candidate nodes`, one line per node (`scanned (near field)`, `scanned (far field)` or `not a

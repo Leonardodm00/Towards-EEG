@@ -189,7 +189,8 @@ def test_invariants():
     br, scene = two_tube_scene(y_other=100.0, with_soma=True)
     scene_near = Scene(scene.seg_xyz, scene.seg_radius, scene.seg_ids, np.array([[cx - half - 2.0, cy, 5.0]]))
     assert CS.isolation_depth(br, 7, scene_near, cx, cy, half, z, B, mu, cfg)[1] == "soma"
-    # straightness: a straight branch has zero excess; a bend of 2 r fails the default tolerance (1 radius)
+    # straightness: a straight branch has zero excess; a bend of 2 r fails a tolerance of 1 radius (D-081.3's; the
+    # test is off by default and its tolerance 2 radii since D-093, tests/smoke/test_smoke_calibration.py)
     straight = Branch.from_points(np.c_[np.linspace(-12, 12, 25), 0.3 * np.linspace(-12, 12, 25), np.zeros(25)], 0.2)
     assert CS.straightness_excess(straight, 12, 10.0) <= 1e-9
     x = np.linspace(-12, 12, 25)

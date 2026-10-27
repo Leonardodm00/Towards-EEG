@@ -56,7 +56,8 @@ Checks
                         the same rendered draw within 5 % (the background
                         within 0.1 gl); node_phi_max_deg = 5 rejects a 7 deg
                         pilot of either set; calibration_reasons adds
-                        not_straight and not_isolated in that order after
+                        not_straight (only with node_straight_check, off by
+                        default, D-093) and not_isolated in that order after
                         not_faint; anchor_from_growth equals the cut table's
                         last value; bootstrap_sigma0's SE within 30 % of the
                         SD over regenerated data sets; example_node picks the
@@ -628,7 +629,8 @@ def test_patch_scan():
         assert CAL.criteria_reasons(math.radians(7.0), 0.3, d_a, cfg) == ["not_flat"]
         assert CAL.criteria_reasons(math.radians(4.0), 0.3, d_a, cfg) == []
     assert cfg.calibration.node_phi_max_deg == 5.0
-    # (c) calibration_reasons adds not_straight and not_isolated, in that order, after not_faint
+    # (c) calibration_reasons adds not_straight (with node_straight_check) and not_isolated, in that order, after
+    # not_faint; D-093 (2026-10-27): the straightness test is off by default, its tolerance 2 radii when on
     x = np.linspace(-12, 12, 25)
     bent = Branch.from_points(np.c_[x, 0.4 * (1 - np.cos(np.pi * x / 10.0)) * (np.abs(x) <= 10), np.zeros(25)], 0.2,
                               ids=np.arange(100, 125))
@@ -638,13 +640,24 @@ def test_patch_scan():
                   np.vstack([s1.seg_ids, s2.seg_ids]), np.empty((0, 3)))
     pil = dataclasses.replace(fake_node(0.0, 0.0, 0.0, 0.0, 0.4, 1.0), B_bar=200.0, mu_hat_per_um=1.0, alpha_hat=0.9)
     planes_z = np.arange(-3, 4) * cfg.acquisition.dz_um
-    assert CAL.calibration_reasons(pil, cfg, 0.4, bent, 12, scene, planes_z) == ["not_faint", "not_straight",
+    assert cfg.calibration.node_straight_check is False and cfg.calibration.node_straight_tol_radii == 2.0
+    on1 = cfg_with(patch_half_um=PATCH_HALF_TEST, node_straight_check=True, node_straight_tol_radii=1.0)
+    assert CAL.calibration_reasons(pil, on1, 0.4, bent, 12, scene, planes_z) == ["not_faint", "not_straight",
                                                                                  "not_isolated"]
-    assert CAL.calibration_reasons(pil, cfg, 0.4, bent, 12, Scene.from_branch(bent), planes_z) == ["not_faint",
+    assert CAL.calibration_reasons(pil, on1, 0.4, bent, 12, Scene.from_branch(bent), planes_z) == ["not_faint",
                                                                                                     "not_straight"]
+    # the default (D-093): the same bent branch is not screened for straightness
+    assert CAL.calibration_reasons(pil, cfg, 0.4, bent, 12, scene, planes_z) == ["not_faint", "not_isolated"]
+    assert CAL.calibration_reasons(pil, cfg, 0.4, bent, 12, Scene.from_branch(bent), planes_z) == ["not_faint"]
+    # with the check on, the tolerance is node_straight_tol_radii x r: not_straight exactly when the excess exceeds it
+    exc = CS.straightness_excess(bent, 12, cfg.calibration.node_straight_half_um)
+    for tol in (1.0, 2.0, 4.0):
+        on = cfg_with(patch_half_um=PATCH_HALF_TEST, node_straight_check=True, node_straight_tol_radii=tol)
+        got = "not_straight" in CAL.calibration_reasons(pil, on, 0.4, bent, 12, Scene.from_branch(bent), planes_z)
+        assert got == (exc > tol * 0.2), (tol, exc, got)
     straight = Branch.from_points(np.c_[x, np.zeros(25), np.zeros(25)], 0.2, ids=np.arange(100, 125))
     good = dataclasses.replace(pil, alpha_hat=0.3)
-    assert CAL.calibration_reasons(good, cfg, 0.4, straight, 12, Scene.from_branch(straight), planes_z) == []
+    assert CAL.calibration_reasons(good, on1, 0.4, straight, 12, Scene.from_branch(straight), planes_z) == []
     assert CAL.calibration_reasons(good, cfg, 0.4) == []                 # without the trace: the old rule
     # (d) the anchor equals the cut table's last value, at 0.84 um; the SE of a node bootstrap on noisy Eq. (4) data
     # within 30 % of the SD over 40 regenerated data sets (the SPEC's tolerance: 40 sets give a 11 % SE of the SD)

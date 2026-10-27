@@ -267,8 +267,9 @@ class CalibrationConfig:
     background_min_far_frac: float = 0.05    # source: PROVISIONAL (Block 10.P): fewer far pixels than this fraction of the patch -> plane status bg_few
     background_trim_sigmas: float = 3.0      # source: PROVISIONAL (Block 10.P): the plane is refitted once without the pixels beyond this x 1.4826 MAD of the first fit's residuals (untraced debris)
     isolation_depth_gl: float = 0.03         # source: D-081.1 [user]: a traced neighbour (not the node's own branch) whose predicted shadow reaches the patch deeper than this (gl) in a scanned plane fails the node (not_isolated)
-    node_straight_half_um: float = 10.0      # source: D-081.3 (proposal accepted), PROVISIONAL: the trace within +-this (um) along the branch must stay near the node's straight line
-    node_straight_tol_radii: float = 1.0     # source: D-081.3, PROVISIONAL: ... within this x (Allen's diameter / 2) of the line, else not_straight
+    node_straight_check: bool = False        # source: D-093 [user, 2026-10-27]: no straightness test -- the calibration evaluates only the measuring line and flatness (node_phi_max_deg) stays strict; True restores 10.I (v) with the two fields below
+    node_straight_half_um: float = 10.0      # source: D-081.3 (proposal accepted), PROVISIONAL: the trace within +-this (um) along the branch must stay near the node's straight line (with node_straight_check)
+    node_straight_tol_radii: float = 2.0     # source: D-093 [user]: "relax the straightness as 2 or 4 x r_A" (was 1.0, D-081.3): ... within this x (Allen's diameter / 2) of the line, else not_straight (with node_straight_check)
     bootstrap_resamples: int = 1000          # source: D-081.7 [user]: node resamples for the SE of the anchor (10.A) and of the far slope (15.5)
     table_max_delta_um: float = 0.84         # source: D-080.1 [user]: every table written for rendering ends here, so the renderer's linear continuation starts at the anchor
     # Block 15, the far-field calibration (D-074, D-077, D-078, D-081)
@@ -455,7 +456,8 @@ class DiameterConfig:
         wb, ao = tuple(cal.far_core_width_bounds), tuple(cal.far_area_offsets)
         if not (cal.patch_half_um > 0 and cal.far_pixel_sigmas >= 0 and 0 < cal.background_min_far_frac <= 1
                 and cal.background_trim_sigmas > 0 and cal.isolation_depth_gl >= 0 and cal.node_straight_half_um > 0
-                and cal.node_straight_tol_radii > 0 and cal.bootstrap_resamples >= 2 and cal.table_max_delta_um > 0
+                and cal.node_straight_tol_radii > 0 and isinstance(cal.node_straight_check, bool)
+                and cal.bootstrap_resamples >= 2 and cal.table_max_delta_um > 0
                 and cal.far_offsets_planes >= cal.offsets_planes and cal.far_profile_half_um > 0
                 and cal.far_min_snr >= 0 and 1 <= cal.far_min_k_offset <= cal.far_offsets_planes
                 and len(ao) == 2 and 1 <= ao[0] <= ao[1] <= cal.far_offsets_planes and cal.far_min_planes_per_node >= 2

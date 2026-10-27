@@ -914,9 +914,10 @@ run("scripts/allen_radius_distribution.py", "--fetch", SPECIMEN, "--cache-dir", 
 # D-067.4; thresholds PROVISIONAL): the near-field set, D_A <= 0.6 um, is scanned plane by plane over k* +- 3
 # (offsets up to 0.84 um); the far-field set, 0.6 < D_A <= 0.8 um, over k* +- 16 (offsets to 4.5 um, D-026,
 # D-078). Both must be in S, flat (phi <= 5 deg, D-081.3) and faint (alpha <= 0.5) by the pilot's columns, and
-# then, on the trace (D-079, D-081): straight (within one radius of its own line over +-10 um) and isolated (no
-# other dendrite or the soma casts a predicted shadow deeper than 0.03 grey levels inside the +-25 um patch, in
-# any scanned plane). Each scan reads a +-25 um patch per plane, fits a planar background to the pixels far from
+# then, on the trace (D-079, D-081.1), isolated (no other dendrite or the soma casts a predicted shadow deeper
+# than 0.03 grey levels inside the +-25 um patch, in any scanned plane); not screened for straightness since
+# D-093 (the calibration evaluates only the measuring line; `calibration.node_straight_check` restores it at
+# 2 radii). Each scan reads a +-25 um patch per plane, fits a planar background to the pixels far from
 # every traced segment (D-078.1) and fits the dip's Gaussian core iteratively (up to 10 passes, stop at 1 SE of
 # the width; D-077, D-078.2). `real` prints `N candidate nodes`, one line per node (`scanned (near field)`,
 # `scanned (far field)` or `not a calibration node (...)` with the reasons), `... candidates scanned: n near-
