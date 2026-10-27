@@ -13,11 +13,21 @@ analysis.calibration_report.figure_inputs; nothing scientific is computed here.
                          Gaussian core over its window (D-075.2)
   kernel_law_figure      both stages as kernel SDs against |delta|, the cut
                          table, the far line and the anchor (D-075.1)
+  kernel_law_by_cell_figure  Block 19.5 (D-090.2): the same points by cell --
+                         one panel coloured by cell up to 3 cells, one panel
+                         per cell beyond
+  kernel_law_residuals_by_cell_figure  the residuals from the pooled law, one
+                         row per cell, with each cell's median per set
   write_all              the PNG files of a run
 
 Colours: the palette of the project's figures (light grey for the nodes,
 blue for the median and the law, orange for the example and the far line,
-green for the near table). Pure ASCII, for the cluster (hpc-python-compat).
+green for the near table). By cell (19.5): the first three categorical slots
+of the reference palette (blue, orange, aqua), validated all-pairs for a
+scatter (dataviz skill's validate_palette.js, 2026-10-27: CVD dE >= 9.2,
+normal-vision dE >= 24.0; aqua below 3:1 on the surface, so the cells are
+also labelled and listed in kernel_law_by_cell.csv); beyond three cells one
+panel per cell. Pure ASCII, for the cluster (hpc-python-compat).
 """
 from __future__ import annotations
 
@@ -28,6 +38,8 @@ import numpy as np
 
 GREY, INK, INK2 = "#a9a8a2", "#0b0b0b", "#52514e"
 BLUE, ORANGE, GREEN, SURFACE, GRID = "#2a78d6", "#eb6834", "#1baf7a", "#fcfcfb", "#e4e3df"
+CELL_HUES = (BLUE, ORANGE, GREEN)      # 19.5: the most a scatter keeps apart by colour (see the module docstring)
+BACKDROP = "#d9d8d3"                   # 19.5: every cell's used points behind one cell's panel
 
 
 def _plt():
@@ -231,9 +243,138 @@ def kernel_law_figure(kl, title=""):
     return fig
 
 
-def write_all(scans, calib, far_fit, patches, cfg, out_dir, every_node=True, dpi=150):
-    """The PNG files of a run in out_dir: width_by_plane_<set>.png, example_<set>.png, kernel_law.png and, when
-    every_node, gaussians/<set>_node_<id>.png. Returns the paths written."""
+def _cell_label(cell):
+    return "cell" if cell is None else "specimen %d" % int(cell)
+
+
+def _law(ax, kc, labels=True):
+    if kc["table"] is not None:
+        ax.plot(kc["table"][0], kc["table"][1], "-", color=INK, lw=1.6, label="pooled near table" if labels else None,
+                zorder=4)
+    if kc["line"] is not None:
+        ax.plot(kc["line"][0], kc["line"][1], "--", color=INK, lw=1.4, label="pooled far line" if labels else None,
+                zorder=4)
+    if kc["anchor"] is not None:
+        ax.plot([kc["anchor"][0]], [kc["anchor"][1]], "D", color=INK, ms=5, label="anchor" if labels else None,
+                zorder=5)
+
+
+def _n_nodes(kc, cell, which):
+    row = next((r for r in kc["summary"] if r["specimen_id"] == cell and r["set"] == which), None)
+    return 0 if row is None else int(row["n_nodes"])
+
+
+def kernel_law_by_cell_figure(kc, title=""):
+    """kc: calibration_report.kernel_law_by_cell. Up to len(CELL_HUES) cells: one panel, colour by cell, marker by
+    set (near a circle, far a triangle), hollow when the fit did not use the point. More cells: one panel per cell,
+    its points in blue over every cell's used points in light grey. The pooled table and far line in ink."""
+    from matplotlib.lines import Line2D
+    plt = _plt()
+    cells, pts = kc["cells"], kc["points"]
+    xlabel = r"$|\hat\delta_{j,k}|$ ($\mu$m), from the fitted axes"
+    ylabel = r"kernel SD $\hat\sigma_{j,k}$ ($\mu$m)"
+    if len(cells) <= len(CELL_HUES):
+        fig, ax = plt.subplots(figsize=(8.0, 4.8), facecolor=SURFACE)
+        _style(ax)
+        for i, c in enumerate(cells):
+            for which, marker in (("near", "o"), ("far", "^")):
+                for used in (True, False):
+                    sel = [p for p in pts if p["cell"] == c and p["set"] == which and p["used"] == used]
+                    if sel:
+                        ax.plot([p["abs_delta_um"] for p in sel], [p["sigma_um"] for p in sel], marker,
+                                color=CELL_HUES[i], mfc=CELL_HUES[i] if used else "none", ms=4.5, alpha=0.8, lw=0,
+                                zorder=3)
+        _law(ax, kc)
+        handles = [Line2D([], [], marker="o", ls="", color=CELL_HUES[i], ms=6,
+                          label="%s (%d near, %d far nodes)" % (_cell_label(c), _n_nodes(kc, c, "near"),
+                                                                _n_nodes(kc, c, "far")))
+                   for i, c in enumerate(cells)]
+        handles += [Line2D([], [], marker="o", ls="", color=INK2, label="near-field planes"),
+                    Line2D([], [], marker="^", ls="", color=INK2, label="far-field planes"),
+                    Line2D([], [], marker="o", ls="", color=INK2, mfc="none", label="not in the fit")]
+        handles += ax.get_legend_handles_labels()[0]
+        ax.legend(handles=handles, frameon=False, fontsize=7.5, ncol=2)
+        ax.set_xlabel(xlabel, fontsize=9)
+        ax.set_ylabel(ylabel, fontsize=9)
+        ax.set_title(title or "the kernel law by cell: near and far fields together, the pooled law in ink",
+                     fontsize=10, loc="left", color=INK)
+        fig.tight_layout()
+        return fig
+    ncol = min(4, len(cells))
+    nrow = int(math.ceil(len(cells) / ncol))
+    fig, axes = plt.subplots(nrow, ncol, figsize=(3.3 * ncol, 2.8 * nrow + 0.7), sharex=True, sharey=True,
+                             squeeze=False, facecolor=SURFACE)
+    back = [p for p in pts if p["used"]]
+    for k, c in enumerate(cells):
+        ax = axes[k // ncol, k % ncol]
+        _style(ax)
+        ax.plot([p["abs_delta_um"] for p in back], [p["sigma_um"] for p in back], "o", color=BACKDROP, ms=2.5,
+                mec="none", zorder=1)
+        for which, marker in (("near", "o"), ("far", "^")):
+            for used in (True, False):
+                sel = [p for p in pts if p["cell"] == c and p["set"] == which and p["used"] == used]
+                if sel:
+                    ax.plot([p["abs_delta_um"] for p in sel], [p["sigma_um"] for p in sel], marker, color=BLUE,
+                            mfc=BLUE if used else "none", ms=4, alpha=0.85, lw=0, zorder=3)
+        _law(ax, kc, labels=False)
+        ax.set_title("%s: %d near, %d far nodes" % (_cell_label(c), _n_nodes(kc, c, "near"), _n_nodes(kc, c, "far")),
+                     fontsize=8, color=INK)
+    for k in range(len(cells), nrow * ncol):
+        axes[k // ncol, k % ncol].axis("off")
+    fig.supxlabel(xlabel, fontsize=9)
+    fig.supylabel(ylabel, fontsize=9)
+    fig.suptitle(title or "the kernel law by cell: each cell's planes in blue (circles near, triangles far, hollow "
+                 "not in the fit) over every cell's in grey; the pooled table (solid) and far line (dashed) in ink",
+                 fontsize=9, color=INK)
+    fig.tight_layout()
+    return fig
+
+
+def kernel_law_residuals_by_cell_figure(kc, title=""):
+    """kc: calibration_report.kernel_law_by_cell. One row per cell (increasing specimen id, top to bottom): the
+    residuals from the pooled law, near circles above the row's line and far triangles below, hollow when not in
+    the fit; the cell's median per set (over the used points) as an ink bar; zero as a line. Colour by cell as in
+    kernel_law_by_cell_figure up to len(CELL_HUES) cells, ink-grey beyond."""
+    from matplotlib.lines import Line2D
+    plt = _plt()
+    cells, pts = kc["cells"], kc["points"]
+    n = len(cells)
+    fig, ax = plt.subplots(figsize=(8.0, 1.5 + 0.42 * n), facecolor=SURFACE)
+    _style(ax)
+    for i, c in enumerate(cells):
+        y = n - 1 - i
+        col = CELL_HUES[i] if n <= len(CELL_HUES) else INK2
+        for which, marker, dy in (("near", "o", 0.15), ("far", "^", -0.15)):
+            for used in (True, False):
+                sel = [p for p in pts if p["cell"] == c and p["set"] == which and p["used"] == used
+                       and math.isfinite(p["residual_um"])]
+                if sel:
+                    ax.plot([p["residual_um"] for p in sel], [y + dy] * len(sel), marker, color=col,
+                            mfc=col if used else "none", ms=4, alpha=0.7, lw=0, zorder=3)
+            row = next((r for r in kc["summary"] if r["specimen_id"] == c and r["set"] == which), None)
+            if row is not None and math.isfinite(row["median_residual_um"]):
+                ax.plot([row["median_residual_um"]], [y + dy], "|", color=INK, ms=12, mew=2.2, zorder=4)
+    ax.axvline(0.0, color=INK2, lw=0.9, zorder=2)
+    ax.set_yticks(range(n))
+    ax.set_yticklabels([_cell_label(c) for c in reversed(cells)], fontsize=8)
+    ax.set_ylim(-0.6, n - 0.4)
+    fig.legend(handles=[Line2D([], [], marker="o", ls="", color=INK2, label="near-field planes"),
+                        Line2D([], [], marker="^", ls="", color=INK2, label="far-field planes"),
+                        Line2D([], [], marker="o", ls="", color=INK2, mfc="none", label="not in the fit"),
+                        Line2D([], [], marker="|", ls="", color=INK, ms=10, mew=2.2, label="the cell's median")],
+               frameon=False, fontsize=7.5, ncol=4, loc="lower center")
+    ax.set_xlabel(r"residual from the pooled law, $\hat\sigma_{j,k} - \sigma_{\rm law}(|\hat\delta_{j,k}|)$ ($\mu$m)",
+                  fontsize=9)
+    ax.set_title(title or "the kernel law's residuals by cell", fontsize=10, loc="left", color=INK)
+    fig.tight_layout(rect=(0, min(0.2, 0.24 / (1.5 + 0.42 * n)), 1, 1))
+    return fig
+
+
+def write_all(scans, calib, far_fit, patches, cfg, out_dir, every_node=True, dpi=150, id_map=None):
+    """The PNG files of a run in out_dir: width_by_plane_<set>.png, example_<set>.png, kernel_law.png, when
+    the points span two cells or more kernel_law_by_cell.png and kernel_law_residuals_by_cell.png (Block 19.5;
+    id_map: the pooled scans file's meta.id_map), and, when every_node, gaussians/<set>_node_<id>.png. Returns
+    the paths written."""
     from ..analysis import calibration_report as CR
     inputs = CR.figure_inputs(scans, cfg, calib, far_fit, patches)
     written = []
@@ -252,6 +393,13 @@ def write_all(scans, calib, far_fit, patches, cfg, out_dir, every_node=True, dpi
         path = os.path.join(out_dir, "kernel_law.png")
         fig = kernel_law_figure(inputs["kernel_law"])
         fig.savefig(path, dpi=dpi, facecolor=SURFACE, bbox_inches="tight"); plt.close(fig); written.append(path)
+    kc = CR.kernel_law_by_cell(scans, cfg, calib, far_fit, id_map)
+    if kc is not None and len(kc["cells"]) >= 2:
+        for name, draw in (("kernel_law_by_cell", kernel_law_by_cell_figure),
+                           ("kernel_law_residuals_by_cell", kernel_law_residuals_by_cell_figure)):
+            path = os.path.join(out_dir, "%s.png" % name)
+            fig = draw(kc)
+            fig.savefig(path, dpi=dpi, facecolor=SURFACE, bbox_inches="tight"); plt.close(fig); written.append(path)
     if every_node:
         os.makedirs(os.path.join(out_dir, "gaussians"), exist_ok=True)
         for g in inputs["gaussians"]:

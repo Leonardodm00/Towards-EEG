@@ -6,6 +6,7 @@ on PlaneScan lists; nothing here reads or writes a file.
   qualify      a cell's scans with their node ids qualified by the specimen
   pool_scans   per set, the cells' scans taken round-robin over the cells up to the cap
   sufficiency  whether a set holds the minimum number of nodes (D-088.3)
+  cell_of      the specimen and SWC node of a (qualified) node id (Block 19.5)
 
 Pure ASCII, for the cluster (hpc-python-compat).
 """
@@ -25,6 +26,20 @@ def qualify(scans, specimen_id):
             raise ValueError("qualify: node id %d of specimen %d is outside [0, %d)" % (sc.node_id, specimen_id, QUALIFIER))
         out.append(dataclasses.replace(sc, node_id=int(specimen_id) * QUALIFIER + int(sc.node_id)))
     return out
+
+
+def cell_of(node_id, id_map=None):
+    """Block 19.5: (specimen id or None, SWC node id) of a node of a scans
+    file -- the pooled file's map (meta.id_map: str(q) -> [s, n]) when it
+    holds q, else (q // QUALIFIER, q % QUALIFIER) for q >= QUALIFIER, else
+    (None, q): a node of one cell's file (Cell 7)."""
+    q = int(node_id)
+    if id_map and str(q) in id_map:
+        s, n = id_map[str(q)]
+        return int(s), int(n)
+    if q >= QUALIFIER:
+        return q // QUALIFIER, q % QUALIFIER
+    return None, q
 
 
 def sufficiency(n_nodes, cfg):

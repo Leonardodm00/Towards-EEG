@@ -1,4 +1,4 @@
-"""The S3 survey's figures -- Blocks 16.2 (f) and 17 in specs/SPEC.md
+"""The S3 survey's figures -- Blocks 16.2 (f), 16.3, 17 and 18 in specs/SPEC.md
 (D-085.2, D-085.5). Plotting only: every array, frame and transform comes
 prepared; nothing scientific is computed here.
 
@@ -10,6 +10,9 @@ prepared; nothing scientific is computed here.
   diameter_figure    S3a (Block 17.5): d_hat and Allen's 2r per layer, by class
   inputs_figure      S3b (Block 18.5): Allen's 2r pooled with d_max; the ON
                      nodes' offsets with their robust SDs; each cell's camera
+  projection_check_figure  Block 16.3 (c): per xy projection, its crop over the
+                     window at the best offset beside the planes' minimum,
+                     mean, median and maximum, one grey scale per row
 
 Colours: the palette of the project's figures. Pure ASCII, for the cluster
 (hpc-python-compat).
@@ -224,3 +227,47 @@ def inputs_figure(rad, jit, cam, sug):
     fig.suptitle("S3b: the simulator's inputs across cells -- suggestions, not decisions", fontsize=11)
     fig.tight_layout()
     return fig
+
+
+def projection_check_figure(rec, ops, crops):
+    """Block 16.3 (c). rec: the specimen's record (its window and checks);
+    ops: {op: (H, W)} the operators over the window; crops: {projection id:
+    (H, W)} each projection over the window at its best operator's offset.
+    One row per checked projection: the projection, then the operators in
+    OPERATORS' order, each titled with r* and its offset; the row's grey scale
+    is the projection's 0.5-99.5 percentiles."""
+    from ..analysis.projection_check import OPERATORS
+    plt = _plt()
+    checks = [c for c in rec.get("checks", []) if int(c["id"]) in crops]
+    n_rows, n_cols = max(len(checks), 1), 1 + len(OPERATORS)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(2.6 * n_cols, 3.05 * n_rows + 0.5), squeeze=False)
+    for i, c in enumerate(checks):
+        P = np.asarray(crops[int(c["id"])], dtype=float)
+        lo, hi = np.percentile(P, [0.5, 99.5])
+        if not hi > lo:
+            lo, hi = lo - 1.0, hi + 1.0
+        axes[i, 0].imshow(P, cmap="gray", vmin=lo, vmax=hi, interpolation="nearest")
+        axes[i, 0].set_title("projection %d\n'%s': %s" % (int(c["id"]), c.get("image_type"), c["verdict"]),
+                             fontsize=7.5, color=INK)
+        for j, op in enumerate(OPERATORS):
+            ax = axes[i, j + 1]
+            if op in ops:
+                ax.imshow(np.asarray(ops[op], dtype=float), cmap="gray", vmin=lo, vmax=hi, interpolation="nearest")
+            m = c["by_operator"].get(op, {})
+            r = m.get("r")
+            txt = "r* = %.4f at (%+d, %+d) px" % (r, m["shift_x_px"], m["shift_y_px"]) if (
+                r is not None and math.isfinite(r)) else "r* not finite"
+            ax.set_title("planes' %s%s\n%s" % (op, "  (best)" if op == c.get("best") else "", txt), fontsize=7.5,
+                         color=INK)
+    for ax in axes.ravel():
+        ax.set_xticks([])
+        ax.set_yticks([])
+    if not checks:
+        axes[0, 0].text(0.5, 0.5, "no xy projection checked", ha="center", va="center", fontsize=9, color=INK)
+    w = rec.get("window") or {}
+    fig.suptitle("specimen %s: window %s px at (%s, %s), %s planes; offset = projection pixel - plane pixel"
+                 % (rec.get("specimen_id"), 2 * int(w.get("half_px", 0)), w.get("left"), w.get("top"),
+                    rec.get("n_planes_used")), fontsize=9, color=INK)
+    fig.tight_layout(h_pad=2.0)
+    return fig
+

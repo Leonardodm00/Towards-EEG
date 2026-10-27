@@ -11,6 +11,10 @@ module plotting/calibration_figures.py only draws.
   kernel_law_inputs    both stages as kernel SDs against |delta_hat|: near
                        (omega - c_j + sigma_r(0)^2)^(1/2), far (omega -
                        c_j)^(1/2), the cut table and the far line, the anchor
+  law_points           those points with the node of each (Block 19.5)
+  pooled_sigma_law     sigma_law(delta): the table, then the far line
+  kernel_law_by_cell   the points with their cell and their residual from the
+                       pooled law, and the summary per cell and set (19.5)
   gaussian_inputs      per node, per plane: the dip, the last pass's core and
                        window, the status (D-075.2)
   figure_inputs        all of the above for the scans, the calibration file
@@ -123,13 +127,13 @@ def stage_inputs(scans, which, cfg, calib=None, far_fit=None):
                 law=law, example_id=calibration.example_node(sel, which), has_fit=bool(c_by), dz_um=dz)
 
 
-def kernel_law_inputs(scans, cfg, calib=None, far_fit=None):
-    """Both stages as kernel SDs (um) against |delta_hat| (D-075.1): points
-    (abs_delta, sigma, side, used, which) per plane with a finite width and a
-    known c_j; the table of the calibration file (delta, sigma); the far line
-    on a grid; the anchor (delta_0, sigma_0). None without a calibration."""
+def law_points(scans, cfg, calib=None, far_fit=None):
+    """Block 19.5: kernel_law_inputs' points with the node of each --
+    (abs_delta, sigma, side, used, which, node_id) per plane with a finite
+    width and a known c_j, near then far, nodes in the stage's order; []
+    without a near fit."""
     if calib is None or "growth" not in calib:
-        return None
+        return []
     s0_cfg = float(cfg.renderer.sigma_r0_um)
     pts = []
     near = stage_inputs(scans, "near", cfg, calib, far_fit)
@@ -143,7 +147,13 @@ def kernel_law_inputs(scans, cfg, calib=None, far_fit=None):
                 sig = np.where(val > 0, np.sqrt(np.maximum(val, 0.0)), np.nan)
             for dh, s, u in zip(nd["delta_hat"], sig, nd["used"]):
                 if np.isfinite(s) and np.isfinite(dh):
-                    pts.append((abs(float(dh)), float(s), 1 if dh > 0 else -1, bool(u), which))
+                    pts.append((abs(float(dh)), float(s), 1 if dh > 0 else -1, bool(u), which, int(nd["node_id"])))
+    return pts
+
+
+def _law_curves(cfg, calib, far_fit):
+    """(table, line, anchor) of the figures: the calibration file's table (delta, sigma), the far line on a grid
+    from the anchor to the far scan's reach, the anchor (delta_0, sigma_0); None where absent."""
     table = None
     if "kernel" in calib:
         table = (np.array(calib["kernel"]["kernel_table_delta_um"], dtype=float),
@@ -155,7 +165,89 @@ def kernel_law_inputs(scans, cfg, calib=None, far_fit=None):
         reach = (cfg.calibration.far_offsets_planes + 0.5) * cfg.acquisition.dz_um
         grid = np.linspace(anchor[0], reach, 100)
         line = (grid, anchor[1] + float(far_fit["far_fit"]["gamma"]) * (grid - anchor[0]))
+    return table, line, anchor
+
+
+def kernel_law_inputs(scans, cfg, calib=None, far_fit=None):
+    """Both stages as kernel SDs (um) against |delta_hat| (D-075.1): points
+    (abs_delta, sigma, side, used, which) per plane with a finite width and a
+    known c_j; the table of the calibration file (delta, sigma); the far line
+    on a grid; the anchor (delta_0, sigma_0). None without a calibration."""
+    if calib is None or "growth" not in calib:
+        return None
+    s0_cfg = float(cfg.renderer.sigma_r0_um)
+    pts = [p[:5] for p in law_points(scans, cfg, calib, far_fit)]
+    table, line, anchor = _law_curves(cfg, calib, far_fit)
     return dict(points=pts, table=table, line=line, anchor=anchor, sigma_r0_um=s0_cfg)
+
+
+BY_CELL_COLUMNS = ("specimen_id", "set", "n_nodes", "n_points_used", "n_points", "median_residual_um",
+                   "q25_residual_um", "q75_residual_um", "median_abs_delta_um")
+
+
+def pooled_sigma_law(calib, far_fit=None):
+    """Block 19.5: sigma_law(delta) (um) for delta >= 0 (um): the calibration
+    file's table, linear between its points, up to its last delta; beyond it
+    the far line sigma_0 + gamma (delta - delta_0) with the calibration's
+    anchor and the far fit's gamma, NaN without a far fit (or an anchor);
+    NaN below 0. None without a table."""
+    if calib is None or "kernel" not in calib:
+        return None
+    td = np.asarray(calib["kernel"]["kernel_table_delta_um"], dtype=float)
+    ts = np.asarray(calib["kernel"]["kernel_table_sigma_um"], dtype=float)
+    gamma = None
+    if far_fit is not None and (far_fit.get("far_fit") or {}).get("gamma") is not None:
+        gamma = float(far_fit["far_fit"]["gamma"])
+    anchor = calib.get("anchor") or {}
+    d0, s0 = anchor.get("delta0_um"), anchor.get("sigma0_um")
+
+    def law(delta):
+        d = np.asarray(delta, dtype=float)
+        out = np.full(d.shape, np.nan)
+        inside = (d >= 0) & (d <= td[-1])
+        out[inside] = np.interp(d[inside], td, ts)
+        if gamma is not None and d0 is not None and s0 is not None:
+            beyond = d > td[-1]
+            out[beyond] = float(s0) + gamma * (d[beyond] - float(d0))
+        return out
+    return law
+
+
+def kernel_law_by_cell(scans, cfg, calib=None, far_fit=None, id_map=None):
+    """Block 19.5 (D-090.2): the kernel-law points with their cell
+    (calibration_pool.cell_of) and their residual from the pooled law,
+    e = sigma - sigma_law(|delta|) (um); the cells in increasing specimen id
+    (a cell of None last); per cell and set the summary row of BY_CELL_COLUMNS
+    over the used points of finite residual; the table, the far line and the
+    anchor. None without a near fit."""
+    if calib is None or "growth" not in calib:
+        return None
+    from .calibration_pool import cell_of
+    raw = law_points(scans, cfg, calib, far_fit)
+    law = pooled_sigma_law(calib, far_fit)
+    d_all = np.array([p[0] for p in raw], dtype=float)
+    lv = law(d_all) if law is not None else np.full(d_all.shape, np.nan)
+    pts = []
+    for (d, s, side, used, which, nid), v in zip(raw, lv):
+        cell, node = cell_of(nid, id_map)
+        pts.append(dict(cell=cell, node=node, node_id=int(nid), set=which, abs_delta_um=float(d), sigma_um=float(s),
+                        side=int(side), used=bool(used), residual_um=float(s - v)))
+    cells = sorted({p["cell"] for p in pts}, key=lambda c: (c is None, 0 if c is None else c))
+    summary = []
+    for c in cells:
+        for which in ("near", "far"):
+            sel = [p for p in pts if p["cell"] == c and p["set"] == which]
+            if not sel:
+                continue
+            ok = [p for p in sel if p["used"] and math.isfinite(p["residual_um"])]
+            e = np.array([p["residual_um"] for p in ok], dtype=float)
+            ad = np.array([p["abs_delta_um"] for p in ok], dtype=float)
+            q = (lambda x, k: float(np.percentile(x, k)) if x.size else float("nan"))
+            summary.append(dict(specimen_id=c, set=which, n_nodes=len({p["node_id"] for p in ok}), n_points_used=len(ok),
+                                n_points=len(sel), median_residual_um=q(e, 50), q25_residual_um=q(e, 25),
+                                q75_residual_um=q(e, 75), median_abs_delta_um=q(ad, 50)))
+    table, line, anchor = _law_curves(cfg, calib, far_fit)
+    return dict(points=pts, cells=cells, summary=summary, table=table, line=line, anchor=anchor)
 
 
 def gaussian_inputs(scan):

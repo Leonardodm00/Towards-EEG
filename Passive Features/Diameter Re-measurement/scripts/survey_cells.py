@@ -81,6 +81,10 @@ class AllenSource:
     def images(self, sid):
         return aio.list_images(int(sid))
 
+    def subimage_rows(self, sid):
+        """Every SubImage row with every field (Block 16.3)."""
+        return aio.subimage_rows(int(sid))
+
     def planes(self, sid):
         return aio.plane_table(self.images(sid))
 
@@ -594,6 +598,18 @@ def pool_calibration(cfg, out_dir, selection_path="", log=print):
         calibrate_kernel.run_figures(cfg, _ap.Namespace(scans=[sp], calibration=cp, far_fit=fp if done["far_fit"] else "",
                                                         patches=[], out_dir=os.path.join(s3c, "figures"),
                                                         no_node_figures=False))
+        # Block 19.5 (D-090.2): the residuals from the pooled law, per cell and set
+        from allen_diameter.analysis import calibration_report as CR
+        from allen_diameter.loading import cell_pool
+        kc = CR.kernel_law_by_cell(pooled, cfg, calibration_io.load_calibration(cp),
+                                   calibration_io.load_calibration(fp) if done["far_fit"] else None, meta["id_map"])
+        if kc is not None:
+            cell_pool.write_table(os.path.join(s3c, "kernel_law_by_cell.csv"), kc["summary"], CR.BY_CELL_COLUMNS)
+            for r in kc["summary"]:
+                log("by cell: %s %s field: %d nodes, %d planes used; median residual %+.4f um (IQR %+.4f to %+.4f)" % (
+                    "specimen %d" % r["specimen_id"] if r["specimen_id"] is not None else "cell", r["set"],
+                    r["n_nodes"], r["n_points_used"], r["median_residual_um"], r["q25_residual_um"],
+                    r["q75_residual_um"]))
     log("pool calibration -> %s" % s3c)
     return meta, done
 

@@ -89,6 +89,14 @@ def list_images(specimen_id):
     section_number. Columns: id, image_type, section_number, width, height,
     resolution (um/px at downsample 0), data_set_id, failed.
     """
+    return images_frame(subimage_rows(specimen_id))
+
+
+def subimage_rows(specimen_id):
+    """Every SubImage row of a specimen as the API returns it, every field
+    kept: the rows of each of its data sets (pages of 1000) and the rows on
+    the specimen itself (the projections), deduplicated by id keeping the
+    first (Block 16.3: list_images keeps a few columns only)."""
     rows = []
     for ds in _data_set_ids(specimen_id):
         start = 0
@@ -104,6 +112,16 @@ def list_images(specimen_id):
                           num_rows=100))
     if not rows:
         raise RuntimeError("no SubImage rows for specimen %d" % specimen_id)
+    seen, out = set(), []
+    for r in rows:
+        if r.get("id") not in seen:
+            seen.add(r.get("id"))
+            out.append(r)
+    return out
+
+
+def images_frame(rows):
+    """list_images' table from subimage_rows' rows (see list_images)."""
     df = pd.DataFrame(rows).drop_duplicates(subset="id")
     keep = ["id", "image_type", "section_number", "width", "height", "resolution",
             "data_set_id", "failed"]

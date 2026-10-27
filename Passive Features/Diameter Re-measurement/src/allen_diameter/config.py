@@ -286,7 +286,7 @@ class CalibrationConfig:
     far_irls_rounds: int = 3                 # source: D-078.3 [user; the S2b checks' code]: refits with the model weights frozen at the previous round
     far_gamma_max: float = 5.0               # source: PROVISIONAL: upper bound of gamma in the far fit; a fit at it fails
     anchor_sensitivity_step_um: float = 0.01  # source: D-081.7 [user]: half-step of the central difference d gamma_hat / d sigma_0
-    # Block 19 (D-088.3): the nodes per calibration set ("per type" read as per set, PROVISIONAL)
+    # Block 19 (D-088.3): the nodes per calibration set ("per type" read as per set, the reading confirmed D-089 [user])
     calib_min_nodes_per_set: int = 10        # source: D-088.3 [user]: below this a set is insufficient: its fit a diagnostic, no production kernel
     calib_max_nodes_per_set: int = 30        # source: D-088.3 [user]: a set stops at this many scanned nodes (one cell: Cell 7; pooled: S3c)
     calib_order_seed: int = 20261026         # source: PROVISIONAL: seed of the candidates' scan order (with the specimen id)
@@ -302,7 +302,7 @@ class SurveyConfig:
 
     species: str = "Homo Sapiens"            # source: D-085.1; the Allen SDK's CellTypesApi.HUMAN, the pool of the passive-fit pipeline
     cells_per_group: int = 5                 # source: D-085.1 [user]: 5 cells per neuron class and layer, all of a smaller group
-    class_map: Tuple[Tuple[str, str], ...] = (("spiny", "exc"), ("aspiny", "inh"), ("sparsely spiny", "sparsely_spiny"))  # source: D-085.1 (spiny exc, aspiny inh: PROVISIONAL reading), D-087 [user]: sparsely spiny a third class (its name the assistant's); an unmapped or missing type is left out
+    class_map: Tuple[Tuple[str, str], ...] = (("spiny", "exc"), ("aspiny", "inh"), ("sparsely spiny", "sparsely_spiny"))  # source: D-085.1 (spiny exc, aspiny inh: PROVISIONAL reading), D-087 [user]: sparsely spiny a third class (its name the assistant's, confirmed D-089 [user]); an unmapped or missing type is left out
     selection_seed: int = 20261026           # source: PROVISIONAL: seed of the per-group permutations (Block 16.1 (d))
     acquisition_rel_tol: float = 1e-3        # source: PROVISIONAL: relative tolerance of a cell's plane spacing and pixel size against acquisition (D-085.3)
     pool_page_rows: int = 10000              # source: PROVISIONAL: rows per page of the ApiCellTypesSpecimenDetail query; large, so the model comes in one page (the SDK asks num_rows 'all'; pages without an order may skip rows)
@@ -311,15 +311,21 @@ class SurveyConfig:
     align_max_shift_um: float = 250.0        # source: PROVISIONAL: half-window of the coarse search (allen_image_align.align_translation's default)
     align_null_n: int = 50                   # source: PROVISIONAL: block-shuffled darkness maps in the null of the score ratio
     align_null_block_um: float = 30.0        # source: PROVISIONAL: side of the shuffled tiles (um; 16 px at level 4)
-    align_min_score_ratio: float = 2.0       # source: PROVISIONAL: a cell whose coarse score is below this multiple of the null's median is set aside (D-085.2)
+    align_min_score_ratio: float = 2.0       # source: D-089 [user, the assistant's default confirmed]: a cell whose coarse score is below this multiple of the null's median is set aside (D-085.2)
     align_fine_downsample: int = 1           # source: PROVISIONAL (the assistant's fine stage): the finest level tried for the fine crop (0.23 um/px)
     align_fine_margin_um: float = 20.0       # source: PROVISIONAL: margin of the fine crop around the skeleton's bounding box (um)
     align_fine_max_shift_um: float = 5.0     # source: PROVISIONAL: half-window of the fine direct search (um)
     align_fine_ridge_um: float = 6.0         # source: PROVISIONAL: widest dark feature kept by the fine stage's ridge darkness (um; the soma is removed)
     align_z0_um: float = 0.0                 # source: PROVISIONAL: depth of plane index 0 (um), as 529878215 (plane index = z / dz); checked by S3b's registration offsets
     projection_size_rel_tol: float = 0.02    # source: PROVISIONAL: an xy projection's width and height lie within this of the planes' median
+    # (the darkest of these is the minimum-intensity projection: the rule confirmed, D-089 [user]; what they are: Block 16.3)
+    # Block 16.3, what Allen's projections are: each xy projection against operators over the planes (D-090.1)
+    projcheck_half_px: int = 256             # source: PROVISIONAL: half-side of the test window (full-res px; 29 um)
+    projcheck_max_shift_px: int = 3          # source: PROVISIONAL: offsets searched between a projection and the planes (full-res px)
+    projcheck_min_r: float = 0.9             # source: PROVISIONAL: the best operator's correlation for 'matches'
+    projcheck_min_ratio: float = 4.0         # source: PROVISIONAL: for 'matches', the next operator's line leaves at least this many times the best's unexplained variance (2x its residual RMS); 12-31 on JPEG-served synthetic stacks
     # Block 17, S3a: the node sample and the coverage of the phantoms' band (D-065.1, D-085.4, D-085.5)
-    nodes_mode: str = "stratified"           # source: D-085.4 [user]: "all" (every dendrite node) or "stratified"; the default PROVISIONAL
+    nodes_mode: str = "stratified"           # source: D-085.4 [user]: "all" (every dendrite node) or "stratified"; the default D-089 [user]
     nodes_per_bin: int = 20                  # source: D-085.4 [user, the proposal accepted]: nodes per bin of Allen's diameter in the stratified sample
     nodes_allen_bins_um: Tuple[float, ...] = (0.4, 0.6, 0.8, 1.2, 2.0)  # source: D-085.4 [user, the proposal accepted]: inner edges of the bins of Allen's 2r (um), [0, 0.4) ... [2, inf)
     coverage_dhat_bins_um: Tuple[float, ...] = (0.2, 0.4, 0.6, 0.8, 1.2, 2.0, 4.0)  # source: PROVISIONAL: edges of the bins of d_hat (um) for the coverage, plus the open bins below and above
@@ -329,9 +335,9 @@ class SurveyConfig:
     # Block 18, S3b: the simulator's inputs across cells (D-065.2-3, D-085.8-9, D-086)
     registration_per_type: int = 3           # source: D-085.8 [user]: list_stretches' suggestion (Cell 3a's rule), stretches per type
     registration_min_nodes: int = 10         # source: D-085.8 [user]: list_stretches' suggestion, nodes a stretch needs
-    inputs_z0_flag_um: float = 1.0           # source: PROVISIONAL: a cell whose median dz* exceeds this (um) is flagged z0
+    inputs_z0_flag_um: float = 1.0           # source: D-089 [user, the assistant's default confirmed]: a cell whose median dz* exceeds this (um) is flagged z0
     # Block 19, S3c (D-088)
-    calib_scans_per_cell: int = 5            # source: PROVISIONAL: per cell and set, the scans S3c's step takes before the pooled round-robin
+    calib_scans_per_cell: int = 5            # source: D-089 [user, the assistant's default confirmed]: per cell and set, the scans S3c's step takes before the pooled round-robin
 
 
 @dataclass(frozen=True)
@@ -473,11 +479,13 @@ class DiameterConfig:
                 and sv.align_null_n >= 10 and sv.align_null_block_um > 0
                 and sv.align_min_score_ratio > 0 and sv.align_fine_margin_um >= 0 and sv.align_fine_max_shift_um > 0
                 and sv.align_fine_ridge_um > 0 and math.isfinite(sv.align_z0_um)
-                and 0 < sv.projection_size_rel_tol < 1):
+                and 0 < sv.projection_size_rel_tol < 1 and sv.projcheck_half_px >= 8 and sv.projcheck_max_shift_px >= 0
+                and -1 <= sv.projcheck_min_r <= 1 and sv.projcheck_min_ratio >= 1):
             raise ValueError("survey: 0 <= align_fine_downsample < align_downsample <= 6, align_max_shift_um > 0, "
                              "align_null_n >= 10, align_null_block_um > 0, align_min_score_ratio > 0, fine "
                              "margin >= 0, fine shift and ridge > 0, align_z0_um finite, 0 < projection_size_rel_tol "
-                             "< 1 (Block 16.2, D-085.2)")
+                             "< 1 (Block 16.2, D-085.2); projcheck_half_px >= 8, projcheck_max_shift_px >= 0, "
+                             "-1 <= projcheck_min_r <= 1, projcheck_min_ratio >= 1 (Block 16.3, D-090.1)")
         nb, cb, pq = sv.nodes_allen_bins_um, sv.coverage_dhat_bins_um, sv.coverage_phantom_quantiles
         if not (sv.nodes_mode in NODES_MODES and sv.nodes_per_bin >= 1 and len(nb) >= 1 and nb[0] > 0
                 and all(b > a for a, b in zip(nb, nb[1:])) and len(cb) >= 2 and cb[0] > 0

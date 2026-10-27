@@ -1116,6 +1116,26 @@ run("scripts/cell_pool.py", "select", "--pool", SURVEY + "/pool.csv", "--acquisi
     *(["--require-match"] if REQUIRE_MATCH else []), "--out", SURVEY + "/selection.csv")
 
 # ====================================================================================================
+# ===== CELL 11b
+# ====================================================================================================
+# CELL 11B: WHAT ALLEN'S PROJECTIONS ARE (Block 16.3; D-090.1). Needs Cells 0 and 1, and Cell 11's selection.csv
+# (without it, only the pilot is listed). (1) For every selected cell: the SubImages that are not Primary planes, with
+# every field Allen returns; the planes' count and size; the xy projections Cell 12 chooses among and the one its
+# darkest rule takes (two small downloads per cell). (2) For the pilot 529878215 only: on a 59 um window around the
+# soma, each xy projection against the minimum, mean, median and maximum over its ~520 planes -- the best pixel
+# offset, the correlation r*, the verdict: `matches min` is expected for one of them. The pilot's test fetches one
+# 512 x 512 px crop per plane (about 520, a few minutes; cached in CACHE_DIR). Expect per cell `[proj] <id>: N
+# non-Primary SubImages: <id> '<image_type>' WxH; ...` and `... darkest at level 4: <id>`, then for the pilot one
+# line per xy projection `[proj] 529878215: <id> '<type>': matches min -- r* min 0.99.. at (+a, +b); mean ...`.
+# Send back survey/projections/projection_types.csv, projections_529878215.json and projection_check_529878215.png.
+SURVEY = OUT + "/survey"
+SEL = SURVEY + "/selection.csv"
+run("scripts/projection_check.py", *(["--selection", SEL] if os.path.exists(SEL) else ["--specimens", SPECIMEN]),
+    "--check", SPECIMEN, "--cache-dir", CACHE_DIR, "--out-dir", SURVEY + "/projections")
+from IPython.display import Image, display
+display(Image(filename="%s/projections/projection_check_%d.png" % (SURVEY, SPECIMEN)))
+
+# ====================================================================================================
 # ===== CELL 12
 # ====================================================================================================
 # CELL 12: S3 ACROSS CELLS -- STEP 1: EVERY SELECTED CELL'S GLOBAL ALIGNMENT (Block 16.2; D-085.2, D-085.12)
@@ -1209,7 +1229,11 @@ display(Image(filename=SURVEY + "/s3b/inputs.png"))
 # candidates: a near-field, b far-field scans; reasons {...}`, then `pooled near field: k of n scans taken (at most
 # 30) from c cells {...} -- sufficient` (or `INSUFFICIENT`), the same for the far field, Cell 7's fit and far-fit
 # lines and `pool calibration -> .../survey/s3c`. For now the test is Cell 7 on the pilot cell (D-088.2): run this
-# cell when the survey has run. Send back the pooled lines, the fit and far-fit lines and the figures.
+# cell when the survey has run. With two cells or more, the near and far points of the kernel law by cell (D-090.2):
+# `by cell: specimen <id> near field: n nodes, m planes used; median residual +x um (IQR ...)` per cell and set,
+# survey/s3c/kernel_law_by_cell.csv, and the figures kernel_law_by_cell.png (one panel coloured by cell up to three
+# cells, one panel per cell beyond) and kernel_law_residuals_by_cell.png. Send back the pooled lines, the fit and
+# far-fit lines, the `by cell:` lines and the figures.
 import json
 SURVEY = OUT + "/survey"
 CFG_S3 = SURVEY + "/survey_config.json"            # Cell 13's (the node mode); written here if Cell 13 did not run
@@ -1221,7 +1245,8 @@ run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", 
 run("scripts/survey_cells.py", "pool", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv",
     "--what", "calibration", "--config-json", CFG_S3)
 from IPython.display import Image, display
-for name in ("width_by_plane_near", "width_by_plane_far", "kernel_law"):
+for name in ("width_by_plane_near", "width_by_plane_far", "kernel_law", "kernel_law_by_cell",
+             "kernel_law_residuals_by_cell"):
     if os.path.exists("%s/s3c/figures/%s.png" % (SURVEY, name)):
         display(Image(filename="%s/s3c/figures/%s.png" % (SURVEY, name)))
 
@@ -1260,10 +1285,13 @@ for name in ("width_by_plane_near", "width_by_plane_far", "kernel_law"):
 # - Cell 6: the `pooled dendrite diameter` line.
 # - Cell 7: the growth-fit report, the far fit (gamma_hat and its interval) and the width-by-plane figures.
 # - Cell 11 (S3, step 0): the `pool:` and `check:` summary lines, acquisition.json, and the `select:` lines.
+# - Cell 11b (Allen's projections): survey/projections/projection_types.csv, projections_529878215.json and
+# projection_check_529878215.png.
 # - Cell 12 (S3, step 1): the `survey:` summary line, status.csv, and the overlays of the set-aside cells.
 # - Cell 13 (S3a): the coverage lines, survey/s3a/coverage.json, diameters.csv and the four figures.
 # - Cell 14 (S3b): the `inputs:` lines, survey/s3b/inputs.json, inputs_per_cell.csv and inputs.png.
-# - Cell 15 (S3c): the pooled lines, the fit and far-fit lines and the figures in survey/s3c/figures.
+# - Cell 15 (S3c): the pooled lines, the fit and far-fit lines and the figures in survey/s3c/figures; with two cells
+# or more the `by cell:` lines, survey/s3c/kernel_law_by_cell.csv and the two by-cell figures (D-090.2).
 #
 # These decide the open items of SPEC section 8: d_max, the mu range, the jitter amplitudes, the camera fields
 # and the dark-flag threshold.

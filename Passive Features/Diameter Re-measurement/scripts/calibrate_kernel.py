@@ -337,16 +337,19 @@ def run_far_fit(cfg, scans_path, calibration_path, out, seed=0):
 
 def run_figures(cfg, a):
     from allen_diameter.plotting import calibration_figures as CF
-    scans = []
+    scans, id_map = [], {}
     for path in a.scans:
-        scans += calibration_io.load_scans(path)[0]
+        sc, meta = calibration_io.load_scans(path)
+        scans += sc
+        id_map.update((meta or {}).get("id_map") or {})        # a pooled file's map (Block 19.5)
     calib = calibration_io.load_calibration(a.calibration) if a.calibration else None
     far_fit = calibration_io.load_calibration(a.far_fit) if a.far_fit else None
     patches = {}
     for path in a.patches or []:
         patches.update(calibration_io.load_patches(path))
     os.makedirs(a.out_dir, exist_ok=True)
-    written = CF.write_all(scans, calib, far_fit, patches, cfg, a.out_dir, every_node=not a.no_node_figures)
+    written = CF.write_all(scans, calib, far_fit, patches, cfg, a.out_dir, every_node=not a.no_node_figures,
+                           id_map=id_map or None)
     for w in written:
         print("wrote %s" % w)
     return a.out_dir
