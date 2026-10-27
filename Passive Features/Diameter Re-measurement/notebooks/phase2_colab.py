@@ -1133,7 +1133,9 @@ SEL = SURVEY + "/selection.csv"
 run("scripts/projection_check.py", *(["--selection", SEL] if os.path.exists(SEL) else ["--specimens", SPECIMEN]),
     "--check", SPECIMEN, "--cache-dir", CACHE_DIR, "--out-dir", SURVEY + "/projections")
 from IPython.display import Image, display
-display(Image(filename="%s/projections/projection_check_%d.png" % (SURVEY, SPECIMEN)))
+FIG = "%s/projections/projection_check_%d.png" % (SURVEY, SPECIMEN)
+if os.path.exists(FIG):
+    display(Image(filename=FIG))
 
 # ====================================================================================================
 # ===== CELL 12
@@ -1187,7 +1189,8 @@ run("scripts/survey_cells.py", "pool", "--out-dir", SURVEY, "--selection", SURVE
     "--what", "coverage", "--config-json", CFG_S3, *(["--phantom-rows"] + PHANTOM_ROWS if PHANTOM_ROWS else []))
 from IPython.display import Image, display
 for name in ("coverage_mud", "coverage_share", "coverage_alpha", "diameters"):
-    display(Image(filename="%s/s3a/%s.png" % (SURVEY, name)))
+    if os.path.exists("%s/s3a/%s.png" % (SURVEY, name)):
+        display(Image(filename="%s/s3a/%s.png" % (SURVEY, name)))
 
 # ====================================================================================================
 # ===== CELL 14
