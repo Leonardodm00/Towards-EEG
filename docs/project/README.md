@@ -26,8 +26,10 @@ Rules (the assistant's reading of D-097, recorded there as open point (a)):
 
 | Path here | In project knowledge | Copied | Workstream |
 |---|---|---|---|
+| `TEEG_decisions_and_ideas_log.md` | root | 2026-10-28, with D-097 | all chats |
 | `claude/TEEG_Stage7_noise_model_2026-09-28.md` | `claude/` | 2026-10-28 (v3.4 of 2026-10-16) | I_h fit, Stage-7 noise |
 | `claude/TEEG_Ih_fit_staged_plan.md` | `claude/` | 2026-10-28 (v0.12 of 2026-10-21) | I_h fit |
+| `claude/TEEG_Stage7_noise_handoff_2026-10-01.md` | `claude/` | 2026-10-28, with its D-097 row | I_h fit, Stage-7 noise |
 
 ## Not copied yet
 
