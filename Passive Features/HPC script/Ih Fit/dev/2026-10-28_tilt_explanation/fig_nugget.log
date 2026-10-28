@@ -1,0 +1,26 @@
+ou h =   1: gamma_hat 0.2983 +/- 0.0006, formula 0.2988, z = -0.81 
+ou h =   5: gamma_hat 0.4705 +/- 0.0009, formula 0.4712, z = -0.78 
+ou h =  10: gamma_hat 0.6431 +/- 0.0018, formula 0.6435, z = -0.22 
+ou h =  20: gamma_hat 0.8852 +/- 0.0036, formula 0.8821, z = +0.86 
+ou h =  40: gamma_hat 1.1252 +/- 0.0062, formula 1.1147, z = +1.69 
+ou h =  60: gamma_hat 1.2089 +/- 0.0077, formula 1.2002, z = +1.13 
+ou h =  80: gamma_hat 1.2397 +/- 0.0085, formula 1.2317, z = +0.94 
+ou h = 100: gamma_hat 1.2477 +/- 0.0085, formula 1.2433, z = +0.52 
+rw h =   1: gamma_hat 0.2693 +/- 0.0005, formula 0.2700, z = -1.37 
+rw h =   5: gamma_hat 0.3494 +/- 0.0006, formula 0.3500, z = -0.99 
+rw h =  10: gamma_hat 0.4507 +/- 0.0010, formula 0.4500, z = +0.73 
+rw h =  20: gamma_hat 0.6505 +/- 0.0022, formula 0.6500, z = +0.23 
+rw h =  40: gamma_hat 1.0512 +/- 0.0060, formula 1.0500, z = +0.20 
+rw h =  60: gamma_hat 1.4447 +/- 0.0111, formula 1.4500, z = -0.48 
+rw h =  80: gamma_hat 1.8350 +/- 0.0171, formula 1.8500, z = -0.88 
+rw h = 100: gamma_hat 2.2203 +/- 0.0241, formula 2.2500, z = -1.23 
+sl h =   1: gamma_hat 0.2503 +/- 0.0003, formula 0.2502, z = +0.39 
+sl h =   5: gamma_hat 0.2553 +/- 0.0004, formula 0.2550, z = +0.87 
+sl h =  10: gamma_hat 0.2707 +/- 0.0006, formula 0.2700, z = +1.20 
+sl h =  20: gamma_hat 0.3308 +/- 0.0018, formula 0.3300, z = +0.44 
+sl h =  40: gamma_hat 0.5724 +/- 0.0071, formula 0.5700, z = +0.34 
+sl h =  60: gamma_hat 0.9749 +/- 0.0160, formula 0.9700, z = +0.30 
+sl h =  80: gamma_hat 1.5379 +/- 0.0285, formula 1.5300, z = +0.28 
+sl h = 100: gamma_hat 2.2620 +/- 0.0445, formula 2.2500, z = +0.27 
+dots within 3 SE of their formulas: PASS
+wrote /tmp/claude-0/-home-claude/0f7fd3d4-0f2d-5606-a12f-dd7365cc0f88/scratchpad/figs/fig_nugget.png

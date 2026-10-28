@@ -1,0 +1,40 @@
+// fig01_overview.dot -- where sigma_b(c) sits in the Stage-7 noise pipeline (schematic).
+// Render: dot -Tpng -Gdpi=150 fig01_overview.dot -o fig01_overview.png
+digraph G {
+  graph [rankdir=TB, forcelabels=true, fontname="DejaVu Sans", fontsize=11, nodesep=0.5, ranksep=0.35, pad=0.2,
+         label="Schematic, not to scale. Status in brackets: [data] read from the archive files; [computed] by a built block;\n[not built]; [open] the user's choice. Sources: decision log D-017 note 4, D-034, D-051 (iii), D-073, D-076;\nSPEC §2.3-2.4, §8; tilt study 2026-10-26.", labelloc=b, labeljust=l];
+  node  [shape=box, style="rounded,filled", fillcolor="#f4f4f4", color="#555555", fontname="DejaVu Sans", fontsize=10];
+  edge  [color="#444444", fontname="DejaVu Sans", fontsize=9];
+
+  subgraph cluster_real {
+    label="Real cell c (Allen L3_exc archive)"; style="rounded"; color="#4a7ab5"; fontcolor="#4a7ab5";
+    ss   [label="SS sweeps of c\nS(c) = 2 in 14 cells, 6 in 1, 10 in 3\n37 pulses per sweep, 200.5 ms apart\n[data]"];
+    win  [label="enlarged-window means x̄(c,k)\n[t_SS, 200) ms after each pulse,\nper-polarity mean window subtracted\n[computed, Block 3]"];
+    vhat [label="V̂_c(h*): half the mean squared\ndifference of same-sweep,\nsame-polarity pairs, h* = 0.802 s\n[computed, Block 3]"];
+    t1   [label="(T1)  σ̂_b(c)² = 2[V̂_c(h*) − V(h* | θ̂_c, 0)] / h*²\nclipped at 0\n[computed, Block 4; not yet run on real cells]", fillcolor="#fff2cc", color="#b58a00"];
+    { rank=same; theta; t1; }
+    theta[label="θ̂_c: per-cell stationary law\n(σ_f, ρ_f, σ_s, τ_s), indirect inference\n[computed, Block 4]"];
+  }
+
+  subgraph cluster_cohort {
+    label="Cohort (the other 17 cells)"; style="rounded,dashed"; color="#888888"; fontcolor="#666666";
+    others [label="σ̂_b(c′), c′ ≠ c\n[computed, as for c]"];
+  }
+
+  choice [label="σ̃_b(c): the value the twin receives\n(a) per cell = σ̂_b(c)   [built]\n(b) one cohort value   [not built]\n(c) partial pooling across cells   [not built]\n[open: the user's choice]", fillcolor="#fde2e2", color="#b33a3a", fontcolor="#7a1f1f"];
+
+  subgraph cluster_twin {
+    label="Twin c′ of cell c (synthetic, Stage 7)"; style="rounded"; color="#3f8f4f"; fontcolor="#3f8f4f";
+    gen  [label="generator: each twin sweep draws\nb ~ N(0, σ̃_b(c)²), adds b (t − t̄)\n[not built, Block 5]"];
+    ls   [label="twin's Long Square step:\nstep-mean baseline error from the tilt\nSD = 0.6375 s × σ̃_b(c)"];
+    gate [label="Stage-7 recovery gate:\nfit the twins, compare with truth\n(D-011, D-083)"];
+  }
+
+  { rank=same; choice; others; }
+  ss -> win -> vhat -> t1;
+  theta -> t1 [label="floor V(h* | θ̂_c, 0)", fontsize=8, minlen=3];
+  t1 -> theta [label="tilt in the fit's simulator\n(D-051 (iii)): moves θ̂_c\nby ≤ 0.18 of its SD", style=dashed, constraint=false, fontsize=8, minlen=3];
+  t1 -> choice;
+  others -> choice [label="(b), (c) only", style=dashed];
+  choice -> gen -> ls -> gate;
+}

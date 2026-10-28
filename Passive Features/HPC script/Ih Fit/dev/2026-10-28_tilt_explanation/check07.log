@@ -1,0 +1,10 @@
+2sw_K40: K 40, sanity (80 ms reproduces the stored bank, 50 cells): PASS
+   t_SS  80.0 ms (window 120.0 ms): V0 = 1.1125e-03 mV^2 | floor: SD of sigma_b_hat^2 at 0 = 0.00131 (mV/s)^2, 95th pct of sigma_b_hat = 0.0478 mV/s | at sigma_b 0.1: ratio 2.5/50/97.5 % = 0.00 / 0.81 / 1.96, clipped 6.4 %, mean sigma_b_hat^2/sigma_b^2 = 0.985
+   t_SS 130.0 ms (window  70.0 ms): V0 = 1.4966e-03 mV^2 | floor: SD of sigma_b_hat^2 at 0 = 0.00176 (mV/s)^2, 95th pct of sigma_b_hat = 0.0564 mV/s | at sigma_b 0.1: ratio 2.5/50/97.5 % = 0.00 / 0.82 / 1.96, clipped 8.5 %, mean sigma_b_hat^2/sigma_b^2 = 0.986
+   P1 floor rise +18.1 % (0 to 30 %: True); V0 rise +34.5 %; P2 largest quantile shift 0.005 (< 0.10: True)
+2sw_K63: K 63, sanity (80 ms reproduces the stored bank, 50 cells): PASS
+   t_SS  80.0 ms (window 120.0 ms): V0 = 1.1125e-03 mV^2 | floor: SD of sigma_b_hat^2 at 0 = 0.00082 (mV/s)^2, 95th pct of sigma_b_hat = 0.0381 mV/s | at sigma_b 0.1: ratio 2.5/50/97.5 % = 0.00 / 0.84 / 1.90, clipped 3.3 %, mean sigma_b_hat^2/sigma_b^2 = 1.001
+   t_SS 130.0 ms (window  70.0 ms): V0 = 1.4966e-03 mV^2 | floor: SD of sigma_b_hat^2 at 0 = 0.00112 (mV/s)^2, 95th pct of sigma_b_hat = 0.0445 mV/s | at sigma_b 0.1: ratio 2.5/50/97.5 % = 0.00 / 0.84 / 1.92, clipped 4.4 %, mean sigma_b_hat^2/sigma_b^2 = 1.001
+   P1 floor rise +16.7 % (0 to 30 %: True); V0 rise +34.5 %; P2 largest quantile shift 0.015 (< 0.10: True)
+
+P1 PASS  P2 PASS   (160 s)

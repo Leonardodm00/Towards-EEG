@@ -1,0 +1,9 @@
+OU   Var Z(10)                     0.9887 +/- 0.0098, predicted 1.0000 -> PASS
+OU   Cov(Z(10), Z(30))             0.3672 +/- 0.0074, predicted 0.3679 -> PASS
+OU   Var Z(900)                    0.9931 +/- 0.0098, predicted 1.0000 -> PASS
+OU   Cov(Z(900), Z(920))           0.3761 +/- 0.0075, predicted 0.3679 -> PASS
+walk Var Z(100)                    99.8012 +/- 1.0044, predicted 100.0000 -> PASS
+walk Var Z(900)                    881.1688 +/- 8.6976, predicted 900.0000 -> PASS
+slope Var Z(400), t - t_bar = -100 1.0068 +/- 0.0098, predicted 1.0000 -> PASS
+slope Var Z(100), t - t_bar = -400 16.1092 +/- 0.1564, predicted 16.0000 -> PASS
+ALL PASS

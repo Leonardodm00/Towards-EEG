@@ -1,0 +1,13 @@
+C1   h =     1: gamma_hat = 0.29870 +/- 0.00040, predicted 0.29877, z = -0.18 -> PASS
+C1   h =    20: gamma_hat = 0.88102 +/- 0.00256, predicted 0.88212, z = -0.43 -> PASS
+C1   h =   160: gamma_hat = 1.25565 +/- 0.00652, predicted 1.24966, z = +0.92 -> PASS
+     sill C(0) = sigma2 + eta2 = 1.250; nugget eta2 = 0.250
+C4   per-record offsets of SD 10: largest relative change of gamma_hat = 0.0e+00 -> PASS
+C2   h =    10: gamma_hat = 4.99685 +/- 0.01374, predicted 5.00000, z = -0.23 -> PASS
+C2   h =   100: gamma_hat = 49.94193 +/- 0.48737, predicted 50.00000, z = -0.12 -> PASS
+C2   h =  1000: gamma_hat = 504.17881 +/- 17.85565, predicted 500.00000, z = +0.23 -> PASS
+C3   h =    50: gamma_hat = 0.37757 +/- 0.00278, predicted 0.37500, z = +0.92 -> PASS
+C3   h =   100: gamma_hat = 0.76169 +/- 0.01106, predicted 0.75000, z = +1.06 -> PASS
+C3   h =   400: gamma_hat = 8.43892 +/- 0.17699, predicted 8.25000, z = +1.07 -> PASS
+
+ALL PASS   (0.3 s)

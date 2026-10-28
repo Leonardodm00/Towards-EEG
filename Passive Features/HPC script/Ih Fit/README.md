@@ -241,6 +241,7 @@ Not code: nothing below is imported by the pipeline or runs in a job.
 | `dev/2026-10-16_covariance_weighting/` | D-048's handoff, its checks, and the study document on the bias of a statistic |
 | `dev/2026-10-26_tilt_sigma_b/` | the study document on the per-sweep tilt and its SD sigma_b(c), with figures and checks |
 | `dev/2026-10-28_window_start/` | the checks behind the explanations of the transient test and of sigma_SS_hat, and behind D-095 |
+| `dev/2026-10-28_tilt_explanation/` | the checks behind the explanations of sigma_b(c), the semivariogram, the nugget and second-order stationarity, and behind D-100 (the tilt variants of the 2-sweep cells) |
 
 The project's own documents (the decision log, the noise-model topic document, the staged plan, the
 living handoff) are copied under `docs/project/` at the repository root.

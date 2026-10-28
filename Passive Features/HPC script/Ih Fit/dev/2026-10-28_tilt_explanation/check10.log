@@ -1,0 +1,4 @@
+h =   1: gamma_hat(walk + noise) = 0.750 (predicted eta2 + q h / 2 = 0.750); shift over the noise-free walk = 0.2497 +/- 0.0004, predicted 0.25 -> PASS
+h =  10: gamma_hat(walk + noise) = 5.242 (predicted eta2 + q h / 2 = 5.250); shift over the noise-free walk = 0.2497 +/- 0.0011, predicted 0.25 -> PASS
+h = 100: gamma_hat(walk + noise) = 49.847 (predicted eta2 + q h / 2 = 50.250); shift over the noise-free walk = 0.2509 +/- 0.0035, predicted 0.25 -> PASS
+ALL PASS

@@ -1,0 +1,18 @@
+B  OU, n = 100 = 5 tau; Var(xbar) = 0.321
+   C_hat(0) (own mean)             mean 0.6796 +/- 0.0027, predicted 1.0000, z = -119.45 -> PASS
+   C_hat(20) (own mean)            mean 0.0230 +/- 0.0015, predicted 0.3679, z = -224.67 -> PASS
+   gamma_hat(1) (no mean)          mean 0.0488 +/- 0.0000, predicted 0.0488, z =   +0.93 -> PASS
+   gamma_hat(20) (no mean)         mean 0.6317 +/- 0.0023, predicted 0.6321, z =   -0.16 -> PASS
+C  OU + white noise eta2 = 0.25, n = 4000
+   C_known(0)                      mean 1.2490 +/- 0.0049, predicted 1.2500, z =   -0.21 -> PASS
+   C_known(1)                      mean 0.9500 +/- 0.0049, predicted 0.9512, z =   -0.25 -> PASS
+   gamma_hat(1)                    mean 0.2990 +/- 0.0004, predicted 0.2988, z =   +0.50 -> PASS
+   gamma_hat(5)                    mean 0.4702 +/- 0.0007, predicted 0.4712, z =   -1.49 -> PASS
+D  random walk q = 1, h = 10
+   n =  500: mean C_hat(10) = 77.2
+   gamma_hat(10), n = 500          mean 4.9915 +/- 0.0182, predicted 5.0000, z =   -0.47 -> PASS
+   n = 4000: mean C_hat(10) = 659.0
+   gamma_hat(10), n = 4000         mean 5.0002 +/- 0.0062, predicted 5.0000, z =   +0.03 -> PASS
+   C_hat ratio n = 4000 / n = 500: 8.54 (> 5: True)
+
+ALL PASS   (0.5 s)

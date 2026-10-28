@@ -1,0 +1,39 @@
+cells: 18 (2-sweep 14, 6-sweep 1, 10-sweep 3); S_eff 2-sweep 1.63-2.00
+
+== omega 0.00: Omega_hat^2 = 0 in DL 89 % / PM 89 % of cohorts; median Omega_hat/2 DL 0.00 / PM 0.00; PM raw tau2 < 0 in 0 cohorts
+   2-sweep  a: per cell  outside x2  25.1 % | zero  4.6 % | median |log ratio| 0.38 | median ratio 0.83 | RMS rel err 0.507
+   2-sweep  c-DL         outside x2   0.0 % | zero  0.0 % | median |log ratio| 0.07 | median ratio 1.03 | RMS rel err 0.102
+   2-sweep  c-PM         outside x2   0.0 % | zero  0.0 % | median |log ratio| 0.07 | median ratio 1.03 | RMS rel err 0.101
+   10-sweep a: per cell  outside x2   1.0 % | zero  0.0 % | median |log ratio| 0.16 | median ratio 0.96 | RMS rel err 0.225
+   10-sweep c-DL         outside x2   0.1 % | zero  0.0 % | median |log ratio| 0.07 | median ratio 1.03 | RMS rel err 0.110
+   10-sweep c-PM         outside x2   0.0 % | zero  0.0 % | median |log ratio| 0.07 | median ratio 1.03 | RMS rel err 0.107
+   P2 |PM - DL| on 2-sweep cells = 0.0 points (< 3: True); P3 (a) 25.1 vs check04 25.1 (within 2: True)
+
+== omega 0.25: Omega_hat^2 = 0 in DL 59 % / PM 59 % of cohorts; median Omega_hat/2 DL 0.00 / PM 0.00; PM raw tau2 < 0 in 0 cohorts
+   2-sweep  a: per cell  outside x2  25.2 % | zero  5.1 % | median |log ratio| 0.38 | median ratio 0.83 | RMS rel err 0.509
+   2-sweep  c-DL         outside x2   1.1 % | zero  0.0 % | median |log ratio| 0.18 | median ratio 1.03 | RMS rel err 0.299
+   2-sweep  c-PM         outside x2   1.1 % | zero  0.0 % | median |log ratio| 0.18 | median ratio 1.03 | RMS rel err 0.298
+   10-sweep a: per cell  outside x2   1.1 % | zero  0.0 % | median |log ratio| 0.15 | median ratio 0.97 | RMS rel err 0.225
+   10-sweep c-DL         outside x2   0.2 % | zero  0.0 % | median |log ratio| 0.14 | median ratio 1.02 | RMS rel err 0.225
+   10-sweep c-PM         outside x2   0.2 % | zero  0.0 % | median |log ratio| 0.14 | median ratio 1.02 | RMS rel err 0.226
+   P2 |PM - DL| on 2-sweep cells = 0.0 points (< 3: True); P3 (a) 25.2 vs check04 25.4 (within 2: True)
+
+== omega 0.50: Omega_hat^2 = 0 in DL 12 % / PM 12 % of cohorts; median Omega_hat/2 DL 0.36 / PM 0.32; PM raw tau2 < 0 in 0 cohorts
+   2-sweep  a: per cell  outside x2  26.0 % | zero  6.2 % | median |log ratio| 0.39 | median ratio 0.84 | RMS rel err 0.524
+   2-sweep  c-DL         outside x2  12.0 % | zero  0.0 % | median |log ratio| 0.30 | median ratio 1.07 | RMS rel err 0.580
+   2-sweep  c-PM         outside x2  12.4 % | zero  0.0 % | median |log ratio| 0.30 | median ratio 1.07 | RMS rel err 0.589
+   10-sweep a: per cell  outside x2   1.6 % | zero  0.1 % | median |log ratio| 0.16 | median ratio 0.97 | RMS rel err 0.234
+   10-sweep c-DL         outside x2   0.8 % | zero  0.0 % | median |log ratio| 0.16 | median ratio 1.02 | RMS rel err 0.258
+   10-sweep c-PM         outside x2   0.8 % | zero  0.0 % | median |log ratio| 0.17 | median ratio 1.02 | RMS rel err 0.268
+   P2 |PM - DL| on 2-sweep cells = 0.4 points (< 3: True); P3 (a) 26.0 vs check04 25.7 (within 2: True)
+
+== omega 1.00: Omega_hat^2 = 0 in DL 0 % / PM 0 % of cohorts; median Omega_hat/2 DL 0.80 / PM 0.73; PM raw tau2 < 0 in 0 cohorts
+   2-sweep  a: per cell  outside x2  31.0 % | zero 10.6 % | median |log ratio| 0.43 | median ratio 0.83 | RMS rel err 0.705
+   2-sweep  c-DL         outside x2  27.8 % | zero  0.0 % | median |log ratio| 0.42 | median ratio 1.18 | RMS rel err 1.578
+   2-sweep  c-PM         outside x2  28.2 % | zero  0.0 % | median |log ratio| 0.43 | median ratio 1.17 | RMS rel err 1.627
+   10-sweep a: per cell  outside x2   5.1 % | zero  2.4 % | median |log ratio| 0.17 | median ratio 0.97 | RMS rel err 0.348
+   10-sweep c-DL         outside x2   2.5 % | zero  0.0 % | median |log ratio| 0.17 | median ratio 1.04 | RMS rel err 0.442
+   10-sweep c-PM         outside x2   2.9 % | zero  0.0 % | median |log ratio| 0.17 | median ratio 1.03 | RMS rel err 0.461
+   P2 |PM - DL| on 2-sweep cells = 0.4 points (< 3: True); P3 (a) 31.0 vs check04 30.5 (within 2: True)
+
+P1 PASS  P2 PASS  P3 PASS   (8 s)
