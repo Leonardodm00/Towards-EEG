@@ -10,24 +10,36 @@ Checks
                         coverage on hand-made nodes: shares, n cells,
                         quantiles and the pass rule as computed by hand (19
                         nodes outside: too_few; 20 with 1 outside: 0.95,
-                        passes; 2 outside: fails)
+                        passes; 2 outside: fails); S recomputed from a row's
+                        columns (D-098.3): a row written before D-096 with
+                        the flag faint (in_S False, reject faint) is in S,
+                        crossing, a fit at a bound and a registration other
+                        than ON are out
     test_reference      the sample equals an independent re-implementation;
                         the analytic share equals the share from the mu-range
                         rule; the quantiles numpy's; the phantoms' band
                         numpy's quantiles of their rows
     test_convergence    not a discretisation: skipped
-    test_invariants     the rows' order and nodes outside S change nothing
+    test_invariants     the rows' order and nodes outside S change nothing;
+                        the stored in_S and reject change nothing when the
+                        row has fit_status and flags (D-098.3)
     test_contract       measure_nodes(whole_stretches=False) measures exactly
                         the ids given, True the whole stretch; the step
                         `nodes` end to end on the synthetic cell of
                         fixtures_cell.py (through fetch_zblock): every
                         sampled node measured, CSV, summary, background
                         statistics; `pool --what coverage` over it: CSVs,
-                        JSON keys, figures
+                        JSON keys, figures; the stored row's S equals
+                        reject_reasons of its NodeResult through the CSV
+                        round trip, and a CSV rewritten as an older run's
+                        (in_S False, reject faint) is pooled with its S
+                        recomputed (D-098.3)
     test_determinism    the sample twice with the seed; another seed changes
                         a bin with more than N candidates
     test_edge_cases     an empty bin, a NaN radius, a cell without nodes in S,
-                        the configuration's refusals
+                        the configuration's refusals; a row without
+                        fit_status or flags keeps its stored S; empty and
+                        NaN cells read as no flag and no registration
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -61,6 +73,7 @@ for _p in (WS / "src", WS / "scripts", HERE):
 import survey_cells as SC  # noqa: E402
 from allen_diameter.analysis import cell as cellmod  # noqa: E402
 from allen_diameter.analysis import coverage as COV  # noqa: E402
+from allen_diameter.analysis import phantoms  # noqa: E402
 from allen_diameter.analysis import s3_nodes as SN  # noqa: E402
 from allen_diameter.analysis import survey  # noqa: E402
 from allen_diameter.config import default_config  # noqa: E402
@@ -156,6 +169,29 @@ def test_known_answer():
     tab = COV.node_table([(dict(specimen_id=9, neuron_class="inh", layer="5"), rows)])
     assert [n["in_S"] for n in tab] == [False, True] and tab[0]["D_allen"] == 0.5 and tab[0]["reject"] == "dark"
     assert tab[1]["d_hat"] != tab[1]["d_hat"] and tab[0]["specimen_id"] == 9 and tab[0]["layer"] == "5"
+    assert [n["s_source"] for n in tab] == ["stored", "stored"]          # no fit_status, flags: the stored S kept
+    # D-098.3: S recomputed from the row's own columns. Rows as a run before D-096 wrote them: the flag faint
+    # failed S then (in_S False, reject faint), and is a label now; crossing, a fit at a bound and a registration
+    # other than ON still fail S, in reject_reasons' order (status, registration, the flags of S)
+    old = [dict(node_id=1, fit_status="converged", reg_verdict="", flags="faint;iter_max_rounds", in_S=False,
+                reject="faint", d_hat_um=0.5, mu_hat_per_um=1.0, alpha_hat=0.2, allen_radius_um=0.25),
+           dict(node_id=2, fit_status="converged", reg_verdict="", flags="faint;crossing", in_S=False,
+                reject="faint;crossing", d_hat_um=0.5, mu_hat_per_um=1.0, alpha_hat=0.2, allen_radius_um=0.25),
+           dict(node_id=3, fit_status="at_bound", reg_verdict="FAR: nearest matching ridge 2.1 um away", flags="faint",
+                in_S=False, reject="status:at_bound;registration:FAR;faint", d_hat_um=0.5, mu_hat_per_um=1.0, alpha_hat=0.2,
+                allen_radius_um=0.25),
+           dict(node_id=4, fit_status="converged", reg_verdict="ON THE PROCESS (lateral offset +0.05 um)", flags="dark",
+                in_S=True, reject="",
+                d_hat_um=0.5, mu_hat_per_um=1.0, alpha_hat=1.3, allen_radius_um=0.25)]
+    tab = COV.node_table([(dict(specimen_id=9, neuron_class="inh", layer="5"), old)])
+    assert [n["in_S"] for n in tab] == [True, False, False, True], [n["in_S"] for n in tab]
+    assert [n["reject"] for n in tab] == ["", "crossing", "status:at_bound;registration:FAR", ""], tab
+    assert [n["in_S_stored"] for n in tab] == [False, False, False, True]
+    summ = COV.selection_summary(tab)
+    assert (summ["n_rows"], summ["n_recomputed"], summ["n_stored_used"], summ["n_now_in_S"], summ["n_now_out_of_S"]) \
+        == (4, 4, 0, 1, 0), summ
+    assert summ["flags"] == ["crossing", "stack_edge", "bbar_few", "profile_nan"], summ["flags"]
+    assert COV.outside_counts(tab) == {"crossing": 1, "registration:FAR": 1, "status:at_bound": 1}
     v = COV.verdict(list(bins.values()), cfg)
     assert v["passed"] is False and v["failing"] == ["0.6-0.8"] and set(v["too_few"]) >= {"0.2-0.4", "0.8-1.2"}
     v2 = COV.verdict([b for b in bins.values() if b["bin"] != "0.6-0.8"], cfg)
@@ -249,6 +285,14 @@ def test_invariants():
     for other in (shuffled, nodes + noise):
         got = COV.coverage_table(other, cfg)
         assert json.dumps(survey_io.clean(got), sort_keys=True) == json.dumps(survey_io.clean(ref), sort_keys=True)
+    # D-098.3: with fit_status and flags present, the stored in_S and reject change nothing
+    rows = [dict(node_id=k, fit_status=("converged", "failed")[k % 2], reg_verdict="", flags=("faint", "crossing", "")[k % 3],
+                 d_hat_um=0.5, mu_hat_per_um=1.0, alpha_hat=0.2, allen_radius_um=0.25) for k in range(12)]
+    rec = dict(specimen_id=5, neuron_class="exc", layer="3")
+    a = COV.node_table([(rec, [dict(r, in_S=True, reject="") for r in rows])])
+    b = COV.node_table([(rec, [dict(r, in_S=False, reject="faint;whatever") for r in rows])])
+    strip = lambda t: [{k: v for k, v in n.items() if k != "in_S_stored"} for n in t]
+    assert strip(a) == strip(b)
 
 
 class CellSource:
@@ -279,6 +323,21 @@ def test_contract():
     whole = survey.measure_nodes(swc, provider, cfg, only={4})
     assert sorted(r.node_id for r, _, _, _ in whole) == list(range(2, 8))
     assert one[0][0].d_hat_um == next(r for r, _, _, _ in whole if r.node_id == 4).d_hat_um
+    # D-098.3, reference: the S of a stored row equals reject_reasons of its NodeResult, through the CSV round trip
+    # (survey.pilot_row, table_io.write_rows, read_rows), for every status, registration verdict and flag mix tried
+    variants = []
+    for res, r_allen, _br, _i in whole[:3]:
+        for st in ("converged", "at_bound", "failed"):
+            for reg in ("", "ON THE PROCESS (lateral offset +0.00 um)", "ALONGSIDE: a ridge 0.4 um off -- snap "
+                        "needed before measuring", "NOT ON A VISIBLE PROCESS (no ridge)"):
+                for fl in ((), ("faint",), ("faint", "crossing"), ("dark", "stack_edge", "iter_max_rounds")):
+                    variants.append((dataclasses.replace(res, fit_status=st, reg_verdict=reg, flags=fl), r_allen))
+    trip = os.path.join(tmp, "trip.csv")
+    table_io.write_rows([survey.pilot_row(v, r_allen, cfg) for v, r_allen in variants], trip)
+    back = table_io.read_rows(trip)
+    assert len(back) == len(variants) == 144
+    for (v, _), row in zip(variants, back):
+        assert phantoms.row_reject_reasons(row) == phantoms.reject_reasons(v), (row["fit_status"], row["flags"])
     # the step `nodes` through the runner (align from a manual identity alignment), then the pooled coverage
     out = os.path.join(tmp, "survey")
     rows = [dict(specimen_id=11, species="Homo Sapiens", layer="3", dendrite_type="spiny", reconstruction_type="full",
@@ -308,6 +367,17 @@ def test_contract():
     js = survey_io.read_json(os.path.join(s3a, "coverage.json"))
     assert {"bins", "verdict", "per_cell", "outside_S", "mu_range_per_um", "dhat_bins_um"} <= set(js)
     assert js["per_cell"]["11"]["n"] == 6 and sum(b["n"] for b in js["bins"]) == js["verdict"]["n_nodes"]
+    assert js["selection"]["n_recomputed"] == 6 and js["selection"]["n_now_in_S"] == 0, js["selection"]
+    assert any(ln.startswith("coverage: S recomputed") for ln in logs), logs
+    # an older run's CSV (in_S False and reject faint on every row, as a run before D-096 could write them): the pool
+    # recomputes S, so the coverage and the per-cell counts are those of the current rule
+    n_in = js["per_cell"]["11"]["n_in_S"]
+    path = cell.path_of("nodes", "pilot_11.csv")
+    table_io.write_rows([dict(r, in_S=False, reject="faint") for r in table_io.read_rows(path)], path)
+    bins2, ver2 = SC.pool_coverage(cfg, out, sel, log=logs.append)
+    js2 = survey_io.read_json(os.path.join(s3a, "coverage.json"))
+    assert js2["per_cell"]["11"]["n_in_S"] == n_in and js2["per_cell"]["11"]["n_in_S_stored"] == 0, js2["per_cell"]
+    assert js2["selection"]["n_now_in_S"] == n_in and ver2["n_nodes"] == ver["n_nodes"], (js2["selection"], ver2)
     head = open(os.path.join(s3a, "coverage.csv")).readline().strip().split(",")
     assert {"bin", "n", "share_inside", "q50_ln_mud", "q05_ln_alpha", "status"} <= set(head), head
     head = open(os.path.join(s3a, "diameters.csv")).readline().strip().split(",")
@@ -348,6 +418,22 @@ def test_edge_cases():
     v = COV.verdict(bins, cfg)
     assert v["passed"] and v["counted"] == [] and v["n_nodes"] == 0
     assert COV.outside_counts([node(1, "exc", "2", 0.5, 1.0, in_S=False, reject="dark;flat")]) == {"dark": 1, "flat": 1}
+    # D-098.3: a row with one of fit_status and flags only keeps its stored S; empty and NaN cells are no flag and
+    # no registration verdict (a NaN read as text would be the category UNKNOWN)
+    half = [dict(node_id=1, fit_status="converged", in_S=False, reject="faint", d_hat_um=0.5, mu_hat_per_um=1.0),
+            dict(node_id=2, flags="", in_S=True, reject="", d_hat_um=0.5, mu_hat_per_um=1.0)]
+    t = COV.node_table([(dict(specimen_id=3), half)])
+    assert [(n["in_S"], n["reject"], n["s_source"]) for n in t] == [(False, "faint", "stored"), (True, "", "stored")], t
+    nan = float("nan")
+    assert phantoms.row_reject_reasons(dict(fit_status="converged", flags=nan, reg_verdict=nan)) == []
+    assert phantoms.row_reject_reasons(dict(fit_status="converged", flags="", reg_verdict="")) == []
+    assert phantoms.row_reject_reasons(dict(fit_status="converged", flags="crossing")) == ["crossing"]
+    try:
+        phantoms.row_reject_reasons(dict(flags="crossing"))
+    except KeyError:
+        pass
+    else:
+        raise AssertionError("a row without fit_status must raise KeyError")
     for bad in (dict(nodes_mode="some"), dict(nodes_per_bin=0), dict(nodes_allen_bins_um=(0.6, 0.4)),
                 dict(coverage_dhat_bins_um=(0.0, 1.0)), dict(coverage_pass_share=1.5),
                 dict(coverage_phantom_quantiles=(0.9, 0.1))):

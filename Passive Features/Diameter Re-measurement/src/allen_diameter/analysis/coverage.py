@@ -3,7 +3,9 @@ nodes and the diameters by layer and class -- Block 17.3-17.4 in
 specs/SPEC.md (D-059.1, D-065.1, D-085.5, D-087). Pure functions of node
 rows and the configuration; nothing here reads or writes a file.
 
-  node_table      the per-node CSV rows of the cells, pooled, with the cell's class and layer
+  node_table      the per-node CSV rows of the cells, pooled, with the cell's class and layer, S
+                  recomputed from each row's columns under the current rule (D-098.3)
+  selection_summary  how S was read: rows recomputed, rows whose stored in_S differs
   coverage_table  per bin of d_hat: counts, quantiles, the shares inside the analytic band (and the phantoms')
   verdict         the pass rule of D-085.5
   diameter_table  d_hat (in S) and Allen's 2r by (class, layer), by class, by layer
@@ -33,19 +35,46 @@ def _true(v):
     return v is True or str(v).strip().lower() in ("true", "1")
 
 
-def node_table(rows_by_cell):
+def node_table(rows_by_cell, flags=None):
     """rows_by_cell: [(cell record with specimen_id, neuron_class, layer; the
     cell's per-node CSV rows)]. Returns one dict per node: specimen_id,
-    neuron_class, layer, node_id, in_S, reject, d_hat, mu_hat, alpha, D_allen."""
+    neuron_class, layer, node_id, in_S, reject, d_hat, mu_hat, alpha, D_allen,
+    and in_S_stored, s_source. in_S and reject are recomputed from the row's
+    fit_status, reg_verdict and flags under the current S
+    (phantoms.row_reject_reasons; `flags` overrides SELECTION_FLAGS), not read
+    from the stored columns, which a CSV written under another S carries
+    (D-098.3); in_S_stored is the column as written; s_source is "recomputed",
+    or "stored" for a row without fit_status or flags, which keeps the stored
+    in_S and reject."""
+    from .phantoms import row_reject_reasons
     out = []
     for rec, rows in rows_by_cell:
         for r in rows:
+            stored = _true(r.get("in_S"))
+            try:
+                reasons = row_reject_reasons(r, flags)
+                in_s, reject, source = not reasons, ";".join(reasons), "recomputed"
+            except KeyError:
+                in_s, reject, source = stored, str(r.get("reject") or ""), "stored"
             out.append(dict(specimen_id=int(rec["specimen_id"]), neuron_class=str(rec.get("neuron_class") or ""),
-                            layer=str(rec.get("layer") or ""), node_id=int(r["node_id"]), in_S=_true(r.get("in_S")),
-                            reject=str(r.get("reject") or ""), d_hat=_f(r.get("d_hat_um")),
+                            layer=str(rec.get("layer") or ""), node_id=int(r["node_id"]), in_S=in_s,
+                            reject=reject, d_hat=_f(r.get("d_hat_um")),
                             mu_hat=_f(r.get("mu_hat_per_um")), alpha=_f(r.get("alpha_hat")),
-                            D_allen=2.0 * _f(r.get("allen_radius_um"))))
+                            D_allen=2.0 * _f(r.get("allen_radius_um")), in_S_stored=stored, s_source=source))
     return out
+
+
+def selection_summary(nodes, flags=None):
+    """How S was read for the pooled nodes (D-098.3): the flags of S applied,
+    the rows recomputed and the rows whose stored in_S was kept, and how many
+    recomputed rows differ from their stored in_S (a CSV written under another
+    S, e.g. before D-096), by direction."""
+    from ..config import SELECTION_FLAGS
+    rec = [n for n in nodes if n.get("s_source") == "recomputed"]
+    return dict(flags=list(SELECTION_FLAGS if flags is None else flags), n_rows=len(nodes), n_recomputed=len(rec),
+                n_stored_used=len(nodes) - len(rec),
+                n_now_in_S=sum(1 for n in rec if n["in_S"] and not n["in_S_stored"]),
+                n_now_out_of_S=sum(1 for n in rec if not n["in_S"] and n["in_S_stored"]))
 
 
 def _usable(n):

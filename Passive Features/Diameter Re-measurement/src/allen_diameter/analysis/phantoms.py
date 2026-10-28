@@ -160,6 +160,33 @@ def reject_reasons(result):
     return out + [f for f in SELECTION_FLAGS if f in result.flags]
 
 
+def _cell_text(value):
+    """A stored CSV value as text: '' for None and NaN (an empty cell read back as a float)."""
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return ""
+    return str(value).strip()
+
+
+def row_reject_reasons(row, flags=None):
+    """reject_reasons on a stored row -- Block 8's per-node CSV or Block 6's
+    replicate CSV, as table_io.read_rows gives it -- from its own columns
+    fit_status, reg_verdict and flags (';'-joined), under the flags of S of
+    the code that reads it (SELECTION_FLAGS, or `flags`), not the stored
+    in_S and reject, which carry the rule of the code that wrote them
+    (D-098.3: a CSV written before D-096 lists `faint` among its reasons).
+    KeyError when the row has no fit_status or flags column."""
+    if "fit_status" not in row or "flags" not in row:
+        raise KeyError("row_reject_reasons: the row has no fit_status or flags column")
+    status = _cell_text(row["fit_status"])
+    out = [] if status == "converged" else ["status:" + status]
+    cat = registration_category(_cell_text(row.get("reg_verdict")))
+    if cat and cat != "ON":
+        out.append("registration:" + cat)
+    have = {f for f in _cell_text(row["flags"]).split(";") if f}
+    use = SELECTION_FLAGS if flags is None else tuple(flags)
+    return out + [f for f in use if f in have]
+
+
 def run_replicate(cfg, seed, g, r, backend=None, d_override_um=None):
     """Render and measure realization r of draw g (Block 14.2); returns a flat dict (one CSV row): the
     Draw (draw_index, realization_index, seed, true d, phi, theta, mu, node centre, radius_um,

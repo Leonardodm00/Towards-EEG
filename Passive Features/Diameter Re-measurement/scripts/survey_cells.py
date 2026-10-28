@@ -450,11 +450,20 @@ def pool_coverage(cfg, out_dir, selection_path="", phantom_paths=(), log=print):
             continue
         rows = table_io.read_rows(cell.path_of("nodes", "pilot_%d.csv" % cell.sid))
         rows_by_cell.append((rec, rows))
-        per_cell[str(cell.sid)] = dict(group=rec.get("group"), n=len(rows),
-                                       n_in_S=sum(1 for r in rows if coverage._true(r.get("in_S"))))
     if not rows_by_cell:
         raise RuntimeError("pool coverage: no cell under %s has finished the step nodes" % out_dir)
-    nodes = coverage.node_table(rows_by_cell)
+    nodes = coverage.node_table(rows_by_cell)          # S recomputed from the rows' columns (D-098.3)
+    for rec, rows in rows_by_cell:
+        mine = [n for n in nodes if n["specimen_id"] == int(rec["specimen_id"])]
+        per_cell[str(int(rec["specimen_id"]))] = dict(group=rec.get("group"), n=len(rows),
+                                                      n_in_S=sum(1 for n in mine if n["in_S"]),
+                                                      n_in_S_stored=sum(1 for n in mine if n["in_S_stored"]))
+    sel = coverage.selection_summary(nodes)
+    log("coverage: S recomputed from the rows' fit_status, reg_verdict and flags (flags of S: %s) for %d of %d rows; "
+        "%d now in S and %d now out of S against their stored in_S (CSVs written under another S)%s"
+        % (", ".join(sel["flags"]), sel["n_recomputed"], sel["n_rows"], sel["n_now_in_S"], sel["n_now_out_of_S"],
+           "; %d rows without those columns keep their stored in_S" % sel["n_stored_used"] if sel["n_stored_used"]
+           else ""))
     phantom = read_phantom_rows(phantom_paths) if phantom_paths else None
     bins = coverage.coverage_table(nodes, cfg, phantom)
     ver = coverage.verdict(bins, cfg)
@@ -476,7 +485,7 @@ def pool_coverage(cfg, out_dir, selection_path="", phantom_paths=(), log=print):
         dflat.append(d)
     table_io.write_rows(dflat, os.path.join(s3a, "diameters.csv"))
     survey_io.write_json(os.path.join(s3a, "coverage.json"), dict(
-        bins=bins, verdict=ver, per_cell=per_cell, outside_S=coverage.outside_counts(nodes),
+        bins=bins, verdict=ver, per_cell=per_cell, outside_S=coverage.outside_counts(nodes), selection=sel,
         mu_range_per_um=list(cfg.phantom.mu_range_per_um), dhat_bins_um=list(cfg.survey.coverage_dhat_bins_um),
         phantom_rows=list(phantom_paths), n_phantom_rows=None if phantom is None else int(phantom["d_hat"].size)))
     figs = survey_figures.coverage_figures(nodes, bins, cfg, phantom)
