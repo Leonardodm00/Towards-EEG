@@ -41,7 +41,11 @@ Checks
                         size guard; the runner: resume, --force,
                         a failing step recorded and the next cell run, a
                         set-aside cell skipping its later steps unless
-                        --include-set-aside, status rebuilt from the markers
+                        --include-set-aside, status rebuilt from the markers;
+                        task_index runs the one cell of that selection row
+                        and refuses an index outside it or with cells
+                        (D-099.1); source_for gives each cell its own source,
+                        the per-cell crop cache (D-099.2)
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -416,6 +420,48 @@ def test_edge_cases():
         # status from the markers alone
         st = {r["specimen_id"]: r for r in SC.status(out, sel, log=logs.append)}
         assert st[201]["align"] == "done" and st[203]["align"] == "pending", st
+        # D-099.1: task_index i runs the one cell of selection row i (201, 202, 203 are rows 0, 1, 2)
+        calls.clear()
+        rows = SC.run(cfg, sel, out, src, ["align", "probe"], force=["probe"], task_index=1, log=logs.append)
+        assert [r["specimen_id"] for r in rows] == [202] and calls == [202] and rows[0]["probe"] == "done", (rows, calls)
+        rows = SC.run(cfg, sel, out, src, ["align", "probe"], force=["probe"], task_index=0, log=logs.append)
+        assert [r["specimen_id"] for r in rows] == [201] and calls == [202, 201], (rows, calls)
+        for bad in dict(task_index=3), dict(task_index=-1), dict(task_index=0, cells=[201]):
+            try:
+                SC.run(cfg, sel, out, src, ["align"], log=logs.append, **bad)
+            except ValueError as exc:
+                assert "task index" in str(exc) or "exclusive" in str(exc), str(exc)
+            else:
+                raise AssertionError("run must refuse %r" % bad)
+        # D-099.2: source_for gives each cell its own source (the per-cell cache); the sources used are recorded
+        used = []
+
+        def source_for(sid):
+            used.append(int(sid))
+            return src
+        SC.run(cfg, sel, out, src, ["align"], cells=[201, 202], force=["align"], source_for=source_for, log=logs.append)
+        assert used == [201, 202], used
+        # the command line: --task-index 0 --cache-per-cell builds one source per cell under <cache>/<sid>
+        made = []
+        real_source = SC.AllenSource
+
+        class StubSource:
+            def __init__(self, cache_dir):
+                made.append(cache_dir)
+                self.fetcher, self.cells = src.fetcher, src.cells
+
+            def swc_path(self, sid):
+                return src.swc_path(sid)
+
+            def images(self, sid):
+                return src.images(sid)
+        SC.AllenSource = StubSource
+        try:
+            rc = SC.main(["run", "--selection", sel, "--out-dir", out, "--cache-dir", os.path.join(tmp, "cache"),
+                          "--steps", "align", "--task-index", "0", "--cache-per-cell", "--force", "align"])
+        finally:
+            SC.AllenSource = real_source
+        assert rc == 0 and made == [os.path.join(tmp, "cache"), os.path.join(tmp, "cache", "201")], made
         try:
             SC.run(cfg, sel, out, src, ["align", "nonsense"], log=logs.append)
         except ValueError as exc:

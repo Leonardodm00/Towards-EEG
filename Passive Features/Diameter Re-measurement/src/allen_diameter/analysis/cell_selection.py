@@ -143,3 +143,41 @@ def select_cells(pool, cfg, acquisition=None, require_match=False):
             selected.append(dict(cells[int(idx)], neuron_class=classes[key], group=key, rank=rank))
         counts[key] = (len(cells), n)
     return Selection(tuple(selected), counts, excluded, int(sv.selection_seed))
+
+
+def pick_cells(pool, cfg, specimen_ids, acquisition=None, require_match=False):
+    """Block 16.1 (e) (D-099.3, 2026-10-28): the selection records of named
+    cells -- one row per id of specimen_ids, in that order, each with its
+    class (neuron_class of its dendrite type), its group key "class|layer" and
+    rank 0 -- for a run on chosen cells (Colab's pilot 529878215, which the
+    stratified selection need not hold). A cell outside the pool, without a
+    class or a layer, or (with require_match) without a matching acquisition
+    record raises ValueError naming it. Returns a Selection whose groups
+    count the picked cells and whose excluded is empty."""
+    sv = cfg.survey
+    by_id = {int(r["specimen_id"]): r for r in pool}
+    acq = None if acquisition is None else {int(r["specimen_id"]): r for r in acquisition}
+    if require_match and acq is None:
+        raise ValueError("pick_cells: require_match needs the acquisition records")
+    selected, counts = [], {}
+    for sid in (int(x) for x in specimen_ids):
+        rec = by_id.get(sid)
+        if rec is None:
+            raise ValueError("pick_cells: specimen %d is not in the pool" % sid)
+        cls = neuron_class(rec.get("dendrite_type"), sv.class_map)
+        if cls is None:
+            raise ValueError("pick_cells: specimen %d has no class (dendrite type %r)" % (sid, rec.get("dendrite_type")))
+        if rec.get("layer") is None or str(rec.get("layer")).strip() == "":
+            raise ValueError("pick_cells: specimen %d has no layer" % sid)
+        if require_match:
+            a = acq.get(sid)
+            if a is None:
+                raise ValueError("pick_cells: specimen %d has no acquisition record" % sid)
+            ok, why = matches_acquisition(a, cfg)
+            if not ok:
+                raise ValueError("pick_cells: specimen %d does not match the acquisition: %s" % (sid, why))
+        key = "%s|%s" % (cls, str(rec["layer"]).strip())
+        selected.append(dict(rec, neuron_class=cls, group=key, rank=0))
+        a_, s_ = counts.get(key, (0, 0))
+        counts[key] = (a_ + 1, s_ + 1)
+    return Selection(tuple(selected), counts, {}, int(sv.selection_seed))

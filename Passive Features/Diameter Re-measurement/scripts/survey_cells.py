@@ -3,7 +3,8 @@
 (g) in specs/SPEC.md and the blocks that add steps; D-085, D-085.12). Colab:
 api.brain-map.org is blocked from the sandbox.
 
-  run     for each cell of selection.csv (Block 16.1) and each named step, in
+  run     for each cell of selection.csv (Block 16.1) -- or the one cell of
+          row --task-index (a PBS array task, D-099) -- and each named step, in
           order: skip a step already done (its marker in <out>/<sid>/done/),
           unless --force names it (which also clears the markers of the
           steps after it); skip every step after `align` of a cell the
@@ -36,7 +37,8 @@ Steps (in their order)
                 most survey.calib_scans_per_cell per set (D-088):
                 <sid>/calibration/scans_<sid>.json
 
-Example (Colab, after Cell 11)
+Example (Colab, after Cell 11; on davinci scripts/pbs/survey_cells.pbs runs one cell per array task with
+--task-index and --cache-per-cell, D-099)
     python scripts/survey_cells.py run --selection .../survey/selection.csv --out-dir .../survey \
         --cache-dir /content/drive/MyDrive/allen_cache --steps align
     python scripts/survey_cells.py status --out-dir .../survey
@@ -323,13 +325,26 @@ def _status_row(cell, record, steps):
     return row
 
 
-def run(cfg, selection_path, out_dir, source, steps, cells=None, force=(), include_set_aside=False, log=print):
-    """Block 16.2 (g). Returns the status rows."""
+def run(cfg, selection_path, out_dir, source, steps, cells=None, force=(), include_set_aside=False, log=print,
+        task_index=None, source_for=None):
+    """Block 16.2 (g). Returns the status rows. task_index (D-099.1): the one
+    cell of that 0-based row of the selection, a PBS array task's; exclusive
+    with cells; beyond the selection: ValueError. source_for (D-099.2): a
+    callable sid -> source used in place of `source` for each cell (a crop
+    cache per cell)."""
     unknown = [s for s in list(steps) + list(force) if s not in STEPS]
     if unknown:
         raise ValueError("unknown steps %s (known: %s)" % (unknown, list(ORDER)))
     steps = [s for s in ORDER if s in steps]
     sel = survey_io.read_selection(selection_path)
+    if task_index is not None:
+        if cells:
+            raise ValueError("run: --task-index and --cells are exclusive")
+        i = int(task_index)
+        if i < 0 or i >= len(sel):
+            raise ValueError("run: task index %d outside the selection of %d cells (rows 0-%d)"
+                             % (i, len(sel), len(sel) - 1))
+        sel = [sel[i]]
     if cells:
         sel = [r for r in sel if int(r["specimen_id"]) in set(int(c) for c in cells)]
     os.makedirs(out_dir, exist_ok=True)
@@ -343,7 +358,7 @@ def run(cfg, selection_path, out_dir, source, steps, cells=None, force=(), inclu
             gone = survey_io.clear_markers(cell, ORDER[ORDER.index(s):])
             if gone:
                 log("  %d: markers cleared %s" % (cell.sid, ",".join(gone)))
-        ctx = Context(rec, cell, source)
+        ctx = Context(rec, cell, source if source_for is None else source_for(cell.sid))
         row = _status_row(cell, rec, steps)
         failed = False
         for s in steps:
@@ -632,6 +647,10 @@ def main(argv=None):
     r.add_argument("--cache-dir", default="allen_cache")
     r.add_argument("--steps", default=",".join(ORDER), help="comma-separated, from: %s" % ",".join(ORDER))
     r.add_argument("--cells", default="", help="comma-separated specimen ids (default: every selected cell)")
+    r.add_argument("--task-index", type=int, default=None,
+                   help="run the one cell of this 0-based row of the selection (a PBS array task; exclusive with --cells)")
+    r.add_argument("--cache-per-cell", action="store_true",
+                   help="cache each cell's crops and SWC under <cache-dir>/<specimen_id>/ (davinci: many small files)")
     r.add_argument("--force", default="", help="steps to run again (with every step after each)")
     r.add_argument("--include-set-aside", action="store_true")
     r.add_argument("--config-json", default="")
@@ -659,8 +678,9 @@ def main(argv=None):
         return 0
     cfg = load_config(a.config_json)
     split = (lambda text: [x.strip() for x in text.split(",") if x.strip()])
+    source_for = (lambda sid: AllenSource(os.path.join(a.cache_dir, str(int(sid))))) if a.cache_per_cell else None
     run(cfg, a.selection, a.out_dir, AllenSource(a.cache_dir), split(a.steps), [int(c) for c in split(a.cells)],
-        split(a.force), a.include_set_aside)
+        split(a.force), a.include_set_aside, task_index=a.task_index, source_for=source_for)
     return 0
 
 

@@ -340,6 +340,7 @@ def _run_script(args, tmp):
 
 
 def test_determinism():
+    """Two runs give the same selection; another seed changes a large group. Also (2026-10-28, D-099.3) `pick`."""
     cfg = default_config()
     pool = CP.pool_records(raw_rows())
     with tempfile.TemporaryDirectory() as tmp:
@@ -353,6 +354,45 @@ def test_determinism():
             outs.append((open(out).read(), json.load(open(os.path.join(tmp, "sel%d.json" % k)))))
         assert outs[0][0] == outs[1][0], "two runs must give the same selection"
         assert {k: v for k, v in outs[0][1].items() if k != "pool"} == {k: v for k, v in outs[1][1].items() if k != "pool"}
+        # pick (D-099.3): the named cells in the order given, each with its class and group; the file reads back as a
+        # selection; a cell outside the pool, without a class, or (require-match) without a record is refused
+        ids = [int(r["specimen_id"]) for r in pool]
+        want = [ids[5], ids[0]]
+        out = os.path.join(tmp, "pick.csv")
+        p = _run_script(["pick", "--pool", pool_csv, "--cells", "%d,%d" % tuple(want), "--out", out], tmp)
+        assert p.returncode == 0 and "pick: 2 cells" in p.stdout, (p.stdout, p.stderr)
+        back = CP.read_table(out, CP.SELECTION_TYPES)
+        assert [int(r["specimen_id"]) for r in back] == want and all(r["rank"] == 0 for r in back)
+        by_id = {int(r["specimen_id"]): r for r in pool}
+        for r in back:
+            src = by_id[int(r["specimen_id"])]
+            assert r["neuron_class"] == CS.neuron_class(src["dendrite_type"], cfg.survey.class_map)
+            assert r["group"] == "%s|%s" % (r["neuron_class"], src["layer"])
+        js = json.load(open(os.path.join(tmp, "pick.json")))
+        assert js["picked"] == want and js["excluded"] == {} and sum(v["selected"] for v in js["groups"].values()) == 2
+        sel_pick = CS.pick_cells(pool, cfg, want)
+        assert [int(r["specimen_id"]) for r in sel_pick.selected] == want and sel_pick.excluded == {}
+        for bad, text in (([123], "not in the pool"),):
+            try:
+                CS.pick_cells(pool, cfg, bad)
+            except ValueError as exc:
+                assert text in str(exc), str(exc)
+            else:
+                raise AssertionError("pick must refuse %r" % bad)
+        try:
+            CS.pick_cells(pool, cfg, want, None, require_match=True)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("require_match without records must be refused")
+        try:
+            CS.pick_cells(pool, cfg, want, [], require_match=True)
+        except ValueError as exc:
+            assert "no acquisition record" in str(exc)
+        else:
+            raise AssertionError("a cell without a record must be refused under require_match")
+        p = _run_script(["pick", "--pool", pool_csv, "--cells", "123", "--out", out], tmp)
+        assert p.returncode != 0
     a = chosen(CS.select_cells(pool, cfg))
     other = dataclasses.replace(cfg, survey=dataclasses.replace(cfg.survey, selection_seed=cfg.survey.selection_seed + 1))
     b = chosen(CS.select_cells(pool, other))

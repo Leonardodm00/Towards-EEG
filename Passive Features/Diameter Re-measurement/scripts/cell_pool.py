@@ -14,12 +14,16 @@ api.brain-map.org is blocked from the sandbox.
           seeded permutation (all of a smaller group), optionally only among
           the cells whose acquisition matches (--require-match) -> SEL.csv and
           SEL.json (the seed, the rule, the groups, the cells left out)
+  pick    the selection records of named cells (--cells 529878215,...), in
+          that order, each with its class and group -> SEL.csv and SEL.json:
+          a selection for a run on chosen cells, e.g. Colab's pilot (D-099.3)
 
 Example (Colab, after the bootstrap cell)
     python scripts/cell_pool.py pool --out /content/drive/MyDrive/diameters/survey/pool.csv
     python scripts/cell_pool.py check --pool .../survey/pool.csv --out .../survey/acquisition.csv
     python scripts/cell_pool.py select --pool .../survey/pool.csv --acquisition .../survey/acquisition.csv \
         --require-match --out .../survey/selection.csv
+    python scripts/cell_pool.py pick --pool .../survey/pool.csv --cells 529878215 --out .../survey_pilot/selection.csv
 
 Pure ASCII, for the cluster (hpc-python-compat).
 """
@@ -133,6 +137,28 @@ def run_select(cfg, pool_path, out, acquisition_path="", require_match=False, su
     return sel
 
 
+def run_pick(cfg, pool_path, cells, out, acquisition_path="", require_match=False, summary_path=""):
+    """Block 16.1 (e): the selection of the named cells (cell_selection.pick_cells)."""
+    pool = cell_pool.read_table(pool_path, cell_pool.POOL_TYPES)
+    acq = cell_pool.read_table(acquisition_path, cell_pool.ACQUISITION_TYPES) if acquisition_path else None
+    ids = [int(x) for x in str(cells).split(",") if x.strip()]
+    if not ids:
+        raise ValueError("pick: --cells names no specimen")
+    sel = cell_selection.pick_cells(pool, cfg, ids, acq, require_match)
+    cell_pool.write_table(out, sel.selected, cell_pool.SELECTION_COLUMNS)
+    summary = dict(picked=ids, cells_per_group=None, class_map=list(cfg.survey.class_map),
+                   require_match=bool(require_match), pool=pool_path, acquisition=acquisition_path or None,
+                   groups={k: dict(available=a, selected=s_) for k, (a, s_) in sel.groups.items()},
+                   excluded={}, excluded_counts={},
+                   rule="the named cells, in the order given, each with its class and group (pick, D-099.3)")
+    spath = _summary_path(out, summary_path)
+    _write_json(summary, spath)
+    print("pick: %d cells -> %s, %s" % (len(sel.selected), out, spath))
+    for r in sel.selected:
+        print("  %-12s %s" % (r["group"], r["specimen_id"]))
+    return sel
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -153,7 +179,14 @@ def main(argv=None):
     s.add_argument("--seed", type=int, default=None, help="default: survey.selection_seed")
     s.add_argument("--per-group", type=int, default=None, help="default: survey.cells_per_group")
     s.add_argument("--summary", default="", help="default: the --out path with .json")
-    for q in (p, c, s):
+    k = sub.add_parser("pick")
+    k.add_argument("--pool", required=True)
+    k.add_argument("--cells", required=True, help="comma-separated specimen ids, in the order wanted")
+    k.add_argument("--out", required=True)
+    k.add_argument("--acquisition", default="")
+    k.add_argument("--require-match", action="store_true", help="refuse a cell whose acquisition does not match")
+    k.add_argument("--summary", default="", help="default: the --out path with .json")
+    for q in (p, c, s, k):
         q.add_argument("--config-json", default="")
     a = ap.parse_args(argv)
     cfg = load_config(a.config_json)
@@ -161,6 +194,8 @@ def main(argv=None):
         run_pool(cfg, a.out, a.from_csv)
     elif a.cmd == "check":
         run_check(cfg, a.pool, a.out, a.summary, a.max_cells, a.fresh)
+    elif a.cmd == "pick":
+        run_pick(cfg, a.pool, a.cells, a.out, a.acquisition, a.require_match, a.summary)
     else:
         sv = cfg.survey
         sv = dataclasses.replace(sv, selection_seed=sv.selection_seed if a.seed is None else int(a.seed),
