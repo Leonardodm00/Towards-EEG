@@ -22,7 +22,9 @@ analysis.calibration_report.figure_inputs; nothing scientific is computed here.
                          patch its background is fitted on, at plane k*, with
                          the traced segments -- its own branch, and every
                          neighbour coloured by whether its predicted shadow
-                         exceeds the isolation threshold -- and the far pixels
+                         exceeds the isolation threshold -- and the far pixels;
+                         under the stripe (10.S) also (c), every plane's
+                         stripe: the far fit's planes lie 5-16 planes from k*
   isolation_overview     the candidates' patches as thumbnails, pages of 36
   write_all              the PNG files of a run
 
@@ -123,10 +125,15 @@ def width_by_plane_figure(stage, title=""):
     return fig
 
 
-def _draw_line(ax, cx, cy, theta, half_um, color):
+def _draw_line(ax, cx, cy, theta, half_um, color, mark_plus=False):
+    """The measuring line (axis (-sin theta, cos theta)); mark_plus labels its +v end (the isolation figure's panel (c)
+    plots the stripe's runs against v)."""
     y_hat = np.array([-math.sin(theta), math.cos(theta)])
     ax.plot([cx - half_um * y_hat[0], cx + half_um * y_hat[0]], [cy - half_um * y_hat[1], cy + half_um * y_hat[1]],
             "-", color=color, lw=0.9)
+    if mark_plus:
+        ax.annotate("+v", (cx + half_um * y_hat[0], cy + half_um * y_hat[1]), color=color, fontsize=8,
+                    xytext=(3, 3), textcoords="offset points")
 
 
 def example_node_figure(ex, line_half_um, title=""):
@@ -412,6 +419,16 @@ def _gl(x):
     return "%.0f" % x if abs(x) >= 100 else ("%.1f" % x if abs(x) >= 1 else "%.2g" % x)
 
 
+def fit_planes_usable(view):
+    """(usable, total): the planes of the set's fit whose stripe is usable (10.S), from the view's stripe_planes;
+    None without them (the square rule, or a view written before 2026-10-28)."""
+    sp = view.get("stripe_planes")
+    if sp is None:
+        return None
+    fit = np.asarray(sp["fit"], dtype=bool)
+    return int(np.sum(fit & np.asarray(sp["ok"], dtype=bool))), int(fit.sum())
+
+
 def _isolation_line(view):
     thr = float(view["threshold_gl"])
     if not view["evaluated"]:
@@ -422,10 +439,61 @@ def _isolation_line(view):
                                 " (segment %d-%d, %.1f um from the patch)" % (w["child_id"], w["parent_id"], w["rho_um"]))
     st = view.get("stripe")
     if st is not None:
-        return "stripe at k*: %s (%d px, runs -%.1f / +%.1f um); deepest predicted neighbour shadow %s gl%s" % (
-            "usable" if st["ok"] else st["reason"], st["n_pixels"], st["side_minus_um"], st["side_plus_um"], _gl(d), who)
+        used = fit_planes_usable(view)
+        return "stripe at k*: %s (%d px, runs -%.1f / +%.1f um)%s; deepest predicted neighbour shadow %s gl%s" % (
+            "usable" if st["ok"] else st["reason"], st["n_pixels"], st["side_minus_um"], st["side_plus_um"],
+            "" if used is None else ", usable in %d of the fit's %d planes" % used, _gl(d), who)
     return "isolation: deepest predicted neighbour shadow %s gl%s %s %s gl -> %s" % (
         _gl(d), who, ">" if d > thr else "<=", _gl(thr), "not_isolated" if d > thr else "isolated")
+
+
+def _stripe_planes_panel(ax_n, ax_r, view):
+    """(c) of the isolation figure under the stripe (10.S; 2026-10-28, the user: "given the far field nodes highlight
+    the stripe used"): every plane of the stage. Above, the stripe's clear pixels (log scale; x: none) against
+    stripe_min_pixels (dashed). Below, its runs along the measuring line beyond the own cylinder's columns (light
+    blue), one bar per side, as wide as the plane's W relative to the grid's largest: dark grey where the plane's
+    stripe is usable, orange where it is not; a black tick where a side's run reaches stripe_min_side_um, the
+    measuring line's ends green and dashed. The planes the set's fit does not use are faint (the far set: the fit
+    uses |k - k*| >= far_min_k_offset; the dip-area planes, far_area_offsets, half-faint)."""
+    from matplotlib.ticker import MaxNLocator
+    sp = view["stripe_planes"]
+    off = np.asarray(sp["offsets"], dtype=int)
+    ok, fit, area = (np.asarray(sp[key], dtype=bool) for key in ("ok", "fit", "area"))
+    alpha = np.where(fit, 1.0, np.where(area, 0.55, 0.22))
+    wmax = max(sp["half_widths_um"]) if len(sp["half_widths_um"]) else 1.0
+    min_side = float(sp["min_side_um"])
+    for ax in (ax_n, ax_r):
+        _style(ax)
+    for j in range(off.size):
+        k, a = int(off[j]), float(alpha[j])
+        colour = INK2 if ok[j] else ORANGE
+        n = float(sp["n_pixels"][j])
+        ax_n.plot([k], [max(n, 1.0)], "o" if n > 0 else "x", color=colour, alpha=a, ms=4.5, mew=1.2)
+        width = 0.2 + 0.6 * float(sp["w_um"][j]) / wmax
+        vm, vp = float(sp["v_own_minus_um"][j]), float(sp["v_own_plus_um"][j])
+        sm, spl = float(sp["side_minus_um"][j]), float(sp["side_plus_um"][j])
+        ax_r.bar(k, vm + vp, width=width, bottom=-vm, color=BLUE, alpha=0.3 * a, lw=0)
+        ax_r.bar(k, sm, width=width, bottom=-(vm + sm), color=colour, alpha=a, lw=0)
+        ax_r.bar(k, spl, width=width, bottom=vp, color=colour, alpha=a, lw=0)
+        for y in (-(vm + min_side), vp + min_side):
+            ax_r.plot([k - 0.5 * width, k + 0.5 * width], [y, y], color=INK, lw=0.9, alpha=a)
+    ax_n.axhline(float(sp["min_pixels"]), color=INK2, ls="--", lw=0.9)
+    ax_n.set_yscale("log")
+    h = float(view["line_half_um"])
+    for y in (-h, h):
+        ax_r.axhline(y, color=GREEN, ls="--", lw=1.0)
+    ax_r.axhline(0.0, color=GREY, lw=0.6)
+    ax_r.set_xlim(off.min() - 0.8, off.max() + 0.8)
+    ax_r.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax_r.set_xlabel("plane offset k - k*", fontsize=8)
+    ax_r.set_ylabel("v along the measuring line (um; +v marked in (b))", fontsize=8)
+    ax_n.tick_params(labelbottom=False)
+    ax_n.set_ylabel("clear px", fontsize=8)
+    usable, total = fit_planes_usable(view)
+    far = view["set"] == "far"
+    ax_n.set_title("(c) every plane's stripe: usable in %d of the %s fit's %d planes%s" % (
+        usable, view["set"], total, " (|k - k*| >= %d)" % int(np.abs(off[fit]).min()) if far and fit.any() else ""),
+        fontsize=9, loc="left", color=INK)
 
 
 def isolation_figure(view, title=""):
@@ -435,12 +503,21 @@ def isolation_figure(view, title=""):
     stage's planes and in grey otherwise (dashed: not evaluated), the soma
     discs, the measuring line (green); (b) the same image with the pixels
     that are not far shaded blue -- the far pixels are those the planar
-    background is fitted on. Returns the Figure."""
+    background is fitted on; under the stripe (10.S), (c) every plane's
+    stripe (_stripe_planes_panel). Returns the Figure."""
     plt = _plt()
     img = np.asarray(view["image"], dtype=float)
     ext = _extent(view, img.shape)
     lo, hi = np.percentile(img, [0.5, 99.8])
-    fig, axes = plt.subplots(1, 2, figsize=(11.5, 6.8), facecolor=SURFACE)
+    by_plane = view.get("stripe_planes") is not None
+    if by_plane:
+        fig = plt.figure(figsize=(16.5, 6.8), facecolor=SURFACE)
+        gs = fig.add_gridspec(2, 3, width_ratios=(1.0, 1.0, 0.95), height_ratios=(1.0, 2.6), hspace=0.32)
+        axes = [fig.add_subplot(gs[:, 0]), fig.add_subplot(gs[:, 1])]
+        ax_r = fig.add_subplot(gs[1, 2])
+        ax_n = fig.add_subplot(gs[0, 2], sharex=ax_r)
+    else:
+        fig, axes = plt.subplots(1, 2, figsize=(11.5, 6.8), facecolor=SURFACE)
     for ax in axes:
         ax.imshow(img, cmap="gray", vmin=lo, vmax=hi if hi > lo else lo + 1, extent=ext, interpolation="nearest")
         ax.set_xlim(ext[0], ext[1]); ax.set_ylim(ext[2], ext[3])
@@ -464,7 +541,7 @@ def isolation_figure(view, title=""):
     shade[..., 2] = 1.0
     shade[..., 3] = np.where(np.asarray(view["far"], dtype=bool), 0.0, 0.30)
     axes[1].imshow(shade, extent=ext, interpolation="nearest")
-    _draw_line(axes[1], view["cx_um"], view["cy_um"], view["theta_rad"], view["line_half_um"], GREEN)
+    _draw_line(axes[1], view["cx_um"], view["cy_um"], view["theta_rad"], view["line_half_um"], GREEN, mark_plus=by_plane)
     frac = float(np.mean(view["far"]))
     b = np.asarray(view["background"], dtype=float)
     st = view.get("stripe")
@@ -472,9 +549,12 @@ def isolation_figure(view, title=""):
           if view["background_ok"] else ("the stripe is not usable (%s): no background" % st["reason"] if st
                                          else "too few far pixels: no background"))
     if st:
-        head_b = ("(b) the stripe (unshaded) the background is fitted on: W +-%.0f um, runs -%.1f / +%.1f um beyond the "
-                  "own cylinder (%.1f / %.1f um), %d px" % (st["w_um"], st["side_minus_um"], st["side_plus_um"],
-                                                            st["v_own_minus_um"], st["v_own_plus_um"], st["n_pixels"]))
+        head_b = ("(b) the stripe (unshaded) the background is fitted on at k*: W +-%.0f um, runs -%.1f / +%.1f um "
+                  "beyond the own cylinder (%.1f / %.1f um), %d px" % (st["w_um"], st["side_minus_um"], st["side_plus_um"],
+                                                                       st["v_own_minus_um"], st["v_own_plus_um"],
+                                                                       st["n_pixels"]))
+        if by_plane and view["set"] == "far":
+            head_b += ";\nthe far fit uses the stripes of the planes in (c)"
     else:
         head_b = "(b) the far pixels (unshaded) the background is fitted on: %.0f %%" % (100.0 * frac)
     axes[1].set_title("%s\n%s" % (head_b, bg), fontsize=9, loc="left", color=INK)
@@ -487,14 +567,25 @@ def isolation_figure(view, title=""):
                         "segment %d-%d %.1f um away: %s gl" % (o["child_id"], o["parent_id"], o["rho_um"],
                                                                _gl(o["depth_gl"])))
                        for o in offenders)
+    if by_plane:
+        _stripe_planes_panel(ax_n, ax_r, view)
+        listed_c = ("\n(c): per plane the runs beyond the own cylinder (light blue), bars as wide as the plane's W; dark "
+                    "grey: usable, orange: not usable; ticks: the %s um a side needs; green dashed: the measuring line's "
+                    "ends; faint: planes the fit does not use%s." % (
+                        _gl(view["stripe_planes"]["min_side_um"]), " (half-faint: the dip-area planes)"
+                        if view["set"] == "far" else ""))
+    else:
+        listed_c = ""
     fig.text(0.01, 0.012, "blue: the node's own branch; orange: neighbours whose predicted shadow in the patch exceeds "
              "%s gl in some plane of k* +- %d%s; grey: below it (dashed: not evaluated); green: the "
-             "measuring line.%s" % (_gl(view["threshold_gl"]), view["offsets_planes"],
-                                     " (not_isolated)" if view.get("support", "square") == "square" else
-                                     " (they bound the stripe; the verdict is the stripe's)",
-                                     ("\nabove the threshold: " + listed + (" ..." if len(view["offenders"]) > 5 else ""))
-                                     if listed else ""), fontsize=7.5, color=INK2, va="bottom")
-    fig.subplots_adjust(left=0.06, right=0.98, top=0.80, bottom=0.15, wspace=0.16)
+             "measuring line.%s%s" % (_gl(view["threshold_gl"]), view["offsets_planes"],
+                                       " (not_isolated)" if view.get("support", "square") == "square" else
+                                       " (they bound the stripe; the verdict is the stripe's)",
+                                       ("\nabove the threshold: " + listed + (" ..." if len(view["offenders"]) > 5
+                                                                              else "")) if listed else "", listed_c),
+             fontsize=7.5, color=INK2, va="bottom")
+    fig.subplots_adjust(left=0.05 if by_plane else 0.06, right=0.98, top=0.80, bottom=0.17 if by_plane else 0.15,
+                        wspace=0.22 if by_plane else 0.16)
     return fig
 
 
@@ -522,6 +613,9 @@ def isolation_overview(views, title="", ncols=6, per_page=36):
             if st is not None:
                 bad = not st["ok"]
                 label = "%d px" % st["n_pixels"] if st["ok"] else st["reason"]
+                used = fit_planes_usable(view)
+                if used is not None:
+                    label += " | %d/%d" % used
             else:
                 bad = view["evaluated"] and view["max_depth_gl"] > view["threshold_gl"]
                 label = ("%s gl" % _gl(view["max_depth_gl"])) if view["evaluated"] else "n/e"
@@ -529,7 +623,8 @@ def isolation_overview(views, title="", ncols=6, per_page=36):
                          color=ORANGE if bad else INK)
         striped = views[0].get("stripe") is not None
         fig.suptitle((title or ("candidates' background patches (plane k*): orange = the stripe at k* is not usable "
-                                "(too_few / side_short); the label is its pixel count" if striped else
+                                "(too_few / side_short); the label is its pixel count and n/N, the planes of the set's "
+                                "fit whose stripe is usable" if striped else
                                 "candidates' background patches (plane k*): orange = a neighbour's predicted shadow "
                                 "above %s gl (not_isolated)" % _gl(views[0]["threshold_gl"]))) + "  [%d-%d of %d]"
                      % (start + 1, start + len(page), len(views)), fontsize=9, color=INK)

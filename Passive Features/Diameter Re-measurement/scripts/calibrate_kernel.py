@@ -217,6 +217,32 @@ def isolation_hook(provider, cfg, fig_dir, views, log=print, dpi=110):
     return hook
 
 
+def knobs_line(cfg):
+    """The stripe's settings a run uses (D-101; Cell 7's knobs reach the scripts through --config-json)."""
+    cal = cfg.calibration
+    if cal.background_support != "stripe":
+        return "calibration knobs: background_support square (the far mask r + %g sigma, the any-shadow veto above " \
+               "%g gl); flatness phi <= %g deg near, %g deg far" % (cal.far_pixel_sigmas, cal.isolation_depth_gl,
+                                                                    cal.node_phi_max_deg, cal.node_phi_max_deg_far)
+    return ("calibration knobs: background_support stripe, tau %g gl, W %s um, at least %d px and %g um per side, patch "
+            "+-%g um; flatness phi <= %g deg near, %g deg far" % (
+                cal.isolation_depth_gl, ", ".join("%g" % w for w in cal.stripe_half_widths_um), cal.stripe_min_pixels,
+                cal.stripe_min_side_um, cal.patch_half_um, cal.node_phi_max_deg, cal.node_phi_max_deg_far))
+
+
+def far_planes_line(views, cfg):
+    """How many of the far set's candidates have a usable stripe in at least far_min_planes_per_node of the far fit's
+    planes (|k - k*| >= far_min_k_offset) -- the far fit drops the others (few_planes); from the views' stripe_planes
+    (panel (c) of the isolation figures, 2026-10-28)."""
+    from allen_diameter.plotting import calibration_figures
+    cal = cfg.calibration
+    far = [calibration_figures.fit_planes_usable(v) for v in views if v["set"] == "far"]
+    far = [u for u in far if u is not None]
+    enough = sum(1 for used, _total in far if used >= int(cal.far_min_planes_per_node))
+    return ("far-set candidates with a usable stripe in at least %d of the far fit's planes (|k - k*| >= %d): %d of %d"
+            % (cal.far_min_planes_per_node, cal.far_min_k_offset, enough, len(far)))
+
+
 def write_isolation_overview(views, fig_dir, dpi=110):
     """The overview pages of the isolation figures: <fig_dir>/isolation_overview_<page>.png. Returns the paths."""
     from allen_diameter.plotting import calibration_figures
@@ -245,6 +271,7 @@ def run_real(cfg, a):
         with open(a.registration_json) as f:
             regs = {int(k): v for k, v in json.load(f).items()}
     print("%d candidate nodes" % len(cand), flush=True)
+    print(knobs_line(cfg), flush=True)
     t0 = time.perf_counter()
     transform = dict(shift_full_px=(a.shift_x, a.shift_y), flip_y_full_h=a.flip_h, z0_um=a.z0)
     cal = cfg.calibration          # Block 19.1 (D-088.3): a seeded order, at most calib_max_nodes_per_set per set
@@ -291,6 +318,7 @@ def run_real(cfg, a):
             print("isolation figures: %d candidates (%d whose stripe at k* is not usable: fewer than %d px or a side "
                   "under %.1f um) -> %s; overview %s" % (len(views), n_bad, cal.stripe_min_pixels, cal.stripe_min_side_um,
                                                          fig_dir, ", ".join(os.path.basename(x) for x in pages) or "none"))
+            print(far_planes_line(views, cfg))
         else:
             n_bad = sum(1 for v in views if v["evaluated"] and v["max_depth_gl"] > v["threshold_gl"])
             print("isolation figures: %d candidates (%d with a neighbour's predicted shadow above %.3g gl) -> %s; "
@@ -442,7 +470,9 @@ def main(argv=None):
     s.add_argument("--d-range", type=_pair, default=None,
                    help="true d, um, comma-separated; default per set: near (0.15, 0.25), far (0.6, 0.8)")
     s.add_argument("--alpha-range", type=_pair, default=(0.15, 0.4))
-    s.add_argument("--phi-max", type=float, default=2.0, help="deg: the pilot reads the tilt to about 1 deg, node_phi_max_deg is 5")
+    s.add_argument("--phi-max", type=float, default=2.0, help="deg: the phantoms' largest tilt; the pilot reads the tilt to about 1 deg (4.5 deg on 0.2 um "
+                        "tubes, the tester's F3 of 2026-10-28); the selection's bounds are node_phi_max_deg (near, 10) "
+                        "and node_phi_max_deg_far (far, 15), D-101.1")
     s.add_argument("--workers", type=int, default=1)
     r = sub.add_parser("real")
     r.add_argument("--specimen", required=True)

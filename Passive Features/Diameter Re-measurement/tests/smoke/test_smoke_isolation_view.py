@@ -31,7 +31,13 @@ Checks
                         panels and writes a PNG; the overview pages hold 36
                         thumbnails each; under the stripe (D-101) the view
                         carries the stripe of k*, drawn by the figure and the
-                        overview; Cell 7's hook on the synthetic cell
+                        overview, and (2026-10-28) the stripe of every plane
+                        of the stage -- support_masks' own, the planes the
+                        fit uses marked (near: all 7; far: |k - k*| >= 5 of
+                        33, the dip-area planes 4-6) -- drawn as panel (c),
+                        n/N in the overview's labels; the notebooks' Cell 7
+                        knob block writes the defaults, read back by
+                        load_config; Cell 7's hook on the synthetic cell
                         of fixtures_cell.py through scan_cell: one PNG per
                         measured candidate, the soma or the segment joining
                         it to the dendrite the worst neighbour at the
@@ -257,9 +263,9 @@ def test_contract():
     keys = {"node_id", "set", "allen_diameter_um", "k_view", "plane_rule", "offsets_planes", "image", "image_valid",
             "left", "top", "res_um_px", "far", "background", "background_ok", "cx_um", "cy_um", "theta_rad", "half_um",
             "line_half_um", "seg_rows", "seg_depth_gl", "soma", "soma_depth_gl", "threshold_gl", "evaluated",
-            "max_depth_gl", "worst", "offenders", "n_neighbours", "verdict", "support", "stripe"}
+            "max_depth_gl", "worst", "offenders", "n_neighbours", "verdict", "support", "stripe", "stripe_planes"}
     assert keys == set(view), sorted(set(view) ^ keys)
-    assert view["support"] == "square" and view["stripe"] is None
+    assert view["support"] == "square" and view["stripe"] is None and view["stripe_planes"] is None
     H, W = view["image"].shape
     assert view["far"].shape == (H, W) and view["far"].dtype == bool and view["seg_rows"].shape[1] == 9
     assert view["seg_depth_gl"].shape == (view["seg_rows"].shape[0],) and view["soma_depth_gl"].shape == (1,)
@@ -281,16 +287,68 @@ def test_contract():
             plt.close(f)
         # under the stripe (D-101, the default): the view carries the stripe of plane k*, its mask is the support
         cfg_s = cfg_with(patch_half_um=HALF, background_support="stripe")
-        view_s = view_of(cfg_s)[0]
+        view_s, br_s, sc_s, node_s, _ = view_of(cfg_s)
         st = view_s["stripe"]
         assert view_s["support"] == "stripe" and isinstance(st, dict) and st["n_pixels"] == int(view_s["far"].sum())
         assert "stripe at k*" in CF._isolation_line(view_s)
         fig = CF.isolation_figure(view_s)
         assert "stripe" in fig.axes[1].get_title(loc="left")
+        # (c), 2026-10-28: every plane's stripe, the support_masks of the whole stage; the near fit uses them all
+        assert len(fig.axes) == 4 and "every plane's stripe" in fig.axes[3].get_title(loc="left"), \
+            [a.get_title(loc="left") for a in fig.axes]
         plt.close(fig)
+        for which, r_own in (("near", 0.2), ("far", 0.35)):
+            # a neighbour 7 um across and 1 um above the node: the planes above and below k* differ, and some planes
+            # outside the far fit (|k - k*| < 5) are usable where the fit's are not
+            br_w = Branch.from_points(np.c_[np.linspace(-12, 12, 25), np.zeros(25), np.zeros(25)], r_own,
+                                      ids=np.arange(100, 125))
+            nb_w = Branch.from_points(np.c_[np.linspace(-8, 8, 5), np.full(5, 7.0), np.full(5, 1.0)], 0.3,
+                                      ids=np.arange(200, 205))
+            sc_w = Scene(np.vstack([Scene.from_branch(b).seg_xyz for b in (br_w, nb_w)]),
+                         np.vstack([Scene.from_branch(b).seg_radius for b in (br_w, nb_w)]),
+                         np.vstack([Scene.from_branch(b).seg_ids for b in (br_w, nb_w)]), np.empty((0, 3)))
+            node_w = pilot(d=2 * r_own, z=0.84, z_sub=0.84, k_star=3)      # k* = 3: the offsets are k - k*
+            v_w = CR.isolation_view(br_w, 12, node_w, sc_w, ramp_provider(cfg_s)[0], cfg_s)
+            assert v_w["set"] == which, (v_w["set"], which)
+            sp = v_w["stripe_planes"]
+            kk = CAL.stage_planes(node_w, cfg_s, which)
+            shape, frame = CS.patch_frame(0.0, 0.0, HALF, cfg_s.acquisition.res0_um)
+            _sup, st_ref = CAL.support_masks(shape, frame, kk, node_w, br_w, sc_w, cfg_s)
+            off = kk - node_w.k_star
+            assert sp["offsets"].tolist() == off.tolist(), (sp["offsets"], off)
+            for key in CR._STRIPE_NUMBERS:
+                assert np.array_equal(sp[key], np.array([float(s[key]) for s in st_ref])), key
+            assert sp["ok"].tolist() == [bool(s["ok"]) for s in st_ref] and sp["reason"] == [s["reason"] for s in st_ref]
+            q0 = int(np.flatnonzero(off == 0)[0])
+            assert all(v_w["stripe"][key] == st_ref[q0][key] for key in CR._STRIPE_NUMBERS)
+            cal = cfg_s.calibration
+            if which == "far":
+                lo, hi = cal.far_area_offsets
+                assert sp["fit"].tolist() == (np.abs(off) >= cal.far_min_k_offset).tolist() and len(off) == 33
+                assert sp["area"].tolist() == ((np.abs(off) >= lo) & (np.abs(off) <= hi)).tolist()
+            else:
+                assert sp["fit"].all() and not sp["area"].any() and len(off) == 7
+            assert CF.fit_planes_usable(v_w) == (int(np.sum(sp["ok"] & sp["fit"])), int(sp["fit"].sum()))
+            assert not np.array_equal(sp["side_plus_um"], sp["side_plus_um"][::-1]), "the scene must break the symmetry"
+            if which == "far":
+                assert np.any(sp["ok"] & ~sp["fit"]) and np.sum(sp["ok"] & sp["fit"]) < np.sum(sp["ok"]), sp["ok"]
+            assert (sp["min_pixels"], sp["min_side_um"]) == (cal.stripe_min_pixels, cal.stripe_min_side_um)
+            fig = CF.isolation_figure(v_w)
+            assert ("the far fit uses the stripes" in fig.axes[1].get_title(loc="left")) == (which == "far")
+            plt.close(fig)
+            page = CF.isolation_overview([v_w])[0]
+            assert " | %d/%d" % CF.fit_planes_usable(v_w) in [a.get_title() for a in page.axes if a.images][0]
+            plt.close(page)
         page = CF.isolation_overview([view_s])[0]
         assert "stripe" in page._suptitle.get_text()
         plt.close(page)
+        # real's far-set line counts the candidates with at least far_min_planes_per_node usable fit planes
+        import calibrate_kernel as CK
+        need = cfg_s.calibration.far_min_planes_per_node
+        fake = [dict(set="far", stripe_planes=dict(fit=np.ones(8, dtype=bool), ok=np.arange(8) < n)) for n in
+                (need, need - 1)] + [dict(set="near", stripe_planes=dict(fit=np.ones(7, dtype=bool), ok=np.ones(7, bool))),
+                                     dict(set="far", stripe_planes=None)]
+        assert CK.far_planes_line(fake, cfg_s).endswith(": 1 of 2"), CK.far_planes_line(fake, cfg_s)
     # Cell 7's hook through scan_cell on the synthetic cell (fixtures_cell): one figure per measured candidate
     import calibrate_kernel as CK
     import run_cell
@@ -323,12 +381,29 @@ def test_contract():
             assert [os.path.basename(x) for x in pages] == ["isolation_overview_1.png"]
             if want_offender:
                 _real_command_line(tmp, cfg_cell, swc, fetcher, planes)
+    # the notebooks' Cell 7 knob block (2026-10-28): its values are the configuration's defaults, and the file it
+    # writes is the configuration load_config (every script's --config-json) reads back
+    import json
+    from build_table import load_config
+    for nb_name in ("phase2_colab.ipynb", "s3_run_2026-10-27.ipynb"):
+        with open(WS / "notebooks" / nb_name) as f:
+            cells = json.load(f)["cells"]
+        i7 = [i for i, c in enumerate(cells) if "".join(c["source"]).startswith("## Cell 7:")]
+        assert len(i7) == 1, nb_name
+        code = "".join(cells[i7[0] + 1]["source"])
+        assert code.count("*CAL_CFG") + code.count("+ CAL_CFG") == 4, (nb_name, "real, fit, far-fit, figures")
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {"OUT": tmp, "os": os}
+            exec(code[:code.index("CAL_CFG = ")], env)          # the knob block, up to the arguments it builds
+            assert load_config(env["CFG_CAL"]) == default_config(), nb_name
+            assert sorted(json.load(open(env["CFG_CAL"]))) == ["calibration"], nb_name
 
 
 def _real_command_line(tmp, cfg_cell, swc, fetcher, planes):
     """`calibrate_kernel.py real` in process on the synthetic cell, Allen's server replaced (the SWC by --swc, the
     image table and the fetcher by the fixture's): the figures land in figures/isolation beside --out, with the
-    overview and the summary line; --no-isolation-figures draws none."""
+    overview and the summary line; --no-isolation-figures draws none; Cell 7's knob file (a partial calibration
+    section) sets what the run prints and records."""
     import contextlib
     import io
     import json
@@ -362,6 +437,28 @@ def _real_command_line(tmp, cfg_cell, swc, fetcher, planes):
             else:
                 assert not os.path.exists(iso) and "isolation figures" not in text, text
             assert "3 candidate nodes" in text and os.path.exists(os.path.join(out_dir, "scans.json")), text
+            assert "calibration knobs: background_support square" in text, text
+        # Cell 7's knob block (2026-10-28): a calibration section holding some fields -- the rest stay the defaults --
+        # reaches `real` through --config-json; the run prints the knobs it uses and the far set's per-plane count
+        knobs = dict(background_support="stripe", isolation_depth_gl=0.05, stripe_min_pixels=50, patch_half_um=3.5)
+        kj = os.path.join(tmp, "calibration_config.json")
+        with open(kj, "w") as f:
+            json.dump(dict(json.loads(cfg_cell.to_json()), calibration=knobs), f)
+        out_dir = os.path.join(tmp, "cal_knobs")
+        os.makedirs(out_dir)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            CK.main(["real", "--specimen", "1", "--nodes-csv", csv_path, "--swc", swc_path, "--cache-dir", tmp,
+                     "--out", os.path.join(out_dir, "scans.json"), "--config-json", kj])
+        text = buf.getvalue()
+        assert ("calibration knobs: background_support stripe, tau 0.05 gl, W 1, 2, 4, 8, 12 um, at least 50 px and "
+                "3 um per side, patch +-3.5 um; flatness phi <= 10 deg near, 15 deg far") in text, text
+        assert "far-set candidates with a usable stripe in at least 6 of the far fit's planes (|k - k*| >= 5): 0 of 0" \
+            in text, text
+        meta = json.load(open(os.path.join(out_dir, "scans.json")))["meta"]["calibration"]
+        want = dict(dataclasses.asdict(default_config().calibration), **knobs)
+        assert {k: (list(v) if isinstance(v, tuple) else v) for k, v in want.items()} == meta, \
+            sorted(k for k in want if want[k] != meta.get(k))
     finally:
         aio.list_images, aio.plane_table, aio.HttpFetcher = saved
 

@@ -324,9 +324,11 @@ def isolation_view(branch, i, node, scene, provider, cfg, verdict=""):
     over the stage's planes (k* +- offsets_planes near, +- far_offsets_planes
     far) with the pilot's B_bar and mu -- the numbers behind not_isolated --
     evaluated, as trace_reasons does, only when the pilot has a sharpest
-    plane and finite B_bar and mu. Returns None when the pilot's centre is
-    not finite (no patch). Computes nothing new: the figure draws what the
-    selection used."""
+    plane and finite B_bar and mu. Under the stripe (10.S) the view carries
+    the stripe of plane k* (stripe) and of every plane of the stage
+    (stripe_planes, _stripe_planes: the far fit's planes lie 5-16 planes
+    from k*). Returns None when the pilot's centre is not finite (no patch).
+    Computes nothing new: the figure draws what the selection used."""
     cal, dz, p = cfg.calibration, cfg.acquisition.dz_um, cfg.acquisition.res0_um
     v = pilot_view(node)
     if not (math.isfinite(float(v.cx_um)) and math.isfinite(float(v.cy_um))):
@@ -345,6 +347,7 @@ def isolation_view(branch, i, node, scene, provider, cfg, verdict=""):
     q = int(np.flatnonzero(kk == k_view)[0])
     far, b, ok = far_all[q:q + 1], b_all[q:q + 1], ok_all[q:q + 1]
     stripe = None if stripe_all is None else dict(stripe_all[q])
+    stripe_planes = None if stripe_all is None else _stripe_planes(stripe_all, kk, k_view, which, cal)
     evaluated = has_plane and all(math.isfinite(float(x)) for x in (v.B_bar, v.mu_hat_per_um))
     parts = []
     if evaluated:
@@ -374,4 +377,28 @@ def isolation_view(branch, i, node, scene, provider, cfg, verdict=""):
                 seg_rows=rows, seg_depth_gl=seg_depth, soma=soma, soma_depth_gl=soma_depth, threshold_gl=thr,
                 evaluated=bool(evaluated), max_depth_gl=float(worst["depth_gl"]) if worst else 0.0, worst=worst,
                 offenders=offenders, n_neighbours=len(parts), verdict=str(verdict),
-                support=str(cal.background_support), stripe=stripe)
+                support=str(cal.background_support), stripe=stripe, stripe_planes=stripe_planes)
+
+
+_STRIPE_NUMBERS = ("w_um", "v_own_minus_um", "v_own_plus_um", "l_minus_um", "l_plus_um", "side_minus_um",
+                   "side_plus_um", "n_pixels")
+
+
+def _stripe_planes(stripe_all, kk, k_view, which, cal):
+    """The stripe of every plane of the stage (10.S; panel (c) of the isolation figure, 2026-10-28: "given the far
+    field nodes highlight the stripe used"): offsets k - k_view (int), the info's numbers as float arrays, ok (bool),
+    reason (str list), and which planes the set's fit uses -- fit: every plane of the near stage (k* +- offsets_planes),
+    the far planes with |k - k*| >= far_min_k_offset (15.3); area: the far planes with |k - k*| in far_area_offsets
+    (the dip's area A_j) -- with the acceptance thresholds and the W grid. Reads what patch_planes computed."""
+    off = np.asarray(kk, dtype=int) - int(k_view)
+    if which == "far":
+        lo, hi = (int(x) for x in cal.far_area_offsets)
+        fit, area = np.abs(off) >= int(cal.far_min_k_offset), (np.abs(off) >= lo) & (np.abs(off) <= hi)
+    else:
+        fit, area = np.ones(off.size, dtype=bool), np.zeros(off.size, dtype=bool)
+    out = {key: np.array([float(s[key]) for s in stripe_all]) for key in _STRIPE_NUMBERS}
+    out.update(offsets=off, fit=fit, area=area, ok=np.array([bool(s["ok"]) for s in stripe_all]),
+               reason=[str(s["reason"]) for s in stripe_all], min_pixels=int(cal.stripe_min_pixels),
+               min_side_um=float(cal.stripe_min_side_um),
+               half_widths_um=tuple(float(w) for w in cal.stripe_half_widths_um))
+    return out

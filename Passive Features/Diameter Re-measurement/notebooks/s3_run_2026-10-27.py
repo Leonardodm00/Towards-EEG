@@ -167,11 +167,41 @@ subprocess.run([sys.executable, "-c", PREFLIGHT, OUT, str(SPECIMEN), REG_JSON], 
 # (`isolation_overview_<n>.png`, shown below; orange = not usable, the label its pixel count). Costs one crop per
 # candidate that is not scanned.
 #
-# Send back: the `real` counts and reasons line, the `fit` and `far-fit` reports, the five figures, and the isolation
+# [2026-10-28, later] The stripe's knobs: the code starts with `CAL_KNOBS`, the stripe's parameters at the
+# configuration's defaults -- `background_support`, tau (`isolation_depth_gl`), the W grid, the minimum pixel count
+# and side run, the patch's half-side -- and the two flatness bounds; the cell writes them to
+# `OUT/calibration/calibration_config.json`, passes the file to `real`, `fit`, `far-fit` and `figures`, and `real`
+# prints `calibration knobs: ...` with the values it ran with. Each isolation figure has a panel (c): every plane's
+# stripe -- its clear pixels, and its runs along the measuring line beyond the own cylinder -- dark where usable,
+# orange where not, faint for the planes the set's fit does not use (the far fit uses |k - k*| >= 5; the dip's area
+# |k - k*| = 4-6, half-faint). The overview's labels end with n/N, the fit's planes whose stripe is usable, and `real`
+# adds `far-set candidates with a usable stripe in at least 6 of the far fit's planes (|k - k*| >= 5): m of n`.
+#
+# Send back: the `calibration knobs:` line, the `real` counts and reasons line and its far-set line, the `fit` and
+# `far-fit` reports, the five figures, and the isolation
 # overview pages (or the per-node figures of the candidates you want to discuss).
 
 # %%
+# The stripe's knobs (D-101; the configuration's calibration.* fields, here at their defaults). Change one and run the
+# cell again: the file below goes to real, fit, far-fit and figures, and real prints `calibration knobs: ...` with the
+# values it ran with. Cell 15 and the davinci array read the same file when it is passed (runbook, "the stripe's knobs").
+CAL_KNOBS = {
+    "calibration.background_support": "stripe",   # "stripe" (D-101) or "square" (before 2026-10-28: the 3-sigma far mask)
+    "calibration.isolation_depth_gl": 0.03,       # tau (gl): a pixel is shaded where a traced segment's predicted shadow exceeds it
+    "calibration.stripe_half_widths_um": [1.0, 2.0, 4.0, 8.0, 12.0],   # the band's half-widths W tried (um); most clear pixels wins
+    "calibration.stripe_min_pixels": 500,         # a plane's stripe is usable with at least this many clear pixels ...
+    "calibration.stripe_min_side_um": 3.0,        # ... and at least this clear run (um) on each side of the own cylinder
+    "calibration.patch_half_um": 25.0,            # the patch's half-side (um): the runs end at its edge (larger: bigger crops)
+    "calibration.node_phi_max_deg": 10.0,         # flatness, near set (deg)
+    "calibration.node_phi_max_deg_far": 15.0,     # flatness, far set (deg)
+}
+import json
+assert all(k.startswith("calibration.") for k in CAL_KNOBS), "CAL_KNOBS: calibration.* fields only"
 os.makedirs(OUT + "/calibration/figures", exist_ok=True)
+CFG_CAL = OUT + "/calibration/calibration_config.json"
+with open(CFG_CAL, "w") as f:
+    json.dump({"calibration": {k.split(".", 1)[1]: v for k, v in CAL_KNOBS.items()}}, f, indent=1)
+CAL_CFG = ["--config-json", CFG_CAL]
 PILOT_CSV = "%s/pilot/pilot_%d.csv" % (OUT, SPECIMEN)
 SCANS = "%s/calibration/scans_%d.json" % (OUT, SPECIMEN)
 CALIB = "%s/calibration/calibration_%d.json" % (OUT, SPECIMEN)
@@ -179,12 +209,13 @@ FARFIT = "%s/calibration/far_fit_%d.json" % (OUT, SPECIMEN)
 PATCHES = "%s/calibration/patches_%d.npz" % (OUT, SPECIMEN)
 REG_ARGS = ["--registration-json", REG_JSON] if os.path.exists(REG_JSON) else []   # Cell 3b's offsets, if run
 rc = run("scripts/calibrate_kernel.py", "real", "--specimen", SPECIMEN, "--nodes-csv", PILOT_CSV,
-         "--cache-dir", CACHE_DIR, "--out", SCANS, *REG_ARGS, *ALIGN, check=False)
+         "--cache-dir", CACHE_DIR, "--out", SCANS, *REG_ARGS, *ALIGN, *CAL_CFG, check=False)
 if rc == 0:
-    rc = run("scripts/calibrate_kernel.py", "fit", "--scans", SCANS, "--out", CALIB, check=False)
+    rc = run("scripts/calibrate_kernel.py", "fit", "--scans", SCANS, "--out", CALIB, *CAL_CFG, check=False)
 if rc == 0:
-    run("scripts/calibrate_kernel.py", "far-fit", "--scans", SCANS, "--calibration", CALIB, "--out", FARFIT, check=False)
-    fig_args = ["--scans", SCANS, "--calibration", CALIB, "--out-dir", OUT + "/calibration/figures"]
+    run("scripts/calibrate_kernel.py", "far-fit", "--scans", SCANS, "--calibration", CALIB, "--out", FARFIT, *CAL_CFG,
+        check=False)
+    fig_args = ["--scans", SCANS, "--calibration", CALIB, "--out-dir", OUT + "/calibration/figures"] + CAL_CFG
     if os.path.exists(FARFIT):
         fig_args += ["--far-fit", FARFIT]
     if os.path.exists(PATCHES):
@@ -354,6 +385,10 @@ display(Image(filename=SURVEY + "/s3b/inputs.png"))
 # far-fit reports when a set is sufficient, and `pool calibration -> .../survey_pilot/s3c`.
 #
 # Send back: the `calibration:` line and the pooled lines.
+#
+# Cell 7's stripe knobs (`calibration/calibration_config.json`), when Cell 7 wrote them, are merged into this cell's
+# own file `survey_config_s3c.json` and printed (`[cell 15] calibration knobs: ...`); the step runs once per cell, so
+# after a change of the knobs set `REDO = ["--force", "calibration"]` [2026-10-28, later].
 
 # %%
 import json
@@ -362,10 +397,22 @@ CFG_S3 = SURVEY + "/survey_config.json"     # Cell 13's (node mode, the pilot's 
 if not os.path.exists(CFG_S3):
     with open(CFG_S3, "w") as f:
         json.dump({"survey": {"nodes_mode": "stratified", "nodes_per_bin": 3}}, f)
+# Cell 7's stripe knobs, when Cell 7 wrote them, join Cell 13's settings in this cell's own file
+CFG_CAL = OUT + "/calibration/calibration_config.json"
+CFG_S3C = SURVEY + "/survey_config_s3c.json"
+with open(CFG_S3) as f:
+    cfg_s3c = json.load(f)
+if os.path.exists(CFG_CAL):
+    with open(CFG_CAL) as f:
+        cfg_s3c["calibration"] = json.load(f)["calibration"]
+with open(CFG_S3C, "w") as f:
+    json.dump(cfg_s3c, f, indent=1)
+print("[cell 15] calibration knobs:", cfg_s3c.get("calibration", "the defaults"))
+REDO = []    # ["--force", "calibration"] after a change of Cell 7's knobs: a done step is not run again otherwise
 run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
-    "--cache-dir", CACHE_DIR, "--steps", "align,nodes,calibration", "--config-json", CFG_S3)
+    "--cache-dir", CACHE_DIR, "--steps", "align,nodes,calibration", "--config-json", CFG_S3C, *REDO)
 run("scripts/survey_cells.py", "pool", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv",
-    "--what", "calibration", "--config-json", CFG_S3)
+    "--what", "calibration", "--config-json", CFG_S3C)
 from IPython.display import Image, display
 for name in ("width_by_plane_near", "width_by_plane_far", "kernel_law", "kernel_law_by_cell",
              "kernel_law_residuals_by_cell"):
