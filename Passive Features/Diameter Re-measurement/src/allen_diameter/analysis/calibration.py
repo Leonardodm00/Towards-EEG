@@ -10,7 +10,7 @@
                       in S, flat and faint are read from the pilot
                       (pilot_view); since D-094 (2026-10-28) neither the
                       optical depth (faint, node_alpha_check) nor the flag
-                      faint (node_faint_flag_check; not in S since D-095) is
+                      faint (node_faint_flag_check; not in S since D-096) is
                       applied unless switched on. The fit's d_hat is no
                       criterion. The
                       far-field scan is not built: such a node is selected and
@@ -384,7 +384,7 @@ def criteria_reasons(phi_rad, alpha_hat, allen_diameter_um, cfg):
 def selection_flags(cfg):
     """The flags that fail a calibration node: Block 6's SELECTION_FLAGS (the
     flags of S), preceded by "faint" when node_faint_flag_check (D-094). Since
-    D-095 S itself has no flag faint, so the switch, off by default, adds it
+    D-096 S itself has no flag faint, so the switch, off by default, adds it
     for the calibration only."""
     return (("faint",) if cfg.calibration.node_faint_flag_check else ()) + tuple(phantoms.SELECTION_FLAGS)
 
@@ -393,7 +393,7 @@ def selection_reasons(result, cfg):
     """The reasons of Block 6's selection S that fail a calibration node:
     phantoms.reject_reasons (the fit's status, the registration, the flags of
     SELECTION_FLAGS), with the flag "faint" put first among the flags when
-    node_faint_flag_check and the node carries it (D-094, D-095)."""
+    node_faint_flag_check and the node carries it (D-094, D-096)."""
     base = phantoms.reject_reasons(result)
     if not (cfg.calibration.node_faint_flag_check and "faint" in result.flags):
         return base

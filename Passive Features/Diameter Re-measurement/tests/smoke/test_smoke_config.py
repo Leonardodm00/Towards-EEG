@@ -9,7 +9,7 @@ What it checks (strongest first)
     test_invariants     signatures: deterministic, the renderer is not an
                         estimator setting, a different sigma_fit is a
                         different estimator (the study set is removed,
-                        D-057 (ii)); D-095: the flags of S (without faint
+                        D-057 (ii)); D-096: the flags of S (without faint
                         and dark) are in the estimator signature, and
                         another S changes both hashes
     test_contract       JSON round trip, frozen dataclasses, ASCII output
@@ -170,16 +170,16 @@ def test_invariants():
     cfg = C.default_config()
     e1 = cfg.estimator_signature()
     assert "sigma_fit_um" in e1["measure"]
-    assert set(e1) == {"acquisition", "measure", "selection"}               # "selection": D-095
+    assert set(e1) == {"acquisition", "measure", "selection"}               # "selection": D-096
     f1 = cfg.full_signature()
     assert set(f1) == {"acquisition", "measure", "selection", "renderer", "phantom", "correction"}
-    # D-095: the flags of S are in the estimator signature, without faint and without dark (labels, D-030, D-095);
+    # D-096: the flags of S are in the estimator signature, without faint and without dark (labels, D-030, D-096);
     # another S changes the estimator and the simulation hashes
     assert e1["selection"] == {"flags": list(C.SELECTION_FLAGS)}
     assert C.SELECTION_FLAGS == ("crossing", "stack_edge", "bbar_few", "profile_nan")
     saved = C.SELECTION_FLAGS
     try:
-        C.SELECTION_FLAGS = ("faint",) + saved                                # the S of before D-095
+        C.SELECTION_FLAGS = ("faint",) + saved                                # the S of before D-096
         old = (cfg.signature_hash("estimator"), cfg.signature_hash("simulation"))
     finally:
         C.SELECTION_FLAGS = saved

@@ -42,8 +42,8 @@ from ..model import geometry, render
 from .node_pipeline import Branch, measure_node
 from .registration import registration_category
 
-# SELECTION_FLAGS: the flags that fail the selection S (Block 6), defined in config.py since D-095 so that they enter
-# the estimator signature. "dark" is a label only since Block 14.1 (D-030), "faint" since D-095 (2026-10-28): such a
+# SELECTION_FLAGS: the flags that fail the selection S (Block 6), defined in config.py since D-096 so that they enter
+# the estimator signature. "dark" is a label only since Block 14.1 (D-030), "faint" since D-096 (2026-10-28): such a
 # node is retained, inverted and keeps the label.
 MAX_RADIUS_REDRAWS = 100000      # a guard: at sd 0.2 um and d 0.2 um a draw is rejected with probability 0.31
 

@@ -102,8 +102,8 @@ def invert_node(d_hat, phi, mu_hat, table, cfg):
 def correct_nodes(results, table, cfg):
     """Inversion of every NodeResult; nodes outside S keep their reasons as flags
     (S: phantoms.reject_reasons; dark and faint are labels, so such nodes are
-    inverted, D-030, D-095). Refuses a table built for another estimator,
-    the flags of S included (procedure s.3.11; D-095)."""
+    inverted, D-030, D-096). Refuses a table built for another estimator,
+    the flags of S included (procedure s.3.11; D-096)."""
     table.check_estimator(cfg)
     out = []
     for res in results:

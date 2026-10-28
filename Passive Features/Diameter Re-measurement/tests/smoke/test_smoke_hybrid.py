@@ -335,7 +335,7 @@ def test_invariants():
 
 def test_contract():
     cfg = default_config()
-    # the default's hashes (Block 21 adds no field); since D-095 (2026-10-28) the flags of S are in the estimator
+    # the default's hashes (Block 21 adds no field); since D-096 (2026-10-28) the flags of S are in the estimator
     # signature: 0508e7ff12f48728 / 0ea5a6d2ec069c68 before it
     assert (cfg.signature_hash("estimator"), cfg.signature_hash("simulation")) == ("59678d4e2aedf2b6", "52aa73e479eb77cf")
     hcfg = dataclasses.replace(cfg, renderer=dataclasses.replace(cfg.renderer, absorption="hybrid"))

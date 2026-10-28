@@ -23,7 +23,7 @@ Checks
                         coordinates
     test_contract       Inversion fields; correct_nodes keeps the selection
                         reasons of nodes outside S, inverts a dark node (D-030:
-                        a label, Block 14.1) and a faint one (D-095: a label)
+                        a label, Block 14.1) and a faint one (D-096: a label)
                         and reads each node's own mu_hat;
                         mu_d_out_of_domain is a label (D-071.4): the node is
                         inverted at the axis' end and keeps its d_tilde;
@@ -34,7 +34,7 @@ Checks
                         without support (off_support), tilt outside the table
                         (flagged and filled, the root kept), missing estimate
                         (d_hat, mu_hat), mismatched estimator signature
-                        (sigma_fit_um; D-095: the flags of S)
+                        (sigma_fit_um; D-096: the flags of S)
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -189,7 +189,7 @@ def test_contract():
                             node(1.05, 0.2, flags=("dark", "steep")), node(1.05, 0.2, flags=("faint", "crossing"))],
                            T, cfg)
     assert isinstance(out[0], IV.Inversion) and abs(out[0].d_tilde_um - 1.0) <= 1e-4 and out[0].flags == ()
-    assert out[1].d_tilde_um == out[0].d_tilde_um and out[1].flags == (), out[1]       # D-095: faint is a label
+    assert out[1].d_tilde_um == out[0].d_tilde_um and out[1].flags == (), out[1]       # D-096: faint is a label
     assert math.isnan(out[2].d_tilde_um) and out[2].flags == ("status:none",)
     assert out[3].d_tilde_um == out[0].d_tilde_um and out[3].flags == (), out[3]       # D-030: dark is a label
     assert math.isnan(out[4].d_tilde_um) and out[4].flags == ("crossing",), out[4]      # a flag of S still fills
@@ -249,7 +249,7 @@ def test_edge_cases():
         pass
     else:
         raise AssertionError("a table must refuse a fit with another estimator")
-    # D-095: a table built under another selection S (here the S of before D-095, with faint) is refused
+    # D-096: a table built under another selection S (here the S of before D-096, with faint) is refused
     saved = C.SELECTION_FLAGS
     try:
         C.SELECTION_FLAGS = ("faint",) + saved
@@ -262,7 +262,7 @@ def test_edge_cases():
     except ValueError:
         pass
     else:
-        raise AssertionError("a table built under another S must be refused (D-095)")
+        raise AssertionError("a table built under another S must be refused (D-096)")
 
 
 # ---------------------------------------------------------------- runner ---

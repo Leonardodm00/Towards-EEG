@@ -1229,7 +1229,7 @@ display(Image(filename=SURVEY + "/s3b/inputs.png"))
 # ====================================================================================================
 # CELL 15: S3c -- ONE DEFOCUS KERNEL CALIBRATED ON NODES POOLED ACROSS CELLS (Block 19; D-088). Needs Cells 0, 1,
 # 11-13. Per aligned cell: the calibration candidates of its node sample (in S, flat, Allen's 2r in a set; no
-# optical-depth cut since D-094, and the flag faint no criterion of S since D-095),
+# optical-depth cut since D-094, and the flag faint no criterion of S since D-096),
 # scanned in a seeded order, at most survey.calib_scans_per_cell (5) per set (the step `calibration`). Then the pool:
 # per set, the cells' scans taken in turn across the cells up to 30, at least 10 for the production kernel (D-088.3),
 # then Cell 7's fit, far-fit and figures on the pooled scans: one kernel (D-088.1). Expect per cell `calibration: n

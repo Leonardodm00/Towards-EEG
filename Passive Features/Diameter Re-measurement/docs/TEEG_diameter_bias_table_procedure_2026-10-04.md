@@ -614,7 +614,7 @@ The table exists only at grid points; this section uses it at a real node.
    failure rate; plus the real-data flags (steep, faint, crossings, stack
    edge). Flagged nodes take values from neighbours on the same branch, or
    Allen's radius if the whole stretch is bad. [superseded in part: `steep`
-   (D-024 (iv)), `dark` (D-030) and `faint` (D-095, 2026-10-28) are labels, not
+   (D-024 (iv)), `dark` (D-030) and `faint` (D-096, 2026-10-28) are labels, not
    fill rules; a node is filled when its fit fails S -- the fit's status, the
    registration, `crossing`, `stack_edge`, `bbar_few`, `profile_nan` -- or the
    inversion flags it (SPEC Block 7)]
