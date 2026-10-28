@@ -11,8 +11,8 @@ branch, at the paths they have in project knowledge:
 
 | Path here | In project knowledge | Copied |
 |---|---|---|
-| `claude/TEEG_diameter_HPC_paths_reference.md` | `claude/` | 2026-10-28, its v10 (the first repository copy) |
-| `TEEG_decisions_and_ideas_log.md` | root | 2026-10-28, its v24 (the diameter chat's status notes on D-085, D-089, D-090) |
+| `claude/TEEG_diameter_HPC_paths_reference.md` | `claude/` | 2026-10-28, its v11 (D-098 on the remote; first copied at v10) |
+| `TEEG_decisions_and_ideas_log.md` | root | 2026-10-28, its v25 (D-098; v24: the status notes on D-085, D-089, D-090) |
 
 A copy here that differs from project knowledge, or from `main`'s copy of the same document, is stale, not a fork:
 re-read the project document and merge.
