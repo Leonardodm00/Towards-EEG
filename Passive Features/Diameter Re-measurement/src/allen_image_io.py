@@ -329,13 +329,42 @@ def verify_coordinate_convention(fetcher, row, probe_px=512):
 SWC_FILE_TYPE_ID = 303941301        # well_known_file_type for the reconstruction
 
 
+def _wkf_name(f):
+    return os.path.basename(str(f.get("path", "")))
+
+
+def _wkf_type(f):
+    try:
+        return int(f.get("well_known_file_type_id"))
+    except (TypeError, ValueError):
+        return None
+
+
+def choose_swc_file(files):
+    """The reconstruction among a NeuronReconstruction's well_known_files, or
+    None (D-098.1, 2026-10-28). A file whose basename contains "marker" (any
+    case) is never taken: some specimens name their marker file
+    *_marker_m.swc, which passes a .swc suffix test and holds comma-separated
+    marker lines, not an SWC (4 of the 51 cells of the S3 selection in Colab,
+    2026-10-28). Among the other files: the first of type SWC_FILE_TYPE_ID,
+    else the first whose path ends in .swc."""
+    rest = [f for f in files if "marker" not in _wkf_name(f).lower()]
+    typed = [f for f in rest if _wkf_type(f) == SWC_FILE_TYPE_ID]
+    if typed:
+        return typed[0]
+    by_suffix = [f for f in rest if _wkf_name(f).lower().endswith(".swc")]
+    return by_suffix[0] if by_suffix else None
+
+
 def fetch_swc(specimen_id, out_dir, overwrite=False):
     """Download the Allen reconstruction SWC for a specimen. Returns the path.
 
     The file is attached to the NeuronReconstruction as a well_known_file and
-    served from /api/v2/well_known_file_download/<id>. Selection is by the .swc
-    path suffix, with the type id as a fallback, because the same
-    NeuronReconstruction also carries a .marker file and a summary .png.
+    served from /api/v2/well_known_file_download/<id>. The same
+    NeuronReconstruction also carries a marker file and a summary .png, so the
+    file is chosen by choose_swc_file (never a "marker" file; the SWC type id
+    first, then the .swc suffix; D-098.1). A file already in out_dir under the
+    chosen name is reused (overwrite=False).
     """
     import requests
     os.makedirs(out_dir, exist_ok=True)
@@ -344,14 +373,11 @@ def fetch_swc(specimen_id, out_dir, overwrite=False):
     if not msg:
         raise RuntimeError("no NeuronReconstruction for specimen %d" % specimen_id)
     files = msg[0].get("well_known_files", [])
-    cand = [f for f in files if str(f.get("path", "")).lower().endswith(".swc")]
-    if not cand:
-        cand = [f for f in files if f.get("well_known_file_type_id") == SWC_FILE_TYPE_ID]
-    if not cand:
-        raise RuntimeError("no .swc among the %d well_known_files for specimen %d: %s"
-                           % (len(files), specimen_id,
-                              [os.path.basename(str(f.get("path"))) for f in files]))
-    wkf = cand[0]
+    wkf = choose_swc_file(files)
+    if wkf is None:
+        raise RuntimeError("no reconstruction SWC (type %d or a .swc path, not a marker file) among the %d "
+                           "well_known_files for specimen %d: %s"
+                           % (SWC_FILE_TYPE_ID, len(files), specimen_id, [_wkf_name(f) for f in files]))
     name = os.path.basename(str(wkf["path"]))
     dest = os.path.join(out_dir, name)
     if os.path.exists(dest) and not overwrite:
