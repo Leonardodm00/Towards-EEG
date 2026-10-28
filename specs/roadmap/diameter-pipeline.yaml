@@ -30,6 +30,12 @@
 # entered as I21 under HR in the same turn (D-091, D-092). T7 stays open (the
 # user's to set).
 #
+# 2026-10-28 (D-099, the user: "Everything now on colab will run on a single
+# pilot cell while the real runs will be on the DaVinci HPC"): S3a-S3c run on
+# davinci as PBS jobs (SPEC Block 16.4: the array diam_survey marks S3a, the
+# pool job diam_survey_pool marks S3b and S3c); Colab keeps every cell on the
+# pilot 529878215 only. The three steps are needs_hpc from now on.
+#
 # 2026-10-27 (table theory chat, the user: "The rest about the Stage 4 has
 # been studied, update the roadmap"): T4 becomes a group of three topics, the
 # split the theory chat made on 2026-10-22 (its commits were never pushed):
@@ -366,33 +372,36 @@ implementation:
     needs_hpc: false
     jobs: []
   - id: S3
-    title: "Phase II on Allen's data (Colab)"
-    summary: "The runs on the real cells that come before the production table (S3 of the plan of 2026-10-20; D-065, D-067): the coverage survey, the simulator's inputs, the kernel calibration on Allen's nodes and the final configuration."
+    title: "Phase II on Allen's data (the pilot in Colab, the survey on davinci)"
+    summary: "The runs on the real cells that come before the production table (S3 of the plan of 2026-10-20; D-065, D-067): the coverage survey, the simulator's inputs, the kernel calibration on Allen's nodes and the final configuration. Since 2026-10-28 (D-099) the survey over the selected cells runs on davinci as PBS jobs (SPEC Block 16.4) and Colab runs every cell on the pilot 529878215 only."
     parent:
     depends_on: []
     needs_theory: []
     needs_hpc: false
   - id: S3a
     title: "Real-cell survey without a table"
-    summary: "Block 13's chain on each selected cell's node sample in Colab (Cell 13): mu_hat d_hat and alpha_hat per bin of d_hat against the phantoms' band, the share inside, and the diameters by layer and class; decides the mu range (D-065, D-059.1, D-085.4-5). The thick-node check is dropped until the renderer is the right one (D-085.6)."
+    summary: "Block 13's chain on each selected cell's node sample -- on davinci, one array task per cell (scripts/pbs/survey_cells.pbs, the nodes step; D-099), the pooled coverage in scripts/pbs/survey_pool.pbs; in Colab on the pilot only (Cell 13): mu_hat d_hat and alpha_hat per bin of d_hat against the phantoms' band, the share inside, and the diameters by layer and class; decides the mu range (D-065, D-059.1, D-085.4-5). The thick-node check is dropped until the renderer is the right one (D-085.6)."
     parent: S3
     depends_on: [G3]
     needs_theory: []
-    needs_hpc: false
+    needs_hpc: true          # the PBS array of scripts/pbs/survey_cells.pbs (D-099)
+    jobs: [diam_survey, scripts/pbs/survey_cells.pbs]
   - id: S3b
     title: "Simulator inputs from the real cells"
-    summary: "Over the selected cells in Colab (Cell 14): d_max as the largest Allen dendrite diameter (D-086), the trace's jitter from the registration offsets (D-085.8), one camera setting (D-085.9) -- suggestions for Cell 8."
+    summary: "Over the selected cells -- on davinci, the radius, registration and camera steps of each array task, pooled by scripts/pbs/survey_pool.pbs (D-099); in Colab on the pilot only (Cell 14): d_max as the largest Allen dendrite diameter (D-086), the trace's jitter from the registration offsets (D-085.8), one camera setting (D-085.9) -- suggestions for Cell 8."
     parent: S3
     depends_on: [G3]
     needs_theory: []
-    needs_hpc: false
+    needs_hpc: true          # pooled by scripts/pbs/survey_pool.pbs (D-099)
+    jobs: [diam_survey_pool, scripts/pbs/survey_pool.pbs]
   - id: S3c
     title: "Kernel calibration on Allen's data"
-    summary: "One defocus kernel calibrated on near- and far-field nodes pooled across cells, 10 to 30 per set (D-088; Cell 15), tested first on the pilot with Cell 7 (D-088.2); the near table to 0.84 um with its anchor and SE, the far slope with its interval, the points and residuals by cell (D-090.2)."
+    summary: "One defocus kernel calibrated on near- and far-field nodes pooled across cells, 10 to 30 per set (D-088) -- the per-cell scans in the array's calibration step, the pooled fit in scripts/pbs/survey_pool.pbs (D-099); in Colab on the pilot only (Cell 15), tested first with Cell 7 (D-088.2); the near table to 0.84 um with its anchor and SE, the far slope with its interval, the points and residuals by cell (D-090.2)."
     parent: S3
     depends_on: [G5]
     needs_theory: [T6]
-    needs_hpc: false
+    needs_hpc: true          # the pooled fit runs in scripts/pbs/survey_pool.pbs (D-099)
+    jobs: [diam_survey_pool, scripts/pbs/survey_pool.pbs]
   - id: S3d
     title: "The final configuration"
     summary: "The decisions of the real-data runs written into config_production.json (Cell 8): the mu range, d_max and the lengths, the jitter, the camera chain, the kernel table and its slope; the production table is built on it alone (D-067.1)."
