@@ -35,6 +35,7 @@
 | 2026-10-28 | v31. Cell 7's calibration nodes are no longer screened by their optical depth ($\hat\alpha \le 0.5$) nor by the flag `faint` (a dip under 6 grey levels) (D-094, the user: "Remove both faint"): flat ($\varphi \le 5°$), in S but for that flag, and isolated remain; S itself keeps the flag. A configuration restores either test (`calibration.node_alpha_check`, `calibration.node_faint_flag_check`). Same cells: re-run Cells 0, 1 and 7 (Cell 15's per-cell candidates follow the same rule). Evidence: `test_smoke_calibration.py` with both switches **[run, sandbox]**; the effect of dark nodes on the near growth in `checks/d094_2026-10-28/` **[run, sandbox]**; not yet re-run on Allen's data. |
 | 2026-10-28 (later) | v32. The flag `faint` is no criterion of S any more (D-096, the user: "we have to correct ALL the nodes regardless the optical depth and the dip"): a faint node is fitted, kept in S and corrected through the table like any other, and keeps `faint` as a label, as `dark` since D-030; the bias table is built on phantoms of every dip depth. The flags of S enter the estimator signature, so the estimator and simulation hashes change (estimator `59678d4e2aedf2b6`, simulation `52aa73e479eb77cf`) and a table or row from before is refused. The pilot CSVs written before keep their old `in_S` column; Cell 7 recomputes its candidates from the flags. [corrects v31's "S itself keeps the flag"] Evidence: the smoke suites **[run, sandbox]**. |
 | 2026-10-28 (later, 2) | v33. D-098 (the user, 15:01: "Let's do this", to the proposals made after the Colab run of Cells 11, 11b and 12): `fetch_swc` never takes Allen's marker file (D-098.1; four cells had failed Cell 12 on it); Cell 12 takes the xy projection of type 'MinimumIntensityProjection - xy', the darkest only when none has that type (D-098.2; on Allen's data the 'MaximumIntensityProjection - xy' is an inverted image, the darker, and misaligned 508305938); Cell 13's coverage recomputes S from each row's columns (D-098.3); Cell 7 draws, as it evaluates each candidate, the patch its background is fitted on with the traced neighbours whose predicted shadows decide `not_isolated` (D-098.4). The run file `notebooks/s3_run_2026-10-27.py` gains Cell 12b (508305938 aligned again) and Cell 13b (the set-aside cells whose overlays look aligned, D-098.5). Measured on 2026-10-28: Cell 11's check 6.6 min for 158 cells, Cell 11b 7.0 min, Cell 12 29.7 min for 51 cells; Cell 13 estimated at one to two days (not measured). The hashes are unchanged. |
+| 2026-10-28 (later, 3) | v34. D-099 (the user, 17:07: "Blocks 13 and 14 are too slow. Let's change approach. Everything now on colab will run on a single pilot cell while the real runs will be on the DaVinci HPC"): the survey over the selected cells runs on davinci as three PBS jobs (`scripts/pbs/survey_prepare.pbs`, the array `survey_cells.pbs` with one task per cell, `survey_pool.pbs`; SPEC Block 16.4; the section "S3 on davinci" below), and every Colab cell runs on the pilot 529878215 only: Cells 11-15 in `survey_pilot/` (`survey/` keeps the run of 2026-10-28), Cell 11 with `cell_pool.py pick` in place of `select`, Cell 13 with 3 nodes per bin (PROVISIONAL). New in the code: the runner's `--task-index` (one row of the selection, a PBS array task's) and `--cache-per-cell` (a crop cache per cell); the run file's Cells 12b and 13b are knobs of the array job (`DIAM_CELLS`, `DIAM_FORCE`, `DIAM_INCLUDE_SET_ASIDE`). Evidence: `test_smoke_survey_pbs.py` (the jobs against stubs), `test_smoke_cell_pool.py`, `test_smoke_cell_alignment.py` **[run, sandbox]**; nothing yet run on davinci (the proxy's reach to api.brain-map.org from a compute node is the first thing the jobs test) **[open]**. |
 
 This runbook covers the real-data steps, in order. Each cell names the line that must **appear** in its output. A missing line means the cell did not get as far as the code that prints it. Each step lists the decisions it feeds; those stay yours. Nothing in these scripts changes the configuration on its own.
 
@@ -753,18 +754,111 @@ Outputs:
 
 Run it on a few stretches first, with `--nodes` (above); the notebook's Cell 10b then runs every dendrite node (the same command without `--nodes`), ~~and Cell 10c runs each σ_fit study table that is on Drive into `cell_sigma<value>/`. No script yet joins the three runs into the `d_tilde_sigma_spread_um` column (SPEC §8): compare the three `nodes_<specimen>.csv` by `node_id`.~~ [corrected 2026-10-21, S2.2: Cell 10c and the column are removed with the σ_fit study, D-057 (ii).]
 
+## S3 on davinci: the survey over the selected cells (Block 16.4)
+
+[added 2026-10-28, v34; D-099. Colab's Cells 11-15 below run on the pilot only since the same decision; the tables under each cell describe the steps, which the jobs run unchanged over the 51 selected cells.]
+
+Three PBS jobs in `scripts/pbs/`, submitted from the workstream directory of the cluster's clone, share `survey_common.sh`. Every knob is a `qsub -v NAME=value,...` variable with a default; a set `CODE`, `ROOT` or `ENV_NAME` (the login shell's) is reported and ignored. The defaults put the survey under the archive root of D-012: `/davinci-1/home/ldellamea/Human Neurons Fitting/diameter_survey/<RUN_TAG>/` (`DIAM_SURVEY`) and the crops under `.../Human Neurons Fitting/allen_cache/<specimen>/` (`DIAM_CACHE`; one folder per cell, so the 51 tasks never write the same file) -- the layout is the assistant's, as the table job's, PROVISIONAL.
+
+| Job | `-N` | What | Walltime | Needs the network |
+|---|---|---|---|---|
+| `survey_prepare.pbs` | `diam_survey_prep` | Cell 11 over the whole pool (`pool`, `check`, `select --require-match`) into `<DIAM_SURVEY>/`, then Cell 11b (`projection_check.py --check <DIAM_PILOT>`, the pilot 529878215 by default, `none` lists only) into `<DIAM_SURVEY>/projections/`; ends with `selection: N cells` and the `qsub -J 0-<N-1>` line to submit next | 2 h (Colab: 0.1 + 6.6 + 0.0 min and 7.0 min) | yes |
+| `survey_cells.pbs` | `diam_survey`, array `-J 0-50` | task $i$ runs row $i$ of `selection.csv` (0-based; `--task-index`) through the steps `DIAM_STEPS` (default `align,nodes,radius,registration,camera,calibration`: Cells 12, 13, 14 and 15's per-cell parts) with its own crop cache (`--cache-per-cell`); resumable: a step with a marker in `<survey>/<cell>/done/` is skipped, so a killed or re-submitted array finishes what is left | 12 h per task, 1 CPU, 4 GB (Colab: about an hour per cell of 120 nodes) | yes |
+| `survey_pool.pbs` | `diam_survey_pool` | `status`, then the pooled analyses (`DIAM_POOL`, default `coverage,inputs,calibration`: Cells 13, 14 and 15's pools; `DIAM_PHANTOM_ROWS` for the phantoms' band), then the archive `<DIAM_SURVEY>/results_<RUN_TAG>.tgz` of `status.csv`, `s3a/`, `s3b/`, `s3c/` and every cell's `align/` and `nodes/` files -- what is read off the cluster | 2 h, 8 GB | no |
+
+Network: the compute nodes reach the outside only through `module load proxy` (`DIAM_PROXY_MODULE`; the H01 reference, section 9 of the paths reference), after which the job runs one RMA query to `api.brain-map.org` (specimen 529878215) before any work and exits 6 if it fails -- a blocked network costs a minute, not a queue wait and a walltime. The first probe job settles whether the proxy reaches Allen's server **[open until run]**.
+
+Exit codes: 2 no scripts under `DIAM_CODE` (submit from the workstream directory); 3 the selection or `DIAM_CONFIG_JSON` missing; 4 a bad `RUN_TAG`, `DIAM_CELLS`, `DIAM_POOL`, `DIAM_PILOT`, a task beyond the selection, or `-J` and `DIAM_N_TASKS` disagreeing; 5 the conda env not active (`python3` not under `envs/spine_env/bin`); 6 `api.brain-map.org` unreachable; 1 the runner or an analysis failed (the pool job runs the other analyses and still writes the archive). The logs land in `$HOME` (`#PBS -k eo`): `diam_survey.o<jobid>.<task>` per task.
+
+The roadmap: the array marks stage S3a and the pool job S3c of `specs/roadmap/diameter-pipeline.yaml` (running, then done or failed) through `specs/roadmap/hpc_status.sh`, which pushes the marker to the branch `hpc-status`; the cluster must be able to push to origin once -- check with `git push --dry-run origin HEAD:refs/heads/hpc-status-probe` from the clone; `ROADMAP_DISABLE=1` in `-v` turns the marker off for one submission, and a failing marker never fails the job.
+
+Procedure, in this order (hpc-git-delivery: verify, dry run, one probe, the array, the pool):
+
+1. Update the clone and verify the bytes on the login node (no allocation needed):
+
+```
+cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/Diameter Re-measurement" && git fetch origin && git checkout sci/diameter-pipeline && git pull --ff-only && git log --oneline -1
+```
+
+```
+python3 - <<'EOF'
+import os, sys
+bad = []
+for root, dirs, files in os.walk("."):
+    dirs[:] = [d for d in dirs if d not in ("__pycache__", ".git")]
+    for f in files:
+        p = os.path.join(root, f)
+        if f.endswith((".sh", ".pbs")) and open(p, "rb").read().count(b"\r"):
+            bad.append(("CRLF", p))
+        if f.endswith(".py") and any(c > 127 for c in open(p, "rb").read()):
+            bad.append(("NON-ASCII", p))
+print(bad or "OK: every .sh/.pbs is LF-only and every .py pure ASCII")
+sys.exit(1 if bad else 0)
+EOF
+```
+
+```
+bash -n scripts/pbs/survey_common.sh scripts/pbs/survey_prepare.pbs scripts/pbs/survey_cells.pbs scripts/pbs/survey_pool.pbs && echo "OK: bash -n" && python3 -m py_compile scripts/survey_cells.py scripts/cell_pool.py scripts/projection_check.py && echo "OK: compiles"
+```
+
+A `CRLF` here means the file was rewritten in transit: `sed -i 's/\r$//' <file>` and check again.
+
+2. Dry runs (they print every command and activate nothing; seconds in the queue):
+
+```
+qsub -v DIAM_DRYRUN=1,RUN_TAG=v1 scripts/pbs/survey_prepare.pbs
+```
+
+Expect in `$HOME/diam_survey_prep.o<jobid>`: the header lines `[diam-survey-prep] code/survey/cache/env/config/pilot` and four `[diam-survey-prep] DRYRUN: python3 scripts/cell_pool.py pool ...`, `... check ...`, `... select ... --require-match ...`, `... projection_check.py ... --check 529878215 ...` lines.
+
+3. The prepare job:
+
+```
+qsub -v RUN_TAG=v1 scripts/pbs/survey_prepare.pbs
+```
+
+Expect `[diam-survey-prep] python /davinci-1/.../envs/spine_env/bin/python3`, `... module proxy loaded (http_proxy http://...)`, **`[diam-survey-prep] api.brain-map.org reachable: specimen 529878215`** (the line that must appear; without it the job exits 6 and names the proxy), then Cell 11's `pool:`, `check:` and `select:` lines and Cell 11b's `[proj]` lines as the runbook gives them, `[diam-survey-prep] selection: 51 cells in .../selection.csv` and `[diam-survey-prep] next: qsub -J 0-50 -v RUN_TAG=v1 scripts/pbs/survey_cells.pbs`. Resumable: a second submission skips the cells already in `acquisition.csv`.
+
+4. One probe task, the alignment of one cell:
+
+```
+qsub -v RUN_TAG=v1,DIAM_STEPS=align scripts/pbs/survey_cells.pbs
+```
+
+(No `-J`: a single job is task 0, row 0 of the selection; PBS Pro may refuse a one-element range such as `-J 0-0`, so the probe does not use one.) Expect in `$HOME/diam_survey.o<jobid>`: `[diam-survey] task 0 of 51 (row 0 of 51)`, the header lines, the python and versions, `[diam-survey] commit <hash>` (the branch head), `[diam-survey] module proxy loaded`, **`[diam-survey] api.brain-map.org reachable: specimen 529878215`**, then the runner's `survey: 1 cells, steps align -> ...`, `[1/1] <id> align: shift (x, y) px, ..., ratio R` and **`[diam-survey] task 0 of 51 (row 0 of 51) done`**. Read the whole `.o` file before going on.
+
+5. The array, with the `-J` the prepare job printed (the default steps; `DIAM_CONFIG_JSON=<path without spaces>` for another node mode or quota):
+
+```
+qsub -J 0-50 -v RUN_TAG=v1 scripts/pbs/survey_cells.pbs
+```
+
+Each task ends with its `... done` line; a task of a set-aside cell prints the runner's `skipped:set_aside` for the later steps and still ends `done`. A failed task (exit 1) is re-run alone by its cell, `qsub -v RUN_TAG=v1,DIAM_CELLS=<id> scripts/pbs/survey_cells.pbs` (no `-J`; the same steps, resumed), or the whole array is re-submitted: it only runs what is left. The run file's Cells 12b and 13b are knobs here: `qsub -v RUN_TAG=v1,DIAM_CELLS=508305938,DIAM_FORCE=align scripts/pbs/survey_cells.pbs` and `qsub -v RUN_TAG=v1,DIAM_CELLS=576084692,596887423,611598198,DIAM_INCLUDE_SET_ASIDE=1 scripts/pbs/survey_cells.pbs` (no `-J`: one job on the named cells; a cell aligned by hand gets its `alignment_manual.json` under `<DIAM_SURVEY>/<id>/align/` first, as Cell 12 describes).
+
+6. The pool, when `qstat -t` shows no task of the array left:
+
+```
+qsub -v RUN_TAG=v1 scripts/pbs/survey_pool.pbs
+```
+
+Expect `[diam-survey-pool] pool coverage`, Cell 13's `coverage:` lines, `pool inputs` and Cell 14's `inputs:` lines, `pool calibration` and Cell 15's pooled lines, then **`[diam-survey-pool] archive .../results_v1.tgz (<size>)`** and `[diam-survey-pool] done`. A `pool <what> FAILED (exit n)` line means that analysis failed; the others ran, the archive is written, the job exits 1. `DIAM_PHANTOM_ROWS="<csv> <csv>"` passes the davinci table's replicate CSVs for the phantoms' own band (paths without spaces).
+
+7. Read the archive off the cluster (MobaXterm's file browser or `scp`, binary mode) and unpack it beside `MyDrive/diameters/survey/` or anywhere else: it holds what Colab's Cells 12-15 printed and wrote, and Cell 8's decisions are made on it. The crops (`allen_cache/<specimen>/`) and the calibration scans stay on the cluster.
+
+What is not settled by the sandbox and the first run settles: the proxy's reach to Allen's server from a compute node, the time per cell and per task on davinci (the 12 h walltime holds Colab's hour per cell with margin), whether the shared archive root tolerates 51 tasks fetching at once (each writes its own folder; Allen's server is the shared resource).
+
 ## Cell 11: S3 across cells, step 0 -- the cell pool, the acquisition check, the selection (Block 16.1)
 
 [added 2026-10-26, v23; D-065, D-085. Needs Cells 0 and 1 only.]
 
+[2026-10-28, v34; D-099: in Colab this cell runs on the pilot 529878215 only, in `survey_pilot/` -- the code below; the steps described after it run unchanged over the selected cells in the davinci jobs (the section above). The notebook's cell of 2026-10-26 ran the whole selection; its last run is `survey/` of 2026-10-28.]
+
 ```python
-SURVEY = OUT + "/survey"
+SURVEY = OUT + "/survey_pilot"     # the pilot's own folder (D-099); survey/ keeps the run of 2026-10-28 over 51 cells
 os.makedirs(SURVEY, exist_ok=True)
 run("scripts/cell_pool.py", "pool", "--out", SURVEY + "/pool.csv")
-run("scripts/cell_pool.py", "check", "--pool", SURVEY + "/pool.csv", "--out", SURVEY + "/acquisition.csv")
-REQUIRE_MATCH = True          # decide after reading the check (D-085.3)
-run("scripts/cell_pool.py", "select", "--pool", SURVEY + "/pool.csv", "--acquisition", SURVEY + "/acquisition.csv",
-    *(["--require-match"] if REQUIRE_MATCH else []), "--out", SURVEY + "/selection.csv")
+run("scripts/cell_pool.py", "pick", "--pool", SURVEY + "/pool.csv", "--cells", SPECIMEN, "--out", SURVEY + "/selection.csv")
+run("scripts/cell_pool.py", "check", "--pool", SURVEY + "/selection.csv", "--out", SURVEY + "/acquisition.csv")
 ```
 
 S3 runs the real-data surveys (S3a-S3d) over many Allen cells instead of 529878215 alone. This cell picks the cells; nothing here measures a node.
@@ -773,6 +867,7 @@ S3 runs the real-data surveys (S3a-S3d) over many Allen cells instead of 5298782
 |---|---|---|
 | `pool` | every row of Allen's `ApiCellTypesSpecimenDetail`, kept when the species is Homo Sapiens and a reconstruction exists (the Allen SDK's own filter, `CellTypesApi.filter_cells_api`); one record per specimen | `survey/pool.csv` |
 | `check` | per pool cell: the plane spacing (`NeuronReconstruction.scale_factor_z`), the pixel size (the Primary planes' `resolution`, µm/px at downsample 0), the usable and failed planes; compared with `acquisition.dz_um` = 0.28 µm and `res0_um` = 0.1144 µm/px at a relative tolerance of 1e-3 (PROVISIONAL) | `survey/acquisition.csv`, `survey/acquisition.json` |
+| `pick` [v34] | the selection records of the named cells (`--cells 529878215`), in that order, each with its class and group `class|layer` (Block 16.1 (e)); Colab's pilot-only Cell 11 uses it, `check` then runs on that one-row file (`check: 1 cells, 0 failed; ...; 1 match the configuration`) | `survey_pilot/selection.csv`, `survey_pilot/selection.json` |
 | `select` | per (class, layer): the cells in increasing specimen id, permuted by `default_rng([20261026, crc32("class|layer")])`, the first 5, or all of a smaller group (D-085.1); with `--require-match`, only the cells whose plane spacing and pixel size match | `survey/selection.csv`, `survey/selection.json` |
 
 Class (D-085.1, D-087): spiny = `exc`, aspiny = `inh` (the mapping PROVISIONAL), sparsely spiny = `sparsely_spiny`, a third class [user, D-087; the name confirmed by the user, D-089]. Cells without a dendrite type have no class: they are listed by `pool` and never selected. Layer: Allen's label as given. [amended 2026-10-26, later, v24: sparsely spiny cells had no class in v23]
@@ -789,8 +884,10 @@ Decisions it feeds: whether the cells whose plane spacing or pixel size differ s
 
 [added 2026-10-27, v29; D-090.1. Needs Cells 0 and 1, and Cell 11's `selection.csv` to list every selected cell (without it, the pilot only).]
 
+[2026-10-28, v34; D-099: in Colab this cell runs on the pilot 529878215 only, in `survey_pilot/` -- the code below; the steps described after it run unchanged over the selected cells in the davinci jobs (the section above). The notebook's cell of 2026-10-26 ran the whole selection; its last run is `survey/` of 2026-10-28.]
+
 ```python
-SURVEY = OUT + "/survey"
+SURVEY = OUT + "/survey_pilot"
 SEL = SURVEY + "/selection.csv"
 run("scripts/projection_check.py", *(["--selection", SEL] if os.path.exists(SEL) else ["--specimens", SPECIMEN]),
     "--check", SPECIMEN, "--cache-dir", CACHE_DIR, "--out-dir", SURVEY + "/projections")
@@ -814,8 +911,10 @@ Decisions it feeds: whether Cell 12's rule stands, and what to do with a non-zer
 
 [added 2026-10-26, v25; D-085.2, D-085.12. Needs Cells 0, 1 and 11.]
 
+[2026-10-28, v34; D-099: in Colab this cell runs on the pilot 529878215 only, in `survey_pilot/` -- the code below; the steps described after it run unchanged over the selected cells in the davinci jobs (the section above). The notebook's cell of 2026-10-26 ran the whole selection; its last run is `survey/` of 2026-10-28.]
+
 ```python
-SURVEY = OUT + "/survey"
+SURVEY = OUT + "/survey_pilot"
 run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
     "--cache-dir", CACHE_DIR, "--steps", "align")
 run("scripts/survey_cells.py", "status", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv")
@@ -853,21 +952,24 @@ Decisions it feeds: which set-aside cells to fix or drop (the threshold, 2, conf
 
 [added 2026-10-26, v26; D-059.1, D-065.1, D-085.4-6, D-087. Needs Cells 0, 1, 11 and 12.]
 
+[2026-10-28, v34; D-099: in Colab this cell runs on the pilot 529878215 only, in `survey_pilot/` -- the code below; the steps described after it run unchanged over the selected cells in the davinci jobs (the section above). The notebook's cell of 2026-10-26 ran the whole selection; its last run is `survey/` of 2026-10-28.]
+
 ```python
 import json
-SURVEY = OUT + "/survey"
+SURVEY = OUT + "/survey_pilot"
 NODES_MODE = "stratified"      # or "all" (D-085.4)
+NODES_PER_BIN = 3              # the Colab pilot's size (D-099, PROVISIONAL): <= 3 x 6 bins = 18 nodes; davinci keeps 20
 PHANTOM_ROWS = []              # e.g. [OUT + "/tables/rows_<hash>_0_1000.csv"]
 CFG_S3 = SURVEY + "/survey_config.json"
 with open(CFG_S3, "w") as f:
-    json.dump({"survey": {"nodes_mode": NODES_MODE}}, f)
+    json.dump({"survey": {"nodes_mode": NODES_MODE, "nodes_per_bin": NODES_PER_BIN}}, f)
 run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
     "--cache-dir", CACHE_DIR, "--steps", "align,nodes", "--config-json", CFG_S3)
 run("scripts/survey_cells.py", "pool", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv",
     "--what", "coverage", "--config-json", CFG_S3, *(["--phantom-rows"] + PHANTOM_ROWS if PHANTOM_ROWS else []))
 ```
 
-(The notebook's cell then shows the four figures.)
+(The notebook's cell then shows the four figures.) [v34] `NODES_PER_BIN = 3` is the Colab pilot's size (PROVISIONAL; at most 18 nodes over the six bins of Allen's 2r, about 10 min at the 30 s per node of 2026-10-28): every coverage bin is then `too_few`, and the cell checks the chain and the pool end to end; the davinci array keeps the default 20 per bin, and its `s3a/` is what decides the mu range.
 
 | Part | What | Who chose it |
 |---|---|---|
@@ -892,13 +994,15 @@ Decisions it feeds: the mu range (D-065.1), with the figures and the failing bin
 
 [added 2026-10-26, v27; D-065.2-3, D-085.8-9, D-086. Needs Cells 0, 1, 11-13.]
 
+[2026-10-28, v34; D-099: in Colab this cell runs on the pilot 529878215 only, in `survey_pilot/` -- the code below; the steps described after it run unchanged over the selected cells in the davinci jobs (the section above). The notebook's cell of 2026-10-26 ran the whole selection; its last run is `survey/` of 2026-10-28.]
+
 ```python
 import json
-SURVEY = OUT + "/survey"
-CFG_S3 = SURVEY + "/survey_config.json"            # Cell 13's (the node mode); written here if Cell 13 did not run
+SURVEY = OUT + "/survey_pilot"
+CFG_S3 = SURVEY + "/survey_config.json"     # Cell 13's (node mode, the pilot's nodes per bin); written if Cell 13 did not run
 if not os.path.exists(CFG_S3):
     with open(CFG_S3, "w") as f:
-        json.dump({"survey": {"nodes_mode": "stratified"}}, f)
+        json.dump({"survey": {"nodes_mode": "stratified", "nodes_per_bin": 3}}, f)
 run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
     "--cache-dir", CACHE_DIR, "--steps", "align,nodes,radius,registration,camera", "--config-json", CFG_S3)
 run("scripts/survey_cells.py", "pool", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv",
@@ -923,13 +1027,15 @@ Decisions it feeds: Cell 8's `phantom.d_range_um`, `jitter_xy_um`, `jitter_z_um`
 
 [added 2026-10-26, v28; D-088 (supersedes D-085.10). Needs Cells 0, 1, 11-13.]
 
+[2026-10-28, v34; D-099: in Colab this cell runs on the pilot 529878215 only, in `survey_pilot/` -- the code below; the steps described after it run unchanged over the selected cells in the davinci jobs (the section above). The notebook's cell of 2026-10-26 ran the whole selection; its last run is `survey/` of 2026-10-28.]
+
 ```python
 import json
-SURVEY = OUT + "/survey"
-CFG_S3 = SURVEY + "/survey_config.json"            # Cell 13's (the node mode); written here if Cell 13 did not run
+SURVEY = OUT + "/survey_pilot"
+CFG_S3 = SURVEY + "/survey_config.json"     # Cell 13's (node mode, the pilot's nodes per bin); written if Cell 13 did not run
 if not os.path.exists(CFG_S3):
     with open(CFG_S3, "w") as f:
-        json.dump({"survey": {"nodes_mode": "stratified"}}, f)
+        json.dump({"survey": {"nodes_mode": "stratified", "nodes_per_bin": 3}}, f)
 run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
     "--cache-dir", CACHE_DIR, "--steps", "align,nodes,calibration", "--config-json", CFG_S3)
 run("scripts/survey_cells.py", "pool", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv",

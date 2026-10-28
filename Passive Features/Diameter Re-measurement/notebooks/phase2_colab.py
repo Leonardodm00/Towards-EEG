@@ -1,6 +1,8 @@
 # Diameter pipeline, Phase II (Colab), specimen 529878215: the cells of notebooks/phase2_colab.ipynb as plain
 # Python. Paste each block between two '# ===== CELL' banners into its own Colab cell and run them in order.
-# Cell 9 runs on davinci, not in Colab: its commands are in the comment block before Cell 10.
+# Cell 9 runs on davinci, not in Colab: its commands are in the comment block before Cell 10. Since 2026-10-28
+# (D-099) Cells 11-15 run on the pilot only (survey_pilot/); the survey over the selected cells is davinci's
+# (scripts/pbs/survey_prepare.pbs, survey_cells.pbs, survey_pool.pbs; runbook, "S3 on davinci").
 # Same code as the notebook and the runbook (2026-10-08). Pure ASCII.
 
 # ====================================================================================================
@@ -1104,44 +1106,39 @@ run("scripts/run_cell.py", "--specimen", SPECIMEN, "--table", TABLE, "--out-dir"
 # ====================================================================================================
 # ===== CELL 11
 # ====================================================================================================
-# CELL 11: S3 ACROSS CELLS -- STEP 0: THE CELL POOL, THE ACQUISITION CHECK, THE SELECTION (Block 16.1; D-085)
-# S3 runs the real-data surveys over many Allen cells, not 529878215 alone (D-065, D-085). This cell needs Cells 0
-# and 1 only. (1) `pool`: every human cell with a reconstruction in Allen's database. Expect `pool: N Homo Sapiens
-# cells with a reconstruction (M rows read, api:...)`, the counts by class and layer (exc = spiny, inh = aspiny,
-# PROVISIONAL; sparsely_spiny = sparsely spiny, a third class, D-087) and the dendrite types left without a class
-# (none expected). A failure that names missing fields prints the keys Allen's rows hold: send them back. A warning
-# `... without an order` means the query needed more than one page: write {"survey": {"pool_page_rows": 50000}}
-# to a JSON file, pass it as --config-json to `pool`, and run the cell again. (2) `check`, over the
-# WHOLE pool first (D-085.3): each cell's
-# plane spacing (NeuronReconstruction.scale_factor_z), pixel size and usable planes; one line per cell, then
-# `check: N cells, k failed; dz (um): {...}; pixel (um): {...}; m match the configuration (dz 0.2800 um, pixel
-# 0.1144 um, ...)`. It resumes where it stopped if Colab disconnects: run the cell again. Send back the summary
-# line and acquisition.json. (3) `select`: 5 cells per neuron class and layer, all of a smaller group (D-085.1),
-# drawn by a seeded permutation. Whether the cells whose plane spacing or pixel size differ stay out is your call on
-# the check's report (D-085.3): set REQUIRE_MATCH. Expect `select: G groups, S cells selected (seed 20261026, 5 per
-# group); left out {...}` and one line per group with its specimen ids.
-SURVEY = OUT + "/survey"
+# Cell 11: S3 step 0 on the pilot -- the pool, the pilot's selection, its acquisition check (Block 16.1)
+# Since 2026-10-28 (D-099) every Colab cell runs on the pilot 529878215 only, in its own folder `survey_pilot/`
+# (`survey/` keeps the run of 2026-10-28 over 51 cells). The run over the selected cells is on davinci since
+# 2026-10-28 (D-099; runbook, section "S3 on davinci"): `scripts/pbs/survey_prepare.pbs`, the array
+# `scripts/pbs/survey_cells.pbs` (one task per cell), `scripts/pbs/survey_pool.pbs`.
+#
+# `pool`: every human cell with a reconstruction (`pool: N Homo Sapiens cells ...`; 0.1 min). `pick`: the pilot's
+# selection record from the pool (Block 16.1 (e); `pick: 1 cells -> .../survey_pilot/selection.csv`). `check` on that
+# one-row file: its plane spacing and pixel size against 0.28 um and 0.1144 um/px (`check: 1 cells, 0 failed; ...;
+# 1 match the configuration`). The stratified selection of 51 cells (`select`) is the prepare job's on davinci.
+#
+# Send back: the `pick:` line and the `check:` summary line.
+SURVEY = OUT + "/survey_pilot"     # the pilot's own folder (D-099); survey/ keeps the run of 2026-10-28 over 51 cells
 os.makedirs(SURVEY, exist_ok=True)
 run("scripts/cell_pool.py", "pool", "--out", SURVEY + "/pool.csv")
-run("scripts/cell_pool.py", "check", "--pool", SURVEY + "/pool.csv", "--out", SURVEY + "/acquisition.csv")
-REQUIRE_MATCH = True          # decide after reading the check (D-085.3)
-run("scripts/cell_pool.py", "select", "--pool", SURVEY + "/pool.csv", "--acquisition", SURVEY + "/acquisition.csv",
-    *(["--require-match"] if REQUIRE_MATCH else []), "--out", SURVEY + "/selection.csv")
+run("scripts/cell_pool.py", "pick", "--pool", SURVEY + "/pool.csv", "--cells", SPECIMEN, "--out", SURVEY + "/selection.csv")
+run("scripts/cell_pool.py", "check", "--pool", SURVEY + "/selection.csv", "--out", SURVEY + "/acquisition.csv")
 
 # ====================================================================================================
 # ===== CELL 11b
 # ====================================================================================================
-# CELL 11B: WHAT ALLEN'S PROJECTIONS ARE (Block 16.3; D-090.1). Needs Cells 0 and 1, and Cell 11's selection.csv
-# (without it, only the pilot is listed). (1) For every selected cell: the SubImages that are not Primary planes, with
-# every field Allen returns; the planes' count and size; the xy projections Cell 12 chooses among and the one its
-# darkest rule takes (two small downloads per cell). (2) For the pilot 529878215 only: on a 59 um window around the
-# soma, each xy projection against the minimum, mean, median and maximum over its ~520 planes -- the best pixel
-# offset, the correlation r*, the verdict: `matches min` is expected for one of them. The pilot's test fetches one
-# 512 x 512 px crop per plane (about 520, a few minutes; cached in CACHE_DIR). Expect per cell `[proj] <id>: N
-# non-Primary SubImages: <id> '<image_type>' WxH; ...` and `... darkest at level 4: <id>`, then for the pilot one
-# line per xy projection `[proj] 529878215: <id> '<type>': matches min -- r* min 0.99.. at (+a, +b); mean ...`.
-# Send back survey/projections/projection_types.csv, projections_529878215.json and projection_check_529878215.png.
-SURVEY = OUT + "/survey"
+# Cell 11b: what Allen's projections are, on the pilot (Block 16.3, D-090.1)
+# The pilot's SubImages that are not Primary planes, with every field Allen returns, the planes' count and size, the xy
+# projections Cell 12 chooses among and the one its rule takes; then each xy projection against the minimum, mean,
+# median and maximum over its ~520 planes on a 59 um window around the soma -- the best pixel offset, r*, the verdict
+# (`matches min` expected for one of them). The ~520 crops are in Drive's cache since the run of 2026-10-28, so this
+# takes a minute; the listing over the selected cells is the prepare job's on davinci.
+#
+# Expect `[proj] 529878215: N non-Primary SubImages: ...`, `... darkest at level 4: <id>` and one
+# `[proj] 529878215: <id> '<type>': matches min -- r* min 0.99.. at (+a, +b); mean ...` line per xy projection.
+#
+# Send back: `survey_pilot/projections/projection_types.csv`, `projections_529878215.json`, `projection_check_529878215.png`.
+SURVEY = OUT + "/survey_pilot"
 SEL = SURVEY + "/selection.csv"
 run("scripts/projection_check.py", *(["--selection", SEL] if os.path.exists(SEL) else ["--specimens", SPECIMEN]),
     "--check", SPECIMEN, "--cache-dir", CACHE_DIR, "--out-dir", SURVEY + "/projections")
@@ -1153,49 +1150,47 @@ if os.path.exists(FIG):
 # ====================================================================================================
 # ===== CELL 12
 # ====================================================================================================
-# CELL 12: S3 ACROSS CELLS -- STEP 1: EVERY SELECTED CELL'S GLOBAL ALIGNMENT (Block 16.2; D-085.2, D-085.12)
-# Needs Cells 0, 1 and 11 (its selection.csv). For each selected cell: the SWC, the minimum-intensity xy projection at
-# level 4, align_translation with both flips (D-085.2), the score ratio against a null of block-shuffled images, then a
-# fine stage at level 1 on the cell's box; one folder per cell under survey/<specimen>/. Expect `survey: S cells,
-# steps align -> ...`, one line per cell `[i/S] <id> align: shift (x, y) px, no flip, ratio R, auto (t s)` -- or
-# `SET ASIDE (reasons)` -- and `survey: align done ... -> .../status.csv`. Resumable: a cell already aligned is
-# skipped, so after a disconnection run the cell again. A SET-ASIDE cell: look at survey/<id>/align/overlay_<id>.png;
-# to align it by hand write survey/<id>/align/alignment_manual.json with {"shift_x_px": .., "shift_y_px": ..,
-# "flip_h_px": null, "z0_um": 0.0} and run again with "--cells", "<id>", "--force", "align". Send back the
-# summary line, status.csv and the overlays of the set-aside cells.
-SURVEY = OUT + "/survey"
+# Cell 12: S3 step 1 on the pilot -- its global alignment (Block 16.2)
+# The xy projection of type 'MinimumIntensityProjection - xy' at level 4 (D-098.2; the darkest only when no SubImage has
+# that type), `align_translation` with both flips, the score ratio R against block-shuffled images, a fine stage at
+# level 1. The pilot's design alignment is no shift and no flip (Cell 0), so expect
+# `[1/1] 529878215 align: shift (x, y) px` with x and y near 0, `no flip`, `ratio R` well above 2, and the overlay with the
+# skeleton on the dendrites. `SET ASIDE` here means the alignment code, not the cell, needs a look: send the overlay.
+# The 51 cells' alignments are the array's `align` step on davinci; a cell to align again there is
+# `qsub -v RUN_TAG=v1,DIAM_CELLS=<id>,DIAM_FORCE=align scripts/pbs/survey_cells.pbs`.
+#
+# Send back: the `align:` line and the overlay.
+SURVEY = OUT + "/survey_pilot"
 run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
     "--cache-dir", CACHE_DIR, "--steps", "align")
 run("scripts/survey_cells.py", "status", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv")
-import glob, json as _json
 from IPython.display import Image, display
-for path in sorted(glob.glob(SURVEY + "/*/align/alignment_*.json")):
-    with open(path) as f:
-        rec = _json.load(f)
-    if rec.get("set_aside"):
-        print("set aside: %s %s" % (rec["specimen_id"], rec["reasons"]))
-        display(Image(filename=path.replace("alignment_", "overlay_").replace(".json", ".png")))
+display(Image(filename="%s/%d/align/overlay_%d.png" % (SURVEY, SPECIMEN, SPECIMEN)))
 
 # ====================================================================================================
 # ===== CELL 13
 # ====================================================================================================
-# CELL 13: S3a -- THE NODE SURVEY ACROSS CELLS AND THE COVERAGE OF THE PHANTOMS' BAND (Block 17; D-065.1, D-085.4-5)
-# Needs Cells 0, 1, 11 and 12. Per aligned cell (set-aside cells are skipped): the node sample -- NODES_MODE
-# "stratified", up to 20 nodes per bin of Allen's 2r spread over the cell's stretches, or "all", every dendrite node
-# (hours per cell) -- measured by Block 13's chain, into survey/<id>/nodes/. Then the pooled coverage: per bin of d_hat,
-# the share of the nodes in S whose mu_hat lies in the phantoms' range (the analytic band of D-065.1), the pass rule
-# of D-085.5 (>= 95 % in every bin with >= 20 nodes), the diameters by layer and class, four figures in survey/s3a/.
-# Expect one line per cell `[i/S] <id> nodes: stratified: n sampled, n measured, k in S (t s)`, then `coverage: ...`,
-# one line per bin and `coverage: PASS ...` or `coverage: FAIL in <bins> ...`. Resumable. To switch NODES_MODE after a
-# run, add "--force", "nodes". PHANTOM_ROWS: optional replicate CSVs of the davinci table (copied to Drive) for the
-# phantoms' own band. Send back the coverage lines, survey/s3a/coverage.json, diameters.csv and the four figures.
+# Cell 13: S3a on the pilot -- the node survey and the coverage of the phantoms' band (Block 17)
+# The pilot's node sample (NODES_MODE "stratified"; NODES_PER_BIN = 3 per bin of Allen's 2r, the Colab pilot's size since
+# D-099, PROVISIONAL -- at most 18 nodes, about 10 min at the 30 s per node measured on 2026-10-28; the davinci array keeps
+# the default 20) measured by Block 13's chain; then the coverage over these nodes: per bin of d_hat the share of nodes in
+# S whose mu_hat lies in the phantoms' range, the pass rule, the diameters by layer and class. With 18 nodes every bin is
+# `too_few` (the rule counts bins of 20 or more): the cell checks the chain and the pool end to end, the numbers that
+# decide the mu range are the davinci run's (`survey_pool.pbs`, `s3a/`).
+#
+# Expect `[1/1] 529878215 nodes: stratified: n sampled, n measured, k in S (t s)` with n <= 18, then `coverage: S
+# recomputed ...`, one `coverage:` line per bin and `coverage: PASS ...` or `coverage: FAIL ...` (or every bin too_few).
+# Resumable: a run with another NODES_PER_BIN needs "--force", "nodes".
+#
+# Send back: the `nodes:` line and the coverage lines.
 import json
-SURVEY = OUT + "/survey"
+SURVEY = OUT + "/survey_pilot"
 NODES_MODE = "stratified"      # or "all" (D-085.4)
+NODES_PER_BIN = 3              # the Colab pilot's size (D-099, PROVISIONAL): <= 3 x 6 bins = 18 nodes; davinci keeps 20
 PHANTOM_ROWS = []              # e.g. [OUT + "/tables/rows_<hash>_0_1000.csv"]
 CFG_S3 = SURVEY + "/survey_config.json"
 with open(CFG_S3, "w") as f:
-    json.dump({"survey": {"nodes_mode": NODES_MODE}}, f)
+    json.dump({"survey": {"nodes_mode": NODES_MODE, "nodes_per_bin": NODES_PER_BIN}}, f)
 run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
     "--cache-dir", CACHE_DIR, "--steps", "align,nodes", "--config-json", CFG_S3)
 run("scripts/survey_cells.py", "pool", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv",
@@ -1208,22 +1203,23 @@ for name in ("coverage_mud", "coverage_share", "coverage_alpha", "diameters"):
 # ====================================================================================================
 # ===== CELL 14
 # ====================================================================================================
-# CELL 14: S3b -- THE SIMULATOR'S INPUTS ACROSS CELLS: d_max, THE NODE JITTER, THE CAMERA (Block 18; D-065.2-3,
-# D-085.8-9, D-086). Needs Cells 0, 1, 11-13. Per aligned cell: Allen's dendrite diameters (radius), the registration
-# survey on list_stretches' suggestion (registration: s* and dz* per node), the camera inputs from the nodes'
-# background (camera). Then the pooled suggestions: d_max = the largest Allen 2r over the cells (D-086), the jitter =
-# the robust SDs of the ON nodes' s* and dz* pooled (D-085.8), one camera setting = the most common JPEG table set and
-# the medians of B and the noise SD (D-085.9). Expect one line per cell and step, then `inputs: d_max ... um (cell,
-# node; p99, p99.5); jitter xy ... um, z ... um; background ... gl, noise SD ... gl, ...` and `inputs: suggestions
-# only (Cell 8 decides)`. A cell flagged z0 has a median dz* above 1 um: its plane origin may be off. These are
-# suggestions: write the ones you accept into Cell 8's DECIDED. Send back the `inputs:` lines, survey/s3b/inputs.json,
-# inputs_per_cell.csv and inputs.png.
+# Cell 14: S3b on the pilot -- d_max, the node jitter, the camera (Block 18)
+# On the pilot's node sample of Cell 13: Allen's dendrite diameters, the registration survey on its suggested stretches,
+# the camera inputs from the nodes' background; then the suggestions over this one cell: d_max = the largest Allen 2r
+# (D-086), the jitter = the robust SDs of the ON nodes' offsets (D-085.8), one camera setting (D-085.9). On one cell of
+# 18 nodes these are a check of the steps, not the suggestions for Cell 8: those come from the davinci run
+# (`survey_pool.pbs`, `s3b/inputs.json`).
+#
+# Expect one `radius:`, `registration:` and `camera:` line for the pilot, then `inputs: d_max ... um (cell, node; p99,
+# p99.5); jitter xy ... um, z ... um; background ... gl, noise SD ... gl` and `inputs: suggestions only (Cell 8 decides)`.
+#
+# Send back: the `inputs:` lines and `survey_pilot/s3b/inputs.png`.
 import json
-SURVEY = OUT + "/survey"
-CFG_S3 = SURVEY + "/survey_config.json"            # Cell 13's (the node mode); written here if Cell 13 did not run
+SURVEY = OUT + "/survey_pilot"
+CFG_S3 = SURVEY + "/survey_config.json"     # Cell 13's (node mode, the pilot's nodes per bin); written if Cell 13 did not run
 if not os.path.exists(CFG_S3):
     with open(CFG_S3, "w") as f:
-        json.dump({"survey": {"nodes_mode": "stratified"}}, f)
+        json.dump({"survey": {"nodes_mode": "stratified", "nodes_per_bin": 3}}, f)
 run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
     "--cache-dir", CACHE_DIR, "--steps", "align,nodes,radius,registration,camera", "--config-json", CFG_S3)
 run("scripts/survey_cells.py", "pool", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv",
@@ -1237,26 +1233,24 @@ display(Image(filename=SURVEY + "/s3b/inputs.png"))
 # ====================================================================================================
 # ===== CELL 15
 # ====================================================================================================
-# CELL 15: S3c -- ONE DEFOCUS KERNEL CALIBRATED ON NODES POOLED ACROSS CELLS (Block 19; D-088). Needs Cells 0, 1,
-# 11-13. Per aligned cell: the calibration candidates of its node sample (in S, flat, Allen's 2r in a set; no
-# optical-depth cut since D-094, and the flag faint no criterion of S since D-096),
-# scanned in a seeded order, at most survey.calib_scans_per_cell (5) per set (the step `calibration`). Then the pool:
-# per set, the cells' scans taken in turn across the cells up to 30, at least 10 for the production kernel (D-088.3),
-# then Cell 7's fit, far-fit and figures on the pooled scans: one kernel (D-088.1). Expect per cell `calibration: n
-# candidates: a near-field, b far-field scans; reasons {...}`, then `pooled near field: k of n scans taken (at most
-# 30) from c cells {...} -- sufficient` (or `INSUFFICIENT`), the same for the far field, Cell 7's fit and far-fit
-# lines and `pool calibration -> .../survey/s3c`. For now the test is Cell 7 on the pilot cell (D-088.2): run this
-# cell when the survey has run. With two cells or more, the near and far points of the kernel law by cell (D-090.2):
-# `by cell: specimen <id> near field: n nodes, m planes used; median residual +x um (IQR ...)` per cell and set,
-# survey/s3c/kernel_law_by_cell.csv, and the figures kernel_law_by_cell.png (one panel coloured by cell up to three
-# cells, one panel per cell beyond) and kernel_law_residuals_by_cell.png. Send back the pooled lines, the fit and
-# far-fit lines, the `by cell:` lines and the figures.
+# Cell 15: S3c on the pilot -- the kernel calibration step and the pool on one cell (Block 19)
+# The pilot's calibration candidates among Cell 13's nodes, scanned in a seeded order, at most 5 per set (D-089.6); then
+# the pool over this one cell: per set the scans taken (up to 30, at least 10 for a production kernel) and Cell 7's fit,
+# far-fit and figures on them. With 18 nodes a set is usually `INSUFFICIENT` (fewer than 10 scans): the cell checks the
+# step and the pool; the pooled kernel across cells is the davinci run's (`survey_pool.pbs`, `s3c/`), and Cell 7 remains
+# the pilot's full calibration (D-088.2).
+#
+# Expect `[1/1] 529878215 calibration: n candidates: a near-field, b far-field scans; ...`, then `pooled near field: k of
+# n scans taken (at most 30) from 1 cells {...} -- sufficient` or `INSUFFICIENT`, the same for the far field, the fit and
+# far-fit reports when a set is sufficient, and `pool calibration -> .../survey_pilot/s3c`.
+#
+# Send back: the `calibration:` line and the pooled lines.
 import json
-SURVEY = OUT + "/survey"
-CFG_S3 = SURVEY + "/survey_config.json"            # Cell 13's (the node mode); written here if Cell 13 did not run
+SURVEY = OUT + "/survey_pilot"
+CFG_S3 = SURVEY + "/survey_config.json"     # Cell 13's (node mode, the pilot's nodes per bin); written if Cell 13 did not run
 if not os.path.exists(CFG_S3):
     with open(CFG_S3, "w") as f:
-        json.dump({"survey": {"nodes_mode": "stratified"}}, f)
+        json.dump({"survey": {"nodes_mode": "stratified", "nodes_per_bin": 3}}, f)
 run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
     "--cache-dir", CACHE_DIR, "--steps", "align,nodes,calibration", "--config-json", CFG_S3)
 run("scripts/survey_cells.py", "pool", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv",
@@ -1301,14 +1295,13 @@ for name in ("width_by_plane_near", "width_by_plane_far", "kernel_law", "kernel_
 # - Cell 5: the `"renderer"` block without the tables, `table_sets`, `pillow_version`, `notes`.
 # - Cell 6: the `pooled dendrite diameter` line.
 # - Cell 7: the growth-fit report, the far fit (gamma_hat and its interval) and the width-by-plane figures.
-# - Cell 11 (S3, step 0): the `pool:` and `check:` summary lines, acquisition.json, and the `select:` lines.
-# - Cell 11b (Allen's projections): survey/projections/projection_types.csv, projections_529878215.json and
-# projection_check_529878215.png.
-# - Cell 12 (S3, step 1): the `survey:` summary line, status.csv, and the overlays of the set-aside cells.
-# - Cell 13 (S3a): the coverage lines, survey/s3a/coverage.json, diameters.csv and the four figures.
-# - Cell 14 (S3b): the `inputs:` lines, survey/s3b/inputs.json, inputs_per_cell.csv and inputs.png.
-# - Cell 15 (S3c): the pooled lines, the fit and far-fit lines and the figures in survey/s3c/figures; with two cells
-# or more the `by cell:` lines, survey/s3c/kernel_law_by_cell.csv and the two by-cell figures (D-090.2).
+# - Cells 11-15 on the pilot (since D-099, survey_pilot/): Cell 11 the `pick:` and `check:` lines; Cell 11b
+# survey_pilot/projections/projection_types.csv, projections_529878215.json and projection_check_529878215.png;
+# Cell 12 the `align:` line and the overlay; Cell 13 the `nodes:` line and the coverage lines; Cell 14 the `inputs:`
+# lines and inputs.png; Cell 15 the `calibration:` line and the pooled lines.
+# - The survey over the selected cells (davinci, D-099): results_<RUN_TAG>.tgz of survey_pool.pbs -- status.csv,
+# s3a/ (coverage.json, diameters.csv, the four figures), s3b/ (inputs.json, inputs_per_cell.csv, inputs.png), s3c/
+# (the pooled lines in the job's log, kernel_law_by_cell.csv and the figures), every cell's align/ and nodes/.
 #
 # These decide the open items of SPEC section 8: d_max, the mu range, the jitter amplitudes, the camera fields
 # and the dark-flag threshold.
