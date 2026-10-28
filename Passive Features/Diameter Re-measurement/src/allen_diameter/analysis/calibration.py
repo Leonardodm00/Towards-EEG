@@ -487,7 +487,7 @@ def scan_node(branch, i, provider, cfg, reg=None, scene=None, keep_images=False)
 
 
 def scan_cell(swc, provider, cfg, transform=None, regs=None, candidates=None, log=None, keep_images=False,
-              order_rng=None, max_per_set=None):
+              order_rng=None, max_per_set=None, on_node=None):
     """Plane scans of one cell's calibration nodes, both sets. Every dendrite
     stretch (Block 8) holding a node id of `candidates` (None: every dendrite
     node) is built in the image frame (transform: keyword arguments of
@@ -499,7 +499,10 @@ def scan_cell(swc, provider, cfg, transform=None, regs=None, candidates=None, lo
     max_per_set a node whose set (by Allen's diameter, calibration_set)
     already holds max_per_set scans is not measured, reason set_full.
     Returns a list of (node_id, NodeResult or None, PlaneScan or None,
-    reasons); log, when given, gets one scan_verdict line per node."""
+    reasons); log, when given, gets one scan_verdict line per node; on_node,
+    when given, is called after each measured node as on_node(node_id,
+    branch, index, NodeResult, PlaneScan or None, reasons, scene) -- Cell 7's
+    isolation figure (10.F (5), D-098.4); not for a set_full node."""
     types = cfg.acquisition.dendrite_swc_types
     xyz_img = cell.to_image_um(swc.xyz, cfg.acquisition.res0_um, **(transform or {}))
     scene = cell.cell_scene(swc, types, cfg.acquisition.res0_um, transform)
@@ -528,6 +531,8 @@ def scan_cell(swc, provider, cfg, transform=None, regs=None, candidates=None, lo
         out.append((nid, res, scan, reasons))
         if log is not None:
             log("node %d: %s" % (nid, scan_verdict(scan, reasons)))
+        if on_node is not None:
+            on_node(nid, branch, i, res, scan, reasons, scene)
     return out
 
 

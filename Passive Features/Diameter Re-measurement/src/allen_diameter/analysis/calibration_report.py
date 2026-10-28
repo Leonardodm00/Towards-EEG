@@ -19,6 +19,11 @@ module plotting/calibration_figures.py only draws.
                        window, the status (D-075.2)
   figure_inputs        all of the above for the scans, the calibration file
                        and the far-fit file at hand
+  isolation_view       one candidate's isolation figure (10.F (5), D-098.4):
+                       the patch the background is fitted on, at the pilot's
+                       sharpest plane, its far pixels and planar background,
+                       the traced segments over it with every neighbour's
+                       predicted shadow, the verdict
 
 Pure ASCII, for the cluster (hpc-python-compat).
 """
@@ -29,8 +34,9 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
-from . import calibration
+from . import calibration, calibration_scene
 from .far_field import select_far_planes
+from .node_pipeline import pilot_view
 from ..model.kernel import sigma_r
 
 
@@ -299,3 +305,71 @@ def figure_inputs(scans, cfg, calib=None, far_fit=None, patches=None):
                 kernel_law=kernel_law_inputs(scans, cfg, calib, far_fit),
                 examples={w: example_inputs(scans, w, patches, cfg, calib, far_fit) for w in stages if stages[w]},
                 gaussians=[g for g in (gaussian_inputs(sc) for sc in scans) if g is not None])
+
+
+def isolation_view(branch, i, node, scene, provider, cfg, verdict=""):
+    """The arrays of one candidate's isolation figure (10.F (5); D-098.4, the
+    user: "as you evaluate each candidate also plot the image of the patch
+    that will be evaluated for the Background (the one that triggers the
+    non_isolated flag)"). branch, i: the candidate's Branch and index; node:
+    its NodeResult (scan_node's pilot; read through pilot_view, as
+    calibration_reasons reads it); scene: the cell's Scene; provider: the
+    fetch_zblock contract (one call: the patch at one plane, a cache hit for a
+    scanned node); verdict: the log phrase (calibration.scan_verdict).
+
+    The patch is the +-patch_half_um square about the pilot's centre (10.P),
+    shown at the pilot's sharpest plane k* (the SWC node's plane when the
+    pilot has none); its far pixels and planar background at that plane are
+    patch_planes' own. Every traced neighbour's shadow is isolation_breakdown's
+    over the stage's planes (k* +- offsets_planes near, +- far_offsets_planes
+    far) with the pilot's B_bar and mu -- the numbers behind not_isolated --
+    evaluated, as trace_reasons does, only when the pilot has a sharpest
+    plane and finite B_bar and mu. Returns None when the pilot's centre is
+    not finite (no patch). Computes nothing new: the figure draws what the
+    selection used."""
+    cal, dz, p = cfg.calibration, cfg.acquisition.dz_um, cfg.acquisition.res0_um
+    v = pilot_view(node)
+    if not (math.isfinite(float(v.cx_um)) and math.isfinite(float(v.cy_um))):
+        return None
+    allen_d = 2.0 * float(branch.radius_um[i])
+    which = calibration.calibration_set(allen_d, cfg) or "near"
+    has_plane = math.isfinite(float(v.z_sub_um))
+    k_view = int(v.k_star) if has_plane else int(round(float(branch.xyz_um[i, 2]) / dz))
+    patch = calibration_scene.fetch_patch(provider, v.cx_um, v.cy_um, cal.patch_half_um, k_view, k_view, p)
+    block, ks, valid, frame = patch
+    image = np.asarray(block[0])
+    # the masks of the whole stage, as the scan computes them (the soma's blur is the stage's largest offset), of
+    # which plane k* is the one fetched: its far pixels and background are the scan's own at k*
+    kk = calibration.stage_planes(v, cfg, which) if has_plane else np.array([k_view])
+    _idx, far_all, b_all, ok_all, frame = calibration.patch_planes(patch, kk, v, branch, scene, cfg)
+    q = int(np.flatnonzero(kk == k_view)[0])
+    far, b, ok = far_all[q:q + 1], b_all[q:q + 1], ok_all[q:q + 1]
+    evaluated = has_plane and all(math.isfinite(float(x)) for x in (v.B_bar, v.mu_hat_per_um))
+    parts = []
+    if evaluated:
+        planes_z = kk * dz
+        parts = calibration_scene.isolation_breakdown(branch, i, scene, v.cx_um, v.cy_um, cal.patch_half_um,
+                                                      planes_z, v.B_bar, v.mu_hat_per_um, cfg)
+    rows, seg_index = calibration_scene.segment_rows(scene, frame, image.shape, branch, 0.0, return_index=True)
+    by_q = {r["index"]: r["depth_gl"] for r in parts if r["kind"] == "segment"}
+    seg_depth = np.array([by_q.get(int(q), np.nan) for q in seg_index], dtype=float)
+    soma = np.atleast_2d(np.asarray(scene.soma, dtype=float)).reshape(-1, 3)
+    soma_depth = np.array([next((r["depth_gl"] for r in parts if r["kind"] == "soma" and r["index"] == m), np.nan)
+                           for m in range(soma.shape[0])], dtype=float)
+    worst = None
+    for r in parts:
+        if r["depth_gl"] > (worst["depth_gl"] if worst else 0.0):
+            worst = r
+    thr = float(cal.isolation_depth_gl)
+    offenders = sorted((r for r in parts if r["depth_gl"] > thr), key=lambda r: -r["depth_gl"])
+    return dict(node_id=int(branch.ids[i]), set=which, allen_diameter_um=allen_d, k_view=k_view,
+                plane_rule="k_star" if has_plane else "swc", offsets_planes=int(cal.offsets_planes if which == "near"
+                                                                               else cal.far_offsets_planes),
+                image=image, image_valid=bool(np.asarray(valid)[0]), left=int(frame.left), top=int(frame.top),
+                res_um_px=float(frame.res_um_px), far=np.asarray(far[0], dtype=bool), background=np.asarray(b[0]),
+                background_ok=bool(ok[0]), cx_um=float(v.cx_um), cy_um=float(v.cy_um), theta_rad=float(v.theta_rad),
+                half_um=float(cal.patch_half_um),
+                line_half_um=float(cfg.measure.profile_half_um if which == "near" else cal.far_profile_half_um),
+                seg_rows=rows, seg_depth_gl=seg_depth, soma=soma, soma_depth_gl=soma_depth, threshold_gl=thr,
+                evaluated=bool(evaluated), max_depth_gl=float(worst["depth_gl"]) if worst else 0.0, worst=worst,
+                offenders=offenders, n_neighbours=len(parts), verdict=str(verdict))

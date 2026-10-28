@@ -18,6 +18,12 @@ analysis.calibration_report.figure_inputs; nothing scientific is computed here.
                          per cell beyond
   kernel_law_residuals_by_cell_figure  the residuals from the pooled law, one
                          row per cell, with each cell's median per set
+  isolation_figure       one candidate of Cell 7 (10.F (5), D-098.4): the
+                         patch its background is fitted on, at plane k*, with
+                         the traced segments -- its own branch, and every
+                         neighbour coloured by whether its predicted shadow
+                         exceeds the isolation threshold -- and the far pixels
+  isolation_overview     the candidates' patches as thumbnails, pages of 36
   write_all              the PNG files of a run
 
 Colours: the palette of the project's figures (light grey for the nodes,
@@ -368,6 +374,147 @@ def kernel_law_residuals_by_cell_figure(kc, title=""):
     ax.set_title(title or "the kernel law's residuals by cell", fontsize=10, loc="left", color=INK)
     fig.tight_layout(rect=(0, min(0.2, 0.24 / (1.5 + 0.42 * n)), 1, 1))
     return fig
+
+
+def _extent(view, shape):
+    p, left, top = float(view["res_um_px"]), int(view["left"]), int(view["top"])
+    H, W = int(shape[0]), int(shape[1])
+    return [(left - 0.5) * p, (left + W - 0.5) * p, (top + H - 0.5) * p, (top - 0.5) * p]
+
+
+def _seg_style(own, depth, thr):
+    """(colour, line width, line style) of a traced segment in the isolation figures."""
+    if own:
+        return BLUE, 1.4, "-"
+    if not np.isfinite(depth):
+        return GREY, 0.9, "--"
+    return (ORANGE, 1.8, "-") if depth > thr else (GREY, 1.0, "-")
+
+
+def _draw_scene(ax, view, thin=False):
+    """The traced segments and soma discs over a patch image (isolation figures)."""
+    thr = float(view["threshold_gl"])
+    scale = 0.6 if thin else 1.0
+    for row, depth in zip(np.atleast_2d(view["seg_rows"]).reshape(-1, 9), view["seg_depth_gl"]):
+        colour, lw, ls = _seg_style(bool(row[8] >= 0.5), float(depth), thr)
+        ax.plot([row[0], row[3]], [row[1], row[4]], ls, color=colour, lw=lw * scale, solid_capstyle="round")
+    import matplotlib.patches as mpatches
+    for (x, y, r), depth in zip(np.atleast_2d(view["soma"]).reshape(-1, 3), view["soma_depth_gl"]):
+        colour = ORANGE if np.isfinite(depth) and depth > thr else GREY
+        ax.add_patch(mpatches.Circle((x, y), r, fill=False, ec=colour, lw=1.4 * scale))
+    _draw_line(ax, view["cx_um"], view["cy_um"], view["theta_rad"], view["line_half_um"], GREEN)
+    ax.plot([view["cx_um"]], [view["cy_um"]], "+", color=GREEN, ms=6 * scale, mew=1.2)
+
+
+def _gl(x):
+    """A grey-level depth for a label: 3 significant figures without an exponent."""
+    x = float(x)
+    return "%.0f" % x if abs(x) >= 100 else ("%.1f" % x if abs(x) >= 1 else "%.2g" % x)
+
+
+def _isolation_line(view):
+    thr = float(view["threshold_gl"])
+    if not view["evaluated"]:
+        return "isolation not evaluated (the pilot has no sharpest plane, or no finite B_bar or mu)"
+    d = float(view["max_depth_gl"])
+    w = view["worst"]
+    who = "" if w is None else (" (soma, %.1f um from the patch)" % w["rho_um"] if w["kind"] == "soma" else
+                                " (segment %d-%d, %.1f um from the patch)" % (w["child_id"], w["parent_id"], w["rho_um"]))
+    return "isolation: deepest predicted neighbour shadow %s gl%s %s %s gl -> %s" % (
+        _gl(d), who, ">" if d > thr else "<=", _gl(thr), "not_isolated" if d > thr else "isolated")
+
+
+def isolation_figure(view, title=""):
+    """view: calibration_report.isolation_view. (a) the patch at plane k (grey
+    levels) with the node's own branch (blue), each traced neighbour in orange
+    when its predicted shadow in the patch exceeds the threshold over the
+    stage's planes and in grey otherwise (dashed: not evaluated), the soma
+    discs, the measuring line (green); (b) the same image with the pixels
+    that are not far shaded blue -- the far pixels are those the planar
+    background is fitted on. Returns the Figure."""
+    plt = _plt()
+    img = np.asarray(view["image"], dtype=float)
+    ext = _extent(view, img.shape)
+    lo, hi = np.percentile(img, [0.5, 99.8])
+    fig, axes = plt.subplots(1, 2, figsize=(11.5, 6.8), facecolor=SURFACE)
+    for ax in axes:
+        ax.imshow(img, cmap="gray", vmin=lo, vmax=hi if hi > lo else lo + 1, extent=ext, interpolation="nearest")
+        ax.set_xlim(ext[0], ext[1]); ax.set_ylim(ext[2], ext[3])
+        ax.set_xlabel("x (um)", fontsize=8); ax.tick_params(colors=INK2, labelsize=7)
+    axes[0].set_ylabel("y (um)", fontsize=8)
+    _draw_scene(axes[0], view)
+    w = view["worst"]
+    if w is not None and w["kind"] == "segment" and view["evaluated"]:
+        rows = np.atleast_2d(view["seg_rows"]).reshape(-1, 9)
+        hit = [q for q, d in enumerate(view["seg_depth_gl"]) if np.isfinite(d) and d == w["depth_gl"]]
+        if hit:
+            r = rows[hit[0]]
+            mx, my = 0.5 * (r[0] + r[3]), 0.5 * (r[1] + r[4])
+            if ext[0] <= mx <= ext[1] and ext[3] <= my <= ext[2]:
+                axes[0].annotate("%s gl" % _gl(w["depth_gl"]), (mx, my), color=ORANGE, fontsize=8, xytext=(4, 4),
+                                 textcoords="offset points")
+    axes[0].set_title("(a) the patch at plane %s = %d, with the traced segments\n(the test covers the planes "
+                      "k* +- %d)" % ("k*" if view["plane_rule"] == "k_star" else "of the SWC node", view["k_view"],
+                                    view["offsets_planes"]), fontsize=9, loc="left", color=INK)
+    shade = np.zeros(img.shape + (4,))
+    shade[..., 2] = 1.0
+    shade[..., 3] = np.where(np.asarray(view["far"], dtype=bool), 0.0, 0.30)
+    axes[1].imshow(shade, extent=ext, interpolation="nearest")
+    _draw_line(axes[1], view["cx_um"], view["cy_um"], view["theta_rad"], view["line_half_um"], GREEN)
+    frac = float(np.mean(view["far"]))
+    b = np.asarray(view["background"], dtype=float)
+    bg = ("background plane %.1f gl at the centre, slope (%+.3f, %+.3f) gl/um" % (b[0], b[1], b[2])
+          if view["background_ok"] else "too few far pixels: no background")
+    axes[1].set_title("(b) the far pixels (unshaded) the background is fitted on: %.0f %%\n%s"
+                      % (100.0 * frac, bg), fontsize=9, loc="left", color=INK)
+    head = title or "node %d -- %s-field set, Allen 2r %.2f um%s" % (
+        view["node_id"], view["set"], view["allen_diameter_um"], "" if view["image_valid"] else " (plane missing)")
+    fig.suptitle("%s\n%s\n%s" % (head, view["verdict"] or "", _isolation_line(view)), fontsize=10, color=INK,
+                 x=0.01, y=0.985, ha="left", va="top")
+    offenders = view["offenders"][:5]
+    listed = "; ".join(("soma %.1f um away: %s gl" % (o["rho_um"], _gl(o["depth_gl"])) if o["kind"] == "soma" else
+                        "segment %d-%d %.1f um away: %s gl" % (o["child_id"], o["parent_id"], o["rho_um"],
+                                                               _gl(o["depth_gl"])))
+                       for o in offenders)
+    fig.text(0.01, 0.012, "blue: the node's own branch; orange: neighbours whose predicted shadow in the patch exceeds "
+             "%s gl in some plane of k* +- %d (not_isolated); grey: below it (dashed: not evaluated); green: the "
+             "measuring line.%s" % (_gl(view["threshold_gl"]), view["offsets_planes"],
+                                     ("\nabove the threshold: " + listed + (" ..." if len(view["offenders"]) > 5 else ""))
+                                     if listed else ""), fontsize=7.5, color=INK2, va="bottom")
+    fig.subplots_adjust(left=0.06, right=0.98, top=0.80, bottom=0.15, wspace=0.16)
+    return fig
+
+
+def isolation_overview(views, title="", ncols=6, per_page=36):
+    """The candidates' patches (plane k*) as thumbnails with their segments,
+    titled with the node id and the deepest neighbour shadow (orange above
+    the threshold); pages of per_page. Returns the list of Figures."""
+    plt = _plt()
+    figs = []
+    for start in range(0, len(views), per_page):
+        page = views[start:start + per_page]
+        nrow = int(math.ceil(len(page) / float(ncols)))
+        fig, axes = plt.subplots(nrow, ncols, figsize=(2.1 * ncols, 2.3 * nrow + 0.6), facecolor=SURFACE,
+                                 squeeze=False)
+        for ax in axes.ravel():
+            ax.set_axis_off()
+        for ax, view in zip(axes.ravel(), page):
+            img = np.asarray(view["image"], dtype=float)
+            ext = _extent(view, img.shape)
+            lo, hi = np.percentile(img, [0.5, 99.8])
+            ax.imshow(img, cmap="gray", vmin=lo, vmax=hi if hi > lo else lo + 1, extent=ext, interpolation="nearest")
+            _draw_scene(ax, view, thin=True)
+            ax.set_xlim(ext[0], ext[1]); ax.set_ylim(ext[2], ext[3])
+            bad = view["evaluated"] and view["max_depth_gl"] > view["threshold_gl"]
+            label = ("%s gl" % _gl(view["max_depth_gl"])) if view["evaluated"] else "n/e"
+            ax.set_title("%d %s: %s" % (view["node_id"], view["set"], label), fontsize=7,
+                         color=ORANGE if bad else INK)
+        fig.suptitle((title or "candidates' background patches (plane k*): orange = a neighbour's predicted shadow "
+                      "above %s gl (not_isolated)" % _gl(views[0]["threshold_gl"])) + "  [%d-%d of %d]"
+                     % (start + 1, start + len(page), len(views)), fontsize=9, color=INK)
+        fig.tight_layout(rect=(0, 0, 1, 0.96))
+        figs.append(fig)
+    return figs
 
 
 def write_all(scans, calib, far_fit, patches, cfg, out_dir, every_node=True, dpi=150, id_map=None):

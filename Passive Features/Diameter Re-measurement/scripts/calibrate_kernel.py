@@ -14,7 +14,11 @@ specs/SPEC.md (procedure Eq. 4, s.3.4; mathematics Eq. 18, s.3.5; S2b).
              flat and faint by the pilot's columns -- are re-measured, tested
              for straightness and isolation (10.I) and scanned: the near set
              on k* +- 3, the far set on k* +- 16 (Block 15.1) -> one scans
-             JSON holding both sets, and the example nodes' patches .npz
+             JSON holding both sets, and the example nodes' patches .npz;
+             as each candidate is evaluated, the figure of the patch its
+             background is fitted on, with the traced neighbours whose
+             predicted shadows decide not_isolated (10.F (5), D-098.4) ->
+             <figures>/isolation/<set>_node_<id>.png and overview pages
   fit        the near field (10.A): Eq. (4) over the near scans; the kernel
              table sigma_r(delta_m) = sqrt(sigma_r(0)^2 + G(delta_m)) CUT at
              table_max_delta_um = 0.84 um (D-080.1); the anchor sigma_0_hat
@@ -42,6 +46,8 @@ Examples
     # Colab, after run_cell.py wrote nodes_529878215.csv:
     python scripts/calibrate_kernel.py real --specimen 529878215 --nodes-csv out/nodes_529878215.csv \\
         --shift-x 12.3 --shift-y -4.1 --cache-dir /content/drive/MyDrive/allen_cache --out cal/scans_529878215.json
+    # the isolation figures go to cal/figures/isolation/ (--isolation-figures DIR elsewhere, --no-isolation-figures
+    # for none)
 
 Pure ASCII, for the cluster (hpc-python-compat).
 """
@@ -172,6 +178,60 @@ def candidates_from_rows(rows, cfg):
     return out
 
 
+def isolation_dir(a):
+    """Where `real` writes the isolation figures: --isolation-figures, else figures/isolation beside --out; "" with
+    --no-isolation-figures."""
+    if getattr(a, "no_isolation_figures", False):
+        return ""
+    return a.isolation_figures or os.path.join(os.path.dirname(os.path.abspath(a.out)), "figures", "isolation")
+
+
+def isolation_hook(provider, cfg, fig_dir, views, log=print, dpi=110):
+    """scan_cell's on_node for Cell 7 (10.F (5), D-098.4): for each measured candidate, its isolation_view (one
+    patch plane through the provider, from the cache for a scanned node) drawn to <fig_dir>/<set>_node_<id>.png and
+    kept, without its far mask, in views for the overview. A figure that fails is reported and skipped: it must not
+    stop the calibration."""
+    from allen_diameter.analysis import calibration_report
+    from allen_diameter.plotting import calibration_figures
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    os.makedirs(fig_dir, exist_ok=True)
+
+    def hook(nid, branch, i, res, scan, reasons, scene):
+        if res is None:
+            return
+        try:
+            view = calibration_report.isolation_view(branch, i, res, scene, provider, cfg,
+                                                     verdict=calibration.scan_verdict(scan, reasons))
+            if view is None:
+                log("node %d: no isolation figure (the pilot has no centre)" % nid)
+                return
+            fig = calibration_figures.isolation_figure(view)
+            fig.savefig(os.path.join(fig_dir, "%s_node_%d.png" % (view["set"], int(nid))), dpi=dpi,
+                        facecolor=calibration_figures.SURFACE)
+            plt.close(fig)
+            views.append({k: v for k, v in view.items() if k != "far"})
+        except Exception as exc:          # noqa: BLE001 -- a figure must not stop the calibration (logged)
+            log("node %d: isolation figure failed: %s: %s" % (nid, type(exc).__name__, exc))
+    return hook
+
+
+def write_isolation_overview(views, fig_dir, dpi=110):
+    """The overview pages of the isolation figures: <fig_dir>/isolation_overview_<page>.png. Returns the paths."""
+    from allen_diameter.plotting import calibration_figures
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    paths = []
+    for page, fig in enumerate(calibration_figures.isolation_overview(views), start=1):
+        path = os.path.join(fig_dir, "isolation_overview_%d.png" % page)
+        fig.savefig(path, dpi=dpi, facecolor=calibration_figures.SURFACE)
+        plt.close(fig)
+        paths.append(path)
+    return paths
+
+
 def run_real(cfg, a):
     import allen_image_io as aio
     import run_cell
@@ -188,9 +248,11 @@ def run_real(cfg, a):
     t0 = time.perf_counter()
     transform = dict(shift_full_px=(a.shift_x, a.shift_y), flip_y_full_h=a.flip_h, z0_um=a.z0)
     cal = cfg.calibration          # Block 19.1 (D-088.3): a seeded order, at most calib_max_nodes_per_set per set
+    fig_dir, views = isolation_dir(a), []
+    hook = isolation_hook(provider, cfg, fig_dir, views, log=lambda m: print(m, flush=True)) if fig_dir else None
     out = calibration.scan_cell(swc, provider, cfg, transform, regs, cand, log=lambda m: print(m, flush=True),
                                 order_rng=np.random.default_rng([int(cal.calib_order_seed), int(a.specimen)]),
-                                max_per_set=int(cal.calib_max_nodes_per_set))
+                                max_per_set=int(cal.calib_max_nodes_per_set), on_node=hook)
     scans = [s for _, _, s, _ in out if s is not None]
     allen_d = {int(i): 2.0 * float(r) for i, r in zip(swc.ids, swc.radius)}
     nodes = [dict(node_id=int(nid), allen_diameter_um=allen_d[int(nid)] if math.isfinite(allen_d[int(nid)]) else None,
@@ -222,6 +284,12 @@ def run_real(cfg, a):
     if records:
         calibration_io.save_patches(patches_name(a.out), records)
         print("patches -> %s" % patches_name(a.out))
+    if fig_dir:
+        pages = write_isolation_overview(views, fig_dir) if views else []
+        n_bad = sum(1 for v in views if v["evaluated"] and v["max_depth_gl"] > v["threshold_gl"])
+        print("isolation figures: %d candidates (%d with a neighbour's predicted shadow above %.3g gl) -> %s; "
+              "overview %s" % (len(views), n_bad, cal.isolation_depth_gl, fig_dir,
+                               ", ".join(os.path.basename(x) for x in pages) or "none"))
     return a.out
 
 
@@ -380,6 +448,9 @@ def main(argv=None):
     r.add_argument("--flip-h", type=float, default=None)
     r.add_argument("--z0", type=float, default=0.0)
     r.add_argument("--registration-json", default="")
+    r.add_argument("--isolation-figures", default="",
+                   help="folder of the per-candidate isolation figures (10.F (5)); default: figures/isolation beside --out")
+    r.add_argument("--no-isolation-figures", action="store_true", help="draw no isolation figure")
     f = sub.add_parser("fit")
     f.add_argument("--scans", required=True)
     f.add_argument("--sigma-r0", type=float, default=None, help="um; default: the configuration's sigma_r0_um")

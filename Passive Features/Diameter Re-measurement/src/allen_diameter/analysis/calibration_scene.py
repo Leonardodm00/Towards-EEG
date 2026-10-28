@@ -17,6 +17,8 @@ and the far scan (Block 15).
                        through a plane's far pixels, refitted once without the
                        pixels beyond trim_sigmas x 1.4826 MAD
   background_on_line   the plane read at points of the measuring line
+  isolation_breakdown  every traced neighbour's predicted shadow (gl) in the
+                       patch, the deepest over the stage's planes (D-098.4)
   isolation_depth      the deepest shadow (gl) a traced neighbour -- not the
                        node's own branch -- throws into the patch in any of
                        the stage's planes, under the renderer's current law
@@ -66,14 +68,16 @@ def pixel_centres(shape, frame):
     return (frame.left + cols) * p, (frame.top + rows) * p
 
 
-def segment_rows(scene, frame, shape, branch, reach_um):
+def segment_rows(scene, frame, shape, branch, reach_um, return_index=False):
     """(n', 9) float64 rows x0 y0 z0 x1 y1 z1 r0 r1 own of the scene's segments
     whose xy bounding box, grown by reach_um, meets the crop (frame, shape);
     own = 1.0 when both ends' ids are among branch.ids (plane_iteration.
-    scene_segments' rule, with the reach)."""
+    scene_segments' rule, with the reach). return_index: also the rows'
+    indices in the scene's segment arrays (n',) int (2026-10-28, for the
+    isolation figure of 10.F (5))."""
     H, W = int(shape[0]), int(shape[1])
     if scene.seg_xyz.shape[0] == 0:
-        return np.empty((0, 9))
+        return (np.empty((0, 9)), np.empty(0, dtype=int)) if return_index else np.empty((0, 9))
     p = float(frame.res_um_px)
     a, b = scene.seg_xyz[:, :3], scene.seg_xyz[:, 3:]
     g = float(reach_um)
@@ -83,7 +87,8 @@ def segment_rows(scene, frame, shape, branch, reach_um):
              & (np.maximum(a[:, 1], b[:, 1]) >= y_lo) & (np.minimum(a[:, 1], b[:, 1]) <= y_hi))
     in_branch = {int(x) for x in np.asarray(branch.ids).ravel()}
     own = np.array([float(int(c) in in_branch and int(q) in in_branch) for c, q in scene.seg_ids])
-    return np.column_stack([a, b, scene.seg_radius[:, 0], scene.seg_radius[:, 1], own])[meets]
+    rows = np.column_stack([a, b, scene.seg_radius[:, 0], scene.seg_radius[:, 1], own])[meets]
+    return (rows, np.flatnonzero(meets)) if return_index else rows
 
 
 def segment_margins(rows, planes_z, n_sigma, rcfg):
@@ -208,21 +213,25 @@ def shadow_depth(rho, r, mu, sigma, B):
     return float(B * r * np.sum(w * deficit * g))
 
 
-def isolation_depth(branch, index, scene, cx, cy, half_um, planes_z, B_bar, mu, cfg):
-    """(max depth gl, worst id): the deepest shadow a traced neighbour throws
-    into the node's +-half_um patch in any plane of planes_z (10.I, D-081.1).
-    Neighbours: the scene's segments with at least one end off branch.ids
-    (the node's own branch is excluded) and the soma discs; a segment's
-    radius is the larger of its ends', its defocus from plane k is tried at
-    both ends' depths; a soma disc is a tube of radius r_s at the blur of the
-    stage's largest offset. B_bar and mu are the pilot's. Returns (0.0, None)
-    when nothing is traced near the patch."""
+def isolation_breakdown(branch, index, scene, cx, cy, half_um, planes_z, B_bar, mu, cfg):
+    """Every traced neighbour's predicted shadow in the node's +-half_um patch
+    (10.I, D-081.1), one dict per neighbour in the scene's order -- the
+    segments not of the node's own branch, then the soma discs: kind
+    ("segment" or "soma"), index (in scene.seg_xyz or scene.soma), child_id
+    and parent_id (None for a soma), rho_um (lateral distance to the patch
+    square, 0 when it crosses it), r_um, depth_gl (the deepest over the
+    planes of planes_z; 0.0 when the neighbour lies beyond 6 sigma of the
+    patch in every plane). A segment's radius is the larger of its ends', its
+    defocus from plane k is tried at both ends' depths; a soma disc is a
+    tube of radius r_s at the blur of the stage's largest offset. B_bar and
+    mu are the pilot's. isolation_depth is the deepest of these; the figure
+    of 10.F (5) draws them (D-098.4)."""
     rc = cfg.renderer
     z = np.asarray(planes_z, dtype=float).reshape(-1)
     lo = np.array([cx - half_um, cy - half_um])
     hi = np.array([cx + half_um, cy + half_um])
     in_branch = {int(x) for x in np.asarray(branch.ids).ravel()}
-    worst, worst_id = 0.0, None
+    out = []
     for q in range(scene.seg_xyz.shape[0]):
         c_id, p_id = int(scene.seg_ids[q, 0]), int(scene.seg_ids[q, 1])
         if c_id in in_branch and p_id in in_branch:
@@ -236,15 +245,28 @@ def isolation_depth(branch, index, scene, cx, cy, half_um, planes_z, B_bar, mu, 
                 if rho > r + 6.0 * s:            # the Gaussian beyond 6 sigma: below 1e-8 of the dip
                     continue
                 depth = max(depth, shadow_depth(rho, r, mu, s, B_bar))
-        if depth > worst:
-            worst, worst_id = depth, c_id
+        out.append(dict(kind="segment", index=int(q), child_id=c_id, parent_id=p_id, rho_um=float(rho), r_um=r,
+                        depth_gl=float(depth)))
     span = 0.5 * (z.max() - z.min()) if z.size > 1 else 0.0
     sig_soma = float(sigma_r(span, rc))
-    for x, y, r in np.atleast_2d(np.asarray(scene.soma, dtype=float)).reshape(-1, 3):
+    for m, (x, y, r) in enumerate(np.atleast_2d(np.asarray(scene.soma, dtype=float)).reshape(-1, 3)):
         rho = float(np.hypot(*(np.clip([x, y], lo, hi) - np.array([x, y]))))
         depth = shadow_depth(rho, float(r), mu, sig_soma, B_bar)
-        if depth > worst:
-            worst, worst_id = depth, "soma"
+        out.append(dict(kind="soma", index=int(m), child_id=None, parent_id=None, rho_um=rho, r_um=float(r),
+                        depth_gl=float(depth)))
+    return out
+
+
+def isolation_depth(branch, index, scene, cx, cy, half_um, planes_z, B_bar, mu, cfg):
+    """(max depth gl, worst id): the deepest shadow a traced neighbour throws
+    into the node's +-half_um patch in any plane of planes_z (10.I, D-081.1)
+    -- the deepest of isolation_breakdown's, the first in its order on a tie;
+    the id is the segment's child id or "soma". Returns (0.0, None) when
+    nothing is traced near the patch."""
+    worst, worst_id = 0.0, None
+    for rec in isolation_breakdown(branch, index, scene, cx, cy, half_um, planes_z, B_bar, mu, cfg):
+        if rec["depth_gl"] > worst:
+            worst, worst_id = rec["depth_gl"], (rec["child_id"] if rec["kind"] == "segment" else "soma")
     return float(worst), worst_id
 
 
