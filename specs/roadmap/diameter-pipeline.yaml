@@ -30,6 +30,13 @@
 # entered as I21 under HR in the same turn (D-091, D-092). T7 stays open (the
 # user's to set).
 #
+# 2026-10-27 (table theory chat, the user: "The rest about the Stage 4 has
+# been studied, update the roadmap"): T4 becomes a group of three topics, the
+# split the theory chat made on 2026-10-22 (its commits were never pushed):
+# T4.1 the table's design (T4's closed DRAFT carried), T4.2 Step 4, the grid
+# value and its SE (closed: studied), T4.3 Step 5, the cubic read-out and the
+# inversion (studying).
+#
 # Theory status: open | studying | closed  (set with
 #   python specs/roadmap/roadmap.py set --yaml specs/roadmap/diameter-pipeline.yaml T6 closed --decision D-nnn)
 # Implementation stages: block = the SPEC.md block; parent = the group the
@@ -93,15 +100,42 @@ theory:
     status: closed        # DRAFT
     closed_on: 2026-10-06
     decision:
-  - id: T4
+  - id: T4                # a group since 2026-10-27: T4.1-T4.3 below (no status of its own)
     title: "Bias table and correction"
-    summary: "The table design, the local linear estimator and the inversion (SPEC 2.4, procedure Eqs. 1-3, 7, mathematics Eqs. 19-21)."
+    summary: "The table design, the local linear estimator and its SE, the read-out and the inversion (SPEC 2.4, procedure Eqs. 1-3, 7, mathematics Eqs. 19-21)."
     refs: [SPEC 2.4, D-024, D-057, D-058, D-059, D-060, D-061, D-062, D-063, D-071]
     parent: TG3
+    depends_on: []
+  - id: T4.1
+    title: "The table's design"
+    summary: "What the table is built from and what it estimates: G draws x n_real realizations of a phantom cylinder, the target b at the fitted third coordinate ln(mu_hat d_hat), the failure count (D-024, D-057 to D-063.1)."
+    refs: ["SPEC 2.4", D-024, D-057, D-058, D-059, D-060, D-061, D-062, D-063.1]
+    parent: T4
     depends_on: [T2, T3]
-    status: closed        # DRAFT: D-071 settled the [to confirm] items of Block 14
+    status: closed
     closed_on: 2026-10-21
     decision: D-071
+    note: "Carried from T4's closed DRAFT (2026-10-21, D-071 settled the [to confirm] items of Block 14) when T4 was split into T4.1-T4.3 (theory chat, 2026-10-22; applied here 2026-10-27)."
+  - id: T4.2
+    title: "Step 4: the grid value and its SE"
+    summary: "How each grid value is estimated (local linear fit), its bias and its noise at fixed rows, and the SE the table reports: the by-draw sandwich, as Block 14.4 codes it (residuals about the cubic read-out)."
+    refs: [D-063.2, D-063.3, D-067.3, D-071.1, D-071.2, D-071.3, "theory handoff 2026-10-22 s.5-6.1"]
+    parent: T4
+    depends_on: [T4.1]
+    status: closed
+    closed_on: 2026-10-27
+    decision:
+    note: "Studied by the user (theory chat 2026-10-23 to 10-27). Left open, carried in the 2026-10-27 study handoff: 4c in part (few effective draws: the support floor counts rows, not draws), 4d (the CV's choice of c in the table's spread), 4e (a row's ratio and its x3 come from one fit), 4f (rho on the real design)."
+  - id: T4.3
+    title: "Step 5: the cubic read-out and the inversion"
+    summary: "Reading the table between grid points (the tensor cubic spline and the SE read there) and inverting it at a real node: the root, its flags, and the error budget and SE of the corrected diameter."
+    refs: [D-063.4, D-071.4, D5, "10-19 handoff s.5.3", "mathematics Eqs. 20-21", "theory handoff 2026-10-22 s.6.2"]
+    parent: T4
+    depends_on: [T4.2]
+    status: studying
+    closed_on:
+    decision:
+    note: "Being studied (the user, 2026-10-27): what remains is the read-out (vi) and the inversion (vii) of the Stage 4 explanation, with its worked case. Study list and material: TEEG_diameter_table_readout_inversion_study_handoff_2026-10-27.md, sent to the user as a file (project knowledge is full)."
   - id: T5
     title: "Skewed generalized-t kernel and the plane fit"
     summary: "The SGT family, the seven-parameter fit at a plane and the Allen-guided plane iteration (Blocks 12-13)."
@@ -158,7 +192,6 @@ theory:
     status: open
     closed_on:
     decision:
-
 implementation:
   # ---- groups (no block of their own; coloured by their least advanced member)
   - id: G1
