@@ -96,7 +96,7 @@ needed (every statistic demeans). For each fixed theta and every lag k >= 0
 
 ### 2.2 The window statistics (D-028, D-029, D-051)
 
-[2026-10-28: the window start and the subtraction of this section are replaced by D-095 with D-103 -- the per-sample median window per SS sweep and polarity over [-10, 200) ms; per group a single exponential with a free baseline fitted on [5, 200) ms and its point value t_sp = tau_hat ln(|A_hat| / (kappa_tr sigma_SS_hat(c))); t_SS(c) = max(80 ms, max t_sp); 80 ms also the fallback, flagged; that median window subtracted on [t_SS(c), 200). To be rewritten here before the code; open: a failed group and the fallback's trigger.]
+[2026-10-28: the window start and the subtraction of this section are replaced by D-095 with D-103 -- the per-sample median window per SS sweep and polarity over [-10, 200) ms; per group a single exponential with a free baseline fitted on [5, 200) ms and its point value t_sp = tau_hat ln(|A_hat| / (kappa_tr sigma_SS_hat(c))); t_SS(c) = max(80 ms, max t_sp); 80 ms also the fallback, flagged; that median window subtracted on [t_SS(c), 200). To be rewritten here before the code; open: a failed group and the fallback's trigger.] [2026-10-28 (later): D-104 -- the fallback applies when the window [t_SS(c), 200) ms would be shorter than 50 ms (min_window_ms = 50), and with no valid group; a group whose fit fails or that has fewer than 5 windows (min_windows_per_group, PROVISIONAL) is flagged and left out of the maximum.]
 
 For a window x_1..x_n (mV) with mean x_bar and u_j = x_j - x_bar:
 

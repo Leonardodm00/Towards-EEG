@@ -1,0 +1,5 @@
+fallback when the window [t_SS, 200) ms is shorter than 50 ms, i.e. a start later than 150 ms; sigma_SS_hat = 0.0402 mV
+P1 kappa_tr 0.05: fallback from tau_m = 28.4 ms at 113 MOhm (fitted start 150.2 ms), or from R_in = 117 MOhm at tau_m 28.1 ms (fitted start 150.2 ms) PASS
+P1 kappa_tr 0.10: fallback from tau_m = 34.0 ms at 113 MOhm (fitted start 150.2 ms), or from R_in = 234 MOhm at tau_m 28.1 ms (fitted start 150.2 ms) PASS
+P1 kappa_tr 0.20: fallback from tau_m = 43.2 ms at 113 MOhm (fitted start 150.2 ms), or from R_in = 467 MOhm at tau_m 28.1 ms (fitted start 150.2 ms) PASS
+ALL PASS

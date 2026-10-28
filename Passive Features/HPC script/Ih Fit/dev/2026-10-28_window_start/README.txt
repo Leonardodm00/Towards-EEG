@@ -23,6 +23,7 @@ then run any script from this folder with python (numpy, scipy, statsmodels, mat
 | check_sigma_ss.py | sigma_ss_2026-10-28.txt | sigma_SS_hat's make-up: one 10 ms segment's expected variance 87 % fast, 13 % slow (8.5 % of sigma_s^2 visible); median 0.0402 mV +/- 1.1 % across cells at K 63 | ~40 s |
 | check_d095_rc_start.py | d095_rc_start_2026-10-28.txt (+ run1, run2 failed) | D-095's start for a noiseless RC response at kappa_tr 0.1: 130 ms for the fixture (28.1 ms, 113 MOhm); past 190 ms from tau_m ~46 ms; a pre-pulse-level baseline delays the crossing (the previous pulse's tail) | seconds |
 | check_kappa_tr_start.py (added 2026-10-28, later) | kappa_tr_start_2026-10-28.txt | D-103's start against kappa_tr on the same RC test cell: 110.3 / 129.8 / 149.3 ms at kappa_tr 0.2 / 0.1 / 0.05 (fitted; analytic within 0.5 ms); halving kappa_tr delays the start by tau_m ln 2; the start reaches 190 ms from tau_m 61.4 / 46.5 / 38.1 ms (113 MOhm) | seconds |
+| check_fallback_window.py (added 2026-10-28, later) | fallback_window_2026-10-28.txt | D-104's fallback (the window [t_SS, 200) ms under 50 ms, a start later than 150 ms) on the same RC test cell: from tau_m 34.0 ms at 113 MOhm or R_in 234 MOhm at 28.1 ms (kappa_tr 0.1); 28.4 ms / 117 MOhm (0.05); 43.2 ms / 467 MOhm (0.2); fitted start within 0.5 ms of 150 ms | seconds |
 | draw_decision_map.py | noise_fit_decision_map.png | schematic of where the 2026-10-23 choices sit in the chain | seconds |
 
 Runs that failed are kept with their outputs, as the explanation reported them (Check by computation: a failed
