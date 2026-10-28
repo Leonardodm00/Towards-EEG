@@ -66,6 +66,9 @@ def scan_to_dict(sc):
             d[k] = {"shape": list(a.shape), "data": _list(a)}
     if sc.v_um is not None:
         d["v_um"] = _list(sc.v_um)
+    if sc.stripe is not None:                      # Block 10.S: one info dict per plane, plain JSON values
+        d["stripe"] = [{k: (float(v) if isinstance(v, (float, np.floating)) else v) for k, v in info.items()}
+                       for info in sc.stripe]
     return d
 
 
@@ -83,6 +86,8 @@ def scan_from_dict(d):
             kw[k] = _array(d[k]["data"]).reshape(d[k]["shape"])
     if d.get("v_um") is not None:
         kw["v_um"] = _array(d["v_um"])
+    if d.get("stripe") is not None:
+        kw["stripe"] = tuple(dict(x) for x in d["stripe"])
     return PlaneScan(int(d["node_id"]), *(nan if d[k] is None else float(d[k]) for k in ("d_hat_um", "phi_rad", "alpha_hat")),
                      int(d["k_star"]), nan if d["z_sub_um"] is None else float(d["z_sub_um"]),
                      np.asarray(d["ks"], dtype=int), *(_array(d[k]) for k in _SCAN_ARRAYS[1:]), tuple(d["status"]),

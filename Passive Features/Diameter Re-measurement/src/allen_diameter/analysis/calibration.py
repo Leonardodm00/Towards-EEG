@@ -207,6 +207,7 @@ class PlaneScan:
     w_gl: Optional[np.ndarray] = None            # (n, n_v) the dip B_hat(line(v)) - I(v)
     bhat_gl: Optional[np.ndarray] = None         # (n, n_v) the background along the line
     images: Optional[dict] = field(default=None, compare=False, repr=False)
+    stripe: Optional[tuple] = None               # (n,) stripe_support's info per plane (Block 10.S), None under "square"
 
     def values(self, statistic):
         if statistic == "gaussian_core_width2":
@@ -236,25 +237,57 @@ def stage_planes(node, cfg, which):
     return np.arange(int(node.k_star) - P, int(node.k_star) + P + 1)
 
 
-def patch_planes(patch, kk, node, branch, scene, cfg):
-    """The per-plane preparation shared by the near and the far scan (10.P):
-    for each plane k of kk, its index in the patch (or None), the far-pixel
-    mask and the planar background. Returns (ks_index (n,) int, -1 when the
-    plane is not in the patch or not valid; far (n, H, W) bool; b (n, 3); ok
-    (n,) bool; frame)."""
-    block, ks, valid, frame = patch
+def support_masks(shape, frame, kk, node, branch, scene, cfg):
+    """The background's support of each plane of kk on a patch of `shape` and
+    `frame` (10.P / 10.S): (support (n, H, W) bool, stripe (n,) tuple of info
+    dicts or None). background_support "square": 10.P's far pixels
+    (far_pixel_mask with far_pixel_sigmas), stripe None. "stripe" (Block
+    10.S, D-101): the pixels no neighbour shades at tau = isolation_depth_gl
+    and the node's own fitted cylinder (d_hat_um) does not shade, cut to the
+    stripe along the measuring line with most clear pixels (stripe_support),
+    plane by plane. The segments considered reach the patch within their
+    radius plus 6 sigma_r at the largest defocus any segment end has from any
+    plane (a deep segment far outside the patch can still shade it)."""
     cal, dz = cfg.calibration, cfg.acquisition.dz_um
-    ks = np.asarray(ks)
     z = np.asarray(kk, dtype=float) * dz
-    H, W = np.shape(block)[1:]
-    # the lateral reach of any segment's margin: its radius plus n_sigma sigma_r at the largest defocus any segment
-    # end has from any scanned plane (a deep segment far outside the patch can still shade it)
+    H, W = int(shape[0]), int(shape[1])
     seg_z = scene.seg_xyz[:, [2, 5]].ravel() if scene.seg_xyz.shape[0] else np.array([float(node.z_sub_um)])
     d_max = float(np.max(np.abs(seg_z[:, None] - z[None, :])))
-    reach = (float(np.max(np.concatenate([scene.seg_radius.ravel(), [0.0]])))
-             + cal.far_pixel_sigmas * float(sigma_r(d_max, cfg.renderer)))
+    r_max = float(np.max(np.concatenate([scene.seg_radius.ravel(), [0.0]])))
+    if cal.background_support == "square":
+        reach = r_max + cal.far_pixel_sigmas * float(sigma_r(d_max, cfg.renderer))
+        rows = calibration_scene.segment_rows(scene, frame, (H, W), branch, reach)
+        return calibration_scene.far_pixel_mask((H, W), frame, rows, scene.soma, z, cfg), None
+    d_own = float(node.d_hat_um)
+    reach = max(r_max, 0.5 * d_own if math.isfinite(d_own) else 0.0) + 6.0 * float(sigma_r(d_max, cfg.renderer))
     rows = calibration_scene.segment_rows(scene, frame, (H, W), branch, reach)
-    far = calibration_scene.far_pixel_mask((H, W), frame, rows, scene.soma, z, cfg)
+    nb, own = calibration_scene.shadow_masks((H, W), frame, rows, scene.soma, z, node.B_bar, node.mu_hat_per_um,
+                                             cfg, d_own)
+    support = np.zeros((z.size, H, W), dtype=bool)
+    infos = []
+    for q in range(z.size):
+        support[q], info = calibration_scene.stripe_support(nb[q], own[q], frame, node.cx_um, node.cy_um,
+                                                            node.theta_rad, cfg)
+        infos.append(info)
+    return support, tuple(infos)
+
+
+def patch_planes(patch, kk, node, branch, scene, cfg):
+    """The per-plane preparation shared by the near and the far scan (10.P,
+    10.S): for each plane k of kk, its index in the patch (or None), the
+    background's support (the far pixels under "square", the stripe under
+    "stripe"; support_masks) and the planar background on it. Returns
+    (ks_index (n,) int, -1 when the plane is not in the patch or not valid;
+    far (n, H, W) bool; b (n, 3); ok (n,) bool; frame; stripe (n,) tuple of
+    info dicts or None). Under "stripe" ok also needs the stripe's own ok
+    (stripe_min_pixels, stripe_min_side_um); under "square" the far fraction
+    background_min_far_frac."""
+    block, ks, valid, frame = patch
+    cal = cfg.calibration
+    ks = np.asarray(ks)
+    H, W = np.shape(block)[1:]
+    far, stripe = support_masks((H, W), frame, kk, node, branch, scene, cfg)
+    min_frac = cal.background_min_far_frac if stripe is None else 0.0
     idx = np.full(len(kk), -1, dtype=int)
     b = np.full((len(kk), 3), np.nan)
     ok = np.zeros(len(kk), dtype=bool)
@@ -263,8 +296,10 @@ def patch_planes(patch, kk, node, branch, scene, cfg):
         if 0 <= i < ks.size and bool(valid[i]):
             idx[q] = i
             b[q], _n, ok[q] = calibration_scene.planar_background(block[i], far[q], frame, node.cx_um, node.cy_um,
-                                                                  cal.background_trim_sigmas, cal.background_min_far_frac)
-    return idx, far, b, ok, frame
+                                                                  cal.background_trim_sigmas, min_frac)
+            if stripe is not None and not stripe[q]["ok"]:
+                ok[q] = False
+    return idx, far, b, ok, frame, stripe
 
 
 def patch_images(patch, idx, far, kk, node):
@@ -302,7 +337,7 @@ def plane_scan(patch, node, branch, scene, cfg, keep_images=False):
     v = profiles.profile_offsets(m)
     kk = stage_planes(node, cfg, "near")
     n = kk.size
-    idx, far, bco, bok, frame = patch_planes(patch, kk, node, branch, scene, cfg)
+    idx, far, bco, bok, frame, stripe = patch_planes(patch, kk, node, branch, scene, cfg)
     names = ("omega_um2", "vw_um2", "area_gl_um", "depth_gl", "B_bar", "se_omega_um2", "amp_gl", "v_c_um", "rms_gl",
              "window_half_um")
     cols = {name: np.full(n, np.nan) for name in names}
@@ -338,7 +373,7 @@ def plane_scan(patch, node, branch, scene, cfg, keep_images=False):
                      cols["area_gl_um"], cols["depth_gl"], cols["B_bar"], tuple(status), "near",
                      cols["se_omega_um2"], cols["amp_gl"], cols["v_c_um"], cols["rms_gl"], n_win, passes,
                      cols["window_half_um"], None, bco, v, w_gl, bhat,
-                     patch_images(patch, idx, far, kk, node) if keep_images else None)
+                     patch_images(patch, idx, far, kk, node) if keep_images else None, stripe)
 
 
 CALIBRATION_SETS = ("near", "far")      # D-067.4: the near-field (thin) set and the far-field set (D-026)
@@ -363,18 +398,24 @@ def calibration_set(allen_diameter_um, cfg):
 def criteria_reasons(phi_rad, alpha_hat, allen_diameter_um, cfg):
     """The calibration criteria other than S, on numbers (D-067.4), in this
     order: Allen's diameter (allen_diameter_missing when it is not finite or
-    <= 0, allen_diameter_out when it is in neither set), flat (phi_rad <=
-    node_phi_max_deg, else not_flat), faint (alpha_hat <= node_alpha_max, else
-    not_faint) -- only when node_alpha_check, off by default (D-094); a NaN
-    fails its criterion. Empty: all met."""
+    <= 0, allen_diameter_out when it is in neither set), flat (phi_rad <= the
+    set's bound: node_phi_max_deg for the near set and a node in neither set,
+    node_phi_max_deg_far for the far set; D-101.1; else not_flat), faint
+    (alpha_hat <= node_alpha_max, else not_faint) -- only when
+    node_alpha_check, off by default (D-094); a NaN fails its criterion.
+    Empty: all met."""
     cal = cfg.calibration
     d = float(allen_diameter_um)
     out = []
+    which = ""
     if not (math.isfinite(d) and d > 0):
         out.append("allen_diameter_missing")
-    elif not calibration_set(d, cfg):
-        out.append("allen_diameter_out")
-    if not float(phi_rad) <= math.radians(cal.node_phi_max_deg):
+    else:
+        which = calibration_set(d, cfg)
+        if not which:
+            out.append("allen_diameter_out")
+    phi_max = cal.node_phi_max_deg_far if which == "far" else cal.node_phi_max_deg
+    if not float(phi_rad) <= math.radians(phi_max):
         out.append("not_flat")
     if cal.node_alpha_check and not float(alpha_hat) <= cal.node_alpha_max:
         out.append("not_faint")
@@ -423,12 +464,31 @@ def trace_reasons(view, cfg, allen_diameter_um, branch, index, scene, planes_z):
             out.append("not_straight")
     if scene is not None and all(math.isfinite(float(x)) for x in (view.cx_um, view.cy_um, view.B_bar,
                                                                     view.mu_hat_per_um)):
-        depth, _who = calibration_scene.isolation_depth(branch, index, scene, view.cx_um, view.cy_um,
-                                                        cal.patch_half_um, planes_z, view.B_bar, view.mu_hat_per_um,
-                                                        cfg)
-        if depth > cal.isolation_depth_gl:
-            out.append("not_isolated")
+        if cal.background_support == "stripe":
+            out += stripe_reasons(view, cfg, branch, index, scene, planes_z)
+        else:
+            depth, _who = calibration_scene.isolation_depth(branch, index, scene, view.cx_um, view.cy_um,
+                                                            cal.patch_half_um, planes_z, view.B_bar,
+                                                            view.mu_hat_per_um, cfg)
+            if depth > cal.isolation_depth_gl:
+                out.append("not_isolated")
     return out
+
+
+def stripe_reasons(view, cfg, branch, index, scene, planes_z):
+    """10.I (vi) under background_support "stripe" (Block 10.S, D-101): the
+    stripe of the plane of planes_z nearest the pilot's depth, computed on the
+    patch's frame without its image (support_masks with patch_frame); the
+    reason "not_isolated:too_few" or "not_isolated:side_short" when it is not
+    ok, else nothing. Returns a list."""
+    cal, p = cfg.calibration, cfg.acquisition.res0_um
+    z = np.asarray(planes_z, dtype=float).reshape(-1)
+    z_star = float(z[int(np.argmin(np.abs(z - float(view.z_sub_um))))]) if math.isfinite(float(view.z_sub_um)) else float(z[z.size // 2])
+    shape, frame = calibration_scene.patch_frame(view.cx_um, view.cy_um, cal.patch_half_um, p)
+    _support, stripe = support_masks(shape, frame, np.array([z_star / cfg.acquisition.dz_um]), view, branch, scene,
+                                     cfg)
+    info = stripe[0]
+    return [] if info["ok"] else ["not_isolated:" + info["reason"]]
 
 
 def calibration_reasons(result, cfg, allen_diameter_um, branch=None, index=None, scene=None, planes_z=None):

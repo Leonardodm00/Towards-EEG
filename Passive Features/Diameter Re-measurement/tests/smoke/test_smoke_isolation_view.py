@@ -29,7 +29,9 @@ Checks
                         closer
     test_contract       the view's keys and shapes; the figure has two
                         panels and writes a PNG; the overview pages hold 36
-                        thumbnails each; Cell 7's hook on the synthetic cell
+                        thumbnails each; under the stripe (D-101) the view
+                        carries the stripe of k*, drawn by the figure and the
+                        overview; Cell 7's hook on the synthetic cell
                         of fixtures_cell.py through scan_cell: one PNG per
                         measured candidate, the soma or the segment joining
                         it to the dendrite the worst neighbour at the
@@ -91,7 +93,11 @@ RAMP = (180.0, 0.4, -0.25)       # gl, gl/um, gl/um: the provider's plane b0 + b
 # --------------------------------------------------------------- helpers ---
 
 def cfg_with(**cal):
+    """The square rule (D-078.1, D-081.1) unless the check says otherwise: these checks are about the figure's
+    contents under it; the stripe (D-101, the default since 2026-10-28) has test_smoke_stripe.py and one check in
+    test_contract below."""
     cfg = default_config()
+    cal = dict({"background_support": "square"}, **cal)
     return dataclasses.replace(cfg, calibration=dataclasses.replace(cfg.calibration, **cal))
 
 
@@ -211,7 +217,7 @@ def test_reference():
     kk = CAL.stage_planes(node, cfg, "near")
     prov, _ = ramp_provider(cfg)
     full = CS.fetch_patch(prov, 0.0, 0.0, HALF, kk[0], kk[-1], cfg.acquisition.res0_um)
-    _idx, far, _b, _ok, _fr = CAL.patch_planes(full, kk, node, br, scene, cfg)
+    _idx, far, _b, _ok, _fr, _st = CAL.patch_planes(full, kk, node, br, scene, cfg)
     q = int(np.flatnonzero(kk == 0)[0])
     assert np.array_equal(view["far"], far[q]) and 0.05 < view["far"].mean() < 1.0, view["far"].mean()
     assert np.array_equal(view["image"], full[0][q])
@@ -251,8 +257,9 @@ def test_contract():
     keys = {"node_id", "set", "allen_diameter_um", "k_view", "plane_rule", "offsets_planes", "image", "image_valid",
             "left", "top", "res_um_px", "far", "background", "background_ok", "cx_um", "cy_um", "theta_rad", "half_um",
             "line_half_um", "seg_rows", "seg_depth_gl", "soma", "soma_depth_gl", "threshold_gl", "evaluated",
-            "max_depth_gl", "worst", "offenders", "n_neighbours", "verdict"}
+            "max_depth_gl", "worst", "offenders", "n_neighbours", "verdict", "support", "stripe"}
     assert keys == set(view), sorted(set(view) ^ keys)
+    assert view["support"] == "square" and view["stripe"] is None
     H, W = view["image"].shape
     assert view["far"].shape == (H, W) and view["far"].dtype == bool and view["seg_rows"].shape[1] == 9
     assert view["seg_depth_gl"].shape == (view["seg_rows"].shape[0],) and view["soma_depth_gl"].shape == (1,)
@@ -272,6 +279,18 @@ def test_contract():
         assert len([a for a in pages[1].axes if a.images]) == 4
         for f in pages:
             plt.close(f)
+        # under the stripe (D-101, the default): the view carries the stripe of plane k*, its mask is the support
+        cfg_s = cfg_with(patch_half_um=HALF, background_support="stripe")
+        view_s = view_of(cfg_s)[0]
+        st = view_s["stripe"]
+        assert view_s["support"] == "stripe" and isinstance(st, dict) and st["n_pixels"] == int(view_s["far"].sum())
+        assert "stripe at k*" in CF._isolation_line(view_s)
+        fig = CF.isolation_figure(view_s)
+        assert "stripe" in fig.axes[1].get_title(loc="left")
+        plt.close(fig)
+        page = CF.isolation_overview([view_s])[0]
+        assert "stripe" in page._suptitle.get_text()
+        plt.close(page)
     # Cell 7's hook through scan_cell on the synthetic cell (fixtures_cell): one figure per measured candidate
     import calibrate_kernel as CK
     import run_cell

@@ -341,9 +341,10 @@ def isolation_view(branch, i, node, scene, provider, cfg, verdict=""):
     # the masks of the whole stage, as the scan computes them (the soma's blur is the stage's largest offset), of
     # which plane k* is the one fetched: its far pixels and background are the scan's own at k*
     kk = calibration.stage_planes(v, cfg, which) if has_plane else np.array([k_view])
-    _idx, far_all, b_all, ok_all, frame = calibration.patch_planes(patch, kk, v, branch, scene, cfg)
+    _idx, far_all, b_all, ok_all, frame, stripe_all = calibration.patch_planes(patch, kk, v, branch, scene, cfg)
     q = int(np.flatnonzero(kk == k_view)[0])
     far, b, ok = far_all[q:q + 1], b_all[q:q + 1], ok_all[q:q + 1]
+    stripe = None if stripe_all is None else dict(stripe_all[q])
     evaluated = has_plane and all(math.isfinite(float(x)) for x in (v.B_bar, v.mu_hat_per_um))
     parts = []
     if evaluated:
@@ -372,4 +373,5 @@ def isolation_view(branch, i, node, scene, provider, cfg, verdict=""):
                 line_half_um=float(cfg.measure.profile_half_um if which == "near" else cal.far_profile_half_um),
                 seg_rows=rows, seg_depth_gl=seg_depth, soma=soma, soma_depth_gl=soma_depth, threshold_gl=thr,
                 evaluated=bool(evaluated), max_depth_gl=float(worst["depth_gl"]) if worst else 0.0, worst=worst,
-                offenders=offenders, n_neighbours=len(parts), verdict=str(verdict))
+                offenders=offenders, n_neighbours=len(parts), verdict=str(verdict),
+                support=str(cal.background_support), stripe=stripe)

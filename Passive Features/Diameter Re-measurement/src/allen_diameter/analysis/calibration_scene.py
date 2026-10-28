@@ -19,6 +19,14 @@ and the far scan (Block 15).
   background_on_line   the plane read at points of the measuring line
   isolation_breakdown  every traced neighbour's predicted shadow (gl) in the
                        patch, the deepest over the stage's planes (D-098.4)
+  shadow_depths        shadow_depth over an array of lateral distances
+  shadow_margin        rho_tau: the lateral distance where a tube's predicted
+                       shadow falls to tau (Block 10.S, D-101.2)
+  shadow_masks         (n, H, W) bool x 2: the pixels each plane's neighbours
+                       shade, and those the node's own fitted cylinder shades
+  stripe_support       the stripe along the measuring line with most clear
+                       pixels, one plane (Block 10.S, D-101.3-4)
+  patch_frame          the patch's shape and frame without fetching it
   isolation_depth      the deepest shadow (gl) a traced neighbour -- not the
                        node's own branch -- throws into the patch in any of
                        the stage's planes, under the renderer's current law
@@ -197,6 +205,32 @@ def _segments_cross(a, b, c, d):
 
 
 _GL = leggauss(16)
+_GL_CACHE = {16: _GL}
+
+
+def _gauss_legendre(r, sigma):
+    """The Gauss-Legendre rule for the tube integral: 16 nodes, more when the
+    blur is narrow against the tube (node spacing about sigma / 3 or finer,
+    so that a Gaussian of SD sigma is resolved on [-r, r]); at most 512."""
+    n = int(min(512, max(16, math.ceil(6.0 * r / max(float(sigma), 1e-6)))))
+    if n not in _GL_CACHE:
+        _GL_CACHE[n] = leggauss(n)
+    return _GL_CACHE[n]
+
+
+def shadow_depths(rho, r, mu, sigma, B):
+    """shadow_depth over an array of lateral distances rho (um): the dip (gl) of
+    a flat tube of radius r (um) and absorption mu (1/um), blurred by a Gaussian
+    of SD sigma (um), B int_{-r}^{r} (1 - exp(-2 mu sqrt(r^2 - v'^2)))
+    phi_sigma(rho - v') dv' (Gauss-Legendre; 16 nodes, more for a blur narrow
+    against the tube, _gauss_legendre), shaped as rho."""
+    x, w = _gauss_legendre(r, sigma)
+    rho = np.asarray(rho, dtype=float)
+    vp = r * x
+    deficit = 1.0 - np.exp(-2.0 * mu * np.sqrt(np.maximum(r * r - vp * vp, 0.0)))
+    s = max(float(sigma), 1e-6)
+    g = np.exp(-0.5 * ((rho[..., None] - vp) / s) ** 2) / (math.sqrt(2.0 * math.pi) * s)
+    return B * r * np.sum(w * deficit * g, axis=-1)
 
 
 def shadow_depth(rho, r, mu, sigma, B):
@@ -205,12 +239,185 @@ def shadow_depth(rho, r, mu, sigma, B):
     its axis: B int_{-r}^{r} (1 - exp(-2 mu sqrt(r^2 - v'^2))) phi_sigma(rho -
     v') dv' (Gauss-Legendre, 16 nodes). Custom: the partition integral of the
     renderer's faint tube in closed quadrature; no library function."""
-    x, w = _GL
-    vp = r * x
-    deficit = 1.0 - np.exp(-2.0 * mu * np.sqrt(np.maximum(r * r - vp * vp, 0.0)))
-    s = max(float(sigma), 1e-6)
-    g = np.exp(-0.5 * ((rho - vp) / s) ** 2) / (math.sqrt(2.0 * math.pi) * s)
-    return float(B * r * np.sum(w * deficit * g))
+    return float(shadow_depths(np.array(float(rho)), r, mu, sigma, B))
+
+
+# ------------------------------------------------------ the stripe (10.S) --
+
+def shadow_margin(r, mu, sigma, B, tau, n_iter=40):
+    """rho_tau (um): the lateral distance at which the predicted shadow of a
+    tube (r, mu, blur sigma, background B) falls to tau (gl), by bisection on
+    [0, r + 6 sigma] -- the shadow decreases with rho >= 0 (a symmetric
+    unimodal deficit blurred by a Gaussian). -1.0 when the shadow is at most
+    tau everywhere (nothing is shaded); r + 6 sigma when it is still above
+    tau there (never, for tau > 0: the Gaussian tail is below 1e-8 of the
+    dip). Block 10.S, D-101.2."""
+    r, s, tau = float(r), max(float(sigma), 1e-6), float(tau)
+    if not (r > 0 and B > 0 and mu > 0):
+        return -1.0
+    hi = r + 6.0 * s
+    # a coarse scan first (robust to the quadrature's ripples), then bisection in the bracketing interval
+    grid = np.linspace(0.0, hi, 257)
+    depth = shadow_depths(grid, r, mu, s, B)
+    below = np.flatnonzero(depth <= tau)
+    if below.size and below[0] == 0:
+        return -1.0
+    if not below.size:
+        return hi
+    lo, hi = float(grid[below[0] - 1]), float(grid[below[0]])
+    for _ in range(int(n_iter)):
+        mid = 0.5 * (lo + hi)
+        if shadow_depth(mid, r, mu, s, B) > tau:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
+
+
+def shadow_masks(shape, frame, rows, soma, planes_z, B_bar, mu, cfg, d_own_um=None, sigma_soma_um=None):
+    """(neighbour (n, H, W) bool, own (n, H, W) bool): the pixels of each plane
+    that a traced neighbour shades -- pixel centres within rho_tau of the
+    segment, rho_tau = shadow_margin at the segment's larger end radius, the
+    wider end's blur sigma_r(delta_q,k), the pilot's B_bar and mu, tau =
+    isolation_depth_gl (Block 10.S, D-101.2) -- and those the node's own
+    branch shades, with the radius max(d_own_um / 2, the end radius): the
+    fitted cylinder (D-101.4; d_own_um None or not finite: Allen's radius).
+    rows: segment_rows (its own column tells the two apart); soma (m, 3) x, y,
+    r, shaded as a tube of radius r_s at sigma_soma_um (default: sigma_r at
+    half the span of planes_z, 10.I's convention). Without a finite positive
+    B_bar and mu (a phantom's node, or a pilot without a fit) the shadow
+    cannot be predicted: the margin is then 10.P's geometric r + far_pixel_
+    sigmas x sigma_r (the same rule for the own branch and the neighbours)."""
+    H, W = int(shape[0]), int(shape[1])
+    px, py = pixel_centres(shape, frame)
+    z = np.asarray(planes_z, dtype=float).reshape(-1)
+    rc, tau = cfg.renderer, float(cfg.calibration.isolation_depth_gl)
+    n_sigma = float(cfg.calibration.far_pixel_sigmas)
+    predicted = all(math.isfinite(float(x)) and float(x) > 0 for x in (B_bar, mu))
+    nb = np.zeros((z.size, H, W), dtype=bool)
+    own = np.zeros((z.size, H, W), dtype=bool)
+    r_own = 0.5 * float(d_own_um) if d_own_um is not None and math.isfinite(float(d_own_um)) and d_own_um > 0 else 0.0
+    rows = np.atleast_2d(np.asarray(rows, dtype=float)).reshape(-1, 9)
+
+    def margin_of(r, sigma):
+        return shadow_margin(r, float(mu), sigma, float(B_bar), tau) if predicted else r + n_sigma * sigma
+
+    for q in range(rows.shape[0]):
+        sg = rows[q]
+        is_own = sg[8] >= 0.5
+        r = max(float(sg[6]), float(sg[7]), r_own if is_own else 0.0)
+        dist = None
+        for k in range(z.size):
+            delta = max(abs(sg[2] - z[k]), abs(sg[5] - z[k]))
+            margin = margin_of(r, float(sigma_r(delta, rc)))
+            if margin < 0:
+                continue
+            if dist is None:
+                dist = background.segment_distance(px, py, sg[0:2], sg[3:5])
+            (own if is_own else nb)[k] |= dist <= margin
+    soma = np.atleast_2d(np.asarray(soma, dtype=float)).reshape(-1, 3)
+    if soma.shape[0]:
+        if sigma_soma_um is None:
+            span = 0.5 * (z.max() - z.min()) if z.size > 1 else 0.0
+            sigma_soma_um = float(sigma_r(span, rc))
+        for x, y, r in soma:
+            margin = margin_of(float(r), float(sigma_soma_um))
+            if margin >= 0:
+                nb |= (np.hypot(px - x, py - y) <= margin)[None]
+    return nb, own
+
+
+def _walk(present, blocked_own, blocked_nb, j0, step, n):
+    """One side of the stripe walk over the columns j0, j0 + step, ... (n of
+    them): (j_own, j_end) -- j_own the first column after the own cylinder,
+    the contiguous block of own-shaded columns about the origin (a column a
+    neighbour shades ends it); j_end the first column at or after j_own that
+    is shaded (by anyone) or absent."""
+    j, taken = j0, 0
+    while taken < n and present[j] and blocked_own[j] and not blocked_nb[j]:
+        j += step
+        taken += 1
+    j_own = j
+    while taken < n and present[j] and not blocked_own[j] and not blocked_nb[j]:
+        j += step
+        taken += 1
+    return j_own, j
+
+
+def stripe_support(neighbour2d, own2d, frame, cx, cy, theta, cfg):
+    """The stripe of one plane (Block 10.S, D-101.3-4): in the measuring line's
+    frame (v along (-sin theta, cos theta), u along (cos theta, sin theta),
+    origin (cx, cy)), for each half-width W of stripe_half_widths_um the band
+    |u| <= W is cut into pixel columns along v; from v = 0 outward on each
+    side the walk passes the columns the own branch shades (to v_own) and
+    goes on to the first column a neighbour or the own branch shades, or the
+    patch's edge (L); the band's clear pixels in the run columns count; the W
+    with most pixels wins (the smaller on a tie). The own cylinder is the
+    contiguous block of own-shaded columns about the origin (_walk). Returns (mask (H, W) bool,
+    info): info = dict(w_um, v_own_minus_um, v_own_plus_um, l_minus_um,
+    l_plus_um, side_minus_um, side_plus_um, n_pixels, ok, reason) with ok when
+    n_pixels >= stripe_min_pixels and both sides' runs >= stripe_min_side_um,
+    reason "" | "too_few" | "side_short"."""
+    cal = cfg.calibration
+    nb = np.asarray(neighbour2d, dtype=bool)
+    ow = np.asarray(own2d, dtype=bool)
+    H, W_ = nb.shape
+    p = float(frame.res_um_px)
+    px, py = pixel_centres(nb.shape, frame)
+    dx, dy = px - float(cx), py - float(cy)
+    nv = np.array([-math.sin(theta), math.cos(theta)])
+    tv = np.array([math.cos(theta), math.sin(theta)])
+    v = dx * nv[0] + dy * nv[1]
+    u = dx * tv[0] + dy * tv[1]
+    col = np.rint(v / p).astype(int)              # pixel columns along the line, 0 at the origin
+    jmin, jmax = int(col.min()), int(col.max())
+    ncol = jmax - jmin + 1
+    clear = ~(nb | ow)
+    best = None
+    for w_um in sorted(float(x) for x in cal.stripe_half_widths_um):
+        band = np.abs(u) <= w_um
+        cj = col[band] - jmin
+        present = np.bincount(cj, minlength=ncol) > 0
+        b_own = np.bincount(cj, weights=ow[band].astype(float), minlength=ncol) > 0
+        b_nb = np.bincount(cj, weights=nb[band].astype(float), minlength=ncol) > 0
+        n_clear = np.bincount(cj, weights=clear[band].astype(float), minlength=ncol)
+        # pad one absent column at each end so the walk stops at the patch's edge
+        present = np.concatenate([[False], present, [False]])
+        b_own = np.concatenate([[False], b_own, [False]])
+        b_nb = np.concatenate([[False], b_nb, [False]])
+        n_clear = np.concatenate([[0.0], n_clear, [0.0]])
+        j0 = -jmin + 1                              # the origin's column in the padded arrays
+        jo_p, je_p = _walk(present, b_own, b_nb, j0, +1, ncol + 1)
+        jo_m, je_m = _walk(present, b_own, b_nb, j0, -1, ncol + 1)
+        run_p = range(jo_p, je_p)                   # columns of the + side's run (origin column included once)
+        run_m = range(je_m + 1, jo_m + 1)
+        cols = set(run_p) | set(run_m)
+        n = float(sum(n_clear[j] for j in cols))
+        info = dict(w_um=w_um, v_own_plus_um=(jo_p - j0) * p, v_own_minus_um=(j0 - jo_m) * p,
+                    l_plus_um=(je_p - j0) * p, l_minus_um=(j0 - je_m) * p,
+                    side_plus_um=(je_p - jo_p) * p, side_minus_um=(jo_m - je_m) * p, n_pixels=int(round(n)),
+                    _cols=cols, _band=band)
+        if best is None or n > best["n_pixels"]:
+            best = info
+    cols, band = best.pop("_cols"), best.pop("_band")
+    mask = band & clear & np.isin(col - jmin + 1, np.fromiter(cols, dtype=int, count=len(cols)))
+    best["n_pixels"] = int(mask.sum())
+    reason = ""
+    if best["n_pixels"] < int(cal.stripe_min_pixels):
+        reason = "too_few"
+    elif min(best["side_plus_um"], best["side_minus_um"]) < float(cal.stripe_min_side_um):
+        reason = "side_short"
+    best["ok"] = reason == ""
+    best["reason"] = reason
+    return mask, best
+
+
+def patch_frame(cx, cy, half_um, res0_um):
+    """((H, W), CropFrame) of the patch about (cx, cy) without fetching it: the
+    frame fetch_patch's provider returns (downsample 0)."""
+    from allen_image_io import CropFrame
+    left, top, width, height = patch_bounds(cx, cy, half_um, res0_um)
+    return (int(height), int(width)), CropFrame(int(left), int(top), 0, float(res0_um))
 
 
 def isolation_breakdown(branch, index, scene, cx, cy, half_um, planes_z, B_bar, mu, cfg):

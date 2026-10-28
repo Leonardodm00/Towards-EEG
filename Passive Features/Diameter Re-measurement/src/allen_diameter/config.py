@@ -45,6 +45,7 @@ from typing import Any, Dict, Tuple
 MU_MODES = ("per_node", "shared_branch", "shared_cell")        # D-023 / D-019 (a)
 BBAR_REGIONS = ("block_masked", "block", "plane_downsampled")  # D-023 / D-018 (a)
 FOCUS_BG_RULES = ("profile_ends_median", "same_as_bbar")       # D-023 / D-018 (c)
+BACKGROUND_SUPPORTS = ("stripe", "square")                      # D-101.3 (Block 10.S) / D-078.1 (10.P)
 FOCUS_RULES = ("gradient_energy", "dip_depth")                 # D-030: gradient energy; dip depth = handoff Eq. 1, comparison
 FOCUS_GRAD_WINDOWS = ("radius_margin", "whole_profile")        # D-030 (provisional default, see MeasureConfig.focus_grad_window)
 ABSORPTIONS = ("partition_vertical", "linear", "ray_world", "hybrid")    # D-024 / procedure s.3.6; "hybrid": Block 21 (D-084, D-092)
@@ -250,7 +251,8 @@ class CalibrationConfig:
 
     node_allen_diameter_max_um: float = 0.6  # source: D-067 (D-067.4, D-061.4), PROVISIONAL: the near-field (thin) set, Allen's diameter 2 r_A <= this (um), scanned up to offsets_planes
     far_field_allen_diameter_um: Tuple[float, float] = (0.6, 0.8)  # source: D-067 (D-067.4, D-026), PROVISIONAL: the far-field set, lo < 2 r_A <= hi (um), for the offsets beyond offsets_planes (its scan is not built)
-    node_phi_max_deg: float = 5.0     # source: D-081.3 [user, 2026-10-23]: flat, both sets, <= 5 deg (was 10, procedure s.3.4); exposed
+    node_phi_max_deg: float = 10.0    # source: D-101.1 [user, 2026-10-28]: flat, the NEAR set, phi <= this (deg); was 5 for both sets (D-081.3), 10 before (procedure s.3.4); exposed
+    node_phi_max_deg_far: float = 15.0  # source: D-101.1 [user, 2026-10-28]: flat, the FAR set, phi <= this (deg): "Far <= 15 while keep the near lower than 10"
     offsets_planes: int = 3           # source: procedure s.3.4 (+-3 planes = +-0.84 um)
     trust_planes: int = 2             # source: procedure s.3.4 (trust beyond +-2 only after a residual check)
     statistic: str = "gaussian_core_width2"  # source: procedure s.3.4 [corrected 2026-10-04]; windowed V as cross-check
@@ -271,7 +273,12 @@ class CalibrationConfig:
     far_pixel_sigmas: float = 3.0            # source: D-078.1 [user]: a far pixel lies beyond r_q + this x sigma_r(delta_q,k) of every traced segment q and of the soma
     background_min_far_frac: float = 0.05    # source: PROVISIONAL (Block 10.P): fewer far pixels than this fraction of the patch -> plane status bg_few
     background_trim_sigmas: float = 3.0      # source: PROVISIONAL (Block 10.P): the plane is refitted once without the pixels beyond this x 1.4826 MAD of the first fit's residuals (untraced debris)
-    isolation_depth_gl: float = 0.03         # source: D-081.1 [user]: a traced neighbour (not the node's own branch) whose predicted shadow reaches the patch deeper than this (gl) in a scanned plane fails the node (not_isolated)
+    isolation_depth_gl: float = 0.03         # source: D-081.1 [user]: a traced neighbour (not the node's own branch) whose predicted shadow reaches the patch deeper than this (gl) in a scanned plane fails the node (not_isolated); D-101.2 [user]: with the stripe, the per-pixel threshold tau -- a pixel is shaded by a segment (the own branch included) whose predicted shadow at it exceeds this
+    # 2026-10-28, D-101 (Block 10.S): the stripe -- the background's support along the measuring line, one per plane
+    background_support: str = "stripe"     # source: D-101.3 [user]: "stripe" (10.S) or "square" (10.P's far mask with far_pixel_sigmas and 10.I's node verdict, D-078.1 / D-081.1)
+    stripe_half_widths_um: Tuple[float, ...] = (1.0, 2.0, 4.0, 8.0, 12.0)  # source: PROVISIONAL (D-101.3, the assistant's grid): the band's half-width W along the dendrite is the one of these with most clear pixels
+    stripe_min_pixels: int = 500             # source: D-101.4 [user, the option accepted]: a plane's stripe needs at least this many clear pixels (about 6.5 um^2)
+    stripe_min_side_um: float = 3.0          # source: D-101.4 [user, the option accepted]: and a clear run of at least this (um) on each side of the own cylinder (the profile's half-length)
     node_straight_check: bool = False        # source: D-093 [user, 2026-10-27]: no straightness test -- the calibration evaluates only the measuring line and flatness (node_phi_max_deg) stays strict; True restores 10.I (v) with the two fields below
     node_straight_half_um: float = 10.0      # source: D-081.3 (proposal accepted), PROVISIONAL: the trace within +-this (um) along the branch must stay near the node's straight line (with node_straight_check)
     node_straight_tol_radii: float = 2.0     # source: D-093 [user]: "relax the straightness as 2 or 4 x r_A" (was 1.0, D-081.3): ... within this x (Allen's diameter / 2) of the line, else not_straight (with node_straight_check)
@@ -453,6 +460,11 @@ class DiameterConfig:
             raise ValueError("calibration: 0 < node_allen_diameter_max_um <= far_field_allen_diameter_um[0] < "
                              "far_field_allen_diameter_um[1], all finite (D-067.4: two disjoint sets of Allen's "
                              "diameter)")
+        _check_in(cal.background_support, BACKGROUND_SUPPORTS, "calibration.background_support")
+        if not (0 <= cal.node_phi_max_deg_far <= 90 and cal.stripe_min_pixels >= 6 and cal.stripe_min_side_um >= 0
+                and len(cal.stripe_half_widths_um) >= 1 and all(w > 0 for w in cal.stripe_half_widths_um)):
+            raise ValueError("calibration: 0 <= node_phi_max_deg_far <= 90, stripe_min_pixels >= 6, stripe_min_side_um >= 0, "
+                             "stripe_half_widths_um non-empty and positive")
         if not (0 <= cal.node_phi_max_deg <= 90 and cal.offsets_planes >= 1
                 and 0 <= cal.trust_planes <= cal.offsets_planes and cal.core_fit_fwhm_factor > 0
                 and cal.node_alpha_max > 0 and isinstance(cal.node_alpha_check, bool)

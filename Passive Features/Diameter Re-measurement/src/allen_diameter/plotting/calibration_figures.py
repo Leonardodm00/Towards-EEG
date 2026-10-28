@@ -420,6 +420,10 @@ def _isolation_line(view):
     w = view["worst"]
     who = "" if w is None else (" (soma, %.1f um from the patch)" % w["rho_um"] if w["kind"] == "soma" else
                                 " (segment %d-%d, %.1f um from the patch)" % (w["child_id"], w["parent_id"], w["rho_um"]))
+    st = view.get("stripe")
+    if st is not None:
+        return "stripe at k*: %s (%d px, runs -%.1f / +%.1f um); deepest predicted neighbour shadow %s gl%s" % (
+            "usable" if st["ok"] else st["reason"], st["n_pixels"], st["side_minus_um"], st["side_plus_um"], _gl(d), who)
     return "isolation: deepest predicted neighbour shadow %s gl%s %s %s gl -> %s" % (
         _gl(d), who, ">" if d > thr else "<=", _gl(thr), "not_isolated" if d > thr else "isolated")
 
@@ -463,10 +467,17 @@ def isolation_figure(view, title=""):
     _draw_line(axes[1], view["cx_um"], view["cy_um"], view["theta_rad"], view["line_half_um"], GREEN)
     frac = float(np.mean(view["far"]))
     b = np.asarray(view["background"], dtype=float)
+    st = view.get("stripe")
     bg = ("background plane %.1f gl at the centre, slope (%+.3f, %+.3f) gl/um" % (b[0], b[1], b[2])
-          if view["background_ok"] else "too few far pixels: no background")
-    axes[1].set_title("(b) the far pixels (unshaded) the background is fitted on: %.0f %%\n%s"
-                      % (100.0 * frac, bg), fontsize=9, loc="left", color=INK)
+          if view["background_ok"] else ("the stripe is not usable (%s): no background" % st["reason"] if st
+                                         else "too few far pixels: no background"))
+    if st:
+        head_b = ("(b) the stripe (unshaded) the background is fitted on: W +-%.0f um, runs -%.1f / +%.1f um beyond the "
+                  "own cylinder (%.1f / %.1f um), %d px" % (st["w_um"], st["side_minus_um"], st["side_plus_um"],
+                                                            st["v_own_minus_um"], st["v_own_plus_um"], st["n_pixels"]))
+    else:
+        head_b = "(b) the far pixels (unshaded) the background is fitted on: %.0f %%" % (100.0 * frac)
+    axes[1].set_title("%s\n%s" % (head_b, bg), fontsize=9, loc="left", color=INK)
     head = title or "node %d -- %s-field set, Allen 2r %.2f um%s" % (
         view["node_id"], view["set"], view["allen_diameter_um"], "" if view["image_valid"] else " (plane missing)")
     fig.suptitle("%s\n%s\n%s" % (head, view["verdict"] or "", _isolation_line(view)), fontsize=10, color=INK,
@@ -477,8 +488,10 @@ def isolation_figure(view, title=""):
                                                                _gl(o["depth_gl"])))
                        for o in offenders)
     fig.text(0.01, 0.012, "blue: the node's own branch; orange: neighbours whose predicted shadow in the patch exceeds "
-             "%s gl in some plane of k* +- %d (not_isolated); grey: below it (dashed: not evaluated); green: the "
+             "%s gl in some plane of k* +- %d%s; grey: below it (dashed: not evaluated); green: the "
              "measuring line.%s" % (_gl(view["threshold_gl"]), view["offsets_planes"],
+                                     " (not_isolated)" if view.get("support", "square") == "square" else
+                                     " (they bound the stripe; the verdict is the stripe's)",
                                      ("\nabove the threshold: " + listed + (" ..." if len(view["offenders"]) > 5 else ""))
                                      if listed else ""), fontsize=7.5, color=INK2, va="bottom")
     fig.subplots_adjust(left=0.06, right=0.98, top=0.80, bottom=0.15, wspace=0.16)
@@ -505,12 +518,20 @@ def isolation_overview(views, title="", ncols=6, per_page=36):
             ax.imshow(img, cmap="gray", vmin=lo, vmax=hi if hi > lo else lo + 1, extent=ext, interpolation="nearest")
             _draw_scene(ax, view, thin=True)
             ax.set_xlim(ext[0], ext[1]); ax.set_ylim(ext[2], ext[3])
-            bad = view["evaluated"] and view["max_depth_gl"] > view["threshold_gl"]
-            label = ("%s gl" % _gl(view["max_depth_gl"])) if view["evaluated"] else "n/e"
+            st = view.get("stripe")
+            if st is not None:
+                bad = not st["ok"]
+                label = "%d px" % st["n_pixels"] if st["ok"] else st["reason"]
+            else:
+                bad = view["evaluated"] and view["max_depth_gl"] > view["threshold_gl"]
+                label = ("%s gl" % _gl(view["max_depth_gl"])) if view["evaluated"] else "n/e"
             ax.set_title("%d %s: %s" % (view["node_id"], view["set"], label), fontsize=7,
                          color=ORANGE if bad else INK)
-        fig.suptitle((title or "candidates' background patches (plane k*): orange = a neighbour's predicted shadow "
-                      "above %s gl (not_isolated)" % _gl(views[0]["threshold_gl"])) + "  [%d-%d of %d]"
+        striped = views[0].get("stripe") is not None
+        fig.suptitle((title or ("candidates' background patches (plane k*): orange = the stripe at k* is not usable "
+                                "(too_few / side_short); the label is its pixel count" if striped else
+                                "candidates' background patches (plane k*): orange = a neighbour's predicted shadow "
+                                "above %s gl (not_isolated)" % _gl(views[0]["threshold_gl"]))) + "  [%d-%d of %d]"
                      % (start + 1, start + len(page), len(views)), fontsize=9, color=INK)
         fig.tight_layout(rect=(0, 0, 1, 0.96))
         figs.append(fig)

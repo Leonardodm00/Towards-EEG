@@ -61,12 +61,14 @@ Checks
     test_patch_scan     2026-10-23 (10.P, 10.I, 10.A; D-078 to D-081): the
                         patch scan's omega equals the block-median scan's on
                         the same rendered draw within 5 % (the background
-                        within 0.1 gl); node_phi_max_deg = 5 rejects a 7 deg
-                        pilot of either set; calibration_reasons adds
+                        within 0.1 gl); flatness per set (D-101.1): 12 deg
+                        fails the near set (10) and passes the far set (15),
+                        16 deg fails the far set; calibration_reasons adds
                         not_straight (only with node_straight_check, off by
                         default, D-093) and not_isolated in that order after
                         not_faint (only with node_alpha_check, off by
-                        default, D-094); anchor_from_growth equals the cut table's
+                        default, D-094) under background_support "square"
+                        (the stripe's reasons: test_smoke_stripe.py); anchor_from_growth equals the cut table's
                         last value; bootstrap_sigma0's SE within 30 % of the
                         SD over regenerated data sets; example_node picks the
                         node planted on the median; the scans JSON round trip
@@ -658,14 +660,17 @@ def test_patch_scan():
         assert sc.status[q] == "ok" and st["status"] == "ok", (q, sc.status[q], st["status"])
         assert abs(sc.B_bar[q] - B) <= 0.1, (q, sc.B_bar[q], B)
         assert abs(sc.omega_um2[q] / st["omega_um2"] - 1.0) <= 0.05, (q, sc.omega_um2[q], st["omega_um2"])
-    # (b) node_phi_max_deg = 5 deg rejects a 7 deg pilot of either set; 4 deg passes
-    for d_a in (0.4, 0.7):
-        assert CAL.criteria_reasons(math.radians(7.0), 0.3, d_a, cfg) == ["not_flat"]
-        assert CAL.criteria_reasons(math.radians(4.0), 0.3, d_a, cfg) == []
-    assert cfg.calibration.node_phi_max_deg == 5.0
+    # (b) flatness per set (D-101.1): near <= 10 deg, far <= 15 deg
+    assert CAL.criteria_reasons(math.radians(12.0), 0.3, 0.4, cfg) == ["not_flat"]
+    assert CAL.criteria_reasons(math.radians(12.0), 0.3, 0.7, cfg) == []
+    assert CAL.criteria_reasons(math.radians(16.0), 0.3, 0.7, cfg) == ["not_flat"]
+    assert CAL.criteria_reasons(math.radians(9.0), 0.3, 0.4, cfg) == []
+    assert cfg.calibration.node_phi_max_deg == 10.0 and cfg.calibration.node_phi_max_deg_far == 15.0
     # (c) calibration_reasons adds not_straight (with node_straight_check) and not_isolated, in that order, after
     # not_faint (with node_alpha_check); D-093 (2026-10-27): the straightness test is off by default, its tolerance
-    # 2 radii when on; D-094 (2026-10-28): the optical-depth criterion is off by default
+    # 2 radii when on; D-094 (2026-10-28): the optical-depth criterion is off by default. The square's isolation
+    # verdict (D-081.1) under background_support "square" (D-101 made the stripe the default)
+    cfg = cfg_with(patch_half_um=PATCH_HALF_TEST, background_support="square")
     x = np.linspace(-12, 12, 25)
     bent = Branch.from_points(np.c_[x, 0.4 * (1 - np.cos(np.pi * x / 10.0)) * (np.abs(x) <= 10), np.zeros(25)], 0.2,
                               ids=np.arange(100, 125))
@@ -677,7 +682,7 @@ def test_patch_scan():
     planes_z = np.arange(-3, 4) * cfg.acquisition.dz_um
     assert cfg.calibration.node_straight_check is False and cfg.calibration.node_straight_tol_radii == 2.0
     on1 = cfg_with(patch_half_um=PATCH_HALF_TEST, node_straight_check=True, node_straight_tol_radii=1.0,
-                   node_alpha_check=True)
+                   node_alpha_check=True, background_support="square")
     assert CAL.calibration_reasons(pil, on1, 0.4, bent, 12, scene, planes_z) == ["not_faint", "not_straight",
                                                                                  "not_isolated"]
     assert CAL.calibration_reasons(pil, on1, 0.4, bent, 12, Scene.from_branch(bent), planes_z) == ["not_faint",
@@ -686,7 +691,7 @@ def test_patch_scan():
     # for its optical depth; isolation still applies
     assert CAL.calibration_reasons(pil, cfg, 0.4, bent, 12, scene, planes_z) == ["not_isolated"]
     assert CAL.calibration_reasons(pil, cfg, 0.4, bent, 12, Scene.from_branch(bent), planes_z) == []
-    on_dark = cfg_with(node_alpha_check=True)
+    on_dark = cfg_with(node_alpha_check=True, background_support="square")
     assert CAL.calibration_reasons(pil, on_dark, 0.4, bent, 12, Scene.from_branch(bent), planes_z) == ["not_faint"]
     # with the check on, the tolerance is node_straight_tol_radii x r: not_straight exactly when the excess exceeds it
     exc = CS.straightness_excess(bent, 12, cfg.calibration.node_straight_half_um)

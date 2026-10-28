@@ -286,10 +286,16 @@ def run_real(cfg, a):
         print("patches -> %s" % patches_name(a.out))
     if fig_dir:
         pages = write_isolation_overview(views, fig_dir) if views else []
-        n_bad = sum(1 for v in views if v["evaluated"] and v["max_depth_gl"] > v["threshold_gl"])
-        print("isolation figures: %d candidates (%d with a neighbour's predicted shadow above %.3g gl) -> %s; "
-              "overview %s" % (len(views), n_bad, cal.isolation_depth_gl, fig_dir,
-                               ", ".join(os.path.basename(x) for x in pages) or "none"))
+        if cal.background_support == "stripe":
+            n_bad = sum(1 for v in views if v.get("stripe") is not None and not v["stripe"]["ok"])
+            print("isolation figures: %d candidates (%d whose stripe at k* is not usable: fewer than %d px or a side "
+                  "under %.1f um) -> %s; overview %s" % (len(views), n_bad, cal.stripe_min_pixels, cal.stripe_min_side_um,
+                                                         fig_dir, ", ".join(os.path.basename(x) for x in pages) or "none"))
+        else:
+            n_bad = sum(1 for v in views if v["evaluated"] and v["max_depth_gl"] > v["threshold_gl"])
+            print("isolation figures: %d candidates (%d with a neighbour's predicted shadow above %.3g gl) -> %s; "
+                  "overview %s" % (len(views), n_bad, cal.isolation_depth_gl, fig_dir,
+                                   ", ".join(os.path.basename(x) for x in pages) or "none"))
     return a.out
 
 
