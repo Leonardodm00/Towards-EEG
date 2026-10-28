@@ -122,6 +122,7 @@ the "Binds" column.
 | 2026-10-28 (later, 3) | Logs **D-097** (user, 10:24; the noise-fit chat): the assistant pushes its own commits, and every document is also committed to the GitHub repository so any chat can consult it -- where, the assistant's reading: byte copies of the project-knowledge documents under `docs/project/` on `main` (the project copy first, the repository copy in the same turn), a workstream's handoffs in its `docs/`, study documents and check packages in its `dev/`; the user's uploads not copied without their word; the repository is public. Applied: the five noise-fit patches and the two roadmap patches pushed (`main` from `64fb8c5` to `4930ba1`), then `53b2713`, `d2ffcb4`, `cd32dad`; the copies of this log and of the living handoff follow in the next commit. Roadmap allen-mtg-fit updated at the user's word ("Update also the roadmap": D-082's hold lifted for this update): N3 and N4 pushed, each with D-095's revise mark; page version 44. D-082 and D-095 annotated. The user still has to answer the tilt option for 2-sweep cells (per cell, one cohort value, or partial pooling across cells; put to the user on 2026-10-23 and 2026-10-26), written into the noise-fit handoff at the user's request. Written after re-reading this log (changed since this chat's write of 2026-10-28 by the diameter chat's row 2026-10-28 (later, 2), D-096; merged, nothing of theirs edited). Next free IDs: D-098, I-005. |
 | 2026-10-28 (later, 4) | Status notes from the Colab run of S3's Cells 11, 11b and 12 on Allen's data (the user's logs and figures of 11:16; the diameter implementation chat), no new decision: **D-085** (the pool, 158 cells; the acquisition check, 158 of 158 at dz 0.28 um and 0.1144 um/px; the selection, 51 cells in 15 groups; the alignment, 47 of 51 aligned, 4 failed on Allen's marker file, 5 set aside), **D-089** (.2: the darkest rule took the maximum-intensity xy projection in each of the 4 specimens that have one; .1: of the 5 cells set aside, 4 have shifts like the kept cells'), **D-090** (.1: on the pilot the minimum-intensity xy projection is the planes' minimum, r* 0.9941 at zero offset). The changes these suggest are put to the user, not made. Written after re-reading this log (changed since v23 by the noise-fit chat: D-097's row, index row and entry, notes on D-082 and D-095; merged, nothing of theirs edited). The repository copy of this version (D-097) is on `sci/diameter-pipeline`, `docs/project/`, until the user settles D-097 (d). Next free IDs: D-098, I-005. |
 | 2026-10-28 (later, 5) | Logs **D-098** (user, 15:01; the diameter implementation chat): "Let's do this" to the assistant's proposals (a), (b), (d) after the Colab run of Cells 11-12 -- `fetch_swc` never takes Allen's marker file, the xy projection chosen by its type 'MinimumIntensityProjection - xy' (D-089.2's darkest rule the fallback), S3a's coverage recomputes $\mathcal S$ from the rows' columns -- with (c), the set-aside cells that look aligned run with `--include-set-aside`, and the user's request that Cell 7 draw each candidate's background patch with the neighbours behind `not_isolated`. Implemented and pushed (`c595bc0`, `4ef6d8e`, `cdba78a`, `28790c3`, `44e95e3`). D-089 (its .2 superseded) and D-090 annotated. Written after re-reading this log (unchanged since v24). The repository copy (D-097) on `sci/diameter-pipeline`, `docs/project/`. Next free IDs: D-099, I-005. |
+| 2026-10-28 (later, 6) | Logs **D-099** (user, 17:07; the diameter implementation chat): "Blocks 13 and 14 are too slow. Let's change approach. Everything now on colab will run on a single pilot cell while the real runs will be on the DaVinci HPC. Adjust all the scripts and the pipeline" -- S3's per-cell survey (Cells 12-15) runs on davinci as three PBS jobs (SPEC Block 16.4: `survey_prepare.pbs`, the array `survey_cells.pbs` with one task per selected cell, `survey_pool.pbs`), and every Colab cell runs on the pilot 529878215 only (`cell_pool.py pick`, `survey_pilot/`, 3 nodes per bin). Implemented, smoke-tested and pushed the same evening (`5230474`, `d4559ba`, `ede27be`, `01a15d6`). D-085 and D-098 annotated. Written after re-reading this log (unchanged since the (later, 5) row). The repository copy (D-097) on `sci/diameter-pipeline`, `docs/project/`. Next free IDs: D-100, I-005. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -240,6 +241,7 @@ would be needed*, *Status*.
 | D-096 | 2026-10-28 | the selection $\mathcal S$ (Block 6, `config.SELECTION_FLAGS`), phantoms and real nodes; the bias table (Block 14); `correct_nodes` and the fill (Block 7, D5); the estimator and simulation signatures (Block 1); D-094.3; D-030 | the flag `faint` is a label, not a criterion of $\mathcal S$: every node whose fit is in $\mathcal S$ is corrected, whatever its optical depth and its dip [user]; the flags of $\mathcal S$ in the estimator signature [the assistant's choice] | active; implemented 2026-10-28 (`cf2f91d`, renumbered `76365a3`), smoke-tested; no table built |
 | D-097 | 2026-10-28 | every chat's delivery: code pushed by the assistant (hpc-git-delivery's last step); every document also in the repository (`docs/project/` on `main` for the project-knowledge documents; handoffs in `<workstream>/docs/`, study documents and checks in `<workstream>/dev/`); DOCUMENT UPKEEP; the roadmaps' push | the assistant pushes its own commits; every document is also committed to the GitHub repository so any chat can read it [user]; where, the assistant's reading; the user's uploads not copied without their word; the repository is public | active; applied 2026-10-28 (noise-fit chat: `53b2713`, `d2ffcb4`, `cd32dad`) |
 | D-098 | 2026-10-28 | `allen_image_io.fetch_swc` (Block 0); Block 16.2 (a)'s projection rule and 16.3 (a) (`projection_xy_type`); S3a's coverage (Block 17.3; `phantoms.row_reject_reasons`); Cell 7's outputs (Block 10.F (5); `scan_cell`'s `on_node`); the set-aside cells' use (D-089.1); D-089.2 | the marker file never taken; the xy projection by its type, the darkest the fallback; $\mathcal S$ recomputed from the rows' columns in the coverage; Cell 7 draws each candidate's background patch with the neighbours behind `not_isolated`; the set-aside cells that look aligned run with `--include-set-aside` [user; the figure's form the assistant's, PROVISIONAL] | active; implemented 2026-10-28 (`c595bc0`, `4ef6d8e`, `cdba78a`, `28790c3`, `44e95e3`), smoke-tested; not run on Allen's data |
+| D-099 | 2026-10-28 | where S3's per-cell survey runs (Blocks 16.2, 17, 18, 19 over the selection: SPEC Block 16.4, `scripts/pbs/survey_*.pbs`); Colab's Cells 11-15 (the pilot only, `survey_pilot/`); the runner's `--task-index` and `--cache-per-cell`; `cell_pool.py pick` (Block 16.1 (e)); the roadmap's S3a-S3c (`needs_hpc`); D-085's "in Colab"; D-098.5's Cells 12b and 13b | the real runs on davinci, one PBS array task per selected cell plus a prepare and a pool job; Colab keeps every cell on the pilot [user]; the layout under the archive root, the proxy module and the 12 h walltime the assistant's, PROVISIONAL | active; implemented and pushed 2026-10-28, smoke-tested against stubs; not yet run on davinci |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
@@ -7400,7 +7402,7 @@ per cell or one table where the kernels agree; what is done with cells whose pla
 check, the stratified selection, SPEC Block 16.1 -- with (D-085.1)'s readings as PROVISIONAL defaults; (D-085.7)'s
 rule settled by D-086] [updated 2026-10-26, later 7: (D-085.1)'s sparsely spiny cells a third class, D-087; (D-085.10) superseded by D-088] [updated 2026-10-27: Blocks 16.1-19 built and on the remote, `2fd8ffb`..`7064e2c` (the plan row `826eb02`), smoke-tested in the sandbox, not run on Allen's data; (D-085.2)'s projection rule confirmed (D-089.2) and checked by Block 16.3 (D-090.1); (D-085.11) holds: S3d waits for the hybrid]
 [updated 2026-10-27, later 3: (D-085.3)'s check run on Allen's data (Cell 11, `check`): the 47 lines the user pasted (the first one cut, so 46 specimen ids seen, the pilot 529878215 among them) all read dz 0.28 um, pixel 0.1144 um, 276 to 651 planes; the user: "All share the same." The check's summary line was not pasted, so the pool's size and any failed cells are not recorded here. No cell seen differs, so (D-085.3)'s rule for cells that differ has nothing to act on.]
-[updated 2026-10-28, the user's logs of 11:16 (Colab, the S3 run file of 2026-10-27): Cell 11 -- the pool holds 158 human cells with a reconstruction (2333 rows read in one query): 111 exc, 38 inh and 9 `sparsely_spiny` over 15 class-layer groups; (D-085.3)'s check covered all 158 (6.6 min), 0 failed, every one at dz 0.28 um and 0.1144 um/px (168 to 660 planes); the selection (D-085.1) is 51 cells (seed 20261026, at most 5 per group), none left out. Cell 12 -- (D-085.2)'s alignment (29.7 min, 10 to 184 s per aligned cell): 47 cells aligned, 42 kept and 5 set aside (D-089.1); 4 failed before aligning (569095789, 508279351, 596036453, 525018757) because `allen_image_io.fetch_swc` downloaded Allen's marker file (`*_marker_m.swc`, which passes its `.swc` suffix test; its comma-separated lines fail `read_swc`) instead of the reconstruction **[user's log, read; src]**. Cell 13 (S3a, D-085.4) was running. A fix of the SWC fetch is put to the user, not made.]
+[updated 2026-10-28, the user's logs of 11:16 (Colab, the S3 run file of 2026-10-27): Cell 11 -- the pool holds 158 human cells with a reconstruction (2333 rows read in one query): 111 exc, 38 inh and 9 `sparsely_spiny` over 15 class-layer groups; (D-085.3)'s check covered all 158 (6.6 min), 0 failed, every one at dz 0.28 um and 0.1144 um/px (168 to 660 planes); the selection (D-085.1) is 51 cells (seed 20261026, at most 5 per group), none left out. Cell 12 -- (D-085.2)'s alignment (29.7 min, 10 to 184 s per aligned cell): 47 cells aligned, 42 kept and 5 set aside (D-089.1); 4 failed before aligning (569095789, 508279351, 596036453, 525018757) because `allen_image_io.fetch_swc` downloaded Allen's marker file (`*_marker_m.swc`, which passes its `.swc` suffix test; its comma-separated lines fail `read_swc`) instead of the reconstruction **[user's log, read; src]**. Cell 13 (S3a, D-085.4) was running. A fix of the SWC fetch is put to the user, not made.] [updated 2026-10-28, D-099: the per-cell survey runs on davinci, Colab keeps the pilot only; the programme itself is unchanged]
 
 ---
 
@@ -8260,7 +8262,87 @@ at level 4: its overlay is to be looked at before its nodes are pooled. (d) Whet
 (SPEC Blocks 0, 16.2, 17, 10).
 
 **Status:** active; (D-098.1)-(D-098.4) implemented and pushed 2026-10-28, smoke-tested, not yet run on Allen's data;
-(D-098.5) waits for the user's look at 571464200 and a Colab run.
+(D-098.5) waits for the user's look at 571464200 and a Colab run. [updated 2026-10-28, D-099: (D-098.5)'s Cells 12b and 13b are knobs of the davinci array job (`DIAM_CELLS`, `DIAM_FORCE`, `DIAM_INCLUDE_SET_ASIDE`)]
+
+---
+
+## D-099 -- S3's per-cell survey runs on davinci, one PBS array task per selected cell; Colab runs every cell on the pilot only (user)
+
+**Date:** 2026-10-28, 17:07 (Europe/Rome), the diameter implementation chat, while Colab's Cell 13 of the run started
+that morning was still measuring. **Binds:** where the per-cell steps of S3 run (Blocks 16.2, 17.1-17.2, 18.1-18.3,
+19.3 over the selection; SPEC Block 16.4); Colab's Cells 11-15 of both notebooks (`notebooks/phase2_colab.*`,
+`notebooks/s3_run_2026-10-27.*`) and the runbook; `scripts/survey_cells.py run` (`--task-index`, `--cache-per-cell`;
+Block 16.2 (g)); `scripts/cell_pool.py pick` (Block 16.1 (e)); the roadmap's S3a-S3c (`needs_hpc: true`, the jobs
+`diam_survey`, `diam_survey_pool`); D-085's framing of S3 as "the real-data programme in Colab"; D-098.5's Cells 12b
+and 13b.
+
+**Decision [user].** "Blocks 13 and 14 are too slow. Let's change approach. Everything now on colab will run on a single
+pilot cell while the real runs will be on the DaVinci HPC. Adjust all the scripts and the pipeline."
+
+**Statement.**
+
+(D-099.1) *The survey on davinci.* The per-cell survey of S3 -- the alignment (Block 16.2), the node sample (17), the
+radius, registration and camera inputs (18) and the calibration scans (19.3) of every selected cell -- runs on davinci
+as PBS jobs, with the same scripts Colab ran: `scripts/pbs/survey_prepare.pbs` (one job: Cell 11's pool, acquisition
+check and selection over the whole pool, Cell 11b's projection listing with the pilot's test), the array
+`scripts/pbs/survey_cells.pbs` (task $i$ runs row $i$ of `selection.csv`, 0-based, through `survey_cells.py run
+--task-index i --cache-per-cell`; one task per selected cell, 51 on 2026-10-28; resumable by the step markers) and
+`scripts/pbs/survey_pool.pbs` (the status table, the pooled coverage, inputs and calibration, and one archive
+`results_<RUN_TAG>.tgz` of what is read off the cluster) [user: "the real runs will be on the DaVinci HPC"; the split
+into three jobs and one task per cell the assistant's]. The runner gains `task_index` (one row of the selection,
+exclusive with `--cells`, refused outside the selection) and `source_for` / `--cache-per-cell` (each cell's Allen
+source over `<cache>/<specimen>/`, so no two tasks write one file).
+
+(D-099.2) *Colab on the pilot.* Every Colab cell runs on the pilot 529878215 only [user: "Everything now on colab will
+run on a single pilot cell"]: Cells 11-15 work in `survey_pilot/` (`survey/` keeps the run of 2026-10-28 over 51 cells
+untouched), Cell 11 builds the one-cell selection with `cell_pool.py pick --cells 529878215` (Block 16.1 (e); the pilot
+is not in the stratified selection) and checks its acquisition on that one-row file, Cell 13 measures 3 nodes per bin
+of Allen's $2r$ (`nodes_per_bin` 3 in `survey_config.json`; at most 18 nodes, about 10 min at the 30 s per node of
+2026-10-28; PROVISIONAL, the assistant's size) so that the chain and the pools are exercised end to end in minutes;
+the numbers that decide (the mu range, $d_{\max}$, the jitter, the camera, the kernel) are the davinci run's. The
+davinci array keeps the default 20 per bin. Cells 12b and 13b of the run file become knobs of the array job
+(`DIAM_CELLS=508305938,DIAM_FORCE=align`; `DIAM_CELLS=...,DIAM_INCLUDE_SET_ASIDE=1`; a single job without `-J`).
+
+(D-099.3) *The reading of "Blocks 13 and 14".* The notebook's Cells 13 and 14 (S3a and S3b), the slow ones (about an
+hour per cell of 120 nodes, measured on 2026-10-28), not SPEC Blocks 13 and 14 [the assistant's reading, stated to the
+user; D-098's entry records the times].
+
+(D-099.4) *The provisional choices [assistant, PROVISIONAL].* (i) The compute nodes reach `api.brain-map.org` through
+`module load proxy` (the H01 reference, section 9 **[KB]**; the same line the H01 campaign uses); every job that needs
+the network runs one RMA query first and exits 6 if it fails, so a blocked network costs a minute, not a queue wait.
+(ii) The layout under the archive root of D-012, as the table job's: `.../Human Neurons Fitting/diameter_survey/<RUN_TAG>/`
+and `.../Human Neurons Fitting/allen_cache/<specimen>/`. (iii) One task per cell, 12 h walltime, 1 CPU and 4 GB per
+task (Colab's hour per cell with margin). (iv) The array marks the roadmap's S3a and the pool job S3c (hpc markers).
+
+**Why [user; data; reasoning].** **[user]** the decision and its reason, "too slow". **[data inspected: the user's Colab
+run of 2026-10-28]** Cell 12 took 29.7 min for 51 cells; Cell 13's first cells about an hour each, so one to two days
+for 42 cells in a Colab session that disconnects -- against 51 cells in parallel on davinci, an hour or two of wall
+time once queued. **[reasoning]** per-cell crop caches and one task per cell remove every shared write; the probe
+before the work turns the one unverified assumption (the proxy's reach) into a one-minute failure; the pilot in Colab
+keeps a place where the user sees each step's output and figures with the code of the day, which the cluster's logs
+do not give.
+
+**What it implies for code and tables.** On `sci/diameter-pipeline`, pushed 2026-10-28 evening: `5230474` the
+runner's options and `pick` (SPEC 16.1 (e), 16.2 (g)); `d4559ba` Block 16.4 with `scripts/pbs/survey_common.sh`, the
+three job scripts, `tests/smoke/test_smoke_survey_pbs.py` (4 pass, 3 skip; 7 mutants killed) and the SPEC; `ede27be`
+the notebooks' Cells 11-15 on the pilot and runbook v34 with the davinci section; `01a15d6` the roadmap's S3 title,
+S3a-S3c `needs_hpc` and jobs. No signature changes (estimator `59678d4e2aedf2b6`, simulation `52aa73e479eb77cf`).
+Order on davinci: the byte checks, `DIAM_DRYRUN=1`, the prepare job, one probe task (`DIAM_STEPS=align`, no
+`-J`), the array, the pool; the archive read off the cluster.
+
+**What it does not decide [open].** (a) Whether the Colab Cell 13 still running on 2026-10-28 is stopped or left to
+finish: its results in `survey/` stay readable either way, and the davinci run starts from its own `selection.csv`
+(the same seed, so the same 51 cells). (b) Whether Drive's crop cache is copied to davinci: not planned; the tasks fetch
+their crops again (one cache per cell). (c) The proxy's reach to Allen's server, the time per cell and the queue's
+behaviour with 51 concurrent fetchers: the first run's. (d) `nodes_per_bin` 3 for the Colab pilot. (e) The set-aside
+cells and 571464200 (D-098.5): the same question, now asked of the array's knobs.
+
+**Sources.** **[user]** 2026-10-28, 17:07. **[KB]** the H01 reference's `module load proxy` (section 9), the davinci
+conventions of the paths references (the conda hook, `#PBS -k eo`, the reserved names). **[data]** the user's Colab
+logs of 2026-10-28. **[run, sandbox]** `test_smoke_survey_pbs.py`, `test_smoke_cell_pool.py`,
+`test_smoke_cell_alignment.py` and the S3 suites; the mutants of Block 16.4.
+
+**Status:** active; implemented and pushed 2026-10-28; smoke-tested against stubs; nothing yet run on davinci.
 
 ---
 
