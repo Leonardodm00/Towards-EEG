@@ -424,7 +424,7 @@ implementation:
     needs_theory: [T6, T10]
     needs_hpc: false
     jobs: []
-    note: "noise_windows.py, noise_cell_stats.py; written 2026-10-23 on sci/noise-fit (smoke W1-W10 10/10, eight mutations caught) and delivered as patches on main 64fb8c5, not yet pushed, so on main the tool still says planned. Window-start rule open (D-076 (ii) floor 80 ms; the transient test as written is noise-limited, options (a)-(c) put to the user 2026-10-23)."
+    note: "noise_windows.py, noise_cell_stats.py; written 2026-10-23 (smoke W1-W10 10/10, eight mutations caught), pushed to main 2026-10-28 (76577d2; spec 0dfe8bf, 65c659b, 033e3bf). D-095 (user, 2026-10-28): the window start is read from the exponential decay of the mean windows per polarity and per sweep over [-10, 200) ms, within kappa_tr sigma_SS(c), no 5 ms bins; each enlarged window minus the mean window of its own sweep and polarity. Replaces transient_start (revise mark); its open points (mean or median, 'statistically', how t_SS(c) is formed, the fit model and baseline, the 80 ms floor and the fallback) are asked before the change."
   - id: N4
     title: "Block 4: the per-cell fit"
     summary: "Indirect inference per cell: the Harrell-Davis binding function on simulated continuous sweeps, the iterated inverse-covariance weights, the tilt's SD alternated with the law, three starts (D-048 to D-051, D-056)."
@@ -434,7 +434,7 @@ implementation:
     needs_theory: [T7, T8]
     needs_hpc: false
     jobs: []
-    note: "noise_fit.py; written 2026-10-23 on sci/noise-fit (smoke F1-F10 10/10, ten mutations caught) and delivered as patches, not yet pushed. The estimator of the tilt's SD for 2-sweep cells is open (per cell, cohort, or shrunk; put to the user 2026-10-23)."
+    note: "noise_fit.py; written 2026-10-23 (smoke F1-F10 10/10, ten mutations caught), pushed to main 2026-10-28 (a95e618). D-095: the simulator subtracts the mean of its simulated windows per sweep and polarity (revise mark). Open, the user to answer: the tilt's SD for 2-sweep cells -- per cell, one cohort value, or partial pooling across cells (put to the user 2026-10-23 and 2026-10-26)."
   - id: N4b
     title: "Block 4b: the per-sweep stage"
     summary: "For each real sweep, the fast pair and the slow SD estimated on that sweep alone (the slow timescale held at the cell's), the slow SD shrunk towards the cell by the random-effects weight; the laws each twin sweep will carry (D-076 (i))."
@@ -528,3 +528,23 @@ implementation:
     jobs: []
     manual_status: planned
     manual_reason: "not started"
+
+# Revisions: a change one side has to absorb because of the other
+# (roadmap.py revise). An implementation stage's flag clears when its
+# code changes after the flag's commit; a topic's when its status
+# changes; or by hand (revise --clear).
+revisions:
+  - stage: N3
+    from: 
+    on: 2026-10-28
+    at: 4930ba1c5e4ea16ab4717ace84a4e24e98c50362
+    decision: D-095
+    note: "window start from the mean windows' exponential decay per sweep and polarity; subtraction per sweep and polarity"
+    cleared:
+  - stage: N4
+    from: 
+    on: 2026-10-28
+    at: 4930ba1c5e4ea16ab4717ace84a4e24e98c50362
+    decision: D-095
+    note: "the simulator's mean-window subtraction per sweep and polarity"
+    cleared:
