@@ -1,0 +1,25 @@
+== near set at k*, every predicted shadow bounds the stripe (tau_check.py): 138 candidates
+tau 0.03 gl: {'too_few': 91, 'side_short': 26, 'ok': 21}
+   tau 0.03: residual on the line among the 21 usable (gl): median 0.099, p90 0.131, max 0.151; <= 0.03: 7, <= 0.1: 11, <= 0.3: 21, <= 1: 21
+tau 0.3 gl: {'side_short': 19, 'ok': 92, 'too_few': 27}
+   tau 0.3: residual on the line among the 92 usable (gl): median 0.236, p90 0.819, max 2.631; <= 0.03: 15, <= 0.1: 30, <= 0.3: 52, <= 1: 87
+tau 1.0 gl: {'side_short': 18, 'ok': 117, 'too_few': 3}
+   tau 1.0: residual on the line among the 117 usable (gl): median 0.346, p90 2.141, max 8.923; <= 0.03: 20, <= 0.1: 32, <= 0.3: 56, <= 1: 86
+tau 3.0 gl: {'side_short': 11, 'ok': 127}
+   tau 3.0: residual on the line among the 127 usable (gl): median 0.451, p90 3.805, max 14.059; <= 0.03: 22, <= 0.1: 32, <= 0.3: 57, <= 1: 87
+== far set: the fit's planes (|k - k*| >= 5) with a usable stripe, and the median residual on the line over them (tau_check.py): 7 candidates
+tau 0.03 gl: 679: 0 (-), 688: 0 (-), 689: 0 (-), 690: 0 (-), 7698: 0 (-), 7702: 0 (-), 7705: 0 (-)
+tau 0.3 gl: 679: 0 (-), 688: 0 (-), 689: 0 (-), 690: 0 (-), 7698: 0 (-), 7702: 0 (-), 7705: 3 (4.9 gl)
+tau 1.0 gl: 679: 0 (-), 688: 0 (-), 689: 16 (9.4 gl), 690: 22 (3.6 gl), 7698: 0 (-), 7702: 21 (4.2 gl), 7705: 24 (5.6 gl)
+tau 3.0 gl: 679: 11 (14.3 gl), 688: 24 (13.2 gl), 689: 21 (7.3 gl), 690: 20 (3.5 gl), 7698: 0 (-), 7702: 23 (4.2 gl), 7705: 24 (5.3 gl)
+== near set at k*, what lies over the node (cap_check.py): 138 candidates; a neighbour above tau at the centre: soma 0, junction 10, broad (sigma_r >= 2 um) 89, sharp 3; summed predicted shadow at the centre median 3.97 gl (p10 0.18, p90 35.53)
+shadows with sigma_r >= 2.0 um left to the plane: {'side_short': 52, 'ok': 82, 'too_few': 4}
+   cap 2.0 (the broad shadows only): residual on the line among the 82 usable (gl): median 0.371, p90 1.706, max 4.968; <= 0.03: 8, <= 0.1: 17, <= 0.3: 35, <= 1: 63
+shadows with sigma_r >= 3.0 um left to the plane: {'side_short': 57, 'ok': 76, 'too_few': 5}
+   cap 3.0 (the broad shadows only): residual on the line among the 76 usable (gl): median 0.305, p90 1.118, max 4.968; <= 0.03: 8, <= 0.1: 17, <= 0.3: 35, <= 1: 65
+shadows with sigma_r >= 5.0 um left to the plane: {'side_short': 57, 'ok': 70, 'too_few': 11}
+   cap 5.0 (the broad shadows only): residual on the line among the 70 usable (gl): median 0.245, p90 0.854, max 1.999; <= 0.03: 9, <= 0.1: 18, <= 0.3: 41, <= 1: 66
+== far set, caps (cap_check.py): 7 candidates
+cap 2.0 um: usable fit planes 679: 6, 688: 15, 689: 10, 690: 8, 7698: 0, 7702: 0, 7705: 0
+cap 3.0 um: usable fit planes 679: 1, 688: 1, 689: 0, 690: 0, 7698: 0, 7702: 0, 7705: 0
+cap 5.0 um: usable fit planes 679: 0, 688: 0, 689: 0, 690: 0, 7698: 0, 7702: 0, 7705: 0
