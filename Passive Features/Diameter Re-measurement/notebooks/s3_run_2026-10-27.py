@@ -134,7 +134,8 @@ if os.path.exists(pilot):
     print("[preflight] pilot rows %d; columns missing: %s; candidates %d by set %s" % (
         len(rows), missing or "none", len(cand), by))
     print("[preflight] a production kernel needs at least 10 scanned nodes per set (D-088.3); the scan drops some "
-          "(not isolated; neither straightness (D-093) nor the optical depth and the flag faint (D-094) is tested)")
+          "(the stripe at k* too small, D-101; neither straightness (D-093) nor the optical depth and the flag "
+          "faint (D-094) is tested)")
 """
 subprocess.run([sys.executable, "-c", PREFLIGHT, OUT, str(SPECIMEN), REG_JSON], cwd=WS, check=False)
 
@@ -143,9 +144,12 @@ subprocess.run([sys.executable, "-c", PREFLIGHT, OUT, str(SPECIMEN), REG_JSON], 
 # ## Cell 7: the kernel calibration on the pilot -- near field (Block 10), far field (Block 15), figures
 # The test on one pilot cell (D-088.2, 529878215 confirmed in D-089.8). Calibration nodes chosen by Allen's diameter:
 # near field 2r <= 0.6 um scanned over k* +- 3, far field 0.6-0.8 um over k* +- 16, each on a +-25 um patch per plane;
-# a node must be in S (the flag faint aside, D-094), flat (phi <= 5 deg) and isolated -- not screened for
-# straightness since D-093 (the calibration evaluates only the measuring line) nor for its optical depth since
-# D-094 (the user: "Remove both faint"). At most 30 scanned nodes per set (seeded
+# a node must be in S (the flag faint aside, D-094), flat (phi <= 10 deg near, <= 15 deg far; D-101.1) and have a
+# usable stripe at k* (D-101: the background's support is the band along the measuring line walked out to the first
+# neighbour's predicted shadow above 0.03 gl, the own fitted cylinder removed; at least 500 px and 3 um of clear run
+# per side, else `not_isolated:too_few` / `:side_short`) -- not screened for straightness since D-093 (the
+# calibration evaluates only the measuring line) nor for its optical depth since D-094 (the user: "Remove both
+# faint"). At most 30 scanned nodes per set (seeded
 # order; the rest `set_full`), at least 10 for a production kernel (D-088.3).
 #
 # Expect from `real`: `N candidate nodes`, one line per node (`scanned (near field)`, `scanned (far field)` or `not a
@@ -156,10 +160,12 @@ subprocess.run([sys.executable, "-c", PREFLIGHT, OUT, str(SPECIMEN), REG_JSON], 
 #
 # [2026-10-28, D-098.4] As `real` evaluates each candidate it draws the patch its background is fitted on (+-25 um,
 # plane k*): (a) the traced segments -- the node's own branch blue, a neighbour orange when its predicted shadow in the
-# patch exceeds 0.03 gl in some plane (what makes `not_isolated`), grey below -- and (b) the far pixels with the fitted
-# background plane. `real` ends with `isolation figures: N candidates (k with a neighbour's predicted shadow above
-# 0.03 gl) -> .../calibration/figures/isolation`; one PNG per candidate (`<set>_node_<id>.png`) and overview pages
-# (`isolation_overview_<n>.png`, shown below). Costs one crop per candidate that is not scanned.
+# patch exceeds 0.03 gl in some plane (they bound the stripe), grey below -- and (b) the stripe the background is
+# fitted on, with its half-width, the clear runs on each side of the own cylinder and its pixel count (D-101). `real`
+# ends with `isolation figures: N candidates (k whose stripe at k* is not usable: fewer than 500 px or a side under
+# 3.0 um) -> .../calibration/figures/isolation`; one PNG per candidate (`<set>_node_<id>.png`) and overview pages
+# (`isolation_overview_<n>.png`, shown below; orange = not usable, the label its pixel count). Costs one crop per
+# candidate that is not scanned.
 #
 # Send back: the `real` counts and reasons line, the `fit` and `far-fit` reports, the five figures, and the isolation
 # overview pages (or the per-node figures of the candidates you want to discuss).

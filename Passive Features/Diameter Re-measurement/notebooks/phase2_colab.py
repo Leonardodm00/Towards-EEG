@@ -915,14 +915,18 @@ run("scripts/allen_radius_distribution.py", "--fetch", SPECIMEN, "--cache-dir", 
 # The calibration nodes of the pilot are chosen by Allen's diameter D_A = 2 r_A, not by the fitted d_hat (D-061.4,
 # D-067.4; thresholds PROVISIONAL): the near-field set, D_A <= 0.6 um, is scanned plane by plane over k* +- 3
 # (offsets up to 0.84 um); the far-field set, 0.6 < D_A <= 0.8 um, over k* +- 16 (offsets to 4.5 um, D-026,
-# D-078). Both must be in S and flat (phi <= 5 deg, D-081.3) by the pilot's columns -- since D-094 with no
-# optical-depth cut and the flag faint (a dip under 6 gl) not counted (`calibration.node_alpha_check` restores
-# alpha <= 0.5, `calibration.node_faint_flag_check` the flag) -- and
-# then, on the trace (D-079, D-081.1), isolated (no other dendrite or the soma casts a predicted shadow deeper
-# than 0.03 grey levels inside the +-25 um patch, in any scanned plane); not screened for straightness since
-# D-093 (the calibration evaluates only the measuring line; `calibration.node_straight_check` restores it at
-# 2 radii). Each scan reads a +-25 um patch per plane, fits a planar background to the pixels far from
-# every traced segment (D-078.1) and fits the dip's Gaussian core iteratively (up to 10 passes, stop at 1 SE of
+# D-078). Both must be in S and flat by the pilot's columns -- phi <= 10 deg for the near set, <= 15 deg for the
+# far set since 2026-10-28 (D-101.1; was 5 deg for both, D-081.3) -- since D-094 with no optical-depth cut and
+# the flag faint (a dip under 6 gl) not counted (`calibration.node_alpha_check` restores alpha <= 0.5,
+# `calibration.node_faint_flag_check` the flag) -- and then, on the trace, usable: since D-101 (2026-10-28) the
+# background of each plane is fitted on the STRIPE along the measuring line -- the band (half-width 1-12 um along
+# the dendrite, the one with most pixels) walked outward on each side of the node to the first pixel column a
+# traced neighbour's predicted shadow reaches above 0.03 gl, the node's own fitted cylinder removed -- and a
+# node is `not_isolated:too_few` / `not_isolated:side_short` when the stripe at k* has fewer than 500 pixels or
+# under 3 um of clear run on a side (the old square rule, D-078.1 / D-081.1, is `calibration.background_support`
+# = "square"); not screened for straightness since D-093 (the calibration evaluates only the measuring line;
+# `calibration.node_straight_check` restores it at 2 radii). Each scan reads a +-25 um patch per plane, fits a
+# planar background to its stripe and fits the dip's Gaussian core iteratively (up to 10 passes, stop at 1 SE of
 # the width; D-077, D-078.2). `real` prints `N candidate nodes`, one line per node (`scanned (near field)`,
 # `scanned (far field)` or `not a calibration node (...)` with the reasons), `... candidates scanned: n near-
 # field, m far-field; reasons {...}` and the example nodes whose patch images are kept (`patches -> ...`).
@@ -950,10 +954,11 @@ run("scripts/allen_radius_distribution.py", "--fetch", SPECIMEN, "--cache-dir", 
 # have read the width-by-plane figures and the far fit.
 # [2026-10-28, D-098.4] As `real` evaluates each candidate it draws the patch its background is fitted on (+-25 um,
 # plane k*): the traced segments -- the node's own branch blue, a neighbour orange when its predicted shadow in the
-# patch exceeds 0.03 gl in some plane (what makes `not_isolated`), grey below -- and the far pixels with the fitted
-# background plane, into OUT/calibration/figures/isolation/<set>_node_<id>.png, with overview pages
-# isolation_overview_<n>.png (shown below); `real` ends with `isolation figures: N candidates (k with a neighbour's
-# predicted shadow above 0.03 gl) -> ...`. One crop more per candidate that is not scanned.
+# patch exceeds 0.03 gl in some plane (they bound the stripe), grey below -- and (b) the stripe the background is
+# fitted on with its width, runs and pixel count (D-101), into OUT/calibration/figures/isolation/<set>_node_<id>.png
+# (orange thumbnails in the overview: the stripe at k* is not usable), with overview pages
+# isolation_overview_<n>.png (shown below); `real` ends with `isolation figures: N candidates (k whose stripe at k* is
+# not usable: fewer than 500 px or a side under 3.0 um) -> ...`. One crop more per candidate that is not scanned.
 os.makedirs(OUT + "/calibration/figures", exist_ok=True)
 SCANS = "%s/calibration/scans_%d.json" % (OUT, SPECIMEN)
 CALIB = "%s/calibration/calibration_%d.json" % (OUT, SPECIMEN)
