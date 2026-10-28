@@ -141,7 +141,7 @@ theory:
     status: studying
     closed_on:
     decision:
-    note: "Being studied (the user, 2026-10-27): what remains is the read-out (vi) and the inversion (vii) of the Stage 4 explanation, with its worked case. Study list and material: TEEG_diameter_table_readout_inversion_study_handoff_2026-10-27.md, sent to the user as a file (project knowledge is full)."
+    note: "Being studied (the user). 2026-10-28: the cubic read-out is studied (the user: \"the cubic spline has been studied\"): the tensor cubic interpolant, its cardinal weights, its smoothness and its fourth-order error (checks tensor_cubic_2026-10-28, 19 of 19 passed). What remains is the inversion (vii) with its worked case: classical calibration, the root and its flags, the error budget and the SE of the corrected diameter (items 5b-5g), explained in depth on 2026-10-28 (checks inversion_2026-10-28: 9 of 10 passed; the band predicted for mathematics Eq. 21 failed); the study resumes on 2026-10-29. Study handoff: TEEG_diameter_table_readout_inversion_study_handoff_2026-10-27.md (sent as a file; project knowledge is full)."
   - id: T5
     title: "Skewed generalized-t kernel and the plane fit"
     summary: "The SGT family, the seven-parameter fit at a plane and the Allen-guided plane iteration (Blocks 12-13)."
