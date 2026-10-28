@@ -946,6 +946,12 @@ run("scripts/allen_radius_distribution.py", "--fetch", SPECIMEN, "--cache-dir", 
 # The first-stage table is not a calibrated kernel on its own: on rendered thin phantoms its growth is about
 # 0.01 um^2 low within two planes (SPEC Block 10). Keep the default kernel for the production table until you
 # have read the width-by-plane figures and the far fit.
+# [2026-10-28, D-098.4] As `real` evaluates each candidate it draws the patch its background is fitted on (+-25 um,
+# plane k*): the traced segments -- the node's own branch blue, a neighbour orange when its predicted shadow in the
+# patch exceeds 0.03 gl in some plane (what makes `not_isolated`), grey below -- and the far pixels with the fitted
+# background plane, into OUT/calibration/figures/isolation/<set>_node_<id>.png, with overview pages
+# isolation_overview_<n>.png (shown below); `real` ends with `isolation figures: N candidates (k with a neighbour's
+# predicted shadow above 0.03 gl) -> ...`. One crop more per candidate that is not scanned.
 os.makedirs(OUT + "/calibration/figures", exist_ok=True)
 SCANS = "%s/calibration/scans_%d.json" % (OUT, SPECIMEN)
 CALIB = "%s/calibration/calibration_%d.json" % (OUT, SPECIMEN)
@@ -964,6 +970,10 @@ if rc == 0:
     if os.path.exists(PATCHES):
         fig_args += ["--patches", PATCHES]
     run("scripts/calibrate_kernel.py", "figures", *fig_args, check=False)
+import glob
+from IPython.display import Image, display
+for path in sorted(glob.glob(OUT + "/calibration/figures/isolation/isolation_overview_*.png")):   # D-098.4
+    display(Image(filename=path))
 
 # ====================================================================================================
 # ===== CELL 8

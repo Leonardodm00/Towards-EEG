@@ -6,6 +6,8 @@
 # The code is the notebook's own (notebooks/phase2_colab.py on sci/diameter-pipeline, the same cell numbers); two
 # additions: a pre-flight before Cell 7, and Cell 7 passes Cell 3b's registration file only if it exists and shows
 # its figures. Each cell's text says what must appear in its output and what to send back.
+# 2026-10-28 (D-098): Cell 7 also draws each candidate's isolation figure; Cells 12b and 13b added (508305938 aligned
+# again on its minimum projection; the set-aside cells that look aligned run with --include-set-aside).
 
 # %% [markdown]
 # ## Before you start
@@ -15,7 +17,10 @@
 #   steps are skipped.
 # - Nothing here changes the configuration; Cell 8 (not in this file) is where you write the decisions.
 # - Times against Allen's server are not measured: the slowest parts are Cell 11's check over the whole pool, Cell 11b's
-#   ~520 crops, and Cell 13 (up to 120 nodes per cell).
+#   ~520 crops, and Cell 13 (up to 120 nodes per cell). [2026-10-28, the run of that day: Cell 11's check 6.6 min for
+#   158 cells, Cell 11b 7.0 min, Cell 12 29.7 min for 51 cells; Cell 13 estimated at about an hour per cell of 120
+#   nodes, one to two days for 42 cells (each node fetches at least 13 plane crops and runs Block 13's fits; not
+#   measured): each finished cell prints its time.]
 
 # %% [markdown]
 # ## Cell 0: Drive and constants
@@ -147,7 +152,15 @@ subprocess.run([sys.executable, "-c", PREFLIGHT, OUT, str(SPECIMEN), REG_JSON], 
 # `far-fit`: `far fit: gamma_hat = ... +- ...`, the per-sign and quadratic comparisons and `production kernel: ...` (or
 # `no production kernel: insufficient ...`). Then the figures. A failure here does not stop the next cells.
 #
-# Send back: the `real` counts and reasons line, the `fit` and `far-fit` reports, and the five figures.
+# [2026-10-28, D-098.4] As `real` evaluates each candidate it draws the patch its background is fitted on (+-25 um,
+# plane k*): (a) the traced segments -- the node's own branch blue, a neighbour orange when its predicted shadow in the
+# patch exceeds 0.03 gl in some plane (what makes `not_isolated`), grey below -- and (b) the far pixels with the fitted
+# background plane. `real` ends with `isolation figures: N candidates (k with a neighbour's predicted shadow above
+# 0.03 gl) -> .../calibration/figures/isolation`; one PNG per candidate (`<set>_node_<id>.png`) and overview pages
+# (`isolation_overview_<n>.png`, shown below). Costs one crop per candidate that is not scanned.
+#
+# Send back: the `real` counts and reasons line, the `fit` and `far-fit` reports, the five figures, and the isolation
+# overview pages (or the per-node figures of the candidates you want to discuss).
 
 # %%
 os.makedirs(OUT + "/calibration/figures", exist_ok=True)
@@ -174,6 +187,9 @@ for name in ("width_by_plane_near", "width_by_plane_far", "kernel_law", "example
     path = "%s/calibration/figures/%s.png" % (OUT, name)
     if os.path.exists(path):
         display(Image(filename=path))
+import glob
+for path in sorted(glob.glob(OUT + "/calibration/figures/isolation/isolation_overview_*.png")):   # D-098.4
+    display(Image(filename=path))
 
 
 # %% [markdown]
@@ -223,7 +239,9 @@ if os.path.exists(FIG):
 
 # %% [markdown]
 # ## Cell 12: S3 step 1 -- every selected cell's global alignment (Block 16.2)
-# The minimum-intensity xy projection at level 4, `align_translation` with both flips, the score ratio R against
+# The minimum-intensity xy projection at level 4 -- the SubImage of type 'MinimumIntensityProjection - xy' since
+# 2026-10-28 (D-098.2; the darkest only when no SubImage has that type) --, `align_translation` with both flips, the
+# score ratio R against
 # block-shuffled images, a fine stage at level 1. One line per cell, `[i/S] <id> align: shift (x, y) px, ..., ratio R`
 # or `SET ASIDE (reasons)` (R < 2, or a search on its window's edge; D-089.1). A set-aside cell's overlay is shown: to
 # align it by hand, write `survey/<id>/align/alignment_manual.json` with {"shift_x_px": .., "shift_y_px": ..,
@@ -247,6 +265,27 @@ for path in sorted(glob.glob(SURVEY + "/*/align/alignment_*.json")):
 
 
 # %% [markdown]
+# ## Cell 12b (2026-10-28, D-098.1-2): 508305938 aligned again on its minimum projection
+# Run Cells 0 and 1 first (they pull the fixes), after Cell 13 has finished or been stopped. Cell 12 of 2026-10-28 aligned
+# 508305938 on its 'MaximumIntensityProjection - xy', an inverted image (Cell 11b), and set it aside; the rule now takes
+# the projection by its type, so its alignment is run again (`--force align`). The four cells that failed on Allen's
+# marker file (569095789, 508279351, 596036453, 525018757) need nothing here: their `align` has no marker, so Cell 13
+# aligns them, now from the reconstruction.
+#
+# Expect `[1/1] 508305938 align: shift (...) px, ..., ratio R` and its overlay, whose left panel names the projection
+# `'MinimumIntensityProjection - xy' (by type)`.
+#
+# Send back: the line and the overlay.
+
+# %%
+SURVEY = OUT + "/survey"
+run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
+    "--cache-dir", CACHE_DIR, "--steps", "align", "--cells", "508305938", "--force", "align")
+from IPython.display import Image, display
+display(Image(filename=SURVEY + "/508305938/align/overlay_508305938.png"))
+
+
+# %% [markdown]
 # ## Cell 13: S3a -- the node survey and the coverage of the phantoms' band (Block 17)
 # Per aligned cell: the node sample (NODES_MODE "stratified", up to 20 nodes per bin of Allen's 2r, the default
 # confirmed in D-089.3; or "all") measured by Block 13's chain. Then per bin of d_hat the share of nodes in S whose mu_hat
@@ -254,6 +293,10 @@ for path in sorted(glob.glob(SURVEY + "/*/align/alignment_*.json")):
 #
 # Expect one line per cell `[i/S] <id> nodes: stratified: n sampled, n measured, k in S (t s)`, then `coverage: ...`
 # per bin and `coverage: PASS ...` or `coverage: FAIL in <bins> ...`. Resumable.
+# [2026-10-28, D-098.3] The pool recomputes S from each row's fit_status, reg_verdict and flags under the current rule:
+# `coverage: S recomputed ... for n of n rows; k now in S and j now out of S against their stored in_S`. A run whose
+# CSVs were written before D-096 (`estimator_hash` 0508e7ff12f48728 in pilot_summary_<id>.json) shows its faint nodes
+# as `now in S`; nothing needs measuring again.
 #
 # Send back: the coverage lines, `survey/s3a/coverage.json`, `diameters.csv` and the four figures.
 
@@ -273,6 +316,28 @@ from IPython.display import Image, display
 for name in ("coverage_mud", "coverage_share", "coverage_alpha", "diameters"):
     if os.path.exists("%s/s3a/%s.png" % (SURVEY, name)):
         display(Image(filename="%s/s3a/%s.png" % (SURVEY, name)))
+
+
+# %% [markdown]
+# ## Cell 13b (2026-10-28, D-098.5): the set-aside cells whose overlays look aligned
+# Their score ratio R is below 2 (D-089.1, unchanged), but their shifts are those of the kept cells and the skeleton
+# lies on their dendrites in the overlays: 576084692 (R 1.66), 596887423 (1.89), 611598198 (1.14). 571464200 (1.79)
+# joins them after your look at full resolution: add it to ACCEPTED. The nodes step runs on these cells with their
+# automatic alignment (`--include-set-aside`, restricted by `--cells`), then the coverage is pooled again.
+#
+# Expect one `nodes:` line per accepted cell, then the `coverage:` lines as in Cell 13.
+#
+# Send back: the `nodes:` lines and the coverage lines.
+
+# %%
+ACCEPTED = [576084692, 596887423, 611598198]      # + 571464200 after the full-resolution look
+SURVEY = OUT + "/survey"
+CFG_S3 = SURVEY + "/survey_config.json"
+run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
+    "--cache-dir", CACHE_DIR, "--steps", "align,nodes", "--cells", ",".join(str(c) for c in ACCEPTED),
+    "--include-set-aside", "--config-json", CFG_S3)
+run("scripts/survey_cells.py", "pool", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv",
+    "--what", "coverage", "--config-json", CFG_S3)
 
 
 # %% [markdown]
