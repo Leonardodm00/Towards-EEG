@@ -324,7 +324,9 @@ class SurveyConfig:
     align_fine_ridge_um: float = 6.0         # source: PROVISIONAL: widest dark feature kept by the fine stage's ridge darkness (um; the soma is removed)
     align_z0_um: float = 0.0                 # source: PROVISIONAL: depth of plane index 0 (um), as 529878215 (plane index = z / dz); checked by S3b's registration offsets
     projection_size_rel_tol: float = 0.02    # source: PROVISIONAL: an xy projection's width and height lie within this of the planes' median
-    # (the darkest of these is the minimum-intensity projection: the rule confirmed, D-089 [user]; what they are: Block 16.3)
+    projection_xy_type: str = "MinimumIntensityProjection - xy"  # source: D-098.2 [user, 2026-10-28]: the xy projection taken is the one of this image_type (case and outer spaces ignored); the darkest only when none is (D-089.2's rule, the fallback)
+    # (D-089.2's rule, superseded by D-098.2: the darkest of these is the minimum-intensity projection -- on Allen's data
+    # the 'MaximumIntensityProjection - xy' is an inverted image and the darkest, Cell 11b, 2026-10-28; Block 16.3)
     # Block 16.3, what Allen's projections are: each xy projection against operators over the planes (D-090.1)
     projcheck_half_px: int = 256             # source: PROVISIONAL: half-side of the test window (full-res px; 29 um)
     projcheck_max_shift_px: int = 3          # source: PROVISIONAL: offsets searched between a projection and the planes (full-res px)
@@ -489,12 +491,14 @@ class DiameterConfig:
                 and sv.align_min_score_ratio > 0 and sv.align_fine_margin_um >= 0 and sv.align_fine_max_shift_um > 0
                 and sv.align_fine_ridge_um > 0 and math.isfinite(sv.align_z0_um)
                 and 0 < sv.projection_size_rel_tol < 1 and sv.projcheck_half_px >= 8 and sv.projcheck_max_shift_px >= 0
-                and -1 <= sv.projcheck_min_r <= 1 and sv.projcheck_min_ratio >= 1):
+                and -1 <= sv.projcheck_min_r <= 1 and sv.projcheck_min_ratio >= 1
+                and isinstance(sv.projection_xy_type, str) and sv.projection_xy_type.strip()):
             raise ValueError("survey: 0 <= align_fine_downsample < align_downsample <= 6, align_max_shift_um > 0, "
                              "align_null_n >= 10, align_null_block_um > 0, align_min_score_ratio > 0, fine "
                              "margin >= 0, fine shift and ridge > 0, align_z0_um finite, 0 < projection_size_rel_tol "
-                             "< 1 (Block 16.2, D-085.2); projcheck_half_px >= 8, projcheck_max_shift_px >= 0, "
-                             "-1 <= projcheck_min_r <= 1, projcheck_min_ratio >= 1 (Block 16.3, D-090.1)")
+                             "< 1, projection_xy_type a non-empty string (Block 16.2, D-085.2, D-098.2); "
+                             "projcheck_half_px >= 8, projcheck_max_shift_px >= 0, -1 <= projcheck_min_r <= 1, "
+                             "projcheck_min_ratio >= 1 (Block 16.3, D-090.1)")
         nb, cb, pq = sv.nodes_allen_bins_um, sv.coverage_dhat_bins_um, sv.coverage_phantom_quantiles
         if not (sv.nodes_mode in NODES_MODES and sv.nodes_per_bin >= 1 and len(nb) >= 1 and nb[0] > 0
                 and all(b > a for a, b in zip(nb, nb[1:])) and len(cb) >= 2 and cb[0] > 0

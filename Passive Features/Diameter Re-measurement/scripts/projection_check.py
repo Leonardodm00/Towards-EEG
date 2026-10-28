@@ -4,11 +4,12 @@ Colab: api.brain-map.org is blocked from the sandbox.
 
 For each specimen listed: every SubImage that is not a Primary plane, with
 every field the API returns; the planes' count and size; the xy candidates
-of Block 16.2 (a) and the one its darkest rule takes (each fetched whole at
-survey.align_downsample). For each specimen of --check: on one
-full-resolution window centred on the soma, each xy candidate against the
-minimum, mean, median and maximum over the usable planes -- the best integer
-offset, the correlation r*, the line, the verdict.
+of Block 16.2 (a), the one its darkest rule takes (each fetched whole at
+survey.align_downsample) and the one 16.2 (a) takes since D-098.2 (of
+image_type survey.projection_xy_type, else the darkest). For each specimen
+of --check: on one full-resolution window centred on the soma, each xy
+candidate against the minimum, mean, median and maximum over the usable
+planes -- the best integer offset, the correlation r*, the line, the verdict.
 
 Example (Colab, Cell 11b)
     python scripts/projection_check.py --selection .../survey/selection.csv --check 529878215 \\
@@ -43,11 +44,11 @@ from allen_diameter.loading import cell_pool, survey_io  # noqa: E402
 from build_table import load_config  # noqa: E402
 
 PILOT = 529878215
-TYPES_COLUMNS = ("specimen_id", "id", "image_type", "width", "height", "xy_candidate", "darkest", "best", "r",
-                 "shift_x_px", "shift_y_px", "verdict")
+TYPES_COLUMNS = ("specimen_id", "id", "image_type", "width", "height", "xy_candidate", "darkest", "chosen", "best",
+                 "r", "shift_x_px", "shift_y_px", "verdict")
 TYPES_TYPES = {"specimen_id": "int", "id": "int", "image_type": "str", "width": "float", "height": "float",
-               "xy_candidate": "str", "darkest": "str", "best": "str", "r": "float", "shift_x_px": "float",
-               "shift_y_px": "float", "verdict": "str"}
+               "xy_candidate": "str", "darkest": "str", "chosen": "str", "best": "str", "r": "float",
+               "shift_x_px": "float", "shift_y_px": "float", "verdict": "str"}
 
 
 def _int_list(text):
@@ -69,12 +70,14 @@ def list_specimen(source, sid, cfg):
     rec = dict(specimen_id=int(sid), subimages=[dict(r) for r in rows if r.get("image_type") != "Primary"],
                planes=dict(n_usable=int(len(planes)), n_failed=n_failed, width_px=float(planes["width"].median()),
                            height_px=float(planes["height"].median())),
-               candidates=[int(i) for i in cands["id"]], darkest=None)
+               candidates=[int(i) for i in cands["id"]], darkest=None, chosen=None)
     if len(cands):
         arrays = [aio.fetch_whole(source.fetcher, row, sv.align_downsample)[0] for _, row in cands.iterrows()]
         k, meds = cell_alignment.darkest(arrays)
         rec["darkest"] = dict(id=int(cands["id"].iloc[k]), downsample=int(sv.align_downsample),
                               medians={str(int(i)): float(m) for i, m in zip(cands["id"], meds)})
+        kc, rule, _m = cell_alignment.choose_projection(list(cands["image_type"]), arrays, sv.projection_xy_type)
+        rec["chosen"] = dict(id=int(cands["id"].iloc[kc]), rule=rule, image_type=str(cands["image_type"].iloc[kc]))
     return rec, planes, cands
 
 
@@ -128,6 +131,7 @@ def type_rows(rec):
     """projection_types.csv's rows of one specimen record (16.3 (c))."""
     by_id = {int(c["id"]): c for c in rec.get("checks", [])}
     dk = (rec.get("darkest") or {}).get("id")
+    ch = (rec.get("chosen") or {}).get("id")
     out = []
     for r in rec["subimages"]:
         i = int(r["id"])
@@ -138,6 +142,7 @@ def type_rows(rec):
                         height=float(r["height"]) if r.get("height") is not None else math.nan,
                         xy_candidate="yes" if i in rec["candidates"] else "no",
                         darkest="" if dk is None else ("yes" if i == dk else "no"),
+                        chosen="" if ch is None else ("yes" if i == ch else "no"),
                         best=(c.get("best") or "") if c else "", r=float(bo.get("r", math.nan)) if bo else math.nan,
                         shift_x_px=float(bo["shift_x_px"]) if bo and bo.get("shift_x_px") is not None else math.nan,
                         shift_y_px=float(bo["shift_y_px"]) if bo and bo.get("shift_y_px") is not None else math.nan,
@@ -148,11 +153,13 @@ def type_rows(rec):
 def _say_listing(rec, log):
     subs = "; ".join("%s '%s' %sx%s" % (r.get("id"), r.get("image_type"), r.get("width"), r.get("height"))
                      for r in rec["subimages"]) or "none"
-    pl, dk = rec["planes"], rec.get("darkest")
+    pl, dk, ch = rec["planes"], rec.get("darkest"), rec.get("chosen")
     log("[proj] %d: %d non-Primary SubImages: %s" % (rec["specimen_id"], len(rec["subimages"]), subs))
-    log("[proj] %d: planes %d usable (%d failed), %.0fx%.0f px; xy candidates %s; darkest at level %s: %s"
+    log("[proj] %d: planes %d usable (%d failed), %.0fx%.0f px; xy candidates %s; darkest at level %s: %s; "
+        "chosen (by %s): %s"
         % (rec["specimen_id"], pl["n_usable"], pl["n_failed"], pl["width_px"], pl["height_px"], rec["candidates"],
-           dk["downsample"] if dk else "-", dk["id"] if dk else "none"))
+           dk["downsample"] if dk else "-", dk["id"] if dk else "none", ch["rule"] if ch else "-",
+           ch["id"] if ch else "none"))
 
 
 def _say_checks(rec, log):

@@ -131,7 +131,7 @@ def step_align(ctx, cfg):
             raise RuntimeError("no xy projection among the SubImages of %d (types: %s)"
                                % (sid, sorted(set(str(t) for t in images["image_type"]))))
         arrays = [aio.fetch_whole(ctx.source.fetcher, row, sv.align_downsample)[0] for _, row in cands.iterrows()]
-        k, meds = cell_alignment.darkest(arrays)
+        k, rule, meds = cell_alignment.choose_projection(list(cands["image_type"]), arrays, sv.projection_xy_type)
         row = cands.iloc[k]
 
         def get_crop(left, top, width, height, q):
@@ -140,7 +140,7 @@ def step_align(ctx, cfg):
         rng = np.random.default_rng([int(sv.selection_seed), int(sid)])
         rec, imgs = cell_alignment.align_record(swc, arrays[k], sv.align_downsample,
                                                 (int(row["width"]), int(row["height"])), get_crop, rho0, sv, rng)
-        rec["projection"] = dict(id=int(row["id"]), image_type=str(row["image_type"]), candidates=[
+        rec["projection"] = dict(id=int(row["id"]), image_type=str(row["image_type"]), rule=rule, candidates=[
             dict(id=int(r["id"]), image_type=str(r["image_type"]), width=int(r["width"]), height=int(r["height"]),
                  median_gl=meds[i]) for i, (_, r) in enumerate(cands.iterrows())])
         from allen_diameter.plotting import survey_figures

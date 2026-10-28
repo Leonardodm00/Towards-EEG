@@ -5,11 +5,16 @@ A synthetic cell: a tree of dendrites (SWC types 3 and 4, in um) painted as
 dark tubes about 1 um wide on a bright noisy field at a known full-res shift
 (and y-flip), the minimum-intensity projection; its maximum-intensity twin
 (bright, no structure); a yz-shaped image; three Primary planes 2 px smaller
-than the projections, as Allen's are. A synthetic source serves the SWC, the
+than the projections, as Allen's are. The SubImages carry Allen's image_type
+strings ('MinimumIntensityProjection - xy', 'MaximumIntensityProjection - xy',
+'MinimumIntensityProjection - yz'). A synthetic source serves the SWC, the
 SubImage table and the crops (allen_image_io.SyntheticFetcher per image).
 
 Checks
-    test_known_answer   the minimum projection chosen; no flip / flip; the
+    test_known_answer   the minimum projection chosen by its type (D-098.2),
+                        also when the maximum-intensity twin is Allen's
+                        inverted image, the darkest of the two (Cell 11b,
+                        2026-10-28); no flip / flip; the
                         coarse shift within 1.5 f_c full-res px (the level-4
                         pixel plus the offset of up to (f_c - 1)/2 between
                         box-averaged content and Block 0's corner convention),
@@ -26,7 +31,11 @@ Checks
     test_contract       the record's keys and JSON round trip; the marker and
                         status files; full_transform feeds cell.to_image_um
     test_determinism    the null with its seed: the same ratio twice
-    test_edge_cases     an empty field is set aside on the ratio; a manual
+    test_edge_cases     choose_projection: the type matched in any case and
+                        with outer spaces, the darkest of several of that
+                        type, the darkest of all when none has it (D-089.2's
+                        rule, the fallback), a length mismatch refused;
+                        an empty field is set aside on the ratio; a manual
                         alignment is used as given; no xy projection fails the
                         step naming the types; the fine level under Block 0's
                         size guard; the runner: resume, --force,
@@ -122,14 +131,20 @@ def painted(swc, dx, dy, flip, seed, empty=False):
     return np.clip(img + rng.normal(0, 4, img.shape), 0, 255).astype(np.uint8)
 
 
-def image_table(base_id, with_xy=True):
+MAX_XY, MIN_XY, MIN_YZ = "MaximumIntensityProjection - xy", "MinimumIntensityProjection - xy", \
+    "MinimumIntensityProjection - yz"         # Allen's image_type strings (Cell 11b, 2026-10-28)
+
+
+def image_table(base_id, with_xy=True, typed=True):
+    """The SubImage table; typed=False gives every projection the generic type 'Projection'."""
+    t_max, t_min, t_yz = (MAX_XY, MIN_XY, MIN_YZ) if typed else ("Projection",) * 3
     rows = []
     if with_xy:
-        rows += [dict(id=base_id + 1, image_type="Projection", section_number=None, width=W_FULL, height=H_FULL,
+        rows += [dict(id=base_id + 1, image_type=t_max, section_number=None, width=W_FULL, height=H_FULL,
                       resolution=RHO0, data_set_id=None, failed=False),
-                 dict(id=base_id + 2, image_type="Projection", section_number=None, width=W_FULL, height=H_FULL,
+                 dict(id=base_id + 2, image_type=t_min, section_number=None, width=W_FULL, height=H_FULL,
                       resolution=RHO0, data_set_id=None, failed=False)]
-    rows += [dict(id=base_id + 3, image_type="Projection", section_number=None, width=500, height=H_FULL,
+    rows += [dict(id=base_id + 3, image_type=t_yz, section_number=None, width=500, height=H_FULL,
                   resolution=RHO0, data_set_id=None, failed=False)]
     rows += [dict(id=base_id + 10 + k, image_type="Primary", section_number=10 + k, width=W_FULL - 2,
                   height=H_FULL - 2, resolution=RHO0, data_set_id=base_id, failed=False) for k in range(3)]
@@ -153,16 +168,23 @@ class SynthSource:
     def __init__(self, tmp):
         self.tmp, self.cells, self.fetcher = tmp, {}, MultiFetcher()
 
-    def add(self, sid, dx, dy, flip=False, empty=False, with_xy=True, seed=None, swc_seed=3):
+    def add(self, sid, dx, dy, flip=False, empty=False, with_xy=True, seed=None, swc_seed=3, inverted_max=False,
+            typed=True):
+        """inverted_max: the maximum-intensity twin is the minimum's negative (bright tubes on a dark field), as
+        Allen's 'MaximumIntensityProjection - xy' (Cell 11b, 2026-10-28), so it is the darker of the two."""
         swc = tree_swc(seed=swc_seed)
         base = sid * 100
         mn = painted(swc, dx, dy, flip, seed if seed is not None else sid % 1000, empty)
-        mx = np.clip(235 + np.random.default_rng(sid % 997).normal(0, 3, mn.shape), 0, 255).astype(np.uint8)
+        if inverted_max:
+            mx = (255 - mn.astype(np.int16)).astype(np.uint8)
+        else:
+            mx = np.clip(235 + np.random.default_rng(sid % 997).normal(0, 3, mn.shape), 0, 255).astype(np.uint8)
         yz = np.full((H_FULL, 500), 200, dtype=np.uint8)
         for iid, arr in ((base + 1, mx), (base + 2, mn), (base + 3, yz)):   # the minimum is NOT the first row
             self.fetcher.by_id[iid] = aio.SyntheticFetcher(arr)
         self.cells[sid] = dict(swc=swc, swc_path=write_swc(swc, os.path.join(self.tmp, "%d.swc" % sid)),
-                               images=image_table(base, with_xy), truth=(dx, dy, flip), min_id=base + 2)
+                               images=image_table(base, with_xy, typed), truth=(dx, dy, flip), min_id=base + 2,
+                               max_id=base + 1, arrays=dict(mn=mn, mx=mx))
         return self
 
     def swc_path(self, sid):
@@ -214,6 +236,7 @@ def test_known_answer():
     for sid, (dx, dy, flip) in ((101, (83.0, -51.0, False)), (102, (45.0, 29.0, True))):
         rec, summ = c[sid]
         assert rec["projection"]["id"] == c["src"].cells[sid]["min_id"], rec["projection"]
+        assert rec["projection"]["rule"] == "type" and rec["projection"]["image_type"] == MIN_XY, rec["projection"]
         assert len(rec["projection"]["candidates"]) == 2, "the yz-shaped image is not a candidate"
         assert rec["coarse"]["flip"] is flip and (rec["flip_h_px"] is not None) == flip, rec
         co = rec["coarse"]
@@ -226,6 +249,19 @@ def test_known_answer():
         if flip:
             assert rec["flip_h_px"] == f_c * (H_FULL // f_c), rec["flip_h_px"]
         assert summ["set_aside"] is False and summ["method"] == "auto"
+    # D-098.2: Allen's 'MaximumIntensityProjection - xy' is an inverted image, the darker of the two; the darkest rule
+    # (D-089.2) takes it, the rule by type keeps the minimum and the alignment holds
+    tmp = tempfile.mkdtemp()
+    src = SynthSource(tmp).add(104, 83.0, -51.0, inverted_max=True, seed=101 % 1000)
+    cell = src.cells[104]
+    k_dark, _m = CA.darkest([aio.SyntheticFetcher(cell["arrays"][a]).get(0, 0, 0, W_FULL, H_FULL, 4)
+                              for a in ("mx", "mn")])
+    assert k_dark == 0, "the inverted twin must be the darker (the test's premise)"
+    rec, summ = align_one(src, 104)
+    assert rec["projection"]["id"] == cell["min_id"] and rec["projection"]["rule"] == "type", rec["projection"]
+    tol = f_f + 0.5
+    assert abs(rec["shift_x_px"] - 83.0) <= tol and abs(rec["shift_y_px"] + 51.0) <= tol, rec
+    assert not rec["set_aside"] and rec["score_ratio"] >= 2.0, (rec["score_ratio"], rec["reasons"])
 
 
 def test_reference():
@@ -300,8 +336,26 @@ def _probe_steps(calls, fail_on=()):
 
 def test_edge_cases():
     cfg = default_config()
+    assert cfg.survey.projection_xy_type == MIN_XY
+    dark, mid, light = (np.full((4, 4), v, dtype=np.uint8) for v in (40, 120, 220))
+    # the type in any case and with outer spaces; the darkest of several of the type; none of it: the darkest of all
+    assert CA.choose_projection([MAX_XY, "  minimumintensityprojection - XY "], [dark, light], MIN_XY)[:2] == (1, "type")
+    assert CA.choose_projection([MIN_XY, MAX_XY, MIN_XY], [light, dark, mid], MIN_XY)[:2] == (2, "type")
+    k, rule, meds = CA.choose_projection(["Projection", "Projection"], [mid, dark], MIN_XY)
+    assert (k, rule) == (1, "darkest") and meds == [120.0, 40.0], (k, rule, meds)
+    assert CA.choose_projection([MIN_XY + "x", MAX_XY], [light, dark], MIN_XY)[:2] == (1, "darkest")
+    try:
+        CA.choose_projection([MIN_XY], [light, dark], MIN_XY)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("a types list of another length must be refused")
     tmp = tempfile.mkdtemp()
     src = SynthSource(tmp).add(201, 30.0, 12.0).add(202, 0.0, 0.0, empty=True).add(203, 0.0, 0.0, with_xy=False)
+    src.add(204, 30.0, 12.0, typed=False, seed=201 % 1000)            # generic types: the darkest rule, the fallback
+    rec_f, _ = align_one(src, 204)
+    assert rec_f["projection"]["rule"] == "darkest" and rec_f["projection"]["id"] == src.cells[204]["min_id"], \
+        rec_f["projection"]
     # an empty field: set aside on the ratio
     rec, _ = align_one(src, 202)
     assert rec["set_aside"] and "low_score_ratio" in rec["reasons"], (rec["score_ratio"], rec["reasons"])
@@ -374,7 +428,8 @@ def test_edge_cases():
         SC.ORDER = saved[1]
     # the configuration's refusals
     for bad in (dict(align_fine_downsample=4), dict(align_null_n=3), dict(align_null_block_um=0.0),
-                dict(projection_size_rel_tol=0.0), dict(align_min_score_ratio=0.0)):
+                dict(projection_size_rel_tol=0.0), dict(align_min_score_ratio=0.0), dict(projection_xy_type=" "),
+                dict(projection_xy_type=None)):
         try:
             dataclasses.replace(cfg, survey=dataclasses.replace(cfg.survey, **bad)).validate()
         except ValueError:

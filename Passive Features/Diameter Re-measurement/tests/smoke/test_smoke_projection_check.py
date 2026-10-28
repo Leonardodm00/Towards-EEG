@@ -144,10 +144,12 @@ class Source:
         if with_xy:
             for iid, op in ((502, "max"), (501, "min")):              # the maximum first: the order must not matter
                 by_id[iid] = aio.SyntheticFetcher(projection_image(ops[op]))
-                rows.append(dict(id=iid, image_type="Projection", section_number=None, width=WP + 2, height=HP + 2,
+                kind = "MaximumIntensityProjection - xy" if op == "max" else "MinimumIntensityProjection - xy"
+                rows.append(dict(id=iid, image_type=kind, section_number=None, width=WP + 2, height=HP + 2,
                                  resolution=RHO0, data_set_id=None, failed=False, storage_directory="/proj/%d/" % iid))
         by_id[503] = aio.SyntheticFetcher(np.full((HP + 2, 40), 200, dtype=np.uint8))
-        rows.append(dict(id=503, image_type="Projection", section_number=None, width=40, height=HP + 2, resolution=RHO0,
+        rows.append(dict(id=503, image_type="MinimumIntensityProjection - yz", section_number=None, width=40,
+                         height=HP + 2, resolution=RHO0,
                          data_set_id=None, failed=False, storage_directory="/proj/503/"))
         for k in range(NPL):
             if missing_section is not None and k == missing_section:
@@ -320,8 +322,9 @@ def test_contract():
         out = os.path.join(tmp, "out")
         recs, lines = run_quiet(small_cfg(), [SID], [SID], src, out)
         rec = survey_io.read_json(os.path.join(out, "projections_%d.json" % SID))
-        assert {"specimen_id", "subimages", "planes", "candidates", "darkest", "window", "n_planes_used", "checks",
-                "seconds"} <= set(rec), sorted(rec)
+        assert {"specimen_id", "subimages", "planes", "candidates", "darkest", "chosen", "window", "n_planes_used",
+                "checks", "seconds"} <= set(rec), sorted(rec)
+        assert rec["chosen"] == dict(id=501, rule="type", image_type="MinimumIntensityProjection - xy"), rec["chosen"]
         assert sorted(r["id"] for r in rec["subimages"]) == [501, 502, 503]
         assert {r["id"]: r["storage_directory"] for r in rec["subimages"]}[502] == "/proj/502/"
         assert sorted(rec["candidates"]) == [501, 502] and rec["darkest"]["id"] == 501, rec["darkest"]
@@ -333,13 +336,14 @@ def test_contract():
         tab = cell_pool.read_table(os.path.join(out, "projection_types.csv"), PCS.TYPES_TYPES)
         assert [r["id"] for r in tab] == [r["id"] for r in rec["subimages"]]
         t = {r["id"]: r for r in tab}
-        assert (t[501]["xy_candidate"], t[501]["darkest"], t[501]["best"]) == ("yes", "yes", "min")
-        assert (t[502]["xy_candidate"], t[502]["darkest"], t[502]["best"]) == ("yes", "no", "max")
+        assert (t[501]["xy_candidate"], t[501]["darkest"], t[501]["chosen"], t[501]["best"]) == ("yes", "yes", "yes", "min")
+        assert (t[502]["xy_candidate"], t[502]["darkest"], t[502]["chosen"], t[502]["best"]) == ("yes", "no", "no", "max")
         assert t[503]["xy_candidate"] == "no" and t[503]["verdict"] in ("", None) and math.isnan(t[503]["r"])
         png = os.path.join(out, "projection_check_%d.png" % SID)
         from PIL import Image
         assert os.path.getsize(png) > 10000 and Image.open(png).size[0] > 500
         assert any("matches min" in ln for ln in lines) and any("darkest at level 4: 501" in ln for ln in lines), lines
+        assert any("chosen (by type): 501" in ln for ln in lines), lines
 
 
 def _strip(path):
@@ -411,6 +415,7 @@ def test_edge_cases():
         run_quiet(cfg, [SID], [SID], Source(tmp, with_xy=False), out)
         rec = survey_io.read_json(os.path.join(out, "projections_%d.json" % SID))
         assert rec["candidates"] == [] and rec["darkest"] is None and rec["checks"] == [] and "no xy" in rec["note"]
+        assert rec["chosen"] is None
         # no soma and no --center: refused, naming --center
         try:
             run_quiet(cfg, [SID], [SID], Source(tmp, soma=False), os.path.join(tmp, "nosoma"))

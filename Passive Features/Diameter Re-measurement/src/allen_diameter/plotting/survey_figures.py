@@ -41,7 +41,10 @@ def alignment_overlay(swc, images, rec, title=""):
     cf, ff = images["coarse_frame"], images["fine_frame"]
     aip.show_image(images["coarse"], cf.res_um_px, ax=axes[0], robust=True)
     aip.overlay_swc(axes[0], swc, cf, final, flip, color=ORANGE, lw=0.6)
-    axes[0].set_title("projection, level %d (%.2f um/px)" % (cf.downsample, cf.res_um_px), fontsize=10)
+    pj = rec.get("projection") or {}
+    which = ("%s '%s' (by %s), " % (pj.get("id"), pj.get("image_type"), pj.get("rule", "darkest"))
+             if pj.get("id") is not None else "")
+    axes[0].set_title("projection %slevel %d (%.2f um/px)" % (which, cf.downsample, cf.res_um_px), fontsize=10)
     aip.show_image(images["fine"], ff.res_um_px, ax=axes[1], robust=True)
     ct = images["coarse_transform"]
     aip.overlay_swc(axes[1], swc, ff, ct["shift_full_px"], ct["flip_y_full_h"], color=GREY, lw=0.6, alpha=0.8)

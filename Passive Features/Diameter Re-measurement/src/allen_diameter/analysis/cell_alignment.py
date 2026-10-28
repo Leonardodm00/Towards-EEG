@@ -4,7 +4,10 @@ configuration; nothing here fetches or writes (the fine crop comes through a
 callable).
 
   xy_projections   the SubImages that are xy projections (the planes' size)
-  darkest          the minimum-intensity projection among them (lowest median)
+  choose_projection  the one taken: of image_type survey.projection_xy_type
+                   ('MinimumIntensityProjection - xy'), else the darkest
+                   (D-098.2; D-089.2's rule is the fallback)
+  darkest          the candidate with the lowest median grey level
   coarse_alignment allen_image_align.align_translation on the projection
   search_score     the coarse search's best mean darkness under the mask
   block_shuffle    the darkness map with its square tiles permuted
@@ -50,6 +53,29 @@ def darkest(arrays):
     if not meds:
         raise ValueError("darkest: no image")
     return int(np.argmin(meds)), meds
+
+
+def _type_key(t):
+    return str(t).strip().lower()
+
+
+def choose_projection(image_types, arrays, xy_type):
+    """Block 16.2 (a) (D-098.2): (index, rule, medians) of the xy projection
+    to align on, among candidates with these image_types and arrays (the
+    same order). rule "type": the candidate whose image_type equals xy_type
+    (case and outer spaces ignored; several such: the darkest of them);
+    rule "darkest": no candidate has that type, so the darkest of all
+    (D-089.2's rule, which on Allen's data takes the inverted
+    'MaximumIntensityProjection - xy' where one exists, Cell 11b,
+    2026-10-28). medians: every candidate's median grey level."""
+    k_all, meds = darkest(arrays)
+    if len(image_types) != len(meds):
+        raise ValueError("choose_projection: %d types for %d images" % (len(image_types), len(meds)))
+    want = _type_key(xy_type)
+    typed = [i for i, t in enumerate(image_types) if _type_key(t) == want]
+    if typed:
+        return min(typed, key=lambda i: (meds[i], i)), "type", meds
+    return k_all, "darkest", meds
 
 
 def _finite(v):
