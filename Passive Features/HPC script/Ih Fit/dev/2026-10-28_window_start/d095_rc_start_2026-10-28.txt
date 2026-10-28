@@ -1,0 +1,13 @@
+kappa_tr sigma_SS = 0.0040 mV; noiseless RC response, SS train position 18; crossing times in ms (pre: against the pre-pulse level; fit: fitted exponential, free baseline; train analytic and one pulse)
+R_in   113 MOhm, tau_m  20.0 ms: V0 0.565 mV | pre   99.3 | fit   99.1 (b 2.2e-14 mV, tau_hat 20.00 ms) | train analytic   98.9 (one pulse   98.9) | ok
+R_in   113 MOhm, tau_m  28.1 ms: V0 0.402 mV | pre  132.7 | fit  129.8 (b -4.8e-13 mV, tau_hat 28.14 ms) | train analytic  129.5 (one pulse  129.6) | ok
+R_in   113 MOhm, tau_m  35.0 ms: V0 0.323 mV | pre  166.3 | fit  153.6 (b 1.2e-13 mV, tau_hat 35.00 ms) | train analytic  153.4 (one pulse  153.5) | ok
+R_in   113 MOhm, tau_m  40.0 ms: V0 0.282 mV | pre  200.0 | fit  170.1 (b 2.9e-13 mV, tau_hat 40.00 ms) | train analytic  169.8 (one pulse  170.1) | ok
+R_in   113 MOhm, tau_m  45.0 ms: V0 0.251 mV | pre  200.0 | fit  185.8 (b 3.2e-13 mV, tau_hat 45.00 ms) | train analytic  185.5 (one pulse  186.1) | ok
+R_in   113 MOhm, tau_m  50.0 ms: V0 0.226 mV | pre  200.0 | fit  200.8 (b 4.8e-13 mV, tau_hat 50.00 ms) | train analytic  200.6 (one pulse  201.5) | ok   [fit start at or past 190 ms: fallback]
+R_in   113 MOhm, tau_m  60.0 ms: V0 0.188 mV | pre  200.0 | fit  229.0 (b -8.5e-13 mV, tau_hat 60.00 ms) | train analytic  228.7 (one pulse  230.8) | ok   [fit start at or past 190 ms: fallback]
+R_in    60 MOhm, tau_m  28.1 ms: V0 0.213 mV | pre  113.5 | fit  112.0 (b -2.0e-14 mV, tau_hat 28.14 ms) | train analytic  111.7 (one pulse  111.8) | ok
+R_in   113 MOhm, tau_m  28.1 ms: V0 0.402 mV | pre  132.7 | fit  129.8 (b -4.8e-13 mV, tau_hat 28.14 ms) | train analytic  129.5 (one pulse  129.6) | ok
+R_in   200 MOhm, tau_m  28.1 ms: V0 0.711 mV | pre  151.2 | fit  145.8 (b -6.7e-13 mV, tau_hat 28.14 ms) | train analytic  145.6 (one pulse  145.6) | ok
+R_in   300 MOhm, tau_m  28.1 ms: V0 1.066 mV | pre  165.7 | fit  157.3 (b 4.0e-12 mV, tau_hat 28.14 ms) | train analytic  157.0 (one pulse  157.0) | ok
+fit reading against the train's analytic crossing within 0.5 ms: PASS

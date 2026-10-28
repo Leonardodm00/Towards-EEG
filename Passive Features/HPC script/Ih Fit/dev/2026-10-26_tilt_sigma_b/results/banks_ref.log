@@ -1,0 +1,4 @@
+ref 2sw_K40    S  2 K  40: 2000 cells, pairs per sweep at lag 4 [5, 12] (91 s)
+ref 2sw_K63    S  2 K  63: 2000 cells, pairs per sweep at lag 4 [28, 20] (99 s)
+ref 6sw_K199   S  6 K 199: 600 cells, pairs per sweep at lag 4 [30, 27, 27, 29, 20, 24] (93 s)
+ref 10sw_K348  S 10 K 348: 400 cells, pairs per sweep at lag 4 [31, 31, 29, 31, 30, 30, 25, 27, 30, 27] (100 s)

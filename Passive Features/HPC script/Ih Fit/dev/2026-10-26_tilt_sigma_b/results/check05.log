@@ -1,0 +1,21 @@
+observed: max/min 12.9, max/median 4.84, median/min 2.67
+homogeneous (one s for all cells, 200000 cohorts): P(max/min >= obs) = 3.66e-02; P(max/median >= obs) = 1.00e-05; P(median/min >= obs) = 0.496; median max/min 5.13 [95th pct 11.76]
+heterogeneous, s_c = exp(omega z_c):
+   omega 0.0: max/min 5/50/95 % = 3.0 / 5.1 / 11.7; P(max/min >= obs) = 0.036; P(max/median >= obs) = 0.000
+   omega 0.1: max/min 5/50/95 % = 3.1 / 5.3 / 12.3; P(max/min >= obs) = 0.043; P(max/median >= obs) = 0.000
+   omega 0.2: max/min 5/50/95 % = 3.4 / 6.0 / 14.1; P(max/min >= obs) = 0.065; P(max/median >= obs) = 0.001
+   omega 0.3: max/min 5/50/95 % = 3.9 / 7.2 / 17.5; P(max/min >= obs) = 0.123; P(max/median >= obs) = 0.007
+   omega 0.4: max/min 5/50/95 % = 4.5 / 9.0 / 23.1; P(max/min >= obs) = 0.244; P(max/median >= obs) = 0.040
+   omega 0.5: max/min 5/50/95 % = 5.5 / 11.6 / 31.8; P(max/min >= obs) = 0.418; P(max/median >= obs) = 0.112
+   omega 0.6: max/min 5/50/95 % = 6.6 / 15.1 / 44.9; P(max/min >= obs) = 0.610; P(max/median >= obs) = 0.225
+   omega 0.7: max/min 5/50/95 % = 8.2 / 20.3 / 66.4; P(max/min >= obs) = 0.780; P(max/median >= obs) = 0.369
+   omega 0.8: max/min 5/50/95 % = 10.1 / 27.8 / 99.5; P(max/min >= obs) = 0.886; P(max/median >= obs) = 0.509
+   omega 0.9: max/min 5/50/95 % = 12.6 / 37.9 / 154.0; P(max/min >= obs) = 0.946; P(max/median >= obs) = 0.632
+   omega 1.0: max/min 5/50/95 % = 15.9 / 52.3 / 239.2; P(max/min >= obs) = 0.976; P(max/median >= obs) = 0.730
+   omega 1.1: max/min 5/50/95 % = 20.2 / 72.1 / 367.7; P(max/min >= obs) = 0.990; P(max/median >= obs) = 0.804
+   omega 1.2: max/min 5/50/95 % = 25.2 / 101.6 / 578.1; P(max/min >= obs) = 0.995; P(max/median >= obs) = 0.859
+   omega 1.3: max/min 5/50/95 % = 31.8 / 141.8 / 931.2; P(max/min >= obs) = 0.998; P(max/median >= obs) = 0.901
+   omega 1.4: max/min 5/50/95 % = 40.6 / 200.4 / 1472.1; P(max/min >= obs) = 0.999; P(max/median >= obs) = 0.928
+   omega 1.5: max/min 5/50/95 % = 50.5 / 280.6 / 2343.4; P(max/min >= obs) = 1.000; P(max/median >= obs) = 0.949
+   omega 1.6: max/min 5/50/95 % = 65.5 / 396.0 / 3729.6; P(max/min >= obs) = 1.000; P(max/median >= obs) = 0.965
+omega for which the observed max/min lies inside the 5-95 % band: 0.2-0.9; median match at omega 0.5

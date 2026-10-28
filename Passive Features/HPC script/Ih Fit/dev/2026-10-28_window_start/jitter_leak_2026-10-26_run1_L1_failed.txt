@@ -1,0 +1,22 @@
+check_jitter_leak.py, 2026-10-26: layout 2 sweeps, K 63 (K = 63: 33 dep, 30 hyp), theta_cf, sigma_b = 0.00 mV/s, 200 cells (null 200), seed 20261027; sigma_SS median 0.0402 mV
+unit of every bias: the across-cell SD of the noise-only statistic at t_SS = 80 ms: sigma 0.001062  rho0.02 0.01916  rho0.1 0.02287  rho1 0.02329  rho10 0.02527
+precision cost of starting at 120 ms instead of 80 ms (noise alone), SD(120)/SD(80): sigma 0.91  rho0.02 1.05  rho0.1 1.08  rho1 1.05  rho10 0.84
+
+L1 -- bias at t_SS = 80 ms (option (c)): measured (+/- SE) against the leak law
+config                        R(80)/sSS   leak_rms  sigma: measured  predicted   rho0.02 rho0.1 rho1 rho10 (measured)
+tau  28.1 ms, A 1.0, cv 0.20         0.55      0.029   0.0119 +/- 0.0164     0.0127     0.025   0.016   0.003   0.027   PASS
+tau  28.1 ms, A 5.0, cv 0.00         2.73      0.000   0.0001 +/- 0.0001     0.0000    -0.000   0.000   0.000  -0.000   PASS
+tau  28.1 ms, A 5.0, cv 0.10         2.73      0.073   0.0623 +/- 0.0299     0.0796     0.078   0.073   0.067   0.058   PASS
+tau  28.1 ms, A 5.0, cv 0.30         2.73      0.218   0.4729 +/- 0.0491     0.7162     0.465   0.469   0.469   0.346   PASS
+tau  60.0 ms, A 1.0, cv 0.30         1.32      0.085   0.0591 +/- 0.0316     0.1097     0.084   0.070   0.083   0.084   PASS
+tau  60.0 ms, A 3.0, cv 0.30         3.96      0.256   0.5829 +/- 0.0563     0.9870     0.565   0.607   0.619   0.465   FAIL
+L1 FAIL
+
+Option (b) (z = 3.5 per-bin simulated null, start max(80 ms, t_tr)): the start it picks and the bias there
+   null SD of r_odd's 5 ms bin mean / sigma_SS at 0, 80, 100, 150, 195 ms: [0.075 0.198 0.202 0.225 0.277]
+tau  28.1 ms, A 5.0, cv 0.00: t_SS median 120 ms [10-90 %: 110-135], >= 190 ms (`ss_enlarged_none`, no enlarged window) in 0.0 %; bias at that start over the 200 cells that keep a window (unit as above): sigma 0.0000 +/- 0.0000 (predicted 0.0000), rho 0.000 0.000 0.000 0.000
+tau  28.1 ms, A 5.0, cv 0.30: t_SS median 120 ms [10-90 %: 110-135], >= 190 ms (`ss_enlarged_none`, no enlarged window) in 0.0 %; bias at that start over the 200 cells that keep a window (unit as above): sigma 0.0034 +/- 0.0225 (predicted 0.0481), rho 0.016 0.021 0.061 0.035
+tau  60.0 ms, A 3.0, cv 0.30: t_SS median 200 ms [10-90 %: 180-200], >= 190 ms (`ss_enlarged_none`, no enlarged window) in 73.5 %; bias at that start over the 53 cells that keep a window (unit as above): sigma 0.0097 +/- 0.0157 (predicted 0.0072), rho 0.018 -0.002 0.010 0.009
+
+L2 -- option (b)'s start, same response (tau 28.1 ms, A 5.0), cv 0.00 vs 0.30: median 120 vs 120 ms, 10-90 % 110-135 vs 110-135 ms; same start in 85.0 % of cells: PASS
+(186 s)

@@ -1,0 +1,5 @@
+theta_cf: sigma_f 0.0380 mV, rho_f 0.175, sigma_s 0.0508 mV, tau_s 36.6 ms; pre-window 500 samples (10 ms)
+closed form E[sigma_hat^2] = 1.6630e-03 mV^2 (sqrt 0.0408 mV): fast 1.4428e-03 (86.8 %), slow 2.2026e-04 (13.2 %); fast visible share 0.999, slow visible share 0.085 of sigma_s^2
+Monte Carlo, 2 sweeps, K 63 (K = 63), sigma_b 0.00 mV/s, 500 cells: sigma_SS_hat median 0.0402 mV, 10-90 % 0.0399-0.0407 (spread +/- 1.1 %); median / sqrt(E) = 0.9869
+Monte Carlo, 2 sweeps, K 63 (K = 63), sigma_b 0.10 mV/s, 500 cells: sigma_SS_hat median 0.0402 mV, 10-90 % 0.0398-0.0407 (spread +/- 1.1 %); median / sqrt(E) = 0.9867
+claim (median within 2 % of sqrt(E)): PASS; claim (tilt moves it < 0.5 %): PASS  (40 s)

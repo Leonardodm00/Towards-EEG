@@ -1,0 +1,13 @@
+kappa_tr sigma_SS = 0.0040 mV; crossing of the noiseless RC response (sampled train, position 18) against tau_m ln(V0 / (kappa sigma_SS)) for one pulse
+R_in   113 MOhm, tau_m  20.0 ms: V0 0.565 mV; crossing   99.3 ms (analytic   98.9)  ok
+R_in   113 MOhm, tau_m  28.1 ms: V0 0.402 mV; crossing  132.7 ms (analytic  129.6)  FAIL
+R_in   113 MOhm, tau_m  35.0 ms: V0 0.323 mV; crossing  166.3 ms (analytic  153.5)  FAIL
+R_in   113 MOhm, tau_m  40.0 ms: V0 0.282 mV; crossing  200.0 ms (analytic  170.1)  -> past 190 ms: fallback  FAIL
+R_in   113 MOhm, tau_m  45.0 ms: V0 0.251 mV; crossing  200.0 ms (analytic  186.1)  -> past 190 ms: fallback  FAIL
+R_in   113 MOhm, tau_m  50.0 ms: V0 0.226 mV; crossing  200.0 ms (analytic  201.5)  -> past 190 ms: fallback  ok
+R_in   113 MOhm, tau_m  60.0 ms: V0 0.188 mV; crossing  200.0 ms (analytic  230.8)  -> past 190 ms: fallback  ok
+R_in    60 MOhm, tau_m  28.1 ms: V0 0.213 mV; crossing  113.5 ms (analytic  111.8)  FAIL
+R_in   113 MOhm, tau_m  28.1 ms: V0 0.402 mV; crossing  132.7 ms (analytic  129.6)  FAIL
+R_in   200 MOhm, tau_m  28.1 ms: V0 0.711 mV; crossing  151.2 ms (analytic  145.6)  FAIL
+R_in   300 MOhm, tau_m  28.1 ms: V0 1.066 mV; crossing  165.7 ms (analytic  157.0)  FAIL
+analytic agreement within 1 ms: FAIL

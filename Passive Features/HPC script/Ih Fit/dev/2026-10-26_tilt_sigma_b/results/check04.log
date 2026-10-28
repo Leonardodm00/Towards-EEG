@@ -1,0 +1,71 @@
+statsmodels combine_effects(dl) on a homogeneous toy: tau2 = -0.887 (negative: True), negative RE weights: True -> the clip at 0 must be ours
+log(chi2_2/2): mean -0.5762 (formula -0.5772), variance 1.6390 (formula 1.6449) -> PASS
+log(chi2_6/6): mean -0.1755 (formula -0.1758), variance 0.3942 (formula 0.3949) -> PASS
+log(chi2_10/10): mean -0.1035 (formula -0.1033), variance 0.2210 (formula 0.2213) -> PASS
+cohort: 508282493:2sw K40 S_eff 1.63, 526785799:2sw K47 S_eff 2.00, 529878215:2sw K39 S_eff 1.76, 531520401:2sw K40 S_eff 1.99, 531523484:2sw K37 S_eff 1.74, 531526539:2sw K46 S_eff 1.97, 537297470:2sw K66 S_eff 1.99, 537313600:2sw K47 S_eff 1.99, 539653924:2sw K47 S_eff 1.99, 541545716:2sw K56 S_eff 1.98, 548408551:2sw K52 S_eff 1.82, 548425467:2sw K69 S_eff 1.99, 548473051:2sw K56 S_eff 1.94, 569844159:10sw K348 S_eff 9.93, 571430815:6sw K199 S_eff 5.99, 571483807:10sw K303 S_eff 9.81, 571624532:10sw K317 S_eff 9.89, 571691416:2sw K58 S_eff 1.99
+floor (SD of noise-only sigma_b_hat^2), (mV/s)^2: 2-sweep cells 0.0008-0.0015, 10-sweep 0.0003-0.0004
+theta_hat error variant: SD(log V0) = 0.210 per cell (check03 (d); fixture layout, applied to every cell)
+
+== omega 0 (sigma_med 0.100 mV/s, 4000 cohorts): DL omega_hat^2 = 0 in 89 %, median sqrt(omega_hat^2)/2 = 0.00 (the implied log-SD of sigma_b); EB d0 = inf in 96 %, median finite d0 20.7
+   2-sweep  a: per cell                    outside x2  25.1 % | zero  4.6 % | median |log ratio| 0.38 | 90th pct 1.25 | median ratio 0.83 | 5-95 % 0.09-1.74 | RMS rel err 0.504
+   2-sweep  b: cohort                      outside x2   0.0 % | zero  0.0 % | median |log ratio| 0.06 | 90th pct 0.15 | median ratio 0.99 | 5-95 % 0.85-1.14 | RMS rel err 0.091
+   2-sweep  c-DL: log, DerSimonian-Laird   outside x2   0.0 % | zero  0.0 % | median |log ratio| 0.07 | 90th pct 0.16 | median ratio 1.02 | 5-95 % 0.87-1.19 | RMS rel err 0.102
+   2-sweep  c-EB: moderated variance       outside x2   0.0 % | zero  0.0 % | median |log ratio| 0.09 | 90th pct 0.20 | median ratio 1.05 | 5-95 % 0.86-1.26 | RMS rel err 0.132
+   10-sweep a: per cell                    outside x2   1.0 % | zero  0.0 % | median |log ratio| 0.16 | 90th pct 0.40 | median ratio 0.97 | 5-95 % 0.62-1.36 | RMS rel err 0.226
+   10-sweep b: cohort                      outside x2   0.0 % | zero  0.0 % | median |log ratio| 0.06 | 90th pct 0.15 | median ratio 0.99 | 5-95 % 0.85-1.14 | RMS rel err 0.091
+   10-sweep c-DL: log, DerSimonian-Laird   outside x2   0.1 % | zero  0.0 % | median |log ratio| 0.07 | 90th pct 0.17 | median ratio 1.02 | 5-95 % 0.85-1.19 | RMS rel err 0.110
+   10-sweep c-EB: moderated variance       outside x2   0.0 % | zero  0.0 % | median |log ratio| 0.09 | 90th pct 0.20 | median ratio 1.05 | 5-95 % 0.86-1.26 | RMS rel err 0.131
+
+== omega 0.25 (sigma_med 0.100 mV/s, 4000 cohorts): DL omega_hat^2 = 0 in 56 %, median sqrt(omega_hat^2)/2 = 0.00 (the implied log-SD of sigma_b); EB d0 = inf in 82 %, median finite d0 13.3
+   2-sweep  a: per cell                    outside x2  25.4 % | zero  5.1 % | median |log ratio| 0.38 | 90th pct 1.29 | median ratio 0.83 | 5-95 % 0.00-1.75 | RMS rel err 0.510
+   2-sweep  b: cohort                      outside x2   1.4 % | zero  0.0 % | median |log ratio| 0.19 | 90th pct 0.46 | median ratio 1.05 | 5-95 % 0.67-1.65 | RMS rel err 0.320
+   2-sweep  c-DL: log, DerSimonian-Laird   outside x2   1.0 % | zero  0.0 % | median |log ratio| 0.18 | 90th pct 0.44 | median ratio 1.03 | 5-95 % 0.66-1.60 | RMS rel err 0.299
+   2-sweep  c-EB: moderated variance       outside x2   1.0 % | zero  0.0 % | median |log ratio| 0.18 | 90th pct 0.45 | median ratio 1.05 | 5-95 % 0.68-1.63 | RMS rel err 0.308
+   10-sweep a: per cell                    outside x2   1.1 % | zero  0.0 % | median |log ratio| 0.16 | 90th pct 0.40 | median ratio 0.97 | 5-95 % 0.62-1.36 | RMS rel err 0.227
+   10-sweep b: cohort                      outside x2   0.6 % | zero  0.0 % | median |log ratio| 0.17 | 90th pct 0.41 | median ratio 1.04 | 5-95 % 0.71-1.59 | RMS rel err 0.288
+   10-sweep c-DL: log, DerSimonian-Laird   outside x2   0.2 % | zero  0.0 % | median |log ratio| 0.14 | 90th pct 0.34 | median ratio 1.02 | 5-95 % 0.72-1.42 | RMS rel err 0.222
+   10-sweep c-EB: moderated variance       outside x2   0.9 % | zero  0.0 % | median |log ratio| 0.17 | 90th pct 0.43 | median ratio 1.05 | 5-95 % 0.69-1.60 | RMS rel err 0.294
+
+== omega 0.5 (sigma_med 0.100 mV/s, 4000 cohorts): DL omega_hat^2 = 0 in 11 %, median sqrt(omega_hat^2)/2 = 0.36 (the implied log-SD of sigma_b); EB d0 = inf in 33 %, median finite d0 5.8
+   2-sweep  a: per cell                    outside x2  25.7 % | zero  6.5 % | median |log ratio| 0.38 | 90th pct 1.41 | median ratio 0.83 | 5-95 % 0.00-1.77 | RMS rel err 0.521
+   2-sweep  b: cohort                      outside x2  22.3 % | zero  0.0 % | median |log ratio| 0.38 | 90th pct 0.93 | median ratio 1.22 | 5-95 % 0.52-2.98 | RMS rel err 0.930
+   2-sweep  c-DL: log, DerSimonian-Laird   outside x2  11.6 % | zero  0.0 % | median |log ratio| 0.29 | 90th pct 0.73 | median ratio 1.07 | 5-95 % 0.52-2.18 | RMS rel err 0.573
+   2-sweep  c-EB: moderated variance       outside x2  11.6 % | zero  0.0 % | median |log ratio| 0.29 | 90th pct 0.73 | median ratio 1.03 | 5-95 % 0.51-2.16 | RMS rel err 0.566
+   10-sweep a: per cell                    outside x2   1.4 % | zero  0.1 % | median |log ratio| 0.16 | 90th pct 0.39 | median ratio 0.97 | 5-95 % 0.62-1.36 | RMS rel err 0.230
+   10-sweep b: cohort                      outside x2  17.3 % | zero  0.0 % | median |log ratio| 0.33 | 90th pct 0.85 | median ratio 1.19 | 5-95 % 0.60-2.78 | RMS rel err 0.849
+   10-sweep c-DL: log, DerSimonian-Laird   outside x2   0.7 % | zero  0.0 % | median |log ratio| 0.16 | 90th pct 0.40 | median ratio 1.03 | 5-95 % 0.67-1.49 | RMS rel err 0.255
+   10-sweep c-EB: moderated variance       outside x2   5.6 % | zero  0.0 % | median |log ratio| 0.21 | 90th pct 0.57 | median ratio 1.02 | 5-95 % 0.60-1.88 | RMS rel err 0.425
+
+== omega 1.0 (sigma_med 0.100 mV/s, 4000 cohorts): DL omega_hat^2 = 0 in 0 %, median sqrt(omega_hat^2)/2 = 0.79 (the implied log-SD of sigma_b); EB d0 = inf in 2 %, median finite d0 1.8
+/usr/local/lib/python3.13/dist-packages/numpy/lib/_function_base_impl.py:4608: RuntimeWarning: invalid value encountered in scalar subtract
+  diff_b_a = b - a
+   2-sweep  a: per cell                    outside x2  30.5 % | zero 10.4 % | median |log ratio| 0.42 | 90th pct inf | median ratio 0.83 | 5-95 % 0.00-1.91 | RMS rel err 0.664
+   2-sweep  b: cohort                      outside x2  59.4 % | zero  0.0 % | median |log ratio| 0.87 | 90th pct 2.12 | median ratio 2.00 | 5-95 % 0.37-12.57 | RMS rel err 6.652
+   2-sweep  c-DL: log, DerSimonian-Laird   outside x2  27.2 % | zero  0.0 % | median |log ratio| 0.42 | 90th pct 1.10 | median ratio 1.17 | 5-95 % 0.42-3.60 | RMS rel err 1.492
+   2-sweep  c-EB: moderated variance       outside x2  25.0 % | zero  0.0 % | median |log ratio| 0.39 | 90th pct 1.07 | median ratio 0.99 | 5-95 % 0.37-3.18 | RMS rel err 1.290
+   10-sweep a: per cell                    outside x2   5.1 % | zero  2.5 % | median |log ratio| 0.17 | 90th pct 0.49 | median ratio 0.97 | 5-95 % 0.51-1.41 | RMS rel err 0.328
+   10-sweep b: cohort                      outside x2  52.9 % | zero  0.0 % | median |log ratio| 0.74 | 90th pct 2.05 | median ratio 1.92 | 5-95 % 0.51-11.61 | RMS rel err 5.977
+   10-sweep c-DL: log, DerSimonian-Laird   outside x2   2.6 % | zero  0.0 % | median |log ratio| 0.17 | 90th pct 0.44 | median ratio 1.04 | 5-95 % 0.66-1.60 | RMS rel err 0.401
+   10-sweep c-EB: moderated variance       outside x2   5.4 % | zero  0.0 % | median |log ratio| 0.18 | 90th pct 0.54 | median ratio 1.01 | 5-95 % 0.64-1.95 | RMS rel err 0.592
+
+== omega 0.5, sigma_med 0.05 (sigma_med 0.050 mV/s, 4000 cohorts): DL omega_hat^2 = 0 in 30 %, median sqrt(omega_hat^2)/2 = 0.25 (the implied log-SD of sigma_b); EB d0 = inf in 84 %, median finite d0 9.8
+   2-sweep  a: per cell                    outside x2  32.8 % | zero 17.2 % | median |log ratio| 0.44 | 90th pct inf | median ratio 0.85 | 5-95 % 0.00-1.91 | RMS rel err 0.632
+   2-sweep  b: cohort                      outside x2  22.4 % | zero  0.0 % | median |log ratio| 0.38 | 90th pct 0.94 | median ratio 1.22 | 5-95 % 0.52-2.98 | RMS rel err 0.928
+   2-sweep  c-DL: log, DerSimonian-Laird   outside x2  17.0 % | zero  0.0 % | median |log ratio| 0.34 | 90th pct 0.83 | median ratio 1.19 | 5-95 % 0.56-2.63 | RMS rel err 0.766
+   2-sweep  c-EB: moderated variance       outside x2  19.6 % | zero  0.0 % | median |log ratio| 0.36 | 90th pct 0.88 | median ratio 1.25 | 5-95 % 0.57-2.81 | RMS rel err 0.849
+   10-sweep a: per cell                    outside x2   5.5 % | zero  2.1 % | median |log ratio| 0.18 | 90th pct 0.50 | median ratio 0.97 | 5-95 % 0.49-1.43 | RMS rel err 0.306
+   10-sweep b: cohort                      outside x2  16.8 % | zero  0.0 % | median |log ratio| 0.33 | 90th pct 0.85 | median ratio 1.19 | 5-95 % 0.59-2.82 | RMS rel err 0.860
+   10-sweep c-DL: log, DerSimonian-Laird   outside x2   2.7 % | zero  0.0 % | median |log ratio| 0.19 | 90th pct 0.49 | median ratio 1.06 | 5-95 % 0.67-1.76 | RMS rel err 0.371
+   10-sweep c-EB: moderated variance       outside x2  17.0 % | zero  0.0 % | median |log ratio| 0.33 | 90th pct 0.82 | median ratio 1.22 | 5-95 % 0.58-2.66 | RMS rel err 0.778
+
+== omega 0.5, theta_hat error (sigma_med 0.100 mV/s, 4000 cohorts): DL omega_hat^2 = 0 in 12 %, median sqrt(omega_hat^2)/2 = 0.37 (the implied log-SD of sigma_b); EB d0 = inf in 32 %, median finite d0 5.7
+   2-sweep  a: per cell                    outside x2  26.8 % | zero  7.8 % | median |log ratio| 0.39 | 90th pct 1.62 | median ratio 0.83 | 5-95 % 0.00-1.77 | RMS rel err 0.531
+   2-sweep  b: cohort                      outside x2  21.7 % | zero  0.0 % | median |log ratio| 0.38 | 90th pct 0.93 | median ratio 1.21 | 5-95 % 0.52-2.93 | RMS rel err 0.914
+   2-sweep  c-DL: log, DerSimonian-Laird   outside x2  11.6 % | zero  0.0 % | median |log ratio| 0.29 | 90th pct 0.73 | median ratio 1.07 | 5-95 % 0.52-2.19 | RMS rel err 0.575
+   2-sweep  c-EB: moderated variance       outside x2  11.5 % | zero  0.0 % | median |log ratio| 0.29 | 90th pct 0.73 | median ratio 1.02 | 5-95 % 0.50-2.16 | RMS rel err 0.562
+   10-sweep a: per cell                    outside x2   3.5 % | zero  0.9 % | median |log ratio| 0.16 | 90th pct 0.45 | median ratio 0.96 | 5-95 % 0.56-1.37 | RMS rel err 0.261
+   10-sweep b: cohort                      outside x2  16.5 % | zero  0.0 % | median |log ratio| 0.33 | 90th pct 0.83 | median ratio 1.18 | 5-95 % 0.60-2.73 | RMS rel err 0.811
+   10-sweep c-DL: log, DerSimonian-Laird   outside x2   1.8 % | zero  0.0 % | median |log ratio| 0.17 | 90th pct 0.43 | median ratio 1.01 | 5-95 % 0.62-1.48 | RMS rel err 0.269
+   10-sweep c-EB: moderated variance       outside x2   5.0 % | zero  0.0 % | median |log ratio| 0.20 | 90th pct 0.56 | median ratio 1.01 | 5-95 % 0.59-1.79 | RMS rel err 0.400
+
+(14 s)

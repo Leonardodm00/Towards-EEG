@@ -1,0 +1,19 @@
+tilt step factor <(t + 0.1375)^2> over the step = 0.48974 s^2
+(b) closed forms: V3 against noise_law.semivariogram_continuous, max rel diff 5.5e-15; step-averaged B3^2 against quadrature, max rel diff 1.9e-13  -> PASS
+
+(a) T = 190 ms (topic doc v3 section 3.6.5):
+   OU    3 s, sigma_3 0.142 mV: sigma_b(match) 0.119 mV/s; read at 0.6/0.8/1.0 s: 0.134 / 0.116 / 0.103 (ratio 1.122 / 0.971 / 0.862); point error tilt/OU at onset 0.47, at end 1.23
+   OU   10 s, sigma_3 0.189 mV: sigma_b(match) 0.091 mV/s; read at 0.6/0.8/1.0 s: 0.101 / 0.089 / 0.080 (ratio 1.113 / 0.974 / 0.874); point error tilt/OU at onset 0.49, at end 1.21
+   OU   30 s, sigma_3 0.294 mV: sigma_b(match) 0.083 mV/s; read at 0.6/0.8/1.0 s: 0.092 / 0.081 / 0.073 (ratio 1.111 / 0.974 / 0.878); point error tilt/OU at onset 0.49, at end 1.20
+
+(finding) ratio sigma_b(read at h) / sigma_b(match), same-polarity lags of the 200.5 ms train:
+   T = 190 ms, OU    3 s: lags [2, 4, 6, 8] periods (0.401, 0.802, 1.203, 1.604 s): 1.353 / 0.969 / 0.778 / 0.658
+   T = 190 ms, OU   10 s: lags [2, 4, 6, 8] periods (0.401, 0.802, 1.203, 1.604 s): 1.328 / 0.972 / 0.797 / 0.689
+   T = 190 ms, OU   30 s: lags [2, 4, 6, 8] periods (0.401, 0.802, 1.203, 1.604 s): 1.320 / 0.973 / 0.803 / 0.698
+   T = 120 ms, OU    3 s: lags [2, 4, 6, 8] periods (0.401, 0.802, 1.203, 1.604 s): 1.403 / 0.987 / 0.787 / 0.664
+   T = 120 ms, OU   10 s: lags [2, 4, 6, 8] periods (0.401, 0.802, 1.203, 1.604 s): 1.374 / 0.988 / 0.806 / 0.694
+   T = 120 ms, OU   30 s: lags [2, 4, 6, 8] periods (0.401, 0.802, 1.203, 1.604 s): 1.366 / 0.989 / 0.812 / 0.704
+   two-lag estimator (2 and 4 periods), T = 190 ms: read / match = 0.802 / 0.820 / 0.826 (OU 3 / 10 / 30 s)
+   two-lag estimator (2 and 4 periods), T = 120 ms: read / match = 0.801 / 0.820 / 0.826 (OU 3 / 10 / 30 s)
+   T = 190 ms: the lag where read = match: 0.755 / 0.756 / 0.756 s (OU 3 / 10 / 30 s)
+   T = 120 ms: the lag where read = match: 0.782 / 0.783 / 0.783 s (OU 3 / 10 / 30 s)

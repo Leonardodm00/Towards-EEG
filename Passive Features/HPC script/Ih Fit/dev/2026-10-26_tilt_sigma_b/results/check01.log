@@ -1,0 +1,9 @@
+layout 2 sweeps, K 40: K = 40, pairs per sweep [9, 11], h* = 0.8020 s, window 6000 samples (120.0 ms)
+(i)   max |D_with - (D_without + b_s h)| = 1.63e-16 mV  (b_s = [-0.0154  0.0631] mV/s)  -> PASS
+(ii)  V_hat subtracted 2.081820e-03, raw 2.081820e-03 (rel diff 4.3e-14); pair list here 2.081820e-03 (rel diff 0.0e+00); N 20 / 20 / 20  -> PASS
+(iii) mean V_hat (sigma_b = 0, 1500 cells) = 1.130043e-03 mV^2 +/- 1.0e-05 (SE); V(h*|theta_cf,0) = 1.112495e-03; z = +1.71  -> PASS
+      noise floor of (T1) in sigma_b^2 units, 2 V0 / h*^2 = 0.00346 (mV/s)^2, i.e. sqrt = 0.0588 mV/s
+(iv)  b = [0.13, -0.04] mV/s: mean sigma_b_hat^2 over 1500 noise draws = 0.008456 +/- 0.000062; sum (N_s/N) b_s^2 = 0.008485; z = -0.47  -> PASS
+      (sigma_b^2 itself would be whatever law drew these b: the estimator cannot see it beyond the S draws)
+(v)   sigma_b = 0.10 mV/s over 120 ms: demeaned variance of the line 1.2000e-05 mV^2 (pred 1.2000e-05, rel err 0.0e+00) -> PASS; share of a window's expected demeaned variance under theta_cf (2.9125e-03 mV^2): 0.41 %
+(66 s)

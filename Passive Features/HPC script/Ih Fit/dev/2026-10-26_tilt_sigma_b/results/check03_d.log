@@ -1,0 +1,7 @@
+
+(d) d log V(h*|theta,0) / d u at theta_cf (120 ms windows) = [6.162e-04 6.355e-04 1.999e+00 6.377e-01]  [log sigma_f, rho_f, log sigma_s, log tau_s]
+    corr(log sigma_s, log tau_s) = -1: SD(log V0_hat) = 0.033; induced SD of sigma_b_hat^2 = 0.00011 (mV/s)^2 (sqrt 0.0106 mV/s)
+    corr(log sigma_s, log tau_s) = +0: SD(log V0_hat) = 0.210; induced SD of sigma_b_hat^2 = 0.00073 (mV/s)^2 (sqrt 0.0270 mV/s)
+    corr(log sigma_s, log tau_s) = +1: SD(log V0_hat) = 0.295; induced SD of sigma_b_hat^2 = 0.00102 (mV/s)^2 (sqrt 0.0320 mV/s)
+
+(0 s)

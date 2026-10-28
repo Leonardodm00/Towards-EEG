@@ -229,3 +229,18 @@ smaller spec -- the protocol is what has to change.
 Sign convention (pinned by S5): `vshift` and `vshift_minf` move the curves along
 v; positive = more activation at a given v. Kalmbach 2018's "-20 mV" shift of
 the Kole rates is `vshift = +20` here.
+
+## Documents kept with this code (D-097)
+
+Not code: nothing below is imported by the pipeline or runs in a job.
+
+| Path | What |
+|---|---|
+| `docs/TEEG_noise_fit_handoff_2026-10-28.md` | the noise-fit chat's current handoff (D-095 to implement; the user's open answers): read first in a new chat on the noise fit |
+| `docs/TEEG_Stage7_noise_study_handoff_2026-10-06.md`, `docs/TEEG_acf_textbook_implementation_handoff_2026-10-07.md` | earlier handoffs of the same thread |
+| `dev/2026-10-16_covariance_weighting/` | D-048's handoff, its checks, and the study document on the bias of a statistic |
+| `dev/2026-10-26_tilt_sigma_b/` | the study document on the per-sweep tilt and its SD sigma_b(c), with figures and checks |
+| `dev/2026-10-28_window_start/` | the checks behind the explanations of the transient test and of sigma_SS_hat, and behind D-095 |
+
+The project's own documents (the decision log, the noise-model topic document, the staged plan, the
+living handoff) are copied under `docs/project/` at the repository root.

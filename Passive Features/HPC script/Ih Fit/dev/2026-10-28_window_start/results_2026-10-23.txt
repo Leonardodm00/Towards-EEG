@@ -1,0 +1,128 @@
+# Output of check_findings_2026-10-23.py, run 2026-10-23 in the sandbox (A; B+C; D as separate processes, OPENBLAS_NUM_THREADS=1)
+
+
+=== A. transient test (D-051 (iv)); theta_cf; kappa_tr 0.10, 5 ms bins, z = 3 ===
+
+-- 2 sweeps, K 40 (K = 40: 19 dep, 21 hyp), sigma_b = 0.00 mV/s, 200 cells (11 s)
+   sigma_SS median 0.0403 mV
+   noise floor of the statistic: SD of a 5 ms bin mean of r_odd in [100, 200) ms = 0.302 sigma_SS (kappa_tr = 0.10); P(|bin mean| >= kappa_tr sigma_SS) per bin = 0.76
+   option's floor estimate (per-sample SD of r_even, t >= 0): median 0.217 sigma_SS [10-90%: 0.183-0.256]; z x floor = 0.652 sigma_SS
+   NOISE ONLY  as written: t_tr 200 [185-200] ms; ss_enlarged_none (t_SS >= 190) in 90 % of cells
+   NOISE ONLY  z = 3     : t_tr 0 [0-180] ms; t_tr > 80 ms (noise alone moves the start) in 16 %; ss_enlarged_none 10 %
+   + RESPONSE  as written: t_tr 200 [185-200] ms; ss_enlarged_none 88 %; noiseless response at kappa sigma_SS: 130 ms
+   + RESPONSE  z = 3     : t_tr 80 [65-166] ms; ss_enlarged_none 9 %; threshold 0.652 sigma_SS; noiseless response at it: 75 ms; t_SS = max(80, t_tr) 80 [80-166] ms
+   per-bin SD of the bin mean (noise only) / sigma_SS, bins starting at [0, 50, 100, 150, 185, 190, 195] ms: r_odd [0.099 0.236 0.282 0.305 0.325 0.325 0.332]; r_even [0.102 0.243 0.264 0.244 0.201 0.192 0.192]
+   NOISE ONLY  z = 3: in the 32 cells with an exceeding bin, the last exceeding bin starts at (ms): median 190, share in [190, 200): 0.53
+
+-- 2 sweeps, K 40 (K = 40: 19 dep, 21 hyp), sigma_b = 0.10 mV/s, 200 cells (12 s)
+   sigma_SS median 0.0403 mV
+   noise floor of the statistic: SD of a 5 ms bin mean of r_odd in [100, 200) ms = 0.281 sigma_SS (kappa_tr = 0.10); P(|bin mean| >= kappa_tr sigma_SS) per bin = 0.73
+   option's floor estimate (per-sample SD of r_even, t >= 0): median 0.226 sigma_SS [10-90%: 0.188-0.290]; z x floor = 0.678 sigma_SS
+   NOISE ONLY  as written: t_tr 200 [190-200] ms; ss_enlarged_none (t_SS >= 190) in 90 % of cells
+   NOISE ONLY  z = 3     : t_tr 0 [0-0] ms; t_tr > 80 ms (noise alone moves the start) in 8 %; ss_enlarged_none 4 %
+   + RESPONSE  as written: t_tr 200 [190-200] ms; ss_enlarged_none 90 %; noiseless response at kappa sigma_SS: 130 ms
+   + RESPONSE  z = 3     : t_tr 75 [60-100] ms; ss_enlarged_none 2 %; threshold 0.678 sigma_SS; noiseless response at it: 75 ms; t_SS = max(80, t_tr) 80 [80-100] ms
+   per-bin SD of the bin mean (noise only) / sigma_SS, bins starting at [0, 50, 100, 150, 185, 190, 195] ms: r_odd [0.101 0.248 0.249 0.286 0.325 0.326 0.32 ]; r_even [0.1   0.264 0.311 0.354 0.385 0.393 0.399]
+   NOISE ONLY  z = 3: in the 18 cells with an exceeding bin, the last exceeding bin starts at (ms): median 178, share in [190, 200): 0.28
+
+-- 2 sweeps, K 63 (K = 63: 33 dep, 30 hyp), sigma_b = 0.00 mV/s, 200 cells (12 s)
+   sigma_SS median 0.0402 mV
+   noise floor of the statistic: SD of a 5 ms bin mean of r_odd in [100, 200) ms = 0.235 sigma_SS (kappa_tr = 0.10); P(|bin mean| >= kappa_tr sigma_SS) per bin = 0.68
+   option's floor estimate (per-sample SD of r_even, t >= 0): median 0.165 sigma_SS [10-90%: 0.148-0.196]; z x floor = 0.496 sigma_SS
+   NOISE ONLY  as written: t_tr 200 [180-200] ms; ss_enlarged_none (t_SS >= 190) in 85 % of cells
+   NOISE ONLY  z = 3     : t_tr 0 [0-166] ms; t_tr > 80 ms (noise alone moves the start) in 12 %; ss_enlarged_none 8 %
+   + RESPONSE  as written: t_tr 200 [175-200] ms; ss_enlarged_none 84 %; noiseless response at kappa sigma_SS: 130 ms
+   + RESPONSE  z = 3     : t_tr 90 [75-180] ms; ss_enlarged_none 8 %; threshold 0.496 sigma_SS; noiseless response at it: 85 ms; t_SS = max(80, t_tr) 90 [80-180] ms
+   per-bin SD of the bin mean (noise only) / sigma_SS, bins starting at [0, 50, 100, 150, 185, 190, 195] ms: r_odd [0.075 0.191 0.205 0.236 0.266 0.279 0.281]; r_even [0.08  0.175 0.193 0.174 0.099 0.086 0.083]
+   NOISE ONLY  z = 3: in the 26 cells with an exceeding bin, the last exceeding bin starts at (ms): median 190, share in [190, 200): 0.58
+
+-- 2 sweeps, K 63 (K = 63: 33 dep, 30 hyp), sigma_b = 0.10 mV/s, 200 cells (13 s)
+   sigma_SS median 0.0402 mV
+   noise floor of the statistic: SD of a 5 ms bin mean of r_odd in [100, 200) ms = 0.256 sigma_SS (kappa_tr = 0.10); P(|bin mean| >= kappa_tr sigma_SS) per bin = 0.70
+   option's floor estimate (per-sample SD of r_even, t >= 0): median 0.186 sigma_SS [10-90%: 0.155-0.248]; z x floor = 0.559 sigma_SS
+   NOISE ONLY  as written: t_tr 200 [184-200] ms; ss_enlarged_none (t_SS >= 190) in 86 % of cells
+   NOISE ONLY  z = 3     : t_tr 0 [0-190] ms; t_tr > 80 ms (noise alone moves the start) in 15 %; ss_enlarged_none 11 %
+   + RESPONSE  as written: t_tr 200 [185-200] ms; ss_enlarged_none 86 %; noiseless response at kappa sigma_SS: 130 ms
+   + RESPONSE  z = 3     : t_tr 85 [70-190] ms; ss_enlarged_none 12 %; threshold 0.559 sigma_SS; noiseless response at it: 80 ms; t_SS = max(80, t_tr) 85 [80-190] ms
+   per-bin SD of the bin mean (noise only) / sigma_SS, bins starting at [0, 50, 100, 150, 185, 190, 195] ms: r_odd [0.081 0.177 0.225 0.242 0.287 0.296 0.297]; r_even [0.075 0.228 0.285 0.342 0.344 0.343 0.34 ]
+   NOISE ONLY  z = 3: in the 30 cells with an exceeding bin, the last exceeding bin starts at (ms): median 195, share in [190, 200): 0.67
+
+-- 6 sweeps, K 199 (K = 199: 99 dep, 100 hyp), sigma_b = 0.00 mV/s, 200 cells (37 s)
+   sigma_SS median 0.0403 mV
+   noise floor of the statistic: SD of a 5 ms bin mean of r_odd in [100, 200) ms = 0.145 sigma_SS (kappa_tr = 0.10); P(|bin mean| >= kappa_tr sigma_SS) per bin = 0.49
+   option's floor estimate (per-sample SD of r_even, t >= 0): median 0.096 sigma_SS [10-90%: 0.084-0.117]; z x floor = 0.287 sigma_SS
+   NOISE ONLY  as written: t_tr 200 [115-200] ms; ss_enlarged_none (t_SS >= 190) in 68 % of cells
+   NOISE ONLY  z = 3     : t_tr 0 [0-195] ms; t_tr > 80 ms (noise alone moves the start) in 14 %; ss_enlarged_none 10 %
+   + RESPONSE  as written: t_tr 200 [140-200] ms; ss_enlarged_none 69 %; noiseless response at kappa sigma_SS: 130 ms
+   + RESPONSE  z = 3     : t_tr 105 [90-195] ms; ss_enlarged_none 12 %; threshold 0.287 sigma_SS; noiseless response at it: 100 ms; t_SS = max(80, t_tr) 105 [90-195] ms
+   per-bin SD of the bin mean (noise only) / sigma_SS, bins starting at [0, 50, 100, 150, 185, 190, 195] ms: r_odd [0.044 0.116 0.124 0.137 0.171 0.175 0.172]; r_even [0.045 0.095 0.115 0.102 0.062 0.049 0.048]
+   NOISE ONLY  z = 3: in the 29 cells with an exceeding bin, the last exceeding bin starts at (ms): median 195, share in [190, 200): 0.72
+
+-- 6 sweeps, K 199 (K = 199: 99 dep, 100 hyp), sigma_b = 0.10 mV/s, 200 cells (38 s)
+   sigma_SS median 0.0403 mV
+   noise floor of the statistic: SD of a 5 ms bin mean of r_odd in [100, 200) ms = 0.145 sigma_SS (kappa_tr = 0.10); P(|bin mean| >= kappa_tr sigma_SS) per bin = 0.49
+   option's floor estimate (per-sample SD of r_even, t >= 0): median 0.104 sigma_SS [10-90%: 0.088-0.142]; z x floor = 0.313 sigma_SS
+   NOISE ONLY  as written: t_tr 200 [105-200] ms; ss_enlarged_none (t_SS >= 190) in 66 % of cells
+   NOISE ONLY  z = 3     : t_tr 0 [0-185] ms; t_tr > 80 ms (noise alone moves the start) in 14 %; ss_enlarged_none 10 %
+   + RESPONSE  as written: t_tr 200 [135-200] ms; ss_enlarged_none 67 %; noiseless response at kappa sigma_SS: 130 ms
+   + RESPONSE  z = 3     : t_tr 100 [85-195] ms; ss_enlarged_none 12 %; threshold 0.313 sigma_SS; noiseless response at it: 100 ms; t_SS = max(80, t_tr) 100 [85-195] ms
+   per-bin SD of the bin mean (noise only) / sigma_SS, bins starting at [0, 50, 100, 150, 185, 190, 195] ms: r_odd [0.041 0.116 0.125 0.136 0.173 0.178 0.177]; r_even [0.046 0.131 0.156 0.193 0.195 0.197 0.203]
+   NOISE ONLY  z = 3: in the 28 cells with an exceeding bin, the last exceeding bin starts at (ms): median 195, share in [190, 200): 0.68
+
+-- 10 sweeps, K 348 (K = 348: 181 dep, 167 hyp), sigma_b = 0.00 mV/s, 200 cells (67 s)
+   sigma_SS median 0.0402 mV
+   noise floor of the statistic: SD of a 5 ms bin mean of r_odd in [100, 200) ms = 0.112 sigma_SS (kappa_tr = 0.10); P(|bin mean| >= kappa_tr sigma_SS) per bin = 0.37
+   option's floor estimate (per-sample SD of r_even, t >= 0): median 0.072 sigma_SS [10-90%: 0.063-0.088]; z x floor = 0.215 sigma_SS
+   NOISE ONLY  as written: t_tr 195 [40-200] ms; ss_enlarged_none (t_SS >= 190) in 56 % of cells
+   NOISE ONLY  z = 3     : t_tr 0 [0-200] ms; t_tr > 80 ms (noise alone moves the start) in 22 %; ss_enlarged_none 13 %
+   + RESPONSE  as written: t_tr 195 [125-200] ms; ss_enlarged_none 56 %; noiseless response at kappa sigma_SS: 130 ms
+   + RESPONSE  z = 3     : t_tr 110 [100-200] ms; ss_enlarged_none 12 %; threshold 0.215 sigma_SS; noiseless response at it: 110 ms; t_SS = max(80, t_tr) 110 [100-200] ms
+   per-bin SD of the bin mean (noise only) / sigma_SS, bins starting at [0, 50, 100, 150, 185, 190, 195] ms: r_odd [0.032 0.079 0.089 0.112 0.131 0.133 0.136]; r_even [0.035 0.081 0.086 0.075 0.041 0.029 0.025]
+   NOISE ONLY  z = 3: in the 45 cells with an exceeding bin, the last exceeding bin starts at (ms): median 190, share in [190, 200): 0.56
+
+-- 10 sweeps, K 348 (K = 348: 181 dep, 167 hyp), sigma_b = 0.10 mV/s, 200 cells (75 s)
+   sigma_SS median 0.0403 mV
+   noise floor of the statistic: SD of a 5 ms bin mean of r_odd in [100, 200) ms = 0.108 sigma_SS (kappa_tr = 0.10); P(|bin mean| >= kappa_tr sigma_SS) per bin = 0.34
+   option's floor estimate (per-sample SD of r_even, t >= 0): median 0.081 sigma_SS [10-90%: 0.064-0.116]; z x floor = 0.242 sigma_SS
+   NOISE ONLY  as written: t_tr 190 [0-200] ms; ss_enlarged_none (t_SS >= 190) in 51 % of cells
+   NOISE ONLY  z = 3     : t_tr 0 [0-185] ms; t_tr > 80 ms (noise alone moves the start) in 17 %; ss_enlarged_none 10 %
+   + RESPONSE  as written: t_tr 190 [125-200] ms; ss_enlarged_none 50 %; noiseless response at kappa sigma_SS: 130 ms
+   + RESPONSE  z = 3     : t_tr 105 [95-190] ms; ss_enlarged_none 10 %; threshold 0.242 sigma_SS; noiseless response at it: 105 ms; t_SS = max(80, t_tr) 105 [95-190] ms
+   per-bin SD of the bin mean (noise only) / sigma_SS, bins starting at [0, 50, 100, 150, 185, 190, 195] ms: r_odd [0.034 0.086 0.093 0.105 0.121 0.126 0.128]; r_even [0.033 0.095 0.131 0.152 0.169 0.168 0.171]
+   NOISE ONLY  z = 3: in the 35 cells with an exceeding bin, the last exceeding bin starts at (ms): median 190, share in [190, 200): 0.54
+
+DONE A (266 s)
+
+
+=== B. sigma_b_hat from (T1) at the true law; sigma_b = 0.10 mV/s; t_SS = 80 ms; h* = 4 periods ===
+-- 2 sweeps, K 40: pairs per sweep [13, 9] (S_eff 1.94), 2000 cells (100 s): sigma_b_hat / sigma_b  2.5/50/97.5 % = 0.00 / 0.81 / 1.93; clipped at 0 in 4.9 %; mean of sigma_b_hat^2 / sigma_b^2 = 0.980 (SE 0.023).  b draws alone, sqrt(chi2_S_eff / S_eff): 0.15 / 0.83 / 1.93
+-- 2 sweeps, K 63: pairs per sweep [22, 26] (S_eff 1.99), 2000 cells (98 s): sigma_b_hat / sigma_b  2.5/50/97.5 % = 0.00 / 0.83 / 1.95; clipped at 0 in 3.5 %; mean of sigma_b_hat^2 / sigma_b^2 = 1.010 (SE 0.023).  b draws alone, sqrt(chi2_S_eff / S_eff): 0.16 / 0.83 / 1.92
+-- 6 sweeps, K 199: pairs per sweep [28, 30, 22, 27, 27, 23] (S_eff 5.93), 600 cells (95 s): sigma_b_hat / sigma_b  2.5/50/97.5 % = 0.42 / 0.94 / 1.56; clipped at 0 in 0.0 %; mean of sigma_b_hat^2 / sigma_b^2 = 0.997 (SE 0.024).  b draws alone, sqrt(chi2_S_eff / S_eff): 0.45 / 0.94 / 1.55
+-- 10 sweeps, K 348: pairs per sweep [29, 31, 33, 29, 27, 25, 32, 27, 32, 29] (S_eff 9.93), 400 cells (105 s): sigma_b_hat / sigma_b  2.5/50/97.5 % = 0.59 / 0.95 / 1.44; clipped at 0 in 0.0 %; mean of sigma_b_hat^2 / sigma_b^2 = 0.972 (SE 0.022).  b draws alone, sqrt(chi2_S_eff / S_eff): 0.57 / 0.97 / 1.43
+-- pooled cohort (7 x 2 sweeps, K 40, 7 x 2 sweeps, K 63, 1 x 6 sweeps, K 199, 3 x 10 sweeps, K 348; 64 SS sweeps; common sigma_b): sigma_b_hat / sigma_b 2.5/50/97.5 % = 0.82 / 0.98 / 1.17
+
+=== C. q_sim(theta_cf, sigma_b), CRN, M = 3000, on the smoke_noise_fit fixture cell; differences / bootstrap SE ===
+   q_sim at sigma_b = 0.00 mV/s (14 s)
+   q_sim at sigma_b = 0.10 mV/s (13 s)
+   q_sim at sigma_b = 0.17 mV/s (16 s)
+   Sigma_hat at theta_cf, sigma_b 0.10, R = 400 (33 s)
+   SD of u_hat (efficient bound (J^T Sigma^-1 J)^-1 at theta_cf, this layout): [0.005 0.007 0.082 0.206]  [log sigma_f, rho_f, log sigma_s, log tau_s]
+   simulator sigma_b 0.00 instead of the data's 0.10: dq / SD(stat) max 0.09 (ls_sd), per statistic [ 0.03  0.02  0.01  0.01 -0.05 -0.09 -0.08 -0.08 -0.09  0.01 -0.01 -0.02
+ -0.03 -0.03 -0.  ]; dq / bootstrap SE max 0.23; linearised shift of u_hat / SD(u_hat) = [-0.09 -0.07  0.08  0.11]
+   simulator sigma_b 0.17 instead of the data's 0.10: dq / SD(stat) max 0.19 (ls_rho_0.1ms), per statistic [ 0.01  0.04  0.06  0.02  0.06  0.19  0.18  0.19  0.19 -0.01  0.05  0.03
+  0.04  0.04  0.03]; dq / bootstrap SE max 0.47; linearised shift of u_hat / SD(u_hat) = [ 0.17  0.18 -0.13 -0.11]
+
+DONE BC (529 s)
+
+
+=== D. candidate fix: threshold per bin = max(kappa sigma_SS, z x SD of r_odd's bin mean simulated at the layout); theta_cf ===
+-- 2 sweeps, K 63, sigma_b 0.10: null from 300 cells, tested on 300 (31 s); null SD per bin / sigma_SS at 0, 100, 150, 185, 195 ms: [0.076 0.218 0.237 0.268 0.277]
+   z = 3.0: NOISE ONLY t_tr > 80 ms in 2.0 %, >= 190 ms in 0.7 %;  + RESPONSE t_SS = max(80, t_tr) median 80 [10-90%: 80-90] ms, >= 190 ms in 0.3 %
+   z = 3.5: NOISE ONLY t_tr > 80 ms in 0.3 %, >= 190 ms in 0.0 %;  + RESPONSE t_SS = max(80, t_tr) median 80 [10-90%: 80-85] ms, >= 190 ms in 0.0 %
+   z = 4.0: NOISE ONLY t_tr > 80 ms in 0.0 %, >= 190 ms in 0.0 %;  + RESPONSE t_SS = max(80, t_tr) median 80 [10-90%: 80-80] ms, >= 190 ms in 0.0 %
+-- 10 sweeps, K 348, sigma_b 0.10: null from 300 cells, tested on 300 (171 s); null SD per bin / sigma_SS at 0, 100, 150, 185, 195 ms: [0.034 0.094 0.113 0.128 0.134]
+   z = 3.0: NOISE ONLY t_tr > 80 ms in 1.7 %, >= 190 ms in 0.3 %;  + RESPONSE t_SS = max(80, t_tr) median 100 [10-90%: 95-115] ms, >= 190 ms in 0.3 %
+   z = 3.5: NOISE ONLY t_tr > 80 ms in 0.7 %, >= 190 ms in 0.3 %;  + RESPONSE t_SS = max(80, t_tr) median 100 [10-90%: 90-110] ms, >= 190 ms in 0.0 %
+   z = 4.0: NOISE ONLY t_tr > 80 ms in 0.0 %, >= 190 ms in 0.0 %;  + RESPONSE t_SS = max(80, t_tr) median 95 [10-90%: 85-105] ms, >= 190 ms in 0.0 %
+
+DONE D (203 s)

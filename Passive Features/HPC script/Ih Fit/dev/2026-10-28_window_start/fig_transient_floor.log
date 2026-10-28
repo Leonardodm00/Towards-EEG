@@ -1,0 +1,4 @@
+2 sweeps, K 63: floor SD at 100-195 ms 0.211-0.277 sigma_SS; response crosses 0.1 sigma_SS at 135 ms (18 s)
+10 sweeps, K 348: floor SD at 100-195 ms 0.079-0.121 sigma_SS; response crosses 0.1 sigma_SS at 135 ms (63 s)
+wrote /tmp/claude-0/-home-claude/1ab2ea5a-b310-5857-9abe-0108e0f157a3/scratchpad/explain_findings/fig_transient_floor.png
+exit 0

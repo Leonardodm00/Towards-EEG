@@ -1,0 +1,35 @@
+V(h|theta_cf,0), 120 ms windows: 1.112392e-03 mV^2 at 2 periods, 1.112495e-03 at 4 periods (difference 1.0e-07)
+
+== 2sw_K40: K 40, pairs per sweep [5, 12] (N 17), S_eff 1.71, 2000 cells
+(b) sigma_b 0.10 mV/s: sigma_b_hat/sigma_b 2.5/50/97.5 % = 0.00 / 0.80 / 2.04; clipped at 0 in 6.4 %; mean sigma_b_hat^2/sigma_b^2 = 1.013 (SE 0.025) -> PASS
+    references: sqrt(chi2_Seff/Seff) 0.12 / 0.80 / 1.99; tilt draws alone (exact weights) 0.16 / 0.80 / 2.04
+    variance of sigma_b_hat^2/sigma_b^2: total 1.3000 = tilt 1.2422 + cross 0.0494 + noise 0.0172 (+ covariances -0.0087); approximations 2 sum lam^2 = 1.1696, 8V0/(N h^2 sb^2) = 0.0814, 8V0^2/(N h^4 sb^4) = 0.0141; excess over 2/S_eff: 11.2 % -> PASS
+(c) floor: SD of sigma_b_hat^2 at sigma_b = 0: 0.00131 (mV/s)^2 (sqrt 0.0362 mV/s); 95th pct 0.00229 (sqrt 0.0478 mV/s); clipped at sigma_b = [0.025, 0.05, 0.1, 0.2] mV/s: 39.3 / 19.8 / 6.4 / 1.6 %
+(e) two-lag estimator (pairs at 2 periods [9, 14]): mean ratio 1.015 (SE 0.027); sigma_b_hat/sigma_b 0.00 / 0.79 / 2.08; clipped 8.6 %; SD of its sigma_b^2 at sigma_b = 0: 0.00169 (mV/s)^2
+(f) per-sweep slopes: RMS(b_hat_s - b_s) = 0.0036 mV/s -> PASS; sqrt(mean_s b_hat_s^2)/sigma_b 0.17 / 0.82 / 1.93 against sqrt(chi2_S/S), S = 2: 0.16 / 0.83 / 1.92
+
+== 2sw_K63: K 63, pairs per sweep [28, 20] (N 48), S_eff 1.95, 2000 cells
+(b) sigma_b 0.10 mV/s: sigma_b_hat/sigma_b 2.5/50/97.5 % = 0.00 / 0.82 / 1.96; clipped at 0 in 3.5 %; mean sigma_b_hat^2/sigma_b^2 = 1.012 (SE 0.023) -> PASS
+    references: sqrt(chi2_Seff/Seff) 0.15 / 0.83 / 1.93; tilt draws alone (exact weights) 0.17 / 0.83 / 1.95
+    variance of sigma_b_hat^2/sigma_b^2: total 1.0874 = tilt 1.0640 + cross 0.0067 + noise 0.0067 (+ covariances 0.0101); approximations 2 sum lam^2 = 1.0278, 8V0/(N h^2 sb^2) = 0.0288, 8V0^2/(N h^4 sb^4) = 0.0050; excess over 2/S_eff: 5.8 % -> PASS
+(c) floor: SD of sigma_b_hat^2 at sigma_b = 0: 0.00082 (mV/s)^2 (sqrt 0.0286 mV/s); 95th pct 0.00145 (sqrt 0.0381 mV/s); clipped at sigma_b = [0.025, 0.05, 0.1, 0.2] mV/s: 30.0 / 11.9 / 3.5 / 0.8 %
+(e) two-lag estimator (pairs at 2 periods [29, 20]): mean ratio 1.013 (SE 0.023); sigma_b_hat/sigma_b 0.00 / 0.83 / 1.96; clipped 3.9 %; SD of its sigma_b^2 at sigma_b = 0: 0.00101 (mV/s)^2
+(f) per-sweep slopes: RMS(b_hat_s - b_s) = 0.0028 mV/s -> PASS; sqrt(mean_s b_hat_s^2)/sigma_b 0.17 / 0.83 / 1.98 against sqrt(chi2_S/S), S = 2: 0.16 / 0.83 / 1.92
+
+== 6sw_K199: K 199, pairs per sweep [30, 27, 27, 29, 20, 24] (N 157), S_eff 5.90, 600 cells
+(b) sigma_b 0.10 mV/s: sigma_b_hat/sigma_b 2.5/50/97.5 % = 0.41 / 0.93 / 1.59; clipped at 0 in 0.0 %; mean sigma_b_hat^2/sigma_b^2 = 0.997 (SE 0.025) -> PASS
+    references: sqrt(chi2_Seff/Seff) 0.45 / 0.94 / 1.56; tilt draws alone (exact weights) 0.44 / 0.94 / 1.57
+    variance of sigma_b_hat^2/sigma_b^2: total 0.3634 = tilt 0.3526 + cross 0.0019 + noise 0.0022 (+ covariances 0.0067); approximations 2 sum lam^2 = 0.3388, 8V0/(N h^2 sb^2) = 0.0088, 8V0^2/(N h^4 sb^4) = 0.0015; excess over 2/S_eff: 7.3 % -> PASS
+(c) floor: SD of sigma_b_hat^2 at sigma_b = 0: 0.00047 (mV/s)^2 (sqrt 0.0216 mV/s); 95th pct 0.00083 (sqrt 0.0287 mV/s); clipped at sigma_b = [0.025, 0.05, 0.1, 0.2] mV/s: 14.0 / 1.7 / 0.0 / 0.0 %
+(e) two-lag estimator (pairs at 2 periods [32, 30, 29, 32, 21, 27]): mean ratio 0.994 (SE 0.025); sigma_b_hat/sigma_b 0.42 / 0.93 / 1.59; clipped 0.0 %; SD of its sigma_b^2 at sigma_b = 0: 0.00053 (mV/s)^2
+(f) per-sweep slopes: RMS(b_hat_s - b_s) = 0.0028 mV/s -> PASS; sqrt(mean_s b_hat_s^2)/sigma_b 0.43 / 0.94 / 1.58 against sqrt(chi2_S/S), S = 6: 0.45 / 0.94 / 1.55
+
+== 10sw_K348: K 348, pairs per sweep [31, 31, 29, 31, 30, 30, 25, 27, 30, 27] (N 291), S_eff 9.95, 400 cells
+(b) sigma_b 0.10 mV/s: sigma_b_hat/sigma_b 2.5/50/97.5 % = 0.55 / 1.00 / 1.38; clipped at 0 in 0.0 %; mean sigma_b_hat^2/sigma_b^2 = 1.027 (SE 0.021) -> PASS
+    references: sqrt(chi2_Seff/Seff) 0.57 / 0.97 / 1.43; tilt draws alone (exact weights) 0.57 / 1.00 / 1.38
+    variance of sigma_b_hat^2/sigma_b^2: total 0.1732 = tilt 0.1695 + cross 0.0009 + noise 0.0011 (+ covariances 0.0018); approximations 2 sum lam^2 = 0.2009, 8V0/(N h^2 sb^2) = 0.0048, 8V0^2/(N h^4 sb^4) = 0.0008; excess over 2/S_eff: -13.8 % -> PASS
+(c) floor: SD of sigma_b_hat^2 at sigma_b = 0: 0.00032 (mV/s)^2 (sqrt 0.0180 mV/s); 95th pct 0.00058 (sqrt 0.0241 mV/s); clipped at sigma_b = [0.025, 0.05, 0.1, 0.2] mV/s: 4.8 / 0.2 / 0.0 / 0.0 %
+(e) two-lag estimator (pairs at 2 periods [33, 33, 31, 33, 32, 32, 27, 29, 32, 29]): mean ratio 1.025 (SE 0.021); sigma_b_hat/sigma_b 0.57 / 1.00 / 1.38; clipped 0.0 %; SD of its sigma_b^2 at sigma_b = 0: 0.00039 (mV/s)^2
+(f) per-sweep slopes: RMS(b_hat_s - b_s) = 0.0027 mV/s -> PASS; sqrt(mean_s b_hat_s^2)/sigma_b 0.57 / 0.99 / 1.36 against sqrt(chi2_S/S), S = 10: 0.57 / 0.97 / 1.43
+
+(0 s)
