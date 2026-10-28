@@ -12,7 +12,8 @@ Checks
                         optical depth (not_faint) and the flag faint fail a
                         calibration node only with node_alpha_check /
                         node_faint_flag_check (off by default), each switch
-                        restoring its own reason; S keeps the flag
+                        restoring its own reason; D-095: S itself no
+                        longer holds the flag (a label)
     test_reference      (a) the growth fit recovers c_i, z_ax,i, the knot
                         values and the curve from exact Eq. (4) data of its
                         family, both conventions, cubic and linear, to 1e-9;
@@ -281,10 +282,10 @@ def test_known_answer():
     assert CAL.calibration_reasons(worst, cfg_with(node_faint_flag_check=True), 1.0) == [w for w in want
                                                                                         if w != "not_faint"]
     assert CAL.criteria_reasons(NAN, NAN, 0.3, cfg) == ["not_flat"]
-    assert CAL.selection_flags(cfg) == tuple(f for f in PH.SELECTION_FLAGS if f != "faint")
-    assert CAL.selection_flags(both) == PH.SELECTION_FLAGS
-    # S itself keeps the flag (Block 6's rule, the table and the deliverable are unchanged)
-    assert PH.reject_reasons(worst) == ["status:at_bound", "registration:FAR", "faint", "crossing"]
+    assert CAL.selection_flags(cfg) == PH.SELECTION_FLAGS and "faint" not in PH.SELECTION_FLAGS
+    assert CAL.selection_flags(both) == ("faint",) + PH.SELECTION_FLAGS
+    # D-095: S itself no longer holds the flag faint (a label, as dark), for the table and the deliverable
+    assert PH.reject_reasons(worst) == ["status:at_bound", "registration:FAR", "crossing"]
     # every criterion but Allen's diameter reads the pilot (pilot_view): a deliverable failing everything with a
     # passing pilot passes; a pilot failing one criterion gives that reason whatever the deliverable
     passing_pilot = dict(pilot_status="converged", pilot_flags=(), d_pilot_um=0.3, mu_pilot_per_um=1.0,
@@ -492,7 +493,7 @@ def test_contract():
         assert got == want and want == expect, (sorted(got), sorted(want))
         assert [r["calibration_set"] for r in rows[:4]] == ["near", "far", "", ""] and rows[2]["calibration_node"] is False
         assert rows[4]["calibration_set"] == "" and rows[4]["calibration_node"] is False      # Allen near, not flat
-        assert rows[14]["in_S"] is False and rows[14]["reject"] == "faint"                   # S keeps the flag
+        assert rows[14]["in_S"] is True and rows[14]["reject"] == ""      # D-095: faint is no criterion of S
         assert rows[14]["calibration_node"] is (c is cfg) and rows[17]["calibration_set"] == ("far" if c is cfg else "")
     # the scans file round trip (NaN <-> null)
     back = CIO.scan_from_dict(json.loads(json.dumps(CIO.scan_to_dict(scan))))

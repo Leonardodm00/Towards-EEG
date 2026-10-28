@@ -61,6 +61,9 @@ FILL_POLICIES = ("same_branch_then_allen", "allen_only", "none")  # D5 / handoff
 CALIBRATION_STATISTICS = ("gaussian_core_width2", "windowed_variance")  # procedure s.3.4 [corrected 2026-10-04]: core width drives
 ORIGIN_CONVENTIONS = ("symmetric", "min_origin")               # mathematics s.3.5: the growth is identified up to a common shift
 GROWTH_INTERPS = ("cubic", "linear")                           # Block 10 (provisional default, see CalibrationConfig.growth_interp)
+# The flags whose presence fails the selection S (Block 6), for phantoms and real nodes alike; part of the estimator
+# signature, so a table and the fits it corrects share one S (D-095). "dark" (D-030) and "faint" (D-095) are labels.
+SELECTION_FLAGS = ("crossing", "stack_edge", "bbar_few", "profile_nan")   # D-030, D-095 [user, 2026-10-28]: no faint
 
 
 @dataclass(frozen=True)
@@ -540,8 +543,10 @@ class DiameterConfig:
     def estimator_signature(self) -> Dict[str, Any]:
         """The estimator part of C (procedure s.3.3, 'shared by real and
         synthetic runs'): a real fit and the table that corrects it must agree
-        on every key here."""
-        return {"acquisition": _asdict(self.acquisition), "measure": _asdict(self.measure)}
+        on every key here -- since D-095 (2026-10-28) also on the flags of the
+        selection S ("selection")."""
+        return {"acquisition": _asdict(self.acquisition), "measure": _asdict(self.measure),
+                "selection": {"flags": list(SELECTION_FLAGS)}}
 
     def full_signature(self) -> Dict[str, Any]:
         """Estimator + simulator settings; stored with every table."""

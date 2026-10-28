@@ -10,8 +10,9 @@
                       in S, flat and faint are read from the pilot
                       (pilot_view); since D-094 (2026-10-28) neither the
                       optical depth (faint, node_alpha_check) nor the flag
-                      faint of S (node_faint_flag_check) is applied unless
-                      switched on. The fit's d_hat is no criterion. The
+                      faint (node_faint_flag_check; not in S since D-095) is
+                      applied unless switched on. The fit's d_hat is no
+                      criterion. The
                       far-field scan is not built: such a node is selected and
                       reported, not scanned (FAR_FIELD_NOT_BUILT)
   plane_scan          at one thin, faint, flat calibration node the measuring
@@ -381,20 +382,23 @@ def criteria_reasons(phi_rad, alpha_hat, allen_diameter_um, cfg):
 
 
 def selection_flags(cfg):
-    """The flags of Block 6's SELECTION_FLAGS that fail a calibration node:
-    all of them with node_faint_flag_check, all but "faint" without (the
-    default, D-094: a node outside S by the flag faint alone can be a
-    calibration node; S itself keeps the flag)."""
-    keep_faint = cfg.calibration.node_faint_flag_check
-    return tuple(f for f in phantoms.SELECTION_FLAGS if keep_faint or f != "faint")
+    """The flags that fail a calibration node: Block 6's SELECTION_FLAGS (the
+    flags of S), preceded by "faint" when node_faint_flag_check (D-094). Since
+    D-095 S itself has no flag faint, so the switch, off by default, adds it
+    for the calibration only."""
+    return (("faint",) if cfg.calibration.node_faint_flag_check else ()) + tuple(phantoms.SELECTION_FLAGS)
 
 
 def selection_reasons(result, cfg):
-    """The reasons of Block 6's selection S (phantoms.reject_reasons: the fit's
-    status, the registration, the flags) that fail a calibration node: all of
-    them but the flag "faint" unless node_faint_flag_check (D-094)."""
-    fail = selection_flags(cfg)
-    return [r for r in phantoms.reject_reasons(result) if r not in phantoms.SELECTION_FLAGS or r in fail]
+    """The reasons of Block 6's selection S that fail a calibration node:
+    phantoms.reject_reasons (the fit's status, the registration, the flags of
+    SELECTION_FLAGS), with the flag "faint" put first among the flags when
+    node_faint_flag_check and the node carries it (D-094, D-095)."""
+    base = phantoms.reject_reasons(result)
+    if not (cfg.calibration.node_faint_flag_check and "faint" in result.flags):
+        return base
+    head = [r for r in base if r not in phantoms.SELECTION_FLAGS]          # the status and the registration
+    return head + ["faint"] + [r for r in base if r in phantoms.SELECTION_FLAGS]
 
 
 def trace_reasons(view, cfg, allen_diameter_um, branch, index, scene, planes_z):

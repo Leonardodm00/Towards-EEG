@@ -613,7 +613,11 @@ The table exists only at grid points; this section uses it at a real node.
    (step 2) or the calibrated kernel range (§3.4); non-monotone $\hat m$; high
    failure rate; plus the real-data flags (steep, faint, crossings, stack
    edge). Flagged nodes take values from neighbours on the same branch, or
-   Allen's radius if the whole stretch is bad.
+   Allen's radius if the whole stretch is bad. [superseded in part: `steep`
+   (D-024 (iv)), `dark` (D-030) and `faint` (D-095, 2026-10-28) are labels, not
+   fill rules; a node is filled when its fit fails S -- the fit's status, the
+   registration, `crossing`, `stack_edge`, `bbar_few`, `profile_nan` -- or the
+   inversion flags it (SPEC Block 7)]
 5. **What the output is.** $\tilde d_i$ is corrected **in the mean**: across
    many real nodes of the same true $(d_i, \varphi_i)$ it removes the systematic
    part of the error, up to a Jensen gap that is small where $\tau$ is small

@@ -23,7 +23,8 @@ Checks
                         coordinates
     test_contract       Inversion fields; correct_nodes keeps the selection
                         reasons of nodes outside S, inverts a dark node (D-030:
-                        a label, Block 14.1) and reads each node's own mu_hat;
+                        a label, Block 14.1) and a faint one (D-095: a label)
+                        and reads each node's own mu_hat;
                         mu_d_out_of_domain is a label (D-071.4): the node is
                         inverted at the axis' end and keeps its d_tilde;
                         end_to_end.phantom_config draws mu on [lo / d, hi / d]
@@ -33,6 +34,7 @@ Checks
                         without support (off_support), tilt outside the table
                         (flagged and filled, the root kept), missing estimate
                         (d_hat, mu_hat), mismatched estimator signature
+                        (sigma_fit_um; D-095: the flags of S)
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -64,6 +66,7 @@ from allen_diameter.analysis import fill as FI  # noqa: E402
 from allen_diameter.analysis import invert as IV  # noqa: E402
 from allen_diameter.analysis import table as TB  # noqa: E402
 from allen_diameter.analysis.node_pipeline import NodeResult  # noqa: E402
+from allen_diameter import config as C  # noqa: E402
 from allen_diameter.config import default_config  # noqa: E402
 
 SEED = 20261006
@@ -183,11 +186,13 @@ def test_invariants():
 def test_contract():
     T, cfg = grid_table(lambda d, p, m: 1.0 + 0.05 / d)
     out = IV.correct_nodes([node(1.05, 0.2), node(1.05, 0.2, flags=("faint",)), node(float("nan"), 0.2, status="none"),
-                            node(1.05, 0.2, flags=("dark", "steep"))], T, cfg)
+                            node(1.05, 0.2, flags=("dark", "steep")), node(1.05, 0.2, flags=("faint", "crossing"))],
+                           T, cfg)
     assert isinstance(out[0], IV.Inversion) and abs(out[0].d_tilde_um - 1.0) <= 1e-4 and out[0].flags == ()
-    assert math.isnan(out[1].d_tilde_um) and out[1].flags == ("faint",)
+    assert out[1].d_tilde_um == out[0].d_tilde_um and out[1].flags == (), out[1]       # D-095: faint is a label
     assert math.isnan(out[2].d_tilde_um) and out[2].flags == ("status:none",)
     assert out[3].d_tilde_um == out[0].d_tilde_um and out[3].flags == (), out[3]       # D-030: dark is a label
+    assert math.isnan(out[4].d_tilde_um) and out[4].flags == ("crossing",), out[4]      # a flag of S still fills
     # each node's own mu_hat is read (D-063.1): b = 1 + 0.05 ln(mu d) inverts mu d = 1 and mu d = e differently
     Tm, _ = grid_table(lambda d, p, m: 1.0 + 0.05 * np.log(m))
     a, b = IV.correct_nodes([node(1.0, 0.2, mu_hat=1.0), node(1.0, 0.2, mu_hat=math.e)], Tm, cfg)
@@ -244,6 +249,20 @@ def test_edge_cases():
         pass
     else:
         raise AssertionError("a table must refuse a fit with another estimator")
+    # D-095: a table built under another selection S (here the S of before D-095, with faint) is refused
+    saved = C.SELECTION_FLAGS
+    try:
+        C.SELECTION_FLAGS = ("faint",) + saved
+        T_old, _ = grid_table(lambda d, p, m: 1.0 + 0.0 * d)
+    finally:
+        C.SELECTION_FLAGS = saved
+    assert T_old.estimator_hash != cfg.signature_hash("estimator")
+    try:
+        IV.correct_nodes([node(1.0, 0.2)], T_old, cfg)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("a table built under another S must be refused (D-095)")
 
 
 # ---------------------------------------------------------------- runner ---

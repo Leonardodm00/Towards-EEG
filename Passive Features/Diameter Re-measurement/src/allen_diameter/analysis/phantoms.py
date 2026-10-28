@@ -37,13 +37,14 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 
+from ..config import SELECTION_FLAGS  # noqa: F401  (re-exported here, its old home)
 from ..model import geometry, render
 from .node_pipeline import Branch, measure_node
 from .registration import registration_category
 
-# the flags that fail the selection S (Block 6); "dark" is a label only since Block 14.1 (D-030): a dark node is
-# retained, inverted and keeps the label
-SELECTION_FLAGS = ("faint", "crossing", "stack_edge", "bbar_few", "profile_nan")
+# SELECTION_FLAGS: the flags that fail the selection S (Block 6), defined in config.py since D-095 so that they enter
+# the estimator signature. "dark" is a label only since Block 14.1 (D-030), "faint" since D-095 (2026-10-28): such a
+# node is retained, inverted and keeps the label.
 MAX_RADIUS_REDRAWS = 100000      # a guard: at sd 0.2 um and d 0.2 um a draw is rejected with probability 0.31
 
 
