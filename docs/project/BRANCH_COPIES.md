@@ -11,8 +11,8 @@ branch, at the paths they have in project knowledge:
 
 | Path here | In project knowledge | Copied |
 |---|---|---|
-| `claude/TEEG_diameter_HPC_paths_reference.md` | `claude/` | 2026-10-28, its v13 (D-101: the stripe; v12: D-099, the survey jobs, section 2b; v11: D-098 on the remote; first copied at v10) |
-| `TEEG_decisions_and_ideas_log.md` | root | 2026-10-28, its v28 (D-101, on the noise-fit chat's v27 with D-100; v26: D-099; v25: D-098; v24: the status notes on D-085, D-089, D-090) |
+| `claude/TEEG_diameter_HPC_paths_reference.md` | `claude/` | 2026-10-28, its v14 (D-105: the recheck, Cell 7's knob file, Cell 15's merged file; v13: D-101, the stripe; v12: D-099, the survey jobs, section 2b; v11: D-098 on the remote; first copied at v10) |
+| `TEEG_decisions_and_ideas_log.md` | root | 2026-10-28, its v29 (D-105, on the noise-fit chat's D-102 to D-104; v28: D-101; v26: D-099; v25: D-098; v24: the status notes on D-085, D-089, D-090) |
 
 A copy here that differs from project knowledge, or from `main`'s copy of the same document, is stale, not a fork:
 re-read the project document and merge.
