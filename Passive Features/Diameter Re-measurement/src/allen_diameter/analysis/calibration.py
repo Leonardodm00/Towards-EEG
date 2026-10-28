@@ -237,7 +237,7 @@ def stage_planes(node, cfg, which):
     return np.arange(int(node.k_star) - P, int(node.k_star) + P + 1)
 
 
-def support_masks(shape, frame, kk, node, branch, scene, cfg):
+def support_masks(shape, frame, kk, node, branch, scene, cfg, sigma_soma_um=None):
     """The background's support of each plane of kk on a patch of `shape` and
     `frame` (10.P / 10.S): (support (n, H, W) bool, stripe (n,) tuple of info
     dicts or None). background_support "square": 10.P's far pixels
@@ -245,9 +245,14 @@ def support_masks(shape, frame, kk, node, branch, scene, cfg):
     10.S, D-101): the pixels no neighbour shades at tau = isolation_depth_gl
     and the node's own fitted cylinder (d_hat_um) does not shade, cut to the
     stripe along the measuring line with most clear pixels (stripe_support),
-    plane by plane. The segments considered reach the patch within their
-    radius plus 6 sigma_r at the largest defocus any segment end has from any
-    plane (a deep segment far outside the patch can still shade it)."""
+    plane by plane. The own cylinder is the trace's own rows and the same rows
+    moved across to the pilot's fitted centre (fitted_own_rows; the fitted
+    cylinder of D-101.4, wherever the trace lies). sigma_soma_um: the soma's
+    blur (default: the stage's, sigma_r at half the span of kk -- a caller
+    testing one plane of a stage passes the stage's, F1 of 2026-10-28). The
+    segments considered reach the patch within their radius plus 6 sigma_r at
+    the largest defocus any segment end has from any plane (a deep segment far
+    outside the patch can still shade it)."""
     cal, dz = cfg.calibration, cfg.acquisition.dz_um
     z = np.asarray(kk, dtype=float) * dz
     H, W = int(shape[0]), int(shape[1])
@@ -261,8 +266,9 @@ def support_masks(shape, frame, kk, node, branch, scene, cfg):
     d_own = float(node.d_hat_um)
     reach = max(r_max, 0.5 * d_own if math.isfinite(d_own) else 0.0) + 6.0 * float(sigma_r(d_max, cfg.renderer))
     rows = calibration_scene.segment_rows(scene, frame, (H, W), branch, reach)
+    rows = np.vstack([rows, calibration_scene.fitted_own_rows(rows, node.cx_um, node.cy_um)])
     nb, own = calibration_scene.shadow_masks((H, W), frame, rows, scene.soma, z, node.B_bar, node.mu_hat_per_um,
-                                             cfg, d_own)
+                                             cfg, d_own, sigma_soma_um)
     support = np.zeros((z.size, H, W), dtype=bool)
     infos = []
     for q in range(z.size):
@@ -477,16 +483,21 @@ def trace_reasons(view, cfg, allen_diameter_um, branch, index, scene, planes_z):
 
 def stripe_reasons(view, cfg, branch, index, scene, planes_z):
     """10.I (vi) under background_support "stripe" (Block 10.S, D-101): the
-    stripe of the plane of planes_z nearest the pilot's depth, computed on the
-    patch's frame without its image (support_masks with patch_frame); the
-    reason "not_isolated:too_few" or "not_isolated:side_short" when it is not
-    ok, else nothing. Returns a list."""
+    stripe of the plane of planes_z (the stage's planes, um) nearest the
+    pilot's depth, computed on the patch's frame without its image
+    (support_masks with patch_frame) and with the soma at the stage's largest
+    blur, sigma_r at half the span of planes_z -- so that the verdict is the
+    scan's stripe at that plane (F1 of 2026-10-28); the reason
+    "not_isolated:too_few" (which takes precedence) or
+    "not_isolated:side_short" when it is not ok, else nothing. Returns a
+    list."""
     cal, p = cfg.calibration, cfg.acquisition.res0_um
     z = np.asarray(planes_z, dtype=float).reshape(-1)
     z_star = float(z[int(np.argmin(np.abs(z - float(view.z_sub_um))))]) if math.isfinite(float(view.z_sub_um)) else float(z[z.size // 2])
+    span = 0.5 * (z.max() - z.min()) if z.size > 1 else 0.0
     shape, frame = calibration_scene.patch_frame(view.cx_um, view.cy_um, cal.patch_half_um, p)
     _support, stripe = support_masks(shape, frame, np.array([z_star / cfg.acquisition.dz_um]), view, branch, scene,
-                                     cfg)
+                                     cfg, sigma_soma_um=float(sigma_r(span, cfg.renderer)))
     info = stripe[0]
     return [] if info["ok"] else ["not_isolated:" + info["reason"]]
 

@@ -35,6 +35,18 @@ Checks
                         patch's edges minus the own cylinder; a non-finite
                         d_hat falls back to Allen's radius; nothing shaded at
                         a huge tau: the whole band
+    test_recheck        2026-10-28, after the integration tester's report and
+                        the run on the pilot's reconstruction: (F1) a soma
+                        beside the node -- the verdict before the fetch equals
+                        the scan's stripe at k*, the soma at the stage's blur;
+                        (F2) the trace 0.5 um off the fitted centre -- the own
+                        cylinder covers the fitted axis (column 0 own-shaded,
+                        no stripe pixel within d_hat / 2 of the fitted axis);
+                        the vectorized margins equal the scalar search of
+                        2026-10-28 (verbatim copy) to 1e-9 um, and the windowed
+                        masks equal the full-patch masks of the same day
+                        (verbatim copy) pixel for pixel on random scenes with
+                        deep segments whose margins cover the whole patch
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -346,6 +358,149 @@ def test_edge_cases():
     assert not n3.any() and not o3.any() and i3["v_own_plus_um"] == 0.0
     px, py = CS.pixel_centres(s3.shape, _f3)
     assert np.array_equal(s3, np.abs(py) <= i3["w_um"])
+
+
+def _old_shadow_margin(r, mu, sigma, B, tau, n_iter=40):
+    """calibration_scene.shadow_margin as committed on 2026-10-28 (03c43b2), verbatim but for the name: the
+    reference of the vectorized search."""
+    r, s, tau = float(r), max(float(sigma), 1e-6), float(tau)
+    if not (r > 0 and B > 0 and mu > 0):
+        return -1.0
+    hi = r + 6.0 * s
+    grid = np.linspace(0.0, hi, 257)
+    depth = CS.shadow_depths(grid, r, mu, s, B)
+    below = np.flatnonzero(depth <= tau)
+    if below.size and below[0] == 0:
+        return -1.0
+    if not below.size:
+        return hi
+    lo, hi = float(grid[below[0] - 1]), float(grid[below[0]])
+    for _ in range(int(n_iter)):
+        mid = 0.5 * (lo + hi)
+        if CS.shadow_depth(mid, r, mu, s, B) > tau:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
+
+
+def _old_shadow_masks(shape, frame, rows, soma, planes_z, B_bar, mu, cfg, d_own_um=None, sigma_soma_um=None):
+    """calibration_scene.shadow_masks as committed on 2026-10-28 (03c43b2), verbatim but for the names: the
+    full-patch reference of the windowed masks."""
+    from allen_diameter.analysis import background
+    H, W = int(shape[0]), int(shape[1])
+    px, py = CS.pixel_centres(shape, frame)
+    z = np.asarray(planes_z, dtype=float).reshape(-1)
+    rc, tau = cfg.renderer, float(cfg.calibration.isolation_depth_gl)
+    n_sigma = float(cfg.calibration.far_pixel_sigmas)
+    predicted = all(math.isfinite(float(x)) and float(x) > 0 for x in (B_bar, mu))
+    nb = np.zeros((z.size, H, W), dtype=bool)
+    own = np.zeros((z.size, H, W), dtype=bool)
+    r_own = 0.5 * float(d_own_um) if d_own_um is not None and math.isfinite(float(d_own_um)) and d_own_um > 0 else 0.0
+    rows = np.atleast_2d(np.asarray(rows, dtype=float)).reshape(-1, 9)
+
+    def margin_of(r, sigma):
+        return _old_shadow_margin(r, float(mu), sigma, float(B_bar), tau) if predicted else r + n_sigma * sigma
+
+    for q in range(rows.shape[0]):
+        sg = rows[q]
+        is_own = sg[8] >= 0.5
+        r = max(float(sg[6]), float(sg[7]), r_own if is_own else 0.0)
+        dist = None
+        for k in range(z.size):
+            delta = max(abs(sg[2] - z[k]), abs(sg[5] - z[k]))
+            margin = margin_of(r, float(sigma_r(delta, rc)))
+            if margin < 0:
+                continue
+            if dist is None:
+                dist = background.segment_distance(px, py, sg[0:2], sg[3:5])
+            (own if is_own else nb)[k] |= dist <= margin
+    soma = np.atleast_2d(np.asarray(soma, dtype=float)).reshape(-1, 3)
+    if soma.shape[0]:
+        if sigma_soma_um is None:
+            span = 0.5 * (z.max() - z.min()) if z.size > 1 else 0.0
+            sigma_soma_um = float(sigma_r(span, rc))
+        for x, y, r in soma:
+            margin = margin_of(float(r), float(sigma_soma_um))
+            if margin >= 0:
+                nb |= (np.hypot(px - x, py - y) <= margin)[None]
+    return nb, own
+
+
+def test_recheck():
+    cfg = cfg_with(background_support="stripe")
+    p, dz = cfg.acquisition.res0_um, cfg.acquisition.dz_um
+    # (F1) a soma beside the node: the verdict equals the scan's stripe at k*, the soma at the stage's blur
+    own, scene = scene_of(())
+    for which, d_a, P in (("near", 0.4, cfg.calibration.offsets_planes), ("far", 0.7, cfg.calibration.far_offsets_planes)):
+        node = pilot(d=0.4)
+        sig_stage = float(sigma_r(P * dz, cfg.renderer))
+        # the soma's edge where the in-focus margin leaves a 3-um side but the stage's does not
+        m0 = CS.shadow_margin(2.0, MU, float(sigma_r(0.0, cfg.renderer)), B_BAR, cfg.calibration.isolation_depth_gl)
+        ms = CS.shadow_margin(2.0, MU, sig_stage, B_BAR, cfg.calibration.isolation_depth_gl)
+        y_soma = -(0.5 * (m0 + ms) + 3.2)
+        sc = Scene(scene.seg_xyz, scene.seg_radius, scene.seg_ids, np.array([[0.0, y_soma, 2.0]]))
+        kk = CAL.stage_planes(node, cfg, which)
+        planes_z = kk * dz
+        shape, frame = frame_of(cfg)
+        _sup, st = CAL.support_masks(shape, frame, kk, node, own, sc, cfg)
+        at_k = st[int(np.flatnonzero(kk == node.k_star)[0])]
+        verdict = CAL.calibration_reasons(node, cfg, d_a, own, 14, sc, planes_z)
+        want = [] if at_k["ok"] else ["not_isolated:" + at_k["reason"]]
+        assert verdict == want, (which, verdict, at_k)
+        assert verdict != [], (which, at_k, y_soma, m0, ms)
+        # discriminating: with the soma at the in-focus blur (the verdict before F1) the stripe is usable
+        _sup0, st0 = CAL.support_masks(shape, frame, kk, node, own, sc, cfg,
+                                       sigma_soma_um=float(sigma_r(0.0, cfg.renderer)))
+        assert st0[int(np.flatnonzero(kk == node.k_star)[0])]["ok"], (which, st0)
+    # (F2) the trace 0.5 um across from the fitted centre: the fitted axis is own-shaded, no stripe pixel lies
+    # within d_hat / 2 of it, and the trace's own tube is removed too
+    own2, scene2 = scene_of((), r_own=0.2)
+    node = pilot(cy=0.5, d=0.4)                     # the pilot's centre 0.5 um across (+v) from the trace (y = 0)
+    support, info, nb, ow, frame = one_plane(cfg, own2, scene2, node)
+    px, py = CS.pixel_centres(support.shape, frame)
+    assert not np.any(support & (np.abs(py - 0.5) <= 0.2)), "stripe pixels on the fitted cylinder"
+    assert not np.any(support & (np.abs(py) <= 0.2)), "stripe pixels on the trace's tube"
+    assert info["v_own_plus_um"] > 0 and info["v_own_minus_um"] > 0.5, info
+    moved = CS.fitted_own_rows(CS.segment_rows(scene2, frame, support.shape, own2, 100.0), 0.0, 0.5)
+    assert moved.shape[0] > 0 and np.allclose(moved[:, [1, 4]], 0.5) and np.all(moved[:, 8] == 1.0)
+    assert CS.fitted_own_rows(np.empty((0, 9)), 0.0, 0.0).shape == (0, 9)
+    # the vectorized margins against the scalar search of 2026-10-28, to 1e-9 um (both bisect the same monotone
+    # quadrature on the same rule; the brackets differ, so the last digits may)
+    rng = np.random.default_rng(SEED + 1)
+    r = rng.uniform(0.05, 6.0, 300)
+    sg = np.exp(rng.uniform(np.log(0.08), np.log(40.0), 300))
+    for mu, B, tau in ((1.0, 200.0, 0.03), (2.5, 120.0, 0.3), (0.3, 230.0, 0.03)):
+        new = CS.shadow_margins(r, mu, sg, B, tau)
+        old = np.array([_old_shadow_margin(a, mu, b, B, tau) for a, b in zip(r, sg)])
+        assert np.max(np.abs(new - old)) <= 1e-9, np.max(np.abs(new - old))
+    assert np.all(CS.shadow_margins(r[:5], float("nan"), sg[:5], 200.0, 0.03) == -1.0)
+    # the windowed masks against the full-patch masks of 2026-10-28, pixel for pixel: random scenes with near,
+    # oblique and deep segments (whose margins cover the whole patch), a soma, the own branch; predicted and
+    # geometric margins; several planes
+    for trial in range(6):
+        g = np.random.default_rng([SEED, trial])
+        segs, rad, sid = [], [], []
+        for q in range(25):
+            a = g.uniform(-14, 14, 2)
+            b = a + g.normal(0, 4, 2)
+            zz = g.choice([0.0, 0.5, 3.0, 25.0, 60.0])
+            segs.append([a[0], a[1], zz, b[0], b[1], zz + g.normal(0, 1.0)])
+            rad.append([g.uniform(0.1, 1.5)] * 2)
+            sid.append([300 + 2 * q, 301 + 2 * q])
+        base = scene_of(())[1]
+        sc = Scene(np.vstack([base.seg_xyz, np.array(segs)]), np.vstack([base.seg_radius, np.array(rad)]),
+                   np.vstack([base.seg_ids, np.array(sid)]), np.array([[g.uniform(-8, 8), g.uniform(-8, 8), 3.0]]))
+        own3 = scene_of(())[0]
+        shape, frame = frame_of(cfg, 6.0)
+        rows = CS.segment_rows(sc, frame, shape, own3, 500.0)
+        for B, mu in ((B_BAR, MU), (float("nan"), MU)):
+            planes = np.array([0.0, 0.84, 4.48])
+            a1 = CS.shadow_masks(shape, frame, rows, sc.soma, planes, B, mu, cfg, 0.5)
+            a0 = _old_shadow_masks(shape, frame, rows, sc.soma, planes, B, mu, cfg, 0.5)
+            assert np.array_equal(a1[0], a0[0]) and np.array_equal(a1[1], a0[1]), (trial, B, int((a1[0] != a0[0]).sum()),
+                                                                                   int((a1[1] != a0[1]).sum()))
+            assert a1[0].any(), trial
 
 
 # ----------------------------------------------------------------- runner --

@@ -20,8 +20,9 @@ and the far scan (Block 15).
   isolation_breakdown  every traced neighbour's predicted shadow (gl) in the
                        patch, the deepest over the stage's planes (D-098.4)
   shadow_depths        shadow_depth over an array of lateral distances
-  shadow_margin        rho_tau: the lateral distance where a tube's predicted
-                       shadow falls to tau (Block 10.S, D-101.2)
+  shadow_margins       rho_tau for arrays of tubes: the lateral distance where
+                       each tube's predicted shadow falls to tau (Block 10.S,
+                       D-101.2); shadow_margin, one tube
   shadow_masks         (n, H, W) bool x 2: the pixels each plane's neighbours
                        shade, and those the node's own fitted cylinder shades
   stripe_support       the stripe along the measuring line with most clear
@@ -244,34 +245,77 @@ def shadow_depth(rho, r, mu, sigma, B):
 
 # ------------------------------------------------------ the stripe (10.S) --
 
-def shadow_margin(r, mu, sigma, B, tau, n_iter=40):
-    """rho_tau (um): the lateral distance at which the predicted shadow of a
-    tube (r, mu, blur sigma, background B) falls to tau (gl), by bisection on
-    [0, r + 6 sigma] -- the shadow decreases with rho >= 0 (a symmetric
-    unimodal deficit blurred by a Gaussian). -1.0 when the shadow is at most
-    tau everywhere (nothing is shaded); r + 6 sigma when it is still above
-    tau there (never, for tau > 0: the Gaussian tail is below 1e-8 of the
-    dip). Block 10.S, D-101.2."""
-    r, s, tau = float(r), max(float(sigma), 1e-6), float(tau)
-    if not (r > 0 and B > 0 and mu > 0):
-        return -1.0
-    hi = r + 6.0 * s
-    # a coarse scan first (robust to the quadrature's ripples), then bisection in the bracketing interval
-    grid = np.linspace(0.0, hi, 257)
-    depth = shadow_depths(grid, r, mu, s, B)
-    below = np.flatnonzero(depth <= tau)
-    if below.size and below[0] == 0:
-        return -1.0
-    if not below.size:
-        return hi
-    lo, hi = float(grid[below[0] - 1]), float(grid[below[0]])
-    for _ in range(int(n_iter)):
-        mid = 0.5 * (lo + hi)
-        if shadow_depth(mid, r, mu, s, B) > tau:
-            lo = mid
-        else:
-            hi = mid
-    return 0.5 * (lo + hi)
+def _depths_rule(rho, r, sigma, mu, B, n):
+    """shadow_depths for arrays rho, r, sigma (m,) of m tubes, all on the n-node Gauss-Legendre rule."""
+    x, w = _GL_CACHE[n] if n in _GL_CACHE else _GL_CACHE.setdefault(n, leggauss(n))
+    vp = r[:, None] * x[None, :]
+    deficit = 1.0 - np.exp(-2.0 * mu * np.sqrt(np.maximum(r[:, None] ** 2 - vp ** 2, 0.0)))
+    s = np.maximum(sigma, 1e-6)[:, None]
+    g = np.exp(-0.5 * ((rho[:, None] - vp) / s) ** 2) / (math.sqrt(2.0 * math.pi) * s)
+    return B * r * np.sum(w * deficit * g, axis=1)
+
+
+def shadow_margins(r, mu, sigma, B, tau, n_iter=48):
+    """rho_tau (um) for arrays r and sigma of the same shape: for each tube
+    (radius r, absorption mu, blur sigma, background B) the lateral distance at
+    which its predicted shadow (shadow_depths, on _gauss_legendre's rule for
+    that tube) falls to tau (gl), by bisection on [0, r + 6 sigma] -- the shadow
+    decreases with rho >= 0 (a symmetric unimodal deficit blurred by a
+    Gaussian, Wintner). -1.0 where the shadow is at most tau everywhere
+    (nothing is shaded) or r <= 0; r + 6 sigma where it is still above tau
+    there (never, for tau > 0: the Gaussian tail is below 1e-8 of the dip);
+    all -1.0 when B or mu is not finite and positive. Block 10.S, D-101.2.
+    Custom: a bisection vectorized over many tubes (one call per plane for
+    every segment of a cell); scipy.optimize.brentq / bisect are scalar, and
+    scipy.optimize.elementwise.find_root needs SciPy >= 1.15, which Colab and
+    the cluster's environment do not guarantee."""
+    r = np.asarray(r, dtype=float)
+    s = np.maximum(np.asarray(sigma, dtype=float), 1e-6)
+    r, s = np.broadcast_arrays(r, s)
+    out = np.full(r.shape, -1.0)
+    B, mu, tau = float(B), float(mu), float(tau)
+    if not (math.isfinite(B) and B > 0 and math.isfinite(mu) and mu > 0):
+        return out
+    fr, fs, res = r.ravel(), s.ravel(), out.ravel()
+    need = np.clip(np.ceil(6.0 * fr / fs), 16, 512).astype(int)       # _gauss_legendre's rule, element by element
+    valid = fr > 0
+    for n in np.unique(need[valid]):
+        idx = np.flatnonzero(valid & (need == n))
+        for c in range(0, idx.size, 20000):
+            j = idx[c:c + 20000]
+            rr, ss = fr[j], fs[j]
+            lo, hi = np.zeros(j.size), rr + 6.0 * ss
+            d0 = _depths_rule(lo, rr, ss, mu, B, int(n))
+            dh = _depths_rule(hi, rr, ss, mu, B, int(n))
+            m = np.where(d0 <= tau, -1.0, np.where(dh > tau, hi, np.nan))
+            todo = np.isnan(m)
+            if todo.any():
+                a, b, r2, s2 = lo[todo], hi[todo], rr[todo], ss[todo]
+                for _ in range(int(n_iter)):
+                    mid = 0.5 * (a + b)
+                    above = _depths_rule(mid, r2, s2, mu, B, int(n)) > tau
+                    a = np.where(above, mid, a)
+                    b = np.where(above, b, mid)
+                m[todo] = 0.5 * (a + b)
+            res[j] = m
+    return res.reshape(r.shape)
+
+
+def shadow_margin(r, mu, sigma, B, tau, n_iter=48):
+    """rho_tau (um) of one tube: shadow_margins for a single (r, sigma)."""
+    return float(shadow_margins(np.array([float(r)]), mu, np.array([float(sigma)]), B, tau, n_iter)[0])
+
+
+def _window(frame, shape, x0, x1, y0, y1):
+    """(r0, r1, c0, c1): the pixel rows and columns whose centres can lie in [x0, x1] x [y0, y1] (um), padded by one
+    pixel and clipped to the crop; empty when r0 >= r1 or c0 >= c1."""
+    p = float(frame.res_um_px)
+    H, W = int(shape[0]), int(shape[1])
+    c0 = max(0, int(math.ceil(x0 / p - frame.left)) - 1)
+    c1 = min(W, int(math.floor(x1 / p - frame.left)) + 2)
+    r0 = max(0, int(math.ceil(y0 / p - frame.top)) - 1)
+    r1 = min(H, int(math.floor(y1 / p - frame.top)) + 2)
+    return r0, r1, c0, c1
 
 
 def shadow_masks(shape, frame, rows, soma, planes_z, B_bar, mu, cfg, d_own_um=None, sigma_soma_um=None):
@@ -284,10 +328,15 @@ def shadow_masks(shape, frame, rows, soma, planes_z, B_bar, mu, cfg, d_own_um=No
     fitted cylinder (D-101.4; d_own_um None or not finite: Allen's radius).
     rows: segment_rows (its own column tells the two apart); soma (m, 3) x, y,
     r, shaded as a tube of radius r_s at sigma_soma_um (default: sigma_r at
-    half the span of planes_z, 10.I's convention). Without a finite positive
-    B_bar and mu (a phantom's node, or a pilot without a fit) the shadow
-    cannot be predicted: the margin is then 10.P's geometric r + far_pixel_
-    sigmas x sigma_r (the same rule for the own branch and the neighbours)."""
+    half the span of planes_z, 10.I's convention -- a caller testing one plane
+    of a stage passes the stage's own, as stripe_reasons does). Without a
+    finite positive B_bar and mu (a phantom's node, or a pilot without a fit)
+    the shadow cannot be predicted: the margin is then 10.P's geometric r +
+    far_pixel_sigmas x sigma_r (the same rule for the own branch and the
+    neighbours). The margins of every segment and plane come from one
+    vectorized shadow_margins call; each segment's distances are computed on
+    the pixels within its largest margin of it only (exact: a pixel outside
+    that window is farther than every margin)."""
     H, W = int(shape[0]), int(shape[1])
     px, py = pixel_centres(shape, frame)
     z = np.asarray(planes_z, dtype=float).reshape(-1)
@@ -299,32 +348,72 @@ def shadow_masks(shape, frame, rows, soma, planes_z, B_bar, mu, cfg, d_own_um=No
     r_own = 0.5 * float(d_own_um) if d_own_um is not None and math.isfinite(float(d_own_um)) and d_own_um > 0 else 0.0
     rows = np.atleast_2d(np.asarray(rows, dtype=float)).reshape(-1, 9)
 
-    def margin_of(r, sigma):
-        return shadow_margin(r, float(mu), sigma, float(B_bar), tau) if predicted else r + n_sigma * sigma
+    def margins_of(r, sigma):
+        if predicted:
+            return shadow_margins(r, float(mu), sigma, float(B_bar), tau)
+        return r + n_sigma * sigma
 
-    for q in range(rows.shape[0]):
-        sg = rows[q]
-        is_own = sg[8] >= 0.5
-        r = max(float(sg[6]), float(sg[7]), r_own if is_own else 0.0)
-        dist = None
-        for k in range(z.size):
-            delta = max(abs(sg[2] - z[k]), abs(sg[5] - z[k]))
-            margin = margin_of(r, float(sigma_r(delta, rc)))
-            if margin < 0:
+    if rows.shape[0]:
+        is_own = rows[:, 8] >= 0.5
+        r = np.maximum(rows[:, 6], rows[:, 7])
+        r = np.where(is_own, np.maximum(r, r_own), r)
+        delta = np.maximum(np.abs(rows[:, 2:3] - z[None, :]), np.abs(rows[:, 5:6] - z[None, :]))   # (n_rows, n)
+        margins = margins_of(np.broadcast_to(r[:, None], delta.shape), sigma_r(delta, rc))
+        # each segment's largest distance to the crop (at a corner: the distance to a segment is convex)
+        cx_ = (frame.left + np.array([0, W - 1, 0, W - 1])) * float(frame.res_um_px)
+        cy_ = (frame.top + np.array([0, 0, H - 1, H - 1])) * float(frame.res_um_px)
+        for q in np.flatnonzero(np.any(margins >= 0, axis=1)):
+            sg, mq = rows[q], margins[q]
+            target = own if is_own[q] else nb
+            far_corner = float(np.max(background.segment_distance(cx_, cy_, sg[0:2], sg[3:5])))
+            whole = mq >= far_corner                      # these planes are shaded on the whole crop
+            target[whole] = True
+            if whole.all():
                 continue
-            if dist is None:
-                dist = background.segment_distance(px, py, sg[0:2], sg[3:5])
-            (own if is_own else nb)[k] |= dist <= margin
+            reach = float(mq[~whole].max())
+            if reach < 0:
+                continue
+            r0, r1, c0, c1 = _window(frame, (H, W), min(sg[0], sg[3]) - reach, max(sg[0], sg[3]) + reach,
+                                     min(sg[1], sg[4]) - reach, max(sg[1], sg[4]) + reach)
+            if r0 >= r1 or c0 >= c1:
+                continue
+            dist = background.segment_distance(px[r0:r1, c0:c1], py[r0:r1, c0:c1], sg[0:2], sg[3:5])
+            for k in np.flatnonzero((mq >= 0) & ~whole):
+                target[k, r0:r1, c0:c1] |= dist <= mq[k]
     soma = np.atleast_2d(np.asarray(soma, dtype=float)).reshape(-1, 3)
     if soma.shape[0]:
         if sigma_soma_um is None:
             span = 0.5 * (z.max() - z.min()) if z.size > 1 else 0.0
             sigma_soma_um = float(sigma_r(span, rc))
-        for x, y, r in soma:
-            margin = margin_of(float(r), float(sigma_soma_um))
+        ms = np.atleast_1d(margins_of(soma[:, 2], np.full(soma.shape[0], float(sigma_soma_um))))
+        for (x, y, _r), margin in zip(soma, ms):
             if margin >= 0:
-                nb |= (np.hypot(px - x, py - y) <= margin)[None]
+                r0, r1, c0, c1 = _window(frame, (H, W), x - margin, x + margin, y - margin, y + margin)
+                if r0 < r1 and c0 < c1:
+                    nb[:, r0:r1, c0:c1] |= (np.hypot(px[r0:r1, c0:c1] - x, py[r0:r1, c0:c1] - y) <= margin)[None]
     return nb, own
+
+
+def fitted_own_rows(rows, cx, cy):
+    """The own branch's rows moved across to the pilot's fitted centre (Block 10.S, D-101.4, the fitted
+    cylinder; the tester's F2 of 2026-10-28): the offset is from the trace's point nearest (cx, cy) to (cx, cy),
+    applied to every own row (x and y only). (n_own, 9); empty when there is no own row or the centre is
+    not finite."""
+    rows = np.atleast_2d(np.asarray(rows, dtype=float)).reshape(-1, 9)
+    own = rows[rows[:, 8] >= 0.5]
+    if not own.shape[0] or not (math.isfinite(float(cx)) and math.isfinite(float(cy))):
+        return np.empty((0, 9))
+    c = np.array([float(cx), float(cy)])
+    a, b = own[:, 0:2], own[:, 3:5]
+    ab = b - a
+    t = np.clip(np.sum((c - a) * ab, axis=1) / np.maximum(np.sum(ab * ab, axis=1), 1e-12), 0.0, 1.0)
+    p = a + t[:, None] * ab
+    j = int(np.argmin(np.hypot(*(c - p).T)))
+    off = c - p[j]
+    moved = own.copy()
+    moved[:, [0, 3]] += off[0]
+    moved[:, [1, 4]] += off[1]
+    return moved
 
 
 def _walk(present, blocked_own, blocked_nb, j0, step, n):
