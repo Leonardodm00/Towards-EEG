@@ -1,0 +1,3 @@
+# Regenerable simulated data (about 8 MB), kept out of the repository (D-097; README.txt):
+#   cd scripts && python make_banks.py ref && python make_banks.py cohort
+results/banks/
