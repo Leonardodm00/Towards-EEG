@@ -1,0 +1,10 @@
+sigma_SS_hat = 0.0402 mV; RC test cell 113 MOhm; crossing = start of the noise window before the 80 ms floor
+P1 kappa_tr 0.05 (tolerance 0.0020 mV): tau_m 28.1 ms, |A| 0.4012 mV -> fitted 149.3 ms, analytic 149.1 ms PASS
+P1 kappa_tr 0.10 (tolerance 0.0040 mV): tau_m 28.1 ms, |A| 0.4012 mV -> fitted 129.8 ms, analytic 129.5 ms PASS
+P1 kappa_tr 0.20 (tolerance 0.0080 mV): tau_m 28.1 ms, |A| 0.4012 mV -> fitted 110.3 ms, analytic 110.0 ms PASS
+P2 kappa_tr 0.10 -> 0.05: start later by 19.51 ms (tau_m ln 2 = 19.51 ms) PASS
+P2 kappa_tr 0.20 -> 0.10: start later by 19.51 ms (tau_m ln 2 = 19.51 ms) PASS
+P3 kappa_tr 0.05: the start reaches 190 ms at tau_m = 38.1 ms (fitted 190.2 ms) PASS
+P3 kappa_tr 0.10: the start reaches 190 ms at tau_m = 46.5 ms (fitted 190.2 ms) PASS
+P3 kappa_tr 0.20: the start reaches 190 ms at tau_m = 61.4 ms (fitted 190.2 ms) PASS
+ALL PASS
