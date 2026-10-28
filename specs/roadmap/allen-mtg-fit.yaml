@@ -536,14 +536,14 @@ implementation:
 revisions:
   - stage: N3
     from: 
-    on: 2026-10-28
+    "on": 2026-10-28
     at: 4930ba1c5e4ea16ab4717ace84a4e24e98c50362
     decision: D-095
     note: "window start from the mean windows' exponential decay per sweep and polarity; subtraction per sweep and polarity"
     cleared:
   - stage: N4
-    from: 
-    on: 2026-10-28
+    from: N3
+    "on": 2026-10-28
     at: 4930ba1c5e4ea16ab4717ace84a4e24e98c50362
     decision: D-095
     note: "the simulator's mean-window subtraction per sweep and polarity"
