@@ -123,6 +123,8 @@ the "Binds" column.
 | 2026-10-28 (later, 4) | Status notes from the Colab run of S3's Cells 11, 11b and 12 on Allen's data (the user's logs and figures of 11:16; the diameter implementation chat), no new decision: **D-085** (the pool, 158 cells; the acquisition check, 158 of 158 at dz 0.28 um and 0.1144 um/px; the selection, 51 cells in 15 groups; the alignment, 47 of 51 aligned, 4 failed on Allen's marker file, 5 set aside), **D-089** (.2: the darkest rule took the maximum-intensity xy projection in each of the 4 specimens that have one; .1: of the 5 cells set aside, 4 have shifts like the kept cells'), **D-090** (.1: on the pilot the minimum-intensity xy projection is the planes' minimum, r* 0.9941 at zero offset). The changes these suggest are put to the user, not made. Written after re-reading this log (changed since v23 by the noise-fit chat: D-097's row, index row and entry, notes on D-082 and D-095; merged, nothing of theirs edited). The repository copy of this version (D-097) is on `sci/diameter-pipeline`, `docs/project/`, until the user settles D-097 (d). Next free IDs: D-098, I-005. |
 | 2026-10-28 (later, 5) | Logs **D-098** (user, 15:01; the diameter implementation chat): "Let's do this" to the assistant's proposals (a), (b), (d) after the Colab run of Cells 11-12 -- `fetch_swc` never takes Allen's marker file, the xy projection chosen by its type 'MinimumIntensityProjection - xy' (D-089.2's darkest rule the fallback), S3a's coverage recomputes $\mathcal S$ from the rows' columns -- with (c), the set-aside cells that look aligned run with `--include-set-aside`, and the user's request that Cell 7 draw each candidate's background patch with the neighbours behind `not_isolated`. Implemented and pushed (`c595bc0`, `4ef6d8e`, `cdba78a`, `28790c3`, `44e95e3`). D-089 (its .2 superseded) and D-090 annotated. Written after re-reading this log (unchanged since v24). The repository copy (D-097) on `sci/diameter-pipeline`, `docs/project/`. Next free IDs: D-099, I-005. |
 | 2026-10-28 (later, 6) | Logs **D-099** (user, 17:07; the diameter implementation chat): "Blocks 13 and 14 are too slow. Let's change approach. Everything now on colab will run on a single pilot cell while the real runs will be on the DaVinci HPC. Adjust all the scripts and the pipeline" -- S3's per-cell survey (Cells 12-15) runs on davinci as three PBS jobs (SPEC Block 16.4: `survey_prepare.pbs`, the array `survey_cells.pbs` with one task per selected cell, `survey_pool.pbs`), and every Colab cell runs on the pilot 529878215 only (`cell_pool.py pick`, `survey_pilot/`, 3 nodes per bin). Implemented, smoke-tested and pushed the same evening (`5230474`, `d4559ba`, `ede27be`, `01a15d6`). D-085 and D-098 annotated. Written after re-reading this log (unchanged since the (later, 5) row). The repository copy (D-097) on `sci/diameter-pipeline`, `docs/project/`. Next free IDs: D-100, I-005. |
+| 2026-10-28 (later, 7) | Logs **D-100** (user, about 18:37; the noise-fit chat): "Let's do A and B for the 2 sweep cells." -- for the 14 L3_exc cells with two SS sweeps the twins' tilt SD is taken both per cell (option (a), D-034's (D-034.1)) and as one cohort value (option (b)); partial pooling across cells (option (c)), the assistant's recommendation, is not taken. The assistant's reading, to confirm with the user: two labelled variants of twins per 2-sweep cell; the cohort value the $S_{\rm eff}$-weighted mean of the unclipped per-cell estimates over the 18 cells, clipped at 0; each real cell's own fit unchanged; open points (a)-(f) in the entry. D-034 annotated (entry and index). Written after re-reading this log (unchanged since the (later, 6) row). The repository copy (D-097) on `main`, `docs/project/`. Next free IDs: D-101, I-005. |
+| 2026-10-28 (later, 8) | Logs **D-101** (user, 18:17 and the dialog's answers at about 18:40; the diameter implementation chat), after Cell 7's isolation overview on the pilot (70 candidates, 2 far-field, both shaded by the soma or a junction): flatness per set -- far $\varphi \le 15$ deg, near $\le 10$ deg --, and the calibration background's support becomes the **stripe** along the measuring line (a pixel is clear when no traced neighbour's predicted shadow at it exceeds 0.03 gl; the band along the line with most clear pixels, walked outward to the first shaded column, the node's own fitted cylinder removed; a plane usable with 500 clear pixels and 3 um of run per side), in place of the square's node-level isolation verdict. Built as SPEC Block 10.S the same evening (`03c43b2`; the notebooks and runbook v35 `6a261e4`). Why it was not S: the pilot table read off Drive -- flatness removes 26 of the 31 far-set nodes, S three, `bbar_few` none **[data]**. D-081 and D-078 annotated. Written after re-reading this log (changed since the (later, 6) row by the noise-fit chat's D-100, merged). The repository copy (D-097) on `sci/diameter-pipeline`, `docs/project/`. Next free IDs: D-102, I-005. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -176,7 +178,7 @@ would be needed*, *Status*.
 | D-031 | 2026-10-07 | the table's regression axes; the response estimator; the inversion | the bias table also accounts for the estimated optical depth: $\hat m(d, \varphi, \hat\alpha \mid \mathcal C)$, inverted at each node's own $\hat\alpha_i$ | active; settles D-030 (b); amends D-024's axes [updated 2026-10-16: the coordinate is $\ln\hat\alpha$ -- D-053 (iii); the scaling, the third bandwidth and the budget still open] [updated 2026-10-18: scaling by design range and the third bandwidth 0.3 -- D-054 (i), (ii); the budget still open] |
 | D-032 | 2026-10-07 | per-tilt tables; D-027's later tilt study; `CalibrationConfig` | tilt-specific tables are dropped, as kernel and as test | active; withdraws D-027's tilt-binned study (reading to be confirmed) |
 | D-033 | 2026-10-08 | D-017 (d); the per-cell noise-law fit in `noise_calibration.py`; abcTau | per-cell $\theta_{\rm noise}$ is a least-squares point estimate on the window statistics (indirect inference); no ABC posterior, no abcTau | active; closed form vs simulated medians, statistic set and scales still open [updated 2026-10-16: scales settled by D-048/D-049/D-050 ($\hat\Sigma^{-1}$ by iteration); statistic set settled by D-051 (simulated medians, $d$ = 15)] |
-| D-034 | 2026-10-08 | D-017 (c), (e); the tilt $b$ and `drift_sigma_mV`; the SS noise window of `noise_calibration.py`; D-033's statistic set | the variance at seconds is carried by the per-sweep tilt, $\sigma_b$ calibrated per cell from the SS window-mean semivariogram (D-034.1); no third OU, no per-sweep multi-OU/BIC; SS noise windows $[t_0, 200)$ ms after the previous pulse where the transient test passes | active; $h^*$ (0.8 s recommended, note) and the test threshold open [updated 2026-10-16: the enlarged windows join the statistic set, replacing the 10 ms window; the response is subtracted per polarity; $h^*$ = 0.8 s, $\kappa_{\rm tr}$ = 0.1 and 5 ms bins are labelled provisional defaults -- D-051] [note 2026-10-26: 4 periods also right for the 120 ms windows of $t_{\rm SS}$ = 80 ms; the 2-sweep spread of $\hat\sigma_b$ is the data's limit; per-cell, cohort and pooled $\sigma_b$ compared -- note in the entry] |
+| D-034 | 2026-10-08 | D-017 (c), (e); the tilt $b$ and `drift_sigma_mV`; the SS noise window of `noise_calibration.py`; D-033's statistic set | the variance at seconds is carried by the per-sweep tilt, $\sigma_b$ calibrated per cell from the SS window-mean semivariogram (D-034.1); no third OU, no per-sweep multi-OU/BIC; SS noise windows $[t_0, 200)$ ms after the previous pulse where the transient test passes | active; $h^*$ (0.8 s recommended, note) and the test threshold open [updated 2026-10-16: the enlarged windows join the statistic set, replacing the 10 ms window; the response is subtracted per polarity; $h^*$ = 0.8 s, $\kappa_{\rm tr}$ = 0.1 and 5 ms bins are labelled provisional defaults -- D-051] [note 2026-10-26: 4 periods also right for the 120 ms windows of $t_{\rm SS}$ = 80 ms; the 2-sweep spread of $\hat\sigma_b$ is the data's limit; per-cell, cohort and pooled $\sigma_b$ compared -- note in the entry] [updated 2026-10-28 (later, 7): for the 2-sweep cells per cell and one cohort value both, D-100] |
 | D-035 | 2026-10-07 | the focus rule of the diameter fit (procedure Eq. 1, handoff Eq. 1); `MeasureConfig.focus_rule`, `focus_grad_window`, `focus_grad_margin_um`; `analysis/focus.py`; the pilot's `k_star`, `k_star_depth` | the sharpest plane $k^*$ is the plane of maximum gradient energy of the profile; the dip depth is kept as the labelled comparison | active; logged 2026-10-08; cited in the repository as "D-030" (collision with this log's D-030); its window open on trunks |
 | D-036 | 2026-10-08 | `scripts/plane_differences.py` (default evaluation), `focus.profile_areas`, notebook Cell 4e; not the focus rule | the plane-to-plane diagnostic evaluates the area under the measuring-line profile per plane and its change between consecutive planes | active; a diagnostic |
 | D-037 | 2026-10-08 | `scripts/plane_differences.py --evaluation entropy`, `focus.plane_entropies`, `profiles.stripe_mask`, notebook Cell 4f; not the focus rule | the plane-to-plane diagnostics include the entropy of the grey-level histogram along the measuring line and in a strip around it | active; a diagnostic; its parameters provisional; pick = global minimum since 2026-10-08, evening (note under the entry) |
@@ -242,6 +244,8 @@ would be needed*, *Status*.
 | D-097 | 2026-10-28 | every chat's delivery: code pushed by the assistant (hpc-git-delivery's last step); every document also in the repository (`docs/project/` on `main` for the project-knowledge documents; handoffs in `<workstream>/docs/`, study documents and checks in `<workstream>/dev/`); DOCUMENT UPKEEP; the roadmaps' push | the assistant pushes its own commits; every document is also committed to the GitHub repository so any chat can read it [user]; where, the assistant's reading; the user's uploads not copied without their word; the repository is public | active; applied 2026-10-28 (noise-fit chat: `53b2713`, `d2ffcb4`, `cd32dad`) |
 | D-098 | 2026-10-28 | `allen_image_io.fetch_swc` (Block 0); Block 16.2 (a)'s projection rule and 16.3 (a) (`projection_xy_type`); S3a's coverage (Block 17.3; `phantoms.row_reject_reasons`); Cell 7's outputs (Block 10.F (5); `scan_cell`'s `on_node`); the set-aside cells' use (D-089.1); D-089.2 | the marker file never taken; the xy projection by its type, the darkest the fallback; $\mathcal S$ recomputed from the rows' columns in the coverage; Cell 7 draws each candidate's background patch with the neighbours behind `not_isolated`; the set-aside cells that look aligned run with `--include-set-aside` [user; the figure's form the assistant's, PROVISIONAL] | active; implemented 2026-10-28 (`c595bc0`, `4ef6d8e`, `cdba78a`, `28790c3`, `44e95e3`), smoke-tested; not run on Allen's data |
 | D-099 | 2026-10-28 | where S3's per-cell survey runs (Blocks 16.2, 17, 18, 19 over the selection: SPEC Block 16.4, `scripts/pbs/survey_*.pbs`); Colab's Cells 11-15 (the pilot only, `survey_pilot/`); the runner's `--task-index` and `--cache-per-cell`; `cell_pool.py pick` (Block 16.1 (e)); the roadmap's S3a-S3c (`needs_hpc`); D-085's "in Colab"; D-098.5's Cells 12b and 13b | the real runs on davinci, one PBS array task per selected cell plus a prepare and a pool job; Colab keeps every cell on the pilot [user]; the layout under the archive root, the proxy module and the 12 h walltime the assistant's, PROVISIONAL | active; implemented and pushed 2026-10-28, smoke-tested against stubs; not yet run on davinci |
+| D-100 | 2026-10-28 | the tilt SD the twins of the 14 two-sweep L3_exc cells receive (Block 5; the tilt of (D-017.1)); D-034's (D-034.1) for those cells; a cohort step after the 18 per-cell fits (Block 6); Block 3's pair counts and Block 4's `TiltResult`; the Stage-7 gate's report (D-011); SPEC §8 (2026-10-23) | for the 2-sweep cells the twins' tilt SD both per cell (a) and as one cohort value (b); partial pooling (c) not taken [user]; two labelled variants of twins, the cohort value's form (the $S_{\rm eff}$-weighted mean of the unclipped estimates over the 18 cells, clipped at 0) and each cell's own fit unchanged -- the assistant's reading, to confirm | active; not implemented; its reading open |
+| D-101 | 2026-10-28 | the calibration nodes' flatness (10.I (iii); `CalibrationConfig.node_phi_max_deg`, `node_phi_max_deg_far`); the background's support and the isolation verdict of both calibration sets (Blocks 10.P, 10.I (vi), 15.1; SPEC Block 10.S; `background_support`, `stripe_half_widths_um`, `stripe_min_pixels`, `stripe_min_side_um`); Cell 7 and S3c's per-cell scans; D-078.1's far mask and D-081.1's node verdict (kept as `"square"`); D-081.3's 5 deg | far $\varphi \le 15$ deg, near $\le 10$ deg; the stripe: a pixel is clear when no neighbour's predicted shadow at it exceeds 0.03 gl, the band along the measuring line with most clear pixels, walked out to the first shaded column, the own fitted cylinder removed, usable with 500 pixels and 3 um per side [user]; the $W$ grid, the walk, the own radius $\max(\hat d/2, r_A)$ and the near bound read as 10 deg the assistant's, PROVISIONAL | active; implemented and pushed 2026-10-28 (Block 10.S), smoke-tested; not yet run on Allen's data |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
@@ -3665,7 +3669,7 @@ protocol, Allen white paper **[KB]**; the checks above **[run]**, in the assista
 sandbox, not in the repo.
 
 **Status:** active. Settles D-017 (c) except $h^*$; calibrating $b$ from pre-window
-slopes stays excluded (D-017 note 4). **[updated 2026-10-16: the enlarged windows' statistics join D-033's set (D-051 (i)); the pulse response is subtracted per polarity before the statistics (D-051 (iv)); $h^*$ = 0.8 s, $\kappa_{\rm tr}$ = 0.1 and 5 ms bins are labelled provisional config defaults until S2 (D-051).]** **[updated 2026-10-28: comment (c)'s transient test -- the 5 ms bins of $\bar d$, the odd part -- is replaced by **D-095**: the start is read from the exponential decay of the mean windows per polarity and per sweep; $\kappa_{\rm tr}$ stays provisional.]**
+slopes stays excluded (D-017 note 4). **[updated 2026-10-16: the enlarged windows' statistics join D-033's set (D-051 (i)); the pulse response is subtracted per polarity before the statistics (D-051 (iv)); $h^*$ = 0.8 s, $\kappa_{\rm tr}$ = 0.1 and 5 ms bins are labelled provisional config defaults until S2 (D-051).]** **[updated 2026-10-28: comment (c)'s transient test -- the 5 ms bins of $\bar d$, the odd part -- is replaced by **D-095**: the start is read from the exponential decay of the mean windows per polarity and per sweep; $\kappa_{\rm tr}$ stays provisional.]** **[updated 2026-10-28 (later, 7): for the 14 cells with two SS sweeps the twins' tilt SD is taken both as (D-034.1) (variant (a)) and as one cohort value (variant (b)) -- **D-100**; the multi-sweep cells keep (D-034.1).]**
 
 **Note added 2026-10-08 (later, 2), from the topic doc's v3 computations; no decision changes.**
 Under the textbook cohort law $\hat\theta_{\rm sim}$ = (0.0383 mV, 0.179, 0.0547 mV, 39.7 ms),
@@ -6961,7 +6965,7 @@ jackknife's was checked: 93 % at nominal 95 %, 60 replicates).
 `fig_junction.py`, with their logs, sent to the user.
 
 **Status:** active; settles D-074.3, D-074.4 (not its junction item) and D-074.1's SNR reading, and fixes D-077.1's
-$N$ and D-077.2's $\kappa$; not implemented (Block 15 not built; SPEC Block 15 not yet rewritten). [updated 2026-10-23, later: D-078.1's patch must hold no traced point but node $j$'s own branch, and the near-field calibration uses the same background (**D-079**, readings PROVISIONAL).] [implemented (D-078.1: `calibration_scene.planar_background`, the line-end mean kept as `line_end_gl`; D-078.2: `far_field.core_fit_iterative`; D-078.3: `far_field.fit_far_slope` with IRLS, `bootstrap_gamma`, `anchor_sensitivity`, the $t_{J-1}$ interval in `far_fit_summary`; on rendered far phantoms $\hat\gamma$ within 1 % noise-free and 0.83 $\pm$ 0.017 against 0.79 with the camera chain, 4 nodes) 2026-10-23, 20:30: commits `24eb687` (Blocks 10 and 15), `cd80081` (the figures), `f55c083` (Cell 7, runbook v22) on `sci/diameter-pipeline`, not yet pushed [updated 2026-10-26: pushed to `origin/sci/diameter-pipeline` at the user's request, `cc60f3c..dd901de`]; the 28 smoke suites pass; the estimator and simulation hashes unchanged (`0508e7ff12f48728`, `0ea5a6d2ec069c68`); Phase II on Allen's data not run.]
+$N$ and D-077.2's $\kappa$; not implemented (Block 15 not built; SPEC Block 15 not yet rewritten). [updated 2026-10-23, later: D-078.1's patch must hold no traced point but node $j$'s own branch, and the near-field calibration uses the same background (**D-079**, readings PROVISIONAL).] [implemented (D-078.1: `calibration_scene.planar_background`, the line-end mean kept as `line_end_gl`; D-078.2: `far_field.core_fit_iterative`; D-078.3: `far_field.fit_far_slope` with IRLS, `bootstrap_gamma`, `anchor_sensitivity`, the $t_{J-1}$ interval in `far_fit_summary`; on rendered far phantoms $\hat\gamma$ within 1 % noise-free and 0.83 $\pm$ 0.017 against 0.79 with the camera chain, 4 nodes) 2026-10-23, 20:30: commits `24eb687` (Blocks 10 and 15), `cd80081` (the figures), `f55c083` (Cell 7, runbook v22) on `sci/diameter-pipeline`, not yet pushed [updated 2026-10-26: pushed to `origin/sci/diameter-pipeline` at the user's request, `cc60f3c..dd901de`]; the 28 smoke suites pass; the estimator and simulation hashes unchanged (`0508e7ff12f48728`, `0ea5a6d2ec069c68`); Phase II on Allen's data not run.] [updated 2026-10-28, D-101: (D-078.1)'s far mask is the default no more -- the background is fitted on the stripe of Block 10.S; the mask stays under `background_support = "square"`]
 
 ---
 
@@ -7171,7 +7175,7 @@ turn.
 **Sources.** **[user]** 2026-10-23, 18:30. **[KB]** D-074 to D-080.
 
 **Status:** active; implementation started the same turn (Blocks 10 and 15 on `sci/diameter-pipeline`). [implemented 2026-10-23, 20:30: commits `24eb687` (Blocks 10 and 15), `cd80081` (the figures), `f55c083` (Cell 7, runbook v22) on `sci/diameter-pipeline`, not yet pushed [updated 2026-10-26: pushed to `origin/sci/diameter-pipeline` at the user's request, `cc60f3c..dd901de`]; the 28 smoke suites pass; the estimator and simulation hashes unchanged (`0508e7ff12f48728`, `0ea5a6d2ec069c68`); Phase II on Allen's data not run.] [refinement 2026-10-23, 20:30, PROVISIONAL: (D-081.3)'s straightness is implemented against the trace's own total-least-squares line through its points within $\pm$10 um of the node (`calibration_scene.straightness_excess`), not the pilot's line, because the pilot's heading error of about 1 deg moves a 10 um line by 0.13 um and flagged straight 0.2 um phantoms (`not_straight` at $r_j$ = 0.1 um); the tolerance stays one $r_j$ (`node_straight_tol_radii` = 1). Two further readings, PROVISIONAL: the isolation test's predicted shadow uses the renderer's current law (the near table continued with today's slope) at the neighbour's defocus, with the soma as a disc of its own radius; a plane whose core fit ends at a width bound is dropped like an unconverged one (`at_bound`). To confirm or change.] [updated 2026-10-26: the roadmap's theory stage T6 (far-field calibration) closed by the user on the Subproject Roadmaps page (08:59), applied in the chat (`c27e3a9`); no question was open under it after D-074 and D-077 to D-081.]
-[updated 2026-10-27, later 3: (D-081.3)'s straightness part superseded by **D-093** (user, 19:08): the calibration nodes are not screened for straightness by default (`node_straight_check` False), the tolerance 2 radii when the test is switched on (was 1); flatness ($\varphi \le$ 5 deg) and the isolation test unchanged. On Cell 7's first run on the pilot 529878215 none of the 68 candidates was a calibration node; the 57 lines the user pasted all failed straightness at one radius, 46 of them isolation too.]
+[updated 2026-10-27, later 3: (D-081.3)'s straightness part superseded by **D-093** (user, 19:08): the calibration nodes are not screened for straightness by default (`node_straight_check` False), the tolerance 2 radii when the test is switched on (was 1); flatness ($\varphi \le$ 5 deg) and the isolation test unchanged. On Cell 7's first run on the pilot 529878215 none of the 68 candidates was a calibration node; the 57 lines the user pasted all failed straightness at one radius, 46 of them isolation too.] [updated 2026-10-28, D-101: (D-081.3)'s 5 deg becomes 10 deg near / 15 deg far; (D-081.1)'s node verdict is the stripe's, the any-shadow rule kept under `background_support = "square"`]
 
 ---
 
@@ -8343,6 +8347,216 @@ logs of 2026-10-28. **[run, sandbox]** `test_smoke_survey_pbs.py`, `test_smoke_c
 `test_smoke_cell_alignment.py` and the S3 suites; the mutants of Block 16.4.
 
 **Status:** active; implemented and pushed 2026-10-28; smoke-tested against stubs; nothing yet run on davinci.
+
+---
+
+## D-100 -- For the cells with two SS sweeps, the twins' tilt SD is taken both per cell and as one cohort value; partial pooling is not taken (user)
+
+**Date:** 2026-10-28, about 18:37 (Europe/Rome), the noise-fit chat. **Binds:** D-034's per-cell $\sigma_b(c)$
+(D-034.1) for the 14 L3_exc cells with two SS sweeps; the tilt SD a twin's generator receives (Block 5,
+`synthetic_ground_truth`; the tilt $b$ of law (D-017.1)); a cohort step after the 18 per-cell fits (Block 6, the driver
+and its PBS jobs); Block 3's pair counts (`noise_cell_stats.window_mean_semivariogram`) and Block 4's tilt output
+(`noise_fit.TiltResult`, the column `noise_sigma_b_mV_per_s`); the Stage-7 gate's report (`run_ih_recovery.py`,
+`ih_recovery_report.py`; D-011); `Ih Fit/specs/SPEC.md` §8 (the tilt question of 2026-10-23); the options (a)-(c) of the
+tilt study document's §3.9; roadmap T8.
+
+**Decision [user].** "Let's do A and B for the 2 sweep cells." Said in answer to the assistant's account, after the
+explanation of the tilt and of the semivariogram (2026-10-28), of what was left for the user to decide on
+$\sigma_b(c)$: (a) per cell, as D-034 reads it; (b) one cohort value for all cells; (c) partial pooling across cells,
+DerSimonian-Laird on $\log\hat\sigma_b(c)^2$ -- the assistant's recommendation (D-034's note of 2026-10-26; the
+noise-fit handoff of 2026-10-28, question 1). Option (c) is not taken.
+
+**Statement** (the assistant's reading of the quote; every point marked **[open]** is to be confirmed with the user
+before Blocks 5 and 6 are specified).
+
+*Notation.* $\mathcal R$ is the set of the 18 real L3_exc cells and $\mathcal R_2 \subset \mathcal R$ the 14 with two
+SS sweeps (of the other four, one has 6 and three have 10) **[data: the archive's sweep counts, as the tilt study
+document's §1 reads them]**; $\mathcal R$ is not D-011's synthetic cohort $\mathcal C$. For a cell $c$, $S(c)$ is its
+number of SS sweeps, $N_s(c) \in \mathbb N$ the number of same-sweep, same-polarity window-mean pairs $h^*$ apart in its
+sweep $s$ ($h^*$ = 4 onset periods, 0.802 s; D-034.1) and $N(c) = \sum_s N_s(c)$.
+
+(D-100.1) *Two tilt variants for the 2-sweep cells.* For each $c \in \mathcal R_2$ the twin is generated, and the
+gate's per-cell errors (D-011 (iv)) computed, once under each of
+$$\tilde\sigma_b^{(a)}(c) = \hat\sigma_b(c), \qquad \tilde\sigma_b^{(b)}(c) = \hat\sigma_{b,\rm coh} \qquad ({\rm mV/s}), \tag{D-100.1}$$
+with $\hat\sigma_b(c) \in \mathbb R_{\ge 0}$ the cell's (D-034.1) clipped at 0, as Block 4 computes it
+(`tilt_from_semivariogram`) **[src]**, and $\hat\sigma_{b,\rm coh} \in \mathbb R_{\ge 0}$ one value for the whole of
+$\mathcal R$ (D-100.2). Both are numbers computed from the recorded sweeps (computed level), each put in place of the
+SD of the law the cell's tilts are drawn from (analytic level); every twin sweep then draws its own tilt
+$b \sim \mathcal N(0, \tilde\sigma_b(c)^2)$, independently across sweeps (D-017.1). The cells of
+$\mathcal R \setminus \mathcal R_2$ keep variant (a) only, as D-034 says ("for the 2 sweep cells"). *Variant*, not
+*arm*: an arm is already a configuration of the I_h fit (D-005, D-011).
+
+(D-100.2) *The cohort value*, in the assistant's form -- the one check04 of the tilt study compared
+(`tilt_common.pool_cohort`) **[src]**:
+$$\hat\sigma_{b,\rm coh}^2 = \max\Bigl\{0,\ \frac{\sum_{c \in \mathcal R}\nu_c\,\hat\sigma_b(c)^2_{\rm u}}{\sum_{c \in \mathcal R}\nu_c}\Bigr\}, \qquad \hat\sigma_b(c)^2_{\rm u} = \frac{2\,\bigl[\hat V_c(h^*) - V(h^* \mid \hat\theta_c, 0)\bigr]}{h^{*2}}, \qquad \nu_c = S_{\rm eff}(c) = \frac{N(c)^2}{\sum_s N_s(c)^2}, \tag{D-100.2}$$
+with $\hat\sigma_b(c)^2_{\rm u} \in \mathbb R$ ((mV/s)$^2$) the unclipped (D-034.1) and $\nu_c \in [1, S(c)]$ the
+effective number of tilt draws behind $\hat V_c(h^*)$ (the study document's eq. (12)). The unclipped values are
+averaged because each is unbiased for $\sigma_b(c)^2$ over the law of the tilts when the floor $V(h^* \mid \theta, 0)$
+is taken at the true law (study document §3.4; check03 (b): mean ratio 0.997-1.027 in every layout simulated)
+**[run]**, so the mean stays unbiased for a common $\sigma_b^2$; the weights $\nu_c$ are then inverse-variance weights,
+since the variance of $\hat\sigma_b(c)^2_{\rm u}$ is close to $2\sigma_b^4/\nu_c$ when the tilt draws dominate it (95-98
+% of it in every layout, study document §3.7) **[run; reasoning]**. With one common $\sigma_b$ = 0.1 mV/s this form
+puts $\tilde\sigma_b^{(b)}/\sigma_b$ within 0.85-1.14 (5-95 %) **[run: check04, $\omega$ = 0]**. **[open: pooled over
+all of $\mathcal R$, as here; over the four multi-sweep cells only; or over $\mathcal R_2$ only.]**
+
+(D-100.3) *Where the variants act.* Only in the value the twins' generator receives. Inside each real cell's own fit
+(Block 4: $\hat\sigma_b(c)$ alternated with $\hat\theta_c$, the tilt of the SS simulator) the cell keeps its own
+$\hat\sigma_b(c)$, as now; a $\sigma_b$ error of the two-draw size (0 or 0.17 mV/s in the simulator for a cell at 0.1)
+moves $\hat u$ by at most 0.18 of its SD (linearised at $\theta_{\rm cf}$, the fixture layout; SPEC §8) **[run,
+2026-10-23]**, so the fitted law would change little under variant (b) **[open: the assistant's reading]**.
+
+(D-100.4) *What the gate reports.* For each cell of $\mathcal R_2$, its per-cell errors under both variants, side by
+side and labelled; for the other cells, under (a). **[open: whether one variant is the default -- the verdict -- and
+the other a labelled comparison, or a 2-sweep cell passes only if it passes under both.]**
+
+**Why [user; run; reasoning].** **[user]** as quoted. **[run: check04 of the tilt study, re-run 2026-10-28 with
+identical output; 18 cells with the L3_exc layouts, $\theta_{\rm cf}$ in every cell, $\sigma_b(c) =
+0.1\,\mathrm e^{\omega z_c}$ mV/s with $z_c \sim \mathcal N(0, 1)$ and $\omega$ the log-SD of $\sigma_b$ across cells,
+(T1) at the true law, 4000 cohorts]** For a 2-sweep cell the two variants fail in different ways. Per cell errs low:
+median $\tilde\sigma_b/\sigma_b$ 0.83 at every $\omega$ from 0 to 1, a zero tilt in 4.6-10.4 % of cells, more than a
+factor 2 off in 25.1, 25.4, 25.7, 30.5 % at $\omega$ = 0, 0.25, 0.5, 1. The cohort value is right when the cells share
+one $\sigma_b$ and errs high once they differ: median ratio 0.99, 1.05, 1.22, 2.00, more than a factor 2 off in 0.0,
+1.4, 22.3, 59.4 %. At $\sigma_b$ = 0.1 mV/s the tilt is a twin's larger baseline error at the Long Square step's lags
+(step-mean SD $0.6375\,\tilde\sigma_b(c)$ s = 0.064 mV, against 0.031 mV from the 37 ms component), and a twin cleaner
+than its cell makes the gate optimistic for that cell (study document §3.8) **[doc]**; the gate run under both variants
+shows, cell by cell, how much its verdict rests on the twin's tilt **[reasoning]**. *Not waiting for D-095* **[run:
+`check07_tss_window.py`, 2026-10-28; the two 2-sweep reference layouts ($K$ = 40, 63), $\theta_{\rm cf}$, 2000 cells
+per layout, the same traces cut at both starts]**: a window start of 130 ms instead of 80 ms -- D-095's rule on the RC
+fixture at $\kappa_{\rm tr}$ = 0.1 -- raises a 2-sweep cell's detection limit (the 95th percentile of $\hat\sigma_b$
+under $\sigma_b$ = 0) from 0.0478 to 0.0564 mV/s ($K$ = 40) and from 0.0381 to 0.0445 mV/s ($K$ = 63), and moves the
+2.5/50/97.5 % points of $\hat\sigma_b/\sigma_b$ at $\sigma_b$ = 0.1 mV/s by at most 0.015; the variants and their
+comparison do not depend on D-095's open points.
+
+**What it implies for code and tables.**
+- Blocks 3-4: (D-100.2) needs each cell's $\hat\sigma_b(c)^2_{\rm u}$ and $\nu_c$. `TiltResult` holds `sigma_b`
+  (clipped), `V_model`, `V_hat` and `h_star`, from which $\hat\sigma_b(c)^2_{\rm u}$ follows; `window_mean_semivariogram`
+  returns $\hat V_c(h^*)$ and the total pair count $N(c)$ only, not the $N_s(c)$ **[src]**. Proposal: the per-sweep
+  counts returned too, and the noise table gains `noise_sigma_b2_unclipped` ((mV/s)$^2$) and `noise_tilt_s_eff`.
+- A cohort step after the 18 per-cell fits, which run as independent jobs (Block 6): it reads their rows, computes
+  (D-100.2) and writes $\hat\sigma_{b,\rm coh}$ with the cells and weights it used -- a pure function in the analysis
+  layer, smoke-tested on a planted cohort, run by a PBS job that depends on the per-cell jobs **[proposal]**.
+- Block 5 (the twins' generator): the tilt SD is an input per variant; a twin's manifest row and every output carry
+  its variant (`tilt_variant` = `per_cell` | `cohort`), so the two are never pooled by accident; the two variants of
+  one cell share the manifest row and every unit draw except the tilt's scale (Block 2's `simulate_traces` scales one
+  fixed `xi_tilt` by `sigma_b`), so their difference is the tilt's effect alone **[proposal; src: Block 2's API]**.
+- No variant is the default for a 2-sweep cell until (b) below is answered: the gate report shows both, labelled; the
+  multi-sweep cells' default stays (a), D-034 **[reasoning: a default is a decision]**.
+- The Stage-7 recovery fits of the 14 cells double (D-083: on davinci) **[reasoning]**.
+- Block 4's fit and Block 4b (D-076 (i), $\sigma_s$ per sweep): unchanged (D-100.3); Block 4b's clip of the DL
+  $\hat\tau^2$ still stands (D-076).
+- SPEC §8's tilt question of 2026-10-23: answered for the 2-sweep cells by this entry (marked there). Roadmap T8 (the
+  tilt's theory) and N4's note: left for the user (D-082's hold) **[log]**.
+
+**What it does not decide [open].**
+(a) The reading of "do A and B": two variants of twins per 2-sweep cell (D-100.1), or both values computed and
+reported and the one the twins receive chosen later, on the real cells' $\hat\sigma_b(c)$ once Block 3 has run on the
+archive.
+(b) The default (D-100.4): one variant as the verdict and the other a labelled comparison, or a pass required under
+both.
+(c) The cohort value's cells and form (D-100.2).
+(d) Whether the four multi-sweep cells also get variant (b), for a like-for-like comparison across $\mathcal R$.
+(e) Zero tilts in variant (a): a cell with $\hat\sigma_b(c)^2_{\rm u} \le 0$ (`tilt_clipped`) gets twins without a
+tilt -- kept, as D-034 is implemented (the assistant's proposal: variant (b) covers that case), or floored.
+(f) Whether a cell's own fit is re-run with the cohort value under variant (b) (D-100.3).
+
+**Sources.** **[user]** 2026-10-28, about 18:37. **[log]** D-005, D-011, D-017, D-034 (with its note of 2026-10-26),
+D-076, D-082, D-083, D-095; the noise-fit handoff of 2026-10-28 (question 1). **[doc]** the tilt study document,
+`Passive Features/HPC script/Ih Fit/dev/2026-10-26_tilt_sigma_b/` (§1, §3.4, §3.7-3.9). **[src]**
+`noise_fit.tilt_from_semivariogram` and `TiltResult`, `noise_cell_stats.window_mean_semivariogram`,
+`noise_law.simulate_traces`, the study's `tilt_common.pool_cohort` and `s_eff` (`main` at `b82c189`). **[run,
+sandbox]** check03 and check04 of the tilt study (re-run 2026-10-28, identical); `check07_tss_window.py` (2026-10-28,
+`Ih Fit/dev/2026-10-28_tilt_explanation/`); `check_findings_2026-10-23.py` (C), through SPEC §8.
+
+**Status:** active; not implemented; its reading open, (a)-(f). Extends D-034 for the 2-sweep cells -- its (D-034.1)
+stays as variant (a) and for the other cells; nothing superseded. Answers, for the 2-sweep cells, the question put to
+the user on 2026-10-23, 2026-10-26 and 2026-10-28 (SPEC §8); option (c), the assistant's recommendation, not taken.
+
+---
+
+## D-101 -- The calibration nodes' flatness per set (far 15 deg, near 10 deg), and the background fitted on a stripe along the measuring line that stops at the first predicted shadow, the own cylinder removed (user)
+
+**Date:** 2026-10-28, 18:17 (Europe/Rome) and the dialog's four answers (about 18:40), the diameter implementation
+chat, on Cell 7's isolation overview of the pilot 529878215. **Binds:** the calibration criteria of Block 10.I
+((iii) flatness, (vi) isolation) for both sets; the background's support of every scanned plane (Blocks 10.P and
+15.1) -- SPEC Block 10.S; `CalibrationConfig.node_phi_max_deg` (now the near set's, 10), `node_phi_max_deg_far` (15),
+`background_support`, `stripe_half_widths_um`, `stripe_min_pixels`, `stripe_min_side_um`; Cell 7 of both notebooks
+and S3c's per-cell scans (`survey_cells.py`'s calibration step, the davinci array's); the isolation figures of
+D-098.4. Supersedes D-078.1's $3\sigma$ far mask and D-081.1's node-level verdict as the default (both kept under
+`background_support = "square"`); amends D-081.3's 5 deg.
+
+**Decision [user].** 18:17: "This is the output of the candidates. Only 2 far field. We need to select more points, S
+is too strict. and also change approach for the far field nodes background estimation. What about using a stripe that
+extends up to where it is clear in the isolation sense. So for near field nodes find such a stripe that maximizes the
+number of pixels of background in isolation." The dialog's answers: flatness "Far <= 15 while keep the near lower than
+10"; the clear-pixel rule, the stripe's shape and the acceptance as recommended, "What I would do also is to remove the
+fitted node's cylinder from the stripe so that it doesn't bias the calculation".
+
+**Statement.**
+
+(D-101.1) *Flatness per set.* A far-set node ($0.6 < D_{\rm A} \le 0.8$ um) is flat when $\varphi_j \le 15$ deg, a
+near-set node when $\varphi_j \le 10$ deg [user; the near bound read as 10 deg from "lower than 10" -- the assistant's
+reading, to correct if 5 was meant]. Was 5 deg for both (D-081.3).
+
+(D-101.2) *The clear pixel.* In plane $k$ a pixel $p$ of the patch is shaded by a traced segment $q$ when
+${\rm dist}(p, q) \le \rho_\tau(q, k)$, $\rho_\tau$ the lateral distance at which $q$'s predicted shadow (10.I's
+$D_{q,k}$, with the pilot's $\bar B_j$ and $\hat\mu_j$) falls to $\tau$ = `isolation_depth_gl` = 0.03 gl; the soma as
+a disc of its radius. This replaces the $3\sigma$ margin of 10.P's far mask [user, the recommended option]: one rule,
+reaching farther than $3\sigma$ for a dark neighbour and less for a faint one.
+
+(D-101.3) *The stripe.* In the measuring line's frame ($v$ along the line, $u$ along the dendrite), for each
+half-width $W \in$ `stripe_half_widths_um` = (1, 2, 4, 8, 12) um the band $|u| \le W$ is walked outward from the node on
+each side of the line, past the columns the node's own cylinder shades, to the first column a neighbour (or the own
+branch again) shades or the patch's edge; the $W$ with most clear pixels wins; one stripe per plane of the stage
+(the far planes' shadows are wider) [user, the recommended option]. The plane's background is 10.P's trimmed
+least-squares plane fitted on the stripe.
+
+(D-101.4) *Acceptance and the own cylinder.* A plane is usable with at least `stripe_min_pixels` = 500 clear pixels
+in its stripe and at least `stripe_min_side_um` = 3 um of clear run on each side (the profile's half-length); the node's
+own fitted cylinder -- radius $\max(\hat d_j/2, r_{\rm Allen})$ with the pilot's fitted $\hat d_j$, Allen's radius
+when $\hat d_j$ is not finite -- is removed from the stripe like any neighbour's shadow, so that its own tails bias no
+background [user: "remove the fitted node's cylinder from the stripe"]. The node's verdict before any fetch is the
+stripe at the plane nearest the pilot's depth: `not_isolated:too_few` or `not_isolated:side_short`.
+
+(D-101.5) *What stays.* $\tau$ = 0.03 gl (D-081.1's value); the $\pm 25$ um patch (D-078.1); the planar background
+and its trimming (10.P); every other criterion of 10.I; the square rule and the plain `not_isolated` under
+`background_support = "square"`. Without a finite $\bar B_j$ and $\hat\mu_j$ (a phantom's node) the margins fall back
+to 10.P's geometric $r + 3\sigma$ (the assistant's, so that the phantom checks keep their meaning).
+
+**Why [user; data; reasoning].** **[user]** the request and the four answers. **[data inspected: `pilot_529878215.csv`,
+393 nodes, read off Drive 2026-10-28]** of the 31 nodes with Allen's $2r$ in (0.6, 0.8] um (two stretches, 677-691
+and 7694-7709) 28 are in $\mathcal S$ and 26 fail flatness alone at 5 deg; `bbar_few` is set on none (unmasked
+fraction 0.65-0.82); at 10 / 15 / 20 / 30 deg the far set would hold 6 / 7 / 14 / 24 before isolation, the near set
+138 / 183 / 213 / 256 (68 at 5 deg). **[the user's figures, read]** the two far survivors, 7702 and 689, are shaded by
+the soma (76.7 gl) and a junction (36.6 gl); near candidates with shadows of 0.04-0.3 gl -- far below the 5.9 gl
+median background noise SD of the pilot's nodes -- were rejected by the any-shadow rule. **[reasoning]** the measuring
+line is across the dendrite, so tilt does not foreshorten the width; it enters through the $\pm 0.5$ um along-branch
+average (a depth smear of 0.17 um at 20 deg, under one plane spacing) and the plane iteration, so 15 deg for the far
+set, whose planes sit 1.4-4.5 um from focus, costs little; the stripe keeps the background local to the fitted line
+(a plane over 50 um is already an approximation to a blotchy background) and turns a neighbour from a veto into a
+boundary. The quadrature of $D_{q,k}$ (16 Gauss-Legendre nodes) ripples at the $10^{-3}$ level when the blur is narrow
+against the tube, which broke the monotone root search on the first attempt: the rule now takes up to 512 nodes and
+the root is bracketed by a scan first **[run, sandbox]**.
+
+**What it implies for code and tables.** On `sci/diameter-pipeline`: `03c43b2` (the block) and `6a261e4` (the notebooks, runbook v35), pushed 2026-10-28 evening. SPEC Block 10.S (and 10.I (iii), (vi) amended); `calibration_scene.shadow_depths`,
+`shadow_margin`, `shadow_masks`, `stripe_support`, `patch_frame`; `calibration.support_masks`, `patch_planes` (six-tuple:
+the stripe infos), `stripe_reasons`, `criteria_reasons` per set; `PlaneScan.stripe` and its JSON; the isolation figures'
+panel (b) and the overview's orange rule; `calibrate_kernel.py real`'s summary line; `tests/smoke/test_smoke_stripe.py`
+(6 pass, 1 skip; 7 of 8 mutants killed, one equivalent); the suites `calibration`, `isolation_view` (the square checks
+under `"square"`), `far_field`, `s3c` adapted and passing; runbook v35; the notebooks' Cell 7 texts. No signature
+changes: the hashes stay estimator `59678d4e2aedf2b6`, simulation `52aa73e479eb77cf`. Colab: Cells 0, 1 and 7 again
+(the figures show the stripes). davinci: the array's calibration step uses the stripe once the clone is pulled.
+
+**What it does not decide [open].** (a) The near bound (10 deg, the reading above). (b) The $W$ grid, 500 pixels, 3 um,
+the own radius rule and the one-plane verdict -- PROVISIONAL, to judge on Cell 7's figures. (c) How many far-set nodes
+the stripe admits on the pilot and across the 51 cells (Cell 7 again; the davinci run). (d) Whether $\tau$ = 0.03 gl
+stays once the stripe makes it a boundary rather than a veto (a larger $\tau$ was offered and not taken). (e) The
+near-set bound and the far-set bound on the per-cell stratified samples of S3c.
+
+**Sources.** **[user]** 2026-10-28, 18:17 and the dialog. **[data]** `pilot_529878215.csv` (Drive, 2026-10-07), read in
+full; the user's two overview pages of 2026-10-28, 18:17. **[run, sandbox]** `test_smoke_stripe.py` and the calibration
+suites; the mutants of Block 10.S. **[reasoning]** the tilt and the locality arguments above.
+
+**Status:** active; implemented and pushed 2026-10-28; smoke-tested; not yet run on Allen's data.
 
 ---
 
