@@ -1,0 +1,144 @@
+#!/bin/bash
+#PBS -S /bin/bash
+#PBS -N diam_survey_pool
+#PBS -q cpu
+#PBS -l select=1:ncpus=1:mem=8gb,walltime=02:00:00
+#PBS -k eo
+
+##########################################################################
+# S3 on davinci, the pooled analyses (Block 16.4 (c), specs/SPEC.md; D-099)
+# after every task of survey_cells.pbs is done: the status table, S3a's
+# coverage of the phantoms' band (Block 17.3-17.5, notebook Cell 13), S3b's
+# simulator inputs (Block 18.4-18.5, Cell 14), S3c's pooled kernel
+# calibration (Block 19.4-19.5, Cell 15), then one archive of what is read
+# off the cluster -- <survey>/results_<RUN_TAG>.tgz: status.csv, s3a/, s3b/,
+# s3c/, every cell's alignment record and overlay, every nodes summary and
+# the per-node CSVs. No network is needed.
+#
+# SUBMIT FROM THE WORKSTREAM DIRECTORY:
+#
+#   cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/Diameter Re-measurement"
+#   qsub -v DIAM_DRYRUN=1,RUN_TAG=v1 scripts/pbs/survey_pool.pbs   # prints the commands only
+#   qsub -v RUN_TAG=v1 scripts/pbs/survey_pool.pbs
+#   qsub -v RUN_TAG=v1,DIAM_POOL=coverage scripts/pbs/survey_pool.pbs   # one analysis only
+#
+# Knobs (qsub -v NAME=value,...); every one has a default:
+#   DIAM_CODE          workstream directory   (default: where qsub was run)
+#   DIAM_ENV           conda env              (default: spine_env)
+#   RUN_TAG            letters, digits, _ . - (default: default)
+#   DIAM_SURVEY        the survey directory   (default: <archive>/diameter_survey/<RUN_TAG>)
+#   DIAM_SELECTION     the selection CSV      (default: <DIAM_SURVEY>/selection.csv)
+#   DIAM_POOL          comma-separated: coverage,inputs,calibration (default: all three)
+#   DIAM_PHANTOM_ROWS  space-separated replicate CSVs for the phantoms' band (default: none)
+#   DIAM_CONFIG_JSON   a config JSON          (default: none = the default config; the same as the array's)
+#   DIAM_DRYRUN        1 = print, do not run  (default: 0)
+# Reserved names: a set CODE, ROOT or ENV_NAME is reported and IGNORED.
+# Exit codes: 2 no scripts under DIAM_CODE; 3 DIAM_CONFIG_JSON or the
+# selection missing; 4 a bad RUN_TAG or DIAM_POOL; 5 the env did not
+# activate; 1 an analysis failed (the later ones still run; the exit is 1).
+#
+# The roadmap marker: this job marks stage S3c (and, by its name, S3b) of
+# specs/roadmap/diameter-pipeline.yaml; ROADMAP_DISABLE=1 turns it off.
+##########################################################################
+
+set -eo pipefail
+TAG="[diam-survey-pool]"
+
+DIAM_CODE="${DIAM_CODE:-${PBS_O_WORKDIR:-$(pwd)}}"
+if [ ! -f "$DIAM_CODE/scripts/pbs/survey_common.sh" ]; then
+    echo "[FATAL] scripts/pbs/survey_common.sh not found under DIAM_CODE=$DIAM_CODE: submit from the workstream directory" >&2
+    exit 2
+fi
+. "$DIAM_CODE/scripts/pbs/survey_common.sh"
+diam_note_reserved
+
+DIAM_ENV="${DIAM_ENV:-spine_env}"
+RUN_TAG="${RUN_TAG:-default}"
+DIAM_SURVEY="${DIAM_SURVEY:-/davinci-1/home/ldellamea/Human Neurons Fitting/diameter_survey/$RUN_TAG}"
+DIAM_SELECTION="${DIAM_SELECTION:-$DIAM_SURVEY/selection.csv}"
+DIAM_POOL="${DIAM_POOL:-coverage,inputs,calibration}"
+DIAM_PHANTOM_ROWS="${DIAM_PHANTOM_ROWS:-}"
+DIAM_CONFIG_JSON="${DIAM_CONFIG_JSON:-}"
+DIAM_DRYRUN="${DIAM_DRYRUN:-0}"
+
+case "$RUN_TAG" in
+    ""|*[!A-Za-z0-9_.-]*) echo "[FATAL] RUN_TAG must be letters, digits, '_', '.', '-' (got '$RUN_TAG')" >&2; exit 4 ;;
+esac
+case ",$DIAM_POOL," in
+    *,,*|*[!a-z,]*) echo "[FATAL] DIAM_POOL must be a comma-separated list from coverage,inputs,calibration (got '$DIAM_POOL')" >&2; exit 4 ;;
+esac
+for _w in ${DIAM_POOL//,/ }; do
+    case "$_w" in
+        coverage|inputs|calibration) ;;
+        *) echo "[FATAL] DIAM_POOL holds '$_w'; the analyses are coverage, inputs, calibration" >&2; exit 4 ;;
+    esac
+done
+unset _w
+diam_check_code "$TAG" survey_cells.py
+diam_check_config
+if [ ! -f "$DIAM_SELECTION" ]; then
+    echo "[FATAL] selection missing: $DIAM_SELECTION" >&2
+    exit 3
+fi
+
+# ${CFG[@]+"${CFG[@]}"}: an empty array expands to nothing under `set -u` in every bash (a bare "${CFG[@]}" is an
+# error before bash 4.4). pool_cmd sets POOL_ARGS, an array (the survey path holds a space: no word splitting).
+CFG=()
+if [ -n "$DIAM_CONFIG_JSON" ]; then CFG=(--config-json "$DIAM_CONFIG_JSON"); fi
+STATUS=(scripts/survey_cells.py status --out-dir "$DIAM_SURVEY" --selection "$DIAM_SELECTION")
+pool_cmd() {
+    POOL_ARGS=(scripts/survey_cells.py pool --out-dir "$DIAM_SURVEY" --selection "$DIAM_SELECTION" --what "$1")
+    if [ "$1" = "coverage" ] && [ -n "$DIAM_PHANTOM_ROWS" ]; then
+        # shellcheck disable=SC2206
+        POOL_ARGS+=(--phantom-rows $DIAM_PHANTOM_ROWS)
+    fi
+    POOL_ARGS+=(${CFG[@]+"${CFG[@]}"})
+}
+
+echo "$TAG code    $DIAM_CODE"
+echo "$TAG survey  $DIAM_SURVEY"
+echo "$TAG env     $DIAM_ENV"
+echo "$TAG pool    $DIAM_POOL"
+echo "$TAG config  ${DIAM_CONFIG_JSON:-<default>}"
+if [ "$DIAM_DRYRUN" = "1" ]; then
+    echo "$TAG DRYRUN: python3 ${STATUS[*]}"
+    for _w in ${DIAM_POOL//,/ }; do
+        pool_cmd "$_w"
+        echo "$TAG DRYRUN: python3 ${POOL_ARGS[*]}"
+    done
+    echo "$TAG DRYRUN: tar czf $DIAM_SURVEY/results_$RUN_TAG.tgz -C $DIAM_SURVEY status.csv s3a s3b s3c <cells>/align <cells>/nodes"
+    exit 0
+fi
+
+diam_activate "$TAG"
+
+export ROADMAP_STAGE=S3c
+export ROADMAP_N_TASKS=1
+if [ -f "$DIAM_CODE/../../specs/roadmap/hpc_status.sh" ]; then
+    . "$DIAM_CODE/../../specs/roadmap/hpc_status.sh"
+    roadmap_job_start
+    trap 'roadmap_job_end $?' EXIT
+else
+    echo "$TAG no specs/roadmap/hpc_status.sh beside the workstream: no roadmap marker"
+fi
+
+cd "$DIAM_CODE"
+"$PY" "${STATUS[@]}"
+FAILED=0
+for _w in ${DIAM_POOL//,/ }; do
+    echo "$TAG pool $_w"
+    pool_cmd "$_w"
+    "$PY" "${POOL_ARGS[@]}" || { echo "$TAG pool $_w FAILED (exit $?)"; FAILED=1; }
+done
+# the archive to read off the cluster: everything but the crops and the per-node tables' bulk is small
+cd "$DIAM_SURVEY"
+LIST=(status.csv)
+for d in s3a s3b s3c; do if [ -d "$d" ]; then LIST+=("$d"); fi; done
+while IFS= read -r f; do LIST+=("$f"); done < <(find . -maxdepth 3 \( -path './*/align/*' -o -path './*/nodes/*' \) -type f | sed 's|^\./||' | sort)
+tar czf "results_$RUN_TAG.tgz" "${LIST[@]}"
+echo "$TAG archive $DIAM_SURVEY/results_$RUN_TAG.tgz ($(du -h "results_$RUN_TAG.tgz" | cut -f1))"
+if [ "$FAILED" = "1" ]; then
+    echo "$TAG done with a failed analysis (see above)"
+    exit 1
+fi
+echo "$TAG done"

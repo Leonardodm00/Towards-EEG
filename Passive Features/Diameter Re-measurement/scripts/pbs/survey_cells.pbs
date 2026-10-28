@@ -1,0 +1,162 @@
+#!/bin/bash
+#PBS -S /bin/bash
+#PBS -N diam_survey
+#PBS -q cpu
+#PBS -l select=1:ncpus=1:mem=4gb,walltime=12:00:00
+#PBS -J 0-50
+#PBS -k eo
+
+##########################################################################
+# S3 on davinci (Block 16.4 (b), specs/SPEC.md; D-099): one PBS array task
+# per selected cell runs the per-cell steps of the survey -- align (Block
+# 16.2), nodes (17, S3a), radius, registration, camera (18, S3b),
+# calibration (19, S3c) -- through scripts/survey_cells.py, resumable: a
+# step with a marker in <survey>/<cell>/done/ is skipped, so a killed or
+# re-submitted array finishes what is left. Task i runs row i of
+# selection.csv (0-based; `--task-index`), with its own crop cache
+# <DIAM_CACHE>/<specimen>/ (`--cache-per-cell`). The array size is the
+# selection's row count (51 on 2026-10-28): survey_prepare.pbs prints the
+# -J to use. In Colab a cell of 120 nodes was estimated at about an hour.
+#
+# SUBMIT FROM THE WORKSTREAM DIRECTORY, after survey_prepare.pbs:
+#
+#   cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/Diameter Re-measurement"
+#   qsub -J 0-50 -v DIAM_DRYRUN=1,RUN_TAG=v1 scripts/pbs/survey_cells.pbs    # prints the commands only
+#   qsub -v RUN_TAG=v1,DIAM_STEPS=align scripts/pbs/survey_cells.pbs          # one cell's alignment: the probe
+#       (no -J: one job, task 0 = row 0; PBS Pro may refuse a one-element -J range)
+#   qsub -J 0-50 -v RUN_TAG=v1 scripts/pbs/survey_cells.pbs                   # the survey
+#   qsub -v RUN_TAG=v1,DIAM_CELLS=508305938,DIAM_FORCE=align scripts/pbs/survey_cells.pbs
+#       (no -J: one job on the named cells; a step forced runs again with every step after it)
+#   qsub -v RUN_TAG=v1,DIAM_CELLS=576084692,596887423,611598198,DIAM_INCLUDE_SET_ASIDE=1 scripts/pbs/survey_cells.pbs
+#       (the set-aside cells the user accepts, on their automatic alignment; D-098.5)
+#
+# Knobs (qsub -v NAME=value,...); every one has a default:
+#   DIAM_CODE          workstream directory   (default: where qsub was run)
+#   DIAM_ENV           conda env              (default: spine_env)
+#   RUN_TAG            letters, digits, _ . - (default: default)
+#   DIAM_SURVEY        the survey directory   (default: <archive>/diameter_survey/<RUN_TAG>)
+#   DIAM_SELECTION     the selection CSV      (default: <DIAM_SURVEY>/selection.csv)
+#   DIAM_CACHE         the crop cache root    (default: <archive>/allen_cache)
+#   DIAM_STEPS         comma-separated steps  (default: align,nodes,radius,registration,camera,calibration)
+#   DIAM_CELLS         comma-separated ids: run these instead of the task's row (default: empty)
+#   DIAM_FORCE         steps to run again, with every step after each (default: empty)
+#   DIAM_INCLUDE_SET_ASIDE  1 = run the later steps on a set-aside cell too (default: 0)
+#   DIAM_CONFIG_JSON   a config JSON          (default: none = the default config; the node mode
+#                      and nodes_per_bin are survey fields of it, Block 17.1)
+#   DIAM_N_TASKS       array size; MUST match -J 0-(N_TASKS-1) (default: the selection's rows)
+#   DIAM_PROXY_MODULE  the module that opens the network (default: proxy; empty = none)
+#   DIAM_DRYRUN        1 = print, do not run  (default: 0)
+# Reserved names: a set CODE, ROOT or ENV_NAME is reported and IGNORED.
+# Exit codes: 2 no scripts under DIAM_CODE; 3 DIAM_CONFIG_JSON or the
+# selection missing; 4 a bad RUN_TAG, a non-integer, -J and DIAM_N_TASKS
+# disagreeing, or the task beyond the selection; 5 the env did not activate;
+# 6 api.brain-map.org unreachable; 1 the runner failed.
+#
+# The roadmap marker (subproject-roadmap skill): the array marks stage S3a
+# of specs/roadmap/diameter-pipeline.yaml running, then done or failed;
+# ROADMAP_DISABLE=1 turns it off for one submission.
+##########################################################################
+
+set -eo pipefail
+TAG="[diam-survey]"
+
+DIAM_CODE="${DIAM_CODE:-${PBS_O_WORKDIR:-$(pwd)}}"
+if [ ! -f "$DIAM_CODE/scripts/pbs/survey_common.sh" ]; then
+    echo "[FATAL] scripts/pbs/survey_common.sh not found under DIAM_CODE=$DIAM_CODE: submit from the workstream directory" >&2
+    exit 2
+fi
+. "$DIAM_CODE/scripts/pbs/survey_common.sh"
+diam_note_reserved
+
+DIAM_ENV="${DIAM_ENV:-spine_env}"
+RUN_TAG="${RUN_TAG:-default}"
+DIAM_SURVEY="${DIAM_SURVEY:-/davinci-1/home/ldellamea/Human Neurons Fitting/diameter_survey/$RUN_TAG}"
+DIAM_SELECTION="${DIAM_SELECTION:-$DIAM_SURVEY/selection.csv}"
+DIAM_CACHE="${DIAM_CACHE:-/davinci-1/home/ldellamea/Human Neurons Fitting/allen_cache}"
+DIAM_STEPS="${DIAM_STEPS:-align,nodes,radius,registration,camera,calibration}"
+DIAM_CELLS="${DIAM_CELLS:-}"
+DIAM_FORCE="${DIAM_FORCE:-}"
+DIAM_INCLUDE_SET_ASIDE="${DIAM_INCLUDE_SET_ASIDE:-0}"
+DIAM_CONFIG_JSON="${DIAM_CONFIG_JSON:-}"
+DIAM_PROXY_MODULE="${DIAM_PROXY_MODULE-proxy}"
+DIAM_DRYRUN="${DIAM_DRYRUN:-0}"
+TASK="${PBS_ARRAY_INDEX:-0}"
+
+case "$RUN_TAG" in
+    ""|*[!A-Za-z0-9_.-]*) echo "[FATAL] RUN_TAG must be letters, digits, '_', '.', '-' (got '$RUN_TAG')" >&2; exit 4 ;;
+esac
+case "$TASK${DIAM_N_TASKS:-0}" in
+    *[!0-9]*) echo "[FATAL] PBS_ARRAY_INDEX and DIAM_N_TASKS must be integers" >&2; exit 4 ;;
+esac
+case "$DIAM_CELLS" in
+    *[!0-9,]*) echo "[FATAL] DIAM_CELLS must be comma-separated specimen ids (got '$DIAM_CELLS')" >&2; exit 4 ;;
+esac
+diam_check_code "$TAG" survey_cells.py
+diam_check_config
+if [ ! -f "$DIAM_SELECTION" ]; then
+    echo "[FATAL] selection missing: $DIAM_SELECTION (run scripts/pbs/survey_prepare.pbs first, or set DIAM_SELECTION)" >&2
+    exit 3
+fi
+N_ROWS="$(diam_selection_rows "$DIAM_SELECTION")"
+DIAM_N_TASKS="${DIAM_N_TASKS:-$N_ROWS}"
+if [ -n "$DIAM_CELLS" ] && [ "$TASK" -gt 0 ]; then
+    echo "$TAG DIAM_CELLS is set: task 0 runs the named cells; nothing to do for task $TASK (submit without -J)"
+    exit 0
+fi
+if [ -z "$DIAM_CELLS" ]; then
+    if [ "$TASK" -ge "$N_ROWS" ]; then
+        echo "[FATAL] PBS_ARRAY_INDEX=$TASK but the selection has $N_ROWS cells (rows 0-$(( N_ROWS - 1 )))" >&2
+        exit 4
+    fi
+    if [ "$TASK" -ge "$DIAM_N_TASKS" ]; then
+        echo "[FATAL] PBS_ARRAY_INDEX=$TASK but DIAM_N_TASKS=$DIAM_N_TASKS: -J and DIAM_N_TASKS disagree" >&2
+        exit 4
+    fi
+fi
+
+ARGS=(scripts/survey_cells.py run --selection "$DIAM_SELECTION" --out-dir "$DIAM_SURVEY"
+      --cache-dir "$DIAM_CACHE" --cache-per-cell --steps "$DIAM_STEPS")
+if [ -n "$DIAM_CELLS" ]; then
+    ARGS+=(--cells "$DIAM_CELLS")
+    WHAT="cells $DIAM_CELLS"
+else
+    ARGS+=(--task-index "$TASK")
+    WHAT="task $TASK of $DIAM_N_TASKS (row $TASK of $N_ROWS)"
+fi
+NOTE=""
+if [ -n "$DIAM_FORCE" ]; then ARGS+=(--force "$DIAM_FORCE"); NOTE="$NOTE (forced: $DIAM_FORCE)"; fi
+if [ "$DIAM_INCLUDE_SET_ASIDE" = "1" ]; then ARGS+=(--include-set-aside); NOTE="$NOTE (set-aside cells included)"; fi
+if [ -n "$DIAM_CONFIG_JSON" ]; then ARGS+=(--config-json "$DIAM_CONFIG_JSON"); fi
+
+echo "$TAG $WHAT"
+echo "$TAG code    $DIAM_CODE"
+echo "$TAG survey  $DIAM_SURVEY"
+echo "$TAG cache   $DIAM_CACHE (per cell)"
+echo "$TAG env     $DIAM_ENV"
+echo "$TAG steps   $DIAM_STEPS$NOTE"
+echo "$TAG config  ${DIAM_CONFIG_JSON:-<default>}"
+if [ "$DIAM_DRYRUN" = "1" ]; then
+    echo "$TAG DRYRUN: python3 ${ARGS[*]}"
+    exit 0
+fi
+
+diam_activate "$TAG"
+
+# The roadmap marker (hpc_status.sh never fails the job; ROADMAP_DISABLE=1 turns it off).
+export ROADMAP_STAGE=S3a
+export ROADMAP_N_TASKS="$DIAM_N_TASKS"
+if [ -n "$DIAM_CELLS" ]; then export ROADMAP_N_TASKS=1; fi
+if [ -f "$DIAM_CODE/../../specs/roadmap/hpc_status.sh" ]; then
+    . "$DIAM_CODE/../../specs/roadmap/hpc_status.sh"
+    roadmap_job_start
+    trap 'roadmap_job_end $?' EXIT
+else
+    echo "$TAG no specs/roadmap/hpc_status.sh beside the workstream: no roadmap marker"
+fi
+
+diam_network "$TAG"
+
+mkdir -p "$DIAM_SURVEY" "$DIAM_CACHE"
+cd "$DIAM_CODE"
+"$PY" "${ARGS[@]}"
+echo "$TAG $WHAT done"

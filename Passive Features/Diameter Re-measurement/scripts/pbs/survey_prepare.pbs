@@ -1,0 +1,112 @@
+#!/bin/bash
+#PBS -S /bin/bash
+#PBS -N diam_survey_prep
+#PBS -q cpu
+#PBS -l select=1:ncpus=1:mem=4gb,walltime=02:00:00
+#PBS -k eo
+
+##########################################################################
+# S3 on davinci, step 0 (Block 16.4 (a), specs/SPEC.md; D-099): the cell
+# pool, the acquisition check over the whole pool, the stratified selection
+# (Block 16.1, notebook Cell 11) and the projection listing with the
+# operator test on the pilot (Block 16.3, Cell 11b) -- one job, no array.
+# In Colab these ran in 0.1 + 6.6 + 0.0 min and 7.0 min (2026-10-28). It
+# ends by printing the array to submit next:
+#
+#   qsub -J 0-<N-1> -v RUN_TAG=<tag> scripts/pbs/survey_cells.pbs
+#
+# SUBMIT FROM THE WORKSTREAM DIRECTORY (the one holding scripts/survey_cells.py):
+#
+#   cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/Diameter Re-measurement"
+#   qsub -v DIAM_DRYRUN=1,RUN_TAG=v1 scripts/pbs/survey_prepare.pbs   # prints the commands only
+#   qsub -v RUN_TAG=v1 scripts/pbs/survey_prepare.pbs
+#
+# Knobs (qsub -v NAME=value,...); every one has a default:
+#   DIAM_CODE          workstream directory   (default: where qsub was run)
+#   DIAM_ENV           conda env              (default: spine_env)
+#   RUN_TAG            letters, digits, _ . - (default: default)
+#   DIAM_SURVEY        the survey directory   (default: <archive>/diameter_survey/<RUN_TAG>)
+#   DIAM_CACHE         the crop cache root    (default: <archive>/allen_cache); this job's
+#                      crops (the projections, the pilot's test) go under <DIAM_CACHE>/projections/
+#   DIAM_CONFIG_JSON   a config JSON          (default: none = the default config)
+#   DIAM_PILOT         the specimen of the operator test (default: 529878215; none = list only)
+#   DIAM_PROXY_MODULE  the module that opens the network (default: proxy; empty = none)
+#   DIAM_DRYRUN        1 = print, do not run  (default: 0)
+# Reserved names: a set CODE, ROOT or ENV_NAME is reported and IGNORED.
+# Exit codes: 2 no scripts under DIAM_CODE; 3 DIAM_CONFIG_JSON missing; 4 a
+# bad RUN_TAG; 5 the env did not activate; 6 api.brain-map.org unreachable.
+##########################################################################
+
+set -eo pipefail
+TAG="[diam-survey-prep]"
+
+DIAM_CODE="${DIAM_CODE:-${PBS_O_WORKDIR:-$(pwd)}}"
+if [ ! -f "$DIAM_CODE/scripts/pbs/survey_common.sh" ]; then
+    echo "[FATAL] scripts/pbs/survey_common.sh not found under DIAM_CODE=$DIAM_CODE: submit from the workstream directory" >&2
+    exit 2
+fi
+. "$DIAM_CODE/scripts/pbs/survey_common.sh"
+diam_note_reserved
+
+DIAM_ENV="${DIAM_ENV:-spine_env}"
+RUN_TAG="${RUN_TAG:-default}"
+DIAM_SURVEY="${DIAM_SURVEY:-/davinci-1/home/ldellamea/Human Neurons Fitting/diameter_survey/$RUN_TAG}"
+DIAM_CACHE="${DIAM_CACHE:-/davinci-1/home/ldellamea/Human Neurons Fitting/allen_cache}"
+DIAM_CONFIG_JSON="${DIAM_CONFIG_JSON:-}"
+DIAM_PILOT="${DIAM_PILOT:-529878215}"
+DIAM_PROXY_MODULE="${DIAM_PROXY_MODULE-proxy}"
+DIAM_DRYRUN="${DIAM_DRYRUN:-0}"
+
+case "$RUN_TAG" in
+    ""|*[!A-Za-z0-9_.-]*) echo "[FATAL] RUN_TAG must be letters, digits, '_', '.', '-' (got '$RUN_TAG')" >&2; exit 4 ;;
+esac
+case "$DIAM_PILOT" in
+    none|[0-9]*) ;;
+    *) echo "[FATAL] DIAM_PILOT must be a specimen id or 'none' (got '$DIAM_PILOT')" >&2; exit 4 ;;
+esac
+diam_check_code "$TAG" cell_pool.py
+diam_check_code "$TAG" projection_check.py
+diam_check_config
+
+# ${CFG[@]+"${CFG[@]}"}: an empty array expands to nothing under `set -u` in every bash (a bare "${CFG[@]}" is an
+# error before bash 4.4)
+CFG=()
+if [ -n "$DIAM_CONFIG_JSON" ]; then CFG=(--config-json "$DIAM_CONFIG_JSON"); fi
+POOL=(scripts/cell_pool.py pool --out "$DIAM_SURVEY/pool.csv" ${CFG[@]+"${CFG[@]}"})
+CHECK=(scripts/cell_pool.py check --pool "$DIAM_SURVEY/pool.csv" --out "$DIAM_SURVEY/acquisition.csv" ${CFG[@]+"${CFG[@]}"})
+SELECT=(scripts/cell_pool.py select --pool "$DIAM_SURVEY/pool.csv" --acquisition "$DIAM_SURVEY/acquisition.csv"
+        --require-match --out "$DIAM_SURVEY/selection.csv" ${CFG[@]+"${CFG[@]}"})
+PROJ=(scripts/projection_check.py --selection "$DIAM_SURVEY/selection.csv" --check "$DIAM_PILOT"
+      --cache-dir "$DIAM_CACHE/projections" --out-dir "$DIAM_SURVEY/projections" ${CFG[@]+"${CFG[@]}"})
+
+echo "$TAG code    $DIAM_CODE"
+echo "$TAG survey  $DIAM_SURVEY"
+echo "$TAG cache   $DIAM_CACHE"
+echo "$TAG env     $DIAM_ENV"
+echo "$TAG config  ${DIAM_CONFIG_JSON:-<default>}"
+echo "$TAG pilot   $DIAM_PILOT"
+if [ "$DIAM_DRYRUN" = "1" ]; then
+    echo "$TAG DRYRUN: python3 ${POOL[*]}"
+    echo "$TAG DRYRUN: python3 ${CHECK[*]}"
+    echo "$TAG DRYRUN: python3 ${SELECT[*]}"
+    echo "$TAG DRYRUN: python3 ${PROJ[*]}"
+    exit 0
+fi
+
+diam_activate "$TAG"
+diam_network "$TAG"
+
+mkdir -p "$DIAM_SURVEY" "$DIAM_CACHE"
+cd "$DIAM_CODE"
+echo "$TAG pool"
+"$PY" "${POOL[@]}"
+echo "$TAG check (resumable: the cells already in acquisition.csv are skipped)"
+"$PY" "${CHECK[@]}"
+echo "$TAG select"
+"$PY" "${SELECT[@]}"
+echo "$TAG projections"
+"$PY" "${PROJ[@]}"
+N="$(diam_selection_rows "$DIAM_SURVEY/selection.csv")"
+echo "$TAG selection: $N cells in $DIAM_SURVEY/selection.csv"
+echo "$TAG next: qsub -J 0-$(( N - 1 )) -v RUN_TAG=$RUN_TAG scripts/pbs/survey_cells.pbs   (DIAM_DRYRUN=1 first)"
+echo "$TAG done"
