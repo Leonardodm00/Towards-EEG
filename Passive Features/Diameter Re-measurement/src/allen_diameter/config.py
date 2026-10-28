@@ -253,7 +253,9 @@ class CalibrationConfig:
     statistic: str = "gaussian_core_width2"  # source: procedure s.3.4 [corrected 2026-10-04]; windowed V as cross-check
     origin_convention: str = "symmetric"     # source: mathematics s.3.5 (identified up to a common shift)
     core_fit_fwhm_factor: float = 1.0        # source: procedure s.3.4 (Gaussian fitted within about one FWHM): samples with |v - v_peak| <= this x FWHM
-    node_alpha_max: float = 0.5              # source: PROVISIONAL (Block 10): "faint" calibration node, alpha_hat <= this (the dark flag is 1.0)
+    node_alpha_max: float = 0.5              # source: PROVISIONAL (Block 10): "faint" calibration node, alpha_hat <= this (the dark flag is 1.0) (with node_alpha_check)
+    node_alpha_check: bool = False           # source: D-094 [user, 2026-10-28]: "Remove both faint" -- no optical-depth criterion for the calibration nodes; True restores Block 10's criterion (iv), alpha_hat <= node_alpha_max, else not_faint
+    node_faint_flag_check: bool = False      # source: D-094 [user]: the flag 'faint' (dip under measure.faint_min_dip_gl) does not fail a calibration node; True restores it among the reasons of S for the calibration (S itself keeps the flag)
     window_half_um: float = 1.5              # source: PROVISIONAL (Block 10): half-window of V_W and A_W about the core centre (the focus score's ends rule)
     min_window_samples: int = 5              # source: PROVISIONAL (Block 10): fewest samples in the core-fit window (3 parameters)
     knot_step_um: float = 0.28               # source: procedure s.3.4 ("tabulated per plane offset"); Block 10: knots finer than dz are not identified (a zig-zag of period 2 x step is absorbed by the c_i)
@@ -448,11 +450,13 @@ class DiameterConfig:
                              "diameter)")
         if not (0 <= cal.node_phi_max_deg <= 90 and cal.offsets_planes >= 1
                 and 0 <= cal.trust_planes <= cal.offsets_planes and cal.core_fit_fwhm_factor > 0
-                and cal.node_alpha_max > 0 and cal.window_half_um > 0 and cal.min_window_samples >= 4
+                and cal.node_alpha_max > 0 and isinstance(cal.node_alpha_check, bool)
+                and isinstance(cal.node_faint_flag_check, bool) and cal.window_half_um > 0 and cal.min_window_samples >= 4
                 and cal.knot_step_um >= self.acquisition.dz_um - 1e-12 and cal.z_ax_bound_um > 0
                 and cal.min_planes_per_node >= 3):
-            raise ValueError("calibration settings out of range (knot_step_um must be >= dz_um: finer knots "
-                             "are not identified by plane scans)")
+            raise ValueError("calibration settings out of range (node_alpha_check and node_faint_flag_check must "
+                             "be bool; knot_step_um must be >= dz_um: finer knots are not identified by "
+                             "plane scans)")
         wb, ao = tuple(cal.far_core_width_bounds), tuple(cal.far_area_offsets)
         if not (cal.patch_half_um > 0 and cal.far_pixel_sigmas >= 0 and 0 < cal.background_min_far_frac <= 1
                 and cal.background_trim_sigmas > 0 and cal.isolation_depth_gl >= 0 and cal.node_straight_half_um > 0

@@ -1,0 +1,11 @@
+absorption: hybrid; noise-free, no JPEG, the true line
+configured kernel (model level): sigma_r(0) = 0.080 um; sigma_r(0.28, 0.56, 0.84) = [0.122 0.438 0.603] um
+true growth sigma_r^2 - sigma_r(0)^2 at the knots: [0.0085 0.1854 0.3572] um^2
+
+d = 0.30 um, 4 nodes per alpha (same geometries)
+ alpha    mu/um    G(0.28)    G(0.56)    G(0.84)  sr(0.28)  sr(0.56)  sr(0.84)    vs ref    dip0 gl   bad
+  0.10    0.333     0.0001     0.1459     0.3523     0.081     0.390     0.599      0.0%       15.8     0   (47 s)
+  1.00    3.333     0.0021     0.1477     0.3570     0.092     0.393     0.603      0.7%      104.2     0   (45 s)
+  1.50    5.000     0.0028     0.1490     0.3575     0.096     0.394     0.603      0.7%      128.3     0   (44 s)
+  proj              0.0102     0.1661     0.3651     0.129     0.415     0.609   (Phase I's oracle: the projected faint-limit growth of a tube of this d)
+  (sr = sigma_hat_r(delta) in um; vs 0.1 = sigma_hat_r(0.84) against alpha = 0.1's; dip0 = the median deepest dip over the planes, gl; bad = planes whose core fit is not ok)

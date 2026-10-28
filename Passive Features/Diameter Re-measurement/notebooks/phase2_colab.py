@@ -913,7 +913,9 @@ run("scripts/allen_radius_distribution.py", "--fetch", SPECIMEN, "--cache-dir", 
 # The calibration nodes of the pilot are chosen by Allen's diameter D_A = 2 r_A, not by the fitted d_hat (D-061.4,
 # D-067.4; thresholds PROVISIONAL): the near-field set, D_A <= 0.6 um, is scanned plane by plane over k* +- 3
 # (offsets up to 0.84 um); the far-field set, 0.6 < D_A <= 0.8 um, over k* +- 16 (offsets to 4.5 um, D-026,
-# D-078). Both must be in S, flat (phi <= 5 deg, D-081.3) and faint (alpha <= 0.5) by the pilot's columns, and
+# D-078). Both must be in S and flat (phi <= 5 deg, D-081.3) by the pilot's columns -- since D-094 with no
+# optical-depth cut and the flag faint (a dip under 6 gl) not counted (`calibration.node_alpha_check` restores
+# alpha <= 0.5, `calibration.node_faint_flag_check` the flag) -- and
 # then, on the trace (D-079, D-081.1), isolated (no other dendrite or the soma casts a predicted shadow deeper
 # than 0.03 grey levels inside the +-25 um patch, in any scanned plane); not screened for straightness since
 # D-093 (the calibration evaluates only the measuring line; `calibration.node_straight_check` restores it at
@@ -1226,7 +1228,8 @@ display(Image(filename=SURVEY + "/s3b/inputs.png"))
 # ===== CELL 15
 # ====================================================================================================
 # CELL 15: S3c -- ONE DEFOCUS KERNEL CALIBRATED ON NODES POOLED ACROSS CELLS (Block 19; D-088). Needs Cells 0, 1,
-# 11-13. Per aligned cell: the calibration candidates of its node sample (in S, flat, faint, Allen's 2r in a set),
+# 11-13. Per aligned cell: the calibration candidates of its node sample (in S but for the flag faint, flat, Allen's
+# 2r in a set; no optical-depth cut since D-094),
 # scanned in a seeded order, at most survey.calib_scans_per_cell (5) per set (the step `calibration`). Then the pool:
 # per set, the cells' scans taken in turn across the cells up to 30, at least 10 for the production kernel (D-088.3),
 # then Cell 7's fit, far-fit and figures on the pooled scans: one kernel (D-088.1). Expect per cell `calibration: n

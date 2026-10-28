@@ -8,7 +8,11 @@ Checks
                         S2.1 (D-061.4, D-067.4): calibration_set at the edges
                         of the two sets of Allen's diameter; Allen's diameter
                         selects, not d_hat; the reasons and their order;
-                        every other criterion read from the pilot
+                        every other criterion read from the pilot; D-094: the
+                        optical depth (not_faint) and the flag faint fail a
+                        calibration node only with node_alpha_check /
+                        node_faint_flag_check (off by default), each switch
+                        restoring its own reason; S keeps the flag
     test_reference      (a) the growth fit recovers c_i, z_ax,i, the knot
                         values and the curve from exact Eq. (4) data of its
                         family, both conventions, cubic and linear, to 1e-9;
@@ -41,7 +45,9 @@ Checks
                         near-field node makes two provider calls, a far-field
                         phantom one and is not scanned (FAR_FIELD_NOT_BUILT);
                         candidates_from_rows on pilot rows equals
-                        calibration_reasons == []
+                        calibration_reasons == [] (D-094: under the default
+                        and with both faint checks on; dark and faint-flagged
+                        rows are candidates by default)
     test_determinism    the growth fit and a rendered scan repeat bit for bit
     test_edge_cases     flat profile -> no_dip; a dip wider than the profile
                         -> no_fwhm; one usable node -> ValueError; min_origin
@@ -58,7 +64,8 @@ Checks
                         pilot of either set; calibration_reasons adds
                         not_straight (only with node_straight_check, off by
                         default, D-093) and not_isolated in that order after
-                        not_faint; anchor_from_growth equals the cut table's
+                        not_faint (only with node_alpha_check, off by
+                        default, D-094); anchor_from_growth equals the cut table's
                         last value; bootstrap_sigma0's SE within 30 % of the
                         SD over regenerated data sets; example_node picks the
                         node planted on the median; the scans JSON round trip
@@ -97,6 +104,7 @@ for _p in (SRC, HERE):
 
 from allen_diameter.analysis import calibration as CAL  # noqa: E402
 from allen_diameter.analysis import calibration_scene as CS  # noqa: E402
+from allen_diameter.analysis import phantoms as PH  # noqa: E402
 from allen_diameter.analysis import profiles  # noqa: E402
 from allen_diameter.analysis.plane_iteration import Scene  # noqa: E402
 from allen_diameter.loading import calibration_io as CIO  # noqa: E402
@@ -257,12 +265,26 @@ def test_known_answer():
     assert CAL.calibration_reasons(thin_fit, cfg, 1.0) == ["allen_diameter_out"]
     for bad in (NAN, 0.0, -1.0, float("inf")):
         assert CAL.calibration_reasons(thin_fit, cfg, bad) == ["allen_diameter_missing"], bad
+    # D-094 (2026-10-28): both faint criteria are switches, off by default; with both on, the rule of D-067.4
+    assert cfg.calibration.node_alpha_check is False and cfg.calibration.node_faint_flag_check is False
+    both = cfg_with(node_alpha_check=True, node_faint_flag_check=True)
     worst = dataclasses.replace(base, fit_status="at_bound", reg_verdict="FAR: nearest matching ridge 2 um",
-                                flags=("dark", "crossing", "steep"), phi_rad=0.5, alpha_hat=0.9)
-    want = ["status:at_bound", "registration:FAR", "crossing", "allen_diameter_out", "not_flat", "not_faint"]   # dark: a label
-    assert CAL.calibration_reasons(worst, cfg, 1.0) == want, CAL.calibration_reasons(worst, cfg, 1.0)
-    assert CAL.criteria_reasons(0.5, 0.9, 1.0, cfg) == want[3:]
-    assert CAL.criteria_reasons(NAN, NAN, 0.3, cfg) == ["not_flat", "not_faint"]
+                                flags=("dark", "crossing", "faint", "steep"), phi_rad=0.5, alpha_hat=0.9)
+    want = ["status:at_bound", "registration:FAR", "faint", "crossing", "allen_diameter_out", "not_flat",
+            "not_faint"]                                         # dark: a label; the flags in SELECTION_FLAGS' order
+    assert CAL.calibration_reasons(worst, both, 1.0) == want, CAL.calibration_reasons(worst, both, 1.0)
+    assert CAL.criteria_reasons(0.5, 0.9, 1.0, both) == want[4:]
+    assert CAL.criteria_reasons(NAN, NAN, 0.3, both) == ["not_flat", "not_faint"]
+    # the default drops exactly the flag faint and not_faint; each switch alone restores its own reason only
+    assert CAL.calibration_reasons(worst, cfg, 1.0) == [w for w in want if w not in ("faint", "not_faint")]
+    assert CAL.calibration_reasons(worst, cfg_with(node_alpha_check=True), 1.0) == [w for w in want if w != "faint"]
+    assert CAL.calibration_reasons(worst, cfg_with(node_faint_flag_check=True), 1.0) == [w for w in want
+                                                                                        if w != "not_faint"]
+    assert CAL.criteria_reasons(NAN, NAN, 0.3, cfg) == ["not_flat"]
+    assert CAL.selection_flags(cfg) == tuple(f for f in PH.SELECTION_FLAGS if f != "faint")
+    assert CAL.selection_flags(both) == PH.SELECTION_FLAGS
+    # S itself keeps the flag (Block 6's rule, the table and the deliverable are unchanged)
+    assert PH.reject_reasons(worst) == ["status:at_bound", "registration:FAR", "faint", "crossing"]
     # every criterion but Allen's diameter reads the pilot (pilot_view): a deliverable failing everything with a
     # passing pilot passes; a pilot failing one criterion gives that reason whatever the deliverable
     passing_pilot = dict(pilot_status="converged", pilot_flags=(), d_pilot_um=0.3, mu_pilot_per_um=1.0,
@@ -271,9 +293,12 @@ def test_known_answer():
                                   **passing_pilot)
     assert CAL.calibration_reasons(bad_fit, cfg, 0.4) == [], CAL.calibration_reasons(bad_fit, cfg, 0.4)
     for change, reason in ((dict(alpha_pilot=0.9), "not_faint"), (dict(pilot_status="at_bound"), "status:at_bound"),
-                           (dict(pilot_flags=("stack_edge",)), "stack_edge"), (dict(alpha_pilot=NAN), "not_faint")):
+                           (dict(pilot_flags=("stack_edge",)), "stack_edge"), (dict(alpha_pilot=NAN), "not_faint"),
+                           (dict(pilot_flags=("faint",)), "faint")):
         node = dataclasses.replace(base, **dict(passing_pilot, **change))
-        assert CAL.calibration_reasons(node, cfg, 0.4) == [reason], (change, CAL.calibration_reasons(node, cfg, 0.4))
+        assert CAL.calibration_reasons(node, both, 0.4) == [reason], (change, CAL.calibration_reasons(node, both, 0.4))
+        dflt = [] if reason in ("faint", "not_faint") else [reason]                  # D-094's default
+        assert CAL.calibration_reasons(node, cfg, 0.4) == dflt, (change, CAL.calibration_reasons(node, cfg, 0.4))
 
 
 def test_reference():
@@ -450,17 +475,25 @@ def test_contract():
              (dict(alpha_hat=0.9), 0.2), (dict(fit_status="at_bound"), 0.2), (dict(flags=("crossing",)), 0.2),
              (dict(pil), 0.2), (dict(pil, alpha_pilot=0.9), 0.2), (dict(pil, pilot_status="failed"), 0.35),
              (dict(pil, pilot_flags=("stack_edge",)), 0.2), (dict(pil, alpha_hat=0.9, fit_status="failed"), 0.35),
-             (dict(pil, flags=("bbar_few",)), 0.2)]
-    rows, want = [], set()
-    for n, (change, r_a) in enumerate(cases):
-        node = dataclasses.replace(base, node_id=100 + n, **change)
-        rows.append(survey.pilot_row(node, r_a, cfg))
-        if not CAL.calibration_reasons(node, cfg, 2.0 * r_a):
-            want.add(100 + n)
-    got = calibrate_kernel.candidates_from_rows(rows, cfg)
-    assert got == want and want == {100, 101, 108, 112, 113}, (sorted(got), sorted(want))
-    assert [r["calibration_set"] for r in rows[:4]] == ["near", "far", "", ""] and rows[2]["calibration_node"] is False
-    assert rows[4]["calibration_set"] == "" and rows[4]["calibration_node"] is False      # Allen near, not flat
+             (dict(pil, flags=("bbar_few",)), 0.2),
+             # D-094: the flag faint on the row (no pilot), on the pilot, with another flag, with a dark row
+             (dict(flags=("faint",)), 0.2), (dict(pil, pilot_flags=("faint",)), 0.2),
+             (dict(pil, pilot_flags=("faint", "stack_edge")), 0.2), (dict(flags=("faint",), alpha_hat=0.9), 0.35)]
+    both = cfg_with(node_alpha_check=True, node_faint_flag_check=True)
+    for c, expect in ((both, {100, 101, 108, 112, 113}),                                   # the rule of D-067.4
+                      (cfg, {100, 101, 105, 108, 109, 112, 113, 114, 115, 117})):         # D-094's default
+        rows, want = [], set()
+        for n, (change, r_a) in enumerate(cases):
+            node = dataclasses.replace(base, node_id=100 + n, **change)
+            rows.append(survey.pilot_row(node, r_a, c))
+            if not CAL.calibration_reasons(node, c, 2.0 * r_a):
+                want.add(100 + n)
+        got = calibrate_kernel.candidates_from_rows(rows, c)
+        assert got == want and want == expect, (sorted(got), sorted(want))
+        assert [r["calibration_set"] for r in rows[:4]] == ["near", "far", "", ""] and rows[2]["calibration_node"] is False
+        assert rows[4]["calibration_set"] == "" and rows[4]["calibration_node"] is False      # Allen near, not flat
+        assert rows[14]["in_S"] is False and rows[14]["reject"] == "faint"                   # S keeps the flag
+        assert rows[14]["calibration_node"] is (c is cfg) and rows[17]["calibration_set"] == ("far" if c is cfg else "")
     # the scans file round trip (NaN <-> null)
     back = CIO.scan_from_dict(json.loads(json.dumps(CIO.scan_to_dict(scan))))
     for name in ("ks", "z_um", "omega_um2", "vw_um2", "area_gl_um", "depth_gl", "B_bar", "se_omega_um2", "amp_gl",
@@ -630,7 +663,8 @@ def test_patch_scan():
         assert CAL.criteria_reasons(math.radians(4.0), 0.3, d_a, cfg) == []
     assert cfg.calibration.node_phi_max_deg == 5.0
     # (c) calibration_reasons adds not_straight (with node_straight_check) and not_isolated, in that order, after
-    # not_faint; D-093 (2026-10-27): the straightness test is off by default, its tolerance 2 radii when on
+    # not_faint (with node_alpha_check); D-093 (2026-10-27): the straightness test is off by default, its tolerance
+    # 2 radii when on; D-094 (2026-10-28): the optical-depth criterion is off by default
     x = np.linspace(-12, 12, 25)
     bent = Branch.from_points(np.c_[x, 0.4 * (1 - np.cos(np.pi * x / 10.0)) * (np.abs(x) <= 10), np.zeros(25)], 0.2,
                               ids=np.arange(100, 125))
@@ -641,14 +675,18 @@ def test_patch_scan():
     pil = dataclasses.replace(fake_node(0.0, 0.0, 0.0, 0.0, 0.4, 1.0), B_bar=200.0, mu_hat_per_um=1.0, alpha_hat=0.9)
     planes_z = np.arange(-3, 4) * cfg.acquisition.dz_um
     assert cfg.calibration.node_straight_check is False and cfg.calibration.node_straight_tol_radii == 2.0
-    on1 = cfg_with(patch_half_um=PATCH_HALF_TEST, node_straight_check=True, node_straight_tol_radii=1.0)
+    on1 = cfg_with(patch_half_um=PATCH_HALF_TEST, node_straight_check=True, node_straight_tol_radii=1.0,
+                   node_alpha_check=True)
     assert CAL.calibration_reasons(pil, on1, 0.4, bent, 12, scene, planes_z) == ["not_faint", "not_straight",
                                                                                  "not_isolated"]
     assert CAL.calibration_reasons(pil, on1, 0.4, bent, 12, Scene.from_branch(bent), planes_z) == ["not_faint",
                                                                                                     "not_straight"]
-    # the default (D-093): the same bent branch is not screened for straightness
-    assert CAL.calibration_reasons(pil, cfg, 0.4, bent, 12, scene, planes_z) == ["not_faint", "not_isolated"]
-    assert CAL.calibration_reasons(pil, cfg, 0.4, bent, 12, Scene.from_branch(bent), planes_z) == ["not_faint"]
+    # the default (D-093, D-094): the same bent, dark (alpha 0.9) branch is screened neither for straightness nor
+    # for its optical depth; isolation still applies
+    assert CAL.calibration_reasons(pil, cfg, 0.4, bent, 12, scene, planes_z) == ["not_isolated"]
+    assert CAL.calibration_reasons(pil, cfg, 0.4, bent, 12, Scene.from_branch(bent), planes_z) == []
+    on_dark = cfg_with(node_alpha_check=True)
+    assert CAL.calibration_reasons(pil, on_dark, 0.4, bent, 12, Scene.from_branch(bent), planes_z) == ["not_faint"]
     # with the check on, the tolerance is node_straight_tol_radii x r: not_straight exactly when the excess exceeds it
     exc = CS.straightness_excess(bent, 12, cfg.calibration.node_straight_half_um)
     for tol in (1.0, 2.0, 4.0):

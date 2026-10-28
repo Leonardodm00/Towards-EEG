@@ -153,14 +153,16 @@ def patches_name(scans_path):
 def candidates_from_rows(rows, cfg):
     """Node ids of a run_cell.py or run_node.py table that can be calibration nodes of either set: the rule of
     calibration.calibration_reasons on the CSV columns read as the pilot's (cell.pilot_row_view, Block 13) --
-    in S by fit_status and the flags of SELECTION_FLAGS, and calibration.criteria_reasons on phi_rad, alpha_hat
-    and Allen's diameter 2 x allen_radius_um (D-061.4, D-067.4). Straightness, isolation and the registration are
-    checked when the node is re-measured before the scan, so this only saves fetches."""
+    in S by fit_status and the flags of calibration.selection_flags (SELECTION_FLAGS, without faint unless
+    node_faint_flag_check, D-094), and calibration.criteria_reasons on phi_rad, alpha_hat and Allen's diameter
+    2 x allen_radius_um (D-061.4, D-067.4). Straightness, isolation and the registration are checked when the
+    node is re-measured before the scan, so this only saves fetches."""
     out = set()
+    fail = calibration.selection_flags(cfg)
     for r in (cell.pilot_row_view(x) for x in rows):
         flags = [f for f in str(r.get("flags", "")).split(";") if f]
         try:
-            ok = (r["fit_status"] == "converged" and not any(f in phantoms.SELECTION_FLAGS for f in flags)
+            ok = (r["fit_status"] == "converged" and not any(f in fail for f in flags)
                   and not calibration.criteria_reasons(float(r["phi_rad"]), float(r["alpha_hat"]),
                                                        2.0 * float(r["allen_radius_um"]), cfg))
         except (KeyError, ValueError, TypeError):

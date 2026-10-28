@@ -8,7 +8,10 @@
                       or the far-field set (lo < D_A <= hi,
                       far_field_allen_diameter_um; the offsets beyond, D-026);
                       in S, flat and faint are read from the pilot
-                      (pilot_view). The fit's d_hat is no criterion. The
+                      (pilot_view); since D-094 (2026-10-28) neither the
+                      optical depth (faint, node_alpha_check) nor the flag
+                      faint of S (node_faint_flag_check) is applied unless
+                      switched on. The fit's d_hat is no criterion. The
                       far-field scan is not built: such a node is selected and
                       reported, not scanned (FAR_FIELD_NOT_BUILT)
   plane_scan          at one thin, faint, flat calibration node the measuring
@@ -361,7 +364,8 @@ def criteria_reasons(phi_rad, alpha_hat, allen_diameter_um, cfg):
     order: Allen's diameter (allen_diameter_missing when it is not finite or
     <= 0, allen_diameter_out when it is in neither set), flat (phi_rad <=
     node_phi_max_deg, else not_flat), faint (alpha_hat <= node_alpha_max, else
-    not_faint); a NaN fails its criterion. Empty: all met."""
+    not_faint) -- only when node_alpha_check, off by default (D-094); a NaN
+    fails its criterion. Empty: all met."""
     cal = cfg.calibration
     d = float(allen_diameter_um)
     out = []
@@ -371,9 +375,26 @@ def criteria_reasons(phi_rad, alpha_hat, allen_diameter_um, cfg):
         out.append("allen_diameter_out")
     if not float(phi_rad) <= math.radians(cal.node_phi_max_deg):
         out.append("not_flat")
-    if not float(alpha_hat) <= cal.node_alpha_max:
+    if cal.node_alpha_check and not float(alpha_hat) <= cal.node_alpha_max:
         out.append("not_faint")
     return out
+
+
+def selection_flags(cfg):
+    """The flags of Block 6's SELECTION_FLAGS that fail a calibration node:
+    all of them with node_faint_flag_check, all but "faint" without (the
+    default, D-094: a node outside S by the flag faint alone can be a
+    calibration node; S itself keeps the flag)."""
+    keep_faint = cfg.calibration.node_faint_flag_check
+    return tuple(f for f in phantoms.SELECTION_FLAGS if keep_faint or f != "faint")
+
+
+def selection_reasons(result, cfg):
+    """The reasons of Block 6's selection S (phantoms.reject_reasons: the fit's
+    status, the registration, the flags) that fail a calibration node: all of
+    them but the flag "faint" unless node_faint_flag_check (D-094)."""
+    fail = selection_flags(cfg)
+    return [r for r in phantoms.reject_reasons(result) if r not in phantoms.SELECTION_FLAGS or r in fail]
 
 
 def trace_reasons(view, cfg, allen_diameter_um, branch, index, scene, planes_z):
@@ -409,7 +430,8 @@ def trace_reasons(view, cfg, allen_diameter_um, branch, index, scene, planes_z):
 def calibration_reasons(result, cfg, allen_diameter_um, branch=None, index=None, scene=None, planes_z=None):
     """Why a NodeResult is not a calibration node (empty: it is one, of the set
     calibration_set(allen_diameter_um, cfg)): outside the selection S (Block 6's
-    rule), then criteria_reasons -- every criterion read from the pilot
+    rule; selection_reasons: the flag faint only with node_faint_flag_check,
+    D-094), then criteria_reasons -- every criterion read from the pilot
     (pilot_view; Block 13.3b, D-061.2, D-067.4) except Allen's diameter
     allen_diameter_um (um; 2 x the branch radius at the node, D-061.4) --,
     then, when branch and index are given, trace_reasons (10.I: not_straight
@@ -417,7 +439,7 @@ def calibration_reasons(result, cfg, allen_diameter_um, branch=None, index=None,
     given too). The fit's d_hat is no
     criterion: the kernel being calibrated must not choose its own nodes."""
     view = pilot_view(result)
-    out = phantoms.reject_reasons(view) + criteria_reasons(view.phi_rad, view.alpha_hat, allen_diameter_um, cfg)
+    out = selection_reasons(view, cfg) + criteria_reasons(view.phi_rad, view.alpha_hat, allen_diameter_um, cfg)
     if branch is not None and index is not None:
         if planes_z is None:
             scene = None
