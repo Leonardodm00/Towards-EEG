@@ -127,6 +127,8 @@ the "Binds" column.
 | 2026-10-28 (later, 8) | Logs **D-101** (user, 18:17 and the dialog's answers at about 18:40; the diameter implementation chat), after Cell 7's isolation overview on the pilot (70 candidates, 2 far-field, both shaded by the soma or a junction): flatness per set -- far $\varphi \le 15$ deg, near $\le 10$ deg --, and the calibration background's support becomes the **stripe** along the measuring line (a pixel is clear when no traced neighbour's predicted shadow at it exceeds 0.03 gl; the band along the line with most clear pixels, walked outward to the first shaded column, the node's own fitted cylinder removed; a plane usable with 500 clear pixels and 3 um of run per side), in place of the square's node-level isolation verdict. Built as SPEC Block 10.S the same evening (`03c43b2`; the notebooks and runbook v35 `6a261e4`). Why it was not S: the pilot table read off Drive -- flatness removes 26 of the 31 far-set nodes, S three, `bbar_few` none **[data]**. D-081 and D-078 annotated. Written after re-reading this log (changed since the (later, 6) row by the noise-fit chat's D-100, merged). The repository copy (D-097) on `sci/diameter-pipeline`, `docs/project/`. Next free IDs: D-102, I-005. |
 | 2026-10-28 (later, 9) | Logs **D-102** and **D-103** (user, 19:35; the noise-fit chat). **D-102**: "I think you have misuderstood ... For each cell draw out per each sweep a tilt. the twin will recieve the very same tilt as in teh real cell so that no statistics has to be computed on the tilt" -- each twin sweep carries the realised tilt of its own real sweep, read on an SS sweep as the least-squares slope of its window means on time (the assistant's proposal; the LS sweeps' reading and the fit's simulator open), and no $\sigma_b(c)$ is computed for the twins; **D-100 withdrawn** as the assistant's misreading of "A and B". **D-103**: D-095's open points closed -- the per-sample median window per sweep and polarity for the start and the subtraction, the fitted decay's point value, $t_{\rm SS}(c)$ the maximum over groups with D-076 (ii)'s 80 ms floor, one exponential with a free baseline on [5, 200) ms, 80 ms also the fallback (flagged), replacing D-051 (i)'s 190 ms; open: point 9 (a failed group) and the fallback's trigger. D-034, D-051, D-076, D-095 and D-100 annotated (entries and index). Written after re-reading this log (changed since the (later, 7) row by the diameter chat's D-101, row (later, 8); merged, nothing of theirs edited). The repository copy (D-097) on `main`, `docs/project/`. Next free IDs: D-104, I-005. |
 | 2026-10-28 (later, 10) | Logs **D-104** (user, 19:53; the noise-fit chat): "When the window has less than 50 ms size" -- the 80 ms fallback applies when the window $[t_{\rm SS}(c), 200)$ ms would be shorter than 50 ms (a start later than 150 ms), and also when no group is valid (the assistant's reading); "Flag and leave it out" -- a group whose fit fails or that has fewer than 5 windows (PROVISIONAL) is flagged and left out of the maximum; on the RC test cell at $\kappa_{\rm tr}$ = 0.1 the fallback applies from $\tau_m$ = 34.0 ms (113 MOhm) or $R_{\rm in}$ = 234 MOhm (28.1 ms). Roadmap allen-mtg-fit updated at the user's word ("Finally update the roadmap with the changes discussed here"): notes and revise marks for D-102 to D-104 on N3, N4, N5 and T8, no status changed (`a945a7a`). D-082, D-095 and D-103 annotated (entries and index). Written after re-reading this log (unchanged since the (later, 9) row). The repository copy (D-097) on `main`, `docs/project/`. Next free IDs: D-105, I-005. |
+| 2026-10-28 (later, 11) | Logs **D-105** (user, 19:39; the diameter implementation chat): "given the far field nodes highlight the stripe used, expose also the parameters to shape the stripe's features ... Also recheck the previous implementation" -- the isolation figures show the stripe of every plane of the stage (panel (c); the far fit's planes lie 5-16 planes from $k^*$), Cell 7 exposes the stripe's existing settings as `CAL_KNOBS` (written to `calibration_config.json`, passed as `--config-json`; Cell 15 and davinci read the same file), and D-101's implementation was rechecked: the integration tester's report (F1, F5 fixed; F2 fixed as the assistant reads D-101.4, to confirm; F3, S4 open) and a run on the pilot's own reconstruction -- as built the stripe keeps 21 of the 138 near candidates and none of the 7 far ones, out-of-focus dendrites' predicted shadows covering the nodes; how they should enter the stripe is D-101 (d), open. D-101 and D-098 annotated (entries and index). Written after re-reading this log (changed since the (later, 8) row by the noise-fit chat's D-102 to D-104, rows (later, 9) and (later, 10); merged, nothing of theirs edited). The repository copy (D-097) on `sci/diameter-pipeline`, `docs/project/`. Next free IDs: D-106, I-005. |
+| 2026-10-29 | Logs **D-106** (user, 14:17; the noise-fit chat): "Should a dropped group's windows also be left out of the noise statistics? Yes as you propose" -- a group with fewer than `min_windows_per_group` = 5 windows (PROVISIONAL) leaves the noise statistics and the layout handed to Block 4 as well as the start's maximum; a group dropped only for a failed fit keeps its windows. D-104 annotated (entry and index). Written after re-reading this log (changed since the (later, 10) row by the diameter chat's D-105, row (later, 11); merged, nothing of theirs edited). The repository copy (D-097) on `main`, `docs/project/`. Next free IDs: D-107, I-005. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -244,13 +246,15 @@ would be needed*, *Status*.
 | D-095 | 2026-10-28 | the SS window start $t_{\rm SS}(c)$ and the SS subtraction (D-051 (iv), (D-051.1); D-076 (ii)); Block 3 (`transient_start`, `subtract_mean_response`, `WindowConfig`), Block 4's simulator (`simulate_cell_windows`), smoke W2, W3, F2; SPEC §2.2; `noise_ss_enl_t0_ms` | mean windows per polarity and per sweep over [-10, 200) ms; $t_{\rm SS}(c)$ where their exponential decay falls within $\kappa_{\rm tr}\hat\sigma_{\rm SS}(c)$ ("statistically"); no binning; each enlarged window minus the mean window of its sweep and polarity on $[t_{\rm SS}(c), 200)$ [user]; mean or median, the reading of "statistically", the per-group combination, the fit model, the 80 ms floor and the fallback open | active; not implemented; supersedes D-051 (iv)'s test and (D-051.1)'s grouping, D-076 (ii)'s $t_{\rm tr}$ [updated 2026-10-28: revise marks on the roadmap's N3 and N4] [updated 2026-10-28 (later, 9): open points closed by D-103 -- median window, point value, maximum, one exponential on [5, 200) ms, 80 ms floor and fallback; point 9 and the trigger open] [updated 2026-10-28 (later, 10): the fallback's trigger and point 9 closed by D-104] |
 | D-096 | 2026-10-28 | the selection $\mathcal S$ (Block 6, `config.SELECTION_FLAGS`), phantoms and real nodes; the bias table (Block 14); `correct_nodes` and the fill (Block 7, D5); the estimator and simulation signatures (Block 1); D-094.3; D-030 | the flag `faint` is a label, not a criterion of $\mathcal S$: every node whose fit is in $\mathcal S$ is corrected, whatever its optical depth and its dip [user]; the flags of $\mathcal S$ in the estimator signature [the assistant's choice] | active; implemented 2026-10-28 (`cf2f91d`, renumbered `76365a3`), smoke-tested; no table built |
 | D-097 | 2026-10-28 | every chat's delivery: code pushed by the assistant (hpc-git-delivery's last step); every document also in the repository (`docs/project/` on `main` for the project-knowledge documents; handoffs in `<workstream>/docs/`, study documents and checks in `<workstream>/dev/`); DOCUMENT UPKEEP; the roadmaps' push | the assistant pushes its own commits; every document is also committed to the GitHub repository so any chat can read it [user]; where, the assistant's reading; the user's uploads not copied without their word; the repository is public | active; applied 2026-10-28 (noise-fit chat: `53b2713`, `d2ffcb4`, `cd32dad`) |
-| D-098 | 2026-10-28 | `allen_image_io.fetch_swc` (Block 0); Block 16.2 (a)'s projection rule and 16.3 (a) (`projection_xy_type`); S3a's coverage (Block 17.3; `phantoms.row_reject_reasons`); Cell 7's outputs (Block 10.F (5); `scan_cell`'s `on_node`); the set-aside cells' use (D-089.1); D-089.2 | the marker file never taken; the xy projection by its type, the darkest the fallback; $\mathcal S$ recomputed from the rows' columns in the coverage; Cell 7 draws each candidate's background patch with the neighbours behind `not_isolated`; the set-aside cells that look aligned run with `--include-set-aside` [user; the figure's form the assistant's, PROVISIONAL] | active; implemented 2026-10-28 (`c595bc0`, `4ef6d8e`, `cdba78a`, `28790c3`, `44e95e3`), smoke-tested; not run on Allen's data |
+| D-098 | 2026-10-28 | `allen_image_io.fetch_swc` (Block 0); Block 16.2 (a)'s projection rule and 16.3 (a) (`projection_xy_type`); S3a's coverage (Block 17.3; `phantoms.row_reject_reasons`); Cell 7's outputs (Block 10.F (5); `scan_cell`'s `on_node`); the set-aside cells' use (D-089.1); D-089.2 | the marker file never taken; the xy projection by its type, the darkest the fallback; $\mathcal S$ recomputed from the rows' columns in the coverage; Cell 7 draws each candidate's background patch with the neighbours behind `not_isolated`; the set-aside cells that look aligned run with `--include-set-aside` [user; the figure's form the assistant's, PROVISIONAL] | active; implemented 2026-10-28 (`c595bc0`, `4ef6d8e`, `cdba78a`, `28790c3`, `44e95e3`), smoke-tested; not run on Allen's data [updated 2026-10-28 (later, 11): (D-098.4)'s figure gains panel (c), every plane's stripe, and the overview's $n/N$ -- D-105] |
 | D-099 | 2026-10-28 | where S3's per-cell survey runs (Blocks 16.2, 17, 18, 19 over the selection: SPEC Block 16.4, `scripts/pbs/survey_*.pbs`); Colab's Cells 11-15 (the pilot only, `survey_pilot/`); the runner's `--task-index` and `--cache-per-cell`; `cell_pool.py pick` (Block 16.1 (e)); the roadmap's S3a-S3c (`needs_hpc`); D-085's "in Colab"; D-098.5's Cells 12b and 13b | the real runs on davinci, one PBS array task per selected cell plus a prepare and a pool job; Colab keeps every cell on the pilot [user]; the layout under the archive root, the proxy module and the 12 h walltime the assistant's, PROVISIONAL | active; implemented and pushed 2026-10-28, smoke-tested against stubs; not yet run on davinci |
 | D-100 | 2026-10-28 | the tilt SD the twins of the 14 two-sweep L3_exc cells receive (Block 5; the tilt of (D-017.1)); D-034's (D-034.1) for those cells; a cohort step after the 18 per-cell fits (Block 6); Block 3's pair counts and Block 4's `TiltResult`; the Stage-7 gate's report (D-011); SPEC §8 (2026-10-23) | for the 2-sweep cells the twins' tilt SD both per cell (a) and as one cohort value (b); partial pooling (c) not taken [user]; two labelled variants of twins, the cohort value's form (the $S_{\rm eff}$-weighted mean of the unclipped estimates over the 18 cells, clipped at 0) and each cell's own fit unchanged -- the assistant's reading, to confirm | active; not implemented; its reading open [superseded 2026-10-28 (later, 9): withdrawn as the assistant's misreading -- D-102] |
-| D-101 | 2026-10-28 | the calibration nodes' flatness (10.I (iii); `CalibrationConfig.node_phi_max_deg`, `node_phi_max_deg_far`); the background's support and the isolation verdict of both calibration sets (Blocks 10.P, 10.I (vi), 15.1; SPEC Block 10.S; `background_support`, `stripe_half_widths_um`, `stripe_min_pixels`, `stripe_min_side_um`); Cell 7 and S3c's per-cell scans; D-078.1's far mask and D-081.1's node verdict (kept as `"square"`); D-081.3's 5 deg | far $\varphi \le 15$ deg, near $\le 10$ deg; the stripe: a pixel is clear when no neighbour's predicted shadow at it exceeds 0.03 gl, the band along the measuring line with most clear pixels, walked out to the first shaded column, the own fitted cylinder removed, usable with 500 pixels and 3 um per side [user]; the $W$ grid, the walk, the own radius $\max(\hat d/2, r_A)$ and the near bound read as 10 deg the assistant's, PROVISIONAL | active; implemented and pushed 2026-10-28 (Block 10.S), smoke-tested; not yet run on Allen's data |
+| D-101 | 2026-10-28 | the calibration nodes' flatness (10.I (iii); `CalibrationConfig.node_phi_max_deg`, `node_phi_max_deg_far`); the background's support and the isolation verdict of both calibration sets (Blocks 10.P, 10.I (vi), 15.1; SPEC Block 10.S; `background_support`, `stripe_half_widths_um`, `stripe_min_pixels`, `stripe_min_side_um`); Cell 7 and S3c's per-cell scans; D-078.1's far mask and D-081.1's node verdict (kept as `"square"`); D-081.3's 5 deg | far $\varphi \le 15$ deg, near $\le 10$ deg; the stripe: a pixel is clear when no neighbour's predicted shadow at it exceeds 0.03 gl, the band along the measuring line with most clear pixels, walked out to the first shaded column, the own fitted cylinder removed, usable with 500 pixels and 3 um per side [user]; the $W$ grid, the walk, the own radius $\max(\hat d/2, r_A)$ and the near bound read as 10 deg the assistant's, PROVISIONAL | active; implemented and pushed 2026-10-28 (Block 10.S), smoke-tested; not yet run on Allen's data [updated 2026-10-28 (later, 11): rechecked -- the verdict's soma blur fixed (F1), the own cylinder on the fitted line (F2, the reading to confirm); on the pilot's own reconstruction as built 21 of 138 near candidates usable at $k^*$, none of 7 far; (c) answered by it, (d) open -- D-105] |
 | D-102 | 2026-10-28 | the tilt in every twin (Block 5; (L1) = (D-017.1)); D-034's draw $b \sim \mathcal N(0, \sigma_b(c)^2)$ and (D-034.1) for the twins; D-100; Block 4's tilt alternation and (T1); Block 3's tilt reading; D-073; SPEC §2.4, §8 | each twin sweep carries the realised tilt of its own real sweep -- "the very same tilt as in the real cell", no statistic of the tilt computed [user]; read on an SS sweep as the least-squares slope of its window means on time, one intercept per polarity (the assistant's proposal); the LS sweeps' reading and the fit's simulator open; D-100 withdrawn as a misreading | active; not implemented; open (a)-(d) |
 | D-103 | 2026-10-28 | D-095's open points; D-076 (ii)'s 80 ms floor; D-051 (i)'s fallback (`fallback_t_ms`, `ss_enlarged_none`); Block 3 (`transient_start`, `subtract_mean_response`, `WindowConfig`), Block 4's simulator; smoke W2, W3, F2; SPEC §2.2 | the per-sample median window per sweep and polarity, for the start and the subtraction; one exponential with a free baseline on [5, 200) ms; $t_{s,p} = \hat\tau_{s,p}\ln(\lvert\hat A_{s,p}\rvert/(\kappa_{\rm tr}\hat\sigma_{\rm SS}(c)))$, the point value; $t_{\rm SS}(c) = \max\{80\ {\rm ms}, \max_{(s,p)} t_{s,p}\}$; 80 ms also the fallback, flagged [user]; the fallback's trigger, point 9 and $\kappa_{\rm tr}$ open | active; not implemented [updated 2026-10-28 (later, 10): (a) and (b) closed by D-104] |
-| D-104 | 2026-10-28 | D-103's open points (a), (b); (D-103.3); Block 3's window start (`WindowConfig.fallback_t_ms`, `min_window_ms`, `min_windows_per_group`); the flags `ss_start_fallback` and `ss_group_dropped`; smoke W2; the roadmap allen-mtg-fit | the 80 ms fallback applies when the window $[t_{\rm SS}(c), 200)$ ms would be shorter than 50 ms; a group whose fit fails or has too few windows is flagged and left out [user]; also with no valid group, and the minimum of 5 windows (PROVISIONAL) -- the assistant's; the roadmap updated for D-102 to D-104 [user] | active; not implemented; open: a dropped group's windows in the statistics |
+| D-104 | 2026-10-28 | D-103's open points (a), (b); (D-103.3); Block 3's window start (`WindowConfig.fallback_t_ms`, `min_window_ms`, `min_windows_per_group`); the flags `ss_start_fallback` and `ss_group_dropped`; smoke W2; the roadmap allen-mtg-fit | the 80 ms fallback applies when the window $[t_{\rm SS}(c), 200)$ ms would be shorter than 50 ms; a group whose fit fails or has too few windows is flagged and left out [user]; also with no valid group, and the minimum of 5 windows (PROVISIONAL) -- the assistant's; the roadmap updated for D-102 to D-104 [user] | active; not implemented; open: a dropped group's windows in the statistics [updated 2026-10-29: open point (a) closed by D-106 -- the windows of a group with too few windows leave the statistics too] |
+| D-105 | 2026-10-28 | the isolation figure of D-098.4 (SPEC Block 10.F (5): panel (c), the overview's $n/N$, `real`'s knob and far-set lines); Cell 7's `CAL_KNOBS` and `OUT/calibration/calibration_config.json` (both notebooks), Cell 15's `survey_config_s3c.json`, davinci's `DIAM_CONFIG_JSON`; SPEC Block 10.S as amended by the recheck (F1, F2, S1-S3, S5-S7) | the stripe of every plane shown, the far fit's planes emphasised; the stripe's existing settings and the flatness bounds exposed in Cell 7 and passed to every step [user]; the set of knobs, panel (c)'s form and F2's fitted cylinder -- the assistant's | active; implemented and pushed 2026-10-28; smoke-tested; open: D-101 (d) (how out-of-focus shadows enter the stripe), S4, F3, F2's reading, the far verdict on the fit's planes |
+| D-106 | 2026-10-29 | D-104's open point (a); Block 3's statistics and the layout it hands to Block 4; Block 4's simulator; `WindowConfig.min_windows_per_group` | a group with too few windows (fewer than 5, PROVISIONAL) leaves the noise statistics too; a group dropped only for a failed fit keeps its windows [user] | active; not implemented |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
@@ -8271,7 +8275,7 @@ at level 4: its overlay is to be looked at before its nodes are pooled. (d) Whet
 (SPEC Blocks 0, 16.2, 17, 10).
 
 **Status:** active; (D-098.1)-(D-098.4) implemented and pushed 2026-10-28, smoke-tested, not yet run on Allen's data;
-(D-098.5) waits for the user's look at 571464200 and a Colab run. [updated 2026-10-28, D-099: (D-098.5)'s Cells 12b and 13b are knobs of the davinci array job (`DIAM_CELLS`, `DIAM_FORCE`, `DIAM_INCLUDE_SET_ASIDE`)]
+(D-098.5) waits for the user's look at 571464200 and a Colab run. [updated 2026-10-28, D-099: (D-098.5)'s Cells 12b and 13b are knobs of the davinci array job (`DIAM_CELLS`, `DIAM_FORCE`, `DIAM_INCLUDE_SET_ASIDE`)] [updated 2026-10-28 (later, 11): (D-098.4)'s figure, under the stripe of D-101, gains a panel (c) -- the stripe of every plane of the stage, the far fit's planes emphasised -- and the overview's labels the count $n/N$ of the fit's planes with a usable stripe -- D-105.1]
 
 ---
 
@@ -8561,7 +8565,7 @@ near-set bound and the far-set bound on the per-cell stratified samples of S3c.
 full; the user's two overview pages of 2026-10-28, 18:17. **[run, sandbox]** `test_smoke_stripe.py` and the calibration
 suites; the mutants of Block 10.S. **[reasoning]** the tilt and the locality arguments above.
 
-**Status:** active; implemented and pushed 2026-10-28; smoke-tested; not yet run on Allen's data.
+**Status:** active; implemented and pushed 2026-10-28; smoke-tested; not yet run on Allen's data. [updated 2026-10-28 (later, 11), **D-105**: rechecked -- the integration tester's report on `e32d03b` (`specs/test_reports/2026-10-28_1955_incremental.md`): the node's verdict shaded the soma at the in-focus blur while the scan used the stage's (F1, fixed at `39ae156`); the own cylinder was centred on the trace while the walk starts on the fitted line (F2, fixed as the union of both -- the assistant's reading of "the fitted node's cylinder", to confirm). On the pilot's own reconstruction **[run, sandbox: `checks/d105_2026-10-28/`]** open point (c) has an answer before Cell 7 runs: as built, 21 of the 138 near candidates have a usable stripe at $k^*$ and none of the 7 far candidates has one in any of the far fit's planes, because the predicted shadows of out-of-focus dendrites exceed 0.03 gl over the nodes themselves (89 near nodes lie under at least one with $\sigma_{\rm r} \ge$ 2 um). Open point (d) is now the question: $\tau$ = 0.3 / 1 gl keeps 92 / 117 near nodes with a residual on the line of median 0.24 / 0.35 gl, but no far node under 3.5 gl -- D-105.]
 
 ---
 
@@ -8790,7 +8794,130 @@ when only its fit failed; the simulator then leaves out the same windows. (b) Th
 medians). **[src]** the roadmap commit `a945a7a`.
 
 **Status:** active; not implemented. Closes D-103's open points (a) and (b), with (a) above left; with D-103, D-095's
-open points are answered except $\kappa_{\rm tr}$'s final value.
+open points are answered except $\kappa_{\rm tr}$'s final value. **[updated 2026-10-29: (a) closed by **D-106** -- a group with fewer than 5 windows (PROVISIONAL) leaves the noise statistics too; a group dropped only for a failed fit keeps its windows.]**
+
+---
+
+## D-105 -- The stripe used in every plane is drawn, the stripe's settings are exposed in Cell 7, and D-101's implementation rechecked (user)
+
+**Date:** 2026-10-28, 19:39 (Europe/Rome), the diameter implementation chat, on the report of D-101's
+implementation. **Binds:** the isolation figure of D-098.4 (SPEC Block 10.F (5)): panel (c), the overview's labels,
+`calibrate_kernel.py real`'s lines `calibration knobs: ...` and `far-set candidates with a usable stripe ...`; Cell 7
+of both notebooks (`CAL_KNOBS`, `OUT/calibration/calibration_config.json` passed as `--config-json` to `real`, `fit`,
+`far-fit` and `figures`), Cell 15 (`survey_pilot/survey_config_s3c.json`, `REDO`), the davinci survey's
+`DIAM_CONFIG_JSON`; SPEC Block 10.S as amended by the recheck. Amends D-098.4's figure; changes no rule of D-101.
+
+**Decision [user].** Quoting the report's sentence on the figures, then: "given the far field nodes highlight the
+stripe used, expose also the parameters to shape the stripe's features. Also recheck the previous implementation".
+
+**Statement.**
+
+(D-105.1) *The stripe used, plane by plane.* The isolation view carries the stripe of every plane of the stage as
+`patch_planes` computed it, and the figure draws it as panel (c): above, each plane's clear pixels against
+`stripe_min_pixels`; below, its runs along the measuring line beyond the own cylinder, one bar per side as wide as the
+plane's $W$, dark where the plane's stripe is usable and orange where not, a tick where a side reaches
+`stripe_min_side_um`, the planes the set's fit does not use faint -- the far fit uses $|k - k^*| \ge$
+`far_min_k_offset` = 5, the dip's area $|k - k^*|$ = 4-6. The overview's label ends with $n/N$, the fit's planes with a
+usable stripe; `real` prints how many far candidates have at least `far_min_planes_per_node` = 6 of them. Nothing in
+the selection changes [the assistant's reading of "highlight the stripe used": for a far node the stripes the far
+fit uses are those of planes 5-16 from $k^*$, while panel (b) shows $k^*$'s].
+
+(D-105.2) *The knobs.* Cell 7 begins with `CAL_KNOBS`, the configuration's existing fields that shape the stripe --
+`background_support`, `isolation_depth_gl` ($\tau$), `stripe_half_widths_um`, `stripe_min_pixels`,
+`stripe_min_side_um`, `patch_half_um` -- and the two flatness bounds, at their defaults; the cell writes them as a
+`calibration` section to `OUT/calibration/calibration_config.json` and passes that file to the four steps, and `real`
+prints the values it ran with. Cell 15 merges the section into its own file; on davinci the same file goes as
+`DIAM_CONFIG_JSON` to the array and the pool job [the set of knobs is the assistant's: every existing field that
+shapes the stripe, no new one; a smoke check fails if the notebooks' values leave the defaults].
+
+(D-105.3) *The recheck.* An integration tester run on `e32d03b` (PASS WITH ISSUES,
+`specs/test_reports/2026-10-28_1955_incremental.md`) and a run of the masks on the pilot's own reconstruction.
+Fixed at `39ae156`: F1 (MAJOR; the verdict now shades the soma at the stage's blur, so it equals the scan's stripe at
+$k^*$), F5 (a help text); F2 as the assistant reads D-101.4 -- the own cylinder is the trace's own segments and their
+copy moved onto the pilot's fitted centre; F4 -- the margin search stays custom, now vectorized over (segment, plane)
+pairs, the reason stated (SciPy's vectorized root finder needs SciPy >= 1.15). S1-S3 and S5-S7 written into the SPEC.
+The triage column of the report holds these as proposals awaiting the user.
+
+**Why [user; run; reasoning].** **[user]** the request. **[run, sandbox: `checks/d105_2026-10-28/`, the pilot's SWC
+(8496 segments) and the pilot table's centres, $k^*$, $\bar B_j$, $\hat\mu_j$, $\hat d_j$; the masks and the stripe
+only, no image]** as built ($\tau$ = 0.03 gl) 21 of the 138 near candidates have a usable stripe at $k^*$ (91
+`too_few`, 26 `side_short`) and none of the 7 far candidates has a usable stripe in any of its 24 fit planes; over the
+node itself 89 near candidates lie under a neighbour whose predicted shadow exceeds 0.03 gl with
+$\sigma_{\rm r}(\delta_{q,k}) \ge$ 2 um, 10 under a junction segment, 3 under a sharp one. With $\tau$ = 0.3 / 1 / 3 gl
+the near set keeps 92 / 117 / 127, and the predicted error the neighbours' summed shadow leaves on the $\pm$3 um line
+after a plane fitted on the stripe has median 0.24 / 0.35 / 0.45 gl over the usable nodes (90th percentile 0.82 / 2.1 /
+3.8 gl; 0.10 and 0.13 gl as built); the far set keeps 0 / 4 / 6 nodes with at least 6 usable fit planes, their error on
+the $\pm$10 um line 3.5-14 gl per node, against the pilot's median background noise SD of 5.9 gl (D-101). Leaving the
+shadows with $\sigma_{\rm r} \ge$ 2 um to the plane at 0.03 gl keeps 82 near nodes (their error median 0.37 gl). The
+performance found on the same scene: the first version's masks took 30-50 s per plane for a near node; now 1-14 s per
+node. **[reasoning]** a neighbour $\delta$ off the plane spreads its shadow over $\sigma_{\rm r}(\delta) \approx$ 0.76-0.79 $\delta$
+for $\delta \ge$ 2 um (the renderer's current law **[run, sandbox]**), and the reach of a fixed per-pixel $\tau$ grows in proportion (2.1-2.6 $\delta$ for a 0.3 um
+tube at $\bar B$ = 200 gl, $\hat\mu$ = 1 /um), so in a dendritic field a few tens of um deep almost every node lies under
+some out-of-focus dendrite's 0.03 gl contour; those shadows are smooth and mostly absorbed by the planar background,
+which is what $\tau$ was not built to recognise.
+
+**What it implies for code and tables.** On `sci/diameter-pipeline`: `39ae156` (the recheck; the tester's report),
+`93a5fde` (panel (c), the knobs, the notebooks, the SPEC), `a4d8b17` (runbook v36), `732e303` (the checks),
+`fcbaf1c` (their references), `ff81622` (the roadmap md); pushed, a fresh clone of `a4d8b17` passing the 40 smoke
+suites (248 pass, 38 skip) and the image checks **[run, sandbox]**. No signature changes: estimator `59678d4e2aedf2b6`, simulation `52aa73e479eb77cf`. Colab: Cells 0, 1 and 7 (and 15)
+again; an open notebook needs Cell 7's new code from GitHub (the knobs live in the cell). davinci: nothing until the
+knob file is passed.
+
+**What it does not decide [open].** (a) How out-of-focus shadows enter the stripe -- D-101 (d): raise $\tau$ (a knob
+now), leave the shadows with $\sigma_{\rm r} \ge \sigma_{\rm cap}$ to the plane under a bound on the predicted error on
+the line (a new rule), or keep the rule as built and take the far set from the survey's cells. (b) S4: the far set's
+minimum side, 3 um or the far line's 10 um. (c) F2's reading of the fitted cylinder. (d) F3: the pilot's tilt error on
+0.2 um nodes (up to 4.5 deg on the tester's phantoms) against the 10 deg bound. (e) Whether the far set's verdict
+before the fetch should count the fit's usable planes (at least 6) instead of $k^*$'s stripe -- panel (c) shows
+both.
+
+**Sources.** **[user]** 2026-10-28, 19:39. **[run, sandbox]** the tester's report; `test_smoke_stripe.py` (7 pass,
+1 skip), `test_smoke_isolation_view.py` (6 pass, 1 skip; 7 mutants killed); `checks/d105_2026-10-28/`
+(`summarize.out`). **[data]** D-101's noise SD. **[reasoning]** the blur-reach argument above.
+
+**Status:** active; implemented and pushed 2026-10-28; smoke-tested; open (a)-(e).
+
+---
+
+## D-106 -- A group with too few windows leaves the noise statistics as well; a group dropped only for a failed fit keeps its windows (user)
+
+**Date:** 2026-10-29, 14:17 (Europe/Rome), the noise-fit chat. **Binds:** D-104's open point (a); (D-104.2)'s dropped
+groups; Block 3's statistics (per window, per sweep and per cell: `noise_cell_stats`) and the layout it hands to Block 4
+(`noise_fit.CellLayout.from_windows`); Block 4's simulator (`simulate_cell_windows`); `WindowConfig.min_windows_per_group`.
+
+**Decision [user].** "Should a dropped group's windows also be left out of the noise statistics? Yes as you propose",
+the answer to D-104's open point (a), where the assistant had proposed: yes when $K_{s,p}$ < 5, no when only the group's
+fit failed.
+
+**Statement.**
+
+(D-106.1) *Too few windows.* For a group $(s,p)$ of an SS sweep $s$ and polarity $p$ with $K_{s,p}$ below
+`min_windows_per_group` (5, PROVISIONAL, D-104.2), its windows leave the noise statistics as well as the start's
+maximum: they enter no per-window, per-sweep or per-cell statistic, nor $\hat V_c(h^*)$ while (T1) is computed, nor the
+tilt reading of (D-102.2). The layout handed to Block 4 leaves them out too, so the simulator's replicate windows are
+cut at the same positions and the operation stays part of the estimator on both sides (D-051 (iv), D-033). The flag
+`ss_group_dropped:<sweep>:<polarity>:few_windows` records it.
+
+(D-106.2) *A failed fit only.* A group dropped from the maximum because its fit failed (no convergence, a non-finite or
+non-positive $\hat\tau_{s,p}$) keeps its windows in the statistics, each minus its group's median window $m_{s,p}(t)$
+(D-103.1) on $[t_{\rm SS}(c), 200)$ ms; the flag `ss_group_dropped:<sweep>:<polarity>:fit` records it.
+
+**Why [user; reasoning].** **[user]** as quoted. **[reasoning]** After its own median is subtracted, a group of one
+window is identically zero, and a group of two keeps only half of each window's difference from the other: the
+statistics of such groups say little about the noise. A failed decay fit says nothing about the windows' noise, so
+their windows are kept.
+
+**What it implies for code and tables.** Block 3 removes the windows of the small groups before the statistics and
+before the layout is built (`SSWindows` filtered; `K` per sweep and polarity recomputed); the per-cell window count
+and every per-cell median exclude them. Smoke: a group of 3 windows is absent from the statistics and from the layout,
+with its flag; a group whose fit fails keeps its windows, with its flag.
+
+**What it does not decide [open].** The value of `min_windows_per_group` (5, PROVISIONAL); $\kappa_{\rm tr}$ (0.1,
+provisional since D-051).
+
+**Sources.** **[user]** 2026-10-29, 14:17. **[log]** D-033, D-051, D-102, D-103, D-104.
+
+**Status:** active; not implemented. Closes D-104's open point (a).
 
 ---
 
