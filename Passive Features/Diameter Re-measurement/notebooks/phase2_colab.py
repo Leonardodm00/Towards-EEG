@@ -921,7 +921,8 @@ run("scripts/allen_radius_distribution.py", "--fetch", SPECIMEN, "--cache-dir", 
 # `calibration.node_faint_flag_check` the flag) -- and then, on the trace, usable: since D-101 (2026-10-28) the
 # background of each plane is fitted on the STRIPE along the measuring line -- the band (half-width 1-12 um along
 # the dendrite, the one with most pixels) walked outward on each side of the node to the first pixel column a
-# traced neighbour's predicted shadow reaches above 0.03 gl, the node's own fitted cylinder removed -- and a
+# traced neighbour's predicted shadow reaches above 0.3 gl (D-108, 2026-10-29; 0.03 gl before), the node's own
+# fitted cylinder removed -- and a
 # node is `not_isolated:too_few` / `not_isolated:side_short` when the stripe at k* has fewer than 500 pixels or
 # under 3 um of clear run on a side (the old square rule, D-078.1 / D-081.1, is `calibration.background_support`
 # = "square"); not screened for straightness since D-093 (the calibration evaluates only the measuring line;
@@ -940,7 +941,7 @@ run("scripts/allen_radius_distribution.py", "--fetch", SPECIMEN, "--cache-dir", 
 # the fitted law), `example_near.png` / `_far.png` (the node nearest the median with its plane images) and
 # `kernel_law.png` into OUT/calibration/figures (D-080.2, D-081.5): judge there whether the straight line
 # holds before you set the slope. Fewer than two near-field nodes stop `fit`; fewer than two far-field nodes
-# with 6 kept planes each stop `far-fit`: measure more stretches in Cell 4b. With the 0.03 grey-level isolation
+# with 6 kept planes each stop `far-fit`: measure more stretches in Cell 4b. With the 0.3 grey-level isolation
 # rule the sets may be small on a dense cell: the `reasons {...}` counts say which rule removed the nodes. A
 # failure here does not stop the notebook.
 # [2026-10-26, D-088.3, Block 19] Each set holds at most 30 scanned nodes (the candidates taken in a seeded order;
@@ -954,7 +955,7 @@ run("scripts/allen_radius_distribution.py", "--fetch", SPECIMEN, "--cache-dir", 
 # have read the width-by-plane figures and the far fit.
 # [2026-10-28, D-098.4] As `real` evaluates each candidate it draws the patch its background is fitted on (+-25 um,
 # plane k*): the traced segments -- the node's own branch blue, a neighbour orange when its predicted shadow in the
-# patch exceeds 0.03 gl in some plane (they bound the stripe), grey below -- and (b) the stripe the background is
+# patch exceeds 0.3 gl in some plane (they bound the stripe), grey below -- and (b) the stripe the background is
 # fitted on with its width, runs and pixel count (D-101), into OUT/calibration/figures/isolation/<set>_node_<id>.png
 # (orange thumbnails in the overview: the stripe at k* is not usable), with overview pages
 # isolation_overview_<n>.png (shown below); `real` ends with `isolation figures: N candidates (k whose stripe at k* is
@@ -969,18 +970,37 @@ run("scripts/allen_radius_distribution.py", "--fetch", SPECIMEN, "--cache-dir", 
 # orange where not, faint for the planes the set's fit does not use (the far fit uses |k - k*| >= 5; the dip's area
 # |k - k*| = 4-6, half-faint). The overview's labels end with n/N, the fit's planes whose stripe is usable, and `real`
 # adds `far-set candidates with a usable stripe in at least 6 of the far fit's planes (|k - k*| >= 5): m of n`.
-# The stripe's knobs (D-101; the configuration's calibration.* fields, here at their defaults). Change one and run the
-# cell again: the file below goes to real, fit, far-fit and figures, and real prints `calibration knobs: ...` with the
-# values it ran with. Cell 15 and the davinci array read the same file when it is passed (runbook, "the stripe's knobs").
+#
+# [2026-10-29, D-108, D-109] tau is 0.3 gl (the stripe kept 21 of the pilot's 138 near candidates at 0.03 gl, 92 at
+# 0.3 gl, in the sandbox's run on the pilot's own reconstruction). The far set is no longer the pilot table's (Cell
+# 4b's stretches hold 31 far-range nodes, on two crowded stretches): before fetching anything `real` judges
+# every dendrite node of the cell with Allen's 2r in (0.6, 0.8] um from the trace -- the trace's tilt (<= 15 deg), the
+# stripe at the trace's plane, and at least 6 usable stripes among the far fit's 24 planes (|k - k*| >= 5), with the
+# pilot table's median background and absorption -- keeps the passing nodes at least 5 um apart along their stretch,
+# and then measures and scans them like any candidate. It prints `far search: the cell's typical background ...`, a
+# progress line every 100 nodes, and `far search over the cell: N far-range nodes; a flat by the trace (phi <= 15
+# deg); b with a usable stripe at the trace's plane; c with at least 6 usable far-fit planes; m chosen, at least 5 um
+# apart (t min) -> .../far_search_529878215.csv` (one row per far-range node and why it failed). On the pilot, in the
+# sandbox, the search took 8.2 min over its 723 far-range nodes (502 flat by the trace, 90 usable at the trace's
+# plane, 74 with at least 6 usable far-fit planes, 19 chosen), before the first fetch; Colab should take about as
+# long, then the 19 are measured and scanned (about 46 crops each). `calibration.far_candidates = "table"` restores
+# the table's far candidates.
+
+# The stripe's knobs (D-101, D-108) and the far set's search (D-109): the configuration's calibration.* fields, here at
+# their defaults. Change one and run the cell again: the file below goes to real, fit, far-fit and figures, and real
+# prints `calibration knobs: ...` with the values it ran with. Cell 15 and the davinci array read the same file when
+# it is passed (runbook, "the stripe's knobs").
 CAL_KNOBS = {
     "calibration.background_support": "stripe",   # "stripe" (D-101) or "square" (before 2026-10-28: the 3-sigma far mask)
-    "calibration.isolation_depth_gl": 0.03,       # tau (gl): a pixel is shaded where a traced segment's predicted shadow exceeds it
+    "calibration.isolation_depth_gl": 0.3,        # tau (gl): a pixel is shaded where a traced segment's predicted shadow exceeds it (D-108)
     "calibration.stripe_half_widths_um": [1.0, 2.0, 4.0, 8.0, 12.0],   # the band's half-widths W tried (um); most clear pixels wins
     "calibration.stripe_min_pixels": 500,         # a plane's stripe is usable with at least this many clear pixels ...
     "calibration.stripe_min_side_um": 3.0,        # ... and at least this clear run (um) on each side of the own cylinder
     "calibration.patch_half_um": 25.0,            # the patch's half-side (um): the runs end at its edge (larger: bigger crops)
     "calibration.node_phi_max_deg": 10.0,         # flatness, near set (deg)
     "calibration.node_phi_max_deg_far": 15.0,     # flatness, far set (deg)
+    "calibration.far_candidates": "cell",         # far set: "cell" found over the whole cell from the trace (D-109), "table"
+    "calibration.far_search_spacing_um": 5.0,     # the far candidates kept at least this far apart along their stretch (um)
 }
 import json
 assert all(k.startswith("calibration.") for k in CAL_KNOBS), "CAL_KNOBS: calibration.* fields only"
