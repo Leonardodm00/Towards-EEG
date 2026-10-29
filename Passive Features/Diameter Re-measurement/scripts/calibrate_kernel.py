@@ -218,16 +218,20 @@ def isolation_hook(provider, cfg, fig_dir, views, log=print, dpi=110):
 
 
 def knobs_line(cfg):
-    """The stripe's settings a run uses (D-101; Cell 7's knobs reach the scripts through --config-json)."""
+    """The stripe's settings a run uses (D-101; Cell 7's knobs reach the scripts through --config-json) and where the
+    far set's candidates come from (D-109)."""
     cal = cfg.calibration
+    far = ("; far set from the whole cell, at least %g um apart" % cal.far_search_spacing_um
+           if cal.far_candidates == "cell" else "; far set from the pilot table")
     if cal.background_support != "stripe":
-        return "calibration knobs: background_support square (the far mask r + %g sigma, the any-shadow veto above " \
-               "%g gl); flatness phi <= %g deg near, %g deg far" % (cal.far_pixel_sigmas, cal.isolation_depth_gl,
-                                                                    cal.node_phi_max_deg, cal.node_phi_max_deg_far)
+        return ("calibration knobs: background_support square (the far mask r + %g sigma, the any-shadow veto above "
+                "%g gl); flatness phi <= %g deg near, %g deg far" % (cal.far_pixel_sigmas, cal.isolation_depth_gl,
+                                                                     cal.node_phi_max_deg, cal.node_phi_max_deg_far)
+                + far)
     return ("calibration knobs: background_support stripe, tau %g gl, W %s um, at least %d px and %g um per side, patch "
             "+-%g um; flatness phi <= %g deg near, %g deg far" % (
                 cal.isolation_depth_gl, ", ".join("%g" % w for w in cal.stripe_half_widths_um), cal.stripe_min_pixels,
-                cal.stripe_min_side_um, cal.patch_half_um, cal.node_phi_max_deg, cal.node_phi_max_deg_far))
+                cal.stripe_min_side_um, cal.patch_half_um, cal.node_phi_max_deg, cal.node_phi_max_deg_far) + far)
 
 
 def far_planes_line(views, cfg):
@@ -241,6 +245,35 @@ def far_planes_line(views, cfg):
     enough = sum(1 for used, _total in far if used >= int(cal.far_min_planes_per_node))
     return ("far-set candidates with a usable stripe in at least %d of the far fit's planes (|k - k*| >= %d): %d of %d"
             % (cal.far_min_planes_per_node, cal.far_min_k_offset, enough, len(far)))
+
+
+def far_search_name(a):
+    """Where `real` writes Block 10.C's records: far_search_<specimen>.csv beside --out."""
+    return os.path.join(os.path.dirname(os.path.abspath(a.out)), "far_search_%s.csv" % a.specimen)
+
+
+def not_far(cand, swc, cfg):
+    """The ids of cand whose Allen diameter (2 x the SWC radius) does not put them in the far set."""
+    radius = {int(i): float(r) for i, r in zip(swc.ids, swc.radius)}
+    return {int(n) for n in cand if calibration.calibration_set(2.0 * radius.get(int(n), float("nan")), cfg) != "far"}
+
+
+def far_candidates_over_cell(swc, cfg, transform, table_rows, a):
+    """Block 10.C (D-109): the far set's candidates found over the whole cell from its trace (they replace the
+    pilot table's far candidates; not_far). Writes every far-range node's record to far_search_<specimen>.csv
+    (far_search_name) and prints the search's lines; returns the set of chosen ids."""
+    from allen_diameter.analysis import far_search
+    B_bar, mu = far_search.typical_background(table_rows, cfg)
+    print("far search: the cell's typical background %.1f gl and absorption %.3f /um (the pilot table's medians in S)"
+          % (B_bar, mu), flush=True)
+    t0 = time.perf_counter()
+    records = far_search.search(swc, cfg, transform, B_bar, mu, log=lambda m: print(m, flush=True))
+    chosen = far_search.choose(records, cfg)
+    kept = set(chosen)
+    table_io.write_rows([dict(r, chosen=int(r["node_id"]) in kept) for r in records], far_search_name(a))
+    print("%s (%.1f min) -> %s" % (far_search.summary_line(records, chosen, cfg), (time.perf_counter() - t0) / 60,
+                                   far_search_name(a)), flush=True)
+    return kept
 
 
 def write_isolation_overview(views, fig_dir, dpi=110):
@@ -265,16 +298,19 @@ def run_real(cfg, a):
     swc = swc_io.read_swc(a.swc or aio.fetch_swc(int(a.specimen), a.cache_dir))
     planes = aio.plane_table(aio.list_images(int(a.specimen)))
     provider = run_cell.real_provider(aio.HttpFetcher(cache_dir=a.cache_dir), planes, cfg.acquisition.res0_um)
-    cand = candidates_from_rows(table_io.read_rows([a.nodes_csv]), cfg)
+    table_rows = table_io.read_rows([a.nodes_csv])
+    cand = candidates_from_rows(table_rows, cfg)
     regs = {}
     if a.registration_json:
         with open(a.registration_json) as f:
             regs = {int(k): v for k, v in json.load(f).items()}
-    print("%d candidate nodes" % len(cand), flush=True)
-    print(knobs_line(cfg), flush=True)
-    t0 = time.perf_counter()
     transform = dict(shift_full_px=(a.shift_x, a.shift_y), flip_y_full_h=a.flip_h, z0_um=a.z0)
     cal = cfg.calibration          # Block 19.1 (D-088.3): a seeded order, at most calib_max_nodes_per_set per set
+    print(knobs_line(cfg), flush=True)
+    if cal.far_candidates == "cell":         # Block 10.C (D-109): the far set from the whole cell, not the table
+        cand = not_far(cand, swc, cfg) | far_candidates_over_cell(swc, cfg, transform, table_rows, a)
+    print("%d candidate nodes" % len(cand), flush=True)
+    t0 = time.perf_counter()
     fig_dir, views = isolation_dir(a), []
     hook = isolation_hook(provider, cfg, fig_dir, views, log=lambda m: print(m, flush=True)) if fig_dir else None
     out = calibration.scan_cell(swc, provider, cfg, transform, regs, cand, log=lambda m: print(m, flush=True),

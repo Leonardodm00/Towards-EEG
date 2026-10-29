@@ -99,11 +99,11 @@ RAMP = (180.0, 0.4, -0.25)       # gl, gl/um, gl/um: the provider's plane b0 + b
 # --------------------------------------------------------------- helpers ---
 
 def cfg_with(**cal):
-    """The square rule (D-078.1, D-081.1) unless the check says otherwise: these checks are about the figure's
-    contents under it; the stripe (D-101, the default since 2026-10-28) has test_smoke_stripe.py and one check in
-    test_contract below."""
+    """The square rule (D-078.1, D-081.1) at its 0.03 gl (the rule of 2026-10-26; the default tau is 0.3 gl since
+    D-108) unless the check says otherwise: these checks are about the figure's contents under it; the stripe (D-101,
+    the default since 2026-10-28) has test_smoke_stripe.py and the stripe checks in test_contract below."""
     cfg = default_config()
-    cal = dict({"background_support": "square"}, **cal)
+    cal = dict({"background_support": "square", "isolation_depth_gl": 0.03}, **cal)
     return dataclasses.replace(cfg, calibration=dataclasses.replace(cfg.calibration, **cal))
 
 
@@ -452,7 +452,8 @@ def _real_command_line(tmp, cfg_cell, swc, fetcher, planes):
                      "--out", os.path.join(out_dir, "scans.json"), "--config-json", kj])
         text = buf.getvalue()
         assert ("calibration knobs: background_support stripe, tau 0.05 gl, W 1, 2, 4, 8, 12 um, at least 50 px and "
-                "3 um per side, patch +-3.5 um; flatness phi <= 10 deg near, 15 deg far") in text, text
+                "3 um per side, patch +-3.5 um; flatness phi <= 10 deg near, 15 deg far; far set from the whole cell, "
+                "at least 5 um apart") in text, text
         assert "far-set candidates with a usable stripe in at least 6 of the far fit's planes (|k - k*| >= 5): 0 of 0" \
             in text, text
         meta = json.load(open(os.path.join(out_dir, "scans.json")))["meta"]["calibration"]

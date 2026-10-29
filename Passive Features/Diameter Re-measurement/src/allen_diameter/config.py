@@ -46,6 +46,7 @@ MU_MODES = ("per_node", "shared_branch", "shared_cell")        # D-023 / D-019 (
 BBAR_REGIONS = ("block_masked", "block", "plane_downsampled")  # D-023 / D-018 (a)
 FOCUS_BG_RULES = ("profile_ends_median", "same_as_bbar")       # D-023 / D-018 (c)
 BACKGROUND_SUPPORTS = ("stripe", "square")                      # D-101.3 (Block 10.S) / D-078.1 (10.P)
+FAR_CANDIDATES = ("cell", "table")                              # D-109 (Block 10.C) / the pilot table's rows
 FOCUS_RULES = ("gradient_energy", "dip_depth")                 # D-030: gradient energy; dip depth = handoff Eq. 1, comparison
 FOCUS_GRAD_WINDOWS = ("radius_margin", "whole_profile")        # D-030 (provisional default, see MeasureConfig.focus_grad_window)
 ABSORPTIONS = ("partition_vertical", "linear", "ray_world", "hybrid")    # D-024 / procedure s.3.6; "hybrid": Block 21 (D-084, D-092)
@@ -273,7 +274,7 @@ class CalibrationConfig:
     far_pixel_sigmas: float = 3.0            # source: D-078.1 [user]: a far pixel lies beyond r_q + this x sigma_r(delta_q,k) of every traced segment q and of the soma
     background_min_far_frac: float = 0.05    # source: PROVISIONAL (Block 10.P): fewer far pixels than this fraction of the patch -> plane status bg_few
     background_trim_sigmas: float = 3.0      # source: PROVISIONAL (Block 10.P): the plane is refitted once without the pixels beyond this x 1.4826 MAD of the first fit's residuals (untraced debris)
-    isolation_depth_gl: float = 0.03         # source: D-081.1 [user]: a traced neighbour (not the node's own branch) whose predicted shadow reaches the patch deeper than this (gl) in a scanned plane fails the node (not_isolated); D-101.2 [user]: with the stripe, the per-pixel threshold tau -- a pixel is shaded by a segment (the own branch included) whose predicted shadow at it exceeds this
+    isolation_depth_gl: float = 0.3          # source: D-108 [user, 2026-10-29: "As you recommend"]: 0.3 gl, PROVISIONAL (to judge on Cell 7's panel (c)); was 0.03 (D-081.1, D-101.5) -- the rule of 2026-10-26 is background_support "square" with 0.03. D-081.1 [user]: a traced neighbour (not the node's own branch) whose predicted shadow reaches the patch deeper than this (gl) in a scanned plane fails the node (not_isolated); D-101.2 [user]: with the stripe, the per-pixel threshold tau -- a pixel is shaded by a segment (the own branch included) whose predicted shadow at it exceeds this
     # 2026-10-28, D-101 (Block 10.S): the stripe -- the background's support along the measuring line, one per plane
     background_support: str = "stripe"     # source: D-101.3 [user]: "stripe" (10.S) or "square" (10.P's far mask with far_pixel_sigmas and 10.I's node verdict, D-078.1 / D-081.1)
     stripe_half_widths_um: Tuple[float, ...] = (1.0, 2.0, 4.0, 8.0, 12.0)  # source: PROVISIONAL (D-101.3, the assistant's grid): the band's half-width W along the dendrite is the one of these with most clear pixels
@@ -291,6 +292,9 @@ class CalibrationConfig:
     far_min_k_offset: int = 5                # source: PROVISIONAL (D-026 (g)): planes with |k - k*| >= this enter the far fit (x >= 0.4 um >= r_j)
     far_area_offsets: Tuple[int, int] = (4, 6)  # source: PROVISIONAL (S2b checks): the node's dip area A_j is the median of a s sqrt(2 pi) over the ok planes with |k - k*| in this range
     far_min_planes_per_node: int = 6         # source: PROVISIONAL: a far node enters the fit with at least this many selected planes
+    # 2026-10-29, D-109 (Block 10.C): where real's far-set candidates come from
+    far_candidates: str = "cell"             # source: D-109 [user, 2026-10-29: "Just let the colab code for the pilot cell find the nodes for the far field calibration"]: "cell" -- every dendrite node of the cell in the far set, judged from the trace before any fetch (10.C); "table" -- the pilot table's rows (candidates_from_rows), the rule before
+    far_search_spacing_um: float = 5.0       # source: PROVISIONAL (D-109, the assistant's): 10.C's chosen far candidates lie at least this far apart along their stretch (um); 0 keeps every passing node
     far_core_max_passes: int = 10            # source: D-078.2 / D-081.4 [user]: N, the cap on the iterative core fit's passes (exposed)
     far_core_stop_tol: float = 1.0           # source: D-078.2 [user]: kappa, the stop |ds| <= kappa SE(s) between passes
     far_core_width_bounds: Tuple[float, float] = (0.25, 4.0)  # source: PROVISIONAL (S2b checks): the core SD bounded to this x sigma_p; a fit at a bound ends the plane
@@ -461,6 +465,9 @@ class DiameterConfig:
                              "far_field_allen_diameter_um[1], all finite (D-067.4: two disjoint sets of Allen's "
                              "diameter)")
         _check_in(cal.background_support, BACKGROUND_SUPPORTS, "calibration.background_support")
+        _check_in(cal.far_candidates, FAR_CANDIDATES, "calibration.far_candidates")
+        if not (math.isfinite(cal.far_search_spacing_um) and cal.far_search_spacing_um >= 0):
+            raise ValueError("calibration.far_search_spacing_um must be finite and >= 0, got %r" % (cal.far_search_spacing_um,))
         if not (0 <= cal.node_phi_max_deg_far <= 90 and cal.stripe_min_pixels >= 6 and cal.stripe_min_side_um >= 0
                 and len(cal.stripe_half_widths_um) >= 1 and all(w > 0 for w in cal.stripe_half_widths_um)):
             raise ValueError("calibration: 0 <= node_phi_max_deg_far <= 90, stripe_min_pixels >= 6, stripe_min_side_um >= 0, "

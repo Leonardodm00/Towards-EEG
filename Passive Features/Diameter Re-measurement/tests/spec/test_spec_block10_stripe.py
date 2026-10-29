@@ -611,7 +611,8 @@ def test_new_calibration_fields_defaults_validate_and_signatures():
     assert cal.background_support == "stripe"
     assert tuple(cal.stripe_half_widths_um) == (1.0, 2.0, 4.0, 8.0, 12.0)
     assert cal.stripe_min_pixels == 500 and cal.stripe_min_side_um == 3.0
-    assert cal.isolation_depth_gl == 0.03
+    # D-108 (the user, 2026-10-29): tau = 0.3 gl, the spec's value since then (was 0.03, D-081.1 / D-101.5)
+    assert cal.isolation_depth_gl == 0.3
     # Block 1's pinned default hashes (SPEC Block 1, D-096): estimator 59678d4e2aedf2b6, simulation 52aa73e479eb77cf
     assert cfg.signature_hash("estimator") == "59678d4e2aedf2b6"
     assert cfg.signature_hash("simulation") == "52aa73e479eb77cf"
