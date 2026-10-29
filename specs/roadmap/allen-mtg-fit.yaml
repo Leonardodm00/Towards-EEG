@@ -17,6 +17,8 @@
 # 2026-10-28 (evening): notes and revise marks for D-102 (the twins copy the realised
 # per-sweep tilts), D-103 and D-104 (the SS window start settled) on N3, N4, N5 and T8,
 # at the user's word ("update the roadmap with the changes discussed here").
+# 2026-10-29: notes and revise marks for D-106 and D-107 (the LS tilts, the fit's
+# simulator with the real sweeps' tilts) and the SS reading's check, at the user's word.
 #
 # Theory status: open | studying | closed  (set with
 #   python specs/roadmap/roadmap.py set --yaml specs/roadmap/allen-mtg-fit.yaml T5 closed --decision D-nnn)
@@ -133,7 +135,7 @@ theory:
     status: open
     closed_on:
     decision:
-    note: "To study (user, 2026-10-26: not read yet). Study document TEEG_tilt_sigma_b_2026-10-26.md delivered with its checks (check01-05): what (T1) estimates, h* = 4 periods also right for 120 ms windows, the two-draw limit of 2-sweep cells, and the per-cell / cohort / partial-pooling options. Option choice open (SPEC s.8). [2026-10-28: answered by D-102 (user) -- the twins copy each real sweep's realised tilt, so sigma_b(c) and the pooling options are no longer on the twins' path (D-100, which had read the answer as per-cell and cohort variants, withdrawn); revise mark from N5; the status stays the user's.]"
+    note: "To study (user, 2026-10-26: not read yet). Study document TEEG_tilt_sigma_b_2026-10-26.md delivered with its checks (check01-05): what (T1) estimates, h* = 4 periods also right for 120 ms windows, the two-draw limit of 2-sweep cells, and the per-cell / cohort / partial-pooling options. Option choice open (SPEC s.8). [2026-10-28: answered by D-102 (user) -- the twins copy each real sweep's realised tilt, so sigma_b(c) and the pooling options are no longer on the twins' path (D-100, which had read the answer as per-cell and cohort variants, withdrawn); revise mark from N5; the status stays the user's.] [2026-10-29: D-107 -- the noise fit drops the tilt SD and (T1) as well: nothing in the pipeline estimates sigma_b(c) any more; revise mark from N4.]"
   - id: T9
     title: "Per-sweep calibration and shrinkage"
     summary: "What one sweep can identify of the law (the fast pair well, the slow SD roughly, the slow timescale not), and how a random-effects shrinkage lets each twin sweep carry its own real sweep's noise."
@@ -406,7 +408,7 @@ implementation:
     needs_theory: [T5, T8]
     needs_hpc: false
     jobs: []
-    note: "On main as 36ba658; smoke M1-M9 9/9 on davinci 2026-10-20 (G6)."
+    note: "On main as 36ba658; smoke M1-M9 9/9 on davinci 2026-10-20 (G6). [2026-10-29: D-107 -- the noise fit's simulator and the twins' generator need a fixed tilt per trace (mV/s), not sigma_b times a unit draw (the assistant's proposal: a keyword argument beside xi_tilt and sigma_b). Revise mark D-107.]"
   - id: NT
     title: "Cluster gates and the archive inspection (tools)"
     summary: "cluster_gates_noise_fit.sh runs every cluster-side check of the noise-fit blocks (G0-G12) and prints a verdict; noise_fit_gates.py reads the SS sweep structure of the archive."
@@ -427,7 +429,7 @@ implementation:
     needs_theory: [T6, T10]
     needs_hpc: false
     jobs: []
-    note: "noise_windows.py, noise_cell_stats.py; written 2026-10-23 (smoke W1-W10 10/10, eight mutations caught), pushed to main 2026-10-28 (76577d2; spec 0dfe8bf, 65c659b, 033e3bf). D-095 (user, 2026-10-28): the window start is read from the exponential decay of the mean windows per polarity and per sweep over [-10, 200) ms, within kappa_tr sigma_SS(c), no 5 ms bins; each enlarged window minus the mean window of its own sweep and polarity. Replaces transient_start (revise mark); its open points (mean or median, 'statistically', how t_SS(c) is formed, the fit model and baseline, the 80 ms floor and the fallback) are asked before the change. [answered 2026-10-28, D-103 and D-104 (user): the per-sample median window per sweep and polarity, for the start and the subtraction; one exponential with a free baseline fitted on [5, 200) ms; the point value t_sp = tau_hat ln(|A_hat| / (kappa_tr sigma_SS(c))); t_SS(c) = max(80 ms, max t_sp); 80 ms also the fallback, flagged, when the window would be shorter than 50 ms; a group whose fit fails or has too few windows flagged and left out. D-102: Block 3 also reads each SS sweep's realised tilt (least-squares slope of the window means on time, proposal). Revise marks D-103, D-102.]"
+    note: "noise_windows.py, noise_cell_stats.py; written 2026-10-23 (smoke W1-W10 10/10, eight mutations caught), pushed to main 2026-10-28 (76577d2; spec 0dfe8bf, 65c659b, 033e3bf). D-095 (user, 2026-10-28): the window start is read from the exponential decay of the mean windows per polarity and per sweep over [-10, 200) ms, within kappa_tr sigma_SS(c), no 5 ms bins; each enlarged window minus the mean window of its own sweep and polarity. Replaces transient_start (revise mark); its open points (mean or median, 'statistically', how t_SS(c) is formed, the fit model and baseline, the 80 ms floor and the fallback) are asked before the change. [answered 2026-10-28, D-103 and D-104 (user): the per-sample median window per sweep and polarity, for the start and the subtraction; one exponential with a free baseline fitted on [5, 200) ms; the point value t_sp = tau_hat ln(|A_hat| / (kappa_tr sigma_SS(c))); t_SS(c) = max(80 ms, max t_sp); 80 ms also the fallback, flagged, when the window would be shorter than 50 ms; a group whose fit fails or has too few windows flagged and left out. D-102: Block 3 also reads each SS sweep's realised tilt (least-squares slope of the window means on time, proposal). Revise marks D-103, D-102.] [2026-10-29: D-106 (user) -- a group with fewer than 5 windows also leaves the statistics and the layout handed to Block 4; D-107 (user) -- Block 3 also reads each Long Square sweep's tilt, the line through the means of its 265 ms pre-window and its last 500 ms (error SD 0.0045 mV/s at theta_cf, check_ls_tilt_reading.py). The SS reading checked with the median subtraction and the later starts (check_ss_tilt_reading.py, theta_cf, the four reference layouts): the subtraction leaves it unchanged; RMS error 0.0027-0.0036 mV/s at 80 ms, 0.0031-0.0041 at 130 ms, 0.0034-0.0044 at 150 ms. Revise marks D-106, D-107.]"
   - id: N4
     title: "Block 4: the per-cell fit"
     summary: "Indirect inference per cell: the Harrell-Davis binding function on simulated continuous sweeps, the iterated inverse-covariance weights, the tilt's SD alternated with the law, three starts (D-048 to D-051, D-056)."
@@ -437,7 +439,7 @@ implementation:
     needs_theory: [T7, T8]
     needs_hpc: false
     jobs: []
-    note: "noise_fit.py; written 2026-10-23 (smoke F1-F10 10/10, ten mutations caught), pushed to main 2026-10-28 (a95e618). D-095: the simulator subtracts the mean of its simulated windows per sweep and polarity (revise mark). Open, the user to answer: the tilt's SD for 2-sweep cells -- per cell, one cohort value, or partial pooling across cells (put to the user 2026-10-23 and 2026-10-26). [answered 2026-10-28, D-102 (user): no tilt SD for the twins -- each twin sweep carries its real sweep's realised tilt; inside the fit the simulator would use the same per-sweep tilts and the tilt's SD would leave the alternation (proposal, open). D-103: the simulator subtracts the per-sweep, per-polarity median of its own windows; F2's expectation becomes a median-subtracted window's. Revise marks D-103, D-102.]"
+    note: "noise_fit.py; written 2026-10-23 (smoke F1-F10 10/10, ten mutations caught), pushed to main 2026-10-28 (a95e618). D-095: the simulator subtracts the mean of its simulated windows per sweep and polarity (revise mark). Open, the user to answer: the tilt's SD for 2-sweep cells -- per cell, one cohort value, or partial pooling across cells (put to the user 2026-10-23 and 2026-10-26). [answered 2026-10-28, D-102 (user): no tilt SD for the twins -- each twin sweep carries its real sweep's realised tilt; inside the fit the simulator would use the same per-sweep tilts and the tilt's SD would leave the alternation (proposal, open). D-103: the simulator subtracts the per-sweep, per-polarity median of its own windows; F2's expectation becomes a median-subtracted window's. Revise marks D-103, D-102.] [2026-10-29: D-107 (user) -- every simulated sweep, SS and LS, carries its real sweep's tilt in every replicate; the tilt SD, (T1) and the alternation leave the fit. Revise mark D-107.]"
   - id: N4b
     title: "Block 4b: the per-sweep stage"
     summary: "For each real sweep, the fast pair and the slow SD estimated on that sweep alone (the slow timescale held at the cell's), the slow SD shrunk towards the cell by the random-effects weight; the laws each twin sweep will carry (D-076 (i))."
@@ -456,7 +458,7 @@ implementation:
     needs_theory: [T5, T9]
     needs_hpc: false
     jobs: []
-    note: "Form of the per-sweep calibration open (D-073 comments (a)-(d)). [2026-10-28, D-102 (user): each twin sweep carries the realised tilt of its own real sweep, b_hat(c,s), not a draw from sigma_b(c); the Long Square sweeps' tilts open (proposal: delta_end_mV / 6.89 s). Revise mark D-102.]"
+    note: "Form of the per-sweep calibration open (D-073 comments (a)-(d)). [2026-10-28, D-102 (user): each twin sweep carries the realised tilt of its own real sweep, b_hat(c,s), not a draw from sigma_b(c); the Long Square sweeps' tilts open (proposal: delta_end_mV / 6.89 s). Revise mark D-102.] [2026-10-29: D-107 (user) -- an LS twin sweep carries the tilt of the line through its real sweep's pre-window and end-window means. Revise mark D-107.]"
   - id: N6
     title: "Block 6: driver, the S0-S3 checks and the PBS job"
     summary: "run_noise_fit.py fits the law for every cell of a group and writes the noise table; the sens_* scripts run the in-silico checks S0-S3 with their fixed predictions (D-055); one PBS job on davinci."
@@ -592,4 +594,46 @@ revisions:
     status_at: open
     decision: D-102
     note: "the twins no longer use sigma_b(c): the realised per-sweep tilts are copied, so the pooling options studied here are off the twins' path"
+    cleared:
+  - stage: N3
+    from: 
+    "on": 2026-10-29
+    at: 3e35c58533586d7679fa29058f2d229857a2a7d7
+    decision: D-106
+    note: "a group with fewer than 5 windows leaves the statistics and the layout handed to Block 4; a group dropped only for a failed fit keeps its windows"
+    cleared:
+  - stage: N3
+    from: 
+    "on": 2026-10-29
+    at: 3e35c58533586d7679fa29058f2d229857a2a7d7
+    decision: D-107
+    note: "read each Long Square sweep's tilt: the line through its pre-window and end-window means"
+    cleared:
+  - stage: N4
+    from: 
+    "on": 2026-10-29
+    at: 3e35c58533586d7679fa29058f2d229857a2a7d7
+    decision: D-107
+    note: "every simulated sweep carries its real sweep's tilt in every replicate; the tilt SD, (T1) and the alternation leave the fit"
+    cleared:
+  - stage: N5
+    from: 
+    "on": 2026-10-29
+    at: 3e35c58533586d7679fa29058f2d229857a2a7d7
+    decision: D-107
+    note: "the LS twins' tilts: the line through the real sweep's pre-window and end-window means"
+    cleared:
+  - stage: N2
+    from: 
+    "on": 2026-10-29
+    at: 3e35c58533586d7679fa29058f2d229857a2a7d7
+    decision: D-107
+    note: "a fixed tilt per trace (mV/s) as a simulator input (proposal)"
+    cleared:
+  - stage: T8
+    from: N4
+    "on": 2026-10-29
+    status_at: open
+    decision: D-107
+    note: "the fit drops the tilt SD and (T1) too: sigma_b(c) is estimated nowhere"
     cleared:
