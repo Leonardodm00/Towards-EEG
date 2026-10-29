@@ -1,0 +1,7 @@
+sigma_b 0.0 mV/s,  2 sweeps: as decided t_star - t0 median  +0.8 ms, fallback   1 % | tilt removed first:  +0.8 ms [ -14.3,  +16.7], fallback   1 %   (41 s)
+sigma_b 0.0 mV/s,  6 sweeps: as decided t_star - t0 median  +0.5 ms, fallback   0 % | tilt removed first:  +0.6 ms [  -9.0,   +9.7], fallback   0 %   (170 s)
+sigma_b 0.0 mV/s, 10 sweeps: as decided t_star - t0 median  +0.8 ms, fallback   0 % | tilt removed first:  +0.9 ms [  -8.0,   +8.1], fallback   0 %   (367 s)
+sigma_b 0.1 mV/s,  2 sweeps: as decided t_star - t0 median  +3.6 ms, fallback  15 % | tilt removed first:  +3.1 ms [ -23.0,  +36.1], fallback  17 %   (405 s)
+sigma_b 0.1 mV/s,  6 sweeps: as decided t_star - t0 median  -0.3 ms, fallback   2 % | tilt removed first:  -0.1 ms [ -10.7,  +15.5], fallback   1 %   (519 s)
+sigma_b 0.1 mV/s, 10 sweeps: as decided t_star - t0 median  -0.3 ms, fallback   1 % | tilt removed first:  -0.2 ms [ -11.9,  +12.8], fallback   1 %   (704 s)
+P1 FAIL  P2 PASS   (704 s)

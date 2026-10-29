@@ -1,0 +1,8 @@
+A  sigma_b 0.0 mV/s, 2 sweeps: SD of t_sp - t0 plain  19.2 ms, offsets removed  19.2 ms; fallback plain   2 %, offsets removed   2 %
+A  sigma_b 0.0 mV/s, 6 sweeps: SD of t_sp - t0 plain  18.1 ms, offsets removed  18.1 ms; fallback plain   1 %, offsets removed   1 %
+A  sigma_b 0.1 mV/s, 2 sweeps: SD of t_sp - t0 plain  35.9 ms, offsets removed  22.2 ms; fallback plain   8 %, offsets removed   4 %
+A  sigma_b 0.1 mV/s, 6 sweeps: SD of t_sp - t0 plain  41.6 ms, offsets removed  21.8 ms; fallback plain   2 %, offsets removed   0 %
+B  b 0.00 mV/s: mean sigma_hat^2 / sigma_f^2 after the median subtraction: plain 0.9607, offsets removed 0.9607
+B  b 0.02 mV/s: mean sigma_hat^2 / sigma_f^2 after the median subtraction: plain 0.9895, offsets removed 0.9618
+B  b 0.10 mV/s: mean sigma_hat^2 / sigma_f^2 after the median subtraction: plain 1.2671, offsets removed 0.9611
+PA1 FAIL  PB1 FAIL  PB2 PASS   (211 s)

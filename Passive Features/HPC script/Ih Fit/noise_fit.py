@@ -1,20 +1,23 @@
 """noise_fit -- Block 4 of specs/SPEC.md: the per-cell fit of the noise law
 by indirect inference with the simulated inverse-covariance weight (D-033,
-D-048 to D-051, D-056; section 2.3 of the spec, items (a)-(h)).
+D-048 to D-051, D-056; the layout and the simulator D-103, D-106, D-107.2;
+section 2.3 of the spec, items (a)-(h)).
 
 In plain words: the real cell gives one vector of 15 noise statistics,
 q_hat(c). For a candidate law theta we simulate a cell with exactly the real
-cell's layout (its SS sweeps as continuous 37-pulse trains, its stored
-windows at their positions, its LS pre-windows), reduce it with the same
-estimators, and move theta until the simulated vector matches the real one,
-each statistic weighted by how much it would scatter if the law were true
-(the inverse of the simulated covariance). The tilt sigma_b is read off the
-semivariogram of the window means after every solve and fed back into the
-simulator. The per-sweep stage of D-076 (i) is Block 4b (noise_sweep_fit).
+cell's layout (its SS sweeps as continuous 37-pulse trains, its kept windows
+at their positions, its LS pre-windows), give every simulated sweep the tilt
+read on its real sweep (D-107.2), subtract from each window its group's
+median window as the data had it subtracted (D-103.1), reduce it with the
+same estimators, and move theta until the simulated vector matches the real
+one, each statistic weighted by how much it would scatter if the law were
+true (the inverse of the simulated covariance). Nothing about the tilt is
+estimated here. The per-sweep stage of D-076 (i) is Block 4b
+(noise_sweep_fit).
 
 Layers: model and analysis only -- no file I/O (an optional `log` callable
 is the only output channel besides the result), no plotting. Units: theta in
-mV, --, mV, s; sigma_b in mV/s; the fit coordinates u = (log sigma_f, rho_f,
+mV, --, mV, s; tilts in mV/s; the fit coordinates u = (log sigma_f, rho_f,
 log sigma_s, log tau_s). Pure ASCII, LF.
 """
 from __future__ import annotations
@@ -32,7 +35,8 @@ from scipy.stats.mstats import hdquantiles
 import noise_cell_stats as ncs
 import noise_law
 from noise_law import NoiseLaw
-from noise_windows import LSWindows, SSWindows, WindowConfig, subtract_mean_response
+from noise_cell_stats import SweepTilts
+from noise_windows import LSWindows, SSNoiseWindows, SSWindows, WindowConfig, subtract_median_response
 
 LOG_1E4 = math.log(1e-4)
 LOG_10 = math.log(10.0)
@@ -64,7 +68,6 @@ class NoiseFitConfig:
     log_sigma_bounds: Tuple[float, float] = (LOG_1E4, LOG_10)
     rho_bounds: Tuple[float, float] = (1e-3, 0.999)
     log_tau_bounds: Tuple[float, float] = (LOG_1E4, LOG_10)
-    lag_periods: int = 4
     chunk_windows: int = 500
     seed: int = 20261023
     window_cfg: WindowConfig = WindowConfig()
@@ -106,7 +109,10 @@ class CellLayout:
     SS: n_sweeps continuous sweeps of L_s = (train_length - 1) P + n_w
     samples; window k (0-based position p_k in sweep s_k) is the enlarged
     window [p_k P + j0, p_k P + n_w) of that sweep's trace, m = n_w - j0
-    samples. LS: K_LS independent pre-windows of n_ls samples each.
+    samples; the windows are the KEPT ones (D-106.1). LS: K_LS pre-windows of
+    n_ls samples each. Every sweep carries its real sweep's tilt (mV/s,
+    D-107.2): ss_tilt[i] for sweep_numbers[i], ls_tilt[k] for
+    ls_sweep_number[k].
     """
     specimen_id: int
     fs: float
@@ -116,13 +122,15 @@ class CellLayout:
     j0: int
     period_samples: int
     train_length: int
-    sweep_numbers: Tuple[int, ...]         # SS sweeps, in the data's order
+    sweep_numbers: Tuple[int, ...]         # SS sweeps with kept windows, in the data's order
     sweep_index: np.ndarray                # (K,) index into sweep_numbers, per window
     position: np.ndarray                   # (K,) position in the train, per window
     polarity_is_dep: np.ndarray            # (K,)
     sweep_number: np.ndarray               # (K,) sweep number per window
     n_ls: int                              # samples of an LS pre-window (0 when the cell has none)
     ls_sweep_number: np.ndarray            # (K_LS,)
+    ss_tilt: np.ndarray                    # (n_sweeps,) mV/s, the tilt of each SS sweep (TL1)
+    ls_tilt: np.ndarray                    # (K_LS,) mV/s, the tilt of each LS sweep (TL2)
 
     @property
     def K(self) -> int:
@@ -145,91 +153,139 @@ class CellLayout:
         return int((self.train_length - 1) * self.period_samples + self.n_w)
 
     @classmethod
-    def from_windows(cls, ss: SSWindows, ls: Optional[LSWindows], t_ss_ms: float) -> "CellLayout":
+    def from_windows(cls, ss: SSWindows, ls: Optional[LSWindows], t_ss_ms: float,
+                     ss_tilts: SweepTilts, ls_tilts: Optional[SweepTilts]) -> "CellLayout":
+        """The layout of the kept windows `ss` (Block 3's SSNoiseWindows.ss) and
+        the LS pre-windows, with every sweep's tilt from Block 3's readings.
+        Refused (ValueError, with the reason) when a sweep has no tilt or a
+        NaN one (an unreadable tilt: the reading's flag is quoted)."""
         j0 = ss.pre_n + int(round(t_ss_ms * 1e-3 * ss.fs))
         if j0 >= ss.n_w - 1:
             raise ValueError("t_SS = %g ms leaves no enlarged window" % t_ss_ms)
+        if ss.n_windows == 0:
+            raise ValueError("no kept SS window: the cell cannot be fitted")
         sweep_numbers = tuple(int(s) for s in dict.fromkeys(int(x) for x in ss.sweep_number))
         index_of = {s: i for i, s in enumerate(sweep_numbers)}
         sweep_index = np.array([index_of[int(s)] for s in ss.sweep_number], dtype=int)
         position = np.asarray(ss.position, dtype=int)
         if position.min() < 0 or position.max() >= ss.train_length:
             raise ValueError("a stored position lies outside the train")
+        ss_tilt = _tilts_for(sweep_numbers, ss_tilts, "SS")
         if ls is None or len(ls.pre) == 0:
-            n_ls, ls_sweeps = 0, np.zeros(0, dtype=int)
+            n_ls, ls_sweeps, ls_tilt = 0, np.zeros(0, dtype=int), np.zeros(0)
         else:
             lengths = np.array([int(p.size) for p in ls.pre])
             if np.unique(lengths).size != 1:
                 raise ValueError("LS pre-windows of unequal length %s; Block 4 needs one n_LS per cell"
                                  % sorted(set(lengths.tolist())))
             n_ls, ls_sweeps = int(lengths[0]), np.asarray(ls.sweep_number, dtype=int)
+            if ls_tilts is None:
+                raise ValueError("the LS sweeps need their tilts (Block 3's ls_sweep_tilts)")
+            ls_tilt = _tilts_for(tuple(int(x) for x in ls_sweeps), ls_tilts, "LS")
         return cls(specimen_id=int(ss.specimen_id), fs=float(ss.fs), dt=float(ss.dt), n_w=int(ss.n_w),
                    pre_n=int(ss.pre_n), j0=int(j0), period_samples=int(ss.period_samples),
                    train_length=int(ss.train_length), sweep_numbers=sweep_numbers, sweep_index=sweep_index,
                    position=position, polarity_is_dep=np.asarray(ss.polarity_is_dep, dtype=bool),
-                   sweep_number=np.asarray(ss.sweep_number, dtype=int), n_ls=n_ls, ls_sweep_number=ls_sweeps)
+                   sweep_number=np.asarray(ss.sweep_number, dtype=int), n_ls=n_ls, ls_sweep_number=ls_sweeps,
+                   ss_tilt=ss_tilt, ls_tilt=ls_tilt)
+
+    @classmethod
+    def from_cell(cls, nwin: SSNoiseWindows, ls: Optional[LSWindows]) -> "CellLayout":
+        """from_windows on Block 3's outputs: the kept windows of `nwin`, its
+        t_SS(c), the SS tilts read on its X_tilde (TL1) and the LS tilts (TL2)."""
+        ss_t = ncs.ss_sweep_tilts(nwin.X_tilde, nwin.ss, nwin.j0)
+        ls_t = ncs.ls_sweep_tilts(ls) if ls is not None and len(ls.pre) else None
+        return cls.from_windows(nwin.ss, ls, nwin.start.t_ss_ms, ss_t, ls_t)
+
+
+def _tilts_for(sweeps: Tuple[int, ...], tilts: SweepTilts, protocol: str) -> np.ndarray:
+    """The tilt (mV/s) of each sweep, in the order given; ValueError when one
+    is missing or NaN (its reading's flag quoted)."""
+    b = tilts.as_dict()
+    out = np.empty(len(sweeps))
+    for i, s in enumerate(sweeps):
+        if s not in b:
+            raise ValueError("%s sweep %d has no tilt reading" % (protocol, s))
+        if not np.isfinite(b[s]):
+            why = [f for f in tilts.flags if (":%d" % s) in f]
+            raise ValueError("the tilt of %s sweep %d could not be read (%s); the fit refuses the cell"
+                             % (protocol, s, ", ".join(why) or "NaN"))
+        out[i] = float(b[s])
+    return out
 
 
 @dataclass(eq=False)
 class CellTarget:
-    """The data side: q_hat(c), the per-window matrices behind it (for W_0's
-    bootstrap) and the semivariogram of the window means."""
+    """The data side: q_hat(c) and the per-window matrices behind it (for W_0's
+    bootstrap)."""
     q_hat: np.ndarray            # (15,)
     per_window_ss: np.ndarray    # (K, 5)
     per_window_ls: np.ndarray    # (K_LS, 10)
-    V_hat: float
-    N_pairs: int
     labels: Tuple[str, ...] = ncs.STAT_LABELS
 
     @classmethod
-    def from_stats(cls, ss_stats: np.ndarray, ls_stats: np.ndarray, layout: CellLayout, V_hat: float,
-                   N_pairs: int, window_cfg: WindowConfig = WindowConfig()) -> "CellTarget":
+    def from_stats(cls, ss_stats: np.ndarray, ls_stats: np.ndarray, layout: CellLayout,
+                   window_cfg: WindowConfig = WindowConfig()) -> "CellTarget":
         ss_stats = np.asarray(ss_stats, dtype=float).reshape(-1, N_SS)
         ls_stats = np.asarray(ls_stats, dtype=float).reshape(-1, N_LS)
         sv = ncs.statistic_vector(ss_stats, layout.m, ls_stats, max(layout.n_ls, 1), window_cfg, layout.fs)
-        return cls(q_hat=sv.q, per_window_ss=ss_stats, per_window_ls=ls_stats, V_hat=float(V_hat),
-                   N_pairs=int(N_pairs))
+        return cls(q_hat=sv.q, per_window_ss=ss_stats, per_window_ls=ls_stats)
+
+    @classmethod
+    def from_cell(cls, nwin: SSNoiseWindows, ls: Optional[LSWindows], layout: CellLayout,
+                  window_cfg: WindowConfig = WindowConfig()) -> "CellTarget":
+        """The statistics of Block 3's kept, subtracted windows and of the LS
+        pre-windows (the same estimators the simulator's windows go through)."""
+        ss_stats = ncs.ss_window_stats(nwin.X_tilde, nwin.ss.fs)
+        ls_stats = ncs.ls_window_stats(ls.pre, ls.fs, window_cfg) if ls is not None and len(ls.pre) else np.zeros((0, N_LS))
+        return cls.from_stats(ss_stats, ls_stats, layout, window_cfg)
 
 
 # ===========================================================================
 #  The simulator of one replicate cell at the real layout (D-056 (i))
 # ===========================================================================
-def simulate_cell_windows(law: NoiseLaw, sigma_b: float, layout: CellLayout, rng: np.random.Generator,
+def simulate_cell_windows(law: NoiseLaw, layout: CellLayout, rng: np.random.Generator,
                           *, parts: Sequence[str] = ("ss", "ls"), window_cfg: WindowConfig = WindowConfig(),
                           return_windows: bool = False):
     """One replicate cell: (ss_stats (K, 5), ls_stats (K_LS, 10)); with
-    return_windows also the subtracted SS windows X_tilde (K, m).
+    return_windows also the subtracted SS windows X_tilde (K, m) and the LS
+    traces (K_LS, n_ls).
 
     SS: each sweep is one continuous trace of L_s samples from
-    `noise_law.simulate_sweep` (fast + slow + its own tilt draw; the offset is
-    invisible and left out), the enlarged windows are cut at the stored
-    positions and the per-polarity mean window of this replicate's own
-    windows is subtracted (D-051 (iv)). LS: K_LS independent traces of n_ls
-    samples, one tilt draw each. Draw order: the SS sweeps in layout order,
-    then the LS windows -- fixed, so a seed gives the same draws for any law.
+    `noise_law.simulate_sweep` (fast + slow, and the real sweep's tilt
+    layout.ss_tilt as a fixed number, D-107.2; the offset is invisible and
+    left out); the enlarged windows are cut at the kept positions and each
+    group's median window -- the per-sample median over this replicate's own
+    windows of that sweep and polarity -- is subtracted (D-103.1, D-051 (iv)).
+    LS: K_LS traces of n_ls samples, trace k with the tilt layout.ls_tilt[k].
+    Draw order: the SS sweeps in layout order, then the LS windows (the unit
+    tilt draws are made and left unused) -- fixed, so a seed gives the same
+    draws for any law.
     """
     ss_stats = np.zeros((0, N_SS))
     ls_stats = np.zeros((0, N_LS))
     X_tilde = None
+    ls_traces = None
     if "ss" in parts and layout.K > 0:
         X = np.empty((layout.K, layout.m))
         P, j0, n_w = layout.period_samples, layout.j0, layout.n_w
         for s_idx in range(layout.n_sweeps):
             units = noise_law.draw_units(rng, 1, layout.L_s)
-            trace = noise_law.simulate_sweep(law, layout.dt, layout.L_s, units, 0, sigma_b=sigma_b, sigma_a=0.0)
+            trace = noise_law.simulate_sweep(law, layout.dt, layout.L_s, units, 0,
+                                             tilt_mV_per_s=float(layout.ss_tilt[s_idx]))
             # Custom: layout-true cutting -- window at position p is [p P + j0, p P + n_w).
             for k in np.flatnonzero(layout.sweep_index == s_idx):
                 p = int(layout.position[k])
                 X[k] = trace[p * P + j0:p * P + n_w]
-        X_tilde, _, _ = subtract_mean_response(X, layout.polarity_is_dep)
+        X_tilde, _ = subtract_median_response(X, layout.polarity_is_dep, layout.sweep_number)
         ss_stats = ncs.ss_window_stats(X_tilde, layout.fs)
     if "ls" in parts and layout.K_LS > 0:
         units = noise_law.draw_units(rng, layout.K_LS, layout.n_ls)
-        traces = noise_law.simulate_traces(law, layout.dt, units.fast, units.slow,
-                                           xi_tilt=units.tilt, sigma_b=sigma_b)
-        ls_stats = ncs.ls_window_stats(list(traces), layout.fs, window_cfg)
+        ls_traces = noise_law.simulate_traces(law, layout.dt, units.fast, units.slow,
+                                              tilt_mV_per_s=layout.ls_tilt)
+        ls_stats = ncs.ls_window_stats(list(ls_traces), layout.fs, window_cfg)
     if return_windows:
-        return ss_stats, ls_stats, X_tilde
+        return ss_stats, ls_stats, X_tilde, ls_traces
     return ss_stats, ls_stats
 
 
@@ -253,15 +309,16 @@ def hd_median(A: np.ndarray) -> np.ndarray:
     return out
 
 
-def binding_function(law: NoiseLaw, sigma_b: float, layout: CellLayout, cfg: NoiseFitConfig, seed: int,
+def binding_function(law: NoiseLaw, layout: CellLayout, cfg: NoiseFitConfig, seed: int,
                      *, which: str = "both", return_pool: bool = False):
     """q_sim(theta) (15,): the SS part on M_cells = ceil(M / K) replicate cells
-    at the real layout (pooled windows), the LS part on M independent
-    pre-windows; the Harrell-Davis median per statistic. Common random
+    at the real layout and tilts (pooled windows), the LS part on N_LS =
+    ceil(M / K_LS) K_LS pre-windows, window i with the tilt of the cell's LS
+    sweep i mod K_LS; the Harrell-Davis median per statistic. Common random
     numbers: `default_rng` is rebuilt from `seed` (two children: SS, LS) at
     every call, so the same (layout, seed) gives the same draws for any law.
     which: 'ss', 'ls' or 'both' (the other part stays NaN). With return_pool
-    also (pool_ss (M_cells K, 5), pool_ls (M, 10))."""
+    also (pool_ss (M_cells K, 5), pool_ls (N_LS, 10))."""
     ss_seed, ls_seed = [int(c.generate_state(1, dtype=np.uint64)[0])
                         for c in np.random.SeedSequence(int(seed)).spawn(2)]
     q = np.full(N_STATS, np.nan)
@@ -272,21 +329,24 @@ def binding_function(law: NoiseLaw, sigma_b: float, layout: CellLayout, cfg: Noi
         m_cells = int(math.ceil(cfg.M_binding / layout.K))
         pools = []
         for _ in range(m_cells):
-            s, _l = simulate_cell_windows(law, sigma_b, layout, rng, parts=("ss",), window_cfg=cfg.window_cfg)
+            s, _l = simulate_cell_windows(law, layout, rng, parts=("ss",), window_cfg=cfg.window_cfg)
             pools.append(s)
         pool_ss = np.vstack(pools)
         q[:N_SS] = hd_median(pool_ss)
     if which in ("ls", "both") and layout.K_LS > 0:
         rng = np.random.default_rng(ls_seed)
+        # Custom: the LS tilts cycled through the pool -- replicate sets of the cell's LS sweeps (D-107.2).
+        n_total = int(math.ceil(cfg.M_binding / layout.K_LS)) * layout.K_LS
+        tilt_of = layout.ls_tilt[np.arange(n_total) % layout.K_LS]
         pools = []
-        left = int(cfg.M_binding)
-        while left > 0:
-            n = min(left, int(cfg.chunk_windows))
+        start = 0
+        while start < n_total:
+            n = min(n_total - start, int(cfg.chunk_windows))
             units = noise_law.draw_units(rng, n, layout.n_ls)
             traces = noise_law.simulate_traces(law, layout.dt, units.fast, units.slow,
-                                               xi_tilt=units.tilt, sigma_b=sigma_b)
+                                               tilt_mV_per_s=tilt_of[start:start + n])
             pools.append(ncs.ls_window_stats(list(traces), layout.fs, cfg.window_cfg))
-            left -= n
+            start += n
         pool_ls = np.vstack(pools)
         q[N_SS:] = hd_median(pool_ls)
     if return_pool:
@@ -324,9 +384,9 @@ class SigmaResult:
     per_sweep: Dict[int, np.ndarray] = field(default_factory=dict)   # sweep -> (R, 5) SS or (R, 10) LS
 
 
-def simulated_covariance(law: NoiseLaw, sigma_b: float, layout: CellLayout, R: int, rng: np.random.Generator,
+def simulated_covariance(law: NoiseLaw, layout: CellLayout, R: int, rng: np.random.Generator,
                          *, per_sweep: bool = False, window_cfg: WindowConfig = WindowConfig()) -> SigmaResult:
-    """R replicate cells at the real layout, each reduced by
+    """R replicate cells at the real layout and tilts, each reduced by
     `noise_cell_stats.statistic_vector`; sample covariance with ddof 1. With
     per_sweep, also every sweep's vector per replicate (SS: the medians over
     that sweep's windows; LS: its one window's 10 values) for Block 4b."""
@@ -336,7 +396,7 @@ def simulated_covariance(law: NoiseLaw, sigma_b: float, layout: CellLayout, R: i
     vectors = np.empty((R, N_STATS))
     sweep_rows: Dict[int, List[np.ndarray]] = {}
     for r in range(R):
-        ss_stats, ls_stats = simulate_cell_windows(law, sigma_b, layout, rng, window_cfg=window_cfg)
+        ss_stats, ls_stats = simulate_cell_windows(law, layout, rng, window_cfg=window_cfg)
         sv = ncs.statistic_vector(ss_stats, layout.m, ls_stats, max(layout.n_ls, 1), window_cfg, layout.fs)
         vectors[r] = sv.q
         if per_sweep:
@@ -368,35 +428,6 @@ def correlation_condition_number(Sigma: np.ndarray) -> float:
 
 
 # ===========================================================================
-#  The tilt from the semivariogram (T1)
-# ===========================================================================
-@dataclass
-class TiltResult:
-    sigma_b: float
-    V_model: float
-    V_hat: float
-    h_star: float
-    flags: Tuple[str, ...]
-
-
-def tilt_from_semivariogram(V_hat: float, N_pairs: int, law: NoiseLaw, layout: CellLayout,
-                            lag_periods: int = 4) -> TiltResult:
-    """sigma_b_hat^2 = 2 [V_hat_c(h*) - V(h* | theta, 0)] / h*^2, h* =
-    lag_periods P Delta_t, V exact for the sampled law
-    (`noise_law.semivariogram(law, dt, m, m, lag_periods P)`); clipped at 0
-    ('tilt_clipped'); sigma_b = 0 without a pair ('tilt_no_pairs')."""
-    offset = int(lag_periods) * layout.period_samples
-    h_star = offset * layout.dt
-    V_model = noise_law.semivariogram(law, layout.dt, layout.m, layout.m, offset)
-    if N_pairs < 1 or not np.isfinite(V_hat):
-        return TiltResult(0.0, V_model, float(V_hat), h_star, ("tilt_no_pairs",))
-    sb2 = 2.0 * (float(V_hat) - V_model) / h_star ** 2
-    if sb2 < 0.0:
-        return TiltResult(0.0, V_model, float(V_hat), h_star, ("tilt_clipped",))
-    return TiltResult(math.sqrt(sb2), V_model, float(V_hat), h_star, ())
-
-
-# ===========================================================================
 #  The inner problem: argmin of (F1) at a fixed weight
 # ===========================================================================
 @dataclass(eq=False)
@@ -412,14 +443,14 @@ class InnerResult:
     at_bound: Tuple[str, ...]
 
 
-def _whitened_residual(u: np.ndarray, q_hat: np.ndarray, C: np.ndarray, mask: np.ndarray, sigma_b: float,
+def _whitened_residual(u: np.ndarray, q_hat: np.ndarray, C: np.ndarray, mask: np.ndarray,
                        layout: CellLayout, cfg: NoiseFitConfig, seed: int) -> np.ndarray:
-    q = binding_function(u_to_law(u), sigma_b, layout, cfg, seed)
+    q = binding_function(u_to_law(u), layout, cfg, seed)
     r = q[mask] - q_hat[mask]
     return linalg.solve_triangular(C, r, lower=True)
 
 
-def solve_inner(q_hat: np.ndarray, C: np.ndarray, starts: Sequence[NoiseLaw], sigma_b: float,
+def solve_inner(q_hat: np.ndarray, C: np.ndarray, starts: Sequence[NoiseLaw],
                 layout: CellLayout, cfg: NoiseFitConfig, seed: int, mask: np.ndarray,
                 residual: Optional[Callable[[np.ndarray], np.ndarray]] = None) -> InnerResult:
     """argmin_u J_W = |C^{-1} (q_sim(u) - q_hat)|^2 over the kept statistics
@@ -429,7 +460,7 @@ def solve_inner(q_hat: np.ndarray, C: np.ndarray, starts: Sequence[NoiseLaw], si
     start)."""
     lo, hi = cfg.bounds()
     fun = residual if residual is not None else (
-        lambda u: _whitened_residual(u, q_hat, C, mask, sigma_b, layout, cfg, seed))
+        lambda u: _whitened_residual(u, q_hat, C, mask, layout, cfg, seed))
     best = None
     tried: List[Tuple[np.ndarray, float]] = []
     for i, start in enumerate(starts):
@@ -474,7 +505,6 @@ class CellFitResult:
     specimen_id: int
     law: NoiseLaw
     u: np.ndarray
-    sigma_b: float
     J: float
     dof: int
     p_value: float
@@ -485,6 +515,8 @@ class CellFitResult:
     q_hat: np.ndarray                      # (15,)
     q_sim: np.ndarray                      # (15,) at the solution
     SE: np.ndarray                         # (15,) W_0's bootstrap SE (NaN where dropped)
+    ss_tilt: Dict[int, float]              # sweep -> mV/s, the SS tilts the simulator carried (D-107.2)
+    ls_tilt: Dict[int, float]              # sweep -> mV/s, the LS tilts the simulator carried
     n_solves: int
     converged: bool
     flags: Tuple[str, ...]
@@ -507,11 +539,14 @@ class CellFitResult:
             "specimen_id": int(self.specimen_id),
             "law": {"sigma_f_mV": self.law.sigma_f, "rho_f": self.law.rho_f, "sigma_s_mV": self.law.sigma_s,
                     "tau_s_s": self.law.tau_s},
-            "u": arr(self.u), "sigma_b_mV_per_s": num(self.sigma_b), "J": num(self.J), "dof": int(self.dof),
+            "u": arr(self.u), "J": num(self.J), "dof": int(self.dof),
             "p_value": num(self.p_value), "kappa": num(self.kappa),
             "Sigma": [arr(row) for row in np.asarray(self.Sigma)], "labels_kept": list(self.labels_kept),
             "stats_dropped": list(self.stats_dropped), "q_hat": arr(self.q_hat), "q_sim": arr(self.q_sim),
-            "SE": arr(self.SE), "n_solves": int(self.n_solves), "converged": bool(self.converged),
+            "SE": arr(self.SE),
+            "ss_tilt_mV_per_s": {str(k): num(v) for k, v in self.ss_tilt.items()},
+            "ls_tilt_mV_per_s": {str(k): num(v) for k, v in self.ls_tilt.items()},
+            "n_solves": int(self.n_solves), "converged": bool(self.converged),
             "flags": list(self.flags),
             "history": [{k: (arr(v) if isinstance(v, np.ndarray) else v) for k, v in h.items()} for h in self.history],
             "per_sweep_cov": {str(s): [arr(row) for row in np.asarray(c)] for s, c in self.per_sweep_cov.items()},
@@ -532,9 +567,10 @@ def fit_cell(target: CellTarget, layout: CellLayout, cfg: NoiseFitConfig = Noise
              log: Optional[Callable[[str], None]] = None) -> CellFitResult:
     """The per-cell fit of section 2.3: W_0 from the window bootstrap, the
     closed-form start and its two tau_s variants, the W_0 solve, then
-    Sigma_hat-weighted solves (R_iter) with the tilt re-read after each, until
-    max |Delta u| <= tol_u or k_max solves ('no_plateau'), then the final step
-    at R_final (Sigma_hat, one solve, J, kappa, the chi-square tail)."""
+    Sigma_hat-weighted solves (R_iter) until max |Delta u| <= tol_u or k_max
+    solves ('no_plateau'), then the final step at R_final (Sigma_hat, one
+    solve, J, kappa, the chi-square tail). The simulator carries the layout's
+    real tilts throughout; no tilt is estimated (D-107.2)."""
     t_start = time.time()
     say = log if log is not None else (lambda s: None)
     seed_binding, seed_boot, seed_sigma_root = _child_seeds(cfg.seed, layout.specimen_id, 3)
@@ -561,7 +597,7 @@ def fit_cell(target: CellTarget, layout: CellLayout, cfg: NoiseFitConfig = Noise
             law0 = closed_form_start(q_hat, SE, prelim, layout, cfg)
         else:
             law0 = NoiseLaw(0.04, 0.2, 0.05, 0.04)
-        _q, pool_ss, pool_ls = binding_function(law0, 0.0, layout, cfg, seed_binding, return_pool=True)
+        _q, pool_ss, pool_ls = binding_function(law0, layout, cfg, seed_binding, return_pool=True)
         sd = np.full(N_STATS, np.nan)
         if pool_ss.shape[0] >= 2:
             sd[:N_SS] = np.nanstd(pool_ss, axis=0, ddof=1) * 1.2533 / math.sqrt(max(layout.K, 1))
@@ -578,31 +614,28 @@ def fit_cell(target: CellTarget, layout: CellLayout, cfg: NoiseFitConfig = Noise
         raise ValueError("only %d usable statistics; the fit needs at least 5" % d_eff)
     SE_masked = np.where(mask, SE, np.nan)
 
-    # --- the closed-form start and the tilt at it
+    # --- the closed-form start
     law_cf = closed_form_start(q_hat, SE, mask, layout, cfg)
-    tilt = tilt_from_semivariogram(target.V_hat, target.N_pairs, law_cf, layout, cfg.lag_periods)
-    say("start (closed form): %s  sigma_b %.4g mV/s %s" % (law_cf, tilt.sigma_b, tilt.flags))
+    say("start (closed form): %s" % (law_cf,))
 
     history: List[Dict[str, object]] = []
 
-    def record(kind, inner, tilt_res, R, t0):
+    def record(kind, inner, R, t0):
         history.append({"solve": len(history), "weight": kind, "R": int(R), "u": np.array(inner.u),
-                        "J": float(inner.J), "sigma_b": float(tilt_res.sigma_b), "nfev": int(inner.nfev),
+                        "J": float(inner.J), "nfev": int(inner.nfev),
                         "start_index": int(inner.start_index), "status": int(inner.status),
-                        "at_bound": list(inner.at_bound), "tilt_flags": list(tilt_res.flags),
-                        "seconds": float(time.time() - t0)})
-        say("solve %d (%s, R=%d): u=%s J=%.4g sigma_b=%.4g nfev=%d start=%d %s %.0f s"
-            % (len(history) - 1, kind, R, np.array2string(inner.u, precision=4), inner.J, tilt_res.sigma_b,
+                        "at_bound": list(inner.at_bound), "seconds": float(time.time() - t0)})
+        say("solve %d (%s, R=%d): u=%s J=%.4g nfev=%d start=%d %s %.0f s"
+            % (len(history) - 1, kind, R, np.array2string(inner.u, precision=4), inner.J,
                inner.nfev, inner.start_index, inner.at_bound, time.time() - t0))
 
     # --- solve 0: W_0 = diag(1 / SE^2), three starts
     t0 = time.time()
     C0 = np.diag(SE[mask])
-    inner = solve_inner(q_hat, C0, _starts_around(law_cf, 3), tilt.sigma_b, layout, cfg, seed_binding, mask)
-    tilt = tilt_from_semivariogram(target.V_hat, target.N_pairs, inner.law, layout, cfg.lag_periods)
-    record("W0", inner, tilt, 0, t0)
+    inner = solve_inner(q_hat, C0, _starts_around(law_cf, 3), layout, cfg, seed_binding, mask)
+    record("W0", inner, 0, t0)
     u_prev = inner.u.copy()
-    law, sigma_b = inner.law, tilt.sigma_b
+    law = inner.law
 
     # --- Sigma_hat-weighted solves
     converged = False
@@ -610,16 +643,15 @@ def fit_cell(target: CellTarget, layout: CellLayout, cfg: NoiseFitConfig = Noise
     for k in range(1, cfg.k_max + 1):
         t0 = time.time()
         rng_k = np.random.default_rng(sigma_seqs[k - 1])
-        sig = simulated_covariance(law, sigma_b, layout, cfg.R_iter, rng_k, window_cfg=cfg.window_cfg)
+        sig = simulated_covariance(law, layout, cfg.R_iter, rng_k, window_cfg=cfg.window_cfg)
         C, jit = _cholesky_lower(sig.Sigma[np.ix_(mask, mask)])
         chol_jitter = chol_jitter or jit
-        inner = solve_inner(q_hat, C, _starts_around(law, cfg.starts_after_first), sigma_b, layout, cfg,
+        inner = solve_inner(q_hat, C, _starts_around(law, cfg.starts_after_first), layout, cfg,
                             seed_binding, mask)
-        tilt = tilt_from_semivariogram(target.V_hat, target.N_pairs, inner.law, layout, cfg.lag_periods)
-        record("Sigma_%d" % k, inner, tilt, cfg.R_iter, t0)
+        record("Sigma_%d" % k, inner, cfg.R_iter, t0)
         du = float(np.max(np.abs(inner.u - u_prev)))
         u_prev = inner.u.copy()
-        law, sigma_b = inner.law, tilt.sigma_b
+        law = inner.law
         if du <= cfg.tol_u:
             converged = True
             break
@@ -629,31 +661,31 @@ def fit_cell(target: CellTarget, layout: CellLayout, cfg: NoiseFitConfig = Noise
     # --- final step at R_final
     t0 = time.time()
     rng_f = np.random.default_rng(sigma_seqs[cfg.k_max + 1])
-    sig = simulated_covariance(law, sigma_b, layout, cfg.R_final, rng_f, per_sweep=True, window_cfg=cfg.window_cfg)
+    sig = simulated_covariance(law, layout, cfg.R_final, rng_f, per_sweep=True, window_cfg=cfg.window_cfg)
     Sigma_m = sig.Sigma[np.ix_(mask, mask)]
     C, jit = _cholesky_lower(Sigma_m)
     chol_jitter = chol_jitter or jit
-    inner = solve_inner(q_hat, C, [law], sigma_b, layout, cfg, seed_binding, mask)
-    tilt = tilt_from_semivariogram(target.V_hat, target.N_pairs, inner.law, layout, cfg.lag_periods)
-    record("final", inner, tilt, cfg.R_final, t0)
-    law, sigma_b = inner.law, tilt.sigma_b
+    inner = solve_inner(q_hat, C, [law], layout, cfg, seed_binding, mask)
+    record("final", inner, cfg.R_final, t0)
+    law = inner.law
     if chol_jitter:
         flags.append("sigma_jitter")
     if inner.at_bound:
         flags.append("at_bound:" + ",".join(inner.at_bound))
-    flags.extend(tilt.flags)
     dof = d_eff - 4
     kappa = correlation_condition_number(Sigma_m)
-    # the reported pair is (theta_hat, sigma_b re-read at theta_hat): q_sim and J
-    # are evaluated at that pair (the solve's own J, at the previous sigma_b, is in the history)
-    q_sim = binding_function(law, sigma_b, layout, cfg, seed_binding)
+    # q_sim and J at the reported theta_hat with the final Sigma_hat
+    q_sim = binding_function(law, layout, cfg, seed_binding)
     r_w = linalg.solve_triangular(C, (q_sim - q_hat)[mask], lower=True)
     J = float(r_w @ r_w)
     p_value = float(chi2.sf(J, dof)) if dof > 0 else float("nan")
     per_sweep_cov = {s: np.cov(v, rowvar=False, ddof=1) for s, v in sig.per_sweep.items()}
-    return CellFitResult(specimen_id=layout.specimen_id, law=law, u=inner.u, sigma_b=sigma_b, J=J, dof=dof,
+    return CellFitResult(specimen_id=layout.specimen_id, law=law, u=inner.u, J=J, dof=dof,
                          p_value=p_value, kappa=kappa, Sigma=Sigma_m,
                          labels_kept=tuple(ncs.STAT_LABELS[j] for j in np.flatnonzero(mask)),
-                         stats_dropped=dropped, q_hat=q_hat, q_sim=q_sim, SE=SE_masked, n_solves=len(history),
+                         stats_dropped=dropped, q_hat=q_hat, q_sim=q_sim, SE=SE_masked,
+                         ss_tilt={int(s): float(b) for s, b in zip(layout.sweep_numbers, layout.ss_tilt)},
+                         ls_tilt={int(s): float(b) for s, b in zip(layout.ls_sweep_number, layout.ls_tilt)},
+                         n_solves=len(history),
                          converged=converged, flags=tuple(flags), history=history, per_sweep_cov=per_sweep_cov,
                          config=cfg, seconds=float(time.time() - t_start))

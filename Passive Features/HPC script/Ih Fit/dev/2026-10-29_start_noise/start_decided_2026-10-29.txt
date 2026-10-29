@@ -1,0 +1,8 @@
+sigma_b 0.0 mV/s,  2 sweeps: t_sp - t0 median  +1.2 ms (SD  17.3, 5-95 % [ -22.7,  +33.8]); t_star - t0 median  +0.6 ms [ -12.9,  +16.5]; fallback   3 %; failed fits 0 of 600 groups   (23 s)
+sigma_b 0.0 mV/s,  6 sweeps: t_sp - t0 median  +0.2 ms (SD  17.9, 5-95 % [ -24.3,  +33.5]); t_star - t0 median  +0.1 ms [  -9.7,  +11.0]; fallback   0 %; failed fits 0 of 1800 groups   (92 s)
+sigma_b 0.0 mV/s, 10 sweeps: t_sp - t0 median  +0.7 ms (SD  17.8, 5-95 % [ -23.8,  +34.4]); t_star - t0 median  +0.4 ms [  -6.2,   +7.8]; fallback   0 %; failed fits 0 of 3000 groups   (208 s)
+sigma_b 0.1 mV/s,  2 sweeps: t_sp - t0 median  +2.3 ms (SD  44.6, 5-95 % [ -41.0,  +87.6]); t_star - t0 median  +3.5 ms [ -24.7,  +33.9]; fallback  16 %; failed fits 0 of 600 groups   (231 s)
+sigma_b 0.1 mV/s,  6 sweeps: t_sp - t0 median  +0.6 ms (SD  39.8, 5-95 % [ -40.3,  +72.8]); t_star - t0 median  +0.9 ms [ -11.3,  +15.1]; fallback   1 %; failed fits 0 of 1800 groups   (295 s)
+sigma_b 0.1 mV/s, 10 sweeps: t_sp - t0 median  -0.2 ms (SD  37.5, 5-95 % [ -41.0,  +65.5]); t_star - t0 median  -0.7 ms [  -9.8,  +13.0]; fallback   0 %; failed fits 1 of 3000 groups   (411 s)
+noiseless t0 at sigma_SS_hat 0.0402 mV: 129.5 ms
+P1 PASS  P2 PASS  P3 FAIL   (411 s)

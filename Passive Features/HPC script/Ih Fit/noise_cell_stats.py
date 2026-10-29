@@ -1,29 +1,33 @@
 """noise_cell_stats -- Block 3 (analysis layer) of specs/SPEC.md: the D-051
 statistics per window, per sweep and per cell, the window-level bootstrap SE
-and the data semivariogram of the SS window means (D-049, D-051, D-073,
-D-076).
+and the tilt of every sweep (D-049, D-051, D-073, D-076, D-102, D-107).
 
 In plain words: every noise window (an enlarged SS window after the
-mean-window subtraction, or an LS pre-window and its two segments) gives a
-few numbers -- its SD and its textbook autocorrelation at a few lags. The
-cell's statistic vector q_hat(c) is the median of each number over the
-cell's windows; a sweep's vector q_hat(c, s) is the median over that sweep's
-windows. The same functions run on simulated windows in Block 4, so data and
-simulation go through one estimator (D-033). No I/O, no plotting here.
+subtraction of its group's median window, or an LS pre-window and its two
+segments) gives a few numbers -- its SD and its textbook autocorrelation at a
+few lags. The cell's statistic vector q_hat(c) is the median of each number
+over the cell's windows; a sweep's vector q_hat(c, s) is the median over that
+sweep's windows. The same functions run on simulated windows in Block 4, so
+data and simulation go through one estimator (D-033). Each sweep's tilt --
+the slow straight-line drift of its baseline -- is read here too: on an SS
+sweep as the least-squares slope of its window means on time (TL1), on an LS
+sweep as the line through its pre-window and end-window means (TL2); the
+twins and the fit's simulator copy these numbers (D-102, D-107). No I/O, no
+plotting here.
 
-Units: SDs in mV, autocorrelations dimensionless, the semivariogram in
-mV^2; lags are given in ms and converted to samples by round(lag_ms f_s / 1e3).
-Pure ASCII, LF.
+Units: SDs in mV, autocorrelations dimensionless, tilts in mV/s, the legacy
+semivariogram in mV^2; lags are given in ms and converted to samples by
+round(lag_ms f_s / 1e3). Pure ASCII, LF.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple
 
 import numpy as np
 
 import noise_stats
-from noise_windows import SSWindows, WindowConfig, ls_segments
+from noise_windows import LSWindows, SSWindows, WindowConfig, ls_segments
 
 SS_LAGS_MS: Tuple[float, ...] = (0.02, 0.1, 1.0, 10.0)
 LS_FULL_LAGS_MS: Tuple[float, ...] = (0.02, 0.1, 1.0)
@@ -160,15 +164,96 @@ def bootstrap_median_se(per_window: np.ndarray, B: int, rng: np.random.Generator
 
 
 # ===========================================================================
-#  The data semivariogram of the window means (D-034.1, D-051 (iii))
+#  The tilt of each sweep (D-102.2: SS, (TL1); D-107.1: LS, (TL2))
+# ===========================================================================
+@dataclass
+class SweepTilts:
+    protocol: str                  # 'ss' | 'ls'
+    sweep_number: np.ndarray       # (S,) int
+    b_mV_per_s: np.ndarray         # (S,) the tilt read on each sweep; NaN when it cannot be read
+    se_mV_per_s: np.ndarray        # (S,) SS: the OLS standard error (a report); LS: NaN
+    n_windows: np.ndarray          # (S,) SS: the sweep's kept windows; LS: 2 (pre and end)
+    flags: Tuple[str, ...]
+
+    def as_dict(self) -> Dict[int, float]:
+        return {int(s): float(b) for s, b in zip(self.sweep_number, self.b_mV_per_s)}
+
+
+def ss_sweep_tilts(X_tilde: np.ndarray, ss: SSWindows, j0: int) -> SweepTilts:
+    """(TL1): per SS sweep, the OLS slope of the window means of X_tilde on
+    the windows' centre times (pos P + j0 + (m - 1) / 2) dt, with one
+    intercept per polarity present (numpy.linalg.lstsq); `ss` holds the kept
+    windows, row for row with X_tilde. NaN and 'ss_tilt_none:<sweep>' when the
+    design's rank is below its column count or the sweep has no more windows
+    than columns. The SE treats the window means as independent (report)."""
+    X = np.asarray(X_tilde, dtype=np.float64)
+    if X.ndim != 2 or X.shape[0] != ss.n_windows:
+        raise ValueError("X_tilde must be (K, m) with K = ss.n_windows = %d" % ss.n_windows)
+    m = X.shape[1]
+    means = X.mean(axis=1)
+    centres = (np.asarray(ss.position, dtype=np.float64) * ss.period_samples + j0 + 0.5 * (m - 1)) * ss.dt
+    sweeps: List[int] = list(dict.fromkeys(int(x) for x in ss.sweep_number))
+    b, se, n_w, flags = [], [], [], []
+    for s in sweeps:
+        g = np.flatnonzero(ss.sweep_number == s)
+        t, y, dep = centres[g], means[g], ss.polarity_is_dep[g]
+        cols = [t - t.mean()] + [(dep == p).astype(np.float64) for p in (True, False) if np.any(dep == p)]
+        D = np.column_stack(cols)
+        n, c = D.shape
+        coef, _, rank, _ = np.linalg.lstsq(D, y, rcond=None)
+        if n <= c or rank < c:
+            b.append(float("nan")); se.append(float("nan")); n_w.append(int(n))
+            flags.append("ss_tilt_none:%d" % s)
+            continue
+        resid = y - D @ coef
+        s2 = float(resid @ resid) / (n - c)
+        b.append(float(coef[0]))
+        se.append(float(np.sqrt(s2 * np.linalg.inv(D.T @ D)[0, 0])))
+        n_w.append(int(n))
+    return SweepTilts(protocol="ss", sweep_number=np.asarray(sweeps, dtype=np.int64),
+                      b_mV_per_s=np.asarray(b, dtype=np.float64), se_mV_per_s=np.asarray(se, dtype=np.float64),
+                      n_windows=np.asarray(n_w, dtype=np.int64), flags=tuple(flags))
+
+
+def ls_sweep_tilts(ls: LSWindows) -> SweepTilts:
+    """(TL2): per LS sweep, (mean of the end window - mean of the finite
+    pre-window samples) / (distance between the two windows' centres), the
+    centres the means of their sample times from the sweep's first sample.
+    NaN with 'ls_tilt_none:<sweep>:tail_short' when the end window is not
+    usable (ls.end_status), ':nonfinite' when a mean is not finite."""
+    b, flags = [], []
+    for k, s in enumerate(ls.sweep_number):
+        if str(ls.end_status[k]) != "ok":
+            b.append(float("nan")); flags.append("ls_tilt_none:%d:tail_short" % int(s))
+            continue
+        pre = np.asarray(ls.pre[k], dtype=np.float64)
+        jj = np.flatnonzero(np.isfinite(pre))
+        end = np.asarray(ls.end[k], dtype=np.float64)
+        if jj.size == 0 or end.size == 0 or not np.all(np.isfinite(end)):
+            b.append(float("nan")); flags.append("ls_tilt_none:%d:nonfinite" % int(s))
+            continue
+        y_pre, t_pre = float(pre[jj].mean()), float(jj.mean()) * ls.dt
+        y_end = float(end.mean())
+        t_end = float(ls.end_start_s[k]) + 0.5 * (end.size - 1) * ls.dt
+        b.append((y_end - y_pre) / (t_end - t_pre))
+    K = len(ls.sweep_number)
+    return SweepTilts(protocol="ls", sweep_number=np.asarray(ls.sweep_number, dtype=np.int64),
+                      b_mV_per_s=np.asarray(b, dtype=np.float64), se_mV_per_s=np.full(K, np.nan),
+                      n_windows=np.full(K, 2, dtype=np.int64), flags=tuple(flags))
+
+
+# ===========================================================================
+#  LEGACY (superseded by D-102 / D-107; unused by the pipeline): the data
+#  semivariogram of the window means, (T1)'s data side (D-034.1, D-051 (iii))
 # ===========================================================================
 def window_mean_semivariogram(X_tilde: np.ndarray, ss: SSWindows, lag_periods: int = 4
                               ) -> Tuple[float, int]:
-    """V_hat_c(h), h = lag_periods onset periods: half the mean squared
+    """LEGACY (kept for the dev checks of the tilt study). V_hat_c(h), h =
+    lag_periods onset periods: half the mean squared
     difference of the window means of two windows of the same sweep and the
     same polarity whose positions differ by lag_periods. (NaN, 0) without a
-    pair. The subtraction of (D-051.1), a common vector per polarity, cancels
-    in every difference."""
+    pair. A subtraction of a common vector per polarity and sweep (D-051.1 or
+    D-103.1) cancels in every difference."""
     # Custom: pairs over positions (no library function for the archive's layout).
     means = np.asarray(X_tilde, dtype=np.float64).mean(axis=1)
     key = {(int(s), int(p)): k for k, (s, p) in enumerate(zip(ss.sweep_number, ss.position))}

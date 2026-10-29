@@ -16,7 +16,9 @@ t_j = j dt, j = 0..n-1, with mid-time t_bar = (n-1) dt / 2,
     rho_s = exp(-dt / tau_s)                                              (L2)
 
 both recursions started in their stationary laws, a ~ N(0, sigma_a^2) (mV)
-and b ~ N(0, sigma_b^2) (mV/s) drawn once per trace. theta = (sigma_f, rho_f,
+and b ~ N(0, sigma_b^2) (mV/s) drawn once per trace -- or b given as a fixed
+number per trace (`tilt_mV_per_s`: the tilt read on the trace's real sweep,
+D-102.1, D-107.2; the twins and the fit's simulator). theta = (sigma_f, rho_f,
 sigma_s, tau_s) in mV, --, mV, s; rho_f is the lag-1 coefficient AT THE dt
 PASSED IN (D-014: a per-sample quantity; its transfer between sampling rates
 is D-017 (f), open, and is not done here). For every lag k >= 0 (samples)
@@ -145,7 +147,8 @@ def _stationary_ar1(sigma: float, rho: float, one_minus_rho2: float, xi: np.ndar
 
 def simulate_traces(law: NoiseLaw, dt: float, xi_fast: np.ndarray, xi_slow: np.ndarray, *,
                     xi_tilt: Optional[np.ndarray] = None, sigma_b: float = 0.0,
-                    xi_offset: Optional[np.ndarray] = None, sigma_a: float = 0.0) -> np.ndarray:
+                    xi_offset: Optional[np.ndarray] = None, sigma_a: float = 0.0,
+                    tilt_mV_per_s: Optional[np.ndarray] = None) -> np.ndarray:
     """Traces of (L1)-(L2) from unit draws.
 
     law, dt   : the law and the sampling interval (s); rho_f is read at this dt.
@@ -154,6 +157,10 @@ def simulate_traces(law: NoiseLaw, dt: float, xi_fast: np.ndarray, xi_slow: np.n
                 of trace r is sigma_b xi_tilt[r] (t_j - t_bar), t_bar the
                 trace's mid-time (n - 1) dt / 2, so it sums to zero over j.
     xi_offset, sigma_a : (n_traces,) unit draws and the offset SD (mV).
+    tilt_mV_per_s : (n_traces,) FIXED tilts (mV/s), the alternative to the
+                random tilt (D-102.1, D-107.2: each trace carries the tilt read
+                on its real sweep): trace r gets tilt_mV_per_s[r] (t_j - t_bar).
+                Not combinable with sigma_b > 0; every entry must be finite.
     Returns (n_traces, n) float64 noise traces in mV. Each component is left
     out when its SD is 0 (then its draws may be None).
     """
@@ -164,16 +171,27 @@ def simulate_traces(law: NoiseLaw, dt: float, xi_fast: np.ndarray, xi_slow: np.n
     if not dt > 0.0:
         raise ValueError("simulate_traces: dt must be > 0 (s)")
     n_traces, n = xi_fast.shape
+    if sigma_b < 0.0 or sigma_a < 0.0:
+        raise ValueError("simulate_traces: sigma_b and sigma_a must be >= 0")
+    if tilt_mV_per_s is not None:
+        if sigma_b > 0.0:
+            raise ValueError("simulate_traces: give either the fixed tilts or sigma_b > 0, not both")
+        tilt_mV_per_s = np.asarray(tilt_mV_per_s, dtype=float)
+        if tilt_mV_per_s.shape != (n_traces,):
+            raise ValueError("simulate_traces: tilt_mV_per_s must be (n_traces,) = (%d,), got %s"
+                             % (n_traces, tilt_mV_per_s.shape))
+        if not np.all(np.isfinite(tilt_mV_per_s)):
+            raise ValueError("simulate_traces: tilt_mV_per_s has a non-finite entry")
     rho_s = law.rho_s(dt)
     out = _stationary_ar1(law.sigma_f, law.rho_f, 1.0 - law.rho_f ** 2, xi_fast)
     out = out + _stationary_ar1(law.sigma_s, rho_s, -np.expm1(-2.0 * dt / law.tau_s), xi_slow)
-    if sigma_b < 0.0 or sigma_a < 0.0:
-        raise ValueError("simulate_traces: sigma_b and sigma_a must be >= 0")
-    if sigma_b > 0.0:
-        if xi_tilt is None or np.shape(xi_tilt) != (n_traces,):
-            raise ValueError("simulate_traces: xi_tilt must be (n_traces,) when sigma_b > 0")
+    if sigma_b > 0.0 or tilt_mV_per_s is not None:
+        if tilt_mV_per_s is None:
+            if xi_tilt is None or np.shape(xi_tilt) != (n_traces,):
+                raise ValueError("simulate_traces: xi_tilt must be (n_traces,) when sigma_b > 0")
+            tilt_mV_per_s = sigma_b * np.asarray(xi_tilt, dtype=float)
         t_centred = (np.arange(n, dtype=float) - 0.5 * (n - 1)) * dt          # s, zero-mean
-        out = out + (sigma_b * np.asarray(xi_tilt, dtype=float))[:, None] * t_centred[None, :]
+        out = out + tilt_mV_per_s[:, None] * t_centred[None, :]
     if sigma_a > 0.0:
         if xi_offset is None or np.shape(xi_offset) != (n_traces,):
             raise ValueError("simulate_traces: xi_offset must be (n_traces,) when sigma_a > 0")
@@ -182,15 +200,19 @@ def simulate_traces(law: NoiseLaw, dt: float, xi_fast: np.ndarray, xi_slow: np.n
 
 
 def simulate_sweep(law: NoiseLaw, dt: float, n_samples: int, units: UnitDraws, index: int = 0, *,
-                   sigma_b: float = 0.0, sigma_a: float = 0.0) -> np.ndarray:
+                   sigma_b: float = 0.0, sigma_a: float = 0.0,
+                   tilt_mV_per_s: Optional[float] = None) -> np.ndarray:
     """One continuous trace of n_samples (the D-056 (i) simulator for one
-    sweep): row `index` of `units` through `simulate_traces`. Returns (n,)."""
+    sweep): row `index` of `units` through `simulate_traces`. tilt_mV_per_s:
+    the sweep's fixed tilt (mV/s), in place of sigma_b. Returns (n,)."""
     if units.fast.shape[1] != n_samples:
         raise ValueError("simulate_sweep: units were drawn for %d samples, not %d"
                          % (units.fast.shape[1], n_samples))
+    fixed = None if tilt_mV_per_s is None else np.array([float(tilt_mV_per_s)])
     out = simulate_traces(law, dt, units.fast[index:index + 1], units.slow[index:index + 1],
                           xi_tilt=units.tilt[index:index + 1], sigma_b=sigma_b,
-                          xi_offset=units.offset[index:index + 1], sigma_a=sigma_a)
+                          xi_offset=units.offset[index:index + 1], sigma_a=sigma_a,
+                          tilt_mV_per_s=fixed)
     return out[0]
 
 
