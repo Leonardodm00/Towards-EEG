@@ -973,23 +973,37 @@ run("scripts/allen_radius_distribution.py", "--fetch", SPECIMEN, "--cache-dir", 
 #
 # [2026-10-29, D-108, D-109] tau is 0.3 gl (the stripe kept 21 of the pilot's 138 near candidates at 0.03 gl, 92 at
 # 0.3 gl, in the sandbox's run on the pilot's own reconstruction). The far set is no longer the pilot table's (Cell
-# 4b's stretches hold 31 far-range nodes, on two crowded stretches): before fetching anything `real` judges
-# every dendrite node of the cell with Allen's 2r in (0.6, 0.8] um from the trace -- the trace's tilt (<= 15 deg), the
+# 4b's stretches hold 31 far-range nodes, on two crowded stretches): before fetching anything `real` judges every
+# dendrite node of the cell with Allen's 2r in (0.6, 0.8] um from the trace -- the trace's tilt (<= 15 deg), the
 # stripe at the trace's plane, and at least 6 usable stripes among the far fit's 24 planes (|k - k*| >= 5), with the
 # pilot table's median background and absorption -- keeps the passing nodes at least 5 um apart along their stretch,
-# and then measures and scans them like any candidate. It prints `far search: the cell's typical background ...`, a
-# progress line every 100 nodes, and `far search over the cell: N far-range nodes; a flat by the trace (phi <= 15
-# deg); b with a usable stripe at the trace's plane; c with at least 6 usable far-fit planes; m chosen, at least 5 um
-# apart (t min) -> .../far_search_529878215.csv` (one row per far-range node and why it failed). On the pilot, in the
-# sandbox, the search took 8.2 min over its 723 far-range nodes (502 flat by the trace, 90 usable at the trace's
-# plane, 74 with at least 6 usable far-fit planes, 19 chosen), before the first fetch; Colab should take about as
-# long, then the 19 are measured and scanned (about 46 crops each). `calibration.far_candidates = "table"` restores
-# the table's far candidates.
+# and then measures and scans them like any candidate. It prints `candidate search: the cell's typical background ...`
+# (once, for both searches), a progress line every 500 nodes, and `far search over the cell: N far-range nodes; a flat
+# by the trace (phi <= 15 deg); b with a usable stripe at the trace's plane; c with at least 6 usable far-fit planes;
+# m chosen, at least 5 um apart (t min) -> .../far_search_529878215.csv` (one row per far-range node and why it
+# failed). On the pilot, in the sandbox, the search took 5.1 min over its 723 far-range nodes (502 flat by the trace,
+# 90 usable at the trace's plane, 74 with at least 6 usable far-fit planes, 19 chosen), before the first fetch; Colab
+# should take about as long, then the 19 are measured and scanned (about 46 crops each). `calibration.far_candidates =
+# "table"` restores the table's far candidates.
+#
+# [2026-10-29, D-112] The near set is searched over the whole cell as well (the user: "the whole cell's nodes must be
+# evaluated for both near and far field calibration"): every dendrite node with Allen's 2r <= 0.6 um, judged from the
+# trace -- the tilt (<= 10 deg), the stripe at the trace's plane, and at least 3 usable stripes among the trace's
+# plane +- 3 (the pairs +-1, +-2, +-3 in turn, stopping once 3 are usable) -- kept at least 5 um apart along its
+# stretch (the most clear pixels at the trace's plane first), then measured and scanned like any candidate, at most 30
+# scanned per set (the others counted in one line, `not measured, their set already holding 30 scans (set_full):
+# ...`). Before the far search it prints `near search: n of N near-range nodes judged (t min)` every 500 nodes and
+# `near search over the cell: N near-range nodes; a flat by the trace (phi <= 10 deg); b with a usable stripe at the
+# trace's plane; c with at least 3 usable planes of the trace's plane +- 3; m chosen, at least 5 um apart (t min) ->
+# .../near_search_529878215.csv`. On the pilot, in the sandbox: 7500 near-range nodes, 3856 flat by the trace, 1960
+# usable at the trace's plane, 1947 with at least 3 usable planes, 380 chosen on 48 stretches, in 15.4 min; with the
+# far search (5.1 min) Cell 7 spends about 20 min before its first download. `calibration.near_candidates = "table"`
+# restores the table's near candidates.
 
-# The stripe's knobs (D-101, D-108) and the far set's search (D-109): the configuration's calibration.* fields, here at
-# their defaults. Change one and run the cell again: the file below goes to real, fit, far-fit and figures, and real
-# prints `calibration knobs: ...` with the values it ran with. Cell 15 and the davinci array read the same file when
-# it is passed (runbook, "the stripe's knobs").
+# The stripe's knobs (D-101, D-108) and the candidates' search over the whole cell (D-109, D-112): the configuration's
+# calibration.* fields, here at their defaults. Change one and run the cell again: the file below goes to real, fit,
+# far-fit and figures, and real prints `calibration knobs: ...` with the values it ran with. Cell 15 and the davinci
+# array read the same file when it is passed (runbook, "the stripe's knobs").
 CAL_KNOBS = {
     "calibration.background_support": "stripe",   # "stripe" (D-101) or "square" (before 2026-10-28: the 3-sigma far mask)
     "calibration.isolation_depth_gl": 0.3,        # tau (gl): a pixel is shaded where a traced segment's predicted shadow exceeds it (D-108)
@@ -999,6 +1013,8 @@ CAL_KNOBS = {
     "calibration.patch_half_um": 25.0,            # the patch's half-side (um): the runs end at its edge (larger: bigger crops)
     "calibration.node_phi_max_deg": 10.0,         # flatness, near set (deg)
     "calibration.node_phi_max_deg_far": 15.0,     # flatness, far set (deg)
+    "calibration.near_candidates": "cell",        # near set: "cell" found over the whole cell from the trace (D-112), "table"
+    "calibration.near_search_spacing_um": 5.0,    # the near candidates kept at least this far apart along their stretch (um)
     "calibration.far_candidates": "cell",         # far set: "cell" found over the whole cell from the trace (D-109), "table"
     "calibration.far_search_spacing_um": 5.0,     # the far candidates kept at least this far apart along their stretch (um)
 }
@@ -1304,6 +1320,12 @@ display(Image(filename=SURVEY + "/s3b/inputs.png"))
 # Cell 7's stripe knobs (`calibration/calibration_config.json`), when Cell 7 wrote them, are merged into this cell's
 # own file `survey_config_s3c.json` and printed (`[cell 15] calibration knobs: ...`); the step runs once per cell, so
 # after a change of the knobs set `REDO = ["--force", "calibration"]` [2026-10-28, later].
+#
+# [2026-10-29, D-112] The calibration step takes the pilot's candidates from Block 10.C's search over the whole cell,
+# as Cell 7 does (Cell 13's nodes give only the typical background and absorption): it prints the `candidate search`
+# line and both searches' lines, takes about as long as Cell 7's search before its first download, and writes
+# `survey_pilot/529878215/calibration/near_search_529878215.csv` and `far_search_529878215.csv`; at most 5 scans per
+# set, as before.
 import json
 SURVEY = OUT + "/survey_pilot"
 CFG_S3 = SURVEY + "/survey_config.json"     # Cell 13's (node mode, the pilot's nodes per bin); written if Cell 13 did not run

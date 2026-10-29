@@ -105,14 +105,15 @@ ALIGN = ["--shift-x", SHIFT_X, "--shift-y", SHIFT_Y, "--z0", Z0] + ([] if FLIP_H
 # first (Cell 4b re-measures every node of the stretches: long).
 
 # %%
-# The inputs Cell 7 reads, and the calibration candidates it will consider (the repository's own rule), in a fresh
+# The inputs Cell 7 reads, the typical background and absorption its search over the whole cell uses (D-109, D-112)
+# and the table's own candidates (used for a set only with calibration.<set>_candidates = "table"), in a fresh
 # Python like run(): no download.
 import subprocess
 PREFLIGHT = r"""
 import os, sys, time
 sys.path[:0] = ["src", "scripts"]
 import calibrate_kernel
-from allen_diameter.analysis import calibration
+from allen_diameter.analysis import calibration, candidate_search
 from allen_diameter.config import default_config
 from allen_diameter.loading import table_io
 out, sp, reg = sys.argv[1], int(sys.argv[2]), sys.argv[3]
@@ -125,17 +126,19 @@ if os.path.exists(pilot):
     rows = table_io.read_rows([pilot])
     need = ("node_id", "fit_status", "flags", "phi_rad", "alpha_hat", "allen_radius_um")
     missing = [c for c in need if rows and c not in rows[0]]
+    B, mu = candidate_search.typical_background(rows, cfg)
+    print("[preflight] the search's typical background %.1f gl and absorption %.3f /um (the medians of the rows in S)"
+          % (B, mu))
     cand = calibrate_kernel.candidates_from_rows(rows, cfg)
     by = {}
     for r in rows:
         if int(r["node_id"]) in cand:
             s = calibration.calibration_set(2.0 * float(r["allen_radius_um"]), cfg)
             by[s] = by.get(s, 0) + 1
-    print("[preflight] pilot rows %d; columns missing: %s; candidates %d by set %s" % (
-        len(rows), missing or "none", len(cand), by))
-    print("[preflight] a production kernel needs at least 10 scanned nodes per set (D-088.3); the scan drops some "
-          "(the stripe at k* too small, D-101; neither straightness (D-093) nor the optical depth and the flag "
-          "faint (D-094) is tested)")
+    print("[preflight] pilot rows %d; columns missing: %s; the table's own candidates %d by set %s (used for a set "
+          "only with calibration.<set>_candidates = table)" % (len(rows), missing or "none", len(cand), by))
+    print("[preflight] Cell 7 first searches both sets over the whole cell from the trace (Block 10.C, D-109, D-112), "
+          "before any download; a production kernel needs at least 10 scanned nodes per set (D-088.3)")
 """
 subprocess.run([sys.executable, "-c", PREFLIGHT, OUT, str(SPECIMEN), REG_JSON], cwd=WS, check=False)
 
@@ -180,28 +183,43 @@ subprocess.run([sys.executable, "-c", PREFLIGHT, OUT, str(SPECIMEN), REG_JSON], 
 #
 # [2026-10-29, D-108, D-109] tau is 0.3 gl (the stripe kept 21 of the pilot's 138 near candidates at 0.03 gl, 92 at
 # 0.3 gl, in the sandbox's run on the pilot's own reconstruction). The far set is no longer the pilot table's (Cell
-# 4b's stretches hold 31 far-range nodes, on two crowded stretches): before fetching anything `real` judges
-# every dendrite node of the cell with Allen's 2r in (0.6, 0.8] um from the trace -- the trace's tilt (<= 15 deg), the
+# 4b's stretches hold 31 far-range nodes, on two crowded stretches): before fetching anything `real` judges every
+# dendrite node of the cell with Allen's 2r in (0.6, 0.8] um from the trace -- the trace's tilt (<= 15 deg), the
 # stripe at the trace's plane, and at least 6 usable stripes among the far fit's 24 planes (|k - k*| >= 5), with the
 # pilot table's median background and absorption -- keeps the passing nodes at least 5 um apart along their stretch,
-# and then measures and scans them like any candidate. It prints `far search: the cell's typical background ...`, a
-# progress line every 100 nodes, and `far search over the cell: N far-range nodes; a flat by the trace (phi <= 15
-# deg); b with a usable stripe at the trace's plane; c with at least 6 usable far-fit planes; m chosen, at least 5 um
-# apart (t min) -> .../far_search_529878215.csv` (one row per far-range node and why it failed). On the pilot, in the
-# sandbox, the search took 8.2 min over its 723 far-range nodes (502 flat by the trace, 90 usable at the trace's
-# plane, 74 with at least 6 usable far-fit planes, 19 chosen), before the first fetch; Colab should take about as
-# long, then the 19 are measured and scanned (about 46 crops each). `calibration.far_candidates = "table"` restores
-# the table's far candidates.
+# and then measures and scans them like any candidate. It prints `candidate search: the cell's typical background ...`
+# (once, for both searches), a progress line every 500 nodes, and `far search over the cell: N far-range nodes; a flat
+# by the trace (phi <= 15 deg); b with a usable stripe at the trace's plane; c with at least 6 usable far-fit planes;
+# m chosen, at least 5 um apart (t min) -> .../far_search_529878215.csv` (one row per far-range node and why it
+# failed). On the pilot, in the sandbox, the search took 5.1 min over its 723 far-range nodes (502 flat by the trace,
+# 90 usable at the trace's plane, 74 with at least 6 usable far-fit planes, 19 chosen), before the first fetch; Colab
+# should take about as long, then the 19 are measured and scanned (about 46 crops each). `calibration.far_candidates =
+# "table"` restores the table's far candidates.
 #
-# Send back: the `calibration knobs:` line, the three `far search` lines (D-109) and `far_search_529878215.csv`,
-# the `real` counts and reasons line and its far-set line, the `fit` and `far-fit` reports, the five figures, and
-# the isolation overview pages (or the per-node figures of the candidates you want to discuss).
+# [2026-10-29, D-112] The near set is searched over the whole cell as well (the user: "the whole cell's nodes must be
+# evaluated for both near and far field calibration"): every dendrite node with Allen's 2r <= 0.6 um, judged from the
+# trace -- the tilt (<= 10 deg), the stripe at the trace's plane, and at least 3 usable stripes among the trace's
+# plane +- 3 (the pairs +-1, +-2, +-3 in turn, stopping once 3 are usable) -- kept at least 5 um apart along its
+# stretch (the most clear pixels at the trace's plane first), then measured and scanned like any candidate, at most 30
+# scanned per set (the others counted in one line, `not measured, their set already holding 30 scans (set_full):
+# ...`). Before the far search it prints `near search: n of N near-range nodes judged (t min)` every 500 nodes and
+# `near search over the cell: N near-range nodes; a flat by the trace (phi <= 10 deg); b with a usable stripe at the
+# trace's plane; c with at least 3 usable planes of the trace's plane +- 3; m chosen, at least 5 um apart (t min) ->
+# .../near_search_529878215.csv`. On the pilot, in the sandbox: 7500 near-range nodes, 3856 flat by the trace, 1960
+# usable at the trace's plane, 1947 with at least 3 usable planes, 380 chosen on 48 stretches, in 15.4 min; with the
+# far search (5.1 min) Cell 7 spends about 20 min before its first download. `calibration.near_candidates = "table"`
+# restores the table's near candidates.
+#
+# Send back: the `calibration knobs:` line, the `candidate search` line, both searches' summary lines (D-109, D-112)
+# and `near_search_529878215.csv`, `far_search_529878215.csv`, the `real` counts and reasons line and its far-set
+# line, the `fit` and `far-fit` reports, the five figures, and the isolation overview pages (or the per-node figures
+# of the candidates you want to discuss).
 
 # %%
-# The stripe's knobs (D-101, D-108) and the far set's search (D-109): the configuration's calibration.* fields, here at
-# their defaults. Change one and run the cell again: the file below goes to real, fit, far-fit and figures, and real
-# prints `calibration knobs: ...` with the values it ran with. Cell 15 and the davinci array read the same file when
-# it is passed (runbook, "the stripe's knobs").
+# The stripe's knobs (D-101, D-108) and the candidates' search over the whole cell (D-109, D-112): the configuration's
+# calibration.* fields, here at their defaults. Change one and run the cell again: the file below goes to real, fit,
+# far-fit and figures, and real prints `calibration knobs: ...` with the values it ran with. Cell 15 and the davinci
+# array read the same file when it is passed (runbook, "the stripe's knobs").
 CAL_KNOBS = {
     "calibration.background_support": "stripe",   # "stripe" (D-101) or "square" (before 2026-10-28: the 3-sigma far mask)
     "calibration.isolation_depth_gl": 0.3,        # tau (gl): a pixel is shaded where a traced segment's predicted shadow exceeds it (D-108)
@@ -211,6 +229,8 @@ CAL_KNOBS = {
     "calibration.patch_half_um": 25.0,            # the patch's half-side (um): the runs end at its edge (larger: bigger crops)
     "calibration.node_phi_max_deg": 10.0,         # flatness, near set (deg)
     "calibration.node_phi_max_deg_far": 15.0,     # flatness, far set (deg)
+    "calibration.near_candidates": "cell",        # near set: "cell" found over the whole cell from the trace (D-112), "table"
+    "calibration.near_search_spacing_um": 5.0,    # the near candidates kept at least this far apart along their stretch (um)
     "calibration.far_candidates": "cell",         # far set: "cell" found over the whole cell from the trace (D-109), "table"
     "calibration.far_search_spacing_um": 5.0,     # the far candidates kept at least this far apart along their stretch (um)
 }
@@ -408,6 +428,12 @@ display(Image(filename=SURVEY + "/s3b/inputs.png"))
 # Cell 7's stripe knobs (`calibration/calibration_config.json`), when Cell 7 wrote them, are merged into this cell's
 # own file `survey_config_s3c.json` and printed (`[cell 15] calibration knobs: ...`); the step runs once per cell, so
 # after a change of the knobs set `REDO = ["--force", "calibration"]` [2026-10-28, later].
+#
+# [2026-10-29, D-112] The calibration step takes the pilot's candidates from Block 10.C's search over the whole cell,
+# as Cell 7 does (Cell 13's nodes give only the typical background and absorption): it prints the `candidate search`
+# line and both searches' lines, takes about as long as Cell 7's search before its first download, and writes
+# `survey_pilot/529878215/calibration/near_search_529878215.csv` and `far_search_529878215.csv`; at most 5 scans per
+# set, as before.
 
 # %%
 import json
