@@ -129,6 +129,7 @@ the "Binds" column.
 | 2026-10-28 (later, 10) | Logs **D-104** (user, 19:53; the noise-fit chat): "When the window has less than 50 ms size" -- the 80 ms fallback applies when the window $[t_{\rm SS}(c), 200)$ ms would be shorter than 50 ms (a start later than 150 ms), and also when no group is valid (the assistant's reading); "Flag and leave it out" -- a group whose fit fails or that has fewer than 5 windows (PROVISIONAL) is flagged and left out of the maximum; on the RC test cell at $\kappa_{\rm tr}$ = 0.1 the fallback applies from $\tau_m$ = 34.0 ms (113 MOhm) or $R_{\rm in}$ = 234 MOhm (28.1 ms). Roadmap allen-mtg-fit updated at the user's word ("Finally update the roadmap with the changes discussed here"): notes and revise marks for D-102 to D-104 on N3, N4, N5 and T8, no status changed (`a945a7a`). D-082, D-095 and D-103 annotated (entries and index). Written after re-reading this log (unchanged since the (later, 9) row). The repository copy (D-097) on `main`, `docs/project/`. Next free IDs: D-105, I-005. |
 | 2026-10-28 (later, 11) | Logs **D-105** (user, 19:39; the diameter implementation chat): "given the far field nodes highlight the stripe used, expose also the parameters to shape the stripe's features ... Also recheck the previous implementation" -- the isolation figures show the stripe of every plane of the stage (panel (c); the far fit's planes lie 5-16 planes from $k^*$), Cell 7 exposes the stripe's existing settings as `CAL_KNOBS` (written to `calibration_config.json`, passed as `--config-json`; Cell 15 and davinci read the same file), and D-101's implementation was rechecked: the integration tester's report (F1, F5 fixed; F2 fixed as the assistant reads D-101.4, to confirm; F3, S4 open) and a run on the pilot's own reconstruction -- as built the stripe keeps 21 of the 138 near candidates and none of the 7 far ones, out-of-focus dendrites' predicted shadows covering the nodes; how they should enter the stripe is D-101 (d), open. D-101 and D-098 annotated (entries and index). Written after re-reading this log (changed since the (later, 8) row by the noise-fit chat's D-102 to D-104, rows (later, 9) and (later, 10); merged, nothing of theirs edited). The repository copy (D-097) on `sci/diameter-pipeline`, `docs/project/`. Next free IDs: D-106, I-005. |
 | 2026-10-29 | Logs **D-106** (user, 14:17; the noise-fit chat): "Should a dropped group's windows also be left out of the noise statistics? Yes as you propose" -- a group with fewer than `min_windows_per_group` = 5 windows (PROVISIONAL) leaves the noise statistics and the layout handed to Block 4 as well as the start's maximum; a group dropped only for a failed fit keeps its windows. D-104 annotated (entry and index). Written after re-reading this log (changed since the (later, 10) row by the diameter chat's D-105, row (later, 11); merged, nothing of theirs edited). The repository copy (D-097) on `main`, `docs/project/`. Next free IDs: D-107, I-005. |
+| 2026-10-29 (later) | Logs **D-107** (user, 14:41; the noise-fit chat), closing D-102's open points: a Long Square sweep's tilt is the line through a start-window mean and an end-window mean (the assistant's reading: the 265 ms pre-window and the last 500 ms of the stored sweep, `delta_end_mV` / 6.8875 s; error SD 0.0045 mV/s at $\theta_{\rm cf}$, `check_ls_tilt_reading.py`); the noise fit's simulator gives every simulated sweep its real sweep's tilt in every replicate, so the tilt SD, (T1) and the alternation leave the fit. D-102 annotated (entry and index). Written after re-reading this log (unchanged since the 2026-10-29 row). The repository copy (D-097) on `main`, `docs/project/`. Next free IDs: D-108, I-005. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -250,11 +251,12 @@ would be needed*, *Status*.
 | D-099 | 2026-10-28 | where S3's per-cell survey runs (Blocks 16.2, 17, 18, 19 over the selection: SPEC Block 16.4, `scripts/pbs/survey_*.pbs`); Colab's Cells 11-15 (the pilot only, `survey_pilot/`); the runner's `--task-index` and `--cache-per-cell`; `cell_pool.py pick` (Block 16.1 (e)); the roadmap's S3a-S3c (`needs_hpc`); D-085's "in Colab"; D-098.5's Cells 12b and 13b | the real runs on davinci, one PBS array task per selected cell plus a prepare and a pool job; Colab keeps every cell on the pilot [user]; the layout under the archive root, the proxy module and the 12 h walltime the assistant's, PROVISIONAL | active; implemented and pushed 2026-10-28, smoke-tested against stubs; not yet run on davinci |
 | D-100 | 2026-10-28 | the tilt SD the twins of the 14 two-sweep L3_exc cells receive (Block 5; the tilt of (D-017.1)); D-034's (D-034.1) for those cells; a cohort step after the 18 per-cell fits (Block 6); Block 3's pair counts and Block 4's `TiltResult`; the Stage-7 gate's report (D-011); SPEC §8 (2026-10-23) | for the 2-sweep cells the twins' tilt SD both per cell (a) and as one cohort value (b); partial pooling (c) not taken [user]; two labelled variants of twins, the cohort value's form (the $S_{\rm eff}$-weighted mean of the unclipped estimates over the 18 cells, clipped at 0) and each cell's own fit unchanged -- the assistant's reading, to confirm | active; not implemented; its reading open [superseded 2026-10-28 (later, 9): withdrawn as the assistant's misreading -- D-102] |
 | D-101 | 2026-10-28 | the calibration nodes' flatness (10.I (iii); `CalibrationConfig.node_phi_max_deg`, `node_phi_max_deg_far`); the background's support and the isolation verdict of both calibration sets (Blocks 10.P, 10.I (vi), 15.1; SPEC Block 10.S; `background_support`, `stripe_half_widths_um`, `stripe_min_pixels`, `stripe_min_side_um`); Cell 7 and S3c's per-cell scans; D-078.1's far mask and D-081.1's node verdict (kept as `"square"`); D-081.3's 5 deg | far $\varphi \le 15$ deg, near $\le 10$ deg; the stripe: a pixel is clear when no neighbour's predicted shadow at it exceeds 0.03 gl, the band along the measuring line with most clear pixels, walked out to the first shaded column, the own fitted cylinder removed, usable with 500 pixels and 3 um per side [user]; the $W$ grid, the walk, the own radius $\max(\hat d/2, r_A)$ and the near bound read as 10 deg the assistant's, PROVISIONAL | active; implemented and pushed 2026-10-28 (Block 10.S), smoke-tested; not yet run on Allen's data [updated 2026-10-28 (later, 11): rechecked -- the verdict's soma blur fixed (F1), the own cylinder on the fitted line (F2, the reading to confirm); on the pilot's own reconstruction as built 21 of 138 near candidates usable at $k^*$, none of 7 far; (c) answered by it, (d) open -- D-105] |
-| D-102 | 2026-10-28 | the tilt in every twin (Block 5; (L1) = (D-017.1)); D-034's draw $b \sim \mathcal N(0, \sigma_b(c)^2)$ and (D-034.1) for the twins; D-100; Block 4's tilt alternation and (T1); Block 3's tilt reading; D-073; SPEC §2.4, §8 | each twin sweep carries the realised tilt of its own real sweep -- "the very same tilt as in the real cell", no statistic of the tilt computed [user]; read on an SS sweep as the least-squares slope of its window means on time, one intercept per polarity (the assistant's proposal); the LS sweeps' reading and the fit's simulator open; D-100 withdrawn as a misreading | active; not implemented; open (a)-(d) |
+| D-102 | 2026-10-28 | the tilt in every twin (Block 5; (L1) = (D-017.1)); D-034's draw $b \sim \mathcal N(0, \sigma_b(c)^2)$ and (D-034.1) for the twins; D-100; Block 4's tilt alternation and (T1); Block 3's tilt reading; D-073; SPEC §2.4, §8 | each twin sweep carries the realised tilt of its own real sweep -- "the very same tilt as in the real cell", no statistic of the tilt computed [user]; read on an SS sweep as the least-squares slope of its window means on time, one intercept per polarity (the assistant's proposal); the LS sweeps' reading and the fit's simulator open; D-100 withdrawn as a misreading | active; not implemented; open (a)-(d) [updated 2026-10-29: (a), (b), (d) closed by D-107 -- the LS tilt through two window means; the simulator uses the real sweeps' tilts] |
 | D-103 | 2026-10-28 | D-095's open points; D-076 (ii)'s 80 ms floor; D-051 (i)'s fallback (`fallback_t_ms`, `ss_enlarged_none`); Block 3 (`transient_start`, `subtract_mean_response`, `WindowConfig`), Block 4's simulator; smoke W2, W3, F2; SPEC §2.2 | the per-sample median window per sweep and polarity, for the start and the subtraction; one exponential with a free baseline on [5, 200) ms; $t_{s,p} = \hat\tau_{s,p}\ln(\lvert\hat A_{s,p}\rvert/(\kappa_{\rm tr}\hat\sigma_{\rm SS}(c)))$, the point value; $t_{\rm SS}(c) = \max\{80\ {\rm ms}, \max_{(s,p)} t_{s,p}\}$; 80 ms also the fallback, flagged [user]; the fallback's trigger, point 9 and $\kappa_{\rm tr}$ open | active; not implemented [updated 2026-10-28 (later, 10): (a) and (b) closed by D-104] |
 | D-104 | 2026-10-28 | D-103's open points (a), (b); (D-103.3); Block 3's window start (`WindowConfig.fallback_t_ms`, `min_window_ms`, `min_windows_per_group`); the flags `ss_start_fallback` and `ss_group_dropped`; smoke W2; the roadmap allen-mtg-fit | the 80 ms fallback applies when the window $[t_{\rm SS}(c), 200)$ ms would be shorter than 50 ms; a group whose fit fails or has too few windows is flagged and left out [user]; also with no valid group, and the minimum of 5 windows (PROVISIONAL) -- the assistant's; the roadmap updated for D-102 to D-104 [user] | active; not implemented; open: a dropped group's windows in the statistics [updated 2026-10-29: open point (a) closed by D-106 -- the windows of a group with too few windows leave the statistics too] |
 | D-105 | 2026-10-28 | the isolation figure of D-098.4 (SPEC Block 10.F (5): panel (c), the overview's $n/N$, `real`'s knob and far-set lines); Cell 7's `CAL_KNOBS` and `OUT/calibration/calibration_config.json` (both notebooks), Cell 15's `survey_config_s3c.json`, davinci's `DIAM_CONFIG_JSON`; SPEC Block 10.S as amended by the recheck (F1, F2, S1-S3, S5-S7) | the stripe of every plane shown, the far fit's planes emphasised; the stripe's existing settings and the flatness bounds exposed in Cell 7 and passed to every step [user]; the set of knobs, panel (c)'s form and F2's fitted cylinder -- the assistant's | active; implemented and pushed 2026-10-28; smoke-tested; open: D-101 (d) (how out-of-focus shadows enter the stripe), S4, F3, F2's reading, the far verdict on the fit's planes |
 | D-106 | 2026-10-29 | D-104's open point (a); Block 3's statistics and the layout it hands to Block 4; Block 4's simulator; `WindowConfig.min_windows_per_group` | a group with too few windows (fewer than 5, PROVISIONAL) leaves the noise statistics too; a group dropped only for a failed fit keeps its windows [user] | active; not implemented |
+| D-107 | 2026-10-29 | D-102's open points (a), (b), (d); Block 3's tilt readings; Block 4's simulator and fit (`simulate_cell_windows`, `fit_cell`, `tilt_from_semivariogram`); Block 2's `simulate_traces`; Block 5; SPEC §2.3, §2.4, §8 | a Long Square sweep's tilt is the line through a start-window mean and an end-window mean; every simulated sweep carries its real sweep's tilt in every replicate, so the tilt SD leaves the fit [user]; the windows (265 ms pre-window, last 500 ms) the assistant's reading | active; not implemented |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
@@ -8650,7 +8652,7 @@ check03 (b), (f) of the tilt study (re-run 2026-10-28, same output). **[src]** `
 `noise_fit.tilt_from_semivariogram` (`main` at `fefdee9`).
 
 **Status:** active; not implemented; open (a)-(d). Supersedes **D-100** (a misreading) and, for the twins, D-034's draw
-of $b$ from $\mathcal N(0, \sigma_b(c)^2)$ with its calibration (D-034.1); D-034's law stands.
+of $b$ from $\mathcal N(0, \sigma_b(c)^2)$ with its calibration (D-034.1); D-034's law stands. **[updated 2026-10-29: open points (a), (b) and (d) closed by **D-107** -- a Long Square sweep's tilt is the line through a start-window mean and an end-window mean; every simulated sweep of the fit carries its real sweep's tilt, so the tilt SD, (T1) and the alternation leave the fit; (c) stays open.]**
 
 ---
 
@@ -8918,6 +8920,73 @@ provisional since D-051).
 **Sources.** **[user]** 2026-10-29, 14:17. **[log]** D-033, D-051, D-102, D-103, D-104.
 
 **Status:** active; not implemented. Closes D-104's open point (a).
+
+---
+
+## D-107 -- Confirmations closing D-102's open points: a Long Square sweep's tilt is the line through a start-window mean and an end-window mean; the noise fit's simulator gives every simulated sweep its real sweep's tilt (user)
+
+**Date:** 2026-10-29, 14:41 (Europe/Rome), the noise-fit chat. **Binds:** D-102's open points (a), (b) and (d);
+(D-102.3), (D-102.4); Block 3 (the tilt readings, SS and LS); Block 4 (`simulate_cell_windows`, `binding_function`,
+`simulated_covariance`, `fit_cell`: the tilt alternation, `tilt_from_semivariogram`, the flags `tilt_clipped` and
+`tilt_no_pairs`); Block 2's `simulate_traces` (a fixed tilt per trace); Block 5's generator; `Ih Fit/specs/SPEC.md`
+§2.3 (f)-(h), §2.4 and §8; the columns `noise_sigma_b_mV_per_s` and the per-sweep tilt.
+
+**Decision [user].** "1) Tilts of the Long Square sweeps: Take a mean window at the start, a mean window at the end and
+define the tilt as teh one that passes thorugh these two measn 2) Tilts in the noise fit's simulator: every simulated
+sweep gets the same $\hat b_{c,s}$ as its real sweep, in every replicate PERFECT". The answers to D-102's two questions,
+restated to the user at 14:17.
+
+**Statement.**
+
+(D-107.1) *The tilt of a Long Square sweep* [user]. For each LS sweep $s$ of cell $c$,
+$$\hat b_{c,s} = \frac{\bar y^{\rm end}_{c,s} - \bar y^{\rm pre}_{c,s}}{\Delta t_{\rm c}} \qquad ({\rm mV/s}), \tag{D-107.1}$$
+the slope of the line through the two window means, with $\bar y^{\rm pre}_{c,s}$ (mV) the sweep's mean over its
+pre-window, $\bar y^{\rm end}_{c,s}$ (mV) its mean over the last 500 ms of the stored sweep, and $\Delta t_{\rm c}$ (s)
+the distance between the two windows' centres [the assistant's reading of "a mean window at the start, a mean window at
+the end": the windows of `ls_baseline_qc.py`'s `delta_end_mV`, so that $\hat b_{c,s}$ = `delta_end_mV` /
+$\Delta t_{\rm c}$]. On the archive's L3_exc LS geometry -- pre-window [0, 265) ms, step from 270 ms for 1 s, 6.000 s
+stored after it -- $\Delta t_{\rm c}$ = 6.8875 s **[src; log: the living handoff §4.6]**. Under (L1), the mean of a line
+over a window being its value at the window's centre, $\hat b_{c,s} = b_{c,s} + (\bar e^{\rm end}_{c,s} - \bar e^{\rm
+pre}_{c,s})/\Delta t_{\rm c}$, with $\bar e$ the window means of the stationary part: unbiased, under the hypothesis
+that the step leaves no after-effect in the end window, 5.5-6 s after it (the living handoff §4.2's rebound caveat; the
+uncorrected hint of a rise with step size in 526785799, §4.6) **[reasoning; log]**. At $\theta_{\rm cf}$ the error's SD
+is 0.0045 mV/s -- 4.5 % of a tilt SD of 0.1 mV/s, 17 % of 0.027 mV/s -- from Block 2's exact window-mean moments,
+matched by 2000 simulated sweeps (0.00449 against 0.00451 mV/s) **[run: `check_ls_tilt_reading.py`, 2026-10-29]**; the
+SS reading of (D-102.2) erred by 0.0027-0.0036 mV/s RMS in its check's configuration **[run: check03 (f) of the tilt
+study]**.
+
+(D-107.2) *The fit's simulator* [user: "PERFECT"]. In every replicate of the binding function and of $\hat\Sigma$, each
+simulated sweep -- SS and LS -- carries the tilt of its real sweep, $\hat b_{c,s}(t_j - \bar t_s)$, a fixed number, not a
+draw. The tilt SD leaves the fit: (T1), `tilt_from_semivariogram` and the alternation of $\hat\sigma_b(c)$ with
+$\hat\theta_c$ (SPEC §2.3 (f)-(h)) are not computed [the assistant's proposal, confirmed]; (T1) is not kept as a
+report-only diagnostic either [the assistant's reading of D-102: "no statistics has to be computed on the tilt"].
+
+**Why [user; run; reasoning].** **[user]** as quoted. **[run]** (D-107.1): the line through two window means 6.9 s apart
+reads an LS sweep's tilt to about 0.0045 mV/s at $\theta_{\rm cf}$, of the order of the SS reading. **[reasoning]** With
+the same tilts in the simulator, the fit's simulated statistics carry the real sweeps' tilts exactly, as its subtraction
+mirrors the data's; nothing about the tilt is estimated inside the fit.
+
+**What it implies for code and tables.**
+- Block 3: the LS reading (D-107.1) beside the SS reading (D-102.2), one tilt per sweep and protocol, written to the
+  per-sweep table (e.g. `noise_tilt_mV_per_s`); `ls_baseline_qc.py`'s `delta_end_mV` is its oracle in the smoke test.
+- Block 2: a fixed tilt per trace (mV/s) as an input of `simulate_traces`, which today forms `sigma_b * xi_tilt`
+  [proposal: a new keyword argument, the old pair kept].
+- Block 4: `simulate_cell_windows` takes the per-sweep tilts in place of `sigma_b`; `fit_cell` loses the alternation;
+  smoke F5 retired, F7's tilt assertions replaced; `noise_sigma_b_mV_per_s` and the flags `tilt_clipped`, `tilt_no_pairs`
+  retired.
+- Block 5: the generator takes the per-sweep tilts of both protocols.
+- SPEC §2.3, §2.4 and §8 rewritten with the blocks (marked now).
+
+**What it does not decide [open].** (a) The precision of the SS reading (D-102.2) with D-103's starts and the median
+subtraction (not checked). (b) Whether the LS end window stays at 500 ms (`END_WINDOW_MS`, the Allen convention) or is
+made longer.
+
+**Sources.** **[user]** 2026-10-29, 14:41. **[log]** D-017 (note 4), D-034, D-102, D-103; the living handoff §4.2 and
+§4.6. **[src]** `ls_baseline_qc.py` (`END_WINDOW_MS` = 500, `delta_end_mV`), `noise_law.var_window_mean`,
+`window_mean_cov`, `simulate_traces` (`main` at `c7a587a`). **[run, sandbox]** `check_ls_tilt_reading.py` (2026-10-29,
+`Ih Fit/dev/2026-10-29_ls_tilt/`; P1, P2 PASS, re-run identical); check03 (f) of the tilt study.
+
+**Status:** active; not implemented. Closes D-102's open points (a), (b) and (d); its (c) stays open as (a) above.
 
 ---
 

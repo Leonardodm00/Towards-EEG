@@ -1,0 +1,7 @@
+geometry: pre-window 13250 samples, end window 25000 samples starting at sample 338500; centres 6.8875 s apart
+exact (noise_law): SD of the pre-window mean 0.0248 mV, of the end-window mean 0.0187 mV, covariance 1.69e-82 mV^2
+P1 covariance below 1e-12 mV^2: PASS
+P2 SD of b_hat - b: exact 0.00451 mV/s, Monte Carlo 0.00449 mV/s (N = 2000, SE 0.00007; mean +0.00005) PASS
+   relative to a tilt SD of 0.100 mV/s: 4.5 %
+   relative to a tilt SD of 0.027 mV/s: 16.7 %
+ALL PASS   (5 s)
