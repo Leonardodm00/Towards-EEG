@@ -178,7 +178,9 @@ def test_contract():
     # scan_cell's cap and order (the calibration test's miniature cell: a 0.2 um tube, Allen radius 0.1 um)
     with tempfile.TemporaryDirectory() as tmp:
         cfg_cell = dataclasses.replace(cfg0, calibration=dataclasses.replace(cfg0.calibration, patch_half_um=3.5,
-                                                                             isolation_depth_gl=50.0),
+                                                                             isolation_depth_gl=50.0,
+                                                                             near_candidates="table",
+                                                                             far_candidates="table"),
                                        measure=dataclasses.replace(cfg0.measure, block_half_um=3.5))
         swc, fetcher, planes, swc_path = fixtures_cell.synthetic_cell(tmp, cfg_cell, d_true=0.2, mu=1.5, allen_radius=0.1)
         provider = run_cell.real_provider(fetcher, planes, cfg_cell.acquisition.res0_um)
@@ -191,9 +193,14 @@ def test_contract():
             calls.append(args)
             return provider(*args)
         perm = np.random.default_rng([7, 1]).permutation(3)
+        lines = []
         out = CAL.scan_cell(swc, counting, cfg_cell, candidates={4, 5, 6}, order_rng=np.random.default_rng([7, 1]),
-                            max_per_set=1)
+                            max_per_set=1, log=lines.append)
         assert [o[0] for o in out] == [[4, 5, 6][k] for k in perm], ([o[0] for o in out], perm)
+        # 2026-10-29: the set_full nodes are counted in one line at the end, not one line each
+        n_full = sum(1 for o in out if o[3] == ["set_full"])
+        assert n_full and not any("set_full" in x for x in lines[:-1]), lines
+        assert lines[-1] == "not measured, their set already holding 1 scans (set_full): %d near" % n_full, lines
         assert sum(1 for o in out if o[2] is not None) == 1
         first = next(i for i, o in enumerate(out) if o[2] is not None)
         assert all(o[3] == ["set_full"] and o[1] is None for o in out[first + 1:]), out
@@ -240,6 +247,26 @@ def test_contract():
         assert "INSUFFICIENT: 2 near-field nodes < 10" in buf.getvalue(), buf.getvalue()
         assert all(n // CP.QUALIFIER == 11 for n in cal["growth"]["node_ids"]), cal["growth"]["node_ids"]
         assert os.path.exists(os.path.join(out_dir, "s3c", "figures", "width_by_plane_near.png"))
+        # the step with Block 10.C's search (D-112, the default): the candidates are the search's chosen nodes, its
+        # records in the cell's calibration folder, its lines printed; no table candidate is used
+        cfg_x = dataclasses.replace(cfg_s, calibration=dataclasses.replace(cfg_s.calibration, near_candidates="cell",
+                                                                           far_candidates="cell"))
+        ctx = SC.Context(rows[0], cell, Source())
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            sx = SC.step_calibration(ctx, cfg_x)
+        near_csv = cell.path_of("calibration", "near_search_11.csv")
+        assert os.path.exists(near_csv) and os.path.exists(cell.path_of("calibration", "far_search_11.csv"))
+        from allen_diameter.loading import table_io
+        chosen = {int(r["node_id"]) for w in ("near", "far")
+                  for r in table_io.read_rows([cell.path_of("calibration", "%s_search_11.csv" % w)])
+                  if str(r["chosen"]) == "True"}
+        _scans, meta_x = CIO.load_scans(cell.path_of("calibration", "scans_11.json"))
+        assert chosen and meta_x["n_candidates"] == sx["n_candidates"] == len(chosen), (meta_x["n_candidates"], sx,
+                                                                                      chosen, buf.getvalue())
+        assert {int(n["node_id"]) for n in meta_x["nodes"]} <= chosen, (meta_x["nodes"], chosen)
+        assert "11 near search over the cell:" in buf.getvalue() and "11 far search over the cell:" in buf.getvalue(), \
+            buf.getvalue()
     # far-fit's production kernel only with both sets sufficient (analytic far scans, a hand-made calibration file)
     cfg = dataclasses.replace(cfg0, calibration=dataclasses.replace(cfg0.calibration, bootstrap_resamples=8))
     rng = np.random.default_rng(SEED)
@@ -294,7 +321,9 @@ def test_edge_cases():
             w.writerow([2, "failed", "", 0.0, 0.2, 0.1])
         survey_io.write_marker(cell, "nodes", {}, 0.0, "x")
         ctx = SC.Context(dict(specimen_id=4), cell, None)
-        s = SC.step_calibration(ctx, default_config())
+        d0 = default_config()      # the table's candidates (no SWC here); the search's own edges: candidate_search
+        s = SC.step_calibration(ctx, dataclasses.replace(d0, calibration=dataclasses.replace(
+            d0.calibration, near_candidates="table", far_candidates="table")))
         assert s == dict(n_candidates=0, n_near=0, n_far=0, reasons={}), s
         scans, meta = CIO.load_scans(cell.path_of("calibration", "scans_4.json"))
         assert scans == [] and meta["n_candidates"] == 0

@@ -34,9 +34,10 @@ def _parse(value):
     return value
 
 
-def write_rows(rows, path):
-    """CSV with the union of the rows' keys (first-seen order)."""
-    keys = []
+def write_rows(rows, path, fieldnames=None):
+    """CSV with the union of the rows' keys (first-seen order); fieldnames, when given, come first and in that
+    order -- the header of a file with no row (2026-10-29, Block 10.C's per-set records)."""
+    keys = list(fieldnames or [])
     for r in rows:
         keys += [k for k in r if k not in keys]
     tmp = path + ".tmp"

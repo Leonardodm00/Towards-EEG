@@ -8,13 +8,18 @@ specs/SPEC.md (procedure Eq. 4, s.3.4; mathematics Eq. 18, s.3.5; S2b).
              planes on the +-patch_half_um patch against the planar far-pixel
              background (10.P) -> scans JSON (+ the example node's patch
              images, patches .npz)
-  real       Phase II (Colab: api.brain-map.org): the candidates of a
-             previous run_cell.py or run_node.py table -- by Allen's diameter
-             in the near-field or the far-field set of D-067.4, and in S,
-             flat and faint by the pilot's columns -- are re-measured, tested
-             for straightness and isolation (10.I) and scanned: the near set
-             on k* +- 3, the far set on k* +- 16 (Block 15.1) -> one scans
-             JSON holding both sets, and the example nodes' patches .npz;
+  real       Phase II (Colab: api.brain-map.org): the calibration candidates
+             -- since 2026-10-29 (D-109, D-112, Block 10.C) every dendrite
+             node of the cell in the near-field or the far-field set of
+             D-067.4, judged from the trace before any fetch (flat, the
+             stripe at the trace's plane and at the set's fit planes), the
+             previous run_cell.py or run_node.py table giving the typical
+             background and absorption; with calibration.near_candidates /
+             far_candidates = "table", that table's rows in S and flat -- are
+             measured (the pilot), judged again (10.I) and scanned: the near
+             set on k* +- 3, the far set on k* +- 16 (Block 15.1) -> one
+             scans JSON holding both sets, <set>_search_<specimen>.csv beside
+             it, and the example nodes' patches .npz;
              as each candidate is evaluated, the figure of the patch its
              background is fitted on, with the traced neighbours whose
              predicted shadows decide not_isolated (10.F (5), D-098.4) ->
@@ -217,12 +222,19 @@ def isolation_hook(provider, cfg, fig_dir, views, log=print, dpi=110):
     return hook
 
 
-def knobs_line(cfg):
-    """The stripe's settings a run uses (D-101; Cell 7's knobs reach the scripts through --config-json) and where the
-    far set's candidates come from (D-109)."""
+def candidate_sources(cfg):
+    """{set: "cell" | "table"}: where each calibration set's candidates come from (Block 10.C, D-109, D-112)."""
     cal = cfg.calibration
-    far = ("; far set from the whole cell, at least %g um apart" % cal.far_search_spacing_um
-           if cal.far_candidates == "cell" else "; far set from the pilot table")
+    return {"near": cal.near_candidates, "far": cal.far_candidates}
+
+
+def knobs_line(cfg):
+    """The stripe's settings a run uses (D-101; Cell 7's knobs reach the scripts through --config-json) and where
+    each set's candidates come from (D-109, D-112)."""
+    cal = cfg.calibration
+    src = candidate_sources(cfg)
+    far = "".join("; %s set from the whole cell, at least %g um apart" % (w, getattr(cal, w + "_search_spacing_um"))
+                  if src[w] == "cell" else "; %s set from the pilot table" % w for w in calibration.CALIBRATION_SETS)
     if cal.background_support != "stripe":
         return ("calibration knobs: background_support square (the far mask r + %g sigma, the any-shadow veto above "
                 "%g gl); flatness phi <= %g deg near, %g deg far" % (cal.far_pixel_sigmas, cal.isolation_depth_gl,
@@ -247,33 +259,47 @@ def far_planes_line(views, cfg):
             % (cal.far_min_planes_per_node, cal.far_min_k_offset, enough, len(far)))
 
 
-def far_search_name(a):
-    """Where `real` writes Block 10.C's records: far_search_<specimen>.csv beside --out."""
-    return os.path.join(os.path.dirname(os.path.abspath(a.out)), "far_search_%s.csv" % a.specimen)
+def search_name(out_dir, which, specimen):
+    """Where Block 10.C's records of set `which` go: <out_dir>/<which>_search_<specimen>.csv (Cell 7: beside the
+    scans file; S3's calibration step: the cell's calibration folder)."""
+    return os.path.join(out_dir, "%s_search_%s.csv" % (which, specimen))
 
 
-def not_far(cand, swc, cfg):
-    """The ids of cand whose Allen diameter (2 x the SWC radius) does not put them in the far set."""
+def not_in_set(cand, swc, cfg, which):
+    """The ids of cand whose Allen diameter (2 x the SWC radius) does not put them in calibration set `which`."""
     radius = {int(i): float(r) for i, r in zip(swc.ids, swc.radius)}
-    return {int(n) for n in cand if calibration.calibration_set(2.0 * radius.get(int(n), float("nan")), cfg) != "far"}
+    return {int(n) for n in cand if calibration.calibration_set(2.0 * radius.get(int(n), float("nan")), cfg) != which}
 
 
-def far_candidates_over_cell(swc, cfg, transform, table_rows, a):
-    """Block 10.C (D-109): the far set's candidates found over the whole cell from its trace (they replace the
-    pilot table's far candidates; not_far). Writes every far-range node's record to far_search_<specimen>.csv
-    (far_search_name) and prints the search's lines; returns the set of chosen ids."""
-    from allen_diameter.analysis import far_search
-    B_bar, mu = far_search.typical_background(table_rows, cfg)
-    print("far search: the cell's typical background %.1f gl and absorption %.3f /um (the pilot table's medians in S)"
-          % (B_bar, mu), flush=True)
-    t0 = time.perf_counter()
-    records = far_search.search(swc, cfg, transform, B_bar, mu, log=lambda m: print(m, flush=True))
-    chosen = far_search.choose(records, cfg)
-    kept = set(chosen)
-    table_io.write_rows([dict(r, chosen=int(r["node_id"]) in kept) for r in records], far_search_name(a))
-    print("%s (%.1f min) -> %s" % (far_search.summary_line(records, chosen, cfg), (time.perf_counter() - t0) / 60,
-                                   far_search_name(a)), flush=True)
-    return kept
+def cell_candidates(swc, cfg, transform, table_rows, out_dir, specimen, log=None):
+    """Block 10.C (D-109, D-112): a cell's calibration candidates. For each set, the pilot table's
+    (candidates_from_rows) when calibration.<set>_candidates is "table"; else the nodes candidate_search finds over
+    the whole cell from its trace (transform: keyword arguments of cell.to_image_um), the table's medians in S as
+    the cell's typical background and absorption -- they replace the table's candidates of that set (not_in_set).
+    Every searched set's records go to search_name(out_dir, set, specimen) with a column `chosen`; log, when
+    given, gets the search's lines. Used by `real` (Cell 7) and by S3's calibration step (survey_cells.py, Block
+    19.3). Returns the set of node ids."""
+    from allen_diameter.analysis import candidate_search
+    say = log or (lambda m: None)
+    cand = candidates_from_rows(table_rows, cfg)
+    sets = [w for w in calibration.CALIBRATION_SETS if candidate_sources(cfg)[w] == "cell"]
+    if not sets:
+        return cand
+    B_bar, mu = candidate_search.typical_background(table_rows, cfg)
+    say("candidate search: the cell's typical background %.1f gl and absorption %.3f /um (the pilot table's medians "
+        "in S)" % (B_bar, mu))
+    for which in sets:
+        t0 = time.perf_counter()
+        records = candidate_search.search(swc, cfg, which, transform, B_bar, mu, log=say)
+        chosen = candidate_search.choose(records, cfg, which)
+        kept = set(chosen)
+        path = search_name(out_dir, which, specimen)
+        table_io.write_rows([dict(r, chosen=int(r["node_id"]) in kept) for r in records], path,
+                            fieldnames=list(candidate_search.RECORD_KEYS) + ["chosen"])
+        say("%s (%.1f min) -> %s" % (candidate_search.summary_line(records, chosen, cfg, which),
+                                     (time.perf_counter() - t0) / 60, path))
+        cand = not_in_set(cand, swc, cfg, which) | kept
+    return cand
 
 
 def write_isolation_overview(views, fig_dir, dpi=110):
@@ -299,7 +325,6 @@ def run_real(cfg, a):
     planes = aio.plane_table(aio.list_images(int(a.specimen)))
     provider = run_cell.real_provider(aio.HttpFetcher(cache_dir=a.cache_dir), planes, cfg.acquisition.res0_um)
     table_rows = table_io.read_rows([a.nodes_csv])
-    cand = candidates_from_rows(table_rows, cfg)
     regs = {}
     if a.registration_json:
         with open(a.registration_json) as f:
@@ -307,8 +332,8 @@ def run_real(cfg, a):
     transform = dict(shift_full_px=(a.shift_x, a.shift_y), flip_y_full_h=a.flip_h, z0_um=a.z0)
     cal = cfg.calibration          # Block 19.1 (D-088.3): a seeded order, at most calib_max_nodes_per_set per set
     print(knobs_line(cfg), flush=True)
-    if cal.far_candidates == "cell":         # Block 10.C (D-109): the far set from the whole cell, not the table
-        cand = not_far(cand, swc, cfg) | far_candidates_over_cell(swc, cfg, transform, table_rows, a)
+    cand = cell_candidates(swc, cfg, transform, table_rows, os.path.dirname(os.path.abspath(a.out)), a.specimen,
+                           log=lambda m: print(m, flush=True))        # Block 10.C (D-109, D-112)
     print("%d candidate nodes" % len(cand), flush=True)
     t0 = time.perf_counter()
     fig_dir, views = isolation_dir(a), []

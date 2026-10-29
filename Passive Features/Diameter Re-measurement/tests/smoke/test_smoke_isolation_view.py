@@ -101,9 +101,11 @@ RAMP = (180.0, 0.4, -0.25)       # gl, gl/um, gl/um: the provider's plane b0 + b
 def cfg_with(**cal):
     """The square rule (D-078.1, D-081.1) at its 0.03 gl (the rule of 2026-10-26; the default tau is 0.3 gl since
     D-108) unless the check says otherwise: these checks are about the figure's contents under it; the stripe (D-101,
-    the default since 2026-10-28) has test_smoke_stripe.py and the stripe checks in test_contract below."""
+    the default since 2026-10-28) has test_smoke_stripe.py and the stripe checks in test_contract below. The
+    candidates are the table's (D-112 makes the whole-cell search the default; test_smoke_candidate_search.py)."""
     cfg = default_config()
-    cal = dict({"background_support": "square", "isolation_depth_gl": 0.03}, **cal)
+    cal = dict({"background_support": "square", "isolation_depth_gl": 0.03, "near_candidates": "table",
+                "far_candidates": "table"}, **cal)
     return dataclasses.replace(cfg, calibration=dataclasses.replace(cfg.calibration, **cal))
 
 
@@ -440,7 +442,8 @@ def _real_command_line(tmp, cfg_cell, swc, fetcher, planes):
             assert "calibration knobs: background_support square" in text, text
         # Cell 7's knob block (2026-10-28): a calibration section holding some fields -- the rest stay the defaults --
         # reaches `real` through --config-json; the run prints the knobs it uses and the far set's per-plane count
-        knobs = dict(background_support="stripe", isolation_depth_gl=0.05, stripe_min_pixels=50, patch_half_um=3.5)
+        knobs = dict(background_support="stripe", isolation_depth_gl=0.05, stripe_min_pixels=50, patch_half_um=3.5,
+                     near_candidates="table", far_candidates="table")
         kj = os.path.join(tmp, "calibration_config.json")
         with open(kj, "w") as f:
             json.dump(dict(json.loads(cfg_cell.to_json()), calibration=knobs), f)
@@ -452,8 +455,8 @@ def _real_command_line(tmp, cfg_cell, swc, fetcher, planes):
                      "--out", os.path.join(out_dir, "scans.json"), "--config-json", kj])
         text = buf.getvalue()
         assert ("calibration knobs: background_support stripe, tau 0.05 gl, W 1, 2, 4, 8, 12 um, at least 50 px and "
-                "3 um per side, patch +-3.5 um; flatness phi <= 10 deg near, 15 deg far; far set from the whole cell, "
-                "at least 5 um apart") in text, text
+                "3 um per side, patch +-3.5 um; flatness phi <= 10 deg near, 15 deg far; near set from the pilot "
+                "table; far set from the pilot table") in text, text
         assert "far-set candidates with a usable stripe in at least 6 of the far fit's planes (|k - k*| >= 5): 0 of 0" \
             in text, text
         meta = json.load(open(os.path.join(out_dir, "scans.json")))["meta"]["calibration"]

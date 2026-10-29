@@ -46,7 +46,13 @@ Checks
                         2026-10-28 (verbatim copy) to 1e-9 um, and the windowed
                         masks equal the full-patch masks of the same day
                         (verbatim copy) pixel for pixel on random scenes with
-                        deep segments whose margins cover the whole patch
+                        deep segments whose margins cover the whole patch;
+                        2026-10-29, the pre-cull of rows that cannot reach the
+                        crop: at a tiny tau each margin is its bracket's end r
+                        + 6 sigma, and segments 0.5 sigma inside that reach
+                        from outside the crop still shade its edge (equal to
+                        the full-patch masks), while those 0.5 sigma beyond it
+                        shade nothing
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -501,6 +507,27 @@ def test_recheck():
             assert np.array_equal(a1[0], a0[0]) and np.array_equal(a1[1], a0[1]), (trial, B, int((a1[0] != a0[0]).sum()),
                                                                                    int((a1[1] != a0[1]).sum()))
             assert a1[0].any(), trial
+    # 2026-10-29, the pre-cull (shadow_masks drops the rows whose window is empty even at r + 6 sigma, the largest
+    # margin shadow_margins can return): at tau 1e-12 gl every margin is that bracket's end (the shadow there is
+    # still ~1e-8 of the dip), so a segment outside the crop at r + 5.5 sigma from its edge pixels shades them and one
+    # at r + 6.5 sigma shades nothing; the full-patch masks of 2026-10-28 are the oracle
+    cfg_t = cfg_with(background_support="stripe", isolation_depth_gl=1e-12)
+    shape, frame = frame_of(cfg_t, 4.0)
+    px, py = CS.pixel_centres(shape, frame)
+    edge = float(py.max())                                   # the crop's last pixel row (um)
+    r_q, delta = 0.3, 2.0
+    sig = float(sigma_r(delta, cfg_t.renderer))
+    assert abs(CS.shadow_margin(r_q, MU, sig, B_BAR, 1e-12) - (r_q + 6.0 * sig)) < 1e-12
+    own4 = scene_of(())[0]
+    for gap, shades in ((r_q + 5.5 * sig, True), (r_q + 6.5 * sig, False)):
+        y = edge + gap
+        sc = Scene(np.array([[-3.0, y, delta, 3.0, y, delta]]), np.array([[r_q, r_q]]), np.array([[900, 901]]),
+                   np.empty((0, 3)))
+        rows = CS.segment_rows(sc, frame, shape, own4, 500.0)
+        a1 = CS.shadow_masks(shape, frame, rows, sc.soma, np.array([0.0]), B_BAR, MU, cfg_t, 0.5)
+        a0 = _old_shadow_masks(shape, frame, rows, sc.soma, np.array([0.0]), B_BAR, MU, cfg_t, 0.5)
+        assert np.array_equal(a1[0], a0[0]) and np.array_equal(a1[1], a0[1]), (gap, int((a1[0] != a0[0]).sum()))
+        assert bool(a1[0][0, -1].any()) is shades and bool(a1[0].any()) is shades, (gap, int(a1[0].sum()))
 
 
 # ----------------------------------------------------------------- runner --

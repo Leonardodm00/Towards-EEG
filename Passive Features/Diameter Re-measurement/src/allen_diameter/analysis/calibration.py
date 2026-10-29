@@ -570,7 +570,9 @@ def scan_cell(swc, provider, cfg, transform=None, regs=None, candidates=None, lo
     max_per_set a node whose set (by Allen's diameter, calibration_set)
     already holds max_per_set scans is not measured, reason set_full.
     Returns a list of (node_id, NodeResult or None, PlaneScan or None,
-    reasons); log, when given, gets one scan_verdict line per node; on_node,
+    reasons); log, when given, gets one scan_verdict line per measured node
+    and, at the end, one line counting the set_full nodes (2026-10-29: the
+    whole-cell search of Block 10.C hands over hundreds of candidates); on_node,
     when given, is called after each measured node as on_node(node_id,
     branch, index, NodeResult, PlaneScan or None, reasons, scene) -- Cell 7's
     isolation figure (10.F (5), D-098.4); not for a set_full node."""
@@ -588,13 +590,12 @@ def scan_cell(swc, provider, cfg, transform=None, regs=None, candidates=None, lo
                 work.append((nid, branch, off + t))
     if order_rng is not None:
         work = [work[k] for k in order_rng.permutation(len(work))]
-    counts, out = {}, []
+    counts, out, full = {}, [], {}
     for nid, branch, i in work:
         which = calibration_set(2.0 * float(branch.radius_um[i]), cfg)
         if max_per_set is not None and which is not None and counts.get(which, 0) >= int(max_per_set):
             out.append((nid, None, None, ["set_full"]))
-            if log is not None:
-                log("node %d: %s" % (nid, scan_verdict(None, ["set_full"])))
+            full[which] = full.get(which, 0) + 1
             continue
         res, scan, reasons = scan_node(branch, i, provider, cfg, (regs or {}).get(nid), scene, keep_images)
         if scan is not None:
@@ -604,6 +605,9 @@ def scan_cell(swc, provider, cfg, transform=None, regs=None, candidates=None, lo
             log("node %d: %s" % (nid, scan_verdict(scan, reasons)))
         if on_node is not None:
             on_node(nid, branch, i, res, scan, reasons, scene)
+    if log is not None and full:
+        log("not measured, their set already holding %d scans (set_full): %s" % (
+            int(max_per_set), ", ".join("%d %s" % (full[w], w) for w in sorted(full))))
     return out
 
 

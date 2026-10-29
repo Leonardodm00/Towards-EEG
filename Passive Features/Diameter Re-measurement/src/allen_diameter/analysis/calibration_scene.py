@@ -336,7 +336,12 @@ def shadow_masks(shape, frame, rows, soma, planes_z, B_bar, mu, cfg, d_own_um=No
     neighbours). The margins of every segment and plane come from one
     vectorized shadow_margins call; each segment's distances are computed on
     the pixels within its largest margin of it only (exact: a pixel outside
-    that window is farther than every margin)."""
+    that window is farther than every margin). [2026-10-29] Before the
+    margins, the rows whose window would be empty even at the largest margin
+    a row can have -- r + 6 sigma, the bisection's bracket, or r + n_sigma
+    sigma for the geometric margins -- are dropped (exact for the same
+    reason; Block 10.C judges thousands of nodes on a scene of thousands of
+    segments)."""
     H, W = int(shape[0]), int(shape[1])
     px, py = pixel_centres(shape, frame)
     z = np.asarray(planes_z, dtype=float).reshape(-1)
@@ -358,7 +363,20 @@ def shadow_masks(shape, frame, rows, soma, planes_z, B_bar, mu, cfg, d_own_um=No
         r = np.maximum(rows[:, 6], rows[:, 7])
         r = np.where(is_own, np.maximum(r, r_own), r)
         delta = np.maximum(np.abs(rows[:, 2:3] - z[None, :]), np.abs(rows[:, 5:6] - z[None, :]))   # (n_rows, n)
-        margins = margins_of(np.broadcast_to(r[:, None], delta.shape), sigma_r(delta, rc))
+        sig = sigma_r(delta, rc)
+        # the rows that can reach the crop at all: _window's own arithmetic on the bounding box grown by the largest
+        # margin each row can have (shadow_margins searches [0, r + 6 sigma]; the geometric margin is r + n_sigma sigma)
+        bound = np.max(r[:, None] + max(6.0, n_sigma) * np.maximum(sig, 1e-6), axis=1)
+        p_um = float(frame.res_um_px)
+        c0 = np.maximum(0, np.ceil((np.minimum(rows[:, 0], rows[:, 3]) - bound) / p_um - frame.left).astype(int) - 1)
+        c1 = np.minimum(W, np.floor((np.maximum(rows[:, 0], rows[:, 3]) + bound) / p_um - frame.left).astype(int) + 2)
+        r0 = np.maximum(0, np.ceil((np.minimum(rows[:, 1], rows[:, 4]) - bound) / p_um - frame.top).astype(int) - 1)
+        r1 = np.minimum(H, np.floor((np.maximum(rows[:, 1], rows[:, 4]) + bound) / p_um - frame.top).astype(int) + 2)
+        reach_crop = (r0 < r1) & (c0 < c1)
+        margins = np.full(delta.shape, -1.0)
+        if reach_crop.any():
+            margins[reach_crop] = margins_of(np.broadcast_to(r[reach_crop, None], delta[reach_crop].shape),
+                                             sig[reach_crop])
         # each segment's largest distance to the crop (at a corner: the distance to a segment is convex)
         cx_ = (frame.left + np.array([0, W - 1, 0, W - 1])) * float(frame.res_um_px)
         cy_ = (frame.top + np.array([0, 0, H - 1, H - 1])) * float(frame.res_um_px)

@@ -33,9 +33,12 @@ Steps (in their order)
   camera        the camera inputs from the nodes' background (Block 18.3; after
                 nodes): <sid>/camera/camera_<sid>.json
   calibration   the kernel calibration's scans of the cell (Block 19.3; after
-                nodes): its candidates from the per-node CSV, a seeded order, at
+                nodes): its candidates found over the whole cell from the
+                trace (Block 10.C, D-112; the per-node CSV gives the typical
+                background and absorption, and the candidates of a set whose
+                calibration.<set>_candidates is "table"), a seeded order, at
                 most survey.calib_scans_per_cell per set (D-088):
-                <sid>/calibration/scans_<sid>.json
+                <sid>/calibration/scans_<sid>.json, <set>_search_<sid>.csv
 
 Example (Colab, after Cell 11; on davinci scripts/pbs/survey_cells.pbs runs one cell per array task with
 --task-index and --cache-per-cell, D-099)
@@ -248,7 +251,10 @@ def step_camera(ctx, cfg):
 
 
 def step_calibration(ctx, cfg):
-    """Block 19.3: the cell's calibration scans for the pooled kernel (D-088)."""
+    """Block 19.3: the cell's calibration scans for the pooled kernel (D-088). The candidates are Block 10.C's
+    (calibrate_kernel.cell_candidates, D-109, D-112): every node of the cell in either set judged from the trace,
+    the cell's per-node CSV giving the typical background and absorption -- or that CSV's rows for a set whose
+    calibration.<set>_candidates is "table"; the search's records go to <sid>/calibration/<set>_search_<sid>.csv."""
     import dataclasses
     import calibrate_kernel
     import run_cell
@@ -257,16 +263,24 @@ def step_calibration(ctx, cfg):
     sid = ctx.sid
     if not ctx.cell.done("nodes"):
         raise RuntimeError("calibration needs the step nodes of %d (its per-node CSV)" % sid)
-    cand = calibrate_kernel.candidates_from_rows(table_io.read_rows(ctx.cell.path_of("nodes", "pilot_%d.csv" % sid)), cfg)
+    rows = table_io.read_rows(ctx.cell.path_of("nodes", "pilot_%d.csv" % sid))
     path = ctx.cell.path_of("calibration", "scans_%d.json" % sid)
+    swc = transform = None
+    if "cell" in calibrate_kernel.candidate_sources(cfg).values():
+        swc = swc_io.read_swc(ctx.data["swc_path"])
+        transform = cell_alignment.full_transform(ctx.alignment)
+    cand = calibrate_kernel.cell_candidates(swc, cfg, transform, rows, os.path.dirname(path), sid,
+                                            log=lambda m: print("    %d %s" % (sid, m), flush=True))
     meta = dict(source="survey", specimen=str(sid), n_candidates=len(cand), calibration=dataclasses.asdict(cfg.calibration),
                 max_per_set=int(cfg.survey.calib_scans_per_cell))
     if not cand:
         calibration_io.save_scans([], path, dict(meta, nodes=[], reasons_count={}))
         return dict(n_candidates=0, n_near=0, n_far=0, reasons={})
-    swc = swc_io.read_swc(ctx.data["swc_path"])
+    if swc is None:
+        swc = swc_io.read_swc(ctx.data["swc_path"])
+        transform = cell_alignment.full_transform(ctx.alignment)
     provider = run_cell.real_provider(ctx.source.fetcher, ctx.source.planes(sid), cfg.acquisition.res0_um)
-    out = calibration.scan_cell(swc, provider, cfg, cell_alignment.full_transform(ctx.alignment), None, cand,
+    out = calibration.scan_cell(swc, provider, cfg, transform, None, cand,
                                 order_rng=np.random.default_rng([int(cfg.calibration.calib_order_seed), int(sid)]),
                                 max_per_set=int(cfg.survey.calib_scans_per_cell))
     scans = [sc for _, _, sc, _ in out if sc is not None]
