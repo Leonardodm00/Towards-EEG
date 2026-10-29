@@ -28,3 +28,9 @@ The Ih Fit folder is found three levels above scripts/; set TEEG_IH_FIT (tilt_co
 (check_findings_2026-10-23.py) to use another checkout. Re-run here on 2026-10-28 from this folder:
 check01, check02 and check05 reproduce results/check01.log, check02.log and check05.log line for line,
 timings aside.
+
+[2026-10-29 (later, 5)] check_findings_2026-10-23.py calls Block 4's API of 2026-10-23 (binding_function and
+simulated_covariance with a sigma_b argument, tilt_from_semivariogram), which Block 4 dropped with D-107.2
+(commit after 7672ffc on sci/noise-fit-d103). Re-run it from a checkout of 1aabe3e (git worktree add
+../ih_1aabe3e 1aabe3e) or earlier. Its part A (the legacy transient test) and every other script here
+still run on the current code.

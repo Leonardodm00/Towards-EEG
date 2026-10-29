@@ -28,3 +28,9 @@ then run any script from this folder with python (numpy, scipy, statsmodels, mat
 
 Runs that failed are kept with their outputs, as the explanation reported them (Check by computation: a failed
 check corrects the claim).
+
+[2026-10-29 (later, 5)] check_findings_2026-10-23.py calls Block 4's API of 2026-10-23 (binding_function and
+simulated_covariance with a sigma_b argument, tilt_from_semivariogram), which Block 4 dropped with D-107.2
+(commit after 7672ffc on sci/noise-fit-d103). Re-run it from a checkout of 1aabe3e (git worktree add
+../ih_1aabe3e 1aabe3e) or earlier. Its part A (the legacy transient test) and every other script here
+still run on the current code.

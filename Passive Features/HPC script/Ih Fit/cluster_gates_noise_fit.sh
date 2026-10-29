@@ -119,7 +119,7 @@ run_check "G6b smoke_noise_windows (Block 3)" g6b_noise_windows "SMOKE noise_win
 
 if [ "$QUICK" != "1" ]; then
     # --- G6c the Block 4 suite (no NEURON; about 2 min, so FULL mode only) ------
-    run_check "G6c smoke_noise_fit (Block 4)" g6c_noise_fit "SMOKE noise_fit: 10/10 passed" "$PY" smoke_noise_fit.py
+    run_check "G6c smoke_noise_fit (Block 4)" g6c_noise_fit "SMOKE noise_fit: 11/11 passed" "$PY" smoke_noise_fit.py
 
     # --- G7 NEURON, skopt and the compiled mechanisms --------------------------
     if out="$("$PY" -c 'import neuron, skopt; print("neuron %s, skopt %s" % (neuron.__version__, skopt.__version__))' 2>&1)"; then
