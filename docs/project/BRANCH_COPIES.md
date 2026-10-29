@@ -11,8 +11,8 @@ branch, at the paths they have in project knowledge:
 
 | Path here | In project knowledge | Copied |
 |---|---|---|
-| `claude/TEEG_diameter_HPC_paths_reference.md` | `claude/` | 2026-10-29, its v15 (D-108, D-109: tau 0.3 gl, Cell 7's far search and `far_search_<sp>.csv`; v14: D-105, the recheck, Cell 7's knob file, Cell 15's merged file; v13: D-101, the stripe; v12: D-099, the survey jobs, section 2b; v11: D-098 on the remote; first copied at v10) |
-| `TEEG_decisions_and_ideas_log.md` | root | 2026-10-29, its v30 (D-108, D-109, on the noise-fit chat's D-106, D-107 and its check note of 2026-10-29; v29: D-105; v28: D-101; v26: D-099; v25: D-098; v24: the status notes on D-085, D-089, D-090) |
+| `claude/TEEG_diameter_HPC_paths_reference.md` | `claude/` | 2026-10-29, its v16 (D-112: the near set searched over the whole cell too, in Cell 7, Cell 15 and the davinci array; v15: D-108, D-109, tau 0.3 gl, Cell 7's far search and `far_search_<sp>.csv`; v14: D-105, the recheck, Cell 7's knob file, Cell 15's merged file; v13: D-101, the stripe; v12: D-099, the survey jobs, section 2b; v11: D-098 on the remote; first copied at v10) |
+| `TEEG_decisions_and_ideas_log.md` | root | 2026-10-29, its v31 (D-112, D-113, on the noise-fit chat's D-110, D-111 and its rows (later, 4) and (later, 5); v30: D-108, D-109; v29: D-105; v28: D-101; v26: D-099; v25: D-098; v24: the status notes on D-085, D-089, D-090) |
 
 A copy here that differs from project knowledge, or from `main`'s copy of the same document, is stale, not a fork:
 re-read the project document and merge.
