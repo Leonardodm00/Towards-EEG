@@ -95,7 +95,7 @@ else
 fi
 
 # --- G2 the code under test is the committed code ------------------------------
-subjects="$(git log --format=%s -n 40 -- . 2>/dev/null)"
+subjects="$(git log --format=%s -- . 2>/dev/null)"   # every commit of the folder (a fixed -n window would lose block 1 as docs commits accumulate)
 b1=no; b2=no; b3=no; b4=no
 case "$subjects" in *"block 1: textbook sample autocorrelation"*) b1=yes ;; esac
 case "$subjects" in *"block 2: the noise law"*) b2=yes ;; esac
@@ -114,7 +114,7 @@ run_check "G4 syntax" g4_compile "COMPILE: ok" "$PY" noise_fit_gates.py compile
 
 # --- G5, G6, G6b the noise-fit suites (no NEURON) -----------------------------------
 run_check "G5 smoke_noise_stats (Block 1)" g5_noise_stats "SMOKE noise_stats: 6/6 passed" "$PY" smoke_noise_stats.py
-run_check "G6 smoke_noise_law (Block 2)" g6_noise_law "SMOKE noise_law: 9/9 passed" "$PY" smoke_noise_law.py
+run_check "G6 smoke_noise_law (Block 2)" g6_noise_law "SMOKE noise_law: 10/10 passed" "$PY" smoke_noise_law.py
 run_check "G6b smoke_noise_windows (Block 3)" g6b_noise_windows "SMOKE noise_windows: 10/10 passed" "$PY" smoke_noise_windows.py
 
 if [ "$QUICK" != "1" ]; then

@@ -1,6 +1,6 @@
 """
-smoke_noise_law.py -- smoke suite for noise_law (M1-M9)
-========================================================
+smoke_noise_law.py -- smoke suite for noise_law (M1-M10)
+=========================================================
 
 Block 2 of specs/SPEC.md (D-017, D-034, D-056). No NEURON, no archive; about
 one minute on one core. Truths are chosen, so every check has a known answer.
@@ -43,12 +43,19 @@ one minute on one core. Truths are chosen, so every check has a known answer.
       50 kHz) within 0.0003 mV and 0.003 (the table's rounding plus theta_cf's
       own 3-digit rounding)
   M9  byte safety: this file and noise_law.py are pure ASCII with LF endings
+  M10 fixed tilt (D-102.1, D-107.2; added 2026-10-29): with tilt_mV_per_s = b
+      the traces minus the same draws without a tilt equal b[r] (t_j - t_bar)
+      to 1e-12 mV (roundoff of one float64 addition of mV-sized terms), for
+      tilts of both signs and a zero; tilt_mV_per_s = sigma_b xi_tilt is
+      bit-identical to the pair (xi_tilt, sigma_b); simulate_sweep with a
+      scalar tilt equals row `index` of simulate_traces; both tilts at once,
+      a wrong shape and a NaN entry each raise ValueError
 
 Run from this folder (needs numpy, scipy):
 
     python smoke_noise_law.py
 
-Expected last line: "SMOKE noise_law: 9/9 passed". Exit 1 on any FAIL.
+Expected last line: "SMOKE noise_law: 10/10 passed". Exit 1 on any FAIL.
 """
 
 import sys
@@ -291,8 +298,38 @@ def _m9():
     report("M9 ASCII + LF on noise_law.py and this file", not bad, ", ".join(bad) if bad else "ok")
 
 
+def _m10():
+    rng = np.random.default_rng(10)
+    R, n = 4, 3000
+    u = draw_units(rng, R, n)
+    b = np.array([0.1, -0.25, 0.0, 1.7])                                   # mV/s, both signs and a zero
+    with_tilt = simulate_traces(THETA_SIM, DT, u.fast, u.slow, tilt_mV_per_s=b)
+    without = simulate_traces(THETA_SIM, DT, u.fast, u.slow)
+    t_bar = 0.5 * (n - 1) * DT
+    expect = b[:, None] * (np.arange(n) * DT - t_bar)[None, :]
+    err = float(np.max(np.abs((with_tilt - without) - expect)))
+    ok_formula = err <= 1e-12
+    # the fixed tilt sigma_b xi_tilt reproduces the random-tilt path bit for bit
+    sb = 0.08
+    ok_same = np.array_equal(simulate_traces(THETA_SIM, DT, u.fast, u.slow, tilt_mV_per_s=sb * u.tilt),
+                             simulate_traces(THETA_SIM, DT, u.fast, u.slow, xi_tilt=u.tilt, sigma_b=sb))
+    ok_sweep = np.array_equal(simulate_sweep(THETA_SIM, DT, n, u, 1, tilt_mV_per_s=float(b[1])), with_tilt[1])
+    refused = 0
+    for kwargs in (dict(tilt_mV_per_s=b, xi_tilt=u.tilt, sigma_b=0.1), dict(tilt_mV_per_s=b[:3]),
+                   dict(tilt_mV_per_s=np.array([0.1, np.nan, 0.0, 0.2]))):
+        try:
+            simulate_traces(THETA_SIM, DT, u.fast, u.slow, **kwargs)
+        except ValueError:
+            refused += 1
+    report("M10 fixed tilt: b (t - t_bar) added exactly; = the random-tilt path for sigma_b xi_tilt; "
+           "simulate_sweep row; 3 misuses refused",
+           ok_formula and ok_same and ok_sweep and refused == 3,
+           "max |diff - b (t - t_bar)| %.1e mV; bit-identical %s; sweep row %s; refused %d/3"
+           % (err, ok_same, ok_sweep, refused))
+
+
 def main():
-    for fn in (_m1, _m2, _m3, _m4, _m5, _m6, _m7, _m8, _m9):
+    for fn in (_m1, _m2, _m3, _m4, _m5, _m6, _m7, _m8, _m9, _m10):
         try:
             fn()
         except BaseException as exc:          # SystemExit included (D-010 (iii) lineage)
