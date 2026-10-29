@@ -1,0 +1,22 @@
+== 2sw_K40: 2 sweeps, K 40, 2000 cells; windows per sweep [18, 22]
+   P1 largest slope difference between the subtraction variants: 2.2e-16 mV/s PASS
+   t_SS  80.0 ms (window 120.0 ms): RMS(b_hat - b) 0.00357 mV/s (Monte Carlo, N 4000, SE 0.00004) against exact 0.00354 -> P2 PASS; 3.6 % of sigma_b; x1.000 of the 80 ms value; check03 (f) 0.0036 -> P3 PASS
+   t_SS 130.0 ms (window  70.0 ms): RMS(b_hat - b) 0.00408 mV/s (Monte Carlo, N 4000, SE 0.00005) against exact 0.00408 -> P2 PASS; 4.1 % of sigma_b; x1.154 of the 80 ms value
+   t_SS 150.0 ms (window  50.0 ms): RMS(b_hat - b) 0.00436 mV/s (Monte Carlo, N 4000, SE 0.00005) against exact 0.00437 -> P2 PASS; 4.4 % of sigma_b; x1.235 of the 80 ms value
+== 2sw_K63: 2 sweeps, K 63, 2000 cells; windows per sweep [34, 29]
+   P1 largest slope difference between the subtraction variants: 2.8e-16 mV/s PASS
+   t_SS  80.0 ms (window 120.0 ms): RMS(b_hat - b) 0.00276 mV/s (Monte Carlo, N 4000, SE 0.00003) against exact 0.00278 -> P2 PASS; 2.8 % of sigma_b; x1.000 of the 80 ms value; check03 (f) 0.0028 -> P3 PASS
+   t_SS 130.0 ms (window  70.0 ms): RMS(b_hat - b) 0.00320 mV/s (Monte Carlo, N 4000, SE 0.00004) against exact 0.00320 -> P2 PASS; 3.2 % of sigma_b; x1.149 of the 80 ms value
+   t_SS 150.0 ms (window  50.0 ms): RMS(b_hat - b) 0.00343 mV/s (Monte Carlo, N 4000, SE 0.00004) against exact 0.00342 -> P2 PASS; 3.4 % of sigma_b; x1.229 of the 80 ms value
+== 6sw_K199: 6 sweeps, K 199, 400 cells; windows per sweep [35, 34, 34, 35, 29, 32]
+   P1 largest slope difference between the subtraction variants: 1.7e-16 mV/s PASS
+   t_SS  80.0 ms (window 120.0 ms): RMS(b_hat - b) 0.00281 mV/s (Monte Carlo, N 2400, SE 0.00004) against exact 0.00278 -> P2 PASS; 2.8 % of sigma_b; x1.000 of the 80 ms value; check03 (f) 0.0028 -> P3 PASS
+   t_SS 130.0 ms (window  70.0 ms): RMS(b_hat - b) 0.00323 mV/s (Monte Carlo, N 2400, SE 0.00005) against exact 0.00319 -> P2 PASS; 3.2 % of sigma_b; x1.149 of the 80 ms value
+   t_SS 150.0 ms (window  50.0 ms): RMS(b_hat - b) 0.00343 mV/s (Monte Carlo, N 2400, SE 0.00005) against exact 0.00342 -> P2 PASS; 3.4 % of sigma_b; x1.229 of the 80 ms value
+== 10sw_K348: 10 sweeps, K 348, 400 cells; windows per sweep [36, 36, 35, 36, 35, 35, 32, 34, 35, 34]
+   P1 largest slope difference between the subtraction variants: 1.7e-16 mV/s PASS
+   t_SS  80.0 ms (window 120.0 ms): RMS(b_hat - b) 0.00274 mV/s (Monte Carlo, N 4000, SE 0.00003) against exact 0.00270 -> P2 PASS; 2.7 % of sigma_b; x1.000 of the 80 ms value; check03 (f) 0.0027 -> P3 PASS
+   t_SS 130.0 ms (window  70.0 ms): RMS(b_hat - b) 0.00313 mV/s (Monte Carlo, N 4000, SE 0.00003) against exact 0.00310 -> P2 PASS; 3.1 % of sigma_b; x1.148 of the 80 ms value
+   t_SS 150.0 ms (window  50.0 ms): RMS(b_hat - b) 0.00338 mV/s (Monte Carlo, N 4000, SE 0.00004) against exact 0.00332 -> P2 PASS; 3.4 % of sigma_b; x1.228 of the 80 ms value
+
+P1 PASS  P2 PASS  P3 PASS   (452 s)

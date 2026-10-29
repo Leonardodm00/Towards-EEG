@@ -242,7 +242,7 @@ Not code: nothing below is imported by the pipeline or runs in a job.
 | `dev/2026-10-26_tilt_sigma_b/` | the study document on the per-sweep tilt and its SD sigma_b(c), with figures and checks |
 | `dev/2026-10-28_window_start/` | the checks behind the explanations of the transient test and of sigma_SS_hat, and behind D-095 |
 | `dev/2026-10-28_tilt_explanation/` | the checks behind the explanations of sigma_b(c), the semivariogram, the nugget and second-order stationarity, and behind D-100 (the tilt variants of the 2-sweep cells) |
-| `dev/2026-10-29_ls_tilt/` | the check behind D-107: how precisely the line through two window means reads a Long Square sweep's tilt |
+| `dev/2026-10-29_ls_tilt/` | the checks behind D-107 and D-102: how precisely a Long Square sweep's tilt (the line through two window means) and an SS sweep's tilt (the least-squares slope, under D-103's median subtraction and later starts) are read |
 
 The project's own documents (the decision log, the noise-model topic document, the staged plan, the
 living handoff) are copied under `docs/project/` at the repository root.
