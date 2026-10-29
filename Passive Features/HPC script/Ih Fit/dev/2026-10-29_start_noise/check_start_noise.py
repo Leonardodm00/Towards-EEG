@@ -2,11 +2,14 @@
 how the SS window start of D-103 / D-104, as Block 3 implements it
 (noise_windows.decay_start), behaves on noisy cells.
 
-Rule (SPEC 2.2 (a)-(e)): per sweep and polarity, the median window's decay
-B + A exp(-t / tau) fitted on [5, 200) ms; the group's start t_sp = tau_hat
-ln(|A_hat| / (kappa_tr sigma_SS_hat)); t_star(c) = max(80 ms, max over
-groups of t_sp); t_SS(c) = t_star(c) when 200 - t_star >= 50 ms, else the
-80 ms fallback.
+Rule (SPEC 2.2 (a)-(e) at f293d4a): per sweep and polarity, the median
+window's decay B + A exp(-t / tau) fitted on [5, 200) ms; the group's start
+t_sp = tau_hat ln(|A_hat| / (kappa_tr sigma_SS_hat)); t_star(c) = max(80 ms,
+max over groups of t_sp); t_SS(c) = t_star(c) when 200 - t_star >= 50 ms,
+else the 80 ms fallback. [2026-10-29 (later, 5): Block 3 now takes the
+MEDIAN over groups (D-111) and fits exactly (D-110); this script computes
+the MAXIMUM rule itself from the groups' t_sp, so it still checks that rule
+(with whichever fit Block 3 has). Its output file is the run of f293d4a.]
 
 Simulated cells (chosen): S SS sweeps of the archive's train (37 pulses of
 +/-200 pA x 0.5 ms, dep first, 10025 samples onset to onset at 50 kHz),
@@ -101,11 +104,15 @@ def main():
                 bad += int((~ok).sum())
                 dev_g.extend((st.t_group_ms[ok] - t0).tolist())
                 n_groups.append(int(ok.sum()))
-                if np.isfinite(st.t_star_ms):
-                    dev_star.append(st.t_star_ms - t0)
-                fall += int("ss_start_fallback" in st.flags)
-                floor += int("ss_start_floor" in st.flags)
-                t_ss.append(st.t_ss_ms)
+                if ok.any():
+                    dev_star.append(max(80.0, float(np.max(st.t_group_ms[ok]))) - t0)
+                # the MAXIMUM rule (D-103.3 as first decided), computed here from the groups' starts
+                t_max = float(np.max(st.t_group_ms[ok])) if ok.any() else float("nan")
+                t_star = max(80.0, t_max) if ok.any() else float("nan")
+                fell = (not ok.any()) or (200.0 - t_star < 50.0)
+                fall += int(fell)
+                floor += int(ok.any() and not fell and t_max < 80.0)
+                t_ss.append(80.0 if fell else t_star)
             dev_g, dev_star = np.array(dev_g), np.array(dev_star)
             rows[(sb, S)] = dict(med_g=float(np.median(dev_g)), sd_g=float(np.std(dev_g, ddof=1)),
                                  q_g=np.percentile(dev_g, [5, 95]), med_star=float(np.median(dev_star)),

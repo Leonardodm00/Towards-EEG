@@ -1,7 +1,7 @@
 """noise_windows -- Block 3 (data layer) of specs/SPEC.md: the archive's SS
 layout, the SS window start and the enlarged windows, the subtraction of the
 group median window, and the LS pre-windows and end windows (D-051, D-072,
-D-073, D-076, D-095, D-103, D-104, D-106, D-107).
+D-073, D-076, D-095, D-103, D-104, D-106, D-107, D-110, D-111).
 
 What this module does, in plain words. A real cell's Square Subthreshold
 (SS) sweep is a train of brief pulses, one every P samples (200.5 ms at
@@ -15,9 +15,10 @@ The noise window of a pulse is the late part of its stored window,
 [t_SS(c), 200) ms. The windows are grouped by sweep and polarity, and a
 group of fewer than 5 windows leaves everything (D-106). Each group's MEDIAN
 WINDOW -- the per-sample median over its windows -- shows the pulse
-response; an exponential fitted to its decay says when the response has
-fallen to kappa_tr times the pre-pulse noise SD, and the cell's start is the
-latest such time over its groups, at least 80 ms, and 80 ms again when the
+response; an exponential fitted exactly to its decay (least squares by
+variable projection, D-110) says when the response has fallen to kappa_tr
+times the pre-pulse noise SD, and the cell's start is the median of those
+times over its groups (D-111), at least 80 ms, and 80 ms again when the
 window left would be shorter than 50 ms (D-103, D-104). Every window then has
 its group's median window subtracted, which removes the response and leaves
 the noise (D-103.1). The Long Square (LS) pre-window of every sweep, [t_0,
@@ -38,12 +39,11 @@ from __future__ import annotations
 import csv
 import json
 import os
-import warnings
 from dataclasses import dataclass, replace
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
-from scipy.optimize import OptimizeWarning, curve_fit
+from scipy.optimize import brentq, minimize_scalar
 
 
 class LayoutError(RuntimeError):
@@ -60,8 +60,8 @@ class WindowConfig:
     kappa_tr: float = 0.1              # D-051, PROVISIONAL: a group's start is where its decay is within
                                        # kappa_tr * sigma_SS_hat(c) (ST1)
     fit_start_ms: float = 5.0          # D-103.2, PROVISIONAL: the decay fit uses the samples with t >= this
-    decay_tau0_ms: Tuple[float, ...] = (5.0, 20.0, 80.0)   # the fit's starts (assistant's choice, 2.2 (d))
-    decay_maxfev: int = 2000           # curve_fit's evaluation cap per start (assistant's choice)
+    decay_tau_bounds_ms: Tuple[float, float] = (1.0, 1000.0)   # D-110, PROVISIONAL: tau's search interval
+    decay_grid_n: int = 301            # D-110, PROVISIONAL: log-spaced grid points over the bounds
     min_window_ms: float = 50.0        # D-104.1: a window [t_star, 200) ms shorter than this -> the fallback
     fallback_t_ms: float = 80.0        # D-103.3 (was 190 ms, D-051 (i)): the fallback start, flagged
     min_windows_per_group: int = 5     # D-104.2, D-106.1, PROVISIONAL: a smaller group leaves everything
@@ -144,13 +144,13 @@ class TransientResult:
 
 @dataclass
 class DecayFit:
-    """One median window's fit B + A exp(-t / tau) (D-103.2)."""
+    """One median window's exact least-squares fit B + A exp(-t / tau) (D-103.2, D-110)."""
     A_mV: float                    # amplitude at the onset (t = 0) of the fitted exponential
     tau_ms: float
     B_mV: float                    # the baseline
     rss: float                     # residual sum of squares over the fitted samples, mV^2
-    ok: bool                       # a start converged to finite (A, B, tau) with tau > 0
-    n_starts_ok: int
+    ok: bool                       # an interior minimum of RSS(tau) was found within the bounds
+    at_bound: bool                 # the grid's minimum lay at a bound: no resolvable decay (D-110.2)
     message: str
 
 
@@ -158,7 +158,7 @@ class DecayFit:
 class StartResult:
     """The SS window start of one cell, SPEC 2.2 (a)-(e)."""
     t_ss_ms: float                 # the start used (ST2)
-    t_star_ms: float               # max(t_floor, max over valid groups of t_sp); NaN when no group is valid
+    t_star_ms: float               # max(t_floor, median over valid groups of t_sp) (D-111); NaN when no group is valid
     sigma_ss_mV: float             # median pre-pulse SD over the kept windows (D-095.2)
     keep: np.ndarray               # (K,) bool: False for the windows of the small groups (D-106.1)
     group_sweep: np.ndarray        # (G,) int
@@ -330,53 +330,76 @@ def measure_period(ss: SSWindows, min_overlap: int = 100) -> int:
 # ===========================================================================
 #  Windows: the start (D-103, D-104, D-106), the enlarged window, the subtraction
 # ===========================================================================
-def _decay_model(t_ms: np.ndarray, B: float, A: float, tau: float) -> np.ndarray:
-    return B + A * np.exp(-t_ms / tau)
+def profile_decay(t_ms: np.ndarray, y_mV: np.ndarray, tau_ms: float) -> Tuple[float, float, float]:
+    """(A, B, RSS) of the linear least-squares fit y = B + A exp(-t / tau) at
+    a fixed tau: the closed form of the centred regression of y on e =
+    exp(-t / tau). RSS in mV^2; (NaN, NaN, inf) when e is constant."""
+    A, B, rss, _, _ = _profile(np.asarray(t_ms, dtype=np.float64), np.asarray(y_mV, dtype=np.float64), float(tau_ms))
+    return A, B, rss
+
+
+def _profile(t: np.ndarray, y: np.ndarray, tau: float):
+    e = np.exp(-t / tau)
+    ec = e - e.mean()
+    see = float(ec @ ec)
+    if not see > 0.0:
+        return float("nan"), float("nan"), float("inf"), None, e
+    A = float(ec @ (y - y.mean())) / see
+    B = float(y.mean() - A * e.mean())
+    r = y - B - A * e
+    return A, B, float(r @ r), r, e
+
+
+def _drss_dtau(t: np.ndarray, y: np.ndarray, tau: float) -> float:
+    """(ST0): dRSS/dtau of the profiled residual, -(2 A / tau^2) sum r e t
+    (the envelope theorem: A and B are optimal at every tau)."""
+    A, _, _, r, e = _profile(t, y, tau)
+    if r is None:
+        return float("nan")
+    return -2.0 * A / tau ** 2 * float(r @ (e * t))
 
 
 def fit_decay(t_ms: np.ndarray, y_mV: np.ndarray, cfg: WindowConfig = WindowConfig()) -> DecayFit:
-    """(D-103.2) Least-squares fit of y = B + A exp(-t / tau) to the samples
-    given (t in ms from the onset, y in mV): scipy.optimize.curve_fit (method
-    'lm', unbounded, maxfev = cfg.decay_maxfev) from each tau_0 in
-    cfg.decay_tau0_ms, with (A_0, B_0) the linear least-squares solution at
-    tau_0; among the starts that converge to finite (A, B, tau) with tau > 0,
-    the one with the smallest residual sum of squares. ok = False when none
-    does (no convergence, or a non-finite or non-positive tau)."""
-    # Custom: the multi-start selection around curve_fit (one library fit per start).
-    # Checked: scipy.optimize.curve_fit and least_squares each fit from one start.
+    """(D-103.2, D-110) The exact least-squares fit of y = B + A exp(-t / tau)
+    to the samples given (t in ms from the onset, y in mV), tau in
+    cfg.decay_tau_bounds_ms, by variable projection: (A, B) in closed form
+    at each tau (profile_decay); tau at the minimum of the profiled RSS on a
+    grid of cfg.decay_grid_n log-spaced points, refined by a bounded Brent
+    minimisation between the grid minimum's neighbours and polished to the
+    root of dRSS/dtau (ST0). No starting value enters. ok = False, at_bound
+    = True when the grid's minimum is its first or last point (D-110.2)."""
+    # Custom: variable projection of the separable model (no SciPy routine profiles out the linear
+    # parameters); the 1-D steps are scipy.optimize.minimize_scalar and brentq.
     t = np.asarray(t_ms, dtype=np.float64)
     y = np.asarray(y_mV, dtype=np.float64)
+    nan = float("nan")
     if t.ndim != 1 or t.shape != y.shape or t.size < 4:
         raise ValueError("fit_decay: t and y must be 1-D of equal length >= 4")
-    best, n_ok, notes = None, 0, []
-    for tau0 in cfg.decay_tau0_ms:
-        basis = np.column_stack([np.exp(-t / float(tau0)), np.ones_like(t)])
-        coef = np.linalg.lstsq(basis, y, rcond=None)[0]
-        p0 = (float(coef[1]), float(coef[0]), float(tau0))
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", OptimizeWarning)      # noise-free data: no covariance
-                with np.errstate(over="ignore", invalid="ignore", divide="ignore", under="ignore"):
-                    popt = curve_fit(_decay_model, t, y, p0=p0, method="lm", maxfev=int(cfg.decay_maxfev))[0]
-        except (RuntimeError, ValueError, np.linalg.LinAlgError) as exc:   # no convergence; non-finite residuals
-            notes.append("tau0 %g ms: %s" % (tau0, str(exc).split("\n")[0][:90]))
-            continue
-        B, A, tau = (float(x) for x in popt)
-        if not (np.isfinite(A) and np.isfinite(B) and np.isfinite(tau) and tau > 0.0):
-            notes.append("tau0 %g ms: tau_hat %r" % (tau0, tau))
-            continue
-        with np.errstate(over="ignore", invalid="ignore"):
-            rss = float(np.sum((y - _decay_model(t, B, A, tau)) ** 2))
-        if not np.isfinite(rss):
-            notes.append("tau0 %g ms: non-finite residuals" % tau0)
-            continue
-        n_ok += 1
-        if best is None or rss < best[3]:
-            best = (A, tau, B, rss)
-    if best is None:
-        nan = float("nan")
-        return DecayFit(nan, nan, nan, nan, False, 0, "; ".join(notes) or "no start converged")
-    return DecayFit(best[0], best[1], best[2], best[3], True, n_ok, "; ".join(notes))
+    if not (np.all(np.isfinite(t)) and np.all(np.isfinite(y))):
+        return DecayFit(nan, nan, nan, nan, False, False, "non-finite sample")
+    lo, hi = (float(b) for b in cfg.decay_tau_bounds_ms)
+    if not 0.0 < lo < hi or int(cfg.decay_grid_n) < 3:
+        raise ValueError("fit_decay: need 0 < tau_lo < tau_hi and decay_grid_n >= 3")
+    grid = np.geomspace(lo, hi, int(cfg.decay_grid_n))
+    rss = np.array([_profile(t, y, g)[2] for g in grid])
+    i = int(np.argmin(rss))
+    if not np.isfinite(rss[i]):
+        return DecayFit(nan, nan, nan, nan, False, False, "no finite residual on the grid")
+    if i == 0 or i == grid.size - 1:
+        return DecayFit(nan, nan, nan, float(rss[i]), False, True,
+                        "the minimum of RSS(tau) lies at the bound tau = %g ms: no resolvable decay" % grid[i])
+    res = minimize_scalar(lambda lt: _profile(t, y, float(np.exp(lt)))[2],
+                          bounds=(float(np.log(grid[i - 1])), float(np.log(grid[i + 1]))),
+                          method="bounded", options={"xatol": 1e-12, "maxiter": 500})
+    tau = float(np.exp(res.x))
+    a, b = tau * (1.0 - 1e-6), tau * (1.0 + 1e-6)
+    ga, gb = _drss_dtau(t, y, a), _drss_dtau(t, y, b)
+    note = "bounded Brent"
+    if np.isfinite(ga) and np.isfinite(gb) and ga * gb < 0.0:
+        tau = float(brentq(lambda x: _drss_dtau(t, y, x), a, b, xtol=1e-13, maxiter=200))
+        note = "bounded Brent, polished to the root of dRSS/dtau"
+    A, B, r_ss, _, _ = _profile(t, y, tau)
+    return DecayFit(A, tau, B, r_ss, True, False, note)
 
 
 def _groups(ss: SSWindows) -> List[Tuple[Tuple[int, bool], np.ndarray]]:
@@ -394,10 +417,10 @@ def _groups(ss: SSWindows) -> List[Tuple[Tuple[int, bool], np.ndarray]]:
 def decay_start(ss: SSWindows, cfg: WindowConfig = WindowConfig(),
                 fit: Callable[[np.ndarray, np.ndarray, WindowConfig], DecayFit] = fit_decay) -> StartResult:
     """The SS window start of the cell, SPEC 2.2 (a)-(e) (D-095, D-103,
-    D-104, D-106): small groups out of everything; sigma_SS_hat(c) over the
-    kept windows; per kept group the median window and its decay fit (`fit`,
-    swappable); t_sp of (ST1); t_SS(c) of (ST2) with the floor and the
-    fallback. Flags: 'ss_group_dropped:<sweep>:<polarity>:few_windows' or
+    D-104, D-106, D-110, D-111): small groups out of everything;
+    sigma_SS_hat(c) over the kept windows; per kept group the median window
+    and its exact decay fit (`fit`, swappable); t_sp of (ST1); t_SS(c) of
+    (ST2): the MEDIAN of the valid groups' t_sp, the floor and the fallback. Flags: 'ss_group_dropped:<sweep>:<polarity>:few_windows' or
     ':fit', 'ss_start_floor', 'ss_start_fallback' (reason in
     fallback_reason)."""
     # Custom: the start rule (ST1)-(ST2) (no library function).
@@ -435,11 +458,11 @@ def decay_start(ss: SSWindows, cfg: WindowConfig = WindowConfig(),
     t_end = (ss.n_w - ss.pre_n) / ss.fs * 1e3                      # 200 ms
     reason = ""
     if valid.any():
-        t_max = float(np.max(t_g[valid]))
-        t_star = max(float(cfg.t_ss_floor_ms), t_max)
+        t_med = float(np.median(t_g[valid]))                         # D-111: the median over valid groups
+        t_star = max(float(cfg.t_ss_floor_ms), t_med)
         if t_end - t_star >= cfg.min_window_ms:                      # (ST2)
             t_ss = t_star
-            if t_max < cfg.t_ss_floor_ms:
+            if t_med < cfg.t_ss_floor_ms:
                 flags.append("ss_start_floor")
         else:
             t_ss, reason = float(cfg.fallback_t_ms), "short_window"

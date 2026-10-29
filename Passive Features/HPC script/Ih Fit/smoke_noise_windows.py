@@ -17,16 +17,19 @@ ls_baseline_qc (pandas); each is reported SKIPPED when its import fails.
       sweep numbers and polarities and the period 10025 exactly; a QC table
       with a wrong row count, a swapped polarity, a non-alternating train and a
       wrong configured period each raise LayoutError; a false head rejected
-  W2  start (D-103, D-104): on noise-free planted groups (B + A exp(-t/tau)
-      for t >= 0, white noise of a known SD before t = 0) A, tau, B come back
-      to 1e-6 relative, sigma_SS_hat is the median pre-pulse SD (1e-15) and
-      t_sp lies within one sample of tau ln(A / (kappa sigma_SS_hat)); a fast
-      decay floors at 80 ms (ss_start_floor); a start at 151 ms falls back to
-      80 ms (ss_start_fallback, short_window), one at 149 ms is kept;
-      decay_maxfev = 1 fails every fit (no_valid_group, all windows kept); a
-      fit double failing the first group leaves it out of the maximum with
-      its windows kept; on the base cell's noisy windows every fit is valid,
-      tau_hat within 25 % of the RC 28.143 ms
+  W2  start (D-103, D-104, D-110, D-111): on noise-free planted groups
+      (B + A exp(-t/tau) for t >= 0, white noise of a known SD before t = 0)
+      A, tau, B come back to 1e-9 relative, sigma_SS_hat is the median
+      pre-pulse SD (1e-15) and t_sp lies within one sample of tau ln(A /
+      (kappa sigma_SS_hat)); a fast decay floors at 80 ms (ss_start_floor);
+      groups at 100, 120, 140, 160 ms give 130 ms (the median); all at 151 ms
+      fall back to 80 ms (ss_start_fallback, short_window), all at 149 ms are
+      kept; a ramp fails every fit at the upper bound (no_valid_group, all
+      windows kept); a fit double failing the first group leaves it out of
+      the median with its windows kept; on the base cell's noisy windows every
+      fit is valid, tau_hat within 25 % of the RC 28.143 ms, and exact:
+      stationary (ST0), the derivative formula = finite differences,
+      curve_fit started there stays, no dense-grid point lower
   W3  subtraction (D-103.1): the per-sample median of the subtracted windows
       is 0 per group (1e-12); the medians equal numpy.median per group from an
       independent loop (exactly); a different common vector added to each
@@ -82,6 +85,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
+from scipy.optimize import curve_fit
 from scipy.signal import lfilter
 
 HERE = Path(__file__).resolve().parent
@@ -91,8 +95,8 @@ import noise_law as nl                                   # noqa: E402
 import noise_stats                                       # noqa: E402
 from noise_windows import (DecayFit, LayoutError, WindowConfig, decay_start, enlarged_windows,  # noqa: E402
                            fit_decay, load_ls_prewindows, load_ss_windows, ls_segments, measure_period,
-                           select_windows, ss_noise_windows, subtract_mean_response, subtract_median_response,
-                           transient_start)
+                           profile_decay, select_windows, ss_noise_windows, subtract_mean_response,
+                           subtract_median_response, transient_start)
 from noise_cell_stats import (LS_FULL_LAGS_MS, LS_LAST_LAGS_MS, SS_LAGS_MS, STAT_BLOCK,  # noqa: E402
                               STAT_LABELS, bootstrap_median_se, ls_sweep_tilts, ls_window_stats,
                               per_sweep_vectors, ss_sweep_tilts, ss_window_stats, statistic_vector,
@@ -312,69 +316,112 @@ def _w2(d, truth):
     cfg = WindowConfig()
     kap = cfg.kappa_tr
     notes, ok = [], True
-    # (a) a planted decay: parameters back, sigma_SS_hat, the start within one sample of (ST1)
+    # (a) a planted decay: parameters back to 1e-9 (D-110: the exact fit), sigma_SS_hat, the start within one sample
     A0, tau0 = 0.4, TAU_M_MS
     sa, sig = planted_ss(ss, 21, lambda key, s: (A0, tau0))
     st = decay_start(sa)
     t_exp = tau0 * np.log(A0 / (kap * sig))
     sgn = np.where(st.group_is_dep, 1.0, -1.0)
     ok_a = (all(x == "ok" for x in st.group_status)
-            and np.allclose(st.A_mV, sgn * A0, rtol=1e-6, atol=0) and np.allclose(st.tau_ms, tau0, rtol=1e-6, atol=0)
-            and np.allclose(st.B_mV, -60.0, rtol=1e-6, atol=0) and abs(st.sigma_ss_mV - sig) <= 1e-15
+            and np.allclose(st.A_mV, sgn * A0, rtol=1e-9, atol=0) and np.allclose(st.tau_ms, tau0, rtol=1e-9, atol=0)
+            and np.allclose(st.B_mV, -60.0, rtol=1e-9, atol=0) and abs(st.sigma_ss_mV - sig) <= 1e-15
             and np.all(np.abs(st.t_group_ms - t_exp) <= 1e3 / FS) and abs(st.t_ss_ms - st.t_star_ms) == 0.0
             and abs(st.t_ss_ms - t_exp) <= 1e3 / FS and st.flags == () and st.fallback_reason == "")
     ok &= ok_a
-    notes.append("planted: t_SS %.3f ms (expected %.3f), max |tau_hat - tau| %.1e ms"
-                 % (st.t_ss_ms, t_exp, float(np.max(np.abs(st.tau_ms - tau0)))))
+    notes.append("planted: t_SS %.3f ms (expected %.3f), max |tau_hat/tau - 1| %.1e"
+                 % (st.t_ss_ms, t_exp, float(np.max(np.abs(st.tau_ms / tau0 - 1.0)))))
     # (b) a fast decay: the floor binds
     sb, _ = planted_ss(ss, 22, lambda key, s: (0.4, 5.0))
     stb = decay_start(sb)
     ok_b = stb.t_ss_ms == 80.0 and "ss_start_floor" in stb.flags and "ss_start_fallback" not in stb.flags
     ok &= ok_b
     notes.append("tau 5 ms: t_sp %.1f, t_SS %.0f, flags %s" % (float(np.max(stb.t_group_ms)), stb.t_ss_ms, stb.flags))
-    # (c) the fallback: a start at 151 ms (49 ms window) falls back, one at 149 ms (51 ms) is kept
-    first = (int(ss.sweep_number[0]), bool(ss.polarity_is_dep[0]))
-    def at(t_target):
-        return lambda key, s: ((kap * s * np.exp(t_target / tau0)) if key == first else 0.4, tau0)
-    s151, _ = planted_ss(ss, 23, at(151.0))
-    s149, _ = planted_ss(ss, 23, at(149.0))
-    st151, st149 = decay_start(s151), decay_start(s149)
-    ok_c = (st151.t_ss_ms == 80.0 and "ss_start_fallback" in st151.flags and st151.fallback_reason == "short_window"
+    # (c) the median (D-111): groups at 100, 120, 140, 160 ms -> 130 ms; all at 151 ms fall back, all at 149 ms kept
+    keys = [(int(gs), bool(gd)) for gs, gd in zip(st.group_sweep, st.group_is_dep)]
+    def at(times):
+        table = dict(zip(keys, times))
+        return lambda key, s: (kap * s * np.exp(table[key] / tau0), tau0)
+    smed, _ = planted_ss(ss, 23, at((100.0, 120.0, 140.0, 160.0)))
+    s151, _ = planted_ss(ss, 23, at((151.0,) * 4))
+    s149, _ = planted_ss(ss, 23, at((149.0,) * 4))
+    stm, st151, st149 = decay_start(smed), decay_start(s151), decay_start(s149)
+    ok_c = (len(keys) == 4 and abs(stm.t_ss_ms - 130.0) <= 1e3 / FS
+            and st151.t_ss_ms == 80.0 and "ss_start_fallback" in st151.flags and st151.fallback_reason == "short_window"
             and abs(st151.t_star_ms - 151.0) <= 1e3 / FS
             and abs(st149.t_ss_ms - 149.0) <= 1e3 / FS and "ss_start_fallback" not in st149.flags
             and st149.fallback_reason == "")
     ok &= ok_c
-    notes.append("151 ms -> t_SS %.0f (%s); 149 ms -> t_SS %.2f" % (st151.t_ss_ms, st151.fallback_reason, st149.t_ss_ms))
-    # (d) every fit fails (maxfev 1): no valid group -> the fallback, every window kept
-    std = decay_start(sa, WindowConfig(decay_maxfev=1))
+    notes.append("groups at 100/120/140/160 -> t_SS %.2f; all 151 -> %.0f (%s); all 149 -> %.2f"
+                 % (stm.t_ss_ms, st151.t_ss_ms, st151.fallback_reason, st149.t_ss_ms))
+    # (d) a ramp, no decay: every group's minimum at the upper bound -> failed fits (D-110.2), the fallback,
+    # every window kept
+    ramp = sa.v.copy()
+    t_post = ss.t[ss.pre_n:] * 1e3
+    for k in range(ss.n_windows):
+        ramp[k, ss.pre_n:] = -60.0 + (1.0 if ss.polarity_is_dep[k] else -1.0) * 0.002 * t_post
+    std = decay_start(replace(sa, v=ramp))
     ok_d = (all(x == "fit" for x in std.group_status) and std.t_ss_ms == 80.0 and np.isnan(std.t_star_ms)
             and std.fallback_reason == "no_valid_group" and "ss_start_fallback" in std.flags
             and sum(f.endswith(":fit") for f in std.flags) == std.n_groups and bool(np.all(std.keep)))
     ok &= ok_d
-    # (e) a fit double failing the first group: out of the maximum, its windows kept
+    # (e) a fit double failing the first group: out of the median, its windows kept
     calls = {"n": 0}
     def first_fails(t, y, c):
         calls["n"] += 1
         if calls["n"] == 1:
             nan = float("nan")
-            return DecayFit(nan, nan, nan, nan, False, 0, "test double")
+            return DecayFit(nan, nan, nan, nan, False, False, "test double")
         return fit_decay(t, y, c)
-    se_, _ = planted_ss(ss, 24, lambda key, s: ((kap * s * np.exp((140.0 if key == first else 100.0) / tau0)), tau0))
+    se_, _ = planted_ss(ss, 24, at((140.0, 100.0, 110.0, 120.0)))
     ste = decay_start(se_, fit=first_fails)
-    tag = "ss_group_dropped:%d:%s:fit" % (first[0], "dep" if first[1] else "hyp")
+    tag = "ss_group_dropped:%d:%s:fit" % (keys[0][0], "dep" if keys[0][1] else "hyp")
     ok_e = (ste.group_status[0] == "fit" and tag in ste.flags and bool(np.all(ste.keep))
-            and abs(ste.t_ss_ms - 100.0) <= 1e3 / FS and all(x == "ok" for x in ste.group_status[1:]))
+            and abs(ste.t_ss_ms - 110.0) <= 1e3 / FS and all(x == "ok" for x in ste.group_status[1:]))
     ok &= ok_e
-    notes.append("first group failed: t_SS %.2f (others at 100)" % ste.t_ss_ms)
+    notes.append("first group failed: t_SS %.2f (110 without it, 115 with it)" % ste.t_ss_ms)
     # (f) the base cell's noisy windows (RC 113 MOhm, 28.143 ms, theta_cf): every fit valid, tau_hat near tau_m
     stf = decay_start(ss)
     ok_f = (all(x == "ok" for x in stf.group_status) and np.all(np.abs(stf.tau_ms / TAU_M_MS - 1.0) < 0.25)
             and 80.0 <= stf.t_ss_ms <= 150.0)
     ok &= ok_f
     notes.append("noisy cell: tau_hat %s ms, t_sp %s ms, t_SS %.1f ms, flags %s"
-                 % (np.round(stf.tau_ms, 1).tolist(), np.round(stf.t_group_ms, 1).tolist(), stf.t_ss_ms, stf.flags))
-    report("W2 start (D-103, D-104): planted decay exact, floor, fallback at 151 / kept at 149, failed fits, noisy cell",
-           ok, "; ".join(notes) + "; parts a-f %s" % [ok_a, ok_b, ok_c, ok_d, ok_e, ok_f])
+                 % (np.round(stf.tau_ms, 2).tolist(), np.round(stf.t_group_ms, 1).tolist(), stf.t_ss_ms, stf.flags))
+    # (g) the fit is the exact least-squares optimum (D-110) on each noisy group: stationary (ST0), the
+    # derivative formula against finite differences, curve_fit started there stays, no dense-grid point lower
+    sel = np.arange(ss.n_w) >= ss.pre_n + int(round(cfg.fit_start_ms * 1e-3 * FS))
+    tt = ss.t[sel] * 1e3
+    worst = dict(stat=0.0, fd=0.0, lm_tau=0.0, lm_rss=0.0, grid=0.0)
+    for g, key in enumerate(keys):
+        idx = np.flatnonzero((ss.sweep_number == key[0]) & (ss.polarity_is_dep == key[1]))
+        y = np.median(ss.v[idx], axis=0)[sel]
+        f = fit_decay(tt, y, cfg)
+        _, _, rss_hat = profile_decay(tt, y, f.tau_ms)
+        h = 1e-5
+        dfun = lambda tau: (profile_decay(tt, y, tau * (1 + h))[2] - profile_decay(tt, y, tau * (1 - h))[2]) / (2 * tau * h)
+        worst["stat"] = max(worst["stat"], abs(_drss(tt, y, f.tau_ms)) * f.tau_ms / rss_hat)
+        worst["fd"] = max(worst["fd"], abs(_drss(tt, y, 0.8 * f.tau_ms) / dfun(0.8 * f.tau_ms) - 1.0))
+        popt = curve_fit(lambda x, B, A, tau: B + A * np.exp(-x / tau), tt, y, p0=(f.B_mV, f.A_mV, f.tau_ms))[0]
+        rss_lm = float(np.sum((y - popt[0] - popt[1] * np.exp(-tt / popt[2])) ** 2))
+        worst["lm_tau"] = max(worst["lm_tau"], abs(popt[2] / f.tau_ms - 1.0))
+        worst["lm_rss"] = max(worst["lm_rss"], (rss_hat - rss_lm) / rss_hat)
+        dense = min(profile_decay(tt, y, tau)[2] for tau in np.geomspace(f.tau_ms / 2, f.tau_ms * 2, 20001))
+        worst["grid"] = max(worst["grid"], (rss_hat - dense) / rss_hat)
+    ok_g = (worst["stat"] < 1e-8 and worst["fd"] < 1e-6 and worst["lm_tau"] < 1e-7 and worst["lm_rss"] < 1e-12
+            and worst["grid"] < 1e-12)
+    ok &= ok_g
+    notes.append("exactness: |dRSS/dtau| tau / RSS %.1e, formula vs finite difference %.1e, curve_fit tau %.1e, "
+                 "RSS %.1e, dense grid %.1e" % (worst["stat"], worst["fd"], worst["lm_tau"], worst["lm_rss"], worst["grid"]))
+    report("W2 start (D-103, D-104, D-110, D-111): planted decay exact, floor, median, fallback at 151 / kept at 149, "
+           "a ramp fails, failed fits, noisy cell, the fit exact", ok,
+           "; ".join(notes) + "; parts a-g %s" % [ok_a, ok_b, ok_c, ok_d, ok_e, ok_f, ok_g])
+
+
+def _drss(t, y, tau):
+    """(ST0) written out here (oracle): dRSS/dtau = -(2 A / tau^2) sum r e t at the profiled (A, B)."""
+    A, B, _ = profile_decay(t, y, tau)
+    e = np.exp(-t / tau)
+    r = y - B - A * e
+    return -2.0 * A / tau ** 2 * float(r @ (e * t))
 
 
 def _w3(d, truth):

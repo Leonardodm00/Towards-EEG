@@ -17,6 +17,9 @@ Each start uses t_sp = tau_hat ln(|A_hat| / (kappa_tr sigma_SS_hat)) (ST1).
 Reported per layout and tilt: the median of t_star - t0 and the fallback
 share (t0 the noiseless start at the cell's sigma_SS_hat, as in
 check_start_noise.py). No pass/fail: a comparison for the user's decision.
+[2026-10-29 (later, 5): V0, V1 and V4 use Block 3's fit, exact since D-110
+(the output file is the run of f293d4a, three-start fits); V2, V3 keep their
+own three-start fit with the linear term.]
 Run (from this folder; about 10 min):  python check_start_options.py
 Pure ASCII, LF.
 """
@@ -33,7 +36,7 @@ sys.path.insert(0, str(HERE))
 import check_start_noise as csn            # noqa: E402  (simulator, t0, the Ih Fit imports)
 
 nw = csn.nw
-CFG = dict(seed=20261042, n_cells=100)
+CFG = dict(seed=20261042, n_cells=100, tau0_ms=(5.0, 20.0, 80.0), maxfev=2000)   # V2/V3's own fit settings
 WCFG = nw.WindowConfig()
 
 
@@ -42,14 +45,14 @@ def fit_with_line(t, y, cfg):
     for A, B, beta at each), the converged start of smallest RSS."""
     best = None
     f = lambda tt, B, A, tau, beta: B + A * np.exp(-tt / tau) + beta * tt      # noqa: E731
-    for tau0 in cfg.decay_tau0_ms:
+    for tau0 in CFG["tau0_ms"]:
         basis = np.column_stack([np.exp(-t / tau0), np.ones_like(t), t])
         a0, b0, c0 = np.linalg.lstsq(basis, y, rcond=None)[0]
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", OptimizeWarning)
                 with np.errstate(over="ignore", invalid="ignore", divide="ignore", under="ignore"):
-                    p = curve_fit(f, t, y, p0=(b0, a0, tau0, c0), method="lm", maxfev=cfg.decay_maxfev)[0]
+                    p = curve_fit(f, t, y, p0=(b0, a0, tau0, c0), method="lm", maxfev=CFG["maxfev"])[0]
         except (RuntimeError, ValueError, np.linalg.LinAlgError):
             continue
         B, A, tau, beta = (float(x) for x in p)
@@ -60,8 +63,8 @@ def fit_with_line(t, y, cfg):
             best = (A, tau, B, rss)
     if best is None:
         nan = float("nan")
-        return nw.DecayFit(nan, nan, nan, nan, False, 0, "no start")
-    return nw.DecayFit(best[0], best[1], best[2], best[3], True, 1, "")
+        return nw.DecayFit(nan, nan, nan, nan, False, False, "no start")
+    return nw.DecayFit(best[0], best[1], best[2], best[3], True, False, "")
 
 
 def t_star_of(t_sp, how):
