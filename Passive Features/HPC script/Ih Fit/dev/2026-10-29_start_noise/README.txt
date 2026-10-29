@@ -55,7 +55,49 @@ In short: the median over groups (V1) stays within 2.4 ms of t0 and falls back i
 V3) adds a parameter's noise and does not help. Which rule to use is the user's
 call (D-103.3 chose the maximum); nothing in the pipeline changed.
 
+After D-110 and D-111 (2026-10-29, later, 5: the exact fit, the median over groups)
+--------------------------------------------------------------------------------
+check_start_noise.py and check_start_options.py now compute the maximum rule and the
+variants themselves from Block 3's group starts (exact fits since D-110); their
+output files are the runs of f293d4a (three-start fits).
+
+check_start_decided.py        the rule as decided and implemented (Block 3 at 7672ffc):
+start_decided_2026-10-29.txt  150 cells per row, seed 20261043. P1, P2 PASS; P3 FAIL:
+  sigma_b  sweeps  t_star - t0 median  fallback
+  0        2       +0.6 ms              3 %
+  0        6       +0.1 ms              0 %
+  0        10      +0.4 ms              0 %
+  0.1      2       +3.5 ms             16 %   (P3 predicted at most 15 %)
+  0.1      6       +0.9 ms              1 %
+  0.1      10      -0.7 ms              0 %
+  No fit at a bound except 1 of 3000 groups (10 sweeps, tilted).
+
+check_start_detrended.py      the tilt's ramp INSIDE the window removed before the fit
+start_detrended_2026-10-29.txt (seed 20261044): no help -- 2 sweeps at 0.1 mV/s fall back
+                              in 15 % as decided and 17 % with the ramp removed. The
+                              assistant's first explanation (the ramp bends the fit) was wrong.
+
+check_median_offsets.py       the tilt's spread of the windows' BASELINES (b (t_k - t_bar),
+median_offsets_2026-10-29.txt up to +/-0.36 mV across a train at 0.1 mV/s) degrades the
+                              per-sample median over a group's windows (seed 20261045):
+  A (start): SD of t_sp - t0 at sigma_b 0.1: 35.9 ms (2 sweeps) and 41.6 ms (6) as
+    decided, 22.2 and 21.8 ms with each window's tilt offset removed first (19.2 and
+    18.1 ms without a tilt); fallback 8 -> 4 % and 2 -> 0 %.
+  B (subtraction, white law): mean sigma_hat^2 / sigma_f^2 after the median
+    subtraction 0.961 (b 0), 0.990 (0.02 mV/s), 1.267 (0.1 mV/s); with the offsets
+    removed 0.961, 0.962, 0.961.
+  Predictions: PA1 FAIL (offsets removed 22.2 ms against "below 22"), PB1 FAIL (1.27
+  against "above 1.5": the inflation is real but smaller than predicted), PB2 PASS.
+  The fit stays consistent either way (its simulator carries the same tilts and
+  subtracts alike); what the spread costs is precision of the SS statistics and the
+  start's scatter. Remedy (a proposal for the user): remove each window's tilt offset
+  before the per-sample median, in the start and the subtraction, data and
+  simulator alike.
+
 Re-run (from this folder):
     python check_start_noise.py      (about 5 min)
     python check_start_options.py    (about 6 min)
+    python check_start_decided.py    (about 7 min)
+    python check_start_detrended.py  (about 9 min)
+    python check_median_offsets.py   (about 4 min)
 Pure ASCII, LF.
