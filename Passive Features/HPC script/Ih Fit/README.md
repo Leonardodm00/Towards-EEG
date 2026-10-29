@@ -243,6 +243,7 @@ Not code: nothing below is imported by the pipeline or runs in a job.
 | `dev/2026-10-28_window_start/` | the checks behind the explanations of the transient test and of sigma_SS_hat, and behind D-095 |
 | `dev/2026-10-28_tilt_explanation/` | the checks behind the explanations of sigma_b(c), the semivariogram, the nugget and second-order stationarity, and behind D-100 (the tilt variants of the 2-sweep cells) |
 | `dev/2026-10-29_ls_tilt/` | the checks behind D-107 and D-102: how precisely a Long Square sweep's tilt (the line through two window means) and an SS sweep's tilt (the least-squares slope, under D-103's median subtraction and later starts) are read |
+| `dev/2026-10-29_start_noise/` | how Block 3's window start (D-103, D-104) behaves on noisy cells: each group's point value scatters by about 18 ms, so the maximum over groups sends most cells to the 80 ms fallback; four alternatives compared (the median over groups, a linear term, a pooled fit) |
 
 The project's own documents (the decision log, the noise-model topic document, the staged plan, the
 living handoff) are copied under `docs/project/` at the repository root.
