@@ -895,13 +895,37 @@ def anchor_from_growth(growth, cfg, sigma_r0_um=None):
     return float(k.kernel_table_sigma_um[-1])
 
 
+def anchor_value(growth, cfg, sigma_r0_um=None):
+    """The anchor (um) read from the growth's knot at delta_0 =
+    cfg.calibration.table_max_delta_um alone (10.A, D-115.4):
+    (sigma_r(0)^2 + G(delta_0))^(1/2), sigma_r(0) = cfg.renderer.sigma_r0_um
+    unless given. Unlike anchor_from_growth, the other knots need not give an
+    accepted table. ValueError for a two-sided growth (the renderer's kernel
+    is even in delta), when no knot sits at delta_0, or when sigma_r(0)^2 +
+    G(delta_0) is not a positive number (G not identified there, or too
+    low)."""
+    if growth.convention != "symmetric":
+        raise ValueError("anchor_value: the renderer's kernel is even in delta; a two-sided growth has no one anchor")
+    d0 = float(cfg.calibration.table_max_delta_um)
+    hit = np.flatnonzero(np.abs(np.asarray(growth.knots_um, dtype=float) - d0) <= 1e-9)
+    if hit.size != 1:
+        raise ValueError("anchor_value: the growth has no knot at table_max_delta_um = %g um" % d0)
+    s0 = float(cfg.renderer.sigma_r0_um if sigma_r0_um is None else sigma_r0_um)
+    s2 = s0 ** 2 + float(growth.g_um2[int(hit[0])])
+    if not (s0 > 0 and math.isfinite(s2) and s2 > 0):
+        raise ValueError("anchor_value: sigma_r(0)^2 + G(delta_0) = %r is not a positive number" % s2)
+    return math.sqrt(s2)
+
+
 def bootstrap_sigma0(scans, cfg, rng, sigma_r0_um=None, n_resamples=None):
     """(se_um, n_ok, draws): the SE of the anchor by a node bootstrap (10.A,
     D-081.7) -- n_resamples (default cfg.calibration.bootstrap_resamples)
     resamples of the scans with replacement (rng: numpy Generator), each
-    refitted by fit_growth and read by anchor_from_growth; a resample with
-    fewer than two usable nodes, a failed fit or an unidentified anchor is
-    dropped (n_ok counts the kept ones). se_um is NaN below two kept draws."""
+    refitted by fit_growth and read by anchor_value, from G(delta_0) alone
+    (D-115.4: a table refused at another knot no longer drops a resample); a
+    resample with fewer than two usable nodes, a failed fit or an anchor not
+    identified at delta_0 is dropped (n_ok counts the kept ones). se_um is
+    NaN below two kept draws."""
     n = int(cfg.calibration.bootstrap_resamples if n_resamples is None else n_resamples)
     scans = list(scans)
     draws = []
@@ -910,7 +934,7 @@ def bootstrap_sigma0(scans, cfg, rng, sigma_r0_um=None, n_resamples=None):
         sample = [replace(scans[j], node_id=1000000 + t) for t, j in enumerate(pick)]
         try:
             g = fit_growth(sample, cfg)
-            draws.append(anchor_from_growth(g, cfg, sigma_r0_um))
+            draws.append(anchor_value(g, cfg, sigma_r0_um))
         except ValueError:
             continue
     draws = np.array(draws, dtype=float)

@@ -69,7 +69,10 @@ Checks
                         not_faint (only with node_alpha_check, off by
                         default, D-094) under background_support "square"
                         (the stripe's reasons: test_smoke_stripe.py); anchor_from_growth equals the cut table's
-                        last value; bootstrap_sigma0's SE within 30 % of the
+                        last value; [2026-10-30, D-115.4] anchor_value equals it
+                        on an accepted growth, stays defined when the table is
+                        refused at another knot, and the bootstrap keeps every
+                        resample when every table is refused; bootstrap_sigma0's SE within 30 % of the
                         SD over regenerated data sets; example_node picks the
                         node planted on the median; the scans JSON round trip
                         with the new fields and a file without them
@@ -718,6 +721,36 @@ def test_patch_scan():
         reps.append(CAL.anchor_from_growth(CAL.fit_growth(sc_r, cfg), cfg))
     sd = float(np.std(reps, ddof=1))
     assert abs(se / sd - 1.0) <= 0.3, (se, sd)
+    # (d') D-115.4: the bootstrap reads each resample's anchor from G(delta_0) alone. On an accepted growth
+    # anchor_value equals anchor_from_growth (both sqrt(sigma_r(0)^2 + G(0.84)); float64 roundoff only)
+    assert abs(CAL.anchor_value(g, cfg) - CAL.anchor_from_growth(g, cfg)) <= 1e-12
+    s0sq = cfg.renderer.sigma_r0_um ** 2
+    i28, i84 = (int(np.flatnonzero(np.isclose(g.knots_um, d))[0]) for d in (0.28, 0.84))
+    low = dataclasses.replace(g, g_um2=np.where(np.arange(g.g_um2.size) == i28, -2.0 * s0sq, g.g_um2))
+    try:                                   # a table refused at 0.28 um: the whole-table anchor raises ...
+        CAL.anchor_from_growth(low, cfg)
+        raise AssertionError("anchor_from_growth accepted sigma_r(0)^2 + G < 0 at 0.28 um")
+    except ValueError:
+        pass
+    # ... while the anchor read at delta_0 alone is still defined
+    assert abs(CAL.anchor_value(low, cfg) - math.sqrt(s0sq + g.g_um2[i84])) <= 1e-12
+    bad = dataclasses.replace(g, g_um2=np.where(np.arange(g.g_um2.size) == i84, -2.0 * s0sq, g.g_um2))
+    try:                                   # not positive at delta_0: no anchor
+        CAL.anchor_value(bad, cfg)
+        raise AssertionError("anchor_value accepted sigma_r(0)^2 + G(delta_0) < 0")
+    except ValueError:
+        pass
+    # with every table refused, the bootstrap keeps every resample (it builds no table): same draws, same SE
+    orig = CAL.kernel_from_growth
+
+    def _refuse(*_a, **_k):
+        raise ValueError("refused (test)")
+    CAL.kernel_from_growth = _refuse
+    try:
+        se2, n2, _ = CAL.bootstrap_sigma0(scans, cfg, np.random.default_rng(SEED + 1), n_resamples=60)
+    finally:
+        CAL.kernel_from_growth = orig
+    assert n2 == n_ok and abs(se2 - se) <= 1e-12, (n2, n_ok, se2, se)
     # (e) example_node: the node planted on the median by offset is the example
     med = CAL.median_by_offset(scans)
     planted = dataclasses.replace(scans[0], node_id=999, omega_um2=np.array([med[int(o)] for o in scans[0].offsets()]))
