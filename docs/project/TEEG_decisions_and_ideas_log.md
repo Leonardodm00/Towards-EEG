@@ -137,6 +137,7 @@ the "Binds" column.
 | 2026-10-29 (later, 6) | Logs **D-112** and **D-113** (user, 15:49; the diameter implementation chat), answering the D-109 report. **D-112**: "Remember that the whole cell's nodes must be evaluated for both near and far field calibration" -- Block 10.C covers the near set too (flat at 10 deg, the stripe at the trace's plane, at least 3 usable stripes of the trace's plane +- 3), in Cell 7 and in S3's calibration step (Cell 15, the davinci array) alike; near: 7500 near-range nodes, 3856 flat by the trace, 1960 with a usable stripe at the trace's plane, 1947 with at least 3 usable planes (the walk stopped after 3 planes for 1879 of them), 380 chosen 5 um apart on 48 stretches, in 15.4 min on one core; of the pilot table's 138 near candidates, 71 pass and 12 are chosen; far: the 723 records identical node for node to D-109's run, 19 chosen, 5.1 min; 399 candidates, 20.5 min in all. **D-113**: "I confirm the union and the F3 without change" -- 10.S's own cylinder as the union (F2) confirmed, the pilot's tilt error on thin nodes (F3) accepted. Implemented, smoke-tested and pushed (`c393834` (Block 10.C for both sets, S3's step, the pre-cull, the set_full line, D-113's marks in the SPEC and the tester's report) and `2c5fef4` (the notebooks, runbook v38)). D-105 and D-109 annotated (entries and index). First numbered D-110 and D-111 in the chat; those IDs went to the noise-fit chat (16:45). Written after re-reading this log (changed since the (later, 3) row by another chat's rows; merged, nothing of theirs edited). The repository copy (D-097) on `sci/diameter-pipeline`, `docs/project/`. Next free IDs: D-114, I-005. |
 | 2026-10-30 | Logs **D-114** (user, 08:21; the noise-fit chat): "All ok" -- the two choices put to the user on 2026-10-29 (later, 5) confirmed: D-110's reading of "fitted precisely" (the exact least-squares optimum by variable projection; the bounds [1, 1000] ms and the 301-point grid stay PROVISIONAL), and the refusal of a cell whose sweep tilt cannot be read (Block 4's `CellLayout.from_windows`, `fb6fec9`). Status cells of D-103, D-106, D-107, D-110 and D-111 brought up to date (entries and index): Blocks 2-4 on `main` since `ace6568`. D-110's sources completed (the method's reference, PubMed full text; `check_fit_profile.py`). **Note under D-103** (D-103.1's median window): a sweep's tilt staggers its windows' baselines and degrades the per-sample median; removing each window's estimated tilt offset first restores it (`Ih Fit/dev/2026-10-30_offsets_and_fit/`) -- a proposal put to the user, not decided. Written after re-reading this log (changed since the (later, 5) row by the diameter chat's D-112 and D-113, row (later, 6); merged, nothing of theirs edited). The repository copy (D-097) on `main`, `docs/project/`. Next free IDs: D-115, I-005. |
 | 2026-10-30 (later) | Status notes from Cell 7's Colab run on the pilot 529878215 with D-112's code (the user's upload of 09:08 and `MyDrive/diameters/calibration/`; the diameter calibration chat), **no new decision**. **D-112**, **D-109**: Colab's two search CSVs equal the sandbox's row by row (7500 near-range nodes, 380 chosen; 723 far-range, 19 chosen; only float rounding in `phi_deg`, `theta_rad`), the near search at most 17.1 min and the far at most 5.3 min; of the 399 candidates 103 were measured -- near 30 scanned of 84 (37 `not_flat` by the pilot's tilt, 22 `not_isolated:*` at the pilot's k*, 7 `crossing`, 2 `stack_edge`), 296 `set_full`; far 2 of 19 (12 `not_isolated:*` at k*, 10 `not_flat`, 1 `crossing`); so the far set is insufficient (**D-088.3**) and no production kernel was written. Near fit (30 nodes): $\sigma_{\rm r}$ = 0.080, 0.143, 0.384, 0.547 um at $\delta$ = 0, 0.28, 0.56, 0.84 um; anchor 0.547 um, SE 0.041 um on 870 of 1000 resamples (the 130 dropped all fail at the 0.28 um knot; jackknife 0.049 um); without three nodes whose dip is not one Gaussian core in the window (7664, 8146, 6273) the anchor is 0.484 um. Far fit, a diagnostic on 2 nodes: $\hat\gamma$ = 0.408, $t_1$ interval [-0.01, 0.83]; node 6660 one-sided, its axis at the -0.28 um bound. Checks **[run, sandbox]**: `fit` and `far-fit` rerun on Colab's scans reproduce both files to 1e-9; on the trace the post-pilot verdict of the far set flips with the pilot's $\bar B_j\hat\mu_j$ and own $\hat d_j$ (19 -> 8 at 58 gl/um, the pilot table's 75th percentile) and with the kernel law (19 -> 4 at the search's stand-ins under the law the run measured, slope 0.408: dendrites 10-40 um off the plane exceed 0.3 gl there and not under the steeper configured law); Block 15.3's SNR rule takes its prior width from the configured law (with the measured law as prior, iterated: $\gamma$ = 0.419, all 24 planes of node 2700 kept); the pilot table's $\hat\varphi$ exceeds the trace's tilt by a median 5.4 deg over 382 nodes. Options put to the user, not decided. D-088, D-108, D-109 and D-112 annotated (entries and index). Written after re-reading this log (changed since v31 by the noise-fit chat's D-114 row, entry and index notes, 08:21; merged, nothing of theirs edited). Project knowledge refused this write (its tool takes a local file only after a whole-file read in one call, beyond this session's read limit for a file this size), so this version lives only in the repository copy (D-097) on `sci/diameter-pipeline`, `docs/project/`, until it is written there. Next free IDs: D-115, I-005. |
+| 2026-10-30 (later, 2) | Logs **D-115** (user, 14:12 and the dialog's answers; the diameter calibration chat), the answers to the report's options: the tilt rule kept at +-2 um (the +-3-node answer withdrawn), the kernel law iterated inside Cell 7 (at most 3 rounds, one SE; the diagnostic slope fed back while the far set is short), a residual-against-noise goodness of fit on every scanned plane, the anchor's bootstrap read from G(delta_0) alone, the pilot's values logged in `meta.nodes`, Cell 15 reusing Cell 7's search. Written after re-reading the project's log (unchanged since D-114, 08:21). Project knowledge still refuses this chat's writes (the 2026-10-30 (later) row), so this version lives only in the repository copy (D-097) on `sci/diameter-pipeline`, `docs/project/`: a chat numbering from project knowledge must take D-116. Next free IDs: D-116, I-005. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -271,6 +272,7 @@ would be needed*, *Status*.
 | D-112 | 2026-10-29 | SPEC Block 10.C for both sets (`analysis/candidate_search.py`, `calibrate_kernel.cell_candidates`); `CalibrationConfig.near_candidates`, `near_search_spacing_um`; Cell 7's `real` and S3's calibration step (Block 19.3: Cell 15, the davinci array); `<set>_search_<specimen>.csv`; Block 19.1's set_full line; 10.S's pre-cull; D-109 (a) | the whole cell's nodes evaluated for both sets, in Colab and on davinci [user]; the near rule (10 deg, the stripe at the trace's plane, at least 3 usable of the trace's plane +- 3, an early stop), its ranking by pixels and the 5 um spacing -- the assistant's, PROVISIONAL | active; implemented 2026-10-29; smoke-tested; not yet run on Allen's data [updated 2026-10-30: run in Colab on the pilot; searches equal to the sandbox's row by row; near 30 of 84 measured, far 2 of 19] |
 | D-113 | 2026-10-29 | SPEC 10.S's own cylinder (F2, `fitted_own_rows`); D-101.1's bounds on the pilot's tilt (F3); D-105 (c), (d) | the union of the trace's and the fitted own cylinder confirmed; F3's tilt error accepted without change [user] | active; nothing to implement |
 | D-114 | 2026-10-30 | D-110's statement; D-107.2; Block 4's `CellLayout.from_windows` (`_tilts_for`); the tilt flags `ss_tilt_none`, `ls_tilt_none`; SPEC §2.3 and Block 4's Confirmed line; smoke W2 (g), F11; Block 6's report of a refused cell | D-110's reading confirmed (the bounds [1, 1000] ms and the 301-point grid PROVISIONAL); a cell with a sweep whose tilt cannot be read is refused with the sweep and the flag, no tilt substituted [user] | active; implemented (`7672ffc`, `fb6fec9`); nothing to change |
+| D-115 | 2026-10-30 | the calibration verdict's tilt (kept); Cell 7's loop over the kernel law that Blocks 10.S, 15.2 and 15.3 read; a goodness of fit on every scanned plane (10.P, 15.2); 10.A's anchor bootstrap; `meta.nodes`; Block 19.3 on the pilot (Cell 15) | the tilt over +-2 um kept; the law iterated in Cell 7 (at most 3 rounds, one SE), the diagnostic slope fed back; residual-against-noise goodness of fit, near and far; the bootstrap's anchor from G(delta_0) alone; the pilot's values logged; Cell 15 reuses Cell 7's search [user] | active; implementation started |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
@@ -9392,6 +9394,88 @@ simulated groups (2-sweep cells, $\theta_{\rm cf}$, $\sigma_b$ 0 and 0.1 mV/s) n
 bounds lay below the exact fit's RSS, and the three-start fit of `f293d4a` never beat it inside the bounds.
 
 **Status:** active; implemented (`7672ffc`, `fb6fec9`); nothing to change.
+
+---
+
+## D-115 -- The answers to the Cell 7 report of 2026-10-30 (user): the pilot's tilt rule kept; the kernel law iterated inside Cell 7 with the diagnostic slope fed back; a residual-against-noise goodness of fit on every scanned plane; the anchor's bootstrap read from G(delta_0) alone; the pilot's values logged per candidate; Cell 15 reuses Cell 7's search
+
+**Date:** 2026-10-30, 14:12 (Europe/Rome) and the dialog's answers that followed, the diameter calibration chat, on the
+"Decisions for you" of the report of Cell 7's Colab run (the 2026-10-30 (later) row). **Binds:** the calibration
+verdict's flatness (Block 10.I (iii), D-101.1, D-113.2); Cell 7 (`calibrate_kernel.py`, both notebooks) and the
+rules that read the renderer's kernel law during the calibration -- Block 10.S's predicted shadows (the stripes, the
+verdict, Block 10.C's search), Block 15.2's starting width $\sigma_{\rm p}$ and width bounds, Block 15.3's SNR rule;
+Blocks 10.P and 15.2 (each scanned plane's fit); Block 10.A's anchor bootstrap (`calibration.bootstrap_sigma0`);
+the scans file's `meta.nodes` (Cell 7 and S3's calibration step); Block 19.3 on the pilot (Cell 15) and
+`calibrate_kernel.cell_candidates`.
+
+**Decision [user].** 14:12: "1) phi_hat is fitted through the 3D centres of nodes within +-2 um. I would judge the tilt
+from the +-3 nodes from the chosen one. 2) The law coupling: iterate 3) Add a goodness of fit please 4) do It 5) Add the
+logging change 6) Cell 15 reuses Cell 7's search. Yes". The dialog's answers: on 1), after the assistant noted that +-3
+nodes (about +-3.4 um at the pilot's 1.15 um spacing) lie beyond the pilot's refined pass (+-2 um), "keep +-2", then
+"Keep +-2 um: no change"; on 2), "Automatic loop inside Cell 7" and, while the far set holds fewer than 10 nodes, "Use
+the diagnostic gamma_hat anyway"; on 3), "Residual vs noise".
+
+**Statement.**
+
+(D-115.1) *The tilt.* The flatness verdict keeps the pilot's $\hat\varphi_j$: the TLS line through the refined 3D centres
+of the nodes within $\pm$2 um along the path (Block 5). The user's first answer (the $\pm$3 nodes) is withdrawn; D-113.2
+stands, and the search keeps the trace's tilt over $\pm$2 um.
+
+(D-115.2) *The law, iterated.* Cell 7 loops: round $t$ runs the search, the scans, `fit` and `far-fit` with the law
+$\sigma^{(t)}_{\rm r}$ in the three rules that read a law (10.S, 15.2's $\sigma_{\rm p}$ and bounds, 15.3), where
+$\sigma^{(1)}_{\rm r}$ is the configured law and $\sigma^{(t+1)}_{\rm r}$ is round $t$'s measured near table, cut at
+$\delta_0$ = 0.84 um and continued linearly with round $t$'s $\hat\gamma$; it stops when $\hat\sigma_0$ and $\hat\gamma$
+each move by less than one SE between rounds, or after 3 rounds [user]. While the far set holds fewer than 10 nodes,
+round $t$'s diagnostic $\hat\gamma$ is fed back all the same [user]. The assistant's readings, PROVISIONAL: $\tau$ stays
+0.3 gl in every round; the renderer's production kernel is not touched (the rules' law is a calibration setting); when
+`far-fit` cannot fit (fewer than 2 nodes) the round keeps the previous slope (0.79 in round 1) and convergence is judged
+on $\hat\sigma_0$ alone; the SEs are each estimate's reported one (10.A's node bootstrap, D-115.4; 15.5's); D-088.3's
+production rule unchanged.
+
+(D-115.3) *Goodness of fit.* A scanned plane's Gaussian core fit is rejected when its residual RMS within the fit window
+exceeds $\kappa_{\rm g}$ times the noise SD of that plane's background measured on its stripe, near and far planes alike;
+a rejected plane is dropped and its node keeps its other planes, the existing minima of planes per node still applying
+[user, the assistant's proposal]; $\kappa_{\rm g}$ is set on rendered phantoms with a neighbouring dip (PROVISIONAL until
+that check).
+
+(D-115.4) *The anchor's SE.* The node bootstrap of $\hat\sigma_0$ reads each resample's anchor from
+$\hat G^*(\delta_0)$ alone, $\hat\sigma^*_0 = [\sigma_{\rm r}(0)^2 + \hat G^*(\delta_0)]^{1/2}$, instead of requiring
+$\sigma_{\rm r}(0)^2 + \hat G^* > 0$ at every knot of the table; a resample is dropped only when its fit fails or
+$\sigma_{\rm r}(0)^2 + \hat G^*(\delta_0) \le 0$ [user: "do It"]. The anchor itself is unchanged.
+
+(D-115.5) *The log.* For every measured candidate (not `set_full`) the scans file's `meta.nodes` records the pilot's
+values the verdict used: $k^*$, the sub-plane depth, the centre, $\hat\theta$, $\hat\varphi$, $\bar B$, $\hat\mu$,
+$\hat d$, $\hat\alpha$, the fit status, the flags and the registration verdict -- in Cell 7 and in S3's calibration step
+[user].
+
+(D-115.6) *Cell 15 reuses Cell 7's search.* S3's calibration step on the pilot takes each set's chosen candidates from
+Cell 7's `<set>_search_<sid>.csv` instead of searching again [user: "Yes"]; the assistant's reading, PROVISIONAL: a
+record beside each search CSV holds the inputs the search depends on (the calibration settings, the kernel law, the
+acquisition, the transform, $\bar B$ and $\hat\mu$, the trace), and the CSV is reused only when they equal the step's
+own, else the step searches; the davinci array keeps searching each cell.
+
+**Why [user; data; run].** **[user]** as quoted. **[data; run, sandbox]** the report of 2026-10-30 (the 2026-10-30
+(later) row): the pilot's tilt exceeds the trace's by a median 5.4 deg over 382 nodes; both rules that predict shadows
+read the configured law, and under the law the run measured the far search would keep 6 of 19; three near nodes whose
+dips are not one Gaussian core move the anchor by -0.063 um; the 130 resamples the bootstrap dropped all failed at the
+0.28 um knot; the verdict of an unscanned candidate cannot be reproduced from the scans file; Cell 15 would repeat a
+22-min search.
+
+**What it implies for code and tables.** `calibration.bootstrap_sigma0` and a function reading the anchor from
+$\hat G(\delta_0)$ (D-115.4); the `meta.nodes` builders of `calibrate_kernel.run_real` and `survey_cells.step_calibration`
+(D-115.5); `calibrate_kernel.cell_candidates` (the record, the reuse) and S3's runner option for Cell 15 (D-115.6);
+then, after their SPEC entries: the goodness of fit in Blocks 10.P and 15.2 with its phantom check (D-115.3) and the
+loop in Cell 7 with a calibration-only law for the three rules (D-115.2). SPEC 10.A, 10.C, 10.S, 15.2, 15.3, 19.3;
+both notebooks' Cells 7 and 15; the runbook. No change to the estimator or simulation hashes is expected (calibration
+fields are in no signature).
+
+**What it does not decide [open].** $\kappa_{\rm g}$'s value; whether $\tau$ should move with the law; the loop's
+tolerance beyond one SE; the far set's sufficiency (pooled cells on davinci); whether Cell 15 should also iterate.
+
+**Sources.** **[user]** 2026-10-30, 14:12 and the dialog. **[data; run, sandbox]** the report of 2026-10-30 and its
+checks (`cell7_checks_2026-10-30.zip`, sent to the user).
+
+**Status:** active; implementation started 2026-10-30 (D-115.4 to D-115.6 first).
 
 ---
 
