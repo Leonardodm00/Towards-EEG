@@ -1,0 +1,16 @@
+Sigma_s (start law) and Sigma*_s (theta_cf), R = 300 each: 55 s
+V = A Sigma* A^T at theta_cf; columns: SD of log sigma_f_hat, rho_f_hat, log sigma_s_hat (the last is sqrt(v)); one row per (M, binding seed)
+  SS sweep 92  M = 1000  seed 1000:  SD = (0.0126, 0.0124, 0.0679)   v = 0.00462   (8 s)
+  SS sweep 92  M = 1000  seed 1001:  SD = (0.0125, 0.0122, 0.0668)   v = 0.00447   (7 s)
+  SS sweep 92  M = 1000  seed 1002:  SD = (0.0124, 0.0125, 0.0693)   v = 0.00481   (7 s)
+  SS sweep 92  M = 3000  seed 1000:  SD = (0.0124, 0.0124, 0.0676)   v = 0.00457   (24 s)
+  SS sweep 92  M = 3000  seed 1001:  SD = (0.0125, 0.0123, 0.0669)   v = 0.00448   (23 s)
+  SS sweep 92  M = 3000  seed 1002:  SD = (0.0123, 0.0124, 0.0673)   v = 0.00452   (23 s)
+  SS: v over seeds -- M = 1000 mean 0.00463 (spread 7.4 % of the mean, max - min); M = 3000 mean 0.00453 (spread 2.1 %); ratio of the means M1000 / M3000 = 1.023
+  LS sweep 54  M = 1000  seed 1000:  SD = (0.0409, 0.0125, 0.1684)   v = 0.02837   (19 s)
+  LS sweep 54  M = 1000  seed 1001:  SD = (0.0411, 0.0132, 0.1571)   v = 0.02468   (18 s)
+  LS sweep 54  M = 1000  seed 1002:  SD = (0.0405, 0.0125, 0.1590)   v = 0.02527   (19 s)
+  LS sweep 54  M = 3000  seed 1000:  SD = (0.0410, 0.0127, 0.1707)   v = 0.02913   (51 s)
+  LS sweep 54  M = 3000  seed 1001:  SD = (0.0412, 0.0133, 0.1502)   v = 0.02256   (54 s)
+  LS sweep 54  M = 3000  seed 1002:  SD = (0.0407, 0.0123, 0.1644)   v = 0.02704   (52 s)
+  LS: v over seeds -- M = 1000 mean 0.02610 (spread 14.1 % of the mean, max - min); M = 3000 mean 0.02624 (spread 25.0 %); ratio of the means M1000 / M3000 = 0.995

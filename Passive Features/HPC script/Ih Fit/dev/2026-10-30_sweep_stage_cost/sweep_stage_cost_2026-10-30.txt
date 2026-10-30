@@ -1,0 +1,10 @@
+fixture: K = 63 SS windows in sweeps (92, 93) (K_s = [30, 33]); K_LS = 5, n_LS = 13250; m = 3309 samples
+E  one evaluation at M = 3000: SS sweep 92 alone 3.54 s (100 replicate sweeps); LS sweep 54 alone 8.55 s (3000 windows); the cell's SS part 3.78 s (48 replicate cells x 2 sweeps), LS part 10.85 s
+R  one replicate sweep: SS 0.042 s, LS 0.005 s
+S  SS sweep 92 at M = 300: status 3, trf nfev 4, njev 4, residual calls 16, 6.2 s; u = (-3.2803, 0.1538, -2.9502); truth (-3.2702, 0.1750, -2.9799); start (-3.2214, 0.1950, -3.2030)
+S  LS sweep 54 at M = 300: status 2, trf nfev 7, njev 7, residual calls 28, 27.5 s; u = (-3.1769, 0.2013, -3.1078); truth (-3.2702, 0.1750, -2.9799); start (-3.2214, 0.1950, -3.2030)
+   (Sigma_hat_s from 200 replicate cells: 20.2 s)
+C  one solve at M = 3000 (the call count of S x the evaluation of E): SS 0.9 min, LS 4.0 min
+C  bootstrap of one sweep at B = 50, full M, refits like the main solve: SS 0.8 h, LS 3.3 h (one core); SD(v)/v about 0.20 for a normal log sigma_s_hat
+C  bootstrap of one sweep at B = 100, full M, refits like the main solve: SS 1.6 h, LS 6.6 h (one core); SD(v)/v about 0.14 for a normal log sigma_s_hat
+C  bootstrap of one sweep at B = 200, full M, refits like the main solve: SS 3.1 h, LS 13.3 h (one core); SD(v)/v about 0.10 for a normal log sigma_s_hat

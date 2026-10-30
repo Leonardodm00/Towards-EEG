@@ -38,7 +38,9 @@ Paths this spec covers (relative to `Passive Features/HPC script/Ih Fit/`):
   (tools: the cluster-side checks and the archive inspection, section 5)
 - `noise_windows.py`, `noise_cell_stats.py`, `smoke_noise_windows.py` (Block 3)
 - `noise_fit.py`, `smoke_noise_fit.py` (Block 4: the per-cell fit)
-- (to be added block by block) `noise_sweep_fit.py` (Block 4b), `run_noise_fit.py`, the `sens_*.py`
+- `noise_sweep_fit.py`, `smoke_noise_sweep_fit.py` (Block 9, "Block 4b": the per-sweep
+  stage; SPEC entry drafted 2026-10-30, the code not written)
+- (to be added block by block) `run_noise_fit.py`, the `sens_*.py`
   scripts, the OU term of `synthetic_ground_truth.add_recording_noise`
 
 Everything else in `Ih Fit/` (the I_h fitter, the loader, the recovery gate,
@@ -68,7 +70,10 @@ assistant's proposal (decision log, D-073 comments) keeps (b) as the pooled
 per-cell stage and adds a per-sweep stage for sigma_f, rho_f and sigma_s with
 tau_s and sigma_b per cell. Until the user settles the form, Blocks 3-4 keep
 every statistic per sweep as well as per cell, so either form can be built on
-them. D-072 (user): no shape test anywhere in the noise fit.]
+them. D-072 (user): no shape test anywhere in the noise fit.] [2026-10-30: the
+form was settled by D-076 (i) (2026-10-23: sigma_f and rho_f per sweep,
+sigma_s per sweep with tau_s held and shrunk towards the cell, tau_s per cell)
+and its estimation by D-116; the per-sweep stage is section 2.5 and Block 9.]
 
 ## 2. Mathematical formulation
 
@@ -409,6 +414,145 @@ closed form `noise_law.semivariogram` (Block 2) and the data side
 the pipeline, for the dev checks of the tilt study; Block 4's
 `tilt_from_semivariogram` and the alternation leave with Block 4's rewrite.]
 
+### 2.5 The per-sweep stage (D-073, D-076 (i), D-115, D-116; Block 9, "Block 4b"; drafted 2026-10-30)
+
+For each real cell c, once the per-cell fit of 2.3 has returned theta_hat(c)
+= (sigma_f_hat, rho_f_hat, sigma_s_hat, tau_s_hat)(c), and for each sweep s
+in S(c) = S_SS(c) u S_LS(c) -- S_SS(c) the SS sweeps with kept windows (2.2
+(a), D-106.1), S_LS(c) the LS sweeps of 2.2's LS rule -- the stage gives the
+law that the twin of s carries (D-076 (i); Block 5):
+
+    theta_tilde(c, s) = (sigma_f_hat(c, s), rho_f_hat(c, s), sigma_s_tilde(c, s), tau_s_hat(c)).    (P0)
+
+Below, pr in {SS, LS} is a protocol (not the polarity p of 2.2) and
+tau2_hat_pr(c) a between-sweep variance of log sigma_s (not the slow time
+constant tau_s).
+
+(a) Target. q_hat(c, s) of the Notation: for s in S_SS(c) the 5 SS
+statistics of 2.2, each the median over the sweep's kept windows after the
+offsets (OF1) and the subtraction (D-115, D-103.1) -- Block 3's
+`per_sweep_vectors`; for s in S_LS(c) the 10 LS statistics of its one
+pre-window. A statistic without a finite value on the sweep is dropped from
+q_hat(c, s), q_sim(theta | s) and Sigma_hat_s (as 2.3 (c)); d_s statistics are
+kept, and d_s >= 4 is required (one degree of freedom over the three
+coordinates; else the sweep fails with the reason `stats`; assistant's
+choice).
+
+(b) Binding function. For each fixed theta and each sweep s, q_sim(theta |
+s) is the Harrell-Davis median per statistic over the pool of the sweep's own
+simulator: for s in S_SS(c), ceil(M / K_s) replicate sweeps (K_s the sweep's
+kept windows), each one continuous sweep of L_s samples carrying b_hat(c, s),
+cut at the sweep's kept positions from the floor, its own (TL1) and offsets
+(OF1) removed and its own group median windows subtracted (D-115.3, D-103.1),
+pooled to ceil(M / K_s) K_s windows; for s in S_LS(c), M pre-windows of n_LS
+samples, each carrying b_hat(c, s). This is 2.3 (a)'s simulator on the cell's
+layout restricted to the sweep: the sweeps are independent under (L1)-(L2) and
+every step of the processing is taken per sweep, so a sweep simulated alone
+has the law of that sweep simulated in its cell [reasoning]. Common random
+numbers per sweep: the pool is rebuilt from seed_binding(c, s) at every
+evaluation, so q_sim(theta | s) is a deterministic function of theta.
+
+(c) The fit (D-116.1). In the coordinates u_s = (log sigma_f, rho_f, log
+sigma_s) -- the first three of 2.3 (d), with their bounds -- with tau_s held at
+tau_s_hat(c) and theta(u_s) = (exp u_s1, u_s2, exp u_s3, tau_s_hat(c)),
+
+    J_s(u_s | c, s) = (q_sim(theta(u_s) | s) - q_hat(c, s))^T W_s (q_sim(theta(u_s) | s) - q_hat(c, s)),    (P1)
+
+W_s = Sigma_hat_s^{-1} fixed: Sigma_hat_s is the sample covariance (ddof 1) of
+sweep s's statistic vector over the R_final replicate cells of Block 4's final
+Sigma_hat run (`CellFitResult.per_sweep_cov[s]`), restricted to the kept
+statistics and whitened through its Cholesky factor as in 2.3 (b). That run is
+simulated at the law the final solve starts from, theta_hat_K, which the final
+solve moves to theta_hat(c) by about tol_u when converged; this is the reading
+of D-116.1's "Sigma_hat_s(theta_hat(c))" (assistant's, flagged). One call of
+`least_squares(method='trf')` with Block 4's diff_step for these coordinates
+(1e-3, 1e-2, 1e-3), its ftol, xtol, gtol and max_nfev, started at
+u_s(theta_hat(c)); no second start, no iteration of the weight.
+theta_hat(c, s) = theta(u_hat_s); J_s is reported with dof_s = d_s - 3 (a
+report only). The sweep's fit fails (D-116.4) when `least_squares` returns
+status <= 0 (max_nfev reached, or improper input; reason `no_convergence`) or
+a coordinate of u_hat_s lies within 1e-3 of its range from a bound (Block 4's
+`at_bound` rule; reason `at_bound:<coordinates>`).
+
+(d) The sampling variance (D-116.2). For b = 1..B_v, one replicate of sweep
+s is simulated at theta_hat(c, s) (tau_s = tau_s_hat(c)) with the sweep's
+layout and tilt, on the stream seed_v(c, s) (the replicates drawn in the order
+b = 1..B_v), reduced to its statistic vector q*_b(c, s) as in (a) and refitted
+by (c) -- the same q_sim(. | s) (seed_binding(c, s)), W_s and start
+u_s(theta_hat(c)) -- giving y*_b = log sigma_s_hat*_b (the third coordinate).
+Then
+
+    v(c, s) = (1 / (B_ok - 1)) sum_{b ok} (y*_b - ybar*)^2,   ybar* = (1 / B_ok) sum_{b ok} y*_b,      (P2)
+
+over the B_ok refits that did not fail by (c)'s rule; v(c, s) is NaN when
+B_ok < 2, and the sweep then fails with the reason `v_none`. A sweep whose fit
+failed is not bootstrapped. [open, section 8: B_v (proposal 100); the refits'
+binding size (proposal M = 1000, the alternative the main solve's M); a failed
+refit (proposal: left out of (P2) and counted, the sweep flagged
+`v_refits_failed:<n>/<B_v>` when more than 10 % of its refits fail).]
+
+(e) The pooling per protocol (D-116.3; (D-076.1)). For pr in {SS, LS} let
+S'_pr(c) be the sweeps of protocol pr whose fit did not fail, k_pr =
+|S'_pr(c)|, and for s in S'_pr(c) y_s = log sigma_s_hat(c, s), v_s = v(c, s),
+w_s = 1 / v_s. For k_pr >= 2, with every sum over s in S'_pr(c),
+
+    ybar_FE,pr(c)  = sum_s w_s y_s / sum_s w_s,
+    Q_pr(c)        = sum_s w_s (y_s - ybar_FE,pr(c))^2,
+    tau2_raw_pr(c) = (Q_pr(c) - (k_pr - 1)) / (sum_s w_s - sum_s w_s^2 / sum_s w_s),                 (P3)
+    tau2_hat_pr(c) = max(0, tau2_raw_pr(c)),
+    mu_hat_pr(c)   = sum_s w*_s y_s / sum_s w*_s,   w*_s = 1 / (v_s + tau2_hat_pr(c)),                (P4)
+    lambda(c, s)   = tau2_hat_pr(c) / (tau2_hat_pr(c) + v_s),
+    log sigma_s_tilde(c, s) = mu_hat_pr(c) + lambda(c, s) (y_s - mu_hat_pr(c)),                        (D-076.1)
+
+the DerSimonian-Laird moment estimate clipped at zero, with the random-effects
+mean recomputed at the clipped value (statsmodels' `combine_effects(...,
+method_re="dl")` returns tau2_raw_pr unclipped and uses it in its random-effects
+weights: D-076's clarification of 2026-10-26). With tau2_hat_pr(c) = 0 every
+sweep of the protocol takes mu_hat_pr(c), the fixed-effect mean. k_pr = 1:
+mu_hat_pr(c) = y_s, tau2_hat_pr(c) and lambda NaN, sigma_s_tilde(c, s) =
+sigma_s_hat(c, s) (unshrunk; D-116, reasoning). k_pr = 0: nothing is pooled
+(mu_hat_pr, tau2_hat_pr NaN). sigma_f and rho_f are not pooled (D-076 (i)).
+
+(f) A failed sweep (D-116.4). Flagged `sweep_fit_failed:<pr>:<sweep>:<reason>`
+and left out of S'_pr(c); its twin takes the cell's values, theta_tilde(c, s) =
+theta_hat(c) [the reading of "the cell's values" is open, section 8; the
+alternative keeps (sigma_f_hat, rho_f_hat, tau_s_hat)(c) and takes sigma_s =
+exp mu_hat_pr(c) when k_pr >= 1].
+
+(g) Outputs. Per sweep: the protocol, the sweep number, K_s (SS) or n_LS
+(LS), b_hat(c, s), d_s, theta_hat(c, s), J_s, dof_s, the residual calls, the
+solver's status, at_bound, failed and its reason, v(c, s), B_ok and the
+failed refits, lambda(c, s), sigma_s_tilde(c, s), theta_tilde(c, s), the
+flags; per cell and protocol: k_pr, Q_pr, tau2_raw_pr, tau2_hat_pr,
+mu_hat_pr. Table columns (D-076, D-116): per sweep `noise_sweep_sigma_f_mV`,
+`noise_sweep_rho_f`, `noise_sweep_sigma_s_raw_mV`, `noise_sweep_sigma_s_mV`
+(the shrunk value), `noise_sweep_v_log_sigma_s`, `noise_sweep_w` (lambda),
+`noise_sweep_flags`; per cell `noise_cell_tau2_log_sigma_s_ss`,
+`noise_cell_tau2_log_sigma_s_ls` and, the assistant's addition,
+`noise_cell_mu_log_sigma_s_ss`, `noise_cell_mu_log_sigma_s_ls`.
+
+(h) Cost and precision (sandbox 2026-10-30, one core, Block 4's smoke
+fixture: SS sweeps of 30 and 33 kept windows, LS pre-windows of 13250
+samples; dev checks `dev/2026-10-30_sweep_stage_cost/`). One evaluation of
+q_sim(theta | s) at M = 3000 takes 3.5 s for an SS sweep (100 replicate
+sweeps) and 8.6 s for an LS sweep (3000 windows; the cell's own SS and LS
+parts 3.8 s and 10.9 s); one solve of (c) took 16 calls of the residual for an
+SS sweep (4 trf iterations) and 28 for an LS sweep (7), from a start 0.22 away
+in log sigma_s -- about 0.9 min and 4.0 min at M = 3000; a replicate sweep
+costs 0.04 s (SS) and 0.005 s (LS). The bootstrap is B_v solves per sweep: at
+B_v = 100, about 1.6 h (SS) and 6.6 h (LS) per sweep with refits at M = 3000,
+a third of that at M = 1000; the fixture cell (2 SS, 5 LS sweeps) about 36 h
+or 13 h on one core. The (cell, sweep) pairs are independent jobs (Block 6).
+For a normal log sigma_s_hat, SD(v) / v = sqrt(2 / (B_ok - 1)), 0.14 at 100
+[textbook: (B_ok - 1) v / sigma^2 ~ chi^2_{B_ok - 1}]. The linearised
+variance V = A Sigma*_s A^T, A = (G^T W_s G)^{-1} G^T W_s, G the Jacobian of
+q_sim(. | s) in u_s (central differences, step 0.02), Sigma*_s the replicate
+sweep's covariance at theta_cf, gives sqrt(v) = 0.067-0.069 (SS sweep, K_s =
+30) and 0.150-0.171 (LS sweep); over three binding seeds its range (max -
+min) is 2-7 % of the mean (SS) and 14-25 % (LS), and the mean of three seeds
+moves between M = 3000 and M = 1000 by -0.5 % (LS) and +2.3 % (SS)
+(`check_refit_binding_size.py`).
+
 ### Notation
 
 | Symbol | Meaning | Type / shape | Units |
@@ -452,6 +596,15 @@ the pipeline, for the dev checks of the tilt study; Block 4's
 | C, kappa(C_hat), d_eff | Cholesky factor of Sigma_hat; condition number of its correlation matrix; statistics kept after dropping the non-finite ones | float[d_eff, d_eff]; float; int | mixed; --; -- |
 | h* | [legacy] the tilt's lag, 4 P Delta_t | float | s |
 | seed_binding, seed_Sigma_k, seed_boot | per-cell child seeds (`SeedSequence([seed, specimen_id])`): the binding function's common random numbers; Sigma_hat's draws at iteration k; the bootstrap | int | -- |
+| S(c), S_SS(c), S_LS(c); pr; S'_pr(c), k_pr | (2.5) the sweeps of c in the per-sweep stage, all and by protocol; a protocol, SS or LS (not a polarity p); the sweeps of protocol pr whose fit did not fail, their count | sets; label; set, int | -- |
+| q_sim(theta \| s), K_s, d_s | the per-sweep binding function (2.5 (b)); the sweep's kept SS windows; its statistics kept (>= 4) | float[15] (NaN outside the sweep's protocol); int; int | mixed; --; -- |
+| u_s, theta_hat(c, s), J_s, dof_s | the per-sweep fit coordinates (log sigma_f, rho_f, log sigma_s); the sweep's estimate, with tau_s_hat(c); the cost (P1) at it; d_s - 3 | float[3]; `NoiseLaw`; float; int | log mV, --, log mV; mV, --, mV, s; --; -- |
+| W_s, Sigma_hat_s | the sweep's weight and simulated covariance (Block 4's `per_sweep_cov[s]`, kept statistics) | float[d_s, d_s] | mixed |
+| B_v, B_ok, q*_b(c, s), y*_b, v(c, s) | the bootstrap's refits per sweep (not the window bootstrap's B of W_0); those that did not fail; the b-th replicate's statistic vector; its refit's log sigma_s_hat; the sampling variance (P2) | int; int; float[15]; float; float | --; --; mixed; log mV; (log mV)^2 |
+| y_s, v_s, w_s, w*_s; Q_pr(c) | log sigma_s_hat(c, s), v(c, s) and the fixed- and random-effects weights of 2.5 (e); Cochran's Q | float | log mV, (log mV)^2, (log mV)^-2, (log mV)^-2; -- |
+| tau2_raw_pr(c), tau2_hat_pr(c), mu_hat_pr(c) | the DerSimonian-Laird moment estimate of the between-sweep variance of log sigma_s in protocol pr (P3), raw and clipped at 0 (not tau_s); the random-effects mean (P4) | float | (log mV)^2; (log mV)^2; log mV |
+| lambda(c, s), sigma_s_tilde(c, s), theta_tilde(c, s) | the shrinkage weight; the shrunk slow SD (D-076.1); the law the twin of s carries (P0) | float; float; `NoiseLaw` | --; mV; mV, --, mV, s |
+| seed_binding(c, s), seed_v(c, s) | per-sweep child seeds: the per-sweep binding function's common random numbers; the bootstrap's replicates | int | -- |
 
 ## 3. Data contracts
 
@@ -475,7 +628,8 @@ the pipeline, for the dev checks of the tilt study; Block 4's
   - D-010 (iii): no check certifies a loss or a statistic by `isfinite` alone.
   - D-017, D-033, D-034, D-048 to D-051, D-055, D-056: as stated in section 2 (blocks 2 onward).
   - D-072: the stored SS windows are the data as the archive wrote them (trace-QC'd when archived); no shape test is applied anywhere in the noise fit -- not to the data, not in the binding function's or Sigma_hat's simulator, not to the twins; each window's position in its 37-pulse train comes from `trace_qc_results.csv`.
-  - D-073: each twin sweep is calibrated on its own real sweep (form open, section 8); statistics are kept per sweep as well as per cell.
+  - D-073: each twin sweep is calibrated on its own real sweep (form open, section 8); statistics are kept per sweep as well as per cell. [2026-10-30: the form is D-076 (i), estimated as D-116 states, section 2.5.]
+  - D-116: the per-sweep stage of 2.5 (Block 9): one solve per sweep at the cell's weights from theta_hat(c), tau_s held at tau_s_hat(c); v(c, s) by a parametric bootstrap; (D-076.1) per protocol, the SS and the LS sweeps separately; a failed sweep flagged, left out of the pooling, its twin at the cell's values.
   - D-095, D-103, D-104, D-106, D-110 (confirmed by D-114.1), D-111: the SS window start and subtraction of 2.2 (a)-(g): the median window per sweep and polarity, its decay fitted by exact least squares (variable projection, no starting values; a minimum at a bound is a failed fit), the point value (ST1), the MEDIAN over valid groups with the 80 ms floor, the 80 ms fallback below a 50 ms window, groups under 5 windows out of everything, a failed fit out of the median only.
   - D-102, D-107: every sweep's tilt is read (2.4: (TL1) for SS, (TL2) for LS) and copied into the twins and the fit's simulator; no statistic of the tilt is computed.
   - D-114.2: a cell with a kept sweep whose tilt cannot be read (`ss_tilt_none:<sweep>`, `ls_tilt_none:<sweep>:<reason>`) is refused by the fit (`CellLayout.from_windows` raises, quoting the sweep and the flag); no tilt is substituted.
@@ -528,7 +682,7 @@ the pipeline, for the dev checks of the tilt study; Block 4's
 
 ### Block 4: the per-cell fit -- binding function, simulated covariance and the iteration (D-033, D-048 to D-051, D-056; the layout and the simulator D-103, D-106, D-107.2, D-115.3)
 
-- Module: `noise_fit.py` (model and analysis layer: the simulator of a cell's windows at the real layout, the binding function, Sigma_hat, the inner solve and the iteration; no I/O beyond an optional log callable, no plotting); smoke `smoke_noise_fit.py`. The per-sweep stage of D-076 (i) is Block 4b (`noise_sweep_fit.py`), specified when written.
+- Module: `noise_fit.py` (model and analysis layer: the simulator of a cell's windows at the real layout, the binding function, Sigma_hat, the inner solve and the iteration; no I/O beyond an optional log callable, no plotting); smoke `smoke_noise_fit.py`. The per-sweep stage of D-076 (i) is Block 4b (`noise_sweep_fit.py`), specified when written [2026-10-30: specified as Block 9, section 2.5; drafted].
 - Public API: `NoiseFitConfig` (frozen dataclass: `M_binding=3000`, `R_iter=600`, `R_final=3000`, `B_boot=2000`, `k_max=6`, `tol_u=0.01`, `starts_after_first=1`, `max_nfev=15`, `ftol=1e-4`, `xtol=1e-3`, `gtol=1e-8`, `fd_rel_step=(1e-3, 1e-2, 1e-3, 1e-3)`, `log_sigma_bounds=(log 1e-4, log 10)`, `rho_bounds=(1e-3, 0.999)`, `log_tau_bounds=(log 1e-4, log 10)`, `chunk_windows=500`, `seed=20261023`, `window_cfg`; `lag_periods` retired with (T1)); `CellLayout` (frozen: `specimen_id`, `fs`, `dt`, `n_w`, `pre_n`, `j0`, `j_floor` (the floor's first sample, pre_n + round(t_ss_floor_ms f_s / 1e3) <= j0; D-115.3), `period_samples`, `train_length`, `sweep_numbers` (n_sweeps,) the SS sweeps with kept windows, `sweep_index` (K,), `position` (K,), `polarity_is_dep` (K,), `sweep_number` (K,), `n_ls`, `ls_sweep_number` (K_LS,), `ss_tilt` (n_sweeps,) and `ls_tilt` (K_LS,) the real sweeps' tilts in mV/s, aligned with `sweep_numbers` and `ls_sweep_number` (D-107.2); `K`, `K_LS`, `m`, `n_sweeps`, `L_s` properties; `from_windows(ss_kept: SSWindows, ls: LSWindows, t_ss_ms, ss_tilts: SweepTilts, ls_tilts: SweepTilts, window_cfg=WindowConfig()) -> CellLayout` (refuses, with the reason: LS pre-windows of unequal length; a sweep of `ss_kept` or `ls` without a tilt, or with a NaN one, quoting the reading's flag); `from_cell(nwin: SSNoiseWindows, ls: LSWindows, window_cfg=WindowConfig()) -> CellLayout` (the SS tilts are Block 3's reading `nwin.tilts` (D-115.2; never re-read on X_tilde, where (OF1) has removed them; `read_ss_tilts(nwin.ss)` when `tilts` is None), the LS tilts `ls_sweep_tilts(ls)`, then `from_windows(nwin.ss, ls, nwin.start.t_ss_ms, ...)`)); `CellTarget` (`q_hat` (15,), `per_window_ss` (K, 5), `per_window_ls` (K_LS, 10), `labels`; `from_stats(ss_stats, ls_stats, layout, window_cfg)`, `from_cell(nwin, ls, layout, window_cfg)` (the statistics of the kept, subtracted windows and of the LS pre-windows); V_hat and N_pairs retired with (T1)); `simulate_cell_windows(law, layout, rng, *, parts=('ss', 'ls'), window_cfg, return_windows=False, return_tilts=False) -> (ss_stats (K, 5), ls_stats (K_LS, 10))`, with `return_windows` also `X_tilde` (K, m) and `ls_traces` (K_LS, n_ls), with `return_tilts` last the replicate's own SS reading (dict sweep -> mV/s) (one replicate cell: the sweeps continuous, sweep s with tilt `layout.ss_tilt[s]`, the windows cut at the kept positions from the floor; the replicate's own (TL1) at the floor (`tl1_fit`) and offsets (OF1) (`tilt_offsets`) removed, D-115.3; the enlarged parts; the group median window of the replicate's own corrected windows subtracted; LS window k with tilt `layout.ls_tilt[k]`); `binding_function(law, layout, cfg, seed, *, which='both', return_pool=False) -> q_sim (15,)` (CRN by re-seeding; with `return_pool` also the pools (M_cells K, 5) and (N_LS, 10), LS row i with the tilt of LS sweep i mod K_LS); `hd_median(A (N, d)) -> (d,)` (Harrell-Davis, NaN-ignoring per column); `simulated_covariance(law, layout, R, rng, *, per_sweep=False, window_cfg) -> SigmaResult` (`Sigma` (15, 15), `vectors` (R, 15), `per_sweep` dict sweep -> (R, 5 or 10) when asked); `closed_form_vector(law, layout, window_cfg) -> (15,)`; `solve_inner(q_hat, C, law_starts, layout, cfg, seed, mask, residual=None) -> InnerResult` (`law`, `u`, `J`, `nfev`, `start_index`, `status`, `message`, `starts` (u_0, J) per start, `at_bound`); `closed_form_start(q_hat, SE, mask, layout, cfg) -> NoiseLaw`; `law_to_u`, `u_to_law`; `correlation_condition_number(Sigma)`; `fit_cell(target, layout, cfg, log=None) -> CellFitResult` (`specimen_id`, `law`, `u`, `J` (at the reported theta_hat), `dof`, `p_value`, `kappa`, `Sigma` (d_eff, d_eff), `labels_kept`, `stats_dropped`, `q_hat`, `q_sim`, `SE` (W_0's; NaN where dropped), `ss_tilt` and `ls_tilt` (dict sweep -> mV/s: the tilts the simulator carried), `n_solves`, `converged`, `flags` ('stats_dropped:<labels>', 'se_from_simulation:<labels>' when a finite statistic had no bootstrap SE -- a single window -- and W_0 took the simulated single-window spread x 1.2533 / sqrt(K) at the closed-form start, 'no_plateau', 'sigma_jitter', 'at_bound:<coordinates>'), `history` (per solve: weight, R, u, J, nfev, start_index, status, at_bound, seconds), `per_sweep_cov` dict sweep -> covariance of its vector (from the final Sigma_hat run, Block 4b's weights), `config`, `seconds`; `to_dict()` JSON-ready, NaN as null). Retired with (T1) (D-107.2): `tilt_from_semivariogram`, `TiltResult`, the result's `sigma_b` and the flags 'tilt_clipped', 'tilt_no_pairs'.
 - Inputs: Block 3's `SSNoiseWindows` (the kept windows, X_tilde, t_SS(c)), `LSWindows`, the per-sweep tilts; theta in mV, --, mV, s; tilts in mV/s.
 - Outputs: theta_hat as `noise_law.NoiseLaw`; u in the fit coordinates; J dimensionless; Sigma in the statistics' units squared.
@@ -539,6 +693,22 @@ the pipeline, for the dev checks of the tilt study; Block 4's
 - Data flow: consumes Blocks 1-3; produces theta_hat(c), Sigma_hat (final) with the per-sweep covariances for Block 4b, the fit report fields for the noise table and manifest (Block 6: columns `noise_sigma_f_mV`, `noise_rho_f`, `noise_sigma_s_mV`, `noise_tau_s_ms`, `noise_J`, `noise_dof`, `noise_p`, `noise_kappa`, `noise_n_solves`, `noise_flags`; `noise_sigma_b_mV_per_s` retired, D-107; the per-sweep tilts are Block 3's, `noise_tilt_mV_per_s` in the per-sweep table); consumed by Block 4b and Block 6.
 - Confirmed: D-033, D-048 to D-051, D-056, D-103, D-106, D-107, D-114.2 (a cell with an unreadable tilt refused; confirmed 2026-10-30) (user). The assistant's choices, flagged: items (c)-(e), (h) of 2.3; the LS tilts cycled through the binding pool by replicate sets; the unit tilt draw kept in the draw order; the chi-square tail probability as a report field only.
 - Status: smoke-tested 2026-10-23 (F1-F10 10/10; mutation-tested with ten planted defects). Rewritten for D-103, D-106, D-107.2 and smoke-tested 2026-10-29 (later, 5) (sandbox: F1-F11 11/11, about 100 s; Blocks 2-3 suites 10/10, 14/14; mutation-tested with seven planted defects -- the mean subtraction in the simulator, the SS tilts dropped, the LS tilts dropped, the LS tilts not cycled, a NaN tilt accepted, the SS tilts misaligned, q_sim reported at the start law -- each FAILs the check named for it, the last once F7 recomputes q_sim at the reported law). Found by the smoke: the fixture cell's start falls back to 80 ms (its sweep 92 carries a -0.25 mV/s tilt, which bends two of its four groups' fits; the median is 161 ms); see the dev check `dev/2026-10-29_start_noise/check_start_detrended.py`. Not run here: a fit at the full M and R (hours; the cluster, Block 6's S0). D-115.3 (each replicate's own reading at the floor and its offsets) implemented and smoke-tested 2026-10-30 (later) (F1-F11 11/11, about 2 min; F1 against an independent loop with the closed-form slope (4.4e-16 mV), F2 also with 0.1 mV/s tilts (the pooled mean 0.0024134 against 0.0024151 expected), F5 the replicate's own reading, F11 `from_cell`'s tilts and `j_floor`; three planted defects -- `from_cell` re-reading on X_tilde, the simulator without the offsets, its offsets from the layout's tilts -- each FAILs F1, F2 or F11). With the offsets removed the fixture cell's median start is 151.7 ms (161.0 ms without): it still falls back, now by 1.7 ms.
+
+### Block 9: the per-sweep stage ("Block 4b") -- each sweep's law, its bootstrap variance and the pooling per protocol (D-073, D-076 (i), D-115, D-116)
+
+Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py` read integer block numbers only and 5-8 are held by the roadmap's later stages (2026-10-30, the assistant's choice); "Block 4b" in the decision log (D-082 to D-116) and the handoffs is this block. It runs after Block 4 and before Block 5.
+
+- Module: `noise_sweep_fit.py` (model and analysis layer: the per-sweep fit, its bootstrap and the pooling; no I/O beyond an optional log callable, no plotting); smoke `smoke_noise_sweep_fit.py`.
+- Public API (drafted; the open points of section 8 change defaults, not the interface): `SweepStageConfig` (frozen dataclass: `B_v=100` [open], `M_refit=None` (the refits' binding size; None takes the main fit's `M_binding`) [open; proposal 1000], `max_failed_refit_frac=0.1` [open], `min_stats=4`, `seed=20261030`); `sweep_layout(layout: CellLayout, protocol: str, sweep: int) -> CellLayout` (the cell's layout restricted to one sweep: 'ss' -- its kept windows (positions, polarities, sweep numbers) and its tilt, no LS window; 'ls' -- its one pre-window and its tilt, no SS window; every other field unchanged); `sweep_target(target: CellTarget, layout: CellLayout, protocol, sweep) -> (q_hat_s (15,), mask (15,) bool)` (2.5 (a); NaN and False outside the sweep's protocol and where a statistic is not finite); `sweep_seeds(seed, specimen_id, protocol, sweep) -> (seed_binding_s, seed_v_s)` (`SeedSequence([seed, specimen_id, 0 for SS or 1 for LS, sweep]).spawn(2)`); `SweepFit` (`protocol`, `sweep`, `u` (3,), `law` (`NoiseLaw`, tau_s = tau_s_hat(c)), `J`, `d`, `dof`, `n_calls`, `status`, `at_bound`, `failed`, `reason`); `fit_sweep(q_hat_s, mask, Sigma_s, sub: CellLayout, law_start: NoiseLaw, cfg: NoiseFitConfig, seed_binding_s: int) -> SweepFit` ((P1), the failure rule of 2.5 (c)); `SweepBootstrap` (`v`, `B`, `B_ok`, `y` (B,) NaN where a refit failed, `flags`); `bootstrap_v(fit, mask, Sigma_s, sub, law_start, cfg, stage_cfg, seed_binding_s, seed_v_s, refit=fit_sweep) -> SweepBootstrap` ((P2); `refit` a callable with `fit_sweep`'s signature, swappable for a test double); `PoolResult` (`protocol`, `sweeps`, `k`, `Q`, `tau2_raw`, `tau2`, `mu`, `lam` (k,), `y_shrunk` (k,)); `pool_protocol(y (k,), v (k,)) -> PoolResult` ((P3), (P4), (D-076.1), the k = 1 and k = 0 rules); `run_sweep(cell_fit: CellFitResult, target, layout, cfg, stage_cfg, protocol, sweep, log=None) -> dict` (one sweep's fit and bootstrap: the per-sweep fields of 2.5 (g); one cluster job per (cell, sweep)); `pool_cell(rows, cell_law: NoiseLaw, specimen_id) -> SweepStageResult` (the pooling per protocol over the rows, the failed sweeps' twins by 2.5 (f), theta_tilde(c, s) by (P0)); `SweepStageResult` (`specimen_id`, `rows` (list of dict), `pools` (dict protocol -> PoolResult), `twin_laws` (dict (protocol, sweep) -> `NoiseLaw`), `flags`, `config`, `seconds`; `to_dict()` JSON-ready, NaN as null; `table_rows()` the columns of 2.5 (g)); `fit_sweeps(cell_fit, target, layout, cfg, stage_cfg, log=None) -> SweepStageResult` (`run_sweep` on every sweep of S(c), then `pool_cell`).
+- Inputs: Block 4's `CellFitResult` (theta_hat(c), `per_sweep_cov`), `CellTarget` and `CellLayout` of the cell; Block 4's `NoiseFitConfig` (M, bounds, steps, tolerances, max_nfev, seed); theta in mV, --, mV, s.
+- Outputs: the per-sweep laws (`NoiseLaw`, tau_s = tau_s_hat(c)); log sigma in log mV, v in (log mV)^2; the pooling's numbers per protocol; the per-sweep and per-cell columns of 2.5 (g).
+- Parameters: `SweepStageConfig` above; `NoiseFitConfig`'s `M_binding`, `log_sigma_bounds`, `rho_bounds`, `fd_rel_step[:3]`, `ftol`, `xtol`, `gtol`, `max_nfev`, `seed`.
+- Library calls relied on: `scipy.optimize.least_squares(method='trf', bounds, diff_step, ftol, xtol, gtol, max_nfev)`; `scipy.linalg.solve_triangular` and Block 4's Cholesky helper; `numpy.var(ddof=1)`; `numpy.random.SeedSequence`; Block 4's `binding_function`, `simulate_cell_windows`, `law_to_u`; Block 3's `per_sweep_vectors`; `statsmodels.stats.meta_analysis.combine_effects` as the smoke's oracle of (P3)'s raw value.
+- Custom code (marked `# Custom:`): the layout restriction; (P3)-(P4) with the clip and the recomputed random-effects mean (statsmodels' `combine_effects` neither clips nor recomputes; its raw tau2 is the smoke's oracle); the bootstrap loop (no library bootstraps an indirect-inference estimator); the failed-sweep rule.
+- Test oracles (`smoke_noise_sweep_fit.py`, P1-P10, reduced sizes, about 5 min (estimate); the cell: Block 4's smoke fixture -- 2 SS sweeps of 30 and 33 kept windows, 5 LS pre-windows, planted tilts -- with a stub per-cell result: theta_hat(c) a law set apart from the fixture's truth theta_cf (sigma_f x 1.05, rho_f + 0.02, sigma_s x 0.8), `per_sweep_cov` from `simulated_covariance(per_sweep=True)` at R = 200): P1 restriction -- `sweep_layout` keeps exactly the sweep's kept windows, its tilt and nothing of the other protocol; `simulate_cell_windows` on it equals, on the same draws, an independent loop (`simulate_sweep` with the sweep's tilt, the windows cut from the floor, the within-polarity closed-form slope (TL1) and its offsets, numpy's per-group median subtracted; 1e-12 mV) and, for an LS sweep, `simulate_traces` with its tilt (1e-12 mV); P2 targets -- an SS target equals numpy's median over the sweep's rows of `ss_window_stats` (exactly), an LS target the window's row; the mask is False outside the protocol; P3 pooling -- on random (y, v), k = 2..12, 200 draws: tau2_raw equals `combine_effects(y, v, method_re="dl").tau2` (1e-12 relative: float64 roundoff on sums of k terms); where it is >= 0, mu equals `mean_effect_re` (1e-12); where it is < 0, tau2 = 0, mu equals `mean_effect_fe` and every lambda is 0; lambda and y_shrunk equal (D-076.1) written out in the test; y_shrunk lies between mu and y; k = 1 gives mu = y, tau2 NaN and y_shrunk = y; k = 0 all NaN; P4 self-consistency -- q_hat_s := q_sim(theta* | s) exactly on the sweep's binding seed: `fit_sweep` from a start 0.2 away in log sigma_s returns u within 0.01 of u(theta*), J < 1e-3, not failed (M = 60), for one SS and one LS sweep; P5 recovery -- every sweep of the fixture fitted at M = 100 from the stub theta_hat(c): |u_hat_s - u(theta_cf)| below 4 times the linearised SD of each coordinate (2.5 (h)'s sandwich at the same M and seed), not failed; P6 the bootstrap's machinery -- with `refit` replaced by a test double returning the log of the replicate's first statistic (the SD) as its third coordinate: `bootstrap_v`'s y equals an independent loop over the same stream (`simulate_cell_windows` on the restricted layout at theta_hat(c, s) with tau_s_hat(c) and the sweep's tilt; 1e-12), v its variance with ddof 1; a double failing every 5th refit gives B_ok = 0.8 B_v, those y NaN, v over the others and the flag `v_refits_failed` (20 % > 10 %); a double failing every refit gives v NaN and the reason `v_none`; P7 the bootstrap against the linearisation -- for the fixture's first SS sweep, B_v = 60 real refits at M = 100: v lies inside v_lin chi2_q(B_ok - 1) / (B_ok - 1) for q in {0.0005, 0.9995}, v_lin the sandwich at the same M and seed (loose: the sandwich is first-order); P8 a failed sweep -- a target whose SD statistics are 100 times below what any law in the bounds produces drives the solve to a bound: flagged `sweep_fit_failed:<pr>:<sweep>:at_bound:...`, not bootstrapped, out of S'_pr(c), its twin law by 2.5 (f); a solve with max_nfev = 1 fails with `no_convergence`; P9 the stage end to end -- `fit_sweeps` on the fixture (M = 60, B_v = 8, M_refit = 60): a row per sweep of S(c) with every field of 2.5 (g); each protocol's pool equals `pool_protocol` on the rows' y and v; theta_tilde(c, s) = (sigma_f_hat, rho_f_hat, sigma_s_tilde, tau_s_hat(c)); bit-identical twice; `run_sweep` per sweep then `pool_cell` equals `fit_sweeps`; `to_dict` round-trips through JSON; P10 ASCII/LF.
+- Data flow: consumes Blocks 2-4 (the law; Block 3's per-sweep vectors through `CellTarget`; Block 4's layout, simulator, binding function, theta_hat(c) and per-sweep covariances); produces theta_tilde(c, s) for Block 5's twins and the per-sweep and per-cell columns for Block 6's tables; consumed by Blocks 5 and 6.
+- Confirmed: D-073, D-076 (i), D-116.1-D-116.3 (user); D-116.4 with its reading open (section 8). The assistant's choices, flagged: Block 4's simulator restricted to one sweep (2.5 (b)); Sigma_hat_s at the law of Block 4's final Sigma_hat run (2.5 (c)); the failure rule's tolerance (Block 4's `at_bound`); d_s >= 4; the seeds; the k = 1 and k = 0 rules; the per-cell mu columns; B_v, M_refit and the failed refits (open, section 8).
+- Status: drafted 2026-10-30 (SPEC only; the code waits for the answers of section 8). Cost and precision measured on the fixture with Block 4's functions (2.5 (h); `dev/2026-10-30_sweep_stage_cost/`).
 
 ### Tools (not blocks): cluster-side checks and the SS archive inspection
 
@@ -577,4 +747,5 @@ the pipeline, for the dev checks of the tilt study; Block 4's
 - Root `specs/SPEC.md` Coverage pointing to this file (user's call, D-056 (ii)).
 - (added 2026-10-20) The stored SS windows are a selected subset: they passed the writer's trace QC (section 3), a test on the lag-1 structure of each pulse's residual after a bounded single-exponential fit over [offset + 2 ms, + 40 ms], the timescales of the law's slow part. The fit's simulator does not apply it. Check SQC (standalone script `sqc_trace_qc_selection.py`, not in the repository; the repository's `trace_qc_v2.py` with the archive's configuration on 2-sweep cells simulated with the Block-2 law, RC response 113 MOhm / 28.1 ms) compared the D-051 SS statistics of the kept windows with a random subset of the same per-polarity counts: Gaussian noise of the law alone makes the QC drop 12.9 % of pulses (theta_cf) and 12.0 % (sigma_s = 0.025 mV); the selection shifts the medians by -0.17 to -0.19 per-cell SD at t_SS = 40 ms, by at most 0.09 SD at t_SS = 80 ms and 0.08 SD at 120 ms, and V_hat at 4 periods by at most 0.07 SD (for a 10-sweep cell the SD is about 2.2 times smaller). The archive's own drop rate in 508282493 (46 %) is far above the noise-only rate, so most of its drops remove structure the law does not have; the check does not cover those. [decided 2026-10-21, D-072: no shape test anywhere in the noise fit; every L3_exc cell's layout is reconstructable, so no fallback is needed and Block 3 refuses a cell whose table, counts or polarity sequence disagree.] Still open: the floor t_SS(c) >= 80 ms and the per-cell excess-drop label (the assistant's proposal).
 - (added 2026-10-23, Block 4) The tilt sigma_b(c) of a 2-sweep cell (14 of 18) is estimated from two draws of b (2.3 (h)): keep per cell as D-034 says (and report its uncertainty), pool the tilt across cells (a cohort sigma_b or a shrinkage towards it, as D-076 does for sigma_s per sweep), or draw on the LS sweeps' slopes as well (each LS pre-window is 265 ms: a slope of 0.1 mV/s moves its mean by 0.027 mV, within the pre-window SD; weak)? [corrected 2026-10-23: the LS pre-window slopes are not an option -- excluded by D-034's status (D-017 note 4: a tilt calibrated from pre-window slopes would be too large by more than an order of magnitude).] The user's call. Simulation 2026-10-23 (`check_findings_2026-10-23.py`; theta_cf, sigma_b = 0.1 mV/s, t_SS = 80 ms, (T1) at the true law): sigma_b_hat / sigma_b has 95 % range 0.00-1.95 with 2 sweeps (clipped at 0 in 3.5-4.9 % of cells), 0.42-1.56 with 6 and 0.59-1.44 with 10 -- the spread of sqrt(chi^2_S / S) from the S realised tilts, plus the noise term in the lower tail -- and sigma_b_hat^2 is unbiased (mean ratio 0.97-1.01); pooled over the cohort's 64 SS sweeps under a common sigma_b, 0.82-1.17. A sigma_b error of that size (0 or 0.17 in the simulator for a cell at 0.1) moves u_hat by at most 0.18 of its SD (linearised at theta_cf, fixture layout): what is at stake is the twins' tilt, not theta_hat. Also open: the batched FFT autocorrelation and the Markov-jump simulator of 2.3 (h), both unneeded at the measured cost. [answered 2026-10-28 (later): D-100 (user, "Let's do A and B for the 2 sweep cells") -- for the 14 cells with two SS sweeps the twins' tilt SD is taken both per cell (D-034, variant a) and as one cohort value (variant b); partial pooling not taken. The assistant's reading, to confirm before Blocks 5-6 are specified: two labelled variants of twins per 2-sweep cell, sharing their manifest row and unit draws; the cohort value max(0, sum_c S_eff(c) sigma_b_hat_u(c)^2 / sum_c S_eff(c)) over the 18 cells, from the unclipped (T1) values; each real cell's own fit (2.3) keeps its own sigma_b_hat. Blocks 3-4 then also export sigma_b_hat_u(c)^2 and the per-sweep pair counts; a cohort step follows the per-cell jobs (Block 6).] [corrected 2026-10-28 (later, 2): D-100 was the assistant's misreading of the user's answer and is withdrawn. D-102 (user): each twin sweep carries the realised tilt of its own real sweep, b_hat(c, s), and no statistic of the tilt (no sigma_b(c)) is computed for the twins; on an SS sweep b_hat(c, s) is the least-squares slope of the window means on time with one intercept per polarity (proposal). Open: the Long Square sweeps' tilts and the fit's simulator (the same b_hat(c, s), proposal, or the data detrended).] [2026-10-29: D-107 -- an LS sweep's tilt is the line through its pre-window and end-window means; the fit's simulator gives every simulated sweep its real sweep's tilt, so the tilt SD leaves the fit.]
-- (added 2026-10-21) D-073's per-sweep calibration: which of (sigma_f, rho_f, sigma_s, tau_s, sigma_b) are estimated per sweep and which per cell; raw or partially pooled per-sweep values; the twins' protocol twinning (LS amplitudes of the real cell instead of the cohort's `--ls-hyp-amps`; SS sweeps as 37-pulse trains at the real stored positions). Evidence for the proposal: `sweep_identifiability.py` (standalone, not in the repository): from one sweep at theta_cf the fast pair is identified to 1-3 % (sigma_f) and +/-0.012-0.014 (rho_f), sigma_s to 18-30 % (6-13 % with tau_s held), tau_s only within a factor of about 2 (log-SD 0.49-0.72).
+- (added 2026-10-21) D-073's per-sweep calibration: which of (sigma_f, rho_f, sigma_s, tau_s, sigma_b) are estimated per sweep and which per cell; raw or partially pooled per-sweep values; the twins' protocol twinning (LS amplitudes of the real cell instead of the cohort's `--ls-hyp-amps`; SS sweeps as 37-pulse trains at the real stored positions). Evidence for the proposal: `sweep_identifiability.py` (standalone, not in the repository): from one sweep at theta_cf the fast pair is identified to 1-3 % (sigma_f) and +/-0.012-0.014 (rho_f), sigma_s to 18-30 % (6-13 % with tau_s held), tau_s only within a factor of about 2 (log-SD 0.49-0.72). [answered: D-076 (i) (2026-10-23) for the form, D-076 (iii) for the LS amplitudes, D-116 (2026-10-30) for the estimation; section 2.5, Block 9. The SS twins' structure stays with Block 5.]
+- (added 2026-10-30, Block 9 = "Block 4b"; put to the user with the SPEC entry) The per-sweep stage's open points (2.5 (d), (f); cost and precision in 2.5 (h)): (1) B_v, the bootstrap's refits per sweep (proposal 100: SD(v) / v about 0.14, comparable to what the binding function's Monte Carlo error already leaves on v); (2) the refits' binding size (proposal M = 1000: the linearised v moves by -0.5 % to +2.3 % against M = 3000, for a third of the cost; the alternative is the main solve's M); (3) a refit that fails (proposal: left out of (P2) and counted, the sweep flagged above 10 % -- v is then the variance of the estimates that would enter the pooling, as D-116.4 leaves a failed sweep out; the alternative keeps the at-bound values in v); (4) D-116.4's "the cell's values" for a failed sweep's twin: theta_hat(c) for sigma_f, rho_f and sigma_s (the assistant's first reading), or theta_hat(c) for sigma_f and rho_f with sigma_s = exp mu_hat_pr(c), the pooled value of its protocol (theta_hat(c)'s when k_pr = 0) -- the value (D-076.1) gives a sweep that carries no information (v -> infinity) and the one that keeps the SS/LS difference D-116.3 separates.
