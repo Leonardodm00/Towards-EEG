@@ -1,0 +1,9 @@
+worked case: K = 13 windows; grid minimum at tau = 27.542 ms (index 144 of 301); Brent in [26.915, 28.184] ms -> 27.257604 ms (8 evaluations); polished root 27.257604 ms (bounded Brent, polished to the root of dRSS/dtau); A_hat 0.3667 mV, B_hat -59.9871 mV, RSS 3.794932e+00 mV^2; sigma_SS_hat 0.0402 mV, t_sp 123.0 ms (noiseless t0 129.5 ms)
+sigma_b 0.0 mV/s: 600 groups, 600 exact fits interior, 0 at a bound; profile minima on the dense grid: one 600, two or more 0, none 0
+   dense grid below RSS(tau_hat): 0 groups; three-start fit inside the bounds in 600 groups, beats the exact fit in 0, worse by > 1e-6 in 0 (|change of t_sp| max 0.00 ms, median 0.00 ms); three-start tau outside [1, 1000] ms in 0 groups, no converged start in 0
+   share with exactly one interior minimum: 1.0000   (230 s)
+sigma_b 0.1 mV/s: 600 groups, 599 exact fits interior, 1 at a bound; profile minima on the dense grid: one 599, two or more 0, none 1
+   dense grid below RSS(tau_hat): 0 groups; three-start fit inside the bounds in 599 groups, beats the exact fit in 0, worse by > 1e-6 in 0 (|change of t_sp| max 0.00 ms, median 0.00 ms); three-start tau outside [1, 1000] ms in 1 groups, no converged start in 0
+   group with no interior exact fit or a three-start tau outside the bounds: exact at a bound (failed fit); three-start tau 9.195e+06 ms, A 1.468e+04 mV, t_sp 138821569.8 ms
+   share with exactly one interior minimum: 0.9983   (467 s)
+PU1 (0.0) PASS  PT1 (0.0) PASS  PU2 PASS  PU1 (0.1) PASS  PT1 (0.1) PASS   (467 s)

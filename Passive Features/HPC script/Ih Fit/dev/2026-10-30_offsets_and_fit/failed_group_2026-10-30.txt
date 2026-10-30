@@ -1,0 +1,4 @@
+tilted cell 47, sweep 101, dep group, K = 11 (positions [0, 4, 8, 10, 12, 18, 24, 26, 28, 34, 36]); b_hat of the sweep 0.115 mV/s
+  plain median: the minimum of RSS(tau) lies at the bound tau = 1000 ms: no resolvable decay; RSS(tau) at tau = [1.0, 3.0, 10.0, 30.0, 100.0, 300.0, 1000.0] ms: [123.496, 117.092, 102.975, 86.776, 63.218, 53.386, 50.174] mV^2
+  offsets removed first: ok True, tau_hat 29.25 ms, A_hat 0.3766 mV, RSS 5.307 mV^2
+groups at a bound among the tilted cells: 1

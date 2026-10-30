@@ -1,0 +1,8 @@
+M  b 0.00 mV/s: central third supplies 0.330 of the median (it holds 0.329 of the windows); median weight by fifth of the train [0.202 0.198 0.198 0.199 0.202]  (400 groups)
+M  b 0.10 mV/s: central third supplies 0.914 of the median (it holds 0.334 of the windows); median weight by fifth of the train [0.002 0.134 0.721 0.14  0.003]  (400 groups)
+E  b 0.00 mV/s: mean sigma_hat^2 / sigma_f^2 after the median subtraction: plain 0.9616, true offsets removed 0.9616, estimated offsets removed 0.9616
+E  b 0.02 mV/s: mean sigma_hat^2 / sigma_f^2 after the median subtraction: plain 0.9881, true offsets removed 0.9604, estimated offsets removed 0.9604
+E  b 0.10 mV/s: mean sigma_hat^2 / sigma_f^2 after the median subtraction: plain 1.2625, true offsets removed 0.9619, estimated offsets removed 0.9619
+F  untilted 2-sweep cells (sigma_b 0.0 mV/s, 300 cells): SD of t_sp - t0 as implemented 18.6 ms, offsets removed 18.6 ms; fallback as implemented 4.3 %, offsets removed 5.0 % (rescued 0, lost 2)
+F  tilted 2-sweep cells (sigma_b 0.1 mV/s, 300 cells): SD of t_sp - t0 as implemented 50.6 ms, offsets removed 21.9 ms; fallback as implemented 16.3 %, offsets removed 3.7 % (rescued 41, lost 3)
+PM1 PASS  PM2 PASS  PE1 PASS  PF1 PASS  PF2 PASS   (208 s)
