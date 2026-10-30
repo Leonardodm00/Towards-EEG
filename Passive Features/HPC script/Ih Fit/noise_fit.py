@@ -36,6 +36,7 @@ import noise_cell_stats as ncs
 import noise_law
 from noise_law import NoiseLaw
 from noise_cell_stats import SweepTilts
+import noise_windows as nw
 from noise_windows import LSWindows, SSNoiseWindows, SSWindows, WindowConfig, subtract_median_response
 
 LOG_1E4 = math.log(1e-4)
@@ -109,7 +110,9 @@ class CellLayout:
     SS: n_sweeps continuous sweeps of L_s = (train_length - 1) P + n_w
     samples; window k (0-based position p_k in sweep s_k) is the enlarged
     window [p_k P + j0, p_k P + n_w) of that sweep's trace, m = n_w - j0
-    samples; the windows are the KEPT ones (D-106.1). LS: K_LS pre-windows of
+    samples, read from the floor [p_k P + j_floor, ...) first for the
+    replicate's own tilt and offsets (D-115.3); the windows are the KEPT
+    ones (D-106.1). LS: K_LS pre-windows of
     n_ls samples each. Every sweep carries its real sweep's tilt (mV/s,
     D-107.2): ss_tilt[i] for sweep_numbers[i], ls_tilt[k] for
     ls_sweep_number[k].
@@ -120,6 +123,7 @@ class CellLayout:
     n_w: int
     pre_n: int
     j0: int
+    j_floor: int                           # the floor's first sample (t_ss_floor_ms), <= j0 (D-115.3)
     period_samples: int
     train_length: int
     sweep_numbers: Tuple[int, ...]         # SS sweeps with kept windows, in the data's order
@@ -154,7 +158,8 @@ class CellLayout:
 
     @classmethod
     def from_windows(cls, ss: SSWindows, ls: Optional[LSWindows], t_ss_ms: float,
-                     ss_tilts: SweepTilts, ls_tilts: Optional[SweepTilts]) -> "CellLayout":
+                     ss_tilts: SweepTilts, ls_tilts: Optional[SweepTilts],
+                     window_cfg: WindowConfig = WindowConfig()) -> "CellLayout":
         """The layout of the kept windows `ss` (Block 3's SSNoiseWindows.ss) and
         the LS pre-windows, with every sweep's tilt from Block 3's readings.
         Refused (ValueError, with the reason) when a sweep has no tilt or a
@@ -162,6 +167,9 @@ class CellLayout:
         j0 = ss.pre_n + int(round(t_ss_ms * 1e-3 * ss.fs))
         if j0 >= ss.n_w - 1:
             raise ValueError("t_SS = %g ms leaves no enlarged window" % t_ss_ms)
+        j_floor = nw.floor_index(ss.pre_n, ss.fs, window_cfg)
+        if j_floor > j0:
+            raise ValueError("t_SS = %g ms lies before the floor %g ms" % (t_ss_ms, window_cfg.t_ss_floor_ms))
         if ss.n_windows == 0:
             raise ValueError("no kept SS window: the cell cannot be fitted")
         sweep_numbers = tuple(int(s) for s in dict.fromkeys(int(x) for x in ss.sweep_number))
@@ -183,19 +191,23 @@ class CellLayout:
                 raise ValueError("the LS sweeps need their tilts (Block 3's ls_sweep_tilts)")
             ls_tilt = _tilts_for(tuple(int(x) for x in ls_sweeps), ls_tilts, "LS")
         return cls(specimen_id=int(ss.specimen_id), fs=float(ss.fs), dt=float(ss.dt), n_w=int(ss.n_w),
-                   pre_n=int(ss.pre_n), j0=int(j0), period_samples=int(ss.period_samples),
+                   pre_n=int(ss.pre_n), j0=int(j0), j_floor=int(j_floor), period_samples=int(ss.period_samples),
                    train_length=int(ss.train_length), sweep_numbers=sweep_numbers, sweep_index=sweep_index,
                    position=position, polarity_is_dep=np.asarray(ss.polarity_is_dep, dtype=bool),
                    sweep_number=np.asarray(ss.sweep_number, dtype=int), n_ls=n_ls, ls_sweep_number=ls_sweeps,
                    ss_tilt=ss_tilt, ls_tilt=ls_tilt)
 
     @classmethod
-    def from_cell(cls, nwin: SSNoiseWindows, ls: Optional[LSWindows]) -> "CellLayout":
+    def from_cell(cls, nwin: SSNoiseWindows, ls: Optional[LSWindows],
+                  window_cfg: WindowConfig = WindowConfig()) -> "CellLayout":
         """from_windows on Block 3's outputs: the kept windows of `nwin`, its
-        t_SS(c), the SS tilts read on its X_tilde (TL1) and the LS tilts (TL2)."""
-        ss_t = ncs.ss_sweep_tilts(nwin.X_tilde, nwin.ss, nwin.j0)
+        t_SS(c), the SS tilts of its reading `nwin.tilts` (D-115.2: (TL1) at
+        the floor, before the offsets; never re-read on X_tilde, where (OF1)
+        has removed them; read_ss_tilts on the kept windows when absent) and
+        the LS tilts (TL2)."""
+        ss_t = nwin.tilts if nwin.tilts is not None else nw.read_ss_tilts(nwin.ss, window_cfg)
         ls_t = ncs.ls_sweep_tilts(ls) if ls is not None and len(ls.pre) else None
-        return cls.from_windows(nwin.ss, ls, nwin.start.t_ss_ms, ss_t, ls_t)
+        return cls.from_windows(nwin.ss, ls, nwin.start.t_ss_ms, ss_t, ls_t, window_cfg)
 
 
 def _tilts_for(sweeps: Tuple[int, ...], tilts: SweepTilts, protocol: str) -> np.ndarray:
@@ -246,17 +258,22 @@ class CellTarget:
 # ===========================================================================
 def simulate_cell_windows(law: NoiseLaw, layout: CellLayout, rng: np.random.Generator,
                           *, parts: Sequence[str] = ("ss", "ls"), window_cfg: WindowConfig = WindowConfig(),
-                          return_windows: bool = False):
+                          return_windows: bool = False, return_tilts: bool = False):
     """One replicate cell: (ss_stats (K, 5), ls_stats (K_LS, 10)); with
     return_windows also the subtracted SS windows X_tilde (K, m) and the LS
-    traces (K_LS, n_ls).
+    traces (K_LS, n_ls); with return_tilts, last, the replicate's own SS
+    tilt reading (dict sweep -> mV/s).
 
     SS: each sweep is one continuous trace of L_s samples from
     `noise_law.simulate_sweep` (fast + slow, and the real sweep's tilt
     layout.ss_tilt as a fixed number, D-107.2; the offset is invisible and
-    left out); the enlarged windows are cut at the kept positions and each
-    group's median window -- the per-sample median over this replicate's own
-    windows of that sweep and polarity -- is subtracted (D-103.1, D-051 (iv)).
+    left out); the windows are cut at the kept positions from the floor;
+    the replicate reads its own tilt by (TL1) on them (noise_windows.tl1_fit)
+    and removes its own offsets (OF1) (noise_windows.tilt_offsets), as Block
+    3 does on the data (D-115.3); then the enlarged parts, and each group's
+    median window -- the per-sample median over this replicate's own
+    corrected windows of that sweep and polarity -- is subtracted (D-103.1,
+    D-051 (iv)).
     LS: K_LS traces of n_ls samples, trace k with the tilt layout.ls_tilt[k].
     Draw order: the SS sweeps in layout order, then the LS windows (the unit
     tilt draws are made and left unused) -- fixed, so a seed gives the same
@@ -266,17 +283,26 @@ def simulate_cell_windows(law: NoiseLaw, layout: CellLayout, rng: np.random.Gene
     ls_stats = np.zeros((0, N_LS))
     X_tilde = None
     ls_traces = None
+    tilts_read: Dict[int, float] = {}
     if "ss" in parts and layout.K > 0:
-        X = np.empty((layout.K, layout.m))
-        P, j0, n_w = layout.period_samples, layout.j0, layout.n_w
+        P, j0, jf, n_w = layout.period_samples, layout.j0, layout.j_floor, layout.n_w
+        m_f = n_w - jf
+        Xf = np.empty((layout.K, m_f))
         for s_idx in range(layout.n_sweeps):
             units = noise_law.draw_units(rng, 1, layout.L_s)
             trace = noise_law.simulate_sweep(law, layout.dt, layout.L_s, units, 0,
                                              tilt_mV_per_s=float(layout.ss_tilt[s_idx]))
-            # Custom: layout-true cutting -- window at position p is [p P + j0, p P + n_w).
+            # Custom: layout-true cutting -- window at position p, from the floor: [p P + j_floor, p P + n_w).
             for k in np.flatnonzero(layout.sweep_index == s_idx):
                 p = int(layout.position[k])
-                X[k] = trace[p * P + j0:p * P + n_w]
+                Xf[k] = trace[p * P + jf:p * P + n_w]
+        # (D-115.3) the replicate's own (TL1) at the floor and its offsets (OF1), as on the data
+        centres = (layout.position.astype(np.float64) * P + jf + 0.5 * (m_f - 1)) * layout.dt
+        sweeps, b_read, _se, _n, _fl = nw.tl1_fit(Xf.mean(axis=1), centres, layout.sweep_number,
+                                                  layout.polarity_is_dep)
+        tilts_read = {int(s): float(v) for s, v in zip(sweeps, b_read)}
+        off = nw.tilt_offsets(layout.position, layout.sweep_number, P, layout.dt, tilts_read)
+        X = Xf[:, j0 - jf:] - off[:, None]
         X_tilde, _ = subtract_median_response(X, layout.polarity_is_dep, layout.sweep_number)
         ss_stats = ncs.ss_window_stats(X_tilde, layout.fs)
     if "ls" in parts and layout.K_LS > 0:
@@ -284,9 +310,12 @@ def simulate_cell_windows(law: NoiseLaw, layout: CellLayout, rng: np.random.Gene
         ls_traces = noise_law.simulate_traces(law, layout.dt, units.fast, units.slow,
                                               tilt_mV_per_s=layout.ls_tilt)
         ls_stats = ncs.ls_window_stats(list(ls_traces), layout.fs, window_cfg)
+    out = (ss_stats, ls_stats)
     if return_windows:
-        return ss_stats, ls_stats, X_tilde, ls_traces
-    return ss_stats, ls_stats
+        out = out + (X_tilde, ls_traces)
+    if return_tilts:
+        out = out + (tilts_read,)
+    return out
 
 
 # ===========================================================================

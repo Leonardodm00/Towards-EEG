@@ -2,9 +2,10 @@
 
 Reduced sizes throughout (M, R, iterations), on Block 3's writer-like
 fixture read through Block 3's pipeline (2 SS sweeps x 37 pulses with 11
-planted drops, K = 63; t_SS(c) of D-111; the kept windows, the median
-subtraction; per-sweep tilts planted at sigma_b = 0.1 mV/s and read by (TL1)
-and (TL2), the LS tail 1.5 s so that every LS tilt can be read; 5 LS
+planted drops, K = 63; t_SS(c) of D-111; the kept windows, the tilt offsets
+removed and the median subtraction (D-115); per-sweep tilts planted at
+sigma_b = 0.1 mV/s and read by (TL1) at the 80 ms floor and (TL2), the LS
+tail 1.5 s so that every LS tilt can be read; 5 LS
 pre-windows of 13250 samples). Each check prints one PASS/FAIL line and the
 suite ends with "SMOKE noise_fit: n/11 passed".
 
@@ -94,41 +95,59 @@ def c_median(K, n_draw=1_000_000, chunk=100_000, seed=7):
 
 # ---------------------------------------------------------------------------
 def _f1(lay, t_ss_ms):
-    """Cutting and subtraction: bit-identical to an independent loop over the kept positions."""
+    """Cutting, the replicate's own tilt and offsets (D-115.3) and the subtraction: equal to an independent loop."""
     seed = 11
     rng = np.random.default_rng(seed)
-    ss_stats, ls_stats, Xt, ls_tr = nf.simulate_cell_windows(THETA_CF, lay, rng, return_windows=True)
+    ss_stats, ls_stats, Xt, ls_tr, tilts_read = nf.simulate_cell_windows(THETA_CF, lay, rng, return_windows=True,
+                                                                          return_tilts=True)
     rng2 = np.random.default_rng(seed)
     j0 = lay.pre_n + int(round(t_ss_ms * 1e-3 * lay.fs))
-    X = np.empty((lay.K, lay.n_w - j0))
+    jf = lay.pre_n + int(round(nw.WindowConfig().t_ss_floor_ms * 1e-3 * lay.fs))
+    mf = lay.n_w - jf
+    Xf = np.empty((lay.K, mf))
     for s_idx, _sw in enumerate(lay.sweep_numbers):
         units = nl.draw_units(rng2, 1, lay.L_s)
         tr = nl.simulate_sweep(THETA_CF, lay.dt, lay.L_s, units, 0, tilt_mV_per_s=float(lay.ss_tilt[s_idx]))
         for k in range(lay.K):
             if lay.sweep_index[k] == s_idx:
-                start = int(lay.position[k]) * lay.period_samples + j0
-                X[k] = tr[start:start + X.shape[1]]
+                start = int(lay.position[k]) * lay.period_samples + jf
+                Xf[k] = tr[start:start + mf]
+    means = Xf.mean(axis=1)
+    centres = (lay.position * lay.period_samples + jf + 0.5 * (mf - 1)) * lay.dt
+    X = Xf[:, j0 - jf:].copy()
+    b_loop = {}
+    for s in lay.sweep_numbers:                                  # (TL1) by its closed form, (OF1) written out
+        g = np.flatnonzero(lay.sweep_number == s)
+        b_loop[s] = sw._fw_slope(centres[g], means[g], lay.polarity_is_dep[g])
+        tk = lay.position[g] * lay.period_samples * lay.dt
+        X[g] -= (b_loop[s] * (tk - tk.mean()))[:, None]
     Xt2 = X.copy()
     for idx in groups_of(lay).values():                         # each group's per-sample median, written out
         Xt2[idx] = X[idx] - np.median(X[idx], axis=0)
-    same = np.array_equal(Xt, Xt2)
+    err = float(np.abs(Xt - Xt2).max())
+    tilt_err = max(abs(tilts_read[int(s)] - b_loop[s]) for s in lay.sweep_numbers)
+    same = err <= 1e-12 and tilt_err <= 1e-12 and lay.j_floor == jf
     units = nl.draw_units(rng2, lay.K_LS, lay.n_ls)
     ls_tr2 = nl.simulate_traces(THETA_CF, lay.dt, units.fast, units.slow, tilt_mV_per_s=lay.ls_tilt)
     same_ls = np.array_equal(ls_tr, ls_tr2) and np.array_equal(ls_stats, ncs.ls_window_stats(list(ls_tr2), lay.fs))
     shapes = ss_stats.shape == (lay.K, 5) and ls_stats.shape == (lay.K_LS, 10) and Xt.shape == (lay.K, lay.m)
     finite = np.all(np.isfinite(ss_stats)) and np.all(np.isfinite(ls_stats))
-    report("F1 cutting: X_tilde == independent cut at the kept positions with the sweeps' tilts and each group's median "
-           "subtracted (bit for bit); LS traces and statistics likewise; shapes",
+    report("F1 cutting (D-115.3): X_tilde == independent loop (cut from the floor, the replicate's (TL1) by its closed "
+           "form, offsets, each group's median) within 1e-12; the replicate's tilts likewise; LS bit for bit; shapes",
            same and same_ls and shapes and finite,
-           "identical SS %s, LS %s, shapes %s %s %s" % (same, same_ls, ss_stats.shape, ls_stats.shape, Xt.shape))
+           "max |X_tilde diff| %.1e mV, max |tilt diff| %.1e mV/s, j_floor %d; identical LS %s, shapes %s %s %s"
+           % (err, tilt_err, lay.j_floor, same_ls, ss_stats.shape, ls_stats.shape, Xt.shape))
 
 
 def _f2(lay):
-    """Subtraction: mean sigma_hat^2 = sigma_f^2 c(K_g) at a white law, c from an independent Monte Carlo."""
+    """Subtraction: mean sigma_hat^2 = sigma_f^2 c(K_g) at a white law, c from an independent Monte Carlo; with
+    zero tilts and with tilts of 0.1 mV/s in size (D-115: the offsets removed, the tilt leaves the expectation)."""
     lay0 = zero_tilts(lay)
+    lay_t = replace(lay0, ss_tilt=np.where(np.arange(lay0.n_sweeps) % 2 == 0, 0.1, -0.1))
     rng = np.random.default_rng(21)
     n_rep = 40
     vals = np.array([nf.simulate_cell_windows(WHITE, lay0, rng, parts=("ss",))[0][:, 0] ** 2 for _ in range(n_rep)])
+    vals_t = np.array([nf.simulate_cell_windows(WHITE, lay_t, rng, parts=("ss",))[0][:, 0] ** 2 for _ in range(n_rep)])
     g = groups_of(lay0)
     K_of = np.empty(lay0.K, dtype=int)
     for idx in g.values():
@@ -140,13 +159,17 @@ def _f2(lay):
     mean_all = vals.mean()
     se = math.sqrt((vals.std(ddof=1) / math.sqrt(vals.size)) ** 2 + (WHITE.sigma_f ** 2 * se_c) ** 2)
     ok1 = abs(mean_all - expected) <= Z_SE * se
+    mean_t = vals_t.mean()
+    se_t = math.sqrt((vals_t.std(ddof=1) / math.sqrt(vals_t.size)) ** 2 + (WHITE.sigma_f ** 2 * se_c) ** 2)
+    ok1 = ok1 and abs(mean_t - expected) <= Z_SE * se_t
     exp_mean_sub = WHITE.sigma_f ** 2 * np.mean(1.0 - 1.0 / K_of)
     ok2 = abs(mean_all - exp_mean_sub) > Z_SE * se                  # the median, not the mean, was subtracted
     agree = all(abs(cs[K][0] - cs[K][2]) <= Z_SE * math.hypot(cs[K][1], cs[K][3]) for K in cs)
-    report("F2 subtraction (D-103.1): pooled mean sigma_hat^2 = sigma_f^2 c(K_g) within 3.5 SE; not the mean subtraction's "
-           "sigma_f^2 (1 - 1/K_g); c's identity = its direct Monte Carlo", ok1 and ok2 and agree,
-           "mean %.7g expected %.7g (mean subtraction %.7g) SE %.2g; c(K) %s"
-           % (mean_all, expected, exp_mean_sub, se,
+    report("F2 subtraction (D-103.1, D-115): pooled mean sigma_hat^2 = sigma_f^2 c(K_g) within 3.5 SE, without and "
+           "with 0.1 mV/s tilts; not the mean subtraction's sigma_f^2 (1 - 1/K_g); c's identity = its direct Monte Carlo",
+           ok1 and ok2 and agree,
+           "mean %.7g, tilted %.7g, expected %.7g (mean subtraction %.7g) SE %.2g; c(K) %s"
+           % (mean_all, mean_t, expected, exp_mean_sub, se,
               {K: "%.5f (direct %.5f)" % (cs[K][0], cs[K][2]) for K in cs}))
 
 
@@ -222,13 +245,13 @@ def _f5(lay, nwin, truth):
     n_rep = 100
     reads = []
     for _ in range(n_rep):
-        _s, _l, Xt, _t = nf.simulate_cell_windows(THETA_CF, lay, rng, parts=("ss",), return_windows=True)
-        reads.append([ncs.ss_sweep_tilts(Xt, nwin.ss, nwin.j0).as_dict()[int(s)] for s in lay.sweep_numbers])
+        out = nf.simulate_cell_windows(THETA_CF, lay, rng, parts=("ss",), return_tilts=True)
+        reads.append([out[-1][int(s)] for s in lay.sweep_numbers])      # the replicate's own (TL1), D-115.3
     reads = np.array(reads)
     z = (reads.mean(axis=0) - lay.ss_tilt) / (reads.std(axis=0, ddof=1) / math.sqrt(n_rep))
     ok_c = bool(np.all(np.abs(z) <= Z_SE))
     report("F5 real tilts (D-107.2): LS traces carry b (t - t_bar) exactly; the binding pool cycles the LS tilts; "
-           "(TL1) on simulated windows recovers each SS sweep's tilt", ok_a and ok_b and ok_c,
+           "each replicate's own (TL1) recovers each SS sweep's tilt", ok_a and ok_b and ok_c,
            "max |diff - b (t - t_bar)| %.1e mV; pool rows %d, ramp SDs exact %s; SS tilts %s mV/s, z %s"
            % (err_a, pool_ls.shape[0], ok_b, np.round(lay.ss_tilt, 4).tolist(), np.round(z, 2).tolist()))
 
@@ -367,7 +390,7 @@ def _f11(tmp):
     d_base = Path(tmp) / "base"
     ss = nw.load_ss_windows(str(d_base)); ls = nw.load_ls_prewindows(str(d_base))
     nwin = nw.ss_noise_windows(ss)
-    ss_t = ncs.ss_sweep_tilts(nwin.X_tilde, nwin.ss, nwin.j0)
+    ss_t = nwin.tilts                                            # the reading of D-115.2
     ls_t = ncs.ls_sweep_tilts(ls)
     short = replace(ls_t, sweep_number=ls_t.sweep_number[1:], b_mV_per_s=ls_t.b_mV_per_s[1:])
     try:
@@ -380,8 +403,14 @@ def _f11(tmp):
     b_ss, b_ls = ss_t.as_dict(), ls_t.as_dict()
     ok_d = (all(lay.ss_tilt[i] == b_ss[s] for i, s in enumerate(lay.sweep_numbers))
             and all(lay.ls_tilt[k] == b_ls[int(s)] for k, s in enumerate(lay.ls_sweep_number)))
-    report("F11 layout (D-106, D-107.2): kept windows only; an unreadable LS tilt and a missing tilt refused; tilts aligned",
-           ok_a and ok_b and ok_c and ok_d, "; ".join(notes) + "; missing refused %s; aligned %s" % (ok_c, ok_d))
+    # (e) from_cell takes Block 3's reading (D-115.2), never a re-reading on X_tilde; j_floor is the floor's sample
+    lay_c = nf.CellLayout.from_cell(nwin, ls)
+    ok_e = (np.array_equal(lay_c.ss_tilt, np.array([nwin.tilts.as_dict()[s] for s in lay_c.sweep_numbers]))
+            and lay_c.j_floor == lay_c.pre_n + int(round(nw.WindowConfig().t_ss_floor_ms * 1e-3 * lay_c.fs)))
+    report("F11 layout (D-106, D-107.2, D-115.2): kept windows only; an unreadable LS tilt and a missing tilt refused; "
+           "tilts aligned; from_cell's SS tilts = Block 3's reading; j_floor",
+           ok_a and ok_b and ok_c and ok_d and ok_e,
+           "; ".join(notes) + "; missing refused %s; aligned %s; from_cell = nwin.tilts and j_floor %s" % (ok_c, ok_d, ok_e))
 
 
 def main(only=None):
