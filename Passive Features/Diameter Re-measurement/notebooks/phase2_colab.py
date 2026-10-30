@@ -1326,6 +1326,16 @@ display(Image(filename=SURVEY + "/s3b/inputs.png"))
 # line and both searches' lines, takes about as long as Cell 7's search before its first download, and writes
 # `survey_pilot/529878215/calibration/near_search_529878215.csv` and `far_search_529878215.csv`; at most 5 scans per
 # set, as before.
+#
+# [2026-10-30, D-115.6] The step reuses Cell 7's searches (`REUSE`): for each set it first reads Cell 7's
+# `calibration/<set>_search_529878215.csv` and the record beside it (`<set>_search_529878215.json`, which Cell 7 writes
+# from this commit on) and takes that search -- its chosen nodes, made with Cell 7's background and absorption -- when
+# it was made from the same trace under the same settings. Expect, in place of the search lines, `near search reused
+# from ...: m chosen of n records, made with B_bar ... gl, mu_hat ... /um, transform ...; this step's own: B_bar ... gl,
+# mu_hat ... /um, transform ...`, the same for the far set, and no search time. Otherwise the step searches as before,
+# after a line saying why: `no record ...` (Cell 7's files of 2026-10-30 have none: run Cell 7 again first, or let this
+# cell search), `the CSV changed since its record`, `another trace`, `other settings: ...` (a knob changed since
+# Cell 7). `REUSE = []` searches anyway.
 import json
 SURVEY = OUT + "/survey_pilot"
 CFG_S3 = SURVEY + "/survey_config.json"     # Cell 13's (node mode, the pilot's nodes per bin); written if Cell 13 did not run
@@ -1344,8 +1354,9 @@ with open(CFG_S3C, "w") as f:
     json.dump(cfg_s3c, f, indent=1)
 print("[cell 15] calibration knobs:", cfg_s3c.get("calibration", "the defaults"))
 REDO = []    # ["--force", "calibration"] after a change of Cell 7's knobs: a done step is not run again otherwise
+REUSE = ["--reuse-search", OUT + "/calibration"]   # Cell 7's searches, if made from this trace under these settings
 run("scripts/survey_cells.py", "run", "--selection", SURVEY + "/selection.csv", "--out-dir", SURVEY,
-    "--cache-dir", CACHE_DIR, "--steps", "align,nodes,calibration", "--config-json", CFG_S3C, *REDO)
+    "--cache-dir", CACHE_DIR, "--steps", "align,nodes,calibration", "--config-json", CFG_S3C, *REDO, *REUSE)
 run("scripts/survey_cells.py", "pool", "--out-dir", SURVEY, "--selection", SURVEY + "/selection.csv",
     "--what", "calibration", "--config-json", CFG_S3C)
 from IPython.display import Image, display

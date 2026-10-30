@@ -1,0 +1,5 @@
+A transform {'shift_full_px': [0.0, 0.0], 'flip_y_full_h': None, 'z0_um': 0.0} B transform {'shift_full_px': [2.3, -1.7], 'flip_y_full_h': None, 'z0_um': 0.1}
+records: A 723, B 723, same node ids: True
+reason differs: 16 [('21', 'not_isolated:too_few', 'not_isolated:side_short'), ('26', 'few_planes', 'not_isolated:side_short'), ('30', 'not_isolated:side_short', 'few_planes'), ('31', 'not_isolated:side_short', 'not_isolated:too_few'), ('1413', 'not_isolated:side_short', 'few_planes'), ('1414', '', 'not_isolated:side_short'), ('1888', 'few_planes', 'not_isolated:side_short'), ('1894', '', 'not_isolated:side_short'), ('1895', 'not_isolated:side_short', ''), ('2665', '', 'not_isolated:side_short'), ('2670', 'not_isolated:side_short', 'few_planes'), ('2672', '', 'not_isolated:side_short'), ('4982', 'not_isolated:too_few', 'not_isolated:side_short'), ('4986', 'few_planes', 'not_isolated:side_short'), ('6652', 'few_planes', 'not_isolated:side_short'), ('6664', '', 'not_isolated:side_short')]
+n_pixels_k differs: 130 of 723
+chosen: A 19, B 19, common 15, only A [1417, 1422, 2672, 4628], only B [1416, 1421, 2674, 4629]

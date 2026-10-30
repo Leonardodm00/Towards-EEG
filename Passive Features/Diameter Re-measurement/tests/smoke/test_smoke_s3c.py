@@ -315,6 +315,45 @@ def test_contract():
         assert {int(n["node_id"]) for n in meta_x["nodes"]} <= chosen, (meta_x["nodes"], chosen)
         assert "11 near search over the cell:" in buf.getvalue() and "11 far search over the cell:" in buf.getvalue(), \
             buf.getvalue()
+        # D-115.6 (10.C.R): run(..., reuse_search=DIR) -- a Cell-7-like folder holding this cell's searches and their
+        # records -- reaches the step through the Context: the step searches nothing and takes the same candidates
+        import shutil
+        from allen_diameter.analysis import candidate_search as FS
+        c7 = os.path.join(tmp, "cell7_calibration")
+        os.makedirs(c7)
+        for w in ("near", "far"):
+            for ext in ("csv", "json"):
+                shutil.copy(cell.path_of("calibration", "%s_search_11.%s" % (w, ext)), c7)
+
+        def boom(*a, **k):
+            raise AssertionError("search called on a reuse")
+        saved_search = FS.search
+        FS.search = boom
+        buf, logs_r = io.StringIO(), []
+        try:
+            with redirect_stdout(buf):
+                st_r = SC.run(cfg_x, sel, out_dir, Source(), ["calibration"], force=["calibration"], log=logs_r.append,
+                              reuse_search=c7)
+        finally:
+            FS.search = saved_search
+        assert st_r[0]["calibration"] == "done", (st_r, logs_r, buf.getvalue())
+        _scans_r, meta_r = CIO.load_scans(cell.path_of("calibration", "scans_11.json"))
+        assert meta_r["n_candidates"] == len(chosen), (meta_r["n_candidates"], chosen)
+        assert "11 near search reused from %s" % os.path.join(c7, "near_search_11.csv") in buf.getvalue(), buf.getvalue()
+        assert "11 far search reused from %s" % os.path.join(c7, "far_search_11.csv") in buf.getvalue(), buf.getvalue()
+        with open(cell.path_of("calibration", "far_search_11.json")) as f:
+            assert json.load(f)["reused_from"] == os.path.abspath(os.path.join(c7, "far_search_11.json"))
+        # main hands --reuse-search to run (and nothing when it is not given)
+        seen = []
+        saved_run = SC.run
+        SC.run = lambda *a, **k: seen.append(k.get("reuse_search")) or []
+        try:
+            for extra in (["--reuse-search", c7], []):
+                SC.main(["run", "--selection", sel, "--out-dir", out_dir, "--cache-dir", os.path.join(tmp, "cache"),
+                         "--steps", "calibration"] + extra)
+        finally:
+            SC.run = saved_run
+        assert seen == [c7, None], seen
     # far-fit's production kernel only with both sets sufficient (analytic far scans, a hand-made calibration file)
     cfg = dataclasses.replace(cfg0, calibration=dataclasses.replace(cfg0.calibration, bootstrap_resamples=8))
     rng = np.random.default_rng(SEED)

@@ -341,6 +341,129 @@ def test_contract():
         b, m = FS.typical_background([], cfg)
         assert math.isnan(b) and math.isnan(m)
         _real_command_line(tmp, swc)
+        _record_and_reuse(tmp, swc)
+
+
+def _record_and_reuse(tmp, swc):
+    """10.C.R (D-115.6): the record beside each search CSV, the reuse of a search made earlier from the same trace
+    under the same settings (whatever B_bar, mu_hat and the transform), and every reason a search is not reused."""
+    import hashlib
+    import shutil
+    import calibrate_kernel as CK
+    cfg = cfg_with()
+    rows = [dict(node_id=99, fit_status="converged", flags="", phi_rad=0.0, alpha_hat=0.3, allen_radius_um=R_NEAR,
+                 B_bar=B_BAR, mu_hat_per_um=MU)]           # B_bar, mu_hat its medians; node 99 is in no SWC
+    tr1 = dict(shift_full_px=(0.0, 0.0), flip_y_full_h=None, z0_um=0.0)
+    first, second = os.path.join(tmp, "rec_first"), os.path.join(tmp, "rec_second")
+    os.makedirs(first)
+    logs1 = []
+    cand1 = CK.cell_candidates(swc, cfg, tr1, rows, first, 7, log=logs1.append)
+    key = CK.search_key(swc, cfg)
+    assert key == dict(swc_sha256=FS.swc_digest(swc), config=FS.search_config(cfg)), key
+    # (a) a record beside each CSV
+    for which in ("near", "far"):
+        with open(CK.search_record_name(first, which, 7)) as f:
+            rec = json.load(f)
+        assert set(rec) == {"set", "specimen", "key", "csv_sha256", "B_bar_gl", "mu_hat_per_um", "transform",
+                            "n_records", "n_chosen", "reused_from"}, sorted(rec)
+        assert rec["set"] == which and rec["specimen"] == "7" and rec["key"] == key and rec["reused_from"] is None
+        with open(CK.search_name(first, which, 7), "rb") as f:
+            assert rec["csv_sha256"] == hashlib.sha256(f.read()).hexdigest()
+        assert rec["B_bar_gl"] == B_BAR and rec["mu_hat_per_um"] == MU, rec
+        assert rec["transform"] == {"shift_full_px": [0.0, 0.0], "flip_y_full_h": None, "z0_um": 0.0}, rec
+        back = table_io.read_rows([CK.search_name(first, which, 7)])
+        assert rec["n_records"] == len(back) and rec["n_chosen"] == sum(str(r["chosen"]) == "True" for r in back)
+        assert rec["n_chosen"] > 0, rec
+    # (b) reused with other B_bar, mu_hat and transform: no search, the same candidates, both files copied
+    rows2 = [dict(r, B_bar=B_BAR / 2.0, mu_hat_per_um=MU * 2.0) for r in rows]
+    tr2 = dict(shift_full_px=(2.3, -1.7), flip_y_full_h=None, z0_um=0.1)
+
+    def boom(*a, **k):
+        raise AssertionError("search called on a reuse")
+    saved = FS.search
+    FS.search = boom
+    logs2 = []
+    try:
+        cand2 = CK.cell_candidates(swc, cfg, tr2, rows2, second, 7, log=logs2.append, reuse_dir=first)
+    finally:
+        FS.search = saved
+    assert cand2 == cand1, (sorted(cand1), sorted(cand2))
+    for which in ("near", "far"):
+        with open(CK.search_name(first, which, 7), "rb") as f1, open(CK.search_name(second, which, 7), "rb") as f2:
+            assert f1.read() == f2.read(), which
+        with open(CK.search_record_name(first, which, 7)) as f1, open(CK.search_record_name(second, which, 7)) as f2:
+            r1, r2 = json.load(f1), json.load(f2)
+        assert r2 == dict(r1, reused_from=os.path.abspath(CK.search_record_name(first, which, 7))), (r1, r2)
+        line = [m for m in logs2 if m.startswith("%s search reused from " % which)]
+        assert len(line) == 1, logs2
+        assert "made with B_bar 200.0 gl, mu_hat 1.000 /um" in line[0], line
+        assert "this step's own: B_bar 100.0 gl, mu_hat 2.000 /um" in line[0] and "2.3" in line[0], line
+    # reusing a folder from itself copies nothing and keeps the record as it is
+    with open(CK.search_record_name(first, "far", 7)) as f:
+        before = f.read()
+    FS.search = boom
+    try:
+        assert CK.cell_candidates(swc, cfg, tr1, rows, first, 7, reuse_dir=first) == cand1
+    finally:
+        FS.search = saved
+    with open(CK.search_record_name(first, "far", 7)) as f:
+        assert f.read() == before
+    # (c) every reason not to reuse; the search then runs (counted) and its record is written afresh
+    third = os.path.join(tmp, "rec_third")
+    os.makedirs(third)
+    ids, rec, why = CK.reuse_search(third, "far", 7, key)
+    assert ids is None and rec is None and why.startswith("no search file "), why
+    shutil.copy(CK.search_name(first, "far", 7), third)
+    ids, rec, why = CK.reuse_search(third, "far", 7, key)
+    assert ids is None and why.startswith("no record "), why
+    shutil.copy(CK.search_record_name(first, "far", 7), third)
+    ids, rec, why = CK.reuse_search(third, "far", 7, key)
+    assert why == "" and sorted(ids) == sorted(n for n in cand1 if n in ids_of(swc, cfg, "far")), (why, ids)
+    with open(CK.search_name(third, "far", 7), "a") as f:
+        f.write("\n")
+    ids, rec, why = CK.reuse_search(third, "far", 7, key)
+    assert ids is None and why == "the CSV changed since its record", why
+    radius = np.array(swc.radius, dtype=float)
+    radius[-1] *= 1.01
+    other = dataclasses.replace(swc, radius=radius)
+    ids, rec, why = CK.reuse_search(first, "far", 7, CK.search_key(other, cfg))
+    assert ids is None and why == "another trace", why
+    cfg_tau = cfg_with(isolation_depth_gl=cfg.calibration.isolation_depth_gl * 2.0)
+    ids, rec, why = CK.reuse_search(first, "far", 7, CK.search_key(swc, cfg_tau))
+    assert ids is None and why == "other settings: calibration", why
+    calls = []
+
+    def counted(*a, **k):
+        calls.append(a[2])
+        return saved(*a, **k)
+    FS.search = counted
+    logs3 = []
+    try:
+        cand3 = CK.cell_candidates(swc, cfg_tau, tr1, rows, third, 7, log=logs3.append, reuse_dir=first)
+    finally:
+        FS.search = saved
+    assert sorted(calls) == ["far", "near"], calls
+    assert sum(m == "%s search not reused (other settings: calibration): searching" % w for m in logs3
+               for w in ("near", "far")) == 2, logs3
+    with open(CK.search_record_name(third, "far", 7)) as f:
+        r3 = json.load(f)
+    assert r3["reused_from"] is None and r3["key"] == CK.search_key(swc, cfg_tau), r3
+    assert isinstance(cand3, set)
+    # (d) the key's parts: the digest follows each of the five arrays and nothing else; the settings' four sections
+    d0 = FS.swc_digest(swc)
+    for name in ("ids", "types", "parent", "xyz", "radius"):
+        a = np.array(getattr(swc, name), copy=True)
+        a.flat[-1] = a.flat[-1] + 1
+        assert FS.swc_digest(dataclasses.replace(swc, **{name: a})) != d0, name
+    assert FS.swc_digest(dataclasses.replace(swc, lines=["# another text"], path="/elsewhere.swc")) == d0
+    conf = FS.search_config(cfg)
+    assert tuple(sorted(conf)) == tuple(sorted(FS.SEARCH_CONFIG_SECTIONS)) == ("acquisition", "calibration", "measure",
+                                                                              "renderer"), sorted(conf)
+    json.dumps(conf, allow_nan=False)
+    conf_nan = FS.search_config(cfg_with(isolation_depth_gl=float("nan")))
+    assert conf_nan["calibration"]["isolation_depth_gl"] == "nan", conf_nan["calibration"]["isolation_depth_gl"]
+    json.dumps(conf_nan, allow_nan=False)
+    assert FS.search_config(cfg) == json.loads(json.dumps(conf)), "the settings survive a JSON round trip"
 
 
 def _real_command_line(tmp, swc):

@@ -44,11 +44,15 @@ Analysis only: no file is read or written here, nothing is drawn.
   search(swc, cfg, which, transform, B_bar, mu, log) -> list of records (dict), one per node of the set's range
   choose(records, cfg, which)           -> list of node ids, in the order kept
   summary_line(records, chosen, cfg, which) -> the log line of calibrate_kernel.cell_candidates
+  swc_digest(swc), search_config(cfg)   -> the key a search's record carries (10.C.R, D-115.6, 2026-10-30:
+                                           Cell 15 reuses Cell 7's search when both equal its own)
 
 Pure ASCII (hpc-python-compat).
 """
 from __future__ import annotations
 
+import dataclasses
+import hashlib
 import math
 import time
 import types as _types
@@ -60,6 +64,41 @@ from ..model.kernel import sigma_r
 
 RECORD_KEYS = ("set", "node_id", "allen_diameter_um", "stretch", "s_um", "x_um", "y_um", "z_um", "k_trace",
                "theta_rad", "phi_deg", "reason", "n_pixels_k", "n_fit_usable", "n_fit")
+# the configuration sections the search's call tree reads (this module, calibration_scene, cell, model.kernel)
+SEARCH_CONFIG_SECTIONS = ("acquisition", "calibration", "measure", "renderer")
+
+
+def swc_digest(swc):
+    """SHA-256 (hex) of the trace a search reads (10.C.R, D-115.6): the SWC's ids, types and parent as
+    little-endian int64, then xyz and radius as little-endian float64, each preceded by its name and shape; not the
+    file's text lines or its path (two copies of one reconstruction digest alike)."""
+    h = hashlib.sha256()
+    for name, dtype in (("ids", "<i8"), ("types", "<i8"), ("parent", "<i8"), ("xyz", "<f8"), ("radius", "<f8")):
+        a = np.ascontiguousarray(np.asarray(getattr(swc, name)), dtype=dtype)
+        h.update(("%s%s" % (name, a.shape)).encode("ascii"))
+        h.update(a.tobytes())
+    return h.hexdigest()
+
+
+def _plain(x):
+    """x as plain JSON values: dicts with str keys, tuples and arrays as lists, numpy scalars as Python ones, a
+    non-finite float as its repr string ("nan", "inf", "-inf"), so that equal settings compare equal and the
+    record stays strict JSON."""
+    if isinstance(x, dict):
+        return {str(k): _plain(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple, np.ndarray)):
+        return [_plain(v) for v in (x.tolist() if isinstance(x, np.ndarray) else x)]
+    if isinstance(x, np.generic):
+        x = x.item()
+    if isinstance(x, float) and not math.isfinite(x):
+        return repr(x)
+    return x
+
+
+def search_config(cfg):
+    """The settings a search depends on (10.C.R, D-115.6): the sections SEARCH_CONFIG_SECTIONS of cfg as plain
+    JSON values (dataclasses.asdict, then _plain)."""
+    return {name: _plain(dataclasses.asdict(getattr(cfg, name))) for name in SEARCH_CONFIG_SECTIONS}
 
 
 def trace_direction(branch, i, window_um):

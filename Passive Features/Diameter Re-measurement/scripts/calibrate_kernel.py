@@ -63,6 +63,7 @@ import dataclasses
 import json
 import math
 import os
+import shutil
 import sys
 import time
 
@@ -265,21 +266,89 @@ def search_name(out_dir, which, specimen):
     return os.path.join(out_dir, "%s_search_%s.csv" % (which, specimen))
 
 
+def search_record_name(out_dir, which, specimen):
+    """The record beside a search's CSV (10.C.R, D-115.6): <out_dir>/<which>_search_<specimen>.json."""
+    return os.path.join(out_dir, "%s_search_%s.json" % (which, specimen))
+
+
+def search_key(swc, cfg):
+    """What a search's result depends on and a reuse must find equal (10.C.R, D-115.6): the trace
+    (candidate_search.swc_digest) and the settings (candidate_search.search_config). The cell's typical background
+    and absorption and its transform are not in it (they go with the search: the record keeps them)."""
+    from allen_diameter.analysis import candidate_search
+    return dict(swc_sha256=candidate_search.swc_digest(swc), config=candidate_search.search_config(cfg))
+
+
+def _file_sha256(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def write_search_record(out_dir, which, specimen, key, B_bar, mu, transform, n_records, n_chosen, reused_from=None):
+    """The record of the search CSV search_name(out_dir, which, specimen), which must exist (10.C.R, D-115.6),
+    written as strict JSON to search_record_name(out_dir, which, specimen). Returns its path."""
+    from allen_diameter.loading import survey_io
+    path = search_record_name(out_dir, which, specimen)
+    survey_io.write_json(path, dict(set=which, specimen=str(specimen), key=key,
+                                    csv_sha256=_file_sha256(search_name(out_dir, which, specimen)),
+                                    B_bar_gl=float(B_bar), mu_hat_per_um=float(mu), transform=transform,
+                                    n_records=int(n_records), n_chosen=int(n_chosen), reused_from=reused_from))
+    return path
+
+
+def reuse_search(reuse_dir, which, specimen, key):
+    """A search of set `which` made earlier for this specimen in reuse_dir (Cell 7's folder; 10.C.R, D-115.6):
+    (chosen node ids, its record, "") when its CSV and record exist, the record's key equals `key` and the CSV is
+    the one the record describes; else (None, the record or None, why)."""
+    csv, rec_path = search_name(reuse_dir, which, specimen), search_record_name(reuse_dir, which, specimen)
+    if not os.path.exists(csv):
+        return None, None, "no search file %s" % csv
+    if not os.path.exists(rec_path):
+        return None, None, "no record %s" % rec_path
+    with open(rec_path) as f:
+        rec = json.load(f)
+    if rec.get("csv_sha256") != _file_sha256(csv):
+        return None, rec, "the CSV changed since its record"
+    theirs = rec.get("key") or {}
+    if theirs.get("swc_sha256") != key["swc_sha256"]:
+        return None, rec, "another trace"
+    conf = theirs.get("config") or {}
+    differ = sorted(name for name in set(conf) | set(key["config"]) if conf.get(name) != key["config"].get(name))
+    if differ:
+        return None, rec, "other settings: %s" % ", ".join(differ)
+    chosen = [int(r["node_id"]) for r in table_io.read_rows([csv]) if str(r["chosen"]) == "True"]
+    return chosen, rec, ""
+
+
+def _bm_text(B_bar, mu):
+    f = (lambda x, fmt: fmt % x if x is not None and math.isfinite(float(x)) else "nan")
+    return "B_bar %s gl, mu_hat %s /um" % (f(B_bar, "%.1f"), f(mu, "%.3f"))
+
+
 def not_in_set(cand, swc, cfg, which):
     """The ids of cand whose Allen diameter (2 x the SWC radius) does not put them in calibration set `which`."""
     radius = {int(i): float(r) for i, r in zip(swc.ids, swc.radius)}
     return {int(n) for n in cand if calibration.calibration_set(2.0 * radius.get(int(n), float("nan")), cfg) != which}
 
 
-def cell_candidates(swc, cfg, transform, table_rows, out_dir, specimen, log=None):
+def cell_candidates(swc, cfg, transform, table_rows, out_dir, specimen, log=None, reuse_dir=None):
     """Block 10.C (D-109, D-112): a cell's calibration candidates. For each set, the pilot table's
     (candidates_from_rows) when calibration.<set>_candidates is "table"; else the nodes candidate_search finds over
     the whole cell from its trace (transform: keyword arguments of cell.to_image_um), the table's medians in S as
     the cell's typical background and absorption -- they replace the table's candidates of that set (not_in_set).
-    Every searched set's records go to search_name(out_dir, set, specimen) with a column `chosen`; log, when
-    given, gets the search's lines. Used by `real` (Cell 7) and by S3's calibration step (survey_cells.py, Block
-    19.3). Returns the set of node ids."""
+    Every searched set's records go to search_name(out_dir, set, specimen) with a column `chosen`, and its record
+    (10.C.R, D-115.6) to search_record_name(out_dir, set, specimen); log, when given, gets the search's lines.
+    reuse_dir (S3's step on the pilot, Cell 15: Cell 7's folder): a set's search made there for this specimen from
+    the same trace under the same settings (reuse_search) is taken instead of searching -- its chosen ids, its
+    CSV and record copied to out_dir, its B_bar, mu_hat and transform printed beside the step's own. Used by
+    `real` (Cell 7, which never reuses) and by S3's calibration step (survey_cells.py, Block 19.3). Returns the
+    set of node ids."""
     from allen_diameter.analysis import candidate_search
+    from allen_diameter.loading import survey_io
     say = log or (lambda m: None)
     cand = candidates_from_rows(table_rows, cfg)
     sets = [w for w in calibration.CALIBRATION_SETS if candidate_sources(cfg)[w] == "cell"]
@@ -288,16 +357,37 @@ def cell_candidates(swc, cfg, transform, table_rows, out_dir, specimen, log=None
     B_bar, mu = candidate_search.typical_background(table_rows, cfg)
     say("candidate search: the cell's typical background %.1f gl and absorption %.3f /um (the pilot table's medians "
         "in S)" % (B_bar, mu))
+    key = search_key(swc, cfg)
+    tr_plain = survey_io.clean(transform)                # tuples as lists, NaN as None: as the record holds it
     for which in sets:
         t0 = time.perf_counter()
-        records = candidate_search.search(swc, cfg, which, transform, B_bar, mu, log=say)
-        chosen = candidate_search.choose(records, cfg, which)
-        kept = set(chosen)
         path = search_name(out_dir, which, specimen)
-        table_io.write_rows([dict(r, chosen=int(r["node_id"]) in kept) for r in records], path,
-                            fieldnames=list(candidate_search.RECORD_KEYS) + ["chosen"])
-        say("%s (%.1f min) -> %s" % (candidate_search.summary_line(records, chosen, cfg, which),
-                                     (time.perf_counter() - t0) / 60, path))
+        kept = None
+        if reuse_dir:
+            ids, rec, why = reuse_search(reuse_dir, which, specimen, key)
+            if ids is None:
+                say("%s search not reused (%s): searching" % (which, why))
+            else:
+                kept = set(ids)
+                src_csv = search_name(reuse_dir, which, specimen)
+                src_rec = os.path.abspath(search_record_name(reuse_dir, which, specimen))
+                if os.path.abspath(src_csv) != os.path.abspath(path):
+                    os.makedirs(out_dir, exist_ok=True)
+                    shutil.copyfile(src_csv, path)
+                    survey_io.write_json(search_record_name(out_dir, which, specimen), dict(rec, reused_from=src_rec))
+                say("%s search reused from %s: %d chosen of %s records, made with %s, transform %s; this step's own: "
+                    "%s, transform %s" % (which, src_csv, len(kept), rec.get("n_records"),
+                                          _bm_text(rec.get("B_bar_gl"), rec.get("mu_hat_per_um")),
+                                          json.dumps(rec.get("transform")), _bm_text(B_bar, mu), json.dumps(tr_plain)))
+        if kept is None:
+            records = candidate_search.search(swc, cfg, which, transform, B_bar, mu, log=say)
+            chosen = candidate_search.choose(records, cfg, which)
+            kept = set(chosen)
+            table_io.write_rows([dict(r, chosen=int(r["node_id"]) in kept) for r in records], path,
+                                fieldnames=list(candidate_search.RECORD_KEYS) + ["chosen"])
+            write_search_record(out_dir, which, specimen, key, B_bar, mu, tr_plain, len(records), len(chosen))
+            say("%s (%.1f min) -> %s" % (candidate_search.summary_line(records, chosen, cfg, which),
+                                         (time.perf_counter() - t0) / 60, path))
         cand = not_in_set(cand, swc, cfg, which) | kept
     return cand
 

@@ -98,9 +98,10 @@ class Context:
     """One cell for the steps: its selection record, its folder, the source,
     and its context file (cell.json: the SWC path, the alignment)."""
 
-    def __init__(self, record, cell, source):
+    def __init__(self, record, cell, source, reuse_search=None):
         self.record, self.cell, self.source = record, cell, source
         self.sid = cell.sid
+        self.reuse_search = reuse_search or None   # Block 10.C.R (D-115.6): a folder of earlier searches to reuse
         self.data = cell.context()
         self.data.setdefault("selection", {k: record[k] for k in record})
 
@@ -270,7 +271,8 @@ def step_calibration(ctx, cfg):
         swc = swc_io.read_swc(ctx.data["swc_path"])
         transform = cell_alignment.full_transform(ctx.alignment)
     cand = calibrate_kernel.cell_candidates(swc, cfg, transform, rows, os.path.dirname(path), sid,
-                                            log=lambda m: print("    %d %s" % (sid, m), flush=True))
+                                            log=lambda m: print("    %d %s" % (sid, m), flush=True),
+                                            reuse_dir=ctx.reuse_search)       # D-115.6: Cell 15 reuses Cell 7's
     meta = dict(source="survey", specimen=str(sid), n_candidates=len(cand), calibration=dataclasses.asdict(cfg.calibration),
                 max_per_set=int(cfg.survey.calib_scans_per_cell))
     if not cand:
@@ -337,12 +339,14 @@ def _status_row(cell, record, steps):
 
 
 def run(cfg, selection_path, out_dir, source, steps, cells=None, force=(), include_set_aside=False, log=print,
-        task_index=None, source_for=None):
+        task_index=None, source_for=None, reuse_search=None):
     """Block 16.2 (g). Returns the status rows. task_index (D-099.1): the one
     cell of that 0-based row of the selection, a PBS array task's; exclusive
     with cells; beyond the selection: ValueError. source_for (D-099.2): a
     callable sid -> source used in place of `source` for each cell (a crop
-    cache per cell)."""
+    cache per cell). reuse_search (Block 10.C.R, D-115.6): a folder whose
+    candidate searches the calibration step reuses when they were made from
+    the cell's trace under the same settings (Cell 15: Cell 7's folder)."""
     unknown = [s for s in list(steps) + list(force) if s not in STEPS]
     if unknown:
         raise ValueError("unknown steps %s (known: %s)" % (unknown, list(ORDER)))
@@ -369,7 +373,7 @@ def run(cfg, selection_path, out_dir, source, steps, cells=None, force=(), inclu
             gone = survey_io.clear_markers(cell, ORDER[ORDER.index(s):])
             if gone:
                 log("  %d: markers cleared %s" % (cell.sid, ",".join(gone)))
-        ctx = Context(rec, cell, source if source_for is None else source_for(cell.sid))
+        ctx = Context(rec, cell, source if source_for is None else source_for(cell.sid), reuse_search)
         row = _status_row(cell, rec, steps)
         failed = False
         for s in steps:
@@ -665,6 +669,9 @@ def main(argv=None):
     r.add_argument("--force", default="", help="steps to run again (with every step after each)")
     r.add_argument("--include-set-aside", action="store_true")
     r.add_argument("--config-json", default="")
+    r.add_argument("--reuse-search", default="",
+                   help="a folder of earlier candidate searches (<set>_search_<id>.csv and .json) the calibration step "
+                        "reuses when made from the same trace under the same settings (Cell 15: Cell 7's calibration/)")
     s = sub.add_parser("status")
     s.add_argument("--out-dir", required=True)
     s.add_argument("--selection", default="")
@@ -691,7 +698,8 @@ def main(argv=None):
     split = (lambda text: [x.strip() for x in text.split(",") if x.strip()])
     source_for = (lambda sid: AllenSource(os.path.join(a.cache_dir, str(int(sid))))) if a.cache_per_cell else None
     run(cfg, a.selection, a.out_dir, AllenSource(a.cache_dir), split(a.steps), [int(c) for c in split(a.cells)],
-        split(a.force), a.include_set_aside, task_index=a.task_index, source_for=source_for)
+        split(a.force), a.include_set_aside, task_index=a.task_index, source_for=source_for,
+        reuse_search=a.reuse_search or None)
     return 0
 
 
