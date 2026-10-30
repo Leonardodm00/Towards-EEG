@@ -288,10 +288,7 @@ def step_calibration(ctx, cfg):
     for _, _, _, rs in out:
         for r in rs:
             reasons[r] = reasons.get(r, 0) + 1
-    allen_d = {int(i): 2.0 * float(r) for i, r in zip(swc.ids, swc.radius)}
-    nodes = [dict(node_id=int(nid), allen_diameter_um=allen_d[int(nid)] if np.isfinite(allen_d[int(nid)]) else None,
-                  set=calibration.calibration_set(allen_d[int(nid)], cfg), reasons=";".join(rs), scanned=sc is not None)
-             for nid, _, sc, rs in out]
+    nodes = calibration.node_records(out, swc, cfg)   # with each measured node's pilot values (D-115.5)
     calibration_io.save_scans(scans, path, dict(meta, nodes=nodes, reasons_count=reasons))
     return dict(n_candidates=len(cand), n_near=sum(1 for x in scans if x.set == "near"),
                 n_far=sum(1 for x in scans if x.set == "far"), reasons=reasons)

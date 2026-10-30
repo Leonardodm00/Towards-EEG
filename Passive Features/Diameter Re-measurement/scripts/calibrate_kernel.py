@@ -342,10 +342,7 @@ def run_real(cfg, a):
                                 order_rng=np.random.default_rng([int(cal.calib_order_seed), int(a.specimen)]),
                                 max_per_set=int(cal.calib_max_nodes_per_set), on_node=hook)
     scans = [s for _, _, s, _ in out if s is not None]
-    allen_d = {int(i): 2.0 * float(r) for i, r in zip(swc.ids, swc.radius)}
-    nodes = [dict(node_id=int(nid), allen_diameter_um=allen_d[int(nid)] if math.isfinite(allen_d[int(nid)]) else None,
-                  set=calibration.calibration_set(allen_d[int(nid)], cfg), reasons=";".join(rs), scanned=s is not None)
-             for nid, _, s, rs in out]             # the scans file is strict JSON (allow_nan=False)
+    nodes = calibration.node_records(out, swc, cfg)   # with each measured node's pilot values (D-115.5); strict JSON
     n_near = sum(1 for s in scans if s.set == "near")
     n_far = sum(1 for s in scans if s.set == "far")
     reasons_count = {}

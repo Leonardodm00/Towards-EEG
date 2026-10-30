@@ -237,6 +237,54 @@ def test_contract():
         assert summ["n_near"] == 2 and summ["n_far"] == 0, summ                 # capped at calib_scans_per_cell
         scans, meta = CIO.load_scans(cell.path_of("calibration", "scans_11.json"))
         assert len(scans) == 2 and meta["max_per_set"] == 2 and "set_full" in summ["reasons"], (meta, summ)
+        # D-115.5: meta.nodes carries the pilot's values -- None for a node never measured (set_full), every field for
+        # a measured one, the scan's own k_star and phi_rad for a scanned one (the file is strict JSON: loaded above)
+        recs = meta["nodes"]
+        assert recs and all("pilot" in n for n in recs), recs
+        by_scan = {int(s.node_id): s for s in scans}
+        n_meas = 0
+        for n in recs:
+            p = n["pilot"]
+            if "set_full" in n["reasons"].split(";"):
+                assert p is None, n
+                continue
+            n_meas += 1
+            assert p is not None and set(p) == set(CAL.PILOT_RECORD_FIELDS), n
+            if n["scanned"]:
+                s = by_scan[int(n["node_id"])]
+                assert p["k_star"] == int(s.k_star) and p["phi_rad"] == float(s.phi_rad), (p, s.k_star, s.phi_rad)
+        assert n_meas >= len(scans) and any(n["pilot"] is None for n in recs), recs
+        assert sum(1 for n in recs if n["scanned"]) == len(scans), recs
+        assert CAL.pilot_record(None) is None
+        # NaN and inf become None; k_star None only when the pilot has no sharpest plane (z_sub_um not finite), -1
+        # being a plane of a phantom stack; duck-typed pilot (pilot_view returns it as it is: pilot_status "")
+        from types import SimpleNamespace
+        base = dict(pilot_status="", k_star=-1, z_sub_um=float("nan"), cx_um=1.0, cy_um=2.0, theta_rad=0.5,
+                    phi_rad=float("nan"), B_bar=150.0, mu_hat_per_um=float("inf"), d_hat_um=0.3, alpha_hat=0.1,
+                    fit_status="converged", flags=("faint",), reg_verdict="ok")
+        r0 = CAL.pilot_record(SimpleNamespace(**base))
+        assert (r0["k_star"] is None and r0["z_sub_um"] is None and r0["phi_rad"] is None
+                and r0["mu_hat_per_um"] is None and r0["flags"] == ["faint"] and r0["B_bar"] == 150.0), r0
+        r1 = CAL.pilot_record(SimpleNamespace(**dict(base, z_sub_um=-0.3)))
+        assert r1["k_star"] == -1 and r1["z_sub_um"] == -0.3, r1
+        json.dumps([r0, r1], allow_nan=False)
+        # the SPEC's field list written out (a field dropped from PILOT_RECORD_FIELDS is caught)
+        assert tuple(CAL.PILOT_RECORD_FIELDS) == ("k_star", "z_sub_um", "cx_um", "cy_um", "theta_rad", "phi_rad", "B_bar",
+                                                  "mu_hat_per_um", "d_hat_um", "alpha_hat", "fit_status", "flags",
+                                                  "reg_verdict"), CAL.PILOT_RECORD_FIELDS
+        # node_records on a hand-made scan_cell result: a measured node the verdict rejected keeps its pilot (the point
+        # of D-115.5: its verdict can be recomputed), a set_full node has none, a scanned one is marked
+        swc_f = SimpleNamespace(ids=np.array([1, 2, 3, 4]), radius=np.array([0.1, 0.1, np.nan, 0.1]))
+        res_f = SimpleNamespace(**dict(base, z_sub_um=2.0, k_star=7, phi_rad=0.1))
+        out_f = [(1, res_f, None, ["not_flat"]), (2, None, None, ["set_full"]), (3, res_f, None, ["allen_diameter_out"]),
+                 (4, res_f, object(), [])]
+        nr = CAL.node_records(out_f, swc_f, cfg_s)
+        assert [n["node_id"] for n in nr] == [1, 2, 3, 4] and [n["scanned"] for n in nr] == [False, False, False, True]
+        assert nr[0]["pilot"] == CAL.pilot_record(res_f) and nr[0]["pilot"]["k_star"] == 7, nr[0]
+        assert nr[0]["reasons"] == "not_flat" and nr[1]["pilot"] is None and nr[3]["reasons"] == "", nr
+        assert nr[2]["allen_diameter_um"] is None and nr[2]["set"] == "" and nr[2]["pilot"] is not None, nr[2]
+        assert nr[0]["allen_diameter_um"] == 0.2 and nr[0]["set"] == CAL.calibration_set(0.2, cfg_s), nr[0]
+        json.dumps(nr, allow_nan=False)
         buf = io.StringIO()
         with redirect_stdout(buf):
             meta_p, done = SC.pool_calibration(cfg_s, out_dir, sel, log=logs.append)

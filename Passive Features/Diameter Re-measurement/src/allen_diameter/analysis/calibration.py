@@ -557,6 +557,53 @@ def scan_node(branch, i, provider, cfg, reg=None, scene=None, keep_images=False)
     return res, far_field.far_plane_scan(patch, res, branch, scene, cfg, keep_images), []
 
 
+PILOT_RECORD_FIELDS = ("k_star", "z_sub_um", "cx_um", "cy_um", "theta_rad", "phi_rad", "B_bar", "mu_hat_per_um",
+                       "d_hat_um", "alpha_hat", "fit_status", "flags", "reg_verdict")
+
+
+def pilot_record(result):
+    """The pilot's values a candidate's verdict read (D-115.5), as a JSON-ready
+    dict with PILOT_RECORD_FIELDS: pilot_view(result)'s fields (the view
+    calibration_reasons reads), k_star an int (None when the pilot has no
+    sharpest plane: its z_sub_um is not finite, plane_scan's own test, since
+    k_star = -1 is also a plane of a phantom stack), flags a list of str,
+    fit_status and reg_verdict str, every other field a float or None when
+    not finite. None for result None (a node never measured, set_full)."""
+    if result is None:
+        return None
+    v = pilot_view(result)
+    out = {}
+    for name in PILOT_RECORD_FIELDS:
+        x = getattr(v, name)
+        if name == "flags":
+            out[name] = [str(f) for f in x]
+        elif name in ("fit_status", "reg_verdict"):
+            out[name] = str(x)
+        elif name == "k_star":
+            out[name] = int(x) if math.isfinite(float(v.z_sub_um)) else None
+        else:
+            x = float(x)
+            out[name] = x if math.isfinite(x) else None
+    return out
+
+
+def node_records(out, swc, cfg):
+    """scan_cell's result as the scans file's meta.nodes (Block 19.1; D-115.5):
+    per (node_id, NodeResult or None, PlaneScan or None, reasons) a dict with
+    node_id, allen_diameter_um (2 x the SWC radius; None when not finite), set
+    (calibration_set), reasons (";"-joined), scanned and pilot
+    (pilot_record). Used by calibrate_kernel.py real and by S3's calibration
+    step."""
+    allen_d = {int(i): 2.0 * float(r) for i, r in zip(swc.ids, swc.radius)}
+    recs = []
+    for nid, res, scan, reasons in out:
+        d = allen_d[int(nid)]
+        recs.append(dict(node_id=int(nid), allen_diameter_um=d if math.isfinite(d) else None,
+                         set=calibration_set(d, cfg), reasons=";".join(reasons), scanned=scan is not None,
+                         pilot=pilot_record(res)))
+    return recs
+
+
 def scan_cell(swc, provider, cfg, transform=None, regs=None, candidates=None, log=None, keep_images=False,
               order_rng=None, max_per_set=None, on_node=None):
     """Plane scans of one cell's calibration nodes, both sets. Every dendrite
