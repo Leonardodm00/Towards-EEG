@@ -446,6 +446,7 @@ def run_real(cfg, a):
     print("%d of %d candidates scanned: %d near-field, %d far-field (at most %d each, D-088.3); reasons %s; in %.1f "
           "min -> %s" % (len(scans), len(out), n_near, n_far, cal.calib_max_nodes_per_set, reasons_count,
                          (time.perf_counter() - t0) / 60, a.out))
+    print(calibration.gof_line(scans, cfg), flush=True)              # Block 10.G (D-115.3)
     # the example nodes, re-scanned with their patch images (served from the cache)
     records = {}
     for which in calibration.CALIBRATION_SETS:

@@ -27,7 +27,8 @@ from ..analysis.calibration import PlaneScan
 _SCAN_ARRAYS = ("ks", "z_um", "omega_um2", "vw_um2", "area_gl_um", "depth_gl", "B_bar")
 _SCAN_SCALARS = ("node_id", "d_hat_um", "phi_rad", "alpha_hat", "k_star", "z_sub_um")
 # 2026-10-23: optional per-plane arrays (None in a PlaneScan built or saved before)
-_SCAN_OPTIONAL_1D = ("se_omega_um2", "amp_gl", "v_c_um", "rms_gl", "window_half_um", "line_end_gl")
+_SCAN_OPTIONAL_1D = ("se_omega_um2", "amp_gl", "v_c_um", "rms_gl", "window_half_um", "line_end_gl",
+                     "bg_sd_gl")   # bg_sd_gl: Block 10.G (D-115.3)
 _SCAN_OPTIONAL_INT = ("n_win", "passes")
 _SCAN_OPTIONAL_2D = ("b_coef", "w_gl", "bhat_gl")
 

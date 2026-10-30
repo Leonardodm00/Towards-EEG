@@ -90,12 +90,14 @@ def cfg_with(base=None, **cal):
 
 
 def far_cfg(gamma=0.79, noise=False):
-    """A reduced far-field configuration for rendering: 12 um patch, +-8 planes, few bootstrap resamples."""
+    """A reduced far-field configuration for rendering: 12 um patch, +-8 planes, few bootstrap resamples. Without
+    noise the goodness of fit (Block 10.G, D-115.3) is off: the background's noise SD is then the quantization's,
+    below every core fit's deterministic misfit."""
     base = default_config()
     rc = dataclasses.replace(base.renderer, kernel_continuation_slope=gamma,
                              **({} if noise else dict(noise_sd_gl=0.0, jpeg=False)))
     return cfg_with(dataclasses.replace(base, renderer=rc), patch_half_um=12.0, far_offsets_planes=8,
-                    bootstrap_resamples=12)
+                    bootstrap_resamples=12, gof_check=bool(noise))
 
 
 def f1_selection(cfg, gamma, sigma0, rng, J=6, noise=0.0, k_max=16, c_range=(-0.02, 0.03), u_sd=0.0):
@@ -407,6 +409,39 @@ def test_edge_cases():
 
 
 # ---------------------------------------------------------------- runner ---
+
+def test_goodness_of_fit():
+    """Block 10.G (D-115.3) on the far scan: one rendered far phantom with the camera's noise, scanned twice from
+    the same seed -- as it is, and with the plane at k* + 6 (a plane of the far fit) stubbed to a core-fit RMS above
+    the bound: that plane alone is poor_fit, its width NaN, and select_far_planes does not take it."""
+    cfg = far_cfg(0.79, noise=True)
+    assert cfg.calibration.gof_check
+    spec = [FAR_SPECS[0]]
+    sc0 = render_far_phantoms(cfg, spec, SEED + 5)[0]
+    assert sc0.bg_sd_gl is not None and sc0.bg_sd_gl.shape == sc0.ks.shape, sc0.bg_sd_gl
+    ok0 = np.array(sc0.status) == "ok"
+    assert np.all(np.isfinite(sc0.bg_sd_gl[ok0])) and np.all(sc0.bg_sd_gl[ok0] > 0)
+    target = int(np.flatnonzero(sc0.offsets() == 6)[0])
+    assert ok0[target], sc0.status
+    saved, calls = FF.far_plane_statistics, []
+
+    def stub(*a, **k):
+        st = saved(*a, **k)
+        calls.append(1)
+        return dict(st, rms_gl=1e6) if len(calls) == target + 1 else st
+    FF.far_plane_statistics = stub
+    try:
+        sc1 = render_far_phantoms(cfg, spec, SEED + 5)[0]
+    finally:
+        FF.far_plane_statistics = saved
+    assert sc1.status[target] == "poor_fit", sc1.status
+    assert math.isnan(float(sc1.omega_um2[target])) and math.isnan(float(sc1.se_omega_um2[target]))
+    other = np.arange(sc1.ks.size) != target
+    assert tuple(np.array(sc1.status)[other]) == tuple(np.array(sc0.status)[other])
+    k_t = int(sc1.ks[target])
+    sel0, sel1 = FF.select_far_planes([sc0], cfg), FF.select_far_planes([sc1], cfg)
+    assert k_t in set(int(k) for k in sel0.obs_k) and k_t not in set(int(k) for k in sel1.obs_k), (k_t, sel1.obs_k)
+
 
 def _environment():
     parts = ["python %s" % platform.python_version()]

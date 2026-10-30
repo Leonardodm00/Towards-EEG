@@ -142,22 +142,32 @@ def far_pixel_mask(shape, frame, rows, soma, planes_z, cfg, sigma_soma_um=None):
 
 # --------------------------------------------------------- the background --
 
-def planar_background(plane2d, far, frame, cx, cy, trim_sigmas, min_frac):
+def planar_background(plane2d, far, frame, cx, cy, trim_sigmas, min_frac, return_sd=False):
     """(b (3,), n_used, ok): the least-squares plane B(x, y) = b0 + bx (x - cx) +
     by (y - cy) through the far pixels of one plane (numpy lstsq), refitted once
     without the pixels whose residual exceeds trim_sigmas x 1.4826 x MAD. ok is
     False (b NaN) when fewer than min_frac of the pixels are far, or fewer than
-    6 remain after trimming."""
+    6 remain after trimming. With return_sd (Block 10.G, D-115.3): (b, n_used,
+    ok, sd), sd = 1.4826 x the MAD of the residuals of every finite far pixel
+    (before the trim) about the final plane, gl; NaN when not ok."""
     img = np.asarray(plane2d, dtype=float)
     far = np.asarray(far, dtype=bool)
     nan3 = np.full(3, np.nan)
+
+    def out(b, n, ok, A=None, val=None):
+        if not return_sd:
+            return b, n, ok
+        if not ok:
+            return b, n, ok, float("nan")
+        r = val - A @ b
+        return b, n, ok, float(1.4826 * np.median(np.abs(r - np.median(r))))
     if far.shape != img.shape or far.mean() < float(min_frac) or far.sum() < 6:
-        return nan3, 0, False
+        return out(nan3, 0, False)
     px, py = pixel_centres(img.shape, frame)
     x, y, val = (px[far] - cx), (py[far] - cy), img[far]
     keep = np.isfinite(val)
     if keep.sum() < 6:
-        return nan3, 0, False
+        return out(nan3, 0, False)
     A = np.column_stack([np.ones(keep.sum()), x[keep], y[keep]])
     b = np.linalg.lstsq(A, val[keep], rcond=None)[0]
     res = val[keep] - A @ b
@@ -166,8 +176,8 @@ def planar_background(plane2d, far, frame, cx, cy, trim_sigmas, min_frac):
         inner = np.abs(res) <= float(trim_sigmas) * 1.4826 * mad
         if inner.sum() >= 6 and inner.sum() < inner.size:
             b = np.linalg.lstsq(A[inner], val[keep][inner], rcond=None)[0]
-            return b, int(inner.sum()), True
-    return b, int(keep.sum()), True
+            return out(b, int(inner.sum()), True, A, val[keep])
+    return out(b, int(keep.sum()), True, A, val[keep])
 
 
 def background_on_line(b, cx, cy, xy):

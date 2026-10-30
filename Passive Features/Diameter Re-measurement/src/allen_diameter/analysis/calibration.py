@@ -208,6 +208,7 @@ class PlaneScan:
     bhat_gl: Optional[np.ndarray] = None         # (n, n_v) the background along the line
     images: Optional[dict] = field(default=None, compare=False, repr=False)
     stripe: Optional[tuple] = None               # (n,) stripe_support's info per plane (Block 10.S), None under "square"
+    bg_sd_gl: Optional[np.ndarray] = None        # (n,) the background's noise SD on its support (10.G, D-115.3)
 
     def values(self, statistic):
         if statistic == "gaussian_core_width2":
@@ -278,14 +279,16 @@ def support_masks(shape, frame, kk, node, branch, scene, cfg, sigma_soma_um=None
     return support, tuple(infos)
 
 
-def patch_planes(patch, kk, node, branch, scene, cfg):
+def patch_planes(patch, kk, node, branch, scene, cfg, with_sd=False):
     """The per-plane preparation shared by the near and the far scan (10.P,
     10.S): for each plane k of kk, its index in the patch (or None), the
     background's support (the far pixels under "square", the stripe under
     "stripe"; support_masks) and the planar background on it. Returns
     (ks_index (n,) int, -1 when the plane is not in the patch or not valid;
     far (n, H, W) bool; b (n, 3); ok (n,) bool; frame; stripe (n,) tuple of
-    info dicts or None). Under "stripe" ok also needs the stripe's own ok
+    info dicts or None) and, with with_sd (Block 10.G, D-115.3), a 7th value
+    sd (n,): the background's noise SD on its support, gl (planar_background's
+    return_sd; NaN where no background). Under "stripe" ok also needs the stripe's own ok
     (stripe_min_pixels, stripe_min_side_um); under "square" the far fraction
     background_min_far_frac."""
     block, ks, valid, frame = patch
@@ -297,15 +300,25 @@ def patch_planes(patch, kk, node, branch, scene, cfg):
     idx = np.full(len(kk), -1, dtype=int)
     b = np.full((len(kk), 3), np.nan)
     ok = np.zeros(len(kk), dtype=bool)
+    sd = np.full(len(kk), np.nan)
     for q, k in enumerate(kk):
         i = int(k - ks[0])
         if 0 <= i < ks.size and bool(valid[i]):
             idx[q] = i
-            b[q], _n, ok[q] = calibration_scene.planar_background(block[i], far[q], frame, node.cx_um, node.cy_um,
-                                                                  cal.background_trim_sigmas, min_frac)
+            b[q], _n, ok[q], sd[q] = calibration_scene.planar_background(block[i], far[q], frame, node.cx_um,
+                                                                         node.cy_um, cal.background_trim_sigmas,
+                                                                         min_frac, return_sd=True)
             if stripe is not None and not stripe[q]["ok"]:
                 ok[q] = False
-    return idx, far, b, ok, frame, stripe
+    return (idx, far, b, ok, frame, stripe, sd) if with_sd else (idx, far, b, ok, frame, stripe)
+
+
+def gof_poor(rms_gl, bg_sd_gl, cfg):
+    """Block 10.G (D-115.3): True when a plane's core fit is rejected -- calibration.gof_check, both finite, the
+    background's noise SD > 0 and the fit's residual RMS > gof_kappa x that SD."""
+    cal = cfg.calibration
+    r, sd = float(rms_gl), float(bg_sd_gl)
+    return bool(cal.gof_check and math.isfinite(r) and math.isfinite(sd) and sd > 0 and r > cal.gof_kappa * sd)
 
 
 def patch_images(patch, idx, far, kk, node):
@@ -343,7 +356,7 @@ def plane_scan(patch, node, branch, scene, cfg, keep_images=False):
     v = profiles.profile_offsets(m)
     kk = stage_planes(node, cfg, "near")
     n = kk.size
-    idx, far, bco, bok, frame, stripe = patch_planes(patch, kk, node, branch, scene, cfg)
+    idx, far, bco, bok, frame, stripe, bsd = patch_planes(patch, kk, node, branch, scene, cfg, with_sd=True)
     names = ("omega_um2", "vw_um2", "area_gl_um", "depth_gl", "B_bar", "se_omega_um2", "amp_gl", "v_c_um", "rms_gl",
              "window_half_um")
     cols = {name: np.full(n, np.nan) for name in names}
@@ -369,6 +382,8 @@ def plane_scan(patch, node, branch, scene, cfg, keep_images=False):
             continue
         w_gl[q] = B_line - I
         st = dip_statistics(v, I - B_line + B0, B0, m, cal)
+        if st["status"] == STATUS_OK and gof_poor(st["rms_gl"], bsd[q], cfg):      # Block 10.G (D-115.3)
+            st = dict(st, status="poor_fit", omega_um2=np.nan, se_omega_um2=np.nan, vw_um2=np.nan)
         for name in names:
             if name != "B_bar":
                 cols[name][q] = st[name]
@@ -379,10 +394,34 @@ def plane_scan(patch, node, branch, scene, cfg, keep_images=False):
                      cols["area_gl_um"], cols["depth_gl"], cols["B_bar"], tuple(status), "near",
                      cols["se_omega_um2"], cols["amp_gl"], cols["v_c_um"], cols["rms_gl"], n_win, passes,
                      cols["window_half_um"], None, bco, v, w_gl, bhat,
-                     patch_images(patch, idx, far, kk, node) if keep_images else None, stripe)
+                     patch_images(patch, idx, far, kk, node) if keep_images else None, stripe, bg_sd_gl=bsd)
 
 
 CALIBRATION_SETS = ("near", "far")      # D-067.4: the near-field (thin) set and the far-field set (D-026)
+
+
+def gof_line(scans, cfg):
+    """Block 10.G (D-115.3): the log line of a run's scans -- per set the planes whose core fit ran (ok or
+    poor_fit), those the goodness of fit dropped and the nodes they belong to; for the near set also the nodes the
+    drop leaves below min_planes_per_node finite widths."""
+    cal = cfg.calibration
+    if not cal.gof_check:
+        return "goodness of fit: off (calibration.gof_check False)"
+    parts = []
+    for which in CALIBRATION_SETS:
+        ss = [sc for sc in scans if sc.set == which]
+        st = [x for sc in ss for x in sc.status]
+        n_fit = sum(1 for x in st if x in (STATUS_OK, "poor_fit"))
+        n_poor = sum(1 for x in st if x == "poor_fit")
+        touched = [sc for sc in ss if "poor_fit" in sc.status]
+        text = "%s %d of %d planes, on %d nodes" % (which, n_poor, n_fit, len(touched))
+        if which == "near":
+            below = sum(1 for sc in touched if int(np.isfinite(sc.omega_um2).sum()) < cal.min_planes_per_node
+                        <= int(np.isfinite(sc.omega_um2).sum()) + sum(1 for x in sc.status if x == "poor_fit"))
+            text += " (%d of them now below %d finite widths)" % (below, cal.min_planes_per_node)
+        parts.append(text)
+    return ("goodness of fit (D-115.3: core-fit RMS > %.2f x the background's noise SD on its support): planes dropped "
+            "as poor_fit -- %s" % (cal.gof_kappa, "; ".join(parts)))
 
 
 def calibration_set(allen_diameter_um, cfg):

@@ -41,7 +41,7 @@ from scipy import ndimage
 from scipy.optimize import least_squares
 
 from . import calibration_scene, profiles
-from .calibration import (FW, PlaneScan, gaussian_core_fit, line_geometry, patch_images, patch_planes,
+from .calibration import (FW, PlaneScan, gaussian_core_fit, gof_poor, line_geometry, patch_images, patch_planes,
                           stage_planes)
 from ..model.kernel import sigma_r
 
@@ -158,7 +158,7 @@ def far_plane_scan(patch, node, branch, scene, cfg, keep_images=False):
     v = far_offsets(cfg)
     kk = stage_planes(node, cfg, "far")
     n = kk.size
-    idx, far, bco, bok, frame, stripe = patch_planes(patch, kk, node, branch, scene, cfg)
+    idx, far, bco, bok, frame, stripe, bsd = patch_planes(patch, kk, node, branch, scene, cfg, with_sd=True)
     names = ("omega_um2", "depth_gl", "B_bar", "se_omega_um2", "amp_gl", "v_c_um", "rms_gl", "window_half_um",
              "line_end_gl")
     cols = {name: np.full(n, np.nan) for name in names}
@@ -186,6 +186,8 @@ def far_plane_scan(patch, node, branch, scene, cfg, keep_images=False):
         w_gl[q] = B_line - I
         sp = float(sigma_r(abs(float(node.z_sub_um) - float(k) * dz), cfg.renderer))
         st = far_plane_statistics(v, I - B_line + B0, B0, sp, m, cal)
+        if st["status"] == STATUS_OK and gof_poor(st["rms_gl"], bsd[q], cfg):      # Block 10.G (D-115.3)
+            st = dict(st, status="poor_fit", omega_um2=np.nan, se_omega_um2=np.nan)
         for name in names:
             if name != "B_bar":
                 cols[name][q] = st[name]
@@ -196,7 +198,7 @@ def far_plane_scan(patch, node, branch, scene, cfg, keep_images=False):
                      nan_n.copy(), cols["depth_gl"], cols["B_bar"], tuple(status), "far",
                      cols["se_omega_um2"], cols["amp_gl"], cols["v_c_um"], cols["rms_gl"], n_win, passes,
                      cols["window_half_um"], cols["line_end_gl"], bco, v, w_gl, bhat,
-                     patch_images(patch, idx, far, kk, node) if keep_images else None, stripe)
+                     patch_images(patch, idx, far, kk, node) if keep_images else None, stripe, bg_sd_gl=bsd)
 
 
 # ------------------------------------------------------------ the selection

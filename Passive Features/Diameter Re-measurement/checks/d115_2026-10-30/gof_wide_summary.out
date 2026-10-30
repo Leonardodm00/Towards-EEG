@@ -1,0 +1,8 @@
+gof_wide.json: set near, 20 records (46.0 min)
+  clean: 0 phantoms, 0 scanned; reasons of the others: []
+  composite: 0 phantoms, 0 scanned; reasons of the others: []
+  wide: 20 phantoms, 14 scanned; reasons of the others: ['not_flat', 'stack_edge', 'stack_edge;not_flat']
+  wide planes 98: g percentiles [50, 90, 95, 99, 100] = [1.235 3.694 4.34  5.276 5.584]
+     d in [0.6, 1.0) um: 49 planes, g median 0.97, 99th 3.94, max 3.98
+     d in [1.0, 1.6) um: 7 planes, g median 1.37, 99th 4.26, max 4.29
+     d in [1.6, 2.6) um: 42 planes, g median 1.63, 99th 5.45, max 5.58

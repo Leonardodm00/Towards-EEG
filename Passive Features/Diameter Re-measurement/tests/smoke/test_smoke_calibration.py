@@ -325,8 +325,11 @@ def test_reference():
     # 1 / 2 / 3 planes (the core width of a mixture of defocus values is narrower than its mean
     # variance, most where sigma_r grows fastest), axis depths within 0.016 um, area ratios
     # 0.976-0.998 (the +-1.5 um window loses the tails of the 3-plane spot)
+    # 2026-10-30 (Block 10.G, D-115.3): the goodness of fit is off here -- on noise-free images the background's
+    # noise SD is the quantization's, below every core fit's deterministic misfit, so the rule would drop the planes
     base = default_config()
-    cfg = dataclasses.replace(base, renderer=dataclasses.replace(base.renderer, noise_sd_gl=0.0, jpeg=False))
+    cfg = dataclasses.replace(base, renderer=dataclasses.replace(base.renderer, noise_sd_gl=0.0, jpeg=False),
+                              calibration=dataclasses.replace(base.calibration, gof_check=False))
     rng = np.random.default_rng(SEED)
     d, mu = 0.25, 1.0
     scans, z_true = [], []
@@ -758,6 +761,81 @@ def test_patch_scan():
 
 
 # ---------------------------------------------------------------- runner ---
+
+def test_goodness_of_fit():
+    """Block 10.G (D-115.3): the background's noise SD, the rule, a near scan's poor_fit plane, fit_growth, the file."""
+    from allen_image_io import CropFrame
+    rng = np.random.default_rng(SEED)
+    # (a) planar_background's sd on Gaussian noise of SD 2 gl over a tilted plane, 4800 support pixels: the SD of
+    # 1.4826 MAD is about 1.65 x 2 / sqrt(2 x 4800) = 0.034 gl, so 0.1 gl is about 3 of its SDs
+    frame = CropFrame(0, 0, 0, 0.1)
+    H = W = 80
+    px, py = CS.pixel_centres((H, W), frame)
+    img = 150.0 + 0.3 * (px - 4.0) - 0.2 * (py - 4.0) + rng.normal(0.0, 2.0, (H, W))
+    far = np.ones((H, W), dtype=bool)
+    far[30:50, :] = False
+    b3 = CS.planar_background(img, far, frame, 4.0, 4.0, 3.0, 0.05)
+    b4 = CS.planar_background(img, far, frame, 4.0, 4.0, 3.0, 0.05, return_sd=True)
+    assert len(b3) == 3 and len(b4) == 4 and np.array_equal(b3[0], b4[0]) and tuple(b3[1:]) == tuple(b4[1:3])
+    assert abs(b4[3] - 2.0) < 0.1, b4[3]
+    few = np.zeros((H, W), dtype=bool)
+    few[0, :3] = True
+    out = CS.planar_background(img, few, frame, 4.0, 4.0, 3.0, 0.05, return_sd=True)
+    assert out[2] is False and math.isnan(out[3]), out
+    # (b) the rule: just above and below the bound, NaN or zero noise, the switch
+    cfg = cfg_with(patch_half_um=PATCH_HALF_TEST)
+    kap = cfg.calibration.gof_kappa
+    assert CAL.gof_poor(kap * 2.0 * 1.001, 2.0, cfg) and not CAL.gof_poor(kap * 2.0 * 0.999, 2.0, cfg)
+    assert not any(CAL.gof_poor(r, sd, cfg) for r, sd in ((NAN, 2.0), (5.0, NAN), (5.0, 0.0)))
+    assert not CAL.gof_poor(1e6, 1.0, cfg_with(patch_half_um=PATCH_HALF_TEST, gof_check=False))
+    # (c) one rendered thin phantom scanned twice from the same seed: as it is (no plane poor: a clean dip's RMS sits
+    # below the pixels' noise SD, the profile being interpolated), and with the core fit of the plane at k* + 1
+    # stubbed to an RMS above the bound: that plane alone is poor_fit, its widths NaN, the others unchanged
+    d, mu, theta, cx, cy, z_ax = 0.2, 1.5, 0.7, 0.02, -0.03, 0.04
+    sc0 = scan_phantom(cfg, d, mu, theta, cx, cy, z_ax, np.random.default_rng(SEED + 7))
+    assert "poor_fit" not in sc0.status and sc0.bg_sd_gl is not None and sc0.bg_sd_gl.shape == sc0.ks.shape
+    ok0 = np.array(sc0.status) == "ok"
+    assert ok0.sum() >= 5 and np.all(np.isfinite(sc0.bg_sd_gl[ok0])) and np.all(sc0.bg_sd_gl[ok0] > 0)
+    assert np.all(sc0.rms_gl[ok0] < kap * sc0.bg_sd_gl[ok0]), (sc0.rms_gl / sc0.bg_sd_gl)
+    target = int(np.flatnonzero(sc0.offsets() == 1)[0])
+    assert ok0[target]
+    saved, calls = CAL.dip_statistics, []
+
+    def stub(v, I, B_bar, mcfg, cal):
+        st = saved(v, I, B_bar, mcfg, cal)
+        calls.append(1)
+        return dict(st, rms_gl=1e6) if len(calls) == target + 1 else st
+    CAL.dip_statistics = stub
+    try:
+        sc1 = scan_phantom(cfg, d, mu, theta, cx, cy, z_ax, np.random.default_rng(SEED + 7))
+    finally:
+        CAL.dip_statistics = saved
+    assert sc1.status[target] == "poor_fit", sc1.status
+    assert all(math.isnan(float(a[target])) for a in (sc1.omega_um2, sc1.se_omega_um2, sc1.vw_um2))
+    assert sc1.rms_gl[target] == 1e6 and math.isfinite(float(sc1.depth_gl[target]))
+    other = np.arange(sc1.ks.size) != target
+    assert tuple(np.array(sc1.status)[other]) == tuple(np.array(sc0.status)[other])
+    assert np.array_equal(sc1.omega_um2[other], sc0.omega_um2[other], equal_nan=True)
+    # fit_growth keeps the node on its other planes (a second, clean node beside it)
+    sc2 = scan_phantom(cfg, 0.22, 1.4, 1.9, -0.04, 0.03, -0.05, np.random.default_rng(SEED + 8))
+    g = CAL.fit_growth([dataclasses.replace(sc1, node_id=1), dataclasses.replace(sc2, node_id=2)], cfg)
+    assert 1 in set(int(n) for n in g.node_ids), g.node_ids
+    n_obs1 = int(np.sum(np.asarray(g.node_ids)[np.asarray(g.obs_node)] == 1))
+    assert n_obs1 == int(np.isfinite(sc1.omega_um2).sum()) == int(ok0.sum()) - 1, (n_obs1, sc1.status)
+    line = CAL.gof_line([dataclasses.replace(sc1, node_id=1), dataclasses.replace(sc2, node_id=2)], cfg)
+    n_fit = sum(1 for sc in (sc1, sc2) for x in sc.status if x in ("ok", "poor_fit"))
+    want = "near 1 of %d planes, on 1 nodes (0 of them now below %d finite widths)" % (
+        n_fit, cfg.calibration.min_planes_per_node)
+    assert want in line, line
+    assert "far 0 of 0 planes, on 0 nodes" in line and ("%.2f x" % kap) in line, line
+    assert CAL.gof_line([sc1], cfg_with(gof_check=False)).startswith("goodness of fit: off"), "the switch"
+    # (d) the scans file keeps bg_sd_gl; a file written without it loads with None
+    back = CIO.scan_from_dict(json.loads(json.dumps(CIO.scan_to_dict(sc1), allow_nan=False)))
+    assert np.array_equal(back.bg_sd_gl, sc1.bg_sd_gl, equal_nan=True)
+    old = CIO.scan_to_dict(sc1)
+    old.pop("bg_sd_gl")
+    assert CIO.scan_from_dict(old).bg_sd_gl is None
+
 
 def _environment():
     parts = ["python %s" % platform.python_version()]

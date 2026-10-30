@@ -274,6 +274,8 @@ class CalibrationConfig:
     far_pixel_sigmas: float = 3.0            # source: D-078.1 [user]: a far pixel lies beyond r_q + this x sigma_r(delta_q,k) of every traced segment q and of the soma
     background_min_far_frac: float = 0.05    # source: PROVISIONAL (Block 10.P): fewer far pixels than this fraction of the patch -> plane status bg_few
     background_trim_sigmas: float = 3.0      # source: PROVISIONAL (Block 10.P): the plane is refitted once without the pixels beyond this x 1.4826 MAD of the first fit's residuals (untraced debris)
+    gof_check: bool = True                   # source: D-115.3 [user, 2026-10-30: "Add a goodness of fit please", "Residual vs noise"] (Block 10.G): a scanned plane whose core fit's residual RMS exceeds gof_kappa x its background's noise SD on the support is dropped (status poor_fit); False: the rule off, for a comparison
+    gof_kappa: float = 1.2                   # source: PROVISIONAL (D-115.3, Block 10.G): kappa_g from rendered phantoms (checks/d115_2026-10-30/gof_kappa_check.py, 2026-10-30): the 99th percentile of RMS / SD_bg over 210 planes of 30 clean thin near phantoms (1.151), rounded up to 0.1; it drops 1 % of those planes and 31 % of the planes of 22 phantoms with an untraced neighbour 0.5-1.5 um away (43 of 105 within 0.8 um), but about half the planes of clean dips 1-2.5 um wide (their median ratio 1.2-1.6)
     isolation_depth_gl: float = 0.3          # source: D-108 [user, 2026-10-29: "As you recommend"]: 0.3 gl, PROVISIONAL (to judge on Cell 7's panel (c)); was 0.03 (D-081.1, D-101.5) -- the rule of 2026-10-26 is background_support "square" with 0.03. D-081.1 [user]: a traced neighbour (not the node's own branch) whose predicted shadow reaches the patch deeper than this (gl) in a scanned plane fails the node (not_isolated); D-101.2 [user]: with the stripe, the per-pixel threshold tau -- a pixel is shaded by a segment (the own branch included) whose predicted shadow at it exceeds this
     # 2026-10-28, D-101 (Block 10.S): the stripe -- the background's support along the measuring line, one per plane
     background_support: str = "stripe"     # source: D-101.3 [user]: "stripe" (10.S) or "square" (10.P's far mask with far_pixel_sigmas and 10.I's node verdict, D-078.1 / D-081.1)
@@ -487,7 +489,8 @@ class DiameterConfig:
                              "plane scans)")
         wb, ao = tuple(cal.far_core_width_bounds), tuple(cal.far_area_offsets)
         if not (cal.patch_half_um > 0 and cal.far_pixel_sigmas >= 0 and 0 < cal.background_min_far_frac <= 1
-                and cal.background_trim_sigmas > 0 and cal.isolation_depth_gl >= 0 and cal.node_straight_half_um > 0
+                and cal.background_trim_sigmas > 0 and cal.gof_kappa > 0 and cal.isolation_depth_gl >= 0
+                and cal.node_straight_half_um > 0 and isinstance(cal.gof_check, bool)
                 and cal.node_straight_tol_radii > 0 and isinstance(cal.node_straight_check, bool)
                 and cal.bootstrap_resamples >= 2 and cal.table_max_delta_um > 0
                 and cal.far_offsets_planes >= cal.offsets_planes and cal.far_profile_half_um > 0

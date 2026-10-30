@@ -1,0 +1,20 @@
+gof_near.json: set near, 60 records (76.0 min)
+  clean: 30 phantoms, 30 scanned; reasons of the others: []
+  composite: 30 phantoms, 22 scanned; reasons of the others: ['crossing']
+  wide: 0 phantoms, 0 scanned; reasons of the others: []
+  clean planes 210: g percentiles [50, 90, 95, 99, 100] = [0.471 0.7   0.791 1.151 1.271]
+  clean: g against the core amplitude, rank correlation 0.07
+  composite planes 154: g percentiles [50, 90, 95, 99, 100] = [0.732 2.585 3.069 5.313 5.523]
+  kappa_g by the rule (99th percentile of the clean planes, rounded up to 0.1): 1.2
+  kappa 1.20: clean planes dropped 1.0 % (2 nodes touched), composite planes dropped 31.2 % (19 nodes touched)
+     composite dropped by |k - k*|: {0: '12/22', 1: '20/44', 2: '10/44', 3: '6/44'}
+     composite dropped by the neighbour's offset: {'s<0.8': '43/105', 's<1.2': '3/35', 's>=1.2': '2/14'}
+  kappa 1.00: clean planes dropped 2.4 % (5 nodes touched), composite planes dropped 38.3 % (20 nodes touched)
+     composite dropped by |k - k*|: {0: '13/22', 1: '25/44', 2: '14/44', 3: '7/44'}
+     composite dropped by the neighbour's offset: {'s<0.8': '51/105', 's<1.2': '6/35', 's>=1.2': '2/14'}
+  kappa 1.50: clean planes dropped 0.0 % (0 nodes touched), composite planes dropped 22.1 % (14 nodes touched)
+     composite dropped by |k - k*|: {0: '7/22', 1: '17/44', 2: '6/44', 3: '4/44'}
+     composite dropped by the neighbour's offset: {'s<0.8': '31/105', 's<1.2': '1/35', 's>=1.2': '2/14'}
+  kappa 2.00: clean planes dropped 0.0 % (0 nodes touched), composite planes dropped 16.2 % (11 nodes touched)
+     composite dropped by |k - k*|: {0: '6/22', 1: '16/44', 2: '3/44', 3: '0/44'}
+     composite dropped by the neighbour's offset: {'s<0.8': '25/105', 's<1.2': '0/35', 's>=1.2': '0/14'}
