@@ -95,7 +95,7 @@ The same checks by hand:
     nrnivmodl mod                          # once per architecture; creates x86_64/
     python smoke_noise_stats.py            # expect "SMOKE noise_stats: 6/6 passed"
     python smoke_noise_law.py              # expect "SMOKE noise_law: 10/10 passed"
-    python smoke_noise_windows.py          # expect "SMOKE noise_windows: 14/14 passed"
+    python smoke_noise_windows.py          # expect "SMOKE noise_windows: 15/15 passed"
     python smoke_noise_fit.py              # expect "SMOKE noise_fit: 11/11 passed" (about 100 s)
     python smoke_ih_fit.py                 # expect "smoke_ih_fit: 12/12 passed"
     python smoke_ih_recovery.py            # expect "smoke_ih_recovery: 14/14 passed"

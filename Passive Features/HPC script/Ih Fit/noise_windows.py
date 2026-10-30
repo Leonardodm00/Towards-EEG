@@ -15,7 +15,10 @@ The noise window of a pulse is the late part of its stored window,
 [t_SS(c), 200) ms. The windows are grouped by sweep and polarity, and a
 group of fewer than 5 windows leaves everything (D-106). Each group's MEDIAN
 WINDOW -- the per-sample median over its windows -- shows the pulse
-response; an exponential fitted exactly to its decay (least squares by
+response. Before it is taken, each window is shifted by the offset that its
+sweep's tilt puts on it, b_hat_s (t_k - t_bar_s), the tilt read on the kept
+windows from 80 ms on (D-115): a tilt would otherwise stagger the windows'
+baselines and the median would follow the few middle windows of the train; an exponential fitted exactly to its decay (least squares by
 variable projection, D-110) says when the response has fallen to kappa_tr
 times the pre-pulse noise SD, and the cell's start is the median of those
 times over its groups (D-111), at least 80 ms, and 80 ms again when the
@@ -25,8 +28,10 @@ the noise (D-103.1). The Long Square (LS) pre-window of every sweep, [t_0,
 t_on - 5 ms), is read as the fitter reads it, and the sweep's last 500 ms
 (the end window) for its tilt (D-107).
 
-Only loading, geometry, the start and the subtraction live here; the
-statistics and the tilts are in noise_cell_stats.py, the fit in noise_fit.py.
+Only loading, geometry, the SS tilt reading and its offsets, the start and
+the subtraction live here; the statistics and the LS tilts are in
+noise_cell_stats.py (which re-exports the SS reading), the fit in
+noise_fit.py.
 No NEURON import: the LS windows are cut from ls_sweeps.npz with the fitter's
 own rule (the smoke test checks it against the monolith's loader).
 
@@ -178,12 +183,27 @@ class StartResult:
 
 
 @dataclass
+class SweepTilts:
+    """The tilt read on each sweep of one protocol (D-102.2 / D-115.2: SS, (TL1); D-107.1: LS, (TL2))."""
+    protocol: str                  # 'ss' | 'ls'
+    sweep_number: np.ndarray       # (S,) int
+    b_mV_per_s: np.ndarray         # (S,) the tilt read on each sweep; NaN when it cannot be read
+    se_mV_per_s: np.ndarray        # (S,) SS: the OLS standard error (a report); LS: NaN
+    n_windows: np.ndarray          # (S,) SS: the sweep's kept windows; LS: 2 (pre and end)
+    flags: Tuple[str, ...]
+
+    def as_dict(self) -> Dict[int, float]:
+        return {int(s): float(b) for s, b in zip(self.sweep_number, self.b_mV_per_s)}
+
+
+@dataclass
 class SSNoiseWindows:
     """The SS noise windows of one cell, ready for the statistics (SPEC 2.2 (a)-(g))."""
     start: StartResult
-    ss: SSWindows                  # the kept windows (D-106.1)
-    X_tilde: np.ndarray            # (K_kept, m) mV, each minus its group's median window
+    ss: SSWindows                  # the kept windows (D-106.1), as stored (without the offsets of (OF1))
+    X_tilde: np.ndarray            # (K_kept, m) mV, each corrected window minus its group's median window
     j0: int                        # first sample of the enlarged window in a stored window
+    tilts: Optional[SweepTilts] = None   # the SS reading of D-115.2 ((TL1) on the kept windows at the floor)
 
     @property
     def m(self) -> int:
@@ -414,11 +434,118 @@ def _groups(ss: SSWindows) -> List[Tuple[Tuple[int, bool], np.ndarray]]:
     return out
 
 
+def keep_mask(ss: SSWindows, cfg: WindowConfig = WindowConfig()) -> np.ndarray:
+    """(K,) bool: False for the windows of the groups with fewer than
+    cfg.min_windows_per_group windows (2.2 (a), D-104.2, D-106.1)."""
+    keep = np.ones(ss.n_windows, dtype=bool)
+    for (_, _), idx in _groups(ss):
+        if idx.size < cfg.min_windows_per_group:
+            keep[idx] = False
+    return keep
+
+
+# ===========================================================================
+#  The SS tilt reading (TL1) and its offsets (OF1): D-102.2, D-115
+# ===========================================================================
+def floor_index(pre_n: int, fs: float, cfg: WindowConfig = WindowConfig()) -> int:
+    """j_f: the first sample at t >= t_floor (cfg.t_ss_floor_ms) in a stored window."""
+    return int(pre_n) + int(round(cfg.t_ss_floor_ms * 1e-3 * fs))
+
+
+def tl1_fit(means: np.ndarray, centres: np.ndarray, sweep_number: np.ndarray, polarity_is_dep: np.ndarray
+            ) -> Tuple[Tuple[int, ...], np.ndarray, np.ndarray, np.ndarray, Tuple[str, ...]]:
+    """(TL1)'s regression, per sweep: the OLS slope of the window means (mV) on
+    their centre times (s), one intercept per polarity present
+    (numpy.linalg.lstsq). Returns (sweeps in order of first appearance, b
+    (S,) mV/s, se (S,), n (S,), flags). NaN and 'ss_tilt_none:<sweep>' when the
+    design's rank is below its column count or the sweep has no more windows
+    than columns. The SE treats the window means as independent (a report).
+    Used alike by Block 3 on the data and by Block 4's simulator (D-115.3)."""
+    means = np.asarray(means, dtype=np.float64)
+    centres = np.asarray(centres, dtype=np.float64)
+    sweep_number = np.asarray(sweep_number)
+    polarity_is_dep = np.asarray(polarity_is_dep, dtype=bool)
+    sweeps = tuple(dict.fromkeys(int(x) for x in sweep_number))
+    b, se, n_w, flags = [], [], [], []
+    for s in sweeps:
+        g = np.flatnonzero(sweep_number == s)
+        t, y, dep = centres[g], means[g], polarity_is_dep[g]
+        cols = [t - t.mean()] + [(dep == p).astype(np.float64) for p in (True, False) if np.any(dep == p)]
+        D = np.column_stack(cols)
+        n, c = D.shape
+        coef, _, rank, _ = np.linalg.lstsq(D, y, rcond=None)
+        if n <= c or rank < c:
+            b.append(float("nan")); se.append(float("nan")); n_w.append(int(n))
+            flags.append("ss_tilt_none:%d" % s)
+            continue
+        resid = y - D @ coef
+        s2 = float(resid @ resid) / (n - c)
+        b.append(float(coef[0]))
+        se.append(float(np.sqrt(s2 * np.linalg.inv(D.T @ D)[0, 0])))
+        n_w.append(int(n))
+    return (sweeps, np.asarray(b, dtype=np.float64), np.asarray(se, dtype=np.float64),
+            np.asarray(n_w, dtype=np.int64), tuple(flags))
+
+
+def ss_sweep_tilts(X: np.ndarray, ss: SSWindows, j0: int) -> SweepTilts:
+    """(TL1) on the window means of X, the windows of `ss` cut at sample j0
+    (row for row): centre times (pos P + j0 + (m - 1) / 2) dt. The slope does
+    not see a constant common to a group (e.g. its median window), which the
+    polarity's intercept absorbs."""
+    X = np.asarray(X, dtype=np.float64)
+    if X.ndim != 2 or X.shape[0] != ss.n_windows:
+        raise ValueError("X must be (K, m) with K = ss.n_windows = %d" % ss.n_windows)
+    m = X.shape[1]
+    centres = (np.asarray(ss.position, dtype=np.float64) * ss.period_samples + j0 + 0.5 * (m - 1)) * ss.dt
+    sweeps, b, se, n_w, flags = tl1_fit(X.mean(axis=1), centres, ss.sweep_number, ss.polarity_is_dep)
+    return SweepTilts(protocol="ss", sweep_number=np.asarray(sweeps, dtype=np.int64), b_mV_per_s=b,
+                      se_mV_per_s=se, n_windows=n_w, flags=flags)
+
+
+def read_ss_tilts(ss: SSWindows, cfg: WindowConfig = WindowConfig()) -> SweepTilts:
+    """The SS tilt reading of D-115.2: (TL1) on the windows of `ss` (the kept
+    ones) cut at the floor, [t_floor, 200) ms, as stored."""
+    jf = floor_index(ss.pre_n, ss.fs, cfg)
+    if jf >= ss.n_w - 1:
+        raise ValueError("the floor %g ms leaves no window" % cfg.t_ss_floor_ms)
+    return ss_sweep_tilts(ss.v[:, jf:], ss, jf)
+
+
+def tilt_offsets(position: np.ndarray, sweep_number: np.ndarray, period_samples: int, dt: float,
+                 b: Dict[int, float]) -> np.ndarray:
+    """(OF1)'s offsets, mV per window: b_s (t_k - t_bar_s), t_k = pos_k P dt
+    the window's start time in its sweep and t_bar_s their mean over the
+    sweep's windows given; 0 for a sweep whose b is absent or not finite.
+    (t_k - t_bar_s equals the difference of the centre times of (TL1) for
+    any cut.)"""
+    # Custom: (OF1) (no library function).
+    position = np.asarray(position, dtype=np.float64)
+    sweep_number = np.asarray(sweep_number)
+    off = np.zeros(position.size)
+    for s in dict.fromkeys(int(x) for x in sweep_number):
+        bs = b.get(s, float("nan"))
+        if not np.isfinite(bs):
+            continue
+        g = np.flatnonzero(sweep_number == s)
+        t_k = position[g] * period_samples * dt
+        off[g] = bs * (t_k - t_k.mean())
+    return off
+
+
+def remove_tilt_offsets(ss: SSWindows, tilts: SweepTilts) -> SSWindows:
+    """A copy of `ss` with (OF1) applied to every window, all samples:
+    x'_k = x_k - b_hat_s (t_k - t_bar_s) (D-115.1)."""
+    off = tilt_offsets(ss.position, ss.sweep_number, ss.period_samples, ss.dt, tilts.as_dict())
+    return replace(ss, v=ss.v - off[:, None])
+
+
 def decay_start(ss: SSWindows, cfg: WindowConfig = WindowConfig(),
-                fit: Callable[[np.ndarray, np.ndarray, WindowConfig], DecayFit] = fit_decay) -> StartResult:
+                fit: Callable[[np.ndarray, np.ndarray, WindowConfig], DecayFit] = fit_decay,
+                tilts: Optional[SweepTilts] = None) -> StartResult:
     """The SS window start of the cell, SPEC 2.2 (a)-(e) (D-095, D-103,
-    D-104, D-106, D-110, D-111): small groups out of everything;
+    D-104, D-106, D-110, D-111, D-115): small groups out of everything;
     sigma_SS_hat(c) over the kept windows; per kept group the median window
+    -- of the windows corrected by (OF1) when `tilts` is given (D-115.1) --
     and its exact decay fit (`fit`, swappable); t_sp of (ST1); t_SS(c) of
     (ST2): the MEDIAN of the valid groups' t_sp, the floor and the fallback. Flags: 'ss_group_dropped:<sweep>:<polarity>:few_windows' or
     ':fit', 'ss_start_floor', 'ss_start_fallback' (reason in
@@ -426,10 +553,12 @@ def decay_start(ss: SSWindows, cfg: WindowConfig = WindowConfig(),
     # Custom: the start rule (ST1)-(ST2) (no library function).
     groups = _groups(ss)
     G = len(groups)
-    keep = np.ones(ss.n_windows, dtype=bool)
-    for (_, _), idx in groups:
-        if idx.size < cfg.min_windows_per_group:
-            keep[idx] = False
+    keep = keep_mask(ss, cfg)
+    v = ss.v
+    if tilts is not None:                                           # (OF1) over the kept set (D-115.1)
+        v = ss.v.copy()
+        off = tilt_offsets(ss.position[keep], ss.sweep_number[keep], ss.period_samples, ss.dt, tilts.as_dict())
+        v[keep] -= off[:, None]
     pre = ss.v[keep, :ss.pre_n]
     sigma_ss = float(np.median(pre.std(axis=1, ddof=1))) if pre.shape[0] else float("nan")
     thr = float(cfg.kappa_tr) * sigma_ss
@@ -444,7 +573,7 @@ def decay_start(ss: SSWindows, cfg: WindowConfig = WindowConfig(),
             status.append("few_windows")
             flags.append("ss_group_dropped:%d:%s:few_windows" % (s, pol))
             continue
-        med = np.median(ss.v[idx], axis=0)
+        med = np.median(v[idx], axis=0)
         f = fit(t_ms[fit_sel], med[fit_sel], cfg)
         if not f.ok:
             status.append("fit")
@@ -523,14 +652,19 @@ def subtract_median_response(X: np.ndarray, polarity_is_dep: np.ndarray, sweep_n
 def ss_noise_windows(ss: SSWindows, cfg: WindowConfig = WindowConfig(),
                      fit: Callable[[np.ndarray, np.ndarray, WindowConfig], DecayFit] = fit_decay
                      ) -> SSNoiseWindows:
-    """SPEC 2.2 (a)-(g) in order: the start (decay_start), the kept windows
-    (select_windows), their enlarged parts (enlarged_windows) and the
-    subtraction of each group's median window (subtract_median_response)."""
-    start = decay_start(ss, cfg, fit)
-    kept = select_windows(ss, start.keep)
-    X, j0 = enlarged_windows(kept, start.t_ss_ms)
+    """SPEC 2.2 (a)-(g) in order (D-115): the small groups out (keep_mask),
+    the SS tilt reading on the kept windows at the floor (read_ss_tilts,
+    D-115.2), the start on the windows corrected by (OF1) (decay_start with
+    the reading), the corrected kept windows (remove_tilt_offsets), their
+    enlarged parts (enlarged_windows) and the subtraction of each group's
+    median window (subtract_median_response). `ss` of the result holds the
+    kept windows as stored; `tilts` the reading."""
+    kept = select_windows(ss, keep_mask(ss, cfg))
+    tilts = read_ss_tilts(kept, cfg)
+    start = decay_start(ss, cfg, fit, tilts=tilts)
+    X, j0 = enlarged_windows(remove_tilt_offsets(kept, tilts), start.t_ss_ms)
     X_tilde, _ = subtract_median_response(X, kept.polarity_is_dep, kept.sweep_number)
-    return SSNoiseWindows(start=start, ss=kept, X_tilde=X_tilde, j0=j0)
+    return SSNoiseWindows(start=start, ss=kept, X_tilde=X_tilde, j0=j0, tilts=tilts)
 
 
 # ===========================================================================

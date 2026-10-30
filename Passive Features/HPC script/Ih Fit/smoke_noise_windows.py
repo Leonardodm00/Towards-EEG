@@ -1,10 +1,11 @@
 """
-smoke_noise_windows.py -- smoke suite for noise_windows and noise_cell_stats (W1-W14)
+smoke_noise_windows.py -- smoke suite for noise_windows and noise_cell_stats (W1-W15)
 =====================================================================================
 
 Block 3 of specs/SPEC.md (D-051, D-072, D-073, D-076; the window start and
 the subtraction D-095, D-103, D-104, D-106; the per-sweep tilts D-102,
-D-107). Builds writer-like archive cells in a temporary folder (two SS
+D-107; the tilt offsets removed before the median and the SS tilt read at
+the 80 ms floor, D-115). Builds writer-like archive cells in a temporary folder (two SS
 sweeps of 37 pulses at the real onset period, with an RC pulse response and
 Block-2 noise, eleven pulses dropped by a planted QC table; six Long Square
 sweeps) so that every check has a known answer: the base cell (0.5 s LS
@@ -54,23 +55,34 @@ ls_baseline_qc (pandas); each is reported SKIPPED when its import fails.
       25000 samples after the step with the 1.5 s tail ('ok'), 'tail_short'
       with the 0.5 s tail
   W10 ASCII and LF on noise_windows.py, noise_cell_stats.py and this file
-  W11 SS tilt (TL1): equals the within-polarity closed form (1e-12 mV/s), on
-      the subtracted and the raw windows alike; on the tilted cell within 4
-      exact SDs of each planted tilt; one polarity takes one intercept; two
-      windows give NaN with ss_tilt_none
+  W11 SS tilt (TL1), the reading of D-115.2 (ss_noise_windows' tilts, on the
+      kept windows at the 80 ms floor): equals the within-polarity closed form
+      (1e-12 mV/s), on the floor windows with and without each group's median
+      subtracted alike; on the tilted cell within 4 exact SDs of each planted
+      tilt; one polarity takes one intercept; two windows give NaN with
+      ss_tilt_none
   W12 LS tilt (TL2): equals ls_baseline_qc.baseline_record's delta_end_mV over
       the distance of its window centres (1e-12 mV/s); on the tilted cell
       within 4 exact SDs of each planted tilt; with the 0.5 s tail every tilt
       is NaN with ls_tilt_none:<sweep>:tail_short, as the oracle's flag
   W13 small groups (D-106): sweep 93 with 3 hyp windows: flagged few_windows,
       absent from the kept windows, X_tilde, the statistic vector's K, sweep
-      93's per-sweep vector and its tilt; sigma_SS_hat over the kept windows
+      93's per-sweep vector and its tilt reading; sigma_SS_hat over the kept
+      windows
   W14 [legacy] transient_start (noise-free time exact, floor 80 ms,
       ss_enlarged_none at 190 ms) and subtract_mean_response (zero mean per
       polarity) as at commit 1aabe3e
+  W15 the offsets (D-115): on a noise-free cell without response, with a
+      planted tilt per sweep, read_ss_tilts returns each tilt to 1e-9
+      relative and ss_noise_windows' X_tilde is 0 (1e-12) where the plain
+      subtraction of the uncorrected windows leaves the offsets (> 0.01 mV);
+      on the noisy tilted cell the tilts are read_ss_tilts on the kept
+      windows, the offsets equal an independent loop (1e-15), X_tilde an
+      independent re-implementation (1e-12), the start that of decay_start on
+      the corrected windows; a NaN tilt gives zero offsets
 
 Run:  python smoke_noise_windows.py
-Expected last line: "SMOKE noise_windows: 14/14 passed". Exit 1 on any FAIL.
+Expected last line: "SMOKE noise_windows: 15/15 passed". Exit 1 on any FAIL.
 """
 from __future__ import annotations
 
@@ -94,9 +106,9 @@ sys.path.insert(0, str(HERE))
 import noise_law as nl                                   # noqa: E402
 import noise_stats                                       # noqa: E402
 from noise_windows import (DecayFit, LayoutError, WindowConfig, decay_start, enlarged_windows,  # noqa: E402
-                           fit_decay, load_ls_prewindows, load_ss_windows, ls_segments, measure_period,
-                           profile_decay, select_windows, ss_noise_windows, subtract_mean_response,
-                           subtract_median_response, transient_start)
+                           fit_decay, floor_index, keep_mask, load_ls_prewindows, load_ss_windows, ls_segments,
+                           measure_period, profile_decay, read_ss_tilts, select_windows, ss_noise_windows,
+                           subtract_mean_response, subtract_median_response, tilt_offsets, transient_start)
 from noise_cell_stats import (LS_FULL_LAGS_MS, LS_LAST_LAGS_MS, SS_LAGS_MS, STAT_BLOCK,  # noqa: E402
                               STAT_LABELS, bootstrap_median_se, ls_sweep_tilts, ls_window_stats,
                               per_sweep_vectors, ss_sweep_tilts, ss_window_stats, statistic_vector,
@@ -115,6 +127,7 @@ LS_PRE_N, LS_STEP_N = 13500, 50000  # LS sweep: 270 ms before the step, a 1 s st
 LS_TAIL_N = 25000                  # 0.5 s after the step: the end window starts AT the step's end ('tail_short')
 LS_LONG_TAIL_N = 75000             # 1.5 s after the step: the end window starts 1 s after it ('ok')
 THETA_CF = nl.NoiseLaw(0.0380, 0.175, 0.0508, 0.0366)
+SILENT = nl.NoiseLaw(0.0, 0.5, 0.0, 1.0)      # W15: no noise at all, only the planted tilts
 R_IN_MOHM, TAU_M_MS = 113.0, 28.143
 DROPPED = {92: (2, 3, 11, 13, 20, 29, 36), 93: (0, 5, 6, 27)}   # planted trace-QC drops
 SMALL_KEEP_HYP_93 = (1, 17, 33)                                  # W13: sweep 93 keeps three hyp windows
@@ -122,6 +135,7 @@ SMALL_DROPPED = {92: DROPPED[92],
                  93: tuple(sorted(set(DROPPED[93]) | {p for p in range(1, TRAIN, 2) if p not in SMALL_KEEP_HYP_93}))}
 Z_SE = 3.5
 N_SD = 4.0                         # W11, W12: a planted tilt must lie within 4 exact SDs (two-sided 6e-5)
+T_FLOOR_MS = 80.0                  # W11: the floor of the SS reading (D-115.2, SPEC 2.4), written out here
 
 
 def report(name, ok, note=""):
@@ -646,43 +660,48 @@ def _tl1_exact_sd(ss_kept, j0, m, law=THETA_CF):
 def _w11(d_tilt, truth_tilt):
     ss = load_ss_windows(str(d_tilt))
     nwin = ss_noise_windows(ss)
-    til = ss_sweep_tilts(nwin.X_tilde, nwin.ss, nwin.j0)
+    til = nwin.tilts                                   # the reading of D-115.2
     k = nwin.ss
-    means = nwin.X_tilde.mean(axis=1)
-    centres = (k.position * PERIOD + nwin.j0 + 0.5 * (nwin.m - 1)) * DT
+    jf = PRE_N + int(round(T_FLOOR_MS * 1e-3 * FS))   # independent of noise_windows.floor_index
+    mf = k.n_w - jf
+    ok_jf = floor_index(k.pre_n, FS) == jf
+    Xf = k.v[:, jf:]
+    means = Xf.mean(axis=1)
+    centres = (k.position * PERIOD + jf + 0.5 * (mf - 1)) * DT
     fw = {s: _fw_slope(centres[k.sweep_number == s], means[k.sweep_number == s], k.polarity_is_dep[k.sweep_number == s])
           for s in (92, 93)}
     b = til.as_dict()
     err_fw = max(abs(b[s] - fw[s]) for s in fw)
-    X_raw, _ = enlarged_windows(k, nwin.start.t_ss_ms)
-    b_raw = ss_sweep_tilts(X_raw, k, nwin.j0).as_dict()
-    err_raw = max(abs(b[s] - b_raw[s]) for s in b)
-    sd = _tl1_exact_sd(k, nwin.j0, nwin.m)
+    Xf_sub, _ = subtract_median_response(Xf, k.polarity_is_dep, k.sweep_number)
+    b_sub = ss_sweep_tilts(Xf_sub, k, jf).as_dict()
+    err_sub = max(abs(b[s] - b_sub[s]) for s in b)
+    sd = _tl1_exact_sd(k, jf, mf)
     z = {s: float((b[s] - truth_tilt["ss_tilt"][s]) / sd[s]) for s in b}
     ok_prec = all(abs(v) < N_SD for v in z.values())
     # one polarity: the dep windows only -> one intercept
     dep_only = select_windows(k, k.polarity_is_dep)
-    Xd, _ = enlarged_windows(dep_only, nwin.start.t_ss_ms)
-    Xdt, _ = subtract_median_response(Xd, dep_only.polarity_is_dep, dep_only.sweep_number)
-    b_dep = ss_sweep_tilts(Xdt, dep_only, nwin.j0).as_dict()
-    md = Xdt.mean(axis=1)
-    cd = (dep_only.position * PERIOD + nwin.j0 + 0.5 * (nwin.m - 1)) * DT
+    b_dep = read_ss_tilts(dep_only).as_dict()
+    md = dep_only.v[:, jf:].mean(axis=1)
+    cd = (dep_only.position * PERIOD + jf + 0.5 * (mf - 1)) * DT
     ok_one = all(abs(b_dep[s] - _fw_slope(cd[dep_only.sweep_number == s], md[dep_only.sweep_number == s],
                                           np.ones(int((dep_only.sweep_number == s).sum()), dtype=bool))) < 1e-12
                  for s in b_dep)
     # two windows of a sweep: no more windows than columns -> NaN, flagged
     two = select_windows(k, np.isin(np.arange(k.n_windows), np.flatnonzero(k.sweep_number == 92)[:2])
                          | (k.sweep_number == 93))
-    X2, _ = enlarged_windows(two, nwin.start.t_ss_ms)
-    til2 = ss_sweep_tilts(X2, two, nwin.j0)
+    til2 = read_ss_tilts(two)
     ok_two = np.isnan(til2.as_dict()[92]) and "ss_tilt_none:92" in til2.flags and np.isfinite(til2.as_dict()[93])
-    ok = err_fw < 1e-12 and err_raw < 1e-12 and ok_prec and ok_one and ok_two and np.all(til.se_mV_per_s > 0)
-    report("W11 SS tilt (TL1): = within-polarity closed form; = on the raw windows; within 4 exact SDs of the planted "
-           "tilts; one intercept; two windows -> NaN", ok,
-           "t_SS %.1f ms; b_hat %s vs planted %s mV/s; exact SD %s; z %s; OLS SE %s; |closed form| %.1e, |raw| %.1e"
+    b_xt = ss_sweep_tilts(nwin.X_tilde, k, nwin.j0).as_dict()     # reported: after (OF1) X_tilde holds no tilt
+    ok = (err_fw < 1e-12 and err_sub < 1e-12 and ok_prec and ok_one and ok_two and np.all(til.se_mV_per_s > 0)
+          and ok_jf)
+    report("W11 SS tilt (TL1) at the 80 ms floor (D-115.2): = within-polarity closed form; = after each group's median; "
+           "within 4 exact SDs of the planted tilts; one intercept; two windows -> NaN", ok,
+           "t_SS %.1f ms; b_hat %s vs planted %s mV/s; exact SD %s; z %s; OLS SE %s; |closed form| %.1e, |subtracted| %.1e; "
+           "re-read on X_tilde (no tilt left) %s"
            % (nwin.start.t_ss_ms, {s: round(v, 5) for s, v in b.items()},
               {s: round(v, 5) for s, v in truth_tilt["ss_tilt"].items()}, {s: round(v, 5) for s, v in sd.items()},
-              {s: round(v, 2) for s, v in z.items()}, np.round(til.se_mV_per_s, 5).tolist(), err_fw, err_raw))
+              {s: round(v, 2) for s, v in z.items()}, np.round(til.se_mV_per_s, 5).tolist(), err_fw, err_sub,
+              {s: round(v, 5) for s, v in b_xt.items()}))
 
 
 def _w12(d, d_tilt, truth_tilt):
@@ -785,7 +804,7 @@ def _w13(d_small, truth_small):
     per = per_sweep_vectors(stats, k.sweep_number)
     dep93 = k.sweep_number == 93
     ok_stats = (list(sv.K[:5]) == [k.n_windows] * 5 and np.allclose(per[93], np.median(stats[dep93], axis=0)))
-    til = ss_sweep_tilts(nwin.X_tilde, k, nwin.j0)
+    til = nwin.tilts                                   # the reading of D-115.2, on the kept windows only
     n93 = int(til.n_windows[list(til.sweep_number).index(93)])
     ok_tilt = n93 == int(dep93.sum()) and np.isfinite(til.as_dict()[93])
     report("W13 small groups (D-106): sweep 93 with 3 hyp windows flagged and absent from the kept windows, X_tilde, "
@@ -821,6 +840,61 @@ def _w14(d, truth):
            "t_tr %.0f (expected %.0f) ms; long-response flags %s; max |mean| %.1e" % (tr.t_tr_ms, t_exp, tr_long.flags, zero))
 
 
+def _w15(tmp, d_tilt):
+    """D-115: the SS tilt read at the floor and its offsets removed before the median."""
+    # (a), (b) a noise-free cell without response and a planted tilt per sweep
+    d0 = Path(tmp) / "specimen_900000006"
+    truth0 = write_fixture(d0, np.random.default_rng(17), law=SILENT, with_response=False, sigma_b=0.1,
+                           ls_tail_n=LS_LONG_TAIL_N)
+    ss0 = load_ss_windows(str(d0))
+    kept0 = select_windows(ss0, keep_mask(ss0))
+    b0 = read_ss_tilts(kept0).as_dict()
+    err_a = max(abs(b0[s] / truth0["ss_tilt"][s] - 1.0) for s in b0)
+    nwin0 = ss_noise_windows(ss0)
+    zero_b = float(np.abs(nwin0.X_tilde).max())
+    Xp, _ = enlarged_windows(kept0, nwin0.start.t_ss_ms)
+    Xpt, _ = subtract_median_response(Xp, kept0.polarity_is_dep, kept0.sweep_number)
+    plain_b = float(np.abs(Xpt).max())
+    # (c) the noisy tilted cell against an independent re-implementation
+    ss = load_ss_windows(str(d_tilt))
+    nwin = ss_noise_windows(ss)
+    kept = select_windows(ss, keep_mask(ss))
+    rt = read_ss_tilts(kept)
+    same_tilts = (np.array_equal(nwin.tilts.b_mV_per_s, rt.b_mV_per_s)
+                  and list(nwin.tilts.sweep_number) == list(rt.sweep_number))
+    b = rt.as_dict()
+    off = np.zeros(kept.n_windows)
+    for s_ in b:
+        g = kept.sweep_number == s_
+        tk = kept.position[g] * PERIOD * DT
+        off[g] = b[s_] * (tk - tk.mean())
+    err_off = float(np.abs(tilt_offsets(kept.position, kept.sweep_number, PERIOD, DT, b) - off).max())
+    corr = kept.v - off[:, None]
+    X = corr[:, nwin.j0:]
+    Xt2 = X.copy()
+    for s_ in (92, 93):
+        for p in (True, False):
+            idx = np.flatnonzero((kept.sweep_number == s_) & (kept.polarity_is_dep == p))
+            Xt2[idx] = X[idx] - np.median(X[idx], axis=0)
+    err_xt = float(np.abs(nwin.X_tilde - Xt2).max())
+    st2 = decay_start(replace(kept, v=corr))
+    same_start = (st2.t_ss_ms == nwin.start.t_ss_ms
+                  and np.allclose(st2.tau_ms, nwin.start.tau_ms, rtol=0, atol=1e-9, equal_nan=True)
+                  and np.allclose(st2.A_mV, nwin.start.A_mV, rtol=0, atol=1e-12, equal_nan=True))
+    # (d) a NaN tilt gives zero offsets for its sweep
+    zz = tilt_offsets(kept.position, kept.sweep_number, PERIOD, DT, {92: float("nan"), 93: b[93]})
+    ok_nan = (np.all(zz[kept.sweep_number == 92] == 0.0)
+              and np.allclose(zz[kept.sweep_number == 93], off[kept.sweep_number == 93], rtol=0, atol=1e-15))
+    ok = (err_a < 1e-9 and zero_b < 1e-12 and plain_b > 0.01 and same_tilts and err_off < 1e-15 and err_xt < 1e-12
+          and same_start and ok_nan)
+    report("W15 offsets (D-115): noise-free tilts read exactly, X_tilde 0 (plain subtraction leaves the offsets); "
+           "tilts, offsets, X_tilde and the start equal independent re-implementations; NaN tilt -> zero offsets", ok,
+           "planted %s, |b/b - 1| %.1e; max|X_tilde| %.1e (plain %.3f mV); same tilts %s; |offsets| %.1e; |X_tilde| %.1e; "
+           "same start %s (t_SS %.1f ms); NaN ok %s"
+           % ({s_: round(v, 4) for s_, v in truth0["ss_tilt"].items()}, err_a, zero_b, plain_b, same_tilts, err_off,
+              err_xt, same_start, nwin.start.t_ss_ms, ok_nan))
+
+
 def main():
     rng = np.random.default_rng(20261023)
     with tempfile.TemporaryDirectory() as tmp:
@@ -834,7 +908,7 @@ def main():
         for fn, args in ((_w1, (d, truth)), (_w2, (d, truth)), (_w3, (d, truth)), (_w4, (d, truth)),
                          (_w5, (d, truth)), (_w6, ()), (_w7, (truth,)), (_w8, (d,)), (_w9, (d, d_tilt, truth_tilt)),
                          (_w10, ()), (_w11, (d_tilt, truth_tilt)), (_w12, (d, d_tilt, truth_tilt)),
-                         (_w13, (d_small, truth_small)), (_w14, (d, truth))):
+                         (_w13, (d_small, truth_small)), (_w14, (d, truth)), (_w15, (tmp, d_tilt))):
             try:
                 fn(*args)
             except BaseException as exc:          # SystemExit included (D-010 (iii) lineage)

@@ -12,8 +12,10 @@ data and simulation go through one estimator (D-033). Each sweep's tilt --
 the slow straight-line drift of its baseline -- is read here too: on an SS
 sweep as the least-squares slope of its window means on time (TL1), on an LS
 sweep as the line through its pre-window and end-window means (TL2); the
-twins and the fit's simulator copy these numbers (D-102, D-107). No I/O, no
-plotting here.
+twins and the fit's simulator copy these numbers (D-102, D-107); the SS reading
+(TL1) is defined in noise_windows since 2026-10-30, where the window pipeline
+reads it at the 80 ms floor before the start (D-115), and is re-exported here.
+No I/O, no plotting here.
 
 Units: SDs in mV, autocorrelations dimensionless, tilts in mV/s, the legacy
 semivariogram in mV^2; lags are given in ms and converted to samples by
@@ -27,7 +29,9 @@ from typing import Dict, List, Sequence, Tuple
 import numpy as np
 
 import noise_stats
-from noise_windows import LSWindows, SSWindows, WindowConfig, ls_segments
+from noise_windows import LSWindows, SSWindows, SweepTilts, WindowConfig, ls_segments, ss_sweep_tilts  # noqa: F401
+# SweepTilts and ss_sweep_tilts ((TL1)) live in noise_windows since 2026-10-30 (D-115: the window pipeline reads
+# the SS tilt before the start and removes its offsets); they are re-exported here for the callers of Block 3.
 
 SS_LAGS_MS: Tuple[float, ...] = (0.02, 0.1, 1.0, 10.0)
 LS_FULL_LAGS_MS: Tuple[float, ...] = (0.02, 0.1, 1.0)
@@ -166,53 +170,7 @@ def bootstrap_median_se(per_window: np.ndarray, B: int, rng: np.random.Generator
 # ===========================================================================
 #  The tilt of each sweep (D-102.2: SS, (TL1); D-107.1: LS, (TL2))
 # ===========================================================================
-@dataclass
-class SweepTilts:
-    protocol: str                  # 'ss' | 'ls'
-    sweep_number: np.ndarray       # (S,) int
-    b_mV_per_s: np.ndarray         # (S,) the tilt read on each sweep; NaN when it cannot be read
-    se_mV_per_s: np.ndarray        # (S,) SS: the OLS standard error (a report); LS: NaN
-    n_windows: np.ndarray          # (S,) SS: the sweep's kept windows; LS: 2 (pre and end)
-    flags: Tuple[str, ...]
-
-    def as_dict(self) -> Dict[int, float]:
-        return {int(s): float(b) for s, b in zip(self.sweep_number, self.b_mV_per_s)}
-
-
-def ss_sweep_tilts(X_tilde: np.ndarray, ss: SSWindows, j0: int) -> SweepTilts:
-    """(TL1): per SS sweep, the OLS slope of the window means of X_tilde on
-    the windows' centre times (pos P + j0 + (m - 1) / 2) dt, with one
-    intercept per polarity present (numpy.linalg.lstsq); `ss` holds the kept
-    windows, row for row with X_tilde. NaN and 'ss_tilt_none:<sweep>' when the
-    design's rank is below its column count or the sweep has no more windows
-    than columns. The SE treats the window means as independent (report)."""
-    X = np.asarray(X_tilde, dtype=np.float64)
-    if X.ndim != 2 or X.shape[0] != ss.n_windows:
-        raise ValueError("X_tilde must be (K, m) with K = ss.n_windows = %d" % ss.n_windows)
-    m = X.shape[1]
-    means = X.mean(axis=1)
-    centres = (np.asarray(ss.position, dtype=np.float64) * ss.period_samples + j0 + 0.5 * (m - 1)) * ss.dt
-    sweeps: List[int] = list(dict.fromkeys(int(x) for x in ss.sweep_number))
-    b, se, n_w, flags = [], [], [], []
-    for s in sweeps:
-        g = np.flatnonzero(ss.sweep_number == s)
-        t, y, dep = centres[g], means[g], ss.polarity_is_dep[g]
-        cols = [t - t.mean()] + [(dep == p).astype(np.float64) for p in (True, False) if np.any(dep == p)]
-        D = np.column_stack(cols)
-        n, c = D.shape
-        coef, _, rank, _ = np.linalg.lstsq(D, y, rcond=None)
-        if n <= c or rank < c:
-            b.append(float("nan")); se.append(float("nan")); n_w.append(int(n))
-            flags.append("ss_tilt_none:%d" % s)
-            continue
-        resid = y - D @ coef
-        s2 = float(resid @ resid) / (n - c)
-        b.append(float(coef[0]))
-        se.append(float(np.sqrt(s2 * np.linalg.inv(D.T @ D)[0, 0])))
-        n_w.append(int(n))
-    return SweepTilts(protocol="ss", sweep_number=np.asarray(sweeps, dtype=np.int64),
-                      b_mV_per_s=np.asarray(b, dtype=np.float64), se_mV_per_s=np.asarray(se, dtype=np.float64),
-                      n_windows=np.asarray(n_w, dtype=np.int64), flags=tuple(flags))
+# SweepTilts and ss_sweep_tilts ((TL1), D-102.2 as moved by D-115.2): see noise_windows.
 
 
 def ls_sweep_tilts(ls: LSWindows) -> SweepTilts:
