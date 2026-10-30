@@ -441,14 +441,15 @@ implementation:
     jobs: []
     note: "noise_fit.py; written 2026-10-23 (smoke F1-F10 10/10, ten mutations caught), pushed to main 2026-10-28 (a95e618). D-095: the simulator subtracts the mean of its simulated windows per sweep and polarity (revise mark). Open, the user to answer: the tilt's SD for 2-sweep cells -- per cell, one cohort value, or partial pooling across cells (put to the user 2026-10-23 and 2026-10-26). [answered 2026-10-28, D-102 (user): no tilt SD for the twins -- each twin sweep carries its real sweep's realised tilt; inside the fit the simulator would use the same per-sweep tilts and the tilt's SD would leave the alternation (proposal, open). D-103: the simulator subtracts the per-sweep, per-polarity median of its own windows; F2's expectation becomes a median-subtracted window's. Revise marks D-103, D-102.] [2026-10-29: D-107 (user) -- every simulated sweep, SS and LS, carries its real sweep's tilt in every replicate; the tilt SD, (T1) and the alternation leave the fit. Revise mark D-107.]"
   - id: N4b
-    title: "Block 4b: the per-sweep stage"
-    summary: "For each real sweep, the fast pair and the slow SD estimated on that sweep alone (the slow timescale held at the cell's), the slow SD shrunk towards the cell by the random-effects weight; the laws each twin sweep will carry (D-076 (i))."
+    title: "Block 9 (\"Block 4b\"): the per-sweep stage"
+    summary: "For each real sweep, the fast pair and the slow SD estimated on that sweep alone (the slow timescale held at the cell's, one solve at the cell's weights), the slow SD's sampling variance by a parametric bootstrap, and the slow SD shrunk towards the mean of its protocol's sweeps (SS and LS pooled apart) by the random-effects weight; the laws each twin sweep will carry (D-076 (i), D-116)."
+    block: 9
     parent: G4
     depends_on: [N4]
     needs_theory: [T9]
     needs_hpc: false
     jobs: []
-    note: "noise_sweep_fit.py, named in the Block 4 SPEC entry; added 2026-10-26 under D-082 (every step still to do is on the roadmap with its theory part). No block field: the tool reads integer block numbers, and the SPEC entry gets its number when written."
+    note: "noise_sweep_fit.py, named in the Block 4 SPEC entry; added 2026-10-26 under D-082 (every step still to do is on the roadmap with its theory part). No block field: the tool reads integer block numbers, and the SPEC entry gets its number when written. [2026-10-30: D-116 (user) -- one solve per sweep at the cell's weights, v(c,s) by a parametric bootstrap, DerSimonian-Laird per protocol, a failed sweep out of the pooling with the cell's values. The SPEC entry is written as Block 9 (section 2.5; drafted, no code): 5-8 are held by the later stages. Open, put to the user: the bootstrap's size, the refits' binding size, a failed refit, the reading of 'the cell's values'. Cost on the fixture (dev/2026-10-30_sweep_stage_cost): one solve 0.9 min (SS) or 4.0 min (LS) at M = 3000; the bootstrap at B = 100 about 36 h per 2 SS + 5 LS cell on one core with M = 3000 refits, 13 h with M = 1000.]"
   - id: N5
     title: "Block 5: the generator's law and the per-sweep twins"
     summary: "The OU term and the tilt in synthetic_ground_truth.add_recording_noise, each twin sweep calibrated on its own real sweep (D-073) with the real cell's LS amplitudes and 37-pulse SS sweeps at the stored positions; manifest columns back-filled."
