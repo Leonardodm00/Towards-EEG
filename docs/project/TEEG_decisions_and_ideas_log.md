@@ -142,6 +142,7 @@ the "Binds" column.
 | 2026-10-30 (later, 4) | **D-117**: D-117.6's reading corrected by the assistant before its code (still PROVISIONAL): the cell's $\bar B$, $\hat\mu$ and transform are not compared but go with the reused search, since on the pilot S3's own (Cell 13's at most 18 nodes, Cell 12's automatic alignment) differ from Cell 7's by construction and the first reading would never reuse; the far search under two transforms keeps 15 of 19 chosen, the other 4 the adjacent node of the same stretch **[run, sandbox: `checks/d115_2026-10-30/`]**. Status: D-117.4 at `447473e`, D-117.5 at `4f4263a`, D-117.6 at `ec28988` on `sci/diameter-pipeline` **[run, sandbox]**. |
 | 2026-10-30 (later, 5) | **D-117.3** implemented at `1146494`, with the check that sets $\kappa_{\rm g}$ (PROVISIONAL): 1.2, the 99th percentile of RMS / SD$_{\rm bg}$ over 210 planes of 30 clean thin phantoms; it drops 31 % of the planes of 22 composite phantoms (43 of 105 with the neighbour within 0.8 um) and about half those of clean dips 1-2.5 um wide, which no $\kappa_{\rm g}$ separates from composites; on this morning's pilot scans about 11 of 206 near planes **[run, sandbox: `checks/d115_2026-10-30/`]**. For the user: whether the wide-dip caveat calls for a depth-relative statistic, after Cell 7's next run. |
 | 2026-11-02 | Logs **D-118** (user, 16:38; the diameter calibration chat): S3c's per-cell quota of calibration scans raised from 5 (D-089) to 30 per set; whether the pooled set keeps D-088.3's cap of 30 per set, taken round-robin over the cells, is put to the user (D-118.2). **Renumbering:** the diameter chat's D-115 of 2026-10-30 -- written to the repository copy on `sci/diameter-pipeline` only, project knowledge having refused the write (its tool needs the whole file read in one call) -- collided with the noise-fit chat's D-115 and D-116 of 14:24, which project knowledge holds; it is **D-117** here, its rows relabelled (later, 2) to (later, 5) after the noise-fit chat's (later); the branch's SPEC, code, notebooks, runbook and path map renamed D-115 -> D-117 in the same turn; the commits of 2026-10-30 to 2026-11-02 and the folder `checks/d115_2026-10-30/` keep the old number. Written after merging main's copy (`854004c`, 2026-11-02 13:03) into the branch's, a three-way merge (nothing of either side edited but the renumbering). Next free IDs: D-119, I-005. |
+| 2026-11-02 (later) | **D-118.2** answered (user, the dialog after 16:38; the diameter calibration chat): "Up to 30 from every cell" -- the pool takes at most 30 per set from each cell and keeps every cell's, superseding D-088.3's cap of 30 for the pool; **D-118.3** proposed by the assistant (the pooled SEs resample cells, as the chosen option's text said; Saravanan et al. 2020, full text read), not decided. D-118.1 and D-118.2 implemented at `e6e37b2` (block 19.4). Finding in D-118: the pooled near fit is dense and slow at D-118.2's sizes (59 s per fit at 1000 nodes in the sandbox, its bootstrap 1000 fits); a sparse fit proposed. Next free IDs: D-119, I-005. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -279,7 +280,7 @@ would be needed*, *Status*.
 | D-115 | 2026-10-30 | (D-103.1)'s median window and subtraction; the start (D-103.2, D-110, D-111); D-102.2's SS reading; D-107.2's simulator; Block 3 (`ss_noise_windows`, `decay_start`, the reading and the offsets), Block 4 (`simulate_cell_windows`, `CellLayout`); SPEC §2.2-§2.4; smoke W2, W3, W11, W15, F1, F2, F11 | each kept SS window minus its sweep's tilt offset $\hat b_s(t_k - \bar t_s)$ before the per-sample median, everywhere the median is used; $\hat b_s$ by (TL1) on the kept windows cut at the 80 ms floor, before the start, the only SS reading; the simulator repeats both per replicate [user] | active; implemented 2026-10-30 in Blocks 3-4 |
 | D-116 | 2026-10-30 | D-073 (c), D-076 (i); Block 4b (`noise_sweep_fit.py`, to write); the per-sweep columns; Block 5's per-sweep laws | one solve per sweep at the cell's weights from $\hat\theta(c)$; $v(c,s)$ by a parametric bootstrap (B refits at the sweep's estimate); (D-076.1) per protocol, SS and LS separately; a failed sweep flagged, out of the pooling, its twin at the cell's values [user]; $B$, the refits' cost, the reading of "the cell's values" open | active; Block 4b not written (SPEC drafted 2026-10-30) |
 | D-117 | 2026-10-30 | the calibration verdict's tilt (kept); Cell 7's loop over the kernel law that Blocks 10.S, 15.2 and 15.3 read; a goodness of fit on every scanned plane (10.P, 15.2); 10.A's anchor bootstrap; `meta.nodes`; Block 19.3 on the pilot (Cell 15) | the tilt over +-2 um kept; the law iterated in Cell 7 (at most 3 rounds, one SE), the diagnostic slope fed back; residual-against-noise goodness of fit, near and far; the bootstrap's anchor from G(delta_0) alone; the pilot's values logged; Cell 15 reuses Cell 7's search [user] | active; implementation started |
-| D-118 | 2026-11-02 | `SurveyConfig.calib_scans_per_cell` (Block 19.3; D-089's 5); S3's calibration step on every cell (Cell 15, the davinci array); the pool's cap (Block 19.4, D-088.3) open | the per-cell quota is 30 scans per set [user]; whether the pooled set keeps its cap of 30 per set, open (D-118.2) | active; not implemented |
+| D-118 | 2026-11-02 | `SurveyConfig.calib_scans_per_cell` (Block 19.3; D-089's 5); S3's calibration step on every cell (Cell 15, the davinci array); the pool (Block 19.4; D-088.3's cap of 30 superseded for it) | the per-cell quota is 30 scans per set; the pool takes up to 30 per set from every cell, no cap in all [user]; resampling cells for the pooled SEs proposed (D-118.3) | active; D-118.1-2 implemented at `e6e37b2` |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
@@ -9613,7 +9614,7 @@ checks (`cell7_checks_2026-10-30.zip`, sent to the user).
 ---
 
 
-## D-118 -- S3c's per-cell quota of calibration scans raised from 5 to 30 per set (user); whether the pool keeps its cap of 30 per set, open
+## D-118 -- S3c's per-cell quota of calibration scans raised from 5 to 30 per set, and the pool keeps every cell's scans (user)
 
 **Date:** 2026-11-02, 16:38 (Europe/Rome), the diameter calibration chat, after Cell 15's run on the pilot (5 near and 2
 far scans) and its comparison with Cell 7. **Binds:** `SurveyConfig.calib_scans_per_cell` (SPEC Block 19.3; D-089's
@@ -9621,34 +9622,59 @@ value 5); S3's calibration step on every cell (Cell 15 on the pilot; the davinci
 notebooks' Cell 15 text; the runbook; the array's walltime. Not yet the pool (Block 19.4; D-088.3's cap).
 
 **Decision [user].** "Cell 15 is S3c's per-cell step, tried on the pilot. I would increase the number of nodes per cell
-that contributes to the fit up to 30."
+that contributes to the fit up to 30." Then, 2026-11-02, in the dialog on D-118.2 (options: up to 30 from every cell;
+keep 30 in total, round-robin; 30 on the pilot only): "Up to 30 from every cell (Recommended)" -- the option's text read
+"Pool keeps all scans, up to 30 x N cells per set; supersedes D-088.3's cap; cells comparable one by one; SE should then
+resample cells (my reasoning)".
 
 **Statement.** (D-118.1) The per-cell quota `survey.calib_scans_per_cell` is 30 per set (was 5, D-089): S3's
 calibration step scans a cell's candidates in the seeded order until each set holds 30 scans or the candidates run
-out [user]. Supersedes D-089's per-cell value. (D-118.2) **[open, put to the user]** Whether the pooled set (Block 19.4)
-keeps D-088.3's cap of 30 per set, taken round-robin across the cells -- then each cell contributes about 30 / (the
-number of cells with scans) nodes per set to the pooled fit, and the higher quota changes the pool only where few
-cells contribute, as on the pilot alone -- or takes up to 30 per set from every cell, superseding D-088.3's maximum
-for the pool (the pooled fit then holds up to 30 x the number of cells per set).
+out [user]. Supersedes D-089's per-cell value. (D-118.2) The pooled set (Block 19.4) takes up to 30 per set from every
+cell -- at most `survey.calib_scans_per_cell` from each, in its scan order -- with no cap in all: it holds up to 30 x
+the number of cells per set [user]. Supersedes D-088.3's maximum of 30 per set for the pool; D-088.3's maximum still
+caps Cell 7 (one cell), and its minimum (10 per set) stands. The assistant's readings, PROVISIONAL: the pooled order
+stays the round-robin's; a configuration integer `survey.calib_pool_max_per_set` restores a cap (None by default).
+[originally put to the user as: keep D-088.3's cap of 30 per set, taken round-robin across the cells -- then each cell
+contributes about 30 / (the number of cells) nodes per set -- or take up to 30 per set from every cell.] (D-118.3)
+**[proposed, the assistant's; not decided]** The pooled fit's SEs (10.A's anchor bootstrap, 15.5's far slope) resample
+cells, each drawn cell with all its nodes, instead of nodes: with up to 30 nodes per cell, the nodes of one cell are not
+independent draws of the population's kernel when the blur differs between cells, and resampling nodes then understates
+the SE (the option the user chose said so, flagged as the assistant's reasoning; to specify before code: the one-cell
+case, which keeps the node bootstrap, and a minimum number of cells).
 
 **Why [user; data; run].** Cell 15's five near nodes are a slice of Cell 7's 29 (the same candidates in the same
 seeded order), so its near fit is a noisy subsample: anchor 0.720 +- 0.137 um against Cell 7's 0.562 +- 0.049 um; the
 far slope inherits the gap through the anchor (0.352 against 0.404, 69-78 % of the change from the anchor) **[data
-inspected: the fit files of 2026-11-02; run, sandbox: the comparison's `law_checks.py`]**.
+inspected: the fit files of 2026-11-02; run, sandbox: the comparison's `law_checks.py`]**. (D-118.3) Data nested in
+groups and analysed as independent points give too small an uncertainty; the hierarchical bootstrap, resampling the
+top level (subjects) with replacement and then the units within each, keeps the error rate at its nominal level
+(Saravanan, Berman & Sober 2020, Neurons Behav Data Anal Theory 3(5), PMC7906290) **[PubMed, full text read]**; that
+cells are such groups for the kernel is the assistant's reasoning **[reasoning]**.
 
 **What it implies for code and tables.** `config.SurveyConfig.calib_scans_per_cell` defaults to 30 (SPEC 19.3); the
 notebooks' Cell 15 text and the runbook; on davinci each cell measures pilots until 30 near scans -- Cell 7 measured 84
 near candidates for 30 scans on the pilot, about 22 min of scanning with the far set's 19 in Colab, against 4 min at
 5 -- so the per-cell walltime and the array's time grow; the far set is unchanged on the pilot (all 19 far candidates
-are measured either way, 2 pass). D-118.2 decides whether `pool --what calibration` changes.
+are measured either way, 2 pass). D-118.2 decides whether `pool --what calibration` changes. [updated 2026-11-02,
+later: D-118.2 changes `calibration_pool.pool_scans` (at most `calib_scans_per_cell` per cell, no cap in all) and the
+pooled lines; and it makes the pooled near fit large -- `fit_growth` fits $(c, z_{\rm ax}, G)$ with a dense Jacobian,
+and on synthetic exact scans (7 planes per node) one fit took 0.02 s at 30 nodes, 0.13 s at 100, 1.7 s at 300, 20 s
+at 600 and 59 s at 1000, which 10.A's bootstrap repeats 1000 times: about 16 h at 1000 pooled near nodes against
+`survey_pool.pbs`'s 2 h **[run, sandbox: `time_growth.py`, the diameter calibration chat]**. The assistant proposes a
+sparse Jacobian (scipy `least_squares`, `tr_solver="lsmr"`; the same estimator) before the davinci pool runs the
+calibration; the array's per-cell step is not affected (30 near nodes per fit).]
 
-**What it does not decide.** D-118.2; D-088.3's minimum (10) and the sufficiency rule; whether the pooled fit weights
-the cells (one with 30 near nodes against one with 2); D-117.2 (the loop in Cell 7).
+**What it does not decide.** D-088.3's minimum (10) and the sufficiency rule; whether the pooled fit weights the cells
+(one with 30 near nodes against one with 2); D-118.3 (the SE by cells) and the sparse fit, both proposed; D-117.2 (the
+loop in Cell 7).
 
-**Sources.** **[user]** 2026-11-02, 16:38. **[data inspected; run, sandbox]** the comparison of 2026-11-02 (the
-diameter calibration chat).
+**Sources.** **[user]** 2026-11-02, 16:38, and the dialog that followed. **[data inspected; run, sandbox]** the
+comparison of 2026-11-02 (the diameter calibration chat). **[PubMed, full text]** Saravanan V, Berman GJ, Sober SJ
+(2020), "Application of the hierarchical bootstrap to multi-level data in neuroscience", Neurons Behav Data Anal Theory
+3(5), PMID 33644783, PMC7906290.
 
-**Status:** active; not implemented (the quota is a configuration default; the pool waits on D-118.2).
+**Status:** active. [updated 2026-11-02: D-118.1 and D-118.2 implemented at `e6e37b2` (block 19.4; `test_smoke_s3c.py`
+6 pass, 1 skip, 11 mutants killed; not run on Allen's data); D-118.3 and the sparse fit proposed, not specified]
 
 ---
 
