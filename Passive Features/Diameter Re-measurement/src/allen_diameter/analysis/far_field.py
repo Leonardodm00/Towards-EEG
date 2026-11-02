@@ -186,7 +186,7 @@ def far_plane_scan(patch, node, branch, scene, cfg, keep_images=False):
         w_gl[q] = B_line - I
         sp = float(sigma_r(abs(float(node.z_sub_um) - float(k) * dz), cfg.renderer))
         st = far_plane_statistics(v, I - B_line + B0, B0, sp, m, cal)
-        if st["status"] == STATUS_OK and gof_poor(st["rms_gl"], bsd[q], cfg):      # Block 10.G (D-115.3)
+        if st["status"] == STATUS_OK and gof_poor(st["rms_gl"], bsd[q], cfg):      # Block 10.G (D-117.3)
             st = dict(st, status="poor_fit", omega_um2=np.nan, se_omega_um2=np.nan)
         for name in names:
             if name != "B_bar":

@@ -91,7 +91,7 @@ def cfg_with(base=None, **cal):
 
 def far_cfg(gamma=0.79, noise=False):
     """A reduced far-field configuration for rendering: 12 um patch, +-8 planes, few bootstrap resamples. Without
-    noise the goodness of fit (Block 10.G, D-115.3) is off: the background's noise SD is then the quantization's,
+    noise the goodness of fit (Block 10.G, D-117.3) is off: the background's noise SD is then the quantization's,
     below every core fit's deterministic misfit."""
     base = default_config()
     rc = dataclasses.replace(base.renderer, kernel_continuation_slope=gamma,
@@ -411,7 +411,7 @@ def test_edge_cases():
 # ---------------------------------------------------------------- runner ---
 
 def test_goodness_of_fit():
-    """Block 10.G (D-115.3) on the far scan: one rendered far phantom with the camera's noise, scanned twice from
+    """Block 10.G (D-117.3) on the far scan: one rendered far phantom with the camera's noise, scanned twice from
     the same seed -- as it is, and with the plane at k* + 6 (a plane of the far fit) stubbed to a core-fit RMS above
     the bound: that plane alone is poor_fit, its width NaN, and select_far_planes does not take it."""
     cfg = far_cfg(0.79, noise=True)

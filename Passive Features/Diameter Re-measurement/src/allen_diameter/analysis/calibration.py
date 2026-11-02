@@ -208,7 +208,7 @@ class PlaneScan:
     bhat_gl: Optional[np.ndarray] = None         # (n, n_v) the background along the line
     images: Optional[dict] = field(default=None, compare=False, repr=False)
     stripe: Optional[tuple] = None               # (n,) stripe_support's info per plane (Block 10.S), None under "square"
-    bg_sd_gl: Optional[np.ndarray] = None        # (n,) the background's noise SD on its support (10.G, D-115.3)
+    bg_sd_gl: Optional[np.ndarray] = None        # (n,) the background's noise SD on its support (10.G, D-117.3)
 
     def values(self, statistic):
         if statistic == "gaussian_core_width2":
@@ -286,7 +286,7 @@ def patch_planes(patch, kk, node, branch, scene, cfg, with_sd=False):
     "stripe"; support_masks) and the planar background on it. Returns
     (ks_index (n,) int, -1 when the plane is not in the patch or not valid;
     far (n, H, W) bool; b (n, 3); ok (n,) bool; frame; stripe (n,) tuple of
-    info dicts or None) and, with with_sd (Block 10.G, D-115.3), a 7th value
+    info dicts or None) and, with with_sd (Block 10.G, D-117.3), a 7th value
     sd (n,): the background's noise SD on its support, gl (planar_background's
     return_sd; NaN where no background). Under "stripe" ok also needs the stripe's own ok
     (stripe_min_pixels, stripe_min_side_um); under "square" the far fraction
@@ -314,7 +314,7 @@ def patch_planes(patch, kk, node, branch, scene, cfg, with_sd=False):
 
 
 def gof_poor(rms_gl, bg_sd_gl, cfg):
-    """Block 10.G (D-115.3): True when a plane's core fit is rejected -- calibration.gof_check, both finite, the
+    """Block 10.G (D-117.3): True when a plane's core fit is rejected -- calibration.gof_check, both finite, the
     background's noise SD > 0 and the fit's residual RMS > gof_kappa x that SD."""
     cal = cfg.calibration
     r, sd = float(rms_gl), float(bg_sd_gl)
@@ -382,7 +382,7 @@ def plane_scan(patch, node, branch, scene, cfg, keep_images=False):
             continue
         w_gl[q] = B_line - I
         st = dip_statistics(v, I - B_line + B0, B0, m, cal)
-        if st["status"] == STATUS_OK and gof_poor(st["rms_gl"], bsd[q], cfg):      # Block 10.G (D-115.3)
+        if st["status"] == STATUS_OK and gof_poor(st["rms_gl"], bsd[q], cfg):      # Block 10.G (D-117.3)
             st = dict(st, status="poor_fit", omega_um2=np.nan, se_omega_um2=np.nan, vw_um2=np.nan)
         for name in names:
             if name != "B_bar":
@@ -401,7 +401,7 @@ CALIBRATION_SETS = ("near", "far")      # D-067.4: the near-field (thin) set and
 
 
 def gof_line(scans, cfg):
-    """Block 10.G (D-115.3): the log line of a run's scans -- per set the planes whose core fit ran (ok or
+    """Block 10.G (D-117.3): the log line of a run's scans -- per set the planes whose core fit ran (ok or
     poor_fit), those the goodness of fit dropped and the nodes they belong to; for the near set also the nodes the
     drop leaves below min_planes_per_node finite widths."""
     cal = cfg.calibration
@@ -420,7 +420,7 @@ def gof_line(scans, cfg):
                         <= int(np.isfinite(sc.omega_um2).sum()) + sum(1 for x in sc.status if x == "poor_fit"))
             text += " (%d of them now below %d finite widths)" % (below, cal.min_planes_per_node)
         parts.append(text)
-    return ("goodness of fit (D-115.3: core-fit RMS > %.2f x the background's noise SD on its support): planes dropped "
+    return ("goodness of fit (D-117.3: core-fit RMS > %.2f x the background's noise SD on its support): planes dropped "
             "as poor_fit -- %s" % (cal.gof_kappa, "; ".join(parts)))
 
 
@@ -601,7 +601,7 @@ PILOT_RECORD_FIELDS = ("k_star", "z_sub_um", "cx_um", "cy_um", "theta_rad", "phi
 
 
 def pilot_record(result):
-    """The pilot's values a candidate's verdict read (D-115.5), as a JSON-ready
+    """The pilot's values a candidate's verdict read (D-117.5), as a JSON-ready
     dict with PILOT_RECORD_FIELDS: pilot_view(result)'s fields (the view
     calibration_reasons reads), k_star an int (None when the pilot has no
     sharpest plane: its z_sub_um is not finite, plane_scan's own test, since
@@ -627,7 +627,7 @@ def pilot_record(result):
 
 
 def node_records(out, swc, cfg):
-    """scan_cell's result as the scans file's meta.nodes (Block 19.1; D-115.5):
+    """scan_cell's result as the scans file's meta.nodes (Block 19.1; D-117.5):
     per (node_id, NodeResult or None, PlaneScan or None, reasons) a dict with
     node_id, allen_diameter_um (2 x the SWC radius; None when not finite), set
     (calibration_set), reasons (";"-joined), scanned and pilot
@@ -983,7 +983,7 @@ def anchor_from_growth(growth, cfg, sigma_r0_um=None):
 
 def anchor_value(growth, cfg, sigma_r0_um=None):
     """The anchor (um) read from the growth's knot at delta_0 =
-    cfg.calibration.table_max_delta_um alone (10.A, D-115.4):
+    cfg.calibration.table_max_delta_um alone (10.A, D-117.4):
     (sigma_r(0)^2 + G(delta_0))^(1/2), sigma_r(0) = cfg.renderer.sigma_r0_um
     unless given. Unlike anchor_from_growth, the other knots need not give an
     accepted table. ValueError for a two-sided growth (the renderer's kernel
@@ -1008,7 +1008,7 @@ def bootstrap_sigma0(scans, cfg, rng, sigma_r0_um=None, n_resamples=None):
     D-081.7) -- n_resamples (default cfg.calibration.bootstrap_resamples)
     resamples of the scans with replacement (rng: numpy Generator), each
     refitted by fit_growth and read by anchor_value, from G(delta_0) alone
-    (D-115.4: a table refused at another knot no longer drops a resample); a
+    (D-117.4: a table refused at another knot no longer drops a resample); a
     resample with fewer than two usable nodes, a failed fit or an anchor not
     identified at delta_0 is dropped (n_ok counts the kept ones). se_um is
     NaN below two kept draws."""

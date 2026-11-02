@@ -345,7 +345,7 @@ def test_contract():
 
 
 def _record_and_reuse(tmp, swc):
-    """10.C.R (D-115.6): the record beside each search CSV, the reuse of a search made earlier from the same trace
+    """10.C.R (D-117.6): the record beside each search CSV, the reuse of a search made earlier from the same trace
     under the same settings (whatever B_bar, mu_hat and the transform), and every reason a search is not reused."""
     import hashlib
     import shutil

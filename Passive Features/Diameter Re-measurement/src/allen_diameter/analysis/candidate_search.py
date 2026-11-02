@@ -44,7 +44,7 @@ Analysis only: no file is read or written here, nothing is drawn.
   search(swc, cfg, which, transform, B_bar, mu, log) -> list of records (dict), one per node of the set's range
   choose(records, cfg, which)           -> list of node ids, in the order kept
   summary_line(records, chosen, cfg, which) -> the log line of calibrate_kernel.cell_candidates
-  swc_digest(swc), search_config(cfg)   -> the key a search's record carries (10.C.R, D-115.6, 2026-10-30:
+  swc_digest(swc), search_config(cfg)   -> the key a search's record carries (10.C.R, D-117.6, 2026-10-30:
                                            Cell 15 reuses Cell 7's search when both equal its own)
 
 Pure ASCII (hpc-python-compat).
@@ -69,7 +69,7 @@ SEARCH_CONFIG_SECTIONS = ("acquisition", "calibration", "measure", "renderer")
 
 
 def swc_digest(swc):
-    """SHA-256 (hex) of the trace a search reads (10.C.R, D-115.6): the SWC's ids, types and parent as
+    """SHA-256 (hex) of the trace a search reads (10.C.R, D-117.6): the SWC's ids, types and parent as
     little-endian int64, then xyz and radius as little-endian float64, each preceded by its name and shape; not the
     file's text lines or its path (two copies of one reconstruction digest alike)."""
     h = hashlib.sha256()
@@ -96,7 +96,7 @@ def _plain(x):
 
 
 def search_config(cfg):
-    """The settings a search depends on (10.C.R, D-115.6): the sections SEARCH_CONFIG_SECTIONS of cfg as plain
+    """The settings a search depends on (10.C.R, D-117.6): the sections SEARCH_CONFIG_SECTIONS of cfg as plain
     JSON values (dataclasses.asdict, then _plain)."""
     return {name: _plain(dataclasses.asdict(getattr(cfg, name))) for name in SEARCH_CONFIG_SECTIONS}
 

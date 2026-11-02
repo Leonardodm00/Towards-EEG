@@ -1,4 +1,4 @@
-"""D-115.6 check: does Block 10.C's far search depend on the cell's transform beyond the pixel grid?
+"""D-117.6 check: does Block 10.C's far search depend on the cell's transform beyond the pixel grid?
 
 The far search (candidate_search.search + choose, the pipeline's code) on the pilot 529878215's trace with the pilot
 table's medians as B_bar and mu_hat, under one transform given on the command line. Run twice (Cell 7's design

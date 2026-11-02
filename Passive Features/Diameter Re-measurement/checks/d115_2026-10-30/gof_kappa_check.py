@@ -1,4 +1,4 @@
-"""D-115.3 check: a scanned plane's core-fit residual RMS against its background's noise SD, on rendered phantoms
+"""D-117.3 check: a scanned plane's core-fit residual RMS against its background's noise SD, on rendered phantoms
 with and without a neighbouring dip -- the data to set kappa_g (PROVISIONAL until this check).
 
 Each phantom is drawn as calibrate_kernel.py synthetic draws the near set (d log-uniform on (0.15, 0.25) um, alpha

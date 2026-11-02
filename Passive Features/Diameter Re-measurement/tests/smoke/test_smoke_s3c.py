@@ -237,7 +237,7 @@ def test_contract():
         assert summ["n_near"] == 2 and summ["n_far"] == 0, summ                 # capped at calib_scans_per_cell
         scans, meta = CIO.load_scans(cell.path_of("calibration", "scans_11.json"))
         assert len(scans) == 2 and meta["max_per_set"] == 2 and "set_full" in summ["reasons"], (meta, summ)
-        # D-115.5: meta.nodes carries the pilot's values -- None for a node never measured (set_full), every field for
+        # D-117.5: meta.nodes carries the pilot's values -- None for a node never measured (set_full), every field for
         # a measured one, the scan's own k_star and phi_rad for a scanned one (the file is strict JSON: loaded above)
         recs = meta["nodes"]
         assert recs and all("pilot" in n for n in recs), recs
@@ -273,7 +273,7 @@ def test_contract():
                                                   "mu_hat_per_um", "d_hat_um", "alpha_hat", "fit_status", "flags",
                                                   "reg_verdict"), CAL.PILOT_RECORD_FIELDS
         # node_records on a hand-made scan_cell result: a measured node the verdict rejected keeps its pilot (the point
-        # of D-115.5: its verdict can be recomputed), a set_full node has none, a scanned one is marked
+        # of D-117.5: its verdict can be recomputed), a set_full node has none, a scanned one is marked
         swc_f = SimpleNamespace(ids=np.array([1, 2, 3, 4]), radius=np.array([0.1, 0.1, np.nan, 0.1]))
         res_f = SimpleNamespace(**dict(base, z_sub_um=2.0, k_star=7, phi_rad=0.1))
         out_f = [(1, res_f, None, ["not_flat"]), (2, None, None, ["set_full"]), (3, res_f, None, ["allen_diameter_out"]),
@@ -315,7 +315,7 @@ def test_contract():
         assert {int(n["node_id"]) for n in meta_x["nodes"]} <= chosen, (meta_x["nodes"], chosen)
         assert "11 near search over the cell:" in buf.getvalue() and "11 far search over the cell:" in buf.getvalue(), \
             buf.getvalue()
-        # D-115.6 (10.C.R): run(..., reuse_search=DIR) -- a Cell-7-like folder holding this cell's searches and their
+        # D-117.6 (10.C.R): run(..., reuse_search=DIR) -- a Cell-7-like folder holding this cell's searches and their
         # records -- reaches the step through the Context: the step searches nothing and takes the same candidates
         import shutil
         from allen_diameter.analysis import candidate_search as FS

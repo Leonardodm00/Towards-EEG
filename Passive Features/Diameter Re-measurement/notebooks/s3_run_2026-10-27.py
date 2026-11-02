@@ -435,7 +435,7 @@ display(Image(filename=SURVEY + "/s3b/inputs.png"))
 # `survey_pilot/529878215/calibration/near_search_529878215.csv` and `far_search_529878215.csv`; at most 5 scans per
 # set, as before.
 #
-# [2026-10-30, D-115.6] The step reuses Cell 7's searches (`REUSE`): for each set it first reads Cell 7's
+# [2026-10-30, D-117.6] The step reuses Cell 7's searches (`REUSE`): for each set it first reads Cell 7's
 # `calibration/<set>_search_529878215.csv` and the record beside it (`<set>_search_529878215.json`, which Cell 7 writes
 # from this commit on) and takes that search -- its chosen nodes, made with Cell 7's background and absorption -- when
 # it was made from the same trace under the same settings. Expect, in place of the search lines, `near search reused

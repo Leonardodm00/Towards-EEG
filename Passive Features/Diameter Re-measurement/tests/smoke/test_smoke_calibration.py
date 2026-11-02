@@ -69,7 +69,7 @@ Checks
                         not_faint (only with node_alpha_check, off by
                         default, D-094) under background_support "square"
                         (the stripe's reasons: test_smoke_stripe.py); anchor_from_growth equals the cut table's
-                        last value; [2026-10-30, D-115.4] anchor_value equals it
+                        last value; [2026-10-30, D-117.4] anchor_value equals it
                         on an accepted growth, stays defined when the table is
                         refused at another knot, and the bootstrap keeps every
                         resample when every table is refused; bootstrap_sigma0's SE within 30 % of the
@@ -325,7 +325,7 @@ def test_reference():
     # 1 / 2 / 3 planes (the core width of a mixture of defocus values is narrower than its mean
     # variance, most where sigma_r grows fastest), axis depths within 0.016 um, area ratios
     # 0.976-0.998 (the +-1.5 um window loses the tails of the 3-plane spot)
-    # 2026-10-30 (Block 10.G, D-115.3): the goodness of fit is off here -- on noise-free images the background's
+    # 2026-10-30 (Block 10.G, D-117.3): the goodness of fit is off here -- on noise-free images the background's
     # noise SD is the quantization's, below every core fit's deterministic misfit, so the rule would drop the planes
     base = default_config()
     cfg = dataclasses.replace(base, renderer=dataclasses.replace(base.renderer, noise_sd_gl=0.0, jpeg=False),
@@ -724,7 +724,7 @@ def test_patch_scan():
         reps.append(CAL.anchor_from_growth(CAL.fit_growth(sc_r, cfg), cfg))
     sd = float(np.std(reps, ddof=1))
     assert abs(se / sd - 1.0) <= 0.3, (se, sd)
-    # (d') D-115.4: the bootstrap reads each resample's anchor from G(delta_0) alone. On an accepted growth
+    # (d') D-117.4: the bootstrap reads each resample's anchor from G(delta_0) alone. On an accepted growth
     # anchor_value equals anchor_from_growth (both sqrt(sigma_r(0)^2 + G(0.84)); float64 roundoff only)
     assert abs(CAL.anchor_value(g, cfg) - CAL.anchor_from_growth(g, cfg)) <= 1e-12
     s0sq = cfg.renderer.sigma_r0_um ** 2
@@ -763,7 +763,7 @@ def test_patch_scan():
 # ---------------------------------------------------------------- runner ---
 
 def test_goodness_of_fit():
-    """Block 10.G (D-115.3): the background's noise SD, the rule, a near scan's poor_fit plane, fit_growth, the file."""
+    """Block 10.G (D-117.3): the background's noise SD, the rule, a near scan's poor_fit plane, fit_growth, the file."""
     from allen_image_io import CropFrame
     rng = np.random.default_rng(SEED)
     # (a) planar_background's sd on Gaussian noise of SD 2 gl over a tilted plane, 4800 support pixels: the SD of

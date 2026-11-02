@@ -1,6 +1,6 @@
-# Checks of 2026-10-30 for D-115 (the answers to the Cell 7 report)
+# Checks of 2026-10-30 for D-117 (the answers to the Cell 7 report)
 
-## D-115.6: does Block 10.C's search depend on the cell's transform beyond the sampling grid?
+## D-117.6: does Block 10.C's search depend on the cell's transform beyond the sampling grid?
 
 Why: Cell 15 (S3's calibration step on the pilot) reuses Cell 7's search when both were made from the same trace
 under the same settings (SPEC 10.C.R). The cell's transform is not in the reuse key: S3's alignment of the pilot
@@ -27,7 +27,7 @@ Reading: the transform changes which node of a stretch the spacing rule keeps an
 the pixel and plane grid; it does not change which stretches are chosen. The reused search is Cell 7's, with Cell 7's
 transform, B_bar and mu_hat; each chosen node is measured and judged again on its own pilot in Cell 15.
 
-## D-115.3: the goodness of fit's kappa_g on rendered phantoms (SPEC 10.G)
+## D-117.3: the goodness of fit's kappa_g on rendered phantoms (SPEC 10.G)
 
 Why: a scanned plane is dropped (`poor_fit`) when its core fit's residual RMS exceeds kappa_g times its
 background's noise SD on the support (1.4826 MAD of the support pixels' residuals about the fitted plane). The user

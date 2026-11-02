@@ -147,7 +147,7 @@ def planar_background(plane2d, far, frame, cx, cy, trim_sigmas, min_frac, return
     by (y - cy) through the far pixels of one plane (numpy lstsq), refitted once
     without the pixels whose residual exceeds trim_sigmas x 1.4826 x MAD. ok is
     False (b NaN) when fewer than min_frac of the pixels are far, or fewer than
-    6 remain after trimming. With return_sd (Block 10.G, D-115.3): (b, n_used,
+    6 remain after trimming. With return_sd (Block 10.G, D-117.3): (b, n_used,
     ok, sd), sd = 1.4826 x the MAD of the residuals of every finite far pixel
     (before the trim) about the final plane, gl; NaN when not ok."""
     img = np.asarray(plane2d, dtype=float)

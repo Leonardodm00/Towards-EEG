@@ -267,12 +267,12 @@ def search_name(out_dir, which, specimen):
 
 
 def search_record_name(out_dir, which, specimen):
-    """The record beside a search's CSV (10.C.R, D-115.6): <out_dir>/<which>_search_<specimen>.json."""
+    """The record beside a search's CSV (10.C.R, D-117.6): <out_dir>/<which>_search_<specimen>.json."""
     return os.path.join(out_dir, "%s_search_%s.json" % (which, specimen))
 
 
 def search_key(swc, cfg):
-    """What a search's result depends on and a reuse must find equal (10.C.R, D-115.6): the trace
+    """What a search's result depends on and a reuse must find equal (10.C.R, D-117.6): the trace
     (candidate_search.swc_digest) and the settings (candidate_search.search_config). The cell's typical background
     and absorption and its transform are not in it (they go with the search: the record keeps them)."""
     from allen_diameter.analysis import candidate_search
@@ -289,7 +289,7 @@ def _file_sha256(path):
 
 
 def write_search_record(out_dir, which, specimen, key, B_bar, mu, transform, n_records, n_chosen, reused_from=None):
-    """The record of the search CSV search_name(out_dir, which, specimen), which must exist (10.C.R, D-115.6),
+    """The record of the search CSV search_name(out_dir, which, specimen), which must exist (10.C.R, D-117.6),
     written as strict JSON to search_record_name(out_dir, which, specimen). Returns its path."""
     from allen_diameter.loading import survey_io
     path = search_record_name(out_dir, which, specimen)
@@ -301,7 +301,7 @@ def write_search_record(out_dir, which, specimen, key, B_bar, mu, transform, n_r
 
 
 def reuse_search(reuse_dir, which, specimen, key):
-    """A search of set `which` made earlier for this specimen in reuse_dir (Cell 7's folder; 10.C.R, D-115.6):
+    """A search of set `which` made earlier for this specimen in reuse_dir (Cell 7's folder; 10.C.R, D-117.6):
     (chosen node ids, its record, "") when its CSV and record exist, the record's key equals `key` and the CSV is
     the one the record describes; else (None, the record or None, why)."""
     csv, rec_path = search_name(reuse_dir, which, specimen), search_record_name(reuse_dir, which, specimen)
@@ -341,7 +341,7 @@ def cell_candidates(swc, cfg, transform, table_rows, out_dir, specimen, log=None
     the whole cell from its trace (transform: keyword arguments of cell.to_image_um), the table's medians in S as
     the cell's typical background and absorption -- they replace the table's candidates of that set (not_in_set).
     Every searched set's records go to search_name(out_dir, set, specimen) with a column `chosen`, and its record
-    (10.C.R, D-115.6) to search_record_name(out_dir, set, specimen); log, when given, gets the search's lines.
+    (10.C.R, D-117.6) to search_record_name(out_dir, set, specimen); log, when given, gets the search's lines.
     reuse_dir (S3's step on the pilot, Cell 15: Cell 7's folder): a set's search made there for this specimen from
     the same trace under the same settings (reuse_search) is taken instead of searching -- its chosen ids, its
     CSV and record copied to out_dir, its B_bar, mu_hat and transform printed beside the step's own. Used by
@@ -432,7 +432,7 @@ def run_real(cfg, a):
                                 order_rng=np.random.default_rng([int(cal.calib_order_seed), int(a.specimen)]),
                                 max_per_set=int(cal.calib_max_nodes_per_set), on_node=hook)
     scans = [s for _, _, s, _ in out if s is not None]
-    nodes = calibration.node_records(out, swc, cfg)   # with each measured node's pilot values (D-115.5); strict JSON
+    nodes = calibration.node_records(out, swc, cfg)   # with each measured node's pilot values (D-117.5); strict JSON
     n_near = sum(1 for s in scans if s.set == "near")
     n_far = sum(1 for s in scans if s.set == "far")
     reasons_count = {}
@@ -446,7 +446,7 @@ def run_real(cfg, a):
     print("%d of %d candidates scanned: %d near-field, %d far-field (at most %d each, D-088.3); reasons %s; in %.1f "
           "min -> %s" % (len(scans), len(out), n_near, n_far, cal.calib_max_nodes_per_set, reasons_count,
                          (time.perf_counter() - t0) / 60, a.out))
-    print(calibration.gof_line(scans, cfg), flush=True)              # Block 10.G (D-115.3)
+    print(calibration.gof_line(scans, cfg), flush=True)              # Block 10.G (D-117.3)
     # the example nodes, re-scanned with their patch images (served from the cache)
     records = {}
     for which in calibration.CALIBRATION_SETS:

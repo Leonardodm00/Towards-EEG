@@ -101,7 +101,7 @@ class Context:
     def __init__(self, record, cell, source, reuse_search=None):
         self.record, self.cell, self.source = record, cell, source
         self.sid = cell.sid
-        self.reuse_search = reuse_search or None   # Block 10.C.R (D-115.6): a folder of earlier searches to reuse
+        self.reuse_search = reuse_search or None   # Block 10.C.R (D-117.6): a folder of earlier searches to reuse
         self.data = cell.context()
         self.data.setdefault("selection", {k: record[k] for k in record})
 
@@ -272,7 +272,7 @@ def step_calibration(ctx, cfg):
         transform = cell_alignment.full_transform(ctx.alignment)
     cand = calibrate_kernel.cell_candidates(swc, cfg, transform, rows, os.path.dirname(path), sid,
                                             log=lambda m: print("    %d %s" % (sid, m), flush=True),
-                                            reuse_dir=ctx.reuse_search)       # D-115.6: Cell 15 reuses Cell 7's
+                                            reuse_dir=ctx.reuse_search)       # D-117.6: Cell 15 reuses Cell 7's
     meta = dict(source="survey", specimen=str(sid), n_candidates=len(cand), calibration=dataclasses.asdict(cfg.calibration),
                 max_per_set=int(cfg.survey.calib_scans_per_cell))
     if not cand:
@@ -290,7 +290,7 @@ def step_calibration(ctx, cfg):
     for _, _, _, rs in out:
         for r in rs:
             reasons[r] = reasons.get(r, 0) + 1
-    nodes = calibration.node_records(out, swc, cfg)   # with each measured node's pilot values (D-115.5)
+    nodes = calibration.node_records(out, swc, cfg)   # with each measured node's pilot values (D-117.5)
     calibration_io.save_scans(scans, path, dict(meta, nodes=nodes, reasons_count=reasons))
     return dict(n_candidates=len(cand), n_near=sum(1 for x in scans if x.set == "near"),
                 n_far=sum(1 for x in scans if x.set == "far"), reasons=reasons)
@@ -344,7 +344,7 @@ def run(cfg, selection_path, out_dir, source, steps, cells=None, force=(), inclu
     cell of that 0-based row of the selection, a PBS array task's; exclusive
     with cells; beyond the selection: ValueError. source_for (D-099.2): a
     callable sid -> source used in place of `source` for each cell (a crop
-    cache per cell). reuse_search (Block 10.C.R, D-115.6): a folder whose
+    cache per cell). reuse_search (Block 10.C.R, D-117.6): a folder whose
     candidate searches the calibration step reuses when they were made from
     the cell's trace under the same settings (Cell 15: Cell 7's folder)."""
     unknown = [s for s in list(steps) + list(force) if s not in STEPS]
