@@ -1,0 +1,26 @@
+check_theory_figures.py -- repo /home/claude/dp_branch
+G1  PASS  chord/d at eps 45 deg (alpha = theta = 45 deg), phi 30 deg = 1.26491 (handoff: 1.265)
+G2  PASS  flat branch, eps 10/20/30 deg: 1.0154 / 1.0642 / 1.1547 (handoff: +1.5 / +6 / +15 %)
+G3  PASS  2000 random tubes: max |chord along y_hat / d - 1| = 2.2e-16
+P1  FAIL  (B3.1) by Gauss-Legendre vs FFT convolution (h = 1e-4 um), d 0.3-2 um, alpha 0.3/3/30: max |diff| = 7.5e-05 B
+P1b PASS  alpha 30, d 0.3/2 um: grid error 7.5e-05 (h 1e-4) -> 1.0e-05 (h 2.5e-5), ratio 7.2 (h^1.5: 8); (B3.1) is the converged side
+P2  FAIL  dip area vs (pi d/2)(I1 - L1), scipy double precision: max rel diff 7.2e-05
+P2b PASS  P2 failed by cancellation in I1 - L1 (both ~ e^alpha; 7e-5 at alpha 30); at 40 digits (mpmath): max rel diff 1.1e-15
+P3  PASS  V/d^2: faint 0.062501 (1/16 = 0.0625), opaque 0.083331 (1/12 = 0.083333)
+K1  PASS  six members at w = 0.5 um: max |integral - 1| = 4.4e-16
+K2  PASS  max |FWHM - w| = 2.2e-16 um
+K3  FAIL  Gaussian, Laplace, t4, Cauchy, gennorm(4) vs scipy.stats (scales from FWHM = w): max rel diff 2.8e-03
+K3b PASS  K3 failed on denormal tail values (gennorm(4) at |z| near 3w is ~1e-308); where the reference exceeds 1e-12 of its peak: max rel diff 2.2e-14
+K4  PASS  skewed Gaussian zeta 1.5: right/left half-width = 2.250000000000 (zeta^2 = 2.25)
+K5  PASS  tail exponents at |z| 200-400 um: t4 -5.0000 (-5), Lorentz -2.0000 (-2)
+K6  PASS  against the repository's model/blur_kernels.sgt_kernel_pdf, six members, |z| <= 5 um: max |diff| / peak = 3.9e-16
+L1  PASS  configured table and slope = config.py: (0.0, 0.14, 0.28, 0.42, 0.56, 0.84) / (0.08, 0.086, 0.122, 0.262, 0.438, 0.603) / 0.79
+L2  PASS  pilot near table (0.08, 0.143, 0.384, 0.547) at (0.0, 0.28, 0.56, 0.84), gamma_hat 0.408 [-0.01, 0.83] = the log's 2026-10-30 row
+L3  PASS  anchor SE after D-115.4 = SPEC 10.A: 0.0438 um
+L4  PASS  phantom first stage (alpha 0.1) at d 0.3 / 0.5 um = dark_node_growth.out
+L5  PASS  far scan +-16 planes, far fit |k - k*| >= 5 = SPEC 15.1 / 15.3
+I1  PASS  d_hat = m(1 um) = 1.1500 um -> root 1.000000000000000 um
+I2  PASS  shortcut error (exact, toy) -0.04106
+I3  PASS  Eq. 21: -0.04306 full, -0.04500 first order (mathematics s.3.6: -4.3 %, -4.5 %)
+I4  PASS  MC SD of the inverted d 0.06647 vs tau d*/[b(1+beta)] = 0.06689 (rel -0.006); mean 0.99890 (Jensen gap -0.00110 um)
+21 of 24 PASS

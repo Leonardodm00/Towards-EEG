@@ -1,0 +1,9 @@
+G1: max |exact/closed - 1| = 2.47e-04; crossing spread at the edge = 2.616 (1/cos theta_o = 2.617)  PASS
+W1: edge phase 3.21 rad. NA 1.4, delta 0.3 um: peak 0.422 unrefocused, 0.990 at the best camera refocus. NA 0.1, delta 85.0 um (same edge phase): 0.388 -> 1.0000  FAIL
+    NA 1.4, delta 0.15 um: best-refocus peak 0.997
+    NA 1.4, delta 0.3 um: best-refocus peak 0.990
+    NA 1.4, delta 0.6 um: best-refocus peak 0.961
+    NA 1.4, delta 1.0 um: best-refocus peak 0.894
+W1b: peak >= 0.95 up to 0.6 um: True; first below 0.8 at delta = 1.45 um  PASS
+FAILED: W1 is the original claim; W1b tests the corrected one
+exit 0

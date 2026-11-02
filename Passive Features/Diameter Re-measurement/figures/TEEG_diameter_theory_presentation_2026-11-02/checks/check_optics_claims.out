@@ -1,0 +1,34 @@
+D1: PASS
+D2: PASS
+D3: FAIL
+D3b: PASS
+D4: PASS
+C1: PASS
+C2: PASS
+C3: PASS
+C4: FAIL
+C4b: PASS
+C5: PASS
+C6: FAIL
+C6b: PASS
+  first_zero_um = 0.2396
+  fwhm_um = 0.2021
+  r50_focus_um = 0.1051
+  delta_qw_um = 0.1469
+  fwhm_qw_um = 0.2047
+  core_defined_up_to_um = 0.4200
+  r50_qw_um = 0.1221
+  r50_geo_qw_um = 0.1268
+  strehl_qw = 0.8227
+  delta_equal_geo_focus = 0.1217
+  r50_wave_084 = 0.6850
+  r50_geo_084 = 0.7251
+  ratio_S1 = 3.8007
+  ratio_S075 = 1.9395
+  mu d = 0.5: {'inc_centre': 0.636, 'S1_centre': 0.6346, 'S075_centre': 0.6026, 'S0_centre': 0.615, 'max_inc_minus_S1': 0.0026, 'argmax_inc_minus_S1_um': 0.459, 'max_abs_inc_minus_S075': 0.0334, 'max_abs_inc_minus_S0': 0.0433}
+  mu d = 1.0: {'inc_centre': 0.4124, 'S1_centre': 0.408, 'S075_centre': 0.362, 'S0_centre': 0.3798, 'max_inc_minus_S1': 0.0088, 'argmax_inc_minus_S1_um': -0.4688, 'max_abs_inc_minus_S075': 0.0504, 'max_abs_inc_minus_S0': 0.0712, 'darkfield_resid_rel': 0.026}
+  mu d = 3.0: {'inc_centre': 0.1058, 'S1_centre': 0.0891, 'S075_centre': 0.0453, 'S0_centre': 0.0587, 'max_inc_minus_S1': 0.044, 'argmax_inc_minus_S1_um': 0.4688, 'max_abs_inc_minus_S075': 0.0831, 'max_abs_inc_minus_S0': 0.1543, 'darkfield_resid_rel': 0.0117}
+  mu d = 10.0: {'inc_centre': 0.0518, 'S1_centre': 0.0253, 'S075_centre': 0.0024, 'S0_centre': 0.0004, 'max_inc_minus_S1': 0.1199, 'argmax_inc_minus_S1_um': 0.4883, 'max_abs_inc_minus_S075': 0.1891, 'max_abs_inc_minus_S0': 0.2518}
+  phase: {'1.0': {'focus_005': 0.000125, 'focus_01': 0.000498, 'defocus028_005': 8e-05, 'defocus028_01': 0.000333, 'ratio_focus': 3.999236, 'ratio_defocus': 4.133215}, '0.75': {'focus_005': 0.000176, 'focus_01': 0.000702, 'defocus028_005': 0.007273, 'defocus028_01': 0.014627, 'ratio_focus': 3.999047, 'ratio_defocus': 2.01108}}
+FAILED: ['D3', 'C4', 'C6'] (D3, C4, C6 are the original claims; see D3b, C4b, C6b for the corrected ones)
+exit 0
