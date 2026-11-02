@@ -413,14 +413,14 @@ display(Image(filename=SURVEY + "/s3b/inputs.png"))
 
 # %% [markdown]
 # ## Cell 15: S3c on the pilot -- the kernel calibration step and the pool on one cell (Block 19)
-# The pilot's calibration candidates among Cell 13's nodes, scanned in a seeded order, at most 5 per set (D-089.6); then
-# the pool over this one cell: per set the scans taken (up to 30, at least 10 for a production kernel) and Cell 7's fit,
+# The pilot's calibration candidates among Cell 13's nodes, scanned in a seeded order, at most 5 per set (D-089.6; 30 from 2026-11-02, D-118.1); then
+# the pool over this one cell: per set the scans taken (up to 30; from 2026-11-02 up to 30 per cell, D-118.2; at least 10 for a production kernel) and Cell 7's fit,
 # far-fit and figures on them. With 18 nodes a set is usually `INSUFFICIENT` (fewer than 10 scans): the cell checks the
 # step and the pool; the pooled kernel across cells is the davinci run's (`survey_pool.pbs`, `s3c/`), and Cell 7 remains
 # the pilot's full calibration (D-088.2).
 #
 # Expect `[1/1] 529878215 calibration: n candidates: a near-field, b far-field scans; ...`, then `pooled near field: k of
-# n scans taken (at most 30) from 1 cells {...} -- sufficient` or `INSUFFICIENT`, the same for the far field, the fit and
+# n scans taken (at most 30 per cell) from 1 cells {...} -- sufficient` or `INSUFFICIENT`, the same for the far field, the fit and
 # far-fit reports when a set is sufficient, and `pool calibration -> .../survey_pilot/s3c`.
 #
 # Send back: the `calibration:` line and the pooled lines.
@@ -444,6 +444,15 @@ display(Image(filename=SURVEY + "/s3b/inputs.png"))
 # after a line saying why: `no record ...` (Cell 7's files of 2026-10-30 have none: run Cell 7 again first, or let this
 # cell search), `the CSV changed since its record`, `another trace`, `other settings: ...` (a knob changed since
 # Cell 7). `REUSE = []` searches anyway.
+#
+# [2026-11-02, D-118] Up to 30 scans per set from each cell (was 5, D-089), and the pool keeps every cell's scans: no
+# cap of 30 in all (D-088.3's, superseded for the pool). After pulling this commit set `REDO = ["--force",
+# "calibration"]` once: the step's marker holds the run of 5 per set. With Cell 7's searches reused the step takes Cell
+# 7's candidates in Cell 7's seeded order, so expect about Cell 7's near set (29 nodes in its fit of 2026-11-02, anchor
+# 0.562 +- 0.049 um) and its 2 far scans: `pooled near field: k of n scans taken (at most 30 per cell) from 1 cells
+# {...} -- sufficient`, the far field `INSUFFICIENT` (2 < 10: no production kernel), and about 22 min of scanning, as in
+# Cell 7 (84 near candidates measured for its 30 near scans). Where the near set differs from Cell 7's, compare first
+# the two transforms of the `reused from` lines: Cell 7 scans with its own shift, this step with Cell 12's alignment.
 
 # %%
 import json

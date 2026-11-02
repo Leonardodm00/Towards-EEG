@@ -3,10 +3,15 @@ cells -- Block 19 in specs/SPEC.md (D-088; 2026-10-26).
 
 Checks
     test_known_answer   the round-robin pool of three cells' hand-made scans
-                        (near 3, 1, 2; far 0, 4, 4) at a cap of 4: each
+                        (near 3, 1, 2; far 0, 4, 4) at a pool cap of 4: each
                         cell's first, then each one's second; the qualified
-                        ids s x 10^6 + n; sufficiency at 9 and 10 nodes
+                        ids s x 10^6 + n; sufficiency at 9 and 10 nodes;
+                        D-118: at the defaults (30 per cell, no pool cap)
+                        every scan, in the round-robin order; at 2 per cell
+                        each cell's first two
     test_reference      the pool equals an independent re-implementation
+                        (a sort by depth and cell) over per-cell caps 1, 2,
+                        30 and pool caps None, 1, 3, 4, 30
     test_convergence    not a discretisation: skipped
     test_invariants     the cells' order in the input changes nothing; two
                         cells sharing a node id give two nodes
@@ -84,24 +89,25 @@ def cells3():
                  fake_scan(23, "far")])]
 
 
-def capped(cap, min_nodes=2):
+def capped(cap, min_nodes=2, per_cell=30):
+    """The pool's cap (None: none, D-118.2), the per-cell cap and the minimum."""
     cfg = default_config()
-    return dataclasses.replace(cfg, calibration=dataclasses.replace(cfg.calibration, calib_max_nodes_per_set=cap,
-                                                                    calib_min_nodes_per_set=min_nodes))
+    return dataclasses.replace(cfg, calibration=dataclasses.replace(cfg.calibration, calib_min_nodes_per_set=min_nodes),
+                               survey=dataclasses.replace(cfg.survey, calib_pool_max_per_set=cap,
+                                                          calib_scans_per_cell=per_cell))
 
 
-def independent_pool(per_cell, cap):
+def independent_pool(per_cell, cap, per_cell_cap=30):
+    """Written apart from the module: every allowed scan keyed by (depth in its cell, specimen), sorted, cut at
+    the cap -- the round-robin's order without its loop."""
     out = []
     for which in ("near", "far"):
-        lists = [(s, [x for x in sc if x.set == which]) for s, sc in sorted(per_cell, key=lambda c: c[0])]
-        k = 0
-        took = []
-        while len(took) < min(cap, sum(len(x) for _, x in lists)):
-            for s, xs in lists:
-                if k < len(xs) and len(took) < cap:
-                    took.append(s * 10 ** 6 + xs[k].node_id)
-            k += 1
-        out += took
+        keyed = []
+        for s, sc in per_cell:
+            xs = [x for x in sc if x.set == which][:per_cell_cap]
+            keyed += [(depth, s, s * 10 ** 6 + x.node_id) for depth, x in enumerate(xs)]
+        keyed.sort()
+        out += [q for _, _, q in (keyed if cap is None else keyed[:cap])]
     return out
 
 
@@ -120,12 +126,32 @@ def test_known_answer():
     d = default_config()
     assert CP.sufficiency(9, d)["sufficient"] is False and CP.sufficiency(10, d)["sufficient"] is True
     assert CP.sufficiency(10, d)["min_nodes"] == 10 and CP.sufficiency(10, d)["max_nodes"] == 30
+    assert meta["sets"]["near"]["max_nodes"] == 4 and meta["sets"]["near"]["max_per_cell"] == 30, meta["sets"]["near"]
+    # D-118.2: at the defaults -- 30 per cell, no pool cap -- every scan, in the round-robin order
+    assert d.survey.calib_scans_per_cell == 30 and d.survey.calib_pool_max_per_set is None
+    pooled, meta = CP.pool_scans(cells3(), d)
+    near = [s.node_id for s in pooled if s.set == "near"]
+    far = [s.node_id for s in pooled if s.set == "far"]
+    assert near == [1000007, 2000001, 3000001, 2000005, 3000002, 3000003], near
+    assert far == [1000010, 2000020, 1000011, 2000021, 1000012, 2000022, 1000013, 2000023], far
+    m = meta["sets"]["near"]
+    assert (m["taken"], m["available"], m["max_nodes"], m["max_per_cell"]) == (6, 6, None, 30), m
+    assert meta["sets"]["far"]["by_cell"] == {"1": 4, "2": 4}, meta["sets"]["far"]["by_cell"]
+    # D-118.1: at most 2 per cell, no pool cap -- each cell's first two
+    pooled, meta = CP.pool_scans(cells3(), capped(None, per_cell=2))
+    near = [s.node_id for s in pooled if s.set == "near"]
+    far = [s.node_id for s in pooled if s.set == "far"]
+    assert near == [1000007, 2000001, 3000001, 2000005, 3000002], near
+    assert far == [1000010, 2000020, 1000011, 2000021], far
+    assert meta["sets"]["near"]["available"] == 6 and meta["sets"]["near"]["taken"] == 5
+    assert meta["sets"]["near"]["by_cell"] == {"1": 1, "2": 2, "3": 2}, meta["sets"]["near"]["by_cell"]
 
 
 def test_reference():
-    for cap in (1, 3, 4, 30):
-        pooled, _ = CP.pool_scans(cells3(), capped(cap))
-        assert [s.node_id for s in pooled] == independent_pool(cells3(), cap), cap
+    for per_cell in (1, 2, 30):
+        for cap in (None, 1, 3, 4, 30):
+            pooled, _ = CP.pool_scans(cells3(), capped(cap, per_cell=per_cell))
+            assert [s.node_id for s in pooled] == independent_pool(cells3(), cap, per_cell), (per_cell, cap)
 
 
 def test_convergence():
@@ -290,6 +316,9 @@ def test_contract():
             meta_p, done = SC.pool_calibration(cfg_s, out_dir, sel, log=logs.append)
         assert done["fit"] and not done["far_fit"], (done, logs[-5:])
         assert meta_p["sets"]["near"]["taken"] == 2 and not meta_p["sets"]["near"]["sufficient"]
+        # D-118: the pooled line names the per-cell cap and no pool cap
+        assert any(ln.startswith("pooled near field: 2 of 2 scans taken (at most 2 per cell) from 1 cells")
+                   for ln in logs), [ln for ln in logs if ln.startswith("pooled")]
         cal = CIO.load_calibration(os.path.join(out_dir, "s3c", "calibration_pooled.json"))
         assert cal["meta"]["sufficiency"]["sufficient"] is False and cal["meta"]["sufficiency"]["n_nodes"] == 2
         assert "INSUFFICIENT: 2 near-field nodes < 10" in buf.getvalue(), buf.getvalue()
@@ -421,12 +450,14 @@ def test_edge_cases():
         except ValueError:
             continue
         raise AssertionError("calibration %s must be refused" % bad)
-    try:
-        dataclasses.replace(d, survey=dataclasses.replace(d.survey, calib_scans_per_cell=0)).validate()
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("calib_scans_per_cell 0 must be refused")
+    for bad in (dict(calib_scans_per_cell=0), dict(calib_pool_max_per_set=0), dict(calib_pool_max_per_set=30.0),
+                dict(calib_pool_max_per_set=True)):
+        try:
+            dataclasses.replace(d, survey=dataclasses.replace(d.survey, **bad)).validate()
+        except ValueError:
+            continue
+        raise AssertionError("survey %s must be refused" % bad)
+    dataclasses.replace(d, survey=dataclasses.replace(d.survey, calib_pool_max_per_set=30)).validate()   # D-088.3's
 
 
 # ---------------------------------------------------------------- runner ---

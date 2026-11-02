@@ -4,7 +4,9 @@ on PlaneScan lists; nothing here reads or writes a file.
 
   QUALIFIER    the factor of a qualified node id, q = specimen_id x QUALIFIER + node_id
   qualify      a cell's scans with their node ids qualified by the specimen
-  pool_scans   per set, the cells' scans taken round-robin over the cells up to the cap
+  pool_scans   per set, the cells' scans taken round-robin over the cells: at most
+               survey.calib_scans_per_cell from a cell (D-118.1), and every cell's unless
+               survey.calib_pool_max_per_set caps the set (D-118.2; D-088.3's 30 when set)
   sufficiency  whether a set holds the minimum number of nodes (D-088.3)
   cell_of      the specimen and SWC node of a (qualified) node id (Block 19.5)
 
@@ -52,19 +54,27 @@ def sufficiency(n_nodes, cfg):
 def pool_scans(per_cell, cfg):
     """Block 19.4: per_cell = [(specimen_id, scans in the cell's scan order)].
     Per set, the cells in increasing specimen id, round-robin -- each cell's
-    first scan of the set, then each one's second -- up to
-    calib_max_nodes_per_set. Returns (pooled scans with qualified ids, meta:
-    per set the counts by cell, the sufficiency, and the id map)."""
-    cap = int(cfg.calibration.calib_max_nodes_per_set)
+    first scan of the set, then each one's second -- with at most
+    survey.calib_scans_per_cell scans from a cell (D-118.1) and, when
+    survey.calib_pool_max_per_set is an integer M, at most M in all (D-088.3's
+    rule at M = 30); None takes every cell's (D-118.2). Returns (pooled scans
+    with qualified ids, meta: per set the counts by cell, the caps, the
+    sufficiency, and the id map)."""
+    per_cell_cap = int(cfg.survey.calib_scans_per_cell)
+    pool_cap = cfg.survey.calib_pool_max_per_set
     cells = sorted((int(s), list(sc)) for s, sc in per_cell)
     pooled, meta = [], dict(sets={}, id_map={})
     for which in ("near", "far"):
         lists = [(s, [x for x in sc if x.set == which]) for s, sc in cells]
-        taken, depth = [], 0
         n_avail = sum(len(x) for _, x in lists)
-        while len(taken) < min(cap, n_avail):
+        lists = [(s, xs[:per_cell_cap]) for s, xs in lists]
+        n_allowed = sum(len(x) for _, x in lists)
+        if pool_cap is not None:
+            n_allowed = min(n_allowed, int(pool_cap))
+        taken, depth = [], 0
+        while len(taken) < n_allowed:
             for s, xs in lists:
-                if depth < len(xs) and len(taken) < cap:
+                if depth < len(xs) and len(taken) < n_allowed:
                     taken.append((s, xs[depth]))
             depth += 1
         by_cell = {}
@@ -73,6 +83,7 @@ def pool_scans(per_cell, cfg):
             pooled.append(q)
             meta["id_map"][str(q.node_id)] = [s, int(sc.node_id)]
             by_cell[str(s)] = by_cell.get(str(s), 0) + 1
-        meta["sets"][which] = dict(available=n_avail, taken=len(taken), by_cell=by_cell,
-                                   **sufficiency(len(taken), cfg))
+        info = dict(available=n_avail, taken=len(taken), by_cell=by_cell, **sufficiency(len(taken), cfg))
+        info.update(max_nodes=None if pool_cap is None else int(pool_cap), max_per_cell=per_cell_cap)
+        meta["sets"][which] = info
     return pooled, meta

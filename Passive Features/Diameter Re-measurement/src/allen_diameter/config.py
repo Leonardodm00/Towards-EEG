@@ -36,7 +36,7 @@ import hashlib
 import json
 import math
 from dataclasses import dataclass, field, fields
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 # ----------------------------------------------------------------- choices --
 # Named alternatives. The first entry of each tuple is the deliverable
@@ -360,7 +360,8 @@ class SurveyConfig:
     registration_min_nodes: int = 10         # source: D-085.8 [user]: list_stretches' suggestion, nodes a stretch needs
     inputs_z0_flag_um: float = 1.0           # source: D-089 [user, the assistant's default confirmed]: a cell whose median dz* exceeds this (um) is flagged z0
     # Block 19, S3c (D-088)
-    calib_scans_per_cell: int = 5            # source: D-089 [user, the assistant's default confirmed]: per cell and set, the scans S3c's step takes before the pooled round-robin
+    calib_scans_per_cell: int = 30           # source: D-118.1 [user] (was 5, D-089): per cell and set, the scans S3c's step takes, and the most the pool takes from a cell
+    calib_pool_max_per_set: Optional[int] = None  # source: D-118.2 [user]: no cap on the pooled set (every cell's scans); an integer M restores the round-robin's cap of M (D-088.3: 30)
 
 
 @dataclass(frozen=True)
@@ -533,9 +534,12 @@ class DiameterConfig:
             raise ValueError("survey: nodes_mode in %s, nodes_per_bin >= 1, increasing positive bin edges, "
                              "0 < coverage_pass_share <= 1, coverage_min_nodes >= 1, 0 <= phantom quantiles "
                              "increasing <= 1 (Block 17, D-085.4-5)" % (NODES_MODES,))
-        if not (1 <= cal.calib_min_nodes_per_set <= cal.calib_max_nodes_per_set and sv.calib_scans_per_cell >= 1):
+        pm = sv.calib_pool_max_per_set
+        if not (1 <= cal.calib_min_nodes_per_set <= cal.calib_max_nodes_per_set and sv.calib_scans_per_cell >= 1
+                and (pm is None or (isinstance(pm, int) and not isinstance(pm, bool) and pm >= 1))):
             raise ValueError("calibration: 1 <= calib_min_nodes_per_set <= calib_max_nodes_per_set; survey: "
-                             "calib_scans_per_cell >= 1 (Block 19, D-088.3)")
+                             "calib_scans_per_cell >= 1, calib_pool_max_per_set None or an integer >= 1 "
+                             "(Block 19, D-088.3, D-118)")
         if not (sv.registration_per_type >= 1 and sv.registration_min_nodes >= 2 and sv.inputs_z0_flag_um > 0):
             raise ValueError("survey: registration_per_type >= 1, registration_min_nodes >= 2, inputs_z0_flag_um > 0 "
                              "(Block 18, D-085.8)")

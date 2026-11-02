@@ -37,7 +37,7 @@ Steps (in their order)
                 trace (Block 10.C, D-112; the per-node CSV gives the typical
                 background and absorption, and the candidates of a set whose
                 calibration.<set>_candidates is "table"), a seeded order, at
-                most survey.calib_scans_per_cell per set (D-088):
+                most survey.calib_scans_per_cell per set (D-088; 30, D-118.1):
                 <sid>/calibration/scans_<sid>.json, <set>_search_<sid>.csv
 
 Example (Colab, after Cell 11; on davinci scripts/pbs/survey_cells.pbs runs one cell per array task with
@@ -600,8 +600,9 @@ def pool_inputs(cfg, out_dir, selection_path="", log=print):
 
 
 def pool_calibration(cfg, out_dir, selection_path="", log=print):
-    """Block 19.4: the cells' scans pooled round-robin up to the cap per set, then Block 10's fit, Block 15's
-    far-fit and the figures on the pooled scans: one kernel (D-088.1)."""
+    """Block 19.4: the cells' scans pooled round-robin, at most survey.calib_scans_per_cell from a cell and every
+    cell's unless survey.calib_pool_max_per_set caps a set (D-118), then Block 10's fit, Block 15's far-fit and the
+    figures on the pooled scans: one kernel (D-088.1)."""
     import argparse as _ap
     import calibrate_kernel
     from allen_diameter.analysis import calibration_pool
@@ -619,8 +620,9 @@ def pool_calibration(cfg, out_dir, selection_path="", log=print):
     calibration_io.save_scans(pooled, sp, dict(meta, source="pooled", cells=[s for s, _ in per_cell]))
     for which in ("near", "far"):
         m = meta["sets"][which]
-        log("pooled %s field: %d of %d scans taken (at most %d) from %d cells %s -- %s" % (
-            which, m["taken"], m["available"], m["max_nodes"], len(m["by_cell"]), m["by_cell"],
+        cap = "" if m["max_nodes"] is None else ", at most %d in all" % m["max_nodes"]
+        log("pooled %s field: %d of %d scans taken (at most %d per cell%s) from %d cells %s -- %s" % (
+            which, m["taken"], m["available"], m["max_per_cell"], cap, len(m["by_cell"]), m["by_cell"],
             "sufficient" if m["sufficient"] else "INSUFFICIENT (< %d, D-088.3)" % m["min_nodes"]))
     done = dict(fit=False, far_fit=False)
     for name, call in (("fit", lambda: calibrate_kernel.run_fit(cfg, sp, cp)),
