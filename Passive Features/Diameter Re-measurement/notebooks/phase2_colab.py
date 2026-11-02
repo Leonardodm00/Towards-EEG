@@ -1338,6 +1338,8 @@ display(Image(filename=SURVEY + "/s3b/inputs.png"))
 # Cell 7). `REUSE = []` searches anyway.
 import json
 SURVEY = OUT + "/survey_pilot"
+if not os.path.exists(SURVEY + "/selection.csv"):      # Cell 11 writes it (and the folder)
+    raise FileNotFoundError("Cell 15 needs the pilot's selection %s/selection.csv: run Cell 11 first" % SURVEY)
 CFG_S3 = SURVEY + "/survey_config.json"     # Cell 13's (node mode, the pilot's nodes per bin); written if Cell 13 did not run
 if not os.path.exists(CFG_S3):
     with open(CFG_S3, "w") as f:
