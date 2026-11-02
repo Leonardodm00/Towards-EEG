@@ -246,6 +246,7 @@ Not code: nothing below is imported by the pipeline or runs in a job.
 | `dev/2026-10-29_start_noise/` | how Block 3's window start (D-103, D-104) behaves on noisy cells: each group's point value scatters by about 18 ms, so the maximum over groups sends most cells to the 80 ms fallback; four alternatives compared (the median over groups, a linear term, a pooled fit) |
 | `dev/2026-10-30_offsets_and_fit/` | the checks behind two explanations of 2026-10-30: how a sweep's tilt degrades the per-sample median window and what removing each window's tilt offset first does (a proposal, not decided) [decided 2026-10-30 (later): D-115, implemented in Blocks 3-4]; the exact decay fit of D-110 on 1200 simulated groups, with the figure of its profile RSS(tau) |
 | `dev/2026-10-30_sweep_stage_cost/` | the cost and precision of the per-sweep stage (SPEC Block 9, "Block 4b", D-116) measured on Block 4's smoke fixture with Block 4's functions: one solve per sweep, the bootstrap at B = 50-200, and how much the refits' binding size and the binding seed move the linearised v(c, s) |
+| `dev/2026-11-02_bootstrap_explained/` | the check behind the explanation of the per-sweep bootstrap (2026-11-02): how the bootstrap size B moves the shrunk sigma_s of the pooling (barely: B = 50 is within 0.16 percentage points of v known), and what one refit stuck at a bound does to v |
 
 The project's own documents (the decision log, the noise-model topic document, the staged plan, the
 living handoff) are copied under `docs/project/` at the repository root.

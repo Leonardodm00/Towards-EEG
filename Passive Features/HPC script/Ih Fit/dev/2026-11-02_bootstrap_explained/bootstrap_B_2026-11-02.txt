@@ -1,0 +1,24 @@
+A  SD(v_hat)/v of the sample variance of B normal values (Monte Carlo, 200000 sets) against sqrt(2/(B-1))
+   B =  20   Monte Carlo 0.3247   formula 0.3244
+   B =  50   Monte Carlo 0.2017   formula 0.2020
+   B = 100   Monte Carlo 0.1417   formula 0.1421
+   B = 200   Monte Carlo 0.1004   formula 0.1003
+B  RMS error of the shrunk log sigma_s against the truth (x 100, log units; 40000 cells per row)
+   protocol  k   tau   raw     B=20    B=50    B=100   B=200   v known
+   SS        2  0.00    6.73    5.55    5.52    5.51    5.50    5.50
+   SS        2  0.05    6.79    6.11    6.09    6.08    6.07    6.07
+   SS        2  0.10    6.79    6.63    6.61    6.61    6.60    6.60
+   SS        2  0.20    6.78    6.94    6.93    6.92    6.92    6.92
+   SS       10  0.00    6.77    3.00    2.85    2.79    2.77    2.75
+   SS       10  0.05    6.79    4.84    4.78    4.77    4.76    4.75
+   SS       10  0.10    6.79    6.07    6.04    6.03    6.02    6.01
+   SS       10  0.20    6.79    6.60    6.58    6.57    6.57    6.56
+   LS        5  0.00   16.17    9.41    9.17    9.09    9.06    9.01
+   LS        5  0.05   16.12   10.16    9.94    9.87    9.83    9.80
+   LS        5  0.10   16.09   11.85   11.69   11.64   11.62   11.59
+   LS        5  0.20   16.13   14.50   14.42   14.39   14.37   14.36
+C  one refit stuck at the lower bound of sigma_s (log 1e-4 mV) among B, kept in v (mean over 20000 bootstraps)
+   SS B =  50: v with the stuck refit 0.781 against 0.0046 without (x 170)
+   SS B = 100: v with the stuck refit 0.393 against 0.0046 without (x 85)
+   LS B =  50: v with the stuck refit 0.802 against 0.0260 without (x 31)
+   LS B = 100: v with the stuck refit 0.414 against 0.0260 without (x 16)
