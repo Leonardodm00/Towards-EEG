@@ -3,6 +3,7 @@
 | Date | Change |
 |---|---|
 | 2026-11-03 | Created by the noise-fit chat at the user's request, for the chat that will build the presentation deck on the optimisation of the passive + I_h model of human pyramidal cells. Status read from the roadmap (`roadmap.py status` at `854004c`); passive and I_h facts gathered from the documents and code named in §9 and spot-checked against them this session (numbers marked); nine figures made (§8). Lives in the repository (`Passive Features/HPC script/Ih Fit/docs/`), because project knowledge has been full since 2026-10-28 (`docs/project/README.md`): the write of a copy to project knowledge `claude/deck_pack/` was refused on 2026-11-03 (the project is over its maximum size). |
+| 2026-11-03 (later) | The nine figures redesigned at the user's request ("much more visually appealing"): one script, `make_figures.py` v2, now builds all nine as HTML/CSS slides with SVG charts; the Mermaid sources are removed. §8: regenerate command corrected, fig01's kind, and a note on what v2 adds (numbers re-checked against §2-§6 and the code named there; the new 36 % / 64 % variance split computed this session). |
 
 **Basis tags.** **[src]** read from source code or a repository document this session; **[run]** executed this
 session; **[KB]** project knowledge, full text; **[log]** the decision log's text (`docs/project/TEEG_decisions_and_ideas_log.md`);
@@ -250,12 +251,16 @@ Verification facts for an "engineering" slide: the Stage-0 regression gate passe
 ## 8. Figures for the deck (`Ih Fit/docs/deck_passive_ih_2026-11-03/figures/`)
 
 Raw URL pattern (public repository): `https://raw.githubusercontent.com/Leonardodm00/Towards-EEG/main/Passive%20Features/HPC%20script/Ih%20Fit/docs/deck_passive_ih_2026-11-03/figures/<file>`.
-Regenerate: `python scripts/make_figures.py --status <roadmap status json>` (plotted ones) and
-`mmdc -i scripts/<name>.mmd -o figures/<name>.png -w 2000 -b white -s 1.5 -C scripts/_mermaid.css` (diagrams).
+Regenerate all nine (v2): `python scripts/make_figures.py --status <roadmap status json>` (about 15 s; numpy,
+Playwright's Chromium and the Inter font; `--only 4,7` for some). Each figure is a 1920 x 1080 slide rendered at 2x
+(3840 x 2160 PNG); the charts are drawn as SVG from the same numbers as v1, following the dataviz rules (thin marks,
+text in ink, legend plus direct labels). [corrected 2026-11-03 (later): v1 built fig02-04, 06, 07 with matplotlib and
+fig01, 05, 08, 09 with `mmdc -i scripts/<name>.mmd ... -C scripts/_mermaid.css`; the user asked for much more visually
+appealing figures, and v2 replaced both pipelines and removed the Mermaid sources.]
 
 | File | Kind | The one claim it shows | Source of what is drawn |
 |---|---|---|---|
-| `fig01_pipeline_status.png` | schematic (Mermaid), status colours of the roadmap | the chain archive -> passive fit -> I_h fitter + noise fit -> gate -> campaign, and what is done / tested / pushed / planned | roadmap at `854004c` |
+| `fig01_pipeline_status.png` | schematic, status colours of the roadmap | the chain archive -> passive fit -> I_h fitter + noise fit -> gate -> campaign, and what is done / tested / pushed / planned | roadmap at `854004c` |
 | `fig02_roadmap_board.png` | plotted from data | every implementation stage and theory topic with its state | `roadmap.py status --json` at `854004c` |
 | `fig03_model_parameters.png` | schematic, not to scale | the cable model, where $F$ applies, and the six parameters with units, coordinates and boxes | `param_spec.py`; AR1 §3.2, §7.2 |
 | `fig04_ih_kinetics.png` | plotted from formulas | the three published curves disagree at rest; the fitted knobs' boxes around the human base | `human_ih_params.py` [run] |
@@ -264,6 +269,13 @@ Regenerate: `python scripts/make_figures.py --status <roadmap status json>` (plo
 | `fig07_noise_law.png` | plotted (simulated) | the law's autocovariance (fast vs slow) and one simulated sweep with a tilt | `noise_law.py` at $\theta_{\rm cf}$ [run] |
 | `fig08_noise_fit.png` | schematic | the per-cell indirect-inference loop and the per-sweep stage to the twins | SPEC §2.2-2.5 |
 | `fig09_recovery_gate.png` | schematic | the Stage-7 design: truths, controls, arms, errors, proposed tolerances, outcomes | `run_ih_recovery.py`, `ih_recovery_report.py`, D-011, D-083 |
+
+v2 keeps each figure's claim and adds, from the sources already listed: fig03 the four formula rows (membrane, spines,
+I_h kinetics, rest balance; §2.1 and §4) and a drawn neuron (I_h halo, spines beyond 60 $\mu$m, electrode); fig05 the gate's
+rules in their order (`_classify_fit`, guide §8) and the I_h arms' held-out bundles (§4); fig07 the split of the lag-0
+variance, 36 % fast and 64 % slow, computed from $\theta_{\rm cf}$ **[run]**; fig08 schematic SS and LS sweeps with
+their windows (SPEC §2.2, §2.4); fig09 the passive truth ranges in their boxes, the rejection draw of
+$(C_m, R_m)$ on $\tau_m$ (`synth_gt_grid.py`) and each arm's parameter count (§4).
 
 Existing figures in the repository (exist; not re-inspected for this handoff unless marked):
 
