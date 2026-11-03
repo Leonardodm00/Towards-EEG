@@ -238,6 +238,7 @@ Not code: nothing below is imported by the pipeline or runs in a job.
 |---|---|
 | `docs/TEEG_noise_fit_handoff_2026-10-28.md` | the noise-fit chat's current handoff (D-095 to implement; the user's open answers): read first in a new chat on the noise fit |
 | `docs/TEEG_Stage7_noise_study_handoff_2026-10-06.md`, `docs/TEEG_acf_textbook_implementation_handoff_2026-10-07.md` | earlier handoffs of the same thread |
+| `docs/TEEG_deck_handoff_passive_ih_2026-11-03.md`, `docs/deck_passive_ih_2026-11-03/` | the handoff for the chat that builds the deck on the passive + I_h optimisation (status, theory, implementation, numbers with sources, what not to claim), its nine figures and the scripts that make them (2026-11-03) |
 | `dev/2026-10-16_covariance_weighting/` | D-048's handoff, its checks, and the study document on the bias of a statistic |
 | `dev/2026-10-26_tilt_sigma_b/` | the study document on the per-sweep tilt and its SD sigma_b(c), with figures and checks |
 | `dev/2026-10-28_window_start/` | the checks behind the explanations of the transient test and of sigma_SS_hat, and behind D-095 |

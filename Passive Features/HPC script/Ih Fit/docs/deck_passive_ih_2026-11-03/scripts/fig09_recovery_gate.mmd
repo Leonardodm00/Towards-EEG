@@ -1,0 +1,17 @@
+%%{init: {"theme": "base", "fontFamily": "Inter, DejaVu Sans, Arial, sans-serif", "themeVariables": {"fontSize": "17px", "fontFamily": "Inter, DejaVu Sans, Arial, sans-serif", "lineColor": "#52514e", "primaryTextColor": "#0b0b0b", "clusterBkg": "#fafaf8", "clusterBorder": "#c9c8c3", "edgeLabelBackground": "#ffffff"}, "flowchart": {"curve": "basis", "nodeSpacing": 28, "rankSpacing": 46, "htmlLabels": true, "wrappingWidth": 360}}}%%
+flowchart LR
+  M1["L3_exc archive morphologies<br/>raw SWCs, F = 1.9"]:::neutral --> MAN["manifest of truths, up to 20 twins<br/>passive: C_m 0.4-1.5 uF/cm2, tau_m 3-40 ms,<br/>R_a 100-500 Ohm cm<br/>I_h: g_h log-U[2e-5, 3e-4] S/cm2,<br/>dv_h U[-5, 5] mV, kappa_tau log-U[0.7, 1.4]<br/>every 4th twin: no I_h (false-positive control)"]:::key
+  NZ["each twin sweep: its real sweep's fitted noise and tilt,<br/>and the real cell's own protocol (D-083)<br/>noise fit Blocks 9, 5-7: <i>planned</i>"]:::planned --> GEN
+  MAN --> GEN["generate the twins<br/>as Phase-0 archives"]:::neutral
+  GEN --> FIT["fit every twin in 4 arms through run_ih_fit:<br/>baseline_runB, passive_fullstep, ih4, ih6<br/>200 GP calls (100 initial)"]:::neutral
+  FIT --> ERR["errors eps_i(c): log ratio for C_m, R_m, R_a,<br/>g_h, kappa_tau; mV for dv_h; rails counted"]:::neutral
+  ERR --> V["<b>gate on ih6</b> (tolerances proposed, not agreed)<br/>median abs eps &lt;= log 1.25 for C_m and g_h<br/>&lt;= 3 mV for dv_h, &lt;= log 1.5 for kappa_tau<br/>&gt;= 80 % of the controls rail g_h at the low bound"]:::key
+  V -- "pass" --> S8["Stage 8 campaign"]:::planned
+  V -- "fail" --> FX["freeze the failing kinetic knob;<br/>a failing C_m or g_h: change the protocol"]:::neutral
+  classDef done fill:#2d9a3d,color:#ffffff,stroke:#1f6e2b,stroke-width:1px;
+  classDef tested fill:#2a9d8f,color:#ffffff,stroke:#1d6f65,stroke-width:1px;
+  classDef pushed fill:#e9c46a,color:#1a1a1a,stroke:#b8963c,stroke-width:1px;
+  classDef planned fill:#d62828,color:#ffffff,stroke:#9c1c1c,stroke-width:1px;
+  classDef ext fill:#ffffff,color:#52514e,stroke:#8a8984,stroke-width:1px,stroke-dasharray:4 3;
+  classDef neutral fill:#f4f3f0,color:#0b0b0b,stroke:#8a8984,stroke-width:1px;
+  classDef key fill:#ffffff,color:#0b0b0b,stroke:#2a78d6,stroke-width:2px;

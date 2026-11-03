@@ -1,0 +1,22 @@
+%%{init: {"theme": "base", "fontFamily": "Inter, DejaVu Sans, Arial, sans-serif", "themeVariables": {"fontSize": "17px", "fontFamily": "Inter, DejaVu Sans, Arial, sans-serif", "lineColor": "#52514e", "primaryTextColor": "#0b0b0b", "clusterBkg": "#fafaf8", "clusterBorder": "#c9c8c3", "edgeLabelBackground": "#ffffff"}, "flowchart": {"curve": "basis", "nodeSpacing": 28, "rankSpacing": 46, "htmlLabels": true, "wrappingWidth": 360}}}%%
+flowchart LR
+  subgraph DATA["One real cell (Phase-0 archive)"]
+    SS["SS pulses, hyperpolarising, averaged per polarity<br/>scored on 0.5-100 ms, weight exp(-(t - 0.5 ms) / 5 ms)"]:::neutral
+    LS["LS steps (1 s)<br/>run B: 2 smallest, first 60 ms<br/>I_h arms: h2 ... h(n-1), whole step"]:::neutral
+  end
+  TH["trial parameters theta<br/>3 passive, or 6 with I_h"]:::key --> SIM["NEURON simulation of the reconstructed cell<br/>I_h arms: e_pas re-balanced so V_rest stays stationary"]:::neutral
+  SIM --> LOSS["loss L(theta) = mean over bundles b of RMSD_b / D_b<br/>D_b = the bundle's peak deflection"]:::key
+  SS --> LOSS
+  LS --> LOSS
+  LOSS --> GP["skopt gp_minimize: GP surrogate + acquisition<br/>run B 100 calls (50 initial); I_h arms 200 (100)"]:::neutral
+  GP -- "next theta" --> TH
+  GP --> HAT["theta_hat"]:::key
+  HAT --> GATE["absolute-mV gate on held-out bundles<br/>good / to_refine / failed"]:::neutral
+  HAT --> P3["Phase 3: bootstrap, B = 200 (intervals)<br/>+ profile (identifiability check)"]:::neutral
+  classDef done fill:#2d9a3d,color:#ffffff,stroke:#1f6e2b,stroke-width:1px;
+  classDef tested fill:#2a9d8f,color:#ffffff,stroke:#1d6f65,stroke-width:1px;
+  classDef pushed fill:#e9c46a,color:#1a1a1a,stroke:#b8963c,stroke-width:1px;
+  classDef planned fill:#d62828,color:#ffffff,stroke:#9c1c1c,stroke-width:1px;
+  classDef ext fill:#ffffff,color:#52514e,stroke:#8a8984,stroke-width:1px,stroke-dasharray:4 3;
+  classDef neutral fill:#f4f3f0,color:#0b0b0b,stroke:#8a8984,stroke-width:1px;
+  classDef key fill:#ffffff,color:#0b0b0b,stroke:#2a78d6,stroke-width:2px;
