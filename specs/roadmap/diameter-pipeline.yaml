@@ -198,6 +198,17 @@ theory:
     status: open
     closed_on:
     decision:
+  - id: T11
+    title: "Bootstrap uncertainty of the pooled kernel on nested data"
+    summary: "Why the pooled kernel's error bars (the anchor sigma_0 and the far slope gamma) come from a bootstrap, and why it resamples cells, not nodes: nodes nested in cells (the one-way random-intercept model, the design effect 1 + (n-1) rho, the between/within ANOVA split), the node bootstrap's blind spot and the cell bootstrap's few-cell bias (chi2_{C-1}/C); the rule of Block 19.6 (D-118.3)."
+    refs: [D-081.7, D-118.3, "SPEC 19.6", "checks/d118_2026-11-04"]
+    parent: TG3
+    depends_on: []
+    affects: [I10, I15, I19]
+    status: studying
+    closed_on:
+    decision:
+    note: "Material (2026-11-04, the diameter calibration chat): why we bootstrap; why nested data understate uncertainty (the design effect); why few cells break the cell bootstrap (chi2_{C-1}/C); the one-way random-intercept model, the between/within split (MS_W, MS_B) and why MS_B carries n; the checks sent in the chat (bootstrap_nested_features.py, variance_components_check.py, anova_identity_check.py, ms_between_*.py) and checks/d118_2026-11-04/cluster_bootstrap_check.py."
 implementation:
   # ---- groups (no block of their own; coloured by their least advanced member)
   - id: G1
