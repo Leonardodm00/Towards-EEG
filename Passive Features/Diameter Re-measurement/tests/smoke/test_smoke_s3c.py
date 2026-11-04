@@ -25,6 +25,12 @@ Checks
                         calibration and pool --what calibration end to end
                         on the synthetic cell
     test_determinism    the pool twice gives identical files
+    test_cell_bootstrap 2026-11-04 (19.6, D-118.3): the plan (node / larger /
+                        cell by the number of cells); a cell resample is whole
+                        cells, a node resample the old draw; the cell SE of
+                        the anchor above the node SE when cells differ, near
+                        it when they do not; "larger" at 5 cells; the far
+                        side's own plan and t_(C-1); determinism; refusals
     test_edge_cases     no scans in a set; a cell without candidates; a
                         node id beyond the qualifier refused; the
                         configuration's refusals
@@ -323,6 +329,9 @@ def test_contract():
         assert cal["meta"]["sufficiency"]["sufficient"] is False and cal["meta"]["sufficiency"]["n_nodes"] == 2
         assert "INSUFFICIENT: 2 near-field nodes < 10" in buf.getvalue(), buf.getvalue()
         assert all(n // CP.QUALIFIER == 11 for n in cal["growth"]["node_ids"]), cal["growth"]["node_ids"]
+        boot = cal["anchor"]["bootstrap"]                                    # 19.6 (D-118.3): one cell, nodes
+        assert boot["rule"] == "node" and boot["unit"] == "node" and boot["n_cells"] == 1, boot
+        assert boot["few_cells"] is False and boot["se_cell"] is None, boot
         assert os.path.exists(os.path.join(out_dir, "s3c", "figures", "width_by_plane_near.png"))
         # the step with Block 10.C's search (D-112, the default): the candidates are the search's chosen nodes, its
         # records in the cell's calibration folder, its lines printed; no table candidate is used
@@ -458,6 +467,121 @@ def test_edge_cases():
             continue
         raise AssertionError("survey %s must be refused" % bad)
     dataclasses.replace(d, survey=dataclasses.replace(d.survey, calib_pool_max_per_set=30)).validate()   # D-088.3's
+
+
+def near_cells(n_cells, n_per, scale_sd, rng, noise=0.003):
+    """Near scans of n_cells cells x n_per nodes, qualified ids s x 10^6 + n: omega = c + a_s 0.3 (z_ax - z_k)^2 +
+    noise, the cell's own growth scale a_s ~ N(1, scale_sd^2) (one blur per cell); 7 planes, z_ax in +- dz/2."""
+    dz = default_config().acquisition.dz_um
+    ks = np.arange(-3, 4)
+    out = []
+    for s in range(1, n_cells + 1):
+        a = 1.0 + scale_sd * rng.normal()
+        for n in range(n_per):
+            z_ax = rng.uniform(-0.5, 0.5) * dz
+            om = rng.uniform(0.02, 0.06) + a * 0.3 * (z_ax - ks * dz) ** 2 + rng.normal(0.0, noise, ks.size)
+            m = ks.size
+            out.append(CAL.PlaneScan(node_id=s * CP.QUALIFIER + n, d_hat_um=0.4, phi_rad=0.0, alpha_hat=0.2, k_star=0,
+                                     z_sub_um=z_ax, ks=ks, z_um=ks * dz, omega_um2=om, vw_um2=om.copy(),
+                                     area_gl_um=np.full(m, 5.0), depth_gl=np.full(m, 20.0), B_bar=np.full(m, 200.0),
+                                     status=tuple("ok" for _ in range(m)), set="near"))
+    return out
+
+
+def test_cell_bootstrap():
+    d = default_config()
+    assert d.calibration.bootstrap_unit == "cell" and d.calibration.bootstrap_cell_min == 10
+    q = lambda cells, per=3: [s * CP.QUALIFIER + n for s in range(1, cells + 1) for n in range(per)]
+    # (a) the plan
+    assert CAL.bootstrap_plan(list(range(20)), d) == ("node", 1)                  # one cell's own (unqualified) ids
+    assert CAL.bootstrap_plan(q(1), d) == ("node", 1)
+    assert CAL.bootstrap_plan(q(5), d) == ("larger", 5) and CAL.bootstrap_plan(q(9), d) == ("larger", 9)
+    assert CAL.bootstrap_plan(q(10), d) == ("cell", 10) and CAL.bootstrap_plan(q(12), d) == ("cell", 12)
+    d_node = dataclasses.replace(d, calibration=dataclasses.replace(d.calibration, bootstrap_unit="node"))
+    assert CAL.bootstrap_plan(q(12), d_node) == ("node", 12)
+    d_min4 = dataclasses.replace(d, calibration=dataclasses.replace(d.calibration, bootstrap_cell_min=4))
+    assert CAL.bootstrap_plan(q(3), d_min4) == ("larger", 3) and CAL.bootstrap_plan(q(4), d_min4) == ("cell", 4)
+    assert list(CAL.node_cells([7, 2000005, 2000001, 3000004])) == [-1, 2, 2, 3]
+    # (a') a cell resample is whole cells, each in its order; a node resample is the node bootstrap's old draw
+    cells = np.array([3, 3, 1, 1, 1, 2, 3])
+    members = {lab: list(np.flatnonzero(cells == lab)) for lab in (1, 2, 3)}
+    rng = np.random.default_rng(5)
+    for _ in range(50):
+        r = list(CAL.resample(cells, rng, "cell"))
+        pos, runs = 0, 0
+        while pos < len(r):
+            lab = int(cells[r[pos]])
+            assert r[pos:pos + len(members[lab])] == members[lab], (r, pos, lab)
+            pos += len(members[lab])
+            runs += 1
+        assert runs == 3, r
+    r1 = CAL.resample(cells, np.random.default_rng(9), "node")
+    assert np.array_equal(r1, np.random.default_rng(9).integers(0, cells.size, cells.size)), r1
+    # (b) reference: cells that differ in blur -> the cell SE well above the node SE; one blur -> close
+    rng = np.random.default_rng(SEED)
+    scans_diff = near_cells(12, 8, 0.3, rng)
+    scans_same = near_cells(12, 8, 0.0, rng)
+    for scans, low, high in ((scans_diff, 1.3, np.inf), (scans_same, 1.0 / 1.6, 1.6)):
+        cell = CAL.anchor_se(scans, d, np.random.default_rng(1), n_resamples=150)
+        node = CAL.anchor_se(scans, d_node, np.random.default_rng(1), n_resamples=150)
+        assert cell["rule"] == "cell" and cell["unit"] == "cell" and cell["n_cells"] == 12 and node["unit"] == "node"
+        ratio = cell["se"] / node["se"]
+        assert low <= ratio <= high, (low, ratio, high, cell["se"], node["se"])
+    # a one-cell set: the plan's node SE equals the old node bootstrap's for the same seed
+    one = [dataclasses.replace(sc, node_id=int(sc.node_id) % CP.QUALIFIER + 100 * i) for i, sc in
+           enumerate(scans_same[:20])]
+    se_old, ok_old, _ = CAL.bootstrap_sigma0(one, d, np.random.default_rng(3), n_resamples=40)
+    plan_one = CAL.anchor_se(one, d, np.random.default_rng(3), n_resamples=40)
+    assert plan_one["rule"] == "node" and plan_one["se"] == se_old and plan_one["n_ok"] == ok_old, (plan_one, se_old)
+    # (c) "larger" at 5 cells: both run, the larger reported and flagged
+    five = scans_diff[:40]
+    lg = CAL.anchor_se(five, d, np.random.default_rng(2), n_resamples=80)
+    assert lg["rule"] == "larger" and lg["few_cells"] is True and lg["n_cells"] == 5, lg
+    assert lg["se_node"] is not None and lg["se_cell"] is not None and lg["n_ok_node"] and lg["n_ok_cell"], lg
+    assert lg["se"] == max(lg["se_node"], lg["se_cell"]) and lg["unit"] == ("cell" if lg["se_cell"] >= lg["se_node"]
+                                                                           else "node"), lg
+    # the larger's node SE is the node bootstrap's from the same generator, before the cell one
+    se_n_alone, _, _ = CAL.bootstrap_sigma0(five, d, np.random.default_rng(2), n_resamples=80)
+    assert lg["se_node"] == se_n_alone, (lg["se_node"], se_n_alone)
+    # (c') the far side: its own cells; under the cell unit the interval uses t_(C-1)
+    from allen_diameter.analysis import far_field as FF
+    cfg_f = dataclasses.replace(d, calibration=dataclasses.replace(d.calibration, calib_min_nodes_per_set=2))
+    frng = np.random.default_rng(11)
+    gam = {s: 0.79 + 0.1 * frng.normal() for s in range(1, 11)}         # one slope per cell: the SEs are not 0
+    far = [dataclasses.replace(far_scan(1, cfg_f, gam[s], 0.6, frng), node_id=s * CP.QUALIFIER + n)
+           for s in range(1, 11) for n in range(2)]
+    sel = FF.select_far_planes(far, cfg_f)
+    assert sel.node_ids.size == 20, sel.node_ids
+    assert CAL.bootstrap_plan(sel.node_ids, cfg_f) == ("cell", 10)
+    fb = FF.gamma_se(sel, 0.6, cfg_f, np.random.default_rng(4), n_resamples=12)
+    assert fb["rule"] == "cell" and fb["unit"] == "cell" and fb["n_cells"] == 10, fb
+    se_fc, _, _ = FF.bootstrap_gamma(sel, 0.6, cfg_f, np.random.default_rng(4), n_resamples=12, unit="cell")
+    se_fn, _, _ = FF.bootstrap_gamma(sel, 0.6, cfg_f, np.random.default_rng(4), n_resamples=12, unit="node")
+    assert fb["se"] == se_fc and se_fc != se_fn, (fb["se"], se_fc, se_fn)      # the plan ran the cell bootstrap
+    fit = FF.fit_far_slope(sel, 0.6, cfg_f)
+    summ = FF.far_fit_summary(sel, fit, None, None, fb["se"], fb["n_ok"], 0.0, 0.6, 0.01, cfg_f, seed=4, boot=fb)
+    from scipy import stats
+    assert summ["t_df"] == 9 and abs(summ["t_quantile"] - stats.t.ppf(0.975, 9)) < 1e-12, summ["t_df"]
+    assert summ["bootstrap"]["unit"] == "cell" and summ["bootstrap"]["n_cells"] == 10
+    summ_n = FF.far_fit_summary(sel, fit, None, None, fb["se"], fb["n_ok"], 0.0, 0.6, 0.01, cfg_f, seed=4)
+    assert summ_n["t_df"] == 19 and summ_n["bootstrap"] is None, summ_n["t_df"]
+    # (e) determinism
+    a1 = CAL.anchor_se(five, d, np.random.default_rng(8), n_resamples=30)
+    a2 = CAL.anchor_se(five, d, np.random.default_rng(8), n_resamples=30)
+    assert a1 == a2, (a1, a2)
+    # (f) refusals
+    for bad in (dict(bootstrap_cell_min=1), dict(bootstrap_cell_min=10.0), dict(bootstrap_unit="both")):
+        try:
+            dataclasses.replace(d, calibration=dataclasses.replace(d.calibration, **bad)).validate()
+        except ValueError:
+            continue
+        raise AssertionError("calibration %s must be refused" % bad)
+    try:
+        CAL.resample(cells, np.random.default_rng(0), "sweep")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("an unknown resampling unit must be refused")
 
 
 # ---------------------------------------------------------------- runner ---

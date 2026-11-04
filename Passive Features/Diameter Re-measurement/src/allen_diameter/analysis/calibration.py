@@ -1025,7 +1025,80 @@ def anchor_value(growth, cfg, sigma_r0_um=None):
     return math.sqrt(s2)
 
 
-def bootstrap_sigma0(scans, cfg, rng, sigma_r0_um=None, n_resamples=None):
+def node_cells(node_ids):
+    """Block 19.6 (D-118.3): the cell of each node id -- the specimen of a pooled
+    file's qualified id (calibration_pool.cell_of), -1 for an unqualified id
+    (one cell's own file, Cell 7). Returns an int array."""
+    from .calibration_pool import cell_of
+    return np.array([-1 if cell_of(int(q))[0] is None else int(cell_of(int(q))[0]) for q in node_ids], dtype=int)
+
+
+def bootstrap_plan(node_ids, cfg):
+    """Block 19.6 (D-118.3): (rule, n_cells) -- "node" with bootstrap_unit
+    "node" or one cell; "cell" from bootstrap_cell_min cells; "larger" (both
+    bootstraps, the larger SE reported, flagged few cells) in between."""
+    n_cells = int(np.unique(node_cells(node_ids)).size)
+    cal = cfg.calibration
+    if cal.bootstrap_unit == "node" or n_cells < 2:
+        return "node", n_cells
+    return ("cell" if n_cells >= int(cal.bootstrap_cell_min) else "larger"), n_cells
+
+
+def resample(cells, rng, unit):
+    """Block 19.6: the indices of one bootstrap resample of n = len(cells)
+    nodes -- "node": rng.integers(0, n, n) (the node bootstrap's draw); "cell":
+    C draws of the C cells (increasing label) with replacement, each drawn
+    cell contributing all its indices in their order."""
+    cells = np.asarray(cells)
+    n = int(cells.size)
+    if unit == "node":
+        return rng.integers(0, n, n)
+    if unit != "cell":
+        raise ValueError("resample: unit must be 'node' or 'cell', got %r" % (unit,))
+    labels = np.unique(cells)
+    members = [np.flatnonzero(cells == lab) for lab in labels]
+    pick = rng.integers(0, labels.size, labels.size)
+    return np.concatenate([members[k] for k in pick])
+
+
+def pick_se(rule, n_cells, se_node, ok_node, se_cell, ok_cell):
+    """Block 19.6: the record of a planned bootstrap -- the SE reported (for
+    "larger" the larger finite one of the two, the other when one is NaN),
+    the unit it came from, and both runs."""
+    if rule == "node":
+        unit = "node"
+    elif rule == "cell":
+        unit = "cell"
+    elif not math.isfinite(se_cell):
+        unit = "node"
+    elif not math.isfinite(se_node):
+        unit = "cell"
+    else:
+        unit = "cell" if se_cell >= se_node else "node"
+    se, n_ok = (se_node, ok_node) if unit == "node" else (se_cell, ok_cell)
+    num = (lambda x: None if x is None or not math.isfinite(float(x)) else float(x))
+    return dict(se=float(se), n_ok=int(n_ok), rule=rule, unit=unit, n_cells=int(n_cells), few_cells=rule == "larger",
+                se_node=num(se_node), se_cell=num(se_cell),
+                n_ok_node=None if ok_node is None else int(ok_node), n_ok_cell=None if ok_cell is None else int(ok_cell))
+
+
+def anchor_se(scans, cfg, rng, sigma_r0_um=None, n_resamples=None):
+    """Block 19.6 (D-118.3): the anchor's SE by bootstrap_plan over the scans'
+    cells -- the node bootstrap, the cell bootstrap, or both (the node one
+    first, then the cell one from the same generator) and the larger.
+    Returns pick_se's dict (se in um)."""
+    scans = list(scans)
+    rule, n_cells = bootstrap_plan([sc.node_id for sc in scans], cfg)
+    se_n = ok_n = se_c = ok_c = None
+    if rule in ("node", "larger"):
+        se_n, ok_n, _ = bootstrap_sigma0(scans, cfg, rng, sigma_r0_um, n_resamples, unit="node")
+    if rule in ("cell", "larger"):
+        se_c, ok_c, _ = bootstrap_sigma0(scans, cfg, rng, sigma_r0_um, n_resamples, unit="cell")
+    return pick_se(rule, n_cells, float("nan") if se_n is None else se_n, ok_n,
+                   float("nan") if se_c is None else se_c, ok_c)
+
+
+def bootstrap_sigma0(scans, cfg, rng, sigma_r0_um=None, n_resamples=None, unit="node"):
     """(se_um, n_ok, draws): the SE of the anchor by a node bootstrap (10.A,
     D-081.7) -- n_resamples (default cfg.calibration.bootstrap_resamples)
     resamples of the scans with replacement (rng: numpy Generator), each
@@ -1033,12 +1106,14 @@ def bootstrap_sigma0(scans, cfg, rng, sigma_r0_um=None, n_resamples=None):
     (D-117.4: a table refused at another knot no longer drops a resample); a
     resample with fewer than two usable nodes, a failed fit or an anchor not
     identified at delta_0 is dropped (n_ok counts the kept ones). se_um is
-    NaN below two kept draws."""
+    NaN below two kept draws. unit "cell" (Block 19.6, D-118.3) resamples the
+    scans' cells instead, each drawn cell with all its scans (resample)."""
     n = int(cfg.calibration.bootstrap_resamples if n_resamples is None else n_resamples)
     scans = list(scans)
+    cells = node_cells([sc.node_id for sc in scans]) if unit == "cell" else np.zeros(len(scans), dtype=int)
     draws = []
     for _ in range(n):
-        pick = rng.integers(0, len(scans), len(scans))
+        pick = resample(cells, rng, unit)
         sample = [replace(scans[j], node_id=1000000 + t) for t, j in enumerate(pick)]
         try:
             g = fit_growth(sample, cfg)

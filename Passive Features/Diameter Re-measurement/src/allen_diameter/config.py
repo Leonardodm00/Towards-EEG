@@ -64,6 +64,7 @@ CALIBRATION_STATISTICS = ("gaussian_core_width2", "windowed_variance")  # proced
 ORIGIN_CONVENTIONS = ("symmetric", "min_origin")               # mathematics s.3.5: the growth is identified up to a common shift
 GROWTH_INTERPS = ("cubic", "linear")                           # Block 10 (provisional default, see CalibrationConfig.growth_interp)
 GROWTH_JACOBIANS = ("sparse", "dense")                         # Block 10 (D-119: sparse the default)
+BOOTSTRAP_UNITS = ("cell", "node")                             # Block 19.6 (D-118.3: cell the default)
 # The flags whose presence fails the selection S (Block 6), for phantoms and real nodes alike; part of the estimator
 # signature, so a table and the fits it corrects share one S (D-096). "dark" (D-030) and "faint" (D-096) are labels.
 SELECTION_FLAGS = ("crossing", "stack_edge", "bbar_few", "profile_nan")   # D-030, D-096 [user, 2026-10-28]: no faint
@@ -288,6 +289,8 @@ class CalibrationConfig:
     node_straight_half_um: float = 10.0      # source: D-081.3 (proposal accepted), PROVISIONAL: the trace within +-this (um) along the branch must stay near the node's straight line (with node_straight_check)
     node_straight_tol_radii: float = 2.0     # source: D-093 [user]: "relax the straightness as 2 or 4 x r_A" (was 1.0, D-081.3): ... within this x (Allen's diameter / 2) of the line, else not_straight (with node_straight_check)
     bootstrap_resamples: int = 1000          # source: D-081.7 [user]: node resamples for the SE of the anchor (10.A) and of the far slope (15.5)
+    bootstrap_unit: str = "cell"             # source: D-118.3 [user]: the pooled fits' SEs resample cells (each with all its nodes) by Block 19.6's plan; "node" resamples nodes always; one cell is always the node bootstrap; not in the search's key (10.C.R)
+    bootstrap_cell_min: int = 10             # source: D-118.3 [user; the value the assistant's, PROVISIONAL]: from this many cells the cell bootstrap; from 2 to this - 1 both, the larger SE reported and flagged few cells; not in the search's key
     table_max_delta_um: float = 0.84         # source: D-080.1 [user]: every table written for rendering ends here, so the renderer's linear continuation starts at the anchor
     # Block 15, the far-field calibration (D-074, D-077, D-078, D-081)
     far_offsets_planes: int = 16             # source: D-074.1 [user]: the far scan reads k* +- this (4.48 um on both sides of focus)
@@ -467,6 +470,10 @@ class DiameterConfig:
         _check_in(cal.origin_convention, ORIGIN_CONVENTIONS, "calibration.origin_convention")
         _check_in(cal.growth_interp, GROWTH_INTERPS, "calibration.growth_interp")
         _check_in(cal.growth_jacobian, GROWTH_JACOBIANS, "calibration.growth_jacobian")
+        _check_in(cal.bootstrap_unit, BOOTSTRAP_UNITS, "calibration.bootstrap_unit")
+        if not (isinstance(cal.bootstrap_cell_min, int) and not isinstance(cal.bootstrap_cell_min, bool)
+                and cal.bootstrap_cell_min >= 2):
+            raise ValueError("calibration.bootstrap_cell_min must be an integer >= 2 (Block 19.6, D-118.3)")
         thin, band = cal.node_allen_diameter_max_um, tuple(cal.far_field_allen_diameter_um)
         if not (len(band) == 2 and all(math.isfinite(x) for x in (thin,) + band) and 0 < thin <= band[0] < band[1]):
             raise ValueError("calibration: 0 < node_allen_diameter_max_um <= far_field_allen_diameter_um[0] < "

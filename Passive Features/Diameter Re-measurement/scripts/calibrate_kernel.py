@@ -476,6 +476,19 @@ def run_real(cfg, a):
     return a.out
 
 
+def boot_words(boot, n_resamples, seed):
+    """The printed words of a Block 19.6 bootstrap (D-118.3): which unit, over how many cells, and the counts."""
+    if boot["rule"] == "node":
+        return "node bootstrap, %d of %d resamples, seed %d" % (boot["n_ok"], n_resamples, seed)
+    if boot["rule"] == "cell":
+        return "cell bootstrap over %d cells, %d of %d resamples, seed %d" % (boot["n_cells"], boot["n_ok"], n_resamples,
+                                                                             seed)
+    fmt = (lambda x: "nan" if x is None else "%.4f" % x)
+    return ("few cells, %d: the larger of the node SE %s and the cell SE %s -- the %s one, %d of %d resamples, seed %d"
+            % (boot["n_cells"], fmt(boot["se_node"]), fmt(boot["se_cell"]), boot["unit"], boot["n_ok"], n_resamples,
+               seed))
+
+
 def run_fit(cfg, scans_path, out, sigma_r0=None, seed=0):
     scans, meta = calibration_io.load_scans(scans_path)
     near = [s for s in scans if s.set == "near"]
@@ -493,10 +506,12 @@ def run_fit(cfg, scans_path, out, sigma_r0=None, seed=0):
     anchor = None
     if kernel is not None:
         rng = np.random.default_rng(int(seed))
-        se, n_ok, _draws = calibration.bootstrap_sigma0(near, cfg, rng, sigma_r0)
-        anchor = dict(sigma0_um=float(kernel.kernel_table_sigma_um[-1]), se_um=float(se), n_boot_ok=int(n_ok),
-                      n_resamples=int(cfg.calibration.bootstrap_resamples), seed=int(seed),
-                      delta0_um=float(cfg.calibration.table_max_delta_um))
+        boot = calibration.anchor_se(near, cfg, rng, sigma_r0)          # Block 19.6 (D-118.3): nodes or cells
+        anchor = dict(sigma0_um=float(kernel.kernel_table_sigma_um[-1]), se_um=float(boot["se"]),
+                      n_boot_ok=int(boot["n_ok"]), n_resamples=int(cfg.calibration.bootstrap_resamples), seed=int(seed),
+                      delta0_um=float(cfg.calibration.table_max_delta_um),
+                      bootstrap={k: boot[k] for k in ("rule", "unit", "n_cells", "few_cells", "se_node", "se_cell",
+                                                      "n_ok_node", "n_ok_cell")})
     ratio = calibration.area_ratio_by_offset(near)
     suff = calibration_pool.sufficiency(g.node_ids.size, cfg)              # Block 19.2 (D-088.3)
     calibration_io.save_calibration(out, g, kernel, err, ratio,
@@ -518,8 +533,8 @@ def run_fit(cfg, scans_path, out, sigma_r0=None, seed=0):
         print("                     sigma %s  (sigma_r(0) = %.3f configured; %s)"
               % (", ".join("%.3f" % x for x in kernel.kernel_table_sigma_um), kernel.sigma_r0_um,
                  "increasing" if mono else "NOT increasing: do not render with it before step 2"))
-        print("  anchor sigma_0_hat = %.4f um, SE %.4f um (node bootstrap, %d of %d resamples, seed %d)"
-              % (anchor["sigma0_um"], anchor["se_um"], anchor["n_boot_ok"], anchor["n_resamples"], seed))
+        print("  anchor sigma_0_hat = %.4f um, SE %.4f um (%s)" % (anchor["sigma0_um"], anchor["se_um"],
+                                                              boot_words(boot, anchor["n_resamples"], seed)))
     else:
         print("  no table: %s" % err)
     if not suff["sufficient"]:
@@ -548,9 +563,11 @@ def run_far_fit(cfg, scans_path, calibration_path, out, seed=0):
     fit_sign = far_field.fit_far_slope(sel, sigma0, cfg, per_sign=True, k_star=k_star)
     fit_quad = far_field.fit_far_slope(sel, sigma0, cfg, quadratic=True, k_star=k_star)
     t0 = time.perf_counter()
-    se_boot, n_ok, _ = far_field.bootstrap_gamma(sel, sigma0, cfg, np.random.default_rng(int(seed)))
+    boot = far_field.gamma_se(sel, sigma0, cfg, np.random.default_rng(int(seed)))   # Block 19.6 (D-118.3)
+    se_boot, n_ok = boot["se"], boot["n_ok"]
     dg = far_field.anchor_sensitivity(sel, sigma0, cfg)
-    summary = far_field.far_fit_summary(sel, fit, fit_sign, fit_quad, se_boot, n_ok, dg, sigma0, se_sigma0, cfg, seed)
+    summary = far_field.far_fit_summary(sel, fit, fit_sign, fit_quad, se_boot, n_ok, dg, sigma0, se_sigma0, cfg, seed,
+                                        boot=boot)
     suff = dict(near=calibration_pool.sufficiency(len(calib.get("growth", {}).get("node_ids", [])), cfg),
                 far=calibration_pool.sufficiency(sel.node_ids.size, cfg))         # Block 19.2 (D-088.3)
     kernel, err = None, ""
@@ -570,9 +587,10 @@ def run_far_fit(cfg, scans_path, calibration_path, out, seed=0):
             ", ".join("%d %s-field nodes" % (suff[s]["n_nodes"], s) for s in short), suff["far"]["min_nodes"])
     calibration_io.save_far_fit(out, summary, kernel, err, dict(scans=scans_path, calibration=calibration_path,
                                                                 config=json.loads(cfg.to_json()), sufficiency=suff))
-    print("far fit: gamma_hat = %.4f +- %.4f (bootstrap %.4f over %d resamples, anchor term %.4f x %.4f), "
+    print("far fit: gamma_hat = %.4f +- %.4f (bootstrap %.4f over %d resamples, %s; anchor term %.4f x %.4f), "
           "t_%d interval [%s, %s]; range %.2f um; %d IRLS rounds, %s" % (
-              fit.gamma, summary["se"] or float("nan"), se_boot, n_ok, dg, se_sigma0, sel.node_ids.size - 1,
+              fit.gamma, summary["se"] or float("nan"), se_boot, n_ok,
+              boot_words(boot, int(cfg.calibration.bootstrap_resamples), seed), dg, se_sigma0, summary["t_df"],
               summary["interval"][0], summary["interval"][1], fit.range_um, fit.rounds,
               "success" if fit.success else "FAILED: " + fit.message))
     print("  per node: c %s um^2, s %s um" % (np.round(fit.c_um2, 4).tolist(), np.round(fit.s_um, 3).tolist()))

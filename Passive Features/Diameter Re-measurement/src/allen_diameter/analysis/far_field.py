@@ -20,7 +20,8 @@
                         gamma x_jk(s_j))^2, sigma_0_hat held fixed, gamma >= 0,
                         both sides, the axis shifts s_j free within +-0.28 um,
                         the weights frozen per IRLS round (D-078.3)
-  bootstrap_gamma       the node bootstrap's SE of gamma_hat (15.5)
+  bootstrap_gamma       the node (or cell) bootstrap's SE of gamma_hat (15.5; unit, 19.6)
+  gamma_se              SE_boot by Block 19.6's plan over the far set's cells (D-118.3)
   anchor_sensitivity    d gamma_hat / d sigma_0 by a central difference (15.5)
   far_fit_summary       everything the far-fit file records
 
@@ -439,17 +440,20 @@ def fit_far_slope(sel, sigma0_um, cfg, per_sign=False, quadratic=False, weights=
                   at_bound, str(r.message), nfev)
 
 
-def bootstrap_gamma(sel, sigma0_um, cfg, rng, n_resamples=None):
+def bootstrap_gamma(sel, sigma0_um, cfg, rng, n_resamples=None, unit="node"):
     """(se, n_ok, draws): the node bootstrap of the far fit (15.5): n_resamples
     (default bootstrap_resamples) draws of the nodes with replacement, each
     refitted by fit_far_slope with the model weights; a draw whose fit fails
     (or has fewer than two distinct nodes' worth of planes) is dropped. se is
-    the SD of the kept gamma_hat*, NaN below two."""
+    the SD of the kept gamma_hat*, NaN below two. unit "cell" (Block 19.6,
+    D-118.3) resamples the far nodes' cells, each with all its nodes."""
+    from .calibration import node_cells, resample
     n = int(cfg.calibration.bootstrap_resamples if n_resamples is None else n_resamples)
     J = int(sel.node_ids.size)
+    cells = node_cells(sel.node_ids) if unit == "cell" else np.zeros(J, dtype=int)
     draws = []
     for _ in range(n):
-        pick = rng.integers(0, J, J)
+        pick = resample(cells, rng, unit)
         try:
             f = fit_far_slope(sel.subset(pick), sigma0_um, cfg)
         except ValueError:
@@ -458,6 +462,22 @@ def bootstrap_gamma(sel, sigma0_um, cfg, rng, n_resamples=None):
             draws.append(f.gamma)
     draws = np.array(draws, dtype=float)
     return (float(np.std(draws, ddof=1)) if draws.size >= 2 else float("nan")), int(draws.size), draws
+
+
+def gamma_se(sel, sigma0_um, cfg, rng, n_resamples=None):
+    """Block 19.6 (D-118.3): SE_boot(gamma_hat) by the plan over the far set's
+    own cells (calibration.bootstrap_plan) -- the node bootstrap, the cell
+    bootstrap, or both (node first, then cell, one generator) and the larger.
+    Returns calibration.pick_se's dict."""
+    from .calibration import bootstrap_plan, pick_se
+    rule, n_cells = bootstrap_plan(sel.node_ids, cfg)
+    se_n = ok_n = se_c = ok_c = None
+    if rule in ("node", "larger"):
+        se_n, ok_n, _ = bootstrap_gamma(sel, sigma0_um, cfg, rng, n_resamples, unit="node")
+    if rule in ("cell", "larger"):
+        se_c, ok_c, _ = bootstrap_gamma(sel, sigma0_um, cfg, rng, n_resamples, unit="cell")
+    return pick_se(rule, n_cells, float("nan") if se_n is None else se_n, ok_n,
+                   float("nan") if se_c is None else se_c, ok_c)
 
 
 def anchor_sensitivity(sel, sigma0_um, cfg):
@@ -470,24 +490,29 @@ def anchor_sensitivity(sel, sigma0_um, cfg):
 
 
 def far_fit_summary(sel, fit, fit_sign, fit_quad, se_boot, n_boot_ok, dgamma_dsigma0, sigma0_um, se_sigma0_um, cfg,
-                    seed=None):
+                    seed=None, boot=None):
     """The far-fit record (15.6) as a JSON-ready dict: gamma_hat, its SE and
     the two parts, the t_(J-1) interval, c, s and the planes used per node, the
     range, the residual RMS by offset, the per-sign and quadratic comparisons,
-    the anchor, the dropped nodes and the plane counts."""
+    the anchor, the dropped nodes and the plane counts. boot (Block 19.6,
+    D-118.3): gamma_se's dict -- recorded, and when its reported unit is "cell"
+    the interval's quantile is t_(C-1), C its number of cells."""
     from scipy import stats
     J = int(sel.node_ids.size)
     se2 = float(se_boot) ** 2 + float(dgamma_dsigma0) ** 2 * float(se_sigma0_um) ** 2 if math.isfinite(se_sigma0_um) \
         else float("nan")
     se = math.sqrt(se2) if math.isfinite(se2) else float("nan")
-    tq = float(stats.t.ppf(0.975, J - 1)) if J >= 2 else float("nan")
+    df = (int(boot["n_cells"]) - 1) if boot is not None and boot["unit"] == "cell" else J - 1
+    tq = float(stats.t.ppf(0.975, df)) if df >= 1 else float("nan")
 
     def num(x):
         x = float(x)
         return x if math.isfinite(x) else None
     return dict(
         gamma=num(fit.gamma), se=num(se), se_boot=num(se_boot), n_boot_ok=int(n_boot_ok),
-        dgamma_dsigma0_per_um=num(dgamma_dsigma0), t_quantile=num(tq),
+        dgamma_dsigma0_per_um=num(dgamma_dsigma0), t_quantile=num(tq), t_df=int(df),
+        bootstrap=None if boot is None else {k: boot[k] for k in ("rule", "unit", "n_cells", "few_cells", "se_node",
+                                                                   "se_cell", "n_ok_node", "n_ok_cell")},
         interval=[num(fit.gamma - tq * se), num(fit.gamma + tq * se)] if math.isfinite(se) else [None, None],
         anchor=dict(sigma0_um=num(sigma0_um), se_um=num(se_sigma0_um), delta0_um=float(cfg.calibration.table_max_delta_um)),
         n_nodes=J, node_ids=[int(i) for i in sel.node_ids], c_um2=[num(x) for x in fit.c_um2],

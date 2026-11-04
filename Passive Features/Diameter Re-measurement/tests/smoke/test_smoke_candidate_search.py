@@ -469,6 +469,8 @@ def _record_and_reuse(tmp, swc):
         for f in fields:
             assert f not in conf[name], (name, f)
     assert FS.search_config(cfg_with(growth_jacobian="dense")) == conf
+    assert FS.search_config(cfg_with(bootstrap_unit="node")) == conf          # D-118.3's two fields as well
+    assert FS.search_config(cfg_with(bootstrap_cell_min=3)) == conf
     assert FS.search_config(cfg_with(knot_step_um=0.56)) != conf          # a field the fits and the key share
 
 
