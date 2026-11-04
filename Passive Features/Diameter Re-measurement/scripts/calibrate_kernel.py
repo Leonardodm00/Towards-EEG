@@ -27,10 +27,13 @@ specs/SPEC.md (procedure Eq. 4, s.3.4; mathematics Eq. 18, s.3.5; S2b).
   fit        the near field (10.A): Eq. (4) over the near scans; the kernel
              table sigma_r(delta_m) = sqrt(sigma_r(0)^2 + G(delta_m)) CUT at
              table_max_delta_um = 0.84 um (D-080.1); the anchor sigma_0_hat
-             and its node-bootstrap SE -> calibration JSON and a report
+             and its bootstrap SE (by node for one cell, by cell for a
+             pool of cells, Block 19.6, D-118.3) -> calibration JSON and a
+             report
   far-fit    the far field (Block 15): the planes selected by the predicted-
              dip SNR rule, the sequential far fit with the anchor (IRLS, both
-             sides, axis free), its node bootstrap, the anchor term, the
+             sides, axis free), its bootstrap (by node or by cell, as fit's),
+             the anchor term, the
              per-sign and quadratic comparisons; the production kernel (the
              cut table + the fitted slope) -> far-fit JSON and a report
   figures    the figures of 10.F (D-075, D-080.2, D-081.5) from the scans,
@@ -661,7 +664,7 @@ def main(argv=None):
     ff = sub.add_parser("far-fit")
     ff.add_argument("--scans", required=True, help="the scans file holding the far-field scans")
     ff.add_argument("--calibration", required=True, help="the calibration JSON of `fit` (the anchor and the table)")
-    ff.add_argument("--seed", type=int, default=0, help="the node bootstrap's seed")
+    ff.add_argument("--seed", type=int, default=0, help="the bootstrap's seed (by node or by cell, D-118.3)")
     g = sub.add_parser("figures")
     g.add_argument("--scans", nargs="+", required=True)
     g.add_argument("--calibration", default="")
