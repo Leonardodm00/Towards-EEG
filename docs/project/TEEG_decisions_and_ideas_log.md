@@ -143,6 +143,7 @@ the "Binds" column.
 | 2026-10-30 (later, 5) | **D-117.3** implemented at `1146494`, with the check that sets $\kappa_{\rm g}$ (PROVISIONAL): 1.2, the 99th percentile of RMS / SD$_{\rm bg}$ over 210 planes of 30 clean thin phantoms; it drops 31 % of the planes of 22 composite phantoms (43 of 105 with the neighbour within 0.8 um) and about half those of clean dips 1-2.5 um wide, which no $\kappa_{\rm g}$ separates from composites; on this morning's pilot scans about 11 of 206 near planes **[run, sandbox: `checks/d115_2026-10-30/`]**. For the user: whether the wide-dip caveat calls for a depth-relative statistic, after Cell 7's next run. |
 | 2026-11-02 | Logs **D-118** (user, 16:38; the diameter calibration chat): S3c's per-cell quota of calibration scans raised from 5 (D-089) to 30 per set; whether the pooled set keeps D-088.3's cap of 30 per set, taken round-robin over the cells, is put to the user (D-118.2). **Renumbering:** the diameter chat's D-115 of 2026-10-30 -- written to the repository copy on `sci/diameter-pipeline` only, project knowledge having refused the write (its tool needs the whole file read in one call) -- collided with the noise-fit chat's D-115 and D-116 of 14:24, which project knowledge holds; it is **D-117** here, its rows relabelled (later, 2) to (later, 5) after the noise-fit chat's (later); the branch's SPEC, code, notebooks, runbook and path map renamed D-115 -> D-117 in the same turn; the commits of 2026-10-30 to 2026-11-02 and the folder `checks/d115_2026-10-30/` keep the old number. Written after merging main's copy (`854004c`, 2026-11-02 13:03) into the branch's, a three-way merge (nothing of either side edited but the renumbering). Next free IDs: D-119, I-005. |
 | 2026-11-02 (later) | **D-118.2** answered (user, the dialog after 16:38; the diameter calibration chat): "Up to 30 from every cell" -- the pool takes at most 30 per set from each cell and keeps every cell's, superseding D-088.3's cap of 30 for the pool; **D-118.3** proposed by the assistant (the pooled SEs resample cells, as the chosen option's text said; Saravanan et al. 2020, full text read), not decided. D-118.1 and D-118.2 implemented at `e6e37b2` (block 19.4). Finding in D-118: the pooled near fit is dense and slow at D-118.2's sizes (59 s per fit at 1000 nodes in the sandbox, its bootstrap 1000 fits); a sparse fit proposed. Next free IDs: D-119, I-005. |
+| 2026-11-04 | Logs **D-119** (user, 12:21; the diameter calibration chat): Block 10's growth fit takes a sparse Jacobian (scipy `least_squares`, `tr_solver="lsmr"`), the same estimator, checked against the dense fit; and **D-118.3 decided** (the user's answers to two dialog questions after a simulation run here, `checks/d118_2026-11-04/cluster_bootstrap_check.py`): the pooled SEs resample cells, each with all its nodes, from 10 cells; with 2 to 9 cells the larger of the node and cell SEs, flagged; one cell keeps the node bootstrap. Next free IDs: D-120, I-005. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -280,7 +281,8 @@ would be needed*, *Status*.
 | D-115 | 2026-10-30 | (D-103.1)'s median window and subtraction; the start (D-103.2, D-110, D-111); D-102.2's SS reading; D-107.2's simulator; Block 3 (`ss_noise_windows`, `decay_start`, the reading and the offsets), Block 4 (`simulate_cell_windows`, `CellLayout`); SPEC §2.2-§2.4; smoke W2, W3, W11, W15, F1, F2, F11 | each kept SS window minus its sweep's tilt offset $\hat b_s(t_k - \bar t_s)$ before the per-sample median, everywhere the median is used; $\hat b_s$ by (TL1) on the kept windows cut at the 80 ms floor, before the start, the only SS reading; the simulator repeats both per replicate [user] | active; implemented 2026-10-30 in Blocks 3-4 |
 | D-116 | 2026-10-30 | D-073 (c), D-076 (i); Block 4b (`noise_sweep_fit.py`, to write); the per-sweep columns; Block 5's per-sweep laws | one solve per sweep at the cell's weights from $\hat\theta(c)$; $v(c,s)$ by a parametric bootstrap (B refits at the sweep's estimate); (D-076.1) per protocol, SS and LS separately; a failed sweep flagged, out of the pooling, its twin at the cell's values [user]; $B$, the refits' cost, the reading of "the cell's values" open | active; Block 4b not written (SPEC drafted 2026-10-30) |
 | D-117 | 2026-10-30 | the calibration verdict's tilt (kept); Cell 7's loop over the kernel law that Blocks 10.S, 15.2 and 15.3 read; a goodness of fit on every scanned plane (10.P, 15.2); 10.A's anchor bootstrap; `meta.nodes`; Block 19.3 on the pilot (Cell 15) | the tilt over +-2 um kept; the law iterated in Cell 7 (at most 3 rounds, one SE), the diagnostic slope fed back; residual-against-noise goodness of fit, near and far; the bootstrap's anchor from G(delta_0) alone; the pilot's values logged; Cell 15 reuses Cell 7's search [user] | active; implementation started |
-| D-118 | 2026-11-02 | `SurveyConfig.calib_scans_per_cell` (Block 19.3; D-089's 5); S3's calibration step on every cell (Cell 15, the davinci array); the pool (Block 19.4; D-088.3's cap of 30 superseded for it) | the per-cell quota is 30 scans per set; the pool takes up to 30 per set from every cell, no cap in all [user]; resampling cells for the pooled SEs proposed (D-118.3) | active; D-118.1-2 implemented at `e6e37b2` |
+| D-118 | 2026-11-02 | `SurveyConfig.calib_scans_per_cell` (Block 19.3; D-089's 5); S3's calibration step on every cell (Cell 15, the davinci array); the pool (Block 19.4; D-088.3's cap of 30 superseded for it) | the per-cell quota is 30 scans per set; the pool takes up to 30 per set from every cell, no cap in all; the pooled SEs resample cells from 10 cells, the larger of node and cell SEs from 2 to 9, nodes for one cell [user] | active; D-118.1-2 implemented at `e6e37b2`; D-118.3 decided 2026-11-04 |
+| D-119 | 2026-11-04 | `calibration.fit_growth` (Block 10, Eq. 4) and its callers (`fit`, 10.A's bootstrap, Cell 7, the pool); `CalibrationConfig.growth_jacobian`; 10.C.R's key | the same least-squares estimator with a sparse Jacobian, scipy `least_squares(method="trf", tr_solver="lsmr")`, checked against the dense fit [user] | active; not implemented |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
@@ -9614,7 +9616,7 @@ checks (`cell7_checks_2026-10-30.zip`, sent to the user).
 ---
 
 
-## D-118 -- S3c's per-cell quota of calibration scans raised from 5 to 30 per set, and the pool keeps every cell's scans (user)
+## D-118 -- S3c's per-cell quota of calibration scans raised from 5 to 30 per set, the pool keeps every cell's scans, and the pooled SEs resample cells (user)
 
 **Date:** 2026-11-02, 16:38 (Europe/Rome), the diameter calibration chat, after Cell 15's run on the pilot (5 near and 2
 far scans) and its comparison with Cell 7. **Binds:** `SurveyConfig.calib_scans_per_cell` (SPEC Block 19.3; D-089's
@@ -9636,11 +9638,17 @@ caps Cell 7 (one cell), and its minimum (10 per set) stands. The assistant's rea
 stays the round-robin's; a configuration integer `survey.calib_pool_max_per_set` restores a cap (None by default).
 [originally put to the user as: keep D-088.3's cap of 30 per set, taken round-robin across the cells -- then each cell
 contributes about 30 / (the number of cells) nodes per set -- or take up to 30 per set from every cell.] (D-118.3)
-**[proposed, the assistant's; not decided]** The pooled fit's SEs (10.A's anchor bootstrap, 15.5's far slope) resample
-cells, each drawn cell with all its nodes, instead of nodes: with up to 30 nodes per cell, the nodes of one cell are not
-independent draws of the population's kernel when the blur differs between cells, and resampling nodes then understates
-the SE (the option the user chose said so, flagged as the assistant's reasoning; to specify before code: the one-cell
-case, which keeps the node bootstrap, and a minimum number of cells).
+The pooled fit's SEs -- 10.A's anchor bootstrap and 15.5's far-slope bootstrap -- resample **cells**, each drawn cell
+with all its nodes as measured (one level; the user, 2026-11-04: "Cells only"), when the fit's nodes come from at least
+10 cells; with 2 to 9 cells both bootstraps run and the **larger** SE is the one reported, flagged "few cells" (the
+user, 2026-11-04: "The larger SE, flagged"); with one cell (Cell 7, the pilot) the node bootstrap stays [user]. The
+threshold of 10 cells is the assistant's, stated in the question the user answered (PROVISIONAL). The assistant's
+readings, PROVISIONAL: a node's cell is its specimen in the pooled file's qualified id ($q = s \cdot 10^6 + n$,
+`calibration_pool.cell_of`); a cell drawn twice enters twice, every copy of a node with its own nuisance parameters
+(as the node bootstrap's duplicates do); 15.5's combination $\mathrm{SE}(\hat\gamma)^2 = \mathrm{SE}_{\rm
+boot}(\hat\gamma)^2 + (\partial\hat\gamma/\partial\sigma_0)^2\,\mathrm{SE}(\hat\sigma_0)^2$ is unchanged, both SEs
+now by this rule. [updated 2026-11-04: was "[proposed, the assistant's; not decided]", with the one-cell case and a
+minimum number of cells left to specify]
 
 **Why [user; data; run].** Cell 15's five near nodes are a slice of Cell 7's 29 (the same candidates in the same
 seeded order), so its near fit is a noisy subsample: anchor 0.720 +- 0.137 um against Cell 7's 0.562 +- 0.049 um; the
@@ -9649,7 +9657,14 @@ inspected: the fit files of 2026-11-02; run, sandbox: the comparison's `law_chec
 groups and analysed as independent points give too small an uncertainty; the hierarchical bootstrap, resampling the
 top level (subjects) with replacement and then the units within each, keeps the error rate at its nominal level
 (Saravanan, Berman & Sober 2020, Neurons Behav Data Anal Theory 3(5), PMC7906290) **[PubMed, full text read]**; that
-cells are such groups for the kernel is the assistant's reasoning **[reasoning]**.
+cells are such groups for the kernel is the assistant's reasoning **[reasoning]**. [added 2026-11-04] On simulated
+nested data (the grand mean of 30 nodes per cell, $C$ = 2 to 51 cells, ICC 0 / 0.05 / 0.2; 400 datasets, 300
+resamples): the node bootstrap's SE is 0.98-1.00 of the true SE when cells do not differ and 0.63-0.64 or 0.36-0.38
+when they do (the design effect: $1/\sqrt{1 + 29\,\mathrm{ICC}}$ = 0.64, 0.38); the cell bootstrap's is 0.89-0.98
+from 10 cells up whatever the ICC, but 0.46-0.82 at 2-5 cells; resampling nodes inside the drawn cells as well
+(two-level) overstates it by 10-38 % at ICC <= 0.05 from 10 cells up; the larger of the node and cell SEs is
+1.00-1.03 at ICC 0 and follows the cell bootstrap otherwise **[run, sandbox: `checks/d118_2026-11-04/
+cluster_bootstrap_check.py`, seed 20261104; a stand-in for the kernel fit, the kernel's own ICC unknown]**.
 
 **What it implies for code and tables.** `config.SurveyConfig.calib_scans_per_cell` defaults to 30 (SPEC 19.3); the
 notebooks' Cell 15 text and the runbook; on davinci each cell measures pilots until 30 near scans -- Cell 7 measured 84
@@ -9665,8 +9680,8 @@ sparse Jacobian (scipy `least_squares`, `tr_solver="lsmr"`; the same estimator) 
 calibration; the array's per-cell step is not affected (30 near nodes per fit).]
 
 **What it does not decide.** D-088.3's minimum (10) and the sufficiency rule; whether the pooled fit weights the cells
-(one with 30 near nodes against one with 2); D-118.3 (the SE by cells) and the sparse fit, both proposed; D-117.2 (the
-loop in Cell 7).
+(one with 30 near nodes against one with 2); the sparse fit (D-119); D-117.2 (the loop in Cell 7). [corrected
+2026-11-04: D-118.3 was listed here as proposed; decided the same day]
 
 **Sources.** **[user]** 2026-11-02, 16:38, and the dialog that followed. **[data inspected; run, sandbox]** the
 comparison of 2026-11-02 (the diameter calibration chat). **[PubMed, full text]** Saravanan V, Berman GJ, Sober SJ
@@ -9675,6 +9690,45 @@ comparison of 2026-11-02 (the diameter calibration chat). **[PubMed, full text]*
 
 **Status:** active. [updated 2026-11-02: D-118.1 and D-118.2 implemented at `e6e37b2` (block 19.4; `test_smoke_s3c.py`
 6 pass, 1 skip, 11 mutants killed; not run on Allen's data); D-118.3 and the sparse fit proposed, not specified]
+[updated 2026-11-04: D-118.3 decided (the user's answers to the two dialog questions); implementation started]
+
+---
+
+## D-119 -- Block 10's near-field growth fit takes a sparse Jacobian: the same estimator, solved by scipy least_squares with tr_solver="lsmr", checked against the dense fit (user)
+
+**Date:** 2026-11-04, 12:21 (Europe/Rome), the diameter calibration chat, on the finding of 2026-11-02 (D-118) that
+the pooled near fit is too slow for the davinci pool job. **Binds:** `calibration.fit_growth` (SPEC Block 10, the growth
+fit, Eq. 4) and every caller -- `calibrate_kernel.py fit` (Cell 7, Cell 15, the pool), 10.A's anchor bootstrap
+(`bootstrap_sigma0`, one refit per resample); the pool job's run time (`survey_pool.pbs`, 2 h).
+
+**Decision [user].** "My proposal is the same estimator with a sparse Jacobian (scipy `least_squares` with
+`tr_solver="lsmr"`), checked against the current fit. Implement this" -- quoting the assistant's proposal of 2026-11-02.
+
+**Statement.** (D-119.1) `fit_growth` minimises the same sum of squares over the same parameters $(c, z_{\rm ax}, G)$,
+with the same bounds and start rule, but hands scipy a sparse Jacobian (each row holds one entry for its node's $c_i$,
+one for its $z_{{\rm ax},i}$ and the free knots' basis values) and solves the trust-region steps with LSMR
+(`least_squares(method="trf", tr_solver="lsmr")`); the linear start (`lsq_linear`) takes the same sparse design
+[user]. (D-119.2) The check: on synthetic scans the sparse and the dense fits agree within tolerances fixed in the smoke
+test before running, and the time per fit is reported at the pool's sizes [user: "checked against the current fit"].
+The assistant's readings, PROVISIONAL: the dense path stays selectable (`calibration.growth_jacobian`: `"sparse"`, the
+default, or `"dense"`) for that check and as a fallback; the field is left out of the candidate search's key (10.C.R),
+since the search does not read it.
+
+**Why [user; run].** One dense fit took 0.02 s at 30 pooled near nodes and 59 s at 1000 in the sandbox, and 10.A's
+bootstrap repeats it 1000 times **[run, sandbox: `time_growth.py`, 2026-11-02]**; the Jacobian of Eq. 4 has three
+non-zero blocks per row out of $2N + K$ columns, so a sparse solver's cost grows with the number of non-zeros rather
+than with $N^2$ **[reasoning]**.
+
+**What it implies for code and tables.** `calibration.fit_growth`, `config.CalibrationConfig.growth_jacobian`,
+`candidate_search.search_config` (the key leaves the field out), SPEC Block 10 and 10.C.R, `test_smoke_calibration.py`
+(the sparse-versus-dense check). No change to the estimator or simulation hashes (calibration fields are in no
+signature). The far fit (15.4) keeps its dense Jacobian (about 2 far nodes per cell).
+
+**What it does not decide.** The far fit's solver; the bootstrap's number of resamples; D-118.3's rule (logged there).
+
+**Sources.** **[user]** 2026-11-04, 12:21. **[run, sandbox]** the timing of 2026-11-02 (D-118).
+
+**Status:** active; not implemented.
 
 ---
 
