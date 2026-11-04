@@ -63,6 +63,7 @@ FILL_POLICIES = ("same_branch_then_allen", "allen_only", "none")  # D5 / handoff
 CALIBRATION_STATISTICS = ("gaussian_core_width2", "windowed_variance")  # procedure s.3.4 [corrected 2026-10-04]: core width drives
 ORIGIN_CONVENTIONS = ("symmetric", "min_origin")               # mathematics s.3.5: the growth is identified up to a common shift
 GROWTH_INTERPS = ("cubic", "linear")                           # Block 10 (provisional default, see CalibrationConfig.growth_interp)
+GROWTH_JACOBIANS = ("sparse", "dense")                         # Block 10 (D-119: sparse the default)
 # The flags whose presence fails the selection S (Block 6), for phantoms and real nodes alike; part of the estimator
 # signature, so a table and the fits it corrects share one S (D-096). "dark" (D-030) and "faint" (D-096) are labels.
 SELECTION_FLAGS = ("crossing", "stack_edge", "bbar_few", "profile_nan")   # D-030, D-096 [user, 2026-10-28]: no faint
@@ -268,6 +269,7 @@ class CalibrationConfig:
     z_ax_bound_um: float = 0.28              # source: PROVISIONAL (Block 10): the fitted axis depth stays within this of the node's sub-plane depth
     min_planes_per_node: int = 3             # source: PROVISIONAL (Block 10): a node enters the growth fit with at least this many finite omega
     growth_interp: str = "cubic"             # source: PROVISIONAL (Block 10): between the plane-offset knots; linear made G(1 plane) < 0 on rendered thin phantoms (convex curve)
+    growth_jacobian: str = "sparse"          # source: D-119 [user]: the growth fit's Jacobian as a sparse matrix, LSMR in least_squares and lsq_linear; "dense" the exact trust-region steps (the check and a fallback); not in the search's key (10.C.R)
     # 2026-10-23, D-078 to D-081 (Block 10.P, 10.I, 10.A): the patch, its planar background, isolation, straightness,
     # the anchor's SE and the table cut -- both calibration sets. None of these is in a signature.
     patch_half_um: float = 25.0              # source: D-078.1 [user]: the +-25 um square about the pilot's centre, fetched over the stage's planes; the background is fitted on its far pixels
@@ -464,6 +466,7 @@ class DiameterConfig:
         _check_in(cal.statistic, CALIBRATION_STATISTICS, "calibration.statistic")
         _check_in(cal.origin_convention, ORIGIN_CONVENTIONS, "calibration.origin_convention")
         _check_in(cal.growth_interp, GROWTH_INTERPS, "calibration.growth_interp")
+        _check_in(cal.growth_jacobian, GROWTH_JACOBIANS, "calibration.growth_jacobian")
         thin, band = cal.node_allen_diameter_max_um, tuple(cal.far_field_allen_diameter_um)
         if not (len(band) == 2 and all(math.isfinite(x) for x in (thin,) + band) and 0 < thin <= band[0] < band[1]):
             raise ValueError("calibration: 0 < node_allen_diameter_max_um <= far_field_allen_diameter_um[0] < "

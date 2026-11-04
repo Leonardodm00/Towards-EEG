@@ -1,0 +1,42 @@
+== sparse vs dense, the same scans (seed 20261104)
+  cubic, symmetric             N =   10: max|dG| 1.89e-12 um2, |d anchor| 8.49e-14 um, max|dc| 2.65e-14, max|dz| 5.24e-13 um, rel d cost 8.54e-16; nfev 7 / 7
+  cubic, symmetric             N =   10: max|dG| 2.02e-14 um2, |d anchor| 2.17e-14 um, max|dc| 2.58e-14, max|dz| 1.92e-13 um, rel d cost 1.82e-15; nfev 7 / 7
+  cubic, symmetric             N =   10: max|dG| 3.70e-12 um2, |d anchor| 4.29e-13 um, max|dc| 2.62e-13, max|dz| 1.12e-12 um, rel d cost 2.00e-15; nfev 8 / 8
+  cubic, symmetric             N =   30: max|dG| 1.04e-13 um2, |d anchor| 6.33e-15 um, max|dc| 4.09e-15, max|dz| 5.45e-14 um, rel d cost 1.75e-16; nfev 7 / 7
+  cubic, symmetric             N =   30: max|dG| 8.79e-13 um2, |d anchor| 4.97e-14 um, max|dc| 4.38e-14, max|dz| 3.61e-13 um, rel d cost 1.20e-15; nfev 7 / 7
+  cubic, symmetric             N =   30: max|dG| 3.63e-13 um2, |d anchor| 1.17e-14 um, max|dc| 1.07e-14, max|dz| 1.40e-13 um, rel d cost 3.71e-15; nfev 7 / 7
+  cubic, symmetric             N =  100: max|dG| 4.77e-14 um2, |d anchor| 5.83e-15 um, max|dc| 8.10e-15, max|dz| 7.34e-14 um, rel d cost 2.54e-15; nfev 7 / 7
+  cubic, symmetric             N =  100: max|dG| 3.61e-13 um2, |d anchor| 1.95e-14 um, max|dc| 5.09e-14, max|dz| 2.49e-13 um, rel d cost 0.00e+00; nfev 7 / 7
+  cubic, symmetric             N =  100: max|dG| 5.48e-12 um2, |d anchor| 4.56e-13 um, max|dc| 2.90e-13, max|dz| 1.35e-12 um, rel d cost 2.42e-16; nfev 6 / 6
+  cubic, symmetric             N =  300: max|dG| 4.26e-13 um2, |d anchor| 4.03e-14 um, max|dc| 2.38e-14, max|dz| 1.51e-13 um, rel d cost 0.00e+00; nfev 6 / 6
+  cubic, symmetric             N =  300: max|dG| 3.51e-12 um2, |d anchor| 3.29e-13 um, max|dc| 2.07e-13, max|dz| 8.64e-13 um, rel d cost 1.55e-16; nfev 6 / 6
+  cubic, symmetric             N =  300: max|dG| 1.14e-12 um2, |d anchor| 8.50e-14 um, max|dc| 8.84e-14, max|dz| 4.76e-13 um, rel d cost 1.56e-16; nfev 6 / 6
+  {'growth_interp': 'linear'}  N =   10: max|dG| 9.03e-14 um2, |d anchor| 3.29e-14 um, max|dc| 2.08e-14, max|dz| 9.44e-14 um, rel d cost 1.31e-15; nfev 7 / 7
+  {'growth_interp': 'linear'}  N =   10: max|dG| 4.42e-14 um2, |d anchor| 7.44e-15 um, max|dc| 1.92e-15, max|dz| 1.62e-14 um, rel d cost 5.57e-15; nfev 7 / 7
+  {'growth_interp': 'linear'}  N =   10: max|dG| 5.03e-13 um2, |d anchor| 1.43e-13 um, max|dc| 3.86e-14, max|dz| 2.18e-13 um, rel d cost 8.21e-16; nfev 6 / 6
+  {'growth_interp': 'linear'}  N =   30: max|dG| 1.29e-13 um2, |d anchor| 7.66e-15 um, max|dc| 3.79e-14, max|dz| 1.65e-13 um, rel d cost 3.74e-16; nfev 7 / 7
+  {'growth_interp': 'linear'}  N =   30: max|dG| 1.75e-13 um2, |d anchor| 1.67e-13 um, max|dc| 1.52e-13, max|dz| 5.59e-13 um, rel d cost 5.84e-16; nfev 7 / 7
+  {'growth_interp': 'linear'}  N =   30: max|dG| 4.33e-13 um2, |d anchor| 6.38e-14 um, max|dc| 4.16e-14, max|dz| 4.22e-13 um, rel d cost 1.55e-15; nfev 6 / 6
+  {'growth_interp': 'linear'}  N =  100: max|dG| 5.99e-14 um2, |d anchor| 1.89e-14 um, max|dc| 4.63e-14, max|dz| 2.03e-13 um, rel d cost 2.18e-16; nfev 7 / 7
+  {'growth_interp': 'linear'}  N =  100: max|dG| 2.73e-12 um2, |d anchor| 5.26e-13 um, max|dc| 2.01e-13, max|dz| 1.22e-12 um, rel d cost 1.14e-16; nfev 6 / 6
+  {'growth_interp': 'linear'}  N =  100: max|dG| 1.73e-12 um2, |d anchor| 3.89e-13 um, max|dc| 1.74e-13, max|dz| 9.32e-13 um, rel d cost 0.00e+00; nfev 6 / 6
+  {'growth_interp': 'linear'}  N =  300: max|dG| 8.74e-13 um2, |d anchor| 1.87e-13 um, max|dc| 1.60e-12, max|dz| 4.84e-12 um, rel d cost 7.41e-16; nfev 6 / 6
+  {'growth_interp': 'linear'}  N =  300: max|dG| 3.69e-14 um2, |d anchor| 8.99e-15 um, max|dc| 3.38e-15, max|dz| 1.55e-14 um, rel d cost 5.89e-16; nfev 7 / 7
+  {'growth_interp': 'linear'}  N =  300: max|dG| 1.01e-12 um2, |d anchor| 1.99e-13 um, max|dc| 9.09e-14, max|dz| 4.95e-13 um, rel d cost 1.45e-16; nfev 6 / 6
+  {'origin_convention': 'min_origin'} N =   10: max|dG| 9.20e-08 um2, |d anchor|   n/a   um, max|dc| 7.16e-09, max|dz| 1.32e-07 um, rel d cost 2.40e-15; nfev 16 / 18
+  {'origin_convention': 'min_origin'} N =   10: max|dG| 7.34e-08 um2, |d anchor|   n/a   um, max|dc| 8.07e-09, max|dz| 1.18e-07 um, rel d cost 5.21e-14; nfev 70 / 58
+  {'origin_convention': 'min_origin'} N =   10: max|dG| 5.24e-11 um2, |d anchor|   n/a   um, max|dc| 2.18e-12, max|dz| 8.69e-11 um, rel d cost 4.35e-15; nfev 27 / 27
+  {'origin_convention': 'min_origin'} N =   30: max|dG| 3.26e-10 um2, |d anchor|   n/a   um, max|dc| 1.76e-10, max|dz| 1.17e-09 um, rel d cost 3.16e-15; nfev 27 / 27
+  {'origin_convention': 'min_origin'} N =   30: max|dG| 3.80e-10 um2, |d anchor|   n/a   um, max|dc| 3.02e-11, max|dz| 4.66e-10 um, rel d cost 3.44e-15; nfev 21 / 23
+  {'origin_convention': 'min_origin'} N =   30: max|dG| 3.47e-07 um2, |d anchor|   n/a   um, max|dc| 2.36e-08, max|dz| 4.84e-07 um, rel d cost 2.90e-13; nfev 23 / 25
+  {'origin_convention': 'min_origin'} N =  100: max|dG| 8.61e-07 um2, |d anchor|   n/a   um, max|dc| 4.98e-08, max|dz| 9.25e-07 um, rel d cost 2.05e-13; nfev 30 / 38
+  {'origin_convention': 'min_origin'} N =  100: max|dG| 1.33e-06 um2, |d anchor|   n/a   um, max|dc| 8.56e-08, max|dz| 1.89e-06 um, rel d cost 4.62e-13; nfev 32 / 31
+  {'origin_convention': 'min_origin'} N =  100: max|dG| 2.76e-10 um2, |d anchor|   n/a   um, max|dc| 3.65e-10, max|dz| 1.69e-09 um, rel d cost 1.55e-15; nfev 33 / 33
+  {'origin_convention': 'min_origin'} N =  300: max|dG| 2.92e-06 um2, |d anchor|   n/a   um, max|dc| 2.77e-07, max|dz| 3.51e-06 um, rel d cost 2.72e-13; nfev 85 / 79
+  {'origin_convention': 'min_origin'} N =  300: max|dG| 1.71e-07 um2, |d anchor|   n/a   um, max|dc| 1.13e-08, max|dz| 2.58e-07 um, rel d cost 5.34e-15; nfev 41 / 45
+  {'origin_convention': 'min_origin'} N =  300: max|dG| 9.59e-07 um2, |d anchor|   n/a   um, max|dc| 1.82e-09, max|dz| 1.47e-06 um, rel d cost 2.19e-14; nfev 17 / 19
+  worst: G 2.92e-06, anchor 5.26e-13, c 2.77e-07, z 3.51e-06, cost 4.62e-13
+== time per fit (cubic, symmetric)
+  N =  300: sparse 0.04 s (x 1000 resamples ~ 0.01 h); dense 1.53 s
+  N = 1000: sparse 0.08 s (x 1000 resamples ~ 0.02 h)
+  N = 1530: sparse 0.14 s (x 1000 resamples ~ 0.04 h)

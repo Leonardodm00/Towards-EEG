@@ -52,6 +52,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from scipy import ndimage
+from scipy import sparse
 from scipy.interpolate import CubicSpline
 from scipy.optimize import least_squares, lsq_linear
 
@@ -853,7 +854,12 @@ def fit_growth(scans, cfg):
     Start: z_ax,i = the node's sub-plane depth (k* dz when NaN); (c, G) by
     linear least squares at those depths (scipy lsq_linear; G >= 0 under
     min_origin); then all of (c, z_ax, G) by scipy least_squares (trf, the
-    analytic Jacobian), z_ax,i within z_ax_bound_um of its start. Knots: m h,
+    analytic Jacobian), z_ax,i within z_ax_bound_um of its start. With
+    growth_jacobian = "sparse" (D-119, the default) the same problem is
+    solved with the Jacobian and the start's design as scipy.sparse CSR
+    matrices and LSMR inside both solvers (least_squares tr_solver="lsmr" with
+    LSMR's atol = btol = 1e-14, lsq_linear lsq_solver="lsmr"); "dense" keeps
+    dense matrices and the exact trust-region steps. Knots: m h,
     m = 0..M, M = ceil((P + 1/2) dz / h) with P the largest plane offset
     scanned (both signs under min_origin); a knot with no observation in
     either adjacent interval is returned as NaN (not identified). Raises
@@ -890,6 +896,12 @@ def fit_growth(scans, cfg):
     n_obs = oi.size
 
     interp = cal.growth_interp
+    use_sparse = cal.growth_jacobian == "sparse"          # D-119
+    rows = np.arange(n_obs)
+
+    def node_block(values):
+        """(n_obs, N) with values[r] in row r at its node's column: one entry per row."""
+        return sparse.csr_matrix((values, (rows, oi)), shape=(n_obs, N))
 
     def design(z):
         return _basis(z[oi] - oz, conv, h, M, interp)
@@ -907,6 +919,9 @@ def fit_growth(scans, cfg):
     def jac(q):
         c, z, G = unpack(q)
         W, dW = design(z)
+        if use_sparse:                       # each row: its node's c_i, its node's z_ax,i, the free knots
+            return sparse.hstack([node_block(np.ones(n_obs)), node_block(dW @ G),
+                                  sparse.csr_matrix(W[:, free])], format="csr")
         J = np.zeros((n_obs, 2 * N + free.size))
         J[np.arange(n_obs), oi] = 1.0
         J[np.arange(n_obs), N + oi] = dW @ G
@@ -915,17 +930,24 @@ def fit_growth(scans, cfg):
 
     # linear start at the starting depths
     W0, _ = design(z0)
-    A = np.zeros((n_obs, N + free.size))
-    A[np.arange(n_obs), oi] = 1.0
-    A[:, N:] = W0[:, free]
     lb = np.r_[np.full(N, -np.inf), np.full(free.size, 0.0 if conv == "min_origin" else -np.inf)]
-    lin = lsq_linear(A, ow, bounds=(lb, np.full(N + free.size, np.inf)))
+    if use_sparse:
+        A = sparse.hstack([node_block(np.ones(n_obs)), sparse.csr_matrix(W0[:, free])], format="csr")
+        lin = lsq_linear(A, ow, bounds=(lb, np.full(N + free.size, np.inf)), lsq_solver="lsmr")
+    else:
+        A = np.zeros((n_obs, N + free.size))
+        A[np.arange(n_obs), oi] = 1.0
+        A[:, N:] = W0[:, free]
+        lin = lsq_linear(A, ow, bounds=(lb, np.full(N + free.size, np.inf)))
     q0 = np.r_[lin.x[:N], z0, lin.x[N:]]
     lo = np.r_[np.full(N, -np.inf), z0 - cal.z_ax_bound_um, lb[N:]]
     hi = np.r_[np.full(N, np.inf), z0 + cal.z_ax_bound_um, np.full(free.size, np.inf)]
     q0 = np.clip(q0, lo, hi)
+    # LSMR's own tolerances tightened to 1e-14 (its defaults left the bounded min_origin fits at max_nfev, D-119)
     r = least_squares(resid, q0, jac=jac, bounds=(lo, hi), method="trf", x_scale="jac",
-                      ftol=1e-12, xtol=1e-12, gtol=1e-12, max_nfev=2000)
+                      ftol=1e-12, xtol=1e-12, gtol=1e-12, max_nfev=2000,
+                      tr_solver="lsmr" if use_sparse else "exact",
+                      tr_options=dict(atol=1e-14, btol=1e-14) if use_sparse else {})
     c, z, G = unpack(r.x)
     delta = z[oi] - oz
     j, _, _ = _weights(delta, conv, h, M)

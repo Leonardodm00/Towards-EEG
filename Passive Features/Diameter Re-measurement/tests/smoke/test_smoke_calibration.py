@@ -76,6 +76,13 @@ Checks
                         SD over regenerated data sets; example_node picks the
                         node planted on the median; the scans JSON round trip
                         with the new fields and a file without them
+    test_sparse_jacobian  2026-11-04 (D-119): the sparse growth fit (LSMR)
+                        against the dense one on the same noisy synthetic
+                        scans with 10 % NaN planes, N = 30 and 100: symmetric
+                        cubic and linear within 1e-9 (knots, anchor, c) and
+                        1e-8 (z_ax); min_origin knots within 1e-5 and costs
+                        within 1e-10 relative; "sparse" the default; a bad
+                        growth_jacobian refused
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -758,6 +765,42 @@ def test_patch_scan():
     med = CAL.median_by_offset(scans)
     planted = dataclasses.replace(scans[0], node_id=999, omega_um2=np.array([med[int(o)] for o in scans[0].offsets()]))
     assert CAL.example_node(scans + [planted]) == 999 and sorted(med) == list(range(-P, P + 1))
+
+
+def test_sparse_jacobian():
+    """D-119: the same estimator with a sparse Jacobian. Tolerances fixed from the 2026-11-04 check
+    (checks/d118_2026-11-04/sparse_growth_check.py: at most 5.5e-12 um^2 on the knots, 5.3e-13 um on the anchor,
+    1.6e-12 on c and 4.8e-12 um on z_ax for the symmetric convention; 2.9e-6 um^2 and 4.6e-13 relative cost under
+    min_origin, where both solvers stop at ftol with bounds active): the margins cover roundoff of the inner
+    linear solves, not a difference of optimum."""
+    assert default_config().calibration.growth_jacobian == "sparse"
+    rng = np.random.default_rng(20261104)
+    curve = lambda d: 0.3 * np.asarray(d, dtype=float) ** 2          # um^2, an even growth
+    for variant in (dict(), dict(growth_interp="linear"), dict(origin_convention="min_origin")):
+        for n in (30, 100):
+            scans, _, _ = eq4_scans(cfg_with(**variant), curve, n, rng, noise=0.003)
+            scans = [dataclasses.replace(sc, omega_um2=np.where(rng.random(sc.ks.size) < 0.1, np.nan, sc.omega_um2))
+                     for sc in scans]
+            cd, cs = cfg_with(growth_jacobian="dense", **variant), cfg_with(growth_jacobian="sparse", **variant)
+            gd, gs = CAL.fit_growth(scans, cd), CAL.fit_growth(scans, cs)
+            fin = np.isfinite(gd.g_um2)
+            assert np.array_equal(fin, np.isfinite(gs.g_um2)) and np.array_equal(gd.node_ids, gs.node_ids)
+            dG = float(np.max(np.abs(gd.g_um2[fin] - gs.g_um2[fin])))
+            if variant.get("origin_convention", "symmetric") == "symmetric":
+                dA = abs(CAL.anchor_value(gd, cd) - CAL.anchor_value(gs, cs))
+                dc = float(np.max(np.abs(gd.c_um2 - gs.c_um2)))
+                dz = float(np.max(np.abs(gd.z_ax_um - gs.z_ax_um)))
+                assert dG <= 1e-9 and dA <= 1e-9 and dc <= 1e-9 and dz <= 1e-8, (variant, n, dG, dA, dc, dz)
+            else:
+                rel = abs(gd.cost - gs.cost) / gd.cost
+                assert dG <= 1e-5 and rel <= 1e-10, (variant, n, dG, rel)
+            assert gs.success and gs.nfev < 2000, (variant, n, gs.nfev, gs.message)
+    try:
+        cfg_with(growth_jacobian="banded").validate()
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("growth_jacobian 'banded' must be refused")
 
 
 # ---------------------------------------------------------------- runner ---

@@ -45,7 +45,8 @@ Analysis only: no file is read or written here, nothing is drawn.
   choose(records, cfg, which)           -> list of node ids, in the order kept
   summary_line(records, chosen, cfg, which) -> the log line of calibrate_kernel.cell_candidates
   swc_digest(swc), search_config(cfg)   -> the key a search's record carries (10.C.R, D-117.6, 2026-10-30:
-                                           Cell 15 reuses Cell 7's search when both equal its own)
+                                           Cell 15 reuses Cell 7's search when both equal its own; the fit-only
+                                           fields of SEARCH_CONFIG_EXCLUDED left out, 2026-11-04)
 
 Pure ASCII (hpc-python-compat).
 """
@@ -66,6 +67,10 @@ RECORD_KEYS = ("set", "node_id", "allen_diameter_um", "stretch", "s_um", "x_um",
                "theta_rad", "phi_deg", "reason", "n_pixels_k", "n_fit_usable", "n_fit")
 # the configuration sections the search's call tree reads (this module, calibration_scene, cell, model.kernel)
 SEARCH_CONFIG_SECTIONS = ("acquisition", "calibration", "measure", "renderer")
+# fields of those sections that only the fits read, left out of the key (10.C.R; D-119, D-118.3): a fit's solver
+# and its bootstrap do not change which candidates a search chooses, and a record written before they existed still
+# matches
+SEARCH_CONFIG_EXCLUDED = {"calibration": ("growth_jacobian", "bootstrap_unit", "bootstrap_cell_min")}
 
 
 def swc_digest(swc):
@@ -97,8 +102,14 @@ def _plain(x):
 
 def search_config(cfg):
     """The settings a search depends on (10.C.R, D-117.6): the sections SEARCH_CONFIG_SECTIONS of cfg as plain
-    JSON values (dataclasses.asdict, then _plain)."""
-    return {name: _plain(dataclasses.asdict(getattr(cfg, name))) for name in SEARCH_CONFIG_SECTIONS}
+    JSON values (dataclasses.asdict, then _plain), without the fields SEARCH_CONFIG_EXCLUDED names."""
+    out = {}
+    for name in SEARCH_CONFIG_SECTIONS:
+        section = dataclasses.asdict(getattr(cfg, name))
+        for f in SEARCH_CONFIG_EXCLUDED.get(name, ()):
+            section.pop(f, None)
+        out[name] = _plain(section)
+    return out
 
 
 def trace_direction(branch, i, window_um):

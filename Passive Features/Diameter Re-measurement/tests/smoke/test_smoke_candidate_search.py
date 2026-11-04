@@ -464,6 +464,12 @@ def _record_and_reuse(tmp, swc):
     assert conf_nan["calibration"]["isolation_depth_gl"] == "nan", conf_nan["calibration"]["isolation_depth_gl"]
     json.dumps(conf_nan, allow_nan=False)
     assert FS.search_config(cfg) == json.loads(json.dumps(conf)), "the settings survive a JSON round trip"
+    # 2026-11-04 (D-119, 10.C.R): the fit-only fields are not in the key -- changing them keeps a record matching
+    for name, fields in FS.SEARCH_CONFIG_EXCLUDED.items():
+        for f in fields:
+            assert f not in conf[name], (name, f)
+    assert FS.search_config(cfg_with(growth_jacobian="dense")) == conf
+    assert FS.search_config(cfg_with(knot_step_um=0.56)) != conf          # a field the fits and the key share
 
 
 def _real_command_line(tmp, swc):
