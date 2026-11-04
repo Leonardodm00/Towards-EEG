@@ -208,7 +208,7 @@ theory:
     status: studying
     closed_on:
     decision:
-    note: "Material (2026-11-04, the diameter calibration chat): why we bootstrap; why nested data understate uncertainty (the design effect); why few cells break the cell bootstrap (chi2_{C-1}/C); the one-way random-intercept model, the between/within split (MS_W, MS_B) and why MS_B carries n; the checks sent in the chat (bootstrap_nested_features.py, variance_components_check.py, anova_identity_check.py, ms_between_*.py) and checks/d118_2026-11-04/cluster_bootstrap_check.py."
+    note: "To study, in this order (the user, 2026-11-04, 17:20), the answers in the diameter calibration chat of 2026-11-04 to the messages of: first re-read (1) 15:02, y_ij = a_i + e_ij as the one-way random-intercept model; (2) 15:40, the derivation of Var(ybar_i) = s_b^2 + s_w^2 / n => E[MS_B] = n s_b^2 + s_w^2 (and 15:47, where the covariance term comes from); (3) 15:16 and, in full with Figure 1, 16:20, why MS_B carries n -- following 15:00, how the shared cell effect is separated from the node scatter with nodes alone (MS_W, MS_B); then study (4) 14:31, whether the near-field core width also depends on depth (the near table vs the anchor; depth in the slice), and (5) 14:31, why few cells break the cell bootstrap and how a bootstrap behaves on nested data treated as independent. Checks sent in the chat: bootstrap_nested_features.py, variance_components_check.py, anova_identity_check.py, grand_mean_check.py, ms_between_figure.py, ms_between_numbers.py; and checks/d118_2026-11-04/cluster_bootstrap_check.py."
 implementation:
   # ---- groups (no block of their own; coloured by their least advanced member)
   - id: G1
