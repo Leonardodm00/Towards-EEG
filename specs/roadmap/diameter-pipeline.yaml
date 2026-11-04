@@ -494,7 +494,7 @@ implementation:
     jobs: []
   - id: I19
     title: "S3c: one defocus kernel pooled across cells; the law by cell"
-    summary: "Each cell's calibration scans (at most 5 per set), pooled round-robin to 30 per set with at least 10 (D-088, D-089); Block 10's and 15's fits on the pool; the near and far points and their residuals by cell (19.5, D-090.2)."
+    summary: "Each cell's calibration scans (up to 30 per set, D-118.1), pooled with every cell's, at least 10 per set (D-088.3, D-118.2); Block 10's and 15's fits on the pool, their error bars from resampling cells, not nodes (19.6, D-118.3); the near and far points and their residuals by cell (19.5, D-090.2)."
     block: 19
     parent: S3c
     depends_on: [I16, I17, I10, I15]
