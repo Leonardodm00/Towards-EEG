@@ -3,6 +3,7 @@
 | Date | Change |
 |---|---|
 | 2026-11-02 | v1. Written by the diameter theory chat at the user's request: "the handoff with all the images you judge important for a presentation ... for the theory part of the diameter pipeline", covering all the theory, with the GitHub locations of the theory documents, for a chat that writes the documents for the design of the presentation. Sources: the repository at `main` 854004c and `sci/diameter-pipeline` 5015806 (2026-11-02); five located reading digests of the documents (line numbers re-grepped by each reader); spot checks of the key equations, numbers and decisions by this chat (section 16); this chat's optics checks (section 13); five new figures with their checks (`check_theory_figures.py`, 21 of 24 pass, the 3 failures kept with their diagnosed follow-ups). |
+| 2026-11-04 | v1.1. Adds the T7 topic document `TEEG_diameter_pupil_phase_2026-11-04/` (the three pupil phases -- aberration, defocus, lateral -- and what they make of diffraction, blur and the defocus kernel; commit 758f0ab on `theory/pupil-phase-2026-11-04`, on top of this handoff). Changes: a row in §2.2; a pointer at the head of §6; one finding in §6.3 (the ideal LSF's central dip near \|δ\| ≈ 0.52-0.68 µm, that document's check P16); figures PP1-PP7 in §14. Evidence: that document and its checks P0-P16 and K1-K4, all PASS. Nothing earlier in this handoff changed. |
 
 Scope: concepts only, i.e. the physics, mathematics and statistics under the pipeline, organised by the roadmap's theory graph. Implementation status, cluster runs and notebooks are out of scope (the roadmap and the runbook carry them).
 
@@ -74,6 +75,7 @@ All paths are under `$D/docs/` unless stated. "Commit" is the last commit that t
 | `TEEG_diameter_study_notes_2026-10-07.md` | main only | bf14eb4 (10-09) | Dark nodes; the partition against the ray world | T3, T7 |
 | `TEEG_diameter_renderers_partition_ray_world_hybrid_2026-10-09.md` | main only | 2637194 (10-09) | Partition, ray world, hybrid (Eqs. 1-15); coherence §3.10 | T3, T7 |
 | `TEEG_diameter_sine_condition_and_W_2026-10-12.md` | main only | 89fd2fb (10-12) | Sine condition, Koehler map, the measure W against W* | T7 |
+| `TEEG_diameter_pupil_phase_2026-11-04/TEEG_diameter_pupil_phase_2026-11-04.md` (+ `figures/`) | branch `theory/pupil-phase-2026-11-04` only (not pushed; patch 0002) | 758f0ab (11-04) | The three pupil phases in the Debye field (Eq. 1); the in-step bound (Eq. 5); Airy pattern, shift theorem, Parseval; Strehl, Maréchal, quarter-wave defocus; axial minima and the LSF's central dip; depth aberration Eq. 18 = the wave form of optics Eq. 9, with its focal shift; where each phase enters the kernel | T7 |
 | `TEEG_diameter_presentation_ideas_2026-10-10.md` | main only | 4f9c258 (10-10) | Idea 1, the kernel in three domains (partly stale, 12.1) | T3, T6 |
 | `TEEG_interactive_figures_spec_2026-10-04.md` | main = branch | 589a0de (10-06) | Specs of the four interactive figures | T3, T7 |
 | `TEEG_diameter_correction_table_handoff_2026-10-16.md` | branch only | ea49181 (10-16) | The SGT kernel and the fit (H1)-(H6) §3; Monte Carlo and identifiability §4 | T5 |
@@ -239,6 +241,8 @@ Fixed setting, unless stated:
 - model wavelength λ = 0.55 µm, oil index n = 1.515 (the code's value, "from memory"; Immersol 518 F has n_e 1.518);
 - s_o = NA_o/n = 0.924 [doc] optics §3.1, l.194-216, l.247-252.
 
+Study document for §6.2, §6.3 and §6.6 (added 2026-11-04): `TEEG_diameter_pupil_phase_2026-11-04.md`. It derives the three pupil phases and their effects on the spot, with seven figures (PP1-PP7, §14). Its numbers use the aplanatic pupil, the pipeline's ideal model; the A-figures of this pack use a pupil uniform in s, so Strehl ratios differ slightly (0.815 against 0.823 at 0.147 µm).
+
 ### 6.1 Light path, Koehler illumination, numerical aperture
 
 **Concepts**
@@ -321,6 +325,7 @@ Numbers, all [run here], D2-D4, D3b:
 - The geometric 50 %-energy radius equals the in-focus wave value at δ = 0.1217 µm.
 - At 0.84 µm (three planes) the wave and geometric radii agree within 6 % (0.685 against 0.725 µm).
 - The core is defined up to |δ| = 0.42 µm and merges with the first ring beyond.
+- [added 2026-11-04] In the aplanatic model the LSF has a central dip near |δ| ≈ 0.52-0.68 µm and ≈ 1.1-1.2 µm. There the rim lags the centre by whole waves; the on-axis minima are at m·0.588 µm (isotropic weighting) and at 0.597 µm (aplanatic). The table's 0.56 µm node (0.438 µm) is a core fit on such a profile [pupil-phase document, checks P6, P16].
 
 Ideal-Debye core width σ (µm) against δ:
 
@@ -1021,6 +1026,17 @@ Pack root: `TEEG_diameter_theory_presentation_2026-11-02/`. A and B are this cha
 | B4 | `.../fig10_T3-T6-T10_defocus_kernel_law.png` | T3, T6, T10 | Near field (configured, pilot, phantoms' first stage); far field (configured law, geometric priors, the pilot's diagnostic γ̂ with t₁ band) | L1-L5 | The pilot far slope is a 2-node diagnostic |
 | B5 | `.../fig11_T4-3_inversion_illustration.png` | T4.3 | Inversion as classical calibration; the shortcut's error; scatter mapped through the slope | I1-I4 | ILLUSTRATION with the mathematics doc's chosen numbers |
 
+
+From the pupil-phase document (`$D/docs/TEEG_diameter_pupil_phase_2026-11-04/figures/`, branch `theory/pupil-phase-2026-11-04`; scripts delivered as files, not committed):
+
+| Id | File | Topic | Shows | Origin | Caveats |
+|---|---|---|---|---|---|
+| PP3 | `fig03_phasor_chains.png` | T7 | The field as a chain of pupil phasors: in step, lateral ramp to the first dark ring, defocus, axial minimum, depth aberration | `make_phase_figures.py` fig3; chain ends asserted against the quadrature | Pupil uniform in s (Airy case) |
+| PP4 | `fig04_in_focus_spot_and_kernel_floor.png` | T7 | PSF (Airy and aplanatic), LSF and its Gaussian core 0.080 µm against the Airy-FWHM Gaussian 0.086 µm; the \|v\|^-2 tail | fig4; P1, P11, P15 | -- |
+| PP5 | `fig05_defocus_through_focus.png` | T7, T3 | Peak St(δ), core power and total power; LSF through focus; σ_core(δ) against the configured σ_r(δ) and the ray slope, with the central-dip bands | fig5; P4, P5, P11-P13, P16 | Aplanatic, aberration-free |
+| PP6 | `fig06_aberration_twin_cases.png` | T7 | Ideal against depth aberration (n_m 1.45, D 20 µm): through-focus maps, axial profiles, LSFs with pedestal; coma skew | fig6; P7, P9, P10 | n_m and D illustrative, not Allen's |
+| PP7 | `fig07_where_each_phase_enters.png` | T7, T3 | Schematic: pupil -> field -> PSF -> LSF -> σ_core -> σ_r -> slab rendering -> fit -> bias table, and where each phase enters | fig7 | Schematic |
+
 ### 14.2 Backup or with caveats
 
 | Id | File | Topic | Shows / caveat |
@@ -1051,6 +1067,8 @@ python3 render_previews.py ../figures/R_repo_main ../figures/R_repo_main/preview
 - The palette is the dataviz reference palette. Its categorical slots 1-6 were validated: all checks pass, slots 3-5 are below 3:1 contrast, so every series also has a label or a line style.
 
 ---
+
+From the pupil-phase document, backup: PP1 `fig01_wavefront_error_W.png` (what W is; tilt moves, defocus lowers; uniform pupil) and PP2 `fig02_three_phases_across_the_pupil.png` (the three phases on one pupil diameter).
 
 ## 15. Figures still to make (specs)
 
