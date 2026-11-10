@@ -209,6 +209,16 @@ theory:
     closed_on:
     decision:
     note: "To study, in this order (the user, 2026-11-04, 17:20), the answers in the diameter calibration chat of 2026-11-04 to the messages of: first re-read (1) 15:02, y_ij = a_i + e_ij as the one-way random-intercept model; (2) 15:40, the derivation of Var(ybar_i) = s_b^2 + s_w^2 / n => E[MS_B] = n s_b^2 + s_w^2 (and 15:47, where the covariance term comes from); (3) 15:16 and, in full with Figure 1, 16:20, why MS_B carries n -- following 15:00, how the shared cell effect is separated from the node scatter with nodes alone (MS_W, MS_B); then study (4) 14:31, whether the near-field core width also depends on depth (the near table vs the anchor; depth in the slice), and (5) 14:31, why few cells break the cell bootstrap and how a bootstrap behaves on nested data treated as independent. Checks sent in the chat: bootstrap_nested_features.py, variance_components_check.py, anova_identity_check.py, grand_mean_check.py, ms_between_figure.py, ms_between_numbers.py; and checks/d118_2026-11-04/cluster_bootstrap_check.py."
+  - id: T12
+    title: "The node's own noise along the measuring line"
+    summary: "How the noise each node carries along its own measuring line, rather than one noise description for every node, could enter the fits at that node: the per-node chain's profile fits and the calibration's per-plane fits, whose goodness-of-fit cut and SNR rule already read a noise level. Hard to integrate; to discuss later (I-005)."
+    refs: [I-005, D-101, D-117.3]
+    parent: TG2
+    depends_on: []
+    affects: [I5, I10, I15]
+    status: open
+    closed_on:
+    decision:
 implementation:
   # ---- groups (no block of their own; coloured by their least advanced member)
   - id: G1
