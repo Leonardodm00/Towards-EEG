@@ -9842,7 +9842,7 @@ between the halves by more than 2 SE, corrected for the number of knots compared
 > 2 SE", whose option read "corrected for the number of knots"]; the SEs come from the cell bootstrap, both halves refitted
 on the same resampled cells [the question's premise]; it runs in the davinci pool job [user]. The assistant's readings,
 PROVISIONAL: "2 SE" is the family-wise level of a two-sided 2-SE test ($\alpha$ = 0.0455), so each of the $K$ knots is
-compared at $z > \Phi^{-1}(1 - 0.0455/(2K))$ (2.40 for the $K$ = 3 knots of the table, 0.28 to 0.84 um); each half is
+compared at $z > \Phi^{-1}(1 - 0.0455/(2K))$ (2.43 for the $K$ = 3 knots of the table, 0.28 to 0.84 um; `scipy.stats.norm.isf`); each half is
 weighted by cell (D-120.2) and must hold `calib_min_nodes_per_set` nodes, else the check reports "not enough nodes"; the
 far set is not split. (D-121.2) *The loop on davinci* (D-117.2 over the pool; Block 22): every round reruns each cell's
 calibration step on the array with the rules' law of the round before, then the pool's fits [user]; all rounds are
