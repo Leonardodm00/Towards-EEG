@@ -147,6 +147,7 @@ the "Binds" column.
 | 2026-11-04 (later) | No decision changed (the diameter calibration chat). **D-119 implemented** at `4892231` (block 10: the sparse growth fit; against the dense fit within 5.5e-12 um^2 on $G$, one fit 0.08 s at 1000 nodes against 59 s dense) and **D-118.3 implemented** at `fb1619a` and `f868d41` (block 19.6: the pooled SEs by cell from 10 cells, the larger of node and cell from 2 to 9, flagged; the far interval's $t$ on $C - 1$ degrees of freedom with the cell SE, the assistant's reading, PROVISIONAL); both statuses and index rows annotated, with the evidence **[run, sandbox: `checks/d118_2026-11-04/`; the smoke suites; 6 and 12 mutants]**. The davinci pool can now run the calibration: about 2 min (near) and 18 min (far) of bootstrap at 51 cells. D-118's Why: the cell bootstrap's range from 10 cells corrected to 0.89-0.99 (was 0.89-0.98; the check's own output). Next free IDs: D-120, I-005. |
 | 2026-11-04 (later, 2) | No decision changed (the diameter calibration chat). **Roadmap diameter-pipeline: T11 added, studying** (the user, 16:51: "Update the roadmap with also the fact that I'm studing this thing of the bootstrap"): "Bootstrap uncertainty of the pooled kernel on nested data" under TG3, affecting I10, I15, I19 -- why the anchor's and the far slope's SEs are bootstrapped and why by cell (the one-way random-intercept model, the design effect, the between/within ANOVA split, the cell bootstrap's few-cell bias); refs D-081.7, D-118.3, SPEC 19.6 (`b5b0d6e`). Next free IDs: D-120, I-005. |
 | 2026-11-10 | No decision changed (the diameter calibration chat). **Cell 15 on the pilot ran** (the user's log of 16:03): `REDO` and the reuse of Cell 7's searches (D-117.6; Cell 7's $\bar B$ 159.0 gl, $\hat\mu$ 0.258 /um and shift (0, 0) printed beside the step's own 123.0 gl, 0.320 /um and (2, 0), as D-117.6's correction intends); near 30 sufficient, far 2 INSUFFICIENT; anchor 0.5356 +- 0.0460 um, far slope 0.3971 +- 0.0302 (diagnostic). Colab's code predates block 19.6 (the far-fit line's format). D-118's status annotated. Next free IDs: D-120, I-005. |
+| 2026-11-10 (later) | Logs **D-120** (the user, 16:18: D-118.3's readings confirmed; the pooled fits weight cells; cells whose mean residual is too rare under the between-cell Gaussian leave the pool; no SE on the inner points; the assistant's readings for the weights and the removal rule PROVISIONAL, to confirm before the code) and **I-005** (the node's own noise along the measuring line; roadmap T12, open). D-118 and D-090 annotated. Next free IDs: D-121, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -286,10 +287,12 @@ would be needed*, *Status*.
 | D-117 | 2026-10-30 | the calibration verdict's tilt (kept); Cell 7's loop over the kernel law that Blocks 10.S, 15.2 and 15.3 read; a goodness of fit on every scanned plane (10.P, 15.2); 10.A's anchor bootstrap; `meta.nodes`; Block 19.3 on the pilot (Cell 15) | the tilt over +-2 um kept; the law iterated in Cell 7 (at most 3 rounds, one SE), the diagnostic slope fed back; residual-against-noise goodness of fit, near and far; the bootstrap's anchor from G(delta_0) alone; the pilot's values logged; Cell 15 reuses Cell 7's search [user] | active; implementation started |
 | D-118 | 2026-11-02 | `SurveyConfig.calib_scans_per_cell` (Block 19.3; D-089's 5); S3's calibration step on every cell (Cell 15, the davinci array); the pool (Block 19.4; D-088.3's cap of 30 superseded for it) | the per-cell quota is 30 scans per set; the pool takes up to 30 per set from every cell, no cap in all; the pooled SEs resample cells from 10 cells, the larger of node and cell SEs from 2 to 9, nodes for one cell [user] | active; D-118.1-2 implemented at `e6e37b2`; D-118.3 decided 2026-11-04, implemented at `fb1619a` |
 | D-119 | 2026-11-04 | `calibration.fit_growth` (Block 10, Eq. 4) and its callers (`fit`, 10.A's bootstrap, Cell 7, the pool); `CalibrationConfig.growth_jacobian`; 10.C.R's key | the same least-squares estimator with a sparse Jacobian, scipy `least_squares(method="trf", tr_solver="lsmr")`, checked against the dense fit [user] | active; implemented at `4892231` |
+| D-120 | 2026-11-10 | the pooled near and far fits (Blocks 10, 15, 19.4-19.6), their bootstraps and the by-cell residuals (19.5); the pool job | D-118.3's readings confirmed; the pooled fits weight cells; a cell whose mean residual is too rare under the between-cell Gaussian leaves the pool; no SE on the inner points [user] | active; D-120.2-3 not implemented |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
 | I-004 | 2026-10-22 | Block 4's absorption (`partition_vertical`, D-024 (i)) and Block 9's ray world; the hybrid of the 2026-10-09 renderers document (§3.8-3.9, on `main`); roadmap T7 | the hybrid renderer -- each slice's absorption from the condenser's rays, then the defocus kernel -- whose optics the user studies first | idea; roadmap T7 open; not scheduled [updated 2026-10-26: adopted as the renderer actually used once built, D-084] [updated 2026-10-27: built as SPEC Block 21 (D-092), not yet the default] |
+| I-005 | 2026-11-10 | the fits along a node's measuring line (Blocks 3, 5, 10, 12-13, 15); roadmap T12 | the node's own noise along its measuring line included in the fits at that node; to discuss later | idea; roadmap T12 open; not scheduled |
 
 ---
 
@@ -7687,7 +7690,7 @@ the report); whether a cell that stands out leaves the pool; a per-cell fit of t
 `tests/smoke/test_smoke_projection_check.py`, `tests/smoke/test_smoke_calibration_by_cell.py`; the dataviz skill's
 `validate_palette.js` on the three cell hues.
 
-**Status:** active; implemented 2026-10-27 (`6b8ea64`); not run on Allen's data (Colab Cells 11b and 15). [updated 2026-10-28: (D-090.1) run on Allen's data (Cell 11b, the user's log and figure of 11:16; 7.0 min, 579 crops): 52 specimens listed, each with `'MinimumIntensityProjection - xy'` and `'- yz'`, 4 also with `'MaximumIntensityProjection - xy'` and `'- yz'` (the strings as the API gives them). On the pilot 529878215, a 512 px window at (4199, 5325) over 521 planes: `'MinimumIntensityProjection - xy'` (546843114) matches the planes' pixelwise minimum, r* 0.9941 at offset (0, 0) (mean 0.7040, median 0.5376, max 0.4743); `'MaximumIntensityProjection - xy'` (550303812) is `unclear`: its best r is negative for every operator (min -0.4870, mean -0.3395, median -0.2415, max -0.3080), each at an edge of the +-3 px search **[user's log and figure, read]**; in the figure its neurites are bright on a dark, speckled ground -- the assistant's reading: an inverted, contrast-stretched image, which is why it is the darkest at level 4 (D-089.2's note) **[reasoning]**. Checked on the pilot only, in one window. (D-090.2), Cell 15, not run.] [updated 2026-10-28, later: the check's result applied by **D-098.2** -- Block 16.2 (a) takes the projection by its type.]
+**Status:** active; implemented 2026-10-27 (`6b8ea64`); not run on Allen's data (Colab Cells 11b and 15). [updated 2026-10-28: (D-090.1) run on Allen's data (Cell 11b, the user's log and figure of 11:16; 7.0 min, 579 crops): 52 specimens listed, each with `'MinimumIntensityProjection - xy'` and `'- yz'`, 4 also with `'MaximumIntensityProjection - xy'` and `'- yz'` (the strings as the API gives them). On the pilot 529878215, a 512 px window at (4199, 5325) over 521 planes: `'MinimumIntensityProjection - xy'` (546843114) matches the planes' pixelwise minimum, r* 0.9941 at offset (0, 0) (mean 0.7040, median 0.5376, max 0.4743); `'MaximumIntensityProjection - xy'` (550303812) is `unclear`: its best r is negative for every operator (min -0.4870, mean -0.3395, median -0.2415, max -0.3080), each at an edge of the +-3 px search **[user's log and figure, read]**; in the figure its neurites are bright on a dark, speckled ground -- the assistant's reading: an inverted, contrast-stretched image, which is why it is the darkest at level 4 (D-089.2's note) **[reasoning]**. Checked on the pilot only, in one window. (D-090.2), Cell 15, not run.] [updated 2026-10-28, later: the check's result applied by **D-098.2** -- Block 16.2 (a) takes the projection by its type.] [updated 2026-11-10: "whether a cell that stands out leaves the pool" answered by **D-120.3** (yes, by its mean residual against the between-cell Gaussian); a per-cell fit of the kernel still open]
 
 ---
 
@@ -9709,6 +9712,7 @@ pool's size (51 cells x 2 far nodes) one far fit takes 1.16 s and its 1000 cell 
 side's 1000 about 2 min with D-119 **[run, sandbox: `checks/d118_2026-11-04/far_fit_timing.py`]**. Not run on
 Allen's data]
 [updated 2026-11-10: run in Colab on the pilot alone (Cell 15 with `REDO` and Cell 7's searches reused, the user's log of 2026-11-10 16:03): 30 near and 2 far scans of 399 candidates (964 s); `pooled near field: 30 of 30 scans taken (at most 30 per cell)` -- sufficient; far 2 of 2 -- INSUFFICIENT (D-088.3); growth fit on 27 nodes (3 dropped), table 0.080, 0.127, 0.351, 0.536 um at 0, 0.28, 0.56, 0.84 um; anchor 0.5356 um, SE 0.0460 um (node bootstrap); far fit 0.3971 +- 0.0302 (diagnostic, 2 nodes, t on 1 df), per sign 0.4158 and 0.2841 **[data: the user's log]**. The far-fit line has the format of `e6e37b2`/`4892231`, so Colab ran code before block 19.6: D-118.3 was not exercised, which on one cell changes nothing (node bootstrap, $t$ on $J - 1$ under both); whether D-119's sparse fit ran is not visible in the log **[src: the print formats]**]
+[updated 2026-11-10 (later): D-118.3's two PROVISIONAL readings confirmed by **D-120.1**]
 
 ---
 
@@ -9755,6 +9759,61 @@ min_origin); one fit takes 0.04 s at 300 nodes (dense 1.53 s), 0.08 s at 1000 an
 bootstrap refits take about 2 min at the pool's size **[run, sandbox: `checks/d118_2026-11-04/
 sparse_growth_check.py`]**; `test_smoke_calibration.py` 10 pass, 6 of 6 mutants killed **[run, sandbox]**; not
 run on Allen's data]
+
+---
+
+## D-120 -- The answers of 2026-11-10 (user): D-118.3's two readings confirmed; the pooled fits weight cells, not nodes; a cell whose mean residual is too rare under the between-cell Gaussian leaves the pool; no SE on the near table's inner points
+
+**Date:** 2026-11-10, 16:18 (Europe/Rome), the diameter calibration chat, answering the list "the decisions to take" of
+16:06. **Binds:** the pooled near and far fits (`calibrate_kernel.py fit` and `far-fit` on `scans_pooled.json`, SPEC Blocks
+10, 15, 19.4-19.6), their bootstraps (19.6), the by-cell residuals (19.5), `survey_cells.py pool --what calibration` and
+the davinci pool job; not Cell 7 or a single cell (one cell: every rule below reduces to today's).
+
+**Decision [user].** "1) and 2) as you propose. 3) I would weight by cell. 4) i would say if a cell's own mean is too rare
+with respect to the sigma_b based gaussian then it has its nodes removed from the fitting pool. [...] 6) no need".
+
+**Statement.** (D-120.1) D-118.3's two readings stand: with the cell SE reported, the far slope's interval takes $t$ on
+$C - 1$ degrees of freedom ($C$ the far nodes' cells); the cell bootstrap starts at `bootstrap_cell_min` = 10 cells [user].
+(D-120.2) *Weights by cell.* The pooled near fit (Eq. 4) and far fit give every cell the same total weight instead of
+every node [user]. The assistant's readings, PROVISIONAL, to confirm before the code: a node of cell $c$ weighs $1/N_c$
+($N_c$ the cell's nodes in that set), i.e. its residuals enter the sum of squares multiplied by $1/N_c$, the far fit's
+IRLS weights multiplied likewise; a resampled cell keeps its weights in every copy; the per-node parameters are unchanged.
+(D-120.3) *Cells that stand out leave the pool.* A cell whose own mean is too rare under the Gaussian of the between-cell
+spread ($\sigma_b$) has its nodes removed from the fitting pool [user]. The assistant's readings, PROVISIONAL, to confirm
+before the code: per set (near, far) separately; a node's value is its mean residual from the pooled law over its used
+planes (19.5's residuals, um); $\hat\sigma_b^2$ and $\hat\sigma_w^2$ from the one-way ANOVA of those values (method of
+moments, the effective size $n_0$ for unequal cells, $\hat\sigma_b^2$ truncated at 0), taken without the tested cell so
+that an outlier does not inflate its own yardstick; the tested cell's mean $m_c$ is compared with
+$\mathcal N(\bar m_{(-c)},\ \hat\sigma_{b,(-c)}^2 + \hat\sigma_{w,(-c)}^2/N_c)$ -- the cell mean also carries its own nodes'
+scatter, so a cell of few nodes is not removed for being noisy; "too rare" is a two-sided tail below $0.05/C$ (Bonferroni
+over the $C$ cells); one pass, then the fit and its bootstrap are run again without the removed cells, which are listed in
+the files and marked in 19.5's figures; applied only from `bootstrap_cell_min` cells (below, the $z$ values are reported
+and nothing is removed). (D-120.4) No SE on the near table's inner points ($\sigma_{\rm r}$ at 0.28 and 0.56 um): the
+anchor's stays the only one [user: "no need"].
+
+**Why [user; run; reasoning].** **[user]** as quoted. On simulated nested data the between-cell variance estimated from
+few cells is very uncertain -- its 10-90 % range 0.13 to 2.04 times the truth at 10 cells and $\rho$ = 0.05, negative in
+47 % of datasets at 2 cells -- hence the minimum of cells for D-120.3 **[run, sandbox: `variance_components_check.py`,
+2026-11-04, n = 30, 4000 datasets]**. With unequal cells the between-cell mean square's expectation carries $n_0$, not the
+mean size: for cells of 30 and 2 nodes $n_0$ = 3.75 against 16 **[run, sandbox: `ms_between_numbers.py`]**.
+
+**What it implies for code and tables.** `calibration.fit_growth` and `far_field.fit_far_slope` gain node weights; the
+pool's fit path (`calibrate_kernel.py fit`/`far-fit`) the removal pass; `calibration_report.kernel_law_by_cell` the ANOVA
+and the $z$ per cell; config fields for the weighting, $\alpha$ and the minimum; SPEC Blocks 10, 15, 19; Cells 7 and 15
+unchanged in number on one cell. No hash changes (calibration fields are in no signature).
+
+**What it does not decide [open].** Weights per node ($1/N_c$) or per observation; the random-effects weights
+$1/(\hat\sigma_b^2 + \hat\sigma_w^2/N_c)$ as an intermediate (node-equal when cells agree, cell-equal when they differ --
+the assistant's mention, not chosen); whether D-088.3's sufficiency (10 nodes per set) should count cells once cells weigh
+equally; $\alpha$ and the minimum of cells; whether a cell removed from one set leaves the other; per-cell kernel fits as a
+check (D-088's open point, not answered by D-120.3); the depth check (procedure s.3.10; explained 2026-11-10) and whether
+Cell 15 loops (D-117; explained 2026-11-10).
+
+**Sources.** **[user]** 2026-11-10, 16:18. **[run, sandbox]** the checks of 2026-11-04 sent in the chat
+(`variance_components_check.py`, `ms_between_numbers.py`).
+
+**Status:** active; D-120.1 and D-120.4 need no code beyond today's (the readings are what `fb1619a` does); D-120.2 and
+D-120.3 not implemented, their readings to confirm.
 
 ---
 
@@ -10045,3 +10104,22 @@ the findings of its abstract); optics v1.5 (on `main`). **[KB]** D-024 (i), D-06
 
 **Status:** idea; the user studies its optics first (roadmap T7, open) **[user]**; not scheduled in the
 diameter plan. [updated 2026-10-26, 16:48: promoted by **D-084** (user) to be the renderer actually used once built; its optics (T7) first] [updated 2026-10-27: built as SPEC Block 21 (**D-092**), smoke-tested, not yet the default; T7 still open]
+
+---
+
+## I-005 -- The node's own noise along the measuring line, included in the fits at that node; to discuss later
+
+**Date:** 2026-11-10, 16:18 (Europe/Rome), the diameter calibration chat. **Concerns:** the fits along a node's measuring
+line -- the tube fit (Block 3), the per-node chain (Block 5), the SGT plane fit (Blocks 12-13) and the calibration's
+per-plane fits (Blocks 10, 15, whose goodness-of-fit cut and SNR rule already read a noise level, D-101, D-117.3); roadmap
+T12.
+
+**Idea [user].** "I would like also to add a branch in the roadmap where we discuss how to include the node's specific
+noise along the measuring line. It is difficult to integrate but we will see afterwards". The assistant's reading: each
+node's own noise along its measuring line -- as opposed to one noise description for all nodes -- would enter the fits at
+that node; how is to be discussed.
+
+**What it changes now.** Nothing in the code or the plan. Recorded as the roadmap's theory stage T12, status open, under
+TG2, linked to I5, I10, I15.
+
+**Status:** idea; roadmap T12 open; not scheduled.
