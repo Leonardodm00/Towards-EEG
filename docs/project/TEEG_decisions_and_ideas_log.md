@@ -148,6 +148,7 @@ the "Binds" column.
 | 2026-11-04 (later, 2) | No decision changed (the diameter calibration chat). **Roadmap diameter-pipeline: T11 added, studying** (the user, 16:51: "Update the roadmap with also the fact that I'm studing this thing of the bootstrap"): "Bootstrap uncertainty of the pooled kernel on nested data" under TG3, affecting I10, I15, I19 -- why the anchor's and the far slope's SEs are bootstrapped and why by cell (the one-way random-intercept model, the design effect, the between/within ANOVA split, the cell bootstrap's few-cell bias); refs D-081.7, D-118.3, SPEC 19.6 (`b5b0d6e`). Next free IDs: D-120, I-005. |
 | 2026-11-10 | No decision changed (the diameter calibration chat). **Cell 15 on the pilot ran** (the user's log of 16:03): `REDO` and the reuse of Cell 7's searches (D-117.6; Cell 7's $\bar B$ 159.0 gl, $\hat\mu$ 0.258 /um and shift (0, 0) printed beside the step's own 123.0 gl, 0.320 /um and (2, 0), as D-117.6's correction intends); near 30 sufficient, far 2 INSUFFICIENT; anchor 0.5356 +- 0.0460 um, far slope 0.3971 +- 0.0302 (diagnostic). Colab's code predates block 19.6 (the far-fit line's format). D-118's status annotated. Next free IDs: D-120, I-005. |
 | 2026-11-10 (later) | Logs **D-120** (the user, 16:18: D-118.3's readings confirmed; the pooled fits weight cells; cells whose mean residual is too rare under the between-cell Gaussian leave the pool; no SE on the inner points; the assistant's readings for the weights and the removal rule PROVISIONAL, to confirm before the code) and **I-005** (the node's own noise along the measuring line; roadmap T12, open). D-118 and D-090 annotated. Next free IDs: D-121, I-006. |
+| 2026-11-10 (later, 2) | Logs **D-121** (the user, 16:37, and four dialog answers: the depth check on davinci, stack z median split, a knot differing > 2 SE family-wise; the loop of D-117.2 over the pool on davinci, all rounds submitted at once, < 1 SE or 5 rounds). D-120's readings confirmed and **D-120.2 implemented** at `7d03e16` (block 19.7) **[run, sandbox]**. Next free IDs: D-122, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -287,7 +288,8 @@ would be needed*, *Status*.
 | D-117 | 2026-10-30 | the calibration verdict's tilt (kept); Cell 7's loop over the kernel law that Blocks 10.S, 15.2 and 15.3 read; a goodness of fit on every scanned plane (10.P, 15.2); 10.A's anchor bootstrap; `meta.nodes`; Block 19.3 on the pilot (Cell 15) | the tilt over +-2 um kept; the law iterated in Cell 7 (at most 3 rounds, one SE), the diagnostic slope fed back; residual-against-noise goodness of fit, near and far; the bootstrap's anchor from G(delta_0) alone; the pilot's values logged; Cell 15 reuses Cell 7's search [user] | active; implementation started |
 | D-118 | 2026-11-02 | `SurveyConfig.calib_scans_per_cell` (Block 19.3; D-089's 5); S3's calibration step on every cell (Cell 15, the davinci array); the pool (Block 19.4; D-088.3's cap of 30 superseded for it) | the per-cell quota is 30 scans per set; the pool takes up to 30 per set from every cell, no cap in all; the pooled SEs resample cells from 10 cells, the larger of node and cell SEs from 2 to 9, nodes for one cell [user] | active; D-118.1-2 implemented at `e6e37b2`; D-118.3 decided 2026-11-04, implemented at `fb1619a` |
 | D-119 | 2026-11-04 | `calibration.fit_growth` (Block 10, Eq. 4) and its callers (`fit`, 10.A's bootstrap, Cell 7, the pool); `CalibrationConfig.growth_jacobian`; 10.C.R's key | the same least-squares estimator with a sparse Jacobian, scipy `least_squares(method="trf", tr_solver="lsmr")`, checked against the dense fit [user] | active; implemented at `4892231` |
-| D-120 | 2026-11-10 | the pooled near and far fits (Blocks 10, 15, 19.4-19.6), their bootstraps and the by-cell residuals (19.5); the pool job | D-118.3's readings confirmed; the pooled fits weight cells; a cell whose mean residual is too rare under the between-cell Gaussian leaves the pool; no SE on the inner points [user] | active; D-120.2-3 not implemented |
+| D-120 | 2026-11-10 | the pooled near and far fits (Blocks 10, 15, 19.4-19.6), their bootstraps and the by-cell residuals (19.5); the pool job | D-118.3's readings confirmed; the pooled fits weight cells; a cell whose mean residual is too rare under the between-cell Gaussian leaves the pool; no SE on the inner points [user] | active; D-120.2 implemented at `7d03e16`; D-120.3 next |
+| D-121 | 2026-11-10 | the pooled calibration on davinci: a depth check (19.9), the loop of D-117.2 over the pool (10.L, 22) | the near law on the shallow and deep halves (stack z, median), flagged when a knot differs > 2 SE family-wise; the loop's rounds all submitted at once, stopped below one SE or after 5 rounds [user] | active; not implemented |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
@@ -9813,7 +9815,57 @@ Cell 15 loops (D-117; explained 2026-11-10).
 (`variance_components_check.py`, `ms_between_numbers.py`).
 
 **Status:** active; D-120.1 and D-120.4 need no code beyond today's (the readings are what `fb1619a` does); D-120.2 and
-D-120.3 not implemented, their readings to confirm.
+D-120.3 not implemented, their readings to confirm. [updated 2026-11-10, 16:37: the readings of D-120.2 and D-120.3 confirmed by the user ("3) and
+4): logged. Perfect as you said"); the open sub-question whether D-088.3's sufficiency should count cells stays open
+(D-088.3 unchanged: 10 nodes per set)] [updated 2026-11-10 (later): D-120.2 implemented at `7d03e16` (block 19.7: on
+exact scans of cells of 6 and 2 nodes the pooled $G$ is the cells' own $G$ averaged 1:1 by cell and 6:2 by node, to
+1e-8 um^2; one cell unchanged; 9 of 10 mutants killed) **[run, sandbox]**; D-120.3 next]
+
+---
+
+## D-121 -- The depth check and the calibration loop, both built to run on davinci (user): the near law fitted on the shallow and the deep half of the pooled nodes; the loop of D-117.2 run over the pool, all rounds submitted at once, stopped below one SE or after 5 rounds
+
+**Date:** 2026-11-10, 16:37 (Europe/Rome), the diameter calibration chat, and the user's answers to the four dialog
+questions that followed. **Binds:** the pooled calibration on davinci (S3c: `survey_cells.pbs`, `survey_pool.pbs`, the
+pool's `fit`/`far-fit`), a new check on the pooled near scans (Block 19.9), the loop of D-117.2 (Block 10.L) and its davinci
+driver (Block 22).
+
+**Decision [user].** "5) Build the check to be run but in da vinci. 6) It's time consuming but worthy to run on the HPC
+where we can heavily parallelize. build it and remind me briefly of the stop rules used in this case to judge that the
+metrics are not changing and thus stop the iterations". The dialog: "Stack z, median split"; "Any knot differs > 2 SE";
+"One submission, pre-chained"; "< 1 SE, max 5 rounds".
+
+**Statement.** (D-121.1) *The depth check* (procedure s.3.10; Block 19.9): a near node's depth is its fitted axis depth
+$\hat z_{{\rm ax},i}$ from the stack's first plane; the pooled near nodes are split at their median into a shallow and a deep
+half and Eq. 4 is fitted on each half [user]; the depth effect is called real when any knot of the near table differs
+between the halves by more than 2 SE, corrected for the number of knots compared (Bonferroni) [user: "Any knot differs
+> 2 SE", whose option read "corrected for the number of knots"]; the SEs come from the cell bootstrap, both halves refitted
+on the same resampled cells [the question's premise]; it runs in the davinci pool job [user]. The assistant's readings,
+PROVISIONAL: "2 SE" is the family-wise level of a two-sided 2-SE test ($\alpha$ = 0.0455), so each of the $K$ knots is
+compared at $z > \Phi^{-1}(1 - 0.0455/(2K))$ (2.40 for the $K$ = 3 knots of the table, 0.28 to 0.84 um); each half is
+weighted by cell (D-120.2) and must hold `calib_min_nodes_per_set` nodes, else the check reports "not enough nodes"; the
+far set is not split. (D-121.2) *The loop on davinci* (D-117.2 over the pool; Block 22): every round reruns each cell's
+calibration step on the array with the rules' law of the round before, then the pool's fits [user]; all rounds are
+submitted at once, linked with `-W depend=afterokarray` / `afterok`, and a round whose predecessor converged exits at once
+[user]; it stops when the anchor $\hat\sigma_0$ and the far slope $\hat\gamma$ each move by less than one SE between two
+rounds, or after 5 rounds [user]. The assistant's readings, PROVISIONAL: the SE is the later round's (the pooled cell
+bootstrap, D-118.3); while the far set holds fewer than 10 nodes its diagnostic slope is fed back, as in D-117.2; the
+production kernel is not touched (the rules' law is a calibration setting, D-117.2's reading); Cell 7 keeps 3 rounds
+(D-117.2).
+
+**Why [user; doc].** **[user]** as quoted. **[doc]** procedure s.3.10 ("Depth dependence | Eq. (4) on shallow vs deep nodes
+in the slice"); the optics notes (index mismatch: aberration with depth). The array's calibration step took 964 s on the
+pilot in Colab (the 2026-11-10 run) **[data]**; 51 cells run in parallel on davinci.
+
+**What it does not decide [open].** Which plane is the stack's first relative to the coverslip (the split's sign is
+reported, not interpreted); the far set by depth; whether a real depth effect makes depth an axis of the kernel or
+restricts the calibration's depth range (procedure s.3.10's two options); the loop's behaviour when a round's far fit
+fails (D-117.2's reading: the previous slope kept).
+
+**Sources.** **[user]** 2026-11-10, 16:37 and the dialog. **[doc]** `TEEG_diameter_bias_table_procedure_2026-10-04.md`
+s.3.10; `TEEG_diameter_optics_notes.md`.
+
+**Status:** active; not implemented (Blocks 19.9, 10.L and 22 drafted next).
 
 ---
 
