@@ -342,6 +342,7 @@ class FarFit:
     at_bound: bool
     message: str
     nfev: int
+    node_weights: Optional[np.ndarray] = None   # (J,) Block 19.7: w_j (mean 1; all 1 for one cell)
 
     def rms_by_offset(self):
         out = {}
@@ -351,7 +352,7 @@ class FarFit:
         return out
 
 
-def fit_far_slope(sel, sigma0_um, cfg, per_sign=False, quadratic=False, weights="model", k_star=None):
+def fit_far_slope(sel, sigma0_um, cfg, per_sign=False, quadratic=False, weights="model", k_star=None, cells=None):
     """The far fit (15.4) over a FarSelection with the anchor sigma0_um held
     fixed. theta = (c in R^J, s in [-b, b]^J, gamma in [0, gamma_max] (two
     slopes when per_sign: delta > 0, delta < 0), gamma_2 in R when quadratic);
@@ -360,13 +361,24 @@ def fit_far_slope(sel, sigma0_um, cfg, per_sign=False, quadratic=False, weights=
     1e-10) from c = 0, s = 0, gamma = 1, gamma_2 = 0. weights "model": an
     unweighted round then far_irls_rounds refits with 1 / SE_m frozen at the
     previous round (D-078.3); "none": the unweighted fit only. k_star: {node_id:
-    k*} for obs_offset (None: offsets from the nearest plane to z_p).
+    k*} for obs_offset (None: offsets from the nearest plane to z_p). Cell
+    weights (Block 19.7, D-120.2): every residual is also multiplied by
+    sqrt(w_j), w = calibration.cell_weights over the far nodes' cells (cells:
+    one label per far node, None for node_cells of sel.node_ids); all 1 for
+    one cell, equal cells or pool_weighting "node". residual_um2 stays
+    unweighted; weights holds the last round's sqrt(w_j) / SE_m.
     ValueError below two nodes or six observations."""
     cal = cfg.calibration
     J = int(sel.node_ids.size)
     om, idx, zk, zp = sel.omega_um2, sel.obs_node, sel.z_um, sel.z_p_um[sel.obs_node]
     if J < 2 or om.size < 6:
         raise ValueError("fit_far_slope: need at least two far nodes and six planes (got %d, %d)" % (J, om.size))
+    from .calibration import cell_weights, node_cells
+    labels = node_cells(sel.node_ids) if cells is None else np.asarray(cells)
+    if labels.shape[0] != J:
+        raise ValueError("fit_far_slope: cells must hold one label per far node (%d for %d)" % (labels.shape[0], J))
+    w_node = cell_weights(labels, cfg)                                      # Block 19.7 (D-120.2)
+    sw = np.sqrt(w_node)[idx]
     d0, s0 = float(cal.table_max_delta_um), float(sigma0_um)
     ng, nq = (2 if per_sign else 1), (1 if quadratic else 0)
     step, half = float(cfg.measure.profile_step_um), float(cal.far_profile_half_um)
@@ -412,7 +424,7 @@ def fit_far_slope(sel, sigma0_um, cfg, per_sign=False, quadratic=False, weights=
                           ftol=1e-10, xtol=1e-10, gtol=1e-10, max_nfev=500)
         return r
 
-    wts = np.ones_like(om)
+    wts = sw.copy()
     r = solve(wts, q0)
     nfev, rounds = int(r.nfev), 0
     if weights == "model":
@@ -422,7 +434,7 @@ def fit_far_slope(sel, sigma0_um, cfg, per_sign=False, quadratic=False, weights=
             se = se_model(a_pred, s_pred, sel.obs_rms_gl, step, half)
             if not np.all(np.isfinite(se)) or np.any(se <= 0):
                 break
-            wts = 1.0 / se
+            wts = sw / se
             r = solve(wts, r.x)
             nfev += int(r.nfev)
             rounds += 1
@@ -437,7 +449,7 @@ def fit_far_slope(sel, sigma0_um, cfg, per_sign=False, quadratic=False, weights=
     return FarFit(float(g[0]), float(g[1]) if per_sign else float("nan"), float(g2) if quadratic else float("nan"),
                   s0, c, s, sel.node_ids.copy(), idx.copy(), np.asarray(sel.obs_k).copy(), offs, dl,
                   predict(r.x) - om, wts.copy(), float(d0 + np.max(x)), rounds, bool(r.success) and not at_bound,
-                  at_bound, str(r.message), nfev)
+                  at_bound, str(r.message), nfev, w_node)
 
 
 def bootstrap_gamma(sel, sigma0_um, cfg, rng, n_resamples=None, unit="node"):
@@ -446,16 +458,17 @@ def bootstrap_gamma(sel, sigma0_um, cfg, rng, n_resamples=None, unit="node"):
     refitted by fit_far_slope with the model weights; a draw whose fit fails
     (or has fewer than two distinct nodes' worth of planes) is dropped. se is
     the SD of the kept gamma_hat*, NaN below two. unit "cell" (Block 19.6,
-    D-118.3) resamples the far nodes' cells, each with all its nodes."""
+    D-118.3) resamples the far nodes' cells, each with all its nodes. Each
+    resample is refitted with its cells' labels (Block 19.7), so the weights
+    of D-120.2 follow the copies."""
     from .calibration import node_cells, resample
     n = int(cfg.calibration.bootstrap_resamples if n_resamples is None else n_resamples)
-    J = int(sel.node_ids.size)
-    cells = node_cells(sel.node_ids) if unit == "cell" else np.zeros(J, dtype=int)
+    cells = node_cells(sel.node_ids)
     draws = []
     for _ in range(n):
-        pick = resample(cells, rng, unit)
+        pick, labs = resample(cells, rng, unit, with_labels=True)
         try:
-            f = fit_far_slope(sel.subset(pick), sigma0_um, cfg)
+            f = fit_far_slope(sel.subset(pick), sigma0_um, cfg, cells=labs)
         except ValueError:
             continue
         if f.success:

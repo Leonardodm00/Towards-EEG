@@ -31,6 +31,15 @@ Checks
                         the anchor above the node SE when cells differ, near
                         it when they do not; "larger" at 5 cells; the far
                         side's own plan and t_(C-1); determinism; refusals
+    test_cell_weights   2026-11-10 (19.7, D-120.2): exact near scans of two
+                        cells (6 nodes, growth 0.3 d^2; 2 nodes, 0.6 d^2):
+                        the pooled G equals the cells' own G averaged with
+                        weights 6:2 by node and 1:1 by cell; one cell, equal
+                        cells and a node dropped from the larger cell give the
+                        same G under both weightings; the labelled resample
+                        draws as the unlabelled one; the far slope by cell
+                        nearer the cells' mean slope than by node; the CLI
+                        records and prints the weighting
     test_edge_cases     no scans in a set; a cell without candidates; a
                         node id beyond the qualifier refused; the
                         configuration's refusals
@@ -582,6 +591,139 @@ def test_cell_bootstrap():
         pass
     else:
         raise AssertionError("an unknown resampling unit must be refused")
+
+
+def exact_near(cell, n_nodes, a, dz, start=0):
+    """Exact near scans of one cell (qualified ids): the axis on plane 0, 7 planes, omega = c_n + a 0.3 delta^2."""
+    ks = np.arange(-3, 4)
+    out = []
+    for n in range(start, start + n_nodes):
+        om = 0.03 + 0.01 * n + a * 0.3 * (ks * dz) ** 2
+        m = ks.size
+        out.append(CAL.PlaneScan(node_id=cell * CP.QUALIFIER + n, d_hat_um=0.4, phi_rad=0.0, alpha_hat=0.2, k_star=0,
+                                 z_sub_um=0.0, ks=ks, z_um=ks * dz, omega_um2=om, vw_um2=om.copy(),
+                                 area_gl_um=np.full(m, 5.0), depth_gl=np.full(m, 20.0), B_bar=np.full(m, 200.0),
+                                 status=tuple("ok" for _ in range(m)), set="near"))
+    return out
+
+
+def test_cell_weights():
+    d = default_config()
+    assert d.calibration.pool_weighting == "cell"
+    d_node = dataclasses.replace(d, calibration=dataclasses.replace(d.calibration, pool_weighting="node"))
+    dz = d.acquisition.dz_um
+    A, B = exact_near(1, 6, 1.0, dz), exact_near(2, 2, 2.0, dz)
+    gA, gB = CAL.fit_growth(A, d).g_um2, CAL.fit_growth(B, d).g_um2
+    g_node, g_cell = CAL.fit_growth(A + B, d_node), CAL.fit_growth(A + B, d)
+    ok = np.isfinite(gA) & np.isfinite(gB)
+    assert ok.sum() >= 3, gA
+    # (a) known answer: Eq. 4 is linear in (c, G) at fixed axes, the axes stay on plane 0 by symmetry, each node's
+    # c_i is free, so the pooled G is the cells' own G averaged with their total weights; 1e-8 um^2 is far above
+    # the solver's 1e-12 tolerances on a cost of order 1e-2 and far below the 0.05-0.3 um^2 the two answers differ by
+    want_node, want_cell = (6 * gA + 2 * gB) / 8, (gA + gB) / 2
+    assert np.max(np.abs(g_node.g_um2[ok] - want_node[ok])) < 1e-8, (g_node.g_um2, want_node)
+    assert np.max(np.abs(g_cell.g_um2[ok] - want_cell[ok])) < 1e-8, (g_cell.g_um2, want_cell)
+    assert np.allclose(g_cell.node_weights, np.r_[np.full(6, 8 / 12.0), np.full(2, 8 / 4.0)], rtol=0, atol=1e-15)
+    assert np.all(g_node.node_weights == 1.0)
+    # (b) invariants: one cell; equal cells; a node dropped from cell A (2 finite planes < 3) leaves A two used
+    # nodes, as many as B's: the weights are all 1 and the fits identical
+    for scans in (A, A[:4] + exact_near(2, 4, 2.0, dz)):
+        assert np.array_equal(CAL.fit_growth(scans, d).g_um2, CAL.fit_growth(scans, d_node).g_um2)
+    A3 = exact_near(1, 3, 1.0, dz)
+    bad = A3[0]
+    om = bad.omega_um2.copy()
+    om[2:] = np.nan
+    A3[0] = dataclasses.replace(bad, omega_um2=om, vw_um2=om.copy())
+    gd_cell, gd_node = CAL.fit_growth(A3 + B, d), CAL.fit_growth(A3 + B, d_node)
+    assert len(gd_cell.dropped_nodes) == 1 and np.all(gd_cell.node_weights == 1.0)
+    assert np.array_equal(gd_cell.g_um2, gd_node.g_um2)
+    # (c) the labelled resample draws as the unlabelled one; node labels are the nodes' cells; cell copies 0..C-1
+    cells = np.array([3, 3, 1, 1, 1, 2, 3])
+    for seed in range(5):
+        i1 = CAL.resample(cells, np.random.default_rng(seed), "cell")
+        i2, lab = CAL.resample(cells, np.random.default_rng(seed), "cell", with_labels=True)
+        assert np.array_equal(i1, i2) and sorted(set(lab.tolist())) == [0, 1, 2]
+        members = {c: list(np.flatnonzero(cells == c)) for c in (1, 2, 3)}
+        for t in range(3):                       # copy t: one contiguous run holding one whole cell, in order
+            run = np.flatnonzero(lab == t)
+            assert np.array_equal(run, np.arange(run[0], run[-1] + 1)), (lab, i2)
+            owner = set(cells[i2[run]].tolist())
+            assert len(owner) == 1 and list(i2[run]) == members[owner.pop()], (lab, i2)
+        j1 = CAL.resample(cells, np.random.default_rng(seed), "node")
+        j2, labn = CAL.resample(cells, np.random.default_rng(seed), "node", with_labels=True)
+        assert np.array_equal(j1, j2) and np.array_equal(labn, cells[j2])
+    w = CAL.cell_weights(np.array([0, 0, 1, 1, 1, 1]), d)
+    assert np.allclose(w, [1.5, 1.5, 0.75, 0.75, 0.75, 0.75]) and abs(w.mean() - 1.0) < 1e-15
+    # (d) the far fit: cell A 6 nodes at gamma 0.6, cell B 2 nodes at 1.0, exact F1 scans, unweighted rounds
+    from allen_diameter.analysis import far_field as FF
+    rng = np.random.default_rng(11)
+    far = [far_scan(1 * CP.QUALIFIER + j, d, 0.6, 0.5, rng) for j in range(6)] + \
+          [far_scan(2 * CP.QUALIFIER + j, d, 1.0, 0.5, rng) for j in range(2)]
+    sel = FF.select_far_planes(far, d)
+    assert sel.node_ids.size == 8, sel.dropped
+    f_node = FF.fit_far_slope(sel, 0.5, d_node, weights="none")
+    f_cell = FF.fit_far_slope(sel, 0.5, d, weights="none")
+    assert 0.6 < f_node.gamma < f_cell.gamma < 1.0, (f_node.gamma, f_cell.gamma)
+    assert abs(f_cell.gamma - 0.8) < abs(f_node.gamma - 0.8), (f_node.gamma, f_cell.gamma)
+    sel1 = FF.select_far_planes(far[:6], d)
+    assert FF.fit_far_slope(sel1, 0.5, d).gamma == FF.fit_far_slope(sel1, 0.5, d_node).gamma
+    # (e) the CLI records the weighting and prints it for two cells or more
+    with tempfile.TemporaryDirectory() as tmp:
+        sp, cp = os.path.join(tmp, "scans.json"), os.path.join(tmp, "calib.json")
+        CIO.save_scans(A + B, sp, {})
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            CK.run_fit(dataclasses.replace(d, calibration=dataclasses.replace(d.calibration, bootstrap_resamples=5)),
+                       sp, cp)
+        rec = CIO.load_calibration(cp)
+        assert rec["meta"]["weighting"] == dict(unit="cell", n_cells=2), rec["meta"].get("weighting")
+        assert "each of the 2 cells weighs the same (D-120.2)" in buf.getvalue(), buf.getvalue()[:400]
+        assert len(rec["growth"]["node_weights"]) == 8
+    # (g) on noisy cells of unequal size (8, 3, 5 nodes) the weighted fit is the same with the sparse and the dense
+    # Jacobian at the table's knots (<= delta_0 = 0.84 um; the knot beyond, extrapolated, is flat enough for the two
+    # stopping points to differ by 1e-6 um^2 at equal cost, weighted or not); 1e-7 um^2 is far below the 5e-2 an
+    # unweighted Jacobian gives; and residual_um2 is the unweighted model minus data, recomputed here from the
+    # fit's own c, axes and G
+    d_dense = dataclasses.replace(d, calibration=dataclasses.replace(d.calibration, growth_jacobian="dense"))
+    noisy = [sc for sc in near_cells(3, 8, 0.4, np.random.default_rng(3), noise=0.01)
+             if not (sc.node_id // CP.QUALIFIER == 2 and sc.node_id % CP.QUALIFIER >= 3)
+             and not (sc.node_id // CP.QUALIFIER == 3 and sc.node_id % CP.QUALIFIER >= 5)]
+    gs, gdn = CAL.fit_growth(noisy, d), CAL.fit_growth(noisy, d_dense)
+    okn = np.isfinite(gs.g_um2) & np.isfinite(gdn.g_um2) & (gs.knots_um <= d.calibration.table_max_delta_um + 1e-9)
+    assert len(set(np.round(gs.node_weights, 12).tolist())) == 3, gs.node_weights
+    assert np.max(np.abs(gs.g_um2[okn] - gdn.g_um2[okn])) < 1e-7, np.max(np.abs(gs.g_um2[okn] - gdn.g_um2[okn]))
+    om_obs = np.concatenate([sc.values(d.calibration.statistic)[np.isfinite(sc.values(d.calibration.statistic))]
+                             for sc in noisy])
+    model = gs.c_um2[gs.obs_node] + gs.growth(gs.delta_um)
+    assert np.max(np.abs(gs.residual_um2 - (model - om_obs))) < 1e-12
+    # (f) the bootstraps refit each resample with its copies as cells: near, cells of 6 and 2 nodes -- every draw
+    # is one cell's own anchor or the two cells' equal-weight anchor, never the 6:2 one (exact data: 1e-9 um)
+    a_A, a_B = CAL.anchor_value(CAL.fit_growth(A, d), d), CAL.anchor_value(CAL.fit_growth(B, d), d)
+    a_cell, a_node = CAL.anchor_value(g_cell, d), CAL.anchor_value(g_node, d)
+    assert abs(a_cell - a_node) > 1e-3, (a_cell, a_node)
+    _se, _n, draws = CAL.bootstrap_sigma0(A + B, d, np.random.default_rng(2), n_resamples=40, unit="cell")
+    near_ok = [min(abs(x - a_A), abs(x - a_B), abs(x - a_cell)) < 1e-9 for x in draws]
+    assert all(near_ok) and any(abs(x - a_cell) < 1e-9 for x in draws), (draws, a_A, a_B, a_cell, a_node)
+    # far, three cells of 2 nodes (0.6, 0.6, 1.0): a copy of a cell is a cell, so with equal cells every draw
+    # equals the resample's fit with every node weighing the same (a cell drawn twice weighing twice)
+    rng = np.random.default_rng(12)
+    far3 = [far_scan(c * CP.QUALIFIER + j, d, g, 0.5, rng) for c, g in ((1, 0.6), (2, 0.6), (3, 1.0)) for j in range(2)]
+    sel3 = FF.select_far_planes(far3, d)
+    cells3 = CAL.node_cells(sel3.node_ids)
+    rng_a, rng_b = np.random.default_rng(13), np.random.default_rng(13)
+    _se, _n, fdraws = FF.bootstrap_gamma(sel3, 0.5, d, rng_a, n_resamples=30, unit="cell")
+    want = []
+    for _ in range(30):
+        pick = CAL.resample(cells3, rng_b, "cell")
+        want.append(FF.fit_far_slope(sel3.subset(pick), 0.5, d_node).gamma)
+    assert fdraws.size == 30 and np.max(np.abs(fdraws - np.array(want))) < 1e-9, (fdraws, want)
+    # refusal
+    try:
+        dataclasses.replace(d, calibration=dataclasses.replace(d.calibration, pool_weighting="cells")).validate()
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("an unknown pool_weighting must be refused")
 
 
 # ---------------------------------------------------------------- runner ---

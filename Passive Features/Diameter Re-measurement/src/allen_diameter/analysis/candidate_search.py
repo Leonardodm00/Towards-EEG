@@ -70,7 +70,8 @@ SEARCH_CONFIG_SECTIONS = ("acquisition", "calibration", "measure", "renderer")
 # fields of those sections that only the fits read, left out of the key (10.C.R; D-119, D-118.3): a fit's solver
 # and its bootstrap do not change which candidates a search chooses, and a record written before they existed still
 # matches
-SEARCH_CONFIG_EXCLUDED = {"calibration": ("growth_jacobian", "bootstrap_unit", "bootstrap_cell_min")}
+SEARCH_CONFIG_EXCLUDED = {"calibration": ("growth_jacobian", "bootstrap_unit", "bootstrap_cell_min",
+                                          "pool_weighting")}
 
 
 def swc_digest(swc):

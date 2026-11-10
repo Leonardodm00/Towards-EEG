@@ -155,7 +155,7 @@ def growth_to_dict(g):
                 c_um2=_list(g.c_um2), z_ax_um=_list(g.z_ax_um), n_obs_per_interval=[int(n) for n in g.n_obs_per_interval],
                 rms_by_offset={str(k): v for k, v in g.rms_by_offset().items()},
                 dropped_nodes=[int(i) for i in g.dropped_nodes], cost=g.cost, success=g.success, message=g.message,
-                nfev=g.nfev)
+                nfev=g.nfev, node_weights=None if g.node_weights is None else _list(g.node_weights))
 
 
 def kernel_to_dict(kernel):

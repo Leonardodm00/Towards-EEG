@@ -479,6 +479,18 @@ def run_real(cfg, a):
     return a.out
 
 
+def weighting_record(node_ids, cfg):
+    """Block 19.7 (D-120.2): {"unit", "n_cells"} of a pooled fit's weights over the cells of node_ids."""
+    return dict(unit=str(cfg.calibration.pool_weighting), n_cells=int(np.unique(calibration.node_cells(node_ids)).size))
+
+
+def weighting_words(rec):
+    """The print's clause for weighting_record's dict: empty for one cell or unit "node"."""
+    if rec["unit"] != "cell" or rec["n_cells"] < 2:
+        return ""
+    return "; each of the %d cells weighs the same (D-120.2)" % rec["n_cells"]
+
+
 def boot_words(boot, n_resamples, seed):
     """The printed words of a Block 19.6 bootstrap (D-118.3): which unit, over how many cells, and the counts."""
     if boot["rule"] == "node":
@@ -517,12 +529,14 @@ def run_fit(cfg, scans_path, out, sigma_r0=None, seed=0):
                                                       "n_ok_node", "n_ok_cell")})
     ratio = calibration.area_ratio_by_offset(near)
     suff = calibration_pool.sufficiency(g.node_ids.size, cfg)              # Block 19.2 (D-088.3)
+    wrec = weighting_record(g.node_ids, cfg)                               # Block 19.7 (D-120.2)
     calibration_io.save_calibration(out, g, kernel, err, ratio,
                                     dict(scans=scans_path, scans_meta_source=meta.get("source", ""),
-                                         config=json.loads(cfg.to_json()), sufficiency=suff), anchor)
+                                         config=json.loads(cfg.to_json()), sufficiency=suff, weighting=wrec), anchor)
     trust = (cfg.calibration.trust_planes + 0.5) * cfg.acquisition.dz_um
-    print("growth fit (%s, %s, %s): %d nodes, %d dropped, cost %.3g, %s"
-          % (g.statistic, g.convention, g.interp, g.node_ids.size, len(g.dropped_nodes), g.cost, g.message))
+    print("growth fit (%s, %s, %s): %d nodes, %d dropped, cost %.3g, %s%s"
+          % (g.statistic, g.convention, g.interp, g.node_ids.size, len(g.dropped_nodes), g.cost, g.message,
+             weighting_words(wrec)))
     print("  delta_um   G_um2      n_obs(interval to the next knot)  trusted")
     for m, (x, val) in enumerate(zip(g.knots_um, g.g_um2)):
         n = "%5d" % int(g.n_obs_per_interval[m]) if m < g.n_obs_per_interval.size else "    -"
@@ -588,14 +602,18 @@ def run_far_fit(cfg, scans_path, calibration_path, out, seed=0):
     if kernel is not None and short:
         kernel, err = None, "insufficient: %s (D-088.3: at least %d nodes per set; the fits are diagnostics)" % (
             ", ".join("%d %s-field nodes" % (suff[s]["n_nodes"], s) for s in short), suff["far"]["min_nodes"])
+    wrec = weighting_record(sel.node_ids, cfg)                             # Block 19.7 (D-120.2)
     calibration_io.save_far_fit(out, summary, kernel, err, dict(scans=scans_path, calibration=calibration_path,
-                                                                config=json.loads(cfg.to_json()), sufficiency=suff))
+                                                                config=json.loads(cfg.to_json()), sufficiency=suff,
+                                                                weighting=wrec))
     print("far fit: gamma_hat = %.4f +- %.4f (bootstrap %.4f over %d resamples, %s; anchor term %.4f x %.4f), "
           "t_%d interval [%s, %s]; range %.2f um; %d IRLS rounds, %s" % (
               fit.gamma, summary["se"] or float("nan"), se_boot, n_ok,
               boot_words(boot, int(cfg.calibration.bootstrap_resamples), seed), dg, se_sigma0, summary["t_df"],
               summary["interval"][0], summary["interval"][1], fit.range_um, fit.rounds,
               "success" if fit.success else "FAILED: " + fit.message))
+    if weighting_words(wrec):
+        print("  weights%s" % weighting_words(wrec))
     print("  per node: c %s um^2, s %s um" % (np.round(fit.c_um2, 4).tolist(), np.round(fit.s_um, 3).tolist()))
     print("  residual RMS by |k - k*|: %s" % ", ".join("%d: %.4f" % kv for kv in fit.rms_by_offset().items()))
     print("  per-sign: gamma_+ %.4f, gamma_- %.4f; quadratic comparison: gamma %.4f, gamma_2 %.4f per um (labelled "

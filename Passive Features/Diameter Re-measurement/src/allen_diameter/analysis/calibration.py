@@ -831,6 +831,7 @@ class GrowthFit:
     success: bool
     message: str
     nfev: int
+    node_weights: Optional[np.ndarray] = None   # (N,) Block 19.7: w_i (mean 1; all 1 for one cell)
 
     def growth(self, delta_um):
         """G(delta) (um^2) for every delta in the array, interpolated as fitted."""
@@ -847,7 +848,7 @@ class GrowthFit:
         return out
 
 
-def fit_growth(scans, cfg):
+def fit_growth(scans, cfg, cells=None):
     """Fit Eq. (4) to the plane scans (cfg.calibration.statistic, convention,
     knot_step_um, z_ax_bound_um, min_planes_per_node).
 
@@ -862,16 +863,28 @@ def fit_growth(scans, cfg):
     dense matrices and the exact trust-region steps. Knots: m h,
     m = 0..M, M = ceil((P + 1/2) dz / h) with P the largest plane offset
     scanned (both signs under min_origin); a knot with no observation in
-    either adjacent interval is returned as NaN (not identified). Raises
-    ValueError with fewer than two usable nodes."""
+    either adjacent interval is returned as NaN (not identified). Weights
+    (Block 19.7, D-120.2): node i's residuals enter the sum of squares times
+    w_i = cell_weights over the used nodes' cells -- cells: one label per
+    scan, None for node_cells of the scans' ids; all w_i = 1 for one cell,
+    equal cells or pool_weighting "node". residual_um2 stays unweighted.
+    Raises ValueError with fewer than two usable nodes."""
     cal, dz = cfg.calibration, cfg.acquisition.dz_um
     conv, h = cal.origin_convention, float(cal.knot_step_um)
     if conv not in ("symmetric", "min_origin"):
         raise ValueError("unknown origin_convention %r" % (conv,))
-    used, dropped = [], []
-    for sc in scans:
+    scans = list(scans)
+    labels_all = node_cells([sc.node_id for sc in scans]) if cells is None else np.asarray(cells)
+    if labels_all.shape[0] != len(scans):
+        raise ValueError("fit_growth: cells must hold one label per scan (%d for %d)" % (labels_all.shape[0], len(scans)))
+    used, dropped, keep = [], [], []
+    for t, sc in enumerate(scans):
         vals = sc.values(cal.statistic)
-        (used if int(np.isfinite(vals).sum()) >= cal.min_planes_per_node else dropped).append(sc)
+        if int(np.isfinite(vals).sum()) >= cal.min_planes_per_node:
+            used.append(sc)
+            keep.append(t)
+        else:
+            dropped.append(sc)
     if len(used) < 2:
         raise ValueError("fit_growth: need at least two nodes with >= %d finite values" % cal.min_planes_per_node)
     N = len(used)
@@ -886,6 +899,8 @@ def fit_growth(scans, cfg):
         obs_o.append(sc.ks[ok] - sc.k_star)
         z0[i] = sc.z_sub_um if math.isfinite(sc.z_sub_um) else sc.k_star * dz
     oi, oz, ow, oo = (np.concatenate(a) for a in (obs_i, obs_z, obs_w, obs_o))
+    w_node = cell_weights(labels_all[np.asarray(keep, dtype=int)], cfg)      # Block 19.7 (D-120.2)
+    sw = np.sqrt(w_node)[oi]                                                # sqrt(w) per observation
     # knots cover |delta| <= P dz + dz / 2 (P the largest plane offset scanned, the axis within half a
     # plane of z_k*); a fitted axis outside that is reached by linear extrapolation
     P_max = int(np.max(np.abs(oo)))
@@ -911,34 +926,37 @@ def fit_growth(scans, cfg):
         G[free] = q[2 * N:]
         return q[:N], q[N:2 * N], G
 
-    def resid(q):
+    def raw(q):
         c, z, G = unpack(q)
         W, _ = design(z)
         return c[oi] + W @ G - ow
+
+    def resid(q):
+        return sw * raw(q)
 
     def jac(q):
         c, z, G = unpack(q)
         W, dW = design(z)
         if use_sparse:                       # each row: its node's c_i, its node's z_ax,i, the free knots
-            return sparse.hstack([node_block(np.ones(n_obs)), node_block(dW @ G),
-                                  sparse.csr_matrix(W[:, free])], format="csr")
+            return sparse.hstack([node_block(sw), node_block(sw * (dW @ G)),
+                                  sparse.csr_matrix(sw[:, None] * W[:, free])], format="csr")
         J = np.zeros((n_obs, 2 * N + free.size))
-        J[np.arange(n_obs), oi] = 1.0
-        J[np.arange(n_obs), N + oi] = dW @ G
-        J[:, 2 * N:] = W[:, free]
+        J[np.arange(n_obs), oi] = sw
+        J[np.arange(n_obs), N + oi] = sw * (dW @ G)
+        J[:, 2 * N:] = sw[:, None] * W[:, free]
         return J
 
-    # linear start at the starting depths
+    # linear start at the starting depths (rows weighted as the fit's)
     W0, _ = design(z0)
     lb = np.r_[np.full(N, -np.inf), np.full(free.size, 0.0 if conv == "min_origin" else -np.inf)]
     if use_sparse:
-        A = sparse.hstack([node_block(np.ones(n_obs)), sparse.csr_matrix(W0[:, free])], format="csr")
-        lin = lsq_linear(A, ow, bounds=(lb, np.full(N + free.size, np.inf)), lsq_solver="lsmr")
+        A = sparse.hstack([node_block(sw), sparse.csr_matrix(sw[:, None] * W0[:, free])], format="csr")
+        lin = lsq_linear(A, sw * ow, bounds=(lb, np.full(N + free.size, np.inf)), lsq_solver="lsmr")
     else:
         A = np.zeros((n_obs, N + free.size))
-        A[np.arange(n_obs), oi] = 1.0
-        A[:, N:] = W0[:, free]
-        lin = lsq_linear(A, ow, bounds=(lb, np.full(N + free.size, np.inf)))
+        A[np.arange(n_obs), oi] = sw
+        A[:, N:] = sw[:, None] * W0[:, free]
+        lin = lsq_linear(A, sw * ow, bounds=(lb, np.full(N + free.size, np.inf)))
     q0 = np.r_[lin.x[:N], z0, lin.x[N:]]
     lo = np.r_[np.full(N, -np.inf), z0 - cal.z_ax_bound_um, lb[N:]]
     hi = np.r_[np.full(N, np.inf), z0 + cal.z_ax_bound_um, np.full(free.size, np.inf)]
@@ -958,8 +976,8 @@ def fit_growth(scans, cfg):
     G = np.where(touched | (np.arange(K + 1) == zero), G, np.nan)
     knots = np.arange(K + 1) * h - (0.0 if conv == "symmetric" else M * h)
     return GrowthFit(conv, cal.statistic, interp, h, knots, G, np.array([sc.node_id for sc in used]), c, z, oi, oo,
-                     delta, resid(r.x), counts, tuple(sc.node_id for sc in dropped),
-                     float(r.cost), bool(r.success), str(r.message), int(r.nfev))
+                     delta, raw(r.x), counts, tuple(sc.node_id for sc in dropped),
+                     float(r.cost), bool(r.success), str(r.message), int(r.nfev), w_node)
 
 
 def kernel_from_growth(growth, rcfg, sigma_r0_um=None, max_delta_um=None):
@@ -1025,6 +1043,22 @@ def anchor_value(growth, cfg, sigma_r0_um=None):
     return math.sqrt(s2)
 
 
+def cell_weights(labels, cfg):
+    """Block 19.7 (D-120.2): one weight per node, N / (C N_c) for a node of
+    cell c -- N nodes, C cells, N_c the cell's nodes -- so that every cell
+    weighs N / C in all and the weights average 1; all 1 with
+    cfg.calibration.pool_weighting "node", one cell, or equal cells.
+    labels: one cell label per node (any comparable values)."""
+    labels = np.asarray(labels)
+    n = int(labels.shape[0])
+    if cfg.calibration.pool_weighting == "node" or n == 0:
+        return np.ones(n)
+    _, inv, counts = np.unique(labels, return_inverse=True, return_counts=True)
+    if counts.size < 2:
+        return np.ones(n)
+    return n / (counts.size * counts[inv].astype(float))
+
+
 def node_cells(node_ids):
     """Block 19.6 (D-118.3): the cell of each node id -- the specimen of a pooled
     file's qualified id (calibration_pool.cell_of), -1 for an unqualified id
@@ -1044,21 +1078,28 @@ def bootstrap_plan(node_ids, cfg):
     return ("cell" if n_cells >= int(cal.bootstrap_cell_min) else "larger"), n_cells
 
 
-def resample(cells, rng, unit):
+def resample(cells, rng, unit, with_labels=False):
     """Block 19.6: the indices of one bootstrap resample of n = len(cells)
     nodes -- "node": rng.integers(0, n, n) (the node bootstrap's draw); "cell":
     C draws of the C cells (increasing label) with replacement, each drawn
-    cell contributing all its indices in their order."""
+    cell contributing all its indices in their order. with_labels (Block
+    19.7): (indices, labels) -- "node": each drawn node's own cell; "cell":
+    each drawn copy's draw number 0..C-1, so that a cell drawn twice is two
+    cells to cell_weights. The draws do not depend on with_labels."""
     cells = np.asarray(cells)
     n = int(cells.size)
     if unit == "node":
-        return rng.integers(0, n, n)
+        idx = rng.integers(0, n, n)
+        return (idx, cells[idx]) if with_labels else idx
     if unit != "cell":
         raise ValueError("resample: unit must be 'node' or 'cell', got %r" % (unit,))
     labels = np.unique(cells)
     members = [np.flatnonzero(cells == lab) for lab in labels]
     pick = rng.integers(0, labels.size, labels.size)
-    return np.concatenate([members[k] for k in pick])
+    idx = np.concatenate([members[k] for k in pick])
+    if not with_labels:
+        return idx
+    return idx, np.concatenate([np.full(members[k].size, t) for t, k in enumerate(pick)])
 
 
 def pick_se(rule, n_cells, se_node, ok_node, se_cell, ok_cell):
@@ -1107,16 +1148,18 @@ def bootstrap_sigma0(scans, cfg, rng, sigma_r0_um=None, n_resamples=None, unit="
     resample with fewer than two usable nodes, a failed fit or an anchor not
     identified at delta_0 is dropped (n_ok counts the kept ones). se_um is
     NaN below two kept draws. unit "cell" (Block 19.6, D-118.3) resamples the
-    scans' cells instead, each drawn cell with all its scans (resample)."""
+    scans' cells instead, each drawn cell with all its scans (resample). Each
+    resample is refitted with its cells' labels (Block 19.7), so the weights
+    of D-120.2 follow the copies."""
     n = int(cfg.calibration.bootstrap_resamples if n_resamples is None else n_resamples)
     scans = list(scans)
-    cells = node_cells([sc.node_id for sc in scans]) if unit == "cell" else np.zeros(len(scans), dtype=int)
+    cells = node_cells([sc.node_id for sc in scans])
     draws = []
     for _ in range(n):
-        pick = resample(cells, rng, unit)
+        pick, labs = resample(cells, rng, unit, with_labels=True)
         sample = [replace(scans[j], node_id=1000000 + t) for t, j in enumerate(pick)]
         try:
-            g = fit_growth(sample, cfg)
+            g = fit_growth(sample, cfg, cells=labs)
             draws.append(anchor_value(g, cfg, sigma_r0_um))
         except ValueError:
             continue
