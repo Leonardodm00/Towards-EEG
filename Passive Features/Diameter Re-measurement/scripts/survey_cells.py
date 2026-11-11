@@ -604,6 +604,10 @@ OUTLIER_COLUMNS = ("set", "specimen_id", "n_nodes", "mean_um", "ref_mean_um", "s
                    "z", "p", "removed")
 
 
+def _sqrt_or_nan(x):
+    return math.sqrt(x) if x is not None and math.isfinite(x) and x >= 0 else float("nan")
+
+
 def pool_calibration(cfg, out_dir, selection_path="", log=print):
     """Block 19.4: the cells' scans pooled round-robin, at most survey.calib_scans_per_cell from a cell and every
     cell's unless survey.calib_pool_max_per_set caps a set (D-118), then pooled_fits: Block 10's fit, Block 15's
@@ -635,11 +639,13 @@ def pool_calibration(cfg, out_dir, selection_path="", log=print):
 def pooled_fits(cfg, pooled, meta, s3c, log=print, figures=True):
     """Blocks 19.4-19.8 on the pooled scans already in s3c/scans_pooled.json (meta: its meta, with id_map):
     Block 10's fit and Block 15's far-fit; then Block 19.8 (D-120.3) tests every cell of each set on the fits'
-    residuals (s3c/cell_outliers.json, .csv) and, when it removes a cell, keeps the first pass as
+    residuals (s3c/cell_outliers.json, .csv; also when calibration.cell_outlier_removal is false, which only stops
+    the removal) and, when it removes a cell, keeps the first pass as
     calibration_pooled_all.json and far_fit_pooled_all.json (its two by-cell figures in s3c/figures_all), writes
     the scans without the removed cells' nodes of that set to s3c/scans_pooled_kept.json and runs both fits again
     on them; then the figures and kernel_law_by_cell.csv of the final pass. Returns (done, outliers): done
-    {"fit", "far_fit"} of the final pass, outliers cell_outliers.cell_outliers's record (None when not run)."""
+    {"fit", "far_fit"} of the final pass, outliers cell_outliers.cell_outliers's record (None when the near fit
+    did not run)."""
     import argparse as _ap
     import calibrate_kernel
     from allen_diameter.analysis import calibration_pool
@@ -674,7 +680,7 @@ def pooled_fits(cfg, pooled, meta, s3c, log=print, figures=True):
 
     done = run_fits(sp)
     outliers, removed, scans_path, final = None, {}, sp, pooled
-    if done["fit"] and cfg.calibration.cell_outlier_removal:
+    if done["fit"]:                                   # the test always runs; cell_outlier_removal gates the removal
         kc = by_cell(pooled, done, None)
         outliers = CO.cell_outliers(kc, cfg)
         survey_io.write_json(os.path.join(s3c, "cell_outliers.json"), outliers)
@@ -682,23 +688,22 @@ def pooled_fits(cfg, pooled, meta, s3c, log=print, figures=True):
                               [dict(r, set=w) for w in ("near", "far") for r in outliers[w]["rows"]], OUTLIER_COLUMNS)
         for which in ("near", "far"):
             rec = outliers[which]
+            head = "cells that stand out (D-120.3): %s field, %d %s" % (which, rec["n_cells"],
+                                                                        "cell" if rec["n_cells"] == 1 else "cells")
             if not rec["n_cells"]:
                 continue
             if rec["n_cells"] < 3:                    # a cell's yardstick needs two other cells
-                log("cells that stand out (D-120.3): %s field, %d %s: no z (fewer than 3 cells)" % (
-                    which, rec["n_cells"], "cell" if rec["n_cells"] == 1 else "cells"))
+                log("%s: no z (fewer than 3 cells)" % head)
                 continue
             a = rec["anova"]
-            spread = "between-cell SD %.4f um, within %.4f um" % (math.sqrt(a["sigma_b2"]) if a["sigma_b2"] == a["sigma_b2"]
-                                                                   else float("nan"), math.sqrt(a["sigma_w2"])
-                                                                   if a["sigma_w2"] == a["sigma_w2"] else float("nan"))
+            head += " (between-cell SD %.4f um, within %.4f um)" % (_sqrt_or_nan(a["sigma_b2"]), _sqrt_or_nan(a["sigma_w2"]))
             if rec["applied"]:
-                log("cells that stand out (D-120.3): %s field, %d cells (%s), p < %.3g / %d = %.2e: %s" % (
-                    which, rec["n_cells"], spread, rec["alpha"], rec["n_cells"], rec["p_threshold"],
-                    "removed %s" % rec["removed"] if rec["removed"] else "none removed"))
+                log("%s, p < %.3g / %d = %.2e: %s" % (head, rec["alpha"], rec["n_cells"], rec["p_threshold"],
+                                                      "removed %s" % rec["removed"] if rec["removed"] else "none removed"))
             else:
-                log("cells that stand out (D-120.3): %s field, %d cells (%s): not applied (fewer than %d cells); "
-                    "the z are in cell_outliers.csv" % (which, rec["n_cells"], spread, rec["min_cells"]))
+                why = ("removal switched off (calibration.cell_outlier_removal false)"
+                       if not cfg.calibration.cell_outlier_removal else "fewer than %d cells" % rec["min_cells"])
+                log("%s: not applied (%s); the z are in cell_outliers.csv" % (head, why))
         removed = {w: list(outliers[w]["removed"]) for w in ("near", "far") if outliers[w]["removed"]}
         if removed:
             for path, keep in ((cp, cp_all), (fp, fp_all)):

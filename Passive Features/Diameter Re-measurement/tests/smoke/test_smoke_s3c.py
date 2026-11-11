@@ -50,8 +50,9 @@ Checks
                         sigma_w^2 / N_c; end to end pooled_fits on twelve
                         cells, one with twice the growth: removed from the
                         near set only, refitted without it, the first pass
-                        kept; switched off on the same folder: nothing
-                        removed and the first run's conditional files gone
+                        kept; switched off on the same folder: the cell
+                        still tested and reported, nothing removed, the
+                        first run's _all files and kept scans gone
     test_edge_cases     no scans in a set; a cell without candidates; a
                         node id beyond the qualifier refused; the
                         configuration's refusals
@@ -858,10 +859,14 @@ def test_cell_outliers():
         off = dataclasses.replace(cfg, calibration=dataclasses.replace(cfg.calibration, cell_outlier_removal=False))
         with redirect_stdout(io.StringIO()):
             done, out = SC.pooled_fits(off, pooled, meta, s3c, log=lines.append, figures=False)
-        assert done["fit"] and out is None
-        for name in ("calibration_pooled_all.json", "far_fit_pooled_all.json", "scans_pooled_kept.json",
-                     "cell_outliers.json", "cell_outliers.csv"):
+        assert done["fit"] and not out["near"]["applied"] and out["near"]["removed"] == [] and out["far"]["removed"] == []
+        z12 = next(r["z"] for r in out["near"]["rows"] if r["specimen_id"] == 12)
+        assert z12 > 10.0, out["near"]["rows"]                      # still tested and reported, not removed
+        for name in ("calibration_pooled_all.json", "far_fit_pooled_all.json", "scans_pooled_kept.json"):
             assert not os.path.exists(os.path.join(s3c, name)), name
+        assert os.path.exists(os.path.join(s3c, "cell_outliers.csv"))
+        assert any("not applied (removal switched off (calibration.cell_outlier_removal false))" in ln
+                   for ln in lines), lines[-6:]
         again = CIO.load_calibration(os.path.join(s3c, "calibration_pooled.json"))
         assert 12 in [CP.cell_of(q, meta["id_map"])[0] for q in again["growth"]["node_ids"]]
 
