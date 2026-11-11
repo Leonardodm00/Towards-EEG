@@ -236,7 +236,8 @@ Not code: nothing below is imported by the pipeline or runs in a job.
 
 | Path | What |
 |---|---|
-| `docs/TEEG_noise_fit_handoff_2026-10-28.md` | the noise-fit chat's current handoff (D-095 to implement; the user's open answers): read first in a new chat on the noise fit |
+| `docs/TEEG_noise_fit_handoff_2026-10-28.md` | the noise-fit chat's current handoff (D-095 to implement; the user's open answers): read first in a new chat on the noise fit [corrected 2026-11-11: now the history of Blocks 1-4 and D-095 to D-116; a new chat starts from the implementation handoff below] |
+| `docs/TEEG_noise_fit_implementation_handoff_2026-11-11.md` | **read first in a new chat on the noise fit (G4)**: the order of work after D-117 and D-118 (Block 9's code, Block 6's run on $n$ real cells, Block 5's twins), the decisions that bind it, the questions to ask, the testing state, paths and traps |
 | `docs/TEEG_Stage7_noise_study_handoff_2026-10-06.md`, `docs/TEEG_acf_textbook_implementation_handoff_2026-10-07.md` | earlier handoffs of the same thread |
 | `docs/TEEG_deck_handoff_passive_ih_2026-11-03.md`, `docs/deck_passive_ih_2026-11-03/` | the handoff for the chat that builds the deck on the passive + I_h optimisation (status, theory, implementation, numbers with sources, what not to claim), its nine figures and the scripts that make them (2026-11-03) |
 | `dev/2026-10-16_covariance_weighting/` | D-048's handoff, its checks, and the study document on the bias of a statistic |
