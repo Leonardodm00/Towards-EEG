@@ -219,6 +219,17 @@ theory:
     status: open
     closed_on:
     decision:
+  - id: T13
+    title: "Kernel calibration: the near growth fit, the anchor and the assembled kernel"
+    summary: "How the near nodes' per-plane squared core widths become the kernel's table and anchor (Eq. 4: one constant per node and one growth curve shared by all nodes on spline knots; why sigma_r(0) is set, not fitted), how the far slope (T6) is joined to the anchor and carries the anchor's error into its SE, and the loop that makes the law the rules read agree with the measured one (D-117.2)."
+    refs: ["SPEC 10", "SPEC 15.4-15.5", "SPEC 4", D-080.1, D-081.7, D-117.2, D-117.4, D-120.2, TEEG_study_kernel_calibration_2026-11-11.md]
+    parent: TG3
+    depends_on: [T3]
+    affects: [I10, I15, I19]
+    status: open
+    closed_on:
+    decision:
+    note: "To study (the user, 2026-11-11, 17:02, diameter calibration chat: 'update the roadmap that I have to study this theory'): the study document TEEG_study_kernel_calibration_2026-11-11.md sent in that chat, written from the answer to the 15:37 question 'refresh me how the defocusing kernel is calibrated'. The far fit itself is T6 (closed 2026-10-26); the bootstrap behind the anchor's and the slope's SEs is T11."
 implementation:
   # ---- groups (no block of their own; coloured by their least advanced member)
   - id: G1
