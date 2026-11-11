@@ -137,6 +137,7 @@ the "Binds" column.
 | 2026-10-29 (later, 6) | Logs **D-112** and **D-113** (user, 15:49; the diameter implementation chat), answering the D-109 report. **D-112**: "Remember that the whole cell's nodes must be evaluated for both near and far field calibration" -- Block 10.C covers the near set too (flat at 10 deg, the stripe at the trace's plane, at least 3 usable stripes of the trace's plane +- 3), in Cell 7 and in S3's calibration step (Cell 15, the davinci array) alike; near: 7500 near-range nodes, 3856 flat by the trace, 1960 with a usable stripe at the trace's plane, 1947 with at least 3 usable planes (the walk stopped after 3 planes for 1879 of them), 380 chosen 5 um apart on 48 stretches, in 15.4 min on one core; of the pilot table's 138 near candidates, 71 pass and 12 are chosen; far: the 723 records identical node for node to D-109's run, 19 chosen, 5.1 min; 399 candidates, 20.5 min in all. **D-113**: "I confirm the union and the F3 without change" -- 10.S's own cylinder as the union (F2) confirmed, the pilot's tilt error on thin nodes (F3) accepted. Implemented, smoke-tested and pushed (`c393834` (Block 10.C for both sets, S3's step, the pre-cull, the set_full line, D-113's marks in the SPEC and the tester's report) and `2c5fef4` (the notebooks, runbook v38)). D-105 and D-109 annotated (entries and index). First numbered D-110 and D-111 in the chat; those IDs went to the noise-fit chat (16:45). Written after re-reading this log (changed since the (later, 3) row by another chat's rows; merged, nothing of theirs edited). The repository copy (D-097) on `sci/diameter-pipeline`, `docs/project/`. Next free IDs: D-114, I-005. |
 | 2026-10-30 | Logs **D-114** (user, 08:21; the noise-fit chat): "All ok" -- the two choices put to the user on 2026-10-29 (later, 5) confirmed: D-110's reading of "fitted precisely" (the exact least-squares optimum by variable projection; the bounds [1, 1000] ms and the 301-point grid stay PROVISIONAL), and the refusal of a cell whose sweep tilt cannot be read (Block 4's `CellLayout.from_windows`, `fb6fec9`). Status cells of D-103, D-106, D-107, D-110 and D-111 brought up to date (entries and index): Blocks 2-4 on `main` since `ace6568`. D-110's sources completed (the method's reference, PubMed full text; `check_fit_profile.py`). **Note under D-103** (D-103.1's median window): a sweep's tilt staggers its windows' baselines and degrades the per-sample median; removing each window's estimated tilt offset first restores it (`Ih Fit/dev/2026-10-30_offsets_and_fit/`) -- a proposal put to the user, not decided. Written after re-reading this log (changed since the (later, 5) row by the diameter chat's D-112 and D-113, row (later, 6); merged, nothing of theirs edited). The repository copy (D-097) on `main`, `docs/project/`. Next free IDs: D-115, I-005. |
 | 2026-10-30 (later) | Logs **D-115** and **D-116** (user, 14:24; the noise-fit chat). **D-115**: "Yes remove it" -- each SS window's tilt offset $\hat b_s(t_k - \bar t_s)$ is removed before the per-sample median window, the sweep's tilt read by (TL1) on the kept windows cut at the 80 ms floor (the only SS reading, used by the offsets, the twins and the simulator), the fit's simulator repeating both on each replicate; implemented in Blocks 3-4 in the same turn. **D-116**: "1) a) 2) b) 3) b) 4) a)" -- Block 4b's per-sweep stage: one solve per sweep at the cell's weights, $v(c,s)$ by a parametric bootstrap, the DerSimonian-Laird pooling per protocol, a failed sweep takes the cell's values (read as $\hat\theta(c)$, to confirm); open: the bootstrap's size and cost, put to the user with Block 4b's SPEC draft. D-073, D-076, D-102, D-103 (its note), D-107 annotated (entries and index). Written after re-reading this log (unchanged since the 2026-10-30 row). The repository copy (D-097) on `main`, `docs/project/`. Next free IDs: D-117, I-005. |
+| 2026-11-11 | Logs **D-117** and **D-118** (user, about 19:00; the noise-fit chat, from multiple-choice questions put when the user asked what the G4 noise fit needs to go on). **D-117**: Block 9's ("Block 4b") four open points -- $B_v$ = 50 bootstrap refits per sweep at the binding size $M$ = 1000; a failed refit left out of $v(c,s)$ and counted, the sweep flagged above 10 %; D-116.4's reading confirmed, a failed sweep's twin carries the cell's whole law $\hat\theta(c)$ (the assistant had recommended the pooled $\exp\hat\mu_{\rm pr}(c)$ for $\sigma_s$). **D-118**: "I would fit the noise features on n cells in order then to use these fits to construct the twins on which to run the synthetic recovery run" -- after Block 9's code, the noise-fit run on $n$ real cells (Block 6's driver and PBS job) comes before the twins (Block 5), which are built from those fits; then Stage 7 (the assistant's reading, to confirm; $n$ open). D-116 annotated (entry and index). Written after re-reading this log (unchanged since the 2026-10-30 (later) row; identical to the repository copy). The repository copy (D-097) on `main`, `docs/project/`. Next free IDs: D-119, I-005. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -272,7 +273,9 @@ would be needed*, *Status*.
 | D-113 | 2026-10-29 | SPEC 10.S's own cylinder (F2, `fitted_own_rows`); D-101.1's bounds on the pilot's tilt (F3); D-105 (c), (d) | the union of the trace's and the fitted own cylinder confirmed; F3's tilt error accepted without change [user] | active; nothing to implement |
 | D-114 | 2026-10-30 | D-110's statement; D-107.2; Block 4's `CellLayout.from_windows` (`_tilts_for`); the tilt flags `ss_tilt_none`, `ls_tilt_none`; SPEC §2.3 and Block 4's Confirmed line; smoke W2 (g), F11; Block 6's report of a refused cell | D-110's reading confirmed (the bounds [1, 1000] ms and the 301-point grid PROVISIONAL); a cell with a sweep whose tilt cannot be read is refused with the sweep and the flag, no tilt substituted [user] | active; implemented (`7672ffc`, `fb6fec9`); nothing to change |
 | D-115 | 2026-10-30 | (D-103.1)'s median window and subtraction; the start (D-103.2, D-110, D-111); D-102.2's SS reading; D-107.2's simulator; Block 3 (`ss_noise_windows`, `decay_start`, the reading and the offsets), Block 4 (`simulate_cell_windows`, `CellLayout`); SPEC §2.2-§2.4; smoke W2, W3, W11, W15, F1, F2, F11 | each kept SS window minus its sweep's tilt offset $\hat b_s(t_k - \bar t_s)$ before the per-sample median, everywhere the median is used; $\hat b_s$ by (TL1) on the kept windows cut at the 80 ms floor, before the start, the only SS reading; the simulator repeats both per replicate [user] | active; implemented 2026-10-30 in Blocks 3-4 |
-| D-116 | 2026-10-30 | D-073 (c), D-076 (i); Block 4b (`noise_sweep_fit.py`, to write); the per-sweep columns; Block 5's per-sweep laws | one solve per sweep at the cell's weights from $\hat\theta(c)$; $v(c,s)$ by a parametric bootstrap (B refits at the sweep's estimate); (D-076.1) per protocol, SS and LS separately; a failed sweep flagged, out of the pooling, its twin at the cell's values [user]; $B$, the refits' cost, the reading of "the cell's values" open | active; Block 4b not written (SPEC drafted 2026-10-30) |
+| D-116 | 2026-10-30 | D-073 (c), D-076 (i); Block 4b (`noise_sweep_fit.py`, to write); the per-sweep columns; Block 5's per-sweep laws | one solve per sweep at the cell's weights from $\hat\theta(c)$; $v(c,s)$ by a parametric bootstrap (B refits at the sweep's estimate); (D-076.1) per protocol, SS and LS separately; a failed sweep flagged, out of the pooling, its twin at the cell's values [user]; $B$, the refits' cost, the reading of "the cell's values" open | active; Block 4b not written (SPEC drafted 2026-10-30) [updated 2026-11-11: the open points answered, D-117] |
+| D-117 | 2026-11-11 | D-116's open points and D-116.4's reading; SPEC §2.5 (d), (f), Block 9's `SweepStageConfig` (`B_v`, `M_refit`, `max_failed_refit_frac`), its Confirmed line, §8; smoke P6; the flags `v_refits_failed`, `v_none`, `sweep_fit_failed` | $B_v$ = 50 refits per sweep at $M$ = 1000; a failed refit left out of (P2) and counted, flagged above 10 %, $B_{\rm ok} < 2$ fails the sweep; a failed sweep's twin carries $\hat\theta(c)$ [user] | active; Block 9 not written (SPEC updated 2026-11-11) |
+| D-118 | 2026-11-11 | the order after Block 9: roadmap N6 (no longer after N5) and N5 (after N6); Block 6 (`run_noise_fit.py`, the PBS job) before Block 5; Stage 7's twins | the noise law fitted on $n$ real cells first (Block 6's driver on davinci), the twins built from those fits (Block 5), then the synthetic recovery [user; reading to confirm] | active; $n$ open; roadmap reordered 2026-11-11 |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
@@ -9514,7 +9517,102 @@ counted); the reading of D-116.4. Put to the user with the cost when Block 4b's 
 **Sources.** **[user]** 2026-10-30, 14:24. **[log]** D-073, D-076 and its clarification of 2026-10-26, D-107, D-114,
 D-115.
 
-**Status:** active; Block 4b not written (its SPEC entry drafted 2026-10-30).
+**Status:** active; Block 4b not written (its SPEC entry drafted 2026-10-30). [updated 2026-11-11: the four open points answered by **D-117** -- $B_v$ = 50 at $M$ = 1000, a failed refit left out and counted, D-116.4's reading (the cell's whole law $\hat\theta(c)$) confirmed; the order after Block 4b by **D-118**]
+
+---
+
+## D-117 -- Block 9's ("Block 4b") open points: $B_v$ = 50 refits per sweep at $M$ = 1000, a failed refit left out and counted, a failed sweep's twin carries the cell's whole law (user)
+
+**Date:** 2026-11-11, about 19:00 (Europe/Rome), the noise-fit chat. **Binds:** D-116's open points and D-116.4's
+reading; `Ih Fit/specs/SPEC.md` §2.5 (d) and (f), Block 9's `SweepStageConfig` (`B_v`, `M_refit`,
+`max_failed_refit_frac`) and its Confirmed line, §8's last item; smoke P6 of `smoke_noise_sweep_fit.py` (to write); the
+per-sweep fields `B_ok`, the failed refits and the flags `v_refits_failed`, `v_none`, `sweep_fit_failed`.
+
+**Decision [user].** The answers to four multiple-choice questions of 2026-11-11 (the assistant's recommendation listed
+first in each): "B_v 50, M 1000 (Recommended)"; "Leave out and count (Recommended)"; "The cell's whole law" (the
+assistant had recommended "Cell's fast pair, pooled sigma_s", i.e. $\sigma_s = \exp\hat\mu_{\rm pr}(c)$). The fourth answer
+is D-118.
+
+**Statement.**
+(D-117.1) *The bootstrap's size and binding size.* For every sweep $s$ of a cell $c$ whose fit did not fail, (P2) uses
+$B_v$ = 50 replicates; each replicate is refitted by 2.5 (c) with the binding function $q_{\rm sim}(\theta \mid s)$ of
+2.5 (b) at $M$ = $M_{\rm refit}$ = 1000 (the main per-sweep solve keeps Block 4's $M$ = 3000), on the sweep's own
+stream `seed_binding(c, s)`, with $W_s$ and the start $u_s(\hat\theta(c))$ as in 2.5 (d).
+(D-117.2) *A failed refit.* A refit that fails by 2.5 (c)'s rule (`least_squares` status $\le 0$, or a coordinate of
+$\hat u$ within $10^{-3}$ of its range from a bound) is left out of (P2) and counted: $v(c,s)$ is the sample variance
+(ddof 1) over the $B_{\rm ok}$ refits that did not fail; the sweep is flagged `v_refits_failed:<n>/<B_v>` when more than
+10 % of its $B_v$ refits fail (a report: the sweep stays in the pooling); $v(c,s)$ is NaN and the sweep fails with the
+reason `v_none` when $B_{\rm ok} < 2$.
+(D-117.3) *A failed sweep* (D-116.4's reading confirmed). A sweep whose fit fails (2.5 (c)) or whose bootstrap ends in
+`v_none` is flagged and left out of its protocol's pooling, and its twin carries the per-cell law: $\tilde\theta(c, s) =
+\hat\theta(c) = (\hat\sigma_f, \hat\rho_f, \hat\sigma_s, \hat\tau_s)(c)$. The alternative ($\hat\theta(c)$ for $\sigma_f$,
+$\rho_f$, $\tau_s$ with $\sigma_s = \exp\hat\mu_{\rm pr}(c)$) is not taken.
+
+**Why [user; run; reasoning].** **[user]** as quoted, no reason given for (D-117.3). **[run]** (D-117.1): the twins'
+shrunk $\log\tilde\sigma_s$ barely feels $B_v$ -- its RMS error at $B_v$ = 50 lies within 0.16 percentage points of its
+value with $v$ known (normal errors, $v$ as measured on Block 4's fixture; `Ih Fit/dev/2026-11-02_bootstrap_explained/`);
+$M$ = 1000 moves the linearised $v$ by $-$0.5 % to +2.3 % against $M$ = 3000 for a third of the cost
+(`Ih Fit/dev/2026-10-30_sweep_stage_cost/check_refit_binding_size.py`); at $B_v$ = 50 and $M$ = 1000 the fixture cell (2
+SS, 5 LS sweeps) costs about 6.6 h on one core. (D-117.2): one refit stuck at the lower bound of $\sigma_s$, kept in $v$,
+multiplies $v$ by 16 to 170 (2026-11-02 check C), which would pull the sweep almost entirely to its protocol's mean.
+**[reasoning]** (D-117.3): the cell's law is the one estimated on all of the cell's sweeps.
+
+**What it implies for code and tables.** `SweepStageConfig` defaults `B_v=50`, `M_refit=1000`,
+`max_failed_refit_frac=0.1`, asserted by a smoke check (a default changed by mistake must FAIL); P6 as drafted (a double
+failing every 5th refit gives $B_{\rm ok}$ = 0.8 $B_v$ and the flag; every refit failing gives `v_none`); `pool_cell`
+gives a failed sweep's twin $\hat\theta(c)$. SPEC §2.5 (d), (f), Block 9's API and Confirmed lines, §8 marked
+(2026-11-11). Note for the reader: with $M_{\rm refit} < M$ the refits are a slightly noisier estimator than the main
+solve, so $v(c,s)$ estimates the sampling variance of the $M$ = 1000 estimator [reasoning; the size of the difference is
+the check's $-$0.5 % to +2.3 %].
+
+**What it does not decide [open].** The cluster layout of the bootstrap (one job per $(c, s)$, SPEC §2.5 (h); Block 6);
+which cells, and how many (D-118).
+
+**Sources.** **[user]** 2026-11-11, about 19:00, the answers quoted. **[run]** the dev checks named. **[log]** D-073,
+D-076, D-116.
+
+**Status:** active; SPEC §2.5 and Block 9's entry updated 2026-11-11; Block 9's code not written.
+
+---
+
+## D-118 -- After Block 9: the noise law fitted on $n$ real cells first, the twins built from those fits, then the synthetic recovery (user)
+
+**Date:** 2026-11-11, about 19:00 (Europe/Rome), the noise-fit chat. **Binds:** the order of the noise-fit blocks after
+Block 9 -- roadmap allen-mtg-fit N6 (Block 6) no longer after N5, N5 (Block 5) after N6; Block 6 (`run_noise_fit.py`,
+`submit_noise_fit.sh`); Block 5 (the twins); Stage 7 (S7; D-083 unchanged).
+
+**Decision [user].** Asked "Blocks 3-4 pass every smoke test but have never run on a real cell, nor on davinci since the
+October changes. After Block 9's code, what comes next?", with the options "Real-cell trial first (Recommended): a dev
+script runs Blocks 3-4 (then 9) on 1-2 L3_exc cells on davinci at reduced M, plus the FULL gates, before designing the
+twins" and "Straight to Block 5 (twins): Block 5's SPEC entry next, as the roadmap orders; first real-cell run comes
+with Block 6's driver", the user answered in their own words: "I would fit the noise features on n cells in order then
+to use these fits to construct the twins on which to run the synthetic recovery run".
+
+**Statement (the assistant's reading, to confirm with the user).**
+(D-118.1) After Block 9's code, the next deliverable is the noise-fit run on $n$ real cells: Block 6's driver and its
+PBS job run Blocks 3, 4 and 9 per cell and per sweep on davinci and write the per-cell and per-sweep noise tables. Not
+the 1-2 cell dev trial, and not Block 5 first.
+(D-118.2) Block 5's twins are built from that run's fits: each twin sweep carries $\tilde\theta(c, s)$ of its real sweep
+(Block 9, D-117.3 for a failed sweep) and its real sweep's tilt $\hat b(c, s)$ (D-102, D-107), read from the run's tables.
+(D-118.3) The synthetic recovery (Stage 7, D-083) runs on those twins.
+
+**Why [reasoning].** The twins need fitted laws, and the fits of real cells need a driver on the cluster; doing the run
+first also puts Blocks 3, 4 and 9 on real cells before the twins are designed, which was the purpose of the trial the
+assistant proposed.
+
+**What it implies for code and tables.** Roadmap: N6's `depends_on` loses N5, N5's gains N6 (2026-11-11). Block 6's SPEC
+entry is written after Block 9's code and before Block 5's: the driver's jobs (per cell for Blocks 3-4; per $(c, s)$
+for Block 9's bootstrap), the tables (SPEC §2.3's and §2.5 (g)'s columns), the PBS script with the roadmap marker lines;
+then the run on davinci (dry run, a pilot, then the $n$ cells); then Block 5's SPEC entry. N7 (the record) unchanged.
+
+**What it does not decide [open].** $n$ and which cells (the L3_exc group holds 18 cells; Stage 7's cohort size is open,
+S7's note); whether the S0-S3 checks of D-055, which N6's summary also holds, run before the twins or later; whether a
+1-2 cell pilot of the same driver precedes the $n$-cell run (the usual dry run, pilot, full sequence).
+
+**Sources.** **[user]** 2026-11-11, about 19:00, the answer quoted. **[log]** D-073, D-076, D-083, D-102, D-107,
+D-116, D-117.
+
+**Status:** active; roadmap N5 and N6 reordered 2026-11-11; Block 6's SPEC entry not written.
 
 ---
 
