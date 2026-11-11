@@ -219,13 +219,14 @@ def pooled_sigma_law(calib, far_fit=None):
     return law
 
 
-def kernel_law_by_cell(scans, cfg, calib=None, far_fit=None, id_map=None):
+def kernel_law_by_cell(scans, cfg, calib=None, far_fit=None, id_map=None, removed=None):
     """Block 19.5 (D-090.2): the kernel-law points with their cell
     (calibration_pool.cell_of) and their residual from the pooled law,
     e = sigma - sigma_law(|delta|) (um); the cells in increasing specimen id
     (a cell of None last); per cell and set the summary row of BY_CELL_COLUMNS
     over the used points of finite residual; the table, the far line and the
-    anchor. None without a near fit."""
+    anchor; removed, Block 19.8's {set: [specimen ids]} as given ({} for
+    None). None without a near fit."""
     if calib is None or "growth" not in calib:
         return None
     from .calibration_pool import cell_of
@@ -253,7 +254,8 @@ def kernel_law_by_cell(scans, cfg, calib=None, far_fit=None, id_map=None):
                                 n_points=len(sel), median_residual_um=q(e, 50), q25_residual_um=q(e, 25),
                                 q75_residual_um=q(e, 75), median_abs_delta_um=q(ad, 50)))
     table, line, anchor = _law_curves(cfg, calib, far_fit)
-    return dict(points=pts, cells=cells, summary=summary, table=table, line=line, anchor=anchor)
+    return dict(points=pts, cells=cells, summary=summary, table=table, line=line, anchor=anchor,
+                removed={k: list(v) for k, v in (removed or {}).items()})
 
 
 def gaussian_inputs(scan):

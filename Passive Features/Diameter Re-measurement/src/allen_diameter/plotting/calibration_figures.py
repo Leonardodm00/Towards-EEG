@@ -256,8 +256,11 @@ def kernel_law_figure(kl, title=""):
     return fig
 
 
-def _cell_label(cell):
-    return "cell" if cell is None else "specimen %d" % int(cell)
+def _cell_label(cell, kc=None):
+    """The cell's label; with kc, " [removed: near]" (or far, or near and far) when Block 19.8 removed it."""
+    lab = "cell" if cell is None else "specimen %d" % int(cell)
+    gone = [w for w in ("near", "far") if cell in ((((kc or {}).get("removed") or {}).get(w)) or ())]
+    return lab + (" [removed: %s]" % " and ".join(gone) if gone else "")
 
 
 def _law(ax, kc, labels=True):
@@ -299,7 +302,7 @@ def kernel_law_by_cell_figure(kc, title=""):
                                 zorder=3)
         _law(ax, kc)
         handles = [Line2D([], [], marker="o", ls="", color=CELL_HUES[i], ms=6,
-                          label="%s (%d near, %d far nodes)" % (_cell_label(c), _n_nodes(kc, c, "near"),
+                          label="%s (%d near, %d far nodes)" % (_cell_label(c, kc), _n_nodes(kc, c, "near"),
                                                                 _n_nodes(kc, c, "far")))
                    for i, c in enumerate(cells)]
         handles += [Line2D([], [], marker="o", ls="", color=INK2, label="near-field planes"),
@@ -330,7 +333,7 @@ def kernel_law_by_cell_figure(kc, title=""):
                     ax.plot([p["abs_delta_um"] for p in sel], [p["sigma_um"] for p in sel], marker, color=BLUE,
                             mfc=BLUE if used else "none", ms=4, alpha=0.85, lw=0, zorder=3)
         _law(ax, kc, labels=False)
-        ax.set_title("%s: %d near, %d far nodes" % (_cell_label(c), _n_nodes(kc, c, "near"), _n_nodes(kc, c, "far")),
+        ax.set_title("%s: %d near, %d far nodes" % (_cell_label(c, kc), _n_nodes(kc, c, "near"), _n_nodes(kc, c, "far")),
                      fontsize=8, color=INK)
     for k in range(len(cells), nrow * ncol):
         axes[k // ncol, k % ncol].axis("off")
@@ -369,7 +372,7 @@ def kernel_law_residuals_by_cell_figure(kc, title=""):
                 ax.plot([row["median_residual_um"]], [y + dy], "|", color=INK, ms=12, mew=2.2, zorder=4)
     ax.axvline(0.0, color=INK2, lw=0.9, zorder=2)
     ax.set_yticks(range(n))
-    ax.set_yticklabels([_cell_label(c) for c in reversed(cells)], fontsize=8)
+    ax.set_yticklabels([_cell_label(c, kc) for c in reversed(cells)], fontsize=8)
     ax.set_ylim(-0.6, n - 0.4)
     fig.legend(handles=[Line2D([], [], marker="o", ls="", color=INK2, label="near-field planes"),
                         Line2D([], [], marker="^", ls="", color=INK2, label="far-field planes"),
@@ -633,11 +636,27 @@ def isolation_overview(views, title="", ncols=6, per_page=36):
     return figs
 
 
-def write_all(scans, calib, far_fit, patches, cfg, out_dir, every_node=True, dpi=150, id_map=None):
+def write_by_cell(kc, out_dir, dpi=150):
+    """Block 19.5's two figures of kc (kernel_law_by_cell) in out_dir, when its points span two cells or more:
+    kernel_law_by_cell.png and kernel_law_residuals_by_cell.png. Returns the paths written."""
+    written = []
+    if kc is None or len(kc["cells"]) < 2:
+        return written
+    plt = _plt()
+    os.makedirs(out_dir, exist_ok=True)
+    for name, draw in (("kernel_law_by_cell", kernel_law_by_cell_figure),
+                       ("kernel_law_residuals_by_cell", kernel_law_residuals_by_cell_figure)):
+        path = os.path.join(out_dir, "%s.png" % name)
+        fig = draw(kc)
+        fig.savefig(path, dpi=dpi, facecolor=SURFACE, bbox_inches="tight"); plt.close(fig); written.append(path)
+    return written
+
+
+def write_all(scans, calib, far_fit, patches, cfg, out_dir, every_node=True, dpi=150, id_map=None, removed=None):
     """The PNG files of a run in out_dir: width_by_plane_<set>.png, example_<set>.png, kernel_law.png, when
     the points span two cells or more kernel_law_by_cell.png and kernel_law_residuals_by_cell.png (Block 19.5;
-    id_map: the pooled scans file's meta.id_map), and, when every_node, gaussians/<set>_node_<id>.png. Returns
-    the paths written."""
+    id_map: the pooled scans file's meta.id_map; removed: Block 19.8's {set: [specimen ids]}, marked on the
+    cells' labels), and, when every_node, gaussians/<set>_node_<id>.png. Returns the paths written."""
     from ..analysis import calibration_report as CR
     inputs = CR.figure_inputs(scans, cfg, calib, far_fit, patches)
     written = []
@@ -656,13 +675,7 @@ def write_all(scans, calib, far_fit, patches, cfg, out_dir, every_node=True, dpi
         path = os.path.join(out_dir, "kernel_law.png")
         fig = kernel_law_figure(inputs["kernel_law"])
         fig.savefig(path, dpi=dpi, facecolor=SURFACE, bbox_inches="tight"); plt.close(fig); written.append(path)
-    kc = CR.kernel_law_by_cell(scans, cfg, calib, far_fit, id_map)
-    if kc is not None and len(kc["cells"]) >= 2:
-        for name, draw in (("kernel_law_by_cell", kernel_law_by_cell_figure),
-                           ("kernel_law_residuals_by_cell", kernel_law_residuals_by_cell_figure)):
-            path = os.path.join(out_dir, "%s.png" % name)
-            fig = draw(kc)
-            fig.savefig(path, dpi=dpi, facecolor=SURFACE, bbox_inches="tight"); plt.close(fig); written.append(path)
+    written += write_by_cell(CR.kernel_law_by_cell(scans, cfg, calib, far_fit, id_map, removed), out_dir, dpi)
     if every_node:
         os.makedirs(os.path.join(out_dir, "gaussians"), exist_ok=True)
         for g in inputs["gaussians"]:

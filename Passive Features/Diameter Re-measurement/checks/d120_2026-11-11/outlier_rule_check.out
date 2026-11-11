@@ -1,0 +1,24 @@
+s_b 0.010 um, s_w 0.020 um, shift 0.20 um, 400 datasets each, seed 20261111
+
+null (no cell shifted): P(any cell removed), target <= 0.05
+                 rule A   rule B
+  C 10, n  2    0.160    0.028
+  C 10, n  5    0.235    0.030
+  C 10, n 30    0.333    0.055
+  C 13, n  2    0.128    0.013
+  C 13, n  5    0.203    0.045
+  C 13, n 30    0.230    0.055
+  C 51, n  2    0.083    0.035
+  C 51, n  5    0.090    0.045
+  C 51, n 30    0.083    0.037
+
+m cells shifted by 0.20 um (n 5): P(exactly the m shifted removed)
+                 rule A   rule B
+  C 13, m 1      1.000    1.000
+  C 13, m 2      0.535    0.000
+  C 13, m 3      0.000    0.000
+  C 13, m 5      0.000    0.000
+  C 51, m 1      1.000    1.000
+  C 51, m 2      1.000    1.000
+  C 51, m 3      1.000    0.998
+  C 51, m 5      0.000    0.000

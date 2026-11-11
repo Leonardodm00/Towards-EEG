@@ -641,7 +641,7 @@ def run_figures(cfg, a):
         patches.update(calibration_io.load_patches(path))
     os.makedirs(a.out_dir, exist_ok=True)
     written = CF.write_all(scans, calib, far_fit, patches, cfg, a.out_dir, every_node=not a.no_node_figures,
-                           id_map=id_map or None)
+                           id_map=id_map or None, removed=getattr(a, "removed", None))
     for w in written:
         print("wrote %s" % w)
     return a.out_dir

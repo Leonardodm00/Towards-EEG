@@ -71,7 +71,7 @@ SEARCH_CONFIG_SECTIONS = ("acquisition", "calibration", "measure", "renderer")
 # and its bootstrap do not change which candidates a search chooses, and a record written before they existed still
 # matches
 SEARCH_CONFIG_EXCLUDED = {"calibration": ("growth_jacobian", "bootstrap_unit", "bootstrap_cell_min",
-                                          "pool_weighting")}
+                                          "pool_weighting", "cell_outlier_removal", "cell_outlier_alpha")}
 
 
 def swc_digest(swc):

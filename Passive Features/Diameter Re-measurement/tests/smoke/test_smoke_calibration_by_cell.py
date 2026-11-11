@@ -30,7 +30,10 @@ Checks
                         with three cells one panel, with one cell neither;
                         pool --what calibration on four cells' files writes
                         kernel_law_by_cell.csv, the figures, and the fourth
-                        cell stands out
+                        cell stands out; 2026-11-11 (Block 19.8): the
+                        removed cells as given and marked on the labels,
+                        and at four cells the cells' test reported but not
+                        applied
     test_determinism    the by-cell figures twice are byte-identical
     test_edge_cases     an unqualified node has no cell; without a far fit no
                         far point and the near points beyond the table have a
@@ -233,7 +236,16 @@ def test_contract():
     st = standard()
     kc = st["kc"]
     assert all(tuple(r) == CR.BY_CELL_COLUMNS for r in kc["summary"])
-    assert {k for k in kc} == {"points", "cells", "summary", "table", "line", "anchor"}
+    assert {k for k in kc} == {"points", "cells", "summary", "table", "line", "anchor", "removed"}
+    assert kc["removed"] == {}                                                  # 2026-11-11, Block 19.8
+    near = [sc for sc in st["near"] + st["far"] if sc.set == "near"]
+    kr = CR.kernel_law_by_cell(st["near"] + st["far"], st["cfg"], TF.fake_calib(st["cfg"], near, None), st["ff"],
+                               removed={"near": [DEV], "far": [DEV, 101]})
+    assert kr["removed"] == {"near": [DEV], "far": [DEV, 101]}
+    assert CF._cell_label(DEV, kr) == "specimen %d [removed: near and far]" % DEV
+    assert CF._cell_label(101, kr) == "specimen 101 [removed: far]" and CF._cell_label(202, kr) == "specimen 202"
+    ticks = [t.get_text() for t in CF.kernel_law_residuals_by_cell_figure(kr).axes[0].get_yticklabels()]
+    assert "specimen %d [removed: near and far]" % DEV in ticks, ticks
     with tempfile.TemporaryDirectory() as tmp:
         w = _write_all(st, os.path.join(tmp, "four"), st["near"] + st["far"])
         names = sorted(os.path.basename(x) for x in w)
@@ -269,6 +281,13 @@ def test_contract():
         for name in ("kernel_law_by_cell", "kernel_law_residuals_by_cell", "kernel_law"):
             assert os.path.getsize(os.path.join(out, "s3c", "figures", "%s.png" % name)) > 5000, name
         assert sum(1 for ln in lines if ln.startswith("by cell: specimen")) == 8, lines
+        # Block 19.8 (D-120.3) at four cells: every cell's z reported, the rule not applied, nothing refitted
+        rows = cell_pool.read_table(os.path.join(out, "s3c", "cell_outliers.csv"), dict(specimen_id="int", set="str"))
+        assert len(rows) == 8 and all(r["removed"] == "false" for r in rows), rows
+        far404 = [r for r in rows if r["set"] == "far" and r["specimen_id"] == DEV]
+        assert len(far404) == 1 and float(far404[0]["z"]) > 100.0, far404   # gamma 0.99 vs 0.79: it stands out
+        assert sum(1 for ln in lines if "not applied (fewer than 10 cells)" in ln) == 2, lines
+        assert not os.path.exists(os.path.join(out, "s3c", "calibration_pooled_all.json"))
 
 
 def test_determinism():

@@ -293,6 +293,8 @@ class CalibrationConfig:
     bootstrap_unit: str = "cell"             # source: D-118.3 [user]: the pooled fits' SEs resample cells (each with all its nodes) by Block 19.6's plan; "node" resamples nodes always; one cell is always the node bootstrap; not in the search's key (10.C.R)
     bootstrap_cell_min: int = 10             # source: D-118.3 [user; the value the assistant's, PROVISIONAL]: from this many cells the cell bootstrap; from 2 to this - 1 both, the larger SE reported and flagged few cells; not in the search's key
     pool_weighting: str = "cell"             # source: D-120.2 [user]: the pooled near and far fits weigh every cell the same (a node N / (C N_c), mean 1); "node": every node the same, as before 2026-11-10; one cell or equal cells: identical; not in the search's key
+    cell_outlier_removal: bool = True        # source: D-120.3 [user]: a cell whose mean residual is too rare under the between-cell Gaussian leaves its set's pool (Block 19.8; applied from bootstrap_cell_min cells); not in the search's key
+    cell_outlier_alpha: float = 0.05          # source: D-120.3 [user's confirmation of the reading]: the family-wise level, p < alpha / C over a set's C cells (Bonferroni); not in the search's key
     table_max_delta_um: float = 0.84         # source: D-080.1 [user]: every table written for rendering ends here, so the renderer's linear continuation starts at the anchor
     # Block 15, the far-field calibration (D-074, D-077, D-078, D-081)
     far_offsets_planes: int = 16             # source: D-074.1 [user]: the far scan reads k* +- this (4.48 um on both sides of focus)
@@ -474,6 +476,11 @@ class DiameterConfig:
         _check_in(cal.growth_jacobian, GROWTH_JACOBIANS, "calibration.growth_jacobian")
         _check_in(cal.bootstrap_unit, BOOTSTRAP_UNITS, "calibration.bootstrap_unit")
         _check_in(cal.pool_weighting, POOL_WEIGHTINGS, "calibration.pool_weighting")
+        if not isinstance(cal.cell_outlier_removal, bool):
+            raise ValueError("calibration.cell_outlier_removal must be true or false")
+        if not (isinstance(cal.cell_outlier_alpha, (int, float)) and not isinstance(cal.cell_outlier_alpha, bool)
+                and 0.0 < float(cal.cell_outlier_alpha) < 1.0):
+            raise ValueError("calibration.cell_outlier_alpha must lie in (0, 1)")
         if not (isinstance(cal.bootstrap_cell_min, int) and not isinstance(cal.bootstrap_cell_min, bool)
                 and cal.bootstrap_cell_min >= 2):
             raise ValueError("calibration.bootstrap_cell_min must be an integer >= 2 (Block 19.6, D-118.3)")

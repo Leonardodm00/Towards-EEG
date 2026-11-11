@@ -53,6 +53,7 @@ Pure ASCII, for the cluster (hpc-python-compat).
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import sys
 import time
@@ -599,12 +600,14 @@ def pool_inputs(cfg, out_dir, selection_path="", log=print):
     return sug
 
 
+OUTLIER_COLUMNS = ("set", "specimen_id", "n_nodes", "mean_um", "ref_mean_um", "sigma_b2_um2", "sigma_w2_um2", "sd_um",
+                   "z", "p", "removed")
+
+
 def pool_calibration(cfg, out_dir, selection_path="", log=print):
     """Block 19.4: the cells' scans pooled round-robin, at most survey.calib_scans_per_cell from a cell and every
-    cell's unless survey.calib_pool_max_per_set caps a set (D-118), then Block 10's fit, Block 15's far-fit and the
-    figures on the pooled scans: one kernel (D-088.1)."""
-    import argparse as _ap
-    import calibrate_kernel
+    cell's unless survey.calib_pool_max_per_set caps a set (D-118), then pooled_fits: Block 10's fit, Block 15's
+    far-fit, Block 19.8's test of the cells and the figures on the pooled scans: one kernel (D-088.1)."""
     from allen_diameter.analysis import calibration_pool
     from allen_diameter.loading import calibration_io
     per_cell = []
@@ -616,34 +619,107 @@ def pool_calibration(cfg, out_dir, selection_path="", log=print):
     pooled, meta = calibration_pool.pool_scans(per_cell, cfg)
     s3c = os.path.join(out_dir, "s3c")
     os.makedirs(s3c, exist_ok=True)
-    sp, cp, fp = (os.path.join(s3c, x) for x in ("scans_pooled.json", "calibration_pooled.json", "far_fit_pooled.json"))
-    calibration_io.save_scans(pooled, sp, dict(meta, source="pooled", cells=[s for s, _ in per_cell]))
+    meta = dict(meta, source="pooled", cells=[s for s, _ in per_cell])
+    calibration_io.save_scans(pooled, os.path.join(s3c, "scans_pooled.json"), meta)
     for which in ("near", "far"):
         m = meta["sets"][which]
         cap = "" if m["max_nodes"] is None else ", at most %d in all" % m["max_nodes"]
         log("pooled %s field: %d of %d scans taken (at most %d per cell%s) from %d cells %s -- %s" % (
             which, m["taken"], m["available"], m["max_per_cell"], cap, len(m["by_cell"]), m["by_cell"],
             "sufficient" if m["sufficient"] else "INSUFFICIENT (< %d, D-088.3)" % m["min_nodes"]))
-    done = dict(fit=False, far_fit=False)
-    for name, call in (("fit", lambda: calibrate_kernel.run_fit(cfg, sp, cp)),
-                       ("far_fit", lambda: calibrate_kernel.run_far_fit(cfg, sp, cp, fp))):
-        if name == "far_fit" and not done["fit"]:
-            log("pooled far-fit not run: the near-field fit did not run")
-            continue
-        try:
-            call()
-            done[name] = True
-        except SystemExit as exc:                     # run_fit and run_far_fit exit on a fit they cannot do
-            log("pooled %s: %s" % (name, exc))
+    done, _outliers = pooled_fits(cfg, pooled, meta, s3c, log)
+    log("pool calibration -> %s" % s3c)
+    return meta, done
+
+
+def pooled_fits(cfg, pooled, meta, s3c, log=print, figures=True):
+    """Blocks 19.4-19.8 on the pooled scans already in s3c/scans_pooled.json (meta: its meta, with id_map):
+    Block 10's fit and Block 15's far-fit; then Block 19.8 (D-120.3) tests every cell of each set on the fits'
+    residuals (s3c/cell_outliers.json, .csv) and, when it removes a cell, keeps the first pass as
+    calibration_pooled_all.json and far_fit_pooled_all.json (its two by-cell figures in s3c/figures_all), writes
+    the scans without the removed cells' nodes of that set to s3c/scans_pooled_kept.json and runs both fits again
+    on them; then the figures and kernel_law_by_cell.csv of the final pass. Returns (done, outliers): done
+    {"fit", "far_fit"} of the final pass, outliers cell_outliers.cell_outliers's record (None when not run)."""
+    import argparse as _ap
+    import calibrate_kernel
+    from allen_diameter.analysis import calibration_pool
+    from allen_diameter.analysis import calibration_report as CR
+    from allen_diameter.analysis import cell_outliers as CO
+    from allen_diameter.loading import calibration_io, cell_pool, survey_io
+    sp, cp, fp = (os.path.join(s3c, x) for x in ("scans_pooled.json", "calibration_pooled.json", "far_fit_pooled.json"))
+    cp_all, fp_all, kp = (os.path.join(s3c, x) for x in ("calibration_pooled_all.json", "far_fit_pooled_all.json",
+                                                         "scans_pooled_kept.json"))
+    for stale in (cp_all, fp_all, kp, os.path.join(s3c, "cell_outliers.json"), os.path.join(s3c, "cell_outliers.csv")):
+        if os.path.exists(stale):                     # a previous run's conditional outputs never outlive it
+            os.remove(stale)
+    id_map = meta.get("id_map")
+
+    def run_fits(scans_path):
+        done = dict(fit=False, far_fit=False)
+        for name, call in (("fit", lambda: calibrate_kernel.run_fit(cfg, scans_path, cp)),
+                           ("far_fit", lambda: calibrate_kernel.run_far_fit(cfg, scans_path, cp, fp))):
+            if name == "far_fit" and not done["fit"]:
+                log("pooled far-fit not run: the near-field fit did not run")
+                continue
+            try:
+                call()
+                done[name] = True
+            except SystemExit as exc:                 # run_fit and run_far_fit exit on a fit they cannot do
+                log("pooled %s: %s" % (name, exc))
+        return done
+
+    def by_cell(scans, done, removed):
+        return CR.kernel_law_by_cell(scans, cfg, calibration_io.load_calibration(cp),
+                                     calibration_io.load_calibration(fp) if done["far_fit"] else None, id_map, removed)
+
+    done = run_fits(sp)
+    outliers, removed, scans_path, final = None, {}, sp, pooled
+    if done["fit"] and cfg.calibration.cell_outlier_removal:
+        kc = by_cell(pooled, done, None)
+        outliers = CO.cell_outliers(kc, cfg)
+        survey_io.write_json(os.path.join(s3c, "cell_outliers.json"), outliers)
+        cell_pool.write_table(os.path.join(s3c, "cell_outliers.csv"),
+                              [dict(r, set=w) for w in ("near", "far") for r in outliers[w]["rows"]], OUTLIER_COLUMNS)
+        for which in ("near", "far"):
+            rec = outliers[which]
+            if not rec["n_cells"]:
+                continue
+            if rec["n_cells"] < 3:                    # a cell's yardstick needs two other cells
+                log("cells that stand out (D-120.3): %s field, %d %s: no z (fewer than 3 cells)" % (
+                    which, rec["n_cells"], "cell" if rec["n_cells"] == 1 else "cells"))
+                continue
+            a = rec["anova"]
+            spread = "between-cell SD %.4f um, within %.4f um" % (math.sqrt(a["sigma_b2"]) if a["sigma_b2"] == a["sigma_b2"]
+                                                                   else float("nan"), math.sqrt(a["sigma_w2"])
+                                                                   if a["sigma_w2"] == a["sigma_w2"] else float("nan"))
+            if rec["applied"]:
+                log("cells that stand out (D-120.3): %s field, %d cells (%s), p < %.3g / %d = %.2e: %s" % (
+                    which, rec["n_cells"], spread, rec["alpha"], rec["n_cells"], rec["p_threshold"],
+                    "removed %s" % rec["removed"] if rec["removed"] else "none removed"))
+            else:
+                log("cells that stand out (D-120.3): %s field, %d cells (%s): not applied (fewer than %d cells); "
+                    "the z are in cell_outliers.csv" % (which, rec["n_cells"], spread, rec["min_cells"]))
+        removed = {w: list(outliers[w]["removed"]) for w in ("near", "far") if outliers[w]["removed"]}
+        if removed:
+            for path, keep in ((cp, cp_all), (fp, fp_all)):
+                if os.path.exists(path):
+                    os.replace(path, keep)
+            if figures:
+                from allen_diameter.plotting import calibration_figures as CF
+                kc["removed"] = removed
+                CF.write_by_cell(kc, os.path.join(s3c, "figures_all"))
+            final = [sc for sc in pooled if calibration_pool.cell_of(sc.node_id, id_map)[0] not in removed.get(sc.set, ())]
+            calibration_io.save_scans(final, kp, dict(meta, source="pooled, cells removed (D-120.3)", removed=removed))
+            scans_path = kp
+            log("pooled fits again without the removed cells (D-120.3) -> %s" % kp)
+            done = run_fits(kp)
+    if done["fit"] and figures:
+        calibrate_kernel.run_figures(cfg, _ap.Namespace(scans=[scans_path], calibration=cp,
+                                                        far_fit=fp if done["far_fit"] else "", patches=[],
+                                                        out_dir=os.path.join(s3c, "figures"), no_node_figures=False,
+                                                        removed=removed or None))
     if done["fit"]:
-        calibrate_kernel.run_figures(cfg, _ap.Namespace(scans=[sp], calibration=cp, far_fit=fp if done["far_fit"] else "",
-                                                        patches=[], out_dir=os.path.join(s3c, "figures"),
-                                                        no_node_figures=False))
-        # Block 19.5 (D-090.2): the residuals from the pooled law, per cell and set
-        from allen_diameter.analysis import calibration_report as CR
-        from allen_diameter.loading import cell_pool
-        kc = CR.kernel_law_by_cell(pooled, cfg, calibration_io.load_calibration(cp),
-                                   calibration_io.load_calibration(fp) if done["far_fit"] else None, meta["id_map"])
+        kc = by_cell(final, done, removed)            # Block 19.5 (D-090.2): the residuals from the pooled law
         if kc is not None:
             cell_pool.write_table(os.path.join(s3c, "kernel_law_by_cell.csv"), kc["summary"], CR.BY_CELL_COLUMNS)
             for r in kc["summary"]:
@@ -651,8 +727,7 @@ def pool_calibration(cfg, out_dir, selection_path="", log=print):
                     "specimen %d" % r["specimen_id"] if r["specimen_id"] is not None else "cell", r["set"],
                     r["n_nodes"], r["n_points_used"], r["median_residual_um"], r["q25_residual_um"],
                     r["q75_residual_um"]))
-    log("pool calibration -> %s" % s3c)
-    return meta, done
+    return done, outliers
 
 
 def main(argv=None):

@@ -40,6 +40,18 @@ Checks
                         draws as the unlabelled one; the far slope by cell
                         nearer the cells' mean slope than by node; the CLI
                         records and prints the weighting
+    test_cell_outliers  2026-11-11 (19.8, D-120.3): the one-way ANOVA against
+                        scipy.stats.f_oneway and the textbook n0; the
+                        reference the other cells' means averaged equally;
+                        thirteen cells, one shifted by 0.2 um (up or down):
+                        only it removed; six: nothing removed, its z the
+                        largest; leaving the cell out of its yardstick raises
+                        its z; a one-node cell 0.05 um off kept thanks to
+                        sigma_w^2 / N_c; end to end pooled_fits on twelve
+                        cells, one with twice the growth: removed from the
+                        near set only, refitted without it, the first pass
+                        kept; switched off on the same folder: nothing
+                        removed and the first run's conditional files gone
     test_edge_cases     no scans in a set; a cell without candidates; a
                         node id beyond the qualifier refused; the
                         configuration's refusals
@@ -337,6 +349,10 @@ def test_contract():
         cal = CIO.load_calibration(os.path.join(out_dir, "s3c", "calibration_pooled.json"))
         assert cal["meta"]["sufficiency"]["sufficient"] is False and cal["meta"]["sufficiency"]["n_nodes"] == 2
         assert "INSUFFICIENT: 2 near-field nodes < 10" in buf.getvalue(), buf.getvalue()
+        # 19.8 (D-120.3) on one cell: no z, nothing removed, the table written
+        assert "cells that stand out (D-120.3): near field, 1 cell: no z (fewer than 3 cells)" in logs, logs
+        assert os.path.exists(os.path.join(out_dir, "s3c", "cell_outliers.csv"))
+        assert not os.path.exists(os.path.join(out_dir, "s3c", "scans_pooled_kept.json"))
         assert all(n // CP.QUALIFIER == 11 for n in cal["growth"]["node_ids"]), cal["growth"]["node_ids"]
         boot = cal["anchor"]["bootstrap"]                                    # 19.6 (D-118.3): one cell, nodes
         assert boot["rule"] == "node" and boot["unit"] == "node" and boot["n_cells"] == 1, boot
@@ -724,6 +740,130 @@ def test_cell_weights():
         pass
     else:
         raise AssertionError("an unknown pool_weighting must be refused")
+
+
+def noisy_near(n_nodes, a, dz, rng, noise=0.004):
+    """One cell's near scans (unqualified ids 0..n-1): the axis on plane 0, 7 planes, omega = c_n + a 0.3 delta^2
+    plus Gaussian noise of SD noise (um^2)."""
+    ks = np.arange(-3, 4)
+    out = []
+    for n in range(n_nodes):
+        om = 0.03 + 0.01 * n + a * 0.3 * (ks * dz) ** 2 + noise * rng.standard_normal(ks.size)
+        m = ks.size
+        out.append(CAL.PlaneScan(node_id=n, d_hat_um=0.4, phi_rad=0.0, alpha_hat=0.2, k_star=0, z_sub_um=0.0, ks=ks,
+                                 z_um=ks * dz, omega_um2=om, vw_um2=om.copy(), area_gl_um=np.full(m, 5.0),
+                                 depth_gl=np.full(m, 20.0), B_bar=np.full(m, 200.0),
+                                 status=tuple("ok" for _ in range(m)), set="near"))
+    return out
+
+
+def test_cell_outliers():
+    from scipy import stats
+    from allen_diameter.analysis import cell_outliers as CO
+    import survey_cells as SC
+    d = default_config()
+    # (a) the ANOVA: F = MS_B / MS_W equals scipy's one-way F on unequal groups; n0 and sigma_b^2 by hand
+    A, B, C3 = [1.0, 1.2], [0.5, 0.7, 0.6], [2.0, 2.2, 1.9, 2.1]
+    an = CO.one_way_anova(np.array(A + B + C3), [1] * 2 + [2] * 3 + [3] * 4)
+    assert abs(an["ms_b"] / an["ms_w"] - stats.f_oneway(A, B, C3).statistic) < 1e-12 * an["ms_b"] / an["ms_w"]
+    n0 = (9 - (4 + 9 + 16) / 9.0) / 2.0
+    gm = np.mean(A + B + C3)
+    msb = (2 * (np.mean(A) - gm) ** 2 + 3 * (np.mean(B) - gm) ** 2 + 4 * (np.mean(C3) - gm) ** 2) / 2.0
+    msw = (np.var(A) * 2 + np.var(B) * 3 + np.var(C3) * 4) / 6.0
+    assert abs(an["n0"] - n0) < 1e-12 and abs(an["ms_b"] - msb) < 1e-12 and abs(an["ms_w"] - msw) < 1e-12
+    assert abs(an["sigma_b2"] - max(0.0, (msb - msw) / n0)) < 1e-12 and an["n_cells"] == 3 and an["n_nodes"] == 9
+    r3 = next(r for r in CO.assess_set([1] * 2 + [2] * 3 + [3] * 4, np.array(A + B + C3), d)["rows"]
+              if r["specimen_id"] == 3)
+    assert abs(r3["ref_mean_um"] - (np.mean(A) + np.mean(B)) / 2.0) < 1e-15, r3     # each other cell equal, not 2:3
+    # (b) thirteen cells of five node values (between SD 0.01 um, within 0.02 um), cell 99 shifted by 0.2 um
+    rng = np.random.default_rng(5)
+    labels, values = [], []
+    for c in list(range(1, 13)) + [99]:
+        eff = 0.01 * rng.standard_normal() + (0.2 if c == 99 else 0.0)
+        for _ in range(5):
+            labels.append(c)
+            values.append(eff + 0.02 * rng.standard_normal())
+    values = np.array(values)
+    rec = CO.assess_set(labels, values, d)
+    assert rec["applied"] and rec["removed"] == [99], rec["removed"]
+    assert abs(rec["p_threshold"] - 0.05 / 13) < 1e-15
+    row99 = next(r for r in rec["rows"] if r["specimen_id"] == 99)
+    assert row99["removed"] and row99["p"] < rec["p_threshold"] < min(r["p"] for r in rec["rows"] if r["specimen_id"] != 99)
+    six = [i for i, c in enumerate(labels) if c in (1, 2, 3, 4, 5, 99)]
+    neg = values.copy()
+    neg[np.array(labels) == 99] -= 0.4                       # the same cell 0.2 um below instead of above
+    assert CO.assess_set(labels, neg, d)["removed"] == [99]
+    rec6 = CO.assess_set([labels[i] for i in six], values[six], d)
+    z6 = {r["specimen_id"]: abs(r["z"]) for r in rec6["rows"]}
+    assert not rec6["applied"] and rec6["removed"] == [] and max(z6, key=z6.get) == 99, z6
+    # (c) leave-one-out: cell 99 judged against a yardstick that includes it has a smaller z
+    full = CO.one_way_anova(values, labels)
+    i99 = full["cells"].index(99)
+    z_in = (full["means"][i99] - np.mean(full["means"])) / math.sqrt(full["sigma_b2"] + full["sigma_w2"] / 5)
+    assert row99["z"] > z_in > 0, (row99["z"], z_in)
+    # (d) a one-node cell 0.05 um off where the within SD is 0.05 um: kept, because its mean carries sigma_w^2 / 1;
+    # a yardstick of sigma_b^2 alone would remove it
+    rng = np.random.default_rng(6)
+    lab2, val2 = [], []
+    for c in range(1, 13):
+        eff = 0.01 * rng.standard_normal()
+        for _ in range(6):
+            lab2.append(c)
+            val2.append(eff + 0.05 * rng.standard_normal())
+    others = CO.one_way_anova(np.array(val2), lab2)
+    lab2.append(77)
+    val2.append(float(np.mean(others["means"])) + 0.05)
+    rec2 = CO.assess_set(lab2, np.array(val2), d)
+    row77 = next(r for r in rec2["rows"] if r["specimen_id"] == 77)
+    assert not row77["removed"] and abs(row77["z"]) < 2.0, row77
+    z_alone = 0.05 / math.sqrt(max(row77["sigma_b2_um2"], 1e-30))
+    assert 2.0 * stats.norm.sf(z_alone) < rec2["p_threshold"], (z_alone, row77)
+    # node_values: a node's value is the mean of its used, finite residuals; other points ignored
+    kc = dict(points=[dict(set="near", used=True, residual_um=0.1, node_id=1, cell=4),
+                      dict(set="near", used=True, residual_um=0.3, node_id=1, cell=4),
+                      dict(set="near", used=False, residual_um=9.0, node_id=1, cell=4),
+                      dict(set="near", used=True, residual_um=float("nan"), node_id=2, cell=5),
+                      dict(set="far", used=True, residual_um=0.5, node_id=3, cell=5)])
+    labs, vals = CO.node_values(kc, "near")
+    assert labs == [4] and np.allclose(vals, [0.2]), (labs, vals)
+    # (e) end to end: twelve cells of six near nodes (cell 12 with twice the growth) and two far nodes each; few
+    # resamples for speed; then the same directory without the removal: the first run's conditional files go
+    cfg = dataclasses.replace(d, calibration=dataclasses.replace(d.calibration, bootstrap_resamples=4))
+    dz = cfg.acquisition.dz_um
+    rng = np.random.default_rng(7)
+    per_cell = [(s_, noisy_near(6, 2.0 if s_ == 12 else 1.0, dz, rng) + [far_scan(100 + j, cfg, 0.6, 0.5, rng)
+                                                                        for j in range(2)]) for s_ in range(1, 13)]
+    pooled, meta = CP.pool_scans(per_cell, cfg)
+    with tempfile.TemporaryDirectory() as s3c:
+        CIO.save_scans(pooled, os.path.join(s3c, "scans_pooled.json"), dict(meta, source="pooled"))
+        lines = []
+        with redirect_stdout(io.StringIO()):
+            done, out = SC.pooled_fits(cfg, pooled, meta, s3c, log=lines.append, figures=False)
+        assert done["fit"] and done["far_fit"], (done, lines)
+        assert out["near"]["removed"] == [12] and out["near"]["applied"], out["near"]["rows"]
+        assert out["far"]["n_cells"] == 12 and out["far"]["removed"] == [], out["far"]["rows"]
+        for name in ("calibration_pooled_all.json", "far_fit_pooled_all.json", "scans_pooled_kept.json",
+                     "cell_outliers.json", "cell_outliers.csv", "calibration_pooled.json", "far_fit_pooled.json",
+                     "kernel_law_by_cell.csv"):
+            assert os.path.exists(os.path.join(s3c, name)), name
+        final = CIO.load_calibration(os.path.join(s3c, "calibration_pooled.json"))
+        first = CIO.load_calibration(os.path.join(s3c, "calibration_pooled_all.json"))
+        ids_final = [CP.cell_of(q, meta["id_map"])[0] for q in final["growth"]["node_ids"]]
+        ids_first = [CP.cell_of(q, meta["id_map"])[0] for q in first["growth"]["node_ids"]]
+        assert 12 not in ids_final and 12 in ids_first and len(set(ids_final)) == 11, set(ids_final)
+        kept, kmeta = CIO.load_scans(os.path.join(s3c, "scans_pooled_kept.json"))
+        kept12 = [sc.set for sc in kept if CP.cell_of(sc.node_id, meta["id_map"])[0] == 12]
+        assert kmeta["removed"] == {"near": [12]} and kept12 == ["far", "far"], (kmeta.get("removed"), kept12)
+        assert any("removed [12]" in ln for ln in lines), lines
+        off = dataclasses.replace(cfg, calibration=dataclasses.replace(cfg.calibration, cell_outlier_removal=False))
+        with redirect_stdout(io.StringIO()):
+            done, out = SC.pooled_fits(off, pooled, meta, s3c, log=lines.append, figures=False)
+        assert done["fit"] and out is None
+        for name in ("calibration_pooled_all.json", "far_fit_pooled_all.json", "scans_pooled_kept.json",
+                     "cell_outliers.json", "cell_outliers.csv"):
+            assert not os.path.exists(os.path.join(s3c, name)), name
+        again = CIO.load_calibration(os.path.join(s3c, "calibration_pooled.json"))
+        assert 12 in [CP.cell_of(q, meta["id_map"])[0] for q in again["growth"]["node_ids"]]
 
 
 # ---------------------------------------------------------------- runner ---
