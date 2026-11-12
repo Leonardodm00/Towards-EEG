@@ -461,15 +461,15 @@ implementation:
     jobs: []
     note: "Form of the per-sweep calibration open (D-073 comments (a)-(d)). [2026-10-28, D-102 (user): each twin sweep carries the realised tilt of its own real sweep, b_hat(c,s), not a draw from sigma_b(c); the Long Square sweeps' tilts open (proposal: delta_end_mV / 6.89 s). Revise mark D-102.] [2026-10-29: D-107 (user) -- an LS twin sweep carries the tilt of the line through its real sweep's pre-window and end-window means. Revise mark D-107.] [2026-11-11: D-123 (user) -- the twins are built from Block 6's noise-fit run on n real cells (each twin sweep with its real sweep's theta_tilde(c,s) and tilt), so this block now follows N6; its SPEC entry after that run.]"
   - id: N6
-    title: "Block 6: driver, the S0-S3 checks and the PBS job"
-    summary: "run_noise_fit.py fits the law for every cell of a group and writes the noise table; the sens_* scripts run the in-silico checks S0-S3 with their fixed predictions (D-055); one PBS job on davinci."
+    title: "Block 6: the noise-fit run -- driver, PBS array and merge"
+    summary: "run_noise_fit.py runs Blocks 3, 4 and 9 on every cell of a group -- one PBS array job per cell, 6 cores each, then a merge -- and writes a JSON per cell and the two noise tables (D-123 to D-125); the S0-S3 checks of D-055 dropped for now (D-125.3)."
     block: 6
     parent: G4
     depends_on: [N3, N4, N4b]
     needs_theory: [T7]
     needs_hpc: true
     jobs: ["Passive Features/HPC script/Ih Fit/submit_noise_fit.sh", noise_fit]
-    note: "The job script gets the roadmap marker lines when written. [2026-11-11: D-123 (user) -- next after Block 9's code: the driver and the PBS job fit Blocks 3, 4 and 9 on n real cells on davinci before the twins (N5 now follows this block); n and which cells, the S0-S3 checks' place and a 1-2 cell pilot open (SPEC section 8).] [2026-11-12: D-124 (user) -- D-123's reading confirmed; the run covers all 18 L3_exc cells, after a pilot of the same driver on 508282493 and 569844159; the S0-S3 checks' place still open. D-117 and D-118 of 2026-11-11 renumbered D-122 and D-123 (the diameter chat had taken D-117 to D-121).]"
+    note: "The job script gets the roadmap marker lines when written. [2026-11-11: D-123 (user) -- next after Block 9's code: the driver and the PBS job fit Blocks 3, 4 and 9 on n real cells on davinci before the twins (N5 now follows this block); n and which cells, the S0-S3 checks' place and a 1-2 cell pilot open (SPEC section 8).] [2026-11-12: D-124 (user) -- D-123's reading confirmed; the run covers all 18 L3_exc cells, after a pilot of the same driver on 508282493 and 569844159; the S0-S3 checks' place still open. D-117 and D-118 of 2026-11-11 renumbered D-122 and D-123 (the diameter chat had taken D-117 to D-121).] [2026-11-12: D-125 (user) -- layout (a) within a 120-core cap, the outputs, S0-S3 dropped for now, a refused cell skipped, a full-size pilot kept; SPEC entry drafted.]"
   - id: N7
     title: "Block 7: the record"
     summary: "The fitted laws and flags written into the Stage-7 manifest and the noise table, the S0-S3 report, and the decision-log and plan entries that close the noise prerequisite."
