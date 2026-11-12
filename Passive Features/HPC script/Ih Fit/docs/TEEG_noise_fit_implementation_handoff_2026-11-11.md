@@ -9,6 +9,7 @@ which stays the history of Blocks 1-4 and of D-095 to D-116.
 |---|---|
 | 2026-11-11 | Created at the user's request ("We are quite behind in the implementation of the G4 Noise fit ... Write an handoff for another chat to go on with the implementation"). The same turn: Block 9's four open points answered (**D-122**), the order after Block 9 decided (**D-123**), both logged; SPEC §2.5, Block 9's entry and §8 updated (`b820498`); roadmap N5 now after N6 (`99760f0`, rendered `ed1514c`; page doc v165). Blocks 1-4's smoke suites re-run on `main` (§5). Project knowledge is full: this document lives only in the repository. |
 | 2026-11-12 | Renumbering (the decision log's 2026-11-12 row): D-117 and D-118 of 2026-11-11 are **D-122** and **D-123** (the diameter chat had already taken D-117 to D-121 and I-005, in the log copy on `sci/diameter-pipeline` only; the decision log's 2026-11-12 row); references renamed, the dated next-free statements left as written; **D-124** (user): D-123's reading confirmed, the noise-fit run on all 18 L3_exc cells after a pilot on 508282493 and 569844159. Marked: §2 (next free IDs). |
+| 2026-11-12 (later) | **Block 9 written and pushed** (`2171519`; roadmap N4b pushed, rendered `d2ae2ca`): `noise_sweep_fit.py`, `smoke_noise_sweep_fit.py` P1-P11 11/11 (404 s), 17 planted defects each caught; the gates run it as G6d (FULL mode). D-123's reading confirmed and $n$ set by **D-124**. Marked: the start-here table (steps 1-2) and its paragraph, §1 (header, N4b), §2 (D-124), §3 (done), §4 (questions 1-2 answered), §5 (rows), §9 (three traps). The next step is Block 6's SPEC entry: put §4's questions 3-7 to the user first. |
 
 **Basis tags.** **[run]** executed in the assistant's sandbox (date given); **[src]** read from the code or SPEC on
 `main` at `ed1514c`; **[log]** the decision log's text; **[user]** the user's decision or words; **[reasoning]** the
@@ -18,8 +19,8 @@ assistant's argument, not checked; **[open]** not decided or not verified.
 
 | # | Step | Blocked by | Where it runs |
 |---|---|---|---|
-| 1 | **Block 9's code**: `noise_sweep_fit.py` + `smoke_noise_sweep_fit.py` (P1-P11), exactly as SPEC §2.5 and the Block 9 entry state | nothing: D-116 and D-122 settle every point | sandbox |
-| 2 | **Block 6's SPEC entry, then its code**: the driver `run_noise_fit.py` and `submit_noise_fit.sh`, which fit Blocks 3, 4 and 9 on $n$ real cells | the user's answers to §3's questions; confirm D-123's reading first | sandbox (smoke), then davinci |
+| 1 | **Block 9's code**: `noise_sweep_fit.py` + `smoke_noise_sweep_fit.py` (P1-P11), exactly as SPEC §2.5 and the Block 9 entry state | nothing: D-116 and D-122 settle every point | sandbox | **[done 2026-11-12: `2171519`, P1-P11 11/11; §3]**
+| 2 | **Block 6's SPEC entry, then its code**: the driver `run_noise_fit.py` and `submit_noise_fit.sh`, which fit Blocks 3, 4 and 9 on $n$ real cells | the user's answers to §4's questions [corrected 2026-11-12: §4, not §3]; confirm D-123's reading first [updated 2026-11-12: confirmed, with $n$, by D-124; §4's questions 3-7 remain] | sandbox (smoke), then davinci |
 | 3 | **The run on davinci**: `git pull`, the FULL cluster gates, a dry run, a pilot on 1-2 cells, then the $n$ cells | the user runs it (the assistant never reaches the cluster) | davinci |
 | 4 | **Block 5's SPEC entry, then its code**: the twins built from the run's per-sweep laws and tilts | the run's tables; the user's answers to §4's questions | sandbox |
 | 5 | **Block 7** (the record), then **Stage 7** (Block 8, the recovery gate, D-083) | Blocks 5-6 | sandbox, davinci |
@@ -27,8 +28,11 @@ assistant's argument, not checked; **[open]** not decided or not verified.
 D-123's words **[user]**: "I would fit the noise features on n cells in order then to use these fits to construct the
 twins on which to run the synthetic recovery run". The reading above (the run before the twins, Block 6 before Block 5)
 is the assistant's, logged as D-123 "to confirm": **confirm it with the user in the first exchange**, together with $n$.
+[done 2026-11-12: "D-118's order: yes", "Which cells: Perfect as you suggest" **[user]** -- **D-124**: all 18 L3_exc cells, after a pilot of the same driver on 508282493 and 569844159.]
 
 ## 1. Where it stands (roadmap at `ed1514c`, 2026-11-11)
+
+[updated 2026-11-12: at `d2ae2ca` **[run]**: implementation planned 6, pushed 5, tested 7, done 8; theory unchanged. N4b pushed (below); nothing else moved.]
 
 `python3 specs/roadmap/roadmap.py status --yaml specs/roadmap/allen-mtg-fit.yaml --json <file>` **[run]**: implementation
 planned 7, pushed 4, tested 7, done 8; theory open 8, studying 4, closed 5. The counts have not moved since `854004c`
@@ -41,7 +45,7 @@ planned 7, pushed 4, tested 7, done 8; theory open 8, studying 4, closed 5. The 
 | NT tools | done | `noise_fit_gates.py`, `cluster_gates_noise_fit.sh` | FULL run on davinci 2026-10-20 at `ca028ea` only |
 | N3 Block 3 | pushed | `noise_windows.py`, `noise_cell_stats.py`: windows, start (D-110, D-111), median subtraction, tilt offsets (D-115), tilts (D-102, D-107), statistics | as N1 |
 | N4 Block 4 | pushed | `noise_fit.py`: the per-cell indirect-inference fit, `CellFitResult.per_sweep_cov` for Block 9 | as N1; never run on a real cell nor at full $M$, $R$ |
-| N4b Block 9 | planned | `noise_sweep_fit.py`: per-sweep fit, bootstrap $v(c,s)$, DerSimonian-Laird per protocol | SPEC complete; the page warns that `noise_sweep_fit.py` is not in the tree until it exists |
+| N4b Block 9 | planned [updated 2026-11-12: **pushed** at `2171519`] | `noise_sweep_fit.py`: per-sweep fit, bootstrap $v(c,s)$, DerSimonian-Laird per protocol | SPEC complete; the page warns that `noise_sweep_fit.py` is not in the tree until it exists [updated 2026-11-12: smoke-tested, no tester report yet; the warning gone] |
 | N6 Block 6 | planned | driver, S0-S3 checks, PBS job | now depends on N3, N4, N4b only (D-123) |
 | N5 Block 5 | planned | the generator's law and the per-sweep twins | now depends on N6 as well (D-123) |
 | N7 Block 7 | planned | the record (manifest, noise table, S0-S3 report) | after N6 |
@@ -60,6 +64,7 @@ Theory (the user's, never changed by the assistant): T5, T6, T7, T9 studying; T8
 | D-116 | Block 9 | one solve per sweep at the cell's weights from $\hat\theta(c)$; $v(c,s)$ by a parametric bootstrap; DerSimonian-Laird per protocol (SS and LS apart), clipped, the random-effects mean recomputed; a failed sweep out of the pooling **[log]** |
 | **D-122** (2026-11-11) | Block 9 | $B_v$ = 50 refits per sweep, each at the binding size $M_{\rm refit}$ = 1000 (the main per-sweep solve keeps $M$ = 3000); a failed refit left out of (P2) and counted, the sweep flagged `v_refits_failed:<n>/<B_v>` above 10 % (a report only); $B_{\rm ok} < 2$ gives `v_none`, a failed sweep; **a failed sweep's twin carries the cell's whole law** $\hat\theta(c)$ (the assistant had recommended the pooled $\sigma_s$; not taken) **[user]** |
 | **D-123** (2026-11-11) | order | the noise fit of $n$ real cells (Block 6 on davinci) before the twins (Block 5), which are built from those fits; then Stage 7 -- the assistant's reading, to confirm; $n$ open **[user]** |
+| **D-124** (2026-11-12) | Block 6 | D-123's reading confirmed; the run covers all 18 L3_exc cells (14 with two SS sweeps), after a pilot of the same driver on 508282493 and 569844159; open: the job layout, the outputs, the pilot's sizes, the S0-S3 checks, a refused cell **[user]** |
 | D-083 | Stage 7 | the six-parameter recovery on synthetic twins before any six-parameter fit of a real cell **[log]** |
 | D-097 | delivery | the assistant pushes its own work; every document is also in the repository **[log]** |
 | D-091 | roadmap | a new SPEC block enters the roadmap in the same turn **[log]** |
@@ -69,6 +74,8 @@ D-119, I-005** [corrected 2026-11-12: **D-125, I-006** -- D-117 to D-121 and I-0
 every write.
 
 ## 3. Step 1 -- Block 9's code (`noise_sweep_fit.py`)
+
+**[done 2026-11-12, `2171519`]** Written from SPEC §2.5 and the Block 9 entry; the API as built is appended to that entry (the additions: `SweepFit.flags`, `run_sweep(..., *, refit=fit_sweep)`, `pool_protocol(y, v, *, protocol, sweeps)`, `pool_cell(..., *, stage_cfg, seconds)`, `fit_sweeps(cfg=None -> cell_fit.config)`, `SweepStageResult.cell_columns()`, the row keys). Smoke P1-P11 11/11 in 404 s on one core **[run 2026-11-12]**: P5's worst z 2.34; P7's bootstrap $v$ = 0.00388 against the linearised 0.00326 (ratio 1.19); P9's pools SS $\hat\tau^2$ = 0 (clipped), LS 0.0060. Mutation-tested with 17 planted defects, each caught. Two oracles changed from the draft: P3 compares with exact rationals and with statsmodels at 1e-10 of its scale (statsmodels' own roundoff reaches 1.1e-12 of it); P8's target lies 100 times *above* the bounds' largest SD (100 times below, the whitened cost is flat near the lower bounds and the solve stops on xtol short of them). The gates run the suite as G6d in FULL mode (about 25 min in all). Not run here: the full sizes, a real cell. The text below is the brief it was written from.
 
 Everything is in SPEC §2.5 (P0)-(P4), (a)-(h) and the Block 9 entry **[src]**; write the code from them, not from this
 summary. The interface, in one place:
@@ -113,8 +120,8 @@ Questions for the user (SPEC entry after the answers; proposals are the assistan
 
 | # | Question | Proposal | Why it matters |
 |---|---|---|---|
-| 1 | D-123's reading: the run before the twins, Block 6 before Block 5 | as logged | it reorders the roadmap (done 2026-11-11 on that reading) |
-| 2 | $n$ and which cells | all 18 L3_exc cells (the group of the noise tables and of the Stage-7 twins), after a pilot on 508282493 and 569844159 (the two cells G12 read) | sizes the run; Stage 7's cohort size is also open (S7) |
+| 1 | D-123's reading: the run before the twins, Block 6 before Block 5 | as logged | it reorders the roadmap (done 2026-11-11 on that reading) [answered 2026-11-12: confirmed, D-124] |
+| 2 | $n$ and which cells | all 18 L3_exc cells (the group of the noise tables and of the Stage-7 twins), after a pilot on 508282493 and 569844159 (the two cells G12 read) | sizes the run; Stage 7's cohort size is also open (S7) [answered 2026-11-12: as proposed, D-124] |
 | 3 | job layout | a PBS array over cells, each job running Blocks 3, 4 and 9 for its cell in sequence, then one merge step writing the group tables; the alternative is an array over (cell, sweep) for Block 9 (SPEC §2.5 (h)), faster but with a join step | wall time against moving parts; one cell is about 6.6 h of Block 9 plus the per-cell fit [run, fixture] |
 | 4 | outputs | per cell a JSON (`CellFitResult.to_dict()` + `SweepStageResult.to_dict()`); per group `noise_cells_<GROUP>.csv` (Block 4's `noise_*` columns) and `noise_sweeps_<GROUP>.csv` (§2.5 (g)'s `noise_sweep_*` columns); under `$IH_OUTPUT_BASE/noise_fit/<RUN_TAG>/<GROUP>/` | Block 5 reads these |
 | 5 | the S0-S3 checks of D-055 (in N6's summary) | not in the first run; specified after it | D-055 predates D-102/D-107/D-115/D-116 (it still names $\sigma_b$ and the tilt alternation, both retired): its scenarios must be revised with the user before any `sens_*.py` is written [log] |
@@ -132,10 +139,11 @@ dry run first).
 
 | What | State | Basis |
 |---|---|---|
+| Block 9 smoke on `main` at `2171519` | `smoke_noise_sweep_fit` 11/11 (404 s); `smoke_noise_fit_gates` 8/8 after the G6d change; statsmodels 0.15.0 installed in the sandbox for P3 | [run 2026-11-12] |
 | Blocks 1-4 smoke on `main` at `a916c2c` | `smoke_noise_stats` 6/6, `smoke_noise_law` 10/10, `smoke_noise_fit_gates` 8/8, `smoke_noise_windows` 15/15 (16 s), `smoke_noise_fit` 11/11 (84 s); numpy 2.5.3, scipy 1.18.1, statsmodels 0.15.0 | [run 2026-11-11] |
-| night tester (integration tester) | no report covers N1-N4 (last report 2026-10-07 at `7a49a28`); that is why the roadmap says "pushed" | [run: roadmap status] |
-| cluster gates | last FULL run 2026-10-20 at `ca028ea` (13/13, SETTLED); Blocks 2-4 changed since; the script expects the current counts (M10, W15, F11) | [log; src] |
-| real cells | Blocks 3-4 have never run on a real cell nor at full $M$, $R$ | [log] |
+| night tester (integration tester) | no report covers N1-N4 (last report 2026-10-07 at `7a49a28`); that is why the roadmap says "pushed" [updated 2026-11-12: nor N4b] | [run: roadmap status] |
+| cluster gates | last FULL run 2026-10-20 at `ca028ea` (13/13, SETTLED); Blocks 2-4 changed since; the script expects the current counts (M10, W15, F11) [updated 2026-11-12: and Block 9's (G2 its commit, G6d P 11/11): FULL mode is 14 checks, about 25 min] | [log; src] |
+| real cells | Blocks 3-4 have never run on a real cell nor at full $M$, $R$ [updated 2026-11-12: nor Block 9, at full $M$, $B_v$] | [log] |
 
 Propose to the user (their call, not the assistant's): (a) the night test on Blocks 1-4 (and 9 once pushed) -- the
 `scientific-coding` skill's integration tester, on the user's "run the night test"; (b) the FULL cluster gates on
@@ -198,7 +206,10 @@ davinci before the driver's first real run:
 | the fixture cell's start | Block 4's smoke fixture falls back to the 80 ms start (its sweep 92 carries a $-$0.25 mV/s tilt); expected, not a bug (`dev/2026-10-29_start_noise/`) |
 | D-055 (S0-S3) | written before D-102/D-107: it names $\sigma_b$ and the tilt alternation, both retired |
 | `per_sweep_cov` keys | sweep numbers, SS and LS in one dict |
-| the roadmap page's warning | "module tokens of SPEC.md not found in the tree: N4b noise_sweep_fit.py" until Block 9's code is pushed |
+| the roadmap page's warning | "module tokens of SPEC.md not found in the tree: N4b noise_sweep_fit.py" until Block 9's code is pushed [updated 2026-11-12: gone since `2171519`] |
+| two copies of the decision log (added 2026-11-12) | the diameter chat cannot write project knowledge's log, so its decisions live in the copy on `sci/diameter-pipeline` (D-117 to D-121, I-005 there); `main` and project knowledge hold this chat's. Read the last changelog rows of **both** before taking an ID: this chat's D-117 and D-118 of 2026-11-11 clashed and are now D-122 and D-123 |
+| P8's at-bound target (added 2026-11-12) | an SD target far *below* the bounds does not reach them: with W_s at the cell's law the whitened cost is flat near the lower bounds and trf stops on xtol (status 3), not at_bound |
+| statsmodels in the sandbox (added 2026-11-12) | not installed by default: `pip install --break-system-packages statsmodels` (minutes) before Block 9's P3 |
 
 ## 10. Documents and files
 
