@@ -10,6 +10,7 @@ which stays the history of Blocks 1-4 and of D-095 to D-116.
 | 2026-11-11 | Created at the user's request ("We are quite behind in the implementation of the G4 Noise fit ... Write an handoff for another chat to go on with the implementation"). The same turn: Block 9's four open points answered (**D-122**), the order after Block 9 decided (**D-123**), both logged; SPEC §2.5, Block 9's entry and §8 updated (`b820498`); roadmap N5 now after N6 (`99760f0`, rendered `ed1514c`; page doc v165). Blocks 1-4's smoke suites re-run on `main` (§5). Project knowledge is full: this document lives only in the repository. |
 | 2026-11-12 | Renumbering (the decision log's 2026-11-12 row): D-117 and D-118 of 2026-11-11 are **D-122** and **D-123** (the diameter chat had already taken D-117 to D-121 and I-005, in the log copy on `sci/diameter-pipeline` only; the decision log's 2026-11-12 row); references renamed, the dated next-free statements left as written; **D-124** (user): D-123's reading confirmed, the noise-fit run on all 18 L3_exc cells after a pilot on 508282493 and 569844159. Marked: §2 (next free IDs). |
 | 2026-11-12 (later) | **Block 9 written and pushed** (`2171519`; roadmap N4b pushed, rendered `d2ae2ca`): `noise_sweep_fit.py`, `smoke_noise_sweep_fit.py` P1-P11 11/11 (404 s), 17 planted defects each caught; the gates run it as G6d (FULL mode). D-123's reading confirmed and $n$ set by **D-124**. Marked: the start-here table (steps 1-2) and its paragraph, §1 (header, N4b), §2 (D-124), §3 (done), §4 (questions 1-2 answered), §5 (rows), §9 (three traps). The next step is Block 6's SPEC entry: put §4's questions 3-7 to the user first. |
+| 2026-11-12 (later, 2) | Step 0 added to the start-here table: the project-knowledge copies of the log and the Stage-7 handoff are behind `main` (not uploaded: the tool needs a whole-file read in one call); the next chat syncs them from `main` first. Marked: §8 (the write order). |
 
 **Basis tags.** **[run]** executed in the assistant's sandbox (date given); **[src]** read from the code or SPEC on
 `main` at `ed1514c`; **[log]** the decision log's text; **[user]** the user's decision or words; **[reasoning]** the
@@ -19,6 +20,7 @@ assistant's argument, not checked; **[open]** not decided or not verified.
 
 | # | Step | Blocked by | Where it runs |
 |---|---|---|---|
+| 0 | **Sync project knowledge from `main`** (added 2026-11-12, later): read `docs/project/TEEG_decisions_and_ideas_log.md` and `docs/project/claude/TEEG_Stage7_noise_handoff_2026-10-01.md` whole, each in ONE call, and write them to project knowledge (`TEEG_decisions_and_ideas_log.md` at the root; `claude/TEEG_Stage7_noise_handoff_2026-10-01.md`) with `project_write(local_path=...)`, then check each copy against `main`. The project copies are BEHIND `main` since 2026-11-12: they lack the renumbering (D-122, D-123), D-124 and Block 9, and still say next free D-119. Never sync the other way: a write that starts from the project copy would erase those entries from `main` | nothing (the 2026-11-12 session could not: the upload needs a whole-file read in one call; the Stage-7 read stopped at line 348 of 424, the log is 1 MB) | sandbox |
 | 1 | **Block 9's code**: `noise_sweep_fit.py` + `smoke_noise_sweep_fit.py` (P1-P11), exactly as SPEC §2.5 and the Block 9 entry state | nothing: D-116 and D-122 settle every point | sandbox | **[done 2026-11-12: `2171519`, P1-P11 11/11; §3]**
 | 2 | **Block 6's SPEC entry, then its code**: the driver `run_noise_fit.py` and `submit_noise_fit.sh`, which fit Blocks 3, 4 and 9 on $n$ real cells | the user's answers to §4's questions [corrected 2026-11-12: §4, not §3]; confirm D-123's reading first [updated 2026-11-12: confirmed, with $n$, by D-124; §4's questions 3-7 remain] | sandbox (smoke), then davinci |
 | 3 | **The run on davinci**: `git pull`, the FULL cluster gates, a dry run, a pilot on 1-2 cells, then the $n$ cells | the user runs it (the assistant never reaches the cluster) | davinci |
@@ -183,7 +185,7 @@ davinci before the driver's first real run:
 - Push your own work (D-097); every document also in the repository; workstream docs beside the code
   (`Ih Fit/docs/`, `Ih Fit/dev/<date>_<topic>/`; `docs/project/README.md`).
 - Project knowledge is full since 2026-10-28: a new document is refused; an existing one can be rewritten (the log
-  was, 2026-11-11). Write the project copy first, then the repository copy, byte for byte.
+  was, 2026-11-11). Write the project copy first, then the repository copy, byte for byte [2026-11-12: for the log and the Stage-7 handoff, not before step 0 is done -- `main` is ahead].
 - A decision the user makes is logged the same turn (`project-decision-log` skill), with the index and changelog rows.
 - SPEC first, then code (`scientific-coding`); a new SPEC block enters the roadmap the same turn (D-091; Block 6 and
   Block 5 already have nodes N6, N5 with `block:` set, so their SPEC entries link by themselves).
