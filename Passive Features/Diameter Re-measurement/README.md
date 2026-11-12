@@ -87,7 +87,8 @@ kernel. **[added 2026-10-12]** The folder also holds one subfolder of static
 PNG figures, described after the table. **[added 2026-10-12, later]** It also
 holds one standalone schematic PNG, described there too. **[added 2026-10-12,
 later, 2]** And a second standalone PNG, the direction-sines figure, also
-described there.
+described there. **[added 2026-11-12]** And a third, the schematic of the
+image-formation chain, described there too.
 
 | File | Shows | Used in |
 |---|---|---|
@@ -133,6 +134,26 @@ spaces:
 The geometry is exact for one example ray; the script checks its six
 relations, all PASS. The script was delivered to the user as a file and is not
 in the repository.
+
+**[added 2026-11-12]** `figures/TEEG_image_formation_chain_2026-11-12.png`,
+drawn at the user's request, is a schematic (not to scale) of the chain from
+the objective's pupil to the grey level the camera writes, in eight steps,
+each with its formula, its units and, where the pipeline holds the object,
+its status:
+- fields add only in step 2, the plane waves that one specimen point sends
+  through the pupil, each with its defocus and lateral phase;
+- at $|\cdot|^2$ (step 3) the phase of the summed field is discarded; the
+  individual phases act only through $|U|$, so from there on only
+  intensities (W/µm²), powers (W), energies (J), photon counts and grey
+  levels add or follow.
+
+Its assumptions are printed on it: the scalar model at one wavelength, and
+incoherent imaging (Köhler illumination, condenser aperture filled, weak
+object); areas are in specimen units. Its formulas are those of the
+pupil-phase document of 2026-11-04 (Eqs. 1, 9-10, 20-21), delivered as
+patches and not yet in the repository; steps 5-8 are textbook. No document
+uses the figure yet. Its script was delivered to the user as a file and is
+not in the repository.
 
 ### `checks/`
 
@@ -224,3 +245,4 @@ implementation handoff). Step 1 is Phase II of that plan.
 | 2026-10-12 | Theory chat, at the user's request: new `docs/TEEG_diameter_sine_condition_and_W_2026-10-12.md` (the sine condition, Köhler illumination and the ray world's $W$), with its seven figures in the new `figures/TEEG_diameter_sine_condition_and_W_2026-10-12/`. Evidence: two PubMed full texts (PMC10674246, PMC4030053); `model/ray_world.py` and `config.py` at `3084991` read; three checks by computation run 2026-10-12, all PASS, one of them on a copy of `directions()` matched bit for bit to the branch function **[run]**. The scripts were delivered to the user as files, not committed. Contents rows added (`docs/`, `figures/`). |
 | 2026-10-12 (later) | Theory chat, at the user's request: new `figures/TEEG_microscope_schematic_2026-10-12.png`, a schematic of Allen's microscope. It shows the light path with the Köhler conjugate planes, and the cone of light at a specimen point F. Evidence: component values from `docs/TEEG_microscope_optics_oil_immersion_2026-10-04.md` §3.1 and §3.6; angles from Eqs. (2) and (6) of the sine-condition document; the drawn conjugates checked by computation, 11 checks PASS **[run]**. The script was delivered to the user, not committed. `figures/` description updated. |
 | 2026-10-12 (later, 2) | Theory chat, at the user's request: new `figures/TEEG_direction_sines_2026-10-12.png`. It shows why $\mathbf s$ has two components and $s_z$ is derived: the diaphragm point $\mathbf h$, Eq. (5), the shadow $\mathbf s$ of $\hat s$ on the hemisphere. Evidence: the sine-condition document §1 and §3.4; six geometric checks in the figure script, PASS **[run]**. The script was delivered to the user, not committed. `figures/` description updated. |
+| 2026-11-12 | Theory chat, at the user's request: new `figures/TEEG_image_formation_chain_2026-11-12.png`, a schematic of the image-formation chain from the pupil to the grey level (fields add only within one point's image; after $|\cdot|^2$ only intensities, powers and energies), with the units of every step. Evidence: the pupil-phase document of 2026-11-04 (Eqs. 1, 9-10, 20-21; delivered as patches, not yet in the repository) and textbook radiometry for steps 5-8; the figure was rendered and inspected. The script was delivered to the user, not committed. `figures/` description updated. |
