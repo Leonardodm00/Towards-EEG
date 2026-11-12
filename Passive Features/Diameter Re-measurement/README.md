@@ -151,7 +151,10 @@ Its assumptions are printed on it: the scalar model at one wavelength, and
 incoherent imaging (Köhler illumination, condenser aperture filled, weak
 object); areas are in specimen units. Its formulas are those of the
 pupil-phase document of 2026-11-04 (Eqs. 1, 9-10, 20-21), delivered as
-patches and not yet in the repository; steps 5-8 are textbook. No document
+patches and not yet in the repository; steps 5-8 are textbook. **[corrected 2026-11-12, later]**
+That document is now in the repository, on branch
+`theory/pupil-phase-2026-11-04` (with the presentation handoff of 2026-11-02),
+pushed on 2026-11-12; it is not on `main`. No document
 uses the figure yet. Its script was delivered to the user as a file and is
 not in the repository.
 
@@ -246,3 +249,4 @@ implementation handoff). Step 1 is Phase II of that plan.
 | 2026-10-12 (later) | Theory chat, at the user's request: new `figures/TEEG_microscope_schematic_2026-10-12.png`, a schematic of Allen's microscope. It shows the light path with the Köhler conjugate planes, and the cone of light at a specimen point F. Evidence: component values from `docs/TEEG_microscope_optics_oil_immersion_2026-10-04.md` §3.1 and §3.6; angles from Eqs. (2) and (6) of the sine-condition document; the drawn conjugates checked by computation, 11 checks PASS **[run]**. The script was delivered to the user, not committed. `figures/` description updated. |
 | 2026-10-12 (later, 2) | Theory chat, at the user's request: new `figures/TEEG_direction_sines_2026-10-12.png`. It shows why $\mathbf s$ has two components and $s_z$ is derived: the diaphragm point $\mathbf h$, Eq. (5), the shadow $\mathbf s$ of $\hat s$ on the hemisphere. Evidence: the sine-condition document §1 and §3.4; six geometric checks in the figure script, PASS **[run]**. The script was delivered to the user, not committed. `figures/` description updated. |
 | 2026-11-12 | Theory chat, at the user's request: new `figures/TEEG_image_formation_chain_2026-11-12.png`, a schematic of the image-formation chain from the pupil to the grey level (fields add only within one point's image; after $|\cdot|^2$ only intensities, powers and energies), with the units of every step. Evidence: the pupil-phase document of 2026-11-04 (Eqs. 1, 9-10, 20-21; delivered as patches, not yet in the repository) and textbook radiometry for steps 5-8; the figure was rendered and inspected. The script was delivered to the user, not committed. `figures/` description updated. |
+| 2026-11-12 (later) | Theory chat: the branches `theory/presentation-handoff-2026-11-02` and `theory/pupil-phase-2026-11-04` (the presentation handoff v1.1 and the pupil-phase document of 2026-11-04, built on `sci/diameter-pipeline` at `5015806`) pushed at the user's request; the figure entry's "not yet in the repository" marked **[corrected]**. Evidence: `git push`, both branches created on the remote. |
