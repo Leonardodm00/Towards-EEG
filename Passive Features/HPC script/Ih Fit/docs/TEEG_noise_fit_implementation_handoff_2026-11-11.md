@@ -1,5 +1,7 @@
 # TEEG -- noise fit (G4): implementation handoff (2026-11-11)
 
+**Superseded as the place to start (2026-11-12) by `TEEG_noise_fit_block6_handoff_2026-11-12.md`.**
+
 For the chat that continues the implementation of the recording-noise fit of the I_h fit (roadmap allen-mtg-fit, group
 G4; `Passive Features/HPC script/Ih Fit/specs/SPEC.md`, Blocks 1-4 written, Block 9 specified, Blocks 5-7 to specify).
 It supersedes, as the place to start, the noise-fit chat's handoff of 2026-10-28 (`docs/TEEG_noise_fit_handoff_2026-10-28.md`),
@@ -12,6 +14,7 @@ which stays the history of Blocks 1-4 and of D-095 to D-116.
 | 2026-11-12 (later) | **Block 9 written and pushed** (`2171519`; roadmap N4b pushed, rendered `d2ae2ca`): `noise_sweep_fit.py`, `smoke_noise_sweep_fit.py` P1-P11 11/11 (404 s), 17 planted defects each caught; the gates run it as G6d (FULL mode). D-123's reading confirmed and $n$ set by **D-124**. Marked: the start-here table (steps 1-2) and its paragraph, §1 (header, N4b), §2 (D-124), §3 (done), §4 (questions 1-2 answered), §5 (rows), §9 (three traps). The next step is Block 6's SPEC entry: put §4's questions 3-7 to the user first. |
 | 2026-11-12 (later, 2) | Step 0 added to the start-here table: the project-knowledge copies of the log and the Stage-7 handoff are behind `main` (not uploaded: the tool needs a whole-file read in one call); the next chat syncs them from `main` first. Marked: §8 (the write order). |
 | 2026-11-12 (later, 3) | **D-125** (user, 18:52): Block 6's five questions answered. Block 6's SPEC entry drafted (the command line, the per-cell pipeline, the JSON, the tables, the job script, oracles R1-R8). The project instructions are now v2 (DOCUMENT UPKEEP: the repository is the source of truth), so step 0 is obsolete; the diameter chat's D-117 to D-121 and I-005 were merged into `main`'s log as v2 asks. Next free IDs: D-126, I-006. Next: Block 6's code. |
+| 2026-11-12 (later, 4) | **Superseded as the place to start** by `docs/TEEG_noise_fit_block6_handoff_2026-11-12.md` (D-126 logged); this file stays the history of D-122 to D-125 and of Block 9. |
 
 **Basis tags.** **[run]** executed in the assistant's sandbox (date given); **[src]** read from the code or SPEC on
 `main` at `ed1514c`; **[log]** the decision log's text; **[user]** the user's decision or words; **[reasoning]** the
