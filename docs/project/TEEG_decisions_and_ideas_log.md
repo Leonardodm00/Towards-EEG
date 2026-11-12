@@ -137,9 +137,24 @@ the "Binds" column.
 | 2026-10-29 (later, 6) | Logs **D-112** and **D-113** (user, 15:49; the diameter implementation chat), answering the D-109 report. **D-112**: "Remember that the whole cell's nodes must be evaluated for both near and far field calibration" -- Block 10.C covers the near set too (flat at 10 deg, the stripe at the trace's plane, at least 3 usable stripes of the trace's plane +- 3), in Cell 7 and in S3's calibration step (Cell 15, the davinci array) alike; near: 7500 near-range nodes, 3856 flat by the trace, 1960 with a usable stripe at the trace's plane, 1947 with at least 3 usable planes (the walk stopped after 3 planes for 1879 of them), 380 chosen 5 um apart on 48 stretches, in 15.4 min on one core; of the pilot table's 138 near candidates, 71 pass and 12 are chosen; far: the 723 records identical node for node to D-109's run, 19 chosen, 5.1 min; 399 candidates, 20.5 min in all. **D-113**: "I confirm the union and the F3 without change" -- 10.S's own cylinder as the union (F2) confirmed, the pilot's tilt error on thin nodes (F3) accepted. Implemented, smoke-tested and pushed (`c393834` (Block 10.C for both sets, S3's step, the pre-cull, the set_full line, D-113's marks in the SPEC and the tester's report) and `2c5fef4` (the notebooks, runbook v38)). D-105 and D-109 annotated (entries and index). First numbered D-110 and D-111 in the chat; those IDs went to the noise-fit chat (16:45). Written after re-reading this log (changed since the (later, 3) row by another chat's rows; merged, nothing of theirs edited). The repository copy (D-097) on `sci/diameter-pipeline`, `docs/project/`. Next free IDs: D-114, I-005. |
 | 2026-10-30 | Logs **D-114** (user, 08:21; the noise-fit chat): "All ok" -- the two choices put to the user on 2026-10-29 (later, 5) confirmed: D-110's reading of "fitted precisely" (the exact least-squares optimum by variable projection; the bounds [1, 1000] ms and the 301-point grid stay PROVISIONAL), and the refusal of a cell whose sweep tilt cannot be read (Block 4's `CellLayout.from_windows`, `fb6fec9`). Status cells of D-103, D-106, D-107, D-110 and D-111 brought up to date (entries and index): Blocks 2-4 on `main` since `ace6568`. D-110's sources completed (the method's reference, PubMed full text; `check_fit_profile.py`). **Note under D-103** (D-103.1's median window): a sweep's tilt staggers its windows' baselines and degrades the per-sample median; removing each window's estimated tilt offset first restores it (`Ih Fit/dev/2026-10-30_offsets_and_fit/`) -- a proposal put to the user, not decided. Written after re-reading this log (changed since the (later, 5) row by the diameter chat's D-112 and D-113, row (later, 6); merged, nothing of theirs edited). The repository copy (D-097) on `main`, `docs/project/`. Next free IDs: D-115, I-005. |
 | 2026-10-30 (later) | Logs **D-115** and **D-116** (user, 14:24; the noise-fit chat). **D-115**: "Yes remove it" -- each SS window's tilt offset $\hat b_s(t_k - \bar t_s)$ is removed before the per-sample median window, the sweep's tilt read by (TL1) on the kept windows cut at the 80 ms floor (the only SS reading, used by the offsets, the twins and the simulator), the fit's simulator repeating both on each replicate; implemented in Blocks 3-4 in the same turn. **D-116**: "1) a) 2) b) 3) b) 4) a)" -- Block 4b's per-sweep stage: one solve per sweep at the cell's weights, $v(c,s)$ by a parametric bootstrap, the DerSimonian-Laird pooling per protocol, a failed sweep takes the cell's values (read as $\hat\theta(c)$, to confirm); open: the bootstrap's size and cost, put to the user with Block 4b's SPEC draft. D-073, D-076, D-102, D-103 (its note), D-107 annotated (entries and index). Written after re-reading this log (unchanged since the 2026-10-30 row). The repository copy (D-097) on `main`, `docs/project/`. Next free IDs: D-117, I-005. |
+| 2026-10-30 (later, 2) | Status notes from Cell 7's Colab run on the pilot 529878215 with D-112's code (the user's upload of 09:08 and `MyDrive/diameters/calibration/`; the diameter calibration chat), **no new decision**. **D-112**, **D-109**: Colab's two search CSVs equal the sandbox's row by row (7500 near-range nodes, 380 chosen; 723 far-range, 19 chosen; only float rounding in `phi_deg`, `theta_rad`), the near search at most 17.1 min and the far at most 5.3 min; of the 399 candidates 103 were measured -- near 30 scanned of 84 (37 `not_flat` by the pilot's tilt, 22 `not_isolated:*` at the pilot's k*, 7 `crossing`, 2 `stack_edge`), 296 `set_full`; far 2 of 19 (12 `not_isolated:*` at k*, 10 `not_flat`, 1 `crossing`); so the far set is insufficient (**D-088.3**) and no production kernel was written. Near fit (30 nodes): $\sigma_{\rm r}$ = 0.080, 0.143, 0.384, 0.547 um at $\delta$ = 0, 0.28, 0.56, 0.84 um; anchor 0.547 um, SE 0.041 um on 870 of 1000 resamples (the 130 dropped all fail at the 0.28 um knot; jackknife 0.049 um); without three nodes whose dip is not one Gaussian core in the window (7664, 8146, 6273) the anchor is 0.484 um. Far fit, a diagnostic on 2 nodes: $\hat\gamma$ = 0.408, $t_1$ interval [-0.01, 0.83]; node 6660 one-sided, its axis at the -0.28 um bound. Checks **[run, sandbox]**: `fit` and `far-fit` rerun on Colab's scans reproduce both files to 1e-9; on the trace the post-pilot verdict of the far set flips with the pilot's $\bar B_j\hat\mu_j$ and own $\hat d_j$ (19 -> 8 at 58 gl/um, the pilot table's 75th percentile) and with the kernel law (19 -> 4 at the search's stand-ins under the law the run measured, slope 0.408: dendrites 10-40 um off the plane exceed 0.3 gl there and not under the steeper configured law); Block 15.3's SNR rule takes its prior width from the configured law (with the measured law as prior, iterated: $\gamma$ = 0.419, all 24 planes of node 2700 kept); the pilot table's $\hat\varphi$ exceeds the trace's tilt by a median 5.4 deg over 382 nodes. Options put to the user, not decided. D-088, D-108, D-109 and D-112 annotated (entries and index). Written after re-reading this log (changed since v31 by the noise-fit chat's D-114 row, entry and index notes, 08:21; merged, nothing of theirs edited). Project knowledge refused this write (its tool takes a local file only after a whole-file read in one call, beyond this session's read limit for a file this size), so this version lives only in the repository copy (D-097) on `sci/diameter-pipeline`, `docs/project/`, until it is written there. Next free IDs: D-117, I-005. |
+| 2026-10-30 (later, 3) | Logs **D-117** (user, 14:12 and the dialog's answers; the diameter calibration chat), the answers to the report's options: the tilt rule kept at +-2 um (the +-3-node answer withdrawn), the kernel law iterated inside Cell 7 (at most 3 rounds, one SE; the diagnostic slope fed back while the far set is short), a residual-against-noise goodness of fit on every scanned plane, the anchor's bootstrap read from G(delta_0) alone, the pilot's values logged in `meta.nodes`, Cell 15 reusing Cell 7's search. Written after re-reading the project's log (unchanged since D-114, 08:21). Project knowledge still refuses this chat's writes (the 2026-10-30 (later, 2) row), so this version lives only in the repository copy (D-097) on `sci/diameter-pipeline`, `docs/project/`: a chat numbering from project knowledge must take D-116. Next free IDs: D-116, I-005. |
+| 2026-10-30 (later, 4) | **D-117**: D-117.6's reading corrected by the assistant before its code (still PROVISIONAL): the cell's $\bar B$, $\hat\mu$ and transform are not compared but go with the reused search, since on the pilot S3's own (Cell 13's at most 18 nodes, Cell 12's automatic alignment) differ from Cell 7's by construction and the first reading would never reuse; the far search under two transforms keeps 15 of 19 chosen, the other 4 the adjacent node of the same stretch **[run, sandbox: `checks/d115_2026-10-30/`]**. Status: D-117.4 at `447473e`, D-117.5 at `4f4263a`, D-117.6 at `ec28988` on `sci/diameter-pipeline` **[run, sandbox]**. |
+| 2026-10-30 (later, 5) | **D-117.3** implemented at `1146494`, with the check that sets $\kappa_{\rm g}$ (PROVISIONAL): 1.2, the 99th percentile of RMS / SD$_{\rm bg}$ over 210 planes of 30 clean thin phantoms; it drops 31 % of the planes of 22 composite phantoms (43 of 105 with the neighbour within 0.8 um) and about half those of clean dips 1-2.5 um wide, which no $\kappa_{\rm g}$ separates from composites; on this morning's pilot scans about 11 of 206 near planes **[run, sandbox: `checks/d115_2026-10-30/`]**. For the user: whether the wide-dip caveat calls for a depth-relative statistic, after Cell 7's next run. |
+| 2026-11-02 | Logs **D-118** (user, 16:38; the diameter calibration chat): S3c's per-cell quota of calibration scans raised from 5 (D-089) to 30 per set; whether the pooled set keeps D-088.3's cap of 30 per set, taken round-robin over the cells, is put to the user (D-118.2). **Renumbering:** the diameter chat's D-115 of 2026-10-30 -- written to the repository copy on `sci/diameter-pipeline` only, project knowledge having refused the write (its tool needs the whole file read in one call) -- collided with the noise-fit chat's D-115 and D-116 of 14:24, which project knowledge holds; it is **D-117** here, its rows relabelled (later, 2) to (later, 5) after the noise-fit chat's (later); the branch's SPEC, code, notebooks, runbook and path map renamed D-115 -> D-117 in the same turn; the commits of 2026-10-30 to 2026-11-02 and the folder `checks/d115_2026-10-30/` keep the old number. Written after merging main's copy (`854004c`, 2026-11-02 13:03) into the branch's, a three-way merge (nothing of either side edited but the renumbering). Next free IDs: D-119, I-005. |
+| 2026-11-02 (later) | **D-118.2** answered (user, the dialog after 16:38; the diameter calibration chat): "Up to 30 from every cell" -- the pool takes at most 30 per set from each cell and keeps every cell's, superseding D-088.3's cap of 30 for the pool; **D-118.3** proposed by the assistant (the pooled SEs resample cells, as the chosen option's text said; Saravanan et al. 2020, full text read), not decided. D-118.1 and D-118.2 implemented at `e6e37b2` (block 19.4). Finding in D-118: the pooled near fit is dense and slow at D-118.2's sizes (59 s per fit at 1000 nodes in the sandbox, its bootstrap 1000 fits); a sparse fit proposed. Next free IDs: D-119, I-005. |
+| 2026-11-04 | Logs **D-119** (user, 12:21; the diameter calibration chat): Block 10's growth fit takes a sparse Jacobian (scipy `least_squares`, `tr_solver="lsmr"`), the same estimator, checked against the dense fit; and **D-118.3 decided** (the user's answers to two dialog questions after a simulation run here, `checks/d118_2026-11-04/cluster_bootstrap_check.py`): the pooled SEs resample cells, each with all its nodes, from 10 cells; with 2 to 9 cells the larger of the node and cell SEs, flagged; one cell keeps the node bootstrap. Next free IDs: D-120, I-005. |
+| 2026-11-04 (later) | No decision changed (the diameter calibration chat). **D-119 implemented** at `4892231` (block 10: the sparse growth fit; against the dense fit within 5.5e-12 um^2 on $G$, one fit 0.08 s at 1000 nodes against 59 s dense) and **D-118.3 implemented** at `fb1619a` and `f868d41` (block 19.6: the pooled SEs by cell from 10 cells, the larger of node and cell from 2 to 9, flagged; the far interval's $t$ on $C - 1$ degrees of freedom with the cell SE, the assistant's reading, PROVISIONAL); both statuses and index rows annotated, with the evidence **[run, sandbox: `checks/d118_2026-11-04/`; the smoke suites; 6 and 12 mutants]**. The davinci pool can now run the calibration: about 2 min (near) and 18 min (far) of bootstrap at 51 cells. D-118's Why: the cell bootstrap's range from 10 cells corrected to 0.89-0.99 (was 0.89-0.98; the check's own output). Next free IDs: D-120, I-005. |
+| 2026-11-04 (later, 2) | No decision changed (the diameter calibration chat). **Roadmap diameter-pipeline: T11 added, studying** (the user, 16:51: "Update the roadmap with also the fact that I'm studing this thing of the bootstrap"): "Bootstrap uncertainty of the pooled kernel on nested data" under TG3, affecting I10, I15, I19 -- why the anchor's and the far slope's SEs are bootstrapped and why by cell (the one-way random-intercept model, the design effect, the between/within ANOVA split, the cell bootstrap's few-cell bias); refs D-081.7, D-118.3, SPEC 19.6 (`b5b0d6e`). Next free IDs: D-120, I-005. |
+| 2026-11-10 | No decision changed (the diameter calibration chat). **Cell 15 on the pilot ran** (the user's log of 16:03): `REDO` and the reuse of Cell 7's searches (D-117.6; Cell 7's $\bar B$ 159.0 gl, $\hat\mu$ 0.258 /um and shift (0, 0) printed beside the step's own 123.0 gl, 0.320 /um and (2, 0), as D-117.6's correction intends); near 30 sufficient, far 2 INSUFFICIENT; anchor 0.5356 +- 0.0460 um, far slope 0.3971 +- 0.0302 (diagnostic). Colab's code predates block 19.6 (the far-fit line's format). D-118's status annotated. Next free IDs: D-120, I-005. |
+| 2026-11-10 (later) | Logs **D-120** (the user, 16:18: D-118.3's readings confirmed; the pooled fits weight cells; cells whose mean residual is too rare under the between-cell Gaussian leave the pool; no SE on the inner points; the assistant's readings for the weights and the removal rule PROVISIONAL, to confirm before the code) and **I-005** (the node's own noise along the measuring line; roadmap T12, open). D-118 and D-090 annotated. Next free IDs: D-121, I-006. |
+| 2026-11-10 (later, 2) | Logs **D-121** (the user, 16:37, and four dialog answers: the depth check on davinci, stack z median split, a knot differing > 2 SE family-wise; the loop of D-117.2 over the pool on davinci, all rounds submitted at once, < 1 SE or 5 rounds). D-120's readings confirmed and **D-120.2 implemented** at `7d03e16` (block 19.7) **[run, sandbox]**. Next free IDs: D-122, I-006. |
+| 2026-11-11 | No decision changed (the diameter calibration chat). **D-120.3 implemented** at `4cbb0de`, `78a5931` (block 19.8: per set, each cell's mean residual against the other cells' between-cell Gaussian, leave-one-out, Bonferroni over the cells, from 10 cells; one pass, then both pooled fits again without the removed cells; `cell_outliers.json`/`.csv`, the first pass kept as `*_all.json`, the kept scans in `scans_pooled_kept.json`, the by-cell figures marked) -- 17 of 17 mutants killed **[run, sandbox]**. Finding (open), put to the user: on simulated cells the rule as confirmed removes a clean cell in 0.08-0.33 of the datasets at 10 to 51 cells instead of 0.05; with the reference mean's variance in the denominator and Student's $t$ on $C - 2$ df, 0.013-0.055, at the price of more masking when two cells stand out alike **[run, sandbox: `checks/d120_2026-11-11/outlier_rule_check.py`]**. Next free IDs unchanged: D-122, I-006. |
+| 2026-11-11 (later) | No decision changed (the diameter calibration chat). **Roadmap diameter-pipeline: T13 added, open** (the user, 17:02: "update the roadmap that I have to study this theory", after the answer to the 15:37 question on how the defocusing kernel is calibrated): "Kernel calibration: the near growth fit, the anchor and the assembled kernel" under TG3, depending on T3, affecting I10, I15, I19 -- the per-plane squared core widths, Eq. 4's growth fit (one constant per node, one growth curve on spline knots to 1.12 um; why $\sigma_{\rm r}(0)$ is configured, not fitted), the table to 0.84 um and the anchor, the far slope joined at the anchor with the anchor's error carried into its SE, and the loop of D-117.2; T6 (the far fit) stays closed; refs SPEC 10, 15.4-15.5, 4, D-080.1, D-081.7, D-117.2, D-117.4, D-120.2 and the study document `TEEG_study_kernel_calibration_2026-11-11.md` (sent in the chat as files) (`90e467e`). Project knowledge still refuses this chat's writes of this log (the 2026-10-30 (later, 2) row), so this row lives in the repository copy (D-097). Next free IDs unchanged: D-122, I-006. |
 | 2026-11-11 | Logs **D-122** and **D-123** (user, about 19:00; the noise-fit chat, from multiple-choice questions put when the user asked what the G4 noise fit needs to go on). **D-122**: Block 9's ("Block 4b") four open points -- $B_v$ = 50 bootstrap refits per sweep at the binding size $M$ = 1000; a failed refit left out of $v(c,s)$ and counted, the sweep flagged above 10 %; D-116.4's reading confirmed, a failed sweep's twin carries the cell's whole law $\hat\theta(c)$ (the assistant had recommended the pooled $\exp\hat\mu_{\rm pr}(c)$ for $\sigma_s$). **D-123**: "I would fit the noise features on n cells in order then to use these fits to construct the twins on which to run the synthetic recovery run" -- after Block 9's code, the noise-fit run on $n$ real cells (Block 6's driver and PBS job) comes before the twins (Block 5), which are built from those fits; then Stage 7 (the assistant's reading, to confirm; $n$ open). D-116 annotated (entry and index). Written after re-reading this log (unchanged since the 2026-10-30 (later) row; identical to the repository copy). The repository copy (D-097) on `main`, `docs/project/`. Next free IDs: D-119, I-005. [renumbered 2026-11-12: logged as D-117 and D-118, numbers the diameter calibration chat had already taken on `sci/diameter-pipeline`, where it had also taken D-119 to D-121 and I-005 -- the 2026-11-12 row] |
-| 2026-11-12 | **Renumbering** (the noise-fit chat). The diameter calibration chat had already taken **D-117 to D-121** (2026-10-30 to 2026-11-10) and **I-005** (2026-11-10), in the log copy on `sci/diameter-pipeline` only (project knowledge refuses that chat's writes of this log: its 2026-10-30 (later, 2) row there), so this copy's D-117 and D-118 of 2026-11-11 clashed with its D-117 and D-118. The noise-fit chat's two entries are now **D-122** (ex-D-117, Block 9's open points; its points D-122.1 to D-122.3) and **D-123** (ex-D-118, the order after Block 9; D-123.1 to D-123.3): renamed in their entries, the index, the 2026-11-11 row and D-116's notes, and on `main` in `Ih Fit/specs/SPEC.md`, `Ih Fit/README.md`, `Ih Fit/CHANGELOG_ih_fit.md`, the noise-fit handoffs of 2026-10-28 and 2026-11-11, `docs/project/claude/TEEG_Stage7_noise_handoff_2026-10-01.md` and roadmap allen-mtg-fit; the commits of 2026-11-11 (`b820498`, `99760f0`, `ed1514c`, `1592608`) keep the old numbers, and the statements of the next free ID stay as written at their dates. The user, 17:05, to the proposal (renumber this chat's two, copy the diameter chat's five here): "Fixing the duplicate numbers: I just need that the roadmap is updated" -- read as: fix it, the roadmap following; the diameter chat's entries are not copied, the index points to that branch instead (rows D-117 to D-121, I-005). Logs **D-124** (user, 17:05): D-123's reading confirmed ("D-118's order: yes"); the noise-fit run covers all 18 L3_exc cells, after a pilot on 508282493 and 569844159 ("Which cells: Perfect as you suggest"). D-123 annotated (entry and index). Written after re-reading this log (unchanged since the 2026-11-11 row; identical to the repository copy) and the copy on `sci/diameter-pipeline` (last row 2026-11-11 (later); D-121, I-005). The repository copy (D-097) on `main`, `docs/project/`. Next free IDs: **D-125, I-006** -- read the last rows of both copies before taking one. |
+| 2026-11-12 | **Renumbering** (the noise-fit chat). The diameter calibration chat had already taken **D-117 to D-121** (2026-10-30 to 2026-11-10) and **I-005** (2026-11-10), in the log copy on `sci/diameter-pipeline` only (project knowledge refuses that chat's writes of this log: its 2026-10-30 (later, 2) row there), so this copy's D-117 and D-118 of 2026-11-11 clashed with its D-117 and D-118. The noise-fit chat's two entries are now **D-122** (ex-D-117, Block 9's open points; its points D-122.1 to D-122.3) and **D-123** (ex-D-118, the order after Block 9; D-123.1 to D-123.3): renamed in their entries, the index, the 2026-11-11 row and D-116's notes, and on `main` in `Ih Fit/specs/SPEC.md`, `Ih Fit/README.md`, `Ih Fit/CHANGELOG_ih_fit.md`, the noise-fit handoffs of 2026-10-28 and 2026-11-11, `docs/project/claude/TEEG_Stage7_noise_handoff_2026-10-01.md` and roadmap allen-mtg-fit; the commits of 2026-11-11 (`b820498`, `99760f0`, `ed1514c`, `1592608`) keep the old numbers, and the statements of the next free ID stay as written at their dates. The user, 17:05, to the proposal (renumber this chat's two, copy the diameter chat's five here): "Fixing the duplicate numbers: I just need that the roadmap is updated" -- read as: fix it, the roadmap following; the diameter chat's entries are not copied, the index points to that branch instead (rows D-117 to D-121, I-005) [corrected 2026-11-12 (later, 2): copied, the project instructions' v2]. Logs **D-124** (user, 17:05): D-123's reading confirmed ("D-118's order: yes"); the noise-fit run covers all 18 L3_exc cells, after a pilot on 508282493 and 569844159 ("Which cells: Perfect as you suggest"). D-123 annotated (entry and index). Written after re-reading this log (unchanged since the 2026-11-11 row; identical to the repository copy) and the copy on `sci/diameter-pipeline` (last row 2026-11-11 (later); D-121, I-005). The repository copy (D-097) on `main`, `docs/project/`. Next free IDs: **D-125, I-006** -- read the last rows of both copies before taking one. |
 | 2026-11-12 (later) | No decision changed (the noise-fit chat). **D-122 implemented**: Block 9's code written and smoke-tested (`noise_sweep_fit.py`, `smoke_noise_sweep_fit.py`, `2171519`: P1-P11 11/11 in 404 s, 17 planted defects each caught; roadmap N4b pushed, `d2ae2ca`) -- `SweepStageConfig()` defaults B_v = 50, M_refit = 1000, max_failed_refit_frac = 0.1 (smoke P11), a failed refit left out and counted with the flag above 10 % (P6), a failed sweep's twin at theta_hat(c) (P8); D-116's stage as specified (P1-P9). Two of the SPEC's oracles corrected as implemented (SPEC Block 9): P3 compares (P3) with exact rational arithmetic and with statsmodels at 1e-10 of its scale (statsmodels' own roundoff reaches 1.1e-12 of it); P8's target lies 100 times above the bounds' largest SD, since 100 times below the solve stops short of the bounds. `cluster_gates_noise_fit.sh` runs the suite as G6d (FULL mode). D-116, D-122, D-124 annotated (entries and index). Next for the noise fit: Block 6's SPEC entry (D-123, D-124), after the user's answers on the job layout, the outputs, the S0-S3 checks, a refused cell and the pilot's sizes. Next free IDs: D-125, I-006 (both copies read: unchanged since the 2026-11-12 row here, since the 2026-11-11 (later) row on `sci/diameter-pipeline`). |
+| 2026-11-12 (later, 2) | Logs **D-125** (user, 18:52; the noise-fit chat): Block 6's five open points answered -- one PBS array job per cell then a merge, never more than 120 cores (the assistant's reading: 6 cores per cell, Block 9's sweeps in a pool); the outputs as proposed; the S0-S3 checks dropped for now, D-055's elements superseded by later decisions listed (D-125.3); a refused or failed cell recorded and skipped; a full-size pilot whose two cells are kept. D-055 and D-124 annotated (entries and index). **The diameter chat's entries merged into this log**, as the project instructions' v2 (DOCUMENT UPKEEP, 2026-11-12) require: D-117 to D-121 and I-005 with their index rows, its changelog rows of 2026-10-30 (later, 2) to 2026-11-11 (later), and its later notes on D-088, D-090, D-108, D-109, D-112 and I-004, from the copy on `sci/diameter-pipeline` (last row 2026-11-11 (later)); D-116 kept as here (the copies differ only by this log's notes); the pointer rows replaced. From now on every chat logs in this copy on `main`. Next free IDs: D-126, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -214,7 +229,7 @@ would be needed*, *Status*.
 | D-052 | 2026-10-16 | Block 5's plane and final fit (`node_pipeline.measure_node`), so every real node's and every phantom's $\hat d$ and the bias table of D-024/D-031; the iteration's functions (to move from `scripts/plane_differences.py` into `src/`); `blur_kernels` (a new family), `fit_variants._Layout`; `MeasureConfig` and the estimator hash; $\mathcal S$'s bound rule | per node: the Allen-guided plane (start $2r$, lines $\pm 1.5 d$, $k_{\rm SWC} \pm 6$, at most 5 rounds), each round's $d$ and the final $\hat\theta$ from the skewed generalized-$t$ fit with $(d, \mu, v_0, w, \beta, \xi, \zeta)$ all fitted and centre weights $\lambda$ = 0.5 um re-centred by IRLS; real nodes and phantoms alike; the error left is the table's | active; not implemented [one sentence of its Why corrected 2026-10-16] [updated 2026-10-16, later: (b) settled by D-053 (ii); (a) by the check of D-053 (i)] [updated 2026-10-18: the per-solve budget settled by D-054 (iv)] [updated 2026-10-18, later: D-052.4 confirmed by the user -- D-057 (iii)] [updated 2026-10-18, later: (D-052.1)-(D-052.2) implemented, Block 12, commit `bee1e0b` (local); the plane rule inside Block 5 is Block 13, not yet] [updated 2026-10-18, later 4: (a), the phantoms' radius, settled by D-058 instead of D-053 (i)'s check] [updated 2026-10-20: Block 13's implementation points settled by D-061 ((a), (c), (d) as recommended; (b) by Allen's diameters)] [updated 2026-10-20, later: (f) settled by D-066 (the renderer's kernel is the SGT family); (g) not run for now, D-065.4] [updated 2026-10-20, later 6: (D-052.3) implemented with (D-052.2) inside the measurement, Block 13 (`measure_node` = the pilot, the iteration, `plane_iteration.sgt_at_plane` at $k^{\rm it}$; commits `b5191c8`-`70136ca`, local, not pushed)] [updated 2026-10-21: pushed at the user's agreement, `84ea91f..888452a` on `sci/diameter-pipeline`] |
 | D-053 | 2026-10-16 | the phantoms' radius (`phantoms.phantom_branch`, the four places of the chain it enters); the bound rule of $\mathcal S$ (`phantoms.reject_reasons`, `fit_status`); the third regression axis of the table (`table.table_inputs`, `BiasTable`, `invert.invert_node`); Blocks 13-14 | (i) a sensitivity check on rendered phantoms decides the phantoms' radius (true $d/2$ if $k^{\rm it}$ and $\hat d$ do not move with the radius, else Allen-like draws), with in-focus images of the measured diameters; (ii) $\mathcal S$ fails on $d$, $\mu$, $v_0$ or $w$ at a bound or an unconverged IRLS, never on $\beta$, $\xi$, $\zeta$ at theirs; (iii) the third axis is $\ln\hat\alpha$ | active; not implemented; the check of (i) to run before Block 14  [updated 2026-10-18: Q4b, Q4c, the threshold and the budget settled by D-054] [updated 2026-10-18, later: (ii) implemented as Block 12's status rule, `bee1e0b`] [updated 2026-10-18, later 4: (i) superseded by D-058] [updated 2026-10-20, later: (iii)'s coordinate amended by D-063.1 -- the third axis is $\ln(\hat\mu\hat d)$] |
 | D-054 | 2026-10-18 | `table.table_inputs` and `BiasTable` (the input scaling, stored with the table); `CorrectionConfig.tau_kernel_bandwidth` (three values), `max_failure_rate`; `MeasureConfig` (the new per-solve budget field, in the estimator hash); Blocks 12 and 14 | (i) each of $(\ln d, \varphi, \ln\hat\alpha)$ divided by its design range before the spline, CV on the smoothing only; (ii) bandwidth 0.3 in $\ln\hat\alpha$, PROVISIONAL; (iii) `max_failure_rate` 0.2 PROVISIONAL until the pilot's curve is read; (iv) `max_nfev` = 3000 per solve | active; not implemented [updated 2026-10-18, later: (iv) implemented in Block 12, `bee1e0b` -- entered on D-056's row by mistake, moved here 2026-10-19] [updated 2026-10-20: the smoothing grid extended to $10^4$ with a flag at either end, D-062.4; (iii) stands, item 14 closed] [updated 2026-10-20, later: (i)'s normalisation retired by D-063 (the estimator works in raw coordinates); (ii)'s bandwidths are now the estimator's, the third carried to $\ln(\hat\mu\hat d)$] |
-| D-055 | 2026-10-18 | the in-silico sensitivity check of D-048: `sens_s0_closure.py`, `sens_s1_tilt.py`, `sens_s2_missing.py`, `sens_s3_real.py` (names provisional) and their read-out; the alarm threshold and $k_{\max}$ they calibrate | S0 closure on two real cells' window structures (537297470, 569844159), 150 twins each; S1 seconds-scale OU twins (0.142 mV, 3 s; 0.293 mV, 30 s), 100 each; S2 sweep-locked transient, +0.1/1/10 % scatter, SS response jitter 2/5 %, Bessel fast part, 100 each; S3 the 18 L3_exc cells; predictions S0.1-S3.3 fixed in the entry; pilot here at $R$ = 100, $M$ = 500, production on the cluster | active; not run |
+| D-055 | 2026-10-18 | the in-silico sensitivity check of D-048: `sens_s0_closure.py`, `sens_s1_tilt.py`, `sens_s2_missing.py`, `sens_s3_real.py` (names provisional) and their read-out; the alarm threshold and $k_{\max}$ they calibrate | S0 closure on two real cells' window structures (537297470, 569844159), 150 twins each; S1 seconds-scale OU twins (0.142 mV, 3 s; 0.293 mV, 30 s), 100 each; S2 sweep-locked transient, +0.1/1/10 % scatter, SS response jitter 2/5 %, Bessel fast part, 100 each; S3 the 18 L3_exc cells; predictions S0.1-S3.3 fixed in the entry; pilot here at $R$ = 100, $M$ = 500, production on the cluster | active; not run [updated 2026-11-12: dropped for now, D-125.3] |
 | D-056 | 2026-10-18 | the noise-fit simulator's SS sweep structure; `Ih Fit/specs/SPEC.md`; branch `sci/noise-fit` and the delivery format; the inner optimiser of `noise_fit.py` (`NoiseFitConfig.n_starts`, the binding-function estimator) | continuous simulated SS sweeps with the real pulse timing, cut at the real windows; spec in `Ih Fit/specs/SPEC.md`, patch series + tarball from a local baseline of the zip; Harrell-Davis median in the binding function with SciPy's default finite-difference Jacobian, `method='trf'` with bounds, three starts (closed form, $\tau_s/2$, $2\tau_s$), best $J$ | active; not implemented ~~[updated 2026-10-18, later: (iv) implemented in Block 12, `bee1e0b`]~~ [corrected 2026-10-19: that annotation is D-054 (iv)'s (`sgt_max_nfev` = 3000, the diameter pipeline's Block 12), entered on this row by mistake; D-056 has parts (i)-(iii) only and none is implemented] [updated 2026-10-19, later 2: (i)'s simulator implemented as Block 2, `1ab29f3`; (ii) in force since Block 1; (iii) is Block 4's] [updated 2026-10-20: the sweep-number open point answered at source -- the archive writer stores `sweep_number` per pulse; the files to confirm by G12] |
 | D-057 | 2026-10-18 | `CorrectionConfig.failure_rate_ignore`; `MeasureConfig.sigma_fit_study_um`, `scripts/build_table.py --sigma-fit`, `run_cell.py --sigma-fit`, the `d_tilde_sigma_spread_um` column, notebook Cell 8; procedure §3.7 as applied to Blocks 5-6 (`phantoms.run_replicate` through `measure_node`) | (i) `failure_rate_ignore = ()`; (ii) the $\sigma_{\rm fit}$ study of D-023 (iv) dropped -- one table, one real-node run, at 0.099 um; (iii) phantoms measured by exactly the real-data pipeline, plane choice and profile extent included [user] | active; not implemented; supersedes D-023 (iv) [corrected 2026-10-19: its Binds named two CLI flags that do not exist] [updated 2026-10-21, later: (ii) implemented, S2.2, `a879067`, pushed at the user's agreement (`f4ac106..9c1329e` on `sci/diameter-pipeline`)] |
 | D-058 | 2026-10-18 | `phantoms.phantom_branch` (the radius a phantom's branch carries) and the places of the chain it enters (handoff §6); `PhantomConfig` (`radius_noise_sd_um`) and the simulation hash; D-053 (i) | each phantom starts from $r_n = d_n/2 + \epsilon_n$, $\epsilon_n \sim \mathcal N(0, \sigma_r^2)$ [user]; $\sigma_r$, the scope (line start or all four places) and the $r_n \le 0$ rule open | active; not implemented; supersedes D-053 (i) [updated 2026-10-20: settled by D-062.1 -- $\sigma_{\rm br}$ = 0.2 um, all four places, redraw for $r \le 0$, per realization; the sensitivity check dropped] |
@@ -247,7 +262,7 @@ would be needed*, *Status*.
 | D-085 | 2026-10-26 | S3 of the plan of 2026-10-20 (Blocks 16-20, to specify); the roadmap's S3a-S3d (on hold, D-082); D-065's "all the cells"; Cell 7's calibration per cell; D-084 | 5 cells per class (exc/inh) and layer, all when fewer; automatic alignment; dz and pixel size checked first over all cells; node selection exposed; every figure plus diameters by layer and class; no thick-node check; jitter by robust SDs pooled; one camera setting; one kernel per cell, pooling only if a cell lacks clean dendrites (checked); the final configuration waits for the hybrid [user] | active; not implemented; readings of (D-085.1), the d_max rule, the sufficiency thresholds and the per-cell tables open [updated 2026-10-26, later 6: Block 16.1 built locally (the pool, the acquisition check, the selection) with (D-085.1)'s readings as PROVISIONAL defaults -- spiny exc, aspiny inh, sparsely spiny left out, seed 20261026; the d_max rule settled by D-086] [updated 2026-10-26, later 7: sparsely spiny a third class, D-087; (D-085.10)'s kernel per cell superseded by D-088, one kernel pooled across cells] [updated 2026-10-27: Blocks 16.1-19 implemented and on the remote (the entry's status); S3d (Block 20) waits for the hybrid's switch, D-092] [updated 2026-10-27, later 3: (D-085.3)'s check run on Allen's data: the 47 lines the user pasted all read dz 0.28 um, pixel 0.1144 um ("All share the same.")] [updated 2026-10-28: Cells 11 and 12 run on Allen's data -- the pool 158 cells, the check 158 of 158 at dz 0.28 um and 0.1144 um/px, the selection 51 cells in 15 groups; 47 aligned, 4 failed (Allen's marker file fetched as the SWC), 5 set aside] |
 | D-086 | 2026-10-26 | `PhantomConfig.d_range_um`'s upper end (Cell 8; the simulation hash); S3b (Block 18, to specify); D-065; D-085.7; D-024 (iii) | $d_{\max}$ = the maximum of Allen's dendrite $2r$ (SWC types 3, 4) across S3's cells, not the 99.5th percentile proposed [user] | active; not implemented (Block 18) [updated 2026-10-27: implemented, Block 18 (`83b400b`), the entry's status] |
 | D-087 | 2026-10-26 | Block 16.1's class map (`SurveyConfig.class_map`) and selection groups; every per-class statistic and figure of S3a-S3d (D-085.5); D-085.1 | sparsely spiny cells are a third class, `sparsely_spiny`, beside exc (spiny) and inh (aspiny), with 5 cells per layer like the others [user] | active; Block 16.1 amended for it the same day |
-| D-088 | 2026-10-26 | the defocus kernel's calibration (Blocks 10 and 15; Cell 7; S3c, Block 19); the production configuration and the number of tables; D-085.10 | one kernel, calibrated on near- and far-field nodes pooled across several cells, so one table; for now the test uses one pilot cell; each calibration set holds 10 to 30 nodes [user] | active; implemented 2026-10-26 (Block 19, `7064e2c`), smoke-tested; not run on Allen's data [updated 2026-10-27: the index's status brought up to the entry's] |
+| D-088 | 2026-10-26 | the defocus kernel's calibration (Blocks 10 and 15; Cell 7; S3c, Block 19); the production configuration and the number of tables; D-085.10 | one kernel, calibrated on near- and far-field nodes pooled across several cells, so one table; for now the test uses one pilot cell; each calibration set holds 10 to 30 nodes [user] | active; implemented 2026-10-26 (Block 19, `7064e2c`), smoke-tested; not run on Allen's data [updated 2026-10-27: the index's status brought up to the entry's] [updated 2026-10-30: Cell 7 on the pilot -- near 30 nodes (sufficient), far 2 (insufficient); no production kernel] |
 | D-089 | 2026-10-27 | the S3 blocks' PROVISIONAL defaults (Blocks 16.1-19; `SurveyConfig`, `CalibrationConfig`) | the set-aside ratio 2, the darkest-projection rule, the stratified default, `sparsely_spiny`, the z0 flag at 1 um, 5 scans per set per cell, "per type" as per calibration set, 529878215 the pilot -- confirmed [user] | active; implemented 2026-10-27 (comments and SPEC, `6b8ea64`) [index row added 2026-10-27, later] [updated 2026-10-28: on Allen's data (D-089.2) the darkest rule took the maximum-intensity xy projection in all 4 specimens that have one, and 508305938's alignment failed with it; (D-089.1) 4 of the 5 cells below 2 have shifts like the kept cells'; changes put to the user] [updated 2026-10-28, later: (D-089.2) superseded by D-098.2 -- the projection by its type, the darkest rule the fallback] |
 | D-090 | 2026-10-27 | Block 16.2 (a)'s projection rule and the alignment of every S3 cell; S3c's pooled calibration; Cells 11b and 15; SPEC Blocks 16.3 and 19.5 | what Allen's projections are, settled by a Colab check (D-090.1); the pooled calibration's near and far points drawn together, coloured by cell, with their residuals from the pooled law (D-090.2) [user] | active; implemented 2026-10-27 (`6b8ea64`); not run on Allen's data [index row added 2026-10-27, later] [updated 2026-10-28: (D-090.1)'s check run on the pilot -- the minimum-intensity xy projection is the planes' minimum (r* 0.9941 at zero offset), the maximum-intensity one `unclear`] |
 | D-091 | 2026-10-27 | every roadmap (`specs/roadmap/<name>.yaml`) and every new SPEC block; D-082's hold of 2026-10-26, 16:48; the diameter-pipeline roadmap's NS2 (now HR) and S3d | every new SPEC block enters its roadmap in the same turn it is written, without being asked; the hold lifted for this [user] | active; applied (`689c702`, `9b99b8b`; I21 with Block 21, `2572e15`) |
@@ -267,24 +282,29 @@ would be needed*, *Status*.
 | D-105 | 2026-10-28 | the isolation figure of D-098.4 (SPEC Block 10.F (5): panel (c), the overview's $n/N$, `real`'s knob and far-set lines); Cell 7's `CAL_KNOBS` and `OUT/calibration/calibration_config.json` (both notebooks), Cell 15's `survey_config_s3c.json`, davinci's `DIAM_CONFIG_JSON`; SPEC Block 10.S as amended by the recheck (F1, F2, S1-S3, S5-S7) | the stripe of every plane shown, the far fit's planes emphasised; the stripe's existing settings and the flatness bounds exposed in Cell 7 and passed to every step [user]; the set of knobs, panel (c)'s form and F2's fitted cylinder -- the assistant's | active; implemented and pushed 2026-10-28; smoke-tested; open: D-101 (d) (how out-of-focus shadows enter the stripe), S4, F3, F2's reading, the far verdict on the fit's planes [updated 2026-10-29: D-101 (d) closed by D-108; the fit's planes counted before the pilot by D-109's search] [updated 2026-10-29 (later): F2's reading confirmed and F3 accepted, D-113] |
 | D-106 | 2026-10-29 | D-104's open point (a); Block 3's statistics and the layout it hands to Block 4; Block 4's simulator; `WindowConfig.min_windows_per_group` | a group with too few windows (fewer than 5, PROVISIONAL) leaves the noise statistics too; a group dropped only for a failed fit keeps its windows [user] | active; not implemented [updated 2026-10-29 (later, 4): implemented in Block 3 on `sci/noise-fit-d103`; Block 4's layout part pending] [updated 2026-10-30: the layout's part implemented in Block 4 (`fb6fec9`), on `main` since `ace6568`] |
 | D-107 | 2026-10-29 | D-102's open points (a), (b), (d); Block 3's tilt readings; Block 4's simulator and fit (`simulate_cell_windows`, `fit_cell`, `tilt_from_semivariogram`); Block 2's `simulate_traces`; Block 5; SPEC §2.3, §2.4, §8 | a Long Square sweep's tilt is the line through a start-window mean and an end-window mean; every simulated sweep carries its real sweep's tilt in every replicate, so the tilt SD leaves the fit [user]; the windows (265 ms pre-window, last 500 ms) the assistant's reading | active; not implemented [updated 2026-10-29 (later): (a) answered by the check noted in the entry] [updated 2026-10-29 (later, 4): (D-107.1) and Block 2's fixed tilt implemented on `sci/noise-fit-d103`; (D-107.2) in Block 4 pending] [updated 2026-10-30: (D-107.2) implemented in Block 4 (`fb6fec9`), on `main` since `ace6568`; a cell with an unreadable tilt refused, D-114] [updated 2026-10-30 (later): the simulator repeats the offset removal per replicate, D-115.3] |
-| D-108 | 2026-10-29 | `CalibrationConfig.isolation_depth_gl` (SPEC Block 10.S's $\tau$; 10.I's veto under `square`); every stripe and verdict of Blocks 10.S, 10.C, 15.1; Cell 7's `CAL_KNOBS` (both notebooks), Cell 15's and davinci's knob file, Block 19.3 through the default; D-081.1 / D-101.5's 0.03 gl; D-101 (d), D-105 (a) | $\tau$ = 0.3 gl, the default and Cell 7's knob [user: "As you recommend", to option (a)]; the square rule of 2026-10-26 = `square` with 0.03 gl | active; implemented 2026-10-29 (`b2f4b06`); smoke-tested; not yet run on Allen's data |
-| D-109 | 2026-10-29 | `calibrate_kernel.py real`'s far-set candidates (Cell 7); SPEC Block 10.C (`analysis/far_search.py`); `CalibrationConfig.far_candidates`, `far_search_spacing_um`; `far_search_<specimen>.csv`; the knobs line; not Block 19.3; D-101 (c), D-105 (e) | the far set's candidates found over the whole pilot cell from its trace (tilt <= 15 deg, the stripe at the trace's plane, at least 6 usable far-fit planes, the pilot table's medians as $\bar B$, $\hat\mu$), kept 5 um apart, then measured and judged like any candidate [user]; the medians, the spacing, the trace's plane for $k^*$ -- the assistant's, PROVISIONAL | active; implemented 2026-10-29 (`b2f4b06`); smoke-tested; on the pilot's reconstruction 19 of 723 chosen [run, sandbox]; not yet run on Allen's data [updated 2026-10-29 (later): both sets and S3's step, D-112] |
+| D-108 | 2026-10-29 | `CalibrationConfig.isolation_depth_gl` (SPEC Block 10.S's $\tau$; 10.I's veto under `square`); every stripe and verdict of Blocks 10.S, 10.C, 15.1; Cell 7's `CAL_KNOBS` (both notebooks), Cell 15's and davinci's knob file, Block 19.3 through the default; D-081.1 / D-101.5's 0.03 gl; D-101 (d), D-105 (a) | $\tau$ = 0.3 gl, the default and Cell 7's knob [user: "As you recommend", to option (a)]; the square rule of 2026-10-26 = `square` with 0.03 gl | active; implemented 2026-10-29 (`b2f4b06`); smoke-tested; not yet run on Allen's data [updated 2026-10-30: on Allen's planes the near set filled its 30 scans; 12 of the 19 far candidates not usable at the pilot's k*; tau's reach depends on the kernel law (the calibration chat's checks)] |
+| D-109 | 2026-10-29 | `calibrate_kernel.py real`'s far-set candidates (Cell 7); SPEC Block 10.C (`analysis/far_search.py`); `CalibrationConfig.far_candidates`, `far_search_spacing_um`; `far_search_<specimen>.csv`; the knobs line; not Block 19.3; D-101 (c), D-105 (e) | the far set's candidates found over the whole pilot cell from its trace (tilt <= 15 deg, the stripe at the trace's plane, at least 6 usable far-fit planes, the pilot table's medians as $\bar B$, $\hat\mu$), kept 5 um apart, then measured and judged like any candidate [user]; the medians, the spacing, the trace's plane for $k^*$ -- the assistant's, PROVISIONAL | active; implemented 2026-10-29 (`b2f4b06`); smoke-tested; on the pilot's reconstruction 19 of 723 chosen [run, sandbox]; not yet run on Allen's data [updated 2026-10-29 (later): both sets and S3's step, D-112] [updated 2026-10-30: in Colab 2 of the 19 passed their pilot (2700, 6660); the far fit a diagnostic] |
 | D-110 | 2026-10-29 | (D-103.2)'s fit of the median window; Block 3's `fit_decay`, `DecayFit`, `WindowConfig` (`decay_tau0_ms`, `decay_maxfev` retired; `decay_tau_bounds_ms`, `decay_grid_n`); SPEC §2.2 (d); smoke W2; D-104.2's failed fit | the decay fit is the exact least-squares optimum, by variable projection (closed-form A, B at each tau; tau from a 301-point log grid over [1, 1000] ms, bounded Brent, the derivative's root); no starting values; a minimum at a bound is a failed fit (the assistant's reading of "fitted precisely") | active; implemented on `sci/noise-fit-d103` [updated 2026-10-30: on `main` since `ace6568`; the reading confirmed, D-114] |
 | D-111 | 2026-10-29 | (D-103.3), (D-104.1)'s t_star(c); Block 3's `decay_start`; SPEC §2.2 (e) (ST2); smoke W2; the flags `ss_start_floor`, `ss_start_fallback` | the cell's start is max(80 ms, the MEDIAN of its valid groups' starts), not their maximum; D-104.1's 50 ms fallback applied to it | active; implemented on `sci/noise-fit-d103`; supersedes D-103.3's maximum [updated 2026-10-30: on `main` since `ace6568`] |
-| D-112 | 2026-10-29 | SPEC Block 10.C for both sets (`analysis/candidate_search.py`, `calibrate_kernel.cell_candidates`); `CalibrationConfig.near_candidates`, `near_search_spacing_um`; Cell 7's `real` and S3's calibration step (Block 19.3: Cell 15, the davinci array); `<set>_search_<specimen>.csv`; Block 19.1's set_full line; 10.S's pre-cull; D-109 (a) | the whole cell's nodes evaluated for both sets, in Colab and on davinci [user]; the near rule (10 deg, the stripe at the trace's plane, at least 3 usable of the trace's plane +- 3, an early stop), its ranking by pixels and the 5 um spacing -- the assistant's, PROVISIONAL | active; implemented 2026-10-29; smoke-tested; not yet run on Allen's data |
+| D-112 | 2026-10-29 | SPEC Block 10.C for both sets (`analysis/candidate_search.py`, `calibrate_kernel.cell_candidates`); `CalibrationConfig.near_candidates`, `near_search_spacing_um`; Cell 7's `real` and S3's calibration step (Block 19.3: Cell 15, the davinci array); `<set>_search_<specimen>.csv`; Block 19.1's set_full line; 10.S's pre-cull; D-109 (a) | the whole cell's nodes evaluated for both sets, in Colab and on davinci [user]; the near rule (10 deg, the stripe at the trace's plane, at least 3 usable of the trace's plane +- 3, an early stop), its ranking by pixels and the 5 um spacing -- the assistant's, PROVISIONAL | active; implemented 2026-10-29; smoke-tested; not yet run on Allen's data [updated 2026-10-30: run in Colab on the pilot; searches equal to the sandbox's row by row; near 30 of 84 measured, far 2 of 19] |
 | D-113 | 2026-10-29 | SPEC 10.S's own cylinder (F2, `fitted_own_rows`); D-101.1's bounds on the pilot's tilt (F3); D-105 (c), (d) | the union of the trace's and the fitted own cylinder confirmed; F3's tilt error accepted without change [user] | active; nothing to implement |
 | D-114 | 2026-10-30 | D-110's statement; D-107.2; Block 4's `CellLayout.from_windows` (`_tilts_for`); the tilt flags `ss_tilt_none`, `ls_tilt_none`; SPEC §2.3 and Block 4's Confirmed line; smoke W2 (g), F11; Block 6's report of a refused cell | D-110's reading confirmed (the bounds [1, 1000] ms and the 301-point grid PROVISIONAL); a cell with a sweep whose tilt cannot be read is refused with the sweep and the flag, no tilt substituted [user] | active; implemented (`7672ffc`, `fb6fec9`); nothing to change |
 | D-115 | 2026-10-30 | (D-103.1)'s median window and subtraction; the start (D-103.2, D-110, D-111); D-102.2's SS reading; D-107.2's simulator; Block 3 (`ss_noise_windows`, `decay_start`, the reading and the offsets), Block 4 (`simulate_cell_windows`, `CellLayout`); SPEC §2.2-§2.4; smoke W2, W3, W11, W15, F1, F2, F11 | each kept SS window minus its sweep's tilt offset $\hat b_s(t_k - \bar t_s)$ before the per-sample median, everywhere the median is used; $\hat b_s$ by (TL1) on the kept windows cut at the 80 ms floor, before the start, the only SS reading; the simulator repeats both per replicate [user] | active; implemented 2026-10-30 in Blocks 3-4 |
 | D-116 | 2026-10-30 | D-073 (c), D-076 (i); Block 4b (`noise_sweep_fit.py`, to write); the per-sweep columns; Block 5's per-sweep laws | one solve per sweep at the cell's weights from $\hat\theta(c)$; $v(c,s)$ by a parametric bootstrap (B refits at the sweep's estimate); (D-076.1) per protocol, SS and LS separately; a failed sweep flagged, out of the pooling, its twin at the cell's values [user]; $B$, the refits' cost, the reading of "the cell's values" open | active; Block 4b not written (SPEC drafted 2026-10-30) [updated 2026-11-11: the open points answered, D-122] [updated 2026-11-12: Block 4b written as Block 9, `2171519`] |
-| D-117 to D-121 | 2026-10-30 to 2026-11-10 | the diameter calibration chat's: Cell 7's tilt rule and kernel-law loop (D-117), S3c's per-cell quota of calibration scans (D-118), Block 10's sparse growth fit (D-119), the pooled fits' cell weights and removal rule (D-120), the depth check and the calibration loop on davinci (D-121) | logged only in the log copy on `sci/diameter-pipeline` (project knowledge refuses that chat's writes of this log); not copied here (the 2026-11-12 row) | that branch's `docs/project/TEEG_decisions_and_ideas_log.md` |
+| D-117 | 2026-10-30 | the calibration verdict's tilt (kept); Cell 7's loop over the kernel law that Blocks 10.S, 15.2 and 15.3 read; a goodness of fit on every scanned plane (10.P, 15.2); 10.A's anchor bootstrap; `meta.nodes`; Block 19.3 on the pilot (Cell 15) | the tilt over +-2 um kept; the law iterated in Cell 7 (at most 3 rounds, one SE), the diagnostic slope fed back; residual-against-noise goodness of fit, near and far; the bootstrap's anchor from G(delta_0) alone; the pilot's values logged; Cell 15 reuses Cell 7's search [user] | active; implementation started |
+| D-118 | 2026-11-02 | `SurveyConfig.calib_scans_per_cell` (Block 19.3; D-089's 5); S3's calibration step on every cell (Cell 15, the davinci array); the pool (Block 19.4; D-088.3's cap of 30 superseded for it) | the per-cell quota is 30 scans per set; the pool takes up to 30 per set from every cell, no cap in all; the pooled SEs resample cells from 10 cells, the larger of node and cell SEs from 2 to 9, nodes for one cell [user] | active; D-118.1-2 implemented at `e6e37b2`; D-118.3 decided 2026-11-04, implemented at `fb1619a` |
+| D-119 | 2026-11-04 | `calibration.fit_growth` (Block 10, Eq. 4) and its callers (`fit`, 10.A's bootstrap, Cell 7, the pool); `CalibrationConfig.growth_jacobian`; 10.C.R's key | the same least-squares estimator with a sparse Jacobian, scipy `least_squares(method="trf", tr_solver="lsmr")`, checked against the dense fit [user] | active; implemented at `4892231` |
+| D-120 | 2026-11-10 | the pooled near and far fits (Blocks 10, 15, 19.4-19.6), their bootstraps and the by-cell residuals (19.5); the pool job | D-118.3's readings confirmed; the pooled fits weight cells; a cell whose mean residual is too rare under the between-cell Gaussian leaves the pool; no SE on the inner points [user] | active; D-120.2 implemented at `7d03e16`; D-120.3 at `4cbb0de`, `78a5931` (finding open: the rule's false-removal rate, SPEC 19.8) |
+| D-121 | 2026-11-10 | the pooled calibration on davinci: a depth check (19.9), the loop of D-117.2 over the pool (10.L, 22) | the near law on the shallow and deep halves (stack z, median), flagged when a knot differs > 2 SE family-wise; the loop's rounds all submitted at once, stopped below one SE or after 5 rounds [user] | active; not implemented |
 | D-122 | 2026-11-11 | D-116's open points and D-116.4's reading; SPEC §2.5 (d), (f), Block 9's `SweepStageConfig` (`B_v`, `M_refit`, `max_failed_refit_frac`), its Confirmed line, §8; smoke P6; the flags `v_refits_failed`, `v_none`, `sweep_fit_failed` | $B_v$ = 50 refits per sweep at $M$ = 1000; a failed refit left out of (P2) and counted, flagged above 10 %, $B_{\rm ok} < 2$ fails the sweep; a failed sweep's twin carries $\hat\theta(c)$ [user] | active; Block 9 not written (SPEC updated 2026-11-11) [renumbered 2026-11-12 from D-117] [updated 2026-11-12: implemented in Block 9, `2171519`] |
 | D-123 | 2026-11-11 | the order after Block 9: roadmap N6 (no longer after N5) and N5 (after N6); Block 6 (`run_noise_fit.py`, the PBS job) before Block 5; Stage 7's twins | the noise law fitted on $n$ real cells first (Block 6's driver on davinci), the twins built from those fits (Block 5), then the synthetic recovery [user; reading to confirm] | active; $n$ open; roadmap reordered 2026-11-11 [renumbered 2026-11-12 from D-118] [updated 2026-11-12: the reading confirmed, $n$ = the 18 L3_exc cells after a 2-cell pilot, D-124] |
 | D-124 | 2026-11-12 | D-123's reading; Block 6's cohort and pilot (`run_noise_fit.py`, `submit_noise_fit.sh`, to write); roadmap N6; the run on davinci | D-123.1-D-123.3 confirmed as read; the run fits all 18 L3_exc cells, after a pilot of the same driver on 508282493 and 569844159 [user] | active; Block 6's SPEC entry not written |
+| D-125 | 2026-11-12 | Block 6 (`run_noise_fit.py`, `submit_noise_fit.sh`, SPEC); the run on davinci; D-055; roadmap N6 | (a) one PBS array job per cell then a merge, at most 120 cores (6 per cell, the assistant's reading); the outputs as proposed; S0-S3 dropped for now, D-055's superseded elements listed; a refused or failed cell recorded and skipped; a full-size pilot, its two cells kept [user] | active; Block 6's SPEC entry drafted |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
 | I-004 | 2026-10-22 | Block 4's absorption (`partition_vertical`, D-024 (i)) and Block 9's ray world; the hybrid of the 2026-10-09 renderers document (§3.8-3.9, on `main`); roadmap T7 | the hybrid renderer -- each slice's absorption from the condenser's rays, then the defocus kernel -- whose optics the user studies first | idea; roadmap T7 open; not scheduled [updated 2026-10-26: adopted as the renderer actually used once built, D-084] [updated 2026-10-27: built as SPEC Block 21 (D-092), not yet the default] |
-| I-005 | 2026-11-10 | the diameter calibration chat's: the node's own noise along its measuring line in the fits at that node | logged only in the log copy on `sci/diameter-pipeline`; not copied here (the 2026-11-12 row) | that branch's log |
+| I-005 | 2026-11-10 | the fits along a node's measuring line (Blocks 3, 5, 10, 12-13, 15); roadmap T12 | the node's own noise along its measuring line included in the fits at that node; to discuss later | idea; roadmap T12 open; not scheduled |
 
 ---
 
@@ -5269,7 +5289,7 @@ done if S3.1 holds (a decision after S3); the two high-trend cells (D-017 (a)).
 above **[run]**.
 
 **Status:** active; not run. Designs D-048's sensitivity check and settles
-handoff §8 item 4.
+handoff §8 item 4. [updated 2026-11-12: dropped from Block 6 for now; the elements later decisions superseded are listed in **D-125.3**]
 
 ---
 
@@ -7571,7 +7591,7 @@ neuron class, the counts apply per class instead).
 
 **Status:** active; not implemented. Supersedes D-085.10 (one kernel per cell, pooled only when a cell lacks clean
 dendrites; the per-cell sufficiency check with 5 + 5 nodes, PROVISIONAL); answers the open point "one table per cell
-or one table where the kernels agree": one table. [updated 2026-10-27: implemented in Block 19, on the remote at `7064e2c` -- Cell 7 stops at 30 scanned nodes per set in a seeded order and withholds the production kernel below 10 per set; the step `calibration` (5 scans per set per cell) and `pool --what calibration` (round-robin over the cells to 30 per set, qualified ids); the readings confirmed, D-089.6-8; the points by cell and their residuals, D-090.2 (Block 19.5); not run on Allen's data]
+or one table where the kernels agree": one table. [updated 2026-10-27: implemented in Block 19, on the remote at `7064e2c` -- Cell 7 stops at 30 scanned nodes per set in a seeded order and withholds the production kernel below 10 per set; the step `calibration` (5 scans per set per cell) and `pool --what calibration` (round-robin over the cells to 30 per set, qualified ids); the readings confirmed, D-089.6-8; the points by cell and their residuals, D-090.2 (Block 19.5); not run on Allen's data] [updated 2026-10-30: Cell 7 on the pilot (D-112's code): near 30 nodes, sufficient; far 2, insufficient -- `far-fit` wrote no production kernel; the far fit a diagnostic ($\hat\gamma$ = 0.408, $t_1$ interval [-0.01, 0.83]). The 2026-10-30 (later, 2) row]
 
 ---
 
@@ -7682,7 +7702,7 @@ the report); whether a cell that stands out leaves the pool; a per-cell fit of t
 `tests/smoke/test_smoke_projection_check.py`, `tests/smoke/test_smoke_calibration_by_cell.py`; the dataviz skill's
 `validate_palette.js` on the three cell hues.
 
-**Status:** active; implemented 2026-10-27 (`6b8ea64`); not run on Allen's data (Colab Cells 11b and 15). [updated 2026-10-28: (D-090.1) run on Allen's data (Cell 11b, the user's log and figure of 11:16; 7.0 min, 579 crops): 52 specimens listed, each with `'MinimumIntensityProjection - xy'` and `'- yz'`, 4 also with `'MaximumIntensityProjection - xy'` and `'- yz'` (the strings as the API gives them). On the pilot 529878215, a 512 px window at (4199, 5325) over 521 planes: `'MinimumIntensityProjection - xy'` (546843114) matches the planes' pixelwise minimum, r* 0.9941 at offset (0, 0) (mean 0.7040, median 0.5376, max 0.4743); `'MaximumIntensityProjection - xy'` (550303812) is `unclear`: its best r is negative for every operator (min -0.4870, mean -0.3395, median -0.2415, max -0.3080), each at an edge of the +-3 px search **[user's log and figure, read]**; in the figure its neurites are bright on a dark, speckled ground -- the assistant's reading: an inverted, contrast-stretched image, which is why it is the darkest at level 4 (D-089.2's note) **[reasoning]**. Checked on the pilot only, in one window. (D-090.2), Cell 15, not run.] [updated 2026-10-28, later: the check's result applied by **D-098.2** -- Block 16.2 (a) takes the projection by its type.]
+**Status:** active; implemented 2026-10-27 (`6b8ea64`); not run on Allen's data (Colab Cells 11b and 15). [updated 2026-10-28: (D-090.1) run on Allen's data (Cell 11b, the user's log and figure of 11:16; 7.0 min, 579 crops): 52 specimens listed, each with `'MinimumIntensityProjection - xy'` and `'- yz'`, 4 also with `'MaximumIntensityProjection - xy'` and `'- yz'` (the strings as the API gives them). On the pilot 529878215, a 512 px window at (4199, 5325) over 521 planes: `'MinimumIntensityProjection - xy'` (546843114) matches the planes' pixelwise minimum, r* 0.9941 at offset (0, 0) (mean 0.7040, median 0.5376, max 0.4743); `'MaximumIntensityProjection - xy'` (550303812) is `unclear`: its best r is negative for every operator (min -0.4870, mean -0.3395, median -0.2415, max -0.3080), each at an edge of the +-3 px search **[user's log and figure, read]**; in the figure its neurites are bright on a dark, speckled ground -- the assistant's reading: an inverted, contrast-stretched image, which is why it is the darkest at level 4 (D-089.2's note) **[reasoning]**. Checked on the pilot only, in one window. (D-090.2), Cell 15, not run.] [updated 2026-10-28, later: the check's result applied by **D-098.2** -- Block 16.2 (a) takes the projection by its type.] [updated 2026-11-10: "whether a cell that stands out leaves the pool" answered by **D-120.3** (yes, by its mean residual against the between-cell Gaussian); a per-cell fit of the kernel still open]
 
 ---
 
@@ -9093,7 +9113,7 @@ estimator `59678d4e2aedf2b6`, simulation `52aa73e479eb77cf`.
 **Sources.** **[user]** 2026-10-29, 14:25. **[run, sandbox]** `checks/d105_2026-10-28/summarize.out`; the smoke suites
 named under D-109. **[data]** D-101's noise SD.
 
-**Status:** active; implemented 2026-10-29; smoke-tested; not yet run on Allen's data.
+**Status:** active; implemented 2026-10-29; smoke-tested; not yet run on Allen's data. [updated 2026-10-30: run on Allen's planes (Cell 7, the pilot): 22 of 84 measured near candidates and 12 of 19 far ones not usable at the pilot's k*; the near set filled its 30 scans. On the trace **[run, sandbox]** the reach of tau depends on the kernel law: under the law the run measured (slope 0.408, a diagnostic on 2 nodes) a tube of radius 0.3 um keeps a peak shadow above 0.3 gl out to 34.9 um of defocus, against 18.4 um under the configured law (0.5 um: 93.8 against 48.8 um), and 4 of the 19 far candidates pass instead of 19. (a) still open]
 
 ---
 
@@ -9165,7 +9185,7 @@ $k^*$). (d) The PROVISIONAL items above.
 run (the method of `checks/d105_2026-10-28/tau_check.py`); `test_smoke_far_search.py` and the mutants; the affected
 suites. **[data]** the pilot table.
 
-**Status:** active; implemented 2026-10-29; smoke-tested; not yet run on Allen's data. [updated 2026-10-29 (later): extended to the near set and to S3's calibration step by **D-112**; the module is now `analysis/candidate_search.py`, its test `test_smoke_candidate_search.py`]
+**Status:** active; implemented 2026-10-29; smoke-tested; not yet run on Allen's data. [updated 2026-10-29 (later): extended to the near set and to S3's calibration step by **D-112**; the module is now `analysis/candidate_search.py`, its test `test_smoke_candidate_search.py`] [updated 2026-10-30: in Colab 2 of the 19 passed their pilot (2700, 6660): 12 `not_isolated:*` at the pilot's k*, 10 `not_flat` by the pilot's tilt, 1 `crossing` -- (c) answered. (b): node 2700's planes 14-16 on one side widen to 7.4-17.7 um^2 and the SNR rule dropped them, and the other side's 13-16 that lie on the line, its prior being the configured law **[data read; run, sandbox]**]
 
 ---
 
@@ -9321,7 +9341,7 @@ it. (d) D-109 (b): the outermost far planes on Allen's images.
 `test_smoke_candidate_search.py`, `test_smoke_stripe.py`, `test_smoke_s3c.py`, `test_smoke_isolation_view.py` and the
 affected suites; the mutants.
 
-**Status:** active; implemented 2026-10-29; smoke-tested; not yet run on Allen's data.
+**Status:** active; implemented 2026-10-29; smoke-tested; not yet run on Allen's data. [updated 2026-10-30: run in Colab on the pilot (Cell 7, the user's upload of 09:08): both searches equal the sandbox's row by row (380 near, 19 far chosen), at most 17.1 and 5.3 min; 30 near scans from 84 measured candidates (296 `set_full`), 2 far from 19. The search's stand-ins (the trace's tilt and plane, the table's medians, Allen's radius) did not predict the post-pilot verdict of the far set: the 2026-10-30 (later, 2) row]
 
 ---
 
@@ -9526,6 +9546,352 @@ D-115.
 
 ---
 
+## D-117 -- The answers to the Cell 7 report of 2026-10-30 (user): the pilot's tilt rule kept; the kernel law iterated inside Cell 7 with the diagnostic slope fed back; a residual-against-noise goodness of fit on every scanned plane; the anchor's bootstrap read from G(delta_0) alone; the pilot's values logged per candidate; Cell 15 reuses Cell 7's search
+
+**[Renumbered 2026-11-02: logged as D-115 on `sci/diameter-pipeline` only; the noise-fit chat's D-115 and D-116 (2026-10-30, 14:24, in project knowledge) came first. Its parts are D-117.1 to D-117.6; the branch's SPEC, code, notebooks, runbook and path map were renamed on 2026-11-02; earlier commits and the folder `checks/d115_2026-10-30/` keep "D-115".]**
+
+**Date:** 2026-10-30, 14:12 (Europe/Rome) and the dialog's answers that followed, the diameter calibration chat, on the
+"Decisions for you" of the report of Cell 7's Colab run (the 2026-10-30 (later, 2) row). **Binds:** the calibration
+verdict's flatness (Block 10.I (iii), D-101.1, D-113.2); Cell 7 (`calibrate_kernel.py`, both notebooks) and the
+rules that read the renderer's kernel law during the calibration -- Block 10.S's predicted shadows (the stripes, the
+verdict, Block 10.C's search), Block 15.2's starting width $\sigma_{\rm p}$ and width bounds, Block 15.3's SNR rule;
+Blocks 10.P and 15.2 (each scanned plane's fit); Block 10.A's anchor bootstrap (`calibration.bootstrap_sigma0`);
+the scans file's `meta.nodes` (Cell 7 and S3's calibration step); Block 19.3 on the pilot (Cell 15) and
+`calibrate_kernel.cell_candidates`.
+
+**Decision [user].** 14:12: "1) phi_hat is fitted through the 3D centres of nodes within +-2 um. I would judge the tilt
+from the +-3 nodes from the chosen one. 2) The law coupling: iterate 3) Add a goodness of fit please 4) do It 5) Add the
+logging change 6) Cell 15 reuses Cell 7's search. Yes". The dialog's answers: on 1), after the assistant noted that +-3
+nodes (about +-3.4 um at the pilot's 1.15 um spacing) lie beyond the pilot's refined pass (+-2 um), "keep +-2", then
+"Keep +-2 um: no change"; on 2), "Automatic loop inside Cell 7" and, while the far set holds fewer than 10 nodes, "Use
+the diagnostic gamma_hat anyway"; on 3), "Residual vs noise".
+
+**Statement.**
+
+(D-117.1) *The tilt.* The flatness verdict keeps the pilot's $\hat\varphi_j$: the TLS line through the refined 3D centres
+of the nodes within $\pm$2 um along the path (Block 5). The user's first answer (the $\pm$3 nodes) is withdrawn; D-113.2
+stands, and the search keeps the trace's tilt over $\pm$2 um.
+
+(D-117.2) *The law, iterated.* Cell 7 loops: round $t$ runs the search, the scans, `fit` and `far-fit` with the law
+$\sigma^{(t)}_{\rm r}$ in the three rules that read a law (10.S, 15.2's $\sigma_{\rm p}$ and bounds, 15.3), where
+$\sigma^{(1)}_{\rm r}$ is the configured law and $\sigma^{(t+1)}_{\rm r}$ is round $t$'s measured near table, cut at
+$\delta_0$ = 0.84 um and continued linearly with round $t$'s $\hat\gamma$; it stops when $\hat\sigma_0$ and $\hat\gamma$
+each move by less than one SE between rounds, or after 3 rounds [user]. While the far set holds fewer than 10 nodes,
+round $t$'s diagnostic $\hat\gamma$ is fed back all the same [user]. The assistant's readings, PROVISIONAL: $\tau$ stays
+0.3 gl in every round; the renderer's production kernel is not touched (the rules' law is a calibration setting); when
+`far-fit` cannot fit (fewer than 2 nodes) the round keeps the previous slope (0.79 in round 1) and convergence is judged
+on $\hat\sigma_0$ alone; the SEs are each estimate's reported one (10.A's node bootstrap, D-117.4; 15.5's); D-088.3's
+production rule unchanged.
+
+(D-117.3) *Goodness of fit.* A scanned plane's Gaussian core fit is rejected when its residual RMS within the fit window
+exceeds $\kappa_{\rm g}$ times the noise SD of that plane's background measured on its stripe, near and far planes alike;
+a rejected plane is dropped and its node keeps its other planes, the existing minima of planes per node still applying
+[user, the assistant's proposal]; $\kappa_{\rm g}$ is set on rendered phantoms with a neighbouring dip (PROVISIONAL until
+that check).
+
+(D-117.4) *The anchor's SE.* The node bootstrap of $\hat\sigma_0$ reads each resample's anchor from
+$\hat G^*(\delta_0)$ alone, $\hat\sigma^*_0 = [\sigma_{\rm r}(0)^2 + \hat G^*(\delta_0)]^{1/2}$, instead of requiring
+$\sigma_{\rm r}(0)^2 + \hat G^* > 0$ at every knot of the table; a resample is dropped only when its fit fails or
+$\sigma_{\rm r}(0)^2 + \hat G^*(\delta_0) \le 0$ [user: "do It"]. The anchor itself is unchanged.
+
+(D-117.5) *The log.* For every measured candidate (not `set_full`) the scans file's `meta.nodes` records the pilot's
+values the verdict used: $k^*$, the sub-plane depth, the centre, $\hat\theta$, $\hat\varphi$, $\bar B$, $\hat\mu$,
+$\hat d$, $\hat\alpha$, the fit status, the flags and the registration verdict -- in Cell 7 and in S3's calibration step
+[user].
+
+(D-117.6) *Cell 15 reuses Cell 7's search.* S3's calibration step on the pilot takes each set's chosen candidates from
+Cell 7's `<set>_search_<sid>.csv` instead of searching again [user: "Yes"]; the assistant's reading, PROVISIONAL: a
+record beside each search CSV holds the inputs the search depends on (the calibration settings, the kernel law, the
+acquisition, the transform, $\bar B$ and $\hat\mu$, the trace), and the CSV is reused only when they equal the step's
+own, else the step searches; the davinci array keeps searching each cell.
+[corrected 2026-10-30, (later, 4), the assistant's, before the code, still PROVISIONAL: $\bar B$, $\hat\mu$ and the
+transform are not compared -- the step's own come from Cell 13's at most 18 nodes and Cell 12's automatic alignment, so
+they differ from Cell 7's by construction and the reading above would never reuse; the reused search keeps Cell 7's
+values, printed beside the step's. The key is the trace's digest and the four settings sections the search reads (SPEC
+10.C.R); the CSV must also match its record]
+
+**Why [user; data; run].** **[user]** as quoted. **[data; run, sandbox]** the report of 2026-10-30 (the 2026-10-30
+(later, 2) row): the pilot's tilt exceeds the trace's by a median 5.4 deg over 382 nodes; both rules that predict shadows
+read the configured law, and under the law the run measured the far search would keep 6 of 19; three near nodes whose
+dips are not one Gaussian core move the anchor by -0.063 um; the 130 resamples the bootstrap dropped all failed at the
+0.28 um knot; the verdict of an unscanned candidate cannot be reproduced from the scans file; Cell 15 would repeat a
+22-min search.
+
+**What it implies for code and tables.** `calibration.bootstrap_sigma0` and a function reading the anchor from
+$\hat G(\delta_0)$ (D-117.4); the `meta.nodes` builders of `calibrate_kernel.run_real` and `survey_cells.step_calibration`
+(D-117.5); `calibrate_kernel.cell_candidates` (the record, the reuse) and S3's runner option for Cell 15 (D-117.6);
+then, after their SPEC entries: the goodness of fit in Blocks 10.P and 15.2 with its phantom check (D-117.3) and the
+loop in Cell 7 with a calibration-only law for the three rules (D-117.2). SPEC 10.A, 10.C, 10.S, 15.2, 15.3, 19.3;
+both notebooks' Cells 7 and 15; the runbook. No change to the estimator or simulation hashes is expected (calibration
+fields are in no signature).
+
+**What it does not decide [open].** $\kappa_{\rm g}$'s value; whether $\tau$ should move with the law; the loop's
+tolerance beyond one SE; the far set's sufficiency (pooled cells on davinci); whether Cell 15 should also iterate.
+
+**Sources.** **[user]** 2026-10-30, 14:12 and the dialog. **[data; run, sandbox]** the report of 2026-10-30 and its
+checks (`cell7_checks_2026-10-30.zip`, sent to the user).
+
+**Status:** active; implementation started 2026-10-30 (D-117.4 to D-117.6 first). [updated 2026-10-30: D-117.4 at `447473e`, D-117.5 at `4f4263a`, D-117.6 at `ec28988`; D-117.3 at `1146494` ($\kappa_{\rm g}$ = 1.2, PROVISIONAL; the wide-dip caveat in the row 2026-10-30 (later, 5)); D-117.2 next]
+
+---
+
+
+## D-118 -- S3c's per-cell quota of calibration scans raised from 5 to 30 per set, the pool keeps every cell's scans, and the pooled SEs resample cells (user)
+
+**Date:** 2026-11-02, 16:38 (Europe/Rome), the diameter calibration chat, after Cell 15's run on the pilot (5 near and 2
+far scans) and its comparison with Cell 7. **Binds:** `SurveyConfig.calib_scans_per_cell` (SPEC Block 19.3; D-089's
+value 5); S3's calibration step on every cell (Cell 15 on the pilot; the davinci array, `survey_cells.pbs`); both
+notebooks' Cell 15 text; the runbook; the array's walltime. Not yet the pool (Block 19.4; D-088.3's cap).
+
+**Decision [user].** "Cell 15 is S3c's per-cell step, tried on the pilot. I would increase the number of nodes per cell
+that contributes to the fit up to 30." Then, 2026-11-02, in the dialog on D-118.2 (options: up to 30 from every cell;
+keep 30 in total, round-robin; 30 on the pilot only): "Up to 30 from every cell (Recommended)" -- the option's text read
+"Pool keeps all scans, up to 30 x N cells per set; supersedes D-088.3's cap; cells comparable one by one; SE should then
+resample cells (my reasoning)".
+
+**Statement.** (D-118.1) The per-cell quota `survey.calib_scans_per_cell` is 30 per set (was 5, D-089): S3's
+calibration step scans a cell's candidates in the seeded order until each set holds 30 scans or the candidates run
+out [user]. Supersedes D-089's per-cell value. (D-118.2) The pooled set (Block 19.4) takes up to 30 per set from every
+cell -- at most `survey.calib_scans_per_cell` from each, in its scan order -- with no cap in all: it holds up to 30 x
+the number of cells per set [user]. Supersedes D-088.3's maximum of 30 per set for the pool; D-088.3's maximum still
+caps Cell 7 (one cell), and its minimum (10 per set) stands. The assistant's readings, PROVISIONAL: the pooled order
+stays the round-robin's; a configuration integer `survey.calib_pool_max_per_set` restores a cap (None by default).
+[originally put to the user as: keep D-088.3's cap of 30 per set, taken round-robin across the cells -- then each cell
+contributes about 30 / (the number of cells) nodes per set -- or take up to 30 per set from every cell.] (D-118.3)
+The pooled fit's SEs -- 10.A's anchor bootstrap and 15.5's far-slope bootstrap -- resample **cells**, each drawn cell
+with all its nodes as measured (one level; the user, 2026-11-04: "Cells only"), when the fit's nodes come from at least
+10 cells; with 2 to 9 cells both bootstraps run and the **larger** SE is the one reported, flagged "few cells" (the
+user, 2026-11-04: "The larger SE, flagged"); with one cell (Cell 7, the pilot) the node bootstrap stays [user]. The
+threshold of 10 cells is the assistant's, stated in the question the user answered (PROVISIONAL). The assistant's
+readings, PROVISIONAL: a node's cell is its specimen in the pooled file's qualified id ($q = s \cdot 10^6 + n$,
+`calibration_pool.cell_of`); a cell drawn twice enters twice, every copy of a node with its own nuisance parameters
+(as the node bootstrap's duplicates do); 15.5's combination $\mathrm{SE}(\hat\gamma)^2 = \mathrm{SE}_{\rm
+boot}(\hat\gamma)^2 + (\partial\hat\gamma/\partial\sigma_0)^2\,\mathrm{SE}(\hat\sigma_0)^2$ is unchanged, both SEs
+now by this rule. [updated 2026-11-04: was "[proposed, the assistant's; not decided]", with the one-cell case and a
+minimum number of cells left to specify]
+
+**Why [user; data; run].** Cell 15's five near nodes are a slice of Cell 7's 29 (the same candidates in the same
+seeded order), so its near fit is a noisy subsample: anchor 0.720 +- 0.137 um against Cell 7's 0.562 +- 0.049 um; the
+far slope inherits the gap through the anchor (0.352 against 0.404, 69-78 % of the change from the anchor) **[data
+inspected: the fit files of 2026-11-02; run, sandbox: the comparison's `law_checks.py`]**. (D-118.3) Data nested in
+groups and analysed as independent points give too small an uncertainty; the hierarchical bootstrap, resampling the
+top level (subjects) with replacement and then the units within each, keeps the error rate at its nominal level
+(Saravanan, Berman & Sober 2020, Neurons Behav Data Anal Theory 3(5), PMC7906290) **[PubMed, full text read]**; that
+cells are such groups for the kernel is the assistant's reasoning **[reasoning]**. [added 2026-11-04] On simulated
+nested data (the grand mean of 30 nodes per cell, $C$ = 2 to 51 cells, ICC 0 / 0.05 / 0.2; 400 datasets, 300
+resamples): the node bootstrap's SE is 0.98-1.00 of the true SE when cells do not differ and 0.63-0.64 or 0.36-0.38
+when they do (the design effect: $1/\sqrt{1 + 29\,\mathrm{ICC}}$ = 0.64, 0.38); the cell bootstrap's is 0.89-0.98 [corrected 2026-11-04 (later): 0.89-0.99, the 0.99 at ICC 0.05 and 51 cells, `cluster_bootstrap_check.out`]
+from 10 cells up whatever the ICC, but 0.46-0.82 at 2-5 cells; resampling nodes inside the drawn cells as well
+(two-level) overstates it by 10-38 % at ICC <= 0.05 from 10 cells up; the larger of the node and cell SEs is
+1.00-1.03 at ICC 0 and follows the cell bootstrap otherwise **[run, sandbox: `checks/d118_2026-11-04/
+cluster_bootstrap_check.py`, seed 20261104; a stand-in for the kernel fit, the kernel's own ICC unknown]**.
+
+**What it implies for code and tables.** `config.SurveyConfig.calib_scans_per_cell` defaults to 30 (SPEC 19.3); the
+notebooks' Cell 15 text and the runbook; on davinci each cell measures pilots until 30 near scans -- Cell 7 measured 84
+near candidates for 30 scans on the pilot, about 22 min of scanning with the far set's 19 in Colab, against 4 min at
+5 -- so the per-cell walltime and the array's time grow; the far set is unchanged on the pilot (all 19 far candidates
+are measured either way, 2 pass). D-118.2 decides whether `pool --what calibration` changes. [updated 2026-11-02,
+later: D-118.2 changes `calibration_pool.pool_scans` (at most `calib_scans_per_cell` per cell, no cap in all) and the
+pooled lines; and it makes the pooled near fit large -- `fit_growth` fits $(c, z_{\rm ax}, G)$ with a dense Jacobian,
+and on synthetic exact scans (7 planes per node) one fit took 0.02 s at 30 nodes, 0.13 s at 100, 1.7 s at 300, 20 s
+at 600 and 59 s at 1000, which 10.A's bootstrap repeats 1000 times: about 16 h at 1000 pooled near nodes against
+`survey_pool.pbs`'s 2 h **[run, sandbox: `time_growth.py`, the diameter calibration chat]**. The assistant proposes a
+sparse Jacobian (scipy `least_squares`, `tr_solver="lsmr"`; the same estimator) before the davinci pool runs the
+calibration; the array's per-cell step is not affected (30 near nodes per fit).]
+
+**What it does not decide.** D-088.3's minimum (10) and the sufficiency rule; whether the pooled fit weights the cells
+(one with 30 near nodes against one with 2); the sparse fit (D-119); D-117.2 (the loop in Cell 7). [corrected
+2026-11-04: D-118.3 was listed here as proposed; decided the same day]
+
+**Sources.** **[user]** 2026-11-02, 16:38, and the dialog that followed. **[data inspected; run, sandbox]** the
+comparison of 2026-11-02 (the diameter calibration chat). **[PubMed, full text]** Saravanan V, Berman GJ, Sober SJ
+(2020), "Application of the hierarchical bootstrap to multi-level data in neuroscience", Neurons Behav Data Anal Theory
+3(5), PMID 33644783, PMC7906290.
+
+**Status:** active. [updated 2026-11-02: D-118.1 and D-118.2 implemented at `e6e37b2` (block 19.4; `test_smoke_s3c.py`
+6 pass, 1 skip, 11 mutants killed; not run on Allen's data); D-118.3 and the sparse fit proposed, not specified]
+[updated 2026-11-04: D-118.3 decided (the user's answers to the two dialog questions); implementation started]
+[updated 2026-11-04 (later): D-118.3 implemented at `fb1619a` (block 19.6; help text `f868d41`):
+`calibration.anchor_se` and `far_field.gamma_se` choose the unit from the fit's own cells (`bootstrap_plan`: one
+cell, nodes; 2 to 9, both and the larger, flagged `few_cells`; from `bootstrap_cell_min` = 10, cells), with
+`CalibrationConfig.bootstrap_unit` = "cell" ("node" restores the node bootstrap everywhere); both fields left out of
+the candidate search's key (the hashes unchanged). The assistant's reading, PROVISIONAL: when the reported far SE is
+the cell one, 15.5's interval takes $t$ on $C - 1$ degrees of freedom ($C$ the far nodes' cells) instead of $J - 1$.
+`calibrate_kernel.py fit` and `far-fit` print the rule (`node bootstrap, ...`, `cell bootstrap over C cells, ...`,
+`few cells, C: the larger of the node SE ... and the cell SE ... -- the ... one, ...`). Evidence: `test_smoke_s3c.py`
+7 pass, 1 skip (on 12 synthetic cells x 8 near nodes the cell SE of the anchor was 2.71 times the node SE when each
+cell had its own growth scale and 1.04 times with one scale; far, 0.0347 against 0.0210); the far-field,
+calibration, by-cell and candidate-search suites pass; 12 of 12 mutants killed **[run, sandbox]**. At the davinci
+pool's size (51 cells x 2 far nodes) one far fit takes 1.16 s and its 1000 cell resamples about 18 min; the near
+side's 1000 about 2 min with D-119 **[run, sandbox: `checks/d118_2026-11-04/far_fit_timing.py`]**. Not run on
+Allen's data]
+[updated 2026-11-10: run in Colab on the pilot alone (Cell 15 with `REDO` and Cell 7's searches reused, the user's log of 2026-11-10 16:03): 30 near and 2 far scans of 399 candidates (964 s); `pooled near field: 30 of 30 scans taken (at most 30 per cell)` -- sufficient; far 2 of 2 -- INSUFFICIENT (D-088.3); growth fit on 27 nodes (3 dropped), table 0.080, 0.127, 0.351, 0.536 um at 0, 0.28, 0.56, 0.84 um; anchor 0.5356 um, SE 0.0460 um (node bootstrap); far fit 0.3971 +- 0.0302 (diagnostic, 2 nodes, t on 1 df), per sign 0.4158 and 0.2841 **[data: the user's log]**. The far-fit line has the format of `e6e37b2`/`4892231`, so Colab ran code before block 19.6: D-118.3 was not exercised, which on one cell changes nothing (node bootstrap, $t$ on $J - 1$ under both); whether D-119's sparse fit ran is not visible in the log **[src: the print formats]**]
+[updated 2026-11-10 (later): D-118.3's two PROVISIONAL readings confirmed by **D-120.1**]
+
+---
+
+## D-119 -- Block 10's near-field growth fit takes a sparse Jacobian: the same estimator, solved by scipy least_squares with tr_solver="lsmr", checked against the dense fit (user)
+
+**Date:** 2026-11-04, 12:21 (Europe/Rome), the diameter calibration chat, on the finding of 2026-11-02 (D-118) that
+the pooled near fit is too slow for the davinci pool job. **Binds:** `calibration.fit_growth` (SPEC Block 10, the growth
+fit, Eq. 4) and every caller -- `calibrate_kernel.py fit` (Cell 7, Cell 15, the pool), 10.A's anchor bootstrap
+(`bootstrap_sigma0`, one refit per resample); the pool job's run time (`survey_pool.pbs`, 2 h).
+
+**Decision [user].** "My proposal is the same estimator with a sparse Jacobian (scipy `least_squares` with
+`tr_solver="lsmr"`), checked against the current fit. Implement this" -- quoting the assistant's proposal of 2026-11-02.
+
+**Statement.** (D-119.1) `fit_growth` minimises the same sum of squares over the same parameters $(c, z_{\rm ax}, G)$,
+with the same bounds and start rule, but hands scipy a sparse Jacobian (each row holds one entry for its node's $c_i$,
+one for its $z_{{\rm ax},i}$ and the free knots' basis values) and solves the trust-region steps with LSMR
+(`least_squares(method="trf", tr_solver="lsmr")`); the linear start (`lsq_linear`) takes the same sparse design
+[user]. (D-119.2) The check: on synthetic scans the sparse and the dense fits agree within tolerances fixed in the smoke
+test before running, and the time per fit is reported at the pool's sizes [user: "checked against the current fit"].
+The assistant's readings, PROVISIONAL: the dense path stays selectable (`calibration.growth_jacobian`: `"sparse"`, the
+default, or `"dense"`) for that check and as a fallback; the field is left out of the candidate search's key (10.C.R),
+since the search does not read it.
+
+**Why [user; run].** One dense fit took 0.02 s at 30 pooled near nodes and 59 s at 1000 in the sandbox, and 10.A's
+bootstrap repeats it 1000 times **[run, sandbox: `time_growth.py`, 2026-11-02]**; the Jacobian of Eq. 4 has three
+non-zero blocks per row out of $2N + K$ columns, so a sparse solver's cost grows with the number of non-zeros rather
+than with $N^2$ **[reasoning]**.
+
+**What it implies for code and tables.** `calibration.fit_growth`, `config.CalibrationConfig.growth_jacobian`,
+`candidate_search.search_config` (the key leaves the field out), SPEC Block 10 and 10.C.R, `test_smoke_calibration.py`
+(the sparse-versus-dense check). No change to the estimator or simulation hashes (calibration fields are in no
+signature). The far fit (15.4) keeps its dense Jacobian (about 2 far nodes per cell).
+
+**What it does not decide.** The far fit's solver; the bootstrap's number of resamples; D-118.3's rule (logged there).
+
+**Sources.** **[user]** 2026-11-04, 12:21. **[run, sandbox]** the timing of 2026-11-02 (D-118).
+
+**Status:** active; not implemented. [updated 2026-11-04 (later): implemented at `4892231` (block 10; the
+readings above as written: `growth_jacobian` = "sparse" by default, "dense" kept, the field outside the search's
+key; LSMR's tolerances set to `atol` = `btol` = 1e-14, the assistant's, since at scipy's defaults the min_origin
+fits ran into `max_nfev`). On the same noisy synthetic scans (N = 10 to 300 nodes, 7 planes, 10 % NaN) the sparse
+and dense fits agree to within 5.5e-12 um^2 on $G$ and 5.3e-13 um on the anchor (symmetric origin; 2.9e-6 um^2 under
+min_origin); one fit takes 0.04 s at 300 nodes (dense 1.53 s), 0.08 s at 1000 and 0.14 s at 1530, so 1000
+bootstrap refits take about 2 min at the pool's size **[run, sandbox: `checks/d118_2026-11-04/
+sparse_growth_check.py`]**; `test_smoke_calibration.py` 10 pass, 6 of 6 mutants killed **[run, sandbox]**; not
+run on Allen's data]
+
+---
+
+## D-120 -- The answers of 2026-11-10 (user): D-118.3's two readings confirmed; the pooled fits weight cells, not nodes; a cell whose mean residual is too rare under the between-cell Gaussian leaves the pool; no SE on the near table's inner points
+
+**Date:** 2026-11-10, 16:18 (Europe/Rome), the diameter calibration chat, answering the list "the decisions to take" of
+16:06. **Binds:** the pooled near and far fits (`calibrate_kernel.py fit` and `far-fit` on `scans_pooled.json`, SPEC Blocks
+10, 15, 19.4-19.6), their bootstraps (19.6), the by-cell residuals (19.5), `survey_cells.py pool --what calibration` and
+the davinci pool job; not Cell 7 or a single cell (one cell: every rule below reduces to today's).
+
+**Decision [user].** "1) and 2) as you propose. 3) I would weight by cell. 4) i would say if a cell's own mean is too rare
+with respect to the sigma_b based gaussian then it has its nodes removed from the fitting pool. [...] 6) no need".
+
+**Statement.** (D-120.1) D-118.3's two readings stand: with the cell SE reported, the far slope's interval takes $t$ on
+$C - 1$ degrees of freedom ($C$ the far nodes' cells); the cell bootstrap starts at `bootstrap_cell_min` = 10 cells [user].
+(D-120.2) *Weights by cell.* The pooled near fit (Eq. 4) and far fit give every cell the same total weight instead of
+every node [user]. The assistant's readings, PROVISIONAL, to confirm before the code: a node of cell $c$ weighs $1/N_c$
+($N_c$ the cell's nodes in that set), i.e. its residuals enter the sum of squares multiplied by $1/N_c$, the far fit's
+IRLS weights multiplied likewise; a resampled cell keeps its weights in every copy; the per-node parameters are unchanged.
+(D-120.3) *Cells that stand out leave the pool.* A cell whose own mean is too rare under the Gaussian of the between-cell
+spread ($\sigma_b$) has its nodes removed from the fitting pool [user]. The assistant's readings, PROVISIONAL, to confirm
+before the code: per set (near, far) separately; a node's value is its mean residual from the pooled law over its used
+planes (19.5's residuals, um); $\hat\sigma_b^2$ and $\hat\sigma_w^2$ from the one-way ANOVA of those values (method of
+moments, the effective size $n_0$ for unequal cells, $\hat\sigma_b^2$ truncated at 0), taken without the tested cell so
+that an outlier does not inflate its own yardstick; the tested cell's mean $m_c$ is compared with
+$\mathcal N(\bar m_{(-c)},\ \hat\sigma_{b,(-c)}^2 + \hat\sigma_{w,(-c)}^2/N_c)$ -- the cell mean also carries its own nodes'
+scatter, so a cell of few nodes is not removed for being noisy; "too rare" is a two-sided tail below $0.05/C$ (Bonferroni
+over the $C$ cells); one pass, then the fit and its bootstrap are run again without the removed cells, which are listed in
+the files and marked in 19.5's figures; applied only from `bootstrap_cell_min` cells (below, the $z$ values are reported
+and nothing is removed). (D-120.4) No SE on the near table's inner points ($\sigma_{\rm r}$ at 0.28 and 0.56 um): the
+anchor's stays the only one [user: "no need"].
+
+**Why [user; run; reasoning].** **[user]** as quoted. On simulated nested data the between-cell variance estimated from
+few cells is very uncertain -- its 10-90 % range 0.13 to 2.04 times the truth at 10 cells and $\rho$ = 0.05, negative in
+47 % of datasets at 2 cells -- hence the minimum of cells for D-120.3 **[run, sandbox: `variance_components_check.py`,
+2026-11-04, n = 30, 4000 datasets]**. With unequal cells the between-cell mean square's expectation carries $n_0$, not the
+mean size: for cells of 30 and 2 nodes $n_0$ = 3.75 against 16 **[run, sandbox: `ms_between_numbers.py`]**.
+
+**What it implies for code and tables.** `calibration.fit_growth` and `far_field.fit_far_slope` gain node weights; the
+pool's fit path (`calibrate_kernel.py fit`/`far-fit`) the removal pass; `calibration_report.kernel_law_by_cell` the ANOVA
+and the $z$ per cell; config fields for the weighting, $\alpha$ and the minimum; SPEC Blocks 10, 15, 19; Cells 7 and 15
+unchanged in number on one cell. No hash changes (calibration fields are in no signature).
+
+**What it does not decide [open].** Weights per node ($1/N_c$) or per observation; the random-effects weights
+$1/(\hat\sigma_b^2 + \hat\sigma_w^2/N_c)$ as an intermediate (node-equal when cells agree, cell-equal when they differ --
+the assistant's mention, not chosen); whether D-088.3's sufficiency (10 nodes per set) should count cells once cells weigh
+equally; $\alpha$ and the minimum of cells; whether a cell removed from one set leaves the other; per-cell kernel fits as a
+check (D-088's open point, not answered by D-120.3); the depth check (procedure s.3.10; explained 2026-11-10) and whether
+Cell 15 loops (D-117; explained 2026-11-10).
+
+**Sources.** **[user]** 2026-11-10, 16:18. **[run, sandbox]** the checks of 2026-11-04 sent in the chat
+(`variance_components_check.py`, `ms_between_numbers.py`).
+
+**Status:** active; D-120.1 and D-120.4 need no code beyond today's (the readings are what `fb1619a` does); D-120.2 and
+D-120.3 not implemented, their readings to confirm. [updated 2026-11-10, 16:37: the readings of D-120.2 and D-120.3 confirmed by the user ("3) and
+4): logged. Perfect as you said"); the open sub-question whether D-088.3's sufficiency should count cells stays open
+(D-088.3 unchanged: 10 nodes per set)] [updated 2026-11-10 (later): D-120.2 implemented at `7d03e16` (block 19.7: on
+exact scans of cells of 6 and 2 nodes the pooled $G$ is the cells' own $G$ averaged 1:1 by cell and 6:2 by node, to
+1e-8 um^2; one cell unchanged; 9 of 10 mutants killed) **[run, sandbox]**; D-120.3 next]
+[updated 2026-11-11: D-120.3 implemented at `4cbb0de`, `78a5931` (block 19.8, the readings as confirmed: per set; a node's value its
+mean residual from the pooled law; leave-one-out one-way ANOVA; $z_c = (m_c - m_{\rm ref})/\sqrt{\hat\sigma_{b,(-c)}^2 +
+\hat\sigma_{w,(-c)}^2/N_c}$ with $m_{\rm ref}$ the other cells' means averaged equally (the assistant's reading, PROVISIONAL);
+removed when $2\Phi(-|z_c|) < 0.05/C$ and $C \ge 10$; one pass, both fits again on the kept scans; a cell removed from one set
+stays in the other); on synthetic pooled scans of twelve cells, the one with twice the growth is removed from the near set
+only and the refit holds the other eleven; 17 of 17 mutants killed **[run, sandbox]**. Finding (open): with no cell standing
+out the rule removes at least one cell in 0.16-0.33 of simulated datasets at 10 cells, 0.13-0.23 at 13 and 0.08-0.09 at 51
+(2 to 30 nodes per cell), not the 0.05 Bonferroni aims at -- $\hat\sigma_b^2$ from few cells is uncertain and the Normal
+ignores it, and $m_{\rm ref}$'s own variance is left out; the variant with $\mathrm{Var}(m_{\rm ref})$ added and Student's $t$ on
+$C - 2$ df gives 0.013-0.055, but where two of 13 cells stand out alike it finds both in none of the datasets (the rule: 0.535)
+**[run, sandbox: `checks/d120_2026-11-11/outlier_rule_check.py`, 400 datasets per case]**; which to keep put to the user]
+
+---
+
+## D-121 -- The depth check and the calibration loop, both built to run on davinci (user): the near law fitted on the shallow and the deep half of the pooled nodes; the loop of D-117.2 run over the pool, all rounds submitted at once, stopped below one SE or after 5 rounds
+
+**Date:** 2026-11-10, 16:37 (Europe/Rome), the diameter calibration chat, and the user's answers to the four dialog
+questions that followed. **Binds:** the pooled calibration on davinci (S3c: `survey_cells.pbs`, `survey_pool.pbs`, the
+pool's `fit`/`far-fit`), a new check on the pooled near scans (Block 19.9), the loop of D-117.2 (Block 10.L) and its davinci
+driver (Block 22).
+
+**Decision [user].** "5) Build the check to be run but in da vinci. 6) It's time consuming but worthy to run on the HPC
+where we can heavily parallelize. build it and remind me briefly of the stop rules used in this case to judge that the
+metrics are not changing and thus stop the iterations". The dialog: "Stack z, median split"; "Any knot differs > 2 SE";
+"One submission, pre-chained"; "< 1 SE, max 5 rounds".
+
+**Statement.** (D-121.1) *The depth check* (procedure s.3.10; Block 19.9): a near node's depth is its fitted axis depth
+$\hat z_{{\rm ax},i}$ from the stack's first plane; the pooled near nodes are split at their median into a shallow and a deep
+half and Eq. 4 is fitted on each half [user]; the depth effect is called real when any knot of the near table differs
+between the halves by more than 2 SE, corrected for the number of knots compared (Bonferroni) [user: "Any knot differs
+> 2 SE", whose option read "corrected for the number of knots"]; the SEs come from the cell bootstrap, both halves refitted
+on the same resampled cells [the question's premise]; it runs in the davinci pool job [user]. The assistant's readings,
+PROVISIONAL: "2 SE" is the family-wise level of a two-sided 2-SE test ($\alpha$ = 0.0455), so each of the $K$ knots is
+compared at $z > \Phi^{-1}(1 - 0.0455/(2K))$ (2.43 for the $K$ = 3 knots of the table, 0.28 to 0.84 um; `scipy.stats.norm.isf`); each half is
+weighted by cell (D-120.2) and must hold `calib_min_nodes_per_set` nodes, else the check reports "not enough nodes"; the
+far set is not split. (D-121.2) *The loop on davinci* (D-117.2 over the pool; Block 22): every round reruns each cell's
+calibration step on the array with the rules' law of the round before, then the pool's fits [user]; all rounds are
+submitted at once, linked with `-W depend=afterokarray` / `afterok`, and a round whose predecessor converged exits at once
+[user]; it stops when the anchor $\hat\sigma_0$ and the far slope $\hat\gamma$ each move by less than one SE between two
+rounds, or after 5 rounds [user]. The assistant's readings, PROVISIONAL: the SE is the later round's (the pooled cell
+bootstrap, D-118.3); while the far set holds fewer than 10 nodes its diagnostic slope is fed back, as in D-117.2; the
+production kernel is not touched (the rules' law is a calibration setting, D-117.2's reading); Cell 7 keeps 3 rounds
+(D-117.2).
+
+**Why [user; doc].** **[user]** as quoted. **[doc]** procedure s.3.10 ("Depth dependence | Eq. (4) on shallow vs deep nodes
+in the slice"); the optics notes (index mismatch: aberration with depth). The array's calibration step took 964 s on the
+pilot in Colab (the 2026-11-10 run) **[data]**; 51 cells run in parallel on davinci.
+
+**What it does not decide [open].** Which plane is the stack's first relative to the coverslip (the split's sign is
+reported, not interpreted); the far set by depth; whether a real depth effect makes depth an axis of the kernel or
+restricts the calibration's depth range (procedure s.3.10's two options); the loop's behaviour when a round's far fit
+fails (D-117.2's reading: the previous slope kept).
+
+**Sources.** **[user]** 2026-11-10, 16:37 and the dialog. **[doc]** `TEEG_diameter_bias_table_procedure_2026-10-04.md`
+s.3.10; `TEEG_diameter_optics_notes.md`.
+
+**Status:** active; not implemented (Blocks 19.9, 10.L and 22 drafted next).
+
+---
+
 ## D-122 -- Block 9's ("Block 4b") open points: $B_v$ = 50 refits per sweep at $M$ = 1000, a failed refit left out and counted, a failed sweep's twin carries the cell's whole law (user)
 
 **Renumbered 2026-11-12.** Logged on 2026-11-11 as D-117, with points D-117.1 to D-117.3; that number, with the others from D-117 to D-121, had already been taken by the diameter calibration chat in the log copy on `sci/diameter-pipeline` (this log's 2026-11-12 row). The commits of 2026-11-11 keep the old number.
@@ -9663,7 +10029,62 @@ tilt cannot be read); Stage 7's cohort size (S7).
 of 2026-11-11, §4 (the proposals). **[src]** SPEC's tools section (G12, 2026-10-20) and §8 (14 of 18 cells with two
 SS sweeps).
 
-**Status:** active; Block 6's SPEC entry not written (after Block 9's code). [updated 2026-11-12: Block 9's code written, `2171519`; Block 6's SPEC entry is next]
+**Status:** active; Block 6's SPEC entry not written (after Block 9's code). [updated 2026-11-12: Block 9's code written, `2171519`; Block 6's SPEC entry is next] [updated 2026-11-12 (later): Block 6's open points answered, D-125; its SPEC entry drafted]
+
+---
+
+## D-125 -- Block 6, the noise-fit run on davinci: one PBS array job per cell, then a merge, within a 120-core cap; the outputs as proposed; the S0-S3 checks dropped for now; a refused or failed cell recorded and skipped; a full-size pilot whose two cells are kept (user)
+
+**Date:** 2026-11-12, 18:52 (Europe/Rome), the noise-fit chat. **Binds:** Block 6 (`run_noise_fit.py`,
+`submit_noise_fit.sh`, its SPEC entry); the noise-fit run on davinci (D-123, D-124); D-055 (the S0-S3 checks); roadmap
+allen-mtg-fit N6.
+
+**Decision [user].** To the five questions put at 18:41 (job layout, outputs, the S0-S3 checks, a refused cell, the
+pilot), the user answered: "1) Job layout: i could run it overnight so keep a. Remember that you have a cap of 120 cores
+2) Outputs: agreed 3) Incorporate the updated decisions. However for now drop the checks 4) as you propose 5) Full + keep".
+
+**Statement.**
+(D-125.1) Job layout (a): one PBS array over the cohort's cells, each array job running Blocks 3, 4 and 9 for its cell in
+sequence, then one merge job writing the group tables; the run goes overnight and never holds more than 120 cores at
+once. The assistant's reading, to confirm: each cell job takes 6 cores (18 x 6 = 108 <= 120) and runs Block 9's sweeps in
+a pool of 6 processes (`run_sweep` per sweep, then `pool_cell`, identical to `fit_sweeps`: Block 9's smoke P9), with the
+BLAS threads pinned to 1.
+(D-125.2) Outputs: per cell one JSON (its status, Block 4's `CellFitResult.to_dict()`, Block 9's
+`SweepStageResult.to_dict()`); per group `noise_cells_<GROUP>.csv` (one row per cell) and `noise_sweeps_<GROUP>.csv`
+(one row per sweep, Block 9's `table_rows()`), under `$IH_OUTPUT_BASE/noise_fit/<RUN_TAG>/<GROUP>/`.
+(D-125.3) The S0-S3 checks of D-055 are dropped from Block 6 for now: no `sens_*.py` is written and the run does not wait
+for them. "Incorporate the updated decisions", read as: D-055 is brought up to date here by listing what later decisions
+superseded in it (the assistant's reading) -- the twins' tilt, D-055's $\sigma_b$ = 0.10 mV/s and the (D-034.1) estimate
+$\hat\sigma_b$, is replaced by each twin sweep's fixed realised tilt $\hat b(c,s)$ (D-102, D-107), so S1's "$\hat\sigma_b$
+measured" is void; the tilt alternation D-051 (iii) has left the fit (D-107.2: the simulator carries the real tilts); the
+window-start estimator D-051 (iv) and its subtraction are replaced by the decay start and the per-sample median
+subtraction with the tilt offsets removed (D-103, D-110, D-111, D-115), which is what S2 (c)'s "subtraction on" now
+means; the twins carry the per-sweep laws of Block 9 (D-073, D-116, D-122). The predictions whose object still exists
+stand as fixed; all are re-read with the user before the checks are scheduled.
+(D-125.4) A cell refused by Block 4 (D-114: a sweep tilt that cannot be read), or whose fit fails or raises, is recorded
+with its status and reason in its JSON; the other cells go on; the merge lists the refused and failed cells, which get no
+twins.
+(D-125.5) On davinci: the FULL cluster gates, a dry run (`DRY_RUN=1`), then the pilot on 508282493 and 569844159 at full
+size (Blocks 4 and 9's defaults: M = 3000, R = 600 and 3000, B_boot = 2000, B_v = 50, M_refit = 1000), whose timings set
+the walltime of the 18-cell run; the pilot's two cells are kept as part of that run: the same run tag, and a cell whose
+JSON was written by the same code commit is not run again.
+
+**Why [user; reasoning].** **[user]** as quoted. **[reasoning]** One job per cell keeps the moving parts few; the cap
+admits 6 cores per cell for 18 cells, and Block 9's sweeps are independent by construction (SPEC 2.5 (h)), so a pool over
+them shortens a cell's wall time without changing a number (P9). Keeping the pilot's cells saves hours of fits when the
+code has not changed.
+
+**What it implies for code and tables.** Block 6's SPEC entry (2026-11-12) and code: `run_noise_fit.py` (`list`,
+`cell`, `merge`), `submit_noise_fit.sh` (the PBS array at `select=1:ncpus=6`, the merge job after it, the roadmap marker
+lines, `DRY_RUN`), a smoke suite. Roadmap N6's summary loses S0-S3.
+
+**What it does not decide [open].** The walltime (the pilot's); the S0-S3 checks' place on the roadmap and the re-reading
+of their predictions; Stage 7's cohort size (S7); the core count, if the reading of D-125.1 is not confirmed.
+
+**Sources.** **[user]** 2026-11-12, 18:52, the answers quoted. **[log]** D-055, D-102, D-103, D-107, D-110, D-111, D-114,
+D-115, D-116, D-122 to D-124. **[src]** SPEC §2.5 (h); Block 9's smoke P9.
+
+**Status:** active; Block 6's SPEC entry drafted 2026-11-12; its code not written.
 
 ---
 
@@ -9954,3 +10375,22 @@ the findings of its abstract); optics v1.5 (on `main`). **[KB]** D-024 (i), D-06
 
 **Status:** idea; the user studies its optics first (roadmap T7, open) **[user]**; not scheduled in the
 diameter plan. [updated 2026-10-26, 16:48: promoted by **D-084** (user) to be the renderer actually used once built; its optics (T7) first] [updated 2026-10-27: built as SPEC Block 21 (**D-092**), smoke-tested, not yet the default; T7 still open]
+
+---
+
+## I-005 -- The node's own noise along the measuring line, included in the fits at that node; to discuss later
+
+**Date:** 2026-11-10, 16:18 (Europe/Rome), the diameter calibration chat. **Concerns:** the fits along a node's measuring
+line -- the tube fit (Block 3), the per-node chain (Block 5), the SGT plane fit (Blocks 12-13) and the calibration's
+per-plane fits (Blocks 10, 15, whose goodness-of-fit cut and SNR rule already read a noise level, D-101, D-117.3); roadmap
+T12.
+
+**Idea [user].** "I would like also to add a branch in the roadmap where we discuss how to include the node's specific
+noise along the measuring line. It is difficult to integrate but we will see afterwards". The assistant's reading: each
+node's own noise along its measuring line -- as opposed to one noise description for all nodes -- would enter the fits at
+that node; how is to be discussed.
+
+**What it changes now.** Nothing in the code or the plan. Recorded as the roadmap's theory stage T12, status open, under
+TG2, linked to I5, I10, I15.
+
+**Status:** idea; roadmap T12 open; not scheduled.
