@@ -170,6 +170,7 @@ the "Binds" column.
 | 2026-11-13 (later, 11) | No new decision ID (the diameter chat, 18:30). **Wave 2 merged**: all six blocks passed the gate (own files only, the contract an ancestor, check 1 by the orchestrator, each suite rerun on the merged tree) -- Block 25 `9fde671` (one blur per slab, D-134: against Block 4 at most 1.6e-15), 26 `b3e2fc0` (against Block 4 at most 2.8e-4, bound 1e-3), 28 `705eee5`, 29 `130a722`, 30 `ab8c6ee`, 31 `cd4ab5a`; SPEC statuses of Blocks 23-31 at `70ea68a` on `sci/diameter-pipeline`, pushed. No change to the mathematics, units, conventions, estimators, validation targets or tolerances beyond D-131, D-134 and D-135. **Open finding (cost, for the user)**: Block 26's hybrid at the production configuration (tube half-length 10 um, 16 x 32 directions) takes 4.9-7.8 s per call at 0.3 um, 58-92 s at 1.0 um and 313-397 s at 2.0 um (the implementer's timings, one core, not rerun by the orchestrator), about 1.5 times faster than Block 4; a per-node fit of some hundreds of calls is then hours per thick node. Evidence for the tier boundary (Block 28's table, rerun by the orchestrator): the residual of subtracting a lone-rendered hybrid neighbour is 0.34 gl at 1 um for flat tubes and 11.5, 2.2, 0 gl at 1, 2, 3 um for tubes at 45 deg (radius 0.25 um, mu 3 /um, B 210 gl). The final check of the merged waves 1 and 2 is running on an Opus tester (incremental, Blocks 23-31, commit `70ea68a`). |
 | 2026-11-13 (later, 12) | Logs **D-136** [orchestrator] (the diameter chat, 19:40; coding directives 7 and 9). **Final check of waves 1 and 2 by an Opus tester: PASS WITH ISSUES** at `70ea68a` (report `specs/test_reports/2026-11-13_1830_incremental.md`, tests `a8d189d`): no wrong number; 51 of 52 smoke suites pass (the one error a sandbox artefact of the git worktree, not a regression), 69 of 69 earlier spec tests, 81 of 92 new ones, the 11 failures reproducing five MINOR findings. The chain Block 24 -> 25 -> 28 returns the node alone to 3.7e-13 gl (partition) and 4.3e-13 gl (hybrid, one neighbour). The orchestrator fixed F1, F2, F3, F5, F8 and amended SPEC for S1-S8 (`2273d5e`); F4 and F10 kept as designed. |
 | 2026-11-13 (later, 13) | Logs **D-137** (user, 17:23; the diameter chat): the cost of the hybrid per-node fit is met with the three measures together -- one cross-section extruded along the tube, 8 x 16 ray directions, and a tube no longer than the blur's reach around the measuring line -- as a new block of wave 3 tested against Block 26; the davinci runs will be heavily parallel; first the pilot's nodes in Colab. Also at the user's word the two spec tests that failed by design were adapted to the amended contract (`90a56af` on `sci/diameter-pipeline`); the tester's 92 new spec tests now pass (92 of 92, rerun by the orchestrator). |
+| 2026-11-13 (later, 14) | Logs **D-138** (user, 17:37, "All yes"; the diameter chat): wave 3's plan approved; Block 35 within 2e-4 of the background of Block 26 at equal ray directions, the 8 x 16 against 16 x 32 difference reported without a bound; nodes where the extrusion does not hold are flagged and skipped in the first Colab run; that run uses the survey's 20 example nodes, a skipped one replaced by the next of its class. With it one point of the orchestrator's (D-138.4): the coarse refinement's predictor in the pipeline is the fast line renderer of the node's local straight tube. **Wave 3's contract committed** (`f0c1fba` on `sci/diameter-pipeline`: SPEC section "Blocks 32, 34, 35", `InferenceConfig.ray_n_rho` 8 and `ray_n_psi` 16, `shadow_depth_bin_um` removed, three stubs and skeletons, roadmap I32, I34, I35) and three Opus implementers started. The Colab cells are not ready: they need these three blocks and the two scripts. Nothing of wave 3 verified yet. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -324,6 +325,7 @@ would be needed*, *Status*.
 | D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
 | D-133 | 2026-11-13 | SPEC Blocks 25 (amendment 2), 28, 29, 30, 31 at `38f7c19`; `CleaningConfig`, `InferenceConfig` | wave 2's validation targets, tolerances and provisional parameters, proposed by the orchestrator at the wave's start: exact inverse of the cleaning 1e-9 gl; recovery 1e-6 and unbiasedness within 3 SE for the two fits; coverage 60-76 % and chi2/N within 10 % of 1 for the per-node fit; hybrid column sum 1e-10 and faint limit 5e-3 for the shadow model; renderers passed as callables [orchestrator] | active |
 | D-134 | 2026-11-13 | SPEC Block 25 (amendment 3); D-132.1 | a tier-1 neighbour's shadow is equations (5-6) for the neighbour rendered alone: one blur per slab, under the hybrid's absorbed light; one kernel per column is dropped [user] | active; supersedes the "one blur per column" clause of D-132.1 |
+| D-138 | 2026-11-13 | SPEC Blocks 32, 34, 35 at `f0c1fba`; the wave-3 scripts and notebook Cells 16-18 | wave 3 approved; the fast line renderer within 2e-4 of Block 26 at equal directions; nodes near a branch point or a stretch's end flagged and skipped for now; the first Colab run on the survey's 20 example nodes [user]; the coarse refinement predicts with the fast line renderer [orchestrator] | active |
 | D-137 | 2026-11-13 | the per-node fit's forward model (SPEC Block 26's successor, wave 3); `InferenceConfig` | the hybrid line renderer is made fast by (1) computing the absorbed light on one cross-section and extruding it along the straight tube, (2) 8 x 16 ray directions, (3) a tube cut to the blur's reach around the measuring line; Block 26 stays as the reference; davinci runs parallel over nodes; first on the pilot in Colab [user] | active |
 | D-136 | 2026-11-13 | SPEC Blocks 1, 24, 25, 27, 28, 29, 30, 31 (section "Final check of waves 1 and 2: amendments") at `2273d5e` | the final check's findings settled: a node's own stretch excludes the prepended parent node (the segment to the parent is a neighbour); $v_0$, $\Delta z$ are total offsets from the traced position; a non-finite forward at any evaluation fails the start; `figure_rounds(history, cfg)`; the two new config sections validated; two wordings of Block 24's oracles corrected [orchestrator] | active |
 | D-135 | 2026-11-13 | SPEC Block 25 (amendment 3), Block 28 (amendment 1) at `fd0ab93` | wave 2's contract amended on the implementers' issues: Block 25 agrees with Block 4 to 1e-9 (was two provisional bounds), `shadow_depths` a sanity check at 0.3 um, the depth-bin oracle dropped, the soma a Beer-Lambert sphere; `clean_block` takes `cfg`; the hybrid bound of Block 28 withdrawn for a measured table [orchestrator] | active |
@@ -10908,4 +10910,40 @@ a node may be for the extrusion to hold; the tier boundary; O12.
 **Sources.** **[user]** the message quoted. **[run, sandbox]** and **[SPEC]** as tagged.
 
 **Status:** active; the block is to be specified with wave 3's plan.
+
+
+## D-138 -- Wave 3 approved: the fast renderer's tolerance, nodes where the extrusion fails are skipped, the first Colab run on the 20 example nodes (user); the coarse refinement predicts with the fast renderer [orchestrator]
+
+**Date:** 2026-11-13, 17:37 (Europe/Rome), the diameter chat; the user's "All yes" to the wave-3 plan and its three
+questions, and "Deliver me here the colab code to run everything if is ready".
+**Binds:** SPEC section "Blocks 32, 34, 35" at `f0c1fba` on `sci/diameter-pipeline`; `scripts/clean_cell.py`,
+`scripts/infer_nodes.py`, notebook Cells 16 to 18.
+
+**Decision [user].** "All yes."
+
+**Statement.** (D-138.1) Block 35 (the fast line renderer of D-137) agrees with Block 26 on the same tube with the same
+ray directions to $\max |\tau^{\rm fast} - \tau^{\rm Block\,26}| \le$ 2e-4 ($\tau$ the transmittance read on the
+measuring line, dimensionless; 2e-4 is about 0.04 gl at a background of 210 gl); the difference between 8 x 16 and
+16 x 32 directions is reported without a bound. (D-138.2) A node whose measuring line lies nearer to an end of its
+straight tube than the blur and the oblique rays reach (a branch point, a stretch's end) is flagged and skipped in the
+first Colab run; no fallback to Block 26 for now. (D-138.3) The first Colab run takes the contamination survey's 20
+example nodes (4 clean, 6 diffuse, 6 close and in focus, 2 overlap, 2 nearest the soma; D-130.O7); a skipped node is
+replaced by the next of its class. (D-138.4) [orchestrator] In the pipeline the coarse refinement of a node (Block 29,
+called by Block 32) predicts the node's shadow with the fast line renderer of the node's local straight tube, not with
+Block 25's `stretch_profiles`. Agreed before (Block 29's entry): `stretch_profiles`. Wave 3 is Blocks 32 (the cleaning
+iteration), 34 (inference figures) and 35; Block 33 (recovery on phantoms) follows in wave 4.
+
+**Why.** (4): Block 25 under the hybrid takes 0.6 to 5.4 s per segment and a refinement some tens of calls per node
+and round **[run, sandbox: the Block 25 implementer's timings]**; the fast renderer caches the cross-section, and it is
+the model the fine fit uses, so the two fits agree on what a node's shadow is [reasoning].
+
+**What it implies for code and tables.** The contract at `f0c1fba`. The Colab cells exist only after wave 3's merge and
+the two scripts.
+
+**What it does not decide [open].** What becomes of the skipped nodes (a fallback, or a model with a cap or a branch);
+the tier boundary; O12.
+
+**Sources.** **[user]** the message quoted. **[run, sandbox]** as tagged. **[SPEC]** `f0c1fba`.
+
+**Status:** active; the implementers are running, nothing verified yet.
 
