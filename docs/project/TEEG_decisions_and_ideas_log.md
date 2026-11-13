@@ -171,6 +171,7 @@ the "Binds" column.
 | 2026-11-13 (later, 12) | Logs **D-136** [orchestrator] (the diameter chat, 19:40; coding directives 7 and 9). **Final check of waves 1 and 2 by an Opus tester: PASS WITH ISSUES** at `70ea68a` (report `specs/test_reports/2026-11-13_1830_incremental.md`, tests `a8d189d`): no wrong number; 51 of 52 smoke suites pass (the one error a sandbox artefact of the git worktree, not a regression), 69 of 69 earlier spec tests, 81 of 92 new ones, the 11 failures reproducing five MINOR findings. The chain Block 24 -> 25 -> 28 returns the node alone to 3.7e-13 gl (partition) and 4.3e-13 gl (hybrid, one neighbour). The orchestrator fixed F1, F2, F3, F5, F8 and amended SPEC for S1-S8 (`2273d5e`); F4 and F10 kept as designed. |
 | 2026-11-13 (later, 13) | Logs **D-137** (user, 17:23; the diameter chat): the cost of the hybrid per-node fit is met with the three measures together -- one cross-section extruded along the tube, 8 x 16 ray directions, and a tube no longer than the blur's reach around the measuring line -- as a new block of wave 3 tested against Block 26; the davinci runs will be heavily parallel; first the pilot's nodes in Colab. Also at the user's word the two spec tests that failed by design were adapted to the amended contract (`90a56af` on `sci/diameter-pipeline`); the tester's 92 new spec tests now pass (92 of 92, rerun by the orchestrator). |
 | 2026-11-13 (later, 14) | Logs **D-138** (user, 17:37, "All yes"; the diameter chat): wave 3's plan approved; Block 35 within 2e-4 of the background of Block 26 at equal ray directions, the 8 x 16 against 16 x 32 difference reported without a bound; nodes where the extrusion does not hold are flagged and skipped in the first Colab run; that run uses the survey's 20 example nodes, a skipped one replaced by the next of its class. With it one point of the orchestrator's (D-138.4): the coarse refinement's predictor in the pipeline is the fast line renderer of the node's local straight tube. **Wave 3's contract committed** (`f0c1fba` on `sci/diameter-pipeline`: SPEC section "Blocks 32, 34, 35", `InferenceConfig.ray_n_rho` 8 and `ray_n_psi` 16, `shadow_depth_bin_um` removed, three stubs and skeletons, roadmap I32, I34, I35) and three Opus implementers started. The Colab cells are not ready: they need these three blocks and the two scripts. Nothing of wave 3 verified yet. |
+| 2026-11-13 (later, 15) | Logs **D-139** [orchestrator] (the diameter chat, 18:25; coding directive 7): contract amendment 1 of Block 32 on its implementer's issue -- the shadow floor's background in the iteration is the largest of the planes' backgrounds; `shadow_fn`'s signature fixed (`3b145e0` on `sci/diameter-pipeline`). Wave 3 so far: Block 34 passed the gate and is merged (`48ca972`); Block 32's suite passes at its `wip` commit (two tubes started 30 % off return to the truth within 1.2e-6 in 4 rounds, the implementer's run) and it is finalising; Block 35 still running. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -325,6 +326,7 @@ would be needed*, *Status*.
 | D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
 | D-133 | 2026-11-13 | SPEC Blocks 25 (amendment 2), 28, 29, 30, 31 at `38f7c19`; `CleaningConfig`, `InferenceConfig` | wave 2's validation targets, tolerances and provisional parameters, proposed by the orchestrator at the wave's start: exact inverse of the cleaning 1e-9 gl; recovery 1e-6 and unbiasedness within 3 SE for the two fits; coverage 60-76 % and chi2/N within 10 % of 1 for the per-node fit; hybrid column sum 1e-10 and faint limit 5e-3 for the shadow model; renderers passed as callables [orchestrator] | active |
 | D-134 | 2026-11-13 | SPEC Block 25 (amendment 3); D-132.1 | a tier-1 neighbour's shadow is equations (5-6) for the neighbour rendered alone: one blur per slab, under the hybrid's absorbed light; one kernel per column is dropped [user] | active; supersedes the "one blur per column" clause of D-132.1 |
+| D-139 | 2026-11-13 | SPEC Block 32 (amendment 1) at `3b145e0` | the cleaning iteration passes the shadow model one background for its floor, the largest of the node's planes' backgrounds (the cleaning itself stays per plane); `shadow_fn`'s signature; the restart, flag and stop-rule edge rules of the implementer accepted [orchestrator] | active |
 | D-138 | 2026-11-13 | SPEC Blocks 32, 34, 35 at `f0c1fba`; the wave-3 scripts and notebook Cells 16-18 | wave 3 approved; the fast line renderer within 2e-4 of Block 26 at equal directions; nodes near a branch point or a stretch's end flagged and skipped for now; the first Colab run on the survey's 20 example nodes [user]; the coarse refinement predicts with the fast line renderer [orchestrator] | active |
 | D-137 | 2026-11-13 | the per-node fit's forward model (SPEC Block 26's successor, wave 3); `InferenceConfig` | the hybrid line renderer is made fast by (1) computing the absorbed light on one cross-section and extruding it along the straight tube, (2) 8 x 16 ray directions, (3) a tube cut to the blur's reach around the measuring line; Block 26 stays as the reference; davinci runs parallel over nodes; first on the pilot in Colab [user] | active |
 | D-136 | 2026-11-13 | SPEC Blocks 1, 24, 25, 27, 28, 29, 30, 31 (section "Final check of waves 1 and 2: amendments") at `2273d5e` | the final check's findings settled: a node's own stretch excludes the prepended parent node (the segment to the parent is a neighbour); $v_0$, $\Delta z$ are total offsets from the traced position; a non-finite forward at any evaluation fails the start; `figure_rounds(history, cfg)`; the two new config sections validated; two wordings of Block 24's oracles corrected [orchestrator] | active |
@@ -10946,4 +10948,31 @@ the tier boundary; O12.
 **Sources.** **[user]** the message quoted. **[run, sandbox]** as tagged. **[SPEC]** `f0c1fba`.
 
 **Status:** active; the implementers are running, nothing verified yet.
+
+
+## D-139 -- Contract amendment 1 of wave 3, Block 32: the background the shadow floor reads; `shadow_fn`'s signature [orchestrator]
+
+**Date:** 2026-11-13, about 18:25 (Europe/Rome), the diameter chat, settled by the orchestrating session under coding
+directive 7 on the issue the Block 32 implementer raised; the user was not asked and can reverse it.
+**Binds:** SPEC Block 32 (`analysis/clean_iteration.py`), amendment 1 at `3b145e0` on `sci/diameter-pipeline`.
+
+**Decision [orchestrator].** Two clauses are stated; D-130.O5's floor and the approach stand.
+
+**Statement.** (D-139.1, convention) For node $i$ with per-plane backgrounds $B_{i,k}$ (gl), the iteration's default
+shadow model is called with the single background $\max_k B_{i,k}$, which Block 25 uses only to decide which neighbours
+fall under `shadow_floor_gl` (0.3 gl) and are left out. The cleaning $I^{(t)}_{i,k} = I_{i,k} + B_{i,k} S^{(t)}_{i,k}$
+uses each plane's own $B_{i,k}$. Agreed before: the entry passed the per-plane array, which Block 25 does not accept.
+(D-139.2, interface) `shadow_fn(fscene, own_ids, left, top, width, height, planes_z, cfg, B_gl, include) -> S`.
+
+**Why.** Block 25's floor reads a scalar (`float(B_gl)` raises on an array) **[the implementer's report, `692b906`]**.
+With the largest background no neighbour above the floor in any plane is dropped; one just under it may be kept, which
+costs time and not accuracy [reasoning].
+
+**What it implies for code and tables.** Block 32 only.
+
+**What it does not decide [open].** A per-plane floor in Block 25, if the backgrounds of a patch prove to differ much.
+
+**Sources.** **[src]** `wip/diameter-pipeline-block-32` at `692b906` (local). **[SPEC]** `3b145e0`.
+
+**Status:** active; the implementer is applying it.
 
