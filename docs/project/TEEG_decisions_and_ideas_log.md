@@ -161,6 +161,7 @@ the "Binds" column.
 | 2026-11-13 (later, 2) | No decision changed (the noise-fit chat). **D-123 to D-126 implemented**: Block 6's code written, smoke-tested and pushed (`run_noise_fit.py`, `submit_noise_fit.sh`, `smoke_noise_run.py`, `1d848f6`: R1-R9 9/9 in the sandbox, 26 planted defects each caught) -- one PBS array subjob per cell at 6 cores, Block 9's sweeps in a pool of 6 processes, the BLAS threads at 1, then the merge job, never more than 120 cores (D-125.1, D-126; smoke R1, R7, R9); per cell a JSON and per group `noise_cells_<GROUP>.csv` and `noise_sweeps_<GROUP>.csv` (D-125.2; R5); a refused or failed cell recorded with its reason, exit 0, the run goes on (D-125.4; R2, R3); the resume rule by the noise-fit code's last commit (D-125.5; R4). The assistant's additions are flagged in SPEC Block 6's as-built notes, not decisions: the resume rule also on the sizes and on clean code; `DRY_RUN` runs the read-only `list` and the driver's parser on the jobs' arguments; a run file in `~/noise_fit_runs/` carries the paths (they hold spaces) and the cohort to the jobs; a `SIZES` knob. D-124, D-125 and D-126 annotated (entries and index). Next: the run on davinci (the Block 6 handoff, §4). Next free IDs: D-129, I-006. |
 | 2026-11-13 (later, 3) | No decision changed (the audit chat). **The audit's six tester runs finished** (08:30-10:57, Opus agents, D-127.4); every verdict PASS WITH ISSUES, no BLOCKER. Run N (noise fit, full, `64a2cbe`): 2 MAJOR -- `sample_acf` returns (n-L)/n instead of NaN on a flat window whose float mean carries roundoff (D-029 (iii)); an LS sweep with one non-finite current sample is dropped without a flag (SPEC 2.2) -- 4 MINOR, 8 NOTEs; Block 6 not in the tested commit. Runs D1-D5 (diameter, incremental `128fdce..1555036`): D2 1 MAJOR (diagnostic only: `node_planes.py` reports the deliverable's d_hat as the pilot's), MINOR 2 (D1), 3 (D2), 6 (D3), 4 (D4), 7 (D5), and NOTEs; for the project, D1's NOTE F5 (the deliverable SGT fit reads d_hat/d 0.63-0.69 on three thin faint phantoms, where D5's 0.2 flag would send nodes to the fill). Delivered as a night run's: spec tests and reports on `tester/2026-11-13-0830-incremental` (`b23645f`) and `tester/2026-11-13-0830-full` (`27c709d`); the reports of D1-D4 on `sci/diameter-pipeline` (`34a5196`), N's on `main` (`23b4f41`), their "Triage for the project" tables for the project chats. D5's report is not in the repository: the harness refused the agent's write of the file, the report came back as text, and whether the assistant saves it is put to the user. D-127 annotated (entry and index). Written after re-reading this log (changed since the 2026-11-13 row by the rows (later) and (later, 2) of two other chats; merged, nothing of theirs edited). Next free IDs: D-129, I-006. |
 | 2026-11-13 (later, 4) | Logs **D-129** (user, 12:35 and 13:01; the diameter chat on the renderer and the inversion per node): the real measuring lines are polluted by other branches' shadows while the table's phantoms are clean -- the cleaning first (the traced neighbours' predicted shadows removed, iteratively, the neighbours' features starting at Allen's diameters and updated by a coarse fit), then option 2 (the node's features by optimisation on the cleaned data, no table), its results judged, option 1 (the table on cleaned lines) only if they are not satisfactory; first on the pilot cell in Colab, with the patch images and the measuring line before and after on several example nodes. **Roadmap diameter-pipeline: NC, NC1-NC4 added** (`0274ce8`), planned, no block yet; the plan `Passive Features/Diameter Re-measurement/docs/TEEG_diameter_cleaning_inference_plan_2026-11-13.md` (`599d865`): steps C0-C7, F1-F5, E and twelve open choices. A toy check behind the entry's Why **[run, sandbox]**. Nothing superseded: the table route S5-S8 stands. Two theory topics proposed, not added. Written after re-reading this log at `10acd5e` (unchanged since the 2026-11-13 (later, 3) row). Next free IDs: D-130, I-006. |
+| 2026-11-13 (later, 5) | Logs **D-130** (user, 14:35; the diameter chat on the cleaning and option 2): the answers to the open questions of D-129's plan -- the waves approved, the choices O1-O7 and O9-O11 settled (the hybrid in the per-node fit; every neighbour's shadow removed wherever it falls; the axon a neighbour; no depth cut-off; the neighbours from the first-stage fit, then refined; 20 example nodes), O8 after the survey, O12 at the judgment; the production table and the inversion (S7-S8) paused. **Roadmap diameter-pipeline: T14 and T15 added, open** (the user: "both add"), I23-I27 under NC1 and NC2 (`4a1d1e1`). SPEC Blocks 23-27 drafted with proposed tolerances (`e414f04`); the plan updated (`9cf01f2`). The orchestrating session runs on Fable 5.2. Written after re-reading this log (unchanged since the 2026-11-13 (later, 4) row). Next free IDs: D-131, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -310,6 +311,7 @@ would be needed*, *Status*.
 | D-127 | 2026-11-13 | the code changed 2026-10-13 to 2026-11-12 that no SPEC covers; both SPECs' Coverage and Blocks (diameter on `sci/diameter-pipeline`, noise fit on `main`); the reports and spec tests of the audit runs N, D1-D5 | specified before it is tested: the checks behind decided values and the two Colab notebook scripts, one SPEC block per study, the document figure scripts left out; the audit's results delivered like a night run's [user] | active; runs N, D1-D5 started 2026-11-13 [updated 2026-11-13 (later, 3): all six finished; results delivered, D5's report pending]; Block 23 drafted, not committed |
 | D-128 | 2026-11-13 | every roadmap's theory topics (`specs/roadmap/<name>.yaml`, the `note` field); the chats that write a document for a topic | a topic's note names every document written for it, by file name, with where it lives [user] | active; applied to diameter-pipeline at `52d7722`, `ca6d900`, `c95ae05` (T4.2, T7, T11) |
 | D-129 | 2026-11-13 | the correction of a real node's diameter (SPEC Blocks 4, 5, 13, 14); the scene and the neighbour-shadow predictor (Block 10.S); `notebooks/phase2_colab.py`; roadmap NC, NC1-NC4; the plan `TEEG_diameter_cleaning_inference_plan_2026-11-13.md` | a real node's measuring line is cleaned of its traced neighbours' predicted shadows, iteratively from Allen's diameters with a coarse fit for the neighbours; then option 2, the node's features by optimisation without a table; option 1, the table on cleaned lines, only if option 2 is not satisfactory; first on the pilot cell in Colab, with before/after patches and lines on example nodes [user] | active; not implemented; roadmap `0274ce8`, plan `599d865` on `sci/diameter-pipeline` |
+| D-130 | 2026-11-13 | SPEC Blocks 23-34; `CleaningConfig`, `InferenceConfig`; the plan's choices O1-O12; roadmap NC, T14, T15, S7, S8 | the choices of the cleaning and of option 2: the waves approved; a round updates diameter, coefficient, lateral offset and depth; the axon a neighbour where traced; no depth cut-off on neighbours; every shadow removed wherever it falls; the neighbours from the first-stage fit, then refined; the hybrid in the per-node fit, on as many planes as necessary; scenes by Eqs. 5-6 on several tubes; 20 example nodes; S7-S8 paused; T14 and T15 added [user] | active; Blocks 23-27 drafted at `e414f04`, not implemented |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
@@ -10560,3 +10562,59 @@ and a toy computation, no literature claim.
 
 **Status:** active; not implemented. Roadmap NC, NC1-NC4 added at `0274ce8`, the plan at `599d865`, both on
 `sci/diameter-pipeline`.
+
+## D-130 -- The choices of the cleaning and of option 2 (user): the waves approved; four features updated; the axon a neighbour; no depth cut-off; every shadow removed wherever it falls; the neighbours from the first-stage fit, then refined; the hybrid in the per-node fit; 20 example nodes; S7-S8 paused; T14 and T15 added
+
+**Date:** 2026-11-13, 14:35 (Europe/Rome), the diameter chat of 2026-11-13, in answer to the open questions put at
+14:17. **Binds:** SPEC Blocks 23-34 (23-27 drafted at `e414f04`); `CleaningConfig`, `InferenceConfig` (not written
+yet); the plan `Passive Features/Diameter Re-measurement/docs/TEEG_diameter_cleaning_inference_plan_2026-11-13.md`
+(choices O1-O12); roadmap diameter-pipeline (NC, T14, T15; S7, S8).
+
+**Decision [user].** "Before anything starts: As you propose, for q4 both add. Before wave 1: O3 yes all four. O4 also
+the axon if traced. O5 I would say as many planes as a neighbouring node could cast a shadow that polluts the image. the
+patch is ok. O10 hybrid. O11 ok. Q5 propose. Before wave 2: O1: given the neighbouring node, calculate the casted shadow
+and just remove it. independently where it is (even if it is direvly above or below). O2 Start by fitting the nodes by
+the pilot fit, then just refine to explain the observed shadow. O9 as you propose, and as many planes as neccesary. Q6
+yes. Before wave 3: O6 Perfect. After the survey runs in Colab: O7 do 20. O8 Decide afterwards. Go on".
+
+**Statement.** (Q1) The three waves of Blocks 23-34 are approved, the joint fit with a close neighbour held back
+[user: "as you propose"]. (Q2) "The cell in Colab" is the pilot cell 529878215 [user]. (Q3) The table route's
+production table and inversion (roadmap S7, S8) are paused while this branch is tried; gate 2 and the davinci pilot (S5,
+S6) may still run [user: "as you propose"]. (Q4) The two theory topics are added [user]: T14 and T15. (O3) A round
+updates a neighbour's diameter, absorption coefficient, lateral offset and depth [user]. (O4) Neighbours are every
+traced dendrite segment outside the node's own stretch, the soma, and the axon where it is traced [user]. (O5) The patch
+is +-10 um; there is no fixed plane range: as many planes as a neighbour's shadow can reach [user] -- the assistant's
+reading, PROVISIONAL: no neighbour is left out for its depth; it counts whenever its predicted shadow in one of the
+node's planes exceeds a floor in grey levels (0.3 gl, the value of `isolation_depth_gl`). (O10) The absorption model of
+the line renderer and of the per-node fit is the hybrid [user] -- the assistant's reading: `InferenceConfig.absorption`
+= "hybrid"; `RendererConfig.absorption`, the default of the table's phantoms, is not switched by this (D-084.2). (O11)
+The checks' scenes apply Eqs. 5-6 to several tubes at once; the product of separately rendered transmittances stays a
+labelled comparison [user]. (Q5) The tolerances are proposed by the assistant [user: "propose"]. (O1) A neighbour's
+predicted shadow is computed and removed wherever it falls, also when the neighbour is directly above or below the node
+[user]; the assistant keeps a label on such nodes and no exclusion. (O2) The neighbours start from the first-stage fit
+(`measure_pilot`) and are then refined so that the shadow model explains their observed shadow [user]. (O9) The
+per-node fit leaves free the diameter, the absorption coefficient, the lateral offset and the axis depth, tilt and
+heading from the line fit, on as many planes as necessary [user] -- the rule that picks the planes is not decided.
+(Q6) The flag `crossing` is evaluated on the cleaned line [user]. (O6) The rounds stop when every diameter changes by
+less than 1 % and every example line by less than the noise SD, or after 5 rounds [user]. (O7) 20 example nodes [user].
+(O8) Close in-focus neighbours: decided after the survey [user].
+
+**Why.** [user]. The assistant's notes on two answers, stated to the user: (O10) SPEC Block 21's findings -- the
+hybrid's planes go below zero in dark stain (from $\mu d \approx 2$ with the production kernel) and it cost 11.8 to
+432 s on blocks the partition rendered in 2.8 to 8.6 s -- now sit inside a per-node optimiser; Block 26 reports the
+time per call in the three modes. (O1) In the renderer's equations the shadows of two tubes add only when their
+projections do not overlap: the one below receives less light (SPEC 2.3, the partition's $T_{<j}$), so adding back a
+shadow predicted for the neighbour alone is an approximation there; the label marks where.
+
+**What it implies for code and tables.** Blocks 23-27 as drafted in `specs/SPEC.md` (`e414f04`); the scene built with
+SWC types (2, 3, 4); `CleaningConfig.shadow_floor_gl`; `InferenceConfig.absorption = "hybrid"`; the survey picks 20
+example nodes. S7 and S8 are not started; if option 1 is needed its table is rebuilt for cleaned lines (roadmap NC4).
+
+**What it does not decide [open].** The tolerances of Blocks 23-27 (proposed, to be agreed before the contract commit);
+the rule that picks a node's planes (O9); the form of the refinement (O2); O8; O12, what "satisfactory" means; what is
+done with structures that are not traced.
+
+**Sources.** **[user]** 2026-11-13, 14:35. **[SPEC]** Blocks 21, 23-27, section 2.3. **[log]** D-084, D-129.
+
+**Status:** active; Blocks 23-27 drafted, not implemented. Roadmap I23-I27, T14, T15 at `4a1d1e1`; the plan at
+`9cf01f2`, on `sci/diameter-pipeline`.
