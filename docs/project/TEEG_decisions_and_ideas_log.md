@@ -165,6 +165,7 @@ the "Binds" column.
 | 2026-11-13 (later, 6) | No new decision ID (the diameter chat). The user agreed to the tolerances of SPEC Blocks 23-27 (14:45); **wave 1's contract committed** (`68dbe60`, `0aa5305` on `sci/diameter-pipeline`: `CleaningConfig`, `InferenceConfig`, the stubs, the smoke-test skeletons; the configuration suite taught the two sections) and four Opus implementers started on Blocks 23, 24, 26, 27. Block 25 (the shadow image) held: the user's question whether a neighbour's shadow is computed with the hybrid puts its shadow model under revision. D-130 annotated. Next free IDs unchanged: D-131, I-006. |
 | 2026-11-13 (later, 7) | Logs **D-131** [orchestrator] (the diameter chat; coding directive 7): contract amendment 1 of wave 1, on the four issues the Block 27 implementer raised -- three conventions and one validation target of the contamination survey changed (the kernel at the segment's nearest point; the classes' precedence; the out-of-focus oracle at zero lateral distance, the evidence reproduced; the soma outside the profile). SPEC at `faa4f6f`. Block 23 returned and passed the gate, not merged yet; Blocks 24 and 26 running; Block 25 held. Next free IDs: D-132, I-006. |
 | 2026-11-13 (later, 8) | Logs **D-132** (user, 15:29; the diameter chat): the cleaning in two tiers, after Block 24's finding that hybrid shadows of separate tubes do not add. **Roadmap diameter-pipeline: the notes and summaries of T14, T15 and T7 updated** (`fe30e03`), statuses unchanged. Wave 1: Blocks 23, 24, 27 passed the gate and are merged (`e0a8a4e`); Block 26's implementer was stopped by the user before reporting, its worktree holds uncommitted work; Block 25 to be re-specified under D-132.1. Next free IDs: D-133, I-006. |
+| 2026-11-13 (later, 9) | Logs **D-133** [orchestrator] (the diameter chat, 15:45-16:00; coding directives 5 to 7), at the user's word "start the new agent with the same tolerances as before. Start also the second wave": **wave 2's contract committed** (`38f7c19` on `sci/diameter-pipeline`: SPEC section "Blocks 28-31" with Block 25's amendment 2 under D-132.1, the new `CleaningConfig` and `InferenceConfig` fields, five stubs, five smoke-test skeletons, roadmap I28-I31) and **six Opus implementers started**, one per block in its own worktree: Block 26 (restart, the tolerances agreed for wave 1 unchanged) and Blocks 25, 28, 29, 30, 31. The validation targets and tolerances of the new entries are the orchestrator's proposals, reported to the user with the start. The plan document carries a row for D-132 and the wave (`7479c25`); roadmap I25 reworded (`f6f5618`). Evidence: the configuration suite on the contract (6 pass, 0 fail, 1 skip); nothing of the blocks has run yet. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -317,6 +318,7 @@ would be needed*, *Status*.
 | D-130 | 2026-11-13 | SPEC Blocks 23-34; `CleaningConfig`, `InferenceConfig`; the plan's choices O1-O12; roadmap NC, T14, T15, S7, S8 | the choices of the cleaning and of option 2: the waves approved; a round updates diameter, coefficient, lateral offset and depth; the axon a neighbour where traced; no depth cut-off on neighbours; every shadow removed wherever it falls; the neighbours from the first-stage fit, then refined; the hybrid in the per-node fit, on as many planes as necessary; scenes by Eqs. 5-6 on several tubes; 20 example nodes; S7-S8 paused; T14 and T15 added [user] | active; Blocks 23-27 drafted at `e414f04`, not implemented |
 | D-131 | 2026-11-13 | SPEC Block 27 (`analysis/contamination.py`) | contract amendment 1 of wave 1: a segment's nearest point sets both its distance and its blur; `clean` first and attached segments no overlap; the out-of-focus oracle only at zero lateral distance; the soma outside the pollution profile, its distance reported [orchestrator] | active; SPEC amended at `faa4f6f`; the implementer applying it |
 | D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
+| D-133 | 2026-11-13 | SPEC Blocks 25 (amendment 2), 28, 29, 30, 31 at `38f7c19`; `CleaningConfig`, `InferenceConfig` | wave 2's validation targets, tolerances and provisional parameters, proposed by the orchestrator at the wave's start: exact inverse of the cleaning 1e-9 gl; recovery 1e-6 and unbiasedness within 3 SE for the two fits; coverage 60-76 % and chi2/N within 10 % of 1 for the per-node fit; hybrid column sum 1e-10 and faint limit 5e-3 for the shadow model; renderers passed as callables [orchestrator] | active |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
@@ -10701,3 +10703,53 @@ limit of tier 2.
 `e0a8a4e`. **[log]** D-130, D-131.
 
 **Status:** active; not implemented. Roadmap T14, T15, T7 updated at `fe30e03` on `sci/diameter-pipeline`.
+
+## D-133 -- Wave 2 of the cleaning and the per-node inference started: the validation targets, tolerances and provisional parameters of Blocks 25 (amendment 2), 28, 29, 30, 31 [orchestrator]
+
+**Date:** 2026-11-13, about 15:45-16:00 (Europe/Rome), the diameter chat. The user asked for the wave ("start the new
+agent with the same tolerances as before. Start also the second wave"); the numbers below are the orchestrating
+session's proposals under coding directives 5 to 7, reported to the user with the start. The user can change any of them.
+**Binds:** SPEC section "Blocks 28-31" at `38f7c19` on `sci/diameter-pipeline`; `CleaningConfig`, `InferenceConfig`.
+
+**Decision [orchestrator].** The contract of wave 2 is committed and six Opus implementers work on it, one block each:
+Block 26 (restart; its tolerance of 1e-3 of the background against Block 4 in the three absorption modes, agreed by the
+user for wave 1, unchanged) and Blocks 25, 28, 29, 30, 31.
+
+**Statement.** Tolerances and targets, each a proposal. (D-133.1) Block 25, amendment 2 (D-132.1): under `"hybrid"` the
+absorbed fraction of a segment $q$ per column, $A_q(x, y)$ (dimensionless), equals the column sum of Block 21's slab
+absorption on the same grid to 1e-10; at $\bar\mu_q \bar d_q$ = 1e-3 the ratio $A_q / (1.4470\,\bar\mu_q \ell_q)$ is
+within 5e-3 of 1 ($\bar\mu_q$ in 1/um and $\bar d_q$ in um the segment's mean coefficient and diameter, $\ell_q$ in um
+the column's length inside it); `stretch_profiles` equals the profile read on `shadow_image`'s planes to 1e-10; the
+wave-1 targets stand. (D-133.2) Block 28: the cleaned block $I^{\rm clean}_{i,k}(x, y) = I_{i,k}(x, y) + B_{i,k}(x, y)\,
+S_{i,k}(x, y)$ (node $i$, plane $k$, pixel $(x, y)$; $I$ and $B$ in gl, $S$ dimensionless) recovers the node rendered
+alone to 1e-9 gl at $B$ = 210 gl under `partition_vertical` and `linear` for non-overlapping projections; under `hybrid`
+the residual is only bounded, by $B \max (1 - \tau^{(1)})(1 - \tau^{(2)})$, $\tau^{(1)}, \tau^{(2)}$ the two tubes'
+transmittances rendered alone. Tier rule (D-132.2): tier 2 within `close_lateral_um` (2.0 um) and `close_defocus_um`
+(0.84 um) of the node, or an unattached neighbour whose footprint meets the own stretch's within `tier_reach_um` (3.0 um,
+PROVISIONAL); soma discs tier 1. (D-133.3) Block 29: the four parameters $(d, \mu, v_0, \Delta z)$ (diameter in um,
+coefficient in 1/um, lateral shift and depth shift in um) recovered to 1e-6 without noise from a start 30 % off; over
+100 draws of Gaussian noise of SD 3 gl at $B$ = 210 gl the mean $\hat d$ within 3 standard errors of the truth; weights
+$w_n = \exp(-|v_n| / \lambda)$ on the offsets $v_n$ (um), $\lambda$ = `sgt_lambda_um`. (D-133.4) Block 30: recovery
+1e-6; over 300 noisy data sets the interval $\hat d \pm$ SE covers the truth in 60 to 76 % (nominal 68 %), the mean
+$\hat d$ within 3 standard errors, $\chi^2_k / N$ averaging 1 within 10 %; a plane $k$ is used when its predicted dip
+$B_k \max_n (1 - \tau_k(v_n; \theta_0))$ is at least `plane_snr_min` (1.0) times the noise SD $\sigma$ (gl), $\theta_0$
+the start (the rule for D-130.O9, PROVISIONAL). (D-133.5) Blocks 28 to 30 take their renderer as a callable argument,
+so each is checked before Blocks 25 and 26 exist. (D-133.6) Bounds of the two fits, PROVISIONAL: $d \in [0.1, 6]$ um,
+$\mu \in [0.01, 10]$ /um, shifts within 1 um.
+
+**Why.** The exact-inverse tolerance is float64 roundoff at 210 gl; the coverage band is the binomial 3-SD interval of
+0.68 over 300 draws (0.68 +/- 0.08); the 5e-3 on the faint limit follows Block 21's accuracy at 8 x 16 directions
+[SPEC Block 21]; the hybrid's bound is the cross term measured on Block 24 (0.020 of the background for two 0.5 um tubes
+1 um apart) [run, sandbox, D-132]. [reasoning otherwise]
+
+**What it implies for code and tables.** The five entries, the stubs and the configuration fields at `38f7c19`. No
+existing signature or hash changes.
+
+**What it does not decide [open].** The boundary between the tiers and the cost per node (after Block 26's timings and
+the survey); what "satisfactory" means for option 2 (O12).
+
+**Sources.** **[SPEC]** section "Blocks 28-31" at `38f7c19`. **[run, sandbox]** the configuration suite on the contract:
+6 pass, 0 fail, 1 skip. **[user]** the instruction quoted above; D-129, D-130, D-132.
+
+**Status:** active; the implementers are running, nothing of the blocks verified yet.
+
