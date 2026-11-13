@@ -168,6 +168,7 @@ the "Binds" column.
 | 2026-11-13 (later, 9) | Logs **D-133** [orchestrator] (the diameter chat, 15:45-16:00; coding directives 5 to 7), at the user's word "start the new agent with the same tolerances as before. Start also the second wave": **wave 2's contract committed** (`38f7c19` on `sci/diameter-pipeline`: SPEC section "Blocks 28-31" with Block 25's amendment 2 under D-132.1, the new `CleaningConfig` and `InferenceConfig` fields, five stubs, five smoke-test skeletons, roadmap I28-I31) and **six Opus implementers started**, one per block in its own worktree: Block 26 (restart, the tolerances agreed for wave 1 unchanged) and Blocks 25, 28, 29, 30, 31. The validation targets and tolerances of the new entries are the orchestrator's proposals, reported to the user with the start. The plan document carries a row for D-132 and the wave (`7479c25`); roadmap I25 reworded (`f6f5618`). Evidence: the configuration suite on the contract (6 pass, 0 fail, 1 skip); nothing of the blocks has run yet. |
 | 2026-11-13 (later, 10) | Logs **D-134** (user, 17:05, the dialog of the diameter chat) and **D-135** [orchestrator] (coding directive 7). D-134: a tier-1 neighbour's shadow is blurred slab by slab, not with one kernel per column -- supersedes that clause of D-132.1, after Block 25's implementer measured the one-kernel model off Block 4 by up to 0.225 of the peak out of focus and 0.382 in focus at 0.6-1.0 um, reproduced by the orchestrator in one dimension. D-135: the oracles of Block 25 that follow from it, the soma's absorption, `clean_block`'s signature, and the hybrid bound of Block 28 withdrawn (it fails for tilted pairs) in favour of a measured table. SPEC amended at `fd0ab93`; both implementers resumed. Wave 2 so far: Blocks 29, 30, 31 passed the gate and are merged (`130a722`, `cd4ab5a`, `ab8c6ee`); Block 26 still running. |
 | 2026-11-13 (later, 11) | No new decision ID (the diameter chat, 18:30). **Wave 2 merged**: all six blocks passed the gate (own files only, the contract an ancestor, check 1 by the orchestrator, each suite rerun on the merged tree) -- Block 25 `9fde671` (one blur per slab, D-134: against Block 4 at most 1.6e-15), 26 `b3e2fc0` (against Block 4 at most 2.8e-4, bound 1e-3), 28 `705eee5`, 29 `130a722`, 30 `ab8c6ee`, 31 `cd4ab5a`; SPEC statuses of Blocks 23-31 at `70ea68a` on `sci/diameter-pipeline`, pushed. No change to the mathematics, units, conventions, estimators, validation targets or tolerances beyond D-131, D-134 and D-135. **Open finding (cost, for the user)**: Block 26's hybrid at the production configuration (tube half-length 10 um, 16 x 32 directions) takes 4.9-7.8 s per call at 0.3 um, 58-92 s at 1.0 um and 313-397 s at 2.0 um (the implementer's timings, one core, not rerun by the orchestrator), about 1.5 times faster than Block 4; a per-node fit of some hundreds of calls is then hours per thick node. Evidence for the tier boundary (Block 28's table, rerun by the orchestrator): the residual of subtracting a lone-rendered hybrid neighbour is 0.34 gl at 1 um for flat tubes and 11.5, 2.2, 0 gl at 1, 2, 3 um for tubes at 45 deg (radius 0.25 um, mu 3 /um, B 210 gl). The final check of the merged waves 1 and 2 is running on an Opus tester (incremental, Blocks 23-31, commit `70ea68a`). |
+| 2026-11-13 (later, 12) | Logs **D-136** [orchestrator] (the diameter chat, 19:40; coding directives 7 and 9). **Final check of waves 1 and 2 by an Opus tester: PASS WITH ISSUES** at `70ea68a` (report `specs/test_reports/2026-11-13_1830_incremental.md`, tests `a8d189d`): no wrong number; 51 of 52 smoke suites pass (the one error a sandbox artefact of the git worktree, not a regression), 69 of 69 earlier spec tests, 81 of 92 new ones, the 11 failures reproducing five MINOR findings. The chain Block 24 -> 25 -> 28 returns the node alone to 3.7e-13 gl (partition) and 4.3e-13 gl (hybrid, one neighbour). The orchestrator fixed F1, F2, F3, F5, F8 and amended SPEC for S1-S8 (`2273d5e`); F4 and F10 kept as designed. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -322,6 +323,7 @@ would be needed*, *Status*.
 | D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
 | D-133 | 2026-11-13 | SPEC Blocks 25 (amendment 2), 28, 29, 30, 31 at `38f7c19`; `CleaningConfig`, `InferenceConfig` | wave 2's validation targets, tolerances and provisional parameters, proposed by the orchestrator at the wave's start: exact inverse of the cleaning 1e-9 gl; recovery 1e-6 and unbiasedness within 3 SE for the two fits; coverage 60-76 % and chi2/N within 10 % of 1 for the per-node fit; hybrid column sum 1e-10 and faint limit 5e-3 for the shadow model; renderers passed as callables [orchestrator] | active |
 | D-134 | 2026-11-13 | SPEC Block 25 (amendment 3); D-132.1 | a tier-1 neighbour's shadow is equations (5-6) for the neighbour rendered alone: one blur per slab, under the hybrid's absorbed light; one kernel per column is dropped [user] | active; supersedes the "one blur per column" clause of D-132.1 |
+| D-136 | 2026-11-13 | SPEC Blocks 1, 24, 25, 27, 28, 29, 30, 31 (section "Final check of waves 1 and 2: amendments") at `2273d5e` | the final check's findings settled: a node's own stretch excludes the prepended parent node (the segment to the parent is a neighbour); $v_0$, $\Delta z$ are total offsets from the traced position; a non-finite forward at any evaluation fails the start; `figure_rounds(history, cfg)`; the two new config sections validated; two wordings of Block 24's oracles corrected [orchestrator] | active |
 | D-135 | 2026-11-13 | SPEC Block 25 (amendment 3), Block 28 (amendment 1) at `fd0ab93` | wave 2's contract amended on the implementers' issues: Block 25 agrees with Block 4 to 1e-9 (was two provisional bounds), `shadow_depths` a sanity check at 0.3 um, the depth-bin oracle dropped, the soma a Beer-Lambert sphere; `clean_block` takes `cfg`; the hybrid bound of Block 28 withdrawn for a measured table [orchestrator] | active |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
@@ -10832,4 +10834,39 @@ table is the evidence for the tier boundary `close_lateral_um`.
 `-block-28` at `6c477bd` (local).
 
 **Status:** active; both implementers are applying it.
+
+
+## D-136 -- The findings of the final check of waves 1 and 2 settled: the own stretch, total offsets, non-finite forwards, `figure_rounds`' signature, configuration validation [orchestrator]
+
+**Date:** 2026-11-13, about 19:40 (Europe/Rome), the diameter chat, settled by the orchestrating session under coding
+directives 7 and 9 on the report of the Opus integration tester; the user was not asked and can reverse any point.
+**Binds:** SPEC section "Final check of waves 1 and 2: amendments" at `2273d5e` on `sci/diameter-pipeline`.
+
+**Decision [orchestrator].** Six clauses are stated or changed; no number of the blocks changes.
+
+**Statement.** (D-136.1, convention) A node's own stretch, for Blocks 25, 27 and 28 alike, is the set of segments with
+both ends among the stretch's own node ids, without the parent node that `cell.stretch_branch` prepends; the segment to
+the parent is a neighbour. Agreed before: not stated; Block 27 counted it as own, Blocks 25 and 28 as a neighbour.
+(D-136.2, convention) The lateral shift $v_0$ (um) and depth shift $\Delta z$ (um) of Block 29 are the node's total
+offset from its traced position, not an increment per round. Agreed before: not stated. (D-136.3, convention) In Block
+30 a forward model returning a non-finite value at any evaluation of a start fails that start without raising. Agreed
+before: stated for the start only. (D-136.4, interface) `figure_rounds(history, cfg)`. Agreed before: no `cfg`.
+(D-136.5, interface) `DiameterConfig.validate()` covers the `cleaning` and `inference` sections; `to_json` stays the
+full signature, without them. (D-136.6, validation targets, wording) Block 24: the stacked tube the light reaches second
+books less (was "the lower"); the light-reversal oracle holds to 1e-10 only on a mirrored slab lattice.
+
+**Why.** Each from the tester's finding of the same subject (F1-F5, S1-S4, S8), reproduced by its tests; after the
+fixes 27 of its 29 reproducers pass and the two left fail by design (F4, F5's old signature) **[run, sandbox]**. For
+(1): the parent segment is not part of the node's tube model, so its shadow is contamination [reasoning].
+
+**What it implies for code and tables.** `node_inference.py`, `cleaning.py`, `cleaning_figures.py`, `config.py`,
+`contamination.py` (a comment) at `2273d5e`. Wave 3: the survey script passes Block 27 a branch without the parent, or the
+block gains `own_ids`; the scripts write the two config sections into their outputs' metadata.
+
+**What it does not decide [open].** Whether the tester's spec tests are adopted (the user's); the cost of the hybrid
+per-node fit (the user's, pending).
+
+**Sources.** **[run, sandbox]** the tester's report and tests (`a8d189d`); the reruns after the fixes. **[SPEC]** `2273d5e`.
+
+**Status:** active.
 
