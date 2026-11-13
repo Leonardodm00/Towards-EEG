@@ -1,44 +1,35 @@
-"""Smoke test for <ALGORITHM> -- Block <N> in specs/SPEC.md.
+"""Smoke test for the coarse refinement of a node's features -- Block 29 in specs/SPEC.md.
 
-Adapt this file for one algorithm: replace every EDIT marker and every
-NotImplementedError. A check that does not apply is not deleted; make it
-raise unittest.SkipTest("<reason>") so the summary shows why it was skipped.
-Until a check is adapted it is reported as TODO and the run fails, so an
-unadapted copy can never pass.
+The shadow model `predict` is the closed form the Block 29 entry describes:
+a flat tube of diameter d and coefficient mu at lateral shift v0, its shadow
+in plane k = calibration_scene.shadow_depths(|v_n - v0|, d/2, mu,
+sigma_r(|z_k - dz|), 1) (dimensionless, B = 1). Block 25 (model/shadow.py) is
+not imported.
 
-Checks, from the strongest oracle to the weakest
-    test_known_answer   analytic or tabulated solution
-    test_reference      independent implementation (library function, or
-                        brute force on a tiny input)
-    test_convergence    discretisations only: observed order p in
-                        e(h) ~ C * h**p, where e(h) is the error at step h
-    test_invariants     conservation laws, symmetries, bounds, normalisation
-    test_contract       output shapes, dtypes and finiteness
-    test_determinism    identical output for an identical seed
-    test_edge_cases     degenerate or boundary inputs named in the spec
+Checks
+    test_known_answer   noise-free recovery of (d, mu, v0, dz) from a start
+                        30 % off [relative 1e-6 on d, mu; 1e-6 um on shifts]
+    test_reference      cost and rms_gl against the objective written by hand
+    test_convergence    skipped: not a discretisation
+    test_invariants     100 seeded noisy draws (SD 3 gl, B = 210): mean d-hat
+                        within 3 standard errors of the truth; the inputs are
+                        not changed
+    test_contract       keys, types, status names; offset_xyz
+    test_determinism    identical output for identical input
+    test_edge_cases     truth outside the bounds -> at_bound with the name;
+                        a NaN predict -> failed without raising; ValueError
+                        for shapes that disagree, B <= 0, a start outside the
+                        bounds
 
-Run
-    python tests/smoke/test_smoke_<algorithm>.py
-        Prints the environment and a PASS / FAIL / ERROR / TODO / SKIP table,
-        then the full message of every failure. Exit code 1 if any check
-        failed, errored or is still TODO.
-    python -m pytest tests/smoke -q
-        The same checks through pytest (TODO checks show up as failures).
+Run (from "Passive Features/Diameter Re-measurement")
+    python3 tests/smoke/test_smoke_coarse_fit.py
+    python3 -m pytest tests/smoke/test_smoke_coarse_fit.py -q
 
 Debug
     A failed check_close() saves both arrays to
         tests/smoke/artifacts/<check name>.npz
-    Inspect it with
-        d = np.load("tests/smoke/artifacts/<check name>.npz")
-        diff = d["actual"] - d["expected"]
-        np.unravel_index(np.argmax(np.abs(diff)), diff.shape)
 
-Add a check
-    Define a function test_<something>() with no arguments that raises
-    AssertionError on failure; the runner below and pytest both pick it up.
-
-Keep this file pure ASCII (no Greek letters, dashes or arrows outside ASCII)
-so it survives transfer to the cluster.
+Pure ASCII, for the cluster.
 """
 from __future__ import annotations
 
@@ -54,13 +45,27 @@ from pathlib import Path
 import numpy as np
 from numpy.testing import assert_allclose, assert_array_equal  # noqa: F401
 
-# EDIT: import the code under test, for example
-# from mypackage.model.integrators import trapezoid
+HERE = Path(__file__).resolve().parent
+SRC = HERE.parent.parent / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 
-SEED = 12345  # EDIT if SPEC.md fixes a seed
-REPORT_PACKAGES = ("numpy", "scipy")  # EDIT: packages whose versions matter
+from allen_diameter.analysis import coarse_fit as CF  # noqa: E402
+from allen_diameter.analysis.calibration_scene import shadow_depths  # noqa: E402
+from allen_diameter.analysis.profiles import profile_offsets  # noqa: E402
+from allen_diameter.config import default_config  # noqa: E402
+from allen_diameter.model.kernel import sigma_r  # noqa: E402
+
+SEED = 12345
+REPORT_PACKAGES = ("numpy", "scipy")
 ARTIFACT_DIR = Path(__file__).resolve().parent / "artifacts"
 _SAVED_ARTIFACTS = []  # files written by check_close during this run
+
+B_GL = 210.0          # the entry's background (gl)
+NOISE_SD_GL = 3.0     # the entry's noise SD (gl)
+N_DRAWS = 100         # the entry's number of noisy draws
+TRUTH = (0.8, 1.5, 0.12, 0.1)   # (d um, mu 1/um, v0 um, dz um), inside the default bounds
+PLANES = np.arange(-3, 4)       # plane indices about the node's plane
 
 
 # --------------------------------------------------------------- helpers ---
@@ -103,59 +108,188 @@ def observed_order(h, err):
     return float(slope)
 
 
+# -------------------------------------------------------------- fixtures ---
+
+def make_case(cfg=None):
+    """(cfg, v (n_v,), z (n_planes,), predict): the entry's closed-form model."""
+    cfg = default_config() if cfg is None else cfg
+    v = profile_offsets(cfg.measure)
+    z = PLANES * float(cfg.acquisition.dz_um)
+    rcfg = cfg.renderer
+
+    def predict(d, mu, v0, dz):
+        sig = sigma_r(np.abs(z - dz), rcfg)
+        return np.stack([shadow_depths(np.abs(v - v0), d / 2.0, mu, s, 1.0) for s in sig])
+
+    return cfg, v, z, predict
+
+
+def observed(predict, theta, n_planes):
+    B = np.full(n_planes, B_GL)
+    return B[:, None] * (1.0 - predict(*theta)), B
+
+
+def theta_of(out):
+    return np.array([out[k] for k in CF.PARAM_NAMES])
+
+
 # ---------------------------------------------------------------- checks ---
 
 def test_known_answer():
-    # EDIT: an input whose exact output is known analytically or tabulated,
-    # e.g. check_close("known_answer", algorithm(x), exact, rtol=...)
-    raise NotImplementedError("EDIT: known-answer check")
+    # Noise-free data: the truth is a zero of every residual, so the solver
+    # reaches it to its own termination tolerance (xtol 1e-8 relative); the
+    # entry's tolerances are 1e-6 relative on d and mu, 1e-6 um on the shifts.
+    cfg, v, z, predict = make_case()
+    truths = [TRUTH, (1.6, 0.6, -0.2, -0.15), (0.4, 3.0, 0.05, 0.2)]
+    for truth in truths:
+        I, B = observed(predict, truth, z.size)
+        for factor in (1.3, 0.7):
+            th0 = np.array(truth) * factor
+            out = CF.refine_node(I, B, v, predict, th0, cfg)
+            est = theta_of(out)
+            tag = "truth %r start x%.1f" % (truth, factor)
+            assert out["status"] == "converged", (tag, out)
+            check_close("known_answer d mu " + tag, est[:2], truth[:2], rtol=1e-6, atol=0.0)
+            check_close("known_answer shifts " + tag, est[2:], truth[2:], rtol=0.0, atol=1e-6)
+            print("    %s: d %.12f mu %.12f v0 %.12f dz %.12f; err %s; nfev %d"
+                  % (tag, est[0], est[1], est[2], est[3], np.array2string(est - np.array(truth), precision=2), out["nfev"]))
 
 
 def test_reference():
-    # EDIT: compare with an independent implementation on a tiny input,
-    # e.g. a SciPy routine, or a brute-force loop that is obviously correct.
-    raise NotImplementedError("EDIT: reference-implementation check")
+    # cost = sum_k sum_n w_n r_kn^2 and rms_gl = sqrt(mean r_kn^2), written as
+    # loops at the returned parameters; float64 roundoff over ~370 terms: 1e-12.
+    cfg, v, z, predict = make_case()
+    I, B = observed(predict, TRUTH, z.size)
+    I = I + make_rng().normal(0.0, NOISE_SD_GL, I.shape)
+    out = CF.refine_node(I, B, v, predict, np.array(TRUTH) * 1.3, cfg)
+    s = predict(*theta_of(out))
+    lam = cfg.measure.sgt_lambda_um
+    cost, ss, n = 0.0, 0.0, 0
+    for k in range(z.size):
+        for j in range(v.size):
+            r = I[k, j] - B[k] * (1.0 - s[k, j])
+            cost += np.exp(-abs(v[j]) / lam) * r * r
+            ss += r * r
+            n += 1
+    check_close("reference cost", out["cost"], cost, rtol=1e-12)
+    check_close("reference rms", out["rms_gl"], np.sqrt(ss / n), rtol=1e-12)
+    print("    cost %.6f gl^2, rms %.4f gl (noise SD %.1f)" % (out["cost"], out["rms_gl"], NOISE_SD_GL))
 
 
 def test_convergence():
-    # EDIT (discretisations): errors at decreasing step sizes h, e.g.
-    #   hs = np.array([...]); errs = np.array([abs(run(h) - exact) for h in hs])
-    #   p = observed_order(hs, errs)
-    #   assert abs(p - EXPECTED_ORDER) < 0.1, f"observed order {p:.3f}"
-    # Not a discretisation: raise unittest.SkipTest("<reason>").
-    raise NotImplementedError("EDIT: convergence check")
+    raise unittest.SkipTest("not a discretisation: a wrapper of scipy.optimize.least_squares")
 
 
 def test_invariants():
-    # EDIT: properties that must hold for any valid input: conservation,
-    # symmetry, bounds, normalisation, linearity, exactness on a class of
-    # inputs the method integrates or fits exactly.
-    raise NotImplementedError("EDIT: invariant check")
+    # Over N_DRAWS seeded noisy data sets the mean d-hat lies within 3
+    # standard errors (SD of the d-hats / sqrt(N_DRAWS)) of the truth.
+    cfg, v, z, predict = make_case()
+    I0, B = observed(predict, TRUTH, z.size)
+    rng = make_rng()
+    th0 = np.array(TRUTH) * 1.3
+    est = []
+    for _ in range(N_DRAWS):
+        I = I0 + rng.normal(0.0, NOISE_SD_GL, I0.shape)
+        I_copy, B_copy, v_copy, th_copy = I.copy(), B.copy(), v.copy(), th0.copy()
+        out = CF.refine_node(I, B, v, predict, th0, cfg)
+        assert_array_equal(I, I_copy)
+        assert_array_equal(B, B_copy)
+        assert_array_equal(v, v_copy)
+        assert_array_equal(th0, th_copy)
+        assert out["status"] == "converged", out
+        est.append(theta_of(out))
+    est = np.array(est)
+    mean = est.mean(axis=0)
+    se = est.std(axis=0, ddof=1) / np.sqrt(N_DRAWS)
+    bias = mean - np.array(TRUTH)
+    for name, m, s, b in zip(CF.PARAM_NAMES, mean, se, bias):
+        print("    %-9s mean %.5f  SE %.5f  bias %+.5f (%+.2f SE)" % (name, m, s, b, b / s))
+    assert abs(bias[0]) <= 3.0 * se[0], "mean d-hat %.6f, truth %.6f, SE %.6f" % (mean[0], TRUTH[0], se[0])
 
 
 def test_contract():
-    # EDIT: output shape and axis order, dtype, finiteness, units where they
-    # are checkable, e.g.
-    #   out = algorithm(x)
-    #   assert out.shape == (n_trials, n_bins), out.shape
-    #   assert out.dtype == np.float64, out.dtype
-    #   assert np.all(np.isfinite(out))
-    raise NotImplementedError("EDIT: output-contract check")
+    cfg, v, z, predict = make_case()
+    I, B = observed(predict, TRUTH, z.size)
+    out = CF.refine_node(I, B, v, predict, np.array(TRUTH) * 1.3, cfg)
+    assert set(out) == {"d_um", "mu_per_um", "v0_um", "dz_um", "cost", "rms_gl", "status", "at_bound", "nfev"}, out
+    for k in ("d_um", "mu_per_um", "v0_um", "dz_um", "cost", "rms_gl"):
+        assert isinstance(out[k], float) and np.isfinite(out[k]), (k, out[k])
+    assert out["status"] in CF.STATUSES and out["status"] in ("converged", "at_bound", "failed")
+    assert isinstance(out["at_bound"], tuple) and isinstance(out["nfev"], int) and out["nfev"] >= 1
+    # offset_xyz: (v0 y_x, v0 y_y, dz), shape (3,), float64; exact products
+    y = np.array([-np.sin(0.7), np.cos(0.7), 0.0])
+    off = CF.offset_xyz(0.25, -0.1, y)
+    assert off.shape == (3,) and off.dtype == np.float64
+    assert_array_equal(off, np.array([0.25 * y[0], 0.25 * y[1], -0.1]))
+    assert_array_equal(CF.offset_xyz(0.25, -0.1, y[:2]), off)
+    for bad in ((np.nan, 0.0, y), (0.1, 0.0, np.ones(4))):
+        try:
+            CF.offset_xyz(*bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("offset_xyz accepted %r" % (bad,))
 
 
 def test_determinism():
-    # EDIT: two runs with the same seed must give bit-identical output, e.g.
-    #   a = algorithm(x, rng=make_rng()); b = algorithm(x, rng=make_rng())
-    #   assert_array_equal(a, b)
-    # No randomness: raise unittest.SkipTest("deterministic algorithm").
-    raise NotImplementedError("EDIT: determinism check")
+    cfg, v, z, predict = make_case()
+    I, B = observed(predict, TRUTH, z.size)
+    I = I + make_rng().normal(0.0, NOISE_SD_GL, I.shape)
+    a = CF.refine_node(I, B, v, predict, np.array(TRUTH) * 0.7, cfg)
+    b = CF.refine_node(I, B, v, predict, np.array(TRUTH) * 0.7, cfg)
+    assert a == b, (a, b)
+
+
+def _raises(func, *args):
+    try:
+        func(*args)
+    except ValueError as exc:
+        return str(exc)
+    raise AssertionError("no ValueError for %r" % (args[:2] if len(args) > 1 else args,))
 
 
 def test_edge_cases():
-    # EDIT: degenerate and boundary inputs named in SPEC.md (empty input,
-    # single sample, zero-length interval, constant signal, ...), each with
-    # its expected behaviour: a value, or a specific exception.
-    raise NotImplementedError("EDIT: edge-case check")
+    cfg, v, z, predict = make_case()
+    d_hi = cfg.cleaning.refine_d_bounds_um[1]
+    # truth beyond the upper diameter bound: at_bound, named
+    truth = (d_hi + 1.0, 1.0, 0.0, 0.1)
+    I, B = observed(predict, truth, z.size)
+    out = CF.refine_node(I, B, v, predict, (d_hi - 1.0, 1.0, 0.0, 0.1), cfg)
+    assert out["status"] == "at_bound" and "d_um" in out["at_bound"], out
+    print("    beyond the d bound: %s %r, d %.6f" % (out["status"], out["at_bound"], out["d_um"]))
+    # truth beyond the dz bound
+    dz_hi = cfg.cleaning.refine_dz_bounds_um[1]
+    truth = (0.8, 1.5, 0.0, dz_hi + 0.5)
+    I, B = observed(predict, truth, z.size)
+    out = CF.refine_node(I, B, v, predict, (0.8, 1.5, 0.0, 0.0), cfg)
+    assert out["status"] == "at_bound" and "dz_um" in out["at_bound"], out
+    # a predict returning NaN: failed, no exception
+    I, B = observed(predict, TRUTH, z.size)
+
+    def nan_predict(d, mu, v0, dz):
+        return np.full((z.size, v.size), np.nan)
+
+    out = CF.refine_node(I, B, v, nan_predict, TRUTH, cfg)
+    assert out["status"] == "failed", out
+
+    def nan_away(d, mu, v0, dz):  # finite at the start, NaN once d moves
+        return predict(d, mu, v0, dz) if d == 1.04 else np.full((z.size, v.size), np.nan)
+
+    out = CF.refine_node(I, B, v, nan_away, (1.04, 1.5, 0.12, 0.1), cfg)
+    assert out["status"] == "failed", out
+    # ValueError: shapes that disagree, B <= 0, a start outside the bounds
+    th0 = np.array(TRUTH)
+    _raises(CF.refine_node, I[:, :-1], B, v, predict, th0, cfg)
+    _raises(CF.refine_node, I, B[:-1], v, predict, th0, cfg)
+    _raises(CF.refine_node, I[0], B, v, predict, th0, cfg)
+    _raises(CF.refine_node, I, B, v, predict, th0[:3], cfg)
+    Bz = B.copy()
+    Bz[2] = 0.0
+    _raises(CF.refine_node, I, Bz, v, predict, th0, cfg)
+    _raises(CF.refine_node, I, -B, v, predict, th0, cfg)
+    _raises(CF.refine_node, I, B, v, predict, (d_hi + 0.5, 1.5, 0.12, 0.1), cfg)
+    _raises(CF.refine_node, I, B, v, predict, (0.8, 1.5, 0.12, dz_hi + 0.5), cfg)
+    _raises(CF.refine_node, I, B, v, predict, (0.8, 1.5, 0.12, np.nan), cfg)
 
 
 # ---------------------------------------------------------------- runner ---
