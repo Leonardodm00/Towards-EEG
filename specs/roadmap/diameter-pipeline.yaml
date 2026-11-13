@@ -167,10 +167,10 @@ theory:
     refs: [renderers doc 2026-10-09 s.3.8-3.9 Eqs. 13-14 on main, optics v1.5 s.3.3-3.7 on main, sine condition and W 2026-10-12 on main, procedure s.3.4 and s.3.6, D-024 (i), D-067.2, I-002, I-003, I-004]
     parent: TG1
     depends_on: [T3]
-    status: open          # added 2026-10-22 at the user's request ("I need to study all the optics theory to construct the hybrid plane absorption ...")
+    status: open
     closed_on:
     decision:
-    note: "Built as SPEC Block 21 (I21, 2026-10-27, D-092); the default renderer is still the partition (D-084.2). Questions the build left for this topic: the hybrid conserves light per direction, not per column, so its planes go below zero in dark stain (SPEC Block 21 findings, section 8); whether the calibrated kernel carries over in dark stain (D-084). [note updated 2026-10-27; status unchanged, the user's] Documents (D-128, 2026-11-13): TEEG_diameter_pupil_phase_2026-11-04.md, the topic document on the three pupil phases, sent as .md + .zip in the chat 'Diffraction and the Airy pattern' and on the branch theory/pupil-phase-2026-11-04 under Passive Features/Diameter Re-measurement/docs/TEEG_diameter_pupil_phase_2026-11-04/; and the documents in refs, on main under Passive Features/Diameter Re-measurement/docs/: TEEG_diameter_renderers_partition_ray_world_hybrid_2026-10-09.md, TEEG_microscope_optics_oil_immersion_2026-10-04.md (v1.5), TEEG_diameter_sine_condition_and_W_2026-10-12.md."
+    note: "Built as SPEC Block 21 (I21, 2026-10-27, D-092); the default renderer is still the partition (D-084.2). Questions the build left for this topic: the hybrid conserves light per direction, not per column, so its planes go below zero in dark stain (SPEC Block 21 findings, section 8); whether the calibrated kernel carries over in dark stain (D-084). [note updated 2026-10-27; status unchanged, the user's] Documents (D-128, 2026-11-13): TEEG_diameter_pupil_phase_2026-11-04.md, the topic document on the three pupil phases, sent as .md + .zip in the chat 'Diffraction and the Airy pattern' and on the branch theory/pupil-phase-2026-11-04 under Passive Features/Diameter Re-measurement/docs/TEEG_diameter_pupil_phase_2026-11-04/; and the documents in refs, on main under Passive Features/Diameter Re-measurement/docs/: TEEG_diameter_renderers_partition_ray_world_hybrid_2026-10-09.md, TEEG_microscope_optics_oil_immersion_2026-10-04.md (v1.5), TEEG_diameter_sine_condition_and_W_2026-10-12.md. [2026-11-13, D-130.O10 and D-132: the hybrid is now the absorption of the per-node fit and of the joint scene for close neighbours; its non-additivity across separate tubes is recorded under T14.]"
   - id: T8
     title: "Uncertainty and flags of the corrected diameter"
     summary: "What the inversion gives on Allen's nodes and how far to trust it: the flags (out of domain, off support, high failure), the fill from the neighbours, the corrected diameter's uncertainty (D5, D-030, D-063)."
@@ -232,22 +232,24 @@ theory:
     note: "To study (the user, 2026-11-11, 17:02, diameter calibration chat: 'update the roadmap that I have to study this theory'): the study document TEEG_study_kernel_calibration_2026-11-11.md sent in that chat, written from the answer to the 15:37 question 'refresh me how the defocusing kernel is calibrated'. The far fit itself is T6 (closed 2026-10-26); the bootstrap behind the anchor's and the slope's SEs is T11."
   - id: T14
     title: "Superposition of several absorbers' shadows and the iterative cleaning"
-    summary: "When the shadows of several branches add on a node's measuring line and when they do not (one branch in the light path of another; the partition and the hybrid for several tubes), what removing a predicted shadow leaves behind, and why updating the neighbours round by round converges (a fixed-point iteration) and when it does not."
+    summary: "When the shadows of several branches add on a node's measuring line and when they do not (one branch in the light path of another; the partition and the hybrid for several tubes), what removing a predicted shadow leaves behind, and why updating the neighbours round by round converges (a fixed-point iteration) and when it does not. Under the hybrid the shadows of two tubes do not add even when their projections do not overlap, because oblique rays cross both; hence the two tiers of D-132: distant or defocused neighbours subtracted with a cheap shadow model, close ones kept inside the node's fit and rendered jointly."
     refs: [D-129, D-130, "SPEC 2.3", "SPEC 24-25"]
     parent: TG1
     depends_on: []
     status: open
     closed_on:
-    decision:
+    decision: D-132
+    note: "2026-11-13 (D-132, the user: PERFECT): two tiers. Finding behind it (Block 24's check, sandbox): two 0.5 um tubes 1 um apart at mu = 3 /um differ from the sum of their separate hybrid renders by up to 0.020 of the background; under the partition the sum is exact to 1e-15. To study: when the cheap subtraction is good enough, and where the boundary between the tiers sits. No document written yet."
   - id: T15
     title: "Per-node inference by fitting the forward model"
-    summary: "What a fit of the rendered node to the cleaned profiles of several planes can identify -- the diameter against the absorption coefficient, the depth, an error in the kernel -- the uncertainty of its estimate, and how it is tested on a generator that is not its own model (the inverse-crime problem)."
+    summary: "What a fit of the rendered node to the cleaned profiles of several planes can identify -- the diameter against the absorption coefficient, the depth, an error in the kernel -- the uncertainty of its estimate, and how it is tested on a generator that is not its own model (the inverse-crime problem). With D-132 the fitted model is a scene for a node with close neighbours: the node free, the neighbours at their fitted features, rendered together with the hybrid."
     refs: [D-129, D-130, "SPEC 26"]
     parent: TG3
     depends_on: []
     status: open
     closed_on:
-    decision:
+    decision: D-132
+    note: "2026-11-13 (D-132): close neighbours (the survey's classes close_in_focus and overlap) stay inside the node's fit as a joint hybrid scene; the fit's cost per node and the split between the tiers are fixed after the line renderer's timings and the survey's shares. No document written yet."
 implementation:
   # ---- groups (no block of their own; coloured by their least advanced member)
   - id: G1
