@@ -164,6 +164,7 @@ the "Binds" column.
 | 2026-11-13 (later, 5) | Logs **D-130** (user, 14:35; the diameter chat on the cleaning and option 2): the answers to the open questions of D-129's plan -- the waves approved, the choices O1-O7 and O9-O11 settled (the hybrid in the per-node fit; every neighbour's shadow removed wherever it falls; the axon a neighbour; no depth cut-off; the neighbours from the first-stage fit, then refined; 20 example nodes), O8 after the survey, O12 at the judgment; the production table and the inversion (S7-S8) paused. **Roadmap diameter-pipeline: T14 and T15 added, open** (the user: "both add"), I23-I27 under NC1 and NC2 (`4a1d1e1`). SPEC Blocks 23-27 drafted with proposed tolerances (`e414f04`); the plan updated (`9cf01f2`). The orchestrating session runs on Fable 5.2. Written after re-reading this log (unchanged since the 2026-11-13 (later, 4) row). Next free IDs: D-131, I-006. |
 | 2026-11-13 (later, 6) | No new decision ID (the diameter chat). The user agreed to the tolerances of SPEC Blocks 23-27 (14:45); **wave 1's contract committed** (`68dbe60`, `0aa5305` on `sci/diameter-pipeline`: `CleaningConfig`, `InferenceConfig`, the stubs, the smoke-test skeletons; the configuration suite taught the two sections) and four Opus implementers started on Blocks 23, 24, 26, 27. Block 25 (the shadow image) held: the user's question whether a neighbour's shadow is computed with the hybrid puts its shadow model under revision. D-130 annotated. Next free IDs unchanged: D-131, I-006. |
 | 2026-11-13 (later, 7) | Logs **D-131** [orchestrator] (the diameter chat; coding directive 7): contract amendment 1 of wave 1, on the four issues the Block 27 implementer raised -- three conventions and one validation target of the contamination survey changed (the kernel at the segment's nearest point; the classes' precedence; the out-of-focus oracle at zero lateral distance, the evidence reproduced; the soma outside the profile). SPEC at `faa4f6f`. Block 23 returned and passed the gate, not merged yet; Blocks 24 and 26 running; Block 25 held. Next free IDs: D-132, I-006. |
+| 2026-11-13 (later, 8) | Logs **D-132** (user, 15:29; the diameter chat): the cleaning in two tiers, after Block 24's finding that hybrid shadows of separate tubes do not add. **Roadmap diameter-pipeline: the notes and summaries of T14, T15 and T7 updated** (`fe30e03`), statuses unchanged. Wave 1: Blocks 23, 24, 27 passed the gate and are merged (`e0a8a4e`); Block 26's implementer was stopped by the user before reporting, its worktree holds uncommitted work; Block 25 to be re-specified under D-132.1. Next free IDs: D-133, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -315,6 +316,7 @@ would be needed*, *Status*.
 | D-129 | 2026-11-13 | the correction of a real node's diameter (SPEC Blocks 4, 5, 13, 14); the scene and the neighbour-shadow predictor (Block 10.S); `notebooks/phase2_colab.py`; roadmap NC, NC1-NC4; the plan `TEEG_diameter_cleaning_inference_plan_2026-11-13.md` | a real node's measuring line is cleaned of its traced neighbours' predicted shadows, iteratively from Allen's diameters with a coarse fit for the neighbours; then option 2, the node's features by optimisation without a table; option 1, the table on cleaned lines, only if option 2 is not satisfactory; first on the pilot cell in Colab, with before/after patches and lines on example nodes [user] | active; not implemented; roadmap `0274ce8`, plan `599d865` on `sci/diameter-pipeline` |
 | D-130 | 2026-11-13 | SPEC Blocks 23-34; `CleaningConfig`, `InferenceConfig`; the plan's choices O1-O12; roadmap NC, T14, T15, S7, S8 | the choices of the cleaning and of option 2: the waves approved; a round updates diameter, coefficient, lateral offset and depth; the axon a neighbour where traced; no depth cut-off on neighbours; every shadow removed wherever it falls; the neighbours from the first-stage fit, then refined; the hybrid in the per-node fit, on as many planes as necessary; scenes by Eqs. 5-6 on several tubes; 20 example nodes; S7-S8 paused; T14 and T15 added [user] | active; Blocks 23-27 drafted at `e414f04`, not implemented |
 | D-131 | 2026-11-13 | SPEC Block 27 (`analysis/contamination.py`) | contract amendment 1 of wave 1: a segment's nearest point sets both its distance and its blur; `clean` first and attached segments no overlap; the out-of-focus oracle only at zero lateral distance; the soma outside the pollution profile, its distance reported [orchestrator] | active; SPEC amended at `faa4f6f`; the implementer applying it |
+| D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
@@ -10660,3 +10662,42 @@ class thresholds, still PROVISIONAL.
 **[SPEC]** Block 27 at `faa4f6f`.
 
 **Status:** active; the implementer is applying it.
+
+## D-132 -- The cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model, close ones kept inside the node's fit and rendered jointly with the hybrid (user)
+
+**Date:** 2026-11-13, 15:29 (Europe/Rome), the diameter chat. **Binds:** SPEC Block 25 (the shadow image, held since
+14:45), Block 28 (the cleaning operator), Block 30 (the per-node fit) and the joint fit held as plan step F3; roadmap
+T14, T15, T7; the plan's choices O1 and O8.
+
+**Decision [user].** To the assistant's suggestion "a tiered version: 1. Distant or defocused neighbours: subtract their
+shadow with the cheap model (option C from before). 2. Close neighbours, the ones the survey classes as 'close and in
+focus' or 'overlap': keep them inside the node's fit and render the scene jointly with the hybrid": "PERFECT. Update
+the theory in the roadmap".
+
+**Statement.** (D-132.1) Tier 1: a neighbour that is distant or out of focus has its predicted shadow subtracted; the
+shadow model is option C of 14:45 -- the absorbed light per column from the hybrid, one blur per column -- and the
+neighbour's features are refined under that same model (D-130.O2) [user]. (D-132.2) Tier 2: a neighbour the survey
+classes `close_in_focus` or `overlap` is not subtracted; it stays in the node's fit, the scene of the node and those
+neighbours rendered together with the hybrid, the node's features free [user]. (D-132.3) The split between the tiers
+and the cost per node are fixed after the line renderer's timings and the survey's shares on the pilot cell [the
+assistant's, stated in the suggestion]. Amends D-130.O1 (every shadow removed wherever it falls): close and
+overlapping neighbours are modelled, not removed. Settles the plan's O8 in favour of the joint fit.
+
+**Why.** [run, sandbox: Block 24's check, reported by its implementer, 2026-11-13] Under the hybrid the shadows of two
+tubes do not add even when their projections do not overlap: two 0.5 um tubes 1 um apart at $\mu$ = 3 /um differ from
+the sum of their separate renders by up to 0.020 of the background, oblique rays crossing both; under the partition the
+sum is exact to 1e-15. Rendering each neighbour alone with the hybrid would not remove this; rendering the scene
+jointly does [reasoning]. The effect is second order in the two absorptions, so it is small for faint or distant
+neighbours [reasoning, not measured].
+
+**What it implies for code and tables.** Block 25's entry is rewritten for option C before its implementer starts;
+Block 28 cleans tier 1 only; the joint fit (F3) is built, on Block 24's scene renderer. Not written yet.
+
+**What it does not decide [open].** The boundary between the tiers (today the survey's PROVISIONAL classes); how the
+hybrid's absorbed light per column is computed cheaply in tier 1 (a table for a straight tube was proposed); the cost
+limit of tier 2.
+
+**Sources.** **[user]** 2026-11-13, 15:29. **[run, sandbox]** as above; `tests/smoke/test_smoke_scene_render.py` at
+`e0a8a4e`. **[log]** D-130, D-131.
+
+**Status:** active; not implemented. Roadmap T14, T15, T7 updated at `fe30e03` on `sci/diameter-pipeline`.
