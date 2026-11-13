@@ -875,7 +875,7 @@ directly above or below the node (D-130.O1); such a node keeps the label `overla
 - Test oracles (proposed tolerances in brackets): round 0 equals Allen's radii doubled and the trace [exact]; `write_features` then `read_features` returns every array bit for bit [exact]; `featured_scene` with zero offsets and `d` = twice Allen's radius reproduces `scene.seg_xyz` and `2 * scene.seg_radius` [exact]; an offset on one node moves exactly the segment ends that carry its id; `with_rows` leaves its input unchanged and the untouched nodes identical; `max_relative_change` against a loop written by hand [1e-15]; ValueError for a non-finite entry, `d_um <= 0`, `mu_per_um < 0`, an unknown `node_id`, an unknown `source`, arrays of unequal length
 - Data flow: consumes Block 13 (`Scene`), Block 8 (`swc_io`); feeds Blocks 25, 29, 32
 - Confirmed: D-129.2, D-130.O3, D-130.O4 (the user); the field names, the root-segment rule and the CSV format are the assistant's
-- Status: drafted
+- Status: drafted 2026-11-13; implemented 2026-11-13 (wave 1, merged `e0a8a4e`); `test_smoke_node_features.py` 5 pass, 2 skip **[run, sandbox]**. Smoke-tested
 
 ### Block 24: the scene renderer, several tubes in one stack (the checks' generator; D-130.O11)
 
@@ -888,7 +888,7 @@ directly above or below the node (D-130.O1); such a node keeps the label `overla
 - Test oracles: one tube equals Block 4's `render_transmittance` in the three modes [1e-10]; two tubes whose projections do not overlap, `linear` and `partition_vertical`: $1 - \tau^{\rm scene}_k = (1 - \tau^{(1)}_k) + (1 - \tau^{(2)}_k)$ with each tube rendered alone on the same slab lattice [1e-10]; C1 for a scene: $\sum_j \Delta A_j = 1 - \exp(-\sum_j a_j)$ per column under the partition, a column through two stacked tubes included [1e-12]; the lower of two stacked tubes books less than alone, by the factor $e^{-\mu_1 \ell_1}$ of the upper tube's column under the partition [1e-10]; hybrid: at $\mu_t \to 0$ the scene is `linear` at $1.4470\,\mu_t$ [relative 5e-3 at $\mu d$ = 1e-3]; every plane carries the same total, $\iint (1 - \tau_k) = \sum_j \iint \Delta A_j$ [relative 1e-10]; light reversed equals depth mirrored [1e-10]; a tube with $\mu$ = 0 changes nothing [exact]; the labelled comparison -- the product of separately rendered transmittances (`tests/smoke/test_smoke_node_pipeline.make_provider`) differs from the scene by at most $\max (1 - \tau^{(1)})(1 - \tau^{(2)})$ for non-overlapping tubes [checked as a bound]; `synthetic_scene_block` bit-identical under one seed; ValueError for unequal lengths, a negative $\mu$, an empty scene
 - Data flow: consumes Blocks 2, 4, 9, 21; feeds the checks of Blocks 25, 28, 29, 32, 33
 - Confirmed: D-130.O11 (the user: the equations applied to several tubes at once; the product kept as a labelled comparison); the hybrid's joint form and the non-intersection assumption are the assistant's
-- Status: drafted
+- Status: drafted 2026-11-13; implemented 2026-11-13 (wave 1, merged `e0a8a4e`); `test_smoke_scene_render.py` 6 pass, 1 skip **[run, sandbox]**. Smoke-tested
 
 ### Block 25: the shadow image of a node's neighbours (plan step C2)
 
@@ -901,7 +901,7 @@ directly above or below the node (D-130.O1); such a node keeps the label `overla
 - Test oracles: a flat segment equals `calibration_scene.shadow_depths` at lateral distances beyond its caps' reach [1e-6 relative]; total per plane equal across planes and to $\iint A_q$ [relative 1e-8]; a segment beyond `shadow_reach_sigmas` kernel SDs of the patch contributes exactly 0; against Block 4's `render_transmittance` (`partition_vertical`) of the same capped tube, pixel-integrated: where the segment's axis is at least 0.84 um out of the plane, $\max |S - (1 - \tau)| \le$ 0.03 x the plane's peak; in focus, $\le$ 0.15 x the peak for $d \le$ 1 um [the two bounds PROVISIONAL: the block reports the measured values over $d \in \{0.3, 0.6, 1.0\}$ um, tilt 0 and 30 deg]; additivity over segments [1e-12]; halving `shadow_depth_bin_um` moves a 45-degree segment's image by less than 1e-3 x its peak; `kept` follows the floor; `overlap` true for a segment directly above the own stretch and false 3 um aside; ValueError for an own stretch with no segment in the scene, non-finite planes
 - Data flow: consumes Block 23 (`FeaturedScene`), Blocks 2, 4; feeds Blocks 28, 29, 31, 32
 - Confirmed: D-129.2, D-130.O1, D-130.O4, D-130.O5 (the user); the shadow model, the soma's sphere, the floor's value and the two bounds against Block 4 are the assistant's, PROVISIONAL
-- Status: drafted
+- Status: drafted 2026-11-13; implemented 2026-11-13 with amendments 2 and 3 (wave 2, merged `9fde671`); `test_smoke_shadow.py` 6 pass, 1 skip, 190 s: against Block 4 at most 1.6e-15 in both absorptions, the hybrid's faint limit within 6.1e-4, the sanity check against `shadow_depths` 2.1e-2 of the peak **[run, sandbox]**. The reach rule is applied per (slab, plane); the test's Block 4 reference renders without the far-field split. Smoke-tested
 
 ### Block 26: the line renderer, the forward model of the per-node fit (plan step F1)
 
@@ -914,7 +914,7 @@ directly above or below the node (D-130.O1); such a node keeps the label `overla
 - Test oracles: against Block 4 -- `render_transmittance` on the block's fine grid, `pixel_integrate`, `sample_profile` -- for $d \in \{0.3, 1.0, 2.0\}$ um, tilt 0, 30, 60 deg, the axis in the plane and 0.14 um off it, planes $-3..3$, `n_avg` 0 and the configured value: $\max |\tau^{\rm line} - \tau^{\rm Block\,4}| \le$ 1e-3 in each of the three modes [1e-3 of the background, about 0.2 gl at 210 gl]; $\mu$ = 0 gives 1 [exact]; mirror symmetry in $v$ for a tube through the origin on a pixel centre [1e-10]; the result does not depend on the order of `ks`; determinism; the time per call reported for each case and mode (no bound: the block's report states it; D-130.O10's cost is judged on it); ValueError for $\mu$ < 0, a non-unit axis, an unknown absorption
 - Data flow: consumes Blocks 2, 4, 5 (`sample_profile`'s reading rule), 9, 21; feeds Blocks 30, 33
 - Confirmed: D-129.1, D-130.O10 (the user: the hybrid); the reading rule (pixel means, then bilinear) is Block 5's; the tolerance and the fine factor are the assistant's
-- Status: drafted
+- Status: drafted 2026-11-13; implemented 2026-11-13 (wave 2, merged `b3e2fc0`); `test_smoke_line_render.py` 7 pass, 200 s: against Block 4 at most 2.43e-4 (linear), 1.82e-4 (partition), 2.78e-4 (hybrid), the difference of second order in the fine factor (Block 4's point-sampled pixel mean; this block integrates each sample's Gaussian over the pixel with `ndtr`) **[run, sandbox]**. An uncapped tube is refused. Timings at the production configuration (the implementer's, one core): hybrid 4.9-7.8 s per call at $d$ = 0.3 um, 58-92 s at 1.0 um, 313-397 s at 2.0 um; linear and partition 0.3-4.3 s. Smoke-tested
 
 ### Block 27: the contamination survey (plan step C0)
 
@@ -927,7 +927,7 @@ directly above or below the node (D-130.O1); such a node keeps the label `overla
 - Test oracles: an isolated branch has $P_i = 0$, $C_i = 0$, class `clean` [exact]; one flat neighbour at lateral distance $\rho$: $P_i(v_n)$ equals `shadow_depths` at $|\rho - v_n|$ [1e-12]; $C_i$ decreases as an in-focus neighbour moves away laterally (monotone over 5 steps) and as a neighbour directly over the line ($\rho$ = 0) moves out of focus (monotone over 5 planes) [amendment 1, D-131 [orchestrator]: was "as it moves out of focus" for any neighbour; for a lateral neighbour the blur first carries its shadow toward the line's centre -- at $\rho$ = 1 um the index rises from 0.049 in focus to 0.083 four planes out, reproduced by the orchestrator]; the four classes on four constructed scenes; `per_neighbour` sums to `P` [1e-12]; `pick_examples` deterministic under a seed, never returns a node twice, reports a short class; ValueError for $B \le 0$, $\mu \le 0$, an index outside the branch
 - Data flow: consumes Blocks 5, 10.S, 13 (`Scene`); feeds the choice of the example nodes (D-130.O7) and D-130.O8; no later block reads its code
 - Confirmed: D-129.4, D-130.O7 (the user: 20 example nodes); the index, the classes, their thresholds and the split of the 20 are the assistant's, PROVISIONAL
-- Status: drafted
+- Status: drafted 2026-11-13; implemented 2026-11-13 with amendment 1 (wave 1, merged `e0a8a4e`); `test_smoke_contamination.py` 6 pass, 1 skip **[run, sandbox]**. Smoke-tested
 
 ### Blocks 28-31: wave 2 of the cleaning and the per-node inference (D-129, D-130, D-132)
 
@@ -1001,7 +1001,7 @@ accepted and are part of this entry.
 - Test oracles: $S = 0$ returns the block as float64 [exact]; exact inverse under the renderer's own rule: with Block 24 (`partition_vertical`, then `linear`), a node tube and a neighbour tube whose projections do not overlap, $B\,\tau^{\rm scene}_k$ cleaned with $S$ = the neighbour's deficit rendered alone equals $B\,\tau^{\rm node}_k$ [1e-9 gl at $B$ = 210]; under `hybrid` the same residual is at most $B \max (1 - \tau^{(1)})(1 - \tau^{(2)})$ [bound]; `added_gl` equals the mean of $B\,S$ [1e-12]; broadcasting of the three forms of `B_gl` agrees [exact]; tiers on four constructed scenes (far lateral: 1; far in depth: 1; close and in focus: 2; directly above, unattached: 2; attached at a branch point and not close: 1); ValueError for unequal shapes, a non-finite or negative $S$, $B \le 0$
 - Data flow: consumes Block 23 (`FeaturedScene`), Block 25's output by contract ($S$); feeds Blocks 31, 32, 33
 - Confirmed: D-130.O1, D-132 (the user); `tier_reach_um`, the tier rule's geometry and `over_background_gl` are the assistant's, PROVISIONAL
-- Status: drafted
+- Status: drafted 2026-11-13; implemented 2026-11-13 with amendment 1 (wave 2, merged `705eee5`); `test_smoke_cleaning.py` 6 pass, 1 skip, 120 s: exact inverse 1.1e-13 gl; tiers against a brute force 81 of 81; the hybrid residual (gl, $B$ = 210, two tubes of radius 0.25 um, $\mu$ = 3 /um): tilt 0 -- 0.34, 1e-3, 1e-3 at 1, 2, 3 um; tilt 45 deg -- 11.5, 2.2, 1e-13 **[run, sandbox]**. Smoke-tested
 
 ### Block 29: the coarse refinement of a node's features (plan step C4; D-130.O2, D-130.O3)
 
@@ -1014,7 +1014,7 @@ accepted and are part of this entry.
 - Test oracles, with a closed-form `predict` built in the test from `calibration_scene.shadow_depths` (a flat tube at lateral shift $v_0$, kernel at $|z_k - \Delta z|$): noise-free recovery of the four parameters from a start 30 % off [relative 1e-6, absolute 1e-6 um on the shifts]; with seeded Gaussian noise of SD 3 gl at $B$ = 210, over 100 draws the mean $\hat d$ within 3 standard errors of the truth; a truth outside the bounds ends `at_bound` with the name; a `predict` returning NaN ends `failed` without raising; the inputs are not changed; determinism; ValueError for shapes that disagree, $B \le 0$, a start outside the bounds
 - Data flow: consumes Block 25's `stretch_profiles` by contract (as `predict`); feeds Block 32
 - Confirmed: D-130.O2, D-130.O3 (the user); the objective, the weights and the bounds are the assistant's, PROVISIONAL
-- Status: drafted
+- Status: drafted 2026-11-13; implemented 2026-11-13 (wave 2, merged `130a722`); `test_smoke_coarse_fit.py` 6 pass, 1 skip: recovery to 1e-15, the mean $\hat d$ +1.15 SE over 100 draws **[run, sandbox]**. `cost` is the weighted sum of squares (gl^2), `rms_gl` unweighted; a start outside the bounds raises; `at_bound` names the result keys; a fit out of evaluations or with a non-finite `predict` is `failed` with NaN parameters. Smoke-tested
 
 ### Block 30: the per-node fit (plan step F2, and F3 through the same function; D-129.1, D-130.O9, D-132.2)
 
@@ -1027,7 +1027,7 @@ accepted and are part of this entry.
 - Test oracles, with a `forward` built in the test from Block 3's `tube_model.model_profile` (one Gaussian whose width grows with $|z_k - z_{\rm ax}|$): noise-free recovery from a start 30 % off in $d$ and $\mu$ [relative 1e-6; 1e-6 um on $v_0$, $z_{\rm ax}$]; on 300 seeded noisy data sets (SD 3 gl, $B$ = 210, $d$ = 1 um) the interval $\hat d \pm$ `se` covers the truth in 60 to 76 % of them (nominal 68 %) and the mean $\hat d$ is within 3 standard errors of the truth; $\chi^2_k / N$ averages 1 within 10 % over those sets; `select_planes` against the rule written by hand; a truth beyond a bound ends `at_bound`; a `forward` returning NaN ends `failed`; `planes` all False raises ValueError; determinism; the inputs unchanged
 - Data flow: consumes Block 26 (and Block 24 for a joint scene) by contract, as `forward`; feeds Blocks 33, 34
 - Confirmed: D-129.1, D-130.O9, D-132.2 (the user); the plane rule, the bounds, the starts and the coverage band are the assistant's, PROVISIONAL
-- Status: drafted
+- Status: drafted 2026-11-13; implemented 2026-11-13 (wave 2, merged `ab8c6ee`); `test_smoke_node_inference.py` 6 pass, 1 skip: recovery to 1e-16, coverage 0.743 over 300 sets, the mean $\hat d$ +1.2 SE, $\chi^2/N$ 0.989 **[run, sandbox]**. `z_bounds_um` is about the start's depth; a start outside the box is clipped; `at_bound` names are `d_lo`/`d_hi` and so on; a parameter at a bound has NaN rows and columns in `cov`; `cost` is $\chi^2$. Tested with a stand-in `forward`, not with Block 26. Smoke-tested
 
 ### Block 31: the cleaning figures (plan step C6; D-129.4)
 
@@ -1039,7 +1039,7 @@ accepted and are part of this entry.
 - Test oracles: on synthetic arrays (a Block 24 scene of a node and a neighbour, its shadow, the cleaned block) `figure_node` returns a Figure with 3 image axes and 1 profile axis per plane shown; the three images of a row share `vmin`/`vmax`; the input arrays are unchanged (computes nothing scientific); `figure_rounds` draws one point per round; `save` writes a non-empty PNG; ValueError for shapes that disagree, an empty `planes`
 - Data flow: consumes the arrays of Blocks 25, 28 and 32 by contract; feeds notebook Cell 16
 - Confirmed: D-129.4 (the user: the patch images and the measuring line before and after); the layout is the assistant's
-- Status: drafted
+- Status: drafted 2026-11-13; implemented 2026-11-13 (wave 2, merged `cd4ab5a`); `test_smoke_cleaning_figures.py` 6 pass, 1 skip; both figures viewed **[run, sandbox]**. `shadow` is $B\,S$ in gl; `line_xy` the line's two ends (2, 2) um; `planes` values of `ks`; `figure_rounds` draws the thresholds of the default configuration and not the noise-SD half of the stop rule (to be passed in with wave 3). Smoke-tested
 
 ## 6. Pipeline entry points
 
