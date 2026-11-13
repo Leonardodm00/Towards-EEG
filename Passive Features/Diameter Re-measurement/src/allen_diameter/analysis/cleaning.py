@@ -8,7 +8,8 @@ I the observed block (gl), B the background (gl), S the summed shadow of the
 tier-1 neighbours (dimensionless, Block 25's ShadowResult.S). No clipping;
 float64 out. Per plane the result also carries the mean grey level added,
 mean_{x,y} B S (gl), and the share of pixels whose cleaned value exceeds B by
-more than CleaningConfig.over_background_gl (an over-subtraction diagnostic).
+more than CleaningConfig.over_background_gl (an over-subtraction diagnostic);
+cfg is a required argument (Block 28, amendment 1; D-135).
 
 Tiers (D-132). Neighbour q of node i -- in shadow.neighbour_indices' order:
 every segment of the FeaturedScene with at least one end outside own_ids, in
@@ -69,20 +70,16 @@ def _background(B_gl, shape):
     return out
 
 
-def clean_block(block, S, B_gl, cfg=None):
+def clean_block(block, S, B_gl, cfg):
     """I_clean = I + B S, plane by plane (D-130.O1); no clipping.
 
     block: (n_planes, H, W), any real dtype (gl); S: the same shape, float, finite and >= 0
     (dimensionless, the tier-1 shadow of Block 25); B_gl: scalar, (n_planes,) or (n_planes, H, W),
-    finite and > 0 (gl). cfg: DiameterConfig for CleaningConfig.over_background_gl -- NOT in the
-    contract signature of SPEC Block 28 (reported to the orchestrator); None takes the default
-    configuration. Returns CleanResult (block float64, added_gl (n_planes,), over_background
+    finite and > 0 (gl). cfg: DiameterConfig, required (CleaningConfig.over_background_gl, gl;
+    Block 28, amendment 1). Returns CleanResult (block float64, added_gl (n_planes,), over_background
     (n_planes,)). The inputs are not changed. ValueError for unequal shapes, a block that is not
     3-D, real and finite, a non-finite or negative S, B <= 0 or non-finite.
     """
-    if cfg is None:
-        from ..config import default_config
-        cfg = default_config()
     thr = float(cfg.cleaning.over_background_gl)
     I = np.asarray(block)
     if I.ndim != 3:

@@ -17,10 +17,14 @@ Checks
                         (dense random points of the reach disc, nearest
                         points by sampling the axis) on random scenes
     test_convergence    SKIP (no discretisation in the cleaning operator)
-    test_invariants     the hybrid: the same residual as the exact inverse is
-                        at most B max (1 - tau_1)(1 - tau_2) [bound; the
-                        measured values printed]; cleaning is linear in S and
-                        the cleaned block minus the block is B S
+    test_invariants     the hybrid: the residual of the same inverse, a
+                        reported measurement with no bound (amendment 1,
+                        D-135), for the draft's three cases and for two equal
+                        tubes (r 0.25 um, mu 3 /um) at tilt 0 and 45 deg,
+                        centres 1.0, 2.0, 3.0 um apart, printed as a table
+                        with the partition's residual as its floor; cleaning
+                        is linear in S and the cleaned block minus the block
+                        is B S
     test_contract       CleanResult's shapes and dtypes; the three forms of
                         B_gl agree [exact]; any real dtype of block; tiers
                         (n_q + n_s,) int64 in {1, 2} in neighbour order
@@ -79,6 +83,8 @@ _SAVED_ARTIFACTS = []
 PX = 0.1144
 B_REF = 210.0
 MEASURED = {}          # numbers printed by main() after the table
+HYBRID_TABLE = []      # rows of the hybrid residual table (Block 28, amendment 1)
+CFG = default_config()
 
 
 # --------------------------------------------------------------- helpers ---
@@ -124,12 +130,14 @@ LEFT, TOP, WIDTH, HEIGHT, PAD = -12, -12, 24, 24, 8
 KS = np.arange(-3, 4)                                     # planes -3 .. 3, z_k = k dz
 
 
-def render_pixels(tubes, mus, rc):
+def render_pixels(tubes, mus, rc, frame=None):
     """Block 24 planes of a scene, pixel means of the fine planes (before the camera chain):
-    (n_planes, HEIGHT, WIDTH) and the slab lattice."""
+    (n_planes, height, width) and the slab lattice. frame = (left, top, width, height) in pixels,
+    default the 24 x 24 patch about the origin."""
     acq = default_config().acquisition
+    left, top, width, height = (LEFT, TOP, WIDTH, HEIGHT) if frame is None else frame
     f = R.fine_factor(min(t.d for t in tubes), rc, acq.res0_um)
-    grid, inner = R.block_fine_grid(LEFT, TOP, WIDTH, HEIGHT, acq.res0_um, f, PAD)
+    grid, inner = R.block_fine_grid(left, top, width, height, acq.res0_um, f, PAD)
     res = SR.render_scene(tubes, mus, KS * acq.dz_um, grid, rc, acq.light_direction,
                           reduce=lambda plane: R.pixel_integrate(plane[inner[0], inner[1]], f))
     return res.tau, res.zeta
@@ -150,22 +158,24 @@ def pair(kind):
     return node, nb
 
 
-def inverse_residual(kind, absorption, mus):
-    """max |B tau_scene cleaned with S = 1 - tau_nb  -  B tau_node| (gl) and the bound
-    B max (1 - tau_node)(1 - tau_nb) (gl)."""
-    node, nb = pair(kind)
+def inverse_residual(kind, absorption, mus, tubes=None, frame=None, same_lattice=True):
+    """max |B tau_scene cleaned with S = 1 - tau_nb  -  B tau_node| (gl), B max (1 - tau_node)(1 - tau_nb)
+    (gl, the withdrawn bound, printed for comparison), and the peaks of B S and of the node's dip (gl).
+    tubes = (node, nb) overrides pair(kind); same_lattice: assert the three renders share one slab lattice."""
+    node, nb = pair(kind) if tubes is None else tubes
     rc = rcfg(absorption)
-    t_scene, z_s = render_pixels([node, nb], list(mus), rc)
-    t_node, z_n = render_pixels([node], [mus[0]], rc)
-    t_nb, z_b = render_pixels([nb], [mus[1]], rc)
-    assert z_s.size == z_n.size == z_b.size, "the three renders must share one slab lattice"
-    # one lattice up to roundoff of z_lo.min() (the two tubes sit at different y): 1e-12 um
-    check_close("lattice node", z_n, z_s, rtol=0, atol=1e-12)
-    check_close("lattice neighbour", z_b, z_s, rtol=0, atol=1e-12)
+    t_scene, z_s = render_pixels([node, nb], list(mus), rc, frame)
+    t_node, z_n = render_pixels([node], [mus[0]], rc, frame)
+    t_nb, z_b = render_pixels([nb], [mus[1]], rc, frame)
+    if same_lattice:
+        assert z_s.size == z_n.size == z_b.size, "the three renders must share one slab lattice"
+        # one lattice up to roundoff of z_lo.min() (the two tubes sit at different y): 1e-12 um
+        check_close("lattice node", z_n, z_s, rtol=0, atol=1e-12)
+        check_close("lattice neighbour", z_b, z_s, rtol=0, atol=1e-12)
     S = 1.0 - t_nb
     assert np.all(S >= -1e-12), "a neighbour's deficit is >= 0 up to roundoff"
     S = np.clip(S, 0.0, None)                            # roundoff of 1 - tau where tau = 1 to the last bit
-    got = CL.clean_block(B_REF * t_scene, S, B_REF)
+    got = CL.clean_block(B_REF * t_scene, S, B_REF, CFG)
     resid = float(np.max(np.abs(got.block - B_REF * t_node)))
     bound = float(B_REF * np.max((1.0 - t_node) * (1.0 - t_nb)))
     # the test is not vacuous: the neighbour's shadow reaches the node's own footprint
@@ -205,7 +215,7 @@ def test_known_answer():
     # S = 0 returns the block as float64, exactly
     rng = make_rng()
     blk = rng.integers(0, 256, size=(3, 5, 4)).astype(np.uint8)
-    out = CL.clean_block(blk, np.zeros(blk.shape), 200.0)
+    out = CL.clean_block(blk, np.zeros(blk.shape), 200.0, CFG)
     assert out.block.dtype == np.float64
     assert_array_equal(out.block, blk.astype(np.float64))
     assert_array_equal(out.added_gl, np.zeros(3))
@@ -296,7 +306,7 @@ def test_reference():
     blk = 200.0 + 10.0 * rng.standard_normal((4, 6, 7))
     S = 0.1 * rng.random((4, 6, 7))
     for B in (210.0, 205.0 + rng.random(4), 200.0 + 20.0 * rng.random((4, 6, 7))):
-        out = CL.clean_block(blk, S, B)
+        out = CL.clean_block(blk, S, B, CFG)
         Bf = np.broadcast_to(np.asarray(B, dtype=float).reshape((-1, 1, 1) if np.ndim(B) == 1 else np.shape(B)),
                              blk.shape)
         check_close("added_gl", out.added_gl, np.array([np.mean(Bf[k] * S[k]) for k in range(4)]),
@@ -343,23 +353,40 @@ def test_convergence():
 
 
 def test_invariants():
-    # hybrid: the residual of the same inverse is at most B max (1 - tau_1)(1 - tau_2) (SPEC, a bound)
+    # hybrid (Block 28, amendment 1, D-135): the residual of the same inverse is a reported measurement, no
+    # bound (the bound B max (1 - tau_1)(1 - tau_2) was withdrawn: oblique rays couple two tubes away from where
+    # their blurred shadows overlap). (i) The three cases of the draft's test:
     for kind, mus in (("flat", (3.0, 2.0)), ("tilted", (3.0, 2.0)), ("flat", (6.0, 6.0))):
         resid, bound, s_peak, own_peak = inverse_residual(kind, "hybrid", mus)
-        MEASURED["hybrid %s mu %s" % (kind, mus)] = "residual %.4f gl <= bound %.4f gl (ratio %.3f)" % (
-            resid, bound, resid / bound)
-        assert resid > 0.0, "the hybrid couples the two tubes: the residual should not vanish"
-        assert resid <= bound, "hybrid %s %r: residual %.4g gl above the bound %.4g gl" % (kind, mus, resid, bound)
+        HYBRID_TABLE.append(("draft " + kind, {"flat": 0.0, "tilted": 30.0}[kind], 0.25 if kind == "flat" else 0.3,
+                             mus, 9 * PX if kind == "flat" else 8 * PX, resid, float("nan"), bound, s_peak, own_peak))
+        assert np.isfinite(resid) and resid > 0.0, "the hybrid couples the two tubes: the residual should not vanish"
+    # (ii) two equal tubes, r 0.25 um, mu 3 /um, tilt 0 and 45 deg, centres 1.0, 2.0, 3.0 um apart (along y,
+    # heading 0). The patch spans y from -1.83 to 4.80 um (58 px) so that a 3 um separation holds both tubes and
+    # their blurred shadows. The separations are not whole pixels, so the node and the neighbour sample the
+    # grid differently and their slab lattices differ slightly (z_lo.min() is read on different samples): the
+    # partition's residual on the same scenes, which would be exactly 0 on one lattice, is printed beside the
+    # hybrid's as the floor of the measurement (no tolerance: a reported number, like the hybrid's).
+    frame = (-14, -16, 28, 58)
+    for tilt in (0.0, 45.0):
+        for sep in (1.0, 2.0, 3.0):
+            node = G.Tube((0.0, 0.0, 0.0), 0.25, math.radians(tilt), 0.0, 1.0, 1.0, "axial")
+            nb = G.Tube((0.0, sep, 0.0), 0.25, math.radians(tilt), 0.0, 1.0, 1.0, "axial")
+            resid, bound, s_peak, own_peak = inverse_residual(None, "hybrid", (3.0, 3.0), (node, nb), frame, False)
+            floor = inverse_residual(None, "partition_vertical", (3.0, 3.0), (node, nb), frame, False)[0]
+            HYBRID_TABLE.append(("pair", tilt, 0.25, (3.0, 3.0), sep, resid, floor, bound, s_peak, own_peak))
+            assert np.isfinite(resid), "hybrid residual not finite"
+            assert np.isfinite(floor), "partition floor not finite"
 
     # linearity in S and the added light: clean(S1 + S2) - clean(0) = B (S1 + S2); 1e-12 relative to B
     rng = make_rng(SEED + 1)
     blk = rng.integers(100, 255, size=(2, 9, 8)).astype(np.uint8)
     S1, S2 = 0.2 * rng.random(blk.shape), 0.1 * rng.random(blk.shape)
     B = 190.0 + 20.0 * rng.random(2)
-    c12 = CL.clean_block(blk, S1 + S2, B).block
-    c1 = CL.clean_block(blk, S1, B).block
-    c2 = CL.clean_block(blk, S2, B).block
-    c0 = CL.clean_block(blk, np.zeros(blk.shape), B).block
+    c12 = CL.clean_block(blk, S1 + S2, B, CFG).block
+    c1 = CL.clean_block(blk, S1, B, CFG).block
+    c2 = CL.clean_block(blk, S2, B, CFG).block
+    c0 = CL.clean_block(blk, np.zeros(blk.shape), B, CFG).block
     check_close("linear in S", c12 - c0, (c1 - c0) + (c2 - c0), rtol=0, atol=1e-12 * 255)
     check_close("added is B S", c12 - blk, B[:, None, None] * (S1 + S2), rtol=0, atol=1e-12 * 255)
 
@@ -370,7 +397,7 @@ def test_contract():
     S = 0.1 * rng.random((n, H, W))
     for dtype in (np.uint8, np.int16, np.float32, np.float64):
         blk = (200 * rng.random((n, H, W))).astype(dtype)
-        out = CL.clean_block(blk, S, 210.0)
+        out = CL.clean_block(blk, S, 210.0, CFG)
         assert isinstance(out, CL.CleanResult)
         assert out.block.shape == (n, H, W) and out.block.dtype == np.float64
         assert out.added_gl.shape == (n,) and out.added_gl.dtype == np.float64
@@ -379,22 +406,32 @@ def test_contract():
         assert np.all(np.isfinite(out.block))
     # the three forms of B_gl agree, exactly
     blk = 200 * rng.random((n, H, W))
-    a = CL.clean_block(blk, S, 207.5)
-    b = CL.clean_block(blk, S, np.full(n, 207.5))
-    c = CL.clean_block(blk, S, np.full((n, H, W), 207.5))
+    a = CL.clean_block(blk, S, 207.5, CFG)
+    b = CL.clean_block(blk, S, np.full(n, 207.5), CFG)
+    c = CL.clean_block(blk, S, np.full((n, H, W), 207.5), CFG)
     for r in (b, c):
         assert_array_equal(r.block, a.block)
         assert_array_equal(r.added_gl, a.added_gl)
         assert_array_equal(r.over_background, a.over_background)
     # per-plane B: (n,) equals the (n, H, W) array of the same values
     Bn = np.array([190.0, 205.0, 220.0])
-    assert_array_equal(CL.clean_block(blk, S, Bn).block,
-                       CL.clean_block(blk, S, np.broadcast_to(Bn[:, None, None], (n, H, W)).copy()).block)
+    assert_array_equal(CL.clean_block(blk, S, Bn, CFG).block,
+                       CL.clean_block(blk, S, np.broadcast_to(Bn[:, None, None], (n, H, W)).copy(), CFG).block)
     # over_background counts pixels strictly above B + over_background_gl
     blk2 = np.full((1, 2, 2), 200.0)
     S2 = np.array([[[0.0, 3.0 / 200.0], [4.0 / 200.0, 0.01]]])
-    out = CL.clean_block(blk2, S2, 200.0)                # cleaned - B = 0, 3, 4, 2 gl; the threshold 3 gl
+    out = CL.clean_block(blk2, S2, 200.0, CFG)                # cleaned - B = 0, 3, 4, 2 gl; the threshold 3 gl
     assert_array_equal(out.over_background, [0.25])
+    # the threshold is read from cfg (Block 28, amendment 1): at 1.5 gl three of the four pixels count
+    cfg_lo = dataclasses.replace(CFG, cleaning=dataclasses.replace(CFG.cleaning, over_background_gl=1.5))
+    assert_array_equal(CL.clean_block(blk2, S2, 200.0, cfg_lo).over_background, [0.75])
+    # cfg is required: no default configuration inside the function
+    try:
+        CL.clean_block(blk2, S2, 200.0)
+    except TypeError:
+        pass
+    else:
+        raise AssertionError("clean_block without cfg should raise TypeError")
     # tiers: (n_q + n_s,) int64 in {1, 2}
     fs = fscene(OWN_SEGS + [CASES["close_in_focus"][0], CASES["far_lateral"][0]], soma=[(9.0, 9.0, 3.0)] * 2)
     t = CL.neighbour_tiers(fs, OWN_IDS, NODE, default_config())
@@ -408,7 +445,7 @@ def test_determinism():
     S = 0.05 * rng.random(blk.shape)
     B = np.array([200.0, 210.0])
     blk0, S0, B0 = blk.copy(), S.copy(), B.copy()
-    a, b = CL.clean_block(blk, S, B), CL.clean_block(blk, S, B)
+    a, b = CL.clean_block(blk, S, B, CFG), CL.clean_block(blk, S, B, CFG)
     assert_array_equal(a.block, b.block)
     assert_array_equal(a.added_gl, b.added_gl)
     assert_array_equal(a.over_background, b.over_background)
@@ -437,19 +474,19 @@ def _raises(func, *args):
 def test_edge_cases():
     blk = np.full((2, 3, 3), 200.0)
     S = np.zeros((2, 3, 3))
-    _raises(CL.clean_block, blk, np.zeros((2, 3, 4)), 200.0)            # unequal shapes
-    _raises(CL.clean_block, blk[0], S[0], 200.0)                        # not (n_planes, H, W)
+    _raises(CL.clean_block, blk, np.zeros((2, 3, 4)), 200.0, CFG)            # unequal shapes
+    _raises(CL.clean_block, blk[0], S[0], 200.0, CFG)                        # not (n_planes, H, W)
     bad = S.copy(); bad[0, 1, 1] = np.nan
-    _raises(CL.clean_block, blk, bad, 200.0)                            # non-finite S
+    _raises(CL.clean_block, blk, bad, 200.0, CFG)                            # non-finite S
     bad = S.copy(); bad[1, 0, 0] = np.inf
-    _raises(CL.clean_block, blk, bad, 200.0)
+    _raises(CL.clean_block, blk, bad, 200.0, CFG)
     bad = S.copy(); bad[1, 2, 2] = -1e-9
-    _raises(CL.clean_block, blk, bad, 200.0)                            # negative S
+    _raises(CL.clean_block, blk, bad, 200.0, CFG)                            # negative S
     for B in (0.0, -5.0, np.nan, np.inf, np.array([200.0, 0.0]), np.full((2, 3, 3), -1.0)):
-        _raises(CL.clean_block, blk, S, B)                              # B <= 0, non-finite B
-    _raises(CL.clean_block, blk, S, np.full(3, 200.0))                  # B of a wrong length
-    _raises(CL.clean_block, blk, S, np.full((2, 1, 1), 200.0))          # not one of the three forms
-    _raises(CL.clean_block, blk.astype(complex), S, 200.0)              # not a real dtype
+        _raises(CL.clean_block, blk, S, B, CFG)                              # B <= 0, non-finite B
+    _raises(CL.clean_block, blk, S, np.full(3, 200.0), CFG)                  # B of a wrong length
+    _raises(CL.clean_block, blk, S, np.full((2, 1, 1), 200.0), CFG)          # not one of the three forms
+    _raises(CL.clean_block, blk.astype(complex), S, 200.0, CFG)              # not a real dtype
     cfg = default_config()
     fs = fscene(OWN_SEGS + [CASES["far_lateral"][0]])
     _raises(CL.neighbour_tiers, fs, OWN_IDS, (0.0, 0.0), cfg)           # node not 3 numbers
@@ -512,6 +549,15 @@ def main():
         if status in ("FAIL", "ERROR"):
             print(f"\n---- {status}: {name}\n{detail.strip()}")
 
+    if HYBRID_TABLE:
+        print("\n-- hybrid: residual of cleaning a joint scene with the neighbour rendered alone (B = 210 gl, "
+              "planes -3..3, 8 x 16 directions; no bound, Block 28 amendment 1)")
+        print("   %-13s %6s %6s %-11s %8s %12s %14s %12s %10s %10s" % (
+            "case", "tilt", "r_um", "mu", "sep_um", "resid_gl", "floor_part_gl", "old_bnd_gl", "peakBS_gl",
+            "nodedip_gl"))
+        for row in HYBRID_TABLE:
+            print("   %-13s %6.1f %6.2f %-11s %8.3f %12.4e %14.2e %12.4f %10.2f %10.2f" % (
+                row[0], row[1], row[2], "%g,%g" % row[3], row[4], row[5], row[6], row[7], row[8], row[9]))
     if MEASURED:
         print("\n-- measured")
         for key, val in MEASURED.items():
