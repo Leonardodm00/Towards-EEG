@@ -138,8 +138,8 @@ theory:
     refs: [D-063.4, D-071.4, D5, "10-19 handoff s.5.3", "mathematics Eqs. 20-21", "theory handoff 2026-10-22 s.6.2"]
     parent: T4
     depends_on: [T4.2]
-    status: studying
-    closed_on:
+    status: closed
+    closed_on: 2026-11-13
     decision:
     note: "Being studied (the user). 2026-10-28: the cubic read-out is studied (the user: \"the cubic spline has been studied\"): the tensor cubic interpolant, its cardinal weights, its smoothness and its fourth-order error (checks tensor_cubic_2026-10-28, 19 of 19 passed). What remains is the inversion (vii) with its worked case: classical calibration, the root and its flags, the error budget and the SE of the corrected diameter (items 5b-5g), explained in depth on 2026-10-28 (checks inversion_2026-10-28: 9 of 10 passed; the band predicted for mathematics Eq. 21 failed); the study resumes on 2026-10-29. Study handoff: TEEG_diameter_table_readout_inversion_study_handoff_2026-10-27.md (sent as a file; project knowledge is full)."
   - id: T5
