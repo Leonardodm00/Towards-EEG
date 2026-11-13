@@ -227,7 +227,7 @@ def run_survey(a, cfg, log):
         warnings.simplefilter("always")
         examples = contamination.pick_examples(eligible, tuple(cfg.cleaning.example_counts), rng)
     for w in caught:
-        log("pick_examples: %s" % w.message)
+        log(str(w.message))
     by_id = {int(r["node_id"]): r for r in rows}
     counts = {c: sum(1 for r in rows if r["class"] == c) for c in contamination.CLASSES}
     counts_eligible = {c: sum(1 for r in eligible if r["class"] == c) for c in contamination.CLASSES}
