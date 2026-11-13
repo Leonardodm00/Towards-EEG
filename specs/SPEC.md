@@ -1077,6 +1077,8 @@ predictor as callables.
 - Confirmed: D-129.2, D-130.O2, D-130.O3, D-130.O6, D-132 (the user); the Jacobi update, the flags, the callables and the returned record are the assistant's
 - Status: drafted
 
+Block 32, amendment 1 (2026-11-13, 18:25; D-139 [orchestrator], on the implementer's issue at `692b906`). (i) The default `shadow_fn` passes Block 25 the scalar $\max_k B_{i,k}$ as `B_gl` (Block 25's floor of D-130.O5 reads one background): every neighbour whose shadow reaches `shadow_floor_gl` in some plane at that plane's own background is kept, and at most a neighbour just under the floor is kept too; exact for a background that does not vary across the planes. The cleaning itself (step (d)) uses the per-plane $B_{i,k}$. (ii) `shadow_fn(fscene, own_ids, left, top, width, height, planes_z, cfg, B_gl, include) -> S (n_planes, H, W)` float64, dimensionless. (iii) Accepted as part of the entry: from round 2 a node whose row is `"refined"` starts at its row's $(d, \mu)$ and at $(v_0, \Delta z)$ read back from `offset_um`, any other node at `theta0`; the flags `refine_failed` and `refine_at_bound` reflect the latest fit only; a round in which no node is refined never satisfies the diameter half of the stop rule, and with no example nodes the line half holds vacuously; a measuring line that leaves the patch raises ValueError.
+
 ### Block 34: the inference figures (plan steps F5, E; D-129.4)
 
 - Module: `src/allen_diameter/plotting/inference_figures.py`; smoke test `tests/smoke/test_smoke_inference_figures.py`
