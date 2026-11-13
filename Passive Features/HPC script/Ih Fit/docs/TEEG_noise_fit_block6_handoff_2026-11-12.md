@@ -7,6 +7,7 @@ which stays the history of Block 9 and of D-122 to D-125.
 | Date | Change |
 |---|---|
 | 2026-11-12 | Created at the user's request ("The handoff then"), after D-125 (Block 6's five questions answered) and D-126 (its two readings confirmed). Same day, before it: Block 9 written and pushed (`2171519`); the noise chat's D-117/D-118 renumbered D-122/D-123 (`a05ccdb`); D-124 (the cohort); the project instructions became v2 (the repository is the source of truth); the diameter chat's D-117 to D-121 and I-005 merged into `main`'s log (`3dc3703`); Block 6's SPEC entry drafted (`3dc3703`). |
+| 2026-11-13 | Step 1 done: Block 6 written, smoke-tested (R1-R9 9/9; 26 planted defects, each caught) and pushed (`1d848f6`). §1, §3 (what was built beyond the SPEC entry), §4 (the final commands, what to read back), §5 and §9 brought up to date. No decision taken (next free IDs unchanged: D-127, I-006). |
 
 **Basis tags.** **[run]** executed in the assistant's sandbox (date given); **[src]** read from the code, SPEC or log
 on `main`; **[log]** the decision log's text; **[user]** the user's decision or words; **[reasoning]** the assistant's
@@ -16,8 +17,8 @@ argument, not checked; **[open]** not decided or not verified.
 
 | # | Step | Blocked by | Where it runs |
 |---|---|---|---|
-| 1 | **Block 6's code**: `run_noise_fit.py`, `submit_noise_fit.sh`, `smoke_noise_run.py` (R1-R8), exactly as SPEC Block 6 states | nothing: D-123 to D-126 settle every point | sandbox |
-| 2 | **The run on davinci** (the user runs it, §4): `git pull`, the FULL gates, a dry run, the 2-cell pilot at full size, then the 18 cells with the pilot's walltime | step 1 | davinci |
+| 1 | **Block 6's code**: `run_noise_fit.py`, `submit_noise_fit.sh`, `smoke_noise_run.py` (R1-R8), exactly as SPEC Block 6 states -- **done 2026-11-13, `1d848f6`** (R1-R9) | nothing: D-123 to D-126 settle every point | sandbox |
+| 2 | **The run on davinci** (the user runs it, §4): `git pull`, the FULL gates, a dry run, the 2-cell pilot at full size, then the 18 cells with the pilot's walltime -- **next** (§4's commands are final) | step 1 | davinci |
 | 3 | **Block 5's SPEC entry, then its code**: the twins built from the run's tables (§6's questions first) | the run's tables | sandbox |
 | 4 | **Block 7** (the record), then **Stage 7** (Block 8, the recovery gate, D-083) | Blocks 5-6 | sandbox, davinci |
 
@@ -26,14 +27,14 @@ Roadmap rule 4: propose, add only on a yes.
 
 ## 1. Where it stands (roadmap at `9526401`, 2026-11-12) [run]
 
-Implementation planned 6, pushed 5, tested 7, done 8; theory open 8, studying 4, closed 5.
+Implementation planned 6, pushed 5, tested 7, done 8; theory open 8, studying 4, closed 5. [corrected 2026-11-13: planned 5, pushed 6, tested 7, done 8 at `1d848f6`, `roadmap.py status`]
 
 | Stage | Status | Note |
 |---|---|---|
 | N1-N4 Blocks 1-4 | pushed | no tester report covers them (last 2026-10-07, `7a49a28`) |
 | NT tools (gates) | done | FULL run on davinci only 2026-10-20 at `ca028ea` (13 checks); now 14 (G2 and G6d cover Block 9): re-run before the pilot |
 | N4b Block 9 | pushed | `noise_sweep_fit.py` at `2171519`, smoke P1-P11 11/11 |
-| N6 Block 6 | planned | SPEC entry drafted 2026-11-12; code not written |
+| N6 Block 6 | planned [corrected 2026-11-13: pushed (roadmap.py status: no tester report covers 1d848f6)] | SPEC entry drafted 2026-11-12; code not written [corrected 2026-11-13: written, smoke-tested, pushed at `1d848f6`] |
 | N5, N7, S7 | planned | after N6 (D-123) |
 
 ## 2. Decisions that bind Block 6
@@ -52,7 +53,23 @@ The log: `docs/project/TEEG_decisions_and_ideas_log.md` on `main`, about 1.06 MB
 read its last changelog rows before taking an ID. **Next free IDs: D-127, I-006.** Every chat now logs in this copy
 (the project instructions' v2).
 
-## 3. Step 1 -- Block 6's code
+## 3. Step 1 -- Block 6's code [done 2026-11-13, `1d848f6`]
+
+Built as SPEC Block 6 states; the as-built notes of its entry list every addition, the assistant's choices, flagged, none decided by the user **[src]**:
+
+| Addition | Why |
+|---|---|
+| the resume rule also needs the same `sizes` record and clean code (`code_dirty`): a JSON written from code that differed from its commit is re-run, and nothing is skipped while `git status` shows a noise-fit file modified | a `--sizes smoke` or hand-edited result must never stand in for a full-size committed one |
+| the submitter writes a run file `~/noise_fit_runs/<RUN_TAG>_<GROUP>_<UTC>.env` (every resolved path, the cohort) and passes the jobs only its path | the archive and code paths hold spaces, which `qsub -v` does not carry; a job runs exactly the cohort submitted |
+| `DRY_RUN=1` runs `list` and checks both argument lists against the driver's own parser (read-only Python) | the SPEC's "runs no Python" would need a second, bash copy of the cohort rule; read as "no fit, no merge, no qsub" |
+| knobs `SIZES` (full / smoke), `NOISE_RUN_DIR`, `ROADMAP_DISABLE` (passed on to the jobs) | a 10-minute check of the PBS path at smoke sizes is possible; the run file's place; a submission can stay off the roadmap |
+| a one-cell cohort is a plain job with `NOISE_INDEX=0` | PBS refuses an array of one subjob **[reasoning: not checked on davinci]** |
+| the JSON also holds `code_dirty`, `job_id`, `started_utc`, `finished_utc`, `versions`, `seconds.total`, `tables` (Block 9's `cell_columns()` and `table_rows()`, read by the merge) and more of Block 3 (`start_groups`, the tilts) | provenance; the merge needs no result object rebuilt from its dict |
+| progress lines `[noise_fit <id>] ...` (Block 4's solves, each sweep's fit and bootstrap) | a job killed by the walltime leaves no JSON; its log still shows how far it got and how long each step took |
+| the LS sweeps submitted to the pool first, rows kept in `fit_sweeps`' order | the LS sweeps are the slow ones (SPEC 2.5 (h)); the numbers do not change (R1) |
+
+The original plan of this step follows, kept as written.
+
 
 Write it from SPEC Block 6 (`Ih Fit/specs/SPEC.md`, section 5, before "Tools"), not from this summary. What it calls,
 all on `main` **[src]**:
@@ -79,13 +96,33 @@ for `smoke_noise_run.py` (G2 for its commit, a G6e in FULL mode).
 
 ## 4. Step 2 -- the run on davinci (the user runs it)
 
-The shape of the commands; finalise them with the code **[open]**:
+The shape of the commands; finalise them with the code **[open]** [corrected 2026-11-13: final, below this block]:
 
     cd /davinci-1/home/ldellamea/TEEG/Towards-EEG && git pull
     cd "Passive Features/HPC script/Ih Fit" && conda activate prova && bash cluster_gates_noise_fit.sh   # FULL, about 25 min; VERDICT SETTLED needed
     RUN_TAG=<tag> CELLS=508282493,569844159 DRY_RUN=1 bash submit_noise_fit.sh   # prints every command, submits nothing
     RUN_TAG=<tag> CELLS=508282493,569844159 bash submit_noise_fit.sh             # the pilot, full size
     RUN_TAG=<tag> WALLTIME=<from the pilot> bash submit_noise_fit.sh            # the 18 cells; the pilot's two skipped (same commit)
+
+The final commands (2026-11-13, `1d848f6`) **[src; run in the sandbox against stubs of conda, qsub and python only]**:
+
+    cd /davinci-1/home/ldellamea/TEEG/Towards-EEG && git pull
+    cd "Passive Features/HPC script/Ih Fit" && conda activate prova
+    bash cluster_gates_noise_fit.sh                  # FULL, about 25 min; needs "VERDICT: SETTLED"
+    python smoke_noise_run.py                        # about 9 min; needs "SMOKE noise_run: 9/9 passed" (Block 6 is not in the gates)
+    RUN_TAG=nf1 CELLS=508282493,569844159 DRY_RUN=1 bash submit_noise_fit.sh
+    RUN_TAG=nf1 CELLS=508282493,569844159 WALLTIME=48:00:00 bash submit_noise_fit.sh   # the pilot
+    # after the pilot has ended:
+    RUN_TAG=nf1 WALLTIME=<from the pilot> DRY_RUN=1 bash submit_noise_fit.sh
+    RUN_TAG=nf1 WALLTIME=<from the pilot> bash submit_noise_fit.sh
+
+The dry run must print `cohort: 2 cell(s): 508282493 569844159`, `cores: 2 cell(s) x NCPUS 6 = 12 (cap 120, D-125.1)`, `CLI contract: ... accepts the cell and the merge arguments`, one `subjob` line per cell and the merge's line, and end with `DRY RUN: nothing written, nothing submitted`. The pilot's walltime is 48 h, not the default 12 h **[reasoning]**: Block 4 alone is estimated at 1-3.5 h (2-sweep) and 2-5.5 h (10-sweep) per cell on one core (SPEC 2.3 (h), from evaluations timed in the sandbox; never run whole at full size), Block 9 adds about the slowest LS sweep's 1.1 h or more with 6 workers, and 569844159 is a 10-sweep cell; a longer request costs nothing if the job ends early. Then WALLTIME for the 18 cells: the pilot's largest `seconds.total` times about 1.5, rounded up **[reasoning]** (571483807 and 571624532 are 10-sweep cells too).
+
+Reading the pilot back (OUT = `/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs_ih/noise_fit/nf1/L3_exc`):
+
+    OUT="/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs_ih/noise_fit/nf1/L3_exc"
+    grep -h '^NOISE_CELL' "$OUT"/logs/cell_*.log; grep -h -A20 '^NOISE_MERGE' "$OUT"/logs/merge_*.log
+    python -c "import json,glob,sys; [print(f.split('/')[-1], json.load(open(f))['status'], json.load(open(f))['seconds']) for f in sorted(glob.glob(sys.argv[1] + '/cells/*.json'))]" "$OUT"
 
 Read back from the pilot: the `NOISE_CELL` lines, each JSON's per-stage seconds (they set `WALLTIME`), the
 `NOISE_MERGE` line. A code change between the pilot and the run re-runs every cell, the pilot's included (the resume
@@ -96,10 +133,12 @@ rule keys on the commit). Gate logs: `~/ih_fit_gate_logs/<date_time>/`.
 | What | State | Basis |
 |---|---|---|
 | Block 9 smoke | 11/11 in 404 s at `2171519`; 17 planted defects, each caught | [run 2026-11-12] |
+| Block 6 smoke | R1-R9 9/9 at `1d848f6` (2 cores, Python 3.13; 508 s before the day's last edit, 675 s after it with two other runs sharing the cores); 26 planted defects, each caught | [run 2026-11-13] |
 | Blocks 1-4 smoke | 6/6, 10/10, 15/15, 11/11 at `a916c2c`; their code unchanged since | [run 2026-11-11; src] |
 | gates smoke | 8/8 after the G6d change | [run 2026-11-12] |
 | sandbox packages | numpy 2.5.3, scipy 1.18.1; statsmodels is NOT preinstalled: `pip install --break-system-packages statsmodels` (minutes) before Block 9's P3 | [run 2026-11-12] |
 | real cells | Blocks 3, 4 and 9 have never run on a real cell nor at full size | [log] |
+| the job script on davinci | never run there: its roles, the run file, `qsub -J`, `-W depend=afterany` on an array id and the marker were checked only against stubs | [run 2026-11-13, sandbox] |
 
 ## 6. After the run: Block 5's questions (carried from the 2026-11-11 handoff, §6)
 
@@ -143,6 +182,10 @@ rule keys on the commit). Gate logs: `~/ih_fit_gate_logs/<date_time>/`.
 | "Block 4b" | is Block 9 |
 | P8 (Block 9's smoke) | its at-bound target lies 100 times above the bounds' largest SD: below them the whitened cost is flat and the solve stops short |
 | D-055 | S0-S3 dropped for now; its superseded elements are listed in D-125.3 |
+| the run file | the jobs read `~/noise_fit_runs/<RUN_TAG>_<GROUP>_<UTC>.env`, not the knobs: a knob changed after `qsub` does not reach a queued job; submit again |
+| modified code on davinci | while `git status` shows a modified `noise_*.py` or `run_noise_fit.py`, the resume rule skips nothing (every cell re-runs) and the JSONs are marked `code_dirty`; fixes travel through git |
+| the pilot's marker | the pilot's array marks N6 done on the roadmap before the 18-cell run; `ROADMAP_DISABLE=1` at submission keeps a submission off it |
+| a killed job | (walltime, memory) writes no JSON: the merge lists the cell as missing; its log's progress lines show where it stopped; the same `RUN_TAG` again re-runs only the cells without an ok JSON |
 
 ## 10. Documents
 
