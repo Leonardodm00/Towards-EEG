@@ -701,3 +701,638 @@ def test_square_restores_the_predicted_depth_verdict():
         assert (depth > cal.isolation_depth_gl) == expect, (off, depth)
         reasons = CAL.calibration_reasons(node, cfg, 0.4, own, 40, scene, planes_z)
         assert reasons == (["not_isolated"] if expect else []), (off, reasons, depth)
+
+
+# =============================================================================
+# Run D4 (integration tester, 2026-11-13, commit 1555036): Block 10's calibration
+# sets, dip statistics, the growth fit of Eq. 4 with D-119's sparse Jacobian,
+# kernel_from_growth, the anchor (10.A, D-117.4), 10.G's background SD and
+# goodness of fit, 10.C's trace direction, typical background and choice, and
+# 10.C.R's digest, key and reuse. Expected values come from spec_helpers_D4
+# (written from SPEC.md) or by hand; every tolerance is justified where used.
+# Run: python -m pytest tests/spec/test_spec_block10_stripe.py -q -k d4
+# =============================================================================
+import spec_helpers_D4 as D4  # noqa: E402
+
+from allen_diameter.analysis import candidate_search as D4_CSR  # noqa: E402
+from allen_diameter.analysis.node_pipeline import Branch as D4_Branch  # noqa: E402
+from allen_diameter.loading import table_io as D4_table_io  # noqa: E402
+from allen_image_io import CropFrame as D4_CropFrame  # noqa: E402
+
+D4_G_SYM = np.array([0.0, 0.010, 0.060, 0.150, 0.280])                       # um^2 at 0, 0.28 .. 1.12 um
+D4_G_MIN = np.array([0.30, 0.17, 0.07, 0.012, 0.0, 0.008, 0.05, 0.13, 0.25])  # um^2 at -1.12 .. 1.12 um
+
+
+def d4_design(n, seed, convention="symmetric"):
+    """c (um^2), true axes z_ax (um), starts z_sub (um), k* for n nodes; axes off-plane on both sides."""
+    rng = np.random.default_rng(seed)
+    k = rng.integers(-5, 15, n)
+    u = rng.uniform(0.03, 0.11, n) * np.where(np.arange(n) % 2 == 0, 1.0, -1.0)
+    z_ax = k * D4.DZ + u
+    z_sub = z_ax + rng.uniform(-0.04, 0.04, n)
+    c = rng.uniform(0.005, 0.05, n)
+    return c, z_ax, z_sub, k
+
+
+def d4_cal(**kw):
+    return D4.cfg_with(calibration=kw)
+
+
+def test_d4_calibration_set_edges():
+    """O10.1: the two sets by Allen's diameter, edges included."""
+    cfg = D4.cfg_with()
+    cases = [(0.6, "near"), (0.6 + 1e-9, "far"), (0.8, "far"), (0.8 + 1e-9, ""), (0.0, ""), (-0.1, ""),
+             (NAN, ""), (float("inf"), ""), (2 * 0.3, "near"), (2 * 0.4, "far"), (1e-12, "near")]
+    for d, want in cases:
+        assert CAL.calibration_set(d, cfg) == want, (d, want)
+
+
+@pytest.mark.parametrize("thin, band", [(0.0, (0.6, 0.8)), (-0.1, (0.6, 0.8)), (0.7, (0.6, 0.8)),
+                                        (0.6, (0.8, 0.8)), (0.6, (0.8, 0.7)), (0.6, (0.6,)),
+                                        (0.6, (0.6, 0.7, 0.8)), (0.6, (0.6, float("inf"))),
+                                        (float("nan"), (0.6, 0.8))])
+def test_d4_validate_refuses_bad_set_bands(thin, band):
+    """O10.2: validate() keeps 0 < D_thin <= a < b, finite, two band values."""
+    with pytest.raises((ValueError, TypeError)):
+        D4.cfg_with(calibration=dict(node_allen_diameter_max_um=thin, far_field_allen_diameter_um=band))
+
+
+def test_d4_validate_accepts_touching_sets():
+    D4.cfg_with(calibration=dict(node_allen_diameter_max_um=0.6, far_field_allen_diameter_um=(0.6, 0.8)))
+    D4.cfg_with(calibration=dict(node_allen_diameter_max_um=0.5, far_field_allen_diameter_um=(0.6, 0.8)))
+
+
+def test_d4_criteria_reasons_order_bounds_and_nan():
+    """O10.3: Allen's diameter, then not_flat by the set's bound (neither set: the near bound), then not_faint
+    only with node_alpha_check; a NaN fails its criterion; bounds inclusive."""
+    on = d4_cal(node_alpha_check=True)
+    r = math.radians
+    assert CAL.criteria_reasons(r(20), 0.9, NAN, on) == ["allen_diameter_missing", "not_flat", "not_faint"]
+    assert CAL.criteria_reasons(r(20), 0.9, 1.0, on) == ["allen_diameter_out", "not_flat", "not_faint"]
+    assert CAL.criteria_reasons(r(12), 0.1, 1.0, on) == ["allen_diameter_out", "not_flat"]   # near bound 10 deg
+    assert CAL.criteria_reasons(r(12), 0.1, 0.7, on) == []                                    # far bound 15 deg
+    assert CAL.criteria_reasons(r(12), 0.1, 0.4, on) == ["not_flat"]
+    assert CAL.criteria_reasons(r(16), 0.1, 0.7, on) == ["not_flat"]
+    assert CAL.criteria_reasons(r(10), 0.5, 0.4, on) == []                                    # both bounds inclusive
+    assert CAL.criteria_reasons(r(15), 0.1, 0.7, on) == []
+    assert CAL.criteria_reasons(NAN, 0.1, 0.4, on) == ["not_flat"]
+    assert CAL.criteria_reasons(0.0, NAN, 0.4, on) == ["not_faint"]
+    off = D4.cfg_with()
+    assert CAL.criteria_reasons(0.0, 5.0, 0.4, off) == []                                     # D-094: no alpha test
+    assert CAL.criteria_reasons(0.0, NAN, 0.4, off) == []
+
+
+def test_d4_selection_flags_default_and_switch():
+    """O10.4 (D-094, D-096)."""
+    base = ("crossing", "stack_edge", "bbar_few", "profile_nan")
+    assert tuple(CAL.selection_flags(D4.cfg_with())) == base
+    assert tuple(CAL.selection_flags(d4_cal(node_faint_flag_check=True))) == ("faint",) + base
+
+
+def test_d4_dip_statistics_sampled_gaussian():
+    """O10.5: omega = s^2 to 1e-12 relative (the spec's figure: the core fit runs on the unsmoothed
+    exact Gaussian, so only the solver's round-off remains); A_W = a s sqrt(2 pi) and V_W = s^2 to 1e-9
+    with a window of 10 s (the Riemann sums of a Gaussian sampled at s / step = 1.75 err by
+    ~exp(-2 pi^2 1.75^2) ~ 1e-26, the window's truncation by exp(-50))."""
+    s, a, vc, B = 0.2, 30.0, 0.05, 200.0
+    cfg = d4_cal(window_half_um=10 * s)
+    step = cfg.measure.profile_step_um
+    n = int(round(3.0 / step))
+    v = np.arange(-n, n + 1) * step
+    I = B - D4.gauss_dip(v, a, vc, s)
+    st = CAL.dip_statistics(v, I, B, cfg.measure, cfg.calibration)
+    assert st["status"] == "ok"
+    assert_allclose(st["omega_um2"], s ** 2, rtol=1e-12)
+    assert_allclose(st["area_gl_um"], a * s * math.sqrt(2 * math.pi), rtol=1e-9)
+    assert_allclose(st["vw_um2"], s ** 2, rtol=1e-9)
+
+
+def test_d4_dip_statistics_refusals():
+    """O10.5: a flat profile is no_dip; a dip wider than the profile has no half-depth width (no_fwhm)."""
+    cfg = D4.cfg_with()
+    step = cfg.measure.profile_step_um
+    n = int(round(3.0 / step))
+    v = np.arange(-n, n + 1) * step
+    assert CAL.dip_statistics(v, np.full(v.size, 200.0), 200.0, cfg.measure, cfg.calibration)["status"] == "no_dip"
+    wide = 200.0 - D4.gauss_dip(v, 30.0, 0.0, 6.0)        # half depth reached at +-7 um, outside +-3 um
+    assert CAL.dip_statistics(v, wide, 200.0, cfg.measure, cfg.calibration)["status"] == "no_fwhm"
+
+
+@pytest.mark.parametrize("convention, interp", [("symmetric", "cubic"), ("symmetric", "linear"),
+                                                ("min_origin", "cubic"), ("min_origin", "linear")])
+def test_d4_fit_growth_recovers_exact_eq4_data(convention, interp):
+    """O10.6: exact Eq. 4 data of the fitted family (knots m dz, M = 4) -> c_i, z_ax,i, the knots and the
+    curve to 1e-9 (the spec's tolerance); the knots are m dz (symmetric) or (m - 4) dz (min_origin)."""
+    G = D4_G_SYM if convention == "symmetric" else D4_G_MIN
+    c, z_ax, z_sub, k = d4_design(8, 11)
+    scans = D4.eq4_scans(G, c, z_ax, z_sub, k, interp, convention)
+    cfg = d4_cal(origin_convention=convention, growth_interp=interp)
+    g = CAL.fit_growth(scans, cfg)
+    want_knots = np.arange(5) * D4.DZ if convention == "symmetric" else (np.arange(9) - 4) * D4.DZ
+    assert_allclose(g.knots_um, want_knots, atol=1e-12)
+    assert_allclose(g.g_um2, G, atol=1e-9)
+    assert_allclose(g.c_um2, c, atol=1e-9)
+    assert_allclose(g.z_ax_um, z_ax, atol=1e-9)
+    d = np.linspace(-1.0, 1.0, 41)
+    assert_allclose(g.growth(d), D4.ref_growth(d, G, D4.DZ, interp, convention), atol=1e-9)
+
+
+@pytest.mark.parametrize("convention, interp", [("symmetric", "cubic"), ("symmetric", "linear"),
+                                                ("min_origin", "linear")])
+def test_d4_fit_growth_matches_independent_minimum(convention, interp):
+    """O10.7: on noisy data (SD 0.003 um^2, 10 % NaN planes) the fit is the minimum of Eq. 4: its cost is no
+    larger than an independent minimisation's (numerical Jacobian, tolerances 1e-15) by more than 1e-9
+    relative, and the parameters agree to 2e-6 (both solvers stop on relative cost changes of 1e-12..1e-15,
+    which bound the parameters to ~sqrt(1e-12) x their scale, 1e-6 for um^2 and um)."""
+    G = D4_G_SYM if convention == "symmetric" else D4_G_MIN
+    c, z_ax, z_sub, k = d4_design(8, 12)
+    scans = D4.eq4_scans(G, c, z_ax, z_sub, k, interp, convention, noise_sd=0.003, nan_frac=0.1,
+                         rng=np.random.default_rng(5))
+    cfg = d4_cal(origin_convention=convention, growth_interp=interp)
+    g = CAL.fit_growth(scans, cfg)
+    ref = D4.ref_fit_eq4(scans, 4, D4.DZ, interp, convention, cfg.calibration.z_ax_bound_um)
+    assert list(g.node_ids) == ref["node_ids"]
+    assert g.cost <= ref["cost"] * (1 + 1e-9) + 1e-18
+    ok = np.isfinite(g.g_um2)
+    assert_allclose(g.g_um2[ok], ref["G"][ok], atol=2e-6)
+    assert_allclose(g.c_um2, ref["c"], atol=2e-6)
+    assert_allclose(g.z_ax_um, ref["z"], atol=2e-6)
+
+
+def test_d4_fit_growth_invariances():
+    """O10.8: a constant on every omega moves only the c_i; a common depth shift u of the planes and the
+    starts moves only the z_ax,i (by u); symmetric data under min_origin give a symmetric curve. 1e-8: the
+    two fits are the same problem in shifted coordinates, solved to the 1e-12 tolerances (1e-9 on exact
+    data, O10.6), with the noise's conditioning."""
+    c, z_ax, z_sub, k = d4_design(8, 13)
+    rng = np.random.default_rng(6)
+    scans = D4.eq4_scans(D4_G_SYM, c, z_ax, z_sub, k, noise_sd=0.002, rng=rng)
+    cfg = D4.cfg_with()
+    g0 = CAL.fit_growth(scans, cfg)
+    shifted = [dataclasses.replace(s, omega_um2=s.omega_um2 + 0.05) for s in scans]
+    g1 = CAL.fit_growth(shifted, cfg)
+    assert_allclose(g1.c_um2, g0.c_um2 + 0.05, atol=1e-8)
+    assert_allclose(g1.g_um2, g0.g_um2, atol=1e-8)
+    assert_allclose(g1.z_ax_um, g0.z_ax_um, atol=1e-8)
+    u = 0.1
+    moved = [dataclasses.replace(s, z_um=s.z_um + u, z_sub_um=s.z_sub_um + u) for s in scans]
+    g2 = CAL.fit_growth(moved, cfg)
+    assert_allclose(g2.z_ax_um, g0.z_ax_um + u, atol=1e-8)
+    assert_allclose(g2.g_um2, g0.g_um2, atol=1e-8)
+    assert_allclose(g2.c_um2, g0.c_um2, atol=1e-8)
+    # symmetric data under min_origin: an even law, axes in +-u pairs
+    G_even = np.r_[D4_G_SYM[::-1], D4_G_SYM[1:]]
+    n = 8
+    kk = np.repeat(np.arange(4) * 5, 2)
+    uu = np.tile([0.07, -0.07], 4)
+    za = kk * D4.DZ + uu
+    sym = D4.eq4_scans(G_even, np.full(n, 0.02), za, za, kk, "linear", "min_origin")
+    gm = CAL.fit_growth(sym, d4_cal(origin_convention="min_origin", growth_interp="linear"))
+    assert_allclose(gm.g_um2, gm.g_um2[::-1], atol=1e-8)
+
+
+def test_d4_fit_growth_knot_count_follows_offsets_planes():
+    """O10.6: M = ceil((P + 1/2) dz / h) with P = offsets_planes (3) -> five knots 0 .. 1.12 um, whatever
+    the planes that happen to hold a finite width; a knot without an observation in either adjacent
+    interval is NaN. Scans of +-3 planes whose +-3 planes are all NaN (axes on the planes) leave the
+    interval [0.84, 1.12] empty, so the 1.12 knot is NaN."""
+    n = 6
+    c = np.linspace(0.01, 0.03, n)
+    k = np.arange(n) * 4
+    z = k * D4.DZ
+    scans = D4.eq4_scans(D4_G_SYM, c, z, z, k)
+    scans = [dataclasses.replace(s, omega_um2=np.where(np.abs(s.ks - s.k_star) == 3, np.nan, s.omega_um2))
+             for s in scans]
+    g = CAL.fit_growth(scans, D4.cfg_with())
+    assert_allclose(g.knots_um, np.arange(5) * D4.DZ, atol=1e-12)
+    assert np.isnan(g.g_um2[4])
+
+
+def test_d4_fit_growth_refuses_one_node():
+    c, z_ax, z_sub, k = d4_design(2, 14)
+    scans = D4.eq4_scans(D4_G_SYM, c, z_ax, z_sub, k)
+    scans[1] = dataclasses.replace(scans[1], omega_um2=np.where(np.arange(7) < 5, np.nan, scans[1].omega_um2))
+    with pytest.raises(ValueError):
+        CAL.fit_growth(scans, D4.cfg_with())
+
+
+@pytest.mark.parametrize("convention, interp, n", [("symmetric", "cubic", 30), ("symmetric", "linear", 30),
+                                                   ("symmetric", "cubic", 100), ("min_origin", "linear", 30)])
+def test_d4_sparse_and_dense_jacobians_agree(convention, interp, n):
+    """O10.9 (D-119): the sparse default and the dense path solve the same problem -- symmetric: knots and
+    c_i within 1e-9 um^2, z_ax within 1e-8 um, the anchor within 1e-9 um; min_origin: knots within 1e-5
+    um^2 and costs within 1e-10 relative (the spec's figures)."""
+    G = D4_G_SYM if convention == "symmetric" else D4_G_MIN
+    c, z_ax, z_sub, k = d4_design(n, 20 + n)
+    scans = D4.eq4_scans(G, c, z_ax, z_sub, k, interp, convention, noise_sd=0.003, nan_frac=0.1,
+                         rng=np.random.default_rng(n))
+    sp = d4_cal(origin_convention=convention, growth_interp=interp)
+    de = d4_cal(origin_convention=convention, growth_interp=interp, growth_jacobian="dense")
+    assert sp.calibration.growth_jacobian == "sparse"
+    gs, gd = CAL.fit_growth(scans, sp), CAL.fit_growth(scans, de)
+    ok = np.isfinite(gs.g_um2)
+    assert_array_equal(ok, np.isfinite(gd.g_um2))
+    if convention == "symmetric":
+        assert_allclose(gs.g_um2[ok], gd.g_um2[ok], atol=1e-9)
+        assert_allclose(gs.c_um2, gd.c_um2, atol=1e-9)
+        assert_allclose(gs.z_ax_um, gd.z_ax_um, atol=1e-8)
+        assert_allclose(CAL.anchor_value(gs, sp), CAL.anchor_value(gd, de), atol=1e-9)
+    else:
+        assert_allclose(gs.g_um2[ok], gd.g_um2[ok], atol=1e-5)
+        assert_allclose(gs.cost, gd.cost, rtol=1e-10)
+
+
+@pytest.mark.parametrize("field, value", [("growth_jacobian", "lsmr"), ("knot_step_um", 0.14)])
+def test_d4_validate_refuses_growth_settings(field, value):
+    with pytest.raises(ValueError):
+        d4_cal(**{field: value})
+
+
+def d4_table_growth(cfg, interp="cubic"):
+    """A growth fitted to exact Eq. 4 data generated from the default table's sigma at the knots."""
+    s0 = cfg.renderer.sigma_r0_um
+    sig = D4.ref_sigma_r(np.arange(5) * D4.DZ, cfg.renderer.kernel_table_delta_um, cfg.renderer.kernel_table_sigma_um,
+                         cfg.renderer.kernel_continuation_slope)
+    G = sig ** 2 - s0 ** 2
+    c, z_ax, z_sub, k = d4_design(8, 30)
+    return CAL.fit_growth(D4.eq4_scans(G, c, z_ax, z_sub, k, interp), cfg), sig
+
+
+def test_d4_kernel_from_growth_round_trip_and_cut():
+    """O10.10: a table on the knots -> its growth -> exact data -> fit -> the table to 1e-10; sigma(0) is the
+    configured sigma_r0_um; the cut keeps the knots <= max_delta_um; the result validates."""
+    cfg = D4.cfg_with()
+    g, sig = d4_table_growth(cfg)
+    k_all = CAL.kernel_from_growth(g, cfg.renderer)
+    assert_allclose(k_all.kernel_table_delta_um, np.arange(5) * D4.DZ, atol=1e-12)
+    assert_allclose(k_all.kernel_table_sigma_um, sig, atol=1e-10)
+    assert k_all.kernel_table_sigma_um[0] == cfg.renderer.sigma_r0_um == k_all.sigma_r0_um
+    assert k_all.kernel_family == "gaussian_table"
+    assert k_all.kernel_continuation == cfg.renderer.kernel_continuation
+    k_cut = CAL.kernel_from_growth(g, cfg.renderer, max_delta_um=cfg.calibration.table_max_delta_um)
+    assert_allclose(k_cut.kernel_table_delta_um, [0.0, 0.28, 0.56, 0.84], atol=1e-12)
+    assert_allclose(k_cut.kernel_table_sigma_um, sig[:4], atol=1e-10)
+    dataclasses.replace(cfg, renderer=k_cut).validate()
+    k_s0 = CAL.kernel_from_growth(g, cfg.renderer, sigma_r0_um=0.1)
+    assert_allclose(k_s0.kernel_table_sigma_um, np.sqrt(0.1 ** 2 + g.g_um2), atol=1e-12)
+    assert k_s0.sigma_r0_um == 0.1
+
+
+def test_d4_kernel_from_growth_refusals():
+    """O10.10: min_origin refused; sigma_r(0)^2 + G <= 0 or NaN at a kept knot refused; a NaN knot beyond the
+    cut does not matter."""
+    cfg = D4.cfg_with()
+    g, _ = d4_table_growth(cfg)
+    s0 = cfg.renderer.sigma_r0_um
+    with pytest.raises(ValueError):
+        CAL.kernel_from_growth(dataclasses.replace(g, convention="min_origin"), cfg.renderer)
+    low = g.g_um2.copy()
+    low[1] = -s0 ** 2
+    with pytest.raises(ValueError):
+        CAL.kernel_from_growth(dataclasses.replace(g, g_um2=low), cfg.renderer)
+    nan2 = g.g_um2.copy()
+    nan2[2] = np.nan
+    with pytest.raises(ValueError):
+        CAL.kernel_from_growth(dataclasses.replace(g, g_um2=nan2), cfg.renderer)
+    nan4 = g.g_um2.copy()
+    nan4[4] = np.nan
+    k = CAL.kernel_from_growth(dataclasses.replace(g, g_um2=nan4), cfg.renderer, max_delta_um=0.84)
+    assert len(k.kernel_table_sigma_um) == 4
+
+
+def test_d4_anchor_value_and_anchor_from_growth():
+    """O10.11 (D-117.4)."""
+    cfg = D4.cfg_with()
+    g, sig = d4_table_growth(cfg)
+    s0 = cfg.renderer.sigma_r0_um
+    assert_allclose(CAL.anchor_value(g, cfg), CAL.anchor_from_growth(g, cfg), rtol=1e-15)
+    assert_allclose(CAL.anchor_value(g, cfg), sig[3], atol=1e-10)
+    low = g.g_um2.copy()
+    low[1] = -s0 ** 2 - 0.001
+    gl = dataclasses.replace(g, g_um2=low)
+    with pytest.raises(ValueError):
+        CAL.anchor_from_growth(gl, cfg)
+    assert_allclose(CAL.anchor_value(gl, cfg), math.sqrt(s0 ** 2 + low[3]), rtol=1e-15)
+    bad = g.g_um2.copy()
+    bad[3] = -s0 ** 2 - 0.001
+    with pytest.raises(ValueError):
+        CAL.anchor_value(dataclasses.replace(g, g_um2=bad), cfg)
+
+
+def d4_plane(n=64, p=0.1144, b=(150.0, 2.0, -1.5), noise=0.0, seed=0, debris=0.0):
+    frame = D4_CropFrame(100, 50, 0, p)
+    rows, cols = np.mgrid[0:n, 0:n]
+    x, y = (100 + cols) * p, (50 + rows) * p
+    cx, cy = x.mean(), y.mean()
+    img = b[0] + b[1] * (x - cx) + b[2] * (y - cy)
+    rng = np.random.default_rng(seed)
+    if noise:
+        img = img + rng.normal(0.0, noise, img.shape)
+    if debris:
+        hit = rng.random(img.shape) < debris
+        img = np.where(hit, img + 80.0, img)
+    return img, frame, cx, cy
+
+
+def test_d4_planar_background_known_answer_and_sd():
+    """O10.12-13: exact plane recovered (1e-9 gl: one lstsq of 4096 exact rows); sd within 5 % of 2 gl on
+    ~4000 pixels of SD 2 (the MAD's own SE is ~1.6 % there), b the same with and without return_sd; 1 %
+    debris trimmed (b0 within 5 x its SE 2/sqrt(N) = 0.16 gl); too few far pixels: not ok, sd NaN."""
+    img, frame, cx, cy = d4_plane()
+    far = np.ones(img.shape, dtype=bool)
+    far[30:34, :] = False
+    b, n, ok = CS.planar_background(img, far, frame, cx, cy, 3.0, 0.05)
+    assert ok and n == int(far.sum())
+    assert_allclose(b, [150.0, 2.0, -1.5], atol=1e-9)
+    img2, frame, cx, cy = d4_plane(noise=2.0, seed=3)
+    b1 = CS.planar_background(img2, far, frame, cx, cy, 3.0, 0.05)
+    b2 = CS.planar_background(img2, far, frame, cx, cy, 3.0, 0.05, return_sd=True)
+    assert len(b1) == 3 and len(b2) == 4
+    assert_array_equal(b1[0], b2[0])
+    assert abs(b2[3] - 2.0) <= 0.05 * 2.0
+    img3, frame, cx, cy = d4_plane(noise=2.0, seed=4, debris=0.01)
+    b3 = CS.planar_background(img3, far, frame, cx, cy, 3.0, 0.05, return_sd=True)
+    assert abs(b3[0][0] - 150.0) <= 5 * 2.0 / math.sqrt(far.sum())
+    few = np.zeros(img.shape, dtype=bool)
+    few[:2, :10] = True                                  # 20 px of 4096 < 5 %
+    b4 = CS.planar_background(img, few, frame, cx, cy, 3.0, 0.05, return_sd=True)
+    assert (not b4[2]) and np.all(np.isnan(b4[0])) and math.isnan(b4[3])
+
+
+def test_d4_gof_poor_rule():
+    """O10.13: RMS > kappa_g x SD with both finite and SD > 0, and the switch on."""
+    cfg = D4.cfg_with()
+    kg = cfg.calibration.gof_kappa
+    assert kg == 1.2
+    assert CAL.gof_poor(kg * 2.0 + 1e-6, 2.0, cfg) is True
+    assert CAL.gof_poor(kg * 2.0 - 1e-6, 2.0, cfg) is False
+    assert CAL.gof_poor(kg * 2.0, 2.0, cfg) is False           # strictly above
+    assert CAL.gof_poor(NAN, 2.0, cfg) is False
+    assert CAL.gof_poor(10.0, NAN, cfg) is False
+    assert CAL.gof_poor(10.0, 0.0, cfg) is False
+    assert CAL.gof_poor(10.0, 2.0, d4_cal(gof_check=False)) is False
+
+
+def d4_line_branch(theta_deg, phi_deg, n=41, step=0.5, reverse=False):
+    th, ph = math.radians(theta_deg), math.radians(phi_deg)
+    t = np.array([math.cos(ph) * math.cos(th), math.cos(ph) * math.sin(th), math.sin(ph)])
+    s = np.arange(n) * step
+    xyz = np.array([10.0, 10.0, 5.0]) + s[:, None] * t[None, :]
+    if reverse:
+        xyz = xyz[::-1]
+    return D4_Branch(np.arange(1, n + 1), np.full(n, 3), xyz, np.full(n, 0.25), s)
+
+
+@pytest.mark.parametrize("theta, phi", [(30.0, 20.0), (-120.0, 5.0), (90.0, 0.0), (170.0, 60.0)])
+def test_d4_trace_direction_known_line(theta, phi):
+    """O10.14: on a straight trace the TLS direction is the line's, oriented first -> last; reversing the
+    trace turns the heading by pi (1e-9 rad: an eigenvector of an exact rank-one scatter)."""
+    b = d4_line_branch(theta, phi)
+    th, ph = D4_CSR.trace_direction(b, 20, 4.0)
+    assert_allclose(ph, math.radians(phi), atol=1e-9)
+    assert_allclose(math.cos(th - math.radians(theta)), 1.0, atol=1e-9)
+    th2, ph2 = D4_CSR.trace_direction(d4_line_branch(theta, phi, reverse=True), 20, 4.0)
+    assert_allclose(math.cos(th2 - math.radians(theta)), -1.0, atol=1e-9)
+    assert_allclose(ph2, math.radians(phi), atol=1e-9)
+
+
+def test_d4_trace_direction_coinciding_points():
+    n = 5
+    b = D4_Branch(np.arange(1, n + 1), np.full(n, 3), np.tile([1.0, 2.0, 3.0], (n, 1)), np.full(n, 0.2),
+                  np.zeros(n))
+    with pytest.raises(ValueError):
+        D4_CSR.trace_direction(b, 2, 4.0)
+
+
+def test_d4_typical_background_medians_over_rows_in_S():
+    """O10.14: the medians of B_bar and mu_hat over the rows in S (converged, no flag of S), finite positive
+    values only; NaN without such rows."""
+    cfg = D4.cfg_with()
+    rows = [dict(fit_status="converged", flags="", B_bar="150", mu_hat_per_um="0.2"),
+            dict(fit_status="converged", flags="dark;faint", B_bar="170", mu_hat_per_um="0.4"),   # labels only
+            dict(fit_status="converged", flags="crossing", B_bar="999", mu_hat_per_um="9"),        # out of S
+            dict(fit_status="at_bound", flags="", B_bar="999", mu_hat_per_um="9"),                 # out of S
+            dict(fit_status="converged", flags="", B_bar="nan", mu_hat_per_um="0.3"),
+            dict(fit_status="converged", flags="", B_bar="160", mu_hat_per_um="-1")]
+    B, mu = D4_CSR.typical_background(rows, cfg)
+    assert_allclose(B, np.median([150.0, 170.0, 160.0]))
+    assert_allclose(mu, np.median([0.2, 0.4, 0.3]))
+    B2, mu2 = D4_CSR.typical_background(rows[2:4], cfg)
+    assert math.isnan(B2) and math.isnan(mu2)
+
+
+def d4_ref_choose(records, which, sp):
+    ok = [r for r in records if r["set"] == which and not r["reason"]]
+    if which == "far":
+        key = lambda r: (-r["n_fit_usable"], -r["n_pixels_k"], r["node_id"])   # noqa: E731
+    else:
+        key = lambda r: (-r["n_pixels_k"], r["node_id"])                        # noqa: E731
+    kept = []
+    for r in sorted(ok, key=key):
+        if all(not (q["stretch"] == r["stretch"] and abs(q["s_um"] - r["s_um"]) < sp) for q in kept):
+            kept.append(r)
+    return [r["node_id"] for r in kept]
+
+
+@pytest.mark.parametrize("which", ["near", "far"])
+def test_d4_choose_greedy_spacing_and_rank(which):
+    """O10.14: choose equals the greedy rule written from the spec on random records; invariants: only
+    passing records of the set, spacing >= the set's along each stretch, every passing record left out
+    lies within the spacing of a kept one ranked before it."""
+    cfg = D4.cfg_with()
+    sp = getattr(cfg.calibration, which + "_search_spacing_um")
+    rng = np.random.default_rng(7)
+    recs = []
+    for i in range(120):
+        recs.append(dict(set=which if rng.random() < 0.9 else ("far" if which == "near" else "near"),
+                         node_id=int(1000 + i), stretch=int(rng.integers(0, 4)), s_um=float(rng.uniform(0, 40)),
+                         reason="" if rng.random() < 0.7 else "few_planes", n_pixels_k=int(rng.integers(500, 900)),
+                         n_fit_usable=int(rng.integers(6, 10))))
+    got = D4_CSR.choose(recs, cfg, which)
+    assert got == d4_ref_choose(recs, which, sp)
+    by_id = {r["node_id"]: r for r in recs}
+    for a in got:
+        assert by_id[a]["set"] == which and by_id[a]["reason"] == ""
+    for i, a in enumerate(got):
+        for b in got[:i]:
+            if by_id[a]["stretch"] == by_id[b]["stretch"]:
+                assert abs(by_id[a]["s_um"] - by_id[b]["s_um"]) >= sp
+    with pytest.raises(ValueError):
+        D4_CSR.choose(recs, cfg, "middle")
+
+
+def d4_swc(n=6):
+    from allen_diameter.loading.swc_io import SWC
+    ids = np.arange(1, n + 1)
+    return SWC(ids, np.r_[1, np.full(n - 1, 3)], np.column_stack([np.arange(n) * 1.0, np.zeros(n), np.zeros(n)]),
+               np.full(n, 0.3), np.r_[-1, ids[:-1]], ["# a comment\n"], list(range(n)), "")
+
+
+def test_d4_swc_digest_and_search_config():
+    """O10.15: the digest changes with each of the five arrays and not with lines or path; the key's settings
+    are the four sections minus the fit-only fields, strict JSON, NaN as 'nan'."""
+    a = d4_swc()
+    d0 = D4_CSR.swc_digest(a)
+    for name in ("ids", "types", "parent", "xyz", "radius"):
+        b = dataclasses.replace(a)
+        arr = np.array(getattr(a, name), copy=True)
+        arr.flat[-1] = arr.flat[-1] + 1
+        setattr(b, name, arr)
+        assert D4_CSR.swc_digest(b) != d0, name
+    b = dataclasses.replace(a, lines=["# other\n"], path="/elsewhere.swc")
+    assert D4_CSR.swc_digest(b) == d0
+    cfg = D4.cfg_with()
+    sc = D4_CSR.search_config(cfg)
+    assert set(sc) == {"acquisition", "calibration", "measure", "renderer"}
+    for f in ("growth_jacobian", "bootstrap_unit", "bootstrap_cell_min", "pool_weighting", "cell_outlier_removal",
+              "cell_outlier_alpha"):
+        assert f not in sc["calibration"], f
+    assert "isolation_depth_gl" in sc["calibration"] and "far_offsets_planes" in sc["calibration"]
+    json.dumps(sc, allow_nan=False)
+    assert isinstance(sc["calibration"]["stripe_half_widths_um"], list)
+    sc_nan = D4_CSR.search_config(dataclasses.replace(cfg, renderer=dataclasses.replace(cfg.renderer,
+                                                                                        ray_post_sigma_um=NAN)))
+    assert sc_nan["renderer"]["ray_post_sigma_um"] == "nan"
+    for f, v in (("growth_jacobian", "dense"), ("bootstrap_unit", "node"), ("bootstrap_cell_min", 5),
+                 ("pool_weighting", "node"), ("cell_outlier_removal", False), ("cell_outlier_alpha", 0.01)):
+        assert D4_CSR.search_config(d4_cal(**{f: v})) == sc, f
+    assert D4_CSR.search_config(d4_cal(isolation_depth_gl=1.0)) != sc
+
+
+def test_d4_reuse_search_rules(tmp_path):
+    """O10.15: reuse only with the CSV and its record, the CSV unchanged and the key equal; the why strings."""
+    import calibrate_kernel as CK
+    cfg = D4.cfg_with()
+    swc = d4_swc()
+    key = CK.search_key(swc, cfg)
+    d = str(tmp_path)
+    ids, rec, why = CK.reuse_search(d, "far", 7, key)
+    assert ids is None and why.startswith("no search file")
+    rows = [dict(set="far", node_id=3, chosen=True), dict(set="far", node_id=4, chosen=False),
+            dict(set="far", node_id=5, chosen=True)]
+    D4_table_io.write_rows(rows, CK.search_name(d, "far", 7))
+    ids, rec, why = CK.reuse_search(d, "far", 7, key)
+    assert ids is None and why.startswith("no record")
+    CK.write_search_record(d, "far", 7, key, 150.0, 0.25, None, 3, 2)
+    ids, rec, why = CK.reuse_search(d, "far", 7, key)
+    assert why == "" and sorted(ids) == [3, 5]
+    other = CK.search_key(dataclasses.replace(swc, radius=swc.radius * 1.01), cfg)
+    assert CK.reuse_search(d, "far", 7, other)[2] == "another trace"
+    other = CK.search_key(swc, d4_cal(isolation_depth_gl=1.0))
+    assert CK.reuse_search(d, "far", 7, other)[2] == "other settings: calibration"
+    with open(CK.search_name(d, "far", 7), "a") as f:
+        f.write("far,6,,,,,,,,,,,,,,False\n")
+    assert CK.reuse_search(d, "far", 7, key)[2] == "the CSV changed since its record"
+
+
+def d4_painted_patch(cfg, k0, a=30.0, B=180.0, noise=2.0, seed=0):
+    """A patch of planes k0 - 3 .. k0 + 3 about (cx, cy) = (50, 40) um: a dendrite along x painted as a Gaussian
+    dip of width 0.25 + 0.3 |delta| um and depth a under B, white pixel noise; its pixel centres within
+    +-patch_half_um of the centre (10.P), frame CropFrame(left, top, 0, p)."""
+    p, half = cfg.acquisition.res0_um, cfg.calibration.patch_half_um
+    cx, cy = 50.0, 40.0
+    left, right = math.ceil((cx - half) / p - 1e-9), math.floor((cx + half) / p + 1e-9)
+    top, bottom = math.ceil((cy - half) / p - 1e-9), math.floor((cy + half) / p + 1e-9)
+    rows, cols = np.mgrid[0:bottom - top + 1, 0:right - left + 1]
+    y = (top + rows) * p
+    rng = np.random.default_rng(seed)
+    ks = k0 + np.arange(-3, 4)
+    block = np.stack([B - a * np.exp(-0.5 * ((y - cy) / (0.25 + 0.3 * abs(k - k0) * D4.DZ)) ** 2)
+                      + rng.normal(0.0, noise, y.shape) for k in ks])
+    frame = D4_CropFrame(int(left), int(top), 0, p)
+    return (block, ks, np.ones(ks.size, dtype=bool), frame), cx, cy
+
+
+def test_d4_goodness_of_fit_drops_one_near_plane(monkeypatch):
+    """10.G oracle (c): a near scan whose core fit is made to report an RMS far above the bound on one plane --
+    that plane poor_fit with NaN omega, SE and V_W, its depth, amplitude, centre, RMS and area kept, the others
+    ok; bg_sd_gl holds the pixels' noise SD (2 gl, within 10 %: the far pixels' residuals about the fitted
+    plane over ~8000 pixels); fit_growth keeps the node on its other planes."""
+    from allen_diameter.analysis.plane_iteration import Scene
+    cfg = D4.cfg_with(calibration=dict(background_support="square", patch_half_um=6.0))
+    k0 = 10
+    patch, cx, cy = d4_painted_patch(cfg, k0)
+    n = 41
+    xs = cx - 10.0 + 0.5 * np.arange(n)
+    branch = D4_Branch(np.arange(1, n + 1), np.full(n, 3), np.column_stack([xs, np.full(n, cy), np.full(n, k0 * D4.DZ)]),
+                       np.full(n, 0.15), 0.5 * np.arange(n))
+    node = D4.node_result(node_id=7, k_star=k0, z_sub_um=k0 * D4.DZ, cx_um=cx, cy_um=cy, theta_rad=0.0)
+    clean = CAL.plane_scan(patch, node, branch, Scene.from_branch(branch), cfg)
+    assert all(s == "ok" for s in clean.status), clean.status
+    assert np.all(np.abs(clean.bg_sd_gl - 2.0) <= 0.2)
+    real = CAL.dip_statistics
+    calls = []
+
+    def inflated(*args, **kw):
+        out = dict(real(*args, **kw))
+        calls.append(1)
+        if len(calls) == 5:                                   # the plane k0 + 1 (planes in order)
+            out["rms_gl"] = 100.0
+        return out
+    monkeypatch.setattr(CAL, "dip_statistics", inflated)
+    sc = CAL.plane_scan(patch, node, branch, Scene.from_branch(branch), cfg)
+    q = list(sc.ks).index(k0 + 1)
+    assert sc.status[q] == "poor_fit"
+    assert all(s == "ok" for i, s in enumerate(sc.status) if i != q)
+    assert np.isnan(sc.omega_um2[q]) and np.isnan(sc.se_omega_um2[q]) and np.isnan(sc.vw_um2[q])
+    for arr in (sc.depth_gl, sc.amp_gl, sc.v_c_um, sc.rms_gl, sc.area_gl_um):
+        assert np.isfinite(arr[q])
+    other = dataclasses.replace(clean, node_id=8)
+    g = CAL.fit_growth([sc, other, dataclasses.replace(clean, node_id=9)], D4.cfg_with())
+    assert 7 in list(g.node_ids) and int(np.sum(g.obs_node == list(g.node_ids).index(7))) == 6
+
+
+def d4_two_dendrites_swc(n=12, step=0.6):
+    """Two straight dendrite trees without a soma (roots with parent -1), 40 um apart, flat at z = 1.4 um:
+    A (ids 1..n) radius 0.25 (Allen's diameter 0.5: near), B (ids n+1..2n) radius 0.35 (0.7: far)."""
+    from allen_diameter.loading.swc_io import SWC
+    ids = np.arange(1, 2 * n + 1)
+    t = np.arange(n) * step
+    xyz = np.vstack([np.column_stack([60 + t, np.zeros(n), np.full(n, 1.4)]),
+                     np.column_stack([60 + t, np.full(n, 40.0), np.full(n, 1.4)])])
+    parent = np.r_[-1, np.arange(1, n), -1, np.arange(n + 1, 2 * n)]
+    radius = np.r_[np.full(n, 0.25), np.full(n, 0.35)]
+    return SWC(ids, np.full(2 * n, 3), xyz, radius, parent, ["%d\n" % i for i in ids], list(range(2 * n)), "")
+
+
+def test_d4_search_known_answer_isolated_flat_dendrites():
+    """10.C oracle (a): a flat near-range dendrite with nothing beside it passes after the trace's plane and the
+    pair +-1 (3 planes evaluated, 3 usable); a flat far-range one passes with every far-fit plane usable (24 of
+    24); each search lists its own range's nodes only; the trace's plane is round(z / dz) = 5. The patch is cut
+    to +-12 um for time: at the farthest far plane (|delta| 4.48 um, sigma_r 3.48 um) the own branch's tau-margin is
+    about 6.8 um (B 150 gl, mu 0.3 /um, r 0.35 um, tau 0.3 gl: 1.98 exp(-rho^2 / 24.2) = 0.3), leaving > 3 um."""
+    cfg = d4_cal(patch_half_um=12.0)
+    swc = d4_two_dendrites_swc()
+    near = D4_CSR.search(swc, cfg, "near", B_bar=150.0, mu=0.3)
+    far = D4_CSR.search(swc, cfg, "far", B_bar=150.0, mu=0.3)
+    assert [r["node_id"] for r in near] == list(range(1, 13))
+    assert [r["node_id"] for r in far] == list(range(13, 25))
+    for r in near:
+        assert (r["reason"], r["n_fit"], r["n_fit_usable"], r["k_trace"]) == ("", 3, 3, 5), r
+        assert r["n_pixels_k"] >= cfg.calibration.stripe_min_pixels and abs(r["phi_deg"]) < 1e-9
+    for r in far:
+        assert (r["reason"], r["n_fit"], r["n_fit_usable"], r["k_trace"]) == ("", 24, 24, 5), r
+    assert set(near[0]) == set(D4_CSR.RECORD_KEYS)
+    chosen = D4_CSR.choose(near, cfg, "near")
+    s = {r["node_id"]: r["s_um"] for r in near}
+    assert all(abs(s[a] - s[b]) >= 5.0 for i, a in enumerate(chosen) for b in chosen[:i])
+
+
+def test_d4_anchor_bootstrap_se_matches_regenerated_sd():
+    """10.A: on Eq. 4 data with noise (12 nodes, SD 0.01 um^2) the node bootstrap's SE of the anchor lies within
+    30 % of the SD of the anchor over 40 regenerated data sets (the spec's oracle; fixed seeds; 200 resamples: the
+    SD over 40 sets carries ~11 % relative error, the bootstrap's own ~5 %, so 30 % is about 2.5 combined SEs)."""
+    cfg = D4.cfg_with()
+    sig = D4.ref_sigma_r(np.arange(5) * D4.DZ, cfg.renderer.kernel_table_delta_um, cfg.renderer.kernel_table_sigma_um,
+                         cfg.renderer.kernel_continuation_slope)
+    G = sig ** 2 - cfg.renderer.sigma_r0_um ** 2
+    c, z_ax, z_sub, k = d4_design(12, 70)
+
+    def data(seed):
+        return D4.eq4_scans(G, c, z_ax, z_sub, k, noise_sd=0.01, rng=np.random.default_rng(seed))
+    anchors = [CAL.anchor_value(CAL.fit_growth(data(1000 + s), cfg), cfg) for s in range(40)]
+    sd = float(np.std(anchors, ddof=1))
+    se, n_ok, draws = CAL.bootstrap_sigma0(data(77), cfg, np.random.default_rng(78), n_resamples=200)
+    assert n_ok == 200 and draws.size == 200
+    assert_allclose(se, np.std(draws, ddof=1), rtol=1e-12)
+    assert 0.7 * sd <= se <= 1.3 * sd, (se, sd)
