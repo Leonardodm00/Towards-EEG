@@ -705,3 +705,12 @@ implementation:
     needs_theory: []
     needs_hpc: false
     jobs: []
+  - id: I36
+    title: "Pilot run: node inputs and entry points"
+    summary: "Builds each node's patch, backgrounds, line and local tube from the pilot fit, and the scripts that run the survey, the cleaning rounds and the per-node fits on the pilot cell's example nodes, with a synthetic dry run."
+    block: 36
+    parent: NC3
+    depends_on: [I27, I32, I30, I35]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []

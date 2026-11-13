@@ -400,6 +400,9 @@ class CleaningConfig:
     refine_dz_bounds_um: Tuple[float, float] = (-1.0, 1.0)       # source: PROVISIONAL (Block 29): depth shift
     refine_max_nfev: int = 200             # source: PROVISIONAL (Block 29)
     stop_rel_d: float = 0.01               # source: D-130.O6 [user]: every diameter changes by less than 1 %
+    plane_half_range: int = 4              # source: PROVISIONAL (Block 36): the planes k* +- this many are fetched, cleaned and offered to the fits (D-130.O5)
+    work_max_nodes: int = 60               # source: PROVISIONAL (Block 36): at most this many nodes are refined in the pilot run
+    work_peak_min_gl: float = 3.0          # source: PROVISIONAL (Block 36): a neighbour's nodes join the work list when its predicted peak on an example's patch reaches this
 
 
 @dataclass(frozen=True)
@@ -412,6 +415,7 @@ class InferenceConfig:
     ray_n_rho: int = 8                     # source: D-137.2 [user]: the hybrid's radial directions in the fast line renderer (Block 35)
     ray_n_psi: int = 16                    # source: D-137.2 [user]: its azimuths
     extrusion_cap_margin_um: float = 3.0   # source: PROVISIONAL (Block 35, amendment 1, D-140): the line at least this far along the axis from each cap, or the node is flagged (D-138.2)
+    tube_half_length_um: float = 5.0       # source: PROVISIONAL (Block 36): the node's straight tube reaches at most this far each way along the stretch (D-137.3)
     d_bounds_um: Tuple[float, float] = (0.1, 6.0)         # source: PROVISIONAL (Block 30)
     mu_bounds_per_um: Tuple[float, float] = (0.01, 10.0)  # source: PROVISIONAL (Block 30)
     v0_bounds_um: Tuple[float, float] = (-1.0, 1.0)       # source: PROVISIONAL (Block 30)
@@ -706,6 +710,7 @@ def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None
           and c.close_lateral_um > 0 and c.close_defocus_um > 0 and c.clean_index_max > 0
           and c.tier_reach_um > 0 and c.over_background_gl >= 0
           and c.max_rounds >= 1 and 0 < c.stop_rel_d < 1 and c.refine_max_nfev >= 1
+          and c.plane_half_range >= 0 and c.work_max_nodes >= 1 and c.work_peak_min_gl >= 0
           and c.shadow_ray_n_rho >= 1 and c.shadow_ray_n_psi >= 1
           and len(c.example_counts) == 5 and all(int(n) == n and n >= 0 for n in c.example_counts)
           and len(c.neighbour_swc_types) >= 1
@@ -718,7 +723,8 @@ def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None
           and pair(i.z_bounds_um, False) and len(i.multistart_factors) >= 1
           and all(math.isfinite(f) and f > 0 for f in i.multistart_factors)
           and i.plane_snr_min >= 0 and math.isfinite(i.plane_snr_min) and i.max_nfev >= 1
-          and i.ray_n_rho >= 1 and i.ray_n_psi >= 1 and i.extrusion_cap_margin_um >= 0)
+          and i.ray_n_rho >= 1 and i.ray_n_psi >= 1 and i.extrusion_cap_margin_um >= 0
+          and i.tube_half_length_um > 0)
     if not ok:
         raise ValueError("inference: the fine factor, reach, a pair of bounds, the starts, the plane rule or the "
                          "evaluation budget is out of range (SPEC Blocks 26, 30)")
