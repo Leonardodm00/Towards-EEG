@@ -160,6 +160,7 @@ the "Binds" column.
 | 2026-11-13 (later) | Logs **D-128** (user, 10:01; the diameter calibration chat): "In the roadmap if a document of a theory block has been generated the notes in the roadmap must cite the name of that document so that I can find it" -- a theory topic's note names, by file name, every document written for it (study document, topic document, course, study handoff), with where it lives. Applied the same turn to the diameter-pipeline roadmap on `sci/diameter-pipeline` (`52d7722`; the ID corrected in `ca6d900`; T7's note completed in `c95ae05`): T4.2 (the 2026-10-27 study handoff), T7 (the pupil-phase topic document and the three documents of its refs), T11 (the 2026-11-11 study document); T4.3 and T13 already named theirs. Written after re-reading this log at `77b0bb7` (unchanged since the 2026-11-13 row; the diameter chat's D-117 to D-121 and I-005 already merged here at `3dc3703`). This chat first took D-122 for it in the roadmap's notes, not knowing the renumbering of 2026-11-12; corrected before this row. Next free IDs: D-129, I-006. |
 | 2026-11-13 (later, 2) | No decision changed (the noise-fit chat). **D-123 to D-126 implemented**: Block 6's code written, smoke-tested and pushed (`run_noise_fit.py`, `submit_noise_fit.sh`, `smoke_noise_run.py`, `1d848f6`: R1-R9 9/9 in the sandbox, 26 planted defects each caught) -- one PBS array subjob per cell at 6 cores, Block 9's sweeps in a pool of 6 processes, the BLAS threads at 1, then the merge job, never more than 120 cores (D-125.1, D-126; smoke R1, R7, R9); per cell a JSON and per group `noise_cells_<GROUP>.csv` and `noise_sweeps_<GROUP>.csv` (D-125.2; R5); a refused or failed cell recorded with its reason, exit 0, the run goes on (D-125.4; R2, R3); the resume rule by the noise-fit code's last commit (D-125.5; R4). The assistant's additions are flagged in SPEC Block 6's as-built notes, not decisions: the resume rule also on the sizes and on clean code; `DRY_RUN` runs the read-only `list` and the driver's parser on the jobs' arguments; a run file in `~/noise_fit_runs/` carries the paths (they hold spaces) and the cohort to the jobs; a `SIZES` knob. D-124, D-125 and D-126 annotated (entries and index). Next: the run on davinci (the Block 6 handoff, §4). Next free IDs: D-129, I-006. |
 | 2026-11-13 (later, 3) | No decision changed (the audit chat). **The audit's six tester runs finished** (08:30-10:57, Opus agents, D-127.4); every verdict PASS WITH ISSUES, no BLOCKER. Run N (noise fit, full, `64a2cbe`): 2 MAJOR -- `sample_acf` returns (n-L)/n instead of NaN on a flat window whose float mean carries roundoff (D-029 (iii)); an LS sweep with one non-finite current sample is dropped without a flag (SPEC 2.2) -- 4 MINOR, 8 NOTEs; Block 6 not in the tested commit. Runs D1-D5 (diameter, incremental `128fdce..1555036`): D2 1 MAJOR (diagnostic only: `node_planes.py` reports the deliverable's d_hat as the pilot's), MINOR 2 (D1), 3 (D2), 6 (D3), 4 (D4), 7 (D5), and NOTEs; for the project, D1's NOTE F5 (the deliverable SGT fit reads d_hat/d 0.63-0.69 on three thin faint phantoms, where D5's 0.2 flag would send nodes to the fill). Delivered as a night run's: spec tests and reports on `tester/2026-11-13-0830-incremental` (`b23645f`) and `tester/2026-11-13-0830-full` (`27c709d`); the reports of D1-D4 on `sci/diameter-pipeline` (`34a5196`), N's on `main` (`23b4f41`), their "Triage for the project" tables for the project chats. D5's report is not in the repository: the harness refused the agent's write of the file, the report came back as text, and whether the assistant saves it is put to the user. D-127 annotated (entry and index). Written after re-reading this log (changed since the 2026-11-13 row by the rows (later) and (later, 2) of two other chats; merged, nothing of theirs edited). Next free IDs: D-129, I-006. |
+| 2026-11-13 (later, 4) | Logs **D-129** (user, 12:35 and 13:01; the diameter chat on the renderer and the inversion per node): the real measuring lines are polluted by other branches' shadows while the table's phantoms are clean -- the cleaning first (the traced neighbours' predicted shadows removed, iteratively, the neighbours' features starting at Allen's diameters and updated by a coarse fit), then option 2 (the node's features by optimisation on the cleaned data, no table), its results judged, option 1 (the table on cleaned lines) only if they are not satisfactory; first on the pilot cell in Colab, with the patch images and the measuring line before and after on several example nodes. **Roadmap diameter-pipeline: NC, NC1-NC4 added** (`0274ce8`), planned, no block yet; the plan `Passive Features/Diameter Re-measurement/docs/TEEG_diameter_cleaning_inference_plan_2026-11-13.md` (`599d865`): steps C0-C7, F1-F5, E and twelve open choices. A toy check behind the entry's Why **[run, sandbox]**. Nothing superseded: the table route S5-S8 stands. Two theory topics proposed, not added. Written after re-reading this log at `10acd5e` (unchanged since the 2026-11-13 (later, 3) row). Next free IDs: D-130, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -308,6 +309,7 @@ would be needed*, *Status*.
 | D-126 | 2026-11-12 | D-125.1, D-125.3; SPEC Block 6's Confirmed line; the job script's NCPUS | D-125's two readings confirmed: 6 cores per cell with Block 9's sweeps in a pool of 6; D-055 up to date as D-125.3 lists [user] | active [updated 2026-11-13: implemented, Block 6 at `1d848f6`] |
 | D-127 | 2026-11-13 | the code changed 2026-10-13 to 2026-11-12 that no SPEC covers; both SPECs' Coverage and Blocks (diameter on `sci/diameter-pipeline`, noise fit on `main`); the reports and spec tests of the audit runs N, D1-D5 | specified before it is tested: the checks behind decided values and the two Colab notebook scripts, one SPEC block per study, the document figure scripts left out; the audit's results delivered like a night run's [user] | active; runs N, D1-D5 started 2026-11-13 [updated 2026-11-13 (later, 3): all six finished; results delivered, D5's report pending]; Block 23 drafted, not committed |
 | D-128 | 2026-11-13 | every roadmap's theory topics (`specs/roadmap/<name>.yaml`, the `note` field); the chats that write a document for a topic | a topic's note names every document written for it, by file name, with where it lives [user] | active; applied to diameter-pipeline at `52d7722`, `ca6d900`, `c95ae05` (T4.2, T7, T11) |
+| D-129 | 2026-11-13 | the correction of a real node's diameter (SPEC Blocks 4, 5, 13, 14); the scene and the neighbour-shadow predictor (Block 10.S); `notebooks/phase2_colab.py`; roadmap NC, NC1-NC4; the plan `TEEG_diameter_cleaning_inference_plan_2026-11-13.md` | a real node's measuring line is cleaned of its traced neighbours' predicted shadows, iteratively from Allen's diameters with a coarse fit for the neighbours; then option 2, the node's features by optimisation without a table; option 1, the table on cleaned lines, only if option 2 is not satisfactory; first on the pilot cell in Colab, with before/after patches and lines on example nodes [user] | active; not implemented; roadmap `0274ce8`, plan `599d865` on `sci/diameter-pipeline` |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
@@ -10483,3 +10485,78 @@ that node; how is to be discussed.
 TG2, linked to I5, I10, I15.
 
 **Status:** idea; roadmap T12 open; not scheduled.
+
+## D-129 -- The polluted measuring lines: neighbours' shadows cleaned iteratively, then the node's features by optimisation (option 2), the table on cleaned lines (option 1) only if that is not satisfactory; first on the pilot cell in Colab (user)
+
+**Date:** 2026-11-13, 12:35 and 13:01 (Europe/Rome), the diameter chat of 2026-11-13 (renderer and inversion per node).
+**Binds:** the correction of a real node's diameter (SPEC Blocks 4, 5, 13, 14; `analysis/invert.py`, `analysis/cell.py`);
+the scene and the neighbour-shadow predictor (`plane_iteration.Scene`, `analysis/calibration_scene.py`, Block 10.S); the
+notebook `notebooks/phase2_colab.py` (new cells); roadmap diameter-pipeline (NC, NC1-NC4); the plan
+`Passive Features/Diameter Re-measurement/docs/TEEG_diameter_cleaning_inference_plan_2026-11-13.md`.
+
+**Decision [user].** 12:35, the problem and the two options: "real node's measuring lines are polluted while the table
+we construct in silico with the rendering is clean from backgorund noise and other branches polluting the measuring
+line's intenisty profile [...] 1) Do contruct the table for inversion. but before fitting the dip along the measuring
+line on the focal plane we need to clear it form such pollutions and contaminations from other dendrites. This would be
+done by applying the defocusing kernel on the nodes in the proximity (Da the allen's ones) and removing the resulting
+shadow's contribution from the measuring line. 2) We do not use the table for inversion, after cleaning as above
+(option 1) rather find thorugh optimization the node's features (diameter, optical depth etc... as before) that best
+explain the cleared observed trace with the off focus planes convolved (in a finer steps in depth than the allen data)
+to emulate the shadows." 13:01, the choice: "I would start first with the cleaning then move to otpion 2 see how the
+results are and then if not satisfactory go on with the subsequent option 1. The cleaning must be made iterative some
+how by updating the neighbouring nodes fitted features starign from the tabulated diameter from the Allen dataset. We
+will start from a single cell (the one in colab). Therefor the cleaning must be done and the comparisons between the
+patch images around the node and the measuring line before and after the cleaning across several example nodes. for the
+neighbouring nodes I would do a coarse fit because doing the same approach also across the other nodes would be too
+demanding. update also the roadmap with another branch with this approach with the two options."
+
+**Statement.** (D-129.1) *The order.* The cleaning is built first; then option 2 -- no table: the node's features found
+by optimisation on the cleaned data; its results are judged; option 1 -- the inversion table, on cleaned lines -- is
+taken up only if option 2's results are not satisfactory [user]. (D-129.2) *The cleaning is iterative.* The shadows that
+a node's neighbours throw on its measuring line are predicted with the defocus kernel and removed; the neighbours'
+features are updated from their own fits, starting from Allen's tabulated diameters [user]. (D-129.3) *One cell first:*
+the one in Colab [user] -- the assistant reads it as the pilot cell 529878215 (D-089). (D-129.4) *The evidence:* the
+patch images around the node and the measuring line, before and after the cleaning, on several example nodes [user].
+(D-129.5) *The neighbours get a coarse fit*, not the node's own full treatment [user]. (D-129.6) *The roadmap* gets a
+branch with this approach and its two options [user]. The assistant's readings, PROVISIONAL, each a choice of the
+plan's table "Choices to settle before the logic" (O1-O12): a node's "features" are its diameter and absorption
+coefficient, with its lateral offset and depth; the removal adds back the predicted absorbed light (SPEC 2.3, Eqs. 5-6
+are linear in it) and flags a neighbour that overlaps the node in projection; every node's features of a round are
+computed from the others' of the round before; the coarse fit's form, the stop rule, the patch size, the choice of the
+example nodes and the meaning of "satisfactory" are not decided.
+
+**Why.** [user] The table is built from clean phantoms and applied to polluted lines. [run, sandbox, 2026-11-13: a toy
+scene -- a 0.5 um node and a 1 um parallel neighbour, both flat, the pilot cell's kernel table, linear absorption, no
+noise, one plane, the node read with its exact model] The node's fitted over true diameter without cleaning: 0.45 (the
+neighbour 1 um aside, in focus), 1.06 (1 um aside, 1.4 um out of focus), 0.97 (2.5 um aside, in focus), 1.18 (directly
+above, 2 um). After subtracting the neighbour's shadow predicted with rough values (one pixel off laterally, one plane
+off in depth, a diameter 25 % too thin, together): 0.69, 1.01, 0.98, 1.09. With the neighbour fitted together with the
+node, its depth free: 1.00 in the four. So the cleaning is tolerant for defocused or distant neighbours and not for a
+close one in focus -- the case the iteration and the coarse fit have to be judged on. The assistant's prediction that a
+joint fit with the neighbour's depth held at its traced value would be within 0.02 failed (0.92).
+
+**What it implies for code and tables.** New steps, none built: a contamination survey of the pilot cell (which nodes
+are polluted, how much; it chooses the example nodes); a per-node features table by round; a shadow image predictor on
+a node's patch; the cleaning operator; the coarse fit; the iteration; the before/after figures; a notebook Cell 16. For
+option 2: a renderer of the measuring line alone (Block 4 costs 48.4 s per rendered and fitted realization, SPEC 13.5,
+and cannot sit in an optimiser); the per-node fit over several planes; its recovery on phantoms, the generators that
+are not the fit's own model included (Blocks 9 and 21); a notebook Cell 17; a report for the judgment. The steps, their
+checks and the open choices are in the plan named under Binds. Roadmap: NC (the branch), NC1 (cleaning), NC2 (option
+2), NC3 (the judgment), NC4 (option 1, only after NC3) -- the ids are the assistant's.
+
+**What it does not decide [open].** The plan's choices O1-O12. Whether the table route as planned (roadmap S5 to S8;
+D-024 (iii), D-031, D-059 to D-063, D-071) is suspended while this branch is tried: nothing is superseded here, and
+option 1 would reuse Block 14's table. Whether the hybrid absorption is the model of option 2's fit (D-084.2 stands).
+What is done with structures that are not traced. Other cells and davinci. Two theory topics proposed to the user and
+not added (the superposition of shadows and the iteration's convergence; what a per-node fit of the forward model can
+identify).
+
+**Sources.** **[user]** 2026-11-13, 12:35 and 13:01. **[src]** `sci/diameter-pipeline` at `34a5196`:
+`analysis/calibration_scene.py`, `analysis/plane_iteration.py`, `analysis/cell.py`, `model/render.py`,
+`tests/smoke/test_smoke_node_pipeline.py`, `notebooks/phase2_colab.py`. **[SPEC]** 2.3, Blocks 4, 5, 10.S, 13 (13.5's
+timing). **[run, sandbox]** `check_neighbour_cleaning.py` and `check_deconvolution_focal_plane.py`, sent as files in
+the chat of 2026-11-13, not in the repository. **[PubMed]** none searched for this entry: it records a design choice
+and a toy computation, no literature claim.
+
+**Status:** active; not implemented. Roadmap NC, NC1-NC4 added at `0274ce8`, the plan at `599d865`, both on
+`sci/diameter-pipeline`.
