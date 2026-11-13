@@ -172,6 +172,7 @@ the "Binds" column.
 | 2026-11-13 (later, 13) | Logs **D-137** (user, 17:23; the diameter chat): the cost of the hybrid per-node fit is met with the three measures together -- one cross-section extruded along the tube, 8 x 16 ray directions, and a tube no longer than the blur's reach around the measuring line -- as a new block of wave 3 tested against Block 26; the davinci runs will be heavily parallel; first the pilot's nodes in Colab. Also at the user's word the two spec tests that failed by design were adapted to the amended contract (`90a56af` on `sci/diameter-pipeline`); the tester's 92 new spec tests now pass (92 of 92, rerun by the orchestrator). |
 | 2026-11-13 (later, 14) | Logs **D-138** (user, 17:37, "All yes"; the diameter chat): wave 3's plan approved; Block 35 within 2e-4 of the background of Block 26 at equal ray directions, the 8 x 16 against 16 x 32 difference reported without a bound; nodes where the extrusion does not hold are flagged and skipped in the first Colab run; that run uses the survey's 20 example nodes, a skipped one replaced by the next of its class. With it one point of the orchestrator's (D-138.4): the coarse refinement's predictor in the pipeline is the fast line renderer of the node's local straight tube. **Wave 3's contract committed** (`f0c1fba` on `sci/diameter-pipeline`: SPEC section "Blocks 32, 34, 35", `InferenceConfig.ray_n_rho` 8 and `ray_n_psi` 16, `shadow_depth_bin_um` removed, three stubs and skeletons, roadmap I32, I34, I35) and three Opus implementers started. The Colab cells are not ready: they need these three blocks and the two scripts. Nothing of wave 3 verified yet. |
 | 2026-11-13 (later, 15) | Logs **D-139** [orchestrator] (the diameter chat, 18:25; coding directive 7): contract amendment 1 of Block 32 on its implementer's issue -- the shadow floor's background in the iteration is the largest of the planes' backgrounds; `shadow_fn`'s signature fixed (`3b145e0` on `sci/diameter-pipeline`). Wave 3 so far: Block 34 passed the gate and is merged (`48ca972`); Block 32's suite passes at its `wip` commit (two tubes started 30 % off return to the truth within 1.2e-6 in 4 rounds, the implementer's run) and it is finalising; Block 35 still running. |
+| 2026-11-13 (later, 16) | Logs **D-140** [orchestrator] (the diameter chat, 19:20; coding directive 7): contract amendment 1 of Block 35 on its implementer's three issues -- the heading in the cross-section's cache key; the 2e-4 oracle against Block 26 judged where the caps do not reach (half-length 40 um for tilted tubes); the validity of the extrusion a plain distance from the caps (`extrusion_cap_margin_um` 3.0 um, PROVISIONAL) (`961c326` on `sci/diameter-pipeline`). Block 32 passed the gate and is merged (`8aabb90`; suite 7 pass, 1 skip, rerun). First timings of the fast renderer at 8 x 16 directions, flat tube of half-length 10 um (the implementer's, one core): 0.37 s per call at 0.3 um, 1.5 s at 1.0 um, 6.1 s at 2.0 um, against Block 26's 1.3, 15.3 and 69.5 s; a cached cross-section saves little (the blur dominates). |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -326,6 +327,7 @@ would be needed*, *Status*.
 | D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
 | D-133 | 2026-11-13 | SPEC Blocks 25 (amendment 2), 28, 29, 30, 31 at `38f7c19`; `CleaningConfig`, `InferenceConfig` | wave 2's validation targets, tolerances and provisional parameters, proposed by the orchestrator at the wave's start: exact inverse of the cleaning 1e-9 gl; recovery 1e-6 and unbiasedness within 3 SE for the two fits; coverage 60-76 % and chi2/N within 10 % of 1 for the per-node fit; hybrid column sum 1e-10 and faint limit 5e-3 for the shadow model; renderers passed as callables [orchestrator] | active |
 | D-134 | 2026-11-13 | SPEC Block 25 (amendment 3); D-132.1 | a tier-1 neighbour's shadow is equations (5-6) for the neighbour rendered alone: one blur per slab, under the hybrid's absorbed light; one kernel per column is dropped [user] | active; supersedes the "one blur per column" clause of D-132.1 |
+| D-140 | 2026-11-13 | SPEC Block 35 (amendment 1) at `961c326`; `InferenceConfig.extrusion_cap_margin_um` | the fast line renderer is the tube without caps: its 2e-4 agreement with Block 26 is judged at half-lengths where the caps do not reach (10 um flat, 40 um tilted); the cross-section is cached per heading too; a node is valid for the extrusion when its line is at least 3.0 um (PROVISIONAL) along the axis from each end [orchestrator] | active |
 | D-139 | 2026-11-13 | SPEC Block 32 (amendment 1) at `3b145e0` | the cleaning iteration passes the shadow model one background for its floor, the largest of the node's planes' backgrounds (the cleaning itself stays per plane); `shadow_fn`'s signature; the restart, flag and stop-rule edge rules of the implementer accepted [orchestrator] | active |
 | D-138 | 2026-11-13 | SPEC Blocks 32, 34, 35 at `f0c1fba`; the wave-3 scripts and notebook Cells 16-18 | wave 3 approved; the fast line renderer within 2e-4 of Block 26 at equal directions; nodes near a branch point or a stretch's end flagged and skipped for now; the first Colab run on the survey's 20 example nodes [user]; the coarse refinement predicts with the fast line renderer [orchestrator] | active |
 | D-137 | 2026-11-13 | the per-node fit's forward model (SPEC Block 26's successor, wave 3); `InferenceConfig` | the hybrid line renderer is made fast by (1) computing the absorbed light on one cross-section and extruding it along the straight tube, (2) 8 x 16 ray directions, (3) a tube cut to the blur's reach around the measuring line; Block 26 stays as the reference; davinci runs parallel over nodes; first on the pilot in Colab [user] | active |
@@ -10973,6 +10975,45 @@ costs time and not accuracy [reasoning].
 **What it does not decide [open].** A per-plane floor in Block 25, if the backgrounds of a patch prove to differ much.
 
 **Sources.** **[src]** `wip/diameter-pipeline-block-32` at `692b906` (local). **[SPEC]** `3b145e0`.
+
+**Status:** active; the implementer is applying it.
+
+
+## D-140 -- Contract amendment 1 of wave 3, Block 35: the tube without caps, where its oracle is judged, the heading in the cache key, the validity as a cap distance [orchestrator]
+
+**Date:** 2026-11-13, about 19:20 (Europe/Rome), the diameter chat, settled by the orchestrating session under coding
+directive 7 on the three issues the Block 35 implementer raised; the user was not asked and can reverse any point. The
+tolerance of D-138.1 (2e-4) is the user's and is unchanged.
+**Binds:** SPEC Block 35 (`model/line_fast.py`), amendment 1 at `961c326` on `sci/diameter-pipeline`;
+`InferenceConfig.extrusion_cap_margin_um`.
+
+**Decision [orchestrator].** Three clauses change; D-137 and D-138 stand.
+
+**Statement.** (D-140.1, validation target) The agreement $\max |\tau^{\rm fast} - \tau^{\rm Block\,26}| \le$ 2e-4
+($\tau$ the transmittance read on the measuring line, dimensionless) is judged on tubes of half-length 10 um for flat
+cases and 40 um for tilted ones. Agreed before: half-length 10 um for all. (D-140.2, convention) The cross-section is
+cached per heading $\theta$ of the tube as well as per $(d, \mu, \varphi)$ (diameter in um, coefficient in 1/um, tilt).
+Agreed before: reused across $\theta$. (D-140.3, convention) A node's line is valid for the extrusion when the point of
+the tube's axis nearest the line's origin lies at least `extrusion_cap_margin_um` = 3.0 um along the axis from each end
+of the tube; PROVISIONAL. Agreed before: a margin of the blur's reach plus $d\,(1 + \tan\vartheta_{\max})$.
+
+**Why.** (1) The fast block computes the tube without caps; with the exact ray history of the capped tube it equals
+Block 26 to 8e-14, and the difference to Block 26 falls with the half-length -- 1.6e-4, 3.3e-5, 7.5e-6 at 10, 20, 40 um
+for $d$ = 1 um at 30 deg; 5.4e-4, 1.1e-4, 2.7e-5 at 60 deg; 1.1e-3 and 2.3e-4 at 10 and 20 um for 2 um at 30 deg --
+so it is the caps' light, which a dendrite does not have. (2) The ray quadrature has a finite number of azimuths, so the
+absorbed light is not invariant under a rotation of the tube: reusing a section across half an azimuth step moves
+$\tau$ by 1.9e-4 to 4.4e-3 at 8 x 16 directions. (3) The earlier margin refused 15 of the oracle's 16 geometries, the
+flat ones among them although they agree with Block 26 to 2.6e-5. **[all: run, sandbox, the Block 35 implementer at
+`5766aba`; not rerun by the orchestrator]**
+
+**What it implies for code and tables.** Block 35 and its test; the scripts flag a node whose line is nearer than the
+margin to its stretch's end. The value 3.0 um is to be judged on the table the implementer reports (the error with the
+line 1.5, 3.0, 5.0 um from a cap).
+
+**What it does not decide [open].** The margin's final value; whether the straight tube without caps is good enough
+near branch points (D-138's open point); further speed (the blur now dominates the time).
+
+**Sources.** **[run, sandbox]** as tagged. **[SPEC]** `961c326`.
 
 **Status:** active; the implementer is applying it.
 
