@@ -166,6 +166,7 @@ the "Binds" column.
 | 2026-11-13 (later, 7) | Logs **D-131** [orchestrator] (the diameter chat; coding directive 7): contract amendment 1 of wave 1, on the four issues the Block 27 implementer raised -- three conventions and one validation target of the contamination survey changed (the kernel at the segment's nearest point; the classes' precedence; the out-of-focus oracle at zero lateral distance, the evidence reproduced; the soma outside the profile). SPEC at `faa4f6f`. Block 23 returned and passed the gate, not merged yet; Blocks 24 and 26 running; Block 25 held. Next free IDs: D-132, I-006. |
 | 2026-11-13 (later, 8) | Logs **D-132** (user, 15:29; the diameter chat): the cleaning in two tiers, after Block 24's finding that hybrid shadows of separate tubes do not add. **Roadmap diameter-pipeline: the notes and summaries of T14, T15 and T7 updated** (`fe30e03`), statuses unchanged. Wave 1: Blocks 23, 24, 27 passed the gate and are merged (`e0a8a4e`); Block 26's implementer was stopped by the user before reporting, its worktree holds uncommitted work; Block 25 to be re-specified under D-132.1. Next free IDs: D-133, I-006. |
 | 2026-11-13 (later, 9) | Logs **D-133** [orchestrator] (the diameter chat, 15:45-16:00; coding directives 5 to 7), at the user's word "start the new agent with the same tolerances as before. Start also the second wave": **wave 2's contract committed** (`38f7c19` on `sci/diameter-pipeline`: SPEC section "Blocks 28-31" with Block 25's amendment 2 under D-132.1, the new `CleaningConfig` and `InferenceConfig` fields, five stubs, five smoke-test skeletons, roadmap I28-I31) and **six Opus implementers started**, one per block in its own worktree: Block 26 (restart, the tolerances agreed for wave 1 unchanged) and Blocks 25, 28, 29, 30, 31. The validation targets and tolerances of the new entries are the orchestrator's proposals, reported to the user with the start. The plan document carries a row for D-132 and the wave (`7479c25`); roadmap I25 reworded (`f6f5618`). Evidence: the configuration suite on the contract (6 pass, 0 fail, 1 skip); nothing of the blocks has run yet. |
+| 2026-11-13 (later, 10) | Logs **D-134** (user, 17:05, the dialog of the diameter chat) and **D-135** [orchestrator] (coding directive 7). D-134: a tier-1 neighbour's shadow is blurred slab by slab, not with one kernel per column -- supersedes that clause of D-132.1, after Block 25's implementer measured the one-kernel model off Block 4 by up to 0.225 of the peak out of focus and 0.382 in focus at 0.6-1.0 um, reproduced by the orchestrator in one dimension. D-135: the oracles of Block 25 that follow from it, the soma's absorption, `clean_block`'s signature, and the hybrid bound of Block 28 withdrawn (it fails for tilted pairs) in favour of a measured table. SPEC amended at `fd0ab93`; both implementers resumed. Wave 2 so far: Blocks 29, 30, 31 passed the gate and are merged (`130a722`, `cd4ab5a`, `ab8c6ee`); Block 26 still running. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -319,6 +320,8 @@ would be needed*, *Status*.
 | D-131 | 2026-11-13 | SPEC Block 27 (`analysis/contamination.py`) | contract amendment 1 of wave 1: a segment's nearest point sets both its distance and its blur; `clean` first and attached segments no overlap; the out-of-focus oracle only at zero lateral distance; the soma outside the pollution profile, its distance reported [orchestrator] | active; SPEC amended at `faa4f6f`; the implementer applying it |
 | D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
 | D-133 | 2026-11-13 | SPEC Blocks 25 (amendment 2), 28, 29, 30, 31 at `38f7c19`; `CleaningConfig`, `InferenceConfig` | wave 2's validation targets, tolerances and provisional parameters, proposed by the orchestrator at the wave's start: exact inverse of the cleaning 1e-9 gl; recovery 1e-6 and unbiasedness within 3 SE for the two fits; coverage 60-76 % and chi2/N within 10 % of 1 for the per-node fit; hybrid column sum 1e-10 and faint limit 5e-3 for the shadow model; renderers passed as callables [orchestrator] | active |
+| D-134 | 2026-11-13 | SPEC Block 25 (amendment 3); D-132.1 | a tier-1 neighbour's shadow is equations (5-6) for the neighbour rendered alone: one blur per slab, under the hybrid's absorbed light; one kernel per column is dropped [user] | active; supersedes the "one blur per column" clause of D-132.1 |
+| D-135 | 2026-11-13 | SPEC Block 25 (amendment 3), Block 28 (amendment 1) at `fd0ab93` | wave 2's contract amended on the implementers' issues: Block 25 agrees with Block 4 to 1e-9 (was two provisional bounds), `shadow_depths` a sanity check at 0.3 um, the depth-bin oracle dropped, the soma a Beer-Lambert sphere; `clean_block` takes `cfg`; the hybrid bound of Block 28 withdrawn for a measured table [orchestrator] | active |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
@@ -10752,4 +10755,80 @@ the survey); what "satisfactory" means for option 2 (O12).
 6 pass, 0 fail, 1 skip. **[user]** the instruction quoted above; D-129, D-130, D-132.
 
 **Status:** active; the implementers are running, nothing of the blocks verified yet.
+
+
+## D-134 -- A tier-1 neighbour's shadow is blurred slab by slab, not with one kernel per column (user)
+
+**Date:** 2026-11-13, 17:05 (Europe/Rome), the diameter chat; the user's answer in the dialog ("One blur per slab") to
+the question the orchestrator raised under coding directive 7 (the change contradicts a clause of D-132.1).
+**Binds:** SPEC Block 25 (`model/shadow.py`), amendment 3 at `fd0ab93` on `sci/diameter-pipeline`; through it Blocks 28,
+29, 31, 32.
+
+**Decision [user].** One blur per slab.
+
+**Statement.** For a tier-1 neighbour segment $q$ of node $i$, the predicted shadow in plane $k$ at pixel $(x, y)$ is
+equations (5-6) of SPEC section 2.3 for the segment's capped cylinder rendered alone:
+$s_{q,k}(x, y) = \sum_j \big(\Delta A_{q,j} * G_{\sigma_{\rm r}(\zeta_j - z_k)}\big)(x, y)$, with $\Delta A_{q,j}(x, y)$
+(dimensionless) the light absorbed in slab $j$ (centre $\zeta_j$ in um) under the hybrid absorption (D-132.1, unchanged),
+$z_k$ (um) the depth of plane $k$, $\sigma_{\rm r}(\delta)$ (um) the calibrated kernel SD at defocus $\delta$ (um) and
+$G_\sigma$ the unit-volume Gaussian of SD $\sigma$. The shadow image is $S_{i,k} = \sum_q s_{q,k}$ over the tier-1
+neighbours. Superseded: D-132.1's "one blur per column" (the kernel at the depth of the cylinder's axis under the
+column). The two tiers and the hybrid's absorbed light stand.
+
+**Why.** With one kernel per column the model misses Block 4's rendering of the same tube by, as a fraction of the
+plane's peak, 0.011 to 0.019 out of focus and 0.021 to 0.083 in focus at $d$ = 0.3 um, and up to 0.225 out of focus and
+0.382 in focus at $d$ = 0.6 to 1.0 um ($\mu$ = 1 /um, tilt 0 and 30 deg, both absorptions); with a constant kernel the
+two agree to 1e-15, so the gap is the model **[run, sandbox: the Block 25 implementer, `13d4b4d`]**. Reproduced by the
+orchestrator on a flat tube in one dimension with the default kernel: 0.113 to 0.137 at 1.0 um, 0.029 to 0.042 at
+0.6 um, 0.004 to 0.019 at 0.3 um **[run, sandbox]**. A thick tube's top and bottom lie at different defocus and the
+kernel's SD grows steeply (0.122 um at 0.28 um, 0.438 um at 0.56 um).
+
+**What it implies for code and tables.** Block 25 renders each neighbour per slab; cost under the hybrid estimated by
+the implementer at 1.2 to 2 times the one-kernel model (not yet measured on the new code). `shadow_depth_bin_um` is no
+longer read.
+
+**What it does not decide [open].** The tier boundary; the non-additivity of hybrid shadows between neighbours (D-132).
+
+**Sources.** **[user]** the dialog. **[run, sandbox]** as above. **[SPEC]** amendment 3 at `fd0ab93`.
+
+**Status:** active; supersedes the "one blur per column" clause of D-132.1. The implementer is applying it.
+
+## D-135 -- Contract amendments of wave 2 on the issues of Blocks 25 and 28: oracles, the soma, `clean_block`'s signature, the hybrid bound withdrawn [orchestrator]
+
+**Date:** 2026-11-13, about 17:10 (Europe/Rome), the diameter chat, settled by the orchestrating session under coding
+directive 7; the user was not asked on these points and can reverse any of them.
+**Binds:** SPEC Block 25 (amendment 3) and Block 28 (amendment 1) at `fd0ab93`.
+
+**Decision [orchestrator].** Five clauses change; the approach of D-129, D-130, D-132 and D-134 stands.
+
+**Statement.** (D-135.1, validation target and tolerance) Block 25 against Block 4's rendering of the same capped tube
+under the same absorption, pixel-integrated: $\max |S - (1 - \tau)| \le$ 1e-9 ($S$ the shadow, $\tau$ the transmittance,
+both dimensionless) for $d \in \{0.3, 0.6, 1.0\}$ um, tilt 0 and 30 deg. Agreed before: two PROVISIONAL bounds, 0.03 of
+the peak out of focus and 0.15 in focus. (D-135.2, validation target) The flat segment against
+`calibration_scene.shadow_depths` is a sanity check at $d$ = 0.3 um, within 5e-2 of the peak. Agreed before: 1e-6
+relative for any flat segment. The depth-bin halving oracle is dropped with the depth bins. (D-135.3, convention) A soma
+disc is a sphere whose column absorbs $1 - \exp(-\mu_s \ell_s)$ ($\mu_s$ = `soma_mu_per_um` in 1/um, $\ell_s$ the chord
+in um), split over the slabs by the vertical partition, under both absorptions. Not stated before. PROVISIONAL.
+(D-135.4, interface) `cleaning.clean_block(block, S, B_gl, cfg)`. Agreed before: no `cfg`. (D-135.5, validation target)
+Block 28's oracle "under the hybrid the cleaning residual is at most $B \max (1 - \tau^{(1)})(1 - \tau^{(2)})$" is
+withdrawn; in its place a reported table of the residual (gl, $B$ = 210 gl) for two equal tubes at tilt 0 and 45 deg
+with centres 1.0, 2.0 and 3.0 um apart.
+
+**Why.** (1) and the dropped oracle follow from D-134: the model is now Block 4's own mathematics for one tube. (2) The
+closed form has one kernel, which D-134 shows is wrong for thick tubes; at 0.3 um the sampling of the square-root edge at
+8 samples per pixel alone gives 1.2e-2 [the implementer's convergence in the fine factor]. (3) Block 21 has no sphere.
+(4) `over_background` needs `over_background_gl` and the signature carried no configuration. (5) The bound fails for
+tilted pairs: residual over bound 1.014 to 1.163 at 45 and 60 deg, radius 0.25 um, centres 0.69 to 0.92 um apart,
+$\mu$ = 3 /um, also at 16 x 32 directions **[run, sandbox: the Block 28 implementer, `6c477bd`; not rerun by the
+orchestrator]**; oblique rays couple two tubes away from where their blurred shadows overlap [reasoning].
+
+**What it implies for code and tables.** Blocks 25 and 28 only; Block 31 does not call `clean_block`. The residual
+table is the evidence for the tier boundary `close_lateral_um`.
+
+**What it does not decide [open].** The tier boundary itself; the soma's coefficient and depth.
+
+**Sources.** **[run, sandbox]** as tagged. **[SPEC]** `fd0ab93`. **[src]** `wip/diameter-pipeline-block-25` at `13d4b4d`,
+`-block-28` at `6c477bd` (local).
+
+**Status:** active; both implementers are applying it.
 
