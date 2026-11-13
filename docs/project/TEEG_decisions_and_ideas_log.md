@@ -169,6 +169,7 @@ the "Binds" column.
 | 2026-11-13 (later, 10) | Logs **D-134** (user, 17:05, the dialog of the diameter chat) and **D-135** [orchestrator] (coding directive 7). D-134: a tier-1 neighbour's shadow is blurred slab by slab, not with one kernel per column -- supersedes that clause of D-132.1, after Block 25's implementer measured the one-kernel model off Block 4 by up to 0.225 of the peak out of focus and 0.382 in focus at 0.6-1.0 um, reproduced by the orchestrator in one dimension. D-135: the oracles of Block 25 that follow from it, the soma's absorption, `clean_block`'s signature, and the hybrid bound of Block 28 withdrawn (it fails for tilted pairs) in favour of a measured table. SPEC amended at `fd0ab93`; both implementers resumed. Wave 2 so far: Blocks 29, 30, 31 passed the gate and are merged (`130a722`, `cd4ab5a`, `ab8c6ee`); Block 26 still running. |
 | 2026-11-13 (later, 11) | No new decision ID (the diameter chat, 18:30). **Wave 2 merged**: all six blocks passed the gate (own files only, the contract an ancestor, check 1 by the orchestrator, each suite rerun on the merged tree) -- Block 25 `9fde671` (one blur per slab, D-134: against Block 4 at most 1.6e-15), 26 `b3e2fc0` (against Block 4 at most 2.8e-4, bound 1e-3), 28 `705eee5`, 29 `130a722`, 30 `ab8c6ee`, 31 `cd4ab5a`; SPEC statuses of Blocks 23-31 at `70ea68a` on `sci/diameter-pipeline`, pushed. No change to the mathematics, units, conventions, estimators, validation targets or tolerances beyond D-131, D-134 and D-135. **Open finding (cost, for the user)**: Block 26's hybrid at the production configuration (tube half-length 10 um, 16 x 32 directions) takes 4.9-7.8 s per call at 0.3 um, 58-92 s at 1.0 um and 313-397 s at 2.0 um (the implementer's timings, one core, not rerun by the orchestrator), about 1.5 times faster than Block 4; a per-node fit of some hundreds of calls is then hours per thick node. Evidence for the tier boundary (Block 28's table, rerun by the orchestrator): the residual of subtracting a lone-rendered hybrid neighbour is 0.34 gl at 1 um for flat tubes and 11.5, 2.2, 0 gl at 1, 2, 3 um for tubes at 45 deg (radius 0.25 um, mu 3 /um, B 210 gl). The final check of the merged waves 1 and 2 is running on an Opus tester (incremental, Blocks 23-31, commit `70ea68a`). |
 | 2026-11-13 (later, 12) | Logs **D-136** [orchestrator] (the diameter chat, 19:40; coding directives 7 and 9). **Final check of waves 1 and 2 by an Opus tester: PASS WITH ISSUES** at `70ea68a` (report `specs/test_reports/2026-11-13_1830_incremental.md`, tests `a8d189d`): no wrong number; 51 of 52 smoke suites pass (the one error a sandbox artefact of the git worktree, not a regression), 69 of 69 earlier spec tests, 81 of 92 new ones, the 11 failures reproducing five MINOR findings. The chain Block 24 -> 25 -> 28 returns the node alone to 3.7e-13 gl (partition) and 4.3e-13 gl (hybrid, one neighbour). The orchestrator fixed F1, F2, F3, F5, F8 and amended SPEC for S1-S8 (`2273d5e`); F4 and F10 kept as designed. |
+| 2026-11-13 (later, 13) | Logs **D-137** (user, 17:23; the diameter chat): the cost of the hybrid per-node fit is met with the three measures together -- one cross-section extruded along the tube, 8 x 16 ray directions, and a tube no longer than the blur's reach around the measuring line -- as a new block of wave 3 tested against Block 26; the davinci runs will be heavily parallel; first the pilot's nodes in Colab. Also at the user's word the two spec tests that failed by design were adapted to the amended contract (`90a56af` on `sci/diameter-pipeline`); the tester's 92 new spec tests now pass (92 of 92, rerun by the orchestrator). |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -323,6 +324,7 @@ would be needed*, *Status*.
 | D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
 | D-133 | 2026-11-13 | SPEC Blocks 25 (amendment 2), 28, 29, 30, 31 at `38f7c19`; `CleaningConfig`, `InferenceConfig` | wave 2's validation targets, tolerances and provisional parameters, proposed by the orchestrator at the wave's start: exact inverse of the cleaning 1e-9 gl; recovery 1e-6 and unbiasedness within 3 SE for the two fits; coverage 60-76 % and chi2/N within 10 % of 1 for the per-node fit; hybrid column sum 1e-10 and faint limit 5e-3 for the shadow model; renderers passed as callables [orchestrator] | active |
 | D-134 | 2026-11-13 | SPEC Block 25 (amendment 3); D-132.1 | a tier-1 neighbour's shadow is equations (5-6) for the neighbour rendered alone: one blur per slab, under the hybrid's absorbed light; one kernel per column is dropped [user] | active; supersedes the "one blur per column" clause of D-132.1 |
+| D-137 | 2026-11-13 | the per-node fit's forward model (SPEC Block 26's successor, wave 3); `InferenceConfig` | the hybrid line renderer is made fast by (1) computing the absorbed light on one cross-section and extruding it along the straight tube, (2) 8 x 16 ray directions, (3) a tube cut to the blur's reach around the measuring line; Block 26 stays as the reference; davinci runs parallel over nodes; first on the pilot in Colab [user] | active |
 | D-136 | 2026-11-13 | SPEC Blocks 1, 24, 25, 27, 28, 29, 30, 31 (section "Final check of waves 1 and 2: amendments") at `2273d5e` | the final check's findings settled: a node's own stretch excludes the prepended parent node (the segment to the parent is a neighbour); $v_0$, $\Delta z$ are total offsets from the traced position; a non-finite forward at any evaluation fails the start; `figure_rounds(history, cfg)`; the two new config sections validated; two wordings of Block 24's oracles corrected [orchestrator] | active |
 | D-135 | 2026-11-13 | SPEC Block 25 (amendment 3), Block 28 (amendment 1) at `fd0ab93` | wave 2's contract amended on the implementers' issues: Block 25 agrees with Block 4 to 1e-9 (was two provisional bounds), `shadow_depths` a sanity check at 0.3 um, the depth-bin oracle dropped, the soma a Beer-Lambert sphere; `clean_block` takes `cfg`; the hybrid bound of Block 28 withdrawn for a measured table [orchestrator] | active |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
@@ -10869,4 +10871,41 @@ per-node fit (the user's, pending).
 **Sources.** **[run, sandbox]** the tester's report and tests (`a8d189d`); the reruns after the fixes. **[SPEC]** `2273d5e`.
 
 **Status:** active.
+
+
+## D-137 -- The hybrid per-node fit made affordable: one cross-section extruded, 8 x 16 directions, a tube cut to the blur's reach; Block 26 the reference (user)
+
+**Date:** 2026-11-13, 17:23 (Europe/Rome), the diameter chat; the user's answer to the four options the orchestrator
+set out after Block 26's timings.
+**Binds:** the forward model of the per-node fit (a new block of wave 3, the fast successor of SPEC Block 26);
+`InferenceConfig`; the wave-3 scripts and notebook cells; later the davinci job scripts.
+
+**Decision [user].** "I would do 1 2 3 remember also that on the da Vinci we will heavly parallelize it. in any case
+now we will try it on the colab nodes".
+
+**Statement.** (D-137.1) For a straight tube of uniform diameter $d$ (um) and coefficient $\mu$ (1/um) at tilt $\varphi$,
+the hybrid's absorbed light is computed once on one cross-section of the tube and carried along its axis (it is the same
+in every cross-section farther from the caps than the oblique rays reach); the planes are then blurred slab by slab as
+in equations (5-6) of SPEC section 2.3. (D-137.2) The per-node fit uses 8 x 16 ray directions (radial x azimuthal).
+(D-137.3) The tube rendered is no longer than what the blur of the most defocused plane used can carry onto the
+measuring line (the reach rule of Block 26, `line_reach_sigmas`). (D-137.4) Block 26 stays in the package as the
+reference the fast block is tested against. (D-137.5) On davinci the fits run in parallel over nodes; the first runs
+are on the pilot cell's nodes in Colab. Not chosen: option 4 (fit with the partition model, correct with the hybrid),
+which would change the estimator of D-130.O10.
+
+**Why.** Block 26's hybrid at the production configuration (half-length 10 um, 16 x 32 directions) takes 4.9-7.8 s per
+call at 0.3 um, 58-92 s at 1.0 um and 313-397 s at 2.0 um, and a fit needs some hundreds of calls **[run, sandbox: the
+Block 26 implementer's timings, one core; not rerun by the orchestrator]**. Block 21 measured 8 x 16 directions within
+about 1.2e-3 of the fine setting [SPEC Block 21]. The gain of the extrusion is the orchestrator's estimate (one to two
+orders of magnitude), not measured.
+
+**What it implies for code and tables.** A new block with its own oracle against Block 26; new `InferenceConfig` fields
+for the directions; the fit's callable built on it; job scripts for davinci as an array over nodes (hpc skills).
+
+**What it does not decide [open].** The tolerance of the fast block against Block 26; how near a cap or a branch point
+a node may be for the extrusion to hold; the tier boundary; O12.
+
+**Sources.** **[user]** the message quoted. **[run, sandbox]** and **[SPEC]** as tagged.
+
+**Status:** active; the block is to be specified with wave 3's plan.
 
