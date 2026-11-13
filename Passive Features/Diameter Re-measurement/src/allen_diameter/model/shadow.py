@@ -1,37 +1,35 @@
 """The shadow image of a node's neighbours (tier 1) -- Block 25 in specs/SPEC.md
-with its amendment 2 (D-129, D-130.O1, O4, O5; D-132.1).
+with its amendments 2 and 3 (D-129, D-130.O1, O4, O5; D-132.1; D-134, D-135).
 
-The shadow model (the assistant's, PROVISIONAL). A segment q with ends
-(p0, d0, mu0), (p1, d1, mu1) is a straight capped cylinder on the line p0 p1
-(Block 2 Tube, round section, axial caps at the two ends) of diameter
-dbar = (d0 + d1) / 2 and coefficient mubar = (mu0 + mu1) / 2. Its absorbed
-fraction on the column through (x, y), A_q(x, y), is the column total of the
-absorbed light of that cylinder rendered alone under
-CleaningConfig.shadow_absorption:
+The shadow model (amendment 3). A segment q with ends (p0, d0, mu0),
+(p1, d1, mu1) is a straight capped cylinder on the line p0 p1 (Block 2 Tube,
+round section, axial caps at the two ends) of diameter dbar = (d0 + d1) / 2
+and coefficient mubar = (mu0 + mu1) / 2. Its shadow in plane k is equations
+(5-6) of section 2.3 for the cylinder rendered alone,
 
-    "hybrid"              A_q = sum_j DeltaA^hyb_j   (section 2.3 (H); Block 21
-                          slab_absorbed over the slabs of thickness dzeta_um,
-                          the directions ray_world.directions(shadow_ray_n_rho,
-                          shadow_ray_n_psi, ray_na, ray_n_oil))
-    "partition_vertical"  A_q = 1 - exp(-mubar l_q), l_q the column's length
-                          inside the cylinder (um)
+    s_qk(x, y) = sum_j (DeltaA_qj * G_{sigma_r(zeta_j - z_k)})(x, y),
 
-In plane k the segment's shadow is s_qk = A_q * G_{sigma_r(z_q(x, y) - z_k)}:
-one kernel per column, at the depth z_q of the cylinder's axis under the
-column. A soma disc (x_s, y_s, r_s) is a sphere of radius r_s centred at depth
-CleaningConfig.soma_z_um with coefficient soma_mu_per_um. The shadow image of
-node i is S_ik = sum over the neighbours of s_qk, averaged over each pixel.
+DeltaA_qj the light absorbed in slab j (centre zeta_j, thickness dzeta_um, the
+lattice of render.slab_grid) under CleaningConfig.shadow_absorption:
+"hybrid" -- Block 21's slab_absorbed with the directions
+ray_world.directions(shadow_ray_n_rho, shadow_ray_n_psi, ray_na, ray_n_oil);
+"partition_vertical" -- Block 4's T_<j (1 - exp(-a_j)). The column total
+A_q = sum_j DeltaA_qj is what segment_absorbed returns, with z_axis. A soma
+disc (x_s, y_s, r_s) is a sphere centred at depth soma_z_um whose column
+absorbs 1 - exp(-soma_mu_per_um l_s), split over the slabs by the vertical
+partition under both absorptions (PROVISIONAL, D-135.3). The shadow image of
+node i is S_ik = sum of s_qk over the kept, included neighbours, averaged
+over each pixel.
 
-Discretisation. A_q is sampled on a fine grid of shadow_fine_factor samples per
-pixel side, on the lattice of the patch's own fine grid (Block 4
-block_fine_grid), over the whole footprint of the segment. The per-column
-kernel (the entry's custom code): the footprint is split into depth bins of
-z_q of equal width at most shadow_depth_bin_um, and each bin is blurred at its
-centre's kernel. The blur of a bin onto the patch is the Gaussian convolution
-written as two matrix products, rows then columns, of the continuous Gaussian
-sampled at the fine offsets and averaged over each pixel's fine samples (the
-pixel mean of the fine-grid blur, Block 4's pixel_integrate, evaluated only on
-the patch). A (bin, plane) pair whose nearest column lies farther than
+Discretisation. DeltaA_qj is sampled on a fine grid of shadow_fine_factor
+samples per pixel side, on the lattice of the patch's own fine grid (Block 4
+block_fine_grid), over the whole footprint of the segment. The custom code
+(amendment 3): (5-6) evaluated from the footprint to the patch's pixels
+without a common padded grid -- each slab's Gaussian convolution written as
+two matrix products, rows then columns, of the continuous Gaussian sampled at
+the fine offsets and averaged over each pixel's fine samples (Block 4's FFT
+blur followed by pixel_integrate, evaluated only on the patch). A (slab,
+plane) pair whose nearest absorbing column lies farther than
 shadow_reach_sigmas x sigma from the patch rectangle contributes exactly 0.
 
 Units: um, 1/um, dimensionless shadows; float64. Pure ASCII, for the cluster.
@@ -121,22 +119,26 @@ def _absorption(cfg):
     return a
 
 
-def _tube_absorbed(tube, mubar, grid, cfg, directions=None):
-    """A (ny, nx) and z_axis (ny, nx) of one tube on grid."""
-    X, Y = grid.mesh()
-    z_lo, z_hi, inside = geometry.column_interval(X, Y, tube)
+def _z_axis(tube, X, Y):
     u = (X - tube.c[0]) * math.cos(tube.theta) + (Y - tube.c[1]) * math.sin(tube.theta)
     u_end = tube.half_length * math.cos(tube.phi0)
-    z_axis = tube.c[2] + np.clip(u, -u_end, u_end) * math.tan(tube.phi)
-    A = np.zeros(X.shape)
-    if mubar == 0.0 or not inside.any():
-        return A, z_axis
-    if _absorption(cfg) == "partition_vertical":
-        A[inside] = -np.expm1(-mubar * (z_hi[inside] - z_lo[inside]))
-        return A, z_axis
-    S, W = _directions(cfg) if directions is None else directions
+    return tube.c[2] + np.clip(u, -u_end, u_end) * math.tan(tube.phi)
+
+
+def _tube_slabs(tube, mubar, grid, cfg, directions=None):
+    """Yield (zeta_j, row slice, column slice, DeltaA_j on that box) for every slab of the tube with
+    absorbed light on grid, in increasing j (the slab lattice of render.slab_grid)."""
+    if mubar == 0.0:
+        return
+    X, Y = grid.mesh()
+    z_lo, z_hi, inside = geometry.column_interval(X, Y, tube)
+    if not inside.any():
+        return
     dz = float(cfg.renderer.dzeta_um)
     light = int(cfg.acquisition.light_direction)
+    hyb = _absorption(cfg) == "hybrid"
+    if hyb:
+        S, W = _directions(cfg) if directions is None else directions
     xs, ys = grid.xs, grid.ys
     for zj in slab_grid(tube, grid, dz):
         hit = inside & (z_lo < zj + 0.5 * dz) & (z_hi > zj - 0.5 * dz)
@@ -145,9 +147,46 @@ def _tube_absorbed(tube, mubar, grid, cfg, directions=None):
         rows = np.flatnonzero(hit.any(axis=1))
         cols = np.flatnonzero(hit.any(axis=0))
         rs, cs = slice(int(rows[0]), int(rows[-1]) + 1), slice(int(cols[0]), int(cols[-1]) + 1)
-        A[rs, cs] += _hybrid.slab_absorbed(xs[cs][None, :], ys[rs][:, None], z_lo[rs, cs], z_hi[rs, cs], zj, dz,
-                                           mubar, tube, S, W, light)
-    return A, z_axis
+        zl, zh = z_lo[rs, cs], z_hi[rs, cs]
+        if hyb:
+            dA = _hybrid.slab_absorbed(xs[cs][None, :], ys[rs][:, None], zl, zh, zj, dz, mubar, tube, S, W, light)
+        else:
+            a = geometry.slab_absorbance(zl, zh, zj, dz, mubar)
+            dA = geometry.transmitted_before(zl, zh, zj, dz, mubar, light) * (-np.expm1(-a))
+        yield float(zj), rs, cs, dA
+
+
+def _soma_slabs(xs, ys, r, grid, cfg):
+    """Yield the slabs of the soma sphere (vertical partition of its Beer-Lambert column)."""
+    mu = float(cfg.cleaning.soma_mu_per_um)
+    if mu == 0.0:
+        return
+    zc = float(cfg.cleaning.soma_z_um)
+    X, Y = grid.mesh()
+    half = np.sqrt(np.clip(r * r - (X - xs) ** 2 - (Y - ys) ** 2, 0.0, None))
+    inside = half > 0
+    if not inside.any():
+        return
+    z_lo, z_hi = np.where(inside, zc - half, zc), np.where(inside, zc + half, zc)
+    dz = float(cfg.renderer.dzeta_um)
+    light = int(cfg.acquisition.light_direction)
+    for zj in geometry.slab_centres(float(z_lo[inside].min()), float(z_hi[inside].max()), dz):
+        hit = inside & (z_lo < zj + 0.5 * dz) & (z_hi > zj - 0.5 * dz)
+        if not hit.any():
+            continue
+        rows = np.flatnonzero(hit.any(axis=1))
+        cols = np.flatnonzero(hit.any(axis=0))
+        rs, cs = slice(int(rows[0]), int(rows[-1]) + 1), slice(int(cols[0]), int(cols[-1]) + 1)
+        zl, zh = z_lo[rs, cs], z_hi[rs, cs]
+        a = geometry.slab_absorbance(zl, zh, zj, dz, mu)
+        yield float(zj), rs, cs, geometry.transmitted_before(zl, zh, zj, dz, mu, light) * (-np.expm1(-a))
+
+
+def _column_total(slabs, shape):
+    A = np.zeros(shape)
+    for _zj, rs, cs, dA in slabs:
+        A[rs, cs] += dA
+    return A
 
 
 def segment_absorbed(fscene, q, grid, cfg):
@@ -158,17 +197,8 @@ def segment_absorbed(fscene, q, grid, cfg):
     tube, mubar = _segment_tube(fscene, q)
     if tube is None:
         return np.zeros((grid.ny, grid.nx)), np.full((grid.ny, grid.nx), float(fscene.seg_xyz[int(q)][2]))
-    return _tube_absorbed(tube, mubar, grid, cfg)
-
-
-def _soma_absorbed(xs, ys, r, grid, cfg):
-    """A (ny, nx), z_axis (ny, nx) of the soma sphere: 1 - exp(-mu 2 sqrt(r^2 - rho^2)), depth soma_z_um."""
     X, Y = grid.mesh()
-    rho2 = (X - xs) ** 2 + (Y - ys) ** 2
-    ell = 2.0 * np.sqrt(np.clip(r * r - rho2, 0.0, None))
-    mu = float(cfg.cleaning.soma_mu_per_um)
-    A = -np.expm1(-mu * ell)
-    return A, np.full(X.shape, float(cfg.cleaning.soma_z_um))
+    return _column_total(_tube_slabs(tube, mubar, grid, cfg), X.shape), _z_axis(tube, X, Y)
 
 
 def neighbour_indices(fscene, own_ids):
@@ -234,41 +264,29 @@ class _Patch:
         dy = np.maximum(np.maximum(y_lo - Y, Y - y_hi), 0.0)
         return np.sqrt(dx * dx + dy * dy)
 
-    def blur(self, A, z_axis, grid, planes_z, rcfg, bin_um):
-        """(n_planes, H, W): the per-column-kernel blur of A (on grid) onto the patch's pixel means."""
+    def blur_slabs(self, slabs, grid, planes_z, rcfg):
+        """(n_planes, H, W): equations (5-6) of the slabs (zeta_j, rows, cols, DeltaA_j on grid), each
+        slab blurred at sigma_r(zeta_j - z_k), onto the patch's pixel means; and the union footprint."""
         out = np.zeros((len(planes_z), self.H, self.W))
-        foot = A != 0.0
-        if not foot.any():
-            return out
-        X, Y = grid.mesh()
-        zf = z_axis[foot]
-        z_min, z_max = float(zf.min()), float(zf.max())
-        nb = max(1, int(math.ceil((z_max - z_min) / bin_um - 1e-12)))
-        width = (z_max - z_min) / nb
-        b = np.zeros(A.shape, dtype=np.int64)
-        if width > 0:
-            b = np.clip(np.floor((z_axis - z_min) / width).astype(np.int64), 0, nb - 1)
-        dist = self.dist_to_rect(X, Y)
+        foot = np.zeros((grid.ny, grid.nx), dtype=bool)
         xs, ys = grid.xs, grid.ys
-        for ib in range(nb):
-            m = foot & (b == ib)
-            if not m.any():
+        z = np.asarray(planes_z, dtype=float)
+        for zj, rs, cs, dA in slabs:
+            nz = dA != 0.0
+            if not nz.any():
                 continue
-            rows = np.flatnonzero(m.any(axis=1))
-            cols = np.flatnonzero(m.any(axis=0))
-            rs, cs = slice(int(rows[0]), int(rows[-1]) + 1), slice(int(cols[0]), int(cols[-1]) + 1)
-            Ab = np.where(m[rs, cs], A[rs, cs], 0.0)
-            dmin = float(dist[rs, cs][m[rs, cs]].min())
-            zc = z_min + (ib + 0.5) * width
-            sig = np.atleast_1d(_kernel.sigma_r(zc - np.asarray(planes_z, dtype=float), rcfg))
+            foot[rs, cs] |= nz
+            Xb, Yb = np.meshgrid(xs[cs], ys[rs])
+            dmin = float(self.dist_to_rect(Xb[nz], Yb[nz]).min())
+            sig = np.atleast_1d(_kernel.sigma_r(zj - z, rcfg))
             for k, s in enumerate(sig):
                 s = float(s)
                 if dmin > self.reach * s:
                     continue
-                Gy = self._weights(self.ty, ys[rs], s)          # (H, ny_b)
-                Gx = self._weights(self.tx, xs[cs], s)          # (W, nx_b)
-                out[k] += Gy @ Ab @ Gx.T
-        return out
+                Gy = self._weights(self.ty, ys[rs], s)          # (H, ny_box)
+                Gx = self._weights(self.tx, xs[cs], s)          # (W, nx_box)
+                out[k] += Gy @ dA @ Gx.T
+        return out, foot
 
 
 def _segment_box(tube):
@@ -281,22 +299,21 @@ def _segment_box(tube):
 
 
 def _neighbour_image(fscene, kind, idx, patch, planes_z, cfg, directions):
-    """(image (n_planes, H, W), footprint on its grid (bool), grid offset (n0, m0)) of one neighbour."""
-    rcfg, cl = cfg.renderer, cfg.cleaning
+    """(image (n_planes, H, W), footprint on its grid (bool, absorbed light > 0), grid offset (n0, m0))."""
     if kind == "seg":
         tube, mubar = _segment_tube(fscene, idx)
         if tube is None:
             return np.zeros((len(planes_z), patch.H, patch.W)), None, None
         grid, off = patch.source_grid(*_segment_box(tube))
-        A, z_axis = _tube_absorbed(tube, mubar, grid, cfg, directions)
+        slabs = _tube_slabs(tube, mubar, grid, cfg, directions)
     else:
         xs, ys, r = (float(v) for v in np.asarray(fscene.soma, dtype=float).reshape(-1, 3)[idx])
         if not (r > 0 and math.isfinite(xs) and math.isfinite(ys)):
             raise ValueError("soma disc %d: need finite centre and radius > 0" % idx)
         grid, off = patch.source_grid(xs - r, xs + r, ys - r, ys + r)
-        A, z_axis = _soma_absorbed(xs, ys, r, grid, cfg)
-    img = patch.blur(A, z_axis, grid, planes_z, rcfg, float(cl.shadow_depth_bin_um))
-    return img, A > 0, off
+        slabs = _soma_slabs(xs, ys, r, grid, cfg)
+    img, foot = patch.blur_slabs(slabs, grid, planes_z, cfg.renderer)
+    return img, foot, off
 
 
 def _paste(mask, off, patch):

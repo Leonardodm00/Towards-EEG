@@ -1,27 +1,22 @@
 """Smoke test for the shadow image of a node's neighbours (tier 1) -- Block 25 in
 specs/SPEC.md, with its amendment 2 (D-132.1).
 
-Checks, from the strongest oracle to the weakest
-    test_known_answer   a flat segment against calibration_scene.shadow_depths
-                        (pixel means of the continuous 1-D integral) at lateral
-                        offsets across its middle, beyond its caps' reach
-                        [1e-6 relative to the peak, as SPEC.md writes it];
-                        before it, the same samples blurred by hand (the blur
-                        exact, 1e-10); hybrid faint limit: at mubar dbar = 1e-3,
+Checks, from the strongest oracle to the weakest (amendment 3)
+    test_known_answer   sanity check: a flat d = 0.3 um segment against
+                        calibration_scene.shadow_depths (a one-kernel closed
+                        form; pixel means) across its middle, beyond its caps'
+                        reach, within 5e-2 of the peak at planes 0 and 0.84 um;
+                        hybrid faint limit: at mubar dbar = 1e-3,
                         A_q / (1.4470 mubar l_q) within 5e-3 of 1
-    test_reference      "hybrid" A_q equals the column sum of
-                        render.absorbed_fractions(..., "hybrid", directions) on
+    test_reference      against Block 4's render_transmittance of the same
+                        capped tube under the same absorption, pixel-integrated:
+                        max |S - (1 - tau)| <= 1e-9 for d in {0.3, 0.6, 1.0} um,
+                        tilt 0 and 30 deg, seven planes, both absorptions (the
+                        values and the times per segment printed); "hybrid" A_q
+                        equals the column sum of render.absorbed_fractions on
                         the same grid [1e-10]; stretch_profiles equals
-                        sample_profile on shadow_image's planes for the same
-                        segments [1e-10], both absorptions; against Block 4's
-                        render_transmittance of the same capped tube under the
-                        same absorption, pixel-integrated: out of focus (axis
-                        >= 0.84 um from the plane) max |S - (1 - tau)| <= 0.03 x
-                        the plane's peak, in focus <= 0.15 x the peak, over
-                        d in {0.3, 0.6, 1.0} um and tilt 0, 30 deg [PROVISIONAL:
-                        the measured values and the time per segment printed]
-    test_convergence    halving shadow_depth_bin_um moves a 45-degree segment's
-                        image by less than 1e-3 x its peak (both absorptions)
+                        sample_profile on shadow_image's planes [1e-10]
+    test_convergence    SKIP: the depth-bin halving is dropped (amendment 3)
     test_invariants     total per plane equal across planes and to the integral
                         of A_q [relative 1e-8] (segments and a soma); additivity
                         over segments [1e-12]; `kept` follows the floor and S
@@ -189,35 +184,23 @@ def test_known_answer():
     f = cfg.cleaning.shadow_fine_factor
     h = P_X / f
     top, height, left, width = -20, 41, -5, 11
-    worst_spec, worst_discrete = 0.0, 0.0
-    rows = []
-    for d in (0.3, 1.0):
-        r, mu = 0.5 * d, 1.0
-        fs = make_scene([((-6.0, 0.0, 0.0), (6.0, 0.0, 0.0), d, mu)])
-        planes = np.array([0.0, 0.84])
-        res = SH.shadow_image(fs, OWN_IDS, left, top, width, height, planes, cfg)
-        col = res.S[:, :, 5]                          # x = 0, 5.4 um from either cap
-        y_pix = (top + np.arange(height)) * P_X
-        y_sub = y_pix[:, None] - 0.5 * P_X + (np.arange(f)[None, :] + 0.5) * h      # the pixel's fine samples
-        y_lat0 = top * P_X - 0.5 * P_X + 0.5 * h                 # the patch's fine lattice
-        m = np.arange(int(math.floor((-r - y_lat0) / h)) - 1, int(math.ceil((r - y_lat0) / h)) + 2)
-        y_src = y_lat0 + m * h
-        y_src = y_src[np.abs(y_src) <= r]
-        A_src = -np.expm1(-mu * 2.0 * np.sqrt(np.clip(r * r - y_src ** 2, 0.0, None)))
-        for k, z in enumerate(planes):
-            sig = float(K.sigma_r(z, cfg.renderer))
-            # the same samples blurred by hand: pixel mean of sum_m h A(y_m) g(y_s - y_m)
-            g = np.exp(-0.5 * ((y_sub[:, :, None] - y_src[None, None, :]) / sig) ** 2) / (math.sqrt(2 * math.pi) * sig)
-            disc = (h * g * A_src).sum(-1).mean(-1)
-            e_disc = float(np.max(np.abs(col[k] - disc)) / disc.max())
-            # SPEC.md's oracle: shadow_depths (the continuous integral), pixel means
-            ref = CS.shadow_depths(np.abs(y_sub), r, mu, sig, 1.0).mean(-1)
-            e_spec = float(np.max(np.abs(col[k] - ref)) / ref.max())
-            rows.append("d %.1f z %.2f: vs hand-blurred samples %.2e, vs shadow_depths %.2e" % (d, z, e_disc, e_spec))
-            worst_discrete = max(worst_discrete, e_disc)
-            worst_spec = max(worst_spec, e_spec)
-    MEASURED["known_answer flat vs shadow_depths (relative to peak)"] = rows
-    assert worst_discrete <= 1e-10, "blur of the samples: %.3e" % worst_discrete
+    d, mu = 0.3, 1.0
+    r = 0.5 * d
+    fs = make_scene([((-6.0, 0.0, 0.0), (6.0, 0.0, 0.0), d, mu)])
+    planes = np.array([0.0, 0.84])
+    res = SH.shadow_image(fs, OWN_IDS, left, top, width, height, planes, cfg)
+    col = res.S[:, :, 5]                          # x = 0, 5.4 um from either cap
+    y_pix = (top + np.arange(height)) * P_X
+    y_sub = y_pix[:, None] - 0.5 * P_X + (np.arange(f)[None, :] + 0.5) * h      # the pixel's fine samples
+    rows, worst = [], 0.0
+    for k, z in enumerate(planes):
+        sig = float(K.sigma_r(z, cfg.renderer))
+        ref = CS.shadow_depths(np.abs(y_sub), r, mu, sig, 1.0).mean(-1)
+        e = float(np.max(np.abs(col[k] - ref)) / ref.max())
+        rows.append("d %.1f z %.2f: %.3e x peak" % (d, z, e))
+        worst = max(worst, e)
+    MEASURED["known_answer flat d 0.3 vs shadow_depths (sanity)"] = rows
+    assert worst <= 5e-2, "flat d 0.3 vs shadow_depths: %.3e x peak" % worst
     # hybrid faint limit (amendment 2): A_q / (1.4470 mubar l_q) within 5e-3 of 1
     cfgh = cfg_for("hybrid")
     p0, p1, d, mu = (0.0, 0.0, 0.0), (3.0, 0.4, 1.0), 1.0, 1e-3
@@ -233,9 +216,6 @@ def test_known_answer():
     MEASURED["known_answer hybrid faint |A/(1.4470 mu l) - 1| max"] = "%.3e over %d columns" % (dev, int(msk.sum()))
     assert dev <= 5e-3, "faint limit %.3e" % dev
     assert np.all(A[~ins] == 0.0)
-    assert worst_spec <= 1e-6, ("flat segment vs calibration_scene.shadow_depths: %.3e relative (SPEC 1e-6); "
-                                "the samples blurred by hand agree to %.1e; per case: %s"
-                                % (worst_spec, worst_discrete, "; ".join(rows)))
 
 
 def test_reference():
@@ -272,37 +252,35 @@ def test_reference():
         ref = np.stack([sample_profile(res.S[k], frame, origin, yh, eu, v, 2, P_X) for k in range(ks.size)])
         assert np.all(np.isfinite(ref)) and ref.max() > 0.05
         check_close("stretch_profiles_" + absorption, prof, ref, rtol=0.0, atol=1e-10)
-    # (3) the two PROVISIONAL bounds against Block 4 under the same absorption
-    rows, worst = [], {"out": 0.0, "in": 0.0}
+    # (3) agreement with Block 4 under the same absorption [1e-9]
+    rows, worst = [], 0.0
     times = {"partition_vertical": [], "hybrid": []}
     for absorption in ("partition_vertical", "hybrid"):
         cfg = cfg_for(absorption)
+        # Block 4 without the far-field split: its exact path (the split's interpolation is 1e-6, Block 4)
         rc4 = dataclasses.replace(cfg.renderer, absorption=absorption, ray_n_rho=cfg.cleaning.shadow_ray_n_rho,
-                                  ray_n_psi=cfg.cleaning.shadow_ray_n_psi)
+                                  ray_n_psi=cfg.cleaning.shadow_ray_n_psi, fft_split_sigma_um=1e9)
         for d in (0.3, 0.6, 1.0):
             for tilt in (0.0, 30.0):
-                out_r, in_r, ts, t4 = _block4_case(cfg, rc4, d, math.radians(tilt))
-                times[absorption].append(ts)
-                rows.append("%-18s d %.1f tilt %2d: out-of-focus %.4f, in focus %.4f (x peak); shadow %.2f s, "
-                            "Block 4 %.2f s" % (absorption, d, tilt, out_r, in_r, ts, t4))
-                worst["out"] = max(worst["out"], out_r)
-                worst["in"] = max(worst["in"], in_r)
-    MEASURED["Block 4 bounds (mu 1/um, segment 4 um)"] = rows
-    MEASURED["time per segment (s), 4 um segment, d 0.3/0.6/1.0 x tilt 0/30"] = [
-        "%s: %s" % (a, ", ".join("%.2f" % t for t in ts)) for a, ts in times.items()]
-    assert worst["out"] <= 0.03 and worst["in"] <= 0.15, (
-        "PROVISIONAL bounds: out-of-focus %.4f (<= 0.03), in focus %.4f (<= 0.15)" % (worst["out"], worst["in"]))
+                err, peak, ts, t4 = _block4_case(cfg, rc4, d, math.radians(tilt))
+                times[absorption].append((ts, t4))
+                rows.append("%-18s d %.1f tilt %2d: max |S - (1 - tau)| %.2e (peak %.3f); shadow %.2f s, "
+                            "Block 4 %.2f s" % (absorption, d, tilt, err, peak, ts, t4))
+                worst = max(worst, err)
+    MEASURED["against Block 4 (mu 1/um, segment 4 um, 7 planes)"] = rows
+    MEASURED["time per segment (s), shadow / Block 4, d 0.3/0.6/1.0 x tilt 0/30"] = [
+        "%s: %s" % (a, ", ".join("%.2f/%.2f" % t for t in ts)) for a, ts in times.items()]
+    assert worst <= 1e-9, "against Block 4: %.3e" % worst
 
 
 def _block4_case(cfg, rc4, d, phi, mu=1.0, U=2.0):
-    """(out-of-focus ratio, in-focus ratio, shadow time, Block 4 time) for one capped tube."""
+    """(max |S - (1 - tau)|, Block 4's peak, shadow time, Block 4 time) for one capped tube."""
     t = np.array([math.cos(phi), 0.0, math.sin(phi)])
     p0, p1 = -U * t, U * t
     fs = make_scene([(tuple(p0), tuple(p1), d, mu)])
     tube = tube_of(p0, p1, d)
     left, top, W, H = -56, -45, 113, 91
-    deltas = np.array([-1.68, -0.84, -0.28, 0.0, 0.28, 0.84, 1.68])
-    zk = deltas.copy()
+    zk = np.array([-1.68, -0.84, -0.28, 0.0, 0.28, 0.84, 1.68])
     t0 = time.perf_counter()
     S = SH.shadow_image(fs, OWN_IDS, left, top, W, H, zk, cfg).S
     ts = time.perf_counter() - t0
@@ -312,37 +290,11 @@ def _block4_case(cfg, rc4, d, phi, mu=1.0, U=2.0):
                                  reduce=lambda pl: R.pixel_integrate(pl, 8)).tau
     t4 = time.perf_counter() - t0
     D4 = 1.0 - tau
-    xc = (left + np.arange(W)) * P_X
-    yc = (top + np.arange(H)) * P_X
-    Xc, Yc = np.meshgrid(xc, yc)
-    u = Xc * math.cos(tube.theta) + Yc * math.sin(tube.theta)
-    z_ax = np.clip(u, -U * math.cos(phi), U * math.cos(phi)) * math.tan(phi)
-    out_r, in_r = 0.0, float("nan")
-    for k, z in enumerate(zk):
-        peak = float(D4[k].max())
-        diff = np.abs(S[k] - D4[k])
-        far = np.abs(z_ax - z) >= 0.84 - 1e-9
-        if far.any():
-            out_r = max(out_r, float(diff[far].max()) / peak)
-        if z == 0.0:
-            in_r = float(diff.max()) / peak
-    return out_r, in_r, ts, t4
+    return float(np.max(np.abs(S - D4))), float(D4.max()), ts, t4
 
 
 def test_convergence():
-    rows = []
-    for absorption, d in (("partition_vertical", 0.6), ("hybrid", 0.3)):
-        imgs = []
-        for b in (0.07, 0.035):
-            cfg = cfg_for(absorption, shadow_depth_bin_um=b)
-            s = 3.0 / math.sqrt(2.0)
-            fs = make_scene([((0.0, 0.0, 0.0), (s, 0.0, s), d, 1.5)])
-            imgs.append(SH.shadow_image(fs, OWN_IDS, -40, -40, 100, 80, np.arange(-2, 11) * 0.28, cfg).S)
-        peak = float(imgs[0].max())
-        move = float(np.max(np.abs(imgs[1] - imgs[0]))) / peak
-        rows.append("%s d %.1f: %.3e x peak" % (absorption, d, move))
-        assert move < 1e-3, "%s: halving the depth bin moves the image by %.3e x peak" % (absorption, move)
-    MEASURED["bin halving, 45-degree segment"] = rows
+    raise unittest.SkipTest("amendment 3 (D-135): no depth bins; the slab thickness is Block 4's and is tested there")
 
 
 def test_invariants():
@@ -441,14 +393,15 @@ def test_determinism():
 def test_edge_cases():
     cfg = cfg_for("partition_vertical")
     planes = np.array([0.0, 0.28])
-    sig_max = float(np.max(K.sigma_r(planes, cfg.renderer)))
+    # the widest kernel any slab of the d 0.6 um flat tube meets: defocus <= 0.28 + r + dzeta
+    sig_max = float(K.sigma_r(0.28 + 0.3 + cfg.renderer.dzeta_um, cfg.renderer))
     reach = cfg.cleaning.shadow_reach_sigmas * sig_max
     # a segment beyond reach of the patch contributes exactly 0 (patch x in [-2.35, 2.23] um)
     x_far = 2.23 + reach + 0.3 + 0.05
     fs = make_scene([((x_far, -1.0, 0.0), (x_far, 1.0, 0.0), 0.6, 2.0)])
     res = SH.shadow_image(fs, OWN_IDS, -20, -20, 40, 40, planes, cfg)
     assert np.all(res.S == 0.0) and res.per_neighbour_peak[0] == 0.0
-    fs_near = make_scene([((x_far - 0.2, -1.0, 0.0), (x_far - 0.2, 1.0, 0.0), 0.6, 2.0)])
+    fs_near = make_scene([((x_far - 0.7, -1.0, 0.0), (x_far - 0.7, 1.0, 0.0), 0.6, 2.0)])
     assert SH.shadow_image(fs_near, OWN_IDS, -20, -20, 40, 40, planes, cfg).S.max() > 0.0
     for absorption in ("partition_vertical", "hybrid"):
         c = cfg_for(absorption)
