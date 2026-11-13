@@ -6,31 +6,31 @@ the trace's points within line_fit_window_um / 2 of path length, oriented
 distally), sampled at Block 5's offsets v_n; the plane is k_i = round(z_i / dz),
 z_k = k_i dz. Each traced segment q of the scene that is not on the node's
 branch (not both ends' ids in branch.ids) is a neighbour; its predicted dip at
-sample n is today's predictor (calibration_scene.shadow_depths, gl):
+sample n is today's predictor (calibration_scene.shadow_depths, already in gl):
 
-    B delta_q(v_n) = shadow_depths(rho_qn, max(r_q0, r_q1), mu, sigma_r(dz_q), B),
+    B delta_q(v_n) = shadow_depths(rho_qn, max(r_q0, r_q1), mu, sigma_r(z_qn - z_k), B),
 
-rho_qn the 2-D distance (um) from the sample o + v_n y_hat to the segment,
-dz_q = min_ends |z_end - z_k| (the end nearer the plane in depth). Then
+with c_qn = a_q + t_qn (b_q - a_q) the segment's point nearest the sample
+o + v_n y_hat in projection (t_qn in [0, 1]), rho_qn its 2-D distance (um) and
+z_qn its depth, linear in the segment's arc: one point sets both the distance
+and the blur (amendment 1, D-131). Then
 
     P_i(v_n) = sum_q B delta_q(v_n)  (gl),   D_i = shadow_depth(0, r_i, mu, sigma_r(0), B)  (gl),
     C_i = (sum_n w_n P_i(v_n) / sum_n w_n) / D_i,   w_n = exp(-|v_n| / lambda),  lambda = sgt_lambda_um.
 
-Classes, first that holds: overlap (a neighbour's footprint -- within its
-larger end radius of its axis -- meets the own branch's footprint at a point of
-the line's square |u|, |v| <= profile_half_um, read on the grid v_n x v_n);
-close_in_focus (one neighbour with lateral distance from the line's centre
-<= close_lateral_um and dz_q <= close_defocus_um carries >= 1/2 of sum_n w_n P);
-diffuse (C_i >= clean_index_max); clean.
+Classes, first that holds (amendment 1, D-131): clean (C_i < clean_index_max);
+overlap (a neighbour sharing no node with the own stretch whose footprint --
+within its larger end radius of its axis -- meets the own branch's footprint at
+a point of the line's square |u|, |v| <= profile_half_um, read on the grid
+v_n x v_n); close_in_focus (one neighbour whose point nearest the line's centre
+lies within close_lateral_um of it laterally and close_defocus_um of the plane
+carries >= 1/2 of sum_n w_n P); diffuse.
 
-Readings of the entry that SPEC.md leaves open (the implementer's, reported to
-the orchestrator, PROVISIONAL): the 2-D point-to-segment distance sets rho_qn
-and the lateral distance from the line's centre; "the nearer end" is the end
-nearer the plane in depth; the soma is not among the neighbours (per_neighbour
-is (n_q, n_v), the predictor is a segment's, the Scene carries no soma depth);
-the own footprint is the branch's consecutive nodes, each segment at its larger
-end radius; n_neighbours counts the neighbours whose dip on the line reaches
-cleaning.shadow_floor_gl.
+The soma is not in P_i (the Scene carries no soma depth); soma_lateral_um is
+the node's 2-D distance to the nearest soma disc's edge, 0 inside a disc, NaN
+without a soma. The own footprint is the branch's consecutive nodes, each
+segment at its larger end radius; n_neighbours counts the neighbours whose dip
+on the line reaches cleaning.shadow_floor_gl.
 
 No file access, no plotting. Pure ASCII, for the cluster (hpc-python-compat).
 """
@@ -85,6 +85,30 @@ def _neighbours(branch, scene, o, cfg):
     return np.asarray(idx, dtype=np.int64)[rows[:, 8] != OWN] if rows.shape[0] else np.empty(0, dtype=np.int64)
 
 
+def _nearest(px, py, a, b):
+    """(distance (um), t in [0, 1]) of the points (px, py) to the segment a-b in projection: the closed form of
+    background.segment_distance, returning the nearest point's parameter as well (its depth is then linear in t)."""
+    ax, ay = float(a[0]), float(a[1])
+    dx, dy = float(b[0]) - ax, float(b[1]) - ay
+    L2 = dx * dx + dy * dy
+    px, py = np.asarray(px, dtype=float), np.asarray(py, dtype=float)
+    t = np.zeros(px.shape) if L2 == 0.0 else np.clip(((px - ax) * dx + (py - ay) * dy) / L2, 0.0, 1.0)
+    return np.hypot(px - (ax + t * dx), py - (ay + t * dy)), t
+
+
+_UNDERFLOW_SIGMAS = 40.0   # exp(-40^2 / 2) underflows to 0 in float64: such samples are exactly 0, not truncated
+
+
+def _segment_dips(rho, sig, r_q, mu, B):
+    """shadow_depths at each sample with its own kernel width, one call per distinct width."""
+    out = np.zeros(rho.shape)
+    live = rho - r_q <= _UNDERFLOW_SIGMAS * np.maximum(sig, 1e-6)
+    for s_val in np.unique(sig[live]):
+        sel = live & (sig == s_val)
+        out[sel] = shadow_depths(rho[sel], r_q, mu, float(s_val), B)
+    return out
+
+
 def _profile(branch, i, scene, v, B_gl, mu_per_um, cfg):
     o, y_hat, e_u, z_k = _line(branch, i, cfg)
     v = np.asarray(v, dtype=float).reshape(-1)
@@ -95,11 +119,11 @@ def _profile(branch, i, scene, v, B_gl, mu_per_um, cfg):
     defocus = np.zeros(qs.size)
     for m, q in enumerate(qs):
         a, b = scene.seg_xyz[q, :3], scene.seg_xyz[q, 3:]
-        defocus[m] = min(abs(a[2] - z_k), abs(b[2] - z_k))
-        lateral[m] = float(background.segment_distance(o[0], o[1], a, b))
-        rho = background.segment_distance(px, py, a, b)
-        r_q = float(np.max(scene.seg_radius[q]))
-        per[m] = shadow_depths(rho, r_q, float(mu_per_um), float(sigma_r(defocus[m], cfg.renderer)), float(B_gl))
+        d0, t0 = _nearest(o[0], o[1], a, b)
+        lateral[m], defocus[m] = float(d0), abs(float(a[2] + t0 * (b[2] - a[2])) - z_k)
+        rho, t = _nearest(px, py, a, b)
+        sig = np.asarray(sigma_r(a[2] + t * (b[2] - a[2]) - z_k, cfg.renderer), dtype=float)
+        per[m] = _segment_dips(rho, sig, float(np.max(scene.seg_radius[q])), float(mu_per_um), float(B_gl))
     return per.sum(axis=0), per, qs, lateral, defocus, (o, y_hat, e_u)
 
 
@@ -121,8 +145,11 @@ def _overlap(branch, scene, qs, frame_line, cfg):
     for j in range(xyz.shape[0] - 1):
         own |= background.segment_distance(px, py, xyz[j], xyz[j + 1]) <= max(r[j], r[j + 1])
     out = np.zeros(qs.size, dtype=bool)
+    own_ids = {int(x) for x in np.asarray(branch.ids).ravel()}
     if own.any():
         for m, q in enumerate(qs):
+            if int(scene.seg_ids[q, 0]) in own_ids or int(scene.seg_ids[q, 1]) in own_ids:
+                continue                                   # attached at a branch point or root: no overlap (D-131)
             d = background.segment_distance(px[own], py[own], scene.seg_xyz[q, :3], scene.seg_xyz[q, 3:])
             out[m] = bool(np.any(d <= float(np.max(scene.seg_radius[q]))))
     return out
@@ -130,8 +157,9 @@ def _overlap(branch, scene, qs, frame_line, cfg):
 
 def node_contamination(branch, index, scene, B_gl, mu_per_um, cfg):
     """-> dict: node_id, own_dip_gl, index, class, n_neighbours, worst_child_id, worst_lateral_um, worst_defocus_um,
-    worst_share. n_neighbours: neighbours whose predicted dip on the line reaches cleaning.shadow_floor_gl;
-    worst: the neighbour of the largest weighted share of sum_n w_n P (-1 / NaN when none carries any)."""
+    worst_share, soma_lateral_um. n_neighbours: neighbours whose predicted dip on the line reaches cleaning.shadow_floor_gl;
+    worst: the neighbour of the largest weighted share of sum_n w_n P (-1 / NaN when none carries any), its
+    lateral distance and unsigned defocus taken at its point nearest the line's centre."""
     i = _check(branch, index, B_gl, mu_per_um)
     m_cfg, c_cfg = cfg.measure, cfg.cleaning
     v = profile_offsets(m_cfg)
@@ -149,24 +177,33 @@ def node_contamination(branch, index, scene, B_gl, mu_per_um, cfg):
         share = np.zeros(qs.size)
         worst = (-1, float("nan"), float("nan"), float("nan"))
     close = (lateral <= c_cfg.close_lateral_um) & (defocus <= c_cfg.close_defocus_um) & (share >= 0.5)
-    if qs.size and np.any(_overlap(branch, scene, qs, frame_line, cfg)):
+    if C < c_cfg.clean_index_max:
+        cls = "clean"
+    elif qs.size and np.any(_overlap(branch, scene, qs, frame_line, cfg)):
         cls = "overlap"
     elif np.any(close):
         cls = "close_in_focus"
-    elif C >= c_cfg.clean_index_max:
-        cls = "diffuse"
     else:
-        cls = "clean"
+        cls = "diffuse"
     n_nb = int(np.sum(np.max(per, axis=1) >= c_cfg.shadow_floor_gl)) if qs.size else 0
     return dict(node_id=int(branch.ids[i]), own_dip_gl=float(D), index=float(C), **{"class": cls},
                 n_neighbours=n_nb, worst_child_id=worst[0], worst_lateral_um=worst[1],
-                worst_defocus_um=worst[2], worst_share=worst[3])
+                worst_defocus_um=worst[2], worst_share=worst[3], soma_lateral_um=_soma_lateral(branch, i, scene))
+
+
+def _soma_lateral(branch, i, scene):
+    """2-D distance (um) from node i to the nearest soma disc's edge (0 inside a disc); NaN without a soma."""
+    soma = np.asarray(scene.soma, dtype=float).reshape(-1, 3)
+    if soma.shape[0] == 0:
+        return float("nan")
+    x, y = float(branch.xyz_um[i, 0]), float(branch.xyz_um[i, 1])
+    return float(np.max([0.0, np.min(np.hypot(soma[:, 0] - x, soma[:, 1] - y) - soma[:, 2])]))
 
 
 def pick_examples(rows, counts, rng):
     """-> list of node ids (D-130.O7). counts: a dict {key: n} or a sequence in EXAMPLE_KEYS' order (the order of
     CleaningConfig.example_counts); a class key draws n of its rows at random (rng, without replacement),
-    NEAREST_SOMA takes the n rows of smallest 'soma_distance_um' (a key the caller adds). No node twice; a short
+    NEAREST_SOMA takes the n rows of smallest 'soma_lateral_um' (node_contamination's key). No node twice; a short
     key is reported by a RuntimeWarning and in the warning's text (wanted, got)."""
     items = list(counts.items()) if isinstance(counts, dict) else list(zip(EXAMPLE_KEYS, counts))
     for key, n in items:
@@ -180,8 +217,8 @@ def pick_examples(rows, counts, rng):
         n = int(n)
         free = [r for r in rows if int(r["node_id"]) not in picked]
         if key == NEAREST_SOMA:
-            free = sorted((r for r in free if np.isfinite(r.get("soma_distance_um", np.nan))),
-                          key=lambda r: (float(r["soma_distance_um"]), int(r["node_id"])))
+            free = sorted((r for r in free if np.isfinite(r.get("soma_lateral_um", np.nan))),
+                          key=lambda r: (float(r["soma_lateral_um"]), int(r["node_id"])))
             take = [int(r["node_id"]) for r in free[:n]]
         else:
             ids = sorted({int(r["node_id"]) for r in free if r["class"] == key})

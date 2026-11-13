@@ -161,7 +161,7 @@ def test_known_answer():
 
 def _hand_profile(br, i, scene, v):
     """Brute force: the line through node i (heading from the trace's window), every off-branch segment, the
-    projection distance written out, scalar shadow_depth per sample, the nearer end's defocus."""
+    projection distance written out, scalar shadow_depth per sample at the nearest point's interpolated depth."""
     xyz = br.xyz_um
     win = [j for j in range(len(br.ids)) if abs(br.s_um[j] - br.s_um[i]) <= CFG.measure.line_fit_window_um / 2]
     pts = xyz[win] - xyz[win].mean(axis=0)
@@ -177,13 +177,13 @@ def _hand_profile(br, i, scene, v):
         if int(scene.seg_ids[q, 0]) in ids and int(scene.seg_ids[q, 1]) in ids:
             continue
         a, b = scene.seg_xyz[q, :3], scene.seg_xyz[q, 3:]
-        sig = float(sigma_r(min(abs(a[2] - zk), abs(b[2] - zk)), CFG.renderer))
         rq = max(scene.seg_radius[q])
         prof = []
         for vn in v:
             p = xyz[i, :2] + vn * yh
             d = b[:2] - a[:2]
             tt = min(1.0, max(0.0, np.dot(p - a[:2], d) / np.dot(d, d)))
+            sig = float(sigma_r(a[2] + tt * (b[2] - a[2]) - zk, CFG.renderer))
             prof.append(shadow_depth(np.linalg.norm(p - a[:2] - tt * d), rq, MU, sig, B))
         out.append(prof)
     return np.array(out).reshape(-1, v.size)
@@ -225,9 +225,8 @@ def test_invariants():
     lat = [CT.node_contamination(br, i, with_segments(br, *parallel(rho)), B, MU, CFG)["index"]
            for rho in 0.5 + 0.5 * np.arange(5)]
     assert np.all(np.diff(lat) < 0), "lateral: %r" % (lat,)
-    # (c) C decreases as the neighbour moves out of focus (5 plane steps), directly over the line (rho = 0).
-    # NOTE (reported to the orchestrator): for rho > 0 this is not monotone -- the blur first spreads the
-    # neighbour's shadow toward the line's centre (rho = 0.3 um: 0.1998 -> 0.2017 from 0 to 1 plane).
+    # (c) C decreases as a neighbour directly over the line (rho = 0) moves out of focus (5 planes; amendment 1,
+    # D-131: for rho > 0 the blur first carries the shadow toward the line's centre, so no monotony there).
     foc = [CT.node_contamination(br, i, with_segments(br, *parallel(0.0, dz)), B, MU, CFG)["index"]
            for dz in DZ * np.arange(5)]
     assert np.all(np.diff(foc) < 0), "defocus: %r" % (foc,)
@@ -259,7 +258,7 @@ def four_scenes():
 def test_contract():
     v = profile_offsets(CFG.measure)
     keys = {"node_id", "own_dip_gl", "index", "class", "n_neighbours", "worst_child_id", "worst_lateral_um",
-            "worst_defocus_um", "worst_share"}
+            "worst_defocus_um", "worst_share", "soma_lateral_um"}
     for name, br, scene in four_scenes():
         i = mid(br)
         P, per = CT.pollution_profile(br, i, scene, v, B, MU, CFG)
@@ -278,6 +277,32 @@ def test_contract():
     (s1, r1), (s2, r2) = parallel(1.9), parallel(-0.8, 1.4, r=0.4)
     row = CT.node_contamination(br, mid(br), with_segments(br, s1 + s2, r1 + r2), B, MU, CFG)
     assert row["class"] == "diffuse" and row["worst_child_id"] == 902 and row["worst_share"] > 0.5, row
+    # clean first (amendment 1): a lone in-focus neighbour 2 um aside carries all of sum w P but C ~ 0.0067
+    row = CT.node_contamination(br, mid(br), with_segments(br, *parallel(2.0)), B, MU, CFG)
+    assert row["class"] == "clean" and row["worst_share"] > 0.99 and row["index"] < CFG.cleaning.clean_index_max, row
+    # a segment attached to the stretch (one end on the node's own id) cannot make an overlap, even when it
+    # crosses the line in focus; the same segment detached is an overlap
+    seg = [[0.0, 0.0, Z0, 0.0, 4.0, Z0]]
+    sc = with_segments(br, seg, [[0.2, 0.2]])
+    detached = CT.node_contamination(br, mid(br), sc, B, MU, CFG)
+    sc = Scene(sc.seg_xyz, sc.seg_radius, np.vstack([sc.seg_ids[:-1], [[900, int(br.ids[mid(br)])]]]), sc.soma)
+    attached = CT.node_contamination(br, mid(br), sc, B, MU, CFG)
+    assert detached["class"] == "overlap", detached
+    assert attached["class"] == "close_in_focus" and attached["index"] == detached["index"], attached
+    # the worst neighbour's lateral distance and defocus at its point nearest the line's centre: a steep segment
+    # from (1.0, -1, Z0 - 2) to (1.0, 1, Z0 + 2) is nearest the centre at its middle, 1.0 um aside, in plane
+    sc = with_segments(br, [[1.0, -1.0, Z0 - 2.0, 1.0, 1.0, Z0 + 2.0]], [[0.3, 0.3]])
+    row = CT.node_contamination(br, mid(br), sc, B, MU, CFG)
+    check_close("worst_lateral", row["worst_lateral_um"], 1.0, rtol=0.0, atol=1e-12)
+    check_close("worst_defocus", row["worst_defocus_um"], 0.0, rtol=0.0, atol=1e-12)
+    # soma_lateral_um: NaN without a soma; the distance to the nearest disc's edge; 0 inside a disc
+    assert np.isnan(CT.node_contamination(br, mid(br), Scene.from_branch(br), B, MU, CFG)["soma_lateral_um"])
+    o = br.xyz_um[mid(br)]
+    for soma, expect in (([[o[0] + 3.0, o[1] + 4.0, 2.0], [o[0] - 20.0, o[1], 5.0]], 3.0), ([[o[0], o[1] + 1.0, 2.0]], 0.0)):
+        own = Scene.from_branch(br)
+        sc = Scene(own.seg_xyz, own.seg_radius, own.seg_ids, np.array(soma, dtype=float))
+        check_close("soma_lateral", CT.node_contamination(br, mid(br), sc, B, MU, CFG)["soma_lateral_um"], expect,
+                    rtol=0.0, atol=1e-12)
     print("  four scenes: " + ", ".join("%s C=%.3g" % (n, CT.node_contamination(b, mid(b), s, B, MU, CFG)["index"])
                                        for n, b, s in four_scenes()))
 
@@ -286,7 +311,7 @@ def _rows(n_per_class, rng):
     rows, nid = [], 1
     for cls, n in n_per_class.items():
         for _ in range(n):
-            rows.append({"node_id": nid, "class": cls, "soma_distance_um": float(rng.uniform(0, 300))})
+            rows.append({"node_id": nid, "class": cls, "soma_lateral_um": float(rng.uniform(0, 300))})
             nid += 1
     return rows
 
@@ -308,7 +333,7 @@ def test_determinism():
     got = [by_id[n]["class"] for n in a[:sum(counts[:4]) - 1]]
     assert got.count("clean") == 4 and got.count("diffuse") == 6 and got.count("close_in_focus") == 6, got
     # nearest the soma: the two smallest distances among the rows not yet picked
-    free = sorted((r for r in rows if r["node_id"] not in a[:-2]), key=lambda r: r["soma_distance_um"])
+    free = sorted((r for r in rows if r["node_id"] not in a[:-2]), key=lambda r: r["soma_lateral_um"])
     assert a[-2:] == [free[0]["node_id"], free[1]["node_id"]], (a[-2:], free[:2])
     # node_contamination is deterministic
     name, br, scene = four_scenes()[1]
