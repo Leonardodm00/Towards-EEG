@@ -243,9 +243,8 @@ def round_once(features, scene, nodes, cfg, predict_factory, shadow_fn=None):
     for node in nodes:
         n_planes, H, W = node.block.shape
         tiers = cleaning.neighbour_tiers(F, node.own_ids, node.node_xyz, cfg)            # (b)
-        # The floor of D-130.O5 takes one background in shadow_image: the largest of the node's planes
-        # (a neighbour whose B_k x peak reaches the floor in some plane is never dropped). PENDING: SPEC
-        # passes B_gl (n_planes,) to a function that reads a scalar -- reported to the orchestrator.
+        # The floor of D-130.O5 takes one background in shadow_image: max_k B_k (Block 32, amendment 1,
+        # D-139); the cleaning (d) uses the per-plane B_k.
         B_floor = float(np.max(node.B_gl))
         S = np.asarray(shadow_fn(F, node.own_ids, node.left, node.top, W, H, node.planes_z, cfg,
                                  B_floor, tiers == 1), dtype=np.float64)                  # (c)

@@ -20,6 +20,9 @@ Checks
                         thresholds written by hand on a recorded history (a loop of round_once and
                         with_rows written here), both branches, max_rounds = 1; (e) a NaN predict:
                         row kept, flag refine_failed, counted
+    test_floor_background  amendment 1 (D-139): with B_gl varying across planes the default
+                        shadow_fn calls shadow.shadow_image with the scalar max_k B_k, and the
+                        cleaning uses the per-plane B_k [exact]
     test_contract       NodeData / IterationResult shapes, dtypes, keys; history feeds
                         cleaning_figures.figure_rounds
     test_determinism    (f) features0, scene and every NodeData array unchanged; two runs bit-identical
@@ -330,6 +333,38 @@ def _real_shadow_oracle():
     assert per[2]["tiers"].tolist() == [1]
     assert float(np.max(np.abs(before - ref))) > 1.0, "the neighbour's shadow must reach the line"
     assert resid <= 1e-9, "real-shadow oracle: %.3e gl" % resid
+
+
+def test_floor_background():
+    # Block 32, amendment 1 (D-139): with B_gl varying across the planes, the default shadow_fn calls
+    # shadow.shadow_image with the scalar max_k B_k as B_gl, and the cleaning uses the per-plane B_k
+    from allen_diameter.model import shadow as SH
+    cfg = cfg_with(shadow_absorption="partition_vertical")
+    B = B_REF + np.arange(KS.size) * 3.0 - 5.0          # 205 .. 223 gl, maximum at the last plane
+    node = make_node(2, B=B)
+    calls = []
+    real = SH.shadow_image
+
+    def spy(*args, **kw):
+        calls.append(kw.get("B_gl"))
+        res = real(*args, **kw)
+        calls.append(res.S)
+        return res
+    SH.shadow_image = spy
+    try:
+        rows, per = CI.round_once(make_features([1.0, 0.8], [1.0, 1.5]), make_scene(), [node], cfg,
+                                  closed_predict_factory)
+    finally:
+        SH.shadow_image = real
+    assert len(calls) == 2, "shadow_image must be called once per node"
+    assert isinstance(calls[0], float) and calls[0] == float(np.max(B)), calls[0]
+    S = calls[1]
+    assert float(S.max()) > 0.01, "the neighbour's shadow must be on the patch"
+    MEASURED["floor background (amendment 1)"] = "shadow_image got B_gl = %r (max_k B_k %r); S peak %.3f" % (
+        calls[0], float(np.max(B)), float(S.max()))
+    # the cleaning uses B_k plane by plane [exact: the same float64 operations as clean_block]
+    assert_array_equal(per[2]["cleaned"], np.asarray(node.block, float) + B[:, None, None] * S)
+    assert_array_equal(per[2]["shadow_gl"], B[:, None, None] * S)
 
 
 def test_convergence():
