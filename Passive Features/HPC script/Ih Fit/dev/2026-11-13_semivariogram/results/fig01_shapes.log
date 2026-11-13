@@ -1,0 +1,6 @@
+white  dots - formula, in SE: [-0.02 -0.46  1.42  0.76  0.84  0.47  0.08  0.68]
+ou     dots - formula, in SE: [ 0.22  0.64  1.89  0.63 -0.38  0.    0.21  0.02]
+rw     dots - formula, in SE: [ 0.32 -0.22  0.31  0.53  0.85  1.02  0.85  0.72]
+slope  dots - formula, in SE: [0.09 1.25 0.04 0.99 0.47 0.65 0.45 0.45]
+all 32 dots within 3 SE of their formulas: PASS
+wrote /home/claude/repo/Passive Features/HPC script/Ih Fit/dev/2026-11-13_semivariogram/figures/fig01_shapes.png

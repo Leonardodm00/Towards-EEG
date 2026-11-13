@@ -1,0 +1,31 @@
+A  white noise, h = 1                            0.25047 +/-   0.00035   predicted     0.25000   z =  +1.36  PASS
+A  white noise, h = 10                           0.25041 +/-   0.00034   predicted     0.25000   z =  +1.20  PASS
+A  white noise, h = 100                          0.24994 +/-   0.00035   predicted     0.25000   z =  -0.16  PASS
+B  OU + nugget, h = 1                            0.29931 +/-   0.00039   predicted     0.29877   z =  +1.36  PASS
+B  OU + nugget, h = 5                            0.47184 +/-   0.00074   predicted     0.47120   z =  +0.86  PASS
+B  OU + nugget, h = 20                           0.88239 +/-   0.00258   predicted     0.88212   z =  +0.11  PASS
+B  OU + nugget, h = 60                           1.20201 +/-   0.00531   predicted     1.20021   z =  +0.34  PASS
+B  OU + nugget, h = 160                          1.24687 +/-   0.00645   predicted     1.24966   z =  -0.43  PASS
+   sill C(0) = 1.250, nugget 0.250, practical range 3 tau = 60 samples (0.950 of the partial sill)
+C  random walk, h = 10                           5.00711 +/-   0.01333   predicted     5.00000   z =  +0.53  PASS
+C  random walk, h = 100                         49.54732 +/-   0.45245   predicted    50.00000   z =  -1.00  PASS
+C  random walk, h = 1000                       499.59605 +/-  17.03635   predicted   500.00000   z =  -0.02  PASS
+D  random slope + nugget, h = 50                 0.37319 +/-   0.00271   predicted     0.37500   z =  -0.67  PASS
+D  random slope + nugget, h = 100                0.74382 +/-   0.01076   predicted     0.75000   z =  -0.57  PASS
+D  random slope + nugget, h = 400                8.15213 +/-   0.17213   predicted     8.25000   z =  -0.57  PASS
+E  offsets SD 10 added per record            largest relative change 5.4e-16  PASS
+F0 E[C_own(h)]: own formula = noise_law      largest relative difference 9.4e-15  PASS
+   Var(xbar) at n = 100 = 5 tau: 0.3206
+F1 C_own(0), own mean (true C = 1.0000)          0.67435 +/-   0.00267   predicted     0.67936   z =  -1.87  PASS
+F1 C_own(5), own mean (true C = 0.7788)          0.44275 +/-   0.00251   predicted     0.44774   z =  -1.99  PASS
+F1 C_own(20), own mean (true C = 0.3679)         0.02224 +/-   0.00153   predicted     0.02261   z =  -0.24  PASS
+F2 gamma_hat(1), no mean                         0.04869 +/-   0.00005   predicted     0.04877   z =  -1.64  PASS
+F2 gamma_hat(5), no mean                         0.22090 +/-   0.00041   predicted     0.22120   z =  -0.73  PASS
+F2 gamma_hat(20), no mean                        0.62781 +/-   0.00224   predicted     0.63212   z =  -1.92  PASS
+G  gamma_hat(10), random walk, n = 500           4.99223 +/-   0.01797   predicted     5.00000   z =  -0.43  PASS
+   mean C_own(10) at n = 500: 74.2
+G  gamma_hat(10), random walk, n = 4000          5.00090 +/-   0.00642   predicted     5.00000   z =  +0.14  PASS
+   mean C_own(10) at n = 4000: 670.1
+G  C_own(10) grows with n (ratio > 5)        ratio n = 4000 / n = 500: 9.03  PASS
+
+ALL PASS   (25 checks, 2.4 s)

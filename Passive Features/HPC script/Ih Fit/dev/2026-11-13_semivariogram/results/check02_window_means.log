@@ -1,0 +1,39 @@
+simulated 400 sweeps of 370900 samples (7.2 s)
+   L =  2 (h = 0.401 s, 35 pairs/sweep): no tilt 1.1060e-03 +/- 1.5e-05 (pred 1.1124e-03, z -0.43) | tilt 2.0511e-03 +/- 7.2e-05 (pred 1.9164e-03, z +1.88)
+   L =  4 (h = 0.802 s, 33 pairs/sweep): no tilt 1.1349e-03 +/- 1.6e-05 (pred 1.1125e-03, z +1.40) | tilt 4.9203e-03 +/- 2.8e-04 (pred 4.3285e-03, z +2.11)
+   L =  6 (h = 1.203 s, 31 pairs/sweep): no tilt 1.1427e-03 +/- 1.8e-05 (pred 1.1125e-03, z +1.66) | tilt 9.6638e-03 +/- 6.3e-04 (pred 8.3485e-03, z +2.09)
+   L =  8 (h = 1.604 s, 29 pairs/sweep): no tilt 1.1397e-03 +/- 1.7e-05 (pred 1.1125e-03, z +1.61) | tilt 1.6295e-02 +/- 1.1e-03 (pred 1.3977e-02, z +2.07)
+   L = 10 (h = 2.005 s, 27 pairs/sweep): no tilt 1.1206e-03 +/- 1.8e-05 (pred 1.1125e-03, z +0.45) | tilt 2.4844e-02 +/- 1.7e-03 (pred 2.1213e-02, z +2.08)
+   L = 12 (h = 2.406 s, 25 pairs/sweep): no tilt 1.1130e-03 +/- 1.7e-05 (pred 1.1125e-03, z +0.03) | tilt 3.5194e-02 +/- 2.5e-03 (pred 3.0057e-02, z +2.06)
+   L = 14 (h = 2.807 s, 23 pairs/sweep): no tilt 1.1311e-03 +/- 1.8e-05 (pred 1.1125e-03, z +1.04) | tilt 4.7494e-02 +/- 3.4e-03 (pred 4.0509e-02, z +2.06)
+   L = 16 (h = 3.208 s, 21 pairs/sweep): no tilt 1.1258e-03 +/- 1.8e-05 (pred 1.1125e-03, z +0.73) | tilt 6.1555e-02 +/- 4.4e-03 (pred 5.2569e-02, z +2.03)
+   L = 18 (h = 3.609 s, 19 pairs/sweep): no tilt 1.1203e-03 +/- 1.8e-05 (pred 1.1125e-03, z +0.42) | tilt 7.7574e-02 +/- 5.6e-03 (pred 6.6237e-02, z +2.02)
+   L = 20 (h = 4.010 s, 17 pairs/sweep): no tilt 1.1166e-03 +/- 1.8e-05 (pred 1.1125e-03, z +0.23) | tilt 9.5582e-02 +/- 6.9e-03 (pred 8.1513e-02, z +2.03)
+   L = 22 (h = 4.411 s, 15 pairs/sweep): no tilt 1.1074e-03 +/- 1.9e-05 (pred 1.1125e-03, z -0.27) | tilt 1.1556e-01 +/- 8.4e-03 (pred 9.8397e-02, z +2.05)
+   L = 24 (h = 4.812 s, 13 pairs/sweep): no tilt 1.1123e-03 +/- 2.1e-05 (pred 1.1125e-03, z -0.01) | tilt 1.3746e-01 +/- 1.0e-02 (pred 1.1689e-01, z +2.06)
+   L = 26 (h = 5.213 s, 11 pairs/sweep): no tilt 1.1529e-03 +/- 2.4e-05 (pred 1.1125e-03, z +1.69) | tilt 1.6148e-01 +/- 1.2e-02 (pred 1.3699e-01, z +2.08)
+   L = 28 (h = 5.614 s,  9 pairs/sweep): no tilt 1.1112e-03 +/- 2.6e-05 (pred 1.1125e-03, z -0.05) | tilt 1.8702e-01 +/- 1.4e-02 (pred 1.5870e-01, z +2.07)
+   L = 30 (h = 6.015 s,  7 pairs/sweep): no tilt 1.1171e-03 +/- 2.9e-05 (pred 1.1125e-03, z +0.16) | tilt 2.1445e-01 +/- 1.6e-02 (pred 1.8201e-01, z +2.06)
+   L = 32 (h = 6.416 s,  5 pairs/sweep): no tilt 1.0889e-03 +/- 3.6e-05 (pred 1.1125e-03, z -0.67) | tilt 2.4318e-01 +/- 1.8e-02 (pred 2.0694e-01, z +2.03)
+   L = 34 (h = 6.817 s,  3 pairs/sweep): no tilt 1.0625e-03 +/- 4.4e-05 (pred 1.1125e-03, z -1.12) | tilt 2.7480e-01 +/- 2.0e-02 (pred 2.3347e-01, z +2.06)
+   L = 36 (h = 7.218 s,  1 pairs/sweep): no tilt 1.1720e-03 +/- 8.4e-05 (pred 1.1125e-03, z +0.71) | tilt 3.0812e-01 +/- 2.3e-02 (pred 2.6161e-01, z +2.06)
+(a) V_hat = V(h | theta_cf, 0) at L = 2..36                max |z| 1.69  PASS
+(a) V_hat = V(h | theta_cf, 0.1 mV/s) at L = 2..36         max |z| 2.11  PASS
+(b) floor flat over L = 2..36 (relative spread)            9.25e-05  PASS
+(b) floor = Var(xbar) of one 120 ms window                 Var(xbar) 1.11250e-03 mV^2, largest relative deviation 9.25e-05  PASS
+(b) floor at h* = 1.1125e-3 mV^2                           1.112495e-03 mV^2  PASS
+   share of the fast AR(1) in Var(xbar): 3.08e-04
+(c) tilt term at h* = sigma_b^2 h*^2 / 2                   3.216020e-03 mV^2 (h* = 0.802 s; ratio to the floor 2.89)  PASS
+(c) (D-034.1) = realised mean square of the tilts          0.01184 (mV/s)^2 against 0.01174, difference +0.00010 +/- 0.00006  PASS
+(d) Allan variance at T = 120 ms = V(h = T)                9.18668e-04 +/- 2.0e-05 against 8.90180e-04 mV^2 (z +1.42)  PASS
+(e) OU 3 s: exact = continuous eq. (25)                    largest relative difference 3.3e-09  PASS
+(e) OU 3 s: log-log slopes in [0.20, 1.15]                 0.253 ... 0.985  PASS
+(e) OU 3 s: point slopes at 0.401 / 7.218 s                1.046 / 0.242 (predicted 1.047 / 0.242)  PASS
+(e) OU 30 s: exact = continuous eq. (25)                   largest relative difference 3.1e-09  PASS
+(e) OU 30 s: log-log slopes in [0.20, 1.15]                0.893 ... 1.068  PASS
+(e) OU 30 s: point slopes at 0.401 / 7.218 s               1.104 / 0.890 (predicted 1.104 / 0.890)  PASS
+(f) OU 3000 s: point slope at 0.401 s -> h / (h - T/3)     1.1107 (limit 1.1108; band [1.109, 1.113])  PASS
+(e) tilt term: log-log slope 2                             max |slope - 2| 7.8e-15  PASS
+
+wrote /home/claude/repo/Passive Features/HPC script/Ih Fit/dev/2026-11-13_semivariogram/results/check02_window_means.json
+ALL PASS   (16 checks, 9.2 s)
