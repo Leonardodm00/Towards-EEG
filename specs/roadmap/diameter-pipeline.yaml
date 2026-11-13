@@ -542,3 +542,38 @@ implementation:
     needs_theory: [T7]
     needs_hpc: false
     jobs: []
+  - id: NC
+    title: "Node-specific correction on cleaned lines: cleaning, then per-node inference (option 2), the table as fallback (option 1)"
+    summary: "A second route to the corrected diameter, opened 2026-11-13 (D-129) beside the table route S5-S8: a real node's measuring line is polluted by the shadows of other branches, while the rendered phantoms are clean. Each node's patch and line are first cleaned of its traced neighbours' predicted shadows; the node is then fitted with its own forward model (option 2); the inversion table on cleaned lines (option 1) follows only if option 2 is not satisfactory. First on the pilot cell 529878215, in Colab. Plan: docs/TEEG_diameter_cleaning_inference_plan_2026-11-13.md."
+    parent:
+    depends_on: []
+    needs_theory: []
+    needs_hpc: false
+  - id: NC1
+    title: "Cleaning: the traced neighbours' shadows removed, iteratively (pilot cell, Colab)"
+    summary: "For every dendrite node of the pilot cell, the shadows its traced neighbours throw on its patch and measuring line are predicted from the neighbours' current features and the calibrated defocus kernel, and removed. The neighbours' features start at Allen's diameters and are updated round by round by a coarse fit on their own cleaned lines, until they stop changing (D-129.2, D-129.5). Figures: the patch images and the measuring line before and after the cleaning, on several example nodes (D-129.4)."
+    parent: NC
+    depends_on: [G2, G3, S3c]
+    needs_theory: []
+    needs_hpc: false
+  - id: NC2
+    title: "Option 2: per-node inference by fitting the node's own forward model"
+    summary: "On a node's cleaned planes: the diameter, the absorption coefficient, the lateral offset and the axis depth for which the rendered node -- cut into slabs finer than the plane spacing, each with its own defocus blur -- best matches the cleaned profiles of several planes. No table (D-129.1). Checked first on rendered phantoms, with and without neighbours and from an independent generator, then run on the pilot cell's nodes."
+    parent: NC
+    depends_on: [NC1, G2]
+    needs_theory: []
+    needs_hpc: false
+  - id: NC3
+    title: "Option 2 judged on the pilot cell"
+    summary: "The user's judgment of option 2's results on the pilot cell (D-129.1): the fits' residuals across planes, the diameters against Allen's and the first-stage fit's, the recovery on phantoms. Decides whether option 1 is needed. What counts as satisfactory is not yet defined."
+    parent: NC
+    depends_on: [NC2]
+    needs_theory: []
+    needs_hpc: false
+  - id: NC4
+    title: "Option 1 (only if option 2 is not satisfactory): the inversion table on cleaned lines"
+    summary: "The bias table of Block 14 used on cleaned lines: each cleaned node fitted by the per-node chain and inverted through the table, the phantoms given neighbours and the same cleaning so that the table describes what it corrects (D-129.1). Not started unless NC3 says so."
+    parent: NC
+    depends_on: [NC3, G4]
+    needs_theory: []
+    needs_hpc: false
