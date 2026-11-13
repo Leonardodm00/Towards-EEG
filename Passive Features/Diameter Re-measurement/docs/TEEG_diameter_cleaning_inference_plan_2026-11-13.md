@@ -4,6 +4,7 @@
 |---|---|
 | 2026-11-13 | Created at the user's request (13:01) after D-129: cleaning first, then option 2, option 1 only if option 2 is not satisfactory; the pilot cell 529878215 in Colab. Code facts at `34a5196` on `sci/diameter-pipeline` **[src]**; the toy numbers of section 5 from this chat's checks **[run, sandbox]**. Nothing below is implemented. Roadmap: NC, NC1-NC4 (`0274ce8`). |
 | 2026-11-13 (later) | Revised at the user's request (14:11) for the coding directives v2 of the same day: the main session plans and orchestrates, independent Opus agents write the blocks in parallel, Opus agents make the final check. New section "Fan-out: waves, blocks, files"; the steps regrouped into three waves of 5, 4 and 3 blocks (SPEC numbers 23-34, proposed); one file per block, so the iteration moves to `analysis/cleaning_iteration.py` and the recovery to `analysis/recovery.py`; a scene renderer added as a block of its own (the checks' generator, O11); scripts and notebook cells stay with the orchestrator. No step dropped; nothing implemented. |
+| 2026-11-13 (later, 2) | The user's answers of 14:35 (D-130) entered in the table of choices: O1-O7 and O9-O11 settled, O8 after the survey, O12 at the judgment; the waves approved; the table route's production and inversion (S7-S8) paused while this branch is tried; theory topics T14 and T15 added. Wave 1's SPEC entries drafted (Blocks 23-27) with proposed tolerances, awaiting the user's agreement before the contract commit. Consequences flagged to the user: the hybrid's cost and its negative planes in dark stain (SPEC Block 21) now sit inside the per-node fit; a shadow removed from a neighbour in the node's light path is not additive. |
 
 Tags: **[src]** read in the code at the commit above; **[SPEC]** `specs/SPEC.md`; **[log]** the decision log on `main`;
 **[run, sandbox]** computed in the chat of 2026-11-13; **[user]** the user's words; **[proposal]** the assistant's, not
@@ -144,17 +145,17 @@ the absorbed light); the alternative divides the observed plane by the neighbour
 
 | # | Choice | Options | Proposal | Status |
 |---|---|---|---|---|
-| O1 | how a shadow is removed | add back the absorbed light; divide by the neighbours' transmittance | add back (Eqs. 5-6); flag overlaps in projection | **[open]** |
-| O2 | the coarse fit, and the starting absorption coefficient | `measure_pilot` on the cleaned block; a two-parameter fit with the calibrated kernel at the trace's plane | a fit whose model is the shadow predictor's own, so that a neighbour's fitted features reproduce its observed shadow; start at the median of the first-stage fits | **[open]** |
-| O3 | what a round updates | diameter and absorption coefficient; also the lateral offset and depth | all four from round 1: position and depth errors mattered in the toy check | **[open]** |
-| O4 | which segments are neighbours | other branches; the node's own branch beyond the fitted stretch; axon; soma | all traced dendrite segments outside the node's fitted stretch, and the soma as today's disc; axon if traced | **[open]** |
-| O5 | patch half-size and planes | +-25 um (calibration); +-5 um (`block_half_um`); planes +-3 or +-6 | +-10 um and +-3 planes for the figures and the line; larger only if C0 shows shadows from farther | **[open]** |
-| O6 | stop rule | fixed rounds; a change threshold | every diameter changes by less than 1 % and every example line by less than the noise SD, or 5 rounds | **[open]** |
-| O7 | example nodes | how many, how chosen | about 10, from C0's classes: 2 clean (controls), 3 diffuse, 3 close and in focus, 2 near the soma | **[open]** |
-| O8 | close in-focus neighbours | flag and fill; joint fit | decide after C0's shares | **[open]** |
-| O9 | option 2's parameters and data | free: diameter, absorption coefficient, lateral offset, axis depth; tilt and heading from the line fit; planes +-3 | as listed | **[open]** |
-| O10 | absorption in F1 | partition (default); hybrid | partition first; the hybrid enters through F4 as a generator | **[open]** |
-| O11 | the scene generator of the checks | the tests' product of transmittances; Eqs. 5-6 applied to several tubes at once | the second, built in C2/C3's tests; the first kept as a labelled comparison | **[open]** |
+| O1 | how a shadow is removed | add back the absorbed light; divide by the neighbours' transmittance | add back (Eqs. 5-6); flag overlaps in projection | **[user, D-130]** the shadow is computed and removed wherever it falls, also directly above or below the node; no exclusion, the node keeps a label |
+| O2 | the coarse fit, and the starting absorption coefficient | `measure_pilot` on the cleaned block; a two-parameter fit with the calibrated kernel at the trace's plane | a fit whose model is the shadow predictor's own, so that a neighbour's fitted features reproduce its observed shadow; start at the median of the first-stage fits | **[user, D-130]** start from the first-stage fit (`measure_pilot`), then refine to explain the observed shadow |
+| O3 | what a round updates | diameter and absorption coefficient; also the lateral offset and depth | all four from round 1: position and depth errors mattered in the toy check | **[user, D-130]** all four |
+| O4 | which segments are neighbours | other branches; the node's own branch beyond the fitted stretch; axon; soma | all traced dendrite segments outside the node's fitted stretch, and the soma as today's disc; axon if traced | **[user, D-130]** as proposed, the axon included where traced |
+| O5 | patch half-size and planes | +-25 um (calibration); +-5 um (`block_half_um`); planes +-3 or +-6 | +-10 um and +-3 planes for the figures and the line; larger only if C0 shows shadows from farther | **[user, D-130]** the patch as proposed; no fixed plane range: as many planes as a neighbour's shadow can reach |
+| O6 | stop rule | fixed rounds; a change threshold | every diameter changes by less than 1 % and every example line by less than the noise SD, or 5 rounds | **[user, D-130]** as proposed |
+| O7 | example nodes | how many, how chosen | about 10, from C0's classes: 2 clean (controls), 3 diffuse, 3 close and in focus, 2 near the soma | **[user, D-130]** 20 nodes |
+| O8 | close in-focus neighbours | flag and fill; joint fit | decide after C0's shares | **[open]** decided after the survey [user, D-130] |
+| O9 | option 2's parameters and data | free: diameter, absorption coefficient, lateral offset, axis depth; tilt and heading from the line fit; planes +-3 | as listed | **[user, D-130]** as proposed, with as many planes as necessary |
+| O10 | absorption in F1 | partition (default); hybrid | partition first; the hybrid enters through F4 as a generator | **[user, D-130]** the hybrid |
+| O11 | the scene generator of the checks | the tests' product of transmittances; Eqs. 5-6 applied to several tubes at once | the second, built in C2/C3's tests; the first kept as a labelled comparison | **[user, D-130]** as proposed |
 | O12 | "satisfactory" (NC3) | -- | the user's; candidates: F4's $\hat d/d$ within a stated band on independent generators; residuals at the noise level on the pilot cell; the share of flagged nodes | **[open]** |
 
 Standing decisions the steps keep: phantoms go through exactly the real-data pipeline, the cleaning included (D-057
