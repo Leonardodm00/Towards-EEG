@@ -157,6 +157,7 @@ the "Binds" column.
 | 2026-11-12 (later, 2) | Logs **D-125** (user, 18:52; the noise-fit chat): Block 6's five open points answered -- one PBS array job per cell then a merge, never more than 120 cores (the assistant's reading: 6 cores per cell, Block 9's sweeps in a pool); the outputs as proposed; the S0-S3 checks dropped for now, D-055's elements superseded by later decisions listed (D-125.3); a refused or failed cell recorded and skipped; a full-size pilot whose two cells are kept. D-055 and D-124 annotated (entries and index). **The diameter chat's entries merged into this log**, as the project instructions' v2 (DOCUMENT UPKEEP, 2026-11-12) require: D-117 to D-121 and I-005 with their index rows, its changelog rows of 2026-10-30 (later, 2) to 2026-11-11 (later), and its later notes on D-088, D-090, D-108, D-109, D-112 and I-004, from the copy on `sci/diameter-pipeline` (last row 2026-11-11 (later)); D-116 kept as here (the copies differ only by this log's notes); the pointer rows replaced. From now on every chat logs in this copy on `main`. Next free IDs: D-126, I-006. |
 | 2026-11-12 (later, 3) | Logs **D-126** (user, 19:08): "I confirm both" -- D-125.1's reading (6 cores per cell, Block 9's sweeps in a pool of 6) and D-125.3's (D-055 brought up to date as listed there) confirmed. D-125 annotated (entry and index); SPEC Block 6's Confirmed line marked. The Block 6 handoff written (`Passive Features/HPC script/Ih Fit/docs/TEEG_noise_fit_block6_handoff_2026-11-12.md`). Next free IDs: D-127, I-006. |
 | 2026-11-13 | Logs **D-127** (user, 09:25-09:40; the audit chat, from multiple-choice questions put when the user asked for agent runs over the month's new code): code changed between 2026-10-13 and 2026-11-12 that no SPEC covers is specified before it is tested -- the checks whose numbers back a decided value (11 study folders under the diameter workstream's `checks/`, 9 under `Ih Fit/dev/`) and the two Colab notebook scripts, one SPEC block per study, drafted `Confirmed: inferred` and confirmed with the user; the document figure scripts are left out; the audit's results are delivered like a night run's. **The month's audit started** (08:30 UTC): six Opus tester agents following the scientific-coding integration-tester procedure on isolated checkouts -- run N on `main` at `64a2cbe`, mode full (the noise SPEC's first tester run), and runs D1-D5 on `sci/diameter-pipeline` at `1555036`, mode incremental from `128fdce` (the branch on 2026-10-12), its 21 blocks split five ways (0-9 and 21; 11; 12-14; 10, 15 and 19; 16-18); the other eight branches had no commit in the month **[src]**. Written after re-reading this log (unchanged since the 2026-11-12 (later, 3) row). Next free IDs: D-128, I-006. |
+| 2026-11-13 (later) | Logs **D-128** (user, 10:01; the diameter calibration chat): "In the roadmap if a document of a theory block has been generated the notes in the roadmap must cite the name of that document so that I can find it" -- a theory topic's note names, by file name, every document written for it (study document, topic document, course, study handoff), with where it lives. Applied the same turn to the diameter-pipeline roadmap on `sci/diameter-pipeline` (`52d7722`; the ID corrected in `ca6d900`; T7's note completed in `c95ae05`): T4.2 (the 2026-10-27 study handoff), T7 (the pupil-phase topic document and the three documents of its refs), T11 (the 2026-11-11 study document); T4.3 and T13 already named theirs. Written after re-reading this log at `77b0bb7` (unchanged since the 2026-11-13 row; the diameter chat's D-117 to D-121 and I-005 already merged here at `3dc3703`). This chat first took D-122 for it in the roadmap's notes, not knowing the renumbering of 2026-11-12; corrected before this row. Next free IDs: D-129, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -304,6 +305,7 @@ would be needed*, *Status*.
 | D-125 | 2026-11-12 | Block 6 (`run_noise_fit.py`, `submit_noise_fit.sh`, SPEC); the run on davinci; D-055; roadmap N6 | (a) one PBS array job per cell then a merge, at most 120 cores (6 per cell, the assistant's reading); the outputs as proposed; S0-S3 dropped for now, D-055's superseded elements listed; a refused or failed cell recorded and skipped; a full-size pilot, its two cells kept [user] | active; Block 6's SPEC entry drafted [readings confirmed, D-126] |
 | D-126 | 2026-11-12 | D-125.1, D-125.3; SPEC Block 6's Confirmed line; the job script's NCPUS | D-125's two readings confirmed: 6 cores per cell with Block 9's sweeps in a pool of 6; D-055 up to date as D-125.3 lists [user] | active |
 | D-127 | 2026-11-13 | the code changed 2026-10-13 to 2026-11-12 that no SPEC covers; both SPECs' Coverage and Blocks (diameter on `sci/diameter-pipeline`, noise fit on `main`); the reports and spec tests of the audit runs N, D1-D5 | specified before it is tested: the checks behind decided values and the two Colab notebook scripts, one SPEC block per study, the document figure scripts left out; the audit's results delivered like a night run's [user] | active; runs N, D1-D5 started 2026-11-13; no SPEC block drafted yet |
+| D-128 | 2026-11-13 | every roadmap's theory topics (`specs/roadmap/<name>.yaml`, the `note` field); the chats that write a document for a topic | a topic's note names every document written for it, by file name, with where it lives [user] | active; applied to diameter-pipeline at `52d7722`, `ca6d900`, `c95ae05` (T4.2, T7, T11) |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
@@ -10427,6 +10429,41 @@ the findings of its abstract); optics v1.5 (on `main`). **[KB]** D-024 (i), D-06
 diameter plan. [updated 2026-10-26, 16:48: promoted by **D-084** (user) to be the renderer actually used once built; its optics (T7) first] [updated 2026-10-27: built as SPEC Block 21 (**D-092**), smoke-tested, not yet the default; T7 still open]
 
 ---
+
+## D-128 -- A roadmap topic's note names every document written for it (user)
+
+**Date:** 2026-11-13, 10:01 (Europe/Rome), the diameter calibration chat. **Binds:** the theory topics of every roadmap
+(`specs/roadmap/<name>.yaml`, the `note` field shown on the page "Subproject Roadmaps"), and every chat that writes a
+document for a topic.
+
+**Decision [user].** "In the roadmap if a document of a theory block has been generated the notes in the roadmap must
+cite the name of that document so that I can find it".
+
+**Statement.** When a document is written for a theory topic -- a study document, a topic document, a course, a study
+handoff -- the topic's note names it by its file name, with the date and where it lives (sent in a chat as files, with
+the chat's name; or its path and branch in a repository) [user]. The assistant's readings, PROVISIONAL: the note is
+updated in the same turn the document is delivered; a document corrected or re-sent keeps its name in the note, with the
+correction's date; a note that refers to a document without its file name is incomplete and is completed when found; the
+edit is a note's wording, so it changes no status and needs no question (Roadmap directive 5 governs statuses only); the
+rule holds for every roadmap, not only diameter-pipeline.
+
+**Applied (2026-11-13, `52d7722`, `ca6d900` and `c95ae05` on `sci/diameter-pipeline`).** T4.2: the 2026-10-27 study handoff by name
+(`TEEG_diameter_table_readout_inversion_study_handoff_2026-10-27.md`); T7: the pupil-phase topic document
+(`TEEG_diameter_pupil_phase_2026-11-04.md`, sent as files in the chat "Diffraction and the Airy pattern", now on the
+branch `theory/pupil-phase-2026-11-04`, `45cd883`, under `Passive Features/Diameter Re-measurement/docs/TEEG_diameter_pupil_phase_2026-11-04/`) and the three documents of its refs on main;
+T11: `TEEG_study_nested_nodes_bootstrap_depth_2026-11-11.md` (sent as files). T4.3 and T13 already named theirs. Documents
+written for topics in other chats and not named in any note are completed when found **[repo; past chats searched for
+T4.2 and T7]**.
+
+**Why [user].** "so that I can find it".
+
+**What it does not decide [open].** Where the documents themselves are kept (study documents are sent as files;
+committing them to the repository is outside the four kinds of document kept without asking -- DOCUMENT UPKEEP); whether
+the `subproject-roadmap` skill takes the rule among its own (proposed to the user on 2026-11-13).
+
+**Sources.** **[user]** 2026-11-13, 10:01. **[repo]** `specs/roadmap/diameter-pipeline.yaml` at `c95ae05`.
+
+**Status:** active; applied to diameter-pipeline at `52d7722`, `ca6d900`, `c95ae05`.
 
 ## I-005 -- The node's own noise along the measuring line, included in the fits at that node; to discuss later
 
