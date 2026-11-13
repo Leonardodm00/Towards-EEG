@@ -678,3 +678,30 @@ implementation:
     needs_theory: []
     needs_hpc: false
     jobs: []
+  - id: I35
+    title: "Fast line renderer (extruded cross-section)"
+    summary: "The node's hybrid forward model made affordable: the absorbed light computed once on a cross-section and carried along the straight tube, 8 x 16 directions, the tube cut to the blur's reach; tested against the line renderer."
+    block: 35
+    parent: NC2
+    depends_on: [I26, I21]
+    needs_theory: [T15]
+    needs_hpc: false
+    jobs: []
+  - id: I32
+    title: "Cleaning iteration"
+    summary: "Rounds of shadow prediction, cleaning and coarse refinement of every node from the others' features of the round before, until diameters and example lines stop changing."
+    block: 32
+    parent: NC1
+    depends_on: [I25, I28, I29]
+    needs_theory: [T14]
+    needs_hpc: false
+    jobs: []
+  - id: I34
+    title: "Inference figures"
+    summary: "Per node the cleaned profiles against the fitted model plane by plane; fitted diameters against Allen's and the first-stage ones; residuals per plane."
+    block: 34
+    parent: NC2
+    depends_on: [I30]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []

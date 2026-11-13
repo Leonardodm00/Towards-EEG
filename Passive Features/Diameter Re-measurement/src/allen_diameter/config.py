@@ -382,7 +382,6 @@ class CleaningConfig:
     shadow_floor_gl: float = 0.3           # source: D-130.O5 (the assistant's reading, PROVISIONAL): a neighbour counts when its predicted shadow exceeds this somewhere in the patch; the value of calibration.isolation_depth_gl
     shadow_fine_factor: int = 8            # source: PROVISIONAL (Block 25): samples per pixel side of the shadow image's fine grid
     shadow_reach_sigmas: float = 6.0       # source: PROVISIONAL (Block 25): a segment farther than this many kernel SDs from the patch contributes 0
-    shadow_depth_bin_um: float = 0.07      # source: PROVISIONAL (Block 25): depth bins of a tilted segment's footprint, a quarter of the plane spacing
     soma_mu_per_um: float = 0.3            # source: PROVISIONAL (Block 25): the soma sphere's coefficient until it is fitted
     soma_z_um: float = 0.0                 # source: PROVISIONAL (Block 25): the soma sphere's depth; set by the script from the soma node's traced z
     close_lateral_um: float = 2.0          # source: PROVISIONAL (Block 27): class close_in_focus, lateral distance from the line's centre
@@ -410,6 +409,8 @@ class InferenceConfig:
     absorption: str = "hybrid"             # source: D-130.O10 [user]: the hybrid in the line renderer and the per-node fit; RendererConfig.absorption is not switched by this
     line_fine_factor: int = 8              # source: PROVISIONAL (Block 26): samples per pixel side where the line renderer integrates a pixel
     line_reach_sigmas: float = 6.0         # source: PROVISIONAL (Block 26): slabs farther than this many kernel SDs from a needed pixel contribute 0
+    ray_n_rho: int = 8                     # source: D-137.2 [user]: the hybrid's radial directions in the fast line renderer (Block 35)
+    ray_n_psi: int = 16                    # source: D-137.2 [user]: its azimuths
     d_bounds_um: Tuple[float, float] = (0.1, 6.0)         # source: PROVISIONAL (Block 30)
     mu_bounds_per_um: Tuple[float, float] = (0.01, 10.0)  # source: PROVISIONAL (Block 30)
     v0_bounds_um: Tuple[float, float] = (-1.0, 1.0)       # source: PROVISIONAL (Block 30)
@@ -715,7 +716,8 @@ def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None
           and pair(i.d_bounds_um, True) and pair(i.mu_bounds_per_um, True) and pair(i.v0_bounds_um, False)
           and pair(i.z_bounds_um, False) and len(i.multistart_factors) >= 1
           and all(math.isfinite(f) and f > 0 for f in i.multistart_factors)
-          and i.plane_snr_min >= 0 and math.isfinite(i.plane_snr_min) and i.max_nfev >= 1)
+          and i.plane_snr_min >= 0 and math.isfinite(i.plane_snr_min) and i.max_nfev >= 1
+          and i.ray_n_rho >= 1 and i.ray_n_psi >= 1)
     if not ok:
         raise ValueError("inference: the fine factor, reach, a pair of bounds, the starts, the plane rule or the "
                          "evaluation budget is out of range (SPEC Blocks 26, 30)")
