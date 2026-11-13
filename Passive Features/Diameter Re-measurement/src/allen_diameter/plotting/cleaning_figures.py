@@ -29,7 +29,6 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from allen_diameter.config import CleaningConfig
 from allen_diameter.plotting.figures import image_extent_um
 
 INK, INK2, BLUE, ORANGE = "#0b0b0b", "#52514e", "#2a78d6", "#eb6834"
@@ -194,7 +193,7 @@ def figure_node(block, shadow, cleaned, ks, frame, line_xy, v, profiles_before, 
     return fig
 
 
-def figure_rounds(history):
+def figure_rounds(history, cfg):
     """The record of the cleaning's rounds. Returns the matplotlib Figure.
 
     history: non-empty list of mappings, one per round in order (round t = 1,
@@ -203,7 +202,8 @@ def figure_rounds(history):
     n_refined (the number of nodes refined). Three panels sharing the round
     axis, one point per round; the stop threshold CleaningConfig.stop_rel_d is
     drawn on max_rel_d and the last allowed round CleaningConfig.max_rounds in
-    every panel (the configuration's defaults: the signature takes no config).
+    every panel, both read from cfg (a DiameterConfig: the run's own values;
+    Block 31, amendment 1).
     ValueError for an empty history or a round without one of the keys.
     """
     if isinstance(history, Mapping) or len(history) == 0:
@@ -214,7 +214,7 @@ def figure_rounds(history):
             raise ValueError("round %d must be a mapping with keys %r" % (t + 1, ROUND_KEYS))
         for key in ROUND_KEYS:
             cols[key].append(float(rec[key]))
-    ccfg = CleaningConfig()
+    ccfg = cfg.cleaning
     t = np.arange(1, len(history) + 1)
     rel = np.asarray(cols["max_rel_d"])
 

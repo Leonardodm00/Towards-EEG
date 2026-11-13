@@ -258,7 +258,7 @@ def test_contract():
     ccfg = CleaningConfig()
     for n_rounds in (1, 3, 7):
         hist = history(n_rounds)
-        fig = CF.figure_rounds(hist)
+        fig = CF.figure_rounds(hist, default_config())
         try:
             assert isinstance(fig, Figure)
             assert len(fig.axes) == 3
@@ -278,7 +278,7 @@ def test_contract():
     fig = call_node(a, planes=[-1, 0, 1])
     p1 = CF.save(fig, os.path.join(folder, "cleaning_node_example.png"), 110)
     plt.close(fig)
-    fig = CF.figure_rounds(history(4))
+    fig = CF.figure_rounds(history(4), default_config())
     p2 = CF.save(fig, os.path.join(folder, "sub", "cleaning_rounds_example.png"), 110)
     plt.close(fig)
     for pth in (p1, p2):
@@ -298,7 +298,7 @@ def test_determinism():
     assert_array_equal(bufs[0], bufs[1])
     bufs = []
     for _ in range(2):
-        fig = CF.figure_rounds(history(3))
+        fig = CF.figure_rounds(history(3), default_config())
         fig.canvas.draw()
         bufs.append(np.array(fig.canvas.buffer_rgba(), copy=True))
         plt.close(fig)
@@ -335,8 +335,8 @@ def test_edge_cases():
     _raises(with_(planes=[]), "an empty planes")
     _raises(with_(planes=[7]), "a plane not in ks")
     _raises(with_(meta="node 1"), "meta not a mapping")
-    _raises(lambda: CF.figure_rounds([]), "an empty history")
-    _raises(lambda: CF.figure_rounds([{"max_rel_d": 0.1, "n_refined": 3}]), "a round without max_line_change_gl")
+    _raises(lambda: CF.figure_rounds([], default_config()), "an empty history")
+    _raises(lambda: CF.figure_rounds([{"max_rel_d": 0.1, "n_refined": 3}], default_config()), "a round without max_line_change_gl")
     fig = plt.figure()
     try:
         _raises(lambda: CF.save(fig, os.path.join(out_dir(), "x.png"), 0), "dpi 0")

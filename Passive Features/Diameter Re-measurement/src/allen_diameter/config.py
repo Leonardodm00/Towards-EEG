@@ -573,6 +573,7 @@ class DiameterConfig:
                              "settings out of range (Block 10.P/10.I/10.A, Block 15; D-078 to D-081)")
         if abs(cal.table_max_delta_um - round(cal.table_max_delta_um / cal.knot_step_um) * cal.knot_step_um) > 1e-9:
             raise ValueError("calibration.table_max_delta_um must be a multiple of knot_step_um (the table ends on a knot)")
+        _check_cleaning_inference(self.cleaning, self.inference)
         sv = self.survey
         types = [str(t).strip().lower() for t, _ in sv.class_map] if all(len(x) == 2 for x in sv.class_map) else None
         if not (isinstance(sv.species, str) and sv.species.strip() and sv.cells_per_group >= 1
@@ -684,6 +685,40 @@ class DiameterConfig:
 def _check_in(value: str, allowed: Tuple[str, ...], name: str) -> None:
     if value not in allowed:
         raise ValueError("%s = %r is not one of %r" % (name, value, allowed))
+
+
+def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None:
+    """The cleaning's and the per-node fit's settings (SPEC Blocks 25-30; final check F3): the two
+    absorptions among their choices; positive lengths, counts and factors; a shadow floor >= 0;
+    every pair of bounds finite and ordered, the diameter and coefficient bounds positive."""
+    _check_in(c.shadow_absorption, ("hybrid", "partition_vertical"), "cleaning.shadow_absorption")
+    _check_in(i.absorption, ("hybrid", "partition_vertical", "linear"), "inference.absorption")
+
+    def pair(b, positive):
+        return (len(b) == 2 and all(math.isfinite(float(x)) for x in b) and b[0] < b[1]
+                and (b[0] > 0 or not positive))
+
+    ok = (c.patch_half_um > 0 and c.shadow_floor_gl >= 0 and math.isfinite(c.shadow_floor_gl)
+          and int(c.shadow_fine_factor) == c.shadow_fine_factor and c.shadow_fine_factor >= 1
+          and c.shadow_reach_sigmas > 0 and c.soma_mu_per_um >= 0 and math.isfinite(c.soma_z_um)
+          and c.close_lateral_um > 0 and c.close_defocus_um > 0 and c.clean_index_max > 0
+          and c.tier_reach_um > 0 and c.over_background_gl >= 0
+          and c.max_rounds >= 1 and 0 < c.stop_rel_d < 1 and c.refine_max_nfev >= 1
+          and c.shadow_ray_n_rho >= 1 and c.shadow_ray_n_psi >= 1
+          and len(c.example_counts) == 5 and all(int(n) == n and n >= 0 for n in c.example_counts)
+          and len(c.neighbour_swc_types) >= 1
+          and pair(c.refine_d_bounds_um, True) and pair(c.refine_mu_bounds_per_um, True)
+          and pair(c.refine_shift_bounds_um, False) and pair(c.refine_dz_bounds_um, False))
+    if not ok:
+        raise ValueError("cleaning: a length, count, floor, stop rule or pair of bounds is out of range (SPEC Blocks 25-29)")
+    ok = (int(i.line_fine_factor) == i.line_fine_factor and i.line_fine_factor >= 1 and i.line_reach_sigmas > 0
+          and pair(i.d_bounds_um, True) and pair(i.mu_bounds_per_um, True) and pair(i.v0_bounds_um, False)
+          and pair(i.z_bounds_um, False) and len(i.multistart_factors) >= 1
+          and all(math.isfinite(f) and f > 0 for f in i.multistart_factors)
+          and i.plane_snr_min >= 0 and math.isfinite(i.plane_snr_min) and i.max_nfev >= 1)
+    if not ok:
+        raise ValueError("inference: the fine factor, reach, a pair of bounds, the starts, the plane rule or the "
+                         "evaluation budget is out of range (SPEC Blocks 26, 30)")
 
 
 def _check_sgt(m: "MeasureConfig") -> None:

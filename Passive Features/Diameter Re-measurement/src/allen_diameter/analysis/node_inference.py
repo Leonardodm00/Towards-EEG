@@ -152,11 +152,15 @@ def fit_node(profiles_gl, B_gl, sigma_gl, forward: Callable, theta0, cfg, planes
         raise ValueError("multistart_factors must be non-empty and > 0")
     lo, hi = _bounds(icfg, th0[3])
 
+    seen = {"nonfinite": False}
+
     def evaluate(theta):
         tau = np.asarray(forward(float(theta[0]), float(theta[1]), float(theta[2]), float(theta[3])),
                          dtype=float)
         if tau.shape != (n_planes, n_v):
             raise ValueError("forward returned shape %s, expected %s" % (tau.shape, (n_planes, n_v)))
+        if not np.all(np.isfinite(tau)):
+            seen["nonfinite"] = True
         return tau
 
     if planes is None:
@@ -189,8 +193,11 @@ def fit_node(profiles_gl, B_gl, sigma_gl, forward: Callable, theta0, cfg, planes
         except ValueError as exc:
             # scipy raises "Residuals are not finite in the initial point" for a NaN model:
             # that start failed; any other ValueError (shape, our own validation) propagates
-            if "not finite" not in str(exc):
+            # ... and a model that turns NaN inside the finite-difference Jacobian reaches the solver's
+            # linear algebra, which raises too: a start that met a non-finite forward failed (as Block 29)
+            if "not finite" not in str(exc) and not seen["nonfinite"]:
                 raise
+            seen["nonfinite"] = False
             nfev += 1
             continue
         nfev += int(run.nfev)

@@ -46,7 +46,7 @@ from .calibration_scene import OWN, patch_frame, segment_rows, shadow_depth, sha
 from .profiles import profile_offsets
 from ..model.kernel import sigma_r
 
-CLASSES = ("overlap", "close_in_focus", "diffuse", "clean")   # in this order of precedence
+CLASSES = ("overlap", "close_in_focus", "diffuse", "clean")   # the labels; precedence: clean first, then overlap, close_in_focus, diffuse (amendment 1, D-131)
 NEAREST_SOMA = "nearest_soma"
 EXAMPLE_KEYS = ("clean", "diffuse", "close_in_focus", "overlap", NEAREST_SOMA)  # CleaningConfig.example_counts' order
 

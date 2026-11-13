@@ -152,7 +152,7 @@ def neighbour_tiers(fscene, own_ids, node_xyz, cfg):
     c = cfg.cleaning
     lat_max, dz_max, reach = float(c.close_lateral_um), float(c.close_defocus_um), float(c.tier_reach_um)
     step = float(cfg.measure.profile_step_um)
-    own = np.asarray(sorted({int(i) for i in np.asarray(own_ids).ravel()}), dtype=np.int64)
+    own = np.asarray(sorted({int(i) for i in own_ids}), dtype=np.int64)   # any iterable of ids, a set included (as shadow.neighbour_indices)
     in0, in1 = np.isin(ids[:, 0], own), np.isin(ids[:, 1], own)
     own_seg = np.flatnonzero(in0 & in1)
     nb = np.flatnonzero(~(in0 & in1))
