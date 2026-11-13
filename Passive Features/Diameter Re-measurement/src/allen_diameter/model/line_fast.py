@@ -40,16 +40,17 @@ by profiles.sample_profile.
 The section is cached (SectionCache) by (d, mu, phi, theta, aspect,
 absorption, the directions and their weights, light_direction, the lattice
 size): a shift of c, lateral or in depth, reuses it. theta is in the key
-because the condenser's quadrature (Block 9: n_psi azimuths) is not invariant
-under a rotation about z, so h depends on theta at the quadrature's
-resolution (see the block's report).
+(amendment 1 (A)): the condenser's quadrature (Block 9: n_psi azimuths) is not
+invariant under a rotation about z, so h depends on theta at the quadrature's
+resolution.
 
-Validity (D-138.2): extrusion_valid is True when every point of the axis whose
-lateral (x, y) distance to the read pixels' box is at most
-line_reach_sigmas x max_{j,k} sigma_r(zeta_j - z_k) + d (1 + tan(theta_max))
-(sin(theta_max) = ray_na / ray_n_oil; j over the slab lattice above, k over
-ks) lies inside the tube's own length; line_profiles raises ExtrusionInvalid
-otherwise.
+Validity (D-138.2; SPEC Block 35, amendment 1 (C), D-140): the block
+computes the tube without caps, read on the capped tube's lattice.
+extrusion_valid is True when the point of the axis nearest the line's origin
+(nearest in the image plane: the origin has no depth) is at least
+inference.extrusion_cap_margin_um along the axis (observed arc length) from
+each cap; line_profiles raises ExtrusionInvalid otherwise, before the mu = 0
+shortcut.
 
 Directions: ray_world.directions(inference.ray_n_rho, inference.ray_n_psi,
 renderer.ray_na, renderer.ray_n_oil) (D-137.2).
@@ -235,59 +236,20 @@ def _axis_length(tube):
     return U / float(np.linalg.norm(a))                     # |s0| = |s| |S^-1 a_hat| <= U
 
 
-def _line_box_interval(px, py, dx, dy, box, M):
-    """The parameters t of the points (px + t dx, py + t dy) whose Euclidean
-    distance to the rectangle box = (x0, x1, y0, y1) is at most M: the line
-    against the rectangle grown by M (two crossed rectangles and four corner
-    discs, a convex set), -> (t_lo, t_hi), or None when the line misses it.
-    (dx, dy) != 0."""
-    x0, x1, y0, y1 = box
-    lo, hi = math.inf, -math.inf
-
-    def rect(ax0, ax1, ay0, ay1):
-        t0, t1 = -math.inf, math.inf
-        for p0, d0, a0, a1 in ((px, dx, ax0, ax1), (py, dy, ay0, ay1)):
-            if d0 == 0.0:
-                if not (a0 <= p0 <= a1):
-                    return None
-            else:
-                ta, tb = (a0 - p0) / d0, (a1 - p0) / d0
-                t0, t1 = max(t0, min(ta, tb)), min(t1, max(ta, tb))
-        return (t0, t1) if t1 >= t0 else None
-
-    pieces = [rect(x0 - M, x1 + M, y0, y1), rect(x0, x1, y0 - M, y1 + M)]
-    A = dx * dx + dy * dy
-    for qx, qy in ((x0, y0), (x0, y1), (x1, y0), (x1, y1)):
-        ex_, ey_ = px - qx, py - qy
-        B = ex_ * dx + ey_ * dy
-        C = ex_ * ex_ + ey_ * ey_ - M * M
-        disc = B * B - A * C
-        if disc >= 0.0:
-            sq = math.sqrt(disc)
-            pieces.append(((-B - sq) / A, (-B + sq) / A))
-    for piece in pieces:
-        if piece is not None:
-            lo, hi = min(lo, piece[0]), max(hi, piece[1])
-    return (lo, hi) if hi >= lo else None
-
-
-def _validity(tube, ks_arr, ex, ey, cfg, zeta):
-    """(valid, margin um, axis interval reached (s_lo, s_hi) or None, half-range inside)."""
-    rcfg, icfg, acq = cfg.renderer, cfg.inference, cfg.acquisition
-    z_planes = ks_arr * float(acq.dz_um)
-    sig_max = float(np.max(sigma_r(zeta[:, None] - z_planes[None, :], rcfg)))
-    s_m = float(rcfg.ray_na) / float(rcfg.ray_n_oil)
-    tan_max = s_m / math.sqrt(1.0 - s_m * s_m)
-    M = float(icfg.line_reach_sigmas) * sig_max + tube.d * (1.0 + tan_max)
+def _cap_distance(tube, origin_xy):
+    """(distance um from the nearer cap, along the axis, of the axis point
+    nearest the origin in the image plane; that point's arc length s; the
+    half-range inside). Arc length is the observed one, P = c + s a_hat."""
     a = tube.t_hat
+    axy = math.hypot(a[0], a[1])                 # cos(phi) > 0 (phi < pi/2, Block 2)
+    dxy = np.asarray(origin_xy, dtype=float) - np.asarray(tube.c[:2], dtype=float)
+    s = float(dxy[0] * a[0] + dxy[1] * a[1]) / (axy * axy)
     S_in = _axis_length(tube)
-    box = (float(ex[0]), float(ex[-1]), float(ey[0]), float(ey[-1]))
-    if math.hypot(a[0], a[1]) == 0.0:          # phi < pi/2 always (Block 2), kept for safety
-        return False, M, None, S_in
-    iv = _line_box_interval(float(tube.c[0]), float(tube.c[1]), float(a[0]), float(a[1]), box, M)
-    if iv is None:
-        return True, M, None, S_in
-    return (iv[0] >= -S_in and iv[1] <= S_in), M, iv, S_in
+    return S_in - abs(s), s, S_in
+
+
+def _is_valid(tube, origin_xy, cfg):
+    return _cap_distance(tube, origin_xy)[0] >= float(cfg.inference.extrusion_cap_margin_um)
 
 
 def _prepare(tube, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg):
@@ -307,19 +269,11 @@ def _prepare(tube, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg):
 
 
 def extrusion_valid(tube, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg):
-    """-> bool: no cap within reach of the pixels the line reads (D-138.2; the
-    margin in the module docstring). An empty ks or a tube whose columns miss
-    the lattice is valid (nothing is drawn)."""
-    o, yh, eu, v, n_avg, step, ks_arr, f = _prepare(tube, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg)
-    if ks_arr.size == 0:
-        return True
-    p = float(cfg.acquisition.res0_um)
-    _c0, _c1, _r0, _r1, ex, ey = _pixel_box(o, yh, eu, v, n_avg, step, p)
-    _ix0, _iy0, _xs, _ys, _X, _Y, z_lo, z_hi, inside = _footprint(tube, p / f, p)
-    if not inside.any():
-        return True
-    zeta = geometry.slab_centres(float(z_lo[inside].min()), float(z_hi[inside].max()), float(cfg.renderer.dzeta_um))
-    return bool(_validity(tube, ks_arr, ex, ey, cfg, zeta)[0])
+    """-> bool: the axis point nearest the line's origin lies at least
+    inference.extrusion_cap_margin_um along the axis from each cap (SPEC Block
+    35, amendment 1 (C)). The other arguments are validated as line_profiles'."""
+    o = _prepare(tube, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg)[0]
+    return bool(_is_valid(tube, o, cfg))
 
 
 # ------------------------------------------------------------- the model ---
@@ -330,7 +284,7 @@ def line_profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, abso
     pixel means of tau_k of Eqs. 5-6, before the camera chain), with the
     hybrid's h read off one cached cross-section. cache: a SectionCache to
     reuse across calls (None: a fresh one). ExtrusionInvalid (a ValueError)
-    when a cap is within reach (extrusion_valid False); ValueError for mu < 0
+    when extrusion_valid is False (checked before the mu = 0 shortcut); ValueError for mu < 0
     or not finite, a non-unit axis, an unknown absorption, an uncapped tube."""
     return _profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache, check=True)
 
@@ -357,8 +311,11 @@ def _profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorpti
     p, dz, dzeta = float(acq.res0_um), float(acq.dz_um), float(rcfg.dzeta_um)
     h = p / f
     n_planes, n_v = ks_arr.size, v.size
-    if n_planes == 0:
-        return np.ones((0, n_v))
+    if check and not _is_valid(tube, o, cfg):
+        raise ExtrusionInvalid("the line's origin is within inference.extrusion_cap_margin_um of a cap along the "
+                               "axis: the extrusion does not hold (D-138.2, D-140); flag the node")
+    if n_planes == 0 or mu == 0.0:
+        return np.ones((n_planes, n_v))
 
     c_lo, c_hi, r_lo, r_hi, ex, ey = _pixel_box(o, yh, eu, v, n_avg, step, p)
     bx0, bx1, by0, by1 = ex[0], ex[-1], ey[0], ey[-1]
@@ -366,11 +323,6 @@ def _profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorpti
     if not inside.any():
         return np.ones((n_planes, n_v))
     zeta = geometry.slab_centres(float(z_lo[inside].min()), float(z_hi[inside].max()), dzeta)
-    if check and not _validity(tube, ks_arr, ex, ey, cfg, zeta)[0]:
-        raise ExtrusionInvalid("a cap of the tube is within reach of the line's pixels: the extrusion does not hold "
-                               "(D-138.2); flag the node")
-    if mu == 0.0:
-        return np.ones((n_planes, n_v))
     z_planes = ks_arr * dz
     sig = sigma_r(zeta[:, None] - z_planes[None, :], rcfg)        # (J, n_planes), um
     R_jk = reach * sig

@@ -12,14 +12,17 @@ Checks, from the strongest oracle to the weakest
                         unit length booked on the fine lattice (Block 26's
                         known answer; hybrid under a near-vertical condenser)
     test_reference      Block 26 on the same tube with the same directions
-                        (4 x 8 in both), half-length 10 um, the line through
-                        the tube's middle: d 0.3, 1 um x tilt 0, 30, 60 deg and
-                        d 2 um x tilt 0, 30 deg, axis depth 0 and 0.14 um,
-                        planes -3..3, n_avg 0 and the configured value, the
-                        three absorptions: max |difference| <= 2e-4 (D-138.1).
-                        Measured with the validity test bypassed, so that every
-                        case is compared; extrusion_valid is printed beside it.
-                        Prints the time per call (Block 26, fast cold, warm)
+                        (4 x 8 in both), the line through the tube's middle:
+                        d 0.3, 1 um x tilt 0, 30, 60 deg and d 2 um x tilt 0,
+                        30 deg, axis depth 0 and 0.14 um, planes -3..3, n_avg 0
+                        and the configured value, the three absorptions:
+                        max |difference| <= 2e-4 (D-138.1), at half-length
+                        10 um (flat) and 40 um (tilted; d 2 um at 30 deg in one
+                        configuration), where the caps do not reach (SPEC
+                        Block 35, amendment 1 (B), D-140). Prints the time per
+                        call (Block 26, fast cold, warm)
+    test_caps           reported: the tilted cases at half-length 10, 20, 40 um
+    test_cap_margin     reported: the line 1.5, 3, 5 um from a cap
     test_convergence    the section's read of h against Block 21's ray_history
                         at interior points falls as the lattice is refined
     test_invariants     lateral shift by whole pixels; a depth shift reuses
@@ -28,13 +31,14 @@ Checks, from the strongest oracle to the weakest
     test_contract       shape, dtype, finiteness; absorption None; the cache
     test_determinism    bit-identical repeat
     test_edge_cases     mu = 0 gives exactly 1; extrusion_valid False and
-                        ExtrusionInvalid 0.5 um from a cap, True in the middle
-                        of a 10 um half-length; ValueErrors as Block 26's
+                        ExtrusionInvalid 0.5 um from a cap (also at mu = 0),
+                        True in the middle of a 10 um half-length and at the
+                        margin; ValueErrors as Block 26's
     test_directions     reported, no bound: 8 x 16 against 16 x 32 directions
                         on the fast renderer for the cases of test_reference
     test_timing         reported, no bound: time per call at 8 x 16 directions,
-                        half-length 10 um, d 0.3, 1, 2 um (flat), Block 26 at
-                        the same directions beside it
+                        half-length 5 and 10 um, d 0.3, 1, 2 um, flat and 30
+                        deg, cold and warm; Block 26 beside the flat 10 um ones
 
 Run
     python3 tests/smoke/test_smoke_line_fast.py
@@ -182,48 +186,109 @@ def test_known_answer():
         print("  test_known_answer %s: relative error %.2e" % (mode, float(np.max(np.abs(mass / expected[mode] - 1)))))
 
 
-def test_reference():
-    # Block 26 as the reference (D-138.1: 2e-4), 4 x 8 directions in both
-    # (SPEC Block 35 allows it for time), U = 10 um, mu = 1 /um.
+def _ref_geometry():
     cfg = make_cfg(n_rho=4, n_psi=8)
     v = PR.profile_offsets(cfg.measure)
-    A = PR.n_along(cfg.measure)
-    step = cfg.measure.profile_step_um
-    ks = np.arange(-3, 4)
     theta = 0.37
     o, yh, eu = line_geometry(theta, (50.03, 40.71))
+    return cfg, v, PR.n_along(cfg.measure), cfg.measure.profile_step_um, np.arange(-3, 4), theta, o, yh, eu
+
+
+def _ref_tube(o, theta, d, phi_deg, cz, U):
+    return G.Tube((o[0] + 0.02, o[1] - 0.01, cz), d / 2, math.radians(phi_deg), theta, 1.0, U, "axial")
+
+
+CAP_U40 = {}  # (d, phi) -> hybrid difference at U 40 um, cz 0, n_avg configured (test_reference, reused by test_caps)
+
+
+def test_reference():
+    # Block 26 as the reference (D-138.1: 2e-4), 4 x 8 directions in both
+    # (SPEC Block 35 allows it for time), mu = 1 /um, the line through the
+    # tube's middle. Amendment 1 (B), D-140: the block is the tube without
+    # caps, so the oracle is judged where the caps do not reach: half-length
+    # 10 um for the flat cases, 40 um for the tilted ones; d 2 um at 30 deg in
+    # one configuration (cz 0, the configured n_avg), for time.
+    cfg, v, A, step, ks, theta, o, yh, eu = _ref_geometry()
     mu = 1.0
     rows, failures = [], []
     for d, phi_deg in REF_CASES:
-        for cz in (0.0, 0.14):
-            tube = G.Tube((o[0] + 0.02, o[1] - 0.01, cz), d / 2, math.radians(phi_deg), theta, 1.0, 10.0, "axial")
-            valid = LF.extrusion_valid(tube, ks, o, yh, eu, v, A, step, cfg)
+        U = 10.0 if phi_deg == 0.0 else 40.0
+        one = (d == 2.0 and phi_deg == 30.0)
+        for cz in ((0.0,) if one else (0.0, 0.14)):
+            tube = _ref_tube(o, theta, d, phi_deg, cz, U)
+            assert LF.extrusion_valid(tube, ks, o, yh, eu, v, A, step, cfg)
             for mode in MODES:
-                err, t = {}, {}
-                for n_avg in (0, A):
+                err, t = {0: float("nan")}, {}
+                for n_avg in ((A,) if one else (0, A)):
                     t0 = time.perf_counter()
                     ref = LR.line_profiles(tube, mu, ks, o, yh, eu, v, n_avg, step, cfg, absorption=mode)
                     t["b26"] = time.perf_counter() - t0
                     cache = LF.SectionCache()
                     t0 = time.perf_counter()
-                    got = fast_unchecked(tube, mu, ks, o, yh, eu, v, n_avg, step, cfg, mode, cache)
+                    got = LF.line_profiles(tube, mu, ks, o, yh, eu, v, n_avg, step, cfg, absorption=mode, cache=cache)
                     t["cold"] = time.perf_counter() - t0
                     t0 = time.perf_counter()
-                    fast_unchecked(tube, mu, ks, o, yh, eu, v, n_avg, step, cfg, mode, cache)
+                    LF.line_profiles(tube, mu, ks, o, yh, eu, v, n_avg, step, cfg, absorption=mode, cache=cache)
                     t["warm"] = time.perf_counter() - t0
                     err[n_avg] = float(np.max(np.abs(got - ref)))
                     if err[n_avg] > TOL_B26:
-                        failures.append("d %.1f phi %g cz %.2f %s n_avg %d: %.2e" % (d, phi_deg, cz, mode, n_avg,
-                                                                                  err[n_avg]))
-                rows.append((d, phi_deg, cz, mode, int(valid), err[0], err[A], t["b26"], t["cold"], t["warm"]))
-    print("  test_reference: max |tau_fast - tau_Block26| (4 x 8 directions, U 10 um, mu 1/um, 7 planes, %d offsets);"
+                        failures.append("d %.1f phi %g U %g cz %.2f %s n_avg %d: %.2e" % (d, phi_deg, U, cz, mode,
+                                                                                       n_avg, err[n_avg]))
+                if mode == "hybrid" and phi_deg > 0 and cz == 0.0:
+                    CAP_U40[(d, phi_deg)] = err[A]
+                rows.append((d, phi_deg, U, cz, mode, err[0], err[A], t["b26"], t["cold"], t["warm"]))
+    print("  test_reference: max |tau_fast - tau_Block26| (4 x 8 directions, mu 1/um, 7 planes, %d offsets);"
           " times at n_avg %d (s)" % (v.size, A))
-    print("  %4s %4s %5s %-18s %5s %9s %9s %8s %8s %8s" % ("d", "phi", "cz", "mode", "valid", "err_A0",
+    print("  %4s %4s %4s %5s %-18s %9s %9s %8s %8s %8s" % ("d", "phi", "U", "cz", "mode", "err_A0",
                                                          "err_A%d" % A, "block26", "cold", "warm"))
     for row in rows:
-        print("  %4.1f %4.0f %5.2f %-18s %5d %9.2e %9.2e %8.3f %8.3f %8.3f" % row)
-    assert not failures, "above 2e-4 (D-138.1) in %d of %d comparisons: %s" % (
-        len(failures), 2 * len(rows), "; ".join(failures))
+        print("  %4.1f %4.0f %4.0f %5.2f %-18s %9.2e %9.2e %8.3f %8.3f %8.3f" % row)
+    assert not failures, "above 2e-4 (D-138.1) in %d comparisons: %s" % (len(failures), "; ".join(failures))
+
+
+def test_caps():
+    # Reported, no bound (amendment 1 (B)): the hybrid's difference to Block 26
+    # for the tilted cases at half-length 10, 20, 40 um (cz 0, n_avg
+    # configured; 40 um from test_reference). Validity bypassed at 10 and 20 um
+    # is not needed: the line is at the middle.
+    cfg, v, A, step, ks, theta, o, yh, eu = _ref_geometry()
+    print("  test_caps: max |tau_fast - tau_Block26|, hybrid, tilted, line at the middle, cz 0, n_avg %d" % A)
+    for d, phi_deg in REF_CASES:
+        if phi_deg == 0.0:
+            continue
+        out = []
+        for U in (10.0, 20.0):
+            tube = _ref_tube(o, theta, d, phi_deg, 0.0, U)
+            ref = LR.line_profiles(tube, 1.0, ks, o, yh, eu, v, A, step, cfg, absorption="hybrid")
+            got = LF.line_profiles(tube, 1.0, ks, o, yh, eu, v, A, step, cfg, absorption="hybrid")
+            out.append(float(np.max(np.abs(got - ref))))
+        u40 = CAP_U40.get((d, phi_deg), float("nan"))
+        print("  d %.1f phi %2.0f: U 10 %.2e, U 20 %.2e, U 40 %.2e" % (d, phi_deg, out[0], out[1], u40))
+
+
+def test_cap_margin():
+    # Reported, no bound (amendment 1 (C)): the hybrid's difference to Block 26
+    # with the line 1.5, 3.0 and 5.0 um along the axis from one cap of a tube
+    # of half-length 10 um (1.5 um is below the margin: the unchecked path).
+    cfg, v, A, step, ks, theta, o, yh, eu = _ref_geometry()
+    print("  test_cap_margin: max |tau_fast - tau_Block26|, hybrid, U 10 um, cz 0, n_avg %d, line x um from a cap"
+          " (margin %.1f um)" % (A, cfg.inference.extrusion_cap_margin_um))
+    for d in (0.3, 1.0):
+        for phi_deg in (0.0, 30.0):
+            out = []
+            for dist in (1.5, 3.0, 5.0):
+                tube0 = _ref_tube(o, theta, d, phi_deg, 0.0, 10.0)
+                s_in = 10.0                                       # axial cut, aspect 1: |s| <= U
+                a = tube0.t_hat
+                c = np.array([o[0], o[1], 0.0]) - (s_in - dist) * a  # the line's origin is dist from the cap
+                tube = G.Tube((c[0] + 0.02, c[1] - 0.01, c[2]), d / 2, math.radians(phi_deg), theta, 1.0, 10.0,
+                              "axial")
+                valid = LF.extrusion_valid(tube, ks, o, yh, eu, v, A, step, cfg)
+                assert valid == (dist >= cfg.inference.extrusion_cap_margin_um), (d, phi_deg, dist, valid)
+                ref = LR.line_profiles(tube, 1.0, ks, o, yh, eu, v, A, step, cfg, absorption="hybrid")
+                got = fast_unchecked(tube, 1.0, ks, o, yh, eu, v, A, step, cfg, "hybrid")
+                out.append(float(np.max(np.abs(got - ref))))
+            print("  d %.1f phi %2.0f: 1.5 um %.2e, 3.0 um %.2e, 5.0 um %.2e" % (d, phi_deg, out[0], out[1], out[2]))
 
 
 def test_convergence():
@@ -369,6 +434,21 @@ def test_edge_cases():
             pass
         else:
             raise AssertionError("no ExtrusionInvalid 0.5 um from a cap (%s)" % mode)
+    try:  # checked before the mu = 0 shortcut (amendment 1 (C))
+        LF.line_profiles(tube, 0.0, ks, o_cap, yh, eu, v, A, p, cfg)
+    except LF.ExtrusionInvalid:
+        pass
+    else:
+        raise AssertionError("no ExtrusionInvalid at mu = 0 0.5 um from a cap")
+    m = cfg.inference.extrusion_cap_margin_um
+    assert LF.extrusion_valid(tube, ks, o + (10.0 - m - 1e-9) * eu, yh, eu, v, A, p, cfg)
+    assert not LF.extrusion_valid(tube, ks, o + (10.0 - m + 1e-6) * eu, yh, eu, v, A, p, cfg)
+    # a tilted tube: the distance is along the axis (observed arc length)
+    tilt = G.Tube((10.0, 10.0, 0.0), 0.15, math.radians(45.0), 0.3, 1.0, 10.0, "axial")
+    s_at = 10.0 - m - 0.01
+    assert LF.extrusion_valid(tilt, ks, o + s_at * math.cos(math.radians(45.0)) * eu, yh, eu, v, A, p, cfg)
+    assert not LF.extrusion_valid(tilt, ks, o + (s_at + 0.02) * math.cos(math.radians(45.0)) * eu, yh, eu, v, A,
+                                  p, cfg)
     bad = [
         dict(mu=-0.1), dict(mu=float("nan")), dict(y_hat=np.array([0.0, 1.01])),
         dict(e_u=np.array([0.5, 0.5])), dict(absorption="ray_world"), dict(absorption="unknown"),
@@ -394,7 +474,7 @@ def test_edge_cases():
 def test_directions():
     # Reported, no bound (SPEC Block 35): the fast renderer at 8 x 16 against
     # 16 x 32 directions, hybrid (the other two do not use directions), the
-    # cases of test_reference, validity bypassed.
+    # cases of test_reference at half-length 10 um.
     c8, c16 = make_cfg(n_rho=8, n_psi=16), make_cfg(n_rho=16, n_psi=32)
     v = PR.profile_offsets(c8.measure)
     A = PR.n_along(c8.measure)
@@ -407,17 +487,18 @@ def test_directions():
         out = []
         for cz in (0.0, 0.14):
             tube = G.Tube((o[0] + 0.02, o[1] - 0.01, cz), d / 2, math.radians(phi_deg), theta, 1.0, 10.0, "axial")
-            a = fast_unchecked(tube, 1.0, ks, o, yh, eu, v, A, step, c8, "hybrid")
-            b = fast_unchecked(tube, 1.0, ks, o, yh, eu, v, A, step, c16, "hybrid")
+            a = LF.line_profiles(tube, 1.0, ks, o, yh, eu, v, A, step, c8, absorption="hybrid")
+            b = LF.line_profiles(tube, 1.0, ks, o, yh, eu, v, A, step, c16, absorption="hybrid")
             out.append(float(np.max(np.abs(a - b))))
         print("  d %.1f phi %2.0f: cz 0 %.2e, cz 0.14 %.2e" % (d, phi_deg, out[0], out[1]))
 
 
 def test_timing():
     # Reported, no bound: time per call at the production directions (8 x 16),
-    # U = 10 um, flat tubes through the line's middle, hybrid, n_avg configured;
-    # Block 26 at the same directions beside it. Cold = new (d, mu), warm =
-    # cached section (a depth shift of 0.05 um).
+    # half-length 5 and 10 um, flat and 30 deg, hybrid, n_avg configured, the
+    # line at the middle. Cold = new (d, mu); warm = the cached section (a depth
+    # shift of 0.05 um). Block 26 at the same directions beside it for the flat
+    # tubes at 10 um.
     cfg = make_cfg(n_rho=8, n_psi=16)
     v = PR.profile_offsets(cfg.measure)
     A = PR.n_along(cfg.measure)
@@ -425,24 +506,27 @@ def test_timing():
     ks = np.arange(-3, 4)
     theta = 0.37
     o, yh, eu = line_geometry(theta, (50.03, 40.71))
-    print("  test_timing: s per call, 8 x 16 directions, U 10 um, flat, hybrid, mu 1/um, 7 planes, n_avg %d" % A)
-    print("  %4s %9s %9s %9s %9s %6s" % ("d", "block26", "cold", "warm", "err", "valid"))
-    for d in (0.3, 1.0, 2.0):
-        tube = G.Tube((o[0] + 0.02, o[1] - 0.01, 0.0), d / 2, 0.0, theta, 1.0, 10.0, "axial")
-        tz = G.Tube((o[0] + 0.02, o[1] - 0.01, 0.05), d / 2, 0.0, theta, 1.0, 10.0, "axial")
-        t0 = time.perf_counter()
-        ref = LR.line_profiles(tube, 1.0, ks, o, yh, eu, v, A, step, cfg, absorption="hybrid")
-        t_b26 = time.perf_counter() - t0
-        cache = LF.SectionCache()
-        t0 = time.perf_counter()
-        got = fast_unchecked(tube, 1.0, ks, o, yh, eu, v, A, step, cfg, "hybrid", cache)
-        t_cold = time.perf_counter() - t0
-        t0 = time.perf_counter()
-        fast_unchecked(tz, 1.0, ks, o, yh, eu, v, A, step, cfg, "hybrid", cache)
-        t_warm = time.perf_counter() - t0
-        valid = LF.extrusion_valid(tube, ks, o, yh, eu, v, A, step, cfg)
-        print("  %4.1f %9.2f %9.2f %9.2f %9.2e %6d" % (d, t_b26, t_cold, t_warm, float(np.max(np.abs(got - ref))),
-                                                    int(valid)))
+    print("  test_timing: s per call, 8 x 16 directions, hybrid, mu 1/um, 7 planes, n_avg %d" % A)
+    print("  %4s %4s %4s %9s %9s %9s %9s" % ("d", "phi", "U", "cold", "warm", "block26", "err"))
+    for U in (5.0, 10.0):
+        for phi_deg in (0.0, 30.0):
+            for d in (0.3, 1.0, 2.0):
+                tube = _ref_tube(o, theta, d, phi_deg, 0.0, U)
+                tz = _ref_tube(o, theta, d, phi_deg, 0.05, U)
+                cache = LF.SectionCache()
+                t0 = time.perf_counter()
+                got = LF.line_profiles(tube, 1.0, ks, o, yh, eu, v, A, step, cfg, absorption="hybrid", cache=cache)
+                t_cold = time.perf_counter() - t0
+                t0 = time.perf_counter()
+                LF.line_profiles(tz, 1.0, ks, o, yh, eu, v, A, step, cfg, absorption="hybrid", cache=cache)
+                t_warm = time.perf_counter() - t0
+                t_b26, err = float("nan"), float("nan")
+                if U == 10.0 and phi_deg == 0.0:
+                    t0 = time.perf_counter()
+                    ref = LR.line_profiles(tube, 1.0, ks, o, yh, eu, v, A, step, cfg, absorption="hybrid")
+                    t_b26 = time.perf_counter() - t0
+                    err = float(np.max(np.abs(got - ref)))
+                print("  %4.1f %4.0f %4.0f %9.2f %9.2f %9.2f %9.2e" % (d, phi_deg, U, t_cold, t_warm, t_b26, err))
 
 
 # ---------------------------------------------------------------- runner ---
