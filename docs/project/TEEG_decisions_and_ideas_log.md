@@ -163,6 +163,7 @@ the "Binds" column.
 | 2026-11-13 (later, 4) | Logs **D-129** (user, 12:35 and 13:01; the diameter chat on the renderer and the inversion per node): the real measuring lines are polluted by other branches' shadows while the table's phantoms are clean -- the cleaning first (the traced neighbours' predicted shadows removed, iteratively, the neighbours' features starting at Allen's diameters and updated by a coarse fit), then option 2 (the node's features by optimisation on the cleaned data, no table), its results judged, option 1 (the table on cleaned lines) only if they are not satisfactory; first on the pilot cell in Colab, with the patch images and the measuring line before and after on several example nodes. **Roadmap diameter-pipeline: NC, NC1-NC4 added** (`0274ce8`), planned, no block yet; the plan `Passive Features/Diameter Re-measurement/docs/TEEG_diameter_cleaning_inference_plan_2026-11-13.md` (`599d865`): steps C0-C7, F1-F5, E and twelve open choices. A toy check behind the entry's Why **[run, sandbox]**. Nothing superseded: the table route S5-S8 stands. Two theory topics proposed, not added. Written after re-reading this log at `10acd5e` (unchanged since the 2026-11-13 (later, 3) row). Next free IDs: D-130, I-006. |
 | 2026-11-13 (later, 5) | Logs **D-130** (user, 14:35; the diameter chat on the cleaning and option 2): the answers to the open questions of D-129's plan -- the waves approved, the choices O1-O7 and O9-O11 settled (the hybrid in the per-node fit; every neighbour's shadow removed wherever it falls; the axon a neighbour; no depth cut-off; the neighbours from the first-stage fit, then refined; 20 example nodes), O8 after the survey, O12 at the judgment; the production table and the inversion (S7-S8) paused. **Roadmap diameter-pipeline: T14 and T15 added, open** (the user: "both add"), I23-I27 under NC1 and NC2 (`4a1d1e1`). SPEC Blocks 23-27 drafted with proposed tolerances (`e414f04`); the plan updated (`9cf01f2`). The orchestrating session runs on Fable 5.2. Written after re-reading this log (unchanged since the 2026-11-13 (later, 4) row). Next free IDs: D-131, I-006. |
 | 2026-11-13 (later, 6) | No new decision ID (the diameter chat). The user agreed to the tolerances of SPEC Blocks 23-27 (14:45); **wave 1's contract committed** (`68dbe60`, `0aa5305` on `sci/diameter-pipeline`: `CleaningConfig`, `InferenceConfig`, the stubs, the smoke-test skeletons; the configuration suite taught the two sections) and four Opus implementers started on Blocks 23, 24, 26, 27. Block 25 (the shadow image) held: the user's question whether a neighbour's shadow is computed with the hybrid puts its shadow model under revision. D-130 annotated. Next free IDs unchanged: D-131, I-006. |
+| 2026-11-13 (later, 7) | Logs **D-131** [orchestrator] (the diameter chat; coding directive 7): contract amendment 1 of wave 1, on the four issues the Block 27 implementer raised -- three conventions and one validation target of the contamination survey changed (the kernel at the segment's nearest point; the classes' precedence; the out-of-focus oracle at zero lateral distance, the evidence reproduced; the soma outside the profile). SPEC at `faa4f6f`. Block 23 returned and passed the gate, not merged yet; Blocks 24 and 26 running; Block 25 held. Next free IDs: D-132, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -313,6 +314,7 @@ would be needed*, *Status*.
 | D-128 | 2026-11-13 | every roadmap's theory topics (`specs/roadmap/<name>.yaml`, the `note` field); the chats that write a document for a topic | a topic's note names every document written for it, by file name, with where it lives [user] | active; applied to diameter-pipeline at `52d7722`, `ca6d900`, `c95ae05` (T4.2, T7, T11) |
 | D-129 | 2026-11-13 | the correction of a real node's diameter (SPEC Blocks 4, 5, 13, 14); the scene and the neighbour-shadow predictor (Block 10.S); `notebooks/phase2_colab.py`; roadmap NC, NC1-NC4; the plan `TEEG_diameter_cleaning_inference_plan_2026-11-13.md` | a real node's measuring line is cleaned of its traced neighbours' predicted shadows, iteratively from Allen's diameters with a coarse fit for the neighbours; then option 2, the node's features by optimisation without a table; option 1, the table on cleaned lines, only if option 2 is not satisfactory; first on the pilot cell in Colab, with before/after patches and lines on example nodes [user] | active; not implemented; roadmap `0274ce8`, plan `599d865` on `sci/diameter-pipeline` |
 | D-130 | 2026-11-13 | SPEC Blocks 23-34; `CleaningConfig`, `InferenceConfig`; the plan's choices O1-O12; roadmap NC, T14, T15, S7, S8 | the choices of the cleaning and of option 2: the waves approved; a round updates diameter, coefficient, lateral offset and depth; the axon a neighbour where traced; no depth cut-off on neighbours; every shadow removed wherever it falls; the neighbours from the first-stage fit, then refined; the hybrid in the per-node fit, on as many planes as necessary; scenes by Eqs. 5-6 on several tubes; 20 example nodes; S7-S8 paused; T14 and T15 added [user] | active; Blocks 23-27 drafted at `e414f04`, not implemented |
+| D-131 | 2026-11-13 | SPEC Block 27 (`analysis/contamination.py`) | contract amendment 1 of wave 1: a segment's nearest point sets both its distance and its blur; `clean` first and attached segments no overlap; the out-of-focus oracle only at zero lateral distance; the soma outside the pollution profile, its distance reported [orchestrator] | active; SPEC amended at `faa4f6f`; the implementer applying it |
 | I-001 | 2026-09-19 | side project: spine-resolved human models from H01; closes D-001's open $R_{\rm neck}$ point and bounds D-001's validity regime | human spine simulations in two tiers — cable (NEURON) $R_{\rm neck}$ census, then electrodiffusion on selected geometries (own solver) | idea, user wants to pursue; not scheduled |
 | I-002 | 2026-10-06 | the kernel family of the renderer and of the calibration (procedure §3.4) | a flexible kernel family with the Gaussian as a special case, its parameters fitted in the calibration | idea, to discuss further [user]; not scheduled [updated 2026-10-16: the fit's kernel is now a flexible family, D-052; the renderer's and the calibration's stay Gaussian] [updated 2026-10-20, later: adopted for the renderer and the calibration by D-066] [updated 2026-10-20, later 2: D-066 withdrawn by D-067; back to an idea, not scheduled] |
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
@@ -10619,3 +10621,42 @@ done with structures that are not traced.
 
 **Status:** active; Blocks 23-27 drafted, not implemented. Roadmap I23-I27, T14, T15 at `4a1d1e1`; the plan at
 `9cf01f2`, on `sci/diameter-pipeline`. [updated 2026-11-13, 14:45: the user agreed to the tolerances of Blocks 23-27 ("Agreed for the tolerances"); the contract of wave 1 committed at `68dbe60` and `0aa5305` for Blocks 23, 24, 26 and 27, one Opus implementer each, started; Block 25 held -- the user asked whether a fitted neighbour's absorbed light and cast shadow are to be computed with the hybrid, so its shadow model is under revision (open)]
+
+## D-131 -- Contract amendment 1 of wave 1, Block 27, the contamination survey: one point of a segment sets its distance and its blur; `clean` first and attached segments no overlap; the out-of-focus oracle at zero lateral distance; the soma outside the pollution profile [orchestrator]
+
+**Date:** 2026-11-13, about 15:15 (Europe/Rome), the diameter chat, settled by the orchestrating session under coding
+directive 7 on the issues the Block 27 implementer raised; the user was not asked and can reverse any point.
+**Binds:** SPEC Block 27 (`analysis/contamination.py`), amended at `faa4f6f` on `sci/diameter-pipeline`.
+
+**Decision [orchestrator].** Four clauses of Block 27's entry are changed; the approach of D-129 and D-130 stands.
+
+**Statement.** (D-131.1, convention) A neighbour segment's predicted dip at a sample of the measuring line takes the
+lateral distance to the segment's nearest point and the kernel at the defocus of that same point's depth, linear along
+the segment. Agreed before: the kernel at the segment's nearer end's defocus. (D-131.2, convention) The classes in
+precedence: `clean` (index below `clean_index_max`), `overlap` (only neighbours that share no node with the node's own
+stretch), `close_in_focus`, `diffuse`. Agreed before: overlap, close_in_focus, diffuse, clean. (D-131.3, validation
+target) The index decreases as an in-focus neighbour moves away laterally, and as a neighbour directly over the line
+moves out of focus. Agreed before: it decreases as any neighbour moves out of focus. (D-131.4, convention) The soma is
+not in the pollution profile of this block; the node's lateral distance to the nearest soma disc's edge is reported
+(`soma_lateral_um`) and feeds the choice of the example nodes nearest the soma.
+
+**Why.** (1) On a steep segment the nearest point and the nearer end in depth are different points, so the old rule
+paired one point's distance with another's blur [the implementer's report; reasoning]. (2) Under the old precedence
+every node within 3 um of a branch point was `overlap`, a segment joined to the stretch meeting its footprint at the
+shared node, and a node with index 0.0067 was `close_in_focus` [the implementer's report]. (3) For a lateral neighbour
+the blur first carries the shadow toward the line's centre, where the weights are largest: at a lateral distance of
+1 um the index is 0.0493 in focus and 0.0832 four planes out; at 0 um it falls from 0.2927 to 0.1147 over five planes
+**[run, sandbox: reproduced by the orchestrator with `calibration_scene.shadow_depths` and the default kernel, a
+neighbour of radius 0.2 um, $B$ = 200 gl, $\mu$ = 1 /um]**. (4) The scene holds no soma depth, so today's predictor
+has no defocus for it.
+
+**What it implies for code and tables.** Block 27 only; no later block reads its code. The implementer adapts its two
+files and repeats both checks.
+
+**What it does not decide [open].** Whether the soma's shadow enters the survey once Block 25 gives it a depth; the
+class thresholds, still PROVISIONAL.
+
+**Sources.** **[run, sandbox]** as above. **[src]** `wip/diameter-pipeline-block-27` at `a1e6d71` (local).
+**[SPEC]** Block 27 at `faa4f6f`.
+
+**Status:** active; the implementer is applying it.
