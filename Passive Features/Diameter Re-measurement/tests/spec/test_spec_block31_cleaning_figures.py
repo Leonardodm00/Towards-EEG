@@ -57,8 +57,14 @@ def test_figure_rounds_and_save(tmp_path):
     hist = [{"max_rel_d": 0.2, "max_line_change_gl": 5.0, "n_refined": 30},
             {"max_rel_d": 0.03, "max_line_change_gl": 1.0, "n_refined": 12},
             {"max_rel_d": 0.004, "max_line_change_gl": 0.2, "n_refined": 3}]
-    fig = CFG_.figure_rounds(hist)
+    from allen_diameter import config as _C   # adapted 2026-11-13: figure_rounds(history, cfg), Block 31 amendment 1 (D-136.4)
+    run = _C.with_overrides(_C.default_config(), {"cleaning.stop_rel_d": 0.05, "cleaning.max_rounds": 7})
+    fig = CFG_.figure_rounds(hist, run)
     ax0 = fig.axes[0]
+    ys = [np.unique(np.asarray(ln.get_ydata(), dtype=float)) for ln in ax0.lines]
+    assert any(y.size == 1 and abs(y[0] - 0.05) < 1e-12 for y in ys), "the run's stop_rel_d (0.05) is not drawn"
+    xs = [np.unique(np.asarray(ln.get_xdata(), dtype=float)) for ln in ax0.lines]
+    assert any(x.size == 1 and abs(x[0] - 7) < 1e-12 for x in xs), "the run's max_rounds (7) is not drawn"
     data = [ln for ax in fig.axes for ln in ax.lines if ln.get_linestyle() == "-"]   # the per-round series
     assert len(data) == 3 and all(len(ln.get_xdata()) == 3 for ln in data)
     p = CFG_.save(fig, str(tmp_path / "sub" / "r.png"), 60)

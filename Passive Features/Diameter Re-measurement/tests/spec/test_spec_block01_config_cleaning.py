@@ -56,10 +56,16 @@ def test_validate_refuses_illegal_cleaning_values(override):
         C.with_overrides(C.default_config(), override)
 
 
-def test_json_round_trip_keeps_cleaning_and_inference():
-    c2 = C.with_overrides(C.default_config(), {"cleaning.shadow_absorption": "partition_vertical",
-                                                "inference.plane_snr_min": 2.0})
-    back = C.config_from_dict(json.loads(c2.to_json()))
-    assert back == c2, "to_json drops the cleaning/inference sections: %r -> %r" % (
-        (c2.cleaning.shadow_absorption, c2.inference.plane_snr_min),
-        (back.cleaning.shadow_absorption, back.inference.plane_snr_min))
+def test_json_is_the_full_signature_without_cleaning_and_inference():
+    """Adapted 2026-11-13 after D-136.5 (final check, F4 kept as designed; at the user's request): to_json is the
+    full signature, and the cleaning and inference sections are outside every signature, so an override of
+    either changes neither the JSON nor a hash. (Was: the JSON round trip keeps the two sections.)"""
+    c0 = C.default_config()
+    c2 = C.with_overrides(c0, {"cleaning.shadow_absorption": "partition_vertical",
+                               "inference.plane_snr_min": 2.0})
+    assert c2.cleaning.shadow_absorption == "partition_vertical" and c2.inference.plane_snr_min == 2.0
+    assert c2.to_json() == c0.to_json()
+    for which in ("estimator", "simulation", "full"):
+        assert c2.signature_hash(which) == c0.signature_hash(which)
+    doc = json.loads(c2.to_json())
+    assert "cleaning" not in doc and "inference" not in doc
