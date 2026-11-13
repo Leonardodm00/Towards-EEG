@@ -29,6 +29,9 @@ Files that are NEW relative to `Biological Fit/` (Stage 0-1):
 | `smoke_noise_fit.py` | its smoke suite F1-F11 at reduced M and R (about 100 s; `python smoke_noise_fit.py F1,F5` runs a subset) |
 | `noise_sweep_fit.py` | Block 9 ("Block 4b"), the per-sweep stage (D-073, D-076 (i), D-116, D-122): each sweep fitted alone with tau_s held at the cell's (`fit_sweep`, SPEC (P1); Block 4's binding function on the layout restricted to the sweep, W_s from Block 4's `per_sweep_cov`), the sampling variance of its log sigma_s by a parametric bootstrap (`bootstrap_v`, (P2): B_v = 50 refits at M = 1000), the DerSimonian-Laird pooling per protocol with the clip (`pool_protocol`, (P3)-(P4), (D-076.1)), the twins' laws theta_tilde(c, s) (`pool_cell`, (P0); a failed sweep's twin at theta_hat(c), D-122.3); `run_sweep` is one (cell, sweep) job, `fit_sweeps` the whole cell; `SweepStageResult.to_dict`, `table_rows`, `cell_columns` |
 | `smoke_noise_sweep_fit.py` | its smoke suite P1-P11 at reduced M and B_v (about 7 min; `python smoke_noise_sweep_fit.py P3,P6` runs a subset; P3's oracle needs statsmodels) |
+| `run_noise_fit.py` | Block 6, the noise-fit run (D-123 to D-126; the only file of the noise fit that reads or writes files): `list` (the cohort: every `specimen_<id>/` of a group with `ss_pulses.npz`), `cell` (Blocks 3, 4 and 9 on one cell, Block 9's sweeps in a pool of `--workers` processes; one JSON per cell, status ok / refused (D-114) / failed, exit 0 whatever the status; skipped when its JSON is ok, of the current code commit and sizes -- D-125.5), `merge` (the cohort's JSONs -> `noise_cells_<GROUP>.csv`, `noise_sweeps_<GROUP>.csv`) |
+| `submit_noise_fit.sh` | its PBS job script: run by hand it submits one array subjob per cell (6 cores each) and the merge after it, never more than 120 cores (D-125.1); `DRY_RUN=1` first; the roadmap marker of stage N6 |
+| `smoke_noise_run.py` | their smoke suite R1-R9 at `--sizes smoke` (about 9 min on 2 cores; `python smoke_noise_run.py R5,R7` runs a subset; git and bash needed, no NEURON, no PBS) |
 | `cluster_gates_noise_fit.sh` | the cluster-side checks of the noise-fit blocks (G0-G12: env, bytes, syntax, every suite, the regression gate on a real cell, the SS archive's sweep structure); one PASS/FAIL/SKIP line each, a VERDICT; writes only its logs |
 | `noise_fit_gates.py` | its read-only helpers: `bytes`, `compile`, `ss-pulses <specimen_dir>...` (what `ss_pulses.npz` holds: sweep numbers, polarity order, adjacency and true onset spacing of the stored windows) |
 | `smoke_noise_fit_gates.py` | their smoke suite T1-T8 (about 15 s; no NEURON) |
@@ -100,6 +103,7 @@ The same checks by hand:
     python smoke_noise_windows.py          # expect "SMOKE noise_windows: 15/15 passed"
     python smoke_noise_fit.py              # expect "SMOKE noise_fit: 11/11 passed" (about 100 s)
     python smoke_noise_sweep_fit.py        # expect "SMOKE noise_sweep_fit: 11/11 passed" (about 7 min)
+    python smoke_noise_run.py              # expect "SMOKE noise_run: 9/9 passed" (about 9 min)
     python smoke_ih_fit.py                 # expect "smoke_ih_fit: 12/12 passed"
     python smoke_ih_recovery.py            # expect "smoke_ih_recovery: 14/14 passed"
     python regression_passive_identity.py --ref-dir "../Biological Fit" \
@@ -111,6 +115,36 @@ Then, before committing walltime to anything (submit FROM this folder):
     qsub -v GROUP=L3_exc,ARM=ih6,DRY_RUN=1 submit_ih_fit.sh
         # checks conda, the nrnivmodl guard, that h.Ih and h.Ih_human load,
         # every resolved path, and the whole CLI contract -- and runs no fit.
+
+## The noise-fit run (Block 6; D-123 to D-126)
+
+The per-cell noise law (Block 4) and the per-sweep laws (Block 9) of every
+cell of a group, as the twins of Stage 7 will need them (D-123). From this
+folder on the login node, after `git pull`, with `prova` active:
+
+    bash cluster_gates_noise_fit.sh        # FULL; expect "VERDICT: SETTLED -- ..."
+    python smoke_noise_run.py              # expect "SMOKE noise_run: 9/9 passed"
+    RUN_TAG=nf1 CELLS=508282493,569844159 DRY_RUN=1 bash submit_noise_fit.sh
+    RUN_TAG=nf1 CELLS=508282493,569844159 WALLTIME=48:00:00 bash submit_noise_fit.sh   # the pilot (D-124)
+    RUN_TAG=nf1 WALLTIME=<from the pilot> bash submit_noise_fit.sh                     # the 18 cells, after the pilot
+
+Outputs: `$IH_OUTPUT_BASE/noise_fit/<RUN_TAG>/<GROUP>/` (default
+`IH_OUTPUT_BASE=$IH_ARCHIVE_ROOT/pipeline_outputs_ih`): `cells/specimen_<id>.json`,
+`noise_cells_<GROUP>.csv`, `noise_sweeps_<GROUP>.csv`, `logs/` (each job's
+output and a copy of the run file). PBS's own `noise_fit.o<id>` and
+`noise_merge.o<id>` stay in `$HOME` (`-k eo`). The run file
+`~/noise_fit_runs/<RUN_TAG>_<GROUP>_<UTC>.env` carries every resolved path
+and the cohort to the jobs, because `qsub -v` cannot carry the paths' spaces.
+
+What a correct run prints: one `NOISE_CELL <id>: status=<ok|refused|failed>
+reason=<...> seconds=<s>` line per cell (in `logs/cell_<id>_<job>.log`), then
+`NOISE_MERGE <GROUP>: <a> ok, <b> refused, <c> failed, <d> missing` and one
+line per cell that is not ok (in `logs/merge_<job>.log`). A refused cell has a
+sweep tilt that cannot be read (D-114); a failed one raised, its traceback in
+its JSON; a missing one has no JSON (its job died: walltime or memory -- read
+its log's progress lines). The 18-cell run with the pilot's `RUN_TAG` skips
+the pilot's cells while the noise-fit code (`noise_*.py`, `run_noise_fit.py`)
+is the same commit; any change to that code re-runs every cell.
 
 ## The three arms (plan section 5)
 
