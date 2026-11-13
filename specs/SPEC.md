@@ -845,7 +845,7 @@ Block 20 is S3d, the collector of the production configuration (the plan of 2026
 ### Blocks 23-27: wave 1 of the cleaning and the per-node inference (roadmap NC; D-129, D-130; the plan `docs/TEEG_diameter_cleaning_inference_plan_2026-11-13.md`)
 
 Drafted 2026-11-13 for a fan-out (one implementer per block). Every tolerance below is the assistant's proposal, put to
-the user on 2026-11-13 (D-130.Q5: "propose"); the entries become the wave's contract when the user agrees. Common
+the user on 2026-11-13 (D-130.Q5: "propose"); the entries become the wave's contract when the user agrees. [2026-11-13, 14:45: the user agreed to the tolerances. Contract commit of wave 1 for Blocks 23, 24, 26 and 27; Block 25 is held: the user asked whether a fitted neighbour's absorbed light and shadow are to be computed with the hybrid, so its shadow model is under revision.] Common
 conventions: the image frame of section 2.1 (x, y in um = full-resolution pixel coordinate x $p_{\rm x}$, pixel
 centres at integer pixel coordinates; z in stage um, plane $k$ at $z_k = k\,\Delta z$); float64; no file access and no
 plotting in `model/` and `analysis/`; parameters only through `config.py` (`CleaningConfig`, `InferenceConfig`, written

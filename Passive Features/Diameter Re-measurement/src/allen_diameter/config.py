@@ -374,6 +374,35 @@ class SurveyConfig:
 
 
 @dataclass(frozen=True)
+class CleaningConfig:
+    """Cleaning of a node's patch from its traced neighbours' predicted shadows (SPEC Blocks 23-25, 27-29, 32; D-129, D-130)."""
+
+    neighbour_swc_types: Tuple[int, ...] = (2, 3, 4)  # source: D-130.O4 [user]: dendrites, and the axon where it is traced
+    patch_half_um: float = 10.0            # source: D-130.O5 [user: "the patch is ok"]: the +-10 um square about the node
+    shadow_floor_gl: float = 0.3           # source: D-130.O5 (the assistant's reading, PROVISIONAL): a neighbour counts when its predicted shadow exceeds this somewhere in the patch; the value of calibration.isolation_depth_gl
+    shadow_fine_factor: int = 8            # source: PROVISIONAL (Block 25): samples per pixel side of the shadow image's fine grid
+    shadow_reach_sigmas: float = 6.0       # source: PROVISIONAL (Block 25): a segment farther than this many kernel SDs from the patch contributes 0
+    shadow_depth_bin_um: float = 0.07      # source: PROVISIONAL (Block 25): depth bins of a tilted segment's footprint, a quarter of the plane spacing
+    soma_mu_per_um: float = 0.3            # source: PROVISIONAL (Block 25): the soma sphere's coefficient until it is fitted
+    soma_z_um: float = 0.0                 # source: PROVISIONAL (Block 25): the soma sphere's depth; set by the script from the soma node's traced z
+    close_lateral_um: float = 2.0          # source: PROVISIONAL (Block 27): class close_in_focus, lateral distance from the line's centre
+    close_defocus_um: float = 0.84         # source: PROVISIONAL (Block 27): class close_in_focus, defocus from the node's plane (the near table's last knot)
+    clean_index_max: float = 0.02          # source: PROVISIONAL (Block 27): contamination index below which a node is clean
+    example_counts: Tuple[int, ...] = (4, 6, 6, 2, 2)  # source: D-130.O7 [user: 20 nodes]; the split (clean, diffuse, close_in_focus, overlap, nearest the soma) is the assistant's
+    max_rounds: int = 5                    # source: D-130.O6 [user]
+    stop_rel_d: float = 0.01               # source: D-130.O6 [user]: every diameter changes by less than 1 %
+
+
+@dataclass(frozen=True)
+class InferenceConfig:
+    """Per-node inference by fitting the node's own forward model (SPEC Blocks 26, 30, 33; D-129.1, D-130)."""
+
+    absorption: str = "hybrid"             # source: D-130.O10 [user]: the hybrid in the line renderer and the per-node fit; RendererConfig.absorption is not switched by this
+    line_fine_factor: int = 8              # source: PROVISIONAL (Block 26): samples per pixel side where the line renderer integrates a pixel
+    line_reach_sigmas: float = 6.0         # source: PROVISIONAL (Block 26): slabs farther than this many kernel SDs from a needed pixel contribute 0
+
+
+@dataclass(frozen=True)
 class DiameterConfig:
     """The whole configuration. Build with ``DiameterConfig()`` for the
     deliverable defaults, or ``dataclasses.replace`` for a labelled variant."""
@@ -385,6 +414,8 @@ class DiameterConfig:
     phantom: PhantomConfig = field(default_factory=PhantomConfig)
     calibration: CalibrationConfig = field(default_factory=CalibrationConfig)
     survey: SurveyConfig = field(default_factory=SurveyConfig)
+    cleaning: CleaningConfig = field(default_factory=CleaningConfig)  # source: D-129, D-130 (sub-config; outside every signature)
+    inference: InferenceConfig = field(default_factory=InferenceConfig)  # source: D-129, D-130 (sub-config; outside every signature)
 
     # ------------------------------------------------------------ checks --
     def validate(self) -> None:
