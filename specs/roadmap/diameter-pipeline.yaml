@@ -642,3 +642,39 @@ implementation:
     needs_theory: []
     needs_hpc: false
     jobs: []
+  - id: I28
+    title: "Cleaning operator and the two tiers"
+    summary: "The predicted tier-1 shadows added back to the observed patch; which neighbours are subtracted and which stay inside the node's fit."
+    block: 28
+    parent: NC1
+    depends_on: [I23, I24]
+    needs_theory: [T14]
+    needs_hpc: false
+    jobs: []
+  - id: I29
+    title: "Coarse refinement of a node's features"
+    summary: "From the first-stage fit, a node's diameter, coefficient, lateral shift and depth refined so that the shadow model explains its observed line."
+    block: 29
+    parent: NC1
+    depends_on: []
+    needs_theory: [T14]
+    needs_hpc: false
+    jobs: []
+  - id: I30
+    title: "Per-node fit of the forward model"
+    summary: "Bounded least squares of the rendered node, or of the joint scene with its close neighbours, to the cleaned profiles of the planes that carry its shadow; estimates, covariance, residual per plane."
+    block: 30
+    parent: NC2
+    depends_on: []
+    needs_theory: [T15]
+    needs_hpc: false
+    jobs: []
+  - id: I31
+    title: "Cleaning figures"
+    summary: "Per example node: the patch before, the predicted shadow and the patch after, plane by plane, with the measuring line's profiles before and after; the change per round."
+    block: 31
+    parent: NC1
+    depends_on: []
+    needs_theory: []
+    needs_hpc: false
+    jobs: []

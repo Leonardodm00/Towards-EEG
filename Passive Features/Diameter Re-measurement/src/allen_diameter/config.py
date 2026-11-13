@@ -390,6 +390,16 @@ class CleaningConfig:
     clean_index_max: float = 0.02          # source: PROVISIONAL (Block 27): contamination index below which a node is clean
     example_counts: Tuple[int, ...] = (4, 6, 6, 2, 2)  # source: D-130.O7 [user: 20 nodes]; the split (clean, diffuse, close_in_focus, overlap, nearest the soma) is the assistant's
     max_rounds: int = 5                    # source: D-130.O6 [user]
+    shadow_absorption: str = "hybrid"      # source: D-132.1 [user]: the absorbed light per column of the tier-1 shadow model; "partition_vertical" the labelled alternative
+    shadow_ray_n_rho: int = 8              # source: PROVISIONAL (Block 25): the hybrid's directions in the shadow model (Block 21 measured 1.5e-2 pointwise at 8 x 16)
+    shadow_ray_n_psi: int = 16             # source: PROVISIONAL (Block 25): as shadow_ray_n_rho
+    tier_reach_um: float = 3.0             # source: PROVISIONAL (Block 28): an unattached neighbour overlapping the own stretch within this distance of the node is tier 2 (D-132.2)
+    over_background_gl: float = 3.0        # source: PROVISIONAL (Block 28): a cleaned pixel above the background by more than this is counted (the configured noise SD)
+    refine_d_bounds_um: Tuple[float, float] = (0.1, 6.0)        # source: PROVISIONAL (Block 29)
+    refine_mu_bounds_per_um: Tuple[float, float] = (0.01, 10.0)  # source: PROVISIONAL (Block 29)
+    refine_shift_bounds_um: Tuple[float, float] = (-1.0, 1.0)    # source: PROVISIONAL (Block 29): lateral shift along the measuring axis
+    refine_dz_bounds_um: Tuple[float, float] = (-1.0, 1.0)       # source: PROVISIONAL (Block 29): depth shift
+    refine_max_nfev: int = 200             # source: PROVISIONAL (Block 29)
     stop_rel_d: float = 0.01               # source: D-130.O6 [user]: every diameter changes by less than 1 %
 
 
@@ -400,6 +410,13 @@ class InferenceConfig:
     absorption: str = "hybrid"             # source: D-130.O10 [user]: the hybrid in the line renderer and the per-node fit; RendererConfig.absorption is not switched by this
     line_fine_factor: int = 8              # source: PROVISIONAL (Block 26): samples per pixel side where the line renderer integrates a pixel
     line_reach_sigmas: float = 6.0         # source: PROVISIONAL (Block 26): slabs farther than this many kernel SDs from a needed pixel contribute 0
+    d_bounds_um: Tuple[float, float] = (0.1, 6.0)         # source: PROVISIONAL (Block 30)
+    mu_bounds_per_um: Tuple[float, float] = (0.01, 10.0)  # source: PROVISIONAL (Block 30)
+    v0_bounds_um: Tuple[float, float] = (-1.0, 1.0)       # source: PROVISIONAL (Block 30)
+    z_bounds_um: Tuple[float, float] = (-1.0, 1.0)        # source: PROVISIONAL (Block 30): the axis depth about the start
+    multistart_factors: Tuple[float, ...] = (0.6, 1.0, 1.6)  # source: PROVISIONAL (Block 30): starts d0 x these
+    plane_snr_min: float = 1.0             # source: D-130.O9 [user: as many planes as necessary]; the rule and the value are the assistant's, PROVISIONAL
+    max_nfev: int = 200                    # source: PROVISIONAL (Block 30)
 
 
 @dataclass(frozen=True)

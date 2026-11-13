@@ -380,6 +380,7 @@ degrees in config and CSV column names ending `_deg`.
   - D-113 (2026-10-29): "I confirm the union and the F3 without change" [user] -- 10.S's own cylinder is the union of the trace's own rows and their copy on the pilot's fitted centre (the tester's F2, fixed at `39ae156`, confirmed); the pilot's tilt error on thin nodes (F3) is accepted against the flatness bounds, no change.
   - D-129 (2026-11-13): a real node's measuring line is cleaned of its traced neighbours' predicted shadows, iteratively from Allen's diameters; then the node's features by optimisation without a table (option 2); the table on cleaned lines (option 1) only if option 2 is not satisfactory; first on the pilot cell 529878215 [user]. Blocks 23 on.
   - D-130 (2026-11-13): a round updates a neighbour's diameter, coefficient, lateral offset and depth; neighbours are every traced segment outside the node's stretch, the axon included where traced, and the soma, at whatever depth their shadow reaches the node's planes; a shadow is removed wherever it falls, also directly above or below the node; the neighbours start from the first-stage fit and are refined to explain their observed shadow; the per-node fit's absorption is the hybrid, its planes as many as carry the node's shadow; the checks' scenes apply Eqs. 5-6 to several tubes at once; the rounds stop below 1 % in every diameter and the noise SD on the example lines, or after 5; 20 example nodes; `crossing` is evaluated on the cleaned line [user]. Blocks 23 on.
+  - D-132 (2026-11-13): the cleaning in two tiers -- distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light per column is the hybrid's; neighbours close and in focus, or overlapping the node in projection, kept inside the node's fit and rendered jointly with the hybrid [user]. Blocks 25, 28, 30.
   - ID note (2026-10-18): this spec cited the gradient-energy focus rule as "D-030" before this date; in the decision log that rule is **D-035**, and the log's D-030 is "every real node gets its own estimate whatever its optical depth" (the dark flag a label only). Text written from 2026-10-18 on cites the log's IDs.
   - ID note (2026-11-02): the decisions this spec cited as "D-115" (D-115.2 to D-115.6, 2026-10-30) are the log's **D-117** (D-117.2 to D-117.6): the diameter chat logged them as D-115 on this branch only, while project knowledge already held the noise-fit chat's D-115 and D-116 (2026-10-30, 14:24); renamed here on 2026-11-02. Commits of 2026-10-30 to 2026-11-02 and the folder `checks/d115_2026-10-30/` keep "D-115".
 
@@ -925,6 +926,79 @@ directly above or below the node (D-130.O1); such a node keeps the label `overla
 - Test oracles: an isolated branch has $P_i = 0$, $C_i = 0$, class `clean` [exact]; one flat neighbour at lateral distance $\rho$: $P_i(v_n)$ equals `shadow_depths` at $|\rho - v_n|$ [1e-12]; $C_i$ decreases as an in-focus neighbour moves away laterally (monotone over 5 steps) and as a neighbour directly over the line ($\rho$ = 0) moves out of focus (monotone over 5 planes) [amendment 1, D-131 [orchestrator]: was "as it moves out of focus" for any neighbour; for a lateral neighbour the blur first carries its shadow toward the line's centre -- at $\rho$ = 1 um the index rises from 0.049 in focus to 0.083 four planes out, reproduced by the orchestrator]; the four classes on four constructed scenes; `per_neighbour` sums to `P` [1e-12]; `pick_examples` deterministic under a seed, never returns a node twice, reports a short class; ValueError for $B \le 0$, $\mu \le 0$, an index outside the branch
 - Data flow: consumes Blocks 5, 10.S, 13 (`Scene`); feeds the choice of the example nodes (D-130.O7) and D-130.O8; no later block reads its code
 - Confirmed: D-129.4, D-130.O7 (the user: 20 example nodes); the index, the classes, their thresholds and the split of the 20 are the assistant's, PROVISIONAL
+- Status: drafted
+
+### Blocks 28-31: wave 2 of the cleaning and the per-node inference (D-129, D-130, D-132)
+
+Drafted 2026-11-13, 15:45, at the user's word "Start also the second wave"; started together with Block 25 (amended
+below) and the restart of Block 26. The tolerances are the assistant's proposals, reported to the user with the wave's
+start; the user can change any of them (an amendment). So that the wave's blocks can be checked before Blocks 25 and
+26 exist, every block that needs a renderer takes it as a callable argument; the scripts wire the real ones.
+
+Block 25, amendment 2 (D-132.1; replaces the absorbed fraction of its Model line, the rest of the entry stands):
+$A_q(x, y)$ is the column total of the absorbed light of segment $q$'s capped cylinder rendered alone under
+`CleaningConfig.shadow_absorption`: `"hybrid"` (default) -- $A_q = \sum_j \Delta A^{\rm hyb}_j$ of section 2.3 (H),
+Block 21's `slab_absorbed` summed over the slabs of thickness `dzeta_um`, with the directions
+`ray_world.directions(cleaning.shadow_ray_n_rho, cleaning.shadow_ray_n_psi, ray_na, ray_n_oil)`;
+`"partition_vertical"` -- $A_q = 1 - \exp(-\bar\mu_q \ell_q)$ as drafted. The blur stays one kernel per column. Added
+API: `shadow_image(..., include=None)` (`include`: bool over the neighbours in `neighbour_indices`' order, False = left
+out, the tier-2 neighbours of D-132.2); `shadow.stretch_profiles(fscene, stretch_ids, ks, origin_xy, y_hat, e_u, v,
+n_avg, step, cfg) -> (n_planes, n_v)`: the same model's shadow of the segments whose two ends are in `stretch_ids`,
+read as `profiles.sample_profile` reads a plane of pixel means. Added oracles: `"hybrid"` $A_q$ equals the column sum of
+`render.absorbed_fractions(tube, mu, grid, zeta, dzeta, light, "hybrid", directions)` on the same grid [1e-10]; at
+$\bar\mu_q \bar d_q$ = 1e-3, $A_q / (1.4470\,\bar\mu_q \ell_q)$ within 5e-3 of 1; the two bounds against Block 4 hold
+with Block 4 rendered under the same absorption; `stretch_profiles` equals `sample_profile` on `shadow_image`'s planes
+for the same segments [1e-10]; the time per segment reported for both absorptions.
+
+### Block 28: the cleaning operator and the two tiers (plan step C3; D-130.O1, D-132)
+
+- Module: `src/allen_diameter/analysis/cleaning.py`; smoke test `tests/smoke/test_smoke_cleaning.py`
+- Mathematics: for each plane $k$ and pixel $(x, y)$ of node $i$'s patch, $I^{\rm clean}_{i,k}(x, y) = I_{i,k}(x, y) + B_{i,k}(x, y)\,S_{i,k}(x, y)$, $I$ the observed block (gl), $B$ the background (gl), $S$ the summed shadow of the tier-1 neighbours (dimensionless, Block 25). No clipping; float64 out. Tiers (D-132): neighbour $q$ of node $i$ is tier 2 when its nearest point (in projection) to the node's position lies within `close_lateral_um` laterally and `close_defocus_um` in depth of it, or when its footprint (the segment at its larger end radius) meets the own stretch's footprint in projection within `tier_reach_um` of the node and it shares no node with the own stretch; tier 1 otherwise. Soma discs are tier 1
+- Public API: `cleaning.clean_block(block, S, B_gl) -> CleanResult` (`block` (n_planes, H, W) any real dtype; `S` same shape; `B_gl` scalar, (n_planes,) or (n_planes, H, W); `CleanResult.block` float64 (n_planes, H, W) gl, `added_gl` (n_planes,) the mean grey level added per plane, `over_background` (n_planes,) the share of pixels whose cleaned value exceeds $B$ by more than `over_background_gl`); `cleaning.neighbour_tiers(fscene, own_ids, node_xyz, cfg) -> tiers (n_q + n_s,) int in {1, 2}` (the neighbours in `shadow.neighbour_indices`' order: every segment with at least one end outside `own_ids`, then the soma discs; computed here from `fscene`, without importing Block 25)
+- Parameters: `CleaningConfig.close_lateral_um`, `close_defocus_um`, `tier_reach_um` (3.0), `over_background_gl` (3.0)
+- Library calls relied on: numpy; `background.segment_distance`
+- Custom code: none numerical
+- Test oracles: $S = 0$ returns the block as float64 [exact]; exact inverse under the renderer's own rule: with Block 24 (`partition_vertical`, then `linear`), a node tube and a neighbour tube whose projections do not overlap, $B\,\tau^{\rm scene}_k$ cleaned with $S$ = the neighbour's deficit rendered alone equals $B\,\tau^{\rm node}_k$ [1e-9 gl at $B$ = 210]; under `hybrid` the same residual is at most $B \max (1 - \tau^{(1)})(1 - \tau^{(2)})$ [bound]; `added_gl` equals the mean of $B\,S$ [1e-12]; broadcasting of the three forms of `B_gl` agrees [exact]; tiers on four constructed scenes (far lateral: 1; far in depth: 1; close and in focus: 2; directly above, unattached: 2; attached at a branch point and not close: 1); ValueError for unequal shapes, a non-finite or negative $S$, $B \le 0$
+- Data flow: consumes Block 23 (`FeaturedScene`), Block 25's output by contract ($S$); feeds Blocks 31, 32, 33
+- Confirmed: D-130.O1, D-132 (the user); `tier_reach_um`, the tier rule's geometry and `over_background_gl` are the assistant's, PROVISIONAL
+- Status: drafted
+
+### Block 29: the coarse refinement of a node's features (plan step C4; D-130.O2, D-130.O3)
+
+- Module: `src/allen_diameter/analysis/coarse_fit.py`; smoke test `tests/smoke/test_smoke_coarse_fit.py`
+- Mathematics: for a node with observed profiles $I_k(v_n)$ (gl) in its planes $k \in K$, backgrounds $B_k$ (gl) and a shadow model `predict`$(d, \mu, v_0, \Delta z) \to s_k(v_n)$ (dimensionless; in the pipeline Block 25's `stretch_profiles` with the node's features set to $(d, \mu)$, moved by $v_0$ along the measuring axis and $\Delta z$ in depth): $(\hat d, \hat\mu, \hat v_0, \widehat{\Delta z}) = \arg\min \sum_{k \in K}\sum_n w_n\,[I_k(v_n) - B_k (1 - s_k(v_n))]^2$ within the bounds, $w_n = \exp(-|v_n| / \lambda)$, $\lambda$ = `sgt_lambda_um`; started at the first-stage fit's values (D-130.O2)
+- Public API: `coarse_fit.refine_node(profiles_gl, B_gl, v, predict, theta0, cfg) -> dict` (`profiles_gl` (n_planes, n_v); `B_gl` (n_planes,); `v` (n_v,) um; `theta0` = $(d, \mu, v_0, \Delta z)$; returns `d_um`, `mu_per_um`, `v0_um`, `dz_um`, `cost`, `rms_gl`, `status` in ("converged", "at_bound", "failed"), `at_bound` tuple of names, `nfev`); `coarse_fit.offset_xyz(v0_um, dz_um, y_hat) -> (3,)` (the image-frame offset $(v_0 \hat y_x, v_0 \hat y_y, \Delta z)$ a features row takes)
+- Parameters: `CleaningConfig.refine_d_bounds_um`, `refine_mu_bounds_per_um`, `refine_shift_bounds_um`, `refine_dz_bounds_um`, `refine_max_nfev`; `MeasureConfig.sgt_lambda_um`
+- Library calls relied on: `scipy.optimize.least_squares` (trf, bounds)
+- Custom code: none (a wrapper of the library solver)
+- Test oracles, with a closed-form `predict` built in the test from `calibration_scene.shadow_depths` (a flat tube at lateral shift $v_0$, kernel at $|z_k - \Delta z|$): noise-free recovery of the four parameters from a start 30 % off [relative 1e-6, absolute 1e-6 um on the shifts]; with seeded Gaussian noise of SD 3 gl at $B$ = 210, over 100 draws the mean $\hat d$ within 3 standard errors of the truth; a truth outside the bounds ends `at_bound` with the name; a `predict` returning NaN ends `failed` without raising; the inputs are not changed; determinism; ValueError for shapes that disagree, $B \le 0$, a start outside the bounds
+- Data flow: consumes Block 25's `stretch_profiles` by contract (as `predict`); feeds Block 32
+- Confirmed: D-130.O2, D-130.O3 (the user); the objective, the weights and the bounds are the assistant's, PROVISIONAL
+- Status: drafted
+
+### Block 30: the per-node fit (plan step F2, and F3 through the same function; D-129.1, D-130.O9, D-132.2)
+
+- Module: `src/allen_diameter/analysis/node_inference.py`; smoke test `tests/smoke/test_smoke_node_inference.py`
+- Mathematics: observed profiles $I_k(v_n)$ (gl) of the planes $k \in K$, backgrounds $B_k$ (gl), noise SD $\sigma$ (gl), and a forward model `forward`$(d, \mu, v_0, z_{\rm ax}) \to \tau_k(v_n)$ (dimensionless; in the pipeline Block 26's `line_profiles` for a lone node, or a joint hybrid scene with the tier-2 neighbours held at their features, D-132.2): $\hat\theta = \arg\min_\theta \sum_{k \in K}\sum_n [I_k(v_n) - B_k \tau_k(v_n; \theta)]^2 / \sigma^2$ over $\theta = (d, \mu, v_0, z_{\rm ax})$ within the bounds, from the starts $d_0 \times$ `multistart_factors`, the lowest cost kept; $\widehat{\rm Cov}(\hat\theta) = (J^\top J)^{-1}$ with $J$ the Jacobian of the residuals already divided by $\sigma$, at $\hat\theta$; per plane $\chi^2_k / N$ = the mean squared residual over $\sigma^2$. Planes (D-130.O9, the rule the assistant's, PROVISIONAL): `select_planes` keeps plane $k$ when $B_k \max_n (1 - \tau_k(v_n; \theta_0)) \ge$ `plane_snr_min` $\times\ \sigma$
+- Public API: `node_inference.select_planes(tau0, B_gl, sigma_gl, cfg) -> keep (n_planes,) bool`; `node_inference.fit_node(profiles_gl, B_gl, sigma_gl, forward, theta0, cfg, planes=None) -> NodeFit` (frozen dataclass: `theta` (4,) = $(d, \mu, v_0, z_{\rm ax})$ in um, 1/um, um, um; `cov` (4, 4), NaN where a parameter is at a bound or $J^\top J$ is singular; `se` (4,); `cost`; `chi2_per_plane` (n_planes,), NaN for planes not used; `planes` (n_planes,) bool; `status` in ("converged", "at_bound", "failed"); `at_bound` tuple; `n_starts`, `nfev`)
+- Parameters: `InferenceConfig.d_bounds_um`, `mu_bounds_per_um`, `v0_bounds_um`, `z_bounds_um`, `multistart_factors`, `plane_snr_min`, `max_nfev`
+- Library calls relied on: `scipy.optimize.least_squares` (trf, bounds), `numpy.linalg`
+- Custom code: none (the covariance is the standard Gauss-Newton one)
+- Test oracles, with a `forward` built in the test from Block 3's `tube_model.model_profile` (one Gaussian whose width grows with $|z_k - z_{\rm ax}|$): noise-free recovery from a start 30 % off in $d$ and $\mu$ [relative 1e-6; 1e-6 um on $v_0$, $z_{\rm ax}$]; on 300 seeded noisy data sets (SD 3 gl, $B$ = 210, $d$ = 1 um) the interval $\hat d \pm$ `se` covers the truth in 60 to 76 % of them (nominal 68 %) and the mean $\hat d$ is within 3 standard errors of the truth; $\chi^2_k / N$ averages 1 within 10 % over those sets; `select_planes` against the rule written by hand; a truth beyond a bound ends `at_bound`; a `forward` returning NaN ends `failed`; `planes` all False raises ValueError; determinism; the inputs unchanged
+- Data flow: consumes Block 26 (and Block 24 for a joint scene) by contract, as `forward`; feeds Blocks 33, 34
+- Confirmed: D-129.1, D-130.O9, D-132.2 (the user); the plane rule, the bounds, the starts and the coverage band are the assistant's, PROVISIONAL
+- Status: drafted
+
+### Block 31: the cleaning figures (plan step C6; D-129.4)
+
+- Module: `src/allen_diameter/plotting/cleaning_figures.py`; smoke test `tests/smoke/test_smoke_cleaning_figures.py`
+- Public API: `cleaning_figures.figure_node(block, shadow, cleaned, ks, frame, line_xy, v, profiles_before, profiles_after, meta, planes=None) -> matplotlib.figure.Figure` (per chosen plane a row of three images on one grey scale -- the patch before, $B\,S$ the predicted shadow, the patch after -- with the measuring line drawn, and one panel of the line's profiles before and after per plane; `meta`: node id, class, round, features, for the title); `cleaning_figures.figure_rounds(history) -> Figure` (`history`: list of dicts per round with `max_rel_d`, `max_line_change_gl`, `n_refined`; the stop rule's two thresholds drawn); `cleaning_figures.save(fig, path, dpi) -> path`
+- Parameters: none scientific; `CleaningConfig.max_rounds`, `stop_rel_d` only to draw the thresholds
+- Library calls relied on: matplotlib (Agg backend in tests)
+- Custom code: none
+- Test oracles: on synthetic arrays (a Block 24 scene of a node and a neighbour, its shadow, the cleaned block) `figure_node` returns a Figure with 3 image axes and 1 profile axis per plane shown; the three images of a row share `vmin`/`vmax`; the input arrays are unchanged (computes nothing scientific); `figure_rounds` draws one point per round; `save` writes a non-empty PNG; ValueError for shapes that disagree, an empty `planes`
+- Data flow: consumes the arrays of Blocks 25, 28 and 32 by contract; feeds notebook Cell 16
+- Confirmed: D-129.4 (the user: the patch images and the measuring line before and after); the layout is the assistant's
 - Status: drafted
 
 ## 6. Pipeline entry points
