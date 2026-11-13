@@ -230,6 +230,24 @@ theory:
     closed_on:
     decision:
     note: "To study (the user, 2026-11-11, 17:02, diameter calibration chat: 'update the roadmap that I have to study this theory'): the study document TEEG_study_kernel_calibration_2026-11-11.md sent in that chat, written from the answer to the 15:37 question 'refresh me how the defocusing kernel is calibrated'. The far fit itself is T6 (closed 2026-10-26); the bootstrap behind the anchor's and the slope's SEs is T11."
+  - id: T14
+    title: "Superposition of several absorbers' shadows and the iterative cleaning"
+    summary: "When the shadows of several branches add on a node's measuring line and when they do not (one branch in the light path of another; the partition and the hybrid for several tubes), what removing a predicted shadow leaves behind, and why updating the neighbours round by round converges (a fixed-point iteration) and when it does not."
+    refs: [D-129, D-130, "SPEC 2.3", "SPEC 24-25"]
+    parent: TG1
+    depends_on: []
+    status: open
+    closed_on:
+    decision:
+  - id: T15
+    title: "Per-node inference by fitting the forward model"
+    summary: "What a fit of the rendered node to the cleaned profiles of several planes can identify -- the diameter against the absorption coefficient, the depth, an error in the kernel -- the uncertainty of its estimate, and how it is tested on a generator that is not its own model (the inverse-crime problem)."
+    refs: [D-129, D-130, "SPEC 26"]
+    parent: TG3
+    depends_on: []
+    status: open
+    closed_on:
+    decision:
 implementation:
   # ---- groups (no block of their own; coloured by their least advanced member)
   - id: G1
@@ -577,3 +595,48 @@ implementation:
     depends_on: [NC3, G4]
     needs_theory: []
     needs_hpc: false
+  - id: I23
+    title: "Features table"
+    summary: "Per traced node and per round: diameter, absorption coefficient, lateral and depth offsets, their source; the scene rebuilt from them; CSV round trip."
+    block: 23
+    parent: NC1
+    depends_on: []
+    needs_theory: [T14]
+    needs_hpc: false
+    jobs: []
+  - id: I24
+    title: "Scene renderer: several tubes in one stack"
+    summary: "The renderer's equations applied to several tubes at once, in the three absorption modes; the generator the checks of the cleaning and the inference build their scenes with."
+    block: 24
+    parent: NC1
+    depends_on: [I4, I21]
+    needs_theory: [T14]
+    needs_hpc: false
+    jobs: []
+  - id: I25
+    title: "Shadow image of a node's neighbours"
+    summary: "Each neighbour segment's predicted shadow on the node's patch, plane by plane, from its features and the calibrated kernel; which neighbours reach the patch; where they overlap the node in projection."
+    block: 25
+    parent: NC1
+    depends_on: [I23, I4]
+    needs_theory: [T14]
+    needs_hpc: false
+    jobs: []
+  - id: I26
+    title: "Line renderer: the forward model on the measuring line"
+    summary: "The rendered node read only where the measuring line reads it, in several planes, with the hybrid absorption; fast enough to sit inside the per-node fit."
+    block: 26
+    parent: NC2
+    depends_on: [I4, I21, I5]
+    needs_theory: [T15]
+    needs_hpc: false
+    jobs: []
+  - id: I27
+    title: "Contamination survey"
+    summary: "For every node: the neighbours' predicted shadow on its measuring line against its own dip, a class (clean, diffuse, close and in focus, overlapping), and the choice of the 20 example nodes."
+    block: 27
+    parent: NC1
+    depends_on: [I10, I13]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
