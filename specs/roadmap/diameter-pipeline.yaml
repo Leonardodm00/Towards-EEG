@@ -616,11 +616,11 @@ implementation:
     needs_hpc: false
     jobs: []
   - id: I25
-    title: "Shadow image of a node's neighbours"
-    summary: "Each neighbour segment's predicted shadow on the node's patch, plane by plane, from its features and the calibrated kernel; which neighbours reach the patch; where they overlap the node in projection."
+    title: "Shadow image of a node's neighbours (tier 1)"
+    summary: "Each tier-1 neighbour's predicted shadow on the node's patch, plane by plane: the hybrid's absorbed light per column, one blur per column (D-132); which neighbours reach the patch, where they overlap the node in projection; also read on a stretch's own measuring line for the coarse refinement."
     block: 25
     parent: NC1
-    depends_on: [I23, I4]
+    depends_on: [I23, I4, I21]
     needs_theory: [T14]
     needs_hpc: false
     jobs: []

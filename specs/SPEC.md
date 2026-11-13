@@ -381,6 +381,7 @@ degrees in config and CSV column names ending `_deg`.
   - D-129 (2026-11-13): a real node's measuring line is cleaned of its traced neighbours' predicted shadows, iteratively from Allen's diameters; then the node's features by optimisation without a table (option 2); the table on cleaned lines (option 1) only if option 2 is not satisfactory; first on the pilot cell 529878215 [user]. Blocks 23 on.
   - D-130 (2026-11-13): a round updates a neighbour's diameter, coefficient, lateral offset and depth; neighbours are every traced segment outside the node's stretch, the axon included where traced, and the soma, at whatever depth their shadow reaches the node's planes; a shadow is removed wherever it falls, also directly above or below the node; the neighbours start from the first-stage fit and are refined to explain their observed shadow; the per-node fit's absorption is the hybrid, its planes as many as carry the node's shadow; the checks' scenes apply Eqs. 5-6 to several tubes at once; the rounds stop below 1 % in every diameter and the noise SD on the example lines, or after 5; 20 example nodes; `crossing` is evaluated on the cleaned line [user]. Blocks 23 on.
   - D-132 (2026-11-13): the cleaning in two tiers -- distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light per column is the hybrid's; neighbours close and in focus, or overlapping the node in projection, kept inside the node's fit and rendered jointly with the hybrid [user]. Blocks 25, 28, 30.
+  - D-134 (2026-11-13): a tier-1 neighbour's shadow is blurred slab by slab (equations 5-6 for the neighbour alone), not with one kernel per column; supersedes that clause of D-132.1 [user]. Block 25.
   - ID note (2026-10-18): this spec cited the gradient-energy focus rule as "D-030" before this date; in the decision log that rule is **D-035**, and the log's D-030 is "every real node gets its own estimate whatever its optical depth" (the dark flag a label only). Text written from 2026-10-18 on cites the log's IDs.
   - ID note (2026-11-02): the decisions this spec cited as "D-115" (D-115.2 to D-115.6, 2026-10-30) are the log's **D-117** (D-117.2 to D-117.6): the diameter chat logged them as D-115 on this branch only, while project knowledge already held the noise-fit chat's D-115 and D-116 (2026-10-30, 14:24); renamed here on 2026-11-02. Commits of 2026-10-30 to 2026-11-02 and the folder `checks/d115_2026-10-30/` keep "D-115".
 
@@ -949,6 +950,45 @@ read as `profiles.sample_profile` reads a plane of pixel means. Added oracles: `
 $\bar\mu_q \bar d_q$ = 1e-3, $A_q / (1.4470\,\bar\mu_q \ell_q)$ within 5e-3 of 1; the two bounds against Block 4 hold
 with Block 4 rendered under the same absorption; `stretch_profiles` equals `sample_profile` on `shadow_image`'s planes
 for the same segments [1e-10]; the time per segment reported for both absorptions.
+
+Block 25, amendment 3 (2026-11-13, 17:10; D-134 [user]: one blur per slab; D-135 [orchestrator] for the rest; replaces
+the blur of the entry's Model line, its "Custom code" line and the oracles named here; where it differs from the entry or
+from amendment 2 it wins). Evidence: one kernel per column misses Block 4 by up to 0.225 of the plane's peak out of focus
+and 0.382 in focus for $d$ = 0.6 to 1.0 um (the implementer's table, `13d4b4d`), reproduced by the orchestrator on a flat
+tube in one dimension (0.113 to 0.137 at 1.0 um, 0.029 to 0.042 at 0.6 um, 0.004 to 0.019 at 0.3 um). Model: the shadow
+of segment $q$ in plane $k$ is equations (5-6) of section 2.3 for its capped cylinder rendered alone,
+$s_{q,k}(x, y) = \sum_j \big(\Delta A_{q,j} * G_{\sigma_{\rm r}(\zeta_j - z_k)}\big)(x, y)$, with $\Delta A_{q,j}(x, y)$
+(dimensionless) the light absorbed in slab $j$ (centre $\zeta_j$, thickness `dzeta_um`, the lattice of
+`render.slab_grid`) under `CleaningConfig.shadow_absorption` -- `"hybrid"`: Block 21's `slab_absorbed` with the
+directions of amendment 2; `"partition_vertical"`: Block 4's -- and $G_\sigma$ the unit-volume Gaussian of SD $\sigma$;
+$S_{i,k} = \sum_{q} s_{q,k}$ over the kept, included neighbours, averaged over each pixel. The column total
+$A_q = \sum_j \Delta A_{q,j}$ is unchanged, and `segment_absorbed` still returns $(A_q, z_{\rm axis})$. A soma disc is a
+sphere whose column absorbs $1 - \exp(-\mu_s \ell_s)$ ($\mu_s$ = `soma_mu_per_um`, $\ell_s$ the chord, um), split over the
+slabs by the vertical partition under both absorptions (the hybrid has no sphere; PROVISIONAL, D-135.3).
+`CleaningConfig.shadow_depth_bin_um` is no longer read (removed with wave 3's contract). The blur and the pixel mean may
+be the separable matrix products of the implementer's draft (equal to Block 4's FFT and `pixel_integrate` to 1e-15, its
+report) or Block 4's own functions. Custom code: the evaluation of (5-6) from a segment's footprint to the patch's
+pixels without a common padded grid. Oracles replaced: (i) the two PROVISIONAL bounds become: against Block 4's
+`render_transmittance` of the same capped tube under the same absorption, pixel-integrated, $\max |S - (1 - \tau)| \le$
+1e-9 for $d \in \{0.3, 0.6, 1.0\}$ um, tilt 0 and 30 deg, the seven planes of the draft's test, both absorptions;
+(ii) the flat segment against `calibration_scene.shadow_depths` (a one-kernel closed form) becomes a sanity check at
+$d$ = 0.3 um only: within 5e-2 of the peak in the planes at 0 and 0.84 um; (iii) the depth-bin halving is dropped (no
+depth bins; the slab thickness is Block 4's and is tested there). Kept: the totals per plane, additivity, the reach, the
+floor, `include`, `overlap`, the hybrid column sum [1e-10] and faint limit [5e-3], `stretch_profiles` [1e-10], the
+ValueErrors. Reported: the time per segment for both absorptions, beside Block 4's.
+
+Block 28, amendment 1 (2026-11-13, 17:10; D-135 [orchestrator]). (i) Public API: `cleaning.clean_block(block, S, B_gl,
+cfg) -> CleanResult`, `cfg` a `DiameterConfig`, required (the entry's signature carried no threshold for
+`over_background`; no default configuration inside the function). (ii) The oracle "under `hybrid` the residual is at
+most $B \max (1 - \tau^{(1)})(1 - \tau^{(2)})$" is withdrawn: it fails for tilted pairs (ratio 1.01 to 1.16 at 45 and
+60 deg, radius 0.25 um, centres 0.69 to 0.92 um apart, $\mu$ = 3 /um; the implementer's probe at `6c477bd`), because
+oblique rays couple two tubes away from where their blurred shadows overlap. It becomes a reported measurement with no
+bound: the residual (gl, $B$ = 210) of cleaning a hybrid scene with the neighbour rendered alone, for the three cases of
+the draft's test and for two equal tubes (radius 0.25 um, $\mu$ = 3 /um) at tilt 0 and 45 deg with centres 1.0, 2.0 and
+3.0 um apart. The table is the evidence on which the tier boundary `close_lateral_um` is judged. The assumptions 2 to 5
+of the implementer's report (the own footprint at the larger end radius; rule (b) read on a grid of spacing
+`profile_step_um`; the depth compared with the node's; the closed-form nearest-point parameter, marked Custom) are
+accepted and are part of this entry.
 
 ### Block 28: the cleaning operator and the two tiers (plan step C3; D-130.O1, D-132)
 
