@@ -5,8 +5,8 @@ The entry of Block 28 in specs/SPEC.md is the specification. Pure ASCII, for the
 from __future__ import annotations
 
 
-def clean_block(block, S, B_gl):
-    """-> CleanResult (block float64 gl, added_gl, over_background)."""
+def clean_block(block, S, B_gl, cfg):
+    """-> CleanResult (block float64 gl, added_gl, over_background); cfg a DiameterConfig (Block 28, amendment 1)."""
     raise NotImplementedError("contract stub")
 
 
