@@ -3,6 +3,7 @@
 | Date | Change |
 |---|---|
 | 2026-11-13 | Created at the user's request (13:01) after D-129: cleaning first, then option 2, option 1 only if option 2 is not satisfactory; the pilot cell 529878215 in Colab. Code facts at `34a5196` on `sci/diameter-pipeline` **[src]**; the toy numbers of section 5 from this chat's checks **[run, sandbox]**. Nothing below is implemented. Roadmap: NC, NC1-NC4 (`0274ce8`). |
+| 2026-11-13 (later) | Revised at the user's request (14:11) for the coding directives v2 of the same day: the main session plans and orchestrates, independent Opus agents write the blocks in parallel, Opus agents make the final check. New section "Fan-out: waves, blocks, files"; the steps regrouped into three waves of 5, 4 and 3 blocks (SPEC numbers 23-34, proposed); one file per block, so the iteration moves to `analysis/cleaning_iteration.py` and the recovery to `analysis/recovery.py`; a scene renderer added as a block of its own (the checks' generator, O11); scripts and notebook cells stay with the orchestrator. No step dropped; nothing implemented. |
 
 Tags: **[src]** read in the code at the commit above; **[SPEC]** `specs/SPEC.md`; **[log]** the decision log on `main`;
 **[run, sandbox]** computed in the chat of 2026-11-13; **[user]** the user's words; **[proposal]** the assistant's, not
@@ -21,6 +22,59 @@ decided; **[open]** not decided.
 - Not in this plan: option 1 (roadmap NC4), other cells, davinci, the switch to the hybrid absorption (D-084.2),
   structures that are not traced (other cells, untraced axon, spines): they stay with the background estimate.
 
+## Fan-out: waves, blocks, files
+
+Procedure: the `scientific-coding` skill, section 10. Orchestrator = the main session (Fable 5.2 on 2026-11-13);
+implementers = one fresh general-purpose agent per block on Opus, each in its own worktree; final checker = the
+integration tester on Opus. A block joins a wave when every interface it touches is fixed in SPEC.md, and no file
+belongs to two blocks. Block numbers are proposed; they are assigned when the SPEC entries are written.
+
+| Wave | Block | Step | Files owned by its agent (plus `tests/smoke/test_smoke_<name>.py`) | Consumes | Choices settled before its contract |
+|---|---|---|---|---|---|
+| 1 | 23 features table | C1 | `analysis/node_features.py`, `loading/features_io.py` | `plane_iteration.Scene` (exists) | O3 |
+| 1 | 24 scene renderer | the checks' generator | `model/scene_render.py` | Blocks 2, 4 (exist) | O11 |
+| 1 | 25 shadow image | C2 | `model/shadow.py` | Block 23's contract; Block 4 as oracle | O4, O5 |
+| 1 | 26 line renderer | F1 | `model/line_render.py` | Block 4 as oracle; Block 5's profile sampler | O10 |
+| 1 | 27 contamination survey | C0 | `analysis/contamination.py` | `calibration_scene` (exists) | O4, O5 |
+| 2 | 28 cleaning operator | C3 | `analysis/cleaning.py` | Blocks 24, 25 | O1 |
+| 2 | 29 coarse fit | C4 | `analysis/coarse_fit.py` | Blocks 24, 25 | O2 |
+| 2 | 30 per-node fit | F2 | `analysis/node_inference.py` | Block 26 | O9 |
+| 2 | 31 cleaning figures | C6 | `plotting/cleaning_figures.py` | the contracts of Blocks 25, 28 | -- |
+| 3 | 32 the iteration | C5 | `analysis/cleaning_iteration.py` | Blocks 23, 25, 28, 29 | O6 |
+| 3 | 33 recovery on phantoms | F4 | `analysis/recovery.py` | Blocks 24, 28, 30; Blocks 9, 21 (exist) | O12 (its numbers are reported, not gated) |
+| 3 | 34 inference figures and report tables | E | `plotting/inference_figures.py` | the contract of Block 30 | -- |
+| held | the joint fit with a close neighbour | F3 | `analysis/node_inference_joint.py` | Block 30 | O8, after the survey's run in Colab; inline or a wave of its own |
+
+Why this grouping **[proposal]**: the line renderer's only oracle is Block 4, so it goes in wave 1 and the inference
+code no longer waits for the cleaning code, only for cleaned data; the scene renderer goes first because the checks of
+Blocks 25, 28, 29, 32 and 33 build their inputs with it; the survey reads only existing code, so its Colab run can
+start after wave 1.
+
+| Who | What |
+|---|---|
+| Orchestrator, inline, never an agent | the SPEC entries with their tolerances and the roadmap blocks (under NC1, NC2, NC3, in the turn each entry is written); `config.py` (`CleaningConfig`, `InferenceConfig`), package `__init__` files; the stubs and each wave's contract commit; `scripts/clean_cell.py`, `scripts/infer_nodes.py`; notebook Cells 16-18; the decision log; every issue an agent raises (directive 7); the gate and the merge of every block |
+| Implementer agents (Opus) | one block each, its files only; both checks of the skill's section 6 on synthetic inputs; a report, or `STATUS: ISSUE` |
+| Final checker (Opus) | the integration tester in the chat on each merged wave, scope from the skill's `scripts/changed_blocks.py` |
+| The user | approves this plan and each wave's choices and tolerances before its contract commit; runs Colab: the survey after wave 1 (its shares settle O7 and O8), Cell 16 and Cell 17 after wave 3; the judgment (NC3). Asked during a wave only when the approach itself is in question |
+
+Per wave, on `sci/diameter-pipeline`:
+
+```
+git commit -m "contract: wave <w>"        # stubs, config, smoke-test skeletons; SPEC entries complete
+git worktree add ../wt-block-<n> -b wip/diameter-pipeline-block-<n> <contract commit>     # one per block; wip/ never pushed
+# the wave's agents launched in one message: Agent tool, general-purpose, model "opus", the skill's brief
+git diff --name-only sci/diameter-pipeline...wip/diameter-pipeline-block-<n>              # gate: its own files only
+git merge-base --is-ancestor <contract commit> wip/diameter-pipeline-block-<n>            # gate: on the contract
+# merge, then the final check on Opus; then SPEC statuses, the report committed, worktrees and wip/ branches removed
+```
+
+At the end of each wave the user gets, in this order: the change report (every change the orchestrator made to the
+mathematics, units, conventions, estimators, validation targets or tolerances, or the statement that there was none);
+the final check's verdict and how each finding was settled; each block with its code and the results obtained.
+
+Limit: the sandbox cannot reach Allen's server **[SPEC, Block 16.3]**, so every agent's check and the final check run
+on synthetic scenes; the checks on real data are the Colab runs and are named as skipped in each report.
+
 ## What exists and what each piece lacks for the cleaning
 
 | Piece | Where **[src]** | What it does today | What the cleaning needs in addition |
@@ -38,8 +92,10 @@ Cost fact behind step F1 **[SPEC 13.5]**: one rendered and fitted realization ta
 
 ## Steps: the cleaning (roadmap NC1)
 
-Each step becomes a SPEC block when it starts (numbers from 23 on; 20 is S3d, 22 is D-121's loop) and enters the roadmap
-under NC1 in the same turn. Logic waits for the choices of the section "Choices to settle before the logic".
+Each step is a SPEC block (numbers from 23 on; 20 is S3d, 22 is D-121's loop) written before its wave's contract commit
+and entered in the roadmap under NC1 in the same turn; who writes it and in which wave is in the section "Fan-out:
+waves, blocks, files" [corrected 2026-11-13 (later): was "becomes a SPEC block when it starts"]. Logic waits for the
+choices of the section "Choices to settle before the logic".
 
 | Step | What is built | Module (all new unless stated) | Check before real data | Output |
 |---|---|---|---|---|
@@ -48,9 +104,9 @@ under NC1 in the same turn. Logic waits for the choices of the section "Choices 
 | **C2** shadow image | for a target node's patch and planes: each neighbour segment's absorbed fraction as an image, from its end nodes' features and the calibrated kernel; segments as short straight tubes | `model/shadow.py` | against Block 4's render of the same tube: agreement fixed in the SPEC entry; zero for a segment beyond 6 kernel SDs; mass per plane equal across planes | array (planes, height, width), dimensionless |
 | **C3** cleaning operator | the cleaned patch from the observed patch, the plane's background and the summed shadow (O1); pixels where a neighbour overlaps the node's own footprint in projection are flagged, not cleaned | `analysis/cleaning.py` | exact inverse on a synthetic scene built by the same rule; the flag fires on a tube directly above the node | cleaned block in the `fetch_zblock` contract, a flag mask |
 | **C4** coarse fit | each node's features from its own cleaned line (O2) | `analysis/coarse_fit.py` or `measure_pilot` on a provider that serves the cleaned block | recovers the features of an isolated rendered tube within the tolerance of the SPEC entry | one features row |
-| **C5** the iteration | the rounds of the section "The iteration, stated", the stop rule (O6), a record per round | `analysis/cleaning.py` | on synthetic scenes started from diameters 25 % too thin: the neighbours' features converge and the cleaned line equals the isolated node's line within tolerance, for diffuse and defocused neighbours; the close in-focus case is expected to end flagged (section "What the toy check says") | the features of every round; a convergence table |
+| **C5** the iteration | the rounds of the section "The iteration, stated", the stop rule (O6), a record per round | `analysis/cleaning_iteration.py` [corrected 2026-11-13 (later): one file per block; was `analysis/cleaning.py`] | on synthetic scenes started from diameters 25 % too thin: the neighbours' features converge and the cleaned line equals the isolated node's line within tolerance, for diffuse and defocused neighbours; the close in-focus case is expected to end flagged (section "What the toy check says") | the features of every round; a convergence table |
 | **C6** figures | per example node: the patch in several planes before, the predicted shadow, the patch after; the measuring line before and after with the first-stage fit; the change per round | `plotting/cleaning_figures.py` | runs on a synthetic scene; computes nothing scientific | PNG per node; a contact sheet |
-| **C7** Colab Cell 16 | C0, then C5 and C6 on the pilot cell: the example nodes first, then every node | `scripts/clean_cell.py`; `notebooks/phase2_colab.py` Cell 16 | the dry run on a cached node | the files above in the run folder |
+| **C7** Colab Cell 16 | C0, then C5 and C6 on the pilot cell: the example nodes first, then every node | `scripts/clean_cell.py`; `notebooks/phase2_colab.py` Cell 16 (the orchestrator's, inline) | the dry run on a cached node | the files above in the run folder |
 
 ## The iteration, stated
 
@@ -79,10 +135,10 @@ the absorbed light); the alternative divides the observed plane by the neighbour
 |---|---|---|---|---|
 | **F1** line renderer | the forward model on the measuring line only: the profiles across a straight tube in the planes $K_i$ for a given diameter, absorption coefficient, lateral offset, axis depth and tilt -- slabs of `dzeta_um`, each with its own kernel, the profile sampler's averaging and the pixel integration | `model/line_render.py` (custom: no library renders a depth-dependent blur) | against Block 4's full render read by `profiles.sample_profile`: agreement fixed in the SPEC entry, flat and tilted, in and off the plane; time per call reported | array (planes, samples), dimensionless |
 | **F2** per-node fit | bounded least squares (`scipy.optimize.least_squares`, several starts) of F1 to the cleaned profiles of the planes $K_i$; parameters and data by O9; the noise level from the patch's far pixels; estimates, their covariance from the Jacobian, the residual against noise per plane, flags | `analysis/node_inference.py` | noise-free recovery to solver tolerance; the stated uncertainty covers the truth at the nominal rate on noisy phantoms | one row per node |
-| **F3** close neighbours (O8) | for nodes of C0's class "close and in focus": either a flag, or the neighbour inside the model with its amplitude, position, depth and diameter free | `analysis/node_inference.py` | the toy scenes of the section below | decided after C0's shares |
-| **F4** recovery on phantoms | phantoms through C3 and F2: isolated and with neighbours; rendered by Block 4, and by the generators that are not F1's model (the ray world, Block 9; the hybrid, Block 21) with the camera chain and noise; $\hat d/d$ and the coverage of the uncertainty by diameter, tilt and darkness | `scripts/infer_nodes.py phantoms` | this step is the check: a fit tested only on its own generator hides its model error | a table and figures; the acceptance numbers of O12 |
-| **F5** Colab Cell 17 | F2 (and F3) on the pilot cell's example nodes, then every node, on the cleaned blocks of Cell 16 | `scripts/infer_nodes.py real`; notebook Cell 17 | the dry run on a cached node | `inference_<specimen>.csv`; per-node figures: data and fitted model, plane by plane |
-| **E** the judgment (NC3) | a report for the user: residuals across planes, the diameters against Allen's and the first-stage fit's, along-branch consistency, the shares flagged, F4's recovery | `plotting/`, notebook Cell 18 | -- | the user's decision: option 2 stands, or NC4 starts |
+| **F3** close neighbours (O8) | for nodes of C0's class "close and in focus": either a flag, or the neighbour inside the model with its amplitude, position, depth and diameter free | `analysis/node_inference_joint.py` [corrected 2026-11-13 (later): its own file] | the toy scenes of the section below | decided after C0's shares |
+| **F4** recovery on phantoms | phantoms through C3 and F2: isolated and with neighbours; rendered by Block 4, and by the generators that are not F1's model (the ray world, Block 9; the hybrid, Block 21) with the camera chain and noise; $\hat d/d$ and the coverage of the uncertainty by diameter, tilt and darkness | `analysis/recovery.py`; run by `scripts/infer_nodes.py phantoms` (the script is the orchestrator's) [corrected 2026-11-13 (later)] | this step is the check: a fit tested only on its own generator hides its model error | a table and figures; the acceptance numbers of O12 |
+| **F5** Colab Cell 17 | F2 (and F3) on the pilot cell's example nodes, then every node, on the cleaned blocks of Cell 16 | `scripts/infer_nodes.py real`; notebook Cell 17 (the orchestrator's, inline) | the dry run on a cached node | `inference_<specimen>.csv`; per-node figures: data and fitted model, plane by plane |
+| **E** the judgment (NC3) | a report for the user: residuals across planes, the diameters against Allen's and the first-stage fit's, along-branch consistency, the shares flagged, F4's recovery | `plotting/inference_figures.py`; notebook Cell 18 (the orchestrator's) | -- | the user's decision: option 2 stands, or NC4 starts |
 
 ## Choices to settle before the logic
 
