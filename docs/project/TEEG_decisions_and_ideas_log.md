@@ -10138,7 +10138,7 @@ D-115, D-116, D-122 to D-124. **[src]** SPEC §2.5 (h); Block 9's smoke P9.
 
 **Sources.** **[user]** 2026-11-13, 09:25-09:40. **[src]** `git diff` of `sci/diameter-pipeline` `128fdce..1555036` and of `main` `81b3327..64a2cbe`; `changed_blocks.py` on the diameter SPEC (scope: Blocks 0, 1, 4-19, 21; neighbours 2, 3). **[log]** D-022 (the tester's convention), D-056 (ii) (the noise SPEC in `Ih Fit/specs/`), D-121 (Block 22), and the entries citing the checks, named in (D-127.2).
 
-**Status:** active; (D-127.4) under way (the six runs started 2026-11-13, 08:30 UTC); (D-127.1)-(D-127.3) not started. [updated 2026-11-13 (later, 3): (D-127.4) done for runs N and D1-D4 -- results branches `tester/2026-11-13-0830-incremental` and `tester/2026-11-13-0830-full`, reports on `sci/diameter-pipeline` (`34a5196`) and `main` (`23b4f41`); D5's report pending (the harness refused the agent's write; the user asked). Block 23's draft (`checks/d115_2026-10-30/`) shown to the user, not committed.]
+**Status:** active; (D-127.4) under way (the six runs started 2026-11-13, 08:30 UTC); (D-127.1)-(D-127.3) not started. [updated 2026-11-13 (later, 3): (D-127.4) done for runs N and D1-D4 -- results branches `tester/2026-11-13-0830-incremental` and `tester/2026-11-13-0830-full`, reports on `sci/diameter-pipeline` (`34a5196`) and `main` (`23b4f41`); D5's report pending (the harness refused the agent's write; the user asked [corrected 2026-11-13: put to the user, not yet answered])). Block 23's draft (`checks/d115_2026-10-30/`) shown to the user, not committed.]
 
 ---
 
