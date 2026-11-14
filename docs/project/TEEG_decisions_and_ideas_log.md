@@ -184,6 +184,7 @@ the "Binds" column.
 | 2026-11-14 (later, 7) | Logs **D-145** [orchestrator] (the diameter chat, 16:20; coding directives 7 and 9). **Second final check (Opus tester) at `49eab6b`: PASS WITH ISSUES** (report `specs/test_reports/2026-11-14_1830_incremental.md`, tests `ab6d6fd`): 220 spec tests pass, no smoke suite regressed; the code agrees with SPEC on every contract checked. One MAJOR finding about the method (F1: a neighbour branch's shadow summed segment by segment over-subtracts on steep branches), one MINOR (F2: the background's trim not centred) and two notes. Settled in amendment 6 of Block 36 (`225c458`): F2, F3, F4 fixed; F1 measured by the orchestrator at the pilot's coefficient (0.258 /um) and found within the 1.5 % bound up to 60 deg (at most 0.71 %), but not at 1 /um above 45 deg -- left open for the user (rendering each neighbour branch jointly would change D-134). Checked: `test_smoke_pilot_run.py` 12 pass, 1 skip; Block 36 and 32 spec tests 40 pass. |
 | 2026-11-14 (later, 8) | No decision changed (the noise-fit chat; output pasted by the user, 16:16) **[cluster]**. In an interactive job on dvnode018: (1) the audit's F2 (report `2026-11-13_0830_full.md`) does not touch the cohort -- a read-only scan of the 18 L3_exc cells finds 0 LS sweeps whose stored current has a non-finite sample or no step (the sweeps `load_ls_prewindows` would drop silently); (2) `cluster_gates_noise_fit.sh` FULL at `62f3324`, env `prova` (python 3.12.13, numpy 2.4.4, scipy 1.17.1, statsmodels 0.14.6, neuron 9.0.1, skopt 0.10.2): **16 passed, 0 failed, 0 skipped, VERDICT SETTLED** (G6c 116 s, G6d 548 s, G8 116 s, G10 263 s; G11 `regression_passive_identity` PASS on 508282493, loss max\|dL\| = 0 over 20 points, ref 0.172357, 1220 s; G12 as on 2026-10-20: 508282493 40 pulses in 2 sweeps, 569844159 348 in 10); logs `~/ih_fit_gate_logs/20261114_152651/`; (3) `smoke_noise_run.py` **9/9** in 536 s (R1: direct fit 155 s, 1 worker 154 s, 2 workers 114 s). (4) The first dry run was refused by the submitter's guard (`PBS_JOBID` set inside the interactive job, where PBS also sets `NCPUS` = 8); nothing written or submitted; the dry run and the pilot go from the login node. Next free IDs: D-146, I-006. |
 | 2026-11-14 (later, 9) | No decision changed (the noise-fit chat; output pasted by the user, 16:19) **[cluster]**. **The pilot of D-124 is submitted** from the login node (dvlogin04) at `52aa4c1`: the dry run as expected (cohort 508282493, 569844159; 2 x 6 = 12 cores; the CLI contract accepted); then the cell array `2096989[].pbsserver01` (2 subjobs, 6 cores each, walltime 48:00:00) and the merge `2096990.pbsserver01` after it; run file `~/noise_fit_runs/nf1_L3_exc_20261114T151931Z.env`; outputs `Human Neurons Fitting/pipeline_outputs_ih/noise_fit/nf1/L3_exc/`. Next: its NOISE_CELL lines and per-stage seconds set WALLTIME for the 18-cell run (D-125.5). Next free IDs: D-146, I-006. |
+| 2026-11-14 (later, 10) | Logs **D-146** [orchestrator] (the diameter chat, 18:30). The pilot's Cell 17 (3 work-list nodes, 2 rounds) ran 30 min without finishing: the shadow model computed the slabs of every segment of the cell (12877) for every node before the reach rule discarded them; the synthetic cell of the tests has 14. Fixed in `326891d` on `sci/diameter-pipeline` (Block 25 amendment 4, Block 36 amendment 7): exact prefilters (beyond reach; provably under the floor) and an exact output crop; a binned blur for defocused slabs (at most 2.2e-4 of a shadow's peak); the shadow model's hybrid directions 4 x 8; the floor in the background's all-segment shadow; the work list cut early. One shadow image of a 3072-segment synthetic scene: 74 s. Suites pass (shadow, cleaning iteration, pilot run, configuration). |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -338,6 +339,7 @@ would be needed*, *Status*.
 | D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
 | D-133 | 2026-11-13 | SPEC Blocks 25 (amendment 2), 28, 29, 30, 31 at `38f7c19`; `CleaningConfig`, `InferenceConfig` | wave 2's validation targets, tolerances and provisional parameters, proposed by the orchestrator at the wave's start: exact inverse of the cleaning 1e-9 gl; recovery 1e-6 and unbiasedness within 3 SE for the two fits; coverage 60-76 % and chi2/N within 10 % of 1 for the per-node fit; hybrid column sum 1e-10 and faint limit 5e-3 for the shadow model; renderers passed as callables [orchestrator] | active |
 | D-134 | 2026-11-13 | SPEC Block 25 (amendment 3); D-132.1 | a tier-1 neighbour's shadow is equations (5-6) for the neighbour rendered alone: one blur per slab, under the hybrid's absorbed light; one kernel per column is dropped [user] | active; supersedes the "one blur per column" clause of D-132.1 |
+| D-146 | 2026-11-14 | SPEC Block 25 (amendment 4), Block 36 (amendment 7) at `326891d`; `CleaningConfig.shadow_bin_sigmas`, `shadow_ray_n_rho`, `shadow_ray_n_psi` | the shadow model renders only the neighbours that can reach the patch and exceed the floor (exact), crops each blur to its reach (exact), bins defocused slabs (2.2e-4 of a peak), uses 4 x 8 hybrid directions (0.04-0.2 % of a shadow's peak); the background's all-segment shadow takes the floor [orchestrator], PROVISIONAL | active |
 | D-145 | 2026-11-14 | SPEC Block 36 (amendment 6) at `225c458` | the summed segment shadows of a neighbour branch accepted at the pilot's coefficient (within 1.5 % of the dip up to 60 deg), not above about 0.5 /um on steep branches (open); the background's trim centred on the residuals' median, one trim; the first backgrounds on the round-0 scene with the pilots' rows; outputs written atomically [orchestrator] | active |
 | D-144 | 2026-11-14 | SPEC Block 36 (amendment 4), Block 32 (amendment 2) at `d35e800`; `CleaningConfig.background_support`, `background_shadow_max` | in the cleaning each plane's planar background is fitted through the shadow model, image = background x (1 - predicted shadow of every traced segment), and refitted each round [user]; pixels with a predicted shadow above 0.10 left out, trimming and validity as the calibration's [orchestrator], PROVISIONAL | active; supersedes D-143.2 and D-141.1 |
 | D-143 | 2026-11-14 | SPEC Block 36 (amendment 3) at `e644ff0`; `CleaningConfig.background_support` | the node's tube runs along its axis exactly over its own segments, which end at the first node beyond `tube_half_length_um` on each side; the cleaning's planar background is fitted on the pixels that no neighbour's and no own predicted shadow reaches above `isolation_depth_gl` [orchestrator], PROVISIONAL | active; refines D-142.1, supersedes D-141.1's default |
@@ -11236,6 +11238,46 @@ reproducer is a regular test.
 tube; `calibration_scene.planar_background` (the kernel calibration's) trims uncentred as well -- unchanged.
 
 **Sources.** **[run, sandbox]** as tagged; the tester's report. **[SPEC]** `225c458`.
+
+**Status:** active.
+
+
+## D-146 -- The shadow model made affordable on a whole cell: exact prefilters and crop, a binned blur, 4 x 8 directions, the floor in the background's shadow [orchestrator]
+
+**Date:** 2026-11-14, about 18:30 (Europe/Rome), the diameter chat, settled by the orchestrating session (Opus 5.5)
+under coding directive 7 after the pilot's Cell 17 ran 30 min on 3 work-list nodes without finishing; the user was not
+asked and can reverse any point. D-132 (the hybrid's absorbed light) and D-134 (one blur per slab, each neighbour
+rendered alone) stand.
+**Binds:** SPEC Block 25 (amendment 4) and Block 36 (amendment 7) at `326891d` on `sci/diameter-pipeline`;
+`CleaningConfig.shadow_bin_sigmas` (new, 8), `shadow_ray_n_rho` and `shadow_ray_n_psi` (4 and 8, were 8 and 16).
+
+**Decision [orchestrator].** Five clauses, PROVISIONAL.
+
+**Statement.** (D-146.1, exact) A neighbour is not rendered when its footprint's lateral bounding box lies farther
+from the patch than `shadow_reach_sigmas` times the largest kernel SD $\sigma_{\rm r}$ (um) over its depth range and
+the planes, or, with a background $B$ (gl) given, when $B$ times an upper bound of its image's peak is under
+`shadow_floor_gl` (0.3 gl). (D-146.5, exact) Each slab-plane blur is computed on the output pixels within
+(`shadow_reach_sigmas` + 2) $\sigma$ of the slab's source. (D-146.4, numerical) A slab blurred at $\sigma$ is summed in
+blocks of side at most $\sigma / 8$ before the blur. (D-146.3, numerical) The shadow model's hybrid uses 4 x 8 ray
+directions. (D-146.2, estimator) The all-segment shadow of the background fit (D-144) leaves out the segments whose
+shadow peaks under the floor. Agreed before: every neighbour rendered; 8 x 16 directions; no floor in the background's
+shadow.
+
+**Why.** On the pilot (12877 segments) every node computed every segment's slabs; on the tests' synthetic cell (14)
+this never showed. Measured in the sandbox (the orchestrator): with (1) and (5) the shadow, the kept set and the overlap
+are identical to the unfiltered result on a 1072-segment scene, and the crop agrees to 1e-15 of the peak; (4) moves a
+shadow by at most 2.2e-4 of its peak against Block 4 (the exact path still agrees to 1.6e-15); (3) by 0.04 to 0.2 % of
+its peak on six segments of 0.3 to 1.0 um at 0 to 8 um of defocus; one shadow image of a 3072-segment scene with a soma
+at the patch takes 74 s. (2): a shadow under 0.3 gl at its peak is wider than about 5 um, smooth over the patch, and
+the planar background takes it up [reasoning]. **[run, sandbox]**
+
+**What it implies for code and tables.** `model/shadow.py`, `analysis/node_inputs.py`, `config.py`; the exact oracles
+of Blocks 25 and 32 run with `shadow_bin_sigmas` = 0.
+
+**What it does not decide [open].** The time per node on the pilot (to be read from Cell 17's log); sharing the
+neighbours' images between the cleaning's shadow and the background's; the survey's 2.9 s per node.
+
+**Sources.** **[run, sandbox]** as above. **[SPEC]** `326891d`.
 
 **Status:** active.
 
