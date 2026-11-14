@@ -698,16 +698,13 @@ def test_tube_cut_decomposition_30deg(spacing):
     assert np.all(before > 0.01)
 
 
-@pytest.mark.xfail(strict=False, reason="tester's finding F2 (2026-11-14 18:30): on noise-free data with a small "
-                   "shadow-model mismatch the trim of model_background (|res| against 3 x 1.4826 x MAD, not "
-                   "centred on the median) rejects almost the whole support of the in-focus plane and build_node "
-                   "refuses the node")
 def test_build_node_noise_free_flat_scene(tmp_path_factory):
     """Not a stated oracle (amendment 4 states 'not refused' for the noise-free 30 deg chain only): the same
     two-tube scene noise-free, true features, matching absorptions, the shadow model at shadow_fine_factor 4
     (this file's speed setting; the default 8 passes: the mismatch at the in-focus edges is what triggers it)
-    -- the node is expected to pass, with B_k within 0.5 gl of 210. It is refused (no_background in plane k*):
-    reproducer of finding F2."""
+    -- the node is expected to pass, with B_k within 0.5 gl of 210. It was refused (no_background in plane k*):
+    the reproducer of finding F2, a regular test since the trim centres the residuals on their median (D-145.2;
+    the xfail mark removed by the orchestrator, 2026-11-14)."""
     cfg, provider, scene, fs, ob, swc, feats = build_case(tmp_path_factory)
     i = int(np.flatnonzero(np.asarray(ob.ids) == 17)[0])
     own = NI.own_ids_within(ob, i, cfg.inference.tube_half_length_um)[0]

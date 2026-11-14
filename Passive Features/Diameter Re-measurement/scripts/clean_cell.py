@@ -110,9 +110,11 @@ def jsonable(x):
 
 
 def write_json(path, obj):
-    with open(path, "w", encoding="utf-8", newline="\n") as f:
+    tmp = path + ".tmp"                      # written whole, then renamed: a kill never leaves half a file (F4)
+    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
         json.dump(jsonable(obj), f, indent=1, sort_keys=True, allow_nan=False)
         f.write("\n")
+    os.replace(tmp, path)
     return path
 
 
@@ -125,11 +127,13 @@ def _cell_text(v):
 
 
 def write_csv(path, rows, columns):
-    with open(path, "w", encoding="utf-8", newline="") as f:
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f, lineterminator="\n")
         w.writerow(columns)
         for r in rows:
             w.writerow([_cell_text(r.get(c, "")) for c in columns])
+    os.replace(tmp, path)
     return path
 
 
@@ -424,6 +428,9 @@ def run_clean(a, cfg, log):
         for t, r in enumerate(run):
             stretch_of[int(swc.ids[r])] = (run, t)
     nodes, infos, pilots, halfs, dropped = [], {}, {}, {}, {}
+    # Pass 1: the pilot of every work-list node; round 0's features = Allen's and --mu, the work-list nodes at their
+    # pilot's (d, mu) (the entry; D-130.O2); the first backgrounds are fitted on that scene (F3; D-145.3)
+    prepared = []
     for nid in work:
         t0 = time.time()
         try:
@@ -432,8 +439,25 @@ def run_clean(a, cfg, log):
             ob = node_inputs.own_branch(swc, run, xyz)
             if ob is None:
                 raise ValueError("a one-node stretch")
-            own_branch_, _ = ob
             pilot = measure_pilot(full, off + t, provider, cfg)
+        except Exception as exc:                     # one node's failure never stops the run
+            dropped[nid] = "%s: %s" % (type(exc).__name__, exc)
+            log("node %d: dropped (%s) in %.1f s" % (nid, dropped[nid], time.time() - t0))
+            continue
+        prepared.append((nid, ob[0], t, pilot, time.time() - t0))
+    rows0 = [dict(node_id=nid, d_um=float(p.d_hat_um), mu_per_um=float(p.mu_hat_per_um), source="pilot")
+             for nid, _b, _t, p, _dt in prepared
+             if math.isfinite(float(p.d_hat_um)) and float(p.d_hat_um) > 0
+             and math.isfinite(float(p.mu_hat_per_um)) and float(p.mu_hat_per_um) > 0]
+    if rows0:
+        features0 = node_features.with_rows(features0, rows0, 0)
+    fscene0 = node_features.featured_scene(scene, features0)
+    log("round 0: %d of %d work-list nodes at their pilot's (d, mu); the first backgrounds on that scene"
+        % (len(rows0), len(work)))
+    # Pass 2: each node's patch, backgrounds, line and noise
+    for nid, own_branch_, t, pilot, dt in prepared:
+        t0 = time.time() - dt
+        try:
             start, clipped = _clip_start(node_inputs.pilot_start(pilot, own_branch_.xyz_um[t]), cfg)
             own = node_inputs.own_ids_within(own_branch_, t, cfg.inference.tube_half_length_um)[0]   # amendment 3
             node, info = node_inputs.build_node(own_branch_, t, pilot, provider, scene, cfg, own, fscene0,
@@ -473,9 +497,6 @@ def run_clean(a, cfg, log):
         write_json(json_path, dict(base, stopped="no_nodes", history=[], rounds=0, nodes={}))
         log("no work-list node could be prepared (%d dropped) -> %s" % (len(dropped), json_path))
         return 1
-    rows0 = [dict(node_id=n.node_id, d_um=float(pilots[n.node_id].d_hat_um),
-                  mu_per_um=float(pilots[n.node_id].mu_hat_per_um), source="pilot") for n in nodes]
-    features0 = node_features.with_rows(features0, rows0, 0)
     sigma = float(np.median([infos[n.node_id]["sigma_gl"] for n in nodes]))
     log("%d nodes prepared (%d dropped), %d example nodes; sigma_gl %.3f gl (median of the nodes' profile SDs)"
         % (len(nodes), len(dropped), len(kept_examples), sigma))

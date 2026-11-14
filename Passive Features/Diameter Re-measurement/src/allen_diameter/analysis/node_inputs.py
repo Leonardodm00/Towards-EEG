@@ -249,7 +249,7 @@ def model_background(block, S_all, frame, origin_xy, cfg):
     4, D-144). Per plane k, b(x, y) = b0 + bx (x - cx) + by (y - cy) ((cx, cy) the patch's centre, um)
     minimises sum [I - b (1 - S_all)]^2 over the pixels with S_all <= cleaning.background_shadow_max (and I
     finite), by numpy.linalg.lstsq, then once more without the pixels whose residual exceeds
-    calibration.background_trim_sigmas x 1.4826 x MAD (calibration_scene.planar_background's trim). B = b at
+    calibration.background_trim_sigmas x 1.4826 x MAD about their median (D-145.2). B = b at
     the line's origin (gl); sd = the SD of the kept residuals (gl, 3 parameters fitted); frac = the kept share
     of the patch; ok = frac >= calibration.background_min_far_frac and B finite and > 0."""
     I_all = np.asarray(block, dtype=float)
@@ -274,9 +274,12 @@ def model_background(block, S_all, frame, origin_xy, cfg):
         A = (1.0 - S)[:, None] * np.column_stack([np.ones_like(X), X, Y])
         b = np.linalg.lstsq(A[keep], I[keep], rcond=None)[0]
         res = I[keep] - A[keep] @ b
-        mad = float(np.median(np.abs(res - np.median(res))))
+        med = float(np.median(res))
+        mad = float(np.median(np.abs(res - med)))
         if mad > 0:
-            inner = np.abs(res) <= trim * 1.4826 * mad
+            # residuals centred on their median before the comparison (final check of 2026-11-14 18:30, F2;
+            # D-145.2): uncentred, a small offset of the model beside a small MAD dropped the whole support
+            inner = np.abs(res - med) <= trim * 1.4826 * mad
             if 6 <= inner.sum() < inner.size:
                 idx = np.flatnonzero(keep)[inner]
                 keep = np.zeros_like(keep)
