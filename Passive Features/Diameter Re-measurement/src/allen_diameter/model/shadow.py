@@ -242,6 +242,7 @@ class _Patch:
         self.rect = ((self.left - 0.5) * self.p, (self.left + self.W - 0.5) * self.p,
                      (self.top - 0.5) * self.p, (self.top + self.H - 0.5) * self.p)
         self.reach = float(cfg.cleaning.shadow_reach_sigmas)
+        self.bin_sigmas = float(getattr(cfg.cleaning, "shadow_bin_sigmas", 0.0))
 
     def source_grid(self, xa, xb, ya, yb):
         """FineGrid on the patch's lattice covering [xa, xb] x [ya, yb] (um)."""
@@ -279,14 +280,54 @@ class _Patch:
             Xb, Yb = np.meshgrid(xs[cs], ys[rs])
             dmin = float(self.dist_to_rect(Xb[nz], Yb[nz]).min())
             sig = np.atleast_1d(_kernel.sigma_r(zj - z, rcfg))
+            binned = {}
+            ysr, xsc = ys[rs], xs[cs]
             for k, s in enumerate(sig):
                 s = float(s)
                 if dmin > self.reach * s:
                     continue
-                Gy = self._weights(self.ty, ys[rs], s)          # (H, ny_box)
-                Gx = self._weights(self.tx, xs[cs], s)          # (W, nx_box)
-                out[k] += Gy @ dA @ Gx.T
+                # D-146.5: only the output pixels within (reach + 2) sigma of the source box are computed (the
+                # weights beyond are under exp(-(reach + 2)^2 / 2) of the peak; exact to float64 at reach 6)
+                m = (self.reach + 2.0) * s + self.p
+                r0, r1 = self._span(self.ty, float(ysr[0]) - m, float(ysr[-1]) + m)
+                c0, c1 = self._span(self.tx, float(xsc[0]) - m, float(xsc[-1]) + m)
+                if r1 <= r0 or c1 <= c0:
+                    continue
+                b = int(s / (self.bin_sigmas * grid.h)) if self.bin_sigmas > 0 else 1
+                if b >= 2:
+                    # D-146.4: the source summed in b x b blocks placed at their centres, b h <= sigma /
+                    # bin_sigmas; the blurred value moves by about (b h / sigma)^2 / 24 of the slab's own
+                    if b not in binned:
+                        binned[b] = _bin_source(dA, xsc, ysr, b)
+                    dAb, xb, yb = binned[b]
+                    out[k, r0:r1, c0:c1] += (self._weights(self.ty[r0:r1], yb, s) @ dAb
+                                             @ self._weights(self.tx[c0:c1], xb, s).T)
+                    continue
+                Gy = self._weights(self.ty[r0:r1], ysr, s)      # (rows, ny_box)
+                Gx = self._weights(self.tx[c0:c1], xsc, s)      # (cols, nx_box)
+                out[k, r0:r1, c0:c1] += Gy @ dA @ Gx.T
         return out, foot
+
+    def _span(self, targets, lo, hi):
+        """The pixels [i0, i1) some fine target of which lies in [lo, hi] (targets (n_pixels, f), increasing)."""
+        first, last = targets[:, 0], targets[:, -1]
+        i0 = int(np.searchsorted(last, lo, side="left"))
+        i1 = int(np.searchsorted(first, hi, side="right"))
+        return max(i0, 0), min(i1, targets.shape[0])
+
+
+def _bin_source(dA, xs, ys, b):
+    """dA (ny, nx) on the uniform coordinates ys (ny,), xs (nx,), summed in b x b blocks (zero-padded at the
+    far ends) -> (dAb, xb, yb), the block sums on the block centres."""
+    ny, nx = dA.shape
+    py, px = (-ny) % b, (-nx) % b
+    a = np.pad(dA, ((0, py), (0, px)))
+    dAb = a.reshape((ny + py) // b, b, (nx + px) // b, b).sum(axis=(1, 3))
+    hx = float(xs[1] - xs[0]) if xs.size > 1 else 0.0
+    hy = float(ys[1] - ys[0]) if ys.size > 1 else 0.0
+    xb = xs[0] + (np.arange(dAb.shape[1]) * b + 0.5 * (b - 1)) * hx
+    yb = ys[0] + (np.arange(dAb.shape[0]) * b + 0.5 * (b - 1)) * hy
+    return dAb, xb, yb
 
 
 def _segment_box(tube):
@@ -296,6 +337,104 @@ def _segment_box(tube):
     e1 = np.asarray(tube.c) + tube.half_length * t
     r = tube.r
     return (min(e0[0], e1[0]) - r, max(e0[0], e1[0]) + r, min(e0[1], e1[1]) - r, max(e0[1], e1[1]) + r)
+
+
+_PREFILTER = True     # skip the neighbours no column of which can reach the patch (exact: see _beyond_reach)
+
+
+def _beyond_reach(fscene, segs, somas, patch, planes_z, cfg):
+    """bool (n_q + n_s,): True for a neighbour whose every slab-plane pair the reach rule of blur_slabs drops,
+    so that its image is exactly 0 -- computed before its slabs are (2026-11-14, D-146: without it every
+    segment of the cell was rendered for every node). The lateral bounding box of the footprint (a superset)
+    lies farther from the patch rectangle than shadow_reach_sigmas x the largest sigma_r over |delta| in
+    [0, delta_max], delta_max the largest |zeta - z_k| over the planes and the depth range [z_lo - dzeta,
+    z_hi + dzeta] of the neighbour (ends' z -+ r for a segment, centre -+ r for a soma); sigma_r is
+    piecewise linear in |delta|, so that maximum is at delta_max or at a knot below it. Conservative: a
+    neighbour it keeps may still contribute 0."""
+    rc = cfg.renderer
+    z = np.asarray(planes_z, dtype=float).reshape(-1)
+    dzeta = float(rc.dzeta_um)
+    xyz = _check_scene(fscene)
+    segs = np.asarray(segs, dtype=np.int64)
+    somas = np.asarray(somas, dtype=np.int64)
+    d = np.asarray(fscene.seg_d_um, dtype=float).reshape(-1, 2)
+    r_seg = 0.5 * 0.5 * (d[segs, 0] + d[segs, 1])
+    p0, p1 = xyz[segs, :3], xyz[segs, 3:]
+    xa = np.minimum(p0[:, 0], p1[:, 0]) - r_seg
+    xb = np.maximum(p0[:, 0], p1[:, 0]) + r_seg
+    ya = np.minimum(p0[:, 1], p1[:, 1]) - r_seg
+    yb = np.maximum(p0[:, 1], p1[:, 1]) + r_seg
+    zl = np.minimum(p0[:, 2], p1[:, 2]) - r_seg - dzeta
+    zh = np.maximum(p0[:, 2], p1[:, 2]) + r_seg + dzeta
+    soma = np.asarray(fscene.soma, dtype=float).reshape(-1, 3)[somas]
+    zc = float(cfg.cleaning.soma_z_um)
+    xa = np.concatenate([xa, soma[:, 0] - soma[:, 2]])
+    xb = np.concatenate([xb, soma[:, 0] + soma[:, 2]])
+    ya = np.concatenate([ya, soma[:, 1] - soma[:, 2]])
+    yb = np.concatenate([yb, soma[:, 1] + soma[:, 2]])
+    zl = np.concatenate([zl, zc - soma[:, 2] - dzeta])
+    zh = np.concatenate([zh, zc + soma[:, 2] + dzeta])
+    x_lo, x_hi, y_lo, y_hi = patch.rect
+    dx = np.maximum(np.maximum(x_lo - xb, xa - x_hi), 0.0)
+    dy = np.maximum(np.maximum(y_lo - yb, ya - y_hi), 0.0)
+    dist = np.sqrt(dx * dx + dy * dy)
+    dmax = np.max(np.maximum(np.abs(zl[:, None] - z[None, :]), np.abs(zh[:, None] - z[None, :])), axis=1)
+    sig = np.asarray(_kernel.sigma_r(dmax, rc), dtype=float)
+    knots = np.asarray(rc.kernel_table_delta_um, dtype=float)
+    kvals = np.maximum.accumulate(np.asarray(_kernel.sigma_r(knots, rc), dtype=float))
+    j = np.searchsorted(knots, dmax, side="right") - 1
+    sig = np.maximum(sig, np.where(j >= 0, kvals[np.clip(j, 0, None)], 0.0))
+    ok = np.isfinite(dist) & np.isfinite(sig)
+    return ok & (dist > patch.reach * sig)
+
+
+_HYBRID_ABSORB_BOUND = 3.0   # >= the hybrid's faint-limit factor 1.447 (Block 21), with room for its slab-wise excess
+_PEAK_BOUND_SAFETY = 1.5     # the discrete footprint and weights against their continuous bound
+
+
+def _below_floor(fscene, segs, somas, planes_z, cfg, B_gl):
+    """bool (n_q + n_s,): True for a neighbour whose image's peak is provably under the floor, B_gl x peak <
+    shadow_floor_gl, so that shadow_image would not keep it -- decided before its slabs are computed
+    (2026-11-14, D-146). Bound: the image of slab j in plane k is at most M_j / (2 pi sigma_jk^2), M_j its
+    absorbed light (um^2), so peak <= max_k M / (2 pi sigma_lo,k^2), with M <= c mu V (V the capped cylinder's
+    volume pi r^2 L or the soma's 4/3 pi r^3; c = 1 for "linear" and "partition_vertical" and for the soma,
+    _HYBRID_ABSORB_BOUND for "hybrid") and sigma_lo,k the smallest sigma_r(|delta|) over |delta| >= the
+    distance from z_k to the neighbour's depth range widened by dzeta; times _PEAK_BOUND_SAFETY. None of it
+    when B_gl is None or the kernel's continuation slope is negative."""
+    n = len(segs) + len(somas)
+    if B_gl is None:
+        return np.zeros(n, dtype=bool)
+    rc = cfg.renderer
+    if rc.kernel_continuation == "linear" and float(rc.kernel_continuation_slope) < 0:
+        return np.zeros(n, dtype=bool)
+    z = np.asarray(planes_z, dtype=float).reshape(-1)
+    dzeta = float(rc.dzeta_um)
+    xyz = _check_scene(fscene)
+    segs = np.asarray(segs, dtype=np.int64)
+    somas = np.asarray(somas, dtype=np.int64)
+    d = np.asarray(fscene.seg_d_um, dtype=float).reshape(-1, 2)[segs]
+    mu = np.asarray(fscene.seg_mu_per_um, dtype=float).reshape(-1, 2)[segs]
+    r = 0.25 * (d[:, 0] + d[:, 1])
+    p0, p1 = xyz[segs, :3], xyz[segs, 3:]
+    L = np.sqrt(np.sum((p1 - p0) ** 2, axis=1))
+    c = _HYBRID_ABSORB_BOUND if cfg.cleaning.shadow_absorption == "hybrid" else 1.0
+    M = c * 0.5 * (mu[:, 0] + mu[:, 1]) * math.pi * r * r * L
+    zl = np.minimum(p0[:, 2], p1[:, 2]) - r - dzeta
+    zh = np.maximum(p0[:, 2], p1[:, 2]) + r + dzeta
+    soma = np.asarray(fscene.soma, dtype=float).reshape(-1, 3)[somas]
+    zc = float(cfg.cleaning.soma_z_um)
+    M = np.concatenate([M, float(cfg.cleaning.soma_mu_per_um) * (4.0 / 3.0) * math.pi * soma[:, 2] ** 3])
+    zl = np.concatenate([zl, zc - soma[:, 2] - dzeta])
+    zh = np.concatenate([zh, zc + soma[:, 2] + dzeta])
+    dmin = np.maximum(np.maximum(zl[:, None] - z[None, :], z[None, :] - zh[:, None]), 0.0)   # (n, n_planes)
+    knots = np.asarray(rc.kernel_table_delta_um, dtype=float)
+    rmin = np.minimum.accumulate(np.asarray(_kernel.sigma_r(knots, rc), dtype=float)[::-1])[::-1]
+    sig = np.asarray(_kernel.sigma_r(dmin, rc), dtype=float)
+    j = np.searchsorted(knots, dmin, side="left")
+    sig = np.where(j < knots.size, np.minimum(sig, rmin[np.clip(j, 0, knots.size - 1)]), sig)
+    bound = _PEAK_BOUND_SAFETY * np.max(M[:, None] / (2.0 * math.pi * sig * sig), axis=1)
+    ok = np.isfinite(bound)
+    return ok & (float(B_gl) * bound < float(cfg.cleaning.shadow_floor_gl))
 
 
 def _neighbour_image(fscene, kind, idx, patch, planes_z, cfg, directions):
@@ -382,8 +521,15 @@ def shadow_image(fscene, own_ids, left, top, width, height, planes_z, cfg, B_gl=
     kept = np.zeros(n_nb, dtype=bool)
     nb_fp = np.zeros_like(own_fp)
     items = [("seg", int(q)) for q in segs] + [("soma", int(s)) for s in somas]
+    if _PREFILTER:
+        far = _beyond_reach(fscene, segs, somas, patch, z, cfg) | _below_floor(fscene, segs, somas, z, cfg, B_gl)
+    else:
+        far = np.zeros(n_nb, dtype=bool)
     for i, (kind, idx) in enumerate(items):
-        img, fp, off = _neighbour_image(fscene, kind, idx, patch, z, cfg, directions)
+        if far[i]:     # its image is 0 (the reach rule) or under the floor (not kept); its peak reported as 0
+            img, fp, off = np.zeros((z.size, patch.H, patch.W)), None, None
+        else:
+            img, fp, off = _neighbour_image(fscene, kind, idx, patch, z, cfg, directions)
         peak[i] = float(img.max()) if img.size else 0.0
         kept[i] = bool(inc[i]) and (B_gl is None or float(B_gl) * peak[i] >= float(cfg.cleaning.shadow_floor_gl))
         if kept[i]:

@@ -252,25 +252,30 @@ def test_reference():
         ref = np.stack([sample_profile(res.S[k], frame, origin, yh, eu, v, 2, P_X) for k in range(ks.size)])
         assert np.all(np.isfinite(ref)) and ref.max() > 0.05
         check_close("stretch_profiles_" + absorption, prof, ref, rtol=0.0, atol=1e-10)
-    # (3) agreement with Block 4 under the same absorption [1e-9]
-    rows, worst = [], 0.0
+    # (3) agreement with Block 4 under the same absorption [1e-9], on the exact path (shadow_bin_sigmas 0); and
+    # (3b) the binned blur of D-146.4 against that exact path [3e-3 of the peak, the orchestrator's tolerance]
+    rows, worst, worst_bin = [], 0.0, 0.0
     times = {"partition_vertical": [], "hybrid": []}
     for absorption in ("partition_vertical", "hybrid"):
-        cfg = cfg_for(absorption)
+        cfg = cfg_for(absorption, shadow_bin_sigmas=0.0)
+        cfg_bin = cfg_for(absorption)
         # Block 4 without the far-field split: its exact path (the split's interpolation is 1e-6, Block 4)
         rc4 = dataclasses.replace(cfg.renderer, absorption=absorption, ray_n_rho=cfg.cleaning.shadow_ray_n_rho,
                                   ray_n_psi=cfg.cleaning.shadow_ray_n_psi, fft_split_sigma_um=1e9)
         for d in (0.3, 0.6, 1.0):
             for tilt in (0.0, 30.0):
                 err, peak, ts, t4 = _block4_case(cfg, rc4, d, math.radians(tilt))
+                err_b, _pk, ts_b, _t4 = _block4_case(cfg_bin, rc4, d, math.radians(tilt))
                 times[absorption].append((ts, t4))
-                rows.append("%-18s d %.1f tilt %2d: max |S - (1 - tau)| %.2e (peak %.3f); shadow %.2f s, "
-                            "Block 4 %.2f s" % (absorption, d, tilt, err, peak, ts, t4))
+                rows.append("%-18s d %.1f tilt %2d: max |S - (1 - tau)| %.2e (peak %.3f), binned %.2e; shadow %.2f s "
+                            "(binned %.2f s), Block 4 %.2f s" % (absorption, d, tilt, err, peak, err_b, ts, ts_b, t4))
                 worst = max(worst, err)
+                worst_bin = max(worst_bin, err_b / peak)
     MEASURED["against Block 4 (mu 1/um, segment 4 um, 7 planes)"] = rows
     MEASURED["time per segment (s), shadow / Block 4, d 0.3/0.6/1.0 x tilt 0/30"] = [
         "%s: %s" % (a, ", ".join("%.2f/%.2f" % t for t in ts)) for a, ts in times.items()]
     assert worst <= 1e-9, "against Block 4: %.3e" % worst
+    assert worst_bin <= 3e-3, "binned against Block 4: %.3e of the peak" % worst_bin
 
 
 def _block4_case(cfg, rc4, d, phi, mu=1.0, U=2.0):

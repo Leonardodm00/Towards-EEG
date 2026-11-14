@@ -219,12 +219,15 @@ def profile_noise_factor(frame, shape, origin_xy, y_hat, e_u, v, n_avg, step):
 _DUMMY_IDS = (-910000001, -910000002)       # a stand-in own stretch no traced id equals (all_shadow)
 
 
-def all_shadow(fscene, node_like, cfg):
+def all_shadow(fscene, node_like, cfg, floor_B_gl=None):
     """S_all (n_planes, H, W) float64, dimensionless: Block 25's predicted shadow (cleaning.shadow_absorption)
     of every traced segment and soma disc of fscene -- the node's own stretch included, no floor, nothing left
     out -- on the node's patch (node_like: left, top, block (n_planes, H, W) or shape, planes_z). shadow.
     shadow_image needs an own stretch with a segment, so it is given a stand-in: one segment of zero
-    coefficient whose two ends carry ids no traced node has, 1 km from the patch (amendment 4, D-144)."""
+    coefficient whose two ends carry ids no traced node has, 1 km from the patch (amendment 4, D-144).
+    floor_B_gl (gl): when given, a segment whose shadow's peak times floor_B_gl is under cleaning.shadow_floor_gl
+    is left out (D-146.2: such shadows are smooth over the patch and the planar background takes them up);
+    None keeps every segment (slow on a whole cell)."""
     from .node_features import FeaturedScene
     shape = np.shape(node_like.block)[1:] if hasattr(node_like, "block") else tuple(node_like.shape)[-2:]
     H, W = int(shape[0]), int(shape[1])
@@ -241,7 +244,7 @@ def all_shadow(fscene, node_like, cfg):
                        seg_type=np.concatenate([np.asarray(fscene.seg_type, dtype=np.int64).reshape(-1), [3]]),
                        soma=np.asarray(fscene.soma, dtype=float).reshape(-1, 3))
     return shadow.shadow_image(fs, _DUMMY_IDS, int(node_like.left), int(node_like.top), W, H,
-                               np.asarray(node_like.planes_z, dtype=float), cfg, B_gl=None, include=None).S
+                               np.asarray(node_like.planes_z, dtype=float), cfg, B_gl=floor_B_gl, include=None).S
 
 
 def model_background(block, S_all, frame, origin_xy, cfg):
@@ -307,11 +310,11 @@ def background_factory(cfg, log=None):
         import time as _time
         t0 = _time.time()
         nid = int(node.node_id)
-        S_all = all_shadow(F, node, cfg)
+        prev = last.get(nid, np.asarray(node.B_gl, dtype=float))
+        S_all = all_shadow(F, node, cfg, floor_B_gl=float(np.max(prev)))     # the floor at the last backgrounds
         B, sd, frac, ok = model_background(node.block, S_all, CropFrame(int(node.left), int(node.top), 0,
                                                                          float(cfg.acquisition.res0_um)),
                                            node.origin_xy, cfg)
-        prev = last.get(nid, np.asarray(node.B_gl, dtype=float))
         kept = not bool(np.all(ok))
         out = np.array(prev, dtype=float) if kept else B
         if kept and log is not None:
@@ -441,7 +444,9 @@ def build_node(branch, index, pilot, provider, scene, cfg, own_ids, fscene, thet
             sub = np.asarray(block_, dtype=float)[idx]
             like = SimpleNamespace(left=int(frame.left), top=int(frame.top), block=sub, planes_z=ks * dz)
             origin0 = calibration.line_geometry(pilot)[0]
-            Bm, sd, frac, ok = model_background(sub, all_shadow(fscene, like, cfg), frame, origin0, cfg)
+            B_floor = float(pilot.B_bar) if (math.isfinite(float(pilot.B_bar)) and float(pilot.B_bar) > 0) else None
+            Bm, sd, frac, ok = model_background(sub, all_shadow(fscene, like, cfg, floor_B_gl=B_floor), frame,
+                                                origin0, cfg)
             bco[:, 0] = Bm                       # B at the line's origin: background_on_line reads b0 there
             bco[:, 1:] = 0.0
             info["support_frac"] = frac
@@ -602,6 +607,9 @@ def work_list(example_ids, fscene, swc, cfg, peak_min_gl, B_gl):
         ob = xyz_rows[key]
         return ob is not None and not is_near_end(ob[0], t, cfg)
 
+    cap = int(cfg.cleaning.work_max_nodes)
+    if len(examples) >= cap:                 # the examples alone fill the work list (F5): no neighbour can join
+        return examples[:cap]
     best = {}
     for nid in examples:
         if nid not in by_id:
@@ -620,8 +628,9 @@ def work_list(example_ids, fscene, swc, cfg, peak_min_gl, B_gl):
         k0 = int(round(float(xyz[2]) / dz))
         planes_z = np.arange(k0 - P, k0 + P + 1) * dz
         tiers = cleaning.neighbour_tiers(fscene, own, xyz, cfg)
-        res = shadow.shadow_image(fscene, own, left, top, width, height, planes_z, pv, B_gl=None,
-                                  include=(tiers == 1))
+        res = shadow.shadow_image(fscene, own, left, top, width, height, planes_z, pv,
+                                  B_gl=B if float(peak_min_gl) >= float(cfg.cleaning.shadow_floor_gl) else None,
+                                  include=(tiers == 1))    # B: the floor's prefilter (D-146); peaks >= peak_min_gl kept
         segs, _somas = shadow.neighbour_indices(fscene, own)
         for m, q in enumerate(segs):
             if tiers[m] != 1:

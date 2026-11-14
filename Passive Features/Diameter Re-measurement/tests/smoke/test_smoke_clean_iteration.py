@@ -298,7 +298,7 @@ def _real_shadow_oracle():
     depth 0, so that each alone and the pair share one slab lattice; the pixel means of Block 24's
     partition render (no far-field split) on the patch, B = 210. One round of round_once with the real
     shadow model: node 2's cleaned profiles equal sample_profile of B tau(node alone)."""
-    cfg = cfg_with(shadow_absorption="partition_vertical")
+    cfg = cfg_with(shadow_absorption="partition_vertical", shadow_bin_sigmas=0.0)   # the exact path (D-146.4)
     d, mu, U, y2 = 0.6, 2.0, 2.0, 21 * PX
     scene = Scene(seg_xyz=np.array([[-U, 0.0, 0.0, U, 0.0, 0.0], [-U, y2, 0.0, U, y2, 0.0]]),
                   seg_radius=np.full((2, 2), 0.5 * d), seg_ids=np.array([[2, 1], [12, 11]]), soma=np.zeros((0, 3)))

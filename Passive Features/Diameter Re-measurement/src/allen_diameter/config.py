@@ -382,6 +382,7 @@ class CleaningConfig:
     shadow_floor_gl: float = 0.3           # source: D-130.O5 (the assistant's reading, PROVISIONAL): a neighbour counts when its predicted shadow exceeds this somewhere in the patch; the value of calibration.isolation_depth_gl
     shadow_fine_factor: int = 8            # source: PROVISIONAL (Block 25): samples per pixel side of the shadow image's fine grid
     shadow_reach_sigmas: float = 6.0       # source: PROVISIONAL (Block 25): a segment farther than this many kernel SDs from the patch contributes 0
+    shadow_bin_sigmas: float = 8.0         # source: PROVISIONAL (D-146.4): a slab blurred at sigma is binned in blocks of at most sigma / this (0: never; the exact path)
     soma_mu_per_um: float = 0.3            # source: PROVISIONAL (Block 25): the soma sphere's coefficient until it is fitted
     soma_z_um: float = 0.0                 # source: PROVISIONAL (Block 25): the soma sphere's depth; set by the script from the soma node's traced z
     close_lateral_um: float = 2.0          # source: PROVISIONAL (Block 27): class close_in_focus, lateral distance from the line's centre
@@ -390,8 +391,8 @@ class CleaningConfig:
     example_counts: Tuple[int, ...] = (4, 6, 6, 2, 2)  # source: D-130.O7 [user: 20 nodes]; the split (clean, diffuse, close_in_focus, overlap, nearest the soma) is the assistant's
     max_rounds: int = 5                    # source: D-130.O6 [user]
     shadow_absorption: str = "hybrid"      # source: D-132.1 [user]: the absorbed light per column of the tier-1 shadow model; "partition_vertical" the labelled alternative
-    shadow_ray_n_rho: int = 8              # source: PROVISIONAL (Block 25): the hybrid's directions in the shadow model (Block 21 measured 1.5e-2 pointwise at 8 x 16)
-    shadow_ray_n_psi: int = 16             # source: PROVISIONAL (Block 25): as shadow_ray_n_rho
+    shadow_ray_n_rho: int = 4              # source: PROVISIONAL (D-146.3; 8 before): the hybrid's directions in the shadow model of the neighbours
+    shadow_ray_n_psi: int = 8              # source: PROVISIONAL (D-146.3; 16 before): as shadow_ray_n_rho
     tier_reach_um: float = 3.0             # source: PROVISIONAL (Block 28): an unattached neighbour overlapping the own stretch within this distance of the node is tier 2 (D-132.2)
     over_background_gl: float = 3.0        # source: PROVISIONAL (Block 28): a cleaned pixel above the background by more than this is counted (the configured noise SD)
     refine_d_bounds_um: Tuple[float, float] = (0.1, 6.0)        # source: PROVISIONAL (Block 29)
@@ -710,6 +711,7 @@ def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None
     ok = (c.patch_half_um > 0 and c.shadow_floor_gl >= 0 and math.isfinite(c.shadow_floor_gl)
           and int(c.shadow_fine_factor) == c.shadow_fine_factor and c.shadow_fine_factor >= 1
           and c.shadow_reach_sigmas > 0 and c.soma_mu_per_um >= 0 and math.isfinite(c.soma_z_um)
+          and c.shadow_bin_sigmas >= 0 and math.isfinite(c.shadow_bin_sigmas)
           and c.close_lateral_um > 0 and c.close_defocus_um > 0 and c.clean_index_max > 0
           and c.tier_reach_um > 0 and c.over_background_gl >= 0
           and c.max_rounds >= 1 and 0 < c.stop_rel_d < 1 and c.refine_max_nfev >= 1
