@@ -367,6 +367,36 @@ def test_floor_background():
     assert_array_equal(per[2]["shadow_gl"], B[:, None, None] * S)
 
 
+def test_background_fn():
+    # Block 32, amendment 2 (D-144): background_fn(node, F) gives the planes' backgrounds of the round, used by the
+    # floor, the cleaning and the refinement; None keeps the node's own B_gl
+    cfg = cfg_with(shadow_absorption="partition_vertical")
+    node = make_node(2)
+    feats, scene = make_features([1.0, 0.8], [1.0, 1.5]), make_scene()
+    rows0, per0 = CI.round_once(feats, scene, [node], cfg, closed_predict_factory)
+    seen = []
+
+    def same(n, F):
+        seen.append((n.node_id, type(F).__name__))
+        return np.array(n.B_gl)
+    rows1, per1 = CI.round_once(feats, scene, [node], cfg, closed_predict_factory, background_fn=same)
+    assert len(seen) == 1 and seen[0][0] == 2
+    assert_array_equal(per1[2]["cleaned"], per0[2]["cleaned"])           # [exact: the same operations]
+    assert_array_equal(per1[2]["B_gl"], np.asarray(node.B_gl, float))
+    assert per1[2]["fit"] == per0[2]["fit"]
+    B2 = np.asarray(node.B_gl, float) + np.arange(KS.size) * 2.0
+    rows2, per2 = CI.round_once(feats, scene, [node], cfg, closed_predict_factory, background_fn=lambda n, F: B2)
+    S = per2[2]["S"]
+    assert_array_equal(per2[2]["cleaned"], np.asarray(node.block, float) + B2[:, None, None] * S)
+    assert_array_equal(per2[2]["B_gl"], B2)
+    res = CI.run_rounds(feats, scene, [node], cfg_with(shadow_absorption="partition_vertical", max_rounds=1), 3.0,
+                        closed_predict_factory, example_ids=(2,), background_fn=lambda n, F: B2)
+    assert_array_equal(res.B_gl[2], B2)
+    for bad in (np.full(KS.size, np.nan), np.zeros(KS.size), np.ones(KS.size + 1) * 200.0):
+        _raises(lambda bad=bad: CI.round_once(feats, scene, [node], cfg, closed_predict_factory,
+                                              background_fn=lambda n, F: bad))
+
+
 def test_convergence():
     raise unittest.SkipTest("no discretisation in the iteration; its contraction is test_known_answer (a)")
 
