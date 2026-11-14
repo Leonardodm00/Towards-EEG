@@ -181,6 +181,7 @@ the "Binds" column.
 | 2026-11-14 (later, 4) | Logs **D-144** (user, 15:30, the dialog of the diameter chat; the details the orchestrator's): in the cleaning a node's background is fitted **through the shadow model** -- image = planar background x (1 - predicted shadow of every traced segment, the own branch included) -- and refitted each round; supersedes D-143.2 and D-141.1, after the "unshaded" support too proved empty on a stretch tilted at 30 deg (0 to 0.1 % of the patch). Contract: amendment 4 of Block 36 and amendment 2 of Block 32 (`d35e800`, `2f5ad01` on `sci/diameter-pipeline`, local); the orchestrator added `background_fn` to `clean_iteration.py` (suite 8 pass, 1 skip). D-143.1 confirmed by the implementer's probe: with the tube over exactly the own segments the model's shortfall is 0.29-0.72 % of the dip with nodes 1 um apart and 0.34-0.88 % with 2 um (bound 1.5 %; 1.3-3.2 % without the cleaning), the background given by hand. |
 | 2026-11-14 (later, 5) | No new decision ID (the diameter chat, 18:30). **Block 36's amendments 2 to 4 passed the gate and are merged and pushed** (`29d1640`, head `aad7da4` on `sci/diameter-pipeline`; suite 12 pass, 1 skip, rerun by the orchestrator on the merged tree). Measured (the suite, noise-free scenes rendered and modelled with `partition_vertical`): on a 20 um tube at 30 deg the node is no longer refused, the model-fitted background is 0.27-0.28 gl above the true 210 gl with nodes 1 um apart and 0.14 gl with 2 um (the shadow model adds segments one by one where the scene shares a column at each joint), and **1.6-1.9 gl above when every diameter of the features is 25 % too large**; D-142.1's oracle with this background: 0.19-0.51 % and 0.05-0.12 % of the dip after cleaning (bound 1.5 %; 1.6-4.2 % before); D-142.2: noise factor 0.267, on white noise chi2/N 1.03 and the SE 0.0026 um instead of 0.0080. Time on the synthetic cell, fast settings (the implementer's): 85-145 s per node and round, the background's refit 39-54 s of it. Open: one synthetic node's SE five times smaller than its neighbour's; on noise-free data a model mismatch makes the background's trim reject the plane. The notebook's first run set to 2 rounds and 20 nodes. A second final check (Opus tester, Blocks 36 and 32, commit `aad7da4`) is running. |
 | 2026-11-14 (later, 6) | No new decision ID (the diameter chat, 15:05; plumbing). The pilot's survey (Cell 16) ran at about 2.9 s per dendrite node in Colab -- 3000 of 8496 in 2.4 h, so about 7 h in all (the notebook had said about 1 s per node, from the synthetic cell) -- and wrote nothing until its end, so the user's stop loses those 3000. Block 36, amendment 5: the survey visits the nodes in a seeded random order, `--max-nodes` stops after that many, the outputs are rewritten every 100 nodes and when the script is stopped (`49eab6b` on `sci/diameter-pipeline`; suite 12 pass, 1 skip; a run stopped by SIGTERM after 8 of 14 synthetic nodes left rows equal to the full run's). The notebook's Cell 16 surveys a random sample of 600 nodes by default (about 30 min). The second final check (Opus tester on `aad7da4`) was stopped by a session restart after 37 min and is resumed. The session's model changed to Opus 5.5 at the user's command. |
+| 2026-11-14 (later, 7) | Logs **D-145** [orchestrator] (the diameter chat, 16:20; coding directives 7 and 9). **Second final check (Opus tester) at `49eab6b`: PASS WITH ISSUES** (report `specs/test_reports/2026-11-14_1830_incremental.md`, tests `ab6d6fd`): 220 spec tests pass, no smoke suite regressed; the code agrees with SPEC on every contract checked. One MAJOR finding about the method (F1: a neighbour branch's shadow summed segment by segment over-subtracts on steep branches), one MINOR (F2: the background's trim not centred) and two notes. Settled in amendment 6 of Block 36 (`225c458`): F2, F3, F4 fixed; F1 measured by the orchestrator at the pilot's coefficient (0.258 /um) and found within the 1.5 % bound up to 60 deg (at most 0.71 %), but not at 1 /um above 45 deg -- left open for the user (rendering each neighbour branch jointly would change D-134). Checked: `test_smoke_pilot_run.py` 12 pass, 1 skip; Block 36 and 32 spec tests 40 pass. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -335,6 +336,7 @@ would be needed*, *Status*.
 | D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
 | D-133 | 2026-11-13 | SPEC Blocks 25 (amendment 2), 28, 29, 30, 31 at `38f7c19`; `CleaningConfig`, `InferenceConfig` | wave 2's validation targets, tolerances and provisional parameters, proposed by the orchestrator at the wave's start: exact inverse of the cleaning 1e-9 gl; recovery 1e-6 and unbiasedness within 3 SE for the two fits; coverage 60-76 % and chi2/N within 10 % of 1 for the per-node fit; hybrid column sum 1e-10 and faint limit 5e-3 for the shadow model; renderers passed as callables [orchestrator] | active |
 | D-134 | 2026-11-13 | SPEC Block 25 (amendment 3); D-132.1 | a tier-1 neighbour's shadow is equations (5-6) for the neighbour rendered alone: one blur per slab, under the hybrid's absorbed light; one kernel per column is dropped [user] | active; supersedes the "one blur per column" clause of D-132.1 |
+| D-145 | 2026-11-14 | SPEC Block 36 (amendment 6) at `225c458` | the summed segment shadows of a neighbour branch accepted at the pilot's coefficient (within 1.5 % of the dip up to 60 deg), not above about 0.5 /um on steep branches (open); the background's trim centred on the residuals' median, one trim; the first backgrounds on the round-0 scene with the pilots' rows; outputs written atomically [orchestrator] | active |
 | D-144 | 2026-11-14 | SPEC Block 36 (amendment 4), Block 32 (amendment 2) at `d35e800`; `CleaningConfig.background_support`, `background_shadow_max` | in the cleaning each plane's planar background is fitted through the shadow model, image = background x (1 - predicted shadow of every traced segment), and refitted each round [user]; pixels with a predicted shadow above 0.10 left out, trimming and validity as the calibration's [orchestrator], PROVISIONAL | active; supersedes D-143.2 and D-141.1 |
 | D-143 | 2026-11-14 | SPEC Block 36 (amendment 3) at `e644ff0`; `CleaningConfig.background_support` | the node's tube runs along its axis exactly over its own segments, which end at the first node beyond `tube_half_length_um` on each side; the cleaning's planar background is fitted on the pixels that no neighbour's and no own predicted shadow reaches above `isolation_depth_gl` [orchestrator], PROVISIONAL | active; refines D-142.1, supersedes D-141.1's default |
 | D-142 | 2026-11-14 | SPEC Block 36 (amendment 2) at `84ecd18` | a node's own part of its stretch is only what its tube models (the nodes within the tube's half-length); the rest of the stretch is a neighbour and is cleaned away; the fits and the stop rule get the noise SD of a profile sample (the pixel's SD times the read's white-noise factor), not the pixel's [orchestrator], PROVISIONAL | active; refines D-136.1 for the cleaning and the fits |
@@ -11193,4 +11195,45 @@ round's backgrounds. One more predicted-shadow image per node and round.
 **Sources.** **[user]** the dialog. **[run, sandbox]** as tagged. **[SPEC]** `d35e800`.
 
 **Status:** active; the implementer is applying it.
+
+
+## D-145 -- The second final check settled: the summed shadows of a branch accepted at the pilot's coefficient; the background's trim centred; the first backgrounds on the round-0 scene [orchestrator]
+
+**Date:** 2026-11-14, about 16:20 (Europe/Rome), the diameter chat, settled by the orchestrating session (now on Opus
+5.5) under coding directives 7 and 9 on the Opus tester's report of 18:30 (`specs/test_reports/2026-11-14_1830_incremental.md`,
+PASS WITH ISSUES at `49eab6b`); the user was not asked and can reverse any point.
+**Binds:** SPEC Block 36, amendment 6 at `225c458` on `sci/diameter-pipeline`.
+
+**Decision [orchestrator].** Four clauses, PROVISIONAL.
+
+**Statement.** (D-145.1, validation target) The shadow model of a neighbour branch is the sum of its segments' shadows,
+each rendered alone (Block 25, D-134). The 1.5 % bound on the cleaned profile's departure from the node's tube model
+(D-142.1) is stated for tilts of 30, 45 and 60 deg at the pilot's coefficient $\mu$ = 0.258 /um. Agreed before: stated at
+30 deg only. (D-145.2, estimator) The trim of the cleaning's background (D-144.3) is one trim and refit, keeping the
+pixels whose residual $r$ satisfies $|r - \mathrm{med}(r)| \le$ `background_trim_sigmas` $\times 1.4826 \times
+\mathrm{MAD}$. Agreed before: $|r| \le$ the same threshold, and "iterative". (D-145.3, convention) The first backgrounds
+of a node are fitted on the round-0 scene, Allen's diameters and `--mu` with every work-list node of finite pilot at its
+pilot's $(\hat d, \hat\mu)$. Agreed before: not stated; the code used Allen's diameters only. (D-145.4) The scripts'
+outputs are written whole and renamed.
+
+**Why.** (1) Where a column of light crosses two consecutive segments of a steep branch the joint absorption
+$1 - e^{-(a_1 + a_2)}$ is less than the sum of the two shadows; the error grows with the tilt, the coefficient and the
+number of joints. Measured by the orchestrator with the tester's reproducer (`tests/spec/repro_block36_tube_cut.py`,
+`case`; $d$ = 1.0 um, nodes 1 / 2 um apart, maximum over the planes $k^* \pm 4$, share of the dip): at $\mu$ = 0.258 /um
+0.09 / 0.05 % (30 deg), 0.39 / 0.21 % (45 deg), 0.71 / 0.41 % (60 deg); at $\mu$ = 1 /um 0.34 / 0.19 %, 1.61 / 0.89 %,
+3.20 / 1.83 %; at $d$ = 0.6 um and 0.258 /um at most 0.23 % **[run, sandbox]**. (2) Uncentred, a small offset of the
+model beside a small MAD dropped the whole support (kept share 0.0057 against 0.94 before the trim, the tester's
+noise-free scene); centred, the share is 0.74 to 0.88 and the node is kept **[run, sandbox]**. (3) The entry's round-0
+features include the pilots' rows; the backgrounds were fitted before those rows were set (the tester's reading).
+
+**What it implies for code and tables.** `node_inputs.model_background`, `scripts/clean_cell.py`; the tester's F2
+reproducer is a regular test.
+
+**What it does not decide [open].** For a cell whose coefficient is near 1 /um: render each neighbour branch jointly
+(changes D-134's "rendered alone": the user's); the survey's classes do not count the node's own stretch beyond its
+tube; `calibration_scene.planar_background` (the kernel calibration's) trims uncentred as well -- unchanged.
+
+**Sources.** **[run, sandbox]** as tagged; the tester's report. **[SPEC]** `225c458`.
+
+**Status:** active.
 
