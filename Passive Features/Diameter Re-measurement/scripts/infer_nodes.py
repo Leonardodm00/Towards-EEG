@@ -138,7 +138,8 @@ def run_real(a, log):
             theta0, row["start"] = fit_start(str(feats.source[k]), float(feats.d_um[k]), float(feats.mu_per_um[k]),
                                              off, pilot, node.node_xyz)
             sigma = float(info["sigma_gl"])
-            forward = node_inputs.forward_factory(pilot, float(info["half_length_um"]), node, cfg, cache)
+            forward = node_inputs.forward_factory(pilot, tuple(float(x) for x in info["U_axis_um"]), node, cfg,
+                                                  cache)        # the tube's extents (amendment 3)
             fit = node_inference.fit_node(prof, node.B_gl, sigma, forward, theta0, cfg)
         except Exception as exc:                      # one node's failure never stops the run
             n_failed += 1

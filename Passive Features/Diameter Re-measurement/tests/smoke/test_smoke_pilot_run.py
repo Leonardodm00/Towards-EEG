@@ -216,7 +216,7 @@ def test_known_answer():
     p = fake_pilot()
     trace = np.array([1.1, -0.4, -0.2])
     d, v0, dz, U = 0.83, 0.21, -0.47, 4.2
-    tube = NI.local_tube(p, trace, d, v0, dz, U)
+    tube = NI.local_tube(p, trace, d, v0, dz, U, U)
     yh = np.array([-math.sin(p.theta_rad), math.cos(p.theta_rad)])
     c = np.array([p.cx_um, p.cy_um])
     foot = c + np.dot(trace[:2] - c, yh) * yh
@@ -227,19 +227,30 @@ def test_known_answer():
     check_close("pilot_start", NI.pilot_start(p, trace), [p.d_hat_um, p.mu_hat_per_um, v_t, p.z_sub_um - trace[2]],
                 rtol=0, atol=1e-12)
     # at the pilot's own start the tube sits on the pilot's centre and depth
-    t0 = NI.local_tube(p, trace, d, v_t, p.z_sub_um - trace[2], U)
+    t0 = NI.local_tube(p, trace, d, v_t, p.z_sub_um - trace[2], U, U)
     check_close("start_on_pilot", np.array(t0.c), [p.cx_um, p.cy_um, p.z_sub_um], rtol=0, atol=1e-12)
     check_close("local_tube_r", tube.r, d / 2.0, rtol=0, atol=1e-12)
     assert (tube.theta, tube.phi, tube.aspect, tube.half_length, tube.end_cut) == \
         (p.theta_rad, p.phi_rad, 1.0, U, "axial"), tube
-    # tube_half_length on a branch written by hand: arc lengths 0, 1, 3, 6, 10, 15 um
+    # asymmetric extents (amendment 3): centre moved by (U+ - U-)/2 along a_hat, half-length (U+ + U-)/2
+    ta = NI.local_tube(p, trace, d, v0, dz, 2.0, 7.0)
+    a_hat = np.array([math.cos(p.phi_rad) * math.cos(p.theta_rad), math.cos(p.phi_rad) * math.sin(p.theta_rad),
+                      math.sin(p.phi_rad)])
+    check_close("local_tube_asym", np.array(ta.c), np.array(tube.c) + 2.5 * a_hat, rtol=0, atol=1e-12)
+    assert ta.half_length == 4.5
+    # own_ids_within and tube_extent on a branch written by hand: arc lengths 0, 1, 3, 6, 10, 15 um, T = 5:
+    # each side up to and including the first node beyond 5 um, or the end
     s = np.array([0.0, 1.0, 3.0, 6.0, 10.0, 15.0])
     P = np.column_stack([s, np.zeros(6), np.zeros(6)])
     br = Branch(np.arange(10, 16), np.full(6, 3), P, np.full(6, 0.3), s)
-    want = [min(si, 15.0 - si, cfg.inference.tube_half_length_um) for si in s]
-    got = [NI.tube_half_length(br, i, cfg) for i in range(6)]
-    check_close("tube_half_length", got, want, rtol=0, atol=1e-12)
-    # near_end at the margin (3.0 um): a node exactly at 3.0 um is valid, at 3.0 - 1e-9 um it is not
+    want = {0: ((10, 11, 12, 13), 0.0, 6.0), 2: ((10, 11, 12, 13, 14), 3.0, 7.0), 3: ((10, 11, 12, 13, 14, 15), 6.0, 9.0),
+            5: ((13, 14, 15), 9.0, 0.0)}
+    for i, w in want.items():
+        got = NI.own_ids_within(br, i, cfg.inference.tube_half_length_um)
+        assert got[0] == w[0], (i, got)
+        check_close("own_extent_%d" % i, got[1:], w[1:], rtol=0, atol=1e-12)
+        check_close("tube_extent_%d" % i, NI.tube_extent(br, i, cfg), w[1:], rtol=0, atol=1e-12)
+    # near_end at the margin (3.0 um): an extent exactly 3.0 um is valid, 3.0 - 1e-9 um is not
     m = cfg.inference.extrusion_cap_margin_um
     for arc, expect in ((m, False), (m - 1e-9, True), (m + 1e-9, False)):
         s2 = np.array([0.0, arc, 20.0])
@@ -283,13 +294,13 @@ def _line_node(cfg):
 def test_reference():
     cfg = fast_cfg()
     p, node = _line_node(cfg)
-    U = 5.0
+    U = (5.0, 5.0)
     cache = line_fast.SectionCache()
     pred = NI.predict_factory({5: p}, {5: U}, cfg, cache)(node)
     fwd = NI.forward_factory(p, U, node, cfg, cache)
     d, mu, v0, dz = 0.7, 1.1, 0.12, -0.2
     z_t = float(node.node_xyz[2])
-    by_hand = line_fast.line_profiles(NI.local_tube(p, node.node_xyz, d, v0, dz, U), mu, node.ks, node.origin_xy,
+    by_hand = line_fast.line_profiles(NI.local_tube(p, node.node_xyz, d, v0, dz, *U), mu, node.ks, node.origin_xy,
                                       node.y_hat, node.e_u, node.v, node.n_avg, node.step, cfg)
     assert_array_equal(pred(d, mu, v0, dz), 1.0 - by_hand)
     assert_array_equal(fwd(d, mu, v0, z_t + dz), by_hand)
@@ -298,7 +309,7 @@ def test_reference():
     # the hybrid through the cache: equal to an uncached call
     hcfg = dataclasses.replace(cfg, inference=dataclasses.replace(cfg.inference, absorption="hybrid"))
     fh = NI.forward_factory(p, U, node, hcfg, line_fast.SectionCache())
-    ref = line_fast.line_profiles(NI.local_tube(p, node.node_xyz, d, v0, 0.1 - z_t, U), mu, node.ks, node.origin_xy, node.y_hat,
+    ref = line_fast.line_profiles(NI.local_tube(p, node.node_xyz, d, v0, 0.1 - z_t, *U), mu, node.ks, node.origin_xy, node.y_hat,
                                   node.e_u, node.v, node.n_avg, node.step, hcfg)
     assert_array_equal(fh(d, mu, v0, 0.1), ref)
 
@@ -318,7 +329,7 @@ def test_invariants():
     bg = cfg.renderer.background_B_gl
     assert np.max(np.abs(node.B_gl - bg)) <= 0.5, ("B_k within 0.5 gl of the background", node.B_gl)
     assert_array_equal(node.ks, NI.node_planes(pilot, cfg))
-    assert cfg.cleaning.background_support == "square", "the default support (amendment 1)"
+    assert cfg.cleaning.background_support == "unshaded", "the default support (amendment 3)"
     check_close("node_xyz", node.node_xyz, ob.xyz_um[t], rtol=0, atol=0)          # the traced position
     check_close("theta0", node.theta0, NI.pilot_start(pilot, ob.xyz_um[t]), rtol=0, atol=0)
     print("    two tubes 3 um apart, default support %r: B_k %s gl, noise SD %.2f gl"
@@ -408,7 +419,7 @@ def test_trace_offset():
     feats = node_features.with_rows(feats, [dict(node_id=7, d_um=pilot.d_hat_um, mu_per_um=pilot.mu_hat_per_um,
                                                  source="pilot")], 0)
     res = clean_iteration.run_rounds(feats, scene, [node], cfg, 1.0,
-                                     NI.predict_factory({7: pilot}, {7: info["half_length_um"]}, cfg, None))
+                                     NI.predict_factory({7: pilot}, {7: info["U_axis_um"]}, cfg, None))
     k = res.features.index_of()[7]
     off = res.features.offset_um[k]
     lat = float(np.hypot(off[0] - true_off[0], off[1] - true_off[1]))
@@ -450,7 +461,7 @@ def test_noise_free_fit():
     node, info = NI.build_node(ob, t, pilot, provider, scene, cfg, tuple(int(i) for i in ob.ids))
     assert node is not None, info
     prof = clean_iteration._profiles(np.asarray(node.block, dtype=float), node, cfg)
-    fwd = NI.forward_factory(pilot, info["half_length_um"], node, cfg, line_fast.SectionCache())
+    fwd = NI.forward_factory(pilot, info["U_axis_um"], node, cfg, line_fast.SectionCache())
     th0 = [pilot.d_hat_um, pilot.mu_hat_per_um, 0.0, pilot.z_sub_um]
     icfg = dataclasses.replace(cfg, inference=dataclasses.replace(cfg.inference, max_nfev=200))
     fit = node_inference.fit_node(prof, node.B_gl, 1.0, fwd, th0, icfg)    # noise-free: sigma only scales chi2
@@ -619,9 +630,9 @@ def test_edge_cases():
     assert tuple(getattr(pilot, n) for n in names) == before[2]
     # ExtrusionInvalid -> NaN in predict and forward (the line 1 um from a cap of a 1.5 um tube)
     p, nd = _line_node(cfg)
-    pred = NI.predict_factory({5: p}, {5: 1.5}, cfg, None)(nd)
+    pred = NI.predict_factory({5: p}, {5: (1.5, 1.5)}, cfg, None)(nd)
     assert np.all(np.isnan(pred(0.6, 1.0, 0.0, 0.0)))
-    assert np.all(np.isnan(NI.forward_factory(p, 1.5, nd, cfg, None)(0.6, 1.0, 0.0, 0.0)))
+    assert np.all(np.isnan(NI.forward_factory(p, (1.5, 1.5), nd, cfg, None)(0.6, 1.0, 0.0, 0.0)))
     # work_list refusals
     feats = node_features.initial_features(swc, (2, 3, 4), 1.0)
     fs = node_features.featured_scene(scene, feats)
@@ -633,11 +644,11 @@ def test_edge_cases():
             continue
         raise AssertionError("work_list accepted %r" % bad)
     try:
-        NI.tube_half_length(long, 5, cfg)
+        NI.tube_extent(long, 5, cfg)
     except ValueError:
         pass
     else:
-        raise AssertionError("tube_half_length accepted an index outside the branch")
+        raise AssertionError("tube_extent accepted an index outside the branch")
 
 
 # ---------------------------------------------------------------- runner ---

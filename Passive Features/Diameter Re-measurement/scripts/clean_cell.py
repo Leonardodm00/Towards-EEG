@@ -386,7 +386,7 @@ def run_clean(a, cfg, log):
             own_branch_, _ = ob
             pilot = measure_pilot(full, off + t, provider, cfg)
             start, clipped = _clip_start(node_inputs.pilot_start(pilot, own_branch_.xyz_um[t]), cfg)
-            own = node_inputs.own_ids_within(own_branch_, t, node_inputs.tube_half_length(own_branch_, t, cfg))
+            own = node_inputs.own_ids_within(own_branch_, t, cfg.inference.tube_half_length_um)[0]   # amendment 3
             node, info = node_inputs.build_node(own_branch_, t, pilot, provider, scene, cfg, own,
                                                 theta0=start)          # own ids within U (amendment 2, F1)
         except Exception as exc:                     # one node's failure never stops the run
@@ -404,13 +404,15 @@ def run_clean(a, cfg, log):
         info.update(pilot=pilot_fields(pilot), start_clipped=clipped, theta0=start,
                     d_allen_um=2.0 * float(own_branch_.radius_um[t]))
         nodes.append(node)
-        infos[nid], pilots[nid], halfs[nid] = info, pilot, info["half_length_um"]
+        infos[nid], pilots[nid], halfs[nid] = info, pilot, info["U_axis_um"]
         log("node %d: pilot d %.3f um, mu %.3f /um, k* %d (%s)%s; %d planes %d..%d, B %.1f..%.1f gl, noise SD %.2f "
-            "gl (pixel %.2f gl x %.3f), %d own nodes, tube half-length %.2f um; %.1f s"
+            "gl (pixel %.2f gl x %.3f), %d own nodes, tube -%.2f..+%.2f um, support %s; %.1f s"
             % (nid, pilot.d_hat_um, pilot.mu_hat_per_um, pilot.k_star, pilot.fit_status,
                " start clipped into the refine box" if clipped else "", node.ks.size, node.ks[0], node.ks[-1],
                node.B_gl.min(), node.B_gl.max(), info["sigma_gl"], info["sigma_pixel_gl"],
-               info["noise_factor"], len(node.own_ids), info["half_length_um"], time.time() - t0))
+               info["noise_factor"], len(node.own_ids), info["U_axis_um"][0], info["U_axis_um"][1],
+               ("%.2f..%.2f" % (min(info["support_frac"]), max(info["support_frac"]))) if "support_frac" in info
+               else cfg.cleaning.background_support, time.time() - t0))
     kept_examples = [i for i in examples if i in infos]
     base = dict(specimen=str(a.specimen), source=label, examples_file=os.path.abspath(a.examples),
                 example_ids=kept_examples, examples_requested=examples, examples_cut=cut, work_list=work, dropped=dropped,
