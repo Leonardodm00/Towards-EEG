@@ -9,6 +9,7 @@ which stays the history of Block 9 and of D-122 to D-125.
 | 2026-11-12 | Created at the user's request ("The handoff then"), after D-125 (Block 6's five questions answered) and D-126 (its two readings confirmed). Same day, before it: Block 9 written and pushed (`2171519`); the noise chat's D-117/D-118 renumbered D-122/D-123 (`a05ccdb`); D-124 (the cohort); the project instructions became v2 (the repository is the source of truth); the diameter chat's D-117 to D-121 and I-005 merged into `main`'s log (`3dc3703`); Block 6's SPEC entry drafted (`3dc3703`). |
 | 2026-11-13 | Step 1 done: Block 6 written, smoke-tested (R1-R9 9/9; 26 planted defects, each caught) and pushed (`1d848f6`). §1, §3 (what was built beyond the SPEC entry), §4 (the final commands, what to read back), §5 and §9 brought up to date. No decision taken (next free IDs unchanged: D-127, I-006). |
 | 2026-11-14 | Step 2 under way **[cluster, pasted 16:16]**: the F2 scan of the 18 cells finds nothing to drop; the FULL gates SETTLED at `62f3324` (16 checks); `smoke_noise_run.py` 9/9 on davinci (536 s); the first dry run refused inside an interactive job (the guard). §1, §4, §5, §9 updated. |
+| 2026-11-14 (later) | The pilot submitted, 16:19 **[cluster]**: array `2096989[].pbsserver01`, merge `2096990.pbsserver01`, walltime 48 h; §4 holds the job IDs, the run file and how to follow it. |
 
 **Basis tags.** **[run]** executed in the assistant's sandbox (date given); **[src]** read from the code, SPEC or log
 on `main`; **[log]** the decision log's text; **[user]** the user's decision or words; **[reasoning]** the assistant's
@@ -126,6 +127,14 @@ Reading the pilot back (OUT = `/davinci-1/home/ldellamea/Human Neurons Fitting/p
     python -c "import json,glob,sys; [print(f.split('/')[-1], json.load(open(f))['status'], json.load(open(f))['seconds']) for f in sorted(glob.glob(sys.argv[1] + '/cells/*.json'))]" "$OUT"
 
 Done 2026-11-14 **[cluster, pasted 16:16]**: the F2 scan (0 sweeps to drop in the 18 cells), `git pull` to `62f3324`, the FULL gates (16 passed, VERDICT SETTLED, G11 1220 s), `smoke_noise_run.py` 9/9 (536 s) -- all inside an interactive job (`qsub -I`, dvnode018). The dry run there was refused by the submitter's guard (`PBS_JOBID` set); it and the pilot run from the **login node** (dvlogin02): `exit` the interactive job first.
+
+**The pilot is running** (submitted 2026-11-14 16:19 from dvlogin04 at `52aa4c1` **[cluster]**): cell array `2096989[].pbsserver01` (subjob 0 = 508282493, subjob 1 = 569844159; 6 cores, 48 h each), merge `2096990.pbsserver01` after it; run file `~/noise_fit_runs/nf1_L3_exc_20261114T151931Z.env`. Following it:
+
+    qstat -t '2096989[]' 2096990           # the two subjobs and the merge (R running, Q queued, F finished)
+    OUT="/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs_ih/noise_fit/nf1/L3_exc"
+    tail -n 4 "$OUT"/logs/cell_*.log     # progress: the windows line first, then each solve and sweep
+
+Expected durations **[reasoning, from SPEC 2.3 (h) and 2.5 (h); never run at full size]**: 508282493 (2 SS sweeps) about 2-5 h, 569844159 (10 SS sweeps) about 4-10 h, the merge minutes after the later one.
 
 Read back from the pilot: the `NOISE_CELL` lines, each JSON's per-stage seconds (they set `WALLTIME`), the
 `NOISE_MERGE` line. A code change between the pilot and the run re-runs every cell, the pilot's included (the resume
