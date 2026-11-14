@@ -43,6 +43,7 @@ import dataclasses
 import json
 import math
 import os
+import signal
 import sys
 import tempfile
 import time
@@ -187,47 +188,23 @@ def soma_z(swc, cfg, transform):
 
 # ----------------------------------------------------------------- survey ---
 
-def run_survey(a, cfg, log):
-    os.makedirs(a.out, exist_ok=True)
-    swc, _provider, label = load_cell(a, cfg, log, need_images=False)
-    transform = transform_of(a)
-    res0 = float(cfg.acquisition.res0_um)
-    xyz = cell.to_image_um(swc.xyz, res0, **transform)
-    scene = cell.cell_scene(swc, tuple(cfg.cleaning.neighbour_swc_types), res0, transform)
-    log("scene: %d segments (types %s), %d soma discs; B %.4g gl, mu %.4g /um"
-        % (scene.seg_xyz.shape[0], tuple(cfg.cleaning.neighbour_swc_types), scene.soma.shape[0], a.B, a.mu))
-    rows, single, failed = [], 0, []
-    runs = cell.stretches(swc, tuple(cfg.acquisition.dendrite_swc_types))
-    n_nodes = sum(len(r) for r in runs)
-    t_last = time.time()
-    for run in runs:
-        ob = node_inputs.own_branch(swc, run, xyz)
-        if ob is None:
-            single += 1
-            log("node %d: a one-node stretch, not surveyed (no own direction; near_end)" % int(swc.ids[run[0]]))
-            continue
-        branch = ob[0]
-        for t in range(len(run)):
-            nid = int(branch.ids[t])
-            try:
-                row = contamination.node_contamination(branch, t, scene, a.B, a.mu, cfg)
-            except Exception as exc:          # one node's failure never stops the survey
-                failed.append(nid)
-                log("node %d: survey failed (%s: %s), dropped" % (nid, type(exc).__name__, exc))
-                continue
-            row["near_end"] = node_inputs.is_near_end(branch, t, cfg)
-            rows.append(row)
-            if len(rows) % 200 == 0 or time.time() - t_last > 60:
-                t_last = time.time()
-                log("%d of %d dendrite nodes surveyed" % (len(rows), n_nodes))
+class _Stop(Exception):
+    """Raised by the SIGTERM handler: the notebook's run() helper terminates the script when its cell is stopped."""
+
+
+def _on_sigterm(signum, frame):
+    raise _Stop()
+
+
+def _survey_outputs(a, cfg, log, rows, single, failed, label, transform, n_target, n_dendrite, partial):
+    """Write contamination_<S>.csv and examples_<S>.json from the rows surveyed so far (a checkpoint when
+    partial). The example nodes are drawn from these rows only."""
     csv_path = write_csv(os.path.join(a.out, "contamination_%s.csv" % a.specimen), rows, CONTAMINATION_COLUMNS)
     eligible = [r for r in rows if not r["near_end"]]
     rng = np.random.default_rng(int(a.seed if a.seed is not None else cfg.phantom.seed))
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         examples = contamination.pick_examples(eligible, tuple(cfg.cleaning.example_counts), rng)
-    for w in caught:
-        log(str(w.message))
     by_id = {int(r["node_id"]): r for r in rows}
     counts = {c: sum(1 for r in rows if r["class"] == c) for c in contamination.CLASSES}
     counts_eligible = {c: sum(1 for r in eligible if r["class"] == c) for c in contamination.CLASSES}
@@ -239,12 +216,81 @@ def run_survey(a, cfg, log):
                               flip_y_full_h=transform["flip_y_full_h"], z0_um=transform["z0_um"]),
                swc=a.swc or "", n_surveyed=len(rows), n_near_end=len(rows) - len(eligible),
                n_single_node_stretches=single, failed=failed, counts=counts, counts_not_near_end=counts_eligible,
+               n_target=int(n_target), n_dendrite_nodes=int(n_dendrite), partial=bool(partial),
+               sample="all dendrite nodes" if n_target == n_dendrite else
+                      "a seeded random sample of %d of %d dendrite nodes" % (n_target, n_dendrite),
                **config_sections(cfg))
     ex_path = write_json(os.path.join(a.out, "examples_%s.json" % a.specimen), rec)
+    return csv_path, ex_path, examples, counts, counts_eligible, caught
+
+
+def run_survey(a, cfg, log):
+    """The survey visits the dendrite nodes in a seeded random order, so the nodes surveyed at any moment are a
+    random sample of the cell; --max-nodes stops after that many. The outputs are rewritten every
+    --checkpoint-every nodes and when the script is stopped (SIGINT, or SIGTERM from the notebook's run()):
+    a stopped survey leaves a usable contamination table and example file of the nodes done."""
+    os.makedirs(a.out, exist_ok=True)
+    swc, _provider, label = load_cell(a, cfg, log, need_images=False)
+    transform = transform_of(a)
+    res0 = float(cfg.acquisition.res0_um)
+    xyz = cell.to_image_um(swc.xyz, res0, **transform)
+    scene = cell.cell_scene(swc, tuple(cfg.cleaning.neighbour_swc_types), res0, transform)
+    log("scene: %d segments (types %s), %d soma discs; B %.4g gl, mu %.4g /um"
+        % (scene.seg_xyz.shape[0], tuple(cfg.cleaning.neighbour_swc_types), scene.soma.shape[0], a.B, a.mu))
+    rows, single, failed = [], 0, []
+    runs = cell.stretches(swc, tuple(cfg.acquisition.dendrite_swc_types))
+    branches = []
+    for run in runs:
+        ob = node_inputs.own_branch(swc, run, xyz)
+        if ob is None:
+            single += 1
+            log("node %d: a one-node stretch, not surveyed (no own direction; near_end)" % int(swc.ids[run[0]]))
+            continue
+        branches.append(ob[0])
+    pairs = [(b, t) for b in branches for t in range(len(b.ids))]
+    n_dendrite = len(pairs)
+    order = np.random.default_rng(int(a.seed if a.seed is not None else cfg.phantom.seed) + 1).permutation(n_dendrite)
+    if a.max_nodes is not None:
+        order = order[:max(0, int(a.max_nodes))]
+    n_target = len(order)
+    log("survey of %s (seeded random order; outputs rewritten every %d nodes and when stopped)"
+        % ("all %d dendrite nodes" % n_dendrite if n_target == n_dendrite
+           else "%d of %d dendrite nodes" % (n_target, n_dendrite), a.checkpoint_every))
+    old = signal.signal(signal.SIGTERM, _on_sigterm)
+    stopped, t_last = False, time.time()
+    try:
+        for j in order:
+            branch, t = pairs[int(j)]
+            nid = int(branch.ids[t])
+            try:
+                row = contamination.node_contamination(branch, t, scene, a.B, a.mu, cfg)
+            except (KeyboardInterrupt, _Stop):
+                raise
+            except Exception as exc:          # one node's failure never stops the survey
+                failed.append(nid)
+                log("node %d: survey failed (%s: %s), dropped" % (nid, type(exc).__name__, exc))
+                continue
+            row["near_end"] = node_inputs.is_near_end(branch, t, cfg)
+            rows.append(row)
+            if len(rows) % max(1, int(a.checkpoint_every)) == 0:
+                _survey_outputs(a, cfg, log, rows, single, failed, label, transform, n_target, n_dendrite, True)
+            if len(rows) % 200 == 0 or time.time() - t_last > 60:
+                t_last = time.time()
+                log("%d of %d dendrite nodes surveyed" % (len(rows), n_target))
+    except (KeyboardInterrupt, _Stop):
+        stopped = True
+        log("survey stopped after %d of %d nodes: writing the outputs of the nodes done" % (len(rows), n_target))
+    finally:
+        signal.signal(signal.SIGTERM, old)
+    csv_path, ex_path, examples, counts, counts_eligible, caught = _survey_outputs(
+        a, cfg, log, rows, single, failed, label, transform, n_target, n_dendrite, stopped)
+    for w in caught:
+        log(str(w.message))
     for c in contamination.CLASSES:
         print("class %-15s %6d nodes (%d not near_end)" % (c, counts[c], counts_eligible[c]), flush=True)
-    log("survey: %d nodes, %d near_end, %d one-node stretches skipped, %d failed -> %s; %d example nodes %s -> %s"
-        % (len(rows), len(rows) - len(eligible), single, len(failed), csv_path, len(examples), examples, ex_path))
+    log("survey: %d nodes%s, %d near_end, %d one-node stretches skipped, %d failed -> %s; %d example nodes %s -> %s"
+        % (len(rows), " (stopped early)" if stopped else "", len(rows) - sum(counts_eligible.values()), single,
+           len(failed), csv_path, len(examples), examples, ex_path))
     return 0
 
 
@@ -568,6 +614,9 @@ def main(argv=None):
     s.add_argument("--B", type=float, required=True, help="the background, gl (e.g. the pilot table's median B_bar)")
     s.add_argument("--mu", type=float, required=True, help="the coefficient, 1/um (e.g. the pilot table's median mu_hat)")
     s.add_argument("--seed", type=int, default=None, help="pick_examples' seed; default phantom.seed")
+    s.add_argument("--max-nodes", type=int, default=None, help="survey a seeded random sample of this many dendrite "
+                   "nodes (default: all; about 3 s per node on the pilot)")
+    s.add_argument("--checkpoint-every", type=int, default=100, help="rewrite the outputs every this many nodes")
     c = sub.add_parser("clean", help="the cleaning rounds on the work list (Blocks 25-32)")
     _common(c)
     c.add_argument("--examples", required=True, help="examples_<S>.json of survey")

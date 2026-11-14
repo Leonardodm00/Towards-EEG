@@ -77,8 +77,11 @@ def run(script, *args, check=True, every=200):
 ALIGN = ["--shift-x", SHIFT_X, "--shift-y", SHIFT_Y, "--z0", Z0] + ([] if FLIP_H is None else ["--flip-h", FLIP_H])
 
 # %% [markdown]
-# ## Cell 16: the configuration of the run and the contamination survey (no image is read; about 1 s per dendrite node,
-# so of the order of an hour for a cell of a few thousand nodes -- measured on the 14-node synthetic cell only)
+# ## Cell 16: the configuration of the run and the contamination survey (no image is read; about 3 s per dendrite node
+# on the pilot, so about 7 h for all 8496 nodes)
+#
+# `SURVEY_MAX_NODES`: survey a seeded random sample of this many nodes (None: all). The outputs are rewritten every 100
+# nodes and when the cell is stopped, so a stopped survey still leaves a usable table and example file.
 #
 # Knobs: `B_GL`, `MU` (Cell 7 of 2026-11-10 printed 159.0 gl and 0.258 /um for the pilot); `KERNEL_SLOPE` (None: the
 # far fit's slope if it is a production kernel, else the configured 0.79 beyond the table's last depth).
@@ -88,6 +91,7 @@ ALIGN = ["--shift-x", SHIFT_X, "--shift-y", SHIFT_Y, "--z0", Z0] + ([] if FLIP_H
 import json
 B_GL, MU = 159.0, 0.258          # gl, 1/um: the pilot's medians (Cell 7, 2026-11-10)
 KERNEL_SLOPE = None              # um of SD per um of defocus beyond the table; None = far fit if production, else configured
+SURVEY_MAX_NODES = 600          # a random sample (about 30 min); None = all 8496 nodes (about 7 h)
 CLEAN = OUT + "/cleaning"
 INFER = OUT + "/inference"
 os.makedirs(CLEAN, exist_ok=True)
@@ -136,11 +140,13 @@ with open(CFG_CLEAN, "w") as f:
 print("[cell 16] " + line)
 CLEAN_CFG = ["--config-json", CFG_CLEAN]
 run("scripts/clean_cell.py", "survey", "--specimen", SPECIMEN, "--out", CLEAN, "--cache-dir", CACHE_DIR, *ALIGN,
-    *CLEAN_CFG, "--B", B_GL, "--mu", MU)
+    *CLEAN_CFG, "--B", B_GL, "--mu", MU, *([] if SURVEY_MAX_NODES is None else ["--max-nodes", SURVEY_MAX_NODES]))
 EXAMPLES = "%s/examples_%d.json" % (CLEAN, SPECIMEN)
 with open(EXAMPLES) as f:
     ex = json.load(f)
 print("[cell 16] example nodes:", ex.get("example_ids"), "| classes:", ex.get("classes"))
+print("[cell 16] surveyed %d of %d dendrite nodes (%s); counts:" % (ex["n_surveyed"], ex["n_dendrite_nodes"], ex["sample"]),
+      ex["counts"])
 
 # %% [markdown]
 # ## Cell 17: the cleaning rounds on the example nodes and their main neighbours (downloads patches; of the order of
