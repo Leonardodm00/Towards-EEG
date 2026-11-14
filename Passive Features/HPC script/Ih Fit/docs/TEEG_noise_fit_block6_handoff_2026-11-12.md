@@ -8,6 +8,7 @@ which stays the history of Block 9 and of D-122 to D-125.
 |---|---|
 | 2026-11-12 | Created at the user's request ("The handoff then"), after D-125 (Block 6's five questions answered) and D-126 (its two readings confirmed). Same day, before it: Block 9 written and pushed (`2171519`); the noise chat's D-117/D-118 renumbered D-122/D-123 (`a05ccdb`); D-124 (the cohort); the project instructions became v2 (the repository is the source of truth); the diameter chat's D-117 to D-121 and I-005 merged into `main`'s log (`3dc3703`); Block 6's SPEC entry drafted (`3dc3703`). |
 | 2026-11-13 | Step 1 done: Block 6 written, smoke-tested (R1-R9 9/9; 26 planted defects, each caught) and pushed (`1d848f6`). §1, §3 (what was built beyond the SPEC entry), §4 (the final commands, what to read back), §5 and §9 brought up to date. No decision taken (next free IDs unchanged: D-127, I-006). |
+| 2026-11-14 | Step 2 under way **[cluster, pasted 16:16]**: the F2 scan of the 18 cells finds nothing to drop; the FULL gates SETTLED at `62f3324` (16 checks); `smoke_noise_run.py` 9/9 on davinci (536 s); the first dry run refused inside an interactive job (the guard). §1, §4, §5, §9 updated. |
 
 **Basis tags.** **[run]** executed in the assistant's sandbox (date given); **[src]** read from the code, SPEC or log
 on `main`; **[log]** the decision log's text; **[user]** the user's decision or words; **[reasoning]** the assistant's
@@ -32,7 +33,7 @@ Implementation planned 6, pushed 5, tested 7, done 8; theory open 8, studying 4,
 | Stage | Status | Note |
 |---|---|---|
 | N1-N4 Blocks 1-4 | pushed | no tester report covers them (last 2026-10-07, `7a49a28`) |
-| NT tools (gates) | done | FULL run on davinci only 2026-10-20 at `ca028ea` (13 checks); now 14 (G2 and G6d cover Block 9): re-run before the pilot |
+| NT tools (gates) | done | FULL run on davinci only 2026-10-20 at `ca028ea` (13 checks); now 14 (G2 and G6d cover Block 9): re-run before the pilot [corrected 2026-11-14: 16 checks (G0-G12 with G6b, G6c, G6d); FULL run at `62f3324` SETTLED, 16 passed **[cluster]**] |
 | N4b Block 9 | pushed | `noise_sweep_fit.py` at `2171519`, smoke P1-P11 11/11 |
 | N6 Block 6 | planned [corrected 2026-11-13: pushed (roadmap.py status: no tester report covers 1d848f6)] | SPEC entry drafted 2026-11-12; code not written [corrected 2026-11-13: written, smoke-tested, pushed at `1d848f6`] |
 | N5, N7, S7 | planned | after N6 (D-123) |
@@ -124,6 +125,8 @@ Reading the pilot back (OUT = `/davinci-1/home/ldellamea/Human Neurons Fitting/p
     grep -h '^NOISE_CELL' "$OUT"/logs/cell_*.log; grep -h -A20 '^NOISE_MERGE' "$OUT"/logs/merge_*.log
     python -c "import json,glob,sys; [print(f.split('/')[-1], json.load(open(f))['status'], json.load(open(f))['seconds']) for f in sorted(glob.glob(sys.argv[1] + '/cells/*.json'))]" "$OUT"
 
+Done 2026-11-14 **[cluster, pasted 16:16]**: the F2 scan (0 sweeps to drop in the 18 cells), `git pull` to `62f3324`, the FULL gates (16 passed, VERDICT SETTLED, G11 1220 s), `smoke_noise_run.py` 9/9 (536 s) -- all inside an interactive job (`qsub -I`, dvnode018). The dry run there was refused by the submitter's guard (`PBS_JOBID` set); it and the pilot run from the **login node** (dvlogin02): `exit` the interactive job first.
+
 Read back from the pilot: the `NOISE_CELL` lines, each JSON's per-stage seconds (they set `WALLTIME`), the
 `NOISE_MERGE` line. A code change between the pilot and the run re-runs every cell, the pilot's included (the resume
 rule keys on the commit). Gate logs: `~/ih_fit_gate_logs/<date_time>/`.
@@ -138,6 +141,7 @@ rule keys on the commit). Gate logs: `~/ih_fit_gate_logs/<date_time>/`.
 | gates smoke | 8/8 after the G6d change | [run 2026-11-12] |
 | sandbox packages | numpy 2.5.3, scipy 1.18.1; statsmodels is NOT preinstalled: `pip install --break-system-packages statsmodels` (minutes) before Block 9's P3 | [run 2026-11-12] |
 | real cells | Blocks 3, 4 and 9 have never run on a real cell nor at full size | [log] |
+| on davinci, 2026-11-14 | FULL gates SETTLED at `62f3324` (16 passed); `smoke_noise_run.py` 9/9 in 536 s (in an interactive job on dvnode018) | [cluster, pasted 16:16] |
 | the job script on davinci | never run there: its roles, the run file, `qsub -J`, `-W depend=afterany` on an array id and the marker were checked only against stubs | [run 2026-11-13, sandbox] |
 
 ## 6. After the run: Block 5's questions (carried from the 2026-11-11 handoff, §6)
@@ -185,6 +189,8 @@ rule keys on the commit). Gate logs: `~/ih_fit_gate_logs/<date_time>/`.
 | the run file | the jobs read `~/noise_fit_runs/<RUN_TAG>_<GROUP>_<UTC>.env`, not the knobs: a knob changed after `qsub` does not reach a queued job; submit again |
 | modified code on davinci | while `git status` shows a modified `noise_*.py` or `run_noise_fit.py`, the resume rule skips nothing (every cell re-runs) and the JSONs are marked `code_dirty`; fixes travel through git |
 | the pilot's marker | the pilot's array marks N6 done on the roadmap before the 18-cell run; `ROADMAP_DISABLE=1` at submission keeps a submission off it |
+| the submitter inside a PBS job | refused (`PBS_JOBID` set): in an interactive job (`qsub -I`) PBS also sets `NCPUS` (8 there), which the submitter would have taken as the cores per cell; submit from the login node |
+| the marker from a compute node | the jobs' roadmap marker pushes to GitHub from the compute node; on dvnode018 `module load proxy` preceded `git pull` **[cluster]**, so the push may fail there -- harmless (the helper never fails the job), the stage just shows no marker **[reasoning, not checked]**; `submit_noise_fit.sh` is outside the resume rule's pathspec, so adding the module to it re-runs no cell |
 | a killed job | (walltime, memory) writes no JSON: the merge lists the cell as missing; its log's progress lines show where it stopped; the same `RUN_TAG` again re-runs only the cells without an ok JSON |
 
 ## 10. Documents
