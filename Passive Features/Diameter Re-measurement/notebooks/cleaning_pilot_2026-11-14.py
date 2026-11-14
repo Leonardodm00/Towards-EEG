@@ -143,16 +143,20 @@ with open(EXAMPLES) as f:
 print("[cell 16] example nodes:", ex.get("example_ids"), "| classes:", ex.get("classes"))
 
 # %% [markdown]
-# ## Cell 17: the cleaning rounds on the example nodes and their main neighbours (downloads patches; 2 to 3 h)
+# ## Cell 17: the cleaning rounds on the example nodes and their main neighbours (downloads patches; of the order of
+# 2 to 4 min per node and round on the synthetic cell, so 2 to 3 h at the first run's settings -- not measured on the pilot)
+#
+# Each round refits every node's background through the shadow model (D-144) before it cleans.
 #
 # Knobs: `ROUNDS` (at most 5, D-130.O6), `MAX_WORK` (how many nodes are refined), `WORK_PEAK_GL` (a neighbour joins
 # the work list when its predicted shadow on an example's patch reaches this). The run can be stopped and started
 # again: the image crops stay in the cache.
-# Output to send back: the lines of each round (`max relative d change`, `max line change`), the stop reason, the
+# Output to send back: each node's line (pixel SD x factor, the backgrounds, `kept the previous backgrounds` if any),
+# the lines of each round (`max relative d change`, `max line change`), the stop reason, the
 # dropped nodes with their reasons, `cleaning_rounds.png` and the `cleaning_node<id>.png` figures.
 
 # %%
-ROUNDS, MAX_WORK, WORK_PEAK_GL = 3, 30, 3.0
+ROUNDS, MAX_WORK, WORK_PEAK_GL = 2, 20, 3.0     # a first run; then 3 to 5 rounds and up to 60 nodes
 run("scripts/clean_cell.py", "clean", "--specimen", SPECIMEN, "--out", CLEAN, "--cache-dir", CACHE_DIR, *ALIGN,
     *CLEAN_CFG, "--examples", EXAMPLES, "--B", B_GL, "--mu", MU, "--rounds", ROUNDS, "--max-work", MAX_WORK,
     "--work-peak-gl", WORK_PEAK_GL)
