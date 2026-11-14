@@ -26,6 +26,10 @@ iteration) and 30 (the per-node fit):
                     with_sd=True, the support cleaning.background_support), B_k the background at
                     the line's origin (calibration_scene.background_on_line), the measuring line of
                     Block 5's pilot, node_xyz the traced position
+  all_shadow        Block 25's predicted shadow of every traced segment and soma disc on a node's
+                    patch (amendment 4, D-144)
+  model_background  the planar background fitted through the shadow model, per plane (amendment 4)
+  background_factory  run_rounds' background_fn: model_background refitted each round (amendment 4)
   predict_factory   Block 32's predict: 1 - line_fast.line_profiles of the local tube at
                     (v0, dz) about the trace (D-138.4); ExtrusionInvalid -> NaN
   forward_factory   Block 30's forward: line_fast.line_profiles of the local tube at absolute
@@ -39,6 +43,7 @@ from __future__ import annotations
 
 import dataclasses
 import math
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -211,6 +216,112 @@ def profile_noise_factor(frame, shape, origin_xy, y_hat, e_u, v, n_avg, step):
 
 # --------------------------------------------------------- node inputs ---
 
+_DUMMY_IDS = (-910000001, -910000002)       # a stand-in own stretch no traced id equals (all_shadow)
+
+
+def all_shadow(fscene, node_like, cfg):
+    """S_all (n_planes, H, W) float64, dimensionless: Block 25's predicted shadow (cleaning.shadow_absorption)
+    of every traced segment and soma disc of fscene -- the node's own stretch included, no floor, nothing left
+    out -- on the node's patch (node_like: left, top, block (n_planes, H, W) or shape, planes_z). shadow.
+    shadow_image needs an own stretch with a segment, so it is given a stand-in: one segment of zero
+    coefficient whose two ends carry ids no traced node has, 1 km from the patch (amendment 4, D-144)."""
+    from .node_features import FeaturedScene
+    shape = np.shape(node_like.block)[1:] if hasattr(node_like, "block") else tuple(node_like.shape)[-2:]
+    H, W = int(shape[0]), int(shape[1])
+    p = float(cfg.acquisition.res0_um)
+    far = np.array([(float(node_like.left) - 1e3 / p) * p, float(node_like.top) * p, 0.0])
+    xyz = np.vstack([np.asarray(fscene.seg_xyz, dtype=float).reshape(-1, 6),
+                     np.concatenate([far, far + np.array([0.1, 0.0, 0.0])])[None, :]])
+    fs = FeaturedScene(seg_xyz=xyz,
+                       seg_d_um=np.vstack([np.asarray(fscene.seg_d_um, dtype=float).reshape(-1, 2), [[0.1, 0.1]]]),
+                       seg_mu_per_um=np.vstack([np.asarray(fscene.seg_mu_per_um, dtype=float).reshape(-1, 2),
+                                                [[0.0, 0.0]]]),
+                       seg_ids=np.vstack([np.asarray(fscene.seg_ids, dtype=np.int64).reshape(-1, 2),
+                                          [list(_DUMMY_IDS)]]),
+                       seg_type=np.concatenate([np.asarray(fscene.seg_type, dtype=np.int64).reshape(-1), [3]]),
+                       soma=np.asarray(fscene.soma, dtype=float).reshape(-1, 3))
+    return shadow.shadow_image(fs, _DUMMY_IDS, int(node_like.left), int(node_like.top), W, H,
+                               np.asarray(node_like.planes_z, dtype=float), cfg, B_gl=None, include=None).S
+
+
+def model_background(block, S_all, frame, origin_xy, cfg):
+    """(B, sd, frac, ok), each (n_planes,): the planar background fitted through the shadow model (amendment
+    4, D-144). Per plane k, b(x, y) = b0 + bx (x - cx) + by (y - cy) ((cx, cy) the patch's centre, um)
+    minimises sum [I - b (1 - S_all)]^2 over the pixels with S_all <= cleaning.background_shadow_max (and I
+    finite), by numpy.linalg.lstsq, then once more without the pixels whose residual exceeds
+    calibration.background_trim_sigmas x 1.4826 x MAD (calibration_scene.planar_background's trim). B = b at
+    the line's origin (gl); sd = the SD of the kept residuals (gl, 3 parameters fitted); frac = the kept share
+    of the patch; ok = frac >= calibration.background_min_far_frac and B finite and > 0."""
+    I_all = np.asarray(block, dtype=float)
+    S_all = np.asarray(S_all, dtype=float)
+    if I_all.shape != S_all.shape or I_all.ndim != 3:
+        raise ValueError("block and S_all must be (n_planes, H, W) of one shape")
+    n, H, W = I_all.shape
+    p = float(frame.res_um_px)
+    px, py = calibration_scene.pixel_centres((H, W), frame)
+    cx, cy = float(px.mean()), float(py.mean())
+    o = np.asarray(origin_xy, dtype=float)
+    smax = float(cfg.cleaning.background_shadow_max)
+    trim = float(cfg.calibration.background_trim_sigmas)
+    min_frac = float(cfg.calibration.background_min_far_frac)
+    B, sd, frac = np.full(n, np.nan), np.full(n, np.nan), np.zeros(n)
+    X, Y = (px - cx).ravel(), (py - cy).ravel()
+    for k in range(n):
+        I, S = I_all[k].ravel(), S_all[k].ravel()
+        keep = (S <= smax) & np.isfinite(I) & np.isfinite(S)
+        if keep.sum() < 6:
+            continue
+        A = (1.0 - S)[:, None] * np.column_stack([np.ones_like(X), X, Y])
+        b = np.linalg.lstsq(A[keep], I[keep], rcond=None)[0]
+        res = I[keep] - A[keep] @ b
+        mad = float(np.median(np.abs(res - np.median(res))))
+        if mad > 0:
+            inner = np.abs(res) <= trim * 1.4826 * mad
+            if 6 <= inner.sum() < inner.size:
+                idx = np.flatnonzero(keep)[inner]
+                keep = np.zeros_like(keep)
+                keep[idx] = True
+                b = np.linalg.lstsq(A[keep], I[keep], rcond=None)[0]
+                res = I[keep] - A[keep] @ b
+        B[k] = b[0] + b[1] * (o[0] - cx) + b[2] * (o[1] - cy)
+        sd[k] = float(np.sqrt(np.sum(res * res) / max(res.size - 3, 1)))
+        frac[k] = keep.sum() / float(H * W)
+    ok = (frac >= min_frac) & np.isfinite(B) & (B > 0)
+    return B, sd, frac, ok
+
+
+def background_factory(cfg, log=None):
+    """-> background_fn(node, F) -> (n_planes,) gl for clean_iteration.run_rounds (Block 32, amendment 2):
+    model_background on all_shadow(F, node, cfg), refitted each round from the featured scene of the round
+    before (amendment 4, D-144). A round in which a plane of a node has no valid background keeps that
+    node's previous backgrounds (NodeData.B_gl at first) and calls log(message). The function keeps
+    background_fn.history: node_id -> list of dicts per call (B_gl, sd_gl, frac, ok, kept_previous,
+    seconds)."""
+    from allen_image_io import CropFrame
+    last, history = {}, {}
+
+    def background_fn(node, F):
+        import time as _time
+        t0 = _time.time()
+        nid = int(node.node_id)
+        S_all = all_shadow(F, node, cfg)
+        B, sd, frac, ok = model_background(node.block, S_all, CropFrame(int(node.left), int(node.top), 0,
+                                                                         float(cfg.acquisition.res0_um)),
+                                           node.origin_xy, cfg)
+        prev = last.get(nid, np.asarray(node.B_gl, dtype=float))
+        kept = not bool(np.all(ok))
+        out = np.array(prev, dtype=float) if kept else B
+        if kept and log is not None:
+            log("node %d: planes %s without a valid model background this round; the previous backgrounds kept"
+                % (nid, [int(k) for k, g in zip(node.ks, ok) if not g]))
+        last[nid] = out
+        history.setdefault(nid, []).append(dict(B_gl=out, B_fit_gl=B, sd_gl=sd, frac=frac, ok=ok,
+                                                kept_previous=kept, seconds=_time.time() - t0))
+        return out
+    background_fn.history = history
+    return background_fn
+
+
 def unshaded_support(shape, frame, ks, pilot, branch, scene, cfg):
     """(n_planes, H, W) bool: the pixels of each plane of ks that neither a traced neighbour nor the node's
     own branch shades by more than calibration.isolation_depth_gl (amendment 3, D-143): Block 10.S's masks
@@ -260,16 +371,19 @@ def unshaded_planes(patch, ks, pilot, branch, scene, cfg):
     return idx, b, ok, frame, sd, sup.mean(axis=(1, 2))
 
 
-def build_node(branch, index, pilot, provider, scene, cfg, own_ids, theta0=None):
+def build_node(branch, index, pilot, provider, scene, cfg, own_ids, fscene, theta0=None):
     """-> (NodeData or None, info). branch: the node's own stretch (own_branch); index: the node's index
     in it; pilot: the node's Block 5 pilot (NodeResult: cx_um, cy_um, theta_rad, phi_rad, z_sub_um,
     k_star, d_hat_um, mu_hat_per_um, B_bar); provider(left, top, width, height, k_lo, k_hi) -> (block,
     ks, valid, frame); scene: the cell's plane_iteration.Scene; cfg: DiameterConfig; own_ids: the
-    stretch's node ids (D-136.1); theta0: (d, mu, v0, dz) about the trace, default pilot_start.
+    node's own ids (own_ids_within); fscene: the round-0 featured scene (node_features.featured_scene),
+    read under "model"; theta0: (d, mu, v0, dz) about the trace, default pilot_start.
 
     One provider call: the patch of half-size cleaning.patch_half_um about the pilot's centre over
     node_planes; per plane its planar background and noise SD; B_k the background at the line's origin.
-    The support is cfg.cleaning.background_support: "unshaded" (amendment 3, D-143, the default) -- the
+    The support is cfg.cleaning.background_support: "model" (amendment 4, D-144, the default) -- the
+    planar background fitted through the shadow model (model_background on all_shadow of fscene), refitted
+    each round by background_factory; "unshaded" (amendment 3, D-143) -- the
     pixels neither a traced neighbour nor the own branch shades above calibration.isolation_depth_gl
     (unshaded_support), the planar background by calibration_scene.planar_background on them; "square" and
     "stripe" -- calibration.patch_planes with calibration.background_support replaced by it (amendment 1). The line:
@@ -312,7 +426,23 @@ def build_node(branch, index, pilot, provider, scene, cfg, own_ids, theta0=None)
     patch = calibration_scene.fetch_patch(provider, float(pilot.cx_um), float(pilot.cy_um),
                                           float(cfg.cleaning.patch_half_um), int(ks[0]), int(ks[-1]),
                                           float(cfg.acquisition.res0_um))
-    if cfg.cleaning.background_support == "unshaded":
+    if cfg.cleaning.background_support == "model":
+        block_, pks, valid, frame = patch
+        pks = np.asarray(pks)
+        idx = np.array([int(k - pks[0]) if 0 <= int(k - pks[0]) < pks.size and bool(valid[int(k - pks[0])])
+                        else -1 for k in ks])
+        bco = np.full((ks.size, 3), np.nan)
+        ok = np.zeros(ks.size, dtype=bool)
+        sd = np.full(ks.size, np.nan)
+        if np.all(idx >= 0):
+            sub = np.asarray(block_, dtype=float)[idx]
+            like = SimpleNamespace(left=int(frame.left), top=int(frame.top), block=sub, planes_z=ks * dz)
+            origin0 = calibration.line_geometry(pilot)[0]
+            Bm, sd, frac, ok = model_background(sub, all_shadow(fscene, like, cfg), frame, origin0, cfg)
+            bco[:, 0] = Bm                       # B at the line's origin: background_on_line reads b0 there
+            bco[:, 1:] = 0.0
+            info["support_frac"] = frac
+    elif cfg.cleaning.background_support == "unshaded":
         idx, bco, ok, frame, sd, frac = unshaded_planes(patch, ks, pilot, branch, scene, cfg)
         info["support_frac"] = frac
     else:
