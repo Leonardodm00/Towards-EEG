@@ -174,6 +174,7 @@ the "Binds" column.
 | 2026-11-13 (later, 15) | Logs **D-139** [orchestrator] (the diameter chat, 18:25; coding directive 7): contract amendment 1 of Block 32 on its implementer's issue -- the shadow floor's background in the iteration is the largest of the planes' backgrounds; `shadow_fn`'s signature fixed (`3b145e0` on `sci/diameter-pipeline`). Wave 3 so far: Block 34 passed the gate and is merged (`48ca972`); Block 32's suite passes at its `wip` commit (two tubes started 30 % off return to the truth within 1.2e-6 in 4 rounds, the implementer's run) and it is finalising; Block 35 still running. |
 | 2026-11-13 (later, 16) | Logs **D-140** [orchestrator] (the diameter chat, 19:20; coding directive 7): contract amendment 1 of Block 35 on its implementer's three issues -- the heading in the cross-section's cache key; the 2e-4 oracle against Block 26 judged where the caps do not reach (half-length 40 um for tilted tubes); the validity of the extrusion a plain distance from the caps (`extrusion_cap_margin_um` 3.0 um, PROVISIONAL) (`961c326` on `sci/diameter-pipeline`). Block 32 passed the gate and is merged (`8aabb90`; suite 7 pass, 1 skip, rerun). First timings of the fast renderer at 8 x 16 directions, flat tube of half-length 10 um (the implementer's, one core): 0.37 s per call at 0.3 um, 1.5 s at 1.0 um, 6.1 s at 2.0 um, against Block 26's 1.3, 15.3 and 69.5 s; a cached cross-section saves little (the blur dominates). |
 | 2026-11-13 (later, 17) | No new decision ID (the diameter chat, 21:30). **Wave 3 merged and pushed** (`2cddd80` on `sci/diameter-pipeline`): Block 32 `8aabb90`, 34 `48ca972`, 35 (the fast line renderer; suite 11 pass in the implementer's 1 h 50 min run; against Block 26 at most 5.25e-5, bound 2e-4; the orchestrator reran the quick tests and an independent spot check, 5.2e-6 and 4.7e-6, but not the long reference test). Evidence for D-140.3's margin: with the line 3.0 um from a cap the fast renderer is within 1.61e-4 of Block 26, at 1.5 um within 1.97e-3 (hybrid, 1 um tube). Time per call at 8 x 16 directions, flat: 0.59, 1.99, 6.18 s at 0.3, 1.0, 2.0 um with half-length 10 um; 0.44, 1.10, 3.63 s with 5 um. **Block 36 specified and started** (`ff19a7f`: the pilot run's node inputs, `scripts/clean_cell.py`, `scripts/infer_nodes.py`, a synthetic dry run; one Opus implementer, delegated by the orchestrator although a single block). Its provisional values, the orchestrator's: tube half-length 5.0 um, planes k* +- 4, at most 60 refined nodes, neighbours joining the work list from a predicted peak of 3.0 gl; tier-2 neighbours not modelled in this first run (flag `tier2_unmodelled`). Open: the fast renderer's reference test is too long for the regression suite; the final check of wave 3 waits for Block 36. |
+| 2026-11-14 | Logs **D-141** [orchestrator] (the diameter chat, 10:15; coding directive 7): contract amendment 1 of Block 36 on its implementer's issues -- the cleaning computes a node's background on the far pixels (`CleaningConfig.background_support` = "square"), because the calibration's stripe refuses contaminated nodes; a node's lateral and depth shifts are measured from its traced position in the node's own tube as well as in the scene; the refinement's bounds widened (`2ee8194` on `sci/diameter-pipeline`). The session restarted overnight and stopped the implementer after 54 min; its work was intact at `a032166` and it was resumed. First synthetic dry run (the implementer's, before the amendment; fixture cell rendered at 0.8 um): fitted diameters 0.796 to 0.834 um on four nodes, 0.89 to 0.90 um on a node at the fixture's image edge; 1 to 2 min per node and round, 2 to 4 min per fine fit, at the default hybrid settings. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -328,6 +329,7 @@ would be needed*, *Status*.
 | D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
 | D-133 | 2026-11-13 | SPEC Blocks 25 (amendment 2), 28, 29, 30, 31 at `38f7c19`; `CleaningConfig`, `InferenceConfig` | wave 2's validation targets, tolerances and provisional parameters, proposed by the orchestrator at the wave's start: exact inverse of the cleaning 1e-9 gl; recovery 1e-6 and unbiasedness within 3 SE for the two fits; coverage 60-76 % and chi2/N within 10 % of 1 for the per-node fit; hybrid column sum 1e-10 and faint limit 5e-3 for the shadow model; renderers passed as callables [orchestrator] | active |
 | D-134 | 2026-11-13 | SPEC Block 25 (amendment 3); D-132.1 | a tier-1 neighbour's shadow is equations (5-6) for the neighbour rendered alone: one blur per slab, under the hybrid's absorbed light; one kernel per column is dropped [user] | active; supersedes the "one blur per column" clause of D-132.1 |
+| D-141 | 2026-11-14 | SPEC Block 36 (amendment 1) at `2ee8194`; `CleaningConfig.background_support`, `refine_shift_bounds_um`, `refine_dz_bounds_um` | in the cleaning a node's planar background is fitted on the far pixels, not on the calibration's stripe; a node's shifts $(v_0, \Delta z)$ are relative to its traced position in its own tube too; refinement bounds +-1.5 um lateral, +-2.5 um in depth [orchestrator], PROVISIONAL | active |
 | D-140 | 2026-11-13 | SPEC Block 35 (amendment 1) at `961c326`; `InferenceConfig.extrusion_cap_margin_um` | the fast line renderer is the tube without caps: its 2e-4 agreement with Block 26 is judged at half-lengths where the caps do not reach (10 um flat, 40 um tilted); the cross-section is cached per heading too; a node is valid for the extrusion when its line is at least 3.0 um (PROVISIONAL) along the axis from each end [orchestrator] | active |
 | D-139 | 2026-11-13 | SPEC Block 32 (amendment 1) at `3b145e0` | the cleaning iteration passes the shadow model one background for its floor, the largest of the node's planes' backgrounds (the cleaning itself stays per plane); `shadow_fn`'s signature; the restart, flag and stop-rule edge rules of the implementer accepted [orchestrator] | active |
 | D-138 | 2026-11-13 | SPEC Blocks 32, 34, 35 at `f0c1fba`; the wave-3 scripts and notebook Cells 16-18 | wave 3 approved; the fast line renderer within 2e-4 of Block 26 at equal directions; nodes near a branch point or a stretch's end flagged and skipped for now; the first Colab run on the survey's 20 example nodes [user]; the coarse refinement predicts with the fast line renderer [orchestrator] | active |
@@ -11015,6 +11017,46 @@ line 1.5, 3.0, 5.0 um from a cap).
 near branch points (D-138's open point); further speed (the blur now dominates the time).
 
 **Sources.** **[run, sandbox]** as tagged. **[SPEC]** `961c326`.
+
+**Status:** active; the implementer is applying it.
+
+
+## D-141 -- Contract amendment 1 of Block 36: the cleaning's background support, the shifts relative to the trace, wider refinement bounds [orchestrator]
+
+**Date:** 2026-11-14, about 10:15 (Europe/Rome), the diameter chat, settled by the orchestrating session under coding
+directive 7 on the issues the Block 36 implementer raised; the user was not asked and can reverse any point. D-101.3
+(the stripe for the calibration) is untouched.
+**Binds:** SPEC Block 36 (`analysis/node_inputs.py`, `scripts/clean_cell.py`, `scripts/infer_nodes.py`), amendment 1 at
+`2ee8194` on `sci/diameter-pipeline`; three `CleaningConfig` fields.
+
+**Decision [orchestrator].** Three clauses change, all PROVISIONAL.
+
+**Statement.** (D-141.1, estimator) For a node of the cleaning's work list the planar background of each plane $k$,
+and from it $B_k$ (gl) at the measuring line's origin and the noise SD (gl), is fitted on the far pixels of the patch
+(Block 10.P: the pixels that no traced segment and no soma shades within `far_pixel_sigmas` kernel SDs),
+`CleaningConfig.background_support` = `"square"`. Agreed before (Block 36's entry, through `calibration.patch_planes`):
+the calibration's support, the stripe of D-101.3. (D-141.2, convention) With $\hat y$ the unit vector of the measuring
+axis and $(x_t, y_t, z_t)$ (um) the node's traced position in the image frame, the node's straight tube in its own
+coarse and fine fits has its centre at the foot of the traced position on the measuring line plus $v_0 \hat y$ and its
+depth at $z_t + \Delta z$; the first-stage start is $(\hat d, \hat\mu, v_t, z_{\rm sub} - z_t)$, with $v_t$ (um) the
+first-stage centre's offset from the trace along $\hat y$ and $z_{\rm sub}$ (um) its depth. Agreed before: the tube at
+the first-stage centre plus $v_0 \hat y$ and at $z_{\rm sub} + \Delta z$, while the scene drew the same node at the
+trace plus the same shifts. (D-141.3, tolerance of the fit's box) `refine_shift_bounds_um` = (-1.5, 1.5),
+`refine_dz_bounds_um` = (-2.5, 2.5). Agreed before: (-1, 1) both.
+
+**Why.** (1) The stripe needs 3 um of clear run on each side of the line: with a neighbour 1.5 or 3 um away every one
+of 9 planes was refused, at 4.5 and 6 um four to six of them, so the nodes the cleaning is for would be dropped; on the
+far pixels $B_k$ stayed within 0.14 gl of the truth. (2) A refined node was fitted in one place and drawn as a
+neighbour in another, apart by the first-stage centre's offset from the trace (0.05 um in depth on the fixture; on a
+real cell the registration's residual). (3) The shifts now carry that residual, which can exceed 1 um in depth
+[reasoning]. **[(1), (2): run, sandbox, the Block 36 implementer at `a032166`; not rerun by the orchestrator]**
+
+**What it implies for code and tables.** Block 36 only; Block 32 and Block 23 unchanged.
+
+**What it does not decide [open].** Whether the far pixels give a good background next to a thick neighbour or the soma
+(to be read on the pilot's figures); a background refitted after the cleaning; the bounds' final values.
+
+**Sources.** **[run, sandbox]** as tagged. **[SPEC]** `2ee8194`.
 
 **Status:** active; the implementer is applying it.
 
