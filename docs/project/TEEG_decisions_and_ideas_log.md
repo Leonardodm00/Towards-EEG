@@ -177,6 +177,7 @@ the "Binds" column.
 | 2026-11-14 | Logs **D-141** [orchestrator] (the diameter chat, 10:15; coding directive 7): contract amendment 1 of Block 36 on its implementer's issues -- the cleaning computes a node's background on the far pixels (`CleaningConfig.background_support` = "square"), because the calibration's stripe refuses contaminated nodes; a node's lateral and depth shifts are measured from its traced position in the node's own tube as well as in the scene; the refinement's bounds widened (`2ee8194` on `sci/diameter-pipeline`). The session restarted overnight and stopped the implementer after 54 min; its work was intact at `a032166` and it was resumed. First synthetic dry run (the implementer's, before the amendment; fixture cell rendered at 0.8 um): fitted diameters 0.796 to 0.834 um on four nodes, 0.89 to 0.90 um on a node at the fixture's image edge; 1 to 2 min per node and round, 2 to 4 min per fine fit, at the default hybrid settings. |
 | 2026-11-14 (later) | No new decision ID (the diameter chat, 11:30). **Block 36 passed the gate and is merged** (`d9cfc2e` on `sci/diameter-pipeline`; suite 8 pass, 1 skip, rerun by the orchestrator: a noise-free tube of 0.8000 um fitted at 0.7994 um; a trace displaced 0.3 um laterally and 0.5 um in depth recovered to 0.0000 and 0.0025 um). **The Colab notebook for the pilot is delivered**: `notebooks/cleaning_pilot_2026-11-14.py` (`0b3e01e`; Cells 16 survey, 17 cleaning, 18 per-node fit), its configuration cell and the survey command dry-run in the sandbox on the synthetic cell; the real cell not run. The notebook takes the kernel from Cell 7's calibration file and, with no production far fit, the configured continuation slope 0.79 beyond 0.84 um (a knob, `KERNEL_SLOPE`); background 159.0 gl and coefficient 0.258 /um from Cell 7 of 2026-11-10; 3 rounds and 30 refined nodes for the first run. The final check of wave 3 and Block 36 is running on an Opus tester (incremental, commit `8113d64`). |
 | 2026-11-14 (later, 2) | Logs **D-142** [orchestrator] (the diameter chat, 12:40; coding directives 7 and 9). **Final check of wave 3 and Block 36 by an Opus tester: PASS WITH ISSUES** at `8113d64` (report `specs/test_reports/2026-11-14_1100_incremental.md`, tests `c7e73d4`): 33 new spec tests pass, 52 of 53 smoke suites (the one error the sandbox's git worktree), the 161 earlier spec tests pass, the three commands run end to end on the synthetic cell twice with identical outputs. **Two MAJOR findings in Block 36**, both with reproducers: F1, the node's tube stops 5 um each way while the rest of its own stretch was neither modelled nor cleaned away (the model's dip short by up to 4.6 % at 30 deg and 8.8 % at 60 deg); F2, the fits were given the pixel's noise SD instead of the profile sample's (standard errors about 3.9 times too large, chi2/N about 0.07 to 0.15). Amendment 2 of Block 36 (`84ecd18`) settles both and two notes; the implementer is applying it. **The notebook delivered at `0b3e01e` must not be run past Cell 16 until Block 36's amendment 2 is merged**: the user was told. |
+| 2026-11-14 (later, 3) | Logs **D-143** [orchestrator] (the diameter chat, 14:10; coding directive 7): contract amendment 3 of Block 36 on two issues its implementer raised while applying D-142 -- the tube now covers exactly the node's own segments (own nodes up to the first node beyond 5 um on each side, the tube from $-U_-$ to $+U_+$), and the cleaning's background is fitted on the pixels no predicted shadow reaches (`background_support` = "unshaded"), superseding D-141.1's far pixels (`e644ff0` on `sci/diameter-pipeline`, local until Block 36 is merged again). Measured so far by the implementer: the profile's noise factor 0.267, against 400 white-noise images within 0.11 %; D-142.1 on a 20 um tube at 30 deg brings the model's shortfall from 1.8-4.2 % of the dip to 0.33-0.82 % when a node falls on the cut. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -331,6 +332,7 @@ would be needed*, *Status*.
 | D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
 | D-133 | 2026-11-13 | SPEC Blocks 25 (amendment 2), 28, 29, 30, 31 at `38f7c19`; `CleaningConfig`, `InferenceConfig` | wave 2's validation targets, tolerances and provisional parameters, proposed by the orchestrator at the wave's start: exact inverse of the cleaning 1e-9 gl; recovery 1e-6 and unbiasedness within 3 SE for the two fits; coverage 60-76 % and chi2/N within 10 % of 1 for the per-node fit; hybrid column sum 1e-10 and faint limit 5e-3 for the shadow model; renderers passed as callables [orchestrator] | active |
 | D-134 | 2026-11-13 | SPEC Block 25 (amendment 3); D-132.1 | a tier-1 neighbour's shadow is equations (5-6) for the neighbour rendered alone: one blur per slab, under the hybrid's absorbed light; one kernel per column is dropped [user] | active; supersedes the "one blur per column" clause of D-132.1 |
+| D-143 | 2026-11-14 | SPEC Block 36 (amendment 3) at `e644ff0`; `CleaningConfig.background_support` | the node's tube runs along its axis exactly over its own segments, which end at the first node beyond `tube_half_length_um` on each side; the cleaning's planar background is fitted on the pixels that no neighbour's and no own predicted shadow reaches above `isolation_depth_gl` [orchestrator], PROVISIONAL | active; refines D-142.1, supersedes D-141.1's default |
 | D-142 | 2026-11-14 | SPEC Block 36 (amendment 2) at `84ecd18` | a node's own part of its stretch is only what its tube models (the nodes within the tube's half-length); the rest of the stretch is a neighbour and is cleaned away; the fits and the stop rule get the noise SD of a profile sample (the pixel's SD times the read's white-noise factor), not the pixel's [orchestrator], PROVISIONAL | active; refines D-136.1 for the cleaning and the fits |
 | D-141 | 2026-11-14 | SPEC Block 36 (amendment 1) at `2ee8194`; `CleaningConfig.background_support`, `refine_shift_bounds_um`, `refine_dz_bounds_um` | in the cleaning a node's planar background is fitted on the far pixels, not on the calibration's stripe; a node's shifts $(v_0, \Delta z)$ are relative to its traced position in its own tube too; refinement bounds +-1.5 um lateral, +-2.5 um in depth [orchestrator], PROVISIONAL | active |
 | D-140 | 2026-11-13 | SPEC Block 35 (amendment 1) at `961c326`; `InferenceConfig.extrusion_cap_margin_um` | the fast line renderer is the tube without caps: its 2e-4 agreement with Block 26 is judged at half-lengths where the caps do not reach (10 um flat, 40 um tilted); the cross-section is cached per heading too; a node is valid for the extrusion when its line is at least 3.0 um (PROVISIONAL) along the axis from each end [orchestrator] | active |
@@ -11104,6 +11106,44 @@ crosses $\pm U_i$ (counted once too often or too little over less than its lengt
 
 **Sources.** **[run, sandbox]** as tagged; the tester's report `specs/test_reports/2026-11-14_1100_incremental.md`.
 **[SPEC]** `84ecd18`.
+
+**Status:** active; the implementer is applying it.
+
+
+## D-143 -- Contract amendment 3 of Block 36: the tube covers exactly the own segments; the cleaning's background on the unshaded pixels [orchestrator]
+
+**Date:** 2026-11-14, about 14:10 (Europe/Rome), the diameter chat, settled by the orchestrating session under coding
+directive 7 on two issues the Block 36 implementer raised while applying D-142; the user was not asked and can reverse
+either point.
+**Binds:** SPEC Block 36, amendment 3 at `e644ff0` on `sci/diameter-pipeline`; `CleaningConfig.background_support`.
+
+**Decision [orchestrator].** Two clauses change, both PROVISIONAL.
+
+**Statement.** (D-143.1, convention; refines D-142.1) On each side of node $i$ along its stretch, the node's own nodes
+run up to and including the first node whose arc length from node $i$ exceeds `tube_half_length_um` (5.0 um), or to the
+stretch's end. With $U_-$ and $U_+$ (um) the arc lengths from node $i$ to the outermost own node on the two sides, the
+node's tube is the straight tube along its axis from $-U_-$ to $+U_+$. The node is `near_end` when
+$\min(U_-, U_+)$ is under `extrusion_cap_margin_um` (3.0 um). Agreed before (D-142.1): own nodes within the half-length
+$U$ and a symmetric tube of half-length $U$. (D-143.2, estimator; supersedes D-141.1's default) The planar background of
+each plane of a node in the cleaning is fitted on the pixels that neither a traced neighbour nor the node's own branch
+shades by more than `calibration.isolation_depth_gl`, as predicted from the first-stage background and coefficient
+(Block 10.S's masks without the stripe's cut): `background_support` = `"unshaded"`. Agreed before (D-141.1): the far
+pixels of Block 10.P (`"square"`).
+
+**Why.** (1) With nodes 2 um apart on a 20 um tube at 30 deg ($d$ = 1 um, $\mu$ = 1 /um), cutting the own nodes at 5 um
+left the segments from 4 to 6 um as neighbours, removed whole although the tube modelled their first 1 um: up to 2.6 %
+of the dip in the outer planes, against 0.33 to 0.82 % when a node falls on the cut. (2) Under `"square"` a node on a
+stretch tilted at 30 deg was refused in all 9 planes: Block 10.P gives each segment a margin of its radius plus 3 kernel
+SDs at its more defocused end, so segments 5 to 10 um out of focus mask the whole patch. **[both: run, sandbox, the
+Block 36 implementer's probes at `bc237fe`; not rerun by the orchestrator]**
+
+**What it implies for code and tables.** Block 36 only. The 1.5 % oracle of D-142.1 is unchanged and now runs with
+nodes 1 um and 2 um apart.
+
+**What it does not decide [open].** Curved stretches (the tube is straight along the node's tangent while its own
+segments bend); a background refitted after the cleaning.
+
+**Sources.** **[run, sandbox]** as tagged. **[SPEC]** `e644ff0`.
 
 **Status:** active; the implementer is applying it.
 
