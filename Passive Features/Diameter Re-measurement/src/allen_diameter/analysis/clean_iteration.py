@@ -30,6 +30,8 @@ plotting. Pure ASCII, for the cluster (hpc-python-compat).
 """
 from __future__ import annotations
 
+import dataclasses
+
 import math
 from dataclasses import dataclass
 from typing import Optional, Tuple
@@ -163,6 +165,7 @@ class IterationResult:
     shadow: dict
     tiers: dict
     fits: dict
+    B_gl: dict = dataclasses.field(default_factory=dict)   # node_id -> (n_planes,) gl, the last round's backgrounds (amendment 2)
 
 
 # ------------------------------------------------------------- helpers ---
@@ -222,7 +225,7 @@ def _start(features, k, node):
 
 # ---------------------------------------------------------------- round ---
 
-def round_once(features, scene, nodes, cfg, predict_factory, shadow_fn=None):
+def round_once(features, scene, nodes, cfg, predict_factory, shadow_fn=None, background_fn=None):
     """One round from the features of the round before -> (rows, per_node).
 
     features: NodeFeatures (round t - 1); scene: plane_iteration.Scene; nodes: NodeData work list;
@@ -242,22 +245,28 @@ def round_once(features, scene, nodes, cfg, predict_factory, shadow_fn=None):
     rows, per_node = [], {}
     for node in nodes:
         n_planes, H, W = node.block.shape
+        # The planes' backgrounds of this round (Block 32, amendment 2, D-144): background_fn(node, F) -> (n_planes,)
+        # gl, from the featured scene of the round before; None: the node's own B_gl, every round.
+        B_k = node.B_gl if background_fn is None else np.asarray(background_fn(node, F), dtype=np.float64)
+        if B_k.shape != (n_planes,) or not np.all(np.isfinite(B_k)) or np.any(B_k <= 0):
+            raise ValueError("node %d: background_fn must return (n_planes,) finite values > 0, got %r"
+                             % (node.node_id, B_k))
         tiers = cleaning.neighbour_tiers(F, node.own_ids, node.node_xyz, cfg)            # (b)
         # The floor of D-130.O5 takes one background in shadow_image: max_k B_k (Block 32, amendment 1,
         # D-139); the cleaning (d) uses the per-plane B_k.
-        B_floor = float(np.max(node.B_gl))
+        B_floor = float(np.max(B_k))
         S = np.asarray(shadow_fn(F, node.own_ids, node.left, node.top, W, H, node.planes_z, cfg,
                                  B_floor, tiers == 1), dtype=np.float64)                  # (c)
         if S.shape != node.block.shape:
             raise ValueError("node %d: shadow_fn returned shape %r, expected %r"
                              % (node.node_id, S.shape, node.block.shape))
-        cr = cleaning.clean_block(node.block, S, node.B_gl, cfg)                          # (d)
+        cr = cleaning.clean_block(node.block, S, B_k, cfg)                          # (d)
         prof = _profiles(cr.block, node, cfg)                                            # (e)
         if not np.all(np.isfinite(prof)):
             raise ValueError("node %d: the measuring line leaves the patch (NaN profile)" % node.node_id)
         k = pos[node.node_id]
         start = _start(features, k, node)
-        fit = coarse_fit.refine_node(prof, node.B_gl, node.v, predict_factory(node), start, cfg)   # (f)
+        fit = coarse_fit.refine_node(prof, B_k, node.v, predict_factory(node), start, cfg)   # (f)
         if fit["status"] == "failed":
             row = {"node_id": node.node_id, "flags": _with_flag(features.flags[k], FLAG_FAILED)}
         else:
@@ -266,7 +275,7 @@ def round_once(features, scene, nodes, cfg, predict_factory, shadow_fn=None):
                    "source": "refined",
                    "flags": _with_flag(features.flags[k], FLAG_AT_BOUND if fit["status"] == "at_bound" else "")}
         rows.append(row)
-        per_node[node.node_id] = {"tiers": tiers, "S": S, "shadow_gl": node.B_gl[:, None, None] * S,
+        per_node[node.node_id] = {"tiers": tiers, "S": S, "shadow_gl": B_k[:, None, None] * S, "B_gl": np.array(B_k),
                                   "cleaned": cr.block, "profiles": prof, "start": start, "fit": fit}
     rows.sort(key=lambda r: r["node_id"])
     return rows, per_node
@@ -283,7 +292,7 @@ def _stop_reached(max_rel_d, max_line_change_gl, stop_rel_d, sigma_gl):
 
 
 def run_rounds(features0, scene, nodes, cfg, sigma_gl, predict_factory, example_ids=(), shadow_fn=None,
-               keep_ids=None):
+               keep_ids=None, background_fn=None):
     """Rounds of round_once until the stop rule of D-130.O6 or CleaningConfig.max_rounds -> IterationResult.
 
     sigma_gl: the noise SD (gl, > 0), the line-change threshold; example_ids: the example nodes E (ids in
@@ -314,7 +323,7 @@ def run_rounds(features0, scene, nodes, cfg, sigma_gl, predict_factory, example_
     per_node = {}
     t = 0
     for t in range(1, max_rounds + 1):
-        rows, per_node = round_once(features, scene, nodes, cfg, predict_factory, shadow_fn)
+        rows, per_node = round_once(features, scene, nodes, cfg, predict_factory, shadow_fn, background_fn)
         new = with_rows(features, rows, t)
         statuses = {nid: per_node[nid]["fit"]["status"] for nid in per_node}
         refined = sorted(nid for nid, s in statuses.items() if s != "failed")
@@ -341,4 +350,5 @@ def run_rounds(features0, scene, nodes, cfg, sigma_gl, predict_factory, example_
         features=features, history=history, stopped=stopped, rounds=t,
         profiles_before=before, profiles_after={nid: per_node[nid]["profiles"] for nid in per_node},
         cleaned={i: per_node[i]["cleaned"] for i in keep}, shadow={i: per_node[i]["shadow_gl"] for i in keep},
-        tiers={nid: per_node[nid]["tiers"] for nid in per_node}, fits={nid: per_node[nid]["fit"] for nid in per_node})
+        tiers={nid: per_node[nid]["tiers"] for nid in per_node}, fits={nid: per_node[nid]["fit"] for nid in per_node},
+        B_gl={nid: per_node[nid]["B_gl"] for nid in per_node})
