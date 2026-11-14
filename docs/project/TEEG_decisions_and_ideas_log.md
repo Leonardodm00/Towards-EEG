@@ -178,6 +178,7 @@ the "Binds" column.
 | 2026-11-14 (later) | No new decision ID (the diameter chat, 11:30). **Block 36 passed the gate and is merged** (`d9cfc2e` on `sci/diameter-pipeline`; suite 8 pass, 1 skip, rerun by the orchestrator: a noise-free tube of 0.8000 um fitted at 0.7994 um; a trace displaced 0.3 um laterally and 0.5 um in depth recovered to 0.0000 and 0.0025 um). **The Colab notebook for the pilot is delivered**: `notebooks/cleaning_pilot_2026-11-14.py` (`0b3e01e`; Cells 16 survey, 17 cleaning, 18 per-node fit), its configuration cell and the survey command dry-run in the sandbox on the synthetic cell; the real cell not run. The notebook takes the kernel from Cell 7's calibration file and, with no production far fit, the configured continuation slope 0.79 beyond 0.84 um (a knob, `KERNEL_SLOPE`); background 159.0 gl and coefficient 0.258 /um from Cell 7 of 2026-11-10; 3 rounds and 30 refined nodes for the first run. The final check of wave 3 and Block 36 is running on an Opus tester (incremental, commit `8113d64`). |
 | 2026-11-14 (later, 2) | Logs **D-142** [orchestrator] (the diameter chat, 12:40; coding directives 7 and 9). **Final check of wave 3 and Block 36 by an Opus tester: PASS WITH ISSUES** at `8113d64` (report `specs/test_reports/2026-11-14_1100_incremental.md`, tests `c7e73d4`): 33 new spec tests pass, 52 of 53 smoke suites (the one error the sandbox's git worktree), the 161 earlier spec tests pass, the three commands run end to end on the synthetic cell twice with identical outputs. **Two MAJOR findings in Block 36**, both with reproducers: F1, the node's tube stops 5 um each way while the rest of its own stretch was neither modelled nor cleaned away (the model's dip short by up to 4.6 % at 30 deg and 8.8 % at 60 deg); F2, the fits were given the pixel's noise SD instead of the profile sample's (standard errors about 3.9 times too large, chi2/N about 0.07 to 0.15). Amendment 2 of Block 36 (`84ecd18`) settles both and two notes; the implementer is applying it. **The notebook delivered at `0b3e01e` must not be run past Cell 16 until Block 36's amendment 2 is merged**: the user was told. |
 | 2026-11-14 (later, 3) | Logs **D-143** [orchestrator] (the diameter chat, 14:10; coding directive 7): contract amendment 3 of Block 36 on two issues its implementer raised while applying D-142 -- the tube now covers exactly the node's own segments (own nodes up to the first node beyond 5 um on each side, the tube from $-U_-$ to $+U_+$), and the cleaning's background is fitted on the pixels no predicted shadow reaches (`background_support` = "unshaded"), superseding D-141.1's far pixels (`e644ff0` on `sci/diameter-pipeline`, local until Block 36 is merged again). Measured so far by the implementer: the profile's noise factor 0.267, against 400 white-noise images within 0.11 %; D-142.1 on a 20 um tube at 30 deg brings the model's shortfall from 1.8-4.2 % of the dip to 0.33-0.82 % when a node falls on the cut. |
+| 2026-11-14 (later, 4) | Logs **D-144** (user, 15:30, the dialog of the diameter chat; the details the orchestrator's): in the cleaning a node's background is fitted **through the shadow model** -- image = planar background x (1 - predicted shadow of every traced segment, the own branch included) -- and refitted each round; supersedes D-143.2 and D-141.1, after the "unshaded" support too proved empty on a stretch tilted at 30 deg (0 to 0.1 % of the patch). Contract: amendment 4 of Block 36 and amendment 2 of Block 32 (`d35e800`, `2f5ad01` on `sci/diameter-pipeline`, local); the orchestrator added `background_fn` to `clean_iteration.py` (suite 8 pass, 1 skip). D-143.1 confirmed by the implementer's probe: with the tube over exactly the own segments the model's shortfall is 0.29-0.72 % of the dip with nodes 1 um apart and 0.34-0.88 % with 2 um (bound 1.5 %; 1.3-3.2 % without the cleaning), the background given by hand. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -332,6 +333,7 @@ would be needed*, *Status*.
 | D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
 | D-133 | 2026-11-13 | SPEC Blocks 25 (amendment 2), 28, 29, 30, 31 at `38f7c19`; `CleaningConfig`, `InferenceConfig` | wave 2's validation targets, tolerances and provisional parameters, proposed by the orchestrator at the wave's start: exact inverse of the cleaning 1e-9 gl; recovery 1e-6 and unbiasedness within 3 SE for the two fits; coverage 60-76 % and chi2/N within 10 % of 1 for the per-node fit; hybrid column sum 1e-10 and faint limit 5e-3 for the shadow model; renderers passed as callables [orchestrator] | active |
 | D-134 | 2026-11-13 | SPEC Block 25 (amendment 3); D-132.1 | a tier-1 neighbour's shadow is equations (5-6) for the neighbour rendered alone: one blur per slab, under the hybrid's absorbed light; one kernel per column is dropped [user] | active; supersedes the "one blur per column" clause of D-132.1 |
+| D-144 | 2026-11-14 | SPEC Block 36 (amendment 4), Block 32 (amendment 2) at `d35e800`; `CleaningConfig.background_support`, `background_shadow_max` | in the cleaning each plane's planar background is fitted through the shadow model, image = background x (1 - predicted shadow of every traced segment), and refitted each round [user]; pixels with a predicted shadow above 0.10 left out, trimming and validity as the calibration's [orchestrator], PROVISIONAL | active; supersedes D-143.2 and D-141.1 |
 | D-143 | 2026-11-14 | SPEC Block 36 (amendment 3) at `e644ff0`; `CleaningConfig.background_support` | the node's tube runs along its axis exactly over its own segments, which end at the first node beyond `tube_half_length_um` on each side; the cleaning's planar background is fitted on the pixels that no neighbour's and no own predicted shadow reaches above `isolation_depth_gl` [orchestrator], PROVISIONAL | active; refines D-142.1, supersedes D-141.1's default |
 | D-142 | 2026-11-14 | SPEC Block 36 (amendment 2) at `84ecd18` | a node's own part of its stretch is only what its tube models (the nodes within the tube's half-length); the rest of the stretch is a neighbour and is cleaned away; the fits and the stop rule get the noise SD of a profile sample (the pixel's SD times the read's white-noise factor), not the pixel's [orchestrator], PROVISIONAL | active; refines D-136.1 for the cleaning and the fits |
 | D-141 | 2026-11-14 | SPEC Block 36 (amendment 1) at `2ee8194`; `CleaningConfig.background_support`, `refine_shift_bounds_um`, `refine_dz_bounds_um` | in the cleaning a node's planar background is fitted on the far pixels, not on the calibration's stripe; a node's shifts $(v_0, \Delta z)$ are relative to its traced position in its own tube too; refinement bounds +-1.5 um lateral, +-2.5 um in depth [orchestrator], PROVISIONAL | active |
@@ -11144,6 +11146,49 @@ nodes 1 um and 2 um apart.
 segments bend); a background refitted after the cleaning.
 
 **Sources.** **[run, sandbox]** as tagged. **[SPEC]** `e644ff0`.
+
+**Status:** active; the implementer is applying it.
+
+
+## D-144 -- In the cleaning the background is fitted through the shadow model and refitted each round (user); its details [orchestrator]
+
+**Date:** 2026-11-14, 15:30 (Europe/Rome), the diameter chat; the user's answer in the dialog ("Through the shadow
+model") to the question the orchestrator raised under coding directive 7 after two of its own rulings (D-141.1,
+D-143.2) had failed on tilted stretches. The details below the first clause are the orchestrator's, PROVISIONAL.
+**Binds:** SPEC Block 36 (amendment 4) and Block 32 (amendment 2) at `d35e800` on `sci/diameter-pipeline`;
+`CleaningConfig.background_support` (= `"model"`), `background_shadow_max`. D-101.3 (the stripe, for the kernel
+calibration) is untouched.
+
+**Decision [user].** Through the shadow model.
+
+**Statement.** (D-144.1 [user]) For node $i$ and plane $k$ of its patch, with $I_{i,k}(x, y)$ (gl) the observed image
+at pixel $(x, y)$ and $S^{\rm all}_{i,k}(x, y)$ (dimensionless) the shadow that the shadow model of Block 25 predicts
+for every traced segment and soma disc, the node's own stretch included, from the features of the round before, the
+background is the plane $b_{i,k}(x, y) = \beta_0 + \beta_x (x - c_x) + \beta_y (y - c_y)$ (gl; $(c_x, c_y)$ the patch's
+centre in um) that minimises $\sum_{(x, y) \in \Omega_{i,k}} [I_{i,k}(x, y) - b_{i,k}(x, y)\,(1 - S^{\rm all}_{i,k}(x, y))]^2$;
+$B_{i,k}$ (gl) is $b_{i,k}$ at the measuring line's origin. (D-144.2 [user]) It is fitted again in every round of the
+cleaning, from that round's starting features. (D-144.3 [orchestrator]) $\Omega_{i,k}$ is the set of pixels with
+$S^{\rm all}_{i,k} \le$ `background_shadow_max` = 0.10, trimmed iteratively at `background_trim_sigmas` on the residuals;
+a plane is valid when the kept pixels are at least `background_min_far_frac` of the patch; the plane's pixel noise SD
+is the SD of the kept residuals; a node with an invalid plane in some round keeps its previous backgrounds. Superseded:
+D-143.2 (`"unshaded"`), D-141.1 (`"square"`), which stay as labelled alternatives with the stripe.
+
+**Why.** On a stretch tilted at 30 deg ($d$ = 1 um, $\mu$ = 1 /um, background 210 gl) the node's own out-of-focus
+parts shade the whole $\pm 10$ um patch by more than the 0.3 gl of `isolation_depth_gl`: the 0.3 gl margin of a segment
+is 4.7 um at 2 um of defocus and 10.5 um at 5 um, with predicted peaks of 5 to 30 gl; the unshaded support held 0 to
+0.1 % of the patch, and the far pixels and the stripe refuse the same node **[run, sandbox, the Block 36 implementer's
+probe at `08f2c2f`; not rerun by the orchestrator]**. No pixel is free of shadow there, so the background can only be
+read with the shadow accounted for; the cleaning already rests on the same shadow model [reasoning].
+
+**What it implies for code and tables.** `node_inputs.all_shadow`, `model_background`, `background_factory`;
+`clean_iteration.round_once` and `run_rounds` take `background_fn` (done, `d35e800`); the fine fit uses the last
+round's backgrounds. One more predicted-shadow image per node and round.
+
+**What it does not decide [open].** How much the background moves when the neighbours' round-0 diameters are wrong
+(the implementer reports it for diameters 25 % too large); the hybrid's non-additivity inside $S^{\rm all}$; the value
+0.10.
+
+**Sources.** **[user]** the dialog. **[run, sandbox]** as tagged. **[SPEC]** `d35e800`.
 
 **Status:** active; the implementer is applying it.
 
