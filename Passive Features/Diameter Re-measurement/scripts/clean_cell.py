@@ -364,7 +364,11 @@ def run_clean(a, cfg, log):
     log("scene: %d segments, %d soma discs; %d nodes in the features table" % (scene.seg_xyz.shape[0],
                                                                                 scene.soma.shape[0], len(features0)))
     work = node_inputs.work_list(examples, fscene0, swc, cfg, cfg.cleaning.work_peak_min_gl, B)
-    log("work list: %d nodes (%d examples, %d neighbours' nodes)" % (len(work), len(examples), len(work) - len(examples)))
+    cut = [i for i in examples if i not in work]
+    if cut:                                         # amendment 2, F5: more examples than work_max_nodes
+        log("work list capped at %d nodes: %d example nodes cut %s" % (cfg.cleaning.work_max_nodes, len(cut), cut))
+    n_ex = len(examples) - len(cut)
+    log("work list: %d nodes (%d examples, %d neighbours' nodes)" % (len(work), n_ex, len(work) - n_ex))
 
     stretch_of = {}
     for run in cell.stretches(swc, tuple(cfg.acquisition.dendrite_swc_types)):
@@ -382,8 +386,9 @@ def run_clean(a, cfg, log):
             own_branch_, _ = ob
             pilot = measure_pilot(full, off + t, provider, cfg)
             start, clipped = _clip_start(node_inputs.pilot_start(pilot, own_branch_.xyz_um[t]), cfg)
-            node, info = node_inputs.build_node(own_branch_, t, pilot, provider, scene, cfg,
-                                                tuple(int(i) for i in own_branch_.ids), theta0=start)
+            own = node_inputs.own_ids_within(own_branch_, t, node_inputs.tube_half_length(own_branch_, t, cfg))
+            node, info = node_inputs.build_node(own_branch_, t, pilot, provider, scene, cfg, own,
+                                                theta0=start)          # own ids within U (amendment 2, F1)
         except Exception as exc:                     # one node's failure never stops the run
             dropped[nid] = "%s: %s" % (type(exc).__name__, exc)
             log("node %d: dropped (%s) in %.1f s" % (nid, dropped[nid], time.time() - t0))
@@ -393,7 +398,7 @@ def run_clean(a, cfg, log):
             log("node %d: dropped (%s) in %.1f s" % (nid, dropped[nid], time.time() - t0))
             continue
         if not (math.isfinite(info["sigma_gl"]) and info["sigma_gl"] > 0):
-            dropped[nid] = "no_noise_sd: the planes' noise SD %r" % (info["sigma_gl"],)
+            dropped[nid] = "no_noise_sd: the profile's noise SD %r" % (info["sigma_gl"],)
             log("node %d: dropped (%s) in %.1f s" % (nid, dropped[nid], time.time() - t0))
             continue
         info.update(pilot=pilot_fields(pilot), start_clipped=clipped, theta0=start,
@@ -401,13 +406,14 @@ def run_clean(a, cfg, log):
         nodes.append(node)
         infos[nid], pilots[nid], halfs[nid] = info, pilot, info["half_length_um"]
         log("node %d: pilot d %.3f um, mu %.3f /um, k* %d (%s)%s; %d planes %d..%d, B %.1f..%.1f gl, noise SD %.2f "
-            "gl, tube half-length %.2f um; %.1f s"
+            "gl (pixel %.2f gl x %.3f), %d own nodes, tube half-length %.2f um; %.1f s"
             % (nid, pilot.d_hat_um, pilot.mu_hat_per_um, pilot.k_star, pilot.fit_status,
                " start clipped into the refine box" if clipped else "", node.ks.size, node.ks[0], node.ks[-1],
-               node.B_gl.min(), node.B_gl.max(), info["sigma_gl"], info["half_length_um"], time.time() - t0))
+               node.B_gl.min(), node.B_gl.max(), info["sigma_gl"], info["sigma_pixel_gl"],
+               info["noise_factor"], len(node.own_ids), info["half_length_um"], time.time() - t0))
     kept_examples = [i for i in examples if i in infos]
     base = dict(specimen=str(a.specimen), source=label, examples_file=os.path.abspath(a.examples),
-                example_ids=kept_examples, examples_requested=examples, work_list=work, dropped=dropped,
+                example_ids=kept_examples, examples_requested=examples, examples_cut=cut, work_list=work, dropped=dropped,
                 B_gl=B, B_source=B_src, mu_per_um=mu, mu_source=mu_src,
                 transform=dict(shift_full_px=list(transform["shift_full_px"]), flip_y_full_h=transform["flip_y_full_h"],
                                z0_um=transform["z0_um"]), **config_sections(cfg))
@@ -420,7 +426,7 @@ def run_clean(a, cfg, log):
                   mu_per_um=float(pilots[n.node_id].mu_hat_per_um), source="pilot") for n in nodes]
     features0 = node_features.with_rows(features0, rows0, 0)
     sigma = float(np.median([infos[n.node_id]["sigma_gl"] for n in nodes]))
-    log("%d nodes prepared (%d dropped), %d example nodes; sigma_gl %.3f gl (median of the nodes')"
+    log("%d nodes prepared (%d dropped), %d example nodes; sigma_gl %.3f gl (median of the nodes' profile SDs)"
         % (len(nodes), len(dropped), len(kept_examples), sigma))
 
     clock = NodeClock(len(nodes), log)

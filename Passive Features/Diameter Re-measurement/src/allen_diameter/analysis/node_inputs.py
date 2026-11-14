@@ -126,6 +126,47 @@ def _has_sharpest_plane(pilot):
     return all(math.isfinite(float(getattr(pilot, name))) for name in ("z_sub_um", "cx_um", "cy_um"))
 
 
+def own_ids_within(branch, index, half_length_um):
+    """-> tuple of node ids: the stretch's own nodes whose arc length from node `index` along the stretch is
+    at most half_length_um (the tube's U), and at least the node and its neighbours on the stretch
+    (amendment 2, F1). The stretch's segments beyond are neighbours for Blocks 25, 28 and 32."""
+    s = np.asarray(branch.s_um, dtype=float)
+    ids = np.asarray(branch.ids)
+    i = int(index)
+    if not 0 <= i < s.size:
+        raise ValueError("index %d outside the branch of %d nodes" % (i, s.size))
+    keep = np.abs(s - s[i]) <= float(half_length_um) * (1.0 + 1e-12) + 1e-12
+    keep[max(0, i - 1):min(s.size, i + 2)] = True
+    return tuple(int(x) for x in ids[keep])
+
+
+def profile_noise_factor(frame, shape, origin_xy, y_hat, e_u, v, n_avg, step):
+    """-> float: sqrt((1 / N_v) sum_n sum_px w_{n,px}^2), w_{n,px} the weight of pixel px in profile sample
+    n of profiles.sample_profile (bilinear, the mean over 2 n_avg + 1 lines) -- the profile's noise SD over
+    a pixel's for white pixel noise (amendment 2, F2). The read is linear in the image: the weights are read
+    from unit impulses over the pixels the line touches (line_render.pixels_needed), each on the box of
+    those pixels with one pixel of margin. frame: the patch's CropFrame (left, top, res_um_px); shape: the
+    patch's (H, W). ValueError when the line touches a pixel outside the patch."""
+    from ..model import line_render
+    p = float(frame.res_um_px)
+    cols, rows = line_render.pixels_needed(origin_xy, y_hat, e_u, v, n_avg, step, p)
+    H, W = int(shape[0]), int(shape[1])
+    if (cols.min() < frame.left or rows.min() < frame.top or cols.max() >= frame.left + W
+            or rows.max() >= frame.top + H):
+        raise ValueError("profile_noise_factor: the line touches pixels outside the patch")
+    c0, r0 = int(cols.min()) - 1, int(rows.min()) - 1
+    box = np.zeros((int(rows.max()) - r0 + 2, int(cols.max()) - c0 + 2))
+    sub = line_render._Frame(c0, r0, p)
+    vv = np.asarray(v, dtype=float)
+    total = np.zeros(vv.size)
+    for c, r in zip(cols, rows):
+        box[r - r0, c - c0] = 1.0
+        w = profiles.sample_profile(box, sub, origin_xy, y_hat, e_u, vv, n_avg, step)
+        box[r - r0, c - c0] = 0.0
+        total += w * w
+    return float(math.sqrt(np.mean(total)))
+
+
 # --------------------------------------------------------- node inputs ---
 
 def build_node(branch, index, pilot, provider, scene, cfg, own_ids, theta0=None):
@@ -143,8 +184,9 @@ def build_node(branch, index, pilot, provider, scene, cfg, own_ids, theta0=None)
     profiles.n_along, step = profile_step_um (Block 5's pilot). node_xyz = the traced position,
     branch.xyz_um[index].
 
-    info: node_id, half_length_um, near_end, ks, and on success sigma_gl (the median of the planes'
-    noise SDs, gl), sd_gl (per plane); on a refusal reason (one of REFUSALS) and detail. Refusals:
+    info: node_id, half_length_um, near_end, ks, and on success sd_gl (the planes' pixel noise SDs, gl),
+    sigma_pixel_gl (their median), noise_factor (profile_noise_factor of the line) and sigma_gl = their
+    product, the profile sample's noise SD (amendment 2, F2); on a refusal reason (one of REFUSALS) and detail. Refusals:
     near_end (checked first, no fetch), no sharpest plane, no usable pilot fit for the default start,
     a plane missing or invalid, a plane with no valid background, a line that leaves the patch."""
     m, dz = cfg.measure, float(cfg.acquisition.dz_um)
@@ -197,7 +239,10 @@ def build_node(branch, index, pilot, provider, scene, cfg, own_ids, theta0=None)
             return refuse(REASON_LINE, "the measuring line leaves the patch in plane %d" % int(ks[q]))
     sd = np.asarray(sd, dtype=float)
     info["sd_gl"] = sd
-    info["sigma_gl"] = float(np.median(sd)) if np.any(np.isfinite(sd)) else float("nan")
+    # the profile sample's noise SD (amendment 2, F2): the pixel's times the read's noise factor
+    info["sigma_pixel_gl"] = float(np.median(sd)) if np.any(np.isfinite(sd)) else float("nan")
+    info["noise_factor"] = profile_noise_factor(frame, block.shape[1:], origin, y_hat, e_u, v, n_avg, step)
+    info["sigma_gl"] = info["sigma_pixel_gl"] * info["noise_factor"]
     node = NodeData(node_id=nid, own_ids=tuple(int(x) for x in own_ids),
                     node_xyz=trace,
                     block=block, B_gl=B, ks=ks, planes_z=ks * dz, left=int(frame.left), top=int(frame.top),
@@ -284,8 +329,9 @@ def work_list(example_ids, fscene, swc, cfg, peak_min_gl, B_gl):
     """-> list of node ids: the example nodes (in their order), then the end nodes of the example nodes'
     tier-1 neighbour segments whose predicted peak on the example's patch times B_gl is at least
     peak_min_gl (gl), by decreasing peak (ties by node id), the whole list capped at
-    max(cleaning.work_max_nodes, number of examples). For each example: its own stretch (cell.stretches,
-    the dendrite types), its position in fscene, the patch of half-size cleaning.patch_half_um about it,
+    cleaning.work_max_nodes, the examples first (more examples than that: the examples cut; amendment 2, F5,
+    the caller logs it). For each example: its own nodes within its tube's half-length on its stretch
+    (own_ids_within, amendment 2, F1), its position in fscene, the patch of half-size cleaning.patch_half_um about it,
     the planes round(z / dz) +- cleaning.plane_half_range, the tiers (cleaning.neighbour_tiers) and the
     peaks (shadow.shadow_image's per_neighbour_peak, under partition_vertical for time, the tier-2
     neighbours left out). An end node joins only when it lies on a dendrite stretch and is not near_end
@@ -322,8 +368,14 @@ def work_list(example_ids, fscene, swc, cfg, peak_min_gl, B_gl):
     for nid in examples:
         if nid not in by_id:
             raise ValueError("example node %d is not on a dendrite stretch" % nid)
-        run, _t = by_id[nid]
-        own = tuple(int(ids[r]) for r in run)
+        run, t_ex = by_id[nid]
+        pos = np.zeros((len(ids), 3))
+        for r in run:
+            pos[int(r)] = _node_position(fscene, int(ids[r]))
+        ob = own_branch(swc, run, pos)
+        if ob is None:
+            raise ValueError("example node %d is on a one-node stretch" % nid)
+        own = own_ids_within(ob[0], t_ex, tube_half_length(ob[0], t_ex, cfg))      # amendment 2, F1
         xyz = _node_position(fscene, nid)
         left, top, width, height = calibration_scene.patch_bounds(float(xyz[0]), float(xyz[1]),
                                                                   float(cfg.cleaning.patch_half_um), p)
@@ -341,10 +393,10 @@ def work_list(example_ids, fscene, swc, cfg, peak_min_gl, B_gl):
                 continue
             for end in seg_ids[int(q)]:
                 e = int(end)
-                if e in examples:
+                if e in examples or e in own:
                     continue
                 if candidate(e):
                     best[e] = max(best.get(e, -np.inf), peak)
-    cap = max(int(cfg.cleaning.work_max_nodes), len(examples))
+    cap = int(cfg.cleaning.work_max_nodes)
     extra = sorted(best, key=lambda e: (-best[e], e))[:max(0, cap - len(examples))]
-    return examples + extra
+    return (examples + extra)[:cap]
