@@ -403,7 +403,7 @@ class CleaningConfig:
     plane_half_range: int = 4              # source: PROVISIONAL (Block 36): the planes k* +- this many are fetched, cleaned and offered to the fits (D-130.O5)
     work_max_nodes: int = 60               # source: PROVISIONAL (Block 36): at most this many nodes are refined in the pilot run
     work_peak_min_gl: float = 3.0          # source: PROVISIONAL (Block 36): a neighbour's nodes join the work list when its predicted peak on an example's patch reaches this
-    background_support: str = "square"     # source: PROVISIONAL (Block 36, amendment 1, D-141): the support of a cleaned node's planar background; "stripe" (D-101.3, the calibration's) refuses contaminated nodes
+    background_support: str = "unshaded"   # source: PROVISIONAL (Block 36, amendment 3, D-143; "square" was amendment 1, D-141): the support of a cleaned node's planar background; "stripe" (D-101.3, the calibration's) refuses contaminated nodes
 
 
 @dataclass(frozen=True)
@@ -700,7 +700,7 @@ def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None
     every pair of bounds finite and ordered, the diameter and coefficient bounds positive."""
     _check_in(c.shadow_absorption, ("hybrid", "partition_vertical"), "cleaning.shadow_absorption")
     _check_in(i.absorption, ("hybrid", "partition_vertical", "linear"), "inference.absorption")
-    _check_in(c.background_support, ("square", "stripe"), "cleaning.background_support")
+    _check_in(c.background_support, ("unshaded", "square", "stripe"), "cleaning.background_support")
 
     def pair(b, positive):
         return (len(b) == 2 and all(math.isfinite(float(x)) for x in b) and b[0] < b[1]
