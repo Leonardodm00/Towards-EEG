@@ -289,7 +289,7 @@ class NodeClock(object):
 
 
 def _clip_start(theta0, cfg):
-    """theta0 = (d, mu, 0, 0) clipped into Block 29's refine box (refine_node refuses a start outside it);
+    """theta0 = (d, mu, v_t, dz) clipped into Block 29's refine box (refine_node refuses a start outside it);
     returns (theta0, clipped?)."""
     c = cfg.cleaning
     lo = np.array([c.refine_d_bounds_um[0], c.refine_mu_bounds_per_um[0], c.refine_shift_bounds_um[0],
@@ -381,7 +381,7 @@ def run_clean(a, cfg, log):
                 raise ValueError("a one-node stretch")
             own_branch_, _ = ob
             pilot = measure_pilot(full, off + t, provider, cfg)
-            start, clipped = _clip_start((pilot.d_hat_um, pilot.mu_hat_per_um, 0.0, 0.0), cfg)
+            start, clipped = _clip_start(node_inputs.pilot_start(pilot, own_branch_.xyz_um[t]), cfg)
             node, info = node_inputs.build_node(own_branch_, t, pilot, provider, scene, cfg,
                                                 tuple(int(i) for i in own_branch_.ids), theta0=start)
         except Exception as exc:                     # one node's failure never stops the run

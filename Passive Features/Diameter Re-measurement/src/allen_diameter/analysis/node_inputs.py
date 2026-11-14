@@ -10,17 +10,22 @@ iteration) and 30 (the per-node fit):
   tube_half_length  U = min(arc length to the stretch's first node, to its last node,
                     inference.tube_half_length_um); the node is near_end when U is below
                     inference.extrusion_cap_margin_um (D-138.2, D-140.3)
-  local_tube        the node's straight capped tube: centre (c_x, c_y) + v0 y_hat at depth z,
-                    radius d / 2, heading pilot.theta_rad, tilt pilot.phi_rad, aspect 1, caps
-                    "axial" at +-U; y_hat = (-sin theta, cos theta) (calibration.line_geometry)
+  local_tube        the node's straight capped tube, shifts relative to the trace (amendment 1,
+                    D-141): centre at the foot of the traced position on the measuring line plus
+                    v0 y_hat, i.e. (c_x, c_y) + (v0 - v_t) y_hat with v_t = ((c_x, c_y) - (x_t, y_t))
+                    . y_hat, depth z_t + dz; radius d / 2, heading pilot.theta_rad, tilt
+                    pilot.phi_rad, aspect 1, caps "axial" at +-U; y_hat = (-sin theta, cos theta)
+  pilot_start       theta0 = (d_hat, mu_hat, v_t, z_sub - z_t), the first-stage start
   node_planes       k* - P .. k* + P, P = cleaning.plane_half_range
   build_node        the NodeData of Block 32 from one patch fetch (calibration_scene.fetch_patch),
                     each plane's planar background and noise SD (calibration.patch_planes,
-                    with_sd=True), B_k the background at the line's origin
-                    (calibration_scene.background_on_line), the measuring line of Block 5's pilot
-  predict_factory   Block 32's predict: 1 - line_fast.line_profiles of the local tube at depth
-                    z_sub + dz (D-138.4); ExtrusionInvalid -> NaN
-  forward_factory   Block 30's forward: line_fast.line_profiles of the local tube at depth z_ax
+                    with_sd=True, the support cleaning.background_support), B_k the background at
+                    the line's origin (calibration_scene.background_on_line), the measuring line of
+                    Block 5's pilot, node_xyz the traced position
+  predict_factory   Block 32's predict: 1 - line_fast.line_profiles of the local tube at
+                    (v0, dz) about the trace (D-138.4); ExtrusionInvalid -> NaN
+  forward_factory   Block 30's forward: line_fast.line_profiles of the local tube at absolute
+                    depth z_ax = z_t + dz
   work_list         the example nodes and the end nodes of their strong tier-1 neighbours
 
 Units: um, 1/um, rad, grey levels (gl). Custom code: none numerical. No file access, no
@@ -80,13 +85,32 @@ def is_near_end(branch, index, cfg):
     return bool(tube_half_length(branch, index, cfg) < float(cfg.inference.extrusion_cap_margin_um))
 
 
-def local_tube(pilot, d_um, v0_um, z_um, half_length_um):
-    """The node's straight tube (Block 2 Tube): centre (cx + v0 yx, cy + v0 yy, z_um), radius d_um / 2,
-    heading pilot.theta_rad, tilt pilot.phi_rad, aspect 1, half-length half_length_um, axial caps;
-    y_hat = (-sin theta, cos theta). pilot: any object with cx_um, cy_um, theta_rad, phi_rad."""
+def trace_offset(pilot, node_xyz_trace):
+    """v_t (um): the pilot centre's offset from the traced position along y_hat = (-sin theta, cos theta),
+    ((cx, cy) - (x_t, y_t)) . y_hat."""
+    t = np.asarray(node_xyz_trace, dtype=float)
+    th = float(pilot.theta_rad)
+    return float((float(pilot.cx_um) - t[0]) * (-math.sin(th)) + (float(pilot.cy_um) - t[1]) * math.cos(th))
+
+
+def pilot_start(pilot, node_xyz_trace):
+    """theta0 = (d_hat, mu_hat, v_t, z_sub - z_t) (amendment 1, D-141): the pilot's fit as shifts about the trace."""
+    t = np.asarray(node_xyz_trace, dtype=float)
+    return np.array([float(pilot.d_hat_um), float(pilot.mu_hat_per_um), trace_offset(pilot, t),
+                     float(pilot.z_sub_um) - float(t[2])])
+
+
+def local_tube(pilot, node_xyz_trace, d_um, v0_um, dz_um, half_length_um):
+    """The node's straight tube (Block 2 Tube), shifts about the trace (amendment 1, D-141): centre
+    (cx, cy) + (v0 - v_t) y_hat -- the foot of the traced position on the measuring line plus v0 y_hat --
+    at depth z_t + dz_um; radius d_um / 2, heading pilot.theta_rad, tilt pilot.phi_rad, aspect 1,
+    half-length half_length_um, axial caps; y_hat = (-sin theta, cos theta). pilot: any object with cx_um,
+    cy_um, theta_rad, phi_rad; node_xyz_trace (3,) um, the traced position in the image frame."""
     th = float(pilot.theta_rad)
     yx, yy = -math.sin(th), math.cos(th)
-    c = (float(pilot.cx_um) + float(v0_um) * yx, float(pilot.cy_um) + float(v0_um) * yy, float(z_um))
+    t = np.asarray(node_xyz_trace, dtype=float)
+    s = float(v0_um) - trace_offset(pilot, t)
+    c = (float(pilot.cx_um) + s * yx, float(pilot.cy_um) + s * yy, float(t[2]) + float(dz_um))
     return geometry.Tube(c=c, r=0.5 * float(d_um), phi=float(pilot.phi_rad), theta=th, aspect=1.0,
                          half_length=float(half_length_um), end_cut="axial")
 
@@ -109,13 +133,15 @@ def build_node(branch, index, pilot, provider, scene, cfg, own_ids, theta0=None)
     in it; pilot: the node's Block 5 pilot (NodeResult: cx_um, cy_um, theta_rad, phi_rad, z_sub_um,
     k_star, d_hat_um, mu_hat_per_um, B_bar); provider(left, top, width, height, k_lo, k_hi) -> (block,
     ks, valid, frame); scene: the cell's plane_iteration.Scene; cfg: DiameterConfig; own_ids: the
-    stretch's node ids (D-136.1); theta0: (d, mu, v0, dz), default (d_hat, mu_hat, 0, 0).
+    stretch's node ids (D-136.1); theta0: (d, mu, v0, dz) about the trace, default pilot_start.
 
     One provider call: the patch of half-size cleaning.patch_half_um about the pilot's centre over
     node_planes; per plane its planar background and noise SD (calibration.patch_planes, with_sd);
-    B_k the background at the line's origin. The line: calibration.line_geometry (origin the pilot's
-    centre), v = profiles.profile_offsets, n_avg = profiles.n_along, step = profile_step_um (Block 5's
-    pilot). node_xyz = (cx_um, cy_um, z_sub_um).
+    B_k the background at the line's origin; the support is cfg.cleaning.background_support (amendment 1,
+    D-141: patch_planes is called with calibration.background_support replaced by it). The line:
+    calibration.line_geometry (origin the pilot's centre), v = profiles.profile_offsets, n_avg =
+    profiles.n_along, step = profile_step_um (Block 5's pilot). node_xyz = the traced position,
+    branch.xyz_um[index].
 
     info: node_id, half_length_um, near_end, ks, and on success sigma_gl (the median of the planes'
     noise SDs, gl), sd_gl (per plane); on a refusal reason (one of REFUSALS) and detail. Refusals:
@@ -136,8 +162,9 @@ def build_node(branch, index, pilot, provider, scene, cfg, own_ids, theta0=None)
                       % (U, float(cfg.inference.extrusion_cap_margin_um)))
     if not _has_sharpest_plane(pilot):
         return refuse(REASON_NO_PLANE, "the pilot has no sharpest plane (z_sub_um not finite)")
+    trace = np.asarray(branch.xyz_um, dtype=float)[i]
     if theta0 is None:
-        theta0 = (float(pilot.d_hat_um), float(pilot.mu_hat_per_um), 0.0, 0.0)
+        theta0 = pilot_start(pilot, trace)
     th0 = np.asarray(theta0, dtype=float)
     if th0.shape != (4,) or not np.all(np.isfinite(th0)) or not th0[0] > 0 or th0[1] < 0:
         return refuse(REASON_NO_FIT, "start %r not usable (the pilot's fit status %r)"
@@ -147,7 +174,9 @@ def build_node(branch, index, pilot, provider, scene, cfg, own_ids, theta0=None)
     patch = calibration_scene.fetch_patch(provider, float(pilot.cx_um), float(pilot.cy_um),
                                           float(cfg.cleaning.patch_half_um), int(ks[0]), int(ks[-1]),
                                           float(cfg.acquisition.res0_um))
-    idx, _far, bco, ok, frame, _stripe, sd = calibration.patch_planes(patch, ks, pilot, branch, scene, cfg,
+    cfg_bg = dataclasses.replace(cfg, calibration=dataclasses.replace(
+        cfg.calibration, background_support=cfg.cleaning.background_support))
+    idx, _far, bco, ok, frame, _stripe, sd = calibration.patch_planes(patch, ks, pilot, branch, scene, cfg_bg,
                                                                       with_sd=True)
     missing = [int(k) for k, j in zip(ks, idx) if j < 0]
     if missing:
@@ -170,7 +199,7 @@ def build_node(branch, index, pilot, provider, scene, cfg, own_ids, theta0=None)
     info["sd_gl"] = sd
     info["sigma_gl"] = float(np.median(sd)) if np.any(np.isfinite(sd)) else float("nan")
     node = NodeData(node_id=nid, own_ids=tuple(int(x) for x in own_ids),
-                    node_xyz=np.array([float(pilot.cx_um), float(pilot.cy_um), float(pilot.z_sub_um)]),
+                    node_xyz=trace,
                     block=block, B_gl=B, ks=ks, planes_z=ks * dz, left=int(frame.left), top=int(frame.top),
                     origin_xy=origin, y_hat=y_hat, e_u=e_u, v=v, n_avg=n_avg, step=step, theta0=th0)
     return node, info
@@ -184,21 +213,20 @@ def _line_args(node):
 
 def predict_factory(pilots, half_lengths, cfg, cache):
     """-> callable(NodeData) -> predict(d, mu, v0, dz) -> (n_planes, n_v) dimensionless shadow, the predictor
-    of Block 32 (D-138.4): 1 - line_fast.line_profiles(local_tube(pilot, d, v0, pilot.z_sub_um + dz, U), mu,
-    node.ks, node's line, cfg, cache=cache). pilots, half_lengths: dicts node_id -> pilot, U (um); cache: a
+    of Block 32 (D-138.4): 1 - line_fast.line_profiles(local_tube(pilot, node.node_xyz, d, v0, dz, U), mu,
+    node.ks, node's line, cfg, cache=cache); node.node_xyz is the traced position (v0, dz about it). pilots, half_lengths: dicts node_id -> pilot, U (um); cache: a
     line_fast.SectionCache shared by the calls (or None). An ExtrusionInvalid returns NaN (the fit then fails
     and Block 32 flags the node)."""
     def factory(node):
         nid = int(node.node_id)
         pilot, U = pilots[nid], float(half_lengths[nid])
-        z0 = float(pilot.z_sub_um)
+        trace = np.asarray(node.node_xyz, dtype=float)
         args = _line_args(node)
         shape = (len(node.ks), len(node.v))
 
         def predict(d, mu, v0, dz):
             try:
-                tau = line_fast.line_profiles(local_tube(pilot, d, v0, z0 + float(dz), U), mu, *args, cfg,
-                                              cache=cache)
+                tau = line_fast.line_profiles(local_tube(pilot, trace, d, v0, dz, U), mu, *args, cfg, cache=cache)
             except line_fast.ExtrusionInvalid:
                 return np.full(shape, np.nan)
             return 1.0 - tau
@@ -208,15 +236,18 @@ def predict_factory(pilots, half_lengths, cfg, cache):
 
 def forward_factory(pilot, half_length, node, cfg, cache):
     """-> forward(d, mu, v0, z_ax) -> (n_planes, n_v) dimensionless, Block 30's forward model:
-    line_fast.line_profiles(local_tube(pilot, d, v0, z_ax, U), mu, node.ks, node's line, cfg, cache=cache),
-    z_ax absolute (um). An ExtrusionInvalid returns NaN (Block 30 fails that start)."""
+    line_fast.line_profiles(local_tube(pilot, node.node_xyz, d, v0, z_ax - z_t, U), mu, node.ks, node's
+    line, cfg, cache=cache): v0 about the trace, z_ax absolute (um) = z_t + dz. An ExtrusionInvalid returns
+    NaN (Block 30 fails that start)."""
     U = float(half_length)
+    trace = np.asarray(node.node_xyz, dtype=float)
     args = _line_args(node)
     shape = (len(node.ks), len(node.v))
 
     def forward(d, mu, v0, z_ax):
         try:
-            return line_fast.line_profiles(local_tube(pilot, d, v0, z_ax, U), mu, *args, cfg, cache=cache)
+            return line_fast.line_profiles(local_tube(pilot, trace, d, v0, float(z_ax) - float(trace[2]), U), mu,
+                                           *args, cfg, cache=cache)
         except line_fast.ExtrusionInvalid:
             return np.full(shape, np.nan)
     return forward

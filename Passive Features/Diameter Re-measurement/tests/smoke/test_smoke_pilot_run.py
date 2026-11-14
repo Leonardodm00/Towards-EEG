@@ -13,6 +13,11 @@ Checks
                             sample_profile on the provider's block along the pilot's line [exact], node_xyz
                             and theta0 as stated; work_list contains the examples first, follows the
                             threshold (a strong in-focus neighbour in, a weak defocused one out) and the cap
+    test_trace_offset       amendment 1 (2): a noise-free rendered tube whose trace is displaced by
+                            (0.3 um lateral, 0.5 um deep): one round of Block 32 with this block's
+                            predict recovers the displacement in the features row's offset [0.02 um
+                            lateral, 0.05 um depth], and featured_scene draws the node on the rendered
+                            tube within the same tolerance
     test_noise_free_fit     on a noise-free rendered isolated tube (Block 4, no camera chain), the pilot,
                             build_node and fit_node of forward_factory: the fitted diameter within 2 % of
                             the rendered one [the pilot's and the model's discretisation]
@@ -29,8 +34,8 @@ Checks
 
 The fits run under partition_vertical with 4 x 8 directions, one start and few evaluations, the shadow
 model under partition_vertical at fine factor 2 with the soma transparent (the entry allows it for time).
-The two-tube checks of build_node use calibration.background_support "square": under the configured
-"stripe" a node with a neighbour a few um away has no background in its outer planes (reported).
+The background runs under cleaning.background_support at its default "square" (Block 36, amendment 1,
+D-141); the shifts v0, dz are about the trace (amendment 1 (2)).
 
 Run
     cd "Passive Features/Diameter Re-measurement"
@@ -163,14 +168,6 @@ def block_provider(block, ks, left, top, res0):
     return provider
 
 
-def square_cfg():
-    """fast_cfg with calibration.background_support "square" (10.P's far pixels; D-101.3's labelled
-    alternative): under the configured "stripe" a node with a neighbour within a few um gets no background
-    in its outer planes (the issue reported with this block), so the two-tube checks use the square."""
-    cfg = fast_cfg()
-    return dataclasses.replace(cfg, calibration=dataclasses.replace(cfg.calibration, background_support="square"))
-
-
 def two_tube_case():
     """A rendered two-tube scene behind a provider and its SWC: dendrite A along x at y = 0 (d 0.6 um), its
     neighbour B parallel at y = 3 um (d 0.6 um), both in focus at z = 0, mu 1 /um, camera chain with noise
@@ -178,7 +175,7 @@ def two_tube_case():
     (_CACHE['three'], for work_list)."""
     if "two" in _CACHE:
         return _CACHE["two"]
-    cfg = square_cfg()
+    cfg = fast_cfg()            # cleaning.background_support at its default, "square" (amendment 1, D-141)
     tmp = tempfile.mkdtemp(prefix="b36_two_")
     ab = [((0.0, 0.0, 0.0), (20.0, 0.0, 0.0), 11, 0.3), ((0.0, 3.0, 0.0), (20.0, 3.0, 0.0), 11, 0.3)]
     swc = write_swc(os.path.join(tmp, "two.swc"), ab)                     # what is rendered
@@ -214,13 +211,24 @@ def node_of(swc, cfg, nid, transform=None):
 
 def test_known_answer():
     cfg = default_config()
-    # local_tube against the pilot's geometry by hand
+    # local_tube against the pilot's geometry and the trace by hand (amendment 1, D-141): the foot of the
+    # trace on the measuring line plus v0 y_hat, depth z_t + dz
     p = fake_pilot()
-    d, v0, z, U = 0.83, 0.21, -0.47, 4.2
-    tube = NI.local_tube(p, d, v0, z, U)
+    trace = np.array([1.1, -0.4, -0.2])
+    d, v0, dz, U = 0.83, 0.21, -0.47, 4.2
+    tube = NI.local_tube(p, trace, d, v0, dz, U)
     yh = np.array([-math.sin(p.theta_rad), math.cos(p.theta_rad)])
-    check_close("local_tube_centre", np.array(tube.c), [p.cx_um + v0 * yh[0], p.cy_um + v0 * yh[1], z], rtol=0,
-                atol=1e-12)
+    c = np.array([p.cx_um, p.cy_um])
+    foot = c + np.dot(trace[:2] - c, yh) * yh
+    check_close("local_tube_centre", np.array(tube.c), [foot[0] + v0 * yh[0], foot[1] + v0 * yh[1], trace[2] + dz],
+                rtol=0, atol=1e-12)
+    v_t = np.dot(c - trace[:2], yh)
+    check_close("trace_offset", NI.trace_offset(p, trace), v_t, rtol=0, atol=1e-12)
+    check_close("pilot_start", NI.pilot_start(p, trace), [p.d_hat_um, p.mu_hat_per_um, v_t, p.z_sub_um - trace[2]],
+                rtol=0, atol=1e-12)
+    # at the pilot's own start the tube sits on the pilot's centre and depth
+    t0 = NI.local_tube(p, trace, d, v_t, p.z_sub_um - trace[2], U)
+    check_close("start_on_pilot", np.array(t0.c), [p.cx_um, p.cy_um, p.z_sub_um], rtol=0, atol=1e-12)
     check_close("local_tube_r", tube.r, d / 2.0, rtol=0, atol=1e-12)
     assert (tube.theta, tube.phi, tube.aspect, tube.half_length, tube.end_cut) == \
         (p.theta_rad, p.phi_rad, 1.0, U, "axial"), tube
@@ -264,7 +272,7 @@ def _line_node(cfg):
     origin, yh, eu = np.array([p.cx_um, p.cy_um]), np.array([-math.sin(0.2), math.cos(0.2)]), \
         np.array([math.cos(0.2), math.sin(0.2)])
     v = profiles.profile_offsets(cfg.measure)
-    node = clean_iteration.NodeData(node_id=5, own_ids=(4, 5, 6), node_xyz=[10.0, 0.0, 0.05],
+    node = clean_iteration.NodeData(node_id=5, own_ids=(4, 5, 6), node_xyz=[9.9, -0.15, -0.3],
                                     block=np.full((ks.size, 4, 4), 210.0), B_gl=np.full(ks.size, 210.0), ks=ks,
                                     planes_z=ks * cfg.acquisition.dz_um, left=0, top=0, origin_xy=origin, y_hat=yh,
                                     e_u=eu, v=v, n_avg=profiles.n_along(cfg.measure),
@@ -280,16 +288,17 @@ def test_reference():
     pred = NI.predict_factory({5: p}, {5: U}, cfg, cache)(node)
     fwd = NI.forward_factory(p, U, node, cfg, cache)
     d, mu, v0, dz = 0.7, 1.1, 0.12, -0.2
-    by_hand = line_fast.line_profiles(NI.local_tube(p, d, v0, p.z_sub_um + dz, U), mu, node.ks, node.origin_xy,
+    z_t = float(node.node_xyz[2])
+    by_hand = line_fast.line_profiles(NI.local_tube(p, node.node_xyz, d, v0, dz, U), mu, node.ks, node.origin_xy,
                                       node.y_hat, node.e_u, node.v, node.n_avg, node.step, cfg)
     assert_array_equal(pred(d, mu, v0, dz), 1.0 - by_hand)
-    assert_array_equal(fwd(d, mu, v0, p.z_sub_um + dz), by_hand)
-    assert_array_equal(1.0 - pred(d, mu, v0, dz), fwd(d, mu, v0, p.z_sub_um + dz))
+    assert_array_equal(fwd(d, mu, v0, z_t + dz), by_hand)
+    assert_array_equal(1.0 - pred(d, mu, v0, dz), fwd(d, mu, v0, z_t + dz))
     assert np.min(by_hand) < 0.9, "the tube must cast a dip"
     # the hybrid through the cache: equal to an uncached call
     hcfg = dataclasses.replace(cfg, inference=dataclasses.replace(cfg.inference, absorption="hybrid"))
     fh = NI.forward_factory(p, U, node, hcfg, line_fast.SectionCache())
-    ref = line_fast.line_profiles(NI.local_tube(p, d, v0, 0.1, U), mu, node.ks, node.origin_xy, node.y_hat,
+    ref = line_fast.line_profiles(NI.local_tube(p, node.node_xyz, d, v0, 0.1 - z_t, U), mu, node.ks, node.origin_xy, node.y_hat,
                                   node.e_u, node.v, node.n_avg, node.step, hcfg)
     assert_array_equal(fh(d, mu, v0, 0.1), ref)
 
@@ -309,8 +318,11 @@ def test_invariants():
     bg = cfg.renderer.background_B_gl
     assert np.max(np.abs(node.B_gl - bg)) <= 0.5, ("B_k within 0.5 gl of the background", node.B_gl)
     assert_array_equal(node.ks, NI.node_planes(pilot, cfg))
-    check_close("node_xyz", node.node_xyz, [pilot.cx_um, pilot.cy_um, pilot.z_sub_um], rtol=0, atol=0)
-    check_close("theta0", node.theta0, [pilot.d_hat_um, pilot.mu_hat_per_um, 0.0, 0.0], rtol=0, atol=0)
+    assert cfg.cleaning.background_support == "square", "the default support (amendment 1)"
+    check_close("node_xyz", node.node_xyz, ob.xyz_um[t], rtol=0, atol=0)          # the traced position
+    check_close("theta0", node.theta0, NI.pilot_start(pilot, ob.xyz_um[t]), rtol=0, atol=0)
+    print("    two tubes 3 um apart, default support %r: B_k %s gl, noise SD %.2f gl"
+          % (cfg.cleaning.background_support, np.round(node.B_gl, 2).tolist(), info["sigma_gl"]))
     assert node.own_ids == own and 1 not in own
     assert math.isfinite(info["sigma_gl"]) and info["sigma_gl"] > 0
     # the profiles Block 32 reads equal sample_profile on the provider's block along the pilot's line
@@ -362,6 +374,58 @@ def test_invariants():
         cfg.cleaning, work_max_nodes=5)), G, B)
     assert capped[:2] == ex and len(capped) == min(5, len(w)) and capped == w[:len(capped)], (capped, w)
     _CACHE["two_node"] = (node, info, pilot, ob, t, scene, own)
+
+
+def _noise_free_tube(cfg, centre, d_true, mu_true, ks):
+    """(provider, ks) of a noise-free rendering of one flat tube along x (Block 4, no camera chain): 210 tau."""
+    res0, dz = cfg.acquisition.res0_um, cfg.acquisition.dz_um
+    tube = geometry.Tube(tuple(centre), 0.5 * d_true, 0.0, 0.0, 1.0, 14.0, "axial")
+    left, top = int(math.floor(-0.5 / res0)), int(math.floor(-10.5 / res0))
+    width = height = int(math.ceil(21.0 / res0))
+    f = render.fine_factor(d_true, cfg.renderer, res0)
+    grid, inner = render.block_fine_grid(left, top, width, height, res0, f, 8)
+    out = render.render_transmittance(tube, mu_true, ks * dz, grid, cfg.renderer, +1,
+                                      reduce=lambda pl: render.pixel_integrate(pl[inner[0], inner[1]], f))
+    block = cfg.renderer.background_B_gl * np.asarray(out.tau, dtype=float)
+    return block_provider(block, ks, left, top, res0)
+
+
+def test_trace_offset():
+    cfg = fast_cfg()
+    cfg = dataclasses.replace(cfg, cleaning=dataclasses.replace(cfg.cleaning, refine_max_nfev=200, max_rounds=1))
+    true_off = np.array([0.0, 0.3, 0.5])                    # the rendered tube minus the trace (um)
+    trace_z = 0.05
+    provider = _noise_free_tube(cfg, (10.0, true_off[1], trace_z + true_off[2]), 0.8, 1.0, np.arange(-5, 9))
+    tmp = tempfile.mkdtemp(prefix="b36_off_")
+    swc = write_swc(os.path.join(tmp, "off.swc"), [((0.0, 0.0, trace_z), (20.0, 0.0, trace_z), 11, 0.3)])
+    full, i_full, ob, t = node_of(swc, cfg, 7)
+    pilot = measure_pilot(full, i_full, provider, cfg)
+    scene = cell.cell_scene(swc, (2, 3, 4), cfg.acquisition.res0_um)
+    own = tuple(int(i) for i in ob.ids)
+    node, info = NI.build_node(ob, t, pilot, provider, scene, cfg, own)
+    assert node is not None, info
+    feats = node_features.initial_features(swc, (2, 3, 4), 1.0)
+    feats = node_features.with_rows(feats, [dict(node_id=7, d_um=pilot.d_hat_um, mu_per_um=pilot.mu_hat_per_um,
+                                                 source="pilot")], 0)
+    res = clean_iteration.run_rounds(feats, scene, [node], cfg, 1.0,
+                                     NI.predict_factory({7: pilot}, {7: info["half_length_um"]}, cfg, None))
+    k = res.features.index_of()[7]
+    off = res.features.offset_um[k]
+    lat = float(np.hypot(off[0] - true_off[0], off[1] - true_off[1]))
+    dep = abs(float(off[2]) - true_off[2])
+    fs = node_features.featured_scene(scene, res.features)
+    q = int(np.flatnonzero(np.asarray(fs.seg_ids)[:, 0] == 7)[0])
+    drawn = fs.seg_xyz[q, 3:]
+    lat_d = abs(float(drawn[1]) - true_off[1])
+    dep_d = abs(float(drawn[2]) - (trace_z + true_off[2]))
+    print("    displaced trace (0.3 um lateral, 0.5 um deep): pilot start v_t %.4f, dz %.4f; refined offset %s "
+          "(d %.4f um, %s): errors %.4f um lateral, %.4f um depth; drawn as a neighbour at y %.4f, z %.4f "
+          "(rendered 0.3, 0.55)" % (node.theta0[2], node.theta0[3], np.round(off, 4).tolist(),
+                                    res.features.d_um[k], res.fits[7]["status"], lat, dep, drawn[1], drawn[2]))
+    assert lat <= 0.02 and dep <= 0.05, (off, true_off)
+    assert lat_d <= 0.02 and dep_d <= 0.05, drawn
+    # the offset is v0 y_hat: along x only v0 sin(theta_pilot), theta_pilot ~ 0 on this flat x-aligned tube
+    check_close("drawn_x_on_trace", drawn[0], ob.xyz_um[t][0], rtol=0, atol=1e-6)
 
 
 def test_noise_free_fit():

@@ -6,7 +6,7 @@ D-132.2, D-137, D-138).
           fit_node of node_inputs.forward_factory (Block 35's fast line renderer, the
           absorption inference.absorption) on the node's cleaned profiles (the last round's,
           cleaning_<S>_node<id>.npz), sigma = the node's noise SD, the start (d, mu, v0,
-          z_sub + dz) from features_<S>.csv, the planes by select_planes; a node with at least
+          z_t + dz) from features_<S>.csv (shifts about the trace, amendment 1), the planes by select_planes; a node with at least
           one tier-2 neighbour is fitted alone and flagged tier2_unmodelled (the joint fit of
           D-132.2 is plan step F3, not built) -> inference_<S>.csv, inference_<S>.json,
           fit_node<id>.png, diameters.png, chi2.png in --out
@@ -117,11 +117,13 @@ def run_real(a, log):
             yh = np.array([-math.sin(pilot.theta_rad), math.cos(pilot.theta_rad)])
             off = feats.offset_um[k]
             v0 = float(off[0] * yh[0] + off[1] * yh[1])
-            theta0 = np.array([float(feats.d_um[k]), float(feats.mu_per_um[k]), v0, pilot.z_sub_um + float(off[2])])
             row["d_refined_um"] = float(feats.d_um[k])
             with np.load(os.path.join(a.cleaning_dir, "cleaning_%s_node%d.npz" % (a.specimen, nid))) as z:
                 node = node_from_npz(nid, z, None)
                 prof = np.array(z["profiles_after"], dtype=float)
+            # shifts about the trace (amendment 1, D-141): z_ax absolute = z_t + dz
+            theta0 = np.array([float(feats.d_um[k]), float(feats.mu_per_um[k]), v0,
+                               float(node.node_xyz[2]) + float(off[2])])
             sigma = float(info["sigma_gl"])
             forward = node_inputs.forward_factory(pilot, float(info["half_length_um"]), node, cfg, cache)
             fit = node_inference.fit_node(prof, node.B_gl, sigma, forward, theta0, cfg)
