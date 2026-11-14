@@ -79,6 +79,21 @@ def node_from_npz(nid, z, theta0):
                     n_avg=int(z["n_avg"]), step=float(z["step"]), theta0=theta0)
 
 
+def fit_start(source, d_um, mu_per_um, offset_um, pilot, node_xyz):
+    """(theta0 = (d, mu, v0, z_ax), which) of Block 30's fit, shifts about the trace (amendment 1, D-141):
+    a "refined" features row starts at its (d, mu) and its offset (v0 = offset . y_hat, z_ax = z_t +
+    offset_z); any other row at node_inputs.pilot_start, the first-stage fit about the trace, z_ax = z_t +
+    (z_sub - z_t) (amendment 2, F4)."""
+    z_t = float(np.asarray(node_xyz, dtype=float)[2])
+    if source == "refined":
+        th = float(pilot.theta_rad)
+        off = np.asarray(offset_um, dtype=float)
+        v0 = float(off[0] * (-math.sin(th)) + off[1] * math.cos(th))
+        return np.array([float(d_um), float(mu_per_um), v0, z_t + float(off[2])]), "features"
+    st = node_inputs.pilot_start(pilot, node_xyz)
+    return np.array([st[0], st[1], st[2], z_t + st[3]]), "pilot_start"
+
+
 def _num(x):
     return float("nan") if x is None else float(x)
 
@@ -105,7 +120,8 @@ def run_real(a, log):
         pil = info["pilot"]
         pilot = _types.SimpleNamespace(cx_um=_num(pil["cx_um"]), cy_um=_num(pil["cy_um"]),
                                        theta_rad=_num(pil["theta_rad"]), phi_rad=_num(pil["phi_rad"]),
-                                       z_sub_um=_num(pil["z_sub_um"]))
+                                       z_sub_um=_num(pil["z_sub_um"]), d_hat_um=_num(pil.get("d_hat_um")),
+                                       mu_hat_per_um=_num(pil.get("mu_hat_per_um")))
         row = {"node_id": nid, "class": info.get("class", ""), "d_allen_um": _num(info.get("d_allen_um")),
                "d_pilot_um": _num(pil.get("d_hat_um")), "status": "failed", "at_bound": "", "planes_used": "",
                "n_planes_used": 0}
@@ -114,18 +130,16 @@ def run_real(a, log):
             flags.append(FLAG_TIER2)
         try:
             k = pos[nid]
-            yh = np.array([-math.sin(pilot.theta_rad), math.cos(pilot.theta_rad)])
             off = feats.offset_um[k]
-            v0 = float(off[0] * yh[0] + off[1] * yh[1])
             row["d_refined_um"] = float(feats.d_um[k])
             with np.load(os.path.join(a.cleaning_dir, "cleaning_%s_node%d.npz" % (a.specimen, nid))) as z:
                 node = node_from_npz(nid, z, None)
                 prof = np.array(z["profiles_after"], dtype=float)
-            # shifts about the trace (amendment 1, D-141): z_ax absolute = z_t + dz
-            theta0 = np.array([float(feats.d_um[k]), float(feats.mu_per_um[k]), v0,
-                               float(node.node_xyz[2]) + float(off[2])])
+            theta0, row["start"] = fit_start(str(feats.source[k]), float(feats.d_um[k]), float(feats.mu_per_um[k]),
+                                             off, pilot, node.node_xyz)
             sigma = float(info["sigma_gl"])
-            forward = node_inputs.forward_factory(pilot, float(info["half_length_um"]), node, cfg, cache)
+            forward = node_inputs.forward_factory(pilot, tuple(float(x) for x in info["U_axis_um"]), node, cfg,
+                                                  cache)        # the tube's extents (amendment 3)
             fit = node_inference.fit_node(prof, node.B_gl, sigma, forward, theta0, cfg)
         except Exception as exc:                      # one node's failure never stops the run
             n_failed += 1
@@ -144,7 +158,7 @@ def run_real(a, log):
                    seconds=time.time() - t0)
         rows.append(row)
         n_failed += fit.status == "failed"
-        per_node[str(nid)] = dict(chi2_per_plane=fit.chi2_per_plane, ks=node.ks, planes=fit.planes, theta=th,
+        per_node[str(nid)] = dict(start=row["start"], chi2_per_plane=fit.chi2_per_plane, ks=node.ks, planes=fit.planes, theta=th,
                                   cov=fit.cov, se=se, theta0=theta0, sigma_gl=sigma, n_starts=fit.n_starts,
                                   nfev=fit.nfev, status=fit.status)
         log("node %d: d %.4f +- %.4f um (Allen %.3f, pilot %.3f, refined %.3f), mu %.4g /um, v0 %.3f um, z_ax %.3f um, "

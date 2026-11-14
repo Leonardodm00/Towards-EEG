@@ -261,6 +261,7 @@ class NodeClock(object):
         self.cur = None                # (round, node_id, t_start, t_predict, nfev)
         self.round_t0 = None
         self.calls = 0
+        self.bg_seconds = None
 
     def node_start(self):
         now = time.time()
@@ -270,6 +271,7 @@ class NodeClock(object):
         self.k += 1
         self.cur = [1 + (self.k - 1) // self.n, None, now, None]
         self.calls = 0
+        self.bg_seconds = None
 
     def node_predict(self, nid):
         if self.cur is not None:
@@ -281,8 +283,9 @@ class NodeClock(object):
         now = time.time() if now is None else now
         rnd, nid, t0, tp = self.cur
         tp = now if tp is None else tp
-        self.log("round %d node %s: shadow and cleaning %.1f s, refinement %.1f s (%d model calls), %.1f s"
-                 % (rnd, nid, tp - t0, now - tp, self.calls, now - t0))
+        bg = "" if self.bg_seconds is None else "background refit %.1f s, " % self.bg_seconds
+        self.log("round %d node %s: %sshadow and cleaning %.1f s, refinement %.1f s (%d model calls), %.1f s"
+                 % (rnd, nid, bg, tp - t0 - (self.bg_seconds or 0.0), now - tp, self.calls, now - t0))
         if self.k % self.n == 0:
             self.log("round %d: %d nodes in %.1f s" % (rnd, self.n, now - self.round_t0))
         self.cur = None
@@ -364,7 +367,11 @@ def run_clean(a, cfg, log):
     log("scene: %d segments, %d soma discs; %d nodes in the features table" % (scene.seg_xyz.shape[0],
                                                                                 scene.soma.shape[0], len(features0)))
     work = node_inputs.work_list(examples, fscene0, swc, cfg, cfg.cleaning.work_peak_min_gl, B)
-    log("work list: %d nodes (%d examples, %d neighbours' nodes)" % (len(work), len(examples), len(work) - len(examples)))
+    cut = [i for i in examples if i not in work]
+    if cut:                                         # amendment 2, F5: more examples than work_max_nodes
+        log("work list capped at %d nodes: %d example nodes cut %s" % (cfg.cleaning.work_max_nodes, len(cut), cut))
+    n_ex = len(examples) - len(cut)
+    log("work list: %d nodes (%d examples, %d neighbours' nodes)" % (len(work), n_ex, len(work) - n_ex))
 
     stretch_of = {}
     for run in cell.stretches(swc, tuple(cfg.acquisition.dendrite_swc_types)):
@@ -382,8 +389,9 @@ def run_clean(a, cfg, log):
             own_branch_, _ = ob
             pilot = measure_pilot(full, off + t, provider, cfg)
             start, clipped = _clip_start(node_inputs.pilot_start(pilot, own_branch_.xyz_um[t]), cfg)
-            node, info = node_inputs.build_node(own_branch_, t, pilot, provider, scene, cfg,
-                                                tuple(int(i) for i in own_branch_.ids), theta0=start)
+            own = node_inputs.own_ids_within(own_branch_, t, cfg.inference.tube_half_length_um)[0]   # amendment 3
+            node, info = node_inputs.build_node(own_branch_, t, pilot, provider, scene, cfg, own, fscene0,
+                                                theta0=start)          # own ids within U (amendment 2, F1)
         except Exception as exc:                     # one node's failure never stops the run
             dropped[nid] = "%s: %s" % (type(exc).__name__, exc)
             log("node %d: dropped (%s) in %.1f s" % (nid, dropped[nid], time.time() - t0))
@@ -393,21 +401,24 @@ def run_clean(a, cfg, log):
             log("node %d: dropped (%s) in %.1f s" % (nid, dropped[nid], time.time() - t0))
             continue
         if not (math.isfinite(info["sigma_gl"]) and info["sigma_gl"] > 0):
-            dropped[nid] = "no_noise_sd: the planes' noise SD %r" % (info["sigma_gl"],)
+            dropped[nid] = "no_noise_sd: the profile's noise SD %r" % (info["sigma_gl"],)
             log("node %d: dropped (%s) in %.1f s" % (nid, dropped[nid], time.time() - t0))
             continue
         info.update(pilot=pilot_fields(pilot), start_clipped=clipped, theta0=start,
                     d_allen_um=2.0 * float(own_branch_.radius_um[t]))
         nodes.append(node)
-        infos[nid], pilots[nid], halfs[nid] = info, pilot, info["half_length_um"]
+        infos[nid], pilots[nid], halfs[nid] = info, pilot, info["U_axis_um"]
         log("node %d: pilot d %.3f um, mu %.3f /um, k* %d (%s)%s; %d planes %d..%d, B %.1f..%.1f gl, noise SD %.2f "
-            "gl, tube half-length %.2f um; %.1f s"
+            "gl (pixel %.2f gl x %.3f), %d own nodes, tube -%.2f..+%.2f um, support %s; %.1f s"
             % (nid, pilot.d_hat_um, pilot.mu_hat_per_um, pilot.k_star, pilot.fit_status,
                " start clipped into the refine box" if clipped else "", node.ks.size, node.ks[0], node.ks[-1],
-               node.B_gl.min(), node.B_gl.max(), info["sigma_gl"], info["half_length_um"], time.time() - t0))
+               node.B_gl.min(), node.B_gl.max(), info["sigma_gl"], info["sigma_pixel_gl"],
+               info["noise_factor"], len(node.own_ids), info["U_axis_um"][0], info["U_axis_um"][1],
+               ("%.2f..%.2f" % (min(info["support_frac"]), max(info["support_frac"]))) if "support_frac" in info
+               else cfg.cleaning.background_support, time.time() - t0))
     kept_examples = [i for i in examples if i in infos]
     base = dict(specimen=str(a.specimen), source=label, examples_file=os.path.abspath(a.examples),
-                example_ids=kept_examples, examples_requested=examples, work_list=work, dropped=dropped,
+                example_ids=kept_examples, examples_requested=examples, examples_cut=cut, work_list=work, dropped=dropped,
                 B_gl=B, B_source=B_src, mu_per_um=mu, mu_source=mu_src,
                 transform=dict(shift_full_px=list(transform["shift_full_px"]), flip_y_full_h=transform["flip_y_full_h"],
                                z0_um=transform["z0_um"]), **config_sections(cfg))
@@ -420,7 +431,7 @@ def run_clean(a, cfg, log):
                   mu_per_um=float(pilots[n.node_id].mu_hat_per_um), source="pilot") for n in nodes]
     features0 = node_features.with_rows(features0, rows0, 0)
     sigma = float(np.median([infos[n.node_id]["sigma_gl"] for n in nodes]))
-    log("%d nodes prepared (%d dropped), %d example nodes; sigma_gl %.3f gl (median of the nodes')"
+    log("%d nodes prepared (%d dropped), %d example nodes; sigma_gl %.3f gl (median of the nodes' profile SDs)"
         % (len(nodes), len(dropped), len(kept_examples), sigma))
 
     clock = NodeClock(len(nodes), log)
@@ -436,15 +447,27 @@ def run_clean(a, cfg, log):
             return predict(d, mu_, v0, dz)
         return counted
 
-    def timed_shadow(fscene, own_ids, left, top, width, height, planes_z, cfg_, B_gl, include):
+    model_bg = cfg.cleaning.background_support == "model"
+    bg_fn = node_inputs.background_factory(cfg, log=log) if model_bg else None   # amendment 4, D-144
+
+    def timed_background(node, F):
         clock.node_start()
+        t_b = time.time()
+        out = bg_fn(node, F)
+        clock.bg_seconds = time.time() - t_b
+        return out
+
+    def timed_shadow(fscene, own_ids, left, top, width, height, planes_z, cfg_, B_gl, include):
+        if not model_bg:
+            clock.node_start()
         return shadow.shadow_image(fscene, own_ids, left, top, width, height, planes_z, cfg_, B_gl=B_gl,
                                    include=include).S
 
     t_run = time.time()
     try:
         res = clean_iteration.run_rounds(features0, scene, nodes, cfg, sigma, timed_factory,
-                                         example_ids=kept_examples, shadow_fn=timed_shadow)
+                                         example_ids=kept_examples, shadow_fn=timed_shadow,
+                                         background_fn=timed_background if model_bg else None)
     except Exception as exc:
         clock.finish()
         write_json(json_path, dict(base, stopped="error", error="%s: %s" % (type(exc).__name__, exc), history=[],
@@ -474,6 +497,9 @@ def run_clean(a, cfg, log):
                    offset_um=feats.offset_um[k], source=str(feats.source[k]),
                    n_tier1=int(np.sum(tiers == 1)), n_tier2=int(np.sum(tiers == 2)))
         rec["class"] = classes.get(nid, "")
+        rec["B_gl_last"] = np.asarray(res.B_gl.get(nid, n.B_gl))
+        if model_bg:                                   # the backgrounds per round (amendment 4)
+            rec["background_rounds"] = [dict(round=r + 1, **h) for r, h in enumerate(bg_fn.history.get(nid, []))]
         per_node[str(nid)] = rec
     write_json(json_path, dict(base, history=res.history, stopped=res.stopped, rounds=res.rounds, sigma_gl=sigma,
                                nodes=per_node,
@@ -492,7 +518,7 @@ def run_clean(a, cfg, log):
         line_xy = np.array([n.origin_xy - r * n.y_hat, n.origin_xy + r * n.y_hat])
         npz = os.path.join(a.out, "cleaning_%s_node%d.npz" % (a.specimen, nid))
         np.savez(npz, block=np.asarray(n.block), shadow_gl=res.shadow[nid], cleaned=res.cleaned[nid], ks=n.ks,
-                 B_gl=n.B_gl, v=n.v, profiles_before=res.profiles_before[nid], profiles_after=res.profiles_after[nid],
+                 B_gl=np.asarray(res.B_gl.get(nid, n.B_gl)), B0_gl=n.B_gl, v=n.v, profiles_before=res.profiles_before[nid], profiles_after=res.profiles_after[nid],
                  origin_xy=n.origin_xy, y_hat=n.y_hat, e_u=n.e_u, n_avg=n.n_avg, step=n.step, line_xy=line_xy,
                  left=n.left, top=n.top, res0_um=res0, planes_z=n.planes_z, node_xyz=n.node_xyz,
                  own_ids=np.asarray(n.own_ids, dtype=np.int64))
