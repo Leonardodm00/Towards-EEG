@@ -239,3 +239,102 @@ def test_value_errors():
         CI.NodeData(node_id=2, own_ids=(1, 2, 3), node_xyz=nd.node_xyz, block=nd.block, B_gl=nd.B_gl[:2],
                     ks=nd.ks, planes_z=nd.planes_z, left=0, top=-20, origin_xy=nd.origin_xy, y_hat=nd.y_hat,
                     e_u=nd.e_u, v=nd.v, n_avg=1, step=P)
+
+
+# ------------------------------------------- amendment 2 (D-144.2), 2026-11-14 18:30 ---
+
+class ScriptB(Script):
+    """A scripted refine_node that also records the backgrounds it is given."""
+
+    def __init__(self, plan):
+        super().__init__(plan)
+        self.B = []
+
+    def __call__(self, prof, B, v, predict, start, cfg):
+        self.B.append((predict.node_id, np.array(B, dtype=float)))
+        return super().__call__(prof, B, v, predict, start, cfg)
+
+
+def const_shadow(value):
+    seen = []
+
+    def fn(fscene, own_ids, left, top, width, height, planes_z, cfg, B_gl, include):
+        seen.append(float(B_gl))
+        return np.full((len(planes_z), height, width), value)
+    fn.seen = seen
+    return fn
+
+
+def test_background_fn_used_everywhere(monkeypatch):
+    """Block 32, amendment 2: background_fn(node, F) -> (n_planes,) gl is that round's B_k for the floor
+    (shadow_fn's scalar = max_k B_k), the cleaning (I + B_k S) and the refinement (refine_node's B); returned
+    as per_node B_gl and IterationResult.B_gl; called once per node and round with the featured scene of the
+    round before (compared with featured_scene of the features after round 1, recomputed by hand from the
+    scripted fits). None keeps NodeData.B_gl (regression of amendment 1's tests)."""
+    from allen_diameter.analysis import node_features
+    plan = {2: [(0.70, 1.2, 0.10, -0.2, "converged"), (0.71, 1.2, 0.10, -0.2, "converged")],
+            12: [(0.55, 0.9, -0.1, 0.1, "converged"), (0.56, 0.9, -0.1, 0.1, "converged")]}
+    sc = ScriptB(plan)
+    monkeypatch.setattr(CI.coarse_fit, "refine_node", sc)
+    Bs = {2: np.array([190.0, 191.0, 189.5]), 12: np.array([180.0, 182.0, 181.0])}
+    calls = []
+
+    def bfn(nd, F):
+        calls.append((nd.node_id, F))
+        return Bs[nd.node_id] + 0.5 * (len([c for c in calls if c[0] == nd.node_id]) - 1)
+    shp = const_shadow(0.01)
+    nodes = [node(2, 1.0), node(12, 4.0, seed=1)]
+    cfg = cfg_rounds(2, 1e-12)
+    f0 = features0()
+    sc_ = scene_two()
+    res = CI.run_rounds(f0, sc_, nodes, cfg, 3.0, factory, example_ids=(2,), shadow_fn=shp, background_fn=bfn,
+                        keep_ids=(2, 12))
+    assert res.rounds == 2 and len(calls) == 4
+    # round 1 sees the features0 scene, round 2 the scene of the round-1 features
+    F0 = node_features.featured_scene(sc_, f0)
+    rows1 = [dict(node_id=2, d_um=0.70, mu_per_um=1.2, offset_um=np.array([0.0, 0.10, -0.2]), source="refined"),
+             dict(node_id=12, d_um=0.55, mu_per_um=0.9, offset_um=np.array([0.0, -0.1, 0.1]), source="refined")]
+    F1 = node_features.featured_scene(sc_, node_features.with_rows(f0, rows1, 1))
+    for nid, F in calls[:2]:
+        assert_array_equal(F.seg_xyz, F0.seg_xyz)
+        assert_array_equal(F.seg_d_um, F0.seg_d_um)
+    for nid, F in calls[2:]:
+        assert_allclose(F.seg_xyz, F1.seg_xyz, rtol=0, atol=1e-15)
+        assert_array_equal(F.seg_d_um, F1.seg_d_um)
+    # the floor's scalar: max_k of this round's B_k (not NodeData.B_gl's 210)
+    assert shp.seen == [191.0, 182.0, 191.5, 182.5]
+    # refine_node got this round's B_k
+    assert [nid for nid, _B in sc.B] == [2, 12, 2, 12]
+    assert_array_equal(sc.B[0][1], Bs[2])
+    assert_array_equal(sc.B[1][1], Bs[12])
+    assert_array_equal(sc.B[2][1], Bs[2] + 0.5)
+    # the cleaning: cleaned = I + B_k S with the last round's B_k [exact], shadow = B_k S
+    for nd in nodes:
+        Bl = Bs[nd.node_id] + 0.5
+        assert_array_equal(res.B_gl[nd.node_id], Bl)
+        assert_allclose(res.cleaned[nd.node_id], nd.block + Bl[:, None, None] * 0.01, rtol=0, atol=1e-12)
+        assert_allclose(res.shadow[nd.node_id], np.broadcast_to(Bl[:, None, None] * 0.01, nd.block.shape),
+                        rtol=0, atol=1e-15)
+        # the profiles are Block 5's read of the cleaned planes (independent bilinear read)
+        for q in range(3):
+            ref = nc_helpers.bilinear_read(res.cleaned[nd.node_id][q], nd.left, nd.top, P, nd.origin_xy, nd.y_hat,
+                                           nd.e_u, nd.v, nd.n_avg, nd.step)
+            assert_allclose(res.profiles_after[nd.node_id][q], ref, rtol=0, atol=1e-9)
+    # None: NodeData.B_gl every round
+    sc2 = ScriptB(plan)
+    monkeypatch.setattr(CI.coarse_fit, "refine_node", sc2)
+    shp2 = const_shadow(0.0)
+    res2 = CI.run_rounds(f0, sc_, nodes, cfg_rounds(1), 3.0, factory, shadow_fn=shp2)
+    assert shp2.seen == [210.0, 210.0]
+    assert_array_equal(sc2.B[0][1], nodes[0].B_gl)
+    assert_array_equal(res2.B_gl[2], nodes[0].B_gl)
+
+
+def test_background_fn_bad_values(monkeypatch):
+    """Block 32, amendment 2: a background_fn that returns a wrong shape, a NaN or a non-positive value is
+    refused (ValueError) rather than cleaning with it (the contract: (n_planes,) gl, a background)."""
+    monkeypatch.setattr(CI.coarse_fit, "refine_node", Script({2: [(0.7, 1.0, 0.0, 0.0, "converged")]}))
+    for bad in (np.array([200.0, 200.0]), np.array([200.0, np.nan, 200.0]), np.array([200.0, 0.0, 200.0])):
+        with pytest.raises(ValueError):
+            CI.run_rounds(features0(), scene_two(), [node(2, 1.0)], cfg_rounds(1), 3.0, factory,
+                          shadow_fn=zero_shadow, background_fn=lambda nd, F, b=bad: b)

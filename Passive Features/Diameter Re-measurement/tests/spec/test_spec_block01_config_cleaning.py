@@ -69,3 +69,19 @@ def test_json_is_the_full_signature_without_cleaning_and_inference():
         assert c2.signature_hash(which) == c0.signature_hash(which)
     doc = json.loads(c2.to_json())
     assert "cleaning" not in doc and "inference" not in doc
+
+
+def test_background_support_amendment4():
+    """Block 36 amendment 4 (D-144.1), 2026-11-14 18:30: background_support defaults to "model", the four names
+    accepted (the other three the labelled alternatives), background_shadow_max 0.10 and refused outside
+    (0, 1); neither moves a signature hash (the cleaning section is outside every signature)."""
+    c = C.default_config()
+    assert c.cleaning.background_support == "model" and c.cleaning.background_shadow_max == 0.10
+    for name in ("model", "unshaded", "square", "stripe"):
+        c2 = C.with_overrides(c, {"cleaning.background_support": name})
+        assert c2.cleaning.background_support == name
+        assert c2.signature_hash("full") == c.signature_hash("full")
+    for bad in ({"cleaning.background_support": "far"}, {"cleaning.background_shadow_max": 0.0},
+                {"cleaning.background_shadow_max": 1.0}, {"cleaning.background_shadow_max": float("nan")}):
+        with pytest.raises(ValueError):
+            C.with_overrides(c, bad)
