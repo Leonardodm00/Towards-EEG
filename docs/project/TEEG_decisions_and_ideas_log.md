@@ -187,6 +187,7 @@ the "Binds" column.
 | 2026-11-14 (later, 10) | Logs **D-146** [orchestrator] (the diameter chat, 18:30). The pilot's Cell 17 (3 work-list nodes, 2 rounds) ran 30 min without finishing: the shadow model computed the slabs of every segment of the cell (12877) for every node before the reach rule discarded them; the synthetic cell of the tests has 14. Fixed in `326891d` on `sci/diameter-pipeline` (Block 25 amendment 4, Block 36 amendment 7): exact prefilters (beyond reach; provably under the floor) and an exact output crop; a binned blur for defocused slabs (at most 2.2e-4 of a shadow's peak); the shadow model's hybrid directions 4 x 8; the floor in the background's all-segment shadow; the work list cut early. One shadow image of a 3072-segment synthetic scene: 74 s. Suites pass (shadow, cleaning iteration, pilot run, configuration). |
 | 2026-11-16 | No decision changed (the noise-fit chat; output pasted by the user, 09:41) **[cluster]**. **The pilot of D-124 is done**: `NOISE_MERGE L3_exc: 2 ok, 0 refused, 0 failed, 0 missing`. Seconds per stage (windows, cell fit, sweep stage, total): 508282493 (2 SS sweeps) 0.7, 3371, 11165, **14536** (4.0 h); 569844159 (10 SS sweeps) 1.7, 6202, 21104, **27308** (7.6 h). The sweep stage (Block 9, 6 workers) is 77 % of both; Block 4 took less than SPEC 2.3 (h)'s estimate (0.9 and 1.7 h against 1-3.5 and 2-5.5 h). The noise-fit code is unchanged since the pilot (the last commit touching `noise_*.py` or `run_noise_fit.py` is still `1d848f6`), so the 18-cell run skips the pilot's two cells. WALLTIME for the 18 cells: the assistant proposes 24:00:00 rather than the handoff's "1.5 x the largest total" (11.4 h, so 12:00:00) **[reasoning]**: the sweep stage grows with a cell's number of sweeps, mostly the LS ones, which are not known for the other 16 cells; a killed cell loses all its work. Next free IDs: D-147, I-006. |
 | 2026-11-16 (later) | Logs **D-147** (user, 09:45; the noise-fit chat): the 18-cell run keeps the pilot's walltime, 48:00:00 per cell job, in place of the 24:00:00 the assistant proposed (row 2026-11-16) and the handoff's 1.5 x rule. The Block 6 handoff's section 4 corrected. Next free IDs: D-148, I-006. |
+| 2026-11-16 | Logs **D-148** [orchestrator] (the diameter chat, 13:30). The pilot's Cell 17 (5 example nodes, 2 rounds, Colab) took 910 to 3076 s per node in round 1 -- the coarse refinement 596 to 2431 s (74 to 115 model calls of 6 to 21 s; the nodes 1.1 to 4.0 um thick by their pilots), the background's and the cleaning's shadows 107 to 334 s each -- and saved nothing before its end. Fixed in `b6073e3` on `sci/diameter-pipeline`: the coarse fit stops at 1e-3 and samples p/4 (on a noisy 2 um tube: 27 calls, 36 s against 59 calls, 261 s; the same diameter); the cleaning's shadow reuses the background's neighbour renderings (exact); the outputs are written after every round. The notebook's Cell 17 defaults to 1 round (with the work list holding only the examples, a second round refines no neighbour). |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -341,6 +342,7 @@ would be needed*, *Status*.
 | D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
 | D-133 | 2026-11-13 | SPEC Blocks 25 (amendment 2), 28, 29, 30, 31 at `38f7c19`; `CleaningConfig`, `InferenceConfig` | wave 2's validation targets, tolerances and provisional parameters, proposed by the orchestrator at the wave's start: exact inverse of the cleaning 1e-9 gl; recovery 1e-6 and unbiasedness within 3 SE for the two fits; coverage 60-76 % and chi2/N within 10 % of 1 for the per-node fit; hybrid column sum 1e-10 and faint limit 5e-3 for the shadow model; renderers passed as callables [orchestrator] | active |
 | D-134 | 2026-11-13 | SPEC Block 25 (amendment 3); D-132.1 | a tier-1 neighbour's shadow is equations (5-6) for the neighbour rendered alone: one blur per slab, under the hybrid's absorbed light; one kernel per column is dropped [user] | active; supersedes the "one blur per column" clause of D-132.1 |
+| D-148 | 2026-11-16 | SPEC Blocks 29 (amendment 1), 25 (amendment 5), 32 (amendment 3), 36 (amendment 8) at `b6073e3`; `CleaningConfig.refine_xtol`, `refine_ftol`, `refine_line_fine_factor` | the coarse refinement stops at relative tolerances 1e-3 (was 1e-8) and its predictor samples p/4 (the fine fit keeps p/8); the neighbours' images shared between the two shadows of a node; the cleaning saves after every round [orchestrator], PROVISIONAL | active |
 | D-147 | 2026-11-16 | `submit_noise_fit.sh`'s `WALLTIME` for the 18-cell run of D-124 (D-125.5) | the 18 L3_exc cells run with WALLTIME = 48:00:00 per cell job, as the pilot did [user] | active |
 | D-146 | 2026-11-14 | SPEC Block 25 (amendment 4), Block 36 (amendment 7) at `326891d`; `CleaningConfig.shadow_bin_sigmas`, `shadow_ray_n_rho`, `shadow_ray_n_psi` | the shadow model renders only the neighbours that can reach the patch and exceed the floor (exact), crops each blur to its reach (exact), bins defocused slabs (2.2e-4 of a peak), uses 4 x 8 hybrid directions (0.04-0.2 % of a shadow's peak); the background's all-segment shadow takes the floor [orchestrator], PROVISIONAL | active |
 | D-145 | 2026-11-14 | SPEC Block 36 (amendment 6) at `225c458` | the summed segment shadows of a neighbour branch accepted at the pilot's coefficient (within 1.5 % of the dip up to 60 deg), not above about 0.5 /um on steep branches (open); the background's trim centred on the residuals' median, one trim; the first backgrounds on the round-0 scene with the pilots' rows; outputs written atomically [orchestrator] | active |
@@ -11302,3 +11304,37 @@ neighbours' images between the cleaning's shadow and the background's; the surve
 **Sources.** **[user]** 2026-11-16, 09:45. **[cluster]** the pilot's JSONs (seconds per stage), pasted 2026-11-16, 09:41. **[log]** D-124, D-125.5.
 
 **Status:** active.
+
+## D-148 -- The cleaning made affordable on the pilot: the coarse fit's tolerances and grid, shared neighbour images, a save after every round [orchestrator]
+
+**Date:** 2026-11-16, about 13:30 (Europe/Rome), the diameter chat, settled by the orchestrating session (Opus 5.5)
+under coding directive 7 after the user's "It's really taking too much" on the pilot's Cell 17; the user was not asked
+and can reverse any point.
+**Binds:** SPEC Blocks 29 (amendment 1), 25 (amendment 5), 32 (amendment 3), 36 (amendment 8) at `b6073e3` on
+`sci/diameter-pipeline`; `CleaningConfig.refine_xtol`, `refine_ftol` (1e-3), `refine_line_fine_factor` (4).
+
+**Decision [orchestrator].** Four clauses, PROVISIONAL.
+
+**Statement.** (D-148.1, tolerance) The coarse refinement of a node (Block 29) stops when the relative step of its
+parameters or the relative change of its weighted cost falls under 1e-3. Agreed before: scipy's defaults, 1e-8.
+(D-148.2, numerical) Its predictor (the fast line renderer of the node's tube) samples the pixel $p$ = 0.1144 um at $p/4$; the
+fine fit keeps $p/8$. Agreed before: $p/8$ for both. (D-148.3, exact) The images of a patch's neighbours are kept for the next
+shadow on the same patch, planes and configuration, so the cleaning's shadow reuses the background's renderings.
+(D-148.4, plumbing) The cleaning writes all its outputs after every round.
+
+**Why.** In the pilot's log (Colab, round 1, 5 nodes) the coarse refinement took 596 to 2431 s per node (74 to 115
+calls), each shadow 107 to 334 s **[the user's log, 2026-11-16]**. The stop rule asks 1 % in the diameter, so 1e-3 is
+ten times finer than needed [reasoning]. On a noisy 2 um tube ($\mu$ = 0.052 /um, $B$ = 107 gl, noise SD 0.85 gl,
+hybrid 8 x 16) the new settings took 27 calls and 36 s against 59 calls and 261 s and gave the same diameter (1.9905 um
+for 2.0); the coarse grid departs from the fine one by at most 2.1e-4 of the background; at the defaults the noise-free
+recovery is within 2e-3 relative; shared images give identical shadows **[run, sandbox]**.
+
+**What it implies for code and tables.** The files of the four blocks; Block 29's exact oracle runs at 1e-8.
+
+**What it does not decide [open].** The per-node time on the pilot after the change (the shadows, 107 to 334 s, now
+dominate); a coarse grid for wide-kernel neighbours such as the soma.
+
+**Sources.** **[user]** the log. **[run, sandbox]** as above. **[SPEC]** `b6073e3`.
+
+**Status:** active.
+
