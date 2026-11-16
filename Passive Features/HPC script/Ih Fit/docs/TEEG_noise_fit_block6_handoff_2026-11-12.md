@@ -11,6 +11,7 @@ which stays the history of Block 9 and of D-122 to D-125.
 | 2026-11-14 | Step 2 under way **[cluster, pasted 16:16]**: the F2 scan of the 18 cells finds nothing to drop; the FULL gates SETTLED at `62f3324` (16 checks); `smoke_noise_run.py` 9/9 on davinci (536 s); the first dry run refused inside an interactive job (the guard). §1, §4, §5, §9 updated. |
 | 2026-11-14 (later) | The pilot submitted, 16:19 **[cluster]**: array `2096989[].pbsserver01`, merge `2096990.pbsserver01`, walltime 48 h; §4 holds the job IDs, the run file and how to follow it. |
 | 2026-11-16 | The pilot done: 2 ok (4.0 h and 7.6 h); the 18-cell run's WALLTIME proposed at 24:00:00; §4 holds the timings and the launch commands. |
+| 2026-11-16 (later) | WALLTIME for the 18 cells: 48:00:00, the user's decision (D-147); §4 corrected. |
 
 **Basis tags.** **[run]** executed in the assistant's sandbox (date given); **[src]** read from the code, SPEC or log
 on `main`; **[log]** the decision log's text; **[user]** the user's decision or words; **[reasoning]** the assistant's
@@ -144,11 +145,11 @@ Expected durations **[reasoning, from SPEC 2.3 (h) and 2.5 (h); never run at ful
 | 508282493 | 2 | 0.7 | 3371 | 11165 | 14536 s = 4.0 h |
 | 569844159 | 10 | 1.7 | 6202 | 21104 | 27308 s = 7.6 h |
 
-The sweep stage is 77 % of both. WALLTIME for the 18 cells **[reasoning, the assistant's proposal]**: 24:00:00, 3.2 x the slower pilot cell, rather than 1.5 x (11.4 h): the stage grows with a cell's sweeps, mostly the LS ones, not known for the other 16 cells, and a killed cell loses all its work. The code is unchanged since the pilot (`1d848f6`), so its two cells are skipped:
+The sweep stage is 77 % of both. WALLTIME for the 18 cells **[reasoning, the assistant's proposal]** [corrected 2026-11-16: **48:00:00**, the user's decision, D-147; the commands below carry it]: 24:00:00, 3.2 x the slower pilot cell, rather than 1.5 x (11.4 h): the stage grows with a cell's sweeps, mostly the LS ones, not known for the other 16 cells, and a killed cell loses all its work. The code is unchanged since the pilot (`1d848f6`), so its two cells are skipped:
 
     cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/HPC script/Ih Fit" && git pull && conda activate prova
-    RUN_TAG=nf1 WALLTIME=24:00:00 DRY_RUN=1 bash submit_noise_fit.sh
-    RUN_TAG=nf1 WALLTIME=24:00:00 bash submit_noise_fit.sh
+    RUN_TAG=nf1 WALLTIME=48:00:00 DRY_RUN=1 bash submit_noise_fit.sh
+    RUN_TAG=nf1 WALLTIME=48:00:00 bash submit_noise_fit.sh
 
 Read back from the pilot: the `NOISE_CELL` lines, each JSON's per-stage seconds (they set `WALLTIME`), the
 `NOISE_MERGE` line. A code change between the pilot and the run re-runs every cell, the pilot's included (the resume
