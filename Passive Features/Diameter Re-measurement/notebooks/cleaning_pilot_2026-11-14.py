@@ -139,9 +139,13 @@ with open(CFG_CLEAN, "w") as f:
     json.dump(cfg_d, f, indent=1)
 print("[cell 16] " + line)
 CLEAN_CFG = ["--config-json", CFG_CLEAN]
-run("scripts/clean_cell.py", "survey", "--specimen", SPECIMEN, "--out", CLEAN, "--cache-dir", CACHE_DIR, *ALIGN,
-    *CLEAN_CFG, "--B", B_GL, "--mu", MU, *([] if SURVEY_MAX_NODES is None else ["--max-nodes", SURVEY_MAX_NODES]))
 EXAMPLES = "%s/examples_%d.json" % (CLEAN, SPECIMEN)
+RESURVEY = False                # True: survey again although an examples file exists
+if RESURVEY or not os.path.exists(EXAMPLES):
+    run("scripts/clean_cell.py", "survey", "--specimen", SPECIMEN, "--out", CLEAN, "--cache-dir", CACHE_DIR, *ALIGN,
+        *CLEAN_CFG, "--B", B_GL, "--mu", MU, *([] if SURVEY_MAX_NODES is None else ["--max-nodes", SURVEY_MAX_NODES]))
+else:
+    print("[cell 16] survey skipped: %s exists (set RESURVEY = True to survey again)" % EXAMPLES)
 with open(EXAMPLES) as f:
     ex = json.load(f)
 print("[cell 16] example nodes:", ex.get("example_ids"), "| classes:", ex.get("classes"))
