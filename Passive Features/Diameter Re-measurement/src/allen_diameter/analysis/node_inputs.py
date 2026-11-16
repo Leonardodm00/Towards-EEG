@@ -502,6 +502,10 @@ def predict_factory(pilots, half_lengths, cfg, cache):
     info["U_axis_um"], amendment 3); cache: a
     line_fast.SectionCache shared by the calls (or None). An ExtrusionInvalid returns NaN (the fit then fails
     and Block 32 flags the node)."""
+    import dataclasses as _dc
+    cfg_c = _dc.replace(cfg, inference=_dc.replace(cfg.inference,          # D-147.2: the coarse fit's grid
+                                                   line_fine_factor=int(cfg.cleaning.refine_line_fine_factor)))
+
     def factory(node):
         nid = int(node.node_id)
         pilot = pilots[nid]
@@ -512,7 +516,7 @@ def predict_factory(pilots, half_lengths, cfg, cache):
 
         def predict(d, mu, v0, dz):
             try:
-                tau = line_fast.line_profiles(local_tube(pilot, trace, d, v0, dz, Um, Up), mu, *args, cfg,
+                tau = line_fast.line_profiles(local_tube(pilot, trace, d, v0, dz, Um, Up), mu, *args, cfg_c,
                                               cache=cache)
             except line_fast.ExtrusionInvalid:
                 return np.full(shape, np.nan)

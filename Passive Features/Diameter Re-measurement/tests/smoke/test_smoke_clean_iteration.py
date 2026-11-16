@@ -397,6 +397,20 @@ def test_background_fn():
                                               background_fn=lambda n, F: bad))
 
 
+def test_on_round():
+    # D-147.4: on_round receives the state after every round; "running" until the last, then the final status
+    cfg = cfg_with(shadow_absorption="partition_vertical", max_rounds=3, stop_rel_d=1e-12)
+    node = make_node(2)
+    feats, scene = make_features([1.3, 0.8], [1.0, 1.5]), make_scene()
+    seen = []
+    res = CI.run_rounds(feats, scene, [node], cfg, 1e-300, closed_predict_factory, example_ids=(2,),
+                        on_round=lambda r: seen.append((r.rounds, r.stopped, len(r.history), r.features)))
+    assert [x[0] for x in seen] == list(range(1, res.rounds + 1)), seen
+    assert all(x[1] == "running" for x in seen[:-1]) and seen[-1][1] == res.stopped, seen
+    assert [x[2] for x in seen] == list(range(1, res.rounds + 1))
+    assert seen[-1][3] is res.features
+
+
 def test_convergence():
     raise unittest.SkipTest("no discretisation in the iteration; its contraction is test_known_answer (a)")
 

@@ -310,9 +310,17 @@ def test_reference():
     z_t = float(node.node_xyz[2])
     by_hand = line_fast.line_profiles(NI.local_tube(p, node.node_xyz, d, v0, dz, *U), mu, node.ks, node.origin_xy,
                                       node.y_hat, node.e_u, node.v, node.n_avg, node.step, cfg)
-    assert_array_equal(pred(d, mu, v0, dz), 1.0 - by_hand)
+    # D-147.2: the coarse fit's predictor samples p / refine_line_fine_factor, the fine fit's forward p /
+    # inference.line_fine_factor; each equals line_profiles by hand on its own grid, and the two agree to the grid's error
+    cfg_c = dataclasses.replace(cfg, inference=dataclasses.replace(
+        cfg.inference, line_fine_factor=int(cfg.cleaning.refine_line_fine_factor)))
+    by_hand_c = line_fast.line_profiles(NI.local_tube(p, node.node_xyz, d, v0, dz, *U), mu, node.ks, node.origin_xy,
+                                        node.y_hat, node.e_u, node.v, node.n_avg, node.step, cfg_c)
+    assert_array_equal(pred(d, mu, v0, dz), 1.0 - by_hand_c)
     assert_array_equal(fwd(d, mu, v0, z_t + dz), by_hand)
-    assert_array_equal(1.0 - pred(d, mu, v0, dz), fwd(d, mu, v0, z_t + dz))
+    grid_err = float(np.max(np.abs((1.0 - pred(d, mu, v0, dz)) - fwd(d, mu, v0, z_t + dz))))
+    print("    predict (coarse grid) against forward (fine grid): max |diff| %.2e of the background" % grid_err)
+    assert grid_err <= 5e-3, "coarse against fine grid: %.3e" % grid_err
     assert np.min(by_hand) < 0.9, "the tube must cast a dip"
     # the hybrid through the cache: equal to an uncached call
     hcfg = dataclasses.replace(cfg, inference=dataclasses.replace(cfg.inference, absorption="hybrid"))

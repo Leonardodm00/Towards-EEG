@@ -292,7 +292,7 @@ def _stop_reached(max_rel_d, max_line_change_gl, stop_rel_d, sigma_gl):
 
 
 def run_rounds(features0, scene, nodes, cfg, sigma_gl, predict_factory, example_ids=(), shadow_fn=None,
-               keep_ids=None, background_fn=None):
+               keep_ids=None, background_fn=None, on_round=None):
     """Rounds of round_once until the stop rule of D-130.O6 or CleaningConfig.max_rounds -> IterationResult.
 
     sigma_gl: the noise SD (gl, > 0), the line-change threshold; example_ids: the example nodes E (ids in
@@ -343,11 +343,20 @@ def run_rounds(features0, scene, nodes, cfg, sigma_gl, predict_factory, example_
                         "n_at_bound": sum(1 for s in statuses.values() if s == "at_bound")})
         features = new
         prev = {nid: per_node[nid]["profiles"] for nid in per_node}
-        if _stop_reached(max_rel_d, line, stop_rel_d, sigma):
+        done = _stop_reached(max_rel_d, line, stop_rel_d, sigma)
+        if done:
             stopped = "converged"
+        if on_round is not None:     # D-147.4: the state after every round (to save it); "running" until the last
+            on_round(_result(features, history, stopped if (done or t == max_rounds) else "running", t, before,
+                             per_node, keep))
+        if done:
             break
+    return _result(features, history, stopped, t, before, per_node, keep)
+
+
+def _result(features, history, stopped, t, before, per_node, keep):
     return IterationResult(
-        features=features, history=history, stopped=stopped, rounds=t,
+        features=features, history=list(history), stopped=stopped, rounds=t,
         profiles_before=before, profiles_after={nid: per_node[nid]["profiles"] for nid in per_node},
         cleaned={i: per_node[i]["cleaned"] for i in keep}, shadow={i: per_node[i]["shadow_gl"] for i in keep},
         tiers={nid: per_node[nid]["tiers"] for nid in per_node}, fits={nid: per_node[nid]["fit"] for nid in per_node},

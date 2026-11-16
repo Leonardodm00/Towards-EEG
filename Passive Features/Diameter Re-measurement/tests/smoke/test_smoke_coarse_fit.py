@@ -42,6 +42,7 @@ import traceback
 import unittest
 from pathlib import Path
 
+import dataclasses
 import numpy as np
 from numpy.testing import assert_allclose, assert_array_equal  # noqa: F401
 
@@ -139,20 +140,28 @@ def test_known_answer():
     # Noise-free data: the truth is a zero of every residual, so the solver
     # reaches it to its own termination tolerance (xtol 1e-8 relative); the
     # entry's tolerances are 1e-6 relative on d and mu, 1e-6 um on the shifts.
-    cfg, v, z, predict = make_case()
+    # D-147.1: the default tolerances are 1e-3 (the coarse fit's purpose); this exact oracle runs at scipy's 1e-8,
+    # and the defaults are checked against the stop rule's needs (d within 2e-3 relative) below.
+    cfg_def, v, z, predict = make_case()
+    cfg = dataclasses.replace(cfg_def, cleaning=dataclasses.replace(cfg_def.cleaning, refine_xtol=1e-8, refine_ftol=1e-8))
     truths = [TRUTH, (1.6, 0.6, -0.2, -0.15), (0.4, 3.0, 0.05, 0.2)]
     for truth in truths:
         I, B = observed(predict, truth, z.size)
         for factor in (1.3, 0.7):
             th0 = np.array(truth) * factor
+            loose = CF.refine_node(I, B, v, predict, th0, cfg_def)
+            est_l = theta_of(loose)
+            assert loose["status"] == "converged", loose
+            assert abs(est_l[0] / truth[0] - 1.0) <= 2e-3, ("default tolerances, d", truth, factor, est_l)
             out = CF.refine_node(I, B, v, predict, th0, cfg)
             est = theta_of(out)
             tag = "truth %r start x%.1f" % (truth, factor)
             assert out["status"] == "converged", (tag, out)
             check_close("known_answer d mu " + tag, est[:2], truth[:2], rtol=1e-6, atol=0.0)
             check_close("known_answer shifts " + tag, est[2:], truth[2:], rtol=0.0, atol=1e-6)
-            print("    %s: d %.12f mu %.12f v0 %.12f dz %.12f; err %s; nfev %d"
-                  % (tag, est[0], est[1], est[2], est[3], np.array2string(est - np.array(truth), precision=2), out["nfev"]))
+            print("    %s: d %.12f mu %.12f v0 %.12f dz %.12f; err %s; nfev %d (defaults: d rel err %.1e, nfev %d)"
+                  % (tag, est[0], est[1], est[2], est[3], np.array2string(est - np.array(truth), precision=2), out["nfev"],
+                     est_l[0] / truth[0] - 1.0, loose["nfev"]))
 
 
 def test_reference():

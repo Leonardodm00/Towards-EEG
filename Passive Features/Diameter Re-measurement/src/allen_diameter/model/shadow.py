@@ -340,6 +340,17 @@ def _segment_box(tube):
 
 
 _PREFILTER = True     # skip the neighbours no column of which can reach the patch (exact: see _beyond_reach)
+_SHARE = True         # D-147.3: keep the last patch's neighbour images for the next call on the same patch
+_shared = {"key": None, "items": {}}
+
+
+def _item_key(fscene, kind, idx):
+    """What a neighbour's image depends on in the scene: its geometry and features."""
+    if kind == "seg":
+        return ("seg", np.asarray(fscene.seg_xyz, dtype=float)[idx].tobytes(),
+                np.asarray(fscene.seg_d_um, dtype=float)[idx].tobytes(),
+                np.asarray(fscene.seg_mu_per_um, dtype=float)[idx].tobytes())
+    return ("soma", np.asarray(fscene.soma, dtype=float)[idx].tobytes())
 
 
 def _beyond_reach(fscene, segs, somas, patch, planes_z, cfg):
@@ -521,6 +532,11 @@ def shadow_image(fscene, own_ids, left, top, width, height, planes_z, cfg, B_gl=
     kept = np.zeros(n_nb, dtype=bool)
     nb_fp = np.zeros_like(own_fp)
     items = [("seg", int(q)) for q in segs] + [("soma", int(s)) for s in somas]
+    if _SHARE:          # the images of the last call are kept only for the same patch, planes and configuration
+        pkey = (int(left), int(top), int(width), int(height), z.tobytes(), hash((cfg.cleaning, cfg.renderer,
+                                                                             cfg.acquisition)))
+        if _shared["key"] != pkey:
+            _shared["key"], _shared["items"] = pkey, {}
     if _PREFILTER:
         far = _beyond_reach(fscene, segs, somas, patch, z, cfg) | _below_floor(fscene, segs, somas, z, cfg, B_gl)
     else:
@@ -528,6 +544,13 @@ def shadow_image(fscene, own_ids, left, top, width, height, planes_z, cfg, B_gl=
     for i, (kind, idx) in enumerate(items):
         if far[i]:     # its image is 0 (the reach rule) or under the floor (not kept); its peak reported as 0
             img, fp, off = np.zeros((z.size, patch.H, patch.W)), None, None
+        elif _SHARE:
+            ik = _item_key(fscene, kind, idx)
+            hit = _shared["items"].get(ik)
+            if hit is None:
+                hit = _neighbour_image(fscene, kind, idx, patch, z, cfg, directions)
+                _shared["items"][ik] = hit
+            img, fp, off = hit
         else:
             img, fp, off = _neighbour_image(fscene, kind, idx, patch, z, cfg, directions)
         peak[i] = float(img.max()) if img.size else 0.0

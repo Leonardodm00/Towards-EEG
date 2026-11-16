@@ -166,7 +166,8 @@ print("[cell 16] surveyed %d of %d dendrite nodes (%s); counts:" % (ex["n_survey
 # dropped nodes with their reasons, `cleaning_rounds.png` and the `cleaning_node<id>.png` figures.
 
 # %%
-ROUNDS, MAX_WORK, WORK_PEAK_GL = 2, 20, 3.0     # a first run; then 3 to 5 rounds and up to 60 nodes
+ROUNDS, MAX_WORK, WORK_PEAK_GL = 1, 5, 3.0      # a first test. More rounds help only when MAX_WORK exceeds the
+# number of examples (then neighbours are refined too); every round is saved as it ends, so stopping keeps the last one
 run("scripts/clean_cell.py", "clean", "--specimen", SPECIMEN, "--out", CLEAN, "--cache-dir", CACHE_DIR, *ALIGN,
     *CLEAN_CFG, "--examples", EXAMPLES, "--B", B_GL, "--mu", MU, "--rounds", ROUNDS, "--max-work", MAX_WORK,
     "--work-peak-gl", WORK_PEAK_GL)

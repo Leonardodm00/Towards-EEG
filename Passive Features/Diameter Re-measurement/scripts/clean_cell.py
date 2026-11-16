@@ -530,85 +530,102 @@ def run_clean(a, cfg, log):
         return shadow.shadow_image(fscene, own_ids, left, top, width, height, planes_z, cfg_, B_gl=B_gl,
                                    include=include).S
 
+    def write_outputs(res):
+        """The run's files from an IterationResult: after every round (D-147.4) and at the end."""
+        feats = res.features
+        pos = feats.index_of()
+        feat_path = os.path.join(a.out, "features_%s.csv" % a.specimen)
+        features_io.write_features(feat_path, feats)
+        per_node = {}
+        for n in nodes:
+            nid = n.node_id
+            k = pos[nid]
+            tiers = np.asarray(res.tiers[nid])
+            fit = dict(res.fits[nid])
+            rec = dict(infos[nid], status=fit.get("status"), refine=fit, flags=str(feats.flags[k]),
+                       is_example=nid in kept_examples, d_um=float(feats.d_um[k]), mu_per_um=float(feats.mu_per_um[k]),
+                       offset_um=feats.offset_um[k], source=str(feats.source[k]),
+                       n_tier1=int(np.sum(tiers == 1)), n_tier2=int(np.sum(tiers == 2)))
+            rec["class"] = classes.get(nid, "")
+            rec["B_gl_last"] = np.asarray(res.B_gl.get(nid, n.B_gl))
+            if model_bg:                                   # the backgrounds per round (amendment 4)
+                rec["background_rounds"] = [dict(round=r + 1, **h) for r, h in enumerate(bg_fn.history.get(nid, []))]
+            per_node[str(nid)] = rec
+        write_json(json_path, dict(base, history=res.history, stopped=res.stopped, rounds=res.rounds, sigma_gl=sigma,
+                                   nodes=per_node,
+                                   counts=dict(work=len(work), prepared=len(nodes), dropped=len(dropped),
+                                               tier1=int(sum(v["n_tier1"] for v in per_node.values())),
+                                               tier2=int(sum(v["n_tier2"] for v in per_node.values())))))
+        log("wrote %s, %s" % (feat_path, json_path))
+
+        from allen_image_io import CropFrame
+        from allen_diameter.plotting import cleaning_figures as CF
+        for n in nodes:
+            nid = n.node_id
+            if nid not in kept_examples:
+                continue
+            r = float(np.max(np.abs(n.v)))
+            line_xy = np.array([n.origin_xy - r * n.y_hat, n.origin_xy + r * n.y_hat])
+            npz = os.path.join(a.out, "cleaning_%s_node%d.npz" % (a.specimen, nid))
+            np.savez(npz, block=np.asarray(n.block), shadow_gl=res.shadow[nid], cleaned=res.cleaned[nid], ks=n.ks,
+                     B_gl=np.asarray(res.B_gl.get(nid, n.B_gl)), B0_gl=n.B_gl, v=n.v, profiles_before=res.profiles_before[nid], profiles_after=res.profiles_after[nid],
+                     origin_xy=n.origin_xy, y_hat=n.y_hat, e_u=n.e_u, n_avg=n.n_avg, step=n.step, line_xy=line_xy,
+                     left=n.left, top=n.top, res0_um=res0, planes_z=n.planes_z, node_xyz=n.node_xyz,
+                     own_ids=np.asarray(n.own_ids, dtype=np.int64))
+            k_star = int(pilots[nid].k_star)
+            planes = [k for k in (k_star - 2, k_star, k_star + 2) if k in set(int(x) for x in n.ks)]
+            meta = dict(node_id=nid, round=res.rounds, features=dict(d_um=float(feats.d_um[pos[nid]]),
+                                                                        mu_per_um=float(feats.mu_per_um[pos[nid]])))
+            if nid in classes:
+                meta["class"] = classes[nid]
+            try:
+                fig = CF.figure_node(n.block, res.shadow[nid], res.cleaned[nid], n.ks, CropFrame(n.left, n.top, 0, res0),
+                                     line_xy, n.v, res.profiles_before[nid], res.profiles_after[nid], meta, planes=planes)
+                png = CF.save(fig, os.path.join(a.out, "cleaning_node%d.png" % nid), DPI)
+                import matplotlib.pyplot as plt
+                plt.close(fig)
+            except Exception as exc:
+                png = "no figure (%s: %s)" % (type(exc).__name__, exc)
+            log("example node %d: %s, %s" % (nid, npz, png))
+        fig = CF.figure_rounds(res.history, cfg)
+        png = CF.save(fig, os.path.join(a.out, "cleaning_rounds.png"), DPI)
+        import matplotlib.pyplot as plt
+        plt.close(fig)
+        return png
+
+    saved = {"round": 0}
+
+    def on_round(res):
+        h = res.history[-1]
+        log("round %d: max relative d change %.4g, largest example line change %.4g gl, %d refined, %d failed, "
+            "%d at a bound" % (h["round"], h["max_rel_d"], h["max_line_change_gl"], h["n_refined"], h["n_failed"],
+                               h["n_at_bound"]))
+        try:
+            write_outputs(res)
+            saved["round"] = int(h["round"])
+            log("round %d saved (%s)" % (h["round"], res.stopped))
+        except Exception as exc:                       # a failed save never stops the rounds
+            log("round %d: the outputs could not be written (%s: %s)" % (h["round"], type(exc).__name__, exc))
+
     t_run = time.time()
     try:
         res = clean_iteration.run_rounds(features0, scene, nodes, cfg, sigma, timed_factory,
                                          example_ids=kept_examples, shadow_fn=timed_shadow,
-                                         background_fn=timed_background if model_bg else None)
+                                         background_fn=timed_background if model_bg else None, on_round=on_round)
     except Exception as exc:
         clock.finish()
+        if saved["round"] > 0:
+            log("the rounds stopped on an error (%s: %s); round %d stays saved in %s"
+                % (type(exc).__name__, exc, saved["round"], json_path))
+            return 1
         write_json(json_path, dict(base, stopped="error", error="%s: %s" % (type(exc).__name__, exc), history=[],
                                    rounds=0, nodes={str(k): v for k, v in infos.items()}))
         log("the rounds stopped on an error (%s: %s) -> %s" % (type(exc).__name__, exc, json_path))
         return 1
     clock.finish()
-    for h in res.history:
-        log("round %d: max relative d change %.4g, largest example line change %.4g gl, %d refined, %d failed, "
-            "%d at a bound" % (h["round"], h["max_rel_d"], h["max_line_change_gl"], h["n_refined"], h["n_failed"],
-                               h["n_at_bound"]))
     log("rounds: %d, stopped %s, in %.1f s; %d cross-sections cached (%d hits, %d misses)"
         % (res.rounds, res.stopped, time.time() - t_run, len(cache), cache.hits, cache.misses))
-
-    feats = res.features
-    pos = feats.index_of()
-    feat_path = os.path.join(a.out, "features_%s.csv" % a.specimen)
-    features_io.write_features(feat_path, feats)
-    per_node = {}
-    for n in nodes:
-        nid = n.node_id
-        k = pos[nid]
-        tiers = np.asarray(res.tiers[nid])
-        fit = dict(res.fits[nid])
-        rec = dict(infos[nid], status=fit.get("status"), refine=fit, flags=str(feats.flags[k]),
-                   is_example=nid in kept_examples, d_um=float(feats.d_um[k]), mu_per_um=float(feats.mu_per_um[k]),
-                   offset_um=feats.offset_um[k], source=str(feats.source[k]),
-                   n_tier1=int(np.sum(tiers == 1)), n_tier2=int(np.sum(tiers == 2)))
-        rec["class"] = classes.get(nid, "")
-        rec["B_gl_last"] = np.asarray(res.B_gl.get(nid, n.B_gl))
-        if model_bg:                                   # the backgrounds per round (amendment 4)
-            rec["background_rounds"] = [dict(round=r + 1, **h) for r, h in enumerate(bg_fn.history.get(nid, []))]
-        per_node[str(nid)] = rec
-    write_json(json_path, dict(base, history=res.history, stopped=res.stopped, rounds=res.rounds, sigma_gl=sigma,
-                               nodes=per_node,
-                               counts=dict(work=len(work), prepared=len(nodes), dropped=len(dropped),
-                                           tier1=int(sum(v["n_tier1"] for v in per_node.values())),
-                                           tier2=int(sum(v["n_tier2"] for v in per_node.values())))))
-    log("wrote %s, %s" % (feat_path, json_path))
-
-    from allen_image_io import CropFrame
-    from allen_diameter.plotting import cleaning_figures as CF
-    for n in nodes:
-        nid = n.node_id
-        if nid not in kept_examples:
-            continue
-        r = float(np.max(np.abs(n.v)))
-        line_xy = np.array([n.origin_xy - r * n.y_hat, n.origin_xy + r * n.y_hat])
-        npz = os.path.join(a.out, "cleaning_%s_node%d.npz" % (a.specimen, nid))
-        np.savez(npz, block=np.asarray(n.block), shadow_gl=res.shadow[nid], cleaned=res.cleaned[nid], ks=n.ks,
-                 B_gl=np.asarray(res.B_gl.get(nid, n.B_gl)), B0_gl=n.B_gl, v=n.v, profiles_before=res.profiles_before[nid], profiles_after=res.profiles_after[nid],
-                 origin_xy=n.origin_xy, y_hat=n.y_hat, e_u=n.e_u, n_avg=n.n_avg, step=n.step, line_xy=line_xy,
-                 left=n.left, top=n.top, res0_um=res0, planes_z=n.planes_z, node_xyz=n.node_xyz,
-                 own_ids=np.asarray(n.own_ids, dtype=np.int64))
-        k_star = int(pilots[nid].k_star)
-        planes = [k for k in (k_star - 2, k_star, k_star + 2) if k in set(int(x) for x in n.ks)]
-        meta = dict(node_id=nid, round=res.rounds, features=dict(d_um=float(feats.d_um[pos[nid]]),
-                                                                    mu_per_um=float(feats.mu_per_um[pos[nid]])))
-        if nid in classes:
-            meta["class"] = classes[nid]
-        try:
-            fig = CF.figure_node(n.block, res.shadow[nid], res.cleaned[nid], n.ks, CropFrame(n.left, n.top, 0, res0),
-                                 line_xy, n.v, res.profiles_before[nid], res.profiles_after[nid], meta, planes=planes)
-            png = CF.save(fig, os.path.join(a.out, "cleaning_node%d.png" % nid), DPI)
-            import matplotlib.pyplot as plt
-            plt.close(fig)
-        except Exception as exc:
-            png = "no figure (%s: %s)" % (type(exc).__name__, exc)
-        log("example node %d: %s, %s" % (nid, npz, png))
-    fig = CF.figure_rounds(res.history, cfg)
-    png = CF.save(fig, os.path.join(a.out, "cleaning_rounds.png"), DPI)
-    import matplotlib.pyplot as plt
-    plt.close(fig)
-    log("wrote %s; done" % png)
+    log("wrote the outputs of round %d; done" % res.rounds)
     return 0
 
 

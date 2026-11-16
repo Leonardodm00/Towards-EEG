@@ -114,7 +114,8 @@ def refine_node(profiles_gl, B_gl, v, predict, theta0, cfg):
         return failed()
     try:
         res = least_squares(residuals, th0, bounds=(lo, hi), method="trf",
-                            max_nfev=int(cfg.cleaning.refine_max_nfev))
+                            max_nfev=int(cfg.cleaning.refine_max_nfev),
+                            xtol=float(cfg.cleaning.refine_xtol), ftol=float(cfg.cleaning.refine_ftol))
     except ValueError:
         # A non-finite predict inside a finite-difference Jacobian reaches the
         # solver's SVD, which raises; only that case is a failed fit.
