@@ -346,7 +346,7 @@ def run_rounds(features0, scene, nodes, cfg, sigma_gl, predict_factory, example_
         done = _stop_reached(max_rel_d, line, stop_rel_d, sigma)
         if done:
             stopped = "converged"
-        if on_round is not None:     # D-147.4: the state after every round (to save it); "running" until the last
+        if on_round is not None:     # D-148.4: the state after every round (to save it); "running" until the last
             on_round(_result(features, history, stopped if (done or t == max_rounds) else "running", t, before,
                              per_node, keep))
         if done:

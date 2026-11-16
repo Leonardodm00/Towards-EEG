@@ -398,7 +398,7 @@ def test_background_fn():
 
 
 def test_on_round():
-    # D-147.4: on_round receives the state after every round; "running" until the last, then the final status
+    # D-148.4: on_round receives the state after every round; "running" until the last, then the final status
     cfg = cfg_with(shadow_absorption="partition_vertical", max_rounds=3, stop_rel_d=1e-12)
     node = make_node(2)
     feats, scene = make_features([1.3, 0.8], [1.0, 1.5]), make_scene()

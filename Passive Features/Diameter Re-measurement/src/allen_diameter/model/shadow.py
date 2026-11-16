@@ -340,7 +340,7 @@ def _segment_box(tube):
 
 
 _PREFILTER = True     # skip the neighbours no column of which can reach the patch (exact: see _beyond_reach)
-_SHARE = True         # D-147.3: keep the last patch's neighbour images for the next call on the same patch
+_SHARE = True         # D-148.3: keep the last patch's neighbour images for the next call on the same patch
 _shared = {"key": None, "items": {}}
 
 

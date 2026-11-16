@@ -400,9 +400,9 @@ class CleaningConfig:
     refine_shift_bounds_um: Tuple[float, float] = (-1.5, 1.5)    # source: PROVISIONAL (Block 29): lateral shift along the measuring axis
     refine_dz_bounds_um: Tuple[float, float] = (-2.5, 2.5)       # source: PROVISIONAL (Block 29): depth shift
     refine_max_nfev: int = 200             # source: PROVISIONAL (Block 29)
-    refine_xtol: float = 1e-3              # source: PROVISIONAL (D-147.1): the coarse fit stops at this relative step (the stop rule asks 1 %; scipy's default 1e-8)
-    refine_ftol: float = 1e-3              # source: PROVISIONAL (D-147.1): and at this relative change of the cost
-    refine_line_fine_factor: int = 4       # source: PROVISIONAL (D-147.2): the coarse fit's predictor samples p / this (the fine fit keeps inference.line_fine_factor)
+    refine_xtol: float = 1e-3              # source: PROVISIONAL (D-148.1): the coarse fit stops at this relative step (the stop rule asks 1 %; scipy's default 1e-8)
+    refine_ftol: float = 1e-3              # source: PROVISIONAL (D-148.1): and at this relative change of the cost
+    refine_line_fine_factor: int = 4       # source: PROVISIONAL (D-148.2): the coarse fit's predictor samples p / this (the fine fit keeps inference.line_fine_factor)
     stop_rel_d: float = 0.01               # source: D-130.O6 [user]: every diameter changes by less than 1 %
     plane_half_range: int = 4              # source: PROVISIONAL (Block 36): the planes k* +- this many are fetched, cleaned and offered to the fits (D-130.O5)
     work_max_nodes: int = 60               # source: PROVISIONAL (Block 36): at most this many nodes are refined in the pilot run

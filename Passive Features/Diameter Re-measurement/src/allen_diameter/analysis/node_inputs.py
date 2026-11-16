@@ -503,7 +503,7 @@ def predict_factory(pilots, half_lengths, cfg, cache):
     line_fast.SectionCache shared by the calls (or None). An ExtrusionInvalid returns NaN (the fit then fails
     and Block 32 flags the node)."""
     import dataclasses as _dc
-    cfg_c = _dc.replace(cfg, inference=_dc.replace(cfg.inference,          # D-147.2: the coarse fit's grid
+    cfg_c = _dc.replace(cfg, inference=_dc.replace(cfg.inference,          # D-148.2: the coarse fit's grid
                                                    line_fine_factor=int(cfg.cleaning.refine_line_fine_factor)))
 
     def factory(node):

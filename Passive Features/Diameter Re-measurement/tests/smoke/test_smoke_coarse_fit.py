@@ -140,7 +140,7 @@ def test_known_answer():
     # Noise-free data: the truth is a zero of every residual, so the solver
     # reaches it to its own termination tolerance (xtol 1e-8 relative); the
     # entry's tolerances are 1e-6 relative on d and mu, 1e-6 um on the shifts.
-    # D-147.1: the default tolerances are 1e-3 (the coarse fit's purpose); this exact oracle runs at scipy's 1e-8,
+    # D-148.1: the default tolerances are 1e-3 (the coarse fit's purpose); this exact oracle runs at scipy's 1e-8,
     # and the defaults are checked against the stop rule's needs (d within 2e-3 relative) below.
     cfg_def, v, z, predict = make_case()
     cfg = dataclasses.replace(cfg_def, cleaning=dataclasses.replace(cfg_def.cleaning, refine_xtol=1e-8, refine_ftol=1e-8))

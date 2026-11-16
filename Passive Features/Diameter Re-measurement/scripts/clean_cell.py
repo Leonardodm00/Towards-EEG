@@ -531,7 +531,7 @@ def run_clean(a, cfg, log):
                                    include=include).S
 
     def write_outputs(res):
-        """The run's files from an IterationResult: after every round (D-147.4) and at the end."""
+        """The run's files from an IterationResult: after every round (D-148.4) and at the end."""
         feats = res.features
         pos = feats.index_of()
         feat_path = os.path.join(a.out, "features_%s.csv" % a.specimen)

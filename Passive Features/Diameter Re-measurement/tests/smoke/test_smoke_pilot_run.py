@@ -310,7 +310,7 @@ def test_reference():
     z_t = float(node.node_xyz[2])
     by_hand = line_fast.line_profiles(NI.local_tube(p, node.node_xyz, d, v0, dz, *U), mu, node.ks, node.origin_xy,
                                       node.y_hat, node.e_u, node.v, node.n_avg, node.step, cfg)
-    # D-147.2: the coarse fit's predictor samples p / refine_line_fine_factor, the fine fit's forward p /
+    # D-148.2: the coarse fit's predictor samples p / refine_line_fine_factor, the fine fit's forward p /
     # inference.line_fine_factor; each equals line_profiles by hand on its own grid, and the two agree to the grid's error
     cfg_c = dataclasses.replace(cfg, inference=dataclasses.replace(
         cfg.inference, line_fine_factor=int(cfg.cleaning.refine_line_fine_factor)))
