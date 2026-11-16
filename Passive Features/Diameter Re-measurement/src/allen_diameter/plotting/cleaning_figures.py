@@ -7,6 +7,11 @@ nothing scientific is computed here and no input array is written to.
                  one grey scale -- the patch before, B S the predicted shadow,
                  the patch after -- with the measuring line drawn on each, and
                  one panel of the line's profiles before and after
+  figure_line_rounds  one example node's measuring line across the rounds:
+                 per chosen plane the profiles before and after each round,
+                 and the light each round added back on the line (after
+                 minus before), so a neighbour's shadow left in or put back
+                 too strongly shows round by round (amendment 1, D-149.4)
   figure_rounds  the record of the rounds: the largest relative diameter
                  change with the stop threshold stop_rel_d, the largest change
                  of the example lines, the number of nodes refined; the last
@@ -189,6 +194,74 @@ def figure_node(block, shadow, cleaned, ks, frame, line_xy, v, profiles_before, 
             ax.legend(fontsize=7, frameon=False, loc="lower right")
         if r == n - 1:
             ax.set_xlabel("v (um)", fontsize=7.5, color=INK2)
+    fig.suptitle(_title(meta), fontsize=9.5, color=INK)
+    return fig
+
+
+ROUND_STYLES = ((ORANGE, "-"), (BLUE, "-"), (INK2, "--"), (INK2, ":"))   # rounds 1, 2, 3, then 4 and later
+
+
+def figure_line_rounds(v, ks, profiles_before, profiles_after_rounds, meta, planes=None):
+    """One example node's measuring line across the cleaning's rounds. Returns the matplotlib Figure.
+
+    v: (n_v,) offsets along the line, um; ks: (n_planes,) plane indices k.
+    profiles_before: (n_planes, n_v) grey levels, the observed line.
+    profiles_after_rounds: mapping round t (int >= 1) -> (n_planes, n_v) grey levels, the cleaned line
+      after round t (each round's cleaning used the features of the round before).
+    meta: mapping for the title, as figure_node's; planes: plane indices k (values of ks) to show; None = all.
+
+    Layout: one row per shown plane -- the profiles (before: ink; after round 1: orange, round 2: blue,
+    later rounds grey, dashed) and the light added back on the line by each round, after minus before (gl),
+    on the same colours with the zero line. ValueError for shapes that disagree, no rounds, a round < 1,
+    an empty `planes`, a plane not in ks.
+    """
+    v = np.asarray(v, dtype=float)
+    if v.ndim != 1 or v.size < 2:
+        raise ValueError("v must be 1-D with at least 2 offsets, got shape %r" % (v.shape,))
+    ks = np.asarray(ks)
+    before = np.asarray(profiles_before, dtype=float)
+    if ks.ndim != 1 or before.shape != (ks.size, v.size):
+        raise ValueError("profiles_before must be (n_planes, n_v) = (%d, %d), got %r" % (ks.size, v.size, before.shape))
+    if not isinstance(profiles_after_rounds, Mapping) or not profiles_after_rounds:
+        raise ValueError("profiles_after_rounds must be a non-empty mapping round -> (n_planes, n_v)")
+    after = {}
+    for t, prof in profiles_after_rounds.items():
+        if int(t) != t or int(t) < 1:
+            raise ValueError("rounds are integers >= 1, got %r" % (t,))
+        a = np.asarray(prof, dtype=float)
+        if a.shape != before.shape:
+            raise ValueError("the profiles of round %d must be %r, got %r" % (int(t), before.shape, a.shape))
+        after[int(t)] = a
+    if not isinstance(meta, Mapping):
+        raise ValueError("meta must be a mapping (node_id, class, round, features)")
+    rows = _plane_rows(ks, planes)
+    order = sorted(after)
+
+    plt = _plt()
+    n = len(rows)
+    fig, axes = plt.subplots(n, 2, figsize=(9.6, 2.3 * n + 0.9), facecolor=SURFACE, squeeze=False,
+                             layout="constrained")
+    for r, j in enumerate(rows):
+        ax, dx = axes[r, 0], axes[r, 1]
+        _style(ax)
+        _style(dx)
+        ax.plot(v, before[j], color=INK, lw=1.2, label="before")
+        dx.axhline(0.0, color=INK2, lw=0.8)
+        for t in order:
+            col, ls = ROUND_STYLES[min(t, len(ROUND_STYLES)) - 1]
+            ax.plot(v, after[t][j], color=col, ls=ls, lw=1.4, label="after round %d" % t)
+            dx.plot(v, after[t][j] - before[j], color=col, ls=ls, lw=1.4, label="round %d" % t)
+        for a_ in (ax, dx):
+            a_.set_xlim(v[0], v[-1])
+        ax.set_ylabel("plane k = %d\ngrey level" % int(ks[j]), fontsize=7.5, color=INK2)
+        dx.set_ylabel("added back (gl)", fontsize=7.5, color=INK2)
+        if r == 0:
+            ax.set_title("profile along the line", fontsize=8.5, color=INK)
+            dx.set_title("light added back on the line (after - before)", fontsize=8.5, color=INK)
+            ax.legend(fontsize=7, frameon=False, loc="lower right")
+        if r == n - 1:
+            ax.set_xlabel("v (um)", fontsize=7.5, color=INK2)
+            dx.set_xlabel("v (um)", fontsize=7.5, color=INK2)
     fig.suptitle(_title(meta), fontsize=9.5, color=INK)
     return fig
 

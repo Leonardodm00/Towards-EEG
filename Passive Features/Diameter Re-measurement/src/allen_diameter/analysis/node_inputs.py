@@ -572,17 +572,40 @@ def _node_position(fscene, nid):
     raise ValueError("node %d is in no segment of the scene" % int(nid))
 
 
-def work_list(example_ids, fscene, swc, cfg, peak_min_gl, B_gl):
+def line_mask(branch, index, left, top, width, height, cfg):
+    """(height, width) bool: the pixels of the block (left, top, width, height) (full-resolution pixel
+    coordinates, pixel (row, col) centred on ((left + col) p, (top + row) p), p = res0_um) that the measuring
+    line of the branch's node `index` reads (amendment 9, D-149.2). The line is Block 27's: through the node's
+    position in `branch`, across the TLS direction of the branch's points within line_fit_window_um / 2 of path
+    length (contamination's rule); a pixel is in when its centre has |v| <= profile_half_um + p along y_hat and
+    |u| <= n_along x profile_step_um + p along e_u (the 2 n_along + 1 lines of Block 5 and one pixel of margin
+    for the bilinear read)."""
+    from .contamination import _line
+    o, y_hat, e_u, _zk = _line(branch, int(index), cfg)
+    p = float(cfg.acquisition.res0_um)
+    m = cfg.measure
+    X, Y = np.meshgrid((int(left) + np.arange(int(width))) * p, (int(top) + np.arange(int(height))) * p)
+    dx, dy = X - float(o[0]), Y - float(o[1])
+    v = dx * float(y_hat[0]) + dy * float(y_hat[1])
+    u = dx * float(e_u[0]) + dy * float(e_u[1])
+    return (np.abs(v) <= float(m.profile_half_um) + p) & (np.abs(u) <= profiles.n_along(m) * float(m.profile_step_um) + p)
+
+
+def work_list(example_ids, fscene, swc, cfg, peak_min_gl, B_gl, peaks=None):
     """-> list of node ids: the example nodes (in their order), then the end nodes of the example nodes'
-    tier-1 neighbour segments whose predicted peak on the example's patch times B_gl is at least
-    peak_min_gl (gl), by decreasing peak (ties by node id), the whole list capped at
-    cleaning.work_max_nodes, the examples first (more examples than that: the examples cut; amendment 2, F5,
-    the caller logs it). For each example: its own nodes within its tube's half-length on its stretch
-    (own_ids_within, amendment 2, F1), its position in fscene, the patch of half-size cleaning.patch_half_um about it,
-    the planes round(z / dz) +- cleaning.plane_half_range, the tiers (cleaning.neighbour_tiers) and the
-    peaks (shadow.shadow_image's per_neighbour_peak, under partition_vertical for time, the tier-2
-    neighbours left out). An end node joins only when it lies on a dendrite stretch and is not near_end
-    (a near_end node is skipped by the fits, D-138.2). B_gl: scalar background (gl, > 0)."""
+    tier-1 neighbour segments whose predicted peak times B_gl is at least peak_min_gl (gl), by decreasing
+    peak (ties by node id), the whole list capped at cleaning.work_max_nodes, the examples first (more
+    examples than that: the examples cut; amendment 2, F5, the caller logs it). The peak is taken on the
+    pixels the example's measuring line reads (cleaning.work_rank "line", line_mask; amendment 9, D-149.2) or
+    on its whole patch ("patch", the entry's rule). For each example: its own nodes within its tube's
+    half-length on its stretch (own_ids_within, amendment 2, F1), its position in fscene, the patch of
+    half-size cleaning.patch_half_um about it, the planes round(z / dz) +- cleaning.plane_half_range, the
+    tiers (cleaning.neighbour_tiers) and the peaks (shadow.shadow_image's per_neighbour_peak_mask or
+    per_neighbour_peak, under partition_vertical for time, the tier-2 neighbours left out). An end node joins
+    only when it lies on a dendrite stretch and is not near_end (a near_end node is skipped by the fits,
+    D-138.2). B_gl: scalar background (gl, > 0). peaks: a dict or None; when given, it receives
+    {node id: (peak (gl), example id)} for every node that passed the threshold, those cut by the cap
+    included (the caller logs them)."""
     B = float(B_gl)
     if not (math.isfinite(B) and B > 0):
         raise ValueError("B_gl must be finite and > 0")
@@ -614,7 +637,8 @@ def work_list(example_ids, fscene, swc, cfg, peak_min_gl, B_gl):
     cap = int(cfg.cleaning.work_max_nodes)
     if len(examples) >= cap:                 # the examples alone fill the work list (F5): no neighbour can join
         return examples[:cap]
-    best = {}
+    rank_line = cfg.cleaning.work_rank == "line"
+    best, src = {}, {}
     for nid in examples:
         if nid not in by_id:
             raise ValueError("example node %d is not on a dendrite stretch" % nid)
@@ -632,22 +656,25 @@ def work_list(example_ids, fscene, swc, cfg, peak_min_gl, B_gl):
         k0 = int(round(float(xyz[2]) / dz))
         planes_z = np.arange(k0 - P, k0 + P + 1) * dz
         tiers = cleaning.neighbour_tiers(fscene, own, xyz, cfg)
+        mask = line_mask(ob[0], t_ex, left, top, width, height, cfg) if rank_line else None
         res = shadow.shadow_image(fscene, own, left, top, width, height, planes_z, pv,
                                   B_gl=B if float(peak_min_gl) >= float(cfg.cleaning.shadow_floor_gl) else None,
-                                  include=(tiers == 1))    # B: the floor's prefilter (D-146); peaks >= peak_min_gl kept
+                                  include=(tiers == 1), peak_mask=mask)  # B: the floor's prefilter (D-146)
+        vals = res.per_neighbour_peak_mask if rank_line else res.per_neighbour_peak
         segs, _somas = shadow.neighbour_indices(fscene, own)
         for m, q in enumerate(segs):
             if tiers[m] != 1:
                 continue
-            peak = B * float(res.per_neighbour_peak[m])
+            peak = B * float(vals[m])
             if peak < float(peak_min_gl):
                 continue
             for end in seg_ids[int(q)]:
                 e = int(end)
                 if e in examples or e in own:
                     continue
-                if candidate(e):
-                    best[e] = max(best.get(e, -np.inf), peak)
-    cap = int(cfg.cleaning.work_max_nodes)
+                if candidate(e) and peak > best.get(e, -np.inf):
+                    best[e], src[e] = peak, nid
+    if peaks is not None:
+        peaks.update({e: (float(best[e]), int(src[e])) for e in best})
     extra = sorted(best, key=lambda e: (-best[e], e))[:max(0, cap - len(examples))]
     return (examples + extra)[:cap]

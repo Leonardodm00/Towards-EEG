@@ -403,11 +403,11 @@ def run_clean(a, cfg, log):
         repl["soma_z_um"] = zs                     # CleaningConfig.soma_z_um: set by the script (Block 25)
     cfg = dataclasses.replace(cfg, cleaning=dataclasses.replace(cl, **repl))
     cfg.validate()
-    log("B %.4g gl (%s), mu %.4g /um (%s); rounds <= %d, work peak >= %.3g gl, work list <= %d nodes; soma z %s um; "
-        "fit absorption %s, %d x %d directions; shadow absorption %s"
-        % (B, B_src, mu, mu_src, cfg.cleaning.max_rounds, cfg.cleaning.work_peak_min_gl, cfg.cleaning.work_max_nodes,
-           "%.3f" % zs if zs is not None else "none", cfg.inference.absorption, cfg.inference.ray_n_rho,
-           cfg.inference.ray_n_psi, cfg.cleaning.shadow_absorption))
+    log("B %.4g gl (%s), mu %.4g /um (%s); rounds <= %d, work peak >= %.3g gl on an example's %s, work list <= %d "
+        "nodes; soma z %s um; fit absorption %s, %d x %d directions; shadow absorption %s"
+        % (B, B_src, mu, mu_src, cfg.cleaning.max_rounds, cfg.cleaning.work_peak_min_gl, cfg.cleaning.work_rank,
+           cfg.cleaning.work_max_nodes, "%.3f" % zs if zs is not None else "none", cfg.inference.absorption,
+           cfg.inference.ray_n_rho, cfg.inference.ray_n_psi, cfg.cleaning.shadow_absorption))
     res0 = float(cfg.acquisition.res0_um)
     types = tuple(cfg.cleaning.neighbour_swc_types)
     xyz = cell.to_image_um(swc.xyz, res0, **transform)
@@ -416,12 +416,23 @@ def run_clean(a, cfg, log):
     fscene0 = node_features.featured_scene(scene, features0)
     log("scene: %d segments, %d soma discs; %d nodes in the features table" % (scene.seg_xyz.shape[0],
                                                                                 scene.soma.shape[0], len(features0)))
-    work = node_inputs.work_list(examples, fscene0, swc, cfg, cfg.cleaning.work_peak_min_gl, B)
+    wpeaks = {}
+    work = node_inputs.work_list(examples, fscene0, swc, cfg, cfg.cleaning.work_peak_min_gl, B, peaks=wpeaks)
     cut = [i for i in examples if i not in work]
     if cut:                                         # amendment 2, F5: more examples than work_max_nodes
         log("work list capped at %d nodes: %d example nodes cut %s" % (cfg.cleaning.work_max_nodes, len(cut), cut))
     n_ex = len(examples) - len(cut)
     log("work list: %d nodes (%d examples, %d neighbours' nodes)" % (len(work), n_ex, len(work) - n_ex))
+    if wpeaks:                                      # amendment 9 (D-149.2): what joined, on whose line, and what not
+        joined = [e for e in work if e in wpeaks]
+        left_out = sorted((e for e in wpeaks if e not in work), key=lambda e: (-wpeaks[e][0], e))
+        log("work list: neighbours' nodes by their largest predicted shadow on an example's %s, gl (example): %s"
+            % (cfg.cleaning.work_rank, ", ".join("%d %.2f (%d)" % (e, wpeaks[e][0], wpeaks[e][1]) for e in joined)))
+        if left_out:
+            log("work list: %d more nodes reach %.3g gl but are cut by the cap of %d: %s%s"
+                % (len(left_out), cfg.cleaning.work_peak_min_gl, cfg.cleaning.work_max_nodes,
+                   ", ".join("%d %.2f (%d)" % (e, wpeaks[e][0], wpeaks[e][1]) for e in left_out[:15]),
+                   " ..." if len(left_out) > 15 else ""))
 
     stretch_of = {}
     for run in cell.stretches(swc, tuple(cfg.acquisition.dendrite_swc_types)):
@@ -530,9 +541,12 @@ def run_clean(a, cfg, log):
         return shadow.shadow_image(fscene, own_ids, left, top, width, height, planes_z, cfg_, B_gl=B_gl,
                                    include=include).S
 
+    line_rounds = {}                                # example id -> {round: cleaned line}, for the figures (D-149.4)
+
     def write_outputs(res):
         """The run's files from an IterationResult: after every round (D-148.4) and at the end."""
         feats = res.features
+        t_now = len(res.history)
         pos = feats.index_of()
         feat_path = os.path.join(a.out, "features_%s.csv" % a.specimen)
         features_io.write_features(feat_path, feats)
@@ -566,9 +580,13 @@ def run_clean(a, cfg, log):
                 continue
             r = float(np.max(np.abs(n.v)))
             line_xy = np.array([n.origin_xy - r * n.y_hat, n.origin_xy + r * n.y_hat])
+            line_rounds.setdefault(nid, {})[t_now] = np.array(res.profiles_after[nid], dtype=float)
+            t_saved = sorted(line_rounds[nid])
             npz = os.path.join(a.out, "cleaning_%s_node%d.npz" % (a.specimen, nid))
             np.savez(npz, block=np.asarray(n.block), shadow_gl=res.shadow[nid], cleaned=res.cleaned[nid], ks=n.ks,
                      B_gl=np.asarray(res.B_gl.get(nid, n.B_gl)), B0_gl=n.B_gl, v=n.v, profiles_before=res.profiles_before[nid], profiles_after=res.profiles_after[nid],
+                     profiles_after_rounds=np.stack([line_rounds[nid][t] for t in t_saved]),
+                     rounds_saved=np.asarray(t_saved, dtype=np.int64),
                      origin_xy=n.origin_xy, y_hat=n.y_hat, e_u=n.e_u, n_avg=n.n_avg, step=n.step, line_xy=line_xy,
                      left=n.left, top=n.top, res0_um=res0, planes_z=n.planes_z, node_xyz=n.node_xyz,
                      own_ids=np.asarray(n.own_ids, dtype=np.int64))
@@ -579,11 +597,17 @@ def run_clean(a, cfg, log):
             if nid in classes:
                 meta["class"] = classes[nid]
             try:
+                import matplotlib.pyplot as plt
                 fig = CF.figure_node(n.block, res.shadow[nid], res.cleaned[nid], n.ks, CropFrame(n.left, n.top, 0, res0),
                                      line_xy, n.v, res.profiles_before[nid], res.profiles_after[nid], meta, planes=planes)
                 png = CF.save(fig, os.path.join(a.out, "cleaning_node%d.png" % nid), DPI)
-                import matplotlib.pyplot as plt
+                CF.save(fig, os.path.join(a.out, "cleaning_node%d_round%d.png" % (nid, t_now)), DPI)   # D-149.4
                 plt.close(fig)
+                fig = CF.figure_line_rounds(n.v, n.ks, res.profiles_before[nid], line_rounds[nid],
+                                            dict(meta, round="1-%d" % t_now if t_now > 1 else 1), planes=planes)
+                png_l = CF.save(fig, os.path.join(a.out, "cleaning_line_node%d.png" % nid), DPI)
+                plt.close(fig)
+                png = "%s, %s" % (png, png_l)
             except Exception as exc:
                 png = "no figure (%s: %s)" % (type(exc).__name__, exc)
             log("example node %d: %s, %s" % (nid, npz, png))

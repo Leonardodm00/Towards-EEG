@@ -196,3 +196,64 @@ for path in [INFER + "/diameters.png", INFER + "/chi2.png"] + sorted(glob.glob(I
     if os.path.exists(path):
         print(path)
         display(Image(filename=path))
+
+# %% [markdown]
+# ## Cell 17b: the cleaning in worse conditions -- the survey's most contaminated tier-1 nodes, with their main
+# neighbours refined (D-149; about 3-4 h, each work-list node about 15 min over the two rounds)
+#
+# Run Cells 0, 1 and 16 first (Cell 16 skips the survey when its files exist). Example nodes, from the survey's 600
+# (Allen's radii, mu 0.258 /um; the worst neighbour's dip on the line): 8089, a branch crossing it 0.08 um aside and
+# 2.1 um above or below (2.1 gl, 10 % of its own dip); 4844, 0.26 um and 2.5 um (1.4 gl); 7081, 1.2 um and 1.6 um
+# (1.5 gl); 7448, the proximal trunk 15.5 um out of focus (3.5 gl) and the soma 4.2 um away.
+# The neighbours' nodes join the work list by their predicted shadow on an example's measuring line (D-149.2), at
+# least WORK_PEAK_GL_W, the strongest first, up to MAX_WORK_W nodes in all. Round 1 cleans every node with round 0's
+# features (the neighbours at Allen's diameter and mu 0.258 /um) and refines them; round 2 cleans the examples with
+# the refined neighbours. Each round is saved as it ends.
+# Outputs in OUT/cleaning_worst (Cell 17's folder is untouched): per example `cleaning_line_node<id>.png` (the line
+# before, after round 1 and after round 2, and the light each round added back), `cleaning_node<id>_round1.png` and
+# `cleaning_node<id>_round2.png`. Output to send back: the log (the `work list:` lines above all) and the figures.
+
+# %%
+import json
+import pandas as pd
+from IPython.display import Image, display
+WORST_IDS = [8089, 4844, 7081, 7448]
+ROUNDS_W, MAX_WORK_W, WORK_PEAK_GL_W = 2, 16, 1.0     # MAX_WORK_W counts the examples too
+CLEAN_W = OUT + "/cleaning_worst"
+os.makedirs(CLEAN_W, exist_ok=True)
+with open(EXAMPLES) as f:
+    exw = json.load(f)
+cont = pd.read_csv("%s/contamination_%d.csv" % (CLEAN, SPECIMEN)).set_index("node_id")
+exw["example_ids"] = WORST_IDS
+exw["classes"] = {str(i): (str(cont.loc[i, "class"]) if i in cont.index else "") for i in WORST_IDS}
+EXAMPLES_W = "%s/examples_worst_%d.json" % (CLEAN_W, SPECIMEN)
+with open(EXAMPLES_W, "w") as f:
+    json.dump(exw, f, indent=1)
+print("[cell 17b] examples:", WORST_IDS, "| classes:", exw["classes"])
+run("scripts/clean_cell.py", "clean", "--specimen", SPECIMEN, "--out", CLEAN_W, "--cache-dir", CACHE_DIR, *ALIGN,
+    *CLEAN_CFG, "--examples", EXAMPLES_W, "--B", B_GL, "--mu", MU, "--rounds", ROUNDS_W, "--max-work", MAX_WORK_W,
+    "--work-peak-gl", WORK_PEAK_GL_W)
+for nid in WORST_IDS:
+    for name in ("cleaning_line_node%d.png", "cleaning_node%d_round1.png", "cleaning_node%d_round2.png"):
+        path = CLEAN_W + "/" + name % nid
+        if os.path.exists(path):
+            print(path)
+            display(Image(filename=path))
+
+# %% [markdown]
+# ## Cell 18b (optional): the per-node fit on Cell 17b's cleaned lines (no download; about 1 h for the four examples)
+#
+# Output to send back: the line per node, the table, `chi2.png` and the `fit_node<id>.png` figures.
+
+# %%
+INFER_W = OUT + "/inference_worst"
+os.makedirs(INFER_W, exist_ok=True)
+run("scripts/infer_nodes.py", "real", "--specimen", SPECIMEN, "--cleaning-dir", CLEAN_W, "--out", INFER_W,
+    "--starts", "1.0")
+import glob
+res_w = pd.read_csv("%s/inference_%d.csv" % (INFER_W, SPECIMEN))
+display(res_w)
+for path in [INFER_W + "/diameters.png", INFER_W + "/chi2.png"] + sorted(glob.glob(INFER_W + "/fit_node*.png")):
+    if os.path.exists(path):
+        print(path)
+        display(Image(filename=path))

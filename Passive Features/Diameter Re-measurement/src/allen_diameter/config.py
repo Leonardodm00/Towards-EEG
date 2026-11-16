@@ -406,7 +406,8 @@ class CleaningConfig:
     stop_rel_d: float = 0.01               # source: D-130.O6 [user]: every diameter changes by less than 1 %
     plane_half_range: int = 4              # source: PROVISIONAL (Block 36): the planes k* +- this many are fetched, cleaned and offered to the fits (D-130.O5)
     work_max_nodes: int = 60               # source: PROVISIONAL (Block 36): at most this many nodes are refined in the pilot run
-    work_peak_min_gl: float = 3.0          # source: PROVISIONAL (Block 36): a neighbour's nodes join the work list when its predicted peak on an example's patch reaches this
+    work_peak_min_gl: float = 1.0          # source: D-149.3 [orchestrator] (was 3.0, PROVISIONAL, Block 36): a neighbour's nodes join the work list when its predicted peak on an example's measuring line (work_rank "line") or patch ("patch") times B reaches this (gl); 1 gl = about the profile's noise SD on the pilot
+    work_rank: str = "line"                # source: D-149.2 [orchestrator] (Block 36, amendment 9): the neighbours' nodes are ranked by their predicted peak on the example's measuring line, "line" (the pixels the line reads), or on its whole patch, "patch" (amendment 1's rule, the labelled alternative)
     background_support: str = "model"      # source: D-144.1 [user]: the planar background fitted through the predicted shadow of every traced segment; "unshaded" (D-143), "square" (D-141), "stripe" (D-101.3) the labelled alternatives
     background_shadow_max: float = 0.10    # source: PROVISIONAL (Block 36, amendment 4): pixels whose predicted shadow exceeds this fraction are left out of the background's fit
 
@@ -706,6 +707,7 @@ def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None
     _check_in(c.shadow_absorption, ("hybrid", "partition_vertical"), "cleaning.shadow_absorption")
     _check_in(i.absorption, ("hybrid", "partition_vertical", "linear"), "inference.absorption")
     _check_in(c.background_support, ("model", "unshaded", "square", "stripe"), "cleaning.background_support")
+    _check_in(c.work_rank, ("line", "patch"), "cleaning.work_rank")
 
     def pair(b, positive):
         return (len(b) == 2 and all(math.isfinite(float(x)) for x in b) and b[0] < b[1]

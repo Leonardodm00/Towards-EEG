@@ -23,6 +23,12 @@ Checks, from the strongest oracle to the weakest (amendment 3)
                         holds exactly the kept neighbours; `overlap` true for a
                         segment directly above the own stretch and false 3 um
                         aside; include=False leaves a neighbour out of S
+    test_peak_mask      amendment 6 (D-149.2): the masked peak equals the max of
+                        each neighbour's image alone over the masked pixels
+                        [exact]; all-True mask = per_neighbour_peak, empty mask
+                        = 0; S, per_neighbour_peak, kept, overlap unchanged by
+                        the mask [exact]; a strip across one segment and 3 um
+                        from another; ValueError for a mask of the wrong shape
     test_contract       ShadowResult shapes, dtypes, finiteness; neighbour_indices;
                         segment_absorbed shapes; stretch_profiles shape
     test_determinism    two runs bit-identical (both absorptions)
@@ -357,6 +363,43 @@ def test_invariants():
             rr, cc = np.nonzero(rx.overlap)
             xs, ys = (cc - 40) * P_X, (rr - 40) * P_X
             assert np.all(np.abs(xs) <= 0.3 + P_X) and np.all(np.abs(ys) <= 0.3 + P_X), "overlap off the crossing"
+
+
+def test_peak_mask():
+    # amendment 6 (D-149.2): per_neighbour_peak_mask is each neighbour's largest value over the planes on the
+    # masked pixels, equal to the max over those pixels of its image rendered alone [exact: the same images];
+    # S, per_neighbour_peak, kept and overlap do not depend on the mask [exact]
+    cfg = cfg_for("partition_vertical")
+    fs = make_scene([((0.0, 0.0, 0.0), (2.0, 0.0, 0.0), 0.6, 1.5),           # crosses the strip below
+                     ((0.0, 4.0, 0.84), (2.0, 4.0, 0.84), 0.6, 1.5)],        # 4 um aside, 0.84 um deep
+                    soma=[(-2.0, -1.5, 0.8)])
+    planes = np.array([-0.28, 0.0, 0.28])
+    left, top, W, H = -45, -45, 90, 90
+    ref = SH.shadow_image(fs, OWN_IDS, left, top, W, H, planes, cfg, B_gl=210.0)
+    assert ref.per_neighbour_peak_mask is None
+    full = SH.shadow_image(fs, OWN_IDS, left, top, W, H, planes, cfg, B_gl=210.0, peak_mask=np.ones((H, W), bool))
+    for f in ("S", "per_neighbour_peak", "kept", "overlap"):
+        assert_array_equal(getattr(full, f), getattr(ref, f))
+    assert_array_equal(full.per_neighbour_peak_mask, ref.per_neighbour_peak)
+    empty = SH.shadow_image(fs, OWN_IDS, left, top, W, H, planes, cfg, peak_mask=np.zeros((H, W), bool))
+    assert_array_equal(empty.per_neighbour_peak_mask, np.zeros(3))
+    X, Y = np.meshgrid((left + np.arange(W)) * P_X, (top + np.arange(H)) * P_X)
+    strip = (np.abs(X - 1.0) <= 0.2) & (np.abs(Y) <= 1.0)              # across the first segment's middle
+    rs = SH.shadow_image(fs, OWN_IDS, left, top, W, H, planes, cfg, peak_mask=strip)
+    for m in range(3):
+        alone = SH.shadow_image(fs, OWN_IDS, left, top, W, H, planes, cfg, include=[i == m for i in range(3)]).S
+        assert rs.per_neighbour_peak_mask[m] == alone[:, strip].max(), (m, rs.per_neighbour_peak_mask[m])
+    pm, pk = rs.per_neighbour_peak_mask, rs.per_neighbour_peak
+    assert pm[0] > 0.9 * pk[0], ("the strip crosses the first segment's axis", pm[0], pk[0])
+    assert pm[1] < 0.05 * pk[1], ("the second segment is 3 um beyond the strip", pm[1], pk[1])
+    MEASURED["peak_mask"] = "strip/patch peak: segment on the strip %.4f, 4 um aside %.2e, soma %.3f" % (
+        pm[0] / pk[0], pm[1] / pk[1], pm[2] / pk[2] if pk[2] > 0 else float("nan"))
+    try:
+        SH.shadow_image(fs, OWN_IDS, left, top, W, H, planes, cfg, peak_mask=np.ones((W + 1, H), bool))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("a peak_mask of the wrong shape was accepted")
 
 
 def test_contract():

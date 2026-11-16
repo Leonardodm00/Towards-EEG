@@ -26,6 +26,10 @@ Checks
                         planes=None and a chosen subset; figure_rounds: one
                         point per round in each panel, stop_rel_d and
                         max_rounds drawn; save writes a non-empty PNG
+    test_line_rounds    amendment 1 (D-149.4): figure_line_rounds draws the input
+                        profiles before and after each round and after - before
+                        per round [exact], in round order with the zero line;
+                        inputs unchanged; its ValueErrors
     test_determinism    two calls give bit-identical rendered canvases
     test_edge_cases     ValueError for shapes that disagree, an empty planes,
                         a plane not in ks, an empty history, a missing key
@@ -285,6 +289,51 @@ def test_contract():
         assert os.path.getsize(pth) > 1000, pth
         with open(pth, "rb") as fh:
             assert fh.read(8) == b"\x89PNG\r\n\x1a\n", pth
+
+
+def test_line_rounds():
+    # amendment 1 (D-149.4): figure_line_rounds draws, per plane shown, the input profiles before and after each
+    # round [exact] and after - before per round [exact, numpy's subtraction], in the rounds' order and colours,
+    # with the zero line; the inputs are not written to; ValueError for no rounds, a round < 1, a shape that
+    # disagrees, a plane not in ks, meta not a mapping
+    a = scene()
+    before = np.array(a["profiles_before"], copy=True)
+    r1 = np.array(a["profiles_after"], copy=True)
+    r2 = r1 - 0.25 * (r1 - before)
+    rounds = {2: r2, 1: r1}                      # out of order on purpose: drawn by round
+    for arr in (before, r1, r2):
+        arr.flags.writeable = False
+    planes = [0, -2]
+    fig = CF.figure_line_rounds(a["v"], a["ks"], before, rounds, a["meta"], planes=planes)
+    try:
+        assert isinstance(fig, Figure) and len(fig.axes) == 2 * len(planes), len(fig.axes)
+        for r, j in enumerate(rows_of(planes, a["ks"])):
+            prof, diff = fig.axes[2 * r], fig.axes[2 * r + 1]
+            ys = [np.asarray(ln.get_ydata(), dtype=float) for ln in prof.lines]
+            assert len(ys) == 3, len(ys)
+            assert_array_equal(ys[0], before[j])
+            assert_array_equal(ys[1], r1[j])
+            assert_array_equal(ys[2], r2[j])
+            assert_array_equal(np.asarray(prof.lines[0].get_xdata(), dtype=float), a["v"])
+            assert prof.lines[1].get_color() == CF.ROUND_STYLES[0][0] and prof.lines[2].get_color() == CF.ROUND_STYLES[1][0]
+            dl = [ln for ln in diff.lines if len(ln.get_xdata()) == a["v"].size]
+            assert len(dl) == 2, len(dl)
+            assert_array_equal(np.asarray(dl[0].get_ydata(), dtype=float), r1[j] - before[j])
+            assert_array_equal(np.asarray(dl[1].get_ydata(), dtype=float), r2[j] - before[j])
+            zero = [ln for ln in diff.lines if len(ln.get_xdata()) == 2 and list(ln.get_ydata()) == [0.0, 0.0]]
+            assert len(zero) == 1, "the zero line is not drawn"
+    finally:
+        plt.close(fig)
+    path = CF.save(CF.figure_line_rounds(a["v"], a["ks"], before, rounds, a["meta"]),
+                   os.path.join(out_dir(), "cleaning_line_example.png"), 110)
+    plt.close("all")
+    assert os.path.getsize(path) > 1000
+    _raises(lambda: CF.figure_line_rounds(a["v"], a["ks"], before, {}, a["meta"]), "no rounds")
+    _raises(lambda: CF.figure_line_rounds(a["v"], a["ks"], before, {0: r1}, a["meta"]), "round 0")
+    _raises(lambda: CF.figure_line_rounds(a["v"], a["ks"], before, {1: r1[:, :-1]}, a["meta"]), "a round's shape")
+    _raises(lambda: CF.figure_line_rounds(a["v"], a["ks"], before[:-1], {1: r1}, a["meta"]), "before's shape")
+    _raises(lambda: CF.figure_line_rounds(a["v"], a["ks"], before, {1: r1}, a["meta"], planes=[7]), "a plane not in ks")
+    _raises(lambda: CF.figure_line_rounds(a["v"], a["ks"], before, {1: r1}, "node 1"), "meta not a mapping")
 
 
 def test_determinism():

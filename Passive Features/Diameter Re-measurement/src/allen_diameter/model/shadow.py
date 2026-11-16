@@ -59,12 +59,15 @@ class ShadowResult:
     neighbours, pixel means; per_neighbour_peak (n_q + n_s,): each neighbour's largest pixel value over
     the planes (segments in neighbour_indices' order, then the soma discs); kept (n_q + n_s,) bool: in S;
     overlap (height, width) bool: pixels where a kept neighbour's footprint (A_q > 0) meets the own
-    stretch's footprint in projection."""
+    stretch's footprint in projection; per_neighbour_peak_mask (n_q + n_s,) or None: with shadow_image's
+    peak_mask, each neighbour's largest pixel value over the planes on the masked pixels only (0 where
+    the mask is empty or the neighbour was not rendered; amendment 6, D-149.2), else None."""
 
     S: np.ndarray
     per_neighbour_peak: np.ndarray
     kept: np.ndarray
     overlap: np.ndarray
+    per_neighbour_peak_mask: object = None
 
 
 # ----------------------------------------------------------- the geometry --
@@ -487,16 +490,20 @@ def _check_planes(planes_z):
     return z
 
 
-def shadow_image(fscene, own_ids, left, top, width, height, planes_z, cfg, B_gl=None, include=None):
+def shadow_image(fscene, own_ids, left, top, width, height, planes_z, cfg, B_gl=None, include=None,
+                 peak_mask=None):
     """ShadowResult of node i's neighbours on the pixel block (left, top, width, height) (full-resolution
     pixel coordinates, integer = pixel centre) at the plane depths planes_z (um).
 
     own_ids: the node ids of the own stretch (its segments: both ends in own_ids). B_gl: background (gl)
     for the floor of D-130.O5 (a neighbour with B_gl x peak < shadow_floor_gl is not kept), None = keep
     every neighbour. include: bool (n_q + n_s,) in neighbour_indices' order, False = left out (tier 2,
-    D-132.2); a left-out neighbour's peak is still computed, and it is not kept.
+    D-132.2); a left-out neighbour's peak is still computed, and it is not kept. peak_mask: bool
+    (height, width) or None; when given, per_neighbour_peak_mask is each neighbour's largest value over
+    the planes on these pixels (amendment 6, D-149.2: the work list's peak on a measuring line); S,
+    per_neighbour_peak, kept and overlap do not depend on it.
     ValueError: an own stretch with no segment in the scene, non-finite or empty planes, include of the
-    wrong length, B_gl not finite and > 0."""
+    wrong length, B_gl not finite and > 0, peak_mask not of shape (height, width)."""
     _check_scene(fscene)
     _absorption(cfg)
     z = _check_planes(planes_z)
@@ -515,6 +522,12 @@ def shadow_image(fscene, own_ids, left, top, width, height, planes_z, cfg, B_gl=
         B = float(B_gl)
         if not (math.isfinite(B) and B > 0):
             raise ValueError("B_gl must be finite and > 0")
+    if peak_mask is not None:
+        pmask = np.asarray(peak_mask, dtype=bool)
+        if pmask.shape != (int(height), int(width)):
+            raise ValueError("peak_mask must have shape (height, width) = (%d, %d), got %r"
+                             % (int(height), int(width), pmask.shape))
+        any_mask = bool(pmask.any())
     patch = _Patch(left, top, width, height, cfg)
     directions = _directions(cfg) if cfg.cleaning.shadow_absorption == "hybrid" else None
 
@@ -529,6 +542,7 @@ def shadow_image(fscene, own_ids, left, top, width, height, planes_z, cfg, B_gl=
 
     S = np.zeros((z.size, patch.H, patch.W))
     peak = np.zeros(n_nb)
+    peak_m = np.zeros(n_nb) if peak_mask is not None else None
     kept = np.zeros(n_nb, dtype=bool)
     nb_fp = np.zeros_like(own_fp)
     items = [("seg", int(q)) for q in segs] + [("soma", int(s)) for s in somas]
@@ -554,13 +568,15 @@ def shadow_image(fscene, own_ids, left, top, width, height, planes_z, cfg, B_gl=
         else:
             img, fp, off = _neighbour_image(fscene, kind, idx, patch, z, cfg, directions)
         peak[i] = float(img.max()) if img.size else 0.0
+        if peak_m is not None and any_mask and img.size:
+            peak_m[i] = float(img[:, pmask].max())
         kept[i] = bool(inc[i]) and (B_gl is None or float(B_gl) * peak[i] >= float(cfg.cleaning.shadow_floor_gl))
         if kept[i]:
             S += img
             nb_fp |= _paste(fp, off, patch)
     both = (own_fp & nb_fp).reshape(patch.H, patch.f, patch.W, patch.f)
     overlap = both.any(axis=(1, 3))
-    return ShadowResult(S=S, per_neighbour_peak=peak, kept=kept, overlap=overlap)
+    return ShadowResult(S=S, per_neighbour_peak=peak, kept=kept, overlap=overlap, per_neighbour_peak_mask=peak_m)
 
 
 def stretch_profiles(fscene, stretch_ids, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg):

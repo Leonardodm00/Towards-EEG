@@ -12,7 +12,10 @@ Checks
                             within 0.5 gl of the scene's background, the profiles Block 32 reads equal
                             sample_profile on the provider's block along the pilot's line [exact], node_xyz
                             and theta0 as stated; work_list contains the examples first, follows the
-                            threshold (a strong in-focus neighbour in, a weak defocused one out) and the cap
+                            threshold (a strong in-focus neighbour in, a weak defocused one out) and the cap;
+                            under work_rank "line" (amendment 9, D-149.2) line_mask equals a mask written by
+                            hand [exact], each node's rank value equals its segments' masked peak by hand
+                            [exact], the order follows it
     test_trace_offset       amendment 1 (2): a noise-free rendered tube whose trace is displaced by
                             (0.3 um lateral, 0.5 um deep): one round of Block 32 with this block's
                             predict recovers the displacement in the features row's offset [0.02 um
@@ -390,17 +393,61 @@ def test_invariants():
     peak_C = max(pk for (e, q), pk in peaks.items() if seg_of[q][0] in range(24, 35))
     assert peak_C < peak_B, (peak_C, peak_B)
     G = 0.5 * (peak_B + peak_C)
-    w = NI.work_list(ex, fs, swc, cfg, G, B)
+    cfg_p = dataclasses.replace(cfg, cleaning=dataclasses.replace(cfg.cleaning, work_rank="patch"))   # the entry's rule
+    w = NI.work_list(ex, fs, swc, cfg_p, G, B)
     assert w[:2] == ex, w
     assert all(13 <= n <= 23 or 2 <= n <= 12 for n in w), ("no node of the weak, defocused dendrite C", w)
     assert any(13 <= n <= 23 for n in w[2:]), ("B's nodes join for A", w)
     assert len(set(w)) == len(w)
     assert not set(w) & {2, 3, 11, 12, 13, 14, 22, 23}, ("no near_end node (D-138.2)", w)
-    lo = NI.work_list(ex, fs, swc, cfg, 0.0, B)
+    lo = NI.work_list(ex, fs, swc, cfg_p, 0.0, B)
     assert any(24 <= n <= 34 for n in lo), ("with the threshold at 0 C's non-near_end nodes join", lo)
-    capped = NI.work_list(ex, fs, swc, dataclasses.replace(cfg, cleaning=dataclasses.replace(
-        cfg.cleaning, work_max_nodes=5)), G, B)
+    capped = NI.work_list(ex, fs, swc, dataclasses.replace(cfg_p, cleaning=dataclasses.replace(
+        cfg_p.cleaning, work_max_nodes=5)), G, B)
     assert capped[:2] == ex and len(capped) == min(5, len(w)) and capped == w[:len(capped)], (capped, w)
+    # amendment 9 (D-149.2), work_rank "line": the mask is the pixels the trace's line reads [exact against a mask
+    # written here: A and B run along x, so the line of a node at (10, y0) is x = 10, |y - y0| <= profile_half_um];
+    # every node's rank value is B x its segments' largest masked peak under partition_vertical, tier 1 only, the
+    # floor's prefilter on [exact]; the order follows it; B's nodes join for A, C's do not
+    cfg_l = dataclasses.replace(cfg, cleaning=dataclasses.replace(cfg.cleaning, work_rank="line"))
+    pv = dataclasses.replace(cfg_l, cleaning=dataclasses.replace(cfg_l.cleaning, shadow_absorption="partition_vertical"))
+    p_ = cfg.acquisition.res0_um
+    half_u = profiles.n_along(cfg.measure) * cfg.measure.profile_step_um + p_
+    half_v = cfg.measure.profile_half_um + p_
+    hand = {}
+    for e in ex:
+        _f, _i, obe, te = node_of(swc, cfg, e)
+        owne = NI.own_ids_within(obe, te, cfg.inference.tube_half_length_um)[0]
+        xyz = NI._node_position(fs, e)
+        l_, t_, w_, h_ = calibration_scene.patch_bounds(xyz[0], xyz[1], cfg.cleaning.patch_half_um, p_)
+        X, Y = np.meshgrid((l_ + np.arange(w_)) * p_, (t_ + np.arange(h_)) * p_)
+        mask = (np.abs(X - xyz[0]) <= half_u) & (np.abs(Y - xyz[1]) <= half_v)
+        assert_array_equal(NI.line_mask(obe, te, l_, t_, w_, h_, cfg_l), mask)
+        k0 = int(round(xyz[2] / cfg.acquisition.dz_um))
+        pz = np.arange(k0 - cfg.cleaning.plane_half_range, k0 + cfg.cleaning.plane_half_range + 1) * \
+            cfg.acquisition.dz_um
+        tiers = cleaning.neighbour_tiers(fs, owne, xyz, cfg_l)
+        r = shadow.shadow_image(fs, owne, l_, t_, w_, h_, pz, pv, B_gl=B, include=(tiers == 1), peak_mask=mask)
+        segs, _ = shadow.neighbour_indices(fs, owne)
+        for m, q in enumerate(segs):
+            if tiers[m] == 1:
+                for end in seg_of[int(q)]:
+                    if end not in ex and end not in owne:
+                        hand[end] = max(hand.get(end, -1.0), B * r.per_neighbour_peak_mask[m])
+    hB = max(v_ for n_, v_ in hand.items() if 15 <= n_ <= 21)
+    hC = max(v_ for n_, v_ in hand.items() if 24 <= n_ <= 34)
+    assert hC < hB, (hC, hB)
+    GL = 0.5 * (hB + hC)
+    got = {}
+    wl = NI.work_list(ex, fs, swc, cfg_l, GL, B, peaks=got)
+    assert wl[:2] == ex, wl
+    assert got and all(got[n_][0] == hand[n_] and got[n_][0] >= GL for n_ in got), (got, hand)
+    assert [got[n_][0] for n_ in wl[2:]] == sorted((got[n_][0] for n_ in wl[2:]), reverse=True), wl
+    assert any(13 <= n_ <= 23 for n_ in wl[2:]), ("B's nodes join for A on A's line", wl)
+    assert not any(24 <= n_ <= 34 for n_ in wl), ("C is under the threshold on the lines", wl)
+    assert not set(wl) & {2, 3, 11, 12, 13, 14, 22, 23}, ("no near_end node (D-138.2)", wl)
+    print("    work list on the lines (amendment 9): peaks B %.2f, C %.2f gl (on the patches %.2f, %.2f); list %s"
+          % (hB, hC, peak_B, peak_C, wl))
     _CACHE["two_node"] = (node, info, pilot, ob, t, scene, own)
 
 
