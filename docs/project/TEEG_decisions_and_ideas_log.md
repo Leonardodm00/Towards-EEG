@@ -188,6 +188,7 @@ the "Binds" column.
 | 2026-11-16 | No decision changed (the noise-fit chat; output pasted by the user, 09:41) **[cluster]**. **The pilot of D-124 is done**: `NOISE_MERGE L3_exc: 2 ok, 0 refused, 0 failed, 0 missing`. Seconds per stage (windows, cell fit, sweep stage, total): 508282493 (2 SS sweeps) 0.7, 3371, 11165, **14536** (4.0 h); 569844159 (10 SS sweeps) 1.7, 6202, 21104, **27308** (7.6 h). The sweep stage (Block 9, 6 workers) is 77 % of both; Block 4 took less than SPEC 2.3 (h)'s estimate (0.9 and 1.7 h against 1-3.5 and 2-5.5 h). The noise-fit code is unchanged since the pilot (the last commit touching `noise_*.py` or `run_noise_fit.py` is still `1d848f6`), so the 18-cell run skips the pilot's two cells. WALLTIME for the 18 cells: the assistant proposes 24:00:00 rather than the handoff's "1.5 x the largest total" (11.4 h, so 12:00:00) **[reasoning]**: the sweep stage grows with a cell's number of sweeps, mostly the LS ones, which are not known for the other 16 cells; a killed cell loses all its work. Next free IDs: D-147, I-006. |
 | 2026-11-16 (later) | Logs **D-147** (user, 09:45; the noise-fit chat): the 18-cell run keeps the pilot's walltime, 48:00:00 per cell job, in place of the 24:00:00 the assistant proposed (row 2026-11-16) and the handoff's 1.5 x rule. The Block 6 handoff's section 4 corrected. Next free IDs: D-148, I-006. |
 | 2026-11-16 | Logs **D-148** [orchestrator] (the diameter chat, 13:30). The pilot's Cell 17 (5 example nodes, 2 rounds, Colab) took 910 to 3076 s per node in round 1 -- the coarse refinement 596 to 2431 s (74 to 115 model calls of 6 to 21 s; the nodes 1.1 to 4.0 um thick by their pilots), the background's and the cleaning's shadows 107 to 334 s each -- and saved nothing before its end. Fixed in `b6073e3` on `sci/diameter-pipeline`: the coarse fit stops at 1e-3 and samples p/4 (on a noisy 2 um tube: 27 calls, 36 s against 59 calls, 261 s; the same diameter); the cleaning's shadow reuses the background's neighbour renderings (exact); the outputs are written after every round. The notebook's Cell 17 defaults to 1 round (with the work list holding only the examples, a second round refines no neighbour). |
+| 2026-11-16 (later, 2) | Logs **D-149** (the diameter chat, 15:00): the user chose to show the cleaning in worse conditions on the pilot's most contaminated tier-1 real nodes with their neighbours refined, not by injection or phantoms for now (D-149.1 [user]); the work list ranked on the measuring line, its threshold 1 gl, per-round line figures, the examples 8089, 4844, 7081, 7448 (D-149.2 to .5 [orchestrator]); code `a2b082c` on `sci/diameter-pipeline`. Evidence: Cell 17's five examples were nearly clean (worst neighbour 0.2 to 0.8 gl on the line) and no neighbour was refined; the survey's index overcounts long out-of-focus neighbours (x94 at 55 um defocus) **[user's CSV and figures; run, sandbox]**. Next free IDs: D-150, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -342,6 +343,7 @@ would be needed*, *Status*.
 | D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
 | D-133 | 2026-11-13 | SPEC Blocks 25 (amendment 2), 28, 29, 30, 31 at `38f7c19`; `CleaningConfig`, `InferenceConfig` | wave 2's validation targets, tolerances and provisional parameters, proposed by the orchestrator at the wave's start: exact inverse of the cleaning 1e-9 gl; recovery 1e-6 and unbiasedness within 3 SE for the two fits; coverage 60-76 % and chi2/N within 10 % of 1 for the per-node fit; hybrid column sum 1e-10 and faint limit 5e-3 for the shadow model; renderers passed as callables [orchestrator] | active |
 | D-134 | 2026-11-13 | SPEC Block 25 (amendment 3); D-132.1 | a tier-1 neighbour's shadow is equations (5-6) for the neighbour rendered alone: one blur per slab, under the hybrid's absorbed light; one kernel per column is dropped [user] | active; supersedes the "one blur per column" clause of D-132.1 |
+| D-149 | 2026-11-16 | SPEC Blocks 25 (amendment 6), 36 (amendment 9), 31 (amendment 1) at `a2b082c`; `CleaningConfig.work_rank`, `work_peak_min_gl`; notebook Cells 17b, 18b | the cleaning is shown in worse conditions on the pilot's most contaminated tier-1 real nodes, neighbours refined, no injection or phantoms now [user]; the work list ranked by the predicted shadow on the example's measuring line, threshold 1 gl, per-round line figures, the examples 8089, 4844, 7081, 7448 [orchestrator], PROVISIONAL | active |
 | D-148 | 2026-11-16 | SPEC Blocks 29 (amendment 1), 25 (amendment 5), 32 (amendment 3), 36 (amendment 8) at `b6073e3`; `CleaningConfig.refine_xtol`, `refine_ftol`, `refine_line_fine_factor` | the coarse refinement stops at relative tolerances 1e-3 (was 1e-8) and its predictor samples p/4 (the fine fit keeps p/8); the neighbours' images shared between the two shadows of a node; the cleaning saves after every round [orchestrator], PROVISIONAL | active |
 | D-147 | 2026-11-16 | `submit_noise_fit.sh`'s `WALLTIME` for the 18-cell run of D-124 (D-125.5) | the 18 L3_exc cells run with WALLTIME = 48:00:00 per cell job, as the pilot did [user] | active |
 | D-146 | 2026-11-14 | SPEC Block 25 (amendment 4), Block 36 (amendment 7) at `326891d`; `CleaningConfig.shadow_bin_sigmas`, `shadow_ray_n_rho`, `shadow_ray_n_psi` | the shadow model renders only the neighbours that can reach the patch and exceed the floor (exact), crops each blur to its reach (exact), bins defocused slabs (2.2e-4 of a peak), uses 4 x 8 hybrid directions (0.04-0.2 % of a shadow's peak); the background's all-segment shadow takes the floor [orchestrator], PROVISIONAL | active |
@@ -11338,3 +11340,61 @@ dominate); a coarse grid for wide-kernel neighbours such as the soma.
 
 **Status:** active.
 
+## D-149 -- The cleaning in worse conditions: the pilot's most contaminated tier-1 real nodes with their neighbours refined (user); the work list ranked on the measuring line, its threshold, per-round figures [orchestrator]
+
+**Date:** 2026-11-16, about 15:00 (Europe/Rome), the diameter chat. D-149.1 is the user's answer to a question of the
+orchestrating session (Opus 5.5); D-149.2 to D-149.5 were settled by that session under coding directive 7 and the user
+can reverse any of them.
+**Binds:** SPEC Blocks 25 (amendment 6), 36 (amendment 9), 31 (amendment 1) at `a2b082c` on `sci/diameter-pipeline`;
+`CleaningConfig.work_rank` ("line"), `work_peak_min_gl` (1.0); notebook `cleaning_pilot_2026-11-14.py` Cells 17b, 18b.
+
+**Decision.** (D-149.1 [user]) The cleaning is to be shown in worse conditions on the pilot cell's most contaminated
+tier-1 real nodes, with their neighbours refined over two rounds, in Colab. The injection of a synthetic neighbour into
+real planes and the synthetic phantoms (step F4) are not run now [user: chose "Worst real nodes, neighbours refined"
+and answered "No injection" to the injection's three questions]. (D-149.2 [orchestrator]) The work list ranks the
+neighbours' nodes by their segments' predicted shadow on the pixels the example's measuring line reads, not on the
+whole patch ("patch" kept as the labelled alternative). (D-149.3 [orchestrator]) `work_peak_min_gl` = 1.0 gl (was 3.0,
+PROVISIONAL). (D-149.4 [orchestrator, plumbing]) `clean` keeps each round's cleaned line of every example and draws it
+round by round (`cleaning_line_node<id>.png`, `cleaning_node<id>_round<t>.png`). (D-149.5 [orchestrator]) Cell 17b's
+examples and knobs: 8089, 4844, 7081, 7448; 2 rounds; at most 16 work-list nodes; 1 gl.
+
+**Statement.** (D-149.2) For an example node $i$ with patch $P_i$ and planes $K_i$, the rank value of a neighbour's end
+node $e$ is $\max_{q \ni e}\, B \max_{k \in K_i} \max_{x \in M_i} S_{q,k}(x)$ (gl), $S_{q,k}$ Block 25's shadow of
+segment $q$ alone under `partition_vertical`, tier-1 segments only, $M_i \subset P_i$ the pixel centres with
+$|v| \le$ `profile_half_um` $+ p$ along $\hat y_i$ and $|u| \le A \cdot$ `profile_step_um` $+ p$ along $\hat e_{u,i}$
+($A$ = `n_along`, $p$ = `res0_um`) about the trace's line through the node (Block 27's rule); a node joins when its value
+reaches `work_peak_min_gl`, the strongest first, up to `work_max_nodes` with the examples. Agreed before (Block 36's
+entry, PROVISIONAL): the maximum over the whole patch $P_i$. (D-149.3) 1 gl is about the pilot's profile noise SD (0.85
+to 1.31 gl at the five examples); a neighbour under it changes no profile sample by more than the noise.
+
+**Why.** Cell 17 (2026-11-16, 11:26) cleaned five nodes drawn at random from the class `diffuse`: their worst
+neighbour's dip on the line was 0.2 to 0.8 gl, 1 to 5 % of their own dip; the cap of 5 kept the first five examples
+and cut 941, 5749, 1300, 7448, 7444 **[user: the log and `contamination_529878215.csv`]**. No neighbour joined the
+work list, so every neighbour's shadow came from Allen's diameter and $\mu$ = 0.258 /um, and the after panels show
+bright ghosts along such neighbours (7136, 5757, 7115) **[user: the figures]**; that the predicted shadows are too
+narrow, too dark or misplaced is the assistant's reading, Likely **[reasoning]**. In the survey's 600 nodes the
+strongest tier-1 cases put 1.4 to 3.5 gl on the line, 8 to 20 % of the dip (7448 and 7444 by the soma and the proximal
+trunk; 8089, 4844, 7081 crossed by a branch 0.08 to 1.2 um aside and 1.6 to 2.5 um above or below); the eleven
+strongest of all (6 to 30 gl, 34 to 66 %) are branch points, tier 2, left to the joint fit (D-132.2) and skipped as
+near_end (D-138.2) **[user's CSV; reasoning]**. On a 20 um patch the largest peaks belong to in-focus neighbours anywhere
+on it, the node's own stretch beyond its tube first, so under the patch rule a small cap refines nodes that do not touch
+the line **[reasoning]**; on the suite's two-tube scene the line rule keeps the neighbour B (87.72 gl on A's line) and
+leaves C (0.37 gl; 0.57 on the patch) **[run, sandbox]**.
+
+**What it implies for code and tables.** The files of the three blocks at `a2b082c`; outputs of Cell 17b in
+`OUT/cleaning_worst`, of Cell 18b in `OUT/inference_worst`; Cell 17's folder untouched.
+
+**What it does not decide [open].** Whether the cleaning passes in these conditions: without ground truth it is judged
+on the line figures round by round, the fit's chi2/N (Cell 18b) and the diameters along the branch; what counts as
+passing (O12) stays the user's. The ghosts elsewhere on the patches (neighbours not on the line are not refined). The
+soma's model (a sphere, $\mu$ = 0.3 /um, PROVISIONAL) near 7448. The survey's index (Block 27): it sums each segment
+of a neighbour as an infinite tube (`calibration_scene.shadow_depths`), so a long straight neighbour counts 94 times
+too strongly at 55 um defocus, 21 times at 12 um and 3.6 to 5 times for a crossing at 1.6 to 2.5 um **[run, sandbox:
+a straight tube of 1.18 um segments, $r$ = 0.45 um, $\mu$ = 0.258 /um, $B$ = 159 gl]**; the classes (no node `clean`
+among 600) and the random example draws rest on it; not changed.
+
+**Sources.** **[user]** the answers of 2026-11-16 (about 14:50), Cell 17's log, `contamination_529878215.csv`, the
+figures. **[run, sandbox]** the suites (shadow 7, pilot run 12, cleaning figures 7, configuration 6, cleaning iteration
+9 pass) and the overcount check. **[SPEC]** `a2b082c`.
+
+**Status:** active.
