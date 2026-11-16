@@ -187,7 +187,8 @@ for path in [CLEAN + "/cleaning_rounds.png"] + sorted(glob.glob(CLEAN + "/cleani
 
 # %%
 os.makedirs(INFER, exist_ok=True)
-run("scripts/infer_nodes.py", "real", "--specimen", SPECIMEN, "--cleaning-dir", CLEAN, "--out", INFER)
+STARTS = "1.0"     # d0 x these: one start at the cleaning's refined values (3x faster); "0.6,1.0,1.6" for three
+run("scripts/infer_nodes.py", "real", "--specimen", SPECIMEN, "--cleaning-dir", CLEAN, "--out", INFER, "--starts", STARTS)
 import pandas as pd
 res = pd.read_csv("%s/inference_%d.csv" % (INFER, SPECIMEN))
 display(res)
