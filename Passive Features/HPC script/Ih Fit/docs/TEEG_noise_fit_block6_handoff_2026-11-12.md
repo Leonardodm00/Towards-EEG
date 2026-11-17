@@ -15,6 +15,7 @@ which stays the history of Block 9 and of D-122 to D-125.
 | 2026-11-17 | Step 2 done: the 18-cell run, 18 ok (§4 holds the per-cell table); step 3 (Block 5) next. |
 | 2026-11-17 (later) | The run's two tables read back **[run, here, on the CSVs the user attached]** (§4, "The two tables read back"; §6 item 8): every integrity check passes; the law is rejected in all 18 cells (J/dof 2.7-160); D-055's S3.1 first half holds, S3.2 first half fails; 10 LS sweeps failed; the LS slow SD exceeds the SS one in 16 of 18 cells; a few LS sweeps carry degenerate fast parts into their twins. Next: the per-cell JSONs, for the residuals. No decision taken. |
 | 2026-11-17 (later, 2) | The 18 cell JSONs read back **[run, here, on the files the user attached]** (§4, "The cell JSONs read back"; §6 item 8 rewritten as two decisions for the user): the misfit sits at the 1 ms autocorrelation (the law above the data in 16 of 18 cells, SS), not at 0.1 ms; D-055's S3.1 second half and S3.3 fail; the per-sweep laws misfit too; the real statistics scatter 1.3 x what the law simulates; the failed sweeps sit at rho_f's lower bound; the `no_plateau` cells wander in tau_s. No decision taken. |
+| 2026-11-17 (later, 3) | A three-component law tested at the user's request (12:28: a faster component, the two slow-side parts split at 1 ms; 12:30: "Go on with the test") **[run, here]**: `dev/2026-11-17_three_component_law/` (README). Fitted by simulation on the 18 cells, the middle component lowers J in every cell (median 121 to 38) and removes the 1 ms excess; 13 of 18 cells stay rejected. §4 "A third component, tested"; §6 item 8 updated. No decision taken. |
 
 **Basis tags.** **[run]** executed in the assistant's sandbox (date given); **[src]** read from the code, SPEC or log
 on `main`; **[log]** the decision log's text; **[user]** the user's decision or words; **[reasoning]** the assistant's
@@ -326,6 +327,27 @@ Sigma (152 to 201 in 571483807). **[reasoning]** a misspecified law makes the op
 iteration's wander is a second sign of the misfit, and tau_s(c) is the least determined of the four parameters
 (Block 9 holds it fixed for every sweep).
 
+**A third component, tested** (2026-11-17, at the user's request; `dev/2026-11-17_three_component_law/`, README and
+outputs there; **[run, here]**). The user's proposal (12:28-12:30): the fast part as it is, a middle part with a time
+scale of at most 1 ms, the slow part above 1 ms. [why not two: the fitted fast part has tau_f = 0.009-0.014 ms
+(rho_f 0.105-0.249 per 20 us sample; the bound 0.999 allows 20 ms), because the data's autocorrelation falls to 0.56
+(SS) and 0.70 (LS) within one sample; a component of 0.1-1 ms keeps 0.82-0.98 after one sample **[arithmetic]**.]
+M3 = SPEC 2.1's law + an OU (sigma_m, tau_m), tau_m in [0.04 ms, 1 ms], tau_s in [1 ms, 10 s]; J with the run's
+stored Sigma.
+
+| Step | Result over the 18 cells |
+|---|---|
+| closed form (corrected by each cell's stored simulation) | median J 116.9 (M2 refitted) to 36.7 (M3); the drop exceeds chi^2_2's 99 % point in 18 of 18; a white fast part (5 parameters) does as well except in 529878215 and 569844159 |
+| simulation, the layout rebuilt from the JSON | M2 at theta_hat(c) reproduces the run's J within 0.97-1.07 |
+| simulation, M3 refined (6 trf iterations at M = 1000, J at M = 3000) | median J 120.7 to 37.9 (ratio median 0.36, 0.08-0.87), lower in 18 of 18; below chi^2_9's 99 % point (21.7) in 5 |
+| SS rho(1 ms) | standardised residual median +2.27 to -0.50; the law above the data in 16 to 6 cells |
+| fitted middle part | sigma_m 0.012-0.024 mV; tau_m 0.07-0.11 ms in 8 cells, 0.15-0.39 ms in 4, 0.77-1.0 ms in 6 (3 at the 1 ms bound) |
+| fitted slow part | tau_s 10-650 ms in 17 cells (median 118 ms); 571624532 189 ms (1863 ms under M2); 569844159 at the 10 s bound |
+| still far | 569844159 398, 529878215 220, 571483807 159, 541545716 144, 526785799 103: the cells whose SS and LS statistics disagree under one law per cell |
+
+Limits: Sigma is M2's; the refinement is short (its J an upper bound of M3's minimum); the per-sweep stage is not
+tested (the JSONs hold no per-sweep targets); the statistic set was chosen for four parameters.
+
 Read back from the pilot: the `NOISE_CELL` lines, each JSON's per-stage seconds (they set `WALLTIME`), the
 `NOISE_MERGE` line. A code change between the pilot and the run re-runs every cell, the pilot's included (the resume
 rule keys on the commit). Gate logs: `~/ih_fit_gate_logs/<date_time>/`.
@@ -366,6 +388,11 @@ rule keys on the commit). Gate logs: `~/ih_fit_gate_logs/<date_time>/`.
    SPEC 2.1, Blocks 2, 4 and 9 and the run again); (b) a rule for a per-sweep fit that is degenerate but not
    "failed" -- the assistant's proposal: sigma_f(c, s) < 0.5 sigma_f(c) or rho_f(c, s) > 0.4 (6 of 515 LS sweeps,
    none of 64 SS) counts as failed, so the twin carries theta_hat(c) (D-122.3).]
+   [updated 2026-11-17 (later, 3): the extension tested (§4, "A third component, tested") -- supported in every
+   cell, J to about a third, the 1 ms excess gone, 13 of 18 cells still rejected. If the user extends the law, to
+   settle before SPEC 2.1 is rewritten: tau_m's bounds (the 1 ms cap binds in 3 cells; the lower one); the fast
+   part's rho_f free or white; which of sigma_m, tau_m are per sweep in Block 9; the statistic set (lags for six
+   parameters); then Blocks 2, 4, 9, their smokes, the gates and the run again. Decision (b) waits for it.]
 
 ## 7. Repository, environment, cluster
 
