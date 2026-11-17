@@ -201,6 +201,7 @@ the "Binds" column.
 | 2026-11-17 (later, 8) | Logs **D-154** (user, 14:59; the noise-fit chat): the implementation plan of the three-component law approved ("I approve everything go on") with its three readings -- the two lags added in all three autocorrelation windows (d = 21); the middle size shrunk per protocol like the slow one; a per-sweep fit with sigma_f under half the cell's counts as failed. Work starts on the branch `sci/noise-three-component`. Next free IDs: D-155, I-006. |
 | 2026-11-17 (later, 9) | Logs **D-155** [orchestrator] (the noise-fit chat, about 19:00). **The three-component law is implemented and merged into `main`** (D-152 to D-154): SPEC 2.6; Blocks 2 and 3 (one Opus implementer), 4 and 9 (one each), 6 (the orchestrating session); every smoke passes in the sandbox (noise_law 11/11, noise_stats 6/6, noise_windows 15/15, noise_fit 12/12, noise_sweep_fit 11/11, noise_run 9/9, gates 8/8); the final check by an independent Opus agent: PASS WITH ISSUES, no blocker or major finding (`Ih Fit/specs/test_reports/2026-11-17_1700_incremental.md`). Its finding F1 (a bootstrap variance of 0 crashed the pooling and lost the cell) settled as D-155: a variance that is NaN or below 1e-12 fails the sweep with `v_none`. Changes to validation targets [orchestrator], in SPEC's as-built notes: Block 2's check against the topic document's two-component values replaced by the white part's analytic moments and additivity; Block 4's reduced-fit tolerance restated from 40 fixture seeds; the fit's finite-difference steps and closed-form starting points for the middle part (2.6 (d), PROVISIONAL). Finding to watch on the pilot: at reduced sizes the slow part ran along its ridge in 6 of 40 synthetic cells. Not run: anything at full size; the run on davinci is next (gates, dry run, pilot). Next free IDs: D-156, I-006. |
 | 2026-11-17 (later, 10) | Logs **D-156** (user, 16:59 and 17:05; the clearance chat): the node's features stay the joint least-squares fit of all its planes with the whole own shadow (Blocks 29, 30, unchanged); the same-node clearance of D-151 becomes a product computed from that fit's estimate every round (the split by depth, the cleared profiles, the chord per plane, figures), no fit reads the cleared profiles, and clear-then-fit is dropped without a comparison. Amends D-151.1 and D-151.4. At 17:20 the user approved the block plan, recalled that the fit comes after the neighbours' cleaning, and restated that this route is the main one, the inversion table the secondary (D-129). (Written locally as D-155 at 17:10 and renumbered at the push: the noise-fit chat had taken D-155 meanwhile.) Evidence **[run, sandbox of the clearance chat: `checks/own_shadow_clearance_check.py` on `sci/diameter-pipeline`, flat tube]**: with the band at 0.14 um the out-of-band part is 72 to 93 % of the dip at its peak; clear-then-fit, linearised, has spectral radius 5.77 and 3.03 undamped (nodes 8089, 7448) and standard errors 1.17 to 1.82 times the joint fit's. Next free IDs: D-157, I-006. |
+| 2026-11-17 (later, 11) | Logs **D-157** [orchestrator] (the clearance chat, the wave of D-156): contract amendment of SPEC Block 35 amendment 2 on the implementer's report -- the depth-mirror oracle of the split holds to 1e-10 only when the slab grid is symmetric about the tube's axis, and is restated with that construction (the generic case reported without a bound); the slab-grid oracle's margin recorded (4.65e-4 against 5e-4). The wave is merged on `sci/diameter-pipeline`: Block 35 amendment 2, Blocks 37, 38, Block 36 amendment 11. Next free IDs: D-158, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -361,6 +362,7 @@ would be needed*, *Status*.
 | D-154 | 2026-11-17 | the implementation of D-152/D-153: SPEC 2.6, Blocks 2, 3, 4, 9, 6 of `Ih Fit` | plan approved; lags 0.04 and 0.3 ms in the SS, LS pre- and LS last windows ($d$ = 21); $\sigma_m(c,s)$ shrunk per protocol as $\sigma_s$ (D-076.1); a sweep with $\hat\sigma_f(c,s) < 0.5\,\hat\sigma_f(c)$ is a failed sweep [user] | active |
 | D-155 | 2026-11-17 | Block 9's failure rule (`noise_sweep_fit.V_MIN`, `_v_usable`), SPEC 2.6 (e) | a sweep whose bootstrap variance of $\log\sigma_m$ or $\log\sigma_s$ is NaN or below $10^{-12}$ is a failed sweep (`v_none`) [orchestrator] | active |
 | D-156 | 2026-11-17 | SPEC Block 35 (amendment 2), new Blocks 37, 38, Block 36 (amendment 11) on `sci/diameter-pipeline`; `CleaningConfig.own_band_half_um`, `own_layer_um`; `clean_cell.py clean`, `infer_nodes.py real`; D-151.1, D-151.4 | the joint fit of all planes with the whole own shadow stays the estimator; the same-node clearance is a product computed from its estimate every round; clear-then-fit dropped, no comparison [user]; the band, the layers, the line, the details [assistant's defaults, orchestrator] | active; amends D-151.1, D-151.4 |
+| D-157 | 2026-11-17 | SPEC Block 35 (amendment 2), oracles (iv) and (v); `tests/smoke/test_smoke_line_fast.py` | the split's depth-mirror oracle restated for a slab grid symmetric about the axis (1e-10 there; generic case reported, no bound); the slab-grid oracle kept at 5e-4 with its margin recorded [orchestrator] | active |
 | D-150 | 2026-11-17 | SPEC Blocks 31 (amendment 2), 27 (amendment 2), 25 (amendment 7), 28 (amendment 2), 36 (amendment 10) at `97b40a4`, `4ed0793`; `CleaningConfig.shadow_cache_mb`, `rank_*`; `clean_cell.py rank`; notebook Cells 16b, 17b, 18b | the cleaning's test re-aimed and sped up [user]: before and after on one 1-99 percentile grey scale, B S on its own; examples ranked by the largest structured dip a tier-1 neighbour casts on the line, tier 2 at most 1 gl, 10 um apart; the shadow model keeps its last sums per patch and changes them by the neighbours that changed (supersedes D-148.3); tiers vectorised [orchestrator] | active |
 | D-149 | 2026-11-16 | SPEC Blocks 25 (amendment 6), 36 (amendment 9), 31 (amendment 1) at `a2b082c`; `CleaningConfig.work_rank`, `work_peak_min_gl`; notebook Cells 17b, 18b | the cleaning is shown in worse conditions on the pilot's most contaminated tier-1 real nodes, neighbours refined, no injection or phantoms now [user]; the work list ranked by the predicted shadow on the example's measuring line, threshold 1 gl, per-round line figures, the examples 8089, 4844, 7081, 7448 [orchestrator], PROVISIONAL | active |
 | D-148 | 2026-11-16 | SPEC Blocks 29 (amendment 1), 25 (amendment 5), 32 (amendment 3), 36 (amendment 8) at `b6073e3`; `CleaningConfig.refine_xtol`, `refine_ftol`, `refine_line_fine_factor` | the coarse refinement stops at relative tolerances 1e-3 (was 1e-8) and its predictor samples p/4 (the fine fit keeps p/8); the neighbours' images shared between the two shadows of a node; the cleaning saves after every round [orchestrator], PROVISIONAL | active |
@@ -11771,3 +11773,36 @@ patch images (Block 4 would need the same split). The far field's calibration on
 **Sources.** **[user]** 2026-11-17, 16:59, 17:05 and 17:20. **[run, sandbox]** as tagged. **[log]** D-024, D-149.3, D-151.
 
 **Status:** active; amends D-151.1, D-151.4.
+
+## D-157 -- The split's depth-mirror test restated for a slab grid symmetric about the axis; the slab-grid test's margin recorded [orchestrator]
+
+**Date:** 2026-11-17, the clearance chat, at the gate of the wave of D-156 (coding directive 7).
+**Binds:** SPEC Block 35, amendment 2, test oracles (iv) and (v); `tests/smoke/test_smoke_line_fast.py`
+(`test_split_symmetry`, `test_split_slab_grid`) on `sci/diameter-pipeline`. No code of the model, no estimate.
+
+**Decision [orchestrator].** (D-157.1, a validation target's condition) Agreed before (the contract of D-156): under
+`linear` absorption, for a flat tube with its axis at depth $z_a$, the split of the own shadow at a plane $\delta$ above
+the axis equals the split at the plane $\delta$ below, to 1e-10. Now: the same, for a tube whose slab grid is symmetric
+about its axis -- the deepest column a whole number of slabs long (the test takes $r = \sqrt{0.3^2 + (h_{\rm g}/2)^2}$ um,
+$h_{\rm g}$ the fine lattice's spacing, so that the column nearest the axis is 0.6 um, 30 slabs); for a generic radius
+the mirror difference is reported without a bound. (D-157.2, a tolerance kept) The slab-grid oracle stays at 5e-4
+(`dzeta_um` 0.02 against 0.01 um); its margin is recorded.
+
+**Why.** **[run, sandbox: the implementer's report on Block 35 amendment 2, commit `9204a97`; `test_split_symmetry`
+and `test_split_slab_grid`]** `geometry.slab_centres` lays the slabs from the tube's lowest point upwards, so the grid
+is mirror-symmetric about the axis only when the depth extent is a whole number of slabs; with $r$ = 0.3 um the
+mirror difference of $S^{\rm in}$ is 4e-7 to 1.7e-5 (the discretisation's own asymmetry, not an error of the split),
+and with the symmetric construction it is at most 1.7e-16 at $z_a$ = 0 and 1.28e-11 at $z_a$ = 0.14 um. The slab-grid
+oracle's worst case is 4.65e-4 (hybrid, the axis 0.01 um off the plane) against 5e-4; over the whole period of the
+grid (0.0025 to 0.0175 um) nothing larger was found; the in-band part is about three times more sensitive to the slab
+grid than the whole shadow there (1.4e-4). **[reasoning]** 4.65e-4 of the background is about 0.1 % of that test
+tube's in-band shadow, far below a profile sample's noise.
+
+**What it implies for code and tables.** The test's construction and SPEC's wording; nothing else.
+
+**What it does not decide [open].** Whether `renderer.dzeta_um` should be halved for the product on thick nodes (the
+in-band part's sensitivity to the slab grid was measured at $d$ = 1 um only).
+
+**Sources.** **[run, sandbox]** as tagged. **[log]** D-156.
+
+**Status:** active.
