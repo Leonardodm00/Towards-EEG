@@ -75,13 +75,13 @@ def window_stats(X: np.ndarray, fs: float, lags_ms: Sequence[float]) -> np.ndarr
 
 
 def ss_window_stats(X_tilde: np.ndarray, fs: float) -> np.ndarray:
-    """The 5 SS statistics per enlarged window (after the subtraction)."""
+    """The N_SS_STATS (7) SS statistics per enlarged window (after the subtraction)."""
     return window_stats(X_tilde, fs, SS_LAGS_MS)
 
 
 def ls_window_stats(pre_list: Sequence[np.ndarray], fs: float,
                     cfg: WindowConfig = WindowConfig()) -> np.ndarray:
-    """The 10 LS statistics per pre-window: full window sigma_hat and
+    """The N_LS_STATS (14) LS statistics per pre-window: full window sigma_hat and
     rho_hat at LS_FULL_LAGS_MS; first-segment sigma_hat; last-segment
     sigma_hat and rho_hat at LS_LAST_LAGS_MS (D-051 (i))."""
     out = np.empty((len(pre_list), N_LS_STATS))
