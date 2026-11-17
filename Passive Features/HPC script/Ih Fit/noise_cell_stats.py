@@ -33,9 +33,10 @@ from noise_windows import LSWindows, SSWindows, SweepTilts, WindowConfig, ls_seg
 # SweepTilts and ss_sweep_tilts ((TL1)) live in noise_windows since 2026-10-30 (D-115: the window pipeline reads
 # the SS tilt before the start and removes its offsets); they are re-exported here for the callers of Block 3.
 
-SS_LAGS_MS: Tuple[float, ...] = (0.02, 0.1, 1.0, 10.0)
-LS_FULL_LAGS_MS: Tuple[float, ...] = (0.02, 0.1, 1.0)
-LS_LAST_LAGS_MS: Tuple[float, ...] = (0.02, 0.1, 1.0, 10.0)
+# SPEC 2.6 (c) (D-153.2, D-154.1): 0.04 ms and 0.3 ms added in the three windows; d = 21.
+SS_LAGS_MS: Tuple[float, ...] = (0.02, 0.04, 0.1, 0.3, 1.0, 10.0)
+LS_FULL_LAGS_MS: Tuple[float, ...] = (0.02, 0.04, 0.1, 0.3, 1.0)
+LS_LAST_LAGS_MS: Tuple[float, ...] = (0.02, 0.04, 0.1, 0.3, 1.0, 10.0)
 
 
 def _lag_label(prefix: str, lag_ms: float) -> str:
@@ -48,8 +49,8 @@ STAT_LABELS: Tuple[str, ...] = (
     + ("ls_first_sd",)
     + ("ls_last_sd",) + tuple(_lag_label("ls_last", l) for l in LS_LAST_LAGS_MS))
 STAT_BLOCK: Tuple[str, ...] = tuple("ss" if lab.startswith("ss") else "ls" for lab in STAT_LABELS)
-N_SS_STATS = 1 + len(SS_LAGS_MS)          # 5
-N_LS_STATS = len(STAT_LABELS) - N_SS_STATS  # 10
+N_SS_STATS = 1 + len(SS_LAGS_MS)          # 7
+N_LS_STATS = len(STAT_LABELS) - N_SS_STATS  # 14
 
 
 def lags_in_samples(lags_ms: Sequence[float], fs: float) -> np.ndarray:
