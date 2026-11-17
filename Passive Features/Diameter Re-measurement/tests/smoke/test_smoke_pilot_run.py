@@ -769,8 +769,10 @@ def _run(args, cwd):
     return r.stdout
 
 
-def _pipeline(out):
-    """The three commands with --synthetic into out; their printed output."""
+def _pipeline(out, no_own=False):
+    """The three commands with --synthetic into out; their printed output. no_own: clean and real run with
+    --no-own (Block 36, amendment 11)."""
+    extra = ["--no-own"] if no_own else []
     os.makedirs(out, exist_ok=True)
     cfgj = os.path.join(out, "fast_config.json")
     with open(cfgj, "w") as f:
@@ -782,11 +784,11 @@ def _pipeline(out):
     ex = os.path.join(out, "examples_7.json")
     h0 = hashlib.sha256(open(ex, "rb").read()).hexdigest()
     o2 = _run([sc, "clean", "--synthetic", "--specimen", "7", "--examples", ex, "--out", out, "--rounds", "1",
-               "--config-json", cfgj], WS)
+               "--config-json", cfgj] + extra, WS)
     h1 = hashlib.sha256(open(ex, "rb").read()).hexdigest()
     assert h0 == h1, "clean changed its input"
     o3 = _run([inf, "real", "--synthetic", "--specimen", "7", "--cleaning-dir", out, "--out",
-               os.path.join(out, "inf")], WS)
+               os.path.join(out, "inf")] + extra, WS)
     return o1, o2, o3
 
 
@@ -836,6 +838,82 @@ def test_contract():
         print("    node %s: Allen %.3f, pilot %.3f, refined %.3f, fitted %.4f um (rendered 0.8 um), %s"
               % (r["node_id"], float(r["d_allen_um"]), float(r["d_pilot_um"]), float(r["d_refined_um"]),
                  float(r["d_hat_um"]), r["status"]))
+
+
+def test_own_product():
+    # Block 36, amendment 11 (D-156.2): the same-node clearance as a product of both entry points.
+    # (1) every work-list node carries an `own` record; (2) for the example nodes the files exist and
+    # own_s_in + own_s_out equals one minus the node's forward model at the estimate; tolerance 1e-9: the split
+    # and line_profiles share the slab loop (Block 35 amendment 2 promises 1e-12) and the NPZ stores float64;
+    # (3) cleared = profile + B s_out and the layers sum to the whole, 1e-9 (the same sums, reordered);
+    # (4) the features and the fits are bit-identical to a run with --no-own, which writes no own output.
+    import types as _types
+    import infer_nodes
+    a, _b, _outs = _e2e()
+    cfg = fast_cfg()
+    rec = json.load(open(os.path.join(a, "cleaning_7.json")))
+    inf = json.load(open(os.path.join(a, "inf", "inference_7.json")))
+    allowed = ("ok", "extrusion_invalid", "not_refined")
+    for nid_s, node in rec["nodes"].items():
+        assert "own" in node, nid_s
+        assert node["own"]["status"] in allowed, (nid_s, node["own"])
+        assert abs(node["own"]["band_half_um"] - cfg.cleaning.own_band_half_um) < 1e-12
+        if node["own"]["status"] == "ok":
+            for key in ("chord_um", "in_peak_gl", "out_peak_gl", "in_share", "residual_rms_gl"):
+                assert len(node["own"][key]) == len(node["own"]["chord_um"]) > 0, key
+    n_checked, worst = 0, 0.0
+    for nid in rec["example_ids"]:
+        info = rec["nodes"][str(nid)]
+        fit = inf["nodes"][str(nid)]
+        assert fit["own"]["status"] in allowed, fit["own"]
+        if info["own"]["status"] == "ok":
+            z = np.load(os.path.join(a, "cleaning_7_node%d.npz" % nid))
+            for key in ("own_s_in", "own_s_out", "own_cleared", "own_model_in", "own_layers_gl", "own_layer_z"):
+                assert key in z.files, key
+            check_close("cleaning: cleared = profile + B s_out", z["own_cleared"],
+                        z["profiles_after"] + z["B_gl"][:, None] * z["own_s_out"], rtol=0, atol=1e-9)
+            check_close("cleaning: layers sum to the whole", z["own_layers_gl"].sum(axis=0),
+                        z["B_gl"][:, None] * (z["own_s_in"] + z["own_s_out"]), rtol=0, atol=1e-9)
+            assert np.all(np.diff(z["own_layer_z"]) > 0)
+            for name in ("own_node%d.png" % nid, "own_node%d_round1.png" % nid, "own_layers_node%d.png" % nid):
+                assert os.path.getsize(os.path.join(a, name)) > 0, name
+        if fit["own"]["status"] != "ok":
+            continue
+        o = np.load(os.path.join(a, "inf", "own_7_node%d.npz" % nid))
+        with np.load(os.path.join(a, "cleaning_7_node%d.npz" % nid)) as zc:
+            node = infer_nodes.node_from_npz(nid, zc, None)
+        pil = info["pilot"]
+        pilot = _types.SimpleNamespace(cx_um=float(pil["cx_um"]), cy_um=float(pil["cy_um"]),
+                                       theta_rad=float(pil["theta_rad"]), phi_rad=float(pil["phi_rad"]))
+        forward = NI.forward_factory(pilot, tuple(float(x) for x in info["U_axis_um"]), node, cfg, None)
+        whole = 1.0 - forward(*[float(x) for x in o["theta"]])
+        dev = float(np.max(np.abs(o["own_s_in"] + o["own_s_out"] - whole)))
+        worst = max(worst, dev)
+        check_close("inference: s_in + s_out = 1 - forward at the estimate", o["own_s_in"] + o["own_s_out"], whole,
+                    rtol=0, atol=1e-9)
+        check_close("inference: cleared = profile + B s_out", o["own_cleared"],
+                    o["profiles"] + o["B_gl"][:, None] * o["own_s_out"], rtol=0, atol=1e-9)
+        assert os.path.getsize(os.path.join(a, "inf", "own_node%d.png" % nid)) > 0
+        chord = np.asarray(fit["own"]["chord_um"], dtype=float)
+        assert chord.shape == (len(node.ks),) and np.all(chord >= 0) and chord.max() <= float(o["theta"][0]) + 1e-12
+        n_checked += 1
+        print("    node %d: |s_in + s_out - (1 - forward)| max %.2e; chord %.3f..%.3f um for d %.3f um; in-band peak "
+              "%.2f..%.2f gl" % (nid, dev, chord.min(), chord.max(), float(o["theta"][0]),
+                                 min(fit["own"]["in_peak_gl"]), max(fit["own"]["in_peak_gl"])))
+    assert n_checked >= 1, "no example node had the product computed after its fit"
+    c = os.path.join(os.path.dirname(a), "c")
+    _pipeline(c, no_own=True)
+    assert open(os.path.join(a, "features_7.csv"), "rb").read() == open(os.path.join(c, "features_7.csv"), "rb").read()
+    strip = lambda s: "\n".join(",".join(r.split(",")[:-1]) for r in s.splitlines())   # noqa: E731  (the seconds)
+    assert strip(open(os.path.join(a, "inf", "inference_7.csv")).read()) == \
+        strip(open(os.path.join(c, "inf", "inference_7.csv")).read()), "the fits changed with the product"
+    rec_c = json.load(open(os.path.join(c, "cleaning_7.json")))
+    assert all("own" not in v for v in rec_c["nodes"].values())
+    for nid_s in rec["nodes"]:
+        assert rec["nodes"][nid_s]["refine"] == rec_c["nodes"][nid_s]["refine"], nid_s
+    assert not [f for f in os.listdir(c) + os.listdir(os.path.join(c, "inf")) if f.startswith("own_")]
+    print("    %d example node(s) checked; worst identity deviation %.2e; --no-own: features and fits identical"
+          % (n_checked, worst))
 
 
 def test_determinism():

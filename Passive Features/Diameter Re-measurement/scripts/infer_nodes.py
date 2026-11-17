@@ -46,7 +46,7 @@ from allen_diameter.config import config_from_dict  # noqa: E402
 from allen_diameter.loading import features_io  # noqa: E402
 from allen_diameter.model import line_fast  # noqa: E402
 from build_table import load_config  # noqa: E402
-from clean_cell import Log, write_csv, write_json  # noqa: E402
+from clean_cell import Log, own_arrays, own_figures, own_record, write_csv, write_json  # noqa: E402
 
 DPI = 110
 FLAG_TIER2 = "tier2_unmodelled"
@@ -166,6 +166,27 @@ def run_real(a, log):
             % (nid, th[0], se[0], row["d_allen_um"], row["d_pilot_um"], row["d_refined_um"], th[1], th[2], th[3],
                len(used), row["chi2_mean"], fit.status, (" [" + row["flags"] + "]") if row["flags"] else "",
                fit.nfev, row["seconds"]))
+        if not a.no_own:                                   # the same-node clearance (amendment 11, D-156.2)
+            if fit.status == "failed" or not np.all(np.isfinite(th)):
+                per_node[str(nid)]["own"] = own_record("not_refined", cfg)
+            else:
+                try:
+                    half = tuple(float(x) for x in info["U_axis_um"])
+                    th_own = (float(th[0]), float(th[1]), float(th[2]), float(th[3]) - float(node.node_xyz[2]))
+                    st, split, clr, v_axis = node_inputs.own_product(node, pilot, half, th_own, prof, node.B_gl, cfg,
+                                                                     cache, layers=True)
+                    per_node[str(nid)]["own"] = own_record(st, cfg, clr)
+                    if st == node_inputs.OWN_OK:
+                        np.savez(os.path.join(a.out, "own_%s_node%d.npz" % (a.specimen, nid)), ks=node.ks, v=node.v,
+                                 planes_z=node.planes_z, B_gl=node.B_gl, profiles=prof, theta=th,
+                                 **own_arrays(split, clr))
+                        k_star = int(node.ks[len(node.ks) // 2])
+                        own_figures(a.out, nid, node, prof, node.B_gl, split, clr, v_axis,
+                                    dict(node_id=nid, d_um=float(th[0]), mu_per_um=float(th[1]),
+                                         **({"class": row["class"]} if row["class"] else {})), k_star, cfg, DPI)
+                except Exception as exc:                   # the product never stops the fits
+                    per_node[str(nid)]["own"] = own_record("error", cfg, detail="%s: %s" % (type(exc).__name__, exc))
+                    log("node %d: no same-node clearance (%s: %s)" % (nid, type(exc).__name__, exc))
         if fit.status != "failed" and np.all(np.isfinite(th)):
             try:
                 model = node.B_gl[:, None] * forward(*th)
@@ -208,6 +229,8 @@ def main(argv=None):
     r.add_argument("--starts", default="", help="comma-separated d0 factors, replacing inference.multistart_factors")
     r.add_argument("--config-json", default="", help="a configuration JSON; default: the cleaning run's")
     r.add_argument("--synthetic", action="store_true", help="accepted for symmetry: this step reads only files")
+    r.add_argument("--no-own", action="store_true", help="skip the same-node clearance product (Block 36, "
+                   "amendment 11)")
     a = ap.parse_args(argv)
     log = Log()
     log("infer_nodes.py real, specimen %s%s" % (a.specimen, " (synthetic)" if a.synthetic else ""))

@@ -610,8 +610,8 @@ comparison, and made the clearance a product of the joint fit's estimate [KB: de
 computes for each node the split at the estimate, the cleared profile (11), the in-band model, the residual, the
 chord (14) per plane, and, for the example nodes, the shadow of each depth layer of thickness $h$ = 0.1 um
 ($L_{m,k}(v_n)$, layers centred at $z_{\rm ax} + m h$; the user's "sub-planes", D-151.2) and a figure
-[CODE: specs/SPEC.md Blocks 35 amendment 2, 37, 38; Block 36 amendment 11] [Certain] for the specification; the
-implementation was in progress when this was written. If the model holds for a node, its cleared profiles show,
+[CODE: specs/SPEC.md Blocks 35 amendment 2, 37, 38; Block 36 amendment 11] [Certain] for the specification; when
+this was written Blocks 37 and 38 were implemented and tested and the split of Block 35 was being implemented. If the model holds for a node, its cleared profiles show,
 plane by plane, a section as wide as the chord of the fitted tube, vanishing on the planes that miss it; where
 they do not, the model fails on that node. By (13) this is the joint fit's residual shown where its meaning is
 geometric. It is the route's answer to the open question of §3.5, as a diagnostic: it can show that the model
@@ -706,3 +706,7 @@ seed.
   `scripts/check02_plane_range_se.py` (output `scripts/check02_plane_range_se.out`); parameters: as check 1 with
   slope 0.79, planes $\pm 4$, $\pm 6$, $\pm 8$, white noise 1 gl, central differences with steps 0.02 um, 2 % of
   $\mu$, 0.02 um, 0.02 um; no seed; result: the numbers quoted in §3.5.
+- Check 3 (§3.6, eq. (14), the chord): `tests/smoke/test_smoke_own_clearance.py` in the workstream (Block 37's
+  smoke test, run after the block's merge); parameters: $d$ = 0.5 and 2.44 um, tilt 0, 30, 60 degrees, nine depths
+  each, the reference on a grid of 1e-4 um; seed 20261117 (used only for the test's random identity cases);
+  result: largest deviation 1.0e-4 um against a bound of 2e-4 um.

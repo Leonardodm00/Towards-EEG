@@ -143,6 +143,49 @@ def write_csv(path, rows, columns):
     return path
 
 
+def own_record(status, cfg, clr=None, detail=""):
+    """A node's `own` entry of the JSON (Block 36, amendment 11): the same-node clearance's status, the band
+    and, when it was computed, the per-plane chord, peaks, in-band share and residual RMS (D-156.2)."""
+    rec = dict(status=str(status), band_half_um=float(cfg.cleaning.own_band_half_um))
+    if detail:
+        rec["detail"] = str(detail)
+    if clr is not None:
+        rec.update(chord_um=clr.chord_um, in_peak_gl=clr.in_peak_gl, out_peak_gl=clr.out_peak_gl,
+                   in_share=clr.in_share, residual_rms_gl=clr.residual_rms_gl)
+    return rec
+
+
+def own_arrays(split, clr):
+    """The example node's own_* arrays for its NPZ (amendment 11); the layers' arrays are empty without layers."""
+    out = dict(own_s_in=split.s_in, own_s_out=split.s_out, own_cleared=clr.cleared_gl, own_model_in=clr.model_in_gl,
+               own_chord_um=clr.chord_um)
+    has = clr.layers_gl is not None and split.layer_z is not None
+    out["own_layers_gl"] = np.asarray(clr.layers_gl) if has else np.zeros((0,) + split.s_in.shape)
+    out["own_layer_z"] = np.asarray(split.layer_z, dtype=float) if has else np.zeros(0)
+    return out
+
+
+def own_figures(out_dir, nid, node, profiles_gl, B_gl, split, clr, v_axis_um, meta, k_star, cfg, dpi, round_index=None):
+    """own_node<id>.png (and own_node<id>_round<t>.png with round_index), own_layers_node<id>.png at the plane
+    k_star when the split carries layers (Block 38); -> the list of files written."""
+    import matplotlib.pyplot as plt
+    from allen_diameter.plotting import own_clearance_figures as OF
+    band = float(cfg.cleaning.own_band_half_um)
+    meta = dict(meta, band_half_um=band)
+    ks = [int(k) for k in node.ks]
+    planes = [k for k in (k_star - 2, k_star, k_star + 2) if k in ks] or None
+    fig = OF.figure_own(node.v, node.ks, profiles_gl, B_gl, clr, meta, planes=planes, v0_um=float(v_axis_um))
+    files = [OF.save(fig, os.path.join(out_dir, "own_node%d.png" % nid), dpi)]
+    if round_index is not None:
+        files.append(OF.save(fig, os.path.join(out_dir, "own_node%d_round%d.png" % (nid, int(round_index))), dpi))
+    plt.close(fig)
+    if clr.layers_gl is not None and split.layer_z is not None and len(split.layer_z) > 0 and k_star in ks:
+        fig = OF.figure_layers(node.v, split.layer_z, clr.layers_gl, node.ks, int(k_star), node.planes_z, band, meta)
+        files.append(OF.save(fig, os.path.join(out_dir, "own_layers_node%d.png" % nid), dpi))
+        plt.close(fig)
+    return files
+
+
 def config_sections(cfg):
     """The configuration's cleaning and inference sections (D-136.5) and the full signature."""
     return dict(cleaning=dataclasses.asdict(cfg.cleaning), inference=dataclasses.asdict(cfg.inference),
@@ -641,6 +684,7 @@ def run_clean(a, cfg, log):
 
     clock = NodeClock(len(nodes), log)
     cache = line_fast.SectionCache()
+    own_on = not getattr(a, "no_own", False)             # the same-node clearance product (amendment 11)
     factory = node_inputs.predict_factory(pilots, halfs, cfg, cache)
 
     def timed_factory(node):
@@ -675,6 +719,7 @@ def run_clean(a, cfg, log):
         feats = res.features
         t_now = len(res.history)
         pos = feats.index_of()
+        own = {}
         feat_path = os.path.join(a.out, "features_%s.csv" % a.specimen)
         features_io.write_features(feat_path, feats)
         per_node = {}
@@ -691,6 +736,24 @@ def run_clean(a, cfg, log):
             rec["B_gl_last"] = np.asarray(res.B_gl.get(nid, n.B_gl))
             if model_bg:                                   # the backgrounds per round (amendment 4)
                 rec["background_rounds"] = [dict(round=r + 1, **h) for r, h in enumerate(bg_fn.history.get(nid, []))]
+            if own_on:                                     # the same-node clearance (amendment 11, D-156.2)
+                own[nid] = None
+                if str(feats.source[k]) != "refined" or fit.get("status") == "failed":
+                    rec["own"] = own_record("not_refined", cfg)
+                else:
+                    try:
+                        off = np.asarray(feats.offset_um[k], dtype=float)
+                        th = (float(feats.d_um[k]), float(feats.mu_per_um[k]),
+                              float(off[0] * n.y_hat[0] + off[1] * n.y_hat[1]), float(off[2]))
+                        B_now = np.asarray(res.B_gl.get(nid, n.B_gl), dtype=float)
+                        st, split, clr, v_axis = node_inputs.own_product(
+                            n, pilots[nid], halfs[nid], th, res.profiles_after[nid], B_now, cfg, cache,
+                            layers=nid in kept_examples)
+                        rec["own"] = own_record(st, cfg, clr)
+                        if st == node_inputs.OWN_OK:
+                            own[nid] = (split, clr, v_axis, B_now)
+                    except Exception as exc:               # the product never stops the rounds
+                        rec["own"] = own_record("error", cfg, detail="%s: %s" % (type(exc).__name__, exc))
             per_node[str(nid)] = rec
         write_json(json_path, dict(base, history=res.history, stopped=res.stopped, rounds=res.rounds, sigma_gl=sigma,
                                    nodes=per_node,
@@ -716,7 +779,8 @@ def run_clean(a, cfg, log):
                      rounds_saved=np.asarray(t_saved, dtype=np.int64),
                      origin_xy=n.origin_xy, y_hat=n.y_hat, e_u=n.e_u, n_avg=n.n_avg, step=n.step, line_xy=line_xy,
                      left=n.left, top=n.top, res0_um=res0, planes_z=n.planes_z, node_xyz=n.node_xyz,
-                     own_ids=np.asarray(n.own_ids, dtype=np.int64))
+                     own_ids=np.asarray(n.own_ids, dtype=np.int64),
+                     **(own_arrays(own[nid][0], own[nid][1]) if own.get(nid) else {}))
             k_star = int(pilots[nid].k_star)
             planes = [k for k in (k_star - 2, k_star, k_star + 2) if k in set(int(x) for x in n.ks)]
             meta = dict(node_id=nid, round=res.rounds, features=dict(d_um=float(feats.d_um[pos[nid]]),
@@ -737,6 +801,18 @@ def run_clean(a, cfg, log):
                 png = "%s, %s" % (png, png_l)
             except Exception as exc:
                 png = "no figure (%s: %s)" % (type(exc).__name__, exc)
+            if own.get(nid):
+                try:
+                    split, clr, v_axis, B_now = own[nid]
+                    own_meta = dict(node_id=nid, round=t_now, d_um=float(feats.d_um[pos[nid]]),
+                                    mu_per_um=float(feats.mu_per_um[pos[nid]]))
+                    if nid in classes:
+                        own_meta["class"] = classes[nid]
+                    files = own_figures(a.out, nid, n, res.profiles_after[nid], B_now, split, clr, v_axis,
+                                        own_meta, k_star, cfg, DPI, round_index=t_now)
+                    png = "%s, %s" % (png, ", ".join(files))
+                except Exception as exc:
+                    png = "%s, no own figure (%s: %s)" % (png, type(exc).__name__, exc)
             log("example node %d: %s, %s" % (nid, npz, png))
         fig = CF.figure_rounds(res.history, cfg)
         png = CF.save(fig, os.path.join(a.out, "cleaning_rounds.png"), DPI)
@@ -824,6 +900,8 @@ def main(argv=None):
     c.add_argument("--rounds", type=int, default=None, help="cleaning.max_rounds")
     c.add_argument("--work-peak-gl", type=float, default=None, help="cleaning.work_peak_min_gl")
     c.add_argument("--max-work", type=int, default=None, help="cleaning.work_max_nodes")
+    c.add_argument("--no-own", action="store_true", help="skip the same-node clearance product (Block 36, "
+                   "amendment 11); the features and the fits are the same either way")
     a = ap.parse_args(argv)
     log = Log()
     cfg = load_config(a.config_json)

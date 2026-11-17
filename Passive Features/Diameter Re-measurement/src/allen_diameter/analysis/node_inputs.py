@@ -47,7 +47,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from . import calibration, calibration_scene, cell, cleaning, profiles
+from . import calibration, calibration_scene, cell, cleaning, own_clearance, profiles
 from .clean_iteration import NodeData
 from .node_pipeline import Branch
 from ..model import geometry, line_fast, shadow
@@ -546,6 +546,59 @@ def forward_factory(pilot, half_length, node, cfg, cache):
 
 
 # ------------------------------------------------------------ work list ---
+
+def own_split_factory(pilots, half_lengths, cfg, cache):
+    """-> callable(node, layers=False) -> split(d, mu, v0, dz) -> line_fast.OwnSplit or None (amendment 11,
+    D-156): the node's own shadow split by depth (SPEC Block 35, amendment 2) for
+    local_tube(pilot, node.node_xyz, d, v0, dz, U_minus, U_plus) on the node's planes and line, at
+    inference.line_fine_factor, band cleaning.own_band_half_um; with layers the depth layers of thickness
+    cleaning.own_layer_um, centred on the axis depth node.node_xyz[2] + dz. None on an ExtrusionInvalid.
+    pilots, half_lengths, cache as predict_factory's."""
+    band = float(cfg.cleaning.own_band_half_um)
+    layer = float(cfg.cleaning.own_layer_um)
+
+    def factory(node, layers=False):
+        nid = int(node.node_id)
+        pilot = pilots[nid]
+        Um, Up = (float(x) for x in half_lengths[nid])
+        trace = np.asarray(node.node_xyz, dtype=float)
+        args = _line_args(node)
+
+        def split(d, mu, v0, dz):
+            try:
+                return line_fast.line_shadow_split(
+                    local_tube(pilot, trace, d, v0, dz, Um, Up), mu, *args, cfg, band, cache=cache,
+                    layer_um=layer if layers else None,
+                    layer_origin_um=(float(trace[2]) + float(dz)) if layers else None)
+            except line_fast.ExtrusionInvalid:
+                return None
+        return split
+    return factory
+
+
+OWN_OK, OWN_EXTRUSION = "ok", "extrusion_invalid"
+
+
+def own_product(node, pilot, half_length, theta, profiles_gl, B_gl, cfg, cache, layers=False):
+    """-> (status, split, clearance, v_axis_um): the same-node clearance of one node at an estimate (amendment
+    11, D-156.2). theta = (d, mu, v0, dz): diameter um, coefficient 1/um, lateral shift um and depth shift um
+    about the trace (z_ax = node.node_xyz[2] + dz); profiles_gl (n_planes, n_v) the profiles the fit read (after
+    the neighbours' cleaning), B_gl (n_planes,) their backgrounds. status OWN_OK with split a
+    line_fast.OwnSplit, clearance an own_clearance.OwnClearance (chord at the pilot's tilt), and v_axis_um the
+    axis' offset on the measuring line, v0 - trace_offset (the line's origin is the pilot's centre); status
+    OWN_EXTRUSION with (None, None, v_axis_um) when the tube's cap is too near the line (D-138.2). Changes
+    nothing; raises what the split or the clearance raise."""
+    d, mu, v0, dz = (float(x) for x in theta)
+    nid = int(node.node_id)
+    trace = np.asarray(node.node_xyz, dtype=float)
+    v_axis = v0 - trace_offset(pilot, trace)
+    split = own_split_factory({nid: pilot}, {nid: half_length}, cfg, cache)(node, layers=layers)(d, mu, v0, dz)
+    if split is None:
+        return OWN_EXTRUSION, None, None, v_axis
+    clr = own_clearance.clear_profiles(profiles_gl, B_gl, split.s_in, split.s_out, node.planes_z, d,
+                                       float(trace[2]) + dz, phi_rad=float(pilot.phi_rad), layers=split.layers)
+    return OWN_OK, split, clr, v_axis
+
 
 def _stretch_rows_by_id(swc, cfg):
     """node id -> (rows of its dendrite stretch, its index in them) over cell.stretches with the

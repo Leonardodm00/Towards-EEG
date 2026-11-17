@@ -241,6 +241,12 @@ display(rank.sort_values("worst1_range_gl", ascending=False)[cols].head(15))
 # back), `cleaning_node<id>_round1.png` and `cleaning_node<id>_round2.png` (before and after on one grey scale,
 # the predicted shadow on its own, D-150.1). Output to send back: the log (the `work list:` lines above all) and
 # the figures.
+#
+# Same-node clearance (D-156; SPEC Blocks 35 amendment 2, 37, 38): after each round the node's own shadow at the
+# round's estimate is split by depth. `own_node<id>.png`: per plane the cleaned profile, the cleared profile (the
+# out-of-band part of the own shadow added back), the in-band model and the whole model, and the fitted tube's
+# chord as a bar; `own_layers_node<id>.png`: the shadow of each 0.1 um depth layer at the plane k*. It is a
+# product: the features and the fits are the same with `--no-own`. Per node, `cleaning_<S>.json` carries `own`.
 
 # %%
 WORST_IDS = None                                       # None: Cell 16b's examples; or a list of node ids
@@ -261,7 +267,8 @@ run("scripts/clean_cell.py", "clean", "--specimen", SPECIMEN, "--out", CLEAN_W, 
     *CLEAN_CFG, "--examples", EXAMPLES_W, "--B", B_GL, "--mu", MU, "--rounds", ROUNDS_W, "--max-work", MAX_WORK_W,
     "--work-peak-gl", WORK_PEAK_GL_W)
 for nid in ids_w:
-    for name in ("cleaning_line_node%d.png", "cleaning_node%d_round1.png", "cleaning_node%d_round2.png"):
+    for name in ("cleaning_line_node%d.png", "cleaning_node%d_round1.png", "cleaning_node%d_round2.png",
+                 "own_node%d.png", "own_layers_node%d.png"):          # the last two: the same-node clearance (D-156)
         path = CLEAN_W + "/" + name % nid
         if os.path.exists(path):
             print(path)
@@ -271,6 +278,7 @@ for nid in ids_w:
 # ## Cell 18b (optional): the per-node fit on Cell 17b's cleaned lines (no download; about 1 h for the four examples)
 #
 # Outputs in OUT/inference_tier1 (OUT/inference_worst untouched). Output to send back: the line per node, the table, `chi2.png` and the `fit_node<id>.png` figures.
+# After each fit the same-node clearance at the fitted parameters: `own_node<id>.png`, `own_layers_node<id>.png`, `own_<S>_node<id>.npz` (D-156).
 
 # %%
 INFER_W = OUT + "/inference_tier1"
@@ -280,7 +288,8 @@ run("scripts/infer_nodes.py", "real", "--specimen", SPECIMEN, "--cleaning-dir", 
 import glob
 res_w = pd.read_csv("%s/inference_%d.csv" % (INFER_W, SPECIMEN))
 display(res_w)
-for path in [INFER_W + "/diameters.png", INFER_W + "/chi2.png"] + sorted(glob.glob(INFER_W + "/fit_node*.png")):
+for path in ([INFER_W + "/diameters.png", INFER_W + "/chi2.png"] + sorted(glob.glob(INFER_W + "/fit_node*.png"))
+             + sorted(glob.glob(INFER_W + "/own_node*.png")) + sorted(glob.glob(INFER_W + "/own_layers_node*.png"))):
     if os.path.exists(path):
         print(path)
         display(Image(filename=path))
