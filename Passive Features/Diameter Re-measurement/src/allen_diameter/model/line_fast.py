@@ -59,6 +59,7 @@ Pure ASCII, for the cluster (hpc-python-compat).
 """
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import math
 from collections import OrderedDict
@@ -385,3 +386,39 @@ def _profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorpti
     for k in range(n_planes):
         out[k] = 1.0 - sample_profile(deficit[k], frame, o, yh, eu, v, n_avg, step)
     return out
+
+
+# ------------------------------------- the own shadow split by depth (amendment 2) ---
+
+@dataclasses.dataclass(frozen=True)
+class OwnSplit:
+    """The own shadow 1 - tau of line_profiles split by depth (SPEC Block 35, amendment 2; D-151, D-156).
+
+    s_in, s_out   (n_planes, n_v) float64, dimensionless, rows in the order of ks: the parts of plane k's
+                  deficit from the slabs inside / outside the band |zeta - z_k| <= band_half_um, a slab's
+                  share being the fraction of its thickness inside the band; s_in + s_out = 1 - tau
+    layers        (n_layers, n_planes, n_v) float64, dimensionless, or None: the deficit of each depth layer
+                  of thickness layer_um (their sum over layers = 1 - tau)
+    layer_z       (n_layers,) um, the layers' centres layer_origin + m layer_um, increasing; or None
+    band_half_um  float, um
+    layer_um      float, um, or None
+    """
+
+    s_in: np.ndarray
+    s_out: np.ndarray
+    layers: object
+    layer_z: object
+    band_half_um: float
+    layer_um: object
+
+
+def line_shadow_split(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, band_half_um, absorption=None,
+                      cache=None, layer_um=None, layer_origin_um=None):
+    """-> OwnSplit: line_profiles' deficit 1 - tau_k(v_n) split by depth (SPEC Block 35, amendment 2).
+
+    Arguments as line_profiles, plus band_half_um (um, >= 0): the half-thickness beta of plane k's band;
+    layer_um (um, > 0, or None): the thickness h of the depth layers to return; layer_origin_um (um, or
+    None: tube.c[2]): the depth z_0 the layers are centred on (centres z_0 + m h). Validity and errors as
+    line_profiles (ExtrusionInvalid first); mu = 0 or no planes gives zeros; ValueError for band_half_um < 0
+    or not finite, layer_um <= 0 or not finite, layer_origin_um not finite."""
+    raise NotImplementedError("SPEC Block 35, amendment 2")

@@ -405,6 +405,8 @@ class CleaningConfig:
     refine_line_fine_factor: int = 4       # source: PROVISIONAL (D-148.2): the coarse fit's predictor samples p / this (the fine fit keeps inference.line_fine_factor)
     stop_rel_d: float = 0.01               # source: D-130.O6 [user]: every diameter changes by less than 1 %
     plane_half_range: int = 4              # source: PROVISIONAL (Block 36): the planes k* +- this many are fetched, cleaned and offered to the fits (D-130.O5)
+    own_band_half_um: float = 0.14         # source: D-156.4 (the assistant's default, not objected to; PROVISIONAL): half-thickness (um) of a plane's band in the same-node clearance (Block 35, amendment 2), acquisition.dz_um / 2
+    own_layer_um: float = 0.1              # source: D-151.2 [user: "0.1 um or less"], D-156.4: thickness (um) of the depth layers whose shadows are kept for the example nodes (Block 35, amendment 2)
     work_max_nodes: int = 60               # source: PROVISIONAL (Block 36): at most this many nodes are refined in the pilot run
     work_peak_min_gl: float = 1.0          # source: D-149.3 [orchestrator] (was 3.0, PROVISIONAL, Block 36): a neighbour's nodes join the work list when its predicted peak on an example's measuring line (work_rank "line") or patch ("patch") times B reaches this (gl); 1 gl = about the profile's noise SD on the pilot
     work_rank: str = "line"                # source: D-149.2 [orchestrator] (Block 36, amendment 9): the neighbours' nodes are ranked by their predicted peak on the example's measuring line, "line" (the pixels the line reads), or on its whole patch, "patch" (amendment 1's rule, the labelled alternative)
@@ -732,6 +734,8 @@ def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None
           and c.tier_reach_um > 0 and c.over_background_gl >= 0
           and c.max_rounds >= 1 and 0 < c.stop_rel_d < 1 and c.refine_max_nfev >= 1
           and c.plane_half_range >= 0 and c.work_max_nodes >= 1 and c.work_peak_min_gl >= 0
+          and math.isfinite(c.own_band_half_um) and c.own_band_half_um >= 0
+          and math.isfinite(c.own_layer_um) and c.own_layer_um > 0
           and 0 < c.background_shadow_max < 1
           and c.shadow_ray_n_rho >= 1 and c.shadow_ray_n_psi >= 1
           and len(c.example_counts) == 5 and all(int(n) == n and n >= 0 for n in c.example_counts)

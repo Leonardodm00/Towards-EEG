@@ -4,6 +4,7 @@
 |---|---|
 | 2026-11-17 | Created at the user's request (D-151) for the chat that builds the same-node clearance. Branch `sci/diameter-pipeline` at `021869d` (code) and the commit that adds this file; decision log on `main` at `2cd9f89` (D-151). Nothing of the clearance is specified, built or computed. |
 | 2026-11-17 (later) | The clearance chat (14:14 onward): section 12 added -- first numbers of the split $S = S^{\rm in} + S^{\rm out}$ and of the iteration's gain, from `checks/own_shadow_clearance_check.py` (output beside it) **[run, sandbox of the clearance chat]**; section 11's first item marked corrected. No decision, no SPEC entry, no pipeline code. |
+| 2026-11-17 (later, 2) | The clearance chat, 17:05: **D-156** [user] -- the joint fit of all planes with the whole own shadow stays the estimator, the clearance becomes a product computed from its estimate every round, clear-then-fit is dropped without a comparison. Section 13 added; it supersedes section 6's correction "before the profile fit" and closes section 7's points (a) to (e). SPEC: Block 35 amendment 2, Blocks 37, 38, Block 36 amendment 11 (drafted, the contract commit that carries this row). The decision's ID is D-156 (written as D-155 until the push: the noise-fit chat took D-155 meanwhile). 17:20: the user approved the block plan and recalled that the fit comes after the neighbours' cleaning (D-156.6). |
 
 Basis tags: **[src]** read in the named file at `021869d`; **[data]** read in the files the user uploaded on
 2026-11-17 at 12:40 (the Colab run of Cell 17b: `cleaning_529878215.json`, `examples_worst_529878215.json`, the
@@ -340,3 +341,23 @@ the cleared planes show the model's in-band section plus the misfit the full mod
 
 Not covered: tilted tubes, the caps (section 7 (g)), the refinement's weights $w_n$, real profiles, a second band,
 the noise's correlation along the line, any timing.
+
+## 13. Decided on 2026-11-17, 17:05 (D-156) -- what is built
+
+Section 6's correction acting before the fit, and its iteration, are superseded [corrected 2026-11-17 (later, 2)]:
+
+| Point of section 7 | Outcome | Basis |
+|---|---|---|
+| (c) which fit, which model | no fit reads a cleared profile; Blocks 29 and 30 stay the estimator (joint least squares over the node's planes with the whole own shadow); clear-then-fit is not built, not even as a comparison | D-156.1, D-156.3 [user] |
+| what the clearance is | a product computed from the estimate after the fit, every round of the cleaning and after each per-node fit: the split $S^{\rm in}_k$, $S^{\rm out}_k$, the cleared profile $I_k + B_k S^{\rm out}_k$, the chord per plane, figures | D-156.2 [user] |
+| (a) the band | $\beta$ = 0.14 um, `CleaningConfig.own_band_half_um` | D-156.4 (the assistant's default, not objected to) |
+| (b) the sub-planes | the split is computed on the renderer's slabs (0.02 um), a slab's share in a band being the fraction of its thickness inside; depth layers of `CleaningConfig.own_layer_um` (0.1 um) are kept for the example nodes only | D-156.4, D-156.5 [orchestrator] |
+| (d) the iteration | none of its own: the product is recomputed from each round's estimate | D-156.2 |
+| (e) images or line | the measuring line; cleared patch images not built | D-156.4 |
+| (f) the far field | the kernel is read from the configuration; pilot runs at 0.79, with 0.397 as a labelled sensitivity run | D-156.4 |
+| (g) the caps | `ExtrusionInvalid`: the node's product is flagged `extrusion_invalid`, nothing stops | SPEC Block 36, amendment 11 |
+
+Blocks (SPEC, drafted 2026-11-17): Block 35 amendment 2 (`line_fast.line_shadow_split`, `OwnSplit`), Block 37
+(`analysis/own_clearance.py`), Block 38 (`plotting/own_clearance_figures.py`), Block 36 amendment 11 (the
+configuration, `node_inputs.own_split_factory`, the two entry points, the pilot-run test). Still open: whether the
+pilot's fitted diameters are right -- the product is the check of the model on those nodes.
