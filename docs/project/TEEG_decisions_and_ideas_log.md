@@ -199,6 +199,7 @@ the "Binds" column.
 | 2026-11-17 (later, 6) | Logs **D-152** (user, 14:19; the noise-fit chat): the noise law is extended to three components -- a white Gaussian fast part, a middle part with a time scale in [0.04 ms, 1 ms], the slow part in [1 ms, 10 s]; five parameters. After the test of row (later, 5). Open, explained to the user and not yet answered: which middle-part parameters Block 9 fits per sweep, and the statistic set. Supersedes D-017.1's form of the law; SPEC 2.1 and Blocks 2, 4, 9 not yet changed. Next free IDs: D-153, I-006. |
 | 2026-11-17 (later, 7) | Logs **D-153** (user, 14:25; the noise-fit chat), D-152's two open points: in the per-sweep stage the middle part's size is fitted per sweep and its time scale held at the cell's; the statistic set gains the autocorrelation at 0.04 ms and 0.3 ms. D-152 annotated. Next free IDs: D-154, I-006. |
 | 2026-11-17 (later, 8) | Logs **D-154** (user, 14:59; the noise-fit chat): the implementation plan of the three-component law approved ("I approve everything go on") with its three readings -- the two lags added in all three autocorrelation windows (d = 21); the middle size shrunk per protocol like the slow one; a per-sweep fit with sigma_f under half the cell's counts as failed. Work starts on the branch `sci/noise-three-component`. Next free IDs: D-155, I-006. |
+| 2026-11-17 (later, 9) | Logs **D-155** [orchestrator] (the noise-fit chat, about 19:00). **The three-component law is implemented and merged into `main`** (D-152 to D-154): SPEC 2.6; Blocks 2 and 3 (one Opus implementer), 4 and 9 (one each), 6 (the orchestrating session); every smoke passes in the sandbox (noise_law 11/11, noise_stats 6/6, noise_windows 15/15, noise_fit 12/12, noise_sweep_fit 11/11, noise_run 9/9, gates 8/8); the final check by an independent Opus agent: PASS WITH ISSUES, no blocker or major finding (`Ih Fit/specs/test_reports/2026-11-17_1700_incremental.md`). Its finding F1 (a bootstrap variance of 0 crashed the pooling and lost the cell) settled as D-155: a variance that is NaN or below 1e-12 fails the sweep with `v_none`. Changes to validation targets [orchestrator], in SPEC's as-built notes: Block 2's check against the topic document's two-component values replaced by the white part's analytic moments and additivity; Block 4's reduced-fit tolerance restated from 40 fixture seeds; the fit's finite-difference steps and closed-form starting points for the middle part (2.6 (d), PROVISIONAL). Finding to watch on the pilot: at reduced sizes the slow part ran along its ridge in 6 of 40 synthetic cells. Not run: anything at full size; the run on davinci is next (gates, dry run, pilot). Next free IDs: D-156, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -357,6 +358,7 @@ would be needed*, *Status*.
 | D-152 | 2026-11-17 | the noise law of SPEC 2.1 (D-017.1) and everything built on it: `noise_law.py`, Blocks 2, 4, 9, the twins' noise (Block 5), the noise-fit run | three independent Gaussian components: a white fast part ($\sigma_f$), a middle OU ($\sigma_m$, $\tau_m \in [0.04, 1]$ ms), a slow OU ($\sigma_s$, $\tau_s \in [1\,\mathrm{ms}, 10\,\mathrm{s}]$); five parameters [user] | active; not implemented |
 | D-153 | 2026-11-17 | Block 9's per-sweep coordinates and Block 3's statistic vector under D-152's law | per sweep $\sigma_f$, $\sigma_m$, $\sigma_s$; per cell $\tau_m$, $\tau_s$; the autocorrelation lags gain 0.04 ms and 0.3 ms [user] | active; not implemented |
 | D-154 | 2026-11-17 | the implementation of D-152/D-153: SPEC 2.6, Blocks 2, 3, 4, 9, 6 of `Ih Fit` | plan approved; lags 0.04 and 0.3 ms in the SS, LS pre- and LS last windows ($d$ = 21); $\sigma_m(c,s)$ shrunk per protocol as $\sigma_s$ (D-076.1); a sweep with $\hat\sigma_f(c,s) < 0.5\,\hat\sigma_f(c)$ is a failed sweep [user] | active |
+| D-155 | 2026-11-17 | Block 9's failure rule (`noise_sweep_fit.V_MIN`, `_v_usable`), SPEC 2.6 (e) | a sweep whose bootstrap variance of $\log\sigma_m$ or $\log\sigma_s$ is NaN or below $10^{-12}$ is a failed sweep (`v_none`) [orchestrator] | active |
 | D-150 | 2026-11-17 | SPEC Blocks 31 (amendment 2), 27 (amendment 2), 25 (amendment 7), 28 (amendment 2), 36 (amendment 10) at `97b40a4`, `4ed0793`; `CleaningConfig.shadow_cache_mb`, `rank_*`; `clean_cell.py rank`; notebook Cells 16b, 17b, 18b | the cleaning's test re-aimed and sped up [user]: before and after on one 1-99 percentile grey scale, B S on its own; examples ranked by the largest structured dip a tier-1 neighbour casts on the line, tier 2 at most 1 gl, 10 um apart; the shadow model keeps its last sums per patch and changes them by the neighbours that changed (supersedes D-148.3); tiers vectorised [orchestrator] | active |
 | D-149 | 2026-11-16 | SPEC Blocks 25 (amendment 6), 36 (amendment 9), 31 (amendment 1) at `a2b082c`; `CleaningConfig.work_rank`, `work_peak_min_gl`; notebook Cells 17b, 18b | the cleaning is shown in worse conditions on the pilot's most contaminated tier-1 real nodes, neighbours refined, no injection or phantoms now [user]; the work list ranked by the predicted shadow on the example's measuring line, threshold 1 gl, per-round line figures, the examples 8089, 4844, 7081, 7448 [orchestrator], PROVISIONAL | active |
 | D-148 | 2026-11-16 | SPEC Blocks 29 (amendment 1), 25 (amendment 5), 32 (amendment 3), 36 (amendment 8) at `b6073e3`; `CleaningConfig.refine_xtol`, `refine_ftol`, `refine_line_fine_factor` | the coarse refinement stops at relative tolerances 1e-3 (was 1e-8) and its predictor samples p/4 (the fine fit keeps p/8); the neighbours' images shared between the two shadows of a node; the cleaning saves after every round [orchestrator], PROVISIONAL | active |
@@ -11659,5 +11661,32 @@ became sequential (Blocks 2 and 3 by one agent, then 4, then 9): Block 3's fixtu
 **What it does not decide [open].** The walltime of the new run (the pilot's); whether the 1 ms cap is kept after it.
 
 **Sources.** **[user]** 2026-11-17, 14:59. **[log]** D-076, D-116, D-122, D-152, D-153.
+
+**Status:** active. [updated 2026-11-17: implemented and merged into `main`; the final check passed with issues; **D-155**]
+
+## D-155 -- A per-sweep bootstrap variance that is NaN or below 1e-12 fails the sweep with `v_none` [orchestrator]
+
+**Date:** 2026-11-17, about 18:30-19:00 (Europe/Rome), the noise-fit chat; settled by the orchestrating session (Fable
+5.2) under coding directive 7, the user not asked; the user can reverse it.
+**Binds:** SPEC 2.6 (e) (amendments 4 and 5 of the contract); `noise_sweep_fit.py` (`V_MIN`, `_v_usable`, `bootstrap_v`,
+`run_sweep`, `pool_cell`); extends D-122.2's `v_none`.
+
+**Decision [orchestrator].** A sweep whose bootstrap variance $v_m(c,s)$ or $v_s(c,s)$ (of $\log\hat\sigma_m$,
+$\log\hat\sigma_s$ over its successful refits) is not finite or is below $V_{\min} = 10^{-12}$ (log mV)$^2$ is a failed
+sweep, reason `v_none`: out of both poolings, its twin $\hat\theta(c)$ (D-122.3). Agreed before (D-122.2, 2.5 (d)):
+`v_none` only when the variance is NaN ($B_{\rm ok} < 2$).
+
+**Why.** **[run: the final check's finding F1 and the implementer's reproducers]** With $v = 0$ the pooling's weights
+$1/v$ do not exist: `pool_protocol` raised, `pool_cell` did not catch it and the whole cell was recorded as failed.
+With refits identical up to roundoff numpy's variance is about $10^{-31}$, not 0, and (P3)'s denominator then vanished
+(ZeroDivisionError). **[reasoning]** $10^{-12}$ is an SD of $10^{-6}$ in $\log\sigma$; the nf1 run's bootstrap SDs were
+0.03 to 0.8, so no real sweep is touched. Not seen on any fixture: a guard, not an observed case.
+
+**What it implies for code and tables.** As bound; smoke P6 covers a variance of exactly 0 and one of roundoff size.
+
+**What it does not decide [open].** Nothing further.
+
+**Sources.** **[run]** `Ih Fit/specs/test_reports/2026-11-17_1700_incremental.md` (F1); commits `3aea91c`, `e9a6469`.
+**[log]** D-116, D-122, D-154.
 
 **Status:** active.

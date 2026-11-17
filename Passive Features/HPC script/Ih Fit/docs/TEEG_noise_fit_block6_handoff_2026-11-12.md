@@ -18,6 +18,7 @@ which stays the history of Block 9 and of D-122 to D-125.
 | 2026-11-17 (later, 3) | A three-component law tested at the user's request (12:28: a faster component, the two slow-side parts split at 1 ms; 12:30: "Go on with the test") **[run, here]**: `dev/2026-11-17_three_component_law/` (README). Fitted by simulation on the 18 cells, the middle component lowers J in every cell (median 121 to 38) and removes the 1 ms excess; 13 of 18 cells stay rejected. §4 "A third component, tested"; §6 item 8 updated. No decision taken. |
 | 2026-11-17 (later, 4) | **D-152** (user, 14:19): the law extended to three components -- a white Gaussian fast part, a middle part in [0.04 ms, 1 ms], the slow part in [1 ms, 10 s]; five parameters. Open with the user: Block 9's per-sweep parameters and the statistic set (§6 item 8). Next: SPEC 2.1 rewritten, then the plan for Blocks 2, 4, 9. |
 | 2026-11-17 (later, 5) | **D-153** (user, 14:25): per sweep the three sizes, per cell the two time scales; lags 0.04 and 0.3 ms added. The plan for Blocks 2, 3, 4, 9, 6 put to the user. |
+| 2026-11-17 (later, 6) | The plan approved (D-154) and carried out: the three-component law implemented, checked and merged into `main` (SPEC 2.6; D-155 [orchestrator]). §4 "The run under the three-component law" holds the commands for davinci. The nf1 tables feed no twin. |
 
 **Basis tags.** **[run]** executed in the assistant's sandbox (date given); **[src]** read from the code, SPEC or log
 on `main`; **[log]** the decision log's text; **[user]** the user's decision or words; **[reasoning]** the assistant's
@@ -349,6 +350,21 @@ stored Sigma.
 
 Limits: Sigma is M2's; the refinement is short (its J an upper bound of M3's minimum); the per-sweep stage is not
 tested (the JSONs hold no per-sweep targets); the statistic set was chosen for four parameters.
+
+**The run under the three-component law** (2026-11-17; D-152 to D-155; code on `main`; never run at full size
+**[open]**). A new run tag, `nf2`: nf1's JSONs are the two-component law's and are not resumed. On davinci, from the
+LOGIN node for the two `submit` lines (the guard refuses them inside a PBS job, §9):
+
+    cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/HPC script/Ih Fit" && git pull && conda activate prova
+    bash cluster_gates_noise_fit.sh                     # in an interactive job; expect VERDICT SETTLED; noise_law 11/11, noise_fit 12/12
+    RUN_TAG=nf2 CELLS=508282493,569844159 WALLTIME=48:00:00 DRY_RUN=1 bash submit_noise_fit.sh
+    RUN_TAG=nf2 CELLS=508282493,569844159 WALLTIME=48:00:00 bash submit_noise_fit.sh
+
+Expect in the dry run: `cohort:` the two IDs, `cores: 2 cell(s) x 6 = 12 (cap 120, D-125.1)`. Expected cost
+**[reasoning]**: 20-40 % above nf1's (4.0 h and 7.6 h for these two cells). To read back from the pilot: the
+`NOISE_MERGE` line; each cell's flags -- `at_bound:log_tau_m` (the 1 ms cap) and `at_bound:log_tau_s` (the slow
+ridge seen at reduced sizes in 6 of 40 synthetic cells, SPEC Block 4); J against 16 dof; the share of sweeps failed
+(`degenerate:sigma_f`, `v_none`, `at_bound`). Then the 18 cells with the same tag (the pilot's two are kept).
 
 Read back from the pilot: the `NOISE_CELL` lines, each JSON's per-stage seconds (they set `WALLTIME`), the
 `NOISE_MERGE` line. A code change between the pilot and the run re-runs every cell, the pilot's included (the resume
