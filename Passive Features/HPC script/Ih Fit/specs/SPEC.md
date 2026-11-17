@@ -80,6 +80,8 @@ and its estimation by D-116; the per-sweep stage is section 2.5 and Block 9.]
 
 ### 2.1 The law (D-017.1, D-034)
 
+[2026-11-17, D-152 to D-154: superseded in part by section 2.6 (the three-component law, 21 statistics, five fit coordinates, three per-sweep coordinates). Where this section and 2.6 differ, 2.6 holds; what 2.6 does not mention stands.]
+
 For one sweep sampled every Delta_t (s) at t_j = j Delta_t, j = 0..n-1, with
 mid-time t_bar, the injected noise (mV) is
 
@@ -104,6 +106,8 @@ demeans). For each fixed theta and every lag k >= 0
     gamma(k | theta) = sigma_f^2 rho_f^k + sigma_s^2 exp(-k Delta_t / tau_s)  (mV^2).  (L3)
 
 ### 2.2 The window statistics (D-028, D-029, D-051, D-095, D-103, D-104, D-106, D-110, D-111, D-115)
+
+[2026-11-17, D-152 to D-154: superseded in part by section 2.6 (the three-component law, 21 statistics, five fit coordinates, three per-sweep coordinates). Where this section and 2.6 differ, 2.6 holds; what 2.6 does not mention stands.]
 
 [2026-10-28 to 2026-10-29: the window start and the subtraction were replaced by D-095 with D-103, D-104 and D-106; this section is rewritten for them (2026-10-29, Block 3), below.]
 [2026-10-30 (later): D-115 -- each kept window's tilt offset is removed before the median window, step (b2) below; (c), (d) and (g) take the corrected windows x'_k.]
@@ -250,6 +254,8 @@ first sample where |i| exceeds half its maximum (the fitter's rule,
 `_estimate_noise`).
 
 ### 2.3 The fit (D-033, D-048 to D-050, D-056)
+
+[2026-11-17, D-152 to D-154: superseded in part by section 2.6 (the three-component law, 21 statistics, five fit coordinates, three per-sweep coordinates). Where this section and 2.6 differ, 2.6 holds; what 2.6 does not mention stands.]
 
 [2026-10-29: D-107 -- the tilt SD and its alternation leave the fit: every simulated sweep, SS and LS, carries the tilt of its real sweep, b_hat(c, s), the same in every replicate. Rewritten 2026-10-29 (later, 5) with Block 4: items (a), (b), (f), (g) below; the layout is the kept windows' (D-106) and the simulator subtracts the group median window (D-103.1).]
 
@@ -417,6 +423,8 @@ the pipeline, for the dev checks of the tilt study; Block 4's
 
 ### 2.5 The per-sweep stage (D-073, D-076 (i), D-115, D-116; Block 9, "Block 4b"; drafted 2026-10-30)
 
+[2026-11-17, D-152 to D-154: superseded in part by section 2.6 (the three-component law, 21 statistics, five fit coordinates, three per-sweep coordinates). Where this section and 2.6 differ, 2.6 holds; what 2.6 does not mention stands.]
+
 For each real cell c, once the per-cell fit of 2.3 has returned theta_hat(c)
 = (sigma_f_hat, rho_f_hat, sigma_s_hat, tau_s_hat)(c), and for each sweep s
 in S(c) = S_SS(c) u S_LS(c) -- S_SS(c) the SS sweeps with kept windows (2.2
@@ -565,7 +573,139 @@ min) is 2-7 % of the mean (SS) and 14-25 % (LS), and the mean of three seeds
 moves between M = 3000 and M = 1000 by -0.5 % (LS) and +2.3 % (SS)
 (`check_refit_binding_size.py`).
 
+### 2.6 The three-component law and what it changes (D-152, D-153, D-154; written 2026-11-17)
+
+Why: the nf1 run (2026-11-17) rejected the law of 2.1 in all 18 L3_exc cells, its SS autocorrelation at 1 ms above
+the data's in 16; a middle component removes that excess (`dev/2026-11-17_three_component_law/`). This section is the
+contract of the change. It replaces the clauses of 2.1, 2.2, 2.3 and 2.5 it names; everything else in them stands
+(the windows, the start, the subtraction, the tilts, the iteration, the bootstrap, the pooling formulas).
+
+(a) The law (replaces (L1)-(L3) and theta of 2.1; D-152). For one sweep sampled every Delta_t (s), t_j = j Delta_t,
+j = 0..n-1, mid-time t_bar, the injected noise (mV) is
+
+    e_j = e_fast_j + e_mid_j + e_slow_j + a + b (t_j - t_bar),                                    (L1')
+
+    e_fast_j ~ N(0, sigma_f^2), independent across j (white),
+    e_mid_j  = rho_m e_mid_{j-1}  + eta_j,   eta_j  ~ N(0, sigma_m^2 (1 - rho_m^2)),  rho_m = exp(-Delta_t / tau_m),
+    e_slow_j = rho_s e_slow_{j-1} + eta'_j,  eta'_j ~ N(0, sigma_s^2 (1 - rho_s^2)),  rho_s = exp(-Delta_t / tau_s),  (L2')
+
+the two recursions started in their stationary laws (e_mid_0 ~ N(0, sigma_m^2), e_slow_0 ~ N(0, sigma_s^2)); the three
+components independent, each driven by its own iid standard-normal draws; a and b as in 2.1 and 2.4 (b fixed per
+sweep, never drawn). theta = (sigma_f, sigma_m, tau_m, sigma_s, tau_s), in mV, mV, s, mV, s: five parameters, in
+this order everywhere (arrays, dataclass fields, fit coordinates). rho_f no longer exists. For each fixed theta and
+Delta_t and every lag k (samples, any sign):
+
+    gamma(k | theta) = sigma_f^2 [k = 0] + sigma_m^2 exp(-|k| Delta_t / tau_m) + sigma_s^2 exp(-|k| Delta_t / tau_s)  (mV^2),  (L3')
+
+[k = 0] being 1 at lag 0 and 0 elsewhere. Reading: the white part adds variance at lag 0 only; the middle and slow
+parts are exponentials of the lag. Every closed-form moment of Block 2 (Var(x_bar), E[S_0], E[S_L], the closed-form
+SD and autocorrelation, the legacy semivariogram functions) keeps its formula in terms of gamma and takes (L3').
+The fit's domain (D-152): sigma_f, sigma_m, sigma_s in [1e-4, 10] mV; tau_m in [4e-5, 1e-3] s (fixed in seconds; 2 samples at the archive's 50 kHz
+to 1 ms); tau_s in [1e-3, 10] s. `NoiseLaw` itself accepts any sigma >= 0 and any tau > 0 (a zero SD switches its
+component off, for oracles), and does not enforce the fit's bounds.
+
+(b) The simulator (replaces 2.1's recursions in code; Block 2). Unit draws per trace: fast, mid, slow (n_traces, n),
+tilt, offset (n_traces,), drawn from the generator in THIS order (fast, mid, slow, tilt, offset), so a generator
+state gives the same draws for any law. e_fast = sigma_f xi_fast; e_mid and e_slow by the stationary AR(1) recursion
+(`scipy.signal.lfilter`, as today's slow part). The draw order changes every simulated number against the
+two-component code: results of the nf1 run are not reproduced bit for bit, by design.
+
+(c) The statistics (replaces 2.2's lag lists and d; D-153.2, D-154.1). Autocorrelation lags, ms: SS enlarged window
+(0.02, 0.04, 0.1, 0.3, 1, 10); LS pre-window (0.02, 0.04, 0.1, 0.3, 1); LS last 132.5 ms (0.02, 0.04, 0.1, 0.3, 1,
+10); in samples round(lag_ms * 1e-3 * f_s): 1, 2, 5, 15, 50, 500 at 50 kHz. The statistic vector has d = 21 entries
+in this order: SS: sigma_hat, rho_hat at the 6 SS lags (7); LS pre-window: sigma_hat, rho_hat at its 5 lags (6); LS
+first 50 ms: sigma_hat (1); LS last 132.5 ms: sigma_hat, rho_hat at its 6 lags (7). N_SS = 7 statistics per SS
+window, N_LS = 14 per LS window. Labels: `ss_sd`, `ss_rho_<lag>ms`, `ls_sd`, `ls_rho_<lag>ms`, `ls_first_sd`,
+`ls_last_sd`, `ls_last_rho_<lag>ms`, <lag> printed with `%g` (0.02, 0.04, 0.1, 0.3, 1, 10). The estimators (S1),
+(S2), their NaN rules and the medians are unchanged. No code may assume 15, 5 or 10: the counts come from
+`noise_cell_stats` (`STAT_LABELS`, `N_SS_STATS`, `N_LS_STATS`).
+
+(d) The per-cell fit (replaces 2.3 (d), (e) in part, and the dof; Block 4). Fit coordinates
+
+    u = (log sigma_f, log sigma_m, log tau_m, log sigma_s, log tau_s)        (natural logs of mV, mV, s, mV, s)
+
+with bounds log 1e-4 <= log sigma <= log 10 for the three SDs, log 4e-5 <= log tau_m <= log 1e-3, log 1e-3 <= log
+tau_s <= log 10. `least_squares(method='trf')` as in 2.3 (d) with diff_step = (1e-3, 3e-3, 3e-3, 1e-3, 1e-3)
+(PROVISIONAL, [orchestrator]: the middle part's coordinates get a step three times larger because the statistics
+respond more weakly to them); ftol, xtol, gtol, max_nfev unchanged (a trf iteration now costs 6 evaluations of
+q_sim). The stop rule is max_i |Delta u_i| <= 0.01 over the five coordinates. Coordinate names, for `at_bound`:
+`log_sigma_f`, `log_sigma_m`, `log_tau_m`, `log_sigma_s`, `log_tau_s`; the rule (within 1e-3 of the range from a
+bound) is unchanged; a cell at the tau_m cap is flagged `at_bound:log_tau_m` and kept. Starts: the closed-form start
+is the lowest-cost solution of the closed-form problem (2.3 (e): W_0 on the closed-form statistics q_cf, instant)
+over the 4 initial points sigma_f = 0.035 mV, sigma_m = 0.017 mV, sigma_s = 0.06 mV with (tau_m, tau_s) in
+{1e-4, 6e-4} s x {0.03, 0.2} s (PROVISIONAL, [orchestrator]: the values of the dev check); then, as D-056, that
+start with tau_s / 2 and 2 tau_s (each clipped into the bounds) -- three starts for the first solve, one afterwards.
+dof = d_eff - 5 (16 when no statistic is dropped); the fit needs d_eff >= 6. Everything else of 2.3 -- W_0, the
+binding function and its common random numbers, Sigma_hat, the iteration, the final step, J, kappa, the flags --
+is unchanged, with the law of (a) and the vector of (c).
+
+(e) The per-sweep stage (replaces 2.5 (P0), (c), (d), (e), (f) in part; Block 9; D-153.1, D-154.2, D-154.3). For
+each sweep s of cell c, with tau_m and tau_s held at the cell's tau_m_hat(c), tau_s_hat(c):
+
+    u_s = (log sigma_f, log sigma_m, log sigma_s),   theta(u_s) = (exp u_s1, exp u_s2, tau_m_hat(c), exp u_s3, tau_s_hat(c)),
+    theta_tilde(c, s) = (sigma_f_hat(c, s), sigma_m_tilde(c, s), tau_m_hat(c), sigma_s_tilde(c, s), tau_s_hat(c)).   (P0')
+
+The fit (P1) is unchanged in form, with diff_step (1e-3, 3e-3, 1e-3) and the three SD bounds; dof_s = d_s - 3
+(SS: 7 - 3 = 4; LS: 14 - 3 = 11 when no statistic is dropped); d_s >= 4 still required. Failure (D-116.4, D-154.3):
+status <= 0 (`no_convergence`), a coordinate at a bound (`at_bound:<coordinates>`), or, checked next,
+sigma_f_hat(c, s) < min_sigma_f_ratio * sigma_f_hat(c) with min_sigma_f_ratio = 0.5 (reason `degenerate:sigma_f`).
+The bootstrap (P2) is run once per sweep as today; each successful refit gives both y_m*_b = log sigma_m_hat*_b
+and y_s*_b = log sigma_s_hat*_b, and
+
+    v_m(c, s), v_s(c, s) = the sample variances (ddof 1) of y_m*_b and of y_s*_b over the B_ok refits;
+
+either NaN (B_ok < 2) or below V_MIN = 1e-12 (log mV)^2 (every successful refit returned the same value, up to roundoff: an SD of log sigma under 1e-6, where real bootstrap SDs are 0.03 to 0.8; the pooling's weights 1 / v would be absurd or not exist; the floor is a module constant, amendment 5) fails the sweep with `v_none` [the second case added 2026-11-17, D-155 [orchestrator], after the final check's finding F1: `pool_cell` raised on v = 0 and the whole cell was lost]. The pooling (P3), (P4), (D-076.1) is applied per protocol
+TWICE, independently: to (y_m, v_m) = (log sigma_m_hat(c, s), v_m(c, s)) giving tau2_hat_m,pr(c), mu_hat_m,pr(c),
+lambda_m(c, s), sigma_m_tilde(c, s); and to (y_s, v_s) as today. sigma_f is not pooled. k_pr = 1 and k_pr = 0 as
+in 2.5 (e), for both. A failed sweep's twin carries theta_hat(c) whole (D-122.3).
+
+(f) Cost. One trf iteration of the per-cell solve costs 6 evaluations (was 5), of the per-sweep solve 4 (unchanged);
+each window statistic set has 2-3 more autocorrelations. Expected run cost 20-40 % above nf1's [reasoning]; the
+pilot measures it.
+
+(g) Outputs (replaces the column lists of 2.5 (g) and of Blocks 4 and 6). Per cell (`noise_cells_<GROUP>.csv`):
+`specimen_id`, `status`, `reason`, `noise_sigma_f_mV`, `noise_sigma_m_mV`, `noise_tau_m_ms`, `noise_sigma_s_mV`,
+`noise_tau_s_ms`, `noise_J`, `noise_dof`, `noise_p`, `noise_kappa`, `noise_n_solves`, `noise_flags`,
+`noise_t_ss_ms`, `noise_K`, `noise_K_LS`, `noise_cell_tau2_log_sigma_m_ss`, `noise_cell_mu_log_sigma_m_ss`,
+`noise_cell_tau2_log_sigma_m_ls`, `noise_cell_mu_log_sigma_m_ls`, `noise_cell_tau2_log_sigma_s_ss`,
+`noise_cell_mu_log_sigma_s_ss`, `noise_cell_tau2_log_sigma_s_ls`, `noise_cell_mu_log_sigma_s_ls`,
+`noise_code_commit`. Per sweep (`noise_sweeps_<GROUP>.csv`): `specimen_id`, `noise_sweep_protocol`,
+`noise_sweep_number`, `noise_tilt_mV_per_s`, `noise_sweep_sigma_f_mV`, `noise_sweep_sigma_m_raw_mV`,
+`noise_sweep_sigma_m_mV`, `noise_sweep_v_log_sigma_m`, `noise_sweep_w_m`, `noise_sweep_sigma_s_raw_mV`,
+`noise_sweep_sigma_s_mV`, `noise_sweep_v_log_sigma_s`, `noise_sweep_w`, `noise_sweep_flags`. The `_mV` columns
+without `raw` are the twin's theta_tilde(c, s) (the cell's values for a failed sweep); the `raw`, `v` and `w`
+columns are NaN for a failed sweep; `w_m` and `w` are lambda_m and lambda. `noise_rho_f` and
+`noise_sweep_rho_f` no longer exist. JSON law dicts carry the keys `sigma_f_mV`, `sigma_m_mV`, `tau_m_s`,
+`sigma_s_mV`, `tau_s_s`.
+
+(i) Dev checks. The scripts under `dev/` dated before 2026-11-17 were written for the two-component law and no longer run against `noise_law.py` (`NoiseLaw` has five fields); each re-runs at the commit it was written at. The statements of 2.2 and 2.4 that legacy functions are kept "so that the dev checks re-run" hold in that sense only [final check, F3].
+
+(h) Code interfaces changed by this section (the blocks' entries carry the rest unchanged).
+Block 2, `noise_law.py`: `NoiseLaw(sigma_f, sigma_m, tau_m, sigma_s, tau_s)` (frozen dataclass; finite values;
+sigmas >= 0; taus > 0; `as_array() -> (5,)`, `from_array((5,))`, `rho_m(dt)`, `rho_s(dt)`; `tau_f` removed);
+`autocovariance(law, dt, lags)` = (L3'); `UnitDraws(fast, mid, slow, tilt, offset)`; `draw_units(rng, n_traces,
+n_samples)` in the order of (b); `simulate_traces(law, dt, xi_fast, xi_mid, xi_slow, *, xi_tilt=None, sigma_b=0.0,
+xi_offset=None, sigma_a=0.0, tilt_mV_per_s=None)`; `simulate_sweep(law, dt, n_samples, units, index=0, *,
+sigma_b=0.0, sigma_a=0.0, tilt_mV_per_s=None)`; the closed-form functions with their present signatures.
+Block 3, `noise_cell_stats.py`: the lag tuples of (c) (set by the contract commit); nothing else.
+Block 4, `noise_fit.py`: `NoiseFitConfig` -- `fd_rel_step` (5 entries, (d)), `log_sigma_bounds` as today,
+`log_tau_m_bounds = (log 4e-5, log 1e-3)`, `log_tau_s_bounds = (log 1e-3, log 10)` (`rho_bounds`,
+`log_tau_bounds` removed), `bounds() -> (lo (5,), hi (5,))`; `law_to_u(law) -> (5,)`, `u_to_law(u (5,))`;
+`closed_form_start` over the 4 initial points; `fit_cell` and `CellFitResult` as today with u (5,), the law dict
+of (g), dof = d_eff - 5.
+Block 9, `noise_sweep_fit.py`: `SweepStageConfig.min_sigma_f_ratio = 0.5`; `SweepFit.u (3,)` in the order of (e);
+`SweepBootstrap` -- `v_m`, `v_s` (floats), `y_m`, `y_s` ((B,), NaN where a refit failed), `B`, `B_ok`, `flags`
+(the field `v` and `y` are replaced); `SweepStageResult.pools`: dict protocol ('ss', 'ls') -> dict coordinate
+('sigma_m', 'sigma_s') -> `PoolResult`; a row's keys: those of today with `rho_f` removed and `sigma_m_mV`,
+`tau_m_s`, `log_sigma_m`, `v_log_sigma_m`, `bootstrap_y_m`, `lambda_m`, `sigma_m_tilde_mV` added (`bootstrap_y`,
+`v_log_sigma_s`, `lambda`, `sigma_s_tilde_mV` keep their names and mean the slow part); `table_rows()` and
+`cell_columns()` return exactly the per-sweep and Block 9 per-cell columns of (g), in that order (`cell_columns()`
+led by `specimen_id`).
+Block 6, `run_noise_fit.py`: the columns of (g); the smoke sizes unchanged.
+
 ### Notation
+
+[2026-11-17: rows written before section 2.6 describe the two-component law where they name rho_f, vectors of 5, 10 or 15 statistics, or unit draws of two components; under 2.6 the vectors hold 7 (SS), 14 (LS) and 21 statistics, the unit draws are fast, mid, slow, and the rows marked (2.6) below hold.]
 
 | Symbol | Meaning | Type / shape | Units |
 |---|---|---|---|
@@ -591,7 +731,10 @@ moves between M = 3000 and M = 1000 by -0.5 % (LS) and +2.3 % (SS)
 | V_hat_c(h*), N_pairs | [legacy, superseded by D-102 / D-107] the data semivariogram at h* = 4 P (same polarity, same sweep, positions 4 apart); the pairs it averages | float; int | mV^2; -- |
 | sigma_hat, rho_hat(L) | window SD (ddof 1); textbook autocorrelation | float | mV; -- |
 | rho_adj(L) | the pre-D-028 estimator (test oracle only) | float | -- |
-| theta | (sigma_f, rho_f, sigma_s, tau_s); `noise_law.NoiseLaw` | float[4] | mV, --, mV, s |
+| theta [until 2026-11-17] | (sigma_f, rho_f, sigma_s, tau_s); `noise_law.NoiseLaw` | float[4] | mV, --, mV, s |
+| theta (2.6, D-152) | (sigma_f, sigma_m, tau_m, sigma_s, tau_s): white fast SD, middle OU SD and correlation time, slow OU SD and correlation time; `noise_law.NoiseLaw` | float[5] | mV, mV, s, mV, s |
+| u, u_s (2.6 (d), (e)) | the per-cell fit coordinates (log sigma_f, log sigma_m, log tau_m, log sigma_s, log tau_s); the per-sweep ones (log sigma_f, log sigma_m, log sigma_s) | float[5]; float[3] | natural logs of mV, mV, s, mV, s |
+| v_m(c, s), v_s(c, s); lambda_m, sigma_m_tilde | (2.6 (e)) the bootstrap variances of log sigma_m_hat and log sigma_s_hat of sweep s; the middle part's shrinkage weight and shrunk SD | float | (log mV)^2; --, mV |
 | xi | unit (standard-normal) draws of the simulator: fast, slow (n_traces, n); tilt, offset (n_traces,); `noise_law.UnitDraws` | float arrays | -- |
 | E[S_0 \| theta, n], E[S_L \| theta, n], Var(x_bar \| theta, n) | closed-form moments of a demeaned window, topic doc (7a), (7b), (9) | float | mV^2 |
 | q_cf_m(theta \| n_m) | closed-form statistic: sqrt(E[S_0]/(n-1)) for an SD, E[S_L]/E[S_0] for an autocorrelation (eq. 10); the fit's starting point only | float | mV; -- |
@@ -664,6 +807,8 @@ moves between M = 3000 and M = 1000 by -0.5 % (LS) and +2.3 % (SS)
 
 ### Block 2: the noise law -- simulator from unit draws and closed-form moments (D-017, D-034, D-056 (i))
 
+[2026-11-17, D-152: the law is 2.6 (a), the simulator 2.6 (b), the interfaces 2.6 (h). The smoke `smoke_noise_law.py` is re-aimed at them: every oracle of this entry that names the fast AR(1) part or rho_f is restated for the white fast part and the middle OU (the closed-form moments against the brute-force covariance matrix and Monte Carlo; the simulator's sample autocovariance against (L3') at lags 0, 1, 2, 5, 15, 50, 500; the draw order; a component switched off by a zero SD; `from_array` / `as_array` round trip on 5 entries). Status: smoke-tested 2026-11-17 (sandbox: `smoke_noise_law.py` M1-M11 11/11, about 3 s; five planted defects -- the middle part with rho_s, mid and slow draws swapped, a non-stationary first sample, the white term at every lag, `from_array` permuted -- each caught; commit `de61d4b`). As built [orchestrator, accepted at the gate]: the check against the topic document's 14 two-component values (old M8) is replaced by the white part's analytic moments (E[S_0] = (n-1) sigma_f^2, E[S_L] = -(n-L) sigma_f^2 / n) and the additivity of every moment over the three components; `semivariogram_continuous` (legacy) takes the white part at its sampled value sigma_f^2 dt / T per window; `simulate_traces` requires all three draw arrays.]
+
 - Module: `noise_law.py` (model layer: no I/O, no plotting, no module-level RNG); smoke `smoke_noise_law.py`.
 - Public API: `NoiseLaw(sigma_f, rho_f, sigma_s, tau_s)` (frozen dataclass; `validate` in `__post_init__`; `as_array`/`from_array`; `rho_s(dt)`, `tau_f(dt)`); `autocovariance(law, dt, lags) -> float[len(lags)]` (L3); `draw_units(rng, n_traces, n_samples) -> UnitDraws` (fast, slow (n_traces, n); tilt, offset (n_traces,); drawn in that fixed order); `simulate_traces(law, dt, xi_fast, xi_slow, *, xi_tilt=None, sigma_b=0.0, xi_offset=None, sigma_a=0.0, tilt_mV_per_s=None) -> float64[n_traces, n]` (L1)-(L2); `simulate_sweep(law, dt, n_samples, units, index, *, sigma_b, sigma_a, tilt_mV_per_s=None) -> float64[n]` (one continuous trace, D-056 (i)); `tilt_mV_per_s` (added 2026-10-29, D-102.1, D-107.2): the tilt as a FIXED number per trace (mV/s; `simulate_traces`: (n_traces,), `simulate_sweep`: a float), each trace's real sweep's tilt read by Block 3 (SPEC 2.4) -- the alternative to the random tilt `sigma_b xi_tilt`, with which it cannot be combined; `var_window_mean(law, dt, n)` (7a); `expected_s0(law, dt, n)` (7b); `expected_sl(law, dt, n, lags)` (9); `closed_form_sd(law, dt, n)`; `closed_form_acf(law, dt, n, lags)` (10); `visible_share(z)` (8); `window_mean_cov(law, dt, n1, n2, offset)`; `semivariogram(law, dt, n1, n2, offset, sigma_b=0.0)` (T1's V, exact for the sampled law); `semivariogram_continuous(law, dt, T1, T2, h, sigma_b=0.0)` (topic doc eq. 25 as written; oracle).
 - Inputs: theta in mV, --, mV, s with rho_f the lag-1 coefficient AT the `dt` passed (D-014; the transfer between sampling rates, D-017 (f), is not done here); dt in s; unit draws float (n_traces, n >= 2); sigma_b in mV/s, sigma_a in mV; lags and offsets in samples.
@@ -677,6 +822,8 @@ moves between M = 3000 and M = 1000 by -0.5 % (LS) and +2.3 % (SS)
 - Status: smoke-tested 2026-10-19 (sandbox: M1-M9 9/9, about 5 s; mutation-tested as above); the fixed tilt smoke-tested 2026-10-29 (sandbox: M1-M10 10/10; M10 mutation-tested with four planted defects -- an uncentred tilt, its sign flipped, the exclusivity check removed, `simulate_sweep` dropping the tilt -- each FAILs M10).
 
 ### Block 3: windows and statistics -- the archive's SS layout, the enlarged windows, the LS pre-windows and the D-051 statistic vector (D-051, D-072, D-073, D-076; window start and subtraction D-095, D-103, D-104, D-106, D-110, D-111, D-115; per-sweep tilts D-102, D-107, D-115)
+
+[2026-11-17, D-153.2, D-154.1: the lag lists and d = 21 are 2.6 (c); `noise_cell_stats.py`'s three lag tuples are set by the contract commit. The fixture writer of `smoke_noise_windows.py` takes the law of 2.6 (a) (its `THETA_CF`-style default becomes a five-parameter law: sigma_f 0.035 mV, sigma_m 0.017 mV, tau_m 0.3 ms, sigma_s 0.055 mV, tau_s 40 ms [orchestrator]) and the simulator of 2.6 (b); the smokes of Blocks 1 and 3 (`smoke_noise_stats.py`, `smoke_noise_windows.py`) pass with the new counts, their oracles otherwise unchanged. Status: smoke-tested 2026-11-17 (sandbox: `smoke_noise_stats.py` 6/6, `smoke_noise_windows.py` W1-W15 15/15 on the five-parameter fixture, the 21 labels compared with 2.6 (c); commit `de61d4b`).]
 
 - Modules: `noise_windows.py` (data layer: loading, layout, windows, the window start, the subtraction; no fitting of the noise law, no plotting), `noise_cell_stats.py` (analysis layer: the statistics per window, per sweep and per cell, the bootstrap SE, the per-sweep tilts; no I/O); smoke `smoke_noise_windows.py`.
 - Public API (`noise_windows`): `WindowConfig` (frozen dataclass; the pipeline's fields: `t_ss_floor_ms=80.0` (D-076 (ii), D-103.3), `kappa_tr=0.1` (D-051, PROVISIONAL), `fit_start_ms=5.0` (D-103.2, PROVISIONAL), `decay_tau_bounds_ms=(1.0, 1000.0)`, `decay_grid_n=301` (D-110, PROVISIONAL; `decay_tau0_ms` and `decay_maxfev` of `f293d4a` retired), `min_window_ms=50.0` (D-104.1), `fallback_t_ms=80.0` (D-103.3; was 190), `min_windows_per_group=5` (D-104.2, PROVISIONAL), `ss_pre_ms=10.0`, `ls_pre_gap_ms=5.0`, `ls_first_ms=50.0`, `ls_last_ms=132.5`, `ls_end_ms=500.0` (D-107.1, PROVISIONAL length), `ls_polarities=("hyp", "dep")`, `ls_amp_min_pA=5.0`, `ss_period_samples=None` (measured), `min_overlap=100`; legacy fields read only by `transient_start`: `transient_bin_ms=5.0`, `transient_floor_z=None`, `transient_fallback_t_ms=190.0`); `load_ss_windows(spec_dir, cfg) -> SSWindows` (fields: `specimen_id`, `fs`, `dt`, `t` (n_w,), `v` (K, n_w) mV, `polarity_is_dep` (K,), `sweep_number` (K,), `position` (K,) int, `train_length` int, `period_samples` int, `pre_n` int, `n_raw`, `n_sweeps`); `measure_period(ss, min_overlap) -> int`; `DecayFit` (`A_mV`, `tau_ms`, `B_mV`, `rss`, `ok`, `at_bound`, `message`); `fit_decay(t_ms (n,), y_mV (n,), cfg) -> DecayFit` (2.2 (d), (ST0): the exact least-squares fit of one median window's fitted samples by variable projection; `profile_decay(t_ms, y_mV, tau_ms) -> (A, B, RSS)`, the closed form at one tau); `StartResult` (`t_ss_ms`, `t_star_ms` (max(80 ms, the median of the valid groups' starts); NaN when no group is valid), `sigma_ss_mV`, `keep` (K,) bool (False for the windows of the small groups), `group_sweep` (G,), `group_is_dep` (G,), `group_K` (G,), `group_status` (G,) 'ok' / 'few_windows' / 'fit', `A_mV`, `tau_ms`, `B_mV`, `t_group_ms` (G,) (NaN where no fit), `flags` tuple of 'ss_group_dropped:<sweep>:<polarity>:<few_windows or fit>', 'ss_start_floor', 'ss_start_fallback', `fallback_reason` ('', 'short_window', 'no_valid_group')); `decay_start(ss, cfg, fit=fit_decay, tilts=None) -> StartResult` (2.2 (a)-(e); groups in the order of the sweeps' first windows, dep before hyp; `fit` a callable with `fit_decay`'s signature, swappable for a test double; with `tilts` (a `SweepTilts`) the kept groups' median windows are taken on the windows corrected by (OF1) over the kept set, D-115.1 -- without, the plain rule); `select_windows(ss, keep) -> SSWindows` (a copy holding the kept windows, every other field unchanged); `enlarged_windows(ss, t_ss_ms) -> (X (K, m), j0)`; `subtract_median_response(X, polarity_is_dep, sweep_number) -> (X_tilde (K, m), medians dict (sweep, is_dep) -> (m,))` (2.2 (g)); `SSNoiseWindows` (`start`, `ss` (the kept `SSWindows`, as stored), `X_tilde` (K_kept, m, from the corrected windows), `j0`, `tilts` (the SS reading of D-115.2, a `SweepTilts`); `m` property); `ss_noise_windows(ss, cfg, fit=fit_decay) -> SSNoiseWindows` (2.2 (a)-(g) in order, D-115: the small groups out, (TL1) on the kept windows at the floor, the offsets (OF1), the start on the corrected windows, the enlarged windows, the subtraction -- the one entry point of the pipeline and of Block 4's driver); the SS tilt reading and the offsets, shared by the data and Block 4's simulator (D-115.3): `SweepTilts` and `ss_sweep_tilts(X, ss, j0) -> SweepTilts` ((TL1) on the window means of X cut at j0; moved here from `noise_cell_stats` on 2026-10-30, which re-exports both), `tl1_fit(means (K,) mV, centres (K,) s, sweep_number (K,), polarity_is_dep (K,)) -> (sweeps tuple, b (S,) mV/s, se (S,), n (S,) int, flags tuple)` ((TL1)'s regression), `read_ss_tilts(ss, cfg) -> SweepTilts` ((TL1) at the floor: `ss_sweep_tilts(ss.v[:, j_f:], ss, j_f)`, j_f = pre_n + round(t_ss_floor_ms f_s / 1e3)), `tilt_offsets(position (K,), sweep_number (K,), period_samples, dt, b: dict sweep -> mV/s) -> (K,) mV` ((OF1)'s offsets, b_s (pos_k P Delta_t - their mean over the sweep's windows given); 0 for a sweep whose b is absent or NaN), `remove_tilt_offsets(ss, tilts) -> SSWindows` (a copy with (OF1) applied to every window, all samples); `load_ls_prewindows(spec_dir, cfg) -> LSWindows` (fields: `specimen_id`, `fs`, `dt`, `sweep_number` (K_LS,), `amplitude_pA` (K_LS,), `polarity` (K_LS,) str, `pre` list of K_LS float64 arrays, `n_pre` (K_LS,), `onset_s` (K_LS,), and for (TL2) `end` list of K_LS float64 arrays (empty where the end window is not usable), `end_start_s` (K_LS,) (NaN there), `step_end_s` (K_LS,) (t_off), `n_samples` (K_LS,), `end_status` (K_LS,) 'ok' / 'tail_short'); `ls_segments(pre, fs, cfg) -> (first (n1,), last (n2,))`; `LayoutError`. Legacy, kept unused by the pipeline for the dev checks of 2026-10-23 to 2026-10-29 (superseded by D-103): `transient_start(ss, cfg) -> TransientResult` (the 5 ms bin test of D-051 (iv); its fallback flag `ss_enlarged_none` at `transient_fallback_t_ms`), `subtract_mean_response(X, polarity_is_dep) -> (X_tilde, mean_dep, mean_hyp)` (D-051.1).
@@ -694,6 +841,8 @@ moves between M = 3000 and M = 1000 by -0.5 % (LS) and +2.3 % (SS)
 
 ### Block 4: the per-cell fit -- binding function, simulated covariance and the iteration (D-033, D-048 to D-051, D-056; the layout and the simulator D-103, D-106, D-107.2, D-115.3)
 
+[2026-11-17, D-152, D-153, D-154: the coordinates, bounds, steps, starts and dof are 2.6 (d), the interfaces 2.6 (h). `smoke_noise_fit.py` is re-aimed: F6's self-consistency and F7's reduced fit on the five coordinates (F7's tolerance on |u_hat - u*| restated by the implementer from the fixture's own Monte Carlo spread and reported), F9's dof = d_eff - 5, every count from `noise_cell_stats`; a new check that `NoiseFitConfig()` carries the bounds and steps of 2.6 (d). Status: smoke-tested 2026-11-17 (sandbox: `smoke_noise_fit.py` F1-F12 12/12 in 106 s; six planted defects -- sigma_m and tau_m swapped in `u_to_law`, the old dof, the mid draws not passed, the closed-form start keeping the last point, tau_s / 2 not clipped, a wrong law-dict key -- each caught; commit `bdd8011`). As built [orchestrator, accepted at the gate]: the 4 initial points are the module constant `CF_INITIAL_POINTS` (also the fallback law); new names `N_PARAMS`, `U_NAMES`, `LOG_4E5`, `LOG_1E3`; `u_to_law` refuses a shape other than (5,). F7's reduced fit (M = 60, R 40/60) recovered (0.0354 mV, 0.0157 mV, 0.275 ms, 0.0490 mV, 23.7 ms) for the truth (0.035, 0.017, 0.3 ms, 0.055, 40 ms), J 22.3 on 16 dof; its tolerance |u_hat - u*| <= (0.03, 0.21, 0.91, 0.64, 1.43) is the mean + 4 SD of 34 of 40 fixture seeds fitted at the reduced sizes. Finding, to watch on the pilot: in the other 6 of 40 seeds the slow part ran along its ridge (log tau_s +4.1 to +5.5, three at the 10 s bound); at these sizes the loose coordinates are the slow part's, not the middle's (SD 0.045 in log sigma_m, 0.20 in log tau_m). Not run here: a fit at the full M and R.]
+
 - Module: `noise_fit.py` (model and analysis layer: the simulator of a cell's windows at the real layout, the binding function, Sigma_hat, the inner solve and the iteration; no I/O beyond an optional log callable, no plotting); smoke `smoke_noise_fit.py`. The per-sweep stage of D-076 (i) is Block 4b (`noise_sweep_fit.py`), specified when written [2026-10-30: specified as Block 9, section 2.5; drafted].
 - Public API: `NoiseFitConfig` (frozen dataclass: `M_binding=3000`, `R_iter=600`, `R_final=3000`, `B_boot=2000`, `k_max=6`, `tol_u=0.01`, `starts_after_first=1`, `max_nfev=15`, `ftol=1e-4`, `xtol=1e-3`, `gtol=1e-8`, `fd_rel_step=(1e-3, 1e-2, 1e-3, 1e-3)`, `log_sigma_bounds=(log 1e-4, log 10)`, `rho_bounds=(1e-3, 0.999)`, `log_tau_bounds=(log 1e-4, log 10)`, `chunk_windows=500`, `seed=20261023`, `window_cfg`; `lag_periods` retired with (T1)); `CellLayout` (frozen: `specimen_id`, `fs`, `dt`, `n_w`, `pre_n`, `j0`, `j_floor` (the floor's first sample, pre_n + round(t_ss_floor_ms f_s / 1e3) <= j0; D-115.3), `period_samples`, `train_length`, `sweep_numbers` (n_sweeps,) the SS sweeps with kept windows, `sweep_index` (K,), `position` (K,), `polarity_is_dep` (K,), `sweep_number` (K,), `n_ls`, `ls_sweep_number` (K_LS,), `ss_tilt` (n_sweeps,) and `ls_tilt` (K_LS,) the real sweeps' tilts in mV/s, aligned with `sweep_numbers` and `ls_sweep_number` (D-107.2); `K`, `K_LS`, `m`, `n_sweeps`, `L_s` properties; `from_windows(ss_kept: SSWindows, ls: LSWindows, t_ss_ms, ss_tilts: SweepTilts, ls_tilts: SweepTilts, window_cfg=WindowConfig()) -> CellLayout` (refuses, with the reason: LS pre-windows of unequal length; a sweep of `ss_kept` or `ls` without a tilt, or with a NaN one, quoting the reading's flag); `from_cell(nwin: SSNoiseWindows, ls: LSWindows, window_cfg=WindowConfig()) -> CellLayout` (the SS tilts are Block 3's reading `nwin.tilts` (D-115.2; never re-read on X_tilde, where (OF1) has removed them; `read_ss_tilts(nwin.ss)` when `tilts` is None), the LS tilts `ls_sweep_tilts(ls)`, then `from_windows(nwin.ss, ls, nwin.start.t_ss_ms, ...)`)); `CellTarget` (`q_hat` (15,), `per_window_ss` (K, 5), `per_window_ls` (K_LS, 10), `labels`; `from_stats(ss_stats, ls_stats, layout, window_cfg)`, `from_cell(nwin, ls, layout, window_cfg)` (the statistics of the kept, subtracted windows and of the LS pre-windows); V_hat and N_pairs retired with (T1)); `simulate_cell_windows(law, layout, rng, *, parts=('ss', 'ls'), window_cfg, return_windows=False, return_tilts=False) -> (ss_stats (K, 5), ls_stats (K_LS, 10))`, with `return_windows` also `X_tilde` (K, m) and `ls_traces` (K_LS, n_ls), with `return_tilts` last the replicate's own SS reading (dict sweep -> mV/s) (one replicate cell: the sweeps continuous, sweep s with tilt `layout.ss_tilt[s]`, the windows cut at the kept positions from the floor; the replicate's own (TL1) at the floor (`tl1_fit`) and offsets (OF1) (`tilt_offsets`) removed, D-115.3; the enlarged parts; the group median window of the replicate's own corrected windows subtracted; LS window k with tilt `layout.ls_tilt[k]`); `binding_function(law, layout, cfg, seed, *, which='both', return_pool=False) -> q_sim (15,)` (CRN by re-seeding; with `return_pool` also the pools (M_cells K, 5) and (N_LS, 10), LS row i with the tilt of LS sweep i mod K_LS); `hd_median(A (N, d)) -> (d,)` (Harrell-Davis, NaN-ignoring per column); `simulated_covariance(law, layout, R, rng, *, per_sweep=False, window_cfg) -> SigmaResult` (`Sigma` (15, 15), `vectors` (R, 15), `per_sweep` dict sweep -> (R, 5 or 10) when asked); `closed_form_vector(law, layout, window_cfg) -> (15,)`; `solve_inner(q_hat, C, law_starts, layout, cfg, seed, mask, residual=None) -> InnerResult` (`law`, `u`, `J`, `nfev`, `start_index`, `status`, `message`, `starts` (u_0, J) per start, `at_bound`); `closed_form_start(q_hat, SE, mask, layout, cfg) -> NoiseLaw`; `law_to_u`, `u_to_law`; `correlation_condition_number(Sigma)`; `fit_cell(target, layout, cfg, log=None) -> CellFitResult` (`specimen_id`, `law`, `u`, `J` (at the reported theta_hat), `dof`, `p_value`, `kappa`, `Sigma` (d_eff, d_eff), `labels_kept`, `stats_dropped`, `q_hat`, `q_sim`, `SE` (W_0's; NaN where dropped), `ss_tilt` and `ls_tilt` (dict sweep -> mV/s: the tilts the simulator carried), `n_solves`, `converged`, `flags` ('stats_dropped:<labels>', 'se_from_simulation:<labels>' when a finite statistic had no bootstrap SE -- a single window -- and W_0 took the simulated single-window spread x 1.2533 / sqrt(K) at the closed-form start, 'no_plateau', 'sigma_jitter', 'at_bound:<coordinates>'), `history` (per solve: weight, R, u, J, nfev, start_index, status, at_bound, seconds), `per_sweep_cov` dict sweep -> covariance of its vector (from the final Sigma_hat run, Block 4b's weights), `config`, `seconds`; `to_dict()` JSON-ready, NaN as null). Retired with (T1) (D-107.2): `tilt_from_semivariogram`, `TiltResult`, the result's `sigma_b` and the flags 'tilt_clipped', 'tilt_no_pairs'.
 - Inputs: Block 3's `SSNoiseWindows` (the kept windows, X_tilde, t_SS(c)), `LSWindows`, the per-sweep tilts; theta in mV, --, mV, s; tilts in mV/s.
@@ -707,6 +856,8 @@ moves between M = 3000 and M = 1000 by -0.5 % (LS) and +2.3 % (SS)
 - Status: smoke-tested 2026-10-23 (F1-F10 10/10; mutation-tested with ten planted defects). Rewritten for D-103, D-106, D-107.2 and smoke-tested 2026-10-29 (later, 5) (sandbox: F1-F11 11/11, about 100 s; Blocks 2-3 suites 10/10, 14/14; mutation-tested with seven planted defects -- the mean subtraction in the simulator, the SS tilts dropped, the LS tilts dropped, the LS tilts not cycled, a NaN tilt accepted, the SS tilts misaligned, q_sim reported at the start law -- each FAILs the check named for it, the last once F7 recomputes q_sim at the reported law). Found by the smoke: the fixture cell's start falls back to 80 ms (its sweep 92 carries a -0.25 mV/s tilt, which bends two of its four groups' fits; the median is 161 ms); see the dev check `dev/2026-10-29_start_noise/check_start_detrended.py`. Not run here: a fit at the full M and R (hours; the cluster, Block 6's S0). D-115.3 (each replicate's own reading at the floor and its offsets) implemented and smoke-tested 2026-10-30 (later) (F1-F11 11/11, about 2 min; F1 against an independent loop with the closed-form slope (4.4e-16 mV), F2 also with 0.1 mV/s tilts (the pooled mean 0.0024134 against 0.0024151 expected), F5 the replicate's own reading, F11 `from_cell`'s tilts and `j_floor`; three planted defects -- `from_cell` re-reading on X_tilde, the simulator without the offsets, its offsets from the layout's tilts -- each FAILs F1, F2 or F11). With the offsets removed the fixture cell's median start is 151.7 ms (161.0 ms without): it still falls back, now by 1.7 ms.
 
 ### Block 9: the per-sweep stage ("Block 4b") -- each sweep's law, its bootstrap variance and the pooling per protocol (D-073, D-076 (i), D-115, D-116)
+
+[2026-11-17, D-153.1, D-154.2, D-154.3: the coordinates, the two bootstrap variances, the two poolings, the degenerate rule and the columns are 2.6 (e), (g), (h). `smoke_noise_sweep_fit.py` is re-aimed: P4/P5 on (log sigma_f, log sigma_m, log sigma_s); P6 the two variances from one set of refits; P3 unchanged (one pooling function, used twice); P8 also a planted sigma_f below half the cell's -> `degenerate:sigma_f`, not bootstrapped, twin = theta_hat(c); P9 the pools as protocol -> coordinate -> PoolResult and the columns of 2.6 (g); P11 also `min_sigma_f_ratio` = 0.5. Status: smoke-tested 2026-11-17 (sandbox: `smoke_noise_sweep_fit.py` P1-P11 11/11 in 388 s; six planted defects -- tau_m not held, v_m from the slow coordinate, the degenerate rule removed, the middle pooling given the slow one's tau2, the wrong three steps, `cell_columns` reordered -- each caught; commit `1b07fb1`). As built [orchestrator, accepted at the gate]: `degenerate:sigma_f` is tested on the sweep's own fit only (in `run_sweep`), with a strict '<'; a bootstrap refit is never failed by it; a refit counts when both its log sigma_m and log sigma_s are finite; new names `U_NAMES`, `COORDS`; the row's keys add `sigma_m_mV`, `tau_m_s`, `log_sigma_m`, `v_log_sigma_m`, `bootstrap_y_m`, `lambda_m`, `sigma_m_tilde_mV`. Measured on the fixture: P5's worst z 1.53 over the three coordinates; P7's bootstrap over linearised variance 1.02 (log sigma_m) and 0.90 (log sigma_s). Not run here: the stage at the full sizes. Amendments 4-5 (2026-11-17, D-155 [orchestrator], after the final check's F1): a bootstrap variance that is NaN or below `V_MIN` = 1e-12 fails the sweep with `v_none`, in `bootstrap_v`, `run_sweep` and `pool_cell` (rows made elsewhere); P6 covers a variance of exactly 0 and one of roundoff size (8.8e-31); P1-P11 11/11 on the merged code (494 s), `smoke_noise_run.py` 9/9 (478 s); commits `3aea91c`, `e9a6469`. Final check 2026-11-17 (an independent Opus agent, `specs/test_reports/2026-11-17_1700_incremental.md`): PASS WITH ISSUES, no blocker or major finding; 54 spec tests of its own pass.]
 
 Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py` read integer block numbers only and 5-8 are held by the roadmap's later stages (2026-10-30, the assistant's choice); "Block 4b" in the decision log (D-082 to D-116) and the handoffs is this block. It runs after Block 4 and before Block 5.
 
@@ -723,6 +874,8 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Status: drafted 2026-10-30 (SPEC only; the code waits for the answers of section 8) [updated 2026-11-11: answered, D-122; the code is next (D-123: then Block 6's driver for the noise fit of n real cells, then Block 5)]. Cost and precision measured on the fixture with Block 4's functions (2.5 (h); `dev/2026-10-30_sweep_stage_cost/`). [2026-11-12: the code written and smoke-tested (sandbox, numpy 2.5.3, scipy 1.18.1, statsmodels 0.15.0: P1-P11 11/11 in 404 s on one core; P5's worst z 2.34, P7's v / v_lin = 1.19 inside [0.50, 1.72] (B_ok 60), P9's pools SS tau2 0 (clipped), mu -2.881, LS tau2 0.0060, mu -2.968; mutation-tested with 17 planted defects -- the SS restriction with the first sweep's tilt, with the first polarities; the SS target a mean; the seeds without the protocol; tau_s not held; J reported as the cost; no at_bound failure; the refits at the main M; the replicates at theta_hat(c); v with ddof 0; the flag at 10 % or more; tau2 not clipped; mu not recomputed; a failed sweep's twin at the pooled sigma_s; the twin with the raw sigma_s; no d_s rule; the LS sweeps left out -- each FAILs the check named for it, J's once P4 lost its absolute floor). Not run here: the stage at the full sizes (M = 3000, B_v = 50, M_refit = 1000: hours per sweep, 2.5 (h)) and on a real cell -- Block 6's run on davinci (D-123, D-124).]
 
 ### Block 6: the noise-fit run -- the driver, its PBS array and the merge (D-123, D-124, D-125)
+
+[2026-11-17, D-152 to D-154: the tables' columns are 2.6 (g); `run_noise_fit.py` and `smoke_noise_run.py` follow. A run under the two-component law (nf1) is not resumed: the code commit differs. Status: smoke-tested 2026-11-17 (sandbox: `smoke_noise_run.py` R1-R9 9/9 in 455 s on the new columns; written by the orchestrating session; the gate script's expected lines for Blocks 2 and 4 are now 11/11 and 12/12). Not run here: the run on davinci.]
 
 - Module: `run_noise_fit.py` (scripts layer: Blocks 3, 4 and 9 on one archive cell, the cohort listing and the merge; the only place of the noise fit that reads or writes files), `submit_noise_fit.sh` (the PBS array and the merge job); smoke `smoke_noise_run.py`.
 - Command line: `python run_noise_fit.py list --group-dir DIR [--cells ID,ID]` -> one specimen ID per line, sorted: every `specimen_<id>/` of the group that holds `ss_pulses.npz`; `--cells` restricts it (the pilot, D-124.3), an ID not in the group refused. `python run_noise_fit.py cell --group-dir DIR --specimen ID --out DIR [--workers N] [--force] [--sizes full|smoke]` -> `<out>/cells/specimen_<id>.json`, written atomically (a temporary file, then `os.replace`), and one line `NOISE_CELL <id>: status=<ok|refused|failed> reason=<...> seconds=<s>`; exit 0 for every status (D-125.4: the run goes on), non-zero only for the driver's own usage or I/O errors; a cell whose JSON has status ok and the current code commit is skipped unless `--force` (D-125.5). `python run_noise_fit.py merge --out DIR --group NAME [--cells ID,ID]` -> the two tables and `NOISE_MERGE <GROUP>: <a> ok, <b> refused, <c> failed, <d> missing`, then one line per refused, failed or missing cell. [as built 2026-11-13, `run_noise_fit.py`: this command line, with the assistant's additions (flagged) -- `list` refuses an empty cohort (exit 2) and deduplicates `--cells`; `cell` treats a missing `specimen_<id>/` as a usage error (exit 2, no JSON) and a `metadata.json` naming another specimen as a failure (RuntimeError); before its NOISE_CELL line `cell` prints progress lines `[noise_fit <id>] ...` (Block 4's and 9's log callables; a worker's prefixed `[noise_fit <id> <SS|LS> <sweep>]`), and a skipped cell's line reads `status=ok reason=skipped (same code commit <12 hex> and sizes) seconds=0`; the resume rule (`resume_decision`) also requires the same `sizes` record and clean code -- a JSON written from code that differed from its commit (`code_dirty`) is re-run, and nothing is skipped while `git status` shows a noise-fit file modified -- so that a smoke-size or hand-edited result never stands in for a full-size committed one; `merge` without `--cells` takes the JSONs found as the cohort, writes its rows sorted by ID, counts an unreadable JSON or an unknown status as failed, and stops (exit 1) on Block 9 column keys that differ from its constants; a missing cell's listing line carries no reason.]
@@ -755,9 +908,9 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 | Command | Purpose | Minimal configuration for testing | Expected runtime |
 |---|---|---|---|
 | `python smoke_noise_stats.py` | Block 1 smoke (N1-N6) | none | seconds |
-| `python smoke_noise_law.py` | Block 2 smoke (M1-M10) | none | about 5 s |
+| `python smoke_noise_law.py` | Block 2 smoke (M1-M11) | none | about 5 s |
 | `python smoke_noise_fit_gates.py` | tools smoke (T1-T8) | none | about 15 s |
-| `python smoke_noise_windows.py` | Block 3 smoke (W1-W14) | none (W4's oracle needs NEURON for the monolith import, W12's pandas for `ls_baseline_qc`, else skipped) | about 20 s |
+| `python smoke_noise_windows.py` | Block 3 smoke (W1-W15) | none (W4's oracle needs NEURON for the monolith import, W12's pandas for `ls_baseline_qc`, else skipped) | about 20 s |
 | `python smoke_noise_fit.py` | Block 4 smoke (F1-F11, reduced M and R) | none | about 100 s |
 | `python smoke_noise_sweep_fit.py` | Block 9 smoke (P1-P11, reduced M and B_v; `P3,P6` runs a subset) | statsmodels (P3's oracle) | about 7 min |
 | `python smoke_noise_run.py` | Block 6 smoke (R1-R9 at `--sizes smoke`; `R5,R7` runs a subset) | statsmodels, git, bash; no NEURON, no PBS | about 8.5 min on 2 cores |

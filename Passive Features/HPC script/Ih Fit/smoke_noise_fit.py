@@ -1,4 +1,4 @@
-"""smoke_noise_fit.py -- Block 4 smoke suite (F1-F11) for noise_fit.py.
+"""smoke_noise_fit.py -- Block 4 smoke suite (F1-F12) for noise_fit.py.
 
 Reduced sizes throughout (M, R, iterations), on Block 3's writer-like
 fixture read through Block 3's pipeline (2 SS sweeps x 37 pulses with 11
@@ -6,13 +6,18 @@ planted drops, K = 63; t_SS(c) of D-111; the kept windows, the tilt offsets
 removed and the median subtraction (D-115); per-sweep tilts planted at
 sigma_b = 0.1 mV/s and read by (TL1) at the 80 ms floor and (TL2), the LS
 tail 1.5 s so that every LS tilt can be read; 5 LS
-pre-windows of 13250 samples). Each check prints one PASS/FAIL line and the
-suite ends with "SMOKE noise_fit: n/11 passed".
+pre-windows of 13250 samples). The noise is the three-component law of SPEC
+2.6 (a) (THETA_CF of smoke_noise_windows: sigma_f 0.035 mV, sigma_m 0.017 mV,
+tau_m 0.3 ms, sigma_s 0.055 mV, tau_s 40 ms), fitted in the five coordinates
+of 2.6 (d) on the 21 statistics of 2.6 (c) (every count from noise_cell_stats).
+Each check prints one PASS/FAIL line and the suite ends with
+"SMOKE noise_fit: n/12 passed".
 
-    python smoke_noise_fit.py            # about 2 min, no NEURON needed
+    python smoke_noise_fit.py            # a few minutes, no NEURON needed
     python smoke_noise_fit.py F1,F5      # a subset (mutation runs)
 
-Pure ASCII, LF. Spec: specs/SPEC.md, Block 4 (test oracles F1-F11).
+Pure ASCII, LF. Spec: specs/SPEC.md, Block 4 (test oracles F1-F11, re-aimed
+by the note of 2026-11-17) and 2.6 (d) (F12, the config's defaults).
 """
 from __future__ import annotations
 
@@ -41,8 +46,24 @@ RESULTS = []
 Z_SE = 3.5
 THETA_CF = sw.THETA_CF
 SIGMA_B_PLANTED = 0.1               # mV/s: the fixture's per-sweep tilts are draws of N(0, 0.1^2)
-WHITE = nl.NoiseLaw(0.05, 1e-3, 0.0, 0.04)   # one-component oracle law (zero slow part)
-SILENT = nl.NoiseLaw(0.0, 0.5, 0.0, 1.0)     # no noise at all: only the tilts remain
+N_STATS = len(ncs.STAT_LABELS)      # d (21, SPEC 2.6 (c)); every count below is taken from noise_cell_stats
+N_SS = ncs.N_SS_STATS
+N_LS = ncs.N_LS_STATS
+N_PARAMS = 5                        # theta = (sigma_f, sigma_m, tau_m, sigma_s, tau_s), SPEC 2.6 (a)
+WHITE = nl.NoiseLaw(0.05, 0.0, 3e-4, 0.0, 0.04)   # one-component oracle law: white only (middle and slow off)
+SILENT = nl.NoiseLaw(0.0, 0.0, 3e-4, 0.0, 1.0)    # no noise at all: only the tilts remain
+# F7's tolerance on |u_hat - u*| per coordinate (log sigma_f, log sigma_m, log tau_m, log sigma_s, log tau_s), from
+# the fixture's own Monte Carlo spread (measured 2026-11-17 in the sandbox, numpy 2.5.3, scipy 1.18.1): build_cell
+# with 40 other fixture seeds (1-40), each fitted with F7's reduced sizes (M 60, R 40/60, B 400, k_max 2, max_nfev 6;
+# about 45 s each). The spread is bimodal. In 34 of 40 fits u_hat - u* had mean (-0.002, -0.022, -0.108, +0.032,
+# +0.017) and SD (0.006, 0.045, 0.200, 0.151, 0.353), max |.| (0.010, 0.144, 0.523, 0.354, 0.760); the tolerance is
+# |mean| + 4 SD of that mode, rounded up to 0.01. In the other 6 (seeds 1, 3, 6, 12, 28, 37) the slow part ran away
+# along its ridge (sigma_s 7-15 times too large, tau_s 60 times too long or at the 10 s bound, flag
+# at_bound:log_tau_s in 3): +1.9 to +2.7 in log sigma_s, +4.1 to +5.5 in log tau_s, sigma_f absorbing 0.03-0.08.
+# The suite's fixture (seed 2026) is deterministic and falls in the first mode (u_hat - u* = (+0.011, -0.078, -0.087,
+# -0.115, -0.525)); a defect that throws it into the second mode, or permutes coordinates, fails the check. The
+# middle part is determined at these sizes about as well as the slow part's main mode (log tau_m SD 0.20).
+F7_TOL_U = np.array([0.03, 0.21, 0.91, 0.64, 1.43])
 
 
 def report(name, ok, note=""):
@@ -128,9 +149,9 @@ def _f1(lay, t_ss_ms):
     tilt_err = max(abs(tilts_read[int(s)] - b_loop[s]) for s in lay.sweep_numbers)
     same = err <= 1e-12 and tilt_err <= 1e-12 and lay.j_floor == jf
     units = nl.draw_units(rng2, lay.K_LS, lay.n_ls)
-    ls_tr2 = nl.simulate_traces(THETA_CF, lay.dt, units.fast, units.slow, tilt_mV_per_s=lay.ls_tilt)
+    ls_tr2 = nl.simulate_traces(THETA_CF, lay.dt, units.fast, units.mid, units.slow, tilt_mV_per_s=lay.ls_tilt)
     same_ls = np.array_equal(ls_tr, ls_tr2) and np.array_equal(ls_stats, ncs.ls_window_stats(list(ls_tr2), lay.fs))
-    shapes = ss_stats.shape == (lay.K, 5) and ls_stats.shape == (lay.K_LS, 10) and Xt.shape == (lay.K, lay.m)
+    shapes = ss_stats.shape == (lay.K, N_SS) and ls_stats.shape == (lay.K_LS, N_LS) and Xt.shape == (lay.K, lay.m)
     finite = np.all(np.isfinite(ss_stats)) and np.all(np.isfinite(ls_stats))
     report("F1 cutting (D-115.3): X_tilde == independent loop (cut from the floor, the replicate's (TL1) by its closed "
            "form, offsets, each group's median) within 1e-12; the replicate's tilts likewise; LS bit for bit; shapes",
@@ -179,8 +200,7 @@ def _f3(lay):
     q1, pool_ss, pool_ls = nf.binding_function(THETA_CF, lay, cfg, 5, return_pool=True)
     q2 = nf.binding_function(THETA_CF, lay, cfg, 5)
     q3 = nf.binding_function(THETA_CF, lay, cfg, 6)
-    law_eps = nl.NoiseLaw(THETA_CF.sigma_f * (1 + 1e-6), THETA_CF.rho_f * (1 + 1e-6),
-                          THETA_CF.sigma_s * (1 + 1e-6), THETA_CF.tau_s * (1 + 1e-6))
+    law_eps = nl.NoiseLaw.from_array(THETA_CF.as_array() * (1 + 1e-6))
     q4 = nf.binding_function(law_eps, lay, cfg, 5)
     se_mc = np.concatenate([pool_ss.std(axis=0, ddof=1) * 1.2533 / math.sqrt(pool_ss.shape[0]),
                             pool_ls.std(axis=0, ddof=1) * 1.2533 / math.sqrt(pool_ls.shape[0])])
@@ -218,8 +238,9 @@ def _f4(lay):
     kappa = nf.correlation_condition_number(S)
     keys = set(sig.per_sweep)
     want = set(int(s) for s in lay0.sweep_numbers) | set(int(s) for s in lay0.ls_sweep_number)
-    shapes = all(sig.per_sweep[s].shape == (R, 5) for s in lay0.sweep_numbers) and \
-        all(sig.per_sweep[int(s)].shape == (R, 10) for s in lay0.ls_sweep_number)
+    shapes = all(sig.per_sweep[s].shape == (R, N_SS) for s in lay0.sweep_numbers) and \
+        all(sig.per_sweep[int(s)].shape == (R, N_LS) for s in lay0.ls_sweep_number) and \
+        sig.Sigma.shape == (N_STATS, N_STATS)
     report("F4 Sigma_hat: Var(ss_sd) and the LS single-window Var(sd) within 40 % of the white-law values; SPD; per-sweep vectors",
            ok1 and ok2 and spd and np.isfinite(kappa) and keys == want and shapes,
            "ss_sd var ratio %.3f, ls_sd var ratio %.3f, SPD %s, kappa %.3g, sweeps %s" % (got / expected, var_ls / exp_ls, spd, kappa, sorted(keys)))
@@ -265,8 +286,7 @@ def _f6(lay):
                          pool_ls.std(axis=0, ddof=1) * 1.2533 / math.sqrt(lay.K_LS)])
     mask = np.isfinite(q_star) & (se > 0)
     C = np.diag(se[mask])
-    starts = [nl.NoiseLaw(THETA_CF.sigma_f, THETA_CF.rho_f, THETA_CF.sigma_s, THETA_CF.tau_s / 2.0),
-              nl.NoiseLaw(THETA_CF.sigma_f, THETA_CF.rho_f, THETA_CF.sigma_s, THETA_CF.tau_s * 2.0)]
+    starts = [replace(THETA_CF, tau_s=THETA_CF.tau_s / 2.0), replace(THETA_CF, tau_s=THETA_CF.tau_s * 2.0)]
     t0 = time.time()
     res = nf.solve_inner(q_star, C, starts, lay, cfg, seed, mask)
     du = np.abs(res.u - nf.law_to_u(THETA_CF))
@@ -284,7 +304,7 @@ def _f7(lay, tg, truth):
     res = nf.fit_cell(tg, lay, cfg, log=lines.append)
     secs = time.time() - t0
     du = np.abs(res.u - nf.law_to_u(THETA_CF))
-    tol = np.array([0.04, 0.03, 0.4, 1.0])
+    tol = F7_TOL_U
     ok_u = np.all(du <= tol)
     # J reported = |C^-1 (q_sim - q_hat)|^2 with the final Sigma_hat and q_sim at the solution
     r = (res.q_sim - res.q_hat)[np.isfinite(res.SE)]
@@ -298,21 +318,27 @@ def _f7(lay, tg, truth):
                and res.ls_tilt == {int(s): float(b) for s, b in zip(lay.ls_sweep_number, lay.ls_tilt)}
                and not any(f.startswith("tilt_") for f in res.flags) and not hasattr(res, "sigma_b"))
     ok_fields = (ok_J and res.n_solves == len(res.history) and res.n_solves >= 2 and np.isfinite(res.J) and np.isfinite(res.kappa)
-                 and res.Sigma.shape == (15, 15) and res.dof == 11 and 0.0 <= res.p_value <= 1.0
-                 and res.stats_dropped == () and len(res.labels_kept) == 15 and np.all(np.isfinite(res.SE))
+                 and res.Sigma.shape == (N_STATS, N_STATS) and res.dof == N_STATS - N_PARAMS
+                 and res.u.shape == (N_PARAMS,) and 0.0 <= res.p_value <= 1.0
+                 and res.stats_dropped == () and res.labels_kept == ncs.STAT_LABELS and np.all(np.isfinite(res.SE))
                  and np.all(np.isfinite(res.q_sim)) and len(res.per_sweep_cov) == 7
                  and res.history[0]["weight"] == "W0" and res.history[-1]["weight"] == "final")
     try:
         txt = json.dumps(res.to_dict())
         back = json.loads(txt)
-        ok_json = (abs(back["law"]["sigma_f_mV"] - res.law.sigma_f) < 1e-15 and back["n_solves"] == res.n_solves
-                   and len(back["Sigma"]) == 15 and len(back["history"]) == res.n_solves
+        law_keys = ("sigma_f_mV", "sigma_m_mV", "tau_m_s", "sigma_s_mV", "tau_s_s")      # SPEC 2.6 (g)
+        ok_json = (tuple(back["law"]) == law_keys
+                   and np.array_equal(np.array([back["law"][k] for k in law_keys]), res.law.as_array())
+                   and back["n_solves"] == res.n_solves and back["dof"] == N_STATS - N_PARAMS
+                   and len(back["Sigma"]) == N_STATS and len(back["u"]) == N_PARAMS
+                   and len(back["history"]) == res.n_solves
                    and "sigma_b_mV_per_s" not in back and len(back["ls_tilt_mV_per_s"]) == lay.K_LS)
     except Exception as exc:  # noqa: BLE001
         ok_json = False
         lines.append("to_dict failed: %r" % (exc,))
-    report("F7 reduced fit: |u_hat - u*| within (0.04, 0.03, 0.4, 1.0); q_sim = q_sim(theta_hat), J = r^T Sigma^-1 r there; the layout's tilts "
-           "carried, no tilt estimate; every field; JSON round trip",
+    report("F7 reduced fit: |u_hat - u*| within %s per coordinate of u; q_sim = q_sim(theta_hat), J = r^T Sigma^-1 r there; "
+           "dof = d - 5; the layout's tilts carried, no tilt estimate; every field; the law dict of 2.6 (g); JSON round trip"
+           % (tuple(float(x) for x in F7_TOL_U),),
            ok_u and ok_tilt and ok_fields and ok_json,
            "du %s theta_hat %s J %.3g (recomputed %.3g) p %.3f kappa %.3g solves %d converged %s flags %s (%.0f s)"
            % (np.array2string(du, precision=3), res.law, res.J, J_check, res.p_value, res.kappa, res.n_solves,
@@ -342,7 +368,7 @@ def _f8():
 
 
 def _f9(lay, tg):
-    """Masks: two NaN statistics are dropped everywhere."""
+    """Masks: two NaN statistics are dropped everywhere; dof = d_eff - 5 (SPEC 2.6 (d))."""
     q = tg.q_hat.copy()
     j1 = ncs.STAT_LABELS.index("ss_rho_10ms")
     j2 = ncs.STAT_LABELS.index("ls_last_rho_10ms")
@@ -351,12 +377,27 @@ def _f9(lay, tg):
     cfg = nf.NoiseFitConfig(M_binding=60, R_iter=20, R_final=20, B_boot=200, k_max=0, max_nfev=1)
     t0 = time.time()
     res = nf.fit_cell(tg2, lay, cfg)
-    ok = (res.Sigma.shape == (13, 13) and set(res.stats_dropped) == {"ss_rho_10ms", "ls_last_rho_10ms"}
-          and len(res.labels_kept) == 13 and res.dof == 9 and np.isnan(res.SE[j1]) and np.isnan(res.SE[j2])
+    d_eff = N_STATS - 2
+    ok = (res.Sigma.shape == (d_eff, d_eff) and set(res.stats_dropped) == {"ss_rho_10ms", "ls_last_rho_10ms"}
+          and len(res.labels_kept) == d_eff and res.dof == d_eff - N_PARAMS
+          and np.isnan(res.SE[j1]) and np.isnan(res.SE[j2])
           and any(f.startswith("stats_dropped:") for f in res.flags) and "no_plateau" in res.flags
           and res.n_solves == 2)
-    report("F9 masks: two NaN statistics -> d_eff 13, Sigma (13, 13), labels, SE NaN, flag; k_max 0 -> no_plateau",
-           ok, "dropped %s dof %d solves %d flags %s (%.0f s)" % (res.stats_dropped, res.dof, res.n_solves, res.flags, time.time() - t0))
+    # d_eff >= 6 required (SPEC 2.6 (d)): a q_hat with 5 finite statistics is refused before any simulation
+    q5 = np.full(N_STATS, np.nan)
+    keep5 = [ncs.STAT_LABELS.index(l) for l in ("ss_sd", "ss_rho_0.02ms", "ss_rho_1ms", "ls_sd", "ls_last_sd")]
+    q5[keep5] = tg.q_hat[keep5]
+    try:
+        nf.fit_cell(nf.CellTarget(q_hat=q5, per_window_ss=tg.per_window_ss, per_window_ls=tg.per_window_ls), lay, cfg)
+        ok_min, why = False, "not refused"
+    except ValueError as exc:
+        why = str(exc)
+        ok_min = "at least %d" % (N_PARAMS + 1) in why
+    ok = ok and ok_min
+    notes_min = "d_eff 5: %s" % why
+    report("F9 masks: two NaN statistics -> d_eff %d, Sigma (%d, %d), dof %d, labels, SE NaN, flag; k_max 0 -> no_plateau; "
+           "d_eff 5 refused" % (d_eff, d_eff, d_eff, d_eff - N_PARAMS), ok, "dropped %s dof %d solves %d flags %s; %s (%.0f s)"
+           % (res.stats_dropped, res.dof, res.n_solves, res.flags, notes_min, time.time() - t0))
 
 
 def _f10():
@@ -413,6 +454,87 @@ def _f11(tmp):
            "; ".join(notes) + "; missing refused %s; aligned %s; from_cell = nwin.tilts and j_floor %s" % (ok_c, ok_d, ok_e))
 
 
+def _f12(lay, tg):
+    """NoiseFitConfig()'s defaults, the bounds, the coordinates and the starts against SPEC 2.6 (d), (h)."""
+    cfg = nf.NoiseFitConfig()
+    L = math.log
+    notes = []
+    # (a) the fields of 2.6 (d), (h), written out here; the fields 2.6 leaves standing (Block 4 entry, 2.3 (d))
+    want = {"fd_rel_step": (1e-3, 3e-3, 3e-3, 1e-3, 1e-3), "log_sigma_bounds": (L(1e-4), L(10.0)),
+            "log_tau_m_bounds": (L(4e-5), L(1e-3)), "log_tau_s_bounds": (L(1e-3), L(10.0)),
+            "M_binding": 3000, "R_iter": 600, "R_final": 3000, "B_boot": 2000, "k_max": 6, "tol_u": 0.01,
+            "starts_after_first": 1, "max_nfev": 15, "ftol": 1e-4, "xtol": 1e-3, "gtol": 1e-8}
+    bad = [k for k, v in want.items() if getattr(cfg, k, None) != v]
+    gone = not hasattr(cfg, "rho_bounds") and not hasattr(cfg, "log_tau_bounds")
+    ok_a = not bad and gone
+    notes.append("fields %s, old bounds removed %s" % ("ok" if not bad else "differ: %s" % bad, gone))
+    # (b) bounds() in the order of u: three SDs [1e-4, 10] mV, tau_m [4e-5, 1e-3] s, tau_s [1e-3, 10] s
+    lo, hi = cfg.bounds()
+    lo_w = np.array([L(1e-4), L(1e-4), L(4e-5), L(1e-4), L(1e-3)])
+    hi_w = np.array([L(10.0), L(10.0), L(1e-3), L(10.0), L(10.0)])
+    ok_b = lo.shape == (N_PARAMS,) and hi.shape == (N_PARAMS,) and np.array_equal(lo, lo_w) and np.array_equal(hi, hi_w)
+    # (c) the coordinates: u = (log sigma_f, log sigma_m, log tau_m, log sigma_s, log tau_s), by field name
+    law = nl.NoiseLaw(0.031, 0.017, 2.5e-4, 0.062, 0.045)
+    u = nf.law_to_u(law)
+    u_w = np.array([L(law.sigma_f), L(law.sigma_m), L(law.tau_m), L(law.sigma_s), L(law.tau_s)])
+    back = nf.u_to_law(u_w)
+    ok_c = (u.shape == (N_PARAMS,) and np.array_equal(u, u_w)
+            and np.allclose([back.sigma_f, back.sigma_m, back.tau_m, back.sigma_s, back.tau_s],
+                            [0.031, 0.017, 2.5e-4, 0.062, 0.045], rtol=1e-14, atol=0))   # exp(log x): roundoff only
+    try:
+        nf.u_to_law(u_w[:4])
+        ok_c = False
+    except ValueError:
+        pass
+    # (d) at_bound names: a residual pulling one coordinate past its bound, the others interior
+    names = ("log_sigma_f", "log_sigma_m", "log_tau_m", "log_sigma_s", "log_tau_s")
+    hits = []
+    for j, target in ((2, L(1e-2)), (1, L(1e-6)), (4, L(100.0))):
+        tgt = nf.law_to_u(THETA_CF)
+        tgt[j] = target
+        r = nf.solve_inner(np.zeros(N_STATS), np.eye(1), [THETA_CF], lay, cfg, 0, np.ones(N_STATS, bool),
+                           residual=lambda x, t=tgt: x - t)
+        hits.append(r.at_bound)
+    ok_d = tuple(nf.U_NAMES) == names and hits == [("log_tau_m",), ("log_sigma_m",), ("log_tau_s",)]
+    notes.append("at_bound %s" % hits)
+    # (e) the three starts of the first solve: tau_s / 2 and 2 tau_s, clipped into [1e-3, 10] s
+    s_mid = nf._starts_around(THETA_CF, 3, cfg)
+    s_lo = nf._starts_around(replace(THETA_CF, tau_s=1.5e-3), 3, cfg)
+    s_hi = nf._starts_around(replace(THETA_CF, tau_s=8.0), 3, cfg)
+    ok_e = ([x.tau_s for x in s_mid] == [THETA_CF.tau_s, THETA_CF.tau_s / 2, THETA_CF.tau_s * 2]
+            and all(replace(x, tau_s=THETA_CF.tau_s) == THETA_CF for x in s_mid)
+            and abs(s_lo[1].tau_s - 1e-3) <= 1e-15 and s_lo[2].tau_s == 3e-3      # exp(log 1e-3): roundoff only
+            and s_hi[1].tau_s == 4.0 and abs(s_hi[2].tau_s - 10.0) <= 1e-12
+            and len(nf._starts_around(THETA_CF, 1, cfg)) == 1)
+    # (f) the closed-form start: the 4 initial points of 2.6 (d); the lowest-cost solution kept; recovers theta on q_cf
+    pts = [(0.035, 0.017, tm, 0.06, ts) for tm in (1e-4, 6e-4) for ts in (0.03, 0.2)]
+    ok_pts = sorted(tuple(p.as_array()) for p in nf.CF_INITIAL_POINTS) == sorted(pts)
+    # (f1) on the fixture's own q_hat (not attainable by q_cf), W_0 from a window bootstrap: the four single-start
+    # solutions differ in their last digits (cost differences of about 1e-9 relative, far above the roundoff of the
+    # cost, 1e-15), and closed_form_start must return, bit for bit, the one of lowest cost
+    SE_d = np.concatenate([ncs.bootstrap_median_se(tg.per_window_ss, 400, np.random.default_rng(1)),
+                           ncs.bootstrap_median_se(tg.per_window_ls, 400, np.random.default_rng(2))])
+    mask_d = np.isfinite(tg.q_hat) & np.isfinite(SE_d) & (SE_d > 0)
+    cost = lambda lw: float(np.sum(((nf.closed_form_vector(lw, lay) - tg.q_hat)[mask_d] / SE_d[mask_d]) ** 2))
+    best = nf.closed_form_start(tg.q_hat, SE_d, mask_d, lay, cfg)
+    singles = [nf.closed_form_start(tg.q_hat, SE_d, mask_d, lay, cfg, u0=nf.law_to_u(p)) for p in nf.CF_INITIAL_POINTS]
+    c_single = [cost(x) for x in singles]
+    ok_f1 = best == singles[int(np.argmin(c_single))]
+    # (f2) on q_cf(theta*) (exactly attainable, any positive weights) the start recovers theta* to 1e-3 in u
+    # (least_squares' default tolerances, 1e-8 on the cost)
+    q_cf = nf.closed_form_vector(THETA_CF, lay)
+    SE = 0.02 * np.abs(q_cf) + 1e-4
+    du_cf = float(np.max(np.abs(nf.law_to_u(nf.closed_form_start(q_cf, SE, np.isfinite(q_cf), lay, cfg))
+                                - nf.law_to_u(THETA_CF))))
+    ok_f = ok_pts and ok_f1 and du_cf <= 1e-3
+    notes.append("closed form: 4 points %s, best = lowest of %s: %s; on q_cf(theta*) max |du| %.1e"
+                 % (ok_pts, ["%.10f" % c for c in c_single], ok_f1, du_cf))
+    report("F12 config and coordinates (SPEC 2.6 (d), (h)): NoiseFitConfig() defaults; bounds() (5,); law_to_u / u_to_law "
+           "order; at_bound names; starts tau_s/2, 2 tau_s clipped; closed-form start = best of the 4 initial points",
+           ok_a and ok_b and ok_c and ok_d and ok_e and ok_f,
+           "; ".join(notes) + "; bounds %s coords %s starts %s" % (ok_b, ok_c, ok_e))
+
+
 def main(only=None):
     t_all = time.time()
     tmp = tempfile.mkdtemp(prefix="smoke_noise_fit_")
@@ -423,7 +545,7 @@ def main(only=None):
     checks = [("F1", lambda: _f1(lay, nwin.start.t_ss_ms)), ("F2", lambda: _f2(lay)), ("F3", lambda: _f3(lay)),
               ("F4", lambda: _f4(lay)), ("F5", lambda: _f5(lay, nwin, truth)), ("F6", lambda: _f6(lay)),
               ("F7", lambda: _f7(lay, tg, truth)), ("F8", _f8), ("F9", lambda: _f9(lay, tg)), ("F10", _f10),
-              ("F11", lambda: _f11(tmp))]
+              ("F11", lambda: _f11(tmp)), ("F12", lambda: _f12(lay, tg))]
     for name, fn in checks:
         if only and name not in only:
             continue

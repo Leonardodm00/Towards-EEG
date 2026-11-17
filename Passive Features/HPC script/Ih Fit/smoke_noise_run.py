@@ -71,7 +71,7 @@ REQUIRED = ("specimen_id", "group", "status", "reason", "code_commit", "code_dir
             "tables")
 WINDOWS_REQUIRED = ("t_ss_ms", "K", "K_LS", "start_flags", "ss_tilt_flags", "ls_tilt_flags")
 LINE = re.compile(r"^NOISE_CELL (\d+): status=(\w+) reason=(.*) seconds=(\d+)$")
-BLOCK4_NAMES = ("noise_sigma_f_mV", "noise_rho_f", "noise_sigma_s_mV", "noise_tau_s_ms", "noise_J", "noise_dof",
+BLOCK4_NAMES = ("noise_sigma_f_mV", "noise_sigma_m_mV", "noise_tau_m_ms", "noise_sigma_s_mV", "noise_tau_s_ms", "noise_J", "noise_dof",
                 "noise_p", "noise_kappa", "noise_n_solves", "noise_flags")
 
 
@@ -580,8 +580,8 @@ def _r5(fx):
     if parts["cells: one row per cohort cell, in ID order, with its status"]:
         ok_row, ref_row, bro_row, mis_row = rows
         cf, w = D.cf, recs[ID_OK]["windows"]
-        expect_ok = {"reason": "", "noise_sigma_f_mV": cf.law.sigma_f, "noise_rho_f": cf.law.rho_f,
-                     "noise_sigma_s_mV": cf.law.sigma_s, "noise_tau_s_ms": 1e3 * cf.law.tau_s, "noise_J": cf.J,
+        expect_ok = {"reason": "", "noise_sigma_f_mV": cf.law.sigma_f, "noise_sigma_m_mV": cf.law.sigma_m,
+                     "noise_tau_m_ms": 1e3 * cf.law.tau_m, "noise_sigma_s_mV": cf.law.sigma_s, "noise_tau_s_ms": 1e3 * cf.law.tau_s, "noise_J": cf.J,
                      "noise_dof": cf.dof, "noise_p": cf.p_value, "noise_kappa": cf.kappa, "noise_n_solves": cf.n_solves,
                      "noise_flags": ";".join(cf.flags), "noise_t_ss_ms": D.nwin.start.t_ss_ms,
                      "noise_K": D.nwin.ss.n_windows, "noise_K_LS": len(D.ls.pre), "noise_code_commit": fx.commit_A}

@@ -33,9 +33,10 @@ from noise_windows import LSWindows, SSWindows, SweepTilts, WindowConfig, ls_seg
 # SweepTilts and ss_sweep_tilts ((TL1)) live in noise_windows since 2026-10-30 (D-115: the window pipeline reads
 # the SS tilt before the start and removes its offsets); they are re-exported here for the callers of Block 3.
 
-SS_LAGS_MS: Tuple[float, ...] = (0.02, 0.1, 1.0, 10.0)
-LS_FULL_LAGS_MS: Tuple[float, ...] = (0.02, 0.1, 1.0)
-LS_LAST_LAGS_MS: Tuple[float, ...] = (0.02, 0.1, 1.0, 10.0)
+# SPEC 2.6 (c) (D-153.2, D-154.1): 0.04 ms and 0.3 ms added in the three windows; d = 21.
+SS_LAGS_MS: Tuple[float, ...] = (0.02, 0.04, 0.1, 0.3, 1.0, 10.0)
+LS_FULL_LAGS_MS: Tuple[float, ...] = (0.02, 0.04, 0.1, 0.3, 1.0)
+LS_LAST_LAGS_MS: Tuple[float, ...] = (0.02, 0.04, 0.1, 0.3, 1.0, 10.0)
 
 
 def _lag_label(prefix: str, lag_ms: float) -> str:
@@ -48,8 +49,8 @@ STAT_LABELS: Tuple[str, ...] = (
     + ("ls_first_sd",)
     + ("ls_last_sd",) + tuple(_lag_label("ls_last", l) for l in LS_LAST_LAGS_MS))
 STAT_BLOCK: Tuple[str, ...] = tuple("ss" if lab.startswith("ss") else "ls" for lab in STAT_LABELS)
-N_SS_STATS = 1 + len(SS_LAGS_MS)          # 5
-N_LS_STATS = len(STAT_LABELS) - N_SS_STATS  # 10
+N_SS_STATS = 1 + len(SS_LAGS_MS)          # 7
+N_LS_STATS = len(STAT_LABELS) - N_SS_STATS  # 14
 
 
 def lags_in_samples(lags_ms: Sequence[float], fs: float) -> np.ndarray:
@@ -74,13 +75,13 @@ def window_stats(X: np.ndarray, fs: float, lags_ms: Sequence[float]) -> np.ndarr
 
 
 def ss_window_stats(X_tilde: np.ndarray, fs: float) -> np.ndarray:
-    """The 5 SS statistics per enlarged window (after the subtraction)."""
+    """The N_SS_STATS (7) SS statistics per enlarged window (after the subtraction)."""
     return window_stats(X_tilde, fs, SS_LAGS_MS)
 
 
 def ls_window_stats(pre_list: Sequence[np.ndarray], fs: float,
                     cfg: WindowConfig = WindowConfig()) -> np.ndarray:
-    """The 10 LS statistics per pre-window: full window sigma_hat and
+    """The N_LS_STATS (14) LS statistics per pre-window: full window sigma_hat and
     rho_hat at LS_FULL_LAGS_MS; first-segment sigma_hat; last-segment
     sigma_hat and rho_hat at LS_LAST_LAGS_MS (D-051 (i))."""
     out = np.empty((len(pre_list), N_LS_STATS))

@@ -1,5 +1,5 @@
 """noise_law.py -- the recording-noise law of the Stage-7 twins: simulator and
-closed-form moments (D-017, D-034, D-056; specs/SPEC.md Block 2).
+closed-form moments (D-017, D-034, D-056, D-152; specs/SPEC.md Block 2, 2.6).
 
 Model layer only: no file I/O, no plotting, no module-level randomness. Every
 function takes the law and the sampling interval explicitly; random numbers
@@ -7,30 +7,38 @@ enter as UNIT draws (standard normal arrays) made by the caller, so that the
 same draws can be reused at every theta (common random numbers, D-050) and
 the generator (Block 5) and the fit (Block 4) share one simulator.
 
-The law (SPEC 2.1, eqs. L1-L3). For one trace sampled every dt (s) at
-t_j = j dt, j = 0..n-1, with mid-time t_bar = (n-1) dt / 2,
+The law (SPEC 2.6 (a), eqs. L1'-L3'; D-152: it replaces the two-component law
+of 2.1). For one trace sampled every dt (s) at t_j = j dt, j = 0..n-1, with
+mid-time t_bar = (n-1) dt / 2,
 
-    e_j = e_fast_j + e_slow_j + a + b (t_j - t_bar)                       (L1)
-    e_fast_j = rho_f e_fast_{j-1} + eta_j,   eta_j  ~ N(0, sigma_f^2 (1 - rho_f^2))
+    e_j = e_fast_j + e_mid_j + e_slow_j + a + b (t_j - t_bar)               (L1')
+    e_fast_j ~ N(0, sigma_f^2), independent across j (white)
+    e_mid_j  = rho_m e_mid_{j-1}  + eta_j,   eta_j  ~ N(0, sigma_m^2 (1 - rho_m^2))
     e_slow_j = rho_s e_slow_{j-1} + eta'_j,  eta'_j ~ N(0, sigma_s^2 (1 - rho_s^2))
-    rho_s = exp(-dt / tau_s)                                              (L2)
+    rho_m = exp(-dt / tau_m),  rho_s = exp(-dt / tau_s)                     (L2')
 
-both recursions started in their stationary laws, a ~ N(0, sigma_a^2) (mV)
-and b ~ N(0, sigma_b^2) (mV/s) drawn once per trace -- or b given as a fixed
-number per trace (`tilt_mV_per_s`: the tilt read on the trace's real sweep,
-D-102.1, D-107.2; the twins and the fit's simulator). theta = (sigma_f, rho_f,
-sigma_s, tau_s) in mV, --, mV, s; rho_f is the lag-1 coefficient AT THE dt
-PASSED IN (D-014: a per-sample quantity; its transfer between sampling rates
-is D-017 (f), open, and is not done here). For every lag k >= 0 (samples)
+the two recursions started in their stationary laws, the three components
+independent, each driven by its own standard-normal draws; a ~ N(0, sigma_a^2)
+(mV) and b ~ N(0, sigma_b^2) (mV/s) drawn once per trace -- or b given as a
+fixed number per trace (`tilt_mV_per_s`: the tilt read on the trace's real
+sweep, D-102.1, D-107.2; the twins and the fit's simulator). theta =
+(sigma_f, sigma_m, tau_m, sigma_s, tau_s) in mV, mV, s, mV, s, in this order
+everywhere. For every lag k (samples, any sign)
 
-    gamma(k | theta, dt) = sigma_f^2 rho_f^k + sigma_s^2 exp(-k dt / tau_s)  (L3)
+    gamma(k | theta, dt) = sigma_f^2 [k = 0] + sigma_m^2 exp(-|k| dt / tau_m)
+                           + sigma_s^2 exp(-|k| dt / tau_s)                 (L3')
+
+In plain words: a white part that adds variance at lag 0 only, and two
+exponentially correlated (Ornstein-Uhlenbeck, sampled) parts, a middle one
+(tau_m, a fraction of a ms) and a slow one (tau_s, tens of ms).
 
 Closed forms (topic doc eqs. (7a), (7b), (9), (10), (8), (25); SPEC 2.4):
 exact expectations of a demeaned window's S_0 and S_L, the ratio of
 expectations used as the closed-form starting point of the fit, the visible
 share of one OU component, and the semivariogram of two window means of one
 trace, exact for the sampled law (discrete time) with the continuous-time
-form of eq. (25) kept as an oracle.
+form of eq. (25) kept as an oracle. Every one is written in terms of gamma and
+therefore takes (L3') unchanged (SPEC 2.6 (a)).
 
 Any constant added to a trace (the offset a, or the tilt's value at a
 window's centre) is invisible to every demeaned statistic and to the
@@ -54,56 +62,61 @@ ArrayLike = Union[int, Sequence[int], np.ndarray]
 # ===========================================================================
 @dataclass(frozen=True)
 class NoiseLaw:
-    """theta = (sigma_f, rho_f, sigma_s, tau_s): the stationary part of (L1).
+    """theta = (sigma_f, sigma_m, tau_m, sigma_s, tau_s): the stationary part of (L1').
 
-    sigma_f : mV, SD of the fast AR(1) component (>= 0; 0 switches it off)
-    rho_f   : lag-1 coefficient of the fast component at the sampling interval
-              the law is used with, in (0, 1)
+    sigma_f : mV, SD of the white (fast) component (>= 0; 0 switches it off)
+    sigma_m : mV, SD of the middle OU component (>= 0; 0 switches it off)
+    tau_m   : s, correlation time of the middle component (> 0)
     sigma_s : mV, SD of the slow OU component (>= 0; 0 switches it off)
     tau_s   : s, correlation time of the slow component (> 0)
-    The fit lives in the interior (sigma_f, sigma_s > 0); zero SDs are allowed
-    so that one-component laws can serve as oracles and comparisons.
+    The fit lives in the interior of the bounds of SPEC 2.6 (a); they are not
+    enforced here: zero SDs are allowed so that one- and two-component laws can
+    serve as oracles and comparisons, and any tau > 0 is accepted.
     """
     sigma_f: float
-    rho_f: float
+    sigma_m: float
+    tau_m: float
     sigma_s: float
     tau_s: float
 
     def __post_init__(self):
-        vals = (self.sigma_f, self.rho_f, self.sigma_s, self.tau_s)
+        vals = (self.sigma_f, self.sigma_m, self.tau_m, self.sigma_s, self.tau_s)
         if not all(np.isfinite(v) for v in vals):
             raise ValueError("NoiseLaw: every parameter must be finite, got %r" % (vals,))
-        if self.sigma_f < 0 or self.sigma_s < 0:
-            raise ValueError("NoiseLaw: sigma_f and sigma_s must be >= 0 (mV)")
-        if not 0.0 < self.rho_f < 1.0:
-            raise ValueError("NoiseLaw: rho_f must lie in (0, 1), got %r" % (self.rho_f,))
+        if self.sigma_f < 0 or self.sigma_m < 0 or self.sigma_s < 0:
+            raise ValueError("NoiseLaw: sigma_f, sigma_m and sigma_s must be >= 0 (mV)")
+        if not self.tau_m > 0.0:
+            raise ValueError("NoiseLaw: tau_m must be > 0 (s), got %r" % (self.tau_m,))
         if not self.tau_s > 0.0:
             raise ValueError("NoiseLaw: tau_s must be > 0 (s), got %r" % (self.tau_s,))
 
     def as_array(self) -> np.ndarray:
-        """(4,) float64: (sigma_f, rho_f, sigma_s, tau_s) in mV, --, mV, s."""
-        return np.array([self.sigma_f, self.rho_f, self.sigma_s, self.tau_s], dtype=float)
+        """(5,) float64: (sigma_f, sigma_m, tau_m, sigma_s, tau_s) in mV, mV, s, mV, s."""
+        return np.array([self.sigma_f, self.sigma_m, self.tau_m, self.sigma_s, self.tau_s], dtype=float)
 
     @classmethod
     def from_array(cls, theta: np.ndarray) -> "NoiseLaw":
+        """The inverse of `as_array`: (5,) in the order of as_array."""
         theta = np.asarray(theta, dtype=float).ravel()
-        if theta.shape != (4,):
-            raise ValueError("NoiseLaw.from_array: expected 4 entries, got shape %r" % (theta.shape,))
-        return cls(float(theta[0]), float(theta[1]), float(theta[2]), float(theta[3]))
+        if theta.shape != (5,):
+            raise ValueError("NoiseLaw.from_array: expected 5 entries, got shape %r" % (theta.shape,))
+        return cls(*(float(v) for v in theta))
+
+    def rho_m(self, dt: float) -> float:
+        """Lag-1 coefficient of the middle component at interval dt (s): exp(-dt/tau_m)."""
+        return float(np.exp(-dt / self.tau_m))
 
     def rho_s(self, dt: float) -> float:
         """Lag-1 coefficient of the slow component at interval dt (s): exp(-dt/tau_s)."""
         return float(np.exp(-dt / self.tau_s))
 
-    def tau_f(self, dt: float) -> float:
-        """Correlation time (s) of the fast component at interval dt: -dt / ln(rho_f)."""
-        return float(-dt / np.log(self.rho_f))
-
 
 def autocovariance(law: NoiseLaw, dt: float, lags: ArrayLike) -> np.ndarray:
-    """gamma(k | theta, dt) of (L3) at each lag in `lags` (samples, any sign), mV^2."""
+    """gamma(k | theta, dt) of (L3') at each lag in `lags` (samples, any sign), mV^2."""
     k = np.abs(np.asarray(lags, dtype=float))
-    return law.sigma_f ** 2 * law.rho_f ** k + law.sigma_s ** 2 * np.exp(-k * dt / law.tau_s)
+    return (law.sigma_f ** 2 * (k == 0).astype(float)
+            + law.sigma_m ** 2 * np.exp(-k * dt / law.tau_m)
+            + law.sigma_s ** 2 * np.exp(-k * dt / law.tau_s))
 
 
 # ===========================================================================
@@ -111,10 +124,11 @@ def autocovariance(law: NoiseLaw, dt: float, lags: ArrayLike) -> np.ndarray:
 # ===========================================================================
 @dataclass(frozen=True)
 class UnitDraws:
-    """Standard-normal draws for `simulate_traces`: fast, slow (n_traces, n),
-    tilt and offset (n_traces,). Made once by `draw_units`, reused at every
-    theta (common random numbers)."""
+    """Standard-normal draws for `simulate_traces`: fast, mid, slow
+    (n_traces, n), tilt and offset (n_traces,). Made once by `draw_units`,
+    reused at every theta (common random numbers)."""
     fast: np.ndarray
+    mid: np.ndarray
     slow: np.ndarray
     tilt: np.ndarray
     offset: np.ndarray
@@ -122,15 +136,16 @@ class UnitDraws:
 
 def draw_units(rng: np.random.Generator, n_traces: int, n_samples: int) -> UnitDraws:
     """Draw the unit noise for n_traces traces of n_samples each from `rng`,
-    in the fixed order fast, slow, tilt, offset (so a given generator state
-    gives the same draws whatever the law)."""
+    in the fixed order fast, mid, slow, tilt, offset (SPEC 2.6 (b); so a given
+    generator state gives the same draws whatever the law)."""
     if n_traces < 1 or n_samples < 2:
         raise ValueError("draw_units: need n_traces >= 1 and n_samples >= 2")
     fast = rng.standard_normal((n_traces, n_samples))
+    mid = rng.standard_normal((n_traces, n_samples))
     slow = rng.standard_normal((n_traces, n_samples))
     tilt = rng.standard_normal(n_traces)
     offset = rng.standard_normal(n_traces)
-    return UnitDraws(fast, slow, tilt, offset)
+    return UnitDraws(fast, mid, slow, tilt, offset)
 
 
 def _stationary_ar1(sigma: float, rho: float, one_minus_rho2: float, xi: np.ndarray) -> np.ndarray:
@@ -145,14 +160,18 @@ def _stationary_ar1(sigma: float, rho: float, one_minus_rho2: float, xi: np.ndar
     return lfilter([1.0], [1.0, -rho], eta, axis=-1)
 
 
-def simulate_traces(law: NoiseLaw, dt: float, xi_fast: np.ndarray, xi_slow: np.ndarray, *,
+def simulate_traces(law: NoiseLaw, dt: float, xi_fast: np.ndarray, xi_mid: np.ndarray, xi_slow: np.ndarray, *,
                     xi_tilt: Optional[np.ndarray] = None, sigma_b: float = 0.0,
                     xi_offset: Optional[np.ndarray] = None, sigma_a: float = 0.0,
                     tilt_mV_per_s: Optional[np.ndarray] = None) -> np.ndarray:
-    """Traces of (L1)-(L2) from unit draws.
+    """Traces of (L1')-(L2') from unit draws.
 
-    law, dt   : the law and the sampling interval (s); rho_f is read at this dt.
-    xi_fast, xi_slow : (n_traces, n) standard-normal draws of the two recursions.
+    law, dt   : the law and the sampling interval (s); rho_m and rho_s are
+                read at this dt.
+    xi_fast, xi_mid, xi_slow : (n_traces, n) standard-normal draws of the
+                white part (e_fast = sigma_f xi_fast) and of the two
+                recursions; all three are required, with one shape, also
+                when a component's SD is 0 (its draws are then not used).
     xi_tilt, sigma_b : (n_traces,) unit draws and the tilt SD (mV/s); the tilt
                 of trace r is sigma_b xi_tilt[r] (t_j - t_bar), t_bar the
                 trace's mid-time (n - 1) dt / 2, so it sums to zero over j.
@@ -161,13 +180,14 @@ def simulate_traces(law: NoiseLaw, dt: float, xi_fast: np.ndarray, xi_slow: np.n
                 random tilt (D-102.1, D-107.2: each trace carries the tilt read
                 on its real sweep): trace r gets tilt_mV_per_s[r] (t_j - t_bar).
                 Not combinable with sigma_b > 0; every entry must be finite.
-    Returns (n_traces, n) float64 noise traces in mV. Each component is left
-    out when its SD is 0 (then its draws may be None).
+    Returns (n_traces, n) float64 noise traces in mV.
     """
     xi_fast = np.asarray(xi_fast, dtype=float)
+    xi_mid = np.asarray(xi_mid, dtype=float)
     xi_slow = np.asarray(xi_slow, dtype=float)
-    if xi_fast.ndim != 2 or xi_fast.shape != xi_slow.shape or xi_fast.shape[1] < 2:
-        raise ValueError("simulate_traces: xi_fast and xi_slow must both be (n_traces, n >= 2)")
+    if (xi_fast.ndim != 2 or xi_fast.shape != xi_mid.shape or xi_fast.shape != xi_slow.shape
+            or xi_fast.shape[1] < 2):
+        raise ValueError("simulate_traces: xi_fast, xi_mid and xi_slow must all be (n_traces, n >= 2)")
     if not dt > 0.0:
         raise ValueError("simulate_traces: dt must be > 0 (s)")
     n_traces, n = xi_fast.shape
@@ -182,9 +202,9 @@ def simulate_traces(law: NoiseLaw, dt: float, xi_fast: np.ndarray, xi_slow: np.n
                              % (n_traces, tilt_mV_per_s.shape))
         if not np.all(np.isfinite(tilt_mV_per_s)):
             raise ValueError("simulate_traces: tilt_mV_per_s has a non-finite entry")
-    rho_s = law.rho_s(dt)
-    out = _stationary_ar1(law.sigma_f, law.rho_f, 1.0 - law.rho_f ** 2, xi_fast)
-    out = out + _stationary_ar1(law.sigma_s, rho_s, -np.expm1(-2.0 * dt / law.tau_s), xi_slow)
+    out = law.sigma_f * xi_fast                                            # white part
+    out = out + _stationary_ar1(law.sigma_m, law.rho_m(dt), -np.expm1(-2.0 * dt / law.tau_m), xi_mid)
+    out = out + _stationary_ar1(law.sigma_s, law.rho_s(dt), -np.expm1(-2.0 * dt / law.tau_s), xi_slow)
     if sigma_b > 0.0 or tilt_mV_per_s is not None:
         if tilt_mV_per_s is None:
             if xi_tilt is None or np.shape(xi_tilt) != (n_traces,):
@@ -209,9 +229,10 @@ def simulate_sweep(law: NoiseLaw, dt: float, n_samples: int, units: UnitDraws, i
         raise ValueError("simulate_sweep: units were drawn for %d samples, not %d"
                          % (units.fast.shape[1], n_samples))
     fixed = None if tilt_mV_per_s is None else np.array([float(tilt_mV_per_s)])
-    out = simulate_traces(law, dt, units.fast[index:index + 1], units.slow[index:index + 1],
-                          xi_tilt=units.tilt[index:index + 1], sigma_b=sigma_b,
-                          xi_offset=units.offset[index:index + 1], sigma_a=sigma_a,
+    sl = slice(index, index + 1)
+    out = simulate_traces(law, dt, units.fast[sl], units.mid[sl], units.slow[sl],
+                          xi_tilt=units.tilt[sl], sigma_b=sigma_b,
+                          xi_offset=units.offset[sl], sigma_a=sigma_a,
                           tilt_mV_per_s=fixed)
     return out[0]
 
@@ -331,20 +352,23 @@ def semivariogram(law: NoiseLaw, dt: float, n1: int, n2: int, offset: int, sigma
 def semivariogram_continuous(law: NoiseLaw, dt: float, T1: float, T2: float, h: float,
                              sigma_b: float = 0.0) -> float:
     """Eq. (25) as written in the topic doc (continuous time), summed over the
-    two OU components (the fast one with tau_f = -dt / ln rho_f):
+    two OU components (middle and slow), plus the white part:
     (1/2) sum_comp [Var_T1 + Var_T2 - 2 Cov_T1,T2(h)] + (1/2) sigma_b^2 h^2,
     Var_T = 2 sigma^2 (z - 1 + e^{-z}) / z^2 (z = T/tau),
     Cov_T1,T2(h) = sigma^2 tau^2 (1 - e^{-T1/tau}) (1 - e^{-T2/tau}) e^{-g/tau} / (T1 T2),
-    gap g = h - (T1 + T2)/2 >= 0. Oracle for `semivariogram`: for the slow
-    component (tau_s >> dt) the two agree to O(dt/tau_s); for the fast
-    component, whose tau_f is below dt, the continuous form does not
-    approximate the sampled law, but that component's share of a window mean
-    is of order sigma_f^2 / n and negligible at the project's windows. mV^2."""
+    gap g = h - (T1 + T2)/2 >= 0. The white part has no continuous-time
+    counterpart; it enters with its sampled value, Var = sigma_f^2 dt / T per
+    window and no covariance between disjoint windows (T / dt samples). Oracle
+    for `semivariogram`: for an OU component with tau >> dt the two agree to
+    O(dt/tau); for the middle component (tau_m of a few samples) the
+    continuous form does not approximate the sampled law, but that
+    component's share of a window mean is of order sigma_m^2 tau_m / T and
+    small at the project's windows. mV^2."""
     if h < 0.5 * (T1 + T2):
         raise ValueError("semivariogram_continuous: the windows overlap (h < (T1 + T2)/2)")
     g = h - 0.5 * (T1 + T2)
-    total = 0.0
-    for sigma, tau in ((law.sigma_f, law.tau_f(dt)), (law.sigma_s, law.tau_s)):
+    total = 0.5 * law.sigma_f ** 2 * (dt / T1 + dt / T2)                 # white part, sampled
+    for sigma, tau in ((law.sigma_m, law.tau_m), (law.sigma_s, law.tau_s)):
         if sigma == 0.0:
             continue
         z1, z2 = T1 / tau, T2 / tau
