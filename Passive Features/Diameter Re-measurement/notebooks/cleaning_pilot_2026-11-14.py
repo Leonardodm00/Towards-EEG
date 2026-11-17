@@ -235,8 +235,8 @@ display(rank.sort_values("worst1_range_gl", ascending=False)[cols].head(15))
 # at Allen's diameter and mu MU) and refines them; round 2 cleans the examples with the refined neighbours. Each
 # round is saved as it ends. The shadows are kept between rounds (D-150.3): a round renders only the neighbours
 # that changed or that differ between the background's and the cleaning's sums, and the log says how many after
-# each round (`shadow images ... reused, ... rendered`). Outputs in OUT/cleaning_worst (Cell 17's folder is
-# untouched): per example
+# each round (`shadow images ... reused, ... rendered`). Outputs in OUT/cleaning_tier1 (Cell 17's folder and
+# OUT/cleaning_worst, the run of 2026-11-16 on 8089, 4844, 7081, 7448, are untouched): per example
 # `cleaning_line_node<id>.png` (the line before, after round 1 and after round 2, and the light each round added
 # back), `cleaning_node<id>_round1.png` and `cleaning_node<id>_round2.png` (before and after on one grey scale,
 # the predicted shadow on its own, D-150.1). Output to send back: the log (the `work list:` lines above all) and
@@ -245,7 +245,7 @@ display(rank.sort_values("worst1_range_gl", ascending=False)[cols].head(15))
 # %%
 WORST_IDS = None                                       # None: Cell 16b's examples; or a list of node ids
 ROUNDS_W, MAX_WORK_W, WORK_PEAK_GL_W = 2, 12, 1.0      # MAX_WORK_W counts the examples too
-CLEAN_W = OUT + "/cleaning_worst"
+CLEAN_W = OUT + "/cleaning_tier1"                       # D-149's run stays in OUT/cleaning_worst
 os.makedirs(CLEAN_W, exist_ok=True)
 with open(EXAMPLES_T1) as f:
     exw = json.load(f)
@@ -270,10 +270,10 @@ for nid in ids_w:
 # %% [markdown]
 # ## Cell 18b (optional): the per-node fit on Cell 17b's cleaned lines (no download; about 1 h for the four examples)
 #
-# Output to send back: the line per node, the table, `chi2.png` and the `fit_node<id>.png` figures.
+# Outputs in OUT/inference_tier1 (OUT/inference_worst untouched). Output to send back: the line per node, the table, `chi2.png` and the `fit_node<id>.png` figures.
 
 # %%
-INFER_W = OUT + "/inference_worst"
+INFER_W = OUT + "/inference_tier1"
 os.makedirs(INFER_W, exist_ok=True)
 run("scripts/infer_nodes.py", "real", "--specimen", SPECIMEN, "--cleaning-dir", CLEAN_W, "--out", INFER_W,
     "--starts", "1.0")
