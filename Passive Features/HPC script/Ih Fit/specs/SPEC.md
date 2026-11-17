@@ -654,7 +654,7 @@ and y_s*_b = log sigma_s_hat*_b, and
 
     v_m(c, s), v_s(c, s) = the sample variances (ddof 1) of y_m*_b and of y_s*_b over the B_ok refits;
 
-either NaN (B_ok < 2) or not strictly positive (every successful refit returned the same value: the pooling's weights 1 / v would not exist) fails the sweep with `v_none` [the second case added 2026-11-17, D-155 [orchestrator], after the final check's finding F1: `pool_cell` raised on v = 0 and the whole cell was lost]. The pooling (P3), (P4), (D-076.1) is applied per protocol
+either NaN (B_ok < 2) or below V_MIN = 1e-12 (log mV)^2 (every successful refit returned the same value, up to roundoff: an SD of log sigma under 1e-6, where real bootstrap SDs are 0.03 to 0.8; the pooling's weights 1 / v would be absurd or not exist; the floor is a module constant, amendment 5) fails the sweep with `v_none` [the second case added 2026-11-17, D-155 [orchestrator], after the final check's finding F1: `pool_cell` raised on v = 0 and the whole cell was lost]. The pooling (P3), (P4), (D-076.1) is applied per protocol
 TWICE, independently: to (y_m, v_m) = (log sigma_m_hat(c, s), v_m(c, s)) giving tau2_hat_m,pr(c), mu_hat_m,pr(c),
 lambda_m(c, s), sigma_m_tilde(c, s); and to (y_s, v_s) as today. sigma_f is not pooled. k_pr = 1 and k_pr = 0 as
 in 2.5 (e), for both. A failed sweep's twin carries theta_hat(c) whole (D-122.3).
