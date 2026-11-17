@@ -55,6 +55,16 @@ shortcut.
 Directions: ray_world.directions(inference.ray_n_rho, inference.ray_n_psi,
 renderer.ray_na, renderer.ray_n_oil) (D-137.2).
 
+The own shadow split by depth (SPEC Block 35, amendment 2; D-151, D-156):
+line_shadow_split runs line_profiles' slab loop with a sink that receives
+each (slab j, plane k) pair's pixel-mean term s_jk and books it twice more,
+w_jk s_jk to the band's image and (1 - w_jk) s_jk to the rest, w_jk the
+fraction of slab j's thickness inside [z_k - beta, z_k + beta]; with layers,
+u_jm s_jk to layer m's image, u_jm the fraction inside the layer
+[z_0 + m h -+ h/2]. Each image is then read as line_profiles reads its
+deficit (profiles.sample_profile, linear in the image), so S_in + S_out and
+sum_m L_m equal 1 - tau to rounding. line_profiles itself is unchanged.
+
 Pure ASCII, for the cluster (hpc-python-compat).
 """
 from __future__ import annotations
@@ -290,24 +300,36 @@ def line_profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, abso
     return _profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache, check=True)
 
 
-def _profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache, check=True, S=None, W=None):
-    """line_profiles; check=False skips the validity test (the smoke test's
-    measurements only); S, W override the inference's directions (the same)."""
-    acq, rcfg, icfg = cfg.acquisition, cfg.renderer, cfg.inference
-    absorption = icfg.absorption if absorption is None else absorption
+def _check_args(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache):
+    """line_profiles' argument checks, in its order: -> (absorption, mu, _prepare's tuple, light, cache)."""
+    absorption = cfg.inference.absorption if absorption is None else absorption
     if absorption not in ABSORPTIONS_LINE:
         raise ValueError("unknown absorption %r for the line renderer (one of %r)" % (absorption, ABSORPTIONS_LINE))
     mu = float(mu)
     if not (math.isfinite(mu) and mu >= 0):
         raise ValueError("mu must be finite and >= 0 (1/um)")
-    o, yh, eu, v, n_avg, step, ks_arr, f = _prepare(tube, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg)
-    light = acq.light_direction
+    prepared = _prepare(tube, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg)
+    light = cfg.acquisition.light_direction
     if light not in (+1, -1):
         raise ValueError("light_direction must be +1 or -1")
     if cache is None:
         cache = SectionCache()
     elif not isinstance(cache, SectionCache):
         raise ValueError("cache must be a line_fast.SectionCache or None")
+    return absorption, mu, prepared, light, cache
+
+
+def _profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache, check=True, S=None, W=None,
+              sink=None):
+    """line_profiles; check=False skips the validity test (the smoke test's
+    measurements only); S, W override the inference's directions (the same).
+    sink: None, or a callable sink(j, zeta_j, k, term) called with every
+    (slab, plane) pair's pixel-mean term (n_rows, n_cols) as it is added to
+    plane k's deficit (amendment 2: the split by depth); the result is the
+    same with or without it."""
+    acq, rcfg, icfg = cfg.acquisition, cfg.renderer, cfg.inference
+    absorption, mu, (o, yh, eu, v, n_avg, step, ks_arr, f), light, cache = _check_args(
+        tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache)
     reach = float(icfg.line_reach_sigmas)
     p, dz, dzeta = float(acq.res0_um), float(acq.dz_um), float(rcfg.dzeta_um)
     h = p / f
@@ -379,7 +401,10 @@ def _profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorpti
             s = float(sig[j, k])
             Kx = _pixel_kernel_lattice(c_lo, n_cols, ix0 + cs.start, cs.stop - cs.start, f, s, h, p)
             Ky = _pixel_kernel_lattice(r_lo, n_rows, iy0 + rs.start, rs.stop - rs.start, f, s, h, p)
-            deficit[k] += Ky @ (dA @ Kx.T)
+            term = Ky @ (dA @ Kx.T)
+            deficit[k] += term
+            if sink is not None:
+                sink(j, zj, k, term)
 
     frame = _lr._Frame(c_lo, r_lo, p)
     out = np.empty((n_planes, n_v))
@@ -421,4 +446,122 @@ def line_shadow_split(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, 
     None: tube.c[2]): the depth z_0 the layers are centred on (centres z_0 + m h). Validity and errors as
     line_profiles (ExtrusionInvalid first); mu = 0 or no planes gives zeros; ValueError for band_half_um < 0
     or not finite, layer_um <= 0 or not finite, layer_origin_um not finite."""
-    raise NotImplementedError("SPEC Block 35, amendment 2")
+    s_in, s_out, layers, layer_z, _whole = _split_reads(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg,
+                                                        band_half_um, absorption, cache, layer_um, layer_origin_um)
+    return OwnSplit(s_in=s_in, s_out=s_out, layers=layers, layer_z=layer_z, band_half_um=float(band_half_um),
+                    layer_um=None if layer_um is None else float(layer_um))
+
+
+def _share(lo, hi, a, b, width):
+    """The fraction of the slab [lo, hi] (thickness width, um) inside the interval [a, b]: exactly 1 when the
+    slab lies wholly inside, exactly 0 when it does not meet it, else the overlap / width clipped to [0, 1]."""
+    if lo >= a and hi <= b:
+        return 1.0
+    return min(1.0, max(0.0, min(hi, b) - max(lo, a)) / width)
+
+
+def _layer_range(zeta, dzeta, h, z0):
+    """(m_min, centres (M,) um, shares (J, M)): the layers m (centre z0 + m h, thickness h) that meet the slabs
+    [zeta_j -+ dzeta/2] (a positive overlap), and u_{j,m}, the fraction of slab j's thickness inside layer m."""
+    if zeta.size == 0:
+        return 0, np.zeros(0), np.zeros((0, 0))
+    lo, hi = float(zeta[0]) - 0.5 * dzeta, float(zeta[-1]) + 0.5 * dzeta
+    m_lo = int(math.floor((lo - z0) / h - 0.5)) - 1          # one layer of margin each side; trimmed below
+    m_hi = int(math.ceil((hi - z0) / h + 0.5)) + 1
+    ms = np.arange(m_lo, m_hi + 1)
+    centres = z0 + ms * h
+    u = np.zeros((zeta.size, ms.size))
+    for j, zj in enumerate(zeta):
+        a, b = float(zj) - 0.5 * dzeta, float(zj) + 0.5 * dzeta
+        for i, lam in enumerate(centres):
+            u[j, i] = _share(a, b, float(lam) - 0.5 * h, float(lam) + 0.5 * h, dzeta)
+    meet = np.flatnonzero(u.max(axis=0) > 0.0)
+    keep = slice(int(meet[0]), int(meet[-1]) + 1)
+    return int(ms[keep][0]), centres[keep], u[:, keep]
+
+
+def _split_reads(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, band_half_um, absorption=None,
+                 cache=None, layer_um=None, layer_origin_um=None):
+    """line_shadow_split's arrays and, last, the read of the unsplit deficit (n_planes, n_v), the whole own
+    shadow as the split books it (the smoke test's exact limits). See line_shadow_split.
+
+    Custom: the two shares w_{j,k} (band) and u_{j,m} (layers) applied to each (slab, plane) pair's term in
+    line_profiles' slab loop (SPEC Block 35, amendment 2); the read on the line is profiles.sample_profile's,
+    linear in the deficit image, so splitting the terms before the read is exact. Checked: no library splits a
+    depth-dependent blur by source depth."""
+    beta = float(band_half_um)
+    if not (math.isfinite(beta) and beta >= 0):
+        raise ValueError("band_half_um must be finite and >= 0 (um)")
+    if layer_um is not None:
+        h_l = float(layer_um)
+        if not (math.isfinite(h_l) and h_l > 0):
+            raise ValueError("layer_um must be finite and > 0 (um), or None")
+    if layer_origin_um is not None and not math.isfinite(float(layer_origin_um)):
+        raise ValueError("layer_origin_um must be finite (um), or None")
+    absorption, mu, (o, yh, eu, v, n_avg, step, ks_arr, f), light, cache = _check_args(
+        tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache)
+    if not _is_valid(tube, o, cfg):
+        raise ExtrusionInvalid("the line's origin is within inference.extrusion_cap_margin_um of a cap along the "
+                               "axis: the extrusion does not hold (D-138.2, D-140); flag the node")
+    acq = cfg.acquisition
+    p, dz, dzeta = float(acq.res0_um), float(acq.dz_um), float(cfg.renderer.dzeta_um)
+    n_planes, n_v = ks_arr.size, v.size
+
+    # the tube's slabs, as _profiles lays them (Block 2 slab_centres over the whole footprint's columns)
+    z_lo, z_hi, inside = _footprint(tube, p / f, p)[6:9]
+    zeta = (geometry.slab_centres(float(z_lo[inside].min()), float(z_hi[inside].max()), dzeta) if inside.any()
+            else np.zeros(0))
+    if layer_um is not None:
+        z0 = float(tube.c[2]) if layer_origin_um is None else float(layer_origin_um)
+        _m_min, layer_z, u = _layer_range(zeta, dzeta, h_l, z0)
+        n_layers = layer_z.size
+    else:
+        layer_z, n_layers = None, 0
+
+    zeros = np.zeros((n_planes, n_v))
+    if n_planes == 0 or mu == 0.0 or zeta.size == 0:
+        layers = None if layer_um is None else np.zeros((n_layers, n_planes, n_v))
+        return zeros, zeros.copy(), layers, layer_z, zeros.copy()
+
+    z_planes = ks_arr * dz
+    c_lo, c_hi, r_lo, r_hi = _pixel_box(o, yh, eu, v, n_avg, step, p)[:4]
+    shape = (n_planes, r_hi - r_lo + 1, c_hi - c_lo + 1)
+    acc_in, acc_out, acc_all = np.zeros(shape), np.zeros(shape), np.zeros(shape)
+    acc_layer = np.zeros((n_layers,) + shape) if layer_um is not None else None
+    layer_of = {}                                   # slab j -> [(layer row, u_{j,m} > 0)]
+    seen = {}
+
+    def sink(j, zj, k, term):
+        if seen.setdefault(j, zj) != zj or zj != zeta[j]:
+            raise RuntimeError("the split's slab grid differs from the slab loop's")   # internal consistency
+        acc_all[k] += term
+        w = _share(zj - 0.5 * dzeta, zj + 0.5 * dzeta, float(z_planes[k]) - beta, float(z_planes[k]) + beta, dzeta)
+        if w > 0.0:
+            acc_in[k] += w * term
+        if w < 1.0:
+            acc_out[k] += (1.0 - w) * term
+        if acc_layer is not None:
+            if j not in layer_of:
+                layer_of[j] = [(i, float(u[j, i])) for i in np.flatnonzero(u[j] > 0.0)]
+            for i, uj in layer_of[j]:
+                acc_layer[i, k] += uj * term
+
+    _profiles(tube, mu, ks_arr, o, yh, eu, v, n_avg, step, cfg, absorption, cache, check=False, sink=sink)
+
+    frame = _lr._Frame(c_lo, r_lo, p)
+
+    def read(img):
+        if not img.any():
+            return np.zeros(n_v)
+        return sample_profile(img, frame, o, yh, eu, v, n_avg, step)
+
+    s_in = np.array([read(acc_in[k]) for k in range(n_planes)]).reshape(n_planes, n_v)
+    s_out = np.array([read(acc_out[k]) for k in range(n_planes)]).reshape(n_planes, n_v)
+    whole = np.array([read(acc_all[k]) for k in range(n_planes)]).reshape(n_planes, n_v)
+    layers = None
+    if acc_layer is not None:
+        layers = np.zeros((n_layers, n_planes, n_v))
+        for i in range(n_layers):
+            for k in range(n_planes):
+                layers[i, k] = read(acc_layer[i, k])
+    return s_in, s_out, layers, layer_z, whole
