@@ -203,6 +203,7 @@ the "Binds" column.
 | 2026-11-17 (later, 10) | Logs **D-156** (user, 16:59 and 17:05; the clearance chat): the node's features stay the joint least-squares fit of all its planes with the whole own shadow (Blocks 29, 30, unchanged); the same-node clearance of D-151 becomes a product computed from that fit's estimate every round (the split by depth, the cleared profiles, the chord per plane, figures), no fit reads the cleared profiles, and clear-then-fit is dropped without a comparison. Amends D-151.1 and D-151.4. At 17:20 the user approved the block plan, recalled that the fit comes after the neighbours' cleaning, and restated that this route is the main one, the inversion table the secondary (D-129). (Written locally as D-155 at 17:10 and renumbered at the push: the noise-fit chat had taken D-155 meanwhile.) Evidence **[run, sandbox of the clearance chat: `checks/own_shadow_clearance_check.py` on `sci/diameter-pipeline`, flat tube]**: with the band at 0.14 um the out-of-band part is 72 to 93 % of the dip at its peak; clear-then-fit, linearised, has spectral radius 5.77 and 3.03 undamped (nodes 8089, 7448) and standard errors 1.17 to 1.82 times the joint fit's. Next free IDs: D-157, I-006. |
 | 2026-11-17 (later, 11) | Logs **D-157** [orchestrator] (the clearance chat, the wave of D-156): contract amendment of SPEC Block 35 amendment 2 on the implementer's report -- the depth-mirror oracle of the split holds to 1e-10 only when the slab grid is symmetric about the tube's axis, and is restated with that construction (the generic case reported without a bound); the slab-grid oracle's margin recorded (4.65e-4 against 5e-4). The wave is merged on `sci/diameter-pipeline`: Block 35 amendment 2, Blocks 37, 38, Block 36 amendment 11. Next free IDs: D-158, I-006. |
 | 2026-11-17 (later, 12) | No decision changed (the noise-fit chat; output pasted by the user, 18:01) **[cluster]**. On davinci at `7c890ff` (which contains the three-component law's merge): the FULL gates SETTLED, 16 passed (noise_law 11/11, noise_fit 12/12 in 122 s, noise_sweep_fit 11/11 in 459 s, G11 1146 s); the dry run correct; **the nf2 pilot submitted** at 18:01: array `2098689[].pbsserver01` (508282493, 569844159; 6 cores each, 48 h), merge `2098690.pbsserver01`; run file `~/noise_fit_runs/nf2_L3_exc_20261117T170135Z.env`. [corrected: D-155 and row (later, 9) were written before 17:20, not "about 19:00"]. Next free IDs: D-158, I-006. |
+| 2026-11-17 (later, 13) | Logs **D-158** [orchestrator] (the clearance chat): the final check of the wave of D-156 (Opus tester, report `specs/test_reports/2026-11-17_1754_incremental.md` on `sci/diameter-pipeline`: PASS WITH ISSUES at `ccf69db` -- one MINOR, four NOTE, three spec gaps; 56 smoke suites pass, 39 new spec tests pass, the 9 failing spec tests fail at the base commit too) and its settlements: the slab-grid oracle's bound stated at mu = 1 /um; a per-node fit that raises or fails gets the product status `not_fitted`; `clean` logs a product that raises. The theory document `TEEG_diameter_pipeline_theory_2026-11-17.md` is on the branch under `Passive Features/Diameter Re-measurement/docs/TEEG_diameter_pipeline_theory_2026-11-17/` and was sent to the user; roadmap diameter-pipeline: I37, I38 added under NC3, T14's and T15's notes name the document. Next free IDs: D-159, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -364,6 +365,7 @@ would be needed*, *Status*.
 | D-155 | 2026-11-17 | Block 9's failure rule (`noise_sweep_fit.V_MIN`, `_v_usable`), SPEC 2.6 (e) | a sweep whose bootstrap variance of $\log\sigma_m$ or $\log\sigma_s$ is NaN or below $10^{-12}$ is a failed sweep (`v_none`) [orchestrator] | active |
 | D-156 | 2026-11-17 | SPEC Block 35 (amendment 2), new Blocks 37, 38, Block 36 (amendment 11) on `sci/diameter-pipeline`; `CleaningConfig.own_band_half_um`, `own_layer_um`; `clean_cell.py clean`, `infer_nodes.py real`; D-151.1, D-151.4 | the joint fit of all planes with the whole own shadow stays the estimator; the same-node clearance is a product computed from its estimate every round; clear-then-fit dropped, no comparison [user]; the band, the layers, the line, the details [assistant's defaults, orchestrator] | active; amends D-151.1, D-151.4 |
 | D-157 | 2026-11-17 | SPEC Block 35 (amendment 2), oracles (iv) and (v); `tests/smoke/test_smoke_line_fast.py` | the split's depth-mirror oracle restated for a slab grid symmetric about the axis (1e-10 there; generic case reported, no bound); the slab-grid oracle kept at 5e-4 with its margin recorded [orchestrator] | active |
+| D-158 | 2026-11-17 | SPEC Block 35 (amendment 2, oracle (iv)), Block 36 (amendment 11, final check); `scripts/clean_cell.py`, `scripts/infer_nodes.py`; the report `specs/test_reports/2026-11-17_1754_incremental.md` | the final check's settlements: the slab-grid bound stated at mu = 1 /um; the product status `not_fitted` for a per-node fit that raises or fails; `clean` logs a product that raises [orchestrator] | active |
 | D-150 | 2026-11-17 | SPEC Blocks 31 (amendment 2), 27 (amendment 2), 25 (amendment 7), 28 (amendment 2), 36 (amendment 10) at `97b40a4`, `4ed0793`; `CleaningConfig.shadow_cache_mb`, `rank_*`; `clean_cell.py rank`; notebook Cells 16b, 17b, 18b | the cleaning's test re-aimed and sped up [user]: before and after on one 1-99 percentile grey scale, B S on its own; examples ranked by the largest structured dip a tier-1 neighbour casts on the line, tier 2 at most 1 gl, 10 um apart; the shadow model keeps its last sums per patch and changes them by the neighbours that changed (supersedes D-148.3); tiers vectorised [orchestrator] | active |
 | D-149 | 2026-11-16 | SPEC Blocks 25 (amendment 6), 36 (amendment 9), 31 (amendment 1) at `a2b082c`; `CleaningConfig.work_rank`, `work_peak_min_gl`; notebook Cells 17b, 18b | the cleaning is shown in worse conditions on the pilot's most contaminated tier-1 real nodes, neighbours refined, no injection or phantoms now [user]; the work list ranked by the predicted shadow on the example's measuring line, threshold 1 gl, per-round line figures, the examples 8089, 4844, 7081, 7448 [orchestrator], PROVISIONAL | active |
 | D-148 | 2026-11-16 | SPEC Blocks 29 (amendment 1), 25 (amendment 5), 32 (amendment 3), 36 (amendment 8) at `b6073e3`; `CleaningConfig.refine_xtol`, `refine_ftol`, `refine_line_fine_factor` | the coarse refinement stops at relative tolerances 1e-3 (was 1e-8) and its predictor samples p/4 (the fine fit keeps p/8); the neighbours' images shared between the two shadows of a node; the cleaning saves after every round [orchestrator], PROVISIONAL | active |
@@ -11807,3 +11809,43 @@ in-band part's sensitivity to the slab grid was measured at $d$ = 1 um only).
 **Sources.** **[run, sandbox]** as tagged. **[log]** D-156.
 
 **Status:** active.
+
+## D-158 -- The final check of the same-node clearance wave settled: the slab-grid test's bound stated at its coefficient; a fit that fails gets the product status `not_fitted` [orchestrator]
+
+**Date:** 2026-11-17, the clearance chat, after the final check of the wave of D-156 (coding directives 7 and 9).
+**Binds:** SPEC Block 35, amendment 2, oracle (iv); Block 36, amendment 11 ("Final check"); section 6;
+`scripts/clean_cell.py`, `scripts/infer_nodes.py`, `tests/smoke/test_smoke_pilot_run.py` on `sci/diameter-pipeline`;
+the report `specs/test_reports/2026-11-17_1754_incremental.md` (its "Project decision" cells).
+
+**Decision [orchestrator].** (D-158.1, a tolerance's condition) Agreed before: halving `dzeta_um` from 0.02 to 0.01 um
+moves $S^{\rm in}$ by at most 5e-4 for $d$ = 1 um flat, $\beta$ = 0.14 um. Now: the same bound, stated at $\mu$ = 1 /um
+(the coefficient the test ran at), the bound being absolute while the difference grows with $\mu$. (D-158.2, a
+convention) In `infer_nodes.py real` a per-node fit that raises or ends `failed` gives the node the product record
+`own.status = "not_fitted"`; the cleaning keeps `"not_refined"`. (D-158.3, plumbing) `clean` writes a product that
+raises to the log as well as to the JSON. (D-158.4, kept as specified) The chord is taken at the plane's own depth
+and the in-band share over the band, so a plane within $\beta$ of the tube's top or bottom has chord 0 and a positive
+share; in `clean` the product is evaluated on the fine fit's lattice while the round's refinement used the coarse one.
+
+**Why.** **[run, sandbox: the tester's report]** Verdict PASS WITH ISSUES at `ccf69db`: the split matches a 1-D
+reference written from the amendment's formulas to 1e-8 (`linear`, `partition_vertical`) and tiles `line_profiles` to
+1e-12 also under the hybrid on a 60 degree tube; `line_profiles` is bit-identical to the base commit's on 9 cases; the
+factory's split equals one minus the forward model at the estimate to 1e-12; `--no-own` leaves the features and the
+fits bit-identical; 56 smoke suites pass (the long tests of `test_smoke_line_fast.py` not run), 39 new spec tests
+pass, 9 older spec tests fail and fail at the base commit `3f72455` too. Its S1: the slab-grid difference is 3.3e-4 at
+$\mu$ = 1 /um and 1.0e-3 at 3 /um under `linear`. Its F1: with the product forced to raise, `clean` said nothing in
+its log. Its F5: the spec named no status for a failed per-node fit. Its F3 on the synthetic cell's node 8, plane 2:
+chord 0 um, in-band share 0.026. Its F4: the lattice term is at most 2.1e-4 of the background (Block 36 amendment 8's
+own figure). **[run, sandbox: the orchestrator]** After the two fixes: with `own_product` forced to raise the run ends
+0, the JSON holds `error` and the log names the node; `test_own_product` passes (165 s). No second tester round
+(plumbing only).
+
+**What it implies for code and tables.** As bound above. The three stale spec tests of earlier tester runs (the
+report's F2: amendments 8 and 9 of Block 36) are untouched: the user decides whether they are retired or updated.
+
+**What it does not decide [open].** Whether the chord should be reported over the band (the largest chord within
+$z_k \pm \beta$) instead of at the plane's depth; whether the slab-grid bound should become relative.
+
+**Sources.** **[run, sandbox]** as tagged. **[log]** D-148, D-156, D-157.
+
+**Status:** active.
+
