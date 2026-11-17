@@ -1,5 +1,6 @@
 """The shadow image of a node's neighbours (tier 1) -- Block 25 in specs/SPEC.md
-with its amendments 2 and 3 (D-129, D-130.O1, O4, O5; D-132.1; D-134, D-135).
+with its amendments 2 to 7 (D-129, D-130.O1, O4, O5; D-132.1; D-134, D-135;
+D-146, D-148.3, D-149.2, D-150.3).
 
 The shadow model (amendment 3). A segment q with ends (p0, d0, mu0),
 (p1, d1, mu1) is a straight capped cylinder on the line p0 p1 (Block 2 Tube,
@@ -32,11 +33,24 @@ blur followed by pixel_integrate, evaluated only on the patch). A (slab,
 plane) pair whose nearest absorbing column lies farther than
 shadow_reach_sigmas x sigma from the patch rectangle contributes exactly 0.
 
+Reuse across calls (amendment 7, D-150.3; D-148.3 kept one patch's images
+for the next call). Per patch (pixels, planes, configuration) the cache
+keeps each rendered neighbour's peak and footprint, keyed by its geometry and
+features, and the last sums S with the neighbours they hold; a call renders
+only the neighbours it has not seen, and takes S as a kept sum changed by the
+images of the neighbours that entered or left it (rendered from their keys),
+or sums afresh in the neighbours' order when that renders no more images.
+Peaks, kept and overlap equal the reference path's exactly, S exactly when
+summed afresh or reused whole, else to rounding. Patches past
+cleaning.shadow_cache_mb leave newest first, never the one in use. _SHARE =
+False is the reference path: every neighbour rendered at every call.
+
 Units: um, 1/um, dimensionless shadows; float64. Pure ASCII, for the cluster.
 """
 from __future__ import annotations
 
 import math
+from collections import Counter, OrderedDict
 from dataclasses import dataclass
 
 import numpy as np
@@ -343,8 +357,100 @@ def _segment_box(tube):
 
 
 _PREFILTER = True     # skip the neighbours no column of which can reach the patch (exact: see _beyond_reach)
-_SHARE = True         # D-148.3: keep the last patch's neighbour images for the next call on the same patch
-_shared = {"key": None, "items": {}}
+_SHARE = True         # D-148.3, D-150.3: reuse across calls (False: every call renders every neighbour)
+# The cache across calls (amendment 7, D-150.3). Per patch key (pixels, planes, configuration), oldest first:
+# "peaks": item key -> (peak, footprint, offset) of every neighbour image rendered there; "sums": the last
+# _N_SUMS sums S with the multiset of item keys they hold; "bytes": their size. A call's S is a kept sum
+# changed by the images of the neighbours that differ from it, or a sum afresh, whichever renders fewer.
+# _current: the images rendered since the patch in use became current (D-148.3), as nonzero boxes.
+_cache = OrderedDict()
+_current = {"key": None, "boxes": {}}
+_cache_stats = {"hits": 0, "misses": 0}
+_N_SUMS = 4
+
+
+def cache_info():
+    """The cache of shadow_image (amendment 7, D-150.3): patches kept, their size and that of the images of
+    the patch in use (MB), the neighbours reused (hits: no image rendered for them) and the images rendered
+    (misses) since the last cache_clear."""
+    return dict(patches=len(_cache), mb=sum(e["bytes"] for e in _cache.values()) / 2.0 ** 20,
+                current_mb=sum(bx[0].nbytes for bx in _current["boxes"].values() if bx is not None) / 2.0 ** 20,
+                hits=int(_cache_stats["hits"]), misses=int(_cache_stats["misses"]))
+
+
+def cache_clear():
+    """Empty the cache of shadow_image and its counters."""
+    _cache.clear()
+    _current.update(key=None, boxes={})
+    _cache_stats.update(hits=0, misses=0)
+
+
+class _OneItem:
+    """A scene of one neighbour rebuilt from its item key (the arrays shadow's renderers read)."""
+
+    def __init__(self, ik):
+        if ik[0] == "seg":
+            self.seg_xyz = np.frombuffer(ik[1], dtype=float).reshape(1, 6)
+            self.seg_d_um = np.frombuffer(ik[2], dtype=float).reshape(1, 2)
+            self.seg_mu_per_um = np.frombuffer(ik[3], dtype=float).reshape(1, 2)
+            self.soma = np.zeros((0, 3))
+        else:
+            self.seg_xyz, self.seg_d_um, self.seg_mu_per_um = np.zeros((0, 6)), np.zeros((0, 2)), np.zeros((0, 2))
+            self.soma = np.frombuffer(ik[1], dtype=float).reshape(1, 3)
+
+
+def _box_peak(box):
+    """The largest value of a neighbour image kept as box = (data, r0, c0, covers) or None (all 0)."""
+    if box is None:
+        return 0.0
+    m = float(box[0].max())
+    return m if box[3] else max(m, 0.0)
+
+
+def _box_masked_peak(box, pmask, n_mask):
+    """The largest value over the planes on the pixels of pmask (n_mask of them, > 0) of a boxed image."""
+    if box is None:
+        return 0.0
+    data, r0, c0, _cov = box
+    sub = pmask[r0:r0 + data.shape[1], c0:c0 + data.shape[2]]
+    n_sub = int(sub.sum())
+    vals = [float(data[:, sub].max())] if n_sub else []
+    return max(vals + ([0.0] if n_mask > n_sub else []))
+
+
+def _add_box(S, box, sign=1.0):
+    """S += sign x the boxed image (in place)."""
+    if box is not None:
+        data, r0, c0, _cov = box
+        if sign > 0:
+            S[:, r0:r0 + data.shape[1], c0:c0 + data.shape[2]] += data
+        else:
+            S[:, r0:r0 + data.shape[1], c0:c0 + data.shape[2]] -= data
+
+
+def _paste_into(out, mask, off):
+    """out |= a footprint (on a lattice grid at offset off) pasted on the patch's fine grid (in place; as
+    _paste, without a full-size array per neighbour)."""
+    if mask is None:
+        return
+    n0, m0 = off
+    ny, nx = mask.shape
+    r0, r1 = max(0, m0), min(out.shape[0], m0 + ny)
+    c0, c1 = max(0, n0), min(out.shape[1], n0 + nx)
+    if r1 > r0 and c1 > c0:
+        out[r0:r1, c0:c1] |= mask[r0 - m0:r1 - m0, c0 - n0:c1 - n0]
+
+
+def _crop(img):
+    """(box, r0, c0, covers) of a neighbour image (n_planes, H, W): the smallest box holding every nonzero pixel
+    over the planes, its corner, and whether it is the whole image; None when no pixel is nonzero."""
+    nz = np.any(img != 0.0, axis=0)
+    if not nz.any():
+        return None
+    rows, cols = np.flatnonzero(nz.any(axis=1)), np.flatnonzero(nz.any(axis=0))
+    r0, r1, c0, c1 = int(rows[0]), int(rows[-1]) + 1, int(cols[0]), int(cols[-1]) + 1
+    box = np.ascontiguousarray(img[:, r0:r1, c0:c1])
+    return box, r0, c0, (r1 - r0 == img.shape[1] and c1 - c0 == img.shape[2])
 
 
 def _item_key(fscene, kind, idx):
@@ -490,6 +596,107 @@ def _check_planes(planes_z):
     return z
 
 
+def _cached_terms(fscene, items, far, inc, B_gl, pmask, patch, z, cfg, directions, pkey):
+    """(S, per_neighbour_peak, per_neighbour_peak_mask or None, kept, the kept neighbours' footprint on the
+    fine grid) of shadow_image through the cache (amendment 7, D-150.3). The peaks, kept and the footprint are
+    those of the images rendered alone [exact]; S is the sum of the kept neighbours' images: summed afresh in
+    the neighbours' order [exact] when that renders no more images than changing a kept sum, else a kept sum
+    plus the images that entered and minus those that left [equal up to rounding]."""
+    n = len(items)
+    memo = _cache.get(pkey)
+    if memo is None:
+        memo = _cache[pkey] = {"peaks": {}, "sums": [], "bytes": 0}
+    if _current["key"] != pkey:
+        _current["key"], _current["boxes"] = pkey, {}
+    boxes, peaks = _current["boxes"], memo["peaks"]
+    floor = float(cfg.cleaning.shadow_floor_gl)
+    n_mask = int(pmask.sum()) if pmask is not None else 0
+    need_box = n_mask > 0
+    peak, kept = np.zeros(n), np.zeros(n, dtype=bool)
+    peak_m = np.zeros(n) if pmask is not None else None
+    keys = [None] * n
+    nb_fp = np.zeros((patch.H * patch.f, patch.W * patch.f), dtype=bool)
+
+    def store(ik, img, fp, off):
+        _cache_stats["misses"] += 1
+        box = _crop(img)
+        boxes[ik] = box
+        if ik not in peaks:
+            peaks[ik] = (_box_peak(box), fp, off)
+            memo["bytes"] += fp.nbytes if fp is not None else 0
+        return box
+
+    def box_of(ik):
+        """The boxed image of an item key: from the patch in use, else rendered from the key."""
+        if ik in boxes:
+            return boxes[ik]
+        one = _OneItem(ik)
+        return store(ik, *_neighbour_image(one, ik[0], 0, patch, z, cfg, directions))
+
+    for i, (kind, idx) in enumerate(items):
+        if far[i]:      # its image is 0 (the reach rule) or under the floor: peak 0, no footprint, not summed
+            kept[i] = bool(inc[i]) and (B_gl is None or float(B_gl) * 0.0 >= floor)
+            continue
+        ik = keys[i] = _item_key(fscene, kind, idx)
+        if ik not in peaks or (need_box and ik not in boxes):
+            store(ik, *_neighbour_image(fscene, kind, idx, patch, z, cfg, directions))
+        else:
+            _cache_stats["hits"] += 1
+        pk, fp, off = peaks[ik]
+        peak[i] = pk
+        if need_box:
+            peak_m[i] = _box_masked_peak(boxes[ik], pmask, n_mask)
+        kept[i] = bool(inc[i]) and (B_gl is None or float(B_gl) * pk >= floor)
+        if kept[i]:
+            _paste_into(nb_fp, fp, off)
+    order = [keys[i] for i in range(n) if kept[i] and keys[i] is not None]
+    K = Counter(order)
+    fresh = sum(1 for ik in K if ik not in boxes)              # images a sum afresh would render
+    best = None
+    for j, (Kr, _Sr) in enumerate(memo["sums"]):
+        diff = (Kr - K) + (K - Kr)
+        cost = sum(1 for ik in diff if ik not in boxes)
+        if diff == Counter():
+            best = (-1, j)
+            break
+        if best is None or cost < best[0]:
+            best = (cost, j)
+    if best is not None and best[0] < 0:          # the same neighbours as a kept sum: that sum
+        Kr, Sr = memo["sums"].pop(best[1])
+        memo["sums"].append((Kr, Sr))
+        S = Sr.copy()
+    else:
+        if best is not None and best[0] < fresh:  # a kept sum, changed by the neighbours that differ
+            Kr, Sr = memo["sums"][best[1]]
+            S = Sr.copy()
+            for ik, c in (Kr - K).items():
+                bx = box_of(ik)
+                for _ in range(c):
+                    _add_box(S, bx, -1.0)
+            for ik, c in (K - Kr).items():
+                bx = box_of(ik)
+                for _ in range(c):
+                    _add_box(S, bx, 1.0)
+        else:                                     # afresh, in the neighbours' order
+            S = np.zeros((z.size, patch.H, patch.W))
+            for ik in order:
+                _add_box(S, box_of(ik), 1.0)
+        memo["sums"].append((K, S.copy()))
+        memo["bytes"] += S.nbytes
+        while len(memo["sums"]) > _N_SUMS:
+            memo["bytes"] -= memo["sums"].pop(0)[1].nbytes
+    # the patches beyond cleaning.shadow_cache_mb leave newest first, never the one in use: a pass over the
+    # same patches in the same order then keeps its first ones (least recently used would keep none)
+    budget = float(cfg.cleaning.shadow_cache_mb) * 2.0 ** 20
+    total = sum(e["bytes"] for e in _cache.values())
+    for k in reversed(list(_cache.keys())):
+        if total <= budget:
+            break
+        if k != pkey:
+            total -= _cache.pop(k)["bytes"]
+    return S, peak, peak_m, kept, nb_fp
+
+
 def shadow_image(fscene, own_ids, left, top, width, height, planes_z, cfg, B_gl=None, include=None,
                  peak_mask=None):
     """ShadowResult of node i's neighbours on the pixel block (left, top, width, height) (full-resolution
@@ -546,31 +753,28 @@ def shadow_image(fscene, own_ids, left, top, width, height, planes_z, cfg, B_gl=
     kept = np.zeros(n_nb, dtype=bool)
     nb_fp = np.zeros_like(own_fp)
     items = [("seg", int(q)) for q in segs] + [("soma", int(s)) for s in somas]
-    if _SHARE:          # the images of the last call are kept only for the same patch, planes and configuration
-        pkey = (int(left), int(top), int(width), int(height), z.tobytes(), hash((cfg.cleaning, cfg.renderer,
-                                                                             cfg.acquisition)))
-        if _shared["key"] != pkey:
-            _shared["key"], _shared["items"] = pkey, {}
     if _PREFILTER:
         far = _beyond_reach(fscene, segs, somas, patch, z, cfg) | _below_floor(fscene, segs, somas, z, cfg, B_gl)
     else:
         far = np.zeros(n_nb, dtype=bool)
+    if _SHARE:
+        S, peak, peak_m, kept, nb_fp = _cached_terms(fscene, items, far, inc, B_gl, pmask if peak_mask is not None
+                                                     else None, patch, z, cfg, directions,
+                                                     (int(left), int(top), int(width), int(height), z.tobytes(),
+                                                      hash((cfg.cleaning, cfg.renderer, cfg.acquisition))))
+        both = (own_fp & nb_fp).reshape(patch.H, patch.f, patch.W, patch.f)
+        return ShadowResult(S=S, per_neighbour_peak=peak, kept=kept, overlap=both.any(axis=(1, 3)),
+                            per_neighbour_peak_mask=peak_m)
+    floor = float(cfg.cleaning.shadow_floor_gl)
     for i, (kind, idx) in enumerate(items):
         if far[i]:     # its image is 0 (the reach rule) or under the floor (not kept); its peak reported as 0
             img, fp, off = np.zeros((z.size, patch.H, patch.W)), None, None
-        elif _SHARE:
-            ik = _item_key(fscene, kind, idx)
-            hit = _shared["items"].get(ik)
-            if hit is None:
-                hit = _neighbour_image(fscene, kind, idx, patch, z, cfg, directions)
-                _shared["items"][ik] = hit
-            img, fp, off = hit
         else:
             img, fp, off = _neighbour_image(fscene, kind, idx, patch, z, cfg, directions)
         peak[i] = float(img.max()) if img.size else 0.0
         if peak_m is not None and any_mask and img.size:
             peak_m[i] = float(img[:, pmask].max())
-        kept[i] = bool(inc[i]) and (B_gl is None or float(B_gl) * peak[i] >= float(cfg.cleaning.shadow_floor_gl))
+        kept[i] = bool(inc[i]) and (B_gl is None or float(B_gl) * peak[i] >= floor)
         if kept[i]:
             S += img
             nb_fp |= _paste(fp, off, patch)

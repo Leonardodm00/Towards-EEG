@@ -32,6 +32,13 @@ without a soma. The own footprint is the branch's consecutive nodes, each
 segment at its larger end radius; n_neighbours counts the neighbours whose dip
 on the line reaches cleaning.shadow_floor_gl.
 
+Amendment 2 (D-150.2): tier1_contamination ranks a node by its worst tier-1
+neighbour -- the neighbours the cleaning subtracts (D-132) -- on the same line
+and with the same predictor, by the structured part of each segment's dip,
+R_q = max_n B delta_q(v_n) - min_n B delta_q(v_n) (gl): a dip that shapes the
+profile, not a uniform rise that the background takes. pick_tier1_examples
+draws the example nodes from that ranking.
+
 No file access, no plotting. Pure ASCII, for the cluster (hpc-python-compat).
 """
 from __future__ import annotations
@@ -42,7 +49,7 @@ import warnings
 import numpy as np
 
 from . import background, path
-from .calibration_scene import OWN, patch_frame, segment_rows, shadow_depth, shadow_depths
+from .calibration_scene import OWN, _GL_CACHE, leggauss, patch_frame, segment_rows, shadow_depth, shadow_depths
 from .profiles import profile_offsets
 from ..model.kernel import sigma_r
 
@@ -229,3 +236,190 @@ def pick_examples(rows, counts, rng):
     if short:
         warnings.warn("pick_examples: short -- " + "; ".join(short), RuntimeWarning, stacklevel=2)
     return picked
+
+
+# --------------------------------------------- tier-1 ranking (amendment 2) --
+
+_BRANCH_AND_BOUND = True   # tier1_contamination stops evaluating tier-1 neighbours whose bound is under the best found
+TIER1_COLUMNS = ("node_id", "x_um", "y_um", "z_um", "own_dip_gl", "n_tier2", "n_evaluated", "worst1_range_gl",
+                 "worst1_peak_gl", "worst1_child_id", "worst1_lateral_um", "worst1_defocus_um", "worst2_peak_gl",
+                 "soma_lateral_um")
+
+
+def _gl_n(r, sigma):
+    """The Gauss-Legendre order shadow_depths uses for a tube of radius r and blur sigma (_gauss_legendre's rule)."""
+    return np.minimum(512, np.maximum(16, np.ceil(6.0 * r / np.maximum(sigma, 1e-6)))).astype(np.int64)
+
+
+def _dips_segments(rho, sigma, r, mu, B):
+    """shadow_depths at every (segment, sample) pair: rho, sigma (m, n_v) um, r, mu (m,) um, 1/um -> (m, n_v) gl,
+    each pair on the Gauss-Legendre rule shadow_depths would take (_gauss_legendre). Custom: shadow_depths'
+    formula with the tube's absorbed fraction at the rule's nodes computed once per segment and rule, not per
+    sample (shadow_depths and _depths_rule take one tube or recompute it per element)."""
+    m, n_v = rho.shape
+    out = np.zeros((m, n_v))
+    n_rule = _gl_n(r[:, None], sigma)
+    for nn in np.unique(n_rule):
+        nn = int(nn)
+        if nn not in _GL_CACHE:
+            _GL_CACHE[nn] = leggauss(nn)
+        x, w = _GL_CACHE[nn]
+        qi, vi = np.nonzero(n_rule == nn)
+        segs, inv = np.unique(qi, return_inverse=True)
+        vp_s = r[segs, None] * x[None, :]
+        deficit = 1.0 - np.exp(-2.0 * mu[segs, None] * np.sqrt(np.maximum(r[segs, None] ** 2 - vp_s ** 2, 0.0)))
+        s = np.maximum(sigma[qi, vi], 1e-6)[:, None]
+        g = np.exp(-0.5 * ((rho[qi, vi][:, None] - vp_s[inv]) / s) ** 2) / (math.sqrt(2.0 * math.pi) * s)
+        out[qi, vi] = B * r[qi] * np.sum(w * deficit[inv] * g, axis=1)
+    return out
+
+
+def tier1_contamination(fscene, branch, index, own_ids, B_gl, cfg, tiers=None):
+    """-> dict (TIER1_COLUMNS): node i's worst tier-1 neighbour on its measuring line (amendment 2, D-150.2).
+
+    fscene: Block 23 FeaturedScene (um; each segment's d and mu at its two ends); branch: the node's own stretch
+    (a Branch whose xyz_um are the positions in fscene's frame); index: the node's index in it; own_ids: the
+    node's own nodes (node_inputs.own_ids_within: its tube); B_gl: background (gl, > 0); tiers: the tiers of the
+    neighbours (cleaning.neighbour_tiers' output for this node), None = computed here at branch.xyz_um[index].
+    The line and the predictor are the survey's (module docstring), each segment q at its larger end radius
+    r_q and larger end coefficient mu_q; the neighbours are the segments with an end outside own_ids, in the
+    scene's order (cleaning.neighbour_tiers' order). Per neighbour, the dip on the line B delta_q(v_n), its
+    peak P_q = max_n and its structured part R_q = max_n - min_n (gl). Bounds (exact, they need sigma_r
+    non-decreasing in |defocus|, else every neighbour is evaluated): A_q = 2 r_q (1 - exp(-2 mu_q r_q)) bounds
+    the integral of the tube's absorbed fraction; with sigma_min, sigma_max the kernel at the segment's smallest
+    and largest defocus, P_q <= B min(1 - exp(-2 mu_q r_q), A_q / (sqrt(2 pi) sigma_min)), and over the line's
+    length ell R_q <= B A_q ell (exp(-1/2) + gamma tan(phi_q)) / (sqrt(2 pi) sigma_min^2) (gamma sigma_r's
+    largest slope, phi_q the segment's tilt); a segment whose distance to every sample, less r_q, is at least
+    6 sigma_max is left out. A tier-2 neighbour is evaluated when its peak bound reaches
+    cleaning.rank_bound_gl; a tier-1 one when its bound min(peak, range) does, by decreasing bound, until the
+    bound falls under the largest R_q found (branch and bound: the worst is exact).
+    worst1: the tier-1 neighbour of the largest R_q (worst1_child_id its child id; lateral distance and unsigned
+    defocus at its point nearest the line's centre, as the survey's worst); worst2_peak_gl: the largest P_q of
+    the tier-2 neighbours evaluated (0 without one); n_evaluated: the neighbours evaluated. No tier-1 neighbour
+    evaluated: worst1_range_gl = worst1_peak_gl = 0, worst1_child_id = -1, the distances NaN."""
+    from . import cleaning                                   # the tier rule (D-132), Block 28's module
+    i = _check(branch, index, B_gl, 1.0)
+    B = float(B_gl)
+    xyz_all = np.asarray(fscene.seg_xyz, dtype=float)
+    ids = np.asarray(fscene.seg_ids, dtype=np.int64)
+    own = np.asarray(sorted({int(x) for x in own_ids}), dtype=np.int64)
+    nb = np.flatnonzero(~(np.isin(ids[:, 0], own) & np.isin(ids[:, 1], own)))
+    node = np.asarray(branch.xyz_um, dtype=float)[i]
+    if tiers is None:
+        tiers = cleaning.neighbour_tiers(fscene, own, node, cfg)
+    tiers = np.asarray(tiers)[:nb.size]
+    o, y_hat, _e_u, z_k = _line(branch, i, cfg)
+    v = profile_offsets(cfg.measure)
+    r_own = float(np.asarray(branch.radius_um, dtype=float)[i])
+    mu_own = float(np.max(np.asarray(fscene.seg_mu_per_um, dtype=float)[np.isin(ids[:, 0], own)
+                                                                         & np.isin(ids[:, 1], own)], initial=0.0))
+    row = dict(node_id=int(branch.ids[i]), x_um=float(node[0]), y_um=float(node[1]), z_um=float(node[2]),
+               own_dip_gl=float(shadow_depth(0.0, r_own, mu_own, float(sigma_r(0.0, cfg.renderer)), B))
+               if mu_own > 0 else float("nan"),
+               n_tier2=int(np.sum(tiers == 2)), n_evaluated=0, worst1_range_gl=0.0, worst1_peak_gl=0.0,
+               worst1_child_id=-1, worst1_lateral_um=float("nan"), worst1_defocus_um=float("nan"),
+               worst2_peak_gl=0.0, soma_lateral_um=_soma_lateral(branch, i, fscene))
+    if nb.size == 0:
+        return row
+    a, b = xyz_all[nb, :3], xyz_all[nb, 3:]
+    r = 0.5 * np.max(np.asarray(fscene.seg_d_um, dtype=float)[nb], axis=1)
+    mu = np.max(np.asarray(fscene.seg_mu_per_um, dtype=float)[nb], axis=1)
+    # the samples' nearest points on every neighbour (n_nb, n_v), as _nearest
+    px, py = o[0] + v * y_hat[0], o[1] + v * y_hat[1]
+    dx, dy = (b[:, 0] - a[:, 0])[:, None], (b[:, 1] - a[:, 1])[:, None]
+    L2 = dx * dx + dy * dy
+    with np.errstate(invalid="ignore", divide="ignore"):
+        t = np.where(L2 == 0.0, 0.0, np.clip(((px[None, :] - a[:, :1]) * dx + (py[None, :] - a[:, 1:2]) * dy) / L2,
+                                             0.0, 1.0))
+    rho = np.hypot(px[None, :] - (a[:, :1] + t * dx), py[None, :] - (a[:, 1:2] + t * dy))
+    # the bounds
+    za, zb = a[:, 2] - z_k, b[:, 2] - z_k
+    d_min = np.where(za * zb <= 0.0, 0.0, np.minimum(np.abs(za), np.abs(zb)))
+    d_max = np.maximum(np.abs(za), np.abs(zb))
+    s_min = np.asarray(sigma_r(d_min, cfg.renderer), dtype=float)
+    s_max = np.asarray(sigma_r(d_max, cfg.renderer), dtype=float)
+    absorbed = 1.0 - np.exp(-2.0 * mu * r)
+    A = 2.0 * r * absorbed                                   # bounds the integral of the absorbed fraction (um)
+    s2 = np.maximum(s_min, 1e-6)
+    peak_bound = B * np.minimum(absorbed, A / (math.sqrt(2.0 * math.pi) * s2))
+    # the structured part over the line's length ell: |d phi_s(x)/dx| <= exp(-1/2) / (sqrt(2 pi) s^2),
+    # |d phi_s(x)/ds| <= 1 / (sqrt(2 pi) s^2), rho is 1-Lipschitz in v, and sigma along the line moves by at most
+    # gamma tan(phi_q) per um (gamma: sigma_r's largest slope; the nearest point's depth along a segment of tilt phi_q)
+    rc = cfg.renderer
+    knots, vals = (np.asarray(x, dtype=float) for x in (rc.kernel_table_delta_um, rc.kernel_table_sigma_um))
+    slope_c = {"linear": float(rc.kernel_continuation_slope), "frozen": 0.0,
+               "proportional": float(vals[-1] / knots[-1])}.get(rc.kernel_continuation, np.inf)
+    gamma = max(float(np.max(np.diff(vals) / np.diff(knots))), slope_c)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        tan = np.where(L2[:, 0] == 0.0, 0.0, np.abs(zb - za) / np.sqrt(L2[:, 0]))
+    ell = float(v[-1] - v[0])
+    range_bound = B * A * ell * (math.exp(-0.5) + gamma * tan) / (math.sqrt(2.0 * math.pi) * s2 ** 2)
+    far = rho.min(axis=1) - r >= 6.0 * s_max
+    # the bounds need sigma_r non-decreasing in |defocus| (between its knots and beyond them)
+    monotone = bool(np.all(np.diff(vals) >= 0.0)) and slope_c >= 0.0
+    bound = float(cfg.cleaning.rank_bound_gl)
+    r_bound = np.minimum(peak_bound, range_bound)
+    if monotone:
+        two = np.flatnonzero(~far & (tiers == 2) & (peak_bound >= bound))
+        one = np.flatnonzero(~far & (tiers == 1) & (r_bound >= bound))
+    else:
+        two, one = np.flatnonzero(tiers == 2), np.flatnonzero(tiers == 1)
+
+    def exact(idx):
+        if idx.size == 0:
+            return np.empty(0), np.empty(0)
+        zq = a[idx, 2:3] + t[idx] * (b[idx, 2:3] - a[idx, 2:3]) - z_k
+        dips = _dips_segments(rho[idx], np.asarray(sigma_r(zq, cfg.renderer), dtype=float), r[idx], mu[idx], B)
+        return dips.max(axis=1), dips.max(axis=1) - dips.min(axis=1)
+
+    P2, _R2 = exact(two)
+    if P2.size:
+        row["worst2_peak_gl"] = float(P2.max())
+    # the tier-1 neighbours by decreasing bound, in chunks; one whose bound is under the largest R found so far
+    # cannot be the worst, so the evaluation stops there (exact; switched off with _BRANCH_AND_BOUND = False)
+    if monotone and _BRANCH_AND_BOUND:
+        one = one[np.argsort(-r_bound[one], kind="stable")]
+    best_R, best_m, done, lo, size = -1.0, -1, 0, 0, 16
+    while lo < one.size:
+        idx = one[lo:lo + size]
+        lo, size = lo + size, min(2 * size, 1024)            # chunks of 16, 32, ... up to 1024
+        if monotone and _BRANCH_AND_BOUND and best_R >= 0.0:
+            idx = idx[r_bound[idx] >= best_R]
+            if idx.size == 0:
+                break
+        P1, R1 = exact(idx)
+        done += idx.size
+        k = int(np.argmax(R1))
+        if R1[k] > best_R:
+            best_R, best_m, best_P = float(R1[k]), int(idx[k]), float(P1[k])
+    row["n_evaluated"] = int(two.size + done)
+    if best_m >= 0:
+        q = nb[best_m]
+        d0, t0 = _nearest(o[0], o[1], xyz_all[q, :3], xyz_all[q, 3:])
+        row.update(worst1_range_gl=best_R, worst1_peak_gl=best_P, worst1_child_id=int(ids[q, 0]),
+                   worst1_lateral_um=float(d0),
+                   worst1_defocus_um=abs(float(xyz_all[q, 2] + float(t0) * (xyz_all[q, 5] - xyz_all[q, 2])) - z_k))
+    return row
+
+
+def pick_tier1_examples(rows, n, max_tier2_gl, min_separation_um):
+    """-> list of node ids (amendment 2, D-150.2): from the rows (tier1_contamination's dicts with a bool
+    'near_end'), the not-near_end ones whose tier-2 neighbours put at most max_tier2_gl on the line, by
+    decreasing worst1_range_gl (ties by node id), skipping a node within min_separation_um (3-D) of one already
+    taken, until n; rows with worst1_range_gl = 0 are never taken."""
+    if int(n) < 0 or not (float(min_separation_um) >= 0.0) or not math.isfinite(float(max_tier2_gl)):
+        raise ValueError("n >= 0, min_separation_um >= 0 and a finite max_tier2_gl are required")
+    ok = [r for r in rows if not bool(r["near_end"]) and float(r["worst2_peak_gl"]) <= float(max_tier2_gl)
+          and float(r["worst1_range_gl"]) > 0.0]
+    ok.sort(key=lambda r: (-float(r["worst1_range_gl"]), int(r["node_id"])))
+    taken, pos = [], []
+    for r in ok:
+        if len(taken) >= int(n):
+            break
+        p = np.array([float(r["x_um"]), float(r["y_um"]), float(r["z_um"])])
+        if any(float(np.linalg.norm(p - q)) < float(min_separation_um) for q in pos):
+            continue
+        taken.append(int(r["node_id"]))
+        pos.append(p)
+    return taken
+

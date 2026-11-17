@@ -408,6 +408,11 @@ class CleaningConfig:
     work_max_nodes: int = 60               # source: PROVISIONAL (Block 36): at most this many nodes are refined in the pilot run
     work_peak_min_gl: float = 1.0          # source: D-149.3 [orchestrator] (was 3.0, PROVISIONAL, Block 36): a neighbour's nodes join the work list when its predicted peak on an example's measuring line (work_rank "line") or patch ("patch") times B reaches this (gl); 1 gl = about the profile's noise SD on the pilot
     work_rank: str = "line"                # source: D-149.2 [orchestrator] (Block 36, amendment 9): the neighbours' nodes are ranked by their predicted peak on the example's measuring line, "line" (the pixels the line reads), or on its whole patch, "patch" (amendment 1's rule, the labelled alternative)
+    shadow_cache_mb: float = 3000.0        # source: D-150.3 [orchestrator] (Block 25, amendment 7): what shadow_image keeps between calls (MB): per patch the neighbours' peaks and footprints and the last sums S; past it the newest patches leave first, never the one in use; 0 = the patch in use only
+    rank_bound_gl: float = 0.05            # source: D-150.2 [orchestrator] (Block 27, amendment 2): a neighbour whose dip on the line is provably below this (gl) is not evaluated by tier1_contamination; a sixth of the shadow floor
+    rank_max_tier2_gl: float = 1.0        # source: D-150.2 [orchestrator]: an example of the tier-1 ranking may have tier-2 neighbours putting at most this (gl) on its line (about the profile's noise SD on the pilot), so that what is left in by design does not confound the test
+    rank_examples: int = 4                 # source: D-150.2 [orchestrator]: example nodes taken from the tier-1 ranking (clean_cell.py rank)
+    rank_min_separation_um: float = 10.0   # source: D-150.2 [orchestrator]: two examples of the tier-1 ranking at least this far apart (3-D, um), so that two do not share one crossing (twice the tube's half-length)
     background_support: str = "model"      # source: D-144.1 [user]: the planar background fitted through the predicted shadow of every traced segment; "unshaded" (D-143), "square" (D-141), "stripe" (D-101.3) the labelled alternatives
     background_shadow_max: float = 0.10    # source: PROVISIONAL (Block 36, amendment 4): pixels whose predicted shadow exceeds this fraction are left out of the background's fit
 
@@ -708,6 +713,12 @@ def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None
     _check_in(i.absorption, ("hybrid", "partition_vertical", "linear"), "inference.absorption")
     _check_in(c.background_support, ("model", "unshaded", "square", "stripe"), "cleaning.background_support")
     _check_in(c.work_rank, ("line", "patch"), "cleaning.work_rank")
+    for name in ("rank_bound_gl", "rank_max_tier2_gl", "rank_min_separation_um", "shadow_cache_mb"):
+        val = float(getattr(c, name))
+        if not (math.isfinite(val) and val >= 0.0):
+            raise ValueError("cleaning.%s must be finite and >= 0, got %r" % (name, val))
+    if isinstance(c.rank_examples, bool) or not isinstance(c.rank_examples, int) or c.rank_examples < 0:
+        raise ValueError("cleaning.rank_examples must be an int >= 0, got %r" % (c.rank_examples,))
 
     def pair(b, positive):
         return (len(b) == 2 and all(math.isfinite(float(x)) for x in b) and b[0] < b[1]

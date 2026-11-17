@@ -29,6 +29,17 @@ Checks, from the strongest oracle to the weakest (amendment 3)
                         = 0; S, per_neighbour_peak, kept, overlap unchanged by
                         the mask [exact]; a strip across one segment and 3 um
                         from another; ValueError for a mask of the wrong shape
+    test_cache          amendment 7 (D-150.3): through the cache every result
+                        equals the reference path (every neighbour rendered):
+                        S exactly when summed afresh or reused, within 1e-13
+                        when a kept sum is changed; peaks, kept, overlap and
+                        masked peaks exactly; the same neighbours again render
+                        nothing (a peak mask: each image once more), one left
+                        out none when its image is at hand, one changed at
+                        most two; an image rendered from its key equals the
+                        scene's; a duplicated neighbour counts twice; at
+                        shadow_cache_mb = 0 one patch stays; over budget the
+                        newest patches leave (a pass keeps its first patch)
     test_contract       ShadowResult shapes, dtypes, finiteness; neighbour_indices;
                         segment_absorbed shapes; stretch_profiles shape
     test_determinism    two runs bit-identical (both absorptions)
@@ -400,6 +411,123 @@ def test_peak_mask():
         pass
     else:
         raise AssertionError("a peak_mask of the wrong shape was accepted")
+
+
+def _same(r1, r2, tag, s_atol=0.0):
+    """r1 equals r2: S within s_atol (0: exactly), the peaks, kept, overlap and masked peaks exactly."""
+    if s_atol == 0.0:
+        assert_array_equal(r1.S, r2.S, err_msg="%s: S" % tag)
+    else:
+        err = float(np.max(np.abs(r1.S - r2.S)))
+        assert err <= s_atol, "%s: S off by %.3g > %.3g" % (tag, err, s_atol)
+    for f in ("per_neighbour_peak", "kept", "overlap"):
+        assert_array_equal(getattr(r1, f), getattr(r2, f), err_msg="%s: %s" % (tag, f))
+    if r1.per_neighbour_peak_mask is None or r2.per_neighbour_peak_mask is None:
+        assert r1.per_neighbour_peak_mask is None and r2.per_neighbour_peak_mask is None, tag
+    else:
+        assert_array_equal(r1.per_neighbour_peak_mask, r2.per_neighbour_peak_mask, err_msg="%s: masked peak" % tag)
+
+
+def _reference(fs, own, p_, planes, cfg, **kw):
+    SH._SHARE = False
+    try:
+        return SH.shadow_image(fs, own, *p_, planes, cfg, **kw)
+    finally:
+        SH._SHARE = True
+
+
+# a summed afresh S is exact; a kept sum changed by a few images differs by rounding: a few additions of
+# values <= 1 in float64 (eps 2.2e-16)
+CACHE_S_ATOL = 1e-13
+
+
+def test_cache():
+    # amendment 7 (D-150.3): every result through the cache equals the reference path (_SHARE False, every
+    # neighbour rendered): S exactly when summed afresh or reused whole, within rounding when a kept sum is
+    # changed; peaks, kept, overlap and masked peaks exactly. Calls on two patches A, B, with the floor, a
+    # peak mask, an include mask, a changed neighbour, a duplicated neighbour; the images rendered from an
+    # item's key equal those rendered from the scene [exact]; at shadow_cache_mb = 0 only the patch in use is
+    # kept; over budget the newest patches leave, so a pass in the same order keeps its first patch
+    cfg = cfg_for("partition_vertical")
+    rows = [((0.0, 0.0, 0.0), (2.0, 0.0, 0.0), 0.6, 1.5),
+            ((0.0, 2.5, 0.84), (2.0, 2.5, 0.84), 0.6, 1.5),
+            ((-1.0, -1.5, 2.0), (1.0, -1.0, 2.5), 0.4, 1.0)]
+    fs = make_scene(rows, soma=[(-2.0, -1.5, 0.8)])
+    planes = np.array([-0.28, 0.0, 0.28])
+    pa, pb = (-30, -30, 60, 60), (-10, -40, 50, 70)
+    X, Y = np.meshgrid((pa[0] + np.arange(pa[2])) * P_X, (pa[1] + np.arange(pa[3])) * P_X)
+    strip = (np.abs(X - 1.0) <= 0.2) & (np.abs(Y) <= 1.0)
+    SH.cache_clear()
+    calls = [("A floor mask", fs, pa, dict(B_gl=210.0, peak_mask=strip)),
+             ("B", fs, pb, dict()),
+             ("A floor", fs, pa, dict(B_gl=210.0)),
+             ("A floor mask again", fs, pa, dict(B_gl=210.0, peak_mask=strip)),
+             ("A one left out", fs, pa, dict(include=[True, False, True, True])),
+             ("A all", fs, pa, dict())]
+    log = []
+    for tag, f_, p_, kw in calls:
+        m0 = SH.cache_info()["misses"]
+        got = SH.shadow_image(f_, OWN_IDS, *p_, planes, cfg, **kw)
+        ref = _reference(f_, OWN_IDS, p_, planes, cfg, **kw)
+        exact = tag in ("A floor mask", "B", "A floor", "A floor mask again")
+        _same(got, ref, tag, 0.0 if exact else CACHE_S_ATOL)
+        log.append((tag, SH.cache_info()["misses"] - m0))
+    renders = dict(log)
+    assert renders["A floor"] == 0, log                 # the same neighbours as a kept sum: nothing rendered
+    assert renders["A floor mask again"] <= 4, log      # a peak mask is read on the images: rendered once more
+    assert renders["A one left out"] == 0, log          # one image out of a kept sum, from the patch in use
+    assert renders["A all"] <= 1, log
+    # one neighbour changed (its diameter): the sum changes by its old and its new image
+    rows2 = [rows[0][:2] + (0.9, 1.5)] + rows[1:]
+    fs2 = make_scene(rows2, soma=[(-2.0, -1.5, 0.8)])
+    m0 = SH.cache_info()["misses"]
+    got = SH.shadow_image(fs2, OWN_IDS, *pa, planes, cfg)
+    _same(got, _reference(fs2, OWN_IDS, pa, planes, cfg), "A changed", CACHE_S_ATOL)
+    n_changed = SH.cache_info()["misses"] - m0
+    assert n_changed <= 2, n_changed
+    # the image of an item rendered from its key equals the scene's [exact]
+    patch = SH._Patch(*pa, cfg)
+    for kind, idx in (("seg", 1), ("soma", 0)):
+        ik = SH._item_key(fs2, kind, idx)
+        a_ = SH._neighbour_image(fs2, kind, idx, patch, planes, cfg, None)[0]
+        b_ = SH._neighbour_image(SH._OneItem(ik), kind, 0, patch, planes, cfg, None)[0]
+        assert_array_equal(a_, b_, err_msg="from the key: %s" % kind)
+    # a duplicated neighbour counts twice, afresh and through a kept sum
+    fs3 = make_scene(rows + [rows[0]], soma=[(-2.0, -1.5, 0.8)])
+    SH.cache_clear()
+    for tag, kw in (("dup afresh", dict()), ("dup one left out", dict(include=[True, True, True, False, True])),
+                    ("dup both in", dict())):
+        got = SH.shadow_image(fs3, OWN_IDS, *pa, planes, cfg, **kw)
+        _same(got, _reference(fs3, OWN_IDS, pa, planes, cfg, **kw), tag,
+              0.0 if tag != "dup one left out" else CACHE_S_ATOL)
+    # the budget: at 0 MB only the patch in use stays
+    cfg0 = cfg_for("partition_vertical", shadow_cache_mb=0.0)
+    SH.cache_clear()
+    SH.shadow_image(fs, OWN_IDS, *pa, planes, cfg0)
+    SH.shadow_image(fs, OWN_IDS, *pb, planes, cfg0)
+    assert SH.cache_info()["patches"] == 1, SH.cache_info()
+    # over budget the newest patches leave: P1, P2, P3 visited with room for P1 and one more -> P1, P3 kept;
+    # P1 visited again renders nothing
+    pc = (-50, -10, 40, 40)
+    SH.cache_clear()
+    sizes = []
+    for p_ in (pa, pb, pc):
+        SH.shadow_image(fs, OWN_IDS, *p_, planes, cfg)
+        sizes.append(SH._cache[next(reversed(SH._cache))]["bytes"])
+    budget = (sizes[0] + max(sizes[1], sizes[2])) * 1.001 / 2.0 ** 20
+    cfgb = cfg_for("partition_vertical", shadow_cache_mb=budget)
+    SH.cache_clear()
+    for p_ in (pa, pb, pc):
+        SH.shadow_image(fs, OWN_IDS, *p_, planes, cfgb)
+    keys = [k[:4] for k in SH._cache]
+    assert keys == [pa, pc], keys
+    m0 = SH.cache_info()["misses"]
+    SH.shadow_image(fs, OWN_IDS, *pa, planes, cfgb)
+    assert SH.cache_info()["misses"] == m0, "the first patch of the pass was not kept"
+    MEASURED["cache"] = ("6 calls on patches A, B, A, A, A, A equal to the reference (S exact afresh, within %.0e "
+                         "changed); images rendered per call %s; a changed neighbour %d; patch sizes %s KB"
+                         % (CACHE_S_ATOL, [r for _t, r in log], n_changed, [int(x / 1024) for x in sizes]))
+    SH.cache_clear()
 
 
 def test_contract():

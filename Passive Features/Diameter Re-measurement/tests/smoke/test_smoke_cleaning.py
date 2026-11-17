@@ -12,7 +12,9 @@ Checks
                         in depth: 1; close and in focus: 2; directly above,
                         unattached: 2; attached at a branch point and not
                         close: 1, with its unattached twin: 2; soma: 1)
-    test_reference      added_gl equals the mean of B S [1e-12]; the tier
+    test_reference      D-150.4: the vectorized tier rule equals the per-segment
+                        loop it replaced on 150 random scenes [exact];
+                        added_gl equals the mean of B S [1e-12]; the tier
                         rule against a brute force written independently
                         (dense random points of the reach disc, nearest
                         points by sampling the axis) on random scenes
@@ -300,7 +302,68 @@ def _brute_tiers(fs, own_ids, node, cfg, spacing=0.01):
     return np.array(tiers + [1] * fs.soma.shape[0], dtype=np.int64), np.array(margins)
 
 
+def _tiers_loop(fs, own_ids, node_xyz, cfg):
+    """neighbour_tiers as it was written before D-150.4 (one segment at a time), kept verbatim as the reference
+    of the vectorized rule."""
+    xyz, ids, d, soma = CL._scene_arrays(fs)
+    node = np.asarray(node_xyz, dtype=np.float64).reshape(-1)
+    c = cfg.cleaning
+    lat_max, dz_max, reach = float(c.close_lateral_um), float(c.close_defocus_um), float(c.tier_reach_um)
+    step = float(cfg.measure.profile_step_um)
+    own = np.asarray(sorted({int(i) for i in own_ids}), dtype=np.int64)
+    in0, in1 = np.isin(ids[:, 0], own), np.isin(ids[:, 1], own)
+    own_seg = np.flatnonzero(in0 & in1)
+    nb = np.flatnonzero(~(in0 & in1))
+    r_max = 0.5 * d.max(axis=1)
+    m = int(math.floor(reach / step + 1e-12))
+    off = np.arange(-m, m + 1) * step
+    OX, OY = np.meshgrid(off, off, indexing="xy")
+    disc = np.hypot(OX, OY) <= reach
+    px, py = node[0] + OX[disc], node[1] + OY[disc]
+    own_fp = np.zeros(px.shape, dtype=bool)
+    for q in own_seg:
+        own_fp |= background.segment_distance(px, py, xyz[q, :3], xyz[q, 3:]) <= r_max[q]
+    qx, qy = px[own_fp], py[own_fp]
+    tiers = np.ones(nb.size + soma.shape[0], dtype=np.int64)
+    for k, q in enumerate(nb):
+        a, b = xyz[q, :3], xyz[q, 3:]
+        t = CL._nearest_t(node[0], node[1], a, b)
+        lateral = math.hypot(node[0] - (a[0] + t * (b[0] - a[0])), node[1] - (a[1] + t * (b[1] - a[1])))
+        defocus = abs(a[2] + t * (b[2] - a[2]) - node[2])
+        if lateral <= lat_max and defocus <= dz_max:
+            tiers[k] = 2
+        elif not (in0[q] or in1[q]) and qx.size:
+            if np.any(background.segment_distance(qx, qy, a, b) <= r_max[q]):
+                tiers[k] = 2
+    return tiers
+
+
 def test_reference():
+    # D-150.4: the vectorized tier rule equals the per-segment loop it replaced, exactly, on random scenes with
+    # segments placed at and around the thresholds (lateral 2.0 um, defocus 0.84 um, reach 3.0 um)
+    rng = make_rng()
+    cfg0 = default_config()
+    n_two = n_all = 0
+    for trial in range(150):
+        segs = list(OWN_SEGS)
+        for k in range(10):
+            p0 = rng.uniform(-5, 5, 3) * np.array([1, 1, 0.5])
+            if k % 3 == 0:                                   # on the close test's edges
+                p0 = np.array([rng.choice([-1, 1]) * 2.0, rng.uniform(-1, 1), rng.choice([-1, 1]) * 0.84])
+            p1 = p0 + rng.uniform(-3, 3, 3) * np.array([1, 1, 0.5])
+            if k == 9:
+                p1 = p0.copy()                               # a zero-length segment
+            parent = int(rng.choice([1, 2, 3])) if k == 0 else 1000 + 20 * trial + k
+            segs.append((3000 + 20 * trial + k, parent, tuple(p0), tuple(p1), 0.2 + rng.random(), 0.2 + rng.random()))
+        fs = fscene(segs, soma=[(5.0, 5.0, 2.0)])
+        got = CL.neighbour_tiers(fs, OWN_IDS, NODE, cfg0)
+        ref = _tiers_loop(fs, OWN_IDS, NODE, cfg0)
+        assert_array_equal(got, ref)
+        n_two += int(np.sum(ref == 2))
+        n_all += ref.size
+    MEASURED["vectorized tiers"] = "identical to the per-segment loop on 150 random scenes (%d of %d tier 2)" % (
+        n_two, n_all)
+
     # added_gl equals the mean of B S; 1e-12 relative (float64 means of ~1e2 numbers of size ~1e2)
     rng = make_rng()
     blk = 200.0 + 10.0 * rng.standard_normal((4, 6, 7))

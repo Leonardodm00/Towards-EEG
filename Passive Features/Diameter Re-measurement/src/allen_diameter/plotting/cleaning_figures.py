@@ -3,10 +3,12 @@
 Plotting only: every array arrives prepared (Blocks 25, 28, 32 by contract);
 nothing scientific is computed here and no input array is written to.
 
-  figure_node    one example node: per chosen plane a row of three images on
-                 one grey scale -- the patch before, B S the predicted shadow,
-                 the patch after -- with the measuring line drawn on each, and
-                 one panel of the line's profiles before and after
+  figure_node    one example node: per chosen plane a row of three images --
+                 the patch before, B S the predicted shadow, the patch after --
+                 before and after on one grey scale (the 1st to 99th
+                 percentile of the two), B S on its own (0 to its largest
+                 value; amendment 2, D-150.1), with the measuring line drawn
+                 on each, and one panel of the line's profiles before and after
   figure_line_rounds  one example node's measuring line across the rounds:
                  per chosen plane the profiles before and after each round,
                  and the light each round added back on the line (after
@@ -102,17 +104,33 @@ def _plane_rows(ks, planes):
     return rows
 
 
-def _row_scale(images):
-    """One (vmin, vmax) for the three images of a row: their joint finite range."""
+IMAGE_PERCENTILES = (1.0, 99.0)   # the grey range of before and after: these percentiles of the two together (amendment 2, D-150.1)
+
+
+def _row_scale(images, percentiles=None):
+    """One (vmin, vmax) for the images of a row: their joint finite range, or, with percentiles = (lo, hi),
+    numpy's percentiles lo and hi of their finite values together (amendment 2, D-150.1)."""
     vals = np.concatenate([np.asarray(im, dtype=float).ravel() for im in images])
     vals = vals[np.isfinite(vals)]
     if vals.size == 0:
         return 0.0, 1.0
-    lo, hi = float(vals.min()), float(vals.max())
+    if percentiles is None:
+        lo, hi = float(vals.min()), float(vals.max())
+    else:
+        lo, hi = (float(x) for x in np.percentile(vals, [float(percentiles[0]), float(percentiles[1])]))
     return (lo, hi) if hi > lo else (lo, lo + 1.0)
 
 
-def figure_node(block, shadow, cleaned, ks, frame, line_xy, v, profiles_before, profiles_after, meta, planes=None):
+def _shadow_scale(shadow):
+    """(vmin, vmax) of a predicted-shadow image: 0 to its largest finite value (1 when there is none above 0)."""
+    vals = np.asarray(shadow, dtype=float)
+    vals = vals[np.isfinite(vals)]
+    hi = float(vals.max()) if vals.size else 0.0
+    return 0.0, (hi if hi > 0.0 else 1.0)
+
+
+def figure_node(block, shadow, cleaned, ks, frame, line_xy, v, profiles_before, profiles_after, meta, planes=None,
+                percentiles=IMAGE_PERCENTILES):
     """One example node of the cleaning. Returns the matplotlib Figure.
 
     block, shadow, cleaned: (n_planes, H, W) on the same pixels, grey levels --
@@ -127,10 +145,15 @@ def figure_node(block, shadow, cleaned, ks, frame, line_xy, v, profiles_before, 
     meta: mapping for the title -- node_id, class, round, features (a mapping
       name -> value, or a string); each optional.
     planes: plane indices k (values of ks) to show, in that order; None = all.
+    percentiles: (lo, hi) -- the grey range of the before and after images of a
+      row is numpy's percentiles lo and hi of the two images' finite values
+      together (one scale for both, so they compare); None = their joint full
+      range (amendment 2, D-150.1).
 
-    Layout: one row per shown plane -- three images sharing one grey scale
-    (vmin/vmax = the joint range of the three), the measuring line drawn on
-    each, then the profile panel (before: ink, after: blue).
+    Layout: one row per shown plane -- the observed and the cleaned image on that
+    shared grey scale, the predicted shadow between them on its own scale (0 to
+    its largest value), the measuring line drawn on each, then the profile panel
+    (before: ink, after: blue); the row's label gives both scales.
     ValueError for shapes that disagree, an empty `planes`, a plane not in ks.
     """
     block = np.asarray(block)
@@ -170,10 +193,12 @@ def figure_node(block, shadow, cleaned, ks, frame, line_xy, v, profiles_before, 
                              gridspec_kw=dict(width_ratios=[1, 1, 1, 1.35]), layout="constrained")
     for r, j in enumerate(rows):
         imgs = (block[j], shadow[j], cleaned[j])
-        lo, hi = _row_scale(imgs)
+        lo, hi = _row_scale((block[j], cleaned[j]), percentiles)
+        s_lo, s_hi = _shadow_scale(shadow[j])
         for c in range(3):
             ax = axes[r, c]
-            ax.imshow(imgs[c], cmap="gray", vmin=lo, vmax=hi, extent=extent, origin="upper",
+            vmin, vmax = (s_lo, s_hi) if c == 1 else (lo, hi)
+            ax.imshow(imgs[c], cmap="gray", vmin=vmin, vmax=vmax, extent=extent, origin="upper",
                       interpolation="nearest")
             ax.plot(line[:, 0], line[:, 1], color=ORANGE, lw=1.4, path_effects=halo)
             ax.set_xlim(extent[0], extent[1])
@@ -182,7 +207,8 @@ def figure_node(block, shadow, cleaned, ks, frame, line_xy, v, profiles_before, 
             ax.set_yticks([])
             if r == 0:
                 ax.set_title(IMAGE_TITLES[c], fontsize=8.5, color=INK)
-        axes[r, 0].set_ylabel("plane k = %d\nscale %.0f-%.0f gl" % (int(ks[j]), lo, hi), fontsize=8, color=INK)
+        axes[r, 0].set_ylabel("plane k = %d\nbefore, after %.0f-%.0f gl\nB S 0-%.1f gl" % (int(ks[j]), lo, hi, s_hi),
+                              fontsize=7.5, color=INK)
         ax = axes[r, 3]
         _style(ax)
         ax.plot(v, before[j], color=INK, lw=1.2, label="before")

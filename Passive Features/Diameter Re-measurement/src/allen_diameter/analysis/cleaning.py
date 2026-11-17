@@ -172,14 +172,26 @@ def neighbour_tiers(fscene, own_ids, node_xyz, cfg):
     qx, qy = px[own_fp], py[own_fp]
 
     tiers = np.ones(nb.size + soma.shape[0], dtype=np.int64)
-    for k, q in enumerate(nb):
-        a, b = xyz[q, :3], xyz[q, 3:]
-        t = _nearest_t(node[0], node[1], a, b)
-        lateral = math.hypot(node[0] - (a[0] + t * (b[0] - a[0])), node[1] - (a[1] + t * (b[1] - a[1])))
-        defocus = abs(a[2] + t * (b[2] - a[2]) - node[2])
-        if lateral <= lat_max and defocus <= dz_max:
-            tiers[k] = 2                                 # (a) close and in focus
-        elif not (in0[q] or in1[q]) and qx.size:
-            if np.any(background.segment_distance(qx, qy, a, b) <= r_max[q]):
+    if nb.size == 0:
+        return tiers
+    # every neighbour at once (D-150.4, exact): the nearest point's parameter, lateral distance and defocus by
+    # the same arithmetic as _nearest_t and math.hypot, element by element
+    a, b = xyz[nb, :3], xyz[nb, 3:]
+    dx, dy = b[:, 0] - a[:, 0], b[:, 1] - a[:, 1]
+    L2 = dx * dx + dy * dy
+    with np.errstate(invalid="ignore", divide="ignore"):
+        t = np.where(L2 == 0.0, 0.0, np.clip(((node[0] - a[:, 0]) * dx + (node[1] - a[:, 1]) * dy) / L2, 0.0, 1.0))
+    ex, ey = node[0] - (a[:, 0] + t * dx), node[1] - (a[:, 1] + t * dy)
+    lateral = np.array([math.hypot(u, w) for u, w in zip(ex.tolist(), ey.tolist())])
+    defocus = np.abs(a[:, 2] + t * (b[:, 2] - a[:, 2]) - node[2])
+    close = (lateral <= lat_max) & (defocus <= dz_max)
+    tiers[:nb.size][close] = 2                           # (a) close and in focus
+    if qx.size:
+        # (b) needs a point of the own footprint, within reach of the node, within r_max of the segment: then the
+        # node is within reach + r_max of it (triangle inequality), so only those segments are examined
+        maybe = ~close & ~(in0[nb] | in1[nb]) & (lateral <= reach + r_max[nb] + 1e-9)
+        for k in np.flatnonzero(maybe):
+            q = nb[k]
+            if np.any(background.segment_distance(qx, qy, xyz[q, :3], xyz[q, 3:]) <= r_max[q]):
                 tiers[k] = 2                             # (b) unattached, overlapping within tier_reach_um
     return tiers

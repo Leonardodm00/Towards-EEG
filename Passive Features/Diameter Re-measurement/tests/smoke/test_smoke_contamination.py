@@ -17,6 +17,12 @@ Checks, from the strongest oracle to the weakest
     test_contract       shapes, dtypes, keys; the four classes on four scenes
     test_determinism    pick_examples under one seed; no node twice; a short
                         class reported
+    test_tier1_ranking  amendment 2 (D-150.2): tier1_contamination's worst
+                        tier-1 range and peak, and the worst tier-2 peak, equal
+                        a hand loop of scalar shadow_depth [1e-12]; the bounds
+                        leave out only provably small neighbours and change
+                        nothing; a non-monotone kernel switches them off;
+                        pick_tier1_examples' order, exclusions and separation
     test_edge_cases     ValueError for B <= 0, mu <= 0, an index outside the branch
 
 Run
@@ -340,6 +346,143 @@ def test_determinism():
     r1 = CT.node_contamination(br, mid(br), scene, B, MU, CFG)
     r2 = CT.node_contamination(br, mid(br), scene, B, MU, CFG)
     assert r1 == r2 or all((r1[k] == r2[k]) or (r1[k] != r1[k] and r2[k] != r2[k]) for k in r1)
+
+
+def _fscene_tier(branch, extra, d_extra, mu_extra, soma=None):
+    """A FeaturedScene (Block 23's type, built directly): the branch's own segments (d = 2 R, mu = MU) and extra
+    segments (rows x0 y0 z0 x1 y1 z1, ids 900 + 2m child, 901 + 2m parent) with their d and mu at both ends."""
+    from allen_diameter.analysis.node_features import FeaturedScene
+    own = Scene.from_branch(branch)
+    segs = np.asarray(extra, dtype=float).reshape(-1, 6)
+    n_own, n_x = own.seg_xyz.shape[0], segs.shape[0]
+    ids = np.array([[900 + 2 * m, 901 + 2 * m] for m in range(n_x)], dtype=np.int64).reshape(-1, 2)
+    d = np.vstack([2.0 * np.asarray(own.seg_radius, dtype=float), np.repeat(np.asarray(d_extra, float)[:, None], 2, 1)])
+    mu = np.vstack([np.full((n_own, 2), MU), np.repeat(np.asarray(mu_extra, float)[:, None], 2, 1)])
+    return FeaturedScene(seg_xyz=np.vstack([own.seg_xyz, segs]), seg_d_um=d, seg_mu_per_um=mu,
+                         seg_ids=np.vstack([own.seg_ids, ids]), seg_type=np.full(n_own + n_x, 3, dtype=np.int64),
+                         soma=np.empty((0, 3)) if soma is None else np.asarray(soma, dtype=float))
+
+
+def _hand_dips(br, i, fs, q, v):
+    """One segment's dip along node i's line, written out (as _hand_profile), at the segment's larger end radius
+    and larger end coefficient."""
+    xyz = br.xyz_um
+    win = [j for j in range(len(br.ids)) if abs(br.s_um[j] - br.s_um[i]) <= CFG.measure.line_fit_window_um / 2]
+    pts = xyz[win] - xyz[win].mean(axis=0)
+    t = np.linalg.svd(pts)[2][0]
+    if np.dot(t, xyz[win[-1]] - xyz[win[0]]) < 0:
+        t = -t
+    th = np.arctan2(t[1], t[0])
+    yh = np.array([-np.sin(th), np.cos(th)])
+    zk = round(xyz[i, 2] / DZ) * DZ
+    a, b = fs.seg_xyz[q, :3], fs.seg_xyz[q, 3:]
+    rq, mq = 0.5 * max(fs.seg_d_um[q]), max(fs.seg_mu_per_um[q])
+    out = []
+    for vn in v:
+        p = xyz[i, :2] + vn * yh
+        d = b[:2] - a[:2]
+        tt = min(1.0, max(0.0, np.dot(p - a[:2], d) / np.dot(d, d)))
+        sig = float(sigma_r(a[2] + tt * (b[2] - a[2]) - zk, CFG.renderer))
+        out.append(shadow_depth(np.linalg.norm(p - a[:2] - tt * d), rq, mq, sig, B))
+    return np.array(out)
+
+
+def test_tier1_ranking():
+    # amendment 2 (D-150.2). A straight branch along x through the origin, its node i in the middle, own nodes
+    # within 5 um; neighbours: N1 in focus 2.5 um aside (tier 1: not close, no overlap within 3 um), N2 along the
+    # line 2 um deeper (tier 2: unattached, overlapping), N3 60 um deeper, thin and pale (bounded out by its
+    # peak: 0.044 gl < rank_bound_gl 0.05), N4 30 um aside in focus (bounded out by the distance); the branch
+    # beyond the tube is neighbour too (D-143.1), in focus and at least 5 um from the line (out by the distance).
+    import dataclasses
+    from allen_diameter.analysis import cleaning
+    br = straight_branch(half=10.0, step=0.5)
+    i = mid(br)
+    own = [int(br.ids[j]) for j in range(len(br.ids)) if abs(br.s_um[j] - br.s_um[i]) <= 5.0]
+    x0 = float(br.xyz_um[i, 0])
+    extra = [[-12.0, 2.5, Z0, 12.0, 2.5, Z0],                    # N1
+             [x0, -12.0, Z0 + 2.0, x0, 12.0, Z0 + 2.0],          # N2
+             [-12.0, 1.0, Z0 + 60.0, 12.0, 1.0, Z0 + 60.0],      # N3
+             [-12.0, 30.0, Z0, 12.0, 30.0, Z0]]                  # N4
+    fs = _fscene_tier(br, extra, [0.6, 0.8, 0.3, 0.6], [1.0, 1.0, 0.3, 1.0])
+    n_own = fs.seg_xyz.shape[0] - 4
+    q1, q2 = n_own, n_own + 1
+    v = profile_offsets(CFG.measure)
+    row = CT.tier1_contamination(fs, br, i, own, B, CFG)
+    tiers = cleaning.neighbour_tiers(fs, own, br.xyz_um[i], CFG)
+    assert tiers.tolist()[-4:] == [1, 2, 1, 1], tiers.tolist()
+    h1, h2 = _hand_dips(br, i, fs, q1, v), _hand_dips(br, i, fs, q2, v)
+    check_close("worst1 range (N1)", row["worst1_range_gl"], h1.max() - h1.min())
+    check_close("worst1 peak (N1)", row["worst1_peak_gl"], h1.max())
+    check_close("worst2 peak (N2)", row["worst2_peak_gl"], h2.max())
+    assert row["worst1_child_id"] == int(fs.seg_ids[q1, 0]), row
+    check_close("worst1 lateral", row["worst1_lateral_um"], 2.5, rtol=0, atol=1e-12)
+    check_close("worst1 defocus", row["worst1_defocus_um"], 0.0, rtol=0, atol=1e-12)
+    assert row["n_tier2"] == 1 and set(TIER1_KEYS) <= set(row), row
+    # the bounds evaluate N1 and N2 only; at rank_bound_gl = 0, N3 is a candidate too (evaluated in the first
+    # chunk with N1) and changes nothing
+    n_nb = int(tiers.size - fs.soma.shape[0])
+    cfg0 = dataclasses.replace(CFG, cleaning=dataclasses.replace(CFG.cleaning, rank_bound_gl=0.0))
+    row0 = CT.tier1_contamination(fs, br, i, own, B, cfg0)
+    for k in ("worst1_range_gl", "worst1_peak_gl", "worst1_child_id", "worst2_peak_gl"):
+        assert row0[k] == row[k], (k, row0[k], row[k])
+    assert row["n_evaluated"] == 2 and row0["n_evaluated"] == 3, (row["n_evaluated"], row0["n_evaluated"], n_nb)
+    # the branch and bound is exact: on a dense random scene (60 random-walk dendrites of 60 segments, thick
+    # and thin, in focus and not), the same worst as evaluating every candidate
+    rng = make_rng()
+    segs, rad = [], []
+    for _bb in range(60):
+        p = rng.uniform([-60, -60, Z0 - 30], [60, 60, Z0 + 30])
+        d = rng.normal(size=3)
+        d /= np.linalg.norm(d)
+        for _k in range(60):
+            d = d + 0.3 * rng.normal(size=3)
+            d /= np.linalg.norm(d)
+            segs.append(np.concatenate([p, p + 1.18 * d]))
+            rad.append(rng.choice([0.15, 0.3, 0.8]))
+            p = p + 1.18 * d
+    fsr = _fscene_tier(br, segs, 2.0 * np.array(rad), np.full(len(rad), 0.258))
+    tr = cleaning.neighbour_tiers(fsr, own, br.xyz_um[i], CFG)
+    for bnd in (0.05, 0.0):
+        cfgb = dataclasses.replace(CFG, cleaning=dataclasses.replace(CFG.cleaning, rank_bound_gl=bnd))
+        fast = CT.tier1_contamination(fsr, br, i, own, B, cfgb, tiers=tr)
+        CT._BRANCH_AND_BOUND = False
+        try:
+            full = CT.tier1_contamination(fsr, br, i, own, B, cfgb, tiers=tr)
+        finally:
+            CT._BRANCH_AND_BOUND = True
+        for k in ("worst1_range_gl", "worst1_peak_gl", "worst1_child_id", "worst2_peak_gl"):
+            assert fast[k] == full[k], (bnd, k, fast[k], full[k])
+        assert fast["n_evaluated"] <= full["n_evaluated"]
+        print("    branch and bound at %.2f gl: worst range %.3f gl, %d of %d candidates evaluated"
+              % (bnd, fast["worst1_range_gl"], fast["n_evaluated"], full["n_evaluated"]))
+    # a kernel table that is not monotone switches the bounds off: every neighbour evaluated, same answer
+    sig_bad = list(CFG.renderer.kernel_table_sigma_um)
+    sig_bad[1] = sig_bad[-1] + 0.1                           # a bump: no longer non-decreasing
+    bad = dataclasses.replace(CFG, renderer=dataclasses.replace(CFG.renderer, kernel_table_sigma_um=tuple(sig_bad)))
+    rowb = CT.tier1_contamination(fs, br, i, own, B, bad)
+    assert rowb["n_evaluated"] == n_nb, rowb["n_evaluated"]
+    # the tiers passed in are used as given
+    rowt = CT.tier1_contamination(fs, br, i, own, B, CFG, tiers=np.ones_like(tiers))
+    check_close("N2 as tier 1 (range)", rowt["worst1_range_gl"], max(h1.max() - h1.min(), h2.max() - h2.min()))
+    assert rowt["worst2_peak_gl"] == 0.0 and rowt["n_tier2"] == 0
+    print("    tier-1 ranking: N1 range %.3f gl (peak %.3f), N2 tier 2 peak %.3f gl; evaluated %d of %d"
+          % (row["worst1_range_gl"], row["worst1_peak_gl"], row["worst2_peak_gl"], row["n_evaluated"], n_nb))
+    # pick_tier1_examples: order by range, near_end and tier-2 exclusions, the separation, zero ranges never
+    rows = [dict(node_id=k, x_um=float(10 * k), y_um=0.0, z_um=0.0, near_end=False, worst2_peak_gl=0.0,
+                 worst1_range_gl=float(r)) for k, r in ((1, 5.0), (2, 3.0), (3, 4.0), (4, 2.0), (5, 0.0))]
+    rows[1]["near_end"] = True
+    rows[3]["worst2_peak_gl"] = 1.5
+    assert CT.pick_tier1_examples(rows, 10, 1.0, 5.0) == [1, 3], CT.pick_tier1_examples(rows, 10, 1.0, 5.0)
+    rows[2]["x_um"] = 12.0                                   # node 3 now 2 um from node 1
+    assert CT.pick_tier1_examples(rows, 10, 1.0, 5.0) == [1]
+    assert CT.pick_tier1_examples(rows, 10, 1.0, 1.0) == [1, 3]
+    assert CT.pick_tier1_examples(rows, 1, 2.0, 1.0) == [1]
+    assert CT.pick_tier1_examples(rows, 10, 2.0, 1.0) == [1, 3, 4]
+
+
+TIER1_KEYS = ("node_id", "x_um", "y_um", "z_um", "own_dip_gl", "n_tier2", "n_evaluated", "worst1_range_gl",
+              "worst1_peak_gl", "worst1_child_id", "worst1_lateral_um", "worst1_defocus_um", "worst2_peak_gl",
+              "soma_lateral_um")
 
 
 def test_edge_cases():

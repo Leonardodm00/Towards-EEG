@@ -7,6 +7,11 @@ D-129, D-130, D-132, D-136, D-138).
           (D-138.2) -> contamination_<S>.csv; the example nodes drawn by
           contamination.pick_examples with cleaning.example_counts, seeded, never a
           near_end node (D-138.3) -> examples_<S>.json; a count per class printed
+  rank    Block 27, amendment 2 (D-150.2) on every dendrite node (no image is read): each
+          node's worst tier-1 neighbour -- one the cleaning subtracts -- by the structured
+          part of its predicted dip on the measuring line, with the worst tier-2 peak ->
+          rank_tier1_<S>.csv; the example nodes for a test of the cleaning
+          (contamination.pick_tier1_examples) -> examples_tier1_<S>.json, which clean reads
   clean   the work list (node_inputs.work_list: the example nodes and the nodes of their
           strong tier-1 neighbours); the pilot of every work-list node (Block 5's
           measure_pilot; a node whose pilot or inputs fail is dropped and logged); round 0 =
@@ -31,6 +36,7 @@ Examples
         --cache-dir /content/drive/MyDrive/allen_cache --out OUT/cleaning
     # dry run, no network:
     python scripts/clean_cell.py survey --synthetic --specimen 0 --B 210 --mu 1.0 --out /tmp/c
+    python scripts/clean_cell.py rank --synthetic --specimen 0 --B 210 --mu 1.0 --out /tmp/c
     python scripts/clean_cell.py clean --synthetic --specimen 0 --examples /tmp/c/examples_0.json --out /tmp/c
 
 Pure ASCII, LF, for the cluster (hpc-python-compat).
@@ -298,6 +304,110 @@ def run_survey(a, cfg, log):
     return 0
 
 
+# ------------------------------------------------------------------- rank ---
+
+RANK_COLUMNS = tuple(contamination.TIER1_COLUMNS) + ("near_end",)
+
+
+def _rank_outputs(a, cfg, rows, label, transform, n_target, n_dendrite, partial, failed, single):
+    """rank_tier1_<S>.csv (every node ranked so far) and examples_tier1_<S>.json (pick_tier1_examples' nodes, in
+    the examples file's format that clean reads), from the rows so far (a checkpoint when partial)."""
+    csv_path = write_csv(os.path.join(a.out, "rank_tier1_%s.csv" % a.specimen), rows, RANK_COLUMNS)
+    c = cfg.cleaning
+    examples = contamination.pick_tier1_examples(rows, c.rank_examples, c.rank_max_tier2_gl, c.rank_min_separation_um)
+    by_id = {int(r["node_id"]): r for r in rows}
+    rec = dict(specimen=str(a.specimen), source=label, example_ids=examples,
+               classes={str(i): "tier1" for i in examples}, B_gl=float(a.B), mu_per_um=float(a.mu),
+               transform=dict(shift_full_px=list(transform["shift_full_px"]),
+                              flip_y_full_h=transform["flip_y_full_h"], z0_um=transform["z0_um"]),
+               swc=a.swc or "", n_ranked=len(rows), n_target=int(n_target), n_dendrite_nodes=int(n_dendrite),
+               n_single_node_stretches=single, failed=failed, partial=bool(partial),
+               sample="all dendrite nodes" if n_target == n_dendrite else
+                      "a seeded random sample of %d of %d dendrite nodes" % (n_target, n_dendrite),
+               ranking={str(i): {k: by_id[i][k] for k in RANK_COLUMNS} for i in examples},
+               **config_sections(cfg))
+    ex_path = write_json(os.path.join(a.out, "examples_tier1_%s.json" % a.specimen), rec)
+    return csv_path, ex_path, examples
+
+
+def run_rank(a, cfg, log):
+    """Block 27, amendment 2 (D-150.2): every dendrite node (or a seeded random sample, --max-nodes) ranked by its
+    worst tier-1 neighbour's structured dip on its measuring line, at round 0 (Allen's diameters, --mu); the
+    example nodes for a test of the cleaning are the highest not near_end, with tier-2 neighbours under
+    cleaning.rank_max_tier2_gl on the line, cleaning.rank_min_separation_um apart. Geometry only: no image."""
+    os.makedirs(a.out, exist_ok=True)
+    swc, _provider, label = load_cell(a, cfg, log, need_images=False)
+    transform = transform_of(a)
+    res0 = float(cfg.acquisition.res0_um)
+    xyz = cell.to_image_um(swc.xyz, res0, **transform)
+    types = tuple(cfg.cleaning.neighbour_swc_types)
+    scene = cell.cell_scene(swc, types, res0, transform)
+    fscene = node_features.featured_scene(scene, node_features.initial_features(swc, types, a.mu))
+    log("scene: %d segments, %d soma discs; B %.4g gl, mu %.4g /um; bound %.3g gl, examples %d (tier 2 on the line "
+        "<= %.3g gl, %.3g um apart)" % (scene.seg_xyz.shape[0], scene.soma.shape[0], a.B, a.mu,
+                                         cfg.cleaning.rank_bound_gl, cfg.cleaning.rank_examples,
+                                         cfg.cleaning.rank_max_tier2_gl, cfg.cleaning.rank_min_separation_um))
+    branches, single = [], 0
+    for run in cell.stretches(swc, tuple(cfg.acquisition.dendrite_swc_types)):
+        ob = node_inputs.own_branch(swc, run, xyz)
+        if ob is None:
+            single += 1
+            continue
+        branches.append(ob[0])
+    pairs = [(b, t) for b in branches for t in range(len(b.ids))]
+    n_dendrite = len(pairs)
+    order = np.random.default_rng(int(a.seed if a.seed is not None else cfg.phantom.seed) + 1).permutation(n_dendrite)
+    if a.max_nodes is not None:
+        order = order[:max(0, int(a.max_nodes))]
+    n_target = len(order)
+    log("ranking %s" % ("all %d dendrite nodes" % n_dendrite if n_target == n_dendrite
+                        else "%d of %d dendrite nodes (seeded random sample)" % (n_target, n_dendrite)))
+    rows, failed = [], []
+    U = float(cfg.inference.tube_half_length_um)
+    old = signal.signal(signal.SIGTERM, _on_sigterm)
+    stopped, t_last = False, time.time()
+    try:
+        for j in order:
+            branch, t = pairs[int(j)]
+            nid = int(branch.ids[t])
+            try:
+                own = node_inputs.own_ids_within(branch, t, U)[0]
+                row = contamination.tier1_contamination(fscene, branch, t, own, a.B, cfg)
+            except (KeyboardInterrupt, _Stop):
+                raise
+            except Exception as exc:          # one node's failure never stops the ranking
+                failed.append(nid)
+                log("node %d: ranking failed (%s: %s), dropped" % (nid, type(exc).__name__, exc))
+                continue
+            row["near_end"] = node_inputs.is_near_end(branch, t, cfg)
+            rows.append(row)
+            if time.time() - t_last > 60:
+                t_last = time.time()
+                log("%d of %d dendrite nodes ranked" % (len(rows), n_target))
+    except (KeyboardInterrupt, _Stop):
+        stopped = True
+        log("ranking stopped after %d of %d nodes: writing the outputs of the nodes done" % (len(rows), n_target))
+    finally:
+        signal.signal(signal.SIGTERM, old)
+    csv_path, ex_path, examples = _rank_outputs(a, cfg, rows, label, transform, n_target, n_dendrite, stopped,
+                                                failed, single)
+    by_id = {int(r["node_id"]): r for r in rows}
+    top = sorted(rows, key=lambda r: (-float(r["worst1_range_gl"]), int(r["node_id"])))[:10]
+    print("the ten largest tier-1 structured dips on the line (gl): " + ", ".join(
+        "%d %.2f%s" % (int(r["node_id"]), float(r["worst1_range_gl"]), " (near_end)" if r["near_end"] else
+                       " (tier 2 %.1f)" % float(r["worst2_peak_gl"]) if float(r["worst2_peak_gl"]) >
+                       cfg.cleaning.rank_max_tier2_gl else "") for r in top), flush=True)
+    for i in examples:
+        r = by_id[i]
+        log("example %d: worst tier-1 neighbour (child %d) %.2f gl structured, peak %.2f gl, %.2f um aside, %.2f um "
+            "out of focus; tier-2 peak %.2f gl; own dip %.1f gl" % (
+                i, int(r["worst1_child_id"]), r["worst1_range_gl"], r["worst1_peak_gl"], r["worst1_lateral_um"],
+                r["worst1_defocus_um"], r["worst2_peak_gl"], r["own_dip_gl"]))
+    log("rank: %d nodes%s, %d failed -> %s; %d example nodes %s -> %s" % (
+        len(rows), " (stopped early)" if stopped else "", len(failed), csv_path, len(examples), examples, ex_path))
+    return 0
+
+
 # ------------------------------------------------------------------ clean ---
 
 class NodeClock(object):
@@ -372,8 +482,23 @@ def pilot_fields(p):
     return out
 
 
+def _cache_logger(cfg, log):
+    """log_cache(label): the neighbours' images reused and rendered since the last call, and what the cache of
+    shadow.shadow_image keeps (Block 25, amendment 7, D-150.3)."""
+    seen = {"hits": 0, "misses": 0}
+
+    def log_cache(label):
+        ci = shadow.cache_info()
+        log("%s: shadow images %d reused, %d rendered; %d patches kept, %.0f MB (budget %g MB)"
+            % (label, ci["hits"] - seen["hits"], ci["misses"] - seen["misses"], ci["patches"], ci["mb"],
+               float(cfg.cleaning.shadow_cache_mb)))
+        seen.update(hits=ci["hits"], misses=ci["misses"])
+    return log_cache
+
+
 def run_clean(a, cfg, log):
     os.makedirs(a.out, exist_ok=True)
+    shadow.cache_clear()                 # what shadow_image keeps across rounds starts empty (D-150.3)
     with open(a.examples, encoding="utf-8") as f:
         ex = json.load(f)
     examples = [int(i) for i in ex["example_ids"]]
@@ -511,6 +636,8 @@ def run_clean(a, cfg, log):
     sigma = float(np.median([infos[n.node_id]["sigma_gl"] for n in nodes]))
     log("%d nodes prepared (%d dropped), %d example nodes; sigma_gl %.3f gl (median of the nodes' profile SDs)"
         % (len(nodes), len(dropped), len(kept_examples), sigma))
+    log_cache = _cache_logger(cfg, log)
+    log_cache("round 0 (work list and preparation)")
 
     clock = NodeClock(len(nodes), log)
     cache = line_fast.SectionCache()
@@ -624,6 +751,7 @@ def run_clean(a, cfg, log):
         log("round %d: max relative d change %.4g, largest example line change %.4g gl, %d refined, %d failed, "
             "%d at a bound" % (h["round"], h["max_rel_d"], h["max_line_change_gl"], h["n_refined"], h["n_failed"],
                                h["n_at_bound"]))
+        log_cache("round %d" % h["round"])
         try:
             write_outputs(res)
             saved["round"] = int(h["round"])
@@ -679,6 +807,13 @@ def main(argv=None):
     s.add_argument("--max-nodes", type=int, default=None, help="survey a seeded random sample of this many dendrite "
                    "nodes (default: all; about 3 s per node on the pilot)")
     s.add_argument("--checkpoint-every", type=int, default=100, help="rewrite the outputs every this many nodes")
+    k = sub.add_parser("rank", help="rank the dendrite nodes by their worst tier-1 neighbour on the line (D-150.2)")
+    _common(k)
+    k.add_argument("--B", type=float, required=True, help="the background, gl (as survey)")
+    k.add_argument("--mu", type=float, required=True, help="the coefficient, 1/um (as survey)")
+    k.add_argument("--seed", type=int, default=None, help="the sample's seed; default phantom.seed")
+    k.add_argument("--max-nodes", type=int, default=None, help="rank a seeded random sample of this many dendrite "
+                   "nodes (default: all)")
     c = sub.add_parser("clean", help="the cleaning rounds on the work list (Blocks 25-32)")
     _common(c)
     c.add_argument("--examples", required=True, help="examples_<S>.json of survey")
@@ -695,6 +830,8 @@ def main(argv=None):
     log("clean_cell.py %s, specimen %s%s" % (a.cmd, a.specimen, " (synthetic)" if a.synthetic else ""))
     if a.cmd == "survey":
         return run_survey(a, cfg, log)
+    if a.cmd == "rank":
+        return run_rank(a, cfg, log)
     return run_clean(a, cfg, log)
 
 

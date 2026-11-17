@@ -2,8 +2,10 @@
 
 The module computes nothing scientific, so the oracles are about what is
 drawn: the images shown are the input planes, the line drawn is line_xy, the
-profiles drawn are the input profiles, one grey scale per row, the inputs are
-not written to, one point per round, the thresholds at the configured values.
+profiles drawn are the input profiles, before and after on one grey scale per
+row (their joint 1st to 99th percentile) and B S on its own (0 to its maximum)
+(amendment 2, D-150.1), the inputs are not written to, one point per round, the
+thresholds at the configured values.
 
 Test arrays (Blocks 25 and 28 are not imported): a Block 24 scene of a node
 tube and a neighbour tube (model/scene_render.synthetic_scene_block, uint8
@@ -17,11 +19,15 @@ Checks
     test_known_answer   the images shown equal the input planes, their extent
                         is image_extent_um(frame), the line drawn is line_xy,
                         the profile lines are the input profiles
-    test_reference      each row's vmin/vmax equals numpy's nanmin/nanmax over
-                        the row's three planes
+    test_reference      amendment 2 (D-150.1): each row's before and after
+                        vmin/vmax equal numpy's 1st and 99th percentiles of the
+                        two planes together, B S's are 0 and its nanmax [exact];
+                        percentiles=None gives the joint full range of before
+                        and after
     test_convergence    skipped (no discretisation)
-    test_invariants     the three images of a row share vmin/vmax; the input
-                        arrays are unchanged (and read-only during the call)
+    test_invariants     before and after share vmin/vmax, B S starts at 0; the
+                        input arrays are unchanged (and read-only during the
+                        call)
     test_contract       3 image axes and 1 profile axis per plane shown, for
                         planes=None and a chosen subset; figure_rounds: one
                         point per round in each panel, stop_rel_d and
@@ -209,17 +215,27 @@ def test_known_answer():
 
 
 def test_reference():
+    # amendment 2 (D-150.1): before and after on numpy's 1st-99th percentiles of the two together, B S on 0 to its max
     a = scene()
-    fig = call_node(a)
-    try:
-        imgs, _ = split_axes(fig)
-        for r, j in enumerate(rows_of(None, a["ks"])):
-            stack = np.concatenate([np.asarray(a[s][j], dtype=float).ravel() for s in ("block", "shadow", "cleaned")])
-            lo, hi = float(np.nanmin(stack)), float(np.nanmax(stack))
-            for c in range(3):
-                check_close("clim r%d c%d" % (r, c), imgs[3 * r + c].images[0].get_clim(), (lo, hi), rtol=0, atol=0)
-    finally:
-        plt.close(fig)
+    for pct in ((1.0, 99.0), None):
+        fig = CF.figure_node(a["block"], a["shadow"], a["cleaned"], a["ks"], a["frame"], a["line_xy"], a["v"],
+                             a["profiles_before"], a["profiles_after"], a["meta"], percentiles=pct)
+        try:
+            imgs, _ = split_axes(fig)
+            for r, j in enumerate(rows_of(None, a["ks"])):
+                pair = np.concatenate([np.asarray(a[s][j], dtype=float).ravel() for s in ("block", "cleaned")])
+                pair = pair[np.isfinite(pair)]
+                if pct is None:
+                    lo, hi = float(pair.min()), float(pair.max())
+                else:
+                    lo, hi = (float(x) for x in np.percentile(pair, list(pct)))
+                for c in (0, 2):
+                    check_close("clim r%d c%d %s" % (r, c, pct), imgs[3 * r + c].images[0].get_clim(), (lo, hi),
+                                rtol=0, atol=0)
+                s_hi = float(np.nanmax(np.asarray(a["shadow"][j], dtype=float)))
+                check_close("clim r%d B S" % r, imgs[3 * r + 1].images[0].get_clim(), (0.0, s_hi), rtol=0, atol=0)
+        finally:
+            plt.close(fig)
 
 
 def test_convergence():
@@ -237,7 +253,8 @@ def test_invariants():
         imgs, _ = split_axes(fig)
         for r in range(3):
             clims = [imgs[3 * r + c].images[0].get_clim() for c in range(3)]
-            assert clims[0] == clims[1] == clims[2], "row %d: grey scales differ %r" % (r, clims)
+            assert clims[0] == clims[2], "row %d: before and after on different grey scales %r" % (r, clims)
+            assert clims[1][0] == 0.0 and clims[1][1] > 0.0, "row %d: B S scale %r" % (r, clims[1])
         plt.close(fig)
     finally:
         for k in copies:

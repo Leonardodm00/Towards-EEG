@@ -198,42 +198,69 @@ for path in [INFER + "/diameters.png", INFER + "/chi2.png"] + sorted(glob.glob(I
         display(Image(filename=path))
 
 # %% [markdown]
-# ## Cell 17b: the cleaning in worse conditions -- the survey's most contaminated tier-1 nodes, with their main
-# neighbours refined (D-149; about 3-4 h, each work-list node about 15 min over the two rounds)
+# ## Cell 16b: rank every dendrite node by its worst tier-1 neighbour (D-150.2; geometry only, about 10 min)
 #
-# Run Cells 0, 1 and 16 first (Cell 16 skips the survey when its files exist). Example nodes, from the survey's 600
-# (Allen's radii, mu 0.258 /um; the worst neighbour's dip on the line): 8089, a branch crossing it 0.08 um aside and
-# 2.1 um above or below (2.1 gl, 10 % of its own dip); 4844, 0.26 um and 2.5 um (1.4 gl); 7081, 1.2 um and 1.6 um
-# (1.5 gl); 7448, the proximal trunk 15.5 um out of focus (3.5 gl) and the soma 4.2 um away.
-# The neighbours' nodes join the work list by their predicted shadow on an example's measuring line (D-149.2), at
-# least WORK_PEAK_GL_W, the strongest first, up to MAX_WORK_W nodes in all. Round 1 cleans every node with round 0's
-# features (the neighbours at Allen's diameter and mu 0.258 /um) and refines them; round 2 cleans the examples with
-# the refined neighbours. Each round is saved as it ends.
-# Outputs in OUT/cleaning_worst (Cell 17's folder is untouched): per example `cleaning_line_node<id>.png` (the line
-# before, after round 1 and after round 2, and the light each round added back), `cleaning_node<id>_round1.png` and
-# `cleaning_node<id>_round2.png`. Output to send back: the log (the `work list:` lines above all) and the figures.
+# Run Cells 0, 1 and 16 first. For each dendrite node: the neighbours the cleaning subtracts (tier 1, D-132), each
+# one's predicted dip along the node's measuring line (the survey's predictor, Allen's radii, MU), and the largest
+# structured part of one such dip (its maximum minus its minimum along the line: a shoulder or a second dip, not a
+# uniform rise). The examples for Cell 17b are the highest-ranked nodes that are not near_end, whose tier-2
+# neighbours (left in by design) put at most 1 gl on the line, 10 um apart. Outputs in CLEAN:
+# `rank_tier1_<S>.csv` and `examples_tier1_<S>.json`. Output to send back: the log's last lines.
 
 # %%
 import json
 import pandas as pd
 from IPython.display import Image, display
-WORST_IDS = [8089, 4844, 7081, 7448]
-ROUNDS_W, MAX_WORK_W, WORK_PEAK_GL_W = 2, 16, 1.0     # MAX_WORK_W counts the examples too
+RANK_CSV = "%s/rank_tier1_%d.csv" % (CLEAN, SPECIMEN)
+EXAMPLES_T1 = "%s/examples_tier1_%d.json" % (CLEAN, SPECIMEN)
+RERANK = False                                         # True: recompute even if the files exist
+if RERANK or not (os.path.exists(RANK_CSV) and os.path.exists(EXAMPLES_T1)):
+    run("scripts/clean_cell.py", "rank", "--specimen", SPECIMEN, "--out", CLEAN, "--cache-dir", CACHE_DIR, *ALIGN,
+        *CLEAN_CFG, "--B", B_GL, "--mu", MU)
+rank = pd.read_csv(RANK_CSV)
+with open(EXAMPLES_T1) as f:
+    ex_t1 = json.load(f)
+cols = ["node_id", "worst1_range_gl", "worst1_peak_gl", "worst1_lateral_um", "worst1_defocus_um", "worst2_peak_gl",
+        "n_tier2", "own_dip_gl", "near_end"]
+print("examples (tier-1 ranking):", ex_t1["example_ids"])
+display(rank.sort_values("worst1_range_gl", ascending=False)[cols].head(15))
+
+# %% [markdown]
+# ## Cell 17b: the cleaning in worse conditions -- the tier-1 ranking's examples, with their neighbours refined
+# (D-149, D-150; about 2-3 h for 4 examples and 12 work-list nodes)
+#
+# Example nodes: Cell 16b's (`examples_tier1_<S>.json`), or your own list in WORST_IDS. The neighbours' nodes join
+# the work list by their predicted shadow on an example's measuring line (D-149.2), at least WORK_PEAK_GL_W, the
+# strongest first, up to MAX_WORK_W nodes in all. Round 1 cleans every node with round 0's features (the neighbours
+# at Allen's diameter and mu MU) and refines them; round 2 cleans the examples with the refined neighbours. Each
+# round is saved as it ends. The shadows are kept between rounds (D-150.3): a round renders only the neighbours
+# that changed or that differ between the background's and the cleaning's sums, and the log says how many after
+# each round (`shadow images ... reused, ... rendered`). Outputs in OUT/cleaning_worst (Cell 17's folder is
+# untouched): per example
+# `cleaning_line_node<id>.png` (the line before, after round 1 and after round 2, and the light each round added
+# back), `cleaning_node<id>_round1.png` and `cleaning_node<id>_round2.png` (before and after on one grey scale,
+# the predicted shadow on its own, D-150.1). Output to send back: the log (the `work list:` lines above all) and
+# the figures.
+
+# %%
+WORST_IDS = None                                       # None: Cell 16b's examples; or a list of node ids
+ROUNDS_W, MAX_WORK_W, WORK_PEAK_GL_W = 2, 12, 1.0      # MAX_WORK_W counts the examples too
 CLEAN_W = OUT + "/cleaning_worst"
 os.makedirs(CLEAN_W, exist_ok=True)
-with open(EXAMPLES) as f:
+with open(EXAMPLES_T1) as f:
     exw = json.load(f)
-cont = pd.read_csv("%s/contamination_%d.csv" % (CLEAN, SPECIMEN)).set_index("node_id")
-exw["example_ids"] = WORST_IDS
-exw["classes"] = {str(i): (str(cont.loc[i, "class"]) if i in cont.index else "") for i in WORST_IDS}
+if WORST_IDS is not None:
+    exw["example_ids"] = list(WORST_IDS)
+    exw["classes"] = {str(i): "chosen" for i in WORST_IDS}
 EXAMPLES_W = "%s/examples_worst_%d.json" % (CLEAN_W, SPECIMEN)
 with open(EXAMPLES_W, "w") as f:
     json.dump(exw, f, indent=1)
-print("[cell 17b] examples:", WORST_IDS, "| classes:", exw["classes"])
+ids_w = [int(i) for i in exw["example_ids"]]
+print("[cell 17b] examples:", ids_w)
 run("scripts/clean_cell.py", "clean", "--specimen", SPECIMEN, "--out", CLEAN_W, "--cache-dir", CACHE_DIR, *ALIGN,
     *CLEAN_CFG, "--examples", EXAMPLES_W, "--B", B_GL, "--mu", MU, "--rounds", ROUNDS_W, "--max-work", MAX_WORK_W,
     "--work-peak-gl", WORK_PEAK_GL_W)
-for nid in WORST_IDS:
+for nid in ids_w:
     for name in ("cleaning_line_node%d.png", "cleaning_node%d_round1.png", "cleaning_node%d_round2.png"):
         path = CLEAN_W + "/" + name % nid
         if os.path.exists(path):
