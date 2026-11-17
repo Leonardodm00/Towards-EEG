@@ -194,6 +194,7 @@ the "Binds" column.
 | 2026-11-17 (later) | No decision changed (the noise-fit chat; output pasted by the user, 10:47) **[cluster]**. **The 18-cell run of D-124 is done**: `NOISE_MERGE L3_exc: 18 ok, 0 refused, 0 failed, 0 missing` -- no cell refused by D-114 (every sweep tilt read), none failed; the pilot's two cells kept (the code commit unchanged, `1d848f6`). Per cell 12971-27308 s (3.6-7.6 h, median 5.3 h; the slowest still 569844159), far inside D-147's 48 h; K 37-348 SS windows, K_LS 16-38 LS sweeps; about 574 core-hours. The time follows K_LS (r = 0.69) more than K (r = 0.34): t ~ 6061 + 10.7 K + 410 K_LS s, residual SD 2368 s **[run, here, on the pasted numbers]** -- a guide for later walltimes. The roadmap markers never reached GitHub (no `hpc-status` branch: the compute nodes need `module load proxy`), so N6 still shows pushed. Next: the two tables inspected, then Block 5's SPEC entry (the Block 6 handoff's §6 questions). D-124, D-125 and D-147 annotated. Next free IDs: D-151, I-006. |
 | 2026-11-17 (later, 2) | No decision changed (the noise-fit chat; the two CSVs attached by the user, 11:01). **The nf1 tables read back** **[run, here, on the two CSVs the user attached]**: every integrity check passes (18 ok on `1d848f6`, dof 11, 589 sweep rows matching the layouts, the pooling (P3)-(P4) recomputed to 2e-14, the failed sweeps' twins at theta_hat(c) as D-122.3 says). The law is rejected in all 18 cells: J 29.9-1756 on 11 dof (J/dof 2.7-160; the Monte Carlo of q_sim can explain a few percent of it **[reasoning]**), J rising with rho_f across cells (Spearman 0.67); no coordinate at a bound; `no_plateau` in 5 cells. D-055's S3 read on this run (a reading, not a scheduled check, D-125.3): S3.1's first half holds (18 of 18 alarms), S3.2's first half fails (tau_s in [15, 100] ms in 10 of 18; 6.7 ms to 1.86 s); S3.1's second half and S3.3 wait for the per-cell JSONs. Per sweep: 10 of 525 LS sweeps failed (9 at a bound in rho_f), none of 64 SS; the LS slow SD exceeds the SS one in 16 of 18 cells (median x 1.15, Wilcoxon p 3e-4); the unpooled fast parts of D-076 (i) spread 1.5-1.6 x their delta-method sampling SD in LS (the same method reproduces Block 9's bootstrap SE of log sigma_s, ratio 1.00), and 3 LS fits collapse the fast part (537297470 LS 67: its twin would carry a sixth of the sweep's SD and no fast part). Details: the Block 6 handoff, §4 "The two tables read back" and §6 item 8. D-055 annotated. Next free IDs unchanged: D-151, I-006. |
 | 2026-11-17 (later, 3) | No decision changed (the noise-fit chat; the 18 cell JSONs attached by the user, 12:21). **The nf1 cell JSONs read back** **[run, here]**: J recomputed from q_hat, q_sim and Sigma equals the stored one (8e-14). The misfit sits at the 1 ms autocorrelation, not below: over the 18 cells the law's SS rho(1 ms) is above the data's in 16 (median +12 %; medians 0.427 against 0.366) and carries the largest share of J in 9; the SDs are matched to a median 4-5 %. D-055 read on it (a reading, D-125.3): S3.1's second half fails as written (the largest residual at SS rho(0.1 ms) in no cell), S3.3 fails (J_SS > J_LS in 6 of 18). The per-sweep laws misfit too (J_s / dof_s median 9.1 SS, 2.9 LS; p < 0.01 in 69 % and 56 % of the sweeps), so the shape misfit is inside each protocol. The real statistics scatter 1.3 x what the law simulates (the data's bootstrap SE over the simulated SD, median), and the marginal residuals give about a third of J. 9 of the 10 failed sweeps sit at rho_f's lower bound with 1.4-4.5 x the cell's slow SD. The 5 `no_plateau` cells wander in tau_s (531526539 alternates 8 and 21 ms) **[reasoning: a misspecified law makes the optimum depend on the weight]**. Two decisions put to the user before Block 5's SPEC entry: the law kept or extended, and a rule for degenerate per-sweep fits. Details: the Block 6 handoff, §4 "The cell JSONs read back", §6 item 8. D-055 annotated. Next free IDs unchanged: D-151, I-006. |
+| 2026-11-17 (later, 4) | Logs **D-151** (user; the diameter chat, request 12:40, answers before 13:30): a same-node clearance -- the node's own out-of-focus shadow estimated per node on sub-planes of chosen spacing with the full defocus kernel (near and far field, past 1 um both sides), added back to each plane before the profile fit, refined as the diameter changes -- to be built in another chat; handoff `Passive Features/Diameter Re-measurement/docs/TEEG_same_node_clearance_handoff_2026-11-17.md` on `sci/diameter-pipeline`. Status note: the 17 Nov run of Cell 17b (D-150's code, the survey's four examples, round 1) added back under 0.1 to 12 gl on the example lines, dips unchanged in shape; the user keeps D-150 **[data inspected: the upload]**. Next free IDs: D-152, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -348,6 +349,7 @@ would be needed*, *Status*.
 | D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
 | D-133 | 2026-11-13 | SPEC Blocks 25 (amendment 2), 28, 29, 30, 31 at `38f7c19`; `CleaningConfig`, `InferenceConfig` | wave 2's validation targets, tolerances and provisional parameters, proposed by the orchestrator at the wave's start: exact inverse of the cleaning 1e-9 gl; recovery 1e-6 and unbiasedness within 3 SE for the two fits; coverage 60-76 % and chi2/N within 10 % of 1 for the per-node fit; hybrid column sum 1e-10 and faint limit 5e-3 for the shadow model; renderers passed as callables [orchestrator] | active |
 | D-134 | 2026-11-13 | SPEC Block 25 (amendment 3); D-132.1 | a tier-1 neighbour's shadow is equations (5-6) for the neighbour rendered alone: one blur per slab, under the hybrid's absorbed light; one kernel per column is dropped [user] | active; supersedes the "one blur per column" clause of D-132.1 |
+| D-151 | 2026-11-17 | a new correction of the cleaning and per-node fit (not specified); the handoff `Passive Features/Diameter Re-measurement/docs/TEEG_same_node_clearance_handoff_2026-11-17.md`; the kernel's use for a node's own shadow | same-node clearance: the node's own out-of-focus shadow, estimated per node on sub-planes of chosen spacing (0.1 um or less) with the full kernel (near table and far field, past 1 um both sides), added back to each plane before the profile fit, refined as the diameter changes; built in another chat; the pilot's table a test, refitted on davinci [user] | active |
 | D-150 | 2026-11-17 | SPEC Blocks 31 (amendment 2), 27 (amendment 2), 25 (amendment 7), 28 (amendment 2), 36 (amendment 10) at `97b40a4`, `4ed0793`; `CleaningConfig.shadow_cache_mb`, `rank_*`; `clean_cell.py rank`; notebook Cells 16b, 17b, 18b | the cleaning's test re-aimed and sped up [user]: before and after on one 1-99 percentile grey scale, B S on its own; examples ranked by the largest structured dip a tier-1 neighbour casts on the line, tier 2 at most 1 gl, 10 um apart; the shadow model keeps its last sums per patch and changes them by the neighbours that changed (supersedes D-148.3); tiers vectorised [orchestrator] | active |
 | D-149 | 2026-11-16 | SPEC Blocks 25 (amendment 6), 36 (amendment 9), 31 (amendment 1) at `a2b082c`; `CleaningConfig.work_rank`, `work_peak_min_gl`; notebook Cells 17b, 18b | the cleaning is shown in worse conditions on the pilot's most contaminated tier-1 real nodes, neighbours refined, no injection or phantoms now [user]; the work list ranked by the predicted shadow on the example's measuring line, threshold 1 gl, per-round line figures, the examples 8089, 4844, 7081, 7448 [orchestrator], PROVISIONAL | active |
 | D-148 | 2026-11-16 | SPEC Blocks 29 (amendment 1), 25 (amendment 5), 32 (amendment 3), 36 (amendment 8) at `b6073e3`; `CleaningConfig.refine_xtol`, `refine_ftol`, `refine_line_fine_factor` | the coarse refinement stops at relative tolerances 1e-3 (was 1e-8) and its predictor samples p/4 (the fine fit keeps p/8); the neighbours' images shared between the two shadows of a node; the cleaning saves after every round [orchestrator], PROVISIONAL | active |
@@ -11487,5 +11489,66 @@ the blur, D-146.4; Block 28's boundary test under `partition_vertical`) failed b
 (shadow 8, cleaning 6, contamination 7, cleaning figures 7, configuration 6, cleaning iteration 9, pilot run 12
 pass, 1 skip each), the dense-scene and call-pattern checks, the synthetic run with and without the cache.
 **[SPEC]** `97b40a4`, `4ed0793`.
+
+**Status:** active.
+
+## D-151 -- Same-node clearance: the node's own out-of-focus shadow, estimated per node on sub-planes with the full defocus kernel and removed from each plane before the profile fit, refined as the diameter changes; built in another chat (user)
+
+**Date:** 2026-11-17, the diameter chat: the user's request of 12:40 (Europe/Rome) and the answers to four questions
+that followed (before 13:30). **Binds:** a new correction in the cleaning and per-node fit (no SPEC entry, no code
+yet); the handoff `Passive Features/Diameter Re-measurement/docs/TEEG_same_node_clearance_handoff_2026-11-17.md` on `sci/diameter-pipeline`; how the defocus kernel (`RendererConfig`: the table and
+its continuation) is used for a node's own shadow.
+
+**Decision.** [user] (D-151.1) A same-node clearance is built: a correction that removes the node's own
+out-of-focus shadow from each plane before the profile fit (the answer "A correction"). (D-151.2) The node's own
+shadow is estimated for each node, finely, over many sub-planes whose spacing is a chosen parameter ("for example i
+decide that we estimate the shadows across planes distant 0.1 um or less"). (D-151.3) With the full defocus kernel,
+near and far field ("Use the full table (near and far fields) of defocusing. to not limit to the near filed"),
+evaluated past 1 um on both sides of focus where the node reaches there ("if the node is considered to have the
+diameter of 2 um perfectly centered in the choosen focal plane"). (D-151.4) Refined iteratively: "the diameter
+across the iterations changes and so the shadows". (D-151.5) The work, the estimate included, is done in another
+chat, from a handoff ("In the other chat"). (D-151.6) The pilot's kernel table (Cell 7, Colab) serves the tests of
+the algorithm only; on davinci the table is refitted on all the cells and nodes. Not a decision: the "0.24 um" of
+the request was a slip for the plane spacing, 0.28 um (the user: "I was wrong. i intended the distance between
+planes so 0.28").
+
+**Statement.** For node $i$ with parameters $\theta = (d, \mu, v_0, z_{\rm ax})$ (diameter um, coefficient 1/um,
+lateral shift along the measuring axis um, axis depth um) and recorded planes $k \in K_i$ at $z_k = k\,\Delta z$
+($\Delta z$ = 0.28 um), the node's own shadow at plane $k$ is
+$S_k(x, y \mid \theta) = \sum_m (\Delta A_m(\cdot \mid \theta) * G_{\sigma_{\rm r}(\zeta_m - z_k)})(x, y)$, the sum over
+sub-planes $\zeta_m$ spaced by the chosen $h$ over the tube's whole depth, $\Delta A_m$ the light absorbed in
+sub-plane $m$, $G_\sigma$ the normalised Gaussian of SD $\sigma$, $\sigma_{\rm r}(\delta)$ the kernel's SD at defocus
+$\delta$ from the table at $|\delta| \le$ 0.84 um and from its far-field continuation beyond. The clearance adds back
+to plane $k$ the light $B_k\,S^{\rm out}_k(\cdot \mid \hat\theta^{(t-1)})$ taken by the sub-planes outside plane $k$'s
+in-focus band, computed at the previous iteration's estimate, before the profile fit of iteration $t$. The band, the
+fit that takes the cleared planes and its model, the iteration's rule and where the correction acts (images or the
+measuring line) are open: the other chat settles them with the user.
+
+**Why.** **[user]** the request. **[data inspected: the upload of 12:40, `cleaning_529878215.json`]** the ten
+work-list nodes of the 17 Nov run have, after round 1, $d$ = 1.29-4.45 um and $\mu$ = 0.026-0.130 /um (the
+first-stage fit 1.50-5.65 um) with Allen's 0.45-0.55 um, and axis depths up to 1.83 um from the trace's: such a
+tube spans +-0.65 to +-2.2 um in depth, beyond the near table's 0.84 um, where $\sigma_{\rm r}$ = 0.69-1.68 um under
+the configured slope $\gamma$ = 0.79 (D-024) and 0.63-1.12 um under the pilot's diagnostic far fit 0.397 (2 far
+nodes, D-118's update of 2026-11-10) **[run, here: `kernel.sigma_r` with the run's table]**. **[reasoning]** The
+refinement's and the per-node fit's forward model (Block 35, slabs of 0.02 um, the full kernel) already contain
+this shadow, so the cleared planes need a fit model that leaves it out, or it is counted twice.
+
+**What it implies for code and tables.** None built. The handoff names the code to start from (Block 35's slab loop
+holds the per-slab, per-plane term the band split needs), the kernel's values on the pilot and the open points.
+
+**What it does not decide [open].** The in-focus band (+-0.14 um, one sub-plane, other); the sub-plane spacing's
+default and whether it is the renderer's 0.02 um slab or a coarser grouping; which fit takes the cleared planes and
+with which model; the iteration (inside the Jacobi rounds of Block 32 or nested; damping; stop rule); images or
+line; the far-field slope used on the pilot (0.79 configured against 0.40 diagnostic).
+
+**Status note, no decision changed.** The 17 Nov run of Cell 17b with D-150's code (the user's upload of 12:40) used
+the survey's four examples (the old Cell 17b, folder `cleaning_worst`; Cell 16b's tier-1 ranking was not run): after
+round 1 the cleaning added back under 0.1 gl on 8089's line, 1-2 gl on 7081's and a 6-12 gl ramp on 7448's (the soma),
+the dips unchanged in shape **[data inspected: the figures]**. The user: "These are the results it doens't seem to be
+much improved. Let's keep it however": D-150 is kept.
+
+**Sources.** **[user]** the message of 12:40 and the four answers. **[data inspected]** `cleaning_529878215.json`,
+`examples_worst_529878215.json`, the line and node figures of the upload. **[run, here]** `kernel.sigma_r`.
+**[log]** D-024, D-085.3, D-118 (update of 2026-11-10), D-137, D-138, D-150.
 
 **Status:** active.
