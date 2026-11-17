@@ -115,12 +115,12 @@ run_check "G4 syntax" g4_compile "COMPILE: ok" "$PY" noise_fit_gates.py compile
 
 # --- G5, G6, G6b the noise-fit suites (no NEURON) -----------------------------------
 run_check "G5 smoke_noise_stats (Block 1)" g5_noise_stats "SMOKE noise_stats: 6/6 passed" "$PY" smoke_noise_stats.py
-run_check "G6 smoke_noise_law (Block 2)" g6_noise_law "SMOKE noise_law: 10/10 passed" "$PY" smoke_noise_law.py
+run_check "G6 smoke_noise_law (Block 2)" g6_noise_law "SMOKE noise_law: 11/11 passed" "$PY" smoke_noise_law.py
 run_check "G6b smoke_noise_windows (Block 3)" g6b_noise_windows "SMOKE noise_windows: 15/15 passed" "$PY" smoke_noise_windows.py
 
 if [ "$QUICK" != "1" ]; then
     # --- G6c the Block 4 suite (no NEURON; about 2 min, so FULL mode only) ------
-    run_check "G6c smoke_noise_fit (Block 4)" g6c_noise_fit "SMOKE noise_fit: 11/11 passed" "$PY" smoke_noise_fit.py
+    run_check "G6c smoke_noise_fit (Block 4)" g6c_noise_fit "SMOKE noise_fit: 12/12 passed" "$PY" smoke_noise_fit.py
 
     # --- G6d the Block 9 suite (no NEURON; about 8 min, so FULL mode only) ------
     run_check "G6d smoke_noise_sweep_fit (Block 9)" g6d_noise_sweep_fit "SMOKE noise_sweep_fit: 11/11 passed" "$PY" smoke_noise_sweep_fit.py

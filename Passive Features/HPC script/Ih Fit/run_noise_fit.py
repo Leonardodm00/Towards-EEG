@@ -82,15 +82,19 @@ _GROUP_NAME = re.compile(r"^[A-Za-z0-9_.-]+$")
 # The tables (D-125.2). Block 4 has no column method: its columns are named
 # here; Block 9's are its cell_columns() and table_rows(), whose keys must be
 # these (the merge refuses a JSON whose keys differ; smoke R5 checks them).
-BLOCK4_COLUMNS = ("noise_sigma_f_mV", "noise_rho_f", "noise_sigma_s_mV", "noise_tau_s_ms", "noise_J",
+# SPEC 2.6 (g) (D-152 to D-154): the three-component law's columns.
+BLOCK4_COLUMNS = ("noise_sigma_f_mV", "noise_sigma_m_mV", "noise_tau_m_ms", "noise_sigma_s_mV", "noise_tau_s_ms", "noise_J",
                   "noise_dof", "noise_p", "noise_kappa", "noise_n_solves", "noise_flags")
 BLOCK3_COLUMNS = ("noise_t_ss_ms", "noise_K", "noise_K_LS")
-BLOCK9_CELL_COLUMNS = ("noise_cell_tau2_log_sigma_s_ss", "noise_cell_mu_log_sigma_s_ss",
+BLOCK9_CELL_COLUMNS = ("noise_cell_tau2_log_sigma_m_ss", "noise_cell_mu_log_sigma_m_ss",
+                       "noise_cell_tau2_log_sigma_m_ls", "noise_cell_mu_log_sigma_m_ls",
+                       "noise_cell_tau2_log_sigma_s_ss", "noise_cell_mu_log_sigma_s_ss",
                        "noise_cell_tau2_log_sigma_s_ls", "noise_cell_mu_log_sigma_s_ls")
 CELL_COLUMNS = (("specimen_id", "status", "reason") + BLOCK4_COLUMNS + BLOCK3_COLUMNS + BLOCK9_CELL_COLUMNS
                 + ("noise_code_commit",))
 SWEEP_COLUMNS = ("specimen_id", "noise_sweep_protocol", "noise_sweep_number", "noise_tilt_mV_per_s",
-                 "noise_sweep_sigma_f_mV", "noise_sweep_rho_f", "noise_sweep_sigma_s_raw_mV",
+                 "noise_sweep_sigma_f_mV", "noise_sweep_sigma_m_raw_mV", "noise_sweep_sigma_m_mV",
+                 "noise_sweep_v_log_sigma_m", "noise_sweep_w_m", "noise_sweep_sigma_s_raw_mV",
                  "noise_sweep_sigma_s_mV", "noise_sweep_v_log_sigma_s", "noise_sweep_w", "noise_sweep_flags")
 
 
@@ -435,8 +439,9 @@ def cell_row(specimen: int, status: str, reason: str, rec: Optional[dict]) -> Di
     cf = rec.get("cell_fit")
     if cf:
         law = cf["law"]
-        tau = law.get("tau_s_s")
-        row.update({"noise_sigma_f_mV": law.get("sigma_f_mV"), "noise_rho_f": law.get("rho_f"),
+        tau, tau_m = law.get("tau_s_s"), law.get("tau_m_s")
+        row.update({"noise_sigma_f_mV": law.get("sigma_f_mV"), "noise_sigma_m_mV": law.get("sigma_m_mV"),
+                    "noise_tau_m_ms": None if tau_m is None else 1e3 * tau_m,
                     "noise_sigma_s_mV": law.get("sigma_s_mV"), "noise_tau_s_ms": None if tau is None else 1e3 * tau,
                     "noise_J": cf.get("J"), "noise_dof": cf.get("dof"), "noise_p": cf.get("p_value"),
                     "noise_kappa": cf.get("kappa"), "noise_n_solves": cf.get("n_solves"),
