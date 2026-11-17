@@ -146,6 +146,8 @@ def run_real(a, log):
             row.update(flags=";".join(flags + ["fit_error"]), seconds=time.time() - t0)
             rows.append(row)
             per_node[str(nid)] = dict(error="%s: %s" % (type(exc).__name__, exc))
+            if not a.no_own:                           # no estimate, no product (amendment 11; the final check's F5)
+                per_node[str(nid)]["own"] = own_record("not_fitted", cfg)
             log("node %d: fit not run (%s: %s), %.1f s" % (nid, type(exc).__name__, exc, time.time() - t0))
             continue
         th, se = fit.theta, fit.se
@@ -168,7 +170,7 @@ def run_real(a, log):
                fit.nfev, row["seconds"]))
         if not a.no_own:                                   # the same-node clearance (amendment 11, D-156.2)
             if fit.status == "failed" or not np.all(np.isfinite(th)):
-                per_node[str(nid)]["own"] = own_record("not_refined", cfg)
+                per_node[str(nid)]["own"] = own_record("not_fitted", cfg)
             else:
                 try:
                     half = tuple(float(x) for x in info["U_axis_um"])

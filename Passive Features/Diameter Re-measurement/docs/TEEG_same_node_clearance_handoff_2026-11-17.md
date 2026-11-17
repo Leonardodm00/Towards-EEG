@@ -5,6 +5,7 @@
 | 2026-11-17 | Created at the user's request (D-151) for the chat that builds the same-node clearance. Branch `sci/diameter-pipeline` at `021869d` (code) and the commit that adds this file; decision log on `main` at `2cd9f89` (D-151). Nothing of the clearance is specified, built or computed. |
 | 2026-11-17 (later) | The clearance chat (14:14 onward): section 12 added -- first numbers of the split $S = S^{\rm in} + S^{\rm out}$ and of the iteration's gain, from `checks/own_shadow_clearance_check.py` (output beside it) **[run, sandbox of the clearance chat]**; section 11's first item marked corrected. No decision, no SPEC entry, no pipeline code. |
 | 2026-11-17 (later, 2) | The clearance chat, 17:05: **D-156** [user] -- the joint fit of all planes with the whole own shadow stays the estimator, the clearance becomes a product computed from its estimate every round, clear-then-fit is dropped without a comparison. Section 13 added; it supersedes section 6's correction "before the profile fit" and closes section 7's points (a) to (e). SPEC: Block 35 amendment 2, Blocks 37, 38, Block 36 amendment 11 (drafted, the contract commit that carries this row). The decision's ID is D-156 (written as D-155 until the push: the noise-fit chat took D-155 meanwhile). 17:20: the user approved the block plan and recalled that the fit comes after the neighbours' cleaning (D-156.6). |
+| 2026-11-17 (later, 3) | The clearance chat: the wave of D-156 is built, merged and checked. Block 35 amendment 2 (`line_fast.line_shadow_split`), Block 37 (`analysis/own_clearance.py`), Block 38 (`plotting/own_clearance_figures.py`) by three Opus implementers; Block 36 amendment 11 (the entry points, `--no-own`, the pilot-run test, notebook Cells 17b and 18b) by the orchestrator; final check by an Opus tester, `specs/test_reports/2026-11-17_1754_incremental.md`: PASS WITH ISSUES (one MINOR, fixed; four NOTE; three spec gaps, closed), D-157 and D-158 [orchestrator]. Section 14 added. The theory document of the main route: `docs/TEEG_diameter_pipeline_theory_2026-11-17/`. Not run: the pilot cell in Colab (Allen's images do not reach the sandbox). |
 
 Basis tags: **[src]** read in the named file at `021869d`; **[data]** read in the files the user uploaded on
 2026-11-17 at 12:40 (the Colab run of Cell 17b: `cleaning_529878215.json`, `examples_worst_529878215.json`, the
@@ -361,3 +362,26 @@ Blocks (SPEC, drafted 2026-11-17): Block 35 amendment 2 (`line_fast.line_shadow_
 (`analysis/own_clearance.py`), Block 38 (`plotting/own_clearance_figures.py`), Block 36 amendment 11 (the
 configuration, `node_inputs.own_split_factory`, the two entry points, the pilot-run test). Still open: whether the
 pilot's fitted diameters are right -- the product is the check of the model on those nodes.
+
+## 14. Built on 2026-11-17 -- how to run it, what it writes, what is next
+
+Run (Colab, the pilot): the notebook's Cell 17b (`clean_cell.py clean`) and Cell 18b (`infer_nodes.py real`) as
+before; the product is on by default, `--no-own` skips it; the features and the fits are the same either way
+[run, sandbox: `test_own_product`, bit-identical on the synthetic cell].
+
+| Output | Where | Content |
+|---|---|---|
+| `own` per work-list node | `cleaning_<S>.json`, `nodes[<id>]` | `status` (`ok`, `extrusion_invalid`, `not_refined`, `error`), `band_half_um`, and per plane `chord_um`, `in_peak_gl`, `out_peak_gl`, `in_share`, `residual_rms_gl` |
+| arrays, example nodes | `cleaning_<S>_node<id>.npz` | `own_s_in`, `own_s_out`, `own_cleared`, `own_model_in`, `own_chord_um`, `own_layers_gl`, `own_layer_z` |
+| figures, example nodes | `own_node<id>.png`, `own_node<id>_round<t>.png`, `own_layers_node<id>.png` | per plane the profile, the cleared profile, the in-band and whole models, the chord; the 0.1 um layers' shadows at plane $k^*$ |
+| after each per-node fit | `inference_<S>.json` (`own`, status `not_fitted` when the fit failed), `own_<S>_node<id>.npz`, the same figures | at Block 30's estimate |
+
+Reading a figure: if the model holds for the node, the cleared profile follows the in-band model, as wide as the
+chord, and is flat on the planes that miss the fitted tube; the difference between the two is the joint fit's
+residual (the handoff's section 12, the identity). A plane within $\beta$ of the tube's top or bottom has chord 0 and
+a small in-band share (D-158.4).
+
+Next, for the user's decision: run Cells 17b and 18b on the pilot and read the ten work-list nodes' figures against
+the open question of section 8 (are the fitted 1.3 to 4.5 um right?); a sensitivity run with the far slope 0.397
+(`--config-json`); whether the three stale spec tests (the report's F2) are retired or updated; whether the tester's
+39 new spec tests (branch `tester/2026-11-17_1754`) come into the branch.

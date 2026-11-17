@@ -865,7 +865,7 @@ def test_own_product():
     for nid in rec["example_ids"]:
         info = rec["nodes"][str(nid)]
         fit = inf["nodes"][str(nid)]
-        assert fit["own"]["status"] in allowed, fit["own"]
+        assert fit["own"]["status"] in ("ok", "extrusion_invalid", "not_fitted"), fit["own"]
         if info["own"]["status"] == "ok":
             z = np.load(os.path.join(a, "cleaning_7_node%d.npz" % nid))
             for key in ("own_s_in", "own_s_out", "own_cleared", "own_model_in", "own_layers_gl", "own_layer_z"):

@@ -754,6 +754,7 @@ def run_clean(a, cfg, log):
                             own[nid] = (split, clr, v_axis, B_now)
                     except Exception as exc:               # the product never stops the rounds
                         rec["own"] = own_record("error", cfg, detail="%s: %s" % (type(exc).__name__, exc))
+                        log("node %d: no same-node clearance (%s: %s)" % (nid, type(exc).__name__, exc))
             per_node[str(nid)] = rec
         write_json(json_path, dict(base, history=res.history, stopped=res.stopped, rounds=res.rounds, sigma_gl=sigma,
                                    nodes=per_node,
