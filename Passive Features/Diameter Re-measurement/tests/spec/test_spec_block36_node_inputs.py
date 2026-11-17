@@ -736,3 +736,94 @@ def test_infer_fit_start_f4():
     st, which = infer_nodes.fit_start("refined", 0.5, 0.7, off, p, trace)
     assert which == "features"
     assert_allclose(st, [0.5, 0.7, 0.25, trace[2] - 0.15], rtol=0, atol=1e-12)
+
+
+# ===================================================================================================
+# Block 36, amendment 11 (D-156): the same-node clearance wired into the node inputs -- integration tester,
+# 2026-11-17. Oracles from the amendment's (ii) and its "As built" sentence; expected values from Block 35's
+# forward (the spec's own oracle (v)), the chord by hand and the trace offset by hand.
+# ===================================================================================================
+
+from allen_diameter.analysis import own_clearance as OC  # noqa: E402
+
+
+@pytest.mark.parametrize("absorption", ["linear", "hybrid"])
+def test_own_split_factory_tiles_forward(absorption):
+    """(ii)/(v): split(d, mu, v0, dz).s_in + s_out = 1 - forward(d, mu, v0, z_t + dz) [1e-12; the amendment's
+    smoke bound is 1e-9, Block 35 amendment 2 promises 1e-12]; the band is cleaning.own_band_half_um; with
+    layers, layer_um = cleaning.own_layer_um and the centres are z_t + dz + m h [1e-9]; the layers sum to the
+    whole [1e-12]."""
+    cfg = fast_cfg(absorption)
+    p = pilot(cx_um=2.0, cy_um=2.0, z_sub_um=0.84, k_star=3, phi_rad=0.35)
+    trace = np.array([2.05, 1.95, 0.7])
+    node = make_node(p, trace, np.arange(-1, 8))
+    Um, Up = 4.0, 5.5
+    d, mu, v0, dz = 0.6, 1.1, 0.1, 0.2
+    fac = NI.own_split_factory({5: p}, {5: (Um, Up)}, cfg, line_fast.SectionCache())
+    sp = fac(node)(d, mu, v0, dz)
+    fwd = NI.forward_factory(p, (Um, Up), node, cfg, line_fast.SectionCache())
+    whole = 1.0 - fwd(d, mu, v0, trace[2] + dz)
+    assert_allclose(sp.s_in + sp.s_out, whole, rtol=0, atol=1e-12)
+    assert sp.band_half_um == cfg.cleaning.own_band_half_um and sp.layers is None
+    spl = fac(node, layers=True)(d, mu, v0, dz)
+    assert spl.layer_um == cfg.cleaning.own_layer_um
+    m = (spl.layer_z - (trace[2] + dz)) / cfg.cleaning.own_layer_um
+    assert_allclose(m, np.round(m), rtol=0, atol=1e-9)
+    assert_allclose(spl.layers.sum(axis=0), whole, rtol=0, atol=1e-12)
+    assert_array_equal(spl.s_in, sp.s_in)
+
+
+def test_own_split_factory_none_on_extrusion_invalid():
+    cfg = fast_cfg()
+    p = pilot(cx_um=2.0, cy_um=2.0, z_sub_um=0.84, k_star=3)
+    trace = np.array([2.0, 2.0, 0.84])
+    node = make_node(p, trace, np.arange(1, 4))
+    assert NI.own_split_factory({5: p}, {5: (2.5, 6.0)}, cfg, None)(node)(0.6, 1.0, 0.0, 0.0) is None
+
+
+def test_own_product_geometry_by_hand():
+    """As built: own_product(node, pilot, half_length, theta = (d, mu, v0, dz), profiles, B, cfg, cache) ->
+    (status, split, clearance, v_axis): v_axis = v0 - v_t with v_t = ((cx, cy) - (x_t, y_t)) . y_hat (by hand);
+    the clearance's chord is 2 sqrt(max(d^2/4 - ((z_k - z_t - dz) cos phi_pilot)^2, 0)) on node.planes_z [1e-12];
+    its cleared profile = profiles + B s_out of the returned split [1e-12]; status 'ok'; extents too short:
+    'extrusion_invalid' with (None, None, v_axis)."""
+    cfg = fast_cfg()
+    p = pilot(cx_um=2.0, cy_um=2.0, z_sub_um=0.84, k_star=3, phi_rad=0.5, theta_rad=0.6)
+    trace = np.array([2.13, 1.91, 0.7])
+    node = make_node(p, trace, np.arange(-1, 8))
+    d, mu, v0, dz = 0.7, 0.9, -0.15, 0.12
+    prof = 200.0 - 10 * np.random.default_rng(0).random((node.ks.size, node.v.size))
+    B = np.linspace(205, 212, node.ks.size)
+    st, sp, clr, v_axis = NI.own_product(node, p, (4.0, 5.0), (d, mu, v0, dz), prof, B, cfg, None)
+    yh = np.array([-math.sin(0.6), math.cos(0.6)])
+    v_t = float((np.array([2.0, 2.0]) - trace[:2]) @ yh)
+    assert st == "ok"
+    assert abs(v_axis - (v0 - v_t)) < 1e-12
+    zax = trace[2] + dz
+    exp = 2 * np.sqrt(np.maximum(d * d / 4 - ((node.planes_z - zax) * math.cos(0.5)) ** 2, 0.0))
+    assert_allclose(clr.chord_um, exp, rtol=0, atol=1e-12)
+    assert_allclose(clr.cleared_gl, prof + B[:, None] * sp.s_out, rtol=0, atol=1e-12)
+    st2, a, b, v2 = NI.own_product(node, p, (2.0, 5.0), (d, mu, v0, dz), prof, B, cfg, None)
+    assert st2 == "extrusion_invalid" and a is None and b is None and abs(v2 - v_axis) < 1e-12
+
+
+def test_own_product_axis_on_the_line_crossing():
+    """Boundary 36 -> 37: the chord's z_ax (z_t + dz) and the bar's centre v_axis are where the model tube's
+    axis crosses the measuring line. Construction by hand: the point of local_tube's axis whose image-plane
+    projection lies on the measuring line (o + v y_hat) is at v = v_axis and depth z_t + dz [1e-9], for
+    unequal extents (the centre moved along the axis, amendment 3)."""
+    p = pilot(cx_um=1.0, cy_um=-0.5, z_sub_um=0.84, k_star=3, phi_rad=0.6, theta_rad=-0.9)
+    trace = np.array([1.2, -0.3, 0.55])
+    d, v0, dz, Um, Up = 0.8, 0.2, -0.1, 3.5, 6.0
+    tube = NI.local_tube(p, trace, d, v0, dz, Um, Up)
+    a = np.array([math.cos(0.6) * math.cos(-0.9), math.cos(0.6) * math.sin(-0.9), math.sin(0.6)])
+    yh = np.array([-math.sin(-0.9), math.cos(-0.9)])
+    eu = np.array([math.cos(-0.9), math.sin(-0.9)])
+    o = np.array([1.0, -0.5])
+    c = np.asarray(tube.c, dtype=float)
+    # axis point c + s a with (c_xy + s a_xy - o) . e_u = 0
+    s = -float((c[:2] - o) @ eu) / float(a[:2] @ eu)
+    q = c + s * a
+    v_axis = v0 - NI.trace_offset(p, trace)
+    assert abs(float((q[:2] - o) @ yh) - v_axis) < 1e-9
+    assert abs(q[2] - (trace[2] + dz)) < 1e-9
