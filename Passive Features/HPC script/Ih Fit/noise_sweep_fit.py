@@ -52,6 +52,10 @@ COORDS: Tuple[str, ...] = ("sigma_m", "sigma_s")      # the pooled sizes (2.6 (e
 _SLICE = {"ss": slice(0, nf.N_SS), "ls": slice(nf.N_SS, nf.N_STATS)}
 _PROTOCOL_CODE = {"ss": 0, "ls": 1}
 _NAN = float("nan")
+# SPEC 2.6 (e), amendment 5 (D-155 [orchestrator]): the floor of a usable bootstrap variance, (log mV)^2. Below it
+# every successful refit returned the same value up to roundoff (an SD of log sigma under 1e-6; real bootstrap SDs
+# are 0.03 to 0.8) and the pooling's weights 1 / v would be absurd or not exist: the sweep fails with 'v_none'.
+V_MIN = 1e-12
 
 
 # ===========================================================================
@@ -290,10 +294,11 @@ def fit_sweep(q_hat_s: np.ndarray, mask: np.ndarray, Sigma_s: np.ndarray, sub: C
 # ===========================================================================
 def _v_usable(v: float) -> bool:
     """2.6 (e) as amended (D-155): a bootstrap variance the pooling can weight
-    by 1 / v -- finite and strictly positive. NaN (B_ok < 2) or 0 (every
-    successful refit returned the same value) fails the sweep with 'v_none'."""
+    by 1 / v -- finite and at least V_MIN. NaN (B_ok < 2) or below V_MIN
+    (every successful refit returned the same value, up to roundoff) fails
+    the sweep with 'v_none' (amendment 5)."""
     v = float(v)
-    return math.isfinite(v) and v > 0.0
+    return math.isfinite(v) and v >= V_MIN
 
 
 @dataclass(eq=False)
@@ -305,7 +310,7 @@ class SweepBootstrap:
     B: int                        # replicates drawn (B_v)
     B_ok: int                     # refits that did not fail
     flags: Tuple[str, ...]        # 'v_refits_failed:<n>/<B>' above max_failed_refit_frac; 'v_none' if v_m or v_s
-                                  # is NaN or not > 0 (_v_usable)
+                                  # is NaN or below V_MIN (_v_usable)
 
 
 def _replicate_vector(law: NoiseLaw, sub: CellLayout, rng: np.random.Generator,
@@ -527,7 +532,7 @@ def run_sweep(cell_fit: CellFitResult, target: CellTarget, layout: CellLayout, c
     with its fit's reason ('no_convergence', 'at_bound:<coordinates>'), then,
     checked next, with 'degenerate:sigma_f' (sigma_f_hat(c, s) <
     min_sigma_f_ratio sigma_f_hat(c), D-154.3), or with 'v_none' (v_m or v_s
-    NaN, B_ok < 2, or not strictly positive, D-155); a sweep whose fit
+    NaN, B_ok < 2, or below V_MIN, D-155); a sweep whose fit
     failed is not bootstrapped; a failed
     sweep is flagged 'sweep_fit_failed:<pr>:<sweep>:<reason>'. `refit` is
     passed to bootstrap_v (a test double in the smoke)."""
