@@ -1,9 +1,11 @@
 """noise_fit -- Block 4 of specs/SPEC.md: the per-cell fit of the noise law
 by indirect inference with the simulated inverse-covariance weight (D-033,
 D-048 to D-051, D-056; the layout and the simulator D-103, D-106, D-107.2;
-section 2.3 of the spec, items (a)-(h)).
+section 2.3 of the spec, items (a)-(h); the three-component law, its five
+fit coordinates and the 21 statistics of section 2.6, D-152 to D-154).
 
-In plain words: the real cell gives one vector of 15 noise statistics,
+In plain words: the real cell gives one vector of noise statistics (21 of
+them, the count taken from noise_cell_stats),
 q_hat(c). For a candidate law theta we simulate a cell with exactly the real
 cell's layout (its SS sweeps as continuous 37-pulse trains, its kept windows
 at their positions, its LS pre-windows), give every simulated sweep the tilt
@@ -16,9 +18,10 @@ estimated here. The per-sweep stage of D-076 (i) is Block 4b
 (noise_sweep_fit).
 
 Layers: model and analysis only -- no file I/O (an optional `log` callable
-is the only output channel besides the result), no plotting. Units: theta in
-mV, --, mV, s; tilts in mV/s; the fit coordinates u = (log sigma_f, rho_f,
-log sigma_s, log tau_s). Pure ASCII, LF.
+is the only output channel besides the result), no plotting. Units: theta =
+(sigma_f, sigma_m, tau_m, sigma_s, tau_s) in mV, mV, s, mV, s; tilts in mV/s;
+the fit coordinates u = (log sigma_f, log sigma_m, log tau_m, log sigma_s,
+log tau_s), natural logs (SPEC 2.6 (d)). Pure ASCII, LF.
 """
 from __future__ import annotations
 
@@ -41,9 +44,19 @@ from noise_windows import LSWindows, SSNoiseWindows, SSWindows, WindowConfig, su
 
 LOG_1E4 = math.log(1e-4)
 LOG_10 = math.log(10.0)
-N_STATS = len(ncs.STAT_LABELS)       # 15
-N_SS = ncs.N_SS_STATS                # 5
-N_LS = ncs.N_LS_STATS                # 10
+LOG_4E5 = math.log(4e-5)             # tau_m's lower bound, s: 2 samples at 50 kHz (SPEC 2.6 (a), (d))
+LOG_1E3 = math.log(1e-3)             # tau_m's upper bound and tau_s's lower bound, s (1 ms)
+N_STATS = len(ncs.STAT_LABELS)       # d = 21 (SPEC 2.6 (c))
+N_SS = ncs.N_SS_STATS                # 7
+N_LS = ncs.N_LS_STATS                # 14
+N_PARAMS = 5                         # theta = (sigma_f, sigma_m, tau_m, sigma_s, tau_s); u has 5 coordinates
+U_NAMES: Tuple[str, ...] = ("log_sigma_f", "log_sigma_m", "log_tau_m", "log_sigma_s", "log_tau_s")
+# SPEC 2.6 (d), PROVISIONAL [orchestrator]: the closed-form problem is solved from these 4 initial points
+# (sigma_f 0.035 mV, sigma_m 0.017 mV, sigma_s 0.06 mV; (tau_m, tau_s) in {1e-4, 6e-4} s x {0.03, 0.2} s, tau_m
+# the outer loop) and the lowest closed-form cost is kept; the first point is also the fallback law where no
+# closed-form start can be computed.
+CF_INITIAL_POINTS: Tuple[NoiseLaw, ...] = tuple(
+    NoiseLaw(0.035, 0.017, tau_m, 0.06, tau_s) for tau_m in (1e-4, 6e-4) for tau_s in (0.03, 0.2))
 
 
 # ===========================================================================
@@ -51,9 +64,10 @@ N_LS = ncs.N_LS_STATS                # 10
 # ===========================================================================
 @dataclass(frozen=True)
 class NoiseFitConfig:
-    """Section 2.3 and the Block 4 entry. Defaults are D-048 to D-051 and
-    D-056 (M, R, B, k_max, tol_u, three starts); the rest are the assistant's
-    choices flagged in 2.3 (c)-(e)."""
+    """Section 2.3 and the Block 4 entry, with the coordinates of 2.6 (d).
+    Defaults are D-048 to D-051 and D-056 (M, R, B, k_max, tol_u, three
+    starts); the rest are the assistant's choices flagged in 2.3 (c)-(e) and
+    the orchestrator's of 2.6 (d) (the steps, PROVISIONAL)."""
     M_binding: int = 3000
     R_iter: int = 600
     R_final: int = 3000
@@ -61,32 +75,40 @@ class NoiseFitConfig:
     k_max: int = 6
     tol_u: float = 0.01
     starts_after_first: int = 1          # 1: warm start from theta_hat_k; 3: plus tau_s / 2 and 2 tau_s
-    max_nfev: int = 15                   # trf iterations; each costs 5 evaluations of q_sim (2-point Jacobian)
+    max_nfev: int = 15                   # trf iterations; each costs 6 evaluations of q_sim (2-point Jacobian)
     ftol: float = 1e-4
     xtol: float = 1e-3
     gtol: float = 1e-8
-    fd_rel_step: Tuple[float, float, float, float] = (1e-3, 1e-2, 1e-3, 1e-3)
-    log_sigma_bounds: Tuple[float, float] = (LOG_1E4, LOG_10)
-    rho_bounds: Tuple[float, float] = (1e-3, 0.999)
-    log_tau_bounds: Tuple[float, float] = (LOG_1E4, LOG_10)
+    # relative finite-difference steps per coordinate of u (SPEC 2.6 (d), PROVISIONAL [orchestrator]: the middle
+    # part's two coordinates three times larger, the statistics respond more weakly to them)
+    fd_rel_step: Tuple[float, float, float, float, float] = (1e-3, 3e-3, 3e-3, 1e-3, 1e-3)
+    log_sigma_bounds: Tuple[float, float] = (LOG_1E4, LOG_10)      # log mV, the three SDs
+    log_tau_m_bounds: Tuple[float, float] = (LOG_4E5, LOG_1E3)     # log s, 0.04 ms to 1 ms
+    log_tau_s_bounds: Tuple[float, float] = (LOG_1E3, LOG_10)      # log s, 1 ms to 10 s
     chunk_windows: int = 500
     seed: int = 20261023
     window_cfg: WindowConfig = WindowConfig()
 
     def bounds(self) -> Tuple[np.ndarray, np.ndarray]:
-        lo = np.array([self.log_sigma_bounds[0], self.rho_bounds[0], self.log_sigma_bounds[0], self.log_tau_bounds[0]])
-        hi = np.array([self.log_sigma_bounds[1], self.rho_bounds[1], self.log_sigma_bounds[1], self.log_tau_bounds[1]])
+        """(lo (5,), hi (5,)) in the order of u (U_NAMES)."""
+        sl, th, ts = self.log_sigma_bounds, self.log_tau_m_bounds, self.log_tau_s_bounds
+        lo = np.array([sl[0], sl[0], th[0], sl[0], ts[0]], dtype=float)
+        hi = np.array([sl[1], sl[1], th[1], sl[1], ts[1]], dtype=float)
         return lo, hi
 
 
 def law_to_u(law: NoiseLaw) -> np.ndarray:
-    """u = (log sigma_f, rho_f, log sigma_s, log tau_s)."""
-    return np.array([math.log(law.sigma_f), law.rho_f, math.log(law.sigma_s), math.log(law.tau_s)])
+    """u (5,) = (log sigma_f, log sigma_m, log tau_m, log sigma_s, log tau_s)."""
+    return np.array([math.log(law.sigma_f), math.log(law.sigma_m), math.log(law.tau_m),
+                     math.log(law.sigma_s), math.log(law.tau_s)])
 
 
 def u_to_law(u: np.ndarray) -> NoiseLaw:
-    u = np.asarray(u, dtype=float)
-    return NoiseLaw(math.exp(u[0]), float(u[1]), math.exp(u[2]), math.exp(u[3]))
+    """The inverse of law_to_u: u (5,) -> NoiseLaw(sigma_f, sigma_m, tau_m, sigma_s, tau_s)."""
+    u = np.asarray(u, dtype=float).ravel()
+    if u.shape != (N_PARAMS,):
+        raise ValueError("u_to_law: u must have %d entries, got shape %r" % (N_PARAMS, u.shape))
+    return NoiseLaw(*(math.exp(float(x)) for x in u))
 
 
 def _clip_to_bounds(u: np.ndarray, lo: np.ndarray, hi: np.ndarray) -> np.ndarray:
@@ -230,9 +252,9 @@ def _tilts_for(sweeps: Tuple[int, ...], tilts: SweepTilts, protocol: str) -> np.
 class CellTarget:
     """The data side: q_hat(c) and the per-window matrices behind it (for W_0's
     bootstrap)."""
-    q_hat: np.ndarray            # (15,)
-    per_window_ss: np.ndarray    # (K, 5)
-    per_window_ls: np.ndarray    # (K_LS, 10)
+    q_hat: np.ndarray            # (d,) = (21,)
+    per_window_ss: np.ndarray    # (K, N_SS) = (K, 7)
+    per_window_ls: np.ndarray    # (K_LS, N_LS) = (K_LS, 14)
     labels: Tuple[str, ...] = ncs.STAT_LABELS
 
     @classmethod
@@ -259,13 +281,13 @@ class CellTarget:
 def simulate_cell_windows(law: NoiseLaw, layout: CellLayout, rng: np.random.Generator,
                           *, parts: Sequence[str] = ("ss", "ls"), window_cfg: WindowConfig = WindowConfig(),
                           return_windows: bool = False, return_tilts: bool = False):
-    """One replicate cell: (ss_stats (K, 5), ls_stats (K_LS, 10)); with
+    """One replicate cell: (ss_stats (K, N_SS), ls_stats (K_LS, N_LS)); with
     return_windows also the subtracted SS windows X_tilde (K, m) and the LS
     traces (K_LS, n_ls); with return_tilts, last, the replicate's own SS
     tilt reading (dict sweep -> mV/s).
 
     SS: each sweep is one continuous trace of L_s samples from
-    `noise_law.simulate_sweep` (fast + slow, and the real sweep's tilt
+    `noise_law.simulate_sweep` (white fast + middle + slow, and the real sweep's tilt
     layout.ss_tilt as a fixed number, D-107.2; the offset is invisible and
     left out); the windows are cut at the kept positions from the floor;
     the replicate reads its own tilt by (TL1) on them (noise_windows.tl1_fit)
@@ -275,9 +297,10 @@ def simulate_cell_windows(law: NoiseLaw, layout: CellLayout, rng: np.random.Gene
     corrected windows of that sweep and polarity -- is subtracted (D-103.1,
     D-051 (iv)).
     LS: K_LS traces of n_ls samples, trace k with the tilt layout.ls_tilt[k].
-    Draw order: the SS sweeps in layout order, then the LS windows (the unit
-    tilt draws are made and left unused) -- fixed, so a seed gives the same
-    draws for any law.
+    Draw order: the SS sweeps in layout order, then the LS windows, each by
+    `noise_law.draw_units` (fast, mid, slow, tilt, offset; SPEC 2.6 (b); the
+    unit tilt draws are made and left unused) -- fixed, so a seed gives the
+    same draws for any law.
     """
     ss_stats = np.zeros((0, N_SS))
     ls_stats = np.zeros((0, N_LS))
@@ -307,7 +330,7 @@ def simulate_cell_windows(law: NoiseLaw, layout: CellLayout, rng: np.random.Gene
         ss_stats = ncs.ss_window_stats(X_tilde, layout.fs)
     if "ls" in parts and layout.K_LS > 0:
         units = noise_law.draw_units(rng, layout.K_LS, layout.n_ls)
-        ls_traces = noise_law.simulate_traces(law, layout.dt, units.fast, units.slow,
+        ls_traces = noise_law.simulate_traces(law, layout.dt, units.fast, units.mid, units.slow,
                                               tilt_mV_per_s=layout.ls_tilt)
         ls_stats = ncs.ls_window_stats(list(ls_traces), layout.fs, window_cfg)
     out = (ss_stats, ls_stats)
@@ -340,14 +363,14 @@ def hd_median(A: np.ndarray) -> np.ndarray:
 
 def binding_function(law: NoiseLaw, layout: CellLayout, cfg: NoiseFitConfig, seed: int,
                      *, which: str = "both", return_pool: bool = False):
-    """q_sim(theta) (15,): the SS part on M_cells = ceil(M / K) replicate cells
+    """q_sim(theta) (d,): the SS part on M_cells = ceil(M / K) replicate cells
     at the real layout and tilts (pooled windows), the LS part on N_LS =
     ceil(M / K_LS) K_LS pre-windows, window i with the tilt of the cell's LS
     sweep i mod K_LS; the Harrell-Davis median per statistic. Common random
     numbers: `default_rng` is rebuilt from `seed` (two children: SS, LS) at
     every call, so the same (layout, seed) gives the same draws for any law.
     which: 'ss', 'ls' or 'both' (the other part stays NaN). With return_pool
-    also (pool_ss (M_cells K, 5), pool_ls (N_LS, 10))."""
+    also (pool_ss (M_cells K, N_SS), pool_ls (ceil(M / K_LS) K_LS, N_LS))."""
     ss_seed, ls_seed = [int(c.generate_state(1, dtype=np.uint64)[0])
                         for c in np.random.SeedSequence(int(seed)).spawn(2)]
     q = np.full(N_STATS, np.nan)
@@ -372,7 +395,7 @@ def binding_function(law: NoiseLaw, layout: CellLayout, cfg: NoiseFitConfig, see
         while start < n_total:
             n = min(n_total - start, int(cfg.chunk_windows))
             units = noise_law.draw_units(rng, n, layout.n_ls)
-            traces = noise_law.simulate_traces(law, layout.dt, units.fast, units.slow,
+            traces = noise_law.simulate_traces(law, layout.dt, units.fast, units.mid, units.slow,
                                                tilt_mV_per_s=tilt_of[start:start + n])
             pools.append(ncs.ls_window_stats(list(traces), layout.fs, cfg.window_cfg))
             start += n
@@ -384,7 +407,7 @@ def binding_function(law: NoiseLaw, layout: CellLayout, cfg: NoiseFitConfig, see
 
 
 def closed_form_vector(law: NoiseLaw, layout: CellLayout, window_cfg: WindowConfig = WindowConfig()) -> np.ndarray:
-    """q_cf(theta | n_m) (15,): sqrt(E[S_0] / (n - 1)) for an SD and
+    """q_cf(theta | n_m) (d,): sqrt(E[S_0] / (n - 1)) for an SD and
     E[S_L] / E[S_0] for an autocorrelation (eq. 10 of the topic doc, Block 2),
     at the cell's window lengths; the fit's starting point only."""
     dt, fs = layout.dt, layout.fs
@@ -407,10 +430,10 @@ def closed_form_vector(law: NoiseLaw, layout: CellLayout, window_cfg: WindowConf
 # ===========================================================================
 @dataclass(eq=False)
 class SigmaResult:
-    Sigma: np.ndarray                      # (15, 15), NaN rows/columns for statistics without data
-    vectors: np.ndarray                    # (R, 15)
+    Sigma: np.ndarray                      # (d, d), NaN rows/columns for statistics without data
+    vectors: np.ndarray                    # (R, d)
     R: int
-    per_sweep: Dict[int, np.ndarray] = field(default_factory=dict)   # sweep -> (R, 5) SS or (R, 10) LS
+    per_sweep: Dict[int, np.ndarray] = field(default_factory=dict)   # sweep -> (R, N_SS) SS or (R, N_LS) LS
 
 
 def simulated_covariance(law: NoiseLaw, layout: CellLayout, R: int, rng: np.random.Generator,
@@ -418,7 +441,7 @@ def simulated_covariance(law: NoiseLaw, layout: CellLayout, R: int, rng: np.rand
     """R replicate cells at the real layout and tilts, each reduced by
     `noise_cell_stats.statistic_vector`; sample covariance with ddof 1. With
     per_sweep, also every sweep's vector per replicate (SS: the medians over
-    that sweep's windows; LS: its one window's 10 values) for Block 4b."""
+    that sweep's windows; LS: its one window's N_LS values) for Block 4b."""
     R = int(R)
     if R < 2:
         raise ValueError("simulated_covariance: R >= 2")
@@ -501,8 +524,7 @@ def solve_inner(q_hat: np.ndarray, C: np.ndarray, starts: Sequence[NoiseLaw],
         if best is None or J < best[1]:
             best = (res, J, i)
     res, J, i = best
-    names = ("log_sigma_f", "rho_f", "log_sigma_s", "log_tau_s")
-    at_bound = tuple(names[j] for j in range(4)
+    at_bound = tuple(U_NAMES[j] for j in range(N_PARAMS)
                      if res.x[j] <= lo[j] + 1e-3 * (hi[j] - lo[j]) or res.x[j] >= hi[j] - 1e-3 * (hi[j] - lo[j]))
     return InnerResult(law=u_to_law(res.x), u=np.array(res.x, dtype=float), J=J, nfev=int(res.nfev),
                        start_index=i, status=int(res.status), message=str(res.message), starts=tried,
@@ -511,19 +533,27 @@ def solve_inner(q_hat: np.ndarray, C: np.ndarray, starts: Sequence[NoiseLaw],
 
 def closed_form_start(q_hat: np.ndarray, SE: np.ndarray, mask: np.ndarray, layout: CellLayout,
                       cfg: NoiseFitConfig, u0: Optional[np.ndarray] = None) -> NoiseLaw:
-    """The closed-form start: argmin of (F1) with W_0 = diag(1 / SE^2) on the
-    closed-form statistics q_cf (instant; no simulation)."""
+    """The closed-form start (SPEC 2.3 (e), 2.6 (d)): the argmin of (F1) with
+    W_0 = diag(1 / SE^2) on the closed-form statistics q_cf (instant; no
+    simulation), solved from each of the 4 initial points CF_INITIAL_POINTS
+    and the solution of lowest closed-form cost kept (the first on a tie).
+    u0 (5,), when given, replaces the 4 points by that one start."""
     lo, hi = cfg.bounds()
     if u0 is None:
-        u0 = law_to_u(NoiseLaw(0.04, 0.2, 0.05, 0.04))
-    u0 = _clip_to_bounds(u0, lo, hi)
+        u0s = [law_to_u(law) for law in CF_INITIAL_POINTS]
+    else:
+        u0s = [np.asarray(u0, dtype=float)]
 
     def fun(u):
         q = closed_form_vector(u_to_law(u), layout, cfg.window_cfg)
         return (q[mask] - q_hat[mask]) / SE[mask]
 
-    res = optimize.least_squares(fun, u0, bounds=(lo, hi), method="trf")
-    return u_to_law(res.x)
+    best_x, best_cost = None, float("inf")
+    for u_start in u0s:
+        res = optimize.least_squares(fun, _clip_to_bounds(u_start, lo, hi), bounds=(lo, hi), method="trf")
+        if best_x is None or float(res.cost) < best_cost:
+            best_x, best_cost = np.array(res.x, dtype=float), float(res.cost)
+    return u_to_law(best_x)
 
 
 # ===========================================================================
@@ -541,9 +571,9 @@ class CellFitResult:
     Sigma: np.ndarray                      # (d_eff, d_eff) final, kept statistics
     labels_kept: Tuple[str, ...]
     stats_dropped: Tuple[str, ...]
-    q_hat: np.ndarray                      # (15,)
-    q_sim: np.ndarray                      # (15,) at the solution
-    SE: np.ndarray                         # (15,) W_0's bootstrap SE (NaN where dropped)
+    q_hat: np.ndarray                      # (d,)
+    q_sim: np.ndarray                      # (d,) at the solution
+    SE: np.ndarray                         # (d,) W_0's bootstrap SE (NaN where dropped)
     ss_tilt: Dict[int, float]              # sweep -> mV/s, the SS tilts the simulator carried (D-107.2)
     ls_tilt: Dict[int, float]              # sweep -> mV/s, the LS tilts the simulator carried
     n_solves: int
@@ -566,8 +596,8 @@ class CellFitResult:
 
         return {
             "specimen_id": int(self.specimen_id),
-            "law": {"sigma_f_mV": self.law.sigma_f, "rho_f": self.law.rho_f, "sigma_s_mV": self.law.sigma_s,
-                    "tau_s_s": self.law.tau_s},
+            "law": {"sigma_f_mV": self.law.sigma_f, "sigma_m_mV": self.law.sigma_m, "tau_m_s": self.law.tau_m,
+                    "sigma_s_mV": self.law.sigma_s, "tau_s_s": self.law.tau_s},
             "u": arr(self.u), "J": num(self.J), "dof": int(self.dof),
             "p_value": num(self.p_value), "kappa": num(self.kappa),
             "Sigma": [arr(row) for row in np.asarray(self.Sigma)], "labels_kept": list(self.labels_kept),
@@ -586,20 +616,27 @@ class CellFitResult:
         }
 
 
-def _starts_around(law: NoiseLaw, n: int) -> List[NoiseLaw]:
+def _starts_around(law: NoiseLaw, n: int, cfg: Optional[NoiseFitConfig] = None) -> List[NoiseLaw]:
+    """[law] for n <= 1; else law, then law with tau_s / 2 and with 2 tau_s
+    (D-056; SPEC 2.6 (d): each clipped into the tau_s bounds of cfg)."""
     if n <= 1:
         return [law]
-    return [law, replace(law, tau_s=law.tau_s / 2.0), replace(law, tau_s=law.tau_s * 2.0)]
+    lo, hi = (cfg if cfg is not None else NoiseFitConfig()).log_tau_s_bounds
+    half = min(max(law.tau_s / 2.0, math.exp(lo)), math.exp(hi))
+    double = min(max(law.tau_s * 2.0, math.exp(lo)), math.exp(hi))
+    return [law, replace(law, tau_s=half), replace(law, tau_s=double)]
 
 
 def fit_cell(target: CellTarget, layout: CellLayout, cfg: NoiseFitConfig = NoiseFitConfig(),
              log: Optional[Callable[[str], None]] = None) -> CellFitResult:
-    """The per-cell fit of section 2.3: W_0 from the window bootstrap, the
-    closed-form start and its two tau_s variants, the W_0 solve, then
-    Sigma_hat-weighted solves (R_iter) until max |Delta u| <= tol_u or k_max
-    solves ('no_plateau'), then the final step at R_final (Sigma_hat, one
-    solve, J, kappa, the chi-square tail). The simulator carries the layout's
-    real tilts throughout; no tilt is estimated (D-107.2)."""
+    """The per-cell fit of section 2.3 with the law and coordinates of 2.6:
+    W_0 from the window bootstrap, the closed-form start (the best of 4
+    initial points) and its two tau_s variants, the W_0 solve, then
+    Sigma_hat-weighted solves (R_iter) until max |Delta u| <= tol_u over the
+    five coordinates or k_max solves ('no_plateau'), then the final step at
+    R_final (Sigma_hat, one solve, J, kappa, the chi-square tail with dof =
+    d_eff - 5; d_eff >= 6 required). The simulator carries the layout's real
+    tilts throughout; no tilt is estimated (D-107.2)."""
     t_start = time.time()
     say = log if log is not None else (lambda s: None)
     seed_binding, seed_boot, seed_sigma_root = _child_seeds(cfg.seed, layout.specimen_id, 3)
@@ -622,10 +659,10 @@ def fit_cell(target: CellTarget, layout: CellLayout, cfg: NoiseFitConfig = Noise
     need_sim_se = mask & ~(np.isfinite(SE) & (SE > 0))
     if need_sim_se.any():
         prelim = np.isfinite(SE) & (SE > 0) & mask
-        if prelim.sum() >= 5:
+        if prelim.sum() >= N_PARAMS + 1:
             law0 = closed_form_start(q_hat, SE, prelim, layout, cfg)
         else:
-            law0 = NoiseLaw(0.04, 0.2, 0.05, 0.04)
+            law0 = CF_INITIAL_POINTS[0]
         _q, pool_ss, pool_ls = binding_function(law0, layout, cfg, seed_binding, return_pool=True)
         sd = np.full(N_STATS, np.nan)
         if pool_ss.shape[0] >= 2:
@@ -639,8 +676,9 @@ def fit_cell(target: CellTarget, layout: CellLayout, cfg: NoiseFitConfig = Noise
     dropped = tuple(ncs.STAT_LABELS[j] for j in np.flatnonzero(~mask))
     if dropped:
         flags.append("stats_dropped:" + ",".join(dropped))
-    if d_eff < 5:
-        raise ValueError("only %d usable statistics; the fit needs at least 5" % d_eff)
+    if d_eff < N_PARAMS + 1:
+        raise ValueError("only %d usable statistics; the fit needs at least %d (SPEC 2.6 (d))"
+                         % (d_eff, N_PARAMS + 1))
     SE_masked = np.where(mask, SE, np.nan)
 
     # --- the closed-form start
@@ -661,7 +699,7 @@ def fit_cell(target: CellTarget, layout: CellLayout, cfg: NoiseFitConfig = Noise
     # --- solve 0: W_0 = diag(1 / SE^2), three starts
     t0 = time.time()
     C0 = np.diag(SE[mask])
-    inner = solve_inner(q_hat, C0, _starts_around(law_cf, 3), layout, cfg, seed_binding, mask)
+    inner = solve_inner(q_hat, C0, _starts_around(law_cf, 3, cfg), layout, cfg, seed_binding, mask)
     record("W0", inner, 0, t0)
     u_prev = inner.u.copy()
     law = inner.law
@@ -675,7 +713,7 @@ def fit_cell(target: CellTarget, layout: CellLayout, cfg: NoiseFitConfig = Noise
         sig = simulated_covariance(law, layout, cfg.R_iter, rng_k, window_cfg=cfg.window_cfg)
         C, jit = _cholesky_lower(sig.Sigma[np.ix_(mask, mask)])
         chol_jitter = chol_jitter or jit
-        inner = solve_inner(q_hat, C, _starts_around(law, cfg.starts_after_first), layout, cfg,
+        inner = solve_inner(q_hat, C, _starts_around(law, cfg.starts_after_first, cfg), layout, cfg,
                             seed_binding, mask)
         record("Sigma_%d" % k, inner, cfg.R_iter, t0)
         du = float(np.max(np.abs(inner.u - u_prev)))
@@ -701,7 +739,7 @@ def fit_cell(target: CellTarget, layout: CellLayout, cfg: NoiseFitConfig = Noise
         flags.append("sigma_jitter")
     if inner.at_bound:
         flags.append("at_bound:" + ",".join(inner.at_bound))
-    dof = d_eff - 4
+    dof = d_eff - N_PARAMS                 # SPEC 2.6 (d): d_eff - 5
     kappa = correlation_condition_number(Sigma_m)
     # q_sim and J at the reported theta_hat with the final Sigma_hat
     q_sim = binding_function(law, layout, cfg, seed_binding)
