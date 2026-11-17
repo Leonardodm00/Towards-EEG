@@ -431,10 +431,72 @@ def _p6(fx):
                       and "sweep_fit_failed:ss:%d:v_none" % s in row["flags"] and all(c[0] == seed_b for c in calls))
             ok = ok and ok_row
             notes.append("run_sweep: reason %s flags %s" % (row["reason"], row["flags"]))
+            # D-155 (2.6 (e) amended): a variance of exactly 0 -- every successful refit returns the same value --
+            # fails the sweep with v_none, so that it never reaches the pooling (1 / v would not exist). Two
+            # doubles: both coordinates constant (v_m = v_s = 0), and only log sigma_m constant (v_s > 0: "either").
+            # These constants are exact binary fractions (variance exactly 0). Amendment 5 (V_MIN = 1e-12): a third
+            # double returns the same NON-dyadic values (-4.3, -2.9) at every refit, where np.var gives about 1e-31
+            # (the mean's roundoff), not 0: the sweep must fail with v_none too.
+            def const_double(vary_s, consts=(-3.5, -4.0, -3.0)):
+                n = [0]
+
+                def double(q_b, m_b, Sigma_s, sub, law_start, cfg_r, seed_r):
+                    n[0] += 1
+                    return SimpleNamespace(failed=False,
+                                           u=np.array([consts[0], consts[1],
+                                                       consts[2] - (0.01 * n[0] if vary_s else 0.0)]))
+                return double
+
+            def varying_double(q_b, m_b, Sigma_s, sub, law_start, cfg_r, seed_r):
+                return SimpleNamespace(failed=False, u=np.array([-3.4, math.log(q_b[1]), math.log(q_b[0])]))
+            b0 = nsf.bootstrap_v(fit, m, fx.psc[s], sub, LAW_CELL, cfg, stage, seed_b, seed_v,
+                                 refit=const_double(False))
+            ok_b0 = b0.B_ok == stage.B_v and b0.v_m == 0.0 and b0.v_s == 0.0 and "v_none" in b0.flags
+            s2 = lay.sweep_numbers[1]
+            row_v = nsf.run_sweep(cell, fx.tg, lay, cfg, stage, pr, s2, refit=varying_double)
+            ok_z = ok_b0 and not row_v["failed"]
+            for vary_s in (False, True):
+                row0 = nsf.run_sweep(cell, fx.tg, lay, cfg, stage, pr, s, refit=const_double(vary_s))
+                ok_r0 = (row0["failed"] and row0["reason"] == "v_none" and row0["v_log_sigma_m"] == 0.0
+                         and (row0["v_log_sigma_s"] > 0.0) == vary_s
+                         and "sweep_fit_failed:ss:%d:v_none" % s in row0["flags"])
+                try:
+                    res0 = nsf.pool_cell([row0, row_v], LAW_CELL, lay.specimen_id)
+                    ok_p0 = (res0.twin_laws[("ss", s)] == LAW_CELL
+                             and all(res0.pools["ss"][co].sweeps == (s2,) for co in ("sigma_m", "sigma_s")))
+                except ValueError:
+                    ok_p0 = False
+                ok_z = ok_z and ok_r0 and ok_p0
+            # the final check's reproducer: an UNFAILED row carrying v_log_sigma_m = 0.0 handed to pool_cell
+            # directly must not raise either; it becomes a failed v_none sweep, out of the pooling
+            row_x = dict(row_v, v_log_sigma_m=0.0, flags=list(row_v["flags"]))
+            try:
+                res_x = nsf.pool_cell([row_x], LAW_CELL, lay.specimen_id)
+                ok_x = (res_x.rows[0]["failed"] and res_x.rows[0]["reason"] == "v_none"
+                        and res_x.pools["ss"]["sigma_m"].k == 0 and res_x.twin_laws[("ss", s2)] == LAW_CELL)
+            except ValueError:
+                ok_x = False
+            b_r = nsf.bootstrap_v(fit, m, fx.psc[s], sub, LAW_CELL, cfg, stage, seed_b, seed_v,
+                                  refit=const_double(False, (-3.4, -4.3, -2.9)))
+            row_r = nsf.run_sweep(cell, fx.tg, lay, cfg, stage, pr, s, refit=const_double(False, (-3.4, -4.3, -2.9)))
+            try:
+                res_r = nsf.pool_cell([row_r, row_v], LAW_CELL, lay.specimen_id)
+                ok_pr = res_r.twin_laws[("ss", s)] == LAW_CELL and res_r.pools["ss"]["sigma_s"].sweeps == (s2,)
+            except (ValueError, ZeroDivisionError):     # without the floor: weights of 1e30 -> (P3)'s denominator 0
+                ok_pr = False
+            ok_rr = (0.0 < b_r.v_m < nsf.V_MIN and 0.0 < b_r.v_s < nsf.V_MIN and "v_none" in b_r.flags and row_r["failed"]
+                     and row_r["reason"] == "v_none" and ok_pr and nsf.V_MIN == 1e-12)
+            ok = ok and ok_z and ok_x and ok_rr
+            notes.append("roundoff (-4.3, -2.9 at every refit): v_m %.2g v_s %.2g (V_MIN %g) -> reason %s, pooled without "
+                         "raising %s" % (b_r.v_m, b_r.v_s, nsf.V_MIN, row_r["reason"], ok_pr))
+            notes.append("zero variance: bootstrap v_m %s v_s %s flags %s; run_sweep both/only-m -> v_none, pool_cell "
+                         "without raising, twin = theta_hat(c): %s; pool_cell on an unfailed row with v 0: %s"
+                         % (b0.v_m, b0.v_s, b0.flags, ok_z, ok_x))
     report("P6 bootstrap machinery (test double): y_m and y_s from one set of refits = an independent loop over "
            "seed_v_s at theta_hat(c, s); v_m, v_s with ddof 1; refits get seed_binding_s, M_refit, theta_hat(c), "
            "Sigma_s; 2/10 failed -> flag, 1/10 -> none; all "
-           "failed -> v NaN, v_none", ok, "; ".join(notes))
+           "failed -> v NaN, v_none; a variance of 0 or below V_MIN (roundoff) -> v_none, pool_cell does not raise "
+           "(D-155)", ok, "; ".join(notes))
 
 
 def _p7(fx):
