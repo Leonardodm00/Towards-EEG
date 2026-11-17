@@ -8,7 +8,8 @@ D-107; the tilt offsets removed before the median and the SS tilt read at
 the 80 ms floor, D-115). Builds writer-like archive cells in a temporary folder (two SS
 sweeps of 37 pulses at the real onset period, with an RC pulse response and
 Block-2 noise, eleven pulses dropped by a planted QC table; six Long Square
-sweeps) so that every check has a known answer: the base cell (0.5 s LS
+sweeps; the noise is the three-component law of SPEC 2.6 (a), THETA_CF below,
+the Block 3 note of 2026-11-17) so that every check has a known answer: the base cell (0.5 s LS
 tail), a tilted cell (per-sweep tilts at sigma_b = 0.1 mV/s, 1.5 s LS tail)
 and a cell whose sweep 93 keeps three hyp windows. About a minute on one
 core; W4's oracle imports the monolith (NEURON) and W12's imports
@@ -37,7 +38,8 @@ ls_baseline_qc (pandas); each is reported SKIPPED when its import fails.
       group leaves X_tilde unchanged (1e-12) and the statistics of response
       + noise after the subtraction equal those of the noise alone (1e-10)
   W4  statistics: window_stats equals np.std(ddof=1) and sample_acf per
-      window (1e-14); the 15 labels, blocks, n and K of SPEC 2.2; the LS
+      window (1e-14); the 21 labels of SPEC 2.6 (c) (written out here),
+      blocks, n and K, the counts read from noise_cell_stats; the LS
       pre-window equals noise_calibration.pre_window_samples(mono, bundle) on
       the same sweep through the monolith (skipped without NEURON)
   W5  per-sweep vectors through ss_noise_windows: keys are the sweep numbers,
@@ -109,8 +111,8 @@ from noise_windows import (DecayFit, LayoutError, WindowConfig, decay_start, enl
                            fit_decay, floor_index, keep_mask, load_ls_prewindows, load_ss_windows, ls_segments,
                            measure_period, profile_decay, read_ss_tilts, select_windows, ss_noise_windows,
                            subtract_mean_response, subtract_median_response, tilt_offsets, transient_start)
-from noise_cell_stats import (LS_FULL_LAGS_MS, LS_LAST_LAGS_MS, SS_LAGS_MS, STAT_BLOCK,  # noqa: E402
-                              STAT_LABELS, bootstrap_median_se, ls_sweep_tilts, ls_window_stats,
+from noise_cell_stats import (LS_FULL_LAGS_MS, LS_LAST_LAGS_MS, N_LS_STATS, N_SS_STATS, SS_LAGS_MS,  # noqa: E402
+                              STAT_BLOCK, STAT_LABELS, bootstrap_median_se, ls_sweep_tilts, ls_window_stats,
                               per_sweep_vectors, ss_sweep_tilts, ss_window_stats, statistic_vector,
                               window_mean_semivariogram, window_stats)
 
@@ -126,8 +128,10 @@ TAIL_N = 11000
 LS_PRE_N, LS_STEP_N = 13500, 50000  # LS sweep: 270 ms before the step, a 1 s step
 LS_TAIL_N = 25000                  # 0.5 s after the step: the end window starts AT the step's end ('tail_short')
 LS_LONG_TAIL_N = 75000             # 1.5 s after the step: the end window starts 1 s after it ('ok')
-THETA_CF = nl.NoiseLaw(0.0380, 0.175, 0.0508, 0.0366)
-SILENT = nl.NoiseLaw(0.0, 0.5, 0.0, 1.0)      # W15: no noise at all, only the planted tilts
+# the fixture law (SPEC Block 3 note of 2026-11-17, the three-component law of 2.6 (a)): sigma_f, sigma_m, tau_m,
+# sigma_s, tau_s in mV, mV, s, mV, s. The name THETA_CF is kept for the modules that import it.
+THETA_CF = nl.NoiseLaw(0.035, 0.017, 3e-4, 0.055, 0.040)
+SILENT = nl.NoiseLaw(0.0, 0.0, 3e-4, 0.0, 1.0)      # W15: no noise at all, only the planted tilts
 R_IN_MOHM, TAU_M_MS = 113.0, 28.143
 DROPPED = {92: (2, 3, 11, 13, 20, 29, 36), 93: (0, 5, 6, 27)}   # planted trace-QC drops
 SMALL_KEEP_HYP_93 = (1, 17, 33)                                  # W13: sweep 93 keeps three hyp windows
@@ -136,6 +140,11 @@ SMALL_DROPPED = {92: DROPPED[92],
 Z_SE = 3.5
 N_SD = 4.0                         # W11, W12: a planted tilt must lie within 4 exact SDs (two-sided 6e-5)
 T_FLOOR_MS = 80.0                  # W11: the floor of the SS reading (D-115.2, SPEC 2.4), written out here
+# W4: the 21 labels of SPEC 2.6 (c), written out here as the oracle of noise_cell_stats.STAT_LABELS
+SPEC_LABELS = (("ss_sd",) + tuple("ss_rho_%gms" % l for l in (0.02, 0.04, 0.1, 0.3, 1, 10))
+               + ("ls_sd",) + tuple("ls_rho_%gms" % l for l in (0.02, 0.04, 0.1, 0.3, 1))
+               + ("ls_first_sd",)
+               + ("ls_last_sd",) + tuple("ls_last_rho_%gms" % l for l in (0.02, 0.04, 0.1, 0.3, 1, 10)))
 
 
 def report(name, ok, note=""):
@@ -211,7 +220,7 @@ def write_fixture(d, rng, law=THETA_CF, with_response=True, dropped=DROPPED, swe
     n_pre, n_step, n_tail = LS_PRE_N, LS_STEP_N, int(ls_tail_n)
     n_ls = n_pre + n_step + n_tail
     units = nl.draw_units(rng, len(ls_amps), n_ls)
-    ls_noise = nl.simulate_traces(law, DT, units.fast, units.slow, xi_tilt=units.tilt, sigma_b=sigma_b)
+    ls_noise = nl.simulate_traces(law, DT, units.fast, units.mid, units.slow, xi_tilt=units.tilt, sigma_b=sigma_b)
     ls_data, ls_info = {}, []
     for k, amp in enumerate(ls_amps):
         i = np.zeros(n_ls); i[n_pre:n_pre + n_step] = amp
@@ -393,7 +402,7 @@ def _w2(d, truth):
             and abs(ste.t_ss_ms - 110.0) <= 1e3 / FS and all(x == "ok" for x in ste.group_status[1:]))
     ok &= ok_e
     notes.append("first group failed: t_SS %.2f (110 without it, 115 with it)" % ste.t_ss_ms)
-    # (f) the base cell's noisy windows (RC 113 MOhm, 28.143 ms, theta_cf): every fit valid, tau_hat near tau_m
+    # (f) the base cell's noisy windows (RC 113 MOhm, 28.143 ms, THETA_CF): every fit valid, tau_hat near tau_m
     stf = decay_start(ss)
     ok_f = (all(x == "ok" for x in stf.group_status) and np.all(np.abs(stf.tau_ms / TAU_M_MS - 1.0) < 0.25)
             and 80.0 <= stf.t_ss_ms <= 150.0)
@@ -474,12 +483,16 @@ def _w4(d, truth):
     ok_stats = ok_stats and list(lags_in_samples((0.02, 0.1, 1.0, 10.0), 44100.0)) == [1, 4, 44, 441]   # round, not truncate
     ls = load_ls_prewindows(str(d))
     ls_st = ls_window_stats(ls.pre, FS)
-    sv = statistic_vector(np.zeros((3, 5)), 6000, ls_st, 13250)
-    ok_labels = (sv.d == 15 and sv.labels == STAT_LABELS and sv.block == STAT_BLOCK
-                 and sv.block[:5] == ("ss",) * 5 and sv.block[5:] == ("ls",) * 10
-                 and list(sv.n) == [6000] * 5 + [13250] * 4 + [2500] + [6625] * 5
-                 and list(sv.K) == [3] * 5 + [len(ls.pre)] * 10
-                 and STAT_LABELS[5] == "ls_sd" and STAT_LABELS[9] == "ls_first_sd" and STAT_LABELS[10] == "ls_last_sd")
+    sv = statistic_vector(np.zeros((3, N_SS_STATS)), 6000, ls_st, 13250)
+    n_full, n_last = 1 + len(LS_FULL_LAGS_MS), 1 + len(LS_LAST_LAGS_MS)
+    ok_labels = (sv.d == len(STAT_LABELS) == N_SS_STATS + N_LS_STATS and sv.labels == STAT_LABELS
+                 and sv.labels == SPEC_LABELS and sv.block == STAT_BLOCK
+                 and sv.block[:N_SS_STATS] == ("ss",) * N_SS_STATS and sv.block[N_SS_STATS:] == ("ls",) * N_LS_STATS
+                 and ls_st.shape == (len(ls.pre), N_LS_STATS)
+                 and list(sv.n) == [6000] * N_SS_STATS + [13250] * n_full + [2500] + [6625] * n_last
+                 and list(sv.K) == [3] * N_SS_STATS + [len(ls.pre)] * N_LS_STATS
+                 and STAT_LABELS[N_SS_STATS] == "ls_sd" and STAT_LABELS[N_SS_STATS + n_full] == "ls_first_sd"
+                 and STAT_LABELS[N_SS_STATS + n_full + 1] == "ls_last_sd")
     # oracle: the monolith's pre-window for the same sweep
     note = "stats 1e-14 %s; labels/n/K %s" % (ok_stats, ok_labels)
     try:
@@ -505,7 +518,8 @@ def _w4(d, truth):
     except ImportError as exc:
         ok_oracle = True
         note += "; monolith oracle SKIPPED (%s)" % exc
-    report("W4 statistics: window_stats = numpy + sample_acf; the 15 labels, blocks, n, K; LS pre-window = the fitter's",
+    report("W4 statistics: window_stats = numpy + sample_acf; the %d labels of SPEC 2.6 (c), blocks, n, K; "
+           "LS pre-window = the fitter's" % len(STAT_LABELS),
            ok_stats and ok_labels and ok_oracle, note)
 
 
@@ -517,8 +531,9 @@ def _w5(d, truth):
     ok = set(per) == {92, 93} and nwin.X_tilde.shape == (nwin.ss.n_windows, nwin.m)
     for s, vec in per.items():
         ok = ok and np.allclose(vec, np.median(st[nwin.ss.sweep_number == s], axis=0))
-    sv = statistic_vector(st, nwin.m, np.zeros((0, 10)), 13250)
-    ok = ok and np.allclose(sv.q[:5], np.median(st, axis=0)) and np.all(np.isnan(sv.q[5:])) and list(sv.K[5:]) == [0] * 10
+    sv = statistic_vector(st, nwin.m, np.zeros((0, N_LS_STATS)), 13250)
+    ok = (ok and st.shape[1] == N_SS_STATS and np.allclose(sv.q[:N_SS_STATS], np.median(st, axis=0))
+          and np.all(np.isnan(sv.q[N_SS_STATS:])) and list(sv.K[N_SS_STATS:]) == [0] * N_LS_STATS)
     report("W5 per-sweep vectors via ss_noise_windows: keys 92, 93; medians over the sweep's kept windows; cell vector; "
            "empty LS -> NaN, K 0", ok, "t_SS %.1f ms, m %d, K per sweep %s"
            % (nwin.start.t_ss_ms, nwin.m, {s: int((nwin.ss.sweep_number == s).sum()) for s in per}))
@@ -543,7 +558,7 @@ def _w6():
 
 def _w7(truth):
     rng = np.random.default_rng(7)
-    law = nl.NoiseLaw(0.03, 0.2, 0.06, 0.04)
+    law = nl.NoiseLaw(0.03, 0.015, 3e-4, 0.06, 0.04)
     ss = load_ss_windows(str(truth["dir"]))
     X, j0 = enlarged_windows(ss, 80.0)
     m = X.shape[1]
@@ -800,10 +815,10 @@ def _w13(d_small, truth_small):
     sig = float(np.median(ss.v[~small, :ss.pre_n].std(axis=1, ddof=1)))
     ok_sig = abs(st.sigma_ss_mV - sig) <= 1e-15
     stats = ss_window_stats(nwin.X_tilde, FS)
-    sv = statistic_vector(stats, nwin.m, np.zeros((0, 10)), 13250)
+    sv = statistic_vector(stats, nwin.m, np.zeros((0, N_LS_STATS)), 13250)
     per = per_sweep_vectors(stats, k.sweep_number)
     dep93 = k.sweep_number == 93
-    ok_stats = (list(sv.K[:5]) == [k.n_windows] * 5 and np.allclose(per[93], np.median(stats[dep93], axis=0)))
+    ok_stats = (list(sv.K[:N_SS_STATS]) == [k.n_windows] * N_SS_STATS and np.allclose(per[93], np.median(stats[dep93], axis=0)))
     til = nwin.tilts                                   # the reading of D-115.2, on the kept windows only
     n93 = int(til.n_windows[list(til.sweep_number).index(93)])
     ok_tilt = n93 == int(dep93.sum()) and np.isfinite(til.as_dict()[93])
