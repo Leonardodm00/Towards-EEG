@@ -190,6 +190,7 @@ the "Binds" column.
 | 2026-11-16 | Logs **D-148** [orchestrator] (the diameter chat, 13:30). The pilot's Cell 17 (5 example nodes, 2 rounds, Colab) took 910 to 3076 s per node in round 1 -- the coarse refinement 596 to 2431 s (74 to 115 model calls of 6 to 21 s; the nodes 1.1 to 4.0 um thick by their pilots), the background's and the cleaning's shadows 107 to 334 s each -- and saved nothing before its end. Fixed in `b6073e3` on `sci/diameter-pipeline`: the coarse fit stops at 1e-3 and samples p/4 (on a noisy 2 um tube: 27 calls, 36 s against 59 calls, 261 s; the same diameter); the cleaning's shadow reuses the background's neighbour renderings (exact); the outputs are written after every round. The notebook's Cell 17 defaults to 1 round (with the work list holding only the examples, a second round refines no neighbour). |
 | 2026-11-16 (later, 2) | Logs **D-149** (the diameter chat, 15:00): the user chose to show the cleaning in worse conditions on the pilot's most contaminated tier-1 real nodes with their neighbours refined, not by injection or phantoms for now (D-149.1 [user]); the work list ranked on the measuring line, its threshold 1 gl, per-round line figures, the examples 8089, 4844, 7081, 7448 (D-149.2 to .5 [orchestrator]); code `a2b082c` on `sci/diameter-pipeline`. Evidence: Cell 17's five examples were nearly clean (worst neighbour 0.2 to 0.8 gl on the line) and no neighbour was refined; the survey's index overcounts long out-of-focus neighbours (x94 at 55 um defocus) **[user's CSV and figures; run, sandbox]**. Next free IDs: D-150, I-006. |
 | 2026-11-16 (later, 3) | No decision changed (the study chat 'Study document questions'). **Roadmap diameter-pipeline: T13 (kernel calibration: the near growth fit, the anchor and the assembled kernel) closed** at the user's word (15:02: "I ve finished to study the document update the theory part of the roadmap") **[user]**, after the study of `TEEG_study_kernel_calibration_2026-11-11.md` (the copy uploaded in that chat); `roadmap.py set T13 closed`, `773b53c` on `sci/diameter-pipeline` (the rendered table refreshed from origin: blocks drawn local are pushed). The topic's note names the chat, the check scripts sent there and two slips found in the document, not corrected in it: §3.3's verdict should subtract the constant from every $\nu_i$, not from every $c_i$ ($c_i=\nu_i+\sigma_{\rm r}(0)^2$ stays unchanged); in §3.6 the two terms of the first-order expansion are uncorrelated when the anchor is unbiased, not independent, because $\partial\hat\gamma/\partial\sigma_0$ is itself a function of the far data **[reasoning; run, sandbox]**. TG3 stays open (T8, T10, T15 open; T11 studying). Next free IDs: D-150, I-006. |
+| 2026-11-17 | Logs **D-150** (the diameter chat, 10:30): the user asked to fix the cleaning figures' grey scale, re-rank the test's nodes by their worst tier-1 neighbour and stop recomputing the shadows between rounds; the details [orchestrator]: before and after on the 1st-99th percentiles of the two, B S on its own scale (D-150.1); the rank value is the largest structured dip (max - min on the line) of one tier-1 neighbour, the examples the four highest not near_end with tier 2 at most 1 gl, 10 um apart, `clean_cell.py rank` and Cell 16b (D-150.2); `shadow_image` keeps per patch its last sums and the neighbours' peaks and footprints, and changes a sum by the neighbours that changed, superseding D-148.3 (D-150.3); `neighbour_tiers` vectorised (D-150.4). Evidence: the joint range of the three images started at 0 (the B S panel) with the patches at 89-96 gl; round 1 of Cell 17b spent 3090 of 5103 s refitting backgrounds on the preparation's scene **[user's log]**; kept images would take 4.2 GB for one dense patch, the kept sums about 7 MB; renders per call fell from 191-326 to 0-5 on a random scene's call pattern; identical files with and without the cache on the synthetic cell **[run, sandbox]**. SPEC at `97b40a4`, `4ed0793` on `sci/diameter-pipeline`. Next free IDs: D-151, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -344,6 +345,7 @@ would be needed*, *Status*.
 | D-132 | 2026-11-13 | SPEC Blocks 25, 28, 30 and the joint fit (F3); roadmap T14, T15, T7; the plan's O1, O8 | the cleaning in two tiers: distant or defocused neighbours subtracted with a cheap shadow model whose absorbed light is the hybrid's; close or overlapping ones kept inside the node's fit and rendered jointly with the hybrid [user] | active; not implemented; roadmap `fe30e03` |
 | D-133 | 2026-11-13 | SPEC Blocks 25 (amendment 2), 28, 29, 30, 31 at `38f7c19`; `CleaningConfig`, `InferenceConfig` | wave 2's validation targets, tolerances and provisional parameters, proposed by the orchestrator at the wave's start: exact inverse of the cleaning 1e-9 gl; recovery 1e-6 and unbiasedness within 3 SE for the two fits; coverage 60-76 % and chi2/N within 10 % of 1 for the per-node fit; hybrid column sum 1e-10 and faint limit 5e-3 for the shadow model; renderers passed as callables [orchestrator] | active |
 | D-134 | 2026-11-13 | SPEC Block 25 (amendment 3); D-132.1 | a tier-1 neighbour's shadow is equations (5-6) for the neighbour rendered alone: one blur per slab, under the hybrid's absorbed light; one kernel per column is dropped [user] | active; supersedes the "one blur per column" clause of D-132.1 |
+| D-150 | 2026-11-17 | SPEC Blocks 31 (amendment 2), 27 (amendment 2), 25 (amendment 7), 28 (amendment 2), 36 (amendment 10) at `97b40a4`, `4ed0793`; `CleaningConfig.shadow_cache_mb`, `rank_*`; `clean_cell.py rank`; notebook Cells 16b, 17b, 18b | the cleaning's test re-aimed and sped up [user]: before and after on one 1-99 percentile grey scale, B S on its own; examples ranked by the largest structured dip a tier-1 neighbour casts on the line, tier 2 at most 1 gl, 10 um apart; the shadow model keeps its last sums per patch and changes them by the neighbours that changed (supersedes D-148.3); tiers vectorised [orchestrator] | active |
 | D-149 | 2026-11-16 | SPEC Blocks 25 (amendment 6), 36 (amendment 9), 31 (amendment 1) at `a2b082c`; `CleaningConfig.work_rank`, `work_peak_min_gl`; notebook Cells 17b, 18b | the cleaning is shown in worse conditions on the pilot's most contaminated tier-1 real nodes, neighbours refined, no injection or phantoms now [user]; the work list ranked by the predicted shadow on the example's measuring line, threshold 1 gl, per-round line figures, the examples 8089, 4844, 7081, 7448 [orchestrator], PROVISIONAL | active |
 | D-148 | 2026-11-16 | SPEC Blocks 29 (amendment 1), 25 (amendment 5), 32 (amendment 3), 36 (amendment 8) at `b6073e3`; `CleaningConfig.refine_xtol`, `refine_ftol`, `refine_line_fine_factor` | the coarse refinement stops at relative tolerances 1e-3 (was 1e-8) and its predictor samples p/4 (the fine fit keeps p/8); the neighbours' images shared between the two shadows of a node; the cleaning saves after every round [orchestrator], PROVISIONAL | active |
 | D-147 | 2026-11-16 | `submit_noise_fit.sh`'s `WALLTIME` for the 18-cell run of D-124 (D-125.5) | the 18 L3_exc cells run with WALLTIME = 48:00:00 per cell job, as the pilot did [user] | active |
@@ -11397,5 +11399,90 @@ among 600) and the random example draws rest on it; not changed.
 **Sources.** **[user]** the answers of 2026-11-16 (about 14:50), Cell 17's log, `contamination_529878215.csv`, the
 figures. **[run, sandbox]** the suites (shadow 7, pilot run 12, cleaning figures 7, configuration 6, cleaning iteration
 9 pass) and the overcount check. **[SPEC]** `a2b082c`.
+
+**Status:** active.
+
+## D-150 -- The cleaning's test made to exercise the cleaning: its figures' grey scale, examples ranked by the worst tier-1 neighbour on the line, the shadows kept across rounds (user); their details [orchestrator]
+
+**Date:** 2026-11-17, about 10:30 (Europe/Rome), the diameter chat. The three changes are the user's (2026-11-16,
+after Cell 17b's run: "I can fix the figure's grey scale, re-rank candidate nodes by their worst tier-1 neighbour so
+the test actually exercises the cleaning, and add the speed-up. Do it", the session's offer quoted back); D-150.1 to
+D-150.4 were settled by the orchestrating session (Opus 5.5) under coding directive 7 and the user can reverse any
+of them.
+**Binds:** SPEC Blocks 31 (amendment 2), 27 (amendment 2), 25 (amendment 7), 28 (amendment 2), 36 (amendment 10) at
+`97b40a4` and `4ed0793` on `sci/diameter-pipeline`; `CleaningConfig.shadow_cache_mb` (3000), `rank_bound_gl` (0.05),
+`rank_max_tier2_gl` (1.0), `rank_examples` (4), `rank_min_separation_um` (10.0); `scripts/clean_cell.py rank`;
+notebook `cleaning_pilot_2026-11-14.py` Cells 16b, 17b, 18b. Supersedes D-148.3 (one patch's images kept for the next
+call) and, as Cell 17b's default, D-149.5's examples.
+
+**Decision.** (D-150 [user]) The figures' grey scale fixed; the example nodes of the test re-ranked by their worst
+tier-1 neighbour, so that the test exercises the cleaning; the neighbours' shadows not recomputed between rounds.
+(D-150.1 [orchestrator]) The figure's before and after images share one grey range, their pixels' 1st to 99th
+percentiles; the predicted shadow has its own. (D-150.2 [orchestrator]) A node's rank is the largest structured dip
+one of its tier-1 neighbours casts on its measuring line; the examples are the four highest not near_end whose
+tier-2 neighbours put at most 1 gl on the line, 10 um apart. (D-150.3 [orchestrator]) The shadow model keeps, per
+patch, its last sums and changes them by the neighbours that changed, instead of keeping every neighbour's image.
+(D-150.4 [orchestrator, exact]) The tiers computed for all neighbours at once.
+
+**Statement.** (D-150.1) In `cleaning_figures.figure_node`, per plane $k$, the observed image $I_k$ and the cleaned
+image $I_k + B_k S_k$ are drawn on $[q_{0.01}, q_{0.99}]$, the 1st and 99th percentiles of their finite pixels taken
+together (`percentiles = None`: their joint minimum to maximum); $B_k S_k$ on $[0, \max B_k S_k]$. Agreed before
+(Block 31): one range for the three images, their joint minimum to maximum. (D-150.2) For a dendrite node $i$ with
+its measuring line's samples $v_n$ ($n = 1, \dots, 53$, $|v_n| \le 3$ um), background $B$ (gl) and the survey's
+predictor (each segment $q$ an infinite tube at its larger end radius $r_q$ and coefficient $\mu_q$, Block 27), the
+dip of neighbour $q$ alone is $B\,\delta_q(v_n)$ and its structured part
+$R_q = \max_n B\,\delta_q(v_n) - \min_n B\,\delta_q(v_n)$ (gl); node $i$'s rank value is
+$\max_{q \in T_1(i)} R_q$, $T_1(i)$ its tier-1 neighbours (`cleaning.neighbour_tiers`, D-132), computed exactly
+(the bounds only skip neighbours that cannot reach the largest $R_q$ found, or 0.05 gl). The examples: the nodes of
+largest rank value that are not near_end and whose tier-2 neighbours' largest peak on the line
+$\max_{q \in T_2(i)} \max_n B\,\delta_q(v_n) \le 1.0$ gl, each at least 10 um (3-D) from those taken, four of them.
+Agreed before (D-149.5): 8089, 4844, 7081, 7448, read off the survey's index. (D-150.3) Per patch (pixels, planes,
+configuration) `shadow_image` keeps every rendered neighbour's peak and footprint, keyed by its geometry and
+features, and its last 4 sums $S$ with the multiset of neighbours each holds; a call renders the neighbours it has
+not seen, and its $S$ is the kept sum nearest it, minus the images of the neighbours that left it plus those that
+entered it, or a sum afresh in the neighbours' order when that renders no more images. Peaks, `kept`, `overlap` and
+the masked peaks equal the path that renders every neighbour [exact]; $S$ is equal when summed afresh or reused
+whole and to rounding otherwise. What is kept stays under `shadow_cache_mb` = 3000 MB, the newest patches leaving
+first and never the one in use. Agreed before (D-148.3): the images of the last patch kept for the next call on the
+same patch. (D-150.4) `neighbour_tiers` gives the same tiers as before [exact].
+
+**Why.** (D-150.1) In the figures of 7448, 7081 and 4844 the $B\,S$ panel is 0 where no neighbour shades and the
+patches sit at $B$ = 89 to 96 gl, so the joint range ran from about 0 to the brightest pixel and a dip of 20 to 25 %
+of $B$ took about a fifth of the grey range **[user: the figures and Cell 17b's log; the code]**; percentiles keep a
+few extreme pixels (the soma, a gap) from setting the range **[reasoning]**. (D-150.2) The survey's index sums each
+segment of a neighbour as an infinite tube and overcounts long out-of-focus neighbours (94 times at 55 um defocus,
+D-149) **[run, sandbox]**; the cleaning subtracts the tier-1 neighbours only (D-132.2), and of their dip only the
+part that varies along the line changes the profile's shape -- a uniform rise is taken by the background
+**[reasoning, Likely]**; a node with a strong tier-2 crossing would show an uncleaned dip whatever the cleaning does
+**[reasoning]**. The bounds are exact for a kernel non-decreasing in |defocus|; branch and bound gave the same worst
+as evaluating all 2040 candidates of a dense random scene (43 evaluated); about 44 ms per node, so the pilot's
+dendrite nodes in minutes **[run, sandbox]**. (D-150.3) In round 1 of Cell 17b the background refit took 110 to 388
+s per node, 3090 s of the 5103 s of 11 nodes (the refinements 1969 s), on the same scene as the preparation's
+**[user: the log, 2026-11-16]**. Kept images do not fit: one patch of a dense random scene held 2044 neighbours'
+images, 4.2 GB in float64 (97 % after cutting each to its nonzero pixels); the kept sums take about 7 MB per patch.
+On that scene's call pattern (3 nodes; round 0 a background each; rounds 1 and 2 a background and a cleaning, the
+nodes' own segments changed between rounds) the calls rendered 191 to 326 images in round 0 and 0 to 5 in rounds 1
+and 2 (17 to 28 s against 0 to 1.1 s), the last call within 5.0e-16 of the reference; on the synthetic cell `clean`
+over 2 rounds wrote the same 8 files with and without the cache **[run, sandbox]**. Newest out first: over a pass
+in a fixed order (the work list, round after round) least-recently-used keeps no patch for the next pass
+**[reasoning]**.
+
+**What it implies for code and tables.** The files at `97b40a4`, `4ed0793`. Cell 16b writes
+`rank_tier1_529878215.csv` and `examples_tier1_529878215.json` in the cleaning folder; Cell 17b writes
+`OUT/cleaning_tier1`, Cell 18b `OUT/inference_tier1`; D-149's run stays in `OUT/cleaning_worst`,
+`OUT/inference_worst`. `clean` logs after the preparation and each round the shadow images reused and rendered. The
+tester's spec test of Block 31's single range fails by design (`test_figure_node_layout_scale_extent_and_inputs`).
+
+**What it does not decide [open].** Whether the cleaning passes in these conditions (D-149, O12: the user's). Which
+nodes the ranking picks on the pilot (not run: the cell is read in Colab only). The ranking's predictor is the
+survey's infinite tube per segment, at each segment's larger end; not compared with Block 25's shadow model on real
+neighbours. The time of a full cell's cleaning: the preparation's first renderings (129 to 414 s per node on the
+pilot) are unchanged. Five of the tester's spec tests (four of Block 25 at 1e-6 against references that do not bin
+the blur, D-146.4; Block 28's boundary test under `partition_vertical`) failed before this change, at `773b53c`.
+
+**Sources.** **[user]** the request of 2026-11-16, Cell 17b's log and figures. **[run, sandbox]** the suites
+(shadow 8, cleaning 6, contamination 7, cleaning figures 7, configuration 6, cleaning iteration 9, pilot run 12
+pass, 1 skip each), the dense-scene and call-pattern checks, the synthetic run with and without the cache.
+**[SPEC]** `97b40a4`, `4ed0793`.
 
 **Status:** active.
