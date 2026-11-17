@@ -600,7 +600,7 @@ Delta_t and every lag k (samples, any sign):
 [k = 0] being 1 at lag 0 and 0 elsewhere. Reading: the white part adds variance at lag 0 only; the middle and slow
 parts are exponentials of the lag. Every closed-form moment of Block 2 (Var(x_bar), E[S_0], E[S_L], the closed-form
 SD and autocorrelation, the legacy semivariogram functions) keeps its formula in terms of gamma and takes (L3').
-The fit's domain (D-152): sigma_f, sigma_m, sigma_s in [1e-4, 10] mV; tau_m in [4e-5, 1e-3] s (2 samples at 50 kHz
+The fit's domain (D-152): sigma_f, sigma_m, sigma_s in [1e-4, 10] mV; tau_m in [4e-5, 1e-3] s (fixed in seconds; 2 samples at the archive's 50 kHz
 to 1 ms); tau_s in [1e-3, 10] s. `NoiseLaw` itself accepts any sigma >= 0 and any tau > 0 (a zero SD switches its
 component off, for oracles), and does not enforce the fit's bounds.
 
@@ -654,7 +654,7 @@ and y_s*_b = log sigma_s_hat*_b, and
 
     v_m(c, s), v_s(c, s) = the sample variances (ddof 1) of y_m*_b and of y_s*_b over the B_ok refits;
 
-either NaN (B_ok < 2) fails the sweep with `v_none`. The pooling (P3), (P4), (D-076.1) is applied per protocol
+either NaN (B_ok < 2) or not strictly positive (every successful refit returned the same value: the pooling's weights 1 / v would not exist) fails the sweep with `v_none` [the second case added 2026-11-17, D-155 [orchestrator], after the final check's finding F1: `pool_cell` raised on v = 0 and the whole cell was lost]. The pooling (P3), (P4), (D-076.1) is applied per protocol
 TWICE, independently: to (y_m, v_m) = (log sigma_m_hat(c, s), v_m(c, s)) giving tau2_hat_m,pr(c), mu_hat_m,pr(c),
 lambda_m(c, s), sigma_m_tilde(c, s); and to (y_s, v_s) as today. sigma_f is not pooled. k_pr = 1 and k_pr = 0 as
 in 2.5 (e), for both. A failed sweep's twin carries theta_hat(c) whole (D-122.3).
@@ -677,6 +677,8 @@ without `raw` are the twin's theta_tilde(c, s) (the cell's values for a failed s
 columns are NaN for a failed sweep; `w_m` and `w` are lambda_m and lambda. `noise_rho_f` and
 `noise_sweep_rho_f` no longer exist. JSON law dicts carry the keys `sigma_f_mV`, `sigma_m_mV`, `tau_m_s`,
 `sigma_s_mV`, `tau_s_s`.
+
+(i) Dev checks. The scripts under `dev/` dated before 2026-11-17 were written for the two-component law and no longer run against `noise_law.py` (`NoiseLaw` has five fields); each re-runs at the commit it was written at. The statements of 2.2 and 2.4 that legacy functions are kept "so that the dev checks re-run" hold in that sense only [final check, F3].
 
 (h) Code interfaces changed by this section (the blocks' entries carry the rest unchanged).
 Block 2, `noise_law.py`: `NoiseLaw(sigma_f, sigma_m, tau_m, sigma_s, tau_s)` (frozen dataclass; finite values;
@@ -702,6 +704,8 @@ led by `specimen_id`).
 Block 6, `run_noise_fit.py`: the columns of (g); the smoke sizes unchanged.
 
 ### Notation
+
+[2026-11-17: rows written before section 2.6 describe the two-component law where they name rho_f, vectors of 5, 10 or 15 statistics, or unit draws of two components; under 2.6 the vectors hold 7 (SS), 14 (LS) and 21 statistics, the unit draws are fast, mid, slow, and the rows marked (2.6) below hold.]
 
 | Symbol | Meaning | Type / shape | Units |
 |---|---|---|---|
@@ -904,9 +908,9 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 | Command | Purpose | Minimal configuration for testing | Expected runtime |
 |---|---|---|---|
 | `python smoke_noise_stats.py` | Block 1 smoke (N1-N6) | none | seconds |
-| `python smoke_noise_law.py` | Block 2 smoke (M1-M10) | none | about 5 s |
+| `python smoke_noise_law.py` | Block 2 smoke (M1-M11) | none | about 5 s |
 | `python smoke_noise_fit_gates.py` | tools smoke (T1-T8) | none | about 15 s |
-| `python smoke_noise_windows.py` | Block 3 smoke (W1-W14) | none (W4's oracle needs NEURON for the monolith import, W12's pandas for `ls_baseline_qc`, else skipped) | about 20 s |
+| `python smoke_noise_windows.py` | Block 3 smoke (W1-W15) | none (W4's oracle needs NEURON for the monolith import, W12's pandas for `ls_baseline_qc`, else skipped) | about 20 s |
 | `python smoke_noise_fit.py` | Block 4 smoke (F1-F11, reduced M and R) | none | about 100 s |
 | `python smoke_noise_sweep_fit.py` | Block 9 smoke (P1-P11, reduced M and B_v; `P3,P6` runs a subset) | statsmodels (P3's oracle) | about 7 min |
 | `python smoke_noise_run.py` | Block 6 smoke (R1-R9 at `--sizes smoke`; `R5,R7` runs a subset) | statsmodels, git, bash; no NEURON, no PBS | about 8.5 min on 2 cores |
