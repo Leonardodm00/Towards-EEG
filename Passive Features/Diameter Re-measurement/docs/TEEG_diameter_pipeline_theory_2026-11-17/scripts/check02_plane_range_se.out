@@ -1,0 +1,12 @@
+node 8089 d 2.441 um mu 0.0751 /um, tube spans -1.69..+0.75 um about plane 0
+  planes +-4 (+-1.12 um): SE d 0.0128 um (0.52 %), mu 0.00079 /um (1.06 %), z_ax 0.0186 um; corr(d, mu) -0.858
+  planes +-6 (+-1.68 um): SE d 0.0122 um (0.50 %), mu 0.00075 /um (0.99 %), z_ax 0.0144 um; corr(d, mu) -0.887
+  planes +-8 (+-2.24 um): SE d 0.0121 um (0.50 %), mu 0.00074 /um (0.99 %), z_ax 0.0125 um; corr(d, mu) -0.907
+node 7448 d 1.288 um mu 0.1296 /um, tube spans -0.13..+1.16 um about plane 0
+  planes +-4 (+-1.12 um): SE d 0.0141 um (1.09 %), mu 0.00278 /um (2.14 %), z_ax 0.0153 um; corr(d, mu) -0.914
+  planes +-6 (+-1.68 um): SE d 0.0139 um (1.08 %), mu 0.00277 /um (2.14 %), z_ax 0.0129 um; corr(d, mu) -0.933
+  planes +-8 (+-2.24 um): SE d 0.0138 um (1.07 %), mu 0.00277 /um (2.14 %), z_ax 0.0122 um; corr(d, mu) -0.942
+node 4924 d 4.454 um mu 0.0264 /um, tube spans -3.00..+1.45 um about plane 0
+  planes +-4 (+-1.12 um): SE d 0.0243 um (0.55 %), mu 0.00027 /um (1.04 %), z_ax 0.0507 um; corr(d, mu) -0.793
+  planes +-6 (+-1.68 um): SE d 0.0212 um (0.47 %), mu 0.00024 /um (0.91 %), z_ax 0.0367 um; corr(d, mu) -0.835
+  planes +-8 (+-2.24 um): SE d 0.0199 um (0.45 %), mu 0.00023 /um (0.85 %), z_ax 0.0288 um; corr(d, mu) -0.862
