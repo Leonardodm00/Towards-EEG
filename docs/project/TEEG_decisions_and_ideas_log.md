@@ -198,6 +198,7 @@ the "Binds" column.
 | 2026-11-17 (later, 5) | No decision changed (the noise-fit chat). The user proposed a faster component for the noise law with the time scales split at 1 ms (12:28) and, to the assistant's three-component reading of it (the fast part as it is, a middle part of at most 1 ms, the slow part above 1 ms: "That is what I was thinking"), asked for the test (12:30: "Go on with the test"). **Run here** (`Ih Fit/dev/2026-11-17_three_component_law/`, README): fitted by simulation on the 18 cells with the run's stored covariance, the three-component law lowers J in every cell (median 120.7 to 37.9; ratio median 0.36), turns the SS 1 ms autocorrelation's excess (the law above the data in 16 cells) into none (6 cells, median residual -0.5 SD), and brings 5 cells under chi-square's 99 % point; 13 stay rejected, the largest those whose SS and LS statistics disagree under one law per cell. The middle time scale is 0.07-0.11 ms in 8 cells and up to the 1 ms cap in 3. Limits: the covariance is the two-component law's, the refinement short, the per-sweep stage untested. The decision to extend SPEC 2.1's law (D-017.1) is the user's and is not taken. The Block 6 handoff, §4 and §6 item 8. Next free IDs unchanged: D-152, I-006. |
 | 2026-11-17 (later, 6) | Logs **D-152** (user, 14:19; the noise-fit chat): the noise law is extended to three components -- a white Gaussian fast part, a middle part with a time scale in [0.04 ms, 1 ms], the slow part in [1 ms, 10 s]; five parameters. After the test of row (later, 5). Open, explained to the user and not yet answered: which middle-part parameters Block 9 fits per sweep, and the statistic set. Supersedes D-017.1's form of the law; SPEC 2.1 and Blocks 2, 4, 9 not yet changed. Next free IDs: D-153, I-006. |
 | 2026-11-17 (later, 7) | Logs **D-153** (user, 14:25; the noise-fit chat), D-152's two open points: in the per-sweep stage the middle part's size is fitted per sweep and its time scale held at the cell's; the statistic set gains the autocorrelation at 0.04 ms and 0.3 ms. D-152 annotated. Next free IDs: D-154, I-006. |
+| 2026-11-17 (later, 8) | Logs **D-154** (user, 14:59; the noise-fit chat): the implementation plan of the three-component law approved ("I approve everything go on") with its three readings -- the two lags added in all three autocorrelation windows (d = 21); the middle size shrunk per protocol like the slow one; a per-sweep fit with sigma_f under half the cell's counts as failed. Work starts on the branch `sci/noise-three-component`. Next free IDs: D-155, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -355,6 +356,7 @@ would be needed*, *Status*.
 | D-151 | 2026-11-17 | a new correction of the cleaning and per-node fit (not specified); the handoff `Passive Features/Diameter Re-measurement/docs/TEEG_same_node_clearance_handoff_2026-11-17.md`; the kernel's use for a node's own shadow | same-node clearance: the node's own out-of-focus shadow, estimated per node on sub-planes of chosen spacing (0.1 um or less) with the full kernel (near table and far field, past 1 um both sides), added back to each plane before the profile fit, refined as the diameter changes; built in another chat; the pilot's table a test, refitted on davinci [user] | active |
 | D-152 | 2026-11-17 | the noise law of SPEC 2.1 (D-017.1) and everything built on it: `noise_law.py`, Blocks 2, 4, 9, the twins' noise (Block 5), the noise-fit run | three independent Gaussian components: a white fast part ($\sigma_f$), a middle OU ($\sigma_m$, $\tau_m \in [0.04, 1]$ ms), a slow OU ($\sigma_s$, $\tau_s \in [1\,\mathrm{ms}, 10\,\mathrm{s}]$); five parameters [user] | active; not implemented |
 | D-153 | 2026-11-17 | Block 9's per-sweep coordinates and Block 3's statistic vector under D-152's law | per sweep $\sigma_f$, $\sigma_m$, $\sigma_s$; per cell $\tau_m$, $\tau_s$; the autocorrelation lags gain 0.04 ms and 0.3 ms [user] | active; not implemented |
+| D-154 | 2026-11-17 | the implementation of D-152/D-153: SPEC 2.6, Blocks 2, 3, 4, 9, 6 of `Ih Fit` | plan approved; lags 0.04 and 0.3 ms in the SS, LS pre- and LS last windows ($d$ = 21); $\sigma_m(c,s)$ shrunk per protocol as $\sigma_s$ (D-076.1); a sweep with $\hat\sigma_f(c,s) < 0.5\,\hat\sigma_f(c)$ is a failed sweep [user] | active |
 | D-150 | 2026-11-17 | SPEC Blocks 31 (amendment 2), 27 (amendment 2), 25 (amendment 7), 28 (amendment 2), 36 (amendment 10) at `97b40a4`, `4ed0793`; `CleaningConfig.shadow_cache_mb`, `rank_*`; `clean_cell.py rank`; notebook Cells 16b, 17b, 18b | the cleaning's test re-aimed and sped up [user]: before and after on one 1-99 percentile grey scale, B S on its own; examples ranked by the largest structured dip a tier-1 neighbour casts on the line, tier 2 at most 1 gl, 10 um apart; the shadow model keeps its last sums per patch and changes them by the neighbours that changed (supersedes D-148.3); tiers vectorised [orchestrator] | active |
 | D-149 | 2026-11-16 | SPEC Blocks 25 (amendment 6), 36 (amendment 9), 31 (amendment 1) at `a2b082c`; `CleaningConfig.work_rank`, `work_peak_min_gl`; notebook Cells 17b, 18b | the cleaning is shown in worse conditions on the pilot's most contaminated tier-1 real nodes, neighbours refined, no injection or phantoms now [user]; the work list ranked by the predicted shadow on the example's measuring line, threshold 1 gl, per-round line figures, the examples 8089, 4844, 7081, 7448 [orchestrator], PROVISIONAL | active |
 | D-148 | 2026-11-16 | SPEC Blocks 29 (amendment 1), 25 (amendment 5), 32 (amendment 3), 36 (amendment 8) at `b6073e3`; `CleaningConfig.refine_xtol`, `refine_ftol`, `refine_line_fine_factor` | the coarse refinement stops at relative tolerances 1e-3 (was 1e-8) and its predictor samples p/4 (the fine fit keeps p/8); the neighbours' images shared between the two shadows of a node; the cleaning saves after every round [orchestrator], PROVISIONAL | active |
@@ -11629,4 +11631,33 @@ left unpooled like $\sigma_f$; the rule for a degenerate per-sweep fit.
 
 **Sources.** **[user]** 2026-11-17, 14:25. **[log]** D-051, D-076, D-116, D-152.
 
-**Status:** active; not implemented.
+**Status:** active; not implemented. [updated 2026-11-17: its open point on the shrinkage and the degenerate-fit rule decided, **D-154**]
+
+## D-154 -- The three-component law's implementation plan approved, with its three readings: the added lags in all three windows, the middle size shrunk like the slow one, a collapsed fast part counts as a failed sweep (user)
+
+**Date:** 2026-11-17, 14:59 (Europe/Rome), the noise-fit chat. **Binds:** SPEC 2.6 (new) and Blocks 2, 3, 4, 9, 6 of
+`Ih Fit/specs/SPEC.md`; `SweepStageConfig.min_sigma_f_ratio`; the tables' columns; D-122.3 (extended).
+
+**Decision [user].** To the plan put at 14:25 (SPEC first; Blocks 2 and 3, then 4, then 9 written by implementer
+agents; Block 6 by the orchestrating session; an independent final check; the gates, a pilot and the run on davinci)
+and its three readings, the user answered "I approve everything go on".
+
+**Statement.** (D-154.1) The lags 0.04 ms and 0.3 ms are added to the autocorrelation statistics of the SS enlarged
+window, of the LS pre-window and of the LS last 132.5 ms; the statistic vector has $d$ = 21 entries (SS 7; LS 14).
+(D-154.2) In the per-sweep stage $\log\sigma_m(c,s)$ is pooled per protocol and shrunk by (P3), (P4) and (D-076.1)
+exactly as $\log\sigma_s(c,s)$, with its own sampling variance from the same bootstrap refits; $\sigma_f(c,s)$ stays
+unpooled. (D-154.3) A sweep whose own fit gives $\hat\sigma_f(c,s) < 0.5\,\hat\sigma_f(c)$ is a failed sweep (reason
+`degenerate:sigma_f`): not bootstrapped, out of the pooling, its twin carrying the cell's whole law (D-122.3).
+
+**Why.** **[user]** as quoted. **[reasoning]** (1) the middle part acts in every window; (2) a sweep's middle size is
+the least determined of its three sizes; (3) in the nf1 run three LS fits collapsed the fast part (0.05-0.16 of the
+cell's) and their twins would have carried almost no fast noise. None of the three is tested.
+
+**What it implies for code and tables.** SPEC 2.6; the columns of the two tables (SPEC 2.6 (g)). The plan's order
+became sequential (Blocks 2 and 3 by one agent, then 4, then 9): Block 3's fixture needs Block 2's simulator [plumbing].
+
+**What it does not decide [open].** The walltime of the new run (the pilot's); whether the 1 ms cap is kept after it.
+
+**Sources.** **[user]** 2026-11-17, 14:59. **[log]** D-076, D-116, D-122, D-152, D-153.
+
+**Status:** active.
