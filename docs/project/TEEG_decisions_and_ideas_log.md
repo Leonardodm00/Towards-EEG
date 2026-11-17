@@ -197,6 +197,7 @@ the "Binds" column.
 | 2026-11-17 (later, 4) | Logs **D-151** (user; the diameter chat, request 12:40, answers before 13:30): a same-node clearance -- the node's own out-of-focus shadow estimated per node on sub-planes of chosen spacing with the full defocus kernel (near and far field, past 1 um both sides), added back to each plane before the profile fit, refined as the diameter changes -- to be built in another chat; handoff `Passive Features/Diameter Re-measurement/docs/TEEG_same_node_clearance_handoff_2026-11-17.md` on `sci/diameter-pipeline`. Status note: the 17 Nov run of Cell 17b (D-150's code, the survey's four examples, round 1) added back under 0.1 to 12 gl on the example lines, dips unchanged in shape; the user keeps D-150 **[data inspected: the upload]**. Next free IDs: D-152, I-006. |
 | 2026-11-17 (later, 5) | No decision changed (the noise-fit chat). The user proposed a faster component for the noise law with the time scales split at 1 ms (12:28) and, to the assistant's three-component reading of it (the fast part as it is, a middle part of at most 1 ms, the slow part above 1 ms: "That is what I was thinking"), asked for the test (12:30: "Go on with the test"). **Run here** (`Ih Fit/dev/2026-11-17_three_component_law/`, README): fitted by simulation on the 18 cells with the run's stored covariance, the three-component law lowers J in every cell (median 120.7 to 37.9; ratio median 0.36), turns the SS 1 ms autocorrelation's excess (the law above the data in 16 cells) into none (6 cells, median residual -0.5 SD), and brings 5 cells under chi-square's 99 % point; 13 stay rejected, the largest those whose SS and LS statistics disagree under one law per cell. The middle time scale is 0.07-0.11 ms in 8 cells and up to the 1 ms cap in 3. Limits: the covariance is the two-component law's, the refinement short, the per-sweep stage untested. The decision to extend SPEC 2.1's law (D-017.1) is the user's and is not taken. The Block 6 handoff, §4 and §6 item 8. Next free IDs unchanged: D-152, I-006. |
 | 2026-11-17 (later, 6) | Logs **D-152** (user, 14:19; the noise-fit chat): the noise law is extended to three components -- a white Gaussian fast part, a middle part with a time scale in [0.04 ms, 1 ms], the slow part in [1 ms, 10 s]; five parameters. After the test of row (later, 5). Open, explained to the user and not yet answered: which middle-part parameters Block 9 fits per sweep, and the statistic set. Supersedes D-017.1's form of the law; SPEC 2.1 and Blocks 2, 4, 9 not yet changed. Next free IDs: D-153, I-006. |
+| 2026-11-17 (later, 7) | Logs **D-153** (user, 14:25; the noise-fit chat), D-152's two open points: in the per-sweep stage the middle part's size is fitted per sweep and its time scale held at the cell's; the statistic set gains the autocorrelation at 0.04 ms and 0.3 ms. D-152 annotated. Next free IDs: D-154, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -353,6 +354,7 @@ would be needed*, *Status*.
 | D-134 | 2026-11-13 | SPEC Block 25 (amendment 3); D-132.1 | a tier-1 neighbour's shadow is equations (5-6) for the neighbour rendered alone: one blur per slab, under the hybrid's absorbed light; one kernel per column is dropped [user] | active; supersedes the "one blur per column" clause of D-132.1 |
 | D-151 | 2026-11-17 | a new correction of the cleaning and per-node fit (not specified); the handoff `Passive Features/Diameter Re-measurement/docs/TEEG_same_node_clearance_handoff_2026-11-17.md`; the kernel's use for a node's own shadow | same-node clearance: the node's own out-of-focus shadow, estimated per node on sub-planes of chosen spacing (0.1 um or less) with the full kernel (near table and far field, past 1 um both sides), added back to each plane before the profile fit, refined as the diameter changes; built in another chat; the pilot's table a test, refitted on davinci [user] | active |
 | D-152 | 2026-11-17 | the noise law of SPEC 2.1 (D-017.1) and everything built on it: `noise_law.py`, Blocks 2, 4, 9, the twins' noise (Block 5), the noise-fit run | three independent Gaussian components: a white fast part ($\sigma_f$), a middle OU ($\sigma_m$, $\tau_m \in [0.04, 1]$ ms), a slow OU ($\sigma_s$, $\tau_s \in [1\,\mathrm{ms}, 10\,\mathrm{s}]$); five parameters [user] | active; not implemented |
+| D-153 | 2026-11-17 | Block 9's per-sweep coordinates and Block 3's statistic vector under D-152's law | per sweep $\sigma_f$, $\sigma_m$, $\sigma_s$; per cell $\tau_m$, $\tau_s$; the autocorrelation lags gain 0.04 ms and 0.3 ms [user] | active; not implemented |
 | D-150 | 2026-11-17 | SPEC Blocks 31 (amendment 2), 27 (amendment 2), 25 (amendment 7), 28 (amendment 2), 36 (amendment 10) at `97b40a4`, `4ed0793`; `CleaningConfig.shadow_cache_mb`, `rank_*`; `clean_cell.py rank`; notebook Cells 16b, 17b, 18b | the cleaning's test re-aimed and sped up [user]: before and after on one 1-99 percentile grey scale, B S on its own; examples ranked by the largest structured dip a tier-1 neighbour casts on the line, tier 2 at most 1 gl, 10 um apart; the shadow model keeps its last sums per patch and changes them by the neighbours that changed (supersedes D-148.3); tiers vectorised [orchestrator] | active |
 | D-149 | 2026-11-16 | SPEC Blocks 25 (amendment 6), 36 (amendment 9), 31 (amendment 1) at `a2b082c`; `CleaningConfig.work_rank`, `work_peak_min_gl`; notebook Cells 17b, 18b | the cleaning is shown in worse conditions on the pilot's most contaminated tier-1 real nodes, neighbours refined, no injection or phantoms now [user]; the work list ranked by the predicted shadow on the example's measuring line, threshold 1 gl, per-round line figures, the examples 8089, 4844, 7081, 7448 [orchestrator], PROVISIONAL | active |
 | D-148 | 2026-11-16 | SPEC Blocks 29 (amendment 1), 25 (amendment 5), 32 (amendment 3), 36 (amendment 8) at `b6073e3`; `CleaningConfig.refine_xtol`, `refine_ftol`, `refine_line_fine_factor` | the coarse refinement stops at relative tolerances 1e-3 (was 1e-8) and its predictor samples p/4 (the fine fit keeps p/8); the neighbours' images shared between the two shadows of a node; the cleaning saves after every round [orchestrator], PROVISIONAL | active |
@@ -11596,5 +11598,35 @@ degenerate per-sweep fit; whether the 1 ms cap, reached in 3 cells in the test, 
 
 **Sources.** **[user]** 2026-11-17, 12:28, 12:30, 14:19. **[run]** the dev check named above; the Block 6 handoff,
 section 4. **[log]** D-017, D-034, D-076, D-116, D-122 to D-125.
+
+**Status:** active; not implemented. [updated 2026-11-17: its two open points decided, **D-153**]
+
+## D-153 -- Under the three-component law: the middle part's size per sweep with its time scale per cell, and two autocorrelation lags added, 0.04 ms and 0.3 ms (user)
+
+**Date:** 2026-11-17, 14:25 (Europe/Rome), the noise-fit chat. **Binds:** Block 9 (the per-sweep stage, SPEC 2.5), Block
+3's statistic vector (SPEC 2.2, D-051 (i)), Block 4's dimension $d$, under D-152's law.
+
+**Decision [user].** To the two points D-152 left open, each put with the assistant's proposal: "3) I choose Size per
+sweep, time scale per cell (my proposal). 4) Add delays (my proposal). perfect".
+
+**Statement.** (D-153.1) For each cell $c$ and each sweep $s$ of the per-sweep stage, the fit's coordinates are the
+three sizes $(\sigma_f, \sigma_m, \sigma_s)(c, s)$; the two time scales are held at the cell's, $\tau_m = \hat\tau_m(c)$
+and $\tau_s = \hat\tau_s(c)$. (D-153.2) The autocorrelation statistics are read at the lags 0.02, 0.04, 0.1, 0.3, 1 ms
+(and 10 ms where 10 ms is read today), in samples round(lag $\cdot f_s$): 1, 2, 5, 15, 50 (and 500) at 50 kHz. The
+assistant's reading, to confirm with the plan: the two lags are added in each of the three windows that carry
+autocorrelations (SS enlarged, LS pre-window, LS last 132.5 ms), so $d$ goes from 15 to 21.
+
+**Why.** **[user]** as quoted. **[reasoning]** One sweep, an LS one above all (a single window), cannot determine a
+time scale; this mirrors $\tau_s$ (D-076 (i)). Of the present lags only 0.1 and 1 ms fall inside the middle part's
+range [0.04, 1] ms, thin for a size and a time scale; in the test $\hat\tau_m$ ran from 0.07 ms to the 1 ms cap.
+Neither point is tested.
+
+**What it implies for code and tables.** `noise_cell_stats` lag lists and labels; every place that assumes 15, 5 and
+10 statistics; Block 9's `u_s`; a per-sweep column `noise_sweep_sigma_m_mV`.
+
+**What it does not decide [open].** Whether $\sigma_m(c, s)$ is shrunk towards the cell like $\sigma_s$ (D-076.1) or
+left unpooled like $\sigma_f$; the rule for a degenerate per-sweep fit.
+
+**Sources.** **[user]** 2026-11-17, 14:25. **[log]** D-051, D-076, D-116, D-152.
 
 **Status:** active; not implemented.
