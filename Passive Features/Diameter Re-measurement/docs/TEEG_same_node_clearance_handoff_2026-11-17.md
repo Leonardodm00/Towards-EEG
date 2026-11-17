@@ -3,6 +3,7 @@
 | Date | Change |
 |---|---|
 | 2026-11-17 | Created at the user's request (D-151) for the chat that builds the same-node clearance. Branch `sci/diameter-pipeline` at `021869d` (code) and the commit that adds this file; decision log on `main` at `2cd9f89` (D-151). Nothing of the clearance is specified, built or computed. |
+| 2026-11-17 (later) | The clearance chat (14:14 onward): section 12 added -- first numbers of the split $S = S^{\rm in} + S^{\rm out}$ and of the iteration's gain, from `checks/own_shadow_clearance_check.py` (output beside it) **[run, sandbox of the clearance chat]**; section 11's first item marked corrected. No decision, no SPEC entry, no pipeline code. |
 
 Basis tags: **[src]** read in the named file at `021869d`; **[data]** read in the files the user uploaded on
 2026-11-17 at 12:40 (the Colab run of Cell 17b: `cleaning_529878215.json`, `examples_worst_529878215.json`, the
@@ -271,9 +272,71 @@ All under `<ws>/` at `021869d` **[src]**.
 
 ## 11. Not checked
 
-- Nothing of the clearance was computed: no $S^{\rm out}$, no share of the dip, no timing **[open]**.
+- Nothing of the clearance was computed: no $S^{\rm out}$, no share of the dip, no timing **[open]**. [corrected 2026-11-17 (later): first numbers on a flat tube in section 12; nothing on real profiles, no timing of a cleared fit]
 - The run's log (the round times and the `shadow images ... reused, ... rendered` lines of D-150.3) was not
   uploaded, so D-150.3's speed-up is not seen on the pilot **[open]**.
 - Cell 16b's tier-1 ranking has not run on the pilot **[open]**.
 - The 7-14 % of the plain paragraph is the in-band share of the absorbing path through a flat tube's axis
   ($2\times0.14/d$), not of the blurred dip **[reasoning, geometry]**.
+
+## 12. First numbers (the clearance chat, 2026-11-17; a diagnostic, not the clearance)
+
+Script `<ws>/checks/own_shadow_clearance_check.py`, output `own_shadow_clearance_check.out` beside it **[run,
+sandbox of the clearance chat]**. It splits the sum of `line_fast._profiles` by one condition on
+$|\zeta_j - z_k|$ (the function's source rewritten in memory, the module untouched); $S = S^{\rm in} + S^{\rm out}$
+holds to 2e-16.
+
+Setting, all of it the assistant's choice for a first look, none decided: a flat capped tube (tilt 0, half-length
+10 um, the cap test bypassed), hybrid at 8 x 16 directions, `line_fine_factor` 4, the pilot's table (section 5),
+$\beta$ = 0.14 um, slabs of 0.02 um, the line $v_n$ = -2.97 to 2.97 um (53 samples, `n_avg` 0), planes $k$ = -4..4
+at $z_k = k \times 0.28$ um, $B_k$ = 92 gl, $(d, \mu, z_{\rm ax})$ of three work-list nodes after round 1 (section 8).
+
+The split with $\gamma$ = 0.79, over the planes that cut the tube ($|z_k - z_{\rm ax}| < d/2$):
+
+| node | $d$ (um) | $\mu$ (1/um) | $\max_n S^{\rm in}_k(v_n)\,/\,S_k$ at the dip's peak | $B_k \max_n S^{\rm in}_k(v_n)$ (gl) | FWHM of $S_k(v_n)$ (um) | FWHM of $S^{\rm in}_k(v_n)$ (um) | chord of the tube at $z_k$ (um) |
+|---|---|---|---|---|---|---|---|
+| 4924 | 4.454 | 0.0264 | 0.073-0.078 | 0.88-0.94 | 3.66-4.12 | 2.29-4.35 | 2.33-4.45 |
+| 8089 | 2.441 | 0.0751 | 0.130-0.142 | 2.35-2.68 | 2.06-2.29 | 1.14-2.29 | 1.30-2.43 |
+| 7448 | 1.288 | 0.1296 | 0.153-0.275 | 2.37-4.55 | 0.92-1.14 | 0.46-1.14 | 0.43-1.28 |
+
+Reading: with the band at half a plane spacing the clearance removes 72 to 93 % of the node's dip at its peak,
+all of it predicted by the model at the previous estimate; what is left, $B_k S^{\rm in}_k$, is 0.9 to 4.5 gl
+against a profile noise SD of 0.85 to 1.31 gl on the pilot (D-149.3). $S^{\rm in}_k(v_n)$ is an optical section:
+its width follows the tube's chord at the depth of plane $k$ (widths read on the 0.1144 um samples) and it is zero
+on the planes that miss the tube, whereas the width of the whole $S_k(v_n)$ changes little from plane to plane.
+The far slope does not enter $S^{\rm in}$ (the band lies inside the table); $\gamma$ = 0.397 in place of 0.79
+raises $\max_n S^{\rm out}_k(v_n)$ by 0 to 14 % on the planes that cut the tube (8089 at $k$ = +2: 0.1608 to
+0.1755, that is 1.35 gl at $B_k$ = 92 gl, beside $B_k \max_n S^{\rm in}_k$ = 2.35 gl) and by up to 28 % on those
+that miss it (7448 at $k$ = -4).
+
+The iteration of section 6, linearised about a fixed point $\theta^*$ (noise-free, unweighted sum over the 9
+planes and 53 samples, $\gamma$ = 0.79): with $J^{\rm in}$, $J^{\rm out}$ the derivatives of
+$S^{\rm in}_k(v_n \mid \theta, \beta)$ and $S^{\rm out}_k(v_n \mid \theta, \beta)$ in $\theta = (d, \mu, v_0, z_{\rm ax})$
+at $\theta^*$ (rows: planes times samples; central differences), "add back $S^{\rm out}$ at $\hat\theta^{(t-1)}$,
+fit $1 - S^{\rm in}$ by least squares" gives
+$$\hat\theta^{(t)} - \theta^* = M\,(\hat\theta^{(t-1)} - \theta^*), \qquad M = -\big(J^{{\rm in}\top} J^{\rm in}\big)^{-1} J^{{\rm in}\top} J^{\rm out},$$
+and with a damping $\lambda$ (the new estimate moved only the share $\lambda$ of the way) the matrix is
+$(1 - \lambda)\,I + \lambda M$. Reading: an error in the previous estimate comes back multiplied by $M$; the
+iteration converges only if every eigenvalue of that matrix is below 1 in modulus.
+
+| node | eigenvalues of $M$ | spectral radius, $\lambda$ = 1 | $\lambda$ = 0.5 | 0.3 | 0.25 | 0.2 | 0.1 |
+|---|---|---|---|---|---|---|---|
+| 8089 | -5.77, -2.33, -1.59, 0.10 | 5.77 | 2.38 | 1.03 | 0.78 | 0.82 | 0.91 |
+| 7448 | -3.03, -1.59, -0.23, 0.42 | 3.03 | 1.02 | 0.83 | 0.86 | 0.88 | 0.94 |
+
+Reading: undamped, the iteration diverges with alternating sign on both nodes (the out-of-band part is several
+times the in-band part, so an overestimated $\mu$ or $d$ removes too much and the next fit swings the other way,
+further); damped at 0.2 to 0.25 it converges by a factor of about 0.8 per round, some ten rounds per decimal
+digit. At the fixed point the residual $I_k - B_k (1 - S_k(\cdot \mid \theta^*))$ is orthogonal to the columns of
+$J^{\rm in}$, not to those of $J = J^{\rm in} + J^{\rm out}$ (the full model's least squares): under white noise
+its standard errors are those of the full fit times 1.22, 1.17, 1.26, 1.79 (8089: $d$, $\mu$, $v_0$, $z_{\rm ax}$)
+and 1.48, 1.38, 1.21, 1.82 (7448). The columns of $J^{\rm in}$ are less collinear than those of $J$ (condition
+number at unit column norm 1.8 against 3.9 and 4.9).
+
+Exact, for any $\theta$ **[reasoning, algebra]**: the cleared profile at $\hat\theta$ minus its own model is the
+full model's residual,
+$I_k + B_k S^{\rm out}_k(\cdot \mid \hat\theta, \beta) - B_k\big(1 - S^{\rm in}_k(\cdot \mid \hat\theta, \beta)\big) = I_k - B_k\big(1 - S_k(\cdot \mid \hat\theta)\big)$:
+the cleared planes show the model's in-band section plus the misfit the full model already has.
+
+Not covered: tilted tubes, the caps (section 7 (g)), the refinement's weights $w_n$, real profiles, a second band,
+the noise's correlation along the line, any timing.
