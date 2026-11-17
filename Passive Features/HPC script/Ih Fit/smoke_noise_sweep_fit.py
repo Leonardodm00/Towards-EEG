@@ -4,17 +4,22 @@ Reduced sizes throughout (M, B_v), on Block 4's smoke fixture read through
 Block 3's pipeline (smoke_noise_fit.build_cell: 2 SS sweeps, 92 and 93, of
 30 and 33 kept windows; 5 LS pre-windows of 13250 samples, sweeps 54-58;
 theta_cf noise; per-sweep tilts planted at sigma_b = 0.1 mV/s and read by
-(TL1) and (TL2)), with a stub per-cell result: theta_hat(c) a law set apart
-from the fixture's truth theta_cf (sigma_f x 1.05, rho_f + 0.02, sigma_s x
-0.8; tau_s as theta_cf's), per_sweep_cov from
-`simulated_covariance(per_sweep=True)` at R = 200. Each check prints one
-PASS/FAIL line and the suite ends with "SMOKE noise_sweep_fit: n/11 passed".
+(TL1) and (TL2)), with a stub per-cell result: theta_hat(c) a law of the
+three-component law of SPEC 2.6 (a) set apart from the fixture's truth
+theta_cf in its three sizes (sigma_f x 1.05, sigma_m x 1.1, sigma_s x 0.8;
+tau_m and tau_s as theta_cf's, so that the truth lies in the per-sweep
+model), per_sweep_cov from `simulated_covariance(per_sweep=True)` at R = 200.
+The per-sweep coordinates are u_s = (log sigma_f, log sigma_m, log sigma_s)
+(SPEC 2.6 (e)); every statistic count comes from noise_fit / noise_cell_stats.
+Each check prints one PASS/FAIL line and the suite ends with
+"SMOKE noise_sweep_fit: n/11 passed".
 
     python smoke_noise_sweep_fit.py           # about 8 min on one core, no NEURON needed
     python smoke_noise_sweep_fit.py P3,P6     # a subset (mutation runs)
 
 Needs numpy, scipy, statsmodels (P3's oracle). Pure ASCII, LF. Spec:
-specs/SPEC.md, Block 9 (test oracles P1-P11).
+specs/SPEC.md, Block 9 (test oracles P1-P11, re-aimed by its note of
+2026-11-17) and section 2.6 (e), (g), (h).
 """
 from __future__ import annotations
 
@@ -45,7 +50,9 @@ import smoke_noise_windows as sw    # noqa: E402  (the closed-form slope of (TL1
 
 RESULTS = []
 THETA_CF = sf.THETA_CF
-LAW_CELL = nl.NoiseLaw(THETA_CF.sigma_f * 1.05, THETA_CF.rho_f + 0.02, THETA_CF.sigma_s * 0.8, THETA_CF.tau_s)
+LAW_CELL = nl.NoiseLaw(THETA_CF.sigma_f * 1.05, THETA_CF.sigma_m * 1.1, THETA_CF.tau_m, THETA_CF.sigma_s * 0.8,
+                       THETA_CF.tau_s)
+U3_IDX = [0, 1, 3]                  # u_s = (log sigma_f, log sigma_m, log sigma_s) inside Block 4's 5-vector u
 STAGE_SEED = 20261030
 R_STUB = 200
 STEP = 0.02                         # central-difference step of the sandwich's Jacobian (2.5 (h))
@@ -60,7 +67,8 @@ def report(name, ok, note=""):
 def stub_cell_fit(lay, tg, per_sweep_cov, cfg):
     """A CellFitResult carrying theta_hat(c) = LAW_CELL and the given per-sweep covariances."""
     return nf.CellFitResult(
-        specimen_id=lay.specimen_id, law=LAW_CELL, u=nf.law_to_u(LAW_CELL), J=float("nan"), dof=11,
+        specimen_id=lay.specimen_id, law=LAW_CELL, u=nf.law_to_u(LAW_CELL), J=float("nan"),
+        dof=nf.N_STATS - nf.N_PARAMS,
         p_value=float("nan"), kappa=float("nan"), Sigma=np.eye(nf.N_STATS), labels_kept=ncs.STAT_LABELS,
         stats_dropped=(), q_hat=tg.q_hat, q_sim=np.full(nf.N_STATS, np.nan), SE=np.full(nf.N_STATS, np.nan),
         ss_tilt={int(s): float(b) for s, b in zip(lay.sweep_numbers, lay.ss_tilt)},
@@ -79,11 +87,17 @@ def independent_seeds(specimen_id, protocol, sweep, seed=STAGE_SEED):
     return tuple(int(c.generate_state(1, dtype=np.uint64)[0]) for c in kids)
 
 
-def law_u3(u, tau_s):
-    return nl.NoiseLaw(math.exp(u[0]), float(u[1]), math.exp(u[2]), tau_s)
+def law_u3(u, tau_m, tau_s):
+    """theta(u_s) written out (P0'): (exp u_1, exp u_2, tau_m, exp u_3, tau_s)."""
+    return nl.NoiseLaw(math.exp(u[0]), math.exp(u[1]), tau_m, math.exp(u[2]), tau_s)
 
 
-def sandwich(u3, tau_s, sub, cfg, seed, protocol, mask, Sigma_w, Sigma_star):
+def u3_of(law):
+    """u_s(law) written out: (log sigma_f, log sigma_m, log sigma_s)."""
+    return np.array([math.log(law.sigma_f), math.log(law.sigma_m), math.log(law.sigma_s)])
+
+
+def sandwich(u3, tau_m, tau_s, sub, cfg, seed, protocol, mask, Sigma_w, Sigma_star):
     """V = A Sigma* A^T, A = (G^T W G)^{-1} G^T W, W = Sigma_w^{-1}, G the central-difference Jacobian
     of q_sim(. | s) in u_s at u3 (step 0.02), on the kept statistics (2.5 (h))."""
     G = np.empty((int(mask.sum()), 3))
@@ -91,8 +105,8 @@ def sandwich(u3, tau_s, sub, cfg, seed, protocol, mask, Sigma_w, Sigma_star):
         up, dn = np.array(u3, dtype=float), np.array(u3, dtype=float)
         up[j] += STEP
         dn[j] -= STEP
-        qp = nf.binding_function(law_u3(up, tau_s), sub, cfg, seed, which=protocol)[mask]
-        qm = nf.binding_function(law_u3(dn, tau_s), sub, cfg, seed, which=protocol)[mask]
+        qp = nf.binding_function(law_u3(up, tau_m, tau_s), sub, cfg, seed, which=protocol)[mask]
+        qm = nf.binding_function(law_u3(dn, tau_m, tau_s), sub, cfg, seed, which=protocol)[mask]
         G[:, j] = (qp - qm) / (2.0 * STEP)
     W = np.linalg.inv(Sigma_w)
     A = np.linalg.solve(G.T @ W @ G, G.T @ W)
@@ -152,7 +166,8 @@ def _p1(fx):
         _ss, _ls, _Xt, tr = nf.simulate_cell_windows(THETA_CF, sub, np.random.default_rng(seed), parts=("ls",),
                                                      return_windows=True)
         units = nl.draw_units(np.random.default_rng(seed), 1, lay.n_ls)
-        tr2 = nl.simulate_traces(THETA_CF, lay.dt, units.fast, units.slow, tilt_mV_per_s=np.array([lay.ls_tilt[k]]))
+        tr2 = nl.simulate_traces(THETA_CF, lay.dt, units.fast, units.mid, units.slow,
+                                 tilt_mV_per_s=np.array([lay.ls_tilt[k]]))
         err = float(np.abs(tr - tr2).max())
         ok = ok and ok_f and err <= 1e-12
         if k == 0:
@@ -187,7 +202,9 @@ def _p2(fx):
     pw[lay.sweep_number == s0, 4] = np.nan
     tg2 = nf.CellTarget(q_hat=tg.q_hat, per_window_ss=pw, per_window_ls=tg.per_window_ls)
     q2, m2 = nsf.sweep_target(tg2, lay, "ss", s0)
-    ok_nan = bool(np.isnan(q2[4]) and not m2[4] and m2[:4].all())
+    m_exp = np.array([True] * nf.N_SS + [False] * nf.N_LS)
+    m_exp[4] = False
+    ok_nan = bool(np.isnan(q2[4]) and np.array_equal(m2, m_exp))
     notes.append("NaN statistic dropped %s" % ok_nan)
     report("P2 targets: SS = numpy's median over the sweep's rows of ss_window_stats (exactly); LS = the window's "
            "row; mask False outside the protocol and where not finite", ok and ok_nan, "; ".join(notes))
@@ -270,23 +287,45 @@ def _p4(fx):
         seed_b, _ = nsf.sweep_seeds(STAGE_SEED, lay.specimen_id, pr, s)
         q_star = nf.binding_function(THETA_CF, sub, cfg, seed_b, which=pr)
         mask = np.isfinite(q_star)
-        start = nl.NoiseLaw(THETA_CF.sigma_f, THETA_CF.rho_f, THETA_CF.sigma_s * math.exp(0.2), THETA_CF.tau_s)
+        start = nl.NoiseLaw(THETA_CF.sigma_f, THETA_CF.sigma_m, THETA_CF.tau_m, THETA_CF.sigma_s * math.exp(0.2),
+                            THETA_CF.tau_s)
         t0 = time.time()
-        fit = nsf.fit_sweep(q_star, mask, fx.psc[s], sub, start, cfg, seed_b)
-        du = np.abs(fit.u - nf.law_to_u(THETA_CF)[:3])
+        seen = []
+        real_ls = nsf.optimize.least_squares
+
+        def spy(fun, x0, **kw):                                  # the solver's settings, as passed
+            seen.append((np.array(x0, dtype=float), kw))
+            return real_ls(fun, x0, **kw)
+        nsf.optimize.least_squares = spy
+        try:
+            fit = nsf.fit_sweep(q_star, mask, fx.psc[s], sub, start, cfg, seed_b)
+        finally:
+            nsf.optimize.least_squares = real_ls
+        du = np.abs(fit.u - u3_of(THETA_CF))
+        # 2.6 (e): diff_step = fd_rel_step entries 0, 1, 3 = (1e-3, 3e-3, 1e-3); the three SD bounds
+        # (log 1e-4, log 10) each; the start u_s(start) (inside the bounds, not clipped here)
+        lo3, hi3 = np.full(3, math.log(1e-4)), np.full(3, math.log(10.0))
+        x0, kw = seen[0]
+        ok_cfg = (len(seen) == 1 and list(kw["diff_step"]) == [1e-3, 3e-3, 1e-3]
+                  and np.allclose(kw["bounds"][0], lo3, rtol=0, atol=1e-12)
+                  and np.allclose(kw["bounds"][1], hi3, rtol=0, atol=1e-12)
+                  and np.allclose(x0, u3_of(start), rtol=0, atol=1e-12))
         # J recomputed at the reported solution: (q_sim - q_hat)^T Sigma_s^-1 (q_sim - q_hat)
         r = (nf.binding_function(fit.law, sub, cfg, seed_b, which=pr) - q_star)[mask]
         J_re = float(r @ np.linalg.solve(protocol_block(fx.psc[s], pr, mask), r))
         # J against its recomputation: relative 1e-6 (the same deterministic residual; float64 roundoff of the
         # quadratic form is far below), no absolute floor -- J itself is about 1e-8 here
         ok_s = (np.all(du <= 0.01) and fit.J < 1e-3 and not fit.failed and fit.law.tau_s == THETA_CF.tau_s
-                and abs(fit.J - J_re) <= 1e-6 * J_re and fit.d == int(mask.sum()) and fit.dof == fit.d - 3)
+                and fit.law.tau_m == THETA_CF.tau_m and fit.u.shape == (3,)
+                and abs(fit.J - J_re) <= 1e-6 * J_re and fit.d == int(mask.sum()) and fit.dof == fit.d - 3
+                and ok_cfg)
         ok = ok and ok_s
-        notes.append("%s %d: |du| %s J %.1e (recomputed %.1e) calls %d status %d (%.0f s)"
+        notes.append("%s %d: |du| %s J %.1e (recomputed %.1e) calls %d status %d, solver settings %s (%.0f s)"
                      % (pr.upper(), s, np.array2string(du, precision=4), fit.J, J_re, fit.n_calls, fit.status,
-                        time.time() - t0))
+                        ok_cfg, time.time() - t0))
     report("P4 self-consistency (M = 60): q_hat_s = q_sim(theta* | s); from 0.2 away in log sigma_s the solve "
-           "returns u within 0.01, J < 1e-3 (and = r^T Sigma_s^-1 r), tau_s held, not failed; SS and LS",
+           "returns u_s = (log sigma_f, log sigma_m, log sigma_s) within 0.01, J < 1e-3 (and = r^T Sigma_s^-1 r), "
+           "tau_m and tau_s held, diff_step (1e-3, 3e-3, 1e-3) and the SD bounds, not failed; SS and LS",
            ok, "; ".join(notes))
 
 
@@ -296,7 +335,7 @@ def _p5(fx):
     cfg = nf.NoiseFitConfig(M_binding=100)
     t0 = time.time()
     star = nf.simulated_covariance(THETA_CF, lay, R_STUB, np.random.default_rng(505), per_sweep=True)
-    u_cf = nf.law_to_u(THETA_CF)[:3]
+    u_cf = u3_of(THETA_CF)
     worst = 0.0
     for pr, s in all_sweeps(lay):
         sub = nsf.sweep_layout(lay, pr, s)
@@ -304,7 +343,7 @@ def _p5(fx):
         seed_b, _ = nsf.sweep_seeds(STAGE_SEED, lay.specimen_id, pr, s)
         fit = nsf.fit_sweep(q, m, fx.psc[s], sub, LAW_CELL, cfg, seed_b)
         Sigma_star = np.cov(star.per_sweep[s], rowvar=False, ddof=1)
-        V = sandwich(u_cf, THETA_CF.tau_s, sub, cfg, seed_b, pr, m, protocol_block(fx.psc[s], pr, m),
+        V = sandwich(u_cf, THETA_CF.tau_m, THETA_CF.tau_s, sub, cfg, seed_b, pr, m, protocol_block(fx.psc[s], pr, m),
                      protocol_block(Sigma_star, pr, m))
         z = np.abs(fit.u - u_cf) / np.sqrt(np.diag(V))
         r = (nf.binding_function(fit.law, sub, cfg, seed_b, which=pr) - q)[m]
@@ -323,7 +362,8 @@ def _p6(fx):
     lay, notes = fx.lay, []
     cfg = nf.NoiseFitConfig(M_binding=60)
     stage = nsf.SweepStageConfig(B_v=10, M_refit=40)
-    law_fit = nl.NoiseLaw(THETA_CF.sigma_f, THETA_CF.rho_f, THETA_CF.sigma_s * 1.1, LAW_CELL.tau_s)
+    law_fit = nl.NoiseLaw(THETA_CF.sigma_f, THETA_CF.sigma_m * 0.9, LAW_CELL.tau_m, THETA_CF.sigma_s * 1.1,
+                          LAW_CELL.tau_s)
     calls = []
 
     def make_double(fail_every=None, fail_all=False):
@@ -335,7 +375,9 @@ def _p6(fx):
             calls.append((int(seed_r), cfg_r.M_binding, law_start, Sigma_s))
             j = int(np.flatnonzero(m_b)[0])                     # the protocol's first statistic: its SD
             failed = fail_all or (fail_every is not None and b % fail_every == fail_every - 1)
-            return SimpleNamespace(failed=failed, u=np.array([np.nan, np.nan, math.log(q_b[j])]))
+            # coordinate 2 (log sigma_m) <- log of the lag-0.02 ms autocorrelation (positive under these laws),
+            # coordinate 3 (log sigma_s) <- log of the SD: two distinct, known functions of the replicate
+            return SimpleNamespace(failed=failed, u=np.array([np.nan, math.log(q_b[j + 1]), math.log(q_b[j])]))
         return double
 
     ok = True
@@ -344,37 +386,43 @@ def _p6(fx):
         q, m = nsf.sweep_target(fx.tg, lay, pr, s)
         seed_b, seed_v = nsf.sweep_seeds(STAGE_SEED, lay.specimen_id, pr, s)
         ok_seeds = (seed_b, seed_v) == independent_seeds(lay.specimen_id, pr, s)
-        fit = nsf.SweepFit(protocol=pr, sweep=s, u=nf.law_to_u(law_fit)[:3], law=law_fit, J=0.0, d=int(m.sum()),
+        fit = nsf.SweepFit(protocol=pr, sweep=s, u=u3_of(law_fit), law=law_fit, J=0.0, d=int(m.sum()),
                            dof=int(m.sum()) - 3, n_calls=0, status=1, at_bound=(), failed=False, reason="")
         calls.clear()
         boot = nsf.bootstrap_v(fit, m, fx.psc[s], sub, LAW_CELL, cfg, stage, seed_b, seed_v, refit=make_double())
         rng = np.random.default_rng(seed_v)                     # the independent loop
-        y_ref = np.empty(stage.B_v)
+        y_ref = np.empty(stage.B_v)                             # y_s: log of the SD statistic
+        ym_ref = np.empty(stage.B_v)                            # y_m: log of the lag-0.02 ms autocorrelation
         for b in range(stage.B_v):
             ss_st, ls_st = nf.simulate_cell_windows(law_fit, sub, rng, parts=(pr,))
-            y_ref[b] = math.log(np.median(ss_st[:, 0]) if pr == "ss" else ls_st[0, 0])
+            row_b = np.median(ss_st, axis=0) if pr == "ss" else ls_st[0]
+            y_ref[b], ym_ref[b] = math.log(row_b[0]), math.log(row_b[1])
         args_ok = all(c[0] == seed_b and c[1] == stage.M_refit and c[2] is LAW_CELL and c[3] is fx.psc[s] for c in calls)
-        ok_y = (float(np.abs(boot.y - y_ref).max()) <= 1e-12 and boot.v == float(np.var(y_ref, ddof=1))
+        err = max(float(np.abs(boot.y_s - y_ref).max()), float(np.abs(boot.y_m - ym_ref).max()))
+        ok_y = (err <= 1e-12 and boot.v_s == float(np.var(y_ref, ddof=1))
+                and boot.v_m == float(np.var(ym_ref, ddof=1)) and boot.v_m != boot.v_s
                 and boot.B == boot.B_ok == stage.B_v and boot.flags == () and len(calls) == stage.B_v)
         ok = ok and ok_seeds and args_ok and ok_y
-        notes.append("%s %d: max|y - loop| %.1e, v %.3g, seeds %s, refit args (seed, M_refit, start, Sigma_s) %s"
-                     % (pr.upper(), s, float(np.abs(boot.y - y_ref).max()), boot.v, ok_seeds, args_ok))
+        notes.append("%s %d: max|y - loop| %.1e, v_m %.3g, v_s %.3g, seeds %s, refit args (seed, M_refit, start, "
+                     "Sigma_s) %s" % (pr.upper(), s, err, boot.v_m, boot.v_s, ok_seeds, args_ok))
         if pr == "ss":
             b5 = nsf.bootstrap_v(fit, m, fx.psc[s], sub, LAW_CELL, cfg, stage, seed_b, seed_v,
                                  refit=make_double(fail_every=5))
             keep = np.ones(stage.B_v, dtype=bool)
             keep[4::5] = False
-            ok5 = (b5.B_ok == 8 and np.all(np.isnan(b5.y[~keep])) and np.array_equal(b5.y[keep], y_ref[keep])
-                   and b5.v == float(np.var(y_ref[keep], ddof=1)) and b5.flags == ("v_refits_failed:2/10",))
+            ok5 = (b5.B_ok == 8 and np.all(np.isnan(b5.y_s[~keep])) and np.all(np.isnan(b5.y_m[~keep]))
+                   and np.array_equal(b5.y_s[keep], y_ref[keep]) and np.array_equal(b5.y_m[keep], ym_ref[keep])
+                   and b5.v_s == float(np.var(y_ref[keep], ddof=1)) and b5.v_m == float(np.var(ym_ref[keep], ddof=1))
+                   and b5.flags == ("v_refits_failed:2/10",))
             b10 = nsf.bootstrap_v(fit, m, fx.psc[s], sub, LAW_CELL, cfg, stage, seed_b, seed_v,
                                   refit=make_double(fail_every=10))
             ok10 = b10.B_ok == 9 and b10.flags == ()            # exactly 10 %: not "more than 10 %"
             ball = nsf.bootstrap_v(fit, m, fx.psc[s], sub, LAW_CELL, cfg, stage, seed_b, seed_v,
                                    refit=make_double(fail_all=True))
-            okall = ball.B_ok == 0 and math.isnan(ball.v) and "v_none" in ball.flags
+            okall = ball.B_ok == 0 and math.isnan(ball.v_m) and math.isnan(ball.v_s) and "v_none" in ball.flags
             ok = ok and ok5 and ok10 and okall
-            notes.append("every 5th fails: B_ok %d flags %s; 1 of 10: flags %s; all: v %s flags %s"
-                         % (b5.B_ok, b5.flags, b10.flags, ball.v, ball.flags))
+            notes.append("every 5th fails: B_ok %d flags %s; 1 of 10: flags %s; all: v_m %s v_s %s flags %s"
+                         % (b5.B_ok, b5.flags, b10.flags, ball.v_m, ball.v_s, ball.flags))
             # through run_sweep: the sweep fails with the reason v_none, flagged
             cell = stub_cell_fit(lay, fx.tg, fx.psc, cfg)
             calls.clear()
@@ -383,8 +431,9 @@ def _p6(fx):
                       and "sweep_fit_failed:ss:%d:v_none" % s in row["flags"] and all(c[0] == seed_b for c in calls))
             ok = ok and ok_row
             notes.append("run_sweep: reason %s flags %s" % (row["reason"], row["flags"]))
-    report("P6 bootstrap machinery (test double): y = an independent loop over seed_v_s at theta_hat(c, s); v with "
-           "ddof 1; refits get seed_binding_s, M_refit, theta_hat(c), Sigma_s; 2/10 failed -> flag, 1/10 -> none; all "
+    report("P6 bootstrap machinery (test double): y_m and y_s from one set of refits = an independent loop over "
+           "seed_v_s at theta_hat(c, s); v_m, v_s with ddof 1; refits get seed_binding_s, M_refit, theta_hat(c), "
+           "Sigma_s; 2/10 failed -> flag, 1/10 -> none; all "
            "failed -> v NaN, v_none", ok, "; ".join(notes))
 
 
@@ -405,20 +454,32 @@ def _p7(fx):
     reps = np.array([np.median(nf.simulate_cell_windows(fit.law, sub, rng, parts=("ss",))[0], axis=0)
                      for _ in range(300)])
     Sigma_star = np.cov(reps, rowvar=False, ddof=1)
-    V = sandwich(fit.u, LAW_CELL.tau_s, sub, cfg, seed_b, "ss", m, protocol_block(fx.psc[s], "ss", m),
+    V = sandwich(fit.u, LAW_CELL.tau_m, LAW_CELL.tau_s, sub, cfg, seed_b, "ss", m, protocol_block(fx.psc[s], "ss", m),
                  Sigma_star[np.ix_(m[:nf.N_SS], m[:nf.N_SS])])
-    v_lin = float(V[2, 2])
+    # The same construction for each of the two pooled coordinates (2.6 (e)): v_m against V[1, 1] (log
+    # sigma_m), v_s against V[2, 2] (log sigma_s). For a normal estimate, (B_ok - 1) v / v_true ~ chi2(B_ok - 1)
+    # [textbook]; the interval v_lin chi2_q(B_ok - 1) / (B_ok - 1), q = 0.0005 and 0.9995, has 0.1 % false-alarm
+    # probability per coordinate if v_lin were exact (about 0.2 % for the pair). It is loose by design: v_lin is
+    # the first-order sandwich at the same M and seed (2.5 (h)), not the refits' exact variance.
     dof = boot.B_ok - 1
-    lo, hi = v_lin * chi2.ppf(0.0005, dof) / dof, v_lin * chi2.ppf(0.9995, dof) / dof
-    ok = (not fit.failed) and boot.B_ok >= 54 and lo <= boot.v <= hi
-    report("P7 bootstrap vs linearisation (SS sweep %d, B_v = 60, M = 100): v inside v_lin chi2_q(B_ok-1)/(B_ok-1), "
-           "q = 0.0005, 0.9995" % s, ok,
-           "v %.4g (B_ok %d) v_lin %.4g, interval [%.4g, %.4g], ratio %.2f; fit u %s (%.0f s)"
-           % (boot.v, boot.B_ok, v_lin, lo, hi, boot.v / v_lin, np.array2string(fit.u, precision=4), t_boot))
+    q_lo, q_hi = chi2.ppf(0.0005, dof) / dof, chi2.ppf(0.9995, dof) / dof
+    ok = (not fit.failed) and boot.B_ok >= 54
+    parts = []
+    for name, v_boot, j in (("v_m", boot.v_m, 1), ("v_s", boot.v_s, 2)):
+        v_lin = float(V[j, j])
+        inside = v_lin * q_lo <= v_boot <= v_lin * q_hi
+        ok = ok and inside
+        parts.append("%s %.4g v_lin %.4g, interval [%.4g, %.4g], ratio %.2f %s"
+                     % (name, v_boot, v_lin, v_lin * q_lo, v_lin * q_hi, v_boot / v_lin, "in" if inside else "OUT"))
+    report("P7 bootstrap vs linearisation (SS sweep %d, B_v = 60, M = 100): v_m and v_s each inside v_lin "
+           "chi2_q(B_ok-1)/(B_ok-1), q = 0.0005, 0.9995" % s, ok,
+           "%s (B_ok %d); fit u %s (%.0f s)" % ("; ".join(parts), boot.B_ok, np.array2string(fit.u, precision=4),
+                                               t_boot))
 
 
 def _p8(fx):
-    """A failed sweep: at a bound, not bootstrapped, out of the pooling, its twin theta_hat(c); no_convergence; stats."""
+    """A failed sweep: at a bound, not bootstrapped, out of the pooling, its twin theta_hat(c); degenerate:sigma_f;
+    no_convergence; stats."""
     lay, notes = fx.lay, []
     cfg = nf.NoiseFitConfig(M_binding=30)
     stage = nsf.SweepStageConfig(B_v=2, M_refit=30)
@@ -437,13 +498,52 @@ def _p8(fx):
     flag = [f for f in row_bad["flags"] if f.startswith("sweep_fit_failed:ss:%d:at_bound:" % s_bad)]
     ok_a = (row_bad["failed"] and str(row_bad["reason"]).startswith("at_bound:") and len(flag) == 1
             and row_bad["B_ok"] == 0 and row_bad["bootstrap_y"] == [] and not row_ok["failed"]
-            and res.pools["ss"].sweeps == (s_ok,) and res.pools["ss"].k == 1
+            and row_bad["bootstrap_y_m"] == []
+            and all(res.pools["ss"][co].sweeps == (s_ok,) and res.pools["ss"][co].k == 1 for co in ("sigma_m", "sigma_s"))
             and res.twin_laws[("ss", s_bad)] == LAW_CELL and math.isnan(res.rows[0]["lambda"])
-            and res.twin_laws[("ss", s_ok)] == nl.NoiseLaw(row_ok["sigma_f_mV"], row_ok["rho_f"],
+            and math.isnan(res.rows[0]["lambda_m"])
+            and res.twin_laws[("ss", s_ok)] == nl.NoiseLaw(row_ok["sigma_f_mV"], row_ok["sigma_m_mV"], LAW_CELL.tau_m,
                                                          row_ok["sigma_s_mV"], LAW_CELL.tau_s))
     notes.append("at a bound: reason %s, flag %s, pooled sweeps %s, twin = theta_hat(c) %s (%.0f s)"
-                 % (row_bad["reason"], flag, res.pools["ss"].sweeps, res.twin_laws[("ss", s_bad)] == LAW_CELL,
-                    time.time() - t0))
+                 % (row_bad["reason"], flag, res.pools["ss"]["sigma_s"].sweeps,
+                    res.twin_laws[("ss", s_bad)] == LAW_CELL, time.time() - t0))
+    # degenerate:sigma_f (D-154.3): the LS sweep's target is q_sim at a law whose fast part is a quarter of the
+    # cell's (the middle and slow parts theta_cf's), exactly, on the sweep's own binding seed: the solve returns
+    # it (P4's self-consistency), which is not at a bound and below 0.5 sigma_f_hat(c) -> failed, no refit, out
+    # of both LS poolings, twin = theta_hat(c). The same target with min_sigma_f_ratio = 0.2 is NOT degenerate
+    # (0.25 > 0.2): the rule reads the configured ratio, not a constant.
+    s_ls = int(lay.ls_sweep_number[0])
+    k_ls = 0
+    law_deg = nl.NoiseLaw(0.25 * LAW_CELL.sigma_f, THETA_CF.sigma_m, LAW_CELL.tau_m, THETA_CF.sigma_s, LAW_CELL.tau_s)
+    seed_ls, _ = nsf.sweep_seeds(STAGE_SEED, lay.specimen_id, "ls", s_ls)
+    q_deg = nf.binding_function(law_deg, nsf.sweep_layout(lay, "ls", s_ls), cfg, seed_ls, which="ls")
+    pwl = fx.tg.per_window_ls.copy()
+    pwl[k_ls] = q_deg[nf.N_SS:]
+    tg_deg = nf.CellTarget(q_hat=fx.tg.q_hat, per_window_ss=fx.tg.per_window_ss, per_window_ls=pwl)
+    n_refit = [0]
+
+    def counting_double(q_b, m_b, Sigma_s, sub, law_start, cfg_r, seed_r):
+        n_refit[0] += 1
+        return SimpleNamespace(failed=False, u=np.array([-3.4, -4.0 + 0.01 * n_refit[0], -2.9 - 0.02 * n_refit[0]]))
+    row_deg = nsf.run_sweep(cell, tg_deg, lay, cfg, stage, "ls", s_ls, refit=counting_double)
+    n_deg = n_refit[0]
+    stage02 = nsf.SweepStageConfig(B_v=2, M_refit=30, min_sigma_f_ratio=0.2)
+    row_02 = nsf.run_sweep(cell, tg_deg, lay, cfg, stage02, "ls", s_ls, refit=counting_double)
+    others = [nsf.run_sweep(cell, fx.tg, lay, cfg, stage, "ls", int(s), refit=counting_double)
+              for s in lay.ls_sweep_number[1:3]]
+    res_d = nsf.pool_cell([row_deg] + others, LAW_CELL, lay.specimen_id)
+    ratio = row_deg["sigma_f_mV"] / LAW_CELL.sigma_f
+    ok_d = (row_deg["failed"] and row_deg["reason"] == "degenerate:sigma_f" and not row_deg["at_bound"]
+            and "sweep_fit_failed:ls:%d:degenerate:sigma_f" % s_ls in row_deg["flags"] and n_deg == 0
+            and row_deg["B_ok"] == 0 and row_deg["bootstrap_y"] == [] and row_deg["bootstrap_y_m"] == []
+            and abs(ratio - 0.25) < 0.05 and not row_02["failed"] and n_refit[0] > 0
+            and all(s_ls not in res_d.pools["ls"][co].sweeps and res_d.pools["ls"][co].k == 2
+                    for co in ("sigma_m", "sigma_s"))
+            and res_d.twin_laws[("ls", s_ls)] == LAW_CELL
+            and res_d.table_rows()[0]["noise_sweep_sigma_f_mV"] == LAW_CELL.sigma_f)
+    notes.append("degenerate: sigma_f_hat(c, s) / sigma_f_hat(c) %.3f, reason %s, refits %d, twin = theta_hat(c) %s; "
+                 "at ratio 0.2: failed %s" % (ratio, row_deg["reason"], n_deg, res_d.twin_laws[("ls", s_ls)] == LAW_CELL,
+                                              row_02["failed"]))
     sub = nsf.sweep_layout(lay, "ss", s_ok)
     q, m = nsf.sweep_target(fx.tg, lay, "ss", s_ok)
     seed_b, _ = nsf.sweep_seeds(STAGE_SEED, lay.specimen_id, "ss", s_ok)
@@ -451,24 +551,33 @@ def _p8(fx):
     ok_b = f1.failed and f1.reason == "no_convergence" and f1.status <= 0
     notes.append("max_nfev 1: status %d reason %s" % (f1.status, f1.reason))
     pw3 = fx.tg.per_window_ss.copy()
-    pw3[lay.sweep_number == s_ok, 3:] = np.nan          # 3 of 5 statistics left: d_s < 4
+    pw3[lay.sweep_number == s_ok, 3:] = np.nan          # 3 of the N_SS statistics left: d_s < 4
     tg3 = nf.CellTarget(q_hat=fx.tg.q_hat, per_window_ss=pw3, per_window_ls=fx.tg.per_window_ls)
     row3 = nsf.run_sweep(cell, tg3, lay, cfg, stage, "ss", s_ok)
     ok_c = row3["failed"] and row3["reason"] == "stats" and row3["n_calls"] == 0 and row3["d"] == 3 \
         and "sweep_fit_failed:ss:%d:stats" % s_ok in row3["flags"]
     notes.append("d_s 3: reason %s calls %d" % (row3["reason"], row3["n_calls"]))
     report("P8 a failed sweep: an SD 100x above the bounds' largest -> at_bound, flagged, not bootstrapped, out of "
-           "S'_pr, twin = theta_hat(c); max_nfev 1 -> no_convergence; d_s < 4 -> stats", ok_a and ok_b and ok_c,
+           "S'_pr, twin = theta_hat(c); sigma_f a quarter of the cell's -> degenerate:sigma_f, the same (not at 0.2); "
+           "max_nfev 1 -> no_convergence; d_s < 4 -> stats", ok_a and ok_d and ok_b and ok_c,
            "; ".join(notes))
 
 
-ROW_FIELDS = ("protocol", "sweep", "K_s", "n_LS", "tilt_mV_per_s", "d", "sigma_f_mV", "rho_f", "sigma_s_mV",
-              "tau_s_s", "J", "dof", "n_calls", "status", "at_bound", "failed", "reason", "v_log_sigma_s", "B_ok",
-              "n_refits_failed", "lambda", "sigma_s_tilde_mV", "twin_law", "flags")
-TABLE_COLUMNS = ("noise_sweep_sigma_f_mV", "noise_sweep_rho_f", "noise_sweep_sigma_s_raw_mV", "noise_sweep_sigma_s_mV",
+# a row's keys after pool_cell (2.6 (h): those of 2.5 with rho_f removed and the middle part's added)
+ROW_FIELDS = ("specimen_id", "protocol", "sweep", "K_s", "n_LS", "tilt_mV_per_s", "d", "labels_kept", "u",
+              "sigma_f_mV", "sigma_m_mV", "tau_m_s", "sigma_s_mV", "tau_s_s", "log_sigma_m", "log_sigma_s", "J", "dof",
+              "n_calls", "status", "at_bound", "failed", "reason", "v_log_sigma_m", "v_log_sigma_s", "B_v", "B_ok",
+              "n_refits_failed", "bootstrap_y_m", "bootstrap_y", "flags", "seconds", "lambda_m", "sigma_m_tilde_mV",
+              "lambda", "sigma_s_tilde_mV", "twin_law")
+# 2.6 (g), exactly and in its order
+TABLE_COLUMNS = ("specimen_id", "noise_sweep_protocol", "noise_sweep_number", "noise_tilt_mV_per_s",
+                 "noise_sweep_sigma_f_mV", "noise_sweep_sigma_m_raw_mV", "noise_sweep_sigma_m_mV",
+                 "noise_sweep_v_log_sigma_m", "noise_sweep_w_m", "noise_sweep_sigma_s_raw_mV", "noise_sweep_sigma_s_mV",
                  "noise_sweep_v_log_sigma_s", "noise_sweep_w", "noise_sweep_flags")
-CELL_COLUMNS = ("noise_cell_tau2_log_sigma_s_ss", "noise_cell_tau2_log_sigma_s_ls", "noise_cell_mu_log_sigma_s_ss",
-                "noise_cell_mu_log_sigma_s_ls")
+CELL_COLUMNS = ("specimen_id", "noise_cell_tau2_log_sigma_m_ss", "noise_cell_mu_log_sigma_m_ss",
+                "noise_cell_tau2_log_sigma_m_ls", "noise_cell_mu_log_sigma_m_ls", "noise_cell_tau2_log_sigma_s_ss",
+                "noise_cell_mu_log_sigma_s_ss", "noise_cell_tau2_log_sigma_s_ls", "noise_cell_mu_log_sigma_s_ls")
+LAW_KEYS = ["sigma_f_mV", "sigma_m_mV", "tau_m_s", "sigma_s_mV", "tau_s_s"]
 
 
 def _comparable(res):
@@ -489,18 +598,31 @@ def _p9(fx):
     res = nsf.fit_sweeps(cell, fx.tg, lay, cfg, stage)
     t1 = time.time() - t0
     order = [(r["protocol"], r["sweep"]) for r in res.rows]
-    ok_rows = order == all_sweeps(lay) and all(all(f in r for f in ROW_FIELDS) for r in res.rows)
-    ok_pool = True
+    ok_rows = (order == all_sweeps(lay) and all(tuple(r.keys()) == ROW_FIELDS for r in res.rows)
+               and all(list(r["twin_law"].keys()) == LAW_KEYS for r in res.rows)
+               and all(r["tau_m_s"] == cell.law.tau_m and r["tau_s_s"] == cell.law.tau_s for r in res.rows))
+    ok_pool = set(res.pools) == set(nsf.PROTOCOLS) and all(set(res.pools[pr]) == {"sigma_m", "sigma_s"}
+                                                           for pr in nsf.PROTOCOLS)
+    pool_notes = []
     for pr in nsf.PROTOCOLS:
         rr = [r for r in res.rows if r["protocol"] == pr and not r["failed"]]
-        P = nsf.pool_protocol([r["log_sigma_s"] for r in rr], [r["v_log_sigma_s"] for r in rr])
-        Q = res.pools[pr]
-        ok_pool = ok_pool and Q.k == len(rr) and Q.sweeps == tuple(r["sweep"] for r in rr) \
-            and np.array_equal(Q.y_shrunk, P.y_shrunk) and (Q.mu == P.mu or (math.isnan(Q.mu) and math.isnan(P.mu)))
+        # the two poolings, each by pool_protocol on its own (y, v): written out here, independently
+        Pm = nsf.pool_protocol([r["log_sigma_m"] for r in rr], [r["v_log_sigma_m"] for r in rr])
+        Ps = nsf.pool_protocol([r["log_sigma_s"] for r in rr], [r["v_log_sigma_s"] for r in rr])
+        for co, P in (("sigma_m", Pm), ("sigma_s", Ps)):
+            Q = res.pools[pr][co]
+            ok_pool = ok_pool and Q.k == len(rr) and Q.sweeps == tuple(r["sweep"] for r in rr) \
+                and np.array_equal(Q.y_shrunk, P.y_shrunk) and np.array_equal(Q.lam, P.lam, equal_nan=True) \
+                and (Q.mu == P.mu or (math.isnan(Q.mu) and math.isnan(P.mu))) \
+                and (Q.tau2 == P.tau2 or (math.isnan(Q.tau2) and math.isnan(P.tau2)))
+            pool_notes.append("%s %s tau2 %.3g mu %.4f" % (pr.upper(), co, Q.tau2, Q.mu))
         for j, r in enumerate(rr):
             twin = res.twin_laws[(pr, r["sweep"])]
-            ok_pool = ok_pool and twin == nl.NoiseLaw(r["sigma_f_mV"], r["rho_f"], math.exp(P.y_shrunk[j]),
-                                                      cell.law.tau_s)
+            ok_pool = ok_pool and twin == nl.NoiseLaw(r["sigma_f_mV"], math.exp(Pm.y_shrunk[j]), cell.law.tau_m,
+                                                      math.exp(Ps.y_shrunk[j]), cell.law.tau_s)
+            ok_pool = ok_pool and r["lambda_m"] == float(Pm.lam[j]) and r["lambda"] == float(Ps.lam[j])
+            ok_pool = ok_pool and r["v_log_sigma_m"] == float(np.var(np.array(r["bootstrap_y_m"]), ddof=1)) \
+                and r["v_log_sigma_s"] == float(np.var(np.array(r["bootstrap_y"]), ddof=1))
     n_failed = sum(bool(r["failed"]) for r in res.rows)
     t0 = time.time()
     rows = [nsf.run_sweep(cell, fx.tg, lay, cfg, stage, pr, s) for pr, s in all_sweeps(lay)]
@@ -511,18 +633,24 @@ def _p9(fx):
     ok_json = back == res.to_dict() or json.dumps(back, sort_keys=True) == json.dumps(res.to_dict(), sort_keys=True)
     tab = res.table_rows()
     cc = res.cell_columns()
-    ok_tab = (len(tab) == len(res.rows) and all(all(c in t for c in TABLE_COLUMNS) for t in tab)
-              and all(c in cc for c in CELL_COLUMNS)
+    ok_tab = (len(tab) == len(res.rows) and all(tuple(t.keys()) == TABLE_COLUMNS for t in tab)
+              and tuple(cc.keys()) == CELL_COLUMNS
               and all(t["noise_sweep_sigma_s_mV"] == res.twin_laws[(r["protocol"], r["sweep"])].sigma_s
-                      for t, r in zip(tab, res.rows)))
+                      and t["noise_sweep_sigma_m_mV"] == res.twin_laws[(r["protocol"], r["sweep"])].sigma_m
+                      and t["noise_sweep_sigma_m_raw_mV"] == r["sigma_m_mV"] and t["noise_sweep_w_m"] == r["lambda_m"]
+                      and t["noise_sweep_v_log_sigma_m"] == r["v_log_sigma_m"]
+                      for t, r in zip(tab, res.rows))
+              and all(cc["noise_cell_tau2_log_%s_%s" % (co, pr)] == res.pools[pr][co].tau2
+                      or math.isnan(res.pools[pr][co].tau2) for co in ("sigma_m", "sigma_s") for pr in nsf.PROTOCOLS)
+              and all(cc["noise_cell_mu_log_%s_%s" % (co, pr)] == res.pools[pr][co].mu
+                      for co in ("sigma_m", "sigma_s") for pr in nsf.PROTOCOLS))
     ok = ok_rows and ok_pool and ok_same and ok_json and ok_tab and n_failed == 0
-    report("P9 the stage end to end (M = 60, B_v = 4, M_refit = 60): a row per sweep of S(c) with every field; each "
-           "protocol's pool = pool_protocol on the rows; theta_tilde by (P0); run_sweep + pool_cell == fit_sweeps "
-           "(bit for bit, two runs); JSON round trip; the table's columns", ok,
-           "rows %s fields %s pools %s same %s json %s table %s failed %d; SS tau2 %.3g mu %.4f, LS tau2 %.3g mu %.4f "
-           "(%.0f s + %.0f s)" % (len(res.rows), ok_rows, ok_pool, ok_same, ok_json, ok_tab, n_failed,
-                                  res.pools["ss"].tau2, res.pools["ss"].mu, res.pools["ls"].tau2,
-                                  res.pools["ls"].mu, t1, t2))
+    report("P9 the stage end to end (M = 60, B_v = 4, M_refit = 60): a row per sweep of S(c) with the keys of 2.6 "
+           "(h); pools protocol -> (sigma_m, sigma_s) -> pool_protocol on the rows' own (y, v), twice, independently; "
+           "theta_tilde by (P0'); run_sweep + pool_cell == fit_sweeps (bit for bit, two runs); JSON round trip; "
+           "table_rows() and cell_columns() exactly the columns of 2.6 (g), in order", ok,
+           "rows %s keys %s pools %s same %s json %s table %s failed %d; %s (%.0f s + %.0f s)"
+           % (len(res.rows), ok_rows, ok_pool, ok_same, ok_json, ok_tab, n_failed, ", ".join(pool_notes), t1, t2))
 
 
 def _p10():
@@ -537,9 +665,18 @@ def _p10():
 def _p11():
     c = nsf.SweepStageConfig()
     ok = c.B_v == 50 and c.M_refit == 1000 and c.max_failed_refit_frac == 0.1 and c.min_stats == 4 \
-        and c.seed == STAGE_SEED
-    report("P11 the decided defaults (D-122.1-D-122.2): B_v 50, M_refit 1000, max_failed_refit_frac 0.1 "
-           "(and min_stats 4, seed 20261030)", ok, "%s" % (c,))
+        and c.seed == STAGE_SEED and c.min_sigma_f_ratio == 0.5
+    refused = []
+    for bad in (-0.1, 1.5, float("nan"), "half", None):
+        try:
+            nsf.SweepStageConfig(min_sigma_f_ratio=bad)
+        except (ValueError, TypeError):
+            refused.append(bad)
+    accepted = all(nsf.SweepStageConfig(min_sigma_f_ratio=x).min_sigma_f_ratio == x for x in (0.0, 1.0))
+    ok = ok and len(refused) == 5 and accepted
+    report("P11 the decided defaults (D-122.1-D-122.2, D-154.3): B_v 50, M_refit 1000, max_failed_refit_frac 0.1, "
+           "min_sigma_f_ratio 0.5 (a number in [0, 1]; and min_stats 4, seed 20261030)", ok,
+           "%s; refused %d/5 bad ratios, 0 and 1 accepted %s" % (c, len(refused), accepted))
 
 
 def main(only=None):
