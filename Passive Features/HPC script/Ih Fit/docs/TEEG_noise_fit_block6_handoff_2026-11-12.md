@@ -13,6 +13,7 @@ which stays the history of Block 9 and of D-122 to D-125.
 | 2026-11-16 | The pilot done: 2 ok (4.0 h and 7.6 h); the 18-cell run's WALLTIME proposed at 24:00:00; §4 holds the timings and the launch commands. |
 | 2026-11-16 (later) | WALLTIME for the 18 cells: 48:00:00, the user's decision (D-147); §4 corrected. |
 | 2026-11-17 | Step 2 done: the 18-cell run, 18 ok (§4 holds the per-cell table); step 3 (Block 5) next. |
+| 2026-11-17 (later) | The run's two tables read back **[run, here, on the CSVs the user attached]** (§4, "The two tables read back"; §6 item 8): every integrity check passes; the law is rejected in all 18 cells (J/dof 2.7-160); D-055's S3.1 first half holds, S3.2 first half fails; 10 LS sweeps failed; the LS slow SD exceeds the SS one in 16 of 18 cells; a few LS sweeps carry degenerate fast parts into their twins. Next: the per-cell JSONs, for the residuals. No decision taken. |
 
 **Basis tags.** **[run]** executed in the assistant's sandbox (date given); **[src]** read from the code, SPEC or log
 on `main`; **[log]** the decision log's text; **[user]** the user's decision or words; **[reasoning]** the assistant's
@@ -24,7 +25,7 @@ argument, not checked; **[open]** not decided or not verified.
 |---|---|---|---|
 | 1 | **Block 6's code**: `run_noise_fit.py`, `submit_noise_fit.sh`, `smoke_noise_run.py` (R1-R8), exactly as SPEC Block 6 states -- **done 2026-11-13, `1d848f6`** (R1-R9) | nothing: D-123 to D-126 settle every point | sandbox |
 | 2 | **The run on davinci** (the user runs it, §4): `git pull`, the FULL gates, a dry run, the 2-cell pilot at full size, then the 18 cells with the pilot's walltime -- **next** (§4's commands are final) [corrected 2026-11-17: **done**, 18 ok, 0 refused, 0 failed, 0 missing] | step 1 | davinci |
-| 3 | **Block 5's SPEC entry, then its code**: the twins built from the run's tables (§6's questions first) -- **next** (2026-11-17): the two tables inspected first | the run's tables | sandbox |
+| 3 | **Block 5's SPEC entry, then its code**: the twins built from the run's tables (§6's questions first) -- **next** (2026-11-17): the two tables inspected first [2026-11-17 (later): tables read back (§4): sound, but the law misfits every cell; next the per-cell JSONs, to see where the misfit sits (§6 item 8)] | the run's tables | sandbox |
 | 4 | **Block 7** (the record), then **Stage 7** (Block 8, the recovery gate, D-083) | Blocks 5-6 | sandbox, davinci |
 
 Open with the user, unanswered: whether the S0-S3 checks get their own roadmap stage (proposal: N6b after N6, under G4).
@@ -177,6 +178,81 @@ The sweep stage is 77 % of both. WALLTIME for the 18 cells **[reasoning, the ass
 
 Per cell 3.6-7.6 h (median 5.3 h), about 574 core-hours in all. For later walltimes **[run, here, on these numbers]**: t ~ 6061 + 10.7 K + 410 K_LS s (residual SD 2368 s; r = 0.69 with K_LS, 0.34 with K).
 
+**The two tables read back** (2026-11-17; `noise_cells_L3_exc.csv` and `noise_sweeps_L3_exc.csv` as the user attached
+them from `$OUT`; everything below **[run, here]** unless tagged; the scripts are in the assistant's sandbox, not
+committed: `read_nf1_tables.py`, `check_sweep_precision.py`, `compare_spread.py`).
+
+Integrity:
+
+| Check | Result |
+|---|---|
+| status, commit, dof | 18 ok; `1d848f6` on every row; dof 11 everywhere (d_eff = 15: no statistic dropped) |
+| sweep rows | 589 = 64 SS + 525 LS; LS rows = K_LS in every cell; SS sweeps 2 (14 cells), 6 (571430815), 10 (569844159, 571483807, 571624532), as the data contract says |
+| pooling recomputed from the sweep rows ((P3), (P4), (D-076.1), written out independently) | tau2 to 5.8e-16, mu to 2.2e-15, the shrunk sigma_s and lambda to 2.0e-14 |
+| failed sweeps | the twin's law equals theta_hat(c) exactly (D-122.3); raw sigma_s, v and lambda empty |
+
+The cell laws theta_hat(c):
+
+| Quantity | min | median | max | Where |
+|---|---|---|---|---|
+| sigma_f (mV) | 0.0346 | 0.0379 | 0.0404 | nearly the same in every cell |
+| rho_f (per 20 us sample) | 0.105 | 0.149 | 0.249 | max 569844159 |
+| sigma_s (mV) | 0.0417 | 0.0578 | 0.328 | 571430815 0.328, 571624532 0.298 |
+| tau_s (ms) | 6.7 | 54.9 | 1863 | 571624532 1863; 571483807 6.7, 569844159 7.7 |
+| slow share of the variance, sigma_s^2 / (sigma_f^2 + sigma_s^2) | 0.56 | 0.71 | 0.99 | |
+| J (11 dof) | 29.9 | 119 | 1756 | J/dof 2.7-160; max 569844159 |
+| p (chi^2_11 tail) | 0 (underflow, 569844159) | | 0.0016 (571430815) | p < 0.01 in 18 of 18 |
+| kappa | 174 | 682 | 4800 | max 571430815 |
+| t_SS (ms) | 80 | 98.9 | 140.8 | 80 ms in 529878215, 539653924, 571430815 |
+
+- No coordinate within Block 4's at-bound distance (1e-3 of the range); the closest are rho_f of 571691416 (0.105 of
+  its range from the lower bound) and log tau_s of 571624532 (0.146 from the upper).
+- `no_plateau` (k_max = 6 reached) in 5 cells: 531520401, 531523484, 531526539, 539653924, 571483807. n_solves: 4
+  (5 cells), 5 (2), 6 (3), 7 (3), 8 (5).
+- J does not follow the amount of data (Spearman with K 0.10, with K_LS 0.33) but rises with rho_f (0.67, p 0.002).
+- Under the law, J would be about chi^2_11, inflated by the Monte Carlo of q_sim by about 1 / ceil(M / K): 1.2 % at
+  K = 37, 11 % at K = 348 **[reasoning; D-055's S0 would have checked it, not run; PubMed, two queries on the
+  simulated-moments J test, nothing; bioRxiv has no keyword search]**. Even 12 % leaves the smallest J at p = 0.005:
+  the law misfits every cell.
+
+D-055's S3 predictions read on this run (fixed 2026-10-18; the checks dropped for now, D-125.3; a reading, not a
+scheduled check):
+
+| Prediction | Reading |
+|---|---|
+| S3.1 (a) alarm (p < 0.01) on >= 12 of 18 cells | **holds**: 18 of 18 |
+| S3.1 (b) the largest residuals at the SS 0.1 ms autocorrelation | **open**: needs q_hat, q_sim and Sigma from the cells' JSONs |
+| S3.2 (a) tau_s in [15, 100] ms for >= 15 cells | **fails**: 10 of 18; above 100 ms 526785799 (198.5), 539653924 (103.7), 541545716 (234.9), 548408551 (116.4), 571430815 (198.1), 571624532 (1863); below 15 ms 569844159 (7.7), 571483807 (6.7) |
+| S3.2 (b) 526785799 and 571430815 among the three largest sigma_b | void (no sigma_b, D-102, D-107, D-125.3); the two have the third- and fourth-longest tau_s (198.5 and 198.1 ms) and sigma_s 0.131 and 0.328 mV |
+| S3.3 J_SS > J_LS in >= 12 cells | **open**: needs the JSONs |
+
+The per-sweep stage (Block 9):
+
+| Finding | Numbers |
+|---|---|
+| failed sweeps | 10 of 525 LS, 0 of 64 SS: 8 `at_bound:rho_f` (508282493 LS 64; 529878215 LS 59, 64; 531523484 LS 42, 65; 541545716 LS 44; 571624532 LS 39, 52), 1 `at_bound:log_sigma_f,rho_f` (537313600 LS 85), 1 `no_convergence` (548473051 LS 53). Which bound: in the JSONs |
+| `v_refits_failed` (> 10 % of the 50 refits) | 39 LS sweeps, 6-29 of 50: 571624532 11, 541545716 11, 526785799 5, 548425467 3, 548473051 3, 539653924 2, four cells 1 (529878215, 531523484, 537297470, 571430815) |
+| the slow SD by protocol | exp(mu_LS) / exp(mu_SS) median 1.154 (IQR 1.08-1.37), > 1 in 16 of 18 cells (Wilcoxon signed-rank p 3.3e-4); not related to t_SS (Spearman 0.08), weakly to tau_s (0.40, p 0.1) |
+| sweeps differ in log sigma_s beyond their v | Cochran's Q p < 0.05 in 12 of 18 cells (LS), 5 of 18 (SS); tau2 = 0 in 4 cells (LS), 9 (SS); sqrt(tau2_LS) median 0.14, max 0.40 (526785799) |
+| the fast part per sweep (not pooled, D-076 (i)) | sigma_f(c, s) / sigma_f(c), 1-99 %: SS 0.88-1.10, LS 0.66-2.07; rho_f(c, s) - rho_f(c): SS -0.05 to 0.06, LS -0.13 to 0.14 |
+| LS fast parts far from the cell's | of 515 fitted LS sweeps: 13 with sigma_f > 1.5 x (each with its own sigma_s 1.7-5.1 x the cell's: noisy sweeps); 3 collapsed below 0.5 x (537297470 LS 67, 0.0018 mV; 541545716 LS 36, 0.0061; 548425467 LS 63, 0.0030); 3 with rho_f > 0.4 (531520401 LS 50, 0.76, and LS 52, 0.63; 571624532 LS 50, 0.97) |
+| a twin from a collapsed fit | 537297470 LS 67: its own sigma_s 0.299 mV with v = 0.65, so lambda = 0.005 and the twin's sigma_s 0.051 mV: the twin's total SD 0.051 mV against the sweep's own fit 0.299 mV, with no fast part |
+
+Precision of one per-sweep fit (delta method; the same construction as SPEC 2.5 (h)): V = (G^T W G)^-1, W the inverse
+covariance of one replicate sweep's statistics at theta_hat(c) (R = 1000 LS, 600 SS), G the central-difference
+Jacobian (step 0.02) of q_sim(. | s) at M = 1000, on Block 4's smoke fixture (a 265 ms LS pre-window at 50 kHz; an SS
+sweep of 30 kept windows from t_SS = 80 ms), tilt 0, 18 cells, 338 s on 2 cores.
+
+| Quantity, LS | Result |
+|---|---|
+| sd(log sigma_s) against Block 9's bootstrap SE (median per cell) | ratio median 1.00, range 0.84-1.14: the linearisation reproduces the bootstrap |
+| sd(log sigma_f), sd(rho_f) | median 0.043 (0.011-0.142), 0.012 (0.011-0.015) |
+| observed robust (MAD) between-sweep SD / that sd | log sigma_f median 1.64 (0.75-11.7; 571483807 11.7, 569844159 3.8); rho_f 1.50 (0.93-8.1; 531520401 8.1) |
+| LS sweeps beyond 4 such SDs from their cell's LS median | 120 of 515 (sigma_f 81, rho_f 59) |
+
+Not checked here (needs the 18 JSONs, `$OUT/cells/`): where J sits by statistic and by protocol; the failed sweeps'
+bound side; the per-sweep J_s of the outlying sweeps; the 5 `no_plateau` histories.
+
 Read back from the pilot: the `NOISE_CELL` lines, each JSON's per-stage seconds (they set `WALLTIME`), the
 `NOISE_MERGE` line. A code change between the pilot and the run re-runs every cell, the pilot's included (the resume
 rule keys on the commit). Gate logs: `~/ih_fit_gate_logs/<date_time>/`.
@@ -204,6 +280,12 @@ rule keys on the commit). Gate logs: `~/ih_fit_gate_logs/<date_time>/`.
 5. The sampling rate: rho_f is per 20 us sample (50 kHz); the twin's trace must be at that rate when the noise is added.
 6. The manifest's per-sweep columns, the back-fill of old manifests, the false-positive controls carrying the same noise.
 7. Stage 7's cohort size, raw against corrected SWCs (D-013), the tolerances (the assistant's proposal still).
+8. [added 2026-11-17, from the tables' read-back, §4] The law misfits every cell (J/dof 2.7-160, p < 0.01 in 18 of
+   18): whether the twins may carry it as it is depends on where the misfit sits -- the fast part's shape, as D-055's
+   S3.1 expects (sub-ms; probably of little weight for a passive fit on ms-to-s responses **[reasoning]**), or the
+   slow part. The per-cell JSONs answer it (S3.1 (b), S3.3). Also a rule for degenerate per-sweep fits: the twin of
+   537297470 LS 67 would carry no fast part and a sixth of its sweep's SD (§4); D-076 (i) leaves sigma_f and rho_f
+   unpooled, and D-122.3's fallback covers failed sweeps only.
 
 ## 7. Repository, environment, cluster
 
