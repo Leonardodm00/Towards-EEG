@@ -239,7 +239,7 @@ theory:
     status: open
     closed_on:
     decision: D-132
-    note: "2026-11-13 (D-132, the user: PERFECT): two tiers. Finding behind it (Block 24's check, sandbox): two 0.5 um tubes 1 um apart at mu = 3 /um differ from the sum of their separate hybrid renders by up to 0.020 of the background; under the partition the sum is exact to 1e-15. To study: when the cheap subtraction is good enough, and where the boundary between the tiers sits. No document written yet."
+    note: "2026-11-13 (D-132, the user: PERFECT): two tiers. Finding behind it (Block 24's check, sandbox): two 0.5 um tubes 1 um apart at mu = 3 /um differ from the sum of their separate hybrid renders by up to 0.020 of the background; under the partition the sum is exact to 1e-15. To study: when the cheap subtraction is good enough, and where the boundary between the tiers sits. Document (2026-11-17, D-156): TEEG_diameter_pipeline_theory_2026-11-17.md, the theory document on the main route (forward model, neighbours' cleaning, joint per-node fit, same-node clearance), sent as files in the chat of the same-node clearance and on sci/diameter-pipeline under Passive Features/Diameter Re-measurement/docs/TEEG_diameter_pipeline_theory_2026-11-17/; status unchanged, the user's."
   - id: T15
     title: "Per-node inference by fitting the forward model"
     summary: "What a fit of the rendered node to the cleaned profiles of several planes can identify -- the diameter against the absorption coefficient, the depth, an error in the kernel -- the uncertainty of its estimate, and how it is tested on a generator that is not its own model (the inverse-crime problem). With D-132 the fitted model is a scene for a node with close neighbours: the node free, the neighbours at their fitted features, rendered together with the hybrid."
@@ -249,7 +249,7 @@ theory:
     status: open
     closed_on:
     decision: D-132
-    note: "2026-11-13 (D-132): close neighbours (the survey's classes close_in_focus and overlap) stay inside the node's fit as a joint hybrid scene; the fit's cost per node and the split between the tiers are fixed after the line renderer's timings and the survey's shares. No document written yet."
+    note: "2026-11-13 (D-132): close neighbours (the survey's classes close_in_focus and overlap) stay inside the node's fit as a joint hybrid scene; the fit's cost per node and the split between the tiers are fixed after the line renderer's timings and the survey's shares. Document (2026-11-17, D-156): TEEG_diameter_pipeline_theory_2026-11-17.md, the theory document on the main route (forward model, neighbours' cleaning, joint per-node fit, same-node clearance), sent as files in the chat of the same-node clearance and on sci/diameter-pipeline under Passive Features/Diameter Re-measurement/docs/TEEG_diameter_pipeline_theory_2026-11-17/; status unchanged, the user's."
 implementation:
   # ---- groups (no block of their own; coloured by their least advanced member)
   - id: G1
@@ -711,6 +711,24 @@ implementation:
     block: 36
     parent: NC3
     depends_on: [I27, I32, I30, I35]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: I37
+    title: "Same-node clearance product"
+    summary: "After the joint fit, the node's own shadow at the estimate is split by depth; the cleared profiles, the in-band model, the residual and the chord per plane (a check of the model, D-156)"
+    block: 37
+    parent: NC3
+    depends_on: [I35]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: I38
+    title: "Same-node clearance figures"
+    summary: "Per plane: the profile, the cleared profile, the in-band and whole models and the chord; the depth layers' shadows at one plane"
+    block: 38
+    parent: NC3
+    depends_on: [I37]
     needs_theory: []
     needs_hpc: false
     jobs: []
