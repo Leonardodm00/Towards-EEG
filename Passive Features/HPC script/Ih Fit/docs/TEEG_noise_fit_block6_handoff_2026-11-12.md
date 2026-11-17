@@ -12,6 +12,7 @@ which stays the history of Block 9 and of D-122 to D-125.
 | 2026-11-14 (later) | The pilot submitted, 16:19 **[cluster]**: array `2096989[].pbsserver01`, merge `2096990.pbsserver01`, walltime 48 h; §4 holds the job IDs, the run file and how to follow it. |
 | 2026-11-16 | The pilot done: 2 ok (4.0 h and 7.6 h); the 18-cell run's WALLTIME proposed at 24:00:00; §4 holds the timings and the launch commands. |
 | 2026-11-16 (later) | WALLTIME for the 18 cells: 48:00:00, the user's decision (D-147); §4 corrected. |
+| 2026-11-17 | Step 2 done: the 18-cell run, 18 ok (§4 holds the per-cell table); step 3 (Block 5) next. |
 
 **Basis tags.** **[run]** executed in the assistant's sandbox (date given); **[src]** read from the code, SPEC or log
 on `main`; **[log]** the decision log's text; **[user]** the user's decision or words; **[reasoning]** the assistant's
@@ -22,8 +23,8 @@ argument, not checked; **[open]** not decided or not verified.
 | # | Step | Blocked by | Where it runs |
 |---|---|---|---|
 | 1 | **Block 6's code**: `run_noise_fit.py`, `submit_noise_fit.sh`, `smoke_noise_run.py` (R1-R8), exactly as SPEC Block 6 states -- **done 2026-11-13, `1d848f6`** (R1-R9) | nothing: D-123 to D-126 settle every point | sandbox |
-| 2 | **The run on davinci** (the user runs it, §4): `git pull`, the FULL gates, a dry run, the 2-cell pilot at full size, then the 18 cells with the pilot's walltime -- **next** (§4's commands are final) | step 1 | davinci |
-| 3 | **Block 5's SPEC entry, then its code**: the twins built from the run's tables (§6's questions first) | the run's tables | sandbox |
+| 2 | **The run on davinci** (the user runs it, §4): `git pull`, the FULL gates, a dry run, the 2-cell pilot at full size, then the 18 cells with the pilot's walltime -- **next** (§4's commands are final) [corrected 2026-11-17: **done**, 18 ok, 0 refused, 0 failed, 0 missing] | step 1 | davinci |
+| 3 | **Block 5's SPEC entry, then its code**: the twins built from the run's tables (§6's questions first) -- **next** (2026-11-17): the two tables inspected first | the run's tables | sandbox |
 | 4 | **Block 7** (the record), then **Stage 7** (Block 8, the recovery gate, D-083) | Blocks 5-6 | sandbox, davinci |
 
 Open with the user, unanswered: whether the S0-S3 checks get their own roadmap stage (proposal: N6b after N6, under G4).
@@ -150,6 +151,31 @@ The sweep stage is 77 % of both. WALLTIME for the 18 cells **[reasoning, the ass
     cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/HPC script/Ih Fit" && git pull && conda activate prova
     RUN_TAG=nf1 WALLTIME=48:00:00 DRY_RUN=1 bash submit_noise_fit.sh
     RUN_TAG=nf1 WALLTIME=48:00:00 bash submit_noise_fit.sh
+
+**The 18-cell run is done** (read back 2026-11-17 **[cluster]**): `NOISE_MERGE L3_exc: 18 ok, 0 refused, 0 failed, 0 missing` (newest merge log); the pilot's two cells kept. Outputs: `$OUT/cells/specimen_<id>.json`, `$OUT/noise_cells_L3_exc.csv`, `$OUT/noise_sweeps_L3_exc.csv`.
+
+| Cell | status | total (s) | K | K_LS |
+|---|---|---|---|---|
+| 508282493 | ok | 14536 | 40 | 22 |
+| 526785799 | ok | 16034 | 47 | 28 |
+| 529878215 | ok | 16620 | 39 | 38 |
+| 531520401 | ok | 17370 | 40 | 25 |
+| 531523484 | ok | 20981 | 37 | 33 |
+| 531526539 | ok | 16981 | 46 | 25 |
+| 537297470 | ok | 20936 | 66 | 35 |
+| 537313600 | ok | 22675 | 47 | 38 |
+| 539653924 | ok | 21699 | 47 | 27 |
+| 541545716 | ok | 21139 | 56 | 27 |
+| 548408551 | ok | 19139 | 52 | 29 |
+| 548425467 | ok | 18907 | 69 | 29 |
+| 548473051 | ok | 20991 | 56 | 33 |
+| 569844159 | ok | 27308 | 348 | 38 |
+| 571430815 | ok | 12971 | 199 | 16 |
+| 571483807 | ok | 18051 | 303 | 28 |
+| 571624532 | ok | 22121 | 317 | 28 |
+| 571691416 | ok | 15682 | 58 | 26 |
+
+Per cell 3.6-7.6 h (median 5.3 h), about 574 core-hours in all. For later walltimes **[run, here, on these numbers]**: t ~ 6061 + 10.7 K + 410 K_LS s (residual SD 2368 s; r = 0.69 with K_LS, 0.34 with K).
 
 Read back from the pilot: the `NOISE_CELL` lines, each JSON's per-stage seconds (they set `WALLTIME`), the
 `NOISE_MERGE` line. A code change between the pilot and the run re-runs every cell, the pilot's included (the resume
