@@ -366,6 +366,8 @@ Expect in the dry run: `cohort:` the two IDs, `cores: 2 cell(s) x 6 = 12 (cap 12
 ridge seen at reduced sizes in 6 of 40 synthetic cells, SPEC Block 4); J against 16 dof; the share of sweeps failed
 (`degenerate:sigma_f`, `v_none`, `at_bound`). Then the 18 cells with the same tag (the pilot's two are kept).
 
+**The nf2 pilot is submitted** (2026-11-17, 18:01 **[cluster, pasted]**): gates SETTLED at `7c890ff` (16 passed); array `2098689[].pbsserver01`, merge `2098690.pbsserver01`; run file `~/noise_fit_runs/nf2_L3_exc_20261117T170135Z.env`; outputs `.../pipeline_outputs_ih/noise_fit/nf2/L3_exc`.
+
 Read back from the pilot: the `NOISE_CELL` lines, each JSON's per-stage seconds (they set `WALLTIME`), the
 `NOISE_MERGE` line. A code change between the pilot and the run re-runs every cell, the pilot's included (the resume
 rule keys on the commit). Gate logs: `~/ih_fit_gate_logs/<date_time>/`.
