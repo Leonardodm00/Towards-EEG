@@ -288,6 +288,14 @@ def fit_sweep(q_hat_s: np.ndarray, mask: np.ndarray, Sigma_s: np.ndarray, sub: C
 # ===========================================================================
 #  (P2): the sampling variances of log sigma_m(c, s) and log sigma_s(c, s) by one parametric bootstrap
 # ===========================================================================
+def _v_usable(v: float) -> bool:
+    """2.6 (e) as amended (D-155): a bootstrap variance the pooling can weight
+    by 1 / v -- finite and strictly positive. NaN (B_ok < 2) or 0 (every
+    successful refit returned the same value) fails the sweep with 'v_none'."""
+    v = float(v)
+    return math.isfinite(v) and v > 0.0
+
+
 @dataclass(eq=False)
 class SweepBootstrap:
     v_m: float                    # (P2) on y_m: var(ddof 1) over the refits that did not fail; NaN when B_ok < 2
@@ -296,7 +304,8 @@ class SweepBootstrap:
     y_s: np.ndarray               # (B,) log sigma_s of each refit, NaN where it failed
     B: int                        # replicates drawn (B_v)
     B_ok: int                     # refits that did not fail
-    flags: Tuple[str, ...]        # 'v_refits_failed:<n>/<B>' above max_failed_refit_frac; 'v_none' if v_m or v_s NaN
+    flags: Tuple[str, ...]        # 'v_refits_failed:<n>/<B>' above max_failed_refit_frac; 'v_none' if v_m or v_s
+                                  # is NaN or not > 0 (_v_usable)
 
 
 def _replicate_vector(law: NoiseLaw, sub: CellLayout, rng: np.random.Generator,
@@ -355,7 +364,7 @@ def bootstrap_v(fit: SweepFit, mask: np.ndarray, Sigma_s: np.ndarray, sub: CellL
     flags: List[str] = []
     if n_failed > float(stage_cfg.max_failed_refit_frac) * B:
         flags.append("v_refits_failed:%d/%d" % (n_failed, B))
-    if not (math.isfinite(v_m) and math.isfinite(v_s)):
+    if not (_v_usable(v_m) and _v_usable(v_s)):
         flags.append("v_none")
     return SweepBootstrap(v_m=v_m, v_s=v_s, y_m=y_m, y_s=y_s, B=B, B_ok=B_ok, flags=tuple(flags))
 
@@ -518,7 +527,8 @@ def run_sweep(cell_fit: CellFitResult, target: CellTarget, layout: CellLayout, c
     with its fit's reason ('no_convergence', 'at_bound:<coordinates>'), then,
     checked next, with 'degenerate:sigma_f' (sigma_f_hat(c, s) <
     min_sigma_f_ratio sigma_f_hat(c), D-154.3), or with 'v_none' (v_m or v_s
-    NaN, B_ok < 2); a sweep whose fit failed is not bootstrapped; a failed
+    NaN, B_ok < 2, or not strictly positive, D-155); a sweep whose fit
+    failed is not bootstrapped; a failed
     sweep is flagged 'sweep_fit_failed:<pr>:<sweep>:<reason>'. `refit` is
     passed to bootstrap_v (a test double in the smoke)."""
     t0 = time.time()
@@ -566,7 +576,7 @@ def run_sweep(cell_fit: CellFitResult, target: CellTarget, layout: CellLayout, c
             row.update({"v_log_sigma_m": boot.v_m, "v_log_sigma_s": boot.v_s, "B_ok": boot.B_ok,
                         "n_refits_failed": boot.B - boot.B_ok, "bootstrap_y_m": boot.y_m.tolist(),
                         "bootstrap_y": boot.y_s.tolist()})
-            if not (math.isfinite(boot.v_m) and math.isfinite(boot.v_s)):
+            if not (_v_usable(boot.v_m) and _v_usable(boot.v_s)):
                 row["failed"], row["reason"] = True, "v_none"
             say("%s sweep %d: v_m=%.4g v_s=%.4g B_ok=%d/%d (%.0f s)"
                 % (pr.upper(), s, boot.v_m, boot.v_s, boot.B_ok, boot.B, time.time() - t0))
@@ -595,6 +605,10 @@ def pool_cell(rows: Sequence[Dict[str, object]], cell_law: NoiseLaw, specimen_id
     out_rows = [dict(r) for r in rows]
     for r in out_rows:
         r["flags"] = list(r["flags"])
+        if not r["failed"] and not (_v_usable(r["v_log_sigma_m"]) and _v_usable(r["v_log_sigma_s"])):
+            # D-155: a row made elsewhere with an unusable variance is a failed sweep, never pooled
+            r["failed"], r["reason"] = True, "v_none"
+            r["flags"].append("sweep_fit_failed:%s:%d:v_none" % (r["protocol"], int(r["sweep"])))
     pools: Dict[str, Dict[str, PoolResult]] = {}
     twins: Dict[Tuple[str, int], NoiseLaw] = {}
     for pr in PROTOCOLS:
