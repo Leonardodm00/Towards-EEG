@@ -16,6 +16,7 @@ which stays the history of Block 9 and of D-122 to D-125.
 | 2026-11-17 (later) | The run's two tables read back **[run, here, on the CSVs the user attached]** (§4, "The two tables read back"; §6 item 8): every integrity check passes; the law is rejected in all 18 cells (J/dof 2.7-160); D-055's S3.1 first half holds, S3.2 first half fails; 10 LS sweeps failed; the LS slow SD exceeds the SS one in 16 of 18 cells; a few LS sweeps carry degenerate fast parts into their twins. Next: the per-cell JSONs, for the residuals. No decision taken. |
 | 2026-11-17 (later, 2) | The 18 cell JSONs read back **[run, here, on the files the user attached]** (§4, "The cell JSONs read back"; §6 item 8 rewritten as two decisions for the user): the misfit sits at the 1 ms autocorrelation (the law above the data in 16 of 18 cells, SS), not at 0.1 ms; D-055's S3.1 second half and S3.3 fail; the per-sweep laws misfit too; the real statistics scatter 1.3 x what the law simulates; the failed sweeps sit at rho_f's lower bound; the `no_plateau` cells wander in tau_s. No decision taken. |
 | 2026-11-17 (later, 3) | A three-component law tested at the user's request (12:28: a faster component, the two slow-side parts split at 1 ms; 12:30: "Go on with the test") **[run, here]**: `dev/2026-11-17_three_component_law/` (README). Fitted by simulation on the 18 cells, the middle component lowers J in every cell (median 121 to 38) and removes the 1 ms excess; 13 of 18 cells stay rejected. §4 "A third component, tested"; §6 item 8 updated. No decision taken. |
+| 2026-11-17 (later, 4) | **D-152** (user, 14:19): the law extended to three components -- a white Gaussian fast part, a middle part in [0.04 ms, 1 ms], the slow part in [1 ms, 10 s]; five parameters. Open with the user: Block 9's per-sweep parameters and the statistic set (§6 item 8). Next: SPEC 2.1 rewritten, then the plan for Blocks 2, 4, 9. |
 
 **Basis tags.** **[run]** executed in the assistant's sandbox (date given); **[src]** read from the code, SPEC or log
 on `main`; **[log]** the decision log's text; **[user]** the user's decision or words; **[reasoning]** the assistant's
@@ -393,6 +394,8 @@ rule keys on the commit). Gate logs: `~/ih_fit_gate_logs/<date_time>/`.
    settle before SPEC 2.1 is rewritten: tau_m's bounds (the 1 ms cap binds in 3 cells; the lower one); the fast
    part's rho_f free or white; which of sigma_m, tau_m are per sweep in Block 9; the statistic set (lags for six
    parameters); then Blocks 2, 4, 9, their smokes, the gates and the run again. Decision (b) waits for it.]
+   [updated 2026-11-17 (later, 4): decided, D-152 -- extended; tau_m's range kept; the fast part white. Still open:
+   the per-sweep parameters of the middle part and the statistic set.]
 
 ## 7. Repository, environment, cluster
 
