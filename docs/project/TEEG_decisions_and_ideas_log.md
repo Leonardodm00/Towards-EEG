@@ -219,6 +219,7 @@ the "Binds" column.
 | 2026-11-18 (later, 11) | Logs **D-165** (user, 15:48; the clearance chat): the kernel's in-focus width is exposed as a tuning parameter, the clear nodes are run at three widths, and the pipeline is applied to clear nodes of different sizes. Built: `kernel.with_in_focus_width`, `clean_cell.py --sigma-r0-um`, `clean_cell.py clear --d-bins`, notebook Cells 19b and 19c (SPEC Block 4 amendment 1, Block 27 amendment 4, Block 36 amendments 14 and 15). **Check added** (`checks/kernel_2026-11-18/kernel_infocus_sizes_check.py`) **[run, sandbox; synthetic, one flat tube, mu x d = 0.4]**: under a true in-focus width of 0.22 um (table 0.080 um) the fitted diameter is 1.61, 1.26, 1.10, 1.04 times the true one at 0.5, 0.8, 1.2, 2.0 um, the misfit 0.8, 1.1, 1.3, 1.4 gl; under 0.30 um: 2.06, 1.48, 1.22, 1.07 times, 0.9, 1.4, 1.8, 2.0 gl -- a blur wider than configured inflates thin dendrites far more than thick ones. Not run here: the cells on the real stack. Next free IDs: D-166, I-006. |
 | 2026-11-18 (later, 12) | Logs **D-166** (user, 16:22; the clearance chat): the distant neighbours are cleaned first and the node is fitted afterwards, together with its close neighbours; the form of the rounds' refinement (one tube, weights exp(-|v_n| / lambda)) is refused -- the fit is the joint non-linear least squares of D-161, D-162 and D-164 over the planes where the node's shadow is readable, without the exponential weights. A handoff for the chat that builds it was asked for: `Passive Features/Diameter Re-measurement/docs/TEEG_joint_fit_handoff_2026-11-18.md` on `sci/diameter-pipeline`. Next free IDs: D-167, I-006. |
 | 2026-11-18 (later, 13) | Logs **D-167** (user, 16:31; the clearance chat), on the joint fit: the residuals' weighting is a parameter to tune; the readable planes are today's rule; a node without a close neighbour is the same fit; cleaning and fit are not repeated for now; of the rounds' old refinement the user would keep nothing (the assistant agrees, 16:40). The handoff `TEEG_joint_fit_handoff_2026-11-18.md` updated. Next free IDs: D-168, I-006. |
+| 2026-11-18 (later, 14) | Logs **D-168** (user, 16:53; the clearance chat): the cap on the neighbours fitted jointly is a tunable parameter. Same message, not decided: the user leans to fixing a neighbour's shift and depth at the pilot's values, or to a narrow range (depth half the plane spacing, lateral one or two pixels), for fear of sloppy directions, and asked the assistant's opinion; and asked whether a neighbour is a chain of nodes sharing one set of parameters. **Check** (`checks/tier2_2026-11-18/tier2_sloppiness.py`; synthetic, the Jacobian at the truth, 1 gl noise) **[run, sandbox]**: the condition number of the scaled Jacobian with the node's 4 parameters / plus the neighbour's d and mu / plus its shift and depth is 7.3 / 8.4 / 8.5 and 6.8 / 9.9 / 10.2 for two in-focus neighbours, 7.1 / 86.9 / 101.5, 7.2 / 1360 / 1529 and 7.2 / 72.2 / 81.2 for three neighbours 1.68 to 2.8 um out of focus: the ill-conditioning comes with the diameter and absorption of a defocused neighbour (SE of its diameter 0.07 to 1.8 um), not with its position (SE 0.002 to 0.049 um); the SE of the node's own diameter stays 0.0046 to 0.0055 um. Code read: today a neighbour is one segment between two traced nodes (`shadow._segment_tube`), tiered on its own. Handoff updated (`TEEG_joint_fit_handoff_2026-11-18.md`: O4 to O6, O13). Next free IDs: D-169, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -382,6 +383,7 @@ would be needed*, *Status*.
 | D-157 | 2026-11-17 | SPEC Block 35 (amendment 2), oracles (iv) and (v); `tests/smoke/test_smoke_line_fast.py` | the split's depth-mirror oracle restated for a slab grid symmetric about the axis (1e-10 there; generic case reported, no bound); the slab-grid oracle kept at 5e-4 with its margin recorded [orchestrator] | active |
 | D-158 | 2026-11-17 | SPEC Block 35 (amendment 2, oracle (iv)), Block 36 (amendment 11, final check); `scripts/clean_cell.py`, `scripts/infer_nodes.py`; the report `specs/test_reports/2026-11-17_1754_incremental.md` | the final check's settlements: the slab-grid bound stated at mu = 1 /um; the product status `not_fitted` for a per-node fit that raises or fails; `clean` logs a product that raises [orchestrator] | active |
 | D-159 | 2026-11-18 | `tests/spec/` on `sci/diameter-pipeline`; the report `specs/test_reports/2026-11-17_1754_incremental.md` (F2) | the tester's 39 spec tests of the run 2026-11-17_1754 brought into the working branch; the three stale spec tests (`test_factories_against_line_fast[linear, hybrid]`, `test_work_list_own_stretch_beyond_U`) retired [user] | active |
+| D-168 | 2026-11-18 | plan step F3 and its SPEC entry, still to be written; `InferenceConfig` (a new parameter); D-161 | the number of close neighbours fitted jointly with a node is capped, and the cap is a tunable parameter [user]; its default 3 [orchestrator], PROVISIONAL | active |
 | D-167 | 2026-11-18 | plan step F3 and its SPEC entry, still to be written; D-166.6; SPEC Block 29 (`coarse_fit.refine_node`), Block 30 (`select_planes`), Block 32 (the round loop); `InferenceConfig` (a new parameter) | in the joint fit the weighting of the residuals is a tuning parameter; the planes used are those of `select_planes`; a node without a close neighbour is the same fit with no neighbour term; one pass, no repeat for now; nothing is kept of the rounds' one-tube refinement in this path [user]; the parameter's default (no weight beyond 1 / sigma^2) and the number of passes as a parameter, default 1 [orchestrator], PROVISIONAL | active |
 | D-166 | 2026-11-18 | plan step F3 and its SPEC entry, still to be written; SPEC Block 29 (`coarse_fit.refine_node`, the rounds' refinement), Block 30 (`node_inference.fit_node`, `select_planes`), Block 32 (the round loop); D-133.3, D-161, D-162, D-164 | order: the tier-1 neighbours are cleaned first, then node and tier-2 neighbours are fitted together; that fit is the joint non-linear least squares over the planes where the node's shadow is readable, all four features of every close neighbour free, with every point of D-162 and D-164; the refinement's one-tube form with exponential weights is not the estimator [user]. Open: whether cleaning and fit are repeated; what the rounds keep of Block 29 | active |
 | D-165 | 2026-11-18 | SPEC Block 4 (amendment 1), Block 27 (amendment 4), Block 36 (amendments 14, 15); `kernel.with_in_focus_width`; `clean_cell.py --sigma-r0-um`, `clear --d-bins`; notebook Cells 19b, 19c; `renderer.sigma_r0_um` | the kernel's in-focus width is a tuning parameter; the clear nodes are run at three widths; the pipeline is applied to clear nodes of different sizes [user]; the widths 0.080, 0.18, 0.28 um, the size = Allen's diameter in the bins 0.40, 0.45, 0.60, 0.80, 1.20, 5.0 um, one node per bin, the re-anchoring rule (the measured growth kept) [orchestrator], PROVISIONAL | active |
@@ -12252,5 +12254,30 @@ bends; the renderer's speed; a node estimated twice; the cost of the tier rule);
 (D-165), waiting for Cells 19b and 19c.
 
 **Sources.** **[user]** 2026-11-18, 16:31. **[reasoning]** as tagged. **[log]** D-162, D-166.
+
+**Status:** active.
+
+---
+
+## D-168 -- The cap on the neighbours fitted jointly with a node is a tunable parameter (user)
+
+**Date:** 2026-11-18, 16:53 (Europe/Rome), the clearance chat.
+**Binds:** plan step F3 and its SPEC entry, still to be written; `InferenceConfig` (a new parameter); D-161.
+
+**Decision [user].** On the assistant's point 2 of 16:40 (at most three free neighbours, the ones with the largest
+predicted bias): "Keep a cap but make it a tunable parameter".
+
+**Statement.** (D-168.1 [user]) The number of close neighbours whose features are free in a node's joint fit is
+capped; the cap is a configuration parameter. (D-168.2 [orchestrator], PROVISIONAL) Default 3; the neighbours are
+taken by decreasing predicted bias (D-164.4).
+
+**Why.** **[user]** as quoted. **[reasoning]** Each free neighbour adds four unknowns.
+
+**What it does not decide [open].** What a neighbour is (one segment, as in today's code, or one chain of connected
+segments, as proposed); what happens to the close neighbours beyond the cap; whether a neighbour's shift and depth
+are free, free in a narrow range or fixed (the user's leaning of 16:53: fixed at the pilot's values, or a narrow
+range).
+
+**Sources.** **[user]** 2026-11-18, 16:53. **[log]** D-161, D-164.
 
 **Status:** active.
