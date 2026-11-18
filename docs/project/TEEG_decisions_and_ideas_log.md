@@ -223,6 +223,7 @@ the "Binds" column.
 | 2026-11-18 (later, 15) | No decision changed (the clearance chat, 17:06; the user: "I'm still deciding what to use"). The user proposed to fix a close neighbour's absorption at a weighted mean over the neighbour's node and the nodes near it on the same branch. **Check** (`checks/tier2_2026-11-18/tier2_fixed_mu.py`; synthetic, the Jacobian at the truth, 1 gl noise) **[run, sandbox]**: with the absorption fixed the condition number is 7.4 to 9.3 in the five scenes (up to 1529 with it free) and the SE of the neighbour's diameter 0.2 to 1.4 %; held 30 % too high it shifts the node's diameter by -2.4 to +0.9 % and the neighbour's by -12 to -14 %. **Code read at `ffe4341`:** at round 0 the work-list nodes take the first stage's diameter and absorption only; a neighbour's position in the scene is the traced one, its offset 0 until a refinement writes it -- so "the pilot's position" of a neighbour is not stored today. Handoff: O14, O15. Next free IDs unchanged: D-169, I-006. |
 | 2026-11-18 (later, 16) | Logs **D-169** and **D-170** (user, 17:38; the clearance chat). **Data** **[the user's upload of 17:25: `focal_529878215.csv`, the focal-plane figure and the `own_node*.png` figures of Cell 19c's five nodes; one in-focus width only, which one not stated]**: clear nodes by size, Allen / first stage / refined (um): 1013 0.449 / 3.200 / 2.168; 5353 0.454 / 0.803 / 0.774; 2669 0.788 / 2.981 / 2.588; 2620 0.811 / 2.056 / 1.913; 639 1.200 / 2.484 / 2.565. Read by eye: 1013, 2669 and 2620 carry other dark structures on the line (blobs, a fork, a joining branch) although the trace has no neighbour there, and the one-tube fit spreads over them (2669: a deep narrow core at v = +0.3 um and a second dip at v = -1.0 um, the model 25 gl off); 639's dip is flat-bottomed and about 2 um wide at half depth, so there Allen's 1.2 um is too thin whatever the kernel. **D-169**: for now the fit works on clear traces only, in one round, without the far neighbours' cleaning, the start of the diameter always Allen's; the residuals weighted again from the centre outwards with a width set by Allen's diameter; the near bumps removed; a close neighbour's absorption fixed; the chain geometry implemented. **D-170**: the defocus table is to be built on davinci from all the eligible cells; a handoff for that chat written. Handoffs: `TEEG_joint_fit_handoff_2026-11-18.md` (updated), `TEEG_defocus_table_davinci_handoff_2026-11-18.md` (new), `sci/diameter-pipeline`. Next free IDs: D-171, I-006. |
 | 2026-11-18 (later, 17) | Logs **D-171** (user, 17:54; the clearance chat): six of the seven choices of D-169's work -- the weights' width slightly above the FWHM of the Gaussian from Allen's diameter, re-centred while fitting; a bump is a second dip rising 2 noise SDs, the multiplier tunable; the samples from the bump outwards get no weight; the clear traces are Cell 19c's; the first stage gives every start but the diameter. The seventh (the in-focus width meanwhile) was put back as a question ("0.22 it appears why?") and answered, not decided. Handoff updated. Next free IDs: D-172, I-006. |
+| 2026-11-18 (later, 18) | Logs **D-172** (user, 17:58; the clearance chat): the kernel's in-focus width stays 0.080 um for now ("Keep 0.08"), after the assistant's answer that 0.22 um is a hypothesis of the synthetic check and that the blur needed for Allen to be right is 0.20 to 0.23 um on the three thin clear nodes and 0.73 um on node 639 (arithmetic on dip widths read by eye from the user's figures). The user also asked to be reminded what the first stage is; answered from `node_pipeline.measure_pilot` and SPEC section 2.2. Handoff: A8 closed. Next free IDs: D-173, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -386,6 +387,7 @@ would be needed*, *Status*.
 | D-157 | 2026-11-17 | SPEC Block 35 (amendment 2), oracles (iv) and (v); `tests/smoke/test_smoke_line_fast.py` | the split's depth-mirror oracle restated for a slab grid symmetric about the axis (1e-10 there; generic case reported, no bound); the slab-grid oracle kept at 5e-4 with its margin recorded [orchestrator] | active |
 | D-158 | 2026-11-17 | SPEC Block 35 (amendment 2, oracle (iv)), Block 36 (amendment 11, final check); `scripts/clean_cell.py`, `scripts/infer_nodes.py`; the report `specs/test_reports/2026-11-17_1754_incremental.md` | the final check's settlements: the slab-grid bound stated at mu = 1 /um; the product status `not_fitted` for a per-node fit that raises or fails; `clean` logs a product that raises [orchestrator] | active |
 | D-159 | 2026-11-18 | `tests/spec/` on `sci/diameter-pipeline`; the report `specs/test_reports/2026-11-17_1754_incremental.md` (F2) | the tester's 39 spec tests of the run 2026-11-17_1754 brought into the working branch; the three stale spec tests (`test_factories_against_line_fast[linear, hybrid]`, `test_work_list_own_stretch_beyond_U`) retired [user] | active |
+| D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
 | D-171 | 2026-11-18 | D-169's fit on clear nodes (its SPEC entry to be written; `node_inference.fit_node`, `scripts/infer_nodes.py`, `clean_cell.py clear --d-bins`); `InferenceConfig` (new parameters); D-169.10 | the weights' width slightly above the FWHM of the Gaussian from Allen's diameter, so that they concentrate about the dip's extreme; re-centred while fitting; a near bump = a second dip rising at least 2 noise SDs, the multiplier a tunable parameter; the samples from the bump outwards get no weight; clear traces = the nodes of notebook Cell 19c; the first stage gives the start of every parameter but the diameter [user]; the width's factor 1.25 and its formula [orchestrator], PROVISIONAL | active |
 | D-170 | 2026-11-18 | the defocus kernel table (`renderer.kernel_table_*`, `kernel_continuation_slope`); S3c on davinci (`scripts/pbs/survey_prepare.pbs`, `survey_cells.pbs`, `survey_pool.pbs`; SPEC Blocks 16, 19); D-085, D-088, D-118 to D-121 | the defocus table is built on davinci from all the eligible cells, not from one cell's noisy table; a handoff for the chat that starts it [user]; "eligible" and the fate of D-085's 5 cells per class and layer to settle there [open] | active |
 | D-169 | 2026-11-18 | the per-node fit on clear nodes (SPEC Block 30, `node_inference.fit_node`; `scripts/infer_nodes.py`, `clean_cell.py`); plan step F3; D-162.4, D-164, D-166.1, D-166.4, D-167.1, D-167.4 | for now: clear traces only, one round, no cleaning of the far neighbours, the node's own expected shadow kept; the diameter's start always Allen's; residuals weighted from the central value outwards, the width from Allen's diameter; near bumps removed from the profile; a close neighbour's absorption fixed (free when that node is the working node); the chain geometry implemented [user]; the weight law's constants and the bump rule [open] | active |
@@ -12404,5 +12406,31 @@ bump is searched in every used plane and the samples it removes are removed in a
 0.080 um stays the configured value until the user chooses); the choices of the joint fit (the handoff's B1 to B9).
 
 **Sources.** **[user]** 2026-11-18, 17:54. **[log]** D-165, D-169.
+
+**Status:** active.
+
+---
+
+## D-172 -- The kernel's in-focus width stays 0.080 um for now (user)
+
+**Date:** 2026-11-18, 17:58 (Europe/Rome), the clearance chat.
+**Binds:** `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165).
+
+**Decision [user].** "7: why 0.22 appears: Keep 0.08".
+
+**Statement.** (D-172.1 [user]) The fits run with the configured in-focus width $\sigma_{\rm r}(0)$ = 0.080 um for
+now. (D-172.2 [orchestrator]) The option of D-165 to run at another width stays.
+
+**Why.** **[user]** as quoted. **[reasoning: arithmetic on the dip's width at half depth read by eye from the user's
+figures, with ${\rm FWHM}^2 = (0.866\,D_{\rm A})^2 + (2.355\,\sigma_{\rm r}(0))^2$]** The in-focus width under which
+Allen's diameter would be right: 0.20, 0.23 and 0.23 um for the clear nodes 5353, 3873 and 4725 (Allen 0.454, 0.536,
+0.466 um; dips 0.62, 0.72, 0.68 um wide) and 0.73 um for node 639 (Allen 1.2 um; a dip about 2.0 um wide): no single
+width reconciles the thin and the thick nodes with Allen. 0.22 um was a hypothesis of
+`checks/kernel_2026-11-18/kernel_infocus_check.py`, not a measurement.
+
+**What it does not decide [open].** How the in-focus width is measured (D-165's open point; the davinci handoff's
+P4).
+
+**Sources.** **[user]** 2026-11-18, 17:58. **[reasoning]** as tagged. **[log]** D-165, D-171.
 
 **Status:** active.
