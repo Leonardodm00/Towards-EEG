@@ -214,6 +214,7 @@ the "Binds" column.
 | 2026-11-18 (later, 6) | No decision changed (the clearance chat, 14:47-15:05); two proposals of the user on D-161 are open. (1) The user asked why the neighbour's lateral shift and depth are not free like the node's. **Check** (`checks/tier2_2026-11-18/tier2_neighbour_position.py` at `cf77927`; synthetic, the Jacobian at the truth, noise 1 gl; node and neighbour 0.6 um, mu 0.5 /um) **[run, sandbox]**: SE(d) of the node with the neighbour's position held / free -- parallel 1.0 um aside 0.79 / 0.79 %; crossing at 45 deg 0.84 um deeper 0.87 / 0.91 %; parallel directly above, 1.68 um deeper 0.84 / 0.84 %; crossing 2.1 um deeper 0.82 / 0.83 %. Holding the neighbour's position 0.2 um wrong shifts the node's diameter, to first order, by +10.8 % (lateral error, the parallel neighbour 1.0 um aside) and +9.7 % (depth error, the crossing 0.84 um deeper); +1.5 to +1.6 % (depth error) for the two neighbours 1.68 and 2.1 um deeper. The assistant's recommendation: all four of the neighbour's features free, its heading and tilt held; put to the user. (2) The user proposed to save the neighbours' fitted values and to substitute them for the pilot's; the assistant asked which use is meant (the working features and starts, or the delivered diameter). (3) Explained from the code read at `f298751`: the node's model is a straight tube of finite length along the fitted heading and tilt (`tube_half_length_um` 5.0 um each way, PROVISIONAL), rendered in three dimensions and read on the line as the data are; a node nearer than `extrusion_cap_margin_um` (3.0 um) to an end of its tube is flagged `near_end`. Next free IDs unchanged: D-162, I-006. |
 | 2026-11-18 (later, 7) | Logs **D-162** (user, 14:57; the clearance chat), on D-161's joint fit: all four of a tier-2 neighbour's features free, its heading and tilt taken from the trace; the neighbours' fitted values saved and used as working values, a parameter choosing Allen's, the pilot's or the fitted ones (default fitted). Open, the user's proposal with the assistant's amendments: tube pieces from traced node to traced node along the branch. Code read for the answer at `cf77927`: a node's heading and tilt are `candidate_search.trace_direction` -- the total-least-squares line through the traced points within +- `line_fit_window_um` / 2 = 2 um of the node along its branch; a neighbour's segments run between traced nodes moved by their offsets (`node_features.featured_scene`). Next free IDs: D-163, I-006. |
 | 2026-11-18 (later, 8) | Logs **D-163** [orchestrator] (the clearance chat, 15:00-15:40; coding directive 7): a changed shadow sum below 0 by rounding is set to 0 (tolerance 1e-12), a lower value raises. **Why:** the pilot's Cell 19 (D-160) **[data: the user's Colab log, 13:50-13:53]** picked the clear nodes 5353, 3873, 4725 (5792 of 8495 ranked nodes qualify; own dips 16.4, 19.6, 16.8 gl; tier-1 peak 0.000 gl; pilot d 0.803, 1.003, 0.964 um) and stopped in round 1 at the second node with `ValueError: S must be finite and >= 0`; node 5353's round 1 had finished. Cause reproduced **[run, sandbox]**: a kept sum changed by the images that left (Block 25, amendment 7) came out at -5.6e-17 on 689 pixels of a synthetic scene. Fixed at `6ac81d2` (`sci/diameter-pipeline`; SPEC Block 25, amendment 8); suites: shadow 8 pass, cleaning 6, clean iteration 9, pilot run 15, no failure; the five older spec tests of Blocks 25 and 28 named in the tester's F2 of 2026-11-17 fail as before the fix. Not run here: Cell 19 on the real stack. Next free IDs: D-164, I-006. |
+| 2026-11-18 (later, 9) | Logs **D-164** (user, 15:13; the clearance chat), on the joint fit of D-161, D-162: the tubes are built from traced node to traced node along the branch, out to the blur's reach, with one diameter and absorption along the node's own stretch; the boundary between the tiers is the predicted bias. Still open, the user's, after an explanation asked for: whether the joint fit runs only after the cleaning rounds or inside them too. Next free IDs: D-165, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -377,6 +378,7 @@ would be needed*, *Status*.
 | D-157 | 2026-11-17 | SPEC Block 35 (amendment 2), oracles (iv) and (v); `tests/smoke/test_smoke_line_fast.py` | the split's depth-mirror oracle restated for a slab grid symmetric about the axis (1e-10 there; generic case reported, no bound); the slab-grid oracle kept at 5e-4 with its margin recorded [orchestrator] | active |
 | D-158 | 2026-11-17 | SPEC Block 35 (amendment 2, oracle (iv)), Block 36 (amendment 11, final check); `scripts/clean_cell.py`, `scripts/infer_nodes.py`; the report `specs/test_reports/2026-11-17_1754_incremental.md` | the final check's settlements: the slab-grid bound stated at mu = 1 /um; the product status `not_fitted` for a per-node fit that raises or fails; `clean` logs a product that raises [orchestrator] | active |
 | D-159 | 2026-11-18 | `tests/spec/` on `sci/diameter-pipeline`; the report `specs/test_reports/2026-11-17_1754_incremental.md` (F2) | the tester's 39 spec tests of the run 2026-11-17_1754 brought into the working branch; the three stale spec tests (`test_factories_against_line_fast[linear, hybrid]`, `test_work_list_own_stretch_beyond_U`) retired [user] | active |
+| D-164 | 2026-11-18 | D-161's joint fit (plan step F3), its SPEC entry to be written; Block 28's tier rule (`cleaning.neighbour_tiers`, `close_lateral_um`, `close_defocus_um`); `node_inputs.local_tube`; D-132.3, D-162 | tube pieces from traced node to traced node along the branch, the chain out to the blur's reach (today's 5 um each way), one diameter and one absorption along the node's own stretch; a neighbour is tier 2 when the predicted bias of the node's diameter exceeds a tolerance [user]; the assumed error 30 % and the tolerance 1 %, rule (b) kept, the chain a setting beside the straight tube until compared [orchestrator], PROVISIONAL | active |
 | D-163 | 2026-11-18 | SPEC Block 25 (amendment 8) at `6ac81d2`; `shadow._cached_terms`, `shadow.SUM_ROUNDING_ATOL`; Block 28's requirement S >= 0; notebook Cell 19 | a shadow sum changed from a kept one is set to 0 where rounding left it below 0 by at most 1e-12; below that it raises `FloatingPointError`; sums afresh or reused whole unchanged [orchestrator] | active |
 | D-162 | 2026-11-18 | D-161's joint fit (plan step F3), its SPEC entry to be written; `InferenceConfig` (a new parameter); `NodeFeatures` | in the joint fit a tier-2 neighbour's diameter, absorption, lateral shift and depth are all free, its heading and tilt from the trace; its fitted values are saved and are the working values of that node elsewhere, a parameter choosing Allen's, the pilot's or the fitted ones, default fitted; delivered diameters stay each node's own fit [user]. Open: tube pieces node to node along the branch | active |
 | D-161 | 2026-11-18 | plan step F3 (the joint fit of a node with its tier-2 neighbours); SPEC Block 30 and the F3 entry to be written; D-132.2; `scripts/infer_nodes.py` (`tier2_unmodelled`) | F3 is built now: the node's four features and each tier-2 neighbour's diameter and absorption are fitted together on the node's cleaned line, the scene rendered jointly; the neighbour's traced position, heading and tilt held [user]. Open: the tier boundary, the neighbour's position, the renderer, whether the rounds' refinement changes | active |
@@ -12057,5 +12059,54 @@ stopped the run before, it was never used.
 changes of 2026-11-16 (the tester's F2 of 2026-11-17) are untouched and still fail.
 
 **Sources.** **[data]**, **[run, sandbox]**, **[reasoning]** as tagged. **[log]** D-150, D-160.
+
+**Status:** active.
+
+---
+
+## D-164 -- The joint fit: tubes from traced node to traced node along the branch, one diameter along the own stretch; the tiers split by the predicted bias (user)
+
+**Date:** 2026-11-18, 15:13 (Europe/Rome), the clearance chat.
+**Binds:** D-161's joint fit (plan step F3) and its SPEC entry, still to be written; Block 28's tier rule
+(`cleaning.neighbour_tiers`; `CleaningConfig.close_lateral_um`, `close_defocus_um`, `tier_reach_um`);
+`node_inputs.local_tube` (the node's straight tube); D-132.3 (the boundary left open there); D-162.
+
+**Decision [user].** To the assistant's answer of 15:05 and its three open points: "1) Go beyond the adjacent nodes.
+perfect 2) Keep one diameter along the node's own stretch. OK 3) Still open before the specification: 1) yes 2) Use
+the predicted bias"; on the third point (where the joint fit acts) an explanation was asked for before answering.
+
+**Statement.** (D-164.1 [user]) The tubes of the model are built from one traced node to the next along the same
+branch (the user's proposal of 14:57), not as one straight tube; (D-164.2 [user]) the chain runs beyond the adjacent
+nodes, out to the blur's reach -- today's extent, `tube_half_length_um` = 5 um each way along the stretch;
+(D-164.3 [user]) within a node's fit its own stretch has one diameter and one absorption, the geometry alone coming
+from the chain. (D-164.4 [user]) A neighbour $q$ of node $i$ is tier 2 (fitted jointly) when the predicted bias of the
+node's diameter exceeds a tolerance, tier 1 (subtracted) otherwise:
+$\Delta\hat d_i(q) = [(J_i^\top J_i)^{-1} J_i^\top \delta_{i,q}]_d$, with $J_i$ the Jacobian of the node's model
+profile $B_{i,k}\,\tau_k(v_n \mid \theta_i)$ (gl) with respect to $\theta_i = (d_i, \mu_i, v_{0,i}, z_{{\rm ax},i})$,
+one row per plane $k \in K$ and line sample $v_n$, and $\delta_{i,q}(k, n) = B_{i,k}[S_{q,k}(v_n \mid (1 -
+\varepsilon) d_q, \mu_q; g_q) - S_{q,k}(v_n \mid d_q, \mu_q; g_q)]$ (gl) the error left on the line when the
+neighbour's shadow $S_{q,k}$ (dimensionless, rendered alone) is subtracted with its diameter off by the fraction
+$\varepsilon$; tier 2 when $|\Delta\hat d_i(q)| / d_i > t$. (D-164.5 [orchestrator], PROVISIONAL) $\varepsilon$ =
+0.30, $t$ = 0.01; rule (b) of Block 28 (projected overlap with the own stretch within `tier_reach_um`) is kept beside
+it; the chain is a setting beside the straight tube, and becomes the default after the two are compared on synthetic
+bent dendrites and on the clear nodes of D-160.
+
+**Why.** **[run, sandbox: `checks/tier2_2026-11-18/tier2_distance_sweep.py`, `tier2_bias_predictor.py` at `f298751`;
+synthetic, parallel tubes of 0.6 um, one configuration]** Distance alone misses neighbours 1 to 2 um aside and 1.7 um
+out of focus (3 to 9 % bias under a 30 % error of theirs, tier 1 under rule (a)); the linear predictor follows the
+fitted bias within about 2 points where that is 1 to 10 %. **[reasoning]** The line cuts the dendrite at the node
+only, so the diameters of the adjacent nodes of the same branch are barely constrained by it; a chain through traced
+nodes follows the dendrite's path where one straight tube over 10 um does not.
+
+**What it implies for code and tables.** The SPEC entry of F3: a renderer of the node's line under a scene of tube
+pieces (the node's chain and the neighbours'); the tier rule of Block 28 amended (the two distances of rule (a)
+replaced by the predicted bias; its cost per pair to be measured); `local_tube` kept as the straight setting.
+
+**What it does not decide [open].** Whether the joint fit runs only in the per-node fit after the cleaning rounds or
+inside the rounds too (asked 15:13); how a chain's joints are rendered (pieces overlap on one side of a bend); the
+bounds of the neighbour's shift and depth; the cap on free neighbours.
+
+**Sources.** **[user]** 2026-11-18, 15:13. **[run, sandbox]**, **[reasoning]** as tagged. **[log]** D-132, D-133,
+D-161, D-162.
 
 **Status:** active.
