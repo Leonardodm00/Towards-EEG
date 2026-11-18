@@ -251,3 +251,239 @@ def test_extrusion_valid_boundary(phi_deg):
     assert line_fast.extrusion_valid(tube, ks, np.array([1.0, 2.0]), yh, eu, v, 0, P, cfg)
     near = np.array([1.0, 2.0]) + (U - 0.5) * math.cos(phi) * eu
     assert not line_fast.extrusion_valid(tube, ks, near, yh, eu, v, 0, P, cfg)
+
+
+# ===================================================================================================
+# Block 35, amendment 2 (D-151, D-156; D-157): the own shadow split by depth -- integration tester,
+# 2026-11-17. Oracles from the amendment's text; the expected split from an independent 1-D reference
+# (below), never from line_fast.
+# ===================================================================================================
+
+from scipy.special import ndtr  # noqa: E402
+
+from spec_helpers import ref_sigma_r  # noqa: E402
+
+
+def ref_split_flat(r, mu, zc, ks, n_lines, beta, cfg, absorption, layer_h=None, layer_z0=None):
+    """Independent reference of the split for a flat infinite tube along x through (y = 0, z = zc), read along
+    y on pixel centres v = n p (n in n_lines), n_avg = 0. Section 2.3 / Block 26 / Block 35 amendment 2:
+      * fine lattice in y: samples (i + 1/2) h - p/2, h = p / line_fine_factor (section 2.1, Block 4);
+      * a column is inside when |y| <= r; z_lo/hi = zc -+ sqrt(r^2 - y^2) (S3, flat);
+      * slab lattice: zeta_j = z_min + (j + 1/2) dzeta over [min z_lo, max z_hi] of the sampled columns
+        (Block 2 slab_centres as stated in section 2.3 / Block 24);
+      * a_j (S4); linear: dA = a; partition (light +1, slabs numbered upward): T_<j (1 - e^{-a_j});
+      * the pixel mean of the blurred plane at pixel n, for a tube infinite along x, is
+        sum_s dA(y_s) (h / p) [Phi((y_hi - y_s)/sigma) - Phi((y_lo - y_s)/sigma)] (the x sum telescopes to 1);
+      * w_{j,k} = |[zeta_j -+ dzeta/2] cap [z_k -+ beta]| / dzeta; u_{j,m} likewise with the layer.
+    Returns (s_in, s_out, whole, layers, layer_centres)."""
+    p = cfg.acquisition.res0_um
+    f = cfg.inference.line_fine_factor
+    h = p / f
+    dzeta = cfg.renderer.dzeta_um
+    nmax = int(math.ceil(r / h)) + f + 2
+    ys = (np.arange(-nmax, nmax + 1) + 0.5) * h - 0.5 * p
+    ys = ys[np.abs(ys) <= r]
+    half = np.sqrt(np.clip(r * r - ys * ys, 0.0, None))
+    z_lo, z_hi = zc - half, zc + half
+    zmin, zmax = float(z_lo.min()), float(z_hi.max())
+    J = max(1, int(math.ceil((zmax - zmin) / dzeta - 1e-12)))
+    zeta = zmin + (np.arange(J) + 0.5) * dzeta
+    a = mu * np.clip(np.minimum(z_hi[None, :], zeta[:, None] + dzeta / 2)
+                     - np.maximum(z_lo[None, :], zeta[:, None] - dzeta / 2), 0.0, None)
+    if absorption == "linear":
+        dA = a
+    elif absorption == "partition_vertical":
+        before = np.vstack([np.zeros((1, ys.size)), np.cumsum(a, axis=0)[:-1]])
+        dA = np.exp(-before) * (-np.expm1(-a))
+    else:
+        raise ValueError(absorption)
+    yc = np.asarray(n_lines) * p                       # pixel centres read (v = n p)
+    zk = np.asarray(ks) * cfg.acquisition.dz_um
+    terms = np.zeros((J, len(ks), yc.size))
+    for j in range(J):
+        for k, z in enumerate(zk):
+            s = float(ref_sigma_r(zeta[j] - z, cfg.renderer))
+            K = ndtr((yc[:, None] + p / 2 - ys[None, :]) / s) - ndtr((yc[:, None] - p / 2 - ys[None, :]) / s)
+            terms[j, k] = (h / p) * (K @ dA[j])
+    lo, hi = zeta - dzeta / 2, zeta + dzeta / 2
+    w = np.clip(np.minimum(hi[:, None], zk[None, :] + beta) - np.maximum(lo[:, None], zk[None, :] - beta),
+                0.0, None) / dzeta                     # (J, n_planes)
+    s_in = np.einsum("jk,jkn->kn", w, terms)
+    s_out = np.einsum("jk,jkn->kn", 1.0 - w, terms)
+    whole = terms.sum(axis=0)
+    layers = cen = None
+    if layer_h is not None:
+        z0 = zc if layer_z0 is None else layer_z0
+        m = np.arange(int(math.floor((zmin - z0) / layer_h)) - 2, int(math.ceil((zmax - z0) / layer_h)) + 3)
+        cen = z0 + m * layer_h
+        u = np.clip(np.minimum(hi[:, None], cen[None, :] + layer_h / 2)
+                    - np.maximum(lo[:, None], cen[None, :] - layer_h / 2), 0.0, None) / dzeta
+        keep = u.max(axis=0) > 0
+        cen, u = cen[keep], u[:, keep]
+        layers = np.einsum("jm,jkn->mkn", u, terms)
+    return s_in, s_out, whole, layers, cen
+
+
+def _flat_args(n_half=26):
+    o, yh, eu, _v = flat_line(n_half)
+    n = np.arange(-n_half, n_half + 1)
+    return o, yh, eu, n * P, n
+
+
+@pytest.mark.parametrize("absorption", ["linear", "partition_vertical"])
+@pytest.mark.parametrize("r,zc,beta", [(0.3, 0.05, 0.14), (0.5, -0.11, 0.05), (0.5, 0.0, 0.3)])
+def test_split_against_independent_reference(absorption, r, zc, beta):
+    """Amendment 2: S_in = sum_j w_jk s_jk, S_out = sum_j (1 - w_jk) s_jk with w the fraction of the slab's
+    thickness inside the band, and the layers sum_j u_jm s_jk, against ref_split_flat. Tolerance 1e-8 (absolute,
+    on a dimensionless deficit of order 0.1-0.5): the reference is the same continuous formula; the only
+    expected differences are the reach rule's truncation at 6 sigma (2 Phi(-6) = 2e-9 relative) and rounding."""
+    cfg = cfg_fast(absorption)
+    mu = 1.3
+    tube = geometry.Tube(c=(0.0, 0.0, zc), r=r, phi=0.0, theta=0.0, half_length=10.0)
+    o, yh, eu, v, n = _flat_args()
+    ks = np.arange(-4, 5)
+    got = line_fast.line_shadow_split(tube, mu, ks, o, yh, eu, v, 0, P, cfg, beta, absorption=absorption,
+                                      layer_um=0.1)
+    s_in, s_out, whole, layers, cen = ref_split_flat(r, mu, zc, ks, n, beta, cfg, absorption, layer_h=0.1)
+    assert_allclose(1.0 - line_fast.line_profiles(tube, mu, ks, o, yh, eu, v, 0, P, cfg, absorption=absorption),
+                    whole, rtol=0, atol=1e-8)        # the reference itself, against the unsplit renderer
+    assert_allclose(got.s_in, s_in, rtol=0, atol=1e-8)
+    assert_allclose(got.s_out, s_out, rtol=0, atol=1e-8)
+    assert_allclose(got.layer_z, cen, rtol=0, atol=1e-12)
+    assert_allclose(got.layers, layers, rtol=0, atol=1e-8)
+
+
+@pytest.mark.parametrize("absorption", ["linear", "partition_vertical", "hybrid"])
+def test_split_monotone_in_band_and_bounds(absorption):
+    """w_{j,k} is non-decreasing in beta and every term s_jk >= 0 (absorbed light, positive kernel), so
+    S_in(beta1) <= S_in(beta2) for beta1 < beta2 pointwise, S_in, S_out >= 0, and S_in <= 1 - tau.
+    Tolerance 1e-15 (rounding of sums of non-negative terms). Tilted tube (30 deg), off-plane axis."""
+    cfg = cfg_fast(absorption, n_rho=2, n_psi=4)
+    th = 0.4
+    tube = geometry.Tube(c=(0.0, 0.0, 0.07), r=0.35, phi=math.radians(30), theta=th, half_length=5.0)
+    o, yh, eu = np.array([0.0, 0.0]), np.array([-math.sin(th), math.cos(th)]), np.array([math.cos(th), math.sin(th)])
+    v = np.arange(-20, 21) * P
+    ks = np.arange(-4, 5)
+    prev = None
+    for beta in (0.0, 0.03, 0.1, 0.14, 0.3, 0.9):
+        sp = line_fast.line_shadow_split(tube, 1.0, ks, o, yh, eu, v, 1, P, cfg, beta)
+        assert np.all(sp.s_in >= -1e-15) and np.all(sp.s_out >= -1e-15)
+        if prev is not None:
+            assert np.all(sp.s_in >= prev - 1e-15), beta
+        prev = sp.s_in
+
+
+def test_split_layer_equals_band():
+    """A layer of thickness h = 2 beta centred on z_k (layer_origin_um = z_k) is the band of plane k, so
+    L_{0,k} = S_in_k [1e-12]; and the layers' centres are layer_origin + m h (spacing h, increasing)."""
+    cfg = cfg_fast("partition_vertical")
+    tube = geometry.Tube(c=(0.0, 0.0, 0.09), r=0.4, phi=math.radians(20), theta=0.0, half_length=8.0)
+    o, yh, eu, v, _n = _flat_args(20)
+    beta = 0.07
+    ks = np.arange(-3, 4)
+    sp = line_fast.line_shadow_split(tube, 1.0, ks, o, yh, eu, v, 0, P, cfg, beta)
+    for i, k in enumerate(ks):
+        zk = k * cfg.acquisition.dz_um
+        lay = line_fast.line_shadow_split(tube, 1.0, ks, o, yh, eu, v, 0, P, cfg, beta, layer_um=2 * beta,
+                                          layer_origin_um=zk)
+        m = (lay.layer_z - zk) / (2 * beta)
+        assert_allclose(m, np.round(m), rtol=0, atol=1e-9)
+        assert np.all(np.diff(lay.layer_z) > 0)
+        i0 = int(np.argmin(np.abs(lay.layer_z - zk)))
+        assert abs(lay.layer_z[i0] - zk) < 1e-12
+        assert_allclose(lay.layers[i0, i], sp.s_in[i], rtol=0, atol=1e-12)
+
+
+def test_split_layer_origin_default_and_depth_shift():
+    """layer_origin_um None = the tube's centre depth tube.c[2]: layer_z - c_z are multiples of h [1e-9];
+    a depth shift of the tube by dz with every plane index raised by one leaves s_in, s_out unchanged [1e-9]
+    (the amendment's own tolerance)."""
+    cfg = cfg_fast("linear")
+    o, yh, eu, v, _n = _flat_args(20)
+    dz = cfg.acquisition.dz_um
+    ks = np.arange(-3, 4)
+    t0 = geometry.Tube(c=(0.0, 0.0, 0.123), r=0.4, phi=0.0, theta=0.0, half_length=8.0)
+    t1 = geometry.Tube(c=(0.0, 0.0, 0.123 + dz), r=0.4, phi=0.0, theta=0.0, half_length=8.0)
+    a = line_fast.line_shadow_split(t0, 0.8, ks, o, yh, eu, v, 0, P, cfg, 0.14, layer_um=0.1)
+    b = line_fast.line_shadow_split(t1, 0.8, ks + 1, o, yh, eu, v, 0, P, cfg, 0.14, layer_um=0.1)
+    m = (a.layer_z - 0.123) / 0.1
+    assert_allclose(m, np.round(m), rtol=0, atol=1e-9)
+    assert_allclose(b.s_in, a.s_in, rtol=0, atol=1e-9)
+    assert_allclose(b.s_out, a.s_out, rtol=0, atol=1e-9)
+
+
+def test_split_linear_in_mu_and_known_mass():
+    """Under `linear` each term is proportional to mu: S_in(2 mu) = 2 S_in(mu) [1e-12 relative]. With
+    beta = dz/2 and a flat tube whose depth extent lies inside the planes' range the bands tile the depth, so
+    sum_k p sum_n S_in_k(v_n) = mu pi r^2 up to the lattice's point sampling of the circle (rtol 3e-3, as the
+    earlier mass oracle) -- the amendment's oracle (vi), here against the continuum value."""
+    cfg = cfg_fast("linear")
+    o, yh, eu, v, _n = _flat_args(40)
+    r, mu = 0.45, 0.9
+    tube = geometry.Tube(c=(0.0, 0.0, 0.03), r=r, phi=0.0, theta=0.0, half_length=10.0)
+    ks = np.arange(-5, 6)
+    beta = cfg.acquisition.dz_um / 2
+    a = line_fast.line_shadow_split(tube, mu, ks, o, yh, eu, v, 0, P, cfg, beta)
+    b = line_fast.line_shadow_split(tube, 2 * mu, ks, o, yh, eu, v, 0, P, cfg, beta)
+    assert_allclose(b.s_in, 2 * a.s_in, rtol=1e-12, atol=1e-15)
+    assert_allclose(P * a.s_in.sum(), mu * math.pi * r * r, rtol=3e-3)
+
+
+def test_split_contract_and_errors():
+    """Contract: OwnSplit with s_in, s_out (n_planes, n_v) float64 finite, rows in the order of ks (a
+    permutation of ks permutes the rows exactly); band_half_um, layer_um stored; layers None without
+    layer_um; mu = 0 gives zeros [exact]; no planes gives (0, n_v); determinism [exact]; ValueError for
+    band_half_um < 0 / nan / inf, layer_um <= 0 / nan, layer_origin_um nan; ExtrusionInvalid (checked first,
+    also at mu = 0) for a line 0.5 um from a cap."""
+    cfg = cfg_fast("linear")
+    th = 0.3
+    tube = geometry.Tube(c=(0.0, 0.0, 0.0), r=0.3, phi=0.2, theta=th, half_length=6.0)
+    o, yh, eu = np.array([0.0, 0.0]), np.array([-math.sin(th), math.cos(th)]), np.array([math.cos(th), math.sin(th)])
+    v = np.arange(-12, 13) * P
+    ks = np.array([-2, 0, 3, 1])
+    sp = line_fast.line_shadow_split(tube, 1.0, ks, o, yh, eu, v, 1, P, cfg, 0.14)
+    assert isinstance(sp, line_fast.OwnSplit)
+    assert sp.s_in.shape == sp.s_out.shape == (4, v.size)
+    assert sp.s_in.dtype == np.float64 and np.all(np.isfinite(sp.s_in)) and np.all(np.isfinite(sp.s_out))
+    assert sp.layers is None and sp.layer_z is None and sp.layer_um is None and sp.band_half_um == 0.14
+    perm = np.array([2, 0, 3, 1])
+    sp2 = line_fast.line_shadow_split(tube, 1.0, ks[perm], o, yh, eu, v, 1, P, cfg, 0.14)
+    assert_array_equal(sp2.s_in, sp.s_in[perm])
+    assert_array_equal(sp2.s_out, sp.s_out[perm])
+    again = line_fast.line_shadow_split(tube, 1.0, ks, o, yh, eu, v, 1, P, cfg, 0.14)
+    assert_array_equal(again.s_in, sp.s_in)
+    z = line_fast.line_shadow_split(tube, 0.0, ks, o, yh, eu, v, 1, P, cfg, 0.14, layer_um=0.1)
+    assert_array_equal(z.s_in, 0.0)
+    assert_array_equal(z.s_out, 0.0)
+    assert np.all(z.layers == 0.0)
+    e = line_fast.line_shadow_split(tube, 1.0, np.array([], dtype=int), o, yh, eu, v, 1, P, cfg, 0.14)
+    assert e.s_in.shape == (0, v.size)
+    for bad in (-0.01, float("nan"), float("inf")):
+        with pytest.raises(ValueError):
+            line_fast.line_shadow_split(tube, 1.0, ks, o, yh, eu, v, 1, P, cfg, bad)
+    for bad in (0.0, -0.1, float("nan")):
+        with pytest.raises(ValueError):
+            line_fast.line_shadow_split(tube, 1.0, ks, o, yh, eu, v, 1, P, cfg, 0.14, layer_um=bad)
+    with pytest.raises(ValueError):
+        line_fast.line_shadow_split(tube, 1.0, ks, o, yh, eu, v, 1, P, cfg, 0.14, layer_um=0.1,
+                                    layer_origin_um=float("nan"))
+    near = np.array([math.cos(th), math.sin(th)]) * (6.0 - 0.5) * math.cos(0.2)
+    with pytest.raises(line_fast.ExtrusionInvalid):
+        line_fast.line_shadow_split(tube, 0.0, ks, near, yh, eu, v, 1, P, cfg, 0.14)
+
+
+@pytest.mark.parametrize("phi_deg", [0.0, 60.0])
+def test_split_tiling_hybrid_long_tube(phi_deg):
+    """S_in + S_out = 1 - line_profiles and sum_m L_m = the same [1e-12] under the hybrid, on a steep (60 deg)
+    tube of half-length 10 um (the reach rule crops the footprint; the split must lay the same slabs as the
+    slab loop) and a flat one. 2 x 4 directions for time."""
+    cfg = cfg_fast("hybrid", n_rho=2, n_psi=4)
+    th = 1.1
+    tube = geometry.Tube(c=(0.2, -0.1, 0.05), r=0.4, phi=math.radians(phi_deg), theta=th, half_length=10.0)
+    o, yh, eu = np.array([0.2, -0.1]), np.array([-math.sin(th), math.cos(th)]), np.array([math.cos(th), math.sin(th)])
+    v = np.arange(-15, 16) * P
+    ks = np.arange(-4, 5)
+    sp = line_fast.line_shadow_split(tube, 1.0, ks, o, yh, eu, v, 1, P, cfg, 0.14, layer_um=0.1)
+    whole = 1.0 - line_fast.line_profiles(tube, 1.0, ks, o, yh, eu, v, 1, P, cfg)
+    assert_allclose(sp.s_in + sp.s_out, whole, rtol=0, atol=1e-12)
+    assert_allclose(sp.layers.sum(axis=0), whole, rtol=0, atol=1e-12)
