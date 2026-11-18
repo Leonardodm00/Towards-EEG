@@ -1,4 +1,4 @@
-"""How often the near-bump rule of Block 39 cuts a clean profile, and how often it cuts a real bump (D-174.1).
+"""How often the near-bump rule of Block 39 cuts a clean profile, and how often it cuts a real bump (D-176.1).
 
 Standalone check, not pipeline code. A clean central dip (Gaussian, SD 0.25 um, 40 gl in the sharpest plane,
 fading with defocus) in K planes, white noise of SD SIGMA gl per sample, optionally a second dip 1.3 um aside

@@ -10,6 +10,7 @@
 | 2026-11-18 (later, 5) | D-171 [user, 17:54]: A1 to A7 of section 8b answered (the weights' width and centre, the bump rule with multiplier 2 as a tunable parameter, no weight from the bump outwards, clear traces = Cell 19c's, the first stage gives every start but the diameter). A8 (the in-focus width meanwhile) still open: the user asked why 0.22. Decision log: next free IDs D-172, I-006. |
 | 2026-11-18 (later, 6) | D-172 [user, 17:58]: the in-focus width stays 0.080 um for now (A8 closed). Decision log: next free IDs D-173, I-006. |
 | 2026-11-18 (later, 7) | D-173 [user, 18:00]: in the first stage the diameter is fixed at Allen's value and the absorption and lateral centre are fitted (section 0's table, A7). Decision log: next free IDs D-174, I-006. |
+| 2026-11-18 (later, 8) | Section 0's path is built and smoke-tested: commit `1bb9973` on `sci/diameter-pipeline` (SPEC Blocks 3, 5, 30, 32, 34, 36 amended, Block 39 new; notebook Cell 20). New section 0b: what was built, the commands, the knobs, what the synthetic checks show and do not show. The builder's choices are D-176 [orchestrator]. D-174 [user, the defocus-table chat, about 18:40] asks for the held diameter as the first stage's default for all its users: not in `1bb9973` (section 0b, last table row). Decision log: next free IDs D-177, I-006. |
 
 Basis tags: **[user]** said or decided by the user, with the time (Europe/Rome, 2026-11-18); **[log]** the decision
 log on `main`; **[src]** read in the named file at `f6504b0`; **[run, sandbox]** executed in the handing-over
@@ -50,6 +51,63 @@ refined (um): 1013 0.449 / 3.200 / 2.168; 5353 0.454 / 0.803 / 0.774; 2669 0.788
 $v$ = -1.0 um; the one-tube model spans both and misses by about 25 gl. Nodes 1013 and 2620: blobs and a joining
 branch on the line. Node 639: a flat-bottomed dip about 2 um wide at half depth; there Allen's 1.2 um is too thin
 whatever the kernel **[reasoning]**. Which in-focus width that run used is not stated in the upload.
+
+## 0b. Section 0's path as built (commit `1bb9973`, 2026-11-18)
+
+Tags as above; **[run, sandbox]** here means executed in the building chat's sandbox on 2026-11-18. Nothing in this
+section has run on Allen's data yet: the first run is the user's, notebook Cell 20.
+
+| Point of section 0 | Built **[src, `1bb9973`]** |
+|---|---|
+| Nodes | Cell 20 reuses Cell 19c's examples file (`OUT/cleaning_sizes/examples_sizes_<S>.json`; nodes 1013, 5353, 2669, 2620, 639 on the pilot) or picks them with `clean_cell.py clear --d-bins`. |
+| Far neighbours, rounds | `clean_cell.py clean --no-clean`: the example nodes are prepared (first stage, patch, backgrounds, line, noise) and recorded with `stopped` "not_cleaned"; no neighbour's node joins the work list, nothing is cleaned or refined (`clean_iteration.prepared_only`). The tiers are counted and recorded, not used. |
+| First stage | `measure_pilot(..., d_fixed="allen")` -> `fit.fit_profile(..., d_fixed_um=2 r_Allen)` in every pass: $d$ held, $(\mu, v_0)$ fitted. Default of `--no-clean`; `--pilot-diameter free` restores the free fit. A cleaning run (no `--no-clean`) keeps the free fit. |
+| Start | `node_inputs.pilot_start`: Allen's diameter, the first stage's $\mu$, centre and depth; the fit's starts are $d_0 \times$ `inference.multistart_factors` (or `--starts`). |
+| Weights | `infer_nodes.py real` on a not-cleaned run: `node_inference.fit_node_recentred` with $w_n = e^{-\lvert v_n - v_c\rvert/\lambda_i}$, $\lambda_i$ = `inference.weight_kappa` (1.25) $\times$ `line_weights.allen_fwhm_um`$(D_{{\rm A},i}, \sigma_{\rm r}(0))$; $v_c$ = the fitted centre, re-centred between solves (at most `weight_irls_max_iter` = 3 solves, stop when $v_c$ moves $\le$ `weight_irls_tol_um` = 0.01 um). Covariance: the sandwich $A^{-1} B A^{-1}$ (the weights are not inverse variances). |
+| Bumps | `line_weights.bump_mask`: on the mean dip over the planes used, smoothed by one line sample, a second dip whose prominence is $\ge$ `inference.bump_sd` (2) noise SDs, beyond the point where the central dip has fallen to `bump_half_depth` (0.5) of its depth; the samples from the lightest sample before it outwards get weight 0 in every plane. |
+| Own shadow | Unchanged: the one-tube forward over the node's planes and the same-node clearance product at the estimate. |
+| In-focus width | The run's `renderer.sigma_r0_um` (0.080 um; `--sigma-r0-um` on `clean` still changes it). |
+| Close neighbour's absorption; chain | Not built (the joint fit; sections 2 to 7). |
+| First stage's default for every user (D-174 [user, the defocus-table chat]) | **Not built.** `measure_pilot`'s default is still the free diameter; only `clean --no-clean` passes "allen". D-174.2 asks for a configuration field with the held diameter as the default (the estimator hash changes; Blocks 6, 10, 13 to 15, 17 follow). The davinci `nodes` and `calibration` steps of D-175 wait for that change. **[open]** |
+
+Commands (Colab: Cell 20; here with the paths of that cell):
+
+```
+python3 scripts/clean_cell.py clean --specimen 529878215 --out OUT/cleaning_d169 --cache-dir CACHE <ALIGN> \
+    --config-json CFG --examples OUT/cleaning_d169/examples_sizes_529878215.json --B 159.0 --mu 0.258 --no-clean
+python3 scripts/infer_nodes.py real --specimen 529878215 --cleaning-dir OUT/cleaning_d169 --out OUT/inference_d169 \
+    [--weights allen|none] [--bump-sd 2.0] [--weight-kappa 1.25] [--starts 1.0,1.6]
+python3 scripts/show_focal.py --cleaning-dir OUT/cleaning_d169 --specimen 529878215 --inference-dir OUT/inference_d169
+```
+
+Outputs per node: `inference_<S>.csv` (now with `weights`, `lambda_um`, `v_cut_lo_um`, `v_cut_hi_um`, `n_solves`
+before `seconds`), `inference_<S>.json` (`weights_mode`, `lambda_um`, `v_cut_um`, `bump_sd`, `n_solves`, `recentred`,
+`weights`), `fit_node<id>.png` (orange: the weights; grey bands: samples of zero weight).
+
+What the checks show **[run, sandbox]**:
+
+| Check | Result |
+|---|---|
+| Synthetic cell (rendered 0.8 um, Allen 0.6 um), the smoke tests' fast configuration, `test_d169_path` | First stage: $d$ = 0.600 um (held), $\mu$ = 1.590 /um. Fit from 0.600 um: 0.8547 $\pm$ 0.0091 um, 1 solve, no cut. The same node unweighted: 0.8702 $\pm$ 0.0087 um. The fast configuration's forward (partition_vertical, 4 x 8 directions) is not the cell's renderer; neither number is a test of accuracy at 1 %. |
+| Bump rule on noise alone, `checks/d169_2026-11-18/bump_false_positive_check.py` (white noise 2.5 gl, 500 draws) | On each plane's raw samples, a prominence of 2 noise SDs is reached in every profile (cut rate 1.00 with 1 to 9 planes). On the mean smoothed by one sample: 0.04 with 1 plane, 0.00 with 3, 5, 9. A second dip of depth 4 noise SDs in every plane is cut in 0.85 to 1.00 of the draws, one of 3 SDs in 0.37 to 0.55, one of 2 SDs in 0.00 to 0.19. |
+| What the cut and the weights recover, `checks/d169_2026-11-18/bump_bias_check.py` (tube 1 um, noise-free, the second dip not in the model) | Second dip 1.3 um aside (SD 0.3 um, 60 gl): $d$ off by +5.3 % unweighted, +2.6 % cut, +3.5 % weights, +2.1 % both. 1.5 um aside (SD 0.6 um, 80 gl): +223 %, +18.7 %, +26.4 %, +15.8 %. **Not removed:** a second dip with no lighter sample between it and the central one (1.0 um aside, 60 gl): +96 % unweighted, +66 % with the weights, no cut. |
+| Sandwich covariance, `test_smoke_node_inference.py::test_weights` (300 noisy sets, $\lambda$ = 0.6 um) | Coverage of $\hat d \pm$ SE 0.663 (nominal 0.683); mean SE 0.00637 um against the SD of $\hat d$ 0.00628 um. |
+
+Limits the next chat should know:
+
+- The bump rule sees a second dip only when a lighter sample separates it from the central one. A shoulder on the
+  flank passes, and the weights alone leave most of its pull on $d$ (table above). A test of the profile's
+  asymmetry would flag it; not built, not decided **[open]**.
+- The cut is placed at the lightest sample between the two dips, where the second dip's near flank can still be
+  tens of grey levels: what lies inside the cut still pulls $d$ up (the +15.8 % case).
+- "The noise" in the rule is the SD of one line sample of one plane (the fit's `sigma_gl`), while the dip searched is
+  a mean over planes: a structure present in one plane only is diluted by the number of planes used.
+- With Allen's (thin) diameter held, the first stage's absorption comes out larger and can raise the first stage's
+  `dark` flag (on a phantom rendered at 1.0 um with Allen's 0.6 um: $\mu$ 0.80 -> 2.25 /um, flag `dark`)
+  **[run, sandbox: `test_pilot_fixed_diameter`]**. What a poor first-stage fit at Allen's diameter should flag is
+  open (D-173).
+- The fit's time on Allen's data under this path is not measured.
+- No independent tester has run on `1bb9973` (written inline by the orchestrator at the user's "Implement now").
 
 ## 1. First actions in the next chat
 

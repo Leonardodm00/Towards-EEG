@@ -1,5 +1,5 @@
 """Smoke test for the residual weights about the centre and the near-bump cut -- Block 39 in specs/SPEC.md
-(D-169.4, D-169.5, D-171.1 to D-171.4; the details D-174 [orchestrator]).
+(D-169.4, D-169.5, D-171.1 to D-171.4; the details D-176 [orchestrator]).
 
 Checks
     test_known_answer   allen_fwhm_um against the arithmetic by hand; the weights at the

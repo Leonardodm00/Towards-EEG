@@ -440,11 +440,11 @@ class InferenceConfig:
     max_nfev: int = 200                    # source: PROVISIONAL (Block 30)
     weights: str = "allen"                 # source: D-169.4 [user] (a parameter, D-167.1): "allen" = residual weights exp(-|v - v_c| / lambda) about the fitted centre, lambda = weight_kappa x allen_fwhm_um (Block 39); "none" = unweighted
     weight_kappa: float = 1.25             # source: D-171.1 [user: slightly larger than the FWHM from Allen's diameter]; the value is the assistant's, PROVISIONAL (D-171.7)
-    weight_irls_max_iter: int = 3          # source: PROVISIONAL (D-174.2 [orchestrator]): solves of the re-centred fit at most (D-171.2)
-    weight_irls_tol_um: float = 0.01       # source: PROVISIONAL (D-174.2 [orchestrator]): the re-centring stops when the centre moves by at most this
+    weight_irls_max_iter: int = 3          # source: PROVISIONAL (D-176.2 [orchestrator]): solves of the re-centred fit at most (D-171.2)
+    weight_irls_tol_um: float = 0.01       # source: PROVISIONAL (D-176.2 [orchestrator]): the re-centring stops when the centre moves by at most this
     bump_sd: float = 2.0                   # source: D-171.3 [user]: a near bump = a second dip of prominence >= this many noise SDs; 0 = off
-    bump_half_depth: float = 0.5           # source: PROVISIONAL (D-174.1 [orchestrator]): the central dip ends where it falls to this fraction of its depth; bumps are searched beyond
-    bump_smooth_samples: float = 1.0       # source: PROVISIONAL (D-174.1 [orchestrator]): the dip the bumps are searched on is the mean over the used planes, smoothed along the line by a Gaussian of this SD in line samples
+    bump_half_depth: float = 0.5           # source: PROVISIONAL (D-176.1 [orchestrator]): the central dip ends where it falls to this fraction of its depth; bumps are searched beyond
+    bump_smooth_samples: float = 1.0       # source: PROVISIONAL (D-176.1 [orchestrator]): the dip the bumps are searched on is the mean over the used planes, smoothed along the line by a Gaussian of this SD in line samples
 
 
 @dataclass(frozen=True)
