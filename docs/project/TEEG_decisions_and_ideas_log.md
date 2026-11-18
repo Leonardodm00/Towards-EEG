@@ -222,6 +222,7 @@ the "Binds" column.
 | 2026-11-18 (later, 14) | Logs **D-168** (user, 16:53; the clearance chat): the cap on the neighbours fitted jointly is a tunable parameter. Same message, not decided: the user leans to fixing a neighbour's shift and depth at the pilot's values, or to a narrow range (depth half the plane spacing, lateral one or two pixels), for fear of sloppy directions, and asked the assistant's opinion; and asked whether a neighbour is a chain of nodes sharing one set of parameters. **Check** (`checks/tier2_2026-11-18/tier2_sloppiness.py`; synthetic, the Jacobian at the truth, 1 gl noise) **[run, sandbox]**: the condition number of the scaled Jacobian with the node's 4 parameters / plus the neighbour's d and mu / plus its shift and depth is 7.3 / 8.4 / 8.5 and 6.8 / 9.9 / 10.2 for two in-focus neighbours, 7.1 / 86.9 / 101.5, 7.2 / 1360 / 1529 and 7.2 / 72.2 / 81.2 for three neighbours 1.68 to 2.8 um out of focus: the ill-conditioning comes with the diameter and absorption of a defocused neighbour (SE of its diameter 0.07 to 1.8 um), not with its position (SE 0.002 to 0.049 um); the SE of the node's own diameter stays 0.0046 to 0.0055 um. Code read: today a neighbour is one segment between two traced nodes (`shadow._segment_tube`), tiered on its own. Handoff updated (`TEEG_joint_fit_handoff_2026-11-18.md`: O4 to O6, O13). Next free IDs: D-169, I-006. |
 | 2026-11-18 (later, 15) | No decision changed (the clearance chat, 17:06; the user: "I'm still deciding what to use"). The user proposed to fix a close neighbour's absorption at a weighted mean over the neighbour's node and the nodes near it on the same branch. **Check** (`checks/tier2_2026-11-18/tier2_fixed_mu.py`; synthetic, the Jacobian at the truth, 1 gl noise) **[run, sandbox]**: with the absorption fixed the condition number is 7.4 to 9.3 in the five scenes (up to 1529 with it free) and the SE of the neighbour's diameter 0.2 to 1.4 %; held 30 % too high it shifts the node's diameter by -2.4 to +0.9 % and the neighbour's by -12 to -14 %. **Code read at `ffe4341`:** at round 0 the work-list nodes take the first stage's diameter and absorption only; a neighbour's position in the scene is the traced one, its offset 0 until a refinement writes it -- so "the pilot's position" of a neighbour is not stored today. Handoff: O14, O15. Next free IDs unchanged: D-169, I-006. |
 | 2026-11-18 (later, 16) | Logs **D-169** and **D-170** (user, 17:38; the clearance chat). **Data** **[the user's upload of 17:25: `focal_529878215.csv`, the focal-plane figure and the `own_node*.png` figures of Cell 19c's five nodes; one in-focus width only, which one not stated]**: clear nodes by size, Allen / first stage / refined (um): 1013 0.449 / 3.200 / 2.168; 5353 0.454 / 0.803 / 0.774; 2669 0.788 / 2.981 / 2.588; 2620 0.811 / 2.056 / 1.913; 639 1.200 / 2.484 / 2.565. Read by eye: 1013, 2669 and 2620 carry other dark structures on the line (blobs, a fork, a joining branch) although the trace has no neighbour there, and the one-tube fit spreads over them (2669: a deep narrow core at v = +0.3 um and a second dip at v = -1.0 um, the model 25 gl off); 639's dip is flat-bottomed and about 2 um wide at half depth, so there Allen's 1.2 um is too thin whatever the kernel. **D-169**: for now the fit works on clear traces only, in one round, without the far neighbours' cleaning, the start of the diameter always Allen's; the residuals weighted again from the centre outwards with a width set by Allen's diameter; the near bumps removed; a close neighbour's absorption fixed; the chain geometry implemented. **D-170**: the defocus table is to be built on davinci from all the eligible cells; a handoff for that chat written. Handoffs: `TEEG_joint_fit_handoff_2026-11-18.md` (updated), `TEEG_defocus_table_davinci_handoff_2026-11-18.md` (new), `sci/diameter-pipeline`. Next free IDs: D-171, I-006. |
+| 2026-11-18 (later, 17) | Logs **D-171** (user, 17:54; the clearance chat): six of the seven choices of D-169's work -- the weights' width slightly above the FWHM of the Gaussian from Allen's diameter, re-centred while fitting; a bump is a second dip rising 2 noise SDs, the multiplier tunable; the samples from the bump outwards get no weight; the clear traces are Cell 19c's; the first stage gives every start but the diameter. The seventh (the in-focus width meanwhile) was put back as a question ("0.22 it appears why?") and answered, not decided. Handoff updated. Next free IDs: D-172, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -385,6 +386,7 @@ would be needed*, *Status*.
 | D-157 | 2026-11-17 | SPEC Block 35 (amendment 2), oracles (iv) and (v); `tests/smoke/test_smoke_line_fast.py` | the split's depth-mirror oracle restated for a slab grid symmetric about the axis (1e-10 there; generic case reported, no bound); the slab-grid oracle kept at 5e-4 with its margin recorded [orchestrator] | active |
 | D-158 | 2026-11-17 | SPEC Block 35 (amendment 2, oracle (iv)), Block 36 (amendment 11, final check); `scripts/clean_cell.py`, `scripts/infer_nodes.py`; the report `specs/test_reports/2026-11-17_1754_incremental.md` | the final check's settlements: the slab-grid bound stated at mu = 1 /um; the product status `not_fitted` for a per-node fit that raises or fails; `clean` logs a product that raises [orchestrator] | active |
 | D-159 | 2026-11-18 | `tests/spec/` on `sci/diameter-pipeline`; the report `specs/test_reports/2026-11-17_1754_incremental.md` (F2) | the tester's 39 spec tests of the run 2026-11-17_1754 brought into the working branch; the three stale spec tests (`test_factories_against_line_fast[linear, hybrid]`, `test_work_list_own_stretch_beyond_U`) retired [user] | active |
+| D-171 | 2026-11-18 | D-169's fit on clear nodes (its SPEC entry to be written; `node_inference.fit_node`, `scripts/infer_nodes.py`, `clean_cell.py clear --d-bins`); `InferenceConfig` (new parameters); D-169.10 | the weights' width slightly above the FWHM of the Gaussian from Allen's diameter, so that they concentrate about the dip's extreme; re-centred while fitting; a near bump = a second dip rising at least 2 noise SDs, the multiplier a tunable parameter; the samples from the bump outwards get no weight; clear traces = the nodes of notebook Cell 19c; the first stage gives the start of every parameter but the diameter [user]; the width's factor 1.25 and its formula [orchestrator], PROVISIONAL | active |
 | D-170 | 2026-11-18 | the defocus kernel table (`renderer.kernel_table_*`, `kernel_continuation_slope`); S3c on davinci (`scripts/pbs/survey_prepare.pbs`, `survey_cells.pbs`, `survey_pool.pbs`; SPEC Blocks 16, 19); D-085, D-088, D-118 to D-121 | the defocus table is built on davinci from all the eligible cells, not from one cell's noisy table; a handoff for the chat that starts it [user]; "eligible" and the fate of D-085's 5 cells per class and layer to settle there [open] | active |
 | D-169 | 2026-11-18 | the per-node fit on clear nodes (SPEC Block 30, `node_inference.fit_node`; `scripts/infer_nodes.py`, `clean_cell.py`); plan step F3; D-162.4, D-164, D-166.1, D-166.4, D-167.1, D-167.4 | for now: clear traces only, one round, no cleaning of the far neighbours, the node's own expected shadow kept; the diameter's start always Allen's; residuals weighted from the central value outwards, the width from Allen's diameter; near bumps removed from the profile; a close neighbour's absorption fixed (free when that node is the working node); the chain geometry implemented [user]; the weight law's constants and the bump rule [open] | active |
 | D-168 | 2026-11-18 | plan step F3 and its SPEC entry, still to be written; `InferenceConfig` (a new parameter); D-161 | the number of close neighbours fitted jointly with a node is capped, and the cap is a tunable parameter [user]; its default 3 [orchestrator], PROVISIONAL | active |
@@ -12363,5 +12365,44 @@ plane spacing and pixel size; D-085 selected 5 per class and layer, 51 in all); 
 are built first; how the in-focus width, which no stack identifies (D-165), is obtained.
 
 **Sources.** **[user]** 2026-11-18, 17:38. **[log]** D-085, D-118 to D-121, D-165.
+
+**Status:** active.
+
+---
+
+## D-171 -- The fit on clear nodes: the weights' width and centre, the bump rule, what a clear trace is, what the first stage gives (user)
+
+**Date:** 2026-11-18, 17:54 (Europe/Rome), the clearance chat.
+**Binds:** D-169's fit on clear nodes and its SPEC entry, still to be written (`node_inference.fit_node`,
+`scripts/infer_nodes.py`, `clean_cell.py clear --d-bins`); `InferenceConfig` (new parameters); D-169.10 (the
+readings to confirm).
+
+**Decision [user].** To the seven choices listed at 17:45: "1) The width of the exponential decay of the weights
+should be slighly larger than the FHMW of the Gaussian based on the suggested diameter from the allen dataset. this
+because I want the weights to be concentrated around the maximum 2) Recenter while fitting 3) perfect. do the 2 times
+the noise, but make teh multiplicator a tunable parameter 4) The samples from the bump outwards get no weight this
+5) What counts as a clear trace. The ones that we are using here" -- notebook Cell 19c -- "6) What the first stage is
+still used for the all the other parameters that are not the diameter 7) Which in-focus width to use meanwhile: 0.22
+it appears why?"
+
+**Statement.** (D-171.1 [user]) The weights $w_n = e^{-|v_n - v_c|/\lambda_i}$ have a width $\lambda_i$ slightly
+larger than the FWHM of the Gaussian obtained from Allen's diameter of node $i$, so that the weight concentrates
+about the dip's extreme. (D-171.2 [user]) $v_c$ is re-centred while fitting. (D-171.3 [user]) A near bump is a second
+dip of the line separated from the central one by a rise of at least $m$ times the node's noise SD, $m$ = 2, a
+tunable parameter. (D-171.4 [user]) The samples from the bump outwards get no weight. (D-171.5 [user]) The clear
+traces are those notebook Cell 19c uses: `clean_cell.py clear --d-bins`, one clear node per bin of Allen's diameter
+(not near an end, no tier-2 neighbour, the least tier-1 light, 20 um from the soma). (D-171.6 [user]) The first
+stage gives the start of every parameter but the diameter, whose start is Allen's (D-169.2).
+(D-171.7 [orchestrator], PROVISIONAL) $\lambda_i = \kappa\,{\rm FWHM}_{{\rm A},i}$ with $\kappa$ = 1.25 a tunable
+parameter and ${\rm FWHM}_{{\rm A},i} = [(0.866\,D_{{\rm A},i})^2 + (2.355\,\sigma_{\rm r}(0))^2]^{1/2}$ (um); the
+bump is searched in every used plane and the samples it removes are removed in all of them.
+
+**Why.** **[user]** as quoted.
+
+**What it does not decide [open].** The in-focus width used meanwhile (the user's seventh answer is a question: why
+0.22; the assistant's answer of 18:00: 0.22 um is a hypothesis of the synthetic check, not a measurement, and
+0.080 um stays the configured value until the user chooses); the choices of the joint fit (the handoff's B1 to B9).
+
+**Sources.** **[user]** 2026-11-18, 17:54. **[log]** D-165, D-169.
 
 **Status:** active.
