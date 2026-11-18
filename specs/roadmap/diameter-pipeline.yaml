@@ -198,6 +198,7 @@ theory:
     status: open
     closed_on:
     decision:
+    note: "Study document: TEEG_diameter_kernel_calibration_step2_2026-11-18.md (2026-11-18), sent as .md + .zip (with its figures/ and scripts/) in the defocus-table chat of 2026-11-18, the chat that took over D-170's handoff; not in the repository. It covers why step 1 (Block 10) is biased by the depth blend of thick tubes and why pooling cannot cure it; step 2 in three forms -- A, indirect inference on step 1's output; B, least squares on the core widths; C, B with the twins' diameters fitted -- and the hypotheses H1-H3; a worked case on a toy forward model; the width-diameter trade-off with the in-focus width; the cost; what the twins read from D-175's run (D-178: the pilot fit holds Allen's diameter). Checks in its scripts/: check01_blend_statistic.py to check07_pooling.py and thick_near_check.py; figures fig01 to fig04. Status unchanged, the user's to set."
   - id: T11
     title: "Bootstrap uncertainty of the pooled kernel on nested data"
     summary: "Why the pooled kernel's error bars (the anchor sigma_0 and the far slope gamma) come from a bootstrap, and why it resamples cells, not nodes: nodes nested in cells (the one-way random-intercept model, the design effect 1 + (n-1) rho, the between/within ANOVA split), the node bootstrap's blind spot and the cell bootstrap's few-cell bias (chi2_{C-1}/C); the rule of Block 19.6 (D-118.3)."
