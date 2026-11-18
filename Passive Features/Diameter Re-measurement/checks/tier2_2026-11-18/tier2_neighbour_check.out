@@ -1,0 +1,23 @@
+truth: node d 0.60 um, mu 0.50 /um, v0 0.0 um, z_ax 0.0 um; neighbour d 0.60 um, mu 0.50 /um; B 200 gl, noise SD 1.0 gl; hybrid; kernel table (0.08, 0.1536, 0.3924, 0.562) um at (0.0, 0.28, 0.56, 0.84) um, slope 0.79; grid h 0.0286 um, pad 14 px, rays 8 x 16
+
+=== parallel, 1.0 um aside, same depth ===
+the neighbour on the line: peak 64.4 gl; node alone: peak dip 64.7 gl; joint minus (node alone + neighbour alone): max |.| 0.12 gl
+treatment                                 d (um)  bias (%)  mu (/um) z_ax (um)  rms (gl)
+a  one tube, neighbour ignored             1.943    +223.8     0.092    +0.010      6.09   [129 s]
+b  cleared with the true neighbour         0.599      -0.1     0.500    -0.000      0.02   [21 s]
+c  cleared, neighbour d x 0.70             0.721     +20.1     0.389    +0.005      5.44   [13 s]
+d  joint, neighbour held at truth          0.600      +0.0     0.500    +0.000      0.00   [41 s]
+e  joint, neighbour held at d x 0.70       0.719     +19.8     0.391    +0.009      5.44   [59 s]
+f  joint, neighbour d and mu free          0.600      +0.0     0.500    -0.000      0.00   [66 s]   neighbour d 0.600 um, mu 0.500 /um
+
+=== crossing at 45 deg over the node, 0.84 um deeper ===
+the neighbour on the line: peak 64.7 gl; node alone: peak dip 64.7 gl; joint minus (node alone + neighbour alone): max |.| 5.79 gl
+treatment                                 d (um)  bias (%)  mu (/um) z_ax (um)  rms (gl)
+a  one tube, neighbour ignored             0.948     +58.0     0.448    +0.463      3.54   [25 s]
+b  cleared with the true neighbour         0.557      -7.1     0.523    -0.032      0.58   [12 s]
+c  cleared, neighbour d x 0.70             0.762     +27.0     0.444    +0.142      2.32   [30 s]
+d  joint, neighbour held at truth          0.600      -0.0     0.500    -0.000      0.00   [57 s]
+e  joint, neighbour held at d x 0.70       0.786     +31.0     0.443    +0.191      2.59   [107 s]
+f  joint, neighbour d and mu free          0.600      +0.0     0.500    +0.000      0.00   [64 s]   neighbour d 0.600 um, mu 0.500 /um
+
+883 renders, 627 s

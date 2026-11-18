@@ -1,0 +1,7 @@
+one tube, no neighbour in the scene: SE(d) 0.0046 um (0.77 %), SE(mu) 0.0081 /um
+parallel, 1.0 um aside, same depth:
+  joint, neighbour held: SE(d) 0.0047 um (0.78 %)
+  joint, neighbour d and mu free: SE(d) 0.0047 um (0.79 %); neighbour SE(d_q) 0.0048 um; corr(d, d_q) -0.10, corr(d, mu_q) +0.06, corr(d, mu) -0.96
+crossing at 45 deg over the node, 0.84 um deeper:
+  joint, neighbour held: SE(d) 0.0047 um (0.78 %)
+  joint, neighbour d and mu free: SE(d) 0.0052 um (0.87 %); neighbour SE(d_q) 0.0050 um; corr(d, d_q) -0.14, corr(d, mu_q) -0.07, corr(d, mu) -0.89
