@@ -359,6 +359,39 @@ def test_edge_cases():
 
 # ---------------------------------------------------------------- runner ---
 
+def test_fixed_diameter():
+    """Block 3, amendment 2 (D-173): d_fixed_um holds the diameter; (mu, v0) are fitted."""
+    cfg = cfg_measure()
+    v = profile_axis(cfg)
+    N2 = 2 * fit_nodes(cfg)
+    d, alpha, v0 = 0.8, 1.2, 0.03
+    worst = 0.0
+    for phi_deg in (0.0, 30.0):
+        phi = math.radians(phi_deg)
+        mu = alpha * math.cos(phi) / d
+        y = M.model_profile(v, d, alpha, v0, cfg.sigma_fit_um, B, N2)
+        r = F.fit_profile(v, y, phi, B, cfg, d_fixed_um=d)
+        assert r.status == "converged" and r.d_hat_um == d and r.form == "mu", (r.status, r.d_hat_um)
+        worst = max(worst, abs(r.mu_hat_per_um / mu - 1), abs(r.v0_hat_um - v0))
+        assert abs(r.alpha_hat / alpha - 1) <= 1e-6
+        # held at 0.6 d: the diameter is the held one, the absorption rises to keep the dip, the fit is worse
+        r6 = F.fit_profile(v, y, phi, B, cfg, d_fixed_um=0.6 * d)
+        assert r6.d_hat_um == 0.6 * d and r6.mu_hat_per_um > mu and r6.rss_gl2 > r.rss_gl2 + 1e-9
+        assert abs(r6.v0_hat_um - v0) <= 1e-3, r6.v0_hat_um
+        assert all(not b.startswith("d_") for b in r6.at_bound)
+        # None is the fit of all three, unchanged
+        r3 = F.fit_profile(v, y, phi, B, cfg)
+        assert r3 == F.fit_profile(v, y, phi, B, cfg, d_fixed_um=None)
+    # observed ~1e-12; the recovery tolerance of test_known_answer
+    assert worst <= 1e-6, "fixed-diameter recovery worst %.3e" % worst
+    for bad in (0.0, -0.5, float("nan"), float("inf")):
+        try:
+            F.fit_profile(v, y, 0.0, B, cfg, d_fixed_um=bad)
+        except ValueError:
+            continue
+        raise AssertionError("d_fixed_um = %r accepted" % (bad,))
+
+
 def _environment():
     parts = ["python %s" % platform.python_version()]
     for package in REPORT_PACKAGES:

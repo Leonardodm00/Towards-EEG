@@ -1016,6 +1016,83 @@ def test_clear_subcommand():
           % (ids, rec["clear"]["n_candidates"], binned["example_ids"]))
 
 
+def test_d169_path():
+    """Block 36, amendment 16 (D-169, D-171 to D-173): the clear-node path on the synthetic cell (rendered at
+    0.8 um, Allen 0.6 um): clean --no-clean records the examples with the first stage's diameter held at
+    Allen's and nothing cleaned; infer_nodes.py real then starts at Allen's diameter and fits with the centre
+    weights and the bump cut; a cleaned run keeps the unweighted fit."""
+    import csv
+    SYNTH_D_TRUE, SYNTH_ALLEN_RADIUS = 0.8, 0.3       # clean_cell.py's SYNTH_D_TRUE_UM, SYNTH_ALLEN_RADIUS_UM
+    out = os.path.join(str(ARTIFACT_DIR), "d169_test")
+    os.makedirs(out, exist_ok=True)
+    cfgj = os.path.join(out, "fast.json")
+    with open(cfgj, "w") as f:
+        json.dump(FAST, f)
+    clean, infer = os.path.join(WS, "scripts", "clean_cell.py"), os.path.join(WS, "scripts", "infer_nodes.py")
+    _run([clean, "rank", "--synthetic", "--specimen", "7", "--B", "210", "--mu", "1.0", "--out", out,
+          "--config-json", cfgj], WS)
+    _run([clean, "clear", "--synthetic", "--specimen", "7", "--out", out, "--n", "1", "--min-soma-um", "0",
+          "--config-json", cfgj], WS)
+    cdir, idir = os.path.join(out, "cleaning_d169"), os.path.join(out, "inference_d169")
+    o = _run([clean, "clean", "--synthetic", "--specimen", "7", "--examples", os.path.join(out, "examples_clear_7.json"),
+              "--out", cdir, "--no-clean", "--config-json", cfgj], WS)
+    assert "--no-clean (D-169)" in o and "round 1" not in o
+    rec = json.load(open(os.path.join(cdir, "cleaning_7.json")))
+    assert rec["stopped"] == "not_cleaned" and rec["rounds"] == 0 and rec["history"] == []
+    assert rec["no_clean"] is True and rec["pilot_diameter"] == "allen"
+    assert rec["work_list"] == rec["example_ids"] and len(rec["example_ids"]) == 1
+    nid = int(rec["example_ids"][0])
+    node = rec["nodes"][str(nid)]
+    assert node["d_allen_um"] == 2 * SYNTH_ALLEN_RADIUS and node["pilot"]["d_hat_um"] == node["d_allen_um"]   # D-173
+    assert node["d_um"] == node["d_allen_um"] and node["source"] == "pilot" and node["refine"]["status"] == "not_run"
+    assert node["theta0"][0] == node["d_allen_um"]
+    z = np.load(os.path.join(cdir, "cleaning_7_node%d.npz" % nid))
+    assert np.array_equal(z["profiles_after"], z["profiles_before"]) and not np.any(z["shadow_gl"])
+    o = _run([infer, "real", "--specimen", "7", "--cleaning-dir", cdir, "--out", idir], WS)
+    assert "not cleaned (D-169) run: residual weights allen" in o and "near-bump cut at 2 noise SDs" in o
+    inf = json.load(open(os.path.join(idir, "inference_7.json")))
+    r = inf["nodes"][str(nid)]
+    assert r["start"] == "pilot_start" and r["theta0"][0] == node["d_allen_um"]          # D-169.2: starts at Allen's
+    assert r["weights_mode"] == "allen" and r["bump_sd"] == 2.0 and 1 <= r["n_solves"] <= 3
+    from allen_diameter.analysis import line_weights
+    lam = 1.25 * line_weights.allen_fwhm_um(node["d_allen_um"], rec["config"]["renderer"]["sigma_r0_um"])
+    assert abs(r["lambda_um"] - lam) <= 1e-12, (r["lambda_um"], lam)
+    w = np.asarray(r["weights"], dtype=float)
+    assert w.shape == z["v"].shape and 0.99 < w.max() <= 1.0 and np.all(w > 0)        # a lone tube: no cut
+    assert r["v_cut_um"] == [None, None]
+    d_hat = float(r["theta"][0])
+    # The fast configuration (partition_vertical, 4 x 8 directions) is not the renderer of the synthetic cell:
+    # its unweighted fit reads 0.870 um on this node; the oracle is the rendered 0.8 um within 10 %, nearer to
+    # it than to Allen's 0.6 um the fit started at
+    print("    clear-node path: Allen %.3f um, start %.3f um, fit %.4f +- %.4f um (rendered %.3f um), %d solve(s)"
+          % (node["d_allen_um"], r["theta0"][0], d_hat, float(r["se"][0]), SYNTH_D_TRUE, r["n_solves"]))
+    assert r["status"] == "converged" and abs(d_hat / SYNTH_D_TRUE - 1.0) <= 0.10
+    rows = list(csv.DictReader(open(os.path.join(idir, "inference_7.csv"))))
+    assert rows[0]["weights"] == "allen" and float(rows[0]["lambda_um"]) == r["lambda_um"]
+    assert os.path.exists(os.path.join(idir, "fit_node%d.png" % nid))
+    assert os.path.exists(os.path.join(idir, "own_7_node%d.npz" % nid))                 # D-169.8: the own shadow kept
+    # the options: unweighted and uncut is fit_node as before; kappa is read
+    o = _run([infer, "real", "--specimen", "7", "--cleaning-dir", cdir, "--out", os.path.join(out, "inference_none"),
+              "--weights", "none", "--bump-sd", "0", "--no-own"], WS)
+    assert "residual weights none, near-bump cut off" in o
+    r0 = json.load(open(os.path.join(out, "inference_none", "inference_7.json")))["nodes"][str(nid)]
+    assert r0["weights_mode"] == "none" and "weights" not in r0 and r0["n_solves"] == 1
+    o = _run([infer, "real", "--specimen", "7", "--cleaning-dir", cdir, "--out", os.path.join(out, "inference_k2"),
+              "--weight-kappa", "2.0", "--no-own"], WS)
+    r2 = json.load(open(os.path.join(out, "inference_k2", "inference_7.json")))["nodes"][str(nid)]
+    assert abs(r2["lambda_um"] - 2.0 * lam / 1.25) <= 1e-12
+    # the focal-plane figure reads the run
+    _run([os.path.join(WS, "scripts", "show_focal.py"), "--cleaning-dir", cdir, "--specimen", "7", "--inference-dir",
+          idir], WS)
+    assert os.path.exists(os.path.join(cdir, "focal_7.png"))
+    # --pilot-diameter free with --no-clean: the first stage's own diameter
+    cfree = os.path.join(out, "cleaning_free")
+    _run([clean, "clean", "--synthetic", "--specimen", "7", "--examples", os.path.join(out, "examples_clear_7.json"),
+          "--out", cfree, "--no-clean", "--pilot-diameter", "free", "--no-own", "--config-json", cfgj], WS)
+    nfree = json.load(open(os.path.join(cfree, "cleaning_7.json")))
+    assert nfree["pilot_diameter"] == "free" and nfree["nodes"][str(nid)]["pilot"]["d_hat_um"] != node["d_allen_um"]
+
+
 def test_sigma_r0_option():
     # Block 4, amendment 1 and Block 36, amendment 14 (D-165): the kernel table re-anchored at another in-focus
     # width with its growth kept, and clean_cell.py --sigma-r0-um. Tolerances: 1e-15 um^2 on the variances

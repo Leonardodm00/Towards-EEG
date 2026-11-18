@@ -175,7 +175,17 @@ def _bbar(block2d, frame, o, branch, m):
 node_background = _bbar   # public name (Block 10's plane scan applies the same rule in every plane)
 
 
-def _node_pass(blk, branch, j, t, m, dz):
+def _d_fixed_um(branch, j, d_fixed):
+    """The diameter the first-stage fit of node j is held at (Block 5, amendment 2; D-173): None (fitted), or
+    "allen" = twice the branch's traced radius at the node."""
+    if d_fixed is None:
+        return None
+    if d_fixed != "allen":
+        raise ValueError("d_fixed must be None or 'allen', got %r" % (d_fixed,))
+    return 2.0 * float(branch.radius_um[j])
+
+
+def _node_pass(blk, branch, j, t, m, dz, d_fixed=None):
     block, ks, valid, frame = blk
     theta, phi, y_hat, e_u = path.angles(t)
     out = _Pass(t, theta, phi, y_hat, e_u)
@@ -205,7 +215,7 @@ def _node_pass(blk, branch, j, t, m, dz):
     I = profiles.sample_profile(plane, frame, o, y_hat, e_u, v, profiles.n_along(m), m.profile_step_um)
     out.centre = np.array([o[0], o[1], z_sub])
     if np.all(np.isfinite(I)) and out.B_bar > 0:
-        out.fit = fit_profile(v, I, phi, out.B_bar, m)
+        out.fit = fit_profile(v, I, phi, out.B_bar, m, _d_fixed_um(branch, j, d_fixed))
         out.centre[:2] = o + out.fit.v0_hat_um * y_hat
     return out
 
@@ -280,12 +290,12 @@ def node_request(branch, i, cfg):
     return _request(branch, i, nodes, t_raw, cfg)
 
 
-def _pilot(branch, i, blk, nodes, t_raw, cfg, reg):
+def _pilot(branch, i, blk, nodes, t_raw, cfg, reg, d_fixed=None):
     """Block 5 on the block blk (the module docstring's passes, unchanged): the
     pilot's NodeResult, the Block 13 fields at their defaults."""
     m, dz = cfg.measure, cfg.acquisition.dz_um
     R, L = int(m.direction_redraws), float(m.line_fit_window_um)
-    passes = {int(j): _node_pass(blk, branch, int(j), t_raw[int(j)], m, dz) for j in nodes}
+    passes = {int(j): _node_pass(blk, branch, int(j), t_raw[int(j)], m, dz, d_fixed) for j in nodes}
     for q in range(1, R + 1):
         current = path.window(branch.s_um, i, 0.5 * (R + 1 - q) * L)
         new = {}
@@ -293,7 +303,7 @@ def _pilot(branch, i, blk, nodes, t_raw, cfg, reg):
             w = [int(x) for x in path.window(branch.s_um, int(j), 0.5 * L) if int(x) in passes]
             C = np.array([passes[x].centre for x in w])
             t = path.orient(path.tls_direction(C), C[0], C[-1]) if len(w) >= 2 else passes[int(j)].t
-            new[int(j)] = _node_pass(blk, branch, int(j), t, m, dz)
+            new[int(j)] = _node_pass(blk, branch, int(j), t, m, dz, d_fixed)
         passes = new
     w = [int(x) for x in path.window(branch.s_um, i, 0.5 * L) if int(x) in passes]
     C = np.array([passes[x].centre for x in w])
@@ -317,7 +327,7 @@ def _pilot(branch, i, blk, nodes, t_raw, cfg, reg):
         if not np.all(np.isfinite(I)):
             flags.append("profile_nan")
         elif last.B_bar > 0:
-            fit = fit_profile(v, I, phi, last.B_bar, m)
+            fit = fit_profile(v, I, phi, last.B_bar, m, _d_fixed_um(branch, i, d_fixed))
             flags += _profile_flags(I, v, last.B_bar, m)
     if last.at_edge:
         flags.append("stack_edge")
@@ -347,7 +357,7 @@ def _pilot(branch, i, blk, nodes, t_raw, cfg, reg):
         focus_planes=np.asarray(last.kk, dtype=int), focus_score=last.F, focus_depth=last.D, k_star_depth=k_depth)
 
 
-def measure_pilot(branch, i, provider, cfg, reg=None):
+def measure_pilot(branch, i, provider, cfg, reg=None, d_fixed=None):
     """The pilot of node i of a Branch (Block 5; D-035, D-061.2): with one
     provider call, node_request's (the request measure_node makes, so the
     diagnostics that call this are served from the image cache), the passes of
@@ -361,10 +371,16 @@ def measure_pilot(branch, i, provider, cfg, reg=None):
     allen_image_align.registration_check (keys verdict, lateral_offset_um,
     z_offset_um are read) -- real data only. Returns NodeResult with the Block
     13 fields at their defaults (pilot_status "": pilot_view is the identity).
+
+    d_fixed (amendment 2, D-173): None, the pilot as above; "allen", every
+    Gaussian fit of the pilot (each window node's passes and the node's final
+    fit) holds the diameter at twice the branch's traced radius at that node
+    and fits (mu, v0): d_hat_um is then Allen's diameter.
     """
     nodes, t_raw = _window(branch, i, cfg.measure)
     blk = provider(*_request(branch, i, nodes, t_raw, cfg))
-    return _pilot(branch, i, _planes_of(blk, *_pilot_planes(branch, nodes, t_raw, cfg)), nodes, t_raw, cfg, reg)
+    return _pilot(branch, i, _planes_of(blk, *_pilot_planes(branch, nodes, t_raw, cfg)), nodes, t_raw, cfg, reg,
+                  d_fixed)
 
 
 # the NodeResult fields Block 13 added, at their defaults in a pilot

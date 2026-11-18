@@ -40,7 +40,8 @@ for _p in (SRC, HERE):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from allen_diameter.analysis import node_inference, node_inputs  # noqa: E402
+from allen_diameter.analysis import line_weights, node_inference, node_inputs  # noqa: E402
+from allen_diameter.analysis.clean_iteration import NOT_CLEANED  # noqa: E402
 from allen_diameter.analysis.clean_iteration import NodeData  # noqa: E402
 from allen_diameter.config import config_from_dict  # noqa: E402
 from allen_diameter.loading import features_io  # noqa: E402
@@ -52,7 +53,9 @@ DPI = 110
 FLAG_TIER2 = "tier2_unmodelled"
 INFERENCE_COLUMNS = ("node_id", "class", "d_allen_um", "d_pilot_um", "d_refined_um", "d_hat_um", "se_d_um",
                      "mu_hat_per_um", "se_mu_per_um", "v0_hat_um", "se_v0_um", "z_ax_hat_um", "se_z_ax_um", "cost",
-                     "chi2_mean", "planes_used", "n_planes_used", "status", "at_bound", "flags", "seconds")
+                     "chi2_mean", "planes_used", "n_planes_used", "status", "at_bound", "flags",
+                     "weights", "lambda_um", "v_cut_lo_um", "v_cut_hi_um", "n_solves",   # amendment 16 (D-169)
+                     "seconds")                                                          # the seconds stay last
 
 
 def run_config(rec, config_json, starts):
@@ -110,6 +113,22 @@ def run_real(a, log):
     log("cleaning run %s: %d example nodes, stopped %s after %d rounds; fit absorption %s, %d x %d directions, starts %s"
         % (rec_path, len(ids), rec.get("stopped"), int(rec.get("rounds", 0)), cfg.inference.absorption,
            cfg.inference.ray_n_rho, cfg.inference.ray_n_psi, tuple(cfg.inference.multistart_factors)))
+    # Amendment 16 (D-169.4, D-169.5, D-171): a run of clean_cell.py clean --no-clean (the clear-node path) is
+    # fitted with the configuration's centre weights and bump cut; a cleaned run as before, unweighted and uncut
+    # (D-166). --weights and --bump-sd replace either default.
+    clear_path = str(rec.get("stopped")) == NOT_CLEANED
+    if a.weight_kappa is not None:                 # the weights' width in FWHMs, a tuning knob (D-171.1)
+        cfg = dataclasses.replace(cfg, inference=dataclasses.replace(cfg.inference, weight_kappa=float(a.weight_kappa)))
+        cfg.validate()
+    weights_mode = a.weights if a.weights else (cfg.inference.weights if clear_path else "none")
+    bump_sd = float(a.bump_sd) if a.bump_sd is not None else (float(cfg.inference.bump_sd) if clear_path else 0.0)
+    if weights_mode not in ("allen", "none") or not (math.isfinite(bump_sd) and bump_sd >= 0):
+        raise ValueError("--weights must be allen or none and --bump-sd finite and >= 0")
+    log("%s run: residual weights %s%s, near-bump cut %s; first stage's diameter %s"
+        % ("not cleaned (D-169)" if clear_path else "cleaned", weights_mode,
+           (" (lambda = %.3g x FWHM from Allen's diameter and sigma_r(0) = %.4g um, re-centred)"
+            % (cfg.inference.weight_kappa, cfg.renderer.sigma_r0_um)) if weights_mode == "allen" else "",
+           ("at %.3g noise SDs" % bump_sd) if bump_sd > 0 else "off", rec.get("pilot_diameter", "free")))
     from allen_diameter.plotting import inference_figures as IF
     import matplotlib.pyplot as plt
     cache = line_fast.SectionCache()
@@ -140,7 +159,32 @@ def run_real(a, log):
             sigma = float(info["sigma_gl"])
             forward = node_inputs.forward_factory(pilot, tuple(float(x) for x in info["U_axis_um"]), node, cfg,
                                                   cache)        # the tube's extents (amendment 3)
-            fit = node_inference.fit_node(prof, node.B_gl, sigma, forward, theta0, cfg)
+            w_fit, winfo = None, dict(n_solves=1, lambda_um=float("nan"))
+            v_lo, v_hi = -math.inf, math.inf
+            if weights_mode == "none" and bump_sd == 0:
+                fit = node_inference.fit_node(prof, node.B_gl, sigma, forward, theta0, cfg)
+            else:
+                fwhm = line_weights.allen_fwhm_um(float(info["d_allen_um"]), float(cfg.renderer.sigma_r0_um))
+                v_t = node_inputs.trace_offset(pilot, node.node_xyz)     # the tube's centre on the line is v0 - v_t
+                centre0 = float(theta0[2]) - v_t
+                planes0 = node_inference.select_planes(forward(*[float(x) for x in theta0]), node.B_gl, sigma, cfg)
+                if not np.any(planes0):
+                    raise ValueError("no plane is readable at the start (plane_snr_min)")
+                keep, v_lo, v_hi = line_weights.bump_mask(
+                    prof, node.B_gl, sigma, node.v, centre0, fwhm, bump_sd, cfg.inference.bump_half_depth,
+                    cfg.inference.bump_smooth_samples, planes=planes0)
+                if weights_mode == "allen":
+                    lam = float(cfg.inference.weight_kappa) * fwhm
+                    fit, winfo = node_inference.fit_node_recentred(prof, node.B_gl, sigma, forward, theta0, cfg,
+                                                                   node.v, lam, centre_offset_um=-v_t, keep=keep,
+                                                                   planes=planes0)
+                    w_fit = winfo["weights"]
+                else:
+                    w_fit = keep.astype(float)
+                    fit = node_inference.fit_node(prof, node.B_gl, sigma, forward, theta0, cfg, planes=planes0,
+                                                  weights=w_fit)
+            row.update(weights=weights_mode, lambda_um=winfo["lambda_um"], v_cut_lo_um=v_lo, v_cut_hi_um=v_hi,
+                       n_solves=int(winfo["n_solves"]))
         except Exception as exc:                      # one node's failure never stops the run
             n_failed += 1
             row.update(flags=";".join(flags + ["fit_error"]), seconds=time.time() - t0)
@@ -162,7 +206,16 @@ def run_real(a, log):
         n_failed += fit.status == "failed"
         per_node[str(nid)] = dict(start=row["start"], chi2_per_plane=fit.chi2_per_plane, ks=node.ks, planes=fit.planes, theta=th,
                                   cov=fit.cov, se=se, theta0=theta0, sigma_gl=sigma, n_starts=fit.n_starts,
-                                  nfev=fit.nfev, status=fit.status)
+                                  nfev=fit.nfev, status=fit.status, weights_mode=weights_mode,
+                                  lambda_um=winfo["lambda_um"], v_cut_um=[v_lo, v_hi], bump_sd=bump_sd,
+                                  n_solves=int(winfo["n_solves"]), recentred=bool(winfo.get("converged", True)),
+                                  **({} if w_fit is None else {"weights": np.asarray(w_fit, dtype=float)}))
+        if w_fit is not None:
+            log("node %d: weights %s, lambda %.3f um, kept v in [%s, %s] um (%d of %d samples), %d solve(s)%s"
+                % (nid, weights_mode, winfo["lambda_um"], "%.2f" % v_lo if math.isfinite(v_lo) else "-inf",
+                   "%.2f" % v_hi if math.isfinite(v_hi) else "+inf", int(np.sum(np.asarray(w_fit) > 0)),
+                   node.v.size, int(winfo["n_solves"]),
+                   "" if winfo.get("converged", True) else " (the centre still moving)"))
         log("node %d: d %.4f +- %.4f um (Allen %.3f, pilot %.3f, refined %.3f), mu %.4g /um, v0 %.3f um, z_ax %.3f um, "
             "%d planes, mean chi2/N %.3g, %s%s; %d evaluations, %.1f s"
             % (nid, th[0], se[0], row["d_allen_um"], row["d_pilot_um"], row["d_refined_um"], th[1], th[2], th[3],
@@ -193,7 +246,9 @@ def run_real(a, log):
             try:
                 model = node.B_gl[:, None] * forward(*th)
                 fig = IF.figure_fit(prof, model, node.v, node.ks, sigma, fit,
-                                    dict(node_id=nid, **({"class": row["class"]} if row["class"] else {})))
+                                    dict(node_id=nid, **({"class": row["class"]} if row["class"] else {}),
+                                         **({"profiles": "as recorded"} if clear_path else {})),
+                                    weights=w_fit)
                 IF.save(fig, os.path.join(a.out, "fit_node%d.png" % nid), DPI)
                 plt.close(fig)
             except Exception as exc:
@@ -233,6 +288,15 @@ def main(argv=None):
     r.add_argument("--synthetic", action="store_true", help="accepted for symmetry: this step reads only files")
     r.add_argument("--no-own", action="store_true", help="skip the same-node clearance product (Block 36, "
                    "amendment 11)")
+    r.add_argument("--weights", choices=("allen", "none"), default="", help="the residual weights (Block 36, "
+                   "amendment 16): allen = exp(-|v - v_c| / lambda) about the fitted centre, lambda = "
+                   "inference.weight_kappa x the FWHM expected from Allen's diameter; none = unweighted. Default: "
+                   "the configuration's inference.weights for a run of clean --no-clean, none for a cleaned run")
+    r.add_argument("--weight-kappa", type=float, default=None, help="lambda in units of the FWHM expected from "
+                   "Allen's diameter, replacing inference.weight_kappa")
+    r.add_argument("--bump-sd", type=float, default=None, help="a near bump is a second dip rising at least this "
+                   "many noise SDs; the samples from it outwards get no weight; 0 = off. Default: the "
+                   "configuration's inference.bump_sd for a run of clean --no-clean, 0 for a cleaned run")
     a = ap.parse_args(argv)
     log = Log()
     log("infer_nodes.py real, specimen %s%s" % (a.specimen, " (synthetic)" if a.synthetic else ""))

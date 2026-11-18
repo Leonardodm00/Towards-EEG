@@ -102,7 +102,7 @@ def _fit_title(meta, fit):
     return head + "\n" + line
 
 
-def figure_fit(profiles_gl, model_gl, v, ks, sigma_gl, fit, meta, planes=None):
+def figure_fit(profiles_gl, model_gl, v, ks, sigma_gl, fit, meta, planes=None, weights=None):
     """One node's fit. Returns the matplotlib Figure.
 
     profiles_gl, model_gl: (n_planes, n_v) grey levels -- the cleaned profiles
@@ -111,8 +111,13 @@ def figure_fit(profiles_gl, model_gl, v, ks, sigma_gl, fit, meta, planes=None):
     sigma_gl: the noise SD (gl, finite > 0) the residual is divided by.
     fit: a Block 30 NodeFit (theta, se (4,), planes (n_planes,) bool,
       chi2_per_plane (n_planes,), status, at_bound).
-    meta: mapping for the title -- node_id, class; each optional.
+    meta: mapping for the title -- node_id, class; each optional; "profiles"
+      (optional) names the profiles in the legend, default "cleaned".
     planes: plane indices k (values of ks) to show, in that order; None = all.
+    weights: None, or (n_v,) the fit's residual weights in [0, 1] (Block 34,
+      amendment 2; D-169.4, D-171.4): drawn in every profile panel as a thin
+      line on a right-hand axis from 0 to 1, and the samples of zero weight
+      (beyond a near bump's cut) shaded in both panels.
 
     Layout: per shown plane a column of two axes, the profile panel (profile:
     ink markers, model: blue line) over the residual panel ((I - B tau) /
@@ -149,6 +154,11 @@ def figure_fit(profiles_gl, model_gl, v, ks, sigma_gl, fit, meta, planes=None):
         raise ValueError("meta must be a mapping (node_id, class)")
     cols = _plane_cols(ks, planes)
     resid = (prof - model) / sigma        # display transform of the inputs (SPEC Block 34)
+    w = None
+    if weights is not None:
+        w = np.asarray(weights, dtype=float)
+        if w.shape != (n_v,) or not np.all(np.isfinite(w)) or np.any(w < 0):
+            raise ValueError("weights must be (n_v,) = (%d,), finite and >= 0" % n_v)
 
     plt = _plt()
     n = len(cols)
@@ -167,12 +177,30 @@ def figure_fit(profiles_gl, model_gl, v, ks, sigma_gl, fit, meta, planes=None):
         _style(ax_r)
         on = bool(used[j])
         c_obs, c_mod, c_res, c_lim = (INK, BLUE, INK2, ORANGE) if on else (GREYED,) * 4
-        ax_p.plot(v, prof[j], ls="none", marker="o", ms=2.8, color=c_obs, label="profile (cleaned)", gid="profile")
+        ax_p.plot(v, prof[j], ls="none", marker="o", ms=2.8, color=c_obs, label="profile (%s)" % meta.get("profiles", "cleaned"),
+                  gid="profile")
         ax_p.plot(v, model[j], ls="-", lw=1.4, color=c_mod, label="model B tau", gid="model")
         ax_r.axhline(0.0, color=GRID, lw=1.0, zorder=1)
         for s in (-RESID_LINE, RESID_LINE):
             ax_r.axhline(s, color=c_lim, lw=1.0, ls="--", gid="resid_limit")
         ax_r.plot(v, resid[j], ls="-", lw=0.8, marker=".", ms=3, color=c_res, gid="residual")
+        if w is not None:
+            half = 0.5 * float(np.median(np.diff(v)))
+            for n_cut in np.flatnonzero(w == 0):
+                for ax_ in (ax_p, ax_r):
+                    ax_.axvspan(v[n_cut] - half, v[n_cut] + half, color=GREYED, alpha=0.25, lw=0, zorder=0,
+                                gid="no_weight")
+            ax_w = ax_p.twinx()
+            ax_w.plot(v, w, ls="-", lw=0.9, color=ORANGE, alpha=0.8, gid="weights")
+            ax_w.set_ylim(0.0, 1.05)
+            ax_w.tick_params(axis="y", labelsize=6, colors=ORANGE, length=2)
+            for side in ("top", "left", "bottom"):
+                ax_w.spines[side].set_visible(False)
+            ax_w.spines["right"].set_color(ORANGE)
+            if c == n_c - 1 or i == n - 1:
+                ax_w.set_ylabel("weight", fontsize=7, color=ORANGE)
+            else:
+                ax_w.set_yticklabels([])
         ax_r.set_xlim(v[0], v[-1])
         if on:
             ax_p.set_title("k = %d,  chi2/N = %.3g" % (int(ks[j]), chi2[j]), fontsize=8.5, color=INK)

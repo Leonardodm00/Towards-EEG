@@ -475,3 +475,62 @@ ax.set_ylabel("refined diameter / Allen's")
 ax.legend()
 fig.savefig("%s/ratio_by_size_%d.png" % (CLEAN_Z, SPECIMEN), dpi=150, bbox_inches="tight")
 plt.show()
+
+# %% [markdown]
+# ## Cell 20: the clear-node fit -- no cleaning, one pass, the first stage held at Allen's diameter, centre weights, bump cut (D-169, D-171 to D-173)
+#
+# The nodes are Cell 19c's (clear nodes by size; its examples file is reused when it exists, else they are picked
+# here with the same rule). Two steps (SPEC Block 36 amendment 16):
+#   1. `clean --no-clean`: per node the first stage with the diameter held at Allen's (absorption, centre, depth,
+#      sharpest plane, direction and background from it), the patch, the line as recorded. No neighbour is cleaned,
+#      no round is run. Downloads the patches when they are not cached; about a minute per node.
+#   2. `infer_nodes.py real`: the multi-plane one-tube fit started at Allen's diameter, its residuals weighted by
+#      exp(-|v - v_c| / lambda) about the fitted centre, lambda = WEIGHT_KAPPA x FWHM expected from Allen's diameter
+#      (FWHM^2 = (0.866 D_Allen)^2 + (2.355 sigma_r(0))^2, sigma_r(0) = 0.080 um), re-centred while fitting; a second
+#      dip beside the central one that rises at least BUMP_SD noise SDs gives no weight to the samples from it
+#      outwards. Then the node's own expected shadow (same-node clearance) at the estimate.
+# Knobs: WEIGHT_KAPPA, BUMP_SD (0 = no cut), D169_WEIGHTS ("none" = unweighted), D169_STARTS.
+# Time: the fit is the long step, of the order of 10 min per node and start (not measured for this path).
+# Output to send back: the lines `node <id>: weights ...` and `node <id>: d ...` of the log, the table, the
+# `focal_<S>.png` figure and the `fit_node<id>.png` figures (orange line: the weights; grey: samples with no weight).
+
+# %%
+import shutil
+import pandas as pd
+from IPython.display import Image, display
+WEIGHT_KAPPA = 1.25                    # lambda in units of the FWHM from Allen's diameter (D-171.1; slightly > 1)
+BUMP_SD = 2.0                          # a near bump rises at least this many noise SDs (D-171.3); 0 = no cut
+D169_WEIGHTS = "allen"                 # "allen": the centre weights; "none": unweighted (the bump cut still applies)
+D169_STARTS = "1.0,1.6"                # the fit's starts, x Allen's diameter; "1.0" alone is twice as fast
+D169_BINS, D169_N_PER_BIN, D169_MIN_SOMA_UM = "0.40,0.45,0.60,0.80,1.20,5.0", 1, 20.0
+RERUN_D169_PREP = False                # True: prepare the nodes again although the folder holds them
+CLEAN_D, INFER_D = OUT + "/cleaning_d169", OUT + "/inference_d169"
+os.makedirs(CLEAN_D, exist_ok=True)
+os.makedirs(INFER_D, exist_ok=True)
+EXAMPLES_D = "%s/examples_sizes_%d.json" % (CLEAN_D, SPECIMEN)
+EX_19C = "%s/cleaning_sizes/examples_sizes_%d.json" % (OUT, SPECIMEN)
+if not os.path.exists(EXAMPLES_D):
+    if os.path.exists(EX_19C):                         # the clear traces are Cell 19c's nodes (D-171.5)
+        shutil.copyfile(EX_19C, EXAMPLES_D)
+    else:
+        run("scripts/clean_cell.py", "clear", "--specimen", SPECIMEN, "--out", CLEAN, "--cache-dir", CACHE_DIR, *ALIGN,
+            *CLEAN_CFG, "--n", D169_N_PER_BIN, "--min-soma-um", D169_MIN_SOMA_UM, "--d-bins", D169_BINS)
+        shutil.copyfile("%s/examples_clear_%d.json" % (CLEAN, SPECIMEN), EXAMPLES_D)
+with open(EXAMPLES_D) as f:
+    print("[cell 20] nodes:", json.load(f)["example_ids"])
+if RERUN_D169_PREP or not os.path.exists("%s/cleaning_%d.json" % (CLEAN_D, SPECIMEN)):
+    run("scripts/clean_cell.py", "clean", "--specimen", SPECIMEN, "--out", CLEAN_D, "--cache-dir", CACHE_DIR, *ALIGN,
+        *CLEAN_CFG, "--examples", EXAMPLES_D, "--B", B_GL, "--mu", MU, "--no-clean")
+run("scripts/infer_nodes.py", "real", "--specimen", SPECIMEN, "--cleaning-dir", CLEAN_D, "--out", INFER_D,
+    "--weights", D169_WEIGHTS, "--bump-sd", BUMP_SD, "--weight-kappa", WEIGHT_KAPPA, "--starts", D169_STARTS)
+run("scripts/show_focal.py", "--cleaning-dir", CLEAN_D, "--specimen", SPECIMEN, "--inference-dir", INFER_D,
+    "--zoom-um", 6.0)
+res_d = pd.read_csv("%s/inference_%d.csv" % (INFER_D, SPECIMEN))
+res_d["d_over_allen"] = res_d["d_hat_um"] / res_d["d_allen_um"]
+display(res_d[["node_id", "d_allen_um", "d_hat_um", "se_d_um", "d_over_allen", "mu_hat_per_um", "v0_hat_um",
+               "z_ax_hat_um", "chi2_mean", "n_planes_used", "lambda_um", "v_cut_lo_um", "v_cut_hi_um", "n_solves",
+               "status", "at_bound", "flags"]].round(4))
+display(Image(filename="%s/focal_%d.png" % (CLEAN_D, SPECIMEN)))
+for path in sorted(glob.glob(INFER_D + "/fit_node*.png")):
+    print(path)
+    display(Image(filename=path))

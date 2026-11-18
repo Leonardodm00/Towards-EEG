@@ -21,6 +21,15 @@ Checks
     test_edge_cases     truth beyond a bound -> at_bound (and NaN cov row);
                         NaN forward -> failed (planes given or selected);
                         planes all False -> ValueError; invalid inputs
+    test_weights        amendment 2 (D-169.4, D-171.2): weights of ones = no
+                        weights; noise-free recovery under centre weights; a
+                        second dip beside the tube pulls the unweighted fit's d
+                        (+5 %, +220 % in the two cases) and the cut with the
+                        centre weights removes most of it (+2 %, +16 %); the
+                        sandwich covariance covers the truth in
+                        [60, 76] % of 300 noisy sets; the refusals
+    test_recentred      fit_node_recentred started 0.2 um off the centre ends on
+                        it within 3 solves; its record; keep honoured
 
 Run (from the code folder "Passive Features/Diameter Re-measurement")
     python3 tests/smoke/test_smoke_node_inference.py
@@ -53,6 +62,7 @@ SRC = WS / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from allen_diameter.analysis import line_weights as LW  # noqa: E402
 from allen_diameter.analysis import node_inference as NI  # noqa: E402
 from allen_diameter.config import default_config  # noqa: E402
 from allen_diameter.model import tube_model as M  # noqa: E402
@@ -292,6 +302,106 @@ def test_edge_cases():
 
 
 # ---------------------------------------------------------------- runner ---
+
+def test_weights():
+    B = np.full(Z_PLANES.size, B_GL)
+    I = B_GL * FORWARD(*TRUTH)
+    # (a) weights of ones are the unweighted fit: the same residual vector, so theta bit-identical; cov equal
+    #     up to the rounding of A^{-1} A A^{-1} against A^{-1} [1e-9 relative]
+    rng = make_rng(SEED + 1)
+    In = I + rng.normal(0.0, NOISE_GL, size=I.shape)
+    f0 = NI.fit_node(In, B, NOISE_GL, FORWARD, START, CFG)
+    f1 = NI.fit_node(In, B, NOISE_GL, FORWARD, START, CFG, weights=np.ones(V.size))
+    f2 = NI.fit_node(In, B, NOISE_GL, FORWARD, START, CFG, weights=np.ones((Z_PLANES.size, V.size)))
+    assert_array_equal(f1.theta, f0.theta)
+    assert_array_equal(f2.theta, f0.theta)
+    check_close("weights_ones_cov", f1.cov, f0.cov, rtol=1e-9, atol=1e-18)
+    check_close("weights_ones_chi2", f1.chi2_per_plane, f0.chi2_per_plane, rtol=1e-12)
+    assert f1.cost == f0.cost
+    # (b) noise-free recovery under the centre weights of Block 39 [as test_known_answer]
+    w = LW.centre_weights(V, TRUTH[2], 0.6)
+    fw = NI.fit_node(I, B, NOISE_GL, FORWARD, START, CFG, weights=w)
+    assert fw.status == "converged", (fw.status, fw.at_bound)
+    check_close("weights_known_d_mu", fw.theta[:2], TRUTH[:2], rtol=1e-6)
+    check_close("weights_known_v0_z", fw.theta[2:], TRUTH[2:], rtol=0.0, atol=1e-6)
+    # (c) a second dip beside the tube, not in the model (Gaussian; every plane): the cut and the weights remove
+    #     most of its pull on d, not all of it -- the second dip's near flank lies inside the cut. Two cases
+    #     (checks/d169_2026-11-18/bump_bias_check.py): 1.3 um aside, SD 0.3 um, 60 gl; 1.5 um aside, SD 0.6 um, 80 gl
+    lam = 1.25 * LW.allen_fwhm_um(TRUTH[0], S0)
+    for sep, sd, depth, lo_none, hi_both in ((1.3, 0.3, 60.0, 0.04, 0.03), (1.5, 0.6, 80.0, 1.0, 0.20)):
+        Ib = I - depth * np.exp(-0.5 * ((V - (TRUTH[2] + sep)) / sd) ** 2)[None, :]
+        fu = NI.fit_node(Ib, B, NOISE_GL, FORWARD, START, CFG)
+        keep, v_lo, v_hi = LW.bump_mask(Ib, B, NOISE_GL, V, TRUTH[2], 0.9, 2.0, 0.5, 1.0)
+        assert np.isfinite(v_hi) and not np.isfinite(v_lo) and TRUTH[2] < v_hi < TRUTH[2] + sep, (v_lo, v_hi)
+        fk = NI.fit_node(Ib, B, NOISE_GL, FORWARD, START, CFG, weights=keep.astype(float))
+        fc = NI.fit_node(Ib, B, NOISE_GL, FORWARD, START, CFG, weights=LW.centre_weights(V, TRUTH[2], lam) * keep)
+        rel = [f.theta[0] / TRUTH[0] - 1.0 for f in (fu, fk, fc)]
+        print("    second dip %.1f um aside (SD %.1f um, %.0f gl): d off by %+.1f %% unweighted, %+.1f %% cut at "
+              "%.2f um, %+.1f %% cut + centre weights" % (sep, sd, depth, 100 * rel[0], 100 * rel[1], v_hi,
+                                                         100 * rel[2]))
+        assert rel[0] > lo_none, "the unweighted fit should be pulled by the second dip, got %.3f" % rel[0]
+        assert abs(rel[2]) < hi_both and abs(rel[2]) < abs(rel[1]) < abs(rel[0]), rel
+    # (d) the sandwich covariance: coverage of d_hat +- se under centre weights [60, 76] % at 300 sets
+    #     (binomial SD 2.7 %), and the naive (J_w^T J_w)^{-1} would not be the estimator's covariance
+    rng = make_rng(SEED + 2)
+    d_hat, se = [], []
+    for _ in range(N_SETS):
+        f = NI.fit_node(noisy_set(rng), B, NOISE_GL, FORWARD, START, CFG, weights=w)
+        assert f.status == "converged", f.status
+        d_hat.append(f.theta[0])
+        se.append(f.se[0])
+    d_hat, se = np.array(d_hat), np.array(se)
+    cover = np.mean(np.abs(d_hat - TRUTH[0]) <= se)
+    print("    centre weights (lambda 0.6 um), %d sets: coverage %.3f; mean se %.5f um, SD of d_hat %.5f um; "
+          "unweighted SD would be smaller (the weights cost precision)" % (N_SETS, cover, se.mean(),
+                                                                          d_hat.std(ddof=1)))
+    assert 0.60 <= cover <= 0.76, "coverage %.3f outside [0.60, 0.76]" % cover
+    assert abs(se.mean() / d_hat.std(ddof=1) - 1.0) < 0.15, (se.mean(), d_hat.std(ddof=1))
+    # (e) chi2_k / N is the weighted mean; a plane of zero weight is NaN
+    w2 = np.tile(w, (Z_PLANES.size, 1))
+    w2[0] = 0.0
+    fz = NI.fit_node(In, B, NOISE_GL, FORWARD, START, CFG, weights=w2, planes=np.ones(Z_PLANES.size, dtype=bool))
+    assert np.isnan(fz.chi2_per_plane[0]) and np.all(np.isfinite(fz.chi2_per_plane[1:]))
+    r = (In - B_GL * FORWARD(*fz.theta)) / NOISE_GL
+    check_close("weights_chi2", fz.chi2_per_plane[1:], (w2[1:] * r[1:] ** 2).sum(axis=1) / w2[1:].sum(axis=1),
+                rtol=1e-9)
+    check_close("weights_cost", fz.cost, float((w2 * r ** 2).sum()), rtol=1e-9)
+    # (f) refusals
+    for bad in (-np.ones(V.size), np.full(V.size, np.nan), np.ones(V.size + 1), np.zeros(V.size)):
+        _raises(ValueError, NI.fit_node, In, B, NOISE_GL, FORWARD, START, CFG, weights=bad)
+
+
+def test_recentred():
+    B = np.full(Z_PLANES.size, B_GL)
+    I = B_GL * FORWARD(*TRUTH)
+    start = np.array([1.3, 0.7, TRUTH[2] - 0.2, 0.0])       # the weights start 0.2 um off the tube's centre
+    fit, info = NI.fit_node_recentred(I, B, NOISE_GL, FORWARD, start, CFG, V, 0.6)
+    print("    re-centred fit from 0.2 um off: v0 error %.2e um, %d solves, converged %s"
+          % (fit.theta[2] - TRUTH[2], info["n_solves"], info["converged"]))
+    assert fit.status == "converged" and info["converged"] and 2 <= info["n_solves"] <= CFG.inference.weight_irls_max_iter
+    assert abs(info["centre_um"] - TRUTH[2]) <= 1e-3 and abs(fit.theta[2] - TRUTH[2]) <= 1e-6
+    check_close("recentred_d_mu", fit.theta[:2], TRUTH[:2], rtol=1e-6)
+    check_close("recentred_weights", info["weights"], LW.centre_weights(V, info["centre_um"], 0.6), rtol=1e-12)
+    assert set(info) == {"n_solves", "centre_um", "converged", "lambda_um", "nfev", "weights"} and info["lambda_um"] == 0.6
+    # the offset maps the fit's v0 onto the line's coordinate: weights centred at v0 + offset
+    fit2, info2 = NI.fit_node_recentred(I, B, NOISE_GL, FORWARD, TRUTH, CFG, V, 0.6, centre_offset_um=0.3)
+    assert abs(info2["centre_um"] - (TRUTH[2] + 0.3)) <= 1e-3
+    # keep: the samples where it is False carry zero weight
+    keep = V < TRUTH[2] + 0.8
+    fit3, info3 = NI.fit_node_recentred(I, B, NOISE_GL, FORWARD, start, CFG, V, 0.6, keep=keep)
+    assert np.all(info3["weights"][~keep] == 0) and np.all(info3["weights"][keep] > 0)
+    check_close("recentred_keep_d", fit3.theta[0], TRUTH[0], rtol=1e-6)
+    # the z box stays about the first start (not the re-starts)
+    assert abs(fit.theta[3] - TRUTH[3]) <= 1e-6
+    # determinism and inputs unchanged
+    I0, s0 = I.copy(), start.copy()
+    fit4, _ = NI.fit_node_recentred(I, B, NOISE_GL, FORWARD, start, CFG, V, 0.6)
+    assert_array_equal(fit4.theta, fit.theta)
+    assert_array_equal(I, I0)
+    assert_array_equal(start, s0)
+    _raises(ValueError, NI.fit_node_recentred, I, B, NOISE_GL, FORWARD, start, CFG, V, 0.6, keep=np.ones(3, dtype=bool))
+    _raises(ValueError, NI.fit_node_recentred, I, B, NOISE_GL, FORWARD, start, CFG, V, -1.0)
+
 
 def _environment():
     parts = [f"python {platform.python_version()}"]

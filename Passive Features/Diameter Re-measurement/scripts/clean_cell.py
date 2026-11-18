@@ -673,7 +673,15 @@ def run_clean(a, cfg, log):
     log("scene: %d segments, %d soma discs; %d nodes in the features table" % (scene.seg_xyz.shape[0],
                                                                                 scene.soma.shape[0], len(features0)))
     wpeaks = {}
-    work = node_inputs.work_list(examples, fscene0, swc, cfg, cfg.cleaning.work_peak_min_gl, B, peaks=wpeaks)
+    no_clean = bool(getattr(a, "no_clean", False))        # amendment 16 (D-169.7): the examples only, nothing cleaned
+    pilot_d = getattr(a, "pilot_diameter", None) or ("allen" if no_clean else "free")
+    if no_clean:
+        work = [int(i) for i in examples]
+        log("--no-clean (D-169): the work list is the %d example nodes; no neighbour is cleaned, no round is run; "
+            "the first stage's diameter is %s" % (len(work), "held at Allen's (D-173)" if pilot_d == "allen"
+                                                  else "fitted"))
+    else:
+        work = node_inputs.work_list(examples, fscene0, swc, cfg, cfg.cleaning.work_peak_min_gl, B, peaks=wpeaks)
     cut = [i for i in examples if i not in work]
     if cut:                                         # amendment 2, F5: more examples than work_max_nodes
         log("work list capped at %d nodes: %d example nodes cut %s" % (cfg.cleaning.work_max_nodes, len(cut), cut))
@@ -706,7 +714,7 @@ def run_clean(a, cfg, log):
             ob = node_inputs.own_branch(swc, run, xyz)
             if ob is None:
                 raise ValueError("a one-node stretch")
-            pilot = measure_pilot(full, off + t, provider, cfg)
+            pilot = measure_pilot(full, off + t, provider, cfg, d_fixed="allen" if pilot_d == "allen" else None)
         except Exception as exc:                     # one node's failure never stops the run
             dropped[nid] = "%s: %s" % (type(exc).__name__, exc)
             log("node %d: dropped (%s) in %.1f s" % (nid, dropped[nid], time.time() - t0))
@@ -756,6 +764,7 @@ def run_clean(a, cfg, log):
     kept_examples = [i for i in examples if i in infos]
     base = dict(specimen=str(a.specimen), source=label, examples_file=os.path.abspath(a.examples),
                 example_ids=kept_examples, examples_requested=examples, examples_cut=cut, work_list=work, dropped=dropped,
+                pilot_diameter=pilot_d, no_clean=no_clean,
                 B_gl=B, B_source=B_src, mu_per_um=mu, mu_source=mu_src,
                 transform=dict(shift_full_px=list(transform["shift_full_px"]), flip_y_full_h=transform["flip_y_full_h"],
                                z0_um=transform["z0_um"]), **config_sections(cfg))
@@ -877,6 +886,8 @@ def run_clean(a, cfg, log):
             if nid in classes:
                 meta["class"] = classes[nid]
             try:
+                if res.rounds < 1:                      # --no-clean: nothing was cleaned, no figure of it
+                    raise RuntimeError("nothing cleaned")
                 import matplotlib.pyplot as plt
                 fig = CF.figure_node(n.block, res.shadow[nid], res.cleaned[nid], n.ks, CropFrame(n.left, n.top, 0, res0),
                                      line_xy, n.v, res.profiles_before[nid], res.profiles_after[nid], meta, planes=planes)
@@ -903,6 +914,8 @@ def run_clean(a, cfg, log):
                 except Exception as exc:
                     png = "%s, no own figure (%s: %s)" % (png, type(exc).__name__, exc)
             log("example node %d: %s, %s" % (nid, npz, png))
+        if not res.history:                              # --no-clean: no round to draw
+            return ""
         fig = CF.figure_rounds(res.history, cfg)
         png = CF.save(fig, os.path.join(a.out, "cleaning_rounds.png"), DPI)
         import matplotlib.pyplot as plt
@@ -924,6 +937,13 @@ def run_clean(a, cfg, log):
         except Exception as exc:                       # a failed save never stops the rounds
             log("round %d: the outputs could not be written (%s: %s)" % (h["round"], type(exc).__name__, exc))
 
+    if no_clean:                                         # amendment 16 (D-169.7): the record, nothing cleaned
+        res = clean_iteration.prepared_only(features0, scene, nodes, cfg, keep_ids=kept_examples)
+        write_outputs(res)
+        clock.finish()
+        log("--no-clean: %d example nodes recorded with their lines as read (stopped %s); done"
+            % (len(kept_examples), res.stopped))
+        return 0
     t_run = time.time()
     try:
         res = clean_iteration.run_rounds(features0, scene, nodes, cfg, sigma, timed_factory,
@@ -1000,6 +1020,12 @@ def main(argv=None):
     c.add_argument("--max-work", type=int, default=None, help="cleaning.work_max_nodes")
     c.add_argument("--no-own", action="store_true", help="skip the same-node clearance product (Block 36, "
                    "amendment 11); the features and the fits are the same either way")
+    c.add_argument("--no-clean", action="store_true", help="the clear-node path (Block 36, amendment 16; D-169): "
+                   "prepare the example nodes only and record their lines as read; no neighbour is cleaned, no "
+                   "round is run. Then infer_nodes.py real fits them")
+    c.add_argument("--pilot-diameter", choices=("allen", "free"), default=None, help="the first stage's diameter: "
+                   "allen = held at Allen's, the absorption and the centre fitted (D-173); free = fitted. Default: "
+                   "allen with --no-clean, free otherwise")
     a = ap.parse_args(argv)
     log = Log()
     cfg = load_config(a.config_json)

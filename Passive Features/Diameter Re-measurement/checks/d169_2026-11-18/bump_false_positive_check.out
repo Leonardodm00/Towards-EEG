@@ -1,0 +1,17 @@
+cut rate over 500 draws; noise SD 2.5 gl; m = 2.0; columns: second dip of depth 0, 2, 3, 4 noise SDs
+K = 1 planes  per plane    1.00  1.00  1.00  1.00
+K = 1 planes  mean, s=0    1.00  1.00  1.00  1.00
+K = 1 planes  mean, s=1    0.04  0.19  0.55  0.85
+K = 1 planes  mean, s=1.5  0.01  0.01  0.10  0.44
+K = 3 planes  per plane    1.00  1.00  1.00  1.00
+K = 3 planes  mean, s=0    0.35  0.77  0.97  1.00
+K = 3 planes  mean, s=1    0.00  0.03  0.40  0.91
+K = 3 planes  mean, s=1.5  0.00  0.00  0.04  0.36
+K = 5 planes  per plane    1.00  1.00  1.00  1.00
+K = 5 planes  mean, s=0    0.04  0.58  0.97  1.00
+K = 5 planes  mean, s=1    0.00  0.01  0.37  0.97
+K = 5 planes  mean, s=1.5  0.00  0.00  0.01  0.47
+K = 9 planes  per plane    1.00  1.00  1.00  1.00
+K = 9 planes  mean, s=0    0.00  0.42  0.99  1.00
+K = 9 planes  mean, s=1    0.00  0.00  0.50  1.00
+K = 9 planes  mean, s=1.5  0.00  0.00  0.00  0.83

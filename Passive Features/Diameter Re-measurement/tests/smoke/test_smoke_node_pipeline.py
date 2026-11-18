@@ -249,6 +249,35 @@ def test_invariants():
     assert peak(ge.focus_score) == 0 and peak(ge.focus_depth) == ge.k_star_depth, (ge.focus_score, ge.focus_depth)
 
 
+def test_pilot_fixed_diameter():
+    """Block 5, amendment 2 (D-173): d_fixed="allen" holds every Gaussian fit of the pilot at twice the traced
+    radius; the centre, the sharpest plane and the direction stay those of a first stage."""
+    cfg = default_config()
+    d_true, d_allen, phi, theta, c = 1.0, 0.6, 0.0, 0.3, (0.03, -0.02, 0.05)
+    tube = G.Tube(c, 0.5 * d_true, phi, theta, 1.0, 6.0, "axial")
+    br = phantom_branch(c, phi, theta, 0.5 * d_allen)
+    free = NP.measure_pilot(br, 4, make_provider([tube], [1.0], cfg, 1), cfg)
+    held = NP.measure_pilot(br, 4, make_provider([tube], [1.0], cfg, 1), cfg, d_fixed="allen")
+    again = NP.measure_pilot(br, 4, make_provider([tube], [1.0], cfg, 1), cfg, d_fixed=None)
+    print("    d rendered %.2f um, Allen %.2f um: free d %.3f mu %.3f; held d %.3f mu %.3f; k* %d / %d"
+          % (d_true, d_allen, free.d_hat_um, free.mu_hat_per_um, held.d_hat_um, held.mu_hat_per_um, free.k_star,
+             held.k_star))
+    assert held.d_hat_um == d_allen and held.fit.d_hat_um == d_allen
+    assert held.mu_hat_per_um > free.mu_hat_per_um          # a thinner tube needs more absorption for the same dip
+    # the focus rule does not read the fit; the redrawn direction uses the passes' centres, which move by ~1e-3 um,
+    # so the sub-plane depth moves by ~5e-4 um: 0.01 um is 1/28 of the plane spacing
+    assert held.k_star == free.k_star and abs(held.z_sub_um - free.z_sub_um) <= 0.01
+    assert math.hypot(held.cx_um - free.cx_um, held.cy_um - free.cy_um) <= 0.05, "the centre moved"
+    assert abs(held.theta_rad - free.theta_rad) <= 0.02
+    assert again.d_hat_um == free.d_hat_um and again.mu_hat_per_um == free.mu_hat_per_um
+    try:
+        NP.measure_pilot(br, 4, make_provider([tube], [1.0], cfg, 1), cfg, d_fixed="pilot")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("d_fixed='pilot' accepted")
+
+
 def test_contract():
     res = run_phantom(0.75, 0.0, 0.3, gate_cfg())
     cols = ("node_id, type, x_um, y_um, z_um, path_um, reg_verdict, s_star_um, dz_star_um, k_star, z_sub_um, cx_um, "

@@ -411,6 +411,35 @@ def test_on_round():
     assert seen[-1][3] is res.features
 
 
+def test_prepared_only():
+    """Block 32, amendment 3 (D-169.7): the work list's record with nothing cleaned."""
+    nodes = [make_node(2), make_node(12)]
+    f0 = start_features()
+    res = CI.prepared_only(f0, make_scene(), nodes, CFG, keep_ids=(2,))
+    assert isinstance(res, CI.IterationResult) and res.stopped == CI.NOT_CLEANED == "not_cleaned"
+    assert res.rounds == 0 and res.history == [] and res.features is f0
+    assert set(res.profiles_before) == {2, 12} == set(res.profiles_after) == set(res.tiers) == set(res.fits)
+    assert set(res.cleaned) == {2} == set(res.shadow)
+    frame = CropFrame(nodes[0].left, nodes[0].top, 0, PX)
+    n = nodes[0]
+    want = np.stack([sample_profile(n.block[k].astype(float), frame, n.origin_xy, n.y_hat, n.e_u, n.v, n.n_avg, n.step)
+                     for k in range(n.block.shape[0])])
+    check_close("prepared_only line", res.profiles_before[2], want, rtol=0, atol=1e-12)
+    assert_array_equal(res.profiles_after[2], res.profiles_before[2])
+    assert_array_equal(res.cleaned[2], np.asarray(n.block, dtype=np.float64))
+    assert not np.any(res.shadow[2]) and res.shadow[2].shape == n.block.shape
+    assert res.fits[2] == {"status": "not_run"} and res.tiers[2].tolist() == [1]      # counted, not subtracted
+    assert_array_equal(res.B_gl[2], n.B_gl)
+    all_kept = CI.prepared_only(f0, make_scene(), nodes, CFG)
+    assert set(all_kept.cleaned) == {2, 12}
+    for bad in ((99,),):
+        try:
+            CI.prepared_only(f0, make_scene(), nodes, CFG, keep_ids=bad)
+        except ValueError:
+            continue
+        raise AssertionError("a kept id outside the work list accepted")
+
+
 def test_convergence():
     raise unittest.SkipTest("no discretisation in the iteration; its contraction is test_known_answer (a)")
 

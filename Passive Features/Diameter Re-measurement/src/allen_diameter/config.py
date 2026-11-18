@@ -48,6 +48,7 @@ FOCUS_BG_RULES = ("profile_ends_median", "same_as_bbar")       # D-023 / D-018 (
 BACKGROUND_SUPPORTS = ("stripe", "square")                      # D-101.3 (Block 10.S) / D-078.1 (10.P)
 CANDIDATE_SOURCES = ("cell", "table")                           # D-109, D-112 (Block 10.C): a set's candidates from the whole cell's trace / the pilot table's rows
 FOCUS_RULES = ("gradient_energy", "dip_depth")                 # D-030: gradient energy; dip depth = handoff Eq. 1, comparison
+INFERENCE_WEIGHTS = ("allen", "none")                           # D-169.4, D-167.1: the per-node fit's residual weights (Block 39)
 FOCUS_GRAD_WINDOWS = ("radius_margin", "whole_profile")        # D-030 (provisional default, see MeasureConfig.focus_grad_window)
 ABSORPTIONS = ("partition_vertical", "linear", "ray_world", "hybrid")    # D-024 / procedure s.3.6; "hybrid": Block 21 (D-084, D-092)
 KERNEL_FAMILIES = ("gaussian_table", "empirical")              # procedure s.3.4
@@ -437,6 +438,13 @@ class InferenceConfig:
     multistart_factors: Tuple[float, ...] = (0.6, 1.0, 1.6)  # source: PROVISIONAL (Block 30): starts d0 x these
     plane_snr_min: float = 1.0             # source: D-130.O9 [user: as many planes as necessary]; the rule and the value are the assistant's, PROVISIONAL
     max_nfev: int = 200                    # source: PROVISIONAL (Block 30)
+    weights: str = "allen"                 # source: D-169.4 [user] (a parameter, D-167.1): "allen" = residual weights exp(-|v - v_c| / lambda) about the fitted centre, lambda = weight_kappa x allen_fwhm_um (Block 39); "none" = unweighted
+    weight_kappa: float = 1.25             # source: D-171.1 [user: slightly larger than the FWHM from Allen's diameter]; the value is the assistant's, PROVISIONAL (D-171.7)
+    weight_irls_max_iter: int = 3          # source: PROVISIONAL (D-174.2 [orchestrator]): solves of the re-centred fit at most (D-171.2)
+    weight_irls_tol_um: float = 0.01       # source: PROVISIONAL (D-174.2 [orchestrator]): the re-centring stops when the centre moves by at most this
+    bump_sd: float = 2.0                   # source: D-171.3 [user]: a near bump = a second dip of prominence >= this many noise SDs; 0 = off
+    bump_half_depth: float = 0.5           # source: PROVISIONAL (D-174.1 [orchestrator]): the central dip ends where it falls to this fraction of its depth; bumps are searched beyond
+    bump_smooth_samples: float = 1.0       # source: PROVISIONAL (D-174.1 [orchestrator]): the dip the bumps are searched on is the mean over the used planes, smoothed along the line by a Gaussian of this SD in line samples
 
 
 @dataclass(frozen=True)
@@ -713,6 +721,17 @@ def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None
     every pair of bounds finite and ordered, the diameter and coefficient bounds positive."""
     _check_in(c.shadow_absorption, ("hybrid", "partition_vertical"), "cleaning.shadow_absorption")
     _check_in(i.absorption, ("hybrid", "partition_vertical", "linear"), "inference.absorption")
+    _check_in(i.weights, INFERENCE_WEIGHTS, "inference.weights")
+    if not (math.isfinite(i.weight_kappa) and i.weight_kappa > 0):
+        raise ValueError("inference.weight_kappa must be finite and > 0")
+    if not (int(i.weight_irls_max_iter) >= 1 and i.weight_irls_tol_um >= 0):
+        raise ValueError("inference.weight_irls_max_iter must be >= 1 and weight_irls_tol_um >= 0")
+    if not (math.isfinite(i.bump_sd) and i.bump_sd >= 0):
+        raise ValueError("inference.bump_sd must be finite and >= 0 (0 = off)")
+    if not (0 < i.bump_half_depth < 1):
+        raise ValueError("inference.bump_half_depth must be in (0, 1)")
+    if not (math.isfinite(i.bump_smooth_samples) and i.bump_smooth_samples >= 0):
+        raise ValueError("inference.bump_smooth_samples must be finite and >= 0")
     _check_in(c.background_support, ("model", "unshaded", "square", "stripe"), "cleaning.background_support")
     _check_in(c.work_rank, ("line", "patch"), "cleaning.work_rank")
     for name in ("rank_bound_gl", "rank_max_tier2_gl", "rank_min_separation_um", "shadow_cache_mb"):

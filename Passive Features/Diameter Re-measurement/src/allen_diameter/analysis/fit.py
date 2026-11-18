@@ -162,7 +162,9 @@ def start_points(v, I, phi, B_bar, cfg, form="mu"):
     return np.array(rows, dtype=float)
 
 
-def _fit(v, I, phi, B_bar, cfg, form):
+def _fit(v, I, phi, B_bar, cfg, form, d_fixed_um=None):
+    if d_fixed_um is not None:
+        return _fit_fixed_d(v, I, phi, B_bar, cfg, form, d_fixed_um)
     if cfg.mu_mode != "per_node":
         raise NotImplementedError("mu_mode %r (a shared mu) is a planned comparison, not in Block 3"
                                   % (cfg.mu_mode,))
@@ -217,13 +219,65 @@ def _fit(v, I, phi, B_bar, cfg, form):
                      nfev=int(sum(int(q.nfev) for q in runs)), n_nodes=int(n_nodes), message=str(r.message))
 
 
-def fit_profile(v, I, phi, B_bar, cfg):
+def _fit_fixed_d(v, I, phi, B_bar, cfg, form, d_fixed_um):
+    """Eq. (3) with the diameter held at d_fixed_um (Block 3, amendment 2; D-173): (mu, v0) fitted over their
+    bounds from the starts of start_points, each start's absorption rescaled to its centre absorbance at the
+    held diameter (mu0 d0 / d_fixed), clipped into the box."""
+    if form != "mu":
+        raise NotImplementedError("d_fixed_um is defined for the mu form only")
+    if cfg.mu_mode != "per_node":
+        raise NotImplementedError("mu_mode %r (a shared mu) is a planned comparison, not in Block 3"
+                                  % (cfg.mu_mode,))
+    d_fix = float(d_fixed_um)
+    if not (math.isfinite(d_fix) and d_fix > 0):
+        raise ValueError("d_fixed_um must be finite and > 0, got %r" % (d_fixed_um,))
+    v, I, phi, B_bar = _check_profile(v, I, phi, B_bar)
+    sigma = cfg.sigma_fit_um
+    n_nodes = tube_model.n_quadrature_nodes(max(cfg.fit_d_bounds_um[1], d_fix), sigma, cfg.fit_quad_min_nodes,
+                                            cfg.fit_quad_nodes_per_sigma)
+    lb3, ub3 = _bounds(cfg, form, math.cos(phi))
+    lb, ub = lb3[1:], ub3[1:]
+    starts3 = start_points(v, I, phi, B_bar, cfg, form)
+    starts = np.array([(min(max(s[1] * s[0] / d_fix, lb[0]), ub[0]), s[2]) for s in starts3], dtype=float)
+
+    def residuals(p):
+        alpha = tube_model.alpha_from_mu(p[0], d_fix, phi)
+        return (tube_model.model_profile(v, d_fix, alpha, p[1], sigma, B_bar, n_nodes) - I) / B_bar
+
+    runs = [least_squares(residuals, x0, bounds=(lb, ub), method="trf", jac="2-point", x_scale="jac",
+                          ftol=cfg.fit_tol, xtol=cfg.fit_tol, gtol=cfg.fit_tol, max_nfev=cfg.fit_max_nfev)
+            for x0 in starts]
+    finite = [k for k, r in enumerate(runs) if np.all(np.isfinite(r.x)) and np.isfinite(r.cost)]
+    converged = [k for k in finite if runs[k].status > 0]
+    pool = converged if converged else finite
+    best = min(pool, key=lambda k: (runs[k].cost, k)) if pool else 0
+    r = runs[best]
+    mu_hat, v0_hat = (float(x) for x in r.x)
+    at_bound = []
+    for name, x, lo, hi in zip(("mu", "v0"), r.x, lb, ub):
+        tol = cfg.fit_at_bound_rel_tol * (hi - lo)
+        if x - lo <= tol:
+            at_bound.append(name + "_lo")
+        if hi - x <= tol:
+            at_bound.append(name + "_hi")
+    status = "failed" if not converged else ("at_bound" if at_bound else "converged")
+    return FitResult(d_hat_um=d_fix, mu_hat_per_um=mu_hat, v0_hat_um=v0_hat,
+                     alpha_hat=float(tube_model.alpha_from_mu(mu_hat, d_fix, phi)), phi_rad=phi, form=form,
+                     status=status, at_bound=tuple(at_bound),
+                     rss_gl2=float(np.sum((np.asarray(r.fun) * B_bar) ** 2)), n_samples=int(v.size),
+                     n_starts=len(runs), best_start=int(best), n_converged=len(converged),
+                     nfev=int(sum(int(q.nfev) for q in runs)), n_nodes=int(n_nodes), message=str(r.message))
+
+
+def fit_profile(v, I, phi, B_bar, cfg, d_fixed_um=None):
     """The deliverable fit (D-019.1): parameters (d, mu, v0), mu per node (D-023).
 
     v (n,) strictly increasing um; I (n,) finite grey levels; phi rad in
     [0, pi/2); B_bar > 0 grey levels; cfg a MeasureConfig. Returns FitResult.
+    d_fixed_um (um, finite, > 0; amendment 2, D-173): the diameter is held at it
+    and (mu, v0) are fitted; d_hat_um is then d_fixed_um. None: all three fitted.
     """
-    return _fit(v, I, phi, B_bar, cfg, "mu")
+    return _fit(v, I, phi, B_bar, cfg, "mu", d_fixed_um)
 
 
 def fit_profile_alpha(v, I, phi, B_bar, cfg):

@@ -44,6 +44,7 @@ from .node_features import featured_scene, with_rows
 from .profiles import sample_profile
 
 STOPPED = ("converged", "max_rounds")
+NOT_CLEANED = "not_cleaned"      # prepared_only: the work list recorded without any cleaning (D-169.7)
 FLAG_FAILED = "refine_failed"
 FLAG_AT_BOUND = "refine_at_bound"
 HISTORY_KEYS = ("round", "max_rel_d", "max_line_change_gl", "n_refined", "n_failed", "n_at_bound")
@@ -352,6 +353,35 @@ def run_rounds(features0, scene, nodes, cfg, sigma_gl, predict_factory, example_
         if done:
             break
     return _result(features, history, stopped, t, before, per_node, keep)
+
+
+def prepared_only(features, scene, nodes, cfg, keep_ids=None):
+    """The work list's record without any cleaning or refinement (Block 32, amendment 3; D-169.7) ->
+    IterationResult with stopped NOT_CLEANED, rounds 0, an empty history: profiles_before = profiles_after =
+    each node's recorded line; cleaned = its recorded block (float64 copy); shadow = zeros; tiers as
+    cleaning.neighbour_tiers on the featured scene (counted, nothing subtracted); fits = {"status":
+    "not_run"}; B_gl = the node's own backgrounds; features unchanged. keep_ids: the nodes whose block is
+    kept (None: all). ValueError as run_rounds for the work list, and for a line that leaves the patch."""
+    nodes = _check_nodes(nodes)
+    pos = features.index_of()
+    work = {n.node_id for n in nodes}
+    keep = sorted(work) if keep_ids is None else [int(i) for i in keep_ids]
+    if any(i not in work for i in keep):
+        raise ValueError("a kept id is not in the work list")
+    F = featured_scene(scene, features)
+    before, per_node = {}, {}
+    for node in nodes:
+        if node.node_id not in pos:
+            raise ValueError("node %d is not in the features" % node.node_id)
+        block = np.array(node.block, dtype=np.float64, copy=True)
+        prof = _profiles(block, node, cfg)
+        if not np.all(np.isfinite(prof)):
+            raise ValueError("node %d: the measuring line leaves the patch (NaN profile)" % node.node_id)
+        before[node.node_id] = prof
+        per_node[node.node_id] = {"tiers": cleaning.neighbour_tiers(F, node.own_ids, node.node_xyz, cfg),
+                                  "shadow_gl": np.zeros_like(block), "B_gl": np.array(node.B_gl, dtype=np.float64),
+                                  "cleaned": block, "profiles": prof.copy(), "fit": {"status": "not_run"}}
+    return _result(features, [], NOT_CLEANED, 0, before, per_node, keep)
 
 
 def _result(features, history, stopped, t, before, per_node, keep):
