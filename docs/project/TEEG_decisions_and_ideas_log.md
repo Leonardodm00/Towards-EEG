@@ -224,6 +224,7 @@ the "Binds" column.
 | 2026-11-18 (later, 16) | Logs **D-169** and **D-170** (user, 17:38; the clearance chat). **Data** **[the user's upload of 17:25: `focal_529878215.csv`, the focal-plane figure and the `own_node*.png` figures of Cell 19c's five nodes; one in-focus width only, which one not stated]**: clear nodes by size, Allen / first stage / refined (um): 1013 0.449 / 3.200 / 2.168; 5353 0.454 / 0.803 / 0.774; 2669 0.788 / 2.981 / 2.588; 2620 0.811 / 2.056 / 1.913; 639 1.200 / 2.484 / 2.565. Read by eye: 1013, 2669 and 2620 carry other dark structures on the line (blobs, a fork, a joining branch) although the trace has no neighbour there, and the one-tube fit spreads over them (2669: a deep narrow core at v = +0.3 um and a second dip at v = -1.0 um, the model 25 gl off); 639's dip is flat-bottomed and about 2 um wide at half depth, so there Allen's 1.2 um is too thin whatever the kernel. **D-169**: for now the fit works on clear traces only, in one round, without the far neighbours' cleaning, the start of the diameter always Allen's; the residuals weighted again from the centre outwards with a width set by Allen's diameter; the near bumps removed; a close neighbour's absorption fixed; the chain geometry implemented. **D-170**: the defocus table is to be built on davinci from all the eligible cells; a handoff for that chat written. Handoffs: `TEEG_joint_fit_handoff_2026-11-18.md` (updated), `TEEG_defocus_table_davinci_handoff_2026-11-18.md` (new), `sci/diameter-pipeline`. Next free IDs: D-171, I-006. |
 | 2026-11-18 (later, 17) | Logs **D-171** (user, 17:54; the clearance chat): six of the seven choices of D-169's work -- the weights' width slightly above the FWHM of the Gaussian from Allen's diameter, re-centred while fitting; a bump is a second dip rising 2 noise SDs, the multiplier tunable; the samples from the bump outwards get no weight; the clear traces are Cell 19c's; the first stage gives every start but the diameter. The seventh (the in-focus width meanwhile) was put back as a question ("0.22 it appears why?") and answered, not decided. Handoff updated. Next free IDs: D-172, I-006. |
 | 2026-11-18 (later, 18) | Logs **D-172** (user, 17:58; the clearance chat): the kernel's in-focus width stays 0.080 um for now ("Keep 0.08"), after the assistant's answer that 0.22 um is a hypothesis of the synthetic check and that the blur needed for Allen to be right is 0.20 to 0.23 um on the three thin clear nodes and 0.73 um on node 639 (arithmetic on dip widths read by eye from the user's figures). The user also asked to be reminded what the first stage is; answered from `node_pipeline.measure_pilot` and SPEC section 2.2. Handoff: A8 closed. Next free IDs: D-173, I-006. |
+| 2026-11-18 (later, 19) | Logs **D-173** (user, 18:00; the clearance chat): in the first stage the diameter is fixed at Allen's value and the other parameters are fitted. Handoff updated. Next free IDs: D-174, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -387,6 +388,7 @@ would be needed*, *Status*.
 | D-157 | 2026-11-17 | SPEC Block 35 (amendment 2), oracles (iv) and (v); `tests/smoke/test_smoke_line_fast.py` | the split's depth-mirror oracle restated for a slab grid symmetric about the axis (1e-10 there; generic case reported, no bound); the slab-grid oracle kept at 5e-4 with its margin recorded [orchestrator] | active |
 | D-158 | 2026-11-17 | SPEC Block 35 (amendment 2, oracle (iv)), Block 36 (amendment 11, final check); `scripts/clean_cell.py`, `scripts/infer_nodes.py`; the report `specs/test_reports/2026-11-17_1754_incremental.md` | the final check's settlements: the slab-grid bound stated at mu = 1 /um; the product status `not_fitted` for a per-node fit that raises or fails; `clean` logs a product that raises [orchestrator] | active |
 | D-159 | 2026-11-18 | `tests/spec/` on `sci/diameter-pipeline`; the report `specs/test_reports/2026-11-17_1754_incremental.md` (F2) | the tester's 39 spec tests of the run 2026-11-17_1754 brought into the working branch; the three stale spec tests (`test_factories_against_line_fast[linear, hybrid]`, `test_work_list_own_stretch_beyond_U`) retired [user] | active |
+| D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
 | D-171 | 2026-11-18 | D-169's fit on clear nodes (its SPEC entry to be written; `node_inference.fit_node`, `scripts/infer_nodes.py`, `clean_cell.py clear --d-bins`); `InferenceConfig` (new parameters); D-169.10 | the weights' width slightly above the FWHM of the Gaussian from Allen's diameter, so that they concentrate about the dip's extreme; re-centred while fitting; a near bump = a second dip rising at least 2 noise SDs, the multiplier a tunable parameter; the samples from the bump outwards get no weight; clear traces = the nodes of notebook Cell 19c; the first stage gives the start of every parameter but the diameter [user]; the width's factor 1.25 and its formula [orchestrator], PROVISIONAL | active |
 | D-170 | 2026-11-18 | the defocus kernel table (`renderer.kernel_table_*`, `kernel_continuation_slope`); S3c on davinci (`scripts/pbs/survey_prepare.pbs`, `survey_cells.pbs`, `survey_pool.pbs`; SPEC Blocks 16, 19); D-085, D-088, D-118 to D-121 | the defocus table is built on davinci from all the eligible cells, not from one cell's noisy table; a handoff for the chat that starts it [user]; "eligible" and the fate of D-085's 5 cells per class and layer to settle there [open] | active |
@@ -12432,5 +12434,37 @@ width reconciles the thin and the thick nodes with Allen. 0.22 um was a hypothes
 P4).
 
 **Sources.** **[user]** 2026-11-18, 17:58. **[reasoning]** as tagged. **[log]** D-165, D-171.
+
+**Status:** active.
+
+---
+
+## D-173 -- In the first stage the diameter is fixed at Allen's value and the other parameters are fitted (user)
+
+**Date:** 2026-11-18, 18:00 (Europe/Rome), the clearance chat.
+**Binds:** the first-stage fit of a node (`node_pipeline.measure_pilot`; SPEC section 2.2, Eq. (3); Block 3) as used
+by D-169's fit on clear nodes; D-169.2, D-171.6.
+
+**Decision [user].** On the assistant's list of what the later fit takes from the first stage (the absorption, the
+lateral centre, the depth, the sharpest plane, the line's direction, the background): "Fix the diameter during the
+pilot to the allen's one and fit the others".
+
+**Statement.** (D-173.1 [user]) In the first stage's one-plane fit, Eq. (3) of SPEC section 2.2, the diameter $d$ is
+held at Allen's diameter of the node and the absorption $\mu$ (1/um) and the lateral centre $v_0$ (um) are fitted.
+(D-173.2 [user]) The later fit starts from these values and from Allen's diameter (D-169.2, D-171.6).
+(D-173.3 [orchestrator], PROVISIONAL, to confirm) This is a setting of the first stage chosen on this path; the
+first stage's other users -- the calibration's choice of nodes (Block 10), the survey (Block 17) and the bias table
+(Blocks 6, 14) -- keep the free-diameter fit unless the user says otherwise, since their results and signatures
+depend on it.
+
+**Why.** **[user]** as quoted. **[reasoning]** An absorption fitted beside a free first-stage diameter (3.2 um at
+node 1013) is not a consistent start for a fit that starts at Allen's diameter; fitted with the diameter held, it
+is.
+
+**What it does not decide [open].** The first stage's sharpest plane, depth, direction and background do not use
+the fitted diameter and are unchanged; what a poor first-stage fit at Allen's diameter (a dip much wider than
+Allen's, as at node 639) should flag.
+
+**Sources.** **[user]** 2026-11-18, 18:00. **[log]** D-169, D-171.
 
 **Status:** active.
