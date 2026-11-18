@@ -1,0 +1,10 @@
+parallel, 1.0 um aside, same depth:
+  mu_q fixed: condition number 7.6; SE(d) 0.0047 um, SE(d_q) 0.0013 um (0.2 %); mu_q held 30 % too high: node's d +0.92 %, d_q -14.0 %
+crossing at 45 deg over the node, 0.84 um deeper:
+  mu_q fixed: condition number 8.7; SE(d) 0.0054 um, SE(d_q) 0.0027 um (0.5 %); mu_q held 30 % too high: node's d -2.43 %, d_q -12.3 %
+parallel, directly above, 1.68 um deeper:
+  mu_q fixed: condition number 9.0; SE(d) 0.0050 um, SE(d_q) 0.0035 um (0.6 %); mu_q held 30 % too high: node's d +0.15 %, d_q -13.5 %
+crossing at 45 deg over the node, 2.8 um deeper:
+  mu_q fixed: condition number 9.3; SE(d) 0.0049 um, SE(d_q) 0.0085 um (1.4 %); mu_q held 30 % too high: node's d +0.01 %, d_q -13.8 %
+parallel, 2.0 um aside, 1.68 um deeper:
+  mu_q fixed: condition number 7.4; SE(d) 0.0047 um, SE(d_q) 0.0030 um (0.5 %); mu_q held 30 % too high: node's d +0.03 %, d_q -13.4 %
