@@ -1,0 +1,21 @@
+{
+ "renderer": {
+  "kernel_table_delta_um": [
+   0.0,
+   0.28,
+   0.56,
+   0.84
+  ],
+  "kernel_table_sigma_um": [
+   0.08,
+   0.1536,
+   0.3924,
+   0.562
+  ],
+  "sigma_r0_um": 0.08,
+  "kernel_continuation_slope": 0.79
+ },
+ "calibration": {
+  "patch_half_um": 8.0
+ }
+}

@@ -1,0 +1,67 @@
+truth G (um^2): 0.28: 0.01719, 0.56: 0.14758, 0.84: 0.30944
+== thin: true d 0.15,0.25 um, 16 phantoms
+   phantom 0: d 0.180 um, alpha 0.16 -> d_hat 0.340, scanned (near field)
+   phantom 1: d 0.243 um, alpha 0.27 -> d_hat 0.288, scanned (near field)
+   phantom 2: d 0.192 um, alpha 0.20 -> d_hat 0.232, scanned (near field)
+   phantom 3: d 0.182 um, alpha 0.37 -> d_hat 0.251, scanned (near field)
+   phantom 4: d 0.170 um, alpha 0.24 -> d_hat 0.271, scanned (near field)
+   phantom 5: d 0.204 um, alpha 0.28 -> d_hat 0.383, scanned (near field)
+   phantom 6: d 0.188 um, alpha 0.30 -> d_hat 0.270, scanned (near field)
+   phantom 7: d 0.174 um, alpha 0.36 -> d_hat 0.284, scanned (near field)
+   phantom 8: d 0.190 um, alpha 0.21 -> d_hat 0.244, scanned (near field)
+   phantom 9: d 0.187 um, alpha 0.40 -> d_hat 0.354, scanned (near field)
+   phantom 10: d 0.171 um, alpha 0.18 -> d_hat 0.334, scanned (near field)
+   phantom 11: d 0.178 um, alpha 0.24 -> d_hat 0.239, scanned (near field)
+   phantom 12: d 0.210 um, alpha 0.31 -> d_hat 0.283, scanned (near field)
+   phantom 13: d 0.190 um, alpha 0.18 -> d_hat 0.317, scanned (near field)
+   phantom 14: d 0.163 um, alpha 0.31 -> d_hat 0.166, scanned (near field)
+   phantom 15: d 0.194 um, alpha 0.33 -> d_hat 0.326, scanned (near field)
+   growth keys: ['c_um2', 'convention', 'cost', 'dropped_nodes', 'g_um2', 'interp', 'knot_step_um', 'knots_um', 'message', 'n_obs_per_interval', 'nfev', 'node_ids']
+   delta 0.28 um: sigma_r fitted 0.1296 (true 0.1536, -15.6 %); G fitted 0.01039 (true 0.01719, -39.5 %)
+   delta 0.56 um: sigma_r fitted 0.3754 (true 0.3924, -4.3 %); G fitted 0.13451 (true 0.14758, -8.9 %)
+   anchor 0.5025254684530195 um, SE 0.029437840649329947 um
+   growth fit (gaussian_core_width2, symmetric, cubic): 16 nodes, 0 dropped, cost 0.0897, `ftol` termination condition is satisfied.
+== mid: true d 0.45,0.55 um, 16 phantoms
+   phantom 0: d 0.458 um, alpha 0.21 -> d_hat 0.542, scanned (near field)
+   phantom 1: d 0.517 um, alpha 0.36 -> d_hat 0.581, scanned (near field)
+   phantom 2: d 0.544 um, alpha 0.40 -> d_hat 0.594, scanned (near field)
+   phantom 3: d 0.510 um, alpha 0.32 -> d_hat 0.571, scanned (near field)
+   phantom 4: d 0.521 um, alpha 0.18 -> d_hat 0.623, scanned (near field)
+   phantom 5: d 0.532 um, alpha 0.23 -> d_hat 0.579, scanned (near field)
+   phantom 6: d 0.505 um, alpha 0.34 -> d_hat 0.571, scanned (near field)
+   phantom 7: d 0.498 um, alpha 0.34 -> d_hat 0.569, scanned (near field)
+   phantom 8: d 0.454 um, alpha 0.27 -> d_hat 0.532, scanned (near field)
+   phantom 9: d 0.544 um, alpha 0.33 -> d_hat 0.605, scanned (near field)
+   phantom 10: d 0.483 um, alpha 0.36 -> d_hat 0.546, scanned (near field)
+   phantom 11: d 0.548 um, alpha 0.37 -> d_hat 0.613, scanned (near field)
+   phantom 12: d 0.462 um, alpha 0.21 -> d_hat 0.549, scanned (near field)
+   phantom 13: d 0.535 um, alpha 0.27 -> d_hat 0.608, scanned (near field)
+   phantom 14: d 0.451 um, alpha 0.29 -> d_hat 0.532, scanned (near field)
+   phantom 15: d 0.479 um, alpha 0.38 -> d_hat 0.563, scanned (near field)
+   growth keys: ['c_um2', 'convention', 'cost', 'dropped_nodes', 'g_um2', 'interp', 'knot_step_um', 'knots_um', 'message', 'n_obs_per_interval', 'nfev', 'node_ids']
+   delta 0.28 um: sigma_r fitted 0.1063 (true 0.1536, -30.8 %); G fitted 0.00490 (true 0.01719, -71.5 %)
+   delta 0.56 um: sigma_r fitted 0.3371 (true 0.3924, -14.1 %); G fitted 0.10723 (true 0.14758, -27.3 %)
+   anchor 0.5359330610113543 um, SE 0.0051947655688157545 um
+   growth fit (gaussian_core_width2, symmetric, cubic): 16 nodes, 0 dropped, cost 0.0112, `ftol` termination condition is satisfied.
+== thick: true d 0.75,0.95 um, 16 phantoms
+   phantom 0: d 0.893 um, alpha 0.30 -> d_hat 1.043, scanned (near field)
+   phantom 1: d 0.905 um, alpha 0.20 -> d_hat 1.016, scanned (near field)
+   phantom 2: d 0.814 um, alpha 0.34 -> d_hat 0.898, scanned (near field)
+   phantom 3: d 0.852 um, alpha 0.17 -> d_hat 0.977, scanned (near field)
+   phantom 4: d 0.765 um, alpha 0.36 -> d_hat 0.854, scanned (near field)
+   phantom 5: d 0.789 um, alpha 0.28 -> d_hat 0.873, scanned (near field)
+   phantom 6: d 0.866 um, alpha 0.36 -> d_hat 0.969, scanned (near field)
+   phantom 7: d 0.887 um, alpha 0.38 -> d_hat 0.978, scanned (near field)
+   phantom 8: d 0.786 um, alpha 0.33 -> d_hat 0.874, scanned (near field)
+   phantom 9: d 0.943 um, alpha 0.37 -> d_hat 1.028, scanned (near field)
+   phantom 10: d 0.886 um, alpha 0.17 -> d_hat 1.003, scanned (near field)
+   phantom 11: d 0.946 um, alpha 0.16 -> d_hat 1.067, scanned (near field)
+   phantom 12: d 0.755 um, alpha 0.26 -> d_hat 0.851, scanned (near field)
+   phantom 13: d 0.926 um, alpha 0.37 -> d_hat 1.049, scanned (near field)
+   phantom 14: d 0.821 um, alpha 0.21 -> d_hat 0.895, scanned (near field)
+   phantom 15: d 0.882 um, alpha 0.34 -> d_hat 0.990, scanned (near field)
+   growth keys: ['c_um2', 'convention', 'cost', 'dropped_nodes', 'g_um2', 'interp', 'knot_step_um', 'knots_um', 'message', 'n_obs_per_interval', 'nfev', 'node_ids']
+   delta 0.28 um: sigma_r fitted 0.1717 (true 0.1536, +11.8 %); G fitted 0.02308 (true 0.01719, +34.3 %)
+   delta 0.56 um: sigma_r fitted 0.2978 (true 0.3924, -24.1 %); G fitted 0.08230 (true 0.14758, -44.2 %)
+   anchor 0.5181118428028905 um, SE 0.01205244144588051 um
+   growth fit (gaussian_core_width2, symmetric, cubic): 16 nodes, 0 dropped, cost 0.00461, `ftol` termination condition is satisfied.

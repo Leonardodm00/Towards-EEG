@@ -1,0 +1,17 @@
+pool: 158 cells x (30 near, 2 far) scans; synthetic anchor 0.4670 um
+  B =    3 resamples: 153.6 s; done {'fit': True, 'far_fit': True}; removed {'near': [], 'far': []}
+  B =    8 resamples: 247.8 s; done {'fit': True, 'far_fit': True}; removed {'near': [], 'far': []}
+  affine in B: fixed 97.2 s + 18.823 s per resample -> B = 1000: 18920 s = 5.26 h (one pass; a removal of cells by Block 19.8 runs both fits again)
+  last run's log, first lines:
+    fit: 316 far-field scans in /tmp/tmpk3mw0pbd/s3c/scans_pooled.json are left to far-fit
+    growth fit (gaussian_core_width2, symmetric, cubic): 4740 nodes, 0 dropped, cost 1.27, `ftol` termination condition is satisfied.; each of the 158 cells weighs the same (D-120.2)
+      delta_um   G_um2      n_obs(interval to the next knot)  trusted
+       +0.000    0.00000   9480  yes
+       +0.280    0.02246   9480  yes
+       +0.560    0.09398   9480  yes
+       +0.840    0.20895   4740  after the residual check
+       +1.120    0.39884      -  after the residual check
+      residual RMS by |k - k*|: 0: 0.0101, 1: 0.0078, 2: 0.0028, 3: 0.0122
+      A_W(k) / A_W(k*): -3: 1.000, -2: 1.000, -1: 1.000, +0: 1.000, +1: 1.000, +2: 1.000, +3: 1.000
+      table (cut at 0.84 um, D-080.1): delta 0.00, 0.28, 0.56, 0.84
+                         sigma 0.080, 0.170, 0.317, 0.464  (sigma_r(0) = 0.080 configured; increasing)

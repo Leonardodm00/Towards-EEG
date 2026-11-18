@@ -3,6 +3,7 @@
 | Date | Change |
 |---|---|
 | 2026-11-18 | Created at the user's request (17:38, D-170) for the chat that starts the construction of the defocus table on davinci. Branch `sci/diameter-pipeline` at `1fb63c4` (code) and the commit that adds this file; decision log on `main` at `30ed363` (next free IDs D-171, I-006). This chat did not run anything on davinci and did not change the calibration code. |
+| 2026-11-18 (later) | The defocus-table chat (18:40, after the user's answers): section 7 settled by **D-174** and **D-175** (log on `main`, `a703319`); section 5's D-117 row corrected (the loop is not built); section 6 gains the pool job's cost at 158 cells and the near fit's bias on thick phantoms (`checks/defocus_pool_2026-11-18/`); section 8's suites rerun; new section 9, the run and its commands. No code changed. |
 
 Basis tags: **[user]** said or decided by the user; **[log]** the decision log on `main`
 (`docs/project/TEEG_decisions_and_ideas_log.md`); **[src]** read today in the named file at `1fb63c4`;
@@ -90,7 +91,7 @@ Status as far as this chat can see:
 | D-120.3 | A cell whose mean residual is too rare under the between-cell Gaussian leaves the pool. | Implemented; open finding: the rule removes a clean cell in 0.08 to 0.33 of simulated datasets instead of 0.05 (SPEC 19.8). |
 | D-121.1 | A depth check: the near law fitted on the shallow and the deep half of the pooled nodes, flagged when a knot differs by more than 2 SE family-wise. | **Not implemented.** |
 | D-121.2 | The calibration loop over the pool: each round reruns the cells' calibration step with the previous round's law, all rounds submitted at once, stopped below one SE or after 5 rounds. | **Not implemented.** |
-| D-117 | Cell 7's loop on one cell (at most 3 rounds). | Implemented (Colab). |
+| D-117 | Cell 7's loop on one cell (at most 3 rounds). | ~~Implemented (Colab).~~ [corrected 2026-11-18 (later): **not implemented** -- no SPEC 10.L, no loop in Cell 7 (`notebooks/phase2_colab.py`), and D-117's status still reads "D-117.2 next" **[src, log]**; the pilot's table is one pass under the configured law] |
 
 ## 6. What the next chat must know before trusting a pooled table
 
@@ -113,6 +114,18 @@ Status as far as this chat can see:
   **[data, 17:25]**. The calibration's own isolation test reads the trace and the predicted shadows of traced
   neighbours **[src: `calibrate_kernel.py` docstring, 10.I]**; whether it rejects such nodes was not checked.
 
+- [added 2026-11-18 (later)] **The pool job's cost at 158 cells.** On synthetic pooled scans of 158 cells x (30
+  near, 2 far), the pool job's calibration (`survey_cells.pooled_fits`) takes about 5 h per pass at 1000 cell
+  resamples: the far fit keeps a dense Jacobian (D-119 made only the near fit sparse) and one far fit takes 18 s at
+  316 far nodes; a cell removed by Block 19.8 runs both fits again. The header's 2 h is not enough; D-175.3 sets 48 h
+  **[run, sandbox: `checks/defocus_pool_2026-11-18/pool_timing.py`, `split_timing.py`]**.
+- [added 2026-11-18 (later)] **The near fit is biased under the pipeline's own forward model, and the bias depends
+  on thickness.** Flat phantoms rendered with the pilot's table as the truth (16 per range), fitted by Block 10:
+  sigma_r at 0.28 / 0.56 / 0.84 um off by -15.6 / -4.3 / -10.6 % (true d 0.15-0.25 um), -30.8 / -14.1 / -4.6 %
+  (0.45-0.55) and +11.8 / -24.1 / -7.8 % (0.75-0.95). A pooled table removes the noise, not this; step 2 (NS1) would
+  **[run, sandbox: `checks/defocus_pool_2026-11-18/thick_near_check.py`]**. Whether step 2 belongs to this chat:
+  asked (D-175.4).
+
 ## 7. Points to settle with the user before running
 
 | # | Point | State and suggestion |
@@ -125,10 +138,41 @@ Status as far as this chat can see:
 | P6 | Cost. | The calibration step took 964 s on the pilot in Colab **[log, D-121]**; 158 array tasks in parallel. Walltime and cores to confirm against davinci's limits. |
 | P7 | What is delivered. | Suggestion: the pooled `calibration.json` and `far_fit.json`, the law-by-cell figures, the table's values with their SEs, and a config JSON the cleaning runs can take with `--config-json`. |
 
+**Settled 2026-11-18, about 18:40 [user; log on `main`, `a703319`]:** P1 -- every pool cell with a class, alignment-
+gated, the few-node cells decided at the pool step (D-175.1). P2 -- one kernel for all cells stands (D-088.1); the
+residuals by cell are read by class and layer afterwards. P3 -- round 1 under the configured law, round 2 by hand
+under the pooled law to D-121.2's stop rule; D-121.1 on the returned scans (D-175.2). P4 -- the in-focus width stays
+0.080 um (D-172; D-175.5). P5 -- `align,nodes,calibration` (D-175.4); `nodes` and `calibration` wait for the first
+stage with the diameter held at Allen's, the default once built (D-174). P6 -- at most 100 one-core tasks at once,
+48 h walltime (D-175.3). P7 -- as suggested, `DIAM_POOL=calibration` only; this chat on the kernel only (D-175.4).
+
 ## 8. Not checked
 
 - Nothing was run on davinci by this chat; the job scripts were read, not executed.
-- The suites of Blocks 10, 15, 16 and 19 were not rerun on 2026-11-18; the last tester report covering Block 10 is
+- [corrected 2026-11-18 (later): rerun at `2de4bf3` by the defocus-table chat -- the 14 suites of Blocks 10, 15, 16, 17, 19 and the survey jobs pass, design skips only **[run, sandbox]**] ~~The suites of Blocks 10, 15, 16 and 19 were not rerun on 2026-11-18;~~ the last tester report covering Block 10 is
   of 2026-11-13.
 - Whether the pool's `fit` and `far-fit` have ever run on more than the pilot's scans.
 - The literature on the bright-field kernel's shape: three PubMed queries on 2026-11-18 returned nothing usable.
+
+## 9. The run as settled (D-174, D-175) [added 2026-11-18 (later)]
+
+Run tag `allcells1`; one configuration for every job, `configs/survey_allcells1.json` (`{"survey":
+{"cells_per_group": 1000}}`: every cell of each class and layer), copied to a path without spaces. A value with
+commas goes to `qsub -v` by name, exported, never inline (PBS splits `-v` at commas). Submit from the workstream
+directory. Expected lines are those of section 4's scripts.
+
+| # | When | Command (login node) | Expect |
+|---|---|---|---|
+| 1 | now | `cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/Diameter Re-measurement" && git fetch origin && git checkout sci/diameter-pipeline && git pull --ff-only && git log -1 --oneline && bash -n scripts/pbs/survey_common.sh scripts/pbs/survey_prepare.pbs scripts/pbs/survey_cells.pbs scripts/pbs/survey_pool.pbs && echo "OK: bash -n"` | the commit pushed with this section, `OK: bash -n` |
+| 2 | now | `mkdir -p ~/diam && cp configs/survey_allcells1.json ~/diam/ && cat ~/diam/survey_allcells1.json` | `{"survey": {"cells_per_group": 1000}}` |
+| 3 | now | `qsub -v DIAM_DRYRUN=1,RUN_TAG=allcells1,DIAM_CONFIG_JSON=$HOME/diam/survey_allcells1.json scripts/pbs/survey_prepare.pbs`, then the same without `DIAM_DRYRUN=1,` | dry run: four `DRYRUN` lines with `--config-json`; real: `api.brain-map.org reachable`, `pool: ...`, `select: ... cells selected (seed 20261026, 1000 per group)`, `next: qsub -J 0-<N-1> ...` |
+| 4 | after 3 | `qsub -v RUN_TAG=allcells1,DIAM_STEPS=align,DIAM_CONFIG_JSON=$HOME/diam/survey_allcells1.json,ROADMAP_DISABLE=1 scripts/pbs/survey_cells.pbs` (the probe: row 0 only) | `api.brain-map.org reachable`, one alignment line, `task 0 ... done` |
+| 5 | after 4 | `qsub -J 0-<N-1>%100 -v RUN_TAG=allcells1,DIAM_STEPS=align,DIAM_CONFIG_JSON=$HOME/diam/survey_allcells1.json,ROADMAP_DISABLE=1 scripts/pbs/survey_cells.pbs` (alignment of every cell; at most 100 at once) | if qsub refuses `%100`: `-J 0-99` now, `-J 100-<N-1>` after it; then `status.csv` and the overlays of the set-aside cells to judge (D-098.5) |
+| 6 | after D-174 is in the code (`git pull --ff-only` first) | `DIAM_STEPS=align,nodes,calibration qsub -v RUN_TAG=allcells1,DIAM_STEPS,DIAM_DRYRUN=1,DIAM_CONFIG_JSON=$HOME/diam/survey_allcells1.json scripts/pbs/survey_cells.pbs`, then `DIAM_STEPS=align,nodes,calibration qsub -J 0-<N-1>%100 -l walltime=48:00:00 -v RUN_TAG=allcells1,DIAM_STEPS,DIAM_CONFIG_JSON=$HOME/diam/survey_allcells1.json scripts/pbs/survey_cells.pbs` | dry run: `steps align,nodes,calibration`; the array: `align` skipped (done), the two steps per cell |
+| 7 | after 6 | `cd "/davinci-1/home/ldellamea/Human Neurons Fitting/diameter_survey/allcells1" && python3 -c 'import json,glob; r=[json.load(open(f)) for f in sorted(glob.glob("*/done/calibration.json"))]; [print(x["specimen_id"], x["summary"].get("n_near"), x["summary"].get("n_far"), int(x["seconds"])) for x in r]; print(len(r), "cells with the calibration step done")'` | one line per cell: near and far scans, seconds -- the counts on which D-175.1's minimum is chosen |
+| 8 | after 7 | `qsub -l walltime=48:00:00 -v RUN_TAG=allcells1,DIAM_POOL=calibration,DIAM_CONFIG_JSON=$HOME/diam/survey_allcells1.json scripts/pbs/survey_pool.pbs` (with `DIAM_SELECTION=<a filtered selection, path without spaces>` if a minimum is set) | `pooled near field: ...`, `growth fit ...`, the table, the anchor and its cell SE, the far fit, the cell test, then `results_allcells1.tgz` |
+
+Round 2 (D-175.2), after reading round 1: keep `s3c/` as `s3c_round1/`; a second configuration adds round 1's pooled
+law (`renderer.kernel_table_delta_um`, `kernel_table_sigma_um`, `sigma_r0_um`, `kernel_continuation_slope`); the
+array again with `DIAM_FORCE=calibration` (only the calibration step reruns), then step 8; stop when the anchor and
+the far slope each move by less than one SE, at most 5 rounds.
