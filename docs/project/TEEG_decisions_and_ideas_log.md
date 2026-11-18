@@ -225,6 +225,7 @@ the "Binds" column.
 | 2026-11-18 (later, 17) | Logs **D-171** (user, 17:54; the clearance chat): six of the seven choices of D-169's work -- the weights' width slightly above the FWHM of the Gaussian from Allen's diameter, re-centred while fitting; a bump is a second dip rising 2 noise SDs, the multiplier tunable; the samples from the bump outwards get no weight; the clear traces are Cell 19c's; the first stage gives every start but the diameter. The seventh (the in-focus width meanwhile) was put back as a question ("0.22 it appears why?") and answered, not decided. Handoff updated. Next free IDs: D-172, I-006. |
 | 2026-11-18 (later, 18) | Logs **D-172** (user, 17:58; the clearance chat): the kernel's in-focus width stays 0.080 um for now ("Keep 0.08"), after the assistant's answer that 0.22 um is a hypothesis of the synthetic check and that the blur needed for Allen to be right is 0.20 to 0.23 um on the three thin clear nodes and 0.73 um on node 639 (arithmetic on dip widths read by eye from the user's figures). The user also asked to be reminded what the first stage is; answered from `node_pipeline.measure_pilot` and SPEC section 2.2. Handoff: A8 closed. Next free IDs: D-173, I-006. |
 | 2026-11-18 (later, 19) | Logs **D-173** (user, 18:00; the clearance chat): in the first stage the diameter is fixed at Allen's value and the other parameters are fitted. Handoff updated. Next free IDs: D-174, I-006. |
+| 2026-11-18 (later, 20) | Logs **D-174** and **D-175** (user, about 18:40; the defocus-table chat, from D-170's handoff, in its answers to four multiple-choice questions). **D-174**: the first stage with the diameter held at Allen's (D-173) becomes the first stage's default once it is built, for every user of the first stage -- supersedes D-173.3's provisional reading (the calibration, the survey and the bias table keeping the free diameter); the davinci run's `nodes` and `calibration` steps wait for it. **D-175**: the davinci run of D-170 -- every pool cell with a class (158 on 2026-10-28), alignment-gated as before, the cells with few calibration nodes decided at the pool step; round 1 under the configured law, round 2 by hand under the pooled law (D-121.2's stop rule); at most 100 one-core tasks at once, 48 h walltime; this chat on the kernel only. **State read [src, log]:** no S3 job has run on davinci (roadmap S3c and I19 'pushed', no cluster marker); D-117.2's loop is not in the code (no SPEC 10.L, no loop in Cell 7; D-117's status 'D-117.2 next'), so the handoff's 'Implemented (Colab)' is corrected there; the 14 suites of Blocks 10, 15, 16, 17, 19 and the survey jobs pass at `2de4bf3` **[run, sandbox]**. **Checks** (`checks/defocus_pool_2026-11-18/` on `sci/diameter-pipeline`) **[run, sandbox]**: the pool job's calibration at 158 cells x (30 near, 2 far) synthetic scans takes about 5 h per pass at 1000 cell resamples, the far fit's dense Jacobian dominating (one far fit 18 s at 316 far nodes), against the header's 2 h; on flat phantoms rendered with the pilot's table as the truth, Block 10's near fit misreads sigma_r at 0.28 / 0.56 / 0.84 um by -15.6 / -4.3 / -10.6 % (true d 0.15-0.25 um), -30.8 / -14.1 / -4.6 % (0.45-0.55) and +11.8 / -24.1 / -7.8 % (0.75-0.95), 16 phantoms each -- pooling reduces the noise, not this bias (step 2, NS1, not built). Next free IDs: D-176, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -388,10 +389,12 @@ would be needed*, *Status*.
 | D-157 | 2026-11-17 | SPEC Block 35 (amendment 2), oracles (iv) and (v); `tests/smoke/test_smoke_line_fast.py` | the split's depth-mirror oracle restated for a slab grid symmetric about the axis (1e-10 there; generic case reported, no bound); the slab-grid oracle kept at 5e-4 with its margin recorded [orchestrator] | active |
 | D-158 | 2026-11-17 | SPEC Block 35 (amendment 2, oracle (iv)), Block 36 (amendment 11, final check); `scripts/clean_cell.py`, `scripts/infer_nodes.py`; the report `specs/test_reports/2026-11-17_1754_incremental.md` | the final check's settlements: the slab-grid bound stated at mu = 1 /um; the product status `not_fitted` for a per-node fit that raises or fails; `clean` logs a product that raises [orchestrator] | active |
 | D-159 | 2026-11-18 | `tests/spec/` on `sci/diameter-pipeline`; the report `specs/test_reports/2026-11-17_1754_incremental.md` (F2) | the tester's 39 spec tests of the run 2026-11-17_1754 brought into the working branch; the three stale spec tests (`test_factories_against_line_fast[linear, hybrid]`, `test_work_list_own_stretch_beyond_U`) retired [user] | active |
-| D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active |
+| D-175 | 2026-11-18 | S3c on davinci (`survey_prepare.pbs`, `survey_cells.pbs`, `survey_pool.pbs`; Blocks 16, 19); `survey.cells_per_group` for this run (`configs/survey_allcells1.json`); D-085.1, D-117.2, D-121.1, D-121.2, D-125.1; D-170's open points | the davinci run of D-170: every pool cell with a class, alignment-gated; few-node cells decided at the pool; round 1 under the configured law, round 2 by hand under the pooled law to D-121.2's stop rule; D-121.1 on the returned scans; at most 100 cores at once, 48 h walltime; this chat on the kernel only [user]; whether step 2 (NS1) is part of it [open] | active |
+| D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active |
+| D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
 | D-171 | 2026-11-18 | D-169's fit on clear nodes (its SPEC entry to be written; `node_inference.fit_node`, `scripts/infer_nodes.py`, `clean_cell.py clear --d-bins`); `InferenceConfig` (new parameters); D-169.10 | the weights' width slightly above the FWHM of the Gaussian from Allen's diameter, so that they concentrate about the dip's extreme; re-centred while fitting; a near bump = a second dip rising at least 2 noise SDs, the multiplier a tunable parameter; the samples from the bump outwards get no weight; clear traces = the nodes of notebook Cell 19c; the first stage gives the start of every parameter but the diameter [user]; the width's factor 1.25 and its formula [orchestrator], PROVISIONAL | active |
-| D-170 | 2026-11-18 | the defocus kernel table (`renderer.kernel_table_*`, `kernel_continuation_slope`); S3c on davinci (`scripts/pbs/survey_prepare.pbs`, `survey_cells.pbs`, `survey_pool.pbs`; SPEC Blocks 16, 19); D-085, D-088, D-118 to D-121 | the defocus table is built on davinci from all the eligible cells, not from one cell's noisy table; a handoff for the chat that starts it [user]; "eligible" and the fate of D-085's 5 cells per class and layer to settle there [open] | active |
+| D-170 | 2026-11-18 | the defocus kernel table (`renderer.kernel_table_*`, `kernel_continuation_slope`); S3c on davinci (`scripts/pbs/survey_prepare.pbs`, `survey_cells.pbs`, `survey_pool.pbs`; SPEC Blocks 16, 19); D-085, D-088, D-118 to D-121 | the defocus table is built on davinci from all the eligible cells, not from one cell's noisy table; a handoff for the chat that starts it [user]; "eligible" and the fate of D-085's 5 cells per class and layer to settle there [open] | active; its open points settled by D-174, D-175 |
 | D-169 | 2026-11-18 | the per-node fit on clear nodes (SPEC Block 30, `node_inference.fit_node`; `scripts/infer_nodes.py`, `clean_cell.py`); plan step F3; D-162.4, D-164, D-166.1, D-166.4, D-167.1, D-167.4 | for now: clear traces only, one round, no cleaning of the far neighbours, the node's own expected shadow kept; the diameter's start always Allen's; residuals weighted from the central value outwards, the width from Allen's diameter; near bumps removed from the profile; a close neighbour's absorption fixed (free when that node is the working node); the chain geometry implemented [user]; the weight law's constants and the bump rule [open] | active |
 | D-168 | 2026-11-18 | plan step F3 and its SPEC entry, still to be written; `InferenceConfig` (a new parameter); D-161 | the number of close neighbours fitted jointly with a node is capped, and the cap is a tunable parameter [user]; its default 3 [orchestrator], PROVISIONAL | active |
 | D-167 | 2026-11-18 | plan step F3 and its SPEC entry, still to be written; D-166.6; SPEC Block 29 (`coarse_fit.refine_node`), Block 30 (`select_planes`), Block 32 (the round loop); `InferenceConfig` (a new parameter) | in the joint fit the weighting of the residuals is a tuning parameter; the planes used are those of `select_planes`; a node without a close neighbour is the same fit with no neighbour term; one pass, no repeat for now; nothing is kept of the rounds' one-tube refinement in this path [user]; the parameter's default (no weight beyond 1 / sigma^2) and the number of passes as a parameter, default 1 [orchestrator], PROVISIONAL | active |
@@ -12370,7 +12373,7 @@ are built first; how the in-focus width, which no stack identifies (D-165), is o
 
 **Sources.** **[user]** 2026-11-18, 17:38. **[log]** D-085, D-118 to D-121, D-165.
 
-**Status:** active.
+**Status:** active. [updated 2026-11-18 (later, 20): what "eligible" means, the law of the rounds and D-121's order, the cores and the walltime settled by D-175; the first stage the run uses by D-174]
 
 ---
 
@@ -12467,4 +12470,123 @@ Allen's, as at node 639) should flag.
 
 **Sources.** **[user]** 2026-11-18, 18:00. **[log]** D-169, D-171.
 
-**Status:** active.
+**Status:** active. [updated 2026-11-18 (later, 20): (D-173.3) superseded by D-174 -- the held diameter is the first stage's default once built, for the calibration, the survey and the bias table as well]
+
+---
+
+## D-174 -- The first stage with the diameter held at Allen's (D-173) becomes the first stage's default once built, for every user of the first stage; supersedes D-173.3 (user)
+
+**Date:** 2026-11-18, about 18:40 (Europe/Rome), the defocus-table chat (D-170's handoff), in the user's answer to the
+question on the kernel law of the davinci run.
+**Binds:** the first stage (`node_pipeline.measure_pilot`; SPEC section 2.2, Eq. (3); Blocks 3 and 5) and its users:
+the calibration's measurement, verdict and scan of each candidate (`calibration.scan_node`, `scan_cell`; Blocks 10, 15,
+19.3), the survey's node sample (Block 17, through Block 13's chain), the bias table (Blocks 6, 14); D-173.3; the davinci
+run of D-170 and D-175.
+
+**Decision [user].** "Now as we have discussed in the 'Quations before logic' chat. The pilot must fix the diameter to
+the allen's proposed one and fit the other parameters. This approach should be the default after that chat's
+implementation so be aware of it".
+
+**Statement.** (D-174.1 [user]) Once the first stage with the diameter held at Allen's diameter of the node (D-173.1:
+$d$ held, the absorption $\mu$ and the lateral centre $v_0$ fitted) is implemented, it is the first stage's default.
+(D-174.2 [orchestrator], PROVISIONAL, to confirm) "The default" is read as the default for every user of the first
+stage that D-173.3 named -- the calibration's choice and scan of its nodes (Blocks 10, 15, 19.3), the survey (Block 17)
+and the bias table (Blocks 6, 14) -- so D-173.3's provisional reading (those users keep the free-diameter fit) is
+superseded; the free-diameter fit stays selectable as the labelled alternative. Since the first stage then estimates
+something else, the switch belongs in the estimator's signature: a configuration field with the held diameter as its
+default, not an argument of one path, so that the calibration and the survey take it without a change of their code.
+(D-174.3 [orchestrator]) The davinci run of D-175 waits for it: its pool, acquisition check, selection and alignment
+run now, since none of them uses the first stage; its `nodes` and `calibration` steps are submitted once the default is
+in the code ("so be aware of it" [user]).
+
+**Why.** **[user]** as quoted. **[src: `analysis/calibration.py`, `analysis/calibration_scene.py`,
+`scripts/survey_cells.py` at `152b988`]** The calibration step uses the first stage of every candidate: its sharpest
+plane, centre and heading for the scan; its $\bar B$ and $\hat\mu$ in the predicted shadows of the traced neighbours,
+which judge isolation (Block 10.S, $\tau$ = 0.3 gl); its $\hat d$ in the reach of the node's own cylinder; and the
+cell's typical $\bar B$ and $\hat\mu$, from the survey's per-node CSV, in the candidate search. **[reasoning]** With the
+diameter free, $\hat\mu$ is fitted beside a $\hat d$ near twice Allen's (the pilot's clear nodes: Allen 0.45-0.54 um,
+fitted 0.77-1.09 um, D-160), while the neighbours' shadows are predicted from their Allen radii: at a given optical
+depth $\alpha = \mu d / \cos\varphi$ the predicted shadows come out about as much fainter, which loosens the isolation
+test; with the diameter held, $\hat\mu$ and the neighbours' radii are on one scale.
+
+**What it implies for code and tables.** The chat building D-173 (Blocks 3 and 5) makes the held diameter the first
+stage's default through the configuration (the estimator hash changes); the calibration and survey steps then need no
+change; the davinci array's `nodes` and `calibration` steps are submitted after that commit, and the run records it;
+the bias table, not yet built in production, is built on the new first stage.
+
+**What it does not decide [open].** Whether the bias table follows (D-174.2, to confirm); what a poor first-stage fit
+at Allen's diameter flags (D-173's open point); the near set's criterion (Allen's $2r \le$ 0.6 um, D-067.4) is
+unchanged.
+
+**Sources.** **[user]** 2026-11-18, about 18:40. **[log]** D-160, D-169, D-171, D-173. **[src]** as tagged.
+**[past chat]** "Questions before logic" (D-173, 18:00).
+
+**Status:** active; not implemented.
+
+---
+
+## D-175 -- The davinci run of the pooled defocus table (user): every pool cell, the few-node cells decided at the pool; round 1 under the configured law, round 2 by hand under the pooled law; at most 100 cores at once, 48 h walltime; this chat on the kernel only
+
+**Date:** 2026-11-18, about 18:40 (Europe/Rome), the defocus-table chat, the user's answers to four multiple-choice
+questions (the assistant's recommendation first in each).
+**Binds:** D-170's open points (the handoff `TEEG_defocus_table_davinci_handoff_2026-11-18.md`, section 7, P1-P7); S3c
+on davinci (`scripts/pbs/survey_prepare.pbs`, `survey_cells.pbs`, `survey_pool.pbs`; SPEC Blocks 16, 19); the run's
+configuration `configs/survey_allcells1.json` (`survey.cells_per_group`); D-085.1 (for this run); the order of D-117.2,
+D-121.1 and D-121.2; D-125.1's cap.
+
+**Decision [user].** (1) "All 158; few-node cells decided at the pool (Recommended)". (2) "THe first is ok" -- the
+option "Configured law, then round 2 by hand (Recommended)", whose text read: round 1 under the same conditions as the
+pilot's Cell 7 (D-117.2's first round); round 2 reruns only the calibration step under the pooled law, D-121.2's loop
+by hand, stopping when the anchor and the slope move < 1 SE; D-121.1 runs on the returned scans. (3) "use 100 cores
+with 48 walltime". (4) To the question on step 2 (NS1): "For now we will focus ONLY on the defocusing kernel
+construction".
+
+**Statement.** (D-175.1 [user]) *Cells.* Every cell of Allen's pool of human cells with a reconstruction whose
+dendrite type has a class (`survey.class_map`; 158 cells on 2026-10-28, all at 0.28 um and 0.1144 um per pixel) enters
+the run; a cell whose automatic alignment is set aside skips the later steps until the user accepts its overlay
+(D-085.2, D-098.5). The selection takes every cell of each group (the run's `survey.cells_per_group` = 1000; D-085.1's
+5 per group is not this run's). Whether a cell with few calibration nodes enters the pooled fits, and the minimum, are
+decided at the pool step on each cell's near and far counts, with no rerun of the array.
+(D-175.2 [user]) *The law of the rounds.* Round 1 runs the calibration step under the configured law (the renderer's
+default table, slope 0.79), as the pilot's Cell 7 did. Round 2 reruns only that step (`DIAM_FORCE=calibration`)
+under round 1's pooled law -- the table cut at 0.84 um and the far slope, the diagnostic one too while the far set is
+insufficient (D-117.2) -- then the pool. Rounds continue while the anchor $\hat\sigma_0$ or the far slope $\hat\gamma$
+moves by 1 SE or more between rounds, at most 5 (D-121.2's stop rule), each round submitted by hand: D-121.2's loop
+without its automation. D-121.1's depth check runs on the returned pooled scans (each near node's fitted axis depth is
+in `calibration_pooled.json`).
+(D-175.3 [user]) *Cores and walltime.* At most 100 one-core array tasks at once (within D-125.1's 120 cores), and a
+48 h walltime for the array's tasks and for the pool job (their headers ask 12 h and 2 h). The assistant's reading,
+PROVISIONAL: one array `-J 0-<N-1>%100` (PBS's limit on running subjobs, the job attribute `max_run_subjobs`) **[web:
+the OpenPBS design page "Limit on maximum number of subjobs that can run at a time"]**; if davinci's PBS refuses the
+`%`, two arrays of at most 100. A value with commas reaches the job only quoted or exported (`DIAM_STEPS=a,b qsub -v
+DIAM_STEPS ...`) **[web: OpenPBS's test `test_commas_in_custom_variable`; university PBS guides]**.
+(D-175.4 [user]) *Scope.* This chat builds the pooled defocus kernel only: no diameter work, and no S3a or S3b pooled
+analyses (`DIAM_POOL=calibration`). The assistant's reading, PROVISIONAL: the array runs the steps `align,nodes,
+calibration` (`nodes` because the calibration step needs its per-node CSV). Whether the calibration's step 2 (NS1)
+belongs to "the kernel construction" is asked **[open]**.
+(D-175.5 [orchestrator]) The in-focus width stays the configured 0.080 um (D-172); the run measures the growth $G$
+only, and the table can be re-anchored later (D-165.4).
+
+**Why [user; run; log].** **[user]** as quoted. **[run, sandbox: `checks/defocus_pool_2026-11-18/`]** At 158 cells x (30
+near, 2 far) synthetic scans the pool job's calibration takes about 5 h per pass at 1000 cell resamples, the far fit's
+dense Jacobian dominating (one far fit 18 s at 316 far nodes; the near growth fit 0.5 s at 4740 nodes), and Block
+19.8's removal of a cell runs everything again: 48 h covers it, 2 h does not. On flat phantoms rendered with the
+pilot's table as the truth, Block 10's near fit misreads $\sigma_{\rm r}$ at 0.28 / 0.56 / 0.84 um by -15.6 / -4.3 /
+-10.6 % (true $d$ 0.15-0.25 um), -30.8 / -14.1 / -4.6 % (0.45-0.55) and +11.8 / -24.1 / -7.8 % (0.75-0.95), 16 phantoms
+per range: pooling reduces the noise of the table, not this bias. **[log; src]** D-117.2 and D-121 are not
+implemented (no SPEC 10.L, 19.9 or Block 22; no loop in Cell 7), so round 1 under the configured law is the pilot's
+condition. PubMed, two queries (PBS job arrays; defocus kernel calibration on dendrites): nothing.
+
+**What it implies for code and tables.** No code change. `configs/survey_allcells1.json` = `{"survey":
+{"cells_per_group": 1000}}`, copied to `$HOME/diam/` on davinci (a path without spaces) and passed to every job of the
+run (`RUN_TAG=allcells1`); the commands in the handoff's section 9; round 2's configuration adds the pooled law
+(`renderer.kernel_table_*`, `kernel_continuation_slope`); round 1's `s3c/` is kept as `s3c_round1/` before round 2's
+pool.
+
+**What it does not decide [open].** The per-cell minimum (at the pool step); step 2 (NS1); whether D-121's automation
+(Blocks 19.9, 10.L, 22) is built later; the near set's Allen-diameter criterion; D-120.3's open false-removal rate.
+
+**Sources.** **[user]** 2026-11-18, about 18:40, the four answers. **[run, sandbox]** `checks/defocus_pool_2026-11-18/`.
+**[log]** D-085, D-088, D-117, D-118, D-120, D-121, D-125, D-165, D-170, D-172, D-174. **[web]** as tagged.
+
+**Status:** active; the prepare job and the alignment can run; the `nodes` and `calibration` steps wait on D-174.
