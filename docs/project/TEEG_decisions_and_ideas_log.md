@@ -216,6 +216,7 @@ the "Binds" column.
 | 2026-11-18 (later, 8) | Logs **D-163** [orchestrator] (the clearance chat, 15:00-15:40; coding directive 7): a changed shadow sum below 0 by rounding is set to 0 (tolerance 1e-12), a lower value raises. **Why:** the pilot's Cell 19 (D-160) **[data: the user's Colab log, 13:50-13:53]** picked the clear nodes 5353, 3873, 4725 (5792 of 8495 ranked nodes qualify; own dips 16.4, 19.6, 16.8 gl; tier-1 peak 0.000 gl; pilot d 0.803, 1.003, 0.964 um) and stopped in round 1 at the second node with `ValueError: S must be finite and >= 0`; node 5353's round 1 had finished. Cause reproduced **[run, sandbox]**: a kept sum changed by the images that left (Block 25, amendment 7) came out at -5.6e-17 on 689 pixels of a synthetic scene. Fixed at `6ac81d2` (`sci/diameter-pipeline`; SPEC Block 25, amendment 8); suites: shadow 8 pass, cleaning 6, clean iteration 9, pilot run 15, no failure; the five older spec tests of Blocks 25 and 28 named in the tester's F2 of 2026-11-17 fail as before the fix. Not run here: Cell 19 on the real stack. Next free IDs: D-164, I-006. |
 | 2026-11-18 (later, 9) | Logs **D-164** (user, 15:13; the clearance chat), on the joint fit of D-161, D-162: the tubes are built from traced node to traced node along the branch, out to the blur's reach, with one diameter and absorption along the node's own stretch; the boundary between the tiers is the predicted bias. Still open, the user's, after an explanation asked for: whether the joint fit runs only after the cleaning rounds or inside them too. Next free IDs: D-165, I-006. |
 | 2026-11-18 (later, 10) | No decision changed (the clearance chat, 15:28-16:10). **D-160's check ran** after the fix of D-163 **[data: the user's upload of 15:25 -- `focal_529878215.csv`, `features_529878215.csv`, the focal-plane figure and the `own_node*.png` figures; the figures read by eye]**: the clear nodes 5353, 3873, 4725 refined to 0.774, 1.085, 1.033 um (round 2; mu 0.194, 0.195, 0.248 /um) against Allen's 0.454, 0.536, 0.466 um (x 1.70, 2.02, 2.22) and the first stage's 0.803, 1.003, 0.964 um. In the planes shown (k* and k* +- 2) the one-tube model follows the measured line, with no narrow core inside a broad dip as on the four `overlap` nodes (x 2.7 to 8.5 Allen); the largest misfit read is about 4 gl at the focal plane of 4725. Reading [reasoning]: by D-160's own criterion the one-tube model holds where nothing else is on the line, and the excess of the four earlier nodes belongs to their neighbours (D-161). The user asked whether the Gaussian kernel could make the clear nodes too wide. **Checks** (`checks/kernel_2026-11-18/` at `3bf3dd1`; synthetic, one flat tube, hybrid, the pilot's table, fitted with the pipeline's model) **[run, sandbox]**: a halo of 10 / 20 / 30 % of the kernel at 3 sigma raises the fitted diameter by 5 / 10 / 15 % (tube 0.5 um, mu 0.8 /um) and 1 / 3 / 6 % (1.0 um, 0.25 /um); a growth of the kernel's variance with defocus 0.5 to 2 times the table's moves it by -5 to +5 %; a true in-focus width of 0.12 / 0.16 / 0.22 / 0.30 um where the table has 0.080 um makes a 0.5 um tube fit as 0.57 / 0.67 / 0.81 / 1.03 um, the misfit under 1 gl rms. **Finding:** `renderer.sigma_r0_um` = 0.080 um is configured ("never identified by the stacks", `config.py`; `calibration.kernel_from_growth`), and the fitted diameter is confounded with it: the clear nodes' 0.8 to 1.1 um cannot be told, by this fit, from Allen-thin dendrites under an in-focus blur of about 0.22 to 0.30 um. Open, put to the user: how sigma_r(0) is measured (the narrowest in-focus dips of the cell as an upper bound; a fit on thick dendrites). Literature: three PubMed queries on the bright-field kernel and on dendrite diameters by light against electron microscopy returned nothing relevant; one project-knowledge query found no dendrite-diameter value. Next free IDs unchanged: D-165, I-006. |
+| 2026-11-18 (later, 11) | Logs **D-165** (user, 15:48; the clearance chat): the kernel's in-focus width is exposed as a tuning parameter, the clear nodes are run at three widths, and the pipeline is applied to clear nodes of different sizes. Built: `kernel.with_in_focus_width`, `clean_cell.py --sigma-r0-um`, `clean_cell.py clear --d-bins`, notebook Cells 19b and 19c (SPEC Block 4 amendment 1, Block 27 amendment 4, Block 36 amendments 14 and 15). **Check added** (`checks/kernel_2026-11-18/kernel_infocus_sizes_check.py`) **[run, sandbox; synthetic, one flat tube, mu x d = 0.4]**: under a true in-focus width of 0.22 um (table 0.080 um) the fitted diameter is 1.61, 1.26, 1.10, 1.04 times the true one at 0.5, 0.8, 1.2, 2.0 um, the misfit 0.8, 1.1, 1.3, 1.4 gl; under 0.30 um: 2.06, 1.48, 1.22, 1.07 times, 0.9, 1.4, 1.8, 2.0 gl -- a blur wider than configured inflates thin dendrites far more than thick ones. Not run here: the cells on the real stack. Next free IDs: D-166, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -379,6 +380,7 @@ would be needed*, *Status*.
 | D-157 | 2026-11-17 | SPEC Block 35 (amendment 2), oracles (iv) and (v); `tests/smoke/test_smoke_line_fast.py` | the split's depth-mirror oracle restated for a slab grid symmetric about the axis (1e-10 there; generic case reported, no bound); the slab-grid oracle kept at 5e-4 with its margin recorded [orchestrator] | active |
 | D-158 | 2026-11-17 | SPEC Block 35 (amendment 2, oracle (iv)), Block 36 (amendment 11, final check); `scripts/clean_cell.py`, `scripts/infer_nodes.py`; the report `specs/test_reports/2026-11-17_1754_incremental.md` | the final check's settlements: the slab-grid bound stated at mu = 1 /um; the product status `not_fitted` for a per-node fit that raises or fails; `clean` logs a product that raises [orchestrator] | active |
 | D-159 | 2026-11-18 | `tests/spec/` on `sci/diameter-pipeline`; the report `specs/test_reports/2026-11-17_1754_incremental.md` (F2) | the tester's 39 spec tests of the run 2026-11-17_1754 brought into the working branch; the three stale spec tests (`test_factories_against_line_fast[linear, hybrid]`, `test_work_list_own_stretch_beyond_U`) retired [user] | active |
+| D-165 | 2026-11-18 | SPEC Block 4 (amendment 1), Block 27 (amendment 4), Block 36 (amendments 14, 15); `kernel.with_in_focus_width`; `clean_cell.py --sigma-r0-um`, `clear --d-bins`; notebook Cells 19b, 19c; `renderer.sigma_r0_um` | the kernel's in-focus width is a tuning parameter; the clear nodes are run at three widths; the pipeline is applied to clear nodes of different sizes [user]; the widths 0.080, 0.18, 0.28 um, the size = Allen's diameter in the bins 0.40, 0.45, 0.60, 0.80, 1.20, 5.0 um, one node per bin, the re-anchoring rule (the measured growth kept) [orchestrator], PROVISIONAL | active |
 | D-164 | 2026-11-18 | D-161's joint fit (plan step F3), its SPEC entry to be written; Block 28's tier rule (`cleaning.neighbour_tiers`, `close_lateral_um`, `close_defocus_um`); `node_inputs.local_tube`; D-132.3, D-162 | tube pieces from traced node to traced node along the branch, the chain out to the blur's reach (today's 5 um each way), one diameter and one absorption along the node's own stretch; a neighbour is tier 2 when the predicted bias of the node's diameter exceeds a tolerance [user]; the assumed error 30 % and the tolerance 1 %, rule (b) kept, the chain a setting beside the straight tube until compared [orchestrator], PROVISIONAL | active |
 | D-163 | 2026-11-18 | SPEC Block 25 (amendment 8) at `6ac81d2`; `shadow._cached_terms`, `shadow.SUM_ROUNDING_ATOL`; Block 28's requirement S >= 0; notebook Cell 19 | a shadow sum changed from a kept one is set to 0 where rounding left it below 0 by at most 1e-12; below that it raises `FloatingPointError`; sums afresh or reused whole unchanged [orchestrator] | active |
 | D-162 | 2026-11-18 | D-161's joint fit (plan step F3), its SPEC entry to be written; `InferenceConfig` (a new parameter); `NodeFeatures` | in the joint fit a tier-2 neighbour's diameter, absorption, lateral shift and depth are all free, its heading and tilt from the trace; its fitted values are saved and are the working values of that node elsewhere, a parameter choosing Allen's, the pilot's or the fitted ones, default fitted; delivered diameters stay each node's own fit [user]. Open: tube pieces node to node along the branch | active |
@@ -12109,5 +12111,47 @@ bounds of the neighbour's shift and depth; the cap on free neighbours.
 
 **Sources.** **[user]** 2026-11-18, 15:13. **[run, sandbox]**, **[reasoning]** as tagged. **[log]** D-132, D-133,
 D-161, D-162.
+
+**Status:** active.
+
+---
+
+## D-165 -- The kernel's in-focus width as a tuning parameter; the clear nodes at three widths; clear nodes of different sizes (user)
+
+**Date:** 2026-11-18, 15:48 (Europe/Rome), the clearance chat.
+**Binds:** `renderer.sigma_r0_um`; SPEC Block 4 (amendment 1: `kernel.with_in_focus_width`), Block 27 (amendment 4:
+`pick_clear_examples(..., taken_xyz)`), Block 36 (amendments 14 and 15: `clean_cell.py --sigma-r0-um`,
+`clear --d-bins`); notebook Cells 19b and 19c on `sci/diameter-pipeline`.
+
+**Decision [user].** After the assistant's finding of 15:45 (the fitted diameter of a clear node is confounded with
+the configured in-focus width): "Can you expose the in focus width as a tuning parameter please? and try the clear
+node with three of them. Moreover apply the pipeline on clear nodes of different sizes".
+
+**Statement.** (D-165.1 [user]) The in-focus width $\sigma_{\rm r}(0)$ of the defocus kernel (um) is a parameter the
+runs can set. (D-165.2 [user]) The clear nodes of D-160 are run at three values of it. (D-165.3 [user]) The pipeline
+is applied to clear nodes of different sizes. (D-165.4 [orchestrator], PROVISIONAL) Setting the width to $s_0$
+re-anchors the kernel table and keeps the growth the calibration measured: for every knot $\delta_m$ (um),
+$\sigma'_{\rm r}(\delta_m) = [\sigma_{\rm r}(\delta_m)^2 - \sigma_{\rm r}(0)^2 + s_0^2]^{1/2}$; the continuation
+beyond the last knot keeps its kind and slope. (D-165.5 [orchestrator], PROVISIONAL) The three widths: 0.080 um (the
+configured one), 0.18 um and 0.28 um. (D-165.6 [orchestrator], PROVISIONAL) The size of a node, before it is
+measured, is Allen's diameter (twice the traced radius); the bins 0.40, 0.45, 0.60, 0.80, 1.20, 5.0 um, one clear
+node per bin by the rule of D-160.2, 10 um apart across the bins.
+
+**Why.** **[code read at `3bf3dd1`]** `renderer.sigma_r0_um` = 0.080 um is configured, "never identified by the
+stacks"; the calibration measures only the growth of the kernel's variance with defocus. **[run, sandbox:
+`checks/kernel_2026-11-18/`]** A true width of 0.22 / 0.30 um makes a 0.5 um tube fit as 0.81 / 1.03 um with a misfit
+under 1 gl, and the inflation falls with size (x 1.61, 1.26, 1.10, 1.04 at 0.5, 0.8, 1.2, 2.0 um under 0.22 um), so
+nodes of different sizes separate a wide blur from wide dendrites where three thin nodes cannot. **[data: the user's
+`features_529878215.csv`]** Allen's diameters on the pilot run from 0.43 to 2.2 um, median 0.50 um.
+
+**What it implies for code and tables.** As bound; without the option every output is unchanged. A run's stored
+configuration carries the re-anchored table, so the per-node fit uses it.
+
+**What it does not decide [open].** Which width is right, and how it is measured for production (the narrowest
+in-focus dips of the cell; a fit on thick dendrites with the width free): after the results of Cells 19b and 19c.
+The order of this against the joint fit of D-161.
+
+**Sources.** **[user]** 2026-11-18, 15:48. **[code read]**, **[run, sandbox]**, **[data]** as tagged. **[log]**
+D-160, D-163.
 
 **Status:** active.
