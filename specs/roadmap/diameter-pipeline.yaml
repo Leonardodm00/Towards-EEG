@@ -732,3 +732,12 @@ implementation:
     needs_theory: []
     needs_hpc: false
     jobs: []
+  - id: I39
+    title: "Centre weights and near-bump cut"
+    summary: "Residual weights that fall off from the fitted centre with a width set by Allen's diameter, and the cut of the line samples lying beyond a second dip beside the node's own: the fit of a clear node kept away from structures that are not in the trace (D-169, D-171)."
+    block: 39
+    parent: NC2
+    depends_on: [I30]
+    needs_theory: [T15]
+    needs_hpc: false
+    jobs: []
