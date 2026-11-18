@@ -500,6 +500,37 @@ def test_cache():
         got = SH.shadow_image(fs3, OWN_IDS, *pa, planes, cfg, **kw)
         _same(got, _reference(fs3, OWN_IDS, pa, planes, cfg, **kw), tag,
               0.0 if tag != "dup one left out" else CACHE_S_ATOL)
+    # amendment 8 (D-163): two overlapping neighbours leave a kept sum of six after a visit to another patch (the
+    # path that changes a kept sum: 2 images rendered, not 4) -> before the fix min S = -5.6e-17 on 689 pixels and
+    # Block 28's clean_block refused it; now S >= 0, within rounding of the reference, and clean_block takes it
+    rows6 = [((-1.0, 0.3, 0.0), (1.0, 0.5, 0.0), 0.6, 1.5), ((-1.0, 0.9, 0.56), (1.0, 0.6, 0.56), 0.5, 1.3),
+             ((-3.0, -3.0, 0.0), (-2.6, -3.0, 0.0), 0.3, 1.0), ((2.6, -3.0, 0.0), (3.0, -3.0, 0.0), 0.3, 1.0),
+             ((-3.0, 3.0, 0.0), (-2.6, 3.0, 0.0), 0.3, 1.0), ((2.6, 3.0, 0.0), (3.0, 3.0, 0.0), 0.3, 1.0)]
+    fs6 = make_scene(rows6, soma=[])
+    SH.cache_clear()
+    SH.shadow_image(fs6, OWN_IDS, *pa, planes, cfg)
+    SH.shadow_image(fs6, OWN_IDS, *pb, planes, cfg)
+    inc6 = [False, False, True, True, True, True]
+    m0 = SH.cache_info()["misses"]
+    got = SH.shadow_image(fs6, OWN_IDS, *pa, planes, cfg, include=inc6)
+    assert SH.cache_info()["misses"] - m0 == 2, "the kept sum was not changed by the two images that left"
+    _same(got, _reference(fs6, OWN_IDS, pa, planes, cfg, include=inc6), "two left a kept sum", CACHE_S_ATOL)
+    assert got.S.min() >= 0.0, "a changed sum below 0: %.3g" % got.S.min()
+    from allen_diameter.analysis import cleaning as _CL
+    _CL.clean_block(np.full(got.S.shape, 200.0), got.S, 200.0, cfg)          # raised ValueError before the fix
+    # a kept sum that is negative beyond rounding is an error, never clipped
+    SH.cache_clear()
+    SH.shadow_image(fs6, OWN_IDS, *pa, planes, cfg)
+    SH.shadow_image(fs6, OWN_IDS, *pb, planes, cfg)
+    for memo in SH._cache.values():
+        for _K, S_kept in memo["sums"]:
+            S_kept -= 1e-6
+    try:
+        SH.shadow_image(fs6, OWN_IDS, *pa, planes, cfg, include=inc6)
+    except FloatingPointError:
+        pass
+    else:
+        raise AssertionError("a changed sum 1e-6 below 0 did not raise")
     # the budget: at 0 MB only the patch in use stays
     cfg0 = cfg_for("partition_vertical", shadow_cache_mb=0.0)
     SH.cache_clear()

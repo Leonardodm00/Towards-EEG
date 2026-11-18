@@ -514,13 +514,13 @@ class NodeClock(object):
         self.calls = 0
         self.bg_seconds = None
 
-    def node_start(self):
+    def node_start(self, nid=None):
         now = time.time()
         self.finish(now)
         if self.k % self.n == 0:
             self.round_t0 = now
         self.k += 1
-        self.cur = [1 + (self.k - 1) // self.n, None, now, None]
+        self.cur = [1 + (self.k - 1) // self.n, None if nid is None else int(nid), now, None]
         self.calls = 0
         self.bg_seconds = None
 
@@ -748,7 +748,7 @@ def run_clean(a, cfg, log):
     bg_fn = node_inputs.background_factory(cfg, log=log) if model_bg else None   # amendment 4, D-144
 
     def timed_background(node, F):
-        clock.node_start()
+        clock.node_start(getattr(node, "node_id", None))      # named from the start: an error before the refinement
         t_b = time.time()
         out = bg_fn(node, F)
         clock.bg_seconds = time.time() - t_b

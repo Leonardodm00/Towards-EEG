@@ -367,6 +367,7 @@ _cache = OrderedDict()
 _current = {"key": None, "boxes": {}}
 _cache_stats = {"hits": 0, "misses": 0}
 _N_SUMS = 4
+SUM_ROUNDING_ATOL = 1e-12   # amendment 8 (D-163): a changed sum below 0 by at most this (dimensionless) is rounding and set to 0
 
 
 def cache_info():
@@ -601,7 +602,8 @@ def _cached_terms(fscene, items, far, inc, B_gl, pmask, patch, z, cfg, direction
     fine grid) of shadow_image through the cache (amendment 7, D-150.3). The peaks, kept and the footprint are
     those of the images rendered alone [exact]; S is the sum of the kept neighbours' images: summed afresh in
     the neighbours' order [exact] when that renders no more images than changing a kept sum, else a kept sum
-    plus the images that entered and minus those that left [equal up to rounding]."""
+    plus the images that entered and minus those that left [equal up to rounding; values the rounding leaves
+    below 0, by at most SUM_ROUNDING_ATOL, are set to 0, a lower value raises FloatingPointError: amendment 8]."""
     n = len(items)
     memo = _cache.get(pkey)
     if memo is None:
@@ -677,6 +679,14 @@ def _cached_terms(fscene, items, far, inc, B_gl, pmask, patch, z, cfg, direction
                 bx = box_of(ik)
                 for _ in range(c):
                     _add_box(S, bx, 1.0)
+            # amendment 8 (D-163): a sum of non-negative images is >= 0, a changed sum only up to rounding --
+            # where every image under a pixel has left it can be -1e-17, and Block 28 requires S >= 0
+            low = float(S.min()) if S.size else 0.0
+            if low < -SUM_ROUNDING_ATOL:
+                raise FloatingPointError("shadow: a changed sum is %.3g < -%.0e: more than rounding (amendment 8)"
+                                         % (low, SUM_ROUNDING_ATOL))
+            if low < 0.0:
+                np.maximum(S, 0.0, out=S)
         else:                                     # afresh, in the neighbours' order
             S = np.zeros((z.size, patch.H, patch.W))
             for ik in order:
