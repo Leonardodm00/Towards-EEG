@@ -176,16 +176,18 @@ node_background = _bbar   # public name (Block 10's plane scan applies the same 
 
 
 def _d_fixed_um(branch, j, d_fixed):
-    """The diameter the first-stage fit of node j is held at (Block 5, amendment 2; D-173): None (fitted), or
-    "allen" = twice the branch's traced radius at the node."""
-    if d_fixed is None:
+    """The diameter the first-stage fit of node j is held at (Block 5, amendments 2 and 3; D-173, D-178):
+    "free" -> None (fitted); "allen" -> twice the branch's traced radius at the node, or None (fitted) when
+    that radius is not finite and > 0 (the pilot then carries the flag "allen_radius_missing")."""
+    if d_fixed == "free":
         return None
     if d_fixed != "allen":
-        raise ValueError("d_fixed must be None or 'allen', got %r" % (d_fixed,))
-    return 2.0 * float(branch.radius_um[j])
+        raise ValueError("d_fixed must be 'allen' or 'free', got %r" % (d_fixed,))
+    d = 2.0 * float(branch.radius_um[j])
+    return d if (math.isfinite(d) and d > 0) else None      # no traced radius: fitted, flagged by _pilot
 
 
-def _node_pass(blk, branch, j, t, m, dz, d_fixed=None):
+def _node_pass(blk, branch, j, t, m, dz, d_fixed="free"):
     block, ks, valid, frame = blk
     theta, phi, y_hat, e_u = path.angles(t)
     out = _Pass(t, theta, phi, y_hat, e_u)
@@ -294,6 +296,7 @@ def _pilot(branch, i, blk, nodes, t_raw, cfg, reg, d_fixed=None):
     """Block 5 on the block blk (the module docstring's passes, unchanged): the
     pilot's NodeResult, the Block 13 fields at their defaults."""
     m, dz = cfg.measure, cfg.acquisition.dz_um
+    d_fixed = m.pilot_diameter if d_fixed is None else d_fixed      # amendment 3 (D-178): the configuration's
     R, L = int(m.direction_redraws), float(m.line_fit_window_um)
     passes = {int(j): _node_pass(blk, branch, int(j), t_raw[int(j)], m, dz, d_fixed) for j in nodes}
     for q in range(1, R + 1):
@@ -317,6 +320,8 @@ def _pilot(branch, i, blk, nodes, t_raw, cfg, reg, d_fixed=None):
         if th is not None:
             theta, y_hat, e_u = th, np.array([-math.sin(th), math.cos(th)]), np.array([math.cos(th), math.sin(th)])
     last = passes[i]
+    if d_fixed == "allen" and _d_fixed_um(branch, i, d_fixed) is None:
+        flags.append("allen_radius_missing")              # amendment 3: nothing to hold, the diameter was fitted
     steep = math.tan(phi) >= m.steep_tan_diagnostic
     fit, I = None, None
     if last.k_star is not None:
@@ -372,10 +377,11 @@ def measure_pilot(branch, i, provider, cfg, reg=None, d_fixed=None):
     z_offset_um are read) -- real data only. Returns NodeResult with the Block
     13 fields at their defaults (pilot_status "": pilot_view is the identity).
 
-    d_fixed (amendment 2, D-173): None, the pilot as above; "allen", every
-    Gaussian fit of the pilot (each window node's passes and the node's final
-    fit) holds the diameter at twice the branch's traced radius at that node
-    and fits (mu, v0): d_hat_um is then Allen's diameter.
+    d_fixed (amendments 2 and 3; D-173, D-178): None, the configuration's
+    measure.pilot_diameter (default "allen"); "allen", every Gaussian fit of
+    the pilot (each window node's passes and the node's final fit) holds the
+    diameter at twice the branch's traced radius at that node and fits
+    (mu, v0): d_hat_um is then Allen's diameter; "free", (d, mu, v0) fitted.
     """
     nodes, t_raw = _window(branch, i, cfg.measure)
     blk = provider(*_request(branch, i, nodes, t_raw, cfg))

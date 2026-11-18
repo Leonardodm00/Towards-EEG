@@ -48,6 +48,7 @@ FOCUS_BG_RULES = ("profile_ends_median", "same_as_bbar")       # D-023 / D-018 (
 BACKGROUND_SUPPORTS = ("stripe", "square")                      # D-101.3 (Block 10.S) / D-078.1 (10.P)
 CANDIDATE_SOURCES = ("cell", "table")                           # D-109, D-112 (Block 10.C): a set's candidates from the whole cell's trace / the pilot table's rows
 FOCUS_RULES = ("gradient_energy", "dip_depth")                 # D-030: gradient energy; dip depth = handoff Eq. 1, comparison
+PILOT_DIAMETERS = ("allen", "free")                             # D-178: the first stage's diameter, held at Allen's or fitted
 INFERENCE_WEIGHTS = ("allen", "none")                           # D-169.4, D-167.1: the per-node fit's residual weights (Block 39)
 FOCUS_GRAD_WINDOWS = ("radius_margin", "whole_profile")        # D-030 (provisional default, see MeasureConfig.focus_grad_window)
 ABSORPTIONS = ("partition_vertical", "linear", "ray_world", "hybrid")    # D-024 / procedure s.3.6; "hybrid": Block 21 (D-084, D-092)
@@ -119,6 +120,7 @@ class MeasureConfig:
     # -- fit, D-018.2 / D-019.1
     sigma_fit_um: float = 0.099       # source: D-023, deliverable value, PROVISIONAL (notes s.2 heuristic budget); the one value, D-057 (ii) dropped the study
     mu_mode: str = "per_node"         # source: D-023 (closes D-019 (a))
+    pilot_diameter: str = "allen"     # source: D-173, D-174, D-178 [user]: the first stage holds d at Allen's (twice the traced radius) and fits (mu, v0); "free" = the labelled alternative, (d, mu, v0) fitted
     fit_params: Tuple[str, ...] = ("d", "mu", "v0")  # source: D-018 (no fitted B) + D-019 (mu, not alpha)
     fit_d_bounds_um: Tuple[float, float] = (0.05, 6.0)     # source: impl-handoff, PROVISIONAL
     fit_mu_bounds_per_um: Tuple[float, float] = (0.0, 20.0)  # source: impl-handoff, PROVISIONAL
@@ -467,6 +469,7 @@ class DiameterConfig:
         """Raise ValueError on a name or range that the code does not accept."""
         m, c, r, p = self.measure, self.correction, self.renderer, self.phantom
         _check_in(m.mu_mode, MU_MODES, "measure.mu_mode")
+        _check_in(m.pilot_diameter, PILOT_DIAMETERS, "measure.pilot_diameter")
         _check_in(m.bbar_region, BBAR_REGIONS, "measure.bbar_region")
         _check_in(m.focus_bg_rule, FOCUS_BG_RULES, "measure.focus_bg_rule")
         _check_in(m.focus_rule, FOCUS_RULES, "measure.focus_rule")

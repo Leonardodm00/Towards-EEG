@@ -674,7 +674,7 @@ def run_clean(a, cfg, log):
                                                                                 scene.soma.shape[0], len(features0)))
     wpeaks = {}
     no_clean = bool(getattr(a, "no_clean", False))        # amendment 16 (D-169.7): the examples only, nothing cleaned
-    pilot_d = getattr(a, "pilot_diameter", None) or ("allen" if no_clean else "free")
+    pilot_d = getattr(a, "pilot_diameter", None) or cfg.measure.pilot_diameter      # amendment 17 (D-178)
     if no_clean:
         work = [int(i) for i in examples]
         log("--no-clean (D-169): the work list is the %d example nodes; no neighbour is cleaned, no round is run; "
@@ -714,7 +714,7 @@ def run_clean(a, cfg, log):
             ob = node_inputs.own_branch(swc, run, xyz)
             if ob is None:
                 raise ValueError("a one-node stretch")
-            pilot = measure_pilot(full, off + t, provider, cfg, d_fixed="allen" if pilot_d == "allen" else None)
+            pilot = measure_pilot(full, off + t, provider, cfg, d_fixed=pilot_d)
         except Exception as exc:                     # one node's failure never stops the run
             dropped[nid] = "%s: %s" % (type(exc).__name__, exc)
             log("node %d: dropped (%s) in %.1f s" % (nid, dropped[nid], time.time() - t0))
@@ -1024,8 +1024,8 @@ def main(argv=None):
                    "prepare the example nodes only and record their lines as read; no neighbour is cleaned, no "
                    "round is run. Then infer_nodes.py real fits them")
     c.add_argument("--pilot-diameter", choices=("allen", "free"), default=None, help="the first stage's diameter: "
-                   "allen = held at Allen's, the absorption and the centre fitted (D-173); free = fitted. Default: "
-                   "allen with --no-clean, free otherwise")
+                   "allen = held at Allen's, the absorption and the centre fitted (D-173, D-178); free = fitted. "
+                   "Default: the configuration's measure.pilot_diameter (allen)")
     a = ap.parse_args(argv)
     log = Log()
     cfg = load_config(a.config_json)

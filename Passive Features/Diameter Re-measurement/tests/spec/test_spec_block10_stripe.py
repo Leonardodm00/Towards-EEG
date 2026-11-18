@@ -614,8 +614,8 @@ def test_new_calibration_fields_defaults_validate_and_signatures():
     # D-108 (the user, 2026-10-29): tau = 0.3 gl, the spec's value since then (was 0.03, D-081.1 / D-101.5)
     assert cal.isolation_depth_gl == 0.3
     # Block 1's pinned default hashes (SPEC Block 1, D-096): estimator 59678d4e2aedf2b6, simulation 52aa73e479eb77cf
-    assert cfg.signature_hash("estimator") == "59678d4e2aedf2b6"
-    assert cfg.signature_hash("simulation") == "52aa73e479eb77cf"
+    assert cfg.signature_hash("estimator") == "16be09f944e45972"   # since D-178 (2026-11-18, measure.pilot_diameter); 59678d4e2aedf2b6 before
+    assert cfg.signature_hash("simulation") == "dc84ed2e89bcfea6"   # since D-178; 52aa73e479eb77cf before
     # the new fields are in no signature (10.S: "none in a signature")
     changed = cfg_with(background_support="square", stripe_half_widths_um=(2.0, 5.0), stripe_min_pixels=900,
                        stripe_min_side_um=1.0, node_phi_max_deg_far=20.0, node_phi_max_deg=7.0)

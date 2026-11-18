@@ -30,8 +30,8 @@ def test_defaults_as_specified():
     assert cl.max_rounds == 5 and cl.stop_rel_d == 0.01 and cl.shadow_absorption == "hybrid"
     assert cl.neighbour_swc_types == (2, 3, 4)
     assert inf.absorption == "hybrid" and inf.line_fine_factor == 8 and inf.line_reach_sigmas == 6.0
-    assert c.signature_hash("estimator") == "59678d4e2aedf2b6"
-    assert c.signature_hash("simulation") == "52aa73e479eb77cf"
+    assert c.signature_hash("estimator") == "16be09f944e45972"   # since D-178 (2026-11-18, measure.pilot_diameter); 59678d4e2aedf2b6 before
+    assert c.signature_hash("simulation") == "dc84ed2e89bcfea6"   # since D-178; 52aa73e479eb77cf before
 
 
 def test_overrides_reach_sections_and_hashes_unmoved():

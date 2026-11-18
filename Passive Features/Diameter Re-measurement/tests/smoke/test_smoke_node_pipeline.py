@@ -256,9 +256,17 @@ def test_pilot_fixed_diameter():
     d_true, d_allen, phi, theta, c = 1.0, 0.6, 0.0, 0.3, (0.03, -0.02, 0.05)
     tube = G.Tube(c, 0.5 * d_true, phi, theta, 1.0, 6.0, "axial")
     br = phantom_branch(c, phi, theta, 0.5 * d_allen)
-    free = NP.measure_pilot(br, 4, make_provider([tube], [1.0], cfg, 1), cfg)
+    cfg_free = dataclasses.replace(cfg, measure=dataclasses.replace(cfg.measure, pilot_diameter="free"))
+    assert cfg.measure.pilot_diameter == "allen"                      # D-178: the default of every user
+    free = NP.measure_pilot(br, 4, make_provider([tube], [1.0], cfg, 1), cfg, d_fixed="free")
     held = NP.measure_pilot(br, 4, make_provider([tube], [1.0], cfg, 1), cfg, d_fixed="allen")
-    again = NP.measure_pilot(br, 4, make_provider([tube], [1.0], cfg, 1), cfg, d_fixed=None)
+    default = NP.measure_pilot(br, 4, make_provider([tube], [1.0], cfg, 1), cfg)
+    again = NP.measure_pilot(br, 4, make_provider([tube], [1.0], cfg, 1), cfg_free)
+    assert default.d_hat_um == held.d_hat_um and default.mu_hat_per_um == held.mu_hat_per_um
+    assert "allen_radius_missing" not in held.flags
+    br0 = phantom_branch(c, phi, theta, 0.0)                          # no traced radius: fitted and flagged
+    miss = NP.measure_pilot(br0, 4, make_provider([tube], [1.0], cfg, 1), cfg)
+    assert "allen_radius_missing" in miss.flags and miss.d_hat_um > 0.5
     print("    d rendered %.2f um, Allen %.2f um: free d %.3f mu %.3f; held d %.3f mu %.3f; k* %d / %d"
           % (d_true, d_allen, free.d_hat_um, free.mu_hat_per_um, held.d_hat_um, held.mu_hat_per_um, free.k_star,
              held.k_star))

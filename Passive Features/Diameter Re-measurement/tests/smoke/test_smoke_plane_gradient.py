@@ -402,7 +402,10 @@ def test_edge_cases():
     from allen_diameter.loading import table_io
     from allen_diameter.plotting import figures as FG
     base = default_config()
-    ccfg = dataclasses.replace(base, measure=dataclasses.replace(base.measure, block_half_um=3.5))
+    # pilot_diameter="free" (the labelled alternative of D-178): these plane diagnostics (D-040, D-042) redo the first
+    # stage's free fit at a plane and size their lines and squares from the pilot's fitted d
+    ccfg = dataclasses.replace(base, measure=dataclasses.replace(base.measure, block_half_um=3.5,
+                                                            pilot_diameter="free"))
     with tempfile.TemporaryDirectory() as tmp:
         swc, fetcher, planes, swc_path = synthetic_cell(tmp, ccfg, d_true=0.8, mu=1.0)
         prov = run_cell.real_provider(fetcher, planes, ccfg.acquisition.res0_um)

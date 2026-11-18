@@ -121,7 +121,10 @@ def _cell(tmp, d_true=0.8):
     import run_cell
     from fixtures_cell import synthetic_cell
     base = default_config()
-    cfg = dataclasses.replace(base, measure=dataclasses.replace(base.measure, block_half_um=3.5))
+    # pilot_diameter="free" (the labelled alternative of D-178): these plane diagnostics (D-040, D-042) redo the first
+    # stage's free fit at a plane and size their lines and squares from the pilot's fitted d
+    cfg = dataclasses.replace(base, measure=dataclasses.replace(base.measure, block_half_um=3.5,
+                                                            pilot_diameter="free"))
     swc, fetcher, planes, swc_path = synthetic_cell(tmp, cfg, d_true=d_true, mu=1.0)
     return cfg, swc, run_cell.real_provider(fetcher, planes, cfg.acquisition.res0_um), swc_path
 

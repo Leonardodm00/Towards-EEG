@@ -99,7 +99,10 @@ def _cell(tmp, d_true=0.8):
     import run_cell
     from fixtures_cell import synthetic_cell
     base = default_config()
-    cfg = dataclasses.replace(base, measure=dataclasses.replace(base.measure, block_half_um=3.5))
+    # pilot_diameter="free" (the labelled alternative of D-178): Cells 4j and 4k redo the first stage's free fit
+    # at a plane, and their oracles (the fit at k* is the pilot's; the square sized from the pilot's d) are that fit's
+    cfg = dataclasses.replace(base, measure=dataclasses.replace(base.measure, block_half_um=3.5,
+                                                                pilot_diameter="free"))
     swc, fetcher, planes, swc_path = synthetic_cell(tmp, cfg, d_true=d_true, mu=1.0)
     return cfg, swc, run_cell.real_provider(fetcher, planes, cfg.acquisition.res0_um), swc_path
 

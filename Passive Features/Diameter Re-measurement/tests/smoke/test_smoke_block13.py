@@ -489,6 +489,9 @@ def test_reference():
     from allen_diameter.analysis import fit_sgt
     with tempfile.TemporaryDirectory() as tmp:
         cfg, swc, prov = _cell(tmp, 0.8)
+        # refit_at_plane is the free fit of (d, mu, v0) at a plane (D-042): it is the pilot's fit at k* when the
+        # pilot's diameter is fitted too, the labelled alternative of D-178
+        cfg = dataclasses.replace(cfg, measure=dataclasses.replace(cfg.measure, pilot_diameter="free"))
         st, _restack = _fixture_state(cfg, swc, prov, 4)
         pilot, k = st["result"], int(st["result"].k_star)
         rf = PI.refit_at_plane(st, cfg, k)
