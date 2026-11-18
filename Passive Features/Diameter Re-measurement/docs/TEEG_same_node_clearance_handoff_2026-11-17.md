@@ -7,6 +7,7 @@
 | 2026-11-17 (later, 2) | The clearance chat, 17:05: **D-156** [user] -- the joint fit of all planes with the whole own shadow stays the estimator, the clearance becomes a product computed from its estimate every round, clear-then-fit is dropped without a comparison. Section 13 added; it supersedes section 6's correction "before the profile fit" and closes section 7's points (a) to (e). SPEC: Block 35 amendment 2, Blocks 37, 38, Block 36 amendment 11 (drafted, the contract commit that carries this row). The decision's ID is D-156 (written as D-155 until the push: the noise-fit chat took D-155 meanwhile). 17:20: the user approved the block plan and recalled that the fit comes after the neighbours' cleaning (D-156.6). |
 | 2026-11-17 (later, 3) | The clearance chat: the wave of D-156 is built, merged and checked. Block 35 amendment 2 (`line_fast.line_shadow_split`), Block 37 (`analysis/own_clearance.py`), Block 38 (`plotting/own_clearance_figures.py`) by three Opus implementers; Block 36 amendment 11 (the entry points, `--no-own`, the pilot-run test, notebook Cells 17b and 18b) by the orchestrator; final check by an Opus tester, `specs/test_reports/2026-11-17_1754_incremental.md`: PASS WITH ISSUES (one MINOR, fixed; four NOTE; three spec gaps, closed), D-157 and D-158 [orchestrator]. Section 14 added. The theory document of the main route: `docs/TEEG_diameter_pipeline_theory_2026-11-17/`. Not run: the pilot cell in Colab (Allen's images do not reach the sandbox). |
 | 2026-11-18 | The clearance chat: D-159 [user] -- the tester's spec tests merged into the branch, the three stale spec tests retired. New at the user's request: `scripts/show_focal.py` and notebook Cell 18c (each example node at its focal plane with the estimated tube's edges and Allen's diameter on the image; SPEC Block 31 amendment 3, Block 36 amendment 12). The pilot's first clearance figures were received (nodes 8089, 7448, 4844, 7081): section 15. |
+| 2026-11-18 (later) | The clearance chat: Cell 18c ran on the pilot (`cleaning_worst`, the four `overlap` examples; refinement's estimates, Cell 18b not run there). Section 16 added: the figure's table and its reading. No decision. |
 
 Basis tags: **[src]** read in the named file at `021869d`; **[data]** read in the files the user uploaded on
 2026-11-17 at 12:40 (the Colab run of Cell 17b: `cleaning_529878215.json`, `examples_worst_529878215.json`, the
@@ -405,3 +406,27 @@ identity of section 12 is the joint fit's misfit shown plane by plane. On 8089 a
 narrow core; two minima) is what a thinner structure, or two structures, inside the fitted width would give; whether
 that is so needs the image itself -- hence Cell 18c -- and was not decided. These four are the survey's `overlap`
 examples, the worst class by construction.
+
+## 16. Cell 18c on the pilot (2026-11-18, 13:24): the fitted tube against the image
+
+**[data: the user's Colab output of `scripts/show_focal.py --cleaning-dir .../cleaning_worst --specimen 529878215
+--plane kstar --image before --zoom-um 6.0` (table) and its figure `focal_529878215.png`, pasted in the chat; the
+figure read by eye: one plane, grey range the 1st to 99th percentile of the view]**
+
+| node | plane $k^*$ | $z_{k^*} - \hat z_{\rm ax}$ (um) | Allen $d$ (um) | first stage (um) | refined $\hat d$ (um) | what the image shows |
+|---|---|---|---|---|---|---|
+| 8089 | 108 | +0.245 | 0.553 | 2.695 | 2.440 | one dark band roughly 1 um wide along the fitted direction, lying in the half of the fitted tube towards one edge; the other edge runs through light background about 1.5 um from the band; a grey surround around the band |
+| 4844 | 268 | +0.926 | 0.467 | 3.141 | 2.623 | several dark blobs of different size, not one uniform band; the fitted axis is 0.93 um out of this plane |
+| 7081 | 198 | +0.002 | 0.446 | 3.975 | 3.801 | a dark band about 2 um wide with a second dark structure joining it; the fitted axis lies about 0.9 um to one side of the trace, and one fitted edge runs through light background |
+| 7448 | 64 | -0.504 | 0.478 | 1.498 | 1.288 | the darkest structure is elongated across the fitted direction, along the measuring line; the soma's dark mass in a corner |
+
+Reading **[reasoning]**: on all four the fitted tube is wider than the dark band it is drawn on, and on none is the
+object one straight uniform tube (a core with a grey surround; several structures; a heading that does not follow the
+dark structure). With the profiles of section 15 (a narrow core inside a broad shallow dip) this says that the
+one-tube fit follows the broad component. What the broad component is, is open: candidates are the dendrite's spines
+(**[knowledge base: Benavides-Piccione et al. 2025, J Comp Neurol, Table 1, full text in project knowledge]** basal
+dendrites of human temporal cortex: spine length 1.449 +- 0.012 um, mean +- SEM, 1.290 +- 0.046 spines per um), tier-2
+neighbours left in the profile (D-132), or a real blur with wider tails than the Gaussian kernel. The fitted
+coefficients (0.03 to 0.13 /um) are low, as a sparse absorber's would be. The four nodes are the survey's `overlap`
+examples; nothing here says how isolated nodes behave. PubMed, "dendritic diameter light microscopy overestimation
+biocytin reconstruction electron microscopy comparison": 0 results.
