@@ -12,6 +12,7 @@
 | 2026-11-18 (later, 7) | D-173 [user, 18:00]: in the first stage the diameter is fixed at Allen's value and the absorption and lateral centre are fitted (section 0's table, A7). Decision log: next free IDs D-174, I-006. |
 | 2026-11-18 (later, 8) | Section 0's path is built and smoke-tested: commit `1bb9973` on `sci/diameter-pipeline` (SPEC Blocks 3, 5, 30, 32, 34, 36 amended, Block 39 new; notebook Cell 20). New section 0b: what was built, the commands, the knobs, what the synthetic checks show and do not show. The builder's choices are D-176 [orchestrator]. D-174 [user, the defocus-table chat, about 18:40] asks for the held diameter as the first stage's default for all its users: not in `1bb9973` (section 0b, last table row). Decision log: next free IDs D-177, I-006. |
 | 2026-11-18 (later, 9) | The joint-fit chat (D-177 [user, 18:25, 18:52]: this chat refines the joint fit with close neighbours; the bumps are the 'Questions before logic' chat's). Section 13 added: four synthetic checks and the pilot's trace analysed (`checks/joint_2026-11-18/`), the chat's PROVISIONAL proposals for B1 to B6 (D-177.3 to D-177.11), the first test nodes. Section 6 corrected (where the own tube's heading comes from); section 12: the node spacing and the trace's depth scatter now measured. Decision log on `main`: next free IDs D-178, I-006. |
+| 2026-11-18 (later, 10) | D-179 [user, 20:23]: of section 13.3, confirmed -- the per-chain rendering with summed shadows, rule (b) dropped, the first test nodes; read as confirmed, to check -- B1 and B2; open, with two figures (`checks/joint_2026-11-18/fig_attached_vs_free.png`, `fig_own_chain_options.png`) -- attached chains as neighbours, the own chain smoothed or raw. Section 13.2: the depth words for D-149's examples corrected. Decision log on `main`: next free IDs D-180, I-006. |
 
 Basis tags: **[user]** said or decided by the user, with the time (Europe/Rome, 2026-11-18); **[log]** the decision
 log on `main`; **[src]** read in the named file at `f6504b0`; **[run, sandbox]** executed in the handing-over
@@ -417,13 +418,19 @@ transform). The raw file carries the pipeline's node ids; the repaired `reconstr
 
   One chain at 251 of the 253 nodes. "Attached": on the node's own stretch beyond the own chain, or on a stretch
   sharing a branch point with it. The list: `close_neighbour_nodes_529878215.csv`.
-- D-149's examples: 8089 an attached chain over the node 2.0 um deeper; 4844 an attached chain 1.15 um beside it,
-  2.1 um deeper; 7081 a free chain 1.4 um beside it, 0.9 um shallower; 7448 nothing on the line (tier 2 today through
-  an axon crossing its stretch 6.3 um deeper). The clear nodes 5353, 3873, 4725, 1013, 2669, 2620, 639: nothing on
+- D-149's examples, the other chain's stage z minus the node's in brackets **[corrected 2026-11-18, later: the
+  first version said "deeper" for the first two and "shallower" for the third, though all three lie on the same side;
+  which sign is deeper along the light path is not claimed]**: 8089 an attached chain (a sibling branch from the same
+  branch point) over the node (-2.0 um); 4844 an attached chain 1.15 um beside it (-2.1 um); 7081 a free chain 1.4 um
+  beside it (-0.9 um); 7448 nothing on the line (tier 2 today through an axon crossing its stretch, +6.3 um). The clear nodes 5353, 3873, 4725, 1013, 2669, 2620, 639: nothing on
   the line at any depth.
 - Not in these counts: the 674 nodes near a branch point or an end; untraced structures; other cells.
 
 ### 13.3 Proposals, PROVISIONAL, each for the user to confirm (D-177.3 to D-177.11)
+
+State after D-179 [user, 20:23]: **confirmed** -- rows "B5, B6", "Tiers" and "Test nodes"; **read as confirmed, to
+check** -- rows "B1" and "B2" (the user's "3) yes" read as the fourth point of the list put to them); **open, figures
+delivered** -- rows "B4" and "Own chain"; not named in the answers -- row "B3".
 
 | Choice | Proposal |
 |---|---|
