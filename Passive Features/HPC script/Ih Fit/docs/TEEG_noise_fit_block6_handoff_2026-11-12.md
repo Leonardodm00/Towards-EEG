@@ -19,6 +19,7 @@ which stays the history of Block 9 and of D-122 to D-125.
 | 2026-11-17 (later, 4) | **D-152** (user, 14:19): the law extended to three components -- a white Gaussian fast part, a middle part in [0.04 ms, 1 ms], the slow part in [1 ms, 10 s]; five parameters. Open with the user: Block 9's per-sweep parameters and the statistic set (§6 item 8). Next: SPEC 2.1 rewritten, then the plan for Blocks 2, 4, 9. |
 | 2026-11-17 (later, 5) | **D-153** (user, 14:25): per sweep the three sizes, per cell the two time scales; lags 0.04 and 0.3 ms added. The plan for Blocks 2, 3, 4, 9, 6 put to the user. |
 | 2026-11-17 (later, 6) | The plan approved (D-154) and carried out: the three-component law implemented, checked and merged into `main` (SPEC 2.6; D-155 [orchestrator]). §4 "The run under the three-component law" holds the commands for davinci. The nf1 tables feed no twin. |
+| 2026-11-18 | The nf2 pilot finished (user's paste, 13:37): 2 ok; 508282493 19299 s (nf1 14536 s, x 1.33), 569844159 25203 s (nf1 27308 s, x 0.92). The law, J and flags not yet read: the one-liner of §4 asked for. |
 
 **Basis tags.** **[run]** executed in the assistant's sandbox (date given); **[src]** read from the code, SPEC or log
 on `main`; **[log]** the decision log's text; **[user]** the user's decision or words; **[reasoning]** the assistant's
@@ -367,6 +368,28 @@ ridge seen at reduced sizes in 6 of 40 synthetic cells, SPEC Block 4); J against
 (`degenerate:sigma_f`, `v_none`, `at_bound`). Then the 18 cells with the same tag (the pilot's two are kept).
 
 **The nf2 pilot is submitted** (2026-11-17, 18:01 **[cluster, pasted]**): gates SETTLED at `7c890ff` (16 passed); array `2098689[].pbsserver01`, merge `2098690.pbsserver01`; run file `~/noise_fit_runs/nf2_L3_exc_20261117T170135Z.env`; outputs `.../pipeline_outputs_ih/noise_fit/nf2/L3_exc`.
+
+**The nf2 pilot finished** (2026-11-18, the user's paste of 13:37 **[cluster]**): array and merge state F;
+`NOISE_CELL 508282493: status=ok seconds=19299`, `NOISE_CELL 569844159: status=ok seconds=25203`,
+`NOISE_MERGE L3_exc: 2 ok, 0 refused, 0 failed, 0 missing`.
+
+| Cell | nf1 (s) | nf2 (s) | nf2 / nf1 |
+|---|---|---|---|
+| 508282493 | 14536 (cell fit 3371, sweep stage 11165) | 19299 (5.4 h) | 1.33 |
+| 569844159 | 27308 (cell fit 6202, sweep stage 21104) | 25203 (7.0 h) | 0.92 |
+
+Together 1.06 x nf1 **[arithmetic on the pasted seconds]**. If every cell takes 0.9-1.3 x its nf1 time, the slowest
+of the 18 needs at most about 10 h: the 48 h walltime of D-147 is ample **[reasoning]**. The 18-cell run with the same
+tag skips the two pilot cells (D-125.5: their JSONs carry the code commit `e9a6469`, still the last commit touching
+`noise_*.py` and `run_noise_fit.py` on 2026-11-18). Read back before it, on davinci (tested here on a JSON written by
+the new code at smoke size; prints per cell the stage times, the law, J, dof, p, kappa, flags, the sweeps by reason
+and the standardised residual z of each statistic):
+
+    conda activate prova && OUT="/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs_ih/noise_fit/nf2/L3_exc" && python -c '<the one-liner of the chat of 2026-11-18>' "$OUT"
+
+For comparison **[run, here, on the nf1 JSONs and the dev check]**: nf1 J 75.0 (508282493) and 1756.2 (569844159) on
+11 dof; the dev check's three-component law (15 statistics, 9 dof) J 33.1 and 397.7, with tau_m 0.083 ms and at the
+1 ms cap, tau_s 49 ms and at the 10 s bound (569844159: the cell whose SS and LS statistics disagree).
 
 Read back from the pilot: the `NOISE_CELL` lines, each JSON's per-stage seconds (they set `WALLTIME`), the
 `NOISE_MERGE` line. A code change between the pilot and the run re-runs every cell, the pilot's included (the resume
