@@ -7,6 +7,7 @@
 | 2026-11-18 (later, 2) | D-168 [user, 16:53]: the cap on free neighbours is a tunable parameter (O5 closed). Open and under discussion with the user: the neighbour's position fixed at the pilot's values or free in a narrow range (O4); what a "neighbour" is -- today one segment, proposed one chain (O6, O7). New check `tier2_sloppiness.py` (section 9) and a new open point O13 from it. Decision log on `main`: next free IDs D-169, I-006. |
 | 2026-11-18 (later, 3) | 17:06, nothing decided (the user: "I'm still deciding"). The user's proposal for O13: fix a neighbour's absorption at a weighted mean over nearby nodes of its branch; check `tier2_fixed_mu.py` added (section 9). Correction to O4: today a neighbour sits at its TRACED position; the first stage's centre and depth are not stored in the features. |
 | 2026-11-18 (later, 4) | D-169 [user, 17:38] changes what is built first: section 0 added (clear traces only, one round, no far-neighbour cleaning, Allen's diameter as the start, centre weights from Allen's diameter, near bumps removed). The joint fit with close neighbours (sections 2 to 7) stays decided and comes after. Section 8 now ends with the list of choices the user still has to make (8b); the user will answer them in the next chat. D-168 and D-169 added to section 2. Decision log on `main` at `30ed363`; next free IDs D-171, I-006. A second handoff exists for the defocus table on davinci (D-170): `TEEG_defocus_table_davinci_handoff_2026-11-18.md`. |
+| 2026-11-18 (later, 5) | D-171 [user, 17:54]: A1 to A7 of section 8b answered (the weights' width and centre, the bump rule with multiplier 2 as a tunable parameter, no weight from the bump outwards, clear traces = Cell 19c's, the first stage gives every start but the diameter). A8 (the in-focus width meanwhile) still open: the user asked why 0.22. Decision log: next free IDs D-172, I-006. |
 
 Basis tags: **[user]** said or decided by the user, with the time (Europe/Rome, 2026-11-18); **[log]** the decision
 log on `main`; **[src]** read in the named file at `f6504b0`; **[run, sandbox]** executed in the handing-over
@@ -89,6 +90,7 @@ whatever the kernel **[reasoning]**. Which in-focus width that run used is not s
 | D-167.6 | 16:31 | The weighting's choices: none beyond $1/\sigma_i^2$ (default) or $w_n = e^{-\lvert v_n\rvert/\lambda}$ with $\lambda$ a parameter; the number of passes a parameter, default 1. | orchestrator |
 | D-168 | 16:53 | The number of close neighbours fitted jointly is capped; the cap is a tunable parameter (default 3, the orchestrator's). | user |
 | D-169 | 17:38 | Section 0. For the joint fit: the chain implemented (D-169.1); the diameter's start always Allen's (D-169.2), which makes Allen's the default of D-162.4's parameter; a close neighbour's absorption fixed, free when it is the working node (D-169.3). | user |
+| D-171 | 17:54 | For section 0: the weights' width slightly above the FWHM of the Gaussian from Allen's diameter, re-centred while fitting; a bump = a second dip rising at least 2 noise SDs (multiplier tunable); the samples from it outwards get no weight; clear traces = Cell 19c's nodes; the first stage gives every start but the diameter. | user |
 
 Superseded on the way, do not implement: D-161.2's "the neighbour's position held" (by D-162.1); SPEC Block 30's
 sentence "a joint hybrid scene with the tier-2 neighbours held at their features" (by D-161, D-162.1).
@@ -200,14 +202,14 @@ For section 0 (built first):
 
 | # | Choice | Options, and the handing-over chat's suggestion |
 |---|---|---|
-| A1 | The weight law's constants. | $\kappa$ (how much wider than Allen's FWHM): suggestion 1.25. The form of ${\rm FWHM}_{\rm A}$: the formula of section 0, or the half-depth width of the model's own in-focus dip for a tube of Allen's diameter. |
-| A2 | Where the weights are centred. | On the fitted centre, re-centred while fitting (suggestion; as D-052's first-stage weights), or on the line's origin (as Block 29). |
-| A3 | Whether the weights are a parameter. | D-167.1 made the weighting a parameter to tune; suggestion: keep it, default the Allen-scaled law. |
-| A4 | How a near bump is recognised. | A second local minimum of the line, separated from the central dip by a rise of at least a multiple of the noise SD (suggestion: 3), searched in the sharpest plane or in every used plane. |
-| A5 | What "removed" means. | (a) the samples from the bump outwards get no weight, in every plane (suggestion); (b) the node is dropped as not clear; (c) the bump is fitted as an extra component. |
-| A6 | What a clear trace is, when the trace cannot see the pollution. | Keep `clear`'s rule and add an image test (no bump within a distance of the centre), or accept the nodes and rely on A5. |
-| A7 | The first stage's role. | Suggestion: only the sharpest plane, the line and the background; the absorption's start the cell's common value; the position's start the trace. |
-| A8 | The kernel's in-focus width while this runs. | 0.080 um (configured) until the davinci table and the width's measurement exist; the tables of Cells 19b and 19c at the three widths were not in the upload of 17:25. |
+| A1 | The weight law's constants. | **Answered, D-171.1:** the width slightly larger than the FWHM of the Gaussian from Allen's diameter, so that the weights concentrate about the dip's extreme. The factor $\kappa$ = 1.25 and the formula of section 0 are the handing-over chat's, PROVISIONAL (D-171.7); $\kappa$ a tunable parameter. |
+| A2 | Where the weights are centred. | **Answered, D-171.2:** re-centred while fitting. |
+| A3 | Whether the weights are a parameter. | Not answered at 17:54; D-167.1 (a parameter to tune) stands. |
+| A4 | How a near bump is recognised. | **Answered, D-171.3:** a second dip separated from the central one by a rise of at least $m$ noise SDs, $m$ = 2, a tunable parameter. Searched in every used plane (the handing-over chat's, PROVISIONAL). |
+| A5 | What "removed" means. | **Answered, D-171.4:** the samples from the bump outwards get no weight. |
+| A6 | What a clear trace is. | **Answered, D-171.5:** the nodes notebook Cell 19c uses (`clean_cell.py clear --d-bins`, one clear node per bin of Allen's diameter). |
+| A7 | The first stage's role. | **Answered, D-171.6:** it gives the start of every parameter but the diameter (absorption, lateral centre, depth, the sharpest plane, the line); the diameter starts at Allen's. Caution **[reasoning]**: the first stage's absorption was fitted with the first stage's diameter (3.2 um at node 1013), so it is not consistent with a start at Allen's diameter; several starts cover it. |
+| A8 | The kernel's in-focus width while this runs. | **Open.** The user at 17:54: "0.22 it appears why?". The handing-over chat's answer: 0.22 um is a hypothesis of the synthetic check (the width under which a 0.5 um tube fits as 0.81 um), not a measurement; with it the thin nodes agree with Allen by construction; node 639 (Allen 1.2 um, a dip about 2 um wide) would need about 0.7 um, so no single width reconciles thin and thick nodes with Allen **[reasoning: arithmetic on widths read by eye]**. Suggestion: 0.080 um, the knob `--sigma-r0-um` kept. |
 
 For the joint fit with close neighbours (after section 0):
 
