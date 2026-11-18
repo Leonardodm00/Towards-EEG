@@ -361,8 +361,8 @@ with open("%s/cleaning_%d.json" % (CLEAN_C, SPECIMEN)) as f:
     rec_c = json.load(f)
 for nid in ids_c:
     node_c = rec_c["nodes"].get(str(nid), {})
-    print("node %d: tier-1 neighbours %s, tier-2 neighbours %s, refined d %s um"
-          % (nid, node_c.get("n_tier1"), node_c.get("n_tier2"), node_c.get("d_um")))
+    print("node %d: tier-1 neighbours %s, tier-2 neighbours %s, refined d %s um" % (   # no line may start with a
+        nid, node_c.get("n_tier1"), node_c.get("n_tier2"), node_c.get("d_um")))          # percent sign: Colab's .py export comments it out
     for name in ("own_node%d.png", "cleaning_line_node%d.png"):
         path = CLEAN_C + "/" + name % nid
         if os.path.exists(path):
