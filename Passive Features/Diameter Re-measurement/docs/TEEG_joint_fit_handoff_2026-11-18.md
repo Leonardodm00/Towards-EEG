@@ -9,6 +9,7 @@
 | 2026-11-18 (later, 4) | D-169 [user, 17:38] changes what is built first: section 0 added (clear traces only, one round, no far-neighbour cleaning, Allen's diameter as the start, centre weights from Allen's diameter, near bumps removed). The joint fit with close neighbours (sections 2 to 7) stays decided and comes after. Section 8 now ends with the list of choices the user still has to make (8b); the user will answer them in the next chat. D-168 and D-169 added to section 2. Decision log on `main` at `30ed363`; next free IDs D-171, I-006. A second handoff exists for the defocus table on davinci (D-170): `TEEG_defocus_table_davinci_handoff_2026-11-18.md`. |
 | 2026-11-18 (later, 5) | D-171 [user, 17:54]: A1 to A7 of section 8b answered (the weights' width and centre, the bump rule with multiplier 2 as a tunable parameter, no weight from the bump outwards, clear traces = Cell 19c's, the first stage gives every start but the diameter). A8 (the in-focus width meanwhile) still open: the user asked why 0.22. Decision log: next free IDs D-172, I-006. |
 | 2026-11-18 (later, 6) | D-172 [user, 17:58]: the in-focus width stays 0.080 um for now (A8 closed). Decision log: next free IDs D-173, I-006. |
+| 2026-11-18 (later, 7) | D-173 [user, 18:00]: in the first stage the diameter is fixed at Allen's value and the absorption and lateral centre are fitted (section 0's table, A7). Decision log: next free IDs D-174, I-006. |
 
 Basis tags: **[user]** said or decided by the user, with the time (Europe/Rome, 2026-11-18); **[log]** the decision
 log on `main`; **[src]** read in the named file at `f6504b0`; **[run, sandbox]** executed in the handing-over
@@ -27,6 +28,7 @@ from the joint fit with neighbours. Build this first; sections 2 to 7 come after
 | Far neighbours | Their cleaning is skipped for now (D-169.7). | `clean_cell.py clean` always cleans tier 1; there is no switch to skip it. |
 | Rounds | One (D-169.6); the user saw no change from round 1 to round 2. | `--rounds 1` exists. |
 | Start of the diameter | Always Allen's value (D-169.2). | The work-list nodes start from the first stage's diameter and absorption (`clean_cell.py`, round 0, source "pilot"). |
+| First stage | Its one-plane fit holds the diameter at Allen's value and fits the absorption and the lateral centre (D-173). | `measure_pilot` fits all three (SPEC section 2.2, Eq. (3)); no option to hold the diameter. |
 | Weights | The residuals weighted by distance from the central value $v_c$ outwards, the width set by Allen's diameter: "an exponential lighlty larger than gaussian FWHM obtained from the Allen's diameter" (D-169.4). | Block 29: $w_n = e^{-\lvert v_n\rvert/\lambda}$, $\lambda$ = `measure.sgt_lambda_um` = 0.5 um for every node, centred on the line's origin. Block 30 (`fit_node`): no such weight. |
 | Bumps | The near bumps that pollute a profile are removed; the example is node 2669 (D-169.5). | Nothing detects or removes a second dip on the line. |
 | Own shadow | The node's own expected shadow is kept (D-169.8). | The one-tube model over the node's planes (`node_inputs.forward_factory`) and the same-node clearance product (`own_product`, D-156). |
@@ -93,6 +95,7 @@ whatever the kernel **[reasoning]**. Which in-focus width that run used is not s
 | D-169 | 17:38 | Section 0. For the joint fit: the chain implemented (D-169.1); the diameter's start always Allen's (D-169.2), which makes Allen's the default of D-162.4's parameter; a close neighbour's absorption fixed, free when it is the working node (D-169.3). | user |
 | D-171 | 17:54 | For section 0: the weights' width slightly above the FWHM of the Gaussian from Allen's diameter, re-centred while fitting; a bump = a second dip rising at least 2 noise SDs (multiplier tunable); the samples from it outwards get no weight; clear traces = Cell 19c's nodes; the first stage gives every start but the diameter. | user |
 | D-172 | 17:58 | The kernel's in-focus width stays 0.080 um for now. | user |
+| D-173 | 18:00 | In the first stage the diameter is fixed at Allen's value; the absorption and the lateral centre are fitted. | user |
 
 Superseded on the way, do not implement: D-161.2's "the neighbour's position held" (by D-162.1); SPEC Block 30's
 sentence "a joint hybrid scene with the tier-2 neighbours held at their features" (by D-161, D-162.1).
@@ -210,7 +213,7 @@ For section 0 (built first):
 | A4 | How a near bump is recognised. | **Answered, D-171.3:** a second dip separated from the central one by a rise of at least $m$ noise SDs, $m$ = 2, a tunable parameter. Searched in every used plane (the handing-over chat's, PROVISIONAL). |
 | A5 | What "removed" means. | **Answered, D-171.4:** the samples from the bump outwards get no weight. |
 | A6 | What a clear trace is. | **Answered, D-171.5:** the nodes notebook Cell 19c uses (`clean_cell.py clear --d-bins`, one clear node per bin of Allen's diameter). |
-| A7 | The first stage's role. | **Answered, D-171.6:** it gives the start of every parameter but the diameter (absorption, lateral centre, depth, the sharpest plane, the line); the diameter starts at Allen's. Caution **[reasoning]**: the first stage's absorption was fitted with the first stage's diameter (3.2 um at node 1013), so it is not consistent with a start at Allen's diameter; several starts cover it. |
+| A7 | The first stage's role. | **Answered, D-171.6 and D-173:** the first stage's one-plane fit runs with the diameter held at Allen's value and fits the absorption and the lateral centre; it gives the start of every parameter but the diameter (absorption, lateral centre, depth), plus the sharpest plane, the line and the background. PROVISIONAL (D-173.3): a setting for this path only; the calibration's node choice, the survey and the bias table keep the free-diameter first stage. Today **[src: `node_pipeline.measure_pilot`]** the first stage fits diameter, absorption and centre together. |
 | A8 | The kernel's in-focus width while this runs. | **Answered, D-172:** 0.080 um ("Keep 0.08"); `--sigma-r0-um` kept for comparison runs. The blur under which Allen would be right is 0.20 to 0.23 um on the three thin clear nodes and 0.73 um on node 639 **[reasoning: arithmetic on dip widths read by eye]**. |
 
 For the joint fit with close neighbours (after section 0):
