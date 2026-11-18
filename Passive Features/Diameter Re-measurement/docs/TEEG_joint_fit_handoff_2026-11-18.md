@@ -11,6 +11,7 @@
 | 2026-11-18 (later, 6) | D-172 [user, 17:58]: the in-focus width stays 0.080 um for now (A8 closed). Decision log: next free IDs D-173, I-006. |
 | 2026-11-18 (later, 7) | D-173 [user, 18:00]: in the first stage the diameter is fixed at Allen's value and the absorption and lateral centre are fitted (section 0's table, A7). Decision log: next free IDs D-174, I-006. |
 | 2026-11-18 (later, 8) | Section 0's path is built and smoke-tested: commit `1bb9973` on `sci/diameter-pipeline` (SPEC Blocks 3, 5, 30, 32, 34, 36 amended, Block 39 new; notebook Cell 20). New section 0b: what was built, the commands, the knobs, what the synthetic checks show and do not show. The builder's choices are D-176 [orchestrator]. D-174 [user, the defocus-table chat, about 18:40] asks for the held diameter as the first stage's default for all its users: not in `1bb9973` (section 0b, last table row). Decision log: next free IDs D-177, I-006. |
+| 2026-11-18 (later, 9) | The joint-fit chat (D-177 [user, 18:25, 18:52]: this chat refines the joint fit with close neighbours; the bumps are the 'Questions before logic' chat's). Section 13 added: four synthetic checks and the pilot's trace analysed (`checks/joint_2026-11-18/`), the chat's PROVISIONAL proposals for B1 to B6 (D-177.3 to D-177.11), the first test nodes. Section 6 corrected (where the own tube's heading comes from); section 12: the node spacing and the trace's depth scatter now measured. Decision log on `main`: next free IDs D-178, I-006. |
 
 Basis tags: **[user]** said or decided by the user, with the time (Europe/Rome, 2026-11-18); **[log]** the decision
 log on `main`; **[src]** read in the named file at `f6504b0`; **[run, sandbox]** executed in the handing-over
@@ -225,7 +226,7 @@ or (b) it shares no node with the own stretch and its projected footprint meets 
 
 | Object | Today **[src]** | Decided |
 |---|---|---|
-| The node's own tube | One straight cylinder along the heading and tilt of `candidate_search.trace_direction` (the total-least-squares line through the traced points within +-`measure.line_fit_window_um`/2 = 2 um of the node along its branch), reaching at most `inference.tube_half_length_um` = 5 um each way; `node_inputs.local_tube`, `tube_extent`, `axis_extent`. A node nearer than `inference.extrusion_cap_margin_um` = 3 um to an end is flagged `near_end` and skipped. | Pieces from traced node to traced node along the branch, out to the same 5 um each way; one $d_i$, $\mu_i$ along them (D-164). The straight tube stays as a setting until compared (D-164.5). |
+| The node's own tube | One straight cylinder along the heading and tilt of the first stage, `node_pipeline._pilot` (the total-least-squares line through the first stage's fitted centres of the nodes within +-`measure.line_fit_window_um`/2 = 2 um of the node along its branch) **[corrected 2026-11-18: the handoff said `candidate_search.trace_direction`, the line through the TRACED points; `node_inputs.local_tube` reads `pilot.theta_rad`, `pilot.phi_rad`]**, reaching at most `inference.tube_half_length_um` = 5 um each way; `node_inputs.local_tube`, `tube_extent`, `axis_extent`. A node nearer than `inference.extrusion_cap_margin_um` = 3 um to an end is flagged `near_end` and skipped. | Pieces from traced node to traced node along the branch, out to the same 5 um each way; one $d_i$, $\mu_i$ along them (D-164). The straight tube stays as a setting until compared (D-164.5). |
 | A neighbour | Segments between consecutive traced nodes, each end with its node's diameter, absorption and offset; `node_features.featured_scene`, `FeaturedScene` (`seg_xyz`, `seg_d_um`, `seg_mu_per_um`, `seg_ids`). | The same pieces; in node $i$'s fit the neighbour takes one $\theta_q$ (section 8, O6 for what "one" covers). |
 | Heading, tilt | From the trace, never fitted. | Unchanged (D-162.1). The tilt uses the traced depth; not checked against the image **[open]**. |
 
@@ -274,7 +275,7 @@ For section 0 (built first):
 | A7 | The first stage's role. | **Answered, D-171.6 and D-173:** the first stage's one-plane fit runs with the diameter held at Allen's value and fits the absorption and the lateral centre; it gives the start of every parameter but the diameter (absorption, lateral centre, depth), plus the sharpest plane, the line and the background. PROVISIONAL (D-173.3): a setting for this path only; the calibration's node choice, the survey and the bias table keep the free-diameter first stage. Today **[src: `node_pipeline.measure_pilot`]** the first stage fits diameter, absorption and centre together. |
 | A8 | The kernel's in-focus width while this runs. | **Answered, D-172:** 0.080 um ("Keep 0.08"); `--sigma-r0-um` kept for comparison runs. The blur under which Allen would be right is 0.20 to 0.23 um on the three thin clear nodes and 0.73 um on node 639 **[reasoning: arithmetic on dip widths read by eye]**. |
 
-For the joint fit with close neighbours (after section 0):
+For the joint fit with close neighbours (after section 0; the joint-fit chat's proposals for B1 to B6 are in section 13, PROVISIONAL, D-177):
 
 | # | Choice | Options, and the suggestion |
 |---|---|---|
@@ -365,7 +366,72 @@ and spec suites were not rerun on 2026-11-18. No tester run was made on 2026-11-
 
 - Nothing of this handoff's section 4 exists as code; no number in section 9 comes from real data.
 - The joint fit with more than one neighbour, with a chain geometry, or started from a displaced trace.
-- The node spacing of the pilot's trace (it decides how many pieces a chain has within 5 um).
-- Whether the traced depth is good enough for the tilt.
+- The node spacing of the pilot's trace (it decides how many pieces a chain has within 5 um). **[measured 2026-11-18, section 13: 1.15 um in the median, 10 pieces per own chain]**
+- Whether the traced depth is good enough for the tilt. **[partly, section 13: the traced depth is smooth along a branch (a node within SD 0.04 um of the chord of its two neighbours); whether it is right, the trace cannot say]**
 - The literature: three PubMed queries (the bright-field kernel; dendrite diameters by light against electron
   microscopy) and one project-knowledge query returned nothing usable on 2026-11-18; no claim here rests on a paper.
+
+## 13. The joint-fit chat, 2026-11-18 from 18:25 (D-177)
+
+Scope **[user, 18:25]**: this chat refines the joint fit of the working node with its close neighbours; the bumps
+(D-169.5, D-171.3, D-171.4) are the 'Questions before logic' chat's. Scripts and outputs:
+`checks/joint_2026-11-18/` (the weights-and-bump checks of the chat's first reply: `checks/weights_2026-11-18/`).
+
+### 13.1 Synthetic checks **[run, sandbox]**
+
+Flat tubes, hybrid absorption, the pilot's kernel table, 9 planes, 53 samples, B = 200 gl, noise-free.
+
+| Script | Result |
+|---|---|
+| `b5_chain_joints.py` | A straight tube cut into 8 pieces of 1.18 um, one cut on the line. Pieces rendered together (Block 24, the ray history through every piece): the uncut tube, 0.000 gl. Each piece rendered alone and the shadows summed (Block 25's rule for a stretch): the dip 2.6, 6.1, 9.2 % too deep at d 0.45, 0.8, 1.2 um (mu 0.5 /um) and 2.4 % at d 0.8 um, mu 0.2 /um; a one-tube fit of it gives d -1.0, -1.3, -1.4, -0.5 % and mu +3.8, +7.6, +14.1, +2.7 %. |
+| `b6_compose_rule.py` | Node and neighbour (0.6 um, 0.5 /um) rendered jointly, fitted with a composed model (node's four parameters and the neighbour's diameter free; its absorption and position at the truth). Sum of the separately rendered shadows, bias of the node's d / the neighbour's d: parallel 1.0 um aside 0.0 / -0.1 %; 0.7 um aside -0.6 / -0.5 %; 2.0 um aside and 1.68 um deeper 0.0 / -1.1 %; crossing at 45 deg over the node 0.84 um deeper -1.8 / -4.4 %, 0.84 um shallower +0.1 / +0.2 % (the node's mu 0.448 against 0.500 /um); parallel over the node 1.68 um deeper 0.0 / -2.4 %, shallower -0.2 / 0.0 %; crossing 2.8 um deeper 0.0 / -1.6 %. Product of the transmittances, the node's d: +0.3, +0.9, -0.4, -4.7, -2.5, -1.5, -2.1, -0.1 %. |
+| (timing) | One 10 um tube on the line: Block 26 (the ray history at every sample) 5.4 s at 4 samples per pixel side, 26.5 s at 8; Block 35 0.30 s and 0.58 s. |
+| `b5_chain_vs_straight.py` | A chain of 8 pieces of 1.15 um (d 0.6 um) read as the pipeline reads it (9 parallel lines), fitted with one straight tube: arc of radius 25 / 12 / 6 um, d -0.2 / -0.2 / +0.4 %; a kink of 10 / 20 / 45 deg at the node, +0.5 / +1.0 / +4.9 % (the kinked truths approximate at the joint: axial caps). |
+
+Limits: one size and absorption in the last three rows, no noise, no real data; no exact reference for a bent chain.
+
+### 13.2 The pilot's trace **[data: `reconstruction.raw.swc` of 529878215, the user's upload of 18:52]**
+
+`trace_chain_stats.py`, `close_neighbour_nodes.py` (the pipeline's `cell.stretches`, `node_inputs.own_ids_within`,
+`is_near_end`, `cleaning.neighbour_tiers`, default configuration; lengths and angles do not depend on the image
+transform). The raw file carries the pipeline's node ids; the repaired `reconstruction.swc` renumbers the nodes.
+
+- 8495 dendrite nodes on 119 stretches; 7821 not near an end. Node spacing 1.12 / 1.15 / 1.31 um (5th / 50th / 95th
+  percentile); 10 pieces in a node's own chain (8 at the 5th percentile).
+- The turn between a node's two pieces: 10.7 deg in the median (in the image plane), above 20 deg at 24.5 % of the
+  nodes, above 45 deg at 4.5 %. A node lies off the chord of its two neighbours by SD 0.19 um laterally and 0.04 um
+  in depth (independent trace errors of at most 0.16 um and 0.03 um per node, the dendrite's curvature included).
+  Over the whole own chain (about 4.6 um each way) the trace leaves the line fitted to the traced nodes within +-2 um, taken through the node, by 1.7 um in the median.
+- Today's tier rule: 24.7 % of the 7821 nodes have a tier-2 neighbour, 24.5 % by rule (b) alone (a free neighbour
+  crossing the own stretch within 3 um, at any depth), whose depth distance is 15.3 um in the median (5th percentile
+  2.8 um); 0.2 % by rule (a).
+- A traced neighbour on the node's measuring line (a point of it within 0.61 um along the branch and 2.0 um across),
+  by the depth distance of the nearest one:
+
+| Within (um) | Nodes | Free / attached | Over the node / beside it |
+|---|---|---|---|
+| 0.84 | 17 (0.2 %) | 14 / 3 | 1 / 16 |
+| 1.68 | 37 (0.5 %) | 26 / 11 | 8 / 29 |
+| 2.8 | 127 (1.6 %) | 82 / 45 | 38 / 89 |
+| 4.2 | 253 (3.2 %) | 135 / 118 | 66 / 187 |
+
+  One chain at 251 of the 253 nodes. "Attached": on the node's own stretch beyond the own chain, or on a stretch
+  sharing a branch point with it. The list: `close_neighbour_nodes_529878215.csv`.
+- D-149's examples: 8089 an attached chain over the node 2.0 um deeper; 4844 an attached chain 1.15 um beside it,
+  2.1 um deeper; 7081 a free chain 1.4 um beside it, 0.9 um shallower; 7448 nothing on the line (tier 2 today through
+  an axon crossing its stretch 6.3 um deeper). The clear nodes 5353, 3873, 4725, 1013, 2669, 2620, 639: nothing on
+  the line at any depth.
+- Not in these counts: the 674 nodes near a branch point or an end; untraced structures; other cells.
+
+### 13.3 Proposals, PROVISIONAL, each for the user to confirm (D-177.3 to D-177.11)
+
+| Choice | Proposal |
+|---|---|
+| B5, B6 | A chain's pieces share one ray history: each piece carries the cross-section history of an infinite tube of its direction (Block 35's method), clipped at the plane bisecting each joint. Node and neighbour chains rendered separately, their shadows summed (amends D-166.2's joint rendering); a neighbour over the node within 1.68 um in depth flags the node `overlap` (8 of the pilot's 7821 nodes). |
+| Tiers | Rule (b) of today's tiers no longer makes tier 2 (amends D-164.5); the predicted-bias rule decides. |
+| B4 | A close neighbour is one on the measuring line, attached or free: attached chains are 118 of the 253 cases. |
+| B1 | The neighbour chain's position free in a narrow range about the trace (+-0.23 um across, +-0.14 um in depth; 0 = fixed), flagged at a bound. |
+| B2 | Its absorption fixed at the mean of the first stage's absorptions (D-173) over the chain's nodes within 5 um of the line, weights $e^{-s/\ell}$ in the arc length $s$ from the point nearest the line, $\ell$ = 2.5 um; the cell's common value as the fallback. |
+| B3 | One diameter, one fixed absorption, one shift and one depth per chain; the cap of D-168 counts chains. |
+| Own chain | Through the trace's positions smoothed along the branch (a parameter, 0 = raw trace): a chain through the raw trace carries its kinks to the measuring line (above 20 deg at 24.5 % of the nodes, worth about 1 % of the diameter; above 45 deg at 4.5 %, about 5 %). The straight tube stays as the comparison. |
+| Test nodes | Nodes 5720 to 5727 beside 7080 to 7087 (two basal stretches 1.2 to 1.8 um apart within 1.7 um in depth, each the other's neighbour; 7081 is one of D-149's examples), and 6746, 6747 (an axon 1.0 and 1.5 um beside them at their depth). |
