@@ -206,6 +206,7 @@ the "Binds" column.
 | 2026-11-17 (later, 13) | Logs **D-158** [orchestrator] (the clearance chat): the final check of the wave of D-156 (Opus tester, report `specs/test_reports/2026-11-17_1754_incremental.md` on `sci/diameter-pipeline`: PASS WITH ISSUES at `ccf69db` -- one MINOR, four NOTE, three spec gaps; 56 smoke suites pass, 39 new spec tests pass, the 9 failing spec tests fail at the base commit too) and its settlements: the slab-grid oracle's bound stated at mu = 1 /um; a per-node fit that raises or fails gets the product status `not_fitted`; `clean` logs a product that raises. The theory document `TEEG_diameter_pipeline_theory_2026-11-17.md` is on the branch under `Passive Features/Diameter Re-measurement/docs/TEEG_diameter_pipeline_theory_2026-11-17/` and was sent to the user; roadmap diameter-pipeline: I37, I38 added under NC3, T14's and T15's notes name the document. Next free IDs: D-159, I-006. |
 | 2026-11-18 | Logs **D-159** (user, 12:48; the clearance chat): the tester's 39 spec tests of the run 2026-11-17_1754 come into `sci/diameter-pipeline`; the three stale spec tests of that report's F2 are retired. Same message: a Colab cell asked for, showing each example node at its focal plane with the diameter the joint fit estimated -- built as SPEC Block 31 amendment 3 (`cleaning_figures.figure_focal`), Block 36 amendment 12 (`scripts/show_focal.py`), notebook Cell 18c. Received with it **[data: 16 PNGs of the pilot's Colab run, nodes 8089, 7448, 4844, 7081, rounds 1 and 2; read by eye in the clearance chat]**: the first same-node clearance figures on real profiles. On none of the four nodes does the cleared profile follow the in-band model: node 8089 at plane 108 has a narrow core about 0.6 um wide down to about 69 gl inside the broad dip, which the whole model at d = 2.44 um does not reproduce; node 7081 at planes 196 and 198 has two minima about 1.5 um apart under a fitted d = 3.80 um. No decision changed; the reading is the assistant's and bears on the open question of D-156 (are the fitted diameters right). Next free IDs: D-160, I-006. |
 | 2026-11-18 (later) | No decision changed (the clearance chat). Cell 18c ran on the pilot's four `overlap` examples **[data: the user's Colab output and figure, 13:24; the figure read by eye]**: refined diameters 2.440, 2.623, 3.801, 1.288 um (nodes 8089, 4844, 7081, 7448) against Allen's 0.553, 0.467, 0.446, 0.478 um; on all four the fitted tube is wider than the dark band it is drawn on and the object is not one straight uniform tube (a core with a grey surround; several structures; on 7448 a heading across the dark structure). The assistant's reading: the one-tube joint fit follows a broad shallow component whose nature is open (spines, tier-2 neighbours, kernel tails); details in section 16 of `TEEG_same_node_clearance_handoff_2026-11-17.md` on `sci/diameter-pipeline`. The approach (one tube per node) is put to the user. Next free IDs: D-160, I-006. |
+| 2026-11-18 (later, 2) | Logs **D-160** (user, 13:31; the clearance chat): the one-tube model is checked first on three clear nodes (no neighbour on the line) before any change of the model. Built for it: `contamination.pick_clear_examples`, `clean_cell.py clear`, notebook Cell 19 (SPEC Block 27 amendment 3, Block 36 amendment 13). Next free IDs: D-161, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -369,6 +370,7 @@ would be needed*, *Status*.
 | D-157 | 2026-11-17 | SPEC Block 35 (amendment 2), oracles (iv) and (v); `tests/smoke/test_smoke_line_fast.py` | the split's depth-mirror oracle restated for a slab grid symmetric about the axis (1e-10 there; generic case reported, no bound); the slab-grid oracle kept at 5e-4 with its margin recorded [orchestrator] | active |
 | D-158 | 2026-11-17 | SPEC Block 35 (amendment 2, oracle (iv)), Block 36 (amendment 11, final check); `scripts/clean_cell.py`, `scripts/infer_nodes.py`; the report `specs/test_reports/2026-11-17_1754_incremental.md` | the final check's settlements: the slab-grid bound stated at mu = 1 /um; the product status `not_fitted` for a per-node fit that raises or fails; `clean` logs a product that raises [orchestrator] | active |
 | D-159 | 2026-11-18 | `tests/spec/` on `sci/diameter-pipeline`; the report `specs/test_reports/2026-11-17_1754_incremental.md` (F2) | the tester's 39 spec tests of the run 2026-11-17_1754 brought into the working branch; the three stale spec tests (`test_factories_against_line_fast[linear, hybrid]`, `test_work_list_own_stretch_beyond_U`) retired [user] | active |
+| D-160 | 2026-11-18 | notebook Cell 19; `clean_cell.py clear`; `contamination.pick_clear_examples`; SPEC Block 27 (amendment 3), Block 36 (amendment 13); the open question of D-156 | the one-tube node model is checked on three clear nodes (not near an end, no tier-2 neighbour, the least tier-1 light on the line) before the model is changed [user]; the selection rule and its soma distance [orchestrator] | active |
 | D-150 | 2026-11-17 | SPEC Blocks 31 (amendment 2), 27 (amendment 2), 25 (amendment 7), 28 (amendment 2), 36 (amendment 10) at `97b40a4`, `4ed0793`; `CleaningConfig.shadow_cache_mb`, `rank_*`; `clean_cell.py rank`; notebook Cells 16b, 17b, 18b | the cleaning's test re-aimed and sped up [user]: before and after on one 1-99 percentile grey scale, B S on its own; examples ranked by the largest structured dip a tier-1 neighbour casts on the line, tier 2 at most 1 gl, 10 um apart; the shadow model keeps its last sums per patch and changes them by the neighbours that changed (supersedes D-148.3); tiers vectorised [orchestrator] | active |
 | D-149 | 2026-11-16 | SPEC Blocks 25 (amendment 6), 36 (amendment 9), 31 (amendment 1) at `a2b082c`; `CleaningConfig.work_rank`, `work_peak_min_gl`; notebook Cells 17b, 18b | the cleaning is shown in worse conditions on the pilot's most contaminated tier-1 real nodes, neighbours refined, no injection or phantoms now [user]; the work list ranked by the predicted shadow on the example's measuring line, threshold 1 gl, per-round line figures, the examples 8089, 4844, 7081, 7448 [orchestrator], PROVISIONAL | active |
 | D-148 | 2026-11-16 | SPEC Blocks 29 (amendment 1), 25 (amendment 5), 32 (amendment 3), 36 (amendment 8) at `b6073e3`; `CleaningConfig.refine_xtol`, `refine_ftol`, `refine_line_fine_factor` | the coarse refinement stops at relative tolerances 1e-3 (was 1e-8) and its predictor samples p/4 (the fine fit keeps p/8); the neighbours' images shared between the two shadows of a node; the cleaning saves after every round [orchestrator], PROVISIONAL | active |
@@ -11883,6 +11885,42 @@ tests (the ones Block 36 amendment 10 lists) are untouched.
 `refine_line_fine_factor`; the work list ranked by the line) are written in their place.
 
 **Sources.** **[user]** 2026-11-18, 12:48. **[run, sandbox]** as tagged. **[log]** D-148, D-149, D-158.
+
+**Status:** active.
+
+## D-160 -- The one-tube model is checked on three clear nodes before it is changed (user)
+
+**Date:** 2026-11-18, 13:31 (Europe/Rome), the clearance chat.
+**Binds:** notebook Cell 19 (`cleaning_pilot_2026-11-14.py`); `scripts/clean_cell.py clear`;
+`contamination.pick_clear_examples`; SPEC Block 27 (amendment 3), Block 36 (amendment 13) on `sci/diameter-pipeline`;
+the open question of D-156 (are the fitted diameters right) and the question put to the user at 13:24 (the one-tube
+model).
+
+**Decision [user].** After Cell 18c on the four `overlap` examples (the fitted tubes wider than the dark bands, none
+of the four objects one straight uniform tube) the assistant offered two checks needing no new model -- clear nodes
+first; a thin start of the per-node fit -- and a two-component node model only afterwards. The user: "Let's do three
+clear nodes."
+
+**Statement.** (D-160.1 [user]) Before any change of the node model, the cleaning, the joint refinement, the
+same-node clearance and the focal-plane figure are run on three nodes with no neighbour on their measuring line.
+(D-160.2 [orchestrator], PROVISIONAL) "Clear" is, in the tier-1 ranking of D-150.2: not `near_end`, no tier-2
+neighbour (`n_tier2` = 0 and `worst2_peak_gl` = 0), at least 20 um from the soma in the image plane, the least
+`worst1_peak_gl` first (ties by the larger own dip, then the node id), `cleaning.rank_min_separation_um` (10 um)
+apart; the nodes are cleaned alone (`--max-work` = their number, two rounds) into `OUT/cleaning_clear`.
+
+**Why.** **[data: the user's Cell 18c output of 13:24, read by eye; handoff sections 15, 16]** The four nodes seen so
+far are the survey's `overlap` class, the worst by construction, so they cannot tell a failure of the model from a
+failure of its conditions. **[reasoning]** If the fitted edges sit on the dendrite's edges on clear nodes, the model
+holds where it is meant to and nodes like the four are to be flagged; if clear nodes show the same narrow core in a
+broad dip, the broad component belongs to the dendrite or to the optics (spines, the kernel's tails) and the model
+has to change.
+
+**What it implies for code and tables.** As bound; no estimate, no existing output changes (`cleaning_worst`,
+`cleaning_tier1` untouched).
+
+**What it does not decide [open].** The thin-start test; the two-component model; what the broad component is.
+
+**Sources.** **[user]** 2026-11-18, 13:31. **[data]**, **[reasoning]** as tagged. **[log]** D-132, D-150, D-156, D-159.
 
 **Status:** active.
 
