@@ -8,6 +8,7 @@
 | 2026-11-18 (later, 3) | 17:06, nothing decided (the user: "I'm still deciding"). The user's proposal for O13: fix a neighbour's absorption at a weighted mean over nearby nodes of its branch; check `tier2_fixed_mu.py` added (section 9). Correction to O4: today a neighbour sits at its TRACED position; the first stage's centre and depth are not stored in the features. |
 | 2026-11-18 (later, 4) | D-169 [user, 17:38] changes what is built first: section 0 added (clear traces only, one round, no far-neighbour cleaning, Allen's diameter as the start, centre weights from Allen's diameter, near bumps removed). The joint fit with close neighbours (sections 2 to 7) stays decided and comes after. Section 8 now ends with the list of choices the user still has to make (8b); the user will answer them in the next chat. D-168 and D-169 added to section 2. Decision log on `main` at `30ed363`; next free IDs D-171, I-006. A second handoff exists for the defocus table on davinci (D-170): `TEEG_defocus_table_davinci_handoff_2026-11-18.md`. |
 | 2026-11-18 (later, 5) | D-171 [user, 17:54]: A1 to A7 of section 8b answered (the weights' width and centre, the bump rule with multiplier 2 as a tunable parameter, no weight from the bump outwards, clear traces = Cell 19c's, the first stage gives every start but the diameter). A8 (the in-focus width meanwhile) still open: the user asked why 0.22. Decision log: next free IDs D-172, I-006. |
+| 2026-11-18 (later, 6) | D-172 [user, 17:58]: the in-focus width stays 0.080 um for now (A8 closed). Decision log: next free IDs D-173, I-006. |
 
 Basis tags: **[user]** said or decided by the user, with the time (Europe/Rome, 2026-11-18); **[log]** the decision
 log on `main`; **[src]** read in the named file at `f6504b0`; **[run, sandbox]** executed in the handing-over
@@ -91,6 +92,7 @@ whatever the kernel **[reasoning]**. Which in-focus width that run used is not s
 | D-168 | 16:53 | The number of close neighbours fitted jointly is capped; the cap is a tunable parameter (default 3, the orchestrator's). | user |
 | D-169 | 17:38 | Section 0. For the joint fit: the chain implemented (D-169.1); the diameter's start always Allen's (D-169.2), which makes Allen's the default of D-162.4's parameter; a close neighbour's absorption fixed, free when it is the working node (D-169.3). | user |
 | D-171 | 17:54 | For section 0: the weights' width slightly above the FWHM of the Gaussian from Allen's diameter, re-centred while fitting; a bump = a second dip rising at least 2 noise SDs (multiplier tunable); the samples from it outwards get no weight; clear traces = Cell 19c's nodes; the first stage gives every start but the diameter. | user |
+| D-172 | 17:58 | The kernel's in-focus width stays 0.080 um for now. | user |
 
 Superseded on the way, do not implement: D-161.2's "the neighbour's position held" (by D-162.1); SPEC Block 30's
 sentence "a joint hybrid scene with the tier-2 neighbours held at their features" (by D-161, D-162.1).
@@ -209,7 +211,7 @@ For section 0 (built first):
 | A5 | What "removed" means. | **Answered, D-171.4:** the samples from the bump outwards get no weight. |
 | A6 | What a clear trace is. | **Answered, D-171.5:** the nodes notebook Cell 19c uses (`clean_cell.py clear --d-bins`, one clear node per bin of Allen's diameter). |
 | A7 | The first stage's role. | **Answered, D-171.6:** it gives the start of every parameter but the diameter (absorption, lateral centre, depth, the sharpest plane, the line); the diameter starts at Allen's. Caution **[reasoning]**: the first stage's absorption was fitted with the first stage's diameter (3.2 um at node 1013), so it is not consistent with a start at Allen's diameter; several starts cover it. |
-| A8 | The kernel's in-focus width while this runs. | **Open.** The user at 17:54: "0.22 it appears why?". The handing-over chat's answer: 0.22 um is a hypothesis of the synthetic check (the width under which a 0.5 um tube fits as 0.81 um), not a measurement; with it the thin nodes agree with Allen by construction; node 639 (Allen 1.2 um, a dip about 2 um wide) would need about 0.7 um, so no single width reconciles thin and thick nodes with Allen **[reasoning: arithmetic on widths read by eye]**. Suggestion: 0.080 um, the knob `--sigma-r0-um` kept. |
+| A8 | The kernel's in-focus width while this runs. | **Answered, D-172:** 0.080 um ("Keep 0.08"); `--sigma-r0-um` kept for comparison runs. The blur under which Allen would be right is 0.20 to 0.23 um on the three thin clear nodes and 0.73 um on node 639 **[reasoning: arithmetic on dip widths read by eye]**. |
 
 For the joint fit with close neighbours (after section 0):
 
