@@ -226,6 +226,7 @@ the "Binds" column.
 | 2026-11-18 (later, 18) | Logs **D-172** (user, 17:58; the clearance chat): the kernel's in-focus width stays 0.080 um for now ("Keep 0.08"), after the assistant's answer that 0.22 um is a hypothesis of the synthetic check and that the blur needed for Allen to be right is 0.20 to 0.23 um on the three thin clear nodes and 0.73 um on node 639 (arithmetic on dip widths read by eye from the user's figures). The user also asked to be reminded what the first stage is; answered from `node_pipeline.measure_pilot` and SPEC section 2.2. Handoff: A8 closed. Next free IDs: D-173, I-006. |
 | 2026-11-18 (later, 19) | Logs **D-173** (user, 18:00; the clearance chat): in the first stage the diameter is fixed at Allen's value and the other parameters are fitted. Handoff updated. Next free IDs: D-174, I-006. |
 | 2026-11-18 (later, 20) | Logs **D-174** and **D-175** (user, about 18:40; the defocus-table chat, from D-170's handoff, in its answers to four multiple-choice questions). **D-174**: the first stage with the diameter held at Allen's (D-173) becomes the first stage's default once it is built, for every user of the first stage -- supersedes D-173.3's provisional reading (the calibration, the survey and the bias table keeping the free diameter); the davinci run's `nodes` and `calibration` steps wait for it. **D-175**: the davinci run of D-170 -- every pool cell with a class (158 on 2026-10-28), alignment-gated as before, the cells with few calibration nodes decided at the pool step; round 1 under the configured law, round 2 by hand under the pooled law (D-121.2's stop rule); at most 100 one-core tasks at once, 48 h walltime; this chat on the kernel only. **State read [src, log]:** no S3 job has run on davinci (roadmap S3c and I19 'pushed', no cluster marker); D-117.2's loop is not in the code (no SPEC 10.L, no loop in Cell 7; D-117's status 'D-117.2 next'), so the handoff's 'Implemented (Colab)' is corrected there; the 14 suites of Blocks 10, 15, 16, 17, 19 and the survey jobs pass at `2de4bf3` **[run, sandbox]**. **Checks** (`checks/defocus_pool_2026-11-18/` on `sci/diameter-pipeline`) **[run, sandbox]**: the pool job's calibration at 158 cells x (30 near, 2 far) synthetic scans takes about 5 h per pass at 1000 cell resamples, the far fit's dense Jacobian dominating (one far fit 18 s at 316 far nodes), against the header's 2 h; on flat phantoms rendered with the pilot's table as the truth, Block 10's near fit misreads sigma_r at 0.28 / 0.56 / 0.84 um by -15.6 / -4.3 / -10.6 % (true d 0.15-0.25 um), -30.8 / -14.1 / -4.6 % (0.45-0.55) and +11.8 / -24.1 / -7.8 % (0.75-0.95), 16 phantoms each -- pooling reduces the noise, not this bias (step 2, NS1, not built). Next free IDs: D-176, I-006. |
+| 2026-11-18 (later, 21) | Logs **D-176** [orchestrator] (the clearance chat, 18:10-21:00; coding directive 7): **the fit on clear nodes of D-169, D-171, D-172 and D-173 is implemented and pushed** -- `1bb9973` on `sci/diameter-pipeline` (SPEC Blocks 3, 5, 30, 32, 34, 36 amended; Block 39 new, `analysis/line_weights.py`; notebook Cell 20; roadmap I39), handoff section 0b at `b01d452`. The builder's choices: the near bump is searched on the mean dip over the used planes smoothed by one line sample (on a plane's raw samples 2 noise SDs are reached by the noise alone in every profile), beyond the central dip's half depth; the weights are re-centred in at most 3 solves to 0.01 um; the covariance of the weighted fit is the sandwich; the weights and the cut are the defaults of a not-cleaned run only. Smoke-tested; not yet run on Allen's data; no independent tester run. **D-174 is not implemented by it**: the held diameter is the default of `clean --no-clean` only, `measure_pilot`'s own default is still the free diameter. Next free IDs: D-177, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -390,6 +391,7 @@ would be needed*, *Status*.
 | D-158 | 2026-11-17 | SPEC Block 35 (amendment 2, oracle (iv)), Block 36 (amendment 11, final check); `scripts/clean_cell.py`, `scripts/infer_nodes.py`; the report `specs/test_reports/2026-11-17_1754_incremental.md` | the final check's settlements: the slab-grid bound stated at mu = 1 /um; the product status `not_fitted` for a per-node fit that raises or fails; `clean` logs a product that raises [orchestrator] | active |
 | D-159 | 2026-11-18 | `tests/spec/` on `sci/diameter-pipeline`; the report `specs/test_reports/2026-11-17_1754_incremental.md` (F2) | the tester's 39 spec tests of the run 2026-11-17_1754 brought into the working branch; the three stale spec tests (`test_factories_against_line_fast[linear, hybrid]`, `test_work_list_own_stretch_beyond_U`) retired [user] | active |
 | D-175 | 2026-11-18 | S3c on davinci (`survey_prepare.pbs`, `survey_cells.pbs`, `survey_pool.pbs`; Blocks 16, 19); `survey.cells_per_group` for this run (`configs/survey_allcells1.json`); D-085.1, D-117.2, D-121.1, D-121.2, D-125.1; D-170's open points | the davinci run of D-170: every pool cell with a class, alignment-gated; few-node cells decided at the pool; round 1 under the configured law, round 2 by hand under the pooled law to D-121.2's stop rule; D-121.1 on the returned scans; at most 100 cores at once, 48 h walltime; this chat on the kernel only [user]; whether step 2 (NS1) is part of it [open] | active |
+| D-176 | 2026-11-18 | SPEC Blocks 3 (am. 2), 5 (am. 2), 30 (am. 2), 32 (am. 3), 34 (am. 2), 36 (am. 16), 39 (new) at `1bb9973`; `line_weights.py`, `node_inference.fit_node`, `fit_node_recentred`, `clean_cell.py clean --no-clean`, `infer_nodes.py real`; `InferenceConfig.weight_*`, `bump_*`; notebook Cell 20 | the builder's choices of the clear-node fit: bump searched on the smoothed mean dip beyond the central dip's half depth; re-centring in at most 3 solves to 0.01 um; sandwich covariance; weights and cut the defaults of a not-cleaned run only; D-174 not implemented by it [orchestrator] | active, PROVISIONAL |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -12590,3 +12592,83 @@ pool.
 **[log]** D-085, D-088, D-117, D-118, D-120, D-121, D-125, D-165, D-170, D-172, D-174. **[web]** as tagged.
 
 **Status:** active; the prepare job and the alignment can run; the `nodes` and `calibration` steps wait on D-174.
+
+---
+
+## D-176 -- The fit on clear nodes as built: where the bump is searched, how the weights are re-centred, the covariance, which runs take the weights [orchestrator]
+
+**Date:** 2026-11-18, 18:10-21:00 (Europe/Rome), the clearance chat ("Questions before logic"), at the user's
+"Implement now so I can test the colab" (18:04). Coding directive 7: details of an estimator, tolerances and defaults
+settled by the orchestrator; each is PROVISIONAL until the user has seen the first run on Allen's data.
+**Binds:** SPEC Blocks 3 (amendment 2), 5 (amendment 2), 30 (amendment 2), 32 (amendment 3), 34 (amendment 2), 36
+(amendment 16) and Block 39 (new) at `1bb9973` on `sci/diameter-pipeline`; `analysis/line_weights.py`,
+`analysis/node_inference.py` (`fit_node`, `fit_node_recentred`), `analysis/fit.py` (`fit_profile(d_fixed_um)`),
+`analysis/node_pipeline.py` (`measure_pilot(d_fixed)`), `analysis/clean_iteration.py` (`prepared_only`),
+`scripts/clean_cell.py clean --no-clean`, `scripts/infer_nodes.py real`; `InferenceConfig.weights`, `weight_kappa`,
+`weight_irls_max_iter`, `weight_irls_tol_um`, `bump_sd`, `bump_half_depth`, `bump_smooth_samples`; notebook Cell 20;
+D-169, D-171, D-172, D-173, D-174.
+
+**Decision [orchestrator].**
+(D-176.1) **Where the near bump is searched.** D-171.3 [user]: a bump is a second dip rising at least $m$ = 2 noise
+SDs. The dip searched is $\bar D(v_n) = \frac{1}{|K_i|}\sum_{k \in K_i}[B_{i,k} - I_{i,k}(v_n)]$ (grey levels), the
+mean over the planes $K_i$ the fit uses of background minus intensity at line sample $v_n$ (um), smoothed along the
+line by a Gaussian of SD `bump_smooth_samples` = 1 line sample. Going outwards from the central extreme (the deepest
+sample within ${\rm FWHM}_{{\rm A},i}$ of the first stage's centre, of depth $D_c$), the central dip ends at the
+first sample with $\bar D \le$ `bump_half_depth` $\times D_c$ = $0.5\,D_c$; beyond it a bump is a local maximum of
+$\bar D$ whose prominence is $\ge m\,\sigma_i$, $\sigma_i$ the noise SD of one line sample of one plane (the fit's).
+The cut is at the lightest sample between the central dip's end and the nearest bump; the samples beyond it get
+weight 0 in every plane (D-171.4 [user]).
+(D-176.2) **Re-centring (D-171.2 [user]: "Recenter while fitting").** Iteratively re-weighted: a solve with the
+weights centred at the current centre $v_c$, then $v_c$ moved to the fitted centre and a further solve from the
+previous estimate (one start), until $v_c$ moves by at most `weight_irls_tol_um` = 0.01 um or after
+`weight_irls_max_iter` = 3 solves; the planes and the depth box are those of the first solve.
+(D-176.3) **Covariance of the weighted fit:** the sandwich $A^{-1} B A^{-1}$ with $A = J^\top W J$,
+$B = J^\top W^2 J$, $J$ the Jacobian of the residuals over $\sigma_i$ and $W$ the diagonal matrix of the weights,
+because the weights are not inverse noise variances.
+(D-176.4) **Which runs take the weights and the cut.** A run prepared with `clean --no-clean` (D-169's path) is fitted
+with `inference.weights` = "allen" and `bump_sd` = 2 by default; a cleaned run (the rounds of Block 32) is fitted as
+before, unweighted and uncut (D-166 [user] refused the exponential weights there). `--weights`, `--bump-sd` and
+`--weight-kappa` replace either default.
+(D-176.5) **"No far-neighbour cleaning, one round" (D-169.6, D-169.7 [user])** is realised as no round at all: the
+example nodes are prepared and their lines recorded as read; nothing is cleaned or refined; the per-node fit is the
+only fit after the first stage.
+(D-176.6) **The first stage's held diameter (D-173 [user])** is an argument, `measure_pilot(..., d_fixed="allen")`,
+passed by `clean --no-clean` (`--pilot-diameter allen`, its default there). `measure_pilot`'s own default is still the
+free diameter: **D-174 [user] is not implemented by this build** (below).
+
+**Why.** (1) **[run, sandbox: `checks/d169_2026-11-18/bump_false_positive_check.py`; white noise of SD 2.5 gl on a
+clean dip, 500 draws per case, m = 2]** Searched on each plane's raw samples, a prominence of 2 noise SDs is reached
+by the noise alone in every profile (cut rate 1.00 with 1, 3, 5 and 9 planes), so the rule as first written would
+have cut every node. On the mean smoothed by one sample the cut rate without a bump is 0.04 with 1 plane and 0.00
+with 3, 5 and 9; a second dip of depth 4 noise SDs in every plane is cut in 0.85 to 1.00 of the draws, one of 3 SDs
+in 0.37 to 0.55, one of 2 SDs in 0.00 to 0.19. **[run, sandbox: `bump_bias_check.py`]** The half-depth condition: a
+2 um wide flat-bottomed dip with texture of 2 noise SDs inside (the shape of node 639) is cut in 0.00 of 300 draws
+at 0.5 and 0.75, in 0.04 at 0.9. (2) **[reasoning]** weights that depend on the parameter being fitted are solved
+as in D-052's first-stage fit, with the weights frozen within a solve. (3) **[run, sandbox:
+`test_smoke_node_inference.py::test_weights`, 300 noisy sets]** coverage of $\hat d \pm$ SE 0.663 (nominal 0.683),
+mean SE 0.00637 um against the SD of $\hat d$ 0.00628 um. (4), (5) **[log]** D-166, D-169. (6) **[log]** D-173.3 as
+it stood when the build started at 18:04; D-174 was logged by the defocus-table chat at about 18:40 and read by this
+chat at the push.
+
+**What it implies for code and tables.** As bound. The outputs of a cleaned run are unchanged (the smoke and spec
+tests of Blocks 30, 32, 34, 36 pass unchanged). `inference_<S>.csv` gains `weights`, `lambda_um`, `v_cut_lo_um`,
+`v_cut_hi_um`, `n_solves` before `seconds`. **[run, sandbox: `bump_bias_check.py`; a tube of 1 um, noise-free, a
+second dip the model does not contain]** What the two tools recover: a second dip 1.3 um aside (SD 0.3 um, 60 gl)
+pulls $\hat d$ by +5.3 % unweighted, +2.6 % with the cut, +3.5 % with the weights, +2.1 % with both; one 1.5 um aside
+(SD 0.6 um, 80 gl) by +223 %, +18.7 %, +26.4 %, +15.8 %; one with no lighter sample between it and the central dip
+(1.0 um aside, 60 gl) by +96 % unweighted and +66 % with the weights, and is not cut. **[run, sandbox:
+`test_d169_path`, the synthetic cell rendered at 0.8 um with Allen's 0.6 um, the fast test configuration]** first
+stage $d$ = 0.600 um held, $\mu$ = 1.590 /um; fit from 0.600 um: 0.8547 $\pm$ 0.0091 um (unweighted on the same node:
+0.8702 um; that configuration's forward is not the cell's renderer).
+
+**What it does not decide [open].** (a) D-174: making the held diameter the first stage's default for every user
+through a configuration field (D-174.2, to confirm) changes the estimator's signature and the oracles of Blocks 5,
+6, 10, 13 to 15 and 17; it is a change of its own, not made here; the davinci steps of D-175 that use the first
+stage wait for it. (b) A shoulder on the flank (no lighter sample before it) is not seen by the bump rule; a test of
+the profile's asymmetry is not built. (c) $\kappa$ = 1.25 and the chord factor $\sqrt 3/2$ of D-171.7; (d) whether
+the multiplier counts SDs of a line sample (as built) or of the mean dip; (e) nothing here has run on Allen's data;
+no independent tester has run on `1bb9973`.
+
+**Sources.** **[run, sandbox]**, **[reasoning]**, **[log]** as tagged. **[user]** 2026-11-18, 18:04 (the request).
+
+**Status:** active, PROVISIONAL (the orchestrator's choices; to confirm after Cell 20's first run).
