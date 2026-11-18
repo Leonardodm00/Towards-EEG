@@ -20,6 +20,7 @@ which stays the history of Block 9 and of D-122 to D-125.
 | 2026-11-17 (later, 5) | **D-153** (user, 14:25): per sweep the three sizes, per cell the two time scales; lags 0.04 and 0.3 ms added. The plan for Blocks 2, 3, 4, 9, 6 put to the user. |
 | 2026-11-17 (later, 6) | The plan approved (D-154) and carried out: the three-component law implemented, checked and merged into `main` (SPEC 2.6; D-155 [orchestrator]). §4 "The run under the three-component law" holds the commands for davinci. The nf1 tables feed no twin. |
 | 2026-11-18 | The nf2 pilot finished (user's paste, 13:37): 2 ok; 508282493 19299 s (nf1 14536 s, x 1.33), 569844159 25203 s (nf1 27308 s, x 0.92). The law, J and flags not yet read: the one-liner of §4 asked for. |
+| 2026-11-18 (later) | The nf2 pilot read back (user's paste, 14:26; §4 "The nf2 pilot read back"): J/dof 6.8 to 2.2 and 160 to 59; the lag-shape residuals gone; no bound, no failed sweep; both cells `no_plateau`; the remaining residual a disagreement between the SS and LS statistics. The 18-cell run recommended now, with a second read-back (the iteration histories and the per-sweep fits). |
 
 **Basis tags.** **[run]** executed in the assistant's sandbox (date given); **[src]** read from the code, SPEC or log
 on `main`; **[log]** the decision log's text; **[user]** the user's decision or words; **[reasoning]** the assistant's
@@ -385,11 +386,49 @@ tag skips the two pilot cells (D-125.5: their JSONs carry the code commit `e9a64
 the new code at smoke size; prints per cell the stage times, the law, J, dof, p, kappa, flags, the sweeps by reason
 and the standardised residual z of each statistic):
 
-    conda activate prova && OUT="/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs_ih/noise_fit/nf2/L3_exc" && python -c '<the one-liner of the chat of 2026-11-18>' "$OUT"
+    conda activate prova && OUT="/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs_ih/noise_fit/nf2/L3_exc" && python -c 'import json,glob,sys,collections,numpy as np; rs=[json.load(open(f)) for f in sorted(glob.glob(sys.argv[1]+"/cells/specimen_*.json"))]; out=lambda r,c,L: (print(r["specimen_id"], r["status"], r["code_commit"][:7], {k: round(v) for k, v in r["seconds"].items()}), print("  law: sigma_f %.4f mV, sigma_m %.4f mV, tau_m %.3f ms, sigma_s %.4f mV, tau_s %.1f ms" % (L["sigma_f_mV"], L["sigma_m_mV"], 1e3*L["tau_m_s"], L["sigma_s_mV"], 1e3*L["tau_s_s"])), print("  J %.1f dof %d p %.3g kappa %.3g n_solves %d flags %s" % (c["J"], c["dof"], c["p_value"], c["kappa"], c["n_solves"], ";".join(c["flags"]) or "-")), print("  sweeps:", dict(collections.Counter((x["protocol"], x["reason"] or "ok") for x in r["sweep_stage"]["rows"])), "v_refits_failed:", sum(any(g.startswith("v_refits_failed") for g in x["flags"]) for x in r["sweep_stage"]["rows"])), print("  z:", " ".join("%s=%+.1f" % (l, z) for l, z in zip(c["labels_kept"], (np.array(c["q_sim"])-np.array(c["q_hat"]))/np.sqrt(np.diag(np.array(c["Sigma"]))))))); [out(r, r["cell_fit"], r["cell_fit"]["law"]) for r in rs]' "$OUT"
 
 For comparison **[run, here, on the nf1 JSONs and the dev check]**: nf1 J 75.0 (508282493) and 1756.2 (569844159) on
 11 dof; the dev check's three-component law (15 statistics, 9 dof) J 33.1 and 397.7, with tau_m 0.083 ms and at the
 1 ms cap, tau_s 49 ms and at the 10 s bound (569844159: the cell whose SS and LS statistics disagree).
+
+**The nf2 pilot read back** (2026-11-18, the user's paste of 14:26 of the one-liner above **[cluster]**; nf1 and the
+dev check from the JSONs here **[run, here]**). z_m = (q_sim - q_hat)_m / sqrt(Sigma_mm), law minus data.
+
+| | 508282493 | 569844159 |
+|---|---|---|
+| code commit | `e9a6469` | `e9a6469` |
+| seconds: cell fit, sweep stage (nf1) | 6678, 12620 (3371, 11165) | 6833, 18368 (6202, 21104) |
+| theta_hat: sigma_f, sigma_m, tau_m, sigma_s, tau_s | 0.0343 mV, 0.0174 mV, 0.071 ms, 0.0838 mV, 118.5 ms | 0.0310 mV, 0.0267 mV, 0.076 ms, 0.0475 mV, 24.1 ms |
+| J / dof, p (nf1) | 35.0 / 16 = 2.19, p 0.0039 (75.0 / 11 = 6.8, p 1.4e-11) | 938.0 / 16 = 58.6, p 2e-189 (1756.2 / 11 = 160) |
+| kappa; n_solves; flags (nf1) | 3850; 8; `no_plateau` (5 solves, none) | 636; 8; `no_plateau` (6 solves, none) |
+| sweeps (nf1) | 24 ok, `v_refits_failed` on 1 (1 of 24 failed) | 48 ok (0 of 48 failed) |
+| z, SS statistics | all 7 between -0.9 and -1.9 | sd -4.4; rho +0.2 to +2.8 (1 ms +2.8, nf1 +10.2; 10 ms +1.6, nf1 -10.5) |
+| z, LS statistics | all 14 between +0.6 and +2.0 | sd +4.0, first-50-ms sd +4.3, last sd +3.3; rho -0.7 to +2.6 |
+
+- The chi^2_16 99 % point is 32.0 (99.9 %: 39.3): 508282493 is rejected at 1 %, not at 0.1 %.
+- No coordinate at a bound. Against the dev check (15 statistics, the two-component Sigma, a short refinement):
+  508282493's sigma_f, sigma_m, tau_m agree (0.0343 mV, 0.0168 mV, 0.083 ms) and its slow part moved along the
+  sigma_s-tau_s ridge (0.0585 mV, 49 ms there); 569844159's dev-check solution at both bounds (tau_m 1 ms, tau_s 10 s)
+  is not the full fit's.
+- **[reasoning, Likely]** What J keeps is a disagreement between the protocols, not a lag shape: in 508282493 the law
+  is below every SS statistic and above every LS one; in 569844159 the SDs miss by about 4 SD in opposite directions.
+  One law per cell cannot meet both; the per-sweep laws (sizes per sweep, pooled per protocol) are the twins' and are
+  read next. Which protocol is "noisier" is not read from these signs: the statistics are window-length dependent, and
+  the nf1 per-sweep fits put the LS slow SD at 1.08 x (508282493) and 1.00 x (569844159) the SS one.
+- Both cells used all k_max = 6 Sigma-weighted solves (`no_plateau`, kept as D-050 says); under the two-component law
+  both had settled. To be read from the histories: a steady drift (more solves would settle it; k_max is tunable, D-050)
+  or a back-and-forth (the weight dependence of a misspecified law; nothing to change).
+
+Second read-back (tested here on a JSON written by the new code; per cell the history -- weight, R, J, max |Delta u|,
+the law per solve -- and per protocol the per-sweep fits' J_s / dof_s and the count with p < 0.01):
+
+    OUT="/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs_ih/noise_fit/nf2/L3_exc" && python -c 'import json,glob,sys,numpy as np; from scipy.stats import chi2; rs=[json.load(open(f)) for f in sorted(glob.glob(sys.argv[1]+"/cells/specimen_*.json"))]; h=lambda r: [print(r["specimen_id"], "%-6s R=%-4d J=%8.1f max|du|=%-6s sigma_f %.4f sigma_m %.4f tau_m %.3f ms sigma_s %.4f tau_s %.1f ms" % (x["weight"], x["R"], x["J"], "-" if i == 0 else "%.3f" % np.max(np.abs(np.subtract(x["u"], r["cell_fit"]["history"][i-1]["u"]))), np.exp(x["u"][0]), np.exp(x["u"][1]), 1e3*np.exp(x["u"][2]), np.exp(x["u"][3]), 1e3*np.exp(x["u"][4]))) for i, x in enumerate(r["cell_fit"]["history"])]; s=lambda r: [print(r["specimen_id"], pr, "sweeps fitted %d, J_s/dof_s median %.2f, q90 %.2f, max %.1f, p<0.01 in %d" % (len(v), np.median(v), np.quantile(v, 0.9), max(v), sum(chi2.sf(J, d) < 0.01 for J, d in w))) for pr in ("ss", "ls") for w in [[(x["J"], x["dof"]) for x in r["sweep_stage"]["rows"] if x["protocol"] == pr and not x["failed"]]] for v in [[J / d for J, d in w]] if w]; [(h(r), s(r)) for r in rs]' "$OUT"
+
+The 18-cell run (the two pilot cells skipped, D-125.5), from the login node in `Ih Fit`:
+
+    RUN_TAG=nf2 WALLTIME=48:00:00 DRY_RUN=1 bash submit_noise_fit.sh     # expect "cores: 18 cell(s) x NCPUS 6 = 108"
+    RUN_TAG=nf2 WALLTIME=48:00:00 bash submit_noise_fit.sh
 
 Read back from the pilot: the `NOISE_CELL` lines, each JSON's per-stage seconds (they set `WALLTIME`), the
 `NOISE_MERGE` line. A code change between the pilot and the run re-runs every cell, the pilot's included (the resume
