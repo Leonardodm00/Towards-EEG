@@ -227,6 +227,7 @@ the "Binds" column.
 | 2026-11-18 (later, 19) | Logs **D-173** (user, 18:00; the clearance chat): in the first stage the diameter is fixed at Allen's value and the other parameters are fitted. Handoff updated. Next free IDs: D-174, I-006. |
 | 2026-11-18 (later, 20) | Logs **D-174** and **D-175** (user, about 18:40; the defocus-table chat, from D-170's handoff, in its answers to four multiple-choice questions). **D-174**: the first stage with the diameter held at Allen's (D-173) becomes the first stage's default once it is built, for every user of the first stage -- supersedes D-173.3's provisional reading (the calibration, the survey and the bias table keeping the free diameter); the davinci run's `nodes` and `calibration` steps wait for it. **D-175**: the davinci run of D-170 -- every pool cell with a class (158 on 2026-10-28), alignment-gated as before, the cells with few calibration nodes decided at the pool step; round 1 under the configured law, round 2 by hand under the pooled law (D-121.2's stop rule); at most 100 one-core tasks at once, 48 h walltime; this chat on the kernel only. **State read [src, log]:** no S3 job has run on davinci (roadmap S3c and I19 'pushed', no cluster marker); D-117.2's loop is not in the code (no SPEC 10.L, no loop in Cell 7; D-117's status 'D-117.2 next'), so the handoff's 'Implemented (Colab)' is corrected there; the 14 suites of Blocks 10, 15, 16, 17, 19 and the survey jobs pass at `2de4bf3` **[run, sandbox]**. **Checks** (`checks/defocus_pool_2026-11-18/` on `sci/diameter-pipeline`) **[run, sandbox]**: the pool job's calibration at 158 cells x (30 near, 2 far) synthetic scans takes about 5 h per pass at 1000 cell resamples, the far fit's dense Jacobian dominating (one far fit 18 s at 316 far nodes), against the header's 2 h; on flat phantoms rendered with the pilot's table as the truth, Block 10's near fit misreads sigma_r at 0.28 / 0.56 / 0.84 um by -15.6 / -4.3 / -10.6 % (true d 0.15-0.25 um), -30.8 / -14.1 / -4.6 % (0.45-0.55) and +11.8 / -24.1 / -7.8 % (0.75-0.95), 16 phantoms each -- pooling reduces the noise, not this bias (step 2, NS1, not built). Next free IDs: D-176, I-006. |
 | 2026-11-18 (later, 21) | Logs **D-176** [orchestrator] (the clearance chat, 18:10-21:00; coding directive 7): **the fit on clear nodes of D-169, D-171, D-172 and D-173 is implemented and pushed** -- `1bb9973` on `sci/diameter-pipeline` (SPEC Blocks 3, 5, 30, 32, 34, 36 amended; Block 39 new, `analysis/line_weights.py`; notebook Cell 20; roadmap I39), handoff section 0b at `b01d452`. The builder's choices: the near bump is searched on the mean dip over the used planes smoothed by one line sample (on a plane's raw samples 2 noise SDs are reached by the noise alone in every profile), beyond the central dip's half depth; the weights are re-centred in at most 3 solves to 0.01 um; the covariance of the weighted fit is the sandwich; the weights and the cut are the defaults of a not-cleaned run only. Smoke-tested; not yet run on Allen's data; no independent tester run. **D-174 is not implemented by it**: the held diameter is the default of `clean --no-clean` only, `measure_pilot`'s own default is still the free diameter. Next free IDs: D-177, I-006. |
+| 2026-11-18 (later, 22) | Logs **D-177** (user, 18:25 and 18:52; the joint-fit chat -- not the clearance chat, which built the clear-node fit (D-176) -- started from `TEEG_joint_fit_handoff_2026-11-18.md`): this chat refines the joint fit of the working node with its close neighbours; the bumps are the 'Questions before logic' chat's. With it, PROVISIONAL and the orchestrator's, each to confirm: how the joint model is built and what a close neighbour is. **Checks** (`checks/joint_2026-11-18/` on `sci/diameter-pipeline`; synthetic unless stated) **[run, sandbox]**: a straight tube cut into 1.18 um pieces equals the uncut tube when the pieces are rendered together (0.000 gl) and has a dip 2.4 to 9.2 % too deep when each piece is rendered alone and the shadows summed (Block 25's rule; fitted d -0.5 to -1.4 %, mu +2.7 to +14.1 %); node and neighbour rendered separately and summed against the joint render: the node's d within 0.6 % in seven of eight scenes, -1.8 % for a neighbour crossing 0.84 um deeper over the node (the product of transmittances: up to -4.7 %); the exact line renderer (Block 26) 5.4 / 26.5 s per 10 um tube at 4 / 8 samples per pixel side against Block 35's 0.30 / 0.58 s; a straight tube fitted to an arc of radius 25, 12, 6 um: d -0.2, -0.2, +0.4 %, to a kink of 10, 20, 45 deg at the node: +0.5, +1.0, +4.9 %. **The pilot's trace** **[data: the user's upload of 18:52, `reconstruction.raw.swc` of 529878215 (the file whose node ids and radii are the pipeline's; the repaired `reconstruction.swc` renumbers the nodes), analysed with the pipeline's functions]**: node spacing 1.12 / 1.15 / 1.31 um (5th / 50th / 95th percentile), 10 pieces in a node's own chain; turn at the node between its two pieces 10.7 deg in the median, above 20 deg at 24.5 % of the nodes and above 45 deg at 4.5 %; a node off the chord of its two neighbours by SD 0.19 um laterally and 0.04 um in depth; of 7821 nodes not near an end, today's rule makes 24.7 % tier 2, 24.5 % by rule (b) alone at a median depth distance of 15.3 um (5th percentile 2.8 um), 0.2 % by rule (a); a traced neighbour passes through the node's measuring line (within 0.61 um along the branch and 2.0 um across) within 0.84 / 1.68 / 2.8 / 4.2 um in depth at 17 / 37 / 127 / 253 nodes (0.2 / 0.5 / 1.6 / 3.2 %), one chain at 251 of the 253, over the node itself at 1 / 8 / 38 / 66, attached to the node's own stretch at 3 / 11 / 45 / 118. D-149's examples: 8089 an attached chain over the node 2.0 um deeper, 4844 an attached chain 1.15 um beside it 2.1 um deeper, 7081 a free chain 1.4 um beside it 0.9 um shallower, 7448 nothing on the line; the clear nodes of D-160 and Cell 19c nothing on the line. Correction to the handoff's section 6: the node's tube takes its heading and tilt from the first stage's centres (`node_pipeline._pilot`), not from `trace_direction`. The checks of this chat's first reply on the weights and the bump rule (now the other chat's subject) are in `checks/weights_2026-11-18/`. Next free IDs: D-178, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -392,6 +393,7 @@ would be needed*, *Status*.
 | D-159 | 2026-11-18 | `tests/spec/` on `sci/diameter-pipeline`; the report `specs/test_reports/2026-11-17_1754_incremental.md` (F2) | the tester's 39 spec tests of the run 2026-11-17_1754 brought into the working branch; the three stale spec tests (`test_factories_against_line_fast[linear, hybrid]`, `test_work_list_own_stretch_beyond_U`) retired [user] | active |
 | D-175 | 2026-11-18 | S3c on davinci (`survey_prepare.pbs`, `survey_cells.pbs`, `survey_pool.pbs`; Blocks 16, 19); `survey.cells_per_group` for this run (`configs/survey_allcells1.json`); D-085.1, D-117.2, D-121.1, D-121.2, D-125.1; D-170's open points | the davinci run of D-170: every pool cell with a class, alignment-gated; few-node cells decided at the pool; round 1 under the configured law, round 2 by hand under the pooled law to D-121.2's stop rule; D-121.1 on the returned scans; at most 100 cores at once, 48 h walltime; this chat on the kernel only [user]; whether step 2 (NS1) is part of it [open] | active |
 | D-176 | 2026-11-18 | SPEC Blocks 3 (am. 2), 5 (am. 2), 30 (am. 2), 32 (am. 3), 34 (am. 2), 36 (am. 16), 39 (new) at `1bb9973`; `line_weights.py`, `node_inference.fit_node`, `fit_node_recentred`, `clean_cell.py clean --no-clean`, `infer_nodes.py real`; `InferenceConfig.weight_*`, `bump_*`; notebook Cell 20 | the builder's choices of the clear-node fit: bump searched on the smoothed mean dip beyond the central dip's half depth; re-centring in at most 3 solves to 0.01 um; sandwich covariance; weights and cut the defaults of a not-cleaned run only; D-174 not implemented by it [orchestrator] | active, PROVISIONAL |
+| D-177 | 2026-11-18 | plan step F3 (the joint fit of a node with its close neighbours) and its SPEC entry, still to be written; `cleaning.neighbour_tiers` (rule (b)); D-164.1, D-164.5, D-166.2, D-168, D-169.1, D-169.3; the handoff's B1 to B9 | the joint-fit chat refines the joint fit, the bumps are the 'Questions before logic' chat's [user]; PROVISIONAL, to confirm [orchestrator]: a chain's pieces share one ray history (each piece the cross-section history of an infinite tube of its direction, clipped at the joints' bisecting planes); node and neighbour chains rendered separately, shadows summed; a close neighbour is one on the measuring line, attached or free; today's rule (b) no longer makes tier 2; the neighbour's position free in a narrow range; its absorption the weighted mean of the first stage's along its chain; the own chain through smoothed trace positions | active; D-177.3 to D-177.11 PROVISIONAL |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -12672,3 +12674,76 @@ no independent tester has run on `1bb9973`.
 **Sources.** **[run, sandbox]**, **[reasoning]**, **[log]** as tagged. **[user]** 2026-11-18, 18:04 (the request).
 
 **Status:** active, PROVISIONAL (the orchestrator's choices; to confirm after Cell 20's first run).
+
+---
+
+## D-177 -- The joint-fit chat refines the joint fit, the bumps go to the 'Questions before logic' chat (user); PROVISIONAL: how the joint model is built and what a close neighbour is (orchestrator)
+
+**Date:** 2026-11-18, 18:25 and 18:52 (Europe/Rome), the joint-fit chat (started from
+`TEEG_joint_fit_handoff_2026-11-18.md`).
+**Binds:** plan step F3 and its SPEC entry, still to be written; `cleaning.neighbour_tiers` (rule (b));
+`model/line_fast.py`, `model/scene_render.py`, `model/shadow.py` (the renderers a chain can be built from); D-164.1,
+D-164.5, D-166.2, D-168, D-169.1, D-169.3; the handoff's choices B1 to B9.
+
+**Decision [user].** 18:25: "For the bumps I'm working int he 'Questions before logic' chat so do not focus on that.
+IN this chat we should be refining the joint fit of the current work node and the close-neighbour ones". 18:52, with
+the pilot cell's two SWC files: "Go on you have full access to everything".
+
+**Statement.** (D-177.1 [user]) The joint-fit chat works on the joint fit of the working node with its close
+neighbours; the bumps (D-169.5, D-171.3, D-171.4) are the 'Questions before logic' chat's. (D-177.2 [user]) The chat
+goes on, with write access to the repository. The rest is the orchestrator's, PROVISIONAL, proposed to the user at
+18:45 and about 19:20 and each to confirm; "Go on" is read as leave to proceed, not as the confirmation of each point.
+(D-177.3) Within a chain (D-164.1) the pieces share one ray history. Construction: each piece carries the
+cross-section history of an infinite tube of its own direction (SPEC Block 35's method), and the pieces are clipped
+at the plane bisecting each joint, so that a point absorbs once and no gap opens at a bend; exact for a straight
+chain, which is its test; no exact reference for a bent chain yet.
+(D-177.4) Node $i$'s chain and the chain of each close neighbour $q \in Q_i$ are rendered separately and their
+shadows summed: $\tau_k(v_n) = 1 - s_{i,k}(v_n \mid \theta_i; c_i) - \sum_{q \in Q_i} s_{q,k}(v_n \mid \theta_q; c_q,
+h_q)$ for every plane $k \in K_i$ and line sample $v_n$, $n = 1, \dots, N_v$ (symbols of the handoff's section 4;
+$s$ a chain's shadow rendered alone, dimensionless). Amends D-166.2's joint rendering; a neighbour passing over the
+node within a depth distance (a parameter, 1.68 um) flags the node `overlap`.
+(D-177.5) A close neighbour is defined on the node's measuring line, by geometry, whether it is attached to the
+node's own stretch or not (supersedes the handoff's suggestion for B4, attached stretches held at working values).
+(D-177.6) Rule (b) of today's tiers (an unattached neighbour crossing the own stretch within `tier_reach_um`, at any
+depth) no longer makes a neighbour tier 2; the predicted-bias rule of D-164.4 decides alone. Amends D-164.5
+[orchestrator].
+(D-177.7) The neighbour chain's position is free in a narrow range about the trace: one rigid shift across its axis
+within +-0.23 um and one depth within +-0.14 um, both parameters, 0 = fixed, a flag when a value ends at its bound
+(the handoff's B1; the user leaned to fixed at 16:53).
+(D-177.8) The value a close neighbour's absorption is fixed at (D-169.3; the user's weighted mean of 17:06): the mean
+of the first stage's absorptions (fitted with the diameter held at Allen's, D-173) over the chain's nodes within 5 um
+of the line, weights $e^{-s/\ell}$, $s$ (um) the arc length from the chain's point nearest the line, $\ell$ = 2.5 um a
+parameter; the cell's common value where no first stage converged.
+(D-177.9) One diameter, one fixed absorption, one shift and one depth per neighbour chain; the cap of D-168 counts
+chains (the handoff's B3).
+(D-177.10) The node's own chain runs through the trace's positions smoothed along the branch, the smoothing a
+parameter (0 = the raw trace); the straight tube stays as the comparison setting (D-164.5).
+(D-177.11) First test nodes: the nodes of `checks/joint_2026-11-18/close_neighbour_nodes_529878215.csv`, starting
+with the two basal stretches that run 1.2 to 1.8 um apart within 1.7 um in depth (nodes 5720 to 5727 beside 7080 to
+7087, each the other's neighbour) and the nodes 6746 and 6747, 1.0 and 1.5 um beside an axon at their depth.
+
+**Why.** **[run, sandbox: `checks/joint_2026-11-18/`]** `b5_chain_joints.py`: a straight tube cut into 1.18 um
+pieces is the uncut tube when the pieces are rendered together (0.000 gl), and 2.4 to 9.2 % too deep when each is
+rendered alone and the shadows summed (fitted d -0.5 to -1.4 %, mu +2.7 to +14.1 %). `b6_compose_rule.py`: the sum
+of separately rendered shadows against the joint render leaves the node's d within 0.6 % in seven of eight scenes and
+at -1.8 % for a neighbour crossing over the node 0.84 um deeper; the product of transmittances up to -4.7 %. Timing:
+Block 26 5.4 / 26.5 s per 10 um tube at 4 / 8 samples per pixel side, Block 35 0.30 / 0.58 s.
+`b5_chain_vs_straight.py`: a straight tube fitted to an arc of radius 25 / 12 / 6 um, d -0.2 / -0.2 / +0.4 %; to a
+kink of 10 / 20 / 45 deg at the node, +0.5 / +1.0 / +4.9 %. **[data: `reconstruction.raw.swc` of 529878215, the
+user's upload of 18:52; `trace_chain_stats.py`, `close_neighbour_nodes.py`]** The trace turns by more than 20 deg at
+24.5 % of the nodes and by more than 45 deg at 4.5 %, a node lying off the chord of its two neighbours by SD 0.19 um
+laterally; today's rule makes 24.7 % of the 7821 nodes not near an end tier 2, 24.5 % by rule (b) alone at a median
+depth distance of 15.3 um; a traced neighbour is on the measuring line within 0.84 / 1.68 / 2.8 / 4.2 um in depth at
+17 / 37 / 127 / 253 nodes, one chain at 251 of 253, over the node at 1 / 8 / 38 / 66, attached at 3 / 11 / 45 / 118.
+**[log]** `tier2_sloppiness.py`, `tier2_fixed_mu.py`, `tier2_neighbour_position.py` (D-168's row and the handoff's
+section 9) for D-177.7.
+
+**What it does not decide [open].** Every point from D-177.3 on, until the user confirms it; the renderer's test for
+a bent chain; whether the kinks of the trace are the dendrite's or the trace's (the image decides, not the trace);
+the nodes near a branch point (674 of 8495, skipped today); the untraced structures (the other chat); when the far
+neighbours' cleaning and the repeat come back (B9); the tier rule's cost (B8).
+
+**Sources.** **[user]** 2026-11-18, 18:25 and 18:52. **[run, sandbox]**, **[data]** as tagged. **[log]** D-132,
+D-161 to D-169, D-171 to D-174.
+
+**Status:** active; D-177.3 to D-177.11 PROVISIONAL.
