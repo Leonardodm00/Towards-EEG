@@ -353,6 +353,92 @@ def test_line_rounds():
     _raises(lambda: CF.figure_line_rounds(a["v"], a["ks"], before, {1: r1}, "node 1"), "meta not a mapping")
 
 
+def _focal_panel(d=1.3, ang=0.4, with_ref=True):
+    rng = np.random.default_rng(3)
+    img = rng.uniform(80.0, 100.0, size=(40, 56))
+    left, top, p = 120, 310, 0.1144
+    extent = ((left - 0.5) * p, (left + 56 - 0.5) * p, (top + 40 - 0.5) * p, (top - 0.5) * p)
+    axis = np.array([(left + 27.3) * p, (top + 19.6) * p])
+    e_u = np.array([np.cos(ang), np.sin(ang)])
+    panel = dict(image=img, extent=extent, axis_xy=axis, e_u=e_u, d_um=d, half_length_um=(1.5, 2.5),
+                 line_xy=np.array([axis - 3.0 * np.array([-e_u[1], e_u[0]]), axis + 3.0 * np.array([-e_u[1], e_u[0]])]),
+                 title="node 1", label="estimate")
+    if with_ref:
+        panel.update(ref_xy=axis + np.array([0.21, -0.13]), d_ref_um=0.5)
+    return panel
+
+
+def _line(ax, gid):
+    hits = [ln for ln in ax.lines if ln.get_gid() == gid]
+    assert len(hits) == 1, (gid, [ln.get_gid() for ln in ax.lines])
+    return np.column_stack([hits[0].get_xdata(), hits[0].get_ydata()])
+
+
+def test_focal():
+    # Block 31, amendment 3: the node at one plane with the estimated tube drawn on it. The oracles are
+    # geometric identities of what is drawn, so the tolerance is float64 roundoff (1e-12 um on values of
+    # a few um): the edges are axis +- (d / 2) n_hat, from -half[0] to +half[1] along e_u, relative to axis.
+    pn = _focal_panel()
+    frozen = {k: (np.array(v, copy=True) if isinstance(v, np.ndarray) else v) for k, v in pn.items()}
+    fig = CF.figure_focal([pn])
+    assert isinstance(fig, Figure)
+    ax = fig.axes[0]
+    e_u, d = pn["e_u"], pn["d_um"]
+    n_hat = np.array([-e_u[1], e_u[0]])
+    ends = np.array([-1.5 * e_u, 2.5 * e_u])
+    check_close("edge on +n", _line(ax, "edge0"), ends + 0.5 * d * n_hat, rtol=0, atol=1e-12)
+    check_close("edge on -n", _line(ax, "edge1"), ends - 0.5 * d * n_hat, rtol=0, atol=1e-12)
+    check_close("axis", _line(ax, "axis"), ends, rtol=0, atol=1e-12)
+    e0, e1 = _line(ax, "edge0"), _line(ax, "edge1")
+    check_close("the edges are d apart, at right angles to the axis", (e0 - e1) @ n_hat, [d, d], rtol=0, atol=1e-12)
+    check_close("and not sheared along it", (e0 - e1) @ e_u, [0.0, 0.0], rtol=0, atol=1e-12)
+    rel = pn["ref_xy"] - pn["axis_xy"]
+    check_close("Allen's edge on +n", _line(ax, "ref_edge0"), rel + ends + 0.25 * n_hat, rtol=0, atol=1e-12)
+    check_close("Allen's edge on -n", _line(ax, "ref_edge1"), rel + ends - 0.25 * n_hat, rtol=0, atol=1e-12)
+    check_close("the measuring line", _line(ax, "line"), pn["line_xy"] - pn["axis_xy"], rtol=0, atol=1e-12)
+    im = ax.images[0]
+    assert_array_equal(np.asarray(im.get_array()), pn["image"])
+    ext = np.asarray(pn["extent"]) - np.array([pn["axis_xy"][0], pn["axis_xy"][0], pn["axis_xy"][1], pn["axis_xy"][1]])
+    check_close("the image's extent, relative to the axis point", im.get_extent(), ext, rtol=0, atol=1e-12)
+    assert ax.get_title().startswith("node 1")
+    for k, v in frozen.items():                               # the inputs are not changed
+        assert np.array_equal(np.asarray(pn[k]), np.asarray(v)), k
+    plt.close(fig)
+    # the view under zoom_um, and the wrapping: 7 panels -> rows of FOCAL_MAX_COLS = 5; ncols = 3 -> 3 rows
+    fig = CF.figure_focal([_focal_panel(with_ref=False)] * 7, zoom_um=2.0)
+    shown = [a for a in fig.axes if a.images]
+    assert len(shown) == 7 and len(fig.axes) == 10
+    check_close("zoomed x", shown[0].get_xlim(), (-2.0, 2.0), rtol=0, atol=1e-12)
+    check_close("zoomed y (downwards)", shown[0].get_ylim(), (2.0, -2.0), rtol=0, atol=1e-12)
+    assert not [ln for ln in shown[0].lines if (ln.get_gid() or "").startswith("ref_")]
+    plt.close(fig)
+    fig = CF.figure_focal([_focal_panel()] * 7, ncols=3)
+    assert len(fig.axes) == 9
+    out = os.path.join(tempfile.mkdtemp(prefix="focal_"), "sub", "focal.png")
+    assert CF.save(fig, out, 60) == out and os.path.getsize(out) > 0
+    plt.close(fig)
+    a, b = CF.figure_focal([_focal_panel()]), CF.figure_focal([_focal_panel()])
+    for fa in (a, b):
+        fa.canvas.draw()
+    assert np.array_equal(np.asarray(a.canvas.buffer_rgba()), np.asarray(b.canvas.buffer_rgba()))
+    plt.close(a)
+    plt.close(b)
+    bad = _focal_panel()
+    _raises(lambda: CF.figure_focal([]), "no panel")
+    _raises(lambda: CF.figure_focal(["x"]), "a panel that is not a mapping")
+    _raises(lambda: CF.figure_focal([{k: v for k, v in bad.items() if k != "d_um"}]), "a missing key")
+    _raises(lambda: CF.figure_focal([dict(bad, d_um=0.0)]), "d = 0")
+    _raises(lambda: CF.figure_focal([dict(bad, d_um=float("nan"))]), "d not finite")
+    _raises(lambda: CF.figure_focal([dict(bad, d_ref_um=-1.0)]), "Allen's d negative")
+    _raises(lambda: CF.figure_focal([dict(bad, e_u=(0.0, 0.0))]), "e_u of zero length")
+    _raises(lambda: CF.figure_focal([dict(bad, image=np.zeros((2, 3, 4)))]), "a 3-D image")
+    _raises(lambda: CF.figure_focal([dict(bad, extent=(0, 1, 2))]), "an extent of 3")
+    _raises(lambda: CF.figure_focal([bad], zoom_um=0.0), "zoom 0")
+    _raises(lambda: CF.figure_focal([bad], ncols=0), "ncols 0")
+    print("    edges, axis, Allen's edges, line, image and extent as specified; 7 panels wrap 5 + 2 and 3 x 3; "
+          "11 ValueErrors")
+
+
 def test_determinism():
     a = scene()
     bufs = []

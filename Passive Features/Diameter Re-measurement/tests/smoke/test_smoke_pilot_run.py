@@ -916,6 +916,51 @@ def test_own_product():
           % (n_checked, worst))
 
 
+def test_show_focal():
+    # Block 36, amendment 12: scripts/show_focal.py on the synthetic cell's outputs. The panel's axis point is the
+    # foot of the traced position on the measuring line plus v0 y_hat (1e-9 um: the same arithmetic, reordered);
+    # on a rendered tube centred on the trace it lies within 0.02 um of the trace's foot (the fits recover v0 to
+    # about 1e-3 um here; 0.02 um leaves room for the fast configuration's coarse lattice); d drawn = the JSON's.
+    import show_focal
+    a, _b, _outs = _e2e()
+    rec = json.load(open(os.path.join(a, "cleaning_7.json")))
+    inf = json.load(open(os.path.join(a, "inf", "inference_7.json")))
+    nid = int(rec["example_ids"][0])
+    node = rec["nodes"][str(nid)]
+    with np.load(os.path.join(a, "cleaning_7_node%d.npz" % nid)) as z:
+        arrays = {k: z[k] for k in z.files}
+    for fit, want, d_want, v0_want in ((inf["nodes"][str(nid)], "fit", inf["nodes"][str(nid)]["theta"][0],
+                                        inf["nodes"][str(nid)]["theta"][2]),
+                                       (None, "refined", node["refine"]["d_um"], node["refine"]["v0_um"])):
+        panel, row = show_focal.focal_panel(node, arrays, fit)
+        assert row["drawn"] == want and panel["d_um"] == float(d_want)
+        y_hat, origin, trace = arrays["y_hat"], arrays["origin_xy"], arrays["node_xyz"][:2]
+        foot = origin + float((trace - origin) @ y_hat) * y_hat
+        check_close("axis point = foot of the trace + v0 y_hat (%s)" % want, panel["axis_xy"],
+                    foot + float(v0_want) * y_hat, rtol=0, atol=1e-9)
+        assert float(np.hypot(*(panel["axis_xy"] - foot))) < 0.02, panel["axis_xy"] - foot
+        assert row["plane_k"] == int(node["pilot"]["k_star"]) and panel["image"].shape == arrays["block"].shape[1:]
+    panel_axis, row_axis = show_focal.focal_panel(node, arrays, None, plane="axis", image="after")
+    assert abs(row_axis["plane_minus_axis_um"]) <= 0.5 * 0.28 + 1e-9 and row_axis["image"] == "after"
+    for bad in (dict(plane="x"), dict(image="x"), dict(estimate="x")):
+        try:
+            show_focal.focal_panel(node, arrays, None, **bad)
+        except ValueError:
+            continue
+        raise AssertionError("no ValueError for %r" % (bad,))
+    script = os.path.join(WS, "scripts", "show_focal.py")
+    out1 = os.path.join(os.path.dirname(a), "focal_test", "with_fit.png")
+    o1 = _run([script, "--cleaning-dir", a, "--specimen", "7", "--inference-dir", os.path.join(a, "inf"), "--out", out1], WS)
+    out2 = os.path.join(os.path.dirname(a), "focal_test", "refined.png")
+    o2 = _run([script, "--cleaning-dir", a, "--specimen", "7", "--nodes", "%d,999999" % nid, "--out", out2], WS)
+    for out in (out1, out2):
+        assert os.path.getsize(out) > 0
+    assert os.path.getsize(os.path.join(os.path.dirname(a), "focal_test", "focal_7.csv")) > 0
+    assert "fit (" in o1 and "refined (" in o2 and "node 999999: skipped" in o2
+    print("    node %d: axis point %.4f um from the trace's foot; fit and refined panels; the script wrote %s"
+          % (nid, float(np.hypot(*(panel["axis_xy"] - foot))), os.path.basename(out1)))
+
+
 def test_determinism():
     a, b, _outs = _e2e()
     _pipeline(b)

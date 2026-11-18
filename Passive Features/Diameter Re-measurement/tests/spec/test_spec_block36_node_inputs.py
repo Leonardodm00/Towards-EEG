@@ -398,23 +398,8 @@ def fast_cfg(absorption="linear"):
                                                                   ray_n_rho=4, ray_n_psi=8))
 
 
-@pytest.mark.parametrize("absorption", ["linear", "hybrid"])
-def test_factories_against_line_fast(absorption):
-    """predict = 1 - line_fast.line_profiles(local_tube(pilot, trace, d, v0, dz, U_minus, U_plus), mu, ...) and
-    forward(d, mu, v0, z_t + dz) = line_fast.line_profiles(same) [exact] (D-138.4; amendments 1, 3)."""
-    cfg = fast_cfg(absorption)
-    p = pilot(cx_um=2.0, cy_um=2.0, z_sub_um=0.84, k_star=3)
-    trace = np.array([2.05, 1.95, 0.7])
-    node = make_node(p, trace, np.arange(1, 6))
-    Um, Up = 4.0, 5.5
-    pred = NI.predict_factory({5: p}, {5: (Um, Up)}, cfg, line_fast.SectionCache())(node)
-    fwd = NI.forward_factory(p, (Um, Up), node, cfg, line_fast.SectionCache())
-    d, mu, v0, dz = 0.6, 1.1, 0.1, 0.2
-    ref = line_fast.line_profiles(NI.local_tube(p, trace, d, v0, dz, Um, Up), mu, node.ks, node.origin_xy,
-                                  node.y_hat, node.e_u, node.v, node.n_avg, node.step, cfg)
-    assert_array_equal(pred(d, mu, v0, dz), 1.0 - ref)
-    assert_array_equal(fwd(d, mu, v0, trace[2] + dz), ref)
-    assert pred(d, mu, v0, dz).shape == (5, node.v.size)
+# test_factories_against_line_fast: retired 2026-11-18 at the user's decision (D-159): stale since an amendment --
+# the predictor is compared with line_fast at inference.line_fine_factor, but since Block 36 amendment 8 (D-148.2) it runs at refine_line_fine_factor. It failed at 3f72455, before the same-node clearance wave (report 2026-11-17_1754, F2).
 
 
 def test_factories_nan_on_extrusion_invalid():
@@ -484,20 +469,8 @@ def test_work_list_examples_cap_threshold(tmp_path):
         NI.work_list(ex, fs, swc, cfg, 3.0, 0.0)
 
 
-def test_work_list_own_stretch_beyond_U(tmp_path):
-    """Amendment 2 (F1) and 3 (3): the example's own nodes (own_ids_within at U = 5 um) are never candidates,
-    but the stretch's segments beyond them are tier-1 neighbours (> close_lateral_um from the node) whose
-    in-focus shadow on the patch (half-size 10 um) reaches 3 gl, so their non-near_end end nodes join."""
-    swc = chain_swc(tmp_path, [(0.0, 31)])                      # ids 2..32 at x = 0..30
-    cfg = default_config()
-    fs = featured(swc, cfg)
-    ex = [17]                                                   # x = 15
-    work = NI.work_list(ex, fs, swc, cfg, 3.0, 210.0)
-    own = set(range(17 - 6, 17 + 7))                            # x 9..21 (6 um > 5 on each side included)
-    extra = set(work[1:])
-    assert not (extra & own), sorted(extra & own)
-    assert {8, 9, 10, 24, 25, 26} <= extra, sorted(extra)       # x 6..8 and 22..24: in the patch, in focus
-    assert all(5 <= e <= 29 for e in extra), sorted(extra)      # x 3..27: not near_end
+# test_work_list_own_stretch_beyond_U: retired 2026-11-18 at the user's decision (D-159): stale since an amendment --
+# it expects the work list ranked by the patch, but since Block 36 amendment 9 (D-149.2) work_rank is "line". It failed at 3f72455, before the same-node clearance wave (report 2026-11-17_1754, F2).
 
 
 # ---------------------------------------------------------- build_node ---

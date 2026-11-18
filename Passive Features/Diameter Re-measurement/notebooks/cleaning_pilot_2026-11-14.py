@@ -293,3 +293,31 @@ for path in ([INFER_W + "/diameters.png", INFER_W + "/chi2.png"] + sorted(glob.g
     if os.path.exists(path):
         print(path)
         display(Image(filename=path))
+
+# %% [markdown]
+# ## Cell 18c: each example node at its focal plane, with the estimated diameter drawn on the image (no download; seconds)
+#
+# For every example node of the cleaning run (the nodes of `WORST_IDS` in Cell 17b; images are kept for the example
+# nodes only): the node's patch at the first stage's sharpest plane k*, the two edges of the tube the joint fit
+# estimated (solid: the per-node fit of Cell 18b when it has run, else the last round's refinement of Cell 17b) and
+# Allen's diameter about the traced position (dashed). SPEC Block 31 amendment 3, Block 36 amendment 12. It reads only
+# the files Cells 17b and 18b wrote. Output to send back: `focal_<S>.png` and the table.
+
+# %%
+FOCAL_NODES = None          # None: the run's example nodes; or a string of ids, e.g. "8089,7448,4844,7081"
+FOCAL_PLANE = "kstar"       # "kstar": the first stage's sharpest plane; "axis": the recorded plane nearest the fitted axis
+FOCAL_IMAGE = "before"      # "before": the patch as recorded; "after": after the neighbours' cleaning
+FOCAL_ZOOM_UM = 6.0         # half-width of the view about the fitted axis (um)
+FOCAL_DIR = next((d for d in (OUT + "/cleaning_tier1", OUT + "/cleaning_worst")
+                  if os.path.exists("%s/cleaning_%d.json" % (d, SPECIMEN))), None)
+assert FOCAL_DIR is not None, "no cleaning_%d.json under %s/cleaning_tier1 or cleaning_worst: run Cell 17b first" % (SPECIMEN, OUT)
+FOCAL_INF = FOCAL_DIR.replace("/cleaning_", "/inference_")
+focal_args = ["--cleaning-dir", FOCAL_DIR, "--specimen", SPECIMEN, "--plane", FOCAL_PLANE, "--image", FOCAL_IMAGE,
+              "--zoom-um", FOCAL_ZOOM_UM]
+if os.path.exists("%s/inference_%d.json" % (FOCAL_INF, SPECIMEN)):
+    focal_args += ["--inference-dir", FOCAL_INF]         # Cell 18b has run: its per-node fits are drawn
+if FOCAL_NODES:
+    focal_args += ["--nodes", FOCAL_NODES]
+run("scripts/show_focal.py", *focal_args)
+display(Image(filename="%s/focal_%d.png" % (FOCAL_DIR, SPECIMEN)))
+display(pd.read_csv("%s/focal_%d.csv" % (FOCAL_DIR, SPECIMEN)))

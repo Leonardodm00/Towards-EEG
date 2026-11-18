@@ -341,6 +341,158 @@ def figure_rounds(history, cfg):
     return fig
 
 
+FOCAL_REQUIRED = ("image", "extent", "axis_xy", "e_u", "d_um")
+FOCAL_MAX_COLS = 5
+
+
+def _focal_panel(panel, index):
+    """Validated arrays of one figure_focal panel (amendment 3)."""
+    if not isinstance(panel, Mapping):
+        raise ValueError("panel %d must be a mapping, got %r" % (index, type(panel).__name__))
+    for key in FOCAL_REQUIRED:
+        if key not in panel:
+            raise ValueError("panel %d lacks %r" % (index, key))
+    image = np.asarray(panel["image"])
+    if image.ndim != 2 or image.size == 0:
+        raise ValueError("panel %d: image must be (H, W), got shape %r" % (index, image.shape))
+    extent = np.asarray(panel["extent"], dtype=float)
+    axis = np.asarray(panel["axis_xy"], dtype=float)
+    e_u = np.asarray(panel["e_u"], dtype=float)
+    if extent.shape != (4,) or axis.shape != (2,) or e_u.shape != (2,):
+        raise ValueError("panel %d: extent must be (4,), axis_xy and e_u (2,), got %r, %r, %r"
+                         % (index, extent.shape, axis.shape, e_u.shape))
+    if not (np.all(np.isfinite(extent)) and np.all(np.isfinite(axis)) and np.all(np.isfinite(e_u))):
+        raise ValueError("panel %d: extent, axis_xy and e_u must be finite" % index)
+    norm = float(np.hypot(e_u[0], e_u[1]))
+    if not norm > 0:
+        raise ValueError("panel %d: e_u has zero length" % index)
+    e_u = e_u / norm
+    d = float(panel["d_um"])
+    if not (np.isfinite(d) and d > 0):
+        raise ValueError("panel %d: d_um must be positive and finite, got %r" % (index, panel["d_um"]))
+    out = dict(image=image, extent=extent, axis=axis, e_u=e_u, d=d, ref=None, d_ref=None, line=None, half=None,
+               title=str(panel.get("title", "")), label=str(panel.get("label", "estimate")))
+    if panel.get("ref_xy") is not None and panel.get("d_ref_um") is not None:
+        ref = np.asarray(panel["ref_xy"], dtype=float)
+        d_ref = float(panel["d_ref_um"])
+        if ref.shape != (2,) or not np.all(np.isfinite(ref)):
+            raise ValueError("panel %d: ref_xy must be (2,) and finite" % index)
+        if not (np.isfinite(d_ref) and d_ref > 0):
+            raise ValueError("panel %d: d_ref_um must be positive and finite, got %r" % (index, panel["d_ref_um"]))
+        out["ref"], out["d_ref"] = ref, d_ref
+    if panel.get("line_xy") is not None:
+        line = np.asarray(panel["line_xy"], dtype=float)
+        if line.shape != (2, 2):
+            raise ValueError("panel %d: line_xy must be (2, 2), got %r" % (index, line.shape))
+        out["line"] = line
+    if panel.get("half_length_um") is not None:
+        half = np.asarray(panel["half_length_um"], dtype=float)
+        if half.shape != (2,) or not np.all(np.isfinite(half)) or np.any(half < 0):
+            raise ValueError("panel %d: half_length_um must be (2,), finite and >= 0" % index)
+        out["half"] = half
+    return out
+
+
+def focal_edges(centre_xy, e_u, d_um, half_minus_um, half_plus_um, origin_xy):
+    """The two edges of a tube of diameter d_um drawn in a focal-plane panel (amendment 3): (2, 2, 2) um, the
+    edge e (0: the side of +n_hat, 1: of -n_hat), its two ends, (x, y), relative to origin_xy:
+    centre_xy +- (d / 2) n_hat, from -half_minus_um to +half_plus_um along the unit e_u, n_hat = (-e_u[1], e_u[0])."""
+    c = np.asarray(centre_xy, dtype=float) - np.asarray(origin_xy, dtype=float)
+    e = np.asarray(e_u, dtype=float)
+    n_hat = np.array([-e[1], e[0]])
+    ends = np.array([c - float(half_minus_um) * e, c + float(half_plus_um) * e])
+    return np.array([ends + 0.5 * float(d_um) * n_hat, ends - 0.5 * float(d_um) * n_hat])
+
+
+def figure_focal(panels, ncols=None, percentiles=IMAGE_PERCENTILES, zoom_um=None):
+    """Nodes at one recorded plane each, with the estimated tube drawn on the image (Block 31, amendment 3).
+    Returns the matplotlib Figure.
+
+    panels: a sequence of mappings, one per node --
+      image (H, W) grey levels; extent (x_left, x_right, y_bottom, y_top) um (figures.image_extent_um);
+      axis_xy (2,) um, where the estimated tube's axis crosses the measuring line; e_u (2,) the direction of the
+      axis' projection; d_um > 0 the estimated diameter;
+      optional: half_length_um (2,) um, how far the edges run against and along e_u (None: zoom_um, or the
+      patch's diagonal); ref_xy (2,) um and d_ref_um > 0, the traced position and Allen's diameter; line_xy
+      (2, 2) um, the measuring line; title; label (the estimate's name in the legend).
+    ncols: panels per row (None: one row up to FOCAL_MAX_COLS, then rows of FOCAL_MAX_COLS).
+    percentiles: (lo, hi) of the finite grey levels in view give the panel's grey range; None = their full range.
+    zoom_um: > 0, the view is +-zoom_um about axis_xy; None = the whole patch.
+
+    Each panel's coordinates are um relative to axis_xy (x to the right, y downwards as in the image). Drawn: the
+    image; the estimate's two edges (solid) at axis_xy +- (d / 2) n_hat along e_u and its axis (thin); Allen's two
+    edges (dashed) about ref_xy along the same direction; the measuring line; the title. Computes nothing
+    scientific. ValueError for an empty panels, a panel that is not a mapping or lacks a required key, shapes
+    that disagree, d_um or d_ref_um not positive and finite, an e_u of zero length, zoom_um or ncols not positive.
+    """
+    if isinstance(panels, Mapping) or not hasattr(panels, "__len__") or len(panels) == 0:
+        raise ValueError("panels must be a non-empty sequence of mappings")
+    items = [_focal_panel(pn, i) for i, pn in enumerate(panels)]
+    if zoom_um is not None and not (np.isfinite(float(zoom_um)) and float(zoom_um) > 0):
+        raise ValueError("zoom_um must be > 0 or None, got %r" % (zoom_um,))
+    if ncols is None:
+        ncols = min(len(items), FOCAL_MAX_COLS)
+    if int(ncols) != ncols or int(ncols) < 1:
+        raise ValueError("ncols must be a positive integer or None, got %r" % (ncols,))
+    ncols = int(ncols)
+    nrows = (len(items) + ncols - 1) // ncols
+
+    plt = _plt()
+    import matplotlib.patheffects as pe
+    halo = [pe.Stroke(linewidth=2.4, foreground="black", alpha=0.5), pe.Normal()]
+    side = 3.1
+    fig, axes = plt.subplots(nrows, ncols, figsize=(side * ncols + 0.4, side * nrows + 1.1), facecolor=SURFACE,
+                             squeeze=False, layout="constrained")
+    handles = {}
+    for i, it in enumerate(items):
+        ax = axes[i // ncols, i % ncols]
+        ext = it["extent"] - np.array([it["axis"][0], it["axis"][0], it["axis"][1], it["axis"][1]])
+        if zoom_um is not None:
+            z = float(zoom_um)
+            view = (-z, z, z, -z)
+        else:
+            view = tuple(ext)
+        H, W = it["image"].shape
+        xs = np.linspace(ext[0], ext[1], W + 1)
+        ys = np.linspace(ext[3], ext[2], H + 1)
+        cols = (xs[1:] > min(view[0], view[1])) & (xs[:-1] < max(view[0], view[1]))
+        rows = (ys[1:] > min(view[2], view[3])) & (ys[:-1] < max(view[2], view[3]))
+        seen = it["image"][np.ix_(rows, cols)] if rows.any() and cols.any() else it["image"]
+        lo, hi = _row_scale((seen,), percentiles)
+        ax.imshow(it["image"], cmap="gray", vmin=lo, vmax=hi, extent=tuple(ext), origin="upper",
+                  interpolation="nearest")
+        diag = float(np.hypot(ext[1] - ext[0], ext[2] - ext[3]))
+        if it["half"] is not None:
+            hm, hp = float(it["half"][0]), float(it["half"][1])
+        else:
+            hm = hp = float(zoom_um) * 1.5 if zoom_um is not None else diag
+        if it["line"] is not None:
+            ln = it["line"] - it["axis"]
+            handles["measuring line"], = ax.plot(ln[:, 0], ln[:, 1], color="#ffd23f", lw=0.9, ls=":", gid="line")
+        if it["ref"] is not None:
+            for e, edge in enumerate(focal_edges(it["ref"], it["e_u"], it["d_ref"], hm, hp, it["axis"])):
+                handles["Allen's diameter, about the trace"], = ax.plot(
+                    edge[:, 0], edge[:, 1], color="#35d0ff", lw=1.1, ls="--", path_effects=halo, gid="ref_edge%d" % e)
+        for e, edge in enumerate(focal_edges(it["axis"], it["e_u"], it["d"], hm, hp, it["axis"])):
+            handles[it["label"]], = ax.plot(edge[:, 0], edge[:, 1], color=ORANGE, lw=1.3, path_effects=halo,
+                                           gid="edge%d" % e)
+        centre = focal_edges(it["axis"], it["e_u"], 0.0, hm, hp, it["axis"])[0]
+        handles["estimated axis"], = ax.plot(centre[:, 0], centre[:, 1], color=ORANGE, lw=0.6, alpha=0.8, gid="axis")
+        ax.set_xlim(view[0], view[1])
+        ax.set_ylim(view[2], view[3])
+        ax.set_aspect("equal")
+        ax.tick_params(labelsize=7, colors=INK2)
+        ax.set_xlabel("x - x_axis (um)", fontsize=7.5, color=INK2)
+        if i % ncols == 0:
+            ax.set_ylabel("y - y_axis (um)", fontsize=7.5, color=INK2)
+        ax.set_title(it["title"], fontsize=8, color=INK)
+    for j in range(len(items), nrows * ncols):
+        axes[j // ncols, j % ncols].set_axis_off()
+    fig.legend(list(handles.values()), list(handles.keys()), loc="outside lower center", ncol=min(4, len(handles)),
+               fontsize=8, frameon=False)
+    return fig
+
+
 def save(fig, path, dpi):
     """Write fig as PNG at dpi (> 0) to path, creating its folder. Returns the path.
     The figure stays open: the caller closes it."""

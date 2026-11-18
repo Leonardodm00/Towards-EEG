@@ -6,6 +6,7 @@
 | 2026-11-17 (later) | The clearance chat (14:14 onward): section 12 added -- first numbers of the split $S = S^{\rm in} + S^{\rm out}$ and of the iteration's gain, from `checks/own_shadow_clearance_check.py` (output beside it) **[run, sandbox of the clearance chat]**; section 11's first item marked corrected. No decision, no SPEC entry, no pipeline code. |
 | 2026-11-17 (later, 2) | The clearance chat, 17:05: **D-156** [user] -- the joint fit of all planes with the whole own shadow stays the estimator, the clearance becomes a product computed from its estimate every round, clear-then-fit is dropped without a comparison. Section 13 added; it supersedes section 6's correction "before the profile fit" and closes section 7's points (a) to (e). SPEC: Block 35 amendment 2, Blocks 37, 38, Block 36 amendment 11 (drafted, the contract commit that carries this row). The decision's ID is D-156 (written as D-155 until the push: the noise-fit chat took D-155 meanwhile). 17:20: the user approved the block plan and recalled that the fit comes after the neighbours' cleaning (D-156.6). |
 | 2026-11-17 (later, 3) | The clearance chat: the wave of D-156 is built, merged and checked. Block 35 amendment 2 (`line_fast.line_shadow_split`), Block 37 (`analysis/own_clearance.py`), Block 38 (`plotting/own_clearance_figures.py`) by three Opus implementers; Block 36 amendment 11 (the entry points, `--no-own`, the pilot-run test, notebook Cells 17b and 18b) by the orchestrator; final check by an Opus tester, `specs/test_reports/2026-11-17_1754_incremental.md`: PASS WITH ISSUES (one MINOR, fixed; four NOTE; three spec gaps, closed), D-157 and D-158 [orchestrator]. Section 14 added. The theory document of the main route: `docs/TEEG_diameter_pipeline_theory_2026-11-17/`. Not run: the pilot cell in Colab (Allen's images do not reach the sandbox). |
+| 2026-11-18 | The clearance chat: D-159 [user] -- the tester's spec tests merged into the branch, the three stale spec tests retired. New at the user's request: `scripts/show_focal.py` and notebook Cell 18c (each example node at its focal plane with the estimated tube's edges and Allen's diameter on the image; SPEC Block 31 amendment 3, Block 36 amendment 12). The pilot's first clearance figures were received (nodes 8089, 7448, 4844, 7081): section 15. |
 
 Basis tags: **[src]** read in the named file at `021869d`; **[data]** read in the files the user uploaded on
 2026-11-17 at 12:40 (the Colab run of Cell 17b: `cleaning_529878215.json`, `examples_worst_529878215.json`, the
@@ -385,3 +386,22 @@ Next, for the user's decision: run Cells 17b and 18b on the pilot and read the t
 the open question of section 8 (are the fitted 1.3 to 4.5 um right?); a sensitivity run with the far slope 0.397
 (`--config-json`); whether the three stale spec tests (the report's F2) are retired or updated; whether the tester's
 39 new spec tests (branch `tester/2026-11-17_1754`) come into the branch.
+
+## 15. The pilot's first clearance figures (2026-11-18)
+
+**[data: 16 PNGs of the user's Colab run, uploaded 2026-11-18 at 12:48 -- `own_node<id>.png`,
+`own_node<id>_round1.png`, `own_node<id>_round2.png`, `own_layers_node<id>.png` for the nodes 8089, 7448, 4844, 7081
+(class `overlap`, round 2); read by eye in the clearance chat, no array was sent]**
+
+| node | fitted $d$ (um), $\mu$ (1/um), round 2 | what the figure shows |
+|---|---|---|
+| 8089 | 2.44, 0.0750 | at plane 108 the profile has a narrow core, about 0.6 um wide and down to about 69 gl, inside a broad dip; the whole model is smooth and misses the core by about 5 gl; the cleared profile shows a narrow dip of about 7 gl, not a flat section 2.4 um wide |
+| 7448 | 1.288, 0.1296 | the dip is fitted well at planes 64 and 66; the cleared profile is irregular (side lobes of 3 to 5 gl on both sides: the soma's surroundings) |
+| 4844 | 2.623, 0.0503 | broad asymmetric dips with shoulders at +1.5 to +2.5 um that the model does not have; the cleared profile is not a flat section |
+| 7081 | 3.801, 0.0432 | at planes 196 and 198 the profile has two minima about 1.5 um apart with a rise between them; one tube of 3.8 um spans both |
+
+Reading **[reasoning]**: on none of the four nodes does the cleared profile follow the in-band model, which by the
+identity of section 12 is the joint fit's misfit shown plane by plane. On 8089 and 7081 the shape of the misfit (a
+narrow core; two minima) is what a thinner structure, or two structures, inside the fitted width would give; whether
+that is so needs the image itself -- hence Cell 18c -- and was not decided. These four are the survey's `overlap`
+examples, the worst class by construction.
