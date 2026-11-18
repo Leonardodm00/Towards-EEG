@@ -1,0 +1,20 @@
+parallel, 1.0 um aside, same depth:
+  4 free: condition number 7.3; SE d 0.0047, mu 0.0081, v0 0.0015, z 0.0035
+  6 free: condition number 8.4; SE d 0.0047, mu 0.0082, v0 0.0016, z 0.0035, d_q 0.0048, mu_q 0.0082
+  8 free: condition number 8.5; SE d 0.0047, mu 0.0082, v0 0.0016, z 0.0036, d_q 0.0048, mu_q 0.0082, v0_q 0.0016, z_q 0.0036
+crossing at 45 deg over the node, 0.84 um deeper:
+  4 free: condition number 6.8; SE d 0.0047, mu 0.0081, v0 0.0015, z 0.0037
+  6 free: condition number 9.9; SE d 0.0052, mu 0.0081, v0 0.0015, z 0.0043, d_q 0.0050, mu_q 0.0082
+  8 free: condition number 10.2; SE d 0.0055, mu 0.0082, v0 0.0016, z 0.0053, d_q 0.0050, mu_q 0.0086, v0_q 0.0015, z_q 0.0057
+parallel, directly above, 1.68 um deeper:
+  4 free: condition number 7.1; SE d 0.0046, mu 0.0081, v0 0.0015, z 0.0035
+  6 free: condition number 86.9; SE d 0.0050, mu 0.0081, v0 0.0015, z 0.0037, d_q 0.0716, mu_q 0.1313
+  8 free: condition number 101.5; SE d 0.0051, mu 0.0081, v0 0.0016, z 0.0038, d_q 0.0785, mu_q 0.1453, v0_q 0.0054, z_q 0.0087
+crossing at 45 deg over the node, 2.8 um deeper:
+  4 free: condition number 7.2; SE d 0.0046, mu 0.0081, v0 0.0015, z 0.0035
+  6 free: condition number 1360.0; SE d 0.0049, mu 0.0081, v0 0.0015, z 0.0036, d_q 1.8007, mu_q 3.2634
+  8 free: condition number 1528.6; SE d 0.0050, mu 0.0081, v0 0.0016, z 0.0036, d_q 1.8012, mu_q 3.2640, v0_q 0.0202, z_q 0.0489
+parallel, 2.0 um aside, 1.68 um deeper:
+  4 free: condition number 7.2; SE d 0.0046, mu 0.0081, v0 0.0015, z 0.0035
+  6 free: condition number 72.2; SE d 0.0046, mu 0.0081, v0 0.0015, z 0.0035, d_q 0.0723, mu_q 0.1336
+  8 free: condition number 81.2; SE d 0.0047, mu 0.0081, v0 0.0015, z 0.0035, d_q 0.0753, mu_q 0.1402, v0_q 0.0054, z_q 0.0085
