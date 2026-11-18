@@ -204,6 +204,7 @@ the "Binds" column.
 | 2026-11-17 (later, 11) | Logs **D-157** [orchestrator] (the clearance chat, the wave of D-156): contract amendment of SPEC Block 35 amendment 2 on the implementer's report -- the depth-mirror oracle of the split holds to 1e-10 only when the slab grid is symmetric about the tube's axis, and is restated with that construction (the generic case reported without a bound); the slab-grid oracle's margin recorded (4.65e-4 against 5e-4). The wave is merged on `sci/diameter-pipeline`: Block 35 amendment 2, Blocks 37, 38, Block 36 amendment 11. Next free IDs: D-158, I-006. |
 | 2026-11-17 (later, 12) | No decision changed (the noise-fit chat; output pasted by the user, 18:01) **[cluster]**. On davinci at `7c890ff` (which contains the three-component law's merge): the FULL gates SETTLED, 16 passed (noise_law 11/11, noise_fit 12/12 in 122 s, noise_sweep_fit 11/11 in 459 s, G11 1146 s); the dry run correct; **the nf2 pilot submitted** at 18:01: array `2098689[].pbsserver01` (508282493, 569844159; 6 cores each, 48 h), merge `2098690.pbsserver01`; run file `~/noise_fit_runs/nf2_L3_exc_20261117T170135Z.env`. [corrected: D-155 and row (later, 9) were written before 17:20, not "about 19:00"]. Next free IDs: D-158, I-006. |
 | 2026-11-17 (later, 13) | Logs **D-158** [orchestrator] (the clearance chat): the final check of the wave of D-156 (Opus tester, report `specs/test_reports/2026-11-17_1754_incremental.md` on `sci/diameter-pipeline`: PASS WITH ISSUES at `ccf69db` -- one MINOR, four NOTE, three spec gaps; 56 smoke suites pass, 39 new spec tests pass, the 9 failing spec tests fail at the base commit too) and its settlements: the slab-grid oracle's bound stated at mu = 1 /um; a per-node fit that raises or fails gets the product status `not_fitted`; `clean` logs a product that raises. The theory document `TEEG_diameter_pipeline_theory_2026-11-17.md` is on the branch under `Passive Features/Diameter Re-measurement/docs/TEEG_diameter_pipeline_theory_2026-11-17/` and was sent to the user; roadmap diameter-pipeline: I37, I38 added under NC3, T14's and T15's notes name the document. Next free IDs: D-159, I-006. |
+| 2026-11-18 | Logs **D-159** (user, 12:48; the clearance chat): the tester's 39 spec tests of the run 2026-11-17_1754 come into `sci/diameter-pipeline`; the three stale spec tests of that report's F2 are retired. Same message: a Colab cell asked for, showing each example node at its focal plane with the diameter the joint fit estimated -- built as SPEC Block 31 amendment 3 (`cleaning_figures.figure_focal`), Block 36 amendment 12 (`scripts/show_focal.py`), notebook Cell 18c. Received with it **[data: 16 PNGs of the pilot's Colab run, nodes 8089, 7448, 4844, 7081, rounds 1 and 2; read by eye in the clearance chat]**: the first same-node clearance figures on real profiles. On none of the four nodes does the cleared profile follow the in-band model: node 8089 at plane 108 has a narrow core about 0.6 um wide down to about 69 gl inside the broad dip, which the whole model at d = 2.44 um does not reproduce; node 7081 at planes 196 and 198 has two minima about 1.5 um apart under a fitted d = 3.80 um. No decision changed; the reading is the assistant's and bears on the open question of D-156 (are the fitted diameters right). Next free IDs: D-160, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -366,6 +367,7 @@ would be needed*, *Status*.
 | D-156 | 2026-11-17 | SPEC Block 35 (amendment 2), new Blocks 37, 38, Block 36 (amendment 11) on `sci/diameter-pipeline`; `CleaningConfig.own_band_half_um`, `own_layer_um`; `clean_cell.py clean`, `infer_nodes.py real`; D-151.1, D-151.4 | the joint fit of all planes with the whole own shadow stays the estimator; the same-node clearance is a product computed from its estimate every round; clear-then-fit dropped, no comparison [user]; the band, the layers, the line, the details [assistant's defaults, orchestrator] | active; amends D-151.1, D-151.4 |
 | D-157 | 2026-11-17 | SPEC Block 35 (amendment 2), oracles (iv) and (v); `tests/smoke/test_smoke_line_fast.py` | the split's depth-mirror oracle restated for a slab grid symmetric about the axis (1e-10 there; generic case reported, no bound); the slab-grid oracle kept at 5e-4 with its margin recorded [orchestrator] | active |
 | D-158 | 2026-11-17 | SPEC Block 35 (amendment 2, oracle (iv)), Block 36 (amendment 11, final check); `scripts/clean_cell.py`, `scripts/infer_nodes.py`; the report `specs/test_reports/2026-11-17_1754_incremental.md` | the final check's settlements: the slab-grid bound stated at mu = 1 /um; the product status `not_fitted` for a per-node fit that raises or fails; `clean` logs a product that raises [orchestrator] | active |
+| D-159 | 2026-11-18 | `tests/spec/` on `sci/diameter-pipeline`; the report `specs/test_reports/2026-11-17_1754_incremental.md` (F2) | the tester's 39 spec tests of the run 2026-11-17_1754 brought into the working branch; the three stale spec tests (`test_factories_against_line_fast[linear, hybrid]`, `test_work_list_own_stretch_beyond_U`) retired [user] | active |
 | D-150 | 2026-11-17 | SPEC Blocks 31 (amendment 2), 27 (amendment 2), 25 (amendment 7), 28 (amendment 2), 36 (amendment 10) at `97b40a4`, `4ed0793`; `CleaningConfig.shadow_cache_mb`, `rank_*`; `clean_cell.py rank`; notebook Cells 16b, 17b, 18b | the cleaning's test re-aimed and sped up [user]: before and after on one 1-99 percentile grey scale, B S on its own; examples ranked by the largest structured dip a tier-1 neighbour casts on the line, tier 2 at most 1 gl, 10 um apart; the shadow model keeps its last sums per patch and changes them by the neighbours that changed (supersedes D-148.3); tiers vectorised [orchestrator] | active |
 | D-149 | 2026-11-16 | SPEC Blocks 25 (amendment 6), 36 (amendment 9), 31 (amendment 1) at `a2b082c`; `CleaningConfig.work_rank`, `work_peak_min_gl`; notebook Cells 17b, 18b | the cleaning is shown in worse conditions on the pilot's most contaminated tier-1 real nodes, neighbours refined, no injection or phantoms now [user]; the work list ranked by the predicted shadow on the example's measuring line, threshold 1 gl, per-round line figures, the examples 8089, 4844, 7081, 7448 [orchestrator], PROVISIONAL | active |
 | D-148 | 2026-11-16 | SPEC Blocks 29 (amendment 1), 25 (amendment 5), 32 (amendment 3), 36 (amendment 8) at `b6073e3`; `CleaningConfig.refine_xtol`, `refine_ftol`, `refine_line_fine_factor` | the coarse refinement stops at relative tolerances 1e-3 (was 1e-8) and its predictor samples p/4 (the fine fit keeps p/8); the neighbours' images shared between the two shadows of a node; the cleaning saves after every round [orchestrator], PROVISIONAL | active |
@@ -11846,6 +11848,40 @@ report's F2: amendments 8 and 9 of Block 36) are untouched: the user decides whe
 $z_k \pm \beta$) instead of at the plane's depth; whether the slab-grid bound should become relative.
 
 **Sources.** **[run, sandbox]** as tagged. **[log]** D-148, D-156, D-157.
+
+**Status:** active.
+
+## D-159 -- The tester's spec tests of 2026-11-17 come into the working branch; three stale spec tests retired (user)
+
+**Date:** 2026-11-18, 12:48 (Europe/Rome), the clearance chat.
+**Binds:** `Passive Features/Diameter Re-measurement/tests/spec/` on `sci/diameter-pipeline`; the report
+`specs/test_reports/2026-11-17_1754_incremental.md`, finding F2.
+
+**Decision [user].** To the two questions left on 2026-11-17 -- "Tester's 39 new tests: bring them into the working
+branch? They are on `tester/2026-11-17_1754`": "yes"; "Three stale older tests: retire or update them? They predate
+this work and fail since the 16 November changes": "Retire".
+
+**Statement.** (D-159.1) The branch `tester/2026-11-17_1754` (the spec tests written by the Opus tester of the final
+check: `test_spec_block37_own_clearance.py`, `test_spec_block38_own_clearance_figures.py`, and the cases added to
+`test_spec_block35_line_fast.py` and `test_spec_block36_node_inputs.py`) is merged into `sci/diameter-pipeline`.
+(D-159.2) `test_factories_against_line_fast` (two cases: linear, hybrid) and `test_work_list_own_stretch_beyond_U` of
+`tests/spec/test_spec_block36_node_inputs.py` are removed, each replaced by a comment naming this decision and the
+reason.
+
+**Why.** **[run, sandbox: the tester's report, F2]** The three tests fail at `3f72455`, before the same-node clearance
+wave: the first compares the round's predictor with `line_fast` at `inference.line_fine_factor`, while since Block 36
+amendment 8 (D-148.2) the predictor runs at `refine_line_fine_factor`; the second expects the work list ranked by the
+patch, while since amendment 9 (D-149.2) `work_rank` is "line". They test contracts that no longer exist. **[run,
+sandbox: the clearance chat]** After the merge and the removal `tests/spec/test_spec_block36_node_inputs.py` runs
+32 passed, 0 failed.
+
+**What it implies for code and tables.** The spec suite of the branch carries the wave's tests; its six other failing
+tests (the ones Block 36 amendment 10 lists) are untouched.
+
+**What it does not decide [open].** Whether tests of the amended contracts (the predictor at
+`refine_line_fine_factor`; the work list ranked by the line) are written in their place.
+
+**Sources.** **[user]** 2026-11-18, 12:48. **[run, sandbox]** as tagged. **[log]** D-148, D-149, D-158.
 
 **Status:** active.
 
