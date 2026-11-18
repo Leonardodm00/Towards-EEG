@@ -6,6 +6,7 @@
 | 2026-11-18 (later) | D-167 [user, 16:31]: the weighting of the residuals is a parameter to tune; the readable planes are today's `select_planes` rule; a node without a close neighbour is the same fit; one pass, no repeat for now; nothing kept of the rounds' one-tube refinement. Section 2 (table), section 3, section 4 and section 8 (O1 to O3 closed) updated. Decision log on `main` at `68180f0`; next free IDs D-168, I-006. |
 | 2026-11-18 (later, 2) | D-168 [user, 16:53]: the cap on free neighbours is a tunable parameter (O5 closed). Open and under discussion with the user: the neighbour's position fixed at the pilot's values or free in a narrow range (O4); what a "neighbour" is -- today one segment, proposed one chain (O6, O7). New check `tier2_sloppiness.py` (section 9) and a new open point O13 from it. Decision log on `main`: next free IDs D-169, I-006. |
 | 2026-11-18 (later, 3) | 17:06, nothing decided (the user: "I'm still deciding"). The user's proposal for O13: fix a neighbour's absorption at a weighted mean over nearby nodes of its branch; check `tier2_fixed_mu.py` added (section 9). Correction to O4: today a neighbour sits at its TRACED position; the first stage's centre and depth are not stored in the features. |
+| 2026-11-18 (later, 4) | D-169 [user, 17:38] changes what is built first: section 0 added (clear traces only, one round, no far-neighbour cleaning, Allen's diameter as the start, centre weights from Allen's diameter, near bumps removed). The joint fit with close neighbours (sections 2 to 7) stays decided and comes after. Section 8 now ends with the list of choices the user still has to make (8b); the user will answer them in the next chat. D-168 and D-169 added to section 2. Decision log on `main` at `30ed363`; next free IDs D-171, I-006. A second handoff exists for the defocus table on davinci (D-170): `TEEG_defocus_table_davinci_handoff_2026-11-18.md`. |
 
 Basis tags: **[user]** said or decided by the user, with the time (Europe/Rome, 2026-11-18); **[log]** the decision
 log on `main`; **[src]** read in the named file at `f6504b0`; **[run, sandbox]** executed in the handing-over
@@ -13,13 +14,46 @@ chat's sandbox, the script named; **[data]** read in files the user uploaded fro
 the assistant, PROVISIONAL until the user confirms; **[reasoning]** the assistant's inference, not checked;
 **[open]** neither decided nor verified.
 
+## 0. Direction of 17:38 (D-169): what is built first
+
+After the five clear nodes of different sizes (section 10, the last bullet) the user set the immediate work aside
+from the joint fit with neighbours. Build this first; sections 2 to 7 come after it and keep their decisions.
+
+| Point | Decided (D-169) | Today **[src, `f6504b0`]** |
+|---|---|---|
+| Nodes | Clear traces only, for now (D-169.9). | `clean_cell.py clear` picks nodes with no tier-2 neighbour and the least tier-1 light, optionally one per bin of Allen's diameter (`--d-bins`). The trace cannot see untraced structures: three of five such nodes were polluted (section 10). |
+| Far neighbours | Their cleaning is skipped for now (D-169.7). | `clean_cell.py clean` always cleans tier 1; there is no switch to skip it. |
+| Rounds | One (D-169.6); the user saw no change from round 1 to round 2. | `--rounds 1` exists. |
+| Start of the diameter | Always Allen's value (D-169.2). | The work-list nodes start from the first stage's diameter and absorption (`clean_cell.py`, round 0, source "pilot"). |
+| Weights | The residuals weighted by distance from the central value $v_c$ outwards, the width set by Allen's diameter: "an exponential lighlty larger than gaussian FWHM obtained from the Allen's diameter" (D-169.4). | Block 29: $w_n = e^{-\lvert v_n\rvert/\lambda}$, $\lambda$ = `measure.sgt_lambda_um` = 0.5 um for every node, centred on the line's origin. Block 30 (`fit_node`): no such weight. |
+| Bumps | The near bumps that pollute a profile are removed; the example is node 2669 (D-169.5). | Nothing detects or removes a second dip on the line. |
+| Own shadow | The node's own expected shadow is kept (D-169.8). | The one-tube model over the node's planes (`node_inputs.forward_factory`) and the same-node clearance product (`own_product`, D-156). |
+| Close neighbour's absorption | Fixed in a node's joint fit; free when that neighbour is itself the working node (D-169.3). | Not built (the joint fit). |
+| Geometry | The chain of D-164 is implemented (D-169.1). | One straight tube (`local_tube`). |
+
+The handing-over chat's readings, PROVISIONAL, to confirm (D-169.10): the weight
+$w_n = e^{-\lvert v_n - v_c\rvert/\lambda_i}$ with $\lambda_i = \kappa\,{\rm FWHM}_{{\rm A},i}$,
+${\rm FWHM}_{{\rm A},i} = [(0.866\,D_{{\rm A},i})^2 + (2.355\,\sigma_{\rm r}(0))^2]^{1/2}$ (um), $D_{{\rm A},i}$
+Allen's diameter of node $i$ (um), $\sigma_{\rm r}(0)$ the kernel's in-focus width (um), $\kappa$ = 1.25, $v_c$ the
+fitted centre; this gives $\lambda_i$ = 0.54 um at $D_{\rm A}$ = 0.45 um and 1.32 um at 1.2 um with
+$\sigma_{\rm r}(0)$ = 0.080 um **[reasoning: arithmetic]**. "Always Allen's" for the working node and for neighbours;
+the first stage keeps what needs no diameter (the sharpest plane, the line's direction). Superseded for now:
+D-167.1's default (no weight beyond $1/\sigma_i^2$), D-166.1's first step, D-162.4's default.
+
+Evidence the user decided on **[data: upload of 17:25, Cell 19c; figures read by eye]**: Allen / first stage /
+refined (um): 1013 0.449 / 3.200 / 2.168; 5353 0.454 / 0.803 / 0.774; 2669 0.788 / 2.981 / 2.588; 2620 0.811 /
+2.056 / 1.913; 639 1.200 / 2.484 / 2.565. Node 2669: a deep narrow core at $v$ = +0.3 um and a second dip at
+$v$ = -1.0 um; the one-tube model spans both and misses by about 25 gl. Nodes 1013 and 2620: blobs and a joining
+branch on the line. Node 639: a flat-bottomed dip about 2 um wide at half depth; there Allen's 1.2 um is too thin
+whatever the kernel **[reasoning]**. Which in-focus width that run used is not stated in the upload.
+
 ## 1. First actions in the next chat
 
 1. Read this file, then in the decision log (`main`, `docs/project/TEEG_decisions_and_ideas_log.md`) the entries
    D-132, D-161, D-162, D-163, D-164, D-165, D-166, D-167 and the changelog rows of 2026-11-18. Read the last changelog
    rows again immediately before taking an ID: the noise-fit chat logs in the same file.
-2. Settle the open points O4 to O12 of section 8 with the user before any logic (coding directive 3); they were explained to the user
-   at 16:40 and the answers may already be in the log.
+2. Build section 0 first. Before any logic (coding directive 3) get the user's answers to section 8b; the user said at 17:38 "update the handoff and i
+   will reply in the other chat".
 3. Write the SPEC entry of F3 (interfaces, shapes, units, oracles, tolerances), get the plan approved, then fan out
    (coding directives 5 to 9; the `scientific-coding` skill). Add the blocks to the roadmap
    (`specs/roadmap/diameter-pipeline.yaml`) in the turn their SPEC entries are written.
@@ -53,6 +87,8 @@ the assistant, PROVISIONAL until the user confirms; **[reasoning]** the assistan
 | D-167.4 | 16:31 | Cleaning and joint fit are run once: "Repeat or not: for now not". | user |
 | D-167.5 | 16:31 | Nothing of the rounds' one-tube refinement (Block 29) is kept in this path. The user: "I woudl say notthing what do you think?"; the assistant agreed at 16:40. | user (an inclination), assistant agreed |
 | D-167.6 | 16:31 | The weighting's choices: none beyond $1/\sigma_i^2$ (default) or $w_n = e^{-\lvert v_n\rvert/\lambda}$ with $\lambda$ a parameter; the number of passes a parameter, default 1. | orchestrator |
+| D-168 | 16:53 | The number of close neighbours fitted jointly is capped; the cap is a tunable parameter (default 3, the orchestrator's). | user |
+| D-169 | 17:38 | Section 0. For the joint fit: the chain implemented (D-169.1); the diameter's start always Allen's (D-169.2), which makes Allen's the default of D-162.4's parameter; a close neighbour's absorption fixed, free when it is the working node (D-169.3). | user |
 
 Superseded on the way, do not implement: D-161.2's "the neighbour's position held" (by D-162.1); SPEC Block 30's
 sentence "a joint hybrid scene with the tier-2 neighbours held at their features" (by D-161, D-162.1).
@@ -158,6 +194,35 @@ or (b) it shares no node with the own stretch and its projected footprint meets 
 | O14 | Where a neighbour's position comes from. | Today **[src: `scripts/clean_cell.py` (round 0), `node_features.featured_scene`]** the work-list nodes take the first stage's diameter and absorption only (source "pilot"); every node's position in the scene is the traced one plus its stored offset, and the offset is 0 until a refinement writes it. The first stage's centre and depth are used only as the start of that node's own refinement (`node_inputs.pilot_start`). | If the neighbour's position is to be "the pilot's" (the user, 16:53), the first stage's lateral offset and depth must be written into the features' offsets first. |
 | O15 | The neighbour's absorption: free, or fixed. | The user's proposal of 17:06, not yet decided: fix $\mu_q$ at a weighted mean over the neighbour's node and the nodes near it on the same branch. `tier2_fixed_mu.py`: with $\mu_q$ fixed the conditioning returns to 7.4 to 9.3 and SE($d_q$) to 0.2 to 1.4 % in all five scenes; held 30 % too high it shifts the node's diameter by -2.4 to +0.9 % and the neighbour's by -12 to -14 %. | Fixed by default, the choice a parameter; the weights (by distance along the branch and by the first-stage fit's quality) and the window to settle. |
 
+## 8b. Choices the user still has to make (to ask first; answers go to the decision log)
+
+For section 0 (built first):
+
+| # | Choice | Options, and the handing-over chat's suggestion |
+|---|---|---|
+| A1 | The weight law's constants. | $\kappa$ (how much wider than Allen's FWHM): suggestion 1.25. The form of ${\rm FWHM}_{\rm A}$: the formula of section 0, or the half-depth width of the model's own in-focus dip for a tube of Allen's diameter. |
+| A2 | Where the weights are centred. | On the fitted centre, re-centred while fitting (suggestion; as D-052's first-stage weights), or on the line's origin (as Block 29). |
+| A3 | Whether the weights are a parameter. | D-167.1 made the weighting a parameter to tune; suggestion: keep it, default the Allen-scaled law. |
+| A4 | How a near bump is recognised. | A second local minimum of the line, separated from the central dip by a rise of at least a multiple of the noise SD (suggestion: 3), searched in the sharpest plane or in every used plane. |
+| A5 | What "removed" means. | (a) the samples from the bump outwards get no weight, in every plane (suggestion); (b) the node is dropped as not clear; (c) the bump is fitted as an extra component. |
+| A6 | What a clear trace is, when the trace cannot see the pollution. | Keep `clear`'s rule and add an image test (no bump within a distance of the centre), or accept the nodes and rely on A5. |
+| A7 | The first stage's role. | Suggestion: only the sharpest plane, the line and the background; the absorption's start the cell's common value; the position's start the trace. |
+| A8 | The kernel's in-focus width while this runs. | 0.080 um (configured) until the davinci table and the width's measurement exist; the tables of Cells 19b and 19c at the three widths were not in the upload of 17:25. |
+
+For the joint fit with close neighbours (after section 0):
+
+| # | Choice | Options, and the suggestion |
+|---|---|---|
+| B1 | A neighbour's position (O4, O14). | Fixed at the trace, or free in a narrow range about it (depth 0.14 um, lateral 0.23 um; 0 = fixed). The user leaned to fixed; `tier2_neighbour_position.py` shows about 10 % bias on the node per 0.2 um of error for a close in-focus neighbour. |
+| B2 | The value a close neighbour's absorption is fixed at (O15). | The user's proposal of 17:06: a weighted mean over the neighbour's node and the nodes near it on the same branch. Needs: the window, the weights, and where the values come from now that the start is Allen's (the cell's common value, or absorptions fitted when those nodes were working nodes). |
+| B3 | A neighbour is a chain (O6). | "Implement the chain" (D-169.1) is read as yes: one diameter, one fixed absorption and one position per chain; the cap counts chains. To confirm. |
+| B4 | Same-branch neighbours and daughters at a branch point (O7). | Suggestion: the same branch beyond the own stretch takes the node's diameter; daughters held at working values, the node flagged. |
+| B5 | Bends (O8). | Suggestion: the chain as one solid, a point inside any piece absorbing once; tested against a straight tube cut in two. |
+| B6 | The renderer (O9). | Suggestion: a line renderer for chains of pieces, built before the fit. |
+| B7 | A node estimated twice (O10). | Suggestion: the own fit delivered; the others tabulated with their difference in standard errors. |
+| B8 | The tier rule's cost (O11). | Suggestion: a distance pre-filter (6 um), then the predicted-bias rule; its time measured before the plan. |
+| B9 | When the far neighbours' cleaning and the repeat come back (D-169.7, D-167.4). | Both are off for now; say what brings them back. |
+
 ## 9. Evidence behind the decisions (synthetic checks; scripts and outputs in the repository)
 
 All in `Passive Features/Diameter Re-measurement/checks/`, standalone, not pipeline code **[run, sandbox]**. Common
@@ -201,6 +266,7 @@ than one neighbour; anything on real data.
   node per bin of Allen's diameter, edges 0.40, 0.45, 0.60, 0.80, 1.20, 5.0 um, at the same widths). Tested on the
   synthetic cell only. **Waiting for the user's Colab outputs**: the two tables, `ratio_by_size_529878215.png`, the
   `clear:` lines, the focal-plane figures.
+- Cell 19c ran (upload of 17:25; one width, not stated which): the table and its reading are in section 0. Of the five clear nodes by size, one (5353) is clean, one (639) is a thick dendrite whose dip is about 2 um wide, three carry untraced structures **[data, figures read by eye]**. Cell 19b's table and the other widths: not received.
 - D-163: a kept shadow sum changed by the images that left could come out at -1e-17 and stop the cleaning; fixed at
   `6ac81d2` (values below 0 by at most 1e-12 set to 0).
 
