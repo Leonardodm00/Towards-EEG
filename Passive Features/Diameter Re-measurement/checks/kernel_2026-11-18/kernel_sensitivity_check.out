@@ -1,0 +1,22 @@
+
+truth d 0.50 um, mu 0.80 /um (dip 79.6 gl in focus)
+  control, true kernel = table: d/d_true 1.000, mu 0.800, rms 0.00 gl
+  A  halo 10 % at 3 x sigma:  d/d_true 1.048, mu 0.692, z_ax -0.000, rms 0.41 gl
+  A  halo 20 % at 3 x sigma:  d/d_true 1.098, mu 0.594, z_ax -0.001, rms 0.81 gl
+  A  halo 30 % at 3 x sigma:  d/d_true 1.147, mu 0.513, z_ax -0.001, rms 1.21 gl
+  B  true growth 0.50 x the table's:  d/d_true 0.969, mu 0.968, z_ax +0.002, rms 2.20 gl
+  B  true growth 0.75 x the table's:  d/d_true 0.979, mu 0.883, z_ax +0.001, rms 0.89 gl
+  B  true growth 1.50 x the table's:  d/d_true 1.031, mu 0.698, z_ax -0.001, rms 1.15 gl
+  B  true growth 2.00 x the table's:  d/d_true 1.053, mu 0.631, z_ax -0.001, rms 1.88 gl
+
+truth d 1.00 um, mu 0.25 /um (dip 55.3 gl in focus)
+  control, true kernel = table: d/d_true 1.000, mu 0.250, rms 0.00 gl
+  A  halo 10 % at 3 x sigma:  d/d_true 1.011, mu 0.233, z_ax -0.001, rms 0.41 gl
+  A  halo 20 % at 3 x sigma:  d/d_true 1.033, mu 0.214, z_ax -0.002, rms 0.82 gl
+  A  halo 30 % at 3 x sigma:  d/d_true 1.063, mu 0.194, z_ax -0.002, rms 1.22 gl
+  B  true growth 0.50 x the table's:  d/d_true 0.952, mu 0.297, z_ax +0.003, rms 1.93 gl
+  B  true growth 0.75 x the table's:  d/d_true 0.981, mu 0.268, z_ax +0.001, rms 0.80 gl
+  B  true growth 1.50 x the table's:  d/d_true 1.020, mu 0.225, z_ax -0.002, rms 1.05 gl
+  B  true growth 2.00 x the table's:  d/d_true 1.040, mu 0.207, z_ax -0.003, rms 1.74 gl
+
+227 s

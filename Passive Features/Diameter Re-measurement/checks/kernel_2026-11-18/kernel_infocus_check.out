@@ -1,0 +1,12 @@
+
+truth d 0.50 um, mu 0.80 /um
+  true in-focus sigma 0.12 um (table 0.08):  fitted d 0.572 um = 1.14 x true, mu 0.591, rms 0.31 gl (dip in focus 73.3 gl)
+  true in-focus sigma 0.16 um (table 0.08):  fitted d 0.665 um = 1.33 x true, mu 0.425, rms 0.54 gl (dip in focus 65.8 gl)
+  true in-focus sigma 0.22 um (table 0.08):  fitted d 0.806 um = 1.61 x true, mu 0.278, rms 0.77 gl (dip in focus 55.2 gl)
+  true in-focus sigma 0.30 um (table 0.08):  fitted d 1.028 um = 2.06 x true, mu 0.166, rms 0.94 gl (dip in focus 44.3 gl)
+
+truth d 0.50 um, mu 0.40 /um
+  true in-focus sigma 0.12 um (table 0.08):  fitted d 0.573 um = 1.15 x true, mu 0.299, rms 0.17 gl (dip in focus 40.5 gl)
+  true in-focus sigma 0.16 um (table 0.08):  fitted d 0.665 um = 1.33 x true, mu 0.218, rms 0.29 gl (dip in focus 36.3 gl)
+  true in-focus sigma 0.22 um (table 0.08):  fitted d 0.808 um = 1.62 x true, mu 0.145, rms 0.42 gl (dip in focus 30.5 gl)
+  true in-focus sigma 0.30 um (table 0.08):  fitted d 1.029 um = 2.06 x true, mu 0.087, rms 0.51 gl (dip in focus 24.4 gl)
