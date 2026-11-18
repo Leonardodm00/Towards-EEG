@@ -217,6 +217,7 @@ the "Binds" column.
 | 2026-11-18 (later, 9) | Logs **D-164** (user, 15:13; the clearance chat), on the joint fit of D-161, D-162: the tubes are built from traced node to traced node along the branch, out to the blur's reach, with one diameter and absorption along the node's own stretch; the boundary between the tiers is the predicted bias. Still open, the user's, after an explanation asked for: whether the joint fit runs only after the cleaning rounds or inside them too. Next free IDs: D-165, I-006. |
 | 2026-11-18 (later, 10) | No decision changed (the clearance chat, 15:28-16:10). **D-160's check ran** after the fix of D-163 **[data: the user's upload of 15:25 -- `focal_529878215.csv`, `features_529878215.csv`, the focal-plane figure and the `own_node*.png` figures; the figures read by eye]**: the clear nodes 5353, 3873, 4725 refined to 0.774, 1.085, 1.033 um (round 2; mu 0.194, 0.195, 0.248 /um) against Allen's 0.454, 0.536, 0.466 um (x 1.70, 2.02, 2.22) and the first stage's 0.803, 1.003, 0.964 um. In the planes shown (k* and k* +- 2) the one-tube model follows the measured line, with no narrow core inside a broad dip as on the four `overlap` nodes (x 2.7 to 8.5 Allen); the largest misfit read is about 4 gl at the focal plane of 4725. Reading [reasoning]: by D-160's own criterion the one-tube model holds where nothing else is on the line, and the excess of the four earlier nodes belongs to their neighbours (D-161). The user asked whether the Gaussian kernel could make the clear nodes too wide. **Checks** (`checks/kernel_2026-11-18/` at `3bf3dd1`; synthetic, one flat tube, hybrid, the pilot's table, fitted with the pipeline's model) **[run, sandbox]**: a halo of 10 / 20 / 30 % of the kernel at 3 sigma raises the fitted diameter by 5 / 10 / 15 % (tube 0.5 um, mu 0.8 /um) and 1 / 3 / 6 % (1.0 um, 0.25 /um); a growth of the kernel's variance with defocus 0.5 to 2 times the table's moves it by -5 to +5 %; a true in-focus width of 0.12 / 0.16 / 0.22 / 0.30 um where the table has 0.080 um makes a 0.5 um tube fit as 0.57 / 0.67 / 0.81 / 1.03 um, the misfit under 1 gl rms. **Finding:** `renderer.sigma_r0_um` = 0.080 um is configured ("never identified by the stacks", `config.py`; `calibration.kernel_from_growth`), and the fitted diameter is confounded with it: the clear nodes' 0.8 to 1.1 um cannot be told, by this fit, from Allen-thin dendrites under an in-focus blur of about 0.22 to 0.30 um. Open, put to the user: how sigma_r(0) is measured (the narrowest in-focus dips of the cell as an upper bound; a fit on thick dendrites). Literature: three PubMed queries on the bright-field kernel and on dendrite diameters by light against electron microscopy returned nothing relevant; one project-knowledge query found no dendrite-diameter value. Next free IDs unchanged: D-165, I-006. |
 | 2026-11-18 (later, 11) | Logs **D-165** (user, 15:48; the clearance chat): the kernel's in-focus width is exposed as a tuning parameter, the clear nodes are run at three widths, and the pipeline is applied to clear nodes of different sizes. Built: `kernel.with_in_focus_width`, `clean_cell.py --sigma-r0-um`, `clean_cell.py clear --d-bins`, notebook Cells 19b and 19c (SPEC Block 4 amendment 1, Block 27 amendment 4, Block 36 amendments 14 and 15). **Check added** (`checks/kernel_2026-11-18/kernel_infocus_sizes_check.py`) **[run, sandbox; synthetic, one flat tube, mu x d = 0.4]**: under a true in-focus width of 0.22 um (table 0.080 um) the fitted diameter is 1.61, 1.26, 1.10, 1.04 times the true one at 0.5, 0.8, 1.2, 2.0 um, the misfit 0.8, 1.1, 1.3, 1.4 gl; under 0.30 um: 2.06, 1.48, 1.22, 1.07 times, 0.9, 1.4, 1.8, 2.0 gl -- a blur wider than configured inflates thin dendrites far more than thick ones. Not run here: the cells on the real stack. Next free IDs: D-166, I-006. |
+| 2026-11-18 (later, 12) | Logs **D-166** (user, 16:22; the clearance chat): the distant neighbours are cleaned first and the node is fitted afterwards, together with its close neighbours; the form of the rounds' refinement (one tube, weights exp(-|v_n| / lambda)) is refused -- the fit is the joint non-linear least squares of D-161, D-162 and D-164 over the planes where the node's shadow is readable, without the exponential weights. A handoff for the chat that builds it was asked for: `Passive Features/Diameter Re-measurement/docs/TEEG_joint_fit_handoff_2026-11-18.md` on `sci/diameter-pipeline`. Next free IDs: D-167, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -380,6 +381,7 @@ would be needed*, *Status*.
 | D-157 | 2026-11-17 | SPEC Block 35 (amendment 2), oracles (iv) and (v); `tests/smoke/test_smoke_line_fast.py` | the split's depth-mirror oracle restated for a slab grid symmetric about the axis (1e-10 there; generic case reported, no bound); the slab-grid oracle kept at 5e-4 with its margin recorded [orchestrator] | active |
 | D-158 | 2026-11-17 | SPEC Block 35 (amendment 2, oracle (iv)), Block 36 (amendment 11, final check); `scripts/clean_cell.py`, `scripts/infer_nodes.py`; the report `specs/test_reports/2026-11-17_1754_incremental.md` | the final check's settlements: the slab-grid bound stated at mu = 1 /um; the product status `not_fitted` for a per-node fit that raises or fails; `clean` logs a product that raises [orchestrator] | active |
 | D-159 | 2026-11-18 | `tests/spec/` on `sci/diameter-pipeline`; the report `specs/test_reports/2026-11-17_1754_incremental.md` (F2) | the tester's 39 spec tests of the run 2026-11-17_1754 brought into the working branch; the three stale spec tests (`test_factories_against_line_fast[linear, hybrid]`, `test_work_list_own_stretch_beyond_U`) retired [user] | active |
+| D-166 | 2026-11-18 | plan step F3 and its SPEC entry, still to be written; SPEC Block 29 (`coarse_fit.refine_node`, the rounds' refinement), Block 30 (`node_inference.fit_node`, `select_planes`), Block 32 (the round loop); D-133.3, D-161, D-162, D-164 | order: the tier-1 neighbours are cleaned first, then node and tier-2 neighbours are fitted together; that fit is the joint non-linear least squares over the planes where the node's shadow is readable, all four features of every close neighbour free, with every point of D-162 and D-164; the refinement's one-tube form with exponential weights is not the estimator [user]. Open: whether cleaning and fit are repeated; what the rounds keep of Block 29 | active |
 | D-165 | 2026-11-18 | SPEC Block 4 (amendment 1), Block 27 (amendment 4), Block 36 (amendments 14, 15); `kernel.with_in_focus_width`; `clean_cell.py --sigma-r0-um`, `clear --d-bins`; notebook Cells 19b, 19c; `renderer.sigma_r0_um` | the kernel's in-focus width is a tuning parameter; the clear nodes are run at three widths; the pipeline is applied to clear nodes of different sizes [user]; the widths 0.080, 0.18, 0.28 um, the size = Allen's diameter in the bins 0.40, 0.45, 0.60, 0.80, 1.20, 5.0 um, one node per bin, the re-anchoring rule (the measured growth kept) [orchestrator], PROVISIONAL | active |
 | D-164 | 2026-11-18 | D-161's joint fit (plan step F3), its SPEC entry to be written; Block 28's tier rule (`cleaning.neighbour_tiers`, `close_lateral_um`, `close_defocus_um`); `node_inputs.local_tube`; D-132.3, D-162 | tube pieces from traced node to traced node along the branch, the chain out to the blur's reach (today's 5 um each way), one diameter and one absorption along the node's own stretch; a neighbour is tier 2 when the predicted bias of the node's diameter exceeds a tolerance [user]; the assumed error 30 % and the tolerance 1 %, rule (b) kept, the chain a setting beside the straight tube until compared [orchestrator], PROVISIONAL | active |
 | D-163 | 2026-11-18 | SPEC Block 25 (amendment 8) at `6ac81d2`; `shadow._cached_terms`, `shadow.SUM_ROUNDING_ATOL`; Block 28's requirement S >= 0; notebook Cell 19 | a shadow sum changed from a kept one is set to 0 where rounding left it below 0 by at most 1e-12; below that it raises `FloatingPointError`; sums afresh or reused whole unchanged [orchestrator] | active |
@@ -12153,5 +12155,56 @@ The order of this against the joint fit of D-161.
 
 **Sources.** **[user]** 2026-11-18, 15:48. **[code read]**, **[run, sandbox]**, **[data]** as tagged. **[log]**
 D-160, D-163.
+
+**Status:** active.
+
+---
+
+## D-166 -- Distant neighbours cleaned first, then node and close neighbours fitted together by one non-linear least squares; the refinement's one-tube form with exponential weights refused (user)
+
+**Date:** 2026-11-18, 16:22 (Europe/Rome), the clearance chat.
+**Binds:** plan step F3 and its SPEC entry, still to be written; SPEC Block 29 (`coarse_fit.refine_node`: the
+refinement inside a cleaning round), Block 30 (`node_inference.fit_node`, `select_planes`), Block 32
+(`clean_iteration`: the round loop); D-133.3 (the refinement's weights, the orchestrator's proposal of 2026-11-13);
+D-161, D-162, D-164.
+
+**Decision [user].** On the assistant's explanation of the rounds (15:25) and its question where the joint fit
+acts: "I agree with doing first the distant node cleaning and then afterward the close nodes and own node
+fitting(tier - 2). I do not agree with the form used" -- equation (2) of that explanation, the refinement
+$\theta^{(t)}_i = \arg\min_\theta \sum_{k \in K}\sum_{n=1}^{53} w_n [I^{(t)}_{i,k}(v_n) - B_{i,k}(1 - s_k(v_n \mid
+\theta))]^2$ with $w_n = e^{-|v_n|/\lambda}$ -- "First of all I'm skeptical about using the w_n exponential
+weighting. Secondly we have agreed above to jointly optimize the four-parameter vector theta of all the close
+neighbour nodes jointly with the i working node. This done across the planes of the i-th node where it's shadow
+(polluted by the shadow of the other nodes) is readable. This is done by non-linear leas squares regression. This
+MUST also implement the subtleties we've discussed just before".
+
+**Statement.** (D-166.1 [user]) Order: the shadows of the distant (tier-1) neighbours are removed first; the node
+and its close (tier-2) neighbours are fitted afterwards. (D-166.2 [user]) That fit is one non-linear least-squares
+problem: the four features of node $i$ and the four features of every close neighbour of $i$ are optimised
+together. (D-166.3 [user]) Its data are the planes of node $i$ in which the node's shadow, with the close
+neighbours' shadows on it, is readable. (D-166.4 [user]) The one-tube refinement with the weights $w_n =
+e^{-|v_n|/\lambda}$ is not the form of this fit; the user is sceptical of those weights. (D-166.5 [user]) The fit
+carries every point settled in D-162 and D-164: the neighbour's heading and tilt from the trace, its fitted values
+saved and used as working values with the three sources (default: the fitted ones), tube pieces from traced node to
+traced node out to the blur's reach, one diameter and absorption along the node's own stretch, the tiers split by
+the predicted bias. (D-166.6 [orchestrator], PROVISIONAL, to confirm) The assistant's reading: the residuals are
+weighted by $1/\sigma_i^2$ alone, as in the objective the user quoted on 14:41 and 14:47; a node with no close
+neighbour is the same fit with no neighbour term; "readable" is, until the user says otherwise, Block 30's
+`select_planes` rule ($B_{i,k} \max_n (1 - \tau_{0,k}(v_n)) \ge$ `plane_snr_min` $\times \sigma_i$, PROVISIONAL).
+
+**Why.** **[user]** as quoted. **[run, sandbox: `checks/tier2_2026-11-18/`]** A one-tube fit of a node with a close
+neighbour left on its line is biased by +58 to +224 % in the two synthetic scenes; the joint fit recovers the truth.
+
+**What it implies for code and tables.** The SPEC entry of F3 states the objective without $w_n$; Block 29's
+refinement stops being the estimator of a node's features where the joint fit runs. D-052 (the user's centre
+weights of the first-stage fit at one plane, 2026-10-16) is another fit and is not touched by this entry.
+
+**What it does not decide [open].** Whether cleaning and joint fit are repeated with the fitted values as working
+values (the assistant recommended one repeat as a test, 15:20; not answered); whether Block 29's refinement stays
+in the rounds for the nodes it still serves, and with which weights; the rule for "readable"; the points left open
+by D-161, D-162 and D-164.
+
+**Sources.** **[user]** 2026-11-18, 16:22. **[run, sandbox]** as tagged. **[log]** D-052, D-133, D-161, D-162,
+D-164.
 
 **Status:** active.
