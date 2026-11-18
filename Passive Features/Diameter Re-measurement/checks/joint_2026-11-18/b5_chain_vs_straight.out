@@ -1,0 +1,8 @@
+straight chain (control)           straight-tube fit: d 0.600 um (+0.0 %), mu 0.500 /um (+0.0 %), v0 +0.000 um, rms 0.00 gl (dip 64.7 gl)
+arc R 25 um (turn 2.6 deg per joint) straight-tube fit: d 0.599 um (-0.2 %), mu 0.501 /um (+0.2 %), v0 +0.007 um, rms 0.05 gl (dip 64.7 gl)
+arc R 12 um (turn 5.5 deg per joint) straight-tube fit: d 0.599 um (-0.2 %), mu 0.501 /um (+0.2 %), v0 +0.015 um, rms 0.12 gl (dip 64.7 gl)
+arc R 6 um (turn 11.0 deg per joint) straight-tube fit: d 0.602 um (+0.4 %), mu 0.499 /um (-0.1 %), v0 +0.033 um, rms 0.22 gl (dip 64.4 gl)
+kink 10 deg at the node            straight-tube fit: d 0.603 um (+0.5 %), mu 0.497 /um (-0.5 %), v0 +0.029 um, rms 0.16 gl (dip 64.5 gl)
+kink 20 deg at the node            straight-tube fit: d 0.606 um (+1.0 %), mu 0.496 /um (-0.9 %), v0 +0.059 um, rms 0.32 gl (dip 64.2 gl)
+kink 45 deg at the node            straight-tube fit: d 0.630 um (+4.9 %), mu 0.481 /um (-3.8 %), v0 +0.139 um, rms 0.82 gl (dip 67.3 gl)
+282 s

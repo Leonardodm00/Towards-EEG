@@ -1,0 +1,19 @@
+7821 dendrite nodes not near an end; band |u| <= 0.61 um, |v| <= 2.0 um
+nodes with a traced neighbour on the line, by the depth distance of the nearest one:
+  within 0.84 um: 17 nodes (0.2 %): free 14, attached 3; over the node 1, beside it 16
+  within 1.68 um: 37 nodes (0.5 %): free 26, attached 11; over the node 8, beside it 29
+  within 2.80 um: 127 nodes (1.6 %): free 82, attached 45; over the node 38, beside it 89
+  within 4.20 um: 253 nodes (3.2 %): free 135, attached 118; over the node 66, beside it 187
+  chains on the line within 4.2 um in depth, per such node: 1: 251, 2: 0, 3 or more: 2
+  type of the nearest one (2 axon, 3 basal, 4 apical): {2: 39, 3: 141, 4: 73}; tier 2 under today's rule: 219 of 253
+node 8089 (Allen d 0.553 um): the on-line neighbour nearest in depth is a segment of node 8231 (type 3, Allen d 0.55 um, attached), passing at v +0.14 um (over the node), -2.01 um in depth; tier 2 today: yes
+node 4844 (Allen d 0.467 um): the on-line neighbour nearest in depth is a segment of node 4925 (type 4, Allen d 0.47 um, attached), passing at v -1.15 um (beside it), -2.10 um in depth; tier 2 today: yes
+node 7081 (Allen d 0.446 um): the on-line neighbour nearest in depth is a segment of node 5722 (type 3, Allen d 0.50 um, free), passing at v -1.40 um (beside it), -0.89 um in depth; tier 2 today: yes
+node 7448 (Allen d 0.478 um): no traced neighbour on the line at any depth
+node 5353 (Allen d 0.454 um): no traced neighbour on the line at any depth
+node 3873 (Allen d 0.536 um): no traced neighbour on the line at any depth
+node 4725 (Allen d 0.466 um): no traced neighbour on the line at any depth
+node 1013 (Allen d 0.449 um): no traced neighbour on the line at any depth
+node 2669 (Allen d 0.788 um): no traced neighbour on the line at any depth
+node 2620 (Allen d 0.811 um): no traced neighbour on the line at any depth
+node 639 (Allen d 1.200 um): no traced neighbour on the line at any depth

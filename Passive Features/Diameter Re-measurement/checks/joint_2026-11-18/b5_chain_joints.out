@@ -1,0 +1,22 @@
+
+d 0.45 um, mu 0.50 /um: one tube's dip 47.9 gl in focus
+  T - J (pieces together): max |.| 0.000 gl
+  T - S (pieces alone, summed): max |.| 1.26 gl; S's dip 49.1 gl in focus (+2.6 %)
+  one-tube fit of S: d 0.446 um (-1.0 %), mu 0.519 /um (+3.8 %), rms 0.04 gl
+
+d 0.80 um, mu 0.50 /um: one tube's dip 82.7 gl in focus
+  T - J (pieces together): max |.| 0.000 gl
+  T - S (pieces alone, summed): max |.| 5.10 gl; S's dip 87.7 gl in focus (+6.1 %)
+  one-tube fit of S: d 0.790 um (-1.3 %), mu 0.538 /um (+7.6 %), rms 0.22 gl
+
+d 1.20 um, mu 0.50 /um: one tube's dip 110.9 gl in focus
+  T - J (pieces together): max |.| 0.000 gl
+  T - S (pieces alone, summed): max |.| 12.46 gl; S's dip 121.0 gl in focus (+9.2 %)
+  one-tube fit of S: d 1.183 um (-1.4 %), mu 0.571 /um (+14.1 %), rms 0.59 gl
+
+d 0.80 um, mu 0.20 /um: one tube's dip 37.5 gl in focus
+  T - J (pieces together): max |.| 0.000 gl
+  T - S (pieces alone, summed): max |.| 0.93 gl; S's dip 38.4 gl in focus (+2.4 %)
+  one-tube fit of S: d 0.796 um (-0.5 %), mu 0.205 /um (+2.7 %), rms 0.04 gl
+
+333 s

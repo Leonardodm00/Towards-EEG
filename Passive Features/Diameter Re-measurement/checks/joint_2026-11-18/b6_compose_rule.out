@@ -1,0 +1,51 @@
+light_direction +1; node alone: dip 64.7 gl in focus
+
+parallel, 1.0 um aside, same depth (neighbour's shadow on the line: peak 64.4 gl)
+  joint - sum:     max |.|  0.12 gl (+0.12 at k +1, v +0.11 um); rms 0.03 gl
+  joint - product: max |.|  1.25 gl (-1.25 at k -3, v +0.46 um); rms 0.31 gl
+  fit with the sum     model: node d 0.600 um (-0.0 %), mu 0.499, z -0.000; neighbour d 0.600 um (-0.1 %); rms 0.01 gl
+  fit with the product model: node d 0.602 um (+0.3 %), mu 0.501, z -0.000; neighbour d 0.603 um (+0.4 %); rms 0.23 gl
+
+parallel, 0.7 um aside, same depth (neighbour's shadow on the line: peak 64.7 gl)
+  joint - sum:     max |.|  0.74 gl (+0.74 at k +1, v +0.57 um); rms 0.19 gl
+  joint - product: max |.|  2.02 gl (-2.02 at k -2, v +0.34 um); rms 0.43 gl
+  fit with the sum     model: node d 0.596 um (-0.6 %), mu 0.499, z -0.001; neighbour d 0.597 um (-0.5 %); rms 0.05 gl
+  fit with the product model: node d 0.606 um (+0.9 %), mu 0.496, z -0.001; neighbour d 0.604 um (+0.6 %); rms 0.29 gl
+
+crossing 45 deg, 0.84 um deeper (neighbour's shadow on the line: peak 64.7 gl)
+  joint - sum:     max |.|  5.79 gl (+5.79 at k +3, v +0.00 um); rms 1.13 gl
+  joint - product: max |.|  7.07 gl (-7.07 at k +1, v +0.00 um); rms 0.95 gl
+  fit with the sum     model: node d 0.589 um (-1.8 %), mu 0.509, z -0.012; neighbour d 0.574 um (-4.4 %); rms 0.30 gl
+  fit with the product model: node d 0.572 um (-4.7 %), mu 0.610, z +0.031; neighbour d 0.583 um (-2.9 %); rms 0.45 gl
+
+crossing 45 deg, 0.84 um shallower (neighbour's shadow on the line: peak 64.7 gl)
+  joint - sum:     max |.|  5.79 gl (+5.79 at k +0, v +0.00 um); rms 1.04 gl
+  joint - product: max |.|  7.05 gl (-7.05 at k -2, v +0.00 um); rms 0.98 gl
+  fit with the sum     model: node d 0.601 um (+0.1 %), mu 0.448, z +0.003; neighbour d 0.601 um (+0.2 %); rms 0.05 gl
+  fit with the product model: node d 0.585 um (-2.5 %), mu 0.544, z -0.043; neighbour d 0.606 um (+1.1 %); rms 0.64 gl
+
+parallel on the line, 1.68 um deeper (neighbour's shadow on the line: peak 37.7 gl)
+  joint - sum:     max |.|  1.35 gl (+1.35 at k +4, v +0.00 um); rms 0.25 gl
+  joint - product: max |.|  3.08 gl (-3.08 at k +1, v +0.00 um); rms 0.55 gl
+  fit with the sum     model: node d 0.600 um (+0.0 %), mu 0.500, z +0.000; neighbour d 0.586 um (-2.4 %); rms 0.01 gl
+  fit with the product model: node d 0.591 um (-1.5 %), mu 0.537, z +0.013; neighbour d 0.601 um (+0.1 %); rms 0.23 gl
+
+parallel on the line, 1.68 um shallower (neighbour's shadow on the line: peak 36.1 gl)
+  joint - sum:     max |.|  2.12 gl (+2.12 at k +0, v +0.00 um); rms 0.42 gl
+  joint - product: max |.|  2.53 gl (-2.53 at k -4, v +0.00 um); rms 0.40 gl
+  fit with the sum     model: node d 0.599 um (-0.2 %), mu 0.482, z +0.000; neighbour d 0.600 um (+0.0 %); rms 0.00 gl
+  fit with the product model: node d 0.587 um (-2.1 %), mu 0.521, z -0.012; neighbour d 0.608 um (+1.4 %); rms 0.24 gl
+
+crossing 45 deg, 2.8 um deeper (neighbour's shadow on the line: peak 10.9 gl)
+  joint - sum:     max |.|  0.27 gl (+0.27 at k +4, v +0.00 um); rms 0.11 gl
+  joint - product: max |.|  1.49 gl (-1.49 at k +1, v +0.00 um); rms 0.28 gl
+  fit with the sum     model: node d 0.600 um (+0.0 %), mu 0.500, z +0.000; neighbour d 0.591 um (-1.6 %); rms 0.00 gl
+  fit with the product model: node d 0.599 um (-0.1 %), mu 0.515, z +0.005; neighbour d 0.595 um (-0.9 %); rms 0.09 gl
+
+parallel, 2.0 um aside, 1.68 um deeper (neighbour's shadow on the line: peak 37.4 gl)
+  joint - sum:     max |.|  0.86 gl (+0.86 at k +4, v +1.94 um); rms 0.16 gl
+  joint - product: max |.|  0.77 gl (-0.77 at k +0, v +0.11 um); rms 0.18 gl
+  fit with the sum     model: node d 0.600 um (+0.0 %), mu 0.500, z -0.000; neighbour d 0.593 um (-1.1 %); rms 0.01 gl
+  fit with the product model: node d 0.598 um (-0.4 %), mu 0.509, z -0.002; neighbour d 0.594 um (-1.0 %); rms 0.05 gl
+
+897 s
