@@ -961,6 +961,40 @@ def test_show_focal():
           % (nid, float(np.hypot(*(panel["axis_xy"] - foot))), os.path.basename(out1)))
 
 
+def test_clear_subcommand():
+    # Block 36, amendment 13: rank, then clear, on the synthetic cell; the examples file is one clean accepts, and
+    # its nodes satisfy the rule (not near_end, no tier-2 neighbour, the soma's distance). Exact: a selection.
+    a, _b, _outs = _e2e()
+    out = os.path.join(os.path.dirname(a), "clear_test")
+    os.makedirs(out, exist_ok=True)
+    cfgj = os.path.join(out, "fast.json")
+    with open(cfgj, "w") as f:
+        json.dump(FAST, f)
+    script = os.path.join(WS, "scripts", "clean_cell.py")
+    _run([script, "rank", "--synthetic", "--specimen", "7", "--B", "210", "--mu", "1.0", "--out", out,
+          "--config-json", cfgj], WS)
+    o = _run([script, "clear", "--synthetic", "--specimen", "7", "--out", out, "--n", "2", "--min-soma-um", "0",
+              "--config-json", cfgj], WS)
+    rec = json.load(open(os.path.join(out, "examples_clear_7.json")))
+    ids = rec["example_ids"]
+    assert 1 <= len(ids) <= 2 and all(rec["classes"][str(i)] == "clear" for i in ids), rec["example_ids"]
+    assert rec["clear"]["n"] == 2 and rec["clear"]["n_candidates"] >= len(ids)
+    for i in ids:
+        r = rec["ranking"][str(i)]
+        assert r["near_end"] is False and r["n_tier2"] == 0 and r["worst2_peak_gl"] == 0.0, r
+    assert "picked" in o
+    _run([script, "clean", "--synthetic", "--specimen", "7", "--examples", os.path.join(out, "examples_clear_7.json"),
+          "--out", out, "--rounds", "1", "--max-work", str(len(ids)), "--config-json", cfgj], WS)
+    done = json.load(open(os.path.join(out, "cleaning_7.json")))
+    assert [int(x) for x in done["example_ids"]] == [int(x) for x in ids]
+    empty = os.path.join(out, "none")
+    os.makedirs(empty, exist_ok=True)
+    r = subprocess.run([sys.executable, script, "clear", "--synthetic", "--specimen", "7", "--out", empty], cwd=str(WS),
+                       capture_output=True, text=True)
+    assert r.returncode == 1 and "run `clean_cell.py rank` first" in r.stdout + r.stderr
+    print("    picked %s of %d candidates; clean ran on them" % (ids, rec["clear"]["n_candidates"]))
+
+
 def test_determinism():
     a, b, _outs = _e2e()
     _pipeline(b)

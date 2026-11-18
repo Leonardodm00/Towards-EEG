@@ -321,3 +321,50 @@ if FOCAL_NODES:
 run("scripts/show_focal.py", *focal_args)
 display(Image(filename="%s/focal_%d.png" % (FOCAL_DIR, SPECIMEN)))
 display(pd.read_csv("%s/focal_%d.csv" % (FOCAL_DIR, SPECIMEN)))
+
+# %% [markdown]
+# ## Cell 19: three clear nodes -- the one-tube model where no neighbour is on the line (D-160; about 1 h)
+#
+# Run Cells 0, 1, 16 and 16b first (16b's ranking is geometry only, about 10 min, and is reused if it exists).
+# `clear` picks from the ranking the nodes that are not near a branch's end, have no tier-2 neighbour (none close or
+# overlapping, D-132), lie at least MIN_SOMA_UM from the soma, and have the least predicted light of a tier-1
+# neighbour on their line, 10 um apart. `clean` then runs on these nodes alone (two rounds) into OUT/cleaning_clear,
+# and `show_focal.py` draws each at its focal plane with the fitted tube's edges (Cell 18c's figure). If the solid
+# edges sit on the dendrite's edges here, the one-tube model holds where nothing else is on the line. Output to send
+# back: the `clear:` lines of the log, `focal_<S>.png`, the table and the `own_node<id>.png` figures.
+
+# %%
+N_CLEAR, MIN_SOMA_UM = 3, 20.0
+CLEAR_IDS = None                                       # None: the pick of `clear`; or your own list of node ids
+CLEAN_C = OUT + "/cleaning_clear"
+os.makedirs(CLEAN_C, exist_ok=True)
+assert os.path.exists("%s/rank_tier1_%d.csv" % (CLEAN, SPECIMEN)), "run Cell 16b first (the tier-1 ranking)"
+run("scripts/clean_cell.py", "clear", "--specimen", SPECIMEN, "--out", CLEAN, *CLEAN_CFG, "--n", N_CLEAR,
+    "--min-soma-um", MIN_SOMA_UM)
+with open("%s/examples_clear_%d.json" % (CLEAN, SPECIMEN)) as f:
+    exc = json.load(f)
+if CLEAR_IDS is not None:
+    exc["example_ids"] = list(CLEAR_IDS)
+    exc["classes"] = {str(i): "chosen" for i in CLEAR_IDS}
+EXAMPLES_C = "%s/examples_clear_%d.json" % (CLEAN_C, SPECIMEN)
+with open(EXAMPLES_C, "w") as f:
+    json.dump(exc, f, indent=1)
+ids_c = [int(i) for i in exc["example_ids"]]
+print("[cell 19] clear nodes:", ids_c)
+run("scripts/clean_cell.py", "clean", "--specimen", SPECIMEN, "--out", CLEAN_C, "--cache-dir", CACHE_DIR, *ALIGN,
+    *CLEAN_CFG, "--examples", EXAMPLES_C, "--B", B_GL, "--mu", MU, "--rounds", 2, "--max-work", len(ids_c),
+    "--work-peak-gl", 1.0)
+run("scripts/show_focal.py", "--cleaning-dir", CLEAN_C, "--specimen", SPECIMEN, "--zoom-um", 6.0)
+display(Image(filename="%s/focal_%d.png" % (CLEAN_C, SPECIMEN)))
+display(pd.read_csv("%s/focal_%d.csv" % (CLEAN_C, SPECIMEN)))
+with open("%s/cleaning_%d.json" % (CLEAN_C, SPECIMEN)) as f:
+    rec_c = json.load(f)
+for nid in ids_c:
+    node_c = rec_c["nodes"].get(str(nid), {})
+    print("node %d: tier-1 neighbours %s, tier-2 neighbours %s, refined d %s um"
+          % (nid, node_c.get("n_tier1"), node_c.get("n_tier2"), node_c.get("d_um")))
+    for name in ("own_node%d.png", "cleaning_line_node%d.png"):
+        path = CLEAN_C + "/" + name % nid
+        if os.path.exists(path):
+            print(path)
+            display(Image(filename=path))

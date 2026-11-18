@@ -423,3 +423,27 @@ def pick_tier1_examples(rows, n, max_tier2_gl, min_separation_um):
         pos.append(p)
     return taken
 
+
+def pick_clear_examples(rows, n, min_separation_um, min_soma_um=0.0):
+    """-> list of node ids (amendment 3): the clearest nodes of a tier-1 ranking, for a check of the one-tube
+    model where no neighbour is on the line. From the rows (tier1_contamination's dicts with a bool 'near_end'):
+    the nodes that are not near_end, have no tier-2 neighbour (n_tier2 = 0 and worst2_peak_gl = 0) and lie at
+    least min_soma_um from the soma in the image plane (soma_lateral_um), by increasing worst1_peak_gl (ties by
+    decreasing own_dip_gl, then by node id), skipping a node within min_separation_um (3-D) of one already taken,
+    until n. The rows are not changed."""
+    if int(n) < 0 or not (math.isfinite(float(min_separation_um)) and float(min_separation_um) >= 0.0) \
+            or not (math.isfinite(float(min_soma_um)) and float(min_soma_um) >= 0.0):
+        raise ValueError("n >= 0 and finite min_separation_um, min_soma_um >= 0 are required")
+    ok = [r for r in rows if not bool(r["near_end"]) and int(r["n_tier2"]) == 0 and float(r["worst2_peak_gl"]) == 0.0
+          and float(r["soma_lateral_um"]) >= float(min_soma_um)]
+    ok.sort(key=lambda r: (float(r["worst1_peak_gl"]), -float(r["own_dip_gl"]), int(r["node_id"])))
+    taken, pos = [], []
+    for r in ok:
+        if len(taken) >= int(n):
+            break
+        p = np.array([float(r["x_um"]), float(r["y_um"]), float(r["z_um"])])
+        if any(float(np.linalg.norm(p - q)) < float(min_separation_um) for q in pos):
+            continue
+        taken.append(int(r["node_id"]))
+        pos.append(p)
+    return taken

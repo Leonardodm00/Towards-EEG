@@ -373,6 +373,54 @@ def _rank_outputs(a, cfg, rows, label, transform, n_target, n_dendrite, partial,
     return csv_path, ex_path, examples
 
 
+def _truthy(x):
+    return str(x).strip().lower() in ("1", "true", "yes")
+
+
+def run_clear(a, cfg, log):
+    """examples_clear_<S>.json: the clearest nodes of rank's table (Block 36, amendment 13) -- not near_end, no
+    tier-2 neighbour, at least --min-soma-um from the soma, the least tier-1 light on the line first,
+    cleaning.rank_min_separation_um apart. Reads rank's two outputs in --out; no image, no network."""
+    rank_csv = os.path.join(a.out, "rank_tier1_%s.csv" % a.specimen)
+    ex_t1 = os.path.join(a.out, "examples_tier1_%s.json" % a.specimen)
+    for path in (rank_csv, ex_t1):
+        if not os.path.exists(path):
+            log("clear: %s is missing: run `clean_cell.py rank` first" % path)
+            return 1
+    with open(rank_csv, encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+    for r in rows:                                         # the CSV's text back to numbers
+        for k in list(r):
+            if k == "near_end":
+                r[k] = _truthy(r[k])
+            elif k in ("node_id", "n_tier2", "n_evaluated", "worst1_child_id"):
+                r[k] = int(float(r[k])) if str(r[k]).strip() not in ("", "nan") else -1
+            else:
+                r[k] = float(r[k]) if str(r[k]).strip() != "" else float("nan")
+    sep = float(cfg.cleaning.rank_min_separation_um)
+    n_cand = len(contamination.pick_clear_examples(rows, len(rows), 0.0, a.min_soma_um))
+    picked = contamination.pick_clear_examples(rows, a.n, sep, a.min_soma_um)
+    if not picked:
+        log("clear: no node of %d qualifies (not near_end, no tier-2 neighbour, >= %.1f um from the soma)"
+            % (len(rows), a.min_soma_um))
+        return 1
+    with open(ex_t1) as f:
+        rec = json.load(f)
+    by_id = {int(r["node_id"]): r for r in rows}
+    rec.update(example_ids=picked, classes={str(i): "clear" for i in picked},
+               ranking={str(i): {k: by_id[i][k] for k in RANK_COLUMNS} for i in picked},
+               clear=dict(n=int(a.n), min_soma_um=float(a.min_soma_um), min_separation_um=sep, n_candidates=n_cand))
+    out = write_json(os.path.join(a.out, "examples_clear_%s.json" % a.specimen), rec)
+    log("clear: %d of %d ranked nodes qualify; picked %s -> %s" % (n_cand, len(rows), picked, out))
+    print("node    own dip (gl)   tier-1 peak (gl)   tier-1 lateral (um)   soma (um)   x, y, z (um)", flush=True)
+    for i in picked:
+        r = by_id[i]
+        print("%-7d %-14.2f %-18.3f %-21.2f %-11.1f %.1f, %.1f, %.1f"
+              % (i, float(r["own_dip_gl"]), float(r["worst1_peak_gl"]), float(r["worst1_lateral_um"]),
+                 float(r["soma_lateral_um"]), float(r["x_um"]), float(r["y_um"]), float(r["z_um"])), flush=True)
+    return 0
+
+
 def run_rank(a, cfg, log):
     """Block 27, amendment 2 (D-150.2): every dendrite node (or a seeded random sample, --max-nodes) ranked by its
     worst tier-1 neighbour's structured dip on its measuring line, at round 0 (Allen's diameters, --mu); the
@@ -891,6 +939,10 @@ def main(argv=None):
     k.add_argument("--seed", type=int, default=None, help="the sample's seed; default phantom.seed")
     k.add_argument("--max-nodes", type=int, default=None, help="rank a seeded random sample of this many dendrite "
                    "nodes (default: all)")
+    e = sub.add_parser("clear", help="pick the clearest nodes of rank's table (Block 36, amendment 13)")
+    _common(e)
+    e.add_argument("--n", type=int, default=3, help="how many nodes")
+    e.add_argument("--min-soma-um", type=float, default=20.0, help="least distance from the soma in the image plane (um)")
     c = sub.add_parser("clean", help="the cleaning rounds on the work list (Blocks 25-32)")
     _common(c)
     c.add_argument("--examples", required=True, help="examples_<S>.json of survey")
@@ -911,6 +963,8 @@ def main(argv=None):
         return run_survey(a, cfg, log)
     if a.cmd == "rank":
         return run_rank(a, cfg, log)
+    if a.cmd == "clear":
+        return run_clear(a, cfg, log)
     return run_clean(a, cfg, log)
 
 

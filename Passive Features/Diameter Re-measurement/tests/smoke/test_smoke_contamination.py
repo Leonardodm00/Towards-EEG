@@ -485,6 +485,47 @@ TIER1_KEYS = ("node_id", "x_um", "y_um", "z_um", "own_dip_gl", "n_tier2", "n_eva
               "soma_lateral_um")
 
 
+def _clear_row(nid, peak1, x=0.0, own=10.0, tier2=0, peak2=0.0, soma=50.0, near_end=False):
+    return dict(node_id=nid, x_um=float(x), y_um=0.0, z_um=0.0, own_dip_gl=float(own), n_tier2=int(tier2),
+                n_evaluated=1, worst1_range_gl=float(peak1), worst1_peak_gl=float(peak1), worst1_child_id=-1,
+                worst1_lateral_um=5.0, worst1_defocus_um=0.0, worst2_peak_gl=float(peak2), soma_lateral_um=float(soma),
+                near_end=bool(near_end))
+
+
+def test_clear_examples():
+    # amendment 3: the clearest nodes of a tier-1 ranking. Rows written by hand; every expected list follows from
+    # the rule read off the SPEC entry (exclusions, then increasing worst1_peak_gl, ties by decreasing own_dip_gl,
+    # then node id, then the 3-D spacing). Exact comparisons: the function only selects.
+    rows = [
+        _clear_row(1, 0.50, x=0.0),
+        _clear_row(2, 0.10, x=100.0),
+        _clear_row(3, 0.00, x=200.0, near_end=True),          # out: near the end
+        _clear_row(4, 0.00, x=300.0, tier2=1),                # out: a tier-2 neighbour
+        _clear_row(5, 0.00, x=400.0, peak2=0.2),              # out: a tier-2 peak
+        _clear_row(6, 0.00, x=500.0, soma=5.0),               # out when min_soma_um > 5
+        _clear_row(7, 0.10, x=104.0, own=20.0),               # ties node 2 on the peak, deeper own dip: before 2
+        _clear_row(8, 0.30, x=600.0),
+        _clear_row(9, 0.30, x=700.0),                         # ties node 8 fully: by node id
+    ]
+    import copy
+    frozen = copy.deepcopy(rows)
+    pick = CT.pick_clear_examples
+    assert pick(rows, 10, 0.0, 10.0) == [7, 2, 8, 9, 1]
+    assert pick(rows, 10, 0.0, 0.0) == [6, 7, 2, 8, 9, 1]       # node 6 back without the soma's distance
+    assert pick(rows, 10, 10.0, 10.0) == [7, 8, 9, 1]           # node 2 is 4 um from node 7: skipped
+    assert pick(rows, 3, 10.0, 10.0) == [7, 8, 9]
+    assert pick(rows, 0, 10.0, 10.0) == [] and pick([], 3, 10.0, 10.0) == []
+    assert rows == frozen
+    for bad in ((rows, -1, 10.0, 0.0), (rows, 3, -1.0, 0.0), (rows, 3, float("nan"), 0.0), (rows, 3, 10.0, -1.0),
+                (rows, 3, 10.0, float("inf"))):
+        try:
+            pick(*bad)
+        except ValueError:
+            continue
+        raise AssertionError("no ValueError for %r" % (bad[1:],))
+    print("    order, five exclusions, two ties, the spacing, n = 0, empty rows, 5 ValueErrors")
+
+
 def test_edge_cases():
     br = straight_branch()
     scene = Scene.from_branch(br)
