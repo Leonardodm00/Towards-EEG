@@ -1,0 +1,61 @@
+
+node D 0.45 um (FWHM_A 0.43 um), in-focus dip 47.8 gl; bump 0.6 / 0.3 um at -1.3 um: dips 64.0 / 27.6 gl
+  sigma 1.0 gl, m 2, smooth 0 px, s_min 0.00 um: clean node flagged 100.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 2, smooth 1 px, s_min 0.00 um: clean node flagged  36.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 2, smooth 1 px, s_min 0.43 um: clean node flagged  20.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 3, smooth 0 px, s_min 0.00 um: clean node flagged 100.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 3, smooth 1 px, s_min 0.00 um: clean node flagged  20.8 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 3, smooth 1 px, s_min 0.43 um: clean node flagged   0.8 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 4, smooth 0 px, s_min 0.00 um: clean node flagged  88.8 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 4, smooth 1 px, s_min 0.00 um: clean node flagged  20.2 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 4, smooth 1 px, s_min 0.43 um: clean node flagged   0.2 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 2, smooth 0 px, s_min 0.00 um: clean node flagged 100.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 2, smooth 1 px, s_min 0.00 um: clean node flagged  57.2 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 2, smooth 1 px, s_min 0.43 um: clean node flagged  27.8 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 3, smooth 0 px, s_min 0.00 um: clean node flagged 100.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 3, smooth 1 px, s_min 0.00 um: clean node flagged  47.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 3, smooth 1 px, s_min 0.43 um: clean node flagged  10.5 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 4, smooth 0 px, s_min 0.00 um: clean node flagged  97.2 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 4, smooth 1 px, s_min 0.00 um: clean node flagged  47.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 4, smooth 1 px, s_min 0.43 um: clean node flagged  10.5 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+
+node D 0.80 um (FWHM_A 0.72 um), in-focus dip 82.7 gl; bump 0.6 / 0.3 um at -1.3 um: dips 64.0 / 27.6 gl
+  sigma 1.0 gl, m 2, smooth 0 px, s_min 0.00 um: clean node flagged 100.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 2, smooth 1 px, s_min 0.00 um: clean node flagged   9.5 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 2, smooth 1 px, s_min 0.72 um: clean node flagged   9.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 3, smooth 0 px, s_min 0.00 um: clean node flagged  99.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 3, smooth 1 px, s_min 0.00 um: clean node flagged   0.5 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 3, smooth 1 px, s_min 0.72 um: clean node flagged   0.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 4, smooth 0 px, s_min 0.00 um: clean node flagged  63.2 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 4, smooth 1 px, s_min 0.00 um: clean node flagged   0.5 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 4, smooth 1 px, s_min 0.72 um: clean node flagged   0.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 2, smooth 0 px, s_min 0.00 um: clean node flagged 100.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 2, smooth 1 px, s_min 0.00 um: clean node flagged  20.5 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 2, smooth 1 px, s_min 0.72 um: clean node flagged  12.8 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 3, smooth 0 px, s_min 0.00 um: clean node flagged 100.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 3, smooth 1 px, s_min 0.00 um: clean node flagged   8.8 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 3, smooth 1 px, s_min 0.72 um: clean node flagged   0.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 4, smooth 0 px, s_min 0.00 um: clean node flagged  83.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 4, smooth 1 px, s_min 0.00 um: clean node flagged   8.8 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 4, smooth 1 px, s_min 0.72 um: clean node flagged   0.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+
+node D 1.20 um (FWHM_A 1.06 um), in-focus dip 109.6 gl; bump 0.6 / 0.3 um at -1.3 um: dips 64.1 / 27.7 gl
+  sigma 1.0 gl, m 2, smooth 0 px, s_min 0.00 um: clean node flagged 100.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 2, smooth 1 px, s_min 0.00 um: clean node flagged   4.5 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 2, smooth 1 px, s_min 1.06 um: clean node flagged   4.5 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 3, smooth 0 px, s_min 0.00 um: clean node flagged  97.8 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 3, smooth 1 px, s_min 0.00 um: clean node flagged   0.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 3, smooth 1 px, s_min 1.06 um: clean node flagged   0.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 4, smooth 0 px, s_min 0.00 um: clean node flagged  48.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 4, smooth 1 px, s_min 0.00 um: clean node flagged   0.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 1.0 gl, m 4, smooth 1 px, s_min 1.06 um: clean node flagged   0.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 2, smooth 0 px, s_min 0.00 um: clean node flagged 100.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 2, smooth 1 px, s_min 0.00 um: clean node flagged   6.5 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 2, smooth 1 px, s_min 1.06 um: clean node flagged   6.2 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 3, smooth 0 px, s_min 0.00 um: clean node flagged  98.5 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 3, smooth 1 px, s_min 0.00 um: clean node flagged   0.2 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 3, smooth 1 px, s_min 1.06 um: clean node flagged   0.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 4, smooth 0 px, s_min 0.00 um: clean node flagged  69.2 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 4, smooth 1 px, s_min 0.00 um: clean node flagged   0.2 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+  sigma 2.0 gl, m 4, smooth 1 px, s_min 1.06 um: clean node flagged   0.0 %; bump 0.6 found 100.0 %, bump 0.3 found 100.0 %
+31 s

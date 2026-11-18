@@ -1,0 +1,28 @@
+
+node D 0.80, bump DB 0.60 at v -1.30, depth +0.00; saddle at v -0.69. Bump's tail beyond the saddle by plane k=-4..4 (gl): 11.5 10.6 6.4 1.3 0.0 1.6 6.9 10.8 11.4
+  cut, planes |k| <= 4: d/D 1.026 (mu 0.50, v0 -0.007, z +0.003)
+     control without bump: d/D 1.000
+  cut, planes |k| <= 2: d/D 1.010 (mu 0.50, v0 -0.004, z +0.001)
+     control without bump: d/D 1.000
+  cut, planes |k| <= 1: d/D 1.003 (mu 0.50, v0 -0.001, z -0.000)
+     control without bump: d/D 1.000
+  2 tubes, all planes: d/D 1.000 (mu 0.50, v0 -0.000, z +0.000); bump d_b 0.600 (true 0.60), mu_b 0.50, v_b -1.300, z_b -0.000
+
+node D 0.45, bump DB 0.60 at v -1.30, depth +0.00; saddle at v -0.57. Bump's tail beyond the saddle by plane k=-4..4 (gl): 9.8 8.1 4.1 0.6 0.0 0.7 4.5 8.3 9.9
+  cut, planes |k| <= 4: d/D 1.097 (mu 0.45, v0 -0.004, z +0.002)
+     control without bump: d/D 1.000
+  cut, planes |k| <= 2: d/D 1.022 (mu 0.49, v0 -0.004, z +0.001)
+     control without bump: d/D 1.000
+  cut, planes |k| <= 1: d/D 1.005 (mu 0.50, v0 -0.001, z -0.000)
+     control without bump: d/D 1.000
+  2 tubes, all planes: d/D 1.000 (mu 0.50, v0 -0.000, z +0.000); bump d_b 0.600 (true 0.60), mu_b 0.50, v_b -1.300, z_b -0.000
+
+node D 0.80, bump DB 0.60 at v -1.30, depth +0.84; saddle at v -0.69. Bump's tail beyond the saddle by plane k=-4..4 (gl): 8.6 9.7 10.7 11.5 10.6 6.4 1.3 0.0 1.6
+  cut, planes |k| <= 4: d/D 1.069 (mu 0.47, v0 -0.015, z -0.031)
+     control without bump: d/D 1.000
+  cut, planes |k| <= 2: d/D 1.058 (mu 0.48, v0 -0.014, z -0.017)
+     control without bump: d/D 1.000
+  cut, planes |k| <= 1: d/D 1.053 (mu 0.48, v0 -0.014, z -0.014)
+     control without bump: d/D 1.000
+  2 tubes, all planes: d/D 1.000 (mu 0.50, v0 -0.000, z +0.000); bump d_b 0.600 (true 0.60), mu_b 0.50, v_b -1.300, z_b +0.840
+351 s

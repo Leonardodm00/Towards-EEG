@@ -1,0 +1,11 @@
+
+node D 0.45 um, mu 0.50, lambda 0.541 um
+  (a) clean        IRLS: d/D 1.000, v0 +0.000 um (1 solves) | in-solve: d/D 1.000, mu 0.50, v0 +0.000 um
+  (b) bump         IRLS: d/D 1.182, v0 -0.015 um (3 solves) | in-solve: d/D 1.166, mu 0.41, v0 +0.038 um
+  (c) kernel 0.18  IRLS: d/D 1.483, v0 -0.000 um (2 solves) | in-solve: d/D 1.483, mu 0.21, v0 +0.000 um
+
+node D 0.80 um, mu 0.50, lambda 0.897 um
+  (a) clean        IRLS: d/D 1.000, v0 +0.000 um (1 solves) | in-solve: d/D 1.000, mu 0.50, v0 +0.000 um
+  (b) bump         IRLS: d/D 1.082, v0 -0.018 um (3 solves) | in-solve: d/D 1.090, mu 0.45, v0 +0.007 um
+  (c) kernel 0.18  IRLS: d/D 1.134, v0 -0.000 um (2 solves) | in-solve: d/D 1.134, mu 0.37, v0 +0.000 um
+286 s
