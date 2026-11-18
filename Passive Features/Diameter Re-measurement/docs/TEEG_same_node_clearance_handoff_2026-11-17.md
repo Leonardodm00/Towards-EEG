@@ -9,6 +9,7 @@
 | 2026-11-18 | The clearance chat: D-159 [user] -- the tester's spec tests merged into the branch, the three stale spec tests retired. New at the user's request: `scripts/show_focal.py` and notebook Cell 18c (each example node at its focal plane with the estimated tube's edges and Allen's diameter on the image; SPEC Block 31 amendment 3, Block 36 amendment 12). The pilot's first clearance figures were received (nodes 8089, 7448, 4844, 7081): section 15. |
 | 2026-11-18 (later) | The clearance chat: Cell 18c ran on the pilot (`cleaning_worst`, the four `overlap` examples; refinement's estimates, Cell 18b not run there). Section 16 added: the figure's table and its reading. No decision. |
 | 2026-11-18 (later, 2) | The clearance chat: D-160 [user] -- three clear nodes first. Built: `contamination.pick_clear_examples`, `clean_cell.py clear`, notebook Cell 19 (outputs in `OUT/cleaning_clear`). Waiting for the user's Colab run of Cells 16b and 19. |
+| 2026-11-18 (later, 3) | The clearance chat, 13:41 to 16:22: the work moved to the joint fit of a node with its close neighbours (D-161 to D-166), to a fix of the cleaning (D-163) and to the kernel's in-focus width (D-165). This file is not updated for them: read `TEEG_joint_fit_handoff_2026-11-18.md` beside it. |
 
 Basis tags: **[src]** read in the named file at `021869d`; **[data]** read in the files the user uploaded on
 2026-11-17 at 12:40 (the Colab run of Cell 17b: `cleaning_529878215.json`, `examples_worst_529878215.json`, the
