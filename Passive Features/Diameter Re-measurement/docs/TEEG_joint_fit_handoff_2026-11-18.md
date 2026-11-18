@@ -3,6 +3,7 @@
 | Date | Change |
 |---|---|
 | 2026-11-18 | Created at the user's request (16:22) for the chat that specifies and builds the joint fit. Branch `sci/diameter-pipeline` at `f6504b0` (code) and the commit that adds this file; decision log on `main` at `55ee935` (D-166 the last entry; next free IDs D-167, I-006). Nothing of the joint fit is specified in `specs/SPEC.md` or written in code yet. |
+| 2026-11-18 (later) | D-167 [user, 16:31]: the weighting of the residuals is a parameter to tune; the readable planes are today's `select_planes` rule; a node without a close neighbour is the same fit; one pass, no repeat for now; nothing kept of the rounds' one-tube refinement. Section 2 (table), section 3, section 4 and section 8 (O1 to O3 closed) updated. Decision log on `main` at `68180f0`; next free IDs D-168, I-006. |
 
 Basis tags: **[user]** said or decided by the user, with the time (Europe/Rome, 2026-11-18); **[log]** the decision
 log on `main`; **[src]** read in the named file at `f6504b0`; **[run, sandbox]** executed in the handing-over
@@ -13,10 +14,10 @@ the assistant, PROVISIONAL until the user confirms; **[reasoning]** the assistan
 ## 1. First actions in the next chat
 
 1. Read this file, then in the decision log (`main`, `docs/project/TEEG_decisions_and_ideas_log.md`) the entries
-   D-132, D-161, D-162, D-163, D-164, D-165, D-166 and the changelog rows of 2026-11-18. Read the last changelog
+   D-132, D-161, D-162, D-163, D-164, D-165, D-166, D-167 and the changelog rows of 2026-11-18. Read the last changelog
    rows again immediately before taking an ID: the noise-fit chat logs in the same file.
-2. Settle the open points of section 8 with the user before any logic (coding directive 3). Those marked
-   "blocks the SPEC entry" come first.
+2. Settle the open points O4 to O12 of section 8 with the user before any logic (coding directive 3); they were explained to the user
+   at 16:40 and the answers may already be in the log.
 3. Write the SPEC entry of F3 (interfaces, shapes, units, oracles, tolerances), get the plan approved, then fan out
    (coding directives 5 to 9; the `scientific-coding` skill). Add the blocks to the roadmap
    (`specs/roadmap/diameter-pipeline.yaml`) in the turn their SPEC entries are written.
@@ -43,7 +44,13 @@ the assistant, PROVISIONAL until the user confirms; **[reasoning]** the assistan
 | D-166.3 | 16:22 | Its data are the planes of the node in which the node's shadow, with the close neighbours' shadows on it, is readable. | user |
 | D-166.4 | 16:22 | The one-tube refinement with weights $w_n = e^{-\lvert v_n\rvert/\lambda}$ (today's Block 29, equation (2) of the 15:25 explanation) is not the form of this fit. The user: "I'm skeptical about using the w_n exponential weighting." | user |
 | D-166.5 | 16:22 | The fit "MUST also implement the subtleties we've discussed": every row of this table from D-162 and D-164. | user |
-| D-166.6 | 16:22 | Residuals weighted by $1/\sigma_i^2$ alone; a node without a close neighbour is the same fit with no neighbour term; "readable" is Block 30's `select_planes` rule until the user says otherwise. | orchestrator |
+| D-166.6 | 16:22 | The assistant's three readings, now settled by D-167.1 to D-167.3. | orchestrator, superseded |
+| D-167.1 | 16:31 | The weighting of the residuals in the joint fit is a parameter to tune ("Keep as a parameter to tune"). | user |
+| D-167.2 | 16:31 | The planes of the fit are those today's `select_planes` keeps: plane $k$ when $B_{i,k}\max_n(1 - \tau_{0,k}(v_n)) \ge$ `plane_snr_min` (1.0) $\times\ \sigma_i$, $\tau_0$ the node's own model at the start. | user |
+| D-167.3 | 16:31 | A node without a close neighbour is the same fit with no neighbour term. | user |
+| D-167.4 | 16:31 | Cleaning and joint fit are run once: "Repeat or not: for now not". | user |
+| D-167.5 | 16:31 | Nothing of the rounds' one-tube refinement (Block 29) is kept in this path. The user: "I woudl say notthing what do you think?"; the assistant agreed at 16:40. | user (an inclination), assistant agreed |
+| D-167.6 | 16:31 | The weighting's choices: none beyond $1/\sigma_i^2$ (default) or $w_n = e^{-\lvert v_n\rvert/\lambda}$ with $\lambda$ a parameter; the number of passes a parameter, default 1. | orchestrator |
 
 Superseded on the way, do not implement: D-161.2's "the neighbour's position held" (by D-162.1); SPEC Block 30's
 sentence "a joint hybrid scene with the tier-2 neighbours held at their features" (by D-161, D-162.1).
@@ -56,7 +63,7 @@ sentence "a joint hybrid scene with the tier-2 neighbours held at their features
 3. Joint fit (to build): node and tier-2 neighbours fitted together on the node's cleaned line (section 4).
 4. The fitted values are saved (D-162.2) and become working values (D-162.3, D-162.4).
 
-**[open]** whether steps 2 to 4 are repeated (section 8, O1). What today's round loop does, for reference
+One pass, no repeat for now (D-167.4); the number of passes is a parameter, default 1 (D-167.6). The rounds' one-tube refinement is not on this path (D-167.5): step 2 runs once, at the working values -- the first stage's where it converged, Allen's elsewhere (D-162.5) -- and the values saved in step 4 are read only when a repeat is switched on **[reasoning]**. What today's round loop does, for reference
 **[src: `analysis/clean_iteration.py`]**: every round, for each work-list node, from the previous round's values
 only (a Jacobi update): refit the background, subtract the tier-1 shadows, read the line, refine the node with the
 one-tube weighted fit of Block 29, then update all nodes at once; stop when every diameter changed by less than
@@ -76,14 +83,14 @@ $$\big(\hat\theta_i, \{\hat\theta_q\}_{q \in Q_i}\big) = \arg\min_{\theta_i,\ \{
   (1/um), shift across its own axis (um) and depth (um). All free (D-162.1).
 - $h_q$: the neighbour's heading and tilt (rad), computed from the trace and held (D-162.1). $c_i$, $c_q$: the
   chains of traced nodes that give the tubes' geometry (D-164.1, D-164.2), held.
-- $K_i$: the planes of node $i$ in which its shadow is readable (D-166.3; the rule, section 8, O2). $v_n$,
+- $K_i$: the planes of node $i$ in which its shadow is readable (D-166.3): those `select_planes` keeps (D-167.2). $v_n$,
   $n = 1, \dots, N_v$: the samples of the node's measuring line (um); $N_v$ = 53 today.
 - $I^{\rm clean}_{i,k}(v_n)$ (grey levels, gl): the node's line in plane $k$ after the tier-1 cleaning (step 2 of
   section 3). $B_{i,k}$ (gl): the background of plane $k$ on the node's patch. $\sigma_i$ (gl): the node's noise SD.
 - $\tau_k(\cdot)$ (dimensionless): the transmittance of node and close neighbours rendered together under the
   hybrid absorption (D-132.2; SPEC section 2.3 (H), Block 24), read on the line as the data are (the mean over the
   $2 n_{\rm avg} + 1$ parallel lines, pixel-integrated).
-- No weight $w_n$ (D-166.4); every residual is divided by $\sigma_i$ only (D-166.6).
+- Weighting: a parameter to tune (D-167.1). Default: no weight beyond $1/\sigma_i^2$, as written above; the other choice multiplies each term by $w_n = e^{-\lvert v_n\rvert/\lambda}$, $\lambda$ (um) a second parameter (D-167.6).
 - Solver: non-linear least squares (D-166.2). Today's per-node fit uses `scipy.optimize.least_squares` (trf,
   bounds), several starts with the lowest cost kept, covariance $(J^\top J)^{-1}$ of the residuals divided by
   $\sigma_i$ **[src: `analysis/node_inference.py`]**.
@@ -133,9 +140,9 @@ or (b) it shares no node with the own stretch and its projected footprint meets 
 
 | # | Point | State | The handing-over chat's recommendation |
 |---|---|---|---|
-| O1 | Are cleaning and joint fit repeated with the fitted values as working values? Blocks the SPEC entry. | Asked at 15:20, not answered. D-166.1 fixes the order within a pass only. | One repeat as a test: if the diameters move by less than their standard error, one pass is the pipeline. |
-| O2 | The rule for "the planes where the node's shadow is readable" (D-166.3). Blocks the SPEC entry. | D-166.6 proposes today's `select_planes`: keep plane $k$ when $B_{i,k}\max_n(1 - \tau_{0,k}(v_n)) \ge$ `plane_snr_min` (1.0) $\times\ \sigma_i$, $\tau_0$ the node's own model at the start. | Confirm with the user; say whether the neighbours' shadows enter the test. |
-| O3 | What becomes of Block 29's refinement (the one-tube fit with $w_n$) in the rounds. | D-166.4 refuses it as the form of the fit. Not said: whether rounds without it remain, and which values the first cleaning uses. | First cleaning at the working values by D-162.5 (pilot where it converged, else Allen); no Block 29 where the joint fit runs. |
+| O1 | Are cleaning and joint fit repeated? | **Closed, D-167.4:** one pass for now; the number of passes a parameter, default 1 (D-167.6). | -- |
+| O2 | The rule for the readable planes. | **Closed, D-167.2:** today's `select_planes`, computed from the node's own model at the start. | -- |
+| O3 | What becomes of Block 29's refinement. | **Closed, D-167.5:** nothing of it on this path; the first and only cleaning uses the first stage's values where it converged, Allen's elsewhere. The module and its tests stay until the joint fit is validated. | -- |
 | O4 | Bounds and starts of the neighbour's shift and depth. | Today, one tube: `inference.v0_bounds_um`, `z_bounds_um` = (-1, 1) um, `multistart_factors` = (0.6, 1.0, 1.6) on $d$. | Bounds about the working values; several starts, since a trace error near 1 um may lead to a wrong minimum **[reasoning]**. |
 | O5 | How many neighbours are free at once, and what happens to the rest. | Not discussed beyond "a cap". | A cap by predicted bias, the others held at working values and flagged. |
 | O6 | What one $\theta_q$ covers: a neighbour is a chain of traced nodes, each with its own features. | **[open]** | One diameter and absorption for the neighbour's pieces within reach of the node's line, a rigid shift of those pieces; written back to the neighbour's traced node nearest the line. To confirm. |
