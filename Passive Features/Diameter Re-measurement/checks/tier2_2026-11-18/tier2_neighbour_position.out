@@ -1,0 +1,12 @@
+parallel, 1.0 um aside, same depth:
+  SE(d): position held 0.79 %, position free 0.79 %; SE(v0_q) 0.002 um, SE(z_q) 0.004 um; largest |corr| of d with the neighbour's four: 0.11 (v0_q)
+  neighbour's position held 0.2 um wrong (first order): d shifts +10.8 % (lateral error), +0.0 % (depth error)
+crossing at 45 deg over the node, 0.84 um deeper:
+  SE(d): position held 0.87 %, position free 0.91 %; SE(v0_q) 0.001 um, SE(z_q) 0.006 um; largest |corr| of d with the neighbour's four: 0.30 (z_q)
+  neighbour's position held 0.2 um wrong (first order): d shifts -0.0 % (lateral error), +9.7 % (depth error)
+parallel, directly above, 1.68 um deeper:
+  SE(d): position held 0.84 %, position free 0.84 %; SE(v0_q) 0.005 um, SE(z_q) 0.009 um; largest |corr| of d with the neighbour's four: 0.19 (d_q)
+  neighbour's position held 0.2 um wrong (first order): d shifts +0.0 % (lateral error), +1.6 % (depth error)
+crossing at 45 deg over the node, 2.1 um deeper:
+  SE(d): position held 0.82 %, position free 0.83 %; SE(v0_q) 0.009 um, SE(z_q) 0.016 um; largest |corr| of d with the neighbour's four: 0.15 (z_q)
+  neighbour's position held 0.2 um wrong (first order): d shifts -0.0 % (lateral error), +1.5 % (depth error)
