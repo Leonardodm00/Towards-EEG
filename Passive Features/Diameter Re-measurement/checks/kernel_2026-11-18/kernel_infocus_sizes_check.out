@@ -1,0 +1,12 @@
+
+true in-focus sigma 0.22 um (table 0.08)
+  true d 0.50 um: fitted 0.806 um = 1.61 x true, mu x d 0.224 (true 0.400), rms 0.77 gl
+  true d 0.80 um: fitted 1.005 um = 1.26 x true, mu x d 0.298 (true 0.400), rms 1.09 gl
+  true d 1.20 um: fitted 1.323 um = 1.10 x true, mu x d 0.348 (true 0.400), rms 1.32 gl
+  true d 2.00 um: fitted 2.076 um = 1.04 x true, mu x d 0.378 (true 0.400), rms 1.36 gl
+
+true in-focus sigma 0.30 um (table 0.08)
+  true d 0.50 um: fitted 1.028 um = 2.06 x true, mu x d 0.170 (true 0.400), rms 0.94 gl
+  true d 0.80 um: fitted 1.181 um = 1.48 x true, mu x d 0.245 (true 0.400), rms 1.37 gl
+  true d 1.20 um: fitted 1.463 um = 1.22 x true, mu x d 0.307 (true 0.400), rms 1.77 gl
+  true d 2.00 um: fitted 2.149 um = 1.07 x true, mu x d 0.359 (true 0.400), rms 2.01 gl

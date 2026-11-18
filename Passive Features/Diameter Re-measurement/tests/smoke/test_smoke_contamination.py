@@ -515,6 +515,18 @@ def test_clear_examples():
     assert pick(rows, 10, 10.0, 10.0) == [7, 8, 9, 1]           # node 2 is 4 um from node 7: skipped
     assert pick(rows, 3, 10.0, 10.0) == [7, 8, 9]
     assert pick(rows, 0, 10.0, 10.0) == [] and pick([], 3, 10.0, 10.0) == []
+    # amendment 4: positions taken before the call exclude the nodes within the distance (node 7 at x = 104 and
+    # node 2 at x = 100 are within 10 um of (101, 0, 0); at 0 um nothing is excluded); the default is the old call
+    assert pick(rows, 10, 10.0, 10.0, taken_xyz=[(101.0, 0.0, 0.0)]) == [8, 9, 1]
+    assert pick(rows, 10, 10.0, 10.0, taken_xyz=[(101.0, 0.0, 0.0), (600.0, 0.0, 0.0)]) == [9, 1]
+    assert pick(rows, 10, 0.0, 10.0, taken_xyz=[(101.0, 0.0, 0.0)]) == [7, 2, 8, 9, 1]
+    assert pick(rows, 10, 10.0, 10.0, taken_xyz=()) == pick(rows, 10, 10.0, 10.0)
+    for bad_xyz in ([(1.0, 2.0)], [(1.0, 2.0, float("nan"))]):
+        try:
+            pick(rows, 3, 10.0, 0.0, taken_xyz=bad_xyz)
+        except ValueError:
+            continue
+        raise AssertionError("no ValueError for taken_xyz %r" % (bad_xyz,))
     assert rows == frozen
     for bad in ((rows, -1, 10.0, 0.0), (rows, 3, -1.0, 0.0), (rows, 3, float("nan"), 0.0), (rows, 3, 10.0, -1.0),
                 (rows, 3, 10.0, float("inf"))):

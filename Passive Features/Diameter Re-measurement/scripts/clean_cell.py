@@ -68,7 +68,7 @@ from allen_diameter.analysis import cell, clean_iteration, contamination, node_f
 from allen_diameter.analysis import node_inputs  # noqa: E402
 from allen_diameter.analysis.node_pipeline import measure_pilot  # noqa: E402
 from allen_diameter.loading import features_io, swc_io, table_io  # noqa: E402
-from allen_diameter.model import line_fast, shadow  # noqa: E402
+from allen_diameter.model import kernel, line_fast, shadow  # noqa: E402
 from build_table import load_config  # noqa: E402
 
 # the synthetic cell of --synthetic (tests/smoke/fixtures_cell.py): 14 nodes 1.18 um apart, so
@@ -212,7 +212,8 @@ def load_cell(a, cfg, log, need_images=True):
         import run_cell
         from fixtures_cell import synthetic_cell
         with tempfile.TemporaryDirectory(prefix="clean_cell_synthetic_") as tmp:    # the SWC is read in memory
-            swc, fetcher, planes, _path = synthetic_cell(tmp, cfg, d_true=SYNTH_D_TRUE_UM, mu=SYNTH_MU_PER_UM,
+            swc, fetcher, planes, _path = synthetic_cell(tmp, getattr(a, "cfg_data", None) or cfg,
+                                                         d_true=SYNTH_D_TRUE_UM, mu=SYNTH_MU_PER_UM,
                                                          n_nodes=SYNTH_N_NODES, allen_radius=SYNTH_ALLEN_RADIUS_UM)
         log("synthetic cell: %d SWC nodes, the dendrite rendered with d %.3f um, mu %.3f /um (no network)"
             % (len(swc.ids), SYNTH_D_TRUE_UM, SYNTH_MU_PER_UM))
@@ -377,6 +378,21 @@ def _truthy(x):
     return str(x).strip().lower() in ("1", "true", "yes")
 
 
+def parse_d_bins(text):
+    """--d-bins "e0,e1,...,eJ" -> [e0, ..., eJ] (um), or None for an empty text. ValueError unless there are at
+    least two edges, all finite, > 0 and strictly increasing (Block 36, amendment 15)."""
+    if not str(text).strip():
+        return None
+    try:
+        edges = [float(x) for x in str(text).split(",")]
+    except ValueError:
+        raise ValueError("--d-bins must be numbers separated by commas (um), got %r" % (text,))
+    if len(edges) < 2 or not all(math.isfinite(e) and e > 0 for e in edges) \
+            or any(b <= a_ for a_, b in zip(edges[:-1], edges[1:])):
+        raise ValueError("--d-bins needs at least two finite edges > 0, strictly increasing (um), got %r" % (text,))
+    return edges
+
+
 def run_clear(a, cfg, log):
     """examples_clear_<S>.json: the clearest nodes of rank's table (Block 36, amendment 13) -- not near_end, no
     tier-2 neighbour, at least --min-soma-um from the soma, the least tier-1 light on the line first,
@@ -398,26 +414,50 @@ def run_clear(a, cfg, log):
             else:
                 r[k] = float(r[k]) if str(r[k]).strip() != "" else float("nan")
     sep = float(cfg.cleaning.rank_min_separation_um)
-    n_cand = len(contamination.pick_clear_examples(rows, len(rows), 0.0, a.min_soma_um))
-    picked = contamination.pick_clear_examples(rows, a.n, sep, a.min_soma_um)
+    by_id = {int(r["node_id"]): r for r in rows}
+    bins = parse_d_bins(getattr(a, "d_bins", ""))
+    sizes = {}
+    if bins is None:
+        n_cand = len(contamination.pick_clear_examples(rows, len(rows), 0.0, a.min_soma_um))
+        picked = contamination.pick_clear_examples(rows, a.n, sep, a.min_soma_um)
+    else:        # amendment 15 (D-165): --n nodes per bin of Allen's diameter (twice the traced radius)
+        swc, _provider, _label = load_cell(a, cfg, log, need_images=False)
+        d_allen = {int(i): 2.0 * float(r) for i, r in zip(np.asarray(swc.ids), np.asarray(swc.radius, dtype=float))}
+        n_cand, picked, pos = 0, [], []
+        for lo, hi in zip(bins[:-1], bins[1:]):
+            sub = [r for r in rows if lo <= d_allen.get(int(r["node_id"]), float("nan")) < hi]
+            n_bin = len(contamination.pick_clear_examples(sub, len(sub), 0.0, a.min_soma_um))
+            got = contamination.pick_clear_examples(sub, a.n, sep, a.min_soma_um, taken_xyz=pos)
+            n_cand += n_bin
+            log("clear: Allen's diameter in [%.3g, %.3g) um: %d ranked nodes, %d qualify, picked %s"
+                % (lo, hi, len(sub), n_bin, got if got else "none (the bin is skipped)"))
+            for i in got:
+                picked.append(i)
+                pos.append([float(by_id[i][k]) for k in ("x_um", "y_um", "z_um")])
+                sizes[str(i)] = dict(d_allen_um=d_allen[i], bin_um=[float(lo), float(hi)])
     if not picked:
-        log("clear: no node of %d qualifies (not near_end, no tier-2 neighbour, >= %.1f um from the soma)"
-            % (len(rows), a.min_soma_um))
+        log("clear: no node of %d qualifies (not near_end, no tier-2 neighbour, >= %.1f um from the soma%s)"
+            % (len(rows), a.min_soma_um, "" if bins is None else ", in the bins of --d-bins"))
         return 1
     with open(ex_t1) as f:
         rec = json.load(f)
-    by_id = {int(r["node_id"]): r for r in rows}
+    clear = dict(n=int(a.n), min_soma_um=float(a.min_soma_um), min_separation_um=sep, n_candidates=n_cand)
+    if bins is not None:
+        clear = dict(clear, d_bins_um=[float(e) for e in bins], n_per_bin=int(a.n))
     rec.update(example_ids=picked, classes={str(i): "clear" for i in picked},
-               ranking={str(i): {k: by_id[i][k] for k in RANK_COLUMNS} for i in picked},
-               clear=dict(n=int(a.n), min_soma_um=float(a.min_soma_um), min_separation_um=sep, n_candidates=n_cand))
+               ranking={str(i): {k: by_id[i][k] for k in RANK_COLUMNS} for i in picked}, clear=clear)
+    if bins is not None:
+        rec["sizes"] = sizes
     out = write_json(os.path.join(a.out, "examples_clear_%s.json" % a.specimen), rec)
     log("clear: %d of %d ranked nodes qualify; picked %s -> %s" % (n_cand, len(rows), picked, out))
-    print("node    own dip (gl)   tier-1 peak (gl)   tier-1 lateral (um)   soma (um)   x, y, z (um)", flush=True)
+    print("node    own dip (gl)   tier-1 peak (gl)   tier-1 lateral (um)   soma (um)   x, y, z (um)%s"
+          % ("" if bins is None else "   Allen d (um)"), flush=True)
     for i in picked:
         r = by_id[i]
-        print("%-7d %-14.2f %-18.3f %-21.2f %-11.1f %.1f, %.1f, %.1f"
+        print("%-7d %-14.2f %-18.3f %-21.2f %-11.1f %.1f, %.1f, %.1f%s"
               % (i, float(r["own_dip_gl"]), float(r["worst1_peak_gl"]), float(r["worst1_lateral_um"]),
-                 float(r["soma_lateral_um"]), float(r["x_um"]), float(r["y_um"]), float(r["z_um"])), flush=True)
+                 float(r["soma_lateral_um"]), float(r["x_um"]), float(r["y_um"]), float(r["z_um"]),
+                 "" if bins is None else "   %.3f" % sizes[str(i)]["d_allen_um"]), flush=True)
     return 0
 
 
@@ -919,6 +959,9 @@ def _common(p):
     p.add_argument("--z0", type=float, default=None, help="um subtracted from the SWC z")
     p.add_argument("--config-json", default="", help="a configuration JSON (config_from_dict); default: the defaults")
     p.add_argument("--synthetic", action="store_true", help="the smoke tests' synthetic cell, no network (dry run)")
+    p.add_argument("--sigma-r0-um", type=float, default=None, help="the kernel's in-focus width (um): the table "
+                   "re-anchored at it, its growth with defocus kept (Block 36, amendment 14; default: the "
+                   "configuration's renderer.sigma_r0_um)")
 
 
 def main(argv=None):
@@ -943,6 +986,8 @@ def main(argv=None):
     _common(e)
     e.add_argument("--n", type=int, default=3, help="how many nodes")
     e.add_argument("--min-soma-um", type=float, default=20.0, help="least distance from the soma in the image plane (um)")
+    e.add_argument("--d-bins", default="", help="edges (um) of bins of Allen's diameter, e.g. 0.4,0.6,0.8,1.2,5: "
+                   "--n nodes per bin (amendment 15); default: no bins")
     c = sub.add_parser("clean", help="the cleaning rounds on the work list (Blocks 25-32)")
     _common(c)
     c.add_argument("--examples", required=True, help="examples_<S>.json of survey")
@@ -959,6 +1004,14 @@ def main(argv=None):
     log = Log()
     cfg = load_config(a.config_json)
     log("clean_cell.py %s, specimen %s%s" % (a.cmd, a.specimen, " (synthetic)" if a.synthetic else ""))
+    a.cfg_data = cfg                                # the synthetic cell is rendered with the file's kernel
+    if a.sigma_r0_um is not None:                   # amendment 14 (D-165): the model's in-focus width, a tuning knob
+        ren = kernel.with_in_focus_width(cfg.renderer, a.sigma_r0_um)
+        log("kernel: in-focus width %.4g um (--sigma-r0-um; the configuration's %.4g um), table %s um at %s um"
+            % (ren.sigma_r0_um, cfg.renderer.sigma_r0_um, ["%.4f" % s for s in ren.kernel_table_sigma_um],
+               ["%.2f" % d for d in ren.kernel_table_delta_um]))
+        cfg = dataclasses.replace(cfg, renderer=ren)
+        cfg.validate()
     if a.cmd == "survey":
         return run_survey(a, cfg, log)
     if a.cmd == "rank":

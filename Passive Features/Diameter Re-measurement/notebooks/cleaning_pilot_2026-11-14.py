@@ -368,3 +368,110 @@ for nid in ids_c:
         if os.path.exists(path):
             print(path)
             display(Image(filename=path))
+
+# %% [markdown]
+# ## Cell 19b: the clear nodes of Cell 19 at three in-focus widths of the kernel (D-165; about 5 min per width)
+#
+# The kernel's in-focus width sigma_r(0) is configured (0.080 um), never measured by the stacks, and a node's fitted
+# diameter is confounded with it. `--sigma-r0-um` re-anchors the kernel table at another width, keeping its measured
+# growth with defocus (SPEC Block 4 amendment 1, Block 36 amendment 14). Here the three nodes of Cell 19 are cleaned
+# and refined once per width of SIGMA_R0_LIST, each run in its own folder OUT/cleaning_clear_s0_<nm>. The table
+# gives, per node and width: the refined diameter, its ratio to Allen's, the coefficient, and the misfit (the RMS
+# over the planes of the line's residual after the one-tube fit, gl) beside the node's noise SD. A width the data
+# reject shows as a misfit clearly above the noise; widths the data cannot tell apart show the same misfit.
+# Run Cells 0, 1, 16, 16b and 19 first. Output to send back: the table and the three `focal_<S>.png` figures.
+
+# %%
+import numpy as np
+SIGMA_R0_LIST = [0.080, 0.18, 0.28]                    # um: the configured width and two larger ones
+RERUN_S0 = False                                       # True: run a width again although its folder holds a result
+
+
+def clean_at_widths(examples_path, tag, widths, rounds=2):
+    """The nodes of examples_path cleaned once per in-focus width, each run in OUT/cleaning_<tag>_s0_<nm>.
+    Returns a table with one row per node and width."""
+    with open(examples_path) as f:
+        ex_w = json.load(f)
+    ids = [int(i) for i in ex_w["example_ids"]]
+    rows = []
+    for s0 in widths:
+        out_w = "%s/cleaning_%s_s0_%03d" % (OUT, tag, int(round(1000 * s0)))
+        os.makedirs(out_w, exist_ok=True)
+        rec_path = "%s/cleaning_%d.json" % (out_w, SPECIMEN)
+        if RERUN_S0 or not os.path.exists(rec_path):
+            run("scripts/clean_cell.py", "clean", "--specimen", SPECIMEN, "--out", out_w, "--cache-dir", CACHE_DIR,
+                *ALIGN, *CLEAN_CFG, "--examples", examples_path, "--B", B_GL, "--mu", MU, "--rounds", rounds,
+                "--max-work", len(ids), "--work-peak-gl", 1.0, "--sigma-r0-um", s0)
+            run("scripts/show_focal.py", "--cleaning-dir", out_w, "--specimen", SPECIMEN, "--zoom-um", 6.0)
+        with open(rec_path) as f:
+            rec_w = json.load(f)
+        print("in-focus width %.3f um -> %s" % (s0, out_w))
+        focal_w = "%s/focal_%d.png" % (out_w, SPECIMEN)
+        if os.path.exists(focal_w):
+            display(Image(filename=focal_w))
+        for nid in ids:
+            node_w = rec_w["nodes"].get(str(nid))
+            if node_w is None:
+                continue
+            rms = (node_w.get("own") or {}).get("residual_rms_gl")
+            misfit = float(np.sqrt(np.mean(np.square(rms)))) if rms else float("nan")
+            rows.append(dict(node_id=nid, sigma_r0_um=s0, d_allen_um=node_w.get("d_allen_um"), d_um=node_w.get("d_um"),
+                             mu_per_um=node_w.get("mu_per_um"), misfit_gl=misfit, noise_gl=node_w.get("sigma_gl"),
+                             status=node_w.get("status")))
+    tab = pd.DataFrame(rows)
+    tab["d_over_allen"] = tab["d_um"] / tab["d_allen_um"]
+    return tab
+
+
+def show_widths(tab):
+    """The table of clean_at_widths, one line per node and one column per width, the nodes by Allen's diameter."""
+    wide = tab.pivot(index="node_id", columns="sigma_r0_um", values=["d_um", "d_over_allen", "mu_per_um", "misfit_gl"])
+    wide.columns = ["%s at %.3f" % (name, s0) for name, s0 in wide.columns]      # one level: quantity at width (um)
+    first = tab.drop_duplicates("node_id").set_index("node_id")[["d_allen_um", "noise_gl"]]
+    display(first.join(wide.round(3)).sort_values("d_allen_um"))
+
+
+EXAMPLES_C = "%s/cleaning_clear/examples_clear_%d.json" % (OUT, SPECIMEN)
+assert os.path.exists(EXAMPLES_C), "run Cell 19 first (its three clear nodes)"
+tab_c = clean_at_widths(EXAMPLES_C, "clear", SIGMA_R0_LIST)
+show_widths(tab_c)
+
+# %% [markdown]
+# ## Cell 19c: clear nodes of different sizes, at the same three widths (D-165; about 10 min per width)
+#
+# `clear --d-bins` picks N_PER_BIN clear nodes per bin of Allen's diameter (twice the traced radius: the only size
+# known before the measurement; SPEC Block 36 amendment 15). On the pilot Allen's diameters run from 0.43 to 2.2 um
+# with 792, 6703, 724, 217 and 57 dendrite nodes in the bins below. The nodes are then cleaned and refined at each
+# width of SIGMA_R0_LIST into OUT/cleaning_sizes_s0_<nm> (Cell 19b's function: run that cell first). What to read:
+# if the in-focus blur is wider than configured, the ratio refined / Allen falls toward 1 as the dendrite gets
+# thicker (on synthetic tubes under a true width of 0.22 um: x 1.6 at 0.5 um, x 1.3 at 0.8 um, x 1.1 at 1.2 um);
+# a ratio that stays the same at every size points elsewhere. Thick nodes also separate blur from diameter best,
+# so their misfit is the one to compare across the widths.
+# Output to send back: the `clear:` lines of the log, the table, the figure and the `focal_<S>.png` figures.
+
+# %%
+import matplotlib.pyplot as plt
+D_BINS = "0.40,0.45,0.60,0.80,1.20,5.0"                # um, edges of the bins of Allen's diameter
+N_PER_BIN, MIN_SOMA_Z_UM = 1, 20.0
+CLEAN_Z = OUT + "/cleaning_sizes"
+os.makedirs(CLEAN_Z, exist_ok=True)
+run("scripts/clean_cell.py", "clear", "--specimen", SPECIMEN, "--out", CLEAN, "--cache-dir", CACHE_DIR, *ALIGN,
+    *CLEAN_CFG, "--n", N_PER_BIN, "--min-soma-um", MIN_SOMA_Z_UM, "--d-bins", D_BINS)
+with open("%s/examples_clear_%d.json" % (CLEAN, SPECIMEN)) as f:
+    exz = json.load(f)
+EXAMPLES_Z = "%s/examples_sizes_%d.json" % (CLEAN_Z, SPECIMEN)
+with open(EXAMPLES_Z, "w") as f:
+    json.dump(exz, f, indent=1)
+print("[cell 19c] nodes by size:", {i: round(s["d_allen_um"], 3) for i, s in exz["sizes"].items()})
+tab_z = clean_at_widths(EXAMPLES_Z, "sizes", SIGMA_R0_LIST)
+show_widths(tab_z)
+fig, ax = plt.subplots(figsize=(5.5, 3.6))
+for s0, g in tab_z.groupby("sigma_r0_um"):
+    g = g.sort_values("d_allen_um")
+    ax.plot(g["d_allen_um"], g["d_over_allen"], "o-", label="in-focus width %.3f um" % s0)
+ax.axhline(1.0, color="0.5", lw=0.8)
+ax.set_xlabel("Allen's diameter (um)")
+ax.set_ylabel("refined diameter / Allen's")
+ax.legend()
+fig.savefig("%s/ratio_by_size_%d.png" % (CLEAN_Z, SPECIMEN), dpi=150, bbox_inches="tight")
+plt.show()

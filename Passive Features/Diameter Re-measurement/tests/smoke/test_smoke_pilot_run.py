@@ -992,7 +992,88 @@ def test_clear_subcommand():
     r = subprocess.run([sys.executable, script, "clear", "--synthetic", "--specimen", "7", "--out", empty], cwd=str(WS),
                        capture_output=True, text=True)
     assert r.returncode == 1 and "run `clean_cell.py rank` first" in r.stdout + r.stderr
-    print("    picked %s of %d candidates; clean ran on them" % (ids, rec["clear"]["n_candidates"]))
+    # amendment 15 (D-165): bins of Allen's diameter. Every node of the synthetic cell has Allen's diameter 0.6 um,
+    # so with the edges 0.2, 0.5, 1.0 the first bin is empty and the picks come from the second; exact: a selection
+    plain = json.load(open(os.path.join(out, "examples_clear_7.json")))
+    assert "sizes" not in plain and "d_bins_um" not in plain["clear"]            # without --d-bins: amendment 13's file
+    o = _run([script, "clear", "--synthetic", "--specimen", "7", "--out", out, "--n", "1", "--min-soma-um", "0",
+              "--config-json", cfgj, "--d-bins", "0.2,0.5,1.0"], WS)
+    binned = json.load(open(os.path.join(out, "examples_clear_7.json")))
+    assert len(binned["example_ids"]) == 1 and binned["clear"]["d_bins_um"] == [0.2, 0.5, 1.0]
+    assert binned["clear"]["n_per_bin"] == 1
+    size = binned["sizes"][str(binned["example_ids"][0])]
+    assert abs(size["d_allen_um"] - 0.6) < 1e-12 and size["bin_um"] == [0.5, 1.0], size
+    assert binned["example_ids"][0] == ids[0], (binned["example_ids"], ids)      # the clearest node, as without bins
+    assert "[0.2, 0.5) um: 0 ranked nodes" in o and "the bin is skipped" in o and "Allen d (um)" in o, o[-600:]
+    r = subprocess.run([sys.executable, script, "clear", "--synthetic", "--specimen", "7", "--out", out, "--min-soma-um",
+                        "0", "--config-json", cfgj, "--d-bins", "1.0,2.0"], cwd=str(WS), capture_output=True, text=True)
+    assert r.returncode == 1 and "in the bins of --d-bins" in r.stdout + r.stderr
+    for bad in ("0.5", "0.5,0.5", "0.6,0.5", "0,1", "a,b"):
+        r = subprocess.run([sys.executable, script, "clear", "--synthetic", "--specimen", "7", "--out", out,
+                            "--config-json", cfgj, "--d-bins", bad], cwd=str(WS), capture_output=True, text=True)
+        assert r.returncode != 0 and "--d-bins" in r.stdout + r.stderr, bad
+    print("    picked %s of %d candidates; clean ran on them; with --d-bins 0.2,0.5,1.0: %s from the second bin"
+          % (ids, rec["clear"]["n_candidates"], binned["example_ids"]))
+
+
+def test_sigma_r0_option():
+    # Block 4, amendment 1 and Block 36, amendment 14 (D-165): the kernel table re-anchored at another in-focus
+    # width with its growth kept, and clean_cell.py --sigma-r0-um. Tolerances: 1e-15 um^2 on the variances
+    # (float64 roundoff of a few operations on values of order 0.1); the direction of the diameter is a sign.
+    from allen_diameter.config import DiameterConfig
+    from allen_diameter.model import kernel as K
+    rc = DiameterConfig().renderer
+    old = np.asarray(rc.kernel_table_sigma_um, dtype=float)
+    for s0 in (0.05, 0.20, 0.30):
+        new_rc = K.with_in_focus_width(rc, s0)
+        new = np.asarray(new_rc.kernel_table_sigma_um, dtype=float)
+        assert new_rc.sigma_r0_um == s0 and new[0] == s0
+        assert_allclose(new ** 2 - old ** 2, s0 ** 2 - old[0] ** 2, rtol=0, atol=1e-15)
+        assert new_rc.kernel_table_delta_um == rc.kernel_table_delta_um
+        assert new_rc.kernel_continuation_slope == rc.kernel_continuation_slope
+        dataclasses.replace(DiameterConfig(), renderer=new_rc).validate()
+    assert_allclose(K.with_in_focus_width(rc, rc.sigma_r0_um).kernel_table_sigma_um, old, rtol=0, atol=1e-15)
+    assert rc.kernel_table_sigma_um == DiameterConfig().renderer.kernel_table_sigma_um     # the input unchanged
+    for bad in (0.0, -0.1, float("nan"), float("inf")):
+        try:
+            K.with_in_focus_width(rc, bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("sigma_r0_um = %r accepted" % (bad,))
+    try:
+        K.with_in_focus_width(dataclasses.replace(rc, kernel_family="empirical"), 0.1)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("an empirical kernel was re-anchored")
+    # the option, on the synthetic cell (rendered with the file's kernel, sigma_r(0) = 0.080 um): the model given
+    # 0.20 um explains part of the dip's width by blur, so every example's refined diameter is smaller
+    a, _b, _outs = _e2e()
+    out = os.path.join(os.path.dirname(a), "s0_test")
+    os.makedirs(out, exist_ok=True)
+    script = str(WS / "scripts" / "clean_cell.py")
+    o = _run([script, "clean", "--synthetic", "--specimen", "7", "--examples", os.path.join(a, "examples_7.json"),
+              "--out", out, "--rounds", "1", "--config-json", os.path.join(a, "fast_config.json"),
+              "--sigma-r0-um", "0.20"], WS)
+    assert "in-focus width 0.2 um" in o, o[-400:]
+    ref = json.load(open(os.path.join(a, "cleaning_7.json")))
+    got = json.load(open(os.path.join(out, "cleaning_7.json")))
+    ren_ref, ren_got = ref["config"]["renderer"], got["config"]["renderer"]
+    assert ren_ref["sigma_r0_um"] == 0.080 and ren_got["sigma_r0_um"] == 0.20
+    assert_allclose(np.asarray(ren_got["kernel_table_sigma_um"]) ** 2 - np.asarray(ren_ref["kernel_table_sigma_um"]) ** 2,
+                    0.20 ** 2 - 0.080 ** 2, rtol=0, atol=1e-15)
+    pairs = []
+    for nid in ref["example_ids"]:
+        r, g = ref["nodes"][str(nid)], got["nodes"][str(nid)]
+        if r["source"] == "refined" and g["source"] == "refined":
+            pairs.append((int(nid), float(r["d_um"]), float(g["d_um"])))
+    assert pairs, "no example refined in both runs"
+    for nid, d_ref, d_got in pairs:
+        assert d_got < d_ref, "node %d: d %.4f um at 0.20 um is not below %.4f um at 0.080 um" % (nid, d_got, d_ref)
+    print("    table re-anchored at 0.05, 0.20, 0.30 um (variances to 1e-15); synthetic example(s) %s: refined d "
+          "%s um at 0.080 um -> %s um at 0.20 um" % ([q[0] for q in pairs], ["%.3f" % q[1] for q in pairs],
+                                                    ["%.3f" % q[2] for q in pairs]))
 
 
 def test_determinism():
