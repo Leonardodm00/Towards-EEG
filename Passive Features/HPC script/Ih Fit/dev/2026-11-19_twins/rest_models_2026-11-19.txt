@@ -1,0 +1,8 @@
+measured soma rest -73.1734 mV
+U: SS pre-onset max|v - v[0]| 5.61e-02 mV, drift across the 10 ms 3.57e-02; LS pre-window drift 5.61e-02 mV; v at t=0 -73.1734
+S: SS pre-onset max|v - v[0]| 5.83e-13 mV, drift across the 10 ms 5.83e-13; LS pre-window drift 1.13e-11 mV; v at t=0 -73.1734
+B: SS pre-onset max|v - v[0]| 0.00e+00 mV, drift across the 10 ms 0.00e+00; LS pre-window drift 0.00e+00 mV; v at t=0 -73.1734
+U vs B: SS window max|diff| 0.0670 mV (RMS 0.0587); LS step max|diff| 0.0311 mV (RMS 0.0269)
+S vs B: SS window max|diff| 0.0004 mV (RMS 0.0003); LS step max|diff| 0.0212 mV (RMS 0.0165)
+U vs S: SS window max|diff| 0.0672 mV (RMS 0.0590); LS step max|diff| 0.0114 mV (RMS 0.0106)
+scale: SS peak deflection 5.716 mV; LS deflection at step end 7.430 mV
