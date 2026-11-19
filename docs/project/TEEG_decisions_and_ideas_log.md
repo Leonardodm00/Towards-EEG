@@ -237,6 +237,7 @@ the "Binds" column.
 | 2026-11-19 (later, 3) | Logs **D-181** (user, 15:43; the defocus-table chat): the near-field table is read between knots with the growth fit's cubic spline, not linearly in $|\delta|$, and the growth fit's cubic interpolation (PROVISIONAL since Block 10) is confirmed. **[run, sandbox]** check 8: with the renderer linear in $|\delta|$ and the growth fit cubic, step 1 errs by -9.2 % at 0.28 um even for tubes of no thickness (toy, pilot cell's knot values); check 9: with a truth of the growth fit's own cubic shape, by -0.1 %. Not built. |
 | 2026-11-19 (later, 4) | Logs **D-182** to **D-186** (user, 21:23; the twins chat, started from `TEEG_twins_block5_handoff_2026-11-19.md`), the answers to the questions put on Block 5 and Stage 7. **D-182**: a Long Square twin carries its sweep's law as fitted, continuous over the whole sweep; D-180's limit binds the SS windows; the four cells with $\hat\tau_s(c) > 265$ ms flagged, the gate reported with and without them (closes D-180's open point 1). **D-183**: every response of a twin is simulated on its real cell's morphology, the data give only the noise of each sweep or window, Long Square included; no per-sweep offset (closes D-180's open point 4; train or single pulses asked again). **D-184**: Stage 7 is a plain recovery run in three configurations of 10 cells each -- `full` (traces with I_h, six parameters fitted), `passive fit` (traces with I_h, passive fit), `active fit` (traces without I_h, the full model fitted) -- with no closure test of the twins' noise statistics; its mapping onto D-011 (ii) and D-083's four arms put to the user. **D-185**: one PBS job per cell under a 120-core cap. **D-186**: all stored SS windows and LS sweeps; the tilt line at the real positions; noise at the twin's own 50 kHz; LS timing from the real cell; a per-sweep twin table beside the manifest; seeds per twin sweep. Not decided: when the bundles' check on the real archive runs (D-180's open point 3; the user asked what it is). **[run, sandbox]** `Ih Fit/dev/2026-11-19_twins/ls_slow_span.py` (the slow part over a Long Square step, per cell, as fitted and at the short end of the ridge) and `check_bundle_variance.py`. D-011, D-083 and D-180 annotated. Next free IDs: D-187, I-007. |
 | 2026-11-19 (later, 5) | Logs **D-187** to **D-189** (user, 21:46; the twins chat), the answers to the points D-182 to D-186 left open, and the approval of the plan. **D-187**: each SS pulse of a twin is simulated alone from rest, not as a 37-pulse train -- supersedes (D-083.2)'s trains for the twins' response, closes D-180's open point 2. **D-188**: Stage 7's configurations settled -- 10 cells per configuration, drawn at random from the 18 L3_exc cells; `passive fit` optimises only the passive properties on traces with I_h; `active fit` is D-011 (ii)'s control; each cell's job builds its twin and runs its fit, a merge job writes the report (closes D-184's readings and D-185.2; two readings of the assistant flagged). **D-189**: the model-free check of the SS bundles is dropped (closes D-180's open point 3, as a limit of Stage 7). The plan approved ("Everything else is ok"): Blocks 5, 10, 11 (wave 1), 12 and 8 (wave 2), on the branch `sci/twins`; roadmap stages N5b, N5c, N5d added at the user's word ("update the roadmap"). **[data inspected]** the user's upload of 21:46: the nf2 tables and JSONs (`nf2_L3_exc.tar.gz`: 18 cells, 64 SS + 525 LS sweep rows, 9 failed) and the archive cell 508282493 (`cell_508282493.tar.gz`). D-083, D-180, D-184 and D-185 annotated. Next free IDs: D-190, I-007. |
+| 2026-11-19 (later, 6) | Logs **D-190** (user, 22:05; the twins chat): a twin leaves out the depolarising Long Square sweeps that the fitter's loader drops for the real cell as not subthreshold ("Leave out") -- narrows D-186.1 (every stored LS sweep). **[src]** read the same evening: the depolarising long steps are validation only, at most the three smallest spike-free ones (`passive_long_step_training.assign_ls_roles`), so the choice changes a twin's validation set, not its fitted parameters. **Wave 1** (branch `sci/twins`, contract `f54fdde`): Block 10 (the twin's noise) returned, passed the gate and was merged (`9aa9c70`; TN1-TN9 9/9); Block 5 returned done and is reopened for D-190's amendment; Block 11 running. Next free IDs: D-191, I-007. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -415,6 +416,7 @@ would be needed*, *Status*.
 | D-187 | 2026-11-19 | Block 11 (the twins' clean responses, `synthetic_ground_truth.py`); (D-083.2); D-180's open point (2) | each SS pulse of a twin is simulated alone from rest, as the fitter simulates a brief bundle; no 37-pulse train [user] | active; not built |
 | D-188 | 2026-11-19 | Stage 7 (roadmap S7, Block 8): the manifest's configurations and cells, the arms, the jobs; D-184's readings (a) to (e); D-185.2; D-011 (ii) | 10 cells per configuration drawn at random from the 18; `passive fit` = only the passive properties optimised on traces with I_h; `active fit` = D-011 (ii)'s control; one job builds a twin and runs its fit, a merge job reports [user] | active; not built |
 | D-189 | 2026-11-19 | D-180's open point (3); the twins' handoff, Q3; Stage 7's limits | the model-free check of the SS bundles on the real archive is dropped [user] | active |
+| D-190 | 2026-11-19 | Block 5 (the twins' table), Block 12 (the build); D-186.1; SPEC 2.7 (a) | a twin leaves out the depolarising LS sweeps the fitter's loader drops for the real cell as not subthreshold (`sweep_spike_reason` non-empty) [user] | active; not built |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -13186,7 +13188,7 @@ position as well -- so that adding a cell or a sweep moves no other draw.
 
 **Sources.** **[user]** 2026-11-19, 21:23. **[log]** D-014, D-017, D-076, D-102, D-180.
 
-**Status:** active; not built.
+**Status:** active; not built. [updated 2026-11-19 (later, 6): (D-186.1)'s "every stored Long Square sweep" narrowed by **D-190** -- the depolarising sweeps the fitter's loader drops for the real cell are left out of the twin.]
 
 ## D-187 -- Each SS pulse of a twin is simulated alone from rest, not as a 37-pulse train (user)
 
@@ -13288,3 +13290,43 @@ and the recovery on twins is optimistic for the parameters the SS bundles constr
 **Sources.** **[user]** 2026-11-19, 21:46. **[run]** the check named. **[log]** D-180.
 
 **Status:** active. Closes D-180's open point (3).
+
+## D-190 -- A twin leaves out the depolarising Long Square sweeps the fitter's loader drops for the real cell (user)
+
+**Date:** 2026-11-19, 22:05 (Europe/Rome), the twins chat. **Binds:** Block 5 (the twins' table: which real sweeps a
+twin has), Block 12 (the build); (D-186.1); SPEC section 2.7 (a) of `Ih Fit/specs/SPEC.md`.
+
+**Decision [user].** To the question put at 21:55 -- the real Long Square sweeps reach large depolarising amplitudes
+(+310 pA in 508282493) on which a real cell can spike; the fitter's loader drops such sweeps by a spike test on the
+voltage; a twin has no Na/Kv channels and never spikes, so none of its sweeps would be dropped; options: (a) keep every
+stored LS sweep in the twin, (b) leave out of the twin the sweeps the loader drops for the real cell, so that both fits
+see the same sweep set -- the user answered: "One new question (for wave 2, not blocking): Leave out".
+
+**Statement.**
+(D-190.1) For each real cell $c$, the twin has every stored hyperpolarising Long Square sweep of $c$ and those stored
+depolarising ones that the fitter's loader keeps for $c$: a depolarising sweep (detected amplitude above 5 pA, the
+loader's threshold) whose real voltage trace gives a non-empty `sweep_spike_reason` under the loader's default
+thresholds (`action_potential`, `peak_above_threshold` or `unusable`) is left out of the twin.
+(D-190.2) The twins' table keeps a row for every real sweep, with the loader's verdict on it and whether the twin has
+it, so that the exclusion is recorded and not silent.
+
+**Why.** **[user]** as quoted: the twin's fit and the real cell's fit see the same sweep set. **[src, read at `f2be771`
+on `sci/twins`, not run]** The loader's rule: `passive_fitting_hpc_fixed.load_cell_from_archive`, section 4b
+(`sweep_spike_reason(v, fs, v_threshold_mV=..., dvdt_threshold_mV_per_ms=...)`, defaults -20 mV and 20 mV/ms).
+The depolarising long steps are validation only, at most the `dep_n_validation` = 3 smallest spike-free ones
+(`passive_long_step_training.assign_ls_roles`); training uses the SS hyperpolarising pulses and the hyperpolarising
+steps $h_2 \dots h_{n-1}$. The choice therefore changes which sweeps validate a twin's fit, not its fitted parameters;
+without it, a twin of a cell that spiked on one of its three smallest depolarising steps would be validated on a step
+its real cell's fit never uses.
+
+**What it implies for code and tables.** Block 5: `CellProtocol` and the table carry each LS sweep's spike verdict on
+the real trace, computed by a function passed in (the loader's own `sweep_spike_reason`, so that Block 5 stays free of
+NEURON), and a column saying whether the twin has the sweep; Block 12 builds only those sweeps. Contract amendment 1 of
+wave 1.
+
+**What it does not decide [open].** Nothing. (The loader's amplitude cap on depolarising steps, off in the I_h arms, is
+not applied to the twins.)
+
+**Sources.** **[user]** 2026-11-19, 22:05. **[src]** as named. **[log]** D-006, D-007, D-016, D-186.
+
+**Status:** active; not built. Narrows (D-186.1).
