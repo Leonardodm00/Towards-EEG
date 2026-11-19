@@ -1,0 +1,14 @@
+sigma 1.64 gl, centre0 0.000 um, window (FWHM_A) 0.708 um, planes used [True, True, True, True, True, True, True, True, True]
+as run (mean over planes, smoothed 1): cut lo -inf hi inf
+mean dip at v = -2.0..0.5 um: -2.06:17  -1.94:20  -1.83:25  -1.72:30  -1.60:36  -1.49:42  -1.37:45  -1.26:46  -1.14:45  -1.03:44  -0.92:42  -0.80:42  -0.69:43  -0.57:47  -0.46:54  -0.34:61  -0.23:67  -0.11:70  0.00:71  0.11:68  0.23:63  0.34:56  0.46:47  0.57:38
+k 255: central depth 52 gl; D at -1.4 um 30 gl, at -0.9 um 35 gl; per-plane cut lo none hi none
+k 256: central depth 58 gl; D at -1.4 um 33 gl, at -0.9 um 35 gl; per-plane cut lo none hi none
+k 257: central depth 69 gl; D at -1.4 um 37 gl, at -0.9 um 35 gl; per-plane cut lo none hi none
+k 258: central depth 84 gl; D at -1.4 um 44 gl, at -0.9 um 38 gl; per-plane cut lo -0.80 hi none
+k 259: central depth 87 gl; D at -1.4 um 47 gl, at -0.9 um 37 gl; per-plane cut lo -0.57 hi none
+k 260: central depth 87 gl; D at -1.4 um 55 gl, at -0.9 um 42 gl; per-plane cut lo -0.69 hi none
+k 261: central depth 78 gl; D at -1.4 um 60 gl, at -0.9 um 46 gl; per-plane cut lo none hi none
+k 262: central depth 67 gl; D at -1.4 um 58 gl, at -0.9 um 50 gl; per-plane cut lo none hi none
+k 263: central depth 59 gl; D at -1.4 um 55 gl, at -0.9 um 58 gl; per-plane cut lo none hi none
+mean: central depth 70.6 gl at v 0.00; falls to half depth (35.3) first at v -1.72
+   left peaks beyond: 

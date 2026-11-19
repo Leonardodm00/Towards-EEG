@@ -16,6 +16,7 @@
 | 2026-11-18 (later, 10) | D-179 [user, 20:23]: of section 13.3, confirmed -- the per-chain rendering with summed shadows, rule (b) dropped, the first test nodes; read as confirmed, to check -- B1 and B2; open, with two figures (`checks/joint_2026-11-18/fig_attached_vs_free.png`, `fig_own_chain_options.png`) -- attached chains as neighbours, the own chain smoothed or raw. Section 13.2: the depth words for D-149's examples corrected. Decision log on `main`: next free IDs D-180, I-006. |
 | 2026-11-19 | Section 0b: the first run on Allen's data (the user's Colab, notebook Cell 20, 2026-11-19; uploaded log and focal-plane figure): results, times, what the figure shows, and what the pooled growth table can and cannot change (new subsection "First run on the pilot"). Two sentences of 0b marked [corrected 2026-11-19]. No decision taken. |
 | 2026-11-19 (later) | Section 0b, new subsection "Second run and the kernel check": the user's rerun with $\kappa$ = 0.5, the in-focus widths of the five dips, the widest dip a tube of Allen's diameter can render, and on node 5353 the fit under wider in-focus widths and heavier-tailed kernels (`checks/kernel_tails_2026-11-19/`). No decision taken. |
+| 2026-11-19 (later, 2) | The clear-node path (sections 0, 0b) now has its own handoff, `TEEG_clear_node_fit_handoff_2026-11-19.md`, for the chat that continues it; 0b's statement on 2669 corrected (the user, 22:02). |
 
 Basis tags: **[user]** said or decided by the user, with the time (Europe/Rome, 2026-11-18); **[log]** the decision
 log on `main`; **[src]** read in the named file at `f6504b0`; **[run, sandbox]** executed in the handing-over
@@ -172,7 +173,7 @@ pipeline's forward, $\mu$ from 0.3 to 10 /um]**: with the run's kernel (in-focus
 1.39 um (5353, 2669, 1013, 2620, 639); with the in-focus SD at 0.25 um 0.72, 1.01, 0.78, 1.04, 1.55 um; with the
 heaviest tail tried (50 % of the blur 6 times wider) 0.58, 1.00, 0.59, 1.03, 1.48 um, the upper values only for a
 nearly opaque tube. So for 1013, 2620 and 639 no kernel tried makes a tube of Allen's diameter as wide as the recorded
-dip; 2669 is compatible in focus; 5353 needs an in-focus SD between 0.080 and 0.25 um, or a thicker tube.
+dip; ~~2669 is compatible in focus;~~ [corrected 2026-11-19 (late), the user: 2669 is not clean in focus -- its central dip's width is compatible, but planes 258-260 hold a second dip about 1.4 um to the left that the bump cut missed; `TEEG_clear_node_fit_handoff_2026-11-19.md` section 6] 5353 needs an in-focus SD between 0.080 and 0.25 um, or a thicker tube.
 
 **Node 5353, the kernel varied [run, sandbox: `kernel_tails_real_check.py`; the pipeline's forward and fit, the
 run's start and planes, the weights' width fixed at the run's 0.218 um so that $\chi^2/N$ compare]**:
