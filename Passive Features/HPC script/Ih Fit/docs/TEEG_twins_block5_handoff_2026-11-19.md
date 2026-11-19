@@ -10,6 +10,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 |---|---|
 | 2026-11-19 | Created at the user's request ("Now we will build the synthetic runs in another chat. Write the extensive handoff and update the roadmap"), after D-180 (the twins no longer than the noise fit's windows) and the nf2 run (18 ok). Facts checked against `main` at `b17f768` and the user's pastes of 2026-11-18/19. |
 | 2026-11-19 (later) | The twins chat (Fable 5.2): section 5a added -- the user's answers of 21:23 to section 5's questions (D-182 to D-186), what they leave open, and the plan as it stands; "Start here" step 1, section 9's next free IDs and a trap (binary files through the Drive connector) updated. Two standalone checks in `Ih Fit/dev/2026-11-19_twins/`. |
+| 2026-11-19 (later, 2) | Section 5a: the user's answers of 21:46 (D-187 to D-189) -- single SS pulses from rest, the configurations' cells and arms, the bundles' check dropped; the plan approved; the nf2 tables and the archive cell 508282493 received in the chat. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -199,7 +200,16 @@ shows the bundles matter **[reasoning]**.
 | Q11 | 10 cells per configuration, three configurations: `full` (traces with I_h, six parameters fitted), `passive fit` (traces with I_h, passive fit), `active fit` (traces without I_h, the full model fitted); one PBS job per cell, 120-core cap | D-184, D-185 |
 | Q12 | no closure test: "this is simply a synthetic run to test whether our pipeline recovers the parameter values from a known truth ... LET's KEEP THINGS SIMPLE"; Block 5 keeps its smoke tests (directive 4) only [corrected 2026-11-19 (later): proposals (a) and "measure by how much" of Q12 are dropped] | D-184.4 |
 
-**Still open, put to the user on 2026-11-19 (later) [open].** (1) Q2: the SS response as the 37-pulse train or each
+**Settled on 2026-11-19, 21:46 [user; log].** Q2: each SS pulse simulated alone from rest, no train (D-187). Q3: the
+check dropped (D-189). Stage 7: 10 twins per configuration on real cells drawn at random from the 18; `passive fit`
+optimises only the passive properties on traces with I_h; `active fit` is D-011 (ii)'s control fitted with `ih6`; one
+job per twin builds it and runs its fit, a merge job reports (D-188). Two readings of the assistant flagged in D-188:
+the three configurations drawn independently (30 twins), and `passive_fullstep` as the passive arm. The plan below is
+approved; the code is on the branch `sci/twins`; roadmap stages N5b (Block 10), N5c (Block 11), N5d (Block 12) added.
+The inputs are in the chat of 2026-11-19 (the user's upload `OneDrive_1_19-11-2026.zip`: `nf2_L3_exc.tar.gz`,
+`cell_508282493.tar.gz`), not in the repository.
+
+**[corrected 2026-11-19 (later, 2): the list that follows was open at 21:23 and is settled as stated above.]** Still open, put to the user on 2026-11-19 (later) [open]. (1) Q2: the SS response as the 37-pulse train or each
 pulse alone from rest (the assistant now leans to single pulses: today's code, the passive benchmark's way, no model
 mismatch with the fitter's own simulation -- but (D-083.2) says trains, so it is the user's call). (2) D-184's readings:
 the same 10 real cells in the three configurations, `full` and `passive fit` as two fits of one I_h twin (20 twins,
@@ -207,7 +217,7 @@ the same 10 real cells in the three configurations, `full` and `passive fit` as 
 control; the note's "5 or 6" against 10. (3) D-185.2: each cell's job builds its twin and runs its fits, a merge job
 writes the report. (4) Q3's check: with the pilot and recorded, or not at all. (5) The roadmap stages for the new blocks.
 
-**The plan as it stands (not yet approved by the user) [reasoning].** Blocks: 5 `twin_table.py` (the nf2 tables joined
+**The plan [approved by the user 2026-11-19, 21:46].** Blocks: 5 `twin_table.py` (the nf2 tables joined
 with each real cell's protocol, one row per twin sweep); 10 `twin_noise.py` (independent SS windows plus the tilt line,
 one continuous LS draw plus the tilt, the seed rule); 11 the clean responses in `synthetic_ground_truth.py` (real LS
 amplitudes and timing; the legacy path bit for bit); 12 `twin_build.py` and `gen_from_manifest.py` (clean plus noise
