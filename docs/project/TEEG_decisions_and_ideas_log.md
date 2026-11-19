@@ -233,6 +233,7 @@ the "Binds" column.
 | 2026-11-18 (later, 25) | No decision changed (the clearance chat). **D-174 and D-178 implemented and pushed**: `513ad9e` on `sci/diameter-pipeline` (SPEC Block 5 amendment 3) -- `MeasureConfig.pilot_diameter` = "allen" by default, read by `measure_pilot` and Block 13's pilot, so the calibration, the survey and the chain take it without a change of their code; "free" is the labelled alternative; a node without a traced radius is fitted free and flagged `allen_radius_missing` [orchestrator]. The estimator hash is now 16be09f944e45972 (simulation dc84ed2e89bcfea6). `refit_at_plane` and the plane diagnostics of D-040/D-042 keep the free fit [orchestrator]. **[run, sandbox]** 56 smoke files pass (line_fast not rerun; its `test_reference` did not finish within the sandbox's limit earlier); the spec tests pass except six that failed before. D-175's `nodes` and `calibration` steps can be submitted from `513ad9e` on. Next free IDs unchanged. |
 | 2026-11-19 | No decision changed (the noise-fit chat; the user's paste of 12:12) **[cluster]**. **The 18-cell nf2 run** (three-component law, D-152 to D-155) read back from its iteration histories and per-sweep fits: J/dof lower than nf1 in 18 of 18 cells (median 10.8 to 2.65; below chi^2_16's 99 % point in 2, its 99.9 % point in 9; largest 569844159, 938); no coordinate at a bound (tau_m 0.053-0.111 ms; tau_s 11 ms - 5.7 s); the per-sweep laws rejected at 1 % in 19 % of SS and 23 % of LS sweeps (nf1 69 % and 56 %); 15 cells `no_plateau` (D-050), none drifting at the end. **The slow part's sigma_s and tau_s are not separately determined where tau_s is long against the windows** (checked by computation on 571430815: tau_s 5.7 s to 1 s at fixed sigma_s^2 / tau_s moves no statistic by more than 0.35 SE, while the slow SD over a 7.4 s train changes from 0.92 to 0.59 mV): put to the user as Block 5's first question. The Block 6 handoff, §4 and §6 item 9; `Ih Fit/dev/2026-11-19_nf2_readback/`. Next free IDs unchanged: D-180, I-006. |
 | 2026-11-19 (later) | Logs **D-180** (user, 12:24; the noise-fit chat): the twins are no longer than the windows the noise fit used (at most 265 ms) and nothing relies on the noise across pulses -- the first of the three options put after the nf2 read-back (the slow part's sigma_s and tau_s not separately determined where tau_s is long). Its application to the Long Square twins (D-076 (iii): whole LS sweeps) and to D-083.2's 37-pulse trains is open, for Block 5's SPEC entry; D-083 annotated. **[cluster, pasted]** the 18-cell nf2 merge (job `2099736`): `NOISE_MERGE L3_exc: 18 ok, 0 refused, 0 failed, 0 missing`; the pilot's merge (`2098690`) 2 ok. The final check's 54 spec tests of 2026-11-17 committed (the user left it to the assistant). Next free IDs: D-181, I-006. |
+| 2026-11-19 (later, 2) | Logs **I-006** (user, 15:12; the defocus-table chat): step 2 of the kernel calibration with every twin's diameter fitted under a Gaussian penalty toward a reference diameter, the table left free -- form C of the T10 study document with the diameters' changes discouraged; read as penalized (Tikhonov-type) least squares, i.e. the maximum a posteriori estimate under a Gaussian prior on each diameter. To implement later; nothing in the code or the plan changes. **[FT]** PMC5064166; **[ABS]** PMID 39191246, 31363890. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -438,6 +439,7 @@ would be needed*, *Status*.
 | I-003 | 2026-10-22 | the renderer's $\sigma_{\rm r}(\delta)$ and its construction (Blocks 4, 10, 15; procedure §3.4 step 2); D-067.2 and I-002 for any non-Gaussian kernel | the defocus kernel constructed with deep learning, in a chat of its own; handoff `docs/TEEG_diameter_defocus_kernel_DL_handoff_2026-10-22.md` | idea, the user pursues it in a chat of its own; not scheduled in the diameter plan [updated 2026-10-22, later: the handoff pushed, `9112bf3..37b42ea`] |
 | I-004 | 2026-10-22 | Block 4's absorption (`partition_vertical`, D-024 (i)) and Block 9's ray world; the hybrid of the 2026-10-09 renderers document (§3.8-3.9, on `main`); roadmap T7 | the hybrid renderer -- each slice's absorption from the condenser's rays, then the defocus kernel -- whose optics the user studies first | idea; roadmap T7 open; not scheduled [updated 2026-10-26: adopted as the renderer actually used once built, D-084] [updated 2026-10-27: built as SPEC Block 21 (D-092), not yet the default] |
 | I-005 | 2026-11-10 | the fits along a node's measuring line (Blocks 3, 5, 10, 12-13, 15); roadmap T12 | the node's own noise along its measuring line included in the fits at that node; to discuss later | idea; roadmap T12 open; not scheduled |
+| I-006 | 2026-11-19 | the kernel calibration's step 2 (procedure §3.4 item 2; roadmap NS1, theory T10); forms B and C of `TEEG_diameter_kernel_calibration_step2_2026-11-18.md` | step 2 with every twin's diameter fitted under a Gaussian penalty toward a reference diameter, the table free (a Gaussian prior on the diameters); to implement later | idea; not scheduled |
 
 ---
 
@@ -12876,3 +12878,44 @@ report) is open **[reasoning]**.
 section 4). **[log]** D-076, D-083, D-102, D-107, D-152 to D-155.
 
 **Status:** active; Block 5's SPEC entry to write -- `Passive Features/HPC script/Ih Fit/docs/TEEG_twins_block5_handoff_2026-11-19.md`.
+
+## I-006 -- Step 2 with every twin's diameter fitted under a Gaussian penalty, the table free; to implement later
+
+**Date:** 2026-11-19, 15:12 (Europe/Rome), the defocus-table chat (the chat of D-174, D-175 and the T10 study
+document). **Concerns:** the kernel calibration's step 2 (procedure §3.4, item 2; roadmap NS1, not built; theory T10);
+forms B and C of the study document `TEEG_diameter_kernel_calibration_step2_2026-11-18.md` (§3.7-§3.10, sent as files
+on 2026-11-18, not in the repository); the in-focus width (D-165, D-172); the pilot fit's held diameter (D-178).
+
+**Idea [user].** "Just take note of another variant here we could implement [...] is the same as the form C but with
+the diameter adjustments made more difficult. I do not know the name of this approach but I would make the trial
+table's values to be freely adjusted while the calibration nodes' diameter more difficult. As if we fix a gaussian
+penalty to changes in the diameters, larger the more dicouraged".
+
+**Statement (the assistant's reading).** Form C's objective -- the twins' core widths matched to the real ones by least
+squares over the trial table $\theta$ and the twins' diameters $\tilde d_i$ -- plus a quadratic penalty on each
+diameter's departure from a reference $d_i^{\rm ref}$, the table unpenalized:
+$$(\hat\theta, \hat d) = \arg\min_{\theta \in \Theta,\ \tilde d \in (0,\infty)^N}\ \sum_{i=1}^N \sum_{k \in K_i}
+\frac{[\omega_{i,k} - \omega^{\rm sim}_{i,k}(\theta; \tilde d_i)]^2}{s_\omega^2} + \sum_{i=1}^N
+\frac{(\tilde d_i - d_i^{\rm ref})^2}{\tau_i^2},$$
+with $s_\omega$ the core widths' noise SD (µm²) and $\tau_i$ (µm) the scale of the penalty -- the smaller $\tau_i$, the
+more a change of diameter is discouraged. It is penalized (Tikhonov-type) least squares toward a reference solution;
+read as Bayes, the maximum a posteriori estimate under a Gaussian prior $N(d_i^{\rm ref}, \tau_i^2)$ on each diameter,
+a flat prior on the table and Gaussian noise of SD $s_\omega$ on the core widths. As $\tau_i \to 0$ it becomes form B
+with the twins at $d_i^{\rm ref}$; as $\tau_i \to \infty$, form C **[own reasoning]**.
+
+**What it leaves open.** The reference $d_i^{\rm ref}$ (Allen's diameter, the pilot fit's default since D-178, or the
+free pilot fit's, which reads wide on phantoms, SPEC §8); $\tau_i$ (from what is known of Allen's diameters' error --
+on the pilot cell's clear nodes Allen's 0.45-0.54 µm against the free fit's 0.77-1.09 µm, D-160 -- or tuned); $s_\omega$
+per plane; whether the in-focus width $\sigma_{\rm r}(0)$, which trades with the diameters (study document §3.10;
+D-165), gets a penalty too or stays configured (D-172). Not tested on the toy.
+
+**What it changes now.** Nothing in the code or the plan; a candidate form for NS1 and for T10's study.
+
+**Sources.** **[user]** 2026-11-19, 15:12. **[FT]** Figuera et al. 2016, Front Physiol 7:466, PMC5064166 (§2.2.1
+Tikhonov regularization: a data misfit plus a weighted penalty on the solution; §2.2.4 the Bayesian MAP estimator with a
+prior mean and covariance). **[ABS]** Niven et al. 2024, Chaos 34(8), PMID 39191246, and Erenler & Serinagaoglu
+Dogrusoz 2019, Med Biol Eng Comput 57:2093-2113, PMID 31363890: MAP estimation with Gaussian likelihood and prior is a
+(generalized) Tikhonov regularization -- abstract only. **[doc]** the T10 study document, §3.8 (form C), §3.10 (the
+width-diameter trade-off).
+
+**Status:** idea; not scheduled; roadmap unchanged (T10 open, NS1 planned).
