@@ -34,8 +34,17 @@ class TwinConfig:
                        significant digits.
     neuron_dt_ms     : ms; NEURON's fixed step for the clean responses
                        (Block 11): 0.025, the generator's value.
+    settle_ms        : ms; every clean response is simulated from the state
+                       reached after this long without stimulus (SPEC 2.7 (f),
+                       D-191): 6000, the settle of measure_rin_tau_sag.
+    ls_dep_min_amplitude_pA : pA; a Long Square sweep above it is a
+                       depolarising sweep, on whose real trace the loader's
+                       spike test decides whether the twin has it (D-190): 5.0,
+                       the loader's threshold.
     """
     base_seed: int = 20261119
     slow_flag_tau_s: float = 0.265
     failed_law_rtol: float = 1e-9
     neuron_dt_ms: float = 0.025
+    settle_ms: float = 6000.0
+    ls_dep_min_amplitude_pA: float = 5.0
