@@ -972,7 +972,8 @@ def write_ball_and_stick_swc(path: Path, *, soma_r_um: float = 10.0,
 # below are the contract; the bodies are written by Block 11's implementer.
 # Nothing above this line changes (the legacy path of old manifests).
 def simulate_ss_clean(cell, *, amplitude_pA: float, duration_s: float, t_s: np.ndarray,
-                      v_init_mV: float, dt_ms: float = 0.025) -> Tuple[np.ndarray, np.ndarray]:
+                      v_init_mV: float, dt_ms: float = 0.025,
+                      settle_ms: float = 0.0) -> Tuple[np.ndarray, np.ndarray]:
     """One Square Subthreshold pulse from rest on a stored window's time axis
     (D-187): (v_mV, i_pA), both float64 (n_w,).
 
@@ -982,16 +983,59 @@ def simulate_ss_clean(cell, *, amplitude_pA: float, duration_s: float, t_s: np.n
     t_s          : (n_w,) s, uniform, 0 at the pulse onset, t_s[0] < 0
     v_init_mV    : the twin's resting potential (mV)
     dt_ms        : NEURON's fixed step (ms, > 0)
+    settle_ms    : ms (>= 0) simulated without stimulus from the uniform
+                   start at v_init_mV before the first output sample
+                   (amendment 2, D-191; the caller passes TwinConfig.settle_ms)
     v_mV[j] is NEURON's somatic trace of ONE run started at v_init_mV with
-    the stimulus delayed by -t_s[0], read at t_s[j] by linear interpolation
-    (as _resample does); i_pA is amplitude_pA where 0 <= t_s <= duration_s
-    and 0 elsewhere. No noise, no averaging, no state kept between calls.
+    the stimulus delayed by settle_ms - t_s[0], read at settle_ms + t_s[j] -
+    t_s[0] by linear interpolation (as _resample does); i_pA is amplitude_pA
+    on the samples j0 .. j0 + n_on - 1, j0 = round(-t_s[0] f_s), n_on =
+    round(duration_s f_s), f_s = 1 / the step of t_s (the real archive's
+    layout), and 0 elsewhere. No noise, no averaging, no state kept between
+    calls.
     ValueError: specs/SPEC.md, Block 11, "Refused"."""
-    raise NotImplementedError("Block 11")
+    amp = _twin_finite("amplitude_pA", amplitude_pA)
+    dur = _twin_positive("duration_s", duration_s)
+    v0 = _twin_finite("v_init_mV", v_init_mV)
+    dt = _twin_positive("dt_ms", dt_ms)
+    settle = _twin_settle(settle_ms)
+    t = np.asarray(t_s, dtype=np.float64)
+    if t.ndim != 1 or t.size < 2:
+        raise ValueError("t_s must be a 1-D axis of at least 2 samples, got shape %s"
+                         % (t.shape,))
+    if not np.all(np.isfinite(t)):
+        raise ValueError("t_s holds a non-finite value")
+    if not t[0] < 0.0:
+        raise ValueError("t_s[0] must be < 0 (the pulse onset is t = 0), got %r"
+                         % float(t[0]))
+    steps = np.diff(t)
+    mean_step = float(steps.mean())
+    if not mean_step > 0.0:
+        raise ValueError("t_s must increase, mean step %r s" % mean_step)
+    spread = float(steps.max() - steps.min()) / mean_step
+    if spread > _TWIN_AXIS_RTOL:
+        raise ValueError("t_s is not uniform: relative spread of its steps %.3g > %g"
+                         % (spread, _TWIN_AXIS_RTOL))
+    fs = 1.0 / mean_step                       # f_s of the window (Hz)
+    j0 = int(round(-float(t[0]) * fs))         # the sample at t = 0
+    n_on = int(round(dur * fs))
+    if n_on < 1:
+        raise ValueError("duration_s %r is shorter than half a sample (f_s %g Hz)"
+                         % (dur, fs))
+    if j0 + n_on > t.size:
+        raise ValueError("the pulse (samples %d .. %d) does not fit in %d samples"
+                         % (j0, j0 + n_on - 1, t.size))
+    delay_ms = settle - float(t[0]) * 1e3      # the onset on NEURON's clock
+    t_out_ms = t * 1e3 + delay_ms              # the samples on NEURON's clock
+    v = _twin_run(cell, amp, delay_ms, dur * 1e3, t_out_ms, v0, dt)
+    i_pA = np.zeros(t.size, dtype=np.float64)
+    i_pA[j0:j0 + n_on] = amp
+    return v, i_pA
 
 
 def simulate_ls_clean(cell, *, amplitude_pA: float, onset_s: float, duration_s: float, n_samples: int,
-                      fs_Hz: float, v_init_mV: float, dt_ms: float = 0.025) -> Tuple[np.ndarray, np.ndarray]:
+                      fs_Hz: float, v_init_mV: float, dt_ms: float = 0.025,
+                      settle_ms: float = 0.0) -> Tuple[np.ndarray, np.ndarray]:
     """One Long Square sweep from rest at its real amplitude and timing
     (D-186.4): (v_mV, i_pA), both float64 (n_samples,).
 
@@ -1002,10 +1046,97 @@ def simulate_ls_clean(cell, *, amplitude_pA: float, onset_s: float, duration_s: 
     fs_Hz        : sampling rate (Hz, > 0)
     v_init_mV    : the twin's resting potential (mV)
     dt_ms        : NEURON's fixed step (ms, > 0)
+    settle_ms    : ms (>= 0) simulated without stimulus from the uniform
+                   start at v_init_mV before the first output sample
+                   (amendment 2, D-191)
     v_mV[j] is NEURON's somatic trace of ONE run of the whole sweep started
-    at v_init_mV, read at j / fs_Hz by linear interpolation; i_pA is
+    at v_init_mV, read at settle_ms + j / fs_Hz by linear interpolation (the
+    stimulus delayed by settle_ms + onset_s); i_pA is
     amplitude_pA on the samples j_on .. j_on + n_on - 1, j_on =
     round(onset_s * fs_Hz), n_on = round(duration_s * fs_Hz), and 0
     elsewhere. No noise, no averaging, no state kept between calls.
     ValueError: specs/SPEC.md, Block 11, "Refused"."""
-    raise NotImplementedError("Block 11")
+    amp = _twin_finite("amplitude_pA", amplitude_pA)
+    onset = _twin_finite("onset_s", onset_s)
+    if onset < 0.0:
+        raise ValueError("onset_s must be >= 0, got %r" % onset)
+    dur = _twin_positive("duration_s", duration_s)
+    fs = _twin_positive("fs_Hz", fs_Hz)
+    v0 = _twin_finite("v_init_mV", v_init_mV)
+    dt = _twin_positive("dt_ms", dt_ms)
+    settle = _twin_settle(settle_ms)
+    if isinstance(n_samples, (bool, np.bool_)):
+        raise ValueError("n_samples must be an integer, got %r" % (n_samples,))
+    import operator                     # local: nothing above the banner changes
+    try:
+        n = operator.index(n_samples)
+    except TypeError:
+        raise ValueError("n_samples must be an integer, got %r" % (n_samples,))
+    if n < 2:
+        raise ValueError("n_samples must be >= 2, got %d" % n)
+    j_on = int(round(onset * fs))
+    n_on = int(round(dur * fs))
+    if n_on < 1:
+        raise ValueError("duration_s %r is shorter than half a sample (fs_Hz %g)"
+                         % (dur, fs))
+    if j_on + n_on > n:
+        raise ValueError("the step (samples %d .. %d) does not fit in %d samples"
+                         % (j_on, j_on + n_on - 1, n))
+    t_out_ms = np.arange(n, dtype=np.float64) / fs * 1e3 + settle   # j / fs_Hz, settled
+    v = _twin_run(cell, amp, settle + onset * 1e3, dur * 1e3, t_out_ms, v0, dt)
+    i_pA = np.zeros(n, dtype=np.float64)
+    i_pA[j_on:j_on + n_on] = amp
+    return v, i_pA
+
+
+# Relative spread of a stored window's steps above which t_s is not uniform
+# (specs/SPEC.md, Block 11, "Refused").
+_TWIN_AXIS_RTOL = 1e-6
+
+
+def _twin_finite(name: str, x) -> float:
+    """float(x), refused (ValueError) when it is not a finite real number."""
+    try:
+        val = float(x)
+    except (TypeError, ValueError):
+        raise ValueError("%s must be a finite number, got %r" % (name, x))
+    if not math.isfinite(val):
+        raise ValueError("%s must be finite, got %r" % (name, val))
+    return val
+
+
+def _twin_settle(x) -> float:
+    """settle_ms as float, refused (ValueError) when not finite or < 0."""
+    val = _twin_finite("settle_ms", x)
+    if val < 0.0:
+        raise ValueError("settle_ms must be >= 0, got %r" % val)
+    return val
+
+
+def _twin_positive(name: str, x) -> float:
+    """float(x), refused (ValueError) when it is not finite and > 0."""
+    val = _twin_finite(name, x)
+    if not val > 0.0:
+        raise ValueError("%s must be > 0, got %r" % (name, val))
+    return val
+
+
+def _twin_run(cell, amp_pA: float, delay_ms: float, dur_ms: float,
+              t_out_ms: np.ndarray, v_init_mV: float, dt_ms: float) -> np.ndarray:
+    """ONE fixed-step NEURON run of `cell` from v_init_mV, read at t_out_ms
+    (ms on NEURON's clock) by numpy.interp, as _resample does. The run lasts
+    one step past the last output sample, so no sample is read beyond the
+    recorded trace; the steps before it are those of a shorter run."""
+    t_last = float(t_out_ms[-1])
+    t_ms, v = cell.simulate(stim_amp_pA=amp_pA, stim_delay_ms=delay_ms,
+                            stim_dur_ms=dur_ms, tstop_ms=t_last + dt_ms,
+                            v_init_mV=v_init_mV, dt_ms=dt_ms)
+    t_ms = np.asarray(t_ms, dtype=np.float64)
+    v = np.asarray(v, dtype=np.float64)
+    if t_ms.size < 2 or t_ms[-1] < t_last:
+        raise RuntimeError("NEURON's trace ends at %r ms, before the last sample at %r ms"
+                           % (float(t_ms[-1]) if t_ms.size else float("nan"), t_last))
+    out = np.interp(t_out_ms, t_ms, v).astype(np.float64)
+    if not np.all(np.isfinite(out)):
+        raise RuntimeError("NEURON's somatic trace is not finite")
+    return out
