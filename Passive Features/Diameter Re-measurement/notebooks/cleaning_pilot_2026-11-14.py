@@ -479,8 +479,9 @@ plt.show()
 # %% [markdown]
 # ## Cell 20: the clear-node fit -- no cleaning, one pass, the first stage held at Allen's diameter, centre weights, bump cut (D-169, D-171 to D-173)
 #
-# The nodes are Cell 19c's (clear nodes by size; its examples file is reused when it exists, else they are picked
-# here with the same rule). Two steps (SPEC Block 36 amendment 16):
+# Run after Cells 0, 1 and 16 (Cell 16 skips its survey when its examples file exists). The nodes are Cell 19c's
+# (clear nodes by size; its examples file is reused when it exists, else they are picked here with the same rule,
+# which needs Cell 16b's ranking in OUT/cleaning). Two steps (SPEC Block 36 amendments 16 and 17):
 #   1. `clean --no-clean`: per node the first stage with the diameter held at Allen's (absorption, centre, depth,
 #      sharpest plane, direction and background from it), the patch, the line as recorded. No neighbour is cleaned,
 #      no round is run. Downloads the patches when they are not cached; about a minute per node.
@@ -490,12 +491,14 @@ plt.show()
 #      dip beside the central one that rises at least BUMP_SD noise SDs gives no weight to the samples from it
 #      outwards. Then the node's own expected shadow (same-node clearance) at the estimate.
 # Knobs: WEIGHT_KAPPA, BUMP_SD (0 = no cut), D169_WEIGHTS ("none" = unweighted), D169_STARTS.
-# Time: the fit is the long step, of the order of 10 min per node and start (not measured for this path).
+# Time: the fit is the long step. Not measured on Allen's data: in the synthetic dry run (the tests' coarse 4 x 8
+# directions) one model evaluation took about 1.5 s and a node about 40 evaluations per solve; the production
+# setting has four times the directions, so expect several minutes to a quarter of an hour per node.
 # Output to send back: the lines `node <id>: weights ...` and `node <id>: d ...` of the log, the table, the
 # `focal_<S>.png` figure and the `fit_node<id>.png` figures (orange line: the weights; grey: samples with no weight).
 
 # %%
-import shutil
+import glob, json, os, shutil       # the cell's own imports: it can follow Cell 16 directly
 import pandas as pd
 from IPython.display import Image, display
 WEIGHT_KAPPA = 1.25                    # lambda in units of the FWHM from Allen's diameter (D-171.1; slightly > 1)
