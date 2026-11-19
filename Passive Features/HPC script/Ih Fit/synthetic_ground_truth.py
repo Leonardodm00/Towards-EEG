@@ -963,3 +963,49 @@ def write_ball_and_stick_swc(path: Path, *, soma_r_um: float = 10.0,
         parent = nid; nid += 1
     path.write_text("\n".join(lines) + "\n")
     return path
+
+
+# ===========================================================================
+#  The twins' clean responses (Block 11; specs/SPEC.md section 2.7 (f))
+# ===========================================================================
+# CONTRACT STUB (contract: wave 1). The signatures, shapes, dtypes and units
+# below are the contract; the bodies are written by Block 11's implementer.
+# Nothing above this line changes (the legacy path of old manifests).
+def simulate_ss_clean(cell, *, amplitude_pA: float, duration_s: float, t_s: np.ndarray,
+                      v_init_mV: float, dt_ms: float = 0.025) -> Tuple[np.ndarray, np.ndarray]:
+    """One Square Subthreshold pulse from rest on a stored window's time axis
+    (D-187): (v_mV, i_pA), both float64 (n_w,).
+
+    cell         : as build_synthetic_cell returns it
+    amplitude_pA : signed pulse amplitude (pA)
+    duration_s   : pulse duration (s, > 0)
+    t_s          : (n_w,) s, uniform, 0 at the pulse onset, t_s[0] < 0
+    v_init_mV    : the twin's resting potential (mV)
+    dt_ms        : NEURON's fixed step (ms, > 0)
+    v_mV[j] is NEURON's somatic trace of ONE run started at v_init_mV with
+    the stimulus delayed by -t_s[0], read at t_s[j] by linear interpolation
+    (as _resample does); i_pA is amplitude_pA where 0 <= t_s <= duration_s
+    and 0 elsewhere. No noise, no averaging, no state kept between calls.
+    ValueError: specs/SPEC.md, Block 11, "Refused"."""
+    raise NotImplementedError("Block 11")
+
+
+def simulate_ls_clean(cell, *, amplitude_pA: float, onset_s: float, duration_s: float, n_samples: int,
+                      fs_Hz: float, v_init_mV: float, dt_ms: float = 0.025) -> Tuple[np.ndarray, np.ndarray]:
+    """One Long Square sweep from rest at its real amplitude and timing
+    (D-186.4): (v_mV, i_pA), both float64 (n_samples,).
+
+    amplitude_pA : signed step amplitude (pA)
+    onset_s      : step onset from the sweep's first sample (s, >= 0)
+    duration_s   : step duration (s, > 0)
+    n_samples    : samples of the sweep (>= 2); sample j at j / fs_Hz
+    fs_Hz        : sampling rate (Hz, > 0)
+    v_init_mV    : the twin's resting potential (mV)
+    dt_ms        : NEURON's fixed step (ms, > 0)
+    v_mV[j] is NEURON's somatic trace of ONE run of the whole sweep started
+    at v_init_mV, read at j / fs_Hz by linear interpolation; i_pA is
+    amplitude_pA on the samples j_on .. j_on + n_on - 1, j_on =
+    round(onset_s * fs_Hz), n_on = round(duration_s * fs_Hz), and 0
+    elsewhere. No noise, no averaging, no state kept between calls.
+    ValueError: specs/SPEC.md, Block 11, "Refused"."""
+    raise NotImplementedError("Block 11")
