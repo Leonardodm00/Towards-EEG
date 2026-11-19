@@ -1,0 +1,173 @@
+ x["protocol"] == pr and not x["failed"]]] for v in [[J / d for J, d in w]] if w]; [(h(r), s(r)) for r in rs]' "$OUT"
+508282493 W0     R=0    J=    23.1 max|du|=-      sigma_f 0.0335 sigma_m 0.0169 tau_m 0.060 ms sigma_s 0.0520 tau_s 27.4 ms
+508282493 Sigma_1 R=600  J=    36.9 max|du|=1.664  sigma_f 0.0337 sigma_m 0.0172 tau_m 0.073 ms sigma_s 0.0892 tau_s 144.9 ms
+508282493 Sigma_2 R=600  J=    32.7 max|du|=0.121  sigma_f 0.0338 sigma_m 0.0170 tau_m 0.073 ms sigma_s 0.0891 tau_s 128.4 ms
+508282493 Sigma_3 R=600  J=    34.0 max|du|=0.047  sigma_f 0.0341 sigma_m 0.0172 tau_m 0.073 ms sigma_s 0.0888 tau_s 134.6 ms
+508282493 Sigma_4 R=600  J=    34.8 max|du|=0.059  sigma_f 0.0341 sigma_m 0.0172 tau_m 0.072 ms sigma_s 0.0942 tau_s 138.6 ms
+508282493 Sigma_5 R=600  J=    36.0 max|du|=0.305  sigma_f 0.0342 sigma_m 0.0175 tau_m 0.074 ms sigma_s 0.0780 tau_s 102.1 ms
+508282493 Sigma_6 R=600  J=    28.7 max|du|=0.313  sigma_f 0.0338 sigma_m 0.0170 tau_m 0.069 ms sigma_s 0.0954 tau_s 139.6 ms
+508282493 final  R=3000 J=    35.0 max|du|=0.164  sigma_f 0.0343 sigma_m 0.0174 tau_m 0.071 ms sigma_s 0.0838 tau_s 118.5 ms
+508282493 ss sweeps fitted 2, J_s/dof_s median 0.63, q90 0.70, max 0.7, p<0.01 in 0
+508282493 ls sweeps fitted 22, J_s/dof_s median 1.25, q90 2.97, max 4.7, p<0.01 in 4
+526785799 W0     R=0    J=    52.0 max|du|=-      sigma_f 0.0275 sigma_m 0.0181 tau_m 0.042 ms sigma_s 0.0712 tau_s 45.3 ms
+526785799 Sigma_1 R=600  J=   165.2 max|du|=2.495  sigma_f 0.0325 sigma_m 0.0225 tau_m 0.057 ms sigma_s 0.1752 tau_s 549.3 ms
+526785799 Sigma_2 R=600  J=    69.2 max|du|=0.482  sigma_f 0.0324 sigma_m 0.0225 tau_m 0.055 ms sigma_s 0.2369 tau_s 889.3 ms
+526785799 Sigma_3 R=600  J=    83.9 max|du|=0.015  sigma_f 0.0328 sigma_m 0.0227 tau_m 0.055 ms sigma_s 0.2405 tau_s 885.3 ms
+526785799 Sigma_4 R=600  J=    71.4 max|du|=0.432  sigma_f 0.0325 sigma_m 0.0226 tau_m 0.059 ms sigma_s 0.2953 tau_s 1364.2 ms
+526785799 Sigma_5 R=600  J=    76.0 max|du|=0.071  sigma_f 0.0326 sigma_m 0.0226 tau_m 0.056 ms sigma_s 0.2806 tau_s 1270.2 ms
+526785799 Sigma_6 R=600  J=    71.7 max|du|=0.021  sigma_f 0.0326 sigma_m 0.0227 tau_m 0.055 ms sigma_s 0.2821 tau_s 1280.2 ms
+526785799 final  R=3000 J=    72.9 max|du|=0.031  sigma_f 0.0326 sigma_m 0.0227 tau_m 0.057 ms sigma_s 0.2818 tau_s 1277.1 ms
+526785799 ss sweeps fitted 2, J_s/dof_s median 0.36, q90 0.57, max 0.6, p<0.01 in 0
+526785799 ls sweeps fitted 28, J_s/dof_s median 1.32, q90 16.78, max 65.5, p<0.01 in 11
+529878215 W0     R=0    J=    82.3 max|du|=-      sigma_f 0.0319 sigma_m 0.0165 tau_m 0.066 ms sigma_s 0.0477 tau_s 29.3 ms
+529878215 Sigma_1 R=600  J=   258.9 max|du|=0.308  sigma_f 0.0315 sigma_m 0.0160 tau_m 0.068 ms sigma_s 0.0513 tau_s 39.9 ms
+529878215 Sigma_2 R=600  J=   234.4 max|du|=0.211  sigma_f 0.0313 sigma_m 0.0160 tau_m 0.068 ms sigma_s 0.0565 tau_s 49.2 ms
+529878215 Sigma_3 R=600  J=   192.8 max|du|=0.646  sigma_f 0.0316 sigma_m 0.0162 tau_m 0.073 ms sigma_s 0.0687 tau_s 94.0 ms
+529878215 Sigma_4 R=600  J=   142.8 max|du|=0.064  sigma_f 0.0315 sigma_m 0.0165 tau_m 0.073 ms sigma_s 0.0732 tau_s 93.5 ms
+529878215 Sigma_5 R=600  J=   144.8 max|du|=0.283  sigma_f 0.0317 sigma_m 0.0165 tau_m 0.071 ms sigma_s 0.0840 tau_s 124.1 ms
+529878215 Sigma_6 R=600  J=   105.8 max|du|=0.021  sigma_f 0.0320 sigma_m 0.0167 tau_m 0.070 ms sigma_s 0.0856 tau_s 123.9 ms
+529878215 final  R=3000 J=    95.0 max|du|=0.011  sigma_f 0.0322 sigma_m 0.0166 tau_m 0.070 ms sigma_s 0.0860 tau_s 124.3 ms
+529878215 ss sweeps fitted 2, J_s/dof_s median 0.93, q90 1.17, max 1.2, p<0.01 in 0
+529878215 ls sweeps fitted 38, J_s/dof_s median 1.40, q90 3.49, max 6.0, p<0.01 in 9
+531520401 W0     R=0    J=     5.7 max|du|=-      sigma_f 0.0334 sigma_m 0.0251 tau_m 0.062 ms sigma_s 0.0631 tau_s 91.9 ms
+531520401 Sigma_1 R=600  J=    48.9 max|du|=0.281  sigma_f 0.0330 sigma_m 0.0255 tau_m 0.065 ms sigma_s 0.0543 tau_s 69.4 ms
+531520401 Sigma_2 R=600  J=    50.0 max|du|=0.016  sigma_f 0.0330 sigma_m 0.0256 tau_m 0.064 ms sigma_s 0.0538 tau_s 69.3 ms
+531520401 Sigma_3 R=600  J=    54.1 max|du|=0.046  sigma_f 0.0331 sigma_m 0.0256 tau_m 0.067 ms sigma_s 0.0546 tau_s 69.5 ms
+531520401 Sigma_4 R=600  J=    49.9 max|du|=0.033  sigma_f 0.0331 sigma_m 0.0255 tau_m 0.067 ms sigma_s 0.0529 tau_s 68.8 ms
+531520401 Sigma_5 R=600  J=    54.0 max|du|=0.022  sigma_f 0.0331 sigma_m 0.0257 tau_m 0.065 ms sigma_s 0.0535 tau_s 68.1 ms
+531520401 Sigma_6 R=600  J=    51.2 max|du|=0.031  sigma_f 0.0331 sigma_m 0.0256 tau_m 0.067 ms sigma_s 0.0545 tau_s 69.1 ms
+531520401 final  R=3000 J=    51.5 max|du|=0.027  sigma_f 0.0330 sigma_m 0.0256 tau_m 0.065 ms sigma_s 0.0540 tau_s 69.2 ms
+531520401 ss sweeps fitted 2, J_s/dof_s median 2.06, q90 2.08, max 2.1, p<0.01 in 0
+531520401 ls sweeps fitted 25, J_s/dof_s median 1.56, q90 3.77, max 6.1, p<0.01 in 7
+531523484 W0     R=0    J=    10.1 max|du|=-      sigma_f 0.0346 sigma_m 0.0194 tau_m 0.094 ms sigma_s 0.0503 tau_s 38.1 ms
+531523484 Sigma_1 R=600  J=    37.8 max|du|=0.098  sigma_f 0.0348 sigma_m 0.0201 tau_m 0.092 ms sigma_s 0.0499 tau_s 42.1 ms
+531523484 Sigma_2 R=600  J=    33.4 max|du|=0.020  sigma_f 0.0348 sigma_m 0.0202 tau_m 0.094 ms sigma_s 0.0497 tau_s 42.1 ms
+531523484 Sigma_3 R=600  J=    33.5 max|du|=0.010  sigma_f 0.0349 sigma_m 0.0203 tau_m 0.094 ms sigma_s 0.0494 tau_s 41.7 ms
+531523484 Sigma_4 R=600  J=    29.9 max|du|=0.028  sigma_f 0.0348 sigma_m 0.0202 tau_m 0.092 ms sigma_s 0.0496 tau_s 42.3 ms
+531523484 Sigma_5 R=600  J=    32.5 max|du|=0.033  sigma_f 0.0349 sigma_m 0.0201 tau_m 0.095 ms sigma_s 0.0498 tau_s 42.3 ms
+531523484 Sigma_6 R=600  J=    34.4 max|du|=0.015  sigma_f 0.0349 sigma_m 0.0202 tau_m 0.095 ms sigma_s 0.0493 tau_s 41.7 ms
+531523484 final  R=3000 J=    32.7 max|du|=0.010  sigma_f 0.0349 sigma_m 0.0201 tau_m 0.094 ms sigma_s 0.0498 tau_s 41.8 ms
+531523484 ss sweeps fitted 2, J_s/dof_s median 1.49, q90 2.17, max 2.3, p<0.01 in 0
+531523484 ls sweeps fitted 32, J_s/dof_s median 1.24, q90 4.76, max 79.3, p<0.01 in 6
+531526539 W0     R=0    J=     3.4 max|du|=-      sigma_f 0.0330 sigma_m 0.0218 tau_m 0.117 ms sigma_s 0.0670 tau_s 67.7 ms
+531526539 Sigma_1 R=600  J=    28.0 max|du|=0.376  sigma_f 0.0338 sigma_m 0.0223 tau_m 0.105 ms sigma_s 0.0570 tau_s 46.4 ms
+531526539 Sigma_2 R=600  J=    37.9 max|du|=0.022  sigma_f 0.0339 sigma_m 0.0223 tau_m 0.107 ms sigma_s 0.0570 tau_s 46.0 ms
+531526539 Sigma_3 R=600  J=    37.1 max|du|=0.019  sigma_f 0.0339 sigma_m 0.0221 tau_m 0.107 ms sigma_s 0.0581 tau_s 45.9 ms
+531526539 Sigma_4 R=600  J=    32.1 max|du|=0.070  sigma_f 0.0338 sigma_m 0.0223 tau_m 0.106 ms sigma_s 0.0564 tau_s 42.8 ms
+531526539 Sigma_5 R=600  J=    33.4 max|du|=0.065  sigma_f 0.0339 sigma_m 0.0221 tau_m 0.104 ms sigma_s 0.0592 tau_s 45.6 ms
+531526539 Sigma_6 R=600  J=    33.5 max|du|=0.185  sigma_f 0.0339 sigma_m 0.0221 tau_m 0.106 ms sigma_s 0.0544 tau_s 37.9 ms
+531526539 final  R=3000 J=    35.2 max|du|=0.018  sigma_f 0.0339 sigma_m 0.0221 tau_m 0.105 ms sigma_s 0.0554 tau_s 38.6 ms
+531526539 ss sweeps fitted 2, J_s/dof_s median 1.50, q90 1.69, max 1.7, p<0.01 in 0
+531526539 ls sweeps fitted 23, J_s/dof_s median 1.15, q90 2.34, max 3.4, p<0.01 in 3
+537297470 W0     R=0    J=    13.9 max|du|=-      sigma_f 0.0317 sigma_m 0.0170 tau_m 0.049 ms sigma_s 0.0361 tau_s 25.6 ms
+537297470 Sigma_1 R=600  J=    77.6 max|du|=0.539  sigma_f 0.0320 sigma_m 0.0174 tau_m 0.057 ms sigma_s 0.0412 tau_s 43.9 ms
+537297470 Sigma_2 R=600  J=    48.7 max|du|=0.661  sigma_f 0.0319 sigma_m 0.0175 tau_m 0.060 ms sigma_s 0.0513 tau_s 85.0 ms
+537297470 Sigma_3 R=600  J=    38.0 max|du|=0.023  sigma_f 0.0319 sigma_m 0.0172 tau_m 0.061 ms sigma_s 0.0525 tau_s 83.2 ms
+537297470 Sigma_4 R=600  J=    31.1 max|du|=0.060  sigma_f 0.0319 sigma_m 0.0175 tau_m 0.058 ms sigma_s 0.0509 tau_s 78.3 ms
+537297470 Sigma_5 R=600  J=    38.8 max|du|=0.061  sigma_f 0.0318 sigma_m 0.0176 tau_m 0.056 ms sigma_s 0.0526 tau_s 83.2 ms
+537297470 Sigma_6 R=600  J=    33.0 max|du|=0.053  sigma_f 0.0320 sigma_m 0.0175 tau_m 0.059 ms sigma_s 0.0529 tau_s 83.3 ms
+537297470 final  R=3000 J=    32.4 max|du|=0.024  sigma_f 0.0319 sigma_m 0.0176 tau_m 0.058 ms sigma_s 0.0527 tau_s 82.5 ms
+537297470 ss sweeps fitted 2, J_s/dof_s median 1.33, q90 2.21, max 2.4, p<0.01 in 0
+537297470 ls sweeps fitted 34, J_s/dof_s median 1.41, q90 2.40, max 4.4, p<0.01 in 4
+537313600 W0     R=0    J=     5.1 max|du|=-      sigma_f 0.0314 sigma_m 0.0196 tau_m 0.047 ms sigma_s 0.0532 tau_s 71.6 ms
+537313600 Sigma_1 R=600  J=    38.4 max|du|=0.326  sigma_f 0.0320 sigma_m 0.0207 tau_m 0.053 ms sigma_s 0.0566 tau_s 99.2 ms
+537313600 Sigma_2 R=600  J=    34.8 max|du|=0.008  sigma_f 0.0320 sigma_m 0.0206 tau_m 0.053 ms sigma_s 0.0568 tau_s 100.0 ms
+537313600 final  R=3000 J=    34.8 max|du|=0.006  sigma_f 0.0321 sigma_m 0.0205 tau_m 0.053 ms sigma_s 0.0570 tau_s 99.6 ms
+537313600 ss sweeps fitted 2, J_s/dof_s median 2.34, q90 2.50, max 2.5, p<0.01 in 0
+537313600 ls sweeps fitted 37, J_s/dof_s median 1.01, q90 2.34, max 3.3, p<0.01 in 4
+539653924 W0     R=0    J=     7.6 max|du|=-      sigma_f 0.0312 sigma_m 0.0170 tau_m 0.074 ms sigma_s 0.4203 tau_s 3347.8 ms
+539653924 Sigma_1 R=600  J=    30.2 max|du|=2.239  sigma_f 0.0340 sigma_m 0.0190 tau_m 0.070 ms sigma_s 0.1349 tau_s 356.6 ms
+539653924 Sigma_2 R=600  J=    35.5 max|du|=0.753  sigma_f 0.0345 sigma_m 0.0193 tau_m 0.073 ms sigma_s 0.0959 tau_s 168.0 ms
+539653924 Sigma_3 R=600  J=    48.8 max|du|=0.010  sigma_f 0.0346 sigma_m 0.0192 tau_m 0.072 ms sigma_s 0.0967 tau_s 167.8 ms
+539653924 Sigma_4 R=600  J=    41.9 max|du|=0.040  sigma_f 0.0345 sigma_m 0.0191 tau_m 0.069 ms sigma_s 0.0989 tau_s 169.5 ms
+539653924 Sigma_5 R=600  J=    47.7 max|du|=0.059  sigma_f 0.0345 sigma_m 0.0193 tau_m 0.073 ms sigma_s 0.0988 tau_s 170.0 ms
+539653924 Sigma_6 R=600  J=    44.4 max|du|=0.011  sigma_f 0.0346 sigma_m 0.0193 tau_m 0.074 ms sigma_s 0.0981 tau_s 169.8 ms
+539653924 final  R=3000 J=    46.3 max|du|=0.014  sigma_f 0.0346 sigma_m 0.0193 tau_m 0.073 ms sigma_s 0.0974 tau_s 169.7 ms
+539653924 ss sweeps fitted 2, J_s/dof_s median 1.38, q90 2.35, max 2.6, p<0.01 in 0
+539653924 ls sweeps fitted 27, J_s/dof_s median 0.86, q90 3.07, max 20.6, p<0.01 in 6
+541545716 W0     R=0    J=    59.5 max|du|=-      sigma_f 0.0320 sigma_m 0.0217 tau_m 0.129 ms sigma_s 0.1090 tau_s 354.6 ms
+541545716 Sigma_1 R=600  J=    98.7 max|du|=0.857  sigma_f 0.0346 sigma_m 0.0231 tau_m 0.113 ms sigma_s 0.0817 tau_s 150.5 ms
+541545716 Sigma_2 R=600  J=   117.1 max|du|=0.019  sigma_f 0.0344 sigma_m 0.0228 tau_m 0.111 ms sigma_s 0.0821 tau_s 151.3 ms
+541545716 Sigma_3 R=600  J=   117.5 max|du|=0.630  sigma_f 0.0343 sigma_m 0.0229 tau_m 0.103 ms sigma_s 0.0637 tau_s 80.6 ms
+541545716 Sigma_4 R=600  J=   112.6 max|du|=0.049  sigma_f 0.0345 sigma_m 0.0229 tau_m 0.108 ms sigma_s 0.0629 tau_s 80.7 ms
+541545716 Sigma_5 R=600  J=   109.2 max|du|=0.062  sigma_f 0.0347 sigma_m 0.0229 tau_m 0.115 ms sigma_s 0.0633 tau_s 81.9 ms
+541545716 Sigma_6 R=600  J=   118.2 max|du|=0.022  sigma_f 0.0347 sigma_m 0.0227 tau_m 0.114 ms sigma_s 0.0647 tau_s 80.7 ms
+541545716 final  R=3000 J=   107.0 max|du|=0.057  sigma_f 0.0346 sigma_m 0.0229 tau_m 0.108 ms sigma_s 0.0642 tau_s 80.9 ms
+541545716 ss sweeps fitted 2, J_s/dof_s median 5.16, q90 6.80, max 7.2, p<0.01 in 1
+541545716 ls sweeps fitted 26, J_s/dof_s median 1.70, q90 3.64, max 6.9, p<0.01 in 9
+548408551 W0     R=0    J=    16.2 max|du|=-      sigma_f 0.0318 sigma_m 0.0148 tau_m 0.081 ms sigma_s 0.1168 tau_s 295.9 ms
+548408551 Sigma_1 R=600  J=    28.4 max|du|=0.090  sigma_f 0.0316 sigma_m 0.0162 tau_m 0.086 ms sigma_s 0.1190 tau_s 285.3 ms
+548408551 Sigma_2 R=600  J=    30.8 max|du|=0.024  sigma_f 0.0316 sigma_m 0.0161 tau_m 0.088 ms sigma_s 0.1180 tau_s 285.7 ms
+548408551 Sigma_3 R=600  J=    30.6 max|du|=0.056  sigma_f 0.0315 sigma_m 0.0163 tau_m 0.083 ms sigma_s 0.1183 tau_s 286.7 ms
+548408551 Sigma_4 R=600  J=    28.5 max|du|=0.036  sigma_f 0.0315 sigma_m 0.0162 tau_m 0.086 ms sigma_s 0.1193 tau_s 284.9 ms
+548408551 Sigma_5 R=600  J=    34.5 max|du|=0.085  sigma_f 0.0314 sigma_m 0.0161 tau_m 0.083 ms sigma_s 0.1252 tau_s 310.1 ms
+548408551 Sigma_6 R=600  J=    30.1 max|du|=0.081  sigma_f 0.0315 sigma_m 0.0163 tau_m 0.078 ms sigma_s 0.1205 tau_s 286.1 ms
+548408551 final  R=3000 J=    30.4 max|du|=0.085  sigma_f 0.0316 sigma_m 0.0161 tau_m 0.085 ms sigma_s 0.1193 tau_s 286.0 ms
+548408551 ss sweeps fitted 2, J_s/dof_s median 0.87, q90 1.08, max 1.1, p<0.01 in 0
+548408551 ls sweeps fitted 29, J_s/dof_s median 1.19, q90 2.86, max 12.3, p<0.01 in 5
+548425467 W0     R=0    J=     7.5 max|du|=-      sigma_f 0.0333 sigma_m 0.0213 tau_m 0.920 ms sigma_s 0.0809 tau_s 114.0 ms
+548425467 Sigma_1 R=600  J=    56.8 max|du|=2.467  sigma_f 0.0314 sigma_m 0.0188 tau_m 0.078 ms sigma_s 0.0825 tau_s 92.2 ms
+548425467 Sigma_2 R=600  J=    50.3 max|du|=0.096  sigma_f 0.0315 sigma_m 0.0183 tau_m 0.086 ms sigma_s 0.0816 tau_s 91.8 ms
+548425467 Sigma_3 R=600  J=    48.1 max|du|=0.088  sigma_f 0.0312 sigma_m 0.0184 tau_m 0.079 ms sigma_s 0.0799 tau_s 84.1 ms
+548425467 Sigma_4 R=600  J=    51.1 max|du|=0.092  sigma_f 0.0315 sigma_m 0.0183 tau_m 0.085 ms sigma_s 0.0814 tau_s 92.2 ms
+548425467 Sigma_5 R=600  J=    52.2 max|du|=0.016  sigma_f 0.0315 sigma_m 0.0186 tau_m 0.086 ms sigma_s 0.0827 tau_s 92.1 ms
+548425467 Sigma_6 R=600  J=    49.9 max|du|=0.025  sigma_f 0.0314 sigma_m 0.0186 tau_m 0.084 ms sigma_s 0.0824 tau_s 92.0 ms
+548425467 final  R=3000 J=    48.0 max|du|=0.052  sigma_f 0.0314 sigma_m 0.0184 tau_m 0.079 ms sigma_s 0.0823 tau_s 91.8 ms
+548425467 ss sweeps fitted 2, J_s/dof_s median 1.70, q90 2.66, max 2.9, p<0.01 in 0
+548425467 ls sweeps fitted 29, J_s/dof_s median 1.50, q90 5.94, max 135.6, p<0.01 in 10
+548473051 W0     R=0    J=     9.0 max|du|=-      sigma_f 0.0319 sigma_m 0.0177 tau_m 0.108 ms sigma_s 0.0880 tau_s 238.5 ms
+548473051 Sigma_1 R=600  J=    31.8 max|du|=1.167  sigma_f 0.0324 sigma_m 0.0179 tau_m 0.076 ms sigma_s 0.0560 tau_s 74.2 ms
+548473051 Sigma_2 R=600  J=    35.8 max|du|=0.027  sigma_f 0.0324 sigma_m 0.0181 tau_m 0.075 ms sigma_s 0.0575 tau_s 75.0 ms
+548473051 Sigma_3 R=600  J=    31.9 max|du|=0.063  sigma_f 0.0325 sigma_m 0.0180 tau_m 0.080 ms sigma_s 0.0560 tau_s 74.3 ms
+548473051 Sigma_4 R=600  J=    34.3 max|du|=0.043  sigma_f 0.0324 sigma_m 0.0182 tau_m 0.077 ms sigma_s 0.0561 tau_s 74.3 ms
+548473051 Sigma_5 R=600  J=    33.7 max|du|=0.018  sigma_f 0.0325 sigma_m 0.0179 tau_m 0.078 ms sigma_s 0.0565 tau_s 74.7 ms
+548473051 Sigma_6 R=600  J=    34.3 max|du|=0.017  sigma_f 0.0325 sigma_m 0.0178 tau_m 0.077 ms sigma_s 0.0575 tau_s 74.8 ms
+548473051 final  R=3000 J=    34.6 max|du|=0.003  sigma_f 0.0324 sigma_m 0.0178 tau_m 0.077 ms sigma_s 0.0573 tau_s 75.0 ms
+548473051 ss sweeps fitted 2, J_s/dof_s median 1.32, q90 1.70, max 1.8, p<0.01 in 0
+548473051 ls sweeps fitted 33, J_s/dof_s median 1.09, q90 2.37, max 7.0, p<0.01 in 6
+569844159 W0     R=0    J=   126.8 max|du|=-      sigma_f 0.0308 sigma_m 0.0272 tau_m 0.073 ms sigma_s 0.0454 tau_s 22.9 ms
+569844159 Sigma_1 R=600  J=  1004.4 max|du|=0.233  sigma_f 0.0312 sigma_m 0.0265 tau_m 0.081 ms sigma_s 0.0446 tau_s 18.1 ms
+569844159 Sigma_2 R=600  J=  1204.9 max|du|=0.086  sigma_f 0.0312 sigma_m 0.0269 tau_m 0.075 ms sigma_s 0.0435 tau_s 16.6 ms
+569844159 Sigma_3 R=600  J=  1155.1 max|du|=0.039  sigma_f 0.0312 sigma_m 0.0265 tau_m 0.077 ms sigma_s 0.0431 tau_s 16.0 ms
+569844159 Sigma_4 R=600  J=  1280.3 max|du|=0.132  sigma_f 0.0310 sigma_m 0.0266 tau_m 0.072 ms sigma_s 0.0451 tau_s 18.2 ms
+569844159 Sigma_5 R=600  J=  1198.4 max|du|=0.062  sigma_f 0.0311 sigma_m 0.0268 tau_m 0.077 ms sigma_s 0.0458 tau_s 18.1 ms
+569844159 Sigma_6 R=600  J=  1187.5 max|du|=0.287  sigma_f 0.0311 sigma_m 0.0265 tau_m 0.076 ms sigma_s 0.0480 tau_s 24.1 ms
+569844159 final  R=3000 J=   938.0 max|du|=0.010  sigma_f 0.0310 sigma_m 0.0267 tau_m 0.076 ms sigma_s 0.0475 tau_s 24.1 ms
+569844159 ss sweeps fitted 10, J_s/dof_s median 2.23, q90 4.63, max 6.6, p<0.01 in 4
+569844159 ls sweeps fitted 38, J_s/dof_s median 1.37, q90 2.50, max 4.3, p<0.01 in 5
+571430815 W0     R=0    J=    17.4 max|du|=-      sigma_f 0.0318 sigma_m 0.0184 tau_m 0.197 ms sigma_s 2.0219 tau_s 9999.5 ms
+571430815 Sigma_1 R=600  J=    42.0 max|du|=0.892  sigma_f 0.0315 sigma_m 0.0176 tau_m 0.081 ms sigma_s 1.8121 tau_s 6876.8 ms
+571430815 Sigma_2 R=600  J=    40.7 max|du|=0.159  sigma_f 0.0316 sigma_m 0.0177 tau_m 0.078 ms sigma_s 1.9370 tau_s 8062.5 ms
+571430815 Sigma_3 R=600  J=    36.6 max|du|=0.033  sigma_f 0.0316 sigma_m 0.0178 tau_m 0.078 ms sigma_s 1.9207 tau_s 7802.6 ms
+571430815 Sigma_4 R=600  J=    40.0 max|du|=0.316  sigma_f 0.0315 sigma_m 0.0180 tau_m 0.079 ms sigma_s 1.6226 tau_s 5689.9 ms
+571430815 Sigma_5 R=600  J=    37.9 max|du|=0.022  sigma_f 0.0315 sigma_m 0.0177 tau_m 0.081 ms sigma_s 1.6001 tau_s 5667.6 ms
+571430815 Sigma_6 R=600  J=    40.6 max|du|=0.036  sigma_f 0.0314 sigma_m 0.0178 tau_m 0.084 ms sigma_s 1.6146 tau_s 5661.6 ms
+571430815 final  R=3000 J=    38.4 max|du|=0.077  sigma_f 0.0315 sigma_m 0.0178 tau_m 0.078 ms sigma_s 1.6150 tau_s 5656.3 ms
+571430815 ss sweeps fitted 6, J_s/dof_s median 1.38, q90 2.37, max 2.4, p<0.01 in 0
+571430815 ls sweeps fitted 16, J_s/dof_s median 1.15, q90 2.83, max 3.7, p<0.01 in 4
+571483807 W0     R=0    J=   107.7 max|du|=-      sigma_f 0.0359 sigma_m 0.0323 tau_m 1.000 ms sigma_s 0.1084 tau_s 337.5 ms
+571483807 Sigma_1 R=600  J=   191.6 max|du|=3.536  sigma_f 0.0329 sigma_m 0.0242 tau_m 0.060 ms sigma_s 0.0461 tau_s 9.8 ms
+571483807 Sigma_2 R=600  J=   201.7 max|du|=0.138  sigma_f 0.0331 sigma_m 0.0251 tau_m 0.057 ms sigma_s 0.0485 tau_s 11.3 ms
+571483807 Sigma_3 R=600  J=   186.3 max|du|=0.053  sigma_f 0.0327 sigma_m 0.0255 tau_m 0.054 ms sigma_s 0.0470 tau_s 11.2 ms
+571483807 Sigma_4 R=600  J=   211.6 max|du|=0.010  sigma_f 0.0327 sigma_m 0.0255 tau_m 0.053 ms sigma_s 0.0475 tau_s 11.2 ms
+571483807 final  R=3000 J=   175.6 max|du|=0.005  sigma_f 0.0328 sigma_m 0.0255 tau_m 0.054 ms sigma_s 0.0476 tau_s 11.2 ms
+571483807 ss sweeps fitted 10, J_s/dof_s median 3.69, q90 6.82, max 7.9, p<0.01 in 7
+571483807 ls sweeps fitted 27, J_s/dof_s median 2.67, q90 21.61, max 27.8, p<0.01 in 16
+571624532 W0     R=0    J=    83.2 max|du|=-      sigma_f 0.0325 sigma_m 0.0199 tau_m 0.079 ms sigma_s 0.2071 tau_s 1392.3 ms
+571624532 Sigma_1 R=600  J=    72.6 max|du|=1.371  sigma_f 0.0348 sigma_m 0.0211 tau_m 0.094 ms sigma_s 0.1146 tau_s 353.6 ms
+571624532 Sigma_2 R=600  J=    85.4 max|du|=0.126  sigma_f 0.0346 sigma_m 0.0208 tau_m 0.094 ms sigma_s 0.1076 tau_s 311.8 ms
+571624532 Sigma_3 R=600  J=    83.6 max|du|=0.120  sigma_f 0.0345 sigma_m 0.0210 tau_m 0.093 ms sigma_s 0.1141 tau_s 351.5 ms
+571624532 Sigma_4 R=600  J=    75.1 max|du|=0.004  sigma_f 0.0346 sigma_m 0.0209 tau_m 0.094 ms sigma_s 0.1142 tau_s 352.9 ms
+571624532 final  R=3000 J=    80.1 max|du|=0.010  sigma_f 0.0346 sigma_m 0.0210 tau_m 0.094 ms sigma_s 0.1131 tau_s 352.0 ms
+571624532 ss sweeps fitted 10, J_s/dof_s median 1.71, q90 2.09, max 2.4, p<0.01 in 0
+571624532 ls sweeps fitted 26, J_s/dof_s median 1.35, q90 2.72, max 16.0, p<0.01 in 6
+571691416 W0     R=0    J=    16.6 max|du|=-      sigma_f 0.0313 sigma_m 0.0155 tau_m 0.065 ms sigma_s 0.1068 tau_s 70.3 ms
+571691416 Sigma_1 R=600  J=    23.4 max|du|=0.539  sigma_f 0.0329 sigma_m 0.0175 tau_m 0.108 ms sigma_s 0.1241 tau_s 120.5 ms
+571691416 Sigma_2 R=600  J=    22.3 max|du|=0.026  sigma_f 0.0331 sigma_m 0.0178 tau_m 0.111 ms sigma_s 0.1227 tau_s 120.2 ms
+571691416 Sigma_3 R=600  J=    22.6 max|du|=0.036  sigma_f 0.0333 sigma_m 0.0177 tau_m 0.115 ms sigma_s 0.1244 tau_s 119.4 ms
+571691416 Sigma_4 R=600  J=    22.9 max|du|=0.064  sigma_f 0.0331 sigma_m 0.0176 tau_m 0.108 ms sigma_s 0.1248 tau_s 120.0 ms
+571691416 Sigma_5 R=600  J=    22.8 max|du|=0.024  sigma_f 0.0332 sigma_m 0.0177 tau_m 0.106 ms sigma_s 0.1243 tau_s 120.7 ms
+571691416 Sigma_6 R=600  J=    24.7 max|du|=0.057  sigma_f 0.0331 sigma_m 0.0178 tau_m 0.112 ms sigma_s 0.1238 tau_s 121.1 ms
+571691416 final  R=3000 J=    22.5 max|du|=0.010  sigma_f 0.0331 sigma_m 0.0177 tau_m 0.111 ms sigma_s 0.1246 tau_s 120.4 ms
+571691416 ss sweeps fitted 2, J_s/dof_s median 1.53, q90 2.06, max 2.2, p<0.01 in 0
+571691416 ls sweeps fitted 26, J_s/dof_s median 1.02, q90 1.58, max 3.6, p<0.01 in 2

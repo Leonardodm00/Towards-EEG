@@ -21,6 +21,7 @@ which stays the history of Block 9 and of D-122 to D-125.
 | 2026-11-17 (later, 6) | The plan approved (D-154) and carried out: the three-component law implemented, checked and merged into `main` (SPEC 2.6; D-155 [orchestrator]). §4 "The run under the three-component law" holds the commands for davinci. The nf1 tables feed no twin. |
 | 2026-11-18 | The nf2 pilot finished (user's paste, 13:37): 2 ok; 508282493 19299 s (nf1 14536 s, x 1.33), 569844159 25203 s (nf1 27308 s, x 0.92). The law, J and flags not yet read: the one-liner of §4 asked for. |
 | 2026-11-18 (later) | The nf2 pilot read back (user's paste, 14:26; §4 "The nf2 pilot read back"): J/dof 6.8 to 2.2 and 160 to 59; the lag-shape residuals gone; no bound, no failed sweep; both cells `no_plateau`; the remaining residual a disagreement between the SS and LS statistics. The 18-cell run recommended now, with a second read-back (the iteration histories and the per-sweep fits). |
+| 2026-11-19 | The 18-cell nf2 run read back (the user's paste of the second one-liner over the 18 JSONs, 12:12; §4 "The nf2 run read back"; `dev/2026-11-19_nf2_readback/`): J/dof lower in 18 of 18 (median 10.8 to 2.65); no bound; the per-sweep laws rejected at 1 % in 19 % (SS) and 23 % (LS) of sweeps (nf1 69 % and 56 %); 15 cells `no_plateau` without a steady drift; the slow part determined only as sigma_s^2 / tau_s where tau_s is long (checked by computation). Step 2 done under D-152; step 3 next, with §6 item 9 first. |
 
 **Basis tags.** **[run]** executed in the assistant's sandbox (date given); **[src]** read from the code, SPEC or log
 on `main`; **[log]** the decision log's text; **[user]** the user's decision or words; **[reasoning]** the assistant's
@@ -31,8 +32,8 @@ argument, not checked; **[open]** not decided or not verified.
 | # | Step | Blocked by | Where it runs |
 |---|---|---|---|
 | 1 | **Block 6's code**: `run_noise_fit.py`, `submit_noise_fit.sh`, `smoke_noise_run.py` (R1-R8), exactly as SPEC Block 6 states -- **done 2026-11-13, `1d848f6`** (R1-R9) | nothing: D-123 to D-126 settle every point | sandbox |
-| 2 | **The run on davinci** (the user runs it, §4): `git pull`, the FULL gates, a dry run, the 2-cell pilot at full size, then the 18 cells with the pilot's walltime -- **next** (§4's commands are final) [corrected 2026-11-17: **done**, 18 ok, 0 refused, 0 failed, 0 missing] | step 1 | davinci |
-| 3 | **Block 5's SPEC entry, then its code**: the twins built from the run's tables (§6's questions first) -- **next** (2026-11-17): the two tables inspected first [2026-11-17 (later): tables read back (§4): sound, but the law misfits every cell; next the per-cell JSONs, to see where the misfit sits (§6 item 8)] [2026-11-17 (later, 2): JSONs read back (§4); two decisions wait for the user before the SPEC entry: the law kept or extended, and a rule for degenerate per-sweep fits (§6 item 8)] | the run's tables | sandbox |
+| 2 | **The run on davinci** (the user runs it, §4): `git pull`, the FULL gates, a dry run, the 2-cell pilot at full size, then the 18 cells with the pilot's walltime -- **next** (§4's commands are final) [corrected 2026-11-17: **done**, 18 ok, 0 refused, 0 failed, 0 missing] | step 1 | davinci [2026-11-19: **done again under the three-component law** (run tag `nf2`, D-152 to D-155): the 18 cells' laws read back, §4] |
+| 3 | **Block 5's SPEC entry, then its code**: the twins built from the run's tables (§6's questions first) -- **next** (2026-11-17): the two tables inspected first [2026-11-17 (later): tables read back (§4): sound, but the law misfits every cell; next the per-cell JSONs, to see where the misfit sits (§6 item 8)] [2026-11-17 (later, 2): JSONs read back (§4); two decisions wait for the user before the SPEC entry: the law kept or extended, and a rule for degenerate per-sweep fits (§6 item 8)] [2026-11-19: **next**, the nf2 tables its input; §6 item 9 (the slow part over seconds) first] | the run's tables | sandbox |
 | 4 | **Block 7** (the record), then **Stage 7** (Block 8, the recovery gate, D-083) | Blocks 5-6 | sandbox, davinci |
 
 Open with the user, unanswered: whether the S0-S3 checks get their own roadmap stage (proposal: N6b after N6, under G4).
@@ -430,6 +431,56 @@ The 18-cell run (the two pilot cells skipped, D-125.5), from the login node in `
     RUN_TAG=nf2 WALLTIME=48:00:00 DRY_RUN=1 bash submit_noise_fit.sh     # expect "cores: 18 cell(s) x NCPUS 6 = 108"
     RUN_TAG=nf2 WALLTIME=48:00:00 bash submit_noise_fit.sh
 
+**The nf2 run read back** (2026-11-19; the user's paste, 12:12, of the second one-liner above over the 18 JSONs of
+`$OUT/cells/` **[cluster]**; nf1 from its CSVs and the slow-ridge check **[run, here]**; files in
+`dev/2026-11-19_nf2_readback/`). The `NOISE_MERGE` line and the stage times were not pasted: every JSON carries a
+cell fit and a sweep stage (the one-liner would have stopped otherwise) **[reasoning: from the paste]**. Final
+laws (the step at R = 3000):
+
+| Cell | J (16 dof) | J/dof nf1 -> nf2 | sigma_f (mV) | sigma_m (mV) | tau_m (ms) | sigma_s (mV) | tau_s (ms) | Sigma solves | per sweep, SS: n, median J_s/dof_s, p < 0.01 | LS: n, median, p < 0.01 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 508282493 | 35.0 | 6.8 -> 2.19 | 0.0343 | 0.0174 | 0.071 | 0.0838 | 118.5 | 6 (`no_plateau`) | 2, 0.63, 0 | 22, 1.25, 4 |
+| 526785799 | 72.9 | 12.4 -> 4.56 | 0.0326 | 0.0227 | 0.057 | 0.2818 | 1277.1 | 6 (`no_plateau`) | 2, 0.36, 0 | 28, 1.32, 11 |
+| 529878215 | 95.0 | 30.3 -> 5.94 | 0.0322 | 0.0166 | 0.070 | 0.0860 | 124.3 | 6 (`no_plateau`) | 2, 0.93, 0 | 38, 1.40, 9 |
+| 531520401 | 51.5 | 11.7 -> 3.22 | 0.0330 | 0.0256 | 0.065 | 0.0540 | 69.2 | 6 (`no_plateau`) | 2, 2.06, 0 | 25, 1.56, 7 |
+| 531523484 | 32.7 | 12.1 -> 2.04 | 0.0349 | 0.0201 | 0.094 | 0.0498 | 41.8 | 6 (`no_plateau`) | 2, 1.49, 0 | 32, 1.24, 6 |
+| 531526539 | 35.2 | 15.6 -> 2.20 | 0.0339 | 0.0221 | 0.105 | 0.0554 | 38.6 | 6 (`no_plateau`) | 2, 1.50, 0 | 23, 1.15, 3 |
+| 537297470 | 32.4 | 7.5 -> 2.02 | 0.0319 | 0.0176 | 0.058 | 0.0527 | 82.5 | 6 (`no_plateau`) | 2, 1.33, 0 | 34, 1.41, 4 |
+| 537313600 | 34.8 | 8.2 -> 2.17 | 0.0321 | 0.0205 | 0.053 | 0.0570 | 99.6 | 2 | 2, 2.34, 0 | 37, 1.01, 4 |
+| 539653924 | 46.3 | 6.1 -> 2.89 | 0.0346 | 0.0193 | 0.073 | 0.0974 | 169.7 | 6 (`no_plateau`) | 2, 1.38, 0 | 27, 0.86, 6 |
+| 541545716 | 107.0 | 33.5 -> 6.69 | 0.0346 | 0.0229 | 0.108 | 0.0642 | 80.9 | 6 (`no_plateau`) | 2, 5.16, 1 | 26, 1.70, 9 |
+| 548408551 | 30.4 | 4.4 -> 1.90 | 0.0316 | 0.0161 | 0.085 | 0.1193 | 286.0 | 6 (`no_plateau`) | 2, 0.87, 0 | 29, 1.19, 5 |
+| 548425467 | 48.0 | 7.9 -> 3.00 | 0.0314 | 0.0184 | 0.079 | 0.0823 | 91.8 | 6 (`no_plateau`) | 2, 1.70, 0 | 29, 1.50, 10 |
+| 548473051 | 34.6 | 9.9 -> 2.16 | 0.0324 | 0.0178 | 0.077 | 0.0573 | 75.0 | 6 (`no_plateau`) | 2, 1.32, 0 | 33, 1.09, 6 |
+| 569844159 | 938.0 | 159.7 -> 58.62 | 0.0310 | 0.0267 | 0.076 | 0.0475 | 24.1 | 6 (`no_plateau`) | 10, 2.23, 4 | 38, 1.37, 5 |
+| 571430815 | 38.4 | 2.7 -> 2.40 | 0.0315 | 0.0178 | 0.078 | 1.6150 | 5656.3 | 6 (`no_plateau`) | 6, 1.38, 0 | 16, 1.15, 4 |
+| 571483807 | 175.6 | 17.0 -> 10.97 | 0.0328 | 0.0255 | 0.054 | 0.0476 | 11.2 | 4 | 10, 3.69, 7 | 27, 2.67, 16 |
+| 571624532 | 80.1 | 36.4 -> 5.01 | 0.0346 | 0.0210 | 0.094 | 0.1131 | 352.0 | 4 | 10, 1.71, 0 | 26, 1.35, 6 |
+| 571691416 | 22.5 | 5.2 -> 1.41 | 0.0331 | 0.0177 | 0.111 | 0.1246 | 120.4 | 6 (`no_plateau`) | 2, 1.53, 0 | 26, 1.02, 2 |
+
+- J/dof lower than nf1 in 18 of 18 cells: median 10.8 -> 2.65 (nf2 / nf1 0.14-0.88, median 0.27). J below chi^2_16's
+  99 % point (32.0) in 2 cells (548408551, 571691416), below its 99.9 % point (39.25) in 9. The largest: 569844159
+  938, 571483807 176, 541545716 107, 529878215 95.
+- No coordinate at a bound: tau_m 0.053-0.111 ms (median 0.077 ms; the W0 starts of 548425467 and 571483807 at
+  0.92 ms and the 1 ms cap left it at the first Sigma solve); tau_s 11.2 ms - 5.66 s (median 96 ms).
+- The per-sweep laws (the twins'): p < 0.01 in 12 of 64 SS sweeps (19 %; nf1 44 of 64, 69 %) and in 117 of 516
+  fitted LS sweeps (23 %; nf1 289 of 515, 56 %); 9 of 525 LS sweeps failed (nf1 10), no SS sweep. Their reasons are
+  not in this paste.
+- Convergence: 3 cells settled (537313600 after 2 Sigma solves, 571483807 and 571624532 after 4); 15 `no_plateau`
+  (D-050: the last iterate kept). None was still moving steadily at the end: the late steps go back and forth by
+  0.01-0.31 in u; 529878215 drifted (tau_s 49 -> 124 ms, J 234 -> 106 over Sigma_2..Sigma_6) and then took steps of
+  0.021 and 0.011. **[reasoning]** the Sigma_hat re-drawn at R = 600 every round moves the optimum by more than
+  tol_u = 0.01 for five parameters; more rounds would not settle it. tau_m moved by at most 13 % over the late rounds.
+- **The slow ridge.** Over Sigma_2..final tau_s moved by more than 20 % in 7 cells while sigma_s^2 / tau_s moved by
+  5-29 %: by 5 % in 526785799 (tau_s 0.89-1.36 s) and 571430815 (5.66-8.06 s; nf1 had 0.328 mV, 198 ms, ratio 0.54
+  against nf2's 0.46 mV^2/s). Checked by computation (`check_slow_ridge.py`, closed form, 571430815): moving its slow
+  part along sigma_s^2 / tau_s = const from 5.66 s to 1 s changes none of the 15 statistics with a bootstrap SE by
+  more than 0.35 SE (to 0.2 s: 1.92 SE, the other parameters not refitted); over a 7.42 s SS train the slow part's SD
+  is 0.92, 0.59 and 0.30 mV and its correlation between pulses 200.5 ms apart 0.965, 0.818 and 0.367 **[run, here]**.
+  **[reasoning, Likely]** Where tau_s is long against the windows (<= 265 ms), the run determines sigma_s^2 / tau_s,
+  not sigma_s and tau_s apart, and the slow noise of a twin longer than the windows, or averaged across pulses, rests
+  on an extrapolation (§6 item 9).
+
 Read back from the pilot: the `NOISE_CELL` lines, each JSON's per-stage seconds (they set `WALLTIME`), the
 `NOISE_MERGE` line. A code change between the pilot and the run re-runs every cell, the pilot's included (the resume
 rule keys on the commit). Gate logs: `~/ih_fit_gate_logs/<date_time>/`.
@@ -455,6 +506,8 @@ rule keys on the commit). Gate logs: `~/ih_fit_gate_logs/<date_time>/`.
 3. The per-sweep offset in a twin (invisible to the noise statistics, visible to the I_h fit's absolute-mV gate).
 4. The LS twins: one per real LS sweep at its own amplitude (D-076 (iii)), with theta_tilde(c, s) and b_hat(c, s).
 5. The sampling rate: rho_f is per 20 us sample (50 kHz); the twin's trace must be at that rate when the noise is added.
+   [updated 2026-11-19: under D-152 there is no rho_f; the fast part is white per 20 us sample and tau_m is 2.7-5.5
+   samples (§4): the twin's noise is still made at 50 kHz.]
 6. The manifest's per-sweep columns, the back-fill of old manifests, the false-positive controls carrying the same noise.
 7. Stage 7's cohort size, raw against corrected SWCs (D-013), the tolerances (the assistant's proposal still).
 8. [added 2026-11-17, from the tables' read-back, §4] The law misfits every cell (J/dof 2.7-160, p < 0.01 in 18 of
@@ -477,6 +530,16 @@ rule keys on the commit). Gate logs: `~/ih_fit_gate_logs/<date_time>/`.
    parameters); then Blocks 2, 4, 9, their smokes, the gates and the run again. Decision (b) waits for it.]
    [updated 2026-11-17 (later, 4): decided, D-152 -- extended; tau_m's range kept; the fast part white. Still open:
    the per-sweep parameters of the middle part and the statistic set.]
+   [updated 2026-11-19: both settled (D-153), and (b) by D-154.3; the run under the extended law read back (§4).]
+9. [added 2026-11-19, from the nf2 run's read-back, §4] The slow part over seconds. Where tau_s(c) is long against
+   the windows (clearly 526785799, 1.28 s, and 571430815, 5.66 s) the fit determines sigma_s^2 / tau_s only; a twin
+   longer than about 0.3 s (item 1's continuous trains are 7.42 s), or responses averaged across pulses, take
+   their slow noise from an extrapolation (571430815: SD over a train 0.30-0.92 mV, correlation between adjacent
+   pulses 0.37-0.97, for laws the statistics cannot tell apart). Options **[reasoning]**: (a) twins no longer
+   than the windows and no reliance on the cross-pulse behaviour; (b) a statistic across windows (for example the
+   correlation of consecutive SS window means within a train), Block 3 and the run again; (c) the law as it is,
+   with a sensitivity run (D-055 S2-type) at both ends of each cell's ridge. Depends on item 1 and on how Stage 7
+   uses the SS responses.
 
 ## 7. Repository, environment, cluster
 
