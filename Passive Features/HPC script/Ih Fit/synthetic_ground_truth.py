@@ -987,7 +987,32 @@ def simulate_ss_clean(cell, *, amplitude_pA: float, duration_s: float, t_s: np.n
     (as _resample does); i_pA is amplitude_pA where 0 <= t_s <= duration_s
     and 0 elsewhere. No noise, no averaging, no state kept between calls.
     ValueError: specs/SPEC.md, Block 11, "Refused"."""
-    raise NotImplementedError("Block 11")
+    amp = _twin_finite("amplitude_pA", amplitude_pA)
+    dur = _twin_positive("duration_s", duration_s)
+    v0 = _twin_finite("v_init_mV", v_init_mV)
+    dt = _twin_positive("dt_ms", dt_ms)
+    t = np.asarray(t_s, dtype=np.float64)
+    if t.ndim != 1 or t.size < 2:
+        raise ValueError("t_s must be a 1-D axis of at least 2 samples, got shape %s"
+                         % (t.shape,))
+    if not np.all(np.isfinite(t)):
+        raise ValueError("t_s holds a non-finite value")
+    if not t[0] < 0.0:
+        raise ValueError("t_s[0] must be < 0 (the pulse onset is t = 0), got %r"
+                         % float(t[0]))
+    steps = np.diff(t)
+    mean_step = float(steps.mean())
+    if not mean_step > 0.0:
+        raise ValueError("t_s must increase, mean step %r s" % mean_step)
+    spread = float(steps.max() - steps.min()) / mean_step
+    if spread > _TWIN_AXIS_RTOL:
+        raise ValueError("t_s is not uniform: relative spread of its steps %.3g > %g"
+                         % (spread, _TWIN_AXIS_RTOL))
+    delay_ms = -float(t[0]) * 1e3
+    t_out_ms = t * 1e3 + delay_ms              # the samples on NEURON's clock
+    v = _twin_run(cell, amp, delay_ms, dur * 1e3, t_out_ms, v0, dt)
+    i_pA = np.where((t >= 0.0) & (t <= dur), amp, 0.0).astype(np.float64)
+    return v, i_pA
 
 
 def simulate_ls_clean(cell, *, amplitude_pA: float, onset_s: float, duration_s: float, n_samples: int,
@@ -1008,4 +1033,75 @@ def simulate_ls_clean(cell, *, amplitude_pA: float, onset_s: float, duration_s: 
     round(onset_s * fs_Hz), n_on = round(duration_s * fs_Hz), and 0
     elsewhere. No noise, no averaging, no state kept between calls.
     ValueError: specs/SPEC.md, Block 11, "Refused"."""
-    raise NotImplementedError("Block 11")
+    amp = _twin_finite("amplitude_pA", amplitude_pA)
+    onset = _twin_finite("onset_s", onset_s)
+    if onset < 0.0:
+        raise ValueError("onset_s must be >= 0, got %r" % onset)
+    dur = _twin_positive("duration_s", duration_s)
+    fs = _twin_positive("fs_Hz", fs_Hz)
+    v0 = _twin_finite("v_init_mV", v_init_mV)
+    dt = _twin_positive("dt_ms", dt_ms)
+    if isinstance(n_samples, (bool, np.bool_)):
+        raise ValueError("n_samples must be an integer, got %r" % (n_samples,))
+    import operator                     # local: nothing above the banner changes
+    try:
+        n = operator.index(n_samples)
+    except TypeError:
+        raise ValueError("n_samples must be an integer, got %r" % (n_samples,))
+    if n < 2:
+        raise ValueError("n_samples must be >= 2, got %d" % n)
+    j_on = int(round(onset * fs))
+    n_on = int(round(dur * fs))
+    if j_on + n_on > n:
+        raise ValueError("the step (samples %d .. %d) does not fit in %d samples"
+                         % (j_on, j_on + n_on - 1, n))
+    t_out_ms = np.arange(n, dtype=np.float64) / fs * 1e3    # sample j at j / fs_Hz
+    v = _twin_run(cell, amp, onset * 1e3, dur * 1e3, t_out_ms, v0, dt)
+    i_pA = np.zeros(n, dtype=np.float64)
+    i_pA[j_on:j_on + n_on] = amp
+    return v, i_pA
+
+
+# Relative spread of a stored window's steps above which t_s is not uniform
+# (specs/SPEC.md, Block 11, "Refused").
+_TWIN_AXIS_RTOL = 1e-6
+
+
+def _twin_finite(name: str, x) -> float:
+    """float(x), refused (ValueError) when it is not a finite real number."""
+    try:
+        val = float(x)
+    except (TypeError, ValueError):
+        raise ValueError("%s must be a finite number, got %r" % (name, x))
+    if not math.isfinite(val):
+        raise ValueError("%s must be finite, got %r" % (name, val))
+    return val
+
+
+def _twin_positive(name: str, x) -> float:
+    """float(x), refused (ValueError) when it is not finite and > 0."""
+    val = _twin_finite(name, x)
+    if not val > 0.0:
+        raise ValueError("%s must be > 0, got %r" % (name, val))
+    return val
+
+
+def _twin_run(cell, amp_pA: float, delay_ms: float, dur_ms: float,
+              t_out_ms: np.ndarray, v_init_mV: float, dt_ms: float) -> np.ndarray:
+    """ONE fixed-step NEURON run of `cell` from v_init_mV, read at t_out_ms
+    (ms on NEURON's clock) by numpy.interp, as _resample does. The run lasts
+    one step past the last output sample, so no sample is read beyond the
+    recorded trace; the steps before it are those of a shorter run."""
+    t_last = float(t_out_ms[-1])
+    t_ms, v = cell.simulate(stim_amp_pA=amp_pA, stim_delay_ms=delay_ms,
+                            stim_dur_ms=dur_ms, tstop_ms=t_last + dt_ms,
+                            v_init_mV=v_init_mV, dt_ms=dt_ms)
+    t_ms = np.asarray(t_ms, dtype=np.float64)
+    v = np.asarray(v, dtype=np.float64)
+    if t_ms.size < 2 or t_ms[-1] < t_last:
+        raise RuntimeError("NEURON's trace ends at %r ms, before the last sample at %r ms"
+                           % (float(t_ms[-1]) if t_ms.size else float("nan"), t_last))
+    out = np.interp(t_out_ms, t_ms, v).astype(np.float64)
+    if not np.all(np.isfinite(out)):
+        raise RuntimeError("NEURON's somatic trace is not finite")
+    return out
