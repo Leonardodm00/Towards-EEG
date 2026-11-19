@@ -238,6 +238,7 @@ the "Binds" column.
 | 2026-11-19 (later, 4) | Logs **D-182** to **D-186** (user, 21:23; the twins chat, started from `TEEG_twins_block5_handoff_2026-11-19.md`), the answers to the questions put on Block 5 and Stage 7. **D-182**: a Long Square twin carries its sweep's law as fitted, continuous over the whole sweep; D-180's limit binds the SS windows; the four cells with $\hat\tau_s(c) > 265$ ms flagged, the gate reported with and without them (closes D-180's open point 1). **D-183**: every response of a twin is simulated on its real cell's morphology, the data give only the noise of each sweep or window, Long Square included; no per-sweep offset (closes D-180's open point 4; train or single pulses asked again). **D-184**: Stage 7 is a plain recovery run in three configurations of 10 cells each -- `full` (traces with I_h, six parameters fitted), `passive fit` (traces with I_h, passive fit), `active fit` (traces without I_h, the full model fitted) -- with no closure test of the twins' noise statistics; its mapping onto D-011 (ii) and D-083's four arms put to the user. **D-185**: one PBS job per cell under a 120-core cap. **D-186**: all stored SS windows and LS sweeps; the tilt line at the real positions; noise at the twin's own 50 kHz; LS timing from the real cell; a per-sweep twin table beside the manifest; seeds per twin sweep. Not decided: when the bundles' check on the real archive runs (D-180's open point 3; the user asked what it is). **[run, sandbox]** `Ih Fit/dev/2026-11-19_twins/ls_slow_span.py` (the slow part over a Long Square step, per cell, as fitted and at the short end of the ridge) and `check_bundle_variance.py`. D-011, D-083 and D-180 annotated. Next free IDs: D-187, I-007. |
 | 2026-11-19 (later, 5) | Logs **D-187** to **D-189** (user, 21:46; the twins chat), the answers to the points D-182 to D-186 left open, and the approval of the plan. **D-187**: each SS pulse of a twin is simulated alone from rest, not as a 37-pulse train -- supersedes (D-083.2)'s trains for the twins' response, closes D-180's open point 2. **D-188**: Stage 7's configurations settled -- 10 cells per configuration, drawn at random from the 18 L3_exc cells; `passive fit` optimises only the passive properties on traces with I_h; `active fit` is D-011 (ii)'s control; each cell's job builds its twin and runs its fit, a merge job writes the report (closes D-184's readings and D-185.2; two readings of the assistant flagged). **D-189**: the model-free check of the SS bundles is dropped (closes D-180's open point 3, as a limit of Stage 7). The plan approved ("Everything else is ok"): Blocks 5, 10, 11 (wave 1), 12 and 8 (wave 2), on the branch `sci/twins`; roadmap stages N5b, N5c, N5d added at the user's word ("update the roadmap"). **[data inspected]** the user's upload of 21:46: the nf2 tables and JSONs (`nf2_L3_exc.tar.gz`: 18 cells, 64 SS + 525 LS sweep rows, 9 failed) and the archive cell 508282493 (`cell_508282493.tar.gz`). D-083, D-180, D-184 and D-185 annotated. Next free IDs: D-190, I-007. |
 | 2026-11-19 (later, 6) | Logs **D-190** (user, 22:05; the twins chat): a twin leaves out the depolarising Long Square sweeps that the fitter's loader drops for the real cell as not subthreshold ("Leave out") -- narrows D-186.1 (every stored LS sweep). **[src]** read the same evening: the depolarising long steps are validation only, at most the three smallest spike-free ones (`passive_long_step_training.assign_ls_roles`), so the choice changes a twin's validation set, not its fitted parameters. **Wave 1** (branch `sci/twins`, contract `f54fdde`): Block 10 (the twin's noise) returned, passed the gate and was merged (`9aa9c70`; TN1-TN9 9/9); Block 5 returned done and is reopened for D-190's amendment; Block 11 running. Next free IDs: D-191, I-007. |
+| 2026-11-19 (later, 7) | Logs **D-191** [orchestrator] (the twins chat; coding directive 7): the changes the orchestrator made while wave 1 ran -- every clean response of a twin starts from the state reached after a 6 s unstimulated settle, not from a uniform start (a cell with I_h and a uniform leak reversal is not at rest when started uniformly: 0.056 mV of drift, 0.067 mV in the SS window, measured); the SS current trace on the real archive's samples; a tolerance of Block 11's smoke; a listed LS sweep that is not a step left out of the twins' table. **Wave 1 complete** on `sci/twins` (`8449152`, pushed): Blocks 5 (`twin_table.py`, TT1-TT11 11/11 on the real nf2 tables and cell 508282493), 10 (`twin_noise.py`, TN1-TN9 9/9) and 11 (`simulate_ss_clean`, `simulate_ls_clean`, TR1-TR10 10/10; `smoke_ih_recovery.py` 14/14) written by three Opus implementers, gated and merged; contract `f54fdde`, amendments `07f3138` (1, 2) and `d203cae` (3, 4). Put to the user: whether a twin is generated with the fitter's own model (the leak reversal balanced per segment, D-005.2) in place of the generator's uniform leak reversal. Next free IDs: D-192, I-007. |
 | 2026-11-19 (later, 7) | No decision changed (the clearance chat, 20:48-22:10). On the user's question whether a heavier-tailed kernel would fix the clear nodes' overestimates: on node 5353 heavier tails at the configured in-focus width fit worse and do not let Allen's diameter fit, a wider in-focus width does, and the fit cannot separate the width from the diameter **[run, sandbox: `checks/kernel_tails_2026-11-19/`, `7c05a01`]**. The user corrected the chat (22:02): node 2669 is not clean in focus; checked -- the bump cut misses its in-focus neighbour because D-176.1 searches the nine-plane mean (`checks/clear_nodes_2026-11-19/`). Handoff for the chat that continues the path: `Passive Features/Diameter Re-measurement/docs/TEEG_clear_node_fit_handoff_2026-11-19.md` (`055e438` on `sci/diameter-pipeline`). Next free IDs: D-191, I-007. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
@@ -418,6 +419,7 @@ would be needed*, *Status*.
 | D-188 | 2026-11-19 | Stage 7 (roadmap S7, Block 8): the manifest's configurations and cells, the arms, the jobs; D-184's readings (a) to (e); D-185.2; D-011 (ii) | 10 cells per configuration drawn at random from the 18; `passive fit` = only the passive properties optimised on traces with I_h; `active fit` = D-011 (ii)'s control; one job builds a twin and runs its fit, a merge job reports [user] | active; not built |
 | D-189 | 2026-11-19 | D-180's open point (3); the twins' handoff, Q3; Stage 7's limits | the model-free check of the SS bundles on the real archive is dropped [user] | active |
 | D-190 | 2026-11-19 | Block 5 (the twins' table), Block 12 (the build); D-186.1; SPEC 2.7 (a) | a twin leaves out the depolarising LS sweeps the fitter's loader drops for the real cell as not subthreshold (`sweep_spike_reason` non-empty) [user] | active; not built |
+| D-191 | 2026-11-19 | Block 11 (`simulate_ss_clean`, `simulate_ls_clean`), Block 5 (`load_cell_protocol`), `TwinConfig.settle_ms`; SPEC 2.7 (f) | a twin's responses start from the settled state (a 6 s unstimulated lead), not a uniform start; the SS current on the real archive's samples; TR10's tolerance; a listed LS sweep that is not a step left out [orchestrator] | active; built (`sci/twins`) |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -13331,3 +13333,62 @@ not applied to the twins.)
 **Sources.** **[user]** 2026-11-19, 22:05. **[src]** as named. **[log]** D-006, D-007, D-016, D-186.
 
 **Status:** active; not built. Narrows (D-186.1).
+
+## D-191 -- A twin's responses start from the cell's settled state, not from a uniform start; three smaller corrections of wave 1 [orchestrator]
+
+**Date:** 2026-11-19, 22:10 to 23:00 (Europe/Rome), the twins chat, while wave 1 of the twins' implementation ran
+(coding directive 7: the orchestrator settles what the implementers raise and reports it). **Binds:** Block 11
+(`synthetic_ground_truth.simulate_ss_clean`, `simulate_ls_clean`), Block 5 (`twin_table.load_cell_protocol`),
+`twin_config.TwinConfig.settle_ms`, SPEC section 2.7 (f) and the two blocks' entries (`Ih Fit/specs/SPEC.md` on
+`sci/twins`); Block 12 (the build passes the settle).
+
+**Decision [orchestrator].** Four changes to what was agreed or written, each made on evidence:
+
+(D-191.1) **The resting state.** Agreed (D-187.1, SPEC 2.7 (f) as first written): each response is simulated "from
+the twin's resting state", realised as NEURON's `finitialize` at one uniform potential, the measured soma rest. Now:
+every run of Block 11 starts `TwinConfig.settle_ms` = 6000 ms (the settle of `measure_rin_tau_sag`) before its first
+output sample, with no stimulus, so that the response starts from the state the cell actually settles to.
+(D-191.2) **The SS current trace.** Written: the legacy rule, the amplitude where $0 \le t \le d$. Now: the amplitude
+on the samples $j_0 \dots j_0 + n_{\rm on} - 1$, $j_0$ the sample at $t = 0$ and $n_{\rm on}$ = round($d\,f_s$) -- the
+real archive's layout (500..524 in 508282493; the closed rule gives 26 samples because $t_{525}$ = 0.0005 s exactly).
+The simulated pulse lasts exactly $d$ either way: the voltage is unchanged.
+(D-191.3) **A tolerance.** TR10's passive half (the settle changes nothing in a passive cell), first written 1e-9 mV,
+is 1e-7 mV.
+(D-191.4) **Sweeps that are not steps.** Written: a sweep of `metadata.json['ls_sweeps']` that the window loader does
+not return refuses the cell. Now: a listed sweep whose amplitude is missing, not finite or below 5 pA in size is left
+out of the twins' table without a row; any other missing sweep is still refused.
+
+**Why.** (D-191.1) **[run, sandbox: Block 11's implementer, TR3; again by the orchestrator,
+`Ih Fit/dev/2026-11-19_twins/rest_models.py`; a ball-and-stick cell with I_h (Ih_human, uniform in soma and dendrites,
+F = 1.9, uniform e_pas)]** A cell whose leak reversal is uniform, whose I_h is absent from the axon and whose spine
+factor scales g_pas but not gIhbar does not rest at a uniform potential (its settled potentials span 0.09 mV), so a
+uniform start is not its rest: started at its measured soma rest it drifts by 0.056 mV before the pulse onset
+(relaxing over about 270 ms), and its baseline-subtracted SS response differs from the settled cell's by up to
+0.067 mV (RMS 0.059 mV) on 0.5 to 100 ms and by up to 0.011 mV over a 1 s step of -50 pA. That exceeds the smallest
+$\hat\sigma_f(c)$ of the nf2 run (0.031 mV) and, in an SS bundle of about 20 windows, the bundle's fast noise several
+times over: every response of an I_h twin would carry a generator artefact the fitter's model does not have. With
+the settle the drift is 1.1e-11 mV, and settles of 6 s and 12 s agree to 3e-6 mV. The legacy generator has the same
+transient (Block 11 reproduces it to 1e-12 mV at `settle_ms` = 0); the legacy path is left as it is.
+(D-191.2) **[data inspected]** the archive cell 508282493. (D-191.3) **[run, the implementer]** NEURON's recorded
+clock is a running sum and lags $k\,\Delta t$ by 3.3e-10 ms after 500 ms; through the legacy interpolation on that
+clock, times the trace's slope (16 mV/ms on the pulse edge), this gave 5.3e-9 mV (SS) and 1.6e-8 mV (LS); on the
+exact step clock the same runs agree to 1e-12 mV, so the settle itself is neutral. (D-191.4) **[reasoning]** such a
+sweep has no noise law (the noise fit skipped it by the same rule) and the fitter's loader ignores it too; the other
+17 cells' archives cannot be inspected in the sandbox, and one 0 pA sweep in any of them would have refused the whole
+cell at the cluster's dry run.
+
+**What it implies for code and tables.** `simulate_ss_clean` and `simulate_ls_clean` take `settle_ms` (0 by default,
+which reproduces the legacy start); the build passes `TwinConfig.settle_ms`; a Long Square sweep costs 13.3 s of
+simulated time in place of 7.3 s. Contract amendments 2, 3 and 4 (`07f3138`, `d203cae` on `sci/twins`).
+
+**What it does not decide [open; put to the user 2026-11-19].** With the settle, the generator's cell (uniform leak
+reversal, a rest that is not uniform) still differs from the fitter's model, which sets the leak reversal per segment
+so that the measured rest is a uniform equilibrium (D-005.2): on the same cell and parameters, 0.0004 mV in the SS
+window and up to 0.021 mV (RMS 0.017 mV, 0.3 % of the 7.4 mV deflection) over the 1 s step (`rest_models.py`).
+Whether a twin is generated with the fitter's own model, so that its truth lies exactly in the fitter's parameter
+space, is a choice of method and the user's.
+
+**Sources.** **[run]**, **[data inspected]** and **[reasoning]** as named. **[log]** D-005, D-183, D-186, D-187, D-190.
+
+**Status:** active; built on `sci/twins` (Blocks 5 and 11 merged, `e72d4a4`, `a13d8d4`). The user can reverse any of
+the four.
