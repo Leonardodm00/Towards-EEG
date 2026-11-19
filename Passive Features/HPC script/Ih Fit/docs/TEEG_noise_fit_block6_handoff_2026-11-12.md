@@ -434,7 +434,7 @@ The 18-cell run (the two pilot cells skipped, D-125.5), from the login node in `
 
 **The nf2 run read back** (2026-11-19; the user's paste, 12:12, of the second one-liner above over the 18 JSONs of
 `$OUT/cells/` **[cluster]**; nf1 from its CSVs and the slow-ridge check **[run, here]**; files in
-`dev/2026-11-19_nf2_readback/`). The `NOISE_MERGE` line and the stage times were not pasted: every JSON carries a
+`dev/2026-11-19_nf2_readback/`). The `NOISE_MERGE` line and the stage times were not pasted [corrected 2026-11-19 (later): the merge line was pasted later -- `NOISE_MERGE L3_exc: 18 ok, 0 refused, 0 failed, 0 missing`, job `2099736` **[cluster]**]: every JSON carries a
 cell fit and a sweep stage (the one-liner would have stopped otherwise) **[reasoning: from the paste]**. Final
 laws (the step at R = 3000):
 
