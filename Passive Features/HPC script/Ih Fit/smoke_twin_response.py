@@ -29,7 +29,7 @@ synthetic_ground_truth.write_ball_and_stick_swc, passive and with I_h
     TR9 bytes and legacy   this file pure ASCII and LF; git diff against the
                            contract commit removes or changes no line above
                            the banner
-    TR10 settle neutral    passive: settle 0 == 500 ms, 1e-9 mV; I_h: settle
+    TR10 settle neutral    passive: settle 0 == 500 ms, 1e-7 mV; I_h: settle
                            6000 == 12000 ms, 1e-4 mV (SS and LS)
 
 Settle used by each check: the passive cell always at settle 0 (its rest is
@@ -484,17 +484,25 @@ def test_TR9_bytes_and_legacy():
 
 def test_TR10_settle_neutral():
     # The settle is neutral where nothing settles (passive: 0 vs 500 ms, the
-    # same linear system shifted in time; roundoff -> 1e-9 mV) and converged
-    # for the I_h cell (6000 vs 12000 ms; the slowest human I_h time constant
-    # is about 343 ms, so 6000 ms is > 17 of them -> 1e-4 mV).
+    # same linear system shifted in time) and converged for the I_h cell
+    # (6000 vs 12000 ms; the slowest human I_h time constant is about 343 ms,
+    # so 6000 ms is > 17 of them -> 1e-4 mV).
+    # Passive tolerance 1e-7 mV (amendment 4, D-191.3): the read-out keeps the
+    # legacy interpolation on NEURON's recorded clock, a running sum t += dt
+    # that lags k*dt by 3.3e-10 ms after 500 ms; times the trace's slope (up
+    # to 16 mV/ms on the SS pulse) this gave 5.3e-9 mV (SS) and 1.6e-8 mV (LS)
+    # (on the exact clock k*dt the two settles agree to 1e-12 mV).
     ev = []
-    for kind, s0, s1, tol in (("passive", 0.0, 500.0, 1e-9),
+    for kind, s0, s1, tol in (("passive", 0.0, 500.0, 1e-7),
                               ("ih", SETTLE_MS, 2.0 * SETTLE_MS, 1e-4)):
         cell, _gt, v0, _ = make_cell(kind)
         a_ss, _ = ss(cell, -200.0, v0, settle=s0)
         b_ss, _ = ss(cell, -200.0, v0, settle=s1)
         a_ls, _ = ls(cell, -110.0, v0, geom=REAL_LS, settle=s0)
         b_ls, _ = ls(cell, -110.0, v0, geom=REAL_LS, settle=s1)
+        print(f"    TR10 {kind} settle {s0:g} vs {s1:g} ms: max|dv| SS "
+              f"{np.max(np.abs(a_ss - b_ss)):.2e} mV, LS "
+              f"{np.max(np.abs(a_ls - b_ls)):.2e} mV (tol {tol:g})")
         check_close(f"TR10_ss_{kind}", a_ss, b_ss, rtol=0.0, atol=tol)
         check_close(f"TR10_ls_{kind}", a_ls, b_ls, rtol=0.0, atol=tol)
         ev.append(f"{kind} settle {s0:g} vs {s1:g} ms: SS {np.max(np.abs(a_ss - b_ss)):.1e}, "
