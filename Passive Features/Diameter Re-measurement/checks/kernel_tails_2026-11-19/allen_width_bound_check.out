@@ -1,0 +1,25 @@
+node 5353: Allen 0.454 um; recorded narrowest dip k 135: FWHM 0.581 um, depth 23 gl |
+    s0 0.080         Allen-tube FWHM 0.43/0.44/0.45/0.50 um (mu 0.3/1/3/10 /um)
+    s0 0.250         Allen-tube FWHM 0.69/0.70/0.70/0.72 um (mu 0.3/1/3/10 /um)
+    halo f 0.3 h 3   Allen-tube FWHM 0.47/0.48/0.49/0.54 um (mu 0.3/1/3/10 /um)
+    halo f 0.5 h 6   Allen-tube FWHM 0.51/0.51/0.53/0.58 um (mu 0.3/1/3/10 /um)
+node 2669: Allen 0.788 um; recorded narrowest dip k 259: FWHM 0.945 um, depth 88 gl |
+    s0 0.080         Allen-tube FWHM 0.72/0.74/0.80/0.91 um (mu 0.3/1/3/10 /um)
+    s0 0.250         Allen-tube FWHM 0.86/0.87/0.91/1.01 um (mu 0.3/1/3/10 /um)
+    halo f 0.3 h 3   Allen-tube FWHM 0.77/0.79/0.84/0.96 um (mu 0.3/1/3/10 /um)
+    halo f 0.5 h 6   Allen-tube FWHM 0.82/0.84/0.89/1.00 um (mu 0.3/1/3/10 /um)
+node 1013: Allen 0.449 um; recorded narrowest dip k 18: FWHM 1.105 um, depth 54 gl |
+    s0 0.080         Allen-tube FWHM 0.46/0.46/0.48/0.53 um (mu 0.3/1/3/10 /um)
+    s0 0.250         Allen-tube FWHM 0.75/0.76/0.76/0.78 um (mu 0.3/1/3/10 /um)
+    halo f 0.3 h 3   Allen-tube FWHM 0.51/0.51/0.53/0.57 um (mu 0.3/1/3/10 /um)
+    halo f 0.5 h 6   Allen-tube FWHM 0.52/0.53/0.54/0.59 um (mu 0.3/1/3/10 /um)
+node 2620: Allen 0.811 um; recorded narrowest dip k 200: FWHM 1.478 um, depth 89 gl |
+    s0 0.080         Allen-tube FWHM 0.75/0.77/0.83/0.94 um (mu 0.3/1/3/10 /um)
+    s0 0.250         Allen-tube FWHM 0.88/0.89/0.93/1.04 um (mu 0.3/1/3/10 /um)
+    halo f 0.3 h 3   Allen-tube FWHM 0.79/0.81/0.87/0.99 um (mu 0.3/1/3/10 /um)
+    halo f 0.5 h 6   Allen-tube FWHM 0.85/0.87/0.92/1.03 um (mu 0.3/1/3/10 /um)
+node 639: Allen 1.200 um; recorded narrowest dip k 128: FWHM 2.048 um, depth 106 gl |
+    s0 0.080         Allen-tube FWHM 1.12/1.16/1.27/1.39 um (mu 0.3/1/3/10 /um)
+    s0 0.250         Allen-tube FWHM 1.16/1.20/1.33/1.55 um (mu 0.3/1/3/10 /um)
+    halo f 0.3 h 3   Allen-tube FWHM 1.15/1.20/1.32/1.43 um (mu 0.3/1/3/10 /um)
+    halo f 0.5 h 6   Allen-tube FWHM 1.23/1.27/1.38/1.48 um (mu 0.3/1/3/10 /um)

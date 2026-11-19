@@ -1,0 +1,12 @@
+node 5353: Allen 0.4544 um; run: d 0.7690 um, chi2/N n/a; lambda 0.2181 um (fixed below); sigma 0.836 gl; rays 8 x 16, fine 8
+gauss s0 0.080, d free                       d 0.7761 (se 0.0109) mu 0.193 v0 +0.066 z 38.133  chi2/N 4.556  cost 2173.0  converged, 1 solve(s), 91 s
+gauss s0 0.080, d = Allen                    d 0.4549 (se nan) mu 0.523 v0 +0.056 z 38.104  chi2/N 6.278  cost 2994.6  at_bound, 1 solve(s), 18 s
+gauss s0 0.150, d free                       d 0.6902 (se 0.0147) mu 0.251 v0 +0.065 z 38.132  chi2/N 4.514  cost 2153.3  converged, 1 solve(s), 72 s
+gauss s0 0.250, d free                       d 0.3294 (se 0.0368) mu 1.260 v0 +0.065 z 38.139  chi2/N 4.756  cost 2268.7  converged, 1 solve(s), 61 s
+gauss s0 0.250, d = Allen                    d 0.4539 (se 0.0302) mu 0.633 v0 +0.067 z 38.140  chi2/N 4.790  cost 2284.7  converged, 1 solve(s), 20 s
+halo f 0.3 h 3 (core 0.080), d free          d 0.7218 (se 0.0120) mu 0.253 v0 +0.063 z 38.141  chi2/N 5.128  cost 2446.0  converged, 1 solve(s), 171 s
+halo f 0.3 h 6 (core 0.080), d free          d 0.7091 (se 0.0118) mu 0.292 v0 +0.063 z 38.144  chi2/N 4.793  cost 2286.0  converged, 1 solve(s), 138 s
+halo f 0.3 h 6 (core 0.080), d = Allen       d 0.4549 (se 0.0111) mu 0.693 v0 +0.056 z 38.120  chi2/N 5.753  cost 2744.0  converged, 1 solve(s), 27 s
+halo f 0.5 h 6 (core 0.080), d free          d 0.6450 (se 0.0130) mu 0.419 v0 +0.061 z 38.155  chi2/N 6.114  cost 2916.6  converged, 1 solve(s), 142 s
+halo f 0.5 h 6 (core 0.080), d = Allen       d 0.4549 (se 0.0126) mu 0.852 v0 +0.055 z 38.139  chi2/N 6.559  cost 3128.8  converged, 1 solve(s), 36 s
+exit 0

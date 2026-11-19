@@ -1,0 +1,10 @@
+node 1013: Allen 0.449 um, noise SD 1.86 gl, k* 19; narrowest dip k 18: FWHM 1.105 um, depth 53.7 gl
+   k: depth gl / FWHM um   15: 34/2.41  16: 37/1.51  17: 47/1.22  18: 54/1.10  19: 59/1.15  20: 61/1.41  21: 64/1.68  22: 64/1.76  23: 61/1.93
+node 5353: Allen 0.454 um, noise SD 0.84 gl, k* 136; narrowest dip k 135: FWHM 0.581 um, depth 22.8 gl
+   k: depth gl / FWHM um   132: 12/1.66  133: 13/1.17  134: 17/0.85  135: 23/0.58  136: 26/0.59  137: 24/0.66  138: 19/0.89  139: 13/1.47  140: 12/1.68
+node 2669: Allen 0.788 um, noise SD 1.64 gl, k* 259; narrowest dip k 259: FWHM 0.945 um, depth 88.0 gl
+   k: depth gl / FWHM um   255: 54/2.47  256: 60/2.26  257: 75/1.27  258: 88/1.03  259: 88/0.94  260: 87/1.02  261: 81/2.17  262: 70/2.37  263: 65/2.50
+node 2620: Allen 0.811 um, noise SD 1.85 gl, k* 202; narrowest dip k 200: FWHM 1.478 um, depth 89.4 gl
+   k: depth gl / FWHM um   198: 72/1.82  199: 80/1.61  200: 89/1.48  201: 91/1.51  202: 91/1.57  203: 86/1.68  204: 84/1.77  205: 81/1.87  206: 81/1.93
+node 639: Allen 1.200 um, noise SD 2.30 gl, k* 126; narrowest dip k 128: FWHM 2.048 um, depth 105.9 gl
+   k: depth gl / FWHM um   122: 88/2.71  123: 92/2.65  124: 95/2.53  125: 99/2.34  126: 102/2.08  127: 104/2.05  128: 106/2.05  129: 106/2.16  130: 107/2.26

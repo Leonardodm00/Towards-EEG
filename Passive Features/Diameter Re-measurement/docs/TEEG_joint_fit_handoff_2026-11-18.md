@@ -15,6 +15,7 @@
 | 2026-11-18 (later, 9) | The joint-fit chat (D-177 [user, 18:25, 18:52]: this chat refines the joint fit with close neighbours; the bumps are the 'Questions before logic' chat's). Section 13 added: four synthetic checks and the pilot's trace analysed (`checks/joint_2026-11-18/`), the chat's PROVISIONAL proposals for B1 to B6 (D-177.3 to D-177.11), the first test nodes. Section 6 corrected (where the own tube's heading comes from); section 12: the node spacing and the trace's depth scatter now measured. Decision log on `main`: next free IDs D-178, I-006. |
 | 2026-11-18 (later, 10) | D-179 [user, 20:23]: of section 13.3, confirmed -- the per-chain rendering with summed shadows, rule (b) dropped, the first test nodes; read as confirmed, to check -- B1 and B2; open, with two figures (`checks/joint_2026-11-18/fig_attached_vs_free.png`, `fig_own_chain_options.png`) -- attached chains as neighbours, the own chain smoothed or raw. Section 13.2: the depth words for D-149's examples corrected. Decision log on `main`: next free IDs D-180, I-006. |
 | 2026-11-19 | Section 0b: the first run on Allen's data (the user's Colab, notebook Cell 20, 2026-11-19; uploaded log and focal-plane figure): results, times, what the figure shows, and what the pooled growth table can and cannot change (new subsection "First run on the pilot"). Two sentences of 0b marked [corrected 2026-11-19]. No decision taken. |
+| 2026-11-19 (later) | Section 0b, new subsection "Second run and the kernel check": the user's rerun with $\kappa$ = 0.5, the in-focus widths of the five dips, the widest dip a tube of Allen's diameter can render, and on node 5353 the fit under wider in-focus widths and heavier-tailed kernels (`checks/kernel_tails_2026-11-19/`). No decision taken. |
 
 Basis tags: **[user]** said or decided by the user, with the time (Europe/Rome, 2026-11-18); **[log]** the decision
 log on `main`; **[src]** read in the named file at `f6504b0`; **[run, sandbox]** executed in the handing-over
@@ -153,6 +154,44 @@ What it shows:
   against +70 to +277 % above Allen here. A true in-focus width of 0.22 / 0.30 um makes a 0.5 um tube fit at
   1.61 / 2.06 times its diameter with a lower $\mu$ **[run, sandbox: `kernel_infocus_check.out`]**: 5353's 1.70 lies
   in that range **if** Allen's 0.454 um were its true diameter and its profile held nothing else **[reasoning]**.
+
+### Second run and the kernel check (2026-11-19, evening)
+
+**[data: the user's upload of 20:48 -- the `cleaning_d169` and `inference_d169` folders of a rerun with
+`WEIGHT_KAPPA` = 0.5, everything else as the first run]**: $\hat d$ (um) 1.563, 0.769, 1.566, 1.911, 2.629 for 1013,
+5353, 2669, 2620, 639 (639 converged this time), $\chi^2/N$ 6.10, 3.49, 38.9, 11.5, 18.2; fit times 21, 2.7, 24, 27,
+49 min (124 min in all).
+
+**In-focus widths [run, sandbox: `checks/kernel_tails_2026-11-19/dip_widths_check.py`, no model]**: the narrowest
+recorded dip (full width at half depth) is 0.58 um for 5353 (depth 23 gl), 0.94 um for 2669, 1.10 um for 1013,
+1.48 um for 2620 and 2.05 um for 639; 2669's dip is 0.94-1.03 um wide in its three central planes and 2.2-2.5 um in
+the others.
+
+**The widest in-focus dip a tube of Allen's diameter renders [run, sandbox: `allen_width_bound_check.py`, the
+pipeline's forward, $\mu$ from 0.3 to 10 /um]**: with the run's kernel (in-focus SD 0.080 um) 0.50, 0.91, 0.53, 0.94,
+1.39 um (5353, 2669, 1013, 2620, 639); with the in-focus SD at 0.25 um 0.72, 1.01, 0.78, 1.04, 1.55 um; with the
+heaviest tail tried (50 % of the blur 6 times wider) 0.58, 1.00, 0.59, 1.03, 1.48 um, the upper values only for a
+nearly opaque tube. So for 1013, 2620 and 639 no kernel tried makes a tube of Allen's diameter as wide as the recorded
+dip; 2669 is compatible in focus; 5353 needs an in-focus SD between 0.080 and 0.25 um, or a thicker tube.
+
+**Node 5353, the kernel varied [run, sandbox: `kernel_tails_real_check.py`; the pipeline's forward and fit, the
+run's start and planes, the weights' width fixed at the run's 0.218 um so that $\chi^2/N$ compare]**:
+
+| kernel | $\hat d$ (um), $d$ free | $\chi^2/N$, $d$ free | $\chi^2/N$, $d$ held at Allen's 0.454 um | unweighted: $\hat d$, $\chi^2/N$ / $\chi^2/N$ at Allen's |
+|---|---|---|---|---|
+| Gaussian, in-focus SD 0.080 um (the run) | 0.769 | 3.49 | 12.3 | 0.776, 4.56 / 6.28 |
+| Gaussian, 0.15 um | 0.713 | 3.29 | 6.19 | 0.690, 4.51 / -- |
+| Gaussian, 0.25 um | 0.449 | 3.89 | 3.89 | 0.329, 4.76 / 4.79 |
+| heavy tail: 30 % of the blur 3 x wider | 0.800 | 5.49 | 13.5 | 0.722, 5.13 / -- |
+| heavy tail: 30 % 6 x wider | 0.784 | 5.38 | 13.3 | 0.709, 4.79 / 5.75 |
+| heavy tail: 50 % 6 x wider | 0.816 | 8.85 | 16.0 | 0.645, 6.11 / 6.56 |
+
+The heavy-tailed kernels are $(1-f)\,G_{\sigma_{\rm r}(\delta)} + f\,G_{h\,\sigma_{\rm r}(\delta)}$ at the run's table
+(the image is linear in the kernel). Reading **[reasoning, on these runs]**: heavier tails at the configured
+in-focus width fit worse with either weighting and do not let Allen's diameter fit; a wider in-focus width does, at a
+small cost in $\chi^2/N$; between 0.080 and 0.25 um the fit's $\chi^2/N$ changes by at most 0.6 while $\hat d$ moves from
+0.77 to 0.45 um (0.33 um unweighted) -- the confound of D-165, now on real data. Not tested: power-law tails, a
+fitted tail fraction, other nodes (1013, 2620, 639 are polluted or not Allen-compatible).
 
 Open, the user's to decide **[open]**: the in-focus width (the defocus-table handoff's P4: its options, not decided,
 are the narrowest in-focus dips of a cell as an upper bound and a fit on thick dendrites with the width free); a test
