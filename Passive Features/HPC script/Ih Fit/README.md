@@ -104,6 +104,7 @@ The same checks by hand:
     python smoke_noise_fit.py              # expect "SMOKE noise_fit: 12/12 passed" (about 100 s)
     python smoke_noise_sweep_fit.py        # expect "SMOKE noise_sweep_fit: 11/11 passed" (about 7 min)
     python smoke_noise_run.py              # expect "SMOKE noise_run: 9/9 passed" (about 9 min)
+    python -m pytest -q tests/spec         # the final check's spec tests of 2026-11-17 (needs pytest; sandbox): expect "54 passed"
     python smoke_ih_fit.py                 # expect "smoke_ih_fit: 12/12 passed"
     python smoke_ih_recovery.py            # expect "smoke_ih_recovery: 14/14 passed"
     python regression_passive_identity.py --ref-dir "../Biological Fit" \
