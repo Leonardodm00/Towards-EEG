@@ -234,6 +234,7 @@ the "Binds" column.
 | 2026-11-19 | No decision changed (the noise-fit chat; the user's paste of 12:12) **[cluster]**. **The 18-cell nf2 run** (three-component law, D-152 to D-155) read back from its iteration histories and per-sweep fits: J/dof lower than nf1 in 18 of 18 cells (median 10.8 to 2.65; below chi^2_16's 99 % point in 2, its 99.9 % point in 9; largest 569844159, 938); no coordinate at a bound (tau_m 0.053-0.111 ms; tau_s 11 ms - 5.7 s); the per-sweep laws rejected at 1 % in 19 % of SS and 23 % of LS sweeps (nf1 69 % and 56 %); 15 cells `no_plateau` (D-050), none drifting at the end. **The slow part's sigma_s and tau_s are not separately determined where tau_s is long against the windows** (checked by computation on 571430815: tau_s 5.7 s to 1 s at fixed sigma_s^2 / tau_s moves no statistic by more than 0.35 SE, while the slow SD over a 7.4 s train changes from 0.92 to 0.59 mV): put to the user as Block 5's first question. The Block 6 handoff, §4 and §6 item 9; `Ih Fit/dev/2026-11-19_nf2_readback/`. Next free IDs unchanged: D-180, I-006. |
 | 2026-11-19 (later) | Logs **D-180** (user, 12:24; the noise-fit chat): the twins are no longer than the windows the noise fit used (at most 265 ms) and nothing relies on the noise across pulses -- the first of the three options put after the nf2 read-back (the slow part's sigma_s and tau_s not separately determined where tau_s is long). Its application to the Long Square twins (D-076 (iii): whole LS sweeps) and to D-083.2's 37-pulse trains is open, for Block 5's SPEC entry; D-083 annotated. **[cluster, pasted]** the 18-cell nf2 merge (job `2099736`): `NOISE_MERGE L3_exc: 18 ok, 0 refused, 0 failed, 0 missing`; the pilot's merge (`2098690`) 2 ok. The final check's 54 spec tests of 2026-11-17 committed (the user left it to the assistant). Next free IDs: D-181, I-006. |
 | 2026-11-19 (later, 2) | Logs **I-006** (user, 15:12; the defocus-table chat): step 2 of the kernel calibration with every twin's diameter fitted under a Gaussian penalty toward a reference diameter, the table left free -- form C of the T10 study document with the diameters' changes discouraged; read as penalized (Tikhonov-type) least squares, i.e. the maximum a posteriori estimate under a Gaussian prior on each diameter. To implement later; nothing in the code or the plan changes. **[FT]** PMC5064166; **[ABS]** PMID 39191246, 31363890. |
+| 2026-11-19 (later, 3) | Logs **D-181** (user, 15:43; the defocus-table chat): the near-field table is read between knots with the growth fit's cubic spline, not linearly in $|\delta|$, and the growth fit's cubic interpolation (PROVISIONAL since Block 10) is confirmed. **[run, sandbox]** check 8: with the renderer linear in $|\delta|$ and the growth fit cubic, step 1 errs by -9.2 % at 0.28 um even for tubes of no thickness (toy, pilot cell's knot values); check 9: with a truth of the growth fit's own cubic shape, by -0.1 %. Not built. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -403,6 +404,7 @@ would be needed*, *Status*.
 | D-178 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, `_pilot`; Blocks 3, 5) and every user of it (Blocks 6, 10, 13 to 15, 17, 36); `MeasureConfig`; D-173.3, D-174.2 | D-174.2 confirmed: the held diameter (Allen's) is the first stage's default for every user, through a configuration field; the free fit stays selectable as the labelled alternative [user] | active; implemented at `513ad9e` (2026-11-18) |
 | D-179 | 2026-11-18 | D-177.3 to D-177.11 (the joint fit's construction, plan step F3); `cleaning.neighbour_tiers` (rule (b)); the SPEC entries of the joint fit, still to be written | confirmed [user]: a chain's pieces share one ray history, chains rendered separately and their shadows summed; rule (b) no longer makes tier 2; the first test nodes. Confirmed as read, to check [user, as read]: the neighbour's position free in a narrow range, its absorption the weighted mean of the first stage's. Open, figures delivered: attached chains as neighbours; the own chain through the smoothed or the raw trace | active |
 | D-180 | 2026-11-19 | Block 5 (the twins; roadmap N5), Stage 7's run (D-083, S7), `synthetic_ground_truth.py`, `gen_from_manifest.py` | the noise of a twin spans no more than the noise fit's windows (at most 265 ms); nothing relies on the noise across pulses [user]; its application to the LS twins and to D-083.2's trains open | active; Block 5's SPEC entry to write |
+| D-181 | 2026-11-19 | SPEC Block 4's kernel law (`model.kernel.sigma_r`, near field $|\delta| \le$ 0.84 um); `CalibrationConfig.growth_interp` (Block 10) | the near-field table read between knots with the growth fit's cubic spline, not linearly; the growth fit's cubic interpolation confirmed | active; not built |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -12919,3 +12921,56 @@ Dogrusoz 2019, Med Biol Eng Comput 57:2093-2113, PMID 31363890: MAP estimation w
 width-diameter trade-off).
 
 **Status:** idea; not scheduled; roadmap unchanged (T10 open, NS1 planned).
+
+## D-181 -- The near-field table read between knots with the growth fit's cubic spline, not linearly; the growth fit's cubic interpolation confirmed (user)
+
+**Date:** 2026-11-19, 15:43 (Europe/Rome), the defocus-table chat. **Binds:** the renderer's kernel law between the
+table's knots in the near field, $|\delta| \le$ 0.84 um (SPEC Block 4, "Kernel (`kernel_family = "gaussian_table"`)":
+today a linear interpolation of (`kernel_table_delta_um`, `kernel_table_sigma_um`) in $|\delta|$, `model.kernel.sigma_r`,
+`numpy.interp`); the growth fit's interpolation (`CalibrationConfig.growth_interp` = "cubic", marked PROVISIONAL in SPEC
+Block 10 and in `config.py`); everything rendered with a table (phantoms, step 2's twins, the diameter bias table, the
+shadow predictions of 10.I and 10.S); the T10 study document `TEEG_diameter_kernel_calibration_step2_2026-11-18.md`,
+§3.2.
+
+**Decision [user].** Quoting the study document ("the growth fit interpolates $G$ between knots with a cubic spline (the
+assistant's default, marked PROVISIONAL in SPEC until the user confirms it), while the renderer interpolates
+$\sigma_{\rm r}$ linearly, Eq. (1), so the two disagree between knots even for an infinitely thin tube"): "I would keep
+the cubis spline interplation also for the values across the knots in the near field part of the table. Take note of
+that".
+
+**Statement.** (D-181.1) The growth fit keeps its cubic interpolation of $G$ between knots -- the not-a-knot cubic
+spline on the signed knots $-Mh, \dots, Mh$ ($h$ = 0.28 um, $M$ = 4), symmetric convention, linear continuation beyond
+-- and the PROVISIONAL mark on it is lifted [user]. (D-181.2) In the near field, $|\delta|$ up to the table's last knot
+(0.84 um), the renderer reads $\sigma_{\rm r}(\delta)$ between knots from the same cubic spline instead of linearly in
+$|\delta|$ [user]. The assistant's reading, to be confirmed: the spline is the one step 1 fits, on the growth, so that
+$\sigma_{\rm r}(\delta) = (\sigma_{\rm r}(0)^2 + G(\delta))^{1/2}$ with $G(\delta) = \sum_m G_m B_m(\delta)$, $B_m$ the
+growth fit's basis; beyond 0.84 um the far field keeps its linear continuation (slope $\gamma$, T6) **[PROVISIONAL]**.
+
+**Why.** With the renderer linear in $|\delta|$ and the growth fit cubic in $G$, the two curves disagree between knots
+even for a tube of no thickness. On the toy model (faint limit, flat tubes, no noise; 128 nodes per population, axis
+offsets $U(-0.14, 0.14)$ um, the pilot cell's knot values): with the table linear in $|\delta|$, step 1 errs by -9.2,
+-3.2, -0.2 % at 0.28, 0.56, 0.84 um for $d \sim U(0.01, 0.03)$ um (check 8); with a truth of the growth fit's own cubic
+shape, by -0.1, -0.0, -0.0 % (check 9) **[run, sandbox]**.
+
+**What it implies for code and tables.** SPEC Block 4's kernel law gets an amendment and `model.kernel.sigma_r` reads the
+near field from the cubic spline by default (the linear law, if kept, only as a labelled comparison); the renderer
+configuration's signature changes, so tables and caches keyed on it are not reused; the PROVISIONAL mark on
+`growth_interp` in SPEC Block 10 and `config.py` is replaced by a reference to D-181.1. A smoke check should assert the
+default and that, for a tube of no thickness, step 1 recovers the knots the renderer was given. Not built: until it is,
+everything is rendered with the linear law.
+
+**What it does not decide.** Whether the spline is on $G$ (the reading above) or on $\sigma_{\rm r}$ itself; how the
+near-field spline meets the far field at 0.84 um (value and slope against the continuation $\gamma$) -- the growth fit's
+knots run to 1.12 um and the table's to 0.84 um, so the renderer's spline equals step 1's only if the table also carries
+the 1.12 um knot or step 1 is cut at 0.84 um; whether it is built before the davinci run's calibration step, whose
+isolation test and shadow predictions read the kernel and whose round 2 renders with round 1's table (D-175.2), or
+after; the far-field law (T6). It does not remove the depth blend: against the cubic-shaped truth step 1 still errs by
+-7.3, -1.9, -0.3 % for $d \sim U(0.15, 0.25)$ um, -20.9, -11.7, -2.2 % for $U(0.45, 0.55)$ um and -13.0, -28.3, -9.1 %
+for $U(0.75, 0.95)$ um (check 9) -- step 2's business (T10, NS1).
+
+**Sources.** **[user]** 2026-11-19, 15:43. **[doc]** the T10 study document, §3.2 and §3.3 (sent as files on
+2026-11-18, not in the repository). **[code]** `analysis/calibration.py` (`_cubic_basis_splines`, `_basis`) and
+`model/kernel.py` (`sigma_r`) at `513ad9e`; SPEC Block 4 (kernel law), Block 10 (`growth_interp`). **[run, sandbox]**
+`check08_thin_nodes.py` and `check09_cubic_truth.py`, in the study document's `scripts/` (this chat, 2026-11-19).
+
+**Status:** active; not built (SPEC Block 4 amendment and the code change to plan with the user).
