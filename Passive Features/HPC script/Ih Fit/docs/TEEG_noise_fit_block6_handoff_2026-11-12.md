@@ -22,6 +22,7 @@ which stays the history of Block 9 and of D-122 to D-125.
 | 2026-11-18 | The nf2 pilot finished (user's paste, 13:37): 2 ok; 508282493 19299 s (nf1 14536 s, x 1.33), 569844159 25203 s (nf1 27308 s, x 0.92). The law, J and flags not yet read: the one-liner of §4 asked for. |
 | 2026-11-18 (later) | The nf2 pilot read back (user's paste, 14:26; §4 "The nf2 pilot read back"): J/dof 6.8 to 2.2 and 160 to 59; the lag-shape residuals gone; no bound, no failed sweep; both cells `no_plateau`; the remaining residual a disagreement between the SS and LS statistics. The 18-cell run recommended now, with a second read-back (the iteration histories and the per-sweep fits). |
 | 2026-11-19 | The 18-cell nf2 run read back (the user's paste of the second one-liner over the 18 JSONs, 12:12; §4 "The nf2 run read back"; `dev/2026-11-19_nf2_readback/`): J/dof lower in 18 of 18 (median 10.8 to 2.65); no bound; the per-sweep laws rejected at 1 % in 19 % (SS) and 23 % (LS) of sweeps (nf1 69 % and 56 %); 15 cells `no_plateau` without a steady drift; the slow part determined only as sigma_s^2 / tau_s where tau_s is long (checked by computation). Step 2 done under D-152; step 3 next, with §6 item 9 first. |
+| 2026-11-19 (later) | D-180 (user): the twins no longer than the noise fit's windows, nothing relying on the noise across pulses (§6 item 9 answered, its open points carried over); the 18-cell merge: 18 ok (job `2099736`). **Block 5 moves to `TEEG_twins_block5_handoff_2026-11-19.md` (this folder), now the place to start**; this handoff stays the history of the noise-fit run. |
 
 **Basis tags.** **[run]** executed in the assistant's sandbox (date given); **[src]** read from the code, SPEC or log
 on `main`; **[log]** the decision log's text; **[user]** the user's decision or words; **[reasoning]** the assistant's
@@ -33,7 +34,7 @@ argument, not checked; **[open]** not decided or not verified.
 |---|---|---|---|
 | 1 | **Block 6's code**: `run_noise_fit.py`, `submit_noise_fit.sh`, `smoke_noise_run.py` (R1-R8), exactly as SPEC Block 6 states -- **done 2026-11-13, `1d848f6`** (R1-R9) | nothing: D-123 to D-126 settle every point | sandbox |
 | 2 | **The run on davinci** (the user runs it, §4): `git pull`, the FULL gates, a dry run, the 2-cell pilot at full size, then the 18 cells with the pilot's walltime -- **next** (§4's commands are final) [corrected 2026-11-17: **done**, 18 ok, 0 refused, 0 failed, 0 missing] [2026-11-19: **done again under the three-component law** (run tag `nf2`, D-152 to D-155): the 18 cells' laws read back, §4] | step 1 | davinci |
-| 3 | **Block 5's SPEC entry, then its code**: the twins built from the run's tables (§6's questions first) -- **next** (2026-11-17): the two tables inspected first [2026-11-17 (later): tables read back (§4): sound, but the law misfits every cell; next the per-cell JSONs, to see where the misfit sits (§6 item 8)] [2026-11-17 (later, 2): JSONs read back (§4); two decisions wait for the user before the SPEC entry: the law kept or extended, and a rule for degenerate per-sweep fits (§6 item 8)] [2026-11-19: **next**, the nf2 tables its input; §6 item 9 (the slow part over seconds) first] | the run's tables | sandbox |
+| 3 | **Block 5's SPEC entry, then its code**: the twins built from the run's tables (§6's questions first) -- **next** (2026-11-17): the two tables inspected first [2026-11-17 (later): tables read back (§4): sound, but the law misfits every cell; next the per-cell JSONs, to see where the misfit sits (§6 item 8)] [2026-11-17 (later, 2): JSONs read back (§4); two decisions wait for the user before the SPEC entry: the law kept or extended, and a rule for degenerate per-sweep fits (§6 item 8)] [2026-11-19: **next**, the nf2 tables its input; §6 item 9 (the slow part over seconds) first] [2026-11-19 (later): moved to `TEEG_twins_block5_handoff_2026-11-19.md`, with D-180] | the run's tables | sandbox |
 | 4 | **Block 7** (the record), then **Stage 7** (Block 8, the recovery gate, D-083) | Blocks 5-6 | sandbox, davinci |
 
 Open with the user, unanswered: whether the S0-S3 checks get their own roadmap stage (proposal: N6b after N6, under G4).
@@ -540,6 +541,9 @@ rule keys on the commit). Gate logs: `~/ih_fit_gate_logs/<date_time>/`.
    correlation of consecutive SS window means within a train), Block 3 and the run again; (c) the law as it is,
    with a sensitivity run (D-055 S2-type) at both ends of each cell's ridge. Depends on item 1 and on how Stage 7
    uses the SS responses.
+   [answered 2026-11-19: **D-180** (user) -- option (a): the twins no longer than the windows the fit used, nothing
+   relying on the noise across pulses; its open points (the LS twins, the trains, the bundles, the offset) are in
+   `TEEG_twins_block5_handoff_2026-11-19.md`, §5.]
 
 ## 7. Repository, environment, cluster
 

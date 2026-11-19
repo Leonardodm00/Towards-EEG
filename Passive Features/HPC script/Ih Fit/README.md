@@ -125,9 +125,10 @@ folder on the login node, after `git pull`, with `prova` active:
 
     bash cluster_gates_noise_fit.sh        # FULL; expect "VERDICT: SETTLED -- ..."
     python smoke_noise_run.py              # expect "SMOKE noise_run: 9/9 passed"
-    RUN_TAG=nf1 CELLS=508282493,569844159 DRY_RUN=1 bash submit_noise_fit.sh
-    RUN_TAG=nf1 CELLS=508282493,569844159 WALLTIME=48:00:00 bash submit_noise_fit.sh   # the pilot (D-124)
-    RUN_TAG=nf1 WALLTIME=<from the pilot> bash submit_noise_fit.sh                     # the 18 cells, after the pilot
+    # a new law, a new tag: nf1 = the two-component law (2026-11-14 to 17), nf2 = the three-component law (2026-11-18/19, 18 ok)
+    RUN_TAG=nf2 CELLS=508282493,569844159 DRY_RUN=1 bash submit_noise_fit.sh
+    RUN_TAG=nf2 CELLS=508282493,569844159 WALLTIME=48:00:00 bash submit_noise_fit.sh   # the pilot (D-124)
+    RUN_TAG=nf2 WALLTIME=48:00:00 bash submit_noise_fit.sh                              # the 18 cells (D-147), the pilot's two skipped
 
 Outputs: `$IH_OUTPUT_BASE/noise_fit/<RUN_TAG>/<GROUP>/` (default
 `IH_OUTPUT_BASE=$IH_ARCHIVE_ROOT/pipeline_outputs_ih`): `cells/specimen_<id>.json`,

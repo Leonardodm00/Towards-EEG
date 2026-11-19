@@ -1,0 +1,267 @@
+# TEEG -- the twins (Block 5): handoff (2026-11-19)
+
+For the chat that writes Block 5 -- the twins' generator: synthetic copies of the 18 L3_exc cells, each on its own
+real morphology, stimulated with its own real protocol and carrying each real sweep's fitted recording noise -- and
+then builds the twins on davinci for Stage 7's recovery of the six parameters (D-083). Supersedes, as the place to
+start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays the history of the noise-fit run
+(nf1 under the two-component law, the three-component law, nf2).
+
+| Date | Change |
+|---|---|
+| 2026-11-19 | Created at the user's request ("Now we will build the synthetic runs in another chat. Write the extensive handoff and update the roadmap"), after D-180 (the twins no longer than the noise fit's windows) and the nf2 run (18 ok). Facts checked against `main` at `b17f768` and the user's pastes of 2026-11-18/19. |
+
+**Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
+text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
+in the assistant's sandbox (date given); **[reasoning]** the assistant's argument, not checked; **[open]** not decided.
+
+**Model.** The coding directives (v2, 2026-11-13) put planning and orchestration on the most powerful model
+available -- Claude Fable 5.2 on 2026-11-19 -- and the implementation and the final check on Opus agents. This
+handoff was written on Opus 5.5. Start the twins chat on Fable 5.2.
+
+## Start here: the order of work
+
+| # | Step | Blocked by | Where it runs |
+|---|---|---|---|
+| 1 | **Settle Block 5's open questions with the user** (§5), first Q1-Q3: what D-180 means for the Long Square twins, for the SS response (trains or single pulses) and for the SS bundles | nothing | chat |
+| 2 | **Block 5's SPEC entry** in `Ih Fit/specs/SPEC.md`: interfaces, shapes, units, oracles; the roadmap's N5 reads it by itself (§8) | 1 | sandbox |
+| 3 | **Plan, then implement** (directives 6-9; the `scientific-coding` skill, "Fan-out"): the orchestrator writes the plan and the interfaces, the user approves, Opus implementers write the blocks, an independent Opus agent makes the final check | 2 | sandbox |
+| 4 | **The twins on davinci** (the user runs it): `git pull`, gates, a dry run, the twins of 1-2 cells, then the 18 | 3 | davinci |
+| 5 | **Stage 7 itself**: Block 8's SPEC entry (the gate run), the recovery fits of the four arms, the gate on `ih6`; then Block 7, the record (N7) | 4 | sandbox, davinci |
+
+## 1. Where it stands (2026-11-19)
+
+- **The noise law is three-component** (D-152 to D-155; SPEC 2.6) **[log; src]**: a white Gaussian fast part
+  $\sigma_f$, a middle OU part ($\sigma_m$, $\tau_m \in [0.04, 1]$ ms) and a slow OU part ($\sigma_s$,
+  $\tau_s \in [1\,{\rm ms}, 10\,{\rm s}]$); per sweep the three sizes are fitted with both time scales held at the
+  cell's; $\sigma_m$ and $\sigma_s$ are shrunk towards their protocol's mean, $\sigma_f$ is not; a sweep whose fit
+  fails (no convergence, a bound, $\hat\sigma_f(c,s) < 0.5\,\hat\sigma_f(c)$, a bootstrap variance NaN or below
+  $10^{-12}$) gives its twin the cell's whole law.
+- **The nf2 run is done** **[cluster]**: pilot 2 ok (2026-11-18; array `2098689[]`, merge `2098690`), then
+  `NOISE_MERGE L3_exc: 18 ok, 0 refused, 0 failed, 0 missing` (merge job `2099736`, 2026-11-19). Code commit of the
+  JSONs: `e9a6469` (the pilot's; the 18-cell run kept the pilot's two cells, which the resume rule allows only at the
+  same commit **[reasoning]**).
+- **Read back** (the Block 6 handoff, §4 "The nf2 run read back"; `Ih Fit/dev/2026-11-19_nf2_readback/`)
+  **[cluster; run]**: misfit per degree of freedom lower than the two-component law's in 18 of 18 cells (median 10.8 to
+  2.65); no coordinate at a bound; the per-sweep laws rejected at 1 % in 19 % of SS and 23 % of LS sweeps (nf1: 69 %
+  and 56 %); 15 of 18 cells used every refinement round (`no_plateau`, D-050) without drifting at the end.
+- **D-180** (user, 2026-11-19) **[log]**: the twins are no longer than the windows the noise fit used (at most
+  265 ms), and nothing relies on how the noise behaves across pulses. It answers the slow-part finding below; how it
+  applies to the Long Square twins and to D-083.2's 37-pulse trains is open (§5, Q1-Q3).
+- **The slow-part finding** **[cluster; run]**: where $\hat\tau_s(c)$ is long against the windows, the fit
+  determines $\sigma_s^2/\tau_s$, not $\sigma_s$ and $\tau_s$ apart. Over the late refinement rounds $\tau_s$ moved by
+  more than 20 % in 7 cells while $\sigma_s^2/\tau_s$ moved by 5-29 % (5 % in 526785799, $\tau_s$ 0.89-1.36 s, and in
+  571430815, 5.66-8.06 s). A closed-form check on 571430815 (`check_slow_ridge.py`: each window's mean removed;
+  the median-window subtraction and the tilt left out) moved its slow part from 5.66 s to 1 s along that ridge: no statistic
+  changed by more than 0.35 SE, while over a 7.42 s SS train the slow part's SD went from 0.92 to 0.59 mV.
+- **Roadmap** (allen-mtg-fit, status at `b17f768`) **[src]**: N5 (Block 5) planned -- no SPEC entry; N7 (the record)
+  planned; S7 (Stage 7) planned -- no SPEC entry for Block 8; I12 (Stage 7 as built: manifest, generator, report,
+  driver) tested; N1-N4b and N6 show `pushed` (§10: the tool does not see this folder's test reports, and N6's
+  marker never reached GitHub).
+
+## 2. The input: the nf2 outputs
+
+### 2.1 Where they are (davinci) [cluster; src]
+
+| What | Path |
+|---|---|
+| group folder `OUT` | `/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs_ih/noise_fit/nf2/L3_exc` |
+| one JSON per cell | `$OUT/cells/specimen_<id>.json` (18) |
+| per-cell table | `$OUT/noise_cells_L3_exc.csv` (18 rows) |
+| per-sweep table | `$OUT/noise_sweeps_L3_exc.csv` (one row per SS sweep with kept windows and per LS sweep: 64 SS + 525 LS **[run, on nf1's table; the layouts are unchanged]**) |
+| logs | `$OUT/logs/cell_<id>_<job>.log`, `$OUT/logs/merge_<job>.log` |
+| run files | `~/noise_fit_runs/nf2_L3_exc_<UTC>.env` |
+| the superseded run | `.../noise_fit/nf1/L3_exc` (two-component law): feeds no twin |
+
+To bring them into a sandbox (one file to attach):
+
+    cd "/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs_ih/noise_fit/nf2/L3_exc" && tar -czf ~/nf2_L3_exc.tar.gz noise_cells_L3_exc.csv noise_sweeps_L3_exc.csv cells && ls -la ~/nf2_L3_exc.tar.gz
+
+### 2.2 What a twin sweep takes from them [src: SPEC 2.6 (e), (g); `noise_sweep_fit.py`]
+
+For real cell $c$ and its sweep $s$ (protocol SS or LS), the twin sweep's noise law is (P0')
+
+$$\tilde\theta(c,s) = \bigl(\hat\sigma_f(c,s),\ \tilde\sigma_m(c,s),\ \hat\tau_m(c),\ \tilde\sigma_s(c,s),\ \hat\tau_s(c)\bigr),$$
+
+the sweep's own fast SD, its shrunk middle and slow SDs, and the cell's two time scales; for a failed sweep,
+$\hat\theta(c)$ whole (D-122.3).
+
+| Quantity | Per-sweep table (`noise_sweeps_L3_exc.csv`) | Per-cell table / JSON |
+|---|---|---|
+| keys | `specimen_id`, `noise_sweep_protocol` (`SS`/`LS`, upper case), `noise_sweep_number` | the JSON rows use `ss`/`ls` |
+| sigma_f (mV) | `noise_sweep_sigma_f_mV` (unpooled) | `noise_sigma_f_mV` = the cell's |
+| sigma_m (mV) | `noise_sweep_sigma_m_mV` = the twin's (shrunk); `noise_sweep_sigma_m_raw_mV` the sweep's own | `noise_sigma_m_mV` |
+| tau_m | -- (the cell's) | `noise_tau_m_ms` (**ms**; `noise_law` takes s) |
+| sigma_s (mV) | `noise_sweep_sigma_s_mV` = the twin's (shrunk); `noise_sweep_sigma_s_raw_mV` the sweep's own | `noise_sigma_s_mV` |
+| tau_s | -- (the cell's) | `noise_tau_s_ms` (**ms**) |
+| tilt $\hat b(c,s)$ (mV/s) | `noise_tilt_mV_per_s` (copied into the twin, D-102, D-107) | `cell_fit.ss_tilt_mV_per_s`, `cell_fit.ls_tilt_mV_per_s` |
+| failure | `noise_sweep_flags` holds `sweep_fit_failed:<pr>:<sweep>:<reason>`; its `_mV` columns already carry $\hat\theta(c)$; the `raw`, `v` and `w` columns are empty | `sweep_stage.rows[].failed`, `.reason` |
+| the whole twin law | -- | `sweep_stage.twin_laws["<pr>:<sweep>"]` = {`sigma_f_mV`, `sigma_m_mV`, `tau_m_s`, `sigma_s_mV`, `tau_s_s`} |
+
+The simulator that matches what was fitted is `noise_law` (Block 2): `NoiseLaw(sigma_f, sigma_m, tau_m, sigma_s,
+tau_s)` (mV, mV, s, mV, s), `draw_units(rng, n_traces, n_samples)` (draws fast, mid, slow, tilt, offset in that
+order), `simulate_sweep(law, dt, n_samples, units, index=0, *, sigma_b=0.0, sigma_a=0.0, tilt_mV_per_s=None)` with
+the tilt fixed at $\hat b(c,s)$ **[src: SPEC 2.6 (b), (h)]**.
+
+### 2.3 The laws in numbers (nf2) [cluster; run]
+
+| Parameter | Range over the 18 cells | Median |
+|---|---|---|
+| sigma_f | 0.0310-0.0349 mV | 0.0327 mV |
+| sigma_m | 0.0161-0.0267 mV | 0.0197 mV |
+| tau_m | 0.053-0.111 ms (2.7-5.5 samples at 50 kHz) | 0.077 ms |
+| sigma_s | 0.0475-1.615 mV | 0.073 mV |
+| tau_s | 11.2 ms - 5.66 s; above 265 ms in 526785799 (1.28 s), 548408551 (0.29 s), 571430815 (5.66 s), 571624532 (0.35 s) | 96 ms |
+| J / dof (16 dof) | 1.41-58.6; not rejected at 0.1 % in 9 cells, at 1 % in 2 | 2.65 |
+
+The per-cell table, the histories and the per-sweep fits: the Block 6 handoff §4 and
+`Ih Fit/dev/2026-11-19_nf2_readback/` (the user's paste, `nf2_cells_from_paste_2026-11-19.csv`). The 9 failed LS
+sweeps' reasons were not pasted (in the JSONs' `sweep_stage.rows[].reason`).
+
+## 3. Decisions that bind Block 5 [log]
+
+| ID | Binds | In short |
+|---|---|---|
+| D-005, D-011 | the six parameters; the cohort | $\theta = (C_m, R_m, R_a, \bar g_h, \Delta v_h, \kappa_\tau)$; real archive morphologies, $F$ = 1.9; a quarter of the cohort, every 4th cell by index, as false-positive control ($\bar g_h = 10^{-6}$ S/cm$^2$, $\Delta v_h = 0$, $\kappa_\tau = 1$); the error measure (D-011.1) and the gate on `ih6` |
+| D-013 | the SWCs | every test on the raw SWCs until the diameter-corrected ones arrive |
+| D-014 | acquisition twins | each twin sampled at its real cell's rates, with its real cell's SS pulse count per polarity (manifest `acq_*`) |
+| D-017 | the twin's noise and LS timing | each twin carries its own real cell's fitted noise law (its form since superseded by D-152) and its real Long Square timing (`ProtocolConfig.ls_onset_ms`) |
+| D-073, D-076 (i) | per-sweep twins | each twin sweep is the twin of one real sweep and carries noise calibrated on that sweep |
+| D-076 (iii) | the LS set | the twin's LS sweeps are the real cell's, each at its own amplitude, one twin sweep per real sweep; `run_ih_recovery.py`'s cohort amplitudes only as a labelled fallback |
+| D-076 (iv), D-072 | QC | no QC on the twins |
+| D-083 | Stage 7 | the recovery runs on davinci before any six-parameter fit of a real cell; the twins carry their cell's morphology, fitted noise and protocol -- "its SS sweeps as 37-pulse trains at the stored positions" (qualified by D-180) -- and are fitted by `run_ih_recovery.py` through `run_ih_fit.main()`, four arms per twin (`baseline_runB`, `passive_fullstep`, `ih4`, `ih6`), the gate on `ih6` |
+| D-102, D-107 | the tilt | each twin sweep carries the realised tilt $\hat b(c,s)$ of its own real sweep, fixed, not drawn (SS: D-102.2's reading; LS: the line through the pre-window and the end-window means) |
+| D-122.3 | failed sweeps | the twin carries $\hat\theta(c)$ |
+| D-152 to D-155 | the law | §1 |
+| D-180 | the twins' span | the noise drawn over spans no longer than the fit's windows (an SS window, $[-10, 200)$ ms; the LS pre-window's 265 ms); nothing relies on the noise across pulses; open: the LS twins, the trains, the bundles, the offset |
+
+## 4. What exists in the code, and what Block 5 changes
+
+### 4.1 Inventory [src at `b17f768`]
+
+| File | What it does today | What the decisions above ask of it [reasoning] |
+|---|---|---|
+| `synthetic_ground_truth.py` | builds the cell in NEURON as the fitter does (I_h through `extra_mechs`); `simulate_ss_protocol`: one clean response per polarity from rest, `ss_n_repeats` independent noisy copies averaged into a bundle, every pulse stored with its own sweep number; `simulate_ls_protocol`: one sweep per amplitude, onset 100 ms, 1 s step, 200 ms after, 20 kHz by default; `add_recording_noise`: white or AR(1) fast noise, a per-sweep DC offset and a linear drift -- **no slow OU, no middle part**; `write_archive_cell`: `ss_pulses.npz`, `ls_sweeps.npz`, `metadata.json` | the noise of each twin sweep from `noise_law` with $\tilde\theta(c,s)$ and $\hat b(c,s)$; the real LS timing and amplitudes; the SS windows as Q1-Q6 settle |
+| `gen_from_manifest.py` | manifest row to kwargs; noise columns `noise_sigma_mV`, `noise_rho_lag1`, `noise_baseline_sigma_mV`, `noise_drift_sigma_mV`, `noise_seed`, `noise_ss_sigma_mV`, `noise_ss_rho_lag1`; acquisition `acq_ss_n_repeats`, `acq_fs_ss_Hz`, `acq_fs_ls_Hz` (D-014) | per-sweep laws do not fit per-cell columns (Q9) |
+| `synth_gt_grid.py` | draws the manifest: truths, the false-positive control by index, noise from a noise table | its noise source becomes the nf2 tables |
+| `run_ih_recovery.py` | phases noise (`noise_calibration`, the old per-sweep AR(1) table), manifest, generate (LS amplitudes `--ls-hyp-amps`/`--ls-dep-amps`, the cohort set), fit (`run_ih_fit.main()`, the arms), report (`ih_recovery_report`, the gate) | phase noise reads the nf2 tables; generate takes each cell's own LS amplitudes and timing |
+| `noise_calibration.py` | the AR(1) noise measurement of D-012 to D-016 | superseded as the twins' noise source; only `lag_autocorr` is in the SPEC's coverage |
+| `noise_law.py` | the three-component simulator and closed-form moments (Block 2) | the generator's noise |
+| `run_ih_fit.py` | the fitter; arms `baseline_runB` (LS window 60 ms after onset), `passive_fullstep` and `ih6` (LS window mode `step`) | unchanged; it fixes what span of an LS twin is read (Q1) |
+| `submit_ih_recovery.sh`, `smoke_ih_recovery.py` | Stage 7's PBS script (S7's marker lines); the smoke R1-R14 (14/14 on davinci, gate G10) | follow the changes |
+
+### 4.2 Two facts the twins' noise has to respect [src]
+
+- **The fit's simulator simulated each SS sweep as a continuous train** -- the windows cut at their real positions,
+  the slow part and the tilt continuous across them (D-056 (i); SPEC section 8; Block 2's data flow) -- and every
+  statistic was read after subtracting, per sweep and polarity, the group's median window, each window's tilt offset
+  removed first (D-103.1, D-115). Twins with independent windows (D-180) carry the law within each window, but their
+  median windows, and the mean windows the fitter averages into bundles, behave differently across windows (Q3, Q12).
+- **The noise is made at 50 kHz.** All 18 cells are at 50 kHz **[run: the nf1 JSONs' `windows.fs_Hz`]**;
+  $\hat\tau_m$ is 2.7-5.5 samples and the fast part is white per 20 us sample, so the noise must be drawn in the
+  twin's own samples at that rate, never resampled; the generator's LS default of 20 kHz must not apply (D-014's
+  `acq_fs_*` set the rates per cell).
+
+## 5. Block 5's open questions (to settle with the user before the SPEC entry)
+
+| # | Question | State, sources | The assistant's proposal [reasoning] |
+|---|---|---|---|
+| Q1 | **The Long Square twins under D-180.** D-076 (iii) gives one twin sweep per real LS sweep; on L3_exc a sweep has its pre-window $[0, 265)$ ms, the step from 270 ms for 1 s and 6 s stored after it (D-107); `ih6` and `passive_fullstep` read the step (`ls_window_mode='step'`), `baseline_runB` 60 ms after onset. The noise over the step lies beyond the fit's 265 ms | open (D-180 open point 1) **[log; src]** | keep the real geometry and draw the law over the whole sweep: an extrapolation in time, mild where $\hat\tau_s \le$ 350 ms (16 cells), strong for 526785799 and 571430815, which the report flags; read D-180 as binding the SS windows |
+| Q2 | **The SS response.** D-083.2: 37-pulse trains at the stored positions (a train simulated in NEURON, the noise added per window), or each pulse simulated alone from rest as `simulate_ss_protocol` does | open (D-180 open point 2) | measure first: one cell, train against single pulse, the difference at each window against the noise SD; trains only if it matters |
+| Q3 | **The SS bundles.** The fitter averages a polarity's windows (SPEC section 8); independent twin windows average the slow part down by $1/K$, the real ones perhaps not, so a twin's bundle may be cleaner than its real cell's | open (D-180 open point 3) | a model-free check: the correlation of window means across the real trains, read from the archive, and the twins' bundle residual noise against the real cells' (run B's residual noise at the MLE) |
+| Q4 | **Which SS windows.** Every pulse of the 37-pulse train, or the stored (kept) windows per polarity and sweep | open since 2026-11-11 | the stored windows, the ones the fitter averages (D-014's pulse count) |
+| Q5 | **The per-sweep offset $a$** (invisible to the noise statistics, visible to the I_h fit's absolute-mV gate) | open since 2026-11-11 | to discuss: none, or the real sweep's offset copied like the tilt |
+| Q6 | **The tilt in SS windows.** D-102 copies $\hat b(c,s)$ for the whole sweep | settled in substance (D-102) | each window carries the tilt line at its real position, $\hat b(c,s)\,(t - \bar t_s)$: measured, not noise, so D-180.2 is kept |
+| Q7 | **The sampling rate** | settled by D-014 | 50 kHz, the noise drawn at the twin's own rate (§4.2) |
+| Q8 | **The LS timing.** D-017 asks for the real timing; the generator's defaults (onset 100 ms, 200 ms after) are not the archive's (270 ms, 6 s after), and no code reads them from the archive | D-017 **[log; src: grep]** | read onset, duration and length per cell from its `ls_sweeps.npz` |
+| Q9 | **The manifest.** Per-sweep laws do not fit per-cell columns; the false-positive controls carry the same noise (D-011 (ii)); old manifests | N5's summary **[src]** | a per-sweep table beside the manifest (specimen, protocol, sweep, amplitude, law, tilt, failed flag), keyed to the manifest's rows; the old noise columns a labelled fallback |
+| Q10 | **Seeds.** Per twin sweep, derived from (specimen, protocol, sweep), so adding a cell or a sweep moves no other draw (D-011 (ii)'s rule) | open | as stated |
+| Q11 | **Stage 7's own points.** The cohort size (default 20; the L3_exc group has 18; L2_exc?), raw against corrected SWCs (D-013), the gate's tolerances (the assistant's proposal, unowned, D-011), Block 8's SPEC entry | open (D-083) | after Block 5 |
+| Q12 | **Block 5's validation** | open | (a) closure: Block 3's statistics on a twin's archive against its real cell's $\hat q(c)$, within the twins' Monte Carlo spread (the independent windows change the median-window subtraction: measure by how much); (b) zero noise reproduces the clean response; (c) the laws in the manifest equal the nf2 tables; (d) the fitter loads a twin archive like a real one |
+
+The option D-180 left aside -- a statistic across windows and the noise fit again -- remains the route if Q3's check
+shows the bundles matter **[reasoning]**.
+
+## 6. Limits of the law the twins inherit [cluster; run]
+
+- **Misfit.** J/dof median 2.65 (worst 569844159, 58.6; 571483807, 11.0); the per-sweep laws rejected at 1 % in 19 %
+  of SS and 23 % of LS sweeps.
+- **The protocols disagree in some cells** (one law per cell cannot meet both): in 508282493 the law is below every
+  SS statistic and above every LS one; in 569844159 the SDs miss by about 4 SD in opposite directions (the pilot's
+  read-back). The per-sweep laws, pooled per protocol, absorb the sizes.
+- **The slow ridge** (§1): $\sigma_s$ and $\tau_s$ apart are not determined where $\tau_s$ is long; within the fit's
+  windows the laws are equivalent.
+- **No plateau** in 15 of 18 cells (D-050: the last iterate kept; the late steps go back and forth).
+- **9 of 525 LS sweeps failed**; their twins carry $\hat\theta(c)$.
+- **$\hat\tau_m$ is 0.05-0.11 ms in every cell**: whether it belongs to the cells or to the recording chain is not
+  studied **[open]**.
+
+## 7. After Block 5: Stage 7 and the record
+
+- **Block 8** (the gate run; roadmap S7): its SPEC entry is still the assistant's draft proposal (S7's note): the
+  recovery driver under D-073, `submit_ih_recovery.sh` with the marker lines; dry run, pilot (`MAX_CELLS=2`), full run
+  (`Ih Fit/README.md`, Stage 7).
+- **The gate** (D-011, D-083): median $|\varepsilon_i|$ per axis against tolerances still to be owned; a failing
+  kinetic knob is frozen at its base value for the campaign, a failing $C_m$ or $\bar g_h$ is not.
+- **Block 7** (roadmap N7): the fitted laws and flags into the Stage-7 manifest and the noise table, and the
+  decision-log and plan entries that close the noise prerequisite (N7's summary; the S0-S3 report dropped, D-125.3).
+- **Stage 8** (the campaign) waits for the gate's verdict and the corrected SWCs (S8's note).
+
+## 8. Repository, environment, cluster
+
+| Item | Value |
+|---|---|
+| repository | `Leonardodm00/Towards-EEG` (public), branch `main` |
+| push from a new session | `add_repo` (owner Leonardodm00, repo Towards-EEG, access push) first, or the proxy refuses the push |
+| a light clone | `git clone --filter=blob:none --sparse https://github.com/Leonardodm00/Towards-EEG.git && cd Towards-EEG && git sparse-checkout set "Passive Features/HPC script/Ih Fit" docs/project specs/roadmap` |
+| commit identity | the user's: `git config user.name "$(git log -1 --format=%an)"`, the same for the address (`%ae`); never write the address into a file |
+| cluster clone, env | `/davinci-1/home/ldellamea/TEEG/Towards-EEG`; conda env `prova` (python 3.12.13, numpy 2.4.4, scipy 1.17.1, statsmodels 0.14.6, neuron 9.0.1) |
+| archive | `/davinci-1/home/ldellamea/Human Neurons Fitting/L3_exc/specimen_*` (18 cells; 14 with two SS sweeps; SS trains of 37 pulses 200.5 ms apart, windows stored $[-10, 200)$ ms at 50 kHz) |
+| the noise-fit gates | `bash cluster_gates_noise_fit.sh` (FULL: 16 checks incl. `smoke_ih_recovery` as G10 and the regression G11; last SETTLED 2026-11-17 at `7c890ff`) |
+| the read-back one-liners | the Block 6 handoff, §4 (per cell: stage times, law, J, flags, sweeps by reason, residuals; histories and per-sweep fits) |
+| spec tests | `python -m pytest -q tests/spec` (sandbox; 54 passed at `b17f768`) |
+| roadmap | `specs/roadmap/allen-mtg-fit.yaml`; `python3 specs/roadmap/roadmap.py status --yaml specs/roadmap/allen-mtg-fit.yaml`; the page "Subproject Roadmaps" is redrawn by the scheduled "Roadmap sync" (every 2 h, 08:12-22:12 Rome) |
+
+## 9. Rules of the road
+
+- Coding directives v2: SPEC first; the orchestrator (Fable 5.2) plans, settles the science with the user, writes the
+  interfaces; one Opus implementer per block, in parallel where blocks are ready together; the orchestrator settles
+  their issues and asks the user only about the approach; the change report at the end; the final check by an
+  independent Opus agent.
+- A decision the user makes is logged in the same turn (`project-decision-log`): read the log's last changelog rows
+  before taking an ID -- other chats log too (next free on 2026-11-19: D-181, I-006).
+- Documents live in the repository on `main` (DOCUMENT UPKEEP v2); a new SPEC block enters the roadmap in the same
+  turn; theory statuses and new topics or steps only at the user's word.
+- The assistant never runs anything on davinci; fixes travel through git (`hpc-git-delivery`); `.py` and `.sh` ASCII
+  and LF; no `__pycache__` in a commit; dev checks are standalone scripts in `Ih Fit/dev/<date>_<topic>/`.
+
+## 10. Traps
+
+| Trap | Why |
+|---|---|
+| units | the tables give $\tau$ in ms, `noise_law` takes s; the per-sweep table's protocol is `SS`/`LS`, the JSON's `ss`/`ls` |
+| a failed sweep | its `_mV` columns already hold $\hat\theta(c)$: do not fall back a second time |
+| old dev scripts | the checks under `dev/` dated before 2026-11-17 use the four-parameter law and fail against today's `noise_law` (final check, F3); each runs at its own commit |
+| run tags | `nf1` (two-component, superseded) and `nf2` (current) sit side by side; a new law needs a new tag |
+| the roadmap's `pushed` | the tool reads tester reports only from the repository root's `specs/test_reports/`; this folder's reports (`Ih Fit/specs/test_reports/`, e.g. the final check of 2026-11-17) are not seen, so N1-N6 do not turn `tested` |
+| N6's marker | the jobs' marker pushes from the compute node, which needs `module load proxy`; none arrived, so N6 shows `pushed` although the run is done; the same holds for Stage 7's jobs unless the job script loads the proxy |
+| the submitter inside a PBS job | refused (`PBS_JOBID` set); submit from the login node |
+| multi-line pastes | the user pastes commands into a terminal: give one chained line or a tested one-liner, never a heredoc |
+| the decision log is about 1 MB | search it with grep or a script and edit it with a script |
+| "Block 4b" | is Block 9; Blocks 5-8 are the twins, the noise-fit run (6), the record (7) and the gate run (8) |
+
+## 11. Documents
+
+| Path (repository, `main`) | What for |
+|---|---|
+| `Passive Features/HPC script/Ih Fit/specs/SPEC.md` | section 2.6 (the law), 2.4 (the tilt), 2.5 (the per-sweep stage), section 8 (Block 5's open question), the block entries |
+| `docs/project/TEEG_decisions_and_ideas_log.md` | the decisions of §3 |
+| `Passive Features/HPC script/Ih Fit/docs/TEEG_noise_fit_block6_handoff_2026-11-12.md` | the noise-fit run, its read-backs (§4), the earlier list of Block 5's questions (§6) |
+| `Passive Features/HPC script/Ih Fit/docs/TEEG_noise_fit_implementation_handoff_2026-11-11.md` | the history of Block 9 and D-122 to D-125 |
+| `Passive Features/HPC script/Ih Fit/dev/2026-11-17_three_component_law/` | the test that led to D-152 |
+| `Passive Features/HPC script/Ih Fit/dev/2026-11-19_nf2_readback/` | the nf2 read-back and the slow-ridge check |
+| `Passive Features/HPC script/Ih Fit/specs/test_reports/2026-11-17_1700_incremental.md`, `tests/spec/` | the final check of the three-component law and its 54 tests |
+| `Passive Features/HPC script/Ih Fit/README.md`, `CHANGELOG_ih_fit.md` | the folder's map, commands and stage log |
+| `specs/roadmap/allen-mtg-fit.yaml`, `.md` | the roadmap (N5, N7, S7) |
+
+Skills to load: `scientific-coding`, `hpc-python-compat`, `hpc-git-delivery`, `subproject-roadmap`,
+`project-decision-log`, `technical-document`, `explanation-modes`.
