@@ -742,3 +742,16 @@ implementation:
     needs_theory: [T15]
     needs_hpc: false
     jobs: []
+
+# Revisions: a change one side has to absorb because of the other
+# (roadmap.py revise). An implementation stage's flag clears when its
+# code changes after the flag's commit; a topic's when its status
+# changes; or by hand (revise --clear).
+revisions:
+  - stage: I4
+    from: T10
+    on: 2026-11-19
+    at: 
+    decision: D-181
+    note: "D-181 (user, 2026-11-19): the near-field table is read between knots with the growth fit's cubic spline, not linearly in |delta|; SPEC Block 4 amendment and model.kernel.sigma_r to change (not built)"
+    cleared:
