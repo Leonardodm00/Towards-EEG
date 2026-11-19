@@ -14,6 +14,7 @@
 | 2026-11-18 (later, 9) | D-178 [user, 20:18] confirms D-174.2; built: the held diameter is the first stage's default for every user through `MeasureConfig.pilot_diameter` (section 0b's table, last row). Decision log: next free IDs D-179, I-006. |
 | 2026-11-18 (later, 9) | The joint-fit chat (D-177 [user, 18:25, 18:52]: this chat refines the joint fit with close neighbours; the bumps are the 'Questions before logic' chat's). Section 13 added: four synthetic checks and the pilot's trace analysed (`checks/joint_2026-11-18/`), the chat's PROVISIONAL proposals for B1 to B6 (D-177.3 to D-177.11), the first test nodes. Section 6 corrected (where the own tube's heading comes from); section 12: the node spacing and the trace's depth scatter now measured. Decision log on `main`: next free IDs D-178, I-006. |
 | 2026-11-18 (later, 10) | D-179 [user, 20:23]: of section 13.3, confirmed -- the per-chain rendering with summed shadows, rule (b) dropped, the first test nodes; read as confirmed, to check -- B1 and B2; open, with two figures (`checks/joint_2026-11-18/fig_attached_vs_free.png`, `fig_own_chain_options.png`) -- attached chains as neighbours, the own chain smoothed or raw. Section 13.2: the depth words for D-149's examples corrected. Decision log on `main`: next free IDs D-180, I-006. |
+| 2026-11-19 | Section 0b: the first run on Allen's data (the user's Colab, notebook Cell 20, 2026-11-19; uploaded log and focal-plane figure): results, times, what the figure shows, and what the pooled growth table can and cannot change (new subsection "First run on the pilot"). Two sentences of 0b marked [corrected 2026-11-19]. No decision taken. |
 
 Basis tags: **[user]** said or decided by the user, with the time (Europe/Rome, 2026-11-18); **[log]** the decision
 log on `main`; **[src]** read in the named file at `f6504b0`; **[run, sandbox]** executed in the handing-over
@@ -57,8 +58,9 @@ whatever the kernel **[reasoning]**. Which in-focus width that run used is not s
 
 ## 0b. Section 0's path as built (commit `1bb9973`, 2026-11-18)
 
-Tags as above; **[run, sandbox]** here means executed in the building chat's sandbox on 2026-11-18. Nothing in this
-section has run on Allen's data yet: the first run is the user's, notebook Cell 20.
+Tags as above; **[run, sandbox]** here means executed in the building chat's sandbox on 2026-11-18. ~~Nothing in this
+section has run on Allen's data yet: the first run is the user's, notebook Cell 20.~~ [corrected 2026-11-19: the first
+run on the pilot is reported at the end of this section, "First run on the pilot".]
 
 | Point of section 0 | Built **[src, `1bb9973`]** |
 |---|---|
@@ -109,8 +111,52 @@ Limits the next chat should know:
   `dark` flag (on a phantom rendered at 1.0 um with Allen's 0.6 um: $\mu$ 0.80 -> 2.25 /um, flag `dark`)
   **[run, sandbox: `test_pilot_fixed_diameter`]**. What a poor first-stage fit at Allen's diameter should flag is
   open (D-173).
-- The fit's time on Allen's data under this path is not measured.
+- ~~The fit's time on Allen's data under this path is not measured.~~ [corrected 2026-11-19: measured, below.]
 - No independent tester has run on `1bb9973` (written inline by the orchestrator at the user's "Implement now").
+
+### First run on the pilot (2026-11-19)
+
+**[data: the user's Colab run of Cell 20 on 529878215, log and focal-plane figure uploaded 2026-11-19; the code was the
+branch before `b10d5c2`, which only adds the cell's own imports -- the run stopped at the display of the fit figures
+(`NameError: glob`), after every output was written]**. Defaults of D-169/D-171 to D-173: one pass, no cleaning, the
+first stage at Allen's diameter, weights $\kappa$ = 1.25, bump cut at 2 noise SDs, starts 1.0 and 1.6 x Allen, the
+Cell 7 kernel ($\sigma_{\rm r}(0)$ = 0.080 um).
+
+| node | Allen $d$ (um) | first stage $\mu$ (/um) | fit $\hat d \pm$ SE (um) | $\hat d$ / Allen | fit $\hat\mu$ (/um) | $\chi^2/N$ | $z_{k^*} - \hat z_{\rm ax}$ (um) | bump cut | fit time (min) | Cell 19c refined $d$ (um) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1013 | 0.449 | 1.082 | 1.692 $\pm$ 0.010 | 3.77 | 0.133 | 15.8 | -0.631 | $v \ge -1.72$ um (42 of 53 kept) | 46.7 | 2.168 |
+| 5353 | 0.454 | 0.581 | 0.774 $\pm$ 0.011 | 1.70 | 0.194 | 4.43 | -0.062 | none | 5.9 | 0.774 |
+| 2669 | 0.788 | 0.813 | 2.728 $\pm$ 0.008 | 3.46 | 0.101 | 48.2 | -0.633 | none | 86.1 | 2.588 |
+| 2620 | 0.811 | 0.942 | 1.905 $\pm$ 0.006 | 2.35 | 0.223 | 11.6 | -0.248 | none | 52.6 | 1.913 |
+| 639 | 1.200 | 1.241 | 2.824 $\pm$ 0.007, **at bound** ($z$ high) | 2.35 | 0.290 | 49.8 | -1.000 | none | 111.0 | 2.565 |
+
+Preparation 7.7 min (36 crops downloaded); the fit 305.2 min in all. Cell 19c's refined values are from the user's
+upload of 2026-11-18 (`focal_529878215.csv`, the cleaning rounds' one-tube refinement, $\sigma_{\rm r}(0)$ = 0.080 um).
+
+What it shows:
+
+- **The path does not change the clean node.** 5353 reads 0.7738 um here and 0.7739 um in Cell 19c; 2620 1.905 against
+  1.913 um **[data]**. Both are weighted one-tube fits over the same planes with near-identical weights on nearly the
+  same profiles (nothing was subtracted near these nodes) **[reasoning]**.
+- **Three nodes are not clear in the image.** At $k^*$, 1013 lies on the edge of a dark blob about 1.5 um wide that
+  the trace does not follow; at 2669 and at 2620 other processes join the node **[data: the figure, read by eye]**.
+  Whether those processes are untraced, or traced on branches the clear-node rule does not count, is **not
+  checked**. They merge with the node's own dip: the bump rule cut once, on one side of 1013, and the fit widened the
+  tube over them (the synthetic case left open in 0b's table: a second dip with no lighter sample between it and the
+  central one, +96 % unweighted, +66 % weighted) **[reasoning, on `bump_bias_check.out`]**.
+- **639 is not an estimate**: the depth reached its bound (1 um from $k^*$) and $\chi^2/N$ is 49.8. Its dark band at
+  $k^*$ is about 2 um wide **[data: the figure, read by eye]**.
+- **The time grows with the diameter the fit reaches**: 5.9 min at 0.77 um, 111 min at 2.82 um **[data]**.
+- **What the pooled growth table (D-170, the davinci run) can change**: it re-measures $G(\delta)$ only;
+  $\sigma_{\rm r}(0)$ stays 0.080 um (D-172, D-175.5). On a synthetic flat tube, a growth 0.5 to 2 times the table's
+  moves the fitted diameter by -5 to +5 % **[run, sandbox: `checks/kernel_2026-11-18/kernel_sensitivity_check.out`]**,
+  against +70 to +277 % above Allen here. A true in-focus width of 0.22 / 0.30 um makes a 0.5 um tube fit at
+  1.61 / 2.06 times its diameter with a lower $\mu$ **[run, sandbox: `kernel_infocus_check.out`]**: 5353's 1.70 lies
+  in that range **if** Allen's 0.454 um were its true diameter and its profile held nothing else **[reasoning]**.
+
+Open, the user's to decide **[open]**: the in-focus width (the defocus-table handoff's P4: its options, not decided,
+are the narrowest in-focus dips of a cell as an upper bound and a fit on thick dendrites with the width free); a test
+of clearness on the image, not only on the trace; whether 639's 2 um band means Allen's 1.2 um is the thin one.
 
 ## 1. First actions in the next chat
 

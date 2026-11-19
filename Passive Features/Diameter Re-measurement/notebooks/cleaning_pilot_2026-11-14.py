@@ -491,9 +491,11 @@ plt.show()
 #      dip beside the central one that rises at least BUMP_SD noise SDs gives no weight to the samples from it
 #      outwards. Then the node's own expected shadow (same-node clearance) at the estimate.
 # Knobs: WEIGHT_KAPPA, BUMP_SD (0 = no cut), D169_WEIGHTS ("none" = unweighted), D169_STARTS.
-# Time: the fit is the long step. Not measured on Allen's data: in the synthetic dry run (the tests' coarse 4 x 8
-# directions) one model evaluation took about 1.5 s and a node about 40 evaluations per solve; the production
-# setting has four times the directions, so expect several minutes to a quarter of an hour per node.
+# Time (measured on the pilot, 2026-11-19, Colab): preparation 7.7 min; the fit 305 min for the five nodes, from
+# 6 min (5353, fitted 0.77 um) to 111 min (639, fitted 2.82 um) -- it grows with the diameter the fit reaches.
+# [corrected 2026-11-19: the earlier estimate here, "several minutes to a quarter of an hour per node", was wrong]
+# The fit figures are written to OUT/inference_d169/fit_node<id>.png by the fit itself: to look at them again,
+# run only the last loop of this cell, not the cell.
 # Output to send back: the lines `node <id>: weights ...` and `node <id>: d ...` of the log, the table, the
 # `focal_<S>.png` figure and the `fit_node<id>.png` figures (orange line: the weights; grey: samples with no weight).
 
@@ -504,7 +506,7 @@ from IPython.display import Image, display
 WEIGHT_KAPPA = 1.25                    # lambda in units of the FWHM from Allen's diameter (D-171.1; slightly > 1)
 BUMP_SD = 2.0                          # a near bump rises at least this many noise SDs (D-171.3); 0 = no cut
 D169_WEIGHTS = "allen"                 # "allen": the centre weights; "none": unweighted (the bump cut still applies)
-D169_STARTS = "1.0,1.6"                # the fit's starts, x Allen's diameter; "1.0" alone is twice as fast
+D169_STARTS = "1.0,1.6"                # the fit's starts, x Allen's diameter; "1.0" alone drops one start (time saved not measured)
 D169_BINS, D169_N_PER_BIN, D169_MIN_SOMA_UM = "0.40,0.45,0.60,0.80,1.20,5.0", 1, 20.0
 RERUN_D169_PREP = False                # True: prepare the nodes again although the folder holds them
 CLEAN_D, INFER_D = OUT + "/cleaning_d169", OUT + "/inference_d169"
