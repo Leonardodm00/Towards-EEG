@@ -3,6 +3,7 @@
 | Date | Change |
 |---|---|
 | 2026-11-19 | Created at the user's request (22:02, "Now deliver a handoff for another chat") by the clearance chat ("Questions before logic"). Code on `sci/diameter-pipeline` at `7c05a01` plus this document's commit; decision log on `main`, next free IDs D-190, I-007 when written (re-read the log's last rows before taking one: other chats log too). Includes the user's correction of 22:02 ("the 2669 IS NOT fine in focus"), checked on the data in section 6. |
+| 2026-11-19 (later) | The user, 22:17 (a new chat started from this handoff): "Let's first of all change the nodes we use" -- a cell that shows a set of judged clean nodes, from which the user selects four; the approach is refined after that. Built the same evening (D-192; SPEC Blocks 40, 41 and Block 36 amendment 18; notebook Cell 21): section 11, new. O2's state changed; nothing else in this document changed. Evidence: `tests/smoke/test_smoke_clearness.py`, `test_smoke_clearness_figures.py`, `checks/clear_gallery_2026-11-19/line_screen_pilot_check.out` **[run, sandbox]**. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -181,7 +182,7 @@ linear in the kernel).
 | # | Point | State |
 |---|---|---|
 | O1 | **The in-focus width (P4).** D-172 keeps 0.080 um; the davinci run does not measure it. Options put to the user on 2026-11-18, not decided: the narrowest in-focus dips of a cell as an upper bound; a fit on clean thick dendrites with the width free (width and diameter separate on thick tubes: in D-052's simulations a $\pm$5 % error in $d$ on 1.5 um tubes cost $\Delta\chi^2 \ge$ 20.8, the smallest a local search found **[log]**); a third, not yet proposed to the user: many clean thin nodes fitted with one shared width. | open; 5353 alone gives the cap of section 7 |
-| O2 | **Clearness on the image.** The trace-based rule of Cell 19c (`clean_cell.py clear --d-bins`) admitted 1013, 2669, 2620; candidates: the per-plane bump test on the in-focus planes, the recorded in-focus width against the widest dip Allen's diameter can render (section 5), the fit's $\chi^2/N$ | open; nothing built |
+| O2 | **Clearness on the image.** The trace-based rule of Cell 19c (`clean_cell.py clear --d-bins`) admitted 1013, 2669, 2620; candidates: the per-plane bump test on the in-focus planes, the recorded in-focus width against the widest dip Allen's diameter can render (section 5), the fit's $\chi^2/N$ | [corrected 2026-11-19, later: was "open; nothing built"] a screen is built, PROVISIONAL (D-192 [orchestrator]; section 11): model-free, on the recorded image; it chooses the nodes shown to the user, who selects four. Its rule and thresholds are to confirm; it has not run on a real image |
 | O3 | **The bump rule** (section 6) | open; D-176.1 stays PROVISIONAL |
 | O4 | **639**: Allen's 1.2 um against a 2.05 um flat-bottomed dip | open; look at the stack around the node |
 | O5 | **Cost**: 124-305 min for five nodes on Colab; grows with the fitted diameter | open |
@@ -219,3 +220,43 @@ inside a name splits it. Each `.out` next to a script is the output of 2026-11-1
   `test_smoke_line_fast.py::test_reference`, which did not finish within the sandbox's time limit; six spec tests
   (Block 25 x4, Block 28 x1, Block 31 x1) failed before these changes and still do **[run, sandbox, 2026-11-18]**.
 - Whether 2620's joining processes are traced (on branches the clear rule does not count) or untraced.
+
+## 11. The gallery of image-judged clean nodes (Cell 21; D-192) [added 2026-11-19, later]
+
+**[user]** 22:17: the five nodes of section 4 are no longer the working set; a cell shows a set of judged clean
+nodes (the image in focus, the images across the planes, the measuring lines across the planes) and the user
+selects four of them; the estimation and the removal of secondary dips are refined on those.
+
+| What | Where |
+|---|---|
+| The screen (no model, no diameter) | `src/allen_diameter/analysis/clearness.py`, SPEC Block 40; thresholds in `ClearnessConfig` (section `clearness`, outside every signature) |
+| The page per node and the contact sheet | `src/allen_diameter/plotting/clearness_figures.py`, SPEC Block 41 |
+| Entry point | `scripts/show_clear_gallery.py`, SPEC Block 36 amendment 18 |
+| Colab | notebook Cell 21: `clear --d-bins` (8 candidates per bin) -> `clean --no-clean` into `OUT/cleaning_gallery` -> the script into `OUT/cleaning_gallery/gallery` |
+| Check on the pilot | `checks/clear_gallery_2026-11-19/line_screen_pilot_check.py` and `.out` |
+
+- **The rule [orchestrator, PROVISIONAL].** On the smoothed dip $\tilde D(v_n) = B - I(v_n)$ of a line: the half-depth
+  width $W$ and centre $c$; the skew $S$ = the largest shift of the midpoints at 0.75 and 0.25 of the depth from
+  the half-depth midpoint, over $W$; the excess outside $E$ = the largest $|\tilde D|$ at least one $W$ from $c$, over
+  the depth. Judged: $E \le 0.25$ and $S \le 0.15$ on the measuring line in the planes $k^* - 1 .. k^* + 1$ and on
+  nine parallel lines 0.5 um apart, up to 2 um along the dendrite, in the plane $k^*$; along those nine lines the
+  range over the median of the width at most 0.25, of the depth at most 0.30, and the range of the centre at most
+  0.50 of the median width; the depth at $k^*$ at least 10 noise SDs. Score $Q$ = the largest ratio to its
+  threshold; clean iff $Q \le 1$ and the depth holds. Full statement: SPEC Block 40.
+- **On the five pilot nodes, the line part only [run, sandbox: the check above, on run 2's files]**: 5353 passes
+  ($E$ 0.18, $S$ 0.06); 2669 ($E$ 0.63, $S$ 0.49), 1013 ($E$ 0.64, $S$ 0.89) and 639 ($E$ 0.67, no skew: the dip
+  never returns on the left) fail; 2620 passes on the line ($E$ 0.15, $S$ 0.08) -- its pollution (section 5: a
+  junction seen in the image) can only be caught by the lines along the dendrite, which need the patch
+  (`OUT/cleaning_d169`, not in the sandbox). **Whether the part along the dendrite rejects 2620 is not checked.**
+- **On synthetic patches [run, sandbox: `test_smoke_clearness.py`]**: a parallel neighbour, a crossing branch, a
+  blob on the edge beside the line (0.83 of the depth), a taper and a bend are rejected; a blob of 0.42 of the depth
+  on the edge passes; 200 noisy clean bands are all judged clean.
+- **Not judged, reported in the table**: the half-depth width over Allen's diameter (`fwhm_over_allen`) -- a
+  criterion on it would select the nodes on which Allen's diameter agrees; the planes beyond $k^* \pm 1$; the
+  centre's drift from plane to plane (O6).
+- **Not run**: the screen on any real image; Cell 21 on Colab (its code ran here on the synthetic cell with
+  stand-ins for the Colab variables). The preparation's time for 40 candidates (about an hour) is extrapolated
+  from 7.7 min for five nodes, not measured.
+- **Open, the user's**: the rule and each threshold (to confirm or change once the first gallery is seen); the
+  four nodes; then O3 (the bump rule) and O1 (the in-focus width) on them.
+

@@ -450,6 +450,27 @@ class InferenceConfig:
 
 
 @dataclass(frozen=True)
+class ClearnessConfig:
+    """The image-based clearness screen of a prepared node (SPEC Block 40; D-192 [orchestrator], PROVISIONAL): a
+    model-free judgement of the recorded dip, used to choose the nodes shown for selection; it enters no fit and
+    no signature."""
+
+    focus_half_planes: int = 1             # source: PROVISIONAL (D-192.2): the line is judged on the planes k* - this .. k* + this
+    along_half_um: float = 2.0             # source: PROVISIONAL (D-192.3): the parallel lines along the axis reach this far each way from the measuring line (um)
+    along_step_um: float = 0.5             # source: PROVISIONAL (D-192.3): their spacing along the axis (um); the read averages +-along_branch_avg_um (0.5 um), so the lines overlap by half and a structure is centred within 0.25 um of one of them
+    smooth_samples: float = 1.0            # source: PROVISIONAL (D-192.1): the dip is smoothed along the line by a Gaussian of this SD in line samples (inference.bump_smooth_samples' value)
+    window_um: float = 1.0                 # source: PROVISIONAL (D-192.1): the central extreme is the deepest sample within this of the line's centre (um)
+    skew_levels: Tuple[float, float] = (0.75, 0.25)   # source: PROVISIONAL (D-192.1): the fractions of the depth whose midpoints are compared with the half-depth midpoint
+    outside_fwhm: float = 1.0              # source: PROVISIONAL (D-192.1): "outside the dip" = at least this many half-depth widths from the dip's centre
+    outside_max: float = 0.25              # source: PROVISIONAL (D-192.4): the largest |dip| outside, over the central depth, at most this
+    skew_max: float = 0.15                 # source: PROVISIONAL (D-192.4): the largest shift of a level's midpoint, over the half-depth width, at most this
+    width_range_max: float = 0.25          # source: PROVISIONAL (D-192.4): (max - min) / median of the half-depth width along the axis, at most this
+    depth_range_max: float = 0.30          # source: PROVISIONAL (D-192.4): the same for the central depth
+    centre_range_max: float = 0.50         # source: PROVISIONAL (D-192.4): (max - min) of the dip's centre along the axis, over the median half-depth width, at most this
+    min_depth_sd: float = 10.0             # source: PROVISIONAL (D-192.4): the central depth on the sharpest plane at least this many noise SDs of a line sample
+
+
+@dataclass(frozen=True)
 class DiameterConfig:
     """The whole configuration. Build with ``DiameterConfig()`` for the
     deliverable defaults, or ``dataclasses.replace`` for a labelled variant."""
@@ -463,6 +484,7 @@ class DiameterConfig:
     survey: SurveyConfig = field(default_factory=SurveyConfig)
     cleaning: CleaningConfig = field(default_factory=CleaningConfig)  # source: D-129, D-130 (sub-config; outside every signature)
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # source: D-129, D-130 (sub-config; outside every signature)
+    clearness: ClearnessConfig = field(default_factory=ClearnessConfig)  # source: D-192 [orchestrator] (sub-config; outside every signature)
 
     # ------------------------------------------------------------ checks --
     def validate(self) -> None:
@@ -605,6 +627,7 @@ class DiameterConfig:
         if abs(cal.table_max_delta_um - round(cal.table_max_delta_um / cal.knot_step_um) * cal.knot_step_um) > 1e-9:
             raise ValueError("calibration.table_max_delta_um must be a multiple of knot_step_um (the table ends on a knot)")
         _check_cleaning_inference(self.cleaning, self.inference)
+        _check_clearness(self.clearness)
         sv = self.survey
         types = [str(t).strip().lower() for t, _ in sv.class_map] if all(len(x) == 2 for x in sv.class_map) else None
         if not (isinstance(sv.species, str) and sv.species.strip() and sv.cells_per_group >= 1
@@ -778,6 +801,25 @@ def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None
     if not ok:
         raise ValueError("inference: the fine factor, reach, a pair of bounds, the starts, the plane rule or the "
                          "evaluation budget is out of range (SPEC Blocks 26, 30)")
+
+
+def _check_clearness(q: "ClearnessConfig") -> None:
+    """The clearness screen's settings (SPEC Block 40): a plane count >= 0, positive lengths and factors, two
+    levels in (0, 1) on either side of the half depth, thresholds finite and > 0, a depth floor >= 0."""
+    lv = tuple(q.skew_levels)
+    ok = (int(q.focus_half_planes) == q.focus_half_planes and q.focus_half_planes >= 0
+          and math.isfinite(q.along_half_um) and q.along_half_um >= 0
+          and math.isfinite(q.along_step_um) and q.along_step_um > 0
+          and math.isfinite(q.smooth_samples) and q.smooth_samples >= 0
+          and math.isfinite(q.window_um) and q.window_um > 0
+          and len(lv) == 2 and all(math.isfinite(f) for f in lv) and 0.5 < lv[0] < 1 and 0 < lv[1] < 0.5
+          and math.isfinite(q.outside_fwhm) and q.outside_fwhm > 0
+          and all(math.isfinite(x) and x > 0 for x in (q.outside_max, q.skew_max, q.width_range_max,
+                                                       q.depth_range_max, q.centre_range_max))
+          and math.isfinite(q.min_depth_sd) and q.min_depth_sd >= 0)
+    if not ok:
+        raise ValueError("clearness: a plane count, length, level, threshold or the depth floor is out of range "
+                         "(SPEC Block 40)")
 
 
 def _check_sgt(m: "MeasureConfig") -> None:

@@ -539,3 +539,78 @@ display(Image(filename="%s/focal_%d.png" % (CLEAN_D, SPECIMEN)))
 for path in sorted(glob.glob(INFER_D + "/fit_node*.png")):
     print(path)
     display(Image(filename=path))
+
+# %% [markdown]
+# ## Cell 21: a gallery of the nodes the image judges clean -- look, then pick four (D-192; about 1.5 min per candidate)
+#
+# Run after Cells 0, 1 and 16; needs Cell 16b's ranking in OUT/cleaning (as Cells 19 to 20). Three steps (SPEC
+# Blocks 40, 41 and Block 36 amendment 18):
+#   1. `clear --d-bins`: GAL_N_PER_BIN candidates per bin of Allen's diameter by the trace-based rule (no traced
+#      neighbour on the line). That rule cannot see what is not traced: on the pilot it admitted 1013, 2669, 2620, 639.
+#   2. `clean --no-clean`: per candidate the first stage (diameter held at Allen's), the patch, the nine planes, the
+#      line as recorded. Nothing is cleaned, nothing is fitted. Downloads the patches (5 nodes took 7.7 min on
+#      2026-11-19, so about an hour for 40: an extrapolation, not measured). Kept in OUT/cleaning_gallery and reused.
+#   3. `show_clear_gallery.py`: the screen on the recorded image only (no model, no diameter). A node is judged
+#      clean when its dip is one symmetric dip that returns to the background -- on the measuring line in the
+#      planes k* - 1 .. k* + 1 and on nine parallel lines up to 2 um along the dendrite in the plane k* -- and keeps
+#      its width, depth and position along the dendrite. Seconds; rerun it alone with other thresholds.
+# Per shown node one page: the patch at k* with the measuring line (dotted), the lines along the dendrite and
+# Allen's diameter (dashed); the profiles on those lines; the measuring line on the nine planes overlaid; the
+# screen's numbers against their thresholds; then the patch at each of the nine planes on one grey scale, and the
+# measuring line's profile at each plane on one axis (blue bar: its half-depth width; light-blue bar: Allen's).
+# Shown: the nodes judged clean, the thinnest bin first, at most GAL_MAX_PER_BIN per bin; when fewer than
+# GAL_FILL_TO are shown, the best-scoring REJECTED nodes follow, titled "NOT judged clean" with the reason (the
+# thresholds are provisional: the rejected ones show which threshold to move).
+# Knobs: GAL_BINS, GAL_N_PER_BIN, GAL_MAX_PER_BIN, GAL_FILL_TO, GAL_SHOW_IDS (your own list of node ids instead
+# of the rule), GAL_ZOOM_UM, GAL_THRESHOLDS (any of outside-max 0.25, skew-max 0.15, width-range-max 0.25,
+# depth-range-max 0.30, centre-range-max 0.50, min-depth-sd 10, along-half-um 2.0, along-step-um 0.5,
+# focus-half-planes 1), RERUN_GAL_PREP (True after changing GAL_BINS or GAL_N_PER_BIN).
+# Output to send back: the four node ids you choose, the printed table, and `gallery_sheet_<S>.png`.
+
+# %%
+import json, os, shutil             # the cell's own imports: it can follow Cell 16 directly
+import pandas as pd
+from IPython.display import Image, display
+GAL_BINS = "0.40,0.45,0.60,0.80,1.20,5.0"     # um, edges of the bins of Allen's diameter (Cell 19c's)
+GAL_N_PER_BIN, GAL_MIN_SOMA_UM = 8, 20.0      # candidates per bin by the trace-based rule; their least distance from the soma
+GAL_MAX_PER_BIN = 4                           # judged-clean nodes shown per bin at most (0: all)
+GAL_FILL_TO = 8                               # fewer shown than this: the best-scoring rejected nodes follow, labelled (0: never)
+GAL_SHOW_IDS = None                           # None: the rule above; or a list of node ids to show whatever their verdict
+GAL_ZOOM_UM = 5.0                             # the image panels show +- this about the line (um)
+GAL_THRESHOLDS = {}                           # e.g. {"outside-max": 0.30, "width-range-max": 0.35}; {} = the defaults
+RERUN_GAL_PREP = False                        # True: pick and prepare the candidates again
+CLEAN_G = OUT + "/cleaning_gallery"
+GAL_OUT = CLEAN_G + "/gallery"
+os.makedirs(CLEAN_G, exist_ok=True)
+EXAMPLES_G = "%s/examples_gallery_%d.json" % (CLEAN_G, SPECIMEN)
+if RERUN_GAL_PREP or not os.path.exists(EXAMPLES_G):
+    assert os.path.exists("%s/rank_tier1_%d.csv" % (CLEAN, SPECIMEN)), "run Cell 16b first (the tier-1 ranking)"
+    run("scripts/clean_cell.py", "clear", "--specimen", SPECIMEN, "--out", CLEAN, "--cache-dir", CACHE_DIR, *ALIGN,
+        *CLEAN_CFG, "--n", GAL_N_PER_BIN, "--min-soma-um", GAL_MIN_SOMA_UM, "--d-bins", GAL_BINS)
+    shutil.copyfile("%s/examples_clear_%d.json" % (CLEAN, SPECIMEN), EXAMPLES_G)
+with open(EXAMPLES_G) as f:
+    ids_g = [int(i) for i in json.load(f)["example_ids"]]
+print("[cell 21] %d candidates:" % len(ids_g), ids_g)
+if RERUN_GAL_PREP or not os.path.exists("%s/cleaning_%d.json" % (CLEAN_G, SPECIMEN)):
+    run("scripts/clean_cell.py", "clean", "--specimen", SPECIMEN, "--out", CLEAN_G, "--cache-dir", CACHE_DIR, *ALIGN,
+        *CLEAN_CFG, "--examples", EXAMPLES_G, "--B", B_GL, "--mu", MU, "--no-clean")
+if os.path.isdir(GAL_OUT):                    # the figures of an earlier screen do not mix with this one's
+    shutil.rmtree(GAL_OUT)
+gal_args = ["--cleaning-dir", CLEAN_G, "--specimen", SPECIMEN, "--out", GAL_OUT, "--d-bins", GAL_BINS,
+            "--max-per-bin", GAL_MAX_PER_BIN, "--fill-to", GAL_FILL_TO, "--zoom-um", GAL_ZOOM_UM]
+for name, value in GAL_THRESHOLDS.items():
+    gal_args += ["--" + name, value]
+if GAL_SHOW_IDS is not None:
+    gal_args += ["--nodes", ",".join(str(int(i)) for i in GAL_SHOW_IDS)]
+run("scripts/show_clear_gallery.py", *gal_args)
+tab_g = pd.read_csv("%s/gallery_%d.csv" % (GAL_OUT, SPECIMEN))
+display(tab_g[["node_id", "d_allen_um", "clean", "score", "reasons", "k_star", "depth_gl", "depth_sd", "fwhm_kstar_um",
+               "fwhm_over_allen", "outside_focus", "skew_focus", "outside_along", "skew_along", "width_range",
+               "depth_range", "centre_range", "shown"]].round(3))
+sheet_g = "%s/gallery_sheet_%d.png" % (GAL_OUT, SPECIMEN)
+if os.path.exists(sheet_g):
+    display(Image(filename=sheet_g))
+for name in tab_g.loc[tab_g["shown"], "figure"]:           # in the order shown: judged clean by bin, then rejected
+    print(GAL_OUT + "/" + name)
+    display(Image(filename=GAL_OUT + "/" + name))
+print("[cell 21] judged clean:", tab_g.loc[tab_g["clean"], "node_id"].tolist())
