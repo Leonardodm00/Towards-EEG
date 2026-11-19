@@ -17,8 +17,16 @@ Checks (the oracles of SPEC, Block 5, "Test oracles")
     test_tt7_protocol       load_cell_protocol returns the planted layout
     test_tt8_real_run       the nf2 tables and JSONs (--nf2-dir) and the
                             archive cell 508282493 (--archive-cell); SKIP
-                            with the reason when a path is not given
+                            with the reason when a path is not given; its
+                            third part (amendment 1) compares the in_twin
+                            counts with the fitter's loader's ls_dep_screen
+                            and needs passive_fitting_hpc_fixed (NEURON)
     test_tt9_ascii_lf       the two files are pure ASCII with LF line ends
+    test_tt10_spike_screen  amendment 1 (D-190): the spike test is called
+                            exactly for the LS sweeps above
+                            ls_dep_min_amplitude_pA (not at it), on their
+                            whole stored voltage; the planted reasons and
+                            in_twin come back; a non-str return is refused
     test_convergence, test_determinism: SKIP (no discretisation, no
                             randomness in Block 5)
 
@@ -77,12 +85,18 @@ ARGS = argparse.Namespace(nf2_dir=None, archive_cell=None)   # set by main(); py
 # Two fixture cells (A, B) in the archive, a third (C) only in the tables, a
 # refused cell (D) in the per-cell table. All values planted here.
 ID_A, ID_B, ID_C, ID_D = 900000101, 900000102, 900000103, 900000104
+ID_F = 900000106                     # TT10: LS sweeps around the depolarising threshold
+LS_AMPS_F = (-110.0, -30.0, 5.0, 20.0, 50.0, 130.0)   # 5.0 pA: exactly the threshold, not tested
+# planted spike-test reasons (amendment 1, D-190): {(specimen, LS sweep): reason}; any other '' (passes)
+REASONS = {(ID_A, 56): "peak_above_threshold", (ID_B, 57): "action_potential",
+           (ID_F, 58): "action_potential", (ID_F, 59): "unusable"}
 SWEEPS_A, DROPPED_A, LS_AMPS_A = (92, 93), snw.DROPPED, (-110.0, -90.0, 50.0)
 SWEEPS_B, DROPPED_B, LS_AMPS_B = (7,), {7: (1, 4, 30)}, (-70.0, 30.0, 130.0, 230.0)
 # per-cell laws (mV, mV, ms, mV, ms); B's tau_s 265.1 ms (flag True), A's 265.0 ms (flag False)
 CELL_LAWS = {ID_A: (0.031, 0.017, 0.0713, 0.08, 265.0),
              ID_B: (0.0345, 0.0222, 0.0569, 0.2818, 265.1),
-             ID_C: (0.032, 0.0165, 0.0698, 0.0859, 1277.0584282427603)}
+             ID_C: (0.032, 0.0165, 0.0698, 0.0859, 1277.0584282427603),
+             ID_F: (0.033, 0.0175, 0.0701, 0.0901, 150.0)}
 FAILED_B = 55                        # B's LS sweep 55 failed: its row holds B's SDs
 FAILED_FLAGS = "at_bound:log_sigma_m;sweep_fit_failed:ls:55:at_bound:log_sigma_m"
 FLAG_A_SS93 = "some_note:93"         # a flag that is not a failure
@@ -104,6 +118,9 @@ def _planted_rows():
             rows[(ID_B, "LS", s)] = (law[0], law[1], law[3], 0.0444, FAILED_FLAGS)
         else:
             rows[(ID_B, "LS", s)] = (0.0349 + 1e-4 * k, 0.0221 + 1e-4 * k, 0.2777 + 1e-3 * k, 0.0105 * k - 0.013, "")
+    rows[(ID_F, "SS", 92)] = (0.0331, 0.0176, 0.0902, 0.003, "")
+    for k in range(len(LS_AMPS_F)):
+        rows[(ID_F, "LS", 54 + k)] = (0.0332 + 1e-4 * k, 0.0177, 0.0903 + 1e-3 * k, 0.004 * k, "")
     rows[(ID_C, "SS", 1)] = (0.0322, 0.0166, 0.0861, 0.001, "")
     rows[(ID_C, "LS", 3)] = (0.0323, 0.0167, 0.0862, -0.002, "")
     return rows
@@ -127,6 +144,9 @@ def _fixture():
         truth[specimen] = snw.write_fixture(d, rng, with_response=False, dropped=dropped, sweeps=sweeps,
                                             ls_amps=amps)
         _set_specimen(d, specimen)
+    d_f = root / ("specimen_%d" % ID_F)
+    truth[ID_F] = snw.write_fixture(d_f, rng, with_response=False, dropped={}, sweeps=(92,), ls_amps=LS_AMPS_F)
+    _set_specimen(d_f, ID_F)
     # a cell whose metadata lists an LS sweep that load_ls_prewindows skips (amplitude 0 pA)
     d_e = root / "specimen_900000105"
     snw.write_fixture(d_e, rng, with_response=False, dropped={}, sweeps=(92,), ls_amps=(-110.0, 0.0, 50.0))
@@ -134,8 +154,42 @@ def _fixture():
     cells_csv, sweeps_csv = root / "noise_cells_FIX.csv", root / "noise_sweeps_FIX.csv"
     write_csv_atomic(cells_csv, CELL_COLUMNS, _cell_table_rows())
     write_csv_atomic(sweeps_csv, SWEEP_COLUMNS, _sweep_table_rows())
-    _STATE.update(root=root, truth=truth, dir_e=d_e, cells_csv=cells_csv, sweeps_csv=sweeps_csv)
+    # the spike test's planted answers, keyed by the bytes of each stored LS voltage
+    by_v = {}
+    for specimen in (ID_A, ID_B, ID_F):
+        d = root / ("specimen_%d" % specimen)
+        meta = json.load(open(d / "metadata.json"))
+        with np.load(d / "ls_sweeps.npz") as z:
+            for info in meta["ls_sweeps"]:
+                v = np.asarray(z["v_%d" % info["index"]], dtype=np.float64)
+                by_v[v.tobytes()] = (specimen, int(info["sweep_number"]), float(info["detected_amplitude_pA"]),
+                                     float(info["sampling_rate_Hz"]))
+    _STATE.update(root=root, truth=truth, dir_e=d_e, dir_f=d_f, cells_csv=cells_csv, sweeps_csv=sweeps_csv,
+                  by_v=by_v)
     return _STATE
+
+
+class PlantedSpikeTest:
+    """A spike_reason_fn written here: identifies the sweep by its voltage,
+    records the call, returns the planted reason ('' when none)."""
+
+    _UNSET = object()
+
+    def __init__(self, result=_UNSET):
+        self.calls = []
+        self.result = result          # given (even None): returned instead of the planted reason
+
+    def __call__(self, v_mV, sampling_rate_Hz):
+        key = _fixture()["by_v"].get(np.asarray(v_mV).tobytes())
+        if key is None:
+            raise AssertionError("spike_reason_fn called on a voltage that is no stored LS sweep (%d samples)"
+                                 % np.asarray(v_mV).size)
+        specimen, sweep, _amp, fs = key
+        if sampling_rate_Hz != fs or np.asarray(v_mV).dtype != np.float64:
+            raise AssertionError("spike_reason_fn: sweep %d called with fs %r (stored %r), dtype %s"
+                                 % (sweep, sampling_rate_Hz, fs, np.asarray(v_mV).dtype))
+        self.calls.append((specimen, sweep))
+        return REASONS.get((specimen, sweep), "") if self.result is PlantedSpikeTest._UNSET else self.result
 
 
 def _set_specimen(d, specimen):
@@ -181,7 +235,8 @@ def _tables():
 
 def _protocols():
     st = _fixture()
-    return [tt.load_cell_protocol(st["root"] / ("specimen_%d" % i)) for i in (ID_A, ID_B)]
+    return [tt.load_cell_protocol(st["root"] / ("specimen_%d" % i), spike_reason_fn=PlantedSpikeTest())
+            for i in (ID_A, ID_B)]
 
 
 def _expected_table():
@@ -199,7 +254,8 @@ def _expected_table():
                              n_windows=int(np.sum(truth["sweeps"] == s)), amplitude_pA=np.nan, onset_s=np.nan,
                              duration_s=np.nan, n_samples=snw.PRE_N + snw.POST_N, fs_Hz=snw.FS,
                              sigma_f_mV=sf, sigma_m_mV=sm, sigma_s_mV=ss_, tilt_mV_per_s=tilt,
-                             law_source="sweep", noise_flags=flags, **common))
+                             law_source="sweep", noise_flags=flags, real_spike_reason="", in_twin=True,
+                             **common))
         for k, amp in enumerate(amps):
             s = 54 + k
             sf, sm, ss_, tilt, flags = PLANTED[(specimen, "LS", s)]
@@ -209,13 +265,15 @@ def _expected_table():
                              n_samples=snw.LS_PRE_N + snw.LS_STEP_N + snw.LS_TAIL_N, fs_Hz=snw.FS,
                              sigma_f_mV=sf, sigma_m_mV=sm, sigma_s_mV=ss_, tilt_mV_per_s=tilt,
                              law_source="cell" if "sweep_fit_failed:" in flags else "sweep",
-                             noise_flags=flags, **common))
+                             noise_flags=flags, real_spike_reason=REASONS.get((specimen, s), ""),
+                             in_twin=(specimen, s) not in REASONS, **common))
     df = pd.DataFrame(rows)[list(tt.TWIN_SWEEP_COLUMNS)]
     for c in ("specimen_id", "sweep_number", "n_windows", "n_samples"):
         df[c] = df[c].astype(np.int64)
-    for c in ("protocol", "law_source", "noise_flags"):
+    for c in ("protocol", "law_source", "noise_flags", "real_spike_reason"):
         df[c] = df[c].astype(str)
-    df["cell_tau_s_above_window"] = df["cell_tau_s_above_window"].astype(bool)
+    for c in ("cell_tau_s_above_window", "in_twin"):
+        df[c] = df[c].astype(bool)
     return df
 
 
@@ -263,7 +321,7 @@ def test_tt1_reference():
     assert tuple(built.columns) == tt.TWIN_SWEEP_COLUMNS, list(built.columns)
     # exact: every value is planted here and passes through repr-CSV (exact) and one division by 1000
     pd.testing.assert_frame_equal(built, expected, check_exact=True)
-    assert set(built["specimen_id"]) == {ID_A, ID_B}, "cell C (tables only) must not enter the table"
+    assert set(built["specimen_id"]) == {ID_A, ID_B}, "cells C, F (tables only) must not enter the table"
     # sorting: specimen, SS before LS, sweep
     keys = list(zip(built["specimen_id"], built["protocol"].map({"SS": 0, "LS": 1}), built["sweep_number"]))
     assert keys == sorted(keys), keys
@@ -365,7 +423,8 @@ def test_tt4_refusals():
     _expect_refusal("row without a stored sweep",
                     lambda: build(prots, cells, pd.concat([sweeps, extra], ignore_index=True)), ID_A, 99)
     # a sweep of metadata.json['ls_sweeps'] that load_ls_prewindows does not return (0 pA: sweep 55)
-    _expect_refusal("LS sweep not loaded", lambda: tt.load_cell_protocol(st["dir_e"]), 900000105, 55)
+    _expect_refusal("LS sweep not loaded",
+                    lambda: tt.load_cell_protocol(st["dir_e"], spike_reason_fn=lambda v, fs: ""), 900000105, 55)
     # a law that NoiseLaw refuses: a negative, a missing SD; a cell time scale missing or zero
     j = sweeps.index[(sweeps["specimen_id"] == ID_A) & (sweeps["noise_sweep_number"] == 92)][0]
     for col, val in (("noise_sweep_sigma_s_mV", -0.01), ("noise_sweep_sigma_f_mV", np.nan),
@@ -417,6 +476,9 @@ def test_tt5_round_trip():
     assert b"\r" not in raw and all(b < 128 for b in raw), "the table file is not ASCII / LF"
     first_ss = raw.decode("ascii").splitlines()[1].split(",")
     assert first_ss[1] == "SS" and first_ss[4:7] == ["", "", ""], first_ss   # SS: NaN as empty fields
+    assert first_ss[-2:] == ["", "True"], first_ss                         # SS: no reason, in the twin
+    assert (~back["in_twin"]).sum() == 2 and set(back.loc[~back["in_twin"], "real_spike_reason"]) == \
+        {"peak_above_threshold", "action_potential"}, back[["real_spike_reason", "in_twin"]]
     # a value that repr and %.17g both need all 17 digits for
     probe = built.copy()
     probe.loc[0, "tilt_mV_per_s"] = 0.1 + 0.2
@@ -444,7 +506,7 @@ def test_tt6_slow_flag():
 def test_tt7_protocol():
     st = _fixture()
     for specimen, sweeps, amps in ((ID_A, SWEEPS_A, LS_AMPS_A), (ID_B, SWEEPS_B, LS_AMPS_B)):
-        p = tt.load_cell_protocol(st["root"] / ("specimen_%d" % specimen))
+        p = tt.load_cell_protocol(st["root"] / ("specimen_%d" % specimen), spike_reason_fn=PlantedSpikeTest())
         truth = st["truth"][specimen]
         K, K_LS = truth["K"], len(amps)
         assert p.specimen_id == specimen
@@ -471,6 +533,10 @@ def test_tt7_protocol():
                   "ls_onset_s": np.float64, "ls_duration_s": np.float64, "ls_n_samples": np.int64}
         for name, dt in dtypes.items():
             assert getattr(p, name).dtype == dt, (name, getattr(p, name).dtype)
+        assert p.ls_spike_reason.dtype == object and p.ls_spike_reason.shape == (K_LS,)
+        want = [REASONS.get((specimen, 54 + k), "") for k in range(K_LS)]
+        assert list(p.ls_spike_reason) == want and all(type(x) is str for x in p.ls_spike_reason), \
+            (list(p.ls_spike_reason), want)
 
 
 def test_tt8_real_run():
@@ -503,7 +569,8 @@ def test_tt8_real_run():
     print("   TT8: 589 rows, worst relative law difference %.3g" % worst)
     if not ARGS.archive_cell:
         raise unittest.SkipTest("first half PASSED; second half skipped: no --archive-cell given")
-    p = tt.load_cell_protocol(ARGS.archive_cell)
+    # the layout half needs no spike test: a stub that passes every sweep (the third part uses the loader's)
+    p = tt.load_cell_protocol(ARGS.archive_cell, spike_reason_fn=lambda v, fs: "")
     assert p.specimen_id == 508282493, p.specimen_id
     table = tt.build_twin_sweep_table([p], cells, sweeps)
     ss = table[table["protocol"] == "SS"]
@@ -523,6 +590,69 @@ def test_tt8_real_run():
         assert r["amplitude_pA"] == amp_meta[r["sweep_number"]], r
     print("   TT8: 508282493 -> %d SS rows (%s windows), %d LS rows"
           % (len(ss), list(ss["n_windows"]), len(ls)))
+    # third part (amendment 1, D-190): the loader's own screen as the reference
+    try:
+        import passive_fitting_hpc_fixed as pf
+    except Exception as exc:  # NEURON or another dependency missing: reported, not hidden
+        raise unittest.SkipTest("first two parts PASSED; third part skipped: import passive_fitting_hpc_fixed "
+                                "failed (%s: %s)" % (type(exc).__name__, exc))
+    p = tt.load_cell_protocol(ARGS.archive_cell, spike_reason_fn=pf.sweep_spike_reason)
+    table = tt.build_twin_sweep_table([p], cells, sweeps)
+    cd = pf.load_cell_from_archive(ARGS.archive_cell, load_depolarising_ls=True, ls_dep_max_amplitude_pA=None,
+                                   verbose=False)
+    screen = cd.ls_dep_screen
+    dep = table[(table["protocol"] == "LS") & (table["amplitude_pA"] > TwinConfig().ls_dep_min_amplitude_pA)]
+    assert len(dep) == screen["n_depolarising"], (len(dep), screen)
+    assert int(dep["in_twin"].sum()) == screen["n_kept"], (int(dep["in_twin"].sum()), screen)
+    for reason in pf.SPIKE_REASONS:
+        n = int((dep["real_spike_reason"] == reason).sum())
+        assert n == screen["n_" + reason], (reason, n, screen)
+    hyp = table[(table["protocol"] == "LS") & ~(table["amplitude_pA"] > TwinConfig().ls_dep_min_amplitude_pA)]
+    assert hyp["in_twin"].all() and (hyp["real_spike_reason"] == "").all(), hyp
+    assert table.loc[table["protocol"] == "SS", "in_twin"].all()
+    print("   TT8: 508282493 -> %d depolarising LS rows, %d in the twin; loader's screen %s"
+          % (len(dep), int(dep["in_twin"].sum()),
+             {k: screen[k] for k in ("n_depolarising", "n_kept") + tuple("n_" + r for r in pf.SPIKE_REASONS)}))
+
+
+def test_tt10_spike_screen():
+    st = _fixture()
+    cells, sweeps = _tables()
+    thr = TwinConfig().ls_dep_min_amplitude_pA
+    assert thr == 5.0, thr
+    fn = PlantedSpikeTest()
+    p = tt.load_cell_protocol(st["dir_f"], spike_reason_fn=fn)
+    above = [(ID_F, 54 + k) for k, a in enumerate(LS_AMPS_F) if a > thr]
+    assert sorted(fn.calls) == above and len(fn.calls) == len(set(fn.calls)), (fn.calls, above)
+    assert (ID_F, 54 + LS_AMPS_F.index(5.0)) not in fn.calls, "the sweep at exactly the threshold was tested"
+    want = [REASONS.get((ID_F, 54 + k), "") for k in range(len(LS_AMPS_F))]
+    assert list(p.ls_spike_reason) == want, (list(p.ls_spike_reason), want)
+    table = tt.build_twin_sweep_table([p], cells, sweeps)
+    ls = table[table["protocol"] == "LS"].set_index("sweep_number")
+    for k, a in enumerate(LS_AMPS_F):
+        s = 54 + k
+        r = REASONS.get((ID_F, s), "")
+        assert ls.loc[s, "real_spike_reason"] == r and ls.loc[s, "in_twin"] == (r == ""), (s, ls.loc[s].to_dict())
+    assert len(table) == 1 + len(LS_AMPS_F), "one row per real sweep, in the twin or not"
+    ssr = table[table["protocol"] == "SS"]
+    assert list(ssr["real_spike_reason"]) == [""] and list(ssr["in_twin"]) == [True], ssr
+    assert table["in_twin"].dtype == bool and table["real_spike_reason"].map(type).eq(str).all()
+    # the threshold is the config's: at 60 pA only the 130 pA sweep is tested
+    fn60 = PlantedSpikeTest()
+    tt.load_cell_protocol(st["dir_f"], spike_reason_fn=fn60, twin_cfg=TwinConfig(ls_dep_min_amplitude_pA=60.0))
+    assert fn60.calls == [(ID_F, 54 + LS_AMPS_F.index(130.0))], fn60.calls
+    # a return value that is not a str is refused, naming the cell and the sweep
+    for bad in (None, 0, False, b"", np.float64(0.0)):
+        _expect_refusal("spike_reason_fn -> %r" % (bad,),
+                        lambda: tt.load_cell_protocol(st["dir_f"], spike_reason_fn=PlantedSpikeTest(bad)),
+                        ID_F, above[0][1])   # the first sweep tested: the 20 pA one
+    # spike_reason_fn is required
+    try:
+        tt.load_cell_protocol(st["dir_f"])
+    except TypeError:
+        pass
+    else:
+        raise AssertionError("load_cell_protocol ran without spike_reason_fn")
 
 
 def test_tt9_ascii_lf():

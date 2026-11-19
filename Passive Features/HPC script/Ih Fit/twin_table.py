@@ -38,7 +38,7 @@ from twin_config import TwinConfig
 TWIN_SWEEP_COLUMNS = (
     "specimen_id", "protocol", "sweep_number", "n_windows", "amplitude_pA", "onset_s", "duration_s", "n_samples",
     "fs_Hz", "sigma_f_mV", "sigma_m_mV", "tau_m_s", "sigma_s_mV", "tau_s_s", "tilt_mV_per_s", "law_source",
-    "noise_flags", "cell_tau_s_above_window")
+    "noise_flags", "cell_tau_s_above_window", "real_spike_reason", "in_twin")
 
 # Columns of sweep_laws_from_tables, in this order (SPEC, Block 5, "Public API").
 SWEEP_LAW_COLUMNS = (
@@ -48,8 +48,8 @@ SWEEP_LAW_COLUMNS = (
 _INT_COLUMNS = ("specimen_id", "sweep_number", "n_windows", "n_samples")
 _FLOAT_COLUMNS = ("amplitude_pA", "onset_s", "duration_s", "fs_Hz", "sigma_f_mV", "sigma_m_mV", "tau_m_s",
                   "sigma_s_mV", "tau_s_s", "tilt_mV_per_s")
-_STR_COLUMNS = ("protocol", "law_source", "noise_flags")
-_BOOL_COLUMNS = ("cell_tau_s_above_window",)
+_STR_COLUMNS = ("protocol", "law_source", "noise_flags", "real_spike_reason")
+_BOOL_COLUMNS = ("cell_tau_s_above_window", "in_twin")
 _LAW_COLUMNS = ("sigma_f_mV", "sigma_m_mV", "tau_m_s", "sigma_s_mV", "tau_s_s")
 _PROTOCOLS = ("SS", "LS")
 _FAILED_PREFIX = "sweep_fit_failed:"
@@ -74,7 +74,10 @@ class CellProtocol:
         ls_index (int64, the <index> of v_<index>), ls_sweep_number (int64),
         ls_amplitude_pA (float64, signed pA), ls_onset_s (float64, s),
         ls_duration_s (float64, s: step end - onset), ls_n_samples (int64);
-        ls_fs_Hz (Hz).
+        ls_spike_reason ((K_LS,) object array of str: '' for a sweep of
+        amplitude <= TwinConfig.ls_dep_min_amplitude_pA, not tested, and for
+        a depolarising sweep the loader's spike test passes; else the reason
+        the test returned -- amendment 1, D-190); ls_fs_Hz (Hz).
     """
     specimen_id: int
     ss_fs_Hz: float
@@ -94,18 +97,29 @@ class CellProtocol:
     ls_onset_s: np.ndarray
     ls_duration_s: np.ndarray
     ls_n_samples: np.ndarray
+    ls_spike_reason: np.ndarray
 
 
 # ===========================================================================
 #  The archive: one real cell's protocol
 # ===========================================================================
-def load_cell_protocol(spec_dir, cfg: WindowConfig = WindowConfig()) -> CellProtocol:
+def load_cell_protocol(spec_dir, cfg: WindowConfig = WindowConfig(), *, spike_reason_fn,
+                       twin_cfg: TwinConfig = TwinConfig()) -> CellProtocol:
     """The protocol of the real cell in `spec_dir` (an archive cell directory,
     SPEC section 3), through noise_windows.load_ss_windows and
     load_ls_prewindows, plus `peak_pA` and `stim_duration_s` of ss_pulses.npz
     and `index` of metadata.json['ls_sweeps']. Raises TwinTableError when a
     sweep of metadata.json['ls_sweeps'] is not returned by load_ls_prewindows.
-    The loaders' own LayoutError passes through unchanged."""
+    The loaders' own LayoutError passes through unchanged.
+
+    spike_reason_fn(v_mV float64 (n,), sampling_rate_Hz float) -> str
+    (required; amendment 1, D-190): the fitter's loader's spike test
+    (passive_fitting_hpc_fixed.sweep_spike_reason, passed by the caller: this
+    module does not import the monolith, which imports NEURON). It is called
+    once for every stored LS sweep with amplitude >
+    twin_cfg.ls_dep_min_amplitude_pA, on that sweep's stored voltage v_<index>
+    of ls_sweeps.npz (all its samples) and its sampling rate, and for no
+    other sweep; a return value that is not a str raises TwinTableError."""
     spec_dir = str(spec_dir)
     ss = load_ss_windows(spec_dir, cfg)
     ls = load_ls_prewindows(spec_dir, cfg)
@@ -128,6 +142,21 @@ def load_cell_protocol(spec_dir, cfg: WindowConfig = WindowConfig()) -> CellProt
                              "load_ls_prewindows (the twin must have every stored LS sweep, D-186.1)"
                              % (specimen, missing if missing else meta_sweeps))
     ls_index = np.asarray([int(info["index"]) for info in infos], dtype=np.int64)
+    amps = np.asarray(ls.amplitude_pA, dtype=np.float64).copy()
+    reasons: List[str] = []
+    with np.load(os.path.join(spec_dir, "ls_sweeps.npz")) as z:
+        for i, info in enumerate(infos):
+            if not amps[i] > twin_cfg.ls_dep_min_amplitude_pA:
+                reasons.append("")
+                continue
+            v = np.asarray(z["v_%d" % int(info["index"])], dtype=np.float64)
+            why = spike_reason_fn(v, float(info["sampling_rate_Hz"]))
+            if not isinstance(why, str):
+                raise TwinTableError("cell %d LS sweep %d: spike_reason_fn returned %r (%s), not a str"
+                                     % (specimen, meta_sweeps[i], why, type(why).__name__))
+            reasons.append(str(why))
+    reason_arr = np.empty(len(reasons), dtype=object)
+    reason_arr[:] = reasons
     return CellProtocol(
         specimen_id=specimen,
         ss_fs_Hz=float(ss.fs),
@@ -143,10 +172,11 @@ def load_cell_protocol(spec_dir, cfg: WindowConfig = WindowConfig()) -> CellProt
         ls_fs_Hz=float(ls.fs),
         ls_index=ls_index,
         ls_sweep_number=np.asarray(ls.sweep_number, dtype=np.int64).copy(),
-        ls_amplitude_pA=np.asarray(ls.amplitude_pA, dtype=np.float64).copy(),
+        ls_amplitude_pA=amps,
         ls_onset_s=np.asarray(ls.onset_s, dtype=np.float64).copy(),
         ls_duration_s=(np.asarray(ls.step_end_s, dtype=np.float64) - np.asarray(ls.onset_s, dtype=np.float64)),
         ls_n_samples=np.asarray(ls.n_samples, dtype=np.int64).copy(),
+        ls_spike_reason=reason_arr,
     )
 
 
@@ -323,22 +353,24 @@ def build_twin_sweep_table(protocols: Sequence[CellProtocol], cells: pd.DataFram
         for s, k in zip(ss_sweeps, ss_counts):
             law = by_key[(specimen, "SS", int(s))][0]
             rows.append(_row(law, n_windows=int(k), amplitude=np.nan, onset=np.nan, duration=np.nan,
-                             n_samples=n_w, fs=float(p.ss_fs_Hz)))
+                             n_samples=n_w, fs=float(p.ss_fs_Hz), spike_reason=""))
         for i, s in enumerate(ls_sweeps):
             law = by_key[(specimen, "LS", s)][0]
             rows.append(_row(law, n_windows=1, amplitude=float(p.ls_amplitude_pA[i]),
                              onset=float(p.ls_onset_s[i]), duration=float(p.ls_duration_s[i]),
-                             n_samples=int(p.ls_n_samples[i]), fs=float(p.ls_fs_Hz)))
+                             n_samples=int(p.ls_n_samples[i]), fs=float(p.ls_fs_Hz),
+                             spike_reason=str(p.ls_spike_reason[i])))
     rows.sort(key=lambda r: (r["specimen_id"], _PROTOCOLS.index(r["protocol"]), r["sweep_number"]))
     df = pd.DataFrame(rows, columns=list(TWIN_SWEEP_COLUMNS))
     return _typed(df, TWIN_SWEEP_COLUMNS).reset_index(drop=True)
 
 
 def _row(law: dict, *, n_windows: int, amplitude: float, onset: float, duration: float, n_samples: int,
-         fs: float) -> dict:
+         fs: float, spike_reason: str) -> dict:
     row = {c: law[c] for c in SWEEP_LAW_COLUMNS}
     row.update({"n_windows": n_windows, "amplitude_pA": amplitude, "onset_s": onset, "duration_s": duration,
-                "n_samples": n_samples, "fs_Hz": fs})
+                "n_samples": n_samples, "fs_Hz": fs, "real_spike_reason": spike_reason,
+                "in_twin": spike_reason == ""})
     return row
 
 
