@@ -22,6 +22,10 @@ Checks (the oracles of SPEC, Block 5, "Test oracles")
                             counts with the fitter's loader's ls_dep_screen
                             and needs passive_fitting_hpc_fixed (NEURON)
     test_tt9_ascii_lf       the two files are pure ASCII with LF line ends
+    test_tt11_not_a_step    amendment 3 (D-191.4): listed LS sweeps that are
+                            not steps (0 pA, a null amplitude, below 5 pA in
+                            size) are left out without a row; the remaining
+                            sweeps keep their own ls_index, number, amplitude
     test_tt10_spike_screen  amendment 1 (D-190): the spike test is called
                             exactly for the LS sweeps above
                             ls_dep_min_amplitude_pA (not at it), on their
@@ -86,6 +90,11 @@ ARGS = argparse.Namespace(nf2_dir=None, archive_cell=None)   # set by main(); py
 # refused cell (D) in the per-cell table. All values planted here.
 ID_A, ID_B, ID_C, ID_D = 900000101, 900000102, 900000103, 900000104
 ID_F = 900000106                     # TT10: LS sweeps around the depolarising threshold
+ID_G = 900000107                     # TT11: listed LS sweeps that are not steps, between real steps
+# written amplitudes; the metadata of sweep 57 (index 3) is then set to null; 55 (0 pA) and 58 (3 pA) are no steps
+LS_AMPS_G = (-110.0, 0.0, -70.0, 30.0, 3.0, 90.0)
+G_NULL_SWEEP = 57
+G_STEPS = (54, 56, 59)               # sweep numbers left; their index in ls_sweeps.npz is sweep - 54
 LS_AMPS_F = (-110.0, -30.0, 5.0, 20.0, 50.0, 130.0)   # 5.0 pA: exactly the threshold, not tested
 # planted spike-test reasons (amendment 1, D-190): {(specimen, LS sweep): reason}; any other '' (passes)
 REASONS = {(ID_A, 56): "peak_above_threshold", (ID_B, 57): "action_potential",
@@ -96,7 +105,8 @@ SWEEPS_B, DROPPED_B, LS_AMPS_B = (7,), {7: (1, 4, 30)}, (-70.0, 30.0, 130.0, 230
 CELL_LAWS = {ID_A: (0.031, 0.017, 0.0713, 0.08, 265.0),
              ID_B: (0.0345, 0.0222, 0.0569, 0.2818, 265.1),
              ID_C: (0.032, 0.0165, 0.0698, 0.0859, 1277.0584282427603),
-             ID_F: (0.033, 0.0175, 0.0701, 0.0901, 150.0)}
+             ID_F: (0.033, 0.0175, 0.0701, 0.0901, 150.0),
+             ID_G: (0.034, 0.0185, 0.0702, 0.0911, 140.0)}
 FAILED_B = 55                        # B's LS sweep 55 failed: its row holds B's SDs
 FAILED_FLAGS = "at_bound:log_sigma_m;sweep_fit_failed:ls:55:at_bound:log_sigma_m"
 FLAG_A_SS93 = "some_note:93"         # a flag that is not a failure
@@ -121,6 +131,9 @@ def _planted_rows():
     rows[(ID_F, "SS", 92)] = (0.0331, 0.0176, 0.0902, 0.003, "")
     for k in range(len(LS_AMPS_F)):
         rows[(ID_F, "LS", 54 + k)] = (0.0332 + 1e-4 * k, 0.0177, 0.0903 + 1e-3 * k, 0.004 * k, "")
+    rows[(ID_G, "SS", 92)] = (0.0341, 0.0186, 0.0912, 0.005, "")
+    for s in G_STEPS:
+        rows[(ID_G, "LS", s)] = (0.0342 + 1e-4 * (s - 54), 0.0187, 0.0913 + 1e-3 * (s - 54), 0.006 * (s - 54), "")
     rows[(ID_C, "SS", 1)] = (0.0322, 0.0166, 0.0861, 0.001, "")
     rows[(ID_C, "LS", 3)] = (0.0323, 0.0167, 0.0862, -0.002, "")
     return rows
@@ -147,24 +160,37 @@ def _fixture():
     d_f = root / ("specimen_%d" % ID_F)
     truth[ID_F] = snw.write_fixture(d_f, rng, with_response=False, dropped={}, sweeps=(92,), ls_amps=LS_AMPS_F)
     _set_specimen(d_f, ID_F)
-    # a cell whose metadata lists an LS sweep that load_ls_prewindows skips (amplitude 0 pA)
+    # a cell with a real step (-90 pA, sweep 55) that load_ls_prewindows cannot return: its stored current
+    # trace has no step (all zeros), so no onset can be detected
     d_e = root / "specimen_900000105"
-    snw.write_fixture(d_e, rng, with_response=False, dropped={}, sweeps=(92,), ls_amps=(-110.0, 0.0, 50.0))
+    snw.write_fixture(d_e, rng, with_response=False, dropped={}, sweeps=(92,), ls_amps=(-110.0, -90.0, 50.0))
     _set_specimen(d_e, 900000105)
+    with np.load(d_e / "ls_sweeps.npz") as z:
+        arrs = {k: z[k] for k in z.files}
+    arrs["i_1"] = np.zeros_like(arrs["i_1"])
+    np.savez_compressed(d_e / "ls_sweeps.npz", **arrs)
+    # TT11: a cell listing a 0 pA sweep, a null amplitude and a 3 pA sweep between real steps
+    d_g = root / ("specimen_%d" % ID_G)
+    truth[ID_G] = snw.write_fixture(d_g, rng, with_response=False, dropped={}, sweeps=(92,), ls_amps=LS_AMPS_G)
+    _set_specimen(d_g, ID_G)
+    meta = json.load(open(d_g / "metadata.json"))
+    meta["ls_sweeps"][G_NULL_SWEEP - 54]["detected_amplitude_pA"] = None
+    with open(d_g / "metadata.json", "w") as fh:
+        json.dump(meta, fh, indent=1)
     cells_csv, sweeps_csv = root / "noise_cells_FIX.csv", root / "noise_sweeps_FIX.csv"
     write_csv_atomic(cells_csv, CELL_COLUMNS, _cell_table_rows())
     write_csv_atomic(sweeps_csv, SWEEP_COLUMNS, _sweep_table_rows())
     # the spike test's planted answers, keyed by the bytes of each stored LS voltage
     by_v = {}
-    for specimen in (ID_A, ID_B, ID_F):
+    for specimen in (ID_A, ID_B, ID_F, ID_G):
         d = root / ("specimen_%d" % specimen)
         meta = json.load(open(d / "metadata.json"))
         with np.load(d / "ls_sweeps.npz") as z:
             for info in meta["ls_sweeps"]:
                 v = np.asarray(z["v_%d" % info["index"]], dtype=np.float64)
-                by_v[v.tobytes()] = (specimen, int(info["sweep_number"]), float(info["detected_amplitude_pA"]),
+                by_v[v.tobytes()] = (specimen, int(info["sweep_number"]), info["detected_amplitude_pA"],
                                      float(info["sampling_rate_Hz"]))
-    _STATE.update(root=root, truth=truth, dir_e=d_e, dir_f=d_f, cells_csv=cells_csv, sweeps_csv=sweeps_csv,
+    _STATE.update(root=root, truth=truth, dir_e=d_e, dir_f=d_f, dir_g=d_g, cells_csv=cells_csv, sweeps_csv=sweeps_csv,
                   by_v=by_v)
     return _STATE
 
@@ -422,7 +448,8 @@ def test_tt4_refusals():
     extra["noise_sweep_protocol"], extra["noise_sweep_number"] = "LS", 99
     _expect_refusal("row without a stored sweep",
                     lambda: build(prots, cells, pd.concat([sweeps, extra], ignore_index=True)), ID_A, 99)
-    # a sweep of metadata.json['ls_sweeps'] that load_ls_prewindows does not return (0 pA: sweep 55)
+    # a step of metadata.json['ls_sweeps'] that load_ls_prewindows does not return (sweep 55, -90 pA, whose
+    # stored current has no step; amendment 3: a step, not a 0 pA sweep)
     _expect_refusal("LS sweep not loaded",
                     lambda: tt.load_cell_protocol(st["dir_e"], spike_reason_fn=lambda v, fs: ""), 900000105, 55)
     # a law that NoiseLaw refuses: a negative, a missing SD; a cell time scale missing or zero
@@ -653,6 +680,40 @@ def test_tt10_spike_screen():
         pass
     else:
         raise AssertionError("load_cell_protocol ran without spike_reason_fn")
+
+
+def test_tt11_not_a_step():
+    st = _fixture()
+    cells, sweeps = _tables()
+    fn = PlantedSpikeTest()
+    p = tt.load_cell_protocol(st["dir_g"], spike_reason_fn=fn)
+    steps = list(G_STEPS)
+    assert list(p.ls_sweep_number) == steps, list(p.ls_sweep_number)
+    # the index in ls_sweeps.npz of the remaining sweeps (not their position among the steps: 0, 1, 2)
+    assert list(p.ls_index) == [s - 54 for s in steps], list(p.ls_index)
+    assert list(p.ls_amplitude_pA) == [LS_AMPS_G[s - 54] for s in steps], list(p.ls_amplitude_pA)
+    K_LS = len(steps)
+    for name in ("ls_onset_s", "ls_duration_s", "ls_n_samples", "ls_spike_reason"):
+        assert getattr(p, name).shape == (K_LS,), (name, getattr(p, name).shape)
+    assert_array_equal(p.ls_onset_s, np.full(K_LS, snw.LS_PRE_N / snw.FS))
+    assert_array_equal(p.ls_n_samples, np.full(K_LS, st["truth"][ID_G]["ls_n_samples"]))
+    assert fn.calls == [(ID_G, 59)], fn.calls          # the spike test: only the step above 5 pA (90 pA)
+    # the stored voltage the index points at is the sweep's own (each fixture sweep has its own noise)
+    meta = json.load(open(st["dir_g"] / "metadata.json"))
+    with np.load(st["dir_g"] / "ls_sweeps.npz") as z:
+        for k, s in zip(p.ls_index, p.ls_sweep_number):
+            info = [i for i in meta["ls_sweeps"] if int(i["sweep_number"]) == int(s)][0]
+            assert int(info["index"]) == int(k), (s, k, info)
+            assert st["by_v"][np.asarray(z["v_%d" % k], dtype=np.float64).tobytes()][1] == int(s), (s, k)
+    table = tt.build_twin_sweep_table([p], cells, sweeps)
+    ls = table[table["protocol"] == "LS"]
+    assert list(ls["sweep_number"]) == steps and len(table) == 1 + K_LS, table[["protocol", "sweep_number"]]
+    assert list(ls["amplitude_pA"]) == [LS_AMPS_G[s - 54] for s in steps]
+    # a row of the per-sweep table for a sweep that is not a step is still refused (no stored step)
+    extra = sweeps[sweeps["specimen_id"] == ID_G].iloc[[1]].copy()
+    extra["noise_sweep_protocol"], extra["noise_sweep_number"] = "LS", 55
+    _expect_refusal("row of a 0 pA sweep", lambda: tt.build_twin_sweep_table(
+        [p], cells, pd.concat([sweeps, extra], ignore_index=True)), ID_G, 55)
 
 
 def test_tt9_ascii_lf():

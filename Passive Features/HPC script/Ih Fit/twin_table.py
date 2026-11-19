@@ -108,9 +108,13 @@ def load_cell_protocol(spec_dir, cfg: WindowConfig = WindowConfig(), *, spike_re
     """The protocol of the real cell in `spec_dir` (an archive cell directory,
     SPEC section 3), through noise_windows.load_ss_windows and
     load_ls_prewindows, plus `peak_pA` and `stim_duration_s` of ss_pulses.npz
-    and `index` of metadata.json['ls_sweeps']. Raises TwinTableError when a
-    sweep of metadata.json['ls_sweeps'] is not returned by load_ls_prewindows.
-    The loaders' own LayoutError passes through unchanged.
+    and `index` of metadata.json['ls_sweeps']. A listed LS sweep that is not
+    a step (detected_amplitude_pA missing, not finite, or below
+    cfg.ls_amp_min_pA in size) is left out (amendment 3, D-191.4); a step
+    that load_ls_prewindows does not return raises TwinTableError. The ls_*
+    fields are matched to the returned sweeps by sweep number, in the order
+    of metadata.json['ls_sweeps']. The loaders' own LayoutError passes
+    through unchanged.
 
     spike_reason_fn(v_mV float64 (n,), sampling_rate_Hz float) -> str
     (required; amendment 1, D-190): the fitter's loader's spike test
@@ -133,13 +137,21 @@ def load_cell_protocol(spec_dir, cfg: WindowConfig = WindowConfig(), *, spike_re
                              % (specimen, peak.shape, dur.shape, K))
     with open(os.path.join(spec_dir, "metadata.json")) as fh:
         infos = json.load(fh).get("ls_sweeps") or []
+    all_sweeps = [int(info["sweep_number"]) for info in infos]
+    dup = sorted({x for x in all_sweeps if all_sweeps.count(x) > 1})
+    if dup:
+        raise TwinTableError("cell %d: LS sweep number(s) %s listed more than once in metadata.json['ls_sweeps']"
+                             % (specimen, dup))
+    # Amendment 3 (D-191.4): a listed sweep that is not a step (amplitude missing, not finite, or below
+    # cfg.ls_amp_min_pA in size) is left out without a row; every step must be returned by the loader.
+    infos = [info for info in infos if _is_step(info.get("detected_amplitude_pA"), cfg)]
     meta_sweeps = [int(info["sweep_number"]) for info in infos]
     got = [int(s) for s in ls.sweep_number]
     if got != meta_sweeps:
-        # the loader returns the sweeps it keeps in the order of metadata.json['ls_sweeps']
+        # the loader returns the sweeps it keeps in the order of metadata.json['ls_sweeps']: matched by number
         missing = [s for s in meta_sweeps if s not in got]
-        raise TwinTableError("cell %d: LS sweep(s) %s of metadata.json['ls_sweeps'] not returned by "
-                             "load_ls_prewindows (the twin must have every stored LS sweep, D-186.1)"
+        raise TwinTableError("cell %d: LS step sweep(s) %s of metadata.json['ls_sweeps'] not returned by "
+                             "load_ls_prewindows (the twin must have every stored LS step, D-186.1)"
                              % (specimen, missing if missing else meta_sweeps))
     ls_index = np.asarray([int(info["index"]) for info in infos], dtype=np.int64)
     amps = np.asarray(ls.amplitude_pA, dtype=np.float64).copy()
@@ -178,6 +190,15 @@ def load_cell_protocol(spec_dir, cfg: WindowConfig = WindowConfig(), *, spike_re
         ls_n_samples=np.asarray(ls.n_samples, dtype=np.int64).copy(),
         ls_spike_reason=reason_arr,
     )
+
+
+def _is_step(amp, cfg: WindowConfig) -> bool:
+    """A listed LS sweep is a step when its detected amplitude is present,
+    finite and at least cfg.ls_amp_min_pA in size (the loader's own rule)."""
+    if amp is None:
+        return False
+    amp = float(amp)
+    return bool(np.isfinite(amp) and abs(amp) >= cfg.ls_amp_min_pA)
 
 
 # ===========================================================================
