@@ -232,6 +232,7 @@ the "Binds" column.
 | 2026-11-18 (later, 24) | Logs **D-179** (user, 20:23; the joint-fit chat), the answers to D-177's five points: "1) yes" -- the joint model is built per chain with the shadows summed, and today's rule (b) no longer makes tier 2 (D-177.3, D-177.4, D-177.6 confirmed); "5) yes" -- the first test nodes (D-177.11 confirmed); "3) yes" is read as the fourth point (the neighbour's position in a narrow range and its absorption the weighted mean, D-177.7, D-177.8), since the user asked in the same message for two figures on the second and third points (attached chains as neighbours, D-177.5; the own chain smoothed or raw, D-177.10), which stay open -- the reading is put back to the user. Figures made for those two points from the pilot's trace (`checks/joint_2026-11-18/fig_two_questions.py`, `fig_attached_vs_free.png`, `fig_own_chain_options.png`) **[data: the SWC]**. **Correction of this chat's row (later, 22) and of the handoff's section 13.2:** the words 'deeper' and 'shallower' were used inconsistently for D-149's examples; in the trace's stage z the other chain lies BELOW the node's z in all three (8089: -2.0 um, 4844: -2.1 um, 7081: -0.9 um, the other chain's z minus the node's); which sign is deeper along the light path is not claimed. Next free IDs: D-180, I-006. |
 | 2026-11-18 (later, 25) | No decision changed (the clearance chat). **D-174 and D-178 implemented and pushed**: `513ad9e` on `sci/diameter-pipeline` (SPEC Block 5 amendment 3) -- `MeasureConfig.pilot_diameter` = "allen" by default, read by `measure_pilot` and Block 13's pilot, so the calibration, the survey and the chain take it without a change of their code; "free" is the labelled alternative; a node without a traced radius is fitted free and flagged `allen_radius_missing` [orchestrator]. The estimator hash is now 16be09f944e45972 (simulation dc84ed2e89bcfea6). `refit_at_plane` and the plane diagnostics of D-040/D-042 keep the free fit [orchestrator]. **[run, sandbox]** 56 smoke files pass (line_fast not rerun; its `test_reference` did not finish within the sandbox's limit earlier); the spec tests pass except six that failed before. D-175's `nodes` and `calibration` steps can be submitted from `513ad9e` on. Next free IDs unchanged. |
 | 2026-11-19 | No decision changed (the noise-fit chat; the user's paste of 12:12) **[cluster]**. **The 18-cell nf2 run** (three-component law, D-152 to D-155) read back from its iteration histories and per-sweep fits: J/dof lower than nf1 in 18 of 18 cells (median 10.8 to 2.65; below chi^2_16's 99 % point in 2, its 99.9 % point in 9; largest 569844159, 938); no coordinate at a bound (tau_m 0.053-0.111 ms; tau_s 11 ms - 5.7 s); the per-sweep laws rejected at 1 % in 19 % of SS and 23 % of LS sweeps (nf1 69 % and 56 %); 15 cells `no_plateau` (D-050), none drifting at the end. **The slow part's sigma_s and tau_s are not separately determined where tau_s is long against the windows** (checked by computation on 571430815: tau_s 5.7 s to 1 s at fixed sigma_s^2 / tau_s moves no statistic by more than 0.35 SE, while the slow SD over a 7.4 s train changes from 0.92 to 0.59 mV): put to the user as Block 5's first question. The Block 6 handoff, §4 and §6 item 9; `Ih Fit/dev/2026-11-19_nf2_readback/`. Next free IDs unchanged: D-180, I-006. |
+| 2026-11-19 (later) | Logs **D-180** (user, 12:24; the noise-fit chat): the twins are no longer than the windows the noise fit used (at most 265 ms) and nothing relies on the noise across pulses -- the first of the three options put after the nf2 read-back (the slow part's sigma_s and tau_s not separately determined where tau_s is long). Its application to the Long Square twins (D-076 (iii): whole LS sweeps) and to D-083.2's 37-pulse trains is open, for Block 5's SPEC entry; D-083 annotated. **[cluster, pasted]** the 18-cell nf2 merge (job `2099736`): `NOISE_MERGE L3_exc: 18 ok, 0 refused, 0 failed, 0 missing`; the pilot's merge (`2098690`) 2 ok. The final check's 54 spec tests of 2026-11-17 committed (the user left it to the assistant). Next free IDs: D-181, I-006. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -400,6 +401,7 @@ would be needed*, *Status*.
 | D-177 | 2026-11-18 | plan step F3 (the joint fit of a node with its close neighbours) and its SPEC entry, still to be written; `cleaning.neighbour_tiers` (rule (b)); D-164.1, D-164.5, D-166.2, D-168, D-169.1, D-169.3; the handoff's B1 to B9 | the joint-fit chat refines the joint fit, the bumps are the 'Questions before logic' chat's [user]; PROVISIONAL, to confirm [orchestrator]: a chain's pieces share one ray history (each piece the cross-section history of an infinite tube of its direction, clipped at the joints' bisecting planes); node and neighbour chains rendered separately, shadows summed; a close neighbour is one on the measuring line, attached or free; today's rule (b) no longer makes tier 2; the neighbour's position free in a narrow range; its absorption the weighted mean of the first stage's along its chain; the own chain through smoothed trace positions | active; D-177.3 to D-177.11 PROVISIONAL |
 | D-178 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, `_pilot`; Blocks 3, 5) and every user of it (Blocks 6, 10, 13 to 15, 17, 36); `MeasureConfig`; D-173.3, D-174.2 | D-174.2 confirmed: the held diameter (Allen's) is the first stage's default for every user, through a configuration field; the free fit stays selectable as the labelled alternative [user] | active; implemented at `513ad9e` (2026-11-18) |
 | D-179 | 2026-11-18 | D-177.3 to D-177.11 (the joint fit's construction, plan step F3); `cleaning.neighbour_tiers` (rule (b)); the SPEC entries of the joint fit, still to be written | confirmed [user]: a chain's pieces share one ray history, chains rendered separately and their shadows summed; rule (b) no longer makes tier 2; the first test nodes. Confirmed as read, to check [user, as read]: the neighbour's position free in a narrow range, its absorption the weighted mean of the first stage's. Open, figures delivered: attached chains as neighbours; the own chain through the smoothed or the raw trace | active |
+| D-180 | 2026-11-19 | Block 5 (the twins; roadmap N5), Stage 7's run (D-083, S7), `synthetic_ground_truth.py`, `gen_from_manifest.py` | the noise of a twin spans no more than the noise fit's windows (at most 265 ms); nothing relies on the noise across pulses [user]; its application to the LS twins and to D-083.2's trains open | active; Block 5's SPEC entry to write |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -7458,7 +7460,7 @@ plan already fixes them -- four fits per twin, `baseline_runB`, `passive_fullste
 **Sources.** **[user]** 2026-10-26, 09:31. **[log]** D-005, D-011, D-013, D-073, D-076, D-082. **[src]** the roadmap
 at `8c671a2`.
 
-**Status:** active; the roadmap updated (patch pending the user's push).
+**Status:** active; the roadmap updated (patch pending the user's push). [updated 2026-11-19: the twins' noise structure qualified by **D-180** (no noise span beyond the noise fit's windows, nothing relying on the noise across pulses); whether (D-083.2)'s 37-pulse trains stay for the twins' response, and how D-180 applies to the Long Square twins, are open for Block 5]
 ---
 
 ## D-084 -- The hybrid absorption renderer is promoted to be the renderer actually used (user)
@@ -12823,3 +12825,54 @@ smoothed; D-177.9 (one set of parameters per chain; the cap counts chains), not 
 **Sources.** **[user]** 2026-11-18, 20:23. **[log]** D-177.
 
 **Status:** active.
+
+## D-180 -- The twins are no longer than the windows the noise fit used, and nothing relies on the noise across pulses (user)
+
+**Date:** 2026-11-19, 12:24 (Europe/Rome), the noise-fit chat. **Binds:** Block 5 (the twins; its SPEC entry not yet
+written; roadmap N5), Stage 7's recovery run (D-083; roadmap S7), `synthetic_ground_truth.py`, `gen_from_manifest.py`,
+`run_ih_recovery.py`; the open question "Block 5 (the twins' generator)" of `Ih Fit/specs/SPEC.md` section 8 and the
+Block 6 handoff's section 6, items 1, 2 and 9; (D-083.2)'s "its SS sweeps as 37-pulse trains at the stored positions".
+
+**Decision [user].** After the read-back of the nf2 run (changelog row 2026-11-19: where $\hat\tau_s(c)$ is long against
+the windows, the noise fit determines $\sigma_s^2/\tau_s$, not $\sigma_s$ and $\tau_s$ apart; three options put -- twins
+no longer than the windows; a statistic across windows and the run again; the law as it is with a sensitivity run), the
+user chose the first: "About the size / time scale: Build twins no longer than the windows the fit used (up to 265 ms),
+and don't rely on how noise behaves across pulses. I would use this".
+
+**Statement.**
+(D-180.1) The noise a twin carries is drawn over spans no longer than the windows on which the noise law was fitted:
+an SS window of the archive's stored length ($[-10, 200)$ ms around a pulse, of which the statistics read
+$[t_{\rm SS}(c), 200)$ ms) and, for Long Square sweeps, the pre-window's 265 ms.
+(D-180.2) Nothing in Block 5, or in Stage 7's reading of its twins, relies on how the noise behaves across pulses: the
+noise of distinct SS windows is given no correlation the fit did not measure. [the assistant's reading, to confirm
+when Block 5's SPEC entry is written: each SS window's noise is drawn independently of the others, as
+`synthetic_ground_truth.simulate_ss_protocol` already does; the deterministic response and the measured tilt line of
+the real sweep (D-102) are not noise and may still follow the real train]
+
+**Why.** **[user]** as quoted. **[run, sandbox: `Ih Fit/dev/2026-11-19_nf2_readback/check_slow_ridge.py`]** For
+571430815, moving the slow part along $\sigma_s^2/\tau_s$ = const from $\tau_s$ = 5.66 s to 1 s changes none of the 15
+statistics with a bootstrap SE by more than 0.35 SE, while over a 7.42 s SS train the slow part's SD goes from 0.92 to
+0.59 mV and its correlation between pulses 200.5 ms apart from 0.965 to 0.818: what lies beyond the windows is not
+measured by the fit.
+
+**What it implies for code and tables.** Block 5's SS twins are built window by window, not as continuous 37-pulse
+trains of noise; the manifest carries no noise parameter across windows; the noise fit (nf2) is not run again.
+
+**What it does not decide [open].**
+(1) The Long Square twins. D-076 (iii) gives each twin one sweep per real LS sweep at its own amplitude; on the L3_exc
+geometry that sweep has the step from 270 ms for 1 s and 6 s stored after it (D-107), beyond 265 ms. The noise over
+that span is an extrapolation of the law -- clearly so for 526785799 ($\hat\tau_s$ 1.28 s) and 571430815 (5.66 s).
+How D-180.1 applies to the LS twins is open.
+(2) Whether (D-083.2)'s "37-pulse trains at the stored positions" still holds for the twins' deterministic response (a
+train simulated in NEURON, the noise added per window), or each pulse is simulated alone as `simulate_ss_protocol`
+does.
+(3) The SS bundles. The I_h fit averages a polarity's windows into a bundle (SPEC section 8) **[src]**; the bundle's
+noise then depends on the correlation across windows, which independent windows set to zero. Whether and how the
+twins' bundle noise is checked against the real cells' (for example against the residual noise the fits of run B
+report) is open **[reasoning]**.
+(4) The per-sweep offset $a$ in a twin (the Block 6 handoff, section 6, item 3).
+
+**Sources.** **[user]** 2026-11-19, 12:24. **[run]** the check named above; the nf2 read-back (the Block 6 handoff,
+section 4). **[log]** D-076, D-083, D-102, D-107, D-152 to D-155.
+
+**Status:** active; Block 5's SPEC entry to write -- `Passive Features/HPC script/Ih Fit/docs/TEEG_twins_block5_handoff_2026-11-19.md`.
