@@ -235,6 +235,7 @@ the "Binds" column.
 | 2026-11-19 (later) | Logs **D-180** (user, 12:24; the noise-fit chat): the twins are no longer than the windows the noise fit used (at most 265 ms) and nothing relies on the noise across pulses -- the first of the three options put after the nf2 read-back (the slow part's sigma_s and tau_s not separately determined where tau_s is long). Its application to the Long Square twins (D-076 (iii): whole LS sweeps) and to D-083.2's 37-pulse trains is open, for Block 5's SPEC entry; D-083 annotated. **[cluster, pasted]** the 18-cell nf2 merge (job `2099736`): `NOISE_MERGE L3_exc: 18 ok, 0 refused, 0 failed, 0 missing`; the pilot's merge (`2098690`) 2 ok. The final check's 54 spec tests of 2026-11-17 committed (the user left it to the assistant). Next free IDs: D-181, I-006. |
 | 2026-11-19 (later, 2) | Logs **I-006** (user, 15:12; the defocus-table chat): step 2 of the kernel calibration with every twin's diameter fitted under a Gaussian penalty toward a reference diameter, the table left free -- form C of the T10 study document with the diameters' changes discouraged; read as penalized (Tikhonov-type) least squares, i.e. the maximum a posteriori estimate under a Gaussian prior on each diameter. To implement later; nothing in the code or the plan changes. **[FT]** PMC5064166; **[ABS]** PMID 39191246, 31363890. |
 | 2026-11-19 (later, 3) | Logs **D-181** (user, 15:43; the defocus-table chat): the near-field table is read between knots with the growth fit's cubic spline, not linearly in $|\delta|$, and the growth fit's cubic interpolation (PROVISIONAL since Block 10) is confirmed. **[run, sandbox]** check 8: with the renderer linear in $|\delta|$ and the growth fit cubic, step 1 errs by -9.2 % at 0.28 um even for tubes of no thickness (toy, pilot cell's knot values); check 9: with a truth of the growth fit's own cubic shape, by -0.1 %. Not built. |
+| 2026-11-19 (later, 4) | Logs **D-182** to **D-186** (user, 21:23; the twins chat, started from `TEEG_twins_block5_handoff_2026-11-19.md`), the answers to the questions put on Block 5 and Stage 7. **D-182**: a Long Square twin carries its sweep's law as fitted, continuous over the whole sweep; D-180's limit binds the SS windows; the four cells with $\hat\tau_s(c) > 265$ ms flagged, the gate reported with and without them (closes D-180's open point 1). **D-183**: every response of a twin is simulated on its real cell's morphology, the data give only the noise of each sweep or window, Long Square included; no per-sweep offset (closes D-180's open point 4; train or single pulses asked again). **D-184**: Stage 7 is a plain recovery run in three configurations of 10 cells each -- `full` (traces with I_h, six parameters fitted), `passive fit` (traces with I_h, passive fit), `active fit` (traces without I_h, the full model fitted) -- with no closure test of the twins' noise statistics; its mapping onto D-011 (ii) and D-083's four arms put to the user. **D-185**: one PBS job per cell under a 120-core cap. **D-186**: all stored SS windows and LS sweeps; the tilt line at the real positions; noise at the twin's own 50 kHz; LS timing from the real cell; a per-sweep twin table beside the manifest; seeds per twin sweep. Not decided: when the bundles' check on the real archive runs (D-180's open point 3; the user asked what it is). **[run, sandbox]** `Ih Fit/dev/2026-11-19_twins/ls_slow_span.py` (the slow part over a Long Square step, per cell, as fitted and at the short end of the ridge) and `check_bundle_variance.py`. D-011, D-083 and D-180 annotated. Next free IDs: D-187, I-007. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
@@ -405,6 +406,11 @@ would be needed*, *Status*.
 | D-179 | 2026-11-18 | D-177.3 to D-177.11 (the joint fit's construction, plan step F3); `cleaning.neighbour_tiers` (rule (b)); the SPEC entries of the joint fit, still to be written | confirmed [user]: a chain's pieces share one ray history, chains rendered separately and their shadows summed; rule (b) no longer makes tier 2; the first test nodes. Confirmed as read, to check [user, as read]: the neighbour's position free in a narrow range, its absorption the weighted mean of the first stage's. Open, figures delivered: attached chains as neighbours; the own chain through the smoothed or the raw trace | active |
 | D-180 | 2026-11-19 | Block 5 (the twins; roadmap N5), Stage 7's run (D-083, S7), `synthetic_ground_truth.py`, `gen_from_manifest.py` | the noise of a twin spans no more than the noise fit's windows (at most 265 ms); nothing relies on the noise across pulses [user]; its application to the LS twins and to D-083.2's trains open | active; Block 5's SPEC entry to write |
 | D-181 | 2026-11-19 | SPEC Block 4's kernel law (`model.kernel.sigma_r`, near field $|\delta| \le$ 0.84 um); `CalibrationConfig.growth_interp` (Block 10) | the near-field table read between knots with the growth fit's cubic spline, not linearly; the growth fit's cubic interpolation confirmed | active; not built |
+| D-182 | 2026-11-19 | Block 5 (the twins; roadmap N5), the LS twin sweeps of Stage 7 (D-076 (iii), D-083); D-180's open point (1) | a Long Square twin carries its sweep's law as fitted, one continuous draw over the whole sweep with the tilt fixed; D-180's limit binds the SS windows; the cells with $\hat\tau_s(c) > 265$ ms flagged, the gate reported with and without them [user] | active; not built |
+| D-183 | 2026-11-19 | Block 5 (`synthetic_ground_truth.py`, the twins' generator); D-083.2; D-180's open points (2), (4) | every response of a twin, SS and LS, is simulated on its real cell's morphology; the data give only the noise of each sweep or window; no per-sweep offset [user]; train or single pulses open | active; not built |
+| D-184 | 2026-11-19 | Stage 7 (roadmap S7, Block 8), the Stage-7 manifest (`synth_gt_grid.py`), the arms of `run_ih_recovery.py`; D-011 (ii), D-083; theory T14 | a plain recovery run in three configurations of 10 cells each -- `full`, `passive fit`, `active fit` -- with no closure test of the twins' noise statistics [user]; the mapping onto the arms and the cells open | active; readings to confirm |
+| D-185 | 2026-11-19 | Stage 7's run on davinci (`submit_ih_recovery.sh`, `run_ih_recovery.py`; roadmap S7) | one PBS job per cell under a 120-core cap [user]; the job builds its twin and runs its fits (the assistant's reading) | active; not built |
+| D-186 | 2026-11-19 | Block 5 (the twins' table, noise and protocol; roadmap N5); `gen_from_manifest.py`; the handoff's Q4, Q6 to Q10 | all stored SS windows and LS sweeps; the tilt line at the real positions; noise at the twin's own 50 kHz; LS timing from the real cell; a per-sweep twin table beside the manifest; seeds per twin sweep [user] | active; not built |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -1436,7 +1442,7 @@ is measured on AVERAGED bundles and mixes protocols, so it is not the per-sweep
 noise the generator injects, and $\rho$ was never set. Items (i), (ii) and
 (iv)-(vi) stand unchanged. **Why (iii)'s number is corrected by D-017
 (2026-09-28)**: $1.8 \pm 1.6$ mV is Moradi Chameh's L2&3 rebound
-depolarisation; the L2&3 sag is $1.7 \pm 1.1$ mV. The argument stands.
+depolarisation; the L2&3 sag is $1.7 \pm 1.1$ mV. The argument stands. [updated 2026-11-19 (later, 4): **D-184** (user) -- Stage 7 runs in three configurations of 10 cells each; its `active fit` configuration (traces without I_h, the six-parameter model fitted) is read as (ii)'s false-positive control, now 10 cells in place of every fourth cell by index -- the assistant's reading, put to the user.]
 
 ---
 
@@ -7464,7 +7470,7 @@ plan already fixes them -- four fits per twin, `baseline_runB`, `passive_fullste
 **Sources.** **[user]** 2026-10-26, 09:31. **[log]** D-005, D-011, D-013, D-073, D-076, D-082. **[src]** the roadmap
 at `8c671a2`.
 
-**Status:** active; the roadmap updated (patch pending the user's push). [updated 2026-11-19: the twins' noise structure qualified by **D-180** (no noise span beyond the noise fit's windows, nothing relying on the noise across pulses); whether (D-083.2)'s 37-pulse trains stay for the twins' response, and how D-180 applies to the Long Square twins, are open for Block 5]
+**Status:** active; the roadmap updated (patch pending the user's push). [updated 2026-11-19: the twins' noise structure qualified by **D-180** (no noise span beyond the noise fit's windows, nothing relying on the noise across pulses); whether (D-083.2)'s 37-pulse trains stay for the twins' response, and how D-180 applies to the Long Square twins, are open for Block 5] [updated 2026-11-19 (later, 4): **D-184** (user) -- three configurations of 10 cells each (`full`, `passive fit`, `active fit`) in place of the 20-cell default; how they map onto the four arms is put to the user. **D-185** -- one PBS job per cell, 120-core cap. **D-183** -- the responses simulated on the real morphology, the data giving only the noise; whether (D-083.2)'s SS trains stay is asked again.]
 ---
 
 ## D-084 -- The hybrid absorption renderer is promoted to be the renderer actually used (user)
@@ -12879,7 +12885,7 @@ report) is open **[reasoning]**.
 **Sources.** **[user]** 2026-11-19, 12:24. **[run]** the check named above; the nf2 read-back (the Block 6 handoff,
 section 4). **[log]** D-076, D-083, D-102, D-107, D-152 to D-155.
 
-**Status:** active; Block 5's SPEC entry to write -- `Passive Features/HPC script/Ih Fit/docs/TEEG_twins_block5_handoff_2026-11-19.md`.
+**Status:** active; Block 5's SPEC entry to write -- `Passive Features/HPC script/Ih Fit/docs/TEEG_twins_block5_handoff_2026-11-19.md`. [updated 2026-11-19 (later, 4): open point (1) closed by **D-182** (the law as fitted, continuous over the whole Long Square sweep; D-180.1 binds the SS windows); (4) closed by **D-183.3** (no offset); D-180.2's reading (each SS window's noise drawn independently, the tilt line at the real positions) stands with **D-186.2**; (2), train or single pulses, asked again; (3), the bundles' check, not decided.]
 
 ## I-006 -- Step 2 with every twin's diameter fitted under a Gaussian penalty, the table free; to implement later
 
@@ -12974,3 +12980,206 @@ for $U(0.75, 0.95)$ um (check 9) -- step 2's business (T10, NS1).
 `check08_thin_nodes.py` and `check09_cubic_truth.py`, in the study document's `scripts/` (this chat, 2026-11-19).
 
 **Status:** active; not built (SPEC Block 4 amendment and the code change to plan with the user).
+
+## D-182 -- A Long Square twin carries its sweep's law as fitted, continuous over the whole sweep; D-180's limit binds the SS windows (user)
+
+**Date:** 2026-11-19, 21:23 (Europe/Rome), the twins chat. **Binds:** Block 5 (the twins' generator; its SPEC entry not
+yet written; roadmap N5), the Long Square twin sweeps of Stage 7 (D-076 (iii), D-083; roadmap S7), the recovery report;
+D-180's open point (1); the twins' handoff (`Ih Fit/docs/TEEG_twins_block5_handoff_2026-11-19.md`), section 5, Q1.
+
+**Decision [user].** To the question how D-180 applies to the Long Square twins -- options put: (a) the law as fitted,
+continuous over the whole sweep, D-180 read as binding the SS windows, the cells with $\hat\tau_s(c) > 265$ ms flagged and
+the gate reported with and without them; (b) for those cells the slow part moved along $\sigma_s^2/\tau_s$ = const to
+$\tau_s$ = 265 ms; (c) both, as two labelled twin sets -- the user answered: "A1: I choose the option a".
+
+**Statement.**
+(D-182.1) For each real cell $c$ and each of its Long Square sweeps $s$, the twin sweep's noise is one continuous draw of
+the law $\tilde\theta(c,s)$ (SPEC 2.6 (g); $\hat\theta(c)$ whole for a failed sweep, D-122.3) over the whole sweep, at the
+sweep's own sampling rate, with the tilt fixed at $\hat b(c,s)$ (D-102, D-107).
+(D-182.2) D-180.1's limit -- no noise span beyond the windows the noise fit used -- binds the SS windows. For a Long
+Square twin the noise beyond the 265 ms pre-window is an extrapolation of the law, accepted as such.
+(D-182.3) The cells with $\hat\tau_s(c) > 265$ ms -- in the nf2 run 571430815 (5.66 s), 526785799 (1.28 s), 571624532
+(352 ms) and 548408551 (286 ms) -- are flagged in the twins' table and in the recovery report, and Stage 7's gate is
+reported with and without them.
+
+**Why.** **[user]** as quoted. **[src, read at `2994946`, not run]** The losses of `ih6` and `passive_fullstep` read the
+baseline $[0, t_{\rm on})$ and the whole 1 s step (`ls_window_mode='step'`), `baseline_runB` 60 ms after onset
+(`passive_long_step_training.bundle_rmsd`, `ls_rmsd_window_s`; `run_ih_fit.ARMS`); the 6 s stored after the step enter no
+loss. A fit of the full step therefore reads noise over 1.27 s whatever is done, beyond 265 ms. **[run, sandbox 2026-11-19:
+`Ih Fit/dev/2026-11-19_twins/ls_slow_span.py`, exact covariance of a stationary OU process, the slow parts from the nf2
+per-cell table as pasted (`dev/2026-11-19_nf2_readback/nf2_cells_from_paste_2026-11-19.csv`)]** SD of the slow part
+relative to the mean of the pre-window $[0, 265)$ ms, at the end of the step ($t$ = 1.27 s), under (a) and under (b):
+0.954 and 0.457 mV in 571430815, 0.297 and 0.168 mV in 526785799, 0.148 and 0.128 mV in 571624532, 0.156 and 0.150 mV in
+548408551; the same under both in the other 14 cells (0.049 to 0.155 mV). **[log]** (b) is not free of misfit: in
+571430815 the slow part moved along the ridge to $\tau_s$ = 0.2 s shifts a statistic by 1.92 SE, the other parameters not
+refitted (changelog 2026-11-19; `dev/2026-11-19_nf2_readback/`).
+
+**What it implies for code and tables.** The generator draws each LS twin sweep's noise with
+`noise_law.simulate_sweep(law, dt, n_samples, units, tilt_mV_per_s=b_hat)`, `n_samples` the real sweep's length; the
+twins' table carries a flag for $\hat\tau_s(c) > 265$ ms; the recovery report prints the gate twice (all cells; without
+the flagged ones).
+
+**What it does not decide [open].** The flag's name and the threshold as a configuration field; whether the flagged
+cells are among the 10 cells of a configuration (D-184).
+
+**Sources.** **[user]** 2026-11-19, 21:23. **[run]** and **[src]** as named. **[log]** D-076, D-102, D-107, D-122, D-153,
+D-180.
+
+**Status:** active; not built. Closes D-180's open point (1).
+
+## D-183 -- Every response of a twin is simulated on its real cell's morphology; from the data comes only the noise of each sweep or window; no per-sweep offset (user)
+
+**Date:** 2026-11-19, 21:23 (Europe/Rome), the twins chat. **Binds:** Block 5 (`synthetic_ground_truth.py`, the twins'
+generator; roadmap N5); (D-083.2); D-180's open points (2) and (4); the twins' handoff, section 5, Q2 and Q5.
+
+**Decision [user].** To the question on the SS response (the 37-pulse train simulated in one run, or each pulse alone
+from rest): "A2 For the synthetic optimization the responses MUST be simulated given the real cell morphology. WHat is
+added from the data is the per sweep or window noise. This also holds for the long squared responses." To the per-sweep
+offset $a(c,s)$ (the assistant's proposal: none): "A4. No offset".
+
+**Statement.**
+(D-183.1) Every response of a twin, Square Subthreshold and Long Square, is simulated in NEURON on the archive
+morphology of its real cell with the twin's chosen parameters (D-011 (i), D-083.2). No recorded response enters a twin.
+(D-183.2) What a twin takes from its real cell's recordings is the noise of each Long Square sweep and of each SS
+window -- the law $\tilde\theta(c,s)$ (D-073, D-076 (i), D-153) -- and its acquisition: the stored windows and sweeps,
+their amplitudes, timing and sampling rate (D-014, D-017, D-076 (iii), D-186). [the assistant's reading, to confirm: the
+measured tilt $\hat b(c,s)$ of D-102 and D-107 is part of that sweep's noise calibration and stays in the twin]
+(D-183.3) No per-sweep offset: $a(c,s) = 0$ in every twin sweep.
+
+**Why.** **[user]** as quoted. **[src, read at `2994946`, not run]** for (D-183.3): every RMSD of the loss and of the
+absolute-mV gate subtracts each trace's own pre-window mean, from the data and from the simulation separately
+(`passive_long_step_training._baseline_subtracted_rmsd`, `bundle_rmsd`; `passive_fitting_hpc_fixed._baseline_subtracted_rmsd`),
+and `v_rest_mV` is read from `metadata.json`, not from the traces: a constant added to a twin sweep cancels. The
+handoff's "visible to the I_h fit's absolute-mV gate" was not found in the code.
+
+**What it implies for code and tables.** The generator has no offset term for the twins (`sigma_a = 0` in
+`noise_law.simulate_sweep`); the legacy `NoiseConfig.baseline_sigma_mV` stays only in the labelled fallback path of old
+manifests.
+
+**What it does not decide [open].** Whether the SS response is simulated as the real 37-pulse train ((D-083.2) as
+written) or each pulse alone from rest (as `simulate_ss_protocol` does today and as the fitter itself simulates a brief
+bundle): the user's answer states the principle, not this choice; asked again on 2026-11-19. A change of the cell's
+holding potential between sweeps (which changes the I_h activation) is not represented by an added constant and is
+not tested by the twins.
+
+**Sources.** **[user]** 2026-11-19, 21:23. **[src]** as named. **[log]** D-011, D-014, D-017, D-073, D-076, D-083, D-102,
+D-107, D-180.
+
+**Status:** active; not built. Closes D-180's open point (4); D-180's open point (2) stays open.
+
+## D-184 -- Stage 7 is a plain recovery run in three configurations of 10 cells each -- full, passive fit, active fit -- with no closure test of the twins' noise (user)
+
+**Date:** 2026-11-19, 21:23 (Europe/Rome), the twins chat. **Binds:** Stage 7 (roadmap S7; SPEC Block 8, to specify),
+the Stage-7 manifest (`synth_gt_grid.py`), the arms run by `run_ih_recovery.py`, `ih_recovery_report.py`; D-011 (ii);
+D-083 (its four arms and its open cohort size); Block 5's validation (the twins' handoff, section 5, Q11 and Q12);
+theory T14.
+
+**Decision [user].** To the proposed closure target for Block 5 (Block 3's statistics on a twin compared with the fit's
+simulator at the same law, within 3.5 Monte Carlo SE): "A5 No need this is simply a synthetic run to test whether our
+pipeline recovers the parameter values from a known truth (as in the passive case we select a for each simulated cell
+a morphology, a set of passive and ih parameters, simulate the stimulation with real sweep / window noise and run the
+optimization. The latter configuration we call 'full' the other configurations include also simulating traces with ih
+but fitting only passive properties (called 'passive fit') and simulating without ih and optimizing the full model
+(called 'active fit')) LET's KEEP THINGS SIMPLE". To the cohort: "A7 I would say 10 cells per configurations : Full,
+passive fit and active fit". And as a note: "Add also 5 or 6 fits whose synthetic traces are produced with the ih
+currents but the fit is only passive."
+
+**Statement.**
+(D-184.1) **Purpose.** Stage 7 tests whether the pipeline recovers known parameter values, as the passive-only
+benchmark did (roadmap I4): for each simulated cell a morphology and a set of passive and I_h parameters are chosen,
+the stimulation is simulated, the real noise of each sweep or window is added (D-183), and the optimisation is run.
+(D-184.2) **Three configurations.** `full`: the traces are simulated with I_h and the six parameters
+$(C_m, R_m, R_a, \bar g_h, \Delta v_h, \kappa_\tau)$ are fitted. `passive fit`: the traces are simulated with I_h and
+only the passive parameters $(C_m, R_m, R_a)$ are fitted. `active fit`: the traces are simulated without I_h and the
+full six-parameter model is fitted.
+(D-184.3) **Size.** 10 cells per configuration.
+(D-184.4) **No closure test.** The twins' noise statistics are not tested against the noise fit's simulator or against
+the real cell's statistics; Block 5's checks are code checks (its smoke tests, coding directive 4), not a statistical
+validation target. Things are kept simple.
+
+**The assistant's readings, put to the user 2026-11-19 [open].** (a) `active fit` is D-011 (ii)'s false-positive
+control (truth $\bar g_h = 10^{-6}$ S/cm$^2$, $\Delta v_h = 0$, $\kappa_\tau = 1$), now 10 cells in place of every fourth
+cell by index. (b) `full` is the arm `ih6`, on which D-011's gate is read. (c) Which passive arm is `passive fit`
+(`passive_fullstep`, the D-006 protocol on the full step, or `baseline_runB`, run B's 60 ms window), and whether `ih4`
+and the other passive arm of D-083's four still run. (d) Whether the same 10 real cells serve the three configurations,
+`full` and `passive fit` being two fits of the same I_h twin (then 20 twins and 30 fits), and which 10 of the 18 L3_exc
+cells. (e) The note's "5 or 6 fits" for `passive fit` against A7's 10 per configuration: 10 is taken, as the later and
+more specific statement.
+
+**Why.** **[user]** as quoted: the run checks the optimisation and the fitting algorithm on a known truth (D-083.3).
+
+**What it implies for code and tables.** The manifest carries a configuration per row; the report gives the recovery
+per configuration; the closure check and the pre-SPEC check of independent windows against the fit's continuous
+simulator, both proposed on 2026-11-19, are dropped. Block 5's smoke tests stay (directive 4).
+
+**What it does not decide [open].** Readings (a) to (e); the gate's tolerances (the assistant's proposal, unowned,
+D-011); raw against corrected SWCs (D-013).
+
+**Sources.** **[user]** 2026-11-19, 21:23. **[log]** D-005, D-006, D-011, D-083.
+
+**Status:** active; readings (a) to (e) to confirm. Once confirmed it supersedes D-011 (ii)'s size and selection of the
+control and D-083's open cohort size (20 by default), and qualifies D-083's four arms per twin; D-011 and D-083
+annotated.
+
+## D-185 -- Stage 7 runs as one PBS job per cell under a 120-core cap (user)
+
+**Date:** 2026-11-19, 21:23 (Europe/Rome), the twins chat. **Binds:** Stage 7's run on davinci (`submit_ih_recovery.sh`,
+`run_ih_recovery.py`; roadmap S7; SPEC Block 8, to specify); the build of the twins (the twins' handoff, "Start here",
+step 4).
+
+**Decision [user].** To the question whether the twins are built by their own step on davinci (a driver and a PBS job
+writing a twin archive, inspected before any fit) or inside `run_ih_recovery.py`'s generate phase: "A6 I would say a job
+per cell you will have 120 cores cap".
+
+**Statement.**
+(D-185.1) The run is one PBS job per cell, and the jobs together use at most 120 cores (the layout of the noise-fit
+run, D-125).
+(D-185.2) [the assistant's reading, to confirm] Each job builds its twin and runs that twin's fits; a merge job after
+the array writes the report. The twins are not built by a separate submission.
+
+**Why.** **[user]** as quoted.
+
+**What it implies for code and tables.** `submit_ih_recovery.sh` becomes a PBS array with a merge job, as
+`submit_noise_fit.sh` is; `run_ih_recovery.py` gains a per-cell mode and a merge mode; the dry run and a 2-cell pilot
+come first (README, Stage 7); the job script carries the roadmap marker lines and `module load proxy`.
+
+**What it does not decide [open].** Cores and walltime per job; (D-185.2).
+
+**Sources.** **[user]** 2026-11-19, 21:23. **[log]** D-083, D-125.
+
+**Status:** active; not built.
+
+## D-186 -- Block 5's remaining points: all stored SS windows and LS sweeps, the tilt line at the real positions, noise at the twin's own 50 kHz, LS timing from the real cell, a per-sweep twin table, seeds per twin sweep (user)
+
+**Date:** 2026-11-19, 21:23 (Europe/Rome), the twins chat. **Binds:** Block 5 (the twins' table, noise and protocol;
+roadmap N5), `gen_from_manifest.py`, `synthetic_ground_truth.py`; the twins' handoff, section 5, Q4 and Q6 to Q10.
+
+**Decision [user].** To the handoff's proposals for Q4 and Q6 to Q10, restated on 2026-11-19: "Q4 all stored SS and LS",
+"Q6 ok", "Q7 yes", "Q8 from the real cell", "Q9 perfect", "Q10 PERFECT".
+
+**Statement.**
+(D-186.1) (Q4) A twin has every stored SS window of its real cell, at its position in its train, and every stored Long
+Square sweep (D-076 (iii)).
+(D-186.2) (Q6) Each SS window carries the tilt line $\hat b(c,s)\,(t - \bar t_s)$ at its real position in sweep $s$,
+$\bar t_s$ the reference time of sweep $s$ that SPEC 2.4 uses (to be written out in Block 5's SPEC entry); a Long Square
+sweep carries its tilt over the whole sweep. Each SS window's noise is drawn independently of the others (D-180.2).
+(D-186.3) (Q7) The noise is drawn at the twin's own sampling rate -- 50 kHz in all 18 L3_exc cells -- and never
+resampled (D-014).
+(D-186.4) (Q8) The onset, the duration and the length of each Long Square twin sweep are read from the real cell's
+`ls_sweeps.npz` (D-017).
+(D-186.5) (Q9) The per-sweep laws travel in a per-sweep twin table beside the manifest (specimen, protocol, sweep,
+amplitude, law, tilt, failed flag), keyed to the manifest's rows; the old per-cell noise columns remain as a labelled
+fallback.
+(D-186.6) (Q10) Seeds are derived per twin sweep from (twin id, protocol, sweep) -- for SS, per window, from its
+position as well -- so that adding a cell or a sweep moves no other draw.
+
+**Why.** **[user]** as quoted; the proposals' reasons are in the handoff, section 5.
+
+**What it implies for code and tables.** Block 5's SPEC entries are written on these points.
+
+**What it does not decide [open].** The table's column names and file name; the seed derivation's exact form
+(SPEC entry).
+
+**Sources.** **[user]** 2026-11-19, 21:23. **[log]** D-014, D-017, D-076, D-102, D-180.
+
+**Status:** active; not built.

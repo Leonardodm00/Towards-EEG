@@ -9,6 +9,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | Date | Change |
 |---|---|
 | 2026-11-19 | Created at the user's request ("Now we will build the synthetic runs in another chat. Write the extensive handoff and update the roadmap"), after D-180 (the twins no longer than the noise fit's windows) and the nf2 run (18 ok). Facts checked against `main` at `b17f768` and the user's pastes of 2026-11-18/19. |
+| 2026-11-19 (later) | The twins chat (Fable 5.2): section 5a added -- the user's answers of 21:23 to section 5's questions (D-182 to D-186), what they leave open, and the plan as it stands; "Start here" step 1, section 9's next free IDs and a trap (binary files through the Drive connector) updated. Two standalone checks in `Ih Fit/dev/2026-11-19_twins/`. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -22,7 +23,7 @@ handoff was written on Opus 5.5. Start the twins chat on Fable 5.2.
 
 | # | Step | Blocked by | Where it runs |
 |---|---|---|---|
-| 1 | **Settle Block 5's open questions with the user** (§5), first Q1-Q3: what D-180 means for the Long Square twins, for the SS response (trains or single pulses) and for the SS bundles | nothing | chat |
+| 1 | **Settle Block 5's open questions with the user** (§5), first Q1-Q3: what D-180 means for the Long Square twins, for the SS response (trains or single pulses) and for the SS bundles [2026-11-19 (later): mostly settled, D-182 to D-186 -- §5a lists what is still open] | nothing | chat |
 | 2 | **Block 5's SPEC entry** in `Ih Fit/specs/SPEC.md`: interfaces, shapes, units, oracles; the roadmap's N5 reads it by itself (§8) | 1 | sandbox |
 | 3 | **Plan, then implement** (directives 6-9; the `scientific-coding` skill, "Fan-out"): the orchestrator writes the plan and the interfaces, the user approves, Opus implementers write the blocks, an independent Opus agent makes the final check | 2 | sandbox |
 | 4 | **The twins on davinci** (the user runs it): `git pull`, gates, a dry run, the twins of 1-2 cells, then the 18 | 3 | davinci |
@@ -181,6 +182,39 @@ sweeps' reasons were not pasted (in the JSONs' `sweep_stage.rows[].reason`).
 The option D-180 left aside -- a statistic across windows and the noise fit again -- remains the route if Q3's check
 shows the bundles matter **[reasoning]**.
 
+## 5a. The user's answers (2026-11-19, 21:23) [user; log]
+
+| # | Answer | Decision |
+|---|---|---|
+| Q1 | option (a): the law as fitted, one continuous draw over the whole LS sweep; D-180's limit binds the SS windows; the four cells with $\hat\tau_s(c) > 265$ ms flagged, the gate reported with and without them | D-182 |
+| Q2 | "the responses MUST be simulated given the real cell morphology. What is added from the data is the per sweep or window noise. This also holds for the long squared responses" -- the principle; **train or single pulses is not answered** and was asked again | D-183.1, D-183.2 |
+| Q3 | not decided: the user asked what the model-free check is (explained in the chat: the correlation of consecutive real window means and the real bundles' residual noise against what independent windows give) | -- |
+| Q4 | all stored SS windows and all stored LS sweeps | D-186.1 |
+| Q5 | no offset | D-183.3 |
+| Q6 | ok: the tilt line at the real positions | D-186.2 |
+| Q7 | yes: 50 kHz, the twin's own rate | D-186.3 |
+| Q8 | from the real cell | D-186.4 |
+| Q9 | the per-sweep twin table beside the manifest | D-186.5 |
+| Q10 | seeds per twin sweep | D-186.6 |
+| Q11 | 10 cells per configuration, three configurations: `full` (traces with I_h, six parameters fitted), `passive fit` (traces with I_h, passive fit), `active fit` (traces without I_h, the full model fitted); one PBS job per cell, 120-core cap | D-184, D-185 |
+| Q12 | no closure test: "this is simply a synthetic run to test whether our pipeline recovers the parameter values from a known truth ... LET's KEEP THINGS SIMPLE"; Block 5 keeps its smoke tests (directive 4) only [corrected 2026-11-19 (later): proposals (a) and "measure by how much" of Q12 are dropped] | D-184.4 |
+
+**Still open, put to the user on 2026-11-19 (later) [open].** (1) Q2: the SS response as the 37-pulse train or each
+pulse alone from rest (the assistant now leans to single pulses: today's code, the passive benchmark's way, no model
+mismatch with the fitter's own simulation -- but (D-083.2) says trains, so it is the user's call). (2) D-184's readings:
+the same 10 real cells in the three configurations, `full` and `passive fit` as two fits of one I_h twin (20 twins,
+30 fits); which 10 of the 18; which passive arm (`passive_fullstep` or `baseline_runB`); `active fit` as D-011 (ii)'s
+control; the note's "5 or 6" against 10. (3) D-185.2: each cell's job builds its twin and runs its fits, a merge job
+writes the report. (4) Q3's check: with the pilot and recorded, or not at all. (5) The roadmap stages for the new blocks.
+
+**The plan as it stands (not yet approved by the user) [reasoning].** Blocks: 5 `twin_table.py` (the nf2 tables joined
+with each real cell's protocol, one row per twin sweep); 10 `twin_noise.py` (independent SS windows plus the tilt line,
+one continuous LS draw plus the tilt, the seed rule); 11 the clean responses in `synthetic_ground_truth.py` (real LS
+amplitudes and timing; the legacy path bit for bit); 12 `twin_build.py` and `gen_from_manifest.py` (clean plus noise
+into an archive in the real layout); 8 the Stage-7 run (the manifest's three configurations, `run_ih_recovery.py` per
+cell and merge, `submit_ih_recovery.sh` as a PBS array). Wave 1: Blocks 5, 10, 11 in parallel; wave 2: Blocks 12 and 8;
+the final check by an independent Opus tester.
+
 ## 6. Limits of the law the twins inherit [cluster; run]
 
 - **Misfit.** J/dof median 2.65 (worst 569844159, 58.6; 571483807, 11.0); the per-sweep laws rejected at 1 % in 19 %
@@ -228,7 +262,8 @@ shows the bundles matter **[reasoning]**.
   their issues and asks the user only about the approach; the change report at the end; the final check by an
   independent Opus agent.
 - A decision the user makes is logged in the same turn (`project-decision-log`): read the log's last changelog rows
-  before taking an ID -- other chats log too (next free on 2026-11-19: D-181, I-006).
+  before taking an ID -- other chats log too (next free on 2026-11-19: D-181, I-006) [corrected 2026-11-19 (later):
+  the defocus-table chat took D-181 and I-006; next free after the twins chat's D-182 to D-186: D-187, I-007].
 - Documents live in the repository on `main` (DOCUMENT UPKEEP v2); a new SPEC block enters the roadmap in the same
   turn; theory statuses and new topics or steps only at the user's word.
 - The assistant never runs anything on davinci; fixes travel through git (`hpc-git-delivery`); `.py` and `.sh` ASCII
@@ -247,6 +282,7 @@ shows the bundles matter **[reasoning]**.
 | the submitter inside a PBS job | refused (`PBS_JOBID` set); submit from the login node |
 | multi-line pastes | the user pastes commands into a terminal: give one chained line or a tested one-liner, never a heredoc |
 | the decision log is about 1 MB | search it with grep or a script and edit it with a script |
+| binary files through the Drive connector | the Drive connector returns a file's content into the conversation as text; the archive's `.npz` files (0.2-8 MB per file on Drive, folders `specimen_508282493` and `specimen_569844159`) cannot reach the sandbox that way: the user attaches them, or the check runs on davinci |
 | "Block 4b" | is Block 9; Blocks 5-8 are the twins, the noise-fit run (6), the record (7) and the gate run (8) |
 
 ## 11. Documents
