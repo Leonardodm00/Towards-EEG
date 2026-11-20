@@ -267,3 +267,43 @@ def test_zero_bootstrap_variance_fails_the_sweep():
         assert res.twin_laws[("ss", 92)] == CELL_LAW
         for co in ("sigma_m", "sigma_s"):
             assert res.pools["ss"][co].k == 1
+
+
+# ------------------------------------------------------------- 2026-11-20 (incremental tester): D-155's V_MIN rule
+def test_v_min_boundary_and_nan_rows():
+    """2.6 (e) as amended (D-155): a variance 'below V_MIN' fails the sweep, so
+    exactly V_MIN is usable (pooled, not failed); NaN and a negative variance
+    of a row made elsewhere fail it with 'v_none'; the failed row's raw, v and
+    w table columns are NaN (2.6 (g))."""
+    ok = _row("ss", 93, 0.036, -4.3, 0.05, -2.7, 0.03)
+    res = nsf.pool_cell([_row("ss", 92, 0.034, -4.0, nsf.V_MIN, -2.9, 0.01), ok], CELL_LAW, 1)
+    r92 = [r for r in res.rows if r["sweep"] == 92][0]
+    assert not r92["failed"] and res.pools["ss"]["sigma_m"].k == 2
+    for bad in (float("nan"), -1e-20):
+        res = nsf.pool_cell([_row("ss", 92, 0.034, -4.0, 0.02, -2.9, bad), ok], CELL_LAW, 1)
+        r92 = [r for r in res.rows if r["sweep"] == 92][0]
+        assert r92["failed"] and r92["reason"] == "v_none"
+        assert res.twin_laws[("ss", 92)] == CELL_LAW
+        t92 = [t for t in res.table_rows() if t["noise_sweep_number"] == 92][0]
+        for k in ("noise_sweep_sigma_m_raw_mV", "noise_sweep_v_log_sigma_m", "noise_sweep_w_m",
+                  "noise_sweep_sigma_s_raw_mV", "noise_sweep_v_log_sigma_s", "noise_sweep_w"):
+            assert math.isnan(t92[k]), k
+        assert (t92["noise_sweep_sigma_f_mV"], t92["noise_sweep_sigma_m_mV"], t92["noise_sweep_sigma_s_mV"]) == (
+            CELL_LAW.sigma_f, CELL_LAW.sigma_m, CELL_LAW.sigma_s)
+
+
+def test_constant_refits_fail_the_sweep_in_run_sweep(cell, stub, monkeypatch):
+    """Every refit returning the same u gives v_m = v_s = 0 exactly (numpy var
+    of equal values): bootstrap_v flags 'v_none' and run_sweep fails the sweep
+    with reason 'v_none' and the flag sweep_fit_failed:<pr>:<s>:v_none."""
+    lay, tg = cell["layout"], cell["target"]
+    cfg = nf.NoiseFitConfig(M_binding=20)
+    st = nsf.SweepStageConfig(B_v=4, M_refit=20)
+    s = int(lay.ls_sweep_number[0])
+    fake = _fake_fit(CELL_LAW.sigma_f)
+    monkeypatch.setattr(nsf, "fit_sweep", fake)
+    row = nsf.run_sweep(stub, tg, lay, cfg, st, "ls", s, refit=fake)
+    assert row["v_log_sigma_m"] == 0.0 and row["v_log_sigma_s"] == 0.0
+    assert row["failed"] and row["reason"] == "v_none"
+    assert "sweep_fit_failed:ls:%d:v_none" % s in row["flags"]
+    assert "v_none" not in row["flags"]
