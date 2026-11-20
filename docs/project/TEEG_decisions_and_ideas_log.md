@@ -241,6 +241,7 @@ the "Binds" column.
 | 2026-11-19 (later, 7) | Logs **D-191** [orchestrator] (the twins chat; coding directive 7): the changes the orchestrator made while wave 1 ran -- every clean response of a twin starts from the state reached after a 6 s unstimulated settle, not from a uniform start (a cell with I_h and a uniform leak reversal is not at rest when started uniformly: 0.056 mV of drift, 0.067 mV in the SS window, measured); the SS current trace on the real archive's samples; a tolerance of Block 11's smoke; a listed LS sweep that is not a step left out of the twins' table. **Wave 1 complete** on `sci/twins` (`8449152`, pushed): Blocks 5 (`twin_table.py`, TT1-TT11 11/11 on the real nf2 tables and cell 508282493), 10 (`twin_noise.py`, TN1-TN9 9/9) and 11 (`simulate_ss_clean`, `simulate_ls_clean`, TR1-TR10 10/10; `smoke_ih_recovery.py` 14/14) written by three Opus implementers, gated and merged; contract `f54fdde`, amendments `07f3138` (1, 2) and `d203cae` (3, 4). Put to the user: whether a twin is generated with the fitter's own model (the leak reversal balanced per segment, D-005.2) in place of the generator's uniform leak reversal. Next free IDs: D-192, I-007. |
 | 2026-11-20 | Logs **D-192** (user, 13:09; the twins chat): a twin is generated with the fitter's own model -- the fitter's builder, the I_h attached as the fit attaches it, the truth applied through the fit's own parameter map with the leak reversal balanced per segment at the real cell's recorded resting potential (D-005.2) -- in place of the generator's cell with a uniform leak reversal ("I choose b. Go on"). The 6 s settle of D-191.1 is no longer needed (`TwinConfig.settle_ms` 0, with a guard on the rest drift) [orchestrator]. Wave 2 of the twins starts on `sci/twins`: Block 12 (`twin_build.py`, the twin build) and a new Block 13 (`twin_manifest.py`, the manifest of D-184 and D-188), then Block 8 (the run). D-191 annotated. Next free IDs: D-193, I-007. |
 | 2026-11-20 (later) | Logs **D-193** [orchestrator] (the twins chat; coding directive 7): the changes made while Blocks 12 and 13 were written -- the zero-noise identity of twin and fitter (Block 12's TB1) restated around a finding in the fitter's loader, which gives every Long Square step a duration one sample short ((n_on - 1) / f_s; real cells too; neither the loader nor the twin changed); a twin's recorded `tau_ms` is the truth's R_m C_m; three plumbing arguments of the archive writer. **Blocks 12 and 13 merged** on `sci/twins` (`ffbc7bf`, `3808459`): `twin_build.py` (TB1-TB9 9/9; one real twin of 508282493 built in 1547 s, 15 of 22 LS sweeps, read by the loader) and `twin_manifest.py` (TM1-TM10 10/10); Block 8's contract committed (`b810bc9`) and its implementer started. Flagged to the user: with the existing drawer's default the 10 twins of a configuration share one R_a truth. Next free IDs: D-194, I-007. |
+| 2026-11-20 (the gallery chat) | Logs **D-194** (user, 2026-11-19 22:17, with the builder's choices [orchestrator], PROVISIONAL; started from the clear-node handoff): the clear-node work moves to four nodes the user selects from a gallery of nodes the image judges clean; the screen is model-free (one symmetric dip that returns to the background on the measuring line in the planes k* - 1 .. k* + 1 and on nine parallel lines up to 2 um along the dendrite, with a steady width, depth and position), its thresholds provisional. **[run, sandbox]** the line part on the five pilot nodes: 5353 passes, 2669, 1013 and 639 fail, 2620 passes on the line (its junction needs the lines along the dendrite, not checked: no patch in the sandbox); smoke tests 7 and 6 pass. Built at `c3f3ccb`, `75ba99a` on `sci/diameter-pipeline` (SPEC Blocks 40, 41, Block 36 amendment 18; notebook Cell 21; handoff section 11). Drafted as D-192 on 2026-11-19 and renumbered: the twins chat took D-192 and D-193 first. Not run on a real image. Next free IDs: D-195, I-007. |
 | 2026-11-19 (later, 7) | No decision changed (the clearance chat, 20:48-22:10). On the user's question whether a heavier-tailed kernel would fix the clear nodes' overestimates: on node 5353 heavier tails at the configured in-focus width fit worse and do not let Allen's diameter fit, a wider in-focus width does, and the fit cannot separate the width from the diameter **[run, sandbox: `checks/kernel_tails_2026-11-19/`, `7c05a01`]**. The user corrected the chat (22:02): node 2669 is not clean in focus; checked -- the bump cut misses its in-focus neighbour because D-176.1 searches the nine-plane mean (`checks/clear_nodes_2026-11-19/`). Handoff for the chat that continues the path: `Passive Features/Diameter Re-measurement/docs/TEEG_clear_node_fit_handoff_2026-11-19.md` (`055e438` on `sci/diameter-pipeline`). Next free IDs: D-191, I-007. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
@@ -424,6 +425,7 @@ would be needed*, *Status*.
 | D-191 | 2026-11-19 | Block 11 (`simulate_ss_clean`, `simulate_ls_clean`), Block 5 (`load_cell_protocol`), `TwinConfig.settle_ms`; SPEC 2.7 (f) | a twin's responses start from the settled state (a 6 s unstimulated lead), not a uniform start; the SS current on the real archive's samples; TR10's tolerance; a listed LS sweep that is not a step left out [orchestrator] | active; built (`sci/twins`) |
 | D-192 | 2026-11-20 | Block 12 (the twin build, `twin_build.py`), Stage 7 (roadmap S7); D-005.2; D-191.1; the legacy generator's cell (`synthetic_ground_truth.build_synthetic_cell`) | a twin is generated with the fitter's own model: the leak reversal balanced per segment at the real cell's recorded resting potential, so that the truth lies exactly in the fitter's parameter space [user]; no settle, a guard on the rest drift [orchestrator] | active; not built |
 | D-193 | 2026-11-20 | Block 12 (`twin_build.py`, its smoke's TB1 and TB7; `write_twin_archive`); the fitter's loader (`passive_fitting_hpc_fixed._ls_bundles_from_sweep_info`), not changed | the twin-fitter identity is tested with the LS duration n_on / f_s and the loader's one-sample-short duration bounded at 1e-3 mV; `tau_ms` of a twin = R_m C_m of the truth; the archive writer's extra arguments [orchestrator] | active; built (`sci/twins`) |
+| D-194 | 2026-11-19 | the nodes of D-169's fit (the clear-node handoff, section 4, O2); SPEC Blocks 40, 41 (new), Block 36 am. 18; `ClearnessConfig`; `clearness.py`, `show_clear_gallery.py`; notebook Cell 21 | the clear-node work moves to four nodes the user selects from a gallery of image-judged clean nodes [user]; the model-free screen (outside excess, skew, steadiness along the dendrite) and its thresholds [orchestrator] | active; the screen PROVISIONAL; built (`c3f3ccb`, `75ba99a`), not run on a real image |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -13490,3 +13492,82 @@ $n_{\rm on}/f_s$: a change of the fitter, the user's.
 **Sources.** **[src]**, **[run]** as named. **[log]** D-192.
 
 **Status:** active; built on `sci/twins` (Block 12 merged, `ffbc7bf`). The user can reverse any of the three.
+
+## D-194 -- The clear-node work moves to four nodes the user selects from a gallery of nodes the image judges clean (user); the screen's rule and thresholds (orchestrator, PROVISIONAL)
+
+**Date:** 2026-11-19, 22:17 (Europe/Rome), the gallery chat, started from
+`TEEG_clear_node_fit_handoff_2026-11-19.md`. **Binds:** the nodes D-169's fit and its refinements are tried on (the
+handoff's section 4 and its open points O2, then O3 and O1); SPEC Blocks 40 and 41 (new), Block 36 amendment 18,
+`ClearnessConfig` (`specs/SPEC.md` on `sci/diameter-pipeline`); `analysis/clearness.py`,
+`plotting/clearness_figures.py`, `scripts/show_clear_gallery.py`; notebook Cell 21.
+
+**Decision [user].** "We have to settle this diameter estimation problem. Moreover also the removal of secondary
+dips that pollute the measuring line profile. Let's find simple but compelling solutions ... Let's first of all change
+the nodes we use. Please write a cell that shows me a set of judged clean nodes (both images at focus and across
+planes as well as the relative measuring lines across planes). Secondly after I've selected 4 nodes among them we
+will refine our approach."
+
+**Statement.**
+
+(D-194.0) **[user]** The five pilot nodes of Cell 19c (1013, 5353, 2669, 2620, 639) are no longer the working set of
+the clear-node fit. A cell shows a set of nodes judged clean, each with its image at the sharpest plane, its images
+at every recorded plane, and its measuring line's profile at every recorded plane; the user selects four of them;
+the estimation and the removal of secondary dips are refined on those four.
+
+The rest is the orchestrator's, PROVISIONAL, each point to confirm or change once the first gallery is seen:
+
+(D-194.1) **[orchestrator]** "Judged clean" is decided on the recorded image alone, with no forward model, no kernel
+and no diameter. For one dip profile $D(v_n) = B - I(v_n)$ (gl) of a line, smoothed along the line by a Gaussian of SD
+1 sample: the central extreme is the deepest sample within 1.0 um of the line's centre, its depth $D_c$; $x_L(f)$,
+$x_R(f)$ are where the smoothed dip first falls to $f D_c$ going outwards on each side (linear interpolation); the
+half-depth width $W = x_R(1/2) - x_L(1/2)$ and the centre $c = [x_L(1/2) + x_R(1/2)]/2$; the skew
+$S = \max_{f \in \{0.75, 0.25\}} |[x_L(f) + x_R(f)]/2 - c| / W$; the excess outside
+$E = \max_{n:\,|v_n - c| \ge W} |D(v_n)| / D_c$.
+(D-194.2) **[orchestrator]** The measuring line is judged on the three planes $k^* - 1, k^*, k^* + 1$ ($k^*$ the
+first stage's sharpest plane).
+(D-194.3) **[orchestrator]** On the plane $k^*$ the same features are taken on nine lines parallel to the measuring
+line, 0.5 um apart, up to 2.0 um along the dendrite each way, each read as the measuring line is (the mean of nine
+bilinear profiles one pixel apart). With $(W_m, D_{c,m}, c_m)$ on line $m$: $U_W = (\max_m W_m - \min_m W_m) /
+{\rm median}_m W_m$, $U_D$ likewise for the depth, $U_c = (\max_m c_m - \min_m c_m) / {\rm median}_m W_m$.
+(D-194.4) **[orchestrator]** A node is judged clean iff, on every judged profile, $E \le 0.25$ and $S \le 0.15$; and
+$U_W \le 0.25$, $U_D \le 0.30$, $U_c \le 0.50$; and the depth on the measuring line at $k^*$ is at least 10 noise SDs
+of a line sample. The score $Q$ is the largest of the five ratios value / threshold ($+\infty$ when a judged feature
+cannot be formed, e.g. a dip that never falls to a quarter of its depth on one side); the gallery orders by $Q$.
+(D-194.5) **[orchestrator]** The candidates are the trace-based rule's (`clean_cell.py clear --d-bins`, D-165's bins
+0.40, 0.45, 0.60, 0.80, 1.20, 5.0 um), 8 per bin, prepared with `clean --no-clean` (D-169.7); shown are the nodes
+judged clean, the thinnest bin first, at most 4 per bin, and, when fewer than 8 are shown, the best-scoring rejected
+nodes, labelled as rejected in the title and in the file name.
+(D-194.6) **[orchestrator]** The half-depth width against Allen's diameter is reported (`fwhm_over_allen`) and not
+judged.
+
+**Why.** (D-194.1 to D-194.4) The trace-based rule sees traced neighbours only; four of its five pilot nodes carry a
+structure that is not in the trace (the handoff's section 5). What the eye rejected there is, on the line, a second
+dip or a side that does not return to the background (2669, 1013, 639) and, in the image, a structure beside the line
+(1013's blob, 2620's junction): $E$ and $S$ are the first, the lines along the dendrite the second. **[run, sandbox:
+`checks/clear_gallery_2026-11-19/line_screen_pilot_check.py` on run 2's fit files, the line part only]** in focus
+5353 has $E$ 0.18 and $S$ 0.06 and passes; 2669 ($E$ 0.63, $S$ 0.49), 1013 ($E$ 0.64, $S$ 0.89) and 639 ($E$ 0.67, no
+skew) fail; 2620 passes on the line ($E$ 0.15, $S$ 0.08). The thresholds 0.25 and 0.15 lie between 5353 and the
+three that fail; they rest on these five nodes only. **[run, sandbox: `tests/smoke/test_smoke_clearness.py`, synthetic
+patches]** a parallel neighbour, a crossing branch, a blob of 0.83 of the depth on the edge 1.5 um along the axis, a
+taper and a bend are rejected; a blob of 0.42 of the depth on the edge passes ($U_W$ at 0.69 of its threshold); with
+the lines 1.0 um apart the larger blob sat at the threshold (1.00), hence 0.5 um. (D-194.6) **[reasoning]** a
+criterion on the width over Allen's diameter would select the nodes on which Allen's diameter agrees, in a workstream
+whose purpose is to re-measure it; 639's question (O4) stays visible in the table. (D-194.2) **[reasoning]** in the
+defocused planes the dip widens until little of the line lies outside it, and 5353 itself has $E$ up to 0.37 there.
+
+**What it implies for code and tables.** `ClearnessConfig` holds every number above, outside every signature (the
+pinned hashes of Block 1 are unchanged); the script's options and Cell 21's `GAL_THRESHOLDS` replace them per run;
+`gallery_<S>.csv` carries every node's values, the rejected ones included, so a threshold can be moved from the
+table without preparing the nodes again.
+
+**What it does not decide.** The four nodes (the user's, after the first gallery). The bump rule (O3), the in-focus
+width (O1), the fit's weights: unchanged, to be refined on the four. Whether the screen becomes a selection rule of
+the pipeline (it only orders what is shown). Whether the part along the dendrite rejects 2620: not checked, the
+patches are not in the sandbox. Nothing has run on a real image.
+
+**Sources.** **[user]** 2026-11-19, 22:17. **[run, sandbox]** and **[reasoning]** as named. **[log]** D-165, D-169,
+D-171, D-176.
+
+**Status:** (D-194.0) active. (D-194.1) to (D-194.6) active, PROVISIONAL, the orchestrator's; built at `c3f3ccb` and `75ba99a` on
+`sci/diameter-pipeline` (local commits; pushed when the user agrees). Drafted on 2026-11-19 as D-192; renumbered on
+2026-11-20 because the twins chat logged D-192 and D-193 on `main` before this entry was pushed. The user can reverse any of them.
