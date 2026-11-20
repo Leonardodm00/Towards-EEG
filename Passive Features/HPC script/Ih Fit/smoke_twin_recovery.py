@@ -28,9 +28,9 @@ Checks
                                recovery_by_configuration.csv; twins_status.csv; 0 / 1 exit codes
     test_TS6_resume_failure    a second `twin` neither rebuilds nor refits; --force does both; a
                                missing real cell ends build_failed, exit 1, with a status file
-    test_TS7_submitter         bash -n; dry run (one array qsub -J 0-2 ncpus=4, one merge qsub
+    test_TS7_submitter         bash -n; dry run (one array qsub -J 0-2 ncpus=1 by default, one merge qsub
                                afterany, three twin commands and the merge command, each accepted by
-                               the parser; nothing written or submitted); 31 x 4 cores refused (3);
+                               the parser; nothing written or submitted); NCPUS=4: 31 x 4 cores refused (3);
                                MAX_TWINS=2; a stubbed submission; the job roles; the marker lines
     test_TS8_ascii_lf_frozen   the three files pure ASCII and LF; `git diff <contract>` empty for
                                the five frozen files
@@ -779,8 +779,8 @@ def test_TS7_submitter():
     sub = [ln for ln in lines if "DRY RUN:   subjob " in ln]
     mrg = [ln for ln in lines if "DRY RUN:   merge:" in ln]
     ids = ["900000000", "900000100", "900000200"]
-    parts["dry run: one array qsub (-J 0-2, ncpus=4), one merge qsub (afterany)"] = (
-        p.returncode == 0 and len(q) == 2 and " -J 0-2 " in q[0] and " select=1:ncpus=4 " in q[0]
+    parts["dry run: one array qsub (-J 0-2, the default ncpus=1, amendment 7), one merge qsub (afterany)"] = (
+        p.returncode == 0 and len(q) == 2 and " -J 0-2 " in q[0] and " select=1:ncpus=1 " in q[0]
         and " walltime=24:00:00 " in q[0] and " -N twin_recovery " in q[0] and "depend=afterany:" in q[1]
         and " -N twin_merge " in q[1])
     ns_t = [parsed(ln, "subjob %d:" % i) for i, ln in enumerate(sub)]
@@ -795,10 +795,10 @@ def test_TS7_submitter():
         and not pylog.exists() and not any(tmpdir.iterdir()) and "CLI contract" in p.stdout)
     dry_text = p.stdout
 
-    # the cap: 31 x 4 = 124 refused, 30 x 4 = 120 accepted
+    # the cap, NCPUS=4 given explicitly: 31 x 4 = 124 refused, 30 x 4 = 120 accepted
     reset()
-    p31 = sh(env(RUN_TAG="t7c", PY_STUB_LIST=31))
-    p30 = sh(env(RUN_TAG="t7c", PY_STUB_LIST=30, DRY_RUN=1))
+    p31 = sh(env(RUN_TAG="t7c", PY_STUB_LIST=31, NCPUS=4))
+    p30 = sh(env(RUN_TAG="t7c", PY_STUB_LIST=30, NCPUS=4, DRY_RUN=1))
     parts["31 twins x 4 cores refused (exit 3), 30 x 4 = 120 accepted"] = (
         p31.returncode == 3 and "124 cores > 120" in p31.stderr and not qlog.exists() and p30.returncode == 0)
 
@@ -810,7 +810,7 @@ def test_TS7_submitter():
     rf = run_files[-1] if run_files else None
     parts["MAX_TWINS=2: 2 subjobs (-J 0-1), then the merge after the array; the run file; the plan written"] = (
         p2.returncode == 0 and len(calls) == 2 and rf is not None and "[-J] [0-1]" in calls[0]
-        and "[select=1:ncpus=4]" in calls[0] and ("[TWIN_ROLE=twin,TWIN_RUN_FILE=%s,ROADMAP_DISABLE=1]" % rf) in calls[0]
+        and "[select=1:ncpus=1]" in calls[0] and ("[TWIN_ROLE=twin,TWIN_RUN_FILE=%s,ROADMAP_DISABLE=1]" % rf) in calls[0]
         and "[depend=afterany:5151[].testserver]" in calls[1]
         and ("[TWIN_ROLE=merge,TWIN_RUN_FILE=%s,ROADMAP_DISABLE=1]" % rf) in calls[1]
         and "TWIN_IDS=( 900000000 900000100 )" in rf.read_text() and (out_dir / "manifest.csv").is_file()
@@ -846,7 +846,7 @@ def test_TS7_submitter():
                 OMP_NUM_THREADS=9), job)
     pm = sh(env(PBS_JOBID="5152.testserver", TWIN_ROLE="merge", TWIN_RUN_FILE=rf or ""), job)
     runs = lines_of(pylog)
-    exp_t = "RUN [%s] [twin] [--out] [%s] [--twin] [900000100] ENV[4/4/4]" % (HERE / "run_twin_recovery.py", out_dir)
+    exp_t = "RUN [%s] [twin] [--out] [%s] [--twin] [900000100] ENV[1/1/1]" % (HERE / "run_twin_recovery.py", out_dir)
     exp_m = "RUN [%s] [merge] [--out] [%s] ENV[1/1/1]" % (HERE / "run_twin_recovery.py", out_dir)
     parts["the twin role: the index-th twin, threads NCPUS; the merge role: threads 1; logs teed"] = (
         pt.returncode == 0 and pm.returncode == 0 and runs == [exp_t, exp_m]

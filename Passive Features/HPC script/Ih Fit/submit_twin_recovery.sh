@@ -39,7 +39,8 @@
 #   GROUP            L3_exc
 #   TWINS            comma-separated twin ids (a subset of the manifest); empty = every twin
 #   MAX_TWINS        submit only the first k twins (of the manifest, or of TWINS): the pilot
-#   NCPUS            4 cores per twin job (30 x 4 = 120, D-185)
+#   NCPUS            1 core per twin job: the fit is one sequential process (amendment 7);
+#                    30 twins = 30 cores, inside the 120-core cap of D-185
 #   WALLTIME         24:00:00 per twin job, until the pilot's timings set it
 #   CONDA_ENV        prova
 #   PLAN_ARGS        extra options for `plan`, split on white space (use the '=' form for a
@@ -62,7 +63,7 @@
 #
 # Threads: the submitter and the merge run with the BLAS threads at 1; a twin
 # job runs one process (NEURON and run_ih_fit are sequential), with the BLAS
-# threads at NCPUS for the optimiser's linear algebra.
+# threads at NCPUS (1 by default, amendment 7) for the optimiser's linear algebra.
 #
 # Logs: PBS keeps each job's own .o/.e in $HOME (-k eo: twin_recovery.o<id>,
 # twin_merge.o<id>); each job also tees its output to
@@ -199,7 +200,7 @@ case "$TWINS" in *[!0-9,]*) die "TWINS: comma-separated twin ids (got '$TWINS')"
 MAX_TWINS="${MAX_TWINS:-}"
 case "$MAX_TWINS" in ''|[1-9]|[1-9]*[0-9]) ;; *) die "MAX_TWINS: a positive integer (got '$MAX_TWINS')" 2 ;; esac
 case "$MAX_TWINS" in *[!0-9]*) die "MAX_TWINS: a positive integer (got '$MAX_TWINS')" 2 ;; esac
-NCPUS="${NCPUS:-4}"
+NCPUS="${NCPUS:-1}"
 case "$NCPUS" in ""|*[!0-9]*|0*) die "NCPUS: a positive integer (got '$NCPUS')" 2 ;; esac
 WALLTIME="${WALLTIME:-24:00:00}"
 [[ "$WALLTIME" =~ ^[0-9]+:[0-5][0-9]:[0-5][0-9]$ ]] || die "WALLTIME: HH:MM:SS (got '$WALLTIME')" 2
