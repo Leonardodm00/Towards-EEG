@@ -168,7 +168,9 @@ def versions() -> Dict[str, Optional[str]]:
         try:
             out[pkg] = im.version(pkg)
         except im.PackageNotFoundError:
-            out[pkg] = None
+            # no pip metadata (NEURON in davinci's env, amendment 10.2): the imported module's own version
+            mod = sys.modules.get(pkg)
+            out[pkg] = getattr(mod, "__version__", None) if mod is not None else None
     return out
 
 

@@ -13,7 +13,8 @@ Checks
     test_TS1_plan              the four files; manifest.csv = draw_twin_manifest called here with
                                truth kwargs recorded from run_ih_recovery.phase_manifest; the twins'
                                table = Block 5's built here; v_rest_mV = the loader's; a second plan
-                               changes nothing; another seed refused without --force; the refusals
+                               changes nothing; another seed refused without --force; the refusals;
+                               versions() with NEURON's pip metadata hidden (amendment 10.2)
     test_TS2_fit_command       run_ih_fit.main replaced by a recorder: each twin's argv equals the one
                                run_ih_recovery.phase_fit builds from the same values (non-default and
                                negative values included), with the twin's own directories and arm
@@ -31,7 +32,8 @@ Checks
     test_TS7_submitter         bash -n; dry run (one array qsub -J 0-2 ncpus=1 by default, one merge qsub
                                afterany, three twin commands and the merge command, each accepted by
                                the parser; nothing written or submitted); NCPUS=4: 31 x 4 cores refused (3);
-                               MAX_TWINS=2; a stubbed submission; the job roles; the marker lines
+                               MAX_TWINS=2; a stubbed submission; the job roles; the marker lines;
+                               every call with a DISPLAY no X server answers (amendment 10)
     test_TS8_ascii_lf_frozen   the three files pure ASCII and LF; `git diff <contract>` empty for
                                the five frozen files
     test_TS9_controls_only     amendment 8.1: only the active_fit twin has results (its real cell
@@ -89,6 +91,9 @@ from numpy.testing import assert_allclose, assert_array_equal  # noqa: E402,F401
 
 SEED = 12345
 REPORT_PACKAGES = ("numpy", "scipy", "pandas", "scikit-optimize", "neuron")
+#: TS7 runs every call of the submitter with this DISPLAY, which no X server answers (amendment 10):
+#: NEURON exits on it ("can't open DISPLAY") unless the submitter unsets DISPLAY
+NO_X_DISPLAY = "localhost:99.0"
 ARTIFACT_DIR = HERE / "smoke_artifacts"
 _SAVED_ARTIFACTS = []
 CONTRACT_COMMIT = "b810bc9"
@@ -333,6 +338,22 @@ def test_TS1_plan():
     code7, _, _ = _run(["list", "--out", _new_out("ts1r")])
     parts["refused: cohort of 4 < 5 (3), an unknown cell named (3), list without run_config (2)"] = (
         code5 == 3 and "fewer" in se5 and code6 == 3 and "123456789" in se6 and code7 == 2)
+    # versions(): a NEURON without pip metadata (davinci's env) -> its module's __version__ (amendment 10.2)
+    import importlib.metadata as im
+    import neuron
+    real_version = im.version
+
+    def no_neuron_metadata(name):
+        if name == "neuron":
+            raise im.PackageNotFoundError(name)
+        return real_version(name)
+    im.version = no_neuron_metadata
+    try:
+        v = T.versions()
+    finally:
+        im.version = real_version
+    parts["versions(): NEURON without pip metadata -> its module's __version__ (amendment 10.2)"] = (
+        v.get("neuron") == neuron.__version__ and v.get("numpy") == real_version("numpy"))
     print("\n  [TS1] run_config: %s" % ", ".join("%s=%r" % (k, json.loads(files[3].read_text()).get(k))
                                               for k in ("code_commit", "code_dirty", "versions")))
     _fail_parts(parts)
@@ -740,6 +761,7 @@ def test_TS7_submitter():
                  "PLAN_ARGS"))}
         e.update({"PATH": "%s:%s" % (stubs / "bin", e.get("PATH", "")), "HOME": str(home), "TMPDIR": str(tmpdir),
                   "FAKE_CONDA_BASE": str(stubs / "condabase"), "REAL_PYTHON": sys.executable,
+                  "DISPLAY": NO_X_DISPLAY,
                   "QSUB_LOG": str(qlog), "PY_LOG": str(pylog), "IH_CODE_DIR": str(HERE),
                   "IH_ARCHIVE_ROOT": str(st["archive_root"]), "GROUP": GROUP, "NOISE_TAG": "nfx",
                   "PLAN_ARGS": " ".join(SMALL), "ROADMAP_DISABLE": "1"})
@@ -802,6 +824,9 @@ def test_TS7_submitter():
     parts["dry run: nothing written (no run dir, no run file, no temporary dir left), nothing submitted"] = (
         not out_dir.exists() and not (home / "twin_recovery_runs").exists() and not qlog.exists()
         and not pylog.exists() and not any(tmpdir.iterdir()) and "CLI contract" in p.stdout)
+    parts["DISPLAY set to a display no X server answers, in every call (amendment 10): the dry run completes, "
+          "no \"can't open DISPLAY\""] = (
+        p.returncode == 0 and "can't open DISPLAY" not in p.stdout + p.stderr and "\nunset DISPLAY\n" in text)
     dry_text = p.stdout
 
     # the cap, NCPUS=4 given explicitly: 31 x 4 = 124 refused, 30 x 4 = 120 accepted

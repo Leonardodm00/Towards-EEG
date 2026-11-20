@@ -83,6 +83,12 @@ set -euo pipefail
 # here, before any python starts).
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 
+# No display, in every role (amendment 10): NEURON exits ("can't open DISPLAY")
+# when DISPLAY is set and no X server answers -- an X11-forwarded login whose
+# local X server is off, or a HOME without the X11 cookie -- and nothing in
+# this run opens a window (the merge's figure is written without a display).
+unset DISPLAY
+
 MAX_CORES=120                 # D-185: never more than 120 cores at once
 MERGE_WALLTIME=01:00:00       # the merge reads CSVs and writes the report: minutes
 JOB_NAME_TWIN=twin_recovery   # roadmap allen-mtg-fit S7
