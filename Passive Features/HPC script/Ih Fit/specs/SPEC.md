@@ -1195,7 +1195,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 | `bash cluster_gates_noise_fit.sh` (`QUICK=1` for the fast half) | every cluster-side check of Blocks 1-4 and 9 and the SS archive read, one PASS/FAIL/SKIP line each and a VERDICT | the conda env active; on the cluster nothing else | about 25 min (QUICK < 1 min) [2026-11-12: about 17 min before G6d] |
 | `python smoke_ih_recovery.py`, `python smoke_ih_fit.py`, `python smoke_ls_baseline_qc.py` | existing suites, re-run after Block 1 (R8/R10 bands now through `sample_acf`) | NEURON + compiled `mod/` | minutes |
 | `python regression_passive_identity.py --ref-dir "../Biological Fit" --archive-cell <dir>` | bit-for-bit gate against the oracle folder | the oracle folder and one archive cell | minutes |
-| `python smoke_twin_table.py [--nf2-dir <dir>] [--archive-cell <specimen dir>]` | Block 5 smoke (TT1-TT9); TT8 on the real nf2 tables and one real archive cell when the paths are given | pandas; no NEURON | seconds |
+| `python smoke_twin_table.py [--nf2-dir <dir>] [--archive-cell <specimen dir>]` | Block 5 smoke (TT1-TT11); TT8 on the real nf2 tables and one real archive cell when the paths are given | pandas; no NEURON | seconds |
 | `python smoke_twin_noise.py` | Block 10 smoke (TN1-TN9) | none | under a minute |
 | `python smoke_twin_response.py [--build]` | Block 11 smoke (TR1-TR10) | NEURON; `./x86_64` (`--build` runs `nrnivmodl mod`) | under a minute |
 | `python smoke_twin_build.py [--build] [--archive-cell <dir> --nf2-dir <dir>]` | Block 12 smoke (TB1-TB9; the optional real twin of 508282493) | NEURON; `./x86_64`; scikit-optimize | minutes; the real twin longer |
