@@ -13,6 +13,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-19 (later, 2) | Section 5a: the user's answers of 21:46 (D-187 to D-189) -- single SS pulses from rest, the configurations' cells and arms, the bundles' check dropped; the plan approved; the nf2 tables and the archive cell 508282493 received in the chat. |
 | 2026-11-20 | The twins chat: section 5b added -- the generator and the Stage-7 run as built on `sci/twins` (Blocks 5, 10, 11, 12, 13, 8 merged, head `577445d`), the decisions taken on the way (D-190 to D-193, D-195), the commands for davinci, and what is still open. The independent final check of the assembled pipeline was running when this was written. Facts from the code and the runs of this chat. |
 | 2026-11-20 (later) | Section 5b brought to `sci/twins` at `216ecf1`: the final check (an independent Opus tester on `577445d`: PASS WITH ISSUES, report `Ih Fit/specs/test_reports/2026-11-20_1432_incremental.md`) and its three findings, fixed in Block 8 (D-196; TS1-TS10 10/10); a second check of the changed block was running when this was written. |
+| 2026-11-20 (later, 2) | Section 5b at the end of the implementation: `sci/twins` at `01ebd72`; the second independent check (`216ecf1`: PASS WITH ISSUES, nothing major; report `Ih Fit/specs/test_reports/2026-11-20_1532_incremental.md`) and its two points fixed (D-197); the six twins' suites run in sequence on the final branch all exit 0; the cluster checkout line added. Not yet run on davinci. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -227,7 +228,7 @@ into an archive in the real layout); 8 the Stage-7 run (the manifest's three con
 cell and merge, `submit_ih_recovery.sh` as a PBS array). Wave 1: Blocks 5, 10, 11 in parallel; wave 2: Blocks 12 and 8;
 the final check by an independent Opus tester.
 
-## 5b. As built (2026-11-20) [src at `216ecf1` on `sci/twins`; run; log]
+## 5b. As built (2026-11-20) [src at `01ebd72` on `sci/twins`; run; log]
 
 The plan of section 5a is implemented on the branch `sci/twins` (not yet merged to `main`: the user's call). Six
 blocks, each written by its own implementer agent, gated and merged by the orchestrator:
@@ -254,12 +255,17 @@ with the configuration recorded at plan time.
 **The final check [run].** An Opus tester that wrote none of the code, on `577445d`, from the SPEC alone: PASS WITH
 ISSUES (one MAJOR, one MINOR, one NOTE, all in Block 8, all fixed by D-196); the 16 suites and the 54 earlier spec
 tests pass; 93 new spec tests in `tests/spec/`; one real `active_fit` twin of 508282493 built (427 s) and fitted.
+A second tester on `216ecf1`, on the changed block: PASS WITH ISSUES, nothing major (`tests/spec` 145 passed); its two
+points (the merge under `--drop-railed`, a negative base seed) are fixed by D-197 and verified by its own reproducers
+(Block 8's spec tests 12/12). No third independent run was made.
 
 **Measured here [run].** One real `full` twin of cell 508282493 built in 1547 s on one core (about 105 s per 7.27 s
 sweep on its 5247 sections); 15 of its 22 LS sweeps are in the twin, 7 left out (`action_potential`). The fit's time on
 a real twin was not measured here: the pilot gives it.
 
-**On davinci.** From the "Ih Fit" folder, on `sci/twins` (or `main` once merged), conda env active; one line each:
+**On davinci.** From the "Ih Fit" folder, on `sci/twins` (or `main` once merged), conda env active; one line each.
+To get the branch: `cd /davinci-1/home/ldellamea/TEEG/Towards-EEG && git fetch origin sci/twins && git checkout sci/twins && git pull && git log --oneline -1`
+(expect `01ebd72` or later).
 
 1. the twins' suites, after `git pull`:
    `python smoke_twin_table.py && python smoke_twin_noise.py && python smoke_twin_manifest.py && python smoke_twin_response.py --build && python smoke_twin_build.py && python smoke_twin_recovery.py`
