@@ -688,3 +688,65 @@ display(Image(filename=FOCAL_F4))
 for path in sorted(glob.glob(INFER_F4 + "/fit_node*.png")):
     print(path)
     display(Image(filename=path))
+
+# %% [markdown]
+# ## Cell 23 (A): the scan of the thick nodes for the in-focus width -- images at k* and +-2 planes (D-201)
+#
+# Run after Cells 0, 1 and 16; needs Cell 16b's ranking in OUT/cleaning. The in-focus width sigma_r(0) is to be
+# fitted on thick nodes, where it separates from the diameter (D-201; SPEC Blocks 42, 43); this part chooses and
+# prepares them and shows them, with the scripts that exist (the fit is part B, built next):
+#   1. `clear --d-bins 1.0,50`: up to THICK_N nodes with Allen's diameter >= 1.0 um, at least THICK_MIN_SOMA_UM from
+#      the soma, no tier-2 neighbour, at least 10 um apart (3-D), the least traced light on the line first. The
+#      ranking may hold only a sample of the cell (Cell 16's SURVEY_MAX_NODES): fewer than THICK_N can come out.
+#   2. `clean --no-clean` into OUT/cleaning_thick with the planes k* - 2 .. k* + 2 only (cleaning.plane_half_range 2)
+#      and the measuring line +-4.5 um (measure.profile_half_um; D-201.6), so that a thick tube's defocused dip
+#      still reaches the background on both sides. Its time per node is not measured on real data (as Cell 21's
+#      preparation: the node's image block and its neighbours' shadows at 5 planes).
+#   3. The gallery of Cell 21 on all of them, judged or not (pages: the patch at each of the 5 planes, the line's
+#      profile at each plane). Seconds.
+# Output to send back: the printed table and `gallery_sheet_<S>.png`; say which nodes look clean.
+
+# %%
+import json, os, shutil       # the cell's own imports: it can follow Cell 16 directly
+import pandas as pd
+from IPython.display import Image, display
+THICK_BINS = "1.0,50"         # um: one bin, Allen's diameter >= 1.0 um (D-201.4)
+THICK_N = 20                  # nodes at most (D-201.4)
+THICK_MIN_SOMA_UM = 5.0       # um: least distance from the soma in the image plane (D-201.4)
+THICK_HALF_PLANES = 2         # the planes k* - 2 .. k* + 2 (D-201 [user])
+THICK_LINE_HALF_UM = 4.5      # um: the measuring line's half-length (D-201.6; Cell 16's runs use 3.0)
+RERUN_THICK_PREP = False      # True: choose and prepare the nodes again
+CLEAN_T = OUT + "/cleaning_thick"
+GAL_T = CLEAN_T + "/gallery"
+os.makedirs(CLEAN_T, exist_ok=True)
+with open(CFG_CLEAN) as f:                   # the run's configuration (Cell 16), with the two changes above
+    cfg_t = json.load(f)
+cfg_t.setdefault("cleaning", {})["plane_half_range"] = THICK_HALF_PLANES
+cfg_t.setdefault("measure", {})["profile_half_um"] = THICK_LINE_HALF_UM
+CFG_THICK = CLEAN_T + "/thick_config.json"
+with open(CFG_THICK, "w") as f:
+    json.dump(cfg_t, f, indent=1)
+THICK_CFG = ["--config-json", CFG_THICK]
+EXAMPLES_T = "%s/examples_thick_%d.json" % (CLEAN_T, SPECIMEN)
+if RERUN_THICK_PREP or not os.path.exists(EXAMPLES_T):
+    assert os.path.exists("%s/rank_tier1_%d.csv" % (CLEAN, SPECIMEN)), "run Cell 16b first (the tier-1 ranking)"
+    run("scripts/clean_cell.py", "clear", "--specimen", SPECIMEN, "--out", CLEAN, "--cache-dir", CACHE_DIR, *ALIGN,
+        *CLEAN_CFG, "--n", THICK_N, "--min-soma-um", THICK_MIN_SOMA_UM, "--d-bins", THICK_BINS)
+    shutil.copyfile("%s/examples_clear_%d.json" % (CLEAN, SPECIMEN), EXAMPLES_T)
+with open(EXAMPLES_T) as f:
+    ids_t = [int(i) for i in json.load(f)["example_ids"]]
+print("[cell 23A] %d thick nodes:" % len(ids_t), ids_t)
+if RERUN_THICK_PREP or not os.path.exists("%s/cleaning_%d.json" % (CLEAN_T, SPECIMEN)):
+    run("scripts/clean_cell.py", "clean", "--specimen", SPECIMEN, "--out", CLEAN_T, "--cache-dir", CACHE_DIR, *ALIGN,
+        *THICK_CFG, "--examples", EXAMPLES_T, "--B", B_GL, "--mu", MU, "--no-clean")
+if os.path.isdir(GAL_T):
+    shutil.rmtree(GAL_T)
+run("scripts/show_clear_gallery.py", "--cleaning-dir", CLEAN_T, "--specimen", SPECIMEN, "--out", GAL_T,
+    "--d-bins", THICK_BINS, "--max-per-bin", 0, "--fill-to", THICK_N, "--zoom-um", 6.0)
+tab_t = pd.read_csv("%s/gallery_%d.csv" % (GAL_T, SPECIMEN))
+display(tab_t[["node_id", "d_allen_um", "clean", "score", "reasons", "k_star", "depth_gl", "depth_sd", "fwhm_kstar_um",
+               "fwhm_over_allen", "outside_focus", "skew_focus", "shown"]].round(3))
+display(Image(filename="%s/gallery_sheet_%d.png" % (GAL_T, SPECIMEN)))
+for name in tab_t.loc[tab_t["shown"], "figure"]:
+    print(GAL_T + "/" + name)
+    display(Image(filename=GAL_T + "/" + name))

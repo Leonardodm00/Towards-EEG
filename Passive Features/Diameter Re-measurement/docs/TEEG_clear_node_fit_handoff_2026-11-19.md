@@ -7,6 +7,7 @@
 | 2026-11-20 | The first real run of Cell 21 (the user's upload, 16:03: the gallery folder and the preparation's records): no node judged clean under D-194; diagnosis and D-198 [orchestrator] (the verdict judges the measuring line only); section 11's last part, new; O2's state. Evidence: `checks/clear_gallery_2026-11-20/first_gallery_check.py` and `.out` **[run, sandbox]**, the run's pages **[data]**. |
 | 2026-11-20 (later) | The user's four nodes and the first fit on them (D-199): notebook Cell 22; section 11.2, new. Evidence: Cell 22's code run on the synthetic cell **[run, sandbox]**. |
 | 2026-11-20 (later, 2) | The user, 16:40: "could we settle this measurement problem of the diameter". Section 11.3, new: what the pilot's data pin and what they leave to the in-focus width; a proposal, not decided. Evidence: `checks/scale_2026-11-20/area_check.py` and `.out` **[run, sandbox]**; PubMed searches (abstracts only). |
+| 2026-11-20 (later, 3) | The user, 16:59 and the answers after it: the in-focus width is fitted on thick nodes (D-201). Section 12, new; 11.3's proposal marked decided in part. Evidence: `kernel.with_kernel` and its smoke test (6 pass, 1 skip), the configuration's test (6 pass, 1 skip), Cell 23A run on the synthetic cell, the forward's time per evaluation measured in the sandbox. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -347,9 +348,41 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   2002 (Network 13:381-395, PMID 12222820): the PSF biases diameter estimates of neuronal tubes unless incorporated;
   Anthonisen et al. 2020 (Appl Opt 59:2914, doi 10.1364/AO.388265): sub-diffraction sizes from out-of-focus brightfield
   images by comparison with calibration objects of known size.
-- **Proposed to the user, not decided**: calibrate $\sigma_{\rm r}(0)$ per cell on objects where it is identifiable --
+- **Proposed to the user, not decided** [updated 2026-11-20, later: the thick-node part decided, D-201; section 12]: calibrate $\sigma_{\rm r}(0)$ per cell on objects where it is identifiable --
   thick clean dendrites fitted with $\sigma_{\rm r}(0)$ free (D-052: $d$ identified on 1.5 um tubes), the thinnest
   traced processes as a near-PSF bound -- then fit the thin nodes at the calibrated value; first a simulation of how
   precisely $\sigma_{\rm r}(0)$ is recovered (target about $\pm$ 0.02 um, which gives $d$ to about $\pm$ 0.05 um at the
   slope above). It would change D-172 (the width held at 0.080 um).
 
+## 12. The in-focus width fitted on thick nodes (D-201) [added 2026-11-20, later]
+
+- **Decided [user, 16:59 and the answers after it]**: "a scan of 20 thick nodes with images only at focus and +-2
+  planes around. I need a fast algorithm." The model is the pipeline's hybrid line renderer as it is ("do not use
+  any 1D version"): `node_inputs.forward_factory` -> `line_fast.line_profiles`, the record's configuration, the
+  kernel replaced through `kernel.with_kernel(renderer, sigma0, c)`. The parameters are
+  $\theta = (d, \mu, v_0, z_{\rm ax}, \sigma_0, c)$; the kernel's variance at defocus $\delta$ is
+  $\sigma_0^2 + c\,G(\delta)$, with $G(\delta) = \sigma_{\rm tab}(\delta)^2 - \sigma_{\rm tab}(0)^2$ and $\sigma_{\rm tab}$
+  the configured table. In the Colab runs that table is Cell 7's per-cell calibrated one (Cell 16 writes it into
+  `cleaning_config.json`), not the ideal-optics default. The background is $(b_{0k} + b_{1k} v)$ per plane, solved
+  exactly for each $\theta$ (variable projection). The nodes have Allen's diameter >= 1.0 um, are spread out and lie
+  on the planes $k^* \pm 2$. The fit makes one start, from the $k^*$ dip's features, with no multistart and no IRLS,
+  and the nodes run in parallel. The settings of D-201.5 and D-201.6 are the orchestrator's (PROVISIONAL). The spec is
+  SPEC Blocks 42 and 43 and Block 4 amendment 2.
+- **Built [run, sandbox]**:
+  - `kernel.with_kernel`: smoke test 6 pass, 1 skip; at $c = 1$ it equals `with_in_focus_width` bit for bit;
+  - `config.SigmaCalibrationConfig`: outside every signature, the pinned hashes unchanged;
+  - Blocks 42 and 43 as stubs (wave 4, to be written by two implementers once the user approves);
+  - notebook Cell 23A: run on the synthetic cell, one node prepared on 5 planes (k* - 2 .. k* + 2), line +-4.46 um
+    (79 samples of 0.1144 um), its gallery drawn.
+- **Speed [run, sandbox, 5 planes, hybrid 8 x 16]**: one forward evaluation takes about 0.5 s at $d$ 0.8 um, 1.6 s at
+  1.5 um and 4.2 s at 2.5 um; the per-slab loop dominates, so the section cache gains little. A whole fit is not timed
+  yet. The bound: trf's `nfev` does not count the finite-difference Jacobian's 6 extra calls per iteration, so
+  `max_nfev` 40 means at most about 280 forward evaluations per node; the expected number is not measured.
+- **Next**:
+  - the identifiability check of Block 42 (how well $\sigma_0$, $d$ and $c$ are pinned on 5 planes at $d$ 1.0,
+    1.5, 2.5 um, and whether the line renderer biases $\hat\sigma_0$ against Block 24's 2-D renderer);
+  - `scripts/calibrate_sigma.py` and Cell 23B;
+  - the user's look at the 20 nodes (Cell 23A), dropping polluted ones;
+  - then the thin nodes at the calibrated width, which would change D-172.
+  If the check shows $\sigma_0$ and $c$ not separable on 5 planes, the approach goes back to the user (coding
+  directive 7).
