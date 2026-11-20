@@ -22,7 +22,10 @@
 #
 # Run it from the "Ih Fit" folder, after `git pull`, with the conda env
 # active (the script activates CONDA_ENV itself as well). The order on the
-# cluster: the gates, DRY_RUN=1, a pilot (MAX_TWINS), then the 30 twins:
+# cluster: the gates, DRY_RUN=1, a pilot (MAX_TWINS), then the 30 twins. The gates
+# (amendment 8.2) are the six twins' suites, each exiting 0, run from this folder:
+#
+#   python smoke_twin_table.py && python smoke_twin_noise.py && python smoke_twin_manifest.py && python smoke_twin_response.py --build && python smoke_twin_build.py && python smoke_twin_recovery.py
 #
 #   RUN_TAG=tw1 NOISE_TAG=nf2 DRY_RUN=1 bash submit_twin_recovery.sh
 #   RUN_TAG=tw1 NOISE_TAG=nf2 MAX_TWINS=2 bash submit_twin_recovery.sh
@@ -43,7 +46,7 @@
 #                    30 twins = 30 cores, inside the 120-core cap of D-185
 #   WALLTIME         24:00:00 per twin job, until the pilot's timings set it
 #   CONDA_ENV        prova
-#   PLAN_ARGS        extra options for `plan`, split on white space (use the '=' form for a
+#   PLAN_ARGS        extra options for `plan` (e.g. --base-seed <int>), split on white space (use the '=' form for a
 #                    negative value, e.g. --dvh-range=-5,5; no value may hold a space)
 #   IH_CODE_DIR      the folder of run_twin_recovery.py; default: this script's folder
 #   IH_ARCHIVE_ROOT  /davinci-1/home/ldellamea/Human Neurons Fitting (the cells: $IH_ARCHIVE_ROOT/$GROUP/specimen_<id>/)

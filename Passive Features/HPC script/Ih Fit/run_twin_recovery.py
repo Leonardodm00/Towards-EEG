@@ -41,6 +41,7 @@ import subprocess
 import sys
 import time
 import traceback
+import dataclasses
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -74,6 +75,9 @@ GATE_ARM = "ih6"
 
 EXIT_OK, EXIT_FAILED, EXIT_USAGE, EXIT_REFUSED = 0, 1, 2, 3
 REPORT_DIR, REPORT_UNFLAGGED_DIR = "report", "report_without_flagged"
+#: the columns of ih_recovery_report.recovery_summary (its own empty frame)
+SUMMARY_COLUMNS = ("arm", "parameter", "n", "n_railed", "median_abs_err", "q25_abs_err", "q75_abs_err",
+                   "median_err", "err_kind")
 STATUS_FIELDS = ("twin_id", "twin_of_specimen_id", "configuration", "arm", "status", "reason", "build_seconds",
                  "fit_seconds", "built", "fitted", "code_commit", "code_dirty", "host", "job_id", "finished_utc")
 
@@ -196,6 +200,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--n-per-configuration", type=int, default=10)
     p.add_argument("--seed", type=int, default=d["seed"])
     p.add_argument("--id-base", type=int, default=d["id_base"])
+    p.add_argument("--base-seed", type=int, default=TwinConfig().base_seed,
+                   help="root of the twins' noise streams, SPEC 2.7 (e) (amendment 8.3); recorded as "
+                        "run_config.json's twin_config.base_seed")
     p.add_argument("--force", action="store_true", help="re-plan a run directory planned with other options")
     # the truth (run_ih_recovery.py's names, types and defaults)
     p.add_argument("--ra-mode", default=d["ra_mode"], choices=["per_cohort", "per_cell"])
@@ -276,6 +283,7 @@ def plan_options(args) -> Dict[str, object]:
         "n_per_configuration": int(args.n_per_configuration),
         "seed": int(args.seed),
         "id_base": int(args.id_base),
+        "base_seed": int(args.base_seed),
     }
     for name in TRUTH_OPTIONS + FIT_OPTIONS + TOL_OPTIONS:
         opts[name] = getattr(args, name)
@@ -370,7 +378,7 @@ def cmd_plan(args) -> int:
     _say("plan: cohort of %d real cell(s) from %s: %s" % (len(ids), group_dir, " ".join(str(i) for i in ids)))
 
     import passive_fitting_hpc_fixed as mono
-    tcfg = TwinConfig()
+    tcfg = dataclasses.replace(TwinConfig(), base_seed=int(opts["base_seed"]))
     protocols, v_rest = [], {}
     for sid in ids:
         d = group_dir / ("specimen_%d" % sid)
@@ -450,6 +458,18 @@ def load_run(out) -> Dict[str, object]:
                 manifest=TM.load_twin_manifest(paths["manifest"]))
 
 
+def recorded_twin_config(config: Dict[str, object]) -> TwinConfig:
+    """The TwinConfig recorded in run_config.json (amendment 8.3); Refused(EXIT_REFUSED) when its keys are
+    not exactly the dataclass's fields."""
+    rec = config.get("twin_config")
+    fields = [f.name for f in dataclasses.fields(TwinConfig)]
+    if not isinstance(rec, dict) or sorted(rec) != sorted(fields):
+        got = sorted(rec) if isinstance(rec, dict) else rec
+        raise Refused(EXIT_REFUSED, "run_config.json's twin_config %r does not hold exactly the fields of "
+                                    "TwinConfig %r" % (got, fields))
+    return TwinConfig(**rec)
+
+
 def cmd_list(args) -> int:
     run = load_run(args.out)
     for sid in run["manifest"]["specimen_id"]:
@@ -523,16 +543,16 @@ def _results_row(csv: Path, twin_id: int) -> Optional[pd.DataFrame]:
     return rows if len(rows) else None
 
 
-def _archive_matches(spec_dir: Path, spec) -> Optional[str]:
+def _archive_matches(spec_dir: Path, spec, tcfg: TwinConfig) -> Optional[str]:
     """None when the archive's twin block is this spec's; else why not."""
     meta = _read_json(spec_dir / "metadata.json")
     if meta is None:
         return "metadata.json unreadable"
     tw = meta.get("twin") or {}
     want = dict(twin_of_specimen_id=int(spec.twin_of_specimen_id), configuration=str(spec.configuration),
-                theta={k: float(v) for k, v in spec.theta.items()}, F=float(spec.F))
+                theta={k: float(v) for k, v in spec.theta.items()}, F=float(spec.F), base_seed=int(tcfg.base_seed))
     got = dict(twin_of_specimen_id=tw.get("twin_of_specimen_id"), configuration=tw.get("configuration"),
-               theta=tw.get("theta"), F=tw.get("F"))
+               theta=tw.get("theta"), F=tw.get("F"), base_seed=tw.get("base_seed"))
     if got != want or int(meta.get("specimen_id", -1)) != int(spec.twin_id) \
             or float(meta.get("v_rest_mV", float("nan"))) != float(spec.v_rest_mV):
         return "its metadata (%r) is not the manifest's twin (%r)" % (got, want)
@@ -547,6 +567,7 @@ def cmd_twin(args) -> int:
 
     run = load_run(args.out)
     out, opts, man = run["out"], run["options"], run["manifest"]
+    tcfg = recorded_twin_config(run["config"])
     rows = man[man["specimen_id"] == int(args.twin)]
     if len(rows) != 1:
         raise Refused(EXIT_USAGE, "twin %d is not in the manifest %s" % (int(args.twin), run["paths"]["manifest"]))
@@ -579,7 +600,7 @@ def cmd_twin(args) -> int:
         spec = TM.twin_spec_of(row, F=float(opts["F"]))
         complete = (spec_dir / "metadata.json").is_file()
         if complete and not args.force:
-            why = _archive_matches(spec_dir, spec)
+            why = _archive_matches(spec_dir, spec, tcfg)
             if why is not None:
                 return finish("build_failed", "the archive %s exists but %s; run with --force to rebuild"
                               % (spec_dir, why))
@@ -592,7 +613,7 @@ def cmd_twin(args) -> int:
             _clear_sections()
             try:
                 TB.build_twin(spec, real_dir, table, group_dir, ih_spec=ih_spec, apply_theta=pspec.apply,
-                              cfg=TwinConfig(), overwrite=True,
+                              cfg=tcfg, overwrite=True,
                               provenance=dict(run_dir=str(out), code_commit=status["code_commit"],
                                               code_dirty=status["code_dirty"], manifest_seed=int(row["manifest_seed"]),
                                               driver="run_twin_recovery.py"))
@@ -671,7 +692,12 @@ def write_one_report(out_dir: Path, manifest: pd.DataFrame, frames: Sequence[pd.
     """The report of run_ih_recovery.phase_report on these frames: returns the long table."""
     import ih_recovery_report as RR
     long_df = RR.recovery_long(manifest, list(frames), box=_box(o), strict_rails=not bool(o["lenient_rails"]))
-    summary = RR.recovery_summary(long_df, drop_railed=bool(o["drop_railed"]))
+    if len(long_df) and (~long_df["is_fp_control"].astype(bool)).any():
+        summary = RR.recovery_summary(long_df, drop_railed=bool(o["drop_railed"]))
+    else:
+        # amendment 8.1: only false-positive controls have results; recovery_summary would raise
+        # KeyError on its empty non-control part, so the summary is its own empty frame
+        summary = pd.DataFrame(columns=list(SUMMARY_COLUMNS))
     inflation = RR.cm_inflation(long_df)
     fp = RR.fp_control_summary(long_df)
     tol = _tolerances(o)
