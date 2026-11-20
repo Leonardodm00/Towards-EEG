@@ -249,6 +249,7 @@ the "Binds" column.
 | 2026-11-20 (later, 4) | Logs **D-197** [orchestrator] (the twins chat; coding directive 7). D-196's fixes merged on `sci/twins` (`83910c7`; Block 8's smoke TS1-TS10 10/10) and checked a second time by another independent Opus tester on `216ecf1` (report `Ih Fit/specs/test_reports/2026-11-20_1532_incremental.md`: **PASS WITH ISSUES**, no BLOCKER and no MAJOR; `tests/spec` 145 passed; a twin's noise under two base seeds differs by exactly the difference recomputed from the seed rule). Its two remaining points settled: the merge's guard is stated by its condition, so that `--drop-railed` cannot empty the summary's input unnoticed, and `plan` refuses a negative base seed (SPEC amendment 9, `51c2830`; with Block 8's implementer). Next free IDs: D-198, I-007. |
 | 2026-11-20 (the gallery chat, later) | Logs **D-198** [orchestrator] (the gallery chat; coding directive 7): the clearness verdict judges the measuring line only (k* - 1 .. k* + 1); the lines along the dendrite are measured and drawn but not judged, superseding D-194.3 and D-194.4 as verdict criteria. Evidence: the first real run of Cell 21 (cell 529878215, 33 candidates) judged none clean -- at one plane a tilted dendrite is in focus over a short stretch only (narrowest within 0.5 um of the node on 18 of 30; 2 um away a median 1.53 times wider; the trace's tilt does not predict it, Spearman 0.08) **[run, sandbox]**; the new verdict passes 12. Built at `ca3ceeb` on `sci/diameter-pipeline` (SPEC Block 40 am. 1, Block 36 am. 18; Cell 21's `GAL_JUDGE_ALONG`; clear-node handoff section 11.1). Next free IDs: D-199, I-007. |
 | 2026-11-20 (the gallery chat, later, 2) | Logs **D-199** (user, 16:25): the four nodes of the clear-node refinement are 3883, 28, 6049, 2657 (two pass D-198's verdict, two do not); their first fit is D-169's path with WEIGHT_KAPPA 0.1 (lambda 0.045 to 0.071 um, under a line sample). Notebook Cell 22 at `481abe4` on `sci/diameter-pipeline`; clear-node handoff section 11.2. Next free IDs: D-200, I-007. |
+| 2026-11-20 (later, 5) | Logs **D-200** (user, 17:08; the twins chat): the 30 twins of Stage 7 are submitted at once, without the pilot of one twin per configuration ("let's run all now"); wall time 48:00:00 per twin job (the assistant's proposal, no measured time); the plan's other options at their defaults. Before it, the twins' gates on davinci (16:35) found TS7's display fault, fixed by SPEC Block 8 amendment 10 (`84d099d`, plumbing; `sci/twins` at `a28d1a5`). Next free IDs: D-201, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -436,6 +437,7 @@ would be needed*, *Status*.
 | D-197 | 2026-11-20 | Block 8 (`run_twin_recovery.py`: `write_one_report`, the parser's `--base-seed`; `smoke_twin_recovery.py` TS9, TS10); D-196.1, D-196.3 | the second check's two points: the empty summary whenever no row is left to summarise (controls and, under `--drop-railed`, railed rows set aside); a negative base seed refused at `plan` [orchestrator] | active |
 | D-198 | 2026-11-20 | SPEC Block 40 am. 1, Block 36 am. 18; `ClearnessConfig.judge_along`; `clearness.py`, `show_clear_gallery.py`; notebook Cell 21 | the clearness verdict judges the measuring line only; the lines along the dendrite measured and drawn, not judged (opt-in `judge_along`) [orchestrator]; supersedes D-194.3, D-194.4 as verdict criteria | active, PROVISIONAL; built (`ca3ceeb`) |
 | D-199 | 2026-11-20 | the nodes D-194.0 left to the user; notebook Cell 22 (`FIT4_IDS`, `WEIGHT_KAPPA`) | the four nodes are 3883, 28, 6049, 2657; the first fit on them with WEIGHT_KAPPA 0.1 [user] | active; Cell 22 built (`481abe4`), not run on Colab |
+| D-200 | 2026-11-20 | the Stage-7 run on davinci (roadmap S7; SPEC Block 8; `RUN_TAG=tw1`, `NOISE_TAG=nf2`); the twins' handoff, section 5b | the 30 twins are submitted at once, no pilot [user]; `WALLTIME=48:00:00` (the assistant's proposal); one R_a truth per configuration and the gate's tolerances at their defaults | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -13781,3 +13783,40 @@ four nodes' results.
 section 11.2. **[log]** D-169, D-171, D-172, D-194, D-198.
 
 **Status:** active. Cell 22 at `481abe4` on `sci/diameter-pipeline`; not yet run on Colab.
+
+## D-200 -- Stage 7: the 30 twins are submitted at once, without the pilot (user)
+
+**Date:** 2026-11-20, 17:08 (Europe/Rome), the twins chat.
+**Binds:** the Stage-7 run on davinci (roadmap allen-mtg-fit S7; SPEC `Ih Fit/specs/SPEC.md`, Block 8): run tag `tw1`, noise
+tag `nf2`, group `L3_exc`; the twins' handoff (`Ih Fit/docs/TEEG_twins_block5_handoff_2026-11-19.md`), section 5b.
+
+**Decision [user].** "let's run all now": the 30 twins (10 `full`, 10 `passive_fit`, 10 `active_fit`, D-184, D-188) go
+into one PBS array, with no pilot of one twin per configuration (the assistant's proposal of 16:18 and 17:05).
+
+**Statement.** One submission from the "Ih Fit" folder at the head of `sci/twins` (`a28d1a5` or later), after
+`smoke_twin_recovery.py` exits 0: `RUN_TAG=tw1 NOISE_TAG=nf2 WALLTIME=48:00:00 bash submit_twin_recovery.sh` -- 30 jobs
+of one core (D-195), the merge after them. **[the assistant's proposal]** `WALLTIME=48:00:00`: no time is measured;
+the noise fit's pilot and run had the same (D-147). Every other option of the plan at its default: one $R_a$ truth per
+configuration (`--ra-mode per_cohort`), base seed 20261119 (D-196.3), `run_ih_recovery.py`'s fit options
+(`--n-calls 200 --n-initial 100`, `--dt-brief-ms 0.1 --dt-long-ms 0.1`, `--phase3-subset none`) and gate tolerances
+(D-011).
+
+**Why.** **[user]** as stated. The cost of a twin is not measured: **[run, sandbox, one `active_fit` twin of
+508282493, 5245 segments, one optimiser call]** about 16 min of the fit's fixed steps and about 4 min for the call with
+its validation; **[reasoning]** at 200 calls, hours per twin. Without a pilot a fault common to every twin shows on all
+30 at once. Each twin's log fills while it runs (the driver's and `run_ih_fit`'s lines are flushed), which is the
+early check: the build, then `FIT (... n_calls=200)`; a twin that ends early writes its status file and a `TWIN <id>:`
+line. A twin killed by the wall time keeps its archive; the same command refits only the twins without results.
+
+**What it implies.** The handoff's steps 3 and 4 (pilot, its times) are replaced by the one submission; the early
+check about an hour after the jobs start; the read-out after the merge (handoff section 7).
+
+**What it does not decide.** One $R_a$ truth per twin: not chosen (raised by the assistant on 2026-11-20 and left
+open); this submission's plan fixes one per configuration, and another choice needs a new run tag. The gate's
+tolerances: they enter only the merge, so the verdict can be re-read under other tolerances from the run's tables
+without refitting. Stage 8.
+
+**Sources.** **[user]**, **[run]**, **[reasoning]** as named. **[log]** D-011, D-147, D-182.3, D-184, D-185, D-188,
+D-195, D-196.
+
+**Status:** active.

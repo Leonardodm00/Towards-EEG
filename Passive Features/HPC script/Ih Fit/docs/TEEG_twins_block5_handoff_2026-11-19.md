@@ -17,6 +17,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-20 (later, 3) | Section 5b, the cluster steps: the gate line now carries `conda activate prova` and the `cd` (run from the repository root under `(base)` it found no file); the pilot is one twin per configuration with a 48 h ceiling; a one-liner for the pilot's times; the expected cost. A trap added (section 10). |
 | 2026-11-20 (later, 4) | The gates on davinci (16:35): 58 checks passed; TS7 of `smoke_twin_recovery.py` ERROR (`manifest.csv` not found). Cause: NEURON exits (`can't open DISPLAY`) when `DISPLAY` is set and no X server answers; the test's fake `HOME` hid the X11 cookie of the MobaXterm login. Fixed by SPEC Block 8 amendment 10 (`84d099d`; the submitter unsets `DISPLAY`; NEURON's version recorded without pip metadata); `sci/twins` at `a28d1a5`. A trap added. |
 | 2026-11-20 (later, 5) | Section 7 brought up to date: Block 8 built (the draft around `submit_ih_recovery.sh` superseded), how to read the run's outputs, the gate's default tolerances and what a failing axis means for Stage 8 (D-005, D-083). |
+| 2026-11-20 (later, 6) | Section 5b: the run as decided (D-200: no pilot; the 30 twins at once with a 48 h wall time) and the early check. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -288,6 +289,11 @@ with `prova` active.
    call): `cd "/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs_ih/twin_recovery/tw1/L3_exc" && python -c "import math, pandas as pd; d=pd.read_csv('twins_status.csv'); d=d[d.status!='missing'].copy(); d['hours']=(d.build_seconds+d.fit_seconds)/3600; print(d[['twin_id','configuration','status','build_seconds','fit_seconds','hours']].round(2).to_string(index=False)); print('suggested WALLTIME=%d:00:00' % max(24, math.ceil(2*d.hours.max())))"`
 5. the 30 twins, from the "Ih Fit" folder after the pilot has ended: `RUN_TAG=tw1 NOISE_TAG=nf2 WALLTIME=<from step 4> bash submit_twin_recovery.sh`
    (the three pilot twins are skipped).
+
+**As run [D-200, user, 2026-11-20 17:08: no pilot].** Steps 3 and 4 are replaced by one submission of the 30 twins, from
+the repository root: `cd /davinci-1/home/ldellamea/TEEG/Towards-EEG && git pull && git log --oneline -1 && cd "Passive Features/HPC script/Ih Fit" && conda activate prova && python smoke_twin_recovery.py && RUN_TAG=tw1 NOISE_TAG=nf2 WALLTIME=48:00:00 bash submit_twin_recovery.sh`.
+The early check, about an hour after the jobs start (no twin ended, every log in the fit, no traceback):
+`cd "/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs_ih/twin_recovery/tw1/L3_exc" && echo "twins ended: $(ls status 2>/dev/null | wc -l)   in the fit: $(grep -l 'n_calls=200' logs/twin_*.log 2>/dev/null | wc -l)   with a traceback: $(grep -l Traceback logs/twin_*.log 2>/dev/null | wc -l)"`.
 
 `RUN_TAG` and `PLAN_ARGS` stay the same in steps 2 to 5: the plan is frozen at the pilot, and a different option is
 refused. One R_a truth per twin instead of one per configuration is `PLAN_ARGS=--ra-mode=per_cell` added to all of them.
