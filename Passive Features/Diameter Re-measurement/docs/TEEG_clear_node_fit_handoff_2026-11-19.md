@@ -6,6 +6,7 @@
 | 2026-11-19 (later) | The user, 22:17 (a new chat started from this handoff): "Let's first of all change the nodes we use" -- a cell that shows a set of judged clean nodes, from which the user selects four; the approach is refined after that. Built the same evening (D-194; SPEC Blocks 40, 41 and Block 36 amendment 18; notebook Cell 21): section 11, new. O2's state changed; nothing else in this document changed. Evidence: `tests/smoke/test_smoke_clearness.py`, `test_smoke_clearness_figures.py`, `checks/clear_gallery_2026-11-19/line_screen_pilot_check.out` **[run, sandbox]**. |
 | 2026-11-20 | The first real run of Cell 21 (the user's upload, 16:03: the gallery folder and the preparation's records): no node judged clean under D-194; diagnosis and D-198 [orchestrator] (the verdict judges the measuring line only); section 11's last part, new; O2's state. Evidence: `checks/clear_gallery_2026-11-20/first_gallery_check.py` and `.out` **[run, sandbox]**, the run's pages **[data]**. |
 | 2026-11-20 (later) | The user's four nodes and the first fit on them (D-199): notebook Cell 22; section 11.2, new. Evidence: Cell 22's code run on the synthetic cell **[run, sandbox]**. |
+| 2026-11-20 (later, 2) | The user, 16:40: "could we settle this measurement problem of the diameter". Section 11.3, new: what the pilot's data pin and what they leave to the in-focus width; a proposal, not decided. Evidence: `checks/scale_2026-11-20/area_check.py` and `.out` **[run, sandbox]**; PubMed searches (abstracts only). |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -325,4 +326,30 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   about 7 % over the truth is the fixture's under its coarse settings, not checked further.
 - **Not run**: Cell 22 on Colab. Time not measured at this $\kappa$ (the pilot's second run, $\kappa$ 0.5: 3 to 49 min
   per node).
+
+### 11.3 The scale problem: what the data pin, what they leave to the in-focus width [added 2026-11-20, later]
+
+- **The weights do not move a clean thin node's diameter; the in-focus width does [data: sections 4 and 7]**. Node
+  5353, all at $\sigma_{\rm r}(0)$ = 0.080 um: $\hat d$ = 0.774 ($\kappa$ 1.25), 0.769 ($\kappa$ 0.5), 0.776 (unweighted).
+  At $\kappa$ 0.5: $\hat d$ = 0.769, 0.713, 0.449 um at $\sigma_{\rm r}(0)$ = 0.080, 0.15, 0.25 um ($\chi^2/N$ 3.49, 3.29,
+  3.89): about $-2.6$ um of $d$ per um of $\sigma_{\rm r}(0)$ between 0.15 and 0.25. The weights move the polluted nodes
+  (2669: 2.728 -> 1.566 um from $\kappa$ 1.25 to 0.5): they act on the neighbours, not on the scale.
+- **The data pin the light the tube removes [run, sandbox: `checks/scale_2026-11-20/area_check.py`]**: with
+  $a(\mu, d) = \int (1 - e^{-\mu c(v)})\,dv$, $c(v) = 2\sqrt{r^2 - v^2}$, 5353's first stage ($d$ held at Allen's 0.454
+  um, $\mu$ 0.581 /um) and its fit (0.769 um, 0.195 /um) give $a$ = 0.0843 and 0.0852 um, 1 % apart; $\mu d^2$ = 0.120 and
+  0.116 um. How that light splits into thickness and darkness is what the in-focus width decides.
+- **The dip's area, which no normalized blur changes, is constant across the nine planes on deep isolated dips** --
+  2620 coefficient of variation 1.4 %, 639 2.3 % -- drifts on polluted ones (1013 8.6 %, 2669 6.9 %), and on the faint
+  5353 varies 1.8-fold (CV 19 %): its two wings differ by up to 4.8 gl, and 1.5 gl of background error over the 6 um
+  line is as large as the dip's whole area (about 12 gl um). So the area is a blur-free observable on deep dips only
+  **[same check]**.
+- **Literature [PubMed; abstracts only, full texts not accessible through the connector]**: Streekstra and van Pelt
+  2002 (Network 13:381-395, PMID 12222820): the PSF biases diameter estimates of neuronal tubes unless incorporated;
+  Anthonisen et al. 2020 (Appl Opt 59:2914, doi 10.1364/AO.388265): sub-diffraction sizes from out-of-focus brightfield
+  images by comparison with calibration objects of known size.
+- **Proposed to the user, not decided**: calibrate $\sigma_{\rm r}(0)$ per cell on objects where it is identifiable --
+  thick clean dendrites fitted with $\sigma_{\rm r}(0)$ free (D-052: $d$ identified on 1.5 um tubes), the thinnest
+  traced processes as a near-PSF bound -- then fit the thin nodes at the calibrated value; first a simulation of how
+  precisely $\sigma_{\rm r}(0)$ is recovered (target about $\pm$ 0.02 um, which gives $d$ to about $\pm$ 0.05 um at the
+  slope above). It would change D-172 (the width held at 0.080 um).
 
