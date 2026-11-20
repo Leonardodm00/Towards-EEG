@@ -244,6 +244,7 @@ the "Binds" column.
 | 2026-11-20 (the gallery chat) | Logs **D-194** (user, 2026-11-19 22:17, with the builder's choices [orchestrator], PROVISIONAL; started from the clear-node handoff): the clear-node work moves to four nodes the user selects from a gallery of nodes the image judges clean; the screen is model-free (one symmetric dip that returns to the background on the measuring line in the planes k* - 1 .. k* + 1 and on nine parallel lines up to 2 um along the dendrite, with a steady width, depth and position), its thresholds provisional. **[run, sandbox]** the line part on the five pilot nodes: 5353 passes, 2669, 1013 and 639 fail, 2620 passes on the line (its junction needs the lines along the dendrite, not checked: no patch in the sandbox); smoke tests 7 and 6 pass. Built at `c3f3ccb`, `75ba99a` on `sci/diameter-pipeline` (SPEC Blocks 40, 41, Block 36 amendment 18; notebook Cell 21; handoff section 11). Drafted as D-192 on 2026-11-19 and renumbered: the twins chat took D-192 and D-193 first. Not run on a real image. Next free IDs: D-195, I-007. |
 | 2026-11-19 (later, 7) | No decision changed (the clearance chat, 20:48-22:10). On the user's question whether a heavier-tailed kernel would fix the clear nodes' overestimates: on node 5353 heavier tails at the configured in-focus width fit worse and do not let Allen's diameter fit, a wider in-focus width does, and the fit cannot separate the width from the diameter **[run, sandbox: `checks/kernel_tails_2026-11-19/`, `7c05a01`]**. The user corrected the chat (22:02): node 2669 is not clean in focus; checked -- the bump cut misses its in-focus neighbour because D-176.1 searches the nine-plane mean (`checks/clear_nodes_2026-11-19/`). Handoff for the chat that continues the path: `Passive Features/Diameter Re-measurement/docs/TEEG_clear_node_fit_handoff_2026-11-19.md` (`055e438` on `sci/diameter-pipeline`). Next free IDs: D-191, I-007. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
+| 2026-11-20 (later, 2) | Logs **D-195** [orchestrator] (the twins chat; coding directive 7): a twin's job of the Stage-7 run asks for 1 core by default, not 4 -- the fit is one sequential process, so the 30 twins take 30 cores, inside the 120-core cap of D-185 (the cap check is unchanged). **Block 8 merged** on `sci/twins` (`c4dc9e3`; pushed head `577445d`): `run_twin_recovery.py` (`plan`, `list`, `twin`, `merge`), `submit_twin_recovery.sh`, `smoke_twin_recovery.py` (TS1-TS8 8/8, run by the implementer and again at the gate). With it the six blocks of the twins' fan-out (5, 10, 11, 12, 13, 8) are merged; the independent final check of the assembled pipeline (an Opus tester that wrote none of it) started on `577445d`. Next free IDs: D-196, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -426,6 +427,7 @@ would be needed*, *Status*.
 | D-192 | 2026-11-20 | Block 12 (the twin build, `twin_build.py`), Stage 7 (roadmap S7); D-005.2; D-191.1; the legacy generator's cell (`synthetic_ground_truth.build_synthetic_cell`) | a twin is generated with the fitter's own model: the leak reversal balanced per segment at the real cell's recorded resting potential, so that the truth lies exactly in the fitter's parameter space [user]; no settle, a guard on the rest drift [orchestrator] | active; not built |
 | D-193 | 2026-11-20 | Block 12 (`twin_build.py`, its smoke's TB1 and TB7; `write_twin_archive`); the fitter's loader (`passive_fitting_hpc_fixed._ls_bundles_from_sweep_info`), not changed | the twin-fitter identity is tested with the LS duration n_on / f_s and the loader's one-sample-short duration bounded at 1e-3 mV; `tau_ms` of a twin = R_m C_m of the truth; the archive writer's extra arguments [orchestrator] | active; built (`sci/twins`) |
 | D-194 | 2026-11-19 | the nodes of D-169's fit (the clear-node handoff, section 4, O2); SPEC Blocks 40, 41 (new), Block 36 am. 18; `ClearnessConfig`; `clearness.py`, `show_clear_gallery.py`; notebook Cell 21 | the clear-node work moves to four nodes the user selects from a gallery of image-judged clean nodes [user]; the model-free screen (outside excess, skew, steadiness along the dendrite) and its thresholds [orchestrator] | active; the screen PROVISIONAL; built (`c3f3ccb`, `75ba99a`), not run on a real image |
+| D-195 | 2026-11-20 | Block 8 (`submit_twin_recovery.sh`, its default `NCPUS`; `smoke_twin_recovery.py` TS7); D-185 (the cap, unchanged) | a twin's PBS job asks for 1 core by default (was 4): `run_ih_fit` is one sequential process; 30 twins = 30 cores [orchestrator] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -13571,3 +13573,31 @@ D-171, D-176.
 **Status:** (D-194.0) active. (D-194.1) to (D-194.6) active, PROVISIONAL, the orchestrator's; built at `c3f3ccb` and `75ba99a` on
 `sci/diameter-pipeline` (local commits; pushed when the user agrees). Drafted on 2026-11-19 as D-192; renumbered on
 2026-11-20 because the twins chat logged D-192 and D-193 on `main` before this entry was pushed. The user can reverse any of them.
+
+## D-195 -- A twin's job of the Stage-7 run asks for one core by default [orchestrator]
+
+**Date:** 2026-11-20, about 14:20 (Europe/Rome), the twins chat, at the gate of Block 8 (coding directive 7).
+**Binds:** Block 8 (`submit_twin_recovery.sh`: the default of `NCPUS`; `smoke_twin_recovery.py`: TS7), SPEC
+`Ih Fit/specs/SPEC.md` on `sci/twins`, the entry of Block 8, amendment 7. D-185 (one PBS job per twin, never more
+than 120 cores at once) is concerned and NOT changed.
+
+**Decision [orchestrator].** Written (the plan of 2026-11-19 and Block 8's entry): each twin's job asks for 4 cores,
+so that the 30 twins fill the cap (30 x 4 = 120). Now: the default `NCPUS` of `submit_twin_recovery.sh` is 1; the 30
+twins take 30 cores. `NCPUS` remains a knob of the submitter, and the cap check (number of twins x `NCPUS` <= 120,
+else the submission is refused with exit 3) is as before.
+
+**Why.** **[src, read at `b810bc9`]** `run_ih_fit.py` runs one cell's fit as one process with `n_workers=1`, and the
+existing `submit_ih_recovery.sh` asks PBS for `select=1:ncpus=1`. **[run, Block 8's implementer; reasoning]** The twin's
+build (NEURON, one thread) and its fit are sequential, so three of four cores would stay idle: 4 cores per twin
+reserves 120 cores to use about 30. With one core per twin the 30 twins still all run at once.
+
+**What it implies for code and tables.** As stated. TS7 tests the cap with `NCPUS=4` given explicitly (31 twins
+refused, 30 accepted) and checks that the default dry run prints `select=1:ncpus=1`.
+
+**What it does not decide.** The wall time of a twin's job (`WALLTIME`, 24:00:00 until the pilot of two twins gives a
+measured one; the build alone took 1547 s for one twin of cell 508282493 in the sandbox **[run]**). Whether the fit is
+parallelised: not planned.
+
+**Sources.** **[src]**, **[run]** as named. **[log]** D-185, D-188.
+
+**Status:** active; built on `sci/twins` (Block 8 merged, `c4dc9e3`). The user can reverse it with `NCPUS=4`.

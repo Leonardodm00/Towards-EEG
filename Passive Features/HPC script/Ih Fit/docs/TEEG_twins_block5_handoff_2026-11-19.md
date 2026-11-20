@@ -11,6 +11,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-19 | Created at the user's request ("Now we will build the synthetic runs in another chat. Write the extensive handoff and update the roadmap"), after D-180 (the twins no longer than the noise fit's windows) and the nf2 run (18 ok). Facts checked against `main` at `b17f768` and the user's pastes of 2026-11-18/19. |
 | 2026-11-19 (later) | The twins chat (Fable 5.2): section 5a added -- the user's answers of 21:23 to section 5's questions (D-182 to D-186), what they leave open, and the plan as it stands; "Start here" step 1, section 9's next free IDs and a trap (binary files through the Drive connector) updated. Two standalone checks in `Ih Fit/dev/2026-11-19_twins/`. |
 | 2026-11-19 (later, 2) | Section 5a: the user's answers of 21:46 (D-187 to D-189) -- single SS pulses from rest, the configurations' cells and arms, the bundles' check dropped; the plan approved; the nf2 tables and the archive cell 508282493 received in the chat. |
+| 2026-11-20 | The twins chat: section 5b added -- the generator and the Stage-7 run as built on `sci/twins` (Blocks 5, 10, 11, 12, 13, 8 merged, head `577445d`), the decisions taken on the way (D-190 to D-193, D-195), the commands for davinci, and what is still open. The independent final check of the assembled pipeline was running when this was written. Facts from the code and the runs of this chat. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -224,6 +225,50 @@ amplitudes and timing; the legacy path bit for bit); 12 `twin_build.py` and `gen
 into an archive in the real layout); 8 the Stage-7 run (the manifest's three configurations, `run_ih_recovery.py` per
 cell and merge, `submit_ih_recovery.sh` as a PBS array). Wave 1: Blocks 5, 10, 11 in parallel; wave 2: Blocks 12 and 8;
 the final check by an independent Opus tester.
+
+## 5b. As built (2026-11-20) [src at `577445d` on `sci/twins`; run; log]
+
+The plan of section 5a is implemented on the branch `sci/twins` (not yet merged to `main`: the user's call). Six
+blocks, each written by its own implementer agent, gated and merged by the orchestrator:
+
+| Block | Files | What it does | Smoke (sandbox) |
+|---|---|---|---|
+| 5 | `twin_table.py`, `twin_config.py` | the twins' table: per real cell and sweep, the law, the tilt, the protocol, and whether the sweep is in the twin | `smoke_twin_table.py` TT1-TT11 11/11 |
+| 10 | `twin_noise.py` | a sweep's noise: independent draws per SS window, one continuous draw per LS sweep, the centred tilt line, the seeds | `smoke_twin_noise.py` TN1-TN9 9/9 |
+| 11 | `synthetic_ground_truth.py` (two new functions) | the clean responses: one SS pulse per polarity from rest, each LS sweep at its real amplitude and timing | `smoke_twin_response.py` TR1-TR10 10/10 |
+| 13 | `twin_manifest.py` | the manifest: 10 twins per configuration (`full`, `passive_fit`, `active_fit`), real cells drawn at random from the 18, the truths | `smoke_twin_manifest.py` TM1-TM10 10/10 |
+| 12 | `twin_build.py` | one twin: the fitter's own cell at the truth, the responses, the noise, an archive the fitter's loader reads | `smoke_twin_build.py` TB1-TB9 9/9 |
+| 8 | `run_twin_recovery.py`, `submit_twin_recovery.sh` | the Stage-7 run: `plan`, one job per twin (build, then fit), `merge` with the recovery report | `smoke_twin_recovery.py` TS1-TS8 8/8 |
+
+**Decisions taken after section 5a [log].** D-190 (user): a twin leaves out the depolarising LS sweeps on which the
+real cell spiked. D-191 [orchestrator]: the settle before a response, the SS current's samples, a tolerance, non-step
+sweeps left out. D-192 (user): the twin's cell is the fitter's own model (the leak reversal balanced per segment at the
+real cell's resting potential), so truth and fit share one model. D-193 [orchestrator]: the twin-fitter identity is
+tested around the loader's Long Square step, which is one sample short (found, not changed). D-195 [orchestrator]: one
+core per twin job (the fit is sequential).
+
+**Measured here [run].** One real `full` twin of cell 508282493 built in 1547 s on one core (about 105 s per 7.27 s
+sweep on its 5247 sections); 15 of its 22 LS sweeps are in the twin, 7 left out (`action_potential`). The fit's time on
+a real twin was not measured here: the pilot gives it.
+
+**On davinci.** From the "Ih Fit" folder, on `sci/twins` (or `main` once merged), conda env active; one line each:
+
+1. the twins' suites, after `git pull`:
+   `python smoke_twin_table.py && python smoke_twin_noise.py && python smoke_twin_manifest.py && python smoke_twin_response.py --build && python smoke_twin_build.py && python smoke_twin_recovery.py`
+2. dry run (writes nothing, submits nothing): `RUN_TAG=tw1 NOISE_TAG=nf2 DRY_RUN=1 bash submit_twin_recovery.sh`
+3. pilot of two twins: `RUN_TAG=tw1 NOISE_TAG=nf2 MAX_TWINS=2 bash submit_twin_recovery.sh`
+4. the 30 twins, after the pilot has ended, with the wall time it measured: `RUN_TAG=tw1 NOISE_TAG=nf2 WALLTIME=<hh:mm:ss> bash submit_twin_recovery.sh`
+   (twins already built and fitted are skipped).
+
+Outputs: `$IH_OUTPUT_BASE/twin_recovery/<RUN_TAG>/L3_exc/` -- `manifest.csv`, `twins/`, `fits/`, `status/`, `logs/`,
+`report/` (all twins), `report_without_flagged/` (without the twins of the four cells of D-182.3),
+`recovery_by_configuration.csv`, `twins_status.csv`.
+
+**Open, the user's [reported 2026-11-20].** (1) With the existing drawer's default the 10 twins of a configuration share
+one $R_a$ truth; one per twin is `PLAN_ARGS=--ra-mode=per_cell` at the first submission. (2) Whether the fitter's loader is corrected for the
+one-sample-short Long Square step (D-193). (3) The roadmap has no stage for Block 13 (the manifest). (4) Two readings in
+D-188: the cells are drawn independently per configuration (30 twins), and the passive arm is `passive_fullstep`.
+(5) The gate's tolerances are still the unowned defaults of D-011. (6) Raw or corrected SWCs for the twins (D-013).
 
 ## 6. Limits of the law the twins inherit [cluster; run]
 
