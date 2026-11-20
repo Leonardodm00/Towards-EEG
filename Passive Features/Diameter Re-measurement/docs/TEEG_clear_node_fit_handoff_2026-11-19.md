@@ -8,6 +8,7 @@
 | 2026-11-20 (later) | The user's four nodes and the first fit on them (D-199): notebook Cell 22; section 11.2, new. Evidence: Cell 22's code run on the synthetic cell **[run, sandbox]**. |
 | 2026-11-20 (later, 2) | The user, 16:40: "could we settle this measurement problem of the diameter". Section 11.3, new: what the pilot's data pin and what they leave to the in-focus width; a proposal, not decided. Evidence: `checks/scale_2026-11-20/area_check.py` and `.out` **[run, sandbox]**; PubMed searches (abstracts only). |
 | 2026-11-20 (later, 3) | The user, 16:59 and the answers after it: the in-focus width is fitted on thick nodes (D-201). Section 12, new; 11.3's proposal marked decided in part. Evidence: `kernel.with_kernel` and its smoke test (6 pass, 1 skip), the configuration's test (6 pass, 1 skip), Cell 23A run on the synthetic cell, the forward's time per evaluation measured in the sandbox. |
+| 2026-11-20 (later, 4) | The user, 17:44: Cell 22's fit (WEIGHT_KAPPA 0.1 on D-199's four nodes) is dropped before it ran (D-202). Section 11.2 marked; the notebook's Cell 22 replaced by a one-line note. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -301,7 +302,7 @@ dendrite, and on the other 3 (605, 1322, 7951) the width could not be formed on 
   wrong too. The one sign so far is indirect (the $\rho$ above and node 4725's page, whose in-focus stretch moves
   about 2 um in depth over about 8 um along the dendrite, against a trace tilt of 6 degrees: a rough reading by eye).
 
-### 11.2 The four nodes and the first fit on them (Cell 22; D-199) [added 2026-11-20, later]
+### 11.2 The four nodes and the first fit on them (Cell 22; D-199) [added 2026-11-20, later] [updated 2026-11-20, 17:44: the fit dropped before it ran, D-202]
 
 **[user]** 16:25: "Let's try the fit for the diameter of the nodes 3883 28 146 245 with a very narrow WEIGHT_KAPPA =
 0.1"; asked which nodes "146" and "245" meant (they are the sharpest planes k* printed on the pages of 6049 and 2657,
@@ -326,7 +327,8 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   (unweighted). The narrow weights add no offset of their own here and widen the standard error; the common excess of
   about 7 % over the truth is the fixture's under its coarse settings, not checked further.
 - **Not run**: Cell 22 on Colab. Time not measured at this $\kappa$ (the pilot's second run, $\kappa$ 0.5: 3 to 49 min
-  per node).
+  per node). [updated 2026-11-20, 17:44: dropped by the user before it ran (D-202); the notebook's Cell 22 is now a
+  one-line note, its code in the history at `481abe4`. The choice of the four nodes, D-199.1, is not withdrawn.]
 
 ### 11.3 The scale problem: what the data pin, what they leave to the in-focus width [added 2026-11-20, later]
 

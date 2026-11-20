@@ -621,73 +621,10 @@ for name in tab_g.loc[tab_g["shown"], "figure"]:           # in the order shown:
 print("[cell 21] judged clean:", tab_g.loc[tab_g["clean"], "node_id"].tolist())
 
 # %% [markdown]
-# ## Cell 22: the clear-node fit on the four chosen nodes, with a weight width of the user's choosing (D-199)
+# ## Cell 22: dropped (D-202)
 #
-# Run after Cells 0, 1 and 16. The user's four nodes of 2026-11-20 (D-199): 3883 and 28, judged clean by Cell 21's
-# measuring-line verdict (D-198), and 6049 and 2657, not judged clean (blobs near the line). The same two steps as
-# Cell 20 (D-169, D-171 to D-173), on these nodes only:
-#   1. `clean --no-clean` into OUT/cleaning_fit4: per node the first stage at Allen's diameter, the patch, the nine
-#      planes, the line as recorded; nothing cleaned. About a minute per node (reused when the folder holds these
-#      nodes; RERUN_FIT4_PREP = True prepares them again).
-#   2. `infer_nodes.py real`: the multi-plane one-tube fit started at Allen's diameter, residuals weighted by
-#      w_n = exp(-|v_n - v_c| / lambda) about the fitted centre v_c, lambda = WEIGHT_KAPPA x FWHM expected from
-#      Allen's diameter (FWHM^2 = (0.866 D_Allen)^2 + (2.355 sigma_r(0))^2, sigma_r(0) = 0.080 um), re-centred while
-#      fitting; the near-bump cut at BUMP_SD noise SDs. The weights multiply the squared residuals.
-# WEIGHT_KAPPA = 0.1 is the user's trial (2026-11-20). D-171.1's default is 1.25 (Cell 20's first run), the pilot's
-# second run 0.5. At 0.1, lambda is 0.045 to 0.071 um for these four nodes (Allen 0.47 to 0.79 um), 0.40 to 0.62 of
-# a line sample (0.1144 um): with the centre on a sample, its two neighbours weigh 0.08 to 0.20 and the next two
-# 0.006 to 0.04 -- the weights of a plane sum to 1.2 to 1.5 samples, against 4.0 to 6.3 at 0.5 and 9.9 to 15.1 at
-# 1.25. So the width of each dip barely enters; the diameter is set mainly by how the central depth changes across
-# the nine planes, and it trades against the absorption mu.
-# The fit folder carries the weight width in its name (OUT/inference_fit4_k<WEIGHT_KAPPA>), so a run at another
-# WEIGHT_KAPPA is written beside this one instead of over it; the focal figure goes there too.
-# Time: not measured at this width. The pilot's second run (WEIGHT_KAPPA 0.5) took 3 to 49 min per node; it grows
-# with the diameter the fit reaches.
-# Output to send back: the lines `node <id>: weights ...` and `node <id>: d ...` of the log, the table, the
-# focal figure and the `fit_node<id>.png` figures (the folder OUT/inference_fit4_k<WEIGHT_KAPPA> as a zip is enough).
-
-# %%
-import glob, json, os                # the cell's own imports: it can follow Cell 16 directly
-import pandas as pd
-from IPython.display import Image, display
-FIT4_IDS = [3883, 28, 6049, 2657]     # the user's four nodes (D-199)
-WEIGHT_KAPPA = 0.1                    # lambda in units of the FWHM from Allen's diameter; the user's trial (D-171.1's default 1.25)
-BUMP_SD = 2.0                         # a near bump rises at least this many noise SDs (D-171.3); 0 = no cut
-FIT4_WEIGHTS = "allen"                # "allen": the centre weights; "none": unweighted (the bump cut still applies)
-FIT4_STARTS = "1.0,1.6"               # the fit's starts, x Allen's diameter
-RERUN_FIT4_PREP = False               # True: prepare the nodes again although the folder holds them
-CLEAN_F4 = OUT + "/cleaning_fit4"
-INFER_F4 = "%s/inference_fit4_k%g" % (OUT, WEIGHT_KAPPA)
-os.makedirs(CLEAN_F4, exist_ok=True)
-os.makedirs(INFER_F4, exist_ok=True)
-EXAMPLES_F4 = "%s/examples_fit4_%d.json" % (CLEAN_F4, SPECIMEN)
-REC_F4 = "%s/cleaning_%d.json" % (CLEAN_F4, SPECIMEN)
-prepared = []
-if os.path.exists(REC_F4):
-    with open(REC_F4) as f:
-        prepared = [int(i) for i in json.load(f).get("examples_requested", [])]
-if RERUN_FIT4_PREP or sorted(prepared) != sorted(FIT4_IDS):
-    with open(EXAMPLES_F4, "w") as f:
-        json.dump({"example_ids": [int(i) for i in FIT4_IDS]}, f)
-    run("scripts/clean_cell.py", "clean", "--specimen", SPECIMEN, "--out", CLEAN_F4, "--cache-dir", CACHE_DIR, *ALIGN,
-        *CLEAN_CFG, "--examples", EXAMPLES_F4, "--B", B_GL, "--mu", MU, "--no-clean")
-with open(REC_F4) as f:
-    rec_f4 = json.load(f)
-print("[cell 22] nodes prepared:", rec_f4["example_ids"], "| dropped:", rec_f4.get("dropped") or "none")
-run("scripts/infer_nodes.py", "real", "--specimen", SPECIMEN, "--cleaning-dir", CLEAN_F4, "--out", INFER_F4,
-    "--weights", FIT4_WEIGHTS, "--bump-sd", BUMP_SD, "--weight-kappa", WEIGHT_KAPPA, "--starts", FIT4_STARTS)
-FOCAL_F4 = "%s/focal_%d.png" % (INFER_F4, SPECIMEN)
-run("scripts/show_focal.py", "--cleaning-dir", CLEAN_F4, "--specimen", SPECIMEN, "--inference-dir", INFER_F4,
-    "--zoom-um", 6.0, "--out", FOCAL_F4)
-res_f4 = pd.read_csv("%s/inference_%d.csv" % (INFER_F4, SPECIMEN))
-res_f4["d_over_allen"] = res_f4["d_hat_um"] / res_f4["d_allen_um"]
-display(res_f4[["node_id", "d_allen_um", "d_hat_um", "se_d_um", "d_over_allen", "mu_hat_per_um", "v0_hat_um",
-                "z_ax_hat_um", "chi2_mean", "n_planes_used", "lambda_um", "v_cut_lo_um", "v_cut_hi_um", "n_solves",
-                "status", "at_bound", "flags"]].round(4))
-display(Image(filename=FOCAL_F4))
-for path in sorted(glob.glob(INFER_F4 + "/fit_node*.png")):
-    print(path)
-    display(Image(filename=path))
+# The clear-node fit on D-199's four nodes (3883, 28, 6049, 2657) with WEIGHT_KAPPA 0.1 was dropped by the user on
+# 2026-11-20, 17:44, before it ran (D-202). Its code is in the history at commit 481abe4.
 
 # %% [markdown]
 # ## Cell 23 (A): the scan of the thick nodes for the in-focus width -- images at k* and +-2 planes (D-201)
