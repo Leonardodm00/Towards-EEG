@@ -183,3 +183,268 @@ def test_merge_with_only_the_fp_control_twin(group, tmp_path):
     assert rtr.main(["twin", "--out", str(out), "--twin", "900000200"]) == 0
     assert rtr.main(["merge", "--out", str(out), "--no-plot"]) == 0
     assert (out / "report").is_dir()
+
+
+# ===========================================================================
+#  Amendment 8 (integration tester, 2026-11-20, second incremental run).
+#  Oracles: the Block 8 entry's amendment 8 (8.1 the controls-only merge, 8.2 the
+#  gate line in the submitter's header, 8.3 the base seed) and SPEC 2.7 (c), (e)
+#  for the noise a twin carries. Expected values are computed here: the gated
+#  axes from RecoveryTolerances.for_axis, the summary's columns from the spec's
+#  list, the noise from SeedSequence([base, g, protocol, s(, pos)]) +
+#  noise_law.draw_units (the draw the spec names) + an AR(1) recursion written
+#  out here (L2').
+# ===========================================================================
+import dataclasses                        # noqa: E402
+
+from twin_config import TwinConfig        # noqa: E402
+
+SUMMARY_COLUMNS_SPEC = ["arm", "parameter", "n", "n_railed", "median_abs_err", "q25_abs_err", "q75_abs_err",
+                        "median_err", "err_kind"]
+TRUTH_COL = {"Cm": "cm_true", "Rm": "rm_true", "Ra": "ra_true", "gbar": "ih_gihbar_S_cm2", "dv_h": "ih_dvh_mV",
+             "kappa_tau": "ih_kappa_tau"}
+IH6 = ("Cm", "Rm", "Ra", "gbar", "dv_h", "kappa_tau")
+PASSIVE3 = ("Cm", "Rm", "Ra")
+FLAGGED = {IDS[1]}                          # tau_s 300 ms > 265 ms in the fixture's per-cell table
+
+
+def _seed_with_unflagged_control():
+    """The smallest manifest seed whose active_fit draw (q = 2) is an unflagged cell (2.7 (i))."""
+    for s in range(100):
+        c = np.random.default_rng(np.random.SeedSequence([s, 2])).choice(np.array(IDS), size=1, replace=False)[0]
+        if int(c) not in FLAGGED:
+            return s
+    raise AssertionError("no seed")
+
+
+def _results(out, tid, names, values, arm):
+    d = out / "fits" / ("twin_%d" % tid)
+    d.mkdir(parents=True, exist_ok=True)
+    rec = {"specimen_id": tid, "param_names": "|".join(names), "validation_status": "good", "arm": arm}
+    rec.update(values)
+    pd.DataFrame([rec]).to_csv(d / "phase2_results.csv", index=False)
+
+
+def test_a8_1_merge_controls_only_reports(group, tmp_path):
+    """8.1: only the active_fit twin has results -> exit 0; report/ and
+    report_without_flagged/ hold the long table (the control's 6 rows), the FP
+    summary, an EMPTY summary with exactly recovery_summary's columns, and a
+    verdict with 'FAIL (axis absent)' on every gated axis; gate FAIL."""
+    import ih_recovery_report as RR
+    seed = _seed_with_unflagged_control()
+    out = tmp_path / "a81"
+    assert _plan(group, out, "--seed", str(seed)) == 0
+    man = pd.read_csv(out / "manifest.csv")
+    row = man[man["configuration"] == "active_fit"].iloc[0]
+    tid = int(row["specimen_id"])
+    vals = {n: float(row[TRUTH_COL[n]]) * 1.1 for n in IH6 if n != "dv_h"}
+    vals["dv_h"] = 1.0
+    vals["gbar"] = 1e-6                                     # the low rail: what a control should give
+    _results(out, tid, IH6, vals, "ih6")
+    assert rtr.main(["merge", "--out", str(out), "--no-plot"]) == 0
+    gated = [a for a in IH6 if RR.RecoveryTolerances().for_axis(a) is not None]
+    assert gated == ["Cm", "gbar", "dv_h", "kappa_tau"]
+    for sub in ("report", "report_without_flagged"):
+        d = out / sub
+        summ = pd.read_csv(d / "recovery_summary.csv")
+        assert len(summ) == 0 and list(summ.columns) == SUMMARY_COLUMNS_SPEC, (sub, list(summ.columns))
+        long_df = pd.read_csv(d / "recovery_per_cell.csv")
+        assert len(long_df) == 6 and set(long_df["specimen_id"]) == {tid} and long_df["is_fp_control"].all()
+        fp = pd.read_csv(d / "fp_control.csv")
+        assert len(fp) >= 1 and set(fp["arm"]) == {"ih6"}
+        ver = pd.read_csv(d / "gate_verdict.csv")
+        for a in gated:
+            v = ver[ver["parameter"] == a]
+            assert len(v) == 1 and v["verdict"].iloc[0] == "FAIL (axis absent)", (sub, a, ver.to_dict("records"))
+        assert (d / "gate_verdict.txt").read_text().startswith("STAGE 7 GATE: FAIL")
+
+
+def test_a8_1_merge_drop_railed_every_noncontrol_axis_railed(group, tmp_path):
+    """Block 8, merge: 'returns 0 when the reports are written, whatever the
+    gate's verdict, and 1 when no twin has results'. --drop-railed is one of
+    plan's options. With a non-control twin whose every axis is on a bound of
+    the box (all railed) and --drop-railed, recovery_summary's input after the
+    drop is empty -- the same root cause as amendment 8.1 -- and a report is
+    still due."""
+    out = tmp_path / "a81r"
+    assert _plan(group, out, "--seed", "4", "--drop-railed") == 0
+    man = pd.read_csv(out / "manifest.csv")
+    row = man[man["configuration"] == "full"].iloc[0]
+    tid = int(row["specimen_id"])
+    import ih_recovery_report as RR
+    box = dict(RR.DEFAULT_BOX)
+    vals = {a: float(box[a][0]) for a in IH6}               # every estimate on the low bound -> rail
+    _results(out, tid, IH6, vals, "ih6")
+    try:
+        code = rtr.main(["merge", "--out", str(out), "--no-plot"])
+    except KeyError as exc:                                 # what the guard of 8.1 does not cover
+        pytest.fail("merge raised KeyError(%s) with --drop-railed and every non-control axis railed" % exc)
+    assert code == 0
+    assert (out / "report" / "recovery_summary.csv").is_file()
+
+
+def test_a8_2_gate_line_in_submitter_header():
+    """8.2: the submitter's header gives the six suites' line exactly."""
+    line = ("python smoke_twin_table.py && python smoke_twin_noise.py && python smoke_twin_manifest.py && "
+            "python smoke_twin_response.py --build && python smoke_twin_build.py && python smoke_twin_recovery.py")
+    text = (rtr.HERE / "submit_twin_recovery.sh").read_text()
+    header = [ln for ln in text.splitlines() if ln.startswith("#")]
+    assert any(ln.lstrip("# ").rstrip() == line for ln in header)
+    for s in ("smoke_twin_table.py", "smoke_twin_noise.py", "smoke_twin_manifest.py", "smoke_twin_response.py",
+              "smoke_twin_build.py", "smoke_twin_recovery.py"):
+        assert (rtr.HERE / s).is_file(), s
+
+
+def test_a8_3_plan_records_and_compares_base_seed(group, tmp_path):
+    """8.3: default TwinConfig().base_seed; recorded as twin_config.base_seed
+    (and among the options); a re-plan with another value is refused (exit 3)
+    unless --force, which records the new one; the same value is a no-op."""
+    out = tmp_path / "a83"
+    assert _plan(group, out) == 0
+    rc = json.loads((out / "run_config.json").read_text())
+    assert rc["twin_config"]["base_seed"] == TwinConfig().base_seed == 20261119
+    assert rc["twin_config"] == dataclasses.asdict(TwinConfig())
+    assert _plan(group, out, "--base-seed", str(TwinConfig().base_seed)) == 0     # the same value: no-op
+    assert _plan(group, out, "--base-seed", "7") == 3
+    assert json.loads((out / "run_config.json").read_text())["twin_config"]["base_seed"] == 20261119
+    assert _plan(group, out, "--base-seed", "7", "--force") == 0
+    rc = json.loads((out / "run_config.json").read_text())
+    assert rc["twin_config"]["base_seed"] == 7
+    assert {k: v for k, v in rc["twin_config"].items() if k != "base_seed"} == \
+        {k: v for k, v in dataclasses.asdict(TwinConfig()).items() if k != "base_seed"}
+
+
+def test_a8_3_twin_refuses_bad_recorded_twin_config(group, tmp_path):
+    """8.3: `twin` refuses (exit 3) a recorded twin_config whose keys are not
+    exactly TwinConfig's fields: an unknown key, a missing key, no twin_config."""
+    out = tmp_path / "a83k"
+    assert _plan(group, out) == 0
+    p = out / "run_config.json"
+    good = json.loads(p.read_text())
+    tid = int(pd.read_csv(out / "manifest.csv")["specimen_id"].iloc[0])
+    for mutate in ("extra", "missing", "absent"):
+        rc = json.loads(json.dumps(good))
+        if mutate == "extra":
+            rc["twin_config"]["no_such_field"] = 1
+        elif mutate == "missing":
+            del rc["twin_config"]["neuron_dt_ms"]
+        else:
+            del rc["twin_config"]
+        p.write_text(json.dumps(rc))
+        assert rtr.main(["twin", "--out", str(out), "--twin", str(tid)]) == 3, mutate
+        assert not (out / "twins" / ("twin_%d" % tid)).exists(), mutate
+
+
+def _ar1(xi, sigma, tau, dt):
+    """(L2'): e_0 = sigma xi_0, e_j = rho e_{j-1} + sigma sqrt(1 - rho^2) xi_j, rho = exp(-dt / tau)."""
+    rho = np.exp(-dt / tau)
+    c = sigma * np.sqrt(1.0 - rho * rho)
+    e = np.empty_like(xi)
+    e[0] = sigma * xi[0]
+    for j in range(1, xi.size):
+        e[j] = rho * e[j - 1] + c * xi[j]
+    return e
+
+
+def _noise(seq, n, law, dt):
+    """One draw of n samples of the stationary law (L1', no tilt), from SeedSequence seq (2.7 (e))."""
+    import noise_law as NL
+    u = NL.draw_units(np.random.default_rng(np.random.SeedSequence(seq)), 1, n)
+    sf, sm, tm, ss, ts = law
+    return sf * u.fast[0] + _ar1(u.mid[0], sm, tm, dt) + _ar1(u.slow[0], ss, ts, dt)
+
+
+def _build_only(out, tid, monkeypatch, *extra):
+    """`twin` with run_ih_fit.main replaced by a no-op: the build runs, the fit writes nothing."""
+    import run_ih_fit
+    monkeypatch.setattr(run_ih_fit, "main", lambda argv: None)
+    return rtr.main(["twin", "--out", str(out), "--twin", str(tid)] + list(extra))
+
+
+def test_a8_3_noise_depends_on_recorded_base_seed(group, tmp_path, monkeypatch):
+    """8.3 with 2.7 (c), (e): one twin planned twice with base seeds 7 and 8
+    (same options otherwise): the archives' SS windows and LS sweeps differ by
+    exactly e_7 - e_8, the noises recomputed here from
+    SeedSequence([b, g, 0, s, pos]) / ([b, g, 1, s]) (the clean response and
+    the tilt line cancel); the archive records the base seed; twin uses the
+    recorded neuron_dt_ms too. A reused archive whose base seed differs from
+    the run's is refused (build_failed, exit 1) without --force."""
+    import passive_fitting_hpc_fixed as mono
+    tid = 900000200
+    arch = {}
+    for b in (7, 8):
+        out = tmp_path / ("b%d" % b)
+        assert _plan(group, out, "--seed", "4", "--base-seed", str(b)) == 0
+        if b == 8:     # also: the recorded twin_config is used, not the defaults
+            rc = json.loads((out / "run_config.json").read_text())
+            rc["twin_config"]["neuron_dt_ms"] = 0.05
+            (out / "run_config.json").write_text(json.dumps(rc))
+        assert _build_only(out, tid, monkeypatch) == 1                    # fit_failed: the fit was a no-op
+        st = json.loads((out / "status" / ("twin_%d.json" % tid)).read_text())
+        assert st["status"] == "fit_failed" and st["built"] is True, st
+        d = out / "twins" / ("twin_%d" % tid) / ("specimen_%d" % tid)
+        meta = json.loads((d / "metadata.json").read_text())
+        assert meta["twin"]["base_seed"] == b
+        if b == 8:
+            assert meta["twin"]["neuron_dt_ms"] == 0.05
+        with np.load(d / "ss_pulses.npz") as z, np.load(d / "ls_sweeps.npz") as y:
+            arch[b] = (z["v"].copy(), z["sweep_number"].copy(), {k: y[k].copy() for k in y.files}, meta)
+    # the neuron step differs between the two runs, so the clean parts differ too: compare the noise
+    # through a third run at base seed 8 and the default step instead
+    out = tmp_path / "b8d"
+    assert _plan(group, out, "--seed", "4", "--base-seed", "8") == 0
+    assert _build_only(out, tid, monkeypatch) == 1
+    d = out / "twins" / ("twin_%d" % tid) / ("specimen_%d" % tid)
+    with np.load(d / "ss_pulses.npz") as z, np.load(d / "ls_sweeps.npz") as y:
+        arch["8d"] = (z["v"].copy(), z["sweep_number"].copy(), {k: y[k].copy() for k in y.files},
+                      json.loads((d / "metadata.json").read_text()))
+    # expected noises
+    man = pd.read_csv(tmp_path / "b7" / "manifest.csv")
+    real = int(man[man["specimen_id"] == tid]["twin_of_specimen_id"].iloc[0])
+    prot = tt.load_cell_protocol(group["gdir"] / ("specimen_%d" % real), spike_reason_fn=mono.sweep_spike_reason)
+    table = tt.read_twin_sweep_table(tmp_path / "b7" / "twin_sweeps_G.csv")
+    dt_ss = 1.0 / prot.ss_fs_Hz
+    n_w = prot.ss_t_s.size
+    v7, sw7, ls7, _ = arch[7]
+    v8, sw8, ls8, meta8 = arch["8d"]
+    assert_array_equal(sw7, prot.ss_sweep_number)
+    for k in range(v7.shape[0]):
+        s, pos = int(prot.ss_sweep_number[k]), int(prot.ss_position[k])
+        r = table[(table["specimen_id"] == real) & (table["protocol"] == "SS") & (table["sweep_number"] == s)].iloc[0]
+        law = (r["sigma_f_mV"], r["sigma_m_mV"], r["tau_m_s"], r["sigma_s_mV"], r["tau_s_s"])
+        de = _noise([7, tid, 0, s, pos], n_w, law, dt_ss) - _noise([8, tid, 0, s, pos], n_w, law, dt_ss)
+        # 1e-12 mV: float64 roundoff of sums of O(0.1 mV) terms over at most ~1e4 recursion steps
+        np.testing.assert_allclose(v7[k] - v8[k], de, rtol=0, atol=1e-12)
+    for ent in meta8["ls_sweeps"]:
+        m, s = int(ent["index"]), int(ent["sweep_number"])
+        r = table[(table["specimen_id"] == real) & (table["protocol"] == "LS") & (table["sweep_number"] == s)].iloc[0]
+        law = (r["sigma_f_mV"], r["sigma_m_mV"], r["tau_m_s"], r["sigma_s_mV"], r["tau_s_s"])
+        n = ls7["v_%d" % m].size
+        dt = 1.0 / float(r["fs_Hz"])
+        de = _noise([7, tid, 1, s], n, law, dt) - _noise([8, tid, 1, s], n, law, dt)
+        np.testing.assert_allclose(ls7["v_%d" % m] - ls8["v_%d" % m], de, rtol=0, atol=1e-11)
+    # a reused archive built under another base seed is refused, then rebuilt with --force
+    out7 = tmp_path / "b7"
+    assert _plan(group, out7, "--seed", "4", "--base-seed", "9", "--force") == 0
+    assert _build_only(out7, tid, monkeypatch) == 1
+    st = json.loads((out7 / "status" / ("twin_%d.json" % tid)).read_text())
+    assert st["status"] == "build_failed" and "base_seed" in st["reason"], st
+    assert _build_only(out7, tid, monkeypatch, "--force") == 1
+    meta = json.loads((out7 / "twins" / ("twin_%d" % tid) / ("specimen_%d" % tid) / "metadata.json").read_text())
+    assert meta["twin"]["base_seed"] == 9
+
+
+def test_a8_3_negative_base_seed(group, tmp_path, monkeypatch):
+    """Probe (spec silent): plan --base-seed -1 is accepted by the parser; numpy's
+    SeedSequence refuses negative entries, so the noise of 2.7 (e) cannot be drawn.
+    Records what each sub-command does: plan should refuse it, or twin must
+    end build_failed (never an uncaught error)."""
+    out = tmp_path / "neg"
+    code = _plan(group, out, "--base-seed=-1")
+    if code != 0:
+        return                                   # refused at plan: fine
+    tid = int(pd.read_csv(out / "manifest.csv")["specimen_id"].iloc[-1])
+    assert _build_only(out, tid, monkeypatch) == 1
+    st = json.loads((out / "status" / ("twin_%d.json" % tid)).read_text())
+    assert st["status"] == "build_failed"
+    pytest.xfail("plan accepts --base-seed -1 (exit 0); the twin then ends build_failed: %s" % st["reason"][:200])
