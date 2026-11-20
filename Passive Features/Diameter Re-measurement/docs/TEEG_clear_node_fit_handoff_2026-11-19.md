@@ -9,6 +9,7 @@
 | 2026-11-20 (later, 2) | The user, 16:40: "could we settle this measurement problem of the diameter". Section 11.3, new: what the pilot's data pin and what they leave to the in-focus width; a proposal, not decided. Evidence: `checks/scale_2026-11-20/area_check.py` and `.out` **[run, sandbox]**; PubMed searches (abstracts only). |
 | 2026-11-20 (later, 3) | The user, 16:59 and the answers after it: the in-focus width is fitted on thick nodes (D-201). Section 12, new; 11.3's proposal marked decided in part. Evidence: `kernel.with_kernel` and its smoke test (6 pass, 1 skip), the configuration's test (6 pass, 1 skip), Cell 23A run on the synthetic cell, the forward's time per evaluation measured in the sandbox. |
 | 2026-11-20 (later, 4) | The user, 17:44: Cell 22's fit (WEIGHT_KAPPA 0.1 on D-199's four nodes) is dropped before it ran (D-202). Section 11.2 marked; the notebook's Cell 22 replaced by a one-line note. |
+| 2026-11-20 (later, 5) | The first thick-node run (the user's upload, 18:09) and the user's "Maybe we have to account for a tilted background": section 12.1, new; D-203 (Block 42's start against a straight background). Evidence: `checks/tilt_2026-11-20/` on the upload; the current gallery script on the upload. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -388,3 +389,23 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   - then the thin nodes at the calibrated width, which would change D-172.
   If the check shows $\sigma_0$ and $c$ not separable on 5 planes, the approach goes back to the user (coding
   directive 7).
+
+### 12.1 The first thick-node run and the tilted background (D-203) [added 2026-11-20, later]
+
+- **What came out [data inspected: the user's upload, 18:09]**: `clear` found 53 thick candidates (Allen >= 1.0 um, not
+  near an end, no tier-2 neighbour, >= 5 um from the soma) among all 8,495 ranked nodes; the 10 um spacing (3-D) kept
+  7 (7, 599, 611, 629, 639, 663, 1802). Thick dendrites crowd near the soma.
+- **The gallery ran code older than D-198** (its settings have no `judge_along`, which the current script always
+  writes), so the lines along the dendrite were judged and 599 and 611 were rejected for `width_range`. The current
+  script on the same preparation **[run, sandbox, `4823f23`]**: 7, 599, 611, 629 clean; 639 rejected (outside, skew);
+  663 and 1802 rejected (the width against the flat background never closes). In Colab: rerun Cell 1 before Cell 23A.
+- **The tilt [run, sandbox: `checks/tilt_2026-11-20/`]**: a straight background $L_k(v) = a_k + b_k v$ through the
+  samples at $|v| \ge 3$ um on $k^* \pm 1$ has slopes of -0.3 to -0.2 gl/um (7), -1.5 to -1.3 (599), about +0.4 (611),
+  about 0 (629), +3.0 to +3.2 (639), +7.5 to +8.0 (663) and -7.5 to -7.0 (1802). Measured against it, the screen's E
+  halves on 7 and 599, the width of 663 and 1802 closes (1.5 to 3.4 um, against 4.2 to 4.7 um flat) but their E and S
+  stay high, and 629's E rises from 0.24 to 0.28-0.30. The wings' scatter about the line is near the noise on 7, 599,
+  611, 629 and 1802, and well above it on 639 (14 gl against 2.3) and 663 (8 to 9 gl against 5.7).
+- **Where the tilt is handled**: the calibration fit's model already has $b_{0k} + b_{1k} v$ per plane (D-201.3);
+  Block 42's start now measures the dip against the straight line (D-203, amendment 4); the clearness screen
+  (Block 40) still measures against the flat $B_k$ (the user's to decide); the thin-node fit (Block 30) has one flat
+  $B_k$ per plane, $I \approx B_k \tau_k$ -- to settle before the calibrated width is used on thin nodes.
