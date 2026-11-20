@@ -34,6 +34,14 @@ Checks
                                MAX_TWINS=2; a stubbed submission; the job roles; the marker lines
     test_TS8_ascii_lf_frozen   the three files pure ASCII and LF; `git diff <contract>` empty for
                                the five frozen files
+    test_TS9_controls_only     amendment 8.1: only the active_fit twin has results (its real cell
+                               unflagged): merge exits 0, no traceback; report/ and
+                               report_without_flagged/ hold the long table and the FP summary, an
+                               empty summary, "FAIL (axis absent)" on the gated axes
+    test_TS10_base_seed        amendment 8.3: --base-seed recorded and compared at a re-plan; the same
+                               twin under b1 != b2 has different noisy traces and identical noise-free
+                               ones, under b1 twice identical ones; `twin` refuses an unknown
+                               twin_config key (exit 3)
 
 Run (from this folder: NEURON loads ./x86_64 from the working directory)
     python smoke_twin_recovery.py [--build]
@@ -872,6 +880,135 @@ def test_TS8_ascii_lf_frozen():
     if r.returncode != 0:
         raise unittest.SkipTest("git diff unavailable: %s" % r.stderr.strip())
     assert r.stdout.strip() == "", "frozen files differ from %s: %s" % (CONTRACT_COMMIT, r.stdout)
+
+
+def test_TS9_controls_only():
+    import twin_manifest as TM
+    sorted_ids = np.array(sorted(REAL_IDS), dtype=np.int64)
+    seed = next(s for s in range(200) if int(TM.configuration_cells(sorted_ids, 1, s, 2)[0]) not in FLAGGED)
+    out = _new_out("ts9")
+    code, _, se = _plan(out, "--seed", seed)
+    assert code == 0, se
+    man = _manifest(out)
+    act = man[man["configuration"] == "active_fit"].reset_index(drop=True)
+    assert not bool(act["cell_tau_s_above_window"].iloc[0]), "the fixture's draw must give an unflagged control"
+    _write_results(out, act, {int(act["specimen_id"].iloc[0]): 1.1})
+    try:
+        code, so, se = _run(["merge", "--out", out, "--no-plot"])
+    except Exception:                      # noqa: BLE001 -- an exception out of merge is this check's failure
+        code, so, se = None, "", traceback.format_exc()
+    parts = {"merge exit 0, no traceback%s" % (("" if code == 0 else " (%s)" % se.strip().splitlines()[-1])
+                                               if se.strip() else ""): code == 0 and "Traceback" not in so + se}
+    gated = {"Cm", "gbar", "dv_h", "kappa_tau"}
+    for sub in ("report", "report_without_flagged"):
+        d = out / sub
+        per = pd.read_csv(d / "recovery_per_cell.csv") if (d / "recovery_per_cell.csv").is_file() else pd.DataFrame()
+        fp = pd.read_csv(d / "fp_control.csv") if (d / "fp_control.csv").is_file() else pd.DataFrame()
+        summ_ok = False
+        if (d / "recovery_summary.csv").is_file():
+            summ = pd.read_csv(d / "recovery_summary.csv")
+            summ_ok = len(summ) == 0 and list(summ.columns) == ["arm", "parameter", "n", "n_railed", "median_abs_err",
+                                                                 "q25_abs_err", "q75_abs_err", "median_err", "err_kind"]
+        ver = pd.read_csv(d / "gate_verdict.csv") if (d / "gate_verdict.csv").is_file() else pd.DataFrame()
+        absent = set(ver.loc[ver["verdict"] == "FAIL (axis absent)", "parameter"]) if len(ver) else set()
+        parts["%s/: the long table (the control's rows), the FP summary, an empty summary with its columns, "
+              "FAIL (axis absent) on the gated axes, the two control rows" % sub] = (
+            len(per) > 0 and set(per["specimen_id"]) == {int(act["specimen_id"].iloc[0])} and len(fp) == 1
+            and summ_ok and absent == gated and len(ver) == len(gated) + 2)
+    _fail_parts(parts)
+
+
+def _build_only(out, tid):
+    """`twin` with run_ih_fit.main replaced by a no-op: the build alone (exit 1: no fit result)."""
+    import run_ih_fit as R
+    orig = R.main
+    R.main = lambda argv=None: None
+    try:
+        return _run(["twin", "--out", out, "--twin", tid])
+    finally:
+        R.main = orig
+        _clear()
+
+
+def test_TS10_base_seed():
+    import twin_build as TB
+    import twin_config
+    import twin_manifest as TM
+    import twin_table as TT
+    import ih_mechanism as IM
+    import param_spec as PS
+    b0 = twin_config.TwinConfig().base_seed
+    b1, b2 = b0 + 1, b0 + 2
+    runs = {}
+    for tag, b in (("a", b1), ("b", b2), ("c", b1)):
+        out = _new_out("ts10" + tag)
+        code, _, se = _plan(out, "--base-seed", b)
+        assert code == 0, se
+        runs[tag] = out
+    cfgs = {k: json.loads((v / "run_config.json").read_text()) for k, v in runs.items()}
+    parts = {"run_config.json records the base seed (twin_config.base_seed and the option)": all(
+        cfgs[k]["twin_config"]["base_seed"] == b and cfgs[k]["options"]["base_seed"] == b
+        for k, b in (("a", b1), ("b", b2), ("c", b1)))}
+    code, _, _ = _plan(_new_out("ts10d"))
+    parts["--base-seed defaults to TwinConfig().base_seed"] = code == 0 and json.loads(
+        (_STATE["root"] / "runs" / ("ts10d_%d" % _STATE["n_runs"]) / "run_config.json").read_text()
+    )["twin_config"]["base_seed"] == b0
+    before = _mtimes([runs["a"] / "manifest.csv", runs["a"] / "run_config.json"])
+    code_r, _, se_r = _plan(runs["a"], "--base-seed", b2)
+    parts["a re-plan with another base seed: refused (3), nothing changed"] = (
+        code_r == 3 and "base_seed" in se_r and _mtimes([runs["a"] / "manifest.csv", runs["a"] / "run_config.json"])
+        == before)
+    mans = {k: _manifest(v) for k, v in runs.items()}
+    row = mans["a"][mans["a"]["configuration"] == "full"].iloc[0]
+    tid = int(row["specimen_id"])
+    same_twin = all(
+        TM.twin_theta(mans[k][mans[k]["specimen_id"] == tid].iloc[0]) == TM.twin_theta(row)
+        and int(mans[k][mans[k]["specimen_id"] == tid].iloc[0]["twin_of_specimen_id"]) == int(row["twin_of_specimen_id"])
+        for k in runs)
+    tables_equal = all(TT.read_twin_sweep_table(runs[k] / ("twin_sweeps_%s.csv" % GROUP))
+                       .equals(TT.read_twin_sweep_table(runs["a"] / ("twin_sweeps_%s.csv" % GROUP))) for k in runs)
+    parts["the same twin in the three runs (id, real cell, truth) and the same table"] = same_twin and tables_equal
+    traces, seeds = {}, {}
+    for k, out in runs.items():
+        _build_only(out, tid)
+        d = out / "twins" / ("twin_%d" % tid) / ("specimen_%d" % tid)
+        with np.load(d / "ss_pulses.npz") as z:
+            ss = np.array(z["v"])
+        with np.load(d / "ls_sweeps.npz") as z:
+            ls = np.concatenate([np.asarray(z[n]) for n in sorted(z.files) if n.startswith("v_")])
+        traces[k] = (ss, ls)
+        seeds[k] = json.loads((d / "metadata.json").read_text())["twin"]["base_seed"]
+    parts["the archive is built with the recorded base seed"] = seeds == {"a": b1, "b": b2, "c": b1}
+    parts["b1 != b2: different noisy traces; b1 twice: identical noisy traces"] = (
+        not np.array_equal(traces["a"][0], traces["b"][0]) and not np.array_equal(traces["a"][1], traces["b"][1])
+        and np.array_equal(traces["a"][0], traces["c"][0]) and np.array_equal(traces["a"][1], traces["c"][1]))
+    # the noise-free traces under each run's recorded TwinConfig (Block 12's simulate_twin, with_noise=False)
+    import passive_fitting_hpc_fixed as mono
+    st = _fixture()
+    real = st["group_dir"] / ("specimen_%d" % int(row["twin_of_specimen_id"]))
+    prot = TT.load_cell_protocol(real, spike_reason_fn=mono.sweep_spike_reason)
+    table = TT.read_twin_sweep_table(runs["a"] / ("twin_sweeps_%s.csv" % GROUP))
+    clean = {}
+    for k in ("a", "b"):
+        cfg_k = twin_config.TwinConfig(**cfgs[k]["twin_config"])
+        spec = TM.twin_spec_of(mans[k][mans[k]["specimen_id"] == tid].iloc[0], F=float(cfgs[k]["options"]["F"]))
+        _clear()
+        cell = TB.build_twin_cell(real / "reconstruction.swc", spec, ih_spec=IM.IhSpec(),
+                                  apply_theta=PS.make_ih_spec().apply, cfg=cfg_k)
+        tr = TB.simulate_twin(cell, spec, prot, table, cfg=cfg_k, with_noise=False)
+        clean[k] = (tr.ss_v_mV, np.concatenate(tr.ls_v_mV))
+        _clear()
+    parts["b1 != b2: identical noise-free traces"] = (np.array_equal(clean["a"][0], clean["b"][0])
+                                                      and np.array_equal(clean["a"][1], clean["b"][1]))
+    # an unknown key in the recorded twin_config: twin refused (3), nothing built
+    cfg_bad = dict(cfgs["b"])
+    cfg_bad["twin_config"] = dict(cfg_bad["twin_config"], not_a_field=1)
+    (runs["b"] / "run_config.json").write_text(json.dumps(cfg_bad, indent=1))
+    other = int(mans["b"][mans["b"]["configuration"] == "passive_fit"]["specimen_id"].iloc[0])
+    code_k, _, se_k = _run(["twin", "--out", runs["b"], "--twin", other])
+    parts["twin_config with an unknown key: twin refused (3), nothing built"] = (
+        code_k == 3 and "not_a_field" in se_k and not (runs["b"] / "twins" / ("twin_%d" % other)).exists())
+    _fail_parts(parts)
 
 
 def test_convergence():
