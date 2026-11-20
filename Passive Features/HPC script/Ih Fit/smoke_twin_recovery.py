@@ -37,11 +37,12 @@ Checks
     test_TS9_controls_only     amendment 8.1: only the active_fit twin has results (its real cell
                                unflagged): merge exits 0, no traceback; report/ and
                                report_without_flagged/ hold the long table and the FP summary, an
-                               empty summary, "FAIL (axis absent)" on the gated axes
+                               empty summary, "FAIL (axis absent)" on the gated axes; with
+                               --drop-railed and every non-control row railed: exit 0, no summary rows
     test_TS10_base_seed        amendment 8.3: --base-seed recorded and compared at a re-plan; the same
                                twin under b1 != b2 has different noisy traces and identical noise-free
                                ones, under b1 twice identical ones; `twin` refuses an unknown
-                               twin_config key (exit 3)
+                               twin_config key (exit 3); a negative --base-seed refused (2)
 
 Run (from this folder: NEURON loads ./x86_64 from the working directory)
     python smoke_twin_recovery.py [--build]
@@ -915,6 +916,34 @@ def test_TS9_controls_only():
               "FAIL (axis absent) on the gated axes, the two control rows" % sub] = (
             len(per) > 0 and set(per["specimen_id"]) == {int(act["specimen_id"].iloc[0])} and len(fp) == 1
             and summ_ok and absent == gated and len(ver) == len(gated) + 2)
+    # amendment 9.1: --drop-railed and every non-control row railed (estimates on the box's bounds)
+    out2 = _new_out("ts9r")
+    code, _, se = _plan(out2, "--drop-railed")
+    assert code == 0, se
+    man2 = _manifest(out2)
+    _write_results(out2, man2, {int(t): 1.0 for t in man2["specimen_id"]})
+    box = {"Cm": (0.3, 3.0), "Rm": (1000.0, 100000.0), "Ra": (50.0, 1000.0), "gbar": (1e-6, 1e-3),
+           "dv_h": (-10.0, 10.0), "kappa_tau": (0.5, 2.0)}                       # the default boxes
+    for t, c in zip(man2["specimen_id"], man2["configuration"]):
+        if c == "active_fit":
+            continue
+        f = out2 / "fits" / ("twin_%d" % int(t)) / "phase2_results.csv"
+        df = pd.read_csv(f)
+        for n in str(df["param_names"].iloc[0]).split("|"):
+            df[n] = box[n][1]                                                    # every axis on its upper bound
+        df.to_csv(f, index=False)
+    try:
+        code2, so2, se2 = _run(["merge", "--out", out2, "--no-plot"])
+    except Exception:                      # noqa: BLE001
+        code2, so2, se2 = None, "", traceback.format_exc()
+    summ2 = (pd.read_csv(out2 / "report" / "recovery_summary.csv")
+             if (out2 / "report" / "recovery_summary.csv").is_file() else None)
+    per2 = (pd.read_csv(out2 / "report" / "recovery_per_cell.csv")
+            if (out2 / "report" / "recovery_per_cell.csv").is_file() else pd.DataFrame())
+    parts["--drop-railed, every non-control row railed: merge exit 0, no traceback, the summary has no rows%s"
+          % ((" (%s)" % se2.strip().splitlines()[-1]) if code2 != 0 and se2.strip() else "")] = (
+        code2 == 0 and "Traceback" not in so2 + se2 and summ2 is not None and len(summ2) == 0
+        and len(per2) > 0 and bool(per2.loc[~per2["is_fp_control"].astype(bool), "rail"].astype(bool).all()))
     _fail_parts(parts)
 
 
@@ -1000,6 +1029,13 @@ def test_TS10_base_seed():
         _clear()
     parts["b1 != b2: identical noise-free traces"] = (np.array_equal(clean["a"][0], clean["b"][0])
                                                       and np.array_equal(clean["a"][1], clean["b"][1]))
+    # amendment 9.2: a negative base seed refused by the parser (2), nothing written
+    out_neg = _new_out("ts10neg")
+    try:
+        code_n, _, se_n = _plan(out_neg, "--base-seed=-1")
+    except SystemExit as exc:                  # argparse's exit
+        code_n, se_n = exc.code, ""
+    parts["plan --base-seed=-1: exit 2, the run directory not written"] = code_n == 2 and not out_neg.exists()
     # an unknown key in the recorded twin_config: twin refused (3), nothing built
     cfg_bad = dict(cfgs["b"])
     cfg_bad["twin_config"] = dict(cfg_bad["twin_config"], not_a_field=1)
