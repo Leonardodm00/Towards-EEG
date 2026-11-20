@@ -13714,7 +13714,8 @@ $+\infty$ when one of them is not finite; clean iff $Q_i \le 1$ and $D_c(k^*_i) 
 D-194's $Q_i$. `judge_along` is a bool outside every signature (the pinned hashes unchanged).
 
 **Why.** The first real run (cell 529878215, Cell 21 with the defaults, 2026-11-20; the user's upload of 16:03)
-judged none of 33 candidates clean; every one failed $U_W$. **[run, sandbox:
+judged none of 33 candidates clean: 30 failed $U_W$, and on the other 3 (605, 1322, 7951) the width could not
+be formed on at least one line along the dendrite [corrected 2026-11-20: first written "every one failed $U_W$"]. **[run, sandbox:
 `checks/clear_gallery_2026-11-20/first_gallery_check.py` on the run's stored features]** at one plane a dendrite tilted
 in depth is in focus over a short stretch only: on 18 of 30 nodes the dip on the lines along it is narrowest within
 0.5 um of the node (about 10 expected by chance), and 2 um away it is a median 1.53 times wider (0.95 to 4.51); the
