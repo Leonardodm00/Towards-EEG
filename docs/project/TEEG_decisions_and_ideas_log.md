@@ -247,6 +247,7 @@ the "Binds" column.
 | 2026-11-20 (later, 2) | Logs **D-195** [orchestrator] (the twins chat; coding directive 7): a twin's job of the Stage-7 run asks for 1 core by default, not 4 -- the fit is one sequential process, so the 30 twins take 30 cores, inside the 120-core cap of D-185 (the cap check is unchanged). **Block 8 merged** on `sci/twins` (`c4dc9e3`; pushed head `577445d`): `run_twin_recovery.py` (`plan`, `list`, `twin`, `merge`), `submit_twin_recovery.sh`, `smoke_twin_recovery.py` (TS1-TS8 8/8, run by the implementer and again at the gate). With it the six blocks of the twins' fan-out (5, 10, 11, 12, 13, 8) are merged; the independent final check of the assembled pipeline (an Opus tester that wrote none of it) started on `577445d`. Next free IDs: D-196, I-007. |
 | 2026-11-20 (later, 3) | Logs **D-196** [orchestrator] (the twins chat; coding directive 7): the three findings of the independent final check of the twins' pipeline (an Opus tester that wrote none of it; `sci/twins` at `577445d`; report `Ih Fit/specs/test_reports/2026-11-20_1432_incremental.md`: **PASS WITH ISSUES** -- 16 suites and the 54 earlier spec tests pass, 93 new spec tests of which 92 pass, one real `active_fit` twin of 508282493 built and fitted) settled: the merge no longer crashes when only false-positive controls have results (the legacy summary is not called on them; the report is written and the legacy gate reads `FAIL (axis absent)`); the twins' gates on davinci are the six twins' suites; the noise's base seed is an option of the plan and a twin is built with the run's recorded configuration. Block 8's implementer is applying them (SPEC amendment 8, `91e0b1c`). Next free IDs: D-197, I-007. |
 | 2026-11-20 (later, 4) | Logs **D-197** [orchestrator] (the twins chat; coding directive 7). D-196's fixes merged on `sci/twins` (`83910c7`; Block 8's smoke TS1-TS10 10/10) and checked a second time by another independent Opus tester on `216ecf1` (report `Ih Fit/specs/test_reports/2026-11-20_1532_incremental.md`: **PASS WITH ISSUES**, no BLOCKER and no MAJOR; `tests/spec` 145 passed; a twin's noise under two base seeds differs by exactly the difference recomputed from the seed rule). Its two remaining points settled: the merge's guard is stated by its condition, so that `--drop-railed` cannot empty the summary's input unnoticed, and `plan` refuses a negative base seed (SPEC amendment 9, `51c2830`; with Block 8's implementer). Next free IDs: D-198, I-007. |
+| 2026-11-20 (the gallery chat, later) | Logs **D-198** [orchestrator] (the gallery chat; coding directive 7): the clearness verdict judges the measuring line only (k* - 1 .. k* + 1); the lines along the dendrite are measured and drawn but not judged, superseding D-194.3 and D-194.4 as verdict criteria. Evidence: the first real run of Cell 21 (cell 529878215, 33 candidates) judged none clean -- at one plane a tilted dendrite is in focus over a short stretch only (narrowest within 0.5 um of the node on 18 of 30; 2 um away a median 1.53 times wider; the trace's tilt does not predict it, Spearman 0.08) **[run, sandbox]**; the new verdict passes 12. Built at `ca3ceeb` on `sci/diameter-pipeline` (SPEC Block 40 am. 1, Block 36 am. 18; Cell 21's `GAL_JUDGE_ALONG`; clear-node handoff section 11.1). Next free IDs: D-199, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -432,6 +433,7 @@ would be needed*, *Status*.
 | D-195 | 2026-11-20 | Block 8 (`submit_twin_recovery.sh`, its default `NCPUS`; `smoke_twin_recovery.py` TS7); D-185 (the cap, unchanged) | a twin's PBS job asks for 1 core by default (was 4): `run_ih_fit` is one sequential process; 30 twins = 30 cores [orchestrator] | active |
 | D-196 | 2026-11-20 | Block 8 (`run_twin_recovery.py`: `write_one_report`, `plan`, `twin`; `submit_twin_recovery.sh`'s header; `smoke_twin_recovery.py` TS9, TS10); `TwinConfig.base_seed`; SPEC 2.7 (e) | the final check's findings settled: `merge` with controls only writes its report; the twins' gates are the six suites; `plan --base-seed`, and `twin` builds with the recorded `TwinConfig` [orchestrator] | active |
 | D-197 | 2026-11-20 | Block 8 (`run_twin_recovery.py`: `write_one_report`, the parser's `--base-seed`; `smoke_twin_recovery.py` TS9, TS10); D-196.1, D-196.3 | the second check's two points: the empty summary whenever no row is left to summarise (controls and, under `--drop-railed`, railed rows set aside); a negative base seed refused at `plan` [orchestrator] | active |
+| D-198 | 2026-11-20 | SPEC Block 40 am. 1, Block 36 am. 18; `ClearnessConfig.judge_along`; `clearness.py`, `show_clear_gallery.py`; notebook Cell 21 | the clearness verdict judges the measuring line only; the lines along the dendrite measured and drawn, not judged (opt-in `judge_along`) [orchestrator]; supersedes D-194.3, D-194.4 as verdict criteria | active, PROVISIONAL; built (`ca3ceeb`) |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -13691,3 +13693,53 @@ cannot use ends that twin as `build_failed` with its reason recorded; the one va
 **Sources.** **[run]**, **[src]**, **[reasoning]** as named. **[log]** D-196.
 
 **Status:** active; the code change is Block 8's amendment 9 on `sci/twins`. The user can reverse either.
+
+## D-198 -- The clearness verdict judges the measuring line only; the lines along the dendrite are measured and drawn but not judged [orchestrator]
+
+**Date:** 2026-11-20 (Europe/Rome), the gallery chat (coding directive 7: an estimator the orchestrator set itself,
+D-194.3 and D-194.4, changed on evidence; the approach of D-194.0 stands). **Binds:** SPEC Block 40 (amendment 1) and
+Block 36 amendment 18 on `sci/diameter-pipeline`; `ClearnessConfig.judge_along`; `analysis/clearness.py`
+(`screen_node`), `scripts/show_clear_gallery.py` (`--judge-along`); notebook Cell 21 (`GAL_JUDGE_ALONG`).
+**Supersedes:** D-194.3 and D-194.4 as criteria of the verdict (the lines along the dendrite, their $E$ and $S$, and
+$U_W$, $U_D$, $U_c$); they stay computed, stored and drawn, and become an opt-in. D-194.0 (the user's), D-194.1,
+D-194.2, D-194.5 and D-194.6 are unchanged.
+
+**Decision [orchestrator].** A node is judged clean when the dip of its measuring line on the planes
+$k^* - 1 .. k^* + 1$ has $E \le 0.25$ and $S \le 0.15$ (D-194.1, D-194.2, D-194.4's values) and its depth at $k^*$ is at
+least 10 noise SDs. The nine lines along the dendrite at $k^*$ are measured and shown on every page, their values
+marked "(not judged)"; `judge_along = True` (`--judge-along`, `GAL_JUDGE_ALONG`) judges them as D-194 did.
+
+**Statement.** $Q_i = \max\{\max_{k \in F_i} E_{i,k} / 0.25,\ \max_{k \in F_i} S_{i,k} / 0.15\}$, $F_i = \{k: |k - k^*_i| \le 1\}$,
+$+\infty$ when one of them is not finite; clean iff $Q_i \le 1$ and $D_c(k^*_i) \ge 10\,\sigma_i$. With `judge_along`:
+D-194's $Q_i$. `judge_along` is a bool outside every signature (the pinned hashes unchanged).
+
+**Why.** The first real run (cell 529878215, Cell 21 with the defaults, 2026-11-20; the user's upload of 16:03)
+judged none of 33 candidates clean; every one failed $U_W$. **[run, sandbox:
+`checks/clear_gallery_2026-11-20/first_gallery_check.py` on the run's stored features]** at one plane a dendrite tilted
+in depth is in focus over a short stretch only: on 18 of 30 nodes the dip on the lines along it is narrowest within
+0.5 um of the node (about 10 expected by chance), and 2 um away it is a median 1.53 times wider (0.95 to 4.51); the
+trace's tilt does not predict it (Spearman $\rho$ = 0.08, $p$ = 0.67, $n$ = 30, $U_W$ against the trace's $\varphi$), so it
+cannot be corrected from the trace. Cutting the lines to $\pm$ 1 um and dropping the ranges still passed 2 nodes: the
+lines' $E$ and $S$ are raised by the background's texture against the defocused, shallower dips. **[data: the run's
+page of node 4725]** across the nine planes the in-focus stretch slides along the dendrite. **[reasoning, by eye on the
+eight pages shown; the orchestrator's reading, not the user's]** the measuring line's part agrees with the images:
+4725, 3883, 28, 3984 pass it and look clean near the node; 2601, 2610, 6049, 2657 fail it and carry blobs or side
+structures. On the pilot it matched the user's reading on four of five nodes (D-194's evidence; 2620's junction is not
+on the line). Recomputed from the stored features, the new verdict passes 12 of 33.
+
+**What it implies for code and tables.** `judge_along` False is the default; `ClearnessResult.ratios` has the keys
+("outside", "skew") by default and all five with `judge_along`; the gallery's CSV keeps every value along the
+dendrite; the page marks them "(not judged)". Smoke tests: a blob beside the line, a taper and a bend are judged clean
+by default and rejected with `judge_along`; a parallel neighbour and a branch that reaches the line are rejected either
+way. On Colab only the screen reruns (seconds): Cell 1, then Cell 21.
+
+**What it does not decide.** The four nodes (the user's, D-194.0). Whether a structure beside the line but off it (a
+junction such as 2620's, a bend such as 28's at 1.5 um) disqualifies a node: left to the user's eye on the page.
+Whether the lines along the dendrite should be read each at its own sharpest plane (a model-free fix of the tilt
+effect; it needs the patches, which were not uploaded): not built. Whether the trace's tilt is right for the fit's
+forward model (a lead, section 11.1 of the clear-node handoff): not checked.
+
+**Sources.** **[run, sandbox]**, **[data]** and **[reasoning]** as named. **[log]** D-194.
+
+**Status:** active, PROVISIONAL, the orchestrator's; built at `ca3ceeb` on `sci/diameter-pipeline`. The user can
+reverse it (`GAL_JUDGE_ALONG = True` restores D-194's verdict for one run).
