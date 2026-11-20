@@ -15,6 +15,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-20 (later) | Section 5b brought to `sci/twins` at `216ecf1`: the final check (an independent Opus tester on `577445d`: PASS WITH ISSUES, report `Ih Fit/specs/test_reports/2026-11-20_1432_incremental.md`) and its three findings, fixed in Block 8 (D-196; TS1-TS10 10/10); a second check of the changed block was running when this was written. |
 | 2026-11-20 (later, 2) | Section 5b at the end of the implementation: `sci/twins` at `01ebd72`; the second independent check (`216ecf1`: PASS WITH ISSUES, nothing major; report `Ih Fit/specs/test_reports/2026-11-20_1532_incremental.md`) and its two points fixed (D-197); the six twins' suites run in sequence on the final branch all exit 0; the cluster checkout line added. Not yet run on davinci. |
 | 2026-11-20 (later, 3) | Section 5b, the cluster steps: the gate line now carries `conda activate prova` and the `cd` (run from the repository root under `(base)` it found no file); the pilot is one twin per configuration with a 48 h ceiling; a one-liner for the pilot's times; the expected cost. A trap added (section 10). |
+| 2026-11-20 (later, 4) | The gates on davinci (16:35): 58 checks passed; TS7 of `smoke_twin_recovery.py` ERROR (`manifest.csv` not found). Cause: NEURON exits (`can't open DISPLAY`) when `DISPLAY` is set and no X server answers; the test's fake `HOME` hid the X11 cookie of the MobaXterm login. Fixed by SPEC Block 8 amendment 10 (`84d099d`; the submitter unsets `DISPLAY`; NEURON's version recorded without pip metadata); `sci/twins` at `a28d1a5`. A trap added. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -269,7 +270,7 @@ a real twin was not measured here: the pilot gives it.
 with `prova` active.
 
 0. the branch (done): `cd /davinci-1/home/ldellamea/TEEG/Towards-EEG && git fetch origin sci/twins && git checkout sci/twins && git pull && git log --oneline -1`
-   (expect `01ebd72` or later).
+   (expect `a28d1a5` or later).
 1. the gates, from the repository root: `conda activate prova && cd "Passive Features/HPC script/Ih Fit" && python smoke_twin_table.py && python smoke_twin_noise.py && python smoke_twin_manifest.py && python smoke_twin_response.py --build && python smoke_twin_build.py && python smoke_twin_recovery.py`
    -- each suite ends `-- N pass, 0 fail, 0 error ...` (10, 9, 10, 10, 9 and 10 pass, with skips); about 5 min.
 2. the dry run: `RUN_TAG=tw1 NOISE_TAG=nf2 DRY_RUN=1 bash submit_twin_recovery.sh` -- must print `plan: cohort of 18 real
@@ -367,6 +368,7 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
 | run tags | `nf1` (two-component, superseded) and `nf2` (current) sit side by side; a new law needs a new tag |
 | the roadmap's `pushed` | the tool reads tester reports only from the repository root's `specs/test_reports/`; this folder's reports (`Ih Fit/specs/test_reports/`, e.g. the final check of 2026-11-17) are not seen, so N1-N6 do not turn `tested` |
 | N6's marker | the jobs' marker pushes from the compute node, which needs `module load proxy`; none arrived, so N6 shows `pushed` although the run is done; the same holds for Stage 7's jobs unless the job script loads the proxy |
+| X11 forwarding and NEURON | `import neuron` exits with status 1 (`can't open DISPLAY`) when `DISPLAY` is set and no X server accepts the connection (MobaXterm's X server off, or a `HOME` without the X11 cookie); the submitter unsets `DISPLAY` (amendment 10); by hand, prefix `env -u DISPLAY`. The SSH server's `X11 connection rejected because of wrong authentication` lines are the sign |
 | the gates from the repository root | the `smoke_twin_*.py` suites live in the "Ih Fit" folder and need `prova`; run from the root under `(base)` they are not found (2026-11-20) |
 | the submitter inside a PBS job | refused (`PBS_JOBID` set); submit from the login node |
 | multi-line pastes | the user pastes commands into a terminal: give one chained line or a tested one-liner, never a heredoc |
