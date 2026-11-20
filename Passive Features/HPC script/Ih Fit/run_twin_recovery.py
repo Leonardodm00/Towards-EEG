@@ -183,6 +183,17 @@ def recovery_defaults() -> Dict[str, object]:
     return vars(ns)
 
 
+def _non_negative_int(text: str) -> int:
+    """argparse type of --base-seed (amendment 9.2): SeedSequence refuses a negative entry."""
+    try:
+        v = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError("%r is not an integer" % text)
+    if v < 0:
+        raise argparse.ArgumentTypeError("must be a non-negative integer, got %d" % v)
+    return v
+
+
 def build_parser() -> argparse.ArgumentParser:
     d = recovery_defaults()
     ap = argparse.ArgumentParser(prog="run_twin_recovery.py",
@@ -200,7 +211,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--n-per-configuration", type=int, default=10)
     p.add_argument("--seed", type=int, default=d["seed"])
     p.add_argument("--id-base", type=int, default=d["id_base"])
-    p.add_argument("--base-seed", type=int, default=TwinConfig().base_seed,
+    p.add_argument("--base-seed", type=_non_negative_int, default=TwinConfig().base_seed,
                    help="root of the twins' noise streams, SPEC 2.7 (e) (amendment 8.3); recorded as "
                         "run_config.json's twin_config.base_seed")
     p.add_argument("--force", action="store_true", help="re-plan a run directory planned with other options")
@@ -687,16 +698,27 @@ def _box(o) -> Dict[str, tuple]:
     return box
 
 
+def summarised_rows(long_df: pd.DataFrame, drop_railed: bool) -> int:
+    """The number of rows recovery_summary would summarise (amendment 9.1): the long table's rows that
+    are not false-positive controls and, with drop_railed, not railed."""
+    if not len(long_df):
+        return 0
+    keep = ~long_df["is_fp_control"].astype(bool)
+    if drop_railed:
+        keep &= ~long_df["rail"].astype(bool)
+    return int(keep.sum())
+
+
 def write_one_report(out_dir: Path, manifest: pd.DataFrame, frames: Sequence[pd.DataFrame], o: Dict[str, object],
                      *, plot: bool) -> pd.DataFrame:
     """The report of run_ih_recovery.phase_report on these frames: returns the long table."""
     import ih_recovery_report as RR
     long_df = RR.recovery_long(manifest, list(frames), box=_box(o), strict_rails=not bool(o["lenient_rails"]))
-    if len(long_df) and (~long_df["is_fp_control"].astype(bool)).any():
+    if summarised_rows(long_df, bool(o["drop_railed"])) > 0:
         summary = RR.recovery_summary(long_df, drop_railed=bool(o["drop_railed"]))
     else:
-        # amendment 8.1: only false-positive controls have results; recovery_summary would raise
-        # KeyError on its empty non-control part, so the summary is its own empty frame
+        # amendments 8.1, 9.1: no row for recovery_summary to summarise (only false-positive controls,
+        # or --drop-railed leaves none); it would raise KeyError, so the summary is its own empty frame
         summary = pd.DataFrame(columns=list(SUMMARY_COLUMNS))
     inflation = RR.cm_inflation(long_df)
     fp = RR.fp_control_summary(long_df)
@@ -791,7 +813,10 @@ COMMANDS = {"plan": cmd_plan, "list": cmd_list, "twin": cmd_twin, "merge": cmd_m
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    args = build_parser().parse_args(argv)
+    try:
+        args = build_parser().parse_args(argv)
+    except SystemExit as exc:      # a usage error (2) or --help (0): returned, not raised, so that
+        return int(exc.code or 0)    # main() gives the exit code in process too
     try:
         return int(COMMANDS[args.command](args))
     except Refused as exc:
