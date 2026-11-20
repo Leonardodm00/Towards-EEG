@@ -245,6 +245,7 @@ the "Binds" column.
 | 2026-11-19 (later, 7) | No decision changed (the clearance chat, 20:48-22:10). On the user's question whether a heavier-tailed kernel would fix the clear nodes' overestimates: on node 5353 heavier tails at the configured in-focus width fit worse and do not let Allen's diameter fit, a wider in-focus width does, and the fit cannot separate the width from the diameter **[run, sandbox: `checks/kernel_tails_2026-11-19/`, `7c05a01`]**. The user corrected the chat (22:02): node 2669 is not clean in focus; checked -- the bump cut misses its in-focus neighbour because D-176.1 searches the nine-plane mean (`checks/clear_nodes_2026-11-19/`). Handoff for the chat that continues the path: `Passive Features/Diameter Re-measurement/docs/TEEG_clear_node_fit_handoff_2026-11-19.md` (`055e438` on `sci/diameter-pipeline`). Next free IDs: D-191, I-007. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 | 2026-11-20 (later, 2) | Logs **D-195** [orchestrator] (the twins chat; coding directive 7): a twin's job of the Stage-7 run asks for 1 core by default, not 4 -- the fit is one sequential process, so the 30 twins take 30 cores, inside the 120-core cap of D-185 (the cap check is unchanged). **Block 8 merged** on `sci/twins` (`c4dc9e3`; pushed head `577445d`): `run_twin_recovery.py` (`plan`, `list`, `twin`, `merge`), `submit_twin_recovery.sh`, `smoke_twin_recovery.py` (TS1-TS8 8/8, run by the implementer and again at the gate). With it the six blocks of the twins' fan-out (5, 10, 11, 12, 13, 8) are merged; the independent final check of the assembled pipeline (an Opus tester that wrote none of it) started on `577445d`. Next free IDs: D-196, I-007. |
+| 2026-11-20 (later, 3) | Logs **D-196** [orchestrator] (the twins chat; coding directive 7): the three findings of the independent final check of the twins' pipeline (an Opus tester that wrote none of it; `sci/twins` at `577445d`; report `Ih Fit/specs/test_reports/2026-11-20_1432_incremental.md`: **PASS WITH ISSUES** -- 16 suites and the 54 earlier spec tests pass, 93 new spec tests of which 92 pass, one real `active_fit` twin of 508282493 built and fitted) settled: the merge no longer crashes when only false-positive controls have results (the legacy summary is not called on them; the report is written and the legacy gate reads `FAIL (axis absent)`); the twins' gates on davinci are the six twins' suites; the noise's base seed is an option of the plan and a twin is built with the run's recorded configuration. Block 8's implementer is applying them (SPEC amendment 8, `91e0b1c`). Next free IDs: D-197, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -428,6 +429,7 @@ would be needed*, *Status*.
 | D-193 | 2026-11-20 | Block 12 (`twin_build.py`, its smoke's TB1 and TB7; `write_twin_archive`); the fitter's loader (`passive_fitting_hpc_fixed._ls_bundles_from_sweep_info`), not changed | the twin-fitter identity is tested with the LS duration n_on / f_s and the loader's one-sample-short duration bounded at 1e-3 mV; `tau_ms` of a twin = R_m C_m of the truth; the archive writer's extra arguments [orchestrator] | active; built (`sci/twins`) |
 | D-194 | 2026-11-19 | the nodes of D-169's fit (the clear-node handoff, section 4, O2); SPEC Blocks 40, 41 (new), Block 36 am. 18; `ClearnessConfig`; `clearness.py`, `show_clear_gallery.py`; notebook Cell 21 | the clear-node work moves to four nodes the user selects from a gallery of image-judged clean nodes [user]; the model-free screen (outside excess, skew, steadiness along the dendrite) and its thresholds [orchestrator] | active; the screen PROVISIONAL; built (`c3f3ccb`, `75ba99a`), not run on a real image |
 | D-195 | 2026-11-20 | Block 8 (`submit_twin_recovery.sh`, its default `NCPUS`; `smoke_twin_recovery.py` TS7); D-185 (the cap, unchanged) | a twin's PBS job asks for 1 core by default (was 4): `run_ih_fit` is one sequential process; 30 twins = 30 cores [orchestrator] | active |
+| D-196 | 2026-11-20 | Block 8 (`run_twin_recovery.py`: `write_one_report`, `plan`, `twin`; `submit_twin_recovery.sh`'s header; `smoke_twin_recovery.py` TS9, TS10); `TwinConfig.base_seed`; SPEC 2.7 (e) | the final check's findings settled: `merge` with controls only writes its report; the twins' gates are the six suites; `plan --base-seed`, and `twin` builds with the recorded `TwinConfig` [orchestrator] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -13601,3 +13603,52 @@ parallelised: not planned.
 **Sources.** **[src]**, **[run]** as named. **[log]** D-185, D-188.
 
 **Status:** active; built on `sci/twins` (Block 8 merged, `c4dc9e3`). The user can reverse it with `NCPUS=4`.
+
+## D-196 -- The final check of the twins' pipeline: the merge with controls only, the twins' gates, the noise's base seed as an option of the run [orchestrator]
+
+**Date:** 2026-11-20, about 15:30 (Europe/Rome), the twins chat, after the final check of the fan-out (coding
+directives 7 and 9).
+**Binds:** Block 8 (`run_twin_recovery.py`: `write_one_report`, `plan`, `twin`; `submit_twin_recovery.sh`: the header;
+`smoke_twin_recovery.py`: TS9, TS10), SPEC `Ih Fit/specs/SPEC.md` on `sci/twins`, the entry of Block 8, amendment 8.
+`ih_recovery_report.py` is concerned and NOT changed. The seed rule of SPEC 2.7 (e) (D-186) is not changed.
+
+**The check [run, an independent Opus tester on `577445d`; report
+`Ih Fit/specs/test_reports/2026-11-20_1432_incremental.md`].** Verdict PASS WITH ISSUES: Blocks 5, 8, 9, 10, 11, 12
+and 13 match their SPEC entries on every oracle tested; the 16 suites and the 54 earlier spec tests pass; of 93 new
+spec tests 92 pass, the failing one being the reproducer of F1; the real entry point ran on the fixture and, for one
+`active_fit` twin, on the real cell 508282493 (built in 427 s, fitted, status ok). Findings: F1 (MAJOR), F2 (MINOR),
+F3 (NOTE).
+
+**Decision [orchestrator].**
+
+(D-196.1, F1) **`merge` when only false-positive controls have results.** Before: a traceback (`KeyError: 'arm'`), no
+report. Now: `write_one_report` does not call the legacy `recovery_summary` when the long table has no non-control
+row; the summary is the empty frame with that function's columns, the report is written (the long table, the
+false-positive summary), the legacy gate reads `FAIL (axis absent)` on every gated axis, and `merge` returns 0.
+(D-196.2, F2) **The twins' gates on davinci** are the six twins' suites run as one chained line before the submitter;
+no gate runner is written and `cluster_gates_noise_fit.sh` stays the noise fit's.
+(D-196.3, F3) **The noise's base seed is an option of the run.** `plan --base-seed <int>` (default
+`TwinConfig().base_seed` = 20261119, unchanged), recorded in `run_config.json` and compared at a re-plan; `twin` builds
+with the `TwinConfig` recorded in `run_config.json`, not with the code's current defaults.
+
+**Why.** (D-196.1) **[src, read at `577445d`; run, the tester's reproducer]** `recovery_summary` drops the control
+rows, builds a frame without columns from an empty loop and merges it on `["arm", "parameter"]`. In the 30-twin run the
+case arises only if every `full` and `passive_fit` twin with results is missing, but a pilot or a partial run of
+`active_fit` twins meets it. A run of controls alone has no truth to recover on the $I_h$ axes, so the gate's own rule
+("an absent required axis fails") is the right reading, and the legacy module, covered by its own regression suite,
+is left as it is. (D-196.2) **[reasoning]** The six suites are the checks that exist; a second runner would repeat
+them. (D-196.3) **[src; run, the tester]** A twin's noise stream is seeded by (base seed, twin id, protocol, sweep,
+position) (SPEC 2.7 (e)); twin ids are the same in every run, so two runs differing only in the manifest's `--seed`
+give a twin with the same id on the same real cell the same noise, with no way to choose otherwise; and `twin` built
+with `TwinConfig()` of the code at hand, so a change of a default between `plan` and `twin` would have gone unnoticed.
+
+**What it implies for code and tables.** As stated; TS9 and TS10 in `smoke_twin_recovery.py`. Default behaviour is
+unchanged: the same base seed, the same twins.
+
+**What it does not decide.** Whether Stage 7 is ever repeated with another base seed (the user's). The tester's
+remarks on the SPEC that concern the noise-fit entries (Block 9's text still describing the two-component law; the
+order of the lettered items of 2.6 and 2.7) are left as they are and reported to the user.
+
+**Sources.** **[src]**, **[run]**, **[reasoning]** as named. **[log]** D-184, D-186, D-188, D-011.
+
+**Status:** active; the code change is Block 8's amendment 8 on `sci/twins`. The user can reverse any of the three.
