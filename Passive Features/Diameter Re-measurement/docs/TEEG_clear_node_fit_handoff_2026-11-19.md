@@ -266,8 +266,9 @@ selects four of them; the estimation and the removal of secondary dips are refin
 **[data: the user's upload of 2026-11-20 16:03 -- `OUT/cleaning_gallery/gallery` and the preparation's
 `cleaning_529878215.json`, `examples_gallery_529878215.json`, `features_529878215.csv`; the patches were not
 uploaded]**. Cell 21 with the defaults: 33 candidates (8 in each of the bins 0.40, 0.45, 0.60, 0.80 um; 1 in 1.20 to
-5.0 um, node 605: the trace-based rule found no other), **none judged clean**; every node failed $U_W$, the width's
-range along the dendrite; the eight pages shown were the best-scoring rejected ones.
+5.0 um, node 605: the trace-based rule found no other), **none judged clean**; 30 failed $U_W$, the width's range along the
+dendrite, and on the other 3 (605, 1322, 7951) the width could not be formed on at least one line along it
+[corrected 2026-11-20: first written "every node failed $U_W$"]; the eight pages shown were the best-scoring rejected ones.
 
 - **Why [run, sandbox: `checks/clear_gallery_2026-11-20/first_gallery_check.py` on the run's stored features]**: at one
   plane a dendrite tilted in depth is in focus over a short stretch only. On 18 of 30 nodes the dip on the lines along
