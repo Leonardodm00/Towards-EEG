@@ -541,7 +541,7 @@ for path in sorted(glob.glob(INFER_D + "/fit_node*.png")):
     display(Image(filename=path))
 
 # %% [markdown]
-# ## Cell 21: a gallery of the nodes the image judges clean -- look, then pick four (D-192; about 1.5 min per candidate)
+# ## Cell 21: a gallery of the nodes the image judges clean -- look, then pick four (D-194; about 1.5 min per candidate)
 #
 # Run after Cells 0, 1 and 16; needs Cell 16b's ranking in OUT/cleaning (as Cells 19 to 20). Three steps (SPEC
 # Blocks 40, 41 and Block 36 amendment 18):

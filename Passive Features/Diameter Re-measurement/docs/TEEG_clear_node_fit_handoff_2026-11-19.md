@@ -3,7 +3,7 @@
 | Date | Change |
 |---|---|
 | 2026-11-19 | Created at the user's request (22:02, "Now deliver a handoff for another chat") by the clearance chat ("Questions before logic"). Code on `sci/diameter-pipeline` at `7c05a01` plus this document's commit; decision log on `main`, next free IDs D-190, I-007 when written (re-read the log's last rows before taking one: other chats log too). Includes the user's correction of 22:02 ("the 2669 IS NOT fine in focus"), checked on the data in section 6. |
-| 2026-11-19 (later) | The user, 22:17 (a new chat started from this handoff): "Let's first of all change the nodes we use" -- a cell that shows a set of judged clean nodes, from which the user selects four; the approach is refined after that. Built the same evening (D-192; SPEC Blocks 40, 41 and Block 36 amendment 18; notebook Cell 21): section 11, new. O2's state changed; nothing else in this document changed. Evidence: `tests/smoke/test_smoke_clearness.py`, `test_smoke_clearness_figures.py`, `checks/clear_gallery_2026-11-19/line_screen_pilot_check.out` **[run, sandbox]**. |
+| 2026-11-19 (later) | The user, 22:17 (a new chat started from this handoff): "Let's first of all change the nodes we use" -- a cell that shows a set of judged clean nodes, from which the user selects four; the approach is refined after that. Built the same evening (D-194; SPEC Blocks 40, 41 and Block 36 amendment 18; notebook Cell 21): section 11, new. O2's state changed; nothing else in this document changed. Evidence: `tests/smoke/test_smoke_clearness.py`, `test_smoke_clearness_figures.py`, `checks/clear_gallery_2026-11-19/line_screen_pilot_check.out` **[run, sandbox]**. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -182,7 +182,7 @@ linear in the kernel).
 | # | Point | State |
 |---|---|---|
 | O1 | **The in-focus width (P4).** D-172 keeps 0.080 um; the davinci run does not measure it. Options put to the user on 2026-11-18, not decided: the narrowest in-focus dips of a cell as an upper bound; a fit on clean thick dendrites with the width free (width and diameter separate on thick tubes: in D-052's simulations a $\pm$5 % error in $d$ on 1.5 um tubes cost $\Delta\chi^2 \ge$ 20.8, the smallest a local search found **[log]**); a third, not yet proposed to the user: many clean thin nodes fitted with one shared width. | open; 5353 alone gives the cap of section 7 |
-| O2 | **Clearness on the image.** The trace-based rule of Cell 19c (`clean_cell.py clear --d-bins`) admitted 1013, 2669, 2620; candidates: the per-plane bump test on the in-focus planes, the recorded in-focus width against the widest dip Allen's diameter can render (section 5), the fit's $\chi^2/N$ | [corrected 2026-11-19, later: was "open; nothing built"] a screen is built, PROVISIONAL (D-192 [orchestrator]; section 11): model-free, on the recorded image; it chooses the nodes shown to the user, who selects four. Its rule and thresholds are to confirm; it has not run on a real image |
+| O2 | **Clearness on the image.** The trace-based rule of Cell 19c (`clean_cell.py clear --d-bins`) admitted 1013, 2669, 2620; candidates: the per-plane bump test on the in-focus planes, the recorded in-focus width against the widest dip Allen's diameter can render (section 5), the fit's $\chi^2/N$ | [corrected 2026-11-19, later: was "open; nothing built"] a screen is built, PROVISIONAL (D-194 [orchestrator]; section 11): model-free, on the recorded image; it chooses the nodes shown to the user, who selects four. Its rule and thresholds are to confirm; it has not run on a real image |
 | O3 | **The bump rule** (section 6) | open; D-176.1 stays PROVISIONAL |
 | O4 | **639**: Allen's 1.2 um against a 2.05 um flat-bottomed dip | open; look at the stack around the node |
 | O5 | **Cost**: 124-305 min for five nodes on Colab; grows with the fitted diameter | open |
@@ -221,7 +221,7 @@ inside a name splits it. Each `.out` next to a script is the output of 2026-11-1
   (Block 25 x4, Block 28 x1, Block 31 x1) failed before these changes and still do **[run, sandbox, 2026-11-18]**.
 - Whether 2620's joining processes are traced (on branches the clear rule does not count) or untraced.
 
-## 11. The gallery of image-judged clean nodes (Cell 21; D-192) [added 2026-11-19, later]
+## 11. The gallery of image-judged clean nodes (Cell 21; D-194) [added 2026-11-19, later]
 
 **[user]** 22:17: the five nodes of section 4 are no longer the working set; a cell shows a set of judged clean
 nodes (the image in focus, the images across the planes, the measuring lines across the planes) and the user

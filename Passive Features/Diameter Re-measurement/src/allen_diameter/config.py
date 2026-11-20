@@ -451,23 +451,23 @@ class InferenceConfig:
 
 @dataclass(frozen=True)
 class ClearnessConfig:
-    """The image-based clearness screen of a prepared node (SPEC Block 40; D-192 [orchestrator], PROVISIONAL): a
+    """The image-based clearness screen of a prepared node (SPEC Block 40; D-194 [orchestrator], PROVISIONAL): a
     model-free judgement of the recorded dip, used to choose the nodes shown for selection; it enters no fit and
     no signature."""
 
-    focus_half_planes: int = 1             # source: PROVISIONAL (D-192.2): the line is judged on the planes k* - this .. k* + this
-    along_half_um: float = 2.0             # source: PROVISIONAL (D-192.3): the parallel lines along the axis reach this far each way from the measuring line (um)
-    along_step_um: float = 0.5             # source: PROVISIONAL (D-192.3): their spacing along the axis (um); the read averages +-along_branch_avg_um (0.5 um), so the lines overlap by half and a structure is centred within 0.25 um of one of them
-    smooth_samples: float = 1.0            # source: PROVISIONAL (D-192.1): the dip is smoothed along the line by a Gaussian of this SD in line samples (inference.bump_smooth_samples' value)
-    window_um: float = 1.0                 # source: PROVISIONAL (D-192.1): the central extreme is the deepest sample within this of the line's centre (um)
-    skew_levels: Tuple[float, float] = (0.75, 0.25)   # source: PROVISIONAL (D-192.1): the fractions of the depth whose midpoints are compared with the half-depth midpoint
-    outside_fwhm: float = 1.0              # source: PROVISIONAL (D-192.1): "outside the dip" = at least this many half-depth widths from the dip's centre
-    outside_max: float = 0.25              # source: PROVISIONAL (D-192.4): the largest |dip| outside, over the central depth, at most this
-    skew_max: float = 0.15                 # source: PROVISIONAL (D-192.4): the largest shift of a level's midpoint, over the half-depth width, at most this
-    width_range_max: float = 0.25          # source: PROVISIONAL (D-192.4): (max - min) / median of the half-depth width along the axis, at most this
-    depth_range_max: float = 0.30          # source: PROVISIONAL (D-192.4): the same for the central depth
-    centre_range_max: float = 0.50         # source: PROVISIONAL (D-192.4): (max - min) of the dip's centre along the axis, over the median half-depth width, at most this
-    min_depth_sd: float = 10.0             # source: PROVISIONAL (D-192.4): the central depth on the sharpest plane at least this many noise SDs of a line sample
+    focus_half_planes: int = 1             # source: PROVISIONAL (D-194.2): the line is judged on the planes k* - this .. k* + this
+    along_half_um: float = 2.0             # source: PROVISIONAL (D-194.3): the parallel lines along the axis reach this far each way from the measuring line (um)
+    along_step_um: float = 0.5             # source: PROVISIONAL (D-194.3): their spacing along the axis (um); the read averages +-along_branch_avg_um (0.5 um), so the lines overlap by half and a structure is centred within 0.25 um of one of them
+    smooth_samples: float = 1.0            # source: PROVISIONAL (D-194.1): the dip is smoothed along the line by a Gaussian of this SD in line samples (inference.bump_smooth_samples' value)
+    window_um: float = 1.0                 # source: PROVISIONAL (D-194.1): the central extreme is the deepest sample within this of the line's centre (um)
+    skew_levels: Tuple[float, float] = (0.75, 0.25)   # source: PROVISIONAL (D-194.1): the fractions of the depth whose midpoints are compared with the half-depth midpoint
+    outside_fwhm: float = 1.0              # source: PROVISIONAL (D-194.1): "outside the dip" = at least this many half-depth widths from the dip's centre
+    outside_max: float = 0.25              # source: PROVISIONAL (D-194.4): the largest |dip| outside, over the central depth, at most this
+    skew_max: float = 0.15                 # source: PROVISIONAL (D-194.4): the largest shift of a level's midpoint, over the half-depth width, at most this
+    width_range_max: float = 0.25          # source: PROVISIONAL (D-194.4): (max - min) / median of the half-depth width along the axis, at most this
+    depth_range_max: float = 0.30          # source: PROVISIONAL (D-194.4): the same for the central depth
+    centre_range_max: float = 0.50         # source: PROVISIONAL (D-194.4): (max - min) of the dip's centre along the axis, over the median half-depth width, at most this
+    min_depth_sd: float = 10.0             # source: PROVISIONAL (D-194.4): the central depth on the sharpest plane at least this many noise SDs of a line sample
 
 
 @dataclass(frozen=True)
@@ -484,7 +484,7 @@ class DiameterConfig:
     survey: SurveyConfig = field(default_factory=SurveyConfig)
     cleaning: CleaningConfig = field(default_factory=CleaningConfig)  # source: D-129, D-130 (sub-config; outside every signature)
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # source: D-129, D-130 (sub-config; outside every signature)
-    clearness: ClearnessConfig = field(default_factory=ClearnessConfig)  # source: D-192 [orchestrator] (sub-config; outside every signature)
+    clearness: ClearnessConfig = field(default_factory=ClearnessConfig)  # source: D-194 [orchestrator] (sub-config; outside every signature)
 
     # ------------------------------------------------------------ checks --
     def validate(self) -> None:

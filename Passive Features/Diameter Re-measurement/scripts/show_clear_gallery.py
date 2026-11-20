@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A gallery of the nodes the image judges clean (SPEC Block 36, amendment 18; Blocks 40 and 41; D-192).
+"""A gallery of the nodes the image judges clean (SPEC Block 36, amendment 18; Blocks 40 and 41; D-194).
 
 Reads the files of a preparation (scripts/clean_cell.py clean --no-clean: cleaning_<S>.json and, per example
 node, cleaning_<S>_node<id>.npz), runs the clearness screen of Block 40 on every example node -- the recorded

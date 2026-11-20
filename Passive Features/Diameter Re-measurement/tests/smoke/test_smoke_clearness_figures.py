@@ -1,5 +1,5 @@
 """Smoke test for the clearness figures and the gallery's entry point -- Block 41 and Block 36, amendment 18,
-in specs/SPEC.md (D-192 [orchestrator]).
+in specs/SPEC.md (D-194 [orchestrator]).
 
 Checks
     test_known_answer   figure_node draws what it is given: the profile lines' data equal the inputs, the

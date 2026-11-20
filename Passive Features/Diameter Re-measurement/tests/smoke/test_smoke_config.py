@@ -137,7 +137,7 @@ def test_reference():
     n_fields = sum(len(dataclasses.fields(k)) for k in (C.AcquisitionConfig, C.MeasureConfig, C.CorrectionConfig,
                                                         C.RendererConfig, C.PhantomConfig, C.CalibrationConfig,
                                                         C.SurveyConfig, C.CleaningConfig, C.InferenceConfig,
-                                                        C.ClearnessConfig))   # Block 40 (D-192)
+                                                        C.ClearnessConfig))   # Block 40 (D-194)
     assert n_tagged == n_fields, (n_tagged, n_fields)
     # every field is read by some code outside config.py (attribute access or getattr, parsed with ast,
     # so a docstring naming a field does not count) [added 2026-10-07: renderer.jpeg_qtables_file was

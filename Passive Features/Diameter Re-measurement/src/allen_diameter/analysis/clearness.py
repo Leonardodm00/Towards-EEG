@@ -1,4 +1,4 @@
-"""The image-based clearness screen of a prepared node -- Block 40 in specs/SPEC.md (D-192 [orchestrator],
+"""The image-based clearness screen of a prepared node -- Block 40 in specs/SPEC.md (D-194 [orchestrator],
 PROVISIONAL; the handoff's open point O2).
 
 The trace-based rule (contamination.pick_clear_examples) only knows the traced neighbours; a structure that is

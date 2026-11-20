@@ -1,4 +1,4 @@
-"""Smoke test for the image-based clearness screen -- Block 40 in specs/SPEC.md (D-192 [orchestrator]).
+"""Smoke test for the image-based clearness screen -- Block 40 in specs/SPEC.md (D-194 [orchestrator]).
 
 Checks
     test_known_answer   dip_features on a Gaussian dip (W = 2 sqrt(2 ln 2) s, S = 0, E = 1/16 at one width),

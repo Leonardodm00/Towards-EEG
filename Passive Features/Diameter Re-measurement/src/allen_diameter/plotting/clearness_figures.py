@@ -1,4 +1,4 @@
-"""Figures of the clearness screen -- Block 41 in specs/SPEC.md (D-192 [orchestrator]; the user, 2026-11-19:
+"""Figures of the clearness screen -- Block 41 in specs/SPEC.md (D-194 [orchestrator]; the user, 2026-11-19:
 "a cell that shows me a set of judged clean nodes (both images at focus and across planes as well as the
 relative measuring lines across planes)").
 
