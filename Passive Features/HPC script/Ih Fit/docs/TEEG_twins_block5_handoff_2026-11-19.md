@@ -12,6 +12,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-19 (later) | The twins chat (Fable 5.2): section 5a added -- the user's answers of 21:23 to section 5's questions (D-182 to D-186), what they leave open, and the plan as it stands; "Start here" step 1, section 9's next free IDs and a trap (binary files through the Drive connector) updated. Two standalone checks in `Ih Fit/dev/2026-11-19_twins/`. |
 | 2026-11-19 (later, 2) | Section 5a: the user's answers of 21:46 (D-187 to D-189) -- single SS pulses from rest, the configurations' cells and arms, the bundles' check dropped; the plan approved; the nf2 tables and the archive cell 508282493 received in the chat. |
 | 2026-11-20 | The twins chat: section 5b added -- the generator and the Stage-7 run as built on `sci/twins` (Blocks 5, 10, 11, 12, 13, 8 merged, head `577445d`), the decisions taken on the way (D-190 to D-193, D-195), the commands for davinci, and what is still open. The independent final check of the assembled pipeline was running when this was written. Facts from the code and the runs of this chat. |
+| 2026-11-20 (later) | Section 5b brought to `sci/twins` at `216ecf1`: the final check (an independent Opus tester on `577445d`: PASS WITH ISSUES, report `Ih Fit/specs/test_reports/2026-11-20_1432_incremental.md`) and its three findings, fixed in Block 8 (D-196; TS1-TS10 10/10); a second check of the changed block was running when this was written. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -226,7 +227,7 @@ into an archive in the real layout); 8 the Stage-7 run (the manifest's three con
 cell and merge, `submit_ih_recovery.sh` as a PBS array). Wave 1: Blocks 5, 10, 11 in parallel; wave 2: Blocks 12 and 8;
 the final check by an independent Opus tester.
 
-## 5b. As built (2026-11-20) [src at `577445d` on `sci/twins`; run; log]
+## 5b. As built (2026-11-20) [src at `216ecf1` on `sci/twins`; run; log]
 
 The plan of section 5a is implemented on the branch `sci/twins` (not yet merged to `main`: the user's call). Six
 blocks, each written by its own implementer agent, gated and merged by the orchestrator:
@@ -238,14 +239,21 @@ blocks, each written by its own implementer agent, gated and merged by the orche
 | 11 | `synthetic_ground_truth.py` (two new functions) | the clean responses: one SS pulse per polarity from rest, each LS sweep at its real amplitude and timing | `smoke_twin_response.py` TR1-TR10 10/10 |
 | 13 | `twin_manifest.py` | the manifest: 10 twins per configuration (`full`, `passive_fit`, `active_fit`), real cells drawn at random from the 18, the truths | `smoke_twin_manifest.py` TM1-TM10 10/10 |
 | 12 | `twin_build.py` | one twin: the fitter's own cell at the truth, the responses, the noise, an archive the fitter's loader reads | `smoke_twin_build.py` TB1-TB9 9/9 |
-| 8 | `run_twin_recovery.py`, `submit_twin_recovery.sh` | the Stage-7 run: `plan`, one job per twin (build, then fit), `merge` with the recovery report | `smoke_twin_recovery.py` TS1-TS8 8/8 |
+| 8 | `run_twin_recovery.py`, `submit_twin_recovery.sh` | the Stage-7 run: `plan`, one job per twin (build, then fit), `merge` with the recovery report | `smoke_twin_recovery.py` TS1-TS10 10/10 |
 
 **Decisions taken after section 5a [log].** D-190 (user): a twin leaves out the depolarising LS sweeps on which the
 real cell spiked. D-191 [orchestrator]: the settle before a response, the SS current's samples, a tolerance, non-step
 sweeps left out. D-192 (user): the twin's cell is the fitter's own model (the leak reversal balanced per segment at the
 real cell's resting potential), so truth and fit share one model. D-193 [orchestrator]: the twin-fitter identity is
 tested around the loader's Long Square step, which is one sample short (found, not changed). D-195 [orchestrator]: one
-core per twin job (the fit is sequential).
+core per twin job (the fit is sequential). D-196 [orchestrator]: the final check's findings -- `merge` writes its
+report when only the no-$I_h$ controls have results; the twins' gates on davinci are the six suites of step 1 below;
+the noise's base seed is an option of the plan (`PLAN_ARGS=--base-seed=<int>`, default unchanged) and a twin is built
+with the configuration recorded at plan time.
+
+**The final check [run].** An Opus tester that wrote none of the code, on `577445d`, from the SPEC alone: PASS WITH
+ISSUES (one MAJOR, one MINOR, one NOTE, all in Block 8, all fixed by D-196); the 16 suites and the 54 earlier spec
+tests pass; 93 new spec tests in `tests/spec/`; one real `active_fit` twin of 508282493 built (427 s) and fitted.
 
 **Measured here [run].** One real `full` twin of cell 508282493 built in 1547 s on one core (about 105 s per 7.27 s
 sweep on its 5247 sections); 15 of its 22 LS sweeps are in the twin, 7 left out (`action_potential`). The fit's time on
