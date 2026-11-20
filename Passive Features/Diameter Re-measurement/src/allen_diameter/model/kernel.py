@@ -76,3 +76,38 @@ def with_in_focus_width(rcfg, sigma_r0_um):
     new = np.sqrt(var)
     new[0] = s0                                    # exactly: the table's first value and sigma_r0_um are one number
     return dataclasses.replace(rcfg, sigma_r0_um=s0, kernel_table_sigma_um=tuple(float(x) for x in new))
+
+
+def with_kernel(rcfg, sigma_r0_um, growth_scale=1.0):
+    """rcfg with its Gaussian kernel table re-anchored at the in-focus width sigma_r0_um (um) and the growth of its
+    variance with defocus scaled by growth_scale -- Block 4, amendment 2 (D-201: the in-focus width calibrated on
+    thick nodes, with a free growth scale).
+
+    For every knot delta_m, with c = growth_scale:
+
+        sigma'(delta_m) = sqrt(c (sigma(delta_m)^2 - sigma(0)^2) + sigma_r0_um^2),
+
+    i.e. Block 10's sigma(delta_m)^2 = sigma(0)^2 + G(delta_m) with another sigma(0) and the growth c G. Beyond the
+    last knot the continuation keeps its kind: "linear" with its slope times sqrt(c) (where the growth dominates,
+    sigma' tends to sqrt(c) sigma), "frozen" unchanged, "proportional" recomputed by sigma_r from the new table.
+    growth_scale = 1 gives with_in_focus_width's table bit for bit. ValueError: a kernel family other than
+    "gaussian_table", a width or a scale that is not finite and > 0, a knot whose new variance is <= 0.
+    """
+    if rcfg.kernel_family != "gaussian_table":
+        raise ValueError("with_kernel needs kernel_family 'gaussian_table', got %r" % (rcfg.kernel_family,))
+    s0, c = float(sigma_r0_um), float(growth_scale)
+    if not (math.isfinite(s0) and s0 > 0.0):
+        raise ValueError("sigma_r0_um must be finite and > 0 (um), got %r" % (sigma_r0_um,))
+    if not (math.isfinite(c) and c > 0.0):
+        raise ValueError("growth_scale must be finite and > 0, got %r" % (growth_scale,))
+    old = np.asarray(rcfg.kernel_table_sigma_um, dtype=float)
+    var = c * (old ** 2 - old[0] ** 2) + s0 ** 2      # c = 1: with_in_focus_width's expression, the same floats
+    if np.any(var <= 0.0):
+        raise ValueError("with_kernel: a knot's variance would be <= 0 at sigma_r0_um = %g um, growth_scale = %g"
+                         % (s0, c))
+    new = np.sqrt(var)
+    new[0] = s0                                    # the table's first value and sigma_r0_um are one number
+    repl = dict(sigma_r0_um=s0, kernel_table_sigma_um=tuple(float(x) for x in new))
+    if rcfg.kernel_continuation == "linear":
+        repl["kernel_continuation_slope"] = float(rcfg.kernel_continuation_slope) * math.sqrt(c)
+    return dataclasses.replace(rcfg, **repl)
