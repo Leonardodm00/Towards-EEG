@@ -16,6 +16,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-20 (later, 2) | Section 5b at the end of the implementation: `sci/twins` at `01ebd72`; the second independent check (`216ecf1`: PASS WITH ISSUES, nothing major; report `Ih Fit/specs/test_reports/2026-11-20_1532_incremental.md`) and its two points fixed (D-197); the six twins' suites run in sequence on the final branch all exit 0; the cluster checkout line added. Not yet run on davinci. |
 | 2026-11-20 (later, 3) | Section 5b, the cluster steps: the gate line now carries `conda activate prova` and the `cd` (run from the repository root under `(base)` it found no file); the pilot is one twin per configuration with a 48 h ceiling; a one-liner for the pilot's times; the expected cost. A trap added (section 10). |
 | 2026-11-20 (later, 4) | The gates on davinci (16:35): 58 checks passed; TS7 of `smoke_twin_recovery.py` ERROR (`manifest.csv` not found). Cause: NEURON exits (`can't open DISPLAY`) when `DISPLAY` is set and no X server answers; the test's fake `HOME` hid the X11 cookie of the MobaXterm login. Fixed by SPEC Block 8 amendment 10 (`84d099d`; the submitter unsets `DISPLAY`; NEURON's version recorded without pip metadata); `sci/twins` at `a28d1a5`. A trap added. |
+| 2026-11-20 (later, 5) | Section 7 brought up to date: Block 8 built (the draft around `submit_ih_recovery.sh` superseded), how to read the run's outputs, the gate's default tolerances and what a failing axis means for Stage 8 (D-005, D-083). |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -320,11 +321,20 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
 
 ## 7. After Block 5: Stage 7 and the record
 
-- **Block 8** (the gate run; roadmap S7): its SPEC entry is still the assistant's draft proposal (S7's note): the
-  recovery driver under D-073, `submit_ih_recovery.sh` with the marker lines; dry run, pilot (`MAX_CELLS=2`), full run
-  (`Ih Fit/README.md`, Stage 7).
-- **The gate** (D-011, D-083): median $|\varepsilon_i|$ per axis against tolerances still to be owned; a failing
-  kinetic knob is frozen at its base value for the campaign, a failing $C_m$ or $\bar g_h$ is not.
+- **Block 8** (the gate run; roadmap S7) is built [corrected 2026-11-20: the draft around `submit_ih_recovery.sh` and
+  `MAX_CELLS=2` is superseded]: the steps are section 5b's -- pilot of one twin per configuration, then the 30 twins.
+- **Reading the run** [src at `a28d1a5`]: `twins_status.csv` (one row per twin; 30 `ok` expected), and in `report/`
+  and `report_without_flagged/` (without the twins of the four cells of D-182.3): `gate_verdict.txt`
+  (`STAGE 7 GATE: PASS|FAIL` and the tolerances), `gate_verdict.csv` (per axis: n, median $|\varepsilon_i|$, tolerance,
+  verdict), `recovery_summary.csv`, `recovery_per_cell.csv`, `cm_inflation.csv` (each arm's $C_m$ bias on the twins with
+  I_h: the `passive_fit` question) and `fp_control.csv` (the `active_fit` twins: $\bar g_h$ on its lower bound). The
+  gate is on the `ih6` arm; $R_m$ and $R_a$ are reported, not gated.
+- **The gate** (D-011, D-083, D-005): median $|\varepsilon_i|$ per axis against tolerances still to be owned by the user
+  (`run_ih_recovery.py`'s defaults: $C_m$ and $\bar g_h$ within x1.25, $\Delta v_h$ within 3 mV, $\kappa_\tau$ within x1.5;
+  control: at least 80 % of the no-I_h twins with $\bar g_h$ on its lower bound and $C_m$ within x1.25); they are plan
+  options, frozen when the pilot is submitted. A failing kinetic knob ($\Delta v_h$, $\kappa_\tau$) is frozen at its base
+  value for the campaign; a failing $C_m$ or $\bar g_h$ means a different protocol, not a smaller fit
+  (`ih_recovery_report.frozen_axes_on_failure`).
 - **Block 7** (roadmap N7): the fitted laws and flags into the Stage-7 manifest and the noise table, and the
   decision-log and plan entries that close the noise prerequisite (N7's summary; the S0-S3 report dropped, D-125.3).
 - **Stage 8** (the campaign) waits for the gate's verdict and the corrected SWCs (S8's note).
