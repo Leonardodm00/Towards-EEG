@@ -239,6 +239,7 @@ the "Binds" column.
 | 2026-11-19 (later, 5) | Logs **D-187** to **D-189** (user, 21:46; the twins chat), the answers to the points D-182 to D-186 left open, and the approval of the plan. **D-187**: each SS pulse of a twin is simulated alone from rest, not as a 37-pulse train -- supersedes (D-083.2)'s trains for the twins' response, closes D-180's open point 2. **D-188**: Stage 7's configurations settled -- 10 cells per configuration, drawn at random from the 18 L3_exc cells; `passive fit` optimises only the passive properties on traces with I_h; `active fit` is D-011 (ii)'s control; each cell's job builds its twin and runs its fit, a merge job writes the report (closes D-184's readings and D-185.2; two readings of the assistant flagged). **D-189**: the model-free check of the SS bundles is dropped (closes D-180's open point 3, as a limit of Stage 7). The plan approved ("Everything else is ok"): Blocks 5, 10, 11 (wave 1), 12 and 8 (wave 2), on the branch `sci/twins`; roadmap stages N5b, N5c, N5d added at the user's word ("update the roadmap"). **[data inspected]** the user's upload of 21:46: the nf2 tables and JSONs (`nf2_L3_exc.tar.gz`: 18 cells, 64 SS + 525 LS sweep rows, 9 failed) and the archive cell 508282493 (`cell_508282493.tar.gz`). D-083, D-180, D-184 and D-185 annotated. Next free IDs: D-190, I-007. |
 | 2026-11-19 (later, 6) | Logs **D-190** (user, 22:05; the twins chat): a twin leaves out the depolarising Long Square sweeps that the fitter's loader drops for the real cell as not subthreshold ("Leave out") -- narrows D-186.1 (every stored LS sweep). **[src]** read the same evening: the depolarising long steps are validation only, at most the three smallest spike-free ones (`passive_long_step_training.assign_ls_roles`), so the choice changes a twin's validation set, not its fitted parameters. **Wave 1** (branch `sci/twins`, contract `f54fdde`): Block 10 (the twin's noise) returned, passed the gate and was merged (`9aa9c70`; TN1-TN9 9/9); Block 5 returned done and is reopened for D-190's amendment; Block 11 running. Next free IDs: D-191, I-007. |
 | 2026-11-19 (later, 7) | Logs **D-191** [orchestrator] (the twins chat; coding directive 7): the changes the orchestrator made while wave 1 ran -- every clean response of a twin starts from the state reached after a 6 s unstimulated settle, not from a uniform start (a cell with I_h and a uniform leak reversal is not at rest when started uniformly: 0.056 mV of drift, 0.067 mV in the SS window, measured); the SS current trace on the real archive's samples; a tolerance of Block 11's smoke; a listed LS sweep that is not a step left out of the twins' table. **Wave 1 complete** on `sci/twins` (`8449152`, pushed): Blocks 5 (`twin_table.py`, TT1-TT11 11/11 on the real nf2 tables and cell 508282493), 10 (`twin_noise.py`, TN1-TN9 9/9) and 11 (`simulate_ss_clean`, `simulate_ls_clean`, TR1-TR10 10/10; `smoke_ih_recovery.py` 14/14) written by three Opus implementers, gated and merged; contract `f54fdde`, amendments `07f3138` (1, 2) and `d203cae` (3, 4). Put to the user: whether a twin is generated with the fitter's own model (the leak reversal balanced per segment, D-005.2) in place of the generator's uniform leak reversal. Next free IDs: D-192, I-007. |
+| 2026-11-20 | Logs **D-192** (user, 13:09; the twins chat): a twin is generated with the fitter's own model -- the fitter's builder, the I_h attached as the fit attaches it, the truth applied through the fit's own parameter map with the leak reversal balanced per segment at the real cell's recorded resting potential (D-005.2) -- in place of the generator's cell with a uniform leak reversal ("I choose b. Go on"). The 6 s settle of D-191.1 is no longer needed (`TwinConfig.settle_ms` 0, with a guard on the rest drift) [orchestrator]. Wave 2 of the twins starts on `sci/twins`: Block 12 (`twin_build.py`, the twin build) and a new Block 13 (`twin_manifest.py`, the manifest of D-184 and D-188), then Block 8 (the run). D-191 annotated. Next free IDs: D-193, I-007. |
 | 2026-11-19 (later, 7) | No decision changed (the clearance chat, 20:48-22:10). On the user's question whether a heavier-tailed kernel would fix the clear nodes' overestimates: on node 5353 heavier tails at the configured in-focus width fit worse and do not let Allen's diameter fit, a wider in-focus width does, and the fit cannot separate the width from the diameter **[run, sandbox: `checks/kernel_tails_2026-11-19/`, `7c05a01`]**. The user corrected the chat (22:02): node 2669 is not clean in focus; checked -- the bump cut misses its in-focus neighbour because D-176.1 searches the nine-plane mean (`checks/clear_nodes_2026-11-19/`). Handoff for the chat that continues the path: `Passive Features/Diameter Re-measurement/docs/TEEG_clear_node_fit_handoff_2026-11-19.md` (`055e438` on `sci/diameter-pipeline`). Next free IDs: D-191, I-007. |
 | 2026-09-19 (later) | Logs I-001 (human spine simulations from H01 geometry, two tiers) with the literature assessment made the same day, and its dependency on the P1 spine-statistics tables (handoff section 4.1). |
 
@@ -420,6 +421,7 @@ would be needed*, *Status*.
 | D-189 | 2026-11-19 | D-180's open point (3); the twins' handoff, Q3; Stage 7's limits | the model-free check of the SS bundles on the real archive is dropped [user] | active |
 | D-190 | 2026-11-19 | Block 5 (the twins' table), Block 12 (the build); D-186.1; SPEC 2.7 (a) | a twin leaves out the depolarising LS sweeps the fitter's loader drops for the real cell as not subthreshold (`sweep_spike_reason` non-empty) [user] | active; not built |
 | D-191 | 2026-11-19 | Block 11 (`simulate_ss_clean`, `simulate_ls_clean`), Block 5 (`load_cell_protocol`), `TwinConfig.settle_ms`; SPEC 2.7 (f) | a twin's responses start from the settled state (a 6 s unstimulated lead), not a uniform start; the SS current on the real archive's samples; TR10's tolerance; a listed LS sweep that is not a step left out [orchestrator] | active; built (`sci/twins`) |
+| D-192 | 2026-11-20 | Block 12 (the twin build, `twin_build.py`), Stage 7 (roadmap S7); D-005.2; D-191.1; the legacy generator's cell (`synthetic_ground_truth.build_synthetic_cell`) | a twin is generated with the fitter's own model: the leak reversal balanced per segment at the real cell's recorded resting potential, so that the truth lies exactly in the fitter's parameter space [user]; no settle, a guard on the rest drift [orchestrator] | active; not built |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -13391,4 +13393,55 @@ space, is a choice of method and the user's.
 **Sources.** **[run]**, **[data inspected]** and **[reasoning]** as named. **[log]** D-005, D-183, D-186, D-187, D-190.
 
 **Status:** active; built on `sci/twins` (Blocks 5 and 11 merged, `e72d4a4`, `a13d8d4`). The user can reverse any of
-the four.
+the four. [updated 2026-11-20: the open point is settled by **D-192** (user): a twin is generated with the fitter's own model. Its rest is then a uniform equilibrium, so (D-191.1)'s settle is set to 0 for the twins and replaced by a guard on the rest drift; `settle_ms` stays in Block 11 for a cell whose rest is not uniform.]
+
+## D-192 -- A twin is generated with the fitter's own model: the leak reversal balanced per segment at the real cell's resting potential (user)
+
+**Date:** 2026-11-20, 13:09 (Europe/Rome), the twins chat. **Binds:** Block 12 (the twin build, `twin_build.py`; SPEC
+section 2.7 (h) of `Ih Fit/specs/SPEC.md` on `sci/twins`), Stage 7 (roadmap S7, Block 8) and its manifest (Block 13);
+D-005.2; D-191's open point; the legacy generator's cell (`synthetic_ground_truth.build_synthetic_cell`), which the
+twins no longer use.
+
+**Decision [user].** To the question put on 2026-11-19 after wave 1 -- build each twin with (a) the generator's cell
+(one leak reversal for every segment; a small, known mismatch with the fitter's model) or (b) the fitter's own model
+(the mismatch zero by construction, each twin's resting potential its real cell's recorded one, no settle needed);
+the assistant recommended (b) -- the user answered: "One question before wave 2: I choose b. Go on".
+
+**Statement.**
+(D-192.1) For each twin $g$ of a real cell $c$, with truth $\theta(g)$ -- $(C_m, R_m, R_a)$, and for the
+configurations simulated with I_h also $(\bar g_h, \Delta v_h, \kappa_\tau)$ -- the twin's cell is the fitter's forward
+model at $\theta(g)$: the fitter's builder on $c$'s archive morphology with the fit's spine factor
+(`passive_fitting_hpc_fixed.build_neuron_model`), the I_h mechanism attached as the fit attaches it
+(`ih_mechanism.attach_ih` with the fit's `IhSpec`), and $\theta(g)$ applied through the fit's own parameter map
+(`param_spec.ParamSpec.apply`), which sets the kinetic knobs and balances the leak reversal of every segment so that
+the resting potential $V_{\rm rest}(g)$ is a uniform equilibrium (D-005.2).
+(D-192.2) $V_{\rm rest}(g)$ is the resting potential of the real cell $c$ as the fitter's loader returns it for $c$'s
+archive; the twin's archive is written so that the loader returns the same value for the twin.
+(D-192.3) A twin simulated without I_h (`active fit`, D-188.4) is the fitter's passive model: no mechanism attached,
+the three passive parameters applied, the leak reversal equal to $V_{\rm rest}(g)$.
+
+**Why.** **[user]** as quoted. **[run, sandbox 2026-11-19: `Ih Fit/dev/2026-11-19_twins/rest_models.py`, a
+ball-and-stick cell with I_h, one parameter set]** With the generator's cell started from its settled state, the
+baseline-subtracted responses still differ from the balanced model's at the same parameters by 0.0004 mV in the SS
+window and by up to 0.021 mV (RMS 0.017 mV; 0.3 % of the 7.4 mV deflection) over a 1 s step of -50 pA; with the
+balanced model the difference is zero by construction and the unstimulated drift is 0. **[reasoning]** The run tests
+whether the pipeline recovers a known truth (D-184.1): the truth must then be a point of the fitter's parameter
+space, as it was in the passive-only benchmark, where the two models coincide.
+
+**What it implies for code and tables [orchestrator].** (i) Block 12 builds the cell with the three calls above and
+does not use `synthetic_ground_truth.build_synthetic_cell`; Block 11's two functions are used as they are (they take
+any cell with the fitter's `simulate`). (ii) The settle of D-191.1 is not needed for a cell whose rest is a uniform
+equilibrium: `TwinConfig.settle_ms` becomes 0 and the build refuses a twin whose unstimulated drift
+(`ih_mechanism.rest_drift`) exceeds `TwinConfig.rest_drift_max_mV` = 1e-3 mV (the bound of the fit's own smoke S3). A
+Long Square sweep costs 7.3 s of simulated time again. (iii) The manifest carries no leak reversal as a truth; it
+carries $V_{\rm rest}(g)$. (iv) NEURON's step for the twins' responses stays 0.025 ms (`TwinConfig.neuron_dt_ms`, the
+generator's value since the passive benchmark), while the fit integrates at 0.1 ms by default: the zero-noise
+identity of twin and fitter is tested at equal steps, and the difference at the fit's default step is measured and
+reported, not gated.
+
+**What it does not decide [open].** Nothing for Block 12. (The gate's tolerances, D-011, and raw against corrected
+SWCs, D-013, remain open for the run.)
+
+**Sources.** **[user]** 2026-11-20, 13:09. **[run]** and **[reasoning]** as named. **[log]** D-005, D-184, D-188, D-191.
+
+**Status:** active; not built. Settles D-191's open point.
