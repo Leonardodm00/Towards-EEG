@@ -14,6 +14,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-20 | The twins chat: section 5b added -- the generator and the Stage-7 run as built on `sci/twins` (Blocks 5, 10, 11, 12, 13, 8 merged, head `577445d`), the decisions taken on the way (D-190 to D-193, D-195), the commands for davinci, and what is still open. The independent final check of the assembled pipeline was running when this was written. Facts from the code and the runs of this chat. |
 | 2026-11-20 (later) | Section 5b brought to `sci/twins` at `216ecf1`: the final check (an independent Opus tester on `577445d`: PASS WITH ISSUES, report `Ih Fit/specs/test_reports/2026-11-20_1432_incremental.md`) and its three findings, fixed in Block 8 (D-196; TS1-TS10 10/10); a second check of the changed block was running when this was written. |
 | 2026-11-20 (later, 2) | Section 5b at the end of the implementation: `sci/twins` at `01ebd72`; the second independent check (`216ecf1`: PASS WITH ISSUES, nothing major; report `Ih Fit/specs/test_reports/2026-11-20_1532_incremental.md`) and its two points fixed (D-197); the six twins' suites run in sequence on the final branch all exit 0; the cluster checkout line added. Not yet run on davinci. |
+| 2026-11-20 (later, 3) | Section 5b, the cluster steps: the gate line now carries `conda activate prova` and the `cd` (run from the repository root under `(base)` it found no file); the pilot is one twin per configuration with a 48 h ceiling; a one-liner for the pilot's times; the expected cost. A trap added (section 10). |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -263,16 +264,34 @@ points (the merge under `--drop-railed`, a negative base seed) are fixed by D-19
 sweep on its 5247 sections); 15 of its 22 LS sweeps are in the twin, 7 left out (`action_potential`). The fit's time on
 a real twin was not measured here: the pilot gives it.
 
-**On davinci.** From the "Ih Fit" folder, on `sci/twins` (or `main` once merged), conda env active; one line each.
-To get the branch: `cd /davinci-1/home/ldellamea/TEEG/Towards-EEG && git fetch origin sci/twins && git checkout sci/twins && git pull && git log --oneline -1`
-(expect `01ebd72` or later).
+**On davinci.** One line each, pasted at the prompt. The branch is checked out in the cluster clone (the user, 2026-11-20
+16:18: `01ebd72`; the clone was on `main` at `7c890ff` before). Every command after step 1 runs in the "Ih Fit" folder
+with `prova` active.
 
-1. the twins' suites, after `git pull`:
-   `python smoke_twin_table.py && python smoke_twin_noise.py && python smoke_twin_manifest.py && python smoke_twin_response.py --build && python smoke_twin_build.py && python smoke_twin_recovery.py`
-2. dry run (writes nothing, submits nothing): `RUN_TAG=tw1 NOISE_TAG=nf2 DRY_RUN=1 bash submit_twin_recovery.sh`
-3. pilot of two twins: `RUN_TAG=tw1 NOISE_TAG=nf2 MAX_TWINS=2 bash submit_twin_recovery.sh`
-4. the 30 twins, after the pilot has ended, with the wall time it measured: `RUN_TAG=tw1 NOISE_TAG=nf2 WALLTIME=<hh:mm:ss> bash submit_twin_recovery.sh`
-   (twins already built and fitted are skipped).
+0. the branch (done): `cd /davinci-1/home/ldellamea/TEEG/Towards-EEG && git fetch origin sci/twins && git checkout sci/twins && git pull && git log --oneline -1`
+   (expect `01ebd72` or later).
+1. the gates, from the repository root: `conda activate prova && cd "Passive Features/HPC script/Ih Fit" && python smoke_twin_table.py && python smoke_twin_noise.py && python smoke_twin_manifest.py && python smoke_twin_response.py --build && python smoke_twin_build.py && python smoke_twin_recovery.py`
+   -- each suite ends `-- N pass, 0 fail, 0 error ...` (10, 9, 10, 10, 9 and 10 pass, with skips); about 5 min.
+2. the dry run: `RUN_TAG=tw1 NOISE_TAG=nf2 DRY_RUN=1 bash submit_twin_recovery.sh` -- must print `plan: cohort of 18 real
+   cell(s)`, `plan: 30 twin(s) (full 10, passive_fit 10, active_fit 10)`, `cores: 30 twin(s) x NCPUS 1 = 30 (cap 120, D-185)`,
+   the CLI-contract line, an array `qsub` with `select=1:ncpus=1` and `-J 0-29`, a merge `qsub` with
+   `depend=afterany:ARRAY_JOB_ID`, and `DRY RUN: nothing written, nothing submitted`.
+3. the pilot, one twin per configuration, with a 48 h ceiling so that it is not killed before it gives its times
+   (the noise fit's pilot had the same, D-147): `RUN_TAG=tw1 NOISE_TAG=nf2 TWINS=900000000,900000100,900000200 WALLTIME=48:00:00 bash submit_twin_recovery.sh`
+   -- plans the run for real, then `twins: 3 of 30`, `cores: 3 twin(s) x NCPUS 1 = 3`, the two `submitted:` lines. Each
+   twin's log `logs/twin_<id>_<job>.log` ends `[twin_recovery] TWIN <id>: status=ok ...`; the merge writes `report/`.
+   [2026-11-20, replaces "pilot of two twins, `MAX_TWINS=2`": the first two twins of the manifest are both `full`, so the
+   passive and the no-I_h paths would not have run on real data before the 30.]
+4. the pilot's times and a wall time for the rest (2x the slowest pilot twin, at least 24 h: a proposal, the user's
+   call): `cd "/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs_ih/twin_recovery/tw1/L3_exc" && python -c "import math, pandas as pd; d=pd.read_csv('twins_status.csv'); d=d[d.status!='missing'].copy(); d['hours']=(d.build_seconds+d.fit_seconds)/3600; print(d[['twin_id','configuration','status','build_seconds','fit_seconds','hours']].round(2).to_string(index=False)); print('suggested WALLTIME=%d:00:00' % max(24, math.ceil(2*d.hours.max())))"`
+5. the 30 twins, from the "Ih Fit" folder after the pilot has ended: `RUN_TAG=tw1 NOISE_TAG=nf2 WALLTIME=<from step 4> bash submit_twin_recovery.sh`
+   (the three pilot twins are skipped).
+
+`RUN_TAG` and `PLAN_ARGS` stay the same in steps 2 to 5: the plan is frozen at the pilot, and a different option is
+refused. One R_a truth per twin instead of one per configuration is `PLAN_ARGS=--ra-mode=per_cell` added to all of them.
+Expected cost [estimate, not measured at full size]: in the sandbox the `active_fit` twin of 508282493 (5245 segments)
+spent about 16 min on the fit's fixed steps and about 4 min on one optimiser call with its validation; the fit makes
+200 calls (`--n-calls 200 --n-initial 100`, `run_ih_recovery.py`'s defaults) -- hours per twin, not minutes.
 
 Outputs: `$IH_OUTPUT_BASE/twin_recovery/<RUN_TAG>/L3_exc/` -- `manifest.csv`, `twins/`, `fits/`, `status/`, `logs/`,
 `report/` (all twins), `report_without_flagged/` (without the twins of the four cells of D-182.3),
@@ -348,6 +367,7 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
 | run tags | `nf1` (two-component, superseded) and `nf2` (current) sit side by side; a new law needs a new tag |
 | the roadmap's `pushed` | the tool reads tester reports only from the repository root's `specs/test_reports/`; this folder's reports (`Ih Fit/specs/test_reports/`, e.g. the final check of 2026-11-17) are not seen, so N1-N6 do not turn `tested` |
 | N6's marker | the jobs' marker pushes from the compute node, which needs `module load proxy`; none arrived, so N6 shows `pushed` although the run is done; the same holds for Stage 7's jobs unless the job script loads the proxy |
+| the gates from the repository root | the `smoke_twin_*.py` suites live in the "Ih Fit" folder and need `prova`; run from the root under `(base)` they are not found (2026-11-20) |
 | the submitter inside a PBS job | refused (`PBS_JOBID` set); submit from the login node |
 | multi-line pastes | the user pastes commands into a terminal: give one chained line or a tested one-liner, never a heredoc |
 | the decision log is about 1 MB | search it with grep or a script and edit it with a script |
