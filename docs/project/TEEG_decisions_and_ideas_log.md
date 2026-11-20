@@ -250,6 +250,7 @@ the "Binds" column.
 | 2026-11-20 (the gallery chat, later) | Logs **D-198** [orchestrator] (the gallery chat; coding directive 7): the clearness verdict judges the measuring line only (k* - 1 .. k* + 1); the lines along the dendrite are measured and drawn but not judged, superseding D-194.3 and D-194.4 as verdict criteria. Evidence: the first real run of Cell 21 (cell 529878215, 33 candidates) judged none clean -- at one plane a tilted dendrite is in focus over a short stretch only (narrowest within 0.5 um of the node on 18 of 30; 2 um away a median 1.53 times wider; the trace's tilt does not predict it, Spearman 0.08) **[run, sandbox]**; the new verdict passes 12. Built at `ca3ceeb` on `sci/diameter-pipeline` (SPEC Block 40 am. 1, Block 36 am. 18; Cell 21's `GAL_JUDGE_ALONG`; clear-node handoff section 11.1). Next free IDs: D-199, I-007. |
 | 2026-11-20 (the gallery chat, later, 2) | Logs **D-199** (user, 16:25): the four nodes of the clear-node refinement are 3883, 28, 6049, 2657 (two pass D-198's verdict, two do not); their first fit is D-169's path with WEIGHT_KAPPA 0.1 (lambda 0.045 to 0.071 um, under a line sample). Notebook Cell 22 at `481abe4` on `sci/diameter-pipeline`; clear-node handoff section 11.2. Next free IDs: D-200, I-007. |
 | 2026-11-20 (later, 5) | Logs **D-200** (user, 17:08; the twins chat): the 30 twins of Stage 7 are submitted at once, without the pilot of one twin per configuration ("let's run all now"); wall time 48:00:00 per twin job (the assistant's proposal, no measured time); the plan's other options at their defaults. Before it, the twins' gates on davinci (16:35) found TS7's display fault, fixed by SPEC Block 8 amendment 10 (`84d099d`, plumbing; `sci/twins` at `a28d1a5`). Next free IDs: D-201, I-007. |
+| 2026-11-20 (the gallery chat, later, 3) | Logs **D-201** (user, 16:59 and the answers after it; the gallery chat): the in-focus width is fitted on thick nodes, with the pipeline's hybrid line renderer as it is, a free growth scale per node and a straight background per plane solved exactly; up to 20 thick nodes (Allen >= 1.0 um, spread out) on $k^* \pm 2$; one start; the starts, bounds, solver settings and the line +-4.5 um are the orchestrator's (D-201.5, D-201.6). On `sci/diameter-pipeline`: `618686e` (SPEC Block 4 am. 2, `kernel.with_kernel`), `b7f4022` (wave 4 contract: Blocks 42, 43 as stubs, `config.sigma_calibration`, roadmap I40-I43), `019fc12` (notebook Cell 23A, the clear-node handoff section 12), `dbefad5` (roadmap rendered). Evidence: the smoke tests of `with_kernel` (6 pass, 1 skip) and of the configuration (6 pass, 1 skip); Cell 23A run on the synthetic cell; the forward's time per evaluation measured in the sandbox. Next free IDs: D-202, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -438,6 +439,7 @@ would be needed*, *Status*.
 | D-198 | 2026-11-20 | SPEC Block 40 am. 1, Block 36 am. 18; `ClearnessConfig.judge_along`; `clearness.py`, `show_clear_gallery.py`; notebook Cell 21 | the clearness verdict judges the measuring line only; the lines along the dendrite measured and drawn, not judged (opt-in `judge_along`) [orchestrator]; supersedes D-194.3, D-194.4 as verdict criteria | active, PROVISIONAL; built (`ca3ceeb`) |
 | D-199 | 2026-11-20 | the nodes D-194.0 left to the user; notebook Cell 22 (`FIT4_IDS`, `WEIGHT_KAPPA`) | the four nodes are 3883, 28, 6049, 2657; the first fit on them with WEIGHT_KAPPA 0.1 [user] | active; Cell 22 built (`481abe4`), not run on Colab |
 | D-200 | 2026-11-20 | the Stage-7 run on davinci (roadmap S7; SPEC Block 8; `RUN_TAG=tw1`, `NOISE_TAG=nf2`); the twins' handoff, section 5b | the 30 twins are submitted at once, no pilot [user]; `WALLTIME=48:00:00` (the assistant's proposal); one R_a truth per configuration and the gate's tolerances at their defaults | active |
+| D-201 | 2026-11-20 | SPEC Blocks 4 am. 2, 42, 43, 36 am. 19; `config.sigma_calibration`; notebook Cell 23; `OUT/cleaning_thick`; roadmap I42, I43 | the in-focus width is fitted on thick nodes with the hybrid line renderer as it is, a free growth scale per node and a straight background per plane solved exactly; up to 20 thick nodes (Allen >= 1.0 um, spread out) on k* +- 2; one start [user]; the starts, bounds, solver settings and the line +-4.5 um [orchestrator] | active; contract `b7f4022`, Cell 23A `019fc12`, not run on Colab |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -13820,3 +13822,71 @@ without refitting. Stage 8.
 D-195, D-196.
 
 **Status:** active.
+
+## D-201 -- The in-focus width is fitted on thick nodes with the pipeline's hybrid line renderer as it is, a free growth scale per node and a straight background per plane solved exactly; 20 thick nodes on k* +- 2, one start (user)
+
+**Date:** 2026-11-20, 16:59 (Europe/Rome) and the answers after it, the gallery chat. **Binds:** SPEC Block 4
+amendment 2 (`kernel.with_kernel`), Blocks 42 (`analysis/sigma_calibration.py`) and 43 (`plotting/sigma_figures.py`),
+Block 36 amendment 19 (`scripts/calibrate_sigma.py`); `config.sigma_calibration` (`SigmaCalibrationConfig`); notebook
+Cell 23 (A built; B after wave 4); the folder `OUT/cleaning_thick`; roadmap I42, I43.
+
+**Decision [user].** At 16:59, quoting the plan's step 3 ("Calibrate $\sigma_0$ ... Thick clean dendrites (1.0-1.5 um
+and up). Fit them with $\sigma_0$ as a fifth free parameter, next to $d$, $\mu$, centre and depth. This needs a small
+code addition."): "Let's start from here. Now a scan of 20 thick nodes with images only at focus and +-2 planes around.
+I need a fast algorithm." To the questions that followed: on the model, "please use the same model as for the cell 21",
+then "do not use any 1D version. use the hybrid as it is"; a free growth scale per node; Allen's diameter >= 1.0 um,
+spread out; a straight line per plane, solved exactly.
+
+**Statement.** (D-201.1) The forward model is the pipeline's, unchanged: `node_inputs.forward_factory` ->
+`line_fast.line_profiles` with the record's configuration (the hybrid absorption of `inference.absorption`, 8 x 16
+directions); the kernel enters only through `kernel.with_kernel(renderer, sigma0, c)` (SPEC Block 4 amendment 2).
+(D-201.2) $\theta = (d, \mu, v_0, z_{\rm ax}, \sigma_0, c)$; the kernel's variance at defocus $\delta$ is
+$\sigma_0^2 + c\,G(\delta)$ with $G(\delta) = \sigma_{\rm tab}(\delta)^2 - \sigma_{\rm tab}(0)^2$, $\sigma_{\rm tab}$ the
+configured table -- in the Colab runs Cell 7's per-cell calibrated table, which Cell 16 writes into
+`cleaning_config.json`; beyond the last knot a linear continuation keeps its form with its slope times $\sqrt c$.
+(D-201.3) The background: $I_k(v_n) \approx (b_{0k} + b_{1k} v_n)\,\tau_k(v_n;\theta)$, the pair $(b_{0k}, b_{1k})$ the
+exact linear least squares of plane $k$ at each $\theta$ (variable projection); the residuals in units of the record's
+noise SD of one line sample. (D-201.4) The nodes: up to 20 with Allen's diameter >= 1.0 um, >= 5 um from the soma, no
+tier-2 neighbour, >= 10 um apart (3-D), the least tier-1 light first (`clean_cell.py clear --d-bins 1.0,50 --n 20
+--min-soma-um 5`), the user dropping nodes after the gallery; the planes $k^* - 2 .. k^* + 2$; fast: one start from
+the $k^*$ dip's features, no multistart, no IRLS, the nodes in parallel. (D-201.5) [orchestrator] PROVISIONAL: the
+start ($d_0 = W(k^*)/0.9$, $W$ the $k^*$ dip's half-depth width; $\mu_0 = -\ln\max(1 - D/B, 10^{-3})/(1.447\,d_0)$, $D$
+its depth, $B$ the plane's background, 1.447 Block 21.3's faint limit; $v_0$ and $z_{\rm ax}$ from `pilot_start`;
+$\sigma_0$ 0.15 um; $c$ 1); the bounds ($d$ 0.2-6 um, $\mu$ 0.005-10 /um, $v_0$ and $z_{\rm ax}$ +-1.5 um about the
+start, $\sigma_0$ 0.02-0.6 um, $c$ 0.05-10); `least_squares` trf with `x_scale="jac"`, a Jacobian of forward
+differences with the absolute steps (0.01, 0.005, 0.005, 0.01, 0.005, 0.02), taken backwards at an upper bound or a
+non-finite residual; `ftol` = `xtol` = 1e-6; `max_nfev` 40 (scipy's count leaves out the Jacobian's calls: at most
+about 280 forward evaluations per node); the cell's summary over the converged nodes with neither $\sigma_0$ nor $c$ at
+a bound (the median and MAD; the inverse-variance weighted mean with the SEs scaled by $\sqrt{\chi^2/{\rm dof}}$, and
+$\chi^2_{\rm cons}$ on $n - 1$ degrees of freedom). (D-201.6) [orchestrator]: for the thick nodes the measuring line is
++-4.5 um (`measure.profile_half_um`; Cell 16's runs 3.0), so that a thick tube's dip at $k^* \pm 2$ still reaches the
+background on both sides; at 0.1144 um a sample it is 79 samples over +-4.46 um.
+
+**Why.** **[run, sandbox]** On a thin node the fitted diameter follows the in-focus width that D-172 holds at 0.080 um
+without measuring it: node 5353 gives $\hat d$ = 0.769, 0.713, 0.449 um at $\sigma_{\rm r}(0)$ = 0.080, 0.15, 0.25 um
+($\chi^2/N$ 3.49, 3.29, 3.89); the data pin the light the tube removes, $a(\mu, d)$, not the diameter and the width
+separately (the clear-node handoff, section 11.3; `checks/scale_2026-11-20/`). **[log]** D-052: in the 1-D profile model
+with the kernel's width free, on 1.5 um tubes no impostor was found below $\Delta\chi^2$ = 20.8 at +-5 % in $d$ (a
+local multi-start search, so an upper bound on the minimum), while on 0.6 um tubes impostors at 20 % or more reached
+$\Delta\chi^2 < 1$: thick tubes separate the two. **[user]** the choices as stated. **[run, sandbox, 5 planes, hybrid
+8 x 16]** one forward evaluation takes about 0.5 s at $d$ 0.8 um, 1.6 s at 1.5 um, 4.2 s at 2.5 um; no whole fit is
+timed yet.
+
+**What it implies for code and tables.** `kernel.with_kernel` built (`618686e`; at $c = 1$ equal to
+`with_in_focus_width` bit for bit); `SigmaCalibrationConfig` outside every signature (the pinned hashes unchanged);
+Blocks 42 and 43 as stubs, wave 4 (`b7f4022`), to be written by two implementers once the user approves the plan;
+`scripts/calibrate_sigma.py` and Cell 23B after the merge; Cell 23A (`019fc12`) runs now with the existing scripts.
+Nothing in the pipeline's defaults changes: $\sigma_{\rm r}(0)$ stays 0.080 um (D-172) until the user decides on the
+calibration's result.
+
+**What it does not decide.** Whether the calibrated width replaces D-172's 0.080 um; whether $c$ is then held per
+cell; what is done with thick nodes the gallery shows polluted; the refit of the thin nodes at the calibrated width;
+the thinnest traced processes as a near-PSF bound (the handoff's section 11.3, the other calibrator). If Block 42's
+identifiability check shows $\sigma_0$ and $c$ not separable on 5 planes, the approach goes back to the user (coding
+directive 7).
+
+**Sources.** **[user]** 16:59 and the answers after it. **[run, sandbox]** as named. **[src]** `sci/diameter-pipeline`
+at `dbefad5`: SPEC Blocks 4 am. 2, 42, 43 and 36 am. 19; `model/kernel.py`; `config.py`; notebook Cell 23A; the
+clear-node handoff, section 12. **[log]** D-052, D-169, D-172, D-194, D-198, D-199.
+
+**Status:** active. Contract at `b7f4022`; Cell 23A at `019fc12`, not run on Colab.
