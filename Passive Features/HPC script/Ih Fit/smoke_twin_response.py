@@ -33,7 +33,7 @@ synthetic_ground_truth.write_ball_and_stick_swc, passive and with I_h
                            6000 == 12000 ms, 1e-4 mV (SS and LS)
 
 Settle used by each check: the passive cell always at settle 0 (its rest is
-uniform and exact) except TR10's 500 ms; the I_h cell at TwinConfig.settle_ms
+uniform and exact) except TR10's 500 ms; the I_h cell at the test's SETTLE_MS
 (6000 ms) in TR3, TR5, TR7 and TR10 (and 12000 ms in TR10), at 0 in TR1
 (parity with the legacy generator, which has no settle) and in TR3's
 defect-detection half. TR8 runs no I_h cell.
@@ -88,7 +88,11 @@ _SAVED_ARTIFACTS = []
 CONTRACT_COMMIT = "f54fdde"        # the wave-1 contract (stubs of Block 11)
 BANNER = "#  The twins' clean responses (Block 11"
 DT_MS = TwinConfig().neuron_dt_ms  # 0.025 ms, the generator's step
-SETTLE_MS = TwinConfig().settle_ms # 6000 ms, amendment 2 (D-191)
+# The settle of the uniform-e_pas I_h test cell: a constant of the test,
+# 6000 ms, as Amendment 2 (iii) and (iv) state (12000 ms in TR10). Not
+# TwinConfig.settle_ms, which is 0 for the twins since D-192 (amendment 5:
+# the twins use the fitter's model, whose rest is a uniform equilibrium).
+SETTLE_MS = 6000.0
 
 # The real archive's geometry (SPEC section 3, 508282493, data inspected):
 # SS window 10500 samples at 50 kHz from -10 ms; LS sweep 363500 samples,
