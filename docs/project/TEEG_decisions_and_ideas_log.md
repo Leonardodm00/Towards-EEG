@@ -251,6 +251,7 @@ the "Binds" column.
 | 2026-11-20 (the gallery chat, later, 2) | Logs **D-199** (user, 16:25): the four nodes of the clear-node refinement are 3883, 28, 6049, 2657 (two pass D-198's verdict, two do not); their first fit is D-169's path with WEIGHT_KAPPA 0.1 (lambda 0.045 to 0.071 um, under a line sample). Notebook Cell 22 at `481abe4` on `sci/diameter-pipeline`; clear-node handoff section 11.2. Next free IDs: D-200, I-007. |
 | 2026-11-20 (later, 5) | Logs **D-200** (user, 17:08; the twins chat): the 30 twins of Stage 7 are submitted at once, without the pilot of one twin per configuration ("let's run all now"); wall time 48:00:00 per twin job (the assistant's proposal, no measured time); the plan's other options at their defaults. Before it, the twins' gates on davinci (16:35) found TS7's display fault, fixed by SPEC Block 8 amendment 10 (`84d099d`, plumbing; `sci/twins` at `a28d1a5`). Next free IDs: D-201, I-007. |
 | 2026-11-20 (the gallery chat, later, 3) | Logs **D-201** (user, 16:59 and the answers after it; the gallery chat): the in-focus width is fitted on thick nodes, with the pipeline's hybrid line renderer as it is, a free growth scale per node and a straight background per plane solved exactly; up to 20 thick nodes (Allen >= 1.0 um, spread out) on $k^* \pm 2$; one start; the starts, bounds, solver settings and the line +-4.5 um are the orchestrator's (D-201.5, D-201.6). On `sci/diameter-pipeline`: `618686e` (SPEC Block 4 am. 2, `kernel.with_kernel`), `b7f4022` (wave 4 contract: Blocks 42, 43 as stubs, `config.sigma_calibration`, roadmap I40-I43), `019fc12` (notebook Cell 23A, the clear-node handoff section 12), `dbefad5` (roadmap rendered). Evidence: the smoke tests of `with_kernel` (6 pass, 1 skip) and of the configuration (6 pass, 1 skip); Cell 23A run on the synthetic cell; the forward's time per evaluation measured in the sandbox. Next free IDs: D-202, I-007. |
+| 2026-11-20 (the gallery chat, later, 4) | Logs **D-202** (user, 17:44; the gallery chat): Cell 22's fit (D-169's path with WEIGHT_KAPPA 0.1 on D-199's four nodes) is dropped before it ran; D-199's status marked (D-199.1, the four nodes, not withdrawn). On `sci/diameter-pipeline`: `0be11a7` (Cell 22 a one-line note; the clear-node handoff, section 11.2 marked). Next free IDs: D-203, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -437,9 +438,10 @@ would be needed*, *Status*.
 | D-196 | 2026-11-20 | Block 8 (`run_twin_recovery.py`: `write_one_report`, `plan`, `twin`; `submit_twin_recovery.sh`'s header; `smoke_twin_recovery.py` TS9, TS10); `TwinConfig.base_seed`; SPEC 2.7 (e) | the final check's findings settled: `merge` with controls only writes its report; the twins' gates are the six suites; `plan --base-seed`, and `twin` builds with the recorded `TwinConfig` [orchestrator] | active |
 | D-197 | 2026-11-20 | Block 8 (`run_twin_recovery.py`: `write_one_report`, the parser's `--base-seed`; `smoke_twin_recovery.py` TS9, TS10); D-196.1, D-196.3 | the second check's two points: the empty summary whenever no row is left to summarise (controls and, under `--drop-railed`, railed rows set aside); a negative base seed refused at `plan` [orchestrator] | active |
 | D-198 | 2026-11-20 | SPEC Block 40 am. 1, Block 36 am. 18; `ClearnessConfig.judge_along`; `clearness.py`, `show_clear_gallery.py`; notebook Cell 21 | the clearness verdict judges the measuring line only; the lines along the dendrite measured and drawn, not judged (opt-in `judge_along`) [orchestrator]; supersedes D-194.3, D-194.4 as verdict criteria | active, PROVISIONAL; built (`ca3ceeb`) |
-| D-199 | 2026-11-20 | the nodes D-194.0 left to the user; notebook Cell 22 (`FIT4_IDS`, `WEIGHT_KAPPA`) | the four nodes are 3883, 28, 6049, 2657; the first fit on them with WEIGHT_KAPPA 0.1 [user] | active; Cell 22 built (`481abe4`), not run on Colab |
+| D-199 | 2026-11-20 | the nodes D-194.0 left to the user; notebook Cell 22 (`FIT4_IDS`, `WEIGHT_KAPPA`) | the four nodes are 3883, 28, 6049, 2657; the first fit on them with WEIGHT_KAPPA 0.1 [user] | active; Cell 22 built (`481abe4`), not run on Colab[updated 2026-11-20, 17:44: D-199.2's fit dropped before it ran, D-202] |
 | D-200 | 2026-11-20 | the Stage-7 run on davinci (roadmap S7; SPEC Block 8; `RUN_TAG=tw1`, `NOISE_TAG=nf2`); the twins' handoff, section 5b | the 30 twins are submitted at once, no pilot [user]; `WALLTIME=48:00:00` (the assistant's proposal); one R_a truth per configuration and the gate's tolerances at their defaults | active |
 | D-201 | 2026-11-20 | SPEC Blocks 4 am. 2, 42, 43, 36 am. 19; `config.sigma_calibration`; notebook Cell 23; `OUT/cleaning_thick`; roadmap I42, I43 | the in-focus width is fitted on thick nodes with the hybrid line renderer as it is, a free growth scale per node and a straight background per plane solved exactly; up to 20 thick nodes (Allen >= 1.0 um, spread out) on k* +- 2; one start [user]; the starts, bounds, solver settings and the line +-4.5 um [orchestrator] | active; contract `b7f4022`, Cell 23A `019fc12`, not run on Colab |
+| D-202 | 2026-11-20 | notebook Cell 22; D-199.2; the folders `OUT/cleaning_fit4`, `OUT/inference_fit4_k0.1` (never made) | Cell 22's fit with WEIGHT_KAPPA 0.1 on the four nodes is dropped, not run [user] | active; Cell 22 a one-line note (`0be11a7`) |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -13784,7 +13786,7 @@ four nodes' results.
 **Sources.** **[user]** 2026-11-20, 16:25 and the answer to the question. **[run, sandbox]**: the clear-node handoff,
 section 11.2. **[log]** D-169, D-171, D-172, D-194, D-198.
 
-**Status:** active. Cell 22 at `481abe4` on `sci/diameter-pipeline`; not yet run on Colab.
+**Status:** active. Cell 22 at `481abe4` on `sci/diameter-pipeline`; not yet run on Colab. [updated 2026-11-20, 17:44: D-199.2's fit dropped before it ran, D-202; D-199.1 stands.]
 
 ## D-200 -- Stage 7: the 30 twins are submitted at once, without the pilot (user)
 
@@ -13890,3 +13892,26 @@ at `dbefad5`: SPEC Blocks 4 am. 2, 42, 43 and 36 am. 19; `model/kernel.py`; `con
 clear-node handoff, section 12. **[log]** D-052, D-169, D-172, D-194, D-198, D-199.
 
 **Status:** active. Contract at `b7f4022`; Cell 23A at `019fc12`, not run on Colab.
+
+## D-202 -- Cell 22's fit on the four nodes (WEIGHT_KAPPA 0.1) is dropped (user)
+
+**Date:** 2026-11-20, 17:44 (Europe/Rome), the gallery chat. **Binds:** notebook Cell 22; D-199.2; the folders
+`OUT/cleaning_fit4` and `OUT/inference_fit4_k0.1` (never made).
+
+**Decision [user].** To the assistant's line "Cell 22 (kappa 0.1 on your four nodes) doesn't depend on any of this and
+still needs running": "Drop this test".
+
+**Statement.** D-199.2 -- D-169's path on the nodes 3883, 28, 6049 and 2657 with $\kappa$ = `weight_kappa` = 0.1 -- is
+not run. The notebook's Cell 22 is a one-line note; its code is in the history at `481abe4`.
+
+**Why.** **[user]** as stated; no reason given.
+
+**What it implies for code and tables.** Nothing in the pipeline changes: Cell 22 ran existing scripts only.
+`weight_kappa`'s default (1.25, D-171.1) is unchanged.
+
+**What it does not decide.** D-199.1 -- the four nodes as the set on which the refinement is done -- is not withdrawn;
+whether a narrow $\kappa$ is tried again later; the thin nodes' refit at the width D-201 calibrates.
+
+**Sources.** **[user]** 2026-11-20, 17:44. **[log]** D-171, D-199, D-201.
+
+**Status:** active. Notebook at `0be11a7` on `sci/diameter-pipeline`.
