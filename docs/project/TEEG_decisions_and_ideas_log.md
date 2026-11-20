@@ -252,6 +252,7 @@ the "Binds" column.
 | 2026-11-20 (later, 5) | Logs **D-200** (user, 17:08; the twins chat): the 30 twins of Stage 7 are submitted at once, without the pilot of one twin per configuration ("let's run all now"); wall time 48:00:00 per twin job (the assistant's proposal, no measured time); the plan's other options at their defaults. Before it, the twins' gates on davinci (16:35) found TS7's display fault, fixed by SPEC Block 8 amendment 10 (`84d099d`, plumbing; `sci/twins` at `a28d1a5`). Next free IDs: D-201, I-007. |
 | 2026-11-20 (the gallery chat, later, 3) | Logs **D-201** (user, 16:59 and the answers after it; the gallery chat): the in-focus width is fitted on thick nodes, with the pipeline's hybrid line renderer as it is, a free growth scale per node and a straight background per plane solved exactly; up to 20 thick nodes (Allen >= 1.0 um, spread out) on $k^* \pm 2$; one start; the starts, bounds, solver settings and the line +-4.5 um are the orchestrator's (D-201.5, D-201.6). On `sci/diameter-pipeline`: `618686e` (SPEC Block 4 am. 2, `kernel.with_kernel`), `b7f4022` (wave 4 contract: Blocks 42, 43 as stubs, `config.sigma_calibration`, roadmap I40-I43), `019fc12` (notebook Cell 23A, the clear-node handoff section 12), `dbefad5` (roadmap rendered). Evidence: the smoke tests of `with_kernel` (6 pass, 1 skip) and of the configuration (6 pass, 1 skip); Cell 23A run on the synthetic cell; the forward's time per evaluation measured in the sandbox. Next free IDs: D-202, I-007. |
 | 2026-11-20 (the gallery chat, later, 4) | Logs **D-202** (user, 17:44; the gallery chat): Cell 22's fit (D-169's path with WEIGHT_KAPPA 0.1 on D-199's four nodes) is dropped before it ran; D-199's status marked (D-199.1, the four nodes, not withdrawn). On `sci/diameter-pipeline`: `0be11a7` (Cell 22 a one-line note; the clear-node handoff, section 11.2 marked). Next free IDs: D-203, I-007. |
+| 2026-11-20 (the gallery chat, later, 5) | Logs **D-203** [orchestrator] (the gallery chat; coding directive 7), prompted by the user, 18:09 ("Maybe we have to account for a tilted background", with Cell 23A's output): Block 42's start measures the k* dip against a straight background through the line's ends. On `sci/diameter-pipeline`: `439f945` (SPEC Block 42 amendment 4, `start_ends_um`), `7d3928b` (`checks/tilt_2026-11-20/`, the clear-node handoff 12.1). Next free IDs: D-204, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -442,6 +443,7 @@ would be needed*, *Status*.
 | D-200 | 2026-11-20 | the Stage-7 run on davinci (roadmap S7; SPEC Block 8; `RUN_TAG=tw1`, `NOISE_TAG=nf2`); the twins' handoff, section 5b | the 30 twins are submitted at once, no pilot [user]; `WALLTIME=48:00:00` (the assistant's proposal); one R_a truth per configuration and the gate's tolerances at their defaults | active |
 | D-201 | 2026-11-20 | SPEC Blocks 4 am. 2, 42, 43, 36 am. 19; `config.sigma_calibration`; notebook Cell 23; `OUT/cleaning_thick`; roadmap I42, I43 | the in-focus width is fitted on thick nodes with the hybrid line renderer as it is, a free growth scale per node and a straight background per plane solved exactly; up to 20 thick nodes (Allen >= 1.0 um, spread out) on k* +- 2; one start [user]; the starts, bounds, solver settings and the line +-4.5 um [orchestrator] | active; contract `b7f4022`, Cell 23A `019fc12`, not run on Colab |
 | D-202 | 2026-11-20 | notebook Cell 22; D-199.2; the folders `OUT/cleaning_fit4`, `OUT/inference_fit4_k0.1` (never made) | Cell 22's fit with WEIGHT_KAPPA 0.1 on the four nodes is dropped, not run [user] | active; Cell 22 a one-line note (`0be11a7`) |
+| D-203 | 2026-11-20 | SPEC Block 42 amendment 4 (`start_theta`, oracle T8); `SigmaCalibrationConfig.start_ends_um`; D-201.5's start | the start measures the k* dip against a straight background through the samples at abs(v) >= 3 um, the pilot's values when it cannot be measured [orchestrator] | active; `439f945`, sent to Block 42's implementer |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -13915,3 +13917,45 @@ whether a narrow $\kappa$ is tried again later; the thin nodes' refit at the wid
 **Sources.** **[user]** 2026-11-20, 17:44. **[log]** D-171, D-199, D-201.
 
 **Status:** active. Notebook at `0be11a7` on `sci/diameter-pipeline`.
+
+## D-203 -- Block 42's start measures the k* dip against a straight background through the line's ends (orchestrator)
+
+**Date:** 2026-11-20, about 18:25 (Europe/Rome), the gallery chat, prompted by the user at 18:09: "Maybe we have to
+account for a tilted background" (with Cell 23A's output on cell 529878215). **Binds:** SPEC Block 42 amendment 4
+(`start_theta`, oracle T8); `SigmaCalibrationConfig.start_ends_um`; the start's width and depth of D-201.5, which it
+supersedes.
+
+**Decision [orchestrator]** (coding directive 7: a setting of the orchestrator's, PROVISIONAL; sent to Block 42's
+implementer while it works).
+
+**Statement.** The start of Block 42's fit measures the $k^*$ dip against $L(v) = a + b\,v$, the least-squares line
+through the $k^*$ profile's samples at $|v| \ge$ `start_ends_um` = 3.0 um (on the +-4.5 um line, the outer 1.5 um at
+each end; $L = B_{k^*}$ when an end has fewer than 3 samples): $d_0 = W/0.9$, $W$ the half-depth width of
+`smooth_dip`$(L - I)$; $\mu_0 = -\ln\max(1 - D/L(c), 10^{-3})/(1.447\,d_0)$; the pilot's $\hat d$ and $\hat\mu$ when $W$ or $D$
+cannot be formed. The fit's model is unchanged: its background is already $b_{0k} + b_{1k} v$ per plane, solved
+exactly (D-201.3).
+
+**Why.** **[data inspected: the user's upload of 18:09, Cell 23A's preparation of 7 thick nodes]** **[run, sandbox:
+`checks/tilt_2026-11-20/tilt_check.py`]** The slopes of the straight background through $|v| \ge 3$ um on $k^* \pm 1$
+are -0.3 to -0.2 gl/um (node 7), -1.5 to -1.3 (599), about +0.4 (611), about 0 (629), +3.0 to +3.2 (639), +7.5 to +8.0
+(663) and -7.5 to -7.0 (1802). Against the flat $B_k$ the half-depth width of 663 and 1802 is 4.2 to 4.7 um (4.0 to 4.7
+times Allen's) and the screen's E and S cannot be formed; against the line it is 1.5 to 3.4 um. A start at
+$d_0 \approx 5$ um, near the upper bound of 6 um, is a poor single start (D-201.4: no multistart).
+
+**What it implies for code and tables.** Block 42's `start_theta` and its smoke test (T8: $d_0$ and $\mu_0$ unchanged
+within 5 % under a slope of +-6 gl/um); nothing else.
+
+**What it does not decide.** Whether the clearness screen (Block 40) measures against a straight background: the
+user's to decide. On these 7 nodes it would turn 629 from clean to rejected (E 0.24 to 0.28-0.30) and rescue none of
+639, 663, 1802, whose wings depart from a line or carry a second dip. Whether the thin-node fit (Block 30: one flat
+$B_k$ per plane, $I \approx B_k\,\tau_k$) gets a straight background before the calibrated width is used on thin nodes.
+The spacing of the thick nodes: the 10 um rule (D-201.4) left 7 of 53 candidates.
+
+**Also found.** **[data inspected]** The upload's gallery ran code older than D-198: its settings have no
+`judge_along`, which the current script always writes. **[run, sandbox, `4823f23`]** The current script on the same
+preparation judges 7, 599, 611, 629 clean and 639, 663, 1802 not.
+
+**Sources.** **[user]** 18:09. **[data inspected]** the upload. **[run, sandbox]** as named. **[src]**
+`analysis/node_inference.py` (Block 30's model). **[log]** D-194, D-198, D-201.
+
+**Status:** active. Contract amendment at `439f945`.
