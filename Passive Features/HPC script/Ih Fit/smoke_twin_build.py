@@ -14,9 +14,12 @@ defaults.
 Checks
     test_TB1_zero_noise_identity   the fitter's own simulation at theta(g) on the
                                    loader's bundles of the written clean archive
-                                   (full, active_fit) at dt = cfg.neuron_dt_ms:
-                                   RMSD < 1e-6 mV per bundle; the RMSD at the
-                                   fit's default 0.1 ms is printed, not gated
+                                   (full, active_fit) at dt = cfg.neuron_dt_ms
+                                   (amendment 6 (i), D-193): (a) SS as loaded
+                                   < 1e-6 mV; (b) LS with duration n_on / f_s,
+                                   three windows, < 1e-6 mV; (c) LS as loaded,
+                                   window 'step', < 1e-3 mV; the RMSDs at the
+                                   fit's default 0.1 ms printed, not gated
     test_TB2_composition           noisy minus clean = Block 10's noise recomputed
                                    here (1e-12 mV); the in_twin False sweep absent
     test_TB3_archive_round_trip    load_cell_from_archive on the twin
@@ -255,14 +258,18 @@ def _expect_refusal(label, func):
 
 
 # ---------------------------------------------------------------- checks ---
-TB1_TOL_MV = 1e-6
+TB1_TOL_MV = 1e-6                 # (a), (b): the model identity of D-192
+TB1_LOADED_TOL_MV = 1e-3          # (c): the loader's one-sample-short LS step (amendment 6, D-193)
 TB1_MODES = ("after_onset", "step", "sweep")
 
 
 def _tb1_rmsds(cd, configuration, dt_ms):
-    """{(kind, amplitude, mode): RMSD} of the fitter's own simulation at
-    theta(g) (passive_long_step_training.bundle_rmsd on a cell built by
-    (TC1)) against every bundle of the loaded clean twin, at dt_ms."""
+    """{(part, kind, amplitude, window): RMSD} of the fitter's own simulation
+    at theta(g) (passive_long_step_training.bundle_rmsd on a cell built by
+    (TC1)) against the loaded clean twin's bundles, at dt_ms. Parts
+    (amendment 6 (i)): 'a' every SS bundle as loaded; 'b' every LS bundle,
+    its duration set to n_on / f_s, in the three windows; 'c' every LS bundle
+    as loaded, in the arms' window 'step'."""
     import ih_mechanism as IM
     import passive_fitting_hpc_fixed as mono
     import passive_long_step_training as plst
@@ -273,23 +280,26 @@ def _tb1_rmsds(cd, configuration, dt_ms):
     if tb.HAS_IH[configuration]:
         IM.attach_ih(cell, ih_spec)
     apply_theta(cell, dict(spec.theta), float(cd.v_rest_mV))
+    v0 = float(cd.v_rest_mV)
     out = {}
-    bundles = ([("SS", b) for b in cd.square_subthreshold] + [("LS", b) for b in cd.long_square_subthreshold]
-               + [("LS", b) for b in cd.long_square_depolarising])
-    for kind, b in bundles:
-        modes = TB1_MODES if kind == "LS" else ("ss_window",)
-        for mode in modes:
-            r, _ = plst.bundle_rmsd(cell, b, float(cd.v_rest_mV), ls_window_mode=(mode if kind == "LS" else
-                                                                                 "after_onset"),
-                                    dt_brief_ms=dt_ms, dt_long_ms=dt_ms)
-            out[(kind, float(b.amplitude_pA), mode)] = float(r)
+    for b in cd.square_subthreshold:
+        out[("a", "SS", float(b.amplitude_pA), "ss_window")] = float(
+            plst.bundle_rmsd(cell, b, v0, dt_brief_ms=dt_ms, dt_long_ms=dt_ms)[0])
+    for b in list(cd.long_square_subthreshold) + list(cd.long_square_depolarising):
+        n_on = int(np.count_nonzero(np.asarray(b.i_pA) != 0.0))
+        b_full = dataclasses.replace(b, stim_duration_s=n_on / float(b.sampling_rate_Hz))
+        for mode in TB1_MODES:
+            out[("b", "LS", float(b.amplitude_pA), mode)] = float(
+                plst.bundle_rmsd(cell, b_full, v0, ls_window_mode=mode, dt_brief_ms=dt_ms, dt_long_ms=dt_ms)[0])
+        out[("c", "LS", float(b.amplitude_pA), "step")] = float(
+            plst.bundle_rmsd(cell, b, v0, ls_window_mode="step", dt_brief_ms=dt_ms, dt_long_ms=dt_ms)[0])
     _clear()
     return out
 
 
 def test_TB1_zero_noise_identity():
     st = _fixture()
-    lines, worst = [], 0.0
+    lines, bad = [], []
     for configuration in ("full", "active_fit"):
         cell, traces = _build_traces(configuration, with_noise=False)
         _clear()
@@ -301,14 +311,16 @@ def test_TB1_zero_noise_identity():
         eq = _tb1_rmsds(cd, configuration, CFG.neuron_dt_ms)
         fit = _tb1_rmsds(cd, configuration, 0.1)
         for key in sorted(eq):
-            worst = max(worst, eq[key])
-            lines.append("%s %s %+.0f pA %s: dt %.3g ms %.2e mV%s | dt 0.1 ms %.2e mV"
-                         % (configuration, key[0], key[1], key[2], CFG.neuron_dt_ms, eq[key],
-                            "" if eq[key] < TB1_TOL_MV else " FAIL", fit[key]))
+            tol = TB1_LOADED_TOL_MV if key[0] == "c" else TB1_TOL_MV
+            ok = eq[key] < tol
+            line = ("(%s) %s %s %+.0f pA %s: dt %.3g ms %.2e mV (bound %g)%s | dt 0.1 ms %.2e mV"
+                    % (key[0], configuration, key[1], key[2], key[3], CFG.neuron_dt_ms, eq[key], tol,
+                       "" if ok else " FAIL", fit[key]))
+            lines.append(line)
+            if not ok:
+                bad.append(line)
     print("\n  [TB1] " + "\n  [TB1] ".join(lines))
-    bad = [ln for ln in lines if " FAIL" in ln]
-    assert not bad, ("TB1: %d bundle/window RMSD(s) at equal steps >= %g mV (worst %.3g mV): %s"
-                     % (len(bad), TB1_TOL_MV, worst, "; ".join(bad)))
+    assert not bad, "TB1: %d RMSD(s) above their bound: %s" % (len(bad), "; ".join(bad))
 
 
 def test_TB2_composition():
@@ -362,6 +374,11 @@ def test_TB3_archive_round_trip():
     got = sorted((int(b.sweep_numbers[0]), float(b.amplitude_pA)) for b in ls)
     want = sorted((54 + k, a) for k, a in enumerate(LS_AMPS) if a != 0.0 and 54 + k != SPIKE_SWEEP)
     assert got == want, ("LS bundles", got, want)
+    for b in ls:                                # the real timing: onset and samples of the step
+        k = int(np.flatnonzero(prot.ls_sweep_number == int(b.sweep_numbers[0]))[0])
+        n_on = int(np.count_nonzero(np.asarray(b.i_pA) != 0.0))
+        assert b.stim_onset_s == prot.ls_onset_s[k], ("LS onset", b.sweep_numbers, b.stim_onset_s, prot.ls_onset_s[k])
+        assert n_on == int(round(prot.ls_duration_s[k] * prot.ls_fs_Hz)), ("LS step samples", b.sweep_numbers, n_on)
     with np.load(d / "ls_sweeps.npz") as z:
         keys = set(z.files)
     want_keys = {"n_sweeps"} | {"%s_%d" % (p, m) for p in ("v", "i") for m in range(len(want))}
@@ -455,6 +472,9 @@ def test_TB7_metadata():
     assert fam["structure_layer_name"] == st["meta"]["layer"] and fam["dendrite_type"] == st["meta"]["dendrite_type"]
     for k in ("rin_MOhm", "tau_ms"):
         assert np.isfinite(meta[k]) and meta[k] > 0, (k, meta[k])
+    tau_truth = THETA_IH["Rm"] * THETA_IH["Cm"] * 1e-3      # ms (amendment 6 (iii))
+    assert abs(meta["tau_ms"] - tau_truth) <= 1e-12 * tau_truth, (meta["tau_ms"], tau_truth)
+    assert meta["twin"]["tau_ms_source"] == "Rm*Cm of the truth", meta["twin"]["tau_ms_source"]
     assert np.isfinite(meta["sag_ratio"]) and meta["sag_ratio"] >= 0, meta["sag_ratio"]
     prot = st["protocol"]
     K = int(prot.ss_polarity_is_dep.size)
@@ -465,7 +485,7 @@ def test_TB7_metadata():
                           "n_samples"} and e["index"] == m and e["stimulus_name"] == "Long Square", e
     tw = meta["twin"]
     want = {"twin_of_specimen_id", "configuration", "theta", "F", "has_ih", "base_seed", "neuron_dt_ms",
-            "settle_ms", "rest_drift_mV", "ls_sweeps_left_out", "provenance"}
+            "settle_ms", "rest_drift_mV", "ls_sweeps_left_out", "provenance", "tau_ms_source"}
     assert set(tw) == want, sorted(set(tw) ^ want)
     assert tw["theta"] == THETA_IH and tw["twin_of_specimen_id"] == REAL_ID and tw["configuration"] == "full"
     assert tw["has_ih"] is True and tw["F"] == F and tw["base_seed"] == CFG.base_seed

@@ -55,6 +55,8 @@ IH_KEYS = ("gbar", "dv_h", "kappa_tau")
 SS_NPZ_KEYS = ("t", "v", "i_pA", "polarity_is_dep", "peak_pA", "stim_duration_s", "sampling_rate_Hz",
                "sweep_number")
 _PROTOCOLS = ("SS", "LS")
+# The `twin` block's record of where tau_ms comes from (amendment 6 (iii), D-193).
+TAU_MS_SOURCE = "Rm*Cm of the truth"
 
 
 class TwinBuildError(RuntimeError):
@@ -367,12 +369,11 @@ def write_twin_archive(group_dir, spec: TwinSpec, traces: TwinTraces, *, swc_pat
     reconstruction.swc, metadata.json with its `twin` block) and return that
     directory. `features`: rin_MOhm, tau_ms, sag_ratio of the twin's cell;
     `real_metadata`: the real cell's metadata.json (for the layer and the
-    dendrite type). Refused (TwinBuildError): SPEC, Block 12.
-
-    PROPOSED, NOT IN THE CONTRACT (reported to the orchestrator): `cfg`,
-    `rest_drift_mV` and `ls_sweeps_left_out` -- the `twin` block's
-    base_seed / neuron_dt_ms / settle_ms, rest_drift_mV and
-    ls_sweeps_left_out cannot be derived from the contract's arguments."""
+    dendrite type). Keyword-only (amendment 6 (ii), D-193): `cfg` (the
+    `twin` block's base_seed, neuron_dt_ms, settle_ms), `rest_drift_mV` (mV,
+    the drift build_twin_cell measured) and `ls_sweeps_left_out` (real LS
+    sweep number -> the real trace's spike reason). Refused (TwinBuildError):
+    SPEC, Block 12."""
     theta = _check_spec(spec)
     swc_path = Path(swc_path)
     if not swc_path.is_file():
@@ -440,7 +441,7 @@ def write_twin_archive(group_dir, spec: TwinSpec, traces: TwinTraces, *, swc_pat
                   theta={k: float(theta[k]) for k in spec.theta}, F=float(spec.F),
                   has_ih=bool(HAS_IH[spec.configuration]), base_seed=int(cfg.base_seed),
                   neuron_dt_ms=float(cfg.neuron_dt_ms), settle_ms=float(cfg.settle_ms),
-                  rest_drift_mV=float(rest_drift_mV),
+                  rest_drift_mV=float(rest_drift_mV), tau_ms_source=TAU_MS_SOURCE,
                   ls_sweeps_left_out={str(int(k)): str(v) for k, v in dict(ls_sweeps_left_out or {}).items()},
                   provenance=(dict(provenance) if provenance is not None else None)),
     )
@@ -470,11 +471,13 @@ def build_twin(spec: TwinSpec, real_spec_dir, table: pd.DataFrame, group_dir, *,
     <real_spec_dir>/reconstruction.swc, simulate_twin, the features
     (synthetic_ground_truth.measure_rin_tau_sag from rest), write_twin_archive.
     Returns the twin's specimen directory. The caller clears NEURON's
-    sections between twins.
-
-    `provenance` (PROPOSED, not in the contract): passed to
-    write_twin_archive."""
-    _check_spec(spec)
+    sections between twins. `provenance` is passed on to write_twin_archive
+    (amendment 6 (ii)). The features (amendment 6 (iii), D-193):
+    measure_rin_tau_sag on GroundTruthParams(cm_uF_cm2=Cm, rm_Ohm_cm2=Rm,
+    e_pas_mV=V_rest) with the truth's Cm and Rm, so tau_ms = Rm Cm 1e-3 (the
+    truth's passive membrane time constant); rin_MOhm and sag_ratio
+    simulated."""
+    theta = _check_spec(spec)
     real_spec_dir = Path(real_spec_dir)
     swc = real_spec_dir / "reconstruction.swc"
     if not swc.is_file():
@@ -495,7 +498,8 @@ def build_twin(spec: TwinSpec, real_spec_dir, table: pd.DataFrame, group_dir, *,
     traces = simulate_twin(cell, spec, protocol, table, cfg=cfg, with_noise=True)
 
     import synthetic_ground_truth as sgt
-    _v, rin, tau, sag = sgt.measure_rin_tau_sag(cell, sgt.GroundTruthParams(e_pas_mV=float(spec.v_rest_mV)))
+    _v, rin, tau, sag = sgt.measure_rin_tau_sag(cell, sgt.GroundTruthParams(cm_uF_cm2=theta["Cm"], rm_Ohm_cm2=theta["Rm"],
+                                                                 e_pas_mV=float(spec.v_rest_mV)))
     left_out = {int(s): str(r) for s, r in zip(protocol.ls_sweep_number, protocol.ls_spike_reason) if str(r)}
     return write_twin_archive(group_dir, spec, traces, swc_path=swc, real_metadata=real_meta,
                               features=dict(rin_MOhm=rin, tau_ms=tau, sag_ratio=sag), provenance=provenance,
