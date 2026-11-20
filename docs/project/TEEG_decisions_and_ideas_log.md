@@ -248,6 +248,7 @@ the "Binds" column.
 | 2026-11-20 (later, 3) | Logs **D-196** [orchestrator] (the twins chat; coding directive 7): the three findings of the independent final check of the twins' pipeline (an Opus tester that wrote none of it; `sci/twins` at `577445d`; report `Ih Fit/specs/test_reports/2026-11-20_1432_incremental.md`: **PASS WITH ISSUES** -- 16 suites and the 54 earlier spec tests pass, 93 new spec tests of which 92 pass, one real `active_fit` twin of 508282493 built and fitted) settled: the merge no longer crashes when only false-positive controls have results (the legacy summary is not called on them; the report is written and the legacy gate reads `FAIL (axis absent)`); the twins' gates on davinci are the six twins' suites; the noise's base seed is an option of the plan and a twin is built with the run's recorded configuration. Block 8's implementer is applying them (SPEC amendment 8, `91e0b1c`). Next free IDs: D-197, I-007. |
 | 2026-11-20 (later, 4) | Logs **D-197** [orchestrator] (the twins chat; coding directive 7). D-196's fixes merged on `sci/twins` (`83910c7`; Block 8's smoke TS1-TS10 10/10) and checked a second time by another independent Opus tester on `216ecf1` (report `Ih Fit/specs/test_reports/2026-11-20_1532_incremental.md`: **PASS WITH ISSUES**, no BLOCKER and no MAJOR; `tests/spec` 145 passed; a twin's noise under two base seeds differs by exactly the difference recomputed from the seed rule). Its two remaining points settled: the merge's guard is stated by its condition, so that `--drop-railed` cannot empty the summary's input unnoticed, and `plan` refuses a negative base seed (SPEC amendment 9, `51c2830`; with Block 8's implementer). Next free IDs: D-198, I-007. |
 | 2026-11-20 (the gallery chat, later) | Logs **D-198** [orchestrator] (the gallery chat; coding directive 7): the clearness verdict judges the measuring line only (k* - 1 .. k* + 1); the lines along the dendrite are measured and drawn but not judged, superseding D-194.3 and D-194.4 as verdict criteria. Evidence: the first real run of Cell 21 (cell 529878215, 33 candidates) judged none clean -- at one plane a tilted dendrite is in focus over a short stretch only (narrowest within 0.5 um of the node on 18 of 30; 2 um away a median 1.53 times wider; the trace's tilt does not predict it, Spearman 0.08) **[run, sandbox]**; the new verdict passes 12. Built at `ca3ceeb` on `sci/diameter-pipeline` (SPEC Block 40 am. 1, Block 36 am. 18; Cell 21's `GAL_JUDGE_ALONG`; clear-node handoff section 11.1). Next free IDs: D-199, I-007. |
+| 2026-11-20 (the gallery chat, later, 2) | Logs **D-199** (user, 16:25): the four nodes of the clear-node refinement are 3883, 28, 6049, 2657 (two pass D-198's verdict, two do not); their first fit is D-169's path with WEIGHT_KAPPA 0.1 (lambda 0.045 to 0.071 um, under a line sample). Notebook Cell 22 at `481abe4` on `sci/diameter-pipeline`; clear-node handoff section 11.2. Next free IDs: D-200, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -434,6 +435,7 @@ would be needed*, *Status*.
 | D-196 | 2026-11-20 | Block 8 (`run_twin_recovery.py`: `write_one_report`, `plan`, `twin`; `submit_twin_recovery.sh`'s header; `smoke_twin_recovery.py` TS9, TS10); `TwinConfig.base_seed`; SPEC 2.7 (e) | the final check's findings settled: `merge` with controls only writes its report; the twins' gates are the six suites; `plan --base-seed`, and `twin` builds with the recorded `TwinConfig` [orchestrator] | active |
 | D-197 | 2026-11-20 | Block 8 (`run_twin_recovery.py`: `write_one_report`, the parser's `--base-seed`; `smoke_twin_recovery.py` TS9, TS10); D-196.1, D-196.3 | the second check's two points: the empty summary whenever no row is left to summarise (controls and, under `--drop-railed`, railed rows set aside); a negative base seed refused at `plan` [orchestrator] | active |
 | D-198 | 2026-11-20 | SPEC Block 40 am. 1, Block 36 am. 18; `ClearnessConfig.judge_along`; `clearness.py`, `show_clear_gallery.py`; notebook Cell 21 | the clearness verdict judges the measuring line only; the lines along the dendrite measured and drawn, not judged (opt-in `judge_along`) [orchestrator]; supersedes D-194.3, D-194.4 as verdict criteria | active, PROVISIONAL; built (`ca3ceeb`) |
+| D-199 | 2026-11-20 | the nodes D-194.0 left to the user; notebook Cell 22 (`FIT4_IDS`, `WEIGHT_KAPPA`) | the four nodes are 3883, 28, 6049, 2657; the first fit on them with WEIGHT_KAPPA 0.1 [user] | active; Cell 22 built (`481abe4`), not run on Colab |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -13744,3 +13746,38 @@ forward model (a lead, section 11.1 of the clear-node handoff): not checked.
 
 **Status:** active, PROVISIONAL, the orchestrator's; built at `ca3ceeb` on `sci/diameter-pipeline`. The user can
 reverse it (`GAL_JUDGE_ALONG = True` restores D-194's verdict for one run).
+
+## D-199 -- The four nodes of the clear-node refinement are 3883, 28, 6049 and 2657; the first fit on them with WEIGHT_KAPPA 0.1 (user)
+
+**Date:** 2026-11-20, 16:25 (Europe/Rome), the gallery chat. **Binds:** the nodes D-194.0 left to the user (the
+refinement of the diameter estimation and of the removal of secondary dips is done on them); notebook Cell 22
+(`FIT4_IDS`, `WEIGHT_KAPPA`); the folders `OUT/cleaning_fit4`, `OUT/inference_fit4_k<kappa>`.
+
+**Decision [user].** "Let's try the fit for the diameter of the nodes 3883 28 146 245 With a very narrow
+WEIGHT_KAPPA = 0.1". Asked whether "146" and "245" meant nodes 6049 and 2657 (whose gallery pages show the sharpest
+planes k* = 146 and 245) or the trace's nodes with those ids, the user answered: 6049 and 2657.
+
+**Statement.** (D-199.1) The four nodes are 3883 (Allen 0.5286 um), 28 (0.7550 um), 6049 (0.4744 um, basal) and
+2657 (0.7934 um), cell 529878215. 3883 and 28 pass D-198's measuring-line verdict; 6049 and 2657 do not (line $E$ 0.32
+and 0.59, $S$ 0.55 and 0.34 on $k^* \pm 1$), so the set holds two clean and two polluted nodes. (D-199.2) Their first fit
+is D-169's path (no cleaning, one pass, the first stage at Allen's diameter, centre weights re-centred, the near-bump
+cut at 2 noise SDs, starts 1.0 and 1.6 x Allen's) with $\kappa$ = `weight_kappa` = 0.1: $\lambda_i = 0.1\,[(\tfrac{\sqrt3}{2}
+D_{{\rm A},i})^2 + (2\sqrt{2\ln2}\,\sigma_{\rm r}(0))^2]^{1/2}$ = 0.0495, 0.0680, 0.0452, 0.0712 um for 3883, 28, 6049,
+2657 ($\sigma_{\rm r}(0)$ = 0.080 um, D-172).
+
+**Why.** The user's choice. **[run, sandbox]** at $\kappa$ = 0.1, $\lambda$ is 0.40 to 0.62 of a line sample (0.1144 um);
+a plane's weights sum to 1.2 to 1.5 samples (4.0 to 6.3 at 0.5, 9.9 to 15.1 at 1.25); on the synthetic cell (true $d$
+0.80 um) the fit gives 0.866 $\pm$ 0.019 um at 0.1 against 0.851 to 0.869 um at 0.5, 1.25 and unweighted.
+
+**What it implies for code and tables.** Cell 22 runs it; nothing in the pipeline changes. D-171.1's default
+$\kappa$ (1.25, "slightly above the FWHM expected from Allen's diameter") is unchanged; 0.1 is this run's setting
+(Cell 22's `WEIGHT_KAPPA`), well below it. The fit folder is named by $\kappa$, so later trials sit beside this one.
+
+**What it does not decide.** Whether $\kappa$ = 0.1 becomes the setting of the clear-node fit; the in-focus width
+(O1); the bump rule (O3); how the two polluted nodes' secondary dips are to be removed -- all to be decided on these
+four nodes' results.
+
+**Sources.** **[user]** 2026-11-20, 16:25 and the answer to the question. **[run, sandbox]**: the clear-node handoff,
+section 11.2. **[log]** D-169, D-171, D-172, D-194, D-198.
+
+**Status:** active. Cell 22 at `481abe4` on `sci/diameter-pipeline`; not yet run on Colab.
