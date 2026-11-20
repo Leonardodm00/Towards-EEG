@@ -5,6 +5,7 @@
 | 2026-11-19 | Created at the user's request (22:02, "Now deliver a handoff for another chat") by the clearance chat ("Questions before logic"). Code on `sci/diameter-pipeline` at `7c05a01` plus this document's commit; decision log on `main`, next free IDs D-190, I-007 when written (re-read the log's last rows before taking one: other chats log too). Includes the user's correction of 22:02 ("the 2669 IS NOT fine in focus"), checked on the data in section 6. |
 | 2026-11-19 (later) | The user, 22:17 (a new chat started from this handoff): "Let's first of all change the nodes we use" -- a cell that shows a set of judged clean nodes, from which the user selects four; the approach is refined after that. Built the same evening (D-194; SPEC Blocks 40, 41 and Block 36 amendment 18; notebook Cell 21): section 11, new. O2's state changed; nothing else in this document changed. Evidence: `tests/smoke/test_smoke_clearness.py`, `test_smoke_clearness_figures.py`, `checks/clear_gallery_2026-11-19/line_screen_pilot_check.out` **[run, sandbox]**. |
 | 2026-11-20 | The first real run of Cell 21 (the user's upload, 16:03: the gallery folder and the preparation's records): no node judged clean under D-194; diagnosis and D-198 [orchestrator] (the verdict judges the measuring line only); section 11's last part, new; O2's state. Evidence: `checks/clear_gallery_2026-11-20/first_gallery_check.py` and `.out` **[run, sandbox]**, the run's pages **[data]**. |
+| 2026-11-20 (later) | The user's four nodes and the first fit on them (D-199): notebook Cell 22; section 11.2, new. Evidence: Cell 22's code run on the synthetic cell **[run, sandbox]**. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -297,4 +298,31 @@ dendrite, and on the other 3 (605, 1322, 7951) the width could not be formed on 
   with the trace's tilt; if the trace's tilt is wrong for a node, the modelled defocus across its nine planes is
   wrong too. The one sign so far is indirect (the $\rho$ above and node 4725's page, whose in-focus stretch moves
   about 2 um in depth over about 8 um along the dendrite, against a trace tilt of 6 degrees: a rough reading by eye).
+
+### 11.2 The four nodes and the first fit on them (Cell 22; D-199) [added 2026-11-20, later]
+
+**[user]** 16:25: "Let's try the fit for the diameter of the nodes 3883 28 146 245 with a very narrow WEIGHT_KAPPA =
+0.1"; asked which nodes "146" and "245" meant (they are the sharpest planes k* printed on the pages of 6049 and 2657,
+and also the ids of two unscreened apical nodes), the user chose **6049 and 2657**. The four nodes: 3883 (Allen 0.529
+um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 2657 (0.793), not judged clean (line $E$
+0.32 and 0.59, $S$ 0.55 and 0.34; blobs near the line on their pages).
+
+- **Cell 22** (notebook): `clean --no-clean` of the four into `OUT/cleaning_fit4`, then `infer_nodes.py real` with
+  `--weight-kappa 0.1` (the other settings as Cell 20: centre weights, bump cut at 2 noise SDs, starts 1.0 and 1.6)
+  into `OUT/inference_fit4_k0.1` -- the folder named by $\kappa$, so a run at another $\kappa$ does not overwrite it (the
+  pilot's second run overwrote the first, section 10) -- and `show_focal.py --out` into the same folder.
+- **What $\kappa$ = 0.1 means here [run, sandbox: the formula of section 3 with $\sigma_{\rm r}(0)$ = 0.080 um]**:
+  $\lambda$ = 0.0495, 0.0680, 0.0452, 0.0712 um for 3883, 28, 6049, 2657, i.e. 0.40 to 0.62 of a line sample (0.1144
+  um); with the centre on a sample its neighbours weigh 0.08 to 0.20 and the next two 0.006 to 0.04; a plane's weights
+  sum to 1.2 to 1.5 samples (4.0 to 6.3 at $\kappa$ 0.5, 9.9 to 15.1 at 1.25). The weights multiply the squared residuals
+  (`node_inference`: residual $\sqrt{w}\,r/\sigma$) **[src]**. **[reasoning]** So the dips' widths barely enter; $d$ is set
+  by how the central depth changes across the nine planes and trades against $\mu$ -- the confound with the in-focus
+  width (section 7) applies.
+- **On the synthetic cell [run, sandbox: Cell 22's code with stand-ins for the Colab variables; the smoke fixture's
+  tube, true $d$ 0.80 um, its trace 0.60 um; the smoke test's coarse settings, 4 x 8 ray directions]**: $\hat d$ = 0.866
+  $\pm$ 0.019 um at $\kappa$ 0.1, against 0.851 $\pm$ 0.002 (0.5), 0.855 $\pm$ 0.009 (1.25) and 0.869 $\pm$ 0.009
+  (unweighted). The narrow weights add no offset of their own here and widen the standard error; the common excess of
+  about 7 % over the truth is the fixture's under its coarse settings, not checked further.
+- **Not run**: Cell 22 on Colab. Time not measured at this $\kappa$ (the pilot's second run, $\kappa$ 0.5: 3 to 49 min
+  per node).
 
