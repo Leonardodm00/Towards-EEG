@@ -10,7 +10,10 @@ the sharpest plane, the patch at every recorded plane, and the measuring line's 
         [--out OUT/cleaning_gallery/gallery] [--d-bins 0.40,0.45,0.60,0.80,1.20,5.0] [--max-per-bin 4] \
         [--fill-to 0] [--nodes 5353,2669] [--zoom-um 5] [--config-json FILE] \
         [--outside-max X] [--skew-max X] [--width-range-max X] [--depth-range-max X] [--centre-range-max X] \
-        [--min-depth-sd X] [--along-half-um X] [--along-step-um X] [--focus-half-planes N]
+        [--min-depth-sd X] [--along-half-um X] [--along-step-um X] [--focus-half-planes N] [--judge-along]
+
+The verdict judges the measuring line on the planes k* - 1 .. k* + 1 (D-198); the lines along the dendrite are
+computed and drawn, and judged only with --judge-along.
 
 Shown: the nodes judged clean, per bin of Allen's diameter the lowest score first, at most --max-per-bin per bin
 (0: all). With --fill-to N, when fewer than N are shown, the best-scoring nodes that are NOT judged clean are
@@ -143,8 +146,11 @@ def panel_text(row, res, ccfg, rec):
     q = ccfg
     pil = rec.get("pilot", {})
 
-    def line(name, value, limit):
+    def line(name, value, limit, judged=True):
+        if not judged:                                  # D-198: computed and shown, not part of the verdict
+            return "  %-11s %5.2f   (not judged)" % (name, value)
         return "  %-11s %5.2f / %.2f%s" % (name, value, limit, "" if not value > limit else "  <-- above")
+    ja = bool(q.judge_along)
     out = ["JUDGED CLEAN" if row["clean"] else "NOT judged clean",
            "score Q     %.2f  (<= 1 passes)" % row["score"],
            "" if row["clean"] else "reasons: " + row["reasons"],
@@ -158,12 +164,12 @@ def panel_text(row, res, ccfg, rec):
            "measuring line, planes k* +- %d" % q.focus_half_planes,
            line("outside E", row["outside_focus"], q.outside_max),
            line("skew S", row["skew_focus"], q.skew_max),
-           "lines along the dendrite, +- %.1f um" % q.along_half_um,
-           line("outside E", row["outside_along"], q.outside_max),
-           line("skew S", row["skew_along"], q.skew_max),
-           line("width U_W", row["width_range"], q.width_range_max),
-           line("depth U_D", row["depth_range"], q.depth_range_max),
-           line("centre U_c", row["centre_range"], q.centre_range_max),
+           "lines along the dendrite, +- %.1f um%s" % (q.along_half_um, "" if ja else " (shown only)"),
+           line("outside E", row["outside_along"], q.outside_max, ja),
+           line("skew S", row["skew_along"], q.skew_max, ja),
+           line("width U_W", row["width_range"], q.width_range_max, ja),
+           line("depth U_D", row["depth_range"], q.depth_range_max, ja),
+           line("centre U_c", row["centre_range"], q.centre_range_max, ja),
            ""]
     if _finite(pil.get("mu_hat_per_um")):
         out.append("first stage: mu %.3f /um at Allen's d" % float(pil["mu_hat_per_um"]))
@@ -227,6 +233,8 @@ def main(argv=None):
     ap.add_argument("--config-json", default="", help="a configuration JSON (its clearness section); default: the defaults")
     for opt, _field in OVERRIDES:
         ap.add_argument("--" + opt.replace("_", "-"), type=float, default=None, help="clearness.%s" % _field)
+    ap.add_argument("--judge-along", action="store_true", help="judge the lines along the dendrite too (clearness."
+                                                                 "judge_along; off by default, D-198)")
     a = ap.parse_args(argv)
     if a.max_per_bin < 0 or a.fill_to < 0 or not a.zoom_um > 0:
         ap.error("--max-per-bin and --fill-to must be >= 0 and --zoom-um > 0")
@@ -239,6 +247,8 @@ def main(argv=None):
         val = getattr(a, opt)
         if val is not None:
             over["clearness." + field] = int(val) if field == "focus_half_planes" else float(val)
+    if a.judge_along:
+        over["clearness.judge_along"] = True
     if over:
         cfg = C.with_overrides(cfg, over)
     ccfg = cfg.clearness

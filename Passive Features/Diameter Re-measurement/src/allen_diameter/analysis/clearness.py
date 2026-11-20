@@ -24,9 +24,15 @@ u_m = m along_step_um, |u_m| <= along_half_um:
     U_W = (max_m W_m - min_m W_m) / median_m W_m,   U_D likewise for the depth,
     U_c = (max_m c_m - min_m c_m) / median_m W_m.
 
-Score Q = the largest of E / outside_max and S / skew_max over the judged profiles and of U_W / width_range_max,
-U_D / depth_range_max, U_c / centre_range_max; +inf when a judged feature is not finite. Clean: Q <= 1 and the
-central depth on the sharpest plane at least min_depth_sd noise SDs.
+Score Q = the largest of E / outside_max and S / skew_max over the judged profiles and, when judge_along is True,
+of U_W / width_range_max, U_D / depth_range_max, U_c / centre_range_max; +inf when a judged feature is not finite.
+Clean: Q <= 1 and the central depth on the sharpest plane at least min_depth_sd noise SDs.
+
+Judged profiles (D-198 [orchestrator], 2026-11-20, superseding D-194.3 and D-194.4 as verdict criteria): by default
+the measuring line on the planes |k - k*| <= focus_half_planes only. The lines along the dendrite are still computed
+and returned (they are drawn for the eye), and enter the verdict -- their E and S, and U_W, U_D, U_c -- only when
+judge_along is True. On the first real run (cell 529878215, 33 nodes) they rejected every node: a dendrite tilted in
+depth is in focus over a short stretch only, so at one plane its dip widens and fades away from the node.
 
 Pure ASCII, LF, for the cluster. No file access, no plotting.
 """
@@ -44,6 +50,7 @@ from . import profiles
 
 FEATURES = ("depth_gl", "fwhm_um", "centre_um", "skew", "outside")
 CRITERIA = ("outside", "skew", "width_range", "depth_range", "centre_range")
+LINE_CRITERIA = ("outside", "skew")       # judged when ClearnessConfig.judge_along is False (D-198)
 REASON_NOT_FINITE = "not_finite"
 REASON_FAINT = "faint"
 
@@ -172,8 +179,9 @@ class ClearnessResult:
     """What screen_node returns. Arrays of one node; n_planes its recorded planes, n_u the lines along the axis.
 
     clean: the verdict; score: Q (dimensionless; <= 1 passes; inf when a judged feature is not finite);
-    reasons: the criteria above their threshold, of CRITERIA, REASON_NOT_FINITE, REASON_FAINT;
-    ratios: {criterion: its largest value over its threshold} (NaN when it could not be formed);
+    reasons: the judged criteria above their threshold, then REASON_NOT_FINITE, REASON_FAINT;
+    ratios: {judged criterion: its largest value over its threshold} (NaN when it could not be formed); the keys
+    are LINE_CRITERIA, or CRITERIA when judge_along is True;
     line: {feature: (n_planes,)} of FEATURES on the measuring line, every recorded plane;
     focus: (n_planes,) bool, the planes the line is judged on; k_index: the sharpest plane's index;
     u_um (n_u,); strips_gl (n_u, n_v): the profiles along the axis on the sharpest plane (grey levels);
@@ -220,8 +228,9 @@ def screen_node(block, ks, k_star, B_gl, sigma_gl, left, top, res0_um, origin_xy
     line, as strip_profiles; ccfg: a ClearnessConfig; profiles_gl (n_planes, n_v) or None: the measuring line
     as recorded (None: read here from block with u = 0).
 
-    Judged: E and S of the measuring line on the planes |k - k*| <= focus_half_planes and of every line along
-    the axis on the sharpest plane; U_W, U_D, U_c of the lines along the axis; the depth floor."""
+    Judged: E and S of the measuring line on the planes |k - k*| <= focus_half_planes, and the depth floor; with
+    ccfg.judge_along also E and S of every line along the axis on the sharpest plane and their U_W, U_D, U_c.
+    The lines along the axis are computed either way."""
     q = ccfg
     blk = np.asarray(block, dtype=float)
     k_arr = np.asarray(ks).reshape(-1)
@@ -251,15 +260,20 @@ def screen_node(block, ks, k_star, B_gl, sigma_gl, left, top, res0_um, origin_xy
     U_W = _range_over_median(along["fwhm_um"], along["fwhm_um"])
     U_D = _range_over_median(along["depth_gl"], along["depth_gl"])
     U_c = _range_over_median(along["centre_um"], along["fwhm_um"])
-    judged_E = np.concatenate([line["outside"][focus], along["outside"]])
-    judged_S = np.concatenate([line["skew"][focus], along["skew"]])
+    if q.judge_along:
+        judged_E = np.concatenate([line["outside"][focus], along["outside"]])
+        judged_S = np.concatenate([line["skew"][focus], along["skew"]])
+    else:                                       # D-198: the measuring line alone enters the verdict
+        judged_E, judged_S = line["outside"][focus], line["skew"][focus]
 
     def worst(x):
         return float(np.max(x)) if np.all(np.isfinite(x)) else float("nan")
-    ratios = dict(outside=worst(judged_E) / q.outside_max, skew=worst(judged_S) / q.skew_max,
-                  width_range=U_W / q.width_range_max, depth_range=U_D / q.depth_range_max,
-                  centre_range=U_c / q.centre_range_max)
-    reasons = [name for name in CRITERIA if math.isfinite(ratios[name]) and ratios[name] > 1.0]
+    every = dict(outside=worst(judged_E) / q.outside_max, skew=worst(judged_S) / q.skew_max,
+                 width_range=U_W / q.width_range_max, depth_range=U_D / q.depth_range_max,
+                 centre_range=U_c / q.centre_range_max)
+    judged = CRITERIA if q.judge_along else LINE_CRITERIA
+    ratios = {name: every[name] for name in judged}
+    reasons = [name for name in judged if math.isfinite(ratios[name]) and ratios[name] > 1.0]
     finite = all(math.isfinite(r) for r in ratios.values())
     if not finite:
         reasons.append(REASON_NOT_FINITE)

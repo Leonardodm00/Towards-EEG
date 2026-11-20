@@ -7,7 +7,8 @@ Checks
                         profile panel per plane on one grey-level axis; figure_sheet has one panel per node
     test_reference      scripts/show_clear_gallery.py on files written by hand (a clean band, a band with a
                         parallel neighbour, a band with a blob beside the line): the table's verdicts and
-                        numbers equal clearness.screen_node called directly; what is shown follows the rule
+                        numbers equal clearness.screen_node called directly, by default (D-198: the blob is
+                        judged clean) and with --judge-along (the blob rejected); what is shown follows the rule
     test_convergence    skipped (no discretisation)
     test_invariants     choose(): the bins' order, the cap per bin, the fill with rejected nodes, an explicit
                         list; bin_of() and parse_bins()
@@ -156,34 +157,56 @@ def test_known_answer():
     plt.close(sheet)
 
 
+def _rows(folder):
+    with open(os.path.join(folder, "gallery_7.csv")) as fh:
+        return {int(r["node_id"]): r for r in csv.DictReader(fh)}
+
+
+def _same_as_direct(rows, cfg):
+    """Every row of the table equals clearness.screen_node called directly with cfg."""
+    for nid, (d_allen, make) in BLOCKS.items():
+        ref = T.screen(make(), cfg=cfg)
+        r = rows[nid]
+        assert (r["clean"] == "True") == ref.clean, (nid, r["clean"], ref.reasons)
+        assert_allclose(float(r["score"]), ref.score, rtol=1e-12)
+        assert r["reasons"] == " ".join(ref.reasons)
+        assert_allclose(float(r["fwhm_kstar_um"]), ref.line["fwhm_um"][ref.k_index], rtol=1e-12)
+        assert_allclose(float(r["fwhm_over_allen"]), ref.line["fwhm_um"][ref.k_index] / d_allen, rtol=1e-12)
+        assert_allclose(float(r["width_range"]), ref.width_range, rtol=1e-12, atol=1e-15)
+        assert int(r["k_star"]) == T.K_STAR
+
+
 def test_reference():
     tmp = tempfile.mkdtemp(prefix="gallery_")
     try:
         write_run(tmp)
-        assert G.main(["--cleaning-dir", tmp, "--specimen", SPECIMEN, "--d-bins", "0.4,0.8,5.0"]) == 0
-        rows = {int(r["node_id"]): r for r in csv.DictReader(open(os.path.join(tmp, "gallery", "gallery_7.csv")))}
+        base = ["--cleaning-dir", tmp, "--specimen", SPECIMEN, "--d-bins", "0.4,0.8,5.0"]
+        # the default verdict (D-198): the measuring line alone. The neighbour on the line (12) is rejected; the
+        # blob beside the line (13) is seen only by the lines along the dendrite, so it is judged clean.
+        assert G.main(base) == 0
+        rows = _rows(os.path.join(tmp, "gallery"))
         assert set(rows) == set(BLOCKS)
-        for nid, (d_allen, make) in BLOCKS.items():
-            ref = T.screen(make())                                      # the screen called directly
-            r = rows[nid]
-            assert (r["clean"] == "True") == ref.clean, (nid, r["clean"], ref.reasons)
-            assert_allclose(float(r["score"]), ref.score, rtol=1e-12)
-            assert r["reasons"] == " ".join(ref.reasons)
-            assert_allclose(float(r["fwhm_kstar_um"]), ref.line["fwhm_um"][ref.k_index], rtol=1e-12)
-            assert_allclose(float(r["fwhm_over_allen"]), ref.line["fwhm_um"][ref.k_index] / d_allen, rtol=1e-12)
-            assert_allclose(float(r["width_range"]), ref.width_range, rtol=1e-12, atol=1e-15)
-            assert int(r["k_star"]) == T.K_STAR
-        assert rows[11]["clean"] == "True" and rows[14]["clean"] == "True"
-        assert rows[12]["clean"] == "False" and "outside" in rows[12]["reasons"]
-        assert rows[13]["clean"] == "False"
+        _same_as_direct(rows, T.CFG)
+        assert [n for n in BLOCKS if rows[n]["clean"] == "True"] == [11, 13, 14]
+        assert "outside" in rows[12]["reasons"]
         rec = json.load(open(os.path.join(tmp, "gallery", "gallery_7.json")))
-        assert rec["shown"] == [11, 14] and rec["judged_clean"] == [11, 14]         # the bins in order, the clean only
+        in_bin = sorted((13, 14), key=lambda i: float(rows[i]["score"]))      # one bin: the lower score first
+        assert rec["shown"] == [11] + in_bin and rec["judged_clean"] == [11] + in_bin
         assert rows[11]["figure"] == "gallery_node11.png" and rows[12]["figure"] == "" and rows[12]["shown"] == "False"
+        assert set(rec["nodes"]["11"]["ratios"]) == set(CL.LINE_CRITERIA)
+        assert rec["clearness"]["judge_along"] is False
+        # --judge-along (D-194.3, D-194.4): the blob is rejected too; the table equals the direct call with it
+        assert G.main(base + ["--judge-along", "--out", os.path.join(tmp, "ja")]) == 0
+        rows_j = _rows(os.path.join(tmp, "ja"))
+        _same_as_direct(rows_j, T.JUDGE)
+        assert [n for n in BLOCKS if rows_j[n]["clean"] == "True"] == [11, 14]
+        rec_j = json.load(open(os.path.join(tmp, "ja", "gallery_7.json")))
+        assert rec_j["shown"] == [11, 14] and rec_j["clearness"]["judge_along"] is True
+        assert set(rec_j["nodes"]["13"]["ratios"]) == set(CL.CRITERIA)
         # with a fill, the best-scoring rejected nodes follow, labelled in their file names
-        assert G.main(["--cleaning-dir", tmp, "--specimen", SPECIMEN, "--d-bins", "0.4,0.8,5.0", "--fill-to", "3",
-                       "--out", os.path.join(tmp, "g2")]) == 0
+        assert G.main(base + ["--judge-along", "--fill-to", "3", "--out", os.path.join(tmp, "g2")]) == 0
         rec2 = json.load(open(os.path.join(tmp, "g2", "gallery_7.json")))
-        best_rejected = min((12, 13), key=lambda i: float(rows[i]["score"]))
+        best_rejected = min((12, 13), key=lambda i: float(rows_j[i]["score"]))
         assert rec2["shown"] == [11, 14, best_rejected]
         assert os.path.exists(os.path.join(tmp, "g2", "gallery_rejected_node%d.png" % best_rejected))
         # a threshold given on the command line is the one applied
@@ -235,7 +258,7 @@ def test_contract():
         rec = json.load(open(os.path.join(out, "gallery_7.json")))
         assert {"clearness", "shown", "judged_clean", "nodes", "skipped", "d_bins_um"} <= set(rec)
         node = rec["nodes"]["11"]
-        assert set(node["ratios"]) == set(CL.CRITERIA) and len(node["line"]["fwhm_um"]) == T.KS.size
+        assert set(node["ratios"]) == set(CL.LINE_CRITERIA) and len(node["line"]["fwhm_um"]) == T.KS.size
         assert len(node["along"]["fwhm_um"]) == len(node["u_um"]) == 9 and sum(node["focus"]) == 3
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

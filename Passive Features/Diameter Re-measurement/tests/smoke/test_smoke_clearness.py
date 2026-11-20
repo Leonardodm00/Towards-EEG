@@ -9,8 +9,10 @@ Checks
                         and without the recorded line given
     test_convergence    the half-depth width of a Gaussian dip against the sampling step: order 2
     test_invariants     mirror and scale of a profile; a clean straight band is judged clean; a parallel
-                        neighbour, a blob on the edge beside the line, a crossing branch, a taper and a bend
-                        are each rejected for the stated reason; 200 seeded noisy clean bands
+                        neighbour and a crossing branch are rejected by the default verdict (the measuring line
+                        alone, D-198); a blob on the edge beside the line, a taper and a bend are rejected for
+                        the stated reason with judge_along and judged clean without it; 200 seeded noisy
+                        clean bands
     test_contract       shapes, dtypes, keys, the judged planes, the offsets along the axis, inputs unchanged
     test_determinism    two identical calls are identical
     test_edge_cases     a dip that never returns on one side; a faint dip; k* outside the planes; NaN in the
@@ -48,6 +50,7 @@ if str(SRC) not in sys.path:
 from allen_diameter.analysis import clearness as CL  # noqa: E402
 from allen_diameter.analysis import profiles  # noqa: E402
 from allen_diameter.config import ClearnessConfig  # noqa: E402
+from allen_diameter import config as C  # noqa: E402
 
 SEED = 20261119
 REPORT_PACKAGES = ("numpy", "scipy")
@@ -60,7 +63,8 @@ LEFT, TOP, HW = 1000, 2000, 90              # the patch's corner (full-resolutio
 THETA = 0.4                                 # rad, the axis' direction in the image
 KS = np.arange(100, 109)                    # nine planes, k* = 104
 K_STAR = 104
-CFG = ClearnessConfig()
+CFG = ClearnessConfig()                     # the default: the measuring line alone is judged (D-198)
+JUDGE = ClearnessConfig(judge_along=True)   # the lines along the dendrite judged too (D-194.3, D-194.4)
 G_HALF = math.sqrt(2.0 * math.log(2.0))     # a Gaussian falls to 1/2 at this many SDs
 
 
@@ -209,19 +213,35 @@ def test_invariants():
         # a branch that crosses the dendrite 1.5 um along the axis at 60 degrees
         "outside ": lambda u, v: 0.8 * A_GL * np.exp(-0.5 * (((u - 1.5) * math.sin(1.05) - v * math.cos(1.05)) / 0.35) ** 2),
     }
+    # both reach the measuring line itself (the branch crosses it at v = -1.5 tan(1.05) = -2.6 um): rejected by
+    # the default verdict and with the lines along the dendrite judged
     for reason, extra in cases.items():
-        r = screen(band_block(extra=extra))
-        assert not r.clean and reason.strip() in r.reasons, (reason, r.reasons, r.ratios)
-    # a dark blob on the dendrite's edge, 1.5 um along the axis: the measuring line itself stays clean
-    blob = screen(band_block(extra=lambda u, v: 50.0 * np.exp(-0.5 * (((u - 1.5) / 0.4) ** 2 + ((v - 0.6) / 0.4) ** 2))))
-    assert not blob.clean, blob.ratios
+        for cfg in (CFG, JUDGE):
+            r = screen(band_block(extra=extra), cfg=cfg)
+            assert not r.clean and reason.strip() in r.reasons, (reason, cfg.judge_along, r.reasons, r.ratios)
+    # what only the lines along the dendrite see (D-194.3): a dark blob on the edge 1.5 um along the axis (the
+    # measuring line itself stays clean), a taper of 15 % per um, a bend of 0.15 u^2 um (0.6 um at |u| = 2 um).
+    # Judged along: each rejected for its reason. Default (D-198): each judged clean -- the trade-off of D-198;
+    # the lines are still computed, and their numbers show the structure.
+    along_only = {
+        "blob": (dict(extra=lambda u, v: 50.0 * np.exp(-0.5 * (((u - 1.5) / 0.4) ** 2 + ((v - 0.6) / 0.4) ** 2))),
+                 ("outside", "width_range")),
+        "taper": (dict(width=lambda u: S0 * (1.0 + 0.15 * u)), ("width_range",)),
+        "bend": (dict(centre=lambda u: 0.15 * u ** 2), ("centre_range",)),
+    }
+    for name, (kw, expect) in along_only.items():
+        block = band_block(**kw)
+        judged, default = screen(block, cfg=JUDGE), screen(block)
+        assert not judged.clean and any(e in judged.reasons for e in expect), (name, judged.reasons, judged.ratios)
+        assert default.clean and default.reasons == () and set(default.ratios) == set(CL.LINE_CRITERIA), \
+            (name, default.reasons, default.ratios)
+        for f in CL.FEATURES:                   # the lines along the dendrite are the same either way
+            assert_array_equal(judged.along[f], default.along[f])
+        assert judged.width_range == default.width_range and judged.centre_range == default.centre_range
+    blob = screen(band_block(**along_only["blob"][0]))
     assert blob.line["outside"][4] < CFG.outside_max and blob.line["skew"][4] < CFG.skew_max
-    # a taper: the band's SD grows by 15 % per um along the axis
-    taper = screen(band_block(width=lambda u: S0 * (1.0 + 0.15 * u)))
-    assert not taper.clean and "width_range" in taper.reasons, (taper.reasons, taper.ratios)
-    # a bend: the centre moves by 0.15 u^2 um, 0.6 um at |u| = 2 um
-    bend = screen(band_block(centre=lambda u: 0.15 * u ** 2))
-    assert not bend.clean and "centre_range" in bend.reasons, (bend.reasons, bend.ratios)
+    # the blob merges with the dip's edge on the lines through it: seen along as a widening, not judged
+    assert blob.width_range > CFG.width_range_max, blob.width_range
 
     # 200 clean bands under white pixel noise of SD 4 gl (depth 60 gl): the read's average of 9 bilinear samples
     # leaves about 0.3 of it on a line sample, i.e. a depth of some 50 noise SDs. None may be rejected: the
@@ -237,7 +257,11 @@ def test_contract():
     r = screen(block)
     assert_array_equal(block, keep)
     assert isinstance(r, CL.ClearnessResult) and isinstance(r.clean, bool) and isinstance(r.score, float)
-    assert set(r.line) == set(CL.FEATURES) == set(r.along) and set(r.ratios) == set(CL.CRITERIA)
+    assert set(r.line) == set(CL.FEATURES) == set(r.along) and set(r.ratios) == set(CL.LINE_CRITERIA)
+    rj = screen(block, cfg=JUDGE)
+    assert set(rj.ratios) == set(CL.CRITERIA) and rj.clean
+    assert_allclose(rj.score, max(rj.ratios.values()), rtol=1e-12)
+    assert rj.score >= r.score                  # judging more can only raise the score
     for name in CL.FEATURES:
         assert r.line[name].shape == (KS.size,) and r.line[name].dtype == np.float64
         assert r.along[name].shape == (9,)
@@ -288,8 +312,11 @@ def test_edge_cases():
     f = CL.dip_features(-np.ones(V.size), V)
     assert f["depth_gl"] == -1.0 and math.isnan(f["fwhm_um"])
     # lines along the axis that leave the patch: not finite, never clean
-    far = screen(band_block(), cfg=dataclasses.replace(CFG, along_half_um=30.0, along_step_um=10.0))
+    far = screen(band_block(), cfg=dataclasses.replace(JUDGE, along_half_um=30.0, along_step_um=10.0))
     assert not far.clean and CL.REASON_NOT_FINITE in far.reasons
+    far0 = screen(band_block(), cfg=dataclasses.replace(CFG, along_half_um=30.0, along_step_um=10.0))
+    assert far0.clean and np.isnan(far0.along["fwhm_um"][0])    # not judged by default: NaN along does not count
+    _raises(ValueError, C.with_overrides, C.default_config(), {"clearness.judge_along": 1})   # a bool only
     # the measuring line alone: the ranges along the axis are 0
     one = screen(band_block(), cfg=dataclasses.replace(CFG, along_half_um=0.0))
     assert one.u_um.shape == (1,) and one.width_range == 0.0 and one.centre_range == 0.0 and one.clean

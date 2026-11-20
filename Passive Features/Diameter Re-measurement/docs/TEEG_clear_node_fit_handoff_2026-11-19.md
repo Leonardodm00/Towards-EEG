@@ -4,6 +4,7 @@
 |---|---|
 | 2026-11-19 | Created at the user's request (22:02, "Now deliver a handoff for another chat") by the clearance chat ("Questions before logic"). Code on `sci/diameter-pipeline` at `7c05a01` plus this document's commit; decision log on `main`, next free IDs D-190, I-007 when written (re-read the log's last rows before taking one: other chats log too). Includes the user's correction of 22:02 ("the 2669 IS NOT fine in focus"), checked on the data in section 6. |
 | 2026-11-19 (later) | The user, 22:17 (a new chat started from this handoff): "Let's first of all change the nodes we use" -- a cell that shows a set of judged clean nodes, from which the user selects four; the approach is refined after that. Built the same evening (D-194; SPEC Blocks 40, 41 and Block 36 amendment 18; notebook Cell 21): section 11, new. O2's state changed; nothing else in this document changed. Evidence: `tests/smoke/test_smoke_clearness.py`, `test_smoke_clearness_figures.py`, `checks/clear_gallery_2026-11-19/line_screen_pilot_check.out` **[run, sandbox]**. |
+| 2026-11-20 | The first real run of Cell 21 (the user's upload, 16:03: the gallery folder and the preparation's records): no node judged clean under D-194; diagnosis and D-198 [orchestrator] (the verdict judges the measuring line only); section 11's last part, new; O2's state. Evidence: `checks/clear_gallery_2026-11-20/first_gallery_check.py` and `.out` **[run, sandbox]**, the run's pages **[data]**. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -182,7 +183,7 @@ linear in the kernel).
 | # | Point | State |
 |---|---|---|
 | O1 | **The in-focus width (P4).** D-172 keeps 0.080 um; the davinci run does not measure it. Options put to the user on 2026-11-18, not decided: the narrowest in-focus dips of a cell as an upper bound; a fit on clean thick dendrites with the width free (width and diameter separate on thick tubes: in D-052's simulations a $\pm$5 % error in $d$ on 1.5 um tubes cost $\Delta\chi^2 \ge$ 20.8, the smallest a local search found **[log]**); a third, not yet proposed to the user: many clean thin nodes fitted with one shared width. | open; 5353 alone gives the cap of section 7 |
-| O2 | **Clearness on the image.** The trace-based rule of Cell 19c (`clean_cell.py clear --d-bins`) admitted 1013, 2669, 2620; candidates: the per-plane bump test on the in-focus planes, the recorded in-focus width against the widest dip Allen's diameter can render (section 5), the fit's $\chi^2/N$ | [corrected 2026-11-19, later: was "open; nothing built"] a screen is built, PROVISIONAL (D-194 [orchestrator]; section 11): model-free, on the recorded image; it chooses the nodes shown to the user, who selects four. Its rule and thresholds are to confirm; it has not run on a real image |
+| O2 | **Clearness on the image.** The trace-based rule of Cell 19c (`clean_cell.py clear --d-bins`) admitted 1013, 2669, 2620; candidates: the per-plane bump test on the in-focus planes, the recorded in-focus width against the widest dip Allen's diameter can render (section 5), the fit's $\chi^2/N$ | [corrected 2026-11-19, later: was "open; nothing built"] a screen is built, PROVISIONAL (D-194 [orchestrator]; section 11): model-free, on the recorded image; it chooses the nodes shown to the user, who selects four. Its rule and thresholds are to confirm; it has not run on a real image [corrected 2026-11-20: it ran on 33 candidates and judged none clean; since D-198 it judges the measuring line only and passes 12 (section 11)] |
 | O3 | **The bump rule** (section 6) | open; D-176.1 stays PROVISIONAL |
 | O4 | **639**: Allen's 1.2 um against a 2.05 um flat-bottomed dip | open; look at the stack around the node |
 | O5 | **Cost**: 124-305 min for five nodes on Colab; grows with the fitted diameter | open |
@@ -254,9 +255,45 @@ selects four of them; the estimation and the removal of secondary dips are refin
 - **Not judged, reported in the table**: the half-depth width over Allen's diameter (`fwhm_over_allen`) -- a
   criterion on it would select the nodes on which Allen's diameter agrees; the planes beyond $k^* \pm 1$; the
   centre's drift from plane to plane (O6).
-- **Not run**: the screen on any real image; Cell 21 on Colab (its code ran here on the synthetic cell with
+- **Not run** [corrected 2026-11-20: Cell 21 ran on Colab on 33 candidates, see below]: the screen on any real image; Cell 21 on Colab (its code ran here on the synthetic cell with
   stand-ins for the Colab variables). The preparation's time for 40 candidates (about an hour) is extrapolated
   from 7.7 min for five nodes, not measured.
 - **Open, the user's**: the rule and each threshold (to confirm or change once the first gallery is seen); the
   four nodes; then O3 (the bump rule) and O1 (the in-focus width) on them.
+
+### 11.1 The first real run (2026-11-20) and D-198 [added 2026-11-20]
+
+**[data: the user's upload of 2026-11-20 16:03 -- `OUT/cleaning_gallery/gallery` and the preparation's
+`cleaning_529878215.json`, `examples_gallery_529878215.json`, `features_529878215.csv`; the patches were not
+uploaded]**. Cell 21 with the defaults: 33 candidates (8 in each of the bins 0.40, 0.45, 0.60, 0.80 um; 1 in 1.20 to
+5.0 um, node 605: the trace-based rule found no other), **none judged clean**; every node failed $U_W$, the width's
+range along the dendrite; the eight pages shown were the best-scoring rejected ones.
+
+- **Why [run, sandbox: `checks/clear_gallery_2026-11-20/first_gallery_check.py` on the run's stored features]**: at one
+  plane a dendrite tilted in depth is in focus over a short stretch only. On 18 of 30 nodes the dip on the lines along
+  it is narrowest within 0.5 um of the node (about 10 by chance: 3 of the 9 lines), and 2 um away it is a median 1.53
+  times wider (0.95 to 4.51). The trace's tilt does not predict it (Spearman $\rho$ = 0.08, $p$ = 0.67, $n$ = 30 between
+  $U_W$ and the trace's $\varphi$), so it cannot be corrected from the trace. **[data: the run's page of node 4725]**
+  across its nine planes the in-focus stretch slides along the dendrite: the lower-left part sharp at k 169-170, the
+  stretch through the node at k* = 173, a bouton about 1.5 um up the dendrite at k 176-177. Restricting the lines to
+  $\pm$ 1 um and dropping the ranges still passed 2 nodes only: the lines' $E$ and $S$ are also raised by the
+  background's texture against the shallower, defocused dips **[run, sandbox, the same stored features]**.
+- **The measuring line's part agrees with the eye [reasoning, by eye on the eight pages; the orchestrator's reading,
+  not the user's]**: 4725, 3883, 28 and 3984 pass it and look clean near the node; 2601 (a dark blob at the line's
+  left), 2610 (a side structure), 6049 (blobs on both sides) and 2657 (blobs around a curved dendrite) fail it and
+  look polluted. On the pilot it matched the user's reading on four of five nodes (section 11, above; 2620 passes the
+  line although a junction joins it).
+- **D-198 [orchestrator], superseding D-194.3 and D-194.4 as verdict criteria**: the verdict judges the measuring line
+  on $k^* - 1 .. k^* + 1$ ($E \le 0.25$, $S \le 0.15$) and the depth floor; the lines along the dendrite are still
+  measured and drawn, their values marked "(not judged)"; `--judge-along` (Cell 21: `GAL_JUDGE_ALONG = True`) restores
+  D-194's rule. SPEC Block 40 amendment 1; Block 36 amendment 18 (the option).
+- **On this run, recomputed from the stored features**, 12 judged clean: 3984, 1322 (bin 0.40); 4725, 3883, 3892,
+  5353 (0.45); 28, 1865 (0.60); 2562, 2620, 2635 (0.80); 605 (1.20). All twelve are shown (at most 4 per bin).
+  Of these, 2620 has the junction of section 5 and 28 a bend about 1.5 um along the dendrite; 605 is the only thick
+  candidate, 637 (Allen 1.19 um) fails the line by $E$ 0.29.
+- **To do on Colab**: Cell 1 (pull), then Cell 21: the preparation is reused, only the screen runs (seconds).
+- **A lead for the refinement, not checked [reasoning]**: the forward model renders the line's read on the 3D tube
+  with the trace's tilt; if the trace's tilt is wrong for a node, the modelled defocus across its nine planes is
+  wrong too. The one sign so far is indirect (the $\rho$ above and node 4725's page, whose in-focus stretch moves
+  about 2 um in depth over about 8 um along the dendrite, against a trace tilt of 6 degrees: a rough reading by eye).
 

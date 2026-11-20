@@ -551,9 +551,11 @@ for path in sorted(glob.glob(INFER_D + "/fit_node*.png")):
 #      line as recorded. Nothing is cleaned, nothing is fitted. Downloads the patches (5 nodes took 7.7 min on
 #      2026-11-19, so about an hour for 40: an extrapolation, not measured). Kept in OUT/cleaning_gallery and reused.
 #   3. `show_clear_gallery.py`: the screen on the recorded image only (no model, no diameter). A node is judged
-#      clean when its dip is one symmetric dip that returns to the background -- on the measuring line in the
-#      planes k* - 1 .. k* + 1 and on nine parallel lines up to 2 um along the dendrite in the plane k* -- and keeps
-#      its width, depth and position along the dendrite. Seconds; rerun it alone with other thresholds.
+#      clean when its dip on the measuring line, in the planes k* - 1 .. k* + 1, is one symmetric dip that returns
+#      to the background (D-198, 2026-11-20). Nine parallel lines up to 2 um along the dendrite are measured and
+#      drawn but not judged: on the first run they rejected all 33 nodes, because a dendrite tilted in depth is in
+#      focus over a short stretch only (GAL_JUDGE_ALONG = True judges them again). Seconds; rerun it alone with
+#      other thresholds.
 # Per shown node one page: the patch at k* with the measuring line (dotted), the lines along the dendrite and
 # Allen's diameter (dashed); the profiles on those lines; the measuring line on the nine planes overlaid; the
 # screen's numbers against their thresholds; then the patch at each of the nine planes on one grey scale, and the
@@ -564,7 +566,7 @@ for path in sorted(glob.glob(INFER_D + "/fit_node*.png")):
 # Knobs: GAL_BINS, GAL_N_PER_BIN, GAL_MAX_PER_BIN, GAL_FILL_TO, GAL_SHOW_IDS (your own list of node ids instead
 # of the rule), GAL_ZOOM_UM, GAL_THRESHOLDS (any of outside-max 0.25, skew-max 0.15, width-range-max 0.25,
 # depth-range-max 0.30, centre-range-max 0.50, min-depth-sd 10, along-half-um 2.0, along-step-um 0.5,
-# focus-half-planes 1), RERUN_GAL_PREP (True after changing GAL_BINS or GAL_N_PER_BIN).
+# focus-half-planes 1), GAL_JUDGE_ALONG, RERUN_GAL_PREP (True after changing GAL_BINS or GAL_N_PER_BIN).
 # Output to send back: the four node ids you choose, the printed table, and `gallery_sheet_<S>.png`.
 
 # %%
@@ -578,6 +580,7 @@ GAL_FILL_TO = 8                               # fewer shown than this: the best-
 GAL_SHOW_IDS = None                           # None: the rule above; or a list of node ids to show whatever their verdict
 GAL_ZOOM_UM = 5.0                             # the image panels show +- this about the line (um)
 GAL_THRESHOLDS = {}                           # e.g. {"outside-max": 0.30, "width-range-max": 0.35}; {} = the defaults
+GAL_JUDGE_ALONG = False                       # True: the lines along the dendrite enter the verdict too (D-194's rule)
 RERUN_GAL_PREP = False                        # True: pick and prepare the candidates again
 CLEAN_G = OUT + "/cleaning_gallery"
 GAL_OUT = CLEAN_G + "/gallery"
@@ -600,6 +603,8 @@ gal_args = ["--cleaning-dir", CLEAN_G, "--specimen", SPECIMEN, "--out", GAL_OUT,
             "--max-per-bin", GAL_MAX_PER_BIN, "--fill-to", GAL_FILL_TO, "--zoom-um", GAL_ZOOM_UM]
 for name, value in GAL_THRESHOLDS.items():
     gal_args += ["--" + name, value]
+if GAL_JUDGE_ALONG:
+    gal_args += ["--judge-along"]
 if GAL_SHOW_IDS is not None:
     gal_args += ["--nodes", ",".join(str(int(i)) for i in GAL_SHOW_IDS)]
 run("scripts/show_clear_gallery.py", *gal_args)

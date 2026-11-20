@@ -468,6 +468,7 @@ class ClearnessConfig:
     depth_range_max: float = 0.30          # source: PROVISIONAL (D-194.4): the same for the central depth
     centre_range_max: float = 0.50         # source: PROVISIONAL (D-194.4): (max - min) of the dip's centre along the axis, over the median half-depth width, at most this
     min_depth_sd: float = 10.0             # source: PROVISIONAL (D-194.4): the central depth on the sharpest plane at least this many noise SDs of a line sample
+    judge_along: bool = False              # source: D-198 [orchestrator]: the lines along the dendrite are computed and drawn but enter the verdict only when True (on the first real run, 2026-11-20, they rejected all 33 nodes, mostly through the dendrite's tilt)
 
 
 @dataclass(frozen=True)
@@ -816,10 +817,11 @@ def _check_clearness(q: "ClearnessConfig") -> None:
           and math.isfinite(q.outside_fwhm) and q.outside_fwhm > 0
           and all(math.isfinite(x) and x > 0 for x in (q.outside_max, q.skew_max, q.width_range_max,
                                                        q.depth_range_max, q.centre_range_max))
-          and math.isfinite(q.min_depth_sd) and q.min_depth_sd >= 0)
+          and math.isfinite(q.min_depth_sd) and q.min_depth_sd >= 0
+          and isinstance(q.judge_along, bool))
     if not ok:
-        raise ValueError("clearness: a plane count, length, level, threshold or the depth floor is out of range "
-                         "(SPEC Block 40)")
+        raise ValueError("clearness: a plane count, length, level, threshold, the depth floor or judge_along (a bool) "
+                         "is out of range (SPEC Block 40)")
 
 
 def _check_sgt(m: "MeasureConfig") -> None:
