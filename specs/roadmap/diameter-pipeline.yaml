@@ -742,6 +742,42 @@ implementation:
     needs_theory: [T15]
     needs_hpc: false
     jobs: []
+  - id: I40
+    title: "Clearness screen"
+    summary: "Judges whether a node's measuring line is clean near focus, from its recorded profiles on the planes k*-1..k*+1: the dip's half-depth width against Allen's diameter, the excess outside the dip and its skew (D-194, D-198)"
+    block: 40
+    parent: NC3
+    depends_on: [I36]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: I41
+    title: "Clearness gallery figures"
+    summary: "The gallery of candidate nodes: each node's patch at every plane with its measuring line, the line's profiles across planes, and the screen's verdict (D-194, D-198)"
+    block: 41
+    parent: NC3
+    depends_on: [I40]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: I42
+    title: "In-focus width fitted on thick nodes"
+    summary: "Fits the kernel's in-focus width and a growth scale together with the diameter on thick nodes, where the two separate, with the pipeline's hybrid line renderer as it is and a straight background per plane solved exactly; one start, nodes in parallel (D-201)"
+    block: 42
+    parent: NC2
+    depends_on: [I4, I30, I35, I36, I40]
+    needs_theory: [T7, T10, T15]
+    needs_hpc: false
+    jobs: []
+  - id: I43
+    title: "In-focus width calibration figures"
+    summary: "One page per thick node (the images, the profiles with the fitted model and background, the residuals on k*-2..k*+2) and the cell's summary of the fitted in-focus widths and growth scales (D-201)"
+    block: 43
+    parent: NC2
+    depends_on: [I42]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
 
 # Revisions: a change one side has to absorb because of the other
 # (roadmap.py revise). An implementation stage's flag clears when its

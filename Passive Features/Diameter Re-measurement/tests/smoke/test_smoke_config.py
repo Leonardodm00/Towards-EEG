@@ -125,7 +125,7 @@ def test_reference():
             continue
         name = m.group(1)
         if name in ("acquisition", "measure", "correction", "renderer", "phantom", "calibration", "survey",
-                    "cleaning", "inference", "clearness"):
+                    "cleaning", "inference", "clearness", "sigma_calibration"):
             continue  # the container's sub-config fields
         if "# source:" in line:
             n_tagged += 1
@@ -137,7 +137,7 @@ def test_reference():
     n_fields = sum(len(dataclasses.fields(k)) for k in (C.AcquisitionConfig, C.MeasureConfig, C.CorrectionConfig,
                                                         C.RendererConfig, C.PhantomConfig, C.CalibrationConfig,
                                                         C.SurveyConfig, C.CleaningConfig, C.InferenceConfig,
-                                                        C.ClearnessConfig))   # Block 40 (D-194)
+                                                        C.ClearnessConfig, C.SigmaCalibrationConfig))   # Blocks 40, 42 (D-194, D-201)
     assert n_tagged == n_fields, (n_tagged, n_fields)
     # every field is read by some code outside config.py (attribute access or getattr, parsed with ast,
     # so a docstring naming a field does not count) [added 2026-10-07: renderer.jpeg_qtables_file was
@@ -163,6 +163,9 @@ def test_reference():
     # [2026-11-13, contract of wave 1 (D-129, D-130)] the fields of the cleaning and inference sections are declared
     # with the contract, before the blocks that read them (Blocks 23-34); they are exempt until wave 3 is merged
     pending = {u for u in unread if u.split(".")[0] in ("cleaning", "inference")}
+    # [2026-11-20, contract of the sigma calibration (D-201)] its fields are declared before Block 42 reads them;
+    # exempt until that block is merged (then this line goes)
+    pending |= {u for u in unread if u.split(".")[0] == "sigma_calibration"}
     assert set(unread) - pending == records, "config fields no code reads: %s (declared records: %s)" % (
         sorted(set(unread) - pending - records), sorted(records - set(unread)))
 

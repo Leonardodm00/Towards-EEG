@@ -472,6 +472,30 @@ class ClearnessConfig:
 
 
 @dataclass(frozen=True)
+class SigmaCalibrationConfig:
+    """The in-focus width calibrated on thick nodes (SPEC Blocks 42, 43; D-201): the pipeline's hybrid line renderer
+    as it is, the kernel re-anchored by kernel.with_kernel(sigma_r0, growth_scale), a straight background per plane
+    solved exactly, one start from the dip's features. Outside every signature."""
+
+    half_planes: int = 2                   # source: D-201 [user]: the planes k* - 2 .. k* + 2
+    sigma0_start_um: float = 0.15          # source: PROVISIONAL (D-201.5): the start of sigma_r(0) (um), inside the pilot's bracket 0.08..0.25
+    growth_scale_start: float = 1.0        # source: D-201.5: the configured table's growth
+    width_to_d: float = 0.9                # source: PROVISIONAL (D-201.5): the start d0 = W(k*) / this, W the k* dip's half-depth width
+    hybrid_faint_factor: float = 1.447     # source: SPEC Block 21.3 (the faint limit 1.447 a_j): mu0 = -ln(1 - D/B) / (this d0)
+    d_bounds_um: Tuple[float, float] = (0.2, 6.0)          # source: PROVISIONAL (D-201.5)
+    mu_bounds_per_um: Tuple[float, float] = (0.005, 10.0)  # source: PROVISIONAL (D-201.5)
+    v0_bounds_um: Tuple[float, float] = (-1.5, 1.5)        # source: PROVISIONAL (D-201.5): about the start
+    z_bounds_um: Tuple[float, float] = (-1.5, 1.5)         # source: PROVISIONAL (D-201.5): the axis depth about the start
+    sigma0_bounds_um: Tuple[float, float] = (0.02, 0.6)    # source: PROVISIONAL (D-201.5)
+    growth_scale_bounds: Tuple[float, float] = (0.05, 10.0)  # source: PROVISIONAL (D-201.5)
+    diff_steps: Tuple[float, ...] = (0.01, 0.005, 0.005, 0.01, 0.005, 0.02)  # source: PROVISIONAL (D-201.5): absolute finite-difference steps of (d um, mu /um, v0 um, z_ax um, sigma0 um, c)
+    max_nfev: int = 40                     # source: PROVISIONAL (D-201.5): scipy's nfev cap (trf does not count the Jacobian's evaluations: at most about 7 x this forward calls per node)
+    ftol: float = 1e-6                     # source: PROVISIONAL (D-201.5): least_squares ftol (scipy's 1e-8 creeps; 1e-6 of a chi2 near 400 is 4e-4)
+    xtol: float = 1e-6                     # source: PROVISIONAL (D-201.5): least_squares xtol
+    workers: int = 0                       # source: D-201.4: nodes fitted in parallel; 0 = os.cpu_count()
+
+
+@dataclass(frozen=True)
 class DiameterConfig:
     """The whole configuration. Build with ``DiameterConfig()`` for the
     deliverable defaults, or ``dataclasses.replace`` for a labelled variant."""
@@ -486,6 +510,7 @@ class DiameterConfig:
     cleaning: CleaningConfig = field(default_factory=CleaningConfig)  # source: D-129, D-130 (sub-config; outside every signature)
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # source: D-129, D-130 (sub-config; outside every signature)
     clearness: ClearnessConfig = field(default_factory=ClearnessConfig)  # source: D-194 [orchestrator] (sub-config; outside every signature)
+    sigma_calibration: SigmaCalibrationConfig = field(default_factory=SigmaCalibrationConfig)  # source: D-201 (sub-config; outside every signature)
 
     # ------------------------------------------------------------ checks --
     def validate(self) -> None:
@@ -629,6 +654,7 @@ class DiameterConfig:
             raise ValueError("calibration.table_max_delta_um must be a multiple of knot_step_um (the table ends on a knot)")
         _check_cleaning_inference(self.cleaning, self.inference)
         _check_clearness(self.clearness)
+        _check_sigma_calibration(self.sigma_calibration)
         sv = self.survey
         types = [str(t).strip().lower() for t, _ in sv.class_map] if all(len(x) == 2 for x in sv.class_map) else None
         if not (isinstance(sv.species, str) and sv.species.strip() and sv.cells_per_group >= 1
@@ -802,6 +828,30 @@ def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None
     if not ok:
         raise ValueError("inference: the fine factor, reach, a pair of bounds, the starts, the plane rule or the "
                          "evaluation budget is out of range (SPEC Blocks 26, 30)")
+
+
+def _check_sigma_calibration(q: "SigmaCalibrationConfig") -> None:
+    """The thick-node calibration's settings (SPEC Block 42): planes >= 1, starts inside their bounds, bounds finite
+    and increasing, six steps > 0, max_nfev >= 1, ftol and xtol in (0, 1), workers >= 0."""
+    def pair(b):
+        return len(tuple(b)) == 2 and all(math.isfinite(float(x)) for x in b) and float(b[0]) < float(b[1])
+    ok = (int(q.half_planes) == q.half_planes and q.half_planes >= 1
+          and all(pair(b) for b in (q.d_bounds_um, q.mu_bounds_per_um, q.v0_bounds_um, q.z_bounds_um,
+                                     q.sigma0_bounds_um, q.growth_scale_bounds))
+          and q.sigma0_bounds_um[0] > 0 and q.growth_scale_bounds[0] > 0 and q.d_bounds_um[0] > 0
+          and q.mu_bounds_per_um[0] > 0
+          and q.sigma0_bounds_um[0] <= q.sigma0_start_um <= q.sigma0_bounds_um[1]
+          and q.growth_scale_bounds[0] <= q.growth_scale_start <= q.growth_scale_bounds[1]
+          and math.isfinite(q.width_to_d) and q.width_to_d > 0
+          and math.isfinite(q.hybrid_faint_factor) and q.hybrid_faint_factor > 0
+          and len(tuple(q.diff_steps)) == 6 and all(math.isfinite(float(x)) and float(x) > 0 for x in q.diff_steps)
+          and int(q.max_nfev) == q.max_nfev and q.max_nfev >= 1
+          and all(math.isfinite(float(t)) and 0 < float(t) < 1 for t in (q.ftol, q.xtol))
+          and int(q.workers) == q.workers and q.workers >= 0)
+    if not ok:
+        raise ValueError("sigma_calibration: a plane count, bound, start, step, max_nfev, tolerance or workers is out "
+                         "of range "
+                         "(SPEC Block 42)")
 
 
 def _check_clearness(q: "ClearnessConfig") -> None:
