@@ -478,6 +478,7 @@ class SigmaCalibrationConfig:
     solved exactly, one start from the dip's features. Outside every signature."""
 
     half_planes: int = 2                   # source: D-201 [user]: the planes k* - 2 .. k* + 2
+    start_ends_um: float = 3.0             # source: PROVISIONAL (D-203 [orchestrator]): the start's straight background through the line's samples at |v| >= this (um)
     sigma0_start_um: float = 0.15          # source: PROVISIONAL (D-201.5): the start of sigma_r(0) (um), inside the pilot's bracket 0.08..0.25
     growth_scale_start: float = 1.0        # source: D-201.5: the configured table's growth
     width_to_d: float = 0.9                # source: PROVISIONAL (D-201.5): the start d0 = W(k*) / this, W the k* dip's half-depth width
@@ -842,6 +843,7 @@ def _check_sigma_calibration(q: "SigmaCalibrationConfig") -> None:
           and q.mu_bounds_per_um[0] > 0
           and q.sigma0_bounds_um[0] <= q.sigma0_start_um <= q.sigma0_bounds_um[1]
           and q.growth_scale_bounds[0] <= q.growth_scale_start <= q.growth_scale_bounds[1]
+          and math.isfinite(q.start_ends_um) and q.start_ends_um > 0
           and math.isfinite(q.width_to_d) and q.width_to_d > 0
           and math.isfinite(q.hybrid_faint_factor) and q.hybrid_faint_factor > 0
           and len(tuple(q.diff_steps)) == 6 and all(math.isfinite(float(x)) and float(x) > 0 for x in q.diff_steps)
