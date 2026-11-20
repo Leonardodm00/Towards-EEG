@@ -10,6 +10,7 @@
 | 2026-11-20 (later, 3) | The user, 16:59 and the answers after it: the in-focus width is fitted on thick nodes (D-201). Section 12, new; 11.3's proposal marked decided in part. Evidence: `kernel.with_kernel` and its smoke test (6 pass, 1 skip), the configuration's test (6 pass, 1 skip), Cell 23A run on the synthetic cell, the forward's time per evaluation measured in the sandbox. |
 | 2026-11-20 (later, 4) | The user, 17:44: Cell 22's fit (WEIGHT_KAPPA 0.1 on D-199's four nodes) is dropped before it ran (D-202). Section 11.2 marked; the notebook's Cell 22 replaced by a one-line note. |
 | 2026-11-20 (later, 5) | The first thick-node run (the user's upload, 18:09) and the user's "Maybe we have to account for a tilted background": section 12.1, new; D-203 (Block 42's start against a straight background). Evidence: `checks/tilt_2026-11-20/` on the upload; the current gallery script on the upload. |
+| 2026-11-20 (later, 6) | The user, 18:24: estimate the background from a stripe close to the node, from 1.2 x Allen's radius per side, and carry it onto the line and into the fit; clear close neighbours first. Section 12.2, new: where the background comes from now, and how far the node's own dip reaches. Evidence: `checks/stripe_2026-11-20/` on the upload of 18:09. Not decided. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -409,3 +410,21 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   Block 42's start now measures the dip against the straight line (D-203, amendment 4); the clearness screen
   (Block 40) still measures against the flat $B_k$ (the user's to decide); the thin-node fit (Block 30) has one flat
   $B_k$ per plane, $I \approx B_k \tau_k$ -- to settle before the calibrated width is used on thin nodes.
+
+### 12.2 The background's support near the node (the user's proposal, 18:24) [added 2026-11-20, later]
+
+- **Proposed [user, 18:24]**: estimate the background's features always from the stripe, but closer to the node --
+  "from like 1.20 * radius per side" -- so that it is faithful to the background that enters the measuring line and
+  the fit; where traced nodes overlap or are close, a first round of clearing first. Not decided.
+- **The background now [src: `node_inputs.model_background`, D-144.1]**: per plane, a plane
+  $b_k(x, y) = b_{0k} + b_{xk} x + b_{yk} y$ fitted over the whole 20 x 20 um patch through the predicted shadow of every
+  traced segment ($I \approx b_k (1 - S)$ on the pixels with predicted shadow $S \le 0.10$, outliers trimmed); only its
+  value at the line's origin is kept, as the flat $B_k$ of the screen, of Block 42's first start and of Block 30's fit
+  ($I \approx B_k \tau_k$). The plane's gradient is estimated and then dropped.
+- **How far a thick node's own dip reaches [run, sandbox: `checks/stripe_2026-11-20/stripe_reach.py` on the upload
+  of 18:09; nodes 7, 599, 611, 629, planes $k^* - 2 .. k^* + 2$; the dip against the straight background through
+  $|v - c| \ge 3$ um]**: at $1.2\,r$ from the dip's centre ($r$ = Allen's radius) the profile is still 0.52 to 0.87 of
+  the dip's depth below the background, on every plane and both sides; at $2\,r$ still 0.06 to 0.47; it stays below
+  5 % only from 2.4 to 3.8 um (2.8 to 5.9 $r$). The half-depth width at $k^*$ is 1.24 to 1.58 times Allen's diameter
+  (section 12.1), so $1.2\,r$ lies inside the half-depth points. Caveat: the reach is read against a background fitted
+  beyond 3 um, which bounds it there.
