@@ -1,4 +1,4 @@
-"""Smoke test for the soma view (analysis/soma_view.py, plotting/soma_figures.py, scripts/show_soma.py) -- Block 44 in specs/SPEC.md (D-208).
+"""Smoke test for the soma view (analysis/soma_view.py, plotting/soma_figures.py, scripts/show_soma.py) -- Block 44 in specs/SPEC.md (D-210).
 
 Oracles: the focus measure's known answer (the least blurred plane of a blurred-disk stack is the sharpest), a
 direct computation with scipy and the disk written out, its invariants (contrast squared, offset, a quadratic

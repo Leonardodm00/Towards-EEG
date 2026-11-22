@@ -732,7 +732,7 @@ for nid in ids_s:
         display(Image(filename=page))
 
 # %% [markdown]
-# ## Cell 24: the soma at focus (D-208; SPEC Block 44)
+# ## Cell 24: the soma at focus (D-210; SPEC Block 44)
 #
 # Run after Cells 0, 1 and 16 (Cell 1 pulls the branch: this cell needs scripts/show_soma.py). The traced soma (the
 # SWC's type-1 node, placed in the image frame with ALIGN's transform) is cropped at +-20 um from every plane within

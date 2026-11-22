@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The soma's view in the image stack -- SPEC Block 44 (D-208).
+"""The soma's view in the image stack -- SPEC Block 44 (D-210).
 
     python3 scripts/show_soma.py --specimen 529878215 --cache-dir DIR [--shift-x X --shift-y Y --flip-h H --z0 Z]
                                  [--config-json FILE] [--swc PATH] [--out DIR] [--synthetic]

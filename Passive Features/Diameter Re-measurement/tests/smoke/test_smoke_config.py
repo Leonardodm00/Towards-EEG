@@ -138,7 +138,7 @@ def test_reference():
                                                         C.RendererConfig, C.PhantomConfig, C.CalibrationConfig,
                                                         C.SurveyConfig, C.CleaningConfig, C.InferenceConfig,
                                                         C.ClearnessConfig, C.SigmaCalibrationConfig,
-                                                        C.SomaViewConfig))   # Blocks 40, 42, 44 (D-194, D-201, D-208)
+                                                        C.SomaViewConfig))   # Blocks 40, 42, 44 (D-194, D-201, D-210)
     assert n_tagged == n_fields, (n_tagged, n_fields)
     # every field is read by some code outside config.py (attribute access or getattr, parsed with ast,
     # so a docstring naming a field does not count) [added 2026-10-07: renderer.jpeg_qtables_file was

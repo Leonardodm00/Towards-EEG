@@ -1,4 +1,4 @@
-"""Figures of the soma's view -- Block 44 in specs/SPEC.md (D-208). Plotting only: every array arrives prepared
+"""Figures of the soma's view -- Block 44 in specs/SPEC.md (D-210). Plotting only: every array arrives prepared
 (analysis.soma_view and the image block); nothing scientific is computed here.
 
   figure_soma_focus   the sharpest plane (the crop about the traced soma, the traced soma's circle and centre, the

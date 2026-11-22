@@ -1303,11 +1303,11 @@ Blocks 42 and 43, new, Block 4 amendment 2 and Block 36 amendment 19 (2026-11-20
 - Data flow: consumes Block 42's `SigmaFit` (through the entry point) and Block 36's per-node arrays; feeds the entry point.
 - Status: implemented 2026-11-20 by one implementer (wave 4), merged `f0f220c`; `test_smoke_sigma_figures.py` 6 pass, 1 skip (rerun by the orchestrator at the gate). Display choices the entry left open, accepted at the gate (plumbing): the grey range is Block 41's rule (the 1st and 99th percentiles of the pixels in view over all planes); the profile range padded by 6 %, the residual range symmetric at 1.1 max |r|; the line drawn from v's first to its last offset with a dark halo; the text panel a right-hand column; on the summary, the SE bars also on the two scatter panels, a dotted line at c = 1, "n/a" where a node has no value, the summary's numbers in the first panel's title, Allen's diameter a cross joined to the fitted one; ValueError also for k_index not an index of the planes, extent, origin_xy or y_hat not finite, an ok that is not a bool, a value that is not a number, a negative SE, a summary lacking a key.
 
-### Block 44: the soma's view in the image stack (D-208)
+### Block 44: the soma's view in the image stack (D-210)
 
 Written by the orchestrator inline (a single small block), 2026-11-22, at the user's request ("from the pilot cell
 let's evaluate the soma first. I need images at focus of the soma"). Every number below is PROVISIONAL, the
-orchestrator's (D-208).
+orchestrator's (D-210).
 
 - Modules: `src/allen_diameter/analysis/soma_view.py`, `src/allen_diameter/plotting/soma_figures.py`,
   `scripts/show_soma.py`; smoke test `tests/smoke/test_smoke_soma_view.py`.
