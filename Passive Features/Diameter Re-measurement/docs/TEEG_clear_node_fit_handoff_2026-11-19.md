@@ -13,6 +13,7 @@
 | 2026-11-20 (later, 6) | The user, 18:24: estimate the background from a stripe close to the node, from 1.2 x Allen's radius per side, and carry it onto the line and into the fit; clear close neighbours first. Section 12.2, new: where the background comes from now, and how far the node's own dip reaches. Evidence: `checks/stripe_2026-11-20/` on the upload of 18:09. Not decided. |
 | 2026-11-22 | The user, 2026-11-20 18:33 (refine the near-soma branches first; how far do diameter errors matter for the somatic passive/Ih fits?) and their answers (D-205): section 13, new. Evidence: `checks/diameter_reach_2026-11-22/` on the pilot's SWC (the user's upload of 2026-11-22). |
 | 2026-11-22 (later) | The user, 14:53: the refinement is limited to the first 250 um from the soma, and on the pilot the soma comes first, from its images at focus in Colab (D-210; the log's D-206 to D-209 were taken by the twins chat meanwhile). Section 14, new. Evidence: the pilot's `reconstruction.swc` **[data inspected]**; SPEC Block 44's smoke test and notebook Cell 24 on the synthetic cell **[run, sandbox]**. |
+| 2026-11-22 (later, 2) | The first real run of Cell 24 (the user's upload, 15:28: "the evaluation is wrong. The soma starts to be visualized at k = 107"): the automatic pick was a dendrite; the soma's plane is now chosen by eye (D-211). Section 14.1, new; section 14's description of the measure marked. Evidence: `soma_529878215.json` from the user's Drive **[data inspected]**; `checks/soma_focus_2026-11-22/` **[run, sandbox]**. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -457,7 +458,8 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   the whole cell's membrane with the spine factor F = 1.9 beyond 60 um). The soma is one SWC node, radius 5.97 um.
 - **Built [SPEC Block 44; `b87e956`]**: `analysis/soma_view.py` (the traced soma's centre and radius, the crop,
   the planes, the focus measure -- the variance of `scipy.ndimage.gaussian_laplace` over the disk of the traced
-  radius + 1 um, NaN on a plane not recorded -- and the sharpest plane, its argmax); `plotting/soma_figures.py`
+  radius + 1 um, NaN on a plane not recorded -- and the sharpest plane, its argmax [corrected 2026-11-22: no plane
+  is picked any more, section 14.1]); `plotting/soma_figures.py`
   (the sharpest plane with the traced circle, its centre and the primary dendrites' first nodes, beside the focus
   curve against depth; a montage, every second plane, 7 panels on each side); `scripts/show_soma.py`
   (`--synthetic` for a dry run); `SomaViewConfig`, PROVISIONAL (D-210.3). Smoke test 6 pass, 1 skip.
@@ -472,3 +474,24 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
 - **Not decided (D-210)**: how the soma is measured (outline, radius, area or volume) and whether its traced
   radius is replaced; whether D-201's thick nodes are taken only within 250 um. The 250 um path-distance cut in
   the pilot run's node selections (Block 36's examples, Block 40's candidates, Cell 23A's scan) is not coded yet.
+
+### 14.1 The first real run: the automatic pick was a dendrite; the soma's plane by eye (D-211) [added 2026-11-22, later]
+
+- **What happened [data inspected: `soma_529878215.json` on the user's Drive; the montage the user uploaded]**: the
+  window held planes 85-149, all recorded; the traced depth is plane 117 (32.76 um). The measure peaked at k = 93
+  (0.415; -6.72 um), where a basal dendrite is in sharp focus inside the traced disk; a second plateau, 0.33-0.345,
+  at k = 107-112; under 0.28 above k = 117. The montage (every second plane, 7 panels a side of k = 93) ended at
+  k = 107, where the user sees the soma begin.
+- **Check [run, sandbox: `checks/soma_focus_2026-11-22/`]**: on a simulated stack (a smooth absorbing sphere of
+  radius 6 um with a dendrite of 0.8, 1.6 or 2.4 um 6.7 um below it) the same measure peaks at the sphere's centre
+  plane each time. So the failure is not the measure's for any soma: on this stack the soma's planes carry less fine
+  detail than its in-focus neighbour, unlike a sharp-edged sphere. Why is not established.
+- **Decided (D-211)**: the soma's plane, and the planes where it is seen, are chosen by eye; nothing is picked
+  automatically until the soma's measurement is specified [user]. The window is now the traced radius + 6 um about
+  the traced depth (k = 74..160 on the pilot), the montage spans it, every second plane aligned on the shown plane
+  [orchestrator, PROVISIONAL]. Block 44 amendment 1, `c5a2bdf`.
+- **To run [Colab]**: Cell 1, then Cell 24 as it is (no plane chosen: the focus figure shows the traced depth's
+  plane, the montage the whole window); then set `SOMA_K` (the plane judged in focus) and `SOMA_K_RANGE` (the first
+  and last plane where the soma is seen), and `MONTAGE_K = (first, last, step)` to narrow the montage, and run Cell 24
+  again. The JSON records `k_traced`, `k_by_eye`, `k_range_by_eye`.
+- **Open**: which plane is the soma's (the user's, from the new montage); how the soma is measured (D-210).
