@@ -780,7 +780,7 @@ implementation:
     jobs: []
   - id: I44
     title: "The soma's view in the image stack"
-    summary: "The pilot's traced soma cropped from the image stack at full resolution on every plane within its traced radius + 6 um of its depth; a montage of the window and the plane the user chooses by eye, with the traced soma's circle and the primary dendrites' first nodes; nothing picked automatically (notebook Cell 24; D-210: the soma first, then the first 250 um; D-211: the soma's plane by eye, after the first run's automatic pick fell on a dendrite)"
+    summary: "The pilot's traced soma cropped from the image stack at full resolution (+-40 um) on every plane within its traced radius + 6 um of its depth, with Allen's reconstruction drawn faintly at its traced diameters; a montage of the window and the plane the user chooses by eye; nothing picked automatically (notebook Cell 24; D-210: the soma first, then the first 250 um; D-211: the soma's plane by eye; D-213: the larger crop and the trace)"
     block: 44
     parent: NC
     depends_on: [I36]
