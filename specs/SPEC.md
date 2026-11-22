@@ -1594,7 +1594,17 @@ orchestrator's (D-210).
 - Confirmed: the parameters, the free far slope with its fixed option, the masks and the equivalent sphere are the
   user's (D-216, D-218); the scales by variable projection, the planes, the region, the bounds, the start and the steps
   are the orchestrator's, PROVISIONAL (D-219).
-- Status: contract (wave 5).
+- Status: implemented 2026-11-22 by one implementer (wave 5), merged `e21dfcf` (block commit `9e68e44`);
+  `test_smoke_soma_fit.py` 9 pass, 1 skip (no discretisation; rerun by the orchestrator at the gate) **[run, sandbox]**,
+  with a stand-in forward model (Block 45 was written in parallel; pixel 0.25 um for speed): T1 against dblquad 3.2e-16;
+  T4(a) noise-free from a start off by 1 um and 15 %, truth a/b = 1.35, phi 46 degrees, c = 3 um, gamma 0.95: 1.5e-12,
+  90 evaluations; T4(b) at most 2.19 SE; T4(c) 27 of 40 (0.675), SD of c_hat 0.0041 um = the median SE(c); T5 fixed
+  slope 3.9e-13; T6 masked pixels change nothing (0.0), unmasked the same stem moves theta by up to 3 um. Choices the
+  entry left open: cov = (J^T J)^-1 chi2/dof (scaled, so se = sqrt(diag(cov)) and SE(S) use one matrix); pinv with NaN
+  for the parameters along J's null space (Block 42's rule); the Jacobian also steps backwards where the forward
+  residual is not finite; grad S with a step of 1e-5 of each axis; the 5th percentile numpy's linear rule, the moments
+  numpy.cov (aweights, bias); a failed fit NaN in every result; more refusals (masks not bool, data not finite on the
+  region, B_far <= 0, ks not strictly ascending, a forward of the wrong shape).
 
 Block 36, amendment 19 (2026-11-20; D-201; the orchestrator's, after wave 4): `scripts/calibrate_sigma.py --cleaning-dir DIR --specimen S [--out DIR/sigma] [--nodes IDS] [--workers N] [--config-json FILE]` -- per example node of a preparation, Block 42's fit on the planes $k^* \pm$ `half_planes` (in a process pool, one node per worker, BLAS threads 1), Block 43's figures, `sigma_<S>.csv`, `sigma_<S>.json` (fits, summary), `sigma_node<id>.png`, `sigma_summary_<S>.png`. Notebook Cell 23: (A, built now with existing scripts) the thick nodes -- `clean_cell.py clear --d-bins 1.0,50 --n 20 --min-soma-um 5` (Allen's diameter >= 1.0 um, the clear rule's 10 um separation in 3-D, no tier-2 neighbour), `clean --no-clean` into `OUT/cleaning_thick` with `cleaning.plane_half_range` 2 and `measure.profile_half_um` 4.5 (D-201.6 [orchestrator]: the measuring line +-4.5 um, so that a thick tube's defocused dip still meets the background on both sides), the gallery of Block 41 on all of them (`--max-per-bin 0 --fill-to 20`); (B, after wave 1) `calibrate_sigma.py` and its figures. Status (2026-11-22): `scripts/calibrate_sigma.py` written by the orchestrator after wave 4's merge: per node, infer_nodes.run_config and node_from_npz, the pilot of the node's record entry, select_planes, forward_with_kernel with one SectionCache, start_theta, fit_sigma_node, and Block 43's node page (the background (b0 + b1 v) drawn); a node enters the summary when it converged with neither sigma0 nor c at a bound; the summary figure's depth is the fitted z_ax. Run on the synthetic preparation of Cell 23A's stand-in (one node, rendered with d 0.8 um, sigma_r(0) 0.080 um, c 1): converged in 58 evaluations, d 0.808 +- 0.002 um, sigma0 0.0776 +- 0.0024 um, c 0.976 +- 0.015 **[run, sandbox]**. Notebook Cell 23B runs it.
 
