@@ -85,3 +85,40 @@ def test_background_support_amendment4():
                 {"cleaning.background_shadow_max": 1.0}, {"cleaning.background_shadow_max": float("nan")}):
         with pytest.raises(ValueError):
             C.with_overrides(c, bad)
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Tester, 2026-11-22 (incremental run at 97f5104): the final check of wave 4's F1 settled by D-212.1 -- every count
+# setting is checked by `config._is_count`: a finite whole number (an int, or a float with an integral value), not a
+# bool, at least its floor; anything else is refused with ValueError (SPEC, "The final check of wave 4", Block 1
+# amendment). Also the two sections of wave 5 (soma_view, soma_fit). Expected values from the spec's text.
+
+COUNT_FIELDS = [("inference.weight_irls_max_iter", 1), ("inference.line_fine_factor", 1),
+                ("cleaning.shadow_fine_factor", 1), ("cleaning.refine_line_fine_factor", 1),
+                ("sigma_calibration.half_planes", 1), ("sigma_calibration.max_nfev", 1), ("sigma_calibration.workers", 0),
+                ("clearness.focus_half_planes", 0), ("soma_view.montage_step_planes", 1), ("soma_view.montage_cols", 1),
+                ("soma_fit.fine_factor", 1), ("soma_fit.plane_step", 1), ("soma_fit.max_nfev", 1)]
+
+
+@pytest.mark.parametrize("field,floor", COUNT_FIELDS)
+def test_count_fields_refuse_non_counts_with_valueerror(field, floor):
+    c = C.default_config()
+    for bad in (float("inf"), float("-inf"), float("nan"), 2.5, True, floor - 1):
+        try:
+            C.with_overrides(c, {field: bad})
+        except ValueError:
+            continue
+        except Exception as exc:        # OverflowError (int(inf)) was the wave-4 finding: any other type is a fail
+            pytest.fail("%s = %r raised %s, not ValueError" % (field, bad, type(exc).__name__))
+        pytest.fail("%s = %r was accepted" % (field, bad))
+    for good in (floor, float(floor + 2)):          # an int, or a float with an integral value
+        c2 = C.with_overrides(c, {field: good})
+        assert c2.signature_hash("estimator") == c.signature_hash("estimator")
+
+
+def test_example_counts_each_a_count():
+    c = C.default_config()
+    for bad in ([4, 6, 6, 2, float("inf")], [4, 6, 6, 2, 2.5], [4, 6, 6, 2, -1], [4, 6, 6, 2, True]):
+        with pytest.raises(ValueError):
+            C.with_overrides(c, {"cleaning.example_counts": bad})
+    assert C.with_overrides(c, {"cleaning.example_counts": [4, 6, 6, 2, 0.0]}).cleaning.example_counts[4] == 0.0
