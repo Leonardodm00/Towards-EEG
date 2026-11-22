@@ -1377,6 +1377,33 @@ orchestrator's (D-210).
 
 Block 36, amendment 19 (2026-11-20; D-201; the orchestrator's, after wave 4): `scripts/calibrate_sigma.py --cleaning-dir DIR --specimen S [--out DIR/sigma] [--nodes IDS] [--workers N] [--config-json FILE]` -- per example node of a preparation, Block 42's fit on the planes $k^* \pm$ `half_planes` (in a process pool, one node per worker, BLAS threads 1), Block 43's figures, `sigma_<S>.csv`, `sigma_<S>.json` (fits, summary), `sigma_node<id>.png`, `sigma_summary_<S>.png`. Notebook Cell 23: (A, built now with existing scripts) the thick nodes -- `clean_cell.py clear --d-bins 1.0,50 --n 20 --min-soma-um 5` (Allen's diameter >= 1.0 um, the clear rule's 10 um separation in 3-D, no tier-2 neighbour), `clean --no-clean` into `OUT/cleaning_thick` with `cleaning.plane_half_range` 2 and `measure.profile_half_um` 4.5 (D-201.6 [orchestrator]: the measuring line +-4.5 um, so that a thick tube's defocused dip still meets the background on both sides), the gallery of Block 41 on all of them (`--max-per-bin 0 --fill-to 20`); (B, after wave 1) `calibrate_sigma.py` and its figures. Status (2026-11-22): `scripts/calibrate_sigma.py` written by the orchestrator after wave 4's merge: per node, infer_nodes.run_config and node_from_npz, the pilot of the node's record entry, select_planes, forward_with_kernel with one SectionCache, start_theta, fit_sigma_node, and Block 43's node page (the background (b0 + b1 v) drawn); a node enters the summary when it converged with neither sigma0 nor c at a bound; the summary figure's depth is the fitted z_ax. Run on the synthetic preparation of Cell 23A's stand-in (one node, rendered with d 0.8 um, sigma_r(0) 0.080 um, c 1): converged in 58 evaluations, d 0.808 +- 0.002 um, sigma0 0.0776 +- 0.0024 um, c 0.976 +- 0.015 **[run, sandbox]**. Notebook Cell 23B runs it.
 
+The final check of wave 4 (2026-11-22; D-212; the orchestrator's settlements of the independent tester's report
+`specs/test_reports/2026-11-22_1440_incremental.md` at `a749cc9`, PASS WITH ISSUES):
+- Block 1, amendment (F1): every count setting checked as `int(x) == x` (and `inference.weight_irls_max_iter`) is
+  checked by `config._is_count`: a finite whole number (int, or a float with an integral value), not a bool, at least
+  its floor; anything else is refused with ValueError (an infinite count raised OverflowError; 2.5 passed).
+- Block 5, amendment 3 stated (S1): under the default `focus_grad_window = "radius_margin"` a non-finite or negative
+  traced radius ends `measure_pilot` with ValueError (`clean_cell.py` drops the node); a radius of exactly 0 is fitted
+  and flagged `allen_radius_missing`; under `"whole_profile"` a NaN reaches the flag too.
+- Block 11, amendment (F6): `colab_bootstrap.bootstrap` takes `<repo>/.git` that exists (a directory in a clone, a file
+  in a git worktree) for an existing clone.
+- Block 27, amendment 5 (F2, S2): in `pick_clear_examples`, a NaN `soma_lateral_um` (no soma disc) passes any
+  `min_soma_um`.
+- Block 36, amendment 20 (F3, F4, F5, S3, S5): `scripts/calibrate_sigma.py` (i) builds its configuration as the
+  preparation's own (`infer_nodes.run_config` without a file) with a `--config-json` file's sections merged over it
+  field by field (`run_configuration`; an unknown section is refused); (ii) names the forward model used
+  (`inference.absorption`, its directions, `renderer.sigma_r0_um`) in the log and in every page's title; (iii) records a
+  node whose fit raises with status "error" and the exception in `message`, and goes on; (iv) rewrites
+  `sigma_<S>.csv` and `sigma_<S>.json` after every node (the JSON's `complete` false until the end); (v) writes strict
+  JSON (`allow_nan=False`, NaN as null); (vi) adds `in_summary` after `ok` in the CSV and the fits: `ok` = converged
+  with neither sigma0 nor c at a bound, `in_summary` = ok with a finite sigma0 and a finite SE > 0; the summary takes
+  the in_summary nodes, and the summary figure the nodes that did not raise.
+- Block 40, "Custom code ... Checked" corrected (F7, S6): `scipy.signal.peak_widths` with
+  `prominence_data = (D[n_c], 0, n - 1)` measures from 0 and stops at the first crossing, agreeing with the walk to
+  1e-14 um (the tester's 299 dips); the walk is kept because where the line ends before the level `peak_widths`
+  returns the line's end, Block 40's rule needs NaN, and the walk works in the offsets v (um).
+
+
 ## 6. Pipeline entry points
 
 | Command | Purpose | Minimal configuration for testing | Expected runtime |
@@ -1446,7 +1473,12 @@ Block 36, amendment 19 (2026-11-20; D-201; the orchestrator's, after wave 4): `s
 | `python tests/smoke/test_smoke_clearness.py` [2026-11-19] | Block 40 checks (the image-based clearness screen) | none | 3 s |
 | `python tests/smoke/test_smoke_clearness_figures.py` [2026-11-19] | Block 41 checks and the gallery's entry point (Block 36, amendment 18) on files written by hand | none | 15 s |
 | `python tests/smoke/test_smoke_kernel_scale.py` [2026-11-20] | Block 4 amendment 2 checks (`kernel.with_kernel`) | none | 1 s |
-| `python tests/smoke/test_smoke_soma_view.py` [2026-11-22] | Block 44 checks (the soma's view) | the synthetic cell | 30 s |
+| `python tests/smoke/test_smoke_soma_view.py` [2026-11-22] | Block 44 checks (the soma's view) | the synthetic cell | 2 min |
+| `python tests/smoke/test_smoke_line_weights.py` [2026-11-22, S4] | Block 39 checks (centre weights and the near-bump cut) | none | 10 s |
+| `python scripts/calibrate_sigma.py --cleaning-dir DIR --specimen S [--out DIR] [--nodes IDS] [--workers N] [--config-json FILE]` [2026-11-22, S4] | Block 36 amendments 19-20: Block 42's fit and Block 43's pages on the thick nodes of a `clean_cell.py clean --no-clean` preparation | `--synthetic` preparation of `clean_cell.py`; one node | 1-3 min a node |
+| `python scripts/clean_cell.py clean --no-clean [--pilot-diameter allen|free] [--sigma-r0-um S]`, `python scripts/clean_cell.py clear --d-bins ...` [2026-11-22, S4] | Block 36 amendments 14-17: the preparation without cleaning, the first stage's diameter rule, the in-focus width override, the clear nodes by diameter bin | `--synthetic` | 1-2 min |
+| `python scripts/infer_nodes.py real --weights ... [--bump-sd S] [--weight-kappa K]` [2026-11-22, S4] | Block 36 amendment 16: the per-node fit with Block 39's weights | `--synthetic` | 1-3 min a node |
+| `python scripts/show_soma.py --specimen S --cache-dir DIR [ALIGN] [--soma-k K] [--soma-k-range LO HI] [--montage-k LO HI STEP]` [2026-11-22] | Block 44: the soma's view, its plane chosen by eye (D-211) | `--synthetic` | 30 s synthetic; minutes on Allen's data |
 | `python tests/smoke/test_smoke_sigma_calibration.py` [2026-11-20; contract] | Block 42 checks (the in-focus width fitted on thick nodes) | the smoke fixture cell | minutes |
 | `python tests/smoke/test_smoke_sigma_figures.py` [2026-11-20; contract] | Block 43 checks | none | seconds |
 | `python scripts/show_clear_gallery.py --cleaning-dir DIR --specimen S [--d-bins EDGES --max-per-bin 4 --fill-to 0 --nodes IDS --zoom-um Z --outside-max X ... --judge-along]` (Cell 21) [2026-11-19; 2026-11-20 `--judge-along`, D-198] | Block 36 amendment 18 (D-194): the clearness screen on every example node of a preparation and one page per node judged clean (the patch in focus and on every plane, the measuring line on every plane); reads the files of `clean_cell.py clean --no-clean`, no network | `clean --no-clean --synthetic` first, or the files `test_smoke_clearness_figures.py` writes | seconds |

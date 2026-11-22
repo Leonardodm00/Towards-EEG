@@ -63,9 +63,11 @@ def _line(v_um):
 
 
 # Custom: the outward walk to a fraction of the depth with linear interpolation, and the features built on it.
-# Checked: scipy.signal.peak_widths returns the width of a peak at a relative height measured from the peak's
-# prominence base, not from the background level 0 that B fixes here, and it does not stop at the first
-# crossing going outwards when a second dip follows; no library function returns the skew or the excess outside.
+# Checked: scipy.signal.peak_widths with prominence_data = (D[n_c], 0, n - 1) measures from the level 0 and stops at
+# the first crossing; it agrees with this walk to 1e-14 um on 299 random dips (final check of wave 4, F7). It is not
+# used because, where the line ends before the level, it returns the line's end, while Block 40's rule needs NaN
+# there, and it works in samples, not in the offsets v (um). No library function returns the skew or the excess
+# outside. [corrected 2026-11-22: the earlier note said peak_widths could not measure from 0]
 def _crossing(D, v, n_c, step, level):
     """The offset where D first falls to `level` going from sample n_c in direction step (+1 or -1): linear
     interpolation between the last sample above the level and the first at or below it; NaN when the line

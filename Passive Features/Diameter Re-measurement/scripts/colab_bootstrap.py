@@ -37,7 +37,7 @@ def bootstrap(repo_dir="/content/Towards-EEG", branch="sci/diameter-pipeline", u
     src/ and scripts/ on sys.path, import the packages the pipeline needs and
     report their versions and the commit. Returns a dict of paths and the
     commit. With clone=False a missing clone raises FileNotFoundError."""
-    if not os.path.isdir(os.path.join(repo_dir, ".git")):
+    if not os.path.exists(os.path.join(repo_dir, ".git")):   # a directory in a clone, a file in a git worktree (F6)
         if not clone:
             raise FileNotFoundError("no git clone at %s" % repo_dir)
         subprocess.run(["git", "clone", "--depth", str(depth), "-b", branch, url, repo_dir], check=True)

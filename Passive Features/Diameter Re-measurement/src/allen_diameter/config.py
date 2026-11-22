@@ -780,6 +780,18 @@ class DiameterConfig:
 
 
 # ----------------------------------------------------------------- helpers --
+def _is_count(x, lo: int = 0) -> bool:
+    """x is a whole number >= lo: an int, or a float with an integral value; not a bool, NaN or infinite (final check
+    of wave 4, F1: int(inf) raised OverflowError, and int(2.5) passed a check written as int(x) >= 1)."""
+    if isinstance(x, bool):
+        return False
+    try:
+        f = float(x)
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(f) and f == math.floor(f) and f >= lo
+
+
 def _check_in(value: str, allowed: Tuple[str, ...], name: str) -> None:
     if value not in allowed:
         raise ValueError("%s = %r is not one of %r" % (name, value, allowed))
@@ -794,7 +806,7 @@ def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None
     _check_in(i.weights, INFERENCE_WEIGHTS, "inference.weights")
     if not (math.isfinite(i.weight_kappa) and i.weight_kappa > 0):
         raise ValueError("inference.weight_kappa must be finite and > 0")
-    if not (int(i.weight_irls_max_iter) >= 1 and i.weight_irls_tol_um >= 0):
+    if not (_is_count(i.weight_irls_max_iter, 1) and i.weight_irls_tol_um >= 0):
         raise ValueError("inference.weight_irls_max_iter must be >= 1 and weight_irls_tol_um >= 0")
     if not (math.isfinite(i.bump_sd) and i.bump_sd >= 0):
         raise ValueError("inference.bump_sd must be finite and >= 0 (0 = off)")
@@ -816,7 +828,7 @@ def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None
                 and (b[0] > 0 or not positive))
 
     ok = (c.patch_half_um > 0 and c.shadow_floor_gl >= 0 and math.isfinite(c.shadow_floor_gl)
-          and int(c.shadow_fine_factor) == c.shadow_fine_factor and c.shadow_fine_factor >= 1
+          and _is_count(c.shadow_fine_factor, 1)
           and c.shadow_reach_sigmas > 0 and c.soma_mu_per_um >= 0 and math.isfinite(c.soma_z_um)
           and c.shadow_bin_sigmas >= 0 and math.isfinite(c.shadow_bin_sigmas)
           and c.close_lateral_um > 0 and c.close_defocus_um > 0 and c.clean_index_max > 0
@@ -827,15 +839,14 @@ def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None
           and math.isfinite(c.own_layer_um) and c.own_layer_um > 0
           and 0 < c.background_shadow_max < 1
           and c.shadow_ray_n_rho >= 1 and c.shadow_ray_n_psi >= 1
-          and len(c.example_counts) == 5 and all(int(n) == n and n >= 0 for n in c.example_counts)
+          and len(c.example_counts) == 5 and all(_is_count(n, 0) for n in c.example_counts)
           and len(c.neighbour_swc_types) >= 1
-          and 0 < c.refine_xtol < 1 and 0 < c.refine_ftol < 1 and int(c.refine_line_fine_factor) == c.refine_line_fine_factor
-          and c.refine_line_fine_factor >= 1
+          and 0 < c.refine_xtol < 1 and 0 < c.refine_ftol < 1 and _is_count(c.refine_line_fine_factor, 1)
           and pair(c.refine_d_bounds_um, True) and pair(c.refine_mu_bounds_per_um, True)
           and pair(c.refine_shift_bounds_um, False) and pair(c.refine_dz_bounds_um, False))
     if not ok:
         raise ValueError("cleaning: a length, count, floor, stop rule or pair of bounds is out of range (SPEC Blocks 25-29)")
-    ok = (int(i.line_fine_factor) == i.line_fine_factor and i.line_fine_factor >= 1 and i.line_reach_sigmas > 0
+    ok = (_is_count(i.line_fine_factor, 1) and i.line_reach_sigmas > 0
           and pair(i.d_bounds_um, True) and pair(i.mu_bounds_per_um, True) and pair(i.v0_bounds_um, False)
           and pair(i.z_bounds_um, False) and len(i.multistart_factors) >= 1
           and all(math.isfinite(f) and f > 0 for f in i.multistart_factors)
@@ -852,7 +863,7 @@ def _check_sigma_calibration(q: "SigmaCalibrationConfig") -> None:
     and increasing, six steps > 0, max_nfev >= 1, ftol and xtol in (0, 1), workers >= 0."""
     def pair(b):
         return len(tuple(b)) == 2 and all(math.isfinite(float(x)) for x in b) and float(b[0]) < float(b[1])
-    ok = (int(q.half_planes) == q.half_planes and q.half_planes >= 1
+    ok = (_is_count(q.half_planes, 1)
           and all(pair(b) for b in (q.d_bounds_um, q.mu_bounds_per_um, q.v0_bounds_um, q.z_bounds_um,
                                      q.sigma0_bounds_um, q.growth_scale_bounds))
           and q.sigma0_bounds_um[0] > 0 and q.growth_scale_bounds[0] > 0 and q.d_bounds_um[0] > 0
@@ -863,9 +874,9 @@ def _check_sigma_calibration(q: "SigmaCalibrationConfig") -> None:
           and math.isfinite(q.width_to_d) and q.width_to_d > 0
           and math.isfinite(q.hybrid_faint_factor) and q.hybrid_faint_factor > 0
           and len(tuple(q.diff_steps)) == 6 and all(math.isfinite(float(x)) and float(x) > 0 for x in q.diff_steps)
-          and int(q.max_nfev) == q.max_nfev and q.max_nfev >= 1
+          and _is_count(q.max_nfev, 1)
           and all(math.isfinite(float(t)) and 0 < float(t) < 1 for t in (q.ftol, q.xtol))
-          and int(q.workers) == q.workers and q.workers >= 0)
+          and _is_count(q.workers, 0))
     if not ok:
         raise ValueError("sigma_calibration: a plane count, bound, start, step, max_nfev, tolerance or workers is out "
                          "of range "
@@ -877,8 +888,8 @@ def _check_soma_view(q: "SomaViewConfig") -> None:
     ok = (math.isfinite(q.half_um) and q.half_um > 0 and math.isfinite(q.z_margin_um) and q.z_margin_um >= 0
           and math.isfinite(q.focus_margin_um) and q.focus_margin_um >= 0
           and math.isfinite(q.focus_sigma_px) and q.focus_sigma_px > 0
-          and int(q.montage_step_planes) == q.montage_step_planes and q.montage_step_planes >= 1
-          and int(q.montage_cols) == q.montage_cols and q.montage_cols >= 1)
+          and _is_count(q.montage_step_planes, 1)
+          and _is_count(q.montage_cols, 1))
     if not ok:
         raise ValueError("soma_view: a length, margin, sigma or montage count is out of range (SPEC Block 44)")
 
@@ -887,7 +898,7 @@ def _check_clearness(q: "ClearnessConfig") -> None:
     """The clearness screen's settings (SPEC Block 40): a plane count >= 0, positive lengths and factors, two
     levels in (0, 1) on either side of the half depth, thresholds finite and > 0, a depth floor >= 0."""
     lv = tuple(q.skew_levels)
-    ok = (int(q.focus_half_planes) == q.focus_half_planes and q.focus_half_planes >= 0
+    ok = (_is_count(q.focus_half_planes, 0)
           and math.isfinite(q.along_half_um) and q.along_half_um >= 0
           and math.isfinite(q.along_step_um) and q.along_step_um > 0
           and math.isfinite(q.smooth_samples) and q.smooth_samples >= 0
