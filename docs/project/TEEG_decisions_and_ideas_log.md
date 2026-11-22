@@ -14270,7 +14270,7 @@ soma's plane(s) in Cell 24; no automatic pick until the soma's measurement is sp
 **Statement.** (D-211.1) [user] The plane where the soma is judged in focus, and the planes where it is seen, are set
 by the user (Cell 24: `SOMA_K`, `SOMA_K_RANGE`); the code picks no plane. (D-211.2) [orchestrator, PROVISIONAL] The
 window holds the planes within the traced radius + 6 um of the traced depth (3 um under D-210.3; on the pilot
-k = 74..160, about +-12 um); the montage shows every second recorded plane of the whole window, aligned on the
+k = 74..160 [corrected 2026-11-22: k = 75..159, the window's ends rounding inward], about +-12 um); the montage shows every second recorded plane of the whole window, aligned on the
 reference plane (the user's, else the plane nearest the traced depth), or the planes the user sets (`MONTAGE_K`).
 (D-211.3) [orchestrator] The variance of the Laplacian of Gaussian (1 px) over the traced disk is kept only as a
 diagnostic, renamed the fine-detail energy and labelled "not a focus estimate".
