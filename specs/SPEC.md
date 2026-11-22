@@ -1303,6 +1303,47 @@ Blocks 42 and 43, new, Block 4 amendment 2 and Block 36 amendment 19 (2026-11-20
 - Data flow: consumes Block 42's `SigmaFit` (through the entry point) and Block 36's per-node arrays; feeds the entry point.
 - Status: implemented 2026-11-20 by one implementer (wave 4), merged `f0f220c`; `test_smoke_sigma_figures.py` 6 pass, 1 skip (rerun by the orchestrator at the gate). Display choices the entry left open, accepted at the gate (plumbing): the grey range is Block 41's rule (the 1st and 99th percentiles of the pixels in view over all planes); the profile range padded by 6 %, the residual range symmetric at 1.1 max |r|; the line drawn from v's first to its last offset with a dark halo; the text panel a right-hand column; on the summary, the SE bars also on the two scatter panels, a dotted line at c = 1, "n/a" where a node has no value, the summary's numbers in the first panel's title, Allen's diameter a cross joined to the fitted one; ValueError also for k_index not an index of the planes, extent, origin_xy or y_hat not finite, an ok that is not a bool, a value that is not a number, a negative SE, a summary lacking a key.
 
+### Block 44: the soma's view in the image stack (D-206)
+
+Written by the orchestrator inline (a single small block), 2026-11-22, at the user's request ("from the pilot cell
+let's evaluate the soma first. I need images at focus of the soma"). Every number below is PROVISIONAL, the
+orchestrator's (D-206).
+
+- Modules: `src/allen_diameter/analysis/soma_view.py`, `src/allen_diameter/plotting/soma_figures.py`,
+  `scripts/show_soma.py`; smoke test `tests/smoke/test_smoke_soma_view.py`.
+- Mathematics. The traced soma: the SWC's type-1 nodes in the image frame (`cell.to_image_um` with the transform of
+  `--shift-x/--shift-y/--flip-h/--z0`, as `clean_cell.py`); centre $c$ = their mean position (um), radius $r$ =
+  the largest of their radii (um). The crop: the square of half-size `half_um` about $(c_x, c_y)$ at full resolution
+  (`allen_image_io.fetch_zblock` through `run_cell.real_provider`); the planes $k$ with $|k\,dz - c_z| \le r +$
+  `z_margin_um`. Per plane $k$ the focus measure
+  $F_k = \mathrm{Var}_{p \in \mathcal D}\,[(\nabla^2 G_{\sigma} * I_k)(p)]$ over the disk $\mathcal D$ of radius
+  $r +$ `focus_margin_um` about $(c_x, c_y)$ (pixel $p$'s centre in the image frame), $G_\sigma$ the Gaussian of SD
+  `focus_sigma_px` (px): `scipy.ndimage.gaussian_laplace`, in grey levels^2 per px^4; NaN for a plane not recorded.
+  The sharpest plane $k_f = \arg\max_k F_k$ (the first on a tie).
+- Public API: `soma_geometry(xyz_um, radius_um, types) -> (centre (3,) um, radius um)`;
+  `crop_box(centre_xy_um, half_um, res0_um) -> (left, top, width, height)` px (corner rounded down, side
+  ceil(2 half / res0) + 1); `plane_range(z_um, half_um, dz_um) -> (k_lo, k_hi)`; `disk_mask(shape, left, top,
+  res0_um, centre_xy_um, radius_um) -> (H, W) bool`; `focus_measure(block, valid, left, top, res0_um,
+  centre_xy_um, radius_um, sigma_px) -> (n_planes,)`; `sharpest(F) -> int`. Figures:
+  `figure_soma_focus(images, ks, extent, centre_xyz, radius_um, dz_um, F, j_focus, roots_xy=None, title="")` (the
+  sharpest plane with the traced soma's circle, its centre and the primary dendrites' first nodes; the focus curve
+  against depth - traced depth, the traced radius shaded) and `figure_soma_planes(images, ks, extent, centre_xyz,
+  radius_um, dz_um, indices, j_focus, roots_xy=None, title="")` (a montage on one grey range, the sharpest framed).
+- Parameters: `SomaViewConfig` (`config.soma_view`; outside every signature): `half_um` 20, `z_margin_um` 3,
+  `focus_margin_um` 1, `focus_sigma_px` 1, `montage_step_planes` 2, `montage_half_n` 7.
+- Outputs (`show_soma.py --out DIR`): `soma_<S>_focus.png`, `soma_<S>_planes.png`, `soma_<S>.json` (the centre,
+  radius, crop, planes, validity, focus values, the sharpest plane and its depth - the traced depth, the
+  montage's planes, the primary dendrites' first nodes), `soma_<S>_block.npz` (the crop: block, ks, valid, left,
+  top, res0_um).
+- Test oracles: the least blurred plane of a stack of a disk blurred by an SD growing with |k - 3| is the sharpest
+  and F falls off on both sides; F equals `gaussian_laplace` and the disk written out [1e-12 relative]; F(2 I + 7) =
+  4 F(I); a quadratic field gives F ~ 0; the geometry's arithmetic; NaN for a plane not recorded; ValueError for no
+  soma node, no finite F, a non-positive half or dz; the script end to end on the synthetic cell (`--synthetic`).
+- Data flow: consumes the SWC and the plane table of a specimen (`clean_cell.load_cell`) and the transform;
+  feeds the user's look at the soma (notebook Cell 24) and a later measurement of the soma, not decided.
+- Status: implemented 2026-11-22 by the orchestrator; `test_smoke_soma_view.py` 6 pass, 1 skip **[run, sandbox]**;
+  not yet run on the real pilot (the Allen API is not reachable from the sandbox).
+
 Block 36, amendment 19 (2026-11-20; D-201; the orchestrator's, after wave 4): `scripts/calibrate_sigma.py --cleaning-dir DIR --specimen S [--out DIR/sigma] [--nodes IDS] [--workers N] [--config-json FILE]` -- per example node of a preparation, Block 42's fit on the planes $k^* \pm$ `half_planes` (in a process pool, one node per worker, BLAS threads 1), Block 43's figures, `sigma_<S>.csv`, `sigma_<S>.json` (fits, summary), `sigma_node<id>.png`, `sigma_summary_<S>.png`. Notebook Cell 23: (A, built now with existing scripts) the thick nodes -- `clean_cell.py clear --d-bins 1.0,50 --n 20 --min-soma-um 5` (Allen's diameter >= 1.0 um, the clear rule's 10 um separation in 3-D, no tier-2 neighbour), `clean --no-clean` into `OUT/cleaning_thick` with `cleaning.plane_half_range` 2 and `measure.profile_half_um` 4.5 (D-201.6 [orchestrator]: the measuring line +-4.5 um, so that a thick tube's defocused dip still meets the background on both sides), the gallery of Block 41 on all of them (`--max-per-bin 0 --fill-to 20`); (B, after wave 1) `calibrate_sigma.py` and its figures. Status (2026-11-22): `scripts/calibrate_sigma.py` written by the orchestrator after wave 4's merge: per node, infer_nodes.run_config and node_from_npz, the pilot of the node's record entry, select_planes, forward_with_kernel with one SectionCache, start_theta, fit_sigma_node, and Block 43's node page (the background (b0 + b1 v) drawn); a node enters the summary when it converged with neither sigma0 nor c at a bound; the summary figure's depth is the fitted z_ax. Run on the synthetic preparation of Cell 23A's stand-in (one node, rendered with d 0.8 um, sigma_r(0) 0.080 um, c 1): converged in 58 evaluations, d 0.808 +- 0.002 um, sigma0 0.0776 +- 0.0024 um, c 0.976 +- 0.015 **[run, sandbox]**. Notebook Cell 23B runs it.
 
 ## 6. Pipeline entry points
@@ -1374,6 +1415,7 @@ Block 36, amendment 19 (2026-11-20; D-201; the orchestrator's, after wave 4): `s
 | `python tests/smoke/test_smoke_clearness.py` [2026-11-19] | Block 40 checks (the image-based clearness screen) | none | 3 s |
 | `python tests/smoke/test_smoke_clearness_figures.py` [2026-11-19] | Block 41 checks and the gallery's entry point (Block 36, amendment 18) on files written by hand | none | 15 s |
 | `python tests/smoke/test_smoke_kernel_scale.py` [2026-11-20] | Block 4 amendment 2 checks (`kernel.with_kernel`) | none | 1 s |
+| `python tests/smoke/test_smoke_soma_view.py` [2026-11-22] | Block 44 checks (the soma's view) | the synthetic cell | 30 s |
 | `python tests/smoke/test_smoke_sigma_calibration.py` [2026-11-20; contract] | Block 42 checks (the in-focus width fitted on thick nodes) | the smoke fixture cell | minutes |
 | `python tests/smoke/test_smoke_sigma_figures.py` [2026-11-20; contract] | Block 43 checks | none | seconds |
 | `python scripts/show_clear_gallery.py --cleaning-dir DIR --specimen S [--d-bins EDGES --max-per-bin 4 --fill-to 0 --nodes IDS --zoom-um Z --outside-max X ... --judge-along]` (Cell 21) [2026-11-19; 2026-11-20 `--judge-along`, D-198] | Block 36 amendment 18 (D-194): the clearness screen on every example node of a preparation and one page per node judged clean (the patch in focus and on every plane, the measuring line on every plane); reads the files of `clean_cell.py clean --no-clean`, no network | `clean --no-clean --synthetic` first, or the files `test_smoke_clearness_figures.py` writes | seconds |

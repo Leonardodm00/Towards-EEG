@@ -125,7 +125,7 @@ def test_reference():
             continue
         name = m.group(1)
         if name in ("acquisition", "measure", "correction", "renderer", "phantom", "calibration", "survey",
-                    "cleaning", "inference", "clearness", "sigma_calibration"):
+                    "cleaning", "inference", "clearness", "sigma_calibration", "soma_view"):
             continue  # the container's sub-config fields
         if "# source:" in line:
             n_tagged += 1
@@ -137,7 +137,8 @@ def test_reference():
     n_fields = sum(len(dataclasses.fields(k)) for k in (C.AcquisitionConfig, C.MeasureConfig, C.CorrectionConfig,
                                                         C.RendererConfig, C.PhantomConfig, C.CalibrationConfig,
                                                         C.SurveyConfig, C.CleaningConfig, C.InferenceConfig,
-                                                        C.ClearnessConfig, C.SigmaCalibrationConfig))   # Blocks 40, 42 (D-194, D-201)
+                                                        C.ClearnessConfig, C.SigmaCalibrationConfig,
+                                                        C.SomaViewConfig))   # Blocks 40, 42, 44 (D-194, D-201, D-206)
     assert n_tagged == n_fields, (n_tagged, n_fields)
     # every field is read by some code outside config.py (attribute access or getattr, parsed with ast,
     # so a docstring naming a field does not count) [added 2026-10-07: renderer.jpeg_qtables_file was

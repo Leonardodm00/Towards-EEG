@@ -730,3 +730,21 @@ for nid in ids_s:
     if os.path.exists(page):
         print(page)
         display(Image(filename=page))
+
+# %% [markdown]
+# ## Cell 24: the soma at focus (D-206; SPEC Block 44)
+#
+# Run after Cells 0, 1 and 16 (Cell 1 pulls the branch: this cell needs scripts/show_soma.py). The traced soma (the
+# SWC's type-1 node, placed in the image frame with ALIGN's transform) is cropped at +-20 um from every plane within
+# its traced radius + 3 um of its depth; per plane a focus measure over the disk of the traced soma (+ 1 um); the
+# sharpest plane is drawn with the traced soma's circle and the primary dendrites' first nodes, with the focus curve
+# against depth, and a montage of the planes about it (every second plane, +-7 panels). About 60 planes are fetched
+# once (they go to CACHE_DIR). Output to send back: soma_<S>_focus.png, soma_<S>_planes.png and soma_<S>.json.
+
+# %%
+from IPython.display import Image, display   # the cell's own imports
+SOMA_OUT = OUT + "/soma"
+run("scripts/show_soma.py", "--specimen", SPECIMEN, "--cache-dir", CACHE_DIR, *ALIGN, *CLEAN_CFG, "--out", SOMA_OUT)
+for name in ("soma_%d_focus.png" % SPECIMEN, "soma_%d_planes.png" % SPECIMEN):
+    print(SOMA_OUT + "/" + name)
+    display(Image(filename=SOMA_OUT + "/" + name))

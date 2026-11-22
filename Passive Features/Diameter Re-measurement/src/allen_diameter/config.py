@@ -497,6 +497,19 @@ class SigmaCalibrationConfig:
 
 
 @dataclass(frozen=True)
+class SomaViewConfig:
+    """The soma's view in the image stack (SPEC Block 44; D-206): the crop about the traced soma, the planes about
+    its depth, the focus measure. Outside every signature."""
+
+    half_um: float = 20.0                  # source: PROVISIONAL (D-206): the square crop's half-size about the soma's centre (um)
+    z_margin_um: float = 3.0               # source: PROVISIONAL (D-206): the planes within (soma radius + this) of the soma's depth
+    focus_margin_um: float = 1.0           # source: PROVISIONAL (D-206): the focus measure's disk, radius = soma radius + this (um)
+    focus_sigma_px: float = 1.0            # source: PROVISIONAL (D-206): the Gaussian of the Laplacian-of-Gaussian focus measure (px)
+    montage_step_planes: int = 2           # source: PROVISIONAL (D-206): every this-many planes in the montage
+    montage_half_n: int = 7                # source: PROVISIONAL (D-206): panels on each side of the sharpest plane
+
+
+@dataclass(frozen=True)
 class DiameterConfig:
     """The whole configuration. Build with ``DiameterConfig()`` for the
     deliverable defaults, or ``dataclasses.replace`` for a labelled variant."""
@@ -512,6 +525,7 @@ class DiameterConfig:
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # source: D-129, D-130 (sub-config; outside every signature)
     clearness: ClearnessConfig = field(default_factory=ClearnessConfig)  # source: D-194 [orchestrator] (sub-config; outside every signature)
     sigma_calibration: SigmaCalibrationConfig = field(default_factory=SigmaCalibrationConfig)  # source: D-201 (sub-config; outside every signature)
+    soma_view: SomaViewConfig = field(default_factory=SomaViewConfig)  # source: D-206 (sub-config; outside every signature)
 
     # ------------------------------------------------------------ checks --
     def validate(self) -> None:
@@ -656,6 +670,7 @@ class DiameterConfig:
         _check_cleaning_inference(self.cleaning, self.inference)
         _check_clearness(self.clearness)
         _check_sigma_calibration(self.sigma_calibration)
+        _check_soma_view(self.soma_view)
         sv = self.survey
         types = [str(t).strip().lower() for t, _ in sv.class_map] if all(len(x) == 2 for x in sv.class_map) else None
         if not (isinstance(sv.species, str) and sv.species.strip() and sv.cells_per_group >= 1
@@ -854,6 +869,17 @@ def _check_sigma_calibration(q: "SigmaCalibrationConfig") -> None:
         raise ValueError("sigma_calibration: a plane count, bound, start, step, max_nfev, tolerance or workers is out "
                          "of range "
                          "(SPEC Block 42)")
+
+
+def _check_soma_view(q: "SomaViewConfig") -> None:
+    """The soma view's settings (SPEC Block 44): lengths finite and > 0 (the margins >= 0), counts >= 1."""
+    ok = (math.isfinite(q.half_um) and q.half_um > 0 and math.isfinite(q.z_margin_um) and q.z_margin_um >= 0
+          and math.isfinite(q.focus_margin_um) and q.focus_margin_um >= 0
+          and math.isfinite(q.focus_sigma_px) and q.focus_sigma_px > 0
+          and int(q.montage_step_planes) == q.montage_step_planes and q.montage_step_planes >= 1
+          and int(q.montage_half_n) == q.montage_half_n and q.montage_half_n >= 1)
+    if not ok:
+        raise ValueError("soma_view: a length, margin, sigma or montage count is out of range (SPEC Block 44)")
 
 
 def _check_clearness(q: "ClearnessConfig") -> None:
