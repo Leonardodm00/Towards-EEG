@@ -11,6 +11,7 @@
 | 2026-11-20 (later, 4) | The user, 17:44: Cell 22's fit (WEIGHT_KAPPA 0.1 on D-199's four nodes) is dropped before it ran (D-202). Section 11.2 marked; the notebook's Cell 22 replaced by a one-line note. |
 | 2026-11-20 (later, 5) | The first thick-node run (the user's upload, 18:09) and the user's "Maybe we have to account for a tilted background": section 12.1, new; D-203 (Block 42's start against a straight background). Evidence: `checks/tilt_2026-11-20/` on the upload; the current gallery script on the upload. |
 | 2026-11-20 (later, 6) | The user, 18:24: estimate the background from a stripe close to the node, from 1.2 x Allen's radius per side, and carry it onto the line and into the fit; clear close neighbours first. Section 12.2, new: where the background comes from now, and how far the node's own dip reaches. Evidence: `checks/stripe_2026-11-20/` on the upload of 18:09. Not decided. |
+| 2026-11-22 | The user, 2026-11-20 18:33 (refine the near-soma branches first; how far do diameter errors matter for the somatic passive/Ih fits?) and their answers (D-205): section 13, new. Evidence: `checks/diameter_reach_2026-11-22/` on the pilot's SWC (the user's upload of 2026-11-22). |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -428,3 +429,18 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   5 % only from 2.4 to 3.8 um (2.8 to 5.9 $r$). The half-depth width at $k^*$ is 1.24 to 1.58 times Allen's diameter
   (section 12.1), so $1.2\,r$ lies inside the half-depth points. Caveat: the reach is read against a background fitted
   beyond 3 um, which bounds it there.
+
+## 13. How far from the soma diameter errors matter (D-205) [added 2026-11-22]
+
+- **Asked [user, 2026-11-20 18:33]**: the refined morphologies feed the passive and Ih fits from somatic
+  stimulation, so the near-soma branches come first; how far from the soma do wrong diameters still matter?
+- **Answer [run, sandbox: `checks/diameter_reach_2026-11-22/`, its README]**: with every dendritic diameter beyond
+  path distance x wrong by 20 % (either way), the passive fit's (Cm, Rm, Ra) move by less than 5 % only for
+  x >= 250 um under Eyal et al. 2016's parameters (cell 060308; full refits confirm at 200 and 250 um), and for
+  x >= 150 um with Rm and Cm forced to this cell's R_in and tau. Ra is set by the first 80-175 um, Rm by the
+  most. Within 250 um lie the whole basal tree (to 218 um) and 59 % of the cell's membrane.
+- **For the refinement order**: first the basal tree and the apical trunk and obliques to about 150 um, where
+  every parameter moves; then to 250 um, which still moves Rm and Cm; the apical tuft beyond 250 um last.
+- **Found on the way**: as reconstructed, the pilot's morphology cannot carry plausible passive parameters --
+  Eyal's values give R_in 220 MOhm against the cell's 54.9 MOhm, and matching R_in and tau needs Cm 5.4 uF/cm2.
+  Ih at rest, underestimated diameters and missing membrane are the candidates (not resolved).

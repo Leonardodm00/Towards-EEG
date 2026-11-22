@@ -1,0 +1,88 @@
+{
+ "label": "eyal2016_060308_refit200",
+ "config": {
+  "cm_uF_cm2": 0.452,
+  "rm_ohm_cm2": 38910.0,
+  "ra_ohm_cm": 203.23,
+  "F": 1.9,
+  "spine_cutoff_um": 60.0,
+  "axon_stub": true,
+  "e_pas_mV": -70.0,
+  "dt_ms": 0.025,
+  "t0_ms": 10.0,
+  "protocols": {
+   "pulse": {
+    "amp_nA": -0.2,
+    "dur_ms": 0.5,
+    "window_ms": [
+     1.0,
+     100.0
+    ],
+    "sample_ms": 0.1
+   },
+   "step": {
+    "amp_nA": -0.11,
+    "dur_ms": 1000.0,
+    "window_ms": [
+     0.0,
+     1000.0
+    ],
+    "sample_ms": 1.0
+   }
+  },
+  "scales": [
+   0.8,
+   1.2
+  ],
+  "x_grid_um": [
+   200.0
+  ],
+  "fd_step": 0.01,
+  "tol": 0.05,
+  "refit_max_iter": 10,
+  "refit_tol": 1e-06
+ },
+ "swc": "reconstruction.swc",
+ "r_in_1s_MOhm": 219.8623096028368,
+ "x_star_um": {
+  "0.80|pulse|Cm": 200.0,
+  "0.80|pulse|Rm": NaN,
+  "0.80|pulse|Ra": 200.0,
+  "0.80|pulse+step|Cm": NaN,
+  "0.80|pulse+step|Rm": NaN,
+  "0.80|pulse+step|Ra": NaN,
+  "1.20|pulse|Cm": 200.0,
+  "1.20|pulse|Rm": NaN,
+  "1.20|pulse|Ra": 200.0,
+  "1.20|pulse+step|Cm": 200.0,
+  "1.20|pulse+step|Rm": NaN,
+  "1.20|pulse+step|Ra": 200.0
+ },
+ "refit_checks": [
+  {
+   "x_um": 200.0,
+   "scale": 1.2,
+   "fit": "pulse",
+   "iterations": 5,
+   "Cm_refit": -0.01193382685767952,
+   "Rm_refit": 0.05985579171594102,
+   "Ra_refit": -0.012598287244159345,
+   "Cm_linear": -0.013041316401658176,
+   "Rm_linear": 0.057392649229739634,
+   "Ra_linear": -0.014742814752929156
+  },
+  {
+   "x_um": 200.0,
+   "scale": 1.2,
+   "fit": "pulse+step",
+   "iterations": 5,
+   "Cm_refit": -0.040259589875943025,
+   "Rm_refit": 0.06912056186024218,
+   "Ra_refit": -0.039598340088240924,
+   "Cm_linear": -0.04199642222687383,
+   "Rm_linear": 0.06787133703860349,
+   "Ra_linear": -0.0447792687067482
+  }
+ ],
+ "seconds": 278.13857531547546
+}

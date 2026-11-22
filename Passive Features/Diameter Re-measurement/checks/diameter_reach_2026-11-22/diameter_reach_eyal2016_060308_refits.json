@@ -1,0 +1,113 @@
+{
+ "label": "eyal2016_060308_refits",
+ "config": {
+  "cm_uF_cm2": 0.452,
+  "rm_ohm_cm2": 38910.0,
+  "ra_ohm_cm": 203.23,
+  "F": 1.9,
+  "spine_cutoff_um": 60.0,
+  "axon_stub": true,
+  "e_pas_mV": -70.0,
+  "dt_ms": 0.025,
+  "t0_ms": 10.0,
+  "protocols": {
+   "pulse": {
+    "amp_nA": -0.2,
+    "dur_ms": 0.5,
+    "window_ms": [
+     1.0,
+     100.0
+    ],
+    "sample_ms": 0.1
+   },
+   "step": {
+    "amp_nA": -0.11,
+    "dur_ms": 1000.0,
+    "window_ms": [
+     0.0,
+     1000.0
+    ],
+    "sample_ms": 1.0
+   }
+  },
+  "scales": [
+   0.8,
+   1.2
+  ],
+  "x_grid_um": [
+   0.0,
+   100.0
+  ],
+  "fd_step": 0.01,
+  "tol": 0.05,
+  "refit_max_iter": 10,
+  "refit_tol": 1e-06
+ },
+ "swc": "reconstruction.swc",
+ "r_in_1s_MOhm": 219.8623096028368,
+ "x_star_um": {
+  "0.80|pulse|Cm": NaN,
+  "0.80|pulse|Rm": NaN,
+  "0.80|pulse|Ra": 100.0,
+  "0.80|pulse+step|Cm": NaN,
+  "0.80|pulse+step|Rm": NaN,
+  "0.80|pulse+step|Ra": NaN,
+  "1.20|pulse|Cm": NaN,
+  "1.20|pulse|Rm": NaN,
+  "1.20|pulse|Ra": 100.0,
+  "1.20|pulse+step|Cm": NaN,
+  "1.20|pulse+step|Rm": NaN,
+  "1.20|pulse+step|Ra": NaN
+ },
+ "refit_checks": [
+  {
+   "x_um": 0.0,
+   "scale": 1.2,
+   "fit": "pulse",
+   "iterations": 5,
+   "Cm_refit": -0.15521609303811967,
+   "Rm_refit": 0.18490183661138304,
+   "Ra_refit": 0.47611552055091666,
+   "Cm_linear": -0.14981564440175954,
+   "Rm_linear": 0.17671636307715155,
+   "Ra_linear": 0.36854874289649997
+  },
+  {
+   "x_um": 0.0,
+   "scale": 1.2,
+   "fit": "pulse+step",
+   "iterations": 5,
+   "Cm_refit": -0.16995360495312162,
+   "Rm_refit": 0.20360649942029108,
+   "Ra_refit": 0.40359819326659485,
+   "Cm_linear": -0.15890475713878027,
+   "Rm_linear": 0.18630452100760952,
+   "Ra_linear": 0.3329038399997286
+  },
+  {
+   "x_um": 100.0,
+   "scale": 1.2,
+   "fit": "pulse",
+   "iterations": 6,
+   "Cm_refit": -0.14013307891444382,
+   "Rm_refit": 0.20046822143030285,
+   "Ra_refit": -0.014137098102330437,
+   "Cm_linear": -0.13299889195779457,
+   "Rm_linear": 0.18622587628967913,
+   "Ra_linear": -0.021667226535203143
+  },
+  {
+   "x_um": 100.0,
+   "scale": 1.2,
+   "fit": "pulse+step",
+   "iterations": 7,
+   "Cm_refit": -0.2233819589278081,
+   "Rm_refit": 0.2657201086030736,
+   "Ra_refit": -0.16081390841848453,
+   "Cm_linear": -0.1887989257152508,
+   "Rm_linear": 0.22981461864946362,
+   "Ra_linear": -0.12942023533395397
+  }
+ ],
+ "seconds": 611.0658538341522
+}

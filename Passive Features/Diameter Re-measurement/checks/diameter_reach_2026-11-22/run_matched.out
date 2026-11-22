@@ -1,0 +1,19 @@
+matched: Rm 3801 Ohm cm2, Cm 5.393 uF/cm2 give R_in 54.89 MOhm (target 54.89) and tau = Rm Cm = 20.5 ms
+cell: 8490 dendritic sections (3136 basal, 5354 apical), path distance max 641 um; soma 11.94 um; axon Hay stub
+reference (Eyal 2016 cell 060308: Cm 5.393 uF/cm2, Rm 3801 Ohm cm2, Ra 203.2 Ohm cm; F 1.9 beyond 60 um): R_in(1 s) 54.9 MOhm; pulse peak -0.945 mV; 7.7 s
+Jacobian (central differences, step 0.01 in log p): 38.8 s
+scale 0.80 done (21 distances)
+scale 1.20 done (21 distances)
+x* (um): the smallest distance beyond which scaling every dendritic diameter by s shifts the fitted parameter by less than 5 %
+  s 0.80  fit pulse       Cm  x* = 90
+  s 0.80  fit pulse       Rm  x* = 150
+  s 0.80  fit pulse       Ra  x* = 80
+  s 0.80  fit pulse+step  Cm  x* = 60
+  s 0.80  fit pulse+step  Rm  x* = 150
+  s 0.80  fit pulse+step  Ra  x* = 80
+  s 1.20  fit pulse       Cm  x* = 90
+  s 1.20  fit pulse       Rm  x* = 150
+  s 1.20  fit pulse       Ra  x* = 80
+  s 1.20  fit pulse+step  Cm  x* = 60
+  s 1.20  fit pulse+step  Rm  x* = 150
+  s 1.20  fit pulse+step  Ra  x* = 80

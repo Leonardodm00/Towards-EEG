@@ -1,0 +1,7 @@
+python 3.13.18 | numpy 2.5.3 | NEURON 9.0.2
+PASS   T1 known answer     0.4s  R_in 937.458 MOhm, analytic 937.458 MOhm (0.000 %); L 500.0 um, d 2.00 um, L/lambda 0.511
+PASS   T2 invariance       3.2s  refit shifts (ln) [-0.09531  0.09531  0.19049], exact [-0.09531  0.09531  0.19062], 4 iterations
+PASS   T3 linearised       1.0s  linearised (ln) [-0.009901  0.0099    0.019689], exact [-0.00995   0.00995   0.019901], worst 1.06 %
+PASS   T4 contract         0.1s  4 of 7 sections scaled beyond 100 um, restored bit for bit; pulse 991, step 1001 samples
+PASS   T5 determinism      0.0s  identical
+-- 5 pass, 0 not

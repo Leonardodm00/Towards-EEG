@@ -1,0 +1,83 @@
+{
+ "label": "matched",
+ "config": {
+  "cm_uF_cm2": 5.392575114574739,
+  "rm_ohm_cm2": 3800.6023587148957,
+  "ra_ohm_cm": 203.23,
+  "F": 1.9,
+  "spine_cutoff_um": 60.0,
+  "axon_stub": true,
+  "e_pas_mV": -70.0,
+  "dt_ms": 0.025,
+  "t0_ms": 10.0,
+  "protocols": {
+   "pulse": {
+    "amp_nA": -0.2,
+    "dur_ms": 0.5,
+    "window_ms": [
+     1.0,
+     100.0
+    ],
+    "sample_ms": 0.1
+   },
+   "step": {
+    "amp_nA": -0.11,
+    "dur_ms": 1000.0,
+    "window_ms": [
+     0.0,
+     1000.0
+    ],
+    "sample_ms": 1.0
+   }
+  },
+  "scales": [
+   0.8,
+   1.2
+  ],
+  "x_grid_um": [
+   0,
+   10,
+   20,
+   30,
+   40,
+   50,
+   60,
+   70,
+   80,
+   90,
+   100,
+   125,
+   150,
+   175,
+   200,
+   250,
+   300,
+   350,
+   400,
+   500,
+   600
+  ],
+  "fd_step": 0.01,
+  "tol": 0.05,
+  "refit_max_iter": 10,
+  "refit_tol": 1e-06
+ },
+ "swc": "reconstruction.swc",
+ "r_in_1s_MOhm": 54.894280876507395,
+ "x_star_um": {
+  "0.80|pulse|Cm": 90.0,
+  "0.80|pulse|Rm": 150.0,
+  "0.80|pulse|Ra": 80.0,
+  "0.80|pulse+step|Cm": 60.0,
+  "0.80|pulse+step|Rm": 150.0,
+  "0.80|pulse+step|Ra": 80.0,
+  "1.20|pulse|Cm": 90.0,
+  "1.20|pulse|Rm": 150.0,
+  "1.20|pulse|Ra": 80.0,
+  "1.20|pulse+step|Cm": 60.0,
+  "1.20|pulse+step|Rm": 150.0,
+  "1.20|pulse+step|Ra": 80.0
+ },
+ "refit_checks": [],
+ "seconds": 299.6272282600403
+}
