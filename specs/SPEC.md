@@ -553,6 +553,8 @@ degrees in config and CSV column names ending `_deg`.
 - Confirmed: yes (D-013; D-024 (iii) for the radius script); the soma-link cylinder, the stretch rule and the registration criterion are the assistant's, PROVISIONAL (2026-10-06)
 - Status: smoke-tested 2026-10-06 (`test_smoke_cell.py` 5 pass, 2 skip; `test_smoke_swc_io.py` 6 pass, 1 skip); `run_cell.py` on real data not run (Colab, Phase II); re-run 2026-10-21 after S2.2 (the spread column removed): the same counts **[run, sandbox]**
 
+- Amendment (2026-11-22; D-222.5; wave 6): `swc_io.edited_lines` and `write_swc`'s arguments `xyz`, `parent` and `keep`
+  (moved nodes, removed rows), specified in Block 47; with `radius` alone the writer is unchanged (D-013).
 ### Block 9: ray-world generator (impl-handoff (S6), (S10); procedure s.3.10)
 
 - Module: `src/allen_diameter/model/ray_world.py`; selected by `RendererConfig.absorption = "ray_world"` through `render.render_transmittance` (Block 4), hence available to `synthetic_block`, the phantoms (Block 6) and `scripts/end_to_end.py` through a config JSON
@@ -1621,6 +1623,110 @@ orchestrator's (D-210).
   residual is not finite; grad S with a step of 1e-5 of each axis; the 5th percentile numpy's linear rule, the moments
   numpy.cov (aweights, bias); a failed fit NaN in every result; more refusals (masks not bool, data not finite on the
   region, B_far <= 0, ks not strictly ascending, a forward of the wrong shape).
+
+### Block 47: the soma in the morphology -- the sphere of equal area and the stems' first nodes (D-215.2, D-216.3, D-222.5)
+
+- Modules: `src/allen_diameter/analysis/soma_morphology.py`; `src/allen_diameter/loading/swc_io.py` (Block 8's module,
+  amended here: `edited_lines`, `write_swc`'s new arguments); smoke test `tests/smoke/test_smoke_soma_morphology.py`
+  (`tests/smoke/test_smoke_swc_io.py` must keep passing).
+- Mathematics. Frames: the image frame of Blocks 44-46 (x, y um from the full image's pixel centres, z um in stage units)
+  and the SWC frame, related by `cell.to_image_um(xyz, res0_um, shift_full_px, flip_y_full_h, z0_um)`: $x_{\rm img} =
+  (x/p + s_x)\,p$, $y_{\rm img} = ((F - y/p \text{ when flipped, else } y/p) + s_y)\,p$, $z_{\rm img} = z - z_0^{\rm align}$;
+  `image_to_swc_um` is its inverse (a shift and an optional reflection: lengths are kept). The fitted ellipsoid
+  $E(\theta_g)$, $\theta_g = (x_0, y_0, z_0, a, b, c, \varphi, \mu)$ (Block 45), in its own frame $(u, v, w) = $ Block 45's
+  rotated in-plane coordinates and $w = z - z_0$; $Q(P) = (u/a)^2 + (v/b)^2 + (w/c)^2 - 1$: negative inside, 0 on the
+  surface. A line $P + t\,d$, $d \ne 0$: $Q(P + t d) = A t^2 + 2 B t + C$ with $A = (d_u/a)^2 + (d_v/b)^2 + (d_w/c)^2 > 0$,
+  $B = P_u d_u/a^2 + P_v d_v/b^2 + P_w d_w/c^2$, $C = Q(P)$; its roots $t = (-B \pm \sqrt{B^2 - AC})/A$, NaN when $B^2 < AC$
+  (the line misses): the points where the line pierces the fitted surface. The corrected soma (D-216.3): the SWC's first
+  type-1 node (in row order) moved to the fitted centre $(x_0, y_0, z_0)$ mapped to the SWC frame, its radius $r_{\rm eq} =
+  \sqrt{S/4\pi}$ (Block 46); any other type-1 node removed, its children re-parented to the first. The stems: the rows whose
+  parent is a type-1 node and whose own type is not 1 (the axon included). For a stem with first node $P_1$ (image frame)
+  and $P_2$ its first child in row order, $d = (P_2 - P_1)/|P_2 - P_1|$ ($P_1$ a leaf: $d$ from the fitted centre to $P_1$).
+  $Q(P_1) > 0$ (outside): $P_1$ moves to $P_1 + t^* d$, $t^*$ the root of smaller $|t|$ (both roots lie on one side);
+  $Q(P_1) < 0$ (inside): $t^*$ the positive root, where the stem leaves the surface; $|Q(P_1)| \le 10^{-12}$: unmoved, "on
+  surface". When $P_1$ is inside and $t^* \ge |P_2 - P_1|$ (the exit lies beyond $P_2$; D-222.5): the chain $P_1, P_2,
+  \ldots, P_m$ is walked while each node from $P_2$ on is inside and has exactly one child; $P_m$ is the first node with $Q
+  \ge 0$; $P_1$ moves to the crossing on the segment $P_{m-1} P_m$ (the root $s \in [0, 1]$ of $Q(P_{m-1} + s\,(P_m -
+  P_{m-1})) = 0$), the nodes $P_2, \ldots, P_{m-1}$ are removed and $P_m$ is re-parented to $P_1$. A node inside with two or
+  more children before the exit: the stem unmoved, "branch inside"; a leaf inside: unmoved, "ends inside"; no root:
+  unmoved, "missed"; otherwise "moved". Radii are kept. Outlines for the figures: the silhouette, the in-plane ellipse $(a,
+  b, \varphi)$ about $(x_0, y_0)$; the section at depth $z$, the same ellipse scaled by $\sqrt{1 - ((z - z_0)/c)^2}$ (none
+  when $|z - z_0| \ge c$); the side outline, the ellipse $(a, c)$ in the $(u, w)$ plane.
+- Public API:
+  - `image_to_swc_um(xyz_img, res0_um, shift_full_px=(0.0, 0.0), flip_y_full_h=None, z0_um=0.0) -> (n, 3)` float64 um.
+  - `fit_frame(P_img, theta_g) -> (n, 3)`: $(u, v, w)$ um of the points (n, 3) in the ellipsoid's frame.
+  - `ellipsoid_q(P_img, theta_g) -> (n,)`: $Q$ at the points.
+  - `line_crossings(P_img, d, theta_g) -> (t_lo, t_hi)`: (n,) each, t_lo <= t_hi, NaN where the line misses; d (n, 3) or
+    (3,), nonzero.
+  - `ellipse_outline(theta_g, z_um=None, n=256) -> (x (n,), y (n,))` um image frame: the silhouette (z_um None) or the
+    section at z_um (empty (0,) arrays when it misses).
+  - `side_outline(theta_g, n=256) -> (u (n,), w (n,))` um.
+  - `stem_rows(swc) -> ndarray[int]`: the stems' first nodes, ascending rows.
+  - `correct_soma(swc, theta_g, r_eq_um, res0_um, shift_full_px=(0.0, 0.0), flip_y_full_h=None, z0_um=0.0) -> SomaEdit`.
+  - `SomaEdit` (frozen dataclass): `xyz` (N, 3) SWC frame um (every row of the input, edited where moved), `radius` (N,),
+    `parent` (N,) ids (re-parented where nodes are removed), `keep` (N,) bool, `soma_row`, `stems` (a tuple of dicts:
+    `row`, `id`, `type`, `flag`, `old_um` (3,), `new_um` (3,), `moved_um`, `removed_ids` (tuple)), `removed_soma_ids`.
+  - `swc_io.edited_lines(swc, xyz=None, radius=None, parent=None, keep=None) -> list[str]`: the data lines of the kept rows
+    with x, y, z (tokens 3-5), the radius (6) and the parent (7) replaced where given -- floats with `_format_like`, the
+    parent as an integer -- the removed rows' lines dropped, every other line verbatim (comments, blank lines, separators,
+    line endings); ValueError for shapes that disagree, a non-finite coordinate, a radius <= 0, a kept row whose parent
+    is removed, a parent id absent from the kept rows (-1 allowed).
+  - `swc_io.write_swc(swc, path, radius=None, xyz=None, parent=None, keep=None)`: writes `edited_lines`; with `radius`
+    alone the bytes of `rewrite_radius_lines`, as before (D-013).
+- Parameters: none (D-216.3 and D-222.5 fix the rule); the surface tolerance $|Q| \le 10^{-12}$ a module constant.
+- Library calls: numpy; `analysis.cell.to_image_um` (the forward map).
+- Custom code: the line-ellipsoid quadratic (no library function); the stems' walk; the SWC editor (Block 8's tokeniser).
+- Test oracles: (T1) `image_to_swc_um` inverts `cell.to_image_um`, with and without the reflection, shifts and z0 [1e-9
+  um]; distances kept. (T2) `line_crossings`: a sphere and a line through its centre give $\pm R/|d|$; an axis-aligned
+  ellipsoid along each axis gives $\pm a, \pm b, \pm c$; on a rotated ellipsoid the points $P + t d$ lie on the surface ($|Q|
+  \le 10^{-12}$); a line that misses gives NaN. (T3) `correct_soma` on a synthetic SWC (one soma node, four stems of three
+  to five nodes), the fitted ellipsoid larger and smaller than the traced sphere: each moved first node on the surface ($|Q|
+  \le 10^{-9}$) and on its stem's line (collinear with its old position and $P_2$, 1e-9); the soma node at the fitted
+  centre in the SWC frame with radius $r_{\rm eq}$; every other node unchanged bit for bit. (T4) the walk: a stem whose
+  second and third nodes lie inside -- $P_1$ on the crossing of the third-fourth segment, the second and third removed, the
+  fourth re-parented to $P_1$; a branch inside: unmoved, "branch inside"; a leaf inside: "ends inside"; a line that misses:
+  "missed". (T5) `swc_io`: radius-only calls give the bytes of `rewrite_radius_lines`; an edit round-trips through
+  `read_swc` (the new xyz, radius and parents, the removed ids absent, every other line verbatim); the edited tokens keep at
+  least `MIN_DECIMALS`. (T6) several type-1 nodes: the first kept, the others removed, their children re-parented. (T7) the
+  reflection: with flip_y_full_h the corrected SWC equals the unflipped case's with the ellipsoid mirrored [1e-9 um].
+  (T8) shapes, dtypes, no mutation of the input SWC, determinism, the ValueErrors (no type-1 node, a bad theta_g, r_eq <= 0).
+- Data flow: consumes the SWC (`read_swc`), Block 46's fit (theta, r_eq), Block 44's alignment (its JSON's `transform`);
+  feeds the entry point (`scripts/fit_soma.py`: the corrected SWC by `write_swc`) and Block 48's morphology figure.
+- Confirmed: the sphere of equal area at the fitted centre and the stems moved along their own direction (D-216.3), the
+  removal of the stems' inside nodes and the flags (D-222.5) are the user's; the numerics are the orchestrator's.
+- Status: contract (wave 6).
+
+### Block 48: the soma fit's figures (D-215, D-222.5)
+
+- Modules: `src/allen_diameter/plotting/soma_fit_figures.py`; smoke test `tests/smoke/test_smoke_soma_fit_figures.py`.
+- Figures only: every number drawn is passed in; the module computes nothing scientific (section 4). Image panels in the
+  image frame, um, with matplotlib's `extent` (left, right, bottom, top), as Block 44's figures.
+- Public API:
+  - `figure_soma_fit_planes(data, model, region, mask, ks, dz_from_centre_um, extent_um, silhouette_xy, sections_xy,
+    allen_circle, eq_circle, title="") -> Figure`: data, model (K, H, W) grey levels on the K planes shown; region, mask
+    (H, W) bool; ks (K,) int; dz_from_centre_um (K,) each plane's depth minus the fitted z0; silhouette_xy (2, n); sections_xy
+    a list of K arrays (2, n_k) or None (None: the plane misses the soma); allen_circle, eq_circle (x, y, r) um. One row per
+    plane -- data, model, residual (data - model, a diverging map symmetric about 0, one scale for every row) -- the
+    region's boundary on every panel, the masked pixels dimmed; on the data panel the silhouette (dashed), the plane's section
+    (solid), Allen's circle (dotted) and the sphere of equal area (dash-dot); each row titled with k and its depth.
+  - `figure_soma_fit_summary(names, theta, se, fitted, derived, allen, z_um, B_gl, rms_gl, noise_gl=None, title="") ->
+    Figure`: a table of the parameters (name, value, SE; held ones marked), the derived area, volume and r_eq with their SEs
+    beside Allen's radius and $4\pi r^2$ (`derived`, `allen` dicts), and two panels against depth: the planes' scales B_k and
+    the residual RMS per plane (a horizontal line at noise_gl when given).
+  - `figure_soma_morphology(top, side, title="") -> Figure`: two panels, the top view (x, y) and the side view (u, w) in the
+    ellipsoid's frame; each a dict of (2, n) arrays `allen`, `silhouette`, `sphere` and `stems`, a list of dicts (`old` (2,),
+    `new` (2,), `next` (2, m), `flag`): the old first node (an open circle), the new (filled), an arrow from old to new, the
+    stem's next nodes as a line, the flag in the legend when not "moved".
+- Parameters: none (styling constants in the module).
+- Library calls: matplotlib.
+- Custom code: none.
+- Test oracles: (T1) each function returns a Figure with the expected number of axes on synthetic inputs, saved to a non-empty
+  PNG; (T2) no input mutated; (T3) sections that are None and an empty stem list are drawn without error; (T4) the residual
+  panels share one colour scale, symmetric about 0; (T5) the ValueErrors for shapes that disagree.
+- Data flow: consumes the arrays the entry point builds from Block 46's fit (the model planes $\hat B_k\tau_k$ from Block 45
+  at $\hat\theta$), Block 47's outlines and `SomaEdit`; written by the entry point as `soma_fit_<S>_planes.png`,
+  `_summary.png` and `_morphology.png`.
+- Status: contract (wave 6).
 
 Block 36, amendment 19 (2026-11-20; D-201; the orchestrator's, after wave 4): `scripts/calibrate_sigma.py --cleaning-dir DIR --specimen S [--out DIR/sigma] [--nodes IDS] [--workers N] [--config-json FILE]` -- per example node of a preparation, Block 42's fit on the planes $k^* \pm$ `half_planes` (in a process pool, one node per worker, BLAS threads 1), Block 43's figures, `sigma_<S>.csv`, `sigma_<S>.json` (fits, summary), `sigma_node<id>.png`, `sigma_summary_<S>.png`. Notebook Cell 23: (A, built now with existing scripts) the thick nodes -- `clean_cell.py clear --d-bins 1.0,50 --n 20 --min-soma-um 5` (Allen's diameter >= 1.0 um, the clear rule's 10 um separation in 3-D, no tier-2 neighbour), `clean --no-clean` into `OUT/cleaning_thick` with `cleaning.plane_half_range` 2 and `measure.profile_half_um` 4.5 (D-201.6 [orchestrator]: the measuring line +-4.5 um, so that a thick tube's defocused dip still meets the background on both sides), the gallery of Block 41 on all of them (`--max-per-bin 0 --fill-to 20`); (B, after wave 1) `calibrate_sigma.py` and its figures. Status (2026-11-22): `scripts/calibrate_sigma.py` written by the orchestrator after wave 4's merge: per node, infer_nodes.run_config and node_from_npz, the pilot of the node's record entry, select_planes, forward_with_kernel with one SectionCache, start_theta, fit_sigma_node, and Block 43's node page (the background (b0 + b1 v) drawn); a node enters the summary when it converged with neither sigma0 nor c at a bound; the summary figure's depth is the fitted z_ax. Run on the synthetic preparation of Cell 23A's stand-in (one node, rendered with d 0.8 um, sigma_r(0) 0.080 um, c 1): converged in 58 evaluations, d 0.808 +- 0.002 um, sigma0 0.0776 +- 0.0024 um, c 0.976 +- 0.015 **[run, sandbox]**. Notebook Cell 23B runs it.
 

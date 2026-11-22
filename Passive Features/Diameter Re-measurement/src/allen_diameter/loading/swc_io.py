@@ -4,8 +4,10 @@ Reads an SWC file into arrays and writes it back with new radii while keeping
 every other byte of the file unchanged (decision D-013: the corrected
 morphology is "a new swc file exactly in the same format as the original").
 
-Only the radius field (the 6th whitespace-separated token of a data line)
-is ever rewritten; comment lines, blank lines, line endings, field separators
+[2026-11-22, wave 6 (D-222.5): `edited_lines` and `write_swc`'s `xyz`, `parent`
+and `keep` also move nodes, re-parent them and drop rows (SPEC Block 47); with
+`radius` alone the writer is unchanged.] Only the radius field (the 6th
+whitespace-separated token of a data line) is rewritten by `rewrite_radius_lines`; comment lines, blank lines, line endings, field separators
 and the other six fields are copied verbatim. A radius is formatted with the
 same number of decimals as the token it replaces (at least
 ``MIN_DECIMALS``), so the file keeps its own precision convention.
@@ -147,10 +149,25 @@ def rewrite_radius_lines(swc: SWC, radius: np.ndarray) -> List[str]:
     return lines
 
 
-def write_swc(swc: SWC, path: str, radius: Optional[np.ndarray] = None) -> None:
-    """Write ``swc`` to ``path``; with ``radius`` given, only the radius
-    field of every data line changes (D-013)."""
-    lines = swc.lines if radius is None else rewrite_radius_lines(swc, radius)
+def edited_lines(swc: SWC, xyz: Optional[np.ndarray] = None, radius: Optional[np.ndarray] = None,
+                 parent: Optional[np.ndarray] = None, keep: Optional[np.ndarray] = None) -> List[str]:
+    """CONTRACT STUB (wave 6, SPEC Block 47): the file's lines with, on the kept data lines, x, y, z (tokens 3-5), the
+    radius (6) and the parent (7) replaced where given (floats with _format_like, the parent as an integer), the removed
+    rows' lines dropped and every other line verbatim. xyz (N, 3) um, radius (N,) um, parent (N,) ids, keep (N,) bool.
+    ValueError for shapes that disagree, a non-finite coordinate, a radius <= 0, a kept row whose parent is removed, a
+    parent id absent from the kept rows (-1 allowed)."""
+    raise NotImplementedError("Block 47 (wave 6)")
+
+
+def write_swc(swc: SWC, path: str, radius: Optional[np.ndarray] = None, xyz: Optional[np.ndarray] = None,
+              parent: Optional[np.ndarray] = None, keep: Optional[np.ndarray] = None) -> None:
+    """Write ``swc`` to ``path``; with ``radius`` alone, only the radius
+    field of every data line changes (D-013); with ``xyz``, ``parent`` or
+    ``keep`` the lines of ``edited_lines`` (SPEC Block 47, wave 6)."""
+    if xyz is not None or parent is not None or keep is not None:
+        lines = edited_lines(swc, xyz=xyz, radius=radius, parent=parent, keep=keep)
+    else:
+        lines = swc.lines if radius is None else rewrite_radius_lines(swc, radius)
     with open(path, "w", encoding="ascii", newline="") as f:
         f.write("".join(lines))
 
