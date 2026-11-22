@@ -4,7 +4,8 @@ twin_build.py -- the twin build: the fitter's own model at the truth, clean resp
 ==========================================================================================================================
 
 specs/SPEC.md, section 2.7 (c), (d), (f), (h) and the entry of Block 12
-(D-183, D-186, D-187, D-190, D-192). NEURON side. Three separate concerns,
+(D-183, D-186, D-187, D-190, D-192); the twin without noise of 2.8 (e) and
+the entry of Block 18 (D-207). NEURON side. Three separate concerns,
 three functions: the cell (build_twin_cell), the traces (simulate_twin), the
 archive (write_twin_archive); build_twin chains them for one twin.
 
@@ -21,7 +22,8 @@ What it does
                         ls_sweep_noise
     write_twin_archive  the archive cell in the layout the fitter's loader
                         reads (as synthetic_ground_truth.write_archive_cell)
-    build_twin          the whole build of one twin
+    build_twin          the whole build of one twin; with_noise=False (Block 18,
+                        SPEC 2.8 (e)) writes the clean responses alone
 
 This module imports no NEURON at module scope (twin_manifest imports
 TwinSpec from it): the fitter's monolith, ih_mechanism and
@@ -47,8 +49,8 @@ import twin_noise
 import twin_table
 from twin_config import TwinConfig
 
-CONFIGURATIONS = ("full", "passive_fit", "active_fit")
-HAS_IH = {"full": True, "passive_fit": True, "active_fit": False}
+CONFIGURATIONS = ("full", "passive_fit", "active_fit", "full_no_noise")
+HAS_IH = {"full": True, "passive_fit": True, "active_fit": False, "full_no_noise": True}
 PASSIVE_KEYS = ("Cm", "Rm", "Ra")
 IH_KEYS = ("gbar", "dv_h", "kappa_tau")
 
@@ -69,7 +71,8 @@ class TwinSpec:
 
     twin_id             : the twin's own id (int), distinct from every real id
     twin_of_specimen_id : the real cell it is the twin of (int)
-    configuration       : 'full' | 'passive_fit' | 'active_fit'
+    configuration       : 'full' | 'passive_fit' | 'active_fit' |
+                          'full_no_noise' (I_h as 'full'; Block 18)
     theta               : the truth in the fitter's names -- Cm (uF/cm^2),
                           Rm (Ohm cm^2), Ra (Ohm cm), and when
                           HAS_IH[configuration] gbar (S/cm^2), dv_h (mV),
@@ -144,6 +147,15 @@ def _check_spec(spec: TwinSpec) -> Dict[str, float]:
         if not math.isfinite(val):
             raise TwinBuildError("twin %d: %s = %r is not finite" % (int(spec.twin_id), name, val))
     return theta
+
+
+def _check_with_noise(with_noise, twin_id) -> bool:
+    """with_noise as a Python bool; a value that is not a bool (bool or
+    numpy.bool_) is refused, so that a string such as "False" read from a
+    CSV cannot build a noisy twin."""
+    if not isinstance(with_noise, (bool, np.bool_)):
+        raise TwinBuildError("twin %d: with_noise = %r is not a bool" % (int(twin_id), with_noise))
+    return bool(with_noise)
 
 
 def _check_table(table: pd.DataFrame, protocol, specimen: int) -> pd.DataFrame:
@@ -363,7 +375,8 @@ def write_twin_archive(group_dir, spec: TwinSpec, traces: TwinTraces, *, swc_pat
                        features: Mapping[str, float], provenance: Optional[Mapping] = None,
                        overwrite: bool = False, cfg: TwinConfig = TwinConfig(),
                        rest_drift_mV: float = float("nan"),
-                       ls_sweeps_left_out: Optional[Mapping[int, str]] = None) -> Path:
+                       ls_sweeps_left_out: Optional[Mapping[int, str]] = None,
+                       with_noise: bool = True) -> Path:
     """Write <group_dir>/specimen_<twin_id>/ in the layout the fitter's loader
     reads (SPEC, Block 12, "Outputs": ss_pulses.npz, ls_sweeps.npz,
     reconstruction.swc, metadata.json with its `twin` block) and return that
@@ -372,9 +385,13 @@ def write_twin_archive(group_dir, spec: TwinSpec, traces: TwinTraces, *, swc_pat
     dendrite type). Keyword-only (amendment 6 (ii), D-193): `cfg` (the
     `twin` block's base_seed, neuron_dt_ms, settle_ms), `rest_drift_mV` (mV,
     the drift build_twin_cell measured) and `ls_sweeps_left_out` (real LS
-    sweep number -> the real trace's spike reason). Refused (TwinBuildError):
+    sweep number -> the real trace's spike reason). `with_noise` (Block 18):
+    whether `traces` carry the noise; recorded as `twin.with_noise`, and with
+    False also `twin.noise_laws_applied` = False (the twins' table's laws and
+    tilts were read for its checks only, not added). Refused (TwinBuildError):
     SPEC, Block 12."""
     theta = _check_spec(spec)
+    with_noise = _check_with_noise(with_noise, spec.twin_id)
     swc_path = Path(swc_path)
     if not swc_path.is_file():
         raise TwinBuildError("twin %d: the real cell's reconstruction.swc %s not found" % (int(spec.twin_id),
@@ -445,6 +462,9 @@ def write_twin_archive(group_dir, spec: TwinSpec, traces: TwinTraces, *, swc_pat
                   ls_sweeps_left_out={str(int(k)): str(v) for k, v in dict(ls_sweeps_left_out or {}).items()},
                   provenance=(dict(provenance) if provenance is not None else None)),
     )
+    meta["twin"]["with_noise"] = with_noise
+    if not with_noise:
+        meta["twin"]["noise_laws_applied"] = False
     try:
         text = json.dumps(meta, indent=2, default=_json_default)
     except TypeError as exc:
@@ -464,7 +484,7 @@ def write_twin_archive(group_dir, spec: TwinSpec, traces: TwinTraces, *, swc_pat
 # ===========================================================================
 def build_twin(spec: TwinSpec, real_spec_dir, table: pd.DataFrame, group_dir, *, ih_spec, apply_theta,
                spike_reason_fn=None, cfg: TwinConfig = TwinConfig(), overwrite: bool = False,
-               provenance: Optional[Mapping] = None) -> Path:
+               provenance: Optional[Mapping] = None, with_noise: bool = True) -> Path:
     """The whole build of one twin from its real cell's archive directory:
     twin_table.load_cell_protocol (spike_reason_fn None ->
     passive_fitting_hpc_fixed.sweep_spike_reason), build_twin_cell on
@@ -476,8 +496,11 @@ def build_twin(spec: TwinSpec, real_spec_dir, table: pd.DataFrame, group_dir, *,
     measure_rin_tau_sag on GroundTruthParams(cm_uF_cm2=Cm, rm_Ohm_cm2=Rm,
     e_pas_mV=V_rest) with the truth's Cm and Rm, so tau_ms = Rm Cm 1e-3 (the
     truth's passive membrane time constant); rin_MOhm and sag_ratio
-    simulated."""
+    simulated. `with_noise` (Block 18, SPEC 2.8 (e)): False writes the clean
+    responses alone (simulate_twin(..., with_noise=False)) and records it in
+    the archive's `twin` block."""
     theta = _check_spec(spec)
+    with_noise = _check_with_noise(with_noise, spec.twin_id)
     real_spec_dir = Path(real_spec_dir)
     swc = real_spec_dir / "reconstruction.swc"
     if not swc.is_file():
@@ -495,7 +518,7 @@ def build_twin(spec: TwinSpec, real_spec_dir, table: pd.DataFrame, group_dir, *,
         real_meta = json.load(fh)
 
     cell = build_twin_cell(swc, spec, ih_spec=ih_spec, apply_theta=apply_theta, cfg=cfg)
-    traces = simulate_twin(cell, spec, protocol, table, cfg=cfg, with_noise=True)
+    traces = simulate_twin(cell, spec, protocol, table, cfg=cfg, with_noise=with_noise)
 
     import synthetic_ground_truth as sgt
     _v, rin, tau, sag = sgt.measure_rin_tau_sag(cell, sgt.GroundTruthParams(cm_uF_cm2=theta["Cm"], rm_Ohm_cm2=theta["Rm"],
@@ -504,4 +527,4 @@ def build_twin(spec: TwinSpec, real_spec_dir, table: pd.DataFrame, group_dir, *,
     return write_twin_archive(group_dir, spec, traces, swc_path=swc, real_metadata=real_meta,
                               features=dict(rin_MOhm=rin, tau_ms=tau, sag_ratio=sag), provenance=provenance,
                               overwrite=overwrite, cfg=cfg, rest_drift_mV=float(cell.twin_rest_drift_mV),
-                              ls_sweeps_left_out=left_out)
+                              ls_sweeps_left_out=left_out, with_noise=with_noise)
