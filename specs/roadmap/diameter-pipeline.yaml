@@ -820,6 +820,24 @@ implementation:
     needs_theory: []
     needs_hpc: false
     jobs: []
+  - id: I47
+    title: "The soma in the morphology"
+    summary: "The fitted soma as the sphere of equal area at the fitted centre; each stem's first node moved along its own direction onto the fitted surface, the stem's inside nodes removed; the edited SWC written in the original's format (D-216.3, D-222.5)"
+    block: 47
+    parent: NC5
+    depends_on: [I46, I8]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: I48
+    title: "The soma fit's figures"
+    summary: "Data, model and residual per plane with the fitted outline, Allen's circle and the sphere of equal area; the parameters with the planes' scales and residuals; the soma and the stems' first nodes before and after (D-215, D-222.5)"
+    block: 48
+    parent: NC5
+    depends_on: [I46, I47]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
 # Revisions: a change one side has to absorb because of the other
 # (roadmap.py revise). An implementation stage's flag clears when its
 # code changes after the flag's commit; a topic's when its status
