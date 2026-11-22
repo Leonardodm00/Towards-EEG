@@ -1377,8 +1377,9 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Public API: `build_twin(spec, real_spec_dir, table, group_dir, *, ih_spec, apply_theta, spike_reason_fn=None,
   cfg=TwinConfig(), overwrite=False, provenance=None, with_noise: bool = True)` -- `with_noise=False` passes
   `simulate_twin(..., with_noise=False)`; the archive's metadata records `twin.with_noise` (bool) in both cases; with
-  `with_noise=False` it also records the noise laws as not applied (the table's rows stay in `twin.sweeps` for the
-  protocol; say how in the as-built note). `TwinSpec.configuration` accepts `"full_no_noise"` (I_h as `full`).
+  `with_noise=False` it also records `twin.noise_laws_applied = False` (amendment 1, 2026-11-22 [orchestrator]: the archive has no
+  `twin.sweeps` and gets none -- the contract named a key that does not exist; the table's laws are read for the
+  table check only). `with_noise` must be a bool (`TwinBuildError` otherwise). TB7's exact key set gains `with_noise`. `TwinSpec.configuration` accepts `"full_no_noise"` (I_h as `full`).
   `write_twin_archive(..., with_noise: bool = True)` if the flag has to reach the writer.
 - Test oracles: TB1-TB9 unchanged; TB11 a twin built with `with_noise=False` has SS and LS traces equal to
   `simulate_twin(with_noise=False)` bit for bit and, read back by the fitter's loader, is equal to the fitter's
