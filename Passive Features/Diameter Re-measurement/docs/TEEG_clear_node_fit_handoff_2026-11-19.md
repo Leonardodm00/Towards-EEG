@@ -12,6 +12,7 @@
 | 2026-11-20 (later, 5) | The first thick-node run (the user's upload, 18:09) and the user's "Maybe we have to account for a tilted background": section 12.1, new; D-203 (Block 42's start against a straight background). Evidence: `checks/tilt_2026-11-20/` on the upload; the current gallery script on the upload. |
 | 2026-11-20 (later, 6) | The user, 18:24: estimate the background from a stripe close to the node, from 1.2 x Allen's radius per side, and carry it onto the line and into the fit; clear close neighbours first. Section 12.2, new: where the background comes from now, and how far the node's own dip reaches. Evidence: `checks/stripe_2026-11-20/` on the upload of 18:09. Not decided. |
 | 2026-11-22 | The user, 2026-11-20 18:33 (refine the near-soma branches first; how far do diameter errors matter for the somatic passive/Ih fits?) and their answers (D-205): section 13, new. Evidence: `checks/diameter_reach_2026-11-22/` on the pilot's SWC (the user's upload of 2026-11-22). |
+| 2026-11-22 (later) | The user, 14:53: the refinement is limited to the first 250 um from the soma, and on the pilot the soma comes first, from its images at focus in Colab (D-210; the log's D-206 to D-209 were taken by the twins chat meanwhile). Section 14, new. Evidence: the pilot's `reconstruction.swc` **[data inspected]**; SPEC Block 44's smoke test and notebook Cell 24 on the synthetic cell **[run, sandbox]**. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -444,3 +445,30 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
 - **Found on the way**: as reconstructed, the pilot's morphology cannot carry plausible passive parameters --
   Eyal's values give R_in 220 MOhm against the cell's 54.9 MOhm, and matching R_in and tau needs Cm 5.4 uF/cm2.
   Ih at rest, underestimated diameters and missing membrane are the candidates (not resolved).
+
+## 14. The soma first: its view at focus (D-210; SPEC Block 44) [added 2026-11-22, later]
+
+- **Asked [user, 2026-11-22 14:53]**: "let's focus on the first 250 um then from the soma. from the pilot cell let's
+  evaluate the soma first. I need images at focus of the soma from colab". Logged as D-210 (D-206 to D-209 were
+  taken by the twins chat while this was being written; the branch's files cite D-210 from `7108994`).
+- **Scope [data inspected: the pilot's `reconstruction.swc`, path length along the SWC from the soma's centre]**:
+  5509 of the 8496 dendrite nodes lie within 250 um (all 3141 basal, 2368 of 5355 apical), 3628 within 150 um;
+  they carry 66.0 % of the dendritic shaft membrane with Allen's radii and no spine factor (section 13's 59 % is
+  the whole cell's membrane with the spine factor F = 1.9 beyond 60 um). The soma is one SWC node, radius 5.97 um.
+- **Built [SPEC Block 44; `b87e956`]**: `analysis/soma_view.py` (the traced soma's centre and radius, the crop,
+  the planes, the focus measure -- the variance of `scipy.ndimage.gaussian_laplace` over the disk of the traced
+  radius + 1 um, NaN on a plane not recorded -- and the sharpest plane, its argmax); `plotting/soma_figures.py`
+  (the sharpest plane with the traced circle, its centre and the primary dendrites' first nodes, beside the focus
+  curve against depth; a montage, every second plane, 7 panels on each side); `scripts/show_soma.py`
+  (`--synthetic` for a dry run); `SomaViewConfig`, PROVISIONAL (D-210.3). Smoke test 6 pass, 1 skip.
+- **To run [Colab]**: Cells 0, 1 (it pulls the branch) and 16 (its survey is skipped when the examples file
+  exists), then Cell 24. About 65 planes of 40 x 40 um are fetched once, into `CACHE_DIR`. Outputs in `OUT/soma/`:
+  `soma_529878215_focus.png`, `soma_529878215_planes.png`, `soma_529878215.json` (`centre_um`, `radius_um`, `ks`,
+  `focus`, `k_sharpest`, `z_sharpest_minus_soma_um`, ...) and `soma_529878215_block.npz` (the crop).
+- **What to read in them**: whether the sharpest plane lies near the traced depth (`z_sharpest_minus_soma_um`);
+  whether the soma's outline there matches the traced circle (radius 5.97 um); whether the focus curve has one
+  clear peak -- a flat or double-peaked curve means something else in the disk (a dendrite crossing, the soma's
+  own edges at two depths) drives the measure.
+- **Not decided (D-210)**: how the soma is measured (outline, radius, area or volume) and whether its traced
+  radius is replaced; whether D-201's thick nodes are taken only within 250 um. The 250 um path-distance cut in
+  the pilot run's node selections (Block 36's examples, Block 40's candidates, Cell 23A's scan) is not coded yet.
