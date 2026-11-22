@@ -112,3 +112,36 @@ def test_figure_chi2_and_determinism(tmp_path):
     assert (tmp_path / "a.png").read_bytes() == (tmp_path / "b.png").read_bytes()
     with pytest.raises(ValueError):
         IF.figure_chi2([])
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Tester 2026-11-22 (incremental at a749cc9): Block 34, amendment 2 -- figure_fit(..., weights). Oracles: with
+# weights (n_v,) a right-hand axis per profile panel carries them (0 to 1), the samples of zero weight are shaded
+# in both panels of each plane, the drawn weights equal the input, inputs unchanged; meta["profiles"] names the
+# profile in the legend.
+# ---------------------------------------------------------------------------------------------------------------
+
+def test_figure_fit_weights_amendment2():
+    import matplotlib.pyplot as plt
+    prof, model, v, ks = data()
+    fit = make_fit(len(ks), np.ones(len(ks), bool))
+    w = np.exp(-np.abs(v) / 0.7)
+    w[:3] = 0.0
+    w0, p0 = w.copy(), prof.copy()
+    fig = IF.figure_fit(prof, model, v, ks, 3.0, fit, {"node_id": 7, "profiles": "as recorded"}, weights=w)
+    twins = [ax for ax in fig.axes if lines_by_gid(ax, "weights")]
+    assert len(twins) == len(ks)
+    for ax in twins:
+        x, y = lines_by_gid(ax, "weights")[0].get_data()
+        assert_array_equal(x, v) and assert_array_equal(y, w)
+        lo, hi = ax.get_ylim()
+        assert lo == 0.0 and 1.0 <= hi <= 1.1          # "from 0 to 1" (a little headroom accepted)
+    spans = [p for ax in fig.axes for p in ax.patches if p.get_gid() == "no_weight"]
+    assert len(spans) == 3 * 2 * len(ks)                # three zero-weight samples, two panels per plane
+    labels = [ln.get_label() for ax in fig.axes for ln in lines_by_gid(ax, "profile")]
+    assert all("as recorded" in s for s in labels)
+    assert_array_equal(w, w0) and assert_array_equal(prof, p0)
+    plt.close(fig)
+    for bad in (np.ones(v.size - 1), -np.ones(v.size), np.full(v.size, np.nan)):
+        with pytest.raises(ValueError):
+            IF.figure_fit(prof, model, v, ks, 3.0, fit, {}, weights=bad)

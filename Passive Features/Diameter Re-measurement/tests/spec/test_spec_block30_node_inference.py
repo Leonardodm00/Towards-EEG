@@ -149,3 +149,110 @@ def test_nan_forward_after_the_start_ends_failed():
         return out * np.nan if n["c"] > 1 else out
     fit = NI.fit_node(I, B, SD, fwd, TRUTH * 1.2, cfg, planes=np.ones(KS.size, bool))
     assert fit.status == "failed"
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Tester 2026-11-22 (incremental at a749cc9): Block 30, amendment 2 (D-169.4, D-171.2) -- fit_node(weights,
+# z_box_centre_um) and fit_node_recentred. Oracles: weights of ones = None [exact theta and cost, cov 1e-9];
+# the weighted cost and chi2_k/N by their formulas; the sandwich A^-1 B A^-1 against an independent central-
+# difference Jacobian; samples of zero weight do not matter [exact]; coverage of d +- se with centre weights
+# [60-76 %, the entry's band]; the re-centred fit from 0.2 um off ends within 1e-3 um of the centre in <= 3 solves.
+# ---------------------------------------------------------------------------------------------------------------
+
+def _w(lam=0.7, vc=0.07):
+    return np.exp(-np.abs(V - vc) / lam)
+
+
+def test_weights_of_ones_equal_none():
+    cfg = H.cfg_with()
+    I = B * forward(*TRUTH) + np.random.default_rng(1).normal(0, SD, (KS.size, V.size))
+    a = NI.fit_node(I, B, SD, forward, TRUTH * 1.1, cfg)
+    b = NI.fit_node(I, B, SD, forward, TRUTH * 1.1, cfg, weights=np.ones(V.size))
+    assert_array_equal(a.theta, b.theta)
+    assert a.cost == b.cost
+    assert_allclose(b.cov, a.cov, rtol=1e-9)
+    assert_allclose(b.chi2_per_plane, a.chi2_per_plane, rtol=1e-12)
+
+
+def test_zero_weight_samples_do_not_matter():
+    cfg = H.cfg_with()
+    rng = np.random.default_rng(2)
+    I = B * forward(*TRUTH) + rng.normal(0, SD, (KS.size, V.size))
+    w = (np.abs(V) < 1.5).astype(float)
+    I2 = I.copy()
+    I2[:, w == 0] += rng.uniform(-80, 80, (KS.size, int((w == 0).sum())))
+    a = NI.fit_node(I, B, SD, forward, TRUTH * 1.1, cfg, weights=w)
+    b = NI.fit_node(I2, B, SD, forward, TRUTH * 1.1, cfg, weights=w)
+    assert_array_equal(a.theta, b.theta) and a.cost == b.cost
+
+
+def test_weighted_cost_chi2_and_sandwich_by_hand():
+    cfg = H.cfg_with()
+    rng = np.random.default_rng(3)
+    I = B * forward(*TRUTH) + rng.normal(0, SD, (KS.size, V.size))
+    w2 = np.tile(_w(), (KS.size, 1))
+    w2[1] *= 0.5                                         # a (n_planes, n_v) form, planes weighted differently
+    fit = NI.fit_node(I, B, SD, forward, TRUTH, cfg, planes=np.ones(KS.size, bool), weights=w2)
+    th = fit.theta
+    r = (I - B * forward(*th)) / SD
+    assert_allclose(fit.cost, np.sum(w2 * r ** 2), rtol=1e-12)
+    assert_allclose(fit.chi2_per_plane, np.sum(w2 * r ** 2, axis=1) / np.sum(w2, axis=1), rtol=1e-12)
+    sw = np.sqrt(w2).ravel()
+    Jw = np.empty((I.size, 4))
+    for p in range(4):
+        h = 1e-6 * max(1.0, abs(th[p]))
+        e = np.zeros(4)
+        e[p] = h
+        rp = (np.sqrt(w2) * (I - B * forward(*(th + e))) / SD).ravel()
+        rm = (np.sqrt(w2) * (I - B * forward(*(th - e))) / SD).ravel()
+        Jw[:, p] = (rp - rm) / (2 * h)
+    A = np.linalg.inv(Jw.T @ Jw)
+    JB = sw[:, None] * Jw
+    cov = A @ (JB.T @ JB) @ A
+    # the solver's 2-point Jacobian against a central difference: 1e-3 relative on the covariance's diagonal
+    assert_allclose(np.diag(fit.cov), np.diag(cov), rtol=2e-3)
+    assert_allclose(fit.se, np.sqrt(np.diag(cov)), rtol=1e-3)
+
+
+def test_weighted_coverage():
+    cfg = H.cfg_with()
+    rng = np.random.default_rng(3031)
+    I0 = B * forward(*TRUTH)
+    w = _w()
+    cover = 0
+    for _ in range(300):
+        fit = NI.fit_node(I0 + rng.normal(0, SD, I0.shape), B, SD, forward, TRUTH, cfg,
+                          planes=np.ones(KS.size, bool), weights=w)
+        assert fit.status == "converged"
+        cover += abs(fit.theta[0] - TRUTH[0]) <= fit.se[0]
+    frac = cover / 300.0
+    print("weighted coverage %.3f" % frac)
+    assert 0.60 <= frac <= 0.76                          # Block 30's band at n = 300 (nominal 68 %)
+
+
+def test_recentred_fit():
+    cfg = H.cfg_with()
+    I = B * forward(*TRUTH)
+    start = TRUTH.copy()
+    start[2] += 0.2
+    lam = 0.7
+    fit, info = NI.fit_node_recentred(I, B, SD, forward, start, cfg, V, lam)
+    assert set(info) >= {"n_solves", "centre_um", "converged", "lambda_um", "nfev", "weights"}
+    assert info["n_solves"] <= 3 and info["lambda_um"] == lam
+    assert abs(fit.theta[2] - TRUTH[2]) <= 1e-3 and abs(info["centre_um"] - TRUTH[2]) <= 1e-2
+    assert_allclose(info["weights"], np.exp(-np.abs(V - info["centre_um"]) / lam), rtol=1e-15)
+    keep = np.abs(V) < 1.8
+    fit2, info2 = NI.fit_node_recentred(I, B, SD, forward, start, cfg, V, lam, keep=keep)
+    assert np.all(info2["weights"][~keep] == 0)
+    # centre_offset_um maps v0 onto the line: v_c = v0 + offset
+    fit3, info3 = NI.fit_node_recentred(I, B, SD, forward, TRUTH, cfg, V, lam, centre_offset_um=-0.3)
+    assert abs(info3["centre_um"] - (fit3.theta[2] - 0.3)) <= cfg.inference.weight_irls_tol_um + 1e-12
+
+
+@pytest.mark.parametrize("bad", [-np.ones(V.size), np.full(V.size, np.nan), np.ones(V.size - 1),
+                                 np.zeros(V.size), np.ones((2, V.size))])
+def test_weights_refusals(bad):
+    cfg = H.cfg_with()
+    I = B * forward(*TRUTH)
+    with pytest.raises(ValueError):
+        NI.fit_node(I, B, SD, forward, TRUTH, cfg, weights=bad)

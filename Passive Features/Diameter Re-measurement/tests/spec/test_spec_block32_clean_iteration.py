@@ -338,3 +338,43 @@ def test_background_fn_bad_values(monkeypatch):
         with pytest.raises(ValueError):
             CI.run_rounds(features0(), scene_two(), [node(2, 1.0)], cfg_rounds(1), 3.0, factory,
                           shadow_fn=zero_shadow, background_fn=lambda nd, F, b=bad: b)
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Tester 2026-11-22 (incremental at a749cc9): Block 32, amendment 3 (D-169.7) -- prepared_only. Oracles: the
+# amendment's list (stopped "not_cleaned", rounds 0, history empty; profiles_before = profiles_after = each node's
+# line read from its block [1e-12 gl, against nc_helpers' independent bilinear read]; cleaned = the block as
+# float64; shadow zeros; tiers = cleaning.neighbour_tiers on the featured scene; fits {"status": "not_run"};
+# B_gl the node's; features unchanged); a kept id outside the work list raises ValueError.
+# ---------------------------------------------------------------------------------------------------------------
+
+def test_prepared_only_amendment3():
+    from allen_diameter.analysis import cleaning
+    from allen_diameter.analysis.node_features import featured_scene
+    cfg = default_config()
+    scene, feats = scene_two(), features0()
+    nodes = [node(2, 1.0, seed=1), node(12, 4.0, seed=2)]
+    blocks = [n.block.copy() for n in nodes]
+    res = CI.prepared_only(feats, scene, nodes, cfg, keep_ids=[2])
+    assert res.stopped == CI.NOT_CLEANED == "not_cleaned" and res.rounds == 0 and res.history == []
+    F = featured_scene(scene, feats)
+    for n, blk0 in zip(nodes, blocks):
+        want = np.stack([nc_helpers.bilinear_read(n.block[i], n.left, n.top, P, n.origin_xy, n.y_hat, n.e_u, n.v,
+                                                  n.n_avg, n.step) for i in range(len(n.ks))])
+        assert_allclose(res.profiles_before[n.node_id], want, rtol=0, atol=1e-12)
+        assert_array_equal(res.profiles_after[n.node_id], res.profiles_before[n.node_id])
+        assert_array_equal(res.tiers[n.node_id], cleaning.neighbour_tiers(F, n.own_ids, n.node_xyz, cfg))
+        assert res.fits[n.node_id] == {"status": "not_run"}
+        assert_array_equal(res.B_gl[n.node_id], n.B_gl)
+        assert_array_equal(n.block, blk0)
+    assert sorted(res.cleaned) == [2] and sorted(res.shadow) == [2]
+    assert res.cleaned[2].dtype == np.float64 and and_array_equal_ok(res.cleaned[2], nodes[0].block)
+    assert not np.any(res.shadow[2]) and res.shadow[2].shape == nodes[0].block.shape
+    assert res.features is feats or all(np.array_equal(getattr(res.features, f.name), getattr(feats, f.name))
+                                        for f in dataclasses.fields(feats))
+    with pytest.raises(ValueError):
+        CI.prepared_only(feats, scene, nodes, cfg, keep_ids=[99])
+
+
+def and_array_equal_ok(a, b):
+    return np.array_equal(np.asarray(a, dtype=np.float64), np.asarray(b, dtype=np.float64))

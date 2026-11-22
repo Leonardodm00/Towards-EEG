@@ -234,3 +234,45 @@ def test_value_errors():
         SH.shadow_image(fs, {1, 2}, 0, 0, 5, 5, [0.0], cfg, B_gl=0.0)
     with pytest.raises(ValueError):
         SH.shadow_image(fs, {1, 2}, 0, 0, 5, 5, [0.0], H.cfg_with({"cleaning.shadow_absorption": "linear"}))
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Tester 2026-11-22 (incremental at a749cc9): Block 25, amendment 8 (D-163) -- a changed kept sum is clipped at 0
+# where rounding left it below, never beyond SUM_ROUNDING_ATOL. Oracle: on random overlapping scenes and random
+# visit orders (two patches, include masks that drop and restore neighbours, the path that changes a kept sum),
+# every S >= 0, equal to the reference path (shadow._SHARE False: every neighbour rendered, summed afresh) within
+# rounding [1e-13: a few float64 additions of values <= 1], and Block 28's clean_block accepts it.
+# ---------------------------------------------------------------------------------------------------------------
+
+def test_changed_kept_sums_stay_non_negative_and_exact_to_rounding():
+    from allen_diameter.analysis import cleaning as CLN
+    cfg = H.cfg_with({"cleaning.shadow_absorption": "partition_vertical", "cleaning.shadow_fine_factor": 2})
+    rng = np.random.default_rng(163)
+    z = np.array([-0.28, 0.0, 0.28])
+    pa, pb = (-25, -25, 50, 50), (-5, -35, 45, 60)
+    worst, n_changed = 0.0, 0
+    for trial in range(4):
+        segs = [OWN]
+        for q in range(6):
+            p0 = rng.uniform(-1.5, 1.5, 3) * np.array([1, 1, 0.4])
+            p1 = p0 + np.array([rng.uniform(0.8, 2.0), rng.uniform(-0.5, 0.5), rng.uniform(-0.3, 0.3)])
+            segs.append((tuple(p0), tuple(p1), rng.uniform(0.3, 0.7), rng.uniform(0.5, 2.0), (2 * q + 4, 2 * q + 3)))
+        fs = fscene(segs)
+        SH.cache_clear()
+        for step in range(6):
+            patch = pa if step % 3 != 1 else pb
+            inc = list(rng.random(6) < 0.6) if step >= 2 else None
+            m0 = SH.cache_info()["misses"]
+            got = SH.shadow_image(fs, {1, 2}, *patch, z, cfg, include=inc)
+            SH._SHARE = False
+            try:
+                ref = SH.shadow_image(fs, {1, 2}, *patch, z, cfg, include=inc)
+            finally:
+                SH._SHARE = True
+            assert got.S.min() >= 0.0, (trial, step, got.S.min())
+            worst = max(worst, float(np.max(np.abs(got.S - ref.S))))
+            n_changed += int(SH.cache_info()["misses"] - m0 < 6)
+            assert_array_equal(got.kept, ref.kept)
+            CLN.clean_block(np.full(got.S.shape, 200.0), got.S, 200.0, cfg)
+    print("largest |S - reference| %.3g over the visits; %d visits reused part of the cache" % (worst, n_changed))
+    assert worst <= 1e-13 and n_changed > 0
