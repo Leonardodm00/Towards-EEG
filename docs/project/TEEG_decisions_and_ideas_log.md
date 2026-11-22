@@ -265,6 +265,7 @@ the "Binds" column.
 | 2026-11-22 (later; the gallery chat, 4) | Logs **D-213** (user, 16:25): the soma view's crop larger and centred on the soma, with Allen's reconstruction superimposed faintly at its traced diameters (soma and main branches); the size and the drawing rule are the orchestrator's. Next free IDs: D-214, I-007. |
 | 2026-11-22 (later, 5) | Logs **D-214** [orchestrator] (the twins chat; coding directives 7 to 9): D-204 and D-206 to D-209 are **implemented** on `sci/twins` (`c974a62`): SPEC 2.8, Blocks 14 (the loss), 15 (arm `ih5`), 16 (manifest), 18 (noise-free twin), 17 (the run and report), each by its own Opus implementer, gated and merged; the independent final check (report `Ih Fit/specs/test_reports/2026-11-22_1554_incremental.md`) PASS WITH ISSUES, two NOTEs, both fixed; `tests/spec` 255 passed. A real twin of cell 508282493 built here under the new loss: the loss at the truth is 0.0109, against 0.042 with $\bar g_h$ x3 and 0.018 with $\bar g_h$ /3. Not yet run on davinci. Next free IDs: D-215, I-007. |
 | 2026-11-22 (later; the gallery chat, 5) | Logs **D-215** (user, 16:53): the refinement plan on the pilot -- the soma's area from a fitted soma model, then the circle and the stems' first nodes, then the diameters to 250 um sampled between nodes. Checks behind the answer: `checks/area_vs_axial_2026-11-22/`. Next free IDs: D-216, I-007. |
+| 2026-11-22 (later; the gallery chat, 6) | Logs **D-216** (user, 17:11, "Everything as recommended"): the method of the soma model and its fit, the equivalent sphere and the stems' first nodes, the sampling of the diameters to 250 um; roadmap steps NC5 and NC6 added. Next free IDs: D-217, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -468,6 +469,7 @@ would be needed*, *Status*.
 | D-213 | 2026-11-22 | SPEC Block 44 amendment 2 (`soma_view.trace_segments`, `segment_mask`, `segments_at_depth`; the figures; `show_soma.py --half-um`; `SomaViewConfig.half_um`), notebook Cell 24 | a larger crop centred on the soma, Allen's reconstruction superimposed faintly with its traced diameters, soma and branches [user]; half-size 40 um, the branches outlined at their traced width on every plane and filled where the trace puts them at the plane's depth [orchestrator, PROVISIONAL] | active |
 | D-214 | 2026-11-22 | SPEC 2.8 and Blocks 14-18 as built on `sci/twins` (`c974a62`): the edge rules of D-207's forms, the code's `kappa_tau` axis under D-209's box in ms, the gate's required axes, `loss_verdict` | the orchestrator's choices while building D-204/D-206 to D-209: `kappa_tau` kept as the code's axis with the box given in ms; roles for n < 4; the peak searched from 1 ms after onset on a 51-sample boxcar; depolarising steps use the maximum; the sample weight on the training loss only; the gate on `ih5` requires $C_m$, $\bar g_h$, $\kappa_\tau$; the noise-free twins reported apart; `loss_verdict` at 2 % with `na` at the penalty [orchestrator] | active; built, smoke-tested, final check PASS WITH ISSUES (two NOTEs, fixed) |
 | D-215 | 2026-11-22 | the pilot's refinement within 250 um (D-205, D-210): the soma, the stems' first nodes, the dendritic diameters | (1) the soma's membrane area from a soma model fitted to the stack; (2) the traced circle and the stems' first nodes adjusted to it; (3) the diameters to 250 um, sampled between successive nodes [user]; the soma model's details, the sampling rule and the order against the in-focus width calibration open | active |
+| D-216 | 2026-11-22 | D-215's open points: the soma model and its fit, how the fitted soma enters the model, the sampling of the diameters; the roadmap's steps NC5, NC6 | an ellipsoid (three semi-axes, its in-plane orientation, its centre), partition absorption, stems and neuropil masked with Allen's trace, depth in stage units, a check on simulated soma stacks first; the sphere of equal area at the fitted centre, the stems' first nodes moved along their own direction onto the fitted surface; every node first, midpoints only where neighbours jump [user] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14436,4 +14438,31 @@ order against the in-focus width calibration (D-201), on which the diameters' fi
 **Sources.** **[user]** 2026-11-22 16:53. **[run, sandbox]** the checks above. **[log]** D-201, D-205, D-210, D-213.
 
 **Status:** active; the open points asked the same day.
+
+## D-216 -- The soma model and its fit, the fitted soma in the model, and the sampling of the diameters (user)
+
+**Date:** 2026-11-22, 17:11 (Europe/Rome), the gallery chat. **Binds:** the soma's fit (D-215.1), how its result enters
+the morphology (D-215.2), the sampling of the diameters within 250 um (D-215.3); the roadmap.
+
+**Decision [user].** "Everything as racommended", to the orchestrator's message of 16:53-17:05.
+
+**Statement.** (D-216.1) The soma model is an ellipsoid with three free semi-axes, its orientation in the image plane
+and its centre (x, y, z) free, with its absorption coefficient; its planes are rendered with the partition absorption
+(the light absorbed column by column, Beer-Lambert, then the calibrated defocus kernel per slab), not the hybrid
+(which goes below zero in very dark stain, D-092); the traced stems and the neuropil are masked out of the residuals
+with Allen's trace (the masks of D-213); depth in stage units (0.28 um per plane), as the SWC. (D-216.2) Before the
+pilot's stack, the fit is checked on simulated soma stacks to recover a known height. (D-216.3) The fitted soma enters
+the model as the sphere of equal membrane area, r = sqrt(S / 4 pi), at the fitted centre (the one-point soma becomes a
+cylinder 2 r long and 2 r wide in NEURON, area 4 pi r^2; the soma is isopotential, so only its area matters); each
+stem's first node is moved along the stem's own direction onto the fitted surface. (D-216.4) The diameters within 250 um
+are measured at every traced node first (the nodes are 1.15 um apart); midpoints are added only where neighbouring
+diameters jump. (D-216.5) Roadmap steps NC5 (the soma) and NC6 (the diameters to 250 um) are added under NC.
+
+**What it does not decide.** The three open points of the in-focus width calibration (D-201; 2026-11-20: the clean
+line's background, the 10 um spacing, the stripe background); the fit's background model, the masks' widening, the fit
+region and its run time (the orchestrator's provisional settings in SPEC); what "jump" means for adding midpoints.
+
+**Sources.** **[user]** 2026-11-22 17:11. **[log]** D-092, D-201, D-213, D-215.
+
+**Status:** active.
 
