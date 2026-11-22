@@ -1,0 +1,48 @@
+Block 42 identifiability check, 2026-11-20 18:26 (python 3.13.18, numpy 2.5.3, scipy 1.18.1, Linux-6.18.44-fc-v726-x86_64-with-glibc2.39; OMP_NUM_THREADS=1)
+forward: line_fast under inference.absorption 'hybrid', 8 x 16 directions, line_fine_factor 8, reach 6.0 sigmas; the configured kernel table delta (0.0, 0.14, 0.28, 0.42, 0.56, 0.84) um, sigma (0.08, 0.086, 0.122, 0.262, 0.438, 0.603) um (linear continuation, slope 0.79); the fit: max_nfev 40, ftol 1e-06, xtol 1e-06, steps (0.01, 0.005, 0.005, 0.01, 0.005, 0.02), bounds d (0.2, 6.0) mu (0.005, 10.0) v0/z about the start (-1.5, 1.5) (-1.5, 1.5) sigma0 (0.02, 0.6) c (0.05, 10.0)
+profiles (1)-(2): (150 -2 v) gl x tau(theta_true), noise 1.1 gl per sample; theta_true = (d, 0.25 /um, v0_start + 0.04 um, z_start + 0.10 um, sigma0, c 1.0)
+
+building the nodes and running parts [1, 2]
+  d 1.0 um: pilot k* 0, z_sub 0.0189 um, cx 10.0000 cy 0.0000 um, theta 8.90e-11 phi 3.04e-17 rad; planes [-2, -1, 0, 1, 2]; 79 samples (+-4.46 um); tube extents (6.0, 6.0) um; prepared in 12.8 s
+    (1) d 1.0 sigma0 0.10: SE d 0.0098 mu 0.00528 v0 0.0028 z 0.0082 sigma0 0.0085 c 0.0594; corr(s0,d) -0.481 corr(s0,c) -0.250; 7 evaluations, 5.5 s
+    (1) d 1.0 sigma0 0.20: SE d 0.0240 mu 0.01243 v0 0.0035 z 0.0102 sigma0 0.0133 c 0.0725; corr(s0,d) -0.830 corr(s0,c) -0.413; 7 evaluations, 4.1 s
+    (2) d 1.0: converged, 42 evaluations, 25.6 s, chi2/dof 0.791; errors d -0.0031 sigma0 +0.0050 c -0.0252; SE_s 0.0140 0.0092 0.0573
+  d 1.5 um: pilot k* 0, z_sub 0.0018 um, cx 10.0000 cy 0.0000 um, theta -5.25e-11 phi 1.12e-16 rad; planes [-2, -1, 0, 1, 2]; 79 samples (+-4.46 um); tube extents (6.0, 6.0) um; prepared in 18.7 s
+    (1) d 1.5 sigma0 0.10: SE d 0.0063 mu 0.00287 v0 0.0018 z 0.0075 sigma0 0.0064 c 0.0470; corr(s0,d) -0.221 corr(s0,c) -0.232; 7 evaluations, 10.6 s
+    (1) d 1.5 sigma0 0.20: SE d 0.0094 mu 0.00396 v0 0.0021 z 0.0089 sigma0 0.0077 c 0.0571; corr(s0,d) -0.412 corr(s0,c) -0.361; 7 evaluations, 10.4 s
+    (2) d 1.5: converged, 42 evaluations, 59.4 s, chi2/dof 1.103; errors d +0.0034 sigma0 -0.0002 c +0.0202; SE_s 0.0092 0.0071 0.0545
+  d 2.5 um: pilot k* 0, z_sub -0.0850 um, cx 10.0000 cy 0.0000 um, theta -6.07e-11 phi 8.33e-17 rad; planes [-2, -1, 0, 1, 2]; 79 samples (+-4.46 um); tube extents (6.0, 6.0) um; prepared in 30.8 s
+    (1) d 2.5 sigma0 0.10: SE d 0.0053 mu 0.00178 v0 0.0015 z 0.0074 sigma0 0.0050 c 0.0306; corr(s0,d) -0.017 corr(s0,c) -0.221; 7 evaluations, 31.5 s
+    (1) d 2.5 sigma0 0.20: SE d 0.0072 mu 0.00224 v0 0.0017 z 0.0090 sigma0 0.0054 c 0.0388; corr(s0,d) +0.036 corr(s0,c) -0.379; 7 evaluations, 29.1 s
+    (2) d 2.5: converged, 52 evaluations, 208.5 s, chi2/dof 1.176; errors d -0.0016 sigma0 -0.0035 c +0.0339; SE_s 0.0063 0.0054 0.0375
+
+(1) SEs from J at the truth (noise 1.1 gl, background 150 gl), Cov = (J^T J)^-1
+  d um  sigma0 um | SE d     SE mu     SE v0    SE z_ax  SE sigma0  SE c   | corr(s0,d) corr(s0,c) corr(d,mu) corr(d,c) | cov    evals  s     | min tau at k*
+   1.0   0.10     | 0.00982  0.005283  0.00285  0.00822  0.00846    0.0594 | -0.481     -0.250     -0.909     -0.153    | inv        7    5.5 | 0.7243
+   1.0   0.20     | 0.02397  0.012435  0.00345  0.01015  0.01334    0.0725 | -0.830     -0.413     -0.982     +0.148    | inv        7    4.1 | 0.7400
+   1.5   0.10     | 0.00630  0.002865  0.00185  0.00752  0.00638    0.0470 | -0.221     -0.232     -0.869     -0.491    | inv        7   10.6 | 0.6222
+   1.5   0.20     | 0.00944  0.003963  0.00213  0.00893  0.00773    0.0571 | -0.412     -0.361     -0.929     -0.398    | inv        7   10.4 | 0.6285
+   2.5   0.10     | 0.00532  0.001777  0.00151  0.00738  0.00496    0.0306 | -0.017     -0.221     -0.870     -0.680    | inv        7   31.5 | 0.4468
+   2.5   0.20     | 0.00716  0.002244  0.00169  0.00901  0.00535    0.0388 | +0.036     -0.379     -0.915     -0.728    | inv        7   29.1 | 0.4507
+
+(2) one noisy fit per d at sigma0 0.15 um, c 1.0, mu 0.25 /um (seed [20261120, index of d])
+  d um | status     evals  seconds  chi2/dof | error d    mu        v0        z_ax      sigma0    c       | SE_s d   sigma0   c       | at_bound
+   1.0 | converged     42     25.6    0.791  | -0.00311  -0.000822  +0.00151  -0.00095  +0.00496  -0.0252 | 0.01397  0.00915  0.0573 | -
+   1.5 | converged     42     59.4    1.103  | +0.00338  +0.001154  -0.00289  -0.00187  -0.00022  +0.0202 | 0.00924  0.00708  0.0545 | -
+   2.5 | converged     52    208.5    1.176  | -0.00160  +0.002070  +0.00060  +0.00051  -0.00353  +0.0339 | 0.00628  0.00543  0.0375 | -
+  d 1.0: truth [1.     0.25   0.04   0.1189 0.15   1.    ]; start [1.0056e+00 2.1144e-01 5.2563e-10 1.8896e-02 1.5000e-01 1.0000e+00]; fit [0.99689 0.24918 0.04151 0.11794 0.15496 0.97483]; `ftol` termination condition is satisfied. (scipy status 2, nfev 6, njev 6, covariance inv)
+  d 1.5: truth [1.5    0.25   0.04   0.1018 0.15   1.    ]; start [1.5809e+00 2.0487e-01 9.7946e-10 1.7617e-03 1.5000e-01 1.0000e+00]; fit [1.50338 0.25115 0.03711 0.09989 0.14978 1.02016]; `ftol` termination condition is satisfied. (scipy status 2, nfev 6, njev 6, covariance inv)
+  d 2.5: truth [2.5   0.25  0.04  0.015 0.15  1.   ]; start [ 2.6783e+00  2.0636e-01  2.2574e-09 -8.5047e-02  1.5000e-01  1.0000e+00]; fit [2.4984  0.25207 0.0406  0.01546 0.14647 1.0339 ]; `ftol` termination condition is satisfied. (scipy status 2, nfev 10, njev 7, covariance inv)
+
+(3) the cross-renderer case: 2-D hybrid render (8 x 16 directions, kernel with_kernel(renderer, 0.15, 1.3)) of a 1.5 um tube, mu 0.25 /um, fitted by Block 42 with the line renderer
+  cross-renderer, d 1.5 um (2-D hybrid render included): pilot k* 0, z_sub -0.0076 um, cx 10.0000 cy 0.0000 um, theta 3.35e-11 phi 1.04e-17 rad; planes [-2, -1, 0, 1, 2]; 79 samples (+-4.46 um); tube extents (6.0, 6.0) um; prepared in 73.3 s
+  the two renderers at the truth, before any fit: profile (2-D) - 210 gl x tau_line, per plane max |.| [0.002 0.003 0.004 0.003 0.002] gl; dip depth at k* (2-D) 76.74 gl
+  build_node's backgrounds B_k [209.996 209.998 210.    209.998 209.998] gl
+  start [ 1.6035e+00  1.9442e-01  2.8124e-09 -7.6127e-03  1.5000e-01  1.0000e+00]
+  truth [1.5  0.25 0.   0.05 0.15 1.3 ]
+  fit   [ 1.50000e+00  2.50000e-01 -2.92925e-09  5.00000e-02  1.49943e-01
+  1.30001e+00]; converged, 77 evaluations, 111.5 s; `xtol` termination condition is satisfied. (scipy status 3, nfev 11, njev 11, covariance inv)
+  errors: sigma0 -5.65e-05 um, d -9.60e-07 um (-6.40e-07 of d), c +5.52e-06 (+4.25e-06 of c); mu +1.43e-07 /um, v0 -2.93e-09 um, z_ax +2.77e-08 um
+  the fit's SE at noise 1.1 gl (for scale): d 0.00463 sigma0 0.00500 c 0.0453; chi2/N per plane [1.6754e-11 4.9230e-11 6.1268e-11 5.3113e-11 1.6159e-11] (in units of 1.1 gl: the model mismatch alone); fitted background b0 [210. 210. 210. 210. 210.] gl, b1 [-3.8306e-09 -3.7354e-09 -3.6956e-09 -3.7471e-09 -3.8412e-09] gl/um
+
+total 10.7 min
