@@ -1393,6 +1393,12 @@ orchestrator's (D-210).
   length L covers 2 r L + pi r^2 [within 3 %, the pixel grid], a cone's area between those of its end radii; a
   soma-rooted segment is left out, a segment outside the box too, one crossing the box kept; `segments_at_depth`'s
   inequality at its edges; the script with `--half-um` crops 2 H / res0 + 1 px and reports the segments.
+- Amendment 3 (2026-11-22; D-220 [orchestrator]; the final check of wave 5, F1, S1, S2, S5). (i) `show_soma.py` refuses
+  (argparse error) `--soma-k-range LO HI` unless LO <= HI and both are recorded planes of the window, and `--montage-k LO
+  HI STEP` unless LO and HI lie in the window; the montage skips the planes between them that are not recorded.
+  [corrected 2026-11-22: the code clipped a montage range to the window and stored a by-eye range with unrecorded ends.]
+  (ii) "a non-positive half" of the oracles binds `crop_box`; `plane_range` takes half >= 0 (0: the plane at the depth
+  only). (iii) Since amendment 2, `test_smoke_soma_view.py` counts 7 pass, 1 skip.
 
 ### Block 45: the soma's forward model -- an ellipsoid rendered with the partition absorption (D-215, D-216, D-218, D-219)
 
@@ -1594,6 +1600,16 @@ orchestrator's (D-210).
 - Confirmed: the parameters, the free far slope with its fixed option, the masks and the equivalent sphere are the
   user's (D-216, D-218); the scales by variable projection, the planes, the region, the bounds, the start and the steps
   are the orchestrator's, PROVISIONAL (D-219).
+- Amendment 1 (2026-11-22; D-220 [orchestrator]; the final check of wave 5, F2, F4, F7, S3, S6, S7, S8). (i) The start's
+  settings are `SomaFitConfig` fields: `start_far_radii` 1.5 (B_far over rho > 1.5 r_s, the moments over rho <= 1.5 r_s),
+  `start_core_radii` 0.5, `start_core_percentile` 5.0, `start_ratio_clip` (0.05, 0.95), `start_ratio_none` 0.5 (D-219.5,
+  PROVISIONAL); `start_theta(..., slope0, scfg=None)` reads them (None: the defaults) and `fit_soma` passes its own.
+  (ii) varrho = `start_ratio_none` when the core holds no region pixel (varrho, not mu0). (iii) The planes' window is
+  Block 44's: `select_planes` keeps the planes k inside `soma_view.plane_range(z_start, half, dz)` (closed, with its
+  tolerance of 1e-9 of a plane), instead of the exact test |k dz - z| <= half, which dropped a plane on the edge (0.28 um
+  is not exact in binary). (iv) The fit requires the renderer's "linear" continuation, whose slope gamma is (D-218):
+  under another continuation Block 45 refuses the slope, and `fit_soma` raises its ValueError at the first render, before
+  the solver; the entry point refuses such a configuration first.
 - Status: implemented 2026-11-22 by one implementer (wave 5), merged `e21dfcf` (block commit `9e68e44`);
   `test_smoke_soma_fit.py` 9 pass, 1 skip (no discretisation; rerun by the orchestrator at the gate) **[run, sandbox]**,
   with a stand-in forward model (Block 45 was written in parallel; pixel 0.25 um for speed): T1 against dblquad 3.2e-16;
@@ -1633,6 +1649,18 @@ The final check of wave 4 (2026-11-22; D-212; the orchestrator's settlements of 
   `prominence_data = (D[n_c], 0, n - 1)` measures from 0 and stops at the first crossing, agreeing with the walk to
   1e-14 um (the tester's 299 dips); the walk is kept because where the line ends before the level `peak_widths`
   returns the line's end, Block 40's rule needs NaN, and the walk works in the offsets v (um).
+
+The final check of wave 5 (2026-11-22; D-220 [orchestrator]; `specs/test_reports/2026-11-22_1905_incremental.md`, PASS
+WITH ISSUES, seven findings NOTE or MINOR, no wrong number on the default path) is settled thus:
+- Block 44, amendment 3 (F1, S1, S2, S5): the refusals of `--soma-k-range` and `--montage-k`; the half clause bound to
+  `crop_box`; the suite's count.
+- Block 46, amendment 1 (F2, F4, F7, S3, S6, S7, S8): the start's settings as configuration fields; varrho's fallback;
+  Block 44's plane window; the "linear" continuation required.
+- Block 36, amendment 21 (F3): `calibrate_sigma.py`'s last line names the node pages and the summary figure written and
+  the nodes that failed; with no node fitted it exits 1 with a message (Cell 23B then stops on it).
+- Block 1 (F5): the config test exempts only `soma_fit.mask_widen_um`, until Block 47 reads it.
+- Section 6 (S4): the rows of the soma render and fit suites.
+- F6: the tester's spec tests of 14:40 and 19:05 come in together when the user agrees (their appended cases kept both).
 
 
 ## 6. Pipeline entry points
@@ -1707,6 +1735,8 @@ The final check of wave 4 (2026-11-22; D-212; the orchestrator's settlements of 
 | `python tests/smoke/test_smoke_soma_view.py` [2026-11-22] | Block 44 checks (the soma's view) | the synthetic cell | 2 min |
 | `python tests/smoke/test_smoke_line_weights.py` [2026-11-22, S4] | Block 39 checks (centre weights and the near-bump cut) | none | 10 s |
 | `python scripts/calibrate_sigma.py --cleaning-dir DIR --specimen S [--out DIR] [--nodes IDS] [--workers N] [--config-json FILE]` [2026-11-22, S4] | Block 36 amendments 19-20: Block 42's fit and Block 43's pages on the thick nodes of a `clean_cell.py clean --no-clean` preparation | `--synthetic` preparation of `clean_cell.py`; one node | 1-3 min a node |
+| `python tests/smoke/test_smoke_soma_render.py` [2026-11-22, D-220] | Block 45 checks: the column interval, the transfer, the light per plane, the direct reference, convergence, the slope, speed and memory | none | 10 s |
+| `python tests/smoke/test_smoke_soma_fit.py` [2026-11-22, D-220] | Block 46 checks: the area, the planes, the scales, recovery with a stand-in forward model, coverage, the fixed slope, masks, bounds, failure | none | 1 min |
 | `python scripts/clean_cell.py clean --no-clean [--pilot-diameter allen|free] [--sigma-r0-um S]`, `python scripts/clean_cell.py clear --d-bins ...` [2026-11-22, S4] | Block 36 amendments 14-17: the preparation without cleaning, the first stage's diameter rule, the in-focus width override, the clear nodes by diameter bin | `--synthetic` | 1-2 min |
 | `python scripts/infer_nodes.py real --weights ... [--bump-sd S] [--weight-kappa K]` [2026-11-22, S4] | Block 36 amendment 16: the per-node fit with Block 39's weights | `--synthetic` | 1-3 min a node |
 | `python scripts/show_soma.py --specimen S --cache-dir DIR [ALIGN] [--soma-k K] [--soma-k-range LO HI] [--montage-k LO HI STEP]` [2026-11-22] | Block 44: the soma's view, its plane chosen by eye (D-211) | `--synthetic` | 30 s synthetic; minutes on Allen's data |

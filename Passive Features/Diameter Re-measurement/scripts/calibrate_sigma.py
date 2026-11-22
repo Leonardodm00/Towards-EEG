@@ -291,7 +291,16 @@ def main(argv=None):
           "weighted mean %.4f +- %.4f um, chi2_cons %.2f on %s dof; %.0f s"
           % (summary["n"], summary["median_um"], summary["mad_um"], summary["ivw_mean_um"], summary["ivw_se_um"],
              summary["chi2_cons"], summary["dof"], time.time() - t0))
-    print("wrote %s/sigma_%s.csv, .json, sigma_summary_%s.png and %d node pages" % (out, a.specimen, a.specimen, len(ids)))
+    # Block 36 amendment 21 (D-220.3): name what was written; no node fitted -> exit 1
+    n_err = sum(1 for r in ordered if r["status"] == "error")
+    n_pages = len(ordered) - n_err
+    written = "%s/sigma_%s.csv, .json" % (out, a.specimen) + (", sigma_summary_%s.png" % a.specimen if srows else "")
+    print("wrote %s and %d node page(s)%s" % (written, n_pages, "; %d node(s) failed (status \"error\" in the CSV)"
+                                               % n_err if n_err else ""))
+    if n_pages == 0:
+        print("calibrate_sigma: no node was fitted; see the status and message columns of %s/sigma_%s.csv"
+              % (out, a.specimen))
+        return 1
     return 0
 
 

@@ -535,6 +535,12 @@ class SomaFitConfig:
     ftol: float = 1e-6                     # source: PROVISIONAL (D-219.4 [orchestrator])
     xtol: float = 1e-6                     # source: PROVISIONAL (D-219.4 [orchestrator])
     diff_steps: Tuple[float, ...] = (0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.004, 1e-4, 0.005)  # source: PROVISIONAL (D-219.4 [orchestrator]): x0, y0, z0, a, b, c (um), phi (rad), mu (1/um), gamma
+    # Block 46's start (D-219.5; fields since D-220.4)
+    start_far_radii: float = 1.5           # source: PROVISIONAL (D-219.5 [orchestrator]): B_far over rho > this x r_s; the moments over rho <= it
+    start_core_radii: float = 0.5          # source: PROVISIONAL (D-219.5 [orchestrator]): the core rho <= this x r_s (mu_0)
+    start_core_percentile: float = 5.0     # source: PROVISIONAL (D-219.5 [orchestrator]): the core's percentile (numpy.percentile, linear)
+    start_ratio_clip: Tuple[float, float] = (0.05, 0.95)  # source: PROVISIONAL (D-219.5 [orchestrator]): varrho clipped into this
+    start_ratio_none: float = 0.5          # source: PROVISIONAL (D-219.5 [orchestrator]): varrho when the core holds no region pixel
 
 
 @dataclass(frozen=True)
@@ -935,9 +941,14 @@ def _check_soma_fit(q: "SomaFitConfig") -> None:
           and pair(q.axis_bounds_um) and q.axis_bounds_um[0] > 0 and pair(q.mu_bounds_per_um)
           and q.mu_bounds_per_um[0] >= 0 and pair(q.slope_bounds) and q.slope_bounds[0] >= 0
           and all(math.isfinite(float(t)) and 0 < float(t) < 1 for t in (q.ftol, q.xtol))
-          and len(tuple(q.diff_steps)) == 9 and all(math.isfinite(float(x)) and float(x) > 0 for x in q.diff_steps))
+          and len(tuple(q.diff_steps)) == 9 and all(math.isfinite(float(x)) and float(x) > 0 for x in q.diff_steps)
+          and math.isfinite(q.start_core_radii) and math.isfinite(q.start_far_radii)
+          and 0 < q.start_core_radii < q.start_far_radii
+          and math.isfinite(q.start_core_percentile) and 0 <= q.start_core_percentile <= 100
+          and pair(q.start_ratio_clip) and 0 < q.start_ratio_clip[0] and q.start_ratio_clip[1] < 1
+          and math.isfinite(q.start_ratio_none) and 0 < q.start_ratio_none < 1)
     if not ok:
-        raise ValueError("soma_fit: a count, length, far_slope, bound, tolerance or step is out of range "
+        raise ValueError("soma_fit: a count, length, far_slope, bound, tolerance, step or start setting is out of range "
                          "(SPEC Blocks 45-46)")
 
 

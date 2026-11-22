@@ -166,7 +166,8 @@ def test_reference():
     pending = {u for u in unread if u.split(".")[0] in ("cleaning", "inference")}
     # [2026-11-22, contract of wave 5 (D-218, D-219)] the soma fit's fields are declared before Blocks 45-46 and the
     # entry point read them (mask_widen_um is read by Block 47, scripts/fit_soma.py); exempt until Block 47 is merged
-    pending |= {u for u in unread if u.split(".")[0] == "soma_fit"}
+    # [2026-11-22, D-220.6 (final check F5)] narrowed to the one field Blocks 45-46 do not read
+    pending |= {u for u in unread if u == "soma_fit.mask_widen_um"}
     # [2026-11-22] the sigma calibration's fields (D-201), exempt while Block 42 and its entry point were written,
     # are all read now (Block 42 merged, scripts/calibrate_sigma.py): the exemption is gone
     assert set(unread) - pending == records, "config fields no code reads: %s (declared records: %s)" % (

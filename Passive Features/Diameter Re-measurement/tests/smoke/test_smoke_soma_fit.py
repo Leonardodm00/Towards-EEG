@@ -391,6 +391,27 @@ def test_known_answer():
     report("start_theta on a 45 deg shadow: phi_0 - phi = %.2e rad, a_0/b_0 = %.3f (shadow 1.6, the disk of 1.5 r_s "
            "truncates it)" % (th[6] - math.radians(45.0), th[3] / th[4]))
 
+    # [2026-11-22, D-220.4 (final check F4)] the start's settings are SomaFitConfig fields: the defaults give the same
+    # start as scfg=None [exact]; a higher core percentile gives a lighter core, so a smaller mu_0; with no core pixel
+    # (core radius below one pixel off the grid) varrho = start_ratio_none, mu_0 = -ln(start_ratio_none) / (2 r_s)
+    from allen_diameter.config import SomaFitConfig
+    d = SomaFitConfig()
+    assert_array_equal(SF.start_theta(plane, sc["left"], sc["top"], P_UM, sc["centre"], 3.2, region, 0.79, d), th)
+    th50 = SF.start_theta(plane, sc["left"], sc["top"], P_UM, sc["centre"], 3.2, region, 0.79,
+                          dataclasses.replace(d, start_core_percentile=50.0))
+    assert th50[7] < th[7], (th50[7], th[7])
+    hole = region & ~disk_um(sc, 0.5 * 3.2)
+    thn = SF.start_theta(plane, sc["left"], sc["top"], P_UM, sc["centre"], 3.2, hole, 0.79,
+                         dataclasses.replace(d, start_ratio_none=0.25))
+    check_close("mu_0 without a core", thn[7], -math.log(0.25) / (2 * 3.2), rtol=1e-15)
+
+    # [2026-11-22, D-220.5 (final check F7)] Block 44's window: with z and half exact multiples of dz = 0.28 um the
+    # edge planes are kept, as soma_view.plane_range keeps them (36 x 0.28 = 10.080000000000002 > 10.08)
+    from allen_diameter.analysis import soma_view as SV
+    kk = np.arange(-40, 41)
+    sel = kk[SF.select_planes(kk, np.ones(kk.size, bool), 0.0, 0.28, 10.08, 1)]
+    assert (int(sel[0]), int(sel[-1])) == SV.plane_range(0.0, 10.08, 0.28) == (-36, 36), (sel[[0, -1]],)
+
 
 def test_reference():
     """T1 against dblquad, T3 against lstsq, start_theta against its rule written out."""

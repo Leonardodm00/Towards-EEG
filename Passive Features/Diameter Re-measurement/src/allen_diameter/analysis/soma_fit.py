@@ -45,17 +45,17 @@ import numpy as np
 from scipy.optimize import least_squares
 from scipy.special import ellipeinc, ellipkinc
 
+from ..config import SomaFitConfig
+from .soma_view import plane_range
+
 PARAMS = ("x0_um", "y0_um", "z0_um", "a_um", "b_um", "c_um", "phi_rad", "mu_per_um", "slope_um_per_um")
 STATUSES = ("converged", "max_nfev", "failed")
 FAR_SLOPES = ("fit", "fixed")
 
 MIN_PLANES = 3                   # SPEC Block 46: select_planes and the fit need at least 3 planes
 AT_BOUND_REL = 1e-6              # SPEC Block 46: "within 1e-6 of the bound interval's width from it"
-START_FAR_RADII = 1.5            # SPEC Block 46 (D-219.5): B_far over rho > 1.5 r_s, the moments over rho <= 1.5 r_s
-START_CORE_RADII = 0.5           # SPEC Block 46: the core rho <= 0.5 r_s
-START_CORE_PERCENTILE = 5.0      # SPEC Block 46: "the 5th percentile" (numpy.percentile, its default linear rule)
-START_RATIO_CLIP = (0.05, 0.95)  # SPEC Block 46: varrho clipped into [0.05, 0.95]
-START_RATIO_NONE = 0.5           # SPEC Block 46: varrho = 0.5 when no region pixel lies in the core
+# The start's settings are SomaFitConfig fields since D-220.4 (start_far_radii, start_core_radii,
+# start_core_percentile, start_ratio_clip, start_ratio_none; SPEC Block 46, amendment 1).
 AREA_GRAD_REL_STEP = 1e-5        # the central differences of S (SE(S)): a step of 1e-5 of each axis (not in SPEC)
 NULL_COMPONENT_TOL = 1e-8        # a parameter with a component above this along J's null space is not estimable
 _MEMO_SIZE = 4                   # residual evaluations kept: the solver's points (the Jacobian's steps are not kept)
@@ -213,8 +213,9 @@ def _area_gradient(a, b, c):
 # ------------------------------------------------------------------ planes ---
 
 def select_planes(ks, valid, z_start_um, dz_um, half_um, step):
-    """-> the indices i into ks (ascending, int64) with valid[i], |ks[i] dz - z_start| <= half_um and ks[i] - k_0
-    divisible by step, k_0 the k of the valid plane nearest z_start (its depth k dz nearest z_start; ties: the
+    """-> the indices i into ks (ascending, int64) with valid[i], ks[i] inside Block 44's window
+    soma_view.plane_range(z_start, half_um, dz) (|k dz - z_start| <= half_um, closed, with a tolerance of 1e-9 of a
+    plane; D-220.5) and ks[i] - k_0 divisible by step, k_0 the k of the valid plane nearest z_start (its depth k dz nearest z_start; ties: the
     lower k). ks (n,) whole plane numbers, strictly ascending; valid (n,) bool; z_start_um, dz_um, half_um um.
     ValueError when fewer than 3 are selected, step < 1 (or not whole) or half_um < 0, and for inputs that
     disagree (shapes, ks not ascending, z_start not finite, dz not > 0)."""
@@ -233,7 +234,8 @@ def select_planes(ks, valid, z_start_um, dz_um, half_um, step):
     i0 = _nearest_valid(k, v, z, dz)
     if i0 is None:
         raise ValueError("no valid plane: at least %d are needed" % MIN_PLANES)
-    keep = v & (np.abs(k * dz - z) <= h) & ((k - k[i0]) % s == 0)
+    k_lo, k_hi = plane_range(z, h, dz)                   # Block 44's closed window, 1e-9 of a plane (D-220.5)
+    keep = v & (k >= k_lo) & (k <= k_hi) & ((k - k[i0]) % s == 0)
     idx = np.flatnonzero(keep).astype(np.int64)
     if idx.size < MIN_PLANES:
         raise ValueError("only %d valid plane(s) within %g um of z = %g um at step %d from k_0 = %d: at least %d "
@@ -272,14 +274,15 @@ def vp_scale(D, tau, region):
 
 # ------------------------------------------------------------------- start ---
 
-def start_theta(block_k0, left, top, res0_um, centre_um, radius_um, region, slope0):
+def start_theta(block_k0, left, top, res0_um, centre_um, radius_um, region, slope0, scfg=None):
     """-> theta0 (9,) = (x_s, y_s, z_s, a_0, b_0, r_s, phi_0, mu_0, slope0) (D-219.5), from the plane block_k0 (H, W)
     gl, the crop's corner (left, top) px, res0_um, the traced centre centre_um (3,) um (image frame; depth in stage
-    units) and radius radius_um um, the region (H, W) bool. rho: a pixel centre's distance from (x_s, y_s);
-    B_far = the median of block_k0 over the region with rho > 1.5 r_s (the whole region if none);
-    mu_0 = -ln(varrho) / (2 r_s), varrho = clip(the 5th percentile (numpy.percentile) of block_k0 over the region
-    with rho <= 0.5 r_s, divided by B_far, 0.05, 0.95), 0.5 if none; weights w = max(0, 1 - block_k0 / B_far) on
-    the region with rho <= 1.5 r_s, C their weighted covariance of (x, y) about the weighted mean (numpy.cov,
+    units) and radius radius_um um, the region (H, W) bool; scfg the SomaFitConfig whose start_* fields are read
+    (None: SomaFitConfig(); D-220.4), shown here at their defaults. rho: a pixel centre's distance from (x_s, y_s);
+    B_far = the median of block_k0 over the region with rho > 1.5 r_s (start_far_radii; the whole region if none);
+    mu_0 = -ln(varrho) / (2 r_s), varrho = clip(the 5th percentile (start_core_percentile; numpy.percentile) of
+    block_k0 over the region with rho <= 0.5 r_s (start_core_radii), divided by B_far, 0.05, 0.95 (start_ratio_clip)),
+    0.5 (start_ratio_none) if none; weights w = max(0, 1 - block_k0 / B_far) on the region with rho <= 1.5 r_s, C their weighted covariance of (x, y) about the weighted mean (numpy.cov,
     aweights w, bias True), lambda_1 >= lambda_2 its eigenvalues (numpy.linalg.eigh):
     phi_0 = atan2(2 C_xy, C_xx - C_yy) / 2, a_0 = r_s (lambda_1 / lambda_2)^(1/4),
     b_0 = r_s (lambda_2 / lambda_1)^(1/4) (a_0 = b_0 = r_s, phi_0 = 0 when sum w = 0 or lambda_2 <= 0). Not clipped
@@ -296,6 +299,8 @@ def start_theta(block_k0, left, top, res0_um, centre_um, radius_um, region, slop
     rs = _positive(radius_um, "radius_um")
     p = _positive(res0_um, "res0_um")
     g0 = _finite(slope0, "slope0")
+    q = SomaFitConfig() if scfg is None else scfg
+    far_r, core_r = float(q.start_far_radii), float(q.start_core_radii)
     x, y = _pixel_centres(P.shape, _whole(left, "left"), _whole(top, "top"), p)
     X = np.broadcast_to(x[None, :], P.shape)[reg]
     Y = np.broadcast_to(y[:, None], P.shape)[reg]
@@ -303,19 +308,20 @@ def start_theta(block_k0, left, top, res0_um, centre_um, radius_um, region, slop
     if not np.all(np.isfinite(vals)):
         raise ValueError("block_k0 must be finite on the region")
     rho = np.hypot(X - xs, Y - ys)
-    far = rho > START_FAR_RADII * rs
+    far = rho > far_r * rs
     B_far = float(np.median(vals[far] if far.any() else vals))
     if not B_far > 0:
         raise ValueError("the start's far background B_far must be > 0, got %r" % (B_far,))
-    core = rho <= START_CORE_RADII * rs
+    core = rho <= core_r * rs
     if core.any():
-        varrho = float(np.clip(np.percentile(vals[core], START_CORE_PERCENTILE) / B_far, *START_RATIO_CLIP))
+        lo_c, hi_c = (float(t) for t in q.start_ratio_clip)
+        varrho = float(np.clip(np.percentile(vals[core], float(q.start_core_percentile)) / B_far, lo_c, hi_c))
     else:
-        varrho = START_RATIO_NONE
+        varrho = float(q.start_ratio_none)
     mu0 = -math.log(varrho) / (2.0 * rs)
     a0 = b0 = rs
     phi0 = 0.0
-    near = rho <= START_FAR_RADII * rs
+    near = rho <= far_r * rs
     w = np.maximum(0.0, 1.0 - vals[near] / B_far)
     if float(np.sum(w)) > 0:
         # Custom (glue): the shadow's weighted second moments. Library: numpy.cov (aweights, bias) and eigh.
@@ -491,8 +497,8 @@ def fit_soma(block, ks, valid, left, top, res0_um, dz_um, centre_um, radius_um, 
     into the bounds (the clipped names in the message). scipy.optimize.least_squares (trf, x_scale "jac"; jac
     _Problem.jac). Never raises on a solver failure or a non-finite forward: status "failed" with NaN results (a
     non-finite residual at the start, a Jacobian column not finite either way, the solver's linear algebra).
-    ValueError for inputs that disagree (shapes, dtypes, a forward of the wrong shape), an empty region, fewer
-    than 3 planes, a far_slope other than "fit" or "fixed", data not finite on the region of the planes fitted, a
+    ValueError for inputs that disagree (shapes, dtypes, a forward of the wrong shape, a forward that refuses the
+    slope -- Block 45 under a continuation other than "linear", D-220.2 --), an empty region, fewer than 3 planes, a far_slope other than "fit" or "fixed", data not finite on the region of the planes fitted, a
     centre, radius, pixel size, spacing or slope0 that is not finite (radius, sizes > 0, slope0 >= 0)."""
     t0 = time.perf_counter()
     far = scfg.far_slope
@@ -544,7 +550,7 @@ def fit_soma(block, ks, valid, left, top, res0_um, dz_um, centre_um, radius_um, 
     dof = n_samples - n_par - K
 
     i0 = _nearest_valid(k, v, zs, dz)
-    th0 = start_theta(data[i0], left_i, top_i, p, (xs, ys, zs), rs, region, g0)
+    th0 = start_theta(data[i0], left_i, top_i, p, (xs, ys, zs), rs, region, g0, scfg)
     x0 = np.clip(th0[:n_par], lo, hi)
     clipped = tuple(fitted[j] for j in range(n_par) if x0[j] != th0[j])
     note = ("; start clipped into the bounds: %s" % ", ".join(clipped)) if clipped else ""

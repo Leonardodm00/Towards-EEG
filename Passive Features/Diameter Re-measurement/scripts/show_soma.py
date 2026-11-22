@@ -91,14 +91,20 @@ def main(argv=None):
         j_traced = soma_view.reference_plane(ks, valid, centre[2], dz)[0]
         j_ref, ref_label = soma_view.reference_plane(ks, valid, centre[2], dz, a.soma_k)
         k_range = None
+        recorded = set(int(k) for k, ok in zip(ks, valid) if ok)
         if a.soma_k_range is not None:
             r_lo, r_hi = (int(v) for v in a.soma_k_range)
-            if not (ks[0] <= r_lo <= r_hi <= ks[-1]):
-                raise ValueError("--soma-k-range %d %d must lie in the window %d..%d with LO <= HI"
+            # Block 44 amendment 3 (i) (D-220.1): both ends recorded planes of the window, LO <= HI
+            if not (r_lo <= r_hi and r_lo in recorded and r_hi in recorded):
+                raise ValueError("--soma-k-range %d %d: LO <= HI, both recorded planes of the window %d..%d"
                                  % (r_lo, r_hi, ks[0], ks[-1]))
             k_range = (r_lo, r_hi)
         if a.montage_k is not None:
             m_lo, m_hi, m_step = (int(v) for v in a.montage_k)
+            # Block 44 amendment 3 (i) (D-220.1): LO and HI inside the window; unrecorded planes between are skipped
+            if not (ks[0] <= m_lo <= m_hi <= ks[-1]):
+                raise ValueError("--montage-k %d %d %d: LO <= HI inside the window %d..%d"
+                                 % (m_lo, m_hi, m_step, ks[0], ks[-1]))
             idx = soma_view.montage_planes(ks, valid, ks[j_ref], m_step, m_lo, m_hi)
         else:
             m_step = int(q.montage_step_planes)

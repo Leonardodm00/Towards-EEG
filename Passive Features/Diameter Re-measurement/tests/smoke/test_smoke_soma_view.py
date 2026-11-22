@@ -283,8 +283,14 @@ def test_edge_cases():
     assert (rec2["k_by_eye"], rec2["k_range_by_eye"], rec2["k_shown"]) == (2, [-3, 5], 2), rec2
     assert rec2["montage_ks"] == [k for k in rec_ks if -6 <= k <= 6]
     assert rec2["half_um"] == 10.0 and rec2["crop"]["width"] == int(np.ceil(20.0 / rec2["crop"]["res0_um"])) + 1
+    # [2026-11-22, D-220.1 (final check F1)] a by-eye range must end on recorded planes; a montage range must lie in
+    # the window (its unrecorded planes are skipped)
+    out3 = tempfile.mkdtemp(prefix="soma_smoke_")
+    assert show_soma.main(["--specimen", "7", "--synthetic", "--out", out3, "--montage-k", "-20", "20", "2"]) == 0
+    rec3 = json.load(open(os.path.join(out3, "soma_7.json")))
+    assert set(rec3["montage_ks"]) <= set(rec_ks), rec3["montage_ks"]
     for argv in (["--soma-k", "99"], ["--soma-k-range", "5", "-3"], ["--montage-k", "40", "50", "1"],
-                 ["--half-um", "0"]):
+                 ["--half-um", "0"], ["--soma-k-range", "-20", "20"], ["--montage-k", "-100", "100", "2"]):
         try:
             show_soma.main(["--specimen", "7", "--synthetic", "--out", out2] + argv)
         except SystemExit as exc:
