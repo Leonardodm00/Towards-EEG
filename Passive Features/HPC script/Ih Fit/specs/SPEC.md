@@ -1439,7 +1439,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   `dev/2026-11-22_tw1_readout/`.
 - Confirmed: yes -- D-204, D-206 to D-209 (user); the report's layout is the orchestrator's.
 - As built [orchestrator, accepted at the gate]: `loss_verdict` compares with 2 % of the other loss; `recovery_extras.csv` for `passive_fit` has the truths filled and the estimates NaN, for `active_fit` the I_h truths NaN; an unknown name in `required_axes` raises; TS8 and TS14 are one check; a run planned by Block 8's code (run `tw1`) cannot be continued or re-merged by this code; the fit's command line carries `--tau-h-pk-bounds-ms` in place of `--kappa-bounds`.
-- Status: smoke-tested 2026-11-22 (sandbox: `smoke_twin_recovery.py` 13 pass, 2 skip, implementer and orchestrator; `smoke_ih_recovery.py` R1-R14; four planted defects caught; commit `fad47f5`, merged `a4b4298`). Not run here: PBS, the real cohort, full-size fits.
+- Status: smoke-tested 2026-11-22 (sandbox: `smoke_twin_recovery.py` 13 pass, 2 skip, implementer and orchestrator; `smoke_ih_recovery.py` R1-R14; four planted defects caught; commit `fad47f5`, merged `a4b4298`). Not run here: PBS, the real cohort, full-size fits. [2026-11-22, after the final check (report `specs/test_reports/2026-11-22_1554_incremental.md`: PASS WITH ISSUES, two NOTEs) and amendment 3: 14 pass, 2 skip; the tester's spec tests 255 passed, 2 skipped (real data); every twins' suite re-run on the merged branch exits 0; commit `577b375`, merged `dbbcc06`.]
 
 ## 6. Pipeline entry points
 
