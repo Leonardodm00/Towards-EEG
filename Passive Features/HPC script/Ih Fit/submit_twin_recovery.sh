@@ -47,7 +47,11 @@
 #   WALLTIME         24:00:00 per twin job, until the pilot's timings set it
 #   CONDA_ENV        prova
 #   PLAN_ARGS        extra options for `plan` (e.g. --base-seed <int>), split on white space (use the '=' form for a
-#                    negative value, e.g. --dvh-range=-5,5; no value may hold a space)
+#                    negative value, e.g. --dvh-bounds=-10,10; no value may hold a space). Block 17's plan
+#                    options: --n-no-noise <k> (5: the full_no_noise twins, counted in the twins and the cap),
+#                    --gbar-bounds (1e-6,1e-2), --tau-h-pk-bounds-ms LO,HI (50,1000: the box of tau_h_pk, ms)
+#                    and --tau-h-pk-truth-ms LO,HI (150,700: the range of its truth, ms), which replace
+#                    --kappa-bounds and --kappa-range; --dvh-range is gone (the truth of dv_h is 0)
 #   IH_CODE_DIR      the folder of run_twin_recovery.py; default: this script's folder
 #   IH_ARCHIVE_ROOT  /davinci-1/home/ldellamea/Human Neurons Fitting (the cells: $IH_ARCHIVE_ROOT/$GROUP/specimen_<id>/)
 #   IH_OUTPUT_BASE   $IH_ARCHIVE_ROOT/pipeline_outputs_ih

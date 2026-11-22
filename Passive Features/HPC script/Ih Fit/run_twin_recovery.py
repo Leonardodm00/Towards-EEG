@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-run_twin_recovery.py -- the Stage-7 run on the twins: plan, one twin (build and fit), merge (Block 8)
-=====================================================================================================
+run_twin_recovery.py -- the Stage-7 run on the twins: plan, one twin (build and fit), merge (Blocks 8, 17)
+=========================================================================================================
 
-specs/SPEC.md, the entry of Block 8 (D-184, D-185, D-188, D-182.3). Entry
-point: wiring only -- the plan, the build, the fit and the report are calls of
-Blocks 5 (twin_table), 13 (twin_manifest), 12 (twin_build), of
-run_ih_fit.main and of ih_recovery_report. Sub-commands:
+specs/SPEC.md, the entries of Block 8 (D-184, D-185, D-188, D-182.3) and of
+Block 17 (the second run, SPEC 2.8: D-204, D-206 to D-209). Entry point:
+wiring only -- the plan, the build, the fit and the report are calls of
+Blocks 5 (twin_table), 13/16 (twin_manifest), 12/18 (twin_build), of
+run_ih_fit.main (Block 15) and of ih_recovery_report. Sub-commands:
 
     python run_twin_recovery.py plan  --group-dir <dir> --noise-dir <dir> --out <dir> [options]
     python run_twin_recovery.py list  --out <dir>
@@ -16,7 +17,15 @@ run_ih_fit.main and of ih_recovery_report. Sub-commands:
 The run directory <out> (SPEC, Block 8, "Outputs"):
     real_cells_<GROUP>.csv, twin_sweeps_<GROUP>.csv, manifest.csv, run_config.json   (plan)
     twins/twin_<id>/specimen_<id>/, fits/twin_<id>/, status/twin_<id>.json            (twin)
-    report/, report_without_flagged/, recovery_by_configuration.csv, twins_status.csv (merge)
+    report/, report_without_flagged/, report_no_noise/, recovery_by_configuration.csv,
+    recovery_extras.csv, twins_status.csv                                             (merge)
+
+Block 17: four configurations (the fourth, full_no_noise, built without noise
+and reported apart in report_no_noise/); the box and the truth of the I_h time
+constant given as tau_h_pk in ms (--tau-h-pk-bounds-ms, --tau-h-pk-truth-ms,
+converted to kappa_tau with run_ih_fit.tau_h_base_peak_ms); dv_h's truth 0;
+the fit of a twin with I_h fitted with I_h evaluated also at the truth
+(--eval-theta); the gate on ih5 with the required axes Cm, gbar, kappa_tau.
 
 The options of plan carry the names and the defaults run_ih_recovery.py gives
 them: the defaults are read from run_ih_recovery's own parser at run time, so
@@ -61,20 +70,39 @@ from twin_config import TwinConfig   # noqa: E402
 # ---------------------------------------------------------------------------
 #: the truth and I_h options: keyword arguments of synth_gt_grid.draw_manifest
 #: built as run_ih_recovery.phase_manifest builds them
+#: (Block 17: --dvh-range dropped, --kappa-range replaced by --tau-h-pk-truth-ms)
 TRUTH_OPTIONS = ("ra_mode", "cm_phys_lo", "cm_phys_hi", "tau_lo_ms", "tau_hi_ms", "ra_phys_lo", "ra_phys_hi",
-                 "gbar_range", "dvh_range", "kappa_range", "gbar_floor")
+                 "gbar_range", "tau_h_pk_truth_ms", "gbar_floor")
 #: the fit options: passed to run_ih_fit.main as run_ih_recovery.phase_fit passes them
+#: (Block 17: --kappa-bounds replaced by --tau-h-pk-bounds-ms)
 FIT_OPTIONS = ("F", "fit_target", "ss_time_weight", "ss_tau_w_ms", "ss_window_ms", "n_calls", "n_initial",
                "ih_mechanism", "ih_distribution", "ih_regions", "vshift_base", "ehcn", "dt_brief_ms", "dt_long_ms",
-               "phase3_subset", "gbar_bounds", "dvh_bounds", "kappa_bounds")
+               "phase3_subset", "gbar_bounds", "dvh_bounds", "tau_h_pk_bounds_ms")
 #: the gate's tolerances and switches (run_ih_recovery.phase_report)
 TOL_OPTIONS = ("tol_cm_factor", "tol_gbar_factor", "tol_dvh_mV", "tol_kappa_factor", "tol_fp_low_rail_frac",
                "tol_fp_cm_factor", "lenient_rails", "drop_railed")
-#: the arm the gate of D-011 applies to (run_ih_recovery's --gate-arm default)
-GATE_ARM = "ih6"
+#: the arm the gate applies to (Block 17, SPEC 2.8 (g)) and its required axes: dv_h is not an
+#: axis of ih5, and its absence does not fail the gate
+GATE_ARM = "ih5"
+GATE_REQUIRED_AXES = ("Cm", "gbar", "kappa_tau")
+#: Block 17's new defaults (D-208; SPEC 2.8 (a), (e)): the gbar box (S/cm^2), tau_h_pk's box and the
+#: range of its truth (ms), the number of noise-free twins, the truth of dv_h (mV)
+GBAR_BOUNDS_DEFAULT = "1e-6,1e-2"
+TAU_H_PK_BOUNDS_MS_DEFAULT = "50,1000"
+TAU_H_PK_TRUTH_MS_DEFAULT = "150,700"
+N_NO_NOISE_DEFAULT = 5
+DVH_TRUTH_MV = 0.0
+#: loss_verdict of recovery_extras.csv: one loss lower than the other by more than this fraction of
+#: the other (Block 17)
+LOSS_VERDICT_REL = 0.02
 
 EXIT_OK, EXIT_FAILED, EXIT_USAGE, EXIT_REFUSED = 0, 1, 2, 3
-REPORT_DIR, REPORT_UNFLAGGED_DIR = "report", "report_without_flagged"
+REPORT_DIR, REPORT_UNFLAGGED_DIR, REPORT_NO_NOISE_DIR = "report", "report_without_flagged", "report_no_noise"
+#: the columns of recovery_extras.csv (Block 17), in order
+EXTRAS_COLUMNS = ("twin_id", "configuration", "twin_of_specimen_id", "paired_with", "with_noise",
+                  "cell_tau_s_above_window", "tau_h_pk_true_ms", "tau_h_pk_est_ms", "loss_at_truth",
+                  "loss_at_estimate", "loss_verdict", "v_deepest_train_mV", "gh_deep_true_S_cm2",
+                  "gh_deep_est_S_cm2", "ln_gh_deep_ratio")
 #: the columns of ih_recovery_report.recovery_summary (its own empty frame)
 SUMMARY_COLUMNS = ("arm", "parameter", "n", "n_railed", "median_abs_err", "q25_abs_err", "q75_abs_err",
                    "median_err", "err_kind")
@@ -211,6 +239,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--group", default=None, help="default: the basename of --group-dir")
     p.add_argument("--cells", default=None, help="comma-separated real specimen ids (default: every ok cell)")
     p.add_argument("--n-per-configuration", type=int, default=10)
+    p.add_argument("--n-no-noise", type=int, default=N_NO_NOISE_DEFAULT,
+                   help="the full_no_noise twins (SPEC 2.8 (e)): the first k full twins copied, built without "
+                        "noise; 0 <= k <= --n-per-configuration")
     p.add_argument("--seed", type=int, default=d["seed"])
     p.add_argument("--id-base", type=int, default=d["id_base"])
     p.add_argument("--base-seed", type=_non_negative_int, default=TwinConfig().base_seed,
@@ -221,8 +252,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--ra-mode", default=d["ra_mode"], choices=["per_cohort", "per_cell"])
     for name in ("cm_phys_lo", "cm_phys_hi", "tau_lo_ms", "tau_hi_ms", "ra_phys_lo", "ra_phys_hi", "gbar_floor"):
         p.add_argument("--" + name.replace("_", "-"), type=float, default=d[name])
-    for name in ("gbar_range", "dvh_range", "kappa_range"):
-        p.add_argument("--" + name.replace("_", "-"), default=d[name])
+    p.add_argument("--gbar-range", default=d["gbar_range"])
+    p.add_argument("--tau-h-pk-truth-ms", default=TAU_H_PK_TRUTH_MS_DEFAULT,
+                   help="'LO,HI' (ms): the range of the truth of tau_h_pk, drawn by draw_manifest's own law "
+                        "through its kappa range (LO/base, HI/base), base = run_ih_fit.tau_h_base_peak_ms "
+                        "(SPEC 2.8 (e)); replaces --kappa-range")
     # the fit
     p.add_argument("--F", type=float, default=d["F"])
     p.add_argument("--fit-target", default=d["fit_target"], choices=["dep", "hyp", "both"])
@@ -240,9 +274,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dt-brief-ms", type=float, default=d["dt_brief_ms"])
     p.add_argument("--dt-long-ms", type=float, default=d["dt_long_ms"])
     p.add_argument("--phase3-subset", default=d["phase3_subset"])
-    p.add_argument("--gbar-bounds", default=d["gbar_bounds"])
+    p.add_argument("--gbar-bounds", default=GBAR_BOUNDS_DEFAULT, help="S/cm^2 (D-208)")
     p.add_argument("--dvh-bounds", default=d["dvh_bounds"])
-    p.add_argument("--kappa-bounds", default=d["kappa_bounds"])
+    p.add_argument("--tau-h-pk-bounds-ms", default=TAU_H_PK_BOUNDS_MS_DEFAULT,
+                   help="'LO,HI' (ms): the box of tau_h_pk, passed to run_ih_fit, which applies it as the box "
+                        "(LO/base, HI/base) of kappa_tau (SPEC 2.8 (a)); replaces --kappa-bounds")
     # the gate
     for name in ("tol_cm_factor", "tol_gbar_factor", "tol_dvh_mV", "tol_kappa_factor", "tol_fp_low_rail_frac",
                  "tol_fp_cm_factor"):
@@ -294,6 +330,7 @@ def plan_options(args) -> Dict[str, object]:
         "group": args.group or group_dir.name,
         "cells": _parse_cells(args.cells),
         "n_per_configuration": int(args.n_per_configuration),
+        "n_no_noise": int(args.n_no_noise),
         "seed": int(args.seed),
         "id_base": int(args.id_base),
         "base_seed": int(args.base_seed),
@@ -303,12 +340,41 @@ def plan_options(args) -> Dict[str, object]:
     return opts
 
 
-def truth_kwargs_of(o) -> Dict[str, object]:
+def fit_args_of(o):
+    """run_ih_fit's parsed options for these plan options (placeholder
+    directories, arm ih5): the fit's own parser, read for the I_h spec."""
+    import run_ih_fit as R
+    return R._parse_args(fit_argv(o, "-", "-", "ih5"))
+
+
+def tau_h_pk_record(o) -> Dict[str, object]:
+    """The box and the truth range of tau_h_pk (ms, as given) and as
+    kappa_tau (divided by base = run_ih_fit.tau_h_base_peak_ms of the run's
+    I_h spec, SPEC 2.8 (a), (e)): the record of run_config.json."""
+    import run_ih_fit as R
+    try:
+        base = float(R.tau_h_base_peak_ms(R.build_ih_spec(fit_args_of(o))))
+        b_lo, b_hi = (float(x) for x in R.parse_window(o["tau_h_pk_bounds_ms"]))
+        t_lo, t_hi = (float(x) for x in R.parse_window(o["tau_h_pk_truth_ms"]))
+    except (ValueError, TypeError) as exc:
+        raise Refused(EXIT_USAGE, "plan: --tau-h-pk-bounds-ms / --tau-h-pk-truth-ms: %s" % exc)
+    for name, lo, hi in (("--tau-h-pk-bounds-ms", b_lo, b_hi), ("--tau-h-pk-truth-ms", t_lo, t_hi)):
+        if not (np.isfinite(lo) and np.isfinite(hi) and 0.0 < lo < hi):
+            raise Refused(EXIT_USAGE, "plan: %s must be LO,HI with 0 < LO < HI (ms), got %r,%r" % (name, lo, hi))
+    if not (np.isfinite(base) and base > 0.0):
+        raise Refused(EXIT_USAGE, "plan: tau_h_base_peak_ms of the run's I_h spec is %r" % base)
+    return dict(base_ms=base, bounds_ms=[b_lo, b_hi], bounds_kappa=[b_lo / base, b_hi / base],
+                truth_ms=[t_lo, t_hi], truth_kappa=[t_lo / base, t_hi / base])
+
+
+def truth_kwargs_of(o, tau_rec: Dict[str, object]) -> Dict[str, object]:
     """synth_gt_grid.draw_manifest's keyword arguments, built as
     run_ih_recovery.phase_manifest builds them, without the noise arguments
     (and without e_pas, cells_per_cohort and max_cells, which are not options
     of plan: the twins' rest is the real cell's, D-192; cells_per_cohort keeps
-    draw_manifest's default 10, the value phase_manifest passes)."""
+    draw_manifest's default 10, the value phase_manifest passes). Block 17:
+    no dv_h range (draw_manifest's None: dv_h 0, and the manifest's
+    dvh_truth_mV = 0); the kappa range is tau_h_pk's truth range as kappa."""
     import run_ih_recovery as RIR
     import synth_gt_grid as G
     ns = argparse.Namespace(**o)
@@ -320,8 +386,8 @@ def truth_kwargs_of(o) -> Dict[str, object]:
         ih_regions=tuple(r.strip() for r in ns.ih_regions.split(",") if r.strip()),
         ih_vshift_base_mV=ns.vshift_base,
         ih_gbar_range_S_cm2=G._pair_or_none(ns.gbar_range, "--gbar-range"),
-        ih_dvh_range_mV=G._pair_or_none(ns.dvh_range, "--dvh-range"),
-        ih_kappa_range=G._pair_or_none(ns.kappa_range, "--kappa-range"),
+        ih_dvh_range_mV=None,
+        ih_kappa_range=(float(tau_rec["truth_kappa"][0]), float(tau_rec["truth_kappa"][1])),
         ih_gbar_floor_S_cm2=ns.gbar_floor,
         ra_phys_lo=ns.ra_phys_lo, ra_phys_hi=ns.ra_phys_hi)
 
@@ -339,6 +405,7 @@ def cmd_plan(args) -> int:
         raise Refused(EXIT_USAGE, "--n-initial (%d) exceeds --n-calls (%d): gp_minimize refuses this"
                       % (args.n_initial, args.n_calls))
     opts = plan_options(args)
+    tau_rec = tau_h_pk_record(opts)
     group, group_dir, noise_dir = str(opts["group"]), Path(opts["group_dir"]), Path(opts["noise_dir"])
     out = Path(args.out).resolve()
     paths = _paths(out, group)
@@ -425,8 +492,9 @@ def cmd_plan(args) -> int:
 
     try:
         manifest = TM.draw_twin_manifest(real_cells[list(TM.REAL_CELL_COLUMNS)], n_per_configuration=n,
-                                         seed=int(opts["seed"]), id_base=int(opts["id_base"]),
-                                         truth_kwargs=truth_kwargs_of(opts))
+                                         n_no_noise=int(opts["n_no_noise"]), seed=int(opts["seed"]),
+                                         id_base=int(opts["id_base"]), dvh_truth_mV=DVH_TRUTH_MV,
+                                         truth_kwargs=truth_kwargs_of(opts, tau_rec))
     except ValueError as exc:
         raise Refused(EXIT_REFUSED, "plan: refused by the manifest (Block 13): %s" % exc)
 
@@ -438,8 +506,10 @@ def cmd_plan(args) -> int:
         "group": group, "group_dir": str(group_dir), "noise_dir": str(noise_dir),
         "noise_cells_csv": str(cells_csv), "noise_sweeps_csv": str(sweeps_csv),
         "twin_config": asdict(tcfg),
-        "truth_kwargs": json.loads(json.dumps(truth_kwargs_of(opts))),
-        "gate_arm": GATE_ARM,
+        "truth_kwargs": json.loads(json.dumps(truth_kwargs_of(opts, tau_rec))),
+        "tau_h_pk": tau_rec,
+        "dvh_truth_mV": DVH_TRUTH_MV,
+        "gate_arm": GATE_ARM, "gate_required_axes": list(GATE_REQUIRED_AXES),
         "code_commit": code_commit(), "code_dirty": code_dirty(),
         "versions": versions(), "planned_utc": _utc_now(), "host": socket.gethostname(),
     }
@@ -493,10 +563,13 @@ def cmd_list(args) -> int:
 # ---------------------------------------------------------------------------
 #  twin
 # ---------------------------------------------------------------------------
-def fit_argv(options: Dict[str, object], archive_dir, output_dir, arm: str, code_dir=HERE) -> List[str]:
+def fit_argv(options: Dict[str, object], archive_dir, output_dir, arm: str, code_dir=HERE,
+             eval_theta: Optional[str] = None) -> List[str]:
     """The argv of run_ih_fit.main for one twin, in the form
     run_ih_recovery.phase_fit builds it (the '=' form for values that can be
-    negative); no --fit-params (the arms ih6 and passive_fullstep)."""
+    negative); no --fit-params (the arms' own names). Block 17: no
+    --kappa-bounds; --tau-h-pk-bounds-ms (the box of kappa_tau given in ms)
+    and, when given, --eval-theta."""
     a = argparse.Namespace(**options)
     argv = ["--archive-dir", str(archive_dir), "--output-dir", str(output_dir),
             "--code-dir", str(code_dir), "--arm", str(arm),
@@ -515,10 +588,29 @@ def fit_argv(options: Dict[str, object], archive_dir, output_dir, arm: str, code
             "--phase3-subset", a.phase3_subset,
             "--gbar-bounds=%s" % a.gbar_bounds,
             "--dvh-bounds=%s" % a.dvh_bounds,
-            "--kappa-bounds=%s" % a.kappa_bounds]
+            "--tau-h-pk-bounds-ms=%s" % a.tau_h_pk_bounds_ms]
     if a.ehcn not in (None, ""):
         argv += ["--ehcn=%s" % a.ehcn]
+    if eval_theta is not None:
+        argv += ["--eval-theta=%s" % eval_theta]
     return argv
+
+
+def eval_theta_of(row, arm: str) -> Optional[str]:
+    """--eval-theta for one twin (Block 17): the truth in the fitted spec's
+    names, for a twin whose configuration has I_h and is fitted with I_h
+    (full, full_no_noise) and whose truth holds every fitted name; None
+    otherwise (active_fit, passive_fit). Values by repr: they read back as
+    the same float64."""
+    import run_ih_fit as R
+    import twin_build as TB
+    import twin_manifest as TM
+    conf = str(row["configuration"])
+    cfg = R.ARMS[str(arm)]
+    theta = TM.twin_theta(row)
+    if not (TB.HAS_IH[conf] and cfg.attach_ih and all(n in theta for n in cfg.fit_params)):
+        return None
+    return ",".join("%s=%r" % (n, float(theta[n])) for n in cfg.fit_params)
 
 
 def twin_model(fit_args, configuration: str):
@@ -526,14 +618,15 @@ def twin_model(fit_args, configuration: str):
     functions from the options the fit receives: run_ih_fit.build_ih_spec, and
     run_ih_fit.build_param_spec on the six names for a configuration with I_h
     (param_spec.make_ih_spec) or the three passive ones for active_fit
-    (param_spec.make_passive_spec)."""
+    (param_spec.make_passive_spec). The kappa_tau box is the fit's own
+    (run_ih_fit.kappa_bounds_from_args: --tau-h-pk-bounds-ms, Block 17)."""
     import run_ih_fit as R
     import twin_build as TB
     names = R.IH6_NAMES if TB.HAS_IH[configuration] else R.PASSIVE_NAMES
     pspec = R.build_param_spec(
         names, cm_bounds=R.parse_window(fit_args.cm_bounds), rm_bounds=R.parse_window(fit_args.rm_bounds),
         ra_bounds=R.parse_window(fit_args.ra_bounds), gbar_bounds=R.parse_window(fit_args.gbar_bounds),
-        dvh_bounds=R.parse_window(fit_args.dvh_bounds), kappa_bounds=R.parse_window(fit_args.kappa_bounds))
+        dvh_bounds=R.parse_window(fit_args.dvh_bounds), kappa_bounds=R.kappa_bounds_from_args(fit_args))
     return R.build_ih_spec(fit_args), pspec
 
 
@@ -556,16 +649,19 @@ def _results_row(csv: Path, twin_id: int) -> Optional[pd.DataFrame]:
     return rows if len(rows) else None
 
 
-def _archive_matches(spec_dir: Path, spec, tcfg: TwinConfig) -> Optional[str]:
-    """None when the archive's twin block is this spec's; else why not."""
+def _archive_matches(spec_dir: Path, spec, tcfg: TwinConfig, with_noise: bool) -> Optional[str]:
+    """None when the archive's twin block is this spec's (and, Block 17, its
+    with_noise the manifest's); else why not."""
     meta = _read_json(spec_dir / "metadata.json")
     if meta is None:
         return "metadata.json unreadable"
     tw = meta.get("twin") or {}
     want = dict(twin_of_specimen_id=int(spec.twin_of_specimen_id), configuration=str(spec.configuration),
-                theta={k: float(v) for k, v in spec.theta.items()}, F=float(spec.F), base_seed=int(tcfg.base_seed))
+                theta={k: float(v) for k, v in spec.theta.items()}, F=float(spec.F), base_seed=int(tcfg.base_seed),
+                with_noise=bool(with_noise))
     got = dict(twin_of_specimen_id=tw.get("twin_of_specimen_id"), configuration=tw.get("configuration"),
-               theta=tw.get("theta"), F=tw.get("F"), base_seed=tw.get("base_seed"))
+               theta=tw.get("theta"), F=tw.get("F"), base_seed=tw.get("base_seed"),
+               with_noise=tw.get("with_noise"))
     if got != want or int(meta.get("specimen_id", -1)) != int(spec.twin_id) \
             or float(meta.get("v_rest_mV", float("nan"))) != float(spec.v_rest_mV):
         return "its metadata (%r) is not the manifest's twin (%r)" % (got, want)
@@ -587,6 +683,7 @@ def cmd_twin(args) -> int:
     row = rows.iloc[0]
     tid, conf, arm = int(row["specimen_id"]), str(row["configuration"]), str(row["arm"])
     real_id = int(row["twin_of_specimen_id"])
+    with_noise = bool(row["with_noise"])
     group_dir = out / "twins" / ("twin_%d" % tid)
     spec_dir = group_dir / ("specimen_%d" % tid)
     fit_dir = out / "fits" / ("twin_%d" % tid)
@@ -605,7 +702,11 @@ def cmd_twin(args) -> int:
              % (tid, st, reason or "-", status["build_seconds"], status["fit_seconds"]))
         return EXIT_OK if st == "ok" else EXIT_FAILED
 
-    argv = fit_argv(opts, group_dir, fit_dir, arm)
+    try:
+        ev = eval_theta_of(row, arm)
+    except Exception as exc:   # noqa: BLE001 -- recorded in the status file, never raised past it
+        return finish("build_failed", "the truth of twin %d: %s: %s" % (tid, type(exc).__name__, exc))
+    argv = fit_argv(opts, group_dir, fit_dir, arm, eval_theta=ev)
 
     # ---- the build (Block 12) ---------------------------------------------
     t0 = time.time()
@@ -613,7 +714,7 @@ def cmd_twin(args) -> int:
         spec = TM.twin_spec_of(row, F=float(opts["F"]))
         complete = (spec_dir / "metadata.json").is_file()
         if complete and not args.force:
-            why = _archive_matches(spec_dir, spec, tcfg)
+            why = _archive_matches(spec_dir, spec, tcfg, with_noise)
             if why is not None:
                 return finish("build_failed", "the archive %s exists but %s; run with --force to rebuild"
                               % (spec_dir, why))
@@ -626,7 +727,7 @@ def cmd_twin(args) -> int:
             _clear_sections()
             try:
                 TB.build_twin(spec, real_dir, table, group_dir, ih_spec=ih_spec, apply_theta=pspec.apply,
-                              cfg=tcfg, overwrite=True,
+                              cfg=tcfg, overwrite=True, with_noise=with_noise,
                               provenance=dict(run_dir=str(out), code_commit=status["code_commit"],
                                               code_dirty=status["code_dirty"], manifest_seed=int(row["manifest_seed"]),
                                               driver="run_twin_recovery.py"))
@@ -691,12 +792,17 @@ def _tolerances(o):
         fp_log_ratio_cm=float(np.log(o["tol_fp_cm_factor"])))
 
 
-def _box(o) -> Dict[str, tuple]:
+def _box(config: Dict[str, object]) -> Dict[str, tuple]:
+    """The fit's box per axis: the defaults of ih_recovery_report, the run's gbar and dv_h boxes, and
+    kappa_tau's box as run_config.json records it (tau_h_pk's box divided by the base, Block 17)."""
     import ih_recovery_report as RR
+    o = config["options"]
     box = dict(RR.DEFAULT_BOX)
-    for axis, text in (("gbar", o["gbar_bounds"]), ("dv_h", o["dvh_bounds"]), ("kappa_tau", o["kappa_bounds"])):
+    for axis, text in (("gbar", o["gbar_bounds"]), ("dv_h", o["dvh_bounds"])):
         lo, hi = (float(x) for x in str(text).split(","))
         box[axis] = (lo, hi)
+    lo, hi = config["tau_h_pk"]["bounds_kappa"]
+    box["kappa_tau"] = (float(lo), float(hi))
     return box
 
 
@@ -711,11 +817,13 @@ def summarised_rows(long_df: pd.DataFrame, drop_railed: bool) -> int:
     return int(keep.sum())
 
 
-def write_one_report(out_dir: Path, manifest: pd.DataFrame, frames: Sequence[pd.DataFrame], o: Dict[str, object],
-                     *, plot: bool) -> pd.DataFrame:
-    """The report of run_ih_recovery.phase_report on these frames: returns the long table."""
+def write_one_report(out_dir: Path, manifest: pd.DataFrame, frames: Sequence[pd.DataFrame],
+                     config: Dict[str, object], *, plot: bool) -> pd.DataFrame:
+    """The report of run_ih_recovery.phase_report on these frames, the gate on GATE_ARM with its
+    required axes (Block 17): returns the long table."""
     import ih_recovery_report as RR
-    long_df = RR.recovery_long(manifest, list(frames), box=_box(o), strict_rails=not bool(o["lenient_rails"]))
+    o = config["options"]
+    long_df = RR.recovery_long(manifest, list(frames), box=_box(config), strict_rails=not bool(o["lenient_rails"]))
     if summarised_rows(long_df, bool(o["drop_railed"])) > 0:
         summary = RR.recovery_summary(long_df, drop_railed=bool(o["drop_railed"]))
     else:
@@ -725,7 +833,7 @@ def write_one_report(out_dir: Path, manifest: pd.DataFrame, frames: Sequence[pd.
     inflation = RR.cm_inflation(long_df)
     fp = RR.fp_control_summary(long_df)
     tol = _tolerances(o)
-    verdict, passed = RR.evaluate_gate(summary, fp, arm=GATE_ARM, tol=tol)
+    verdict, passed = RR.evaluate_gate(summary, fp, arm=GATE_ARM, tol=tol, required_axes=GATE_REQUIRED_AXES)
     RR.write_report(out_dir, long_df=long_df, summary=summary, inflation=inflation, fp=fp, verdict=verdict,
                     passed=passed, tol=tol)
     print("== %s" % out_dir, flush=True)
@@ -756,7 +864,7 @@ def cmd_merge(args) -> int:
     import ih_recovery_report as RR
 
     run = load_run(args.out)
-    out, o, man = run["out"], run["options"], run["manifest"]
+    out, man = run["out"], run["manifest"]
 
     # twins_status.csv: one row per manifest twin
     srows = []
@@ -784,28 +892,107 @@ def cmd_merge(args) -> int:
         _err("merge: no twin has results (fits/twin_<id>/phase2_results.csv with its row); no report written")
         return EXIT_FAILED
 
-    long_df = write_one_report(out / REPORT_DIR, man, arm_frames(man, frames), o, plot=not args.no_plot)
-
+    cfg = run["config"]
+    plot = not args.no_plot
+    noisy = man["with_noise"].astype(bool).to_numpy()
+    man_n = man[noisy].reset_index(drop=True)          # report/, report_without_flagged/: the noisy twins
+    man_0 = man[~noisy].reset_index(drop=True)         # report_no_noise/: the full_no_noise twins alone
     flagged = set(int(t) for t, f in zip(man["specimen_id"], man["cell_tau_s_above_window"]) if bool(f))
-    man_u = man[~man["specimen_id"].isin(flagged)].reset_index(drop=True)
-    frames_u = arm_frames(man_u, frames)
-    unflagged_dir = out / REPORT_UNFLAGGED_DIR
-    if frames_u:
-        write_one_report(unflagged_dir, man_u, frames_u, o, plot=not args.no_plot)
-    else:
-        if unflagged_dir.exists():
-            shutil.rmtree(unflagged_dir)
-        _write_text_atomic(unflagged_dir / "NO_RESULTS.txt",
-                           "No twin of an unflagged real cell (cell_tau_s_above_window False) has results; "
-                           "no report.\n")
-        _say("merge: no unflagged twin with results; %s/NO_RESULTS.txt" % unflagged_dir)
+    man_u = man_n[~man_n["specimen_id"].isin(flagged)].reset_index(drop=True)
+    longs = []
+    for sub_dir, sub_man, what in ((REPORT_DIR, man_n, "noisy twin"),
+                                   (REPORT_UNFLAGGED_DIR, man_u,
+                                    "noisy twin of an unflagged real cell (cell_tau_s_above_window False)"),
+                                   (REPORT_NO_NOISE_DIR, man_0, "noise-free (full_no_noise) twin")):
+        long_df = write_subset_report(out / sub_dir, sub_man, frames, cfg, plot=plot, what=what)
+        if sub_dir != REPORT_UNFLAGGED_DIR and long_df is not None:
+            longs.append(long_df)
 
     join = man[["specimen_id", "configuration", "twin_of_specimen_id", "cell_tau_s_above_window"]]
-    by_conf = long_df.merge(join, on="specimen_id", how="left")
+    by_conf = pd.concat(longs, ignore_index=True, sort=False).merge(join, on="specimen_id", how="left")
     _write_csv_atomic(out / "recovery_by_configuration.csv", by_conf)
-    _say("merge: report -> %s; without the %d flagged twin(s) -> %s; %d twin(s) without results"
-         % (out / REPORT_DIR, len(flagged), unflagged_dir, n_missing))
+    _write_csv_atomic(out / "recovery_extras.csv", recovery_extras(man, frames, cfg))
+    _say("merge: report -> %s (%d noisy twin(s)); without the flagged twins -> %s; noise-free twins -> %s; "
+         "recovery_extras.csv; %d twin(s) without results"
+         % (out / REPORT_DIR, len(man_n), out / REPORT_UNFLAGGED_DIR, out / REPORT_NO_NOISE_DIR, n_missing))
     return EXIT_OK
+
+
+def write_subset_report(out_dir: Path, sub_man: pd.DataFrame, frames: Dict[int, pd.DataFrame],
+                        config: Dict[str, object], *, plot: bool, what: str) -> Optional[pd.DataFrame]:
+    """write_one_report on the twins of sub_man that have results (returns the long table), or, when
+    none has, NO_RESULTS.txt in place of a report (returns None)."""
+    sub_frames = arm_frames(sub_man, frames) if len(sub_man) else []
+    if sub_frames:
+        return write_one_report(out_dir, sub_man, sub_frames, config, plot=plot)
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    _write_text_atomic(out_dir / "NO_RESULTS.txt", "No %s has results; no report.\n" % what)
+    _say("merge: no %s with results; %s/NO_RESULTS.txt" % (what, out_dir))
+    return None
+
+
+def _num(r: pd.Series, col: str) -> float:
+    """A results row's float column; NaN when absent or not a number."""
+    try:
+        v = float(r[col]) if col in r.index else float("nan")
+    except (TypeError, ValueError):
+        return float("nan")
+    return v
+
+
+def loss_verdict(loss_at_truth: float, loss_at_estimate: float, rel: float = LOSS_VERDICT_REL) -> str:
+    """'optimiser' when the loss at the truth is lower than at the estimate by more than rel of the
+    latter (the optimiser missed a better point), 'data' when the estimate's is lower than the truth's
+    by more than rel of the truth's (the data prefer another point), 'tie' otherwise, 'na' when either is
+    not finite (Block 17)."""
+    lt, le = float(loss_at_truth), float(loss_at_estimate)
+    if not (np.isfinite(lt) and np.isfinite(le)):
+        return "na"
+    if lt < (1.0 - rel) * le:
+        return "optimiser"
+    if le < (1.0 - rel) * lt:
+        return "data"
+    return "tie"
+
+
+def recovery_extras(man: pd.DataFrame, frames: Dict[int, pd.DataFrame], config: Dict[str, object]) -> pd.DataFrame:
+    """recovery_extras.csv (Block 17, SPEC 2.8 (f)): one row per twin with results, in the manifest's
+    order. tau_h_pk_true_ms = the truth's kappa_tau x tau_h_base_pk (run_config.json's base_ms), NaN for a
+    twin without I_h; tau_h_pk_est_ms, loss_at_estimate, v_deepest_train_mV, gh_deep_est_S_cm2 are the
+    fit's columns, loss_at_truth its loss_at_eval_theta; gh_deep_true_S_cm2 = the truth's gbar x
+    human_ih_params.minf(v*) with the truth's dv_h (run_ih_fit.gh_at_voltage_S_cm2 on the run's I_h spec),
+    NaN without I_h; ln_gh_deep_ratio = ln(est / true) when both are positive and finite."""
+    import run_ih_fit as R
+    import twin_build as TB
+    import twin_manifest as TM
+    ih_spec = R.build_ih_spec(fit_args_of(config["options"]))
+    base = float(config["tau_h_pk"]["base_ms"])
+    rows = []
+    for _, m in man.iterrows():
+        tid = int(m["specimen_id"])
+        if tid not in frames:
+            continue
+        r = frames[tid].iloc[0]
+        conf = str(m["configuration"])
+        theta = TM.twin_theta(m)
+        has_ih = bool(TB.HAS_IH[conf])
+        v_star = _num(r, "v_deepest_train_mV")
+        tau_true = float(theta["kappa_tau"]) * base if has_ih else float("nan")
+        gh_true = (R.gh_at_voltage_S_cm2(float(theta["gbar"]), v_star, ih_spec, dv_h_mV=float(theta["dv_h"]))
+                   if has_ih else float("nan"))
+        gh_est = _num(r, "gh_at_v_deepest_S_cm2")
+        ok = np.isfinite(gh_true) and np.isfinite(gh_est) and gh_true > 0.0 and gh_est > 0.0
+        lt, le = _num(r, "loss_at_eval_theta"), _num(r, "loss_at_estimate")
+        rows.append(dict(
+            twin_id=tid, configuration=conf, twin_of_specimen_id=int(m["twin_of_specimen_id"]),
+            paired_with=int(m["paired_with"]), with_noise=bool(m["with_noise"]),
+            cell_tau_s_above_window=bool(m["cell_tau_s_above_window"]),
+            tau_h_pk_true_ms=tau_true, tau_h_pk_est_ms=_num(r, "tau_h_pk_ms"),
+            loss_at_truth=lt, loss_at_estimate=le, loss_verdict=loss_verdict(lt, le),
+            v_deepest_train_mV=v_star, gh_deep_true_S_cm2=float(gh_true), gh_deep_est_S_cm2=gh_est,
+            ln_gh_deep_ratio=float(np.log(gh_est / gh_true)) if ok else float("nan")))
+    return pd.DataFrame(rows, columns=list(EXTRAS_COLUMNS))
 
 
 # ---------------------------------------------------------------------------
