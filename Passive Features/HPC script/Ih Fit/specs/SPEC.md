@@ -1436,7 +1436,8 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Data flow: consumes Blocks 14, 15, 16, 18; produces the run directory read by the user and
   `dev/2026-11-22_tw1_readout/`.
 - Confirmed: yes -- D-204, D-206 to D-209 (user); the report's layout is the orchestrator's.
-- Status: drafted
+- As built [orchestrator, accepted at the gate]: `loss_verdict` compares with 2 % of the other loss; `recovery_extras.csv` for `passive_fit` has the truths filled and the estimates NaN, for `active_fit` the I_h truths NaN; an unknown name in `required_axes` raises; TS8 and TS14 are one check; a run planned by Block 8's code (run `tw1`) cannot be continued or re-merged by this code; the fit's command line carries `--tau-h-pk-bounds-ms` in place of `--kappa-bounds`.
+- Status: smoke-tested 2026-11-22 (sandbox: `smoke_twin_recovery.py` 13 pass, 2 skip, implementer and orchestrator; `smoke_ih_recovery.py` R1-R14; four planted defects caught; commit `fad47f5`, merged `a4b4298`). Not run here: PBS, the real cohort, full-size fits.
 
 ## 6. Pipeline entry points
 
@@ -1459,7 +1460,8 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 | `python smoke_twin_build.py [--build] [--archive-cell <dir> --nf2-dir <dir>]` | Block 12 smoke (TB1-TB9; the optional real twin of 508282493) | NEURON; `./x86_64`; scikit-optimize | minutes; the real twin longer |
 | `python smoke_twin_manifest.py` | Block 13 smoke (TM1-TM10) | pandas; no NEURON | seconds |
 | `python run_twin_recovery.py plan|list|twin|merge ...` | Block 8: the Stage-7 run (the plan, one twin, the report) | NEURON; `./x86_64`; scikit-optimize | `twin`: one build and one fit |
-| `RUN_TAG=... NOISE_TAG=... [MAX_TWINS=2] [DRY_RUN=1] bash submit_twin_recovery.sh` | Block 8 on the cluster: the plan, one PBS array job (one sub-job per twin) and the merge | PBS, conda | 30 twins, 1 core each |
+| `RUN_TAG=... NOISE_TAG=... [TWINS=...] [DRY_RUN=1] bash submit_twin_recovery.sh` | Blocks 8 and 17 on the cluster: the plan, one PBS array job (one sub-job per twin) and the merge | PBS, conda | 35 twins (30 + 5 noise-free), 1 core each |
+| `python smoke_ls_protocol.py` / `python smoke_ih5.py` | Block 14 (LP1-LP9) and Block 15 (I1-I8) smokes | NEURON for the losses and fits | under 1 min each |
 | `python smoke_twin_recovery.py [--build]` | Block 8 smoke (TS1-TS10) | NEURON; `./x86_64`; scikit-optimize; bash | minutes |
 
 ## 7. Not executable in the sandbox
