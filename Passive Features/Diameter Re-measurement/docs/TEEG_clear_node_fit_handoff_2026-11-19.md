@@ -15,6 +15,7 @@
 | 2026-11-22 (later) | The user, 14:53: the refinement is limited to the first 250 um from the soma, and on the pilot the soma comes first, from its images at focus in Colab (D-210; the log's D-206 to D-209 were taken by the twins chat meanwhile). Section 14, new. Evidence: the pilot's `reconstruction.swc` **[data inspected]**; SPEC Block 44's smoke test and notebook Cell 24 on the synthetic cell **[run, sandbox]**. |
 | 2026-11-22 (later, 2) | The first real run of Cell 24 (the user's upload, 15:28: "the evaluation is wrong. The soma starts to be visualized at k = 107"): the automatic pick was a dendrite; the soma's plane is now chosen by eye (D-211). Section 14.1, new; section 14's description of the measure marked. Evidence: `soma_529878215.json` from the user's Drive **[data inspected]**; `checks/soma_focus_2026-11-22/` **[run, sandbox]**. |
 | 2026-11-22 (later, 3) | The user, 16:05 ("Let's do it": the soma's outline per plane) and 16:25 (a larger crop with Allen's trace, D-213): sections 14.2 and 14.3, new. Evidence: the user's block and JSON from Drive and the SWC **[data inspected]**; `checks/soma_area_2026-11-22/`, `checks/soma_focus_2026-11-22/sphere_contours.py` **[run, sandbox]**. |
+| 2026-11-22 (later, 4) | Wave 5 (D-215, D-216, D-218: the user's plan of 17:58 approved): section 14.4, new -- the soma's forward model and fit (SPEC Blocks 45-46, merged d1ee02f and e21dfcf), the orchestrator's provisional settings (D-219), the recovery check on simulated stacks (D-216.2). Evidence: the gates' reruns (test_smoke_soma_render.py 10 pass, test_smoke_soma_fit.py 9 pass, 1 skip), the joint noise-free fit, `checks/soma_recovery_2026-11-22/` (20f4ca1). The final check of the wave is running. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -530,3 +531,35 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   narrower than its dark band in the image -- a visual impression, not a measurement.
 - **To run [Colab]**: Cell 1, then Cell 24 (`SOMA_HALF_UM` None = 40 um; planes already fetched at the old size are
   fetched again at the new one).
+
+### 14.4 The soma's model and its fit (wave 5; SPEC Blocks 45-46; D-216, D-218, D-219) [added 2026-11-22, later]
+
+- **Built [two implementers in parallel, merged after the gates]**: `model/soma_render.py` (Block 45) renders an
+  ellipsoid soma -- centre (x0, y0, z0), in-plane semi-axes a, b at the angle phi, depth semi-axis c, absorption mu --
+  with the partition absorption and the calibrated kernel, the far slope gamma replaceable per render (D-218);
+  `analysis/soma_fit.py` (Block 46) fits theta = (x0, y0, z0, a, b, c, phi, mu, gamma) to the planes about the soma,
+  each plane's grey level solved exactly (variable projection), the stems masked, and derives the membrane area S
+  (Legendre's form), the volume and r_eq = sqrt(S / 4 pi) with their SEs. `far_slope` "fit" (default, D-218.1) or
+  "fixed" (D-218.2, the configured slope; the user's far-slope calibration next week).
+- **Provisional settings [orchestrator, D-219]**: the pixel grid itself (f = 1) and slabs of 0.14 um; the blur as the
+  normalised sampled Gaussian (positive: tau <= 1; `checks/soma_fit_2026-11-22/check_transfer.py`); planes within
+  10 um of the start, 0.56 um apart; a 13 um disk minus Allen's stems widened by 2 um; the start from the traced centre
+  and radius with the shadow's orientation from its moments.
+- **Cost [run, sandbox]**: one render of 36 planes of a 280 px crop 5.4 s, 380 MB; a fit 50-100 renders, 8-21 min on 2
+  shared CPUs (about 3-4 s per render alone).
+- **Recovery on simulated stacks [run, sandbox; `checks/soma_recovery_2026-11-22/`, D-216.2]**: the pilot's
+  acquisition and kernel, the truth rendered finer than the fit (f 2, 0.07 um), noise 3 gl, the start offset as from
+  Allen's trace (0.8, -0.6, +1.5 um; radius x 0.9).
+  - Ellipsoids, c = 3, 4.5, 6 um: c within 0.009 um (0.3 %), S within 0.08 %, all within 2.2 SE: the fit's own
+    discretisation does not bias it.
+  - The far slope 20 % steeper than configured: fitted, recovered (0.9499 against 0.95) and c, S unbiased; held at the
+    configured 0.79, c 0.74 um low (-16.5 %) and S 7.5 % low -- why gamma is fitted (D-218).
+  - A pyramidal soma (the ellipsoid plus a cone toward the apical side, true area 10.6 % above the ellipsoid's): c right
+    (+0.5 %), but S 5.1 % low and r_eq 2.6 % low -- the cone goes into the in-plane axes and the centre; chi2/dof 13.3
+    against 9.1 for an ellipsoid, the cone's shadow in the residual of the in-focus planes. With masked stems as well:
+    S 6.1 % low. These errors are model error, 100-400 times the SEs: the SE does not show them; chi2/dof and the
+    residual's structure do.
+- **Next [pending the user]**: the final check of the wave (running); Block 47 (the corrected morphology: the
+  equivalent sphere at the fitted centre, each stem's first node moved along its own direction onto the fitted surface,
+  D-216.3) and Block 48 (the fit's figures) as wave 6, with `scripts/fit_soma.py` and notebook Cell 25 by the
+  orchestrator; there is no entry point for the fit yet.
