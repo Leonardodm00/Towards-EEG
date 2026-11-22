@@ -893,6 +893,72 @@ holding potential between sweeps is not represented (D-183).
 | lambda(c, s), sigma_s_tilde(c, s), theta_tilde(c, s) | the shrinkage weight; the shrunk slow SD (D-076.1); the law the twin of s carries (P0) | float; float; `NoiseLaw` | --; mV; mV, --, mV, s |
 | seed_binding(c, s), seed_v(c, s) | per-sweep child seeds: the per-sweep binding function's common random numbers; the bootstrap's replicates | int | -- |
 
+### 2.8 The fit's protocol after run tw1: five parameters, strength-weighted steps, a sag-weighted sample window (D-204, D-206 to D-209)
+
+Run `tw1` (Block 8, 30 twins) failed the Stage-7 gate on the I_h axes (decision log D-204). The user's decisions of
+2026-11-22 change the fit; this section is their statement. It applies to the arms `ih5` and `passive_fullstep`
+(Block 15); the arm `ih6` and `baseline_runB` keep the protocol of D-006 as labelled comparisons.
+
+**(a) Parameters (D-206, D-208, D-209).** The fitted vector of the I_h arm is $(C_m, R_m, R_a, \bar g_h, \kappa_\tau)$,
+in the code's names `("Cm","Rm","Ra","gbar","kappa_tau")`; $\Delta v_h$ (`dv_h`) is not fitted and is 0 (the
+activation curve of `Ih_human`: $m_\infty(v) = 1/(1 + e^{(v - v_h)/k})$, $v_h = -90.87$ mV, $k = 8.05$ mV, for each
+fixed $v$). Box of $\bar g_h$: $[10^{-6}, 10^{-2}]$ S/cm$^2$, log scale. The time constant is stated to the user as
+its peak value: with $\tau_h^{\rm base}(v)$ the mechanism's activation time constant at $\kappa_\tau = 1$, for each
+fixed $v$, and $\tau_h^{\rm base,pk} = \max_{v \in [-140, -40]\,{\rm mV}} \tau_h^{\rm base}(v)$
+(`human_ih_params.peak_mtau_shifted_ms`, about 343 ms for `Ih_human`; never hard-coded),
+$\tau_h^{\rm pk} = \kappa_\tau\, \tau_h^{\rm base,pk}$ (ms). Its box is $\tau_h^{\rm pk} \in [50, 1000]$ ms on the log
+scale, which the code applies as the box $[50/\tau_h^{\rm base,pk}, 1000/\tau_h^{\rm base,pk}]$ of the axis
+`kappa_tau` (log scale: the two searches are the same search). Every output states $\tau_h^{\rm pk}$ in ms next to
+`kappa_tau`. A log-ratio error is the same number for $\tau_h^{\rm pk}$ and $\kappa_\tau$.
+
+**(b) Roles (D-207 (1)); rule name `d207`.** For one cell let $h_1, \dots, h_n$ be its hyperpolarising subthreshold
+long-square bundles in increasing $\lvert I\rvert$ ($n \ge 0$) and $m = \lceil n/2 \rceil$ (1-based). Training long
+squares $T_{\rm LS} = \{h_i : 2 \le i \le n,\ i \ne m\}$; validation: $h_1$ and $h_m$ (one bundle when $m = 1$) and
+the depolarising steps exactly as under D-006 (`dep_n_validation`); no report-only bundle. If $T_{\rm LS}$ is empty
+and $n \ge 1$ (it is for $n = 1$), every $h_i$ is trained on and none validates, as the D-006 rule already does, with
+the reason recorded. So $n = 6$: train $h_2, h_4, h_5, h_6$; $n = 5$: $h_2, h_4, h_5$; $n = 3$: $h_3$; $n = 2$: $h_2$.
+The optional floor `v_trough_min_mV` keeps its meaning (a training step below it becomes report-only).
+
+**(c) Step weight (D-207 (2)); weighting name `ls_amplitude`.** With $T_{\rm SS}$ the training short-square bundles,
+$n_{\rm SS} = \lvert T_{\rm SS}\rvert$, $n_{\rm LS} = \lvert T_{\rm LS}\rvert$, $I_b$ the current amplitude of bundle
+$b$ (pA), $\omega_b = \lvert I_b\rvert / \sum_{b' \in T_{\rm LS}} \lvert I_{b'}\rvert$ for $b \in T_{\rm LS}$, and
+$D_b$ the deflection the existing `relative` weighting divides by:
+
+$$L(q) = \frac{1}{n_{\rm SS} + n_{\rm LS}} \Big[ \sum_{b \in T_{\rm SS}} \frac{\mathrm{RMSD}_b(q)}{D_b} + n_{\rm LS} \sum_{b \in T_{\rm LS}} \omega_b\, \frac{\mathrm{RMSD}_b(q)}{D_b} \Big].$$
+
+With $n_{\rm LS} = 0$ the second sum is absent; with $n_{\rm SS} = 0$ the first. Equal amplitudes give exactly the
+`relative` loss.
+
+**(d) Sample weight of a long square (D-207 (3)); name `peak_decay`.** For a long-square bundle $b$ with recorded
+trace $V_b$ on its time grid, step onset $t_{\rm on}$ and offset $t_{\rm off} = t_{\rm on} + $ `stim_duration_s`:
+$t_{{\rm pk},b}$ is the time of the minimum, over the grid samples in $[t_{\rm on} + 1\,{\rm ms}, t_{\rm off}]$, of
+$V_b$ smoothed by a centred boxcar of 1 ms (`smooth_ms`; the smoothing uses samples outside the interval where the
+boxcar reaches them; ties: the earliest). For a DEPOLARISING long square the maximum replaces the minimum. For each
+$t$ in the RMSD window:
+
+$$w_b(t) = \begin{cases} (t - t_{\rm on})/(t_{{\rm pk},b} - t_{\rm on}), & t_{\rm on} \le t \le t_{{\rm pk},b} \\ \exp\!\big(-(t - t_{{\rm pk},b})/\tau_d\big), & t > t_{{\rm pk},b} \end{cases}$$
+
+with $\tau_d = 500$ ms (`ls_tau_d_ms`) and $w_b(t) = 0$ for $t < t_{\rm on}$. $t_{{\rm pk},b}$ and $w_b$ depend on
+the recorded trace only, never on the model. It enters the long square's RMSD as the short squares' weight does:
+$\mathrm{RMSD}_b(q) = [\sum_s w_b(t_s)\,(\hat V_b(t_s; q) - V_b(t_s))^2 / \sum_s w_b(t_s)]^{1/2}$ over the samples of
+the window, both traces baseline-subtracted as now. It applies to the TRAINING loss only: the validation RMSDs, the
+gate and every reported residual in mV stay unweighted, so they remain comparable with run `tw1`. $D_b$ is unchanged.
+
+**(e) The twins (D-207 (4), (5); D-209).** A fourth configuration `full_no_noise`: twins with I_h, fitted with the arm
+`ih5`, whose traces are the noise-free responses (no noise, no tilt). There are $n_0$ of them (5), and the $i$-th
+takes the real cell and the truths of the $i$-th `full` twin of the same manifest. The truth of $\Delta v_h$ is 0 in
+every configuration with I_h. The truth of $\tau_h^{\rm pk}$ is drawn by the existing drawer through its
+`kappa_range` $= (150/\tau_h^{\rm base,pk}, 700/\tau_h^{\rm base,pk})$, with the drawer's own law.
+
+**(f) What each twin's fit records (D-207 (6)).** $L$ of (c) at the estimate and at a parameter vector given to the fit
+(the truth, for a twin whose fitted model contains it); and, with $v^\ast$ the lowest trough voltage among the training
+long squares of that cell, $g_h(v^\ast) = \bar g_h\, m_\infty(v^\ast)$ (S/cm$^2$) at the estimate. The report computes
+the same quantity at the truth and compares them by a log ratio; it is reported, not gated.
+
+**(g) The gate.** On the arm `ih5`: $C_m$, $\bar g_h$, $\kappa_\tau$ and the two control rows at D-011's tolerances;
+`dv_h` is not an axis of the arm and its absence does not fail the gate. The control row "gbar on its lower bound" is
+kept as defined.
+
 ## 3. Data contracts
 
 | Item | Source / format | Shape and axis order | dtype | Units | Conventions |
@@ -1182,6 +1248,191 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Defaults: `IH_ARCHIVE_GROUP=/davinci-1/home/ldellamea/Human Neurons Fitting/L3_exc`, `REG_SPECIMEN=508282493`, `NPZ_SPECIMENS="508282493 569844159"`, `PYTHON=python`.
 - Test oracles (`smoke_noise_fit_gates.py`): T1 planted CR and non-ASCII files flagged, nothing else; T2 a syntax error named, no `.pyc`; T3 a writer-like Format-A fixture (two sweeps of an ADC-quantised trace, spacings 200.000 and 200.040 ms, one pulse dropped) gives the exact expected summary and the gap; T4 Format B the same; T5 no `sweep_number`: three adjacency chains; T6 no false adjacency in 200 independent quantised pairs, a 50-sample overlap refused unless the minimum is lowered; T7 the runner's QUICK mode passes G0, G1, G3-G6b and cannot settle, a bad interpreter fails G0 with exit 1; T8 ASCII/LF. Mutation-tested 2026-10-20 (no overlap minimum, sweep numbers ignored, a wrong ms scale, `mod/` not scanned, a check certified on exit status: each caught).
 - Status: smoke-tested 2026-10-20 (sandbox: T1-T8 8/8). The FULL runner was run in the sandbox on `main` + Block 2 + these tools, with `Biological Fit/` and `Synthetic Passive fit Test/` from `main` and a synthetic archive group; its result is in the decision log's changelog of 2026-10-20. Not run here: G11 on a real cell and G12 on the real archive (cluster). Run on the cluster 2026-10-20 (FULL, `main` at `ca028ea`, env `prova`): 13 passed, 0 failed, 0 skipped, VERDICT SETTLED; G11 PASS on 508282493; G12 read 508282493 and 569844159 (section 3). [2026-11-12: G2 and G6d extended to Block 9 (FULL mode now 14 checks); T1-T8 8/8 after the change (sandbox); not run on davinci since.]
+
+### Block 14: the loss of 2.8 -- roles `d207`, step weight `ls_amplitude`, sample weight `peak_decay`
+
+- Purpose: the role rule, the cross-bundle weighting and the per-sample long-square weight of 2.8 (b), (c), (d), as
+  options of the existing functions; every default stays what it is, so no existing caller changes behaviour.
+- Module: `passive_long_step_training.py`; smoke `smoke_ls_protocol.py` (new).
+- Public API (additions; existing arguments unchanged):
+  - `assign_ls_roles(cell_data, *, ..., role_rule: str = "d006")` -- `"d207"` applies 2.8 (b); `n_drop_weakest`,
+    `n_drop_strongest` and `train_all_hyp` are ignored under `"d207"` (`train_all_hyp=True` with `"d207"` raises
+    ValueError). Records: `role` in {train, validate, report}, `reason` naming the rule (`"h_i of n (d207)"`,
+    `"weakest step (held out)"`, `"middle step h_m (held out, d207)"`).
+  - `ls_peak_time_s(bundle, *, smooth_ms: float = 1.0) -> float` -- $t_{{\rm pk},b}$ of 2.8 (d), seconds on the
+    bundle's own time axis; ValueError for a brief (short-square) bundle or a bundle with fewer than 3 samples in the
+    interval.
+  - `peak_decay_weight(t_on_s: float, t_pk_s: float, tau_d_s: float) -> Callable[[np.ndarray], np.ndarray]` -- $w_b$
+    of 2.8 (d) as a function of an array of times (s); ValueError unless `t_pk_s > t_on_s` and `tau_d_s > 0`.
+  - `bundle_rmsd(cell, bundle, v_rest_mV, *, ..., ls_sample_weight: str = "none", ls_tau_d_ms: float = 500.0)` --
+    `"peak_decay"` weights a long bundle's RMSD by 2.8 (d); `"none"` is today's uniform RMSD, bit for bit.
+  - `build_multi_protocol_loss(cell, train_bundles, v_rest_mV, *, ..., weighting: str = "relative",
+    ls_sample_weight: str = "none", ls_tau_d_ms: float = 500.0)` -- `weighting="ls_amplitude"` is 2.8 (c).
+  - `integrate_long_step(mono, *, ..., role_rule: str = "d006", ls_sample_weight: str = "none",
+    ls_tau_d_ms: float = 500.0)` passes them on: `role_rule` to `assign_ls_roles` (only when `ih_protocol=True`),
+    the two others and `weighting` to the TRAINING loss only. The validation / diagnostic RMSDs it or its patched
+    functions compute stay unweighted (2.8 (d)).
+- Inputs / outputs: as today (bundles with `t` (s), `v_mV` (mV), `amplitude_pA`, `stim_onset_s`, `stim_duration_s`).
+- Library calls: numpy (`np.convolve` or `scipy.ndimage.uniform_filter1d` for the boxcar).
+- Custom code: the weight and the peak rule (no library function is this rule).
+- Test oracles (`smoke_ls_protocol.py`; synthetic bundles and a stub cell, NEURON only where a real loss is built):
+  LP1 roles for n = 0..7 against 2.8 (b) written out by hand in the test, with the depolarising steps and the
+  records; `"d006"` unchanged against a table computed from the code at the contract commit. LP2 `ls_peak_time_s` on
+  a synthetic trace with a known trough (exact to one sample), with noise spikes shorter than the boxcar that must
+  not move it, on a monotone trace (the last sample), and a depolarising one. LP3 `peak_decay_weight`: 0 at onset, 1
+  at the peak, $e^{-1}$ at $t_{\rm pk} + \tau_d$, linear before, continuous, 0 before onset. LP4 the weighted RMSD
+  equals the formula recomputed with numpy on a synthetic pair of traces (1e-12 relative), and `"none"` equals the
+  unweighted one bit for bit. LP5 `ls_amplitude`: the loss equals the formula of 2.8 (c) recomputed from the
+  per-bundle RMSDs and deflections; equal amplitudes reproduce `relative` (1e-12); only SS or only LS bundles.
+  LP6 defaults: with every new argument at its default, the loss of a fixture cell equals the loss at the contract
+  commit's code for three parameter vectors, bit for bit (run the old code from `git show <contract>:...` in a
+  temporary module). LP7 `integrate_long_step` with the new options: the patched training loss uses them and a
+  validation RMSD computed through the patched monolith is unchanged by `ls_sample_weight`. LP8 refusals. LP9
+  ASCII/LF.
+- Data flow: Block 15 calls `integrate_long_step` with the arm's options; Block 17 reads `ls_roles.csv`.
+- Confirmed: yes -- D-204, D-207 (user). Edge rules (n < 4, the 1 ms guard after onset, depolarising steps, ties)
+  are the orchestrator's.
+- Status: drafted
+
+### Block 15: the five-parameter arm `ih5` and what a fit records
+
+- Purpose: the arm of 2.8 (a) with the protocol of 2.8 (b)-(d), the box of the time constant stated in ms, the loss
+  at a given parameter vector, and the columns of 2.8 (f).
+- Module: `run_ih_fit.py`, `param_spec.py` (the default box of gbar only); smoke `smoke_ih5.py` (new);
+  `smoke_ih_fit.py` adapted only where a changed default makes an existing assertion false (say which).
+- Public API:
+  - `IH5_NAMES = ("Cm", "Rm", "Ra", "gbar", "kappa_tau")`.
+  - `ArmConfig` gains `role_rule: str`, `weighting: str`, `ls_sample_weight: str` (the arm's protocol).
+    `ARMS["ih5"]`: as `ih6` with `fit_params=IH5_NAMES`, `role_rule="d207"`, `weighting="ls_amplitude"`,
+    `ls_sample_weight="peak_decay"`. `ARMS["passive_fullstep"]`: the same three values (2.8). `ih6` and
+    `baseline_runB`: `"d006"`, `"relative"`, `"none"`.
+  - CLI: `--ls-role-rule {d006,d207}`, `--ls-sample-weight {none,peak_decay}`, `--ls-tau-d-ms` (500.0), default None =
+    the arm's; `--weighting` default None = the arm's (today's default `relative` becomes the arm's value);
+    `--tau-h-pk-bounds-ms LO,HI` (default None): when given it REPLACES `--kappa-bounds` by
+    `(LO / base, HI / base)` with `base = tau_h_base_peak_ms(ih_spec)`; `--gbar-bounds` default `1e-6,1e-2`
+    (D-208), and `param_spec.DEFAULT_GBAR_BOUNDS = (1e-6, 1e-2)`; `--eval-theta "Cm=..,Rm=..,Ra=..,gbar=..,kappa_tau=.."`
+    (default None): every name of the arm's spec exactly once, else exit 2.
+  - `tau_h_base_peak_ms(ih_spec) -> float` -- $\tau_h^{\rm base,pk}$ of 2.8 (a) from
+    `human_ih_params.peak_mtau_shifted_ms` for the spec's mechanism and base shift (ms).
+  - `resolve_arm_config(args)` applies the overrides; the run header logs the protocol and the box in ms.
+- Outputs: `phase2_results.csv` gains, for every cell: `tau_h_pk_ms`, `tau_h_base_pk_ms` (NaN for a passive arm),
+  `ls_role_rule`, `weighting`, `ls_sample_weight`, `ls_tau_d_ms`, `loss_at_estimate` (the training loss $L$ at the
+  returned estimate, evaluated after the fit), `loss_at_eval_theta` (NaN without `--eval-theta`),
+  `v_deepest_train_mV` ($v^\ast$ of 2.8 (f): the minimum `v_trough_mV` over the bundles with role `train`; NaN if
+  none), `gh_at_v_deepest_S_cm2` ($\bar g_h\, m_\infty(v^\ast)$ at the estimate with `human_ih_params.minf` for the
+  spec's mechanism, base shift and the estimate's `dv_h` (0 when not fitted); NaN for a passive arm). The existing
+  columns keep their meaning; `train_rel_loss` stays what the optimiser returned.
+- Parameters: as above; `--n-calls`, `--n-initial` unchanged.
+- Library calls: as today.
+- Custom code: none.
+- Test oracles (`smoke_ih5.py`, on the fixture cells the existing smokes use; NEURON): I1 the arm table (pure, no
+  NEURON): each arm's names and protocol; overrides. I2 `tau_h_base_peak_ms` equals a brute-force maximum of
+  `human_ih_params.mtau_ms` over a 0.01 mV grid (1e-3 ms) and lies in [340, 346] ms for `Ih_human` at base shift 0;
+  `--tau-h-pk-bounds-ms 50,1000` gives the kappa box `(50/base, 1000/base)` in the spec. I3 a fit with `--arm ih5`,
+  `--n-calls 6 --n-initial 3`, on a noise-free fixture archive built at a known truth: it runs, the spec has the five
+  names, `dv_h` on the cell is 0, `ls_roles.csv` follows `d207`, the new columns are present and finite, and
+  `loss_at_estimate` equals `train_rel_loss` (1e-9 relative). I4 `--eval-theta` at the fixture's truth:
+  `loss_at_eval_theta` is finite, below `loss_at_estimate` of that short fit, and below the loss at the truth with
+  gbar multiplied by 3 (computed in the test through the same builder); a malformed `--eval-theta` exits 2.
+  I5 `gh_at_v_deepest_S_cm2` equals gbar x `human_ih_params.minf(v_deepest)` recomputed (1e-12 relative). I6 the arm
+  `ih6` with no new option reproduces its `phase2_results.csv` of the contract commit on the fixture, the old columns
+  bit for bit apart from the gbar box (run with `--gbar-bounds=1e-6,1e-3`). I7 a noise-free archive (zero residual
+  noise) is fitted without error (the fit's noise estimate may be 0). I8 ASCII/LF.
+- Data flow: consumes Block 14's options (contract: its Public API above); Block 17 builds the command line and reads
+  the columns.
+- Confirmed: yes -- D-206, D-207, D-208, D-209 (user). Keeping `kappa_tau` as the code's axis with the box given in
+  ms is the orchestrator's (2.8 (a)).
+- Status: drafted
+
+### Block 16: the manifest with the noise-free configuration
+
+- Purpose: 2.8 (e) in the manifest.
+- Module: `twin_manifest.py`; smoke `smoke_twin_manifest.py` (extended).
+- Public API:
+  - `CONFIGURATIONS = ("full", "passive_fit", "active_fit", "full_no_noise")`;
+    `ARM_OF = {"full": "ih5", "passive_fit": "passive_fullstep", "active_fit": "ih5", "full_no_noise": "ih5"}`;
+    `HAS_IH = {..., "full_no_noise": True}`; `WITH_NOISE = {"full": True, "passive_fit": True, "active_fit": True,
+    "full_no_noise": False}`.
+  - `draw_twin_manifest(real_cells, *, n_per_configuration=10, n_no_noise=5, seed=0, id_base=900_000_000,
+    dvh_truth_mV=0.0, truth_kwargs=None)`: the first `3 * n_per_configuration` rows are drawn exactly as before
+    (same cells, same truths for the same arguments), then `ih_dvh_mV` is set to `dvh_truth_mV` in every row with
+    I_h (`dvh_truth_mV=None` keeps the drawn values); then `n_no_noise` rows of `full_no_noise` (0 <= n_no_noise <=
+    n_per_configuration, else ValueError), the i-th a copy of the i-th `full` row with `specimen_id = id_base + 300 +
+    i`, `configuration = "full_no_noise"`, its own `arm`, and every truth, real cell, `manifest_seed`, flag and path
+    column equal to the `full` row's. New columns in every row: `with_noise` (bool) and `paired_with` (int: the `full`
+    twin's id for a `full_no_noise` row, -1 otherwise).
+  - `twin_theta`, `twin_spec_of`, save/load: unchanged in meaning; the CSV round trip keeps the new columns' dtypes.
+- Test oracles: the existing TM1-TM10 adapted to four configurations; TM11 the first 30 rows equal the manifest of the
+  contract commit's code for the same arguments in every column except `arm` (ih6 -> ih5) and `ih_dvh_mV` (0), with
+  `dvh_truth_mV=None` restoring the drawn `ih_dvh_mV` bit for bit; TM12 the `full_no_noise` rows: ids, pairing, equal
+  truths, `with_noise` False, `n_no_noise` 0 and its refusals; TM13 `twin_theta` of a paired row equals its partner's.
+- Data flow: Block 17 plans with it; Block 18 receives `with_noise`.
+- Confirmed: yes -- D-207 (user); the id offset 300 and the column names are the orchestrator's.
+- Status: drafted
+
+### Block 18: a twin without noise
+
+- Purpose: build a twin whose traces are the clean responses (2.8 (e)).
+- Module: `twin_build.py`; smoke `smoke_twin_build.py` (extended).
+- Public API: `build_twin(spec, real_spec_dir, table, group_dir, *, ih_spec, apply_theta, spike_reason_fn=None,
+  cfg=TwinConfig(), overwrite=False, provenance=None, with_noise: bool = True)` -- `with_noise=False` passes
+  `simulate_twin(..., with_noise=False)`; the archive's metadata records `twin.with_noise` (bool) in both cases; with
+  `with_noise=False` it also records the noise laws as not applied (the table's rows stay in `twin.sweeps` for the
+  protocol; say how in the as-built note). `TwinSpec.configuration` accepts `"full_no_noise"` (I_h as `full`).
+  `write_twin_archive(..., with_noise: bool = True)` if the flag has to reach the writer.
+- Test oracles: TB1-TB9 unchanged; TB11 a twin built with `with_noise=False` has SS and LS traces equal to
+  `simulate_twin(with_noise=False)` bit for bit and, read back by the fitter's loader, is equal to the fitter's
+  noise-free simulation at the truth within TB1's tolerances; its metadata says `with_noise` False; the same twin
+  with noise differs from it; TB12 the default is `with_noise=True` and reproduces the contract commit's archive
+  arrays bit for bit for the same seed.
+- Data flow: called by Block 17.
+- Confirmed: yes -- D-207 (user).
+- Status: drafted
+
+### Block 17: the second Stage-7 run -- four configurations, the truth passed to the fit, the report's additions
+
+- Purpose: the run of 2.8 on the twins: plan with Block 16, build with Block 18, fit with Block 15's `ih5` and
+  `passive_fullstep`, merge with the gate of 2.8 (g) and the additions of 2.8 (f).
+- Module: `run_twin_recovery.py`, `submit_twin_recovery.sh`, `ih_recovery_report.py` (the gate's required axes only),
+  smoke `smoke_twin_recovery.py` (adapted and extended), `smoke_ih_recovery.py` only where the gate's new argument
+  needs it.
+- Depends on the merged Blocks 14, 15, 16, 18 (wave 2).
+- Specification, relative to the Block 8 entry (everything not named here stays):
+  - `plan`: `--n-no-noise` (5); `--gbar-bounds` default `1e-6,1e-2`; `--tau-h-pk-bounds-ms` default `50,1000` and
+    `--tau-h-pk-truth-ms` default `150,700` replace the options `--kappa-bounds` and `--kappa-range` (converted with
+    `run_ih_fit.tau_h_base_peak_ms` of the run's I_h spec; both recorded in ms and as kappa in `run_config.json`);
+    `--dvh-range` is dropped and the manifest's `dvh_truth_mV` is 0; `--gate-arm` is `ih5`. The twins' table and the
+    cap (twins x NCPUS <= 120) count the `full_no_noise` twins.
+  - `twin`: `build_twin(..., with_noise=row.with_noise)`; the twin's model is built on the six names as now (its
+    truth has `dv_h` = 0); the fit's command line names the manifest's arm and adds `--tau-h-pk-bounds-ms`, and, for a
+    twin whose fitted spec's names are all in its truth and whose configuration has I_h fitted with I_h
+    (`full`, `full_no_noise`), `--eval-theta` with the truth. `active_fit` and `passive_fit` get none. A recorded
+    archive is reused only if its `with_noise` equals the manifest's.
+  - `merge`: the gate on `ih5` with required axes `Cm`, `gbar`, `kappa_tau` (2.8 (g)): `ih_recovery_report.
+    evaluate_gate(summary, fp, *, arm, tol, required_axes=None)` -- None = today's behaviour; an axis not in
+    `required_axes` and absent from the arm's summary is skipped, not failed. The `full_no_noise` twins are NOT in
+    `report/` nor in `report_without_flagged/` (the gate is on the noisy twins, as in `tw1`); they get
+    `report_no_noise/` (the same tables on them alone, `--no-plot` behaviour as the others). New file
+    `recovery_extras.csv`, one row per twin with results: `twin_id`, `configuration`, `twin_of_specimen_id`,
+    `paired_with`, `with_noise`, `cell_tau_s_above_window`, `tau_h_pk_true_ms`, `tau_h_pk_est_ms`,
+    `loss_at_truth` (= the fit's `loss_at_eval_theta`), `loss_at_estimate`, `loss_verdict` in
+    {`optimiser` (truth lower by more than 2 %), `data` (estimate lower by more than 2 %), `tie`, `na`},
+    `v_deepest_train_mV`, `gh_deep_true_S_cm2` (truth's gbar x `human_ih_params.minf` at that voltage with the
+    truth's `dv_h`; NaN without I_h), `gh_deep_est_S_cm2`, `ln_gh_deep_ratio`. `recovery_by_configuration.csv` and
+    `twins_status.csv` as now, with the fourth configuration.
+  - `submit_twin_recovery.sh`: the usage text names the new plan options; nothing else.
+- Test oracles: TS1-TS10 adapted (four configurations; 3 + n_no_noise twins in the small runs: use
+  `--n-per-configuration 1 --n-no-noise 1`); TS11 the fit's command line per configuration (arm, `--tau-h-pk-bounds-ms`,
+  `--eval-theta` only for `full` and `full_no_noise`, the truth's five values); TS12 end to end on fixtures: the
+  noise-free twin's archive has `with_noise` False and equals its partner's noise-free traces, it is fitted, and
+  `recovery_extras.csv` has its columns with `loss_at_truth` finite for `full` and `full_no_noise` and `na` verdicts
+  elsewhere; `gh_deep_true_S_cm2` recomputed; TS13 the gate: a summary without `dv_h` passes or fails on the three
+  required axes alone, and `required_axes=None` reproduces the old verdict table; `report_no_noise/` exists and the
+  noise-free twins are in neither other report; TS14 ASCII/LF and the frozen list without `ih_recovery_report.py`.
+- Data flow: consumes Blocks 14, 15, 16, 18; produces the run directory read by the user and
+  `dev/2026-11-22_tw1_readout/`.
+- Confirmed: yes -- D-204, D-206 to D-209 (user); the report's layout is the orchestrator's.
+- Status: drafted
 
 ## 6. Pipeline entry points
 
