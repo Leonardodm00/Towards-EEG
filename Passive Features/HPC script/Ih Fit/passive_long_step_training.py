@@ -261,6 +261,108 @@ def ls_subwindows_s(bundle, *, charge_ms: float = 150.0
             "rebound": (off, end)}
 
 
+# ---------------------------------------------------------------------------
+#  The long square's sample weight (SPEC 2.8 (d), D-207 (3); name peak_decay)
+# ---------------------------------------------------------------------------
+LS_SAMPLE_WEIGHTS = ("none", "peak_decay")
+_PEAK_GUARD_S = 1e-3          # the peak is searched from t_on + 1 ms (2.8 (d))
+
+
+def _check_ls_sample_weight(name: str) -> None:
+    if name not in LS_SAMPLE_WEIGHTS:
+        raise ValueError("ls_sample_weight must be one of %s, got %r"
+                         % (LS_SAMPLE_WEIGHTS, name))
+
+
+def _is_depolarising_ls(bundle) -> bool:
+    """A long square is depolarising when its current is positive."""
+    return float(bundle.amplitude_pA) > 0.0
+
+
+def ls_peak_time_s(bundle, *, smooth_ms: float = 1.0) -> float:
+    """t_pk of 2.8 (d), in s on the bundle's own time axis.
+
+    The time of the minimum (the maximum for a depolarising step) over the
+    grid samples t in [t_on + 1 ms, t_off], t_off = t_on + stim_duration_s,
+    of the recorded voltage smoothed by a centred boxcar of `smooth_ms`. The
+    boxcar holds 2 h + 1 samples, h = round(smooth_ms / 2 / dt), and uses the
+    samples outside the interval wherever it reaches them; at the ends of the
+    trace, and over non-finite samples, it averages the finite samples it
+    covers. Ties: the earliest sample. Depends on the recorded trace only.
+    """
+    # Custom: the peak rule of SPEC 2.8 (d) (interval, guard, tie rule) is
+    # not a library function. Checked: scipy.ndimage.uniform_filter1d (pads
+    # rather than averaging the samples it covers; no NaN handling) and
+    # scipy.signal.find_peaks (local extrema, not the interval's extremum).
+    # The boxcar itself is np.convolve.
+    if _is_brief(bundle):
+        raise ValueError("ls_peak_time_s: a brief (short-square) bundle has no "
+                         "long-square peak (stim_duration_s=%g s)"
+                         % float(bundle.stim_duration_s))
+    if not (float(smooth_ms) > 0):
+        raise ValueError("smooth_ms must be > 0, got %r" % (smooth_ms,))
+    t = np.asarray(bundle.t, dtype=float)
+    v = np.asarray(bundle.v_mV, dtype=float)
+    t_on = float(bundle.stim_onset_s)
+    t_off = t_on + float(bundle.stim_duration_s)
+    idx = np.flatnonzero((t >= t_on + _PEAK_GUARD_S) & (t <= t_off))
+    if idx.size < 3:
+        raise ValueError("ls_peak_time_s: %d sample(s) in [t_on + 1 ms, t_off] "
+                         "= [%.6g, %.6g] s; at least 3 are needed"
+                         % (idx.size, t_on + _PEAK_GUARD_S, t_off))
+    dt = float(np.median(np.diff(t)))
+    half = int(round(0.5 * float(smooth_ms) * 1e-3 / dt))
+    i0 = max(int(idx[0]) - half, 0)
+    i1 = min(int(idx[-1]) + half + 1, v.size)
+    seg = v[i0:i1]
+    fin = np.isfinite(seg)
+    kern = np.ones(2 * half + 1)
+    num = np.convolve(np.where(fin, seg, 0.0), kern, mode="same")
+    cnt = np.convolve(fin.astype(float), kern, mode="same")
+    with np.errstate(invalid="ignore", divide="ignore"):
+        sm = num / cnt
+    sm_in = sm[int(idx[0]) - i0:int(idx[-1]) - i0 + 1]   # NaN where cnt == 0
+    if not np.any(np.isfinite(sm_in)):
+        raise ValueError("ls_peak_time_s: no finite sample in the interval")
+    k = (int(np.nanargmax(sm_in)) if _is_depolarising_ls(bundle)
+         else int(np.nanargmin(sm_in)))
+    return float(t[int(idx[0]) + k])
+
+
+def peak_decay_weight(t_on_s: float, t_pk_s: float, tau_d_s: float
+                      ) -> Callable[[np.ndarray], np.ndarray]:
+    """w_b of 2.8 (d) as a function of an array of times (s):
+    0 before t_on; (t - t_on) / (t_pk - t_on) on [t_on, t_pk];
+    exp(-(t - t_pk) / tau_d) after t_pk."""
+    # Custom: the piecewise weight of SPEC 2.8 (d); no library function.
+    t_on_s = float(t_on_s)
+    t_pk_s = float(t_pk_s)
+    tau_d_s = float(tau_d_s)
+    if not (np.isfinite(t_on_s) and np.isfinite(t_pk_s) and t_pk_s > t_on_s):
+        raise ValueError("peak_decay_weight needs t_pk_s > t_on_s, got "
+                         "t_on_s=%r, t_pk_s=%r" % (t_on_s, t_pk_s))
+    if not (np.isfinite(tau_d_s) and tau_d_s > 0):
+        raise ValueError("tau_d_s must be > 0, got %r" % (tau_d_s,))
+
+    def _w(t_s: np.ndarray) -> np.ndarray:
+        t = np.asarray(t_s, dtype=float)
+        rise = (t - t_on_s) / (t_pk_s - t_on_s)
+        decay = np.exp(-np.maximum(t - t_pk_s, 0.0) / tau_d_s)
+        return np.where(t < t_on_s, 0.0, np.where(t <= t_pk_s, rise, decay))
+    return _w
+
+
+def _ls_weight_fn(bundle, ls_sample_weight: str, ls_tau_d_ms: float
+                  ) -> Optional[Callable[[np.ndarray], np.ndarray]]:
+    """The sample weight of one LONG bundle's RMSD (None = uniform)."""
+    _check_ls_sample_weight(ls_sample_weight)
+    if ls_sample_weight == "none":
+        return None
+    return peak_decay_weight(float(bundle.stim_onset_s),
+                             ls_peak_time_s(bundle),
+                             float(ls_tau_d_ms) * 1e-3)
+
+
 def bundle_rmsd(cell, bundle, v_rest_mV: float, *,
                 ss_window_ms: Tuple[float, float] = (0.5, 100.0),
                 ls_window_ms_after_onset: float = 150.0,
@@ -269,8 +371,17 @@ def bundle_rmsd(cell, bundle, v_rest_mV: float, *,
                 ss_sample_weight_fn: Optional[Callable[[np.ndarray], np.ndarray]]
                 = None,
                 dt_brief_ms: Optional[float] = None,
-                dt_long_ms: Optional[float] = None) -> Tuple[float, float]:
+                dt_long_ms: Optional[float] = None,
+                ls_sample_weight: str = "none",
+                ls_tau_d_ms: float = 500.0) -> Tuple[float, float]:
     """Return (rmsd_mV, deflection_mV) for one bundle.
+
+    `ls_sample_weight` (SPEC 2.8 (d), D-207 (3)) is the per-sample weight of
+    a LONG bundle's RMSD: "none" (default) is the uniform RMSD, bit for bit
+    the previous behaviour; "peak_decay" weights it by w_b of
+    `peak_decay_weight`, with t_pk from the recorded trace
+    (`ls_peak_time_s`) and tau_d = `ls_tau_d_ms`. Brief bundles ignore it.
+    The deflection is never weighted.
 
     `ss_window_ms` defaults to (0.5, 100.0): the start is the 0.5 ms pulse
     OFFSET (not 1.0 ms), so the Cm-bearing early decay just after the peak is
@@ -282,6 +393,7 @@ def bundle_rmsd(cell, bundle, v_rest_mV: float, *,
     (r_in_target='steady') experimental deflection in the fit window, used
     only for optional relative weighting; it does not change the RMSD itself.
     """
+    _check_ls_sample_weight(ls_sample_weight)
     if _is_brief(bundle):
         t_s, v = _simulate_brief(cell, bundle, v_rest_mV, dt_ms=dt_brief_ms)
         pre_w = (-10e-3, 0.0)
@@ -292,7 +404,7 @@ def bundle_rmsd(cell, bundle, v_rest_mV: float, *,
         onset = float(bundle.stim_onset_s)
         pre_w = (0.0, onset)
         rmsd_w = ls_rmsd_window_s(bundle, ls_window_mode, ls_window_ms_after_onset)
-        weight_fn = None                      # time-weight is SS-only by design
+        weight_fn = _ls_weight_fn(bundle, ls_sample_weight, ls_tau_d_ms)
     rmsd = _baseline_subtracted_rmsd(
         np.asarray(bundle.t), np.asarray(bundle.v_mV), t_s, v, pre_w, rmsd_w,
         sample_weight_fn=weight_fn)
@@ -319,6 +431,8 @@ def build_multi_protocol_loss(
     dt_brief_ms: Optional[float] = None,
     dt_long_ms: Optional[float] = None,
     spec: Optional[object] = None,
+    ls_sample_weight: str = "none",
+    ls_tau_d_ms: float = 500.0,
 ) -> Callable[..., float]:
     """Return loss(*q) -> scalar, q in the spec's axis order.
 
@@ -342,11 +456,44 @@ def build_multi_protocol_loss(
                     larger signal then dominates the mean; the brief pulse keeps
                     its Cm constraint but with less leverage.
       'custom'   -> use `weights` (len == len(train_bundles)).
+      'ls_amplitude' -> SPEC 2.8 (c) (D-207 (2)):
+                    L = [sum_SS r_b/D_b + n_LS sum_LS omega_b r_b/D_b]
+                        / (n_SS + n_LS),
+                    omega_b = |I_b| / sum_LS |I_b'|, r_b/D_b the 'relative'
+                    term; the long bundles' weights sum to n_LS, so equal
+                    amplitudes give the 'relative' loss.
+
+    ls_sample_weight, ls_tau_d_ms:
+      the long bundles' per-sample weight of 2.8 (d) ('none' | 'peak_decay'),
+      passed to bundle_rmsd. 'none' (default) is the previous behaviour.
     """
+    _check_ls_sample_weight(ls_sample_weight)
     if weighting == "custom":
         if weights is None or len(weights) != len(train_bundles):
             raise ValueError("weighting='custom' needs weights of matching length")
         w = np.asarray(weights, dtype=float)
+    if ls_sample_weight != "none":
+        # t_pk and w_b depend on the recorded trace only: build them once
+        # here so a bundle the rule cannot serve raises now, instead of being
+        # folded into the loss's 1e6 penalty at every evaluation.
+        for b in train_bundles:
+            if not _is_brief(b):
+                _ls_weight_fn(b, ls_sample_weight, ls_tau_d_ms)
+    if weighting == "ls_amplitude":
+        is_ls = np.array([not _is_brief(b) for b in train_bundles], dtype=bool)
+        n_ls = int(is_ls.sum())
+        n_all = len(train_bundles)
+        amps = np.array([abs(float(b.amplitude_pA)) for b in train_bundles],
+                        dtype=float)
+        tot = float(np.sum(amps[is_ls]))
+        if n_ls and not (np.isfinite(tot) and tot > 0):
+            raise ValueError("weighting='ls_amplitude' needs a positive total "
+                             "|amplitude| over the training long squares, got %r"
+                             % tot)
+        if n_all == 0:
+            raise ValueError("weighting='ls_amplitude' needs training bundles")
+        # c_b: 1 for a short square, n_LS * omega_b for a long square
+        w = np.where(is_ls, n_ls * amps / (tot if n_ls else 1.0), 1.0)
     if spec is None:
         import param_spec as _ps
         spec = _ps.PASSIVE_3D
@@ -362,16 +509,20 @@ def build_multi_protocol_loss(
                     ls_window_mode=ls_window_mode,
                     r_in_target=r_in_target,
                     ss_sample_weight_fn=ss_sample_weight_fn,
-                    dt_brief_ms=dt_brief_ms, dt_long_ms=dt_long_ms)
+                    dt_brief_ms=dt_brief_ms, dt_long_ms=dt_long_ms,
+                    ls_sample_weight=ls_sample_weight,
+                    ls_tau_d_ms=ls_tau_d_ms)
                 if not np.isfinite(rmsd):
                     return 1e6
-                if weighting == "relative":
+                if weighting in ("relative", "ls_amplitude"):
                     terms.append(rmsd / max(abs(defl), 1e-6))
                 else:
                     terms.append(rmsd)
             terms = np.asarray(terms, dtype=float)
             if weighting == "custom":
                 return float(np.sum(w * terms) / np.sum(w))
+            if weighting == "ls_amplitude":
+                return float(np.sum(w * terms) / len(terms))
             return float(np.mean(terms))
         except Exception as exc:  # noqa: BLE001 - mirror monolith: penalise
             # A dt-enforcement failure is a broken integrator configuration,
@@ -584,10 +735,21 @@ def assign_ls_roles(cell_data, *, n_drop_weakest: int = 1,
                     dep_n_validation: Optional[int] = 3,
                     v_trough_min_mV: Optional[float] = None,
                     train_all_hyp: bool = False,
-                    verbose: bool = True) -> Dict[str, object]:
+                    verbose: bool = True,
+                    role_rule: str = "d006") -> Dict[str, object]:
     """Assign every long-square bundle of one cell to train / validate /
-    report, per D-006. Returns a dict with the three bundle lists and a
-    per-bundle record for the log.
+    report, per D-006 (`role_rule="d006"`, default) or per SPEC 2.8 (b)
+    (`role_rule="d207"`, D-207 (1)). Returns a dict with the three bundle
+    lists and a per-bundle record for the log.
+
+    role_rule="d207"
+        With h_1..h_n by increasing |I| and m = ceil(n / 2): train h_i for
+        2 <= i <= n, i != m; validate h_1 and h_m (one bundle when m = 1);
+        no report-only bundle except through `v_trough_min_mV`. If that
+        leaves no training step and n >= 1 (n = 1), every h_i is trained on.
+        `n_drop_weakest` and `n_drop_strongest` are ignored;
+        `train_all_hyp=True` raises ValueError. The depolarising steps are
+        handled exactly as under D-006.
 
     n_drop_weakest / n_drop_strongest
         How many of the extreme hyperpolarising amplitudes are withheld from
@@ -608,34 +770,45 @@ def assign_ls_roles(cell_data, *, n_drop_weakest: int = 1,
                  key=lambda b: abs(float(b.amplitude_pA)))
     dep = sorted(list(getattr(cell_data, "long_square_depolarising", [])),
                  key=lambda b: abs(float(b.amplitude_pA)))
+    if role_rule not in LS_ROLE_RULES:
+        raise ValueError("role_rule must be one of %s, got %r"
+                         % (LS_ROLE_RULES, role_rule))
+    if role_rule == "d207" and train_all_hyp:
+        raise ValueError("train_all_hyp=True is the D-007 opt-in of the d006 "
+                         "rule; it cannot be combined with role_rule='d207'")
     n = len(hyp)
     records: List[Dict[str, object]] = []
 
-    if train_all_hyp:
-        lo, hi = 0, n
+    if role_rule == "d207":
+        roles_1b = _d207_roles(n)
     else:
-        lo = min(int(n_drop_weakest), max(n - 1, 0))
-        hi = max(n - int(n_drop_strongest), lo)
-    # A cell with too few steps to drop any: train on what there is rather
-    # than on nothing. Recorded in the reason string, never silent.
-    if hi <= lo and n:
-        lo, hi = 0, n
+        if train_all_hyp:
+            lo, hi = 0, n
+        else:
+            lo = min(int(n_drop_weakest), max(n - 1, 0))
+            hi = max(n - int(n_drop_strongest), lo)
+        # A cell with too few steps to drop any: train on what there is rather
+        # than on nothing. Recorded in the reason string, never silent.
+        if hi <= lo and n:
+            lo, hi = 0, n
 
     train_ls: List = []
     valid_ls: List = []
     report_ls: List = []
     for i, b in enumerate(hyp):
         trough = _trough_mV(b)
-        if lo <= i < hi:
+        if role_rule == "d207":
+            role, why = roles_1b[i]
+        elif lo <= i < hi:
             role, why = "train", "h_%d of %d" % (i + 1, n)
-            if (v_trough_min_mV is not None and np.isfinite(trough)
-                    and trough < float(v_trough_min_mV)):
-                role, why = "report", ("V_trough %.1f mV below floor %.1f"
-                                       % (trough, float(v_trough_min_mV)))
         elif i < lo:
             role, why = "validate", "weakest step (held out)"
         else:
             role, why = "report", "strongest step (PIR conductances unmodelled)"
+        if (role == "train" and v_trough_min_mV is not None
+                and np.isfinite(trough) and trough < float(v_trough_min_mV)):
+            role, why = "report", ("V_trough %.1f mV below floor %.1f"
+                                   % (trough, float(v_trough_min_mV)))
         {"train": train_ls, "validate": valid_ls, "report": report_ls}[role].append(b)
         records.append({"amplitude_pA": float(b.amplitude_pA), "polarity": "hyp",
                         "role": role, "reason": why, "v_trough_mV": trough})
@@ -660,6 +833,26 @@ def assign_ls_roles(cell_data, *, n_drop_weakest: int = 1,
                   "cell -- " + _dep_absence_reason(cell_data))
     return {"train": train_ls, "validate": valid_ls, "report": report_ls,
             "records": records, "n_hyp": n, "n_dep": len(dep)}
+
+
+LS_ROLE_RULES = ("d006", "d207")
+
+
+def _d207_roles(n: int) -> List[Tuple[str, str]]:
+    """(role, reason) of h_1..h_n under SPEC 2.8 (b), 0-based list."""
+    m = -(-int(n) // 2)                      # ceil(n / 2), 1-based
+    out: List[Tuple[str, str]] = []
+    for i in range(1, n + 1):
+        if i == 1:
+            out.append(("validate", "weakest step (held out)"))
+        elif i == m:
+            out.append(("validate", "middle step h_m (held out, d207)"))
+        else:
+            out.append(("train", "h_%d of %d (d207)" % (i, n)))
+    # T_LS empty with n >= 1 (n = 1): train on every h_i, as D-006 does.
+    if n and not any(r == "train" for r, _ in out):
+        out = [("train", "h_%d of %d (d207)" % (i, n)) for i in range(1, n + 1)]
+    return out
 
 
 def _dep_absence_reason(cell_data) -> str:
@@ -705,8 +898,11 @@ def split_train_validation_ih(cell_data, *, fit_target: str = "hyp",
                               dep_n_validation: Optional[int] = 3,
                               v_trough_min_mV: Optional[float] = None,
                               train_all_hyp: bool = False,
-                              verbose: bool = True):
+                              verbose: bool = True,
+                              role_rule: str = "d006"):
     """(train, validation, report, roles) for the I_h campaign.
+
+    `role_rule` is passed to assign_ls_roles ("d006" default, or "d207").
 
     Brief SS pulses follow `fit_target` exactly as before; the long steps
     follow assign_ls_roles. This REPLACES split_train_validation_with_long_step
@@ -729,7 +925,8 @@ def split_train_validation_ih(cell_data, *, fit_target: str = "hyp",
                             n_drop_strongest=n_drop_strongest,
                             dep_n_validation=dep_n_validation,
                             v_trough_min_mV=v_trough_min_mV,
-                            train_all_hyp=train_all_hyp, verbose=verbose)
+                            train_all_hyp=train_all_hyp, verbose=verbose,
+                            role_rule=role_rule)
     return (train_ss + list(roles["train"]),
             held_ss + list(roles["validate"]),
             list(roles["report"]),
@@ -763,6 +960,9 @@ def integrate_long_step(
     dt_brief_ms: Optional[float] = None,
     dt_long_ms: Optional[float] = None,
     verbose: bool = True,
+    role_rule: str = "d006",
+    ls_sample_weight: str = "none",
+    ls_tau_d_ms: float = 500.0,
 ):
     """Monkeypatch the imported monolith module `mono` so Phase 2 trains on the
     brief hyperpolarising pulses PLUS the `n_long_train` smallest hyperpolarising
@@ -790,8 +990,28 @@ def integrate_long_step(
     If you instead launch the monolith's own __main__, call this right after
     `import`-ing it and before `main()`.
 
+    SPEC 2.8 options (Block 14; defaults keep the previous behaviour):
+        role_rule         "d006" | "d207", passed to assign_ls_roles, and
+                          only when ih_protocol=True.
+        weighting, ls_sample_weight, ls_tau_d_ms
+                          reach the TRAINING loss (_build_loss_function)
+                          only. The monolith's validation RMSDs and every
+                          diagnostic are not routed through them and stay
+                          unweighted.
+
     Returns the original `prepare_optimiser_inputs` so you can restore it.
     """
+    # Refuse a bad option now, not inside the loss (whose exceptions become
+    # the 1e6 penalty).
+    if role_rule not in LS_ROLE_RULES:
+        raise ValueError("role_rule must be one of %s, got %r"
+                         % (LS_ROLE_RULES, role_rule))
+    if role_rule == "d207" and train_all_hyp:
+        raise ValueError("train_all_hyp=True cannot be combined with "
+                         "role_rule='d207'")
+    _check_ls_sample_weight(ls_sample_weight)
+    if ls_sample_weight != "none" and not (float(ls_tau_d_ms) > 0):
+        raise ValueError("ls_tau_d_ms must be > 0, got %r" % (ls_tau_d_ms,))
     OptimiserInputs = mono.OptimiserInputs
     PassiveSearchSpace = mono.PassiveSearchSpace
     orig_prepare = mono.prepare_optimiser_inputs
@@ -823,7 +1043,8 @@ def integrate_long_step(
                 n_drop_weakest=n_drop_weakest, n_drop_strongest=n_drop_strongest,
                 dep_n_validation=dep_n_validation,
                 v_trough_min_mV=v_trough_min_mV,
-                train_all_hyp=train_all_hyp, verbose=verbose)
+                train_all_hyp=train_all_hyp, verbose=verbose,
+                role_rule=role_rule)
         else:
             train, validation = split_train_validation_with_long_step(
                 cell_data, fit_target=fit_target, n_long_train=n_long_train,
@@ -888,7 +1109,8 @@ def integrate_long_step(
             r_in_target=r_in_target, weighting=weighting,
             ss_sample_weight_fn=_make_ss_weight_fn(tuple(train_window_ms)),
             dt_brief_ms=DEFAULT_DT_BRIEF_MS, dt_long_ms=DEFAULT_DT_LONG_MS,
-            spec=(spec if spec is not None else globals().get("_INTEGRATE_SPEC")))
+            spec=(spec if spec is not None else globals().get("_INTEGRATE_SPEC")),
+            ls_sample_weight=ls_sample_weight, ls_tau_d_ms=ls_tau_d_ms)
 
     global _INTEGRATE_SPEC
     _INTEGRATE_SPEC = spec
@@ -901,6 +1123,8 @@ def integrate_long_step(
                       f"{n_drop_weakest} weakest / {n_drop_strongest} "
                       f"strongest)" if not train_all_hyp
                       else "brief + EVERY hyperpolarising long step")
+            if role_rule == "d207":
+                ntrain = "brief + long steps by role (SPEC 2.8 (b), d207)"
         else:
             ntrain = "SS-only" if int(n_long_train) == 0 \
                 else f"brief + {n_long_train} long step(s)"
@@ -910,6 +1134,13 @@ def integrate_long_step(
               f"{tuple(ss_window_ms)} ms, SS time-weight = {wtag}; "
               f"r_in_target={r_in_target!r}, ls_window={ls_window_ms_after_onset} "
               f"ms, cross-bundle weighting={weighting!r}")
+        if (role_rule != "d006" or ls_sample_weight != "none"
+                or weighting == "ls_amplitude"):
+            print(f"[integrate_long_step] SPEC 2.8 protocol: role_rule="
+                  f"{role_rule!r}"
+                  f"{'' if ih_protocol else ' (ignored: ih_protocol=False)'}, "
+                  f"ls_sample_weight={ls_sample_weight!r}, ls_tau_d_ms="
+                  f"{float(ls_tau_d_ms):g} (training loss only)")
         print(f"[integrate_long_step] dt ENFORCED: brief="
               f"{DEFAULT_DT_BRIEF_MS:g} ms, long={DEFAULT_DT_LONG_MS:g} ms "
               f"(applied to training, validation, Phase 2.5 and Phase 3)")
