@@ -1736,7 +1736,16 @@ orchestrator's (D-210).
 - Data flow: consumes the arrays the entry point builds from Block 46's fit (the model planes $\hat B_k\tau_k$ from Block 45
   at $\hat\theta$), Block 47's outlines and `SomaEdit`; written by the entry point as `soma_fit_<S>_planes.png`,
   `_summary.png` and `_morphology.png`.
-- Status: contract (wave 6).
+- Status: implemented 2026-11-23 by one implementer (wave 6), merged `265f7d4` (block commit `829184d`);
+  `test_smoke_soma_fit_figures.py` 6 pass, 1 skip (no discretisation), rerun by the orchestrator at the gate, the
+  example planes figure looked at **[run, sandbox]**; 18 planted bugs caught. Choices the entry left open: the dicts'
+  keys -- `derived` needs `area_um2`, `volume_um3`, `r_eq_um` (optional `se_area_um2`, `se_volume_um3`,
+  `se_r_eq_um`), `allen` needs `radius_um`, `area_um2` (optional `volume_um3`); "--" for an absent optional value;
+  the residual's half-range the 99th percentile of |data - model| over the fitted pixels of every plane shown,
+  saturating beyond; grey per row the 1st-99th percentiles of data and model together; the image panels in the
+  absolute image frame (um); the masked pixels dimmed on all three panels; a section that is None or empty titled
+  "(misses the fitted soma)"; arrows only where a stem moved; colours by flag; a 36-plane figure 951 x 10600 px
+  (8.6 MB), so the entry point shows a subset.
 
 Block 36, amendment 19 (2026-11-20; D-201; the orchestrator's, after wave 4): `scripts/calibrate_sigma.py --cleaning-dir DIR --specimen S [--out DIR/sigma] [--nodes IDS] [--workers N] [--config-json FILE]` -- per example node of a preparation, Block 42's fit on the planes $k^* \pm$ `half_planes` (in a process pool, one node per worker, BLAS threads 1), Block 43's figures, `sigma_<S>.csv`, `sigma_<S>.json` (fits, summary), `sigma_node<id>.png`, `sigma_summary_<S>.png`. Notebook Cell 23: (A, built now with existing scripts) the thick nodes -- `clean_cell.py clear --d-bins 1.0,50 --n 20 --min-soma-um 5` (Allen's diameter >= 1.0 um, the clear rule's 10 um separation in 3-D, no tier-2 neighbour), `clean --no-clean` into `OUT/cleaning_thick` with `cleaning.plane_half_range` 2 and `measure.profile_half_um` 4.5 (D-201.6 [orchestrator]: the measuring line +-4.5 um, so that a thick tube's defocused dip still meets the background on both sides), the gallery of Block 41 on all of them (`--max-per-bin 0 --fill-to 20`); (B, after wave 1) `calibrate_sigma.py` and its figures. Status (2026-11-22): `scripts/calibrate_sigma.py` written by the orchestrator after wave 4's merge: per node, infer_nodes.run_config and node_from_npz, the pilot of the node's record entry, select_planes, forward_with_kernel with one SectionCache, start_theta, fit_sigma_node, and Block 43's node page (the background (b0 + b1 v) drawn); a node enters the summary when it converged with neither sigma0 nor c at a bound; the summary figure's depth is the fitted z_ax. Run on the synthetic preparation of Cell 23A's stand-in (one node, rendered with d 0.8 um, sigma_r(0) 0.080 um, c 1): converged in 58 evaluations, d 0.808 +- 0.002 um, sigma0 0.0776 +- 0.0024 um, c 0.976 +- 0.015 **[run, sandbox]**. Notebook Cell 23B runs it.
 
@@ -1854,6 +1863,7 @@ WITH ISSUES, seven findings NOTE or MINOR, no wrong number on the default path) 
 | `python tests/smoke/test_smoke_soma_render.py` [2026-11-22, D-220] | Block 45 checks: the column interval, the transfer, the light per plane, the direct reference, convergence, the slope, speed and memory | none | 10 s |
 | `python tests/smoke/test_smoke_soma_fit.py` [2026-11-22, D-220] | Block 46 checks: the area, the planes, the scales, recovery with a stand-in forward model, coverage, the fixed slope, masks, bounds, failure | none | 1 min |
 | `python tests/smoke/test_smoke_soma_morphology.py` [2026-11-23, wave 6] | Block 47 checks: the frames, the crossings, the corrected soma and stems, the walk and flags, the SWC editor, several somas, the reflection | none | 5 s |
+| `python tests/smoke/test_smoke_soma_fit_figures.py` [2026-11-23, wave 6] | Block 48 checks: the three figures' axes and PNGs, the arrays drawn, the contour's pixel convention, the residual's shared scale, no mutation, the refusals | none | 15 s |
 | `python scripts/clean_cell.py clean --no-clean [--pilot-diameter allen|free] [--sigma-r0-um S]`, `python scripts/clean_cell.py clear --d-bins ...` [2026-11-22, S4] | Block 36 amendments 14-17: the preparation without cleaning, the first stage's diameter rule, the in-focus width override, the clear nodes by diameter bin | `--synthetic` | 1-2 min |
 | `python scripts/infer_nodes.py real --weights ... [--bump-sd S] [--weight-kappa K]` [2026-11-22, S4] | Block 36 amendment 16: the per-node fit with Block 39's weights | `--synthetic` | 1-3 min a node |
 | `python scripts/show_soma.py --specimen S --cache-dir DIR [ALIGN] [--soma-k K] [--soma-k-range LO HI] [--montage-k LO HI STEP]` [2026-11-22] | Block 44: the soma's view, its plane chosen by eye (D-211) | `--synthetic` | 30 s synthetic; minutes on Allen's data |
