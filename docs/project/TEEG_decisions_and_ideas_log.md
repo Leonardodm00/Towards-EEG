@@ -263,6 +263,7 @@ the "Binds" column.
 | 2026-11-22 (later; the gallery chat, 2) | Logs **D-211** (user, 15:28 and the answer after it): on the first real run of Cell 24 the automatic pick (k = 93) was a basal dendrite in focus inside the traced disk, not the soma, which the user sees begin at k = 107; the soma's plane(s) are now chosen by eye, no automatic pick; the window widened to the traced radius + 6 um and the montage spans it [orchestrator]. A simulated sharp-edged sphere is found by the same measure, so on this stack the soma carries less fine detail than its in-focus neighbour. Supersedes D-210.3 in part. Next free IDs: D-212, I-007. |
 | 2026-11-22 (later; the gallery chat, 3) | Logs **D-212** (orchestrator): the final check of wave 4 by an independent Opus tester (incremental, `a749cc9`), PASS WITH ISSUES, 2 MINOR and 5 NOTE findings and 6 spec gaps, settled under directive 7 without an approach question. Next free IDs: D-213, I-007. |
 | 2026-11-22 (later; the gallery chat, 4) | Logs **D-213** (user, 16:25): the soma view's crop larger and centred on the soma, with Allen's reconstruction superimposed faintly at its traced diameters (soma and main branches); the size and the drawing rule are the orchestrator's. Next free IDs: D-214, I-007. |
+| 2026-11-22 (later, 5) | Logs **D-214** [orchestrator] (the twins chat; coding directives 7 to 9): D-204 and D-206 to D-209 are **implemented** on `sci/twins` (`c974a62`): SPEC 2.8, Blocks 14 (the loss), 15 (arm `ih5`), 16 (manifest), 18 (noise-free twin), 17 (the run and report), each by its own Opus implementer, gated and merged; the independent final check (report `Ih Fit/specs/test_reports/2026-11-22_1554_incremental.md`) PASS WITH ISSUES, two NOTEs, both fixed; `tests/spec` 255 passed. A real twin of cell 508282493 built here under the new loss: the loss at the truth is 0.0109, against 0.042 with $\bar g_h$ x3 and 0.018 with $\bar g_h$ /3. Not yet run on davinci. Next free IDs: D-215, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -464,6 +465,7 @@ would be needed*, *Status*.
 | D-211 | 2026-11-22 | SPEC Block 44 (`analysis/soma_view.py`, `plotting/soma_figures.py`, `scripts/show_soma.py`, `SomaViewConfig`), notebook Cell 24; D-210.3 in part | the soma's in-focus plane(s) chosen by eye, no automatic pick until the soma's measurement is specified [user]; the window +-(traced radius + 6 um), the montage over all of it; the Laplacian-of-Gaussian measure kept only as a labelled diagnostic [orchestrator] | active; supersedes D-210.3 in part |
 | D-212 | 2026-11-22 | the final check of wave 4 (report `specs/test_reports/2026-11-22_1440_incremental.md` at `a749cc9`): `config.validate`, `contamination.pick_clear_examples`, `scripts/calibrate_sigma.py`, `scripts/colab_bootstrap.py`, SPEC Blocks 1, 5, 11, 27, 36, 40 and section 6 | PASS WITH ISSUES; F1-F7 and S1-S6 settled: counts refused when not whole and finite; a missing soma distance passes; a failing node recorded, not fatal; --config-json merged over the preparation's configuration; strict JSON; `in_summary` beside `ok`; the spec stated where it was silent [orchestrator] | active |
 | D-213 | 2026-11-22 | SPEC Block 44 amendment 2 (`soma_view.trace_segments`, `segment_mask`, `segments_at_depth`; the figures; `show_soma.py --half-um`; `SomaViewConfig.half_um`), notebook Cell 24 | a larger crop centred on the soma, Allen's reconstruction superimposed faintly with its traced diameters, soma and branches [user]; half-size 40 um, the branches outlined at their traced width on every plane and filled where the trace puts them at the plane's depth [orchestrator, PROVISIONAL] | active |
+| D-214 | 2026-11-22 | SPEC 2.8 and Blocks 14-18 as built on `sci/twins` (`c974a62`): the edge rules of D-207's forms, the code's `kappa_tau` axis under D-209's box in ms, the gate's required axes, `loss_verdict` | the orchestrator's choices while building D-204/D-206 to D-209: `kappa_tau` kept as the code's axis with the box given in ms; roles for n < 4; the peak searched from 1 ms after onset on a 51-sample boxcar; depolarising steps use the maximum; the sample weight on the training loss only; the gate on `ih5` requires $C_m$, $\bar g_h$, $\kappa_\tau$; the noise-free twins reported apart; `loss_verdict` at 2 % with `na` at the penalty [orchestrator] | active; built, smoke-tested, final check PASS WITH ISSUES (two NOTEs, fixed) |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14363,3 +14365,38 @@ nodes of the stems are not drawn, as they lie inside the traced soma, which is d
 
 **Status:** active.
 
+## D-214 -- Building D-204 and D-206 to D-209: the orchestrator's choices [orchestrator]
+
+**Date:** 2026-11-22, 15:20 to 17:40 (Europe/Rome), the twins chat (coding directive 7).
+**Binds:** SPEC `Ih Fit/specs/SPEC.md` section 2.8 and Blocks 14 to 18 on `sci/twins` (`c974a62`).
+
+**Decision [orchestrator].** Choices the user's decisions left open, each written in SPEC:
+(1) **The time constant in the code (D-209).** Agreed: the fitted parameter is $\tau_h^{\rm pk}$ in ms, box
+$[50, 1000]$ ms, log scale. Built: the code's axis stays `kappa_tau`, with the box $[50, 1000]/\tau_h^{\rm base,pk}$
+= $[0.145956, 2.919126]$ ($\tau_h^{\rm base,pk}$ = 342.568 ms, computed from the mechanism, 0.01 mV scan); every
+input and output is in ms (`--tau-h-pk-bounds-ms`, `--tau-h-pk-truth-ms`, `tau_h_pk_ms`). On the log scale the two
+searches are the same search; the mechanism and the legacy report stay untouched.
+(2) **Roles for few steps (D-207 (1)).** $n = 3$: train $h_3$; $n = 2$: train $h_2$; $n = 1$: train $h_1$, none
+validates.
+(3) **The peak (D-207 (3)).** Searched from 1 ms after onset to the offset on a centred boxcar of 51 samples (1.02 ms
+at 50 kHz); a depolarising step uses the maximum; ties: the earliest.
+(4) **Where the sample weight acts.** On the training loss only; the validation RMSDs, the gate and every reported
+residual in mV stay unweighted, so they compare with run `tw1`.
+(5) **The gate (D-206).** On the arm `ih5` the required axes are $C_m$, $\bar g_h$, $\kappa_\tau$ and the two control
+rows, at D-011's tolerances; `dv_h` is not an axis and its absence does not fail. The noise-free twins are reported in
+`report_no_noise/`, not in the gated reports.
+(6) **`loss_verdict`.** `optimiser` when the loss at the truth is below 98 % of the loss at the estimate, `data` in
+the mirror case, `tie` otherwise, `na` when either is not finite or is the fit's penalty (1e6).
+(7) Plumbing: `twin.noise_laws_applied`; the frozen-file check's reference; round-trip floats in the merge.
+
+**Why.** Each is the smallest rule that makes the user's form computable; (1) keeps tested code untouched at no change
+to the search; (4) keeps the two runs comparable.
+
+**Evidence [run].** Blocks' smokes: 9/9, 8/8, 13/13, 11 (+1 skip), 14 (+2 skip); the final check (an Opus tester that
+wrote none of it): PASS WITH ISSUES, two NOTEs, fixed; `tests/spec` 255 passed, 2 skipped (real data). Real twin of
+508282493 (tw1's 900000005 with $\Delta v_h$ = 0), new loss, dt 0.1 ms: $L$ at the truth 0.0109; with $\bar g_h$ x3
+0.0423; with $\bar g_h$ /3 0.0184 (`/home/claude/realcheck`, sandbox, not in the repository).
+
+**What it does not decide.** The optimiser's budget; the gate's tolerances (D-011).
+
+**Status:** active. The user can reverse any item.

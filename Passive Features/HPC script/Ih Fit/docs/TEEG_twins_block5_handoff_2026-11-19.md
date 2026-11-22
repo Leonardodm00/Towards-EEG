@@ -22,6 +22,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-22 (later) | Section 7: the result of run tw1 (gate FAIL; 30 ok; job IDs; run times) and its reading (the foot of `Ih_human` at the voltages the steps reach; the optimiser question left open), from the user's extract and `dev/2026-11-22_tw1_readout/`. |
 | 2026-11-22 (later, 2) | Section 7: the user's decision after the FAIL (D-204: a new training set, step and sample weights, 5 noise-free twins; forms pending) and the split of the 10 `full` twins by sag against noise. |
 | 2026-11-22 (later, 3) | Section 7: the settled forms (D-206 to D-209), the fan-out in progress (contract `aac46d3`), and the loss-at-truth diagnostic delivered for davinci. |
+| 2026-11-22 (later, 4) | Section 7: Blocks 14-18 built and checked (`c974a62`), the commands of run `tw2`, the real-cell check of the new loss. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -385,6 +386,17 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   `job_loss_at_truth.sh` (`83111d8`) -- on davinci `qsub dev/2026-11-22_tw1_readout/job_loss_at_truth.sh` from the
   "Ih Fit" folder; it tells, per `full` twin of `tw1`, whether the truth fits better than the estimate (the
   optimiser's miss) or not. Its result was not yet returned when this was written.
+- **Built [2026-11-22 17:40; src at `c974a62` on `sci/twins`; run].** SPEC 2.8 and Blocks 14-18 are implemented,
+  gated, merged and checked by an independent tester (PASS WITH ISSUES, two NOTEs, fixed; `tests/spec` 255 passed).
+  The second run is `tw2`: 35 twins (10 `full`, 10 `passive_fit`, 10 `active_fit`, 5 `full_no_noise` with ids
+  900000300-304 paired with 900000000-004), arms `ih5` / `passive_fullstep`. On davinci, from the repository root:
+  gates `conda activate prova && git pull && cd "Passive Features/HPC script/Ih Fit" && python smoke_ls_protocol.py && python smoke_ih5.py && python smoke_twin_manifest.py && python smoke_twin_build.py && python smoke_twin_recovery.py`;
+  dry run `RUN_TAG=tw2 NOISE_TAG=nf2 DRY_RUN=1 bash submit_twin_recovery.sh` (expect `-J 0-34`); pilot
+  `RUN_TAG=tw2 NOISE_TAG=nf2 TWINS=900000000,900000100,900000200,900000300 WALLTIME=48:00:00 bash submit_twin_recovery.sh`;
+  then the same line without `TWINS=`. Read-out: `/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs_ih/twin_recovery/tw2/L3_exc/recovery_extras.csv` (loss at truth vs
+  estimate, `loss_verdict`, $\tau_h^{\rm pk}$ in ms, $g_h$ at the deepest trained voltage), `report/`,
+  `report_without_flagged/`, `report_no_noise/`. Real-cell check here: the new loss on a real twin of 508282493
+  is 0.0109 at the truth, 0.042 with $\bar g_h$ x3, 0.018 with $\bar g_h$ /3.
 - **Block 7** (roadmap N7): the fitted laws and flags into the Stage-7 manifest and the noise table, and the
   decision-log and plan entries that close the noise prerequisite (N7's summary; the S0-S3 report dropped, D-125.3).
 - **Stage 8** (the campaign) waits for the gate's verdict and the corrected SWCs (S8's note).
