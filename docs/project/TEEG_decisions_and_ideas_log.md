@@ -259,6 +259,7 @@ the "Binds" column.
 | 2026-11-22 (later, 2) | Logs **D-207** (user, 14:58, "All ok"; the twins chat): the exact forms of D-204 as the assistant proposed them at 14:24 and 14:51, the twins' true $\Delta v_h$ = 0, and the two additions (the loss at the truth; $g_h$ at the deepest trained voltage, reported, not gated). Implementation plan proposed to the user; nothing implemented. Next free IDs: D-208, I-007. |
 | 2026-11-22 (later, 3) | Logs **D-208** (user, 15:01; the twins chat): $\bar g_h$'s upper bound raised to $10^{-2}$ S/cm$^2$; the user also asks that $\kappa_\tau$ not be a multiplicative factor but "a plain range" -- its meaning asked back, not settled. `loss_at_truth.py` and its job script delivered on `sci/twins` (`dev/2026-11-22_tw1_readout/`) to tell whether `tw1`'s misses are the optimiser's. Next free IDs: D-209, I-007. |
 | 2026-11-22 (later, 4) | Logs **D-209** (user, 15:06; the twins chat): the I_h time constant is fitted as its peak value in ms over a range wider than 170-685 ms, taken from the literature; the assistant proposes $[50, 1000]$ ms. Next free IDs: D-210, I-007. |
+| 2026-11-22 (later, 4; the gallery chat) | Logs **D-210** (user, 14:53; the gallery chat): the diameter refinement is limited to the first 250 um of path distance from the soma (D-205's x*); on the pilot the soma comes first, from its images at focus in Colab. Scope on the pilot's SWC: 5509 of the 8496 dendrite nodes within 250 um (all 3141 basal, 2368 apical; 66.0 % of the dendritic membrane with Allen's radii). Built as SPEC Block 44 (`b87e956` on `sci/diameter-pipeline`, notebook Cell 24), its settings PROVISIONAL [orchestrator]; the branch's files first cited it as D-206, then D-208, both taken meanwhile by the twins chat. Next free IDs: D-211, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -456,6 +457,7 @@ would be needed*, *Status*.
 | D-207 | 2026-11-22 | D-204's forms; `passive_long_step_training.py` (`assign_ls_roles`, `bundle_rmsd`, `build_multi_protocol_loss`), `run_ih_fit.py`, `twin_manifest.py`, `run_twin_recovery.py`, the Stage-7 report; SPEC (to write) | the forms of D-204 confirmed: train $h_2..h_n$ without $h_{\lceil n/2\rceil}$; step weight $\propto \lvert I_b\rvert$; sample weight linear to the peak then $e^{-(t-t_{\rm pk})/500\,{\rm ms}}$; 5 noise-free twins paired with the first 5 `full` twins; twins' truth $\Delta v_h$ = 0; the loss at the truth recorded; $g_h$ at the deepest trained voltage reported [user: "All ok"] | active; not implemented |
 | D-208 | 2026-11-22 | the search box of $\bar g_h$ (`param_spec.DEFAULT_GBAR_BOUNDS`, `--gbar-bounds`); D-005's box | the upper bound of $\bar g_h$ is $10^{-2}$ S/cm$^2$ (was $10^{-3}$): box $[10^{-6}, 10^{-2}]$, log scale [user, "maybe"]; the parameterisation of the I_h time constant is under question (the user: no multiplicative factor, a plain range), not yet settled | active; not implemented |
 | D-209 | 2026-11-22 | the I_h time-constant parameter (`param_spec`, `run_ih_fit.py`, the twins' truths and report); D-005's $\kappa_\tau \in [0.5, 2]$; D-208's open point | the fit's parameter is the peak I_h time constant $\tau_h^{\rm pk}$ in ms, not a factor [user]; box $[50, 1000]$ ms, log scale (the assistant's proposal from the literature, at the user's instruction to widen) | active; box proposed; not implemented |
+| D-210 | 2026-11-22 | which nodes the diameter refinement treats and in which order (D-205.1); SPEC Block 44 (`analysis/soma_view.py`, `plotting/soma_figures.py`, `scripts/show_soma.py`, `SomaViewConfig`), notebook Cell 24 | the refinement limited to the first 250 um of path distance from the soma, D-205's x* [user]; on the pilot the soma first, from its images at focus in Colab [user]; Block 44's settings PROVISIONAL [orchestrator] | active; `b87e956` |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14203,3 +14205,46 @@ in log; `tw1` drew $\kappa_\tau$ in 0.7 to 1.4, i.e. 240 to 480 ms).
 constants beyond these. **[log]** D-005, D-206, D-208.
 
 **Status:** active; the box and the truths' range proposed; not implemented.
+
+## D-210 -- The diameter refinement is limited to the first 250 um from the soma; on the pilot the soma comes first, from its images at focus (user)
+
+**Date:** 2026-11-22, 14:53 (Europe/Rome), the gallery chat. **Binds:** which nodes the diameter refinement treats
+and in which order (the pilot 529878215's run on cleaned lines: the cleaning, the per-node fits, the thick-node
+calibration's later refits; D-205.1); SPEC Block 44 (`analysis/soma_view.py`, `plotting/soma_figures.py`,
+`scripts/show_soma.py`, `SomaViewConfig`) and the notebook's Cell 24 on `sci/diameter-pipeline`.
+
+**Decision [user].** "Se let's focus on the first 250 um then form the soma. from the pilot cell let's evaluate the
+soma first. I need images at focus of the soma form colab".
+
+**Statement.** (D-210.1) The refinement treats the dendritic nodes at path distance x <= 250 um from the soma:
+D-205.2's reach x* under Eyal et al. 2016's parameters, the larger of the two values D-205 found (150 um with Rm and
+Cm matched to the cell). The distance is D-205.2's, measured along the tree from soma(0.5) [the orchestrator's
+reading]. The nodes beyond 250 um are not treated for now. (D-210.2) On the pilot the soma comes first: its view in
+the image stack at full resolution, from Colab -- the traced soma (the SWC's type-1 node placed in the image frame),
+the planes about its traced depth, the sharpest plane by a focus measure over the traced soma's disk, and the
+figures of SPEC Block 44 (Cell 24). (D-210.3) [orchestrator] Block 44's settings, PROVISIONAL: the crop's half-size
+20 um; the planes within the traced radius + 3 um of the traced depth; the focus measure, the variance of the
+Laplacian of a Gaussian of SD 1 px over the disk of the traced radius + 1 um; the montage, every second plane, 7
+panels on each side of the sharpest.
+
+**Why.** **[user]** as stated. **[log]** D-205.2: on the pilot, every diameter beyond 250 um wrong by 20 % shifts
+each fitted Cm, Rm, Ra by less than 5 %. **[data inspected]** the pilot's `reconstruction.swc` (path length along the
+SWC from the soma's centre, which approximates the distance from soma(0.5)): 5509 of the 8496 dendrite nodes lie
+within 250 um (64.8 %: all 3141 basal, 2368 of 5355 apical), 3628 within 150 um; they carry 66.0 % of the dendritic
+membrane with Allen's radii (11044 of 16734 um2, no spine factor). The soma is one node of radius 5.97 um (a sphere
+of 448 um2).
+
+**What it implies for code and tables.** Block 44 and Cell 24 (`b87e956`). The node selections of the pilot's run
+(Block 36's examples, Block 40's gallery candidates, Cell 23A's thick-node scan) take a path-distance cut at 250 um
+when next specified; not coded yet.
+
+**What it does not decide.** How the soma is measured (its outline, radius, area or volume) and whether its traced
+radius is replaced: Block 44 only shows it. Whether D-201's thick nodes for sigma0 are taken only within 250 um
+(sigma0 belongs to the acquisition, not to the morphology). Whether 150 um or 250 um is the boundary (open in
+D-205), and whether the nodes beyond 250 um are refined later. The other cells.
+
+**Sources.** **[user]** 2026-11-22 14:53. **[data inspected]** the upload of 2026-11-22 (`reconstruction.swc`).
+**[run, sandbox]** `tests/smoke/test_smoke_soma_view.py` (6 pass, 1 skip) and Cell 24 on the synthetic cell.
+**[log]** D-201, D-205.
+
+**Status:** active. Block 44 `b87e956` on `sci/diameter-pipeline`; not yet run on the pilot.
