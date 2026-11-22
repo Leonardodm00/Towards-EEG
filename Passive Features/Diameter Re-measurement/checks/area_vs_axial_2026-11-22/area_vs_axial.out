@@ -1,0 +1,8 @@
+[eyal] 5003 of 8490 dendritic sections within 250 um; perturbation x 1.20
+   perturbation  | fit on the pulse: dCm   dRm   dRa  | fit on pulse+step: dCm   dRm   dRa  | rmsd pulse, step (mV)
+   diameters     |  -0.149 +0.141 +0.372 |  -0.143 +0.143 +0.364 | 0.0738, 4.5325
+   membrane      |  -0.150 +0.155 +0.020 |  -0.163 +0.171 -0.025 | 0.0411, 2.4077
+[matched] 5003 of 8490 dendritic sections within 250 um; perturbation x 1.20
+   perturbation  | fit on the pulse: dCm   dRm   dRa  | fit on pulse+step: dCm   dRm   dRa  | rmsd pulse, step (mV)
+   diameters     |  -0.101 +0.133 +0.416 |  -0.065 +0.099 +0.435 | 0.0279, 1.3530
+   membrane      |  -0.053 +0.113 +0.051 |  -0.053 +0.095 +0.054 | 0.0068, 0.4275
