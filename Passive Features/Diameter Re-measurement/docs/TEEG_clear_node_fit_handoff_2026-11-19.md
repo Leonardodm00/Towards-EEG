@@ -17,6 +17,7 @@
 | 2026-11-22 (later, 3) | The user, 16:05 ("Let's do it": the soma's outline per plane) and 16:25 (a larger crop with Allen's trace, D-213): sections 14.2 and 14.3, new. Evidence: the user's block and JSON from Drive and the SWC **[data inspected]**; `checks/soma_area_2026-11-22/`, `checks/soma_focus_2026-11-22/sphere_contours.py` **[run, sandbox]**. |
 | 2026-11-22 (later, 4) | Wave 5 (D-215, D-216, D-218: the user's plan of 17:58 approved): section 14.4, new -- the soma's forward model and fit (SPEC Blocks 45-46, merged d1ee02f and e21dfcf), the orchestrator's provisional settings (D-219), the recovery check on simulated stacks (D-216.2). Evidence: the gates' reruns (test_smoke_soma_render.py 10 pass, test_smoke_soma_fit.py 9 pass, 1 skip), the joint noise-free fit, `checks/soma_recovery_2026-11-22/` (20f4ca1). The final check of the wave is running. |
 | 2026-11-22 (later, 5) | The wave's final check came back (PASS WITH ISSUES) and was settled (D-220): section 14.4's "Final check" bullet. Evidence: the report, the reruns of the smoke suites and of the tester's spec tests against the fixed code (144d9c4). |
+| 2026-11-23 | Wave 6 (D-222.5): section 14.5, new -- the corrected morphology (Block 47), the fit's figures (Block 48), the entry point `scripts/fit_soma.py` and notebook Cell 25. Evidence: the gates' reruns, the entry point's synthetic dry run. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -569,3 +570,25 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   equivalent sphere at the fitted centre, each stem's first node moved along its own direction onto the fitted surface,
   D-216.3) and Block 48 (the fit's figures) as wave 6, with `scripts/fit_soma.py` and notebook Cell 25 by the
   orchestrator; there is no entry point for the fit yet.
+
+### 14.5 The fitted soma into the morphology; the fit's figures; Cell 25 (wave 6; SPEC Blocks 47-48; D-222) [added 2026-11-23]
+
+- **Built [two implementers in parallel, merged after the gates]**: `analysis/soma_morphology.py` (Block 47): the SWC's
+  soma node moved to the fitted centre with the radius of equal area, r_eq = sqrt(S / 4 pi) (D-216.3); each stem's
+  first node moved along the stem onto the fitted surface; a stem whose next nodes lie inside the surface loses them and
+  its first node goes where it leaves the surface; a first node inside that is a branch point or a leaf stays, flagged
+  (D-222.5); `swc_io.edited_lines` writes the result in the original's format (Allen's four decimals kept byte for byte).
+  `plotting/soma_fit_figures.py` (Block 48): data, model and residual per plane with the fitted outline, Allen's circle
+  and the sphere of equal area; the parameters and the planes' scales and residuals by depth; the stems before and
+  after.
+- **Run it [Colab, Cell 25]**: after Cells 0, 1, 16 and 24; `SOMA_FIT_K` (default Cell 24's `SOMA_K`, else the traced
+  depth), `FAR_SLOPE` "fit" (D-218.1) or "fixed" with `SLOPE0`. Outputs in `OUT/soma_fit`: `soma_fit_<S>_planes.png`,
+  `_summary.png`, `_morphology.png`, `soma_fit_<S>.json` and the corrected `reconstruction_soma_<S>.swc`.
+- **Dry run [run, sandbox]**: `fit_soma.py --synthetic` recovers a planted soma to 0.007 um (S +0.17 %, chi2/dof 9.07)
+  in about 2 min. Two earlier dry runs went wrong for a reason in the dry run itself: the synthetic cell's image covers
+  part of the crop and only planes -7..7, and composing it with a uniform background left a step the fit explained
+  (S +9 %); the soma is now rendered on a uniform background alone.
+- **Reading the real fit**: chi2/dof near the noise's level means the ellipsoid fits; a wedge in the in-focus residuals
+  toward the apical side is a pyramidal soma's signature (S then about 5 % low, `checks/soma_recovery_2026-11-22/`).
+- **Next**: the final check of wave 6; then the kernel wave (D-221, D-222: the switch to the calibrated sigma_0 and c;
+  the SGT kernel in the node's joint fit), starting with a check that (beta, xi) separate from the diameter.

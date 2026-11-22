@@ -524,7 +524,7 @@ class SomaFitConfig:
     plane_step: int = 2                    # source: PROVISIONAL (D-219.4 [orchestrator]): planes whose index differs from k_0 by a multiple of this
     plane_half_um: float = 10.0            # source: PROVISIONAL (D-219.4 [orchestrator]): the planes within this of the start depth (um)
     region_radius_um: float = 13.0         # source: PROVISIONAL (D-219.4 [orchestrator]): the fit's disk about the traced centre (um)
-    mask_widen_um: float = 2.0             # source: PROVISIONAL (D-219.4 [orchestrator]): the caller's widening of Allen's trace mask (um; Block 47)
+    mask_widen_um: float = 2.0             # source: PROVISIONAL (D-219.4 [orchestrator]): the caller's widening of Allen's trace mask (um; read by scripts/fit_soma.py)
     far_slope: str = "fit"                 # source: D-218.1 [user]: the kernel's far slope fitted with the soma; "fixed" (D-218.2) holds it
     shift_xy_um: float = 4.0               # source: PROVISIONAL (D-219.4 [orchestrator]): the centre's in-plane bound about the traced centre (um)
     shift_z_um: float = 6.0                # source: PROVISIONAL (D-219.4 [orchestrator]): the centre's depth bound about the start depth (um)
@@ -541,6 +541,9 @@ class SomaFitConfig:
     start_core_percentile: float = 5.0     # source: PROVISIONAL (D-219.5 [orchestrator]): the core's percentile (numpy.percentile, linear)
     start_ratio_clip: Tuple[float, float] = (0.05, 0.95)  # source: PROVISIONAL (D-219.5 [orchestrator]): varrho clipped into this
     start_ratio_none: float = 0.5          # source: PROVISIONAL (D-219.5 [orchestrator]): varrho when the core holds no region pixel
+    # the entry point, scripts/fit_soma.py (wave 6; D-222.5)
+    crop_margin_um: float = 1.0            # source: PROVISIONAL (D-222.5 [orchestrator]; the recovery check's margin): the crop beyond the fit's disk (um)
+    figure_planes_um: Tuple[float, ...] = (-8.0, -3.0, 0.0, 3.0, 8.0)  # source: PROVISIONAL (D-222.5 [orchestrator]; the recovery figures' planes): depths from the fitted centre shown (um)
 
 
 @dataclass(frozen=True)
@@ -946,7 +949,9 @@ def _check_soma_fit(q: "SomaFitConfig") -> None:
           and 0 < q.start_core_radii < q.start_far_radii
           and math.isfinite(q.start_core_percentile) and 0 <= q.start_core_percentile <= 100
           and pair(q.start_ratio_clip) and 0 < q.start_ratio_clip[0] and q.start_ratio_clip[1] < 1
-          and math.isfinite(q.start_ratio_none) and 0 < q.start_ratio_none < 1)
+          and math.isfinite(q.start_ratio_none) and 0 < q.start_ratio_none < 1
+          and math.isfinite(q.crop_margin_um) and q.crop_margin_um >= 0
+          and len(tuple(q.figure_planes_um)) >= 1 and all(math.isfinite(float(x)) for x in q.figure_planes_um))
     if not ok:
         raise ValueError("soma_fit: a count, length, far_slope, bound, tolerance, step or start setting is out of range "
                          "(SPEC Blocks 45-46)")

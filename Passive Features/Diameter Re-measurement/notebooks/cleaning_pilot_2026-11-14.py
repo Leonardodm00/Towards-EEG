@@ -763,3 +763,35 @@ run("scripts/show_soma.py", "--specimen", SPECIMEN, "--cache-dir", CACHE_DIR, *A
 for name in ("soma_%d_focus.png" % SPECIMEN, "soma_%d_planes.png" % SPECIMEN):
     print(SOMA_OUT + "/" + name)
     display(Image(filename=SOMA_OUT + "/" + name))
+
+
+# %% [markdown]
+# ## Cell 25: the soma fitted with an ellipsoid; the corrected SWC (D-215, D-216, D-218, D-222; Blocks 45-48)
+#
+# Run after Cells 0, 1, 16 and 24 (Cell 1 pulls the branch). The soma is fitted with an ellipsoid -- centre, three
+# semi-axes, in-plane orientation, absorption, and the defocus kernel's far slope -- rendered with the partition
+# absorption and Cell 16's kernel, on the planes within 10 um of the start, Allen's traced processes masked (D-216).
+# The start is Allen's traced soma; its depth is SOMA_FIT_K (default: Cell 24's SOMA_K, else the traced depth).
+# FAR_SLOPE "fit" fits the slope (D-218.1, the default); "fixed" holds it at SLOPE0 (D-218.2; None: the configured
+# 0.79) -- for when the far-slope calibration gives a value. A fit takes a few minutes. The fitted soma enters the
+# corrected SWC as the sphere of equal membrane area at the fitted centre, each stem's first node moved onto the fitted
+# surface (D-216.3, D-222.5). Output to send back: soma_fit_<S>_planes.png, _summary.png, _morphology.png and
+# soma_fit_<S>.json; the corrected SWC is reconstruction_soma_<S>.swc. On the simulated stacks (D-216.2) chi2/dof near
+# the noise's level means an ellipsoid fits; a wedge in the in-focus residuals toward the apical side is the
+# pyramidal soma's signature (the area then about 5 % low).
+
+# %%
+from IPython.display import Image, display   # the cell's own imports
+SOMA_FIT_K = None     # the start plane, e.g. 115; None: Cell 24's SOMA_K, else the traced depth
+FAR_SLOPE = "fit"     # "fit" (D-218.1) or "fixed" (D-218.2)
+SLOPE0 = None         # the far slope's start or held value (um/um); None: the configured renderer.kernel_continuation_slope
+SOMA_FIT_OUT = OUT + "/soma_fit"
+k_start = SOMA_FIT_K if SOMA_FIT_K is not None else globals().get("SOMA_K")
+choice = (([] if k_start is None else ["--soma-k", k_start]) + ["--far-slope", FAR_SLOPE]
+          + ([] if SLOPE0 is None else ["--slope0", SLOPE0]))
+run("scripts/fit_soma.py", "--specimen", SPECIMEN, "--cache-dir", CACHE_DIR, *ALIGN, *CLEAN_CFG, "--out", SOMA_FIT_OUT,
+    *choice)
+for name in ("soma_fit_%d_planes.png" % SPECIMEN, "soma_fit_%d_summary.png" % SPECIMEN,
+             "soma_fit_%d_morphology.png" % SPECIMEN):
+    print(SOMA_FIT_OUT + "/" + name)
+    display(Image(filename=SOMA_FIT_OUT + "/" + name))
