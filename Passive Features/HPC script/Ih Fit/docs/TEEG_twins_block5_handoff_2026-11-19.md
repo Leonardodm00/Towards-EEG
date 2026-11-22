@@ -19,6 +19,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-20 (later, 5) | Section 7 brought up to date: Block 8 built (the draft around `submit_ih_recovery.sh` superseded), how to read the run's outputs, the gate's default tolerances and what a failing axis means for Stage 8 (D-005, D-083). |
 | 2026-11-20 (later, 6) | Section 5b: the run as decided (D-200: no pilot; the 30 twins at once with a 48 h wall time) and the early check. |
 | 2026-11-22 | Section 5b: the run has ended (the user's early-check line: 30 status files, 30 logs in the fit, no traceback); the read-out is next. |
+| 2026-11-22 (later) | Section 7: the result of run tw1 (gate FAIL; 30 ok; job IDs; run times) and its reading (the foot of `Ih_human` at the voltages the steps reach; the optimiser question left open), from the user's extract and `dev/2026-11-22_tw1_readout/`. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -345,6 +346,26 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   options, frozen when the pilot is submitted. A failing kinetic knob ($\Delta v_h$, $\kappa_\tau$) is frozen at its base
   value for the campaign; a failing $C_m$ or $\bar g_h$ means a different protocol, not a smaller fit
   (`ih_recovery_report.frozen_axes_on_failure`).
+- **Result of run tw1 (2026-11-22) [data inspected: the run's tables and logs, the user's extract;
+  `dev/2026-11-22_tw1_readout/` reproduces every number].** PBS array `2101455[]` (30 twins) and merge `2101456`;
+  30 `ok`; build + fit median 11.0 h, max 29.0 h (`full`; `passive_fit` at most 7.2 h). **STAGE 7 GATE: FAIL**, in
+  `report/` and in `report_without_flagged/` (7 twins on the four cells of D-182.3 left out). All 30, `ih6` arm,
+  median $|\varepsilon|$: $C_m$ 0.126 (pass), $\bar g_h$ 1.84, $\Delta v_h$ 7.47 mV, $\kappa_\tau$ 0.61 (all FAIL);
+  control: $\bar g_h$ on its lower bound in 3 of 10 (FAIL), its $C_m$ 0.49 (FAIL); $R_m$ 0.086, $R_a$ 0.207 not
+  gated. Without the flagged twins $C_m$ fails too (0.239).
+- **Reading [checked by computation; reasoning; Rich et al. 2021 full text in project knowledge: Eq. 1, Table 1].**
+  (1) The training steps reach a median 10.6 mV below rest (to about -70 mV); there `Ih_human` ($v_h$ = -90.87 mV,
+  $k$ = 8.05 mV) is in its exponential foot: a shift of $\Delta v_h$ by +-5 mV is undone by scaling $\bar g_h$ by
+  $e^{\mp 5/k}$ to within 3.5-6 % in $g_h(V)$ over rest to 11 mV below (35-40 % over -95 to -60 mV), so $\bar g_h$ and
+  $\Delta v_h$ are not separately identifiable from these steps. (2) The truths' I_h is small there: across the 20
+  twins with I_h, median 1.3 % of the leak at rest and 4.6 % at the deepest training trough. (3) In the 3 `full` twins
+  whose I_h is at least 0.3x the leak at that trough, $g_h$ at rest comes back within x1.6 while $\Delta v_h$ runs to its
+  bound and $\bar g_h$ compensates; in the other 7 nothing about I_h comes back. (4) $\kappa_\tau$ ends on a bound in
+  8 of 10. (5) `active_fit`: the fitted I_h at rest is at most 1.8 % of the leak in all 10, but $C_m$ is off by more
+  than x1.25 in 7 (on a bound in 6). (6) **Open:** the absolute training residual is a median 1.9x the noise sigma;
+  whether the optimiser (200 calls in 6-D) reached the best fit is not established -- it needs the objective at the
+  truth. The real cell 508282493 shows a sag of 0.10-0.12 on its -90 and -110 pA steps (troughs -70 and -72 mV).
+  By D-005 and D-083 a failing $\bar g_h$ makes the six-parameter fit unusable as it is; the next step is the user's.
 - **Block 7** (roadmap N7): the fitted laws and flags into the Stage-7 manifest and the noise table, and the
   decision-log and plan entries that close the noise prerequisite (N7's summary; the S0-S3 report dropped, D-125.3).
 - **Stage 8** (the campaign) waits for the gate's verdict and the corrected SWCs (S8's note).

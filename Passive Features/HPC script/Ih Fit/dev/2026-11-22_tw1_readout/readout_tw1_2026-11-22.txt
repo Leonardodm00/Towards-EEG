@@ -1,0 +1,94 @@
+== 1. full twins (six-parameter fit on traces with I_h): truth, estimate, errors (ln ratio; dv_h in mV)
+ specimen_id  twin_of_specimen_id  cell_tau_s_above_window  ih_gihbar_S_cm2   gbar  ln_gbar  ih_dvh_mV     dv_h    d_dvh  ih_kappa_tau  kappa_tau  ln_kappa   ln_Cm   ln_Rm   ln_Ra rail_gbar rail_dv_h rail_kappa_tau  rail_Cm
+   900000000            537313600                    False           0.0002 0.0001  -1.0784     1.4250  -7.7488  -9.1738        0.8075     0.5000   -0.4793 -0.1513 -0.0352 -0.1153     False     False           True    False
+   900000001            571430815                     True           0.0000 0.0001   1.8076     4.1402  -8.6385 -12.7788        0.8395     1.3377    0.4659 -0.0085  0.1277 -0.0530     False     False          False    False
+   900000002            537297470                    False           0.0003 0.0004   0.2908    -4.8497 -10.0000  -5.1503        1.2046     0.5000   -0.8793 -0.1001 -0.0215 -0.1757     False      True           True    False
+   900000003            531526539                    False           0.0000 0.0010   3.2930     4.6569   0.7256  -3.9313        0.8700     2.0000    0.8324  1.3981 -1.1112  1.4701      True     False           True     True
+   900000004            531520401                    False           0.0001 0.0000  -2.9871     3.8923   1.6766  -2.2157        0.8120     0.5000   -0.4849 -0.6628  0.2391 -0.4525     False     False           True     True
+   900000005            508282493                    False           0.0000 0.0000  -2.4067     3.3006  -3.1774  -6.4779        1.3594     0.5000   -1.0002 -0.0492 -0.0407 -0.0472     False     False           True    False
+   900000006            571483807                    False           0.0000 0.0010   3.8180    -1.1145  10.0000  11.1145        1.1092     0.5000   -0.7968  0.9056 -0.7951  0.8557      True      True           True     True
+   900000007            531523484                    False           0.0001 0.0003   1.1126     2.7389 -10.0000 -12.7389        0.7973     0.5000   -0.4667 -0.0359 -0.0747 -0.3113     False      True           True    False
+   900000008            529878215                    False           0.0000 0.0000   0.0039     4.9898  -3.4628  -8.4526        0.9592     2.0000    0.7348 -0.3259  0.0978 -0.2379     False     False           True     True
+   900000009            526785799                     True           0.0000 0.0000  -1.8662     4.4788  10.0000   5.5212        1.3016     1.2570   -0.0349 -0.0158 -0.0678  0.0199     False      True          False    False
+bounds hit (of 10): kappa_tau 8, dv_h 4, gbar 2, Cm 4
+absolute training residual / noise sigma: median 1.90
+
+== 2. voltages reached by the training steps; the truth's I_h conductance over the leak (twins with I_h)
+ specimen_id configuration  v_rest_mV  v_train_hi  v_train_lo  ih_over_leak_rest_true  ih_over_leak_lo_true
+   900000000          full    -58.975     -61.094     -64.935                   0.075                 0.153
+   900000001          full    -57.746     -67.671     -86.003                   0.020                 0.365
+   900000002          full    -61.519     -67.319     -78.628                   0.310                 2.350
+   900000003          full    -61.846     -63.425     -66.193                   0.009                 0.014
+   900000004          full    -56.638     -58.280     -59.349                   0.014                 0.020
+   900000005          full    -59.331     -63.083     -70.374                   0.024                 0.088
+   900000006          full    -56.407     -58.054     -60.571                   0.001                 0.001
+   900000007          full    -62.004     -67.149     -76.710                   0.202                 1.048
+   900000008          full    -59.553     -64.125     -72.652                   0.021                 0.094
+   900000009          full    -61.972     -72.985     -81.681                   0.028                 0.216
+   900000100   passive_fit    -61.519     -62.904     -65.815                   0.006                 0.009
+   900000101   passive_fit    -57.746     -68.747     -74.894                   0.017                 0.135
+   900000102   passive_fit    -56.407     -58.421     -61.645                   0.001                 0.003
+   900000103   passive_fit    -56.638     -58.954     -60.520                   0.030                 0.048
+   900000104   passive_fit    -61.972     -67.148     -71.879                   0.052                 0.164
+   900000105   passive_fit    -57.683     -61.114     -67.452                   0.048                 0.153
+   900000106   passive_fit    -62.612     -66.941     -75.483                   0.027                 0.123
+   900000107   passive_fit    -59.473     -64.769     -74.601                   0.045                 0.257
+   900000108   passive_fit    -57.269     -61.007     -68.422                   0.012                 0.045
+   900000109   passive_fit    -62.004     -63.793     -66.582                   0.073                 0.125
+   900000200    active_fit    -58.975     -62.936     -70.448                   0.001                 0.003
+   900000201    active_fit    -62.004     -71.691     -90.330                   0.002                 0.043
+   900000202    active_fit    -59.553     -63.152     -69.934                   0.000                 0.000
+   900000203    active_fit    -57.746     -72.693    -108.477                   0.001                 0.050
+   900000204    active_fit    -59.331     -60.675     -62.771                   0.000                 0.000
+   900000205    active_fit    -59.576     -63.112     -70.127                   0.000                 0.001
+   900000206    active_fit    -60.541     -64.173     -71.192                   0.000                 0.001
+   900000207    active_fit    -56.407     -58.964     -63.366                   0.000                 0.000
+   900000208    active_fit    -56.638     -59.095     -60.781                   0.000                 0.000
+   900000209    active_fit    -57.683     -63.829     -75.447                   0.001                 0.005
+deepest training trough below rest: median 10.6 mV; I_h/leak at rest: median 0.013; at the deepest trough: median 0.046
+
+== 3. full twins: g_h at rest (gbar * m_inf(V_rest; dv_h)), split by the truth's I_h at the deepest trough
+I_h >= 0.3 x leak (3): [900000001, 900000002, 900000007]; |ln g_h at rest| [0.24, 0.34, 0.44]; ln gbar [1.81, 0.29, 1.11]; dv_h error [-12.8, -5.2, -12.7]
+I_h <  0.3 x leak (7): |ln g_h at rest| [2.2, 2.82, 3.26, 3.2, 5.16, 1.02, 1.22]
+
+== 4a. passive_fit twins (passive arm on traces with I_h): ln ratio of C_m, R_m, R_a
+ specimen_id  cell_tau_s_above_window  ln_Cm  ln_Rm  ln_Ra  ih_over_leak_rest_true
+   900000100                    False  0.790 -0.898  0.906                   0.006
+   900000101                     True  0.175 -0.210  0.246                   0.017
+   900000102                    False -0.156  0.167 -0.181                   0.001
+   900000103                    False -0.242  0.129 -0.185                   0.030
+   900000104                     True  0.645 -0.830  0.906                   0.052
+   900000105                    False -0.253  0.037 -0.215                   0.048
+   900000106                    False -0.073 -0.021 -0.213                   0.027
+   900000107                     True -0.149 -0.021 -0.183                   0.045
+   900000108                     True -0.196  0.108 -0.255                   0.012
+   900000109                    False  0.431 -0.366  0.215                   0.073
+|ln Cm| > ln 1.25 in 5 of 10; median |ln Cm| 0.219
+
+== 4b. active_fit twins (no I_h; six-parameter fit): gbar, its bound, fitted I_h at rest over the leak, C_m
+ specimen_id    gbar rail_gbar      dv_h  kappa_tau  gh_rest_over_gpas    ln_Cm    ln_Rm  rail_Cm
+   900000200 0.00003     False -10.00000    0.71863            0.00246  1.25052 -0.71428    False
+   900000201 0.00000      True  -7.13787    0.50000            0.00113 -0.16449  0.10717    False
+   900000202 0.00001     False  10.00000    0.57847            0.01432 -1.16039  0.86492     True
+   900000203 0.00000      True -10.00000    0.50000            0.00026 -0.03097 -0.00766    False
+   900000204 0.00001     False   0.72512    0.50000            0.00039  0.20594 -0.09982    False
+   900000205 0.00020     False -10.00000    0.50000            0.01784 -0.50741  0.38247     True
+   900000206 0.00006     False  -7.11713    2.00000            0.00600 -0.47211  0.18724     True
+   900000207 0.00000     False  -4.11747    0.50000            0.00023 -0.85897  0.70774     True
+   900000208 0.00003     False  -3.23362    2.00000            0.00373 -1.53245  0.67799     True
+   900000209 0.00000      True  10.00000    1.80174            0.00232 -0.46916  0.11159     True
+fitted I_h at rest / leak: max 0.0178; |ln Cm| > ln 1.25 in 7 of 10; Cm on a bound in 6
+
+== 4c. status {'ok': 30}; hours per twin (build + fit): median 11.0, max 29.0; max by configuration {'active_fit': 26.9, 'full': 29.0, 'passive_fit': 7.2}
+
+== 5. the foot: max |gbar e^{-dv/k} m_inf(V; dv) / (gbar m_inf(V; 0)) - 1| over V
+  median rest (-59.4 mV) to 11 mV below    dv=-10: 0.055  dv=-5: 0.035  dv=+5: 0.059  dv=+10: 0.153
+  -95 to -60 mV                            dv=-10: 0.802  dv=-5: 0.407  dv=+5: 0.350  dv=+10: 0.606
+
+== 6. the real cell: sag = (V_end - V_trough)/(V_base - V_trough) on its hyperpolarising steps (rest -59.331 mV)
+   -110.0 pA: trough -71.86 mV (12.59 below base), sag 0.119
+    -90.0 pA: trough -69.70 mV (10.59 below base), sag 0.101
+    -70.0 pA: trough -67.55 mV (8.36 below base), sag 0.089
+    -50.0 pA: trough -65.45 mV (6.11 below base), sag 0.082
+    -30.0 pA: trough -63.13 mV (3.88 below base), sag 0.100
+    -10.0 pA: trough -60.74 mV (1.29 below base), sag 0.082
