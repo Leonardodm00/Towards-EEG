@@ -23,6 +23,22 @@ What it adds over run_biological_fit.py
                        helped" (plan section 5, [reasoning]).
      ih6               the same protocol with theta =
                        (C_m, R_m, R_a, gbar_h, dv_h, kappa_tau).
+     ih5               SPEC 2.8 (D-206 to D-209): theta = (C_m, R_m, R_a,
+                       gbar_h, kappa_tau), dv_h = 0; long-step roles 'd207',
+                       cross-bundle weighting 'ls_amplitude', per-sample
+                       long-step weight 'peak_decay' (training loss only).
+                       passive_fullstep runs on the same protocol since 2.8;
+                       ih6 and baseline_runB keep D-006's (d006, relative,
+                       none). --ls-role-rule / --weighting /
+                       --ls-sample-weight override an arm's protocol.
+
+   What a fit records (SPEC 2.8 (a), (f); phase2_results.csv, after the
+   existing columns): tau_h_pk_ms = kappa_tau x tau_h_base_pk_ms (the peak of
+   the mechanism's tau_h over [-140, -40] mV at kappa_tau = 1), the protocol,
+   loss_at_estimate (the training loss at the returned estimate, re-evaluated)
+   and loss_at_eval_theta (at --eval-theta), v_deepest_train_mV and
+   gh_at_v_deepest_S_cm2 = gbar x m_inf(v*). --tau-h-pk-bounds-ms gives the
+   box of kappa_tau in ms.
 
    `--fit-params` overrides an arm's axis list, so the 4-D arm of Stage 7 is
    `--arm ih6 --fit-params Cm,Rm,Ra,gbar`.
@@ -189,6 +205,13 @@ def compute_absolute_gate(
 # ===========================================================================
 PASSIVE_NAMES: Tuple[str, ...] = ("Cm", "Rm", "Ra")
 IH6_NAMES: Tuple[str, ...] = ("Cm", "Rm", "Ra", "gbar", "dv_h", "kappa_tau")
+#: SPEC 2.8 (a), D-206: dv_h is not fitted (it is 0 on the cell).
+IH5_NAMES: Tuple[str, ...] = ("Cm", "Rm", "Ra", "gbar", "kappa_tau")
+
+#: The protocol of SPEC 2.8 (b)-(d) (D-207) and the one of D-006 it replaces
+#: on the arms ih5 and passive_fullstep: (role_rule, weighting, ls_sample_weight).
+PROTOCOL_D207: Tuple[str, str, str] = ("d207", "ls_amplitude", "peak_decay")
+PROTOCOL_D006: Tuple[str, str, str] = ("d006", "relative", "none")
 
 
 @dataclass(frozen=True)
@@ -206,6 +229,9 @@ class ArmConfig:
     n_long_train: int                      # legacy split only
     ls_deflection_cap_mV: Optional[float]  # legacy split only
     gate_valid_via: str                    # legacy_early | same_window
+    role_rule: str                         # d006 | d207 (SPEC 2.8 (b))
+    weighting: str                         # relative | ls_amplitude | ... (2.8 (c))
+    ls_sample_weight: str                  # none | peak_decay (2.8 (d))
 
 
 ARMS: Dict[str, ArmConfig] = {
@@ -216,24 +242,36 @@ ARMS: Dict[str, ArmConfig] = {
         ls_window_mode="after_onset", ls_window_ms=60.0,
         ls_max_amplitude_pA=100.0, load_depolarising_ls=False,
         n_long_train=2, ls_deflection_cap_mV=12.0,
-        gate_valid_via="legacy_early"),
-    # D-006 protocol, still passive: the control for "was it I_h or the window?"
+        gate_valid_via="legacy_early",
+        role_rule=PROTOCOL_D006[0], weighting=PROTOCOL_D006[1],
+        ls_sample_weight=PROTOCOL_D006[2]),
+    # Still passive: the control for "was it I_h or the window?". Since SPEC
+    # 2.8 (D-207) it runs on the protocol of ih5, so that it stays ih5's control.
     "passive_fullstep": ArmConfig(
         name="passive_fullstep", fit_params=PASSIVE_NAMES,
         attach_ih=False, ih_protocol=True,
         ls_window_mode="step", ls_window_ms=150.0,
         ls_max_amplitude_pA=None, load_depolarising_ls=True,
         n_long_train=0, ls_deflection_cap_mV=None,
-        gate_valid_via="same_window"),
-    # The deliverable.
+        gate_valid_via="same_window",
+        role_rule=PROTOCOL_D207[0], weighting=PROTOCOL_D207[1],
+        ls_sample_weight=PROTOCOL_D207[2]),
+    # The D-006 deliverable, kept as a labelled comparison (SPEC 2.8).
     "ih6": ArmConfig(
         name="ih6", fit_params=IH6_NAMES,
         attach_ih=True, ih_protocol=True,
         ls_window_mode="step", ls_window_ms=150.0,
         ls_max_amplitude_pA=None, load_depolarising_ls=True,
         n_long_train=0, ls_deflection_cap_mV=None,
-        gate_valid_via="same_window"),
+        gate_valid_via="same_window",
+        role_rule=PROTOCOL_D006[0], weighting=PROTOCOL_D006[1],
+        ls_sample_weight=PROTOCOL_D006[2]),
 }
+# SPEC 2.8 (a)-(d), D-206 to D-209: ih6 without dv_h, on the D-207 protocol.
+ARMS["ih5"] = replace(
+    ARMS["ih6"], name="ih5", fit_params=IH5_NAMES,
+    role_rule=PROTOCOL_D207[0], weighting=PROTOCOL_D207[1],
+    ls_sample_weight=PROTOCOL_D207[2])
 
 
 def resolve_arm_config(args) -> ArmConfig:
@@ -259,7 +297,121 @@ def resolve_arm_config(args) -> ArmConfig:
         over["ls_max_amplitude_pA"] = parse_optional_float(args.ls_max_amplitude_pA)
     if getattr(args, "gate_valid_via", None):
         over["gate_valid_via"] = args.gate_valid_via
+    # SPEC 2.8 / Block 15: None = the arm's own protocol.
+    if getattr(args, "ls_role_rule", None) is not None:
+        over["role_rule"] = str(args.ls_role_rule)
+    if getattr(args, "weighting", None) is not None:
+        over["weighting"] = str(args.weighting)
+    if getattr(args, "ls_sample_weight", None) is not None:
+        over["ls_sample_weight"] = str(args.ls_sample_weight)
     return replace(cfg, **over) if over else cfg
+
+
+# ===========================================================================
+#  SPEC 2.8 (a), (f): the time constant in ms, the parameter vector given to
+#  the fit, and the conductance at the deepest training trough (PURE)
+# ===========================================================================
+#: The voltage range of SPEC 2.8 (a) over which tau_h^base peaks (mV), and the
+#: grid step of the scan (mV). 0.01 mV: on Ih_human the 0.1 mV default of
+#: human_ih_params.peak_mtau_ms misses the maximum by 1.8e-3 ms.
+TAU_PEAK_V_RANGE_MV: Tuple[float, float] = (-140.0, -40.0)
+TAU_PEAK_DV_MV: float = 0.01
+
+
+def tau_h_base_peak_ms(ih_spec) -> float:
+    """tau_h^{base,pk} of SPEC 2.8 (a), ms: the maximum over v in [-140, -40]
+    mV of the mechanism's activation time constant at kappa_tau = 1, for the
+    spec's mechanism and base shift (human_ih_params.peak_mtau_shifted_ms).
+    Never hard-coded: about 343 ms for Ih_human at base shift 0."""
+    import human_ih_params as HIP
+    _v, tau = HIP.peak_mtau_shifted_ms(
+        str(ih_spec.mechanism), vshift_mV=float(ih_spec.vshift_base_mV),
+        tau_scale=1.0, v_lo=TAU_PEAK_V_RANGE_MV[0],
+        v_hi=TAU_PEAK_V_RANGE_MV[1], dv=TAU_PEAK_DV_MV)
+    return float(tau)
+
+
+def kappa_bounds_from_args(args) -> Tuple[float, float]:
+    """The box of kappa_tau: --kappa-bounds, or, when --tau-h-pk-bounds-ms
+    LO,HI is given, (LO / base, HI / base) with base = tau_h_base_peak_ms of
+    the run's I_h spec (SPEC 2.8 (a): the same search on the log scale)."""
+    tpk = getattr(args, "tau_h_pk_bounds_ms", None)
+    if tpk is None:
+        return parse_window(args.kappa_bounds)
+    lo_ms, hi_ms = parse_window(tpk)
+    base = tau_h_base_peak_ms(build_ih_spec(args))
+    return (float(lo_ms) / base, float(hi_ms) / base)
+
+
+def build_spec_from_args(args, cfg):
+    """The ParamSpec of the run: the arm's names, the boxes of the CLI."""
+    return build_param_spec(
+        cfg.fit_params,
+        cm_bounds=parse_window(args.cm_bounds),
+        rm_bounds=parse_window(args.rm_bounds),
+        ra_bounds=parse_window(args.ra_bounds),
+        gbar_bounds=parse_window(args.gbar_bounds),
+        dvh_bounds=parse_window(args.dvh_bounds),
+        kappa_bounds=kappa_bounds_from_args(args))
+
+
+#: Names whose physical value is a voltage shift (may be zero or negative);
+#: every other fitted quantity is positive (param_spec: a log axis).
+_SIGNED_NAMES = ("dv_h",)
+
+
+def parse_eval_theta(s: str, names: Sequence[str]) -> Dict[str, float]:
+    """'Cm=0.9,Rm=3e4,...' -> {name: float}. Every name of `names` exactly
+    once and nothing else; every value finite, and > 0 unless the name is a
+    voltage shift. ValueError otherwise (the CLI turns it into exit 2)."""
+    out: Dict[str, float] = {}
+    for tok in str(s).split(","):
+        tok = tok.strip()
+        if tok == "":
+            continue
+        if tok.count("=") != 1:
+            raise ValueError("--eval-theta item {!r} is not name=value".format(tok))
+        k, v = (x.strip() for x in tok.split("="))
+        if k in out:
+            raise ValueError("--eval-theta names {!r} twice".format(k))
+        try:
+            val = float(v)
+        except ValueError:
+            raise ValueError("--eval-theta {}={!r} is not a number".format(k, v))
+        if not np.isfinite(val):
+            raise ValueError("--eval-theta {}={!r} is not finite".format(k, v))
+        if k not in _SIGNED_NAMES and not val > 0.0:
+            raise ValueError("--eval-theta {}={!r} must be > 0".format(k, v))
+        out[k] = val
+    want = list(names)
+    if sorted(out) != sorted(want):
+        raise ValueError(
+            "--eval-theta must name each of {} exactly once; got {}"
+            .format(",".join(want), ",".join(out) if out else "nothing"))
+    return {n: out[n] for n in want}
+
+
+def v_deepest_train_mV(roles: Optional[dict]) -> float:
+    """v* of SPEC 2.8 (f): the minimum v_trough_mV over the long-step records
+    with role 'train'; NaN when there is none (or no role record at all)."""
+    recs = list((roles or {}).get("records", []) or [])
+    vals = [float(r["v_trough_mV"]) for r in recs
+            if r.get("role") == "train" and r.get("v_trough_mV") is not None]
+    vals = [v for v in vals if np.isfinite(v)]
+    return float(min(vals)) if vals else float("nan")
+
+
+def gh_at_voltage_S_cm2(gbar_S_cm2: float, v_mV: float, ih_spec,
+                        dv_h_mV: float = 0.0) -> float:
+    """gbar * m_inf(v) (S/cm^2), m_inf from human_ih_params.minf for the
+    spec's mechanism and base shift and the given dv_h; NaN for a NaN v."""
+    import human_ih_params as HIP
+    if not (np.isfinite(v_mV) and np.isfinite(gbar_S_cm2)):
+        return float("nan")
+    return float(gbar_S_cm2) * float(HIP.minf(
+        float(v_mV), str(ih_spec.mechanism),
+        vshift_mV=float(ih_spec.vshift_base_mV),
+        vshift_minf_mV=float(dv_h_mV)))
 
 
 # ===========================================================================
@@ -372,6 +524,7 @@ def results_to_dataframe(results: Sequence, *, arm: str = "",
         row["ih_label"] = ih_label
         row["morphology_source"] = morphology_source
         row.update(PS.flatten_result_params(r))
+        row.update(getattr(r, "fit_record", None) or {})   # Block 15, last
         rows.append(row)
     if not rows:
         return pd.DataFrame(columns=_RESULT_FIELDS
@@ -424,16 +577,13 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     ss_window = parse_window(args.ss_window_ms)
     group_label = Path(args.archive_dir).name
 
-    spec = build_param_spec(
-        cfg.fit_params,
-        cm_bounds=parse_window(args.cm_bounds),
-        rm_bounds=parse_window(args.rm_bounds),
-        ra_bounds=parse_window(args.ra_bounds),
-        gbar_bounds=parse_window(args.gbar_bounds),
-        dvh_bounds=parse_window(args.dvh_bounds),
-        kappa_bounds=parse_window(args.kappa_bounds))
+    spec = build_spec_from_args(args, cfg)
     ih_spec = build_ih_spec(args) if cfg.attach_ih else None
     ih_label = ih_spec.label() if ih_spec is not None else ""
+    tau_base_ms = (tau_h_base_peak_ms(ih_spec) if ih_spec is not None
+                   else float("nan"))
+    eval_theta = (parse_eval_theta(args.eval_theta, spec.names)
+                  if args.eval_theta is not None else None)
 
     if cfg.attach_ih and "gbar" not in spec.names:
         raise SystemExit("[FATAL] arm attaches I_h but gbar is not fitted; "
@@ -460,6 +610,13 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                 cfg.ls_max_amplitude_pA, cfg.load_depolarising_ls,
                 args.n_drop_weakest, args.n_drop_strongest,
                 args.dep_n_validation, args.v_trough_min))
+    log("loss (SPEC 2.8): role rule={} | weighting={} | LS sample weight={} "
+        "(tau_d={} ms) | eval-theta: {}"
+        .format(cfg.role_rule, cfg.weighting, cfg.ls_sample_weight,
+                args.ls_tau_d_ms,
+                (", ".join("%s=%.6g" % kv for kv in eval_theta.items())
+                 if eval_theta is not None else "none")))
+    log("box: {}".format(_box_text(spec, tau_base_ms)))
     log("dt (ENFORCED): brief={} ms  long={} ms | tau_w={} ms (fixed) | "
         "budget {}/{}"
         .format(args.dt_brief_ms, args.dt_long_ms, tau_w_ms,
@@ -479,7 +636,9 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         train_all_hyp=bool(args.train_all_hyp),
         n_long_train=cfg.n_long_train,
         max_ls_train_deflection_mV=cfg.ls_deflection_cap_mV,
-        r_in_target=args.r_in_target, weighting=args.weighting,
+        r_in_target=args.r_in_target, weighting=cfg.weighting,
+        role_rule=cfg.role_rule, ls_sample_weight=cfg.ls_sample_weight,
+        ls_tau_d_ms=float(args.ls_tau_d_ms),
         ss_window_ms=ss_window, ss_time_weight=args.ss_time_weight,
         ss_tau_w_ms=tau_w_ms,
         ss_t0_ms=parse_optional_float(args.ss_t0_ms),
@@ -553,6 +712,11 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             fr.tau_w_chosen_ms = float(tau_w_ms)
             fr.tau_w_hw_rho = float("nan")
             fr.tau_w_reason = "fixed_by_cli"
+            # SPEC 2.8 (f): the training loss at the estimate and at the
+            # given theta, through the builder the fit minimised. Evaluating
+            # it moves the cell, so the estimate is re-applied just below.
+            fr.fit_record = _fit_record(mono, cell, oi, fr, spec, cfg, args,
+                                        ih_spec, tau_base_ms, eval_theta)
 
             # theta is ON the cell already (fit_one_cell's last apply), but be
             # explicit: every post-fit diagnostic below assumes the fit point.
@@ -576,6 +740,13 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                 mono, plst, IM, cell, oi, fr, cfg, args))
 
             results.append(fr)
+            log("    tau_h_pk={:.4g} ms (base {:.4g} ms) | loss at estimate="
+                "{:.6g}, at eval-theta={:.6g} | v*={:.3f} mV, g_h(v*)={:.4g} "
+                "S/cm^2".format(fr.fit_record["tau_h_pk_ms"], tau_base_ms,
+                                fr.fit_record["loss_at_estimate"],
+                                fr.fit_record["loss_at_eval_theta"],
+                                fr.fit_record["v_deepest_train_mV"],
+                                fr.fit_record["gh_at_v_deepest_S_cm2"]))
             log("  cell {}/{} ({}): FIT done in {:.0f}s -> {} | status={} "
                 "(valid_abs={:.3f} mV) | cell total {:.0f}s"
                 .format(i + 1, len(cells_data), sid, time.time() - t_fit,
@@ -689,6 +860,67 @@ def _apply_theta(spec, cell, fit_result, v_rest_mV: float) -> None:
                  "Rm": float(fit_result.rm_Ohm_cm2),
                  "Ra": float(fit_result.ra_Ohm_cm)}
     spec.apply(cell, theta, float(v_rest_mV))
+
+
+def _box_text(spec, tau_base_ms: float) -> str:
+    """Each axis' box; kappa_tau also as tau_h_pk in ms (SPEC 2.8 (a))."""
+    parts = []
+    for ax in spec.axes:
+        txt = "{}[{:g}, {:g}]{}".format(ax.name, ax.lo, ax.hi,
+                                        "" if ax.log else " lin")
+        if ax.name == "kappa_tau" and np.isfinite(tau_base_ms):
+            txt += " = tau_h_pk [{:.4g}, {:.4g}] ms (base {:.4g} ms)".format(
+                ax.lo * tau_base_ms, ax.hi * tau_base_ms, tau_base_ms)
+        parts.append(txt)
+    return "; ".join(parts)
+
+
+def _loss_at(mono, cell, oi, spec, theta) -> float:
+    """The training loss L at a PHYSICAL theta, through the (patched) builder
+    fit_one_cell minimises, on the same bundles, rest and window."""
+    L = mono._build_loss_function(
+        cell, oi.train_bundles, float(oi.v_rest_mV),
+        tuple(oi.train_window_ms), spec=spec)
+    return float(L(*spec.to_q(theta)))
+
+
+#: Columns of SPEC 2.8 (f) / Block 15, written after the existing ones.
+FIT_RECORD_COLUMNS: Tuple[str, ...] = (
+    "tau_h_pk_ms", "tau_h_base_pk_ms", "ls_role_rule", "weighting",
+    "ls_sample_weight", "ls_tau_d_ms", "loss_at_estimate",
+    "loss_at_eval_theta", "v_deepest_train_mV", "gh_at_v_deepest_S_cm2")
+
+
+def _fit_record(mono, cell, oi, fr, spec, cfg, args, ih_spec, tau_base_ms,
+                eval_theta) -> Dict[str, object]:
+    """The Block 15 columns of one cell's row (SPEC 2.8 (a), (f)).
+
+    Leaves the cell at whatever theta was evaluated last: the caller
+    re-applies the estimate."""
+    theta = {n: float(v) for n, v in
+             (getattr(fr, "params", None) or {}).items()}
+    est_ok = (all(n in theta for n in spec.names)
+              and all(np.isfinite(theta[n]) for n in spec.names))
+    nan = float("nan")
+    rec: Dict[str, object] = dict(
+        tau_h_pk_ms=nan, tau_h_base_pk_ms=float(tau_base_ms),
+        ls_role_rule=cfg.role_rule, weighting=cfg.weighting,
+        ls_sample_weight=cfg.ls_sample_weight,
+        ls_tau_d_ms=float(args.ls_tau_d_ms),
+        loss_at_estimate=nan, loss_at_eval_theta=nan,
+        v_deepest_train_mV=v_deepest_train_mV(getattr(oi, "ls_roles", None)),
+        gh_at_v_deepest_S_cm2=nan)
+    if ih_spec is not None and est_ok:
+        # kappa_tau frozen (not fitted) is 1, as param_spec._apply_ih applies it
+        rec["tau_h_pk_ms"] = float(theta.get("kappa_tau", 1.0)) * float(tau_base_ms)
+        rec["gh_at_v_deepest_S_cm2"] = gh_at_voltage_S_cm2(
+            theta["gbar"], float(rec["v_deepest_train_mV"]), ih_spec,
+            dv_h_mV=float(theta.get("dv_h", 0.0)))
+    if est_ok:
+        rec["loss_at_estimate"] = _loss_at(mono, cell, oi, spec, theta)
+    if eval_theta is not None:
+        rec["loss_at_eval_theta"] = _loss_at(mono, cell, oi, spec, eval_theta)
+    return rec
 
 
 def _q_box_centre(spec) -> List[float]:
@@ -1050,9 +1282,20 @@ def _parse_args(argv):
     ap.add_argument("--cm-bounds", default="0.3,3.0")
     ap.add_argument("--rm-bounds", default="1000.0,100000.0")
     ap.add_argument("--ra-bounds", default="50.0,1000.0")
-    ap.add_argument("--gbar-bounds", default="1e-6,1e-3")
+    ap.add_argument("--gbar-bounds", default="1e-6,1e-2",
+                    help="S/cm^2 (D-208; was 1e-6,1e-3).")
     ap.add_argument("--dvh-bounds", default="-10.0,10.0")
     ap.add_argument("--kappa-bounds", default="0.5,2.0")
+    ap.add_argument("--tau-h-pk-bounds-ms", default=None,
+                    help="'LO,HI' (ms): the box of tau_h_pk; REPLACES "
+                         "--kappa-bounds by (LO/base, HI/base), base = the "
+                         "peak of the mechanism's tau_h at kappa_tau = 1 "
+                         "(SPEC 2.8 (a)).")
+    ap.add_argument("--eval-theta", default=None,
+                    help="'Cm=..,Rm=..,Ra=..,gbar=..,kappa_tau=..': the "
+                         "training loss is also evaluated here and written as "
+                         "loss_at_eval_theta. Every name of the arm's spec "
+                         "exactly once, else exit 2.")
 
     # --- the I_h configuration (never fitted; D-005/D-007) -----------------
     ap.add_argument("--ih-mechanism", default="Ih_human",
@@ -1099,6 +1342,15 @@ def _parse_args(argv):
                          "voltage (mV) to report-only. Off by default.")
     ap.add_argument("--train-all-hyp", action="store_true",
                     help="D-007's labelled opt-in: train on h_1..h_n.")
+    ap.add_argument("--ls-role-rule", default=None, choices=["d006", "d207"],
+                    help="Long-step roles; default None = the arm's "
+                         "(SPEC 2.8 (b)).")
+    ap.add_argument("--ls-sample-weight", default=None,
+                    choices=["none", "peak_decay"],
+                    help="Per-sample weight of a long step in the TRAINING "
+                         "loss; default None = the arm's (SPEC 2.8 (d)).")
+    ap.add_argument("--ls-tau-d-ms", type=float, default=500.0,
+                    help="tau_d of the peak_decay weight (ms).")
     ap.add_argument("--gate-valid-via", default=None,
                     choices=["legacy_early", "same_window"],
                     help="Override how the absolute-mV gate windows the "
@@ -1110,7 +1362,10 @@ def _parse_args(argv):
     ap.add_argument("--n-calls", type=int, default=200)
     ap.add_argument("--n-initial", type=int, default=100)
     ap.add_argument("--r-in-target", default="peak", choices=["peak", "steady"])
-    ap.add_argument("--weighting", default="relative")
+    ap.add_argument("--weighting", default=None,
+                    help="Cross-bundle weighting; default None = the arm's "
+                         "(relative, or ls_amplitude on ih5 and "
+                         "passive_fullstep: SPEC 2.8 (c)).")
     ap.add_argument("--ss-window-ms", default="0.5,100.0")
     ap.add_argument("--ss-t0-ms", default=None)
     ap.add_argument("--ss-time-weight", default="exp",
@@ -1158,6 +1413,13 @@ def _parse_args(argv):
         if init > calls:
             ap.error("--%sn-initial (%d) exceeds --%sn-calls (%d): gp_minimize "
                      "refuses this." % (name, init, name, calls))
+    # --eval-theta names the arm's spec exactly: refuse it here (exit 2)
+    # rather than after the cells are loaded.
+    if args.eval_theta is not None:
+        try:
+            parse_eval_theta(args.eval_theta, resolve_arm_config(args).fit_params)
+        except ValueError as exc:
+            ap.error(str(exc))
     return args
 
 
