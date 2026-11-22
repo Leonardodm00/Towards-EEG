@@ -895,6 +895,8 @@ holding potential between sweeps is not represented (D-183).
 
 ### 2.8 The fit's protocol after run tw1: five parameters, strength-weighted steps, a sag-weighted sample window (D-204, D-206 to D-209)
 
+Where section 2.7 (i), section 4 and the entries of Blocks 12 and 13 say "three configurations" or the arm `ih6`, this section and Blocks 16 to 18 supersede them: four configurations, the arm `ih5` [2026-11-22, the final check's S1; the older text is left as the record of run `tw1`].
+
 Run `tw1` (Block 8, 30 twins) failed the Stage-7 gate on the I_h axes (decision log D-204). The user's decisions of
 2026-11-22 change the fit; this section is their statement. It applies to the arms `ih5` and `passive_fullstep`
 (Block 15); the arm `ih6` and `baseline_runB` keep the protocol of D-006 as labelled comparisons.
@@ -912,7 +914,7 @@ scale, which the code applies as the box $[50/\tau_h^{\rm base,pk}, 1000/\tau_h^
 `kappa_tau`. A log-ratio error is the same number for $\tau_h^{\rm pk}$ and $\kappa_\tau$.
 
 **(b) Roles (D-207 (1)); rule name `d207`.** For one cell let $h_1, \dots, h_n$ be its hyperpolarising subthreshold
-long-square bundles in increasing $\lvert I\rvert$ ($n \ge 0$) and $m = \lceil n/2 \rceil$ (1-based). Training long
+long-square bundles in increasing $\lvert I\rvert$ ($n \ge 0$; bundles of equal $\lvert I\rvert$ keep the loader's order -- a stable sort; the loader gives one bundle per distinct amplitude, so no tie arises in the archive [the final check's S4]) and $m = \lceil n/2 \rceil$ (1-based). Training long
 squares $T_{\rm LS} = \{h_i : 2 \le i \le n,\ i \ne m\}$; validation: $h_1$ and $h_m$ (one bundle when $m = 1$) and
 the depolarising steps exactly as under D-006 (`dep_n_validation`); no report-only bundle. If $T_{\rm LS}$ is empty
 and $n \ge 1$ (it is for $n = 1$), every $h_i$ is trained on and none validates, as the D-006 rule already does, with
@@ -932,7 +934,7 @@ With $n_{\rm LS} = 0$ the second sum is absent; with $n_{\rm SS} = 0$ the first.
 **(d) Sample weight of a long square (D-207 (3)); name `peak_decay`.** For a long-square bundle $b$ with recorded
 trace $V_b$ on its time grid, step onset $t_{\rm on}$ and offset $t_{\rm off} = t_{\rm on} + $ `stim_duration_s`:
 $t_{{\rm pk},b}$ is the time of the minimum, over the grid samples in $[t_{\rm on} + 1\,{\rm ms}, t_{\rm off}]$, of
-$V_b$ smoothed by a centred boxcar of 1 ms (`smooth_ms`; the smoothing uses samples outside the interval where the
+$V_b$ smoothed by a centred boxcar of 1 ms (`smooth_ms`; as built and confirmed [orchestrator, the final check's S3]: $2h + 1$ samples with $h = \mathrm{round}(\texttt{smooth\_ms}/2/dt)$, 51 samples = 1.02 ms at 50 kHz; the smoothing uses samples outside the interval where the
 boxcar reaches them; ties: the earliest). For a DEPOLARISING long square the maximum replaces the minimum. For each
 $t$ in the RMSD window:
 
@@ -1405,7 +1407,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   - `plan`: `--n-no-noise` (5); `--gbar-bounds` default `1e-6,1e-2`; `--tau-h-pk-bounds-ms` default `50,1000` and
     `--tau-h-pk-truth-ms` default `150,700` replace the options `--kappa-bounds` and `--kappa-range` (converted with
     `run_ih_fit.tau_h_base_peak_ms` of the run's I_h spec; both recorded in ms and as kappa in `run_config.json`);
-    `--dvh-range` is dropped and the manifest's `dvh_truth_mV` is 0; `--gate-arm` is `ih5`. The twins' table and the
+    `--dvh-range` is dropped and the manifest's `dvh_truth_mV` is 0; the gate's arm is `ih5` (the module constant `GATE_ARM`, recorded in `run_config.json`; there is no `--gate-arm` option [corrected 2026-11-22, the final check's S5]). The twins' table and the
     cap (twins x NCPUS <= 120) count the `full_no_noise` twins.
   - `twin`: `build_twin(..., with_noise=row.with_noise)`; the twin's model is built on the six names as now (its
     truth has `dv_h` = 0); the fit's command line names the manifest's arm and adds `--tau-h-pk-bounds-ms`, and, for a
@@ -1457,12 +1459,12 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 | `python smoke_twin_table.py [--nf2-dir <dir>] [--archive-cell <specimen dir>]` | Block 5 smoke (TT1-TT11); TT8 on the real nf2 tables and one real archive cell when the paths are given | pandas; no NEURON | seconds |
 | `python smoke_twin_noise.py` | Block 10 smoke (TN1-TN9) | none | under a minute |
 | `python smoke_twin_response.py [--build]` | Block 11 smoke (TR1-TR10) | NEURON; `./x86_64` (`--build` runs `nrnivmodl mod`) | under a minute |
-| `python smoke_twin_build.py [--build] [--archive-cell <dir> --nf2-dir <dir>]` | Block 12 smoke (TB1-TB9; the optional real twin of 508282493) | NEURON; `./x86_64`; scikit-optimize | minutes; the real twin longer |
-| `python smoke_twin_manifest.py` | Block 13 smoke (TM1-TM10) | pandas; no NEURON | seconds |
+| `python smoke_twin_build.py [--build] [--archive-cell <dir> --nf2-dir <dir>]` | Block 12 smoke (TB1-TB12; the optional real twin of 508282493) | NEURON; `./x86_64`; scikit-optimize | minutes; the real twin longer |
+| `python smoke_twin_manifest.py` | Block 13 smoke (TM1-TM13) | pandas; no NEURON | seconds |
 | `python run_twin_recovery.py plan|list|twin|merge ...` | Block 8: the Stage-7 run (the plan, one twin, the report) | NEURON; `./x86_64`; scikit-optimize | `twin`: one build and one fit |
 | `RUN_TAG=... NOISE_TAG=... [TWINS=...] [DRY_RUN=1] bash submit_twin_recovery.sh` | Blocks 8 and 17 on the cluster: the plan, one PBS array job (one sub-job per twin) and the merge | PBS, conda | 35 twins (30 + 5 noise-free), 1 core each |
 | `python smoke_ls_protocol.py` / `python smoke_ih5.py` | Block 14 (LP1-LP9) and Block 15 (I1-I8) smokes | NEURON for the losses and fits | under 1 min each |
-| `python smoke_twin_recovery.py [--build]` | Block 8 smoke (TS1-TS10) | NEURON; `./x86_64`; scikit-optimize; bash | minutes |
+| `python smoke_twin_recovery.py [--build]` | Blocks 8 and 17 smoke (TS1-TS15) | NEURON; `./x86_64`; scikit-optimize; bash | minutes |
 
 ## 7. Not executable in the sandbox
 
