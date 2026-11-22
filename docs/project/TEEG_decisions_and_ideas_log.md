@@ -254,6 +254,7 @@ the "Binds" column.
 | 2026-11-20 (the gallery chat, later, 4) | Logs **D-202** (user, 17:44; the gallery chat): Cell 22's fit (D-169's path with WEIGHT_KAPPA 0.1 on D-199's four nodes) is dropped before it ran; D-199's status marked (D-199.1, the four nodes, not withdrawn). On `sci/diameter-pipeline`: `0be11a7` (Cell 22 a one-line note; the clear-node handoff, section 11.2 marked). Next free IDs: D-203, I-007. |
 | 2026-11-20 (the gallery chat, later, 5) | Logs **D-203** [orchestrator] (the gallery chat; coding directive 7), prompted by the user, 18:09 ("Maybe we have to account for a tilted background", with Cell 23A's output): Block 42's start measures the k* dip against a straight background through the line's ends. On `sci/diameter-pipeline`: `439f945` (SPEC Block 42 amendment 4, `start_ends_um`), `7d3928b` (`checks/tilt_2026-11-20/`, the clear-node handoff 12.1). Next free IDs: D-204, I-007. |
 | 2026-11-22 | Logs **D-204** (user, 14:24; the twins chat). **Stage 7's run `tw1` ended: gate FAIL** (30 twins `ok`; PBS `2101455[]`, merge `2101456`; `ih6` arm, median abs error: $C_m$ 0.126 pass, $\bar g_h$ 1.84, $\Delta v_h$ 7.47 mV, $\kappa_\tau$ 0.61, the no-I_h control 3 of 10 on the lower bound; read-out in `Ih Fit/dev/2026-11-22_tw1_readout/` and the twins' handoff, section 7). The user does not accept "not recoverable" and changes the fit's protocol: the stronger hyperpolarising long squares are trained on, a medium one held out; a step's weight grows with its strength; a per-sample weight on each long square that rises to the peak of the response and decays slowly, so that the sag counts; and a new configuration of 5 twins fitted without noise. The exact forms are the assistant's proposals, pending the user's confirmation. D-006 (ii) and its role table superseded in part. Next free IDs: D-205, I-007. |
+| 2026-11-22 (the gallery chat) | Logs **D-205** (user, 2026-11-20 18:33 and the answers after it): the diameter refinement starts from the near-soma branches; how far diameter errors matter is measured as the linearised shift of the passive fit's (Cm, Rm, Ra), threshold 5 %, every diameter beyond x wrong by 20 %, Eyal 2016 cell 060308's parameters, on the pilot's own SWC (uploaded 2026-11-22). Result: x* 250 um (150 um with Rm, Cm matched to the cell). On `sci/diameter-pipeline`: `42fc57d` (`checks/diameter_reach_2026-11-22/`, the clear-node handoff section 13). Next free IDs: D-206, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -446,6 +447,7 @@ would be needed*, *Status*.
 | D-202 | 2026-11-20 | notebook Cell 22; D-199.2; the folders `OUT/cleaning_fit4`, `OUT/inference_fit4_k0.1` (never made) | Cell 22's fit with WEIGHT_KAPPA 0.1 on the four nodes is dropped, not run [user] | active; Cell 22 a one-line note (`0be11a7`) |
 | D-203 | 2026-11-20 | SPEC Block 42 amendment 4 (`start_theta`, oracle T8); `SigmaCalibrationConfig.start_ends_um`; D-201.5's start | the start measures the k* dip against a straight background through the samples at abs(v) >= 3 um, the pilot's values when it cannot be measured [orchestrator] | active; `439f945`, sent to Block 42's implementer |
 | D-204 | 2026-11-22 | the I_h fit's protocol (`passive_long_step_training.py`: `assign_ls_roles`, `bundle_rmsd`, `build_multi_protocol_loss`; `run_ih_fit.py`); the Stage-7 configurations (`twin_manifest.py`, `run_twin_recovery.py`); D-006 (ii), D-184, D-188 | after `tw1`'s gate FAIL: train on the stronger hyperpolarising long squares (a medium one validates), weight a step by its strength, weight each long square's samples to peak at the response's peak and decay slowly, and add 5 twins fitted without noise [user]; the forms pending | active; forms proposed, not yet confirmed |
+| D-205 | 2026-11-22 | the order of the diameter refinement; `checks/diameter_reach_2026-11-22/` | the near-soma branches first [user]; the reach of diameter errors measured as the linearised shift of the fitted (Cm, Rm, Ra) under +-20 % beyond x, threshold 5 %, Eyal 2016 060308, passive [user]; x* 250 um [run] | active; `42fc57d` |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14015,3 +14017,47 @@ out): the twins have none. (e) The rebound stays out of the loss (D-006).
 **[log]** D-005, D-006, D-011, D-083, D-182.3, D-184, D-188, D-200.
 
 **Status:** active; the forms proposed, not yet confirmed; nothing implemented.
+
+## D-205 -- The diameter refinement starts from the near-soma branches; how far diameter errors matter, measured on the pilot (user)
+
+**Date:** 2026-11-20, 18:33 (Europe/Rome), and the answers given before 2026-11-22, the gallery chat. **Binds:**
+the order in which the diameter refinement treats a cell's branches; `checks/diameter_reach_2026-11-22/` on
+`sci/diameter-pipeline`.
+
+**Decision [user].** "given that we will use these refined morphologies to estimate the passive and ih parameters
+from the stimulation of the soma I will need to be accurate mostly on the near soma branches so we will try those
+first. Try to calculate the most far position from the soma where the effects of wrongly defined diameters has an
+effect." Asked how, the user chose: the pilot's own morphology (and waited for its SWC); the measure, the
+linearised shift of the fitted parameters with every shift under 5 %; the error, every diameter beyond the
+distance scaled by 0.8 and by 1.2; the parameters, Eyal et al. 2016 cell 060308, passive, no Ih.
+
+**Statement.** (D-205.1) The refinement treats the branches nearest the soma first. (D-205.2) The reach x* of
+diameter errors: the smallest path distance x from soma(0.5) such that, with every dendritic diameter beyond x
+scaled by s in {0.8, 1.2} and the rest exact, one Gauss-Newton step of the passive fitter's cost (its training
+target, the -200 pA 0.5 ms pulse on 1-100 ms after onset; and with a -110 pA 1 s step) shifts each of Cm, Rm, Ra
+by less than 5 %, at every larger grid distance. The model is the fitter's `PassiveCell` (Import3d, Hay stub
+axon, F = 1.9 beyond 60 um), Cm 0.452 uF/cm2, Rm 38.91 kOhm cm2, Ra 203.23 Ohm cm (Eyal 2016, Table 1).
+
+**Why.** **[user]** as stated. **[run, sandbox]** on the pilot's repaired SWC: x* = 250 um for Rm (175-250 um for
+Cm and Ra); full refits confirm the threshold (Rm +6.0 % beyond 200 um, +3.2 % beyond 250 um, s 1.2, pulse fit).
+With Rm 3.8 kOhm cm2 and Cm 5.39 uF/cm2 (matched to the cell's R_in 54.9 MOhm and tau 20.5 ms): x* = 150 um. A
+diameter error over the whole tree is absorbed by the fit (the cable equation's invariance Cm/s, s Rm, s^2 Ra).
+**[KB]** Eyal et al. 2016 (eLife 5:e16553), Table 1: the parameters; their systematic-error analysis moved the fitted
+Cm, Rm, Ra by 30 to 53 % under morphological errors.
+
+**What it implies.** The thick-node calibration (D-201) and the later refits proceed from the soma outwards: the
+basal tree and the apical trunk and obliques to about 150 um first, then to 250 um; the apical tuft beyond
+250 um last.
+
+**What it does not decide.** Whether 150 um or 250 um is the boundary for this cell (Ih at rest, absent here,
+shortens the electrotonic length); random rather than systematic errors (they reach less far); the other cells.
+**Found, not decided**: the pilot's morphology as reconstructed cannot carry plausible passive parameters (Eyal's
+give R_in 220 MOhm against 54.9 measured; matching R_in and tau needs Cm 5.4 uF/cm2) -- Ih at rest,
+underestimated diameters, missing membrane.
+
+**Sources.** **[user]** 2026-11-20 18:33 and the four answers. **[data inspected]** the upload of 2026-11-22
+(`reconstruction.swc`, `metadata.json`). **[run, sandbox]** `checks/diameter_reach_2026-11-22/` (smoke 5 pass).
+**[src]** `passive_fitting_hpc_fixed.py` (`PassiveCell`, `_build_loss_function`). **[KB]** Eyal et al. 2016.
+**[log]** D-005, D-201.
+
+**Status:** active. `42fc57d` on `sci/diameter-pipeline`.
