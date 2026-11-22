@@ -1694,7 +1694,17 @@ orchestrator's (D-210).
   feeds the entry point (`scripts/fit_soma.py`: the corrected SWC by `write_swc`) and Block 48's morphology figure.
 - Confirmed: the sphere of equal area at the fitted centre and the stems moved along their own direction (D-216.3), the
   removal of the stems' inside nodes and the flags (D-222.5) are the user's; the numerics are the orchestrator's.
-- Status: contract (wave 6).
+- Status: implemented 2026-11-23 by one implementer (wave 6), merged `37c1ac4` (block commit `a391055`);
+  `test_smoke_soma_morphology.py` 11 pass, 1 skip (no discretisation), rerun by the orchestrator at the gate, with
+  `test_smoke_swc_io.py` 6 pass, 1 skip and `test_smoke_cell.py` 5 pass, 2 skip **[run, sandbox]**: the roots on the
+  surface to 2e-13 against the 1e-12 bound, against `brentq` 1.6e-12 um; the moved first nodes on the surface to 2e-14
+  and on their lines to 2e-13 um; the walk's crossing exact; the reflection 1.7e-13 um; seven mutations of the module
+  caught. Readings the orchestrator settled (D-222.5): a first node that lies inside the fitted surface and is itself a
+  branch point is unmoved, "branch inside", and one that is a leaf is unmoved, "ends inside" (the branch rule applied
+  to P_1 as well); a first segment of zero length outside: "missed"; old_um and new_um in the SWC frame; outlines closed
+  (the last point the first), the side outline about (0, 0); the roots in the cancellation-free form; a field given to
+  `edited_lines` is rewritten on every kept line, as `rewrite_radius_lines` does (Allen's four decimals kept byte for
+  byte); more refusals (res0, the alignment, non-finite points, a cycle met by the walk).
 
 ### Block 48: the soma fit's figures (D-215, D-222.5)
 
@@ -1843,6 +1853,7 @@ WITH ISSUES, seven findings NOTE or MINOR, no wrong number on the default path) 
 | `python scripts/calibrate_sigma.py --cleaning-dir DIR --specimen S [--out DIR] [--nodes IDS] [--workers N] [--config-json FILE]` [2026-11-22, S4] | Block 36 amendments 19-20: Block 42's fit and Block 43's pages on the thick nodes of a `clean_cell.py clean --no-clean` preparation | `--synthetic` preparation of `clean_cell.py`; one node | 1-3 min a node |
 | `python tests/smoke/test_smoke_soma_render.py` [2026-11-22, D-220] | Block 45 checks: the column interval, the transfer, the light per plane, the direct reference, convergence, the slope, speed and memory | none | 10 s |
 | `python tests/smoke/test_smoke_soma_fit.py` [2026-11-22, D-220] | Block 46 checks: the area, the planes, the scales, recovery with a stand-in forward model, coverage, the fixed slope, masks, bounds, failure | none | 1 min |
+| `python tests/smoke/test_smoke_soma_morphology.py` [2026-11-23, wave 6] | Block 47 checks: the frames, the crossings, the corrected soma and stems, the walk and flags, the SWC editor, several somas, the reflection | none | 5 s |
 | `python scripts/clean_cell.py clean --no-clean [--pilot-diameter allen|free] [--sigma-r0-um S]`, `python scripts/clean_cell.py clear --d-bins ...` [2026-11-22, S4] | Block 36 amendments 14-17: the preparation without cleaning, the first stage's diameter rule, the in-focus width override, the clear nodes by diameter bin | `--synthetic` | 1-2 min |
 | `python scripts/infer_nodes.py real --weights ... [--bump-sd S] [--weight-kappa K]` [2026-11-22, S4] | Block 36 amendment 16: the per-node fit with Block 39's weights | `--synthetic` | 1-3 min a node |
 | `python scripts/show_soma.py --specimen S --cache-dir DIR [ALIGN] [--soma-k K] [--soma-k-range LO HI] [--montage-k LO HI STEP]` [2026-11-22] | Block 44: the soma's view, its plane chosen by eye (D-211) | `--synthetic` | 30 s synthetic; minutes on Allen's data |
