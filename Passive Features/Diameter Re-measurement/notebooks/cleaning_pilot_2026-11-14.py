@@ -687,3 +687,46 @@ display(Image(filename="%s/gallery_sheet_%d.png" % (GAL_T, SPECIMEN)))
 for name in tab_t.loc[tab_t["shown"], "figure"]:
     print(GAL_T + "/" + name)
     display(Image(filename=GAL_T + "/" + name))
+
+# %% [markdown]
+# ## Cell 23 (B): the in-focus width fitted on the thick nodes (D-201; SPEC Blocks 42, 43; Block 36 amendment 19)
+#
+# Run after Cell 23A (its preparation in OUT/cleaning_thick and its gallery); in a new runtime, after Cells 0, 1 and
+# 16 first (Cell 1 pulls the branch: this cell needs Blocks 42 and 43). For each node `scripts/calibrate_sigma.py`
+# fits the planes k* - 2 .. k* + 2 with the pipeline's hybrid line renderer as it is, its kernel re-anchored at a
+# fitted in-focus width sigma0 with a fitted growth scale c, and a straight background per plane solved exactly,
+# from one start. The nodes: those the gallery of Cell 23A judged clean (D-198's verdict), or your own list in
+# SIGMA_NODES. Time per node [measured in the sandbox on synthetic nodes]: 26 s at d 1.0 um, 59 s at 1.5 um, 208 s
+# at 2.5 um, the nodes in parallel on the runtime's CPUs.
+# Output to send back: the printed table and summary, sigma_summary_<S>.png and the node pages (OUT/cleaning_thick/sigma).
+
+# %%
+import os, json               # the cell's own imports: it can follow Cell 23A or Cell 16 directly
+import pandas as pd
+from IPython.display import Image, display
+SIGMA_NODES = None            # None: the nodes the gallery of Cell 23A judged clean; or a list of node ids
+SIGMA_WORKERS = 0             # 0: all CPUs of the runtime
+CLEAN_T = OUT + "/cleaning_thick"
+GAL_T = CLEAN_T + "/gallery"
+SIG_T = CLEAN_T + "/sigma"
+if SIGMA_NODES is None:
+    gal = pd.read_csv("%s/gallery_%d.csv" % (GAL_T, SPECIMEN))
+    is_clean = gal["clean"].map(lambda x: str(x).strip().lower() == "true")
+    ids_s = [int(i) for i in gal.loc[is_clean, "node_id"]]
+else:
+    ids_s = [int(i) for i in SIGMA_NODES]
+assert ids_s, "no node to fit: the gallery judged none clean -- give SIGMA_NODES"
+print("[cell 23B] fitting %d nodes:" % len(ids_s), ids_s)
+run("scripts/calibrate_sigma.py", "--cleaning-dir", CLEAN_T, "--specimen", SPECIMEN, "--out", SIG_T,
+    "--nodes", ",".join(str(i) for i in ids_s), "--workers", SIGMA_WORKERS)
+tab_s = pd.read_csv("%s/sigma_%d.csv" % (SIG_T, SPECIMEN))
+display(tab_s[["node_id", "d_allen_um", "status", "ok", "d_um", "se_d_um", "sigma0_um", "se_sigma0_um", "growth_scale",
+               "se_growth_scale", "chi2_per_dof", "n_eval", "seconds", "at_bound"]].round(4))
+with open("%s/sigma_%d.json" % (SIG_T, SPECIMEN)) as f:
+    print("summary:", json.load(f)["summary"])
+display(Image(filename="%s/sigma_summary_%d.png" % (SIG_T, SPECIMEN)))
+for nid in ids_s:
+    page = "%s/sigma_node%d.png" % (SIG_T, nid)
+    if os.path.exists(page):
+        print(page)
+        display(Image(filename=page))

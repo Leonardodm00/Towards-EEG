@@ -163,9 +163,8 @@ def test_reference():
     # [2026-11-13, contract of wave 1 (D-129, D-130)] the fields of the cleaning and inference sections are declared
     # with the contract, before the blocks that read them (Blocks 23-34); they are exempt until wave 3 is merged
     pending = {u for u in unread if u.split(".")[0] in ("cleaning", "inference")}
-    # [2026-11-20, contract of the sigma calibration (D-201)] its fields are declared before Block 42 reads them;
-    # exempt until that block is merged (then this line goes)
-    pending |= {u for u in unread if u.split(".")[0] == "sigma_calibration"}
+    # [2026-11-22] the sigma calibration's fields (D-201), exempt while Block 42 and its entry point were written,
+    # are all read now (Block 42 merged, scripts/calibrate_sigma.py): the exemption is gone
     assert set(unread) - pending == records, "config fields no code reads: %s (declared records: %s)" % (
         sorted(set(unread) - pending - records), sorted(records - set(unread)))
 
