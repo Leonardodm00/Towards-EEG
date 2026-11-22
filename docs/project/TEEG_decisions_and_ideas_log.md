@@ -261,6 +261,7 @@ the "Binds" column.
 | 2026-11-22 (later, 4) | Logs **D-209** (user, 15:06; the twins chat): the I_h time constant is fitted as its peak value in ms over a range wider than 170-685 ms, taken from the literature; the assistant proposes $[50, 1000]$ ms. Next free IDs: D-210, I-007. |
 | 2026-11-22 (later, 4; the gallery chat) | Logs **D-210** (user, 14:53; the gallery chat): the diameter refinement is limited to the first 250 um of path distance from the soma (D-205's x*); on the pilot the soma comes first, from its images at focus in Colab. Scope on the pilot's SWC: 5509 of the 8496 dendrite nodes within 250 um (all 3141 basal, 2368 apical; 66.0 % of the dendritic membrane with Allen's radii). Built as SPEC Block 44 (`b87e956` on `sci/diameter-pipeline`, notebook Cell 24), its settings PROVISIONAL [orchestrator]; the branch's files first cited it as D-206, then D-208, both taken meanwhile by the twins chat. Next free IDs: D-211, I-007. |
 | 2026-11-22 (later; the gallery chat, 2) | Logs **D-211** (user, 15:28 and the answer after it): on the first real run of Cell 24 the automatic pick (k = 93) was a basal dendrite in focus inside the traced disk, not the soma, which the user sees begin at k = 107; the soma's plane(s) are now chosen by eye, no automatic pick; the window widened to the traced radius + 6 um and the montage spans it [orchestrator]. A simulated sharp-edged sphere is found by the same measure, so on this stack the soma carries less fine detail than its in-focus neighbour. Supersedes D-210.3 in part. Next free IDs: D-212, I-007. |
+| 2026-11-22 (later; the gallery chat, 3) | Logs **D-212** (orchestrator): the final check of wave 4 by an independent Opus tester (incremental, `a749cc9`), PASS WITH ISSUES, 2 MINOR and 5 NOTE findings and 6 spec gaps, settled under directive 7 without an approach question. Next free IDs: D-213, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -460,6 +461,7 @@ would be needed*, *Status*.
 | D-209 | 2026-11-22 | the I_h time-constant parameter (`param_spec`, `run_ih_fit.py`, the twins' truths and report); D-005's $\kappa_\tau \in [0.5, 2]$; D-208's open point | the fit's parameter is the peak I_h time constant $\tau_h^{\rm pk}$ in ms, not a factor [user]; box $[50, 1000]$ ms, log scale (the assistant's proposal from the literature, at the user's instruction to widen) | active; box proposed; not implemented |
 | D-210 | 2026-11-22 | which nodes the diameter refinement treats and in which order (D-205.1); SPEC Block 44 (`analysis/soma_view.py`, `plotting/soma_figures.py`, `scripts/show_soma.py`, `SomaViewConfig`), notebook Cell 24 | the refinement limited to the first 250 um of path distance from the soma, D-205's x* [user]; on the pilot the soma first, from its images at focus in Colab [user]; Block 44's settings PROVISIONAL [orchestrator] | active; `b87e956` |
 | D-211 | 2026-11-22 | SPEC Block 44 (`analysis/soma_view.py`, `plotting/soma_figures.py`, `scripts/show_soma.py`, `SomaViewConfig`), notebook Cell 24; D-210.3 in part | the soma's in-focus plane(s) chosen by eye, no automatic pick until the soma's measurement is specified [user]; the window +-(traced radius + 6 um), the montage over all of it; the Laplacian-of-Gaussian measure kept only as a labelled diagnostic [orchestrator] | active; supersedes D-210.3 in part |
+| D-212 | 2026-11-22 | the final check of wave 4 (report `specs/test_reports/2026-11-22_1440_incremental.md` at `a749cc9`): `config.validate`, `contamination.pick_clear_examples`, `scripts/calibrate_sigma.py`, `scripts/colab_bootstrap.py`, SPEC Blocks 1, 5, 11, 27, 36, 40 and section 6 | PASS WITH ISSUES; F1-F7 and S1-S6 settled: counts refused when not whole and finite; a missing soma distance passes; a failing node recorded, not fatal; --config-json merged over the preparation's configuration; strict JSON; `in_summary` beside `ok`; the spec stated where it was silent [orchestrator] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14296,4 +14298,42 @@ only]** Groen et al. 1985 (Cytometry 6:81-91), Geusebroek et al. 2000 (Cytometry
 A 91:800-809), comparisons of focus functions; no number used. **[log]** D-210.
 
 **Status:** active; supersedes D-210.3 in part (its crop half-size and the measure's disk and scale stand).
+
+## D-212 -- The final check of wave 4: its findings settled (orchestrator)
+
+**Date:** 2026-11-22, the gallery chat. **Binds:** `config.validate` (Block 1), `contamination.pick_clear_examples`
+(Block 27), `scripts/calibrate_sigma.py` (Block 36 amendment 20), `scripts/colab_bootstrap.py` (Block 11), SPEC
+Blocks 5 and 40 and section 6.
+
+**Decision [orchestrator].** The independent Opus tester's incremental check of wave 4 (`a749cc9`; report
+`specs/test_reports/2026-11-22_1440_incremental.md`) found PASS WITH ISSUES: every new piece of science agreed with
+SPEC.md where it was tested independently; 2 MINOR and 5 NOTE findings, 6 problems in the spec. None questions the
+approach, so they are settled here (directive 7):
+
+**Statement.** (D-212.1, F1) A count setting that is not a finite whole number (infinite, NaN, 2.5, a bool) is refused
+by `validate()` with ValueError (it raised OverflowError, or passed 2.5 to `weight_irls_max_iter`). (D-212.2, F2, S2) A
+node whose `soma_lateral_um` is NaN (a cell without a soma disc) passes any `min_soma_um`: there is no soma to keep
+away from. (D-212.3, F3) `sigma_<S>.json` is strict JSON, NaN written as null. (D-212.4, F4, S5) `calibrate_sigma.py`
+records a node whose fit raises (status "error", the exception in `message`) and goes on, rewriting its CSV and JSON
+after every node. (D-212.5, F5, S5) Its `--config-json` merges the file's sections over the preparation's configuration
+field by field (a file with only `sigma_calibration` leaves the forward model as prepared); the log and every page
+name the forward model used. (D-212.6, F6) `colab_bootstrap` takes a `.git` file (a git worktree) for a clone. (D-212.7,
+F7, S6) Block 40's custom walk is kept -- where the line ends before the level, `scipy.signal.peak_widths` returns the
+line's end and Block 40 needs NaN, and it works in samples, not in um -- and SPEC's "Checked" line is corrected.
+(D-212.8, S1) Block 5 amendment 3 states the code's behaviour: under the default focus window a non-finite or negative
+traced radius ends the first stage with ValueError (`clean_cell.py` drops the node); a radius of exactly 0 is fitted
+and flagged `allen_radius_missing`; under `"whole_profile"` a NaN reaches the flag as well. (D-212.9, S3) In
+`sigma_<S>.csv/.json`, `ok` = converged with neither sigma0 nor c at a bound, `in_summary` = ok with a finite sigma0
+and a finite SE > 0; the summary takes the in_summary nodes. (D-212.10, S4) SPEC section 6 lists `calibrate_sigma.py`,
+`test_smoke_line_weights.py` and the options of Block 36 amendments 14-17.
+
+**Why.** **[run, sandbox]** the tester's reproducers, rerun on the fixes: F1 5 tests, F2 1, F3-F4 6 (with
+`--runxfail`); smoke suites of config, contamination, clearness, phase2, sigma calibration and soma view pass. A
+worktree run of `test_smoke_phase2` for F6 is reported with the commit.
+
+**What it does not decide.** Whether the tester's 16 spec-test files (`tests/spec/`, 9 new) come in: the user's.
+
+**Sources.** **[report]** the tester's report. **[run, sandbox]** as above. **[log]** D-201.
+
+**Status:** active.
 
