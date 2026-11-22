@@ -1,0 +1,5 @@
+joint fit with the far slope gamma (configured 0.79 um/um) free:
+  c true | SE(c) um  SE(gamma)  corr(c,gamma) corr(c,mu) corr(gamma,mu)
+   3.5   | 0.0067    0.0005     +0.594        -0.943      -0.401   (40 s)
+   5.0   | 0.0063    0.0007     +0.604        -0.743      -0.087   (65 s)
+   8.0   | 0.0069    0.0011     +0.609        +0.138      +0.749   (98 s)
