@@ -1,0 +1,30 @@
+validate_check.py: the checks of the check (D-216.2), git 97f5104
+(1) the check renderer against SomaRenderer, plain ellipsoid
+  (1) small crop (141, 141) f 1 dzeta 0.14 slope None: max|check - SomaRenderer| = 0 (bit-identical True)
+  (1) small crop (141, 141) f 1 dzeta 0.14 slope 0.95: max|check - SomaRenderer| = 0 (bit-identical True)
+  (1) small crop (141, 141) f 2 dzeta 0.07 slope None: max|check - SomaRenderer| = 0 (bit-identical True)
+  (1) small crop (141, 141) f 2 dzeta 0.07 slope 0.95: max|check - SomaRenderer| = 0 (bit-identical True)
+  (1) fit crop (246, 247) (truth's settings): max|check - SomaRenderer| = 0 (bit-identical True)
+  (1) planes in groups vs one group: max|diff| = 2.22e-15
+  (1) SomaRenderer in groups vs one render: max|diff| = 2.22e-15
+(2) marching-cubes area against ellipsoid_area
+  (2) ellipsoid 6.5 x 5.0 x 3.0, spacing 0.050: mesh 289.543 um2, ellipsoid_area 289.556 um2, rel. err -4.39e-05
+  (2) ellipsoid 6.5 x 5.0 x 4.5, spacing 0.100: mesh 355.236 um2, ellipsoid_area 355.277 um2, rel. err -1.17e-04
+  (2) ellipsoid 6.5 x 5.0 x 4.5, spacing 0.050: mesh 355.267 um2, ellipsoid_area 355.277 um2, rel. err -2.93e-05
+  (2) ellipsoid 6.5 x 5.0 x 4.5, spacing 0.035: mesh 355.272 um2, ellipsoid_area 355.277 um2, rel. err -1.43e-05
+  (2) ellipsoid 6.5 x 5.0 x 6.0, spacing 0.050: mesh 426.732 um2, ellipsoid_area 426.742 um2, rel. err -2.38e-05
+(3) the union of case C
+  (3) union, spacing 0.100: mesh 392.677 um2 (118400 faces)
+  (3) union, spacing 0.050: mesh 392.768 um2 (474112 faces)
+  (3) union, spacing 0.035: mesh 392.787 um2 (967892 faces)
+  (3) union: half-height analytic 4.5000 um, on a 0.01 um grid 4.5000 um; cone half-angle 22.25 deg; base's least ellipsoid level 0 (>= 0: inside); min(hE - hC) at v = 0: 0 um (>= 0: continuous)
+  (3) union: volume 657.6 um3 (ellipsoid 612.6), footprint u [-6.48  6.5 ], v [-5. 11.] um; area change 0.05 -> 0.035 um spacing +4.91e-05
+(4) discretisation context
+  (4) f 1, dzeta 0.140: rendered in 0 s
+  (4) f 2, dzeta 0.070: rendered in 1 s
+  (4) f 4, dzeta 0.035: rendered in 12 s
+  (4) f1 - f4: max |d tau| per plane (z0 - 3, z0, z0 + 3) [0.0006 0.0159 0.0003], RMS [6.84e-05 8.05e-04 5.31e-05]
+  (4) f2 - f4: max |d tau| per plane (z0 - 3, z0, z0 + 3) [1.0608e-04 5.5730e-03 5.5676e-05], RMS [1.70e-05 2.09e-04 1.28e-05]
+  (4) f1 - f2: max |d tau| per plane (z0 - 3, z0, z0 + 3) [0.0005 0.0181 0.0003], RMS [6.51e-05 8.24e-04 4.91e-05]
+  (4) the projection of (f1 - f2) on (f1 - f4): 0.990 (the share of the fit's error the f 2 truth captures)
+done in 59 s; results/validation.json written

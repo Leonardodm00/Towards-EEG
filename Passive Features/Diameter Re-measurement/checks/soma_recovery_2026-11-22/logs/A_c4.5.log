@@ -1,0 +1,27 @@
+[    0.0 s] case A_c4.5: ellipsoid, c 4.50 um, truth's slope 0.79, far_slope 'fit'; git 97f5104
+[    0.0 s] truth: c_ref 4.5000 um, S_ref 355.277 um2 (ellipsoid_area (Legendre's form)), r_eq_ref 5.3171 um
+[    0.0 s] start: traced centre [504.117 287.041  34.26 ] um, radius 4.7854 um; crop (4284, 2386, 246, 247) px; window k 84..160, fitted planes 36 (k 88..158)
+[   30.8 s]     SomaRenderer: group 1/3 (17 planes) done, 31 s
+[   60.3 s]     SomaRenderer: group 2/3 (17 planes) done, 60 s
+[   74.0 s]     SomaRenderer: group 3/3 (2 planes) done, 74 s
+[   74.0 s] truth rendered (SomaRenderer (planes in groups)) in 74 s; tau in [0.3564, 1.0000]
+[   74.1 s] stack: B_k 104.50..115.49 gl, data 32..129 gl, region 40574 px, masked 0 px; start theta0 [5.0412e+02 2.8704e+02 3.4260e+01 5.1846e+00 4.4170e+00 4.7854e+00 6.1058e-01 9.1657e-02 7.9000e-01]
+[   74.1 s] fit_soma: far_slope 'fit', max_nfev 80, ftol 1e-06, xtol 1e-06
+[   82.7 s]   forward    1, 8.6 s/eval, theta [5.0412e+02 2.8704e+02 3.4260e+01 5.1846e+00 4.4170e+00 4.7854e+00 6.1058e-01 9.1657e-02], slope 0.7900
+[  153.4 s]   forward   10, 7.9 s/eval, theta [5.0412e+02 2.8704e+02 3.4260e+01 5.1846e+00 4.4170e+00 4.7854e+00 6.1058e-01 9.1657e-02], slope 0.7950
+[  283.2 s]   forward   20, 10.5 s/eval, theta [5.0344e+02 2.8759e+02 3.3055e+01 6.0101e+00 4.8174e+00 5.2754e+00 5.3188e-01 1.2680e-01], slope 0.7644
+[  376.3 s]   forward   30, 10.1 s/eval, theta [5.0333e+02 2.8765e+02 3.2864e+01 6.3852e+00 4.9582e+00 4.9281e+00 6.0126e-01 1.4269e-01], slope 0.8115
+[  507.0 s]   forward   40, 10.8 s/eval, theta [5.0332e+02 2.8764e+02 3.2772e+01 6.4920e+00 4.9932e+00 4.5540e+00 5.9785e-01 1.4825e-01], slope 0.7965
+[  642.0 s]   forward   50, 11.4 s/eval, theta [5.0332e+02 2.8764e+02 3.2762e+01 6.5006e+00 4.9998e+00 4.5044e+00 5.9991e-01 1.4989e-01], slope 0.7952
+[  741.6 s]   forward   60, 11.1 s/eval, theta [5.0332e+02 2.8764e+02 3.2761e+01 6.5013e+00 5.0005e+00 4.4978e+00 6.0005e-01 1.5002e-01], slope 0.7949
+[  742.3 s] fit: converged, n_eval 60, 668 s; `ftol` termination condition is satisfied. (scipy status 2, nfev 6, njev 6, covariance inv)
+[  742.3 s]   theta [5.03317e+02 2.87641e+02 3.27607e+01 6.50134e+00 5.00054e+00 4.49777e+00 6.00051e-01 1.50022e-01 7.89906e-01]
+[  742.3 s]   se    [6.41857e-04 6.18515e-04 1.45639e-03 1.15709e-03 1.03222e-03 4.01361e-03 5.00186e-04 9.42683e-05 4.02385e-04]
+[  742.3 s]   S 355.256 +- 0.161 um2, r_eq 5.3170 um, chi2/dof 9.0927, at_bound ()
+[  742.3 s]   error c      -0.0022 (  -0.05 %, -0.55 SE)
+[  742.3 s]   error a      +0.0013 (  +0.02 %, +1.16 SE)
+[  742.3 s]   error b      +0.0005 (  +0.01 %, +0.53 SE)
+[  742.3 s]   error S      -0.0212 (  -0.01 %, -0.13 SE)
+[  742.3 s]   error r_eq   -0.0002 (  -0.00 %, -0.13 SE)
+[  750.1 s] wrote /home/claude/wt-recovery/Passive Features/Diameter Re-measurement/checks/soma_recovery_2026-11-22/results/A_c4.5.json
+[  752.3 s] wrote /home/claude/wt-recovery/Passive Features/Diameter Re-measurement/checks/soma_recovery_2026-11-22/figures/A_c4.5.png; total 752 s
