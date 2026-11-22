@@ -802,6 +802,24 @@ implementation:
     needs_hpc: false
     jobs: []
 
+  - id: I45
+    title: "The soma's forward model"
+    summary: "An ellipsoid soma (centre, three semi-axes, in-plane orientation, absorption) rendered on a crop with the partition absorption and the calibrated defocus kernel, its far slope a parameter (D-216, D-218)"
+    block: 45
+    parent: NC5
+    depends_on: [I4]
+    needs_theory: [T3]
+    needs_hpc: false
+    jobs: []
+  - id: I46
+    title: "The soma fit"
+    summary: "The ellipsoid fitted to the planes about the soma, the stems masked with Allen's trace, each plane's background solved exactly, the far slope fitted or held; the membrane area, volume and equivalent radius with their SEs (D-216, D-218)"
+    block: 46
+    parent: NC5
+    depends_on: [I45, I44]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
 # Revisions: a change one side has to absorb because of the other
 # (roadmap.py revise). An implementation stage's flag clears when its
 # code changes after the flag's commit; a topic's when its status
