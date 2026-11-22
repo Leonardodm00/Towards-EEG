@@ -149,14 +149,88 @@ def rewrite_radius_lines(swc: SWC, radius: np.ndarray) -> List[str]:
     return lines
 
 
+def _parent_ids(parent, n: int) -> np.ndarray:
+    """``parent`` as an int64 array of shape (n,): integers, or floats with integral values (not bools)."""
+    a = np.asarray(parent)
+    if a.shape != (n,):
+        raise ValueError("parent must have shape (%d,), got %s" % (n, a.shape))
+    if a.dtype.kind in "iu":
+        return a.astype(np.int64)
+    if a.dtype.kind == "f" and np.all(np.isfinite(a)) and np.all(a == np.floor(a)):
+        return a.astype(np.int64)
+    raise ValueError("parent must hold integer node ids, got dtype %s" % a.dtype)
+
+
 def edited_lines(swc: SWC, xyz: Optional[np.ndarray] = None, radius: Optional[np.ndarray] = None,
                  parent: Optional[np.ndarray] = None, keep: Optional[np.ndarray] = None) -> List[str]:
-    """CONTRACT STUB (wave 6, SPEC Block 47): the file's lines with, on the kept data lines, x, y, z (tokens 3-5), the
+    """The file's lines (SPEC Block 47, wave 6; D-222.5) with, on the kept data lines, x, y, z (tokens 3-5), the
     radius (6) and the parent (7) replaced where given (floats with _format_like, the parent as an integer), the removed
-    rows' lines dropped and every other line verbatim. xyz (N, 3) um, radius (N,) um, parent (N,) ids, keep (N,) bool.
-    ValueError for shapes that disagree, a non-finite coordinate, a radius <= 0, a kept row whose parent is removed, a
-    parent id absent from the kept rows (-1 allowed)."""
-    raise NotImplementedError("Block 47 (wave 6)")
+    rows' lines dropped and every other line verbatim (comments, blank lines, separators, line endings, other tokens).
+    xyz (N, 3) um, radius (N,) um, parent (N,) ids, keep (N,) bool; None leaves that field (or every row) as read.
+    With radius alone the result is rewrite_radius_lines(swc, radius). ValueError for shapes that disagree, a
+    non-finite coordinate, a radius <= 0 or not finite, parent ids that are not integers, keep not bool, a kept row
+    whose parent is removed, a parent id absent from the kept rows (-1 allowed)."""
+    n = len(swc)
+    X = R = PA = None
+    if xyz is not None:
+        X = np.asarray(xyz, dtype=float)
+        if X.shape != (n, 3):
+            raise ValueError("xyz must have shape (%d, 3), got %s" % (n, X.shape))
+        if not np.all(np.isfinite(X)):
+            raise ValueError("every coordinate must be finite")
+    if radius is not None:
+        R = np.asarray(radius, dtype=float)
+        if R.shape != (n,):
+            raise ValueError("radius must have shape (%d,), got %s" % (n, R.shape))
+        if not np.all(np.isfinite(R)) or np.any(R <= 0):
+            raise ValueError("every radius must be finite and > 0")
+    if parent is not None:
+        PA = _parent_ids(parent, n)
+    if keep is None:
+        K = np.ones(n, dtype=bool)
+    else:
+        K = np.asarray(keep)
+        if K.shape != (n,) or K.dtype != np.bool_:
+            raise ValueError("keep must be a bool array of shape (%d,), got %s %s" % (n, K.dtype, K.shape))
+    ids = np.asarray(swc.ids, dtype=np.int64)
+    par = PA if PA is not None else np.asarray(swc.parent, dtype=np.int64)
+    kept_ids = set(int(i) for i in ids[K])
+    removed_ids = set(int(i) for i in ids[~K])
+    for i in np.flatnonzero(K):
+        p = int(par[i])
+        if p == -1 or p in kept_ids:
+            continue
+        if p in removed_ids:
+            raise ValueError("node %d (row %d) is kept but its parent %d is removed" % (ids[i], i, p))
+        raise ValueError("node %d (row %d): parent id %d is not a kept node" % (ids[i], i, p))
+    # Custom: an SWC editor that keeps every byte it does not edit; no SWC library promises byte identity (checked:
+    # str.split, a pandas round trip). It reuses Block 8's separator-keeping tokeniser, _split_keep.
+    node_of_line = {line_no: i for i, line_no in enumerate(swc.data_rows)}
+    out = []
+    for k, line in enumerate(swc.lines):
+        i = node_of_line.get(k)
+        if i is None:
+            out.append(line)                               # a comment or blank line: verbatim
+            continue
+        if not K[i]:
+            continue                                       # a removed row: its line dropped
+        if X is None and R is None and PA is None:
+            out.append(line)
+            continue
+        parts = _split_keep(line)
+        # parts[2:5] are x, y, z, parts[5] the radius, parts[6] the parent; the final element is trailing whitespace
+        if X is not None:
+            for j in range(3):
+                lead, tok = parts[2 + j]
+                parts[2 + j] = (lead, _format_like(float(X[i, j]), tok))
+        if R is not None:
+            lead, tok = parts[5]
+            parts[5] = (lead, _format_like(float(R[i]), tok))
+        if PA is not None:
+            lead, _tok = parts[6]
+            parts[6] = (lead, "%d" % int(PA[i]))
+        out.append("".join(a + b for a, b in parts))
+    return out
 
 
 def write_swc(swc: SWC, path: str, radius: Optional[np.ndarray] = None, xyz: Optional[np.ndarray] = None,
