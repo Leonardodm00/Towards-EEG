@@ -1,4 +1,4 @@
-"""The soma's view in the image stack -- Block 44 in specs/SPEC.md (D-206).
+"""The soma's view in the image stack -- Block 44 in specs/SPEC.md (D-208).
 
 The traced soma (the SWC's type-1 nodes) placed in the image frame, the square crop about it, the recorded planes
 about its depth, and a focus measure per plane over a disk about it:

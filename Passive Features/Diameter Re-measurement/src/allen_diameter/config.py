@@ -498,15 +498,15 @@ class SigmaCalibrationConfig:
 
 @dataclass(frozen=True)
 class SomaViewConfig:
-    """The soma's view in the image stack (SPEC Block 44; D-206): the crop about the traced soma, the planes about
+    """The soma's view in the image stack (SPEC Block 44; D-208): the crop about the traced soma, the planes about
     its depth, the focus measure. Outside every signature."""
 
-    half_um: float = 20.0                  # source: PROVISIONAL (D-206): the square crop's half-size about the soma's centre (um)
-    z_margin_um: float = 3.0               # source: PROVISIONAL (D-206): the planes within (soma radius + this) of the soma's depth
-    focus_margin_um: float = 1.0           # source: PROVISIONAL (D-206): the focus measure's disk, radius = soma radius + this (um)
-    focus_sigma_px: float = 1.0            # source: PROVISIONAL (D-206): the Gaussian of the Laplacian-of-Gaussian focus measure (px)
-    montage_step_planes: int = 2           # source: PROVISIONAL (D-206): every this-many planes in the montage
-    montage_half_n: int = 7                # source: PROVISIONAL (D-206): panels on each side of the sharpest plane
+    half_um: float = 20.0                  # source: PROVISIONAL (D-208): the square crop's half-size about the soma's centre (um)
+    z_margin_um: float = 3.0               # source: PROVISIONAL (D-208): the planes within (soma radius + this) of the soma's depth
+    focus_margin_um: float = 1.0           # source: PROVISIONAL (D-208): the focus measure's disk, radius = soma radius + this (um)
+    focus_sigma_px: float = 1.0            # source: PROVISIONAL (D-208): the Gaussian of the Laplacian-of-Gaussian focus measure (px)
+    montage_step_planes: int = 2           # source: PROVISIONAL (D-208): every this-many planes in the montage
+    montage_half_n: int = 7                # source: PROVISIONAL (D-208): panels on each side of the sharpest plane
 
 
 @dataclass(frozen=True)
@@ -525,7 +525,7 @@ class DiameterConfig:
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # source: D-129, D-130 (sub-config; outside every signature)
     clearness: ClearnessConfig = field(default_factory=ClearnessConfig)  # source: D-194 [orchestrator] (sub-config; outside every signature)
     sigma_calibration: SigmaCalibrationConfig = field(default_factory=SigmaCalibrationConfig)  # source: D-201 (sub-config; outside every signature)
-    soma_view: SomaViewConfig = field(default_factory=SomaViewConfig)  # source: D-206 (sub-config; outside every signature)
+    soma_view: SomaViewConfig = field(default_factory=SomaViewConfig)  # source: D-208 (sub-config; outside every signature)
 
     # ------------------------------------------------------------ checks --
     def validate(self) -> None:
