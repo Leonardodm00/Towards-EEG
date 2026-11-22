@@ -1,8 +1,10 @@
-"""Smoke test for the soma view (analysis/soma_view.py, plotting/soma_figures.py, scripts/show_soma.py) -- Block 44 in specs/SPEC.md (D-210).
+"""Smoke test for the soma view (analysis/soma_view.py, plotting/soma_figures.py, scripts/show_soma.py) -- Block 44 in specs/SPEC.md (D-210, D-211).
 
-Oracles: the focus measure's known answer (the least blurred plane of a blurred-disk stack is the sharpest), a
+Oracles: the fine-detail energy's known answer (largest on the least blurred plane of a blurred-disk stack), a
 direct computation with scipy and the disk written out, its invariants (contrast squared, offset, a quadratic
-field), the geometry's arithmetic, determinism, the refusals, and the script end to end on the synthetic cell.
+field); the reference plane (the one chosen by eye, else the recorded plane nearest the traced depth) and the
+montage's planes (the whole window at the step, aligned on the reference plane); the geometry's arithmetic,
+determinism, the refusals, and the script end to end on the synthetic cell (D-211: no plane picked automatically).
 
 Checks, from the strongest oracle to the weakest
     test_known_answer   analytic or tabulated solution
@@ -120,24 +122,38 @@ def _disk_stack(blurs_um, radius_um=4.0, res=0.1144, half_um=8.0, dark=80.0, bri
 
 
 def test_known_answer():
-    """The sharpest plane is the least blurred one, and the measure falls off on both sides."""
+    """The fine-detail energy of a blurred-disk stack is largest on the least blurred plane and falls off on both
+    sides; reference_plane returns the chosen plane, or the recorded plane nearest the traced depth; montage_planes
+    spans the window at the step, aligned on the reference plane (the pilot's window: k = 74..160, k_ref 117, step
+    2 -> 43 planes with 117 among them; 105..145 step 1 -> 41)."""
     blurs = [0.15 + 0.4 * abs(k - 3) for k in range(9)]
     block, left, top, res = _disk_stack(blurs)
-    F = SV.focus_measure(block, np.ones(9, bool), left, top, res, (0.0, 0.0), 5.0, 1.0)
-    assert SV.sharpest(F) == 3, ("sharpest", F)
-    assert np.all(np.diff(F[:4]) > 0) and np.all(np.diff(F[3:]) < 0), F
+    E = SV.detail_energy(block, np.ones(9, bool), left, top, res, (0.0, 0.0), 5.0, 1.0)
+    assert int(np.nanargmax(E)) == 3, ("argmax", E)
+    assert np.all(np.diff(E[:4]) > 0) and np.all(np.diff(E[3:]) < 0), E
+    ks = np.arange(74, 161)
+    v = np.ones(ks.size, bool)
+    assert SV.reference_plane(ks, v, 117 * 0.28, 0.28) == (117 - 74, "traced depth")
+    assert SV.reference_plane(ks, v, 117 * 0.28, 0.28, 110) == (110 - 74, "chosen by eye")
+    v2 = v.copy()
+    v2[117 - 74] = False                                   # the traced plane missing: the nearest recorded, lower first
+    assert SV.reference_plane(ks, v2, 117 * 0.28, 0.28)[0] == 116 - 74
+    idx = SV.montage_planes(ks, v, 117, 2)
+    got = [int(ks[i]) for i in idx]
+    assert len(got) == 43 and 117 in got and got[0] == 75 and got[-1] == 159 and set(np.diff(got)) == {2}, got
+    assert [int(ks[i]) for i in SV.montage_planes(ks, v, 117, 1, 105, 145)] == list(range(105, 146))
 
 
 def test_reference():
     """Against a direct computation: scipy.ndimage.gaussian_laplace and the disk mask written out here."""
     from scipy.ndimage import gaussian_laplace
     block, left, top, res = _disk_stack([0.3, 0.6])
-    F = SV.focus_measure(block, np.ones(2, bool), left, top, res, (0.5, -0.25), 3.0, 1.5)
+    E = SV.detail_energy(block, np.ones(2, bool), left, top, res, (0.5, -0.25), 3.0, 1.5)
     x = (left + np.arange(block.shape[2])) * res
     y = (top + np.arange(block.shape[1])) * res
     m = (x[None, :] - 0.5) ** 2 + (y[:, None] + 0.25) ** 2 <= 9.0
     ref = [np.var(gaussian_laplace(block[j].astype(float), 1.5)[m]) for j in range(2)]
-    check_close("focus_measure against the direct form", F, ref, rtol=1e-12)
+    check_close("detail_energy against the direct form", E, ref, rtol=1e-12)   # same operations: roundoff only
 
 
 def test_convergence():
@@ -145,23 +161,27 @@ def test_convergence():
 
 
 def test_invariants():
-    """F scales with the square of the contrast and ignores a constant offset; a quadratic field (constant
-    Laplacian) has F near 0 away from the borders."""
+    """E scales with the square of the contrast and ignores a constant offset; a quadratic field (constant
+    Laplacian) has E near 0 away from the borders; the montage skips planes not recorded and keeps the alignment."""
     block, left, top, res = _disk_stack([0.3, 0.8])
     v = np.ones(2, bool)
-    F1 = SV.focus_measure(block, v, left, top, res, (0.0, 0.0), 5.0, 1.0)
-    F2 = SV.focus_measure(2.0 * block + 7.0, v, left, top, res, (0.0, 0.0), 5.0, 1.0)
-    check_close("F(2 I + 7) = 4 F(I)", F2, 4.0 * F1, rtol=1e-10)
+    E1 = SV.detail_energy(block, v, left, top, res, (0.0, 0.0), 5.0, 1.0)
+    E2 = SV.detail_energy(2.0 * block + 7.0, v, left, top, res, (0.0, 0.0), 5.0, 1.0)
+    check_close("E(2 I + 7) = 4 E(I)", E2, 4.0 * E1, rtol=1e-10)       # linear filter: exact up to roundoff
     n = 141
     x = (np.arange(n) - 70) * res
     X, Y = np.meshgrid(x, x)
     quad = (2.0 * X ** 2 + 3.0 * Y ** 2)[None]
-    Fq = SV.focus_measure(quad, np.ones(1, bool), -70, -70, res, (0.0, 0.0), 2.0, 1.0)
-    assert Fq[0] < 1e-6, Fq        # the Laplacian of Gaussian of a quadratic is a constant: zero variance
+    Eq = SV.detail_energy(quad, np.ones(1, bool), -70, -70, res, (0.0, 0.0), 2.0, 1.0)
+    assert Eq[0] < 1e-6, Eq        # the Laplacian of Gaussian of a quadratic is a constant: zero variance
+    ks = np.arange(-5, 6)
+    vv = np.ones(ks.size, bool)
+    vv[[3, 7]] = False             # planes -2 and 2 missing
+    assert [int(ks[i]) for i in SV.montage_planes(ks, vv, 0, 2)] == [-4, 0, 4]
 
 
 def test_contract():
-    """Geometry, crop and plane range; the outputs' shapes."""
+    """Geometry, crop and plane range; the outputs' shapes and types."""
     xyz = np.array([[10.0, 20.0, 5.0], [12.0, 22.0, 7.0], [30.0, 30.0, 6.0]])
     c, r = SV.soma_geometry(xyz, [3.0, 5.0, 1.0], [1, 1, 3])
     check_close("centre", c, [11.0, 21.0, 6.0], rtol=0, atol=1e-12)
@@ -171,33 +191,46 @@ def test_contract():
     assert SV.plane_range(10.0, 3.0, 0.28) == (25, 46)
     assert SV.plane_range(0.0, 0.0, 0.28) == (0, 0)
     block, left, top, res = _disk_stack([0.3, 0.5, 0.7])
-    F = SV.focus_measure(block, np.array([True, False, True]), left, top, res, (0.0, 0.0), 5.0, 1.0)
-    assert F.shape == (3,) and np.isnan(F[1]) and np.all(np.isfinite(F[[0, 2]]))
-    assert SV.sharpest(F) == 0
+    E = SV.detail_energy(block, np.array([True, False, True]), left, top, res, (0.0, 0.0), 5.0, 1.0)
+    assert E.shape == (3,) and np.isnan(E[1]) and np.all(np.isfinite(E[[0, 2]]))
+    j, lab = SV.reference_plane([0, 1, 2], [True, False, True], 0.29, 0.28)
+    assert isinstance(j, int) and j in (0, 2) and lab == "traced depth"
+    assert all(isinstance(i, int) for i in SV.montage_planes([0, 1, 2], [True, True, True], 0, 1))
+    assert not hasattr(SV, "sharpest") and not hasattr(SV, "focus_measure")   # D-211: no automatic pick
 
 
 def test_determinism():
     block, left, top, res = _disk_stack([0.3, 0.5])
-    a = SV.focus_measure(block, np.ones(2, bool), left, top, res, (0.0, 0.0), 5.0, 1.0)
-    b = SV.focus_measure(block, np.ones(2, bool), left, top, res, (0.0, 0.0), 5.0, 1.0)
+    a = SV.detail_energy(block, np.ones(2, bool), left, top, res, (0.0, 0.0), 5.0, 1.0)
+    b = SV.detail_energy(block, np.ones(2, bool), left, top, res, (0.0, 0.0), 5.0, 1.0)
     assert np.array_equal(a, b)
 
 
 def test_edge_cases():
-    """No soma node; no finite focus value; a disk outside the crop; the end-to-end script on the synthetic cell
-    (no network): its four outputs exist and its sharpest plane is a recorded one."""
+    """The refusals; a disk outside the crop; the script end to end on the synthetic cell (no network): by default
+    no plane is chosen and the montage spans the window with the traced depth's plane among its planes (the failure
+    of the first real run: the montage centred on the automatic pick never reached the soma); with --soma-k,
+    --soma-k-range and --montage-k the choices are recorded; a plane outside the window is refused."""
+    ks = np.arange(0, 10)
+    v = np.ones(10, bool)
+    vbad = v.copy()
+    vbad[4] = False
     for bad in (lambda: SV.soma_geometry(np.zeros((2, 3)), [1.0, 1.0], [3, 3]),
-                lambda: SV.sharpest([np.nan, np.nan]),
                 lambda: SV.crop_box((0.0, 0.0), -1.0, 0.1),
-                lambda: SV.plane_range(0.0, 1.0, 0.0)):
+                lambda: SV.plane_range(0.0, 1.0, 0.0),
+                lambda: SV.reference_plane(ks, v, 0.0, 0.28, 12),          # outside the window
+                lambda: SV.reference_plane(ks, vbad, 0.0, 0.28, 4),        # not recorded
+                lambda: SV.reference_plane(ks, np.zeros(10, bool), 0.0, 0.28),
+                lambda: SV.montage_planes(ks, v, 0, 0),
+                lambda: SV.montage_planes(ks, v, 0, 1, 7, 3)):
         try:
             bad()
         except ValueError:
             continue
         raise AssertionError("no ValueError")
     block, left, top, res = _disk_stack([0.3])
-    F = SV.focus_measure(block, np.ones(1, bool), left, top, res, (500.0, 500.0), 2.0, 1.0)
-    assert np.isnan(F[0]), F
+    E = SV.detail_energy(block, np.ones(1, bool), left, top, res, (500.0, 500.0), 2.0, 1.0)
+    assert np.isnan(E[0]), E
     import json
     import tempfile
     sys.path.insert(0, os.path.join(WS, "scripts"))
@@ -207,8 +240,24 @@ def test_edge_cases():
     for name in ("soma_7_focus.png", "soma_7_planes.png", "soma_7.json", "soma_7_block.npz"):
         assert os.path.exists(os.path.join(out, name)), name
     rec = json.load(open(os.path.join(out, "soma_7.json")))
-    k = rec["ks"].index(rec["k_sharpest"])
-    assert rec["valid"][k] and rec["focus"][k] is not None
+    rec_ks = [k for k, ok in zip(rec["ks"], rec["valid"]) if ok]
+    assert rec["k_by_eye"] is None and rec["k_range_by_eye"] is None and rec["k_shown"] == rec["k_traced"]
+    assert rec["k_traced"] in rec["montage_ks"]
+    assert rec["montage_ks"] == [k for k in rec_ks if (k - rec["k_traced"]) % 2 == 0], rec["montage_ks"]
+    assert "k_sharpest" not in rec and "focus" not in rec and len(rec["detail_energy"]) == len(rec["ks"])
+    out2 = tempfile.mkdtemp(prefix="soma_smoke_")
+    assert show_soma.main(["--specimen", "7", "--synthetic", "--out", out2, "--soma-k", "2", "--soma-k-range", "-3",
+                           "5", "--montage-k", "-6", "6", "1"]) == 0
+    rec2 = json.load(open(os.path.join(out2, "soma_7.json")))
+    assert (rec2["k_by_eye"], rec2["k_range_by_eye"], rec2["k_shown"]) == (2, [-3, 5], 2), rec2
+    assert rec2["montage_ks"] == [k for k in rec_ks if -6 <= k <= 6]
+    for argv in (["--soma-k", "99"], ["--soma-k-range", "5", "-3"], ["--montage-k", "40", "50", "1"]):
+        try:
+            show_soma.main(["--specimen", "7", "--synthetic", "--out", out2] + argv)
+        except SystemExit as exc:
+            assert exc.code == 2, (argv, exc.code)
+            continue
+        raise AssertionError("not refused: %s" % argv)
 
 
 def _environment():

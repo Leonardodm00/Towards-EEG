@@ -498,15 +498,16 @@ class SigmaCalibrationConfig:
 
 @dataclass(frozen=True)
 class SomaViewConfig:
-    """The soma's view in the image stack (SPEC Block 44; D-210): the crop about the traced soma, the planes about
-    its depth, the focus measure. Outside every signature."""
+    """The soma's view in the image stack (SPEC Block 44; D-210, D-211): the crop about the traced soma, the planes
+    about its depth, the montage, and the fine-detail energy drawn as a diagnostic. The soma's plane is chosen by eye
+    (D-211.1): nothing here picks it. Outside every signature."""
 
     half_um: float = 20.0                  # source: PROVISIONAL (D-210): the square crop's half-size about the soma's centre (um)
-    z_margin_um: float = 3.0               # source: PROVISIONAL (D-210): the planes within (soma radius + this) of the soma's depth
-    focus_margin_um: float = 1.0           # source: PROVISIONAL (D-210): the focus measure's disk, radius = soma radius + this (um)
-    focus_sigma_px: float = 1.0            # source: PROVISIONAL (D-210): the Gaussian of the Laplacian-of-Gaussian focus measure (px)
-    montage_step_planes: int = 2           # source: PROVISIONAL (D-210): every this-many planes in the montage
-    montage_half_n: int = 7                # source: PROVISIONAL (D-210): panels on each side of the sharpest plane
+    z_margin_um: float = 6.0               # source: PROVISIONAL (D-211.2 [orchestrator]; 3.0 under D-210.3): the planes within (soma radius + this) of the soma's depth (um)
+    focus_margin_um: float = 1.0           # source: PROVISIONAL (D-210): the fine-detail energy's disk, radius = soma radius + this (um)
+    focus_sigma_px: float = 1.0            # source: PROVISIONAL (D-210): the Gaussian of the fine-detail energy's Laplacian of Gaussian (px)
+    montage_step_planes: int = 2           # source: PROVISIONAL (D-210): every this-many recorded planes in the montage
+    montage_cols: int = 6                  # source: PROVISIONAL (D-211.2 [orchestrator]): panels per row of the montage
 
 
 @dataclass(frozen=True)
@@ -525,7 +526,7 @@ class DiameterConfig:
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # source: D-129, D-130 (sub-config; outside every signature)
     clearness: ClearnessConfig = field(default_factory=ClearnessConfig)  # source: D-194 [orchestrator] (sub-config; outside every signature)
     sigma_calibration: SigmaCalibrationConfig = field(default_factory=SigmaCalibrationConfig)  # source: D-201 (sub-config; outside every signature)
-    soma_view: SomaViewConfig = field(default_factory=SomaViewConfig)  # source: D-210 (sub-config; outside every signature)
+    soma_view: SomaViewConfig = field(default_factory=SomaViewConfig)  # source: D-210, D-211 (sub-config; outside every signature)
 
     # ------------------------------------------------------------ checks --
     def validate(self) -> None:
@@ -877,7 +878,7 @@ def _check_soma_view(q: "SomaViewConfig") -> None:
           and math.isfinite(q.focus_margin_um) and q.focus_margin_um >= 0
           and math.isfinite(q.focus_sigma_px) and q.focus_sigma_px > 0
           and int(q.montage_step_planes) == q.montage_step_planes and q.montage_step_planes >= 1
-          and int(q.montage_half_n) == q.montage_half_n and q.montage_half_n >= 1)
+          and int(q.montage_cols) == q.montage_cols and q.montage_cols >= 1)
     if not ok:
         raise ValueError("soma_view: a length, margin, sigma or montage count is out of range (SPEC Block 44)")
 

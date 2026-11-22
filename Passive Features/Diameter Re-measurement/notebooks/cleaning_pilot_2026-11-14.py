@@ -732,19 +732,30 @@ for nid in ids_s:
         display(Image(filename=page))
 
 # %% [markdown]
-# ## Cell 24: the soma at focus (D-210; SPEC Block 44)
+# ## Cell 24: the soma, plane by plane; its plane chosen by eye (D-210, D-211; SPEC Block 44)
 #
-# Run after Cells 0, 1 and 16 (Cell 1 pulls the branch: this cell needs scripts/show_soma.py). The traced soma (the
-# SWC's type-1 node, placed in the image frame with ALIGN's transform) is cropped at +-20 um from every plane within
-# its traced radius + 3 um of its depth; per plane a focus measure over the disk of the traced soma (+ 1 um); the
-# sharpest plane is drawn with the traced soma's circle and the primary dendrites' first nodes, with the focus curve
-# against depth, and a montage of the planes about it (every second plane, +-7 panels). About 60 planes are fetched
-# once (they go to CACHE_DIR). Output to send back: soma_<S>_focus.png, soma_<S>_planes.png and soma_<S>.json.
+# Run after Cells 0, 1 and 16 (Cell 1 pulls the branch). The traced soma (the SWC's type-1 node, placed in the image
+# frame with ALIGN's transform) is cropped at +-20 um from every plane within its traced radius + 6 um of its depth
+# (on the pilot k = 74..160; the traced depth is k = 117). Nothing is picked automatically (D-211): the first run's
+# automatic pick, k = 93, was a basal dendrite in focus inside the soma's disk. The montage shows every second plane
+# of the whole window; once you have looked at it, set SOMA_K (the plane where you judge the soma in focus) and
+# SOMA_K_RANGE (the first and last plane where you see it) and run the cell again: the focus figure then shows your
+# plane, and both are recorded in soma_<S>.json. MONTAGE_K = (first, last, step) narrows the montage, e.g.
+# (105, 145, 1) for every plane from 105 to 145. The right panel of the focus figure, the fine-detail energy inside
+# the traced disk, counts every structure (dendrites included): a diagnostic, not a focus estimate. Planes already
+# fetched come from CACHE_DIR. Output to send back: soma_<S>_focus.png, soma_<S>_planes.png and soma_<S>.json.
 
 # %%
 from IPython.display import Image, display   # the cell's own imports
+SOMA_K = None         # the plane where you judge the soma in focus, e.g. 115; None: the traced depth's plane is shown
+SOMA_K_RANGE = None   # (first, last) plane where you see the soma, e.g. (107, 140); None: not set
+MONTAGE_K = None      # (first, last, step), e.g. (105, 145, 1); None: the whole window, every second plane
 SOMA_OUT = OUT + "/soma"
-run("scripts/show_soma.py", "--specimen", SPECIMEN, "--cache-dir", CACHE_DIR, *ALIGN, *CLEAN_CFG, "--out", SOMA_OUT)
+choice = (([] if SOMA_K is None else ["--soma-k", SOMA_K])
+          + ([] if SOMA_K_RANGE is None else ["--soma-k-range", *SOMA_K_RANGE])
+          + ([] if MONTAGE_K is None else ["--montage-k", *MONTAGE_K]))
+run("scripts/show_soma.py", "--specimen", SPECIMEN, "--cache-dir", CACHE_DIR, *ALIGN, *CLEAN_CFG, "--out", SOMA_OUT,
+    *choice)
 for name in ("soma_%d_focus.png" % SPECIMEN, "soma_%d_planes.png" % SPECIMEN):
     print(SOMA_OUT + "/" + name)
     display(Image(filename=SOMA_OUT + "/" + name))

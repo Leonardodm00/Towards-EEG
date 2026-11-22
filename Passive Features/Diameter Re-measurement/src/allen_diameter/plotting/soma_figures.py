@@ -1,9 +1,11 @@
-"""Figures of the soma's view -- Block 44 in specs/SPEC.md (D-210). Plotting only: every array arrives prepared
-(analysis.soma_view and the image block); nothing scientific is computed here.
+"""Figures of the soma's view -- Block 44 in specs/SPEC.md (D-210, D-211). Plotting only: every array arrives
+prepared (analysis.soma_view and the image block); nothing scientific is computed here.
 
-  figure_soma_focus   the sharpest plane (the crop about the traced soma, the traced soma's circle and centre, the
-                      primary dendrites' first nodes) beside the focus measure against depth
-  figure_soma_planes  a montage of the planes about the sharpest one, on one grey range, with the same overlay
+  figure_soma_focus   the reference plane -- the one chosen by eye, else the one nearest the traced depth -- (the crop
+                      about the traced soma, the traced soma's circle and centre, the primary dendrites' first nodes)
+                      beside the fine-detail energy against the plane index, a diagnostic, not a focus estimate
+  figure_soma_planes  a montage of planes on one grey range, with the same overlay; the reference plane framed orange,
+                      the planes where the soma is seen (by eye) framed dark
 Coordinates in the image panels: um relative to the traced soma's centre (x right, y down as in the image).
 Pure ASCII, for the cluster.
 """
@@ -36,16 +38,24 @@ def _image(ax, img, ext, centre_xy, lo, hi):
     return e
 
 
-def figure_soma_focus(images, ks, extent, centre_xyz, radius_um, dz_um, F, j_focus, roots_xy=None, title=""):
+def _plane_title(k, dzk, k_traced, chosen):
+    tags = [t for t, on in (("traced depth", k == int(k_traced)), ("chosen", chosen)) if on]
+    return "k = %d  (%+.2f um)%s" % (k, dzk, ("  " + ", ".join(tags)) if tags else "")
+
+
+def figure_soma_focus(images, ks, extent, centre_xyz, radius_um, dz_um, E, j_ref, ref_label, k_traced, k_range=None,
+                      roots_xy=None, title=""):
     """images (n, H, W) grey levels; ks (n,) plane indices; extent (4,) um (figures.image_extent_um); centre_xyz (3,)
-    um, the traced soma's centre (image frame); radius_um its traced radius; dz_um the plane spacing; F (n,) the
-    focus measure (NaN for a missing plane); j_focus the sharpest plane's index; roots_xy (m, 2) um or None."""
+    um, the traced soma's centre (image frame); radius_um its traced radius; dz_um the plane spacing; E (n,) the
+    fine-detail energy (NaN for a missing plane); j_ref the index of the plane shown and ref_label its origin ("chosen
+    by eye" or "traced depth"); k_traced the plane nearest the traced depth; k_range (lo, hi) the planes where the soma
+    is seen by eye, or None; roots_xy (m, 2) um or None."""
     imgs = np.asarray(images)
-    F = np.asarray(F, dtype=float)
+    E = np.asarray(E, dtype=float)
     ks = np.asarray(ks).astype(int)
-    if imgs.ndim != 3 or F.shape != (imgs.shape[0],) or ks.shape != F.shape:
-        raise ValueError("images (n, H, W), ks (n,) and F (n,) must agree")
-    j = int(j_focus)
+    if imgs.ndim != 3 or E.shape != (imgs.shape[0],) or ks.shape != E.shape:
+        raise ValueError("images (n, H, W), ks (n,) and E (n,) must agree")
+    j = int(j_ref)
     lo, hi = _row_scale((imgs[j:j + 1].astype(float),), IMAGE_PERCENTILES)
     plt = _plt()
     fig = plt.figure(figsize=(12.5, 6.2), facecolor=SURFACE, layout="constrained")
@@ -54,30 +64,35 @@ def figure_soma_focus(images, ks, extent, centre_xyz, radius_um, dz_um, F, j_foc
     _image(ax, imgs[j], extent, centre_xyz, lo, hi)
     _overlay(ax, extent, centre_xyz, radius_um, roots_xy)
     dzk = ks[j] * float(dz_um) - float(centre_xyz[2])
-    ax.set_title("sharpest plane k = %d (%+.2f um from the traced soma's depth)" % (ks[j], dzk), fontsize=9, color=INK)
+    what = ("the plane chosen by eye" if ref_label == "chosen by eye"
+            else "the traced depth's plane -- no plane chosen yet (SOMA_K in Cell 24)")
+    ax.set_title("k = %d (%+.2f um from the traced depth): %s" % (ks[j], dzk, what), fontsize=9, color=INK)
     ax.set_xlabel("x - x_soma (um)", fontsize=8, color=INK2)
     ax.set_ylabel("y - y_soma (um); grey %.0f-%.0f gl" % (lo, hi), fontsize=8, color=INK2)
     ax.tick_params(labelsize=7, colors=INK2)
     a2 = fig.add_subplot(gs[0, 1])
     _style(a2)
-    z = ks * float(dz_um) - float(centre_xyz[2])
-    f = F / np.nanmax(F)
-    a2.plot(z, f, color=BLUE, lw=1.4, marker="o", ms=3, gid="focus")
-    a2.axvline(0.0, color=INK2, lw=0.9, ls="--", gid="soma_depth")
-    a2.axvline(z[j], color=ORANGE, lw=1.2, gid="sharpest")
-    a2.axvspan(-float(radius_um), float(radius_um), color="#e1e0d9", alpha=0.6, lw=0, zorder=0)
-    a2.set_xlabel("plane depth - traced soma depth (um)", fontsize=8, color=INK2)
-    a2.set_ylabel("focus measure / its maximum", fontsize=8, color=INK2)
-    a2.set_title("focus over the disk of the traced soma (+ margin)\ndashed: the traced depth; orange: the sharpest "
-                 "plane; grey band: +- the traced radius", fontsize=8, color=INK)
+    if k_range is not None:
+        a2.axvspan(int(k_range[0]) - 0.5, int(k_range[1]) + 0.5, color="#e1e0d9", alpha=0.8, lw=0, zorder=0,
+                   gid="range_by_eye")
+    a2.plot(ks, E / np.nanmax(E), color=BLUE, lw=1.4, marker="o", ms=3, gid="detail_energy")
+    a2.axvline(int(k_traced), color=INK2, lw=0.9, ls="--", gid="traced_depth")
+    a2.axvline(ks[j], color=ORANGE, lw=1.2, gid="shown")
+    a2.set_xlabel("plane k (%.2f um apart)" % float(dz_um), fontsize=8, color=INK2)
+    a2.set_ylabel("fine-detail energy / its maximum", fontsize=8, color=INK2)
+    a2.set_title("fine-detail energy inside the traced disk (+ margin): every structure counts, dendrites included --\n"
+                 "a diagnostic, not a focus estimate. dashed: the traced depth (k = %d); orange: the plane shown%s"
+                 % (int(k_traced), "; grey: the planes where you see the soma" if k_range is not None else ""),
+                 fontsize=8, color=INK)
     if title:
         fig.suptitle(title, fontsize=10, color=INK)
     return fig
 
 
-def figure_soma_planes(images, ks, extent, centre_xyz, radius_um, dz_um, indices, j_focus, roots_xy=None, title=""):
-    """The montage: the planes `indices` (into images) on one grey range, each with the traced soma's circle, the
-    sharpest one framed."""
+def figure_soma_planes(images, ks, extent, centre_xyz, radius_um, dz_um, indices, j_ref, ref_label, k_traced,
+                       k_range=None, roots_xy=None, title="", ncol=6):
+    """The montage: the planes `indices` (into images) on one grey range, each with the traced soma's circle; the
+    reference plane j_ref framed orange, the planes inside k_range (by eye) framed dark."""
     imgs = np.asarray(images)
     ks = np.asarray(ks).astype(int)
     idx = [int(i) for i in indices]
@@ -85,24 +100,30 @@ def figure_soma_planes(images, ks, extent, centre_xyz, radius_um, dz_um, indices
         raise ValueError("indices must index the planes of images (n, H, W)")
     lo, hi = _row_scale((imgs[idx].astype(float),), IMAGE_PERCENTILES)
     n = len(idx)
-    ncol = min(5, n)
-    nrow = int(np.ceil(n / float(ncol)))
+    nc = max(1, min(int(ncol), n))
+    nrow = int(np.ceil(n / float(nc)))
     plt = _plt()
-    fig, axes = plt.subplots(nrow, ncol, figsize=(3.0 * ncol, 3.1 * nrow + 0.6), facecolor=SURFACE,
+    fig, axes = plt.subplots(nrow, nc, figsize=(2.7 * nc, 2.85 * nrow + 0.8), facecolor=SURFACE,
                              layout="constrained", squeeze=False)
     for a in axes.ravel()[n:]:
         a.set_axis_off()
+    chosen = ref_label == "chosen by eye"
     for a, i in zip(axes.ravel(), idx):
         _image(a, imgs[i], extent, centre_xyz, lo, hi)
         _overlay(a, extent, centre_xyz, radius_um, roots_xy)
         dzk = ks[i] * float(dz_um) - float(centre_xyz[2])
-        star = i == int(j_focus)
-        a.set_title("k = %d  (%+.2f um)%s" % (ks[i], dzk, "  sharpest" if star else ""), fontsize=8,
-                    color=INK)   # text stays in ink; the orange frame marks the sharpest plane
+        ref = i == int(j_ref)
+        a.set_title(_plane_title(int(ks[i]), dzk, k_traced, ref and chosen), fontsize=7.5, color=INK)
+        inside = k_range is not None and int(k_range[0]) <= ks[i] <= int(k_range[1])
         for side in a.spines.values():
-            side.set_color(ORANGE if star else INK2)
-            side.set_linewidth(2.0 if star else 0.6)
-        a.tick_params(labelsize=6, colors=INK2)
+            side.set_color(ORANGE if ref else (INK if inside else INK2))
+            side.set_linewidth(2.0 if ref else (1.4 if inside else 0.5))
+        a.tick_params(labelsize=5.5, colors=INK2)
+    legend = ("orange frame: %s (k = %d)" % ("the plane chosen by eye" if chosen else "the traced depth's plane",
+                                             int(ks[int(j_ref)]))
+              + ("; dark frames: the planes where you see the soma (k = %d to %d)" % (int(k_range[0]), int(k_range[1]))
+                 if k_range is not None else ""))
     fig.suptitle((title + "\n" if title else "") + "dashed: the traced soma (Allen's radius); +: its centre; circles: "
-                 "the primary dendrites' first traced nodes; grey %.0f-%.0f gl" % (lo, hi), fontsize=9, color=INK)
+                 "the primary dendrites' first traced nodes; grey %.0f-%.0f gl\n%s" % (lo, hi, legend), fontsize=9,
+                 color=INK)
     return fig

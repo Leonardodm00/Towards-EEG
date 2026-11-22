@@ -1,0 +1,3 @@
+config: d_um 1.60, R_um 6.0, mu 0.258 /um, z_dend -6.70 um
+dendrite False: max at z = +0.00 um (soma centre 0.00, dendrite -6.70); E at the max 1.23, at the soma centre 1.23, at the dendrite's plane 0.168
+dendrite True : max at z = +0.00 um (soma centre 0.00, dendrite -6.70); E at the max 1.2, at the soma centre 1.2, at the dendrite's plane 0.241

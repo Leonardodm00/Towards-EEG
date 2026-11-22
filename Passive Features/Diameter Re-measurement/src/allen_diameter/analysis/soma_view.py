@@ -1,13 +1,15 @@
-"""The soma's view in the image stack -- Block 44 in specs/SPEC.md (D-210).
+"""The soma's view in the image stack -- Block 44 in specs/SPEC.md (D-210, D-211).
 
 The traced soma (the SWC's type-1 nodes) placed in the image frame, the square crop about it, the recorded planes
-about its depth, and a focus measure per plane over a disk about it:
+about its depth, the plane to show and the planes of the montage, and a diagnostic per plane over a disk about it,
+the fine-detail energy:
 
-    F_k = Var over the disk { (G_sigma * L)(I_k) }       (L the Laplacian, G_sigma the Gaussian: their product the
+    E_k = Var over the disk { (G_sigma * L)(I_k) }       (L the Laplacian, G_sigma the Gaussian: their product the
                                                           Laplacian of Gaussian, scipy.ndimage.gaussian_laplace)
 
-large where the plane holds sharp structure (the soma's outline and its interior at focus), small where it is
-blurred. The sharpest plane is the one of largest F_k. Image frame: pixel (row, col) of a crop with corner
+large where the plane holds sharp structure anywhere in the disk -- the soma's outline, or a dendrite crossing it --
+and small where all of it is blurred. It is not a focus estimate of the soma: on the pilot its maximum was a basal
+dendrite's plane, and the soma's plane is chosen by eye (D-211). Image frame: pixel (row, col) of a crop with corner
 (left, top) is centred on ((left + col) p, (top + row) p) um, p = res0 (plotting.figures.image_extent_um).
 
 No file access, no plotting. Pure ASCII, LF, for the cluster.
@@ -68,10 +70,11 @@ def disk_mask(shape, left, top, res0_um, centre_xy_um, radius_um):
     return (x[None, :] - cx) ** 2 + (y[:, None] - cy) ** 2 <= float(radius_um) ** 2
 
 
-def focus_measure(block, valid, left, top, res0_um, centre_xy_um, radius_um, sigma_px):
-    """-> F (n_planes,): per plane the variance, over the disk of radius_um about the centre, of the Laplacian of
-    Gaussian (sigma_px) of the plane (grey levels^2 per px^4); NaN for a plane not valid or an empty disk.
-    block (n_planes, H, W) grey levels (any real dtype, not modified); valid (n_planes,) bool."""
+def detail_energy(block, valid, left, top, res0_um, centre_xy_um, radius_um, sigma_px):
+    """-> E (n_planes,): per plane the variance, over the disk of radius_um about the centre, of the Laplacian of
+    Gaussian (sigma_px) of the plane (grey levels^2 per px^4); NaN for a plane not valid or an empty disk. Every
+    structure in the disk counts: a diagnostic, not a focus estimate of the soma (D-211.3). block (n_planes, H, W)
+    grey levels (any real dtype, not modified); valid (n_planes,) bool."""
     B = np.asarray(block)
     v = np.asarray(valid, dtype=bool).reshape(-1)
     if B.ndim != 3 or v.shape != (B.shape[0],):
@@ -79,20 +82,52 @@ def focus_measure(block, valid, left, top, res0_um, centre_xy_um, radius_um, sig
     if not (float(sigma_px) > 0 and float(radius_um) > 0):
         raise ValueError("sigma_px and radius_um must be > 0")
     mask = disk_mask(B.shape[1:], left, top, res0_um, centre_xy_um, radius_um)
-    F = np.full(B.shape[0], np.nan)
+    E = np.full(B.shape[0], np.nan)
     if not mask.any():
-        return F
+        return E
     for j in range(B.shape[0]):
         if not v[j]:
             continue
         L = gaussian_laplace(np.asarray(B[j], dtype=float), float(sigma_px))
-        F[j] = float(np.var(L[mask]))
-    return F
+        E[j] = float(np.var(L[mask]))
+    return E
 
 
-def sharpest(F):
-    """-> the index of the largest finite F (the first on a tie); ValueError when none is finite."""
-    f = np.asarray(F, dtype=float).reshape(-1)
-    if not np.any(np.isfinite(f)):
-        raise ValueError("no finite focus value")
-    return int(np.nanargmax(f))
+def reference_plane(ks, valid, z_um, dz_um, k_chosen=None):
+    """-> (index into ks, label). With k_chosen: that plane, label "chosen by eye" (ValueError when it is outside the
+    window ks or not recorded). Without: the recorded plane whose depth k dz_um is nearest z_um (the first on a tie),
+    label "traced depth" (ValueError when no plane is recorded). ks (n,) int, ascending; valid (n,) bool."""
+    k = np.asarray(ks).astype(int).reshape(-1)
+    v = np.asarray(valid, dtype=bool).reshape(-1)
+    if k.shape != v.shape or k.size == 0:
+        raise ValueError("ks and valid must be (n,) with n >= 1")
+    if k_chosen is not None:
+        hit = np.flatnonzero(k == int(k_chosen))
+        if hit.size == 0:
+            raise ValueError("plane %d is outside the window %d..%d" % (int(k_chosen), k.min(), k.max()))
+        if not v[hit[0]]:
+            raise ValueError("plane %d is not recorded" % int(k_chosen))
+        return int(hit[0]), "chosen by eye"
+    if not v.any():
+        raise ValueError("no recorded plane in the window")
+    d = np.abs(k * float(dz_um) - float(z_um))
+    d[~v] = np.inf
+    return int(np.argmin(d)), "traced depth"
+
+
+def montage_planes(ks, valid, k_ref, step, k_lo=None, k_hi=None):
+    """-> the indices into ks of the recorded planes k = k_ref + j step (j any integer) with k_lo <= k <= k_hi
+    (defaults: the window's first and last plane), in the order of ks. ValueError for step < 1 or k_lo > k_hi."""
+    k = np.asarray(ks).astype(int).reshape(-1)
+    v = np.asarray(valid, dtype=bool).reshape(-1)
+    s = int(step)
+    if k.shape != v.shape or k.size == 0:
+        raise ValueError("ks and valid must be (n,) with n >= 1")
+    if s < 1 or s != step:
+        raise ValueError("step must be an integer >= 1")
+    lo = int(k.min()) if k_lo is None else int(k_lo)
+    hi = int(k.max()) if k_hi is None else int(k_hi)
+    if lo > hi:
+        raise ValueError("k_lo %d > k_hi %d" % (lo, hi))
+    r = int(k_ref)
+    return [i for i in range(k.size) if v[i] and lo <= k[i] <= hi and (int(k[i]) - r) % s == 0]

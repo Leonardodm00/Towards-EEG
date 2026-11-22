@@ -1319,23 +1319,23 @@ orchestrator's (D-210).
   $F_k = \mathrm{Var}_{p \in \mathcal D}\,[(\nabla^2 G_{\sigma} * I_k)(p)]$ over the disk $\mathcal D$ of radius
   $r +$ `focus_margin_um` about $(c_x, c_y)$ (pixel $p$'s centre in the image frame), $G_\sigma$ the Gaussian of SD
   `focus_sigma_px` (px): `scipy.ndimage.gaussian_laplace`, in grey levels^2 per px^4; NaN for a plane not recorded.
-  The sharpest plane $k_f = \arg\max_k F_k$ (the first on a tie).
+  The sharpest plane $k_f = \arg\max_k F_k$ (the first on a tie). [superseded 2026-11-22 by amendment 1 (D-211): no plane is picked; $F_k$ is kept as the fine-detail energy $E_k$, a diagnostic]
 - Public API: `soma_geometry(xyz_um, radius_um, types) -> (centre (3,) um, radius um)`;
   `crop_box(centre_xy_um, half_um, res0_um) -> (left, top, width, height)` px (corner rounded down, side
   ceil(2 half / res0) + 1); `plane_range(z_um, half_um, dz_um) -> (k_lo, k_hi)`; `disk_mask(shape, left, top,
   res0_um, centre_xy_um, radius_um) -> (H, W) bool`; `focus_measure(block, valid, left, top, res0_um,
-  centre_xy_um, radius_um, sigma_px) -> (n_planes,)`; `sharpest(F) -> int`. Figures:
+  centre_xy_um, radius_um, sigma_px) -> (n_planes,)`; `sharpest(F) -> int` [removed by amendment 1]. Figures [signatures changed by amendment 1]:
   `figure_soma_focus(images, ks, extent, centre_xyz, radius_um, dz_um, F, j_focus, roots_xy=None, title="")` (the
   sharpest plane with the traced soma's circle, its centre and the primary dendrites' first nodes; the focus curve
   against depth - traced depth, the traced radius shaded) and `figure_soma_planes(images, ks, extent, centre_xyz,
   radius_um, dz_um, indices, j_focus, roots_xy=None, title="")` (a montage on one grey range, the sharpest framed).
 - Parameters: `SomaViewConfig` (`config.soma_view`; outside every signature): `half_um` 20, `z_margin_um` 3,
-  `focus_margin_um` 1, `focus_sigma_px` 1, `montage_step_planes` 2, `montage_half_n` 7.
+  `focus_margin_um` 1, `focus_sigma_px` 1, `montage_step_planes` 2, `montage_half_n` 7 [amendment 1: `z_margin_um` 6, `montage_half_n` replaced by `montage_cols` 6].
 - Outputs (`show_soma.py --out DIR`): `soma_<S>_focus.png`, `soma_<S>_planes.png`, `soma_<S>.json` (the centre,
   radius, crop, planes, validity, focus values, the sharpest plane and its depth - the traced depth, the
   montage's planes, the primary dendrites' first nodes), `soma_<S>_block.npz` (the crop: block, ks, valid, left,
   top, res0_um).
-- Test oracles: the least blurred plane of a stack of a disk blurred by an SD growing with |k - 3| is the sharpest
+- Test oracles [amendment 1 adds and replaces some, below]: the least blurred plane of a stack of a disk blurred by an SD growing with |k - 3| is the sharpest
   and F falls off on both sides; F equals `gaussian_laplace` and the disk written out [1e-12 relative]; F(2 I + 7) =
   4 F(I); a quadratic field gives F ~ 0; the geometry's arithmetic; NaN for a plane not recorded; ValueError for no
   soma node, no finite F, a non-positive half or dz; the script end to end on the synthetic cell (`--synthetic`).
@@ -1343,6 +1343,37 @@ orchestrator's (D-210).
   feeds the user's look at the soma (notebook Cell 24) and a later measurement of the soma, not decided.
 - Status: implemented 2026-11-22 by the orchestrator; `test_smoke_soma_view.py` 6 pass, 1 skip **[run, sandbox]**;
   not yet run on the real pilot (the Allen API is not reachable from the sandbox).
+- Amendment 1 (2026-11-22; D-211, the user's choice after the first real run, and the orchestrator's settings). The
+  first real run (`soma_529878215.json`, planes 85-149, traced depth k = 117) picked k = 93 (-6.72 um): F peaked there
+  (0.415) on a basal dendrite in sharp focus inside the disk, with a second plateau (0.33-0.345) at k = 107-112, where
+  the user sees the soma begin; the montage, 7 panels a side of k = 93, ended at k = 107. The user: the soma's
+  plane(s) are chosen by eye, no automatic pick until the soma's measurement is specified (D-211.1). Changes:
+  (i) `sharpest` removed; `focus_measure` renamed `detail_energy(block, valid, left, top, res0_um, centre_xy_um,
+  radius_um, sigma_px) -> (n_planes,)`, the same formula, now the fine-detail energy E_k, a diagnostic labelled "not
+  a focus estimate" (D-211.3). (ii) `reference_plane(ks, valid, z_um, dz_um, k_chosen=None) -> (index, label)`: the
+  plane chosen by eye (it must be in the window and recorded: ValueError otherwise) with label "chosen by eye", or the
+  recorded plane whose depth k dz is nearest z_um (the first on a tie) with label "traced depth". (iii)
+  `montage_planes(ks, valid, k_ref, step, k_lo=None, k_hi=None) -> list of indices`: the recorded planes
+  k = k_ref + j step, j integer, with k_lo <= k <= k_hi (defaults: the window's first and last plane); ValueError for
+  step < 1 or k_lo > k_hi. (iv) `SomaViewConfig.z_margin_um` 3 -> 6 (the window +-(r + 6 um); the soma's top lay
+  beyond +8.96 um if it begins 2.8 um below the traced depth), `montage_half_n` replaced by `montage_cols` 6, PROVISIONAL
+  [orchestrator] (D-211.2). (v) `show_soma.py --soma-k K` (the plane judged in focus), `--soma-k-range LO HI` (the
+  planes where the soma is seen), `--montage-k LO HI STEP`; a plane outside the window, or not recorded, is refused
+  (argparse error). The montage defaults to every `montage_step_planes`-th recorded plane of the whole window aligned
+  on the reference plane. (vi) Figures: `figure_soma_focus(images, ks, extent, centre_xyz, radius_um, dz_um, E, j_ref,
+  ref_label, k_traced, k_range=None, roots_xy=None, title="")`: the reference plane with the overlay, beside E/max E
+  against k (the traced depth's plane dashed, the reference plane orange, the range seen by eye shaded);
+  `figure_soma_planes(images, ks, extent, centre_xyz, radius_um, dz_um, indices, j_ref, ref_label, k_traced,
+  k_range=None, roots_xy=None, title="", ncol=6)`: the reference plane framed orange, the planes of the range framed
+  dark. (vii) The JSON: `detail_energy` (was `focus`), `k_traced`, `k_by_eye`, `k_range_by_eye`, `montage_ks`;
+  `k_sharpest` and `z_sharpest_minus_soma_um` removed. Oracles added: `reference_plane`'s choice and refusals;
+  `montage_planes` on a window (k = 74..160, k_ref 117, step 2: 43 planes, 117 among them; a range 105..145 step 1:
+  41); the script end to end by default (no plane chosen, the montage spans the window and holds the traced depth's
+  plane) and with `--soma-k`, `--soma-k-range`, `--montage-k` (recorded in the JSON), and refusing a plane outside the
+  window.
+  Status: amendment 1 implemented 2026-11-22 by the orchestrator; `test_smoke_soma_view.py` 6 pass, 1 skip **[run,
+  sandbox]**; Cell 24 run through a stand-in on the synthetic cell, by default and with the three choices; not yet
+  rerun on the pilot. The check behind D-211's "why": `checks/soma_focus_2026-11-22/`.
 
 Block 36, amendment 19 (2026-11-20; D-201; the orchestrator's, after wave 4): `scripts/calibrate_sigma.py --cleaning-dir DIR --specimen S [--out DIR/sigma] [--nodes IDS] [--workers N] [--config-json FILE]` -- per example node of a preparation, Block 42's fit on the planes $k^* \pm$ `half_planes` (in a process pool, one node per worker, BLAS threads 1), Block 43's figures, `sigma_<S>.csv`, `sigma_<S>.json` (fits, summary), `sigma_node<id>.png`, `sigma_summary_<S>.png`. Notebook Cell 23: (A, built now with existing scripts) the thick nodes -- `clean_cell.py clear --d-bins 1.0,50 --n 20 --min-soma-um 5` (Allen's diameter >= 1.0 um, the clear rule's 10 um separation in 3-D, no tier-2 neighbour), `clean --no-clean` into `OUT/cleaning_thick` with `cleaning.plane_half_range` 2 and `measure.profile_half_um` 4.5 (D-201.6 [orchestrator]: the measuring line +-4.5 um, so that a thick tube's defocused dip still meets the background on both sides), the gallery of Block 41 on all of them (`--max-per-bin 0 --fill-to 20`); (B, after wave 1) `calibrate_sigma.py` and its figures. Status (2026-11-22): `scripts/calibrate_sigma.py` written by the orchestrator after wave 4's merge: per node, infer_nodes.run_config and node_from_npz, the pilot of the node's record entry, select_planes, forward_with_kernel with one SectionCache, start_theta, fit_sigma_node, and Block 43's node page (the background (b0 + b1 v) drawn); a node enters the summary when it converged with neither sigma0 nor c at a bound; the summary figure's depth is the fitted z_ax. Run on the synthetic preparation of Cell 23A's stand-in (one node, rendered with d 0.8 um, sigma_r(0) 0.080 um, c 1): converged in 58 evaluations, d 0.808 +- 0.002 um, sigma0 0.0776 +- 0.0024 um, c 0.976 +- 0.015 **[run, sandbox]**. Notebook Cell 23B runs it.
 
