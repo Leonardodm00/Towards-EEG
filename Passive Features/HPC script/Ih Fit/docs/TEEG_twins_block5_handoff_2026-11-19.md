@@ -21,6 +21,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-22 | Section 5b: the run has ended (the user's early-check line: 30 status files, 30 logs in the fit, no traceback); the read-out is next. |
 | 2026-11-22 (later) | Section 7: the result of run tw1 (gate FAIL; 30 ok; job IDs; run times) and its reading (the foot of `Ih_human` at the voltages the steps reach; the optimiser question left open), from the user's extract and `dev/2026-11-22_tw1_readout/`. |
 | 2026-11-22 (later, 2) | Section 7: the user's decision after the FAIL (D-204: a new training set, step and sample weights, 5 noise-free twins; forms pending) and the split of the 10 `full` twins by sag against noise. |
+| 2026-11-22 (later, 3) | Section 7: the settled forms (D-206 to D-209), the fan-out in progress (contract `aac46d3`), and the loss-at-truth diagnostic delivered for davinci. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -375,6 +376,15 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   4 (-000, -005, -008, -009) have a sag far above the noise yet a wrong I_h conductance (the fit's miss), 3 (-003,
   -004, -006) a sag at or below the noise, 3 (-001, -002, -007) a conductance at rest within x1.6. Including the
   strongest step deepens the reach from a median 10.6 to 13.0 mV below rest; $\bar g_h$ and $\Delta v_h$ stay tied.
+- **In progress [2026-11-22 15:10, the user's go].** The forms are settled (D-206 to D-209): $\Delta v_h$ fixed at 0
+  (Rich et al. 2021), five fitted parameters, $\bar g_h$ up to $10^{-2}$ S/cm$^2$, the I_h time constant stated as
+  its peak in ms (box 50-1000 ms; truths 150-700 ms), roles `d207`, step weight by current, the peak-decay sample
+  weight (500 ms), 5 noise-free twins paired with the first five `full` twins, the loss at the truth recorded.
+  SPEC section 2.8 and Blocks 14, 15, 16, 18 (wave 3a, implementers running) and 17 (wave 3b) on `sci/twins`
+  (contract `aac46d3`). Also delivered: `dev/2026-11-22_tw1_readout/loss_at_truth.py` with
+  `job_loss_at_truth.sh` (`83111d8`) -- on davinci `qsub dev/2026-11-22_tw1_readout/job_loss_at_truth.sh` from the
+  "Ih Fit" folder; it tells, per `full` twin of `tw1`, whether the truth fits better than the estimate (the
+  optimiser's miss) or not. Its result was not yet returned when this was written.
 - **Block 7** (roadmap N7): the fitted laws and flags into the Stage-7 manifest and the noise table, and the
   decision-log and plan entries that close the noise prerequisite (N7's summary; the S0-S3 report dropped, D-125.3).
 - **Stage 8** (the campaign) waits for the gate's verdict and the corrected SWCs (S8's note).
