@@ -861,8 +861,6 @@ def arm_frames(manifest: pd.DataFrame, frames: Dict[int, pd.DataFrame]) -> List[
 
 
 def cmd_merge(args) -> int:
-    import ih_recovery_report as RR
-
     run = load_run(args.out)
     out, man = run["out"], run["manifest"]
 
@@ -884,7 +882,7 @@ def cmd_merge(args) -> int:
         csv = out / "fits" / ("twin_%d" % tid) / "phase2_results.csv"
         if _results_row(csv, tid) is None:
             continue
-        df = RR.load_arm_results(csv, str(r["arm"]))
+        df = load_results_round_trip(csv, str(r["arm"]))
         frames[tid] = df[pd.to_numeric(df["specimen_id"], errors="coerce") == tid].reset_index(drop=True)
     n_missing = len(man) - len(frames)
     _say("merge: %d of %d twin(s) with results" % (len(frames), len(man)))
@@ -918,6 +916,18 @@ def cmd_merge(args) -> int:
     return EXIT_OK
 
 
+def load_results_round_trip(csv: Path, arm: str) -> pd.DataFrame:
+    """ih_recovery_report.load_arm_results with the floats read back exactly (amendment 3:
+    float_precision="round_trip", so recovery_extras.csv and the reports carry the fit's values): the
+    CSV, tagged with the arm; KeyError without a specimen_id column, as load_arm_results."""
+    df = pd.read_csv(csv, float_precision="round_trip")
+    if "specimen_id" not in df.columns:
+        raise KeyError("{} has no specimen_id column".format(csv))
+    df = df.copy()
+    df["arm"] = str(arm)
+    return df
+
+
 def write_subset_report(out_dir: Path, sub_man: pd.DataFrame, frames: Dict[int, pd.DataFrame],
                         config: Dict[str, object], *, plot: bool, what: str) -> Optional[pd.DataFrame]:
     """write_one_report on the twins of sub_man that have results (returns the long table), or, when
@@ -945,9 +955,14 @@ def loss_verdict(loss_at_truth: float, loss_at_estimate: float, rel: float = LOS
     """'optimiser' when the loss at the truth is lower than at the estimate by more than rel of the
     latter (the optimiser missed a better point), 'data' when the estimate's is lower than the truth's
     by more than rel of the truth's (the data prefer another point), 'tie' otherwise, 'na' when either is
-    not finite (Block 17)."""
+    not finite or is at or above the training loss's penalty (Block 17; amendment 3: a loss of
+    run_ih_fit._LOSS_CRASH_PENALTY = 1e6, the value the loss builders return when a simulation fails,
+    is not a loss)."""
+    import run_ih_fit as R
     lt, le = float(loss_at_truth), float(loss_at_estimate)
     if not (np.isfinite(lt) and np.isfinite(le)):
+        return "na"
+    if lt >= R._LOSS_CRASH_PENALTY or le >= R._LOSS_CRASH_PENALTY:
         return "na"
     if lt < (1.0 - rel) * le:
         return "optimiser"

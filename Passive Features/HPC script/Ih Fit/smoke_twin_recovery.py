@@ -62,6 +62,10 @@ Checks
                                columns, loss_at_truth finite for full and full_no_noise and na verdicts
                                elsewhere, gh_deep_true_S_cm2, tau_h_pk_true_ms and the log ratio recomputed
                                here; loss_verdict on hand cases
+    test_TS15_penalty_round_trip
+                               amendment 3: loss_verdict is na when a loss is not finite or at or above
+                               run_ih_fit's penalty 1e6, ordinary pairs unchanged; on TS3's run,
+                               recovery_extras.csv's losses equal the fit's exactly (both round_trip)
     test_TS13_gate             Block 17: evaluate_gate with required_axes -- a summary without dv_h
                                passes or fails on Cm, gbar, kappa_tau alone; required_axes=None equals
                                the WAVE3A code's verdict tables; unknown axes refused; on TS5's run
@@ -696,8 +700,10 @@ def test_TS5_merge():
         for arm in ("ih5", "passive_fullstep"):
             ids = [int(t) for t, c in zip(sub_man["specimen_id"], sub_man["configuration"]) if EXPECTED_ARM[c] == arm]
             if ids:
-                frames.append(pd.concat([RR.load_arm_results(out / "fits" / ("twin_%d" % t) / "phase2_results.csv",
-                                                             arm) for t in ids], ignore_index=True))
+                # amendment 3: the merge reads each phase2_results.csv with round_trip floats
+                frames.append(pd.concat([pd.read_csv(out / "fits" / ("twin_%d" % t) / "phase2_results.csv",
+                                                     float_precision="round_trip").assign(arm=arm)
+                                         for t in ids], ignore_index=True))
         long_df = RR.recovery_long(sub_man, frames, box=box, strict_rails=True)
         summ = RR.recovery_summary(long_df, drop_railed=False)
         infl, fp = RR.cm_inflation(long_df), RR.fp_control_summary(long_df)
@@ -1326,7 +1332,7 @@ def test_TS12_no_noise_extras():
         tid = int(e["twin_id"])
         m = man[man["specimen_id"] == tid].iloc[0]
         conf = str(m["configuration"])
-        res = pd.read_csv(out / "fits" / ("twin_%d" % tid) / "phase2_results.csv")
+        res = pd.read_csv(out / "fits" / ("twin_%d" % tid) / "phase2_results.csv", float_precision="round_trip")
         r = res[res["specimen_id"] == tid].iloc[0]
         th = TM.twin_theta(m)
         has_ih = conf != "active_fit"
@@ -1465,6 +1471,34 @@ def test_TS13_gate():
     parts["the gate in report/ and report_no_noise/ is on ih5, without a dv_h row"] = (
         set(ver["arm"]) == {"ih5"} and "dv_h" not in set(ver["parameter"]) and set(ver0["arm"]) == {"ih5"}
         and "dv_h" not in set(ver0["parameter"]))
+    _fail_parts(parts)
+
+
+def test_TS15_penalty_round_trip():
+    import run_ih_fit as R
+    import run_twin_recovery as T
+    na = [(1e6, 0.3), (0.3, 1e6), (float("nan"), 0.3), (0.3, float("inf")), (2e6, 1e7), (1e6, 1e6)]
+    ordinary = [((1.0, 2.0), "optimiser"), ((2.0, 1.0), "data"), ((1.0, 1.01), "tie"), ((0.0, 0.0), "tie"),
+                ((0.97, 1.0), "optimiser"), ((1.0, 0.97), "data"), ((999999.0, 0.3), "data")]
+    parts = {"the penalty is run_ih_fit's 1e6": R._LOSS_CRASH_PENALTY == 1e6,
+             "na at or above the penalty and for non-finite losses": all(T.loss_verdict(*a) == "na" for a in na),
+             "ordinary pairs unchanged": all(T.loss_verdict(*a) == w for a, w in ordinary)}
+    out = _STATE.get("ts3_out")
+    if out is None:
+        test_TS3_end_to_end()
+        out = _STATE["ts3_out"]
+    code, _, se = _run(["merge", "--out", out, "--no-plot"])
+    ex = pd.read_csv(out / "recovery_extras.csv", float_precision="round_trip")
+    ok = code == 0 and len(ex) == 4
+    for _, e in ex.iterrows():
+        tid = int(e["twin_id"])
+        res = pd.read_csv(out / "fits" / ("twin_%d" % tid) / "phase2_results.csv", float_precision="round_trip")
+        r = res[res["specimen_id"] == tid].iloc[0]
+        for a, b in (("loss_at_truth", "loss_at_eval_theta"), ("loss_at_estimate", "loss_at_estimate")):
+            x, y = float(e[a]), float(r[b])
+            ok = ok and (x == y or (np.isnan(x) and np.isnan(y)))
+    parts["recovery_extras.csv: loss_at_truth / loss_at_estimate = the fit's loss_at_eval_theta / "
+          "loss_at_estimate exactly (round_trip on both sides)"] = ok
     _fail_parts(parts)
 
 
