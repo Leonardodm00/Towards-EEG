@@ -294,3 +294,118 @@ def test_swap_config(fx):
     d = np.max(np.abs(c1.ss_v_mV - c0.ss_v_mV))
     assert 0 < d < 0.2, d
     _clear()
+
+
+# ===========================================================================
+#  Block 18: a twin without noise (SPEC 2.8 (e), the Block 18 entry).
+#  Integration tester, 2026-11-22. Expected values: the clean traces of
+#  simulate_twin(with_noise=False) (the entry's reference, "bit for bit"); the
+#  default build against twin_build.py as it stood at the base commit 216ecf1
+#  (`git show`; TB12's reference); the metadata keys the entry lists.
+# ===========================================================================
+import importlib.util     # noqa: E402
+import subprocess         # noqa: E402
+import tempfile           # noqa: E402
+from pathlib import Path  # noqa: E402
+
+BASE18 = "216ecf13ccca455903b2cb05d740dd64f3feff08"
+
+
+def _old_twin_build(_c={}):
+    if "m" in _c:
+        return _c["m"]
+    code = Path(__file__).resolve().parents[2]
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=code, capture_output=True, text=True,
+                         check=True).stdout.strip()
+    rel = (code.relative_to(top) / "twin_build.py").as_posix()
+    src = subprocess.run(["git", "show", "%s:%s" % (BASE18, rel)], cwd=top, capture_output=True, check=True).stdout
+    p = Path(tempfile.mkdtemp()) / "twin_build_base.py"
+    p.write_bytes(src)
+    spec = importlib.util.spec_from_file_location("twin_build_base", p)
+    m = importlib.util.module_from_spec(spec)
+    import sys
+    sys.modules["twin_build_base"] = m          # dataclasses resolve their module through sys.modules
+    spec.loader.exec_module(m)
+    _c["m"] = m
+    return m
+
+
+def _read_archive(d):
+    with np.load(d / "ss_pulses.npz") as z, np.load(d / "ls_sweeps.npz") as y:
+        return {k: z[k].copy() for k in z.files}, {k: y[k].copy() for k in y.files}, \
+            json.load(open(d / "metadata.json"))
+
+
+@pytest.mark.parametrize("conf", ["full", "full_no_noise"])
+def test_b18_no_noise_archive_equals_clean_traces(fx, built, conf, tmp_path):
+    _clear()
+    ih_spec, apply = _model(conf)
+    d = tb.build_twin(_spec(conf), fx["real"], fx["table"], tmp_path / "g", ih_spec=ih_spec, apply_theta=apply,
+                      spike_reason_fn=fx["spike_fn"], with_noise=False)
+    _clear()
+    ss, ls, meta = _read_archive(d)
+    cl = built["clean"]                         # the 'full' cell's clean traces (same truth, same real cell)
+    assert_array_equal(ss["v"], cl.ss_v_mV)
+    assert_array_equal(ss["i_pA"], cl.ss_i_pA)
+    for m, (v, i) in enumerate(zip(cl.ls_v_mV, cl.ls_i_pA)):
+        assert_array_equal(ls["v_%d" % m], v)
+        assert_array_equal(ls["i_%d" % m], i)
+    tw = meta["twin"]
+    assert tw["with_noise"] is False and tw["noise_laws_applied"] is False
+    assert tw["configuration"] == conf and tw["has_ih"] is True
+    # read back by the fitter's loader: the SS bundles are the clean polarity responses
+    import passive_fitting_hpc_fixed as mono
+    cd = mono.load_cell_from_archive(d, load_depolarising_ls=True, verbose=False)
+    for b in cd.square_subthreshold:
+        m = ss["polarity_is_dep"] == (b.polarity == "dep")
+        assert_allclose(b.v_mV, cl.ss_v_mV[m][0], rtol=0, atol=1e-12)
+
+
+def test_b18_with_noise_metadata_and_difference(fx, built, tmp_path):
+    _clear()
+    ih_spec, apply = _model("full")
+    d = tb.build_twin(_spec("full"), fx["real"], fx["table"], tmp_path / "g", ih_spec=ih_spec, apply_theta=apply,
+                      spike_reason_fn=fx["spike_fn"])
+    _clear()
+    ss, ls, meta = _read_archive(d)
+    assert meta["twin"]["with_noise"] is True
+    assert meta["twin"].get("noise_laws_applied", True) is not False
+    assert_array_equal(ss["v"], built["noisy"].ss_v_mV)
+    assert not np.array_equal(ss["v"], built["clean"].ss_v_mV)
+
+
+def test_b18_default_reproduces_base_archive(fx, tmp_path):
+    """TB12: the default (with_noise=True) gives the base commit's archive arrays bit for bit."""
+    old = _old_twin_build()
+    ih_spec, apply = _model("full")
+    arrs = []
+    for mod, sub in ((tb, "new"), (old, "old")):
+        _clear()
+        spec = mod.TwinSpec(twin_id=TWIN_ID, twin_of_specimen_id=REAL_ID, configuration="full",
+                            theta=dict(THETA_IH), v_rest_mV=-60.0, F=1.9)
+        d = mod.build_twin(spec, fx["real"], fx["table"], tmp_path / sub, ih_spec=ih_spec, apply_theta=apply,
+                           spike_reason_fn=fx["spike_fn"])
+        arrs.append(_read_archive(d))
+    _clear()
+    for part in (0, 1):
+        assert arrs[0][part].keys() == arrs[1][part].keys()
+        for k in arrs[0][part]:
+            assert_array_equal(arrs[0][part][k], arrs[1][part][k])
+    new_tw, old_tw = arrs[0][2]["twin"], arrs[1][2]["twin"]
+    assert set(new_tw) - set(old_tw) == {"with_noise"}
+    assert {k: v for k, v in new_tw.items() if k != "with_noise"} == old_tw
+
+
+@pytest.mark.parametrize("bad", ["False", 0, 1, None, "true"])
+def test_b18_with_noise_must_be_bool(fx, bad, tmp_path):
+    ih_spec, apply = _model("full")
+    with pytest.raises(tb.TwinBuildError):
+        tb.build_twin(_spec("full"), fx["real"], fx["table"], tmp_path / "g", ih_spec=ih_spec, apply_theta=apply,
+                      spike_reason_fn=fx["spike_fn"], with_noise=bad)
+    assert not (tmp_path / "g" / ("specimen_%d" % TWIN_ID)).exists()
+    _clear()
+
+
+def test_b18_full_no_noise_configuration():
+    assert tb.CONFIGURATIONS == ("full", "passive_fit", "active_fit", "full_no_noise")
+    assert tb.HAS_IH["full_no_noise"] is True

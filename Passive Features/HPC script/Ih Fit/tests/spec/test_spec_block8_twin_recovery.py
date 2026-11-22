@@ -8,6 +8,14 @@ enter the cohort. Expected values: the cohort rule, the cell draw of 2.7 (i)
 (SeedSequence written out), Block 5's table on the same inputs (the producer
 the plan consumes), the loader's v_rest (the reference the spec names), the
 exit codes of the entry.
+
+Renewed 2026-11-22 (third incremental run) to the current SPEC (Block 17): plan
+now draws a fourth configuration (full_no_noise, --n-no-noise 5 by default,
+refused above --n-per-configuration), so the small runs below pass
+--n-no-noise 0 to keep their three twins; the gate arm is ih5 with the required
+axes Cm, gbar, kappa_tau (2.8 (g)), so the amendment-8 tests write ih5 results
+(five names) and expect no dv_h row; the kappa_tau box is run_config.json's
+tau_h_pk record. Block 17's own tests are at the end of this file.
 """
 import csv
 import json
@@ -28,7 +36,7 @@ import twin_table as tt             # noqa: E402
 IDS = (500000011, 500000012, 500000013, 500000014)
 REFUSED_ID = 500000015
 LS_AMPS = (-110.0, -70.0, 0.0)
-SMALL = ["--n-per-configuration", "1", "--n-calls", "1", "--n-initial", "1"]
+SMALL = ["--n-per-configuration", "1", "--n-no-noise", "0", "--n-calls", "1", "--n-initial", "1"]
 
 
 @pytest.fixture(scope="module")
@@ -148,6 +156,7 @@ def test_one_twin_end_to_end_and_merge(group, tmp_path, capsys):
     byc = pd.read_csv(out / "recovery_by_configuration.csv")
     assert set(byc["specimen_id"]) == {tid} and set(byc["configuration"]) == {"passive_fit"}
     assert (out / "report").is_dir() and (out / "report_without_flagged").is_dir()
+    assert (out / "report_no_noise" / "NO_RESULTS.txt").is_file()      # no full_no_noise twin in this run
 
 
 def test_same_seed_same_run(group, tmp_path):
@@ -204,6 +213,7 @@ SUMMARY_COLUMNS_SPEC = ["arm", "parameter", "n", "n_railed", "median_abs_err", "
 TRUTH_COL = {"Cm": "cm_true", "Rm": "rm_true", "Ra": "ra_true", "gbar": "ih_gihbar_S_cm2", "dv_h": "ih_dvh_mV",
              "kappa_tau": "ih_kappa_tau"}
 IH6 = ("Cm", "Rm", "Ra", "gbar", "dv_h", "kappa_tau")
+IH5 = ("Cm", "Rm", "Ra", "gbar", "kappa_tau")
 PASSIVE3 = ("Cm", "Rm", "Ra")
 FLAGGED = {IDS[1]}                          # tau_s 300 ms > 265 ms in the fixture's per-cell table
 
@@ -237,22 +247,22 @@ def test_a8_1_merge_controls_only_reports(group, tmp_path):
     man = pd.read_csv(out / "manifest.csv")
     row = man[man["configuration"] == "active_fit"].iloc[0]
     tid = int(row["specimen_id"])
-    vals = {n: float(row[TRUTH_COL[n]]) * 1.1 for n in IH6 if n != "dv_h"}
-    vals["dv_h"] = 1.0
+    vals = {n: float(row[TRUTH_COL[n]]) * 1.1 for n in IH5}
     vals["gbar"] = 1e-6                                     # the low rail: what a control should give
-    _results(out, tid, IH6, vals, "ih6")
+    _results(out, tid, IH5, vals, "ih5")
     assert rtr.main(["merge", "--out", str(out), "--no-plot"]) == 0
-    gated = [a for a in IH6 if RR.RecoveryTolerances().for_axis(a) is not None]
-    assert gated == ["Cm", "gbar", "dv_h", "kappa_tau"]
+    gated = [a for a in IH5 if RR.RecoveryTolerances().for_axis(a) is not None]
+    assert gated == ["Cm", "gbar", "kappa_tau"]             # the required axes of 2.8 (g)
     for sub in ("report", "report_without_flagged"):
         d = out / sub
         summ = pd.read_csv(d / "recovery_summary.csv")
         assert len(summ) == 0 and list(summ.columns) == SUMMARY_COLUMNS_SPEC, (sub, list(summ.columns))
         long_df = pd.read_csv(d / "recovery_per_cell.csv")
-        assert len(long_df) == 6 and set(long_df["specimen_id"]) == {tid} and long_df["is_fp_control"].all()
+        assert len(long_df) == 5 and set(long_df["specimen_id"]) == {tid} and long_df["is_fp_control"].all()
         fp = pd.read_csv(d / "fp_control.csv")
-        assert len(fp) >= 1 and set(fp["arm"]) == {"ih6"}
+        assert len(fp) >= 1 and set(fp["arm"]) == {"ih5"}
         ver = pd.read_csv(d / "gate_verdict.csv")
+        assert "dv_h" not in set(ver["parameter"])         # not an axis of ih5, not required
         for a in gated:
             v = ver[ver["parameter"] == a]
             assert len(v) == 1 and v["verdict"].iloc[0] == "FAIL (axis absent)", (sub, a, ver.to_dict("records"))
@@ -273,8 +283,11 @@ def test_a8_1_merge_drop_railed_every_noncontrol_axis_railed(group, tmp_path):
     tid = int(row["specimen_id"])
     import ih_recovery_report as RR
     box = dict(RR.DEFAULT_BOX)
-    vals = {a: float(box[a][0]) for a in IH6}               # every estimate on the low bound -> rail
-    _results(out, tid, IH6, vals, "ih6")
+    rc = json.loads((out / "run_config.json").read_text())
+    box["gbar"] = tuple(float(x) for x in rc["options"]["gbar_bounds"].split(","))
+    box["kappa_tau"] = tuple(rc["tau_h_pk"]["bounds_kappa"])
+    vals = {a: float(box[a][0]) for a in IH5}               # every estimate on the low bound -> rail
+    _results(out, tid, IH5, vals, "ih5")
     try:
         code = rtr.main(["merge", "--out", str(out), "--no-plot"])
     except KeyError as exc:                                 # what the guard of 8.1 does not cover
@@ -448,3 +461,381 @@ def test_a8_3_negative_base_seed(group, tmp_path, monkeypatch):
     st = json.loads((out / "status" / ("twin_%d.json" % tid)).read_text())
     assert st["status"] == "build_failed"
     pytest.xfail("plan accepts --base-seed -1 (exit 0); the twin then ends build_failed: %s" % st["reason"][:200])
+
+
+# ===========================================================================
+#  Block 17 (integration tester, 2026-11-22, third incremental run).
+#  Oracles: the Block 17 entry and SPEC 2.8 (a), (e), (f), (g). Expected
+#  values: tau_h^{base,pk} as the closed-form maximum of the mechanism's tau(v)
+#  (constants read from mod/Ih_human.mod); m_inf(v) = 1 / (1 + exp((v + 90.87) /
+#  8.05)); the noise of the full twin written out from 2.7 (c)-(e); the
+#  loss_verdict rule of the entry (2 % of the other loss); evaluate_gate with
+#  required_axes=None against ih_recovery_report.py at the base commit.
+# ===========================================================================
+import math                                    # noqa: E402
+import re                                      # noqa: E402
+import subprocess                              # noqa: E402
+
+B17_SMALL = ["--n-per-configuration", "1", "--n-no-noise", "1", "--n-calls", "1", "--n-initial", "1"]
+BASE17 = "216ecf13ccca455903b2cb05d740dd64f3feff08"
+
+
+def _plan17(group, out, *extra):
+    return rtr.main(["plan", "--group-dir", str(group["gdir"]), "--noise-dir", str(group["ndir"]), "--out", str(out)]
+                    + B17_SMALL + list(extra))
+
+
+def _tau_base_closed_form():
+    txt = (rtr.HERE / "mod" / "Ih_human.mod").read_text()
+    c = {k: float(re.search(r"^\s*%s\s*=\s*([-+0-9.eE]+)" % k, txt, re.M).group(1))
+         for k in ("aa", "bb", "cc", "dd", "ff")}
+    v = (math.log(c["bb"] / c["dd"]) + c["cc"] - c["aa"]) / (c["bb"] + c["dd"])
+    return c["ff"] + 1.0 / (math.exp(-c["aa"] - c["bb"] * v) + math.exp(-c["cc"] + c["dd"] * v))
+
+
+def _minf(v):
+    return 1.0 / (1.0 + math.exp((v + 90.87) / 8.05))
+
+
+def test_b17_plan_records_and_manifest(group, tmp_path):
+    out = tmp_path / "p17"
+    assert _plan17(group, out, "--seed", "4") == 0
+    rc = json.loads((out / "run_config.json").read_text())
+    tau = rc["tau_h_pk"]
+    base = _tau_base_closed_form()
+    assert abs(tau["base_ms"] - base) <= 1e-3                     # the 0.01 mV scan of the code
+    assert tau["bounds_ms"] == [50.0, 1000.0] and tau["truth_ms"] == [150.0, 700.0]
+    assert tau["bounds_kappa"] == [50.0 / tau["base_ms"], 1000.0 / tau["base_ms"]]
+    assert tau["truth_kappa"] == [150.0 / tau["base_ms"], 700.0 / tau["base_ms"]]
+    assert rc["dvh_truth_mV"] == 0.0 and rc["gate_arm"] == "ih5"
+    assert rc["gate_required_axes"] == ["Cm", "gbar", "kappa_tau"]
+    o = rc["options"]
+    assert o["gbar_bounds"] == "1e-6,1e-2" and o["tau_h_pk_bounds_ms"] == "50,1000" and o["n_no_noise"] == 1
+    assert "kappa_bounds" not in o and "kappa_range" not in o and "dvh_range" not in o
+    assert rc["truth_kwargs"]["ih_kappa_range"] == tau["truth_kappa"] and rc["truth_kwargs"]["ih_dvh_range_mV"] is None
+    import twin_manifest as TM
+    man = TM.load_twin_manifest(out / "manifest.csv")
+    assert list(man["configuration"]) == ["full", "passive_fit", "active_fit", "full_no_noise"]
+    assert list(man["arm"]) == ["ih5", "passive_fullstep", "ih5", "ih5"]
+    assert list(man["specimen_id"]) == [900000000, 900000100, 900000200, 900000300]
+    ih = man["configuration"].isin(["full", "passive_fit", "full_no_noise"])
+    assert (man.loc[ih, "ih_dvh_mV"] == 0.0).all()
+    k = man.loc[ih, "ih_kappa_tau"].to_numpy(dtype=float)
+    assert np.all((k >= tau["truth_kappa"][0]) & (k <= tau["truth_kappa"][1]))
+    nn, fu = man.iloc[3], man.iloc[0]
+    assert int(nn["paired_with"]) == 900000000 and not bool(nn["with_noise"])
+    assert TM.twin_theta(nn) == TM.twin_theta(fu) and int(nn["twin_of_specimen_id"]) == int(fu["twin_of_specimen_id"])
+    # the manifest is Block 16's on real_cells with the recorded truth kwargs
+    rc_cells = pd.read_csv(out / "real_cells_G.csv")
+    kw = dict(rc["truth_kwargs"])
+    for key in ("ih_kappa_range", "ih_gbar_range_S_cm2"):
+        if kw.get(key) is not None:
+            kw[key] = tuple(kw[key])
+    kw["ih_regions"] = tuple(kw["ih_regions"])
+    ref = TM.draw_twin_manifest(rc_cells[list(TM.REAL_CELL_COLUMNS)], n_per_configuration=1, n_no_noise=1, seed=4,
+                                id_base=900000000, dvh_truth_mV=0.0, truth_kwargs=kw)
+    pd.testing.assert_frame_equal(man, ref)
+    # list: the four twins (the submitter counts them for the cap)
+    import io
+    import contextlib
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        assert rtr.main(["list", "--out", str(out)]) == 0
+    assert buf.getvalue().split() == ["900000000", "900000100", "900000200", "900000300"]
+
+
+@pytest.mark.parametrize("old", [["--kappa-bounds", "0.5,2"], ["--kappa-range", "0.5,2"], ["--dvh-range=-5,5"]])
+def test_b17_old_options_gone(group, tmp_path, old):
+    assert _plan17(group, tmp_path / "o", *old) == 2
+
+
+def test_b17_n_no_noise_above_n_refused(group, tmp_path):
+    assert rtr.main(["plan", "--group-dir", str(group["gdir"]), "--noise-dir", str(group["ndir"]),
+                     "--out", str(tmp_path / "x"), "--n-per-configuration", "1", "--n-calls", "1",
+                     "--n-initial", "1"]) == 3                   # the default --n-no-noise 5 > 1
+
+
+def test_b17_fit_command_and_noise_free_twin(group, tmp_path, monkeypatch):
+    """TS11 and TS12's first half: the fit's command line per configuration (recorded), and the
+    full_no_noise archive = its partner's archive minus the partner's noise (2.7 (c)-(e) written out)."""
+    import run_ih_fit as R
+    import twin_manifest as TM
+    import passive_fitting_hpc_fixed as mono
+    out = tmp_path / "c17"
+    assert _plan17(group, out, "--seed", "4") == 0
+    seen = {}
+    monkeypatch.setattr(R, "main", lambda argv: seen.__setitem__(len(seen), list(argv)))
+    man = TM.load_twin_manifest(out / "manifest.csv")
+    for _, row in man.iterrows():
+        tid = int(row["specimen_id"])
+        n0 = len(seen)
+        assert rtr.main(["twin", "--out", str(out), "--twin", str(tid)]) == 1   # no results written: fit_failed
+        st = json.loads((out / "status" / ("twin_%d.json" % tid)).read_text())
+        assert st["built"] is True and st["status"] == "fit_failed", st
+        argv = seen[n0]
+        assert argv[argv.index("--arm") + 1] == row["arm"]
+        assert "--tau-h-pk-bounds-ms=50,1000" in argv and not any(a.startswith("--kappa-bounds") for a in argv)
+        ev = [a for a in argv if a.startswith("--eval-theta")]
+        conf = row["configuration"]
+        if conf in ("full", "full_no_noise"):
+            assert len(ev) == 1
+            th = dict(kv.split("=") for kv in ev[0].split("=", 1)[1].split(","))
+            assert list(th) == list(R.IH5_NAMES)
+            truth = TM.twin_theta(row)
+            for n in R.IH5_NAMES:
+                assert float(th[n]) == float(truth[n]), n           # exactly: repr round-trips float64
+        else:
+            assert ev == [], conf
+        a = R._parse_args(argv)                                   # the fit's own parser accepts it
+        assert R.resolve_arm_config(a).name == row["arm"]
+        meta = json.loads((out / "twins" / ("twin_%d" % tid) / ("specimen_%d" % tid) / "metadata.json").read_text())
+        assert meta["twin"]["with_noise"] is bool(row["with_noise"])
+    # the noise-free twin: the full twin's traces minus its noise and tilt line
+    full_id, nn_id = 900000000, 900000300
+    rd = {}
+    for t in (full_id, nn_id):
+        d = out / "twins" / ("twin_%d" % t) / ("specimen_%d" % t)
+        with np.load(d / "ss_pulses.npz") as z, np.load(d / "ls_sweeps.npz") as y:
+            rd[t] = (z["v"].copy(), {k: y[k].copy() for k in y.files}, json.loads((d / "metadata.json").read_text()))
+    real = int(man.iloc[0]["twin_of_specimen_id"])
+    prot = tt.load_cell_protocol(group["gdir"] / ("specimen_%d" % real), spike_reason_fn=mono.sweep_spike_reason)
+    table = tt.read_twin_sweep_table(out / "twin_sweeps_G.csv")
+    base = json.loads((out / "run_config.json").read_text())["twin_config"]["base_seed"]
+    dt = 1.0 / prot.ss_fs_Hz
+    n_w = prot.ss_t_s.size
+    vf, vn = rd[full_id][0], rd[nn_id][0]
+    for s in np.unique(prot.ss_sweep_number):
+        r = table[(table["specimen_id"] == real) & (table["protocol"] == "SS") & (table["sweep_number"] == s)].iloc[0]
+        law = (r["sigma_f_mV"], r["sigma_m_mV"], r["tau_m_s"], r["sigma_s_mV"], r["tau_s_s"])
+        m = np.flatnonzero(prot.ss_sweep_number == s)
+        pos = prot.ss_position[m]
+        u = (pos[:, None] * prot.ss_period_samples + np.arange(n_w)[None, :]) * dt
+        for j, k in enumerate(m):
+            e = _noise([base, full_id, 0, int(s), int(pos[j])], n_w, law, dt) + r["tilt_mV_per_s"] * (u[j] - u.mean())
+            np.testing.assert_allclose(vf[k] - vn[k], e, rtol=0, atol=1e-11)   # roundoff of mV-sized sums
+    for ent in rd[nn_id][2]["ls_sweeps"]:
+        mi, s = int(ent["index"]), int(ent["sweep_number"])
+        r = table[(table["specimen_id"] == real) & (table["protocol"] == "LS") & (table["sweep_number"] == s)].iloc[0]
+        law = (r["sigma_f_mV"], r["sigma_m_mV"], r["tau_m_s"], r["sigma_s_mV"], r["tau_s_s"])
+        n = rd[nn_id][1]["v_%d" % mi].size
+        e = _noise([base, full_id, 1, s], n, law, dt) + r["tilt_mV_per_s"] * (np.arange(n) - (n - 1) / 2) * dt
+        np.testing.assert_allclose(rd[full_id][1]["v_%d" % mi] - rd[nn_id][1]["v_%d" % mi], e, rtol=0, atol=1e-11)
+    # reuse only when with_noise matches the manifest's
+    d = out / "twins" / ("twin_%d" % nn_id) / ("specimen_%d" % nn_id)
+    meta = json.loads((d / "metadata.json").read_text())
+    meta["twin"]["with_noise"] = True
+    (d / "metadata.json").write_text(json.dumps(meta))
+    assert rtr.main(["twin", "--out", str(out), "--twin", str(nn_id)]) == 1
+    st = json.loads((out / "status" / ("twin_%d.json" % nn_id)).read_text())
+    assert st["status"] == "build_failed" and "with_noise" in st["reason"], st
+
+
+@pytest.fixture(scope="module")
+def e2e17(group, tmp_path_factory):
+    """Plan, the four twins built and fitted at the smallest budget, merge; twice, in two run dirs."""
+    runs = []
+    for name in ("r1", "r2"):
+        out = tmp_path_factory.mktemp("e17") / name
+        assert _plan17(group, out, "--seed", "4") == 0
+        codes = [rtr.main(["twin", "--out", str(out), "--twin", str(t)])
+                 for t in (900000000, 900000100, 900000200, 900000300)]
+        assert rtr.main(["merge", "--out", str(out), "--no-plot"]) == 0
+        runs.append((out, codes))
+    return runs
+
+
+def test_b17_end_to_end_fits_and_records(e2e17):
+    """Block 15's columns of 2.8 (f) on the fits Block 17 ran (I3, I5 in substance)."""
+    import twin_manifest as TM
+    out, codes = e2e17[0]
+    assert codes == [0, 0, 0, 0], codes
+    rc = json.loads((out / "run_config.json").read_text())
+    base = rc["tau_h_pk"]["base_ms"]
+    man = TM.load_twin_manifest(out / "manifest.csv")
+    for _, row in man.iterrows():
+        tid = int(row["specimen_id"])
+        fd = out / "fits" / ("twin_%d" % tid)
+        res = pd.read_csv(fd / "phase2_results.csv")
+        r = res[res["specimen_id"] == tid].iloc[0]
+        names = r["param_names"].split("|") if isinstance(r["param_names"], str) else []
+        conf = row["configuration"]
+        exp_names = ["Cm", "Rm", "Ra"] if conf == "passive_fit" else ["Cm", "Rm", "Ra", "gbar", "kappa_tau"]
+        assert names == exp_names, (conf, names)
+        assert (r["ls_role_rule"], r["weighting"], r["ls_sample_weight"]) == ("d207", "ls_amplitude", "peak_decay")
+        assert r["ls_tau_d_ms"] == 500.0
+        roles = pd.read_csv(fd / "ls_roles.csv")
+        hyp = roles[roles["polarity"] == "hyp"].copy()
+        hyp["a"] = hyp["amplitude_pA"].abs()
+        hyp = hyp.sort_values("a")
+        assert list(hyp["role"]) == ["validate", "train"]           # n = 2: h_1 validates, h_2 trains (2.8 (b))
+        v_star = float(hyp.loc[hyp["role"] == "train", "v_trough_mV"].min())
+        assert r["v_deepest_train_mV"] == pytest.approx(v_star, rel=1e-12)
+        # loss_at_estimate is the training loss at the estimate: the optimiser's value (1e-9 relative)
+        assert r["loss_at_estimate"] == pytest.approx(r["train_rel_loss"], rel=1e-9)
+        if conf == "passive_fit":
+            assert math.isnan(r["tau_h_pk_ms"]) and math.isnan(r["gh_at_v_deepest_S_cm2"])
+            assert math.isnan(r["loss_at_eval_theta"])
+        else:
+            assert r["tau_h_base_pk_ms"] == pytest.approx(base, rel=1e-15)
+            assert r["tau_h_pk_ms"] == pytest.approx(r["kappa_tau"] * base, rel=1e-12)
+            assert r["gh_at_v_deepest_S_cm2"] == pytest.approx(r["gbar"] * _minf(v_star), rel=1e-12)
+            if conf == "active_fit":
+                assert math.isnan(r["loss_at_eval_theta"])
+            else:
+                assert np.isfinite(r["loss_at_eval_theta"]) and r["loss_at_eval_theta"] > 0
+
+
+def test_b17_merge_reports_and_extras(e2e17):
+    import twin_manifest as TM
+    out, _ = e2e17[0]
+    rc = json.loads((out / "run_config.json").read_text())
+    base = rc["tau_h_pk"]["base_ms"]
+    man = TM.load_twin_manifest(out / "manifest.csv")
+    noisy = set(man.loc[man["with_noise"], "specimen_id"].astype(int))
+    clean = set(man.loc[~man["with_noise"], "specimen_id"].astype(int))
+    assert clean == {900000300}
+    flagged = set(man.loc[man["cell_tau_s_above_window"].astype(bool), "specimen_id"].astype(int))
+    for sub, want in (("report", noisy), ("report_without_flagged", noisy - flagged), ("report_no_noise", clean)):
+        d = out / sub
+        if not want:
+            assert (d / "NO_RESULTS.txt").is_file(), sub
+            continue
+        long_df = pd.read_csv(d / "recovery_per_cell.csv")
+        assert set(long_df["specimen_id"].astype(int)) == want, sub
+        ver = pd.read_csv(d / "gate_verdict.csv")
+        ih5 = ver[ver["arm"] == "ih5"]
+        assert "dv_h" not in set(ih5["parameter"]), sub            # 2.8 (g): not an axis of ih5, not failed
+        for a in ("Cm", "gbar", "kappa_tau"):
+            assert (ih5["parameter"] == a).sum() == 1, (sub, a)
+    byc = pd.read_csv(out / "recovery_by_configuration.csv")
+    assert set(byc["configuration"]) == {"full", "passive_fit", "active_fit", "full_no_noise"}
+    ex = pd.read_csv(out / "recovery_extras.csv", float_precision="round_trip")
+    assert list(ex.columns) == ["twin_id", "configuration", "twin_of_specimen_id", "paired_with", "with_noise",
+                                "cell_tau_s_above_window", "tau_h_pk_true_ms", "tau_h_pk_est_ms", "loss_at_truth",
+                                "loss_at_estimate", "loss_verdict", "v_deepest_train_mV", "gh_deep_true_S_cm2",
+                                "gh_deep_est_S_cm2", "ln_gh_deep_ratio"]
+    assert list(ex["twin_id"]) == list(man["specimen_id"])
+    for _, e in ex.iterrows():
+        tid = int(e["twin_id"])
+        row = man[man["specimen_id"] == tid].iloc[0]
+        r = pd.read_csv(out / "fits" / ("twin_%d" % tid) / "phase2_results.csv", float_precision="round_trip").iloc[0]
+        th = TM.twin_theta(row)
+        conf = row["configuration"]
+        assert e["configuration"] == conf and int(e["paired_with"]) == int(row["paired_with"])
+        assert bool(e["with_noise"]) == bool(row["with_noise"])
+        assert e["v_deepest_train_mV"] == pytest.approx(r["v_deepest_train_mV"], rel=1e-15)
+        if conf == "active_fit":
+            assert math.isnan(e["tau_h_pk_true_ms"]) and math.isnan(e["gh_deep_true_S_cm2"])
+        else:
+            assert e["tau_h_pk_true_ms"] == pytest.approx(th["kappa_tau"] * base, rel=1e-12)
+            assert e["gh_deep_true_S_cm2"] == pytest.approx(th["gbar"] * _minf(e["v_deepest_train_mV"]), rel=1e-12)
+        lt, le = e["loss_at_truth"], e["loss_at_estimate"]
+        if conf in ("full", "full_no_noise"):
+            # 1e-15 relative: merge reads phase2_results.csv with pandas' default float parser (last digit)
+            assert lt == pytest.approx(r["loss_at_eval_theta"], rel=1e-15)
+            assert le == pytest.approx(r["loss_at_estimate"], rel=1e-15)
+            exp = "optimiser" if le - lt > 0.02 * le else ("data" if lt - le > 0.02 * lt else "tie")
+            assert e["loss_verdict"] == exp
+        else:
+            assert math.isnan(lt) and e["loss_verdict"] == "na"
+        if conf == "passive_fit":
+            assert math.isnan(e["tau_h_pk_est_ms"]) and math.isnan(e["gh_deep_est_S_cm2"])
+            assert math.isnan(e["ln_gh_deep_ratio"])
+        elif conf != "active_fit":
+            assert e["ln_gh_deep_ratio"] == pytest.approx(math.log(e["gh_deep_est_S_cm2"] / e["gh_deep_true_S_cm2"]),
+                                                          rel=1e-12)
+    ts = pd.read_csv(out / "twins_status.csv")
+    assert list(ts["status"]) == ["ok"] * 4
+
+
+def test_b17_two_runs_identical(e2e17):
+    (a, _), (b, _) = e2e17
+    for f in ("manifest.csv", "twin_sweeps_G.csv", "recovery_extras.csv"):
+        pa, pb = pd.read_csv(a / f), pd.read_csv(b / f)
+        pd.testing.assert_frame_equal(pa, pb)
+    for t in (900000000, 900000100, 900000200, 900000300):
+        ra = pd.read_csv(a / "fits" / ("twin_%d" % t) / "phase2_results.csv")
+        rb = pd.read_csv(b / "fits" / ("twin_%d" % t) / "phase2_results.csv")
+        num = [c for c in ra.columns if ra[c].dtype.kind == "f" and "seconds" not in c and "time" not in c]
+        pd.testing.assert_frame_equal(ra[num], rb[num])
+        for part in ("ss_pulses.npz", "ls_sweeps.npz"):
+            za = np.load(a / "twins" / ("twin_%d" % t) / ("specimen_%d" % t) / part)
+            zb = np.load(b / "twins" / ("twin_%d" % t) / ("specimen_%d" % t) / part)
+            for k in za.files:
+                assert_array_equal(za[k], zb[k])
+
+
+def _old_report(_c={}):
+    if "m" in _c:
+        return _c["m"]
+    import importlib.util
+    import sys
+    import tempfile
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=rtr.HERE, capture_output=True, text=True,
+                         check=True).stdout.strip()
+    rel = (Path(rtr.HERE).resolve().relative_to(top) / "ih_recovery_report.py").as_posix()
+    src = subprocess.run(["git", "show", "%s:%s" % (BASE17, rel)], cwd=top, capture_output=True, check=True).stdout
+    p = Path(tempfile.mkdtemp()) / "ih_recovery_report_base.py"
+    p.write_bytes(src)
+    spec = importlib.util.spec_from_file_location("ih_recovery_report_base", p)
+    m = importlib.util.module_from_spec(spec)
+    sys.modules["ih_recovery_report_base"] = m
+    spec.loader.exec_module(m)
+    _c["m"] = m
+    return m
+
+
+def _summary(arm, errs):
+    rows = []
+    for p, e in errs.items():
+        rows.append(dict(arm=arm, parameter=p, n=5, n_railed=0, median_abs_err=e, q25_abs_err=e, q75_abs_err=e,
+                         median_err=e, err_kind="log_ratio" if p != "dv_h" else "diff"))
+    return pd.DataFrame(rows)
+
+
+@pytest.mark.parametrize("errs", [
+    dict(Cm=0.05, Rm=0.1, Ra=0.3, gbar=0.2, kappa_tau=0.1),                 # all within: pass on ih5
+    dict(Cm=0.05, Rm=0.1, Ra=0.3, gbar=5.0, kappa_tau=0.1),                 # gbar out: fail
+    dict(Cm=0.05, Rm=0.1, Ra=0.3, gbar=0.2),                                # kappa absent: fail (required)
+    dict(Cm=0.05, Rm=0.1, Ra=0.3, gbar=0.2, dv_h=9.0, kappa_tau=0.1),       # dv_h present: judged as before
+])
+def test_b17_evaluate_gate_required_axes(errs):
+    import ih_recovery_report as RR
+    old = _old_report()
+    summ = _summary("ih5", errs)
+    fp = pd.DataFrame()
+    tol = RR.RecoveryTolerances()
+    ver, ok = RR.evaluate_gate(summ, fp, arm="ih5", tol=tol, required_axes=("Cm", "gbar", "kappa_tau"))
+    # the axes that decide: the three required ones present and within, plus any present gated axis
+    def within(a):
+        t = tol.for_axis(a)
+        return a in errs and errs[a] <= t
+    exp_axes = all(within(a) for a in ("Cm", "gbar", "kappa_tau")) and \
+        (("dv_h" not in errs) or within("dv_h"))
+    rows = ver[ver["arm"] == "ih5"] if "arm" in ver.columns else ver
+    if "dv_h" not in errs:
+        assert "dv_h" not in set(rows["parameter"])
+    if "kappa_tau" not in errs:
+        assert rows[rows["parameter"] == "kappa_tau"]["verdict"].iloc[0] == "FAIL (axis absent)"
+    # the axes rows decide as the tolerances say (the control rows may decide the rest)
+    ax_rows = rows[rows["parameter"].isin(["Cm", "gbar", "kappa_tau", "dv_h"])]
+    assert (not ax_rows["verdict"].astype(str).str.startswith("FAIL").any()) == exp_axes
+    # required_axes=None: the old verdict table, exactly
+    v_new, ok_new = RR.evaluate_gate(summ, fp, arm="ih5", tol=tol)
+    v_old, ok_old = old.evaluate_gate(summ, fp, arm="ih5", tol=old.RecoveryTolerances())
+    pd.testing.assert_frame_equal(v_new, v_old)
+    assert ok_new == ok_old
+    with pytest.raises(ValueError):
+        RR.evaluate_gate(summ, fp, arm="ih5", tol=tol, required_axes=("Cm", "dvh"))
+
+
+def test_b17_submitter_usage_names_new_options():
+    text = (rtr.HERE / "submit_twin_recovery.sh").read_text()
+    for opt in ("--n-no-noise", "--gbar-bounds", "--tau-h-pk-bounds-ms", "--tau-h-pk-truth-ms"):
+        assert opt in text, opt
+    raw = (rtr.HERE / "submit_twin_recovery.sh").read_bytes()
+    assert all(c < 128 for c in raw) and b"\r" not in raw
+    for f in ("run_twin_recovery.py", "ih_recovery_report.py"):
+        raw = (rtr.HERE / f).read_bytes()
+        assert all(c < 128 for c in raw) and b"\r" not in raw, f
+    assert subprocess.run(["bash", "-n", str(rtr.HERE / "submit_twin_recovery.sh")]).returncode == 0
