@@ -1468,7 +1468,9 @@ orchestrator's (D-210).
   a crop that extends at least 7 $s_{\max}$ beyond the soma (the light outside it below 1e-11). (T4) a direct
   reference on a small case: `scipy.ndimage.gaussian_filter` with sigma $s_{jk}/h$, mode "constant", truncate
   `rcfg.direct_truncate`, per (slab, plane) on the same samples, summed and pixel-integrated, with SDs below one sample
-  among them [1e-9 absolute in tau: the wrap below $e^{-18}$, the truncation's tail below 1e-15, the aliases below
+  among them [1e-9 absolute in tau: the wrap -- the kernel's mass beyond 6 $s_{\max}$, below 4e-9, times a slab's
+  absorbed fraction, at most $\mu\Delta\zeta$; measured 2e-12 with the soma filling the crop [corrected 2026-11-22: the
+  entry said "below $e^{-18}$", 1.5e-8, above the tolerance] --, the truncation's tail below 1e-15, the aliases below
   1e-12]. (T5) convergence: in f = 1, 2, 4 against f = 8 (a small soma), the largest difference in tau decreases; in
   $\Delta\zeta$ = 0.56, 0.28, 0.14 against 0.035 um at f = 1, it decreases; the differences at the defaults (f = 1,
   $\Delta\zeta$ = 0.14 um) are reported (the discretisation error of D-219.1). (T6) slope: slope = the configured
@@ -1485,7 +1487,16 @@ orchestrator's (D-210).
 - Confirmed: the ellipsoid, the partition absorption, stage units and the far slope as a parameter are the user's
   (D-216.1, D-218); the sampling, the slab thickness and the kernel's discretisation are the orchestrator's,
   PROVISIONAL (D-219).
-- Status: contract (wave 5).
+- Status: implemented 2026-11-22 by one implementer (wave 5), merged `d1ee02f` (block commit `160f980`);
+  `test_smoke_soma_render.py` 10 pass (rerun by the orchestrator at the gate) **[run, sandbox]**: T2 1.8e-15; T3 2e-16;
+  T4 7e-16 (f 1, SDs from 0.71 sample) and 2e-15 (f 2); T5 against f = 8: 2.1e-2, 6.9e-3, 4.1e-3 at f = 1, 2, 4, against
+  dzeta 0.035 um: 4.0e-2, 1.3e-2, 4.0e-3 at 0.56, 0.28, 0.14 um; T8 5.4 s, 380 MB (a 945 x 945 box). The implementer's
+  side run at the pilot's size (a 4.3 x 3.9 x 3.5 um soma, mu 0.2/um, planes within 5 um): f = 1 against f = 4, at most
+  2.5e-2 in tau on the in-focus plane's rim pixels (about 2.8 gl at B = 110 gl, the noise's size), RMS 4.9e-4, at most
+  7e-4 on the other planes; f = 2 at most 8.8e-3; dzeta 0.14 against 0.035 um at most 1.5e-3 -- D-219.1 to be tested by
+  the wave's recovery check (truth rendered at f = 4, fitted at f = 1). Choices the entry left open: q evaluated as
+  1 - min(A, B) rho^2 - |A - B| w^2 (exact phi-independence at a = b); rows and columns where a transfer is exactly 0
+  skipped (bit-identical, tested); no chunking of the planes (memory about K N_y (N_x/2 + 1) 16 B).
 
 ### Block 46: the soma fit -- an ellipsoid fitted to the planes about the soma (D-215, D-216, D-218, D-219)
 
