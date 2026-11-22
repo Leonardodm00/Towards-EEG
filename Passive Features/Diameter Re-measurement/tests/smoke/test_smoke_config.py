@@ -164,8 +164,8 @@ def test_reference():
     # [2026-11-13, contract of wave 1 (D-129, D-130)] the fields of the cleaning and inference sections are declared
     # with the contract, before the blocks that read them (Blocks 23-34); they are exempt until wave 3 is merged
     pending = {u for u in unread if u.split(".")[0] in ("cleaning", "inference")}
-    # [2026-11-22, contract of wave 5 (D-218)] the soma fit's fields are declared before Blocks 45-46 read them;
-    # exempt until wave 5 is merged (the exemption is removed then)
+    # [2026-11-22, contract of wave 5 (D-218, D-219)] the soma fit's fields are declared before Blocks 45-46 and the
+    # entry point read them (mask_widen_um is read by Block 47, scripts/fit_soma.py); exempt until Block 47 is merged
     pending |= {u for u in unread if u.split(".")[0] == "soma_fit"}
     # [2026-11-22] the sigma calibration's fields (D-201), exempt while Block 42 and its entry point were written,
     # are all read now (Block 42 merged, scripts/calibrate_sigma.py): the exemption is gone

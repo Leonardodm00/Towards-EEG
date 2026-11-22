@@ -20,3 +20,14 @@ model the soma's own stack separates its height from the kernel's far growth.
 
 Not in it (precision, not accuracy): a soma that is not an ellipsoid (the pilot's is pyramidal), a far-defocus point
 spread that is not Gaussian, neuropil and background structure, JPEG.
+
+## The blur's discretisation (2026-11-22, D-219.2): `check_transfer.py`
+
+Run: `python3 check_transfer.py` (numpy only, 1 s); output in `check_transfer_output.txt`. On a periodic grid of 4096
+samples, for SDs s from 0.2 to 20 samples: (1) the transfer of the normalised sampled Gaussian by Poisson summation,
+sum over m of exp(-2 pi^2 s^2 (nu - m/h)^2), normalised at nu = 0, M = max(1, ceil(1.2 h/s)) aliases, equals the DFT
+of that kernel to 1.8e-15; (2) the continuous transfer exp(-2 pi^2 s^2 nu^2) used above (with a floor at half a
+pixel) has a kernel with negative lobes below about one sample (minimum -1.8e-2 at 0.5, -2.6e-3 at 0.7, -1.6e-4 at 1
+sample), so a blurred edge overshoots (by 1.3e-2 at 0.5 sample, 1.6e-3 at 0.7: the pilot kernel's in-focus 0.08 um on
+0.1144 um pixels) and the transmittance can exceed 1; the sampled kernel does not overshoot (below 7e-16). Block 45
+therefore uses the sampled Gaussian (SPEC Block 45; D-219.2).

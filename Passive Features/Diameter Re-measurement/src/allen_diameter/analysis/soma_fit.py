@@ -1,4 +1,4 @@
-"""The soma fit -- Block 46 in specs/SPEC.md (D-215, D-216, D-218). CONTRACT STUB (wave 5).
+"""The soma fit -- Block 46 in specs/SPEC.md (D-215, D-216, D-218, D-219). CONTRACT STUB (wave 5).
 
 An ellipsoid fitted to the planes about the soma: D_k(x, y) ~ B_k tau_k(x, y; theta) over a disk about the traced
 soma, Allen's traced stems and the neuropil masked; theta = (x0, y0, z0, a, b, c, phi, mu, gamma), gamma the kernel's
@@ -53,9 +53,9 @@ def ellipsoid_area(a_um, b_um, c_um):
 
 
 def select_planes(ks, valid, z_start_um, dz_um, half_um, step):
-    """-> indices into ks (ascending) of the recorded planes k with |k dz - z_start| <= half_um, every step-th one
-    counted from the recorded plane nearest z_start (that plane included). ks (n,) int ascending, valid (n,) bool.
-    ValueError when fewer than 3 are selected, step < 1 or half_um < 0."""
+    """-> the indices i into ks (ascending) with valid[i], |ks[i] dz - z_start| <= half_um and ks[i] - k_0 divisible
+    by step, k_0 the k of the valid plane nearest z_start / dz (ties: the lower k). ks (n,) int ascending, valid (n,)
+    bool; z_start_um, dz_um, half_um um. ValueError when fewer than 3 are selected, step < 1 or half_um < 0."""
     raise NotImplementedError("Block 46 (wave 5)")
 
 
@@ -66,9 +66,16 @@ def vp_scale(D, tau, region):
 
 
 def start_theta(block_k0, left, top, res0_um, centre_um, radius_um, region, slope0):
-    """-> theta0 (9,): (x_s, y_s, z_s, r_s, r_s, r_s, 0, mu_0, slope0), mu_0 = -ln(rho) / (2 r_s), rho = clip(the
-    5th percentile of the plane block_k0 (H, W) gl within 0.5 r_s of (x_s, y_s) / its median over the region's pixels
-    farther than 1.5 r_s, 0.05, 0.95). centre_um (3,) um (image frame; depth in stage units); radius_um um."""
+    """-> theta0 (9,) = (x_s, y_s, z_s, a_0, b_0, r_s, phi_0, mu_0, slope0) (D-219.5), from the plane block_k0 (H, W)
+    gl, the crop's corner (left, top) px, res0_um, the traced centre centre_um (3,) um (image frame; depth in stage
+    units) and radius radius_um um, the region (H, W) bool. rho: a pixel centre's distance from (x_s, y_s);
+    B_far = the median of block_k0 over the region with rho > 1.5 r_s (the whole region if none);
+    mu_0 = -ln(varrho) / (2 r_s), varrho = clip(the 5th percentile of block_k0 over the region with rho <= 0.5 r_s,
+    divided by B_far, 0.05, 0.95), 0.5 if none; weights w = max(0, 1 - block_k0 / B_far) on the region with
+    rho <= 1.5 r_s, C their weighted covariance of (x, y) about the weighted mean, lambda_1 >= lambda_2 its
+    eigenvalues: phi_0 = atan2(2 C_xy, C_xx - C_yy) / 2, a_0 = r_s (lambda_1 / lambda_2)^(1/4),
+    b_0 = r_s (lambda_2 / lambda_1)^(1/4) (a_0 = b_0 = r_s, phi_0 = 0 when sum w = 0 or lambda_2 <= 0). Not clipped
+    here: fit_soma clips the start into the bounds."""
     raise NotImplementedError("Block 46 (wave 5)")
 
 

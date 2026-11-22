@@ -512,31 +512,29 @@ class SomaViewConfig:
 
 @dataclass(frozen=True)
 class SomaFitConfig:
-    """The soma's forward model and fit (SPEC Blocks 45-46; D-215, D-216, D-218): an ellipsoid rendered with the
-    partition absorption and fitted to the planes about the soma. Outside every signature."""
+    """The soma's forward model and fit (SPEC Blocks 45-46; D-215, D-216, D-218, D-219): an ellipsoid rendered with
+    the partition absorption and fitted to the planes about the soma. Outside every signature. The kernel, the FFT
+    box's padding (renderer.fft_wrap_sigmas) and the light direction (acquisition.light_direction) are not repeated
+    here."""
 
     # Block 45, the forward model
-    fine_factor: int = 1                   # source: PROVISIONAL (D-218 [orchestrator]): samples per pixel side (1: the pixel grid)
-    dzeta_um: float = 0.14                 # source: PROVISIONAL (D-218 [orchestrator]): the soma's slab thickness (um); the tubes keep renderer.dzeta_um
-    floor_px: float = 0.5                  # source: PROVISIONAL (D-218 [orchestrator]): the kernel's SD floor, in pixels
-    wrap_sigmas: float = 3.0               # source: PROVISIONAL (D-218 [orchestrator]): the FFT box's padding, in the largest SD
-    light_direction: int = 1               # source: the pipeline's convention (Block 4): light toward +z
-    max_render_seconds: float = 30.0       # source: PROVISIONAL (D-218 [orchestrator]): one render of 36 planes of a 280 px crop (the speed oracle)
+    fine_factor: int = 1                   # source: PROVISIONAL (D-219.1 [orchestrator]): samples per pixel side (1: the pixel grid)
+    dzeta_um: float = 0.14                 # source: PROVISIONAL (D-219.1 [orchestrator]): the soma's slab thickness (um); the tubes keep renderer.dzeta_um
     # Block 46, the fit
-    plane_step: int = 2                    # source: PROVISIONAL (D-218 [orchestrator]): every this-many recorded planes
-    plane_half_um: float = 10.0            # source: PROVISIONAL (D-218 [orchestrator]): the planes within this of the start depth (um)
-    region_radius_um: float = 13.0         # source: PROVISIONAL (D-218 [orchestrator]): the fit's disk about the start centre (um)
-    mask_widen_um: float = 2.0             # source: PROVISIONAL (D-218 [orchestrator]): the caller's widening of Allen's trace mask (um)
+    plane_step: int = 2                    # source: PROVISIONAL (D-219.4 [orchestrator]): planes whose index differs from k_0 by a multiple of this
+    plane_half_um: float = 10.0            # source: PROVISIONAL (D-219.4 [orchestrator]): the planes within this of the start depth (um)
+    region_radius_um: float = 13.0         # source: PROVISIONAL (D-219.4 [orchestrator]): the fit's disk about the traced centre (um)
+    mask_widen_um: float = 2.0             # source: PROVISIONAL (D-219.4 [orchestrator]): the caller's widening of Allen's trace mask (um; Block 47)
     far_slope: str = "fit"                 # source: D-218.1 [user]: the kernel's far slope fitted with the soma; "fixed" (D-218.2) holds it
-    shift_xy_um: float = 4.0               # source: PROVISIONAL (D-218 [orchestrator]): the centre's in-plane bound about the start (um)
-    shift_z_um: float = 6.0                # source: PROVISIONAL (D-218 [orchestrator]): the centre's depth bound about the start (um)
-    axis_bounds_um: Tuple[float, float] = (1.0, 15.0)        # source: PROVISIONAL (D-218 [orchestrator]): a, b, c (um)
-    mu_bounds_per_um: Tuple[float, float] = (0.001, 3.0)     # source: PROVISIONAL (D-218 [orchestrator]): the absorption (1/um)
-    slope_bounds: Tuple[float, float] = (0.2, 3.0)           # source: PROVISIONAL (D-218 [orchestrator]): gamma (um/um)
-    max_nfev: int = 80                     # source: PROVISIONAL (D-218 [orchestrator]): least_squares' evaluations
-    ftol: float = 1e-6                     # source: PROVISIONAL (D-218 [orchestrator])
-    xtol: float = 1e-6                     # source: PROVISIONAL (D-218 [orchestrator])
-    diff_steps: Tuple[float, ...] = (0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.004, 1e-4, 0.005)  # source: PROVISIONAL (D-218 [orchestrator]): x0, y0, z0, a, b, c (um), phi (rad), mu (1/um), gamma
+    shift_xy_um: float = 4.0               # source: PROVISIONAL (D-219.4 [orchestrator]): the centre's in-plane bound about the traced centre (um)
+    shift_z_um: float = 6.0                # source: PROVISIONAL (D-219.4 [orchestrator]): the centre's depth bound about the start depth (um)
+    axis_bounds_um: Tuple[float, float] = (1.0, 15.0)        # source: PROVISIONAL (D-219.4 [orchestrator]): a, b, c (um)
+    mu_bounds_per_um: Tuple[float, float] = (0.001, 3.0)     # source: PROVISIONAL (D-219.4 [orchestrator]): the absorption (1/um)
+    slope_bounds: Tuple[float, float] = (0.2, 3.0)           # source: PROVISIONAL (D-219.4 [orchestrator]): gamma (um of SD per um of defocus)
+    max_nfev: int = 80                     # source: PROVISIONAL (D-219.4 [orchestrator]): least_squares' function evaluations
+    ftol: float = 1e-6                     # source: PROVISIONAL (D-219.4 [orchestrator])
+    xtol: float = 1e-6                     # source: PROVISIONAL (D-219.4 [orchestrator])
+    diff_steps: Tuple[float, ...] = (0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.004, 1e-4, 0.005)  # source: PROVISIONAL (D-219.4 [orchestrator]): x0, y0, z0, a, b, c (um), phi (rad), mu (1/um), gamma
 
 
 @dataclass(frozen=True)
@@ -556,7 +554,7 @@ class DiameterConfig:
     clearness: ClearnessConfig = field(default_factory=ClearnessConfig)  # source: D-194 [orchestrator] (sub-config; outside every signature)
     sigma_calibration: SigmaCalibrationConfig = field(default_factory=SigmaCalibrationConfig)  # source: D-201 (sub-config; outside every signature)
     soma_view: SomaViewConfig = field(default_factory=SomaViewConfig)  # source: D-210, D-211 (sub-config; outside every signature)
-    soma_fit: SomaFitConfig = field(default_factory=SomaFitConfig)  # source: D-216, D-218 (sub-config; outside every signature)
+    soma_fit: SomaFitConfig = field(default_factory=SomaFitConfig)  # source: D-216, D-218, D-219 (sub-config; outside every signature)
 
     # ------------------------------------------------------------ checks --
     def validate(self) -> None:
@@ -926,23 +924,21 @@ def _check_soma_view(q: "SomaViewConfig") -> None:
 
 
 def _check_soma_fit(q: "SomaFitConfig") -> None:
-    """The soma's forward model and fit (SPEC Blocks 45-46): counts whole and >= 1, lengths and factors finite and
-    > 0, light_direction +-1, far_slope "fit" or "fixed", bounds finite and increasing, nine steps > 0."""
+    """The soma's forward model and fit (SPEC Blocks 45-46): counts whole and >= 1, lengths finite and > 0 (the mask's
+    widening >= 0), far_slope "fit" or "fixed", bounds finite and increasing, tolerances in (0, 1), nine steps > 0."""
     def pair(b):
         return len(tuple(b)) == 2 and all(math.isfinite(float(x)) for x in b) and float(b[0]) < float(b[1])
-    pos = (q.dzeta_um, q.floor_px, q.wrap_sigmas, q.max_render_seconds, q.plane_half_um, q.region_radius_um,
-           q.shift_xy_um, q.shift_z_um)
+    pos = (q.dzeta_um, q.plane_half_um, q.region_radius_um, q.shift_xy_um, q.shift_z_um)
     ok = (_is_count(q.fine_factor, 1) and _is_count(q.plane_step, 1) and _is_count(q.max_nfev, 1)
           and all(math.isfinite(float(x)) and float(x) > 0 for x in pos)
-          and math.isfinite(q.mask_widen_um) and q.mask_widen_um >= 0
-          and q.light_direction in (1, -1) and q.far_slope in ("fit", "fixed")
+          and math.isfinite(q.mask_widen_um) and q.mask_widen_um >= 0 and q.far_slope in ("fit", "fixed")
           and pair(q.axis_bounds_um) and q.axis_bounds_um[0] > 0 and pair(q.mu_bounds_per_um)
           and q.mu_bounds_per_um[0] >= 0 and pair(q.slope_bounds) and q.slope_bounds[0] >= 0
           and all(math.isfinite(float(t)) and 0 < float(t) < 1 for t in (q.ftol, q.xtol))
           and len(tuple(q.diff_steps)) == 9 and all(math.isfinite(float(x)) and float(x) > 0 for x in q.diff_steps))
     if not ok:
-        raise ValueError("soma_fit: a count, length, factor, direction, far_slope, bound, tolerance or step is out of "
-                         "range (SPEC Blocks 45-46)")
+        raise ValueError("soma_fit: a count, length, far_slope, bound, tolerance or step is out of range "
+                         "(SPEC Blocks 45-46)")
 
 
 def _check_clearness(q: "ClearnessConfig") -> None:

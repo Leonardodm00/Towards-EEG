@@ -1,0 +1,9 @@
+s/h= 0.20  |DFT - Poisson| 1.8e-15   continuous kernel min -8.43e-03   step overshoot: continuous +6.02e-03, sampled +6.66e-16
+s/h= 0.30  |DFT - Poisson| 4.4e-16   continuous kernel min -1.52e-02   step overshoot: continuous +1.09e-02, sampled +6.66e-16
+s/h= 0.50  |DFT - Poisson| 4.4e-16   continuous kernel min -1.80e-02   step overshoot: continuous +1.26e-02, sampled +4.44e-16
+s/h= 0.70  |DFT - Poisson| 4.4e-16   continuous kernel min -2.55e-03   step overshoot: continuous +1.56e-03, sampled +4.44e-16
+s/h= 1.00  |DFT - Poisson| 3.3e-16   continuous kernel min -1.64e-04   step overshoot: continuous +9.31e-05, sampled +4.44e-16
+s/h= 2.00  |DFT - Poisson| 2.2e-16   continuous kernel min -2.62e-11   step overshoot: continuous +1.36e-11, sampled +4.44e-16
+s/h= 5.00  |DFT - Poisson| 2.2e-16   continuous kernel min -6.94e-18   step overshoot: continuous +4.44e-16, sampled +4.44e-16
+s/h=20.00  |DFT - Poisson| 2.2e-16   continuous kernel min -3.47e-18   step overshoot: continuous +4.44e-16, sampled +4.44e-16
+worst |DFT - Poisson| over s/h in [0.2, 20]: 1.8e-15
