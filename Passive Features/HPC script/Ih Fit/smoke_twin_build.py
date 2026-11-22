@@ -1,5 +1,6 @@
 """Smoke test for the twin build -- Block 12 in specs/SPEC.md (TB1-TB9, and the
-optional slow oracle on a real cell).
+optional slow oracle on a real cell) and Block 18, the twin without noise
+(TB11, TB12).
 
 The fixture: a real-layout archive cell written by
 smoke_noise_windows.write_fixture (two SS sweeps with trace-QC drops; LS
@@ -30,6 +31,15 @@ Checks
     test_TB8_refusals              every refusal of the entry
     test_TB9_ascii_lf              the two files
     test_TB10_real_twin            optional, slow (--archive-cell, --nf2-dir)
+    test_TB11_no_noise_twin        build_twin(with_noise=False), configuration
+                                   full_no_noise: archive arrays = simulate_twin(
+                                   with_noise=False) bit for bit; loaded, the
+                                   fitter's noise-free simulation at the truth
+                                   within TB1's bounds; twin.with_noise False;
+                                   the same twin with noise differs
+    test_TB12_default_parity       build_twin's default is with_noise=True and
+                                   its archive arrays equal those of the contract
+                                   commit's twin_build.py (git show) bit for bit
 
 Run (from this folder: NEURON loads ./x86_64 from the working directory)
     python smoke_twin_build.py [--build] [--archive-cell DIR --nf2-dir DIR]
@@ -65,6 +75,8 @@ import numpy as np                 # noqa: E402
 import pandas as pd                # noqa: E402
 from numpy.testing import assert_allclose  # noqa: E402
 
+import importlib.util              # noqa: E402
+
 import twin_build as tb            # noqa: E402
 import twin_noise as tn            # noqa: E402
 import twin_table as tt            # noqa: E402
@@ -78,6 +90,7 @@ ARTIFACT_DIR = HERE / "smoke_artifacts"
 _SAVED_ARTIFACTS = []
 ARGS = argparse.Namespace(archive_cell=None, nf2_dir=None)
 CFG = TwinConfig()
+CONTRACT_COMMIT = "aac46d3"                 # Block 18's contract commit (TB12's reference twin_build.py)
 
 # ---------------------------------------------------------------- fixture ---
 REAL_ID = 900000003                       # write_fixture's specimen id (the "real" cell)
@@ -218,12 +231,16 @@ def _build_traces(configuration, *, twin_id=TWIN_ID, with_noise=True, cfg=CFG):
     return cell, tb.simulate_twin(cell, spec, st["protocol"], st["table"], cfg=cfg, with_noise=with_noise)
 
 
-def _build_twin(configuration, *, twin_id=TWIN_ID, group=None):
+def _build_twin(configuration, *, twin_id=TWIN_ID, group=None, module=None, **kw):
+    """build_twin of one twin on the fixture (`module`: twin_build or another
+    version of it; `kw`: further keywords of build_twin, e.g. with_noise)."""
     st = _fixture()
+    mod = module or tb
     _clear()
     ih_spec, apply_theta = _model(configuration)
-    out = tb.build_twin(_spec(configuration, twin_id=twin_id), st["real"], st["table"], group or _new_group(),
-                        ih_spec=ih_spec, apply_theta=apply_theta, spike_reason_fn=st["spike_fn"], cfg=CFG)
+    spec = mod.TwinSpec(**dataclasses.asdict(_spec(configuration, twin_id=twin_id)))
+    out = mod.build_twin(spec, st["real"], st["table"], group or _new_group(),
+                         ih_spec=ih_spec, apply_theta=apply_theta, spike_reason_fn=st["spike_fn"], cfg=CFG, **kw)
     _clear()
     return out
 
@@ -485,8 +502,10 @@ def test_TB7_metadata():
                           "n_samples"} and e["index"] == m and e["stimulus_name"] == "Long Square", e
     tw = meta["twin"]
     want = {"twin_of_specimen_id", "configuration", "theta", "F", "has_ih", "base_seed", "neuron_dt_ms",
-            "settle_ms", "rest_drift_mV", "ls_sweeps_left_out", "provenance", "tau_ms_source"}
+            "settle_ms", "rest_drift_mV", "ls_sweeps_left_out", "provenance", "tau_ms_source",
+            "with_noise"}                                       # with_noise: Block 18
     assert set(tw) == want, sorted(set(tw) ^ want)
+    assert tw["with_noise"] is True, tw["with_noise"]
     assert tw["theta"] == THETA_IH and tw["twin_of_specimen_id"] == REAL_ID and tw["configuration"] == "full"
     assert tw["has_ih"] is True and tw["F"] == F and tw["base_seed"] == CFG.base_seed
     assert tw["neuron_dt_ms"] == CFG.neuron_dt_ms and tw["settle_ms"] == CFG.settle_ms
@@ -622,6 +641,104 @@ def test_TB10_real_twin():
     assert len(meta["ls_sweeps"]) == 15 and len(prot.ls_sweep_number) == 22, (len(meta["ls_sweeps"]),)
     assert len(left) == 7 and set(left.values()) == {"action_potential"}, left
     assert n_ls == 15, n_ls
+
+
+def _archive_arrays(d):
+    """{(file, key): array} of a twin archive's two npz files."""
+    out = {}
+    for name in ("ss_pulses.npz", "ls_sweeps.npz"):
+        with np.load(d / name) as z:
+            for k in z.files:
+                out[(name, k)] = np.array(z[k])
+    return out
+
+
+def _bit_equal(a, b):
+    a, b = np.asarray(a), np.asarray(b)
+    return a.dtype == b.dtype and a.shape == b.shape and a.tobytes() == b.tobytes()
+
+
+def test_TB11_no_noise_twin():
+    st = _fixture()
+    conf = "full_no_noise"
+    assert tb.HAS_IH[conf] is True and conf in tb.CONFIGURATIONS
+    d = _build_twin(conf, with_noise=False)
+    _cell, clean = _build_traces(conf, with_noise=False)
+    _clear()
+    z = _archive_arrays(d)
+    # the archive's arrays are simulate_twin(with_noise=False)'s, bit for bit
+    want = {("ss_pulses.npz", "t"): clean.ss_t_s, ("ss_pulses.npz", "v"): clean.ss_v_mV,
+            ("ss_pulses.npz", "i_pA"): clean.ss_i_pA, ("ss_pulses.npz", "polarity_is_dep"): clean.ss_polarity_is_dep,
+            ("ss_pulses.npz", "peak_pA"): clean.ss_peak_pA,
+            ("ss_pulses.npz", "stim_duration_s"): clean.ss_stim_duration_s,
+            ("ss_pulses.npz", "sweep_number"): clean.ss_sweep_number}
+    for m in range(len(clean.ls_v_mV)):
+        want[("ls_sweeps.npz", "v_%d" % m)] = clean.ls_v_mV[m]
+        want[("ls_sweeps.npz", "i_%d" % m)] = clean.ls_i_pA[m]
+    unequal = [k for k, v in want.items() if not _bit_equal(z[k], v)]
+    assert not unequal, ("archive differs from simulate_twin(with_noise=False)", unequal)
+    meta = json.load(open(d / "metadata.json"))
+    assert [int(e["sweep_number"]) for e in meta["ls_sweeps"]] == clean.ls_sweep_number.tolist()
+    tw = meta["twin"]
+    assert tw["with_noise"] is False and tw["noise_laws_applied"] is False, (tw.get("with_noise"),
+                                                                             tw.get("noise_laws_applied"))
+    assert tw["configuration"] == conf and tw["has_ih"] is True and tw["theta"] == THETA_IH, tw
+    msg = _expect_refusal("with_noise a string", lambda: _build_twin(conf, with_noise="False"))
+    assert "with_noise" in msg, msg
+    # read back by the fitter's loader: the fitter's noise-free simulation at the truth, TB1's bounds
+    cd = _load(d)
+    rm = _tb1_rmsds(cd, conf, CFG.neuron_dt_ms)
+    bad = ["%s %.2e" % (k, v) for k, v in sorted(rm.items())
+           if not v < (TB1_LOADED_TOL_MV if k[0] == "c" else TB1_TOL_MV)]
+    print("\n  [TB11] %d RMSDs at dt %g ms, max (a, b) %.2e mV, max (c) %.2e mV"
+          % (len(rm), CFG.neuron_dt_ms, max(v for k, v in rm.items() if k[0] != "c"),
+             max(v for k, v in rm.items() if k[0] == "c")))
+    assert not bad, ("TB11: RMSD above TB1's bound", bad)
+    # the same twin with noise differs from it (in every voltage array), not in the currents
+    zn = _archive_arrays(_build_twin(conf, with_noise=True))
+    for k in want:
+        same = _bit_equal(zn[k], z[k])
+        if k[1] == "v" or k[1].startswith("v_"):
+            assert not same, ("noisy and noise-free twin equal", k)
+        else:
+            assert same, ("noisy and noise-free twin differ outside the voltages", k)
+
+
+def _contract_module():
+    """twin_build.py as of CONTRACT_COMMIT (git show), imported under another name."""
+    if "contract_tb" in _STATE:
+        return _STATE["contract_tb"]
+    rel = subprocess.run(["git", "ls-files", "--full-name", "twin_build.py"], cwd=str(HERE), capture_output=True,
+                         text=True, check=True).stdout.strip()
+    src = subprocess.run(["git", "show", "%s:%s" % (CONTRACT_COMMIT, rel)], cwd=str(HERE), capture_output=True,
+                         check=True).stdout
+    path = _fixture()["root"] / "twin_build_contract.py"
+    path.write_bytes(src)
+    spec = importlib.util.spec_from_file_location("twin_build_contract", str(path))
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["twin_build_contract"] = mod
+    spec.loader.exec_module(mod)
+    _STATE["contract_tb"] = mod
+    return mod
+
+
+def test_TB12_default_parity():
+    import inspect
+    p = inspect.signature(tb.build_twin).parameters["with_noise"]
+    assert p.default is True and p.kind == p.KEYWORD_ONLY, (p.default, p.kind)
+    old = _contract_module()
+    for conf in ("full", "active_fit"):
+        new_d = _build_twin(conf)                       # the default
+        old_d = _build_twin(conf, module=old)
+        a, b = _archive_arrays(new_d), _archive_arrays(old_d)
+        assert set(a) == set(b), sorted(set(a) ^ set(b))
+        unequal = [k for k in a if not _bit_equal(a[k], b[k])]
+        assert not unequal, ("default build differs from the contract commit's", conf, unequal)
+        ma, mb = json.load(open(new_d / "metadata.json")), json.load(open(old_d / "metadata.json"))
+        tw_a = dict(ma.pop("twin"))
+        tw_b = dict(mb.pop("twin"))
+        assert tw_a.pop("with_noise") is True
+        assert ma == mb and tw_a == tw_b, "metadata differs beyond twin.with_noise"
 
 
 # ---------------------------------------------------------------- runner ---
