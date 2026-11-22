@@ -14,6 +14,7 @@
 | 2026-11-22 | The user, 2026-11-20 18:33 (refine the near-soma branches first; how far do diameter errors matter for the somatic passive/Ih fits?) and their answers (D-205): section 13, new. Evidence: `checks/diameter_reach_2026-11-22/` on the pilot's SWC (the user's upload of 2026-11-22). |
 | 2026-11-22 (later) | The user, 14:53: the refinement is limited to the first 250 um from the soma, and on the pilot the soma comes first, from its images at focus in Colab (D-210; the log's D-206 to D-209 were taken by the twins chat meanwhile). Section 14, new. Evidence: the pilot's `reconstruction.swc` **[data inspected]**; SPEC Block 44's smoke test and notebook Cell 24 on the synthetic cell **[run, sandbox]**. |
 | 2026-11-22 (later, 2) | The first real run of Cell 24 (the user's upload, 15:28: "the evaluation is wrong. The soma starts to be visualized at k = 107"): the automatic pick was a dendrite; the soma's plane is now chosen by eye (D-211). Section 14.1, new; section 14's description of the measure marked. Evidence: `soma_529878215.json` from the user's Drive **[data inspected]**; `checks/soma_focus_2026-11-22/` **[run, sandbox]**. |
+| 2026-11-22 (later, 3) | The user, 16:05 ("Let's do it": the soma's outline per plane) and 16:25 (a larger crop with Allen's trace, D-213): sections 14.2 and 14.3, new. Evidence: the user's block and JSON from Drive and the SWC **[data inspected]**; `checks/soma_area_2026-11-22/`, `checks/soma_focus_2026-11-22/sphere_contours.py` **[run, sandbox]**. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -488,10 +489,44 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   detail than its in-focus neighbour, unlike a sharp-edged sphere. Why is not established.
 - **Decided (D-211)**: the soma's plane, and the planes where it is seen, are chosen by eye; nothing is picked
   automatically until the soma's measurement is specified [user]. The window is now the traced radius + 6 um about
-  the traced depth (k = 74..160 on the pilot), the montage spans it, every second plane aligned on the shown plane
+  the traced depth (k = 74..160 on the pilot [corrected 2026-11-22: k = 75..159, the window's ends rounding inward]), the montage spans it, every second plane aligned on the shown plane
   [orchestrator, PROVISIONAL]. Block 44 amendment 1, `c5a2bdf`.
 - **To run [Colab]**: Cell 1, then Cell 24 as it is (no plane chosen: the focus figure shows the traced depth's
   plane, the montage the whole window); then set `SOMA_K` (the plane judged in focus) and `SOMA_K_RANGE` (the first
   and last plane where the soma is seen), and `MONTAGE_K = (first, last, step)` to narrow the montage, and run Cell 24
   again. The JSON records `k_traced`, `k_by_eye`, `k_range_by_eye`.
 - **Open**: which plane is the soma's (the user's, from the new montage); how the soma is measured (D-210).
+
+### 14.2 The soma's area: what the stack measures, and how much it matters [added 2026-11-22, later]
+
+- **Asked [user, 16:05]**: "Let's do it" -- my proposal to trace the soma's outline on every plane of a range and sum
+  it into a volume and a membrane area. **Corrected before any code**: on a simulated brightfield stack of a 6 um
+  sphere the half-depth outline stays at about 6 um on every plane, even 8.4 um from the centre where the section is
+  empty (`checks/soma_focus_2026-11-22/sphere_contours.py` **[run, sandbox]**). A plane shows the blurred silhouette of
+  the whole soma; outlines give its width, not its height.
+- **What the pilot's stack gives [data inspected: the block of the run of 15:54, the SWC]**: the silhouette at the
+  sharp planes k = 111-121 covers 111-135 um2 (equivalent radius 5.95-6.55 um; Allen's 5.97); the stems' first nodes
+  leave the soma between -4.5 and +2.4 um of its traced depth (6.9 um, stage units); spheroids within those bounds have
+  327-539 um2 of membrane, 0.73-1.20 x Allen's sphere (448 um2) (`shape_areas.py`, closed form checked numerically).
+- **How much it matters [run, sandbox: `soma_area_sensitivity.py`, the reach check's model]**: under the parameters
+  matched to the cell (Cm 5.39 uF/cm2, Rm 3.8 kOhm cm2) a soma area x 0.75 moves the fitted Cm by +7 % (pulse) to
+  +17 % (pulse + step), x 1.26 by -9 % to -13 %; under Eyal's parameters under 3 % (the soma is 1.45 % of the membrane
+  the fit charges). A full refit at x 1.5 agrees with the linear step.
+- **Open (the user's)**: (1) fit a soma model (a spheroid through the defocus model) to the stack, checked first on
+  simulated soma stacks -- recommended; (2) bound the area and carry the range into the passive fit; (3) keep Allen's
+  sphere.
+
+### 14.3 Allen's trace over the soma view (D-213; Block 44 amendment 2) [added 2026-11-22, later]
+
+- **Asked [user, 16:25]**: a larger crop centred on the soma, with Allen's reconstruction superimposed faintly at its
+  traced diameters, the soma and the main branches.
+- **Built [`soma_view.trace_segments`, `segment_mask`, `segments_at_depth`; the figures; `show_soma.py --half-um`;
+  `SomaViewConfig.half_um` 40]**: every traced segment in the crop drawn as the disc of its traced radius swept along
+  it -- outlined on every image (the axon dashed), filled where the trace puts it at the plane's depth; the soma's
+  traced circle as before; the soma's own segments (from the soma node to the stems' first nodes) not drawn.
+- **Checked on the real data [offline, the +-20 um block and the SWC]**: 358 traced segments in that crop (radii
+  0.11-1.02 um, median 0.25); the trace follows the dendrites in the images. The traced axon runs about 10 um below the
+  soma and crosses its disk in projection (hence dashed). At k = 117 the traced apical trunk (about 2 um wide) looks
+  narrower than its dark band in the image -- a visual impression, not a measurement.
+- **To run [Colab]**: Cell 1, then Cell 24 (`SOMA_HALF_UM` None = 40 um; planes already fetched at the old size are
+  fetched again at the new one).
