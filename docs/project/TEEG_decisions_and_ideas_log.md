@@ -262,6 +262,7 @@ the "Binds" column.
 | 2026-11-22 (later, 4; the gallery chat) | Logs **D-210** (user, 14:53; the gallery chat): the diameter refinement is limited to the first 250 um of path distance from the soma (D-205's x*); on the pilot the soma comes first, from its images at focus in Colab. Scope on the pilot's SWC: 5509 of the 8496 dendrite nodes within 250 um (all 3141 basal, 2368 apical; 66.0 % of the dendritic membrane with Allen's radii). Built as SPEC Block 44 (`b87e956` on `sci/diameter-pipeline`, notebook Cell 24), its settings PROVISIONAL [orchestrator]; the branch's files first cited it as D-206, then D-208, both taken meanwhile by the twins chat. Next free IDs: D-211, I-007. |
 | 2026-11-22 (later; the gallery chat, 2) | Logs **D-211** (user, 15:28 and the answer after it): on the first real run of Cell 24 the automatic pick (k = 93) was a basal dendrite in focus inside the traced disk, not the soma, which the user sees begin at k = 107; the soma's plane(s) are now chosen by eye, no automatic pick; the window widened to the traced radius + 6 um and the montage spans it [orchestrator]. A simulated sharp-edged sphere is found by the same measure, so on this stack the soma carries less fine detail than its in-focus neighbour. Supersedes D-210.3 in part. Next free IDs: D-212, I-007. |
 | 2026-11-22 (later; the gallery chat, 3) | Logs **D-212** (orchestrator): the final check of wave 4 by an independent Opus tester (incremental, `a749cc9`), PASS WITH ISSUES, 2 MINOR and 5 NOTE findings and 6 spec gaps, settled under directive 7 without an approach question. Next free IDs: D-213, I-007. |
+| 2026-11-22 (later; the gallery chat, 4) | Logs **D-213** (user, 16:25): the soma view's crop larger and centred on the soma, with Allen's reconstruction superimposed faintly at its traced diameters (soma and main branches); the size and the drawing rule are the orchestrator's. Next free IDs: D-214, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -462,6 +463,7 @@ would be needed*, *Status*.
 | D-210 | 2026-11-22 | which nodes the diameter refinement treats and in which order (D-205.1); SPEC Block 44 (`analysis/soma_view.py`, `plotting/soma_figures.py`, `scripts/show_soma.py`, `SomaViewConfig`), notebook Cell 24 | the refinement limited to the first 250 um of path distance from the soma, D-205's x* [user]; on the pilot the soma first, from its images at focus in Colab [user]; Block 44's settings PROVISIONAL [orchestrator] | active; `b87e956` |
 | D-211 | 2026-11-22 | SPEC Block 44 (`analysis/soma_view.py`, `plotting/soma_figures.py`, `scripts/show_soma.py`, `SomaViewConfig`), notebook Cell 24; D-210.3 in part | the soma's in-focus plane(s) chosen by eye, no automatic pick until the soma's measurement is specified [user]; the window +-(traced radius + 6 um), the montage over all of it; the Laplacian-of-Gaussian measure kept only as a labelled diagnostic [orchestrator] | active; supersedes D-210.3 in part |
 | D-212 | 2026-11-22 | the final check of wave 4 (report `specs/test_reports/2026-11-22_1440_incremental.md` at `a749cc9`): `config.validate`, `contamination.pick_clear_examples`, `scripts/calibrate_sigma.py`, `scripts/colab_bootstrap.py`, SPEC Blocks 1, 5, 11, 27, 36, 40 and section 6 | PASS WITH ISSUES; F1-F7 and S1-S6 settled: counts refused when not whole and finite; a missing soma distance passes; a failing node recorded, not fatal; --config-json merged over the preparation's configuration; strict JSON; `in_summary` beside `ok`; the spec stated where it was silent [orchestrator] | active |
+| D-213 | 2026-11-22 | SPEC Block 44 amendment 2 (`soma_view.trace_segments`, `segment_mask`, `segments_at_depth`; the figures; `show_soma.py --half-um`; `SomaViewConfig.half_um`), notebook Cell 24 | a larger crop centred on the soma, Allen's reconstruction superimposed faintly with its traced diameters, soma and branches [user]; half-size 40 um, the branches outlined at their traced width on every plane and filled where the trace puts them at the plane's depth [orchestrator, PROVISIONAL] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14334,6 +14336,30 @@ worktree run of `test_smoke_phase2` for F6 is reported with the commit.
 **What it does not decide.** Whether the tester's 16 spec-test files (`tests/spec/`, 9 new) come in: the user's.
 
 **Sources.** **[report]** the tester's report. **[run, sandbox]** as above. **[log]** D-201.
+
+**Status:** active.
+
+## D-213 -- The soma view shows a larger crop with Allen's reconstruction superimposed at its traced diameters (user)
+
+**Date:** 2026-11-22, 16:25 (Europe/Rome), the gallery chat. **Binds:** SPEC Block 44 amendment 2 (the soma view's
+crop, the trace overlay), `SomaViewConfig.half_um`, notebook Cell 24.
+
+**Decision [user].** "I would like you to make the crop larger centered to the soma and superimpose (faintly) the
+allens reconstructed cell within that crop with the specific diameters for both the soma and the main branches".
+
+**Statement.** (D-213.1) [user] The crop is centred on the traced soma and larger; Allen's reconstruction is drawn
+faintly over every image of the soma view, each traced segment at its traced diameter, and the soma at its traced
+radius. (D-213.2) [orchestrator, PROVISIONAL] The crop's half-size 40 um (was 20, D-210.3), with `SOMA_HALF_UM` in
+Cell 24; a segment is drawn as the disc of its traced radius swept from its parent node to its node (the radius
+interpolated linearly), outlined on every plane and filled where the trace places it at the plane's depth (the
+plane's depth within its ends' depths widened by its larger radius); the segments from the soma node to the first
+nodes of the stems are not drawn, as they lie inside the traced soma, which is drawn as its circle.
+
+**Why.** **[user]** to compare Allen's traced diameters of the soma and the main branches with the images.
+
+**What it does not decide.** Whether and how the traced diameters are corrected (the refinement, D-205, D-210).
+
+**Sources.** **[user]** 2026-11-22 16:25. **[log]** D-210, D-211.
 
 **Status:** active.
 
