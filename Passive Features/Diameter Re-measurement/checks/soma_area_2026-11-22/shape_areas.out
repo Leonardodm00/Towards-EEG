@@ -1,0 +1,12 @@
+Allen's sphere (r 5.9694): 447.8 um2
+  a (um)  c (um)  shape                 area (um2)  / Allen
+   5.95    3.45   stems' spread 6.9 um    327.2     0.73
+   5.95    4.50   +-4.5 um                374.7     0.84
+   5.95    5.95   sphere                  444.9     0.99
+   6.20    3.45   stems' spread 6.9 um    348.7     0.78
+   6.20    4.50   +-4.5 um                397.6     0.89
+   6.20    6.20   sphere                  483.1     1.08
+   6.55    3.45   stems' spread 6.9 um    380.1     0.85
+   6.55    4.50   +-4.5 um                430.9     0.96
+   6.55    6.55   sphere                  539.1     1.20
+  cylinder r 6.5, height 7.28 (stacked outlines 107-133)    562.8     1.26

@@ -1,0 +1,13 @@
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+[eyal] Cm 0.452 uF/cm2, Rm 38910 Ohm cm2, Ra 203.2 Ohm cm; soma area 447.8 um2 (4 pi r^2 with r 5.97: 447.8); membrane charged by the fit 30929 um2 (the soma 1.45 %)
+ area x  soma um2 | fit on the pulse: dCm   dRm   dRa  | fit on pulse+step: dCm   dRm   dRa   (relative)
+  0.50    223.9  |  +0.029 -0.026 +0.053 |  -0.006 +0.005 -0.051
+  0.75    335.8  |  +0.014 -0.013 +0.026 |  -0.003 +0.002 -0.025
+  0.86    385.1  |  +0.008 -0.007 +0.014 |  -0.002 +0.001 -0.014
+  1.26    564.2  |  -0.014 +0.013 -0.025 |  +0.003 -0.002 +0.027
+  1.50    671.7  |  -0.026 +0.025 -0.045 |  +0.006 -0.005 +0.051
+  2.00    895.6  |  -0.049 +0.048 -0.082 |  +0.012 -0.009 +0.104
+refit at area x 1.50, fit on pulse (4 iterations): dCm -0.026 dRm +0.024 dRa -0.043   (linear: -0.026 +0.025 -0.045)
+refit at area x 1.50, fit on pulse+step (5 iterations): dCm +0.002 dRm -0.002 dRa +0.046   (linear: +0.006 -0.005 +0.051)
+[eyal] 310 s

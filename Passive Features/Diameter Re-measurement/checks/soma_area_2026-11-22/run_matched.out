@@ -1,0 +1,11 @@
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+[matched] Cm 5.393 uF/cm2, Rm 3801 Ohm cm2, Ra 203.2 Ohm cm; soma area 447.8 um2 (4 pi r^2 with r 5.97: 447.8); membrane charged by the fit 30929 um2 (the soma 1.45 %)
+ area x  soma um2 | fit on the pulse: dCm   dRm   dRa  | fit on pulse+step: dCm   dRm   dRa   (relative)
+  0.50    223.9  |  +0.109 -0.066 +0.083 |  +0.385 -0.203 +0.180
+  0.75    335.8  |  +0.073 -0.042 +0.044 |  +0.166 -0.101 +0.079
+  0.86    385.1  |  +0.044 -0.025 +0.025 |  +0.087 -0.056 +0.042
+  1.26    564.2  |  -0.094 +0.056 -0.046 |  -0.131 +0.101 -0.063
+  1.50    671.7  |  -0.182 +0.115 -0.085 |  -0.224 +0.189 -0.108
+  2.00    895.6  |  -0.342 +0.246 -0.150 |  -0.360 +0.352 -0.171
+[matched] 77 s
