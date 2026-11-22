@@ -1394,6 +1394,131 @@ orchestrator's (D-210).
   soma-rooted segment is left out, a segment outside the box too, one crossing the box kept; `segments_at_depth`'s
   inequality at its edges; the script with `--half-um` crops 2 H / res0 + 1 px and reports the segments.
 
+### Block 45: the soma's forward model -- an ellipsoid rendered with the partition absorption (D-215, D-216, D-218)
+
+- Modules: `src/allen_diameter/model/soma_render.py`; smoke test `tests/smoke/test_smoke_soma_render.py`.
+- Mathematics. The soma $E(\theta_g)$, $\theta_g = (x_0, y_0, z_0, a, b, c, \varphi, \mu)$: centre $(x_0, y_0)$ um in
+  the image frame (pixel (row, col) of a crop with corner (left, top) is centred on ((left + col) p, (top + row) p),
+  p = res0, as Block 44), $z_0$ um in stage units (plane $k$ at depth $k\,dz$); in-plane semi-axes $a$ along
+  $(\cos\varphi, \sin\varphi)$ and $b$ across it, depth semi-axis $c$ (um, > 0); absorption coefficient $\mu$ (1/um,
+  >= 0). A column at $(x, y)$: $u = (x - x_0)\cos\varphi + (y - y_0)\sin\varphi$, $v = -(x - x_0)\sin\varphi +
+  (y - y_0)\cos\varphi$, $q = 1 - (u/a)^2 - (v/b)^2$; inside when $q > 0$, on $[z_{\rm lo}, z_{\rm hi}] =
+  [z_0 - c\sqrt q,\ z_0 + c\sqrt q]$ (outside: $z_{\rm lo} = z_{\rm hi} = z_0$). Slabs $\zeta_j$ =
+  `geometry.slab_centres`$(z_0 - c, z_0 + c, \Delta\zeta)$; per sample and slab, $a_j$ = `geometry.slab_absorbance`
+  $(z_{\rm lo}, z_{\rm hi}, \zeta_j, \Delta\zeta, \mu)$, $T_{<j}$ = `geometry.transmitted_before`$(\ldots, \mu,$
+  light_direction$)$, and $\Delta A_j = T_{<j}\,(1 - e^{-a_j})$ inside, 0 outside (the partition absorption,
+  procedure Eq. 5; D-216.1). For each plane depth $z_k$:
+  $$\tau_k(x, y) = 1 - \sum_j \big(G_{s_{jk}} * \Delta A_j\big)(x, y),\qquad s_{jk} = \max\big(\sigma_r(\zeta_j - z_k;
+  \gamma),\ s_{\rm floor}\big),$$
+  $\sigma_r$ = `model.kernel.sigma_r` with the renderer configuration, its `kernel_continuation_slope` replaced by
+  $\gamma$ when $\gamma$ is given (D-218: the far slope a parameter; the continuation must be "linear", ValueError
+  otherwise), $s_{\rm floor}$ = `floor_px` $\times$ p. Sampling: the samples are the centres of an $f \times f$
+  subdivision of every pixel ($f$ = `fine_factor`, spacing $h = p/f$); the Gaussian convolution by FFT on a
+  zero-padded box of $N$ = `scipy.fft.next_fast_len`$(n + 2\lceil$`wrap_sigmas`$\,s_{\max}/h\rceil)$ samples a side
+  ($n$ the crop's samples a side, $s_{\max}$ the largest $s_{jk}$), the transfer $\exp(-2\pi^2 s_{jk}^2 |\nu|^2)$ per
+  (slab, plane); each plane then pixel-integrated (the mean of a pixel's $f^2$ samples). Light toward $+z$ when
+  light_direction = +1 (the pipeline's convention).
+- Public API:
+  - `ellipsoid_columns(x_um, y_um, theta_g) -> (z_lo, z_hi, inside)`: arrays of x's broadcast shape (um, um, bool);
+    theta_g (8,) as above. ValueError for a, b or c not finite and > 0, mu < 0 or not finite.
+  - `SomaRenderer(crop, res0_um, z_planes_um, rcfg, scfg)`: crop = (left, top, width, height) px of the
+    full-resolution image; z_planes_um (K,) um; rcfg a `RendererConfig`; scfg the `SomaFitConfig`. Holds the sample
+    grid and the box's frequencies. `.render(theta_g, slope=None) -> tau (K, height, width)` float64 in (0, 1],
+    dimensionless, the planes in the order of z_planes_um; slope (um/um) replaces the continuation's slope. mu = 0
+    gives tau = 1. ValueError for an empty crop, non-finite depths, a bad theta_g, a slope with a non-linear
+    continuation.
+- Parameters: `SomaFitConfig` (`config.soma_fit`; outside every signature): `fine_factor` 1, `dzeta_um` 0.14,
+  `floor_px` 0.5, `wrap_sigmas` 3.0, `light_direction` +1, `max_render_seconds` 30.0 -- PROVISIONAL (D-218
+  [orchestrator]; `dzeta_um` is the soma's own, the tubes' renderer keeps `renderer.dzeta_um`).
+- Library calls: `scipy.fft.rfft2`, `irfft2`, `next_fast_len`; `model.geometry.slab_centres`, `slab_absorbance`,
+  `transmitted_before`; `model.kernel.sigma_r`.
+- Custom code: the ellipsoid's column interval (no library function); the per-(slab, plane) Gaussian transfer as in
+  Block 4's "fft" backend (Block 4 renders tubes only; checked: `render.render_transmittance` takes a `geometry.Tube`).
+- Test oracles: (T1) `ellipsoid_columns`: a sphere's chord $2\sqrt{R^2 - \rho^2}$ [1e-12 um]; for a = b the result
+  does not depend on phi; the chords along the in-plane axes. (T2) light per plane: for every plane,
+  $\sum_{x,y}(1 - \tau_k)\,p^2$ equals $\sum_{x,y}(1 - e^{-\mu (z_{\rm hi} - z_{\rm lo})})\,p^2$ over a crop wide
+  enough to hold the blur (the Gaussian keeps the integral; the partition conserves a column's light) [1e-6
+  relative, the box's padding]. (T3) a direct reference on a small case: `scipy.ndimage.gaussian_filter` per (slab,
+  plane), mode "constant", on the same samples [1e-6 absolute in tau]. (T4) convergence in f = 1, 2, 3, 4: the
+  difference to f = 4 decreases. (T5) slope: slope = the configured value gives the result of slope None [exact];
+  a larger slope blurs the far planes more (their minimum tau rises). (T6) mu = 0 gives 1; the contract's shapes and
+  dtype; determinism; the ValueErrors. (T7) speed: one render of 36 planes of a 280 x 280 px crop (a 6 um soma) at
+  f = 1 within `max_render_seconds` on the sandbox, reported.
+- Data flow: consumes the renderer configuration's kernel (Cell 16's `cleaning_config.json` in production);
+  feeds Block 46 (as its forward model) and the recovery check of the wave.
+- Confirmed: the ellipsoid, the partition absorption, stage units and the far slope as a parameter are the user's
+  (D-216.1, D-218); the sampling, the slab thickness, the floor and the box are the orchestrator's, PROVISIONAL.
+- Status: contract (wave 5).
+
+### Block 46: the soma fit -- an ellipsoid fitted to the planes about the soma (D-215, D-216, D-218)
+
+- Modules: `src/allen_diameter/analysis/soma_fit.py`; smoke test `tests/smoke/test_smoke_soma_fit.py`.
+- Mathematics. Data: the soma's crop `block` (n, H, W) grey levels on the recorded planes `ks` (n,) with `valid`
+  (n,), the crop's corner (left, top) px, pixel size p, plane spacing dz; the start: the traced soma's centre
+  $(x_s, y_s, z_s)$ um and radius $r_s$ um; `mask` (H, W) bool, True where a pixel is left out (Allen's traced stems
+  and neuropil, built by the caller). Planes $K$ = `select_planes`: the recorded planes $k$ with
+  $|k\,dz - z_s| \le$ `plane_half_um`, every `plane_step`-th one counted from the recorded plane nearest $z_s$ (that
+  plane included). Region $R$: the pixels whose centre lies within `region_radius_um` of $(x_s, y_s)$ and whose mask
+  is False. Parameters $\theta = (x_0, y_0, z_0, a, b, c, \varphi, \mu, \gamma)$; with `far_slope` = "fit" (D-218.1,
+  the default) $\gamma$ is fitted, with "fixed" (D-218.2) $\gamma$ = `slope0` and the fit is over the first eight.
+  Model: $D_k(x, y) \approx B_k\,\tau_k(x, y; \theta)$, $\tau$ the forward model (Block 45 in production). For a
+  given $\theta$, each plane's $B_k$ is the least-squares scale over $R$, $\hat B_k = \sum_R D_k\tau_k /
+  \sum_R \tau_k^2$ (variable projection); residuals $r_k = D_k - \hat B_k\tau_k$ over $R$, in grey levels;
+  $\hat\theta = \arg\min \tfrac12 \sum_{k \in K}\sum_R r_k^2$ within the bounds: `scipy.optimize.least_squares`,
+  method "trf", `x_scale="jac"`, `max_nfev`, `ftol`, `xtol`, the Jacobian by forward differences with the absolute
+  steps `diff_steps` (taken backwards at an upper bound), as Block 42. SE: $\sqrt{\mathrm{diag}((J^\top J)^{-1})\,
+  \chi^2/\mathrm{dof}}$, $\chi^2 = \sum r^2$, dof = (samples) - (fitted parameters) - |K| (the B_k); `numpy.linalg.pinv`
+  when $J^\top J$ is singular. Bounds: $|x_0 - x_s|, |y_0 - y_s| \le$ `shift_xy_um`, $|z_0 - z_s| \le$ `shift_z_um`,
+  a, b, c in `axis_bounds_um`, $\varphi \in [-\pi, \pi]$, $\mu$ in `mu_bounds_per_um`, $\gamma$ in `slope_bounds`.
+  Start: $(x_s, y_s, z_s, r_s, r_s, r_s, 0, \mu_0, \gamma_0)$, $\gamma_0$ = `slope0`, $\mu_0 = -\ln(\rho)/(2 r_s)$ with
+  $\rho$ = clip(the 5th percentile of $D_{k_0}$ within $0.5 r_s$ of $(x_s, y_s)$ / the median of $D_{k_0}$ over the
+  region's pixels farther than $1.5 r_s$, 0.05, 0.95), $k_0$ the plane nearest $z_s$; a start outside a bound is
+  moved inside it. Derived: the membrane area $S(a, b, c)$ = `ellipsoid_area` (Legendre's form with
+  `scipy.special.ellipkinc`, `ellipeinc`; the spheroid and sphere limits in closed form), the volume $V =
+  \tfrac43\pi abc$, the equivalent radius $r_{\rm eq} = \sqrt{S/(4\pi)}$ (D-216.3), SE(S) by the delta method on the
+  (a, b, c) block of the covariance with $\nabla S$ by central differences.
+- Public API:
+  - `PARAMS = ("x0_um", "y0_um", "z0_um", "a_um", "b_um", "c_um", "phi_rad", "mu_per_um", "slope_um_per_um")`.
+  - `ellipsoid_area(a_um, b_um, c_um) -> float` um^2; symmetric in its arguments; ValueError unless all finite > 0.
+  - `select_planes(ks, valid, z_start_um, dz_um, half_um, step) -> ndarray[int]`: indices into ks, ascending;
+    ValueError when fewer than 3, step < 1 or half_um < 0.
+  - `vp_scale(D, tau, region) -> (B (K,), resid (K, n_region))`: D, tau (K, H, W); region (H, W) bool.
+  - `start_theta(block_k0, left, top, res0_um, centre_um, radius_um, region, slope0) -> ndarray (9,)`.
+  - `fit_soma(block, ks, valid, left, top, res0_um, dz_um, centre_um, radius_um, mask, forward_factory, scfg,
+    slope0) -> SomaFit`: forward_factory(z_planes_um (K,)) -> forward; forward(theta_g (8,), slope) -> tau
+    (K, H, W). Never raises on a solver failure or a NaN forward: status "failed" with NaN results. ValueError for
+    inputs that disagree, an empty region, fewer than 3 planes.
+  - `SomaFit` (frozen dataclass): `theta` (9,), `se` (9,) (NaN for gamma when fixed), `cov` (9, 9), `fitted` (tuple
+    of the fitted PARAMS), `B_gl` (K,), `ks` (K,), `chi2`, `dof`, `n_samples`, `status` ("converged" | "max_nfev" |
+    "failed"), `at_bound` (tuple of PARAMS names), `n_eval`, `seconds`, `area_um2`, `se_area_um2`, `volume_um3`,
+    `r_eq_um`, `message`.
+- Parameters: `SomaFitConfig` (`config.soma_fit`): `plane_step` 2, `plane_half_um` 10.0, `region_radius_um` 13.0,
+  `mask_widen_um` 2.0 (the caller's widening of the trace's mask), `far_slope` "fit" (D-218.1; "fixed" D-218.2),
+  `shift_xy_um` 4.0, `shift_z_um` 6.0, `axis_bounds_um` (1.0, 15.0), `mu_bounds_per_um` (0.001, 3.0),
+  `slope_bounds` (0.2, 3.0), `max_nfev` 80, `ftol` 1e-6, `xtol` 1e-6, `diff_steps` (0.02, 0.02, 0.02, 0.02, 0.02,
+  0.02, 0.004, 1e-4, 0.005) -- PROVISIONAL (D-218 [orchestrator]) except `far_slope`'s default (the user's).
+- Library calls: `scipy.optimize.least_squares`, `scipy.special.ellipkinc`, `ellipeinc`, `numpy.linalg.pinv`;
+  the test's reference `scipy.integrate.dblquad`.
+- Custom code: the solver's `jac` (forward differences with absolute steps, as Block 42: scipy's `diff_step` is
+  relative); the variable projection of the scales (one division per plane).
+- Test oracles: (T1) `ellipsoid_area`: a sphere $4\pi r^2$; oblate and prolate spheroids against their closed forms;
+  a general ellipsoid against `scipy.integrate.dblquad` of the parametric surface [1e-8 relative]; symmetry in the
+  arguments. (T2) `select_planes` on a window. (T3) `vp_scale`: D = B tau exactly gives B [1e-12 relative] and a zero
+  residual. (T4) recovery with an injected fast forward model of the same parameter vector (any smooth
+  ellipsoid-like model): from a start off by 10-20 %, the fit recovers theta within 3 SE, and over 30 seeded noisy
+  data sets the 1-SE coverage of c lies in [0.55, 0.80]. (T5) far_slope "fixed": gamma not fitted (theta[8] =
+  slope0, se[8] NaN), the others recovered. (T6) masked pixels do not change the fit (changing them leaves theta
+  unchanged [1e-10]). (T7) a start outside a bound is moved inside; at_bound reported. (T8) a forward returning NaN
+  gives status "failed", no raise; determinism; shapes; the ValueErrors.
+- Data flow: consumes Block 44's crop (`soma_<S>_block.npz`: block, ks, valid, left, top, res0_um) and the traced
+  soma (`soma_<S>.json`), a mask from Allen's trace (Block 44's `segment_mask`, widened), Block 45's renderer as the
+  forward model; feeds Block 47 (figures, entry point, the equivalent sphere and the stems' first nodes) and the
+  wave's recovery check on simulated stacks (D-216.2).
+- Confirmed: the parameters, the free far slope with the fixed option, the masks, the equivalent sphere are the
+  user's (D-216, D-218); the background per plane as one scale, the region, the bounds, the start, the steps are
+  the orchestrator's, PROVISIONAL.
+- Status: contract (wave 5).
+
 Block 36, amendment 19 (2026-11-20; D-201; the orchestrator's, after wave 4): `scripts/calibrate_sigma.py --cleaning-dir DIR --specimen S [--out DIR/sigma] [--nodes IDS] [--workers N] [--config-json FILE]` -- per example node of a preparation, Block 42's fit on the planes $k^* \pm$ `half_planes` (in a process pool, one node per worker, BLAS threads 1), Block 43's figures, `sigma_<S>.csv`, `sigma_<S>.json` (fits, summary), `sigma_node<id>.png`, `sigma_summary_<S>.png`. Notebook Cell 23: (A, built now with existing scripts) the thick nodes -- `clean_cell.py clear --d-bins 1.0,50 --n 20 --min-soma-um 5` (Allen's diameter >= 1.0 um, the clear rule's 10 um separation in 3-D, no tier-2 neighbour), `clean --no-clean` into `OUT/cleaning_thick` with `cleaning.plane_half_range` 2 and `measure.profile_half_um` 4.5 (D-201.6 [orchestrator]: the measuring line +-4.5 um, so that a thick tube's defocused dip still meets the background on both sides), the gallery of Block 41 on all of them (`--max-per-bin 0 --fill-to 20`); (B, after wave 1) `calibrate_sigma.py` and its figures. Status (2026-11-22): `scripts/calibrate_sigma.py` written by the orchestrator after wave 4's merge: per node, infer_nodes.run_config and node_from_npz, the pilot of the node's record entry, select_planes, forward_with_kernel with one SectionCache, start_theta, fit_sigma_node, and Block 43's node page (the background (b0 + b1 v) drawn); a node enters the summary when it converged with neither sigma0 nor c at a bound; the summary figure's depth is the fitted z_ax. Run on the synthetic preparation of Cell 23A's stand-in (one node, rendered with d 0.8 um, sigma_r(0) 0.080 um, c 1): converged in 58 evaluations, d 0.808 +- 0.002 um, sigma0 0.0776 +- 0.0024 um, c 0.976 +- 0.015 **[run, sandbox]**. Notebook Cell 23B runs it.
 
 The final check of wave 4 (2026-11-22; D-212; the orchestrator's settlements of the independent tester's report

@@ -125,7 +125,7 @@ def test_reference():
             continue
         name = m.group(1)
         if name in ("acquisition", "measure", "correction", "renderer", "phantom", "calibration", "survey",
-                    "cleaning", "inference", "clearness", "sigma_calibration", "soma_view"):
+                    "cleaning", "inference", "clearness", "sigma_calibration", "soma_view", "soma_fit"):
             continue  # the container's sub-config fields
         if "# source:" in line:
             n_tagged += 1
@@ -138,7 +138,7 @@ def test_reference():
                                                         C.RendererConfig, C.PhantomConfig, C.CalibrationConfig,
                                                         C.SurveyConfig, C.CleaningConfig, C.InferenceConfig,
                                                         C.ClearnessConfig, C.SigmaCalibrationConfig,
-                                                        C.SomaViewConfig))   # Blocks 40, 42, 44 (D-194, D-201, D-210)
+                                                        C.SomaViewConfig, C.SomaFitConfig))   # Blocks 40, 42, 44, 45-46 (D-194, D-201, D-210, D-218)
     assert n_tagged == n_fields, (n_tagged, n_fields)
     # every field is read by some code outside config.py (attribute access or getattr, parsed with ast,
     # so a docstring naming a field does not count) [added 2026-10-07: renderer.jpeg_qtables_file was
@@ -164,6 +164,9 @@ def test_reference():
     # [2026-11-13, contract of wave 1 (D-129, D-130)] the fields of the cleaning and inference sections are declared
     # with the contract, before the blocks that read them (Blocks 23-34); they are exempt until wave 3 is merged
     pending = {u for u in unread if u.split(".")[0] in ("cleaning", "inference")}
+    # [2026-11-22, contract of wave 5 (D-218)] the soma fit's fields are declared before Blocks 45-46 read them;
+    # exempt until wave 5 is merged (the exemption is removed then)
+    pending |= {u for u in unread if u.split(".")[0] == "soma_fit"}
     # [2026-11-22] the sigma calibration's fields (D-201), exempt while Block 42 and its entry point were written,
     # are all read now (Block 42 merged, scripts/calibrate_sigma.py): the exemption is gone
     assert set(unread) - pending == records, "config fields no code reads: %s (declared records: %s)" % (
