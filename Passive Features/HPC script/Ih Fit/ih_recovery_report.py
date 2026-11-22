@@ -381,6 +381,7 @@ def evaluate_gate(summary: pd.DataFrame,
                   *,
                   arm: str = "ih6",
                   tol: RecoveryTolerances = RecoveryTolerances(),
+                  required_axes: Optional[Sequence[str]] = None,
                   ) -> Tuple[pd.DataFrame, bool]:
     """Apply the Stage-7 tolerances to ONE arm and return (verdict table, pass).
 
@@ -389,14 +390,30 @@ def evaluate_gate(summary: pd.DataFrame,
     tolerance (R_m, R_a) appears in the table with verdict "not gated". An
     axis the arm did not fit does not appear at all, and a REQUIRED axis that
     is missing fails the gate -- silence is not a pass.
+
+    `required_axes` (SPEC Block 17, 2.8 (g)): None keeps the rule above (every
+    axis with a tolerance is required). Given, an axis NOT in it and absent
+    from the arm's summary is skipped (no row), not failed; an axis in it and
+    absent fails as before (an axis with a tolerance: "FAIL (axis absent)").
+    Axes present are judged as before either way. An unknown name in
+    `required_axes` is a ValueError.
     """
+    _axes = ("Cm", "Rm", "Ra", "gbar", "dv_h", "kappa_tau")
+    if required_axes is not None:
+        required_axes = tuple(str(a) for a in required_axes)
+        unknown = [a for a in required_axes if a not in _axes]
+        if unknown:
+            raise ValueError("required_axes names unknown axes {}; known: {}"
+                             .format(unknown, _axes))
     rows: List[dict] = []
     ok_all = True
     sub = summary[summary["arm"] == arm]
-    for axis in ("Cm", "Rm", "Ra", "gbar", "dv_h", "kappa_tau"):
+    for axis in _axes:
         t = tol.for_axis(axis)
         g = sub[sub["parameter"] == axis]
         if g.empty:
+            if required_axes is not None and axis not in required_axes:
+                continue
             if t is not None:
                 rows.append(dict(arm=arm, parameter=axis, n=0,
                                  median_abs_err=np.nan, tolerance=t,
