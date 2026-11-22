@@ -16,6 +16,7 @@
 | 2026-11-22 (later, 2) | The first real run of Cell 24 (the user's upload, 15:28: "the evaluation is wrong. The soma starts to be visualized at k = 107"): the automatic pick was a dendrite; the soma's plane is now chosen by eye (D-211). Section 14.1, new; section 14's description of the measure marked. Evidence: `soma_529878215.json` from the user's Drive **[data inspected]**; `checks/soma_focus_2026-11-22/` **[run, sandbox]**. |
 | 2026-11-22 (later, 3) | The user, 16:05 ("Let's do it": the soma's outline per plane) and 16:25 (a larger crop with Allen's trace, D-213): sections 14.2 and 14.3, new. Evidence: the user's block and JSON from Drive and the SWC **[data inspected]**; `checks/soma_area_2026-11-22/`, `checks/soma_focus_2026-11-22/sphere_contours.py` **[run, sandbox]**. |
 | 2026-11-22 (later, 4) | Wave 5 (D-215, D-216, D-218: the user's plan of 17:58 approved): section 14.4, new -- the soma's forward model and fit (SPEC Blocks 45-46, merged d1ee02f and e21dfcf), the orchestrator's provisional settings (D-219), the recovery check on simulated stacks (D-216.2). Evidence: the gates' reruns (test_smoke_soma_render.py 10 pass, test_smoke_soma_fit.py 9 pass, 1 skip), the joint noise-free fit, `checks/soma_recovery_2026-11-22/` (20f4ca1). The final check of the wave is running. |
+| 2026-11-22 (later, 5) | The wave's final check came back (PASS WITH ISSUES) and was settled (D-220): section 14.4's "Final check" bullet. Evidence: the report, the reruns of the smoke suites and of the tester's spec tests against the fixed code (144d9c4). |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -559,7 +560,12 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
     against 9.1 for an ellipsoid, the cone's shadow in the residual of the in-focus planes. With masked stems as well:
     S 6.1 % low. These errors are model error, 100-400 times the SEs: the SE does not show them; chi2/dof and the
     residual's structure do.
-- **Next [pending the user]**: the final check of the wave (running); Block 47 (the corrected morphology: the
+- **Final check [independent tester, `specs/test_reports/2026-11-22_1905_incremental.md`]**: PASS WITH ISSUES, seven
+  findings NOTE or MINOR, none changing a number on the default path; settled by the orchestrator (D-220, 144d9c4):
+  `show_soma.py`'s refusals as SPEC says, the start's settings in `SomaFitConfig`, Block 44's plane window for Block 46,
+  the "linear" continuation required by the soma fit, `calibrate_sigma.py` exiting 1 when no node is fitted. Its 101
+  spec cases are on `tester/diameter-pipeline-2026-11-22_1905`, with the 14:40 run's, awaiting the user.
+- **Next [pending the user]**: Block 47 (the corrected morphology: the
   equivalent sphere at the fitted centre, each stem's first node moved along its own direction onto the fitted surface,
   D-216.3) and Block 48 (the fit's figures) as wave 6, with `scripts/fit_soma.py` and notebook Cell 25 by the
   orchestrator; there is no entry point for the fit yet.
