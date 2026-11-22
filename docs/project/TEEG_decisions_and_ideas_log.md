@@ -258,6 +258,7 @@ the "Binds" column.
 | 2026-11-22 (later) | Logs **D-206** (user, 14:51; the twins chat): $\Delta v_h$ is fixed at the Rich et al. 2021 activation curve ($\Delta v_h$ = 0), no longer fitted, because the long squares do not separate it from $\bar g_h$; the I_h fit becomes five parameters. Next free IDs: D-207, I-007. |
 | 2026-11-22 (later, 2) | Logs **D-207** (user, 14:58, "All ok"; the twins chat): the exact forms of D-204 as the assistant proposed them at 14:24 and 14:51, the twins' true $\Delta v_h$ = 0, and the two additions (the loss at the truth; $g_h$ at the deepest trained voltage, reported, not gated). Implementation plan proposed to the user; nothing implemented. Next free IDs: D-208, I-007. |
 | 2026-11-22 (later, 3) | Logs **D-208** (user, 15:01; the twins chat): $\bar g_h$'s upper bound raised to $10^{-2}$ S/cm$^2$; the user also asks that $\kappa_\tau$ not be a multiplicative factor but "a plain range" -- its meaning asked back, not settled. `loss_at_truth.py` and its job script delivered on `sci/twins` (`dev/2026-11-22_tw1_readout/`) to tell whether `tw1`'s misses are the optimiser's. Next free IDs: D-209, I-007. |
+| 2026-11-22 (later, 4) | Logs **D-209** (user, 15:06; the twins chat): the I_h time constant is fitted as its peak value in ms over a range wider than 170-685 ms, taken from the literature; the assistant proposes $[50, 1000]$ ms. Next free IDs: D-210, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -454,6 +455,7 @@ would be needed*, *Status*.
 | D-206 | 2026-11-22 | the I_h fit's parameter vector (`param_spec.make_ih_spec`, `run_ih_fit.py` arm `ih6`); D-005; D-204; the next Stage-7 run | $\Delta v_h$ is not fitted: fixed at 0, the activation curve of Rich et al. 2021 ($v_h$ = -90.87 mV, $k$ = 8.05 mV); the fit is five parameters ($C_m$, $R_m$, $R_a$, $\bar g_h$, $\kappa_\tau$) [user] | active; not implemented |
 | D-207 | 2026-11-22 | D-204's forms; `passive_long_step_training.py` (`assign_ls_roles`, `bundle_rmsd`, `build_multi_protocol_loss`), `run_ih_fit.py`, `twin_manifest.py`, `run_twin_recovery.py`, the Stage-7 report; SPEC (to write) | the forms of D-204 confirmed: train $h_2..h_n$ without $h_{\lceil n/2\rceil}$; step weight $\propto \lvert I_b\rvert$; sample weight linear to the peak then $e^{-(t-t_{\rm pk})/500\,{\rm ms}}$; 5 noise-free twins paired with the first 5 `full` twins; twins' truth $\Delta v_h$ = 0; the loss at the truth recorded; $g_h$ at the deepest trained voltage reported [user: "All ok"] | active; not implemented |
 | D-208 | 2026-11-22 | the search box of $\bar g_h$ (`param_spec.DEFAULT_GBAR_BOUNDS`, `--gbar-bounds`); D-005's box | the upper bound of $\bar g_h$ is $10^{-2}$ S/cm$^2$ (was $10^{-3}$): box $[10^{-6}, 10^{-2}]$, log scale [user, "maybe"]; the parameterisation of the I_h time constant is under question (the user: no multiplicative factor, a plain range), not yet settled | active; not implemented |
+| D-209 | 2026-11-22 | the I_h time-constant parameter (`param_spec`, `run_ih_fit.py`, the twins' truths and report); D-005's $\kappa_\tau \in [0.5, 2]$; D-208's open point | the fit's parameter is the peak I_h time constant $\tau_h^{\rm pk}$ in ms, not a factor [user]; box $[50, 1000]$ ms, log scale (the assistant's proposal from the literature, at the user's instruction to widen) | active; box proposed; not implemented |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14168,3 +14170,36 @@ instead of a log search scale; or another form) is asked back and not settled.
 **Sources.** **[user]**; **[data inspected]**; **[KB]** `TEEG_Ih_fit_staged_plan.md` 6.3. **[log]** D-005, D-206.
 
 **Status:** active; not implemented.
+
+## D-209 -- The I_h time constant is fitted as its peak value in ms, over a wider range (user)
+
+**Date:** 2026-11-22, 15:06 (Europe/Rome), the twins chat. **Binds:** `param_spec` (the axis that was `kappa_tau`),
+`run_ih_fit.py`, `twin_manifest.py` (the truths), the Stage-7 report; amends D-005's $\kappa_\tau \in [0.5, 2]$;
+settles D-208's open point.
+
+**Decision [user].** "170 to 685 ms yes but look at the values in literature and make a larger range": the fitted
+quantity is the time constant itself, not a multiplicative factor, and its range is widened from the literature.
+
+**Statement.** Let $\tau_h^{\rm base}(v)$ be the activation time constant of `Ih_human` (Rich et al. 2021, Eq. 1,
+Table 1), for each fixed $v$, and $\tau_h^{\rm base,pk} = \max_v \tau_h^{\rm base}(v)$ (343 ms **[run, the fit plan
+6.1]**, to be recomputed in code, not hard-coded from this entry). The fitted parameter is
+$\tau_h^{\rm pk} \in [50, 1000]$ ms **[the assistant's proposal]**, searched on the log scale, and the model uses
+$\tau_h(v) = (\tau_h^{\rm pk}/\tau_h^{\rm base,pk})\,\tau_h^{\rm base}(v)$ for each fixed $v$: the same model as
+before with $\kappa_\tau = \tau_h^{\rm pk}/\tau_h^{\rm base,pk} \in [0.146, 2.92]$; only the parameter's name, unit and
+box change. The gate's tolerance on it stays a factor (x1.5, D-011, unowned).
+
+**Why the box [KB, full text: Rich et al. 2021, Fig. 6 and Fig. 8, values read off the plots].** Human L5 voltage
+clamp: the primary cell about 190 to 330 ms between -60 and -90 mV; the population means about 110 to 450 ms with
+error bars from near 10 to about 690 ms; the model's peak about 345 ms near -75 mV; the rodent curve (Kole et al.
+2006), used with a shift for the human deep-L3 model of Kalmbach et al. 2018, stays below about 80 ms (78 ms peak
+**[run, the fit plan]**). Moradi Chameh et al. 2021 report the time course similar in human L2&3 and L5 (values only
+in their Suppl. Fig. 5b). 50 ms is below the fastest model in use for human cells; 1000 ms is above the upper error
+bar and is the length of the step, beyond which a sag cannot be timed.
+
+**What it does not decide.** The twins' truths for $\tau_h^{\rm pk}$ (the assistant proposes 150 to 700 ms, uniform
+in log; `tw1` drew $\kappa_\tau$ in 0.7 to 1.4, i.e. 240 to 480 ms).
+
+**Sources.** **[user]**; **[KB]** as named; PubMed searched (2026-11-22), nothing on human cortical I_h time
+constants beyond these. **[log]** D-005, D-206, D-208.
+
+**Status:** active; the box and the truths' range proposed; not implemented.
