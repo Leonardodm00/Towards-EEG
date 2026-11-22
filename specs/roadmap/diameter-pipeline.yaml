@@ -598,6 +598,20 @@ implementation:
     depends_on: [NC3, G4]
     needs_theory: []
     needs_hpc: false
+  - id: NC5
+    title: "The soma: a fitted soma model, its circle and the stems' first nodes (pilot cell)"
+    summary: "The soma's membrane area from an ellipsoid (three semi-axes, in-plane orientation, centre, absorption) rendered with the partition absorption and the calibrated defocus kernel and fitted to the planes about the soma, the traced stems and the neuropil masked with Allen's trace; checked first on simulated soma stacks for the recovery of a known height. The fitted soma enters the model as the sphere of equal area at the fitted centre, and each stem's first node moves along the stem onto the fitted surface (D-210, D-215, D-216). The soma's view (I44) is its first block."
+    parent: NC
+    depends_on: [S3c]
+    needs_theory: []
+    needs_hpc: false
+  - id: NC6
+    title: "Diameters to 250 um from the soma (pilot cell)"
+    summary: "Within 250 um of path distance from the soma (D-205, D-210), the dendritic diameters measured at every traced node (1.15 um apart), midpoints added only where neighbouring diameters jump, with the per-node fit and the in-focus width calibrated on thick nodes (D-201); a cluster job (D-215, D-216)."
+    parent: NC
+    depends_on: [NC5, NC2]
+    needs_theory: []
+    needs_hpc: true
   - id: I23
     title: "Features table"
     summary: "Per traced node and per round: diameter, absorption coefficient, lateral and depth offsets, their source; the scene rebuilt from them; CSV round trip."
@@ -782,7 +796,7 @@ implementation:
     title: "The soma's view in the image stack"
     summary: "The pilot's traced soma cropped from the image stack at full resolution (+-40 um) on every plane within its traced radius + 6 um of its depth, with Allen's reconstruction drawn faintly at its traced diameters; a montage of the window and the plane the user chooses by eye; nothing picked automatically (notebook Cell 24; D-210: the soma first, then the first 250 um; D-211: the soma's plane by eye; D-213: the larger crop and the trace)"
     block: 44
-    parent: NC
+    parent: NC5
     depends_on: [I36]
     needs_theory: []
     needs_hpc: false
