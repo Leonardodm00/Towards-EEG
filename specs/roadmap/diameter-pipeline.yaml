@@ -780,7 +780,7 @@ implementation:
     jobs: []
   - id: I44
     title: "The soma's view in the image stack"
-    summary: "The pilot's traced soma cropped from the image stack at full resolution on the planes about its traced depth; per plane a focus measure over the disk of the traced soma; the sharpest plane drawn with the traced soma's circle and the primary dendrites' first nodes, the focus curve, and a montage of the planes about it (notebook Cell 24; D-206: the soma first, then the first 250 um)"
+    summary: "The pilot's traced soma cropped from the image stack at full resolution on the planes about its traced depth; per plane a focus measure over the disk of the traced soma; the sharpest plane drawn with the traced soma's circle and the primary dendrites' first nodes, the focus curve, and a montage of the planes about it (notebook Cell 24; D-208: the soma first, then the first 250 um)"
     block: 44
     parent: NC
     depends_on: [I36]
