@@ -271,6 +271,7 @@ the "Binds" column.
 | 2026-11-22 (later; the gallery chat, 8) | Logs **D-219** (orchestrator, 18:20): the soma fit's provisional settings in the contract of wave 5, the blur's discretisation corrected before launch. Check: `checks/soma_fit_2026-11-22/check_transfer.py`. Next free IDs: D-220, I-007. |
 | 2026-11-22 (later; the gallery chat, 9) | Logs **D-220** (orchestrator): the final check of wave 5 settled (F1-F7, S1-S8). Evidence: `specs/test_reports/2026-11-22_1905_incremental.md`. Next free IDs: D-221, I-007. |
 | 2026-11-22 (later; the gallery chat, 10) | Logs **D-221** (user, 23:12): sigma_0 fixed at 0.080 um with a switch to the calibration; the SGT kernel as an option of the node's diameter fit, in the joint fit across planes too. Next free IDs: D-222, I-007. |
+| 2026-11-22 (later; the gallery chat, 11) | Logs **D-222** (user): D-221's details -- the SGT's shape (beta, xi; zeta as an option) and width (the law's FWHM), the switch's weighted means, wave 6 first. Next free IDs: D-223, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -480,6 +481,7 @@ would be needed*, *Status*.
 | D-219 | 2026-11-22 | the soma fit's provisional settings (SPEC Blocks 45-46, `SomaFitConfig`): the sampling, the blur's discretisation, the background, the planes, the region, the bounds, the start | the pixel grid and 0.14 um slabs; the normalised sampled Gaussian by FFT (a positive kernel: tau <= 1); a scale per plane by variable projection; planes within 10 um, 0.56 um apart; a 13 um disk minus the traced stems; the traced centre and radius with the shadow's orientation [orchestrator] | active (provisional) |
 | D-220 | 2026-11-22 | the final check of wave 5 (report 2026-11-22_1905, PASS WITH ISSUES): `show_soma.py`'s refusals, the soma fit's kernel continuation, `calibrate_sigma.py`'s exit, the start's settings, the plane window's edge, the config test | refusals as SPEC says; "linear" continuation required (D-218); exit 1 when no node is fitted; the start's settings in `SomaFitConfig`; one plane-window rule for Blocks 44 and 46; the tester's spec tests with the user's agreement [orchestrator] | active |
 | D-221 | 2026-11-22 | `renderer.sigma_r0_um` and a switch to Block 42's calibrated width; the kernel of the node's diameter fit (Block 30, `infer_nodes.py`, NC6); `blur_kernels` (Block 12) | sigma_0 fixed at 0.080 um with a switch to the calibration; a parameter choosing the Gaussian law or the SGT family (shape fitted) for the node's diameter, the SGT also in the joint fit across planes, its width from the defocus law [user] | active |
+| D-222 | 2026-11-22 | D-221's details: the SGT option of the node fit (Block 30), the calibrated values of the switch, the soma's wave 6 (Blocks 47-48) | (beta, xi) per node with zeta = 1, zeta fitted as an option; the width the law's FWHM; the weighted means of sigma_0 and c; wave 6 first (the stems' inside nodes removed), then the kernel wave [user] | active; extends D-221 |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14641,3 +14643,36 @@ points (the screen's background, the 10 um spacing, the stripe background) stay 
 **Sources.** **[user]** the message of 23:12. **[log]** D-052, D-066, D-172, D-201.
 
 **Status:** active.
+
+## D-222 -- D-221's details: the SGT's shape and width in the node fit, the calibrated values, the order of the work (user)
+
+**Date:** 2026-11-22, 23:36 (Europe/Rome), the gallery chat, the user's answers to four questions. **Binds:** as D-221, and
+the soma's wave 6 (SPEC Blocks 47-48, `scripts/fit_soma.py`, notebook Cell 25).
+
+**Decision [user].** To the four questions: "1 as default but allow also 2" (the SGT's shape); "The law's FWHM"
+(the width); "sigma0 and c, weighted means" (the switch); "Soma wave 6 first" (the order).
+
+**Statement.** (D-222.1) In the per-node joint fit across planes (Block 30) the SGT option fits the shape (beta, xi) per
+node with zeta = 1 by default -- a symmetric profile kernel, the isotropic PSF of D-066.1; an option fits zeta per node
+as well, as an asymmetry of the profile kernel along the node's measuring line (no isotropic 2-D PSF has it, D-066.2).
+(D-222.2) At each slab-plane defocus delta the SGT's FWHM is the Gaussian law's, w(delta) = 2 sqrt(2 ln 2)
+sigma_r(delta), the law as D-221.1 sets its in-focus width; the member (beta, xi, zeta) = (2, 0, 1) is today's Gaussian
+fit. (D-222.3) The switch to the calibration (D-221.1) applies the inverse-variance weighted means of sigma_0 and of the
+growth scale c over Block 42's converged nodes inside their bounds, through `kernel.with_kernel`. (D-222.4) The Gaussian
+stays the default kernel of the node fit (D-221.2); the neighbours' shadows in the cleaning keep it. (D-222.5) Order:
+the soma's wave 6 first, as proposed -- Blocks 47 (the soma node as the sphere of equal area at the fitted centre; each
+stem's first node moved along the stem onto the fitted surface, D-216.3; stem nodes inside the fitted surface removed and
+the first node placed where the stem leaves it; a branch point inside the soma leaves its stem unmoved, flagged) and 48
+(the fit's figures) by two implementers, `scripts/fit_soma.py` and Cell 25 by the orchestrator -- then the kernel work
+(the switch and the SGT option) as its own wave.
+
+**Why.** **[user]** as quoted. **[log]** D-052.1 (the SGT family), D-066.1-2 (isotropic PSF, no rendered skew), D-201
+(Block 42's per-node sigma_0 and c), D-216.3 (the stems).
+
+**What it does not decide.** The SGT wave's numerics (the PSF's construction, the shape's bounds, Block 12's
+`sgt_*` settings reused or not), the identifiability of (beta, xi) against the diameter on the joint fit's planes
+(a check before the wave), its run time.
+
+**Sources.** **[user]** the answers. **[log]** D-052, D-066, D-201, D-216, D-221.
+
+**Status:** active; extends D-221.
