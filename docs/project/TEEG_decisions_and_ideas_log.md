@@ -257,6 +257,7 @@ the "Binds" column.
 | 2026-11-22 (the gallery chat) | Logs **D-205** (user, 2026-11-20 18:33 and the answers after it): the diameter refinement starts from the near-soma branches; how far diameter errors matter is measured as the linearised shift of the passive fit's (Cm, Rm, Ra), threshold 5 %, every diameter beyond x wrong by 20 %, Eyal 2016 cell 060308's parameters, on the pilot's own SWC (uploaded 2026-11-22). Result: x* 250 um (150 um with Rm, Cm matched to the cell). On `sci/diameter-pipeline`: `42fc57d` (`checks/diameter_reach_2026-11-22/`, the clear-node handoff section 13). Next free IDs: D-206, I-007. |
 | 2026-11-22 (later) | Logs **D-206** (user, 14:51; the twins chat): $\Delta v_h$ is fixed at the Rich et al. 2021 activation curve ($\Delta v_h$ = 0), no longer fitted, because the long squares do not separate it from $\bar g_h$; the I_h fit becomes five parameters. Next free IDs: D-207, I-007. |
 | 2026-11-22 (later, 2) | Logs **D-207** (user, 14:58, "All ok"; the twins chat): the exact forms of D-204 as the assistant proposed them at 14:24 and 14:51, the twins' true $\Delta v_h$ = 0, and the two additions (the loss at the truth; $g_h$ at the deepest trained voltage, reported, not gated). Implementation plan proposed to the user; nothing implemented. Next free IDs: D-208, I-007. |
+| 2026-11-22 (later, 3) | Logs **D-208** (user, 15:01; the twins chat): $\bar g_h$'s upper bound raised to $10^{-2}$ S/cm$^2$; the user also asks that $\kappa_\tau$ not be a multiplicative factor but "a plain range" -- its meaning asked back, not settled. `loss_at_truth.py` and its job script delivered on `sci/twins` (`dev/2026-11-22_tw1_readout/`) to tell whether `tw1`'s misses are the optimiser's. Next free IDs: D-209, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -452,6 +453,7 @@ would be needed*, *Status*.
 | D-205 | 2026-11-22 | the order of the diameter refinement; `checks/diameter_reach_2026-11-22/` | the near-soma branches first [user]; the reach of diameter errors measured as the linearised shift of the fitted (Cm, Rm, Ra) under +-20 % beyond x, threshold 5 %, Eyal 2016 060308, passive [user]; x* 250 um [run] | active; `42fc57d` |
 | D-206 | 2026-11-22 | the I_h fit's parameter vector (`param_spec.make_ih_spec`, `run_ih_fit.py` arm `ih6`); D-005; D-204; the next Stage-7 run | $\Delta v_h$ is not fitted: fixed at 0, the activation curve of Rich et al. 2021 ($v_h$ = -90.87 mV, $k$ = 8.05 mV); the fit is five parameters ($C_m$, $R_m$, $R_a$, $\bar g_h$, $\kappa_\tau$) [user] | active; not implemented |
 | D-207 | 2026-11-22 | D-204's forms; `passive_long_step_training.py` (`assign_ls_roles`, `bundle_rmsd`, `build_multi_protocol_loss`), `run_ih_fit.py`, `twin_manifest.py`, `run_twin_recovery.py`, the Stage-7 report; SPEC (to write) | the forms of D-204 confirmed: train $h_2..h_n$ without $h_{\lceil n/2\rceil}$; step weight $\propto \lvert I_b\rvert$; sample weight linear to the peak then $e^{-(t-t_{\rm pk})/500\,{\rm ms}}$; 5 noise-free twins paired with the first 5 `full` twins; twins' truth $\Delta v_h$ = 0; the loss at the truth recorded; $g_h$ at the deepest trained voltage reported [user: "All ok"] | active; not implemented |
+| D-208 | 2026-11-22 | the search box of $\bar g_h$ (`param_spec.DEFAULT_GBAR_BOUNDS`, `--gbar-bounds`); D-005's box | the upper bound of $\bar g_h$ is $10^{-2}$ S/cm$^2$ (was $10^{-3}$): box $[10^{-6}, 10^{-2}]$, log scale [user, "maybe"]; the parameterisation of the I_h time constant is under question (the user: no multiplicative factor, a plain range), not yet settled | active; not implemented |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14142,5 +14144,27 @@ where the noise puts the minimum of the plateau) -- accepted as stated to the us
 twins.
 
 **Sources.** **[user]** 14:58. **[log]** D-006, D-204, D-206.
+
+**Status:** active; not implemented.
+
+## D-208 -- The upper bound of $\bar g_h$ is $10^{-2}$ S/cm$^2$ (user)
+
+**Date:** 2026-11-22, 15:01 (Europe/Rome), the twins chat. **Binds:** `param_spec.DEFAULT_GBAR_BOUNDS`, the
+`--gbar-bounds` passed by `run_ih_recovery.py` / `run_twin_recovery.py`; amends D-005's box for $\bar g_h$.
+
+**Decision [user].** "10^-6 - 10^-3: maybe is better up to 10^-2": the search box of $\bar g_h$ becomes
+$[10^{-6}, 10^{-2}]$ S/cm$^2$, on the log scale as before. Said with "maybe"; taken as the choice for the next run.
+
+**Why.** **[user]**. **[data inspected, run `tw1`]** two `full` twins ended on the upper bound $10^{-3}$ (both with a
+truth below $3\times10^{-5}$: runaways, not a truth outside the box). **[KB]** the anchors of the fit plan are at most
+$2\times10^{-4}$ S/cm$^2$ (Rich, Kalmbach, Hay, Eyal); the twins' truths stay drawn in $[2\times10^{-5}, 3\times10^{-4}]$.
+**[reasoning]** one more decade on a log axis costs the optimiser little, and with $\Delta v_h$ fixed (D-206) the
+runaway direction along the $\bar g_h$-$\Delta v_h$ trade is closed.
+
+**What it does not decide.** The parameterisation of the I_h time constant: the user asks for "a plain range" instead
+of the multiplicative factor $\kappa_\tau \in [0.5, 2]$; what that means (the peak time constant in ms; a linear
+instead of a log search scale; or another form) is asked back and not settled.
+
+**Sources.** **[user]**; **[data inspected]**; **[KB]** `TEEG_Ih_fit_staged_plan.md` 6.3. **[log]** D-005, D-206.
 
 **Status:** active; not implemented.
