@@ -267,6 +267,7 @@ the "Binds" column.
 | 2026-11-22 (later; the gallery chat, 5) | Logs **D-215** (user, 16:53): the refinement plan on the pilot -- the soma's area from a fitted soma model, then the circle and the stems' first nodes, then the diameters to 250 um sampled between nodes. Checks behind the answer: `checks/area_vs_axial_2026-11-22/`. Next free IDs: D-216, I-007. |
 | 2026-11-22 (later; the gallery chat, 6) | Logs **D-216** (user, 17:11, "Everything as recommended"): the method of the soma model and its fit, the equivalent sphere and the stems' first nodes, the sampling of the diameters to 250 um; roadmap steps NC5 and NC6 added. Next free IDs: D-217, I-007. |
 | 2026-11-22 (later, 6) | Logs **D-217** (user, 17:37; the twins chat): run `tw2` is submitted in full, without the pilot the assistant recommended. Next free IDs: D-218, I-007. |
+| 2026-11-22 (later; the gallery chat, 7) | Logs **D-218** (user, 18:01): the soma fit fits the kernel's far slope with the soma; the fixed slope is an option, for the calibration the user builds next week. Checks: `checks/soma_fit_2026-11-22/`. Next free IDs: D-219, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -472,6 +473,7 @@ would be needed*, *Status*.
 | D-215 | 2026-11-22 | the pilot's refinement within 250 um (D-205, D-210): the soma, the stems' first nodes, the dendritic diameters | (1) the soma's membrane area from a soma model fitted to the stack; (2) the traced circle and the stems' first nodes adjusted to it; (3) the diameters to 250 um, sampled between successive nodes [user]; the soma model's details, the sampling rule and the order against the in-focus width calibration open | active |
 | D-216 | 2026-11-22 | D-215's open points: the soma model and its fit, how the fitted soma enters the model, the sampling of the diameters; the roadmap's steps NC5, NC6 | an ellipsoid (three semi-axes, its in-plane orientation, its centre), partition absorption, stems and neuropil masked with Allen's trace, depth in stage units, a check on simulated soma stacks first; the sphere of equal area at the fitted centre, the stems' first nodes moved along their own direction onto the fitted surface; every node first, midpoints only where neighbours jump [user] | active |
 | D-217 | 2026-11-22 | the second Stage-7 run on davinci (`RUN_TAG=tw2`, `NOISE_TAG=nf2`; SPEC Block 17) | the 35 twins of `tw2` are submitted at once, no pilot [user]; `WALLTIME=48:00:00` and the plan's defaults (D-206 to D-209) | active |
+| D-218 | 2026-11-22 | the soma fit's kernel (SPEC Blocks 45-46): the far-defocus continuation slope | fitted jointly with the soma by default; held fixed at the renderer configuration's slope as an option, for the far-slope calibration the user builds next week [user]; wave 5 started on this answer | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14490,3 +14492,31 @@ killed by the wall time keeps its archive; the same command refits only the twin
 **Sources.** **[user]**. **[log]** D-200, D-204, D-206 to D-209, D-214.
 
 **Status:** active.
+
+## D-218 -- The soma fit fits the kernel's far slope; a fixed slope is the option (user)
+
+**Date:** 2026-11-22, 18:01 (Europe/Rome), the gallery chat. **Binds:** SPEC Blocks 45-46 (the soma's forward model
+and fit), `SomaFitConfig.far_slope`.
+
+**Decision [user].** To "how should the far slope be handled in the soma fit? 1 fit it jointly with the soma, 2 keep
+it fixed at 0.79, 3 calibrate it first from far-defocus nodes": "First 1 but make available as an option 2. In the
+next week I will build the calibration and run it".
+
+**Statement.** (D-218.1) The soma fit's parameters include the kernel's continuation slope gamma (um of SD per um of
+defocus beyond the table's last depth), fitted jointly with the ellipsoid: the default, `far_slope = "fit"`.
+(D-218.2) `far_slope = "fixed"` holds gamma at the renderer configuration's `kernel_continuation_slope` -- the
+configured 0.79 um/um now, the calibrated value once the user's far-slope calibration exists. (D-218.3) The
+implementation plan of 17:58 (wave 5: Blocks 45 and 46 by two implementers; the recovery check on simulated stacks;
+Block 47 with step 2) is taken as approved.
+
+**Why.** **[run, sandbox]** `checks/soma_fit_2026-11-22/`: with gamma fixed and the truth's 20 % steeper, the fitted
+height is 0.5-1.0 um small, the area 3-10 %; with gamma free, SE(c) 0.006-0.007 um and corr(c, gamma) about +0.6 in an
+exactly specified model. **[user]** a far-slope calibration of their own next week.
+
+**What it does not decide.** The far-slope calibration's method (the user's, next week); whether the soma's fitted
+gamma is used elsewhere.
+
+**Sources.** **[user]** 2026-11-22 18:01. **[run, sandbox]** as above. **[log]** D-215, D-216.
+
+**Status:** active.
+
