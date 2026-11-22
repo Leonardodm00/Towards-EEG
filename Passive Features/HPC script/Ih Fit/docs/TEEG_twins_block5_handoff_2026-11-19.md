@@ -18,6 +18,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-20 (later, 4) | The gates on davinci (16:35): 58 checks passed; TS7 of `smoke_twin_recovery.py` ERROR (`manifest.csv` not found). Cause: NEURON exits (`can't open DISPLAY`) when `DISPLAY` is set and no X server answers; the test's fake `HOME` hid the X11 cookie of the MobaXterm login. Fixed by SPEC Block 8 amendment 10 (`84d099d`; the submitter unsets `DISPLAY`; NEURON's version recorded without pip metadata); `sci/twins` at `a28d1a5`. A trap added. |
 | 2026-11-20 (later, 5) | Section 7 brought up to date: Block 8 built (the draft around `submit_ih_recovery.sh` superseded), how to read the run's outputs, the gate's default tolerances and what a failing axis means for Stage 8 (D-005, D-083). |
 | 2026-11-20 (later, 6) | Section 5b: the run as decided (D-200: no pilot; the 30 twins at once with a 48 h wall time) and the early check. |
+| 2026-11-22 | Section 5b: the run has ended (the user's early-check line: 30 status files, 30 logs in the fit, no traceback); the read-out is next. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -294,6 +295,9 @@ with `prova` active.
 the repository root: `cd /davinci-1/home/ldellamea/TEEG/Towards-EEG && git pull && git log --oneline -1 && cd "Passive Features/HPC script/Ih Fit" && conda activate prova && python smoke_twin_recovery.py && RUN_TAG=tw1 NOISE_TAG=nf2 WALLTIME=48:00:00 bash submit_twin_recovery.sh`.
 The early check, about an hour after the jobs start (no twin ended, every log in the fit, no traceback):
 `cd "/davinci-1/home/ldellamea/Human Neurons Fitting/pipeline_outputs_ih/twin_recovery/tw1/L3_exc" && echo "twins ended: $(ls status 2>/dev/null | wc -l)   in the fit: $(grep -l 'n_calls=200' logs/twin_*.log 2>/dev/null | wc -l)   with a traceback: $(grep -l Traceback logs/twin_*.log 2>/dev/null | wc -l)"`.
+**Ended [the user's paste, 2026-11-22 13:52]:** the early check read `twins ended: 30   in the fit: 30   with a
+traceback: 0` -- every twin wrote its status file after reaching the fit; whether each is `ok`, and the merge's
+report, are read next (section 7). The job IDs were not recorded.
 
 `RUN_TAG` and `PLAN_ARGS` stay the same in steps 2 to 5: the plan is frozen at the pilot, and a different option is
 refused. One R_a truth per twin instead of one per configuration is `PLAN_ARGS=--ra-mode=per_cell` added to all of them.
