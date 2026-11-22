@@ -268,6 +268,7 @@ the "Binds" column.
 | 2026-11-22 (later; the gallery chat, 6) | Logs **D-216** (user, 17:11, "Everything as recommended"): the method of the soma model and its fit, the equivalent sphere and the stems' first nodes, the sampling of the diameters to 250 um; roadmap steps NC5 and NC6 added. Next free IDs: D-217, I-007. |
 | 2026-11-22 (later, 6) | Logs **D-217** (user, 17:37; the twins chat): run `tw2` is submitted in full, without the pilot the assistant recommended. Next free IDs: D-218, I-007. |
 | 2026-11-22 (later; the gallery chat, 7) | Logs **D-218** (user, 18:01): the soma fit fits the kernel's far slope with the soma; the fixed slope is an option, for the calibration the user builds next week. Checks: `checks/soma_fit_2026-11-22/`. Next free IDs: D-219, I-007. |
+| 2026-11-22 (later; the gallery chat, 8) | Logs **D-219** (orchestrator, 18:20): the soma fit's provisional settings in the contract of wave 5, the blur's discretisation corrected before launch. Check: `checks/soma_fit_2026-11-22/check_transfer.py`. Next free IDs: D-220, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -474,6 +475,7 @@ would be needed*, *Status*.
 | D-216 | 2026-11-22 | D-215's open points: the soma model and its fit, how the fitted soma enters the model, the sampling of the diameters; the roadmap's steps NC5, NC6 | an ellipsoid (three semi-axes, its in-plane orientation, its centre), partition absorption, stems and neuropil masked with Allen's trace, depth in stage units, a check on simulated soma stacks first; the sphere of equal area at the fitted centre, the stems' first nodes moved along their own direction onto the fitted surface; every node first, midpoints only where neighbours jump [user] | active |
 | D-217 | 2026-11-22 | the second Stage-7 run on davinci (`RUN_TAG=tw2`, `NOISE_TAG=nf2`; SPEC Block 17) | the 35 twins of `tw2` are submitted at once, no pilot [user]; `WALLTIME=48:00:00` and the plan's defaults (D-206 to D-209) | active |
 | D-218 | 2026-11-22 | the soma fit's kernel (SPEC Blocks 45-46): the far-defocus continuation slope | fitted jointly with the soma by default; held fixed at the renderer configuration's slope as an option, for the far-slope calibration the user builds next week [user]; wave 5 started on this answer | active |
+| D-219 | 2026-11-22 | the soma fit's provisional settings (SPEC Blocks 45-46, `SomaFitConfig`): the sampling, the blur's discretisation, the background, the planes, the region, the bounds, the start | the pixel grid and 0.14 um slabs; the normalised sampled Gaussian by FFT (a positive kernel: tau <= 1); a scale per plane by variable projection; planes within 10 um, 0.56 um apart; a 13 um disk minus the traced stems; the traced centre and radius with the shadow's orientation [orchestrator] | active (provisional) |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14520,3 +14522,43 @@ gamma is used elsewhere.
 
 **Status:** active.
 
+
+## D-219 -- The soma fit's provisional settings in the contract of wave 5 (orchestrator)
+
+**Date:** 2026-11-22, 18:20 (Europe/Rome), the gallery chat. **Binds:** SPEC Blocks 45-46 (the contract of wave 5),
+`SomaFitConfig` (`config.soma_fit`).
+
+**Decision [orchestrator].** The settings D-216 left to the orchestrator (the fit's background model, the masks'
+widening, the fit region and its run time) and the forward model's numerics are set provisionally in the contract of
+wave 5. They change in SPEC without a new decision of the user's; the recovery check on simulated stacks (D-216.2)
+tests them.
+
+**Statement.** (D-219.1) Sampling: the pixel grid itself (`fine_factor` 1) and slabs of 0.14 um (`dzeta_um`; the tubes'
+renderer keeps 0.02 um); Block 45's smoke test reports the discretisation error of both. (D-219.2) The blur: the
+normalised sampled Gaussian on the samples, applied by FFT with its transfer by Poisson summation, in place of the
+continuous transfer with a half-pixel floor of the identifiability check (`checks/soma_fit_2026-11-22/`); the box padded
+by Block 4's rule (`renderer.fft_wrap_sigmas`); the light direction the acquisition's. (D-219.3) The background: each
+plane's grey level a scale B_k, solved exactly for every parameter vector (variable projection). (D-219.4) The fit: the
+planes within 10 um of the start depth whose index differs from the nearest plane's by a multiple of 2 (0.56 um
+apart); a disk of 13 um about the traced centre, minus Allen's traced stems widened by 2 um; `least_squares` (trf),
+the Jacobian by forward differences with absolute steps, at most 80 evaluations; the bounds: the centre +-4 um in the
+plane and +-6 um in depth, the semi-axes 1-15 um, mu 0.001-3 /um, gamma 0.2-3 um/um. (D-219.5) The start: the traced
+centre and radius (D-216), with the in-plane orientation and an aspect of the same mean radius from the second moments
+of the soma's shadow on the plane nearest the start depth; mu from the shadow's darkest pixels.
+
+**Why.** (D-219.2) **[run, sandbox]** `checks/soma_fit_2026-11-22/check_transfer.py`: the continuous transfer's kernel
+has negative lobes below about one sample (its minimum -1.8e-2 at 0.5 sample, -2.6e-3 at 0.7, -1.6e-4 at 1), so a
+blurred edge overshoots and tau can exceed 1: by 1.3e-2 at the floor's 0.5 sample, by 1.6e-3 at 0.7 sample (the pilot
+kernel's in-focus 0.08 um on 0.1144 um pixels). The sampled Gaussian's kernel is positive (no overshoot above 7e-16),
+and its Poisson-summed transfer equals its DFT to 1.8e-15 for SDs from 0.2 to 20 samples. (D-219.5) **[own
+reasoning]** at a = b the Jacobian's column for the orientation is zero, so the fit reaches the orientation only
+through the aspect, and not at all for a soma elongated at about 45 degrees to the start's orientation. (D-219.1,
+D-219.4) **[run, sandbox]** the identifiability check of D-216.2 used the same planes, region, slab thickness and grid
+(36 planes; 6.6 s per render in a 512-sample box).
+
+**What it does not decide.** The far slope (D-218, the user's); the settings after the recovery check; Block 47 (the
+figures, the entry point, the corrected SWC).
+
+**Sources.** **[log]** D-215, D-216, D-218. **[run, sandbox]** as above. **[own reasoning]** as above.
+
+**Status:** active (provisional).
