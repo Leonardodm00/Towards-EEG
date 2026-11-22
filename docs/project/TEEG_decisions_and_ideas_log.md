@@ -269,6 +269,7 @@ the "Binds" column.
 | 2026-11-22 (later, 6) | Logs **D-217** (user, 17:37; the twins chat): run `tw2` is submitted in full, without the pilot the assistant recommended. Next free IDs: D-218, I-007. |
 | 2026-11-22 (later; the gallery chat, 7) | Logs **D-218** (user, 18:01): the soma fit fits the kernel's far slope with the soma; the fixed slope is an option, for the calibration the user builds next week. Checks: `checks/soma_fit_2026-11-22/`. Next free IDs: D-219, I-007. |
 | 2026-11-22 (later; the gallery chat, 8) | Logs **D-219** (orchestrator, 18:20): the soma fit's provisional settings in the contract of wave 5, the blur's discretisation corrected before launch. Check: `checks/soma_fit_2026-11-22/check_transfer.py`. Next free IDs: D-220, I-007. |
+| 2026-11-22 (later; the gallery chat, 9) | Logs **D-220** (orchestrator): the final check of wave 5 settled (F1-F7, S1-S8). Evidence: `specs/test_reports/2026-11-22_1905_incremental.md`. Next free IDs: D-221, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -476,6 +477,7 @@ would be needed*, *Status*.
 | D-217 | 2026-11-22 | the second Stage-7 run on davinci (`RUN_TAG=tw2`, `NOISE_TAG=nf2`; SPEC Block 17) | the 35 twins of `tw2` are submitted at once, no pilot [user]; `WALLTIME=48:00:00` and the plan's defaults (D-206 to D-209) | active |
 | D-218 | 2026-11-22 | the soma fit's kernel (SPEC Blocks 45-46): the far-defocus continuation slope | fitted jointly with the soma by default; held fixed at the renderer configuration's slope as an option, for the far-slope calibration the user builds next week [user]; wave 5 started on this answer | active |
 | D-219 | 2026-11-22 | the soma fit's provisional settings (SPEC Blocks 45-46, `SomaFitConfig`): the sampling, the blur's discretisation, the background, the planes, the region, the bounds, the start | the pixel grid and 0.14 um slabs; the normalised sampled Gaussian by FFT (a positive kernel: tau <= 1); a scale per plane by variable projection; planes within 10 um, 0.56 um apart; a 13 um disk minus the traced stems; the traced centre and radius with the shadow's orientation [orchestrator] | active (provisional) |
+| D-220 | 2026-11-22 | the final check of wave 5 (report 2026-11-22_1905, PASS WITH ISSUES): `show_soma.py`'s refusals, the soma fit's kernel continuation, `calibrate_sigma.py`'s exit, the start's settings, the plane window's edge, the config test | refusals as SPEC says; "linear" continuation required (D-218); exit 1 when no node is fitted; the start's settings in `SomaFitConfig`; one plane-window rule for Blocks 44 and 46; the tester's spec tests with the user's agreement [orchestrator] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14562,3 +14564,41 @@ figures, the entry point, the corrected SWC).
 **Sources.** **[log]** D-215, D-216, D-218. **[run, sandbox]** as above. **[own reasoning]** as above.
 
 **Status:** active (provisional).
+
+## D-220 -- The final check of wave 5 settled (orchestrator)
+
+**Date:** 2026-11-22, 20:36 (Europe/Rome), the gallery chat. **Binds:** SPEC Block 36 (amendment 21), Block 44 (amendment
+3), Block 46 (amendment 1), section 6; `SomaFitConfig`; `scripts/show_soma.py`, `scripts/calibrate_sigma.py`; the
+config test.
+
+**Decision [orchestrator].** The seven findings and eight spec problems of the independent final check of wave 5
+(`specs/test_reports/2026-11-22_1905_incremental.md`: PASS WITH ISSUES, every finding NOTE or MINOR, no wrong number
+on the default path) are settled as below.
+
+**Statement.** (D-220.1; F1, S1) `show_soma.py` refuses `--soma-k-range LO HI` unless both ends are recorded planes of
+the window, and `--montage-k LO HI STEP` unless LO and HI lie in the window (the planes not recorded between them are
+skipped). (D-220.2; F2, S6) The soma fit requires the renderer's "linear" continuation, whose slope gamma is (D-218):
+under another continuation Block 45 refuses the slope and `fit_soma` raises ValueError at its first render, before the
+solver -- stated in SPEC, not changed. (D-220.3; F3) `calibrate_sigma.py` names in its last line the node pages and the
+summary figure it wrote and the nodes that failed, and exits 1 with a message when no node was fitted. (D-220.4; F4, S7)
+The start's settings become `SomaFitConfig` fields -- `start_far_radii` 1.5, `start_core_radii` 0.5,
+`start_core_percentile` 5.0, `start_ratio_clip` (0.05, 0.95), `start_ratio_none` 0.5 (D-219.5, PROVISIONAL) --
+and `start_theta` takes the configuration as an optional keyword (None: the defaults). (D-220.5; F7, S8) Block 46's
+plane window is Block 44's: `select_planes` keeps the planes inside `soma_view.plane_range` (a tolerance of 1e-9 of a
+plane at both closed ends). (D-220.6; F5) The config test exempts only `soma_fit.mask_widen_um`, until Block 47 reads
+it. (D-220.7; S2) Block 44's "a non-positive half" binds `crop_box`; `plane_range` takes half >= 0 (0: the plane at
+the depth). (D-220.8; S3) varrho = 0.5, not mu0, when the core holds no pixel (the code's reading). (D-220.9; S4, S5)
+Section 6 gains the rows of `test_smoke_soma_render.py` and `test_smoke_soma_fit.py`; Block 44's count becomes 7
+pass, 1 skip. (D-220.10; F6) The tester's spec tests of 14:40 and of 19:05 (`tester/diameter-pipeline-2026-11-22_1440`,
+`..._1905`) come into the working line together when the user agrees; their cases appended to the same two files are
+both kept.
+
+**Why.** **[run, sandbox]** the report's reproducers. (D-220.2) **[log]** D-218: gamma is the linear continuation's slope;
+the pilot's kernel is linear (D-024). (D-220.4) SPEC section 4 and D-021: an open choice is a configuration field, as
+Block 42's start. (D-220.5) 0.28 um is not exact in binary, so an exact edge test drops a plane Block 44 keeps.
+
+**What it does not decide.** Whether the spec tests come in (the user's); wave 6 (Blocks 47-48), pending the user.
+
+**Sources.** **[run, sandbox]** the report. **[log]** D-021, D-024, D-212, D-218, D-219.
+
+**Status:** active.
