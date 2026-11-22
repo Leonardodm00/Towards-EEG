@@ -253,6 +253,7 @@ the "Binds" column.
 | 2026-11-20 (the gallery chat, later, 3) | Logs **D-201** (user, 16:59 and the answers after it; the gallery chat): the in-focus width is fitted on thick nodes, with the pipeline's hybrid line renderer as it is, a free growth scale per node and a straight background per plane solved exactly; up to 20 thick nodes (Allen >= 1.0 um, spread out) on $k^* \pm 2$; one start; the starts, bounds, solver settings and the line +-4.5 um are the orchestrator's (D-201.5, D-201.6). On `sci/diameter-pipeline`: `618686e` (SPEC Block 4 am. 2, `kernel.with_kernel`), `b7f4022` (wave 4 contract: Blocks 42, 43 as stubs, `config.sigma_calibration`, roadmap I40-I43), `019fc12` (notebook Cell 23A, the clear-node handoff section 12), `dbefad5` (roadmap rendered). Evidence: the smoke tests of `with_kernel` (6 pass, 1 skip) and of the configuration (6 pass, 1 skip); Cell 23A run on the synthetic cell; the forward's time per evaluation measured in the sandbox. Next free IDs: D-202, I-007. |
 | 2026-11-20 (the gallery chat, later, 4) | Logs **D-202** (user, 17:44; the gallery chat): Cell 22's fit (D-169's path with WEIGHT_KAPPA 0.1 on D-199's four nodes) is dropped before it ran; D-199's status marked (D-199.1, the four nodes, not withdrawn). On `sci/diameter-pipeline`: `0be11a7` (Cell 22 a one-line note; the clear-node handoff, section 11.2 marked). Next free IDs: D-203, I-007. |
 | 2026-11-20 (the gallery chat, later, 5) | Logs **D-203** [orchestrator] (the gallery chat; coding directive 7), prompted by the user, 18:09 ("Maybe we have to account for a tilted background", with Cell 23A's output): Block 42's start measures the k* dip against a straight background through the line's ends. On `sci/diameter-pipeline`: `439f945` (SPEC Block 42 amendment 4, `start_ends_um`), `7d3928b` (`checks/tilt_2026-11-20/`, the clear-node handoff 12.1). Next free IDs: D-204, I-007. |
+| 2026-11-22 | Logs **D-204** (user, 14:24; the twins chat). **Stage 7's run `tw1` ended: gate FAIL** (30 twins `ok`; PBS `2101455[]`, merge `2101456`; `ih6` arm, median abs error: $C_m$ 0.126 pass, $\bar g_h$ 1.84, $\Delta v_h$ 7.47 mV, $\kappa_\tau$ 0.61, the no-I_h control 3 of 10 on the lower bound; read-out in `Ih Fit/dev/2026-11-22_tw1_readout/` and the twins' handoff, section 7). The user does not accept "not recoverable" and changes the fit's protocol: the stronger hyperpolarising long squares are trained on, a medium one held out; a step's weight grows with its strength; a per-sample weight on each long square that rises to the peak of the response and decays slowly, so that the sag counts; and a new configuration of 5 twins fitted without noise. The exact forms are the assistant's proposals, pending the user's confirmation. D-006 (ii) and its role table superseded in part. Next free IDs: D-205, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -277,7 +278,7 @@ would be needed*, *Status*.
 | D-003 | 2026-09-21 | `passive_params*.csv`, `p1_export.pbs` knobs, output trees `h01/p1_inh_SST`, `h01/p1_inh_PVVIP` | L2/L3 inh exported under BOTH passive sets (SST cm 1.0; PV/VIP cm 2.0), one tree each; which tree the EEG model uses is decided downstream | active |
 | D-004 | 2026-09-22 | the campaign job scripts; what "a finished cell" means; which F is reported anywhere | one submission runs P1 -> P2 -> P3 per cell; the spine area and F of every cell are the `mesh_beyond` measurement, other variants are comparison only | active; orchestration IMPLEMENTED 2026-09-22 (`campaign.pbs`), pending push to the cluster |
 | D-005 | 2026-09-22 | `Ih Fit/` mod files, `ih_mechanism.py`, `ParamSpec`, search box and GP budget of every I_h arm | six fitted parameters $(C_m, R_m, R_a, \bar g_h, \Delta v_h, \kappa_\tau)$; uniform $\bar g_h$ (Eyal law = comparison); $e_{\rm pas}$ solved so $V_{\rm rest}$ is stationary; 200/100 | active; IMPLEMENTED through Stage 7 on 2026-09-22, pending push; the recovery gate is BUILT (D-011) but has not yet been RUN |
-| D-006 | 2026-09-22 | loader roles, loss windows, `run_ih_fit.py`, `submit_ih_fit.sh`, Phase 3, the comparison tables | no I_h-suppressing guards; train on $h_2..h_{n-1}$ on the step window; validate on small depolarising steps + $h_1$; $h_n$ and rebound report-only; Phase 2.5 off, Phase 3 on; baseline = run B (dt 0.1 ms, 60 ms); monolith copy edited in `Ih Fit/` with a 3-D regression gate | active; role table confirmed by D-007; IMPLEMENTED through Stage 7 on 2026-09-22, pending push; **the spike screen of Q7's implementation corrected by D-016** |
+| D-006 | 2026-09-22 | loader roles, loss windows, `run_ih_fit.py`, `submit_ih_fit.sh`, Phase 3, the comparison tables | no I_h-suppressing guards; train on $h_2..h_{n-1}$ on the step window; validate on small depolarising steps + $h_1$; $h_n$ and rebound report-only; Phase 2.5 off, Phase 3 on; baseline = run B (dt 0.1 ms, 60 ms); monolith copy edited in `Ih Fit/` with a 3-D regression gate | active; role table confirmed by D-007; IMPLEMENTED through Stage 7 on 2026-09-22, pending push; **the spike screen of Q7's implementation corrected by D-016**; (ii) and the role table superseded in part by D-204 (2026-11-22) |
 | D-007 | 2026-09-22 | same objects as D-005/D-006 | confirmations: base `Ih_human`; role table stands; dt 0.1 ms; $F=1.9$ for L2/L3 optimisation; Phase-3 100/30, B=200; every recorded hyperpolarising amplitude admitted | active; all six are the defaults of `run_ih_fit.py` / `submit_ih_fit.sh` as of Stage 6; morphology input contract closed by D-013 |
 | D-008 | 2026-09-22 | `Ih Fit/` loader defaults, `param_spec.py`, every loss and refit call site | loader keeps legacy defaults (no-cap is opt-in, so the regression gate stays meaningful); every loss is variadic positional in spec order, `loss(*q)` | active; both conventions held through Stages 5-6 (the regression gate is still bit-for-bit) |
 | D-009 | 2026-09-22 | `--min-coverage` and `qc_status` (what they are FOR); every table reporting an $F$ beside its mesh coverage; `campaign_policy_report.py`; `campaign.pbs` resources; `campaign_queue_check.py` defaults | the kappa fill stays and no cell is dropped -- the uncovered area fraction is REPORTED instead; `shaft_terminates` components are kept as spines; the allocation is 200 CPUs at once, 300 h walltime ceiling | active |
@@ -444,6 +445,7 @@ would be needed*, *Status*.
 | D-201 | 2026-11-20 | SPEC Blocks 4 am. 2, 42, 43, 36 am. 19; `config.sigma_calibration`; notebook Cell 23; `OUT/cleaning_thick`; roadmap I42, I43 | the in-focus width is fitted on thick nodes with the hybrid line renderer as it is, a free growth scale per node and a straight background per plane solved exactly; up to 20 thick nodes (Allen >= 1.0 um, spread out) on k* +- 2; one start [user]; the starts, bounds, solver settings and the line +-4.5 um [orchestrator] | active; contract `b7f4022`, Cell 23A `019fc12`, not run on Colab |
 | D-202 | 2026-11-20 | notebook Cell 22; D-199.2; the folders `OUT/cleaning_fit4`, `OUT/inference_fit4_k0.1` (never made) | Cell 22's fit with WEIGHT_KAPPA 0.1 on the four nodes is dropped, not run [user] | active; Cell 22 a one-line note (`0be11a7`) |
 | D-203 | 2026-11-20 | SPEC Block 42 amendment 4 (`start_theta`, oracle T8); `SigmaCalibrationConfig.start_ends_um`; D-201.5's start | the start measures the k* dip against a straight background through the samples at abs(v) >= 3 um, the pilot's values when it cannot be measured [orchestrator] | active; `439f945`, sent to Block 42's implementer |
+| D-204 | 2026-11-22 | the I_h fit's protocol (`passive_long_step_training.py`: `assign_ls_roles`, `bundle_rmsd`, `build_multi_protocol_loss`; `run_ih_fit.py`); the Stage-7 configurations (`twin_manifest.py`, `run_twin_recovery.py`); D-006 (ii), D-184, D-188 | after `tw1`'s gate FAIL: train on the stronger hyperpolarising long squares (a medium one validates), weight a step by its strength, weight each long square's samples to peak at the response's peak and decay slowly, and add 5 twins fitted without noise [user]; the forms pending | active; forms proposed, not yet confirmed |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -13959,3 +13961,57 @@ preparation judges 7, 599, 611, 629 clean and 639, 663, 1802 not.
 `analysis/node_inference.py` (Block 30's model). **[log]** D-194, D-198, D-201.
 
 **Status:** active. Contract amendment at `439f945`.
+
+## D-204 -- After `tw1`'s gate FAIL: stronger long squares trained on, strength-weighted steps, a sag-weighted sample window, and five twins without noise (user)
+
+**Date:** 2026-11-22, 14:24 (Europe/Rome), the twins chat, after the read-out of run `tw1` (13:59) and the user's
+"It's not possible that it is not recoverable" (14:12).
+**Binds:** the I_h fit's protocol -- `passive_long_step_training.py` (`assign_ls_roles`, `bundle_rmsd`,
+`build_multi_protocol_loss`), `run_ih_fit.py` (the arms `ih6` and `passive_fullstep`); the Stage-7 configurations
+(`twin_manifest.py`, `run_twin_recovery.py`, SPEC `Ih Fit/specs/SPEC.md` 2.7 and Blocks 8, 13); the next Stage-7 run.
+Supersedes in part **D-006 (ii)** and its role table (train on $h_2..h_{n-1}$, $h_n$ report-only, equal weight per
+bundle, uniform weight per sample on a long square). Adds a configuration to D-184 / D-188.
+
+**What preceded it [data inspected: the run's tables; `Ih Fit/dev/2026-11-22_tw1_readout/`].** Run `tw1` (D-200): 30
+twins `ok`, **STAGE 7 GATE: FAIL** in `report/` and `report_without_flagged/`. `ih6` arm, 10 `full` twins, median
+absolute error: $C_m$ 0.126 (pass at 0.223), $\bar g_h$ 1.84, $\Delta v_h$ 7.47 mV, $\kappa_\tau$ 0.61 (FAIL);
+the 10 `active_fit` twins: $\bar g_h$ on its lower bound in 3 (FAIL), $C_m$ 0.49 (FAIL).
+
+**Decision [user], in the user's terms.**
+(D-204.1) "use the stronger hyperpolarizing long squared steps for training except a medium one used for validations."
+(D-204.2) "Stronger the hyperpolarising step higher the weight we give to that RMSD."
+(D-204.3) "We implement a weighting for the samples that rises from the initial part and peaks at the peak of the
+response and then slowly decays. I would like that the sag has importance for each long squared."
+(D-204.4) "Among all the configurations we test add one where 5 cells are optimized without noise."
+
+**Statement.** Not yet fixed: the user gave the four rules; their exact forms are the assistant's proposals of
+2026-11-22 (the reply to the user's message), each **[open]** until the user confirms -- which steps train and which
+one validates; the law of the step weight and the short squares' share; the shape and time constant of the sample
+weight and the definition of the peak; which 5 cells and truths the noise-free twins take. The confirmed forms are
+logged in a later entry and written into SPEC before any code.
+
+**Why.** **[user]** The I_h parameters must be recoverable; the present loss gives the sag too little weight.
+**[data inspected; reasoning, one-compartment estimate]** In 4 of the 10 `full` twins (900000000, -005, -008, -009)
+the truth's sag on the stronger steps is an estimated 1.5 to 7 mV against a noise sigma of 0.07 to 0.2 mV, yet the
+fitted I_h conductance at rest is off by a factor e^1.0 to e^3.2: there the miss is the fit's (loss or optimiser), not
+the noise's. In 3 (-003, -004, -006) the estimated sag is at or below the noise sigma (0.008 to 0.12 mV against about
+0.07 mV). In 3 (-001, -002, -007) the conductance at rest came back within a factor 1.6.
+
+**What it implies for code and tables.** The role split, the cross-step weights and the per-sample weight change in
+`passive_long_step_training.py` for both arms; a fourth configuration (I_h traces without noise, six-parameter fit, 5
+twins) in the manifest and the driver; a new Stage-7 run under a new run tag. SPEC entries first; the fan-out rules of
+the coding directives apply.
+
+**What it does not decide.** (a) The exact forms (above). (b) **[reasoning, checked by computation]** These changes do
+not separate $\bar g_h$ from $\Delta v_h$: the strongest step takes the twins a median 13.0 mV below rest (10.6 mV on
+the steps trained now), and over rest to the deepest step a 5 mV shift of $\Delta v_h$ is still undone by rescaling
+$\bar g_h$ to within a median 4.5 to 7.4 % in $g_h(V)$; whether the gate judges the conductance at the voltages
+reached is the user's. (c) The optimiser's budget (200 calls, 100 random) is not changed. (d) Whether the strongest
+step is trained on for REAL cells, where conductances outside the model may act on it (D-006's reason for holding it
+out): the twins have none. (e) The rebound stays out of the loss (D-006).
+
+**Sources.** **[user]** 2026-11-22 14:12 and 14:24. **[data inspected]** the run's tables (the user's extract),
+`tw1_readout.py`, and a scratch computation of the steps' depths and of the sag against each sweep's noise law.
+**[log]** D-005, D-006, D-011, D-083, D-182.3, D-184, D-188, D-200.
+
+**Status:** active; the forms proposed, not yet confirmed; nothing implemented.

@@ -20,6 +20,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-20 (later, 6) | Section 5b: the run as decided (D-200: no pilot; the 30 twins at once with a 48 h wall time) and the early check. |
 | 2026-11-22 | Section 5b: the run has ended (the user's early-check line: 30 status files, 30 logs in the fit, no traceback); the read-out is next. |
 | 2026-11-22 (later) | Section 7: the result of run tw1 (gate FAIL; 30 ok; job IDs; run times) and its reading (the foot of `Ih_human` at the voltages the steps reach; the optimiser question left open), from the user's extract and `dev/2026-11-22_tw1_readout/`. |
+| 2026-11-22 (later, 2) | Section 7: the user's decision after the FAIL (D-204: a new training set, step and sample weights, 5 noise-free twins; forms pending) and the split of the 10 `full` twins by sag against noise. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -366,6 +367,14 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   whether the optimiser (200 calls in 6-D) reached the best fit is not established -- it needs the objective at the
   truth. The real cell 508282493 shows a sag of 0.10-0.12 on its -90 and -110 pA steps (troughs -70 and -72 mV).
   By D-005 and D-083 a failing $\bar g_h$ makes the six-parameter fit unusable as it is; the next step is the user's.
+- **Next [D-204, user, 2026-11-22 14:24].** The user does not accept "not recoverable" and changes the fit's
+  protocol before a second Stage-7 run: train on the stronger hyperpolarising long squares (a medium one validates);
+  weight a step by its strength; weight each long square's samples to peak at the response's peak and decay slowly;
+  add 5 twins fitted without noise. The exact forms are proposed and await the user's confirmation; nothing is
+  implemented. Refinement of the reading above [data inspected; one-compartment estimate]: of the 10 `full` twins,
+  4 (-000, -005, -008, -009) have a sag far above the noise yet a wrong I_h conductance (the fit's miss), 3 (-003,
+  -004, -006) a sag at or below the noise, 3 (-001, -002, -007) a conductance at rest within x1.6. Including the
+  strongest step deepens the reach from a median 10.6 to 13.0 mV below rest; $\bar g_h$ and $\Delta v_h$ stay tied.
 - **Block 7** (roadmap N7): the fitted laws and flags into the Stage-7 manifest and the noise table, and the
   decision-log and plan entries that close the noise prerequisite (N7's summary; the S0-S3 report dropped, D-125.3).
 - **Stage 8** (the campaign) waits for the gate's verdict and the corrected SWCs (S8's note).
