@@ -270,6 +270,7 @@ the "Binds" column.
 | 2026-11-22 (later; the gallery chat, 7) | Logs **D-218** (user, 18:01): the soma fit fits the kernel's far slope with the soma; the fixed slope is an option, for the calibration the user builds next week. Checks: `checks/soma_fit_2026-11-22/`. Next free IDs: D-219, I-007. |
 | 2026-11-22 (later; the gallery chat, 8) | Logs **D-219** (orchestrator, 18:20): the soma fit's provisional settings in the contract of wave 5, the blur's discretisation corrected before launch. Check: `checks/soma_fit_2026-11-22/check_transfer.py`. Next free IDs: D-220, I-007. |
 | 2026-11-22 (later; the gallery chat, 9) | Logs **D-220** (orchestrator): the final check of wave 5 settled (F1-F7, S1-S8). Evidence: `specs/test_reports/2026-11-22_1905_incremental.md`. Next free IDs: D-221, I-007. |
+| 2026-11-22 (later; the gallery chat, 10) | Logs **D-221** (user, 23:12): sigma_0 fixed at 0.080 um with a switch to the calibration; the SGT kernel as an option of the node's diameter fit, in the joint fit across planes too. Next free IDs: D-222, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -478,6 +479,7 @@ would be needed*, *Status*.
 | D-218 | 2026-11-22 | the soma fit's kernel (SPEC Blocks 45-46): the far-defocus continuation slope | fitted jointly with the soma by default; held fixed at the renderer configuration's slope as an option, for the far-slope calibration the user builds next week [user]; wave 5 started on this answer | active |
 | D-219 | 2026-11-22 | the soma fit's provisional settings (SPEC Blocks 45-46, `SomaFitConfig`): the sampling, the blur's discretisation, the background, the planes, the region, the bounds, the start | the pixel grid and 0.14 um slabs; the normalised sampled Gaussian by FFT (a positive kernel: tau <= 1); a scale per plane by variable projection; planes within 10 um, 0.56 um apart; a 13 um disk minus the traced stems; the traced centre and radius with the shadow's orientation [orchestrator] | active (provisional) |
 | D-220 | 2026-11-22 | the final check of wave 5 (report 2026-11-22_1905, PASS WITH ISSUES): `show_soma.py`'s refusals, the soma fit's kernel continuation, `calibrate_sigma.py`'s exit, the start's settings, the plane window's edge, the config test | refusals as SPEC says; "linear" continuation required (D-218); exit 1 when no node is fitted; the start's settings in `SomaFitConfig`; one plane-window rule for Blocks 44 and 46; the tester's spec tests with the user's agreement [orchestrator] | active |
+| D-221 | 2026-11-22 | `renderer.sigma_r0_um` and a switch to Block 42's calibrated width; the kernel of the node's diameter fit (Block 30, `infer_nodes.py`, NC6); `blur_kernels` (Block 12) | sigma_0 fixed at 0.080 um with a switch to the calibration; a parameter choosing the Gaussian law or the SGT family (shape fitted) for the node's diameter, the SGT also in the joint fit across planes, its width from the defocus law [user] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14600,5 +14602,42 @@ Block 42's start. (D-220.5) 0.28 um is not exact in binary, so an exact edge tes
 **What it does not decide.** Whether the spec tests come in (the user's); wave 6 (Blocks 47-48), pending the user.
 
 **Sources.** **[run, sandbox]** the report. **[log]** D-021, D-024, D-212, D-218, D-219.
+
+**Status:** active.
+
+## D-221 -- The in-focus width stays 0.080 um with a switch to the calibration; the node fit gets the SGT kernel as an option (user)
+
+**Date:** 2026-11-22, 23:12 (Europe/Rome; logged 23:15), the gallery chat. **Binds:** `renderer.sigma_r0_um` and a new
+switch to the calibrated in-focus width (Block 42's `calibrate_sigma.py` output); the kernel of the per-node joint fit
+across planes (SPEC Block 30 with the line renderers of Blocks 26 and 35; `infer_nodes.py`; the diameters to 250 um of
+NC6); `model/blur_kernels.py` (Block 12's SGT family, D-052.1); D-066, D-172, D-201.
+
+**Decision [user].** "The sigma0 calibration: fixed to 0.08 as before but expose a parameter that allows to switch to the
+calibration. I'm thinking that the [measurement] of the node diameter can be done with the flexible kernel we have
+already used before (two weeks ago I think) fitting a kernel that is flexible having 3 parameters that control shape,
+tails etc... Expose a parameter that allows to choose between the Gaussian kernel and this kernel (integrate this kernel
+also in the joint fit across planes also for a node given the defocusing kernel)" (23:12).
+
+**Statement.** (D-221.1) The kernel's in-focus width stays at the configured 0.080 um (D-172) by default; a configuration
+parameter switches it to the value calibrated on thick nodes by Block 42 (D-201). (D-221.2) The node's diameter
+measurement gets a configuration parameter choosing its kernel: the Gaussian defocus law (today's, the default unless the
+user says otherwise) or the flexible SGT family of D-052.1 -- the width w and the shape kappa = (beta, xi, zeta): beta
+the core's power, xi the tails (xi = 0 the generalized normal), zeta the two-piece skew -- with the shape fitted. (D-221.3)
+The SGT option also enters the per-node joint fit across planes (Block 30), its width at each defocus given by the
+defocus kernel (the calibrated law).
+
+**Why.** **[user]** as quoted. **[log]** D-052 (the SGT fit per node, Block 12), D-066 (the SGT family as the renderer's
+PSF: isotropic, through the inverse Abel transform of the symmetric profile kernel; the skew not rendered, D-066.2;
+active, not implemented), D-172 (0.080 um held), D-201 (the calibration of the in-focus width on thick nodes).
+
+**What it does not decide.** Asked the same night: which shape parameters the joint fit frees per node (zeta has no
+isotropic 2-D counterpart, D-066.2) or whether the shape is calibrated once and held; how the width follows the defocus
+law (the Gaussian's FWHM, or with a fitted scale); which calibrated values the switch applies (sigma_0 alone or with the
+growth scale c; the weighted mean or the median); the default of D-221.2. Not decided: the neighbours' shadows in the
+cleaning and the sigma_0 calibration itself keep the Gaussian unless the user extends D-221.2 to them; D-201's three open
+points (the screen's background, the 10 um spacing, the stripe background) stay open, not needed while sigma_0 stays at
+0.080 um.
+
+**Sources.** **[user]** the message of 23:12. **[log]** D-052, D-066, D-172, D-201.
 
 **Status:** active.
