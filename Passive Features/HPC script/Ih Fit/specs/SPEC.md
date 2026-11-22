@@ -1292,7 +1292,8 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Data flow: Block 15 calls `integrate_long_step` with the arm's options; Block 17 reads `ls_roles.csv`.
 - Confirmed: yes -- D-204, D-207 (user). Edge rules (n < 4, the 1 ms guard after onset, depolarising steps, ties)
   are the orchestrator's.
-- Status: drafted
+- As built [orchestrator, accepted at the gate]: a long square is depolarising when `amplitude_pA > 0`; the boxcar is 2h+1 samples, h = round(smooth_ms / 2 / dt) with dt the median sample step (51 samples at 50 kHz), averaging the finite samples it covers; a bad option, a zero total amplitude or an unusable peak is refused when the loss is built, not turned into the fit's penalty; `split_train_validation_ih` passes `role_rule` on; an unknown `weighting` still falls through to `equal` as before.
+- Status: smoke-tested 2026-11-22 (sandbox: `smoke_ls_protocol.py` LP1-LP9 9/9, implementer and orchestrator; five planted defects caught; `smoke_ih_fit.py` 12/12; commit `86f6b33`, merged `65c74e9`)
 
 ### Block 15: the five-parameter arm `ih5` and what a fit records
 
@@ -1342,7 +1343,8 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   the columns.
 - Confirmed: yes -- D-206, D-207, D-208, D-209 (user). Keeping `kappa_tau` as the code's axis with the box given in
   ms is the orchestrator's (2.8 (a)).
-- Status: drafted
+- As built [orchestrator, accepted at the gate]: the scan step of `tau_h_base_peak_ms` is 0.01 mV (342.568 ms for `Ih_human`; the box 50-1000 ms is kappa [0.145956, 2.919126]); `--eval-theta` also refuses non-finite and non-positive values (except `dv_h`); `tau_h_pk_ms` uses kappa 1 when kappa is frozen; the ten new columns are appended after the existing ones.
+- Status: smoke-tested 2026-11-22 (sandbox: `smoke_ih5.py` I1-I8 8/8 on the merged branch with Block 14's code -- the implementer could run I3's role check only against a shim; `smoke_ih_fit.py` 12/12; four planted defects caught; commit `a34af0d`, merged `c0095e5`)
 
 ### Block 16: the manifest with the noise-free configuration
 
@@ -1368,7 +1370,8 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   truths, `with_noise` False, `n_no_noise` 0 and its refusals; TM13 `twin_theta` of a paired row equals its partner's.
 - Data flow: Block 17 plans with it; Block 18 receives `with_noise`.
 - Confirmed: yes -- D-207 (user); the id offset 300 and the column names are the orchestrator's.
-- Status: drafted
+- As built: `with_noise` and `paired_with` are the last two columns; `n_no_noise` and `dvh_truth_mV` are type-checked.
+- Status: smoke-tested 2026-11-22 (sandbox: `smoke_twin_manifest.py` TM1-TM13 13/13, implementer and orchestrator; five planted defects caught; commit `a17594d`, merged `baddba0`)
 
 ### Block 18: a twin without noise
 
@@ -1388,7 +1391,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   arrays bit for bit for the same seed.
 - Data flow: called by Block 17.
 - Confirmed: yes -- D-207 (user).
-- Status: drafted
+- Status: smoke-tested 2026-11-22 (sandbox: `smoke_twin_build.py` 11 pass, TB10 skipped (real data), implementer and orchestrator; four planted defects caught; commit `7b142f3`, merged `dd15a1d`)
 
 ### Block 17: the second Stage-7 run -- four configurations, the truth passed to the fit, the report's additions
 
@@ -1397,7 +1400,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Module: `run_twin_recovery.py`, `submit_twin_recovery.sh`, `ih_recovery_report.py` (the gate's required axes only),
   smoke `smoke_twin_recovery.py` (adapted and extended), `smoke_ih_recovery.py` only where the gate's new argument
   needs it.
-- Depends on the merged Blocks 14, 15, 16, 18 (wave 2).
+- Depends on the merged Blocks 14, 15, 16, 18 (wave 2). Note (Block 16's report): `draw_twin_manifest` now defaults to `n_no_noise=5` and refuses `n_no_noise > n_per_configuration`, so every call passes it; `tests/spec/test_spec_block13_twin_manifest.py` (the tester's, read-only) is out of date and is the final check's to renew. `build_twin` wants a real bool for `with_noise`.
 - Specification, relative to the Block 8 entry (everything not named here stays):
   - `plan`: `--n-no-noise` (5); `--gbar-bounds` default `1e-6,1e-2`; `--tau-h-pk-bounds-ms` default `50,1000` and
     `--tau-h-pk-truth-ms` default `150,700` replace the options `--kappa-bounds` and `--kappa-range` (converted with
@@ -1429,7 +1432,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   `recovery_extras.csv` has its columns with `loss_at_truth` finite for `full` and `full_no_noise` and `na` verdicts
   elsewhere; `gh_deep_true_S_cm2` recomputed; TS13 the gate: a summary without `dv_h` passes or fails on the three
   required axes alone, and `required_axes=None` reproduces the old verdict table; `report_no_noise/` exists and the
-  noise-free twins are in neither other report; TS14 ASCII/LF and the frozen list without `ih_recovery_report.py`.
+  noise-free twins are in neither other report; TS14 ASCII/LF; the frozen check (amendment 2, 2026-11-22 [orchestrator]: Block 15 changed `run_ih_fit.py`, which the old list froze against `b810bc9`): the reference commit is the wave-3a merge `WAVE3A` named in the brief, and the frozen files are those of the old list that Block 17 does not own (`run_ih_recovery.py`, `submit_ih_recovery.sh`, `gen_from_manifest.py`, `synth_gt_grid.py`, `run_ih_fit.py`, and any other the old list holds except `ih_recovery_report.py`).
 - Data flow: consumes Blocks 14, 15, 16, 18; produces the run directory read by the user and
   `dev/2026-11-22_tw1_readout/`.
 - Confirmed: yes -- D-204, D-206 to D-209 (user); the report's layout is the orchestrator's.
