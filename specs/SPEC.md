@@ -1367,13 +1367,32 @@ orchestrator's (D-210).
   k_range=None, roots_xy=None, title="", ncol=6)`: the reference plane framed orange, the planes of the range framed
   dark. (vii) The JSON: `detail_energy` (was `focus`), `k_traced`, `k_by_eye`, `k_range_by_eye`, `montage_ks`;
   `k_sharpest` and `z_sharpest_minus_soma_um` removed. Oracles added: `reference_plane`'s choice and refusals;
-  `montage_planes` on a window (k = 74..160, k_ref 117, step 2: 43 planes, 117 among them; a range 105..145 step 1:
+  `montage_planes` on a window (k = 75..159, k_ref 117, step 2: 43 planes, 117 among them; a range 105..145 step 1:
   41); the script end to end by default (no plane chosen, the montage spans the window and holds the traced depth's
   plane) and with `--soma-k`, `--soma-k-range`, `--montage-k` (recorded in the JSON), and refusing a plane outside the
   window.
   Status: amendment 1 implemented 2026-11-22 by the orchestrator; `test_smoke_soma_view.py` 6 pass, 1 skip **[run,
   sandbox]**; Cell 24 run through a stand-in on the synthetic cell, by default and with the three choices; not yet
   rerun on the pilot. The check behind D-211's "why": `checks/soma_focus_2026-11-22/`.
+- Amendment 2 (2026-11-22; D-213, the user's request at 16:25; the sizes and the drawing rule PROVISIONAL, the
+  orchestrator's): a larger crop centred on the soma, Allen's reconstruction drawn faintly at its traced diameters.
+  (i) `SomaViewConfig.half_um` 20 -> 40; `show_soma.py --half-um H` overrides it (Cell 24: `SOMA_HALF_UM`). (ii)
+  `trace_segments(xyz_um, radius_um, parent_index, types, box_um) -> dict(p1, p2 (m, 2) um, r1, r2, z1, z2 (m,) um,
+  type (m,) int)`: one segment per traced node with a parent, from the parent to the node, in the image frame; a
+  segment whose parent is a soma node (type 1) is left out (it lies inside the traced soma; the dendrite starts at its
+  first node, as in the model); kept when its xy bounding box widened by its larger radius meets the box
+  (x0, x1, y0, y1) um; ValueError for arrays that disagree or a parent index out of range. (iii)
+  `segment_mask(shape, left, top, res0_um, p1, p2, r1, r2) -> (H, W) bool`: the pixels whose centre lies within
+  r1 + t (r2 - r1) of a segment, t in [0, 1] the position of the nearest point on it (the disc of the traced radius
+  swept along the segment: the traced tube's outline seen from above); no segment: all False. (iv)
+  `segments_at_depth(z1, z2, r1, r2, z_um) -> (m,) bool`: min(z1, z2) - max(r1, r2) <= z_um <= max(z1, z2) +
+  max(r1, r2). (v) The figures take `trace=None` or a dict: `figure_soma_focus` -- `all` (H, W) bool and `plane` (H, W)
+  bool; `figure_soma_planes` -- `all` and `by_index` {montage index: (H, W) bool}: the outline of `all` drawn thin and
+  faint on every image, the plane's mask filled faintly; the traced soma stays its dashed circle. (vi) The JSON adds
+  `half_um` and `n_trace_segments`. Oracles added: `segment_mask` of one straight segment of constant radius r and
+  length L covers 2 r L + pi r^2 [within 3 %, the pixel grid], a cone's area between those of its end radii; a
+  soma-rooted segment is left out, a segment outside the box too, one crossing the box kept; `segments_at_depth`'s
+  inequality at its edges; the script with `--half-um` crops 2 H / res0 + 1 px and reports the segments.
 
 Block 36, amendment 19 (2026-11-20; D-201; the orchestrator's, after wave 4): `scripts/calibrate_sigma.py --cleaning-dir DIR --specimen S [--out DIR/sigma] [--nodes IDS] [--workers N] [--config-json FILE]` -- per example node of a preparation, Block 42's fit on the planes $k^* \pm$ `half_planes` (in a process pool, one node per worker, BLAS threads 1), Block 43's figures, `sigma_<S>.csv`, `sigma_<S>.json` (fits, summary), `sigma_node<id>.png`, `sigma_summary_<S>.png`. Notebook Cell 23: (A, built now with existing scripts) the thick nodes -- `clean_cell.py clear --d-bins 1.0,50 --n 20 --min-soma-um 5` (Allen's diameter >= 1.0 um, the clear rule's 10 um separation in 3-D, no tier-2 neighbour), `clean --no-clean` into `OUT/cleaning_thick` with `cleaning.plane_half_range` 2 and `measure.profile_half_um` 4.5 (D-201.6 [orchestrator]: the measuring line +-4.5 um, so that a thick tube's defocused dip still meets the background on both sides), the gallery of Block 41 on all of them (`--max-per-bin 0 --fill-to 20`); (B, after wave 1) `calibrate_sigma.py` and its figures. Status (2026-11-22): `scripts/calibrate_sigma.py` written by the orchestrator after wave 4's merge: per node, infer_nodes.run_config and node_from_npz, the pilot of the node's record entry, select_planes, forward_with_kernel with one SectionCache, start_theta, fit_sigma_node, and Block 43's node page (the background (b0 + b1 v) drawn); a node enters the summary when it converged with neither sigma0 nor c at a bound; the summary figure's depth is the fitted z_ax. Run on the synthetic preparation of Cell 23A's stand-in (one node, rendered with d 0.8 um, sigma_r(0) 0.080 um, c 1): converged in 58 evaluations, d 0.808 +- 0.002 um, sigma0 0.0776 +- 0.0024 um, c 0.976 +- 0.015 **[run, sandbox]**. Notebook Cell 23B runs it.
 

@@ -1,5 +1,7 @@
-"""Figures of the soma's view -- Block 44 in specs/SPEC.md (D-210, D-211). Plotting only: every array arrives
-prepared (analysis.soma_view and the image block); nothing scientific is computed here.
+"""Figures of the soma's view -- Block 44 in specs/SPEC.md (D-210, D-211, D-213). Plotting only: every array arrives
+prepared (analysis.soma_view and the image block); nothing scientific is computed here. Allen's reconstruction, when
+given (amendment 2), is drawn faintly: the outline of its traced segments at their traced diameters on every image,
+the segments the trace places at the plane's depth filled.
 
   figure_soma_focus   the reference plane -- the one chosen by eye, else the one nearest the traced depth -- (the crop
                       about the traced soma, the traced soma's circle and centre, the primary dendrites' first nodes)
@@ -19,6 +21,30 @@ from allen_diameter.plotting.cleaning_figures import (BLUE, IMAGE_PERCENTILES, I
 __all__ = ["figure_soma_focus", "figure_soma_planes", "save"]
 
 SOMA_COLOUR = "#ffd23f"      # the traced soma on the images (the measuring line's yellow of Blocks 41, 43)
+TRACE_COLOUR = BLUE          # Allen's traced branches (amendment 2)
+TRACE_LINE_ALPHA, TRACE_FILL_ALPHA = 0.55, 0.22
+
+
+def _trace(ax, extent_rel, mask_all, mask_plane, mask_axon=None):
+    """Allen's traced segments: the outline of mask_all (the dendrites) thin and faint, that of mask_axon dashed,
+    mask_plane filled faintly. The masks share the image's pixel grid; extent_rel is the image's extent relative to the
+    soma's centre (um)."""
+    from matplotlib.colors import to_rgba
+    H, W = mask_all.shape
+    x0, x1, y1, y0 = extent_rel                   # imshow extent (left, right, bottom, top), origin "upper"
+    xs = np.linspace(x0, x1, W + 1)
+    ys = np.linspace(y0, y1, H + 1)
+    xc, yc = 0.5 * (xs[1:] + xs[:-1]), 0.5 * (ys[1:] + ys[:-1])
+    if mask_plane is not None and np.any(mask_plane):
+        rgba = np.zeros((H, W, 4))
+        rgba[mask_plane] = to_rgba(TRACE_COLOUR, TRACE_FILL_ALPHA)
+        ax.imshow(rgba, extent=tuple(extent_rel), origin="upper", interpolation="nearest", zorder=2)
+    if np.any(mask_all):
+        ax.contour(xc, yc, mask_all.astype(float), levels=[0.5], colors=[TRACE_COLOUR], linewidths=0.6,
+                   alpha=TRACE_LINE_ALPHA, zorder=3)
+    if mask_axon is not None and np.any(mask_axon):
+        ax.contour(xc, yc, np.asarray(mask_axon, dtype=float), levels=[0.5], colors=[TRACE_COLOUR], linewidths=0.6,
+                   alpha=TRACE_LINE_ALPHA, linestyles="dashed", zorder=3)
 
 
 def _overlay(ax, ext, centre_xy, radius_um, roots_xy):
@@ -31,6 +57,7 @@ def _overlay(ax, ext, centre_xy, radius_um, roots_xy):
 
 
 def _image(ax, img, ext, centre_xy, lo, hi):
+    """the plane on the soma-centred axes; -> the extent relative to the soma's centre"""
     e = np.asarray(ext, dtype=float) - np.array([centre_xy[0], centre_xy[0], centre_xy[1], centre_xy[1]])
     ax.imshow(np.asarray(img, dtype=float), cmap="gray", vmin=lo, vmax=hi, extent=tuple(e), origin="upper",
               interpolation="nearest")
@@ -44,12 +71,14 @@ def _plane_title(k, dzk, k_traced, chosen):
 
 
 def figure_soma_focus(images, ks, extent, centre_xyz, radius_um, dz_um, E, j_ref, ref_label, k_traced, k_range=None,
-                      roots_xy=None, title=""):
+                      roots_xy=None, title="", trace=None):
     """images (n, H, W) grey levels; ks (n,) plane indices; extent (4,) um (figures.image_extent_um); centre_xyz (3,)
     um, the traced soma's centre (image frame); radius_um its traced radius; dz_um the plane spacing; E (n,) the
     fine-detail energy (NaN for a missing plane); j_ref the index of the plane shown and ref_label its origin ("chosen
     by eye" or "traced depth"); k_traced the plane nearest the traced depth; k_range (lo, hi) the planes where the soma
-    is seen by eye, or None; roots_xy (m, 2) um or None."""
+    is seen by eye, or None; roots_xy (m, 2) um or None; trace None or dict(all=(H, W) bool, plane=(H, W) bool, and
+    optionally axon=(H, W) bool): Allen's traced dendrites, the segments at the plane's depth, the traced axon
+    (amendment 2)."""
     imgs = np.asarray(images)
     E = np.asarray(E, dtype=float)
     ks = np.asarray(ks).astype(int)
@@ -61,7 +90,9 @@ def figure_soma_focus(images, ks, extent, centre_xyz, radius_um, dz_um, E, j_ref
     fig = plt.figure(figsize=(12.5, 6.2), facecolor=SURFACE, layout="constrained")
     gs = fig.add_gridspec(1, 2, width_ratios=(1.25, 1.0))
     ax = fig.add_subplot(gs[0, 0])
-    _image(ax, imgs[j], extent, centre_xyz, lo, hi)
+    e = _image(ax, imgs[j], extent, centre_xyz, lo, hi)
+    if trace is not None:
+        _trace(ax, e, np.asarray(trace["all"], dtype=bool), np.asarray(trace["plane"], dtype=bool), trace.get("axon"))
     _overlay(ax, extent, centre_xyz, radius_um, roots_xy)
     dzk = ks[j] * float(dz_um) - float(centre_xyz[2])
     what = ("the plane chosen by eye" if ref_label == "chosen by eye"
@@ -69,6 +100,9 @@ def figure_soma_focus(images, ks, extent, centre_xyz, radius_um, dz_um, E, j_ref
     ax.set_title("k = %d (%+.2f um from the traced depth): %s" % (ks[j], dzk, what), fontsize=9, color=INK)
     ax.set_xlabel("x - x_soma (um)", fontsize=8, color=INK2)
     ax.set_ylabel("y - y_soma (um); grey %.0f-%.0f gl" % (lo, hi), fontsize=8, color=INK2)
+    if trace is not None:
+        ax.set_xlabel("x - x_soma (um).  Blue: Allen's traced dendrites at their traced diameters (outline; the axon "
+                      "dashed), filled where the trace puts them at this plane's depth", fontsize=7.5, color=INK2)
     ax.tick_params(labelsize=7, colors=INK2)
     a2 = fig.add_subplot(gs[0, 1])
     _style(a2)
@@ -90,9 +124,10 @@ def figure_soma_focus(images, ks, extent, centre_xyz, radius_um, dz_um, E, j_ref
 
 
 def figure_soma_planes(images, ks, extent, centre_xyz, radius_um, dz_um, indices, j_ref, ref_label, k_traced,
-                       k_range=None, roots_xy=None, title="", ncol=6):
+                       k_range=None, roots_xy=None, title="", ncol=6, trace=None):
     """The montage: the planes `indices` (into images) on one grey range, each with the traced soma's circle; the
-    reference plane j_ref framed orange, the planes inside k_range (by eye) framed dark."""
+    reference plane j_ref framed orange, the planes inside k_range (by eye) framed dark; trace None or dict(all=(H, W)
+    bool, by_index={index: (H, W) bool}, and optionally axon=(H, W) bool): Allen's traced segments (amendment 2)."""
     imgs = np.asarray(images)
     ks = np.asarray(ks).astype(int)
     idx = [int(i) for i in indices]
@@ -109,7 +144,9 @@ def figure_soma_planes(images, ks, extent, centre_xyz, radius_um, dz_um, indices
         a.set_axis_off()
     chosen = ref_label == "chosen by eye"
     for a, i in zip(axes.ravel(), idx):
-        _image(a, imgs[i], extent, centre_xyz, lo, hi)
+        e = _image(a, imgs[i], extent, centre_xyz, lo, hi)
+        if trace is not None:
+            _trace(a, e, np.asarray(trace["all"], dtype=bool), trace["by_index"].get(i), trace.get("axon"))
         _overlay(a, extent, centre_xyz, radius_um, roots_xy)
         dzk = ks[i] * float(dz_um) - float(centre_xyz[2])
         ref = i == int(j_ref)
@@ -123,7 +160,9 @@ def figure_soma_planes(images, ks, extent, centre_xyz, radius_um, dz_um, indices
                                              int(ks[int(j_ref)]))
               + ("; dark frames: the planes where you see the soma (k = %d to %d)" % (int(k_range[0]), int(k_range[1]))
                  if k_range is not None else ""))
+    tr = ("; blue: Allen's traced dendrites at their traced diameters (the axon dashed), filled where the trace puts "
+          "them at the plane's depth" if trace is not None else "")
     fig.suptitle((title + "\n" if title else "") + "dashed: the traced soma (Allen's radius); +: its centre; circles: "
-                 "the primary dendrites' first traced nodes; grey %.0f-%.0f gl\n%s" % (lo, hi, legend), fontsize=9,
+                 "the primary dendrites' first traced nodes%s; grey %.0f-%.0f gl\n%s" % (tr, lo, hi, legend), fontsize=9,
                  color=INK)
     return fig

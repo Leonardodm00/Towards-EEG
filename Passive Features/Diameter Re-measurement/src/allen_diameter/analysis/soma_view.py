@@ -1,4 +1,4 @@
-"""The soma's view in the image stack -- Block 44 in specs/SPEC.md (D-210, D-211).
+"""The soma's view in the image stack -- Block 44 in specs/SPEC.md (D-210, D-211, D-213).
 
 The traced soma (the SWC's type-1 nodes) placed in the image frame, the square crop about it, the recorded planes
 about its depth, the plane to show and the planes of the montage, and a diagnostic per plane over a disk about it,
@@ -131,3 +131,72 @@ def montage_planes(ks, valid, k_ref, step, k_lo=None, k_hi=None):
         raise ValueError("k_lo %d > k_hi %d" % (lo, hi))
     r = int(k_ref)
     return [i for i in range(k.size) if v[i] and lo <= k[i] <= hi and (int(k[i]) - r) % s == 0]
+
+
+def trace_segments(xyz_um, radius_um, parent_index, types, box_um):
+    """-> dict(p1, p2 (m, 2) um, r1, r2, z1, z2 (m,) um, type (m,) int): Allen's traced segments that reach the box
+    (amendment 2, D-213): one segment per node with a parent, from the parent (p1, r1, z1) to the node (p2, r2, z2), in
+    the image frame; a segment whose parent is a soma node (type 1) is left out (it lies inside the traced soma: the
+    dendrite starts at its first node, as in the model); kept when its xy bounding box, widened by its larger radius,
+    meets the box (x0, x1, y0, y1) um. xyz_um (n, 3); radius_um, types (n,); parent_index (n,) int, -1 for none.
+    ValueError for arrays that disagree or a parent index out of range."""
+    P = np.asarray(xyz_um, dtype=float)
+    r = np.asarray(radius_um, dtype=float).reshape(-1)
+    pi = np.asarray(parent_index).astype(int).reshape(-1)
+    t = np.asarray(types).astype(int).reshape(-1)
+    n = P.shape[0] if P.ndim == 2 else -1
+    if P.ndim != 2 or P.shape[1] != 3 or not (r.shape == pi.shape == t.shape == (n,)):
+        raise ValueError("xyz_um must be (n, 3) with radius_um, parent_index and types (n,)")
+    if np.any(pi >= n) or np.any(pi < -1):
+        raise ValueError("a parent index lies outside -1..n-1")
+    x0, x1, y0, y1 = (float(v) for v in box_um)
+    child = np.flatnonzero(pi >= 0)
+    child = child[t[pi[child]] != 1]                        # the soma's own segments are left out
+    a, b = P[pi[child]], P[child]
+    ra, rb = r[pi[child]], r[child]
+    w = np.maximum(ra, rb)
+    keep = ((np.maximum(a[:, 0], b[:, 0]) + w >= x0) & (np.minimum(a[:, 0], b[:, 0]) - w <= x1)
+            & (np.maximum(a[:, 1], b[:, 1]) + w >= y0) & (np.minimum(a[:, 1], b[:, 1]) - w <= y1))
+    k = child[keep]
+    return dict(p1=a[keep, :2].copy(), p2=b[keep, :2].copy(), r1=ra[keep].copy(), r2=rb[keep].copy(),
+                z1=a[keep, 2].copy(), z2=b[keep, 2].copy(), type=t[k].copy())
+
+
+def segment_mask(shape, left, top, res0_um, p1, p2, r1, r2):
+    """(H, W) bool: the pixels whose centre lies within r1 + t (r2 - r1) of a segment from p1 to p2 (um, image frame),
+    t in [0, 1] the position of the pixel's nearest point on it -- the disc of the traced radius swept along the
+    segment, the traced tube's outline seen from above -- for any of the segments; no segment: all False."""
+    H, W = int(shape[0]), int(shape[1])
+    p = float(res0_um)
+    A = np.asarray(p1, dtype=float).reshape(-1, 2)
+    B = np.asarray(p2, dtype=float).reshape(-1, 2)
+    ra = np.asarray(r1, dtype=float).reshape(-1)
+    rb = np.asarray(r2, dtype=float).reshape(-1)
+    mask = np.zeros((H, W), dtype=bool)
+    for (ax, ay), (bx, by), u, v in zip(A, B, ra, rb):
+        w = max(u, v)
+        c0 = max(0, int(math.floor((min(ax, bx) - w) / p)) - int(left))
+        c1 = min(W - 1, int(math.ceil((max(ax, bx) + w) / p)) - int(left))
+        q0 = max(0, int(math.floor((min(ay, by) - w) / p)) - int(top))
+        q1 = min(H - 1, int(math.ceil((max(ay, by) + w) / p)) - int(top))
+        if c0 > c1 or q0 > q1:
+            continue
+        X = ((int(left) + np.arange(c0, c1 + 1)) * p)[None, :]
+        Y = ((int(top) + np.arange(q0, q1 + 1)) * p)[:, None]
+        dx, dy = bx - ax, by - ay
+        L2 = dx * dx + dy * dy
+        tt = np.zeros((Y.size, X.size)) if L2 == 0.0 else np.clip(((X - ax) * dx + (Y - ay) * dy) / L2, 0.0, 1.0)
+        d2 = (X - (ax + tt * dx)) ** 2 + (Y - (ay + tt * dy)) ** 2
+        mask[q0:q1 + 1, c0:c1 + 1] |= d2 <= (u + tt * (v - u)) ** 2
+    return mask
+
+
+def segments_at_depth(z1, z2, r1, r2, z_um):
+    """(m,) bool: the segments whose traced tube reaches depth z_um: min(z1, z2) - max(r1, r2) <= z_um <=
+    max(z1, z2) + max(r1, r2) (um)."""
+    a = np.asarray(z1, dtype=float)
+    b = np.asarray(z2, dtype=float)
+    w = np.maximum(np.asarray(r1, dtype=float), np.asarray(r2, dtype=float))
+    z = float(z_um)
+    return (np.minimum(a, b) - w <= z) & (z <= np.maximum(a, b) + w)
+

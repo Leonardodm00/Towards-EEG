@@ -1,4 +1,4 @@
-"""Smoke test for the soma view (analysis/soma_view.py, plotting/soma_figures.py, scripts/show_soma.py) -- Block 44 in specs/SPEC.md (D-210, D-211).
+"""Smoke test for the soma view (analysis/soma_view.py, plotting/soma_figures.py, scripts/show_soma.py) -- Block 44 in specs/SPEC.md (D-210, D-211, D-213).
 
 Oracles: the fine-detail energy's known answer (largest on the least blurred plane of a blurred-disk stack), a
 direct computation with scipy and the disk written out, its invariants (contrast squared, offset, a quadratic
@@ -124,24 +124,47 @@ def _disk_stack(blurs_um, radius_um=4.0, res=0.1144, half_um=8.0, dark=80.0, bri
 def test_known_answer():
     """The fine-detail energy of a blurred-disk stack is largest on the least blurred plane and falls off on both
     sides; reference_plane returns the chosen plane, or the recorded plane nearest the traced depth; montage_planes
-    spans the window at the step, aligned on the reference plane (the pilot's window: k = 74..160, k_ref 117, step
+    spans the window at the step, aligned on the reference plane (the pilot's window: k = 75..159, k_ref 117, step
     2 -> 43 planes with 117 among them; 105..145 step 1 -> 41)."""
     blurs = [0.15 + 0.4 * abs(k - 3) for k in range(9)]
     block, left, top, res = _disk_stack(blurs)
     E = SV.detail_energy(block, np.ones(9, bool), left, top, res, (0.0, 0.0), 5.0, 1.0)
     assert int(np.nanargmax(E)) == 3, ("argmax", E)
     assert np.all(np.diff(E[:4]) > 0) and np.all(np.diff(E[3:]) < 0), E
-    ks = np.arange(74, 161)
+    ks = np.arange(75, 160)
     v = np.ones(ks.size, bool)
-    assert SV.reference_plane(ks, v, 117 * 0.28, 0.28) == (117 - 74, "traced depth")
-    assert SV.reference_plane(ks, v, 117 * 0.28, 0.28, 110) == (110 - 74, "chosen by eye")
+    assert SV.reference_plane(ks, v, 117 * 0.28, 0.28) == (117 - 75, "traced depth")
+    assert SV.reference_plane(ks, v, 117 * 0.28, 0.28, 110) == (110 - 75, "chosen by eye")
     v2 = v.copy()
-    v2[117 - 74] = False                                   # the traced plane missing: the nearest recorded, lower first
-    assert SV.reference_plane(ks, v2, 117 * 0.28, 0.28)[0] == 116 - 74
+    v2[117 - 75] = False                                   # the traced plane missing: the nearest recorded, lower first
+    assert SV.reference_plane(ks, v2, 117 * 0.28, 0.28)[0] == 116 - 75
     idx = SV.montage_planes(ks, v, 117, 2)
     got = [int(ks[i]) for i in idx]
     assert len(got) == 43 and 117 in got and got[0] == 75 and got[-1] == 159 and set(np.diff(got)) == {2}, got
     assert [int(ks[i]) for i in SV.montage_planes(ks, v, 117, 1, 105, 145)] == list(range(105, 146))
+
+
+def test_trace_known_answer():
+    """Amendment 2: one straight segment of constant radius r and length L covers 2 r L + pi r^2 (a stadium), within
+    the pixel grid's error (perimeter x pixel size, a bound); a cone's area lies between those of its end radii;
+    trace_segments leaves out the soma's own segment and the segments outside the box; segments_at_depth's edges."""
+    res = 0.01
+    n = 1001
+    m = SV.segment_mask((n, n), -500, -500, res, [[-2.0, 0.0]], [[2.0, 0.0]], [0.5], [0.5])
+    exact = 2 * 0.5 * 4.0 + np.pi * 0.25
+    perim = 2 * 4.0 + 2 * np.pi * 0.5
+    assert abs(m.sum() * res * res - exact) <= perim * res, (m.sum() * res * res, exact)
+    lo = SV.segment_mask((n, n), -500, -500, res, [[-2.0, 0.0]], [[2.0, 0.0]], [0.3], [0.3]).sum()
+    hi = SV.segment_mask((n, n), -500, -500, res, [[-2.0, 0.0]], [[2.0, 0.0]], [0.7], [0.7]).sum()
+    cone = SV.segment_mask((n, n), -500, -500, res, [[-2.0, 0.0]], [[2.0, 0.0]], [0.3], [0.7]).sum()
+    assert lo < cone < hi, (lo, cone, hi)
+    xyz = np.array([[0.0, 0.0, 0.0], [5.0, 0.0, 0.0], [9.0, 1.0, 0.5], [100.0, 100.0, 0.0], [104.0, 100.0, 0.0]])
+    seg = SV.trace_segments(xyz, [4.0, 1.0, 0.6, 0.5, 0.5], [-1, 0, 1, 2, 3], [1, 3, 3, 3, 3], (-20, 20, -20, 20))
+    assert seg["p1"].shape == (2, 2) and seg["r1"].tolist() == [1.0, 0.6] and seg["r2"].tolist() == [0.6, 0.5], seg
+    check_close("first kept segment", np.r_[seg["p1"][0], seg["p2"][0]], [5.0, 0.0, 9.0, 1.0], rtol=0, atol=0)
+    a = SV.segments_at_depth([0.0, 0.0], [1.0, 1.0], [0.2, 0.2], [0.3, 0.3], 1.3)
+    b = SV.segments_at_depth([0.0], [1.0], [0.2], [0.3], 1.31)
+    assert a.tolist() == [True, True] and b.tolist() == [False]
 
 
 def test_reference():
@@ -197,6 +220,10 @@ def test_contract():
     assert isinstance(j, int) and j in (0, 2) and lab == "traced depth"
     assert all(isinstance(i, int) for i in SV.montage_planes([0, 1, 2], [True, True, True], 0, 1))
     assert not hasattr(SV, "sharpest") and not hasattr(SV, "focus_measure")   # D-211: no automatic pick
+    m = SV.segment_mask((7, 9), 0, 0, 0.1, np.zeros((0, 2)), np.zeros((0, 2)), [], [])
+    assert m.shape == (7, 9) and m.dtype == bool and not m.any()                # no segment: all False
+    seg = SV.trace_segments(np.zeros((1, 3)), [1.0], [-1], [1], (-1, 1, -1, 1))
+    assert all(v.shape[0] == 0 for v in seg.values())
 
 
 def test_determinism():
@@ -222,7 +249,9 @@ def test_edge_cases():
                 lambda: SV.reference_plane(ks, vbad, 0.0, 0.28, 4),        # not recorded
                 lambda: SV.reference_plane(ks, np.zeros(10, bool), 0.0, 0.28),
                 lambda: SV.montage_planes(ks, v, 0, 0),
-                lambda: SV.montage_planes(ks, v, 0, 1, 7, 3)):
+                lambda: SV.montage_planes(ks, v, 0, 1, 7, 3),
+                lambda: SV.trace_segments(np.zeros((2, 3)), [1.0, 1.0], [-1, 5], [1, 3], (0, 1, 0, 1)),
+                lambda: SV.trace_segments(np.zeros((2, 3)), [1.0], [-1, 0], [1, 3], (0, 1, 0, 1))):
         try:
             bad()
         except ValueError:
@@ -245,13 +274,17 @@ def test_edge_cases():
     assert rec["k_traced"] in rec["montage_ks"]
     assert rec["montage_ks"] == [k for k in rec_ks if (k - rec["k_traced"]) % 2 == 0], rec["montage_ks"]
     assert "k_sharpest" not in rec and "focus" not in rec and len(rec["detail_energy"]) == len(rec["ks"])
+    assert rec["half_um"] == 40.0 and rec["crop"]["width"] == int(np.ceil(80.0 / rec["crop"]["res0_um"])) + 1
+    assert rec["n_trace_segments"] >= 1
     out2 = tempfile.mkdtemp(prefix="soma_smoke_")
     assert show_soma.main(["--specimen", "7", "--synthetic", "--out", out2, "--soma-k", "2", "--soma-k-range", "-3",
-                           "5", "--montage-k", "-6", "6", "1"]) == 0
+                           "5", "--montage-k", "-6", "6", "1", "--half-um", "10"]) == 0
     rec2 = json.load(open(os.path.join(out2, "soma_7.json")))
     assert (rec2["k_by_eye"], rec2["k_range_by_eye"], rec2["k_shown"]) == (2, [-3, 5], 2), rec2
     assert rec2["montage_ks"] == [k for k in rec_ks if -6 <= k <= 6]
-    for argv in (["--soma-k", "99"], ["--soma-k-range", "5", "-3"], ["--montage-k", "40", "50", "1"]):
+    assert rec2["half_um"] == 10.0 and rec2["crop"]["width"] == int(np.ceil(20.0 / rec2["crop"]["res0_um"])) + 1
+    for argv in (["--soma-k", "99"], ["--soma-k-range", "5", "-3"], ["--montage-k", "40", "50", "1"],
+                 ["--half-um", "0"]):
         try:
             show_soma.main(["--specimen", "7", "--synthetic", "--out", out2] + argv)
         except SystemExit as exc:

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""The soma's view in the image stack -- SPEC Block 44 (D-210, D-211).
+"""The soma's view in the image stack -- SPEC Block 44 (D-210, D-211, D-213).
 
     python3 scripts/show_soma.py --specimen 529878215 --cache-dir DIR [--shift-x X --shift-y Y --flip-h H --z0 Z]
                                  [--config-json FILE] [--swc PATH] [--out DIR] [--synthetic]
-                                 [--soma-k K] [--soma-k-range LO HI] [--montage-k LO HI STEP]
+                                 [--soma-k K] [--soma-k-range LO HI] [--montage-k LO HI STEP] [--half-um H]
 
 Places the traced soma (the SWC's type-1 nodes) in the image frame (the transform of --shift-x/--shift-y/--flip-h/
 --z0, as clean_cell.py) and fetches the square crop of soma_view.half_um about it from the planes within (its radius
@@ -12,7 +12,10 @@ where the soma is judged in focus (without it, the plane nearest the traced dept
 planes where the soma is seen; nothing is picked automatically. Draws the shown plane beside the fine-detail energy
 of each plane over the traced disk (a diagnostic, analysis.soma_view.detail_energy), and a montage: every
 soma_view.montage_step_planes-th recorded plane of the window aligned on the shown plane, or --montage-k LO HI STEP.
-A plane outside the window or not recorded is refused. Writes into --out (default ./soma_<S>): soma_<S>_focus.png,
+A plane outside the window or not recorded is refused. Allen's reconstruction is drawn faintly over every image
+(D-213): each traced segment in the crop at its traced diameter (analysis.soma_view.trace_segments, segment_mask),
+filled where the trace places it at the plane's depth; --half-um sets the crop's half-size (soma_view.half_um).
+Writes into --out (default ./soma_<S>): soma_<S>_focus.png,
 soma_<S>_planes.png, soma_<S>.json (geometry, window, energies, k_traced, k_by_eye, k_range_by_eye, montage_ks),
 soma_<S>_block.npz (the crop: block, ks, valid, left, top, res0_um). Pure ASCII, LF.
 """
@@ -51,6 +54,7 @@ def main(argv=None):
                     help="the first and last plane where the soma is seen (by eye)")
     ap.add_argument("--montage-k", type=int, nargs=3, default=None, metavar=("LO", "HI", "STEP"),
                     help="the montage's planes; default: the whole window, every soma_view.montage_step_planes-th")
+    ap.add_argument("--half-um", type=float, default=None, help="the crop's half-size (um); default soma_view.half_um")
     a = ap.parse_args(argv)
     import clean_cell
     from build_table import load_config
@@ -71,7 +75,10 @@ def main(argv=None):
     soma_ids = set(int(i) for i, t in zip(swc.ids, types) if int(t) == 1)
     parents = np.asarray(swc.parent)
     roots = np.array([xyz[k, :2] for k in range(len(swc.ids)) if int(parents[k]) in soma_ids and int(types[k]) != 1])
-    left, top, width, height = soma_view.crop_box(centre[:2], q.half_um, res0)
+    half = float(q.half_um if a.half_um is None else a.half_um)
+    if not (half > 0 and np.isfinite(half)):
+        ap.error("--half-um must be finite and > 0")
+    left, top, width, height = soma_view.crop_box(centre[:2], half, res0)
     k_lo, k_hi = soma_view.plane_range(centre[2], radius + q.z_margin_um, dz)
     log("%s cell: traced soma at (%.2f, %.2f, %.2f) um (image frame), radius %.2f um; crop %d x %d px at (%d, %d); "
         "planes %d..%d (%d)" % (label, centre[0], centre[1], centre[2], radius, width, height, left, top, k_lo, k_hi,
@@ -105,12 +112,32 @@ def main(argv=None):
         % (int(np.sum(valid)), len(ks), k_traced, ks[j_ref], ref_label, len(idx), m_step))
     frame_ns = _types.SimpleNamespace(left=int(left), top=int(top), res_um_px=res0, downsample=0)
     ext = image_extent_um(frame_ns, block.shape)
+    index_of = {int(i): k for k, i in enumerate(swc.ids)}
+    parent_index = np.array([index_of.get(int(pp), -1) for pp in parents])
+    box = (left * res0, (left + width) * res0, top * res0, (top + height) * res0)
+    seg = soma_view.trace_segments(xyz, swc.radius, parent_index, types, box)
+    shape = block.shape[1:]
+
+    def plane_mask(i):
+        sel = soma_view.segments_at_depth(seg["z1"], seg["z2"], seg["r1"], seg["r2"], ks[i] * dz)
+        return soma_view.segment_mask(shape, left, top, res0, seg["p1"][sel], seg["p2"][sel], seg["r1"][sel],
+                                      seg["r2"][sel])
+
+    den = seg["type"] != 2                                   # the axon's outline is drawn dashed
+    mask_all = soma_view.segment_mask(shape, left, top, res0, seg["p1"][den], seg["p2"][den], seg["r1"][den],
+                                      seg["r2"][den])
+    mask_axon = soma_view.segment_mask(shape, left, top, res0, seg["p1"][~den], seg["p2"][~den], seg["r1"][~den],
+                                       seg["r2"][~den])
+    log("Allen's trace in the crop: %d segments (%d of the axon) drawn at their traced diameters"
+        % (len(seg["r1"]), int(np.sum(~den))))
     title = "specimen %s: the soma (traced radius %.2f um) -- %s" % (a.specimen, radius, label)
     fig = SF.figure_soma_focus(block, ks, ext, centre, radius, dz, E, j_ref, ref_label, k_traced, k_range=k_range,
-                               roots_xy=roots, title=title)
+                               roots_xy=roots, title=title, trace=dict(all=mask_all, plane=plane_mask(j_ref),
+                                                                       axon=mask_axon))
     SF.save(fig, os.path.join(out, "soma_%s_focus.png" % a.specimen), DPI)
     fig2 = SF.figure_soma_planes(block, ks, ext, centre, radius, dz, idx, j_ref, ref_label, k_traced, k_range=k_range,
-                                 roots_xy=roots, title=title, ncol=int(q.montage_cols))
+                                 roots_xy=roots, title=title, ncol=int(q.montage_cols),
+                                 trace=dict(all=mask_all, by_index={i: plane_mask(i) for i in idx}, axon=mask_axon))
     SF.save(fig2, os.path.join(out, "soma_%s_planes.png" % a.specimen), DPI)
     rec = dict(specimen=str(a.specimen), source=label, transform=transform, centre_um=[float(x) for x in centre],
                radius_um=float(radius), crop=dict(left=left, top=top, width=width, height=height, res0_um=res0),
@@ -118,7 +145,8 @@ def main(argv=None):
                detail_energy=[None if not np.isfinite(e) else float(e) for e in E], k_traced=k_traced,
                k_by_eye=None if a.soma_k is None else int(a.soma_k),
                k_range_by_eye=None if k_range is None else [int(k_range[0]), int(k_range[1])],
-               k_shown=int(ks[j_ref]), montage_ks=[int(ks[i]) for i in idx],
+               k_shown=int(ks[j_ref]), montage_ks=[int(ks[i]) for i in idx], half_um=half,
+               n_trace_segments=int(len(seg["r1"])),
                primary_dendrite_roots_um=[[float(x), float(y)] for x, y in roots],
                soma_view=dict(vars(q)) if hasattr(q, "__dict__") else None)
     with open(os.path.join(out, "soma_%s.json" % a.specimen), "w") as f:

@@ -732,11 +732,13 @@ for nid in ids_s:
         display(Image(filename=page))
 
 # %% [markdown]
-# ## Cell 24: the soma, plane by plane; its plane chosen by eye (D-210, D-211; SPEC Block 44)
+# ## Cell 24: the soma, plane by plane; its plane chosen by eye; Allen's trace over it (D-210, D-211, D-213; Block 44)
 #
 # Run after Cells 0, 1 and 16 (Cell 1 pulls the branch). The traced soma (the SWC's type-1 node, placed in the image
-# frame with ALIGN's transform) is cropped at +-20 um from every plane within its traced radius + 6 um of its depth
-# (on the pilot k = 74..160; the traced depth is k = 117). Nothing is picked automatically (D-211): the first run's
+# frame with ALIGN's transform) is cropped at +-SOMA_HALF_UM (40 um by default; it was 20) from every plane within its
+# traced radius + 6 um of its depth (on the pilot k = 75..159; the traced depth is k = 117). Allen's reconstruction is
+# drawn faintly over every image (D-213): each traced dendrite segment at its traced diameter (blue outline; the axon
+# dashed), filled where the trace places it at that plane's depth; the soma is its traced circle (dashed yellow). Nothing is picked automatically (D-211): the first run's
 # automatic pick, k = 93, was a basal dendrite in focus inside the soma's disk. The montage shows every second plane
 # of the whole window; once you have looked at it, set SOMA_K (the plane where you judge the soma in focus) and
 # SOMA_K_RANGE (the first and last plane where you see it) and run the cell again: the focus figure then shows your
@@ -750,10 +752,12 @@ from IPython.display import Image, display   # the cell's own imports
 SOMA_K = None         # the plane where you judge the soma in focus, e.g. 115; None: the traced depth's plane is shown
 SOMA_K_RANGE = None   # (first, last) plane where you see the soma, e.g. (107, 140); None: not set
 MONTAGE_K = None      # (first, last, step), e.g. (105, 145, 1); None: the whole window, every second plane
+SOMA_HALF_UM = None   # the crop's half-size in um, e.g. 60; None: 40 (the configuration's soma_view.half_um)
 SOMA_OUT = OUT + "/soma"
 choice = (([] if SOMA_K is None else ["--soma-k", SOMA_K])
           + ([] if SOMA_K_RANGE is None else ["--soma-k-range", *SOMA_K_RANGE])
-          + ([] if MONTAGE_K is None else ["--montage-k", *MONTAGE_K]))
+          + ([] if MONTAGE_K is None else ["--montage-k", *MONTAGE_K])
+          + ([] if SOMA_HALF_UM is None else ["--half-um", SOMA_HALF_UM]))
 run("scripts/show_soma.py", "--specimen", SPECIMEN, "--cache-dir", CACHE_DIR, *ALIGN, *CLEAN_CFG, "--out", SOMA_OUT,
     *choice)
 for name in ("soma_%d_focus.png" % SPECIMEN, "soma_%d_planes.png" % SPECIMEN):

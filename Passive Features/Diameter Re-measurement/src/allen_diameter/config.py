@@ -498,11 +498,11 @@ class SigmaCalibrationConfig:
 
 @dataclass(frozen=True)
 class SomaViewConfig:
-    """The soma's view in the image stack (SPEC Block 44; D-210, D-211): the crop about the traced soma, the planes
-    about its depth, the montage, and the fine-detail energy drawn as a diagnostic. The soma's plane is chosen by eye
+    """The soma's view in the image stack (SPEC Block 44; D-210, D-211, D-213): the crop about the traced soma, the
+    planes about its depth, the montage with Allen's trace, and the fine-detail energy drawn as a diagnostic. The soma's plane is chosen by eye
     (D-211.1): nothing here picks it. Outside every signature."""
 
-    half_um: float = 20.0                  # source: PROVISIONAL (D-210): the square crop's half-size about the soma's centre (um)
+    half_um: float = 40.0                  # source: PROVISIONAL (D-213 [orchestrator], at the user's request for a larger crop; 20.0 under D-210): the square crop's half-size about the soma's centre (um)
     z_margin_um: float = 6.0               # source: PROVISIONAL (D-211.2 [orchestrator]; 3.0 under D-210.3): the planes within (soma radius + this) of the soma's depth (um)
     focus_margin_um: float = 1.0           # source: PROVISIONAL (D-210): the fine-detail energy's disk, radius = soma radius + this (um)
     focus_sigma_px: float = 1.0            # source: PROVISIONAL (D-210): the Gaussian of the fine-detail energy's Laplacian of Gaussian (px)
