@@ -43,8 +43,9 @@ the backgrounds known), and the same with the shape held at the truth.
 ```
 cd "Passive Features/Diameter Re-measurement/checks/sgt_psf_2d_2026-11-23"
 python3 run_compare.py ../../src validate.json validate   # the FFT reference against Block 35: 1 min
-python3 run_compare.py ../../src compare.json compare > compare.out   # 18 geometries x 4 shapes: about 2 h
+python3 run_compare.py ../../src compare.json compare > compare.out   # 18 geometries x 4 shapes: about 3 h
 python3 bias.py ../../src bias.json > bias.out            # 4 cases: about 40 min
+python3 tables.py                                         # the two tables below, from the .out files
 ```
 
 ## Results
@@ -54,8 +55,8 @@ python3 bias.py ../../src bias.json > bias.out            # 4 cases: about 40 mi
 2.2e-16 (flat, heading 0.52 rad), 1.1e-16 (tilt 0.3 rad, heading 0.52 rad, half-length 3.2 um). The reference computes
 Block 35's quantity.
 
-**The two constructions [run here]** (`compare.out`; rows as they finished -- the run continues, the table is
-completed when it ends): max and RMS of $|\tau_{\rm iso} - \tau_{\rm sep}|$ over the 9 planes x 53 offsets, in noise
+**The two constructions [run here]** (`compare.out`; the 53 of the 72 rows that finished: the run was stopped to free
+the processors for wave 7's implementers, the $d$ = 1.5 um rows and two $d$ = 0.8 um ones left out): max and RMS of $|\tau_{\rm iso} - \tau_{\rm sep}|$ over the 9 planes x 53 offsets, in noise
 SD; beside, the shape's own effect $\max|\tau_{\rm iso} - \tau_{\rm Gauss}|$ and the Gaussian share of the pairs left
 out.
 
@@ -103,6 +104,18 @@ out.
 | 0.8 | 0.3 | 0.52 | flat4 | 1.277 | 0.466 | 6.27 | 2.43 |
 | 0.8 | 0.3 | 0.52 | tails1 | 1.411 | 0.615 | 9.61 | 2.43 |
 | 0.8 | 0.6 | 0.00 | heavy | 0.663 | 0.305 | 5.41 | 5.14 |
+| 0.8 | 0.6 | 0.00 | b13 | 1.174 | 0.562 | 8.61 | 5.14 |
+| 0.8 | 0.6 | 0.00 | flat4 | 3.132 | 1.015 | 6.31 | 5.14 |
+| 0.8 | 0.6 | 0.00 | tails1 | 1.727 | 0.524 | 11.51 | 5.14 |
+| 0.8 | 0.6 | 0.52 | heavy | 0.662 | 0.303 | 5.38 | 5.18 |
+| 0.8 | 0.6 | 0.52 | b13 | 1.176 | 0.557 | 8.56 | 5.18 |
+| 0.8 | 0.6 | 0.52 | flat4 | 3.062 | 0.997 | 6.32 | 5.18 |
+| 0.8 | 0.6 | 0.52 | tails1 | 1.718 | 0.518 | 11.48 | 5.18 |
+| 1.5 | 0.0 | 0.00 | heavy | 0.014 | 0.006 | 7.98 | 2.19 |
+| 1.5 | 0.0 | 0.00 | b13 | 0.004 | 0.001 | 13.29 | 2.19 |
+| 1.5 | 0.0 | 0.00 | flat4 | 0.000 | 0.000 | 10.49 | 2.19 |
+| 1.5 | 0.0 | 0.00 | tails1 | 0.110 | 0.056 | 15.47 | 2.19 |
+| 1.5 | 0.0 | 0.52 | heavy | 0.014 | 0.006 | 7.93 | 2.19 |
 <!-- /compare -->
 
 Flat tubes: at most 0.04 noise SD (the caps and the 2-D tails of `tails1`); tilted tubes: up to 1.9 noise SD, a
@@ -110,18 +123,21 @@ sizeable fraction of the shape's own effect (3-10 noise SD). A tilted tube's sla
 axis, and the kernel's part along the line weighs them; the separable kernel's Gaussian along the line is not the
 isotropic kernel's **[reasoning]**.
 
-**The diameter [run here]** (`bias.out`; linearised; SE from the same Jacobian, noise 1.1/150):
+**The diameter [run here]** (`bias.out`; linearised; SE from the same Jacobian, noise 1.1/150; three of the four cases,
+the fourth stopped with the comparison):
 
 <!-- bias -->
 | d (um) | tilt (rad) | heading (rad) | shape | bias of d, shape fitted | in SE | bias of d, shape held | in SE | SE(d)/d | RMS residual (noise SD) |
 |---|---|---|---|---|---|---|---|---|---|
 | 0.4 | 0.3 | 0.52 | b13 | -5.03 % | -1.23 | +0.66 % | +0.18 | 4.10 % | 0.25 |
 | 0.4 | 0.6 | 0.52 | heavy | -0.09 % | -0.03 | -0.36 % | -0.14 | 2.76 % | 0.11 |
+| 0.8 | 0.3 | 0.52 | b13 | -3.08 % | -4.52 | +0.22 % | +0.37 | 0.68 % | 0.71 |
 <!-- /bias -->
 
-With the shape fitted -- the option's use -- the construction's error can move a tilted thin node's $\hat d$ by more
-than its SE (`b13`, tilt 0.3 rad); with the shape held at the truth the effect is small. The size depends on the shape
-and the geometry.
+With the shape fitted -- the option's use -- the construction's error moves a tilted node's $\hat d$ by -5 % (-1.2 SE)
+at 0.4 um and by -3 % (-4.5 SE) at 0.8 um (`b13`, tilt 0.3 rad): the shape absorbs part of the misfit and drags $d$
+with it. With the shape held at the truth the effect is at most 0.4 SE; for `heavy` at tilt 0.6 rad it is small either
+way. The size depends on the shape and the geometry.
 
 ## Conclusion (D-225.1)
 
