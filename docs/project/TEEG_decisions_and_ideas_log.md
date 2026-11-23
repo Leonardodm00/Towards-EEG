@@ -281,6 +281,7 @@ the "Binds" column.
 | 2026-11-23 (09:31; the defocus-table chat) | Logs **D-229** (user, 09:31), the answers to D-228's open points: the far-set twins are matched on the core widths, as in form B; the planes are weighted by their distance from focus -- near-set twins on $k^* \pm 1..3$, far-set twins on $|k - k^*|$ from 4 to 16, the far nodes' planes within $\pm 3$ kept as validation; the slope is fitted even when the pool has few far nodes. D-228 annotated. Next free IDs: D-230, I-007. |
 | 2026-11-23 (09:57; the defocus-table chat) | Logs **D-230** (user, 09:57): the calibration runs near first -- step 1 then step 2 for the near kernel -- and then the far slope the same way -- the far fit (its step 1) then a step 2 on far twins. The assistant's condition, PROVISIONAL until the user confirms: the two are alternated (the near stage rerun with the new slope, the far stage with the new knots) until neither moves, so that the result is D-228/D-229's joint fit. Next free IDs: D-231, I-007. |
 | 2026-11-23 (11:50; the defocus-table chat) | Logs **D-231** (user, 11:50): the hybrid absorption (SPEC Block 21) becomes `RendererConfig.absorption`'s default; the partition, `linear` and `ray_world` stay as labelled alternatives. Implemented at `2812d4d` on `sci/diameter-pipeline` (config, SPEC Blocks 4, 5 and 21, eight smoke files; the table plan's changelog at `ed6cc63`), not pushed: the push waits for the user, and another chat's wave 7 runs on the branch. The default's simulation hash `dc84ed2e89bcfea6` -> `d355d5fb9bbb4f1d`, the estimator's unchanged. **[run, sandbox]** a near-vertical tube renders far darker under the hybrid and Block 5 reads it at 45 deg instead of 88 (recorded in SPEC Block 21). D-024, D-084 and D-092 annotated. Written after re-reading this log (unchanged since D-230's row). Next free IDs: D-232, I-007. |
+| 2026-11-23 | Logs **D-232** (orchestrator): Block 49's issue (oracle (iii) at the raised reach infeasible here) settled, the implementer's readings accepted, the SGT path's cost recorded. Evidence: Block 49's report (`fde033b`), the gate's rerun. Next free IDs: D-233, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -500,6 +501,7 @@ would be needed*, *Status*.
 | D-229 | 2026-11-23 | step 2's matching (D-228): the far twins' statistic, the planes and their weights, the slope with few far nodes | core widths for the far twins too (form B); planes weighted by distance from focus, near $k^* \pm 1..3$, far $|k-k^*|$ = 4..16 with the far nodes' $\pm 3$ planes as validation; the slope always fitted | active; not built |
 | D-230 | 2026-11-23 | the order of the calibration's fits (D-228, D-229): near then far | near: step 1 then step 2 (the knots, slope held); far: the far fit then a step 2 on far twins (the slope, knots held); alternated until stable [PROVISIONAL] | active; not built |
 | D-231 | 2026-11-23 | Block 4's absorption (`RendererConfig.absorption`, `config.ABSORPTIONS`); every renderer user that takes the default (Blocks 4-6, 10, 14, 15, 24; step 2's twins); the default's simulation hash; D-024 (i), D-084.2, D-092.2 | the hybrid (Block 21) is the default absorption [user]; the partition, `linear` and `ray_world` labelled alternatives; the smoke tests set on the partition set it explicitly [orchestrator] | active; implemented at `2812d4d` (2026-11-23), smoke-tested; not pushed |
+| D-232 | 2026-11-23 | SPEC Block 49 (oracle (iii), the skew's sample drawing, the table's key, level 0), `test_smoke_line_sgt.py` | Block 49's issue settled: (iii) at the default reach against an independently truncated reference where the raised reach cannot run here; the implementer's readings accepted; the SGT path's cost recorded [orchestrator] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15081,3 +15083,41 @@ sandbox]** the hashes, the near-vertical comparison and the smoke tests below.
 
 **Status:** active; implemented at `2812d4d` on `sci/diameter-pipeline`, not pushed (the push waits for the
 user; another chat's wave 7 runs on the branch); smoke-tested 2026-11-23: the 34 smoke files that render with the default configuration pass in the sandbox (2 cores), 28 unchanged and 6 after the changes of D-231.2 (`test_smoke_hybrid` 7 pass, `test_smoke_config` 6, `test_smoke_far_field` 7, `test_smoke_node_pipeline` 7, `test_smoke_pilot_run` 17, `test_smoke_ray_world` 6); the other smoke files do not read the renderer's absorption and were not rerun.
+
+## D-232 -- Block 49's issue settled: oracle (iii) at the default reach where the raised reach's reference cannot run; the implementer's readings accepted (orchestrator)
+
+**Date:** 2026-11-23 (Europe/Rome), the gallery chat. **Binds:** SPEC Block 49 (its oracles (ii)-(iii), the
+mathematics' sample drawing for the skew, the table's key, the lattices' sampling) and `tests/smoke/test_smoke_line_sgt.py`;
+D-225.
+
+**Decision [orchestrator].** The implementer of Block 49 reported STATUS ISSUE on one clause: oracle (iii) asks for a
+brute-force reference at the raised reach (where `truncated_mass` <= 1e-7), whose grids are infeasible here for
+(2, 0.5, 1) (117 law SDs: 10400^2 to 18000^2 complex arrays, beyond 7 GB) and slow for the skews at tilt 0.6 (28.6 law
+SDs: about 1 h per case). Every other oracle passes with a wide margin. Settled as below; the module needs no change.
+
+**Statement.** (D-232.1) Oracle (iii) runs, for a shape whose raised-reach reference is infeasible, at the default reach
+(12 law SDs) against a reference truncated the same way and built independently of the module -- for beta = 2 the
+truncated bivariate t by a Gauss-Legendre Hankel transform, for the skews the stretched truncated kernel cell-averaged
+in real space -- with the bound 5e-5 unchanged (run: at most 5.9e-10 for (2, 0.5, 1), 1.3e-7 for the skews, on all
+four geometries; at the raised reach on tilt 0.3, at most 8.3e-8). The raised reach stays covered on flat tubes by (ii)
+and on tilted tubes by the cases that can run. (iii)'s geometry: line_fine_factor 4 for module and reference, planes
+-1..1, half-length 3.5 um, n_avg 4, the line through the tube's middle. (D-232.2) Accepted readings: s is taken along
+the unit normal of y_hat (equal to +-e_u on every Block 5 line, where K depends on s^2 only; for an oblique e_u it keeps
+zeta = 1 isotropic); for zeta != 1 the samples are drawn within Z R_jk, Z = max(2.1, zeta, 1/zeta) -- the stretched
+support reaches max(zeta, 1/zeta) R_jk and is drawn whole, 2.1 above the bound e^0.7 so that the lattices do not change
+with zeta; the unit table is keyed by (beta, xi, rho_c), rho_c = R/a depending on zeta through W(kappa); level 0 is the
+fine lattice itself, where in-focus pairs at line_fine_factor 8 have about 13 samples per FWHM (the source lives on it).
+(D-232.3) Reported for planning (D-225.8): per warm call (hybrid, 8 x 16 directions, planes -4..4) the SGT path with
+zeta = 1 takes 0.37-4.96 s against the Gaussian's 0.09-2.48 s at line_fine_factor 8, and the skew 6.1-22.8 s; at 32,
+2.4-105 s (zeta = 1) and 13-142 s (skew) against 1.3-44 s.
+
+**Why.** **[run, sandbox]** the implementer's runs and the orchestrator's rerun of the quick suite at the gate (11 pass,
+3 skip); **[reasoning]** a reference truncated as the module is and built independently tests the computation the fit
+uses; the raised reach adds the tail's mass, which (ii) and the closed forms of (vi) check.
+
+**What it does not decide.** Whether the skew option's cost (5-10 times the Gaussian per call at line_fine_factor 8)
+needs a cheaper construction; the run time of a pilot fit with the SGT (to be measured on the nodes).
+
+**Sources.** **[run, sandbox]** Block 49's report (commit `fde033b`), the gate's rerun. **[log]** D-225.
+
+**Status:** active; amends SPEC Block 49's oracle (iii) and its mathematics' wording (D-225.2-4 unchanged in substance).
