@@ -600,7 +600,8 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   means of sigma_0 and c, `kernel.with_kernel`); the node's joint fit across planes (Block 30) gets the SGT kernel as an
   option -- the shape (beta, xi) fitted per node with zeta = 1, zeta fitted as a further option, the width the Gaussian
   law's FWHM at each slab-plane defocus; the Gaussian stays the default; the cleaning keeps it. Not built yet: the plan
-  waits for the user's approval.
+  waits for the user's approval. [corrected 2026-11-23: approved at 07:43 (D-224), with the error bars on p/32 for both
+  kernels; being built as wave 7, section 15.1]
 - **Identifiability check [run, sandbox; `checks/sgt_identifiability_2026-11-23/`]**: a 1-D model of the node's line
   (partition absorption, the default kernel law, planes k* +- 4, noise 1.1 gl on 150 gl), validated against Block 35 to
   1.8e-10.
@@ -617,3 +618,33 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
     on a lattice of p/32 they converge.
   - Not tested: a width off the law (the in-focus-width confound), tilt, oblique headings, caps, neighbours, the hybrid
     absorption, background texture.
+
+### 15.1 Wave 7: how the SGT kernel enters the line renderer, the error bars, the width switch (D-224, D-225) [added 2026-11-23]
+
+- **The 2-D kernel [run, sandbox; `checks/sgt_psf_2d_2026-11-23/`; D-225.1]**: the kernel that is the SGT across the
+  measuring line and the law's Gaussian along it agrees with D-222.1's isotropic PSF on flat tubes (at most 0.04 noise
+  SD) but not on tilted ones (up to 1.9 noise SD); fitted with the shape free to isotropic data it moves d by -5 %
+  (-1.2 SE) at 0.4 um and -3 % (-4.5 SE) at 0.8 um (shape (1.3, 0, 1), tilt 0.3 rad). So the SGT path renders the
+  isotropic PSF (transfer h_hat(a |nu|)) by FFT on lattices coarsened with each pair's width, the pixel box's transfer
+  exact (SPEC Block 49, `model/line_sgt.py`, `line_fast.line_profiles(..., kernel=SGTKernel(beta, xi, zeta))`); the
+  Gaussian path (kernel None) is unchanged. The skew option stretches the isotropic PSF by zeta on one side of the
+  measuring line and 1/zeta on the other; the kernel is truncated at 12 law SDs, its dropped mass reported
+  (`line_sgt.truncated_mass`; about 1.6 % for the heavy-tailed (2, 1, 1)). Block 26 is not extended.
+- **The fit [D-225.5]**: Block 30 amendment 3 -- the shape searched in log10 beta, xi, ln zeta within Block 12's bounds;
+  xi = 0 (the generalized normal) is a converged end, not a bound; one start from the node's Gaussian estimate at the
+  Gaussian member; under `--kernel sgt` the node's estimate is the SGT fit's, the Gaussian fit's beside it
+  (`gauss_d_um`). The same-node clearance keeps the Gaussian fit (D-222.4).
+- **The error bars [D-224.2, D-225.6]**: from central differences of the model at `inference.cov_fine_factor` = 32 with
+  absolute steps (2e-3 um, 1e-3 /um, 2e-3 um, 2e-3 um, 1e-3, 1e-3, 1e-3); `cov_source` names the Jacobian used. Cost:
+  Block 35's Gaussian path takes 3.5 s (flat 0.4 um) to 61 s (tilt 0.3 rad, 0.8 um) per warm call at p/32 against
+  0.17 and 3.5 s at p/8 (hybrid, 8 x 16 directions, shared sandbox CPU): about nine such calls per Gaussian fit, so
+  Cell 20's runs (6 to 111 min per node) roughly double; `--cov-fine-factor 0` (Cell 20's `COV_FINE_FACTOR`) gives the
+  fit's own Jacobian back.
+- **The width switch [D-225.7; SPEC Block 36 amendment 22]**: `--kernel-width fixed|calibrated --sigma-json
+  sigma_<S>.json` in `clean_cell.py`, `infer_nodes.py`, `fit_soma.py`; `calibrate_sigma.py` now writes
+  `summary_growth_scale`; "calibrated" re-anchors the configuration's base table with `kernel.with_kernel` at the two
+  weighted means; `clean_cell.py` records the base renderer so that `infer_nodes.py`'s own switch does not compound c.
+  Notebook: Cell 16's `KERNEL_WIDTH`, `SIGMA_JSON` (passed to Cells 20, 25, 26; Cell 23's thick-node preparation stays
+  fixed); Cell 26 fits Cell 20's nodes with the SGT kernel beside the Gaussian.
+- **Status**: contract `9ea1abe`; Block 49 and Block 30 amendment 3 with two implementers; the orchestrator's wiring
+  committed (`0b20f32`); then the final check.
