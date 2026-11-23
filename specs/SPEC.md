@@ -1832,7 +1832,8 @@ with the isotropic PSF it moves a tilted thin node's $d$ by -5 % (-1.2 SE).
     its 2-D Fourier transform is $\hat K_{jk}(\nu) = \hat h(a_{jk}|\nu|)$ (projection-slice theorem). $P_{jk}(r)$ is its
     radial profile.
   - $\zeta \ne 1$ (`inference.sgt_skew` "fit"; D-225.3): with $u = x\cdot\hat y$ ($\hat y$ = `y_hat`; $u > 0$ towards
-    increasing $v$) and $s = x\cdot\hat e$ ($\hat e$ = `e_u`), $K_{jk}(x) = \frac{2}{\zeta + 1/\zeta}\,
+    increasing $v$) and $s$ the coordinate along the unit normal of $\hat y$ (equal to $\pm x\cdot\hat e$, $\hat e$ =
+    `e_u`, on every line of Block 5; D-232.2), $K_{jk}(x) = \frac{2}{\zeta + 1/\zeta}\,
     P_{jk}\big(\sqrt{(u/\zeta)^2 + s^2}\big)$ for $u \ge 0$ and $\frac{2}{\zeta + 1/\zeta}\,P_{jk}\big(\sqrt{(\zeta
     u)^2 + s^2}\big)$ for $u < 0$. Its line projection across $\hat y$, $\int K_{jk}(u\hat y + s\hat e)\,ds$, is the
     two-piece SGT $g_{w_{jk},\kappa}(u)$ of (H2)-(H3) (FWHM $w_{jk}$, right-to-left half-width ratio $\zeta^2$, the right
@@ -1843,11 +1844,14 @@ with the isotropic PSF it moves a tilted thin node's $d$ by -5 % (-1.2 SE).
     $R_{jk}/a_{jk}$ = `sgt_reach_sigmas` $\times\,W(\kappa)/(2\sqrt{2\ln 2})$ depends on $\kappa$ only: the truncated
     kernel scales with the width and $\tau$ is smooth in $\kappa$. The dropped fraction, the isotropic kernel's 2-D mass
     beyond that radius (the stretch keeps it), is `truncated_mass`. Samples are drawn as Block 35 draws them, with
-    $R_{jk}$ in place of `line_reach_sigmas` $\times\,\sigma_{jk}$.
+    $Z R_{jk}$ in place of `line_reach_sigmas` $\times\,\sigma_{jk}$: $Z$ = 1 for $\zeta = 1$, $Z = \max(2.1, \zeta,
+    1/\zeta)$ otherwise, so that the stretched support is drawn whole and the lattices do not change with $\zeta$
+    within its bound (D-232.2).
   - Computation: the implementer's, within the oracles below (an FFT on lattices coarsened with the pair's width is the
     expected route -- Block 35's exact separable pixel integral holds for the Gaussian only -- with at least
-    `inference.sgt_samples_per_fwhm` samples per FWHM on a pair's lattice; $\hat h$ by a numerical transform, cached per
-    $(\beta, \xi)$). Block 26 (the reference renderer with exact caps) is not extended (D-225.2): the SGT path's
+    `inference.sgt_samples_per_fwhm` samples per FWHM on a pair's coarsened lattice, the fine lattice itself for the
+    narrowest pairs (about 13 samples per FWHM in focus at `line_fine_factor` 8); the unit kernel's transfer by a
+    numerical transform, cached per $(\beta, \xi, R/a)$; D-232.2). Block 26 (the reference renderer with exact caps) is not extended (D-225.2): the SGT path's
     reference is a brute-force FFT (oracle (iii)).
 - Public API:
   - `line_sgt.SGTKernel(beta, xi, zeta=1.0)`: frozen dataclass; ValueError outside the family's domain
@@ -1884,7 +1888,12 @@ with the isotropic PSF it moves a tilted thin node's $d$ by -5 % (-1.2 SE).
   (`checks/sgt_psf_2d_2026-11-23/fft_line.py` is such a reference for $\zeta = 1$; it reproduces Block 35's Gaussian to
   1e-11): $\max|\Delta\tau| \le$ 5e-5. For the skew the reference's kernel is built independently of the module's:
   for $\beta$ = 2 the isotropic PSF is the bivariate $t$ with $\nu = 2/\xi$ and scale $1/\sqrt 2$ in core units,
-  $P_1(r) = \frac{1}{\pi}(1 + \xi r^2)^{-(1/\xi + 1)}$, stretched as above, cell-averaged on the grid and transformed;
+  $P_1(r) = \frac{1}{\pi}(1 + \xi r^2)^{-(1/\xi + 1)}$, stretched as above, cell-averaged on the grid and transformed.
+  Where the raised reach's reference cannot run here -- (2, 0.5, 1) at 117 law SDs, the skews at tilt 0.6 -- (iii)
+  runs at the default reach against a reference truncated the same way, built independently (the truncated bivariate
+  $t$ by a Gauss-Legendre Hankel transform; the skews cell-averaged in real space), bound unchanged; geometry:
+  `line_fine_factor` 4 for both, planes $-1..1$, half-length 3.5 um, `n_avg` 4, the line through the tube's middle
+  [amended 2026-11-23, D-232.1];
   (iv) the transfer: along $\hat y$ ($\nu = t\hat y$) the untruncated kernel's transfer equals the 1-D characteristic
   function of $g_{w,\kappa}$ computed independently (quadrature of (H2)-(H3)) [1e-7 absolute]; $\zeta = 1$ gives the
   isotropic transfer [exact]; $\zeta \to 1/\zeta$ mirrors the profile ($v \to -v$) of a tube symmetric about the line's
@@ -1906,8 +1915,23 @@ with the isotropic PSF it moves a tilted thin node's $d$ by -5 % (-1.2 SE).
   `node_inputs.forward_factory` (amendment 23).
 - Confirmed: D-221, D-222, D-224 (the user: the SGT in the joint fit, its shape and width, the wave); D-225 (the
   orchestrator: the isotropic PSF over the separable construction, the half-plane skew, the truncation, Block 26 not
-  extended, the tolerances).
-- Status: drafted 2026-11-23.
+  extended, the tolerances); D-232 (the orchestrator: oracle (iii)'s settlement, the implementer's readings).
+- Status: drafted 2026-11-23; implemented 2026-11-23 (wave 7, merged `5dbc9c1`); `test_smoke_line_sgt.py` quick run 11
+  pass, 3 skip (rerun at the gate), the long run (`LINE_SGT_LONG=1`, about 2.5 h) 13 pass **[run, sandbox]**:
+  (i) the Gaussian member against Block 35's path 2.7e-10 on 32 cases; (ii) flat tubes against the 1-D model at most
+  3.7e-5 ((2, 0.5, 1) at $d$ 1.5 um: the caps, 1.3e-6 at half-length 20 um), the others at most 8.1e-6; (iii) tilted
+  tubes at most 1.6e-7 at the raised reach, 5.9e-10 ((2, 0.5, 1)) and 1.3e-7 (skews) at the default reach against
+  truncated references; (iv) the transfer along $\hat y$ against the 1-D characteristic function 3.4e-8, the mirror
+  $\zeta \to 1/\zeta$ 5.3e-15, `sgt_tail_mass` against its closed forms 4.4e-16; (v) the central differences in the
+  shape agree within 1e-3 % of the derivative; (vi) (2, 1, 1): `truncated_mass` 0.01612 as the closed form, $\tau$
+  against the truncated reference 1.4e-9; (vii) the invariants, the ValueErrors, Block 35's quick tests and its
+  Gaussian path bit-identical to the contract's. Reported: against the 1-D model, (2, 1, 1) at the default reach
+  differs by 5.6e-4 to 2.6e-3 (its truncated 1.6 %); `truncated_mass` at 12 law SDs: (2, 0.5, 1) 8.6e-4, (1.3, 0, 1)
+  1.7e-6, (4, 0, 1) 0, the skews 2.9e-5, (1.3, 0.2, 1) 2.8e-3. Time per warm call (hybrid, 8 x 16 directions, planes
+  $-4..4$), Gaussian / SGT $\zeta = 1$ / SGT skew: at `line_fine_factor` 8, 0.09-2.48 / 0.37-4.96 / 6.1-22.8 s; at 32,
+  1.3-44 / 2.4-105 / 13-142 s. Accepted as part of the entry: Block 35's loop split into `_render_setup`, `_slab_maps`,
+  `_read` (one code for both paths); `scipy.interpolate.CubicSpline` among the library calls; the transfers cached
+  per law SD within a call. Smoke-tested
 
 Block 30, amendment 3 (2026-11-23, drafted; D-221.2-3, D-222.1-2, D-224.1-2, D-225.5-6; where it differs from the entry
 it wins). The SGT option and the error bars on the fine lattice.
