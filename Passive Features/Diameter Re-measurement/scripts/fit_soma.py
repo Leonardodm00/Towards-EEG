@@ -109,6 +109,7 @@ def main(argv=None):
     from build_table import load_config
     from allen_diameter.config import default_config
     from allen_diameter.plotting import soma_fit_figures as FF
+    import matplotlib.pyplot as plt                               # the figures are closed after saving (D-233, F5)
     from allen_diameter.plotting.figures import image_extent_um
     from allen_diameter.plotting.soma_figures import save
     cfg = load_config(a.config_json) if a.config_json else default_config()
@@ -220,6 +221,7 @@ def main(argv=None):
                                         z_fit[pick] - th[2], ext, sil, sections, (centre[0], centre[1], radius),
                                         (th[0], th[1], fit.r_eq_um), title=title)
         save(fig, os.path.join(out, "soma_fit_%s_planes.png" % a.specimen), DPI)
+        plt.close(fig)
         derived = dict(area_um2=fit.area_um2, se_area_um2=fit.se_area_um2, volume_um3=fit.volume_um3,
                        r_eq_um=fit.r_eq_um, se_volume_um3=_se_volume(th, fit.cov),
                        se_r_eq_um=fit.se_area_um2 / (8.0 * math.pi * fit.r_eq_um))   # delta method: dr/dS = 1/(8 pi r)
@@ -227,9 +229,11 @@ def main(argv=None):
         fig = FF.figure_soma_fit_summary(soma_fit.PARAMS, th, fit.se, fit.fitted, derived, allen, z_fit, fit.B_gl,
                                          rms, title=title)
         save(fig, os.path.join(out, "soma_fit_%s_summary.png" % a.specimen), DPI)
+        plt.close(fig)
         top_v, side_v = _morphology_views(swc, edit, xyz, th, centre, radius, fit.r_eq_um, res0, transform)
         fig = FF.figure_soma_morphology(top_v, side_v, title=title)
         save(fig, os.path.join(out, "soma_fit_%s_morphology.png" % a.specimen), DPI)
+        plt.close(fig)
 
     rec = dict(specimen=str(a.specimen), source=label, transform=transform,
                start=dict(centre_um=list(start), radius_um=float(radius), source=start_src),

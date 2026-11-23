@@ -52,6 +52,8 @@ PILOT_DIAMETERS = ("allen", "free")                             # D-178: the fir
 INFERENCE_WEIGHTS = ("allen", "none")                           # D-169.4, D-167.1: the per-node fit's residual weights (Block 39)
 INFERENCE_KERNELS = ("gaussian", "sgt")                         # D-221.2, D-222.4: the per-node fit's kernel (Block 49)
 SGT_SKEWS = ("off", "fit")                                      # D-222.1: zeta held at 1 or fitted
+SGT_STRETCH_ALLOWANCE = 2.1     # = model.line_sgt.STRETCH_ALLOWANCE: the zeta its lattices are sized for (D-232.2);
+                                # inference.sgt_ln_zeta_bounds stays within +-ln of it (D-233, the final check's S5)
 FOCUS_GRAD_WINDOWS = ("radius_margin", "whole_profile")        # D-030 (provisional default, see MeasureConfig.focus_grad_window)
 ABSORPTIONS = ("partition_vertical", "linear", "ray_world", "hybrid")    # D-024 / procedure s.3.6; "hybrid": Block 21 (D-084, D-092)
 KERNEL_FAMILIES = ("gaussian_table", "empirical")              # procedure s.3.4
@@ -880,6 +882,11 @@ def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None
     if not (b_lo <= math.log10(st[0]) <= b_hi and i.sgt_xi_bounds[0] <= st[1] <= i.sgt_xi_bounds[1]
             and z_lo <= math.log(st[2]) <= z_hi):
         raise ValueError("inference.sgt_start_shape must lie inside the shape's bounds, got %r" % (st,))
+    if not max(abs(float(z_lo)), abs(float(z_hi))) <= math.log(SGT_STRETCH_ALLOWANCE):
+        raise ValueError("inference.sgt_ln_zeta_bounds must lie within +-ln(%g) = +-%.4f, where Block 49's lattices "
+                         "do not change with zeta (D-232.2), got %r" % (SGT_STRETCH_ALLOWANCE,
+                                                                        math.log(SGT_STRETCH_ALLOWANCE),
+                                                                        (z_lo, z_hi)))
     if not (math.isfinite(i.sgt_reach_sigmas) and i.sgt_reach_sigmas >= i.line_reach_sigmas):
         raise ValueError("inference.sgt_reach_sigmas must be finite and >= line_reach_sigmas")
     if not _is_count(i.sgt_samples_per_fwhm, 2):

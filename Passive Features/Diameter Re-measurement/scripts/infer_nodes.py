@@ -117,6 +117,20 @@ def kernel_switches(a, rec, cfg, log):
     return cfg, kw
 
 
+def failed_sgt_fit(fit_g, cfg):
+    """The NodeFit of an SGT stage that raised (amendment 23, D-233): Block 30's failed fit (status "failed", every
+    estimate, error and shape NaN) on the Gaussian fit's planes, with the SGT search's parameter names."""
+    nan4 = np.full(4, np.nan)
+    n_s = 3 if cfg.inference.sgt_skew == "fit" else 2
+    names = tuple(node_inference.PARAM_NAMES) + tuple(node_inference.SHAPE_NAMES[:n_s])
+    return node_inference.NodeFit(theta=nan4, cov=np.full((4, 4), np.nan), se=nan4.copy(), cost=float("nan"),
+                                  chi2_per_plane=np.full(len(fit_g.planes), np.nan), planes=fit_g.planes,
+                                  status="failed", at_bound=(), n_starts=0, nfev=0, shape=np.full(3, np.nan),
+                                  se_shape=np.full(3, np.nan), param_names=names,
+                                  cov_search=np.full((len(names), len(names)), np.nan),
+                                  cov_source="fine" if cfg.inference.cov_fine_factor else "fit")
+
+
 def fit_start(source, d_um, mu_per_um, offset_um, pilot, node_xyz):
     """(theta0 = (d, mu, v0, z_ax), which) of Block 30's fit, shifts about the trace (amendment 1, D-141):
     a "refined" features row starts at its (d, mu) and its offset (v0 = offset . y_hat, z_ax = z_t +
@@ -141,7 +155,11 @@ def run_real(a, log):
     with open(rec_path, encoding="utf-8") as f:
         rec = json.load(f)
     cfg = run_config(rec, a.config_json, a.starts)
-    cfg, kw_record = kernel_switches(a, rec, cfg, log)
+    try:
+        cfg, kw_record = kernel_switches(a, rec, cfg, log)
+    except ValueError as exc:                         # amendment 22's refusals (D-233, the final check's S6)
+        log("refused: %s" % exc)
+        return 2
     kern = cfg.inference.kernel_family
     feats = features_io.read_features(os.path.join(a.cleaning_dir, "features_%s.csv" % a.specimen))
     pos = feats.index_of()
@@ -229,24 +247,36 @@ def run_real(a, log):
                     fit = node_inference.fit_node(prof, node.B_gl, sigma, forward, theta0, cfg, planes=planes0,
                                                   weights=w_fit, forward_cov=fcov)
             fit_g, winfo_g, w_g = fit, winfo, w_fit
+            sgt_error = ""
             if kern == "sgt" and fit_g.status != "failed" and np.all(np.isfinite(fit_g.theta)):
                 # amendment 23 (D-224.1, D-225.5): the SGT fit from the Gaussian estimate at the Gaussian member,
-                # one start, the same planes, weights and cut; the node's estimate is this fit
-                forward = node_inputs.forward_factory(pilot, half, node, cfg, cache, "sgt")
-                fcov_s = node_inputs.forward_cov_factory(pilot, half, node, cfg, cache, "sgt")
-                shape0 = tuple(float(x) for x in cfg.inference.sgt_start_shape)
-                cfg1 = dataclasses.replace(cfg, inference=dataclasses.replace(cfg.inference, multistart_factors=(1.0,)))
-                start = np.array(fit_g.theta, dtype=float)
-                if weights_mode == "allen":
-                    fit, winfo = node_inference.fit_node_recentred(prof, node.B_gl, sigma, forward, start, cfg1,
-                                                                   node.v, lam, centre_offset_um=-v_t, keep=keep,
-                                                                   planes=fit_g.planes, shape0=shape0,
-                                                                   forward_cov=fcov_s)
-                    w_fit = winfo["weights"]
-                else:
-                    fit = node_inference.fit_node(prof, node.B_gl, sigma, forward, start, cfg1, planes=fit_g.planes,
-                                                  weights=w_g, z_box_centre_um=float(start[3]), shape0=shape0,
-                                                  forward_cov=fcov_s)
+                # one start, the same planes, weights and cut; the node's estimate is this fit. A failure of this
+                # stage is the SGT estimate's, written as a failed fit: the Gaussian fit's record and the
+                # same-node clearance stay (D-233, the final check's F3)
+                try:
+                    forward = node_inputs.forward_factory(pilot, half, node, cfg, cache, "sgt")
+                    fcov_s = node_inputs.forward_cov_factory(pilot, half, node, cfg, cache, "sgt")
+                    shape0 = tuple(float(x) for x in cfg.inference.sgt_start_shape)
+                    cfg1 = dataclasses.replace(cfg, inference=dataclasses.replace(cfg.inference,
+                                                                                  multistart_factors=(1.0,)))
+                    start = np.array(fit_g.theta, dtype=float)
+                    if weights_mode == "allen":
+                        fit, winfo = node_inference.fit_node_recentred(prof, node.B_gl, sigma, forward, start, cfg1,
+                                                                       node.v, lam, centre_offset_um=-v_t, keep=keep,
+                                                                       planes=fit_g.planes, shape0=shape0,
+                                                                       forward_cov=fcov_s)
+                        w_fit = winfo["weights"]
+                    else:
+                        fit = node_inference.fit_node(prof, node.B_gl, sigma, forward, start, cfg1,
+                                                      planes=fit_g.planes, weights=w_g,
+                                                      z_box_centre_um=float(start[3]), shape0=shape0,
+                                                      forward_cov=fcov_s)
+                except Exception as exc:
+                    sgt_error = "%s: %s" % (type(exc).__name__, exc)
+                    fit = failed_sgt_fit(fit_g, cfg)
+                    winfo, w_fit = winfo_g, w_g
+                    flags = flags + ["sgt_error"]
+                    log("node %d: the SGT fit failed (%s); the Gaussian fit is kept beside it" % (nid, sgt_error))
             row.update(weights=weights_mode, lambda_um=winfo["lambda_um"], v_cut_lo_um=v_lo, v_cut_hi_um=v_hi,
                        n_solves=int(winfo["n_solves"]), kernel=kern, cov_source=fit.cov_source,
                        gauss_d_um=float(fit_g.theta[0]), gauss_se_d_um=float(fit_g.se[0]), gauss_status=fit_g.status,
@@ -257,7 +287,8 @@ def run_real(a, log):
                 sh, ssh = fit.shape, fit.se_shape
                 row.update(beta=float(sh[0]), se_beta=float(ssh[0]), xi=float(sh[1]), se_xi=float(ssh[1]),
                            zeta=float(sh[2]), se_zeta=float(ssh[2]),
-                           truncated_mass=line_sgt.truncated_mass(line_sgt.SGTKernel(*sh), cfg))
+                           truncated_mass=line_sgt.truncated_mass(line_sgt.SGTKernel(*sh), cfg)
+                           if np.all(np.isfinite(sh)) else float("nan"))     # a failed SGT fit: NaN (D-233)
         except Exception as exc:                      # one node's failure never stops the run
             n_failed += 1
             row.update(flags=";".join(flags + ["fit_error"]), seconds=time.time() - t0)
@@ -288,6 +319,7 @@ def run_real(a, log):
                                              at_bound=list(fit_g.at_bound), chi2_per_plane=fit_g.chi2_per_plane,
                                              nfev=fit_g.nfev, cov_source=fit_g.cov_source,
                                              n_solves=int(winfo_g["n_solves"])),
+                                  **({"sgt_error": sgt_error} if sgt_error else {}),
                                   **({} if w_fit is None else {"weights": np.asarray(w_fit, dtype=float)}))
         if w_fit is not None:
             log("node %d: weights %s, lambda %.3f um, kept v in [%s, %s] um (%d of %d samples), %d solve(s)%s"
@@ -384,7 +416,8 @@ def main(argv=None):
     r.add_argument("--bump-sd", type=float, default=None, help="a near bump is a second dip rising at least this "
                    "many noise SDs; the samples from it outwards get no weight; 0 = off. Default: the "
                    "configuration's inference.bump_sd for a run of clean --no-clean, 0 for a cleaned run")
-    kernel_width.add_arguments(r)                     # amendment 22
+    kernel_width.add_arguments(r, "Default: the preparation's law, as its cleaning_<S>.json records it (fixed = "
+                               "the preparation's base table, overriding a calibrated preparation; D-233)")   # am. 22
     r.add_argument("--kernel", choices=("gaussian", "sgt"), default="", help="the fit's kernel (amendment 23, D-221): "
                    "gaussian = Block 4's law; sgt = the SGT point-spread function at the law's FWHM, fitted after the "
                    "Gaussian fit from its estimate. Default: the configuration's inference.kernel_family")

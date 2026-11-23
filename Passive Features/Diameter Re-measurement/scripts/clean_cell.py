@@ -187,15 +187,13 @@ def own_figures(out_dir, nid, node, profiles_gl, B_gl, split, clr, v_axis_um, me
     return files
 
 
-KERNEL_WIDTH = None     # the switch's record of this run (Block 36 amendment 22), set by main
-
-
-def config_sections(cfg):
+def config_sections(cfg, kernel_width_record):
     """The configuration's cleaning and inference sections (D-136.5), the full signature and the kernel width's
     record (Block 36 amendment 22: the mode, the values and the base renderer, which infer_nodes.py re-anchors when
-    given its own switch)."""
+    given its own switch). kernel_width_record: kernel_width.apply's record for cfg, required, so that no path
+    records a re-anchored table without its base (D-233, the final check's F4; main passes a.kernel_width_record)."""
     return dict(cleaning=dataclasses.asdict(cfg.cleaning), inference=dataclasses.asdict(cfg.inference),
-                config=json.loads(cfg.to_json()), kernel_width=KERNEL_WIDTH)
+                config=json.loads(cfg.to_json()), kernel_width=kernel_width_record)
 
 
 # ------------------------------------------------------------------- cell ---
@@ -279,7 +277,7 @@ def _survey_outputs(a, cfg, log, rows, single, failed, label, transform, n_targe
                n_target=int(n_target), n_dendrite_nodes=int(n_dendrite), partial=bool(partial),
                sample="all dendrite nodes" if n_target == n_dendrite else
                       "a seeded random sample of %d of %d dendrite nodes" % (n_target, n_dendrite),
-               **config_sections(cfg))
+               **config_sections(cfg, a.kernel_width_record))
     ex_path = write_json(os.path.join(a.out, "examples_%s.json" % a.specimen), rec)
     return csv_path, ex_path, examples, counts, counts_eligible, caught
 
@@ -375,7 +373,7 @@ def _rank_outputs(a, cfg, rows, label, transform, n_target, n_dendrite, partial,
                sample="all dendrite nodes" if n_target == n_dendrite else
                       "a seeded random sample of %d of %d dendrite nodes" % (n_target, n_dendrite),
                ranking={str(i): {k: by_id[i][k] for k in RANK_COLUMNS} for i in examples},
-               **config_sections(cfg))
+               **config_sections(cfg, a.kernel_width_record))
     ex_path = write_json(os.path.join(a.out, "examples_tier1_%s.json" % a.specimen), rec)
     return csv_path, ex_path, examples
 
@@ -773,7 +771,7 @@ def run_clean(a, cfg, log):
                 pilot_diameter=pilot_d, no_clean=no_clean,
                 B_gl=B, B_source=B_src, mu_per_um=mu, mu_source=mu_src,
                 transform=dict(shift_full_px=list(transform["shift_full_px"]), flip_y_full_h=transform["flip_y_full_h"],
-                               z0_um=transform["z0_um"]), **config_sections(cfg))
+                               z0_um=transform["z0_um"]), **config_sections(cfg, a.kernel_width_record))
     json_path = os.path.join(a.out, "cleaning_%s.json" % a.specimen)
     if not nodes:
         write_json(json_path, dict(base, stopped="no_nodes", history=[], rounds=0, nodes={}))
@@ -1047,12 +1045,11 @@ def main(argv=None):
         cfg.validate()
     if a.kernel_width == "calibrated" and a.sigma_r0_um is not None:   # Block 36 amendment 22
         ap.error("--kernel-width calibrated and --sigma-r0-um are exclusive (Block 36 amendment 22)")
-    global KERNEL_WIDTH
     try:
-        cfg, KERNEL_WIDTH = kernel_width.apply(cfg, a.kernel_width, a.sigma_json)
+        cfg, a.kernel_width_record = kernel_width.apply(cfg, a.kernel_width, a.sigma_json)
     except ValueError as exc:
         ap.error(str(exc))
-    log(kernel_width.describe(KERNEL_WIDTH))
+    log(kernel_width.describe(a.kernel_width_record))
     if a.cmd == "survey":
         return run_survey(a, cfg, log)
     if a.cmd == "rank":

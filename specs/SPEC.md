@@ -1863,8 +1863,11 @@ with the isotropic PSF it moves a tilted thin node's $d$ by -5 % (-1.2 SE).
   - `line_sgt.sgt_tail_mass(beta, xi, r_over_a) -> float`: the isotropic unit kernel's 2-D mass beyond radius $r$
     (core-scale units). `line_sgt.truncated_mass(kernel, cfg) -> float`: `sgt_tail_mass` at $R/a$ of the truncation.
   - `line_sgt.FWHM_PER_SD` $= 2\sqrt{2\ln 2}$.
-- Parameters: `InferenceConfig.sgt_reach_sigmas` (12, PROVISIONAL), `sgt_samples_per_fwhm` (16, PROVISIONAL), with
-  Block 35's (`absorption`, `line_fine_factor`, `ray_n_rho`, `ray_n_psi`; the renderer's kernel table, `dzeta_um`,
+- Parameters: `InferenceConfig.sgt_reach_sigmas` (12, PROVISIONAL; `validate`: $\ge$ `line_reach_sigmas`),
+  `sgt_samples_per_fwhm` (16, PROVISIONAL; `validate`: a whole number $\ge 2$, the module itself accepting 1), the fit's
+  $\zeta$ box `sgt_ln_zeta_bounds` within $\pm\ln$ `config.SGT_STRETCH_ALLOWANCE` $= \pm\ln 2.1$ (the module's
+  `STRETCH_ALLOWANCE`; within it the lattices do not change with $\zeta$, D-232.2) [stated 2026-11-23, D-233: the final
+  check's S4-S5], with Block 35's (`absorption`, `line_fine_factor`, `ray_n_rho`, `ray_n_psi`; the renderer's kernel table, `dzeta_um`,
   `ray_na`, `ray_n_oil`; `res0_um`, `dz_um`, `light_direction`).
 - Library calls relied on: numpy, scipy.fft, scipy.special (incomplete beta and gamma functions, Bessel functions),
   scipy.integrate; Blocks 2, 4, 5, 12 (`blur_kernels`), 21, 35.
@@ -1907,7 +1910,10 @@ with the isotropic PSF it moves a tilted thin node's $d$ by -5 % (-1.2 SE).
   against the closed form $(1 + \xi r^2)^{-1/\xi}$ [1e-8];
   (vii) $\mu = 0$ gives 1 [exact]; mirror symmetry in $v$ for $\zeta = 1$ and a tube through the line's origin [1e-10];
   the order of `ks`; a cached call equals an uncached one [1e-12]; determinism; the ValueErrors; Block 35's quick smoke
-  tests pass unchanged and its Gaussian path is bit-identical to the contract commit's on 6 cases.
+  tests pass unchanged and its Gaussian path is bit-identical to the contract commit's on 6 cases;
+  (viii) the fit box's corners, $(\beta, \xi, \zeta) = (1, 2, e^{\pm 0.7})$, at the default reach against an exact
+  model of the truncated kernel [5e-5] [added 2026-11-23, D-233: the final check's S7; it ran them within 1.6e-5 with
+  its own references, `tests/spec/wave7_refs.py`].
   Reported, no bound: the difference against the 1-D model for (2, 1, 1) at the default reach; the time per warm call of the Gaussian path and of the SGT path ($\zeta = 1$ and $\zeta \ne 1$)
   on (i)'s geometries at `line_fine_factor` 8 and 32 (the error bars' lattice, D-224.2), `hybrid` at 8 x 16
   directions; `truncated_mass` of the shapes tested.
@@ -1931,7 +1937,12 @@ with the isotropic PSF it moves a tilted thin node's $d$ by -5 % (-1.2 SE).
   $-4..4$), Gaussian / SGT $\zeta = 1$ / SGT skew: at `line_fine_factor` 8, 0.09-2.48 / 0.37-4.96 / 6.1-22.8 s; at 32,
   1.3-44 / 2.4-105 / 13-142 s. Accepted as part of the entry: Block 35's loop split into `_render_setup`, `_slab_maps`,
   `_read` (one code for both paths); `scipy.interpolate.CubicSpline` among the library calls; the transfers cached
-  per law SD within a call. Smoke-tested
+  per law SD within a call. Smoke-tested. Final check 2026-11-23 13:55 (incremental, `16eb8be`; Opus tester): PASS on
+  references written from the spec alone -- the 1-D model at a raised reach within 1.3e-6 on 8 shapes at the levels 0-2,
+  the exact truncated model at the default reach within 1.6e-5 (the box's corners included), a brute-force oblique
+  heading within 5.3e-6 (the reference's quadrature error), the dropped mass equal to `truncated_mass`, the Gaussian
+  member within 3.4e-10 of Block 35's path, which is bit-identical to the base commit **[run, sandbox]**; its gaps
+  settled by D-233.
 
 Block 30, amendment 3 (2026-11-23, drafted; D-221.2-3, D-222.1-2, D-224.1-2, D-225.5-6; where it differs from the entry
 it wins). The SGT option and the error bars on the fine lattice.
@@ -1946,14 +1957,23 @@ today. `param_names` = `PARAM_NAMES` + ("log10_beta", "xi"[, "ln_zeta"]).
 (B) Bounds and status. `at_bound` names every parameter at a bound, `<name>_lo` / `<name>_hi`. $\xi = 0$ is a member
 of the family (the generalized normal, D-052.2): a fit whose only active bound is `xi_lo` has status "converged"
 (D-225.5); any other active bound gives "at_bound", as today. Rows and columns of the covariance are NaN for every
-parameter at a bound, `xi_lo` included.
+parameter at a bound, `xi_lo` included. The covariance is the inverse over all the search parameters, those at a bound
+included (their columns of the Jacobian one-sided, (D), or the solver's), and only then are their rows and columns set
+NaN: for the free parameters $F$ and the parameters $\mathcal A$ at an active bound, the reported block is
+$\Sigma_{FF} = [M^{-1}]_{FF} = (M_{FF} - M_{F\mathcal A}M_{\mathcal A\mathcal A}^{-1}M_{\mathcal A F})^{-1}$ with
+$M = J^\top J$ over all of $\phi$ (weighted: the $FF$ block of amendment 2's sandwich $A^{-1} B A^{-1}$, its $A$ and $B$
+over all of $\phi$), the errors marginal over $\phi_{\mathcal A}$, not the conditional $M_{FF}^{-1}$ of a Jacobian
+without $\mathcal A$'s columns, which is smaller or equal -- Block 30's convention since its entry
+(`_covariance`) [stated 2026-11-23, D-233: the final check's S2; the SGT option's coverage 0.700 of 300 sets, 152 of
+them ending at `xi_lo`].
 (C) Results. `theta` (4,), `cov` (4, 4), `se` (4,) are $\theta$'s, the $(d, \mu, v_0, z_{\rm ax})$ block of the
 covariance in the search parameters `cov_search` ($n_\phi \times n_\phi$); `shape` (3,) $= (\hat\beta, \hat\xi,
 \hat\zeta)$ ($\hat\zeta = \zeta_0$ when held); `se_shape` (3,) by the delta method, ${\rm se}(\beta) = \hat\beta \ln 10\,
 {\rm se}(b)$, ${\rm se}(\xi)$, ${\rm se}(\zeta) = \hat\zeta\,{\rm se}(l)$, NaN when held or at a bound; `cov_source`. A
 Gaussian fit has `shape` and `se_shape` None, `param_names` = `PARAM_NAMES`, `cov_search` = `cov`.
 (D) Error bars on the fine lattice (D-224.2). With `forward_cov` given -- a callable of `forward`'s arity, the model
-with `line_fine_factor` = `inference.cov_fine_factor` -- the covariance is computed at $\hat\phi$ from the Jacobian of
+with `line_fine_factor` = `inference.cov_fine_factor` (32 by default, D-224.2, D-225.6 [stated 2026-11-23, D-233: the
+final check's S1]) -- the covariance is computed at $\hat\phi$ from the Jacobian of
 the residuals by central differences of `forward_cov` with the absolute steps `inference.cov_steps` (in the order $d,
 \mu, v_0, z_{\rm ax}, \log_{10}\beta, \xi, \ln\zeta$; the first 4, 6 or 7); a parameter within two steps of a bound
 uses the one-sided three-point rule inward, $(-3f(\phi) + 4f(\phi \pm h) - f(\phi \pm 2h))/(\pm 2h)$; unweighted
@@ -1995,7 +2015,9 @@ last weights to 2e-15. The Gaussian path bit-identical to the contract's on 16 c
 amendment: a shape start within 1e-12 (relative) outside the box is clipped (the re-centred fit hands the shape back in
 natural units); a failed SGT fit has `shape`, `se_shape` and `cov_search` all NaN; `forward_cov`'s calls are not in
 `nfev`; "within two steps" is a distance $\le 2h$; a $\hat\xi$ at the edge is reported as the solver ends it (e.g.
-1e-10). Smoke-tested.
+1e-10). Smoke-tested. Final check 2026-11-23 13:55 (`16eb8be`): PASS -- rule (D) written out by hand within 1e-9, the
+Gaussian path bit-identical to the base commit, the SGT option's coverage 0.700 of 300 sets **[run, sandbox]**; the
+covariance's convention at a bound stated by D-233 (above, (B)).
 
 Block 36, amendment 22 (2026-11-23, drafted; D-221.1, D-222.3, D-224.1, D-225.7; the orchestrator's). The kernel's
 in-focus width, fixed or calibrated. (i) `scripts/calibrate_sigma.py` writes beside `summary` (sigma_0) a
@@ -2006,20 +2028,27 @@ statistics (n, median, MAD, the inverse-variance weighted mean and its SE, chi2_
 "fixed" (the default) keeps the configuration's table (sigma_r(0) = 0.080 um, D-172). "calibrated" replaces the
 renderer's table by `kernel.with_kernel(base, sigma_0, c)` with sigma_0 = `summary.ivw_mean_um` and $c$ =
 `summary_growth_scale.ivw_mean` (D-222.3), `base` the configuration's table before any re-anchoring; refused, with a
-message, without `--sigma-json`, for a JSON whose `complete` is false, whose summaries have n = 0, or whose means are not
-finite and > 0; exclusive with `clean_cell.py`'s `--sigma-r0-um` (amendment 14). The values, the file, n and the SEs
+message, without `--sigma-json`, for a `--sigma-json` file that is missing or unreadable [D-233: the final check's
+S6], for a JSON whose `complete` is false, whose summaries have n = 0, or whose means are not finite and > 0 --
+`clean_cell.py` and `fit_soma.py` with an argparse error, `infer_nodes.py` with "refused: ..." in its log, status 2,
+before anything is written; exclusive with `clean_cell.py`'s `--sigma-r0-um` (amendment 14). The values, the file, n and the SEs
 are printed and recorded in the script's JSON (`kernel_width`: mode, sigma0_um, growth_scale, their SEs, n, file, the
 base table). `infer_nodes.py` inherits the preparation's renderer (the cleaning run's configuration, as today); its own
 `--kernel-width` re-anchors the preparation's recorded base table (an override, logged: the preparation's cleaning
 used its own law). The width switch acts on the law, so it reaches every kernel built from it: the Gaussian, the SGT's
-FWHM (D-222.2), the soma's renderer.
+FWHM (D-222.2), the soma's renderer. [Stated 2026-11-23, D-233, the final check's S3, F1 and F4:] without the switch
+`infer_nodes.py` takes the preparation's law as its `cleaning_<S>.json` records it (fixed or calibrated); "fixed" given
+there is the recorded base table (an override of a calibrated preparation), "calibrated" that base re-anchored; its
+help says so. The recorded base is read back by `config.config_from_dict`'s rule (nested tuples restored:
+`renderer.jpeg_qtables`). `clean_cell.py` hands the switch's record to `config_sections(cfg, kernel_width_record)` as a
+required argument: no module state, so no path records a re-anchored table without its base.
 
 Block 36, amendment 23 (2026-11-23, drafted; D-221.2-3, D-222, D-224.1-2, D-225.5-6; the orchestrator's). The SGT
 stage and the error bars in `scripts/infer_nodes.py`. (i) `node_inputs.forward_factory(pilot, half_length, node, cfg,
 cache, kernel_family="gaussian")`: "sgt" returns `forward(d, mu, v0, z_ax, beta, xi, zeta)` =
 `line_fast.line_profiles(..., kernel=line_sgt.SGTKernel(beta, xi, zeta))` (NaN on `ExtrusionInvalid`, as today);
 `node_inputs.forward_cov_factory(pilot, half_length, node, cfg, cache, kernel_family="gaussian")`: the same model with
-`line_fine_factor` = `inference.cov_fine_factor` (None when it is 0). (ii) Per node: the Gaussian fit as today, its
+`line_fine_factor` = `inference.cov_fine_factor` (32 by default; None when it is 0). (ii) Per node: the Gaussian fit as today, its
 error bars from `forward_cov`; with `inference.kernel_family` "sgt", the SGT fit of Block 30 amendment 3 (G) with its
 own `forward_cov`. (iii) Outputs: the node's estimate is the fit of the configured kernel (D-225.5) -- the CSV's and
 the JSON's `d_hat_um`, `se_d_um`, `mu_hat_per_um`, ..., `status`, `at_bound` are the SGT fit's under "sgt" -- with
@@ -2027,7 +2056,11 @@ the JSON's `d_hat_um`, `se_d_um`, `mu_hat_per_um`, ..., `status`, `at_bound` are
 fit's `gauss_d_um`, `gauss_se_d_um`, `gauss_status`, `gauss_chi2_mean`, in the CSV after `flags` (amendment 16's five
 columns stay just before `seconds`, the last); the JSON's node record adds `kernel`, `cov_source`, `param_names`,
 `cov_search`, `shape`, `se_shape` and the Gaussian fit's record `gauss`; the per-node figure (Block 34) draws the
-estimate's model; the node's log line names the kernel and the shape. (iv) Command line: `--kernel gaussian|sgt`
+estimate's model; the node's log line names the kernel and the shape. A failure of the SGT stage -- Block 30's failed
+fit (no finite run) or an exception inside the stage -- is the node's estimate failing: status "failed", the estimates,
+their SEs, the shape and `truncated_mass` NaN, an exception's message under the JSON node record's `sgt_error` with the
+flag `sgt_error`; the Gaussian fit's columns and record and the same-node clearance (at the Gaussian estimate) are kept;
+the node's estimate is not replaced by the Gaussian's [D-233: the final check's F3]. (iv) Command line: `--kernel gaussian|sgt`
 (default: `inference.kernel_family`), `--sgt-skew off|fit` (default: `inference.sgt_skew`), `--cov-fine-factor N`
 (default: `inference.cov_fine_factor`; 0 = the fit's own Jacobian), `--nodes` (a subset of the preparation's example
 nodes, for time), with amendment 22's switch. The same-node clearance (amendment 11) is a cleaning product and keeps
@@ -2035,6 +2068,23 @@ the Gaussian fit's estimate (D-222.4). (v) Notebook: Cell 16 sets `KERNEL_WIDTH`
 Cells 20, 25 and 26; the thick nodes' preparation of Cell 23 stays fixed, so that the calibration is not re-anchored on
 itself); Cell 20 gains `COV_FINE_FACTOR`; a new Cell 26 fits Cell 20's prepared nodes with the SGT kernel and shows the
 Gaussian and the SGT fits side by side (`KERNEL`, `SGT_SKEW`, `COV_FINE_FACTOR`, `SGT_NODES`).
+Status (amendments 22-23): implemented 2026-11-23 by the orchestrator (`16eb8be`); smoke `test_smoke_kernel_width.py` and
+the synthetic run end to end; final check 2026-11-23 13:55 PASS WITH ISSUES; settled by D-233:
+`test_smoke_kernel_width.py` 7 pass as a script; `test_smoke_config.py` 6 pass, 1 skip; the tester's `test_spec_block36_am22_23.py` 31 pass on the fixes (its F1 and F3 cases run with `--runxfail` before they became plain tests; 2886 s here); the SGT stage's exception path run end to end (the node failed, `sgt_error`, the Gaussian record and the clearance kept); `fit_soma.main` in-process leaves no figure open; rerun on the fixes: the spec files of Block 1 (135 pass), Block 36's node inputs (32) and scripts (6) and the soma fit end to end (12), and `test_smoke_pilot_run.py` (17 pass, 1 skip, 993 s) **[run, sandbox]**.
+
+The final check of wave 7 (2026-11-23; D-233 [orchestrator]; `specs/test_reports/2026-11-23_1355_incremental.md`, PASS
+WITH ISSUES: five findings MINOR or NOTE, none on a fitted number of the default path, no regression; seven gaps in the
+spec) is settled thus:
+- Block 36, amendment 22 (F1): the preparation's recorded base renderer is read back by `config.config_from_dict`'s rule,
+  so the switch works on a configuration with Allen's JPEG tables;
+- section 6 (F2): `tests/smoke/test_smoke_kernel_width.py` has the package's script runner (7 pass);
+- Block 36, amendment 23 (F3): a failed SGT stage keeps the Gaussian fit's record and the same-node clearance (above);
+- Block 36, amendment 22 (F4): `clean_cell.config_sections` takes the switch's record as an argument;
+- Block 48's entry point (F5): `scripts/fit_soma.py` closes its three figures after saving them;
+- S1-S7: stated in Blocks 30 (amendment 3 (B), (D)), 36 (amendments 22-23) and 49 (parameters, oracle (viii)), and in
+  section 6; `config.validate` keeps `sgt_ln_zeta_bounds` within $\pm\ln 2.1$ (S5) and the configuration's smoke suite
+  asserts `SGT_STRETCH_ALLOWANCE` = `line_sgt.STRETCH_ALLOWANCE`;
+- the tester's spec tests come into the working line (D-224.3), its two strict xfails (F1, F3) as plain tests.
 
 ## 6. Pipeline entry points
 
@@ -2115,10 +2165,10 @@ Gaussian and the SGT fits side by side (`KERNEL`, `SGT_SKEW`, `COV_FINE_FACTOR`,
 | `python scripts/fit_soma.py --specimen S [ALIGN] [--config-json CLEANING] [--soma-k K] [--far-slope fit|fixed] [--slope0 G] --out DIR` (Cell 25) [2026-11-23, wave 6; D-222.5] | Blocks 45-48's entry point: the traced soma's start (depth from --soma-k, else the traced depth), the crop (`soma_fit.region_radius_um` + `crop_margin_um`), the trace's mask (+ `mask_widen_um`), the fit, `soma_fit_<S>.json`, `_planes.png` (the fitted planes nearest `figure_planes_um` from the fitted centre), `_summary.png` (with SE(V) and SE(r_eq) by the delta method on the fit's covariance), `_morphology.png`, `reconstruction_soma_<S>.swc`; refuses a kernel continuation that is not "linear" (D-220.2) | `--synthetic`: the synthetic cell's trace over a known ellipsoid on a uniform background, noise 3 gl -- recovered to 0.007 um, S +0.17 % (1.6 SE), chi2/dof 9.07 [run, sandbox, 2026-11-23] | 2 min |
 | `python scripts/clean_cell.py clean --no-clean [--pilot-diameter allen|free] [--sigma-r0-um S]`, `python scripts/clean_cell.py clear --d-bins ...` [2026-11-22, S4] | Block 36 amendments 14-17: the preparation without cleaning, the first stage's diameter rule, the in-focus width override, the clear nodes by diameter bin | `--synthetic` | 1-2 min |
 | `python scripts/infer_nodes.py real --weights ... [--bump-sd S] [--weight-kappa K]` [2026-11-22, S4] | Block 36 amendment 16: the per-node fit with Block 39's weights | `--synthetic` | 1-3 min a node |
-| `python scripts/infer_nodes.py real ... [--kernel gaussian\|sgt] [--sgt-skew off\|fit] [--cov-fine-factor N] [--nodes IDS] [--kernel-width fixed\|calibrated --sigma-json FILE]` (Cells 20, 26) [2026-11-23, wave 7] | Block 36 amendments 22-23 (D-224, D-225): the Gaussian fit with its error bars from the model at `cov_fine_factor`; under `sgt` the SGT fit from its estimate (Blocks 30 amendment 3, 49), the node's estimate, the Gaussian beside it; the width switch | `--synthetic` | Gaussian with p/16 error bars 30 s a synthetic node; the SGT stage longer (Block 49's timing) |
+| `python scripts/infer_nodes.py real ... [--kernel gaussian\|sgt] [--sgt-skew off\|fit] [--cov-fine-factor N] [--nodes IDS] [--kernel-width fixed\|calibrated --sigma-json FILE]` (Cells 20, 26) [2026-11-23, wave 7] | Block 36 amendments 22-23 (D-224, D-225): the Gaussian fit with its error bars from the model at `cov_fine_factor`; under `sgt` the SGT fit from its estimate (Blocks 30 amendment 3, 49), the node's estimate, the Gaussian beside it; the width switch | `--synthetic` | the Gaussian stage with its p/32 error bars 68-93 s a synthetic node (10-33 s with `--cov-fine-factor 0`); with the SGT stage ($\zeta$ held) 351-499 s a node in all, the skew 769 s a node with the fit's own Jacobian (the pilot-run suite's fast configuration: partition, 4 x 8 directions, one start; 9 planes; this sandbox) [measured 2026-11-23, D-233: the final check's S1] |
 | `python scripts/clean_cell.py ... [--kernel-width fixed\|calibrated --sigma-json FILE]`, `python scripts/fit_soma.py ... [--kernel-width ... --sigma-json FILE]`, `python scripts/calibrate_sigma.py ...` (`summary_growth_scale`) [2026-11-23, wave 7] | Block 36 amendment 22 (D-221.1, D-222.3): the kernel's in-focus width re-anchored at Cell 23B's weighted means of sigma0 and c, recorded with the base renderer | `--synthetic` | as before |
 | `python tests/smoke/test_smoke_line_sgt.py` [quick, about 8 min] and `LINE_SGT_LONG=1 python tests/smoke/test_smoke_line_sgt.py` [about 2.5 h] [2026-11-23, wave 7] | Block 49 checks | none | as stated |
-| `python tests/smoke/test_smoke_kernel_width.py` [2026-11-23, wave 7] | Block 36 amendment 22's switch | none | seconds |
+| `python tests/smoke/test_smoke_kernel_width.py` [2026-11-23, wave 7; its script runner D-233] | Block 36 amendment 22's switch (the refusals, the recorded base read back, the growth scale's summary) | none | seconds; 7 pass |
 | `python scripts/show_soma.py --specimen S --cache-dir DIR [ALIGN] [--soma-k K] [--soma-k-range LO HI] [--montage-k LO HI STEP]` [2026-11-22] | Block 44: the soma's view, its plane chosen by eye (D-211) | `--synthetic` | 30 s synthetic; minutes on Allen's data |
 | `python tests/smoke/test_smoke_sigma_calibration.py` [2026-11-20; contract] | Block 42 checks (the in-focus width fitted on thick nodes) | the smoke fixture cell | minutes |
 | `python tests/smoke/test_smoke_sigma_figures.py` [2026-11-20; contract] | Block 43 checks | none | seconds |

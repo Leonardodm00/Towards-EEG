@@ -505,10 +505,8 @@ def test_outputs_exist_and_log_names_the_kernel(runs):
 
 # ------------------------------------------------------------ findings' reproducers ---
 
-@pytest.mark.xfail(strict=True, reason="F1: kernel_width._renderer rebuilds the preparation's recorded base renderer "
-                   "from JSON turning only top-level lists into tuples; renderer.jpeg_qtables (tuples of 64-integer "
-                   "tuples) comes back as a tuple of lists, which validate() refuses: infer_nodes.py --kernel-width "
-                   "fixed|calibrated then dies with ValueError")
+# F1, a strict xfail in the tester's run of 2026-11-23 13:55, settled by D-233 (the recorded base renderer is read back
+# by config.config_from_dict's rule): a plain test since (the orchestrator, 2026-11-23)
 def test_switch_with_jpeg_tables_in_the_preparation(tmp_path):
     """Block 36 amendment 22 ("its own --kernel-width re-anchors the preparation's recorded base table") on a
     preparation whose renderer carries Allen's JPEG tables (Block 4: renderer.jpeg_qtables, the tables themselves):
@@ -525,10 +523,8 @@ def test_switch_with_jpeg_tables_in_the_preparation(tmp_path):
     assert out.renderer.jpeg_qtables == cfg.renderer.jpeg_qtables
 
 
-@pytest.mark.xfail(strict=True, reason="F2: a failed SGT fit without a finite run (Block 30 amendment 3: shape, "
-                   "se_shape, cov_search all NaN) makes infer_nodes.py call SGTKernel(nan, nan, nan) for "
-                   "truncated_mass; the ValueError sends the node to 'fit_error', dropping its Gaussian fit's record "
-                   "and its same-node clearance, which keeps the Gaussian estimate (D-222.4)")
+# F3 (named F2 in the xfail's reason at the time), a strict xfail in the tester's run of 2026-11-23 13:55, settled by
+# D-233 (a failed SGT stage keeps the Gaussian record and the clearance): a plain test since (the orchestrator, 2026-11-23)
 def test_failed_sgt_stage_keeps_the_gaussian_record(prep, monkeypatch, tmp_path):
     """Block 36 amendment 23 (iii): the node's estimate is the configured kernel's fit, the Gaussian beside it; the
     same-node clearance keeps the Gaussian estimate. An SGT stage whose model is not finite (stand-in: the "sgt"

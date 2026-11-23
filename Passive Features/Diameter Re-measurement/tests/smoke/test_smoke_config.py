@@ -361,6 +361,19 @@ def test_edge_cases():
             pass
         else:
             raise AssertionError("with_overrides accepted %r" % (bad,))
+    # wave 7 (D-225; D-233: the final check's S4 and S5): the SGT kernel's and the error bars' knobs
+    i = cfg.inference
+    refuses(inference=dict(kernel_family="cauchy"))
+    refuses(inference=dict(sgt_skew="both"))
+    refuses(inference=dict(sgt_reach_sigmas=i.line_reach_sigmas - 1.0))
+    refuses(inference=dict(sgt_samples_per_fwhm=1))
+    refuses(inference=dict(cov_fine_factor=i.line_fine_factor - 1))
+    refuses(inference=dict(sgt_ln_zeta_bounds=(-0.75, 0.7)))       # beyond ln(2.1): Block 49's lattices move
+    refuses(inference=dict(sgt_ln_zeta_bounds=(-0.7, 0.75)))
+    from allen_diameter.model import line_sgt
+    assert line_sgt.STRETCH_ALLOWANCE == C.SGT_STRETCH_ALLOWANCE, (line_sgt.STRETCH_ALLOWANCE, C.SGT_STRETCH_ALLOWANCE)
+    for ok in (dict(sgt_ln_zeta_bounds=(-0.74, 0.74)), dict(cov_fine_factor=0), dict(sgt_samples_per_fwhm=2)):
+        dataclasses.replace(cfg, inference=dataclasses.replace(i, **ok)).validate()
 
 
 # ---------------------------------------------------------------- runner ---

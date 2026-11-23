@@ -2,15 +2,21 @@
 loading/sigma_io.read_calibrated_kernel, scripts/kernel_width.apply and scripts/calibrate_sigma.growth_scale_summary.
 
 Run
-    python -m pytest tests/smoke/test_smoke_kernel_width.py -q        (seconds)
+    python tests/smoke/test_smoke_kernel_width.py                     (seconds; the "-- n pass" line, exit 0/1)
+    python -m pytest tests/smoke/test_smoke_kernel_width.py -q        (the same checks through pytest)
 
-Pure ASCII.
+The script runner is the package's (D-233: the final check's F2 found unittest.main() running none of these
+module-level checks). Pure ASCII.
 """
+import dataclasses
 import json
 import math
 import os
+import platform
 import sys
 import tempfile
+import time
+import traceback
 import unittest
 
 import numpy as np
@@ -92,12 +98,30 @@ def test_calibrated_is_with_kernel_of_the_base():
 
 def test_calibrated_refusals():
     cfg = C.default_config()
-    for mode, path in (("calibrated", ""), ("other", ""), ("calibrated", _write(dict(GOOD, complete=False)))):
+    missing = os.path.join(tempfile.mkdtemp(), "no_such_sigma.json")          # D-233 (S6): a ValueError, no traceback
+    for mode, path in (("calibrated", ""), ("other", ""), ("calibrated", _write(dict(GOOD, complete=False))),
+                       ("calibrated", missing)):
         try:
             kernel_width.apply(cfg, mode, path)
         except ValueError:
             continue
         raise AssertionError("accepted %r %r" % (mode, path))
+
+
+def test_recorded_base_with_jpeg_tables():
+    """D-233 (the final check's F1): a preparation's recorded base renderer, after its JSON round trip, carries
+    Allen's JPEG tables as nested lists; the switch reads it back with config_from_dict's rule."""
+    cfg0 = C.default_config()
+    cfg = dataclasses.replace(cfg0, renderer=dataclasses.replace(cfg0.renderer,
+                                                                 jpeg_qtables=(tuple(range(1, 65)),)))
+    cfg.validate()
+    _, rec = kernel_width.apply(cfg, "fixed", "")
+    rec_rt = json.loads(json.dumps(rec))
+    assert isinstance(rec_rt["base_renderer"]["jpeg_qtables"][0], list)
+    out, _ = kernel_width.apply(cfg, "fixed", "", base=rec_rt["base_renderer"])
+    assert out.renderer == cfg.renderer
+    out, _ = kernel_width.apply(cfg, "calibrated", _write(GOOD), base=rec_rt["base_renderer"])
+    assert out.renderer == kernel.with_kernel(cfg.renderer, 0.0712, 1.083)
 
 
 def test_growth_scale_summary_by_hand():
@@ -117,5 +141,37 @@ def test_growth_scale_summary_by_hand():
     assert empty["n"] == 0 and math.isnan(empty["ivw_mean"])
 
 
+def main():
+    """The package's script runner: a PASS/FAIL table and the "-- n pass, ..." line; exit 1 on a FAIL or ERROR."""
+    checks = [(name, obj) for name, obj in globals().items() if name.startswith("test_") and callable(obj)]
+    print("== %s" % os.path.basename(__file__))
+    print("python %s | numpy %s | %s" % (platform.python_version(), np.__version__, platform.platform()))
+    results = []
+    for name, func in checks:
+        start = time.perf_counter()
+        try:
+            func()
+            status, detail = "PASS", ""
+        except unittest.SkipTest as exc:
+            status, detail = "SKIP", str(exc)
+        except NotImplementedError as exc:
+            status, detail = "TODO", str(exc)
+        except AssertionError as exc:
+            status, detail = "FAIL", str(exc)
+        except Exception:                       # unexpected errors are reported, never hidden
+            status, detail = "ERROR", traceback.format_exc()
+        results.append((name, status, time.perf_counter() - start, detail))
+    width = max([len(n) for n, _, _, _ in results] + [4])
+    for name, status, seconds, detail in results:
+        lines = detail.strip().splitlines()
+        print(("%-5s  %-" + str(width) + "s  %8.3fs  %s") % (status, name, seconds, lines[0] if lines else ""))
+    for name, status, _s, detail in results:
+        if status in ("FAIL", "ERROR"):
+            print("\n---- %s: %s\n%s" % (status, name, detail.strip()))
+    counts = {s: sum(1 for r in results if r[1] == s) for s in ("PASS", "FAIL", "ERROR", "TODO", "SKIP")}
+    print("\n-- " + ", ".join("%d %s" % (n, s.lower()) for s, n in counts.items()))
+    return 1 if (counts["FAIL"] + counts["ERROR"] + counts["TODO"]) else 0
+
+
 if __name__ == "__main__":
-    unittest.main()
+    sys.exit(main())
