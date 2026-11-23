@@ -282,6 +282,7 @@ the "Binds" column.
 | 2026-11-23 (09:57; the defocus-table chat) | Logs **D-230** (user, 09:57): the calibration runs near first -- step 1 then step 2 for the near kernel -- and then the far slope the same way -- the far fit (its step 1) then a step 2 on far twins. The assistant's condition, PROVISIONAL until the user confirms: the two are alternated (the near stage rerun with the new slope, the far stage with the new knots) until neither moves, so that the result is D-228/D-229's joint fit. Next free IDs: D-231, I-007. |
 | 2026-11-23 (11:50; the defocus-table chat) | Logs **D-231** (user, 11:50): the hybrid absorption (SPEC Block 21) becomes `RendererConfig.absorption`'s default; the partition, `linear` and `ray_world` stay as labelled alternatives. Implemented at `2812d4d` on `sci/diameter-pipeline` (config, SPEC Blocks 4, 5 and 21, eight smoke files; the table plan's changelog at `ed6cc63`), not pushed: the push waits for the user, and another chat's wave 7 runs on the branch. The default's simulation hash `dc84ed2e89bcfea6` -> `d355d5fb9bbb4f1d`, the estimator's unchanged. **[run, sandbox]** a near-vertical tube renders far darker under the hybrid and Block 5 reads it at 45 deg instead of 88 (recorded in SPEC Block 21). D-024, D-084 and D-092 annotated. Written after re-reading this log (unchanged since D-230's row). Next free IDs: D-232, I-007. |
 | 2026-11-23 | Logs **D-232** (orchestrator): Block 49's issue (oracle (iii) at the raised reach infeasible here) settled, the implementer's readings accepted, the SGT path's cost recorded. Evidence: Block 49's report (`fde033b`), the gate's rerun. Next free IDs: D-233, I-007. |
+| 2026-11-23 (17:07) | Logs **D-233** (orchestrator): wave 7's final check settled (F1-F5 fixed, S1-S7 stated in the spec). Next free IDs: D-234, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -502,6 +503,7 @@ would be needed*, *Status*.
 | D-230 | 2026-11-23 | the order of the calibration's fits (D-228, D-229): near then far | near: step 1 then step 2 (the knots, slope held); far: the far fit then a step 2 on far twins (the slope, knots held); alternated until stable [PROVISIONAL] | active; not built |
 | D-231 | 2026-11-23 | Block 4's absorption (`RendererConfig.absorption`, `config.ABSORPTIONS`); every renderer user that takes the default (Blocks 4-6, 10, 14, 15, 24; step 2's twins); the default's simulation hash; D-024 (i), D-084.2, D-092.2 | the hybrid (Block 21) is the default absorption [user]; the partition, `linear` and `ray_world` labelled alternatives; the smoke tests set on the partition set it explicitly [orchestrator] | active; implemented at `2812d4d` (2026-11-23), smoke-tested; not pushed |
 | D-232 | 2026-11-23 | SPEC Block 49 (oracle (iii), the skew's sample drawing, the table's key, level 0), `test_smoke_line_sgt.py` | Block 49's issue settled: (iii) at the default reach against an independently truncated reference where the raised reach cannot run here; the implementer's readings accepted; the SGT path's cost recorded [orchestrator] | active |
+| D-233 | 2026-11-23 | wave 7's final check (`kernel_width.py`, `infer_nodes.py`, `clean_cell.py`, `fit_soma.py`, `config.validate`); SPEC Blocks 30 am. 3, 36 am. 22-23, 49, section 6 | F1-F5 fixed (the recorded base read back by config_from_dict's rule; the suite's runner; a failed SGT stage keeps the Gaussian fit and the clearance; the switch's record by argument; the figures closed); S1-S7 stated (cov_fine_factor 32; the covariance at a bound marginal, as since Block 30's entry; the zeta box within +-ln 2.1; a missing calibration refused; the box's corners an oracle) [orchestrator] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15121,3 +15123,89 @@ needs a cheaper construction; the run time of a pilot fit with the SGT (to be me
 **Sources.** **[run, sandbox]** Block 49's report (commit `fde033b`), the gate's rerun. **[log]** D-225.
 
 **Status:** active; amends SPEC Block 49's oracle (iii) and its mathematics' wording (D-225.2-4 unchanged in substance).
+
+## D-233 -- Wave 7's final check settled: the switch's recorded base read back by the configuration's rule, a failed SGT stage kept beside the Gaussian fit, no module state, the figures closed; the spec's seven gaps closed (orchestrator)
+
+**Date:** 2026-11-23 (Europe/Rome), the gallery chat. **Binds:** `scripts/kernel_width.py`, `scripts/infer_nodes.py`,
+`scripts/clean_cell.py`, `scripts/fit_soma.py`, `src/allen_diameter/config.py` (`SGT_STRETCH_ALLOWANCE`, `validate`),
+`tests/smoke/test_smoke_kernel_width.py`, `tests/smoke/test_smoke_config.py`,
+`tests/spec/test_spec_block36_am22_23.py` (its two strict xfails); SPEC Block 30 amendment 3 (B), (D), Block 36
+amendments 22-23, Block 49 (parameters, oracle (viii)), section 6; the report
+`specs/test_reports/2026-11-23_1355_incremental.md` (F1-F5, S1-S7); D-222.4, D-224, D-225, D-232.
+
+**Decision [orchestrator].** The final check of wave 7 (an Opus tester on `16eb8be`, incremental: PASS WITH ISSUES,
+five findings MINOR or NOTE, none on a fitted number of the default path, no regression; seven gaps in the spec) is
+settled as below. No finding puts the approach in question.
+
+**Statement.**
+(D-233.1) F1: a preparation's recorded base renderer (`cleaning_<S>.json`, `kernel_width.base_renderer`) is read back
+by `config.config_from_dict`'s rule -- nested tuples restored (`renderer.jpeg_qtables`), the renderer validated -- so
+`infer_nodes.py --kernel-width fixed|calibrated` works on a configuration that carries Allen's JPEG tables.
+(D-233.2) F2: `tests/smoke/test_smoke_kernel_width.py` gets the package's script runner (the PASS table, the "-- n
+pass" line, exit 0/1); section 6's command runs its 7 checks.
+(D-233.3) F3: in `infer_nodes.py`, under `inference.kernel_family` "sgt", a failure of the SGT stage -- Block 30's
+failed fit (no finite run: `theta`, `shape`, `se_shape` NaN) or an exception inside the stage -- is the node's SGT
+estimate failing: the node is written with status "failed", its estimates, their SEs, the shape and
+`truncated_mass` NaN; an exception's message goes under the JSON node record's `sgt_error`, with the flag
+`sgt_error`; the Gaussian fit's columns (`gauss_*`) and its record `gauss` are kept, and the same-node clearance is
+made at the Gaussian estimate (D-222.4); the node counts among the failed. The node's estimate stays the configured
+kernel's (Block 36 amendment 23 (iii)): the Gaussian estimate is not put in its place.
+(D-233.4) F4: `clean_cell.config_sections(cfg, kernel_width_record)` takes the switch's record as a required argument
+(`main` keeps it on the parsed arguments): no module-global state. A caller that leaves it out fails, instead of
+recording a re-anchored table with a null record (on which `infer_nodes.py --kernel-width calibrated` would compound
+the growth scale $c$).
+(D-233.5) F5: `fit_soma.py` closes each of its three figures after saving it (the package's `save`: the caller closes).
+(D-233.6) S1: `inference.cov_fine_factor` = 32 (D-224.2, D-225.6) is stated in Block 30 amendment 3 (D) and Block 36
+amendment 23 (i); section 6's "p/16 error bars, 30 s a synthetic node" is replaced by the times measured at 32.
+(D-233.7) S2: the covariance at an active bound is, as in Block 30 since its entry (`node_inference._covariance`), the
+inverse over all the search parameters $\phi$, those at a bound included (their Jacobian columns inward one-sided by
+amendment 3 (D), or the solver's), after which their rows and columns are set NaN. For the free parameters $F$ and
+those at a bound $B$, with $A = J^\top J$ (weighted: the sandwich of amendment 2),
+$\Sigma_{FF} = (A_{FF} - A_{FB} A_{BB}^{-1} A_{BF})^{-1}$: the errors of $\phi_F$ are marginal over $\phi_B$, not the
+conditional $A_{FF}^{-1}$ of a Jacobian without $B$'s columns, which is smaller or equal in the Loewner order
+($\Sigma_{FF} \succeq A_{FF}^{-1}$). Kept: the SGT option ($\zeta$ held) covers the true $d$ in 0.700 of 300 seeded
+sets, 152 of them ending at `xi_lo` (tester; the implementer's 0.720), inside oracle (iii)'s band 0.60-0.76 around the
+nominal 0.683 of $\pm 1$ SE.
+(D-233.8) S3: `infer_nodes.py` without `--kernel-width` takes the preparation's law as its `cleaning_<S>.json` records it
+(fixed or calibrated); "fixed" given there is the preparation's recorded base table (an override of a calibrated
+preparation, logged); "calibrated", that base re-anchored. Its help says so.
+(D-233.9) S4: `config.validate()`'s constraints on wave 7's knobs, in force since the contract, are the spec's:
+`sgt_reach_sigmas` $\ge$ `line_reach_sigmas`; `sgt_samples_per_fwhm` a whole number $\ge 2$ (Block 49's module
+accepts 1; the configuration is stricter); `cov_fine_factor` 0 or a whole number $\ge$ `line_fine_factor`.
+(D-233.10) S5: `inference.sgt_ln_zeta_bounds` must lie within $\pm\ln 2.1 = \pm 0.742$, where Block 49's supports and
+lattices do not change with $\zeta$ ($Z = \max(2.1, \zeta, 1/\zeta)$, D-232.2); `config.SGT_STRETCH_ALLOWANCE` =
+`line_sgt.STRETCH_ALLOWANCE` = 2.1, asserted by the configuration's smoke suite. The default box $(-0.7, 0.7)$ is
+inside it.
+(D-233.11) S6: a missing or unreadable `--sigma-json` is refused like an incomplete one: `clean_cell.py` and
+`fit_soma.py` with an argparse error, `infer_nodes.py` with "refused: ..." in its log; status 2, before anything is
+written.
+(D-233.12) S7: Block 49's oracles name the fit box's corners, $(\beta, \xi, \zeta) = (1, 2, e^{\pm 0.7})$, at the default
+reach against an exact model of the truncated kernel [5e-5] (oracle (viii)); the tester ran them within 1.6e-5.
+
+**Why.** (.1)-(.5) **[run, sandbox]** the tester's reproducers fail on `16eb8be` and pass on the fixes: its
+`test_spec_block36_am22_23.py` run whole with `--runxfail` gives 31 pass in 2886 s (the F1 and F3 cases among them);
+the new smoke checks of F1 and S6 fail on the old `kernel_width.py` (ValueError on the JPEG tables;
+FileNotFoundError) and pass on the new; `fit_soma.main` run in-process leaves 0 figures open (3 before).
+(.3) **[log]** amendment 23 (iii)-(iv): the node's estimate is the configured kernel's, the clearance keeps the
+Gaussian's (D-222.4); a failure of one stage must not erase the other's result. (.6) **[run, sandbox]** at 32, the
+pilot-run suite's fast configuration (partition, 4 x 8 directions, one start; 9 planes), this sandbox: the Gaussian stage
+68-93 s a synthetic node (10-33 s with the fit's own Jacobian); the SGT stage with $\zeta$ held about 280-410 s more;
+the skew 769 s for one node with the fit's own Jacobian. (.7) **[run, sandbox]** the coverage runs;
+**[reasoning]** across data sets the bound parameter's estimate lands on either side of its bound, so the marginal
+error is the conservative one, and a reduced Jacobian would give a node whose $\hat\xi$ sits at 0 a smaller
+${\rm se}(d)$ than one whose $\hat\xi$ is just inside. (.10) **[code]** `line_sgt.profiles`: `allow = max(
+STRETCH_ALLOWANCE, zeta, 1/zeta)` sizes the support and the lattices; past the allowance they change with $\zeta$
+inside a fit, which breaks the finite-difference Jacobian (D-225.4's argument).
+
+**What it does not decide.** Whether a later study should report the SGT fit's ${\rm se}(d)$ conditionally on
+$\hat\xi$ at its edge (the coverage supports the marginal); a fallback of a node's estimate to the Gaussian when its
+SGT stage fails (not done); the cases the report leaves untested: the SGT path on a depth-dependent law with
+non-Gaussian members against an independent reference, the hybrid at 8 x 16 directions on the SGT path, the SGT stage
+on the clear-node path end to end, production timings.
+
+**Sources.** **[run, sandbox]** the report and its tests (`tester/diameter-pipeline-2026-11-23_1355`, `2461eb3`); the
+reruns on the fixes. **[log]** D-222.4, D-224, D-225, D-232. **[code]** `kernel_width.py`, `infer_nodes.py`,
+`clean_cell.py`, `fit_soma.py`, `config.py`, `node_inference._covariance`, `line_sgt.profiles`.
+
+**Status:** active; amends SPEC Blocks 30 (amendment 3), 36 (amendments 22-23) and 49 (statements, oracle (viii)), and
+section 6.
