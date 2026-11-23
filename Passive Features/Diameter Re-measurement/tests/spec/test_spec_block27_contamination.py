@@ -220,3 +220,29 @@ def test_pick_clear_examples_soma_distance_nan_without_a_soma():
     on NaN; with min_soma_um = 0 (the function's default) a cell without a soma disc gets no clear node."""
     rows = [_clear_row(1, 0, 0.0, soma=float("nan")), _clear_row(2, 20, 0.0, soma=float("nan"))]
     assert CT.pick_clear_examples(rows, 2, 10.0, min_soma_um=0.0) == [1, 2]
+
+# Tester, 2026-11-22 (incremental run at 97f5104): Block 27 amendment 5 (D-212.2, F2 and S2 of the final check of
+# wave 4): in pick_clear_examples a NaN soma_lateral_um (no soma disc) passes any min_soma_um; the other rules of
+# amendments 3-4 unchanged. Rows written by hand.
+
+def _row(nid, peak1, soma, x=0.0, own=10.0, tier2=0, peak2=0.0, near_end=False):
+    return {"node_id": nid, "worst1_peak_gl": peak1, "own_dip_gl": own, "n_tier2": tier2, "worst2_peak_gl": peak2,
+            "soma_lateral_um": soma, "near_end": near_end, "x_um": x, "y_um": 0.0, "z_um": 0.0}
+
+
+def test_nan_soma_distance_passes_any_min_soma():
+    nan = float("nan")
+    rows = [_row(1, 0.3, nan, x=0.0), _row(2, 0.1, 3.0, x=50.0), _row(3, 0.2, nan, x=100.0),
+            _row(4, 0.0, nan, x=150.0, near_end=True), _row(5, 0.05, nan, x=200.0, tier2=1)]
+    before = [dict(r) for r in rows]
+    for m in (0.0, 5.0, 1e9):
+        got = CT.pick_clear_examples(rows, 10, 10.0, min_soma_um=m)
+        want = [3, 1] if m > 3.0 else [2, 3, 1]          # the finite 3.0 um row falls below 5 um; NaN rows never do
+        assert got == want, (m, got)
+    assert CT.pick_clear_examples(rows, 10, 10.0) == [2, 3, 1]                     # the default min_soma_um 0
+    assert CT.pick_clear_examples(rows, 10, 10.0, 5.0, taken_xyz=[(100.0, 0.0, 0.0)]) == [1]   # spacing unchanged
+    assert [dict(r) for r in rows] == [dict(b) for b in before] or all(
+        (a.keys() == b.keys()) for a, b in zip(rows, before))                     # rows unchanged (NaN != NaN)
+    for bad in (float("nan"), -1.0, float("inf")):
+        with pytest.raises(ValueError):
+            CT.pick_clear_examples(rows, 1, 10.0, min_soma_um=bad)
