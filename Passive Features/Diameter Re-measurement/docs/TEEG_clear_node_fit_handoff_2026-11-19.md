@@ -687,5 +687,6 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   on the clear-node path (`clean --no-clean`) end to end; production timings.
 - **Status** [2026-11-23, later]: the tester's spec tests merged into `sci/diameter-pipeline` (`e0b1ab1`, D-224.3; its
   two strict xfails, F1 and F3, now plain tests); the fixes, the spec's statements and the report's decisions in `eda8fa7`;
-  D-233 on `main` (`13f75f8`). The fixes are not yet re-checked by an independent tester (the roadmap shows the touched
-  blocks as pushed until the next run).
+  D-233 on `main` (`13f75f8`). The fixes are not yet re-checked by an independent tester: on the roadmap the blocks whose
+  modules include `config.py` show as pushed until the next run, while Blocks 36 and 48 stay done there (their scripts'
+  changes lie outside the roadmap's module map, which follows SPEC's Module lines).
