@@ -273,6 +273,7 @@ the "Binds" column.
 | 2026-11-22 (later; the gallery chat, 10) | Logs **D-221** (user, 23:12): sigma_0 fixed at 0.080 um with a switch to the calibration; the SGT kernel as an option of the node's diameter fit, in the joint fit across planes too. Next free IDs: D-222, I-007. |
 | 2026-11-22 (later; the gallery chat, 11) | Logs **D-222** (user): D-221's details -- the SGT's shape (beta, xi; zeta as an option) and width (the law's FWHM), the switch's weighted means, wave 6 first. Next free IDs: D-223, I-007. |
 | 2026-11-23 | Logs **D-223** (orchestrator): the final check of wave 6 settled (F1-F3). Evidence: `specs/test_reports/2026-11-23_0027_incremental.md`, the reproducers and the dry run. Next free IDs: D-224, I-007. |
+| 2026-11-23 (07:43) | Logs **D-224** (user): wave 7 approved, the error bars on a finer lattice included; the tester's spec tests into the working line. Next free IDs: D-225, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -484,6 +485,7 @@ would be needed*, *Status*.
 | D-221 | 2026-11-22 | `renderer.sigma_r0_um` and a switch to Block 42's calibrated width; the kernel of the node's diameter fit (Block 30, `infer_nodes.py`, NC6); `blur_kernels` (Block 12) | sigma_0 fixed at 0.080 um with a switch to the calibration; a parameter choosing the Gaussian law or the SGT family (shape fitted) for the node's diameter, the SGT also in the joint fit across planes, its width from the defocus law [user] | active |
 | D-222 | 2026-11-22 | D-221's details: the SGT option of the node fit (Block 30), the calibrated values of the switch, the soma's wave 6 (Blocks 47-48) | (beta, xi) per node with zeta = 1, zeta fitted as an option; the width the law's FWHM; the weighted means of sigma_0 and c; wave 6 first (the stems' inside nodes removed), then the kernel wave [user] | active; extends D-221 |
 | D-223 | 2026-11-23 | the final check of wave 6 (report 2026-11-23_0027, PASS WITH ISSUES): `fit_soma.py`'s mask and morphology arrays, `calibrate_sigma.py`'s last line | the mask's segments from the crop widened by `mask_widen_um`; the edited tree for the stems' next nodes; the failed ids named [orchestrator] | active |
+| D-224 | 2026-11-23 | wave 7 (the calibrated-kernel switch; the SGT option in Blocks 26, 35 and 30); Block 30's error bars; `tests/spec/` | wave 7 as proposed; the covariance on a finer lattice for both kernels; the three tester runs' spec tests into the working line [user] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14701,5 +14703,36 @@ planted soma unchanged (10 segments taken instead of 8, the mask 5.9 % of the cr
 line (the user's).
 
 **Sources.** **[run, sandbox]** the report and the reruns. **[log]** D-220, D-222.
+
+**Status:** active.
+
+## D-224 -- The kernel wave approved as proposed, the error bars on the finer lattice included; the tester's spec tests into the working line (user)
+
+**Date:** 2026-11-23, 07:43 (Europe/Rome), the gallery chat. **Binds:** wave 7 (the switch to the calibrated kernel;
+the SGT option in the line renderers, Blocks 26 and 35, and in the per-node fit, Block 30; the entry points'
+knobs); Block 30's reported error bars; `tests/spec/` of the working line.
+
+**Decision [user].** "Everything ok go ahead and put the spec tests into the working branch" (07:43), answering the
+plan of 2026-11-23, 02:10, and the standing question on the tester's spec tests.
+
+**Statement.** (D-224.1) Wave 7 runs as proposed: the switch "fixed" (0.080 um, the default) or "calibrated" (Cell 23B's
+weighted means of sigma_0 and c; `calibrate_sigma.py` adds c's) by the orchestrator, with the matching option of the
+node scripts and of the soma fit; the SGT in the line renderers by one implementer (across the measuring line the
+SGT of the law's FWHM; the Gaussian member reproducing today's renderer); the SGT option of the per-node fit by a
+second (`inference.kernel_family` "gaussian" default or "sgt", `inference.sgt_skew` "off" default or "fit"; the shape
+and its SEs reported; the start from the node's Gaussian fit); the knobs of `infer_nodes.py` and the notebook by the
+orchestrator; then an independent final check. (D-224.2) The per-node fit's covariance -- the error bars of d and the
+correlations -- is evaluated at the fitted parameters on a lattice finer than the fit's own (the identifiability
+check: p/32 converged, p/8 not), for both kernels; the fit itself stays on its lattice. (D-224.3) The tester's spec
+tests of the runs of 2026-11-22 14:40, 19:05 and 2026-11-23 00:27 come into the working line, the cases two runs
+appended to one file both kept, the strict xfails of findings fixed since turned into plain tests.
+
+**Why.** **[user]** as quoted. **[run, sandbox]** `checks/sgt_identifiability_2026-11-23/` (D-222's check):
+no degeneracy of d with the shape, the Gaussian assumption's bias on thin nodes, the error bars unconverged on p/8.
+
+**What it does not decide.** The fine lattice's factor (the check: p/32), the SGT's PSF construction in 2-D and its
+cost, which belong to the wave's contract.
+
+**Sources.** **[user]** the message of 07:43. **[log]** D-221, D-222, D-223.
 
 **Status:** active.
