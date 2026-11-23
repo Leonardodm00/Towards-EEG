@@ -317,3 +317,116 @@ def test_pre_wave6_file_loads_with_the_defaults():
 def test_validate_refuses_illegal_soma_start_values(override):
     with pytest.raises(ValueError):
         C.with_overrides(C.default_config(), override)
+
+
+# ------------------------------- wave 7's inference fields (tester, 2026-11-23 13:55) ---
+# Oracles: Block 49's parameters (sgt_reach_sigmas 12, sgt_samples_per_fwhm 16), Block 30 amendment 3 (the shape
+# bounds, sgt_skew "off"/"fit", cov_steps in the order d, mu, v0, z_ax, log10 beta, xi, ln zeta, the first 4, 6 or 7),
+# Block 36 amendments 22-23 (kernel_family "gaussian"/"sgt", sgt_start_shape the Gaussian member, cov_fine_factor 0 =
+# the fit's own Jacobian), Block 1 (the inference section outside every signature, # source: tags, validate refusing
+# illegal values, every field read outside config.py, a file without the new keys taking the defaults).
+
+import dataclasses  # noqa: E402
+import math  # noqa: E402
+import re  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+W7_FIELDS = ("kernel_family", "sgt_skew", "sgt_log10_beta_bounds", "sgt_xi_bounds", "sgt_ln_zeta_bounds",
+             "sgt_start_shape", "sgt_reach_sigmas", "sgt_samples_per_fwhm", "cov_fine_factor", "cov_steps")
+
+
+def test_w7_defaults_as_specified():
+    """B1.5: the defaults the spec names, and the shape box equal to Block 12's (log10 of sgt_beta_bounds (1, 10),
+    sgt_xi_bounds (0, 2), sgt_ln_zeta_bounds (-0.7, 0.7); D-052.2) so that the per-node SGT and Block 12's fit share
+    one family box."""
+    c = C.default_config()
+    i, m = c.inference, c.measure
+    assert i.kernel_family == "gaussian" and C.INFERENCE_KERNELS[0] == "gaussian" and "sgt" in C.INFERENCE_KERNELS
+    assert i.sgt_skew == "off" and tuple(C.SGT_SKEWS) == ("off", "fit")
+    assert i.sgt_reach_sigmas == 12.0 and i.sgt_samples_per_fwhm == 16
+    assert tuple(i.sgt_start_shape) == (2.0, 0.0, 1.0)
+    assert tuple(i.sgt_log10_beta_bounds) == tuple(math.log10(b) for b in m.sgt_beta_bounds)
+    assert tuple(i.sgt_xi_bounds) == tuple(m.sgt_xi_bounds) and tuple(i.sgt_ln_zeta_bounds) == tuple(m.sgt_ln_zeta_bounds)
+    assert len(i.cov_steps) == 7 and all(s > 0 for s in i.cov_steps)
+    assert i.cov_fine_factor == 32 and i.cov_fine_factor % i.line_fine_factor == 0   # Block 49: "8 and 32 (the error bars' lattice)"
+
+
+@pytest.mark.parametrize("key,value", [("kernel_family", "sgt"), ("sgt_skew", "fit"), ("sgt_reach_sigmas", 20.0),
+                                       ("sgt_samples_per_fwhm", 24), ("cov_fine_factor", 0),
+                                       ("cov_steps", (1e-3,) * 7), ("sgt_start_shape", (2.0, 0.5, 1.2)),
+                                       ("sgt_xi_bounds", (0.0, 1.5))])
+def test_w7_fields_outside_every_signature(key, value):
+    """B1.1: the inference section is outside every signature: the estimator, simulation and full hashes do not
+    move with a wave-7 field (pinned 16be09f944e45972 / dc84ed2e89bcfea6)."""
+    c = C.default_config()
+    c2 = C.with_overrides(c, {"inference." + key: list(value) if isinstance(value, tuple) else value})
+    assert getattr(c2.inference, key) == value
+    for which in ("estimator", "simulation", "full"):
+        assert c2.signature_hash(which) == c.signature_hash(which)
+    assert c2.signature_hash("estimator") == "16be09f944e45972" and c2.signature_hash("simulation") == "dc84ed2e89bcfea6"
+
+
+def test_w7_overrides_in_declared_form():
+    """B1.3: with_overrides puts the new fields in their declared form (lists to tuples, an integer given for a
+    float field to a float), validated, without touching its input."""
+    c = C.default_config()
+    c2 = C.with_overrides(c, {"inference.cov_steps": [1, 1, 1, 1, 1, 1, 1], "inference.sgt_start_shape": [2, 0, 1],
+                              "inference.sgt_reach_sigmas": 15, "inference.sgt_log10_beta_bounds": [0, 0.8]})
+    assert isinstance(c2.inference.cov_steps, tuple) and all(isinstance(x, float) for x in c2.inference.cov_steps)
+    assert isinstance(c2.inference.sgt_start_shape, tuple) and isinstance(c2.inference.sgt_reach_sigmas, float)
+    assert c.inference.cov_steps != c2.inference.cov_steps
+
+
+@pytest.mark.parametrize("override", [
+    {"inference.kernel_family": "laplace"}, {"inference.kernel_family": ""}, {"inference.sgt_skew": "on"},
+    {"inference.sgt_log10_beta_bounds": [1.0, 0.0]}, {"inference.sgt_log10_beta_bounds": [0.0, float("nan")]},
+    {"inference.sgt_xi_bounds": [-0.1, 2.0]}, {"inference.sgt_ln_zeta_bounds": [0.7, -0.7]},
+    {"inference.sgt_start_shape": [20.0, 0.0, 1.0]}, {"inference.sgt_start_shape": [2.0, 3.0, 1.0]},
+    {"inference.sgt_start_shape": [2.0, 0.0, 3.0]}, {"inference.sgt_start_shape": [0.0, 0.0, 1.0]},
+    {"inference.sgt_start_shape": [2.0, 0.0, 0.0]}, {"inference.sgt_start_shape": [2.0, float("nan"), 1.0]},
+    {"inference.sgt_start_shape": [2.0, 0.0]},
+    {"inference.sgt_reach_sigmas": 0.0}, {"inference.sgt_reach_sigmas": float("nan")},
+    {"inference.sgt_reach_sigmas": float("inf")},
+    {"inference.sgt_samples_per_fwhm": 0}, {"inference.sgt_samples_per_fwhm": 2.5},
+    {"inference.sgt_samples_per_fwhm": True},
+    {"inference.cov_fine_factor": -1}, {"inference.cov_fine_factor": 2.5}, {"inference.cov_fine_factor": True},
+    {"inference.cov_steps": [1e-3] * 6}, {"inference.cov_steps": [1e-3] * 6 + [0.0]},
+    {"inference.cov_steps": [1e-3] * 6 + [float("nan")]}, {"inference.cov_steps": [1e-3] * 6 + [-1e-3]}])
+def test_w7_validate_refuses(override):
+    """B1.2: validate() refuses each illegal value with ValueError (through with_overrides, which validates)."""
+    with pytest.raises(ValueError):
+        C.with_overrides(C.default_config(), override)
+
+
+def test_w7_record_without_the_new_keys_loads_with_defaults():
+    """B1.3: a preparation's record written before wave 7 (its inference section without the ten new keys) loads
+    through infer_nodes.run_config with the new fields at their defaults, the recorded ones kept."""
+    import infer_nodes
+    c = C.default_config()
+    inf = dataclasses.asdict(c.inference)
+    for k in W7_FIELDS:
+        inf.pop(k)
+    inf["max_nfev"] = 77
+    rec = dict(config=json.loads(c.to_json()), cleaning=dataclasses.asdict(c.cleaning), inference=inf)
+    cfg = infer_nodes.run_config(rec, "", None)
+    assert cfg.inference.max_nfev == 77
+    for k in W7_FIELDS:
+        assert getattr(cfg.inference, k) == getattr(c.inference, k), k
+
+
+def test_w7_source_tags_and_readers():
+    """B1.1 / B1.4: every new field's line carries '# source:', and every new field is read by code outside
+    config.py (an attribute access in src/ or scripts/)."""
+    root = Path(H.WS)
+    text = (root / "src" / "allen_diameter" / "config.py").read_text()
+    body = text.split("class InferenceConfig", 1)[1].split("\n@dataclass", 1)[0]
+    for k in W7_FIELDS:
+        lines = [ln for ln in body.splitlines() if re.match(r"\s+%s\s*:" % k, ln)]
+        assert len(lines) == 1 and "# source:" in lines[0], k
+    others = [p for p in list((root / "src").rglob("*.py")) + list((root / "scripts").rglob("*.py"))
+              if p.name != "config.py"]
+    blob = "\n".join(p.read_text(errors="replace") for p in others)
+    for k in W7_FIELDS:
+        # kernel_family is also a RendererConfig field: require the inference section's own reads
+        pat = r"(inference|icfg|\bi)\.kernel_family\b" if k == "kernel_family" else r"\.%s\b" % k
+        assert re.search(pat, blob), "%s is read by nothing outside config.py" % k

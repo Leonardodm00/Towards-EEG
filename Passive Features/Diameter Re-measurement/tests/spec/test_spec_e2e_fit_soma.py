@@ -234,3 +234,50 @@ def test_morphology_view_next_nodes_after_a_walk():
     nxt = np.asarray(top["stems"][0]["next"])                        # (2, m): the corrected stem goes on at P4, P5
     assert nxt.shape == (2, 2), nxt.shape
     assert_allclose(nxt, [[6.0, 8.0], [0.0, 0.0]])
+
+
+# ---------------- Block 36 amendment 22 in the soma's entry point (wave 7; tester, 2026-11-23 13:55) ---
+
+def _sigma_file(path, s0=0.11, c=1.2, complete=True):
+    d = dict(specimen="7", complete=complete,
+             summary=dict(n=3, median_um=s0, mad_um=0.01, ivw_mean_um=s0, ivw_se_um=0.004, chi2_cons=1.0, dof=2),
+             summary_growth_scale=dict(n=3, median=c, mad=0.1, ivw_mean=c, ivw_se=0.05, chi2_cons=1.0, dof=2))
+    with open(path, "w") as f:
+        json.dump(d, f)
+    return str(path)
+
+
+def test_kernel_width_fixed_by_default(default_run):
+    """B22.2 / B22.6: without the switch the soma's renderer reads the configuration's table, and the JSON records
+    the width as "fixed" with that table."""
+    rc, rec, out = default_run
+    assert rc == 0
+    base = default_config().renderer
+    assert rec["kernel_width"]["mode"] == "fixed"
+    assert rec["kernel"]["table_sigma_um"] == list(base.kernel_table_sigma_um)
+    assert rec["kernel"]["sigma_r0_um"] == base.sigma_r0_um
+
+
+def test_kernel_width_calibrated_reaches_the_soma_renderer(tmp_path):
+    """B22.6 (amendment 22: "the width switch acts on the law, so it reaches every kernel built from it ... the soma's
+    renderer"): --kernel-width calibrated --sigma-json re-anchors the renderer's table that the soma fit renders with
+    -- the JSON's kernel equals Block 4 amendment 2 of the configuration's table written out by hand [1e-12], the
+    linear continuation's slope (the far slope's start, --slope0's default) times sqrt(c) -- and records the switch;
+    without --sigma-json, or with an unfinished calibration, the run is refused (status 2). Reduced settings for
+    time."""
+    js = _sigma_file(tmp_path / "s.json", s0=0.11, c=1.2)
+    rc, rec = _run(str(tmp_path / "cal"), "--kernel-width", "calibrated", "--sigma-json", js, config=REDUCED)
+    assert rc == 0
+    base = default_config().renderer
+    s = np.asarray(base.kernel_table_sigma_um, dtype=float)
+    ref = np.sqrt(1.2 * (s * s - s[0] * s[0]) + 0.11 ** 2)
+    ref[0] = 0.11
+    assert_allclose(rec["kernel"]["table_sigma_um"], ref, rtol=1e-12)
+    assert rec["kernel"]["sigma_r0_um"] == 0.11
+    assert_allclose(rec["kernel"]["continuation_slope"], base.kernel_continuation_slope * math.sqrt(1.2), rtol=1e-12)
+    assert rec["kernel_width"]["mode"] == "calibrated" and rec["kernel_width"]["growth_scale"] == 1.2
+    assert_allclose(rec["slope0"], base.kernel_continuation_slope * math.sqrt(1.2), rtol=1e-12)
+    rc2, _ = _run(str(tmp_path / "nofile"), "--kernel-width", "calibrated", config=REDUCED)
+    rc3, _ = _run(str(tmp_path / "bad"), "--kernel-width", "calibrated", "--sigma-json",
+                  _sigma_file(tmp_path / "bad.json", complete=False), config=REDUCED)
+    assert rc2 == 2 and rc3 == 2

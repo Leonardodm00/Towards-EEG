@@ -487,3 +487,69 @@ def test_split_tiling_hybrid_long_tube(phi_deg):
     whole = 1.0 - line_fast.line_profiles(tube, 1.0, ks, o, yh, eu, v, 1, P, cfg)
     assert_allclose(sp.s_in + sp.s_out, whole, rtol=0, atol=1e-12)
     assert_allclose(sp.layers.sum(axis=0), whole, rtol=0, atol=1e-12)
+
+
+# ------------------------------------------- amendment 3 (wave 7; tester, 2026-11-23 13:55) ---
+
+_B35_CASES = r'''
+import dataclasses, math, os
+import numpy as np
+from allen_diameter.config import default_config
+from allen_diameter.model import geometry, line_fast
+
+P = 0.1144
+
+
+def b35_cases():
+    """The Gaussian path's outputs on cases spanning the three absorptions, tilts, headings, depth offsets,
+    n_avg, a shared cache, line_shadow_split (amendment 2) with layers, and extrusion_valid."""
+    out = {}
+    base = default_config()
+    for absorption in ("linear", "partition_vertical", "hybrid"):
+        i = dataclasses.replace(base.inference, absorption=absorption, ray_n_rho=2, ray_n_psi=4)
+        cfg = dataclasses.replace(base, inference=i)
+        cache = line_fast.SectionCache()
+        for g, (d, tilt, th, zoff, n_avg, mu) in enumerate([(0.6, 0.0, 0.0, 0.0, 0, 1.0),
+                                                            (1.0, 0.4, 0.52, 0.14, 4, 1.7),
+                                                            (0.3, 0.2, 1.1, 0.05, 2, 0.6)]):
+            yh = np.array([-math.sin(th), math.cos(th)])
+            eu = np.array([math.cos(th), math.sin(th)])
+            o = np.array([0.03, -0.02])
+            tube = geometry.Tube((0.03, -0.02, zoff), d / 2.0, tilt, th, 1.0, 8.0, "axial")
+            v = np.arange(-26, 27) * P
+            ks = list(range(-3, 4))
+            out["lp_%s_%d" % (absorption, g)] = line_fast.line_profiles(tube, mu, ks, o, yh, eu, v, n_avg, P, cfg)
+            out["lpc_%s_%d" % (absorption, g)] = line_fast.line_profiles(tube, mu, ks, o, yh, eu, v, n_avg, P, cfg,
+                                                                         cache=cache)
+            out["ev_%s_%d" % (absorption, g)] = np.array(line_fast.extrusion_valid(tube, ks, o, yh, eu, v, n_avg, P,
+                                                                                   cfg))
+            if g == 1:
+                sp = line_fast.line_shadow_split(tube, mu, ks, o, yh, eu, v, n_avg, P, cfg, 0.14, layer_um=0.1)
+                out["sin_%s" % absorption] = sp.s_in
+                out["sout_%s" % absorption] = sp.s_out
+                out["lay_%s" % absorption] = sp.layers
+                out["layz_%s" % absorption] = sp.layer_z
+    return out
+
+
+if __name__ == "__main__":
+    np.savez(os.path.join(os.environ["OUT"], "b35_base.npz"), **b35_cases())
+'''
+
+
+def test_amendment3_gaussian_path_bit_identical_to_base(tmp_path):
+    """Block 35 amendment 3 / Block 49 (vii) (B49.2): kernel=None is Block 35's path "unchanged bit for bit", and
+    line_shadow_split keeps the Gaussian (D-222.4): the same cases computed with the base commit's package (git
+    archive of f1bc7cb, before wave 7, in a subprocess) and with the commit under test are equal bit for bit
+    (line_profiles with and without a shared cache, extrusion_valid, line_shadow_split's s_in, s_out, layers,
+    layer_z), in the three absorptions."""
+    import wave7_refs
+    wave7_refs.run_at_commit(_B35_CASES, tmp_path)
+    ns = {}
+    exec(compile(_B35_CASES, "b35_cases", "exec"), ns)
+    head = ns["b35_cases"]()
+    with np.load(tmp_path / "b35_base.npz") as z:
+        assert sorted(z.files) == sorted(head)
+        for key in z.files:
+            assert z[key].shape == np.asarray(head[key]).shape, key
+            assert_array_equal(np.asarray(head[key]), z[key], err_msg=key)
