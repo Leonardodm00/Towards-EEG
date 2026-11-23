@@ -277,6 +277,7 @@ the "Binds" column.
 | 2026-11-23 | Logs **D-225** (orchestrator): wave 7's contract -- the SGT kernel in 2-D (isotropic, by an FFT path), its truncation, the fit's parametrisation, the error bars' steps, the width switch. Evidence: `checks/sgt_psf_2d_2026-11-23/`. Next free IDs: D-226, I-007. |
 | 2026-11-23 (09:01; the defocus-table chat) | Logs **D-226** (user, 09:01): the user chooses the nodes that enter the defocus kernel calibration. On davinci the screening runs only on the cells of the passive + I_h fit and hands the user, for every apt node, its image at focus with the planes $k^* \pm 3$ (near set) or $k^* \pm 1$ to $k^* \pm 16$ (far set, D-074.1); the user picks the clearest, and a Colab notebook lets the user set each picked node's diameter by eye on its image at focus. Supersedes D-175.1's cell set (all 158 cells) and the automatic choice of calibration nodes behind D-170's pooled table; D-170 and D-175 annotated. Not built. Next free IDs: D-227, I-007. |
 | 2026-11-23 (09:05; the defocus-table chat) | Logs **D-227** (user, 09:05): D-226's export shows, side by side with each node's image in every plane, the intensity profile along the node's measuring line in that plane, so that the user can choose the neatest nodes. Refines D-226.3. Not built. Next free IDs: D-228, I-007. |
+| 2026-11-23 (09:16; the defocus-table chat) | Logs **D-228** (user, 09:16): step 2's trial table includes the far-field slope $\gamma$ beside the three near-field knots; $\sigma_{\rm r}(0)$ stays held (D-221). **[run, sandbox]** check 10: near-set twins respond to a relative change of $\gamma$ about 11-14 % as much as to the same change of $\theta_3$, and adding $\gamma$ raises the unit-free condition number from 10 to 30 (0.45-0.55 um) and from 6 to 47 (0.75-0.95 um) -- the far-set twins fix it. Supersedes the T10 study document's convention of a held slope. Next free IDs: D-229, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -492,6 +493,7 @@ would be needed*, *Status*.
 | D-225 | 2026-11-23 | wave 7's contract: Block 49 (the SGT kernel in the line renderer), Block 30 amendment 3, Block 36 amendments 22-23; `InferenceConfig.kernel_family`, `sgt_*`, `cov_*` | the isotropic PSF by an FFT path (not the separable construction); the half-plane skew; truncation at 12 law SDs; the shape in log10 beta, xi, ln zeta, xi = 0 converged; the error bars' steps; the width switch's flags [orchestrator] | active |
 | D-226 | 2026-11-23 | the defocus kernel calibration's nodes and cells (Block 10's candidates, D-170's pool, D-175's davinci run); a screening export of node images on davinci; a Colab notebook for by-eye diameters | the user chooses the calibration nodes from per-node images (focus and $k^* \pm 3$ near, $k^* \pm 1..16$ far) of the passive + I_h fit's cells and sets their diameters by eye in Colab | active; not built |
 | D-227 | 2026-11-23 | D-226's screening export (per node, per plane) | beside each plane's image, the intensity profile along the node's measuring line in that plane | active; not built |
+| D-228 | 2026-11-23 | step 2 of the kernel calibration (procedure §3.4 item 2; NS1; T10), its trial table; the far-field slope (T6) | the trial table is $(\theta_1, \theta_2, \theta_3, \gamma)$: the slope is fitted too, fixed in practice by the far-set twins; $\sigma_{\rm r}(0)$ held | active; not built |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14885,5 +14887,45 @@ and are the nearest existing code. Not built.
 panel; the display of the far set's sixteen planes on each side (all, or $|k - k^*| \ge 5$ only, D-226).
 
 **Sources.** **[user]** 2026-11-23, 09:05. **[log]** D-198, D-226.
+
+**Status:** active; not built.
+
+## D-228 -- Step 2's trial table includes the far-field slope; the far-set twins fix it (user)
+
+**Date:** 2026-11-23, 09:16 (Europe/Rome), the defocus-table chat. **Binds:** step 2 of the kernel calibration
+(procedure §3.4, item 2; roadmap NS1, not built; theory T10), its trial table and its twins; the far-field
+continuation slope $\gamma$ (`kernel_continuation_slope`, 0.79 configured; T6, Block 10's far fit); the T10 study
+document `TEEG_diameter_kernel_calibration_step2_2026-11-18.md` (§3.5 and §3.7 hold the slope, a convention of the
+document, not a decision).
+
+**Decision [user].** On the study document's "the trial table ... with $\sigma_{\rm r}(0)$ = 0.080 um and the far slope
+held fixed": "I do not agree to held fixed the slope. I would insert also it in the trial table. Obviusly it changes
+only when far field nodes are concerned".
+
+**Statement.** (D-228.1) Step 2's trial table is $\theta = (\theta_1, \theta_2, \theta_3, \gamma)$: the kernel widths at
+0.28, 0.56, 0.84 um and the slope of the linear continuation beyond 0.84 um; the in-focus width stays held at 0.080 um
+(D-221) [user]. (D-228.2) The slope is fixed in practice by the far-set twins (planes up to $k^* \pm 16$, D-226.3);
+near-set twins respond to it only through the slices of their outer planes that lie beyond 0.84 um [user; quantified
+below].
+
+**Why.** The slope is as uncertain as the knots and is calibrated from the same images; holding it would carry its
+error into the knots the twins are matched on. Check 10 **[run, sandbox]** (toy: faint limit, flat tubes, no noise,
+the pilot cell's table, 30 near-set nodes per range, planes $k^* \pm 3$): a relative change of $\gamma$ moves the
+near-set core widths 0.108 (d ~ U(0.45, 0.55) um) and 0.138 (U(0.75, 0.95) um) times as much as the same relative
+change of $\theta_3$; with $\gamma$ added, the condition number of the unit-free Jacobian rises from 10.4 to 30.1 and
+from 6.2 to 47.4. So "only" holds approximately: near nodes inform $\gamma$ weakly, the far nodes are needed to fix it.
+
+**What it implies for code and tables.** Step 2 renders far-set twins as well as near-set ones (over the far planes),
+and its least squares has four shared parameters (five with form C's diameters, I-006's penalty aside). The far fit's
+$\gamma$ (T6) is the natural starting value. Not built.
+
+**What it does not decide.** Which statistic the far twins are matched on (the far fit's own, or the core width); the
+weight of far against near twins; whether $\gamma$ is fitted when the pool has few far nodes, or then held or penalized
+toward the far fit's value (as I-006 does for the diameters); whether the far fit stays a stage of its own once step 2
+fits $\gamma$; how D-181's near-field spline meets the continuation at 0.84 um.
+
+**Sources.** **[user]** 2026-11-23, 09:16. **[run, sandbox]** `check10_slope_sensitivity.py`, in the T10 study
+document's `scripts/` (this chat). **[log]** D-074, D-181, D-221, D-226, I-006. **[doc]** the T10 study document, §3.5,
+§3.7.
 
 **Status:** active; not built.
