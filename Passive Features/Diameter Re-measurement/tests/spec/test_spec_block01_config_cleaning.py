@@ -199,8 +199,7 @@ def test_validate_refuses_new_illegal_values(override):
     {"sigma_calibration.workers": float("inf")}, {"clearness.focus_half_planes": float("inf")},
     {"inference.weight_irls_max_iter": float("inf")},
 ])
-@pytest.mark.xfail(strict=True, raises=OverflowError, reason="2026-11-22 report F1: int(inf) in the new "
-                   "checks of config.py raises OverflowError, not ValueError")
+# 2026-11-22 (14:40) report F1, fixed by D-212.1: a strict xfail until then, a plain test since D-224.3.
 def test_validate_raises_valueerror_for_an_infinite_count(override):
     """Block 1: validate() raises ValueError on an illegal value. An infinite count is illegal; the check must
     say so with ValueError (not another exception type)."""

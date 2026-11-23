@@ -193,8 +193,7 @@ def test_refusals(tmp_path, extra, config):
     assert rc == 2 and rec is None
 
 
-@pytest.mark.xfail(strict=True, reason="tester 2026-11-23, finding F1: the box filter drops widened segments outside "
-                                        "the crop")
+# 2026-11-23 (00:27) report F1, fixed by D-223.1: a strict xfail until then, a plain test since D-224.3.
 def test_mask_holds_widened_segments_outside_the_crop():
     """The trace's mask (+ mask_widen_um): a traced dendrite running 0.9 um outside the crop's edge, radius 0.5 um,
     reaches 1.6 um into the crop once widened by 2 um -- into the fit's 13 um disk (crop half 14 um)."""
@@ -218,7 +217,7 @@ def test_mask_holds_widened_segments_outside_the_crop():
     assert_array_equal(m & region, ref & region)
 
 
-@pytest.mark.xfail(strict=True, reason="tester 2026-11-23, finding F2: after a walk the figure's stem has no next nodes")
+# 2026-11-23 (00:27) report F2, fixed by D-223.2: a strict xfail until then, a plain test since D-224.3.
 def test_morphology_view_next_nodes_after_a_walk():
     with tempfile.TemporaryDirectory() as tmp:
         fn = os.path.join(tmp, "c.swc")

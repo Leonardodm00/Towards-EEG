@@ -213,8 +213,8 @@ def test_pick_clear_examples_on_random_rows_against_reference():
         assert CT.pick_clear_examples(rows, n, sep, ms) == _ref_pick(rows, n, sep, ms)
 
 
-@pytest.mark.xfail(strict=True, reason="2026-11-22 report F2 (spec gap): a NaN soma_lateral_um fails the "
-                   "comparison with min_soma_um, so a cell without a soma disc gets no clear node")
+# 2026-11-22 (14:40) report F2 (spec gap), settled by D-212.2 (Block 27 amendment 5): a strict xfail until then,
+# a plain test since D-224.3.
 def test_pick_clear_examples_soma_distance_nan_without_a_soma():
     """Block 27: soma_lateral_um is NaN without a soma. The rule "at least min_soma_um from the soma" is silent
     on NaN; with min_soma_um = 0 (the function's default) a cell without a soma disc gets no clear node."""

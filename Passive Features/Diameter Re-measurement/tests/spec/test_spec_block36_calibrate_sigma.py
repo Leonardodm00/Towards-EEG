@@ -167,8 +167,7 @@ def test_pool_and_repeat_give_the_same_fits(prep):
     assert outs[0] == outs[1]
 
 
-@pytest.mark.xfail(strict=True, reason="2026-11-22 report F3: sigma_<S>.json writes NaN as the bare token NaN "
-                                       "(json.dump's default), unlike the gallery's and the cleaning's strict JSON")
+# 2026-11-22 (14:40) report F3, fixed by D-212.3: a strict xfail until then, a plain test since D-224.3.
 def test_sigma_json_is_strict_when_the_summary_is_empty(prep):
     base, cdir, cfgj = prep
     import calibrate_sigma
@@ -183,8 +182,7 @@ def test_sigma_json_is_strict_when_the_summary_is_empty(prep):
     _strict((out / "sigma_7.json").read_text())
 
 
-@pytest.mark.xfail(strict=True, reason="2026-11-22 report F4: one node that raises stops calibrate_sigma.py and "
-                                       "no CSV or JSON is written for the nodes already fitted")
+# 2026-11-22 (14:40) report F4, fixed by D-212.4: a strict xfail until then, a plain test since D-224.3.
 def test_one_bad_node_does_not_lose_the_others(prep):
     base, cdir, _ = prep
     import calibrate_sigma
