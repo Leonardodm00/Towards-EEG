@@ -1,0 +1,11 @@
+d 0.4 f  8: SE(d) known 0.00964, zf 0.01064 (infl 1.104); SE(v0) zf 0.00417; corr(d, v0) known -0.404, zf -0.334; corr(d, beta, xi, zeta) -0.092 -0.181 +0.113
+d 0.4 f 16: SE(d) known 0.00671, zf 0.00745 (infl 1.110); SE(v0) zf 0.00342; corr(d, v0) known -0.346, zf -0.234; corr(d, beta, xi, zeta) -0.051 -0.152 +0.025
+d 0.4 f 32: SE(d) known 0.00783, zf 0.00865 (infl 1.106); SE(v0) zf 0.00357; corr(d, v0) known +0.221, zf +0.113; corr(d, beta, xi, zeta) -0.067 -0.165 +0.029
+d 0.4 f 64: SE(d) known 0.00785, zf 0.00868 (infl 1.105); SE(v0) zf 0.00354; corr(d, v0) known -0.003, zf +0.003; corr(d, beta, xi, zeta) -0.067 -0.165 -0.007
+d 0.4: recovery (f = 8 data and fits), empirical SD of d_hat: gauss-truth model n/a; heavy truth z1 0.00943, zf 0.00915
+d 2.5 f  8: SE(d) known 0.00222, zf 0.00236 (infl 1.060); SE(v0) zf 0.00122; corr(d, v0) known +0.603, zf +0.599; corr(d, beta, xi, zeta) +0.083 +0.093 -0.312
+d 2.5 f 16: SE(d) known 0.00225, zf 0.00227 (infl 1.009); SE(v0) zf 0.00128; corr(d, v0) known -0.273, zf -0.212; corr(d, beta, xi, zeta) +0.082 +0.090 +0.065
+d 2.5 f 32: SE(d) known 0.00204, zf 0.00205 (infl 1.004); SE(v0) zf 0.00124; corr(d, v0) known +0.034, zf +0.021; corr(d, beta, xi, zeta) +0.070 +0.076 -0.002
+d 2.5 f 64: SE(d) known 0.00214, zf 0.00215 (infl 1.005); SE(v0) zf 0.00123; corr(d, v0) known -0.009, zf -0.009; corr(d, beta, xi, zeta) +0.074 +0.080 +0.005
+d 2.5: recovery (f = 8 data and fits), empirical SD of d_hat: gauss-truth model n/a; heavy truth z1 0.00284, zf 0.00269
+wrote lattice_check.json

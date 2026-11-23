@@ -1,0 +1,50 @@
+setup: B 150 gl, sigma 1.10 gl per line sample, planes -4..4, n_v 53
+(a) d0.4_mu0.5_z0.0 done (4 s)
+(a) d0.4_mu0.5_z0.5 done (9 s)
+(a) d0.4_mu1.5_z0.0 done (13 s)
+(a) d0.4_mu1.5_z0.5 done (18 s)
+(a) d0.8_mu0.5_z0.0 done (23 s)
+(a) d0.8_mu0.5_z0.5 done (29 s)
+(a) d0.8_mu1.5_z0.0 done (35 s)
+(a) d0.8_mu1.5_z0.5 done (41 s)
+(a) d1.5_mu0.5_z0.0 done (50 s)
+(a) d1.5_mu0.5_z0.5 done (58 s)
+(a) d1.5_mu1.5_z0.0 done (67 s)
+(a) d1.5_mu1.5_z0.5 done (75 s)
+(a) d2.5_mu0.5_z0.0 done (86 s)
+(a) d2.5_mu0.5_z0.5 done (92 s)
+(a) d2.5_mu1.5_z0.0 done (98 s)
+(a) d2.5_mu1.5_z0.5 done (104 s)
+(a) steps x0.5 d0.4_mu0.5_z0.5: SE(d) +0.002, SE(v0) +0.006, shape SEs <= 3.2e-04 (relative); inflation 1.101 -> 1.101; corr(d, shape) moves <= 0.004
+(a) steps x2.0 d0.4_mu0.5_z0.5: SE(d) +0.008, SE(v0) -0.055, shape SEs <= 3.4e-03 (relative); inflation 1.101 -> 1.106; corr(d, shape) moves <= 0.043
+(a) steps x0.5 d0.4_mu1.5_z0.5: SE(d) +0.002, SE(v0) +0.008, shape SEs <= 3.0e-04 (relative); inflation 1.104 -> 1.103; corr(d, shape) moves <= 0.005
+(a) steps x2.0 d0.4_mu1.5_z0.5: SE(d) +0.012, SE(v0) -0.066, shape SEs <= 3.2e-03 (relative); inflation 1.104 -> 1.110; corr(d, shape) moves <= 0.048
+(a) steps x0.5 d0.8_mu0.5_z0.5: SE(d) +0.000, SE(v0) +0.006, shape SEs <= 8.9e-05 (relative); inflation 1.066 -> 1.065; corr(d, shape) moves <= 0.004
+(a) steps x2.0 d0.8_mu0.5_z0.5: SE(d) +0.011, SE(v0) -0.057, shape SEs <= 4.8e-04 (relative); inflation 1.066 -> 1.074; corr(d, shape) moves <= 0.054
+(a) steps x0.5 d0.8_mu1.5_z0.5: SE(d) -0.000, SE(v0) +0.008, shape SEs <= 7.7e-05 (relative); inflation 1.070 -> 1.069; corr(d, shape) moves <= 0.005
+(a) steps x2.0 d0.8_mu1.5_z0.5: SE(d) +0.021, SE(v0) -0.076, shape SEs <= 3.1e-04 (relative); inflation 1.070 -> 1.082; corr(d, shape) moves <= 0.065
+(a) steps x0.5 d1.5_mu0.5_z0.5: SE(d) -0.014, SE(v0) +0.036, shape SEs <= 3.2e-03 (relative); inflation 1.050 -> 1.041; corr(d, shape) moves <= 0.035
+(a) steps x2.0 d1.5_mu0.5_z0.5: SE(d) -0.092, SE(v0) +0.005, shape SEs <= 4.1e-03 (relative); inflation 1.050 -> 1.027; corr(d, shape) moves <= 0.117
+(a) steps x0.5 d1.5_mu1.5_z0.5: SE(d) -0.025, SE(v0) +0.048, shape SEs <= 1.6e-03 (relative); inflation 1.058 -> 1.045; corr(d, shape) moves <= 0.041
+(a) steps x2.0 d1.5_mu1.5_z0.5: SE(d) -0.146, SE(v0) -0.005, shape SEs <= 7.3e-03 (relative); inflation 1.058 -> 1.025; corr(d, shape) moves <= 0.141
+(a) steps x0.5 d2.5_mu0.5_z0.5: SE(d) -0.012, SE(v0) +0.038, shape SEs <= 6.4e-03 (relative); inflation 1.087 -> 1.076; corr(d, shape) moves <= 0.035
+(a) steps x2.0 d2.5_mu0.5_z0.5: SE(d) -0.096, SE(v0) +0.117, shape SEs <= 1.9e-02 (relative); inflation 1.087 -> 1.062; corr(d, shape) moves <= 0.101
+(a) steps x0.5 d2.5_mu1.5_z0.5: SE(d) -0.029, SE(v0) +0.040, shape SEs <= 4.4e-03 (relative); inflation 1.060 -> 1.043; corr(d, shape) moves <= 0.052
+(a) steps x2.0 d2.5_mu1.5_z0.5: SE(d) -0.180, SE(v0) +0.116, shape SEs <= 1.2e-02 (relative); inflation 1.060 -> 1.016; corr(d, shape) moves <= 0.158
+(b) d0.4_mu0.5_z0.0 done (2 s)
+(b) d0.4_mu0.5_z0.5 done (4 s)
+(b) d0.4_mu1.5_z0.0 done (7 s)
+(b) d0.4_mu1.5_z0.5 done (9 s)
+(b) d0.8_mu0.5_z0.0 done (12 s)
+(b) d0.8_mu0.5_z0.5 done (15 s)
+(b) d0.8_mu1.5_z0.0 done (18 s)
+(b) d0.8_mu1.5_z0.5 done (20 s)
+(b) d1.5_mu0.5_z0.0 done (25 s)
+(b) d1.5_mu0.5_z0.5 done (30 s)
+(b) d1.5_mu1.5_z0.0 done (34 s)
+(b) d1.5_mu1.5_z0.5 done (38 s)
+(b) d2.5_mu0.5_z0.0 done (47 s)
+(b) d2.5_mu0.5_z0.5 done (59 s)
+(b) d2.5_mu1.5_z0.0 done (76 s)
+(b) d2.5_mu1.5_z0.5 done (89 s)
+wrote fisher_a.csv, bias_b.csv, fisher_bias.json

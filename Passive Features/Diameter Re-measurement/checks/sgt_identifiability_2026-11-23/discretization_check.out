@@ -1,0 +1,19 @@
+default (dzeta 0.02, f 8)  d 0.4 heavy Gaussian-fit bias +6.662 %; SE(d) known 0.00964, zf 0.01064 (infl 1.104); corr(d, beta, xi, zeta) -0.092 -0.181 +0.113
+default (dzeta 0.02, f 8)  d 0.4 b13   Gaussian-fit bias +13.022 %; SE(d) known 0.01137, zf 0.01260 (infl 1.108); corr(d, beta, xi, zeta) -0.096 -0.185 +0.100
+default (dzeta 0.02, f 8)  d 0.4 skew  Gaussian-fit bias +4.812 %; SE(d) known 0.00893, zf 0.00987 (infl 1.105); corr(d, beta, xi, zeta) -0.130 -0.214 +0.129
+default (dzeta 0.02, f 8)  d 2.5 heavy Gaussian-fit bias +0.072 %; SE(d) known 0.00222, zf 0.00236 (infl 1.060); corr(d, beta, xi, zeta) +0.083 +0.093 -0.312
+default (dzeta 0.02, f 8)  d 2.5 b13   Gaussian-fit bias +0.496 %; SE(d) known 0.00236, zf 0.00252 (infl 1.067); corr(d, beta, xi, zeta) +0.094 +0.105 -0.311
+default (dzeta 0.02, f 8)  d 2.5 skew  Gaussian-fit bias +0.037 %; SE(d) known 0.00212, zf 0.00224 (infl 1.056); corr(d, beta, xi, zeta) +0.104 +0.110 -0.282
+dzeta 0.01                 d 0.4 heavy Gaussian-fit bias +6.604 %; SE(d) known 0.00963, zf 0.01063 (infl 1.104); corr(d, beta, xi, zeta) -0.093 -0.182 +0.114
+dzeta 0.01                 d 0.4 b13   Gaussian-fit bias +13.038 %; SE(d) known 0.01137, zf 0.01259 (infl 1.108); corr(d, beta, xi, zeta) -0.098 -0.187 +0.101
+dzeta 0.01                 d 0.4 skew  Gaussian-fit bias +4.783 %; SE(d) known 0.00892, zf 0.00986 (infl 1.105); corr(d, beta, xi, zeta) -0.130 -0.214 +0.131
+dzeta 0.01                 d 2.5 heavy Gaussian-fit bias +0.072 %; SE(d) known 0.00222, zf 0.00236 (infl 1.060); corr(d, beta, xi, zeta) +0.083 +0.093 -0.313
+dzeta 0.01                 d 2.5 b13   Gaussian-fit bias +0.495 %; SE(d) known 0.00236, zf 0.00252 (infl 1.067); corr(d, beta, xi, zeta) +0.093 +0.105 -0.311
+dzeta 0.01                 d 2.5 skew  Gaussian-fit bias +0.036 %; SE(d) known 0.00212, zf 0.00224 (infl 1.057); corr(d, beta, xi, zeta) +0.104 +0.110 -0.282
+f 16                       d 0.4 heavy Gaussian-fit bias +6.667 %; SE(d) known 0.00671, zf 0.00745 (infl 1.110); corr(d, beta, xi, zeta) -0.051 -0.152 +0.025
+f 16                       d 0.4 b13   Gaussian-fit bias +12.675 %; SE(d) known 0.00800, zf 0.00897 (infl 1.121); corr(d, beta, xi, zeta) -0.026 -0.131 +0.022
+f 16                       d 0.4 skew  Gaussian-fit bias +4.534 %; SE(d) known 0.00622, zf 0.00688 (infl 1.107); corr(d, beta, xi, zeta) -0.089 -0.183 +0.037
+f 16                       d 2.5 heavy Gaussian-fit bias +0.107 %; SE(d) known 0.00225, zf 0.00227 (infl 1.009); corr(d, beta, xi, zeta) +0.082 +0.090 +0.065
+f 16                       d 2.5 b13   Gaussian-fit bias +0.379 %; SE(d) known 0.00240, zf 0.00244 (infl 1.017); corr(d, beta, xi, zeta) +0.107 +0.117 +0.062
+f 16                       d 2.5 skew  Gaussian-fit bias +0.171 %; SE(d) known 0.00215, zf 0.00216 (infl 1.005); corr(d, beta, xi, zeta) +0.046 +0.052 +0.075
+wrote discretization_check.json
