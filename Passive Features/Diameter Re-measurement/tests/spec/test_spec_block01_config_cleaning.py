@@ -85,3 +85,59 @@ def test_background_support_amendment4():
                 {"cleaning.background_shadow_max": 1.0}, {"cleaning.background_shadow_max": float("nan")}):
         with pytest.raises(ValueError):
             C.with_overrides(c, bad)
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Appended by the tester, 2026-11-23 (incremental run at f1bc7cb; Block 1's diff: SomaFitConfig's start settings
+# (Block 46 amendment 1, D-220.4) and the entry point's crop_margin_um, figure_planes_um (section 6, D-222.5)).
+# Oracles: the defaults SPEC Blocks 44-46 state; the soma sections outside every signature (the pinned hashes do not
+# move); with_overrides reaches the new fields in their declared form; a configuration file written before wave 6
+# (without the new fields) loads with the defaults.
+
+def test_soma_sections_defaults_as_specified():
+    c = C.default_config()
+    q, v = c.soma_fit, c.soma_view
+    assert (q.fine_factor, q.dzeta_um) == (1, 0.14)                                         # Block 45
+    assert (q.plane_step, q.plane_half_um, q.region_radius_um, q.mask_widen_um) == (2, 10.0, 13.0, 2.0)
+    assert (q.far_slope, q.shift_xy_um, q.shift_z_um) == ("fit", 4.0, 6.0)
+    assert tuple(q.axis_bounds_um) == (1.0, 15.0) and tuple(q.mu_bounds_per_um) == (0.001, 3.0)
+    assert tuple(q.slope_bounds) == (0.2, 3.0) and (q.max_nfev, q.ftol, q.xtol) == (80, 1e-6, 1e-6)
+    assert tuple(q.diff_steps) == (0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.004, 1e-4, 0.005)
+    assert (q.start_far_radii, q.start_core_radii, q.start_core_percentile) == (1.5, 0.5, 5.0)   # amendment 1 (i)
+    assert tuple(q.start_ratio_clip) == (0.05, 0.95) and q.start_ratio_none == 0.5
+    assert (v.half_um, v.z_margin_um, v.focus_margin_um, v.focus_sigma_px) == (40, 6, 1, 1)        # Block 44
+    assert (v.montage_step_planes, v.montage_cols) == (2, 6)
+
+
+def test_soma_fit_overrides_and_hashes_unmoved():
+    c = C.default_config()
+    c2 = C.with_overrides(c, {"soma_fit.start_ratio_clip": [0.1, 0.9], "soma_fit.figure_planes_um": [-2, 0, 2],
+                              "soma_fit.start_core_percentile": 10, "soma_fit.crop_margin_um": 2.5})
+    assert c2.soma_fit.start_ratio_clip == (0.1, 0.9) and isinstance(c2.soma_fit.start_ratio_clip, tuple)
+    assert tuple(c2.soma_fit.figure_planes_um) == (-2.0, 0.0, 2.0)
+    assert c2.soma_fit.start_core_percentile == 10.0 and c2.soma_fit.crop_margin_um == 2.5
+    for which in ("estimator", "simulation"):
+        assert c2.signature_hash(which) == c.signature_hash(which)
+    assert c.signature_hash("estimator") == "16be09f944e45972" and c.signature_hash("simulation") == "dc84ed2e89bcfea6"
+
+
+def test_pre_wave6_file_loads_with_the_defaults():
+    old = {"soma_fit": {"plane_step": 2, "plane_half_um": 8.0, "region_radius_um": 12.0, "far_slope": "fixed"}}
+    c = C.config_from_dict(old)
+    q = c.soma_fit
+    assert (q.plane_half_um, q.far_slope) == (8.0, "fixed")
+    assert (q.start_far_radii, q.start_core_radii, q.start_core_percentile, q.start_ratio_none) == (1.5, 0.5, 5.0, 0.5)
+    assert tuple(q.start_ratio_clip) == (0.05, 0.95) and q.crop_margin_um == 1.0
+
+
+@pytest.mark.parametrize("override", [
+    {"soma_fit.start_ratio_none": 0.0},          # varrho must stay in (0, 1): mu_0 = -ln(varrho) / (2 r_s) >= 0
+    {"soma_fit.start_ratio_none": 1.5},
+    {"soma_fit.start_ratio_clip": [0.0, 0.9]},
+    {"soma_fit.start_core_radii": -0.5},
+    {"soma_fit.crop_margin_um": float("nan")},
+    {"soma_fit.figure_planes_um": [float("inf")]},
+])
+def test_validate_refuses_illegal_soma_start_values(override):
+    with pytest.raises(ValueError):
+        C.with_overrides(C.default_config(), override)
