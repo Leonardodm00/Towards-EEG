@@ -275,6 +275,7 @@ the "Binds" column.
 | 2026-11-23 | Logs **D-223** (orchestrator): the final check of wave 6 settled (F1-F3). Evidence: `specs/test_reports/2026-11-23_0027_incremental.md`, the reproducers and the dry run. Next free IDs: D-224, I-007. |
 | 2026-11-23 (07:43) | Logs **D-224** (user): wave 7 approved, the error bars on a finer lattice included; the tester's spec tests into the working line. Next free IDs: D-225, I-007. |
 | 2026-11-23 | Logs **D-225** (orchestrator): wave 7's contract -- the SGT kernel in 2-D (isotropic, by an FFT path), its truncation, the fit's parametrisation, the error bars' steps, the width switch. Evidence: `checks/sgt_psf_2d_2026-11-23/`. Next free IDs: D-226, I-007. |
+| 2026-11-23 (09:01; the defocus-table chat) | Logs **D-226** (user, 09:01): the user chooses the nodes that enter the defocus kernel calibration. On davinci the screening runs only on the cells of the passive + I_h fit and hands the user, for every apt node, its image at focus with the planes $k^* \pm 3$ (near set) or $k^* \pm 1$ to $k^* \pm 16$ (far set, D-074.1); the user picks the clearest, and a Colab notebook lets the user set each picked node's diameter by eye on its image at focus. Supersedes D-175.1's cell set (all 158 cells) and the automatic choice of calibration nodes behind D-170's pooled table; D-170 and D-175 annotated. Not built. Next free IDs: D-227, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -488,6 +489,7 @@ would be needed*, *Status*.
 | D-223 | 2026-11-23 | the final check of wave 6 (report 2026-11-23_0027, PASS WITH ISSUES): `fit_soma.py`'s mask and morphology arrays, `calibrate_sigma.py`'s last line | the mask's segments from the crop widened by `mask_widen_um`; the edited tree for the stems' next nodes; the failed ids named [orchestrator] | active |
 | D-224 | 2026-11-23 | wave 7 (the calibrated-kernel switch; the SGT option in Blocks 26, 35 and 30); Block 30's error bars; `tests/spec/` | wave 7 as proposed; the covariance on a finer lattice for both kernels; the three tester runs' spec tests into the working line [user] | active |
 | D-225 | 2026-11-23 | wave 7's contract: Block 49 (the SGT kernel in the line renderer), Block 30 amendment 3, Block 36 amendments 22-23; `InferenceConfig.kernel_family`, `sgt_*`, `cov_*` | the isotropic PSF by an FFT path (not the separable construction); the half-plane skew; truncation at 12 law SDs; the shape in log10 beta, xi, ln zeta, xi = 0 converged; the error bars' steps; the width switch's flags [orchestrator] | active |
+| D-226 | 2026-11-23 | the defocus kernel calibration's nodes and cells (Block 10's candidates, D-170's pool, D-175's davinci run); a screening export of node images on davinci; a Colab notebook for by-eye diameters | the user chooses the calibration nodes from per-node images (focus and $k^* \pm 3$ near, $k^* \pm 1..16$ far) of the passive + I_h fit's cells and sets their diameters by eye in Colab | active; not built |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -12472,7 +12474,7 @@ are built first; how the in-focus width, which no stack identifies (D-165), is o
 
 **Sources.** **[user]** 2026-11-18, 17:38. **[log]** D-085, D-118 to D-121, D-165.
 
-**Status:** active. [updated 2026-11-18 (later, 20): what "eligible" means, the law of the rounds and D-121's order, the cores and the walltime settled by D-175; the first stage the run uses by D-174]
+**Status:** active. [updated 2026-11-18 (later, 20): what "eligible" means, the law of the rounds and D-121's order, the cores and the walltime settled by D-175; the first stage the run uses by D-174] [updated 2026-11-23: the cells and the nodes that enter the table -- every eligible cell, the nodes chosen by Block 10's rules -- superseded by D-226: the passive + I_h fit's cells, the nodes chosen by the user]
 
 ---
 
@@ -12688,7 +12690,7 @@ pool.
 **Sources.** **[user]** 2026-11-18, about 18:40, the four answers. **[run, sandbox]** `checks/defocus_pool_2026-11-18/`.
 **[log]** D-085, D-088, D-117, D-118, D-120, D-121, D-125, D-165, D-170, D-172, D-174. **[web]** as tagged.
 
-**Status:** active; the prepare job and the alignment can run; the `nodes` and `calibration` steps wait on D-174.
+**Status:** active; the prepare job and the alignment can run; the `nodes` and `calibration` steps wait on D-174. [updated 2026-11-23: (D-175.1)'s cell set -- all 158 cells -- superseded by D-226 (the cells of the passive + I_h fit, the nodes chosen by the user from exported images); D-174 built at `513ad9e` (D-178)]
 
 ---
 
@@ -14804,3 +14806,55 @@ of Block 35 at `line_fine_factor` 8, 16, 32. **[log]** D-052, D-066, D-221, D-22
 `kernel.py`, `node_inference.py`.
 
 **Status:** active.
+
+## D-226 -- The user chooses the calibration nodes from per-node images of the passive + I_h fit's cells, and sets their diameters by eye in Colab (user)
+
+**Date:** 2026-11-23, 09:01 (Europe/Rome), the defocus-table chat. **Binds:** the defocus kernel calibration's cells
+and nodes (D-170's pooled table; D-175's davinci run, its `nodes` and `calibration` steps; Block 10's candidate rules,
+which become a pre-screen); a new screening export of node images on davinci; a new Colab notebook for by-eye
+diameters; the defocus-table handoff (`Passive Features/Diameter Re-measurement/docs/TEEG_defocus_table_davinci_handoff_2026-11-18.md`).
+
+**Decision [user].** "It would be far better that I choose the nodes that will enter the defocusing kernel calibration.
+Therefore my suggestion is this one. On DaVinci we will perform the screening for each cell (just the ones that enter
+the passive + Ih fit) so that I'm given for each apt node its image at focus and its +-3 planes images (if near fit
+calibration node) and from +-1 up to the upper limit in planes (i do not remember) for the far fit nodes. I will
+inspect them choose the most clear ones and i will need a colab notebook that interacts with me so that I can set the
+diameter by eye interacting for each node with its image at focus. Are we ok? Just take note".
+
+**Statement.** (D-226.1) The nodes that enter the defocus kernel calibration are chosen by the user, not by the
+pipeline alone: the pipeline's screening proposes the apt nodes, the user keeps the clearest [user]. (D-226.2) The
+screening runs on davinci only on the cells of the passive + I_h fit -- in the assistant's reading the 18 L3_exc cells
+of that fit (D-123, D-124), to be confirmed [user; reading PROVISIONAL]. (D-226.3) For every apt node the user is
+given its image at focus ($k^*$) and: for a near-set node (Allen's diameter at most 0.6 um, D-067.4) the planes
+$k^* \pm 1, \pm 2, \pm 3$ (`offsets_planes` = 3); for a far-set node (Allen's diameter in (0.6, 0.8] um, D-067.4) the
+planes $k^* \pm 1$ up to $k^* \pm 16$ -- the upper limit the user did not remember is `far_offsets_planes` = 16,
+4.48 um on each side of focus (D-074.1), of which the far fit uses $|k - k^*| \ge 5$ (`far_min_k_offset`, PROVISIONAL)
+[user; limit from `config.py`]. (D-226.4) A Colab notebook, interactive, lets the user set each chosen node's diameter
+by eye on its image at focus [user].
+
+**Why.** The user's judgement of which nodes are clear replaces the automatic choice as the last filter (as for the
+clear-node refinement's nodes, D-194, D-199); the screening still does the bulk work on the cluster.
+
+**What it implies for code and tables.** A screening export on davinci: per cell, per apt node, the image patches
+(focus and the planes above) written for inspection; the selection written back by the user as a list the pool step
+reads; the calibration (step 1) on the chosen nodes only. A Colab notebook: one node at a time, its image at focus,
+an interactive setting of the diameter, the values saved per node. D-175's `nodes` and `calibration` steps over 158
+cells are superseded for the cell set (D-175 annotated); D-170's table is built from the chosen nodes (D-170
+annotated). The gallery chat's screens and Colab views (D-194, D-198, D-211, D-213) are the nearest existing tools.
+Not built.
+
+**What it does not decide.** What the by-eye diameter is used for -- held in the first stage instead of Allen's for
+these nodes (D-178), the twins' diameter of step 2, or I-006's reference -- and how its uncertainty is carried; note
+that the eye sees the dip at focus already blurred by the in-focus kernel and by the tube's slices out of focus, so the
+diameter it sets is a reference, not a measurement free of $\sigma_{\rm r}(0)$ (D-165, the T10 study document §3.10)
+**[own reasoning]**; the exact cell list (D-226.2); the patches' size and format, and whether the far planes are shown
+all or only $|k - k^*| \ge 5$; the minimum number of chosen nodes per cell and in the pool; whether D-181's cubic
+near-field law is built before this calibration runs.
+
+**Sources.** **[user]** 2026-11-23, 09:01. **[code]** `config.py` on `sci/diameter-pipeline` at `bac0c1c`:
+`offsets_planes` = 3, `far_offsets_planes` = 16 (D-074.1), `far_min_k_offset` = 5 (PROVISIONAL),
+`far_field_allen_diameter_um` = (0.6, 0.8) (D-067.4, PROVISIONAL). **[log]** D-067, D-074, D-123, D-124, D-165, D-170,
+D-175, D-178, D-194, D-198, D-199, D-211, D-213, I-006.
+
+**Status:** active; not built (the export, the selection list, the notebook and the pool step's reading of it to plan
+with the user).
