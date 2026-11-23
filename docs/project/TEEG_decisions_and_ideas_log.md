@@ -274,6 +274,7 @@ the "Binds" column.
 | 2026-11-22 (later; the gallery chat, 11) | Logs **D-222** (user): D-221's details -- the SGT's shape (beta, xi; zeta as an option) and width (the law's FWHM), the switch's weighted means, wave 6 first. Next free IDs: D-223, I-007. |
 | 2026-11-23 | Logs **D-223** (orchestrator): the final check of wave 6 settled (F1-F3). Evidence: `specs/test_reports/2026-11-23_0027_incremental.md`, the reproducers and the dry run. Next free IDs: D-224, I-007. |
 | 2026-11-23 (07:43) | Logs **D-224** (user): wave 7 approved, the error bars on a finer lattice included; the tester's spec tests into the working line. Next free IDs: D-225, I-007. |
+| 2026-11-23 | Logs **D-225** (orchestrator): wave 7's contract -- the SGT kernel in 2-D (isotropic, by an FFT path), its truncation, the fit's parametrisation, the error bars' steps, the width switch. Evidence: `checks/sgt_psf_2d_2026-11-23/`. Next free IDs: D-226, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -486,6 +487,7 @@ would be needed*, *Status*.
 | D-222 | 2026-11-22 | D-221's details: the SGT option of the node fit (Block 30), the calibrated values of the switch, the soma's wave 6 (Blocks 47-48) | (beta, xi) per node with zeta = 1, zeta fitted as an option; the width the law's FWHM; the weighted means of sigma_0 and c; wave 6 first (the stems' inside nodes removed), then the kernel wave [user] | active; extends D-221 |
 | D-223 | 2026-11-23 | the final check of wave 6 (report 2026-11-23_0027, PASS WITH ISSUES): `fit_soma.py`'s mask and morphology arrays, `calibrate_sigma.py`'s last line | the mask's segments from the crop widened by `mask_widen_um`; the edited tree for the stems' next nodes; the failed ids named [orchestrator] | active |
 | D-224 | 2026-11-23 | wave 7 (the calibrated-kernel switch; the SGT option in Blocks 26, 35 and 30); Block 30's error bars; `tests/spec/` | wave 7 as proposed; the covariance on a finer lattice for both kernels; the three tester runs' spec tests into the working line [user] | active |
+| D-225 | 2026-11-23 | wave 7's contract: Block 49 (the SGT kernel in the line renderer), Block 30 amendment 3, Block 36 amendments 22-23; `InferenceConfig.kernel_family`, `sgt_*`, `cov_*` | the isotropic PSF by an FFT path (not the separable construction); the half-plane skew; truncation at 12 law SDs; the shape in log10 beta, xi, ln zeta, xi = 0 converged; the error bars' steps; the width switch's flags [orchestrator] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14734,5 +14736,71 @@ no degeneracy of d with the shape, the Gaussian assumption's bias on thin nodes,
 cost, which belong to the wave's contract.
 
 **Sources.** **[user]** the message of 07:43. **[log]** D-221, D-222, D-223.
+
+**Status:** active.
+
+## D-225 -- Wave 7's contract: the SGT kernel in 2-D, its truncation, the fit's parametrisation, the error bars' steps, the width switch (orchestrator)
+
+**Date:** 2026-11-23 (Europe/Rome; logged with the contract commit), the gallery chat. **Binds:** SPEC Block 49
+(`model/line_sgt.py`, the `kernel` argument of `line_fast.line_profiles`), Block 30 amendment 3
+(`analysis/node_inference.py`), Block 36 amendments 22-23 (`calibrate_sigma.py`, `clean_cell.py`, `infer_nodes.py`,
+`fit_soma.py`, `node_inputs`' forward factories); `InferenceConfig.kernel_family`, `sgt_*`, `cov_*`; D-221, D-222,
+D-224.
+
+**Decision [orchestrator].** The points D-224 left to wave 7's contract -- the SGT kernel's construction in 2-D and its
+cost -- and the details the contract needs are settled as below, on the evidence of `checks/sgt_psf_2d_2026-11-23/`.
+
+**Statement.** (D-225.1) The SGT option's kernel in the line renderer is D-222.1's isotropic PSF (2-D transfer
+$\hat h(a|\nu|)$), not the cheaper kernel that is the SGT across the measuring line and the law's Gaussian along it.
+The two give the same profile for a tube parallel to the image plane (at most 0.04 noise SD in the check) but differ by
+up to 1.9 noise SD on tilted tubes, and the separable model, fitted with the shape free to the isotropic model's
+profiles, moves a tilted thin node's $\hat d$ by -5 % (-1.2 SE; $d$ 0.4 um, tilt 0.3 rad, shape (1.3, 0, 1)).
+(D-225.2) Its computation: a new path in Block 35's renderer (SPEC Block 49): the slab maps convolved by FFT on lattices
+coarsened with the pair's width (at least `inference.sgt_samples_per_fwhm` = 16 samples per FWHM), the pixel box's
+transfer exact; with `kernel` None the Gaussian path, unchanged bit for bit. Block 26 is not extended: the SGT path's
+reference is a brute-force FFT (the check's `fft_line.py`, which reproduces Block 35's Gaussian to 1e-11).
+(D-225.3) The skew option (`sgt_skew` "fit", D-222.1): the isotropic PSF stretched by $\zeta$ on the side $u > 0$ of the
+measuring line and by $1/\zeta$ on the other (a half-plane two-piece); its line projection across the line is the
+two-piece SGT of (H2)-(H3), and at $\zeta = 1$ it is the isotropic PSF.
+(D-225.4) Truncation: the kernel is applied within `inference.sgt_reach_sigmas` = 12 law SDs of its centre (radially,
+before the stretch), its mass beyond dropped, not renormalised. The radius scales with the width, so the model scales
+with it and stays smooth in the shape. The dropped fraction (`line_sgt.truncated_mass`) is reported: about 1e-31 for
+the Gaussian member, about 1.6 % for (2, 1, 1), whose line projection decays as $|u|^{-3}$.
+(D-225.5) The fit (Block 30 amendment 3): the shape searched in $\log_{10}\beta$, $\xi$ and $\ln\zeta$ within Block 12's
+bounds (D-052.2: $\beta \in [1, 10]$, $\xi \in [0, 2]$, $\zeta \in [e^{-0.7}, e^{0.7}]$); $\xi = 0$ is a member (the
+generalized normal), so a fit whose only active bound is `xi_lo` is "converged", its SE undefined (NaN); one start, the
+Gaussian member at the node's Gaussian estimate (D-224.1); under "sgt" the node's estimate is the SGT fit's, the
+Gaussian fit's recorded beside it (the default stays "gaussian", D-222.4).
+(D-225.6) The error bars (D-224.2): the Jacobian of the residuals by central differences of the model at
+`inference.cov_fine_factor` = 32 with the absolute steps (2e-3 um, 1e-3 /um, 2e-3 um, 2e-3 um, 1e-3, 1e-3, 1e-3) in
+$(d, \mu, v_0, z_{\rm ax}, \log_{10}\beta, \xi, \ln\zeta)$ -- the identifiability check's -- one-sided near a bound;
+`NodeFit.cov_source` says which Jacobian was used.
+(D-225.7) The width switch (D-221.1, D-222.3): `--kernel-width fixed|calibrated` with `--sigma-json` in `clean_cell.py`,
+`infer_nodes.py` and `fit_soma.py`; "calibrated" re-anchors the configuration's base table by `kernel.with_kernel` at
+the inverse-variance weighted means of $\sigma_0$ and $c$ (`calibrate_sigma.py` adds $c$'s summary); the values and
+their file recorded; `infer_nodes.py` inherits the preparation's law and, given its own switch, re-anchors the
+preparation's recorded base table.
+(D-225.8) Cost is reported, not bounded: the SGT path's time per call beside the Gaussian's (Block 49), the forward calls
+of an SGT fit and of its error bars (Block 30). Block 35's Gaussian path at `line_fine_factor` 32 takes 3.5 s (flat,
+$d$ 0.4 um) to 61 s (tilt 0.3 rad, $d$ 0.8 um) per warm call, against 0.17 and 3.5 s at 8 (hybrid, 8 x 16 directions,
+on a shared sandbox CPU): the error bars of D-224.2 cost about nine such calls per Gaussian fit.
+
+**Why.** (.1) **[run, sandbox]** as stated; **[user]** D-222.1 names the isotropic PSF. (.2) **[code]** Block 35's exact
+pixel integral rests on the Gaussian's separability in the image axes; **[reasoning]** an FFT takes any kernel given its
+transfer, and a lattice per width keeps the grids small. (.3) **[reasoning]** the construction that reduces to the
+isotropic PSF at $\zeta = 1$ and projects exactly onto (H2)-(H3). (.4) **[reasoning]** a reach that depended on the shape
+would change the grids and the samples drawn as $\kappa$ moves inside a fit, and break its finite-difference Jacobian.
+(.5) **[log]** D-052.2's bounds and edge; **[user]** D-224.1's start. (.6) **[run, sandbox]**
+`checks/sgt_identifiability_2026-11-23/` (SE(d) converged at p/32; its step check). (.7) **[user]** D-222.3; **[code]**
+`with_kernel` re-anchors a base table: applied twice it would compound $c$.
+
+**What it does not decide.** The SGT path's numerics inside the oracles (the implementer's); whether $\xi$ near 2
+(Cauchy-like tails) should be bounded tighter in the joint fit (its truncated mass is reported); the 2-D shape's effect
+for pairs wider than 1.3 um, which the check left out; a cheaper route to the error bars (an exact area integral of the
+cross-section on the fit's lattice, the identifiability check's side finding).
+
+**Sources.** **[run, sandbox]** `checks/sgt_psf_2d_2026-11-23/` (`validate.json`, `compare.out`, `bias.out`); the timing
+of Block 35 at `line_fine_factor` 8, 16, 32. **[log]** D-052, D-066, D-221, D-222, D-224. **[code]** `line_fast.py`,
+`kernel.py`, `node_inference.py`.
 
 **Status:** active.
