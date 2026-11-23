@@ -279,6 +279,7 @@ the "Binds" column.
 | 2026-11-23 (09:05; the defocus-table chat) | Logs **D-227** (user, 09:05): D-226's export shows, side by side with each node's image in every plane, the intensity profile along the node's measuring line in that plane, so that the user can choose the neatest nodes. Refines D-226.3. Not built. Next free IDs: D-228, I-007. |
 | 2026-11-23 (09:16; the defocus-table chat) | Logs **D-228** (user, 09:16): step 2's trial table includes the far-field slope $\gamma$ beside the three near-field knots; $\sigma_{\rm r}(0)$ stays held (D-221). **[run, sandbox]** check 10: near-set twins respond to a relative change of $\gamma$ about 11-14 % as much as to the same change of $\theta_3$, and adding $\gamma$ raises the unit-free condition number from 10 to 30 (0.45-0.55 um) and from 6 to 47 (0.75-0.95 um) -- the far-set twins fix it. Supersedes the T10 study document's convention of a held slope. Next free IDs: D-229, I-007. |
 | 2026-11-23 (09:31; the defocus-table chat) | Logs **D-229** (user, 09:31), the answers to D-228's open points: the far-set twins are matched on the core widths, as in form B; the planes are weighted by their distance from focus -- near-set twins on $k^* \pm 1..3$, far-set twins on $|k - k^*|$ from 4 to 16, the far nodes' planes within $\pm 3$ kept as validation; the slope is fitted even when the pool has few far nodes. D-228 annotated. Next free IDs: D-230, I-007. |
+| 2026-11-23 (09:57; the defocus-table chat) | Logs **D-230** (user, 09:57): the calibration runs near first -- step 1 then step 2 for the near kernel -- and then the far slope the same way -- the far fit (its step 1) then a step 2 on far twins. The assistant's condition, PROVISIONAL until the user confirms: the two are alternated (the near stage rerun with the new slope, the far stage with the new knots) until neither moves, so that the result is D-228/D-229's joint fit. Next free IDs: D-231, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -496,6 +497,7 @@ would be needed*, *Status*.
 | D-227 | 2026-11-23 | D-226's screening export (per node, per plane) | beside each plane's image, the intensity profile along the node's measuring line in that plane | active; not built |
 | D-228 | 2026-11-23 | step 2 of the kernel calibration (procedure §3.4 item 2; NS1; T10), its trial table; the far-field slope (T6) | the trial table is $(\theta_1, \theta_2, \theta_3, \gamma)$: the slope is fitted too, fixed in practice by the far-set twins; $\sigma_{\rm r}(0)$ held | active; not built |
 | D-229 | 2026-11-23 | step 2's matching (D-228): the far twins' statistic, the planes and their weights, the slope with few far nodes | core widths for the far twins too (form B); planes weighted by distance from focus, near $k^* \pm 1..3$, far $|k-k^*|$ = 4..16 with the far nodes' $\pm 3$ planes as validation; the slope always fitted | active; not built |
+| D-230 | 2026-11-23 | the order of the calibration's fits (D-228, D-229): near then far | near: step 1 then step 2 (the knots, slope held); far: the far fit then a step 2 on far twins (the slope, knots held); alternated until stable [PROVISIONAL] | active; not built |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14970,3 +14972,45 @@ criterion.
 `far_min_k_offset` = 5 (PROVISIONAL). **[run, sandbox]** check 10 (D-228). **[log]** D-228.
 
 **Status:** active; not built.
+
+## D-230 -- The calibration's order: the near kernel by step 1 then step 2, then the far slope by the far fit then a step 2 on far twins (user)
+
+**Date:** 2026-11-23, 09:57 (Europe/Rome), the defocus-table chat. **Binds:** how D-228's trial table
+$(\theta_1, \theta_2, \theta_3, \gamma)$ is fitted under D-229's matching: the order of the near and far stages; the far
+fit (`far_field.fit_far_slope`, run by `calibrate_kernel.py far-fit`, which holds the 0.84 um anchor fixed and fits
+$\gamma$ on the far-set nodes); step 2 (NS1, T10).
+
+**Decision [user].** After the assistant explained that the far slope is fitted by the far fit after step 1: "Therefore
+in step we will do stage 1 and stage 2 for the near defcusing kernel and equivalently, afterwards, the same stage 1 and
+stage 2 fit for the far slope ok?"
+
+**Statement.** (D-230.1) Near first: step 1 (the growth fit on the near-set nodes) and then step 2 (near-set twins
+matched on core widths, D-229) give the knots $\theta_1, \theta_2, \theta_3$, with $\gamma$ held [user]. (D-230.2) Then
+the far slope: the far fit -- the far analogue of step 1 -- and then a step 2 on far-set twins (planes $|k - k^*|$ = 4
+to 16, D-229) give $\gamma$, with the knots held at the near stage's values [user]. (D-230.3) The assistant's
+condition, PROVISIONAL until the user confirms: the two stages are alternated -- the near stage rerun with the new
+$\gamma$, the far stage with the new knots -- until neither moves by more than a set fraction of its SE, so that the
+result is the joint least squares of D-228 and D-229 (block-wise, alternating minimisation **[textbook]**).
+
+**Why.** The order is the natural one: the far stage needs the 0.84 um knot as its anchor, and the knots are fixed
+mainly by the near nodes. The alternation is needed because the two blocks are coupled: the far twins' core widths
+grow from the 0.84 um knot, and the near twins respond to $\gamma$ through their outer planes (check 10: 11-14 % of the
+0.84 um knot's effect per relative change) **[run, sandbox]**; one near-then-far pass alone leaves the near knots
+fitted at the held $\gamma$. With the far stage anchored on step 2's corrected knot, step 1's error at 0.84 um no longer
+passes into $\gamma$ through the held anchor, as it does in today's far fit.
+
+**What it implies for code and tables.** Step 2 is built as two fitting blocks sharing one renderer and one statistic,
+with a loop around them and a stopping rule; the far fit stays, as the far stage's step 1 (its starting value). Not
+built.
+
+**What it does not decide.** The stopping rule's fraction and the number of passes allowed; the starting $\gamma$ of the
+first near stage (the configured 0.79 or a first far fit on step 1's anchor); how many passes are needed in practice
+(not tested: the toy has no far twins yet); D-229's open points (the weighting function, the far fit's first plane, the
+weight of far against near).
+
+**Sources.** **[user]** 2026-11-23, 09:57. **[code]** `analysis/far_field.py` (`fit_far_slope`) and
+`scripts/calibrate_kernel.py` (`run_far_fit`: the far fit holds the calibration's anchor; the kernel is step 1's table
+with `kernel_continuation_slope` = the fitted $\gamma$) on `sci/diameter-pipeline`. **[run, sandbox]** check 10 (D-228).
+**[log]** D-228, D-229.
+
+**Status:** active; not built; D-230.3 to confirm.
