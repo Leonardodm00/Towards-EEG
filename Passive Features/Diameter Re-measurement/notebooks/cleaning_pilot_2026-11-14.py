@@ -710,7 +710,11 @@ for name in tab_t.loc[tab_t["shown"], "figure"]:
 # from one start. The nodes: those the gallery of Cell 23A judged clean (D-198's verdict), or your own list in
 # SIGMA_NODES. Time per node [measured in the sandbox on synthetic nodes]: 26 s at d 1.0 um, 59 s at 1.5 um, 208 s
 # at 2.5 um, the nodes in parallel on the runtime's CPUs.
-# Output to send back: the printed table and summary, sigma_summary_<S>.png and the node pages (OUT/cleaning_thick/sigma).
+# Its sigma_<S>.json is what Cell 16's KERNEL_WIDTH = "calibrated" reads (D-222.3; SPEC Block 36 amendment 22): the
+# inverse-variance weighted means of sigma0 and of the growth scale c, printed last. A file written before wave 7 has
+# no summary of c and the switch refuses it: run this cell again with the current branch.
+# Output to send back: the printed table and the two summaries, sigma_summary_<S>.png and the node pages
+# (OUT/cleaning_thick/sigma).
 
 # %%
 import os, json               # the cell's own imports: it can follow Cell 23A or Cell 16 directly
@@ -735,7 +739,14 @@ tab_s = pd.read_csv("%s/sigma_%d.csv" % (SIG_T, SPECIMEN))
 display(tab_s[["node_id", "d_allen_um", "status", "ok", "d_um", "se_d_um", "sigma0_um", "se_sigma0_um", "growth_scale",
                "se_growth_scale", "chi2_per_dof", "n_eval", "seconds", "at_bound"]].round(4))
 with open("%s/sigma_%d.json" % (SIG_T, SPECIMEN)) as f:
-    print("summary:", json.load(f)["summary"])
+    sig = json.load(f)
+s0_sum, c_sum = sig["summary"], sig.get("summary_growth_scale") or {}
+print("summary of sigma0 (um):", s0_sum)
+print("summary of the growth scale c:", c_sum or "absent (calibrate_sigma.py from before wave 7)")
+f4 = lambda x: "%.4f" % x if isinstance(x, (int, float)) else str(x)   # None (n = 0) printed as it is
+print("[cell 23B] for Cell 16's KERNEL_WIDTH = 'calibrated': sigma0 %s +- %s um (n %s), c %s +- %s (n %s)"
+      % (f4(s0_sum.get("ivw_mean_um")), f4(s0_sum.get("ivw_se_um")), s0_sum.get("n"), f4(c_sum.get("ivw_mean")),
+         f4(c_sum.get("ivw_se")), c_sum.get("n")))
 display(Image(filename="%s/sigma_summary_%d.png" % (SIG_T, SPECIMEN)))
 for nid in ids_s:
     page = "%s/sigma_node%d.png" % (SIG_T, nid)
@@ -798,6 +809,9 @@ SOMA_FIT_K = None     # the start plane, e.g. 115; None: Cell 24's SOMA_K, else 
 FAR_SLOPE = "fit"     # "fit" (D-218.1) or "fixed" (D-218.2)
 SLOPE0 = None         # the far slope's start or held value (um/um); None: the configured renderer.kernel_continuation_slope
 SOMA_FIT_OUT = OUT + "/soma_fit"
+if "KW_ARGS" not in globals():        # a Cell 16 from before wave 7: the kernel's width fixed, the default (D-221.1)
+    KW_ARGS = ["--kernel-width", "fixed"]
+print("[cell 25] kernel width:", " ".join(str(x) for x in KW_ARGS))
 k_start = SOMA_FIT_K if SOMA_FIT_K is not None else globals().get("SOMA_K")
 choice = (([] if k_start is None else ["--soma-k", k_start]) + ["--far-slope", FAR_SLOPE]
           + ([] if SLOPE0 is None else ["--slope0", SLOPE0]))
@@ -811,15 +825,20 @@ for name in ("soma_fit_%d_planes.png" % SPECIMEN, "soma_fit_%d_summary.png" % SP
 # %% [markdown]
 # ## Cell 26: the per-node fit with the SGT kernel -- Cell 20's nodes, the Gaussian fit and the SGT fit side by side (D-221, D-222, D-224, D-225; SPEC Block 49, Block 30 amendment 3, Block 36 amendment 23)
 #
-# Run after Cells 0, 1, 16 and 20 (it reads Cell 20's prepared nodes, OUT/cleaning_d169; no download). Per node the
+# Run after Cells 0, 1 and 16, once Cell 20 has prepared its nodes (OUT/cleaning_d169, read here; no download): Cell 20
+# need not run again in this runtime, its knobs taking Cell 20's values when they are not defined. Per node the
 # Gaussian fit of Cell 20 is run again, then the fit with the skewed generalized-t kernel (D-052.1) started from its
 # estimate at the Gaussian member: the kernel's FWHM at each slab-plane defocus is the Gaussian law's (D-222.2), its
 # shape (beta: the core, xi: the tails) is fitted per node, the skew zeta held at 1 (SGT_SKEW "off": the isotropic PSF;
 # "fit" frees it, as an asymmetry along the node's measuring line). The node's estimate is the SGT fit's; the Gaussian
-# fit's d is beside it (gauss_d_um). The error bars come from the model at line_fine_factor COV_FINE_FACTOR (D-224.2;
-# 0 = the fit's own Jacobian). Cell 16's KERNEL_WIDTH applies. Time: the SGT renderer is slower than the Gaussian one
-# (Block 49's report gives the factor) and Cell 20 took 6 to 111 min per node with the Gaussian alone, growing with the
-# diameter: start with the thinner nodes (SGT_NODES, e.g. "5353"; None: all of Cell 20's).
+# fit's d is beside it (gauss_d_um). If the SGT fit fails, the node's status is "failed" (flag sgt_error when it
+# raised) and its Gaussian fit and same-node clearance are kept (D-233.3). The error bars of both fits come from the
+# model at line_fine_factor COV_FINE_FACTOR (D-224.2; 0 = the fit's own Jacobian). Cell 16's KERNEL_WIDTH applies.
+# Time: Cell 20's Gaussian fits took 6 min (5353, 0.77 um) to 111 min (639, 2.82 um) on the pilot. On two synthetic
+# nodes (the test suite's fast configuration, sandbox, D-233.6) this cell took 15 to 35 times the Gaussian fit alone
+# (351-499 s per node against 10-33 s): carried over to 5353, about 1.5 to 3.5 h -- an extrapolation, not a
+# measurement. So the cell starts with 5353 alone (SGT_NODES; "5353,599" adds a node; None: all of Cell 20's, which may
+# outlast a Colab session). COV_FINE_FACTOR = 0 drops the error bars' renders for a first look at the shape.
 # Output to send back: the lines `node <id>: d ...` of the log, the table, and the `fit_node<id>.png` figures.
 
 # %%
@@ -828,8 +847,11 @@ import pandas as pd
 from IPython.display import Image, display
 SGT_SKEW = "off"                      # "off": zeta = 1 (the isotropic PSF, D-222.1); "fit": zeta fitted too
 COV_FINE_FACTOR = 32                  # the error bars' lattice (D-224.2); 0 = the fit's own Jacobian (faster)
-SGT_NODES = None                      # e.g. "5353" or "5353,599"; None: all of Cell 20's nodes
+SGT_NODES = "5353"                    # the thinnest of Cell 20's nodes first; "5353,599" adds one; None: all of them
 CLEAN_D, INFER_S = OUT + "/cleaning_d169", OUT + "/inference_sgt"
+if "KW_ARGS" not in globals():        # a Cell 16 from before wave 7: the kernel's width fixed, the default (D-221.1)
+    KW_ARGS = ["--kernel-width", "fixed"]
+print("[cell 26] kernel width:", " ".join(str(x) for x in KW_ARGS), "| nodes:", SGT_NODES or "all of Cell 20's")
 os.makedirs(INFER_S, exist_ok=True)
 run("scripts/infer_nodes.py", "real", "--specimen", SPECIMEN, "--cleaning-dir", CLEAN_D, "--out", INFER_S,
     "--weights", globals().get("D169_WEIGHTS", "allen"), "--bump-sd", globals().get("BUMP_SD", 2.0),   # Cell 20's
@@ -840,7 +862,7 @@ res_s = pd.read_csv("%s/inference_%d.csv" % (INFER_S, SPECIMEN))
 res_s["sgt_over_gauss"] = res_s["d_hat_um"] / res_s["gauss_d_um"]
 display(res_s[["node_id", "d_allen_um", "gauss_d_um", "gauss_se_d_um", "d_hat_um", "se_d_um", "sgt_over_gauss",
                "beta", "se_beta", "xi", "se_xi", "zeta", "truncated_mass", "chi2_mean", "gauss_chi2_mean", "status",
-               "gauss_status", "at_bound", "cov_source", "seconds"]].round(4))
+               "gauss_status", "at_bound", "flags", "cov_source", "seconds"]].round(4))
 for path in sorted(glob.glob(INFER_S + "/fit_node*.png")):
     print(path)
     display(Image(filename=path))

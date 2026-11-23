@@ -2067,7 +2067,11 @@ nodes, for time), with amendment 22's switch. The same-node clearance (amendment
 the Gaussian fit's estimate (D-222.4). (v) Notebook: Cell 16 sets `KERNEL_WIDTH` and `SIGMA_JSON` (`KW_ARGS`, passed to
 Cells 20, 25 and 26; the thick nodes' preparation of Cell 23 stays fixed, so that the calibration is not re-anchored on
 itself); Cell 20 gains `COV_FINE_FACTOR`; a new Cell 26 fits Cell 20's prepared nodes with the SGT kernel and shows the
-Gaussian and the SGT fits side by side (`KERNEL`, `SGT_SKEW`, `COV_FINE_FACTOR`, `SGT_NODES`).
+Gaussian and the SGT fits side by side (`SGT_SKEW`, `COV_FINE_FACTOR`, `SGT_NODES`) [corrected 2026-11-23: the list named
+a `KERNEL` knob the cell does not have; it passes `--kernel sgt`]. [Added 2026-11-23, later, at the cells' delivery:]
+Cells 25 and 26 fall back to `--kernel-width fixed` (the default, D-221.1) when Cell 16 predates wave 7 and print the
+width used; Cell 26 starts with Cell 20's thinnest node, `SGT_NODES = "5353"` (None: all), and shows the `flags`
+column; Cell 23B prints both summaries, sigma0's and $c$'s, and the two weighted means the calibrated switch reads.
 Status (amendments 22-23): implemented 2026-11-23 by the orchestrator (`16eb8be`); smoke `test_smoke_kernel_width.py` and
 the synthetic run end to end; final check 2026-11-23 13:55 PASS WITH ISSUES; settled by D-233:
 `test_smoke_kernel_width.py` 7 pass as a script; `test_smoke_config.py` 6 pass, 1 skip; the tester's `test_spec_block36_am22_23.py` 31 pass on the fixes (its F1 and F3 cases run with `--runxfail` before they became plain tests; 2886 s here); the SGT stage's exception path run end to end (the node failed, `sgt_error`, the Gaussian record and the clearance kept); `fit_soma.main` in-process leaves no figure open; rerun on the fixes: the spec files of Block 1 (135 pass), Block 36's node inputs (32) and scripts (6) and the soma fit end to end (12), and `test_smoke_pilot_run.py` (17 pass, 1 skip, 993 s) **[run, sandbox]**.
