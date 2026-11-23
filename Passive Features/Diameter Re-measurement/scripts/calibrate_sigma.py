@@ -292,11 +292,12 @@ def main(argv=None):
           % (summary["n"], summary["median_um"], summary["mad_um"], summary["ivw_mean_um"], summary["ivw_se_um"],
              summary["chi2_cons"], summary["dof"], time.time() - t0))
     # Block 36 amendment 21 (D-220.3): name what was written; no node fitted -> exit 1
-    n_err = sum(1 for r in ordered if r["status"] == "error")
+    failed = [str(r["node_id"]) for r in ordered if r["status"] == "error"]
+    n_err = len(failed)
     n_pages = len(ordered) - n_err
     written = "%s/sigma_%s.csv, .json" % (out, a.specimen) + (", sigma_summary_%s.png" % a.specimen if srows else "")
-    print("wrote %s and %d node page(s)%s" % (written, n_pages, "; %d node(s) failed (status \"error\" in the CSV)"
-                                               % n_err if n_err else ""))
+    print("wrote %s and %d node page(s)%s" % (written, n_pages, "; %d node(s) failed: %s (status \"error\" in the CSV)"
+                                               % (n_err, ", ".join(failed)) if n_err else ""))   # D-223.3: ids named
     if n_pages == 0:
         print("calibrate_sigma: no node was fitted; see the status and message columns of %s/sigma_%s.csv"
               % (out, a.specimen))

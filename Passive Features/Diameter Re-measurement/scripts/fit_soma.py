@@ -72,8 +72,12 @@ def _json_safe(v):
 
 
 def _mask(xyz, swc, parent_index, types, box, shape, left, top, res0, widen):
-    """Every traced process in the crop at its traced radius + widen (um): Block 44's swept discs."""
-    seg = soma_view.trace_segments(xyz, swc.radius, parent_index, types, box)
+    """Every traced process whose widened disc reaches the crop, at its traced radius + widen (um): Block 44's swept
+    discs. The segments are taken from the box widened by `widen` (D-223.1: a process just outside the crop whose
+    widened mask reaches into it is kept)."""
+    x0, x1, y0, y1 = box
+    seg = soma_view.trace_segments(xyz, swc.radius, parent_index, types,
+                                   (x0 - widen, x1 + widen, y0 - widen, y1 + widen))
     if len(seg["r1"]) == 0:
         return np.zeros(shape, dtype=bool), 0
     m = soma_view.segment_mask(shape, left, top, res0, seg["p1"], seg["p2"], seg["r1"] + widen, seg["r2"] + widen)
@@ -260,17 +264,18 @@ def _se_volume(th, cov):
 def _morphology_views(swc, edit, xyz, th, centre, radius, r_eq, res0, transform):
     """The arrays of Block 48's morphology figure: the top view in the image frame, the side view in the fitted
     ellipsoid's (u, w) frame (Block 47's fit_frame)."""
-    index_of = {int(i): k for k, i in enumerate(swc.ids)}
-    children = {}
-    for k, pp in enumerate(np.asarray(swc.parent)):
-        children.setdefault(int(pp), []).append(k)
+    ids = np.asarray(swc.ids)
+    index_of = {int(i): k for k, i in enumerate(ids)}
+    children = {}                                    # the edited tree (D-223.2): kept rows under their new parents
+    for k in np.flatnonzero(edit.keep):
+        children.setdefault(int(edit.parent[k]), []).append(int(k))
     stems_top, stems_side = [], []
     for s in edit.stems:
         old = cell.to_image_um(np.asarray(s["old_um"], float)[None, :], res0, **transform)[0]
         new = cell.to_image_um(np.asarray(s["new_um"], float)[None, :], res0, **transform)[0]
         chain, k = [], index_of[int(s["id"])]
         for _ in range(6):                                          # the stem's next nodes (up to six)
-            kids = [c for c in children.get(int(swc.ids[k]), []) if edit.keep[c]]
+            kids = children.get(int(ids[k]), [])
             if not kids:
                 break
             k = kids[0]

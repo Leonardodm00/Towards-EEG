@@ -1787,6 +1787,14 @@ WITH ISSUES, seven findings NOTE or MINOR, no wrong number on the default path) 
 - Section 6 (S4): the rows of the soma render and fit suites.
 - F6: the tester's spec tests of 14:40 and 19:05 come in together when the user agrees (their appended cases kept both).
 
+The final check of wave 6 (2026-11-23; D-223 [orchestrator]; `specs/test_reports/2026-11-23_0027_incremental.md`, PASS
+WITH ISSUES, three findings MINOR or NOTE, no fitted number changed, no regression) is settled thus:
+- the entry point `scripts/fit_soma.py` (F1): the trace's segments are taken from the crop's box widened by
+  `soma_fit.mask_widen_um`, so a process just outside the crop whose widened mask reaches the fit's disk is masked;
+- the same (F2): the morphology figure's stems follow the edited tree (Block 47's kept rows under their new parents), so a
+  stem after a walk keeps its next nodes;
+- Block 36, amendment 21 (F3): `calibrate_sigma.py`'s last line names the failed nodes' ids.
+
 
 ## 6. Pipeline entry points
 
