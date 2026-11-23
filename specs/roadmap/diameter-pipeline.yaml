@@ -838,6 +838,15 @@ implementation:
     needs_theory: []
     needs_hpc: false
     jobs: []
+  - id: I49
+    title: "SGT point-spread function in the fast line renderer"
+    summary: "The fast line renderer with the skewed generalized-t kernel of the law's FWHM in place of the Gaussian: the isotropic PSF whose line projection is the SGT (the skew a half-plane stretch across the measuring line), truncated at 12 law SDs, convolved by FFT with exact pixel means; the Gaussian path unchanged; the per-node fit's SGT option and its error bars on the fine lattice build on it (D-221, D-222, D-224, D-225)"
+    block: 49
+    parent: NC2
+    depends_on: [I35, I12]
+    needs_theory: [T5, T7, T15]
+    needs_hpc: false
+    jobs: []
 # Revisions: a change one side has to absorb because of the other
 # (roadmap.py revise). An implementation stage's flag clears when its
 # code changes after the flag's commit; a topic's when its status
