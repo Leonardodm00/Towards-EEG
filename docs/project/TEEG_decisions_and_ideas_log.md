@@ -276,6 +276,7 @@ the "Binds" column.
 | 2026-11-23 (07:43) | Logs **D-224** (user): wave 7 approved, the error bars on a finer lattice included; the tester's spec tests into the working line. Next free IDs: D-225, I-007. |
 | 2026-11-23 | Logs **D-225** (orchestrator): wave 7's contract -- the SGT kernel in 2-D (isotropic, by an FFT path), its truncation, the fit's parametrisation, the error bars' steps, the width switch. Evidence: `checks/sgt_psf_2d_2026-11-23/`. Next free IDs: D-226, I-007. |
 | 2026-11-23 (09:01; the defocus-table chat) | Logs **D-226** (user, 09:01): the user chooses the nodes that enter the defocus kernel calibration. On davinci the screening runs only on the cells of the passive + I_h fit and hands the user, for every apt node, its image at focus with the planes $k^* \pm 3$ (near set) or $k^* \pm 1$ to $k^* \pm 16$ (far set, D-074.1); the user picks the clearest, and a Colab notebook lets the user set each picked node's diameter by eye on its image at focus. Supersedes D-175.1's cell set (all 158 cells) and the automatic choice of calibration nodes behind D-170's pooled table; D-170 and D-175 annotated. Not built. Next free IDs: D-227, I-007. |
+| 2026-11-23 (09:05; the defocus-table chat) | Logs **D-227** (user, 09:05): D-226's export shows, side by side with each node's image in every plane, the intensity profile along the node's measuring line in that plane, so that the user can choose the neatest nodes. Refines D-226.3. Not built. Next free IDs: D-228, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -490,6 +491,7 @@ would be needed*, *Status*.
 | D-224 | 2026-11-23 | wave 7 (the calibrated-kernel switch; the SGT option in Blocks 26, 35 and 30); Block 30's error bars; `tests/spec/` | wave 7 as proposed; the covariance on a finer lattice for both kernels; the three tester runs' spec tests into the working line [user] | active |
 | D-225 | 2026-11-23 | wave 7's contract: Block 49 (the SGT kernel in the line renderer), Block 30 amendment 3, Block 36 amendments 22-23; `InferenceConfig.kernel_family`, `sgt_*`, `cov_*` | the isotropic PSF by an FFT path (not the separable construction); the half-plane skew; truncation at 12 law SDs; the shape in log10 beta, xi, ln zeta, xi = 0 converged; the error bars' steps; the width switch's flags [orchestrator] | active |
 | D-226 | 2026-11-23 | the defocus kernel calibration's nodes and cells (Block 10's candidates, D-170's pool, D-175's davinci run); a screening export of node images on davinci; a Colab notebook for by-eye diameters | the user chooses the calibration nodes from per-node images (focus and $k^* \pm 3$ near, $k^* \pm 1..16$ far) of the passive + I_h fit's cells and sets their diameters by eye in Colab | active; not built |
+| D-227 | 2026-11-23 | D-226's screening export (per node, per plane) | beside each plane's image, the intensity profile along the node's measuring line in that plane | active; not built |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14858,3 +14860,30 @@ D-175, D-178, D-194, D-198, D-199, D-211, D-213, I-006.
 
 **Status:** active; not built (the export, the selection list, the notebook and the pool step's reading of it to plan
 with the user).
+
+## D-227 -- Beside each plane's image of a node, its intensity profile along the measuring line (user)
+
+**Date:** 2026-11-23, 09:05 (Europe/Rome), the defocus-table chat. **Binds:** D-226's screening export (per apt node,
+per plane: the focus and the planes of D-226.3) and the way the user inspects it.
+
+**Decision [user].** "Side by side with the images (across planes per each node) also the profile of the intenisty
+across the measuring line so I can choose the neater ones".
+
+**Statement.** (D-227.1) For every apt node of D-226, each plane's image is shown with, beside it, the intensity
+profile along the node's measuring line in that plane [user]. The assistant's reading, PROVISIONAL: the line is the one
+the pipeline measures (through the node's centre, across the dendrite, as the plane scan of Block 10 reads it), the
+profile in raw grey levels against position along the line (um), with the background level the scan fits marked.
+
+**Why.** The profile shows at a glance whether the dip is single, symmetric and clean of neighbours' shadows in every
+plane, which the image alone shows less sharply.
+
+**What it implies for code and tables.** The export of D-226 writes, per node and plane, the line's profile next to the
+image patch (one panel per plane). The gallery chat's screens already measure and draw lines on a node's images (D-198)
+and are the nearest existing code. Not built.
+
+**What it does not decide.** The line's length and sampling; whether the profiles of all planes are also overlaid in one
+panel; the display of the far set's sixteen planes on each side (all, or $|k - k^*| \ge 5$ only, D-226).
+
+**Sources.** **[user]** 2026-11-23, 09:05. **[log]** D-198, D-226.
+
+**Status:** active; not built.
