@@ -19,6 +19,8 @@
 | 2026-11-22 (later, 5) | The wave's final check came back (PASS WITH ISSUES) and was settled (D-220): section 14.4's "Final check" bullet. Evidence: the report, the reruns of the smoke suites and of the tester's spec tests against the fixed code (144d9c4). |
 | 2026-11-23 | Wave 6 (D-222.5): section 14.5, new -- the corrected morphology (Block 47), the fit's figures (Block 48), the entry point `scripts/fit_soma.py` and notebook Cell 25. Evidence: the gates' reruns, the entry point's synthetic dry run. |
 | 2026-11-23 (later) | Section 15, new: the kernel work of D-221/D-222 and its identifiability check (`checks/sgt_identifiability_2026-11-23/`); the wave-6 final check settled (D-223). |
+| 2026-11-23 (later, 2) | Section 15.1, new [row added 2026-11-23, later, 3: it was written without one]: wave 7 merged -- the SGT kernel in the line renderer (Block 49), the fit's SGT option and fine-lattice error bars (Block 30 amendment 3), the width switch (Block 36 amendments 22-23); D-224, D-225, D-232. Evidence: `checks/sgt_psf_2d_2026-11-23/`, Block 49's and Block 30's reports, the synthetic run **[run, sandbox]**. |
+| 2026-11-23 (later, 3) | Wave 7's final check came back (PASS WITH ISSUES) and was settled (D-233): section 15.2, new; 15.1's status bullet superseded and its synthetic times marked as p/16. Evidence: `specs/test_reports/2026-11-23_1355_incremental.md`, the tester's reproducers rerun on the fixes, the times measured at p/32 **[run, sandbox]**. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -646,12 +648,44 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   weighted means; `clean_cell.py` records the base renderer so that `infer_nodes.py`'s own switch does not compound c.
   Notebook: Cell 16's `KERNEL_WIDTH`, `SIGMA_JSON` (passed to Cells 20, 25, 26; Cell 23's thick-node preparation stays
   fixed); Cell 26 fits Cell 20's nodes with the SGT kernel beside the Gaussian.
-- **Status** [updated 2026-11-23, 14:00]: contract `9ea1abe`; Block 30 amendment 3 merged (`cf86785`), Block 49 merged
+- **Status** [updated 2026-11-23, 14:00; superseded 2026-11-23 by 15.2's status]: contract `9ea1abe`; Block 30 amendment 3 merged (`cf86785`), Block 49 merged
   (`5dbc9c1`; its one issue, oracle (iii) at the raised reach infeasible here, settled by D-232); the orchestrator's
   wiring (`0b20f32`, `bb650a7`); pushed at `16eb8be`; the independent final check running on that commit.
 - **Cost, measured [run, sandbox; Block 49's report]**: per warm call (hybrid, 8 x 16 directions, planes -4..4),
   Gaussian / SGT zeta = 1 / SGT skew: 0.09-2.48 / 0.37-4.96 / 6.1-22.8 s at line_fine_factor 8; 1.3-44 / 2.4-105 /
   13-142 s at 32 (the error bars' lattice). The skew option is 5-10 times the Gaussian per call. On the synthetic
   cell (partition absorption, 4 x 8 directions) one node took 27 s for the Gaussian fit with error bars at p/16 and
-  133 s with the SGT stage added (d 0.7968 +- 0.0018 um against the Gaussian's 0.7947 +- 0.0017; beta 2.09 +- 0.10,
+  133 s with the SGT stage added [corrected 2026-11-23: both at p/16, not the default p/32; 15.2 gives the times at 32] (d 0.7968 +- 0.0018 um against the Gaussian's 0.7947 +- 0.0017; beta 2.09 +- 0.10,
   xi at its edge 0: the synthetic blur is Gaussian).
+
+### 15.2 Wave 7's final check and its settlement (D-233) [added 2026-11-23, later]
+
+- **The verdict [run, sandbox; `specs/test_reports/2026-11-23_1355_incremental.md`, an Opus tester on `16eb8be`]**:
+  PASS WITH ISSUES. Every changed block meets its oracles against references written from the spec alone: Block 49
+  within 1.3e-6 of the 1-D model at a raised reach (8 shapes, levels 0-2) and within 1.6e-5 of an exact model of the
+  truncated kernel at the default reach, the fit box's corners included; the Gaussian member within 3.4e-10 of Block
+  35's path, which is bit-identical to the base commit; Block 30's fine error bars equal to rule (D) by hand within
+  1e-9; the SGT option's coverage 0.700 of 300 sets. No regression in the smoke suites or the earlier spec suites (the
+  six stale cases of Blocks 25, 28 and 31 that SPEC names aside).
+- **Fixed [D-233.1-5]**: the switch's recorded base renderer read back by `config_from_dict`'s rule (a configuration
+  with Allen's JPEG tables failed under `infer_nodes.py --kernel-width`); the kernel-width smoke suite's script runner
+  (section 6's command ran nothing); a failed SGT stage keeps the node's Gaussian record and its same-node clearance
+  (the node's estimate stays the SGT's, written as failed); `clean_cell.config_sections` takes the switch's record as an
+  argument (no module state); `fit_soma.py` closes its three figures.
+- **Stated [D-233.6-12]**: `inference.cov_fine_factor` 32 by default; the covariance at an active bound is marginal over
+  the bound parameter (the full inverse, then NaN rows and columns: Block 30's convention since its entry); without
+  `--kernel-width`, `infer_nodes.py` takes the preparation's law, with "fixed" its base table; `validate()`'s
+  constraints on the knobs; `sgt_ln_zeta_bounds` within +-ln 2.1 (Block 49's lattices do not move with zeta inside it);
+  a missing `--sigma-json` refused with status 2; Block 49's oracle (viii) at the fit box's corners.
+- **Time at the default p/32 [run, sandbox; the tester's end-to-end file under the pilot-run suite's fast configuration:
+  partition absorption, 4 x 8 directions, one start, 9 planes; this sandbox]**: the Gaussian stage 68-93 s a synthetic
+  node (10-33 s with `--cov-fine-factor 0`); with the SGT stage (zeta held) 351-499 s a node in all; the skew 769 s for
+  one node with the fit's own Jacobian. On the two synthetic nodes the SGT fit ends with xi at its edge, beta 2.08-2.10,
+  d 0.0020 um (about 1 SE) above the Gaussian fit's.
+- **Left untested by the final check**: the real cell (SPEC section 7); the SGT path on a depth-dependent law with
+  non-Gaussian members against an independent reference; the hybrid at 8 x 16 directions on the SGT path; the SGT stage
+  on the clear-node path (`clean --no-clean`) end to end; production timings.
+- **Status** [2026-11-23, later]: the tester's spec tests merged into `sci/diameter-pipeline` (`e0b1ab1`, D-224.3; its
+  two strict xfails, F1 and F3, now plain tests); the fixes, the spec's statements and the report's decisions in `eda8fa7`;
+  D-233 on `main` (`13f75f8`). The fixes are not yet re-checked by an independent tester (the roadmap shows the touched
+  blocks as pushed until the next run).
