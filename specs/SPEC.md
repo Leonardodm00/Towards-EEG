@@ -1960,7 +1960,18 @@ Richardson-extrapolated Jacobian [relative 1e-3]; a parameter at a bound takes t
 the weighted sandwich with the shape against a hand-written computation [1e-10]; (vi) `fit_node_recentred` with the
 shape ends where `fit_node` with its last weights ends [1e-8]; (vii) the Gaussian path unchanged (the entry's tests);
 a Gaussian `NodeFit` has `shape` None and `cov_search` equal to `cov`; (viii) determinism, the inputs unchanged, the
-ValueErrors. Reported: the forward calls of an SGT fit and of the error bars on the stand-in.
+ValueErrors. Reported: the forward calls of an SGT fit and of the error bars on the stand-in. Status: implemented
+2026-11-23 (wave 7, merged `cf86785`); `test_smoke_node_inference.py` 16 pass, 1 skip, rerun at the gate **[run,
+sandbox]**: (i) recovery to 1.8e-15 from 15 % off (246 forward calls, 281 with $\zeta$ fitted); (ii) a Gaussian truth
+ends "converged" with `xi_lo` alone, $\hat\beta$ = 2, $\hat d$ the Gaussian fit's to 2.2e-13 (14 calls); (iii) 300
+sets: coverage 0.720, mean $\hat d$ -0.71 SE, 146 of 300 ending at `xi_lo`, 45.8 forward calls per SGT fit; (iv) the
+fine error bars within 2.5e-4 of a Richardson Jacobian's (14 `forward_cov` calls for 7 parameters), the one-sided rule
+at both bounds by hand to 1e-10; (v) the sandwich to 1.2e-13; (vi) the re-centred SGT fit equals `fit_node` with its
+last weights to 2e-15. The Gaussian path bit-identical to the contract's on 16 cases. Accepted as part of the
+amendment: a shape start within 1e-12 (relative) outside the box is clipped (the re-centred fit hands the shape back in
+natural units); a failed SGT fit has `shape`, `se_shape` and `cov_search` all NaN; `forward_cov`'s calls are not in
+`nfev`; "within two steps" is a distance $\le 2h$; a $\hat\xi$ at the edge is reported as the solver ends it (e.g.
+1e-10). Smoke-tested.
 
 Block 36, amendment 22 (2026-11-23, drafted; D-221.1, D-222.3, D-224.1, D-225.7; the orchestrator's). The kernel's
 in-focus width, fixed or calibrated. (i) `scripts/calibrate_sigma.py` writes beside `summary` (sigma_0) a
