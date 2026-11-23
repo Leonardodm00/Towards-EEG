@@ -278,6 +278,7 @@ the "Binds" column.
 | 2026-11-23 (09:01; the defocus-table chat) | Logs **D-226** (user, 09:01): the user chooses the nodes that enter the defocus kernel calibration. On davinci the screening runs only on the cells of the passive + I_h fit and hands the user, for every apt node, its image at focus with the planes $k^* \pm 3$ (near set) or $k^* \pm 1$ to $k^* \pm 16$ (far set, D-074.1); the user picks the clearest, and a Colab notebook lets the user set each picked node's diameter by eye on its image at focus. Supersedes D-175.1's cell set (all 158 cells) and the automatic choice of calibration nodes behind D-170's pooled table; D-170 and D-175 annotated. Not built. Next free IDs: D-227, I-007. |
 | 2026-11-23 (09:05; the defocus-table chat) | Logs **D-227** (user, 09:05): D-226's export shows, side by side with each node's image in every plane, the intensity profile along the node's measuring line in that plane, so that the user can choose the neatest nodes. Refines D-226.3. Not built. Next free IDs: D-228, I-007. |
 | 2026-11-23 (09:16; the defocus-table chat) | Logs **D-228** (user, 09:16): step 2's trial table includes the far-field slope $\gamma$ beside the three near-field knots; $\sigma_{\rm r}(0)$ stays held (D-221). **[run, sandbox]** check 10: near-set twins respond to a relative change of $\gamma$ about 11-14 % as much as to the same change of $\theta_3$, and adding $\gamma$ raises the unit-free condition number from 10 to 30 (0.45-0.55 um) and from 6 to 47 (0.75-0.95 um) -- the far-set twins fix it. Supersedes the T10 study document's convention of a held slope. Next free IDs: D-229, I-007. |
+| 2026-11-23 (09:31; the defocus-table chat) | Logs **D-229** (user, 09:31), the answers to D-228's open points: the far-set twins are matched on the core widths, as in form B; the planes are weighted by their distance from focus -- near-set twins on $k^* \pm 1..3$, far-set twins on $|k - k^*|$ from 4 to 16, the far nodes' planes within $\pm 3$ kept as validation; the slope is fitted even when the pool has few far nodes. D-228 annotated. Next free IDs: D-230, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -494,6 +495,7 @@ would be needed*, *Status*.
 | D-226 | 2026-11-23 | the defocus kernel calibration's nodes and cells (Block 10's candidates, D-170's pool, D-175's davinci run); a screening export of node images on davinci; a Colab notebook for by-eye diameters | the user chooses the calibration nodes from per-node images (focus and $k^* \pm 3$ near, $k^* \pm 1..16$ far) of the passive + I_h fit's cells and sets their diameters by eye in Colab | active; not built |
 | D-227 | 2026-11-23 | D-226's screening export (per node, per plane) | beside each plane's image, the intensity profile along the node's measuring line in that plane | active; not built |
 | D-228 | 2026-11-23 | step 2 of the kernel calibration (procedure §3.4 item 2; NS1; T10), its trial table; the far-field slope (T6) | the trial table is $(\theta_1, \theta_2, \theta_3, \gamma)$: the slope is fitted too, fixed in practice by the far-set twins; $\sigma_{\rm r}(0)$ held | active; not built |
+| D-229 | 2026-11-23 | step 2's matching (D-228): the far twins' statistic, the planes and their weights, the slope with few far nodes | core widths for the far twins too (form B); planes weighted by distance from focus, near $k^* \pm 1..3$, far $|k-k^*|$ = 4..16 with the far nodes' $\pm 3$ planes as validation; the slope always fitted | active; not built |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14927,5 +14929,44 @@ fits $\gamma$; how D-181's near-field spline meets the continuation at 0.84 um.
 **Sources.** **[user]** 2026-11-23, 09:16. **[run, sandbox]** `check10_slope_sensitivity.py`, in the T10 study
 document's `scripts/` (this chat). **[log]** D-074, D-181, D-221, D-226, I-006. **[doc]** the T10 study document, §3.5,
 §3.7.
+
+**Status:** active; not built. [updated 2026-11-23: the far twins' statistic, the planes' weights and the slope with few far nodes settled by D-229; the weight of far against near twins still open]
+
+## D-229 -- Step 2's matching: core widths for the far twins too; planes weighted by distance from focus, the far nodes' near planes kept for validation; the slope always fitted (user)
+
+**Date:** 2026-11-23, 09:31 (Europe/Rome), the defocus-table chat. **Binds:** step 2 of the kernel calibration
+(procedure §3.4, item 2; NS1; T10) as D-228 set it: the statistic its far-set twins are matched on, the planes each
+twin enters with and their weights, and the slope when the pool has few far nodes.
+
+**Decision [user].** On D-228's open points: "1) Core widths as in the scheme B of matching 2) Near field weights the
+plane based on distance between +- 3 planes from the focus one. Same for the far fit that weights the planes from 4 up
+to 16 i would say. keeping the near field planes of the far fit nodes as validation 3)what to do with the slope if the
+pool has few far nodes:. Fit anyway".
+
+**Statement.** (D-229.1) The far-set twins are matched like the near-set ones: on the core-width statistic, plane by
+plane, by least squares on the core widths (form B) [user]. (D-229.2) Each twin's planes are weighted by their
+distance from focus: a near-set twin on its planes within $k^* \pm 3$; a far-set twin on the planes with
+$|k - k^*|$ from 4 to 16 [user, "i would say"]; a far node's planes within $\pm 3$ do not enter the fit and are kept
+as a validation set, the fitted table predicting them [user]. (D-229.3) The slope $\gamma$ is fitted even when the pool
+has few far nodes [user].
+
+**Why.** One statistic and one matching rule for both sets keep step 2 a single least squares over
+$(\theta_1, \theta_2, \theta_3, \gamma)$; the far nodes' near planes, which the near-set twins already constrain,
+become an independent check of the fitted table.
+
+**What it implies for code and tables.** Step 2's residual is a weighted sum over near twins' planes $k^* \pm 3$ and
+far twins' planes $|k - k^*|$ = 4..16, with a weight that is a function of $|k - k^*|$; the far nodes' planes
+$|k - k^*| \le 3$ go to a validation report (predicted against measured core widths). With few far nodes, $\gamma$ is
+weakly determined (check 10: near twins respond to it at 11-14 % of the 0.84 um knot's sensitivity), so its standard
+error must be reported with it. Not built.
+
+**What it does not decide.** The weighting function of the distance -- its form and its direction (e.g. the inverse of
+each plane's core-width noise variance, which grows as the dip fades and widens away from focus) -- and whether the
+focus plane $k^*$ enters; the weight of far against near twins as wholes; whether Block 10's own far fit moves its
+first plane from 5 (`far_min_k_offset`, PROVISIONAL) to 4 as step 2's far twins do; the validation's acceptance
+criterion.
+
+**Sources.** **[user]** 2026-11-23, 09:31. **[code]** `config.py` at `bac0c1c`: `far_offsets_planes` = 16,
+`far_min_k_offset` = 5 (PROVISIONAL). **[run, sandbox]** check 10 (D-228). **[log]** D-228.
 
 **Status:** active; not built.
