@@ -306,7 +306,7 @@ def line_profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, abso
     from . import line_sgt
     if not isinstance(kernel, line_sgt.SGTKernel):
         raise ValueError("kernel must be None (the Gaussian law) or a line_sgt.SGTKernel, got %r" % (kernel,))
-    raise NotImplementedError("Block 49 (wave 7): the SGT path")
+    return line_sgt.profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache, kernel)
 
 
 def _check_args(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache):
@@ -328,32 +328,45 @@ def _check_args(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorp
     return absorption, mu, prepared, light, cache
 
 
-def _profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache, check=True, S=None, W=None,
-              sink=None):
-    """line_profiles; check=False skips the validity test (the smoke test's
-    measurements only); S, W override the inference's directions (the same).
-    sink: None, or a callable sink(j, zeta_j, k, term) called with every
-    (slab, plane) pair's pixel-mean term (n_rows, n_cols) as it is added to
-    plane k's deficit (amendment 2: the split by depth); the result is the
-    same with or without it."""
+class _Setup(object):
+    """What the slab loop needs (_render_setup): the line, the pixel box, the kept part of the fine lattice, the
+    slabs, the kernel widths and reaches, the absorption. ones: True when the result is exactly 1 (no planes,
+    mu = 0, no column inside the tube, no sample within reach)."""
+
+
+def _render_setup(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache, check, reach=None,
+                  S=None, W=None, extra_checks=None):
+    """The slab loop's setup, shared by the Gaussian path (_profiles) and Block 49's SGT path (line_sgt.profiles):
+    line_profiles' argument checks in its order, then extra_checks() (a callable or None: the SGT path's own
+    ValueErrors), the validity test (check), the mu = 0 shortcut, the pixel box, the footprint, the slabs,
+    sig = sigma_r(zeta_j - z_k) and R_jk = reach x sig (reach None: inference.line_reach_sigmas), the samples
+    within max R_jk of the box, the hybrid's section. -> _Setup (the arithmetic is the one Block 35's loop
+    performed inline)."""
     acq, rcfg, icfg = cfg.acquisition, cfg.renderer, cfg.inference
     absorption, mu, (o, yh, eu, v, n_avg, step, ks_arr, f), light, cache = _check_args(
         tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache)
-    reach = float(icfg.line_reach_sigmas)
+    if extra_checks is not None:
+        extra_checks()
+    reach = float(icfg.line_reach_sigmas) if reach is None else float(reach() if callable(reach) else reach)
+    st = _Setup()
     p, dz, dzeta = float(acq.res0_um), float(acq.dz_um), float(rcfg.dzeta_um)
     h = p / f
     n_planes, n_v = ks_arr.size, v.size
+    st.absorption, st.mu, st.light, st.cache = absorption, mu, light, cache
+    st.o, st.yh, st.eu, st.v, st.n_avg, st.step, st.ks_arr, st.f = o, yh, eu, v, n_avg, step, ks_arr, f
+    st.p, st.dz, st.dzeta, st.h, st.n_planes, st.n_v = p, dz, dzeta, h, n_planes, n_v
+    st.ones = True
     if check and not _is_valid(tube, o, cfg):
         raise ExtrusionInvalid("the line's origin is within inference.extrusion_cap_margin_um of a cap along the "
                                "axis: the extrusion does not hold (D-138.2, D-140); flag the node")
     if n_planes == 0 or mu == 0.0:
-        return np.ones((n_planes, n_v))
+        return st
 
     c_lo, c_hi, r_lo, r_hi, ex, ey = _pixel_box(o, yh, eu, v, n_avg, step, p)
     bx0, bx1, by0, by1 = ex[0], ex[-1], ey[0], ey[-1]
     ix0, iy0, xs_all, ys_all, X, Y, z_lo, z_hi, inside = _footprint(tube, h, p)
     if not inside.any():
-        return np.ones((n_planes, n_v))
+        return st
     zeta = geometry.slab_centres(float(z_lo[inside].min()), float(z_hi[inside].max()), dzeta)
     z_planes = ks_arr * dz
     sig = sigma_r(zeta[:, None] - z_planes[None, :], rcfg)        # (J, n_planes), um
@@ -365,7 +378,7 @@ def _profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorpti
     dist = np.hypot(dxb[None, :], dyb[:, None])
     keep = inside & (dist <= float(R_j.max()))
     if not keep.any():
-        return np.ones((n_planes, n_v))
+        return st
     kr = np.flatnonzero(keep.any(axis=1))
     kc = np.flatnonzero(keep.any(axis=0))
     sl = (slice(int(kr[0]), int(kr[-1]) + 1), slice(int(kc[0]), int(kc[-1]) + 1))
@@ -373,15 +386,30 @@ def _profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorpti
     X, Y, z_lo, z_hi, inside, dist = X[sl], Y[sl], z_lo[sl], z_hi[sl], inside[sl], dist[sl]
 
     section = None
+    c3 = None
     if absorption == "hybrid":
         if S is None:
             S, W = ray_world.directions(icfg.ray_n_rho, icfg.ray_n_psi, rcfg.ray_na, rcfg.ray_n_oil)
         section = _section_for(tube, mu, S, W, light, cache)
         c3 = np.asarray(tube.c, dtype=float)
 
-    n_rows, n_cols = r_hi - r_lo + 1, c_hi - c_lo + 1
-    deficit = np.zeros((n_planes, n_rows, n_cols))
-    for j in range(zeta.size):
+    st.ones = False
+    st.c_lo, st.c_hi, st.r_lo, st.r_hi, st.bx0, st.bx1, st.by0, st.by1 = c_lo, c_hi, r_lo, r_hi, bx0, bx1, by0, by1
+    st.ix0, st.iy0, st.X, st.Y, st.z_lo, st.z_hi, st.inside, st.dist = ix0, iy0, X, Y, z_lo, z_hi, inside, dist
+    st.zeta, st.z_planes, st.sig, st.R_jk, st.R_j = zeta, z_planes, sig, R_jk, R_j
+    st.section, st.c3 = section, c3
+    st.n_rows, st.n_cols = r_hi - r_lo + 1, c_hi - c_lo + 1
+    return st
+
+
+def _slab_maps(st, order=None):
+    """For each slab j whose drawn samples (within R_j of the box) meet the tube: (j, zeta_j, rs, cs, dA, dmin),
+    rs, cs the slices of the kept lattice holding the slab's samples, dA (rows, cols) its absorbed light under the
+    absorption named (0 outside the slab), dmin the distance (um) of its nearest drawn sample from the box. order:
+    the slabs' indices in the order wanted (None: increasing; the Gaussian path's)."""
+    zeta, dzeta, mu, light = st.zeta, st.dzeta, st.mu, st.light
+    inside, z_lo, z_hi, dist, R_j = st.inside, st.z_lo, st.z_hi, st.dist, st.R_j
+    for j in (range(zeta.size) if order is None else order):
         zj = float(zeta[j])
         hit = inside & (z_lo < zj + 0.5 * dzeta) & (z_hi > zj - 0.5 * dzeta) & (dist <= R_j[j])
         if not hit.any():
@@ -392,34 +420,58 @@ def _profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorpti
         m = hit[rs, cs]
         zl, zh = z_lo[rs, cs], z_hi[rs, cs]
         a = geometry.slab_absorbance(zl, zh, zj, dzeta, mu)
-        if absorption == "hybrid":
+        if st.absorption == "hybrid":
+            c3 = st.c3
             mm = m & (a > 0)
             dA = np.zeros(m.shape)
             if mm.any():
                 zbar = 0.5 * (np.maximum(zl[mm], zj - 0.5 * dzeta) + np.minimum(zh[mm], zj + 0.5 * dzeta))
-                q = np.column_stack([X[rs, cs][mm] - c3[0], Y[rs, cs][mm] - c3[1], zbar - c3[2]])
-                dA[mm] = a[mm] * section.h(q)
-        elif absorption == "partition_vertical":
+                q = np.column_stack([st.X[rs, cs][mm] - c3[0], st.Y[rs, cs][mm] - c3[1], zbar - c3[2]])
+                dA[mm] = a[mm] * st.section.h(q)
+        elif st.absorption == "partition_vertical":
             dA = np.where(m, geometry.transmitted_before(zl, zh, zj, dzeta, mu, light) * (-np.expm1(-a)), 0.0)
         else:
             dA = np.where(m, a, 0.0)
         dmin = float(dist[rs, cs][m].min())
-        for k in range(n_planes):
+        yield j, zj, rs, cs, dA, dmin
+
+
+def _read(st, deficit):
+    """tau (n_planes, n_v) = 1 - profiles.sample_profile of each plane's pixel-mean deficit (n_rows, n_cols)."""
+    frame = _lr._Frame(st.c_lo, st.r_lo, st.p)
+    out = np.empty((st.n_planes, st.n_v))
+    for k in range(st.n_planes):
+        out[k] = 1.0 - sample_profile(deficit[k], frame, st.o, st.yh, st.eu, st.v, st.n_avg, st.step)
+    return out
+
+
+def _profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache, check=True, S=None, W=None,
+              sink=None):
+    """line_profiles; check=False skips the validity test (the smoke test's
+    measurements only); S, W override the inference's directions (the same).
+    sink: None, or a callable sink(j, zeta_j, k, term) called with every
+    (slab, plane) pair's pixel-mean term (n_rows, n_cols) as it is added to
+    plane k's deficit (amendment 2: the split by depth); the result is the
+    same with or without it."""
+    st = _render_setup(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache, check,
+                       None, S, W)
+    if st.ones:
+        return np.ones((st.n_planes, st.n_v))
+    f, h, p, c_lo, r_lo, n_rows, n_cols = st.f, st.h, st.p, st.c_lo, st.r_lo, st.n_rows, st.n_cols
+    sig, R_jk = st.sig, st.R_jk
+    deficit = np.zeros((st.n_planes, n_rows, n_cols))
+    for j, zj, rs, cs, dA, dmin in _slab_maps(st):
+        for k in range(st.n_planes):
             if dmin > R_jk[j, k]:
                 continue
             s = float(sig[j, k])
-            Kx = _pixel_kernel_lattice(c_lo, n_cols, ix0 + cs.start, cs.stop - cs.start, f, s, h, p)
-            Ky = _pixel_kernel_lattice(r_lo, n_rows, iy0 + rs.start, rs.stop - rs.start, f, s, h, p)
+            Kx = _pixel_kernel_lattice(c_lo, n_cols, st.ix0 + cs.start, cs.stop - cs.start, f, s, h, p)
+            Ky = _pixel_kernel_lattice(r_lo, n_rows, st.iy0 + rs.start, rs.stop - rs.start, f, s, h, p)
             term = Ky @ (dA @ Kx.T)
             deficit[k] += term
             if sink is not None:
                 sink(j, zj, k, term)
-
-    frame = _lr._Frame(c_lo, r_lo, p)
-    out = np.empty((n_planes, n_v))
-    for k in range(n_planes):
-        out[k] = 1.0 - sample_profile(deficit[k], frame, o, yh, eu, v, n_avg, step)
-    return out
+    return _read(st, deficit)
 
 
 # ------------------------------------- the own shadow split by depth (amendment 2) ---
