@@ -525,24 +525,50 @@ def predict_factory(pilots, half_lengths, cfg, cache):
     return factory
 
 
-def forward_factory(pilot, half_length, node, cfg, cache):
-    """-> forward(d, mu, v0, z_ax) -> (n_planes, n_v) dimensionless, Block 30's forward model:
-    line_fast.line_profiles(local_tube(pilot, node.node_xyz, d, v0, z_ax - z_t, U_minus, U_plus), mu,
-    node.ks, node's line, cfg, cache=cache): v0 about the trace, z_ax absolute (um) = z_t + dz; half_length =
-    (U_minus, U_plus) um along the model axis (amendment 3). An ExtrusionInvalid returns NaN (Block 30 fails
-    that start)."""
+def forward_factory(pilot, half_length, node, cfg, cache, kernel_family="gaussian"):
+    """-> forward, Block 30's forward model: line_fast.line_profiles(local_tube(pilot, node.node_xyz, d, v0,
+    z_ax - z_t, U_minus, U_plus), mu, node.ks, node's line, cfg, cache=cache): v0 about the trace, z_ax absolute
+    (um) = z_t + dz; half_length = (U_minus, U_plus) um along the model axis (amendment 3). An ExtrusionInvalid
+    returns NaN (Block 30 fails that start). kernel_family (amendment 23, D-225): "gaussian" -> forward(d, mu, v0,
+    z_ax), Block 4's law; "sgt" -> forward(d, mu, v0, z_ax, beta, xi, zeta), Block 49's SGT point-spread function of
+    shape (beta, xi, zeta) at the law's FWHM."""
+    if kernel_family not in ("gaussian", "sgt"):
+        raise ValueError("kernel_family must be 'gaussian' or 'sgt', got %r" % (kernel_family,))
     Um, Up = (float(x) for x in half_length)
     trace = np.asarray(node.node_xyz, dtype=float)
     args = _line_args(node)
     shape = (len(node.ks), len(node.v))
 
-    def forward(d, mu, v0, z_ax):
+    def tube_of(d, v0, z_ax):
+        return local_tube(pilot, trace, d, v0, float(z_ax) - float(trace[2]), Um, Up)
+
+    if kernel_family == "gaussian":
+        def forward(d, mu, v0, z_ax):
+            try:
+                return line_fast.line_profiles(tube_of(d, v0, z_ax), mu, *args, cfg, cache=cache)
+            except line_fast.ExtrusionInvalid:
+                return np.full(shape, np.nan)
+        return forward
+
+    from ..model import line_sgt
+
+    def forward_sgt(d, mu, v0, z_ax, beta, xi, zeta):
         try:
-            return line_fast.line_profiles(local_tube(pilot, trace, d, v0, float(z_ax) - float(trace[2]), Um, Up),
-                                           mu, *args, cfg, cache=cache)
+            return line_fast.line_profiles(tube_of(d, v0, z_ax), mu, *args, cfg, cache=cache,
+                                           kernel=line_sgt.SGTKernel(beta, xi, zeta))
         except line_fast.ExtrusionInvalid:
             return np.full(shape, np.nan)
-    return forward
+    return forward_sgt
+
+
+def forward_cov_factory(pilot, half_length, node, cfg, cache, kernel_family="gaussian"):
+    """-> forward_factory's model on the error bars' lattice: line_fine_factor = inference.cov_fine_factor (amendment
+    23, D-224.2), the rest of cfg unchanged; None when cov_fine_factor is 0 (the fit's own Jacobian)."""
+    f = int(cfg.inference.cov_fine_factor)
+    if f == 0:
+        return None
+    cfg_cov = dataclasses.replace(cfg, inference=dataclasses.replace(cfg.inference, line_fine_factor=f))
+    return forward_factory(pilot, half_length, node, cfg_cov, cache, kernel_family)
 
 
 # ------------------------------------------------------------ work list ---

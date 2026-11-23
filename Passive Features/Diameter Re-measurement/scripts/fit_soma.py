@@ -102,6 +102,8 @@ def main(argv=None):
                     help="fit the kernel's far slope (D-218.1) or hold it at --slope0 (D-218.2); default soma_fit.far_slope")
     ap.add_argument("--slope0", type=float, default=None,
                     help="the far slope's start, or its held value (um/um); default renderer.kernel_continuation_slope")
+    import kernel_width                                           # Block 36 amendment 22 (D-221.1, D-222.3)
+    kernel_width.add_arguments(ap)
     a = ap.parse_args(argv)
     import clean_cell
     from build_table import load_config
@@ -110,6 +112,10 @@ def main(argv=None):
     from allen_diameter.plotting.figures import image_extent_um
     from allen_diameter.plotting.soma_figures import save
     cfg = load_config(a.config_json) if a.config_json else default_config()
+    try:                                                          # the width switch (Block 36 amendment 22)
+        cfg, kw = kernel_width.apply(cfg, a.kernel_width, a.sigma_json)
+    except ValueError as exc:
+        ap.error(str(exc))
     rcfg, q = cfg.renderer, cfg.soma_fit
     if a.far_slope is not None:
         q = dataclasses.replace(q, far_slope=a.far_slope)
@@ -124,6 +130,7 @@ def main(argv=None):
     out = a.out or os.path.join(os.getcwd(), "soma_fit_%s" % a.specimen)
     os.makedirs(out, exist_ok=True)
     log = lambda msg: print("[fit_soma] %s" % msg, flush=True)      # noqa: E731
+    log(kernel_width.describe(kw))
     t0 = time.time()
 
     # the traced soma and the start (Block 44's geometry)
@@ -240,7 +247,7 @@ def main(argv=None):
                stems=stems, swc_out=swc_out, slope0=slope0, settings=dataclasses.asdict(q),
                kernel=dict(sigma_r0_um=rcfg.sigma_r0_um, table_delta_um=list(rcfg.kernel_table_delta_um),
                            table_sigma_um=list(rcfg.kernel_table_sigma_um), continuation=rcfg.kernel_continuation,
-                           continuation_slope=rcfg.kernel_continuation_slope),
+                           continuation_slope=rcfg.kernel_continuation_slope), kernel_width=kw,
                synthetic_truth=None if truth is None else truth, seconds=time.time() - t0)
     with open(os.path.join(out, "soma_fit_%s.json" % a.specimen), "w") as f:
         json.dump(_json_safe(rec), f, indent=1, allow_nan=False)

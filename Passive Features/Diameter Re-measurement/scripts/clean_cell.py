@@ -70,6 +70,7 @@ from allen_diameter.analysis.node_pipeline import measure_pilot  # noqa: E402
 from allen_diameter.loading import features_io, swc_io, table_io  # noqa: E402
 from allen_diameter.model import kernel, line_fast, shadow  # noqa: E402
 from build_table import load_config  # noqa: E402
+import kernel_width  # noqa: E402  (Block 36 amendment 22)
 
 # the synthetic cell of --synthetic (tests/smoke/fixtures_cell.py): 14 nodes 1.18 um apart, so
 # that the middle nodes are not near_end at the default margins; the rendered tube's d and mu
@@ -186,10 +187,15 @@ def own_figures(out_dir, nid, node, profiles_gl, B_gl, split, clr, v_axis_um, me
     return files
 
 
+KERNEL_WIDTH = None     # the switch's record of this run (Block 36 amendment 22), set by main
+
+
 def config_sections(cfg):
-    """The configuration's cleaning and inference sections (D-136.5) and the full signature."""
+    """The configuration's cleaning and inference sections (D-136.5), the full signature and the kernel width's
+    record (Block 36 amendment 22: the mode, the values and the base renderer, which infer_nodes.py re-anchors when
+    given its own switch)."""
     return dict(cleaning=dataclasses.asdict(cfg.cleaning), inference=dataclasses.asdict(cfg.inference),
-                config=json.loads(cfg.to_json()))
+                config=json.loads(cfg.to_json()), kernel_width=KERNEL_WIDTH)
 
 
 # ------------------------------------------------------------------- cell ---
@@ -979,6 +985,7 @@ def _common(p):
     p.add_argument("--z0", type=float, default=None, help="um subtracted from the SWC z")
     p.add_argument("--config-json", default="", help="a configuration JSON (config_from_dict); default: the defaults")
     p.add_argument("--synthetic", action="store_true", help="the smoke tests' synthetic cell, no network (dry run)")
+    kernel_width.add_arguments(p)
     p.add_argument("--sigma-r0-um", type=float, default=None, help="the kernel's in-focus width (um): the table "
                    "re-anchored at it, its growth with defocus kept (Block 36, amendment 14; default: the "
                    "configuration's renderer.sigma_r0_um)")
@@ -1038,6 +1045,14 @@ def main(argv=None):
                ["%.2f" % d for d in ren.kernel_table_delta_um]))
         cfg = dataclasses.replace(cfg, renderer=ren)
         cfg.validate()
+    if a.kernel_width == "calibrated" and a.sigma_r0_um is not None:   # Block 36 amendment 22
+        ap.error("--kernel-width calibrated and --sigma-r0-um are exclusive (Block 36 amendment 22)")
+    global KERNEL_WIDTH
+    try:
+        cfg, KERNEL_WIDTH = kernel_width.apply(cfg, a.kernel_width, a.sigma_json)
+    except ValueError as exc:
+        ap.error(str(exc))
+    log(kernel_width.describe(KERNEL_WIDTH))
     if a.cmd == "survey":
         return run_survey(a, cfg, log)
     if a.cmd == "rank":

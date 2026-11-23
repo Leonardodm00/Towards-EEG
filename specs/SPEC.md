@@ -1945,7 +1945,9 @@ v_um, lambda_um, centre_offset_um=0.0, keep=None, planes=None, shape0=None, forw
 `shape0` not three finite numbers with $\beta > 0$, $\zeta > 0$, or outside the box; the rest as today.
 (G) The caller's sequence (Block 36, amendment 23): the Gaussian fit as today; with `kernel_family` "sgt", the SGT fit
 from the Gaussian estimate -- `theta0` = $\hat\theta_G$, `shape0` = `sgt_start_shape` (the Gaussian member),
-`multistart_factors` (1.0,), the same planes and $z$ box (D-224.1).
+`multistart_factors` (1.0,), the same planes, weights and cut (D-224.1); its $z_{\rm ax}$ box about the Gaussian
+estimate's depth (`fit_node_recentred` centres the box on its start) [corrected 2026-11-23, the orchestrator: "the
+same $z$ box" would need a box argument `fit_node_recentred` does not have].
 Test oracles (added to `tests/smoke/test_smoke_node_inference.py`), with a stand-in `forward` built in the test in
 which the shape enters as it does in the renderer (each plane's profile the tube's chord profile convolved with
 `blur_kernels.sgt_kernel_pdf` of an FWHM growing with $|z_k - z_{\rm ax}|$, on a fine 1-D grid): (i) noise-free
@@ -1990,9 +1992,12 @@ the JSON's `d_um`, `se_d_um`, `mu_per_um`, ... are the SGT fit's under "sgt" -- 
 `gauss_d_um`, `gauss_se_d_um`, `gauss_status`, `gauss_chi2`; `cov_source`; the per-node figure (Block 34) draws the
 estimate's model; the node's log line names the kernel and the shape. (iv) Command line: `--kernel gaussian|sgt`
 (default: `inference.kernel_family`), `--sgt-skew off|fit` (default: `inference.sgt_skew`), `--cov-fine-factor N`
-(default: `inference.cov_fine_factor`; 0 = the fit's own Jacobian), with amendment 22's switch. (v) Notebook: Cell 18's
-and Cell 18b's `KERNEL`, `SGT_SKEW`, `KERNEL_WIDTH`, `SIGMA_JSON`, `COV_FINE_FACTOR`; Cell 25 (the soma) `KERNEL_WIDTH`,
-`SIGMA_JSON`.
+(default: `inference.cov_fine_factor`; 0 = the fit's own Jacobian), `--nodes` (a subset of the preparation's example
+nodes, for time), with amendment 22's switch. The same-node clearance (amendment 11) is a cleaning product and keeps
+the Gaussian fit's estimate (D-222.4). (v) Notebook: Cell 16 sets `KERNEL_WIDTH` and `SIGMA_JSON` (`KW_ARGS`, passed to
+Cells 20, 25 and 26; the thick nodes' preparation of Cell 23 stays fixed, so that the calibration is not re-anchored on
+itself); Cell 20 gains `COV_FINE_FACTOR`; a new Cell 26 fits Cell 20's prepared nodes with the SGT kernel and shows the
+Gaussian and the SGT fits side by side (`KERNEL`, `SGT_SKEW`, `COV_FINE_FACTOR`, `SGT_NODES`).
 
 ## 6. Pipeline entry points
 

@@ -184,15 +184,30 @@ def fit_one(cleaning_dir, specimen, nid, config_json, out_dir):
     return row, dict(depth_um=depth)
 
 
-def write_outputs(out, a, ids, rows, scfg, summary, t0):
-    """sigma_<S>.csv and sigma_<S>.json of the nodes done so far, in the order of ids (strict JSON, F3)."""
+def write_outputs(out, a, ids, rows, scfg, summary, t0, summary_growth_scale=None):
+    """sigma_<S>.csv and sigma_<S>.json of the nodes done so far, in the order of ids (strict JSON, F3); the growth
+    scale's summary beside sigma0's (Block 36 amendment 22, D-222.3: the switch to the calibrated kernel reads both)."""
     done = [rows[i] for i in ids if i in rows]
     write_csv(os.path.join(out, "sigma_%s.csv" % a.specimen), done)
     with open(os.path.join(out, "sigma_%s.json" % a.specimen), "w") as f:
         json.dump(_json_safe(dict(specimen=a.specimen, cleaning_dir=a.cleaning_dir, nodes=ids,
-                                  config=dataclasses.asdict(scfg), summary=summary, fits=done,
+                                  config=dataclasses.asdict(scfg), summary=summary,
+                                  summary_growth_scale=summary_growth_scale, fits=done,
                                   complete=summary is not None, seconds=time.time() - t0)),
                   f, indent=1, allow_nan=False)
+
+
+def growth_scale_summary(ordered):
+    """The growth scale c's summary (Block 36 amendment 22): sigma_calibration.summarize over the nodes ok (converged,
+    neither sigma0 nor c at a bound) with a finite c and a finite SE(c) > 0, its keys without the unit."""
+    c = np.array([_num(r.get("growth_scale")) for r in ordered], dtype=float)
+    se = np.array([_num(r.get("se_growth_scale")) for r in ordered], dtype=float)
+    ok = np.array([bool(r.get("ok")) for r in ordered], dtype=bool)
+    with np.errstate(invalid="ignore"):
+        ok = ok & np.isfinite(c) & np.isfinite(se) & (se > 0)
+    s = SC.summarize(np.where(ok, c, np.nan), np.where(ok, se, np.nan), ok)
+    return dict(n=s["n"], median=s["median_um"], mad=s["mad_um"], ivw_mean=s["ivw_mean_um"], ivw_se=s["ivw_se_um"],
+                chi2_cons=s["chi2_cons"], dof=s["dof"])
 
 
 def write_csv(path, rows):
@@ -274,7 +289,8 @@ def main(argv=None):
     se = np.array([r["se_sigma0_um"] for r in ordered], dtype=float)
     ok = np.array([bool(r["in_summary"]) for r in ordered], dtype=bool)
     summary = SC.summarize(np.where(ok, sig, np.nan), np.where(ok, se, np.nan), ok)
-    write_outputs(out, a, ids, rows, scfg, summary, t0)
+    summary_c = growth_scale_summary(ordered)
+    write_outputs(out, a, ids, rows, scfg, summary, t0, summary_growth_scale=summary_c)
     from allen_diameter.plotting import sigma_figures as SF
     srows = [dict(node_id=r["node_id"], sigma0_um=r["sigma0_um"], se_sigma0_um=r["se_sigma0_um"],
                   growth_scale=r["growth_scale"], se_growth_scale=r["se_growth_scale"], d_hat_um=r["d_um"],
@@ -291,6 +307,10 @@ def main(argv=None):
           "weighted mean %.4f +- %.4f um, chi2_cons %.2f on %s dof; %.0f s"
           % (summary["n"], summary["median_um"], summary["mad_um"], summary["ivw_mean_um"], summary["ivw_se_um"],
              summary["chi2_cons"], summary["dof"], time.time() - t0))
+    print("growth scale c over %d node(s) (ok, a finite c and SE): median %.4f (MAD %.4f), weighted mean %.4f +- %.4f, "
+          "chi2_cons %.2f on %s dof -- with sigma0's weighted mean, the values --kernel-width calibrated applies "
+          "(D-222.3)" % (summary_c["n"], summary_c["median"], summary_c["mad"], summary_c["ivw_mean"],
+                         summary_c["ivw_se"], summary_c["chi2_cons"], summary_c["dof"]))
     # Block 36 amendment 21 (D-220.3): name what was written; no node fitted -> exit 1
     failed = [str(r["node_id"]) for r in ordered if r["status"] == "error"]
     n_err = len(failed)

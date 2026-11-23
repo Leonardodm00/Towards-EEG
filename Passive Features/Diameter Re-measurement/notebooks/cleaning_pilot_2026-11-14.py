@@ -84,7 +84,11 @@ ALIGN = ["--shift-x", SHIFT_X, "--shift-y", SHIFT_Y, "--z0", Z0] + ([] if FLIP_H
 # nodes and when the cell is stopped, so a stopped survey still leaves a usable table and example file.
 #
 # Knobs: `B_GL`, `MU` (Cell 7 of 2026-11-10 printed 159.0 gl and 0.258 /um for the pilot); `KERNEL_SLOPE` (None: the
-# far fit's slope if it is a production kernel, else the configured 0.79 beyond the table's last depth).
+# far fit's slope if it is a production kernel, else the configured 0.79 beyond the table's last depth);
+# `KERNEL_WIDTH` (D-221.1, D-222.3; SPEC Block 36 amendment 22): "fixed" keeps the kernel's in-focus width at the
+# configured 0.080 um; "calibrated" re-anchors the kernel at Cell 23B's inverse-variance weighted means of sigma0 and of
+# the growth scale c (`SIGMA_JSON`, Cell 23B's sigma_<S>.json). The switch reaches the fits of Cells 20, 25 and 26
+# (`KW_ARGS`); the thick nodes' preparation of Cell 23 stays fixed, so that the calibration is not re-anchored on itself.
 # Output to send back: the line `kernel used: ...`, the count per class, and the list of example nodes.
 
 # %%
@@ -92,6 +96,9 @@ import json
 B_GL, MU = 159.0, 0.258          # gl, 1/um: the pilot's medians (Cell 7, 2026-11-10)
 KERNEL_SLOPE = None              # um of SD per um of defocus beyond the table; None = far fit if production, else configured
 SURVEY_MAX_NODES = 600          # a random sample (about 30 min); None = all 8496 nodes (about 7 h)
+KERNEL_WIDTH = "fixed"           # "fixed" (0.080 um in focus, D-172) or "calibrated" (Cell 23B's means, D-222.3)
+SIGMA_JSON = "%s/cleaning_thick/sigma/sigma_%d.json" % (OUT, SPECIMEN)   # Cell 23B's output, read when "calibrated"
+KW_ARGS = ["--kernel-width", KERNEL_WIDTH] + (["--sigma-json", SIGMA_JSON] if KERNEL_WIDTH == "calibrated" else [])
 CLEAN = OUT + "/cleaning"
 INFER = OUT + "/inference"
 os.makedirs(CLEAN, exist_ok=True)
@@ -490,7 +497,10 @@ plt.show()
 #      (FWHM^2 = (0.866 D_Allen)^2 + (2.355 sigma_r(0))^2, sigma_r(0) = 0.080 um), re-centred while fitting; a second
 #      dip beside the central one that rises at least BUMP_SD noise SDs gives no weight to the samples from it
 #      outwards. Then the node's own expected shadow (same-node clearance) at the estimate.
-# Knobs: WEIGHT_KAPPA, BUMP_SD (0 = no cut), D169_WEIGHTS ("none" = unweighted), D169_STARTS.
+# Knobs: WEIGHT_KAPPA, BUMP_SD (0 = no cut), D169_WEIGHTS ("none" = unweighted), D169_STARTS; COV_FINE_FACTOR (D-224.2;
+# SPEC Block 36 amendment 23): the error bars from the model at line_fine_factor 32 (p/32, where they converge) -- about
+# nine renders 20 times the fit's cost each, so it adds roughly the fit's own time again per node; 0 = the fit's own
+# Jacobian, as before (faster, its SE(d) off by tens of percent on thin nodes). Cell 16's KERNEL_WIDTH applies.
 # Time (measured on the pilot, 2026-11-19, Colab): preparation 7.7 min; the fit 305 min for the five nodes, from
 # 6 min (5353, fitted 0.77 um) to 111 min (639, fitted 2.82 um) -- it grows with the diameter the fit reaches.
 # [corrected 2026-11-19: the earlier estimate here, "several minutes to a quarter of an hour per node", was wrong]
@@ -507,6 +517,7 @@ WEIGHT_KAPPA = 1.25                    # lambda in units of the FWHM from Allen'
 BUMP_SD = 2.0                          # a near bump rises at least this many noise SDs (D-171.3); 0 = no cut
 D169_WEIGHTS = "allen"                 # "allen": the centre weights; "none": unweighted (the bump cut still applies)
 D169_STARTS = "1.0,1.6"                # the fit's starts, x Allen's diameter; "1.0" alone drops one start (time saved not measured)
+COV_FINE_FACTOR = 32                   # the error bars' lattice (D-224.2); 0 = the fit's own Jacobian (faster)
 D169_BINS, D169_N_PER_BIN, D169_MIN_SOMA_UM = "0.40,0.45,0.60,0.80,1.20,5.0", 1, 20.0
 RERUN_D169_PREP = False                # True: prepare the nodes again although the folder holds them
 CLEAN_D, INFER_D = OUT + "/cleaning_d169", OUT + "/inference_d169"
@@ -527,7 +538,8 @@ if RERUN_D169_PREP or not os.path.exists("%s/cleaning_%d.json" % (CLEAN_D, SPECI
     run("scripts/clean_cell.py", "clean", "--specimen", SPECIMEN, "--out", CLEAN_D, "--cache-dir", CACHE_DIR, *ALIGN,
         *CLEAN_CFG, "--examples", EXAMPLES_D, "--B", B_GL, "--mu", MU, "--no-clean")
 run("scripts/infer_nodes.py", "real", "--specimen", SPECIMEN, "--cleaning-dir", CLEAN_D, "--out", INFER_D,
-    "--weights", D169_WEIGHTS, "--bump-sd", BUMP_SD, "--weight-kappa", WEIGHT_KAPPA, "--starts", D169_STARTS)
+    "--weights", D169_WEIGHTS, "--bump-sd", BUMP_SD, "--weight-kappa", WEIGHT_KAPPA, "--starts", D169_STARTS,
+    "--cov-fine-factor", COV_FINE_FACTOR, *KW_ARGS)
 run("scripts/show_focal.py", "--cleaning-dir", CLEAN_D, "--specimen", SPECIMEN, "--inference-dir", INFER_D,
     "--zoom-um", 6.0)
 res_d = pd.read_csv("%s/inference_%d.csv" % (INFER_D, SPECIMEN))
@@ -790,8 +802,45 @@ k_start = SOMA_FIT_K if SOMA_FIT_K is not None else globals().get("SOMA_K")
 choice = (([] if k_start is None else ["--soma-k", k_start]) + ["--far-slope", FAR_SLOPE]
           + ([] if SLOPE0 is None else ["--slope0", SLOPE0]))
 run("scripts/fit_soma.py", "--specimen", SPECIMEN, "--cache-dir", CACHE_DIR, *ALIGN, *CLEAN_CFG, "--out", SOMA_FIT_OUT,
-    *choice)
+    *choice, *KW_ARGS)       # Cell 16's KERNEL_WIDTH (Block 36 amendment 22)
 for name in ("soma_fit_%d_planes.png" % SPECIMEN, "soma_fit_%d_summary.png" % SPECIMEN,
              "soma_fit_%d_morphology.png" % SPECIMEN):
     print(SOMA_FIT_OUT + "/" + name)
     display(Image(filename=SOMA_FIT_OUT + "/" + name))
+
+# %% [markdown]
+# ## Cell 26: the per-node fit with the SGT kernel -- Cell 20's nodes, the Gaussian fit and the SGT fit side by side (D-221, D-222, D-224, D-225; SPEC Block 49, Block 30 amendment 3, Block 36 amendment 23)
+#
+# Run after Cells 0, 1, 16 and 20 (it reads Cell 20's prepared nodes, OUT/cleaning_d169; no download). Per node the
+# Gaussian fit of Cell 20 is run again, then the fit with the skewed generalized-t kernel (D-052.1) started from its
+# estimate at the Gaussian member: the kernel's FWHM at each slab-plane defocus is the Gaussian law's (D-222.2), its
+# shape (beta: the core, xi: the tails) is fitted per node, the skew zeta held at 1 (SGT_SKEW "off": the isotropic PSF;
+# "fit" frees it, as an asymmetry along the node's measuring line). The node's estimate is the SGT fit's; the Gaussian
+# fit's d is beside it (gauss_d_um). The error bars come from the model at line_fine_factor COV_FINE_FACTOR (D-224.2;
+# 0 = the fit's own Jacobian). Cell 16's KERNEL_WIDTH applies. Time: the SGT renderer is slower than the Gaussian one
+# (Block 49's report gives the factor) and Cell 20 took 6 to 111 min per node with the Gaussian alone, growing with the
+# diameter: start with the thinner nodes (SGT_NODES, e.g. "5353"; None: all of Cell 20's).
+# Output to send back: the lines `node <id>: d ...` of the log, the table, and the `fit_node<id>.png` figures.
+
+# %%
+import glob, os                       # the cell's own imports
+import pandas as pd
+from IPython.display import Image, display
+SGT_SKEW = "off"                      # "off": zeta = 1 (the isotropic PSF, D-222.1); "fit": zeta fitted too
+COV_FINE_FACTOR = 32                  # the error bars' lattice (D-224.2); 0 = the fit's own Jacobian (faster)
+SGT_NODES = None                      # e.g. "5353" or "5353,599"; None: all of Cell 20's nodes
+CLEAN_D, INFER_S = OUT + "/cleaning_d169", OUT + "/inference_sgt"
+os.makedirs(INFER_S, exist_ok=True)
+run("scripts/infer_nodes.py", "real", "--specimen", SPECIMEN, "--cleaning-dir", CLEAN_D, "--out", INFER_S,
+    "--weights", globals().get("D169_WEIGHTS", "allen"), "--bump-sd", globals().get("BUMP_SD", 2.0),   # Cell 20's
+    "--weight-kappa", globals().get("WEIGHT_KAPPA", 1.25), "--starts", globals().get("D169_STARTS", "1.0,1.6"),
+    "--kernel", "sgt", "--sgt-skew", SGT_SKEW, "--cov-fine-factor", COV_FINE_FACTOR, *KW_ARGS,
+    *([] if SGT_NODES is None else ["--nodes", SGT_NODES]))
+res_s = pd.read_csv("%s/inference_%d.csv" % (INFER_S, SPECIMEN))
+res_s["sgt_over_gauss"] = res_s["d_hat_um"] / res_s["gauss_d_um"]
+display(res_s[["node_id", "d_allen_um", "gauss_d_um", "gauss_se_d_um", "d_hat_um", "se_d_um", "sgt_over_gauss",
+               "beta", "se_beta", "xi", "se_xi", "zeta", "truncated_mass", "chi2_mean", "gauss_chi2_mean", "status",
+               "gauss_status", "at_bound", "cov_source", "seconds"]].round(4))
+for path in sorted(glob.glob(INFER_S + "/fit_node*.png")):
+    print(path)
+    display(Image(filename=path))
