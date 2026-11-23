@@ -21,6 +21,7 @@
 | 2026-11-23 (later) | Section 15, new: the kernel work of D-221/D-222 and its identifiability check (`checks/sgt_identifiability_2026-11-23/`); the wave-6 final check settled (D-223). |
 | 2026-11-23 (later, 2) | Section 15.1, new [row added 2026-11-23, later, 3: it was written without one]: wave 7 merged -- the SGT kernel in the line renderer (Block 49), the fit's SGT option and fine-lattice error bars (Block 30 amendment 3), the width switch (Block 36 amendments 22-23); D-224, D-225, D-232. Evidence: `checks/sgt_psf_2d_2026-11-23/`, Block 49's and Block 30's reports, the synthetic run **[run, sandbox]**. |
 | 2026-11-23 (later, 3) | Wave 7's final check came back (PASS WITH ISSUES) and was settled (D-233): section 15.2, new; 15.1's status bullet superseded and its synthetic times marked as p/16. Evidence: `specs/test_reports/2026-11-23_1355_incremental.md`, the tester's reproducers rerun on the fixes, the times measured at p/32 **[run, sandbox]**. |
+| 2026-11-23 (later, 4) | Notebook Cells 23 (B), 25 and 26 delivered to the user (17:46, "deliver the 25, 23b and 26 cells"): section 15.2's last bullet, new. Evidence: the three cells run on the synthetic cell in the sandbox **[run, sandbox]**. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -690,3 +691,11 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   D-233 on `main` (`13f75f8`). The fixes are not yet re-checked by an independent tester: on the roadmap the blocks whose
   modules include `config.py` show as pushed until the next run, while Blocks 36 and 48 stay done there (their scripts'
   changes lie outside the roadmap's module map, which follows SPEC's Module lines).
+- **The notebook's Cells 23 (B), 25 and 26** [2026-11-23, 17:58; delivered as `cells_23B_25_26_2026-11-23.py`, taken
+  from `notebooks/cleaning_pilot_2026-11-14.py`]: Cell 23 (B) prints both summaries (sigma0's and c's) and the two
+  weighted means Cell 16's "calibrated" switch reads; Cells 25 and 26 use `--kernel-width fixed` when Cell 16 predates
+  wave 7 and print the width used; Cell 26 starts with node 5353 alone (`SGT_NODES`), shows the `flags` column, and
+  needs only Cell 20's prepared nodes on Drive. Run on the synthetic cell in the sandbox **[run, sandbox]**: Cell 23 (B)
+  on its two nodes gives sigma0 0.0799 +- 0.0018 um and c 1.012 +- 0.011 (the truth 0.080 and 1); Cell 25 recovers the
+  synthetic soma with the fixed and with that calibrated width; Cell 26 on one node (fast configuration, the fit's own
+  Jacobian, 301 s) ends at the Gaussian member, beta 1.99 +- 0.12, xi 0.00 +- 0.09, d equal to the Gaussian fit's.
