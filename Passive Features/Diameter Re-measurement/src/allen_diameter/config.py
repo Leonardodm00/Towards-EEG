@@ -50,6 +50,8 @@ CANDIDATE_SOURCES = ("cell", "table")                           # D-109, D-112 (
 FOCUS_RULES = ("gradient_energy", "dip_depth")                 # D-030: gradient energy; dip depth = handoff Eq. 1, comparison
 PILOT_DIAMETERS = ("allen", "free")                             # D-178: the first stage's diameter, held at Allen's or fitted
 INFERENCE_WEIGHTS = ("allen", "none")                           # D-169.4, D-167.1: the per-node fit's residual weights (Block 39)
+INFERENCE_KERNELS = ("gaussian", "sgt")                         # D-221.2, D-222.4: the per-node fit's kernel (Block 49)
+SGT_SKEWS = ("off", "fit")                                      # D-222.1: zeta held at 1 or fitted
 FOCUS_GRAD_WINDOWS = ("radius_margin", "whole_profile")        # D-030 (provisional default, see MeasureConfig.focus_grad_window)
 ABSORPTIONS = ("partition_vertical", "linear", "ray_world", "hybrid")    # D-024 / procedure s.3.6; "hybrid": Block 21 (D-084, D-092)
 KERNEL_FAMILIES = ("gaussian_table", "empirical")              # procedure s.3.4
@@ -447,6 +449,16 @@ class InferenceConfig:
     bump_sd: float = 2.0                   # source: D-171.3 [user]: a near bump = a second dip of prominence >= this many noise SDs; 0 = off
     bump_half_depth: float = 0.5           # source: PROVISIONAL (D-176.1 [orchestrator]): the central dip ends where it falls to this fraction of its depth; bumps are searched beyond
     bump_smooth_samples: float = 1.0       # source: PROVISIONAL (D-176.1 [orchestrator]): the dip the bumps are searched on is the mean over the used planes, smoothed along the line by a Gaussian of this SD in line samples
+    kernel_family: str = "gaussian"        # source: D-221.2, D-222.4 [user]: the per-node fit's kernel -- "gaussian" (Block 4's law, the fit of D-129) or "sgt" (D-052.1's family at the law's FWHM, D-222.2; Block 49), fitted after the Gaussian fit from its estimate (D-224.1)
+    sgt_skew: str = "off"                  # source: D-222.1 [user]: "off" = zeta held at 1 (the isotropic PSF, D-066.1); "fit" = zeta fitted per node (the two-piece stretch across the measuring line, D-225.3)
+    sgt_log10_beta_bounds: Tuple[float, float] = (0.0, 1.0)  # source: D-052.2 (beta in [1, 10], Block 12's sgt_beta_bounds), searched in log10 beta (D-225.5)
+    sgt_xi_bounds: Tuple[float, float] = (0.0, 2.0)          # source: D-052.2 (xi = 0 the generalized-normal edge, a member: a fit ending there is converged, D-225.5)
+    sgt_ln_zeta_bounds: Tuple[float, float] = (-0.7, 0.7)    # source: D-052.2 (zeta in [0.497, 2.014], searched in ln zeta)
+    sgt_start_shape: Tuple[float, float, float] = (2.0, 0.0, 1.0)  # source: D-222.2, D-224.1: the Gaussian member, the SGT fit's start at the node's Gaussian estimate
+    sgt_reach_sigmas: float = 12.0         # source: PROVISIONAL (D-225.4 [orchestrator]): the SGT kernel is truncated at this many law SDs sigma_r(delta) from its centre, its mass beyond dropped (a fixed multiple, so that the model scales with the width and stays smooth in the shape)
+    sgt_samples_per_fwhm: int = 16         # source: PROVISIONAL (D-225.2 [orchestrator]): the coarsest lattice a (slab, plane) pair is convolved on keeps at least this many samples per FWHM of its kernel (Block 49)
+    cov_fine_factor: int = 32              # source: D-224.2 [user] (the identifiability check: p/32 converged, p/8 not): line_fine_factor of the model whose Jacobian gives the reported error bars; 0 = the fit's own Jacobian (scipy's, on the fit's lattice)
+    cov_steps: Tuple[float, ...] = (2e-3, 1e-3, 2e-3, 2e-3, 1e-3, 1e-3, 1e-3)  # source: PROVISIONAL (D-225.6; checks/sgt_identifiability_2026-11-23 default_steps): the error bars' absolute central-difference steps in (d um, mu 1/um, v0 um, z_ax um, log10 beta, xi, ln zeta)
 
 
 @dataclass(frozen=True)
@@ -852,6 +864,31 @@ def _check_cleaning_inference(c: "CleaningConfig", i: "InferenceConfig") -> None
         raise ValueError("inference.bump_half_depth must be in (0, 1)")
     if not (math.isfinite(i.bump_smooth_samples) and i.bump_smooth_samples >= 0):
         raise ValueError("inference.bump_smooth_samples must be finite and >= 0")
+    _check_in(i.kernel_family, INFERENCE_KERNELS, "inference.kernel_family")
+    _check_in(i.sgt_skew, SGT_SKEWS, "inference.sgt_skew")
+    for name in ("sgt_log10_beta_bounds", "sgt_xi_bounds", "sgt_ln_zeta_bounds"):
+        b = tuple(getattr(i, name))
+        if not (len(b) == 2 and all(math.isfinite(float(x)) for x in b) and b[0] < b[1]):
+            raise ValueError("inference.%s must be two finite numbers in increasing order, got %r" % (name, b))
+    if not (i.sgt_xi_bounds[0] >= 0.0):
+        raise ValueError("inference.sgt_xi_bounds must lie in xi >= 0 (the family's domain)")
+    st = tuple(float(x) for x in i.sgt_start_shape)
+    if not (len(st) == 3 and all(math.isfinite(x) for x in st) and st[0] > 0 and st[2] > 0):
+        raise ValueError("inference.sgt_start_shape must be (beta, xi, zeta), finite, beta > 0, zeta > 0; got %r" % (st,))
+    b_lo, b_hi = i.sgt_log10_beta_bounds
+    z_lo, z_hi = i.sgt_ln_zeta_bounds
+    if not (b_lo <= math.log10(st[0]) <= b_hi and i.sgt_xi_bounds[0] <= st[1] <= i.sgt_xi_bounds[1]
+            and z_lo <= math.log(st[2]) <= z_hi):
+        raise ValueError("inference.sgt_start_shape must lie inside the shape's bounds, got %r" % (st,))
+    if not (math.isfinite(i.sgt_reach_sigmas) and i.sgt_reach_sigmas >= i.line_reach_sigmas):
+        raise ValueError("inference.sgt_reach_sigmas must be finite and >= line_reach_sigmas")
+    if not _is_count(i.sgt_samples_per_fwhm, 2):
+        raise ValueError("inference.sgt_samples_per_fwhm must be a whole number >= 2")
+    if not (_is_count(i.cov_fine_factor, 0) and (i.cov_fine_factor == 0 or i.cov_fine_factor >= i.line_fine_factor)):
+        raise ValueError("inference.cov_fine_factor must be 0 (the fit's own Jacobian) or a whole number >= "
+                         "line_fine_factor")
+    if not (len(i.cov_steps) == 7 and all(math.isfinite(float(x)) and float(x) > 0 for x in i.cov_steps)):
+        raise ValueError("inference.cov_steps must be 7 finite steps > 0 (d, mu, v0, z_ax, log10 beta, xi, ln zeta)")
     _check_in(c.background_support, ("model", "unshaded", "square", "stripe"), "cleaning.background_support")
     _check_in(c.work_rank, ("line", "patch"), "cleaning.work_rank")
     for name in ("rank_bound_gl", "rank_max_tier2_gl", "rank_min_separation_um", "shadow_cache_mb"):

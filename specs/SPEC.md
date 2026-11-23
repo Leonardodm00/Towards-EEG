@@ -1033,6 +1033,8 @@ accepted and are part of this entry.
 - Confirmed: D-129.1, D-130.O9, D-132.2 (the user); the plane rule, the bounds, the starts and the coverage band are the assistant's, PROVISIONAL
 - Status: drafted 2026-11-13; implemented 2026-11-13 (wave 2, merged `ab8c6ee`); `test_smoke_node_inference.py` 6 pass, 1 skip: recovery to 1e-16, coverage 0.743 over 300 sets, the mean $\hat d$ +1.2 SE, $\chi^2/N$ 0.989 **[run, sandbox]**. `z_bounds_um` is about the start's depth; a start outside the box is clipped; `at_bound` names are `d_lo`/`d_hi` and so on; a parameter at a bound has NaN rows and columns in `cov`; `cost` is $\chi^2$. Tested with a stand-in `forward`, not with Block 26. Smoke-tested
 
+Block 30, amendment 3 (2026-11-23, drafted; wave 7): the SGT option and the error bars on the fine lattice -- stated after Block 49's entry, in the wave 7 section.
+
 ### Block 31: the cleaning figures (plan step C6; D-129.4)
 
 - Module: `src/allen_diameter/plotting/cleaning_figures.py`; smoke test `tests/smoke/test_smoke_cleaning_figures.py`
@@ -1069,6 +1071,8 @@ predictor as callables.
 Block 35, amendment 1 (2026-11-13, 19:20; D-140 [orchestrator], on the implementer's issues at `5766aba`; where it differs from the entry it wins). (A) The cross-section is cached by $(d, \mu, \varphi, \theta)$, aspect, absorption, directions and light direction: Block 9's quadrature has `ray_n_psi` discrete azimuths, so the hybrid's ray history is not invariant under a rotation of the tube about $z$ (a section reused across half an azimuth step moves $\tau$ by 1.9e-4 to 4.4e-3 at 8 x 16 directions; the implementer's runs). A change of $c$ alone reuses it. (B) What the block computes is the tube without caps (D-137.1: the light absorbed as in every cross-section of an unbounded straight tube), read on the capped tube's slab and column lattice. It differs from Block 26's capped tube by the caps' own ray histories, carried to the line by the wide kernels of a tilted tube's far ends: with Block 21's exact history on the capped tube the block equals Block 26 to 8e-14, and the difference falls with the half-length (1.6e-4, 3.3e-5, 7.5e-6 at 10, 20, 40 um for $d$ = 1 um at 30 deg; 5.4e-4, 1.1e-4, 2.7e-5 at 60 deg; the implementer's runs). The oracle against Block 26 [2e-4, D-138.1, unchanged] is therefore judged where the caps do not reach: half-length 10 um for the flat cases, 40 um for the tilted ones ($d$ = 2.0 um at 30 deg: one configuration, the axis in the plane and the configured `n_avg`, for time). Reported beside it, no bound: the difference at half-length 10, 20, 40 um for the tilted cases. (C) Validity, replacing the entry's margin (which refused 15 of the oracle's 16 geometries, the flat ones among them although they agree with Block 26 to 2.6e-5): `extrusion_valid` is True when the point of the axis nearest the line's origin is at least `InferenceConfig.extrusion_cap_margin_um` (3.0 um, PROVISIONAL) along the axis from each cap. Reported, no bound, as the evidence for that value: $\max |\tau^{\rm fast} - \tau^{\rm Block\,26}|$ under the hybrid with the line 1.5, 3.0 and 5.0 um along the axis from one cap of a tube of half-length 10 um, for $d \in \{0.3, 1.0\}$ um at tilt 0 and 30 deg. The validity is checked before the $\mu$ = 0 shortcut. (D) Accepted as part of the entry: the lattice of the cross-section (256 intervals, bicubic read; module constants, PROVISIONAL), the midpoint rule of Block 21 for a slab's integral (as Block 26), closed forms for `linear` and `partition_vertical`. Also reported: the time per call at 8 x 16 directions for half-lengths 5 and 10 um.
 
 Block 35, amendment 2 (2026-11-17, drafted; D-151, D-156: the same-node clearance as a product; where it adds to the entry it does not change `line_profiles`). The own shadow split by depth. With the entry's objects -- slabs $j$ of centre $\zeta_j$ and thickness $\Delta\zeta$ = `renderer.dzeta_um`, planes $k$ at $z_k = k\,\Delta z$, and $s_{j,k}(v_n)$ the term slab $j$ adds to plane $k$'s deficit $1 - \tau_k$, read on the line as the entry reads it (the same pairs skipped by the reach rule) -- and a band half-thickness $\beta \ge 0$ (um): the share of slab $j$ in plane $k$'s band is the fraction of the slab's thickness inside it, $w_{j,k} = \max\big(0,\ \min(\zeta_j + \Delta\zeta/2,\ z_k + \beta) - \max(\zeta_j - \Delta\zeta/2,\ z_k - \beta)\big) / \Delta\zeta \in [0, 1]$ (D-156.5 [orchestrator]: a share by the slab's centre would make $S^{\rm in}$ jump by one slab in fourteen with the position of the slab grid on the planes), and $S^{\rm in}_k(v_n) = \sum_j w_{j,k}\,s_{j,k}(v_n)$, $S^{\rm out}_k(v_n) = \sum_j (1 - w_{j,k})\,s_{j,k}(v_n)$, so that $S^{\rm in}_k + S^{\rm out}_k = 1 - \tau_k$ of `line_profiles` to rounding. Depth layers (D-151.2's sub-planes), when a layer thickness $h > 0$ (um) is given: layer $m \in \mathbb Z$ is the depth interval of centre $\lambda_m = z_0 + m\,h$ and thickness $h$, $z_0$ = `layer_origin_um` (the tube's centre depth `tube.c[2]` when None), slab $j$'s share in it $u_{j,m}$ = the fraction of the slab's thickness inside the interval ($\sum_m u_{j,m} = 1$), and $L_{m,k}(v_n) = \sum_j u_{j,m}\,s_{j,k}(v_n)$ for the layers $m_{\min}..m_{\max}$ that meet the tube's slabs, so that $\sum_m L_{m,k} = 1 - \tau_k$. Public API added: `line_fast.line_shadow_split(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, band_half_um, absorption=None, cache=None, layer_um=None, layer_origin_um=None) -> OwnSplit`; `line_fast.OwnSplit` (frozen dataclass: `s_in`, `s_out` (n_planes, n_v) float64, dimensionless, rows in the order of `ks`; `layers` (n_layers, n_planes, n_v) float64 or None; `layer_z` (n_layers,) um, the centres $\lambda_m$ in increasing order, or None; `band_half_um` float; `layer_um` float or None). Validity and errors as `line_profiles` (`ExtrusionInvalid` checked first); $\mu$ = 0 or no planes gives zeros: `s_in`, `s_out` of zeros and, with `layer_um`, `layers` of zeros over the layers that meet the tube's slabs (the same `layer_z` as for $\mu$ > 0); only a tube with no slab at all gives `layers` of shape (0, n_planes, n_v) and an empty `layer_z` [clarified 2026-11-17, the final check's S2]; ValueError for `band_half_um` < 0 or not finite, `layer_um` <= 0 or not finite, a `layer_origin_um` not finite. `line_profiles` and its results are unchanged (the implementation may share the slab loop). Parameters: none new in the block (the caller passes `CleaningConfig.own_band_half_um`, `own_layer_um`). Custom code: the two shares in the slab loop. Test oracles (added to `tests/smoke/test_smoke_line_fast.py`): (i) $S^{\rm in} + S^{\rm out}$ = 1 - `line_profiles` and $\sum_m L_m$ = the same, for $d \in \{0.3, 1.0, 2.0\}$ um at tilt 0 and 30 deg, the axis in the plane and 0.14 um off it, planes $-4..4$, $\beta \in \{0.05, 0.14\}$ um, $h$ = 0.1 um, the three absorptions [1e-12]; (ii) known answer, `linear`, a flat tube along x through a pixel centre read at $v = n\,p$, `n_avg` 0 (the entry's `test_known_answer` setting): $p \sum_n S^{\rm in}_k(v_n)$ equals $\mu$ times the area of the tube's cross-section inside the band as booked on the fine lattice [1e-8 relative], and is reported against the circle's segment area $F(z_2) - F(z_1)$, $F(z) = z\sqrt{r^2 - z^2} + r^2\arcsin(z/r)$, $z$ clipped to $[-r, r]$ [no bound; the lattice's point sampling]; (iii) limits: $\beta$ larger than the tube's whole distance from every plane gives $S^{\rm out}$ = 0 and $S^{\rm in}$ = the whole [exact]; $\beta$ = 0 gives $S^{\rm in}$ = 0 [exact]; (iv) the slab grid: `dzeta_um` 0.02 against 0.01 um moves $S^{\rm in}$ by at most 5e-4 (Block 4's tolerance for a halved slab) for $d$ = 1 um flat, $\mu$ = 1 /um, $\beta$ = 0.14 um (the bound is absolute and stated at this $\mu$: the difference grows with $\mu$ about as the shadow does, 1.0e-3 at $\mu$ = 3 /um under `linear`, the final check's S1; D-158.1 [orchestrator]), with the axis in the plane and 0.005 and 0.01 um off it (so that the slab grid falls differently on the band's edges); a depth shift of the tube by $\Delta z$ with every plane index raised by one leaves the split unchanged [1e-9]; (v) symmetries: mirror in $v$ for a tube through a pixel centre [1e-10]; under `linear`, a flat tube with its axis at depth $z_a$ whose slab grid is symmetric about the axis (the deepest column a whole number of slabs long; the test takes $r = \sqrt{0.3^2 + (h_{\rm g}/2)^2}$ um): the split at a plane $\delta$ above the axis equals the split at the plane $\delta$ below [1e-10]; for a generic radius the difference is reported without a bound (D-157.1 [orchestrator]: `slab_centres` lays the slabs from the tube's lowest point, so the grid is symmetric only then); the order of `ks`; (vi) with $\beta = \Delta z/2$ and a flat tube whose depth extent lies inside the planes' range, under `linear`: $\sum_k p\sum_n S^{\rm in}_k(v_n)$ = the whole mass per unit length $\mu\pi r^2$ as booked on the lattice [1e-8 relative] (the bands tile the depth; the blur keeps the mass); (vii) contract (shapes, dtype, finiteness, `layer_z` increasing with spacing $h$), determinism, the ValueErrors, `ExtrusionInvalid` as `line_profiles`; the entry's quick tests still pass. Reported, no bound: the time of one split call beside `line_profiles` at $d$ = 0.3, 1.0, 2.0 um. Data flow: feeds Block 37 through Block 36's `own_split_factory`. Confirmed: D-156 (the user: the product; the defaults not objected to); the overlap shares, the layers' anchoring and the API are the orchestrator's, PROVISIONAL. Status: drafted 2026-11-17; implemented 2026-11-17 (wave of D-156, merged `137bddf`); the eight new tests of `test_smoke_line_fast.py` pass (the implementer's run; `test_split_limits`, `test_split_known_answer`, `test_split_tiling`, `test_split_contract` rerun by the orchestrator after the merge) **[run, sandbox]**: (i) $S^{\rm in} + S^{\rm out}$ and $\sum_m L_m$ against 1 - `line_profiles` 1.3e-15 and 1.8e-15 over 72 splits; (ii) against the lattice's booking 8.9e-16 and 7.8e-16 relative, against the circle's segment area -7e-4 to +6e-3 (point sampling, no bound); (iii) exact; (iv) at most 4.65e-4 (hybrid, the axis 0.01 um off the plane; linear and partition 3.3e-4) against 5e-4 -- a thin margin, the in-band part being about three times more sensitive to the slab grid than the whole (1.4e-4), D-157.2; the shift by $\Delta z$ within 1e-9; (v) 1.7e-16 and 1.28e-11 with the symmetric grid, 4e-7 to 1.7e-5 for a generic radius; (vi) 2.2e-16 and 1.8e-15 relative; `line_profiles` bit-identical to the contract commit's on 9 cases; one split call costs about one `line_profiles` call (hybrid, 8 x 16 directions, warm: 0.46, 2.5, 9.8 s at $d$ = 0.3, 1.0, 2.0 um; with layers 0.47, 2.6, 8.6 s). Accepted as part of the amendment: `_profiles` takes an optional `sink` called with every (slab, plane) term; a slab wholly inside a band or a layer has share exactly 1; the new ValueErrors are raised before `line_profiles`' own checks, `ExtrusionInvalid` before the $\mu$ = 0 shortcut; the tests use half-length 5 um and 2 x 4 directions (timing: 8 x 16). The entry's long tests (`test_reference`, `test_caps`, `test_cap_margin`, `test_directions`, `test_timing`) were not rerun. Smoke-tested
+
+Block 35, amendment 3 (2026-11-23, drafted; wave 7, D-225): `line_profiles` takes `kernel=None`; a `line_sgt.SGTKernel` selects Block 49's SGT point-spread function, None keeps this entry's Gaussian path, unchanged bit for bit. See Block 49.
 
 ### Block 32: the cleaning iteration (plan step C5; D-129.2, D-130.O3, D-130.O6, D-132)
 
@@ -1795,6 +1799,200 @@ WITH ISSUES, three findings MINOR or NOTE, no fitted number changed, no regressi
   stem after a walk keeps its next nodes;
 - Block 36, amendment 21 (F3): `calibrate_sigma.py`'s last line names the failed nodes' ids.
 
+
+### Wave 7: the kernel's in-focus width, fixed or calibrated, and the SGT option in the per-node fit (D-221, D-222, D-224, D-225)
+
+Drafted 2026-11-23 after the user's approval of the plan (D-224). Two blocks are written by implementers in parallel:
+Block 49 (the SGT point-spread function in the fast line renderer: `model/line_sgt.py`, and the `kernel` argument of
+`line_fast.line_profiles`) and Block 30, amendment 3 (the SGT option and the error bars on the fine lattice in
+`analysis/node_inference.py`). The orchestrator writes the configuration (the `inference.kernel_family`,
+`sgt_*` and `cov_*` fields), the width switch (Block 36, amendment 22), the SGT stage and the error bars in
+`scripts/infer_nodes.py` with `node_inputs`' forward factories (Block 36, amendment 23) and the notebook's knobs. The
+construction of the SGT kernel in 2-D (D-225.1-4) rests on `checks/sgt_psf_2d_2026-11-23/`: a kernel that is the SGT
+across the measuring line and the law's Gaussian along it -- the cheaper construction -- differs from the isotropic PSF
+of D-222.1 by up to 1.9 noise SD on tilted tubes (0.01-0.04 on flat ones), and fitted with the shape free to data made
+with the isotropic PSF it moves a tilted thin node's $d$ by -5 % (-1.2 SE).
+
+### Block 49: the SGT point-spread function in the fast line renderer (D-221.2-3, D-222.1-2, D-224.1, D-225)
+
+- Modules: `src/allen_diameter/model/line_sgt.py` (new) and `src/allen_diameter/model/line_fast.py` (Block 35: the
+  `kernel` argument and its dispatch; the Gaussian path unchanged bit for bit); smoke test
+  `tests/smoke/test_smoke_line_sgt.py`.
+- Mathematics. Block 35's quantity with another kernel: $\tau_k(v_n) = 1 - \mathrm{read}\big(\text{pixel means of }
+  \sum_j \Delta A_j * K_{jk}\big)(v_n)$, with Block 35's $\Delta A_j$ (each fine-lattice sample a point mass
+  $h^2 \Delta A_j$; the hybrid's cached cross-section; `partition_vertical`, `linear`), Block 26's pixel mean (the mean
+  over the pixel square $[x_c \pm p/2] \times [y_c \pm p/2]$ of the blurred field) and Block 5's read
+  (`profiles.sample_profile`). Slab $j$ (centre $\zeta_j$), plane $k$ ($z_k = k\,\Delta z$), $\delta_{jk} = \zeta_j -
+  z_k$; the law's SD $\sigma_{jk} = \sigma_{\rm r}(\delta_{jk})$ (Block 4, the configured table); the SGT's FWHM
+  $w_{jk} = 2\sqrt{2\ln 2}\,\sigma_{jk}$ (D-222.2); the shape $\kappa = (\beta, \xi, \zeta)$ (D-052.1); the core scale
+  $a_{jk} = w_{jk} / W(\kappa)$, $W$ of (H3) (`blur_kernels.sgt_unit_fwhm`). $h$ is the symmetric core density of (H1)
+  at unit scale (`blur_kernels.sgt_unit_pdf(x, beta, xi, 1)`) and $\hat h(t) = \int h(x)\,e^{-2\pi i t x}\,dx$ its
+  characteristic function (real, even).
+  - $\zeta = 1$ (D-222.1, D-066.1): $K_{jk}$ is the isotropic PSF whose line projection is $g_{w_{jk},(\beta,\xi,1)}$;
+    its 2-D Fourier transform is $\hat K_{jk}(\nu) = \hat h(a_{jk}|\nu|)$ (projection-slice theorem). $P_{jk}(r)$ is its
+    radial profile.
+  - $\zeta \ne 1$ (`inference.sgt_skew` "fit"; D-225.3): with $u = x\cdot\hat y$ ($\hat y$ = `y_hat`; $u > 0$ towards
+    increasing $v$) and $s = x\cdot\hat e$ ($\hat e$ = `e_u`), $K_{jk}(x) = \frac{2}{\zeta + 1/\zeta}\,
+    P_{jk}\big(\sqrt{(u/\zeta)^2 + s^2}\big)$ for $u \ge 0$ and $\frac{2}{\zeta + 1/\zeta}\,P_{jk}\big(\sqrt{(\zeta
+    u)^2 + s^2}\big)$ for $u < 0$. Its line projection across $\hat y$, $\int K_{jk}(u\hat y + s\hat e)\,ds$, is the
+    two-piece SGT $g_{w_{jk},\kappa}(u)$ of (H2)-(H3) (FWHM $w_{jk}$, right-to-left half-width ratio $\zeta^2$, the right
+    side $u > 0$); unit integral; $\zeta = 1$ gives the isotropic kernel (D-222.1: the asymmetry of the profile kernel
+    along the node's measuring line).
+  - Truncation (D-225.4): the kernel is applied within $R_{jk}$ = `inference.sgt_reach_sigmas` $\times\,\sigma_{jk}$ of
+    its centre in the radial variable of $P_{jk}$ (before the stretch), its mass beyond dropped, not renormalised.
+    $R_{jk}/a_{jk}$ = `sgt_reach_sigmas` $\times\,W(\kappa)/(2\sqrt{2\ln 2})$ depends on $\kappa$ only: the truncated
+    kernel scales with the width and $\tau$ is smooth in $\kappa$. The dropped fraction, the isotropic kernel's 2-D mass
+    beyond that radius (the stretch keeps it), is `truncated_mass`. Samples are drawn as Block 35 draws them, with
+    $R_{jk}$ in place of `line_reach_sigmas` $\times\,\sigma_{jk}$.
+  - Computation: the implementer's, within the oracles below (an FFT on lattices coarsened with the pair's width is the
+    expected route -- Block 35's exact separable pixel integral holds for the Gaussian only -- with at least
+    `inference.sgt_samples_per_fwhm` samples per FWHM on a pair's lattice; $\hat h$ by a numerical transform, cached per
+    $(\beta, \xi)$). Block 26 (the reference renderer with exact caps) is not extended (D-225.2): the SGT path's
+    reference is a brute-force FFT (oracle (iii)).
+- Public API:
+  - `line_sgt.SGTKernel(beta, xi, zeta=1.0)`: frozen dataclass; ValueError outside the family's domain
+    (`blur_kernels.check_sgt_shape`).
+  - `line_fast.line_profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption=None, cache=None,
+    kernel=None) -> tau (n_planes, n_v)`: `kernel` None = Block 4's Gaussian law (Block 35's path, unchanged bit for
+    bit); an `SGTKernel` = this entry's kernel; ValueError for anything else. `ExtrusionInvalid` and the other
+    ValueErrors as Block 35's, in its order. `line_shadow_split` keeps the Gaussian (D-222.4: the cleaning keeps it).
+  - `line_sgt.sgt_tail_mass(beta, xi, r_over_a) -> float`: the isotropic unit kernel's 2-D mass beyond radius $r$
+    (core-scale units). `line_sgt.truncated_mass(kernel, cfg) -> float`: `sgt_tail_mass` at $R/a$ of the truncation.
+  - `line_sgt.FWHM_PER_SD` $= 2\sqrt{2\ln 2}$.
+- Parameters: `InferenceConfig.sgt_reach_sigmas` (12, PROVISIONAL), `sgt_samples_per_fwhm` (16, PROVISIONAL), with
+  Block 35's (`absorption`, `line_fine_factor`, `ray_n_rho`, `ray_n_psi`; the renderer's kernel table, `dzeta_um`,
+  `ray_na`, `ray_n_oil`; `res0_um`, `dz_um`, `light_direction`).
+- Library calls relied on: numpy, scipy.fft, scipy.special (incomplete beta and gamma functions, Bessel functions),
+  scipy.integrate; Blocks 2, 4, 5, 12 (`blur_kernels`), 21, 35.
+- Custom code: the kernel's transfer and its truncation, the lattices (no library convolves a depth-dependent,
+  non-separable kernel with pixel means).
+- Test oracles (`tests/smoke/test_smoke_line_sgt.py`; $|\Delta\tau| \le$ 5e-5 is 0.007 of the pilot's noise in
+  $\tau$ units, 1.1/150):
+  (i) the Gaussian member: `kernel=SGTKernel(2, 0, 1)` against `kernel=None`: $\max|\Delta\tau| \le$ 5e-5 for $d \in
+  \{0.3, 1.0\}$ um, tilt 0 and 0.3 rad, heading 0 and 0.52 rad, the axis in the plane and 0.14 um off, planes $-4..4$,
+  `partition_vertical` and `hybrid` (2 x 4 directions in the test for time), half-length 8 um, `n_avg` 4, $v = n\,p$,
+  $n = -26..26$;
+  (ii) a flat tube along the pixel grid read at pixel centres, against the identifiability check's 1-D model
+  (`checks/sgt_identifiability_2026-11-23/sgt_line_model.py`: the SGT's pixel mean by its closed-form CDF), exact for
+  that geometry and untruncated: shapes (2, 0.5, 1), (1.3, 0, 1), (4, 0, 1), and with the skew (2, 0.3, 1.3) and
+  (2, 0.3, 0.77); $d \in \{0.4, 1.5\}$ um; `partition_vertical`; half-length 10 um; `sgt_reach_sigmas` raised in the
+  test until `truncated_mass` $\le$ 1e-7; $\max|\Delta\tau| \le$ 5e-5;
+  (iii) tilted tubes (tilt 0.3 and 0.6 rad, heading 0.52 rad, $d \in \{0.4, 1.0\}$ um), the same shapes and the same
+  raised reach, against a brute-force reference written in the test: one FFT grid on the fine lattice, padded by more
+  than the largest reach, the kernel's transfer times the pixel box's $\mathrm{sinc}(p\nu_x)\,\mathrm{sinc}(p\nu_y)$,
+  and the half-sample phase that puts pixel centres on the output lattice
+  (`checks/sgt_psf_2d_2026-11-23/fft_line.py` is such a reference for $\zeta = 1$; it reproduces Block 35's Gaussian to
+  1e-11): $\max|\Delta\tau| \le$ 5e-5. For the skew the reference's kernel is built independently of the module's:
+  for $\beta$ = 2 the isotropic PSF is the bivariate $t$ with $\nu = 2/\xi$ and scale $1/\sqrt 2$ in core units,
+  $P_1(r) = \frac{1}{\pi}(1 + \xi r^2)^{-(1/\xi + 1)}$, stretched as above, cell-averaged on the grid and transformed;
+  (iv) the transfer: along $\hat y$ ($\nu = t\hat y$) the untruncated kernel's transfer equals the 1-D characteristic
+  function of $g_{w,\kappa}$ computed independently (quadrature of (H2)-(H3)) [1e-7 absolute]; $\zeta = 1$ gives the
+  isotropic transfer [exact]; $\zeta \to 1/\zeta$ mirrors the profile ($v \to -v$) of a tube symmetric about the line's
+  origin [1e-10]; `sgt_tail_mass` against its closed forms -- the Gaussian member $e^{-r^2}$, the Laplace member
+  $r K_1(r)$, a Student member (the bivariate $t$'s radial tail) [1e-8];
+  (v) smoothness in $\kappa$: the central differences of $\tau$ in $\log_{10}\beta$, $\xi$ and $\ln\zeta$ at steps 1e-3
+  and 5e-4 agree within 1 % of the derivative's largest magnitude, on two of (iii)'s geometries;
+  (vi) the truncation at the default reach, on a member whose PSF is known in closed form: (2, 1, 1), the bivariate
+  $t$ with $\nu = 2$ (its line projection decays as $|u|^{-3}$, so 12 law SDs drop about 1.6 % of it): `line_profiles`
+  against the reference with the truncated $P_1$ of (iii), on (iii)'s tilted geometries [5e-5]; `truncated_mass`
+  against the closed form $(1 + \xi r^2)^{-1/\xi}$ [1e-8];
+  (vii) $\mu = 0$ gives 1 [exact]; mirror symmetry in $v$ for $\zeta = 1$ and a tube through the line's origin [1e-10];
+  the order of `ks`; a cached call equals an uncached one [1e-12]; determinism; the ValueErrors; Block 35's quick smoke
+  tests pass unchanged and its Gaussian path is bit-identical to the contract commit's on 6 cases.
+  Reported, no bound: the difference against the 1-D model for (2, 1, 1) at the default reach; the time per warm call of the Gaussian path and of the SGT path ($\zeta = 1$ and $\zeta \ne 1$)
+  on (i)'s geometries at `line_fine_factor` 8 and 32 (the error bars' lattice, D-224.2), `hybrid` at 8 x 16
+  directions; `truncated_mass` of the shapes tested.
+- Data flow: consumes Blocks 2, 4, 5, 12, 21, 35; feeds Block 30 (as `forward`, and `forward_cov`) through Block 36's
+  `node_inputs.forward_factory` (amendment 23).
+- Confirmed: D-221, D-222, D-224 (the user: the SGT in the joint fit, its shape and width, the wave); D-225 (the
+  orchestrator: the isotropic PSF over the separable construction, the half-plane skew, the truncation, Block 26 not
+  extended, the tolerances).
+- Status: drafted 2026-11-23.
+
+Block 30, amendment 3 (2026-11-23, drafted; D-221.2-3, D-222.1-2, D-224.1-2, D-225.5-6; where it differs from the entry
+it wins). The SGT option and the error bars on the fine lattice.
+(A) Parametrisations. Gaussian (`shape0` None): the search vector $\phi = \theta = (d, \mu, v_0, z_{\rm ax})$ and
+`forward(d, mu, v0, z_ax)`, as today. SGT (`shape0` $= (\beta_0, \xi_0, \zeta_0)$ given): $\phi = (d, \mu, v_0,
+z_{\rm ax}, b, \xi)$ with $b = \log_{10}\beta$, and with `inference.sgt_skew` "fit" also $l = \ln\zeta$;
+`forward(d, mu, v0, z_ax, beta, xi, zeta)` with $\beta = 10^b$ and $\zeta = e^l$, or $\zeta = \zeta_0$ held under
+"off"; bounds: $\theta$'s as today, $b$ in `sgt_log10_beta_bounds`, $\xi$ in `sgt_xi_bounds`, $l$ in
+`sgt_ln_zeta_bounds`; the starts $d_0 \times$ `multistart_factors` (as today), each with `shape0`. The objective, the
+weights (amendment 2), the plane selection (`select_planes` on the start), the run of lowest cost and $\chi^2_k$ as
+today. `param_names` = `PARAM_NAMES` + ("log10_beta", "xi"[, "ln_zeta"]).
+(B) Bounds and status. `at_bound` names every parameter at a bound, `<name>_lo` / `<name>_hi`. $\xi = 0$ is a member
+of the family (the generalized normal, D-052.2): a fit whose only active bound is `xi_lo` has status "converged"
+(D-225.5); any other active bound gives "at_bound", as today. Rows and columns of the covariance are NaN for every
+parameter at a bound, `xi_lo` included.
+(C) Results. `theta` (4,), `cov` (4, 4), `se` (4,) are $\theta$'s, the $(d, \mu, v_0, z_{\rm ax})$ block of the
+covariance in the search parameters `cov_search` ($n_\phi \times n_\phi$); `shape` (3,) $= (\hat\beta, \hat\xi,
+\hat\zeta)$ ($\hat\zeta = \zeta_0$ when held); `se_shape` (3,) by the delta method, ${\rm se}(\beta) = \hat\beta \ln 10\,
+{\rm se}(b)$, ${\rm se}(\xi)$, ${\rm se}(\zeta) = \hat\zeta\,{\rm se}(l)$, NaN when held or at a bound; `cov_source`. A
+Gaussian fit has `shape` and `se_shape` None, `param_names` = `PARAM_NAMES`, `cov_search` = `cov`.
+(D) Error bars on the fine lattice (D-224.2). With `forward_cov` given -- a callable of `forward`'s arity, the model
+with `line_fine_factor` = `inference.cov_fine_factor` -- the covariance is computed at $\hat\phi$ from the Jacobian of
+the residuals by central differences of `forward_cov` with the absolute steps `inference.cov_steps` (in the order $d,
+\mu, v_0, z_{\rm ax}, \log_{10}\beta, \xi, \ln\zeta$; the first 4, 6 or 7); a parameter within two steps of a bound
+uses the one-sided three-point rule inward, $(-3f(\phi) + 4f(\phi \pm h) - f(\phi \pm 2h))/(\pm 2h)$; unweighted
+$(J^\top J)^{-1}$, weighted the sandwich of amendment 2, on the solve's planes and weights; NaN as (B); all NaN when
+`forward_cov` returns a non-finite value at a point it needs. `cov_source` "fine"; without `forward_cov`, "fit" (the
+solver's Jacobian, as today).
+(E) `fit_node_recentred` passes `shape0` and `forward_cov` on: solve 1 with every start, each later solve one start
+from the previous estimate (its shape included); the error bars once, after the last solve, with its weights.
+(F) API: `fit_node(profiles_gl, B_gl, sigma_gl, forward, theta0, cfg, planes=None, weights=None, z_box_centre_um=None,
+shape0=None, forward_cov=None) -> NodeFit`; `fit_node_recentred(profiles_gl, B_gl, sigma_gl, forward, theta0, cfg,
+v_um, lambda_um, centre_offset_um=0.0, keep=None, planes=None, shape0=None, forward_cov=None) -> (NodeFit, info)`;
+`NodeFit` gains `shape`, `se_shape`, `param_names`, `cov_search`, `cov_source` (defaults: the Gaussian's). ValueError:
+`shape0` not three finite numbers with $\beta > 0$, $\zeta > 0$, or outside the box; the rest as today.
+(G) The caller's sequence (Block 36, amendment 23): the Gaussian fit as today; with `kernel_family` "sgt", the SGT fit
+from the Gaussian estimate -- `theta0` = $\hat\theta_G$, `shape0` = `sgt_start_shape` (the Gaussian member),
+`multistart_factors` (1.0,), the same planes and $z$ box (D-224.1).
+Test oracles (added to `tests/smoke/test_smoke_node_inference.py`), with a stand-in `forward` built in the test in
+which the shape enters as it does in the renderer (each plane's profile the tube's chord profile convolved with
+`blur_kernels.sgt_kernel_pdf` of an FWHM growing with $|z_k - z_{\rm ax}|$, on a fine 1-D grid): (i) noise-free
+recovery of $(d, \mu, v_0, z_{\rm ax}, \beta, \xi)$ = (1.0, 1.5, 0.05, 0.1, 1.4, 0.4) from the Gaussian member at
+$\theta$ 15 % off, and with "fit" of $\zeta$ = 1.3 too [relative 1e-5 on $d$, $\beta$, $\xi$, $\zeta$]; (ii) a Gaussian
+truth: the SGT fit ends at $\hat\xi = 0$ with `xi_lo` in `at_bound`, status "converged", $\hat\beta$ = 2 [1e-5], $\hat d$
+the Gaussian fit's [relative 1e-6]; (iii) coverage on the entry's 300 seeded sets with the option ($\zeta$ held): 60
+to 76 %, the mean $\hat d$ within 3 SE; (iv) `forward_cov` = `forward`: the error bars equal $(J^\top J)^{-1}$ of a
+Richardson-extrapolated Jacobian [relative 1e-3]; a parameter at a bound takes the one-sided rule; `cov_source`; (v)
+the weighted sandwich with the shape against a hand-written computation [1e-10]; (vi) `fit_node_recentred` with the
+shape ends where `fit_node` with its last weights ends [1e-8]; (vii) the Gaussian path unchanged (the entry's tests);
+a Gaussian `NodeFit` has `shape` None and `cov_search` equal to `cov`; (viii) determinism, the inputs unchanged, the
+ValueErrors. Reported: the forward calls of an SGT fit and of the error bars on the stand-in.
+
+Block 36, amendment 22 (2026-11-23, drafted; D-221.1, D-222.3, D-224.1, D-225.7; the orchestrator's). The kernel's
+in-focus width, fixed or calibrated. (i) `scripts/calibrate_sigma.py` writes beside `summary` (sigma_0) a
+`summary_growth_scale` over the nodes `ok` with a finite $c$ and a finite SE($c$) > 0 -- `sigma_calibration.summarize`'s
+statistics (n, median, MAD, the inverse-variance weighted mean and its SE, chi2_cons, dof) with the keys `median`,
+`mad`, `ivw_mean`, `ivw_se` (no unit) -- and prints it. (ii) `scripts/clean_cell.py`, `scripts/infer_nodes.py` and
+`scripts/fit_soma.py` take `--kernel-width fixed|calibrated` and `--sigma-json PATH` (Cell 23B's `sigma_<S>.json`).
+"fixed" (the default) keeps the configuration's table (sigma_r(0) = 0.080 um, D-172). "calibrated" replaces the
+renderer's table by `kernel.with_kernel(base, sigma_0, c)` with sigma_0 = `summary.ivw_mean_um` and $c$ =
+`summary_growth_scale.ivw_mean` (D-222.3), `base` the configuration's table before any re-anchoring; refused, with a
+message, without `--sigma-json`, for a JSON whose `complete` is false, whose summaries have n = 0, or whose means are not
+finite and > 0; exclusive with `clean_cell.py`'s `--sigma-r0-um` (amendment 14). The values, the file, n and the SEs
+are printed and recorded in the script's JSON (`kernel_width`: mode, sigma0_um, growth_scale, their SEs, n, file, the
+base table). `infer_nodes.py` inherits the preparation's renderer (the cleaning run's configuration, as today); its own
+`--kernel-width` re-anchors the preparation's recorded base table (an override, logged: the preparation's cleaning
+used its own law). The width switch acts on the law, so it reaches every kernel built from it: the Gaussian, the SGT's
+FWHM (D-222.2), the soma's renderer.
+
+Block 36, amendment 23 (2026-11-23, drafted; D-221.2-3, D-222, D-224.1-2, D-225.5-6; the orchestrator's). The SGT
+stage and the error bars in `scripts/infer_nodes.py`. (i) `node_inputs.forward_factory(pilot, half_length, node, cfg,
+cache, kernel_family="gaussian")`: "sgt" returns `forward(d, mu, v0, z_ax, beta, xi, zeta)` =
+`line_fast.line_profiles(..., kernel=line_sgt.SGTKernel(beta, xi, zeta))` (NaN on `ExtrusionInvalid`, as today);
+`node_inputs.forward_cov_factory(pilot, half_length, node, cfg, cache, kernel_family="gaussian")`: the same model with
+`line_fine_factor` = `inference.cov_fine_factor` (None when it is 0). (ii) Per node: the Gaussian fit as today, its
+error bars from `forward_cov`; with `inference.kernel_family` "sgt", the SGT fit of Block 30 amendment 3 (G) with its
+own `forward_cov`. (iii) Outputs: the node's estimate is the fit of the configured kernel (D-225.5) -- the CSV's and
+the JSON's `d_um`, `se_d_um`, `mu_per_um`, ... are the SGT fit's under "sgt" -- with `kernel`, `beta`, `xi`, `zeta`,
+`se_beta`, `se_xi`, `se_zeta`, `sgt_status`, `sgt_at_bound`, `truncated_mass` and, beside, the Gaussian fit's
+`gauss_d_um`, `gauss_se_d_um`, `gauss_status`, `gauss_chi2`; `cov_source`; the per-node figure (Block 34) draws the
+estimate's model; the node's log line names the kernel and the shape. (iv) Command line: `--kernel gaussian|sgt`
+(default: `inference.kernel_family`), `--sgt-skew off|fit` (default: `inference.sgt_skew`), `--cov-fine-factor N`
+(default: `inference.cov_fine_factor`; 0 = the fit's own Jacobian), with amendment 22's switch. (v) Notebook: Cell 18's
+and Cell 18b's `KERNEL`, `SGT_SKEW`, `KERNEL_WIDTH`, `SIGMA_JSON`, `COV_FINE_FACTOR`; Cell 25 (the soma) `KERNEL_WIDTH`,
+`SIGMA_JSON`.
 
 ## 6. Pipeline entry points
 

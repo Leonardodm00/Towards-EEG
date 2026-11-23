@@ -289,15 +289,24 @@ def extrusion_valid(tube, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg):
 
 # ------------------------------------------------------------- the model ---
 
-def line_profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption=None, cache=None):
+def line_profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption=None, cache=None,
+                  kernel=None):
     """tau (n_planes, n_v) float64, dimensionless: Block 26's line_profiles
     (rows in the order of ks; what profiles.sample_profile reads from the
     pixel means of tau_k of Eqs. 5-6, before the camera chain), with the
     hybrid's h read off one cached cross-section. cache: a SectionCache to
-    reuse across calls (None: a fresh one). ExtrusionInvalid (a ValueError)
-    when extrusion_valid is False (checked before the mu = 0 shortcut); ValueError for mu < 0
+    reuse across calls (None: a fresh one). kernel (Block 49, wave 7): None =
+    Block 4's Gaussian law (this module's path, unchanged); a
+    line_sgt.SGTKernel = the SGT point-spread function of Block 49; ValueError
+    for anything else. ExtrusionInvalid (a ValueError) when extrusion_valid is
+    False (checked before the mu = 0 shortcut); ValueError for mu < 0
     or not finite, a non-unit axis, an unknown absorption, an uncapped tube."""
-    return _profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache, check=True)
+    if kernel is None:
+        return _profiles(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache, check=True)
+    from . import line_sgt
+    if not isinstance(kernel, line_sgt.SGTKernel):
+        raise ValueError("kernel must be None (the Gaussian law) or a line_sgt.SGTKernel, got %r" % (kernel,))
+    raise NotImplementedError("Block 49 (wave 7): the SGT path")
 
 
 def _check_args(tube, mu, ks, origin_xy, y_hat, e_u, v, n_avg, step, cfg, absorption, cache):

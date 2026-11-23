@@ -57,6 +57,12 @@ class NodeFit:
     at_bound: Tuple[str, ...]    # e.g. ("d_hi",), names <param>_lo / <param>_hi
     n_starts: int                # starts run
     nfev: int                    # residual evaluations summed over the starts
+    # amendment 3 (wave 7; D-222, D-224, D-225): the SGT option and the fine-lattice error bars
+    shape: object = None         # (3,) (beta, xi, zeta) of an SGT fit; None for the Gaussian fit
+    se_shape: object = None      # (3,) their SEs in natural units (delta method); NaN for a held zeta or a parameter at a bound
+    param_names: Tuple[str, ...] = PARAM_NAMES  # the search parameters, in order (SGT: + "log10_beta", "xi"[, "ln_zeta"])
+    cov_search: object = None    # (n_p, n_p) covariance in the search parameters (theta's block is cov); None: as cov
+    cov_source: str = "fit"      # "fit" (the fit's own Jacobian) or "fine" (central differences on the fine lattice, D-224.2)
 
 
 def _inference_cfg(cfg):
@@ -168,7 +174,7 @@ def _weights(weights, n_planes, n_v, keep):
 
 
 def fit_node(profiles_gl, B_gl, sigma_gl, forward: Callable, theta0, cfg, planes=None, weights=None,
-             z_box_centre_um=None):
+             z_box_centre_um=None, shape0=None, forward_cov=None):
     """Fit (d, mu, v0, z_ax) of one node to its profiles (SPEC Block 30).
 
     profiles_gl: (n_planes, n_v) grey levels, finite. B_gl: scalar or (n_planes,)
@@ -181,6 +187,8 @@ def fit_node(profiles_gl, B_gl, sigma_gl, forward: Callable, theta0, cfg, planes
     used: the squared residuals are multiplied by them, chi2_per_plane is their weighted mean and cov the
     sandwich of the module docstring. z_box_centre_um: the centre of the z_ax box (default theta0's z_ax).
     """
+    if shape0 is not None or forward_cov is not None:
+        raise NotImplementedError("Block 30, amendment 3 (wave 7): the SGT option and the fine-lattice error bars")
     icfg = _inference_cfg(cfg)
     I_obs = np.array(profiles_gl, dtype=float, copy=True)
     if I_obs.ndim != 2 or I_obs.shape[0] == 0 or I_obs.shape[1] == 0:
@@ -300,7 +308,7 @@ def fit_node(profiles_gl, B_gl, sigma_gl, forward: Callable, theta0, cfg, planes
 
 
 def fit_node_recentred(profiles_gl, B_gl, sigma_gl, forward: Callable, theta0, cfg, v_um, lambda_um,
-                       centre_offset_um=0.0, keep=None, planes=None):
+                       centre_offset_um=0.0, keep=None, planes=None, shape0=None, forward_cov=None):
     """fit_node with the centre weights of Block 39, re-centred on the fitted centre (amendment 2; D-171.2).
 
     The weights are w_n = exp(-|v_n - v_c| / lambda_um) x keep_n, v_c = v0 + centre_offset_um the tube's
@@ -312,6 +320,8 @@ def fit_node_recentred(profiles_gl, B_gl, sigma_gl, forward: Callable, theta0, c
     mask). Returns (NodeFit of the last solve, info) with info = dict(n_solves, centre_um (the last solve's
     v_c), converged (bool), lambda_um, nfev (summed), weights ((n_v,) of the last solve)).
     """
+    if shape0 is not None or forward_cov is not None:
+        raise NotImplementedError("Block 30, amendment 3 (wave 7): the SGT option and the fine-lattice error bars")
     icfg = _inference_cfg(cfg)
     v = np.array(v_um, dtype=float, copy=True).reshape(-1)
     th0 = np.array(theta0, dtype=float, copy=True).reshape(-1)
