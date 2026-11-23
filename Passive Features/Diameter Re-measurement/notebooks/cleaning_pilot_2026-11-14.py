@@ -709,7 +709,8 @@ for name in tab_t.loc[tab_t["shown"], "figure"]:
 # fitted in-focus width sigma0 with a fitted growth scale c, and a straight background per plane solved exactly,
 # from one start. The nodes: those the gallery of Cell 23A judged clean (D-198's verdict), or your own list in
 # SIGMA_NODES. Time per node [measured in the sandbox on synthetic nodes]: 26 s at d 1.0 um, 59 s at 1.5 um, 208 s
-# at 2.5 um, the nodes in parallel on the runtime's CPUs.
+# at 2.5 um, the nodes in parallel on the runtime's CPUs. On the pilot in Colab node 7 (fitted 2.87 um) took 17.7 min,
+# 68 evaluations of about 15 s [the user's run, 2026-11-23]: Colab runs these renders 2-3 times slower than the sandbox.
 # Its sigma_<S>.json is what Cell 16's KERNEL_WIDTH = "calibrated" reads (D-222.3; SPEC Block 36 amendment 22): the
 # inverse-variance weighted means of sigma0 and of the growth scale c, printed last. A file written before wave 7 has
 # no summary of c and the switch refuses it: run this cell again with the current branch.
@@ -796,7 +797,8 @@ for name in ("soma_%d_focus.png" % SPECIMEN, "soma_%d_planes.png" % SPECIMEN):
 # absorption and Cell 16's kernel, on the planes within 10 um of the start, Allen's traced processes masked (D-216).
 # The start is Allen's traced soma; its depth is SOMA_FIT_K (default: Cell 24's SOMA_K, else the traced depth).
 # FAR_SLOPE "fit" fits the slope (D-218.1, the default); "fixed" holds it at SLOPE0 (D-218.2; None: the configured
-# 0.79) -- for when the far-slope calibration gives a value. A fit takes a few minutes. The fitted soma enters the
+# 0.79) -- for when the far-slope calibration gives a value. A fit took 8-21 min in the sandbox (36 planes of a 280 px
+# crop, 50-100 renders); Colab ran Cell 23B's renders 2-3 times slower, so allow up to about an hour. The fitted soma enters the
 # corrected SWC as the sphere of equal membrane area at the fitted centre, each stem's first node moved onto the fitted
 # surface (D-216.3, D-222.5). Output to send back: soma_fit_<S>_planes.png, _summary.png, _morphology.png and
 # soma_fit_<S>.json; the corrected SWC is reconstruction_soma_<S>.swc. On the simulated stacks (D-216.2) chi2/dof near
@@ -834,11 +836,14 @@ for name in ("soma_fit_%d_planes.png" % SPECIMEN, "soma_fit_%d_summary.png" % SP
 # fit's d is beside it (gauss_d_um). If the SGT fit fails, the node's status is "failed" (flag sgt_error when it
 # raised) and its Gaussian fit and same-node clearance are kept (D-233.3). The error bars of both fits come from the
 # model at line_fine_factor COV_FINE_FACTOR (D-224.2; 0 = the fit's own Jacobian). Cell 16's KERNEL_WIDTH applies.
-# Time: Cell 20's Gaussian fits took 6 min (5353, 0.77 um) to 111 min (639, 2.82 um) on the pilot. On two synthetic
-# nodes (the test suite's fast configuration, sandbox, D-233.6) this cell took 15 to 35 times the Gaussian fit alone
-# (351-499 s per node against 10-33 s): carried over to 5353, about 1.5 to 3.5 h -- an extrapolation, not a
-# measurement. So the cell starts with 5353 alone (SGT_NODES; "5353,599" adds a node; None: all of Cell 20's, which may
-# outlast a Colab session). COV_FINE_FACTOR = 0 drops the error bars' renders for a first look at the shape.
+# Time: Cell 20's Gaussian fits took 6 min (5353, 0.77 um) to 111 min (639, 2.82 um) on the pilot. With this cell's
+# settings (hybrid, 8 x 16 directions, two starts, centre weights, p/32 error bars) a 0.8 um synthetic node took 624 s
+# against 107 s for the Gaussian fit alone, 5.9 times [run, sandbox, 2026-11-23]: the Gaussian fit's error bars add
+# about the fit's time again, the SGT stage about 400 s. Carried over to 5353, about 35 min -- an estimate, not
+# measured on the pilot [corrected 2026-11-23, 18:25: the earlier "1.5 to 3.5 h" came from the test suite's fast
+# configuration, which makes the Gaussian fit unusually cheap]. All five of Cell 20's nodes would take of the order of
+# a day, beyond a Colab session: the cell starts with 5353 alone (SGT_NODES; "5353,2620" adds a node; None: all).
+# COV_FINE_FACTOR = 0 drops the error bars' renders for a first look at the shape.
 # Output to send back: the lines `node <id>: d ...` of the log, the table, and the `fit_node<id>.png` figures.
 
 # %%
@@ -847,7 +852,7 @@ import pandas as pd
 from IPython.display import Image, display
 SGT_SKEW = "off"                      # "off": zeta = 1 (the isotropic PSF, D-222.1); "fit": zeta fitted too
 COV_FINE_FACTOR = 32                  # the error bars' lattice (D-224.2); 0 = the fit's own Jacobian (faster)
-SGT_NODES = "5353"                    # the thinnest of Cell 20's nodes first; "5353,599" adds one; None: all of them
+SGT_NODES = "5353"                    # the thinnest of Cell 20's nodes first; "5353,2620" adds one; None: all of them
 CLEAN_D, INFER_S = OUT + "/cleaning_d169", OUT + "/inference_sgt"
 if "KW_ARGS" not in globals():        # a Cell 16 from before wave 7: the kernel's width fixed, the default (D-221.1)
     KW_ARGS = ["--kernel-width", "fixed"]
