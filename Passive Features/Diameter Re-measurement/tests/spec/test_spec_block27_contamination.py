@@ -144,3 +144,79 @@ def test_value_errors():
     for args in ((5, sc, 0.0, MU), (5, sc, B, 0.0), (11, sc, B, MU), (-1, sc, B, MU)):
         with pytest.raises(ValueError):
             CT.node_contamination(branch(), args[0], args[1], args[2], args[3], cfg)
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Tester 2026-11-22 (incremental at a749cc9): Block 27, amendments 3 and 4 -- pick_clear_examples. Oracles: the
+# amendments' rule (not near_end, n_tier2 = 0 and worst2_peak_gl = 0, soma_lateral_um >= min_soma_um; increasing
+# worst1_peak_gl, ties by decreasing own_dip_gl then node id; skipped within min_separation_um (3-D) of a node
+# taken in this call or of taken_xyz; until n), written out by hand below on rows built by hand.
+# ---------------------------------------------------------------------------------------------------------------
+
+def _clear_row(nid, x, peak, dip=50.0, near_end=False, n2=0, p2=0.0, soma=30.0, y=0.0, z=0.0):
+    return dict(node_id=nid, x_um=float(x), y_um=float(y), z_um=float(z), own_dip_gl=float(dip), n_tier2=n2,
+                n_evaluated=3, worst1_range_gl=0.0, worst1_peak_gl=float(peak), worst1_child_id=-1,
+                worst1_lateral_um=float("nan"), worst1_defocus_um=float("nan"), worst2_peak_gl=float(p2),
+                soma_lateral_um=float(soma), near_end=near_end)
+
+
+def _ref_pick(rows, n, sep, min_soma=0.0, taken=()):
+    ok = [r for r in rows if not r["near_end"] and r["n_tier2"] == 0 and r["worst2_peak_gl"] == 0
+          and r["soma_lateral_um"] >= min_soma]
+    ok = sorted(ok, key=lambda r: (r["worst1_peak_gl"], -r["own_dip_gl"], r["node_id"]))
+    pos = [np.asarray(t, float) for t in taken]
+    out = []
+    for r in ok:
+        if len(out) >= n:
+            break
+        p = np.array([r["x_um"], r["y_um"], r["z_um"]])
+        if any(np.linalg.norm(p - q) < sep for q in pos):
+            continue
+        out.append(r["node_id"])
+        pos.append(p)
+    return out
+
+
+def test_pick_clear_examples_rule_by_hand():
+    rows = [_clear_row(1, 0, 0.30), _clear_row(2, 20, 0.10), _clear_row(3, 40, 0.10, dip=70.0),
+            _clear_row(4, 60, 0.05, near_end=True), _clear_row(5, 80, 0.01, n2=1), _clear_row(6, 100, 0.02, p2=0.4),
+            _clear_row(7, 120, 0.00, soma=5.0), _clear_row(8, 3, 0.00), _clear_row(9, 140, 0.10, dip=70.0),
+            _clear_row(10, 160, 0.20)]
+    before = [dict(r) for r in rows]
+    got = CT.pick_clear_examples(rows, 10, 10.0, min_soma_um=10.0)
+    # 8 first (peak 0); 3 and 9 tie at 0.10 with dip 70 -> id order; then 2; 10 at 0.20; 1 at 0.30 is within
+    # 10 um of 8 (3 um apart) -> skipped; 4 near_end, 5 a tier-2 neighbour, 6 a tier-2 peak, 7 the soma: out
+    assert got == [8, 3, 9, 2, 10] == _ref_pick(rows, 10, 10.0, 10.0)
+    assert rows == before
+    assert CT.pick_clear_examples(rows, 0, 10.0) == []
+    assert CT.pick_clear_examples(rows, 2, 10.0, min_soma_um=10.0) == [8, 3]
+    # taken_xyz: a node within the distance of a position taken before is skipped
+    got = CT.pick_clear_examples(rows, 10, 10.0, min_soma_um=10.0, taken_xyz=[(42.0, 0.0, 0.0)])
+    assert got == _ref_pick(rows, 10, 10.0, 10.0, taken=[(42.0, 0.0, 0.0)]) and 3 not in got
+    assert CT.pick_clear_examples(rows, 10, 10.0, 10.0, taken_xyz=()) == CT.pick_clear_examples(rows, 10, 10.0, 10.0)
+    for bad in (dict(n=-1), dict(min_separation_um=-1.0), dict(min_separation_um=float("nan")),
+                dict(min_soma_um=float("inf")), dict(taken_xyz=[(1.0, 2.0)]), dict(taken_xyz=[(1.0, np.nan, 0.0)])):
+        kw = dict(rows=rows, n=3, min_separation_um=10.0)
+        kw.update(bad)
+        with pytest.raises(ValueError):
+            CT.pick_clear_examples(**kw)
+
+
+def test_pick_clear_examples_on_random_rows_against_reference():
+    rng = np.random.default_rng(9)
+    for _ in range(50):
+        rows = [_clear_row(i, rng.uniform(0, 60), round(rng.uniform(0, 1), 1), dip=round(rng.uniform(10, 90), -1),
+                           near_end=bool(rng.random() < 0.2), n2=int(rng.random() < 0.2),
+                           p2=float(rng.random() < 0.1), soma=rng.uniform(0, 40), y=rng.uniform(0, 20))
+                for i in rng.permutation(40)]
+        n, sep, ms = int(rng.integers(0, 12)), float(rng.uniform(0, 15)), float(rng.uniform(0, 20))
+        assert CT.pick_clear_examples(rows, n, sep, ms) == _ref_pick(rows, n, sep, ms)
+
+
+@pytest.mark.xfail(strict=True, reason="2026-11-22 report F2 (spec gap): a NaN soma_lateral_um fails the "
+                   "comparison with min_soma_um, so a cell without a soma disc gets no clear node")
+def test_pick_clear_examples_soma_distance_nan_without_a_soma():
+    """Block 27: soma_lateral_um is NaN without a soma. The rule "at least min_soma_um from the soma" is silent
+    on NaN; with min_soma_um = 0 (the function's default) a cell without a soma disc gets no clear node."""
+    rows = [_clear_row(1, 0, 0.0, soma=float("nan")), _clear_row(2, 20, 0.0, soma=float("nan"))]
+    assert CT.pick_clear_examples(rows, 2, 10.0, min_soma_um=0.0) == [1, 2]
