@@ -1,0 +1,1 @@
+d2.5_mu0.5_z0.0 gauss [9 planes] gauss d err +0.0011 (rmse 0.0032) cover 0.67/0.93 bound 0.00 nfev 5 0.46s; z1 d err +0.0012 (rmse 0.0034) cover 0.67/0.90 bound 0.60 nfev 7 1.60s; zf d err +0.0011 (rmse 0.0034) cover 0.63/0.90 bound 0.63 nfev 9 2.26s | robust 0/12 better | 179 s
