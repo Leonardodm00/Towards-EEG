@@ -22,6 +22,7 @@
 | 2026-11-23 (later, 2) | Section 15.1, new [row added 2026-11-23, later, 3: it was written without one]: wave 7 merged -- the SGT kernel in the line renderer (Block 49), the fit's SGT option and fine-lattice error bars (Block 30 amendment 3), the width switch (Block 36 amendments 22-23); D-224, D-225, D-232. Evidence: `checks/sgt_psf_2d_2026-11-23/`, Block 49's and Block 30's reports, the synthetic run **[run, sandbox]**. |
 | 2026-11-23 (later, 3) | Wave 7's final check came back (PASS WITH ISSUES) and was settled (D-233): section 15.2, new; 15.1's status bullet superseded and its synthetic times marked as p/16. Evidence: `specs/test_reports/2026-11-23_1355_incremental.md`, the tester's reproducers rerun on the fixes, the times measured at p/32 **[run, sandbox]**. |
 | 2026-11-23 (later, 4) | Notebook Cells 23 (B), 25 and 26 delivered to the user (17:46, "deliver the 25, 23b and 26 cells"): section 15.2's last bullet, new. Evidence: the three cells run on the synthetic cell in the sandbox **[run, sandbox]**. |
+| 2026-11-23 (later, 5) | Cell 23B on the pilot, node 7 alone (the user's run, 18:20): section 12.3, new. Cell 26's time measured with its own settings on a synthetic node: section 15.2's time bullet; the notebook's Cell 23B, 25 and 26 time notes corrected. Evidence: the user's log **[data]**; `infer_nodes.py` at the production settings **[run, sandbox]**. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -440,6 +441,18 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   (section 12.1), so $1.2\,r$ lies inside the half-depth points. Caveat: the reach is read against a background fitted
   beyond 3 um, which bounds it there.
 
+### 12.3 The calibration on the pilot, node 7 alone (2026-11-23) [added 2026-11-23, later]
+
+- **What came out [data: the user's log, 18:20; Cell 23B with `--nodes 7`]**: node 7 converged with d 2.867 +- 0.031 um
+  (Allen 2.039), sigma0 0.2582 +- 0.0223 um, c 1.363 +- 0.203, chi2/dof 4.34; 68 evaluations in 1054 s (17.7 min, about
+  15 s each: Colab ran 2-3 times slower than the sandbox's synthetic timings). The sigma file now holds n = 1 for both
+  summaries, so chi2_cons cannot be computed (0 dof).
+- **What it does not yet support [reasoning]**: one node, whose model misses its data by chi2/dof 4.3, is not D-201's
+  calibration, which is a weighted mean over thick nodes with a consistency check. Its sigma0 is 3.2 times the fixed
+  0.080 um, so `KERNEL_WIDTH = "calibrated"` on this file would move every thin-node fit a long way. The switch accepts
+  n = 1 (it refuses only n = 0). The other nodes the current screen judges clean (599, 611, 629; section 12.1) are the
+  next run.
+
 ## 13. How far from the soma diameter errors matter (D-205) [added 2026-11-22]
 
 - **Asked [user, 2026-11-20 18:33]**: the refined morphologies feed the passive and Ih fits from somatic
@@ -683,6 +696,11 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   node (10-33 s with `--cov-fine-factor 0`); with the SGT stage (zeta held) 351-499 s a node in all; the skew 769 s for
   one node with the fit's own Jacobian. On the two synthetic nodes the SGT fit ends with xi at its edge, beta 2.08-2.10,
   d 0.0020 um (about 1 SE) above the Gaussian fit's.
+- **Time with Cell 26's own settings [run, sandbox, 18:19; hybrid, 8 x 16 directions, starts 1.0 and 1.6, centre
+  weights, a 0.8 um synthetic node]**: the Gaussian fit 107 s, with its p/32 error bars 223 s, with the SGT stage (zeta
+  held) 624 s: 5.9 times the fit alone. Carried over to 5353 (Cell 20: 5.9 min on Colab), about 35 min -- an estimate
+  [corrects the notebook's earlier "1.5 to 3.5 h", taken from the fast configuration, where the Gaussian fit is
+  unusually cheap].
 - **Left untested by the final check**: the real cell (SPEC section 7); the SGT path on a depth-dependent law with
   non-Gaussian members against an independent reference; the hybrid at 8 x 16 directions on the SGT path; the SGT stage
   on the clear-node path (`clean --no-clean`) end to end; production timings.
