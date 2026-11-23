@@ -646,5 +646,12 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   weighted means; `clean_cell.py` records the base renderer so that `infer_nodes.py`'s own switch does not compound c.
   Notebook: Cell 16's `KERNEL_WIDTH`, `SIGMA_JSON` (passed to Cells 20, 25, 26; Cell 23's thick-node preparation stays
   fixed); Cell 26 fits Cell 20's nodes with the SGT kernel beside the Gaussian.
-- **Status**: contract `9ea1abe`; Block 49 and Block 30 amendment 3 with two implementers; the orchestrator's wiring
-  committed (`0b20f32`); then the final check.
+- **Status** [updated 2026-11-23, 14:00]: contract `9ea1abe`; Block 30 amendment 3 merged (`cf86785`), Block 49 merged
+  (`5dbc9c1`; its one issue, oracle (iii) at the raised reach infeasible here, settled by D-232); the orchestrator's
+  wiring (`0b20f32`, `bb650a7`); pushed at `16eb8be`; the independent final check running on that commit.
+- **Cost, measured [run, sandbox; Block 49's report]**: per warm call (hybrid, 8 x 16 directions, planes -4..4),
+  Gaussian / SGT zeta = 1 / SGT skew: 0.09-2.48 / 0.37-4.96 / 6.1-22.8 s at line_fine_factor 8; 1.3-44 / 2.4-105 /
+  13-142 s at 32 (the error bars' lattice). The skew option is 5-10 times the Gaussian per call. On the synthetic
+  cell (partition absorption, 4 x 8 directions) one node took 27 s for the Gaussian fit with error bars at p/16 and
+  133 s with the SGT stage added (d 0.7968 +- 0.0018 um against the Gaussian's 0.7947 +- 0.0017; beta 2.09 +- 0.10,
+  xi at its edge 0: the synthetic blur is Gaussian).
