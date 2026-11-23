@@ -184,10 +184,12 @@ def fit_one(cleaning_dir, specimen, nid, config_json, out_dir):
     return row, dict(depth_um=depth)
 
 
-def write_outputs(out, a, ids, rows, scfg, summary, t0, summary_growth_scale=None):
-    """sigma_<S>.csv and sigma_<S>.json of the nodes done so far, in the order of ids (strict JSON, F3); the growth
-    scale's summary beside sigma0's (Block 36 amendment 22, D-222.3: the switch to the calibrated kernel reads both)."""
+def write_outputs(out, a, ids, rows, scfg, summary, t0):
+    """sigma_<S>.csv and sigma_<S>.json of the nodes done so far, in the order of ids (strict JSON, F3); with the
+    final summary, the growth scale's beside sigma0's (Block 36 amendment 22, D-222.3: the switch to the calibrated
+    kernel reads both), computed here from the rows so that the signature stays the one amendment 20 tested."""
     done = [rows[i] for i in ids if i in rows]
+    summary_growth_scale = None if summary is None else growth_scale_summary(done)
     write_csv(os.path.join(out, "sigma_%s.csv" % a.specimen), done)
     with open(os.path.join(out, "sigma_%s.json" % a.specimen), "w") as f:
         json.dump(_json_safe(dict(specimen=a.specimen, cleaning_dir=a.cleaning_dir, nodes=ids,
@@ -290,7 +292,7 @@ def main(argv=None):
     ok = np.array([bool(r["in_summary"]) for r in ordered], dtype=bool)
     summary = SC.summarize(np.where(ok, sig, np.nan), np.where(ok, se, np.nan), ok)
     summary_c = growth_scale_summary(ordered)
-    write_outputs(out, a, ids, rows, scfg, summary, t0, summary_growth_scale=summary_c)
+    write_outputs(out, a, ids, rows, scfg, summary, t0)
     from allen_diameter.plotting import sigma_figures as SF
     srows = [dict(node_id=r["node_id"], sigma0_um=r["sigma0_um"], se_sigma0_um=r["se_sigma0_um"],
                   growth_scale=r["growth_scale"], se_growth_scale=r["se_growth_scale"], d_hat_um=r["d_um"],

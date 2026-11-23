@@ -55,10 +55,10 @@ FLAG_TIER2 = "tier2_unmodelled"
 INFERENCE_COLUMNS = ("node_id", "class", "d_allen_um", "d_pilot_um", "d_refined_um", "d_hat_um", "se_d_um",
                      "mu_hat_per_um", "se_mu_per_um", "v0_hat_um", "se_v0_um", "z_ax_hat_um", "se_z_ax_um", "cost",
                      "chi2_mean", "planes_used", "n_planes_used", "status", "at_bound", "flags",
-                     "weights", "lambda_um", "v_cut_lo_um", "v_cut_hi_um", "n_solves",   # amendment 16 (D-169)
                      "kernel", "beta", "se_beta", "xi", "se_xi", "zeta", "se_zeta", "truncated_mass",  # amendment 23
                      "cov_source", "gauss_d_um", "gauss_se_d_um", "gauss_status", "gauss_chi2_mean",   # (D-225)
-                     "seconds")                                                          # the seconds stay last
+                     "weights", "lambda_um", "v_cut_lo_um", "v_cut_hi_um", "n_solves",   # amendment 16 (D-169)
+                     "seconds")                                       # amendment 16's five, then the seconds, last
 
 
 def run_config(rec, config_json, starts):

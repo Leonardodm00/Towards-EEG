@@ -1987,9 +1987,11 @@ cache, kernel_family="gaussian")`: "sgt" returns `forward(d, mu, v0, z_ax, beta,
 `line_fine_factor` = `inference.cov_fine_factor` (None when it is 0). (ii) Per node: the Gaussian fit as today, its
 error bars from `forward_cov`; with `inference.kernel_family` "sgt", the SGT fit of Block 30 amendment 3 (G) with its
 own `forward_cov`. (iii) Outputs: the node's estimate is the fit of the configured kernel (D-225.5) -- the CSV's and
-the JSON's `d_um`, `se_d_um`, `mu_per_um`, ... are the SGT fit's under "sgt" -- with `kernel`, `beta`, `xi`, `zeta`,
-`se_beta`, `se_xi`, `se_zeta`, `sgt_status`, `sgt_at_bound`, `truncated_mass` and, beside, the Gaussian fit's
-`gauss_d_um`, `gauss_se_d_um`, `gauss_status`, `gauss_chi2`; `cov_source`; the per-node figure (Block 34) draws the
+the JSON's `d_hat_um`, `se_d_um`, `mu_hat_per_um`, ..., `status`, `at_bound` are the SGT fit's under "sgt" -- with
+`kernel`, `beta`, `se_beta`, `xi`, `se_xi`, `zeta`, `se_zeta`, `truncated_mass`, `cov_source` and, beside, the Gaussian
+fit's `gauss_d_um`, `gauss_se_d_um`, `gauss_status`, `gauss_chi2_mean`, in the CSV after `flags` (amendment 16's five
+columns stay just before `seconds`, the last); the JSON's node record adds `kernel`, `cov_source`, `param_names`,
+`cov_search`, `shape`, `se_shape` and the Gaussian fit's record `gauss`; the per-node figure (Block 34) draws the
 estimate's model; the node's log line names the kernel and the shape. (iv) Command line: `--kernel gaussian|sgt`
 (default: `inference.kernel_family`), `--sgt-skew off|fit` (default: `inference.sgt_skew`), `--cov-fine-factor N`
 (default: `inference.cov_fine_factor`; 0 = the fit's own Jacobian), `--nodes` (a subset of the preparation's example
