@@ -18,6 +18,7 @@
 | 2026-11-22 (later, 4) | Wave 5 (D-215, D-216, D-218: the user's plan of 17:58 approved): section 14.4, new -- the soma's forward model and fit (SPEC Blocks 45-46, merged d1ee02f and e21dfcf), the orchestrator's provisional settings (D-219), the recovery check on simulated stacks (D-216.2). Evidence: the gates' reruns (test_smoke_soma_render.py 10 pass, test_smoke_soma_fit.py 9 pass, 1 skip), the joint noise-free fit, `checks/soma_recovery_2026-11-22/` (20f4ca1). The final check of the wave is running. |
 | 2026-11-22 (later, 5) | The wave's final check came back (PASS WITH ISSUES) and was settled (D-220): section 14.4's "Final check" bullet. Evidence: the report, the reruns of the smoke suites and of the tester's spec tests against the fixed code (144d9c4). |
 | 2026-11-23 | Wave 6 (D-222.5): section 14.5, new -- the corrected morphology (Block 47), the fit's figures (Block 48), the entry point `scripts/fit_soma.py` and notebook Cell 25. Evidence: the gates' reruns, the entry point's synthetic dry run. |
+| 2026-11-23 (later) | Section 15, new: the kernel work of D-221/D-222 and its identifiability check (`checks/sgt_identifiability_2026-11-23/`); the wave-6 final check settled (D-223). |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -592,3 +593,27 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   toward the apical side is a pyramidal soma's signature (S then about 5 % low, `checks/soma_recovery_2026-11-22/`).
 - **Next**: the final check of wave 6; then the kernel wave (D-221, D-222: the switch to the calibrated sigma_0 and c;
   the SGT kernel in the node's joint fit), starting with a check that (beta, xi) separate from the diameter.
+
+## 15. The kernel of the node fit: the switch to the calibrated sigma_0 and the SGT option (D-221, D-222) [added 2026-11-23]
+
+- **Decided [user, D-221, D-222]**: sigma_0 stays 0.080 um (D-172) with a switch to Block 42's calibration (the weighted
+  means of sigma_0 and c, `kernel.with_kernel`); the node's joint fit across planes (Block 30) gets the SGT kernel as an
+  option -- the shape (beta, xi) fitted per node with zeta = 1, zeta fitted as a further option, the width the Gaussian
+  law's FWHM at each slab-plane defocus; the Gaussian stays the default; the cleaning keeps it. Not built yet: the plan
+  waits for the user's approval.
+- **Identifiability check [run, sandbox; `checks/sgt_identifiability_2026-11-23/`]**: a 1-D model of the node's line
+  (partition absorption, the default kernel law, planes k* +- 4, noise 1.1 gl on 150 gl), validated against Block 35 to
+  1.8e-10.
+  - No degeneracy between d and the shape: freeing (beta, xi) multiplies SE(d) by 1.00-1.10, freeing zeta as well by
+    1.01-1.13; the ill-conditioning lies inside the shape (beta against xi, correlation 0.97-1.00). Thin nodes (0.4 um)
+    fix the shape loosely, but d stays unbiased. zeta is well determined and trades with v0, not with d. Expect xi = 0
+    (a member of the family) in about half the fits of Gaussian-like nodes.
+  - The Gaussian fit on non-Gaussian truths of the same FWHM biases d by +4 to +13 % on 0.4 um nodes, +0.7 to +2.9 % at
+    0.8 um, at most 2.6 % in magnitude on thick nodes -- up to 6.5 SE on thin nodes and 32 SE on dark thick ones; its
+    SE's 1-SE coverage falls to 0.03-0.25. The SGT fits recover d within 1.9 % at 0.4 um and 0.24 % above, with coverage
+    0.66-0.72 at 1 SE.
+  - Side finding: on Blocks 26/35's lattice (h = p/8) the derivative of the model with respect to d and v0 has not
+    converged, so Block 30's SE(d) and corr(d, v0) carry errors of tens of percent on thin nodes (the values are fine);
+    on a lattice of p/32 they converge.
+  - Not tested: a width off the law (the in-focus-width confound), tilt, oblique headings, caps, neighbours, the hybrid
+    absorption, background texture.
