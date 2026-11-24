@@ -291,6 +291,7 @@ the "Binds" column.
 | 2026-11-24 (the gallery chat, 16:40) | Logs **D-239** (user, 16:30: a cell like Cell 24 without the skeleton, a slider across the planes to choose the one in focus): Cell 24 (b), SPEC Block 44 amendment 4. Next free IDs: D-240, I-007. |
 | 2026-11-24 (the gallery chat, 16:50) | Logs **D-240** (user, 16:46: "the far slope fit is to be drop. the only thing we might fit is the in-focus blur"): the soma fit's far slope held by default; supersedes D-218.1. Next free IDs: D-241, I-007. |
 | 2026-11-24 (the defocus-table chat, 16:50) | No decision changed. The status lines of **D-174** and **D-178** brought in step with the row of 2026-11-18 (later, 25): implemented at `513ad9e` (they still said "not implemented"; evidence: `MeasureConfig.pilot_diameter` = "allen" in `config.py` at `7b4a9ab`). Kernel calibration step 2 (roadmap NS1, theory T10): not started; its implementation handoff `Passive Features/Diameter Re-measurement/docs/TEEG_kernel_calibration_step2_implementation_handoff_2026-11-24.md` on `sci/diameter-pipeline` (`786977b`). Next free IDs: D-241, I-007. |
+| 2026-11-24 (the gallery chat, 17:40) | Logs **D-241** (user, 17:32): the soma fit's region of Allen's soma radius, only the branches' pixels masked. Next free IDs: D-242, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -519,6 +520,7 @@ would be needed*, *Status*.
 | D-238 | 2026-11-24 | the twins' submitter (`Ih Fit/submit_twin_recovery.sh`, `MAX_CORES`; SPEC Block 22); D-185 (its cap superseded for this submitter) | one submission of the twins' run may use up to 200 cores (was 120) [user] | active; implemented |
 | D-239 | 2026-11-24 | SPEC Block 44 amendment 4 (`plotting/plane_viewer.py`, `loading/soma_io.py`, `show_soma.py --z-margin-um`), notebook Cell 24 (b); D-211.1 in part | the soma's plane picked with a slider over the planes, nothing drawn over them, the pick becoming SOMA_K [user]; the view, the contrast and the window's margin [orchestrator] | active |
 | D-240 | 2026-11-24 | SPEC Block 46 (`soma_fit.far_slope`), `fit_soma.py --far-slope`, notebook Cell 25; supersedes D-218.1 | the soma fit holds the far slope (default "fixed", "fit" a labelled comparison only); only the in-focus blur might be fitted, not decided [user] | active |
+| D-241 | 2026-11-24 | SPEC Block 46 (`soma_fit.region_radius_um`, `mask_widen_um`), `fit_soma.py`, notebook Cell 25; supersedes D-219.4's disc and the +2 um widening | the soma fit's region: a disc of Allen's soma radius; only the pixels under the traced branches left out, the processes otherwise kept in the data [user] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15459,3 +15461,37 @@ bounds); the far slope's calibration on Allen's data (roadmap far-field stage); 
 figure of 16:30.
 
 **Status:** active; supersedes D-218.1.
+
+## D-241 -- The soma fit's region: a disc of Allen's soma radius, only the pixels under the traced branches left out (user)
+
+**Date:** 2026-11-24, 17:32 (Europe/Rome), the gallery chat. **Binds:** SPEC Block 46 (`soma_fit.region_radius_um`,
+`soma_fit.mask_widen_um`, `analysis/soma_fit.fit_soma`), `scripts/fit_soma.py` (the crop, the mask, the JSON), the
+notebook's Cell 25; supersedes D-219.4's 13 um disc and D-216's "+2 um" widening of the trace mask.
+
+**Decision [user].** "1) for the region take the radius of the Allen database, 2) Allen's traced processes must be
+kept for now (we should clean them with the procedure already available) they represent a constant for now, slightly
+biasing the estimate but for the pilot is ok. So remove only the pixels that are superimposed with the branches."
+
+**Statement.** (D-241.1) The fit's region R is the disc of Allen's traced soma radius (the SWC's soma node; 5.97 um on
+the pilot) about Allen's soma centre: `soma_fit.region_radius_um` None (the default) means that radius; a number
+overrides it. The crop is that radius plus `crop_margin_um`. (D-241.2) The mask leaves out only the pixels the traced
+branches cover, at their traced radius (`soma_fit.mask_widen_um` 0, was 2 um), at every depth, the soma-rooted
+segments excepted as before; the traced processes otherwise stay in the data, their shadows unmodelled (a slight bias
+the user accepts for the pilot). (D-241.3) Cleaning those processes from the soma's planes with the existing procedure
+(the cleaning of neighbours' shadows) is for later: not decided when.
+
+**Why.** **[user]** as stated. **[run, sandbox: `region_new_check.py`, sent to the user]** on the pilot the new region
+holds 7442 px per plane (the old 7486); a compact soma (c 7.26 um, 2 mu c kept) and the fitted tall one differ there
+by 2.3 gl RMS per plane (median, each plane's brightness re-solved) against 1.4 gl on the old region: the new region
+sees the depth somewhat better, through the soma's interior.
+
+**What it implies for code and tables.** `SomaFitConfig.region_radius_um` Optional, None; `mask_widen_um` 0.0;
+`fit_soma` takes the traced radius when None; `fit_soma.py` sizes the crop with it and records the radius used in the
+JSON (`crop.region_radius_um`); SPEC Block 46 amended; the defaults' tests updated.
+
+**What it does not decide.** When and how the processes are cleaned from the soma's planes; whether the radius should
+carry a margin later; the soma's depth problem (handoff 14.6), which the next run will show.
+
+**Sources.** **[user]** 2026-11-24 17:32. **[run, sandbox]** the check above.
+
+**Status:** active; supersedes D-219.4 (the disc's radius) and the +2 um widening (D-216, D-219.4).
