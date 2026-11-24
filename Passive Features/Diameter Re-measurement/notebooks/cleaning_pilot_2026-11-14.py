@@ -871,3 +871,24 @@ display(res_s[["node_id", "d_allen_um", "gauss_d_um", "gauss_se_d_um", "d_hat_um
 for path in sorted(glob.glob(INFER_S + "/fit_node*.png")):
     print(path)
     display(Image(filename=path))
+
+# %% [markdown]
+# ## Cell 26 (b): the fitted tube on the node's in-focus image (scripts/show_focal.py; SPEC Block 36, amendment 12)
+#
+# Cell 26's estimate drawn on the node's patch at the first stage's sharpest plane k* (FOCAL26_PLANE = "axis": the
+# recorded plane nearest the fitted axis depth): the estimated diameter's two edges (solid), Allen's diameter about the
+# trace (dashed), the measuring line. Reads the files Cells 20 and 26 wrote; seconds. Cell 20's Gaussian fits of the
+# five nodes are already drawn the same way in OUT/cleaning_d169/focal_<S>.png. On 5353 the Gaussian and the SGT
+# diameters differ by 0.003 um, far below a pixel.
+
+# %%
+import pandas as pd
+from IPython.display import Image, display
+FOCAL26_NODES = "5353"         # Cell 26's nodes, comma-separated; None: all of them
+FOCAL26_PLANE = "kstar"        # or "axis"
+INF26 = OUT + "/inference_sgt"
+png26 = "%s/focal_%d.png" % (INF26, SPECIMEN)
+run("scripts/show_focal.py", "--cleaning-dir", OUT + "/cleaning_d169", "--specimen", SPECIMEN, "--inference-dir", INF26,
+    "--plane", FOCAL26_PLANE, "--zoom-um", 4.0, "--out", png26, *(["--nodes", FOCAL26_NODES] if FOCAL26_NODES else []))
+display(Image(filename=png26))
+display(pd.read_csv("%s/focal_%d.csv" % (INF26, SPECIMEN)))
