@@ -1521,6 +1521,8 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
     loss is garbage-collected and at interpreter exit. For `n_workers == 1` both exist and `close()` does nothing.
   - `integrate_long_step(..., n_workers: int = 1)`: passed to the loss the patched `mono._build_loss_function`
     builds; validated as above.
+  - One live pool per process [amendment 2, D-236]: before a loss creates its pool, the live pool of any OTHER loss of this module is closed (as `close()` does; that loss creates a new pool at its next call). Reason: a pool keeps a manager thread in the parent, and a `fork` made while another thread runs can deadlock the child (Python 3.12 warns "process is multi-threaded, use of fork() may lead to deadlocks"); the fit keeps its loss alive (the optimiser's result holds it) while `run_ih_fit.py` builds further losses, so the callers cannot be relied on to close in time.
+  - As built [orchestrator, accepted at the gate]: the pool is `concurrent.futures.ProcessPoolExecutor` on the fork context (a `multiprocessing.Pool` hangs when a worker dies); a worker that dies raises `BrokenProcessPool` in the parent, never 1e6; every bundle is computed even when an earlier one fails, the outcome decided in the bundles' order; `n_workers` must be an integer that is not a bool; with no training bundle no pool is made.
 - Inputs / outputs: as today; `loss(*q) -> float` (dimensionless under `relative`/`ls_amplitude`).
 - Parameters: `n_workers` (processes), default 1.
 - Library calls: `multiprocessing` (standard library), fork context.
@@ -1539,7 +1541,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   the first call, the function the workers call). W6 `n_workers=0`, `-1`, `1.5` raise ValueError; W7 through
   `integrate_long_step(mono, ..., n_workers=2)` the loss `mono._build_loss_function` returns has `n_workers == 2`
   and equals the serial one at 3 points. W8 wall time of 5 evaluations with W=2 against W=1, REPORTED (not
-  asserted: the sandbox has 2 cores). W9 `smoke_ls_protocol.py` still 9/9. W10 ASCII/LF.
+  asserted: the sandbox has 2 cores). W9 `smoke_ls_protocol.py` still 9/9. W10 ASCII/LF. W13 [amendment 2] two losses with `n_workers=2` on the same cell (different bundle subsets), evaluated alternately 3 times each with `warnings.simplefilter("error")`: every value equals its serial loss, no warning is raised, and after each call the parent has at most `min(2, n_bundles)` live worker children (one pool).
 - Data flow: Block 20 passes `n_workers` to `integrate_long_step` and calls `close()` on losses it builds itself.
 - Confirmed: yes -- D-234 (user: "the sweeps of one evaluation"). Fork, the lazy pool and `close()` are the
   orchestrator's.
@@ -1591,10 +1593,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Custom code: the selection of the starts and the bookkeeping only. Custom: scipy offers no multi-start from a
   list of evaluated points. Checked: `scipy.optimize.minimize`, `basinhopping`, `shgo`, `dual_annealing`,
   `differential_evolution(polish=True)`.
-- Test oracles (`smoke_local_refine.py`, pure): R1 on $f(q) = \sum_i (q_i - c_i)^2$ in $p = 5$ with $c$ inside the
-  box and 30 random evaluations, `refine` returns `fun` < 1e-6 x the search's best and
-  $\max_i \lvert u_i(\hat q) - u_i(c)\rvert < 5 \times 10^{-3}$ within the 3 x 100 evaluations (report the numbers; if
-  100 evaluations cannot reach it in 5-D, STOP with an ISSUE giving the reached values). R2 with $c$ outside the box
+- Test oracles (`smoke_local_refine.py`, pure): R1 [amended 2026-11-24, amendment 1, D-236: the first wording asked a ratio of 1e-6, which the refinement's own stopping tolerances (xatol 1e-3, fatol 1e-4 relative) cannot give at any budget, and which 100 evaluations per start do not approach] on $f(q) = \sum_i (q_i - c_i)^2$ in $p = 5$ on the box $[0, 1]^5$ with `rng = numpy.random.default_rng(0)`, `c = 0.15 + 0.7 * rng.random(5)` and the 30 evaluations `rng.random((30, 5))`: (R1a, the default budget) `refine` with the defaults returns `fun` < 1e-3 x the search's best and $\max_i \lvert u_i(\hat q) - u_i(c)\rvert < 2 \times 10^{-2}$ with `n_evals` $\le$ 3 x 100 + 3 x $p$ (measured by the implementer over 50 draws: ratio at most 6.9e-4, distance at most 1.1e-2; every start stops on `maxfev`); (R1b, convergence) with `maxfev_per_start=10000` every start stops on its tolerances (`status == 0`), `fun` < 1e-5 x the search's best and the distance < 2e-3 (measured: 1.1e-6 to 4.2e-6, 2.7e-4 to 5.3e-4). Both report their numbers. R2 with $c$ outside the box
   along one axis the estimate lies on that face (within 1e-9) and never leaves the box (every recorded point checked).
   R3 `select_starts` against a brute-force re-implementation on 200 random draws, and hand cases: ties by index;
   penalised and non-finite left out; fewer than 3 when the points are closer than 0.1; none when all are penalised.
@@ -1623,6 +1622,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Confirmed: yes -- D-234 (user: Nelder-Mead from the best 3 points, at most 100 evaluations each; the box; dv_h
   fitted again). The distance rule between starts, the simplex step, the two tolerances, wrapping `mono.gp_minimize`
   and the refinement of `passive_fullstep` are the orchestrator's (decision log, tagged [orchestrator]).
+- Notes for the reader of a refined fit [amendment 1; read in `fit_one_cell` by the implementer, the monolith is not edited]: (i) the `*_sigma` columns come from the global search's Gaussian process, keeping its predicted points within a margin of `result.fun`; at a refined (lower) `fun` fewer points pass, so they shrink, or are 0 when fewer than 5 pass -- they are not an uncertainty of the refined estimate and the gate does not use them; (ii) the stored loss history is the running minimum of the global evaluations only, so its last value is `loss_after_search`; (iii) Phase 3 uses the search's Gaussian process centred on the refined estimate.
 - Status: drafted
 
 ### Block 21: the manifest with the run's I_h arm (2.9 (d))
