@@ -221,6 +221,16 @@ theory:
     status: open          # DRAFT
     closed_on:
     decision:
+  - id: T18
+    title: "Local refinement after the global search"
+    summary: "Why the Bayesian-optimisation fit can stop above a point it could reach (tw2: the truth fits better than the estimate), and how a derivative-free local search started from its best point (Nelder-Mead simplex; Powell, BOBYQA) closes the gap; what it cannot fix (a wrong basin, a flat direction)."
+    refs: []
+    parent: TG3
+    depends_on: []
+    status: open
+    closed_on:
+    decision:
+    note: "Added at the user's word, 2026-11-24 (D-234), after run tw2. Study document in preparation: TEEG_topic_local_refinement_after_global_search_2026-11-24.md (to be sent as files in the twins chat)."
 
 implementation:
   # ---- groups (no block of their own; coloured by their least advanced member)
