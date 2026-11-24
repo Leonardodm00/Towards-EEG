@@ -23,6 +23,7 @@
 | 2026-11-23 (later, 3) | Wave 7's final check came back (PASS WITH ISSUES) and was settled (D-233): section 15.2, new; 15.1's status bullet superseded and its synthetic times marked as p/16. Evidence: `specs/test_reports/2026-11-23_1355_incremental.md`, the tester's reproducers rerun on the fixes, the times measured at p/32 **[run, sandbox]**. |
 | 2026-11-23 (later, 4) | Notebook Cells 23 (B), 25 and 26 delivered to the user (17:46, "deliver the 25, 23b and 26 cells"): section 15.2's last bullet, new. Evidence: the three cells run on the synthetic cell in the sandbox **[run, sandbox]**. |
 | 2026-11-23 (later, 5) | Cell 23B on the pilot, node 7 alone (the user's run, 18:20): section 12.3, new. Cell 26's time measured with its own settings on a synthetic node: section 15.2's time bullet; the notebook's Cell 23B, 25 and 26 time notes corrected. Evidence: the user's log **[data]**; `infer_nodes.py` at the production settings **[run, sandbox]**. |
+| 2026-11-24 | The user's uploads of 14:15 (Cells 25 and 26, Cell 23B again): sections 14.6 and 15.3, new -- the soma's polar semi-axis and the SGT's beta end at their bounds unflagged; the notebook's Cell 26 (b), new. Evidence: the uploaded JSON and CSV **[data]**; `soma_fit._at_bound`, `node_inference` (active_mask) **[code]**. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -610,6 +611,19 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
 - **Next**: the final check of wave 6; then the kernel wave (D-221, D-222: the switch to the calibrated sigma_0 and c;
   the SGT kernel in the node's joint fit), starting with a check that (beta, xi) separate from the diameter.
 
+### 14.6 The soma fit on the pilot (Cell 25, 2026-11-24) [added 2026-11-24]
+
+- **What came out [data: `soma_fit_529878215.json`, the user's upload of 14:15]**: status converged, 244 evaluations,
+  2874 s (48 min); centre (510.21, 638.53, 26.76) um (traced 509.60, 638.50, 32.76), semi-axes a 8.08 +- 0.01,
+  b 6.52 +- 0.01, c 14.99997 +- 0.09 um, phi 1.13 rad, mu 0.0290 /um, far slope 0.367; area 1173.7 +- 5.6 um^2 (Allen's
+  sphere 447.8), r_eq 9.66 um; chi2/dof 18.7 (5.02e6 on 267 496); kernel width fixed.
+- **c is at its upper bound, unflagged [data, code]**: `soma_fit.axis_bounds_um` is (1, 15); c ends 3.0e-5 um below 15,
+  while `_at_bound` flags only within AT_BOUND_REL 1e-6 of the width (1.4e-5 um), and the trust-region solver keeps its
+  iterates strictly inside the bounds, so its last step stops short of them. The area is therefore set by the bound,
+  not by the data, and `at_bound` is empty. mu is 0.029 /um, against 0.18 /um fitted on nodes 7 and 5353 **[data]**:
+  through the centre mu x 2c = 0.87, the absorbance a 0.18 /um soma would reach with c near 2.4 um, so the fit appears
+  to trade depth extent for absorption, only their product being pinned **[reasoning]**.
+
 ## 15. The kernel of the node fit: the switch to the calibrated sigma_0 and the SGT option (D-221, D-222) [added 2026-11-23]
 
 - **Decided [user, D-221, D-222]**: sigma_0 stays 0.080 um (D-172) with a switch to Block 42's calibration (the weighted
@@ -717,3 +731,16 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   on its two nodes gives sigma0 0.0799 +- 0.0018 um and c 1.012 +- 0.011 (the truth 0.080 and 1); Cell 25 recovers the
   synthetic soma with the fixed and with that calibrated width; Cell 26 on one node (fast configuration, the fit's own
   Jacobian, 301 s) ends at the Gaussian member, beta 1.99 +- 0.12, xi 0.00 +- 0.09, d equal to the Gaussian fit's.
+
+### 15.3 Cell 26 on the pilot, node 5353 (2026-11-24) [added 2026-11-24]
+
+- **What came out [data: `inference_529878215.csv` of OUT/inference_sgt, the user's upload of 14:15]**: the SGT fit
+  d 0.7713 +- 0.0104 um, the Gaussian fit beside it 0.7738 +- 0.0110 um (Allen 0.4544): the kernel's shape moves d by
+  0.0025 um, 0.2 SE. beta 10.0 (log10 beta 0.99999995, its box's upper end), xi 1.83 +- 1.80, zeta held at 1;
+  chi2/N 3.86 against the Gaussian's 4.43; truncated mass 1.1e-6; 1412 s (23.5 min; the estimate was about 35 min).
+- **beta at its bound, unflagged [data, code]**: status converged and `at_bound` empty, because Block 30 reads
+  `least_squares`' `active_mask`, whose threshold the solver's last strictly-feasible step does not reach (5e-8 in
+  log10 beta here). The same miss as the soma's c (section 14.6). The shape is not determined by this node's data; d
+  is.
+- **Cell 26 (b)** [notebook, 2026-11-24]: `show_focal.py` on Cell 26's output draws the fitted tube's edges on the
+  node's patch at k*, Allen's diameter dashed.
