@@ -434,7 +434,7 @@ def bundle_rmsd(cell, bundle, v_rest_mV: float, *,
 #  the pool is closed. Only (token, q, bundle index, dt) cross the pipe.
 _POOL_CONTEXTS: Dict[int, tuple] = {}
 _POOL_TOKENS = itertools.count(1)
-# One live pool per process (SPEC Block 19, amendment 2, D-236): the state of
+# One live pool per process (SPEC Block 19, amendment 2, D-237): the state of
 # every loss whose pool is alive, by id. A pool keeps a manager thread in the
 # parent, and a fork made while another thread runs can deadlock the child,
 # so a loss closes every other live pool before it forks its own.
