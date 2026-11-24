@@ -3,6 +3,7 @@
 | Date | Change |
 |---|---|
 | 2026-11-24 | Created at the end of the gallery chat (the user, 17:32: "Let's also continue the pipeline in another chat. Write an handoff with also the instruction to start with the explanation of the soma fit"). State after D-233 to D-243. |
+| 2026-11-24 (later) | Section 5's SGT scope checked file by file and split by route (the first list mixed in the table route's Block 12-13 files and `measure.sgt_lambda_um`'s users); section 4's two attributions checked against handoff 14.1 and 14.6; D-243 named in sections 1-2; the roadmap's I49 noted. Evidence: `grep -rni sgt` on `src`, `scripts`, `tests`, `notebooks` **[run, sandbox]**. |
 
 Repository `Leonardodm00/Towards-EEG`, branch `sci/diameter-pipeline` (workstream `Passive Features/Diameter
 Re-measurement/`, called W below); SPEC at the repository root `specs/SPEC.md`; the decision log on `main`
@@ -11,8 +12,8 @@ Re-measurement/`, called W below); SPEC at the repository root `specs/SPEC.md`; 
 
 ## 1. First task of the next chat: explain the soma fit to the user
 
-The user asked that the next chat **start by explaining the soma fit** -- as it stands after D-240 and D-241, step by
-step, with images. Do it before any other work:
+The user asked that the next chat **start by explaining the soma fit** -- as it stands after D-240, D-241 and D-243,
+step by step, with images. Do it before any other work:
 
 - Load the `explanation-modes` skill (Mode A, comprehensive: CONTEXT, NOTATION, GLOSSARY, BODY in two parts) and follow
   it; the project's source rules apply (SPEC, this file, the handoff above, the log; PubMed where a claim needs it).
@@ -34,7 +35,7 @@ step, with images. Do it before any other work:
 
 | What | Where | State |
 |---|---|---|
-| Soma fit entry point | `W/scripts/fit_soma.py` (Blocks 45-48) | far slope held (D-240), region D-241, bound flag D-236 |
+| Soma fit entry point | `W/scripts/fit_soma.py` (Blocks 45-48) | far slope held (D-240), region D-241, crop D-243, bound flag D-236 |
 | Soma fit core | `W/src/allen_diameter/analysis/soma_fit.py` (Block 46), `model/soma_render.py` (45), `analysis/soma_morphology.py` (47: the corrected SWC), `plotting/soma_fit_figures.py` (48) | tested (section 7) |
 | Soma plane viewer | `W/src/allen_diameter/plotting/plane_viewer.py`, `loading/soma_io.py`; `scripts/show_soma.py --z-margin-um` (Block 44 amendment 4, D-239) | smoke-tested; not tried in a browser |
 | Notebook | `W/notebooks/cleaning_pilot_2026-11-14.py`: Cell 24 (static montage with Allen's trace), Cell 24 (b) (slider, no overlay, sets SOMA_K), Cell 25 (the soma fit) | Cells 26 and 26 (b) removed (D-242) |
@@ -66,7 +67,7 @@ D-240.2); cleaning the processes from the soma's planes with the existing cleani
 
 | Run | Result | Reading |
 |---|---|---|
-| Cell 25, free far slope, start at the traced depth, 13 um region with + 2 um mask (the user's upload of 14:15) | c 15.00 um (upper bound), z0 26.76 um (lower bound, 6 um shallower than traced), slope 0.367, S 1174 +- 5.6 um^2 (Allen 448); residual RMS 3.5-6.3 gl per plane, largest on the small-z planes | not usable: the fit pushed absorption as far toward small z as the box allowed **[data]** |
+| Cell 25, free far slope, start at the traced depth, 13 um region with + 2 um mask (the user's upload of 14:15) | c 15.00 um (upper bound), z0 26.76 um (lower bound, 6 um shallower than traced), slope 0.367, S 1174 +- 5.6 um^2 (Allen 448); residual RMS 3.5-6.3 gl per plane, largest on the top planes (handoff 14.6) | not usable: the fit pushed absorption as far toward small z as the box allowed **[data]** |
 | Cell 25, far slope held at 0.79 (the user's planes figure of 16:30) | z0 30.96 um, inside its box; c and S not in the figure | the summary figure or the JSON would show c **[data]** |
 | Not run yet | start at the user's SOMA_K (Cell 24 (b)), region D-241 | the next real test |
 
@@ -76,7 +77,8 @@ within 2.4 gl RMS, half the fit's residual; the old region was 82 % background m
 outline (94 % of the outline masked); a bright background wedge or a tilt moved c by at most 0.1 um per gl, so not
 the cause; what pulled the fit toward small z is not identified (candidates: the soma's real depth -- against the
 user's D-211 reading, the soma seen from k = 107 toward larger k; an unmasked dark structure in the soma's column --
-D-211 found a basal dendrite in focus inside the traced disc at k = 93; a far blur that is not the Gaussian law).
+the first Cell 24 run found a basal dendrite in sharp focus inside the traced disc at k = 93, handoff 14.1; a far blur
+that is not the Gaussian law).
 With the D-241 region (7442 px per plane; the old region rebuilt by the same rule 7486, the run counted 7644) the
 depth signal is somewhat larger **[run, sandbox: `region_new_check.py`]**: a compact soma (c 7.26 um, 2 mu c kept, z0
 and slope as fitted) differs from the fitted one by 2.3 gl RMS per plane (median, each plane's brightness re-solved)
@@ -96,18 +98,26 @@ Withdrawn in this chat: holding mu at the dendrites' 0.18 /um (it forces 2c = 0.
    for the run of 14:15 (Cell 25's note: 8-21 min in the sandbox).
 3. **Remove the SGT code** (D-242: "totally drop the SGT"; the notebook already has no SGT cell). Through the
    `scientific-coding` skill (SPEC first: the dropped marks are in place on Block 49, Block 30 amendment 3, Block 36
-   amendment 23 and section 6's `infer_nodes.py` row). Scope found by `grep -rli sgt`:
-   `src/allen_diameter/model/line_sgt.py` (Block 49), the SGT stage in `analysis/node_inference.py` and
-   `scripts/infer_nodes.py` (`--kernel sgt`, `--sgt-skew`; keep `--cov-fine-factor`), `inference.sgt_*` and
-   `kernel_family` in `config.py`, mentions in `node_pipeline.py`, `line_fast.py`, `node_inputs.py`,
-   `plane_iteration.py`, `contamination.py`, `coarse_fit.py`; tests `tests/smoke/test_smoke_line_sgt.py`,
-   `test_smoke_node_inference.py`, `test_smoke_coarse_fit.py`, `test_smoke_contamination.py`,
-   `test_smoke_block13.py`, `test_smoke_config.py`; `tests/spec/test_spec_block49_line_sgt.py`, `wave7_refs.py`,
-   `test_spec_block36_am22_23.py`, `test_spec_block30_node_inference.py`, `test_spec_block29_coarse_fit.py`,
-   `test_spec_block01_config_cleaning.py`. NOT in scope: the table route's per-plane SGT fit (Block 12,
-   `analysis/fit_sgt.py`, `model/blur_kernels.py`, `measure.sgt_*`; D-052) -- a separate, older piece the user did not
-   discuss; ask before touching it (`test_smoke_sgt_fit.py` belongs to it: Block 12's docstring). Run the suites; an independent
-   Opus check after (coding directive 9).
+   amendment 23 and section 6's `infer_nodes.py` row). Scope, from `grep -rni sgt` read file by file
+   **[run, sandbox]**:
+   - **In** (the node fit's SGT: D-221, D-222, D-224, D-225; wave 7): `src/allen_diameter/model/line_sgt.py`
+     (Block 49); `model/line_fast.py` (its `SGTKernel` branch); `analysis/node_inputs.py` (`kernel_family` "sgt");
+     `analysis/node_inference.py` (the SGT stage, `SHAPE_NAMES`); `scripts/infer_nodes.py` (`--kernel sgt`,
+     `--sgt-skew`; keep `--cov-fine-factor`); `config.py`: `INFERENCE_KERNELS`, `SGT_STRETCH_ALLOWANCE`,
+     `inference.kernel_family`, `inference.sgt_*` and their validation (`inference.cov_steps` keeps its first four
+     entries' meaning; its three shape entries fall out of use); tests: `tests/smoke/test_smoke_line_sgt.py`, the SGT
+     parts of `test_smoke_node_inference.py` and `test_smoke_config.py`; `tests/spec/test_spec_block49_line_sgt.py`,
+     `wave7_refs.py`, the SGT parts of `test_spec_block36_am22_23.py`, `test_spec_block30_node_inference.py` and
+     `test_spec_block01_config_cleaning.py`.
+   - **Out** (the table route's SGT: D-052, Blocks 12-13; the user did not discuss it -- ask before touching):
+     `analysis/fit_sgt.py`, `model/blur_kernels.py`, `analysis/plane_iteration.py` (`sgt_at_plane`),
+     `analysis/node_pipeline.py`, `analysis/cell.py` and `analysis/phantoms.py` (Block 13's columns), `measure.sgt_*`
+     in `config.py` -- including `measure.sgt_lambda_um`, the centre-weight length that `analysis/contamination.py`,
+     `analysis/coarse_fit.py` and their tests use (a weight, not a kernel); `tests/smoke/test_smoke_sgt_fit.py`,
+     `test_smoke_block13.py`; the ignored artifacts under `tests/smoke/artifacts/`.
+   - Run the suites; an independent Opus check after (coding directive 9). The roadmap's stage I49 (Block 49) stays
+     until its code is gone; whether to drop the stage then is the user's call (the roadmap is not restructured
+     unasked).
 4. **Open questions to raise when they become relevant** (not decided): fit the in-focus blur in the soma fit
    (D-240.2); clean the processes from the soma's planes (D-241.3); the far slope's calibration on Allen's data (the
    roadmap's far-field stage, D-218.2); whether the real blur's shape biases the Gaussian fit's d on thin nodes (a
@@ -117,7 +127,8 @@ Withdrawn in this chat: holding mu at the dendrites' 0.18 /um (it forces 2c = 0.
 
 ## 6. Data the checks need (not in the repository)
 
-The user's uploads of 2026-11-24 (Colab `OUT`; the sandbox copies were in `/tmp/up24/`, gone with that session):
+The user's uploads of 2026-11-24 (Colab `OUT`; this chat's sandbox copies, `/tmp/up24/`, are not reachable from
+another chat):
 `soma_fit_529878215.json`, `reconstruction_soma_529878215.swc`, `soma_fit_529878215_planes.png`, `_summary.png`,
 `_morphology.png` (Cell 25, free slope, 14:15); `inference_529878215.csv` / `.json` (Cell 26 on node 5353, 14:15);
 the held-slope planes figure (16:30). Ask the user to upload them again if a check has to be rerun.
