@@ -26,6 +26,7 @@
 | 2026-11-24 | The user's uploads of 14:15 (Cells 25 and 26, Cell 23B again): sections 14.6 and 15.3, new -- the soma's polar semi-axis and the SGT's beta end at their bounds unflagged; the notebook's Cell 26 (b), new. Evidence: the uploaded JSON and CSV **[data]**; `soma_fit._at_bound`, `node_inference` (active_mask) **[code]**. |
 | 2026-11-24 (later) | The bound flag fixed (D-236, the user: "Fix it"): sections 14.6 and 15.3 marked. Evidence: the rule on the pilot's numbers and the four fits' suites **[run, sandbox]**. |
 | 2026-11-24 (later, 2) | Section 14.6: the diagnosis of c and z0 at their bounds (the user: "what do you think is the problem?") -- the c-z0-slope trade-off, what the fit's region covers, two background patterns ruled out, the next runs proposed; its "only their product being pinned" marked as understated. Evidence: five standalone checks on the uploaded JSON and corrected SWC **[run, sandbox]**. |
+| 2026-11-24 (later, 3) | Section 14.6: the run with the far slope held (the user's figure of 16:30, z0 30.96 um, inside its box); section 14.7, new: Cell 24 (b), the soma's planes in a slider viewer (D-239, Block 44 amendment 4). Evidence: the figure **[data]**; the smoke test and the cell through a stand-in **[run, sandbox]**. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -650,6 +651,25 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
     2c = 0.87 / 0.18 = 4.8 um against 16 x 13 um in-plane.
   - Next [proposed to the user]: Cell 25 from the plane the user judges the soma's centre; then with `FAR_SLOPE`
     "fixed" as a sensitivity test. This run's area is not used.
+
+- **The run with the far slope held (the user's planes figure of 2026-11-24 16:30) [data]**: "far slope fixed" (0.79);
+  the panel titles put z0 at 30.96 um (k 111 at z - z0 = +0.12 um), inside its box (26.76..38.76 um), where the free
+  slope had it on the box's shallow end. c and the area are not in that figure (the summary figure or the JSON has
+  them).
+
+### 14.7 Cell 24 (b): the soma's planes in a slider viewer (2026-11-24) [added 2026-11-24]
+
+- **What [code, D-239; SPEC Block 44 amendment 4]**: the same crop and window as Cell 24 (`show_soma.py`), shown one
+  plane at a time with nothing drawn over them (`plotting/plane_viewer.PlaneViewer`, ipywidgets): a slider over the
+  recorded planes with a play button, the plane's depth and its offset from the traced depth's plane, contrast
+  "fixed" (one grey range for every plane, the default) or "per plane", and a button that sets the notebook's
+  `SOMA_K` to the plane shown -- Cell 25's start when its `SOMA_FIT_K` is None. `VIEW_HALF_UM` 20, `ZOOM` 2;
+  `SOMA_Z_MARGIN_UM` (`show_soma.py --z-margin-um`) widens the window. The crop is read back from `show_soma.py`'s
+  files by `loading/soma_io.read_soma_view`.
+- **Checked [run, sandbox]**: `test_smoke_plane_viewer.py` 7 pass, 1 skip; the cell through a stand-in on the synthetic
+  cell (the pick sets `SOMA_K`, the next run starts there, a margin of 8 um widens the window by 7 planes a side); a
+  stack of the pilot's size builds in 0.26 s, a new plane shows in 3 ms. Not checked: the widget in a browser.
+- **Rerunning Cell 24 resets `SOMA_K`** to its own line: type the picked plane there if Cell 24 is run again.
 
 ## 15. The kernel of the node fit: the switch to the calibrated sigma_0 and the SGT option (D-221, D-222) [added 2026-11-23]
 
