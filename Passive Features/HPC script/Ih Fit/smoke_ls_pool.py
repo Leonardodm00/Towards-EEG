@@ -30,6 +30,11 @@ Checks (the oracles of the Block 19 entry, W1-W10, plus W11-W12)
     W8   wall time of 5 evaluations, W = 2 against W = 1: REPORTED only
     W9   smoke_ls_protocol.py still 9/9
     W10  ASCII / LF of the block's files
+    W13  [amendment 2] one live pool per process: two W = 2 losses on the
+         same cell (different bundle subsets) evaluated alternately, 3 times
+         each, with warnings turned into errors: every value equals its
+         serial loss, no warning, at most min(2, n_bundles) live worker
+         children after each call
     W11  (beyond the entry) a worker that dies: BrokenProcessPool in the
          parent, not the 1e6 penalty, and no hang; the next call makes a new
          pool and equals the serial value
@@ -450,6 +455,32 @@ def test_W10_ascii_lf():
         b = (HERE / f).read_bytes()
         assert all(c < 128 for c in b), f + " non-ASCII"
         assert b"\r" not in b, f + " CR bytes"
+
+
+def test_W13_one_live_pool():
+    import warnings
+    tb = _train_set()
+    subsets = (tb[:3], tb[2:])                    # 3 bundles each, different
+    pts = box_points(SPEC6)
+    before = set(_children())
+    pooled = [build(s, 2, weighting="ls_amplitude", lsw="peak_decay")
+              for s in subsets]
+    serial = [build(s, 1, weighting="ls_amplitude", lsw="peak_decay")
+              for s in subsets]
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            for r in range(3):
+                for k in (0, 1):
+                    q = pts[r + 3 * k]
+                    v = pooled[k](*q)
+                    live = [pid for pid in _children() if pid not in before]
+                    assert len(live) <= min(2, len(subsets[k])), (r, k, live)
+                    assert v == serial[k](*q), (r, k, v)
+    finally:
+        for lw in pooled:
+            lw.close()
+    assert not [pid for pid in _children() if pid not in before]
 
 
 def test_W11_worker_death():

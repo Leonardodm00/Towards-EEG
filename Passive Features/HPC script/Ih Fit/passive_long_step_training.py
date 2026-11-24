@@ -434,6 +434,11 @@ def bundle_rmsd(cell, bundle, v_rest_mV: float, *,
 #  the pool is closed. Only (token, q, bundle index, dt) cross the pipe.
 _POOL_CONTEXTS: Dict[int, tuple] = {}
 _POOL_TOKENS = itertools.count(1)
+# One live pool per process (SPEC Block 19, amendment 2, D-236): the state of
+# every loss whose pool is alive, by id. A pool keeps a manager thread in the
+# parent, and a fork made while another thread runs can deadlock the child,
+# so a loss closes every other live pool before it forks its own.
+_LIVE_POOLS: Dict[int, dict] = {}
 
 
 class _RemoteDtEnforcementError(RuntimeError):
@@ -507,6 +512,7 @@ def _close_pool(state: dict) -> None:
     pool, token = state.get("pool"), state.get("token")
     state["pool"] = None
     state["token"] = None
+    _LIVE_POOLS.pop(id(state), None)
     try:
         if pool is not None:
             pool.shutdown(wait=True, cancel_futures=True)
@@ -526,6 +532,11 @@ def _make_pooled_loss(cell, train_bundles, v_rest_mV, spec, n_workers,
 
     def _pool():
         if state["pool"] is None:
+            # One live pool per process: close every other loss's pool first
+            # (as its close() does; it makes a new pool at its next call).
+            for other in list(_LIVE_POOLS.values()):
+                if other is not state:
+                    _close_pool(other)
             token = next(_POOL_TOKENS)
             _POOL_CONTEXTS[token] = (cell, spec, bundles, v_rest_mV, rmsd_kw)
             state["token"] = token
@@ -534,6 +545,7 @@ def _make_pooled_loss(cell, train_bundles, v_rest_mV, spec, n_workers,
             state["pool"] = ProcessPoolExecutor(
                 max_workers=n_proc,
                 mp_context=multiprocessing.get_context("fork"))
+            _LIVE_POOLS[id(state)] = state
         return state["pool"], state["token"]
 
     def loss(*q: float) -> float:
@@ -640,7 +652,9 @@ def build_multi_protocol_loss(
       under that class name); a worker that dies raises BrokenProcessPool.
       The loss carries `loss.n_workers` and `loss.close()` (terminates the
       pool; idempotent; a later call creates a new pool; also run when the
-      loss is garbage-collected and at exit; a no-op for W = 1).
+      loss is garbage-collected and at exit; a no-op for W = 1). One live
+      pool per process: a loss about to create its pool first closes the
+      live pool of any other loss (which makes a new one at its next call).
       ValueError unless an integer >= 1.
     """
     n_workers = _check_n_workers(n_workers)
