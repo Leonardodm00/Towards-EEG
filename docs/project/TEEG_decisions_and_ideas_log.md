@@ -290,6 +290,7 @@ the "Binds" column.
 | 2026-11-24 (the twins chat, 4) | Logs **D-238** (user, 16:14: "Let's increase the total available core up to 200 to be used"): the twins' submitter's cap on the cores of one submission is 200 (was 120, D-185). The final check of Blocks 19 to 22 returned PASS WITH ISSUES (one MINOR, six spec-text points, settled; `257b351` on `sci/twins`). Next free IDs: D-239, I-008. |
 | 2026-11-24 (the gallery chat, 16:40) | Logs **D-239** (user, 16:30: a cell like Cell 24 without the skeleton, a slider across the planes to choose the one in focus): Cell 24 (b), SPEC Block 44 amendment 4. Next free IDs: D-240, I-007. |
 | 2026-11-24 (the gallery chat, 16:50) | Logs **D-240** (user, 16:46: "the far slope fit is to be drop. the only thing we might fit is the in-focus blur"): the soma fit's far slope held by default; supersedes D-218.1. Next free IDs: D-241, I-007. |
+| 2026-11-24 (the defocus-table chat, 16:50) | No decision changed. The status lines of **D-174** and **D-178** brought in step with the row of 2026-11-18 (later, 25): implemented at `513ad9e` (they still said "not implemented"; evidence: `MeasureConfig.pilot_diameter` = "allen" in `config.py` at `7b4a9ab`). Kernel calibration step 2 (roadmap NS1, theory T10): not started; its implementation handoff `Passive Features/Diameter Re-measurement/docs/TEEG_kernel_calibration_step2_implementation_handoff_2026-11-24.md` on `sci/diameter-pipeline` (`786977b`). Next free IDs: D-241, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -12650,7 +12651,7 @@ unchanged.
 **Sources.** **[user]** 2026-11-18, about 18:40. **[log]** D-160, D-169, D-171, D-173. **[src]** as tagged.
 **[past chat]** "Questions before logic" (D-173, 18:00).
 
-**Status:** active; not implemented.
+**Status:** active; not implemented. [updated 2026-11-24: implemented and pushed at `513ad9e` (SPEC Block 5 amendment 3), as the changelog row of 2026-11-18 (later, 25) records; this line had not been brought in step]
 
 ---
 
@@ -12906,7 +12907,7 @@ phantoms' traced radius in the bias table (D-058's perturbed radius is what the 
 
 **Sources.** **[user]** 2026-11-18, 20:18. **[log]** D-173, D-174, D-176.
 
-**Status:** active; not implemented.
+**Status:** active; not implemented. [updated 2026-11-24: implemented and pushed at `513ad9e` (SPEC Block 5 amendment 3), as the changelog row of 2026-11-18 (later, 25) records; this line had not been brought in step]
 
 ---
 
