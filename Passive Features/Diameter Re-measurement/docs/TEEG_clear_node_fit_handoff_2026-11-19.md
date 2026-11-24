@@ -27,6 +27,7 @@
 | 2026-11-24 (later) | The bound flag fixed (D-236, the user: "Fix it"): sections 14.6 and 15.3 marked. Evidence: the rule on the pilot's numbers and the four fits' suites **[run, sandbox]**. |
 | 2026-11-24 (later, 2) | Section 14.6: the diagnosis of c and z0 at their bounds (the user: "what do you think is the problem?") -- the c-z0-slope trade-off, what the fit's region covers, two background patterns ruled out, the next runs proposed; its "only their product being pinned" marked as understated. Evidence: five standalone checks on the uploaded JSON and corrected SWC **[run, sandbox]**. |
 | 2026-11-24 (later, 3) | Section 14.6: the run with the far slope held (the user's figure of 16:30, z0 30.96 um, inside its box); section 14.7, new: Cell 24 (b), the soma's planes in a slider viewer (D-239, Block 44 amendment 4). Evidence: the figure **[data]**; the smoke test and the cell through a stand-in **[run, sandbox]**. |
+| 2026-11-24 (later, 4) | Section 14.6: the far slope is no longer fitted (D-240, the user). Evidence: the code's default and the soma's suites **[run, sandbox]**. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -656,6 +657,9 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   the panel titles put z0 at 30.96 um (k 111 at z - z0 = +0.12 um), inside its box (26.76..38.76 um), where the free
   slope had it on the box's shallow end. c and the area are not in that figure (the summary figure or the JSON has
   them).
+- **The far slope is no longer fitted (D-240, the user, 16:46)**: `soma_fit.far_slope` defaults to "fixed" (held at
+  `SLOPE0`, the configured 0.79 when None); Cell 25 offers no choice; "fit" is kept as a labelled comparison only.
+  Fitting the in-focus blur instead: not decided.
 
 ### 14.7 Cell 24 (b): the soma's planes in a slider viewer (2026-11-24) [added 2026-11-24]
 
