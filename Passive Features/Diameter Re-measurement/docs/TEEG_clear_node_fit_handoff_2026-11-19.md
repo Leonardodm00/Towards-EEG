@@ -29,6 +29,7 @@
 | 2026-11-24 (later, 3) | Section 14.6: the run with the far slope held (the user's figure of 16:30, z0 30.96 um, inside its box); section 14.7, new: Cell 24 (b), the soma's planes in a slider viewer (D-239, Block 44 amendment 4). Evidence: the figure **[data]**; the smoke test and the cell through a stand-in **[run, sandbox]**. |
 | 2026-11-24 (later, 4) | Section 14.6: the far slope is no longer fitted (D-240, the user). Evidence: the code's default and the soma's suites **[run, sandbox]**. |
 | 2026-11-24 (later, 5) | Section 14.6: the fit region's make-up corrected (82 / 12 / 6 %, not 72 / 11 / 17 %; 94 % of the outline masked): the first rebuild lacked the moved stems' inner stretch. Evidence: the better rebuild, 7486 px against the run's 7644 **[run, sandbox]**. |
+| 2026-11-24 (later, 6) | Section 15.3: the FWHM rule of D-222.2 against the calibration's Gaussian-core estimator (exact only for the Gaussian member). Evidence: `core_fit_proxy.py` **[run, sandbox]**. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -800,3 +801,12 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   is.
 - **Cell 26 (b)** [notebook, 2026-11-24]: `show_focal.py` on Cell 26's output draws the fitted tube's edges on the
   node's patch at k*, Allen's diameter dashed.
+- **The FWHM rule against the calibration's own estimator [added 2026-11-24, later; the user's question of 17:22]
+  [run, sandbox: `core_fit_proxy.py`, sent to the user]**: sigma_r is the width s of a Gaussian fitted to the dip's
+  core within +-1 FWHM (Block 10's `dip_statistics`), and the default table is the same estimator on the ideal Debye
+  LSF; the Gaussian renderer is self-consistent with it (the core fit of its own Gaussian returns sigma_r exactly).
+  D-222.2 gives the SGT the FWHM 2.355 sigma_r, which is exact only for the Gaussian member: on a blur that is an SGT,
+  the core fit returns s with 2.355 s / FWHM = 0.77-0.96 for node 5353's shape (beta 10, xi 1.83), 1.06-1.07 for
+  (2, 0.5), 1.21-1.36 for (1, 0), 0.55-0.94 for (10, 0) (FWHM 0.3-1.5 um, 0.1144 um sampling; noise-free; the widest
+  spreads at 0.3 um). The consistent alternative, estimator matching (the SGT's scale such that the core fit of the
+  SGT-blurred dip returns sigma_r), is the user's call (D-222.2 is theirs); d's sensitivity to it is not checked.
