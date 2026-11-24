@@ -28,6 +28,7 @@
 | 2026-11-24 (later, 2) | Section 14.6: the diagnosis of c and z0 at their bounds (the user: "what do you think is the problem?") -- the c-z0-slope trade-off, what the fit's region covers, two background patterns ruled out, the next runs proposed; its "only their product being pinned" marked as understated. Evidence: five standalone checks on the uploaded JSON and corrected SWC **[run, sandbox]**. |
 | 2026-11-24 (later, 3) | Section 14.6: the run with the far slope held (the user's figure of 16:30, z0 30.96 um, inside its box); section 14.7, new: Cell 24 (b), the soma's planes in a slider viewer (D-239, Block 44 amendment 4). Evidence: the figure **[data]**; the smoke test and the cell through a stand-in **[run, sandbox]**. |
 | 2026-11-24 (later, 4) | Section 14.6: the far slope is no longer fitted (D-240, the user). Evidence: the code's default and the soma's suites **[run, sandbox]**. |
+| 2026-11-24 (later, 5) | Section 14.6: the fit region's make-up corrected (82 / 12 / 6 %, not 72 / 11 / 17 %; 94 % of the outline masked): the first rebuild lacked the moved stems' inner stretch. Evidence: the better rebuild, 7486 px against the run's 7644 **[run, sandbox]**. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -640,7 +641,10 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   - The fit sees little of the soma. R is 7644 px per plane (100 um^2, 19 % of the disc): every traced process, at
     every depth, is masked at its radius + 2 um. Rebuilt from the corrected SWC (approximate: 8610 px), 72 % of R lies
     more than 1 um outside the fitted silhouette, 11 % within 1 um of its edge, 17 % inside; 14 % of the silhouette
-    enters the fit.
+    enters the fit. [corrected 2026-11-24, later: that rebuild lacked the moved stems' inner stretch, which the run
+    masked; restored from the JSON (each stem's original first node to its moved one), R is 7486 px against the run's
+    7644, and 82 % of it lies more than 1 um outside the outline, 12 % within 1 um of it, 6 % inside; 94 % of the
+    outline's area is masked (`fig_region.py`, the figure sent to the user) **[run, sandbox]**.]
   - Ruled out: the residual's bright top-left wedge and a background tilt move c by at most 0.10 um per gl (the fit's
     linear response at the compact soma).
   - Reading **[reasoning]**: z0 stopped at its shallow end (6 um above Allen's traced depth) and c at 15 um, so the fit
