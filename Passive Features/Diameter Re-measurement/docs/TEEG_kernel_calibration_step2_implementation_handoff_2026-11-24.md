@@ -3,6 +3,7 @@
 | Date | Change |
 |---|---|
 | 2026-11-24 | Created at the user's request (16:36) for the chat that implements step 2 of the defocus kernel's calibration. Written on `sci/diameter-pipeline` at `7b4a9ab` (this file's commit follows it); decision log on `main` at `44b6e6a`. Nothing of step 2 is built (section 3). The defocus-table chat wrote no step-2 code; its study of step 2 is the T10 document (section 4.1), which is not in the repository, so sections 4 and 7 restate what the implementation needs from it. |
+| 2026-11-24 (later) | Pushed at `786977b`, rebased onto `9c7e8bb`: the commits in between (Block 44 amendment 4, D-239) do not touch step 2's code, but they moved SPEC s.8, so its line numbers are dropped here. The log on `main` at `c7822ad`: D-174 and D-178 marked implemented (section 5); D-240 (the soma fit holds the far slope, uncalibrated) added to section 5 as a consumer of step 2's $\gamma$; next free IDs D-241, I-007. |
 
 **Status [2026-11-24]:** not started. D-228 to D-230 fix the estimator (form B, on core widths), its trial table and
 its order. The twins' settings -- diameter, absorption, axis depth -- and their forward model are open (section 9) and
@@ -20,8 +21,8 @@ Paths are relative to `Passive Features/Diameter Re-measurement/`, except those 
 ## 1. First actions in the next chat
 
 1. Read this file; then, in the log on `main`, by ID: D-165, D-172, D-175, D-178, D-181, D-201, D-221, D-226 to D-231,
-   I-006. Read the changelog's last rows again before taking an ID (several chats log there); at writing, the newest
-   row gives the next free IDs as D-240 and I-007.
+   I-006. Read the changelog's last rows again before taking an ID (several chats log there); at `c7822ad` the newest
+   row gives the next free IDs as D-241 and I-007.
 2. Ask the user:
    - whether D-231's code has reached `origin`: `git log origin/sci/diameter-pipeline --oneline --grep "D-231"`. At
      writing it had not (section 8, item 1);
@@ -44,7 +45,7 @@ step NS1; theory topic T10. The T10 study document develops it, and D-228 to D-2
 | Where | What it says |
 |---|---|
 | Roadmap: `roadmap.py status --no-fetch` on `specs/roadmap/diameter-pipeline.yaml` at `7b4a9ab` | NS1 "Kernel calibration, step 2" is planned, with "no blocks defined yet"; `depends_on: [S3c]`, `needs_theory: [T10]`, `needs_hpc: false`. T10 is open. **[run, sandbox]** |
-| `specs/SPEC.md` s.8 (line 2250) | "Kernel calibration, step 2 (...): not built." **[src]** |
+| `specs/SPEC.md` s.8, the item "Kernel calibration, step 2" | "Kernel calibration, step 2 (...): not built." **[src]** |
 | Log | D-228 and D-229: "active; not built". D-230: "active; not built; D-230.3 to confirm". I-006: "idea; not scheduled". D-232 to D-239 concern other work. **[log]** |
 | Code | Nothing named for step 2 under `src/allen_diameter/` or `scripts/`; the only "twin" hits are matplotlib's `twinx`. **[src]** |
 
@@ -218,6 +219,7 @@ table too, since it is computed by the same renderer **[doc, Likely]**. H2 is th
 | D-230 | Near stage, then far stage; D-230.3's alternation PROVISIONAL | active; not built |
 | D-231 | The hybrid is the renderer's default absorption. Implemented at `2812d4d` in the defocus-table chat's sandbox; not on `origin` (section 8, item 1) | active |
 | I-006 | Form P | idea |
+| D-240 | Not binding on step 2: the soma fit (Block 46) holds the far slope at the configured 0.79, which the entry calls uncalibrated. A calibrated $\gamma$ from step 2 is a candidate for it **[reasoning]** | active |
 
 The log's status lines of D-174 and D-178 said "not implemented" although the changelog row of 2026-11-18 (later, 25)
 records both implemented at `513ad9e`. They were marked "[updated 2026-11-24]" together with this file.
@@ -502,4 +504,4 @@ Candidate smoke-test oracles **[reasoning]**:
 | The renderer check of check 20 | `checks/defocus_pool_2026-11-18/thick_near_check.py` (`ced566b`), without `--absorption` | On `origin` |
 | The procedure | `docs/TEEG_diameter_bias_table_procedure_2026-10-04.md` s.3.4 | On `origin` |
 | The davinci table run and D-226's change to it | `docs/TEEG_defocus_table_davinci_handoff_2026-11-18.md` (status note, s.7, s.9) | On `origin` |
-| SPEC: Block 10 (s.5, line 574), Block 15 (690), Block 21 (831), Block 35 (1057), Block 42 (1274), s.8 (2211) | `specs/SPEC.md` | On `origin` |
+| SPEC: Block 10 (s.5, line 574), Block 15 (690), Block 21 (831), Block 35 (1057), Block 42 (1274); s.8 "Open questions" | `specs/SPEC.md` | On `origin` |
