@@ -576,6 +576,97 @@ implementation:
     needs_theory: []
     needs_hpc: false
     jobs: []
+  - id: B13
+    title: "Block 13: the twins' manifest"
+    summary: "Which real cells become twins and at which true parameters, in configurations of n twins drawn at random."
+    block: 13
+    parent: G5
+    depends_on: [N5d]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: B14
+    title: "Block 14: the loss after tw1 -- stronger steps, strength and sag weights"
+    summary: "Trains on the stronger hyperpolarising long squares (a medium one validates), weights each step by its strength and each sample by a window peaking at the response peak (D-204, D-207)."
+    block: 14
+    parent: G5
+    depends_on: [I9]
+    needs_theory: [T13]
+    needs_hpc: false
+    jobs: []
+  - id: B15
+    title: "Block 15: the five-parameter arm ih5 and what a fit records"
+    summary: "The fit with dv_h fixed, the time constant's box in ms, the loss at a given parameter vector (D-206 to D-209)."
+    block: 15
+    parent: G5
+    depends_on: [B14, I11]
+    needs_theory: [T11, T13]
+    needs_hpc: false
+    jobs: []
+  - id: B16
+    title: "Block 16: the manifest with the noise-free configuration"
+    summary: "Adds five noise-free twins paired with five noisy ones."
+    block: 16
+    parent: G5
+    depends_on: [B13]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: B18
+    title: "Block 18: a twin without noise"
+    summary: "The twin build with the noise and the tilt switched off."
+    block: 18
+    parent: G5
+    depends_on: [N5d]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: B17
+    title: "Block 17: the second Stage-7 run (tw2)"
+    summary: "Four configurations, the truth passed to the fit, the loss at the truth against the loss at the estimate. Run tw2 failed the gate, the optimiser being the limit."
+    block: 17
+    parent: G5
+    depends_on: [B15, B16, B18, S7]
+    needs_theory: [T14]
+    needs_hpc: true
+    jobs: ["Passive Features/HPC script/Ih Fit/submit_twin_recovery.sh", twin_recovery, twin_merge]
+  - id: B19
+    title: "Block 19: the sweeps of one loss evaluation in parallel"
+    summary: "A pool of worker processes simulates the training sweeps of one evaluation at once; the loss must equal the serial one exactly (D-234)."
+    block: 19
+    parent: G5
+    depends_on: [B14]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: B20
+    title: "Block 20: the local refinement, the arm ih6_d207, g_h on two decades"
+    summary: "Nelder-Mead from the 3 best points of the global search; six parameters again under the new loss; g_h in 1e-5 to 1e-3 S/cm2 (D-234, D-235)."
+    block: 20
+    parent: G5
+    depends_on: [B15, B19]
+    needs_theory: [T18, T11]
+    needs_hpc: false
+    jobs: []
+  - id: B21
+    title: "Block 21: the manifest with the run's I_h arm"
+    summary: "The arm and the truth of dv_h follow the run's I_h arm; control twins at the new g_h floor."
+    block: 21
+    parent: G5
+    depends_on: [B16]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: B22
+    title: "Block 22: the third Stage-7 run"
+    summary: "The I_h arm as a plan option, the refinement and the workers passed to the fit, dv_h back in the gate; first test on the 5 noise-free twins with five and six parameters."
+    block: 22
+    parent: G5
+    depends_on: [B17, B20, B21]
+    needs_theory: [T14]
+    needs_hpc: true
+    jobs: ["Passive Features/HPC script/Ih Fit/submit_twin_recovery.sh", twin_recovery, twin_merge]
+
 revisions:
   - stage: N3
     from: 
