@@ -183,6 +183,9 @@ def main(argv=None):
     # the fit (Block 46 with Block 45's renderer)
     fit = soma_fit.fit_soma(block, ks, valid, left, top, res0, dz, start, float(radius), mask, make, q, slope0)
     log("fit %s in %d evaluations, %.0f s: %s" % (fit.status, fit.n_eval, fit.seconds, fit.message))
+    if fit.at_bound:
+        log("at a bound: %s -- their values are the bounds', not the data's; the area rests on a, b and c (D-236)"
+            % ", ".join(fit.at_bound))
     th = np.asarray(fit.theta, dtype=float)
     ok = bool(np.all(np.isfinite(th[:8])))
     if ok:
@@ -227,7 +230,7 @@ def main(argv=None):
                        se_r_eq_um=fit.se_area_um2 / (8.0 * math.pi * fit.r_eq_um))   # delta method: dr/dS = 1/(8 pi r)
         allen = dict(radius_um=float(radius), area_um2=4 * math.pi * float(radius) ** 2)
         fig = FF.figure_soma_fit_summary(soma_fit.PARAMS, th, fit.se, fit.fitted, derived, allen, z_fit, fit.B_gl,
-                                         rms, title=title)
+                                         rms, title=title, at_bound=fit.at_bound)
         save(fig, os.path.join(out, "soma_fit_%s_summary.png" % a.specimen), DPI)
         plt.close(fig)
         top_v, side_v = _morphology_views(swc, edit, xyz, th, centre, radius, fit.r_eq_um, res0, transform)

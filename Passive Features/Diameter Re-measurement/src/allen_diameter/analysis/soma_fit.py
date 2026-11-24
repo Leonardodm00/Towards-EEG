@@ -53,7 +53,8 @@ STATUSES = ("converged", "max_nfev", "failed")
 FAR_SLOPES = ("fit", "fixed")
 
 MIN_PLANES = 3                   # SPEC Block 46: select_planes and the fit need at least 3 planes
-AT_BOUND_REL = 1e-6              # SPEC Block 46: "within 1e-6 of the bound interval's width from it"
+AT_BOUND_REL = 1e-3              # SPEC Block 46: "within 1e-3 of the bound interval's width from it" (D-236: the
+                                 # trust-region solver stops short of a bound, by 1e-4 of the width on the pilot)
 # The start's settings are SomaFitConfig fields since D-220.4 (start_far_radii, start_core_radii,
 # start_core_percentile, start_ratio_clip, start_ratio_none; SPEC Block 46, amendment 1).
 AREA_GRAD_REL_STEP = 1e-5        # the central differences of S (SE(S)): a step of 1e-5 of each axis (not in SPEC)

@@ -67,6 +67,8 @@ FIT_STATUSES = ("converged", "at_bound", "failed")
 SGT_SKEWS = ("off", "fit")                        # inference.sgt_skew: zeta held at zeta0, or fitted
 COV_SOURCES = ("fit", "fine")
 MEMBER_BOUNDS = ("xi_lo",)                        # an active bound that leaves a fit "converged" (D-225.5)
+AT_BOUND_REL = 1e-3      # D-236: a search parameter within 1e-3 of its box's width from a bound is at it (the
+                         # trust-region solver stops short of a bound; its active_mask alone missed beta at 1e-7)
 # a shape start this close outside the box (times max(1, |bound|)) is taken as rounding and clipped into it: the
 # re-centred fit hands a fitted shape back in natural units, and log10(10^b), ln(e^l) can move by an ulp
 _BOX_ROUNDING = 1e-12
@@ -255,6 +257,16 @@ def _failed(n_planes, planes, n_starts, nfev, search=None, cov_source="fit"):
                    at_bound=(), n_starts=n_starts, nfev=nfev, shape=np.full(3, np.nan),
                    se_shape=np.full(3, np.nan), param_names=search.names, cov_search=np.full((n, n), np.nan),
                    cov_source=cov_source)
+
+
+def _bound_side(x, lo, hi, active_mask):
+    """-1 / +1 for a parameter at its lower / upper bound, 0 inside: the solver's active_mask, or within
+    AT_BOUND_REL of the box's width from a bound (D-236)."""
+    x, lo, hi = (np.asarray(v, dtype=float) for v in (x, lo, hi))
+    tol = AT_BOUND_REL * (hi - lo)
+    side = np.where(x - lo <= tol, -1, np.where(hi - x <= tol, 1, 0))
+    am = np.asarray(active_mask, dtype=int)
+    return np.where(am != 0, am, side)
 
 
 def _covariance(J, active):
@@ -456,8 +468,9 @@ def _solve(profiles_gl, B_gl, sigma_gl, forward, theta0, cfg, planes, weights, z
 
     phi = np.array(best.x, dtype=float)
     theta = phi[:4].copy()
-    active = np.asarray(best.active_mask) != 0
-    at_bound = tuple("%s_%s" % (search.names[i], "lo" if best.active_mask[i] < 0 else "hi")
+    side = _bound_side(phi, search.lo, search.hi, best.active_mask)
+    active = side != 0
+    at_bound = tuple("%s_%s" % (search.names[i], "lo" if side[i] < 0 else "hi")
                      for i in range(search.n) if active[i])
     if w_used is None:
         cov_search = _covariance(np.asarray(best.jac, dtype=float), active)

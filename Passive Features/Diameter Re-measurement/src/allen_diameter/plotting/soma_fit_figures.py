@@ -39,6 +39,7 @@ FIT_COLOUR = ORANGE              # the fitted ellipsoid: its silhouette (dashed)
 EQ_COLOUR = BLUE                 # the sphere of equal area (dash-dot)
 ALLEN_COLOUR = SOMA_COLOUR       # Allen's traced soma on the images (dotted; Block 44's yellow)
 ALLEN_COLOUR_LIGHT = "#b8860b"   # the same on the white views of the morphology figure (a darker gold)
+BOUND_COLOUR = "#c0392b"         # a parameter at a bound in the summary table (D-236)
 REGION_COLOUR = INK              # the fit region's boundary (with a white halo)
 MASK_DIM = ("#6f6e69", 0.55)     # the masked pixels: this grey laid over them at this opacity
 RESIDUAL_COLOURS = _DIV          # the residual's diverging map: blue (data darker) - neutral grey (0) - red
@@ -321,7 +322,8 @@ def _table(ax, rows, columns, widths):
     return tab
 
 
-def figure_soma_fit_summary(names, theta, se, fitted, derived, allen, z_um, B_gl, rms_gl, noise_gl=None, title=""):
+def figure_soma_fit_summary(names, theta, se, fitted, derived, allen, z_um, B_gl, rms_gl, noise_gl=None, title="",
+                            at_bound=()):
     """The fit's summary. Returns the matplotlib Figure (4 axes: two tables, two panels).
 
     names: (P,) the parameters' names (Block 46's PARAMS); theta, se: (P,) their values and SEs in the names' units;
@@ -330,8 +332,10 @@ def figure_soma_fit_summary(names, theta, se, fitted, derived, allen, z_um, B_gl
     (optional: "--" when absent or None); allen: dict of radius_um and area_um2 = 4 pi r^2 (required) and volume_um3
     (optional), Allen's traced sphere, shown beside them; z_um: (K,) the planes' depths (um, stage units); B_gl: (K,)
     the planes' scales B_k (gl); rms_gl: (K,) the residual RMS per plane (gl, >= 0); noise_gl: None or the noise SD
-    (gl), a horizontal line on the RMS panel. ValueError for lengths that disagree, a name fitted that is not in names,
-    a dict without a required key or with a non-number, an RMS < 0, a noise_gl not finite and >= 0.
+    (gl), a horizontal line on the RMS panel; at_bound: the names whose fitted value is at a bound (Block 46's
+    at_bound, D-236): their rows in the warning colour, the SE cell marked "at bound". ValueError for lengths that
+    disagree, a name fitted or at_bound that is not in names, a dict without a required key or with a non-number, an
+    RMS < 0, a noise_gl not finite and >= 0.
     """
     nm = _names(names)
     P = len(nm)
@@ -358,16 +362,24 @@ def figure_soma_fit_summary(names, theta, se, fitted, derived, allen, z_um, B_gl
     a_B = fig.add_subplot(gs[0, 1])
     a_rms = fig.add_subplot(gs[1, 1], sharex=a_B)
 
-    rows = [[n, VALUE_FMT % v, "held" if h else SE_FMT % e] for n, v, e, h in zip(nm, th, s, held)]
+    bound = set(str(n) for n in at_bound)
+    if not bound <= set(nm):
+        raise ValueError("at_bound names %r are not parameters" % sorted(bound - set(nm)))
+    rows = [[n, VALUE_FMT % v, "held" if h else (SE_FMT % e + (" at bound" if n in bound else ""))]
+            for n, v, e, h in zip(nm, th, s, held)]
     tab = _table(a_par, rows, ("parameter", "value", "SE"), (0.46, 0.3, 0.2))
     for i, h in enumerate(held):
         if h:
             for c in range(3):
                 tab[(i + 1, c)].get_text().set_color(INK2)
                 tab[(i + 1, c)].get_text().set_fontstyle("italic")
+        elif nm[i] in bound:
+            for c in range(3):
+                tab[(i + 1, c)].get_text().set_color(BOUND_COLOUR)
+                tab[(i + 1, c)].get_text().set_fontweight("bold")
     tab.set_gid("parameters")
-    a_par.set_title("the fitted parameters: %d fitted, %d held (italic)" % (P - sum(held), sum(held)), fontsize=9,
-                    color=INK)
+    a_par.set_title("the fitted parameters: %d fitted, %d held (italic), %d at a bound (red)"
+                    % (P - sum(held), sum(held), len(bound)), fontsize=9, color=INK)
     drows = [["area (um^2): S | 4 pi r^2", _cell(der["area_um2"], DERIVED_FMT), _cell(der["se_area_um2"], SE_FMT),
               _cell(al["area_um2"], DERIVED_FMT)],
              ["volume (um^3): V | 4/3 pi r^3", _cell(der["volume_um3"], DERIVED_FMT),

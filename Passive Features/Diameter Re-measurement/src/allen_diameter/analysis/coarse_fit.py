@@ -26,6 +26,7 @@ import numpy as np
 from scipy.optimize import least_squares
 
 PARAM_NAMES = ("d_um", "mu_per_um", "v0_um", "dz_um")
+AT_BOUND_REL = 1e-3      # D-236: within 1e-3 of the box's width from a bound is at it, or the solver's active_mask
 STATUSES = ("converged", "at_bound", "failed")
 
 
@@ -127,7 +128,9 @@ def refine_node(profiles_gl, B_gl, v, predict, theta0, cfg):
     finite = bool(np.all(np.isfinite(r_raw)) and np.all(np.isfinite(x)))
     cost = float(2.0 * res.cost) if finite else float("nan")
     rms = float(np.sqrt(np.mean(r_raw ** 2))) if finite else float("nan")
-    at_bound = tuple(PARAM_NAMES[i] for i in range(4) if res.active_mask[i] != 0)
+    tol = AT_BOUND_REL * (np.asarray(hi, dtype=float) - np.asarray(lo, dtype=float))
+    near = (x - np.asarray(lo, dtype=float) <= tol) | (np.asarray(hi, dtype=float) - x <= tol)
+    at_bound = tuple(PARAM_NAMES[i] for i in range(4) if res.active_mask[i] != 0 or near[i])
     if not (res.success and finite):
         status = "failed"
     elif at_bound:

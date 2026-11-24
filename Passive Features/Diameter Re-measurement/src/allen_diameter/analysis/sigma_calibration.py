@@ -54,7 +54,7 @@ STATUSES = ("converged", "max_nfev", "failed")
 
 MIN_PLANES = 3                 # SPEC Block 42: select_planes and the fit need at least 3 planes
 MIN_SAMPLES = 3                # SPEC Block 42: vp_background's least squares needs at least 3 finite samples a plane
-AT_BOUND_REL = 1e-6            # SPEC Block 42: "within 1e-6 of a bound, relative to the bound's width"
+AT_BOUND_REL = 1e-3            # SPEC Block 42: "within 1e-3 of a bound, relative to the bound's width" (D-236)
 START_SMOOTH_SAMPLES = 1.0     # SPEC Block 42: the start reads clearness.smooth_dip(L - I, 1)
 START_TRANSMISSION_FLOOR = 1e-3  # SPEC Block 42: mu0 = -ln max(1 - D/L(c), 1e-3) / (...)
 START_END_MIN_SAMPLES = 3      # SPEC Block 42, amendment 4: L is fitted when each end holds at least 3 finite samples

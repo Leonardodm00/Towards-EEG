@@ -1011,7 +1011,7 @@ accepted and are part of this entry.
 
 - Module: `src/allen_diameter/analysis/coarse_fit.py`; smoke test `tests/smoke/test_smoke_coarse_fit.py`
 - Mathematics: for a node with observed profiles $I_k(v_n)$ (gl) in its planes $k \in K$, backgrounds $B_k$ (gl) and a shadow model `predict`$(d, \mu, v_0, \Delta z) \to s_k(v_n)$ (dimensionless; in the pipeline Block 25's `stretch_profiles` with the node's features set to $(d, \mu)$, moved by $v_0$ along the measuring axis and $\Delta z$ in depth): $(\hat d, \hat\mu, \hat v_0, \widehat{\Delta z}) = \arg\min \sum_{k \in K}\sum_n w_n\,[I_k(v_n) - B_k (1 - s_k(v_n))]^2$ within the bounds, $w_n = \exp(-|v_n| / \lambda)$, $\lambda$ = `sgt_lambda_um`; started at the first-stage fit's values (D-130.O2)
-- Public API: `coarse_fit.refine_node(profiles_gl, B_gl, v, predict, theta0, cfg) -> dict` (`profiles_gl` (n_planes, n_v); `B_gl` (n_planes,); `v` (n_v,) um; `theta0` = $(d, \mu, v_0, \Delta z)$; returns `d_um`, `mu_per_um`, `v0_um`, `dz_um`, `cost`, `rms_gl`, `status` in ("converged", "at_bound", "failed"), `at_bound` tuple of names, `nfev`); `coarse_fit.offset_xyz(v0_um, dz_um, y_hat) -> (3,)` (the image-frame offset $(v_0 \hat y_x, v_0 \hat y_y, \Delta z)$ a features row takes)
+- Public API: `coarse_fit.refine_node(profiles_gl, B_gl, v, predict, theta0, cfg) -> dict` (`profiles_gl` (n_planes, n_v); `B_gl` (n_planes,); `v` (n_v,) um; `theta0` = $(d, \mu, v_0, \Delta z)$; returns `d_um`, `mu_per_um`, `v0_um`, `dz_um`, `cost`, `rms_gl`, `status` in ("converged", "at_bound", "failed"), `at_bound` tuple of names -- a parameter the solver's `active_mask` marks, or within 1e-3 of its bound interval's width from a bound [added 2026-11-24, D-236] --, `nfev`); `coarse_fit.offset_xyz(v0_um, dz_um, y_hat) -> (3,)` (the image-frame offset $(v_0 \hat y_x, v_0 \hat y_y, \Delta z)$ a features row takes)
 - Parameters: `CleaningConfig.refine_d_bounds_um`, `refine_mu_bounds_per_um`, `refine_shift_bounds_um`, `refine_dz_bounds_um`, `refine_max_nfev`; `MeasureConfig.sgt_lambda_um`
 - Library calls relied on: `scipy.optimize.least_squares` (trf, bounds)
 - Custom code: none (a wrapper of the library solver)
@@ -1287,7 +1287,7 @@ Blocks 42 and 43, new, Block 4 amendment 2 and Block 36 amendment 19 (2026-11-20
   - `forward_with_kernel(pilot, half_length, node, cfg, cache) -> f(d, mu, v0, z_ax, sigma0, c) -> (n_planes, n_v)` dimensionless: `node_inputs.forward_factory`(pilot, half_length, node, cfg', cache) with cfg' = cfg whose renderer is `kernel.with_kernel`(cfg.renderer, sigma0, c); a NaN array on `line_fast.ExtrusionInvalid` (as `forward_factory`) and on a kernel `with_kernel` refuses (a knot variance <= 0: possible only where the configured table decreases); the section cache is shared across kernels.
   - `start_theta(prof, B_gl, v, k_index, pilot, node_xyz, scfg) -> ndarray (6,)`: the start above; prof (n_planes, n_v) gl, B_gl (n_planes,), k_index the index of $k^*$ in the planes. Amendment 4: never raises on a profile whose dip cannot be measured (the pilot's values instead).
   - `fit_sigma_node(prof, sigma_gl, v, forward6, theta0, scfg) -> SigmaFit`: the fit above; prof (n_planes, n_v) gl on the planes forward6 renders; never raises on a NaN forward or a solver failure: status "failed" with the message.
-  - `SigmaFit` (frozen dataclass): `theta` (6,), `se` (6,), `se_scaled` (6,), `b` (n_planes, 2) gl, `model_gl` (n_planes, n_v) (the fitted $(\hat b_0 + \hat b_1 v)\tau$), `chi2`, `chi2_per_plane` (n_planes,), `n_res`, `dof`, `n_eval` (forward evaluations, the Jacobian's included), `seconds`, `status` ("converged" | "max_nfev" | "failed"), `at_bound` (tuple of PARAMS within 1e-6 of a bound, relative to the bound's width), `message`.
+  - `SigmaFit` (frozen dataclass): `theta` (6,), `se` (6,), `se_scaled` (6,), `b` (n_planes, 2) gl, `model_gl` (n_planes, n_v) (the fitted $(\hat b_0 + \hat b_1 v)\tau$), `chi2`, `chi2_per_plane` (n_planes,), `n_res`, `dof`, `n_eval` (forward evaluations, the Jacobian's included), `seconds`, `status` ("converged" | "max_nfev" | "failed"), `at_bound` (tuple of PARAMS within 1e-3 of a bound, relative to the bound's width [corrected 2026-11-24, D-236: 1e-6 before]), `message`.
   - `summarize(sigma0_um, se_scaled_um, ok) -> dict(n, median_um, mad_um, ivw_mean_um, ivw_se_um, chi2_cons, dof)`: arrays (n,), ok (n,) bool; NaN entries when no node is ok (n = 0) or one (chi2_cons NaN).
 - Parameters: `SigmaCalibrationConfig` (`config.sigma_calibration`; outside every signature, the pinned hashes unchanged [exact, checked]): `half_planes` 2, `start_ends_um` 3.0 (PROVISIONAL, D-203: the outer 1.5 um of a +-4.5 um line at each end), `sigma0_start_um` 0.15, `growth_scale_start` 1.0, `width_to_d` 0.9, `hybrid_faint_factor` 1.447 (Block 21.3's faint limit), `d_bounds_um` (0.2, 6.0), `mu_bounds_per_um` (0.005, 10), `v0_bounds_um` (-1.5, 1.5), `z_bounds_um` (-1.5, 1.5), `sigma0_bounds_um` (0.02, 0.6), `growth_scale_bounds` (0.05, 10), `diff_steps` (0.01, 0.005, 0.005, 0.01, 0.005, 0.02), `max_nfev` 40, `ftol` 1e-6 and `xtol` 1e-6 (scipy's 1e-8 creeps; 1e-6 of a $\chi^2$ near 400 is 4e-4), `workers` 0 (= `os.cpu_count()`).
 - Library calls: `scipy.optimize.least_squares`, `numpy.linalg.lstsq`, `numpy.linalg.pinv` (the covariance when $J^{\top}J$ is singular: SE NaN for the unidentified directions is acceptable, stated in the report); Block 35 `line_fast`, Block 36 `node_inputs` (and `scripts/infer_nodes.py`'s `node_from_npz`, `run_config`, the pilot built from the node's entry as its loop does), Block 4 `kernel.with_kernel`, Block 40 `clearness.dip_features`, `smooth_dip`.
@@ -1536,8 +1536,9 @@ orchestrator's (D-210).
   \big((J^\top J)^{-1}\big)\,\chi^2/\mathrm{dof}}$ at $\hat\theta$, $\chi^2 = \sum r^2$, dof = $|K|\,|R|$ - (fitted
   parameters) - $|K|$ (the scales); `numpy.linalg.pinv` when $J^\top J$ is singular. Bounds: $|x_0 - x_s|, |y_0 - y_s|
   \le$ `shift_xy_um`, $|z_0 - z_s| \le$ `shift_z_um`, a, b, c in `axis_bounds_um`, $\varphi \in [-\pi, \pi]$, $\mu$ in
-  `mu_bounds_per_um`, $\gamma$ in `slope_bounds`; a parameter is at a bound when within 1e-6 of the bound interval's
-  width from it. Start (`start_theta`, on the plane $k_0$; D-219.5): $\rho$ a pixel centre's distance from $(x_s,
+  `mu_bounds_per_um`, $\gamma$ in `slope_bounds`; a parameter is at a bound when within 1e-3 of the bound interval's
+  width from it [corrected 2026-11-24, D-236: 1e-6 before, which the trust-region solver's last step, stopping 2e-6
+  to 1e-4 of the width short of a bound on the pilot, never reached]. Start (`start_theta`, on the plane $k_0$; D-219.5): $\rho$ a pixel centre's distance from $(x_s,
   y_s)$; $B_{\rm far}$ the median of $D_{k_0}$ over the region's pixels with $\rho > 1.5 r_s$ (over the whole region if
   there are none); $\mu_0 = -\ln(\varrho)/(2 r_s)$, $\varrho$ = clip(the 5th percentile of $D_{k_0}$ over the region's
   pixels with $\rho \le 0.5 r_s$, divided by $B_{\rm far}$, 0.05, 0.95), 0.5 if there are none; the weights $w =
@@ -1956,7 +1957,9 @@ weights (amendment 2), the plane selection (`select_planes` on the start), the r
 today. `param_names` = `PARAM_NAMES` + ("log10_beta", "xi"[, "ln_zeta"]).
 (B) Bounds and status. `at_bound` names every parameter at a bound, `<name>_lo` / `<name>_hi`. $\xi = 0$ is a member
 of the family (the generalized normal, D-052.2): a fit whose only active bound is `xi_lo` has status "converged"
-(D-225.5); any other active bound gives "at_bound", as today. Rows and columns of the covariance are NaN for every
+(D-225.5); any other active bound gives "at_bound", as today. A bound is active when the solver's `active_mask` marks
+it or the search parameter lies within 1e-3 of its box's width from it [added 2026-11-24, D-236: the mask alone missed
+log10 beta 5e-8 from its upper bound on the pilot's node 5353]. Rows and columns of the covariance are NaN for every
 parameter at a bound, `xi_lo` included. The covariance is the inverse over all the search parameters, those at a bound
 included (their columns of the Jacobian one-sided, (D), or the solver's), and only then are their rows and columns set
 NaN: for the free parameters $F$ and the parameters $\mathcal A$ at an active bound, the reported block is
@@ -2089,6 +2092,19 @@ spec) is settled thus:
   section 6; `config.validate` keeps `sgt_ln_zeta_bounds` within $\pm\ln 2.1$ (S5) and the configuration's smoke suite
   asserts `SGT_STRETCH_ALLOWANCE` = `line_sgt.STRETCH_ALLOWANCE`;
 - the tester's spec tests come into the working line (D-224.3), its two strict xfails (F1, F3) as plain tests.
+
+Blocks 29, 30, 42 and 46, and Block 48's summary: the bound flag (2026-11-24; D-236; the user, 14:26: "Fix it"). The
+four trust-region fits of the inference route flag a parameter at a bound when it lies within 1e-3 of its bound
+interval's width from it, or (Blocks 29 and 30) when the solver's `active_mask` marks it; before, Blocks 42 and 46
+used 1e-6 of the width and Blocks 29 and 30 the mask alone, and the pilot's soma fit (c 2.1e-6 and z0 1.0e-4 of the
+width from their bounds) and node 5353's SGT fit (log10 beta 4.8e-8 from its upper bound) were reported unflagged.
+`soma_fit_figures.figure_soma_fit_summary(..., at_bound=())` marks those rows (the SE cell "at bound", the row in red,
+the count in the title) and `scripts/fit_soma.py` passes Block 46's `at_bound` and logs it. The fits of the table route
+(Blocks 3, 11 and 12, `measure.fit_at_bound_rel_tol` = 1e-6) are unchanged: their flag decides the phantoms' success
+set, inside the table's configuration hash. Rerun: smoke `coarse_fit` 6, `soma_fit` 9, `soma_fit_figures` 6,
+`sigma_calibration` 9, `node_inference` 16 pass (each with 1 skip); spec Blocks 29 (4), 30 (45), 42 (13), 46 (13 and
+28), 48 (14) and the soma fit end to end (12) pass; on the pilot's numbers the rule flags z0_um and c_um, and node
+5353's log10_beta_hi **[run, sandbox]**.
 
 ## 6. Pipeline entry points
 
