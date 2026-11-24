@@ -287,6 +287,7 @@ the "Binds" column.
 | 2026-11-24 (the twins chat, 2) | Logs **D-235** [orchestrator] (coding directive 7) with the user's go of 14:42 ("Perfect all go on") to the plan: the build choices of D-234, stated in SPEC 2.9 and Blocks 19 to 22; contract commit `1e3fe25` on `sci/twins`; four Opus implementers started (Blocks 19 to 22). The user, 14:41: "the Ra must be fitted as well" -- it is, in every arm (no change). Next free IDs: D-236, I-008. |
 | 2026-11-24 (15:05) | Logs **D-236** (user + orchestrator): the inference route's bound flag, 1e-3 of the width or the solver's mark. Next free IDs: D-237, I-007. |
 | 2026-11-24 (the twins chat, 3) | Logs **D-237** [orchestrator] (coding directive 7): amendments 1 (`33a6a70`) and 2 (`3fe1582`) of the wave of D-234. Blocks 19 to 22 returned, passed the gate and are merged on `sci/twins` (`74f3c85`); the final check by an independent Opus agent is running. **Roadmap allen-mtg-fit: B13 to B22 added** at the user's word (14:50, "update the roadmap"; `13885a8`). Next free IDs: D-238, I-008. |
+| 2026-11-24 (the twins chat, 4) | Logs **D-238** (user, 16:14: "Let's increase the total available core up to 200 to be used"): the twins' submitter's cap on the cores of one submission is 200 (was 120, D-185). The final check of Blocks 19 to 22 returned PASS WITH ISSUES (one MINOR, six spec-text points, settled; `257b351` on `sci/twins`). Next free IDs: D-239, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -459,7 +460,7 @@ would be needed*, *Status*.
 | D-182 | 2026-11-19 | Block 5 (the twins; roadmap N5), the LS twin sweeps of Stage 7 (D-076 (iii), D-083); D-180's open point (1) | a Long Square twin carries its sweep's law as fitted, one continuous draw over the whole sweep with the tilt fixed; D-180's limit binds the SS windows; the cells with $\hat\tau_s(c) > 265$ ms flagged, the gate reported with and without them [user] | active; not built |
 | D-183 | 2026-11-19 | Block 5 (`synthetic_ground_truth.py`, the twins' generator); D-083.2; D-180's open points (2), (4) | every response of a twin, SS and LS, is simulated on its real cell's morphology; the data give only the noise of each sweep or window; no per-sweep offset [user]; train or single pulses open | active; not built |
 | D-184 | 2026-11-19 | Stage 7 (roadmap S7, Block 8), the Stage-7 manifest (`synth_gt_grid.py`), the arms of `run_ih_recovery.py`; D-011 (ii), D-083; theory T14 | a plain recovery run in three configurations of 10 cells each -- `full`, `passive fit`, `active fit` -- with no closure test of the twins' noise statistics [user]; the mapping onto the arms and the cells open | active; readings to confirm |
-| D-185 | 2026-11-19 | Stage 7's run on davinci (`submit_ih_recovery.sh`, `run_ih_recovery.py`; roadmap S7) | one PBS job per cell under a 120-core cap [user]; the job builds its twin and runs its fits (the assistant's reading) | active; not built |
+| D-185 | 2026-11-19 | Stage 7's run on davinci (`submit_ih_recovery.sh`, `run_ih_recovery.py`; roadmap S7) | one PBS job per cell under a 120-core cap [user]; the job builds its twin and runs its fits (the assistant's reading) | active; not built; the 120-core cap superseded by D-238 for the twins' submitter (2026-11-24: 200) |
 | D-186 | 2026-11-19 | Block 5 (the twins' table, noise and protocol; roadmap N5); `gen_from_manifest.py`; the handoff's Q4, Q6 to Q10 | all stored SS windows and LS sweeps; the tilt line at the real positions; noise at the twin's own 50 kHz; LS timing from the real cell; a per-sweep twin table beside the manifest; seeds per twin sweep [user] | active; not built |
 | D-187 | 2026-11-19 | Block 11 (the twins' clean responses, `synthetic_ground_truth.py`); (D-083.2); D-180's open point (2) | each SS pulse of a twin is simulated alone from rest, as the fitter simulates a brief bundle; no 37-pulse train [user] | active; not built |
 | D-188 | 2026-11-19 | Stage 7 (roadmap S7, Block 8): the manifest's configurations and cells, the arms, the jobs; D-184's readings (a) to (e); D-185.2; D-011 (ii) | 10 cells per configuration drawn at random from the 18; `passive fit` = only the passive properties optimised on traces with I_h; `active fit` = D-011 (ii)'s control; one job builds a twin and runs its fit, a merge job reports [user] | active; not built |
@@ -512,6 +513,7 @@ would be needed*, *Status*.
 | D-235 | 2026-11-24 | SPEC 2.9 and Blocks 19 to 22 of `Ih Fit/specs/SPEC.md` (`local_refine.py`, `run_ih_fit.py`, `passive_long_step_training.py`, `twin_manifest.py`, `run_twin_recovery.py`, `submit_twin_recovery.sh`); D-234 | the build choices of D-234: the starts at least 0.1 apart in unit coordinates, the simplex step 0.05, stopping at 1e-3 (unit) and 1e-4 (relative loss), the refinement by wrapping `mono.gp_minimize`, also for `passive_fullstep`; the arm `ih6_d207`; a fork pool created at the first evaluation; linear-algebra threads at 1 in a twin's job [orchestrator]; dv_h truths in $\pm 5$ mV and 3 cores per twin [user, 14:42] | active; in implementation |
 | D-236 | 2026-11-24 | the bound flag of Blocks 29, 30, 42, 46 (and Block 48's summary, `fit_soma.py`'s log) | at a bound = within 1e-3 of the bound interval's width, or the solver's active_mask; the table route's 1e-6 unchanged [user: "Fix it"; orchestrator: the rule] | active |
 | D-237 | 2026-11-24 | SPEC Blocks 19 and 20 (`passive_long_step_training.py`, `local_refine.py`, their smoke suites); D-234, D-235 | two contract amendments of the wave: Block 20's oracle R1 restated on what the refinement reaches (a validation target); at most one live worker pool per process, a dead worker stops the fit instead of counting as a penalty (conventions) [orchestrator] | active; implemented |
+| D-238 | 2026-11-24 | the twins' submitter (`Ih Fit/submit_twin_recovery.sh`, `MAX_CORES`; SPEC Block 22); D-185 (its cap superseded for this submitter) | one submission of the twins' run may use up to 200 cores (was 120) [user] | active; implemented |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15360,3 +15362,24 @@ loss alive while `run_ih_fit.py` builds others. A dead worker has no serial anal
 R1a/R1b, `smoke_ls_pool.py` W11, W13. **[log]** D-234, D-235.
 
 **Status:** active; implemented.
+
+## D-238 -- The twins' run may use up to 200 cores at once (user)
+
+**Date:** 2026-11-24, 16:14 (Europe/Rome), the twins chat. **Binds:** `Passive Features/HPC script/Ih Fit/submit_twin_recovery.sh`
+(`MAX_CORES`), SPEC Block 22.
+
+**Decision [user].** "Let's increase the total available core up to 200 to be used".
+
+**Statement.** The submitter refuses a submission whose number of twins times `NCPUS` (cores per twin) exceeds 200;
+it was 120 (D-185). Nothing else changes: `NCPUS` default 3.
+
+**What it implies.** 35 twins at 5 cores each (175) fit in one submission; the test on the 5 noise-free twins in two
+runs can take up to 20 cores per twin (2 x 5 x 20 = 200), though workers beyond the number of training sweeps of a
+cell are not used.
+
+**What it does not decide.** The cap of the noise-fit submitter (`submit_noise_fit.sh`, 120, D-125), unchanged. The
+cap is per submission: two submissions made together add up, and the submitter does not see the other one.
+
+**Sources.** **[user]**. **[log]** D-185, D-195, D-235.
+
+**Status:** active; implemented (`sci/twins`).
