@@ -1,4 +1,4 @@
-"""Smoke test for the Stage-7 run on the twins -- Blocks 8 and 17 in specs/SPEC.md (TS1-TS14).
+"""Smoke test for the Stage-7 run on the twins -- Blocks 8, 17 and 22 in specs/SPEC.md (TS1-TS15, T1-T8).
 
 The fixture: a group of 4 real-layout fixture cells (smoke_noise_windows.write_fixture:
 one SS sweep with two trace-QC drops; LS sweeps of -110, -70, -30 and +30 pA)
@@ -12,9 +12,9 @@ full_no_noise).
 
 Checks
     test_TS1_plan              the four files; manifest.csv = draw_twin_manifest called here with
-                               truth kwargs recorded from run_ih_recovery.phase_manifest (Block 17: no
-                               dv_h range, the kappa range = tau_h_pk's truth range / base, n_no_noise,
-                               dv_h truth 0); the new options and defaults, the old ones gone; the
+                               truth kwargs recorded from run_ih_recovery.phase_manifest (Block 22: the
+                               dv_h range -5,5 and the floor 1e-5; the kappa range = tau_h_pk's truth
+                               range / base, n_no_noise); the new options and defaults, the old ones gone; the
                                tau_h_pk record of run_config.json; the twins' table = Block 5's built
                                here; v_rest_mV = the loader's; a second plan changes nothing; another
                                seed refused without --force; the refusals; versions() with NEURON's pip
@@ -23,11 +23,12 @@ Checks
                                run_ih_recovery.phase_fit builds from the same values (non-default and
                                negative values included) with Block 17's changes (the arm ih5,
                                --tau-h-pk-bounds-ms for --kappa-bounds, --eval-theta), with the twin's
-                               own directories and arm
+                               own directories and arm (Block 22: --refine, --refine-starts,
+                               --refine-maxfev, the six names of ih6_d207, --n-workers 1)
     test_TS3_end_to_end        each twin built and fitted (three as subprocesses, the active_fit one in
                                process) at the smallest budget run_ih_fit accepts (1 call, 1 initial
                                point): the loader reads the archive, phase2_results.csv holds the
-                               twin's row, status ok; active_fit: no I_h in the cell, five parameters fitted
+                               twin's row, status ok; active_fit: no I_h in the cell, six parameters fitted
     test_TS4_model_identity    the IhSpec and ParamSpec handed to twin_build.build_twin equal
                                run_ih_fit.build_ih_spec / build_param_spec on the same options
     test_TS5_merge             report/ = ih_recovery_report called here on the same frames;
@@ -35,14 +36,15 @@ Checks
                                recovery_by_configuration.csv; twins_status.csv; 0 / 1 exit codes
     test_TS6_resume_failure    a second `twin` neither rebuilds nor refits; --force does both; a
                                missing real cell ends build_failed, exit 1, with a status file
-    test_TS7_submitter         bash -n; dry run (one array qsub -J 0-2 ncpus=1 by default, one merge qsub
+    test_TS7_submitter         bash -n; dry run (one array qsub -J 0-3 ncpus=3 by default, one merge qsub
                                afterany, three twin commands and the merge command, each accepted by
                                the parser; nothing written or submitted); NCPUS=4: 31 x 4 cores refused (3);
                                MAX_TWINS=2; a stubbed submission; the job roles; the marker lines;
                                every call with a DISPLAY no X server answers (amendment 10)
     test_TS8_TS14_ascii_lf_frozen
                                (TS8 adapted = TS14) the four own files pure ASCII and LF; `git diff
-                               <WAVE3A>` empty for the frozen files of amendment 2
+                               <FROZEN_REF>` empty for the frozen files (Block 22: the wave-4 contract
+                               commit; run_ih_fit.py and twin_manifest.py change in that wave)
     test_TS9_controls_only     amendment 8.1: only the active_fit twin has results (its real cell
                                unflagged): merge exits 0, no traceback; report/ and
                                report_without_flagged/ hold the long table and the FP summary, an
@@ -70,7 +72,17 @@ Checks
                                passes or fails on Cm, gbar, kappa_tau alone; required_axes=None equals
                                the WAVE3A code's verdict tables; unknown axes refused; on TS5's run
                                report_no_noise/ holds exactly the noise-free twins, report/ and
-                               report_without_flagged/ none of them, the gate on ih5 without a dv_h row
+                               report_without_flagged/ none of them, the gate on ih6_d207 with a dv_h row
+    Block 22 (SPEC 2.9; the default run's I_h arm is ih6_d207: TS1, TS2, TS5, TS7, TS9, TS11-TS13 adapted)
+    test_T1_plan_ih6_d207      plan with defaults: arms and dv_h truths as Block 21's M2; the gate arm and axes
+    test_T2_plan_ih5           plan --ih-arm ih5: arms ih5, dv_h 0, gate axes Cm, gbar, kappa_tau
+    test_T3_fit_argv_workers   fit_argv's refinement options and gbar box, accepted by run_ih_fit's parser;
+                               twin --n-workers 2 passes it; another --n-workers does not refit a finished twin
+    test_T4_refusals           the gbar floor outside the gbar box, the dv_h range outside the dv_h box: exit 3
+    test_T5_eval_theta_ih6_d207  the six names with the manifest's dv_h
+    test_T6_merge_ih6_d207     the gate requires dv_h (5 mV off fails, 1 mV passes); recovery_extras' new columns
+    test_T7_submitter_workers  NCPUS=3: --n-workers 3, N x 3 against the cap, the thread variables at 1
+    test_T8_bash_ascii_lf      bash -n; ASCII/LF
 
 Run (from this folder: NEURON loads ./x86_64 from the working directory)
     python smoke_twin_recovery.py [--build]
@@ -125,8 +137,12 @@ _SAVED_ARTIFACTS = []
 #: the frozen check's reference (SPEC Block 17, amendment 2: the wave-3a merge) and its files: the old list
 #: without ih_recovery_report.py (Block 17 owns it), with synth_gt_grid.py
 CONTRACT_COMMIT = "06b5c46"
+#: Block 22: the frozen check's reference is the wave-4 contract commit; run_ih_fit.py (Block 20) and
+#: twin_manifest.py (Block 21) change in that wave and are not frozen; ih_recovery_report.py, which Block 22
+#: does not change, is
+FROZEN_REF = "1e3fe25"
 FROZEN = ("run_ih_recovery.py", "submit_ih_recovery.sh", "gen_from_manifest.py", "synth_gt_grid.py",
-          "run_ih_fit.py")
+          "ih_recovery_report.py")
 OWN_FILES = ("run_twin_recovery.py", "submit_twin_recovery.sh", "smoke_twin_recovery.py", "ih_recovery_report.py")
 
 # ---------------------------------------------------------------- fixture ---
@@ -135,32 +151,41 @@ REAL_IDS = (500000001, 500000002, 500000003, 500000004)
 FLAGGED = (500000001, 500000004)           # tau_s 300 ms > 265 ms (D-182.3)
 SS_SWEEP, SS_DROPPED = 92, {92: (2, 3)}
 LS_AMPS = (-110.0, -70.0, -30.0, 30.0)     # sweeps 54..57
-SMALL = ["--n-per-configuration", "1", "--n-no-noise", "1", "--n-calls", "1", "--n-initial", "1"]
+SMALL = ["--n-per-configuration", "1", "--n-no-noise", "1", "--n-calls", "1", "--n-initial", "1",
+         "--refine-maxfev", "2"]
 #: the smallest budget run_ih_fit accepts: its parser only asks n_initial <= n_calls, and gp_minimize
-#: refuses n_initial_points = 0 without x0 (skopt), so 1 call with 1 initial point
+#: refuses n_initial_points = 0 without x0 (skopt), so 1 call with 1 initial point; Block 22: the
+#: refinement's evaluations kept small (--refine-maxfev 2; one start at most after one global call)
 NONDEFAULT_FIT = ["--gbar-bounds=2e-6,2e-3", "--vshift-base=-1.5", "--ehcn=-40.0", "--ih-regions", "soma,dend",
                   "--dvh-bounds=-8.0,8.0", "--F", "2.1", "--ss-tau-w-ms", "4.0", "--tau-h-pk-bounds-ms=60,900"]
 IH6 = ("Cm", "Rm", "Ra", "gbar", "dv_h", "kappa_tau")
 IH5 = ("Cm", "Rm", "Ra", "gbar", "kappa_tau")
 PASSIVE = ("Cm", "Rm", "Ra")
 CONFS = ("full", "passive_fit", "active_fit", "full_no_noise")                 # Block 16's order
-#: the twin's model (2.7 (h), (i); Block 17: the six names as before, its truth's dv_h 0)
+#: the twin's model (2.7 (h), (i); the six names whatever the run's arm)
 EXPECTED_NAMES = {"full": IH6, "passive_fit": IH6, "active_fit": PASSIVE, "full_no_noise": IH6}
-EXPECTED_ARM = {"full": "ih5", "passive_fit": "passive_fullstep", "active_fit": "ih5", "full_no_noise": "ih5"}
-FITTED = {"ih5": IH5, "passive_fullstep": PASSIVE}                             # the arms' names (Block 15)
+#: Block 22: the default run's I_h arm is ih6_d207 (SPEC 2.9 (d)); EXPECTED_ARM_IH5 the run planned with
+#: --ih-arm ih5
+EXPECTED_ARM = {"full": "ih6_d207", "passive_fit": "passive_fullstep", "active_fit": "ih6_d207",
+                "full_no_noise": "ih6_d207"}
+EXPECTED_ARM_IH5 = {"full": "ih5", "passive_fit": "passive_fullstep", "active_fit": "ih5", "full_no_noise": "ih5"}
+FITTED = {"ih5": IH5, "passive_fullstep": PASSIVE, "ih6_d207": IH6}           # the arms' names (Blocks 15, 20)
+GATE_AXES = {"ih5": ("Cm", "gbar", "kappa_tau"), "ih6_d207": ("Cm", "gbar", "dv_h", "kappa_tau")}  # 2.9 (f)
+GBAR_FLOOR = 1e-5                                                             # 2.9 (d): the box's lower bound
 WITH_EVAL = ("full", "full_no_noise")                                          # --eval-theta (Block 17)
 TWIN_IDS = ["900000000", "900000100", "900000200", "900000300"]               # id_base + 100 q (+ 300 + i)
 # the plan options the entry names that keep the name and default run_ih_recovery.py gives them
 PLAN_OPTION_NAMES = ("seed", "id_base", "ra_mode", "cm_phys_lo", "cm_phys_hi", "tau_lo_ms", "tau_hi_ms",
-                     "ra_phys_lo", "ra_phys_hi", "gbar_range", "gbar_floor", "F",
+                     "ra_phys_lo", "ra_phys_hi", "gbar_range", "F",
                      "fit_target", "ss_time_weight", "ss_tau_w_ms", "ss_window_ms", "n_calls", "n_initial",
                      "ih_mechanism", "ih_distribution", "ih_regions", "vshift_base", "ehcn", "dt_brief_ms",
                      "dt_long_ms", "phase3_subset", "dvh_bounds", "tol_cm_factor",
                      "tol_gbar_factor", "tol_dvh_mV", "tol_kappa_factor", "tol_fp_low_rail_frac", "tol_fp_cm_factor",
                      "lenient_rails", "drop_railed")
-#: Block 17's new options and defaults; the options it removes
-NEW_DEFAULTS = {"n_no_noise": 5, "gbar_bounds": "1e-6,1e-2", "tau_h_pk_bounds_ms": "50,1000",
-                "tau_h_pk_truth_ms": "150,700"}
+#: Block 17's and Block 22's new options and defaults; the options Block 17 removes
+NEW_DEFAULTS = {"n_no_noise": 5, "gbar_bounds": "1e-5,1e-3", "tau_h_pk_bounds_ms": "50,1000",
+                "tau_h_pk_truth_ms": "150,700", "gbar_floor": 1e-5, "ih_arm": "ih6_d207",
+                "dvh_truth_range_mV": "-5,5", "refine": "nelder_mead", "refine_starts": 3, "refine_maxfev": 100}
 REMOVED_OPTIONS = ("--kappa-bounds=0.5,2.0", "--kappa-range=0.7,1.4", "--dvh-range=-5,5")
 
 _STATE = {}
@@ -315,7 +340,8 @@ def test_TS1_plan():
     rd = vars(_rir_defaults())
     parts["plan's options carry run_ih_recovery's names and defaults"] = all(
         hasattr(pa, k) and getattr(pa, k) == rd[k] for k in PLAN_OPTION_NAMES) and pa.n_per_configuration == 10
-    parts["Block 17's options and defaults (n_no_noise 5, gbar 1e-6,1e-2, tau_h_pk 50,1000 and 150,700)"] = all(
+    parts["Block 17's and 22's options and defaults (n_no_noise 5, gbar 1e-5,1e-3 and floor 1e-5, tau_h_pk "
+          "50,1000 and 150,700, ih_arm ih6_d207, dv_h truth -5,5, nelder_mead 3 x 100)"] = all(
         getattr(pa, k, None) == v for k, v in NEW_DEFAULTS.items())
     gone = []
     for opt in REMOVED_OPTIONS:
@@ -370,17 +396,20 @@ def test_TS1_plan():
     dropped = ("draws_per_morph", "seed", "cells_per_cohort", "e_pas_mV", "max_cells", "use_ih", "fp_control_frac",
                "id_base", "noise_table")
     ref_kwargs = {k: v for k, v in recorded.items() if k not in dropped and not k.startswith("noise_")}
-    # Block 17: no dv_h range (dv_h's truth 0); the kappa range = tau_h_pk's truth range (150, 700 ms) / base
+    # Block 22: the dv_h range -5,5 (ih6_d207); the kappa range = tau_h_pk's truth range (150, 700 ms) / base;
+    # the floor 1e-5 (phase_manifest's own default is 1e-6)
     cfg1 = json.loads(files[3].read_text())
     base = _tau_base_ms(cfg1["options"])
-    ref_kwargs["ih_dvh_range_mV"] = None
+    ref_kwargs["ih_dvh_range_mV"] = (-5.0, 5.0)
+    ref_kwargs["ih_gbar_floor_S_cm2"] = GBAR_FLOOR
     ref_kwargs["ih_kappa_range"] = (150.0 / base, 700.0 / base)
     real_cells = rc.copy()
     real_cells["v_rest_mV"] = real_cells["v_rest_mV"].astype(np.float64)
     real_cells["cell_tau_s_above_window"] = real_cells["cell_tau_s_above_window"].astype(bool)
     with contextlib.redirect_stdout(io.StringIO()):
         ref_man = TM.draw_twin_manifest(real_cells[list(TM.REAL_CELL_COLUMNS)], n_per_configuration=1, n_no_noise=1,
-                                        seed=0, id_base=900_000_000, dvh_truth_mV=0.0, truth_kwargs=ref_kwargs)
+                                        seed=0, id_base=900_000_000, ih_arm="ih6_d207", dvh_truth_mV=None,
+                                        truth_kwargs=ref_kwargs)
     try:
         pd.testing.assert_frame_equal(_manifest(out), ref_man)
         parts["manifest = draw_twin_manifest here (truth kwargs of phase_manifest, cells_per_cohort %r)"
@@ -389,21 +418,21 @@ def test_TS1_plan():
         parts["manifest = draw_twin_manifest here (%s)" % str(exc).splitlines()[0]] = False
     m1 = _manifest(out)
     ih_rows = m1["configuration"].isin(["full", "passive_fit", "full_no_noise"])
-    parts["the manifest: four configurations in order, ids, with_noise, the pairing, dv_h truth 0"] = (
+    parts["the manifest: four configurations in order, ids, with_noise, the pairing, dv_h truths in [-5, 5]"] = (
         list(m1["configuration"]) == list(CONFS) and [str(i) for i in m1["specimen_id"]] == TWIN_IDS
         and list(m1["with_noise"]) == [True, True, True, False]
         and int(m1["paired_with"].iloc[3]) == int(m1["specimen_id"].iloc[0])
-        and bool((m1.loc[ih_rows, "ih_dvh_mV"] == 0.0).all()))
+        and bool((m1.loc[ih_rows, "ih_dvh_mV"].abs() <= 5.0).all()))
     rec = cfg1.get("tau_h_pk") or {}
     kap = m1.loc[m1["configuration"].isin(["full", "passive_fit"]), "ih_kappa_tau"].to_numpy(dtype=float)
-    parts["run_config.json: tau_h_pk in ms and as kappa (base recomputed), gate arm ih5, its required axes; the "
-          "truths' kappa inside the truth range"] = (
+    parts["run_config.json: tau_h_pk in ms and as kappa (base recomputed), gate arm ih6_d207, its required axes; "
+          "the truths' kappa inside the truth range"] = (
         rec.get("base_ms") == base and rec.get("bounds_ms") == [50.0, 1000.0]
         and rec.get("bounds_kappa") == [50.0 / base, 1000.0 / base] and rec.get("truth_ms") == [150.0, 700.0]
-        and rec.get("truth_kappa") == [150.0 / base, 700.0 / base] and cfg1.get("gate_arm") == "ih5"
-        and cfg1.get("gate_required_axes") == ["Cm", "gbar", "kappa_tau"]
+        and rec.get("truth_kappa") == [150.0 / base, 700.0 / base] and cfg1.get("gate_arm") == "ih6_d207"
+        and cfg1.get("gate_required_axes") == ["Cm", "gbar", "dv_h", "kappa_tau"]
         and cfg1["truth_kwargs"]["ih_kappa_range"] == [150.0 / base, 700.0 / base]
-        and cfg1["truth_kwargs"]["ih_dvh_range_mV"] is None
+        and cfg1["truth_kwargs"]["ih_dvh_range_mV"] == [-5.0, 5.0]
         and bool(np.all((kap >= 150.0 / base) & (kap <= 700.0 / base)))
         and 340.0 <= base <= 346.0)                       # Block 15's I2 range for Ih_human at base shift 0
 
@@ -501,22 +530,27 @@ def _phase_fit_argv(options, archive, arm_name):
     return got[0]
 
 
-def _ref_fit_argv(options, archive, fit_dir, row):
-    """The twin's expected argv (Block 17): phase_fit's for the arm (ih6 standing in for ih5, which
-    phase_fit does not know), --arm set to the configuration's arm, its own output directory,
-    --kappa-bounds replaced in place by --tau-h-pk-bounds-ms, and --eval-theta with the truth's five
-    values (repr) for full and full_no_noise."""
+def _ref_fit_argv(options, archive, fit_dir, row, n_workers=None):
+    """The twin's expected argv (Blocks 17, 22): phase_fit's for the arm (ih6 standing in for ih5 and
+    ih6_d207, which phase_fit does not know), --arm set to the row's arm, its own output directory,
+    --kappa-bounds replaced in place by --tau-h-pk-bounds-ms, then --refine, --refine-starts,
+    --refine-maxfev (the run's), --eval-theta with the truth's values (repr) in the arm's names for full
+    and full_no_noise, and --n-workers N when given."""
     import twin_manifest as TM
     conf = str(row["configuration"])
-    arm = EXPECTED_ARM[conf]
-    ref = _phase_fit_argv(options, archive, "ih6" if arm == "ih5" else arm)
+    arm = str(row["arm"])
+    ref = _phase_fit_argv(options, archive, "ih6" if arm in ("ih5", "ih6_d207") else arm)
     ref[ref.index("--arm") + 1] = arm
     ref[ref.index("--output-dir") + 1] = str(fit_dir)   # phase_fit's own <out>/arms/<arm> -> the twin's
     i = ref.index("--kappa-bounds=KAPPA_PLACEHOLDER")
     ref[i] = "--tau-h-pk-bounds-ms=%s" % options["tau_h_pk_bounds_ms"]
+    ref += ["--refine", str(options["refine"]), "--refine-starts", str(options["refine_starts"]),
+            "--refine-maxfev", str(options["refine_maxfev"])]
     if conf in WITH_EVAL:
         th = TM.twin_theta(row)
-        ref.append("--eval-theta=" + ",".join("%s=%r" % (n, th[n]) for n in IH5))
+        ref.append("--eval-theta=" + ",".join("%s=%r" % (n, th[n]) for n in FITTED[arm]))
+    if n_workers is not None:
+        ref += ["--n-workers", str(n_workers)]
     return ref
 
 
@@ -531,8 +565,9 @@ def test_TS2_fit_command():
         arm = EXPECTED_ARM[conf]
         twin_group = out / "twins" / ("twin_%d" % tid)
         fit_dir = out / "fits" / ("twin_%d" % tid)
-        ref = _ref_fit_argv(cfg["options"], twin_group, fit_dir, row)
-        parts["%s: argv = phase_fit's with Block 17's changes (arm %s, own directories)" % (conf, arm)] = (
+        ref = _ref_fit_argv(cfg["options"], twin_group, fit_dir, row, n_workers=1)
+        parts["%s: argv = phase_fit's with Block 17's and 22's changes (arm %s, own directories, "
+              "--n-workers 1 by default)" % (conf, arm)] = (
             argv == ref and argv[argv.index("--arm") + 1] == arm
             and argv[argv.index("--archive-dir") + 1] == str(twin_group))
     neg = rec["fit_calls"][0] if rec["fit_calls"] else []
@@ -592,7 +627,7 @@ def test_TS3_end_to_end():
     tid_a = int(man[man["configuration"] == "active_fit"]["specimen_id"].iloc[0])
     tid_f = int(man[man["configuration"] == "full"]["specimen_id"].iloc[0])
     meta_a = json.loads((out / "twins" / ("twin_%d" % tid_a) / ("specimen_%d" % tid_a) / "metadata.json").read_text())
-    parts["active_fit: no I_h mechanism in any section of its cell, has_ih False (five parameters fitted: above)"] = (
+    parts["active_fit: no I_h mechanism in any section of its cell, has_ih False (six parameters fitted: above)"] = (
         has_ih.get(tid_a) == [] and meta_a["twin"]["has_ih"] is False)
     meta_f = json.loads((out / "twins" / ("twin_%d" % tid_f) / ("specimen_%d" % tid_f) / "metadata.json").read_text())
     parts["full: has_ih True"] = meta_f["twin"]["has_ih"] is True
@@ -617,7 +652,7 @@ def test_TS4_model_identity():
         conf, tid = str(row["configuration"]), int(row["specimen_id"])
         # the options the fit receives, rebuilt here by run_ih_recovery.phase_fit (not read from the recorder)
         fa = R._parse_args(_ref_fit_argv(cfg["options"], out / "twins" / ("twin_%d" % tid),
-                                         out / "fits" / ("twin_%d" % tid), row))
+                                         out / "fits" / ("twin_%d" % tid), row, n_workers=1))
         ref_ih = R.build_ih_spec(fa)
         base = _tau_base_ms(cfg["options"])
         lo_ms, hi_ms = _ms_pair(cfg["options"]["tau_h_pk_bounds_ms"])
@@ -645,20 +680,22 @@ def test_TS4_model_identity():
     _fail_parts(parts)
 
 
-def _write_results(out, man, factors):
-    """phase2_results.csv per twin, estimates = truth x factor (log axes) or truth + 1 mV (dv_h)."""
+def _write_results(out, man, factors, dvh_offset_mV=1.0, extra=None):
+    """phase2_results.csv per twin (the row's arm and its names), estimates = truth x factor (log axes) or
+    truth + dvh_offset_mV (dv_h); `extra` {twin id: {column: value}} adds columns (Block 22's)."""
     truth_col = {"Cm": "cm_true", "Rm": "rm_true", "Ra": "ra_true", "gbar": "ih_gihbar_S_cm2", "dv_h": "ih_dvh_mV",
                  "kappa_tau": "ih_kappa_tau"}
     for _, row in man.iterrows():
         tid, conf = int(row["specimen_id"]), str(row["configuration"])
-        names = FITTED[EXPECTED_ARM[conf]]
+        names = FITTED[str(row["arm"])]
         rec = {"specimen_id": tid, "param_names": "|".join(names), "validation_status": "good",
-               "arm": EXPECTED_ARM[conf]}
+               "arm": str(row["arm"])}
         for n in names:
             t = float(row[truth_col[n]])
-            rec[n] = t + 1.0 if n == "dv_h" else t * factors[tid]
+            rec[n] = t + dvh_offset_mV if n == "dv_h" else t * factors[tid]
         if conf == "active_fit":
-            rec["gbar"] = 1e-6                    # the low rail of the default box: the FP control passes it
+            rec["gbar"] = GBAR_FLOOR              # the low rail of the default box: the FP control passes it
+        rec.update((extra or {}).get(tid, {}))
         d = out / "fits" / ("twin_%d" % tid)
         d.mkdir(parents=True, exist_ok=True)
         pd.DataFrame([rec]).to_csv(d / "phase2_results.csv", index=False)
@@ -676,14 +713,14 @@ def test_TS5_merge():
     _write_results(out, man, factors)
     tid0 = int(man["specimen_id"].iloc[0])
     status0 = dict(twin_id=tid0, twin_of_specimen_id=int(man["twin_of_specimen_id"].iloc[0]), configuration="full",
-                   arm="ih6", status="ok", reason="", build_seconds=1.5, fit_seconds=2.5, code_commit="abc")
+                   arm="ih6_d207", status="ok", reason="", build_seconds=1.5, fit_seconds=2.5, code_commit="abc")
     (out / "status").mkdir()
     (out / "status" / ("twin_%d.json" % tid0)).write_text(json.dumps(status0))
     code, so, se = _run(["merge", "--out", out, "--no-plot"])
     parts = {"merge exit 0": code == 0}
 
     # the reference: ih_recovery_report called here, one frame per arm, as run_ih_recovery.phase_report does;
-    # Block 17: the gate on ih5 with required axes Cm, gbar, kappa_tau; the kappa box = tau_h_pk's / base
+    # Block 22: the gate on ih6_d207 with required axes Cm, gbar, dv_h, kappa_tau; the kappa box = tau_h_pk's / base
     opts = json.loads((out / "run_config.json").read_text())["options"]
     box = dict(RR.DEFAULT_BOX)
     for axis, text in (("gbar", opts["gbar_bounds"]), ("dv_h", opts["dvh_bounds"])):
@@ -697,7 +734,7 @@ def test_TS5_merge():
 
     def reference(sub_man, dest):
         frames = []
-        for arm in ("ih5", "passive_fullstep"):
+        for arm in ("ih6_d207", "passive_fullstep"):
             ids = [int(t) for t, c in zip(sub_man["specimen_id"], sub_man["configuration"]) if EXPECTED_ARM[c] == arm]
             if ids:
                 # amendment 3: the merge reads each phase2_results.csv with round_trip floats
@@ -707,7 +744,7 @@ def test_TS5_merge():
         long_df = RR.recovery_long(sub_man, frames, box=box, strict_rails=True)
         summ = RR.recovery_summary(long_df, drop_railed=False)
         infl, fp = RR.cm_inflation(long_df), RR.fp_control_summary(long_df)
-        verdict, passed = RR.evaluate_gate(summ, fp, arm="ih5", tol=tol, required_axes=("Cm", "gbar", "kappa_tau"))
+        verdict, passed = RR.evaluate_gate(summ, fp, arm="ih6_d207", tol=tol, required_axes=GATE_AXES["ih6_d207"])
         RR.write_report(dest, long_df=long_df, summary=summ, inflation=infl, fp=fp, verdict=verdict, passed=passed,
                         tol=tol)
         return long_df
@@ -958,17 +995,18 @@ def test_TS7_submitter():
     sub = [ln for ln in lines if "DRY RUN:   subjob " in ln]
     mrg = [ln for ln in lines if "DRY RUN:   merge:" in ln]
     ids = TWIN_IDS
-    parts["dry run: one array qsub (-J 0-3: four twins, the noise-free one counted; the default ncpus=1, "
-          "amendment 7), one merge qsub (afterany)"] = (
-        p.returncode == 0 and len(q) == 2 and " -J 0-3 " in q[0] and " select=1:ncpus=1 " in q[0]
+    parts["dry run: one array qsub (-J 0-3: four twins, the noise-free one counted; the default ncpus=3, "
+          "Block 22), one merge qsub (afterany)"] = (
+        p.returncode == 0 and len(q) == 2 and " -J 0-3 " in q[0] and " select=1:ncpus=3 " in q[0]
         and " walltime=24:00:00 " in q[0] and " -N twin_recovery " in q[0] and "depend=afterany:" in q[1]
         and " -N twin_merge " in q[1])
     ns_t = [parsed(ln, "subjob %d:" % i) for i, ln in enumerate(sub)]
     ns_m = parsed(mrg[0], "merge:") if mrg else None
-    parts["dry run: four twin commands (manifest order) and the merge, each accepted by the parser"] = (
+    parts["dry run: four twin commands (manifest order, --n-workers 3 = the default NCPUS) and the merge, each "
+          "accepted by the parser"] = (
         len(sub) == 4 and len(mrg) == 1 and all(n is not None for n in ns_t) and ns_m is not None
-        and [(n.command, n.out, n.twin, n.force) for n in ns_t] == [("twin", str(out_dir), int(i), False)
-                                                                    for i in ids]
+        and [(n.command, n.out, n.twin, n.force, n.n_workers) for n in ns_t]
+        == [("twin", str(out_dir), int(i), False, 3) for i in ids]
         and (ns_m.command, ns_m.out, ns_m.no_plot) == ("merge", str(out_dir), False))
     parts["dry run: nothing written (no run dir, no run file, no temporary dir left), nothing submitted"] = (
         not out_dir.exists() and not (home / "twin_recovery_runs").exists() and not qlog.exists()
@@ -993,7 +1031,7 @@ def test_TS7_submitter():
     rf = run_files[-1] if run_files else None
     parts["MAX_TWINS=2: 2 subjobs (-J 0-1), then the merge after the array; the run file; the plan written"] = (
         p2.returncode == 0 and len(calls) == 2 and rf is not None and "[-J] [0-1]" in calls[0]
-        and "[select=1:ncpus=1]" in calls[0] and ("[TWIN_ROLE=twin,TWIN_RUN_FILE=%s,ROADMAP_DISABLE=1]" % rf) in calls[0]
+        and "[select=1:ncpus=3]" in calls[0] and ("[TWIN_ROLE=twin,TWIN_RUN_FILE=%s,ROADMAP_DISABLE=1]" % rf) in calls[0]
         and "[depend=afterany:5151[].testserver]" in calls[1]
         and ("[TWIN_ROLE=merge,TWIN_RUN_FILE=%s,ROADMAP_DISABLE=1]" % rf) in calls[1]
         and "TWIN_IDS=( 900000000 900000100 )" in rf.read_text() and (out_dir / "manifest.csv").is_file()
@@ -1029,9 +1067,11 @@ def test_TS7_submitter():
                 OMP_NUM_THREADS=9), job)
     pm = sh(env(PBS_JOBID="5152.testserver", TWIN_ROLE="merge", TWIN_RUN_FILE=rf or ""), job)
     runs = lines_of(pylog)
-    exp_t = "RUN [%s] [twin] [--out] [%s] [--twin] [900000100] ENV[1/1/1]" % (HERE / "run_twin_recovery.py", out_dir)
+    exp_t = ("RUN [%s] [twin] [--out] [%s] [--twin] [900000100] [--n-workers] [3] ENV[1/1/1]"
+             % (HERE / "run_twin_recovery.py", out_dir))
     exp_m = "RUN [%s] [merge] [--out] [%s] ENV[1/1/1]" % (HERE / "run_twin_recovery.py", out_dir)
-    parts["the twin role: the index-th twin, threads NCPUS; the merge role: threads 1; logs teed"] = (
+    parts["the twin role: the index-th twin, --n-workers NCPUS (3), threads 1 although PBS set 9 (Block 22); "
+          "the merge role: threads 1; logs teed"] = (
         pt.returncode == 0 and pm.returncode == 0 and runs == [exp_t, exp_m]
         and (out_dir / "logs" / "twin_900000100_5151_1_.testserver.log").is_file())
     pq = sh(env(PBS_JOBID="99.testserver", RUN_TAG="t7"), job)
@@ -1050,11 +1090,11 @@ def test_TS8_TS14_ascii_lf_frozen():
         if b"\r" in raw or any(b > 127 for b in raw):
             bad.append(name)
     assert not bad, "not pure ASCII / LF: %s" % bad
-    r = subprocess.run(["git", "-C", str(HERE), "diff", "--stat", CONTRACT_COMMIT, "--"] + list(FROZEN),
+    r = subprocess.run(["git", "-C", str(HERE), "diff", "--stat", FROZEN_REF, "--"] + list(FROZEN),
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     if r.returncode != 0:
         raise unittest.SkipTest("git diff unavailable: %s" % r.stderr.strip())
-    assert r.stdout.strip() == "", "frozen files differ from %s: %s" % (CONTRACT_COMMIT, r.stdout)
+    assert r.stdout.strip() == "", "frozen files differ from %s: %s" % (FROZEN_REF, r.stdout)
 
 
 def test_TS9_controls_only():
@@ -1074,7 +1114,7 @@ def test_TS9_controls_only():
         code, so, se = None, "", traceback.format_exc()
     parts = {"merge exit 0, no traceback%s" % (("" if code == 0 else " (%s)" % se.strip().splitlines()[-1])
                                                if se.strip() else ""): code == 0 and "Traceback" not in so + se}
-    gated = {"Cm", "gbar", "kappa_tau"}              # Block 17: the required axes of ih5; dv_h skipped
+    gated = set(GATE_AXES["ih6_d207"])               # Block 22: the required axes of ih6_d207
     for sub in ("report", "report_without_flagged"):
         d = out / sub
         per = pd.read_csv(d / "recovery_per_cell.csv") if (d / "recovery_per_cell.csv").is_file() else pd.DataFrame()
@@ -1090,7 +1130,7 @@ def test_TS9_controls_only():
               "FAIL (axis absent) on the gated axes, the two control rows" % sub] = (
             len(per) > 0 and set(per["specimen_id"]) == {int(act["specimen_id"].iloc[0])} and len(fp) == 1
             and summ_ok and absent == gated and len(ver) == len(gated) + 2
-            and set(ver["arm"]) == {"ih5"})
+            and set(ver["arm"]) == {"ih6_d207"})
     parts["report_no_noise/: no noise-free twin has results -> NO_RESULTS.txt"] = (
         (out / "report_no_noise" / "NO_RESULTS.txt").is_file())
     # amendment 9.1: --drop-railed and every non-control row railed (estimates on the box's bounds)
@@ -1101,8 +1141,8 @@ def test_TS9_controls_only():
     _write_results(out2, man2, {int(t): 1.0 for t in man2["specimen_id"]})
     opts2 = json.loads((out2 / "run_config.json").read_text())["options"]
     base2 = _tau_base_ms(opts2)
-    box = {"Cm": (0.3, 3.0), "Rm": (1000.0, 100000.0), "Ra": (50.0, 1000.0), "gbar": (1e-6, 1e-2),
-           "dv_h": (-10.0, 10.0), "kappa_tau": (50.0 / base2, 1000.0 / base2)}   # the default boxes (Block 17)
+    box = {"Cm": (0.3, 3.0), "Rm": (1000.0, 100000.0), "Ra": (50.0, 1000.0), "gbar": (1e-5, 1e-3),
+           "dv_h": (-10.0, 10.0), "kappa_tau": (50.0 / base2, 1000.0 / base2)}   # the default boxes (Block 22)
     for t, c in zip(man2["specimen_id"], man2["configuration"]):
         if c == "active_fit":
             continue
@@ -1246,13 +1286,13 @@ def test_TS11_eval_theta():
               and kb == (60.0 / base, 900.0 / base))
         if conf in WITH_EVAL:
             th = TM.twin_theta(row)
-            got = R.parse_eval_theta(fa.eval_theta, IH5) if fa.eval_theta is not None else {}
-            ok = ok and len(ev) == 1 and list(got) == list(IH5) and all(got[n] == th[n] for n in IH5) \
-                and th["dv_h"] == 0.0
+            names = FITTED[EXPECTED_ARM[conf]]                # Block 22: the six names of ih6_d207
+            got = R.parse_eval_theta(fa.eval_theta, names) if fa.eval_theta is not None else {}
+            ok = ok and len(ev) == 1 and list(got) == list(names) and all(got[n] == th[n] for n in names)
         else:
             ok = ok and not ev and fa.eval_theta is None
         parts["%s: arm %s, --tau-h-pk-bounds-ms (kappa box 60/base, 900/base), %s" % (
-            conf, EXPECTED_ARM[conf], "--eval-theta = the truth's five values exactly" if conf in WITH_EVAL
+            conf, EXPECTED_ARM[conf], "--eval-theta = the truth's six values exactly" if conf in WITH_EVAL
             else "no --eval-theta")] = ok
     print("\n  [TS11] full_no_noise argv tail: %s" % " ".join(rec["fit_calls"][3][-3:] if len(rec["fit_calls"]) > 3
                                                             else []))
@@ -1356,7 +1396,7 @@ def test_TS12_no_noise_extras():
                 and np.isclose(e["tau_h_pk_true_ms"], th["kappa_tau"] * base, rtol=1e-12, atol=0.0)
         else:
             row_ok = row_ok and np.isnan(e["gh_deep_true_S_cm2"]) and np.isnan(e["tau_h_pk_true_ms"])
-        if EXPECTED_ARM[conf] == "ih5":
+        if EXPECTED_ARM[conf] != "passive_fullstep":
             ge = float(r["gh_at_v_deepest_S_cm2"])
             row_ok = row_ok and float(e["gh_deep_est_S_cm2"]) == ge and float(e["tau_h_pk_est_ms"]) == float(
                 r["tau_h_pk_ms"])
@@ -1364,6 +1404,16 @@ def test_TS12_no_noise_extras():
                 row_ok = row_ok and np.isclose(e["ln_gh_deep_ratio"], np.log(ge / gh_t), rtol=1e-12, atol=1e-15)
         else:
             row_ok = row_ok and np.isnan(e["gh_deep_est_S_cm2"]) and np.isnan(e["ln_gh_deep_ratio"])
+        # Block 22: the refinement's columns are the fit's; dv_h for the twins fitted with it (ih6_d207)
+        row_ok = row_ok and float(e["loss_after_search"]) == float(r["loss_after_search"]) \
+            and bool(e["refine_improved"]) == bool(r["refine_improved"]) \
+            and int(e["refine_n_evals"]) == int(r["refine_n_evals"]) \
+            and int(e["refine_best_start"]) == int(r["refine_best_start"])
+        if "dv_h" in FITTED[EXPECTED_ARM[conf]]:
+            row_ok = row_ok and float(e["dvh_true_mV"]) == float(m["ih_dvh_mV"]) \
+                and float(e["dvh_est_mV"]) == float(r["dv_h"])
+        else:
+            row_ok = row_ok and np.isnan(e["dvh_true_mV"]) and np.isnan(e["dvh_est_mV"])
         if not row_ok:
             notes.append("row of %s FAILED" % conf)
         ok_rows = ok_rows and bool(row_ok)
@@ -1372,7 +1422,8 @@ def test_TS12_no_noise_extras():
                                e["v_deepest_train_mV"], e["gh_deep_true_S_cm2"], e["gh_deep_est_S_cm2"],
                                e["tau_h_pk_true_ms"], e["tau_h_pk_est_ms"]))
     parts["every row: loss_at_truth finite for full and full_no_noise (= loss_at_eval_theta), na elsewhere; "
-          "gh_deep_true, tau_h_pk_true and the log ratio recomputed here"] = ok_rows
+          "gh_deep_true (the truth's dv_h), tau_h_pk_true and the log ratio recomputed here; the refinement's "
+          "columns and dv_h's truth and estimate (Block 22)"] = ok_rows
     hand = [((1.0, 2.0), "optimiser"), ((2.0, 1.0), "data"), ((1.0, 1.01), "tie"), ((1.01, 1.0), "tie"),
             ((0.97, 1.0), "optimiser"), ((1.0, 0.97), "data"), ((float("nan"), 1.0), "na"),
             ((1.0, float("inf")), "na"), ((0.0, 0.0), "tie")]
@@ -1468,9 +1519,9 @@ def test_TS13_gate():
     parts["report_no_noise/ holds exactly the noise-free twins; report/ and report_without_flagged/ none of them"] = (
         bool(quiet) and ids["report_no_noise"] == quiet and ids["report"] is not None and not (ids["report"] & quiet)
         and (ids["report_without_flagged"] is None or not (ids["report_without_flagged"] & quiet)))
-    parts["the gate in report/ and report_no_noise/ is on ih5, without a dv_h row"] = (
-        set(ver["arm"]) == {"ih5"} and "dv_h" not in set(ver["parameter"]) and set(ver0["arm"]) == {"ih5"}
-        and "dv_h" not in set(ver0["parameter"]))
+    parts["the gate in report/ and report_no_noise/ is on ih6_d207, with a dv_h row (Block 22)"] = (
+        set(ver["arm"]) == {"ih6_d207"} and "dv_h" in set(ver["parameter"]) and set(ver0["arm"]) == {"ih6_d207"}
+        and "dv_h" in set(ver0["parameter"]))
     _fail_parts(parts)
 
 
@@ -1500,6 +1551,357 @@ def test_TS15_penalty_round_trip():
     parts["recovery_extras.csv: loss_at_truth / loss_at_estimate = the fit's loss_at_eval_theta / "
           "loss_at_estimate exactly (round_trip on both sides)"] = ok
     _fail_parts(parts)
+
+
+# ------------------------------------------------------------ Block 22 (SPEC 2.9) ---
+def _truth_cols():
+    """The manifest's truth columns (2.7 (i)): the passive three and the I_h three."""
+    return ["cm_true", "rm_true", "ra_true", "ih_gihbar_S_cm2", "ih_dvh_mV", "ih_kappa_tau"]
+
+
+def test_T1_plan_ih6_d207():
+    """T1: plan with defaults (n = 2, two noise-free twins): the manifest's arms and dv_h truths as Block 21's
+    M2; run_config.json records ih_arm, the gate arm ih6_d207 and the required axes Cm, gbar, dv_h, kappa_tau."""
+    import synth_gt_grid as G
+    import twin_manifest as TM
+    out = _new_out("t1")
+    code, _, se = _plan(out, "--n-per-configuration", "2", "--n-no-noise", "2")
+    assert code == 0, "plan exit %d: %s" % (code, se)
+    man = _manifest(out)
+    cfg = json.loads((out / "run_config.json").read_text())
+    parts = {"arms: ih6_d207 for full, active_fit, full_no_noise; passive_fullstep for passive_fit": all(
+        str(a) == EXPECTED_ARM[str(c)] for a, c in zip(man["arm"], man["configuration"]))
+        and list(man["configuration"]) == ["full"] * 2 + ["passive_fit"] * 2 + ["active_fit"] * 2 + ["full_no_noise"] * 2}
+    ih = man[man["configuration"].isin(["full", "passive_fit", "full_no_noise"])]
+    dvh = ih["ih_dvh_mV"].to_numpy(dtype=float)
+    parts["dv_h truths of the rows with I_h in [-5, 5] mV and not all equal"] = (
+        bool(np.all((dvh >= -5.0) & (dvh <= 5.0))) and len(set(dvh.tolist())) > 1)
+    # the drawer's own values for the same seeds (2.9 (d): the existing drawer, its uniform law)
+    tk = dict(cfg["truth_kwargs"])
+    tk = {k: (tuple(v) if isinstance(v, list) else v) for k, v in tk.items()}
+    same = True
+    for q, conf in enumerate(("full", "passive_fit")):
+        rows = man[man["configuration"] == conf]
+        swcs = list(rows["real_swc_path"])
+        with contextlib.redirect_stdout(io.StringIO()):
+            ref = G.draw_manifest(swcs, draws_per_morph=1, seed=TM.truth_seed(int(cfg["options"]["seed"]), q),
+                                  id_base=900_000_000 + 100 * q, use_ih=True, fp_control_frac=0.0, **tk)
+        same = same and np.array_equal(ref["ih_dvh_mV"].to_numpy(dtype=float), rows["ih_dvh_mV"].to_numpy(dtype=float))
+    parts["dv_h truths = synth_gt_grid.draw_manifest's for the same seeds and the recorded truth kwargs"] = same
+    act = man[man["configuration"] == "active_fit"]
+    parts["active_fit: dv_h 0, gbar = the floor 1e-5, is_fp_control"] = (
+        bool((act["ih_dvh_mV"] == 0.0).all()) and bool((act["ih_gihbar_S_cm2"] == GBAR_FLOOR).all())
+        and bool(act["is_fp_control"].all()))
+    full = man[man["configuration"] == "full"].set_index("specimen_id")
+    nn = man[man["configuration"] == "full_no_noise"]
+    parts["each full_no_noise twin equals its partner in every truth column, dv_h included"] = all(
+        all(float(r[c]) == float(full.loc[int(r["paired_with"]), c]) for c in _truth_cols()) for _, r in nn.iterrows())
+    parts["run_config.json: ih_arm ih6_d207, gate arm ih6_d207, required axes Cm, gbar, dv_h, kappa_tau, the dv_h "
+          "range -5,5 as truth kwarg, dvh_truth_mV None"] = (
+        cfg.get("ih_arm") == "ih6_d207" and cfg["options"]["ih_arm"] == "ih6_d207"
+        and cfg.get("gate_arm") == "ih6_d207" and cfg.get("gate_required_axes") == ["Cm", "gbar", "dv_h", "kappa_tau"]
+        and cfg["truth_kwargs"]["ih_dvh_range_mV"] == [-5.0, 5.0] and cfg.get("dvh_truth_mV") is None
+        and cfg["truth_kwargs"]["ih_gbar_floor_S_cm2"] == GBAR_FLOOR)
+    print("\n  [T1] dv_h truths (mV): %s" % ", ".join("%.4f" % v for v in dvh))
+    _fail_parts(parts)
+
+
+def test_T2_plan_ih5():
+    """T2: plan --ih-arm ih5: the arms ih5 / passive_fullstep, dv_h 0 in every row, the gate on ih5 with the
+    axes Cm, gbar, kappa_tau; the default plan's options differ from it only by --ih-arm."""
+    out = _new_out("t2")
+    code, _, se = _plan(out, "--ih-arm", "ih5")
+    assert code == 0, "plan exit %d: %s" % (code, se)
+    man = _manifest(out)
+    cfg = json.loads((out / "run_config.json").read_text())
+    parts = {"arms ih5 for full, active_fit, full_no_noise; passive_fullstep for passive_fit": all(
+        str(a) == EXPECTED_ARM_IH5[str(c)] for a, c in zip(man["arm"], man["configuration"]))}
+    parts["dv_h truth 0 in every row"] = bool((man["ih_dvh_mV"] == 0.0).all())
+    parts["run_config.json: ih_arm ih5, gate ih5 on Cm, gbar, kappa_tau; no dv_h range; dvh_truth_mV 0"] = (
+        cfg.get("ih_arm") == "ih5" and cfg.get("gate_arm") == "ih5"
+        and cfg.get("gate_required_axes") == ["Cm", "gbar", "kappa_tau"]
+        and cfg["truth_kwargs"]["ih_dvh_range_mV"] is None and cfg.get("dvh_truth_mV") == 0.0)
+    # a re-plan of the same directory with the default arm: refused (3), the difference named
+    code2, _, se2 = _plan(out)
+    parts["a re-plan with the other arm: refused (3), ih_arm named"] = code2 == 3 and "ih_arm" in se2
+    _fail_parts(parts)
+
+
+def test_T3_fit_argv_workers():
+    """T3: fit_argv carries --refine, --refine-starts, --refine-maxfev and --gbar-bounds=1e-5,1e-3 and is
+    accepted by run_ih_fit._parse_args; `twin --n-workers 2` passes --n-workers 2 to the fit; re-running
+    `twin` with another --n-workers on a finished twin does not refit."""
+    import run_ih_fit as R
+    import run_twin_recovery as T
+    out = _new_out("t3")
+    code, _, se = _plan(out)
+    assert code == 0, se
+    opts = json.loads((out / "run_config.json").read_text())["options"]
+    argv = T.fit_argv(opts, "/a", "/o", "ih6_d207")
+    i = argv.index("--refine")
+    parts = {"fit_argv: --refine nelder_mead --refine-starts 3 --refine-maxfev 2 (SMALL), --gbar-bounds=1e-5,1e-3, "
+             "no --n-workers when not given": (
+                 argv[i:i + 6] == ["--refine", "nelder_mead", "--refine-starts", "3", "--refine-maxfev", "2"]
+                 and "--gbar-bounds=1e-5,1e-3" in argv and "--n-workers" not in argv)}
+    try:
+        fa = R._parse_args(T.fit_argv(opts, "/a", "/o", "ih6_d207", n_workers=2))
+        accepted = (fa.refine == "nelder_mead" and fa.refine_starts == 3 and fa.refine_maxfev == 2
+                    and fa.n_workers == 2 and fa.arm == "ih6_d207" and fa.gbar_bounds == "1e-5,1e-3")
+    except SystemExit as exc:
+        accepted = False
+        print("\n  [T3] run_ih_fit._parse_args refused: exit %r" % (exc.code,))
+    parts["run_ih_fit._parse_args accepts it (refine, starts, maxfev, n_workers 2, arm ih6_d207, gbar box)"] = accepted
+    # `twin --n-workers 2`: the fit's argv, recorded (run_ih_fit.main replaced)
+    calls = []
+    orig = R.main
+    R.main = lambda argv=None: calls.append(list(argv))
+    man = _manifest(out)
+    tid = int(man[man["configuration"] == "passive_fit"]["specimen_id"].iloc[0])
+    try:
+        _run(["twin", "--out", out, "--twin", tid, "--n-workers", 2])
+    finally:
+        R.main = orig
+        _clear()
+    parts["twin --n-workers 2: the fit's argv ends with --n-workers 2"] = (
+        len(calls) == 1 and calls[0][-2:] == ["--n-workers", "2"])
+    code_bad, _, _ = _run(["twin", "--out", out, "--twin", tid, "--n-workers", 0])
+    parts["twin --n-workers 0: refused by the parser (2)"] = code_bad == 2
+    # a finished twin (TS3's run) re-run with --n-workers 3: neither rebuilt nor refitted
+    ts3 = _STATE.get("ts3_out")
+    if ts3 is None:
+        test_TS3_end_to_end()
+        ts3 = _STATE["ts3_out"]
+    m3 = _manifest(ts3)
+    tid3 = int(m3[m3["configuration"] == "full"]["specimen_id"].iloc[0])
+    meta = ts3 / "twins" / ("twin_%d" % tid3) / ("specimen_%d" % tid3) / "metadata.json"
+    csv = ts3 / "fits" / ("twin_%d" % tid3) / "phase2_results.csv"
+    before = _mtimes([meta, csv])
+    calls2 = []
+    R.main = lambda argv=None: calls2.append(list(argv))
+    try:
+        c3, _, se3 = _run(["twin", "--out", ts3, "--twin", tid3, "--n-workers", 3])
+    finally:
+        R.main = orig
+        _clear()
+    st = json.loads((ts3 / "status" / ("twin_%d.json" % tid3)).read_text())
+    parts["a finished twin re-run with --n-workers 3: exit 0, ok, no fit call, neither rebuilt nor refitted"] = (
+        c3 == 0 and not calls2 and _mtimes([meta, csv]) == before and st["status"] == "ok"
+        and st["built"] is False and st["fitted"] is False)
+    print("\n  [T3] argv tail: %s" % " ".join(calls[0][-12:] if calls else []))
+    _fail_parts(parts)
+
+
+def test_T4_refusals():
+    """T4: the plan refuses (3) a gbar floor outside the gbar box and a dv_h truth range outside the dv_h box,
+    writing nothing; the closed ends are accepted."""
+    cases = {"floor below the box (1e-6 < 1e-5)": ["--gbar-floor", "1e-6"],
+             "floor above the box (2e-3 > 1e-3)": ["--gbar-floor", "2e-3"],
+             "floor outside a given box (1e-5 < 2e-5)": ["--gbar-bounds=2e-5,1e-3"],
+             "dv_h range below the box (-12 < -10)": ["--dvh-truth-range-mV=-12,5"],
+             "dv_h range above the box (11 > 10)": ["--dvh-truth-range-mV=-5,11"],
+             "dv_h range outside a given box (5 > 4)": ["--dvh-bounds=-4,4"]}
+    parts = {}
+    for what, extra in cases.items():
+        out = _new_out("t4")
+        code, _, se = _plan(out, *extra)
+        parts["refused (3), nothing written: %s" % what] = code == 3 and not out.exists() and "SPEC 2.9 (d)" in se
+    out = _new_out("t4ok")
+    code, _, se = _plan(out, "--gbar-floor", "1e-3", "--dvh-truth-range-mV=-10,10")
+    parts["accepted: the floor on the box's upper end, the dv_h range equal to the box"] = code == 0
+    out = _new_out("t4ih5")
+    code, _, se = _plan(out, "--ih-arm", "ih5", "--dvh-truth-range-mV=-12,5")
+    parts["with --ih-arm ih5 the dv_h range is not used and not checked"] = code == 0
+    _fail_parts(parts)
+
+
+def test_T5_eval_theta_ih6_d207():
+    """T5: eval_theta_of for an ih6_d207 twin names the six, with the manifest's dv_h; none for active_fit and
+    passive_fit."""
+    import run_ih_fit as R
+    import run_twin_recovery as T
+    import twin_manifest as TM
+    out = _new_out("t5")
+    code, _, se = _plan(out)
+    assert code == 0, se
+    man = _manifest(out)
+    parts = {}
+    for _, row in man.iterrows():
+        conf = str(row["configuration"])
+        ev = T.eval_theta_of(row, str(row["arm"]))
+        if conf in WITH_EVAL:
+            got = R.parse_eval_theta(ev, IH6) if ev is not None else {}
+            th = TM.twin_theta(row)
+            parts["%s: the six names, the truth exactly, dv_h = the manifest's (%r)" % (conf, row["ih_dvh_mV"])] = (
+                list(got) == list(IH6) and all(got[n] == th[n] for n in IH6)
+                and got.get("dv_h") == float(row["ih_dvh_mV"]) and got.get("dv_h") != 0.0)
+        else:
+            parts["%s: no --eval-theta" % conf] = ev is None
+    _fail_parts(parts)
+
+
+def _t6_run(dvh_offset_mV, drop_dvh=False):
+    """A planned run with synthetic results for ih6_d207 (estimates = truth x 1.05; dv_h = truth + offset;
+    Block 22's columns given; drop_dvh: dv_h removed from every fit's names and columns), merged: (out,
+    manifest, extras written, the merge's exit code)."""
+    import human_ih_params as HIP
+    out = _new_out("t6")
+    code, _, se = _plan(out)
+    assert code == 0, se
+    man = _manifest(out)
+    v_star = -95.0
+    extra = {}
+    for k, (_, row) in enumerate(man.iterrows()):
+        tid = int(row["specimen_id"])
+        e = {"loss_after_search": 0.25 + 0.01 * k, "loss_after_refine": 0.2 + 0.01 * k, "refine_improved": k % 2 == 0,
+             "refine_n_starts": 3, "refine_n_evals": 100 + k, "refine_best_start": k % 3 - 1, "n_workers": 3,
+             "v_deepest_train_mV": v_star}
+        if FITTED[str(row["arm"])] != PASSIVE:
+            gb = GBAR_FLOOR if row["configuration"] == "active_fit" else float(row["ih_gihbar_S_cm2"]) * 1.05
+            dv = float(row["ih_dvh_mV"]) + dvh_offset_mV
+            e["gh_at_v_deepest_S_cm2"] = gb * float(HIP.minf(v_star, "Ih_human", vshift_mV=0.0, vshift_minf_mV=dv))
+        extra[tid] = e
+    _write_results(out, man, {int(t): 1.05 for t in man["specimen_id"]}, dvh_offset_mV=dvh_offset_mV, extra=extra)
+    if drop_dvh:
+        for t in man["specimen_id"]:
+            f = out / "fits" / ("twin_%d" % int(t)) / "phase2_results.csv"
+            df = pd.read_csv(f)
+            df["param_names"] = ["|".join(n for n in str(x).split("|") if n != "dv_h") for x in df["param_names"]]
+            df.drop(columns=[c for c in ("dv_h",) if c in df.columns]).to_csv(f, index=False)
+    code, so, se = _run(["merge", "--out", out, "--no-plot"])
+    return out, man, extra, code
+
+
+def test_T6_merge_ih6_d207():
+    """T6: the merge on synthetic results for ih6_d207: the gate requires dv_h (off by 5 mV fails, by 1 mV
+    passes); recovery_extras.csv's new columns are filled (the refinement's from the fit's columns; dv_h's
+    truth and estimate; g_h(v*) at the truth with the truth's dv_h)."""
+    import human_ih_params as HIP
+    import run_twin_recovery as T
+    parts = {}
+    verdicts = {}
+    for off in (1.0, 5.0):
+        out, man, extra, code = _t6_run(off)
+        ver = pd.read_csv(out / "report" / "gate_verdict.csv")
+        txt = (out / "report" / "gate_verdict.txt").read_text()
+        row = ver[ver["parameter"] == "dv_h"]
+        verdicts[off] = (code, set(ver["arm"]), list(ver["parameter"]), row["verdict"].tolist(), txt.splitlines()[0])
+        if off == 1.0:
+            parts["dv_h within 1 mV: merge 0, the gate on ih6_d207 has a dv_h row 'pass' (|err| 1 mV, tolerance 3 mV) "
+                  "and PASSes"] = (code == 0 and set(ver["arm"]) == {"ih6_d207"} and len(row) == 1
+                                   and row["verdict"].iloc[0] == "pass"
+                                   and abs(float(row["median_abs_err"].iloc[0]) - 1.0) < 1e-9
+                                   and "STAGE 7 GATE: PASS" in txt)
+            ex = pd.read_csv(out / "recovery_extras.csv", float_precision="round_trip")
+            ok = list(ex.columns) == list(T.EXTRAS_COLUMNS) and len(ex) == len(man)
+            for _, e in ex.iterrows():
+                tid = int(e["twin_id"])
+                m = man[man["specimen_id"] == tid].iloc[0]
+                x = extra[tid]
+                ok = ok and float(e["loss_after_search"]) == x["loss_after_search"] \
+                    and bool(e["refine_improved"]) == x["refine_improved"] \
+                    and int(e["refine_n_evals"]) == x["refine_n_evals"] \
+                    and int(e["refine_best_start"]) == x["refine_best_start"]
+                if str(m["configuration"]) == "passive_fit":
+                    ok = ok and np.isnan(e["dvh_true_mV"]) and np.isnan(e["dvh_est_mV"])
+                else:
+                    ok = ok and float(e["dvh_true_mV"]) == float(m["ih_dvh_mV"]) \
+                        and abs(float(e["dvh_est_mV"]) - (float(m["ih_dvh_mV"]) + 1.0)) < 1e-12
+                if str(m["configuration"]) in WITH_EVAL:
+                    dv_t = float(m["ih_dvh_mV"])
+                    gh_t = float(m["ih_gihbar_S_cm2"]) * float(HIP.minf(-95.0, "Ih_human", vshift_mV=0.0,
+                                                                         vshift_minf_mV=dv_t))
+                    gh_0 = float(m["ih_gihbar_S_cm2"]) * float(HIP.minf(-95.0, "Ih_human", vshift_mV=0.0))
+                    # 1e-12 relative: the same float64 product, in another order at most
+                    ok = ok and np.isclose(e["gh_deep_true_S_cm2"], gh_t, rtol=1e-12, atol=0.0) \
+                        and not np.isclose(e["gh_deep_true_S_cm2"], gh_0, rtol=1e-6, atol=0.0) \
+                        and float(e["gh_deep_est_S_cm2"]) == x["gh_at_v_deepest_S_cm2"]
+            parts["recovery_extras.csv: its columns; the refinement's four from the fit; dv_h's truth (manifest) "
+                  "and estimate for the twins fitted with dv_h, NaN for passive_fit; g_h(v*) at the truth with the "
+                  "truth's dv_h (not 0)"] = bool(ok)
+        else:
+            parts["dv_h off by 5 mV: merge 0, dv_h 'FAIL', the gate FAILs"] = (
+                code == 0 and len(row) == 1 and row["verdict"].iloc[0] == "FAIL" and "STAGE 7 GATE: FAIL" in txt
+                and set(ver.loc[ver["parameter"].isin(["Cm", "gbar", "kappa_tau"]), "verdict"]) == {"pass"})
+    out, man, extra, code = _t6_run(1.0, drop_dvh=True)
+    ver = pd.read_csv(out / "report" / "gate_verdict.csv")
+    row = ver[ver["parameter"] == "dv_h"]
+    parts["no dv_h in the fits: the gate on ih6_d207 requires it -- 'FAIL (axis absent)', the gate FAILs"] = (
+        code == 0 and len(row) == 1 and row["verdict"].iloc[0] == "FAIL (axis absent)"
+        and "STAGE 7 GATE: FAIL" in (out / "report" / "gate_verdict.txt").read_text())
+    print("\n  [T6] " + "\n  [T6] ".join("offset %.0f mV: %r" % kv for kv in verdicts.items()))
+    _fail_parts(parts)
+
+
+def test_T7_submitter_workers():
+    """T7: the submitter's dry run with NCPUS=3: the twin commands carry --n-workers 3, the core count is
+    N x 3 against the cap (41 x 3 refused, 40 x 3 accepted), the three thread variables are 1 in the twin job's
+    environment text; the twin role runs with them at 1 and --n-workers NCPUS."""
+    st = _fixture()
+    script = HERE / "submit_twin_recovery.sh"
+    text = script.read_text()
+    tmp = st["root"] / "t7"
+    tmp.mkdir()
+    stubs = _stubs(tmp)
+    home, tmpdir = tmp / "home", tmp / "tmpdir"
+    home.mkdir()
+    tmpdir.mkdir()
+
+    def env(**extra):
+        e = {k: v for k, v in os.environ.items()
+             if not (k.startswith(("TWIN_", "PBS_", "ROADMAP_", "IH_", "PY_STUB")) or k in (
+                 "RUN_TAG", "NOISE_TAG", "GROUP", "TWINS", "MAX_TWINS", "NCPUS", "WALLTIME", "CONDA_ENV", "DRY_RUN",
+                 "PLAN_ARGS", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"))}
+        e.update({"PATH": "%s:%s" % (stubs / "bin", e.get("PATH", "")), "HOME": str(home), "TMPDIR": str(tmpdir),
+                  "FAKE_CONDA_BASE": str(stubs / "condabase"), "REAL_PYTHON": sys.executable,
+                  "DISPLAY": NO_X_DISPLAY, "QSUB_LOG": str(tmp / "qsub.log"), "PY_LOG": str(tmp / "py.log"),
+                  "IH_CODE_DIR": str(HERE), "IH_ARCHIVE_ROOT": str(st["archive_root"]), "GROUP": GROUP,
+                  "NOISE_TAG": "nfx", "PLAN_ARGS": " ".join(SMALL), "ROADMAP_DISABLE": "1"})
+        e.update({k: str(v) for k, v in extra.items()})
+        return e
+
+    def sh(e, path=script):
+        return subprocess.run(["bash", str(path)], cwd=str(tmp), env=e, stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, universal_newlines=True, timeout=900)
+    p = sh(env(RUN_TAG="t7w", DRY_RUN=1, NCPUS=3))
+    lines = p.stdout.splitlines()
+    sub = [ln for ln in lines if "DRY RUN:   subjob " in ln]
+    q = [ln for ln in lines if "DRY RUN:" in ln and " qsub " in ln]
+    envl = [ln for ln in lines if "twin job environment:" in ln]
+    parts = {"dry run NCPUS=3: every twin command ends with --n-workers 3, the array qsub ncpus=3": (
+        p.returncode == 0 and len(sub) == 4 and all(shlex.split(ln)[-2:] == ["--n-workers", "3"] for ln in sub)
+        and len(q) == 2 and " select=1:ncpus=3 " in q[0])}
+    parts["the core count: 4 twin(s) x NCPUS 3 = 12 against the cap"] = any(
+        "4 twin(s) x NCPUS 3 = 12 (cap 120" in ln for ln in lines)
+    parts["the twin job's environment text: OMP/OPENBLAS/MKL_NUM_THREADS=1"] = (
+        len(envl) == 1 and all("%s=1" % v in envl[0] for v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS",
+                                                                 "MKL_NUM_THREADS")))
+    p41 = sh(env(RUN_TAG="t7w", PY_STUB_LIST=41, NCPUS=3))
+    p40 = sh(env(RUN_TAG="t7w", PY_STUB_LIST=40, NCPUS=3, DRY_RUN=1))
+    parts["41 x 3 = 123 cores refused (3), 40 x 3 = 120 accepted (D-185)"] = (
+        p41.returncode == 3 and "123 cores > 120" in p41.stderr and p40.returncode == 0
+        and not (tmp / "qsub.log").exists())
+    # the twin role with NCPUS=5 in the run file and PBS's OMP_NUM_THREADS=5: threads 1, --n-workers 5
+    rf = tmp / "run.env"
+    rf.write_text("TWIN_CODE_DIR=%s\nTWIN_OUT_DIR=%s\nTWIN_GROUP=%s\nTWIN_NCPUS=5\nTWIN_CONDA_ENV=prova\n"
+                  "TWIN_IDS=( 900000000 900000100 )\n" % (shlex.quote(str(HERE)), shlex.quote(str(tmp / "o")), GROUP))
+    pt = sh(env(PBS_JOBID="7[0].testserver", PBS_ARRAY_INDEX=0, TWIN_ROLE="twin", TWIN_RUN_FILE=rf,
+                OMP_NUM_THREADS=5, OPENBLAS_NUM_THREADS=5, MKL_NUM_THREADS=5))
+    runs = (tmp / "py.log").read_text().splitlines() if (tmp / "py.log").exists() else []
+    parts["the twin role (run file NCPUS 5, PBS threads 5): --n-workers 5, ENV[1/1/1]"] = (
+        pt.returncode == 0 and len(runs) == 1 and "[--twin] [900000000] [--n-workers] [5] ENV[1/1/1]" in runs[0])
+    parts["the script: NCPUS default 3; no thread variable set from NCPUS"] = (
+        'NCPUS="${NCPUS:-3}"' in text and "NUM_THREADS=\"$TWIN_NCPUS\"" not in text
+        and "NUM_THREADS=$TWIN_NCPUS" not in text)
+    print("\n  [T7] " + "\n  [T7] ".join(envl + sub[:1]))
+    _fail_parts(parts)
+
+
+def test_T8_bash_ascii_lf():
+    """T8: bash -n on the submitter; the own files pure ASCII and LF."""
+    r = subprocess.run(["bash", "-n", str(HERE / "submit_twin_recovery.sh")], stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE, universal_newlines=True)
+    bad = [n for n in OWN_FILES if (b"\r" in (HERE / n).read_bytes() or any(b > 127 for b in (HERE / n).read_bytes()))]
+    assert r.returncode == 0 and not bad, "bash -n: %d %s; not ASCII/LF: %s" % (r.returncode, r.stderr, bad)
 
 
 def test_convergence():
