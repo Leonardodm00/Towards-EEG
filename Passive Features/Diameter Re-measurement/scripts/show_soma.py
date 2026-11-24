@@ -4,12 +4,14 @@
     python3 scripts/show_soma.py --specimen 529878215 --cache-dir DIR [--shift-x X --shift-y Y --flip-h H --z0 Z]
                                  [--config-json FILE] [--swc PATH] [--out DIR] [--synthetic]
                                  [--soma-k K] [--soma-k-range LO HI] [--montage-k LO HI STEP] [--half-um H]
+                                 [--z-margin-um M]
 
 Places the traced soma (the SWC's type-1 nodes) in the image frame (the transform of --shift-x/--shift-y/--flip-h/
 --z0, as clean_cell.py) and fetches the square crop of soma_view.half_um about it from the planes within (its radius
-+ soma_view.z_margin_um) of its depth: the window. The soma's plane is chosen by eye (D-211): --soma-k K is the plane
-where the soma is judged in focus (without it, the plane nearest the traced depth is shown), --soma-k-range LO HI the
-planes where the soma is seen; nothing is picked automatically. Draws the shown plane beside the fine-detail energy
++ soma_view.z_margin_um) of its depth: the window (--z-margin-um M sets the margin instead, Block 44 amendment 4).
+The soma's plane is chosen by eye (D-211): --soma-k K is the plane where the soma is judged in focus (without it,
+the plane nearest the traced depth is shown), --soma-k-range LO HI the planes where the soma is seen; nothing is
+picked automatically. Draws the shown plane beside the fine-detail energy
 of each plane over the traced disk (a diagnostic, analysis.soma_view.detail_energy), and a montage: every
 soma_view.montage_step_planes-th recorded plane of the window aligned on the shown plane, or --montage-k LO HI STEP.
 A plane outside the window or not recorded is refused. Allen's reconstruction is drawn faintly over every image
@@ -55,6 +57,9 @@ def main(argv=None):
     ap.add_argument("--montage-k", type=int, nargs=3, default=None, metavar=("LO", "HI", "STEP"),
                     help="the montage's planes; default: the whole window, every soma_view.montage_step_planes-th")
     ap.add_argument("--half-um", type=float, default=None, help="the crop's half-size (um); default soma_view.half_um")
+    ap.add_argument("--z-margin-um", type=float, default=None,
+                    help="the window: the planes within the traced radius + M um of the traced depth; "
+                         "default soma_view.z_margin_um (Block 44 amendment 4, D-239)")
     a = ap.parse_args(argv)
     import clean_cell
     from build_table import load_config
@@ -78,8 +83,11 @@ def main(argv=None):
     half = float(q.half_um if a.half_um is None else a.half_um)
     if not (half > 0 and np.isfinite(half)):
         ap.error("--half-um must be finite and > 0")
+    z_margin = float(q.z_margin_um if a.z_margin_um is None else a.z_margin_um)
+    if not (z_margin >= 0 and np.isfinite(z_margin)):
+        ap.error("--z-margin-um must be finite and >= 0")
     left, top, width, height = soma_view.crop_box(centre[:2], half, res0)
-    k_lo, k_hi = soma_view.plane_range(centre[2], radius + q.z_margin_um, dz)
+    k_lo, k_hi = soma_view.plane_range(centre[2], radius + z_margin, dz)
     log("%s cell: traced soma at (%.2f, %.2f, %.2f) um (image frame), radius %.2f um; crop %d x %d px at (%d, %d); "
         "planes %d..%d (%d)" % (label, centre[0], centre[1], centre[2], radius, width, height, left, top, k_lo, k_hi,
                                 k_hi - k_lo + 1))
@@ -151,7 +159,7 @@ def main(argv=None):
                detail_energy=[None if not np.isfinite(e) else float(e) for e in E], k_traced=k_traced,
                k_by_eye=None if a.soma_k is None else int(a.soma_k),
                k_range_by_eye=None if k_range is None else [int(k_range[0]), int(k_range[1])],
-               k_shown=int(ks[j_ref]), montage_ks=[int(ks[i]) for i in idx], half_um=half,
+               k_shown=int(ks[j_ref]), montage_ks=[int(ks[i]) for i in idx], half_um=half, z_margin_um=z_margin,
                n_trace_segments=int(len(seg["r1"])),
                primary_dendrite_roots_um=[[float(x), float(y)] for x, y in roots],
                soma_view=dict(vars(q)) if hasattr(q, "__dict__") else None)

@@ -1316,7 +1316,9 @@ let's evaluate the soma first. I need images at focus of the soma"). Every numbe
 orchestrator's (D-210).
 
 - Modules: `src/allen_diameter/analysis/soma_view.py`, `src/allen_diameter/plotting/soma_figures.py`,
-  `scripts/show_soma.py`; smoke test `tests/smoke/test_smoke_soma_view.py`.
+  `scripts/show_soma.py`; smoke test `tests/smoke/test_smoke_soma_view.py` [amendment 4 adds
+  `src/allen_diameter/plotting/plane_viewer.py`, `src/allen_diameter/loading/soma_io.py`,
+  `tests/smoke/test_smoke_plane_viewer.py`].
 - Mathematics. The traced soma: the SWC's type-1 nodes in the image frame (`cell.to_image_um` with the transform of
   `--shift-x/--shift-y/--flip-h/--z0`, as `clean_cell.py`); centre $c$ = their mean position (um), radius $r$ =
   the largest of their radii (um). The crop: the square of half-size `half_um` about $(c_x, c_y)$ at full resolution
@@ -1405,6 +1407,59 @@ orchestrator's (D-210).
   [corrected 2026-11-22: the code clipped a montage range to the window and stored a by-eye range with unrecorded ends.]
   (ii) "a non-positive half" of the oracles binds `crop_box`; `plane_range` takes half >= 0 (0: the plane at the depth
   only). (iii) Since amendment 2, `test_smoke_soma_view.py` counts 7 pass, 1 skip.
+- Amendment 4 (2026-11-24; D-239, the user's request at 16:30: "a cell like [Cell 24] without the superimposition of
+  the skeleton ... an interactive thing that slides across the planes so that I can choose the right one (the one at
+  focus)"; the view's settings PROVISIONAL, the orchestrator's). The soma's planes one at a time in an interactive
+  viewer, nothing drawn over them; the window's margin as an option. (i) `loading/soma_io.py`: `SomaView` (frozen
+  dataclass: `specimen`; `block` (n_planes, H, W) grey levels as fetched; `ks` (n_planes,) int, increasing; `valid`
+  (n_planes,) bool; `left`, `top` px; `res0_um`; `dz_um`; `centre_um` (3,) um; `radius_um`; `k_traced`; `k_by_eye`
+  or None) and `read_soma_view(out_dir, specimen) -> SomaView`, reading `soma_<S>_block.npz` and `soma_<S>.json`:
+  FileNotFoundError naming a missing file; ValueError when the block is not (n_planes, height, width) of the JSON's
+  crop, when the two files disagree on `ks`, `valid`, the crop's corner or `res0_um`, or when `ks` is not increasing.
+  (ii) `plotting/plane_viewer.py` (display only; PIL and ipywidgets imported inside `plane_png` and `PlaneViewer`,
+  notebook-side dependencies the pipeline never imports): `view_slices(shape, left, top, res0_um, centre_xy_um=None,
+  half_um=None) -> (rows, cols)`, the slices of the pixels whose centre ((left + j) res0_um, (top + i) res0_um) lies
+  within half_um of the centre in x and in y, clipped to the crop (half_um None: the whole crop); ValueError for a
+  half_um that is not finite and > 0, a missing or non-finite centre, a view that misses the crop.
+  `grey_ranges(block, valid, contrast="fixed", percentiles=(0.5, 99.5)) -> (n_planes, 2)` float: "fixed", one row
+  (lo, hi) = the percentiles of the pixels of every recorded plane together, for every plane; "per plane", each
+  recorded plane's own percentiles; NaN rows for planes not recorded; hi = lo + 1 where the range is flat;
+  ValueError for an unknown contrast, percentiles not 0 <= p_lo < p_hi <= 100, a block that is not (n_planes, H, W)
+  with n_planes = len(valid), no recorded plane. `plane_png(image, lo, hi, zoom=1) -> bytes`: the 8-bit grey PNG of
+  rint(255 (g - lo) / (hi - lo)) clipped to 0..255, each pixel repeated zoom x zoom times; ValueError for an image that
+  is not 2-D, lo or hi not finite, hi <= lo, zoom not an integer >= 1. `PlaneViewer(block, ks, valid, *, left, top,
+  res0_um, dz_um, centre_xy_um=None, view_half_um=None, k_ref=None, title="", zoom=2, contrast="fixed",
+  k_start=None, on_pick=None, pick_label="pick this plane", percentiles=(0.5, 99.5), play_interval_ms=200)`: a slider
+  over k from the first to the last recorded plane, step 1, linked to a play button; an info line (k, z = k dz_um,
+  z - z(k_ref)); the contrast toggle; a button handing the shown plane to on_pick (shown only with on_pick); a status
+  line; the image, `plane_png` of the view with `grey_ranges` of the view (cached per plane and contrast), nothing
+  drawn over it; a plane not recorded is shown as a uniform grey (128) image, the info line says "not recorded" and
+  the button refuses it. The first plane shown is k_start when it is a recorded plane, else k_ref when recorded, else
+  the middle recorded plane; a k_start not used is said in the status line. A str returned by on_pick is shown in the
+  status line, an exception's type and message too (not raised: a widget callback's error is otherwise invisible).
+  Attributes `widget` (the VBox to display), `k` (the plane shown), `png(k, contrast)`. ValueError for arrays that
+  disagree, `ks` not increasing, no recorded plane, an unknown contrast, a zoom that is not an integer >= 1, a
+  view_half_um without a centre. (iii) `show_soma.py --z-margin-um M`: the window's margin instead of
+  `soma_view.z_margin_um` (the planes within the traced radius + M of the traced depth); argparse error unless finite
+  and >= 0; the JSON adds `z_margin_um`. (iv) Notebook Cell 24 (b): `show_soma.py` as in Cell 24 (with
+  `SOMA_Z_MARGIN_UM`; `SOMA_HALF_UM` when Cell 24 set it), the view read back with `read_soma_view`, a `PlaneViewer`
+  centred on the traced soma with `VIEW_HALF_UM` 20, `ZOOM` 2, `CONTRAST` "fixed", k_ref the traced depth's plane,
+  k_start the notebook's `SOMA_K` when set, on_pick setting `SOMA_K` (Cell 25's start when its `SOMA_FIT_K` is None).
+  Oracles (`tests/smoke/test_smoke_plane_viewer.py`): `plane_png`'s known answer (lo shown 0, hi 255, the thirds 85
+  and 170, clipped outside; zoom repeats each pixel exactly); `grey_ranges` against `numpy.percentile` written out;
+  `view_slices` against the pixel centres selected one by one; the PNG unchanged under g -> a g + b (a > 0) with its
+  range mapped likewise; the contract (shapes, dtypes, NaN rows); determinism; the refusals; `show_soma.py` end to
+  end on the synthetic cell by default and with `--z-margin-um 8` (7 planes more on each side at dz 0.28 um; the
+  JSON's margin), refusing -1 and nan; `read_soma_view` against `show_soma.py`'s own files, refusing a missing file
+  and files that disagree; the viewer driven from Python (skipped without ipywidgets): the first plane, the slider's
+  range, the image following the slider and the contrast, a plane not recorded, the pick and on_pick's message and
+  exception, a k_start not recorded, the refusals.
+  Status: amendment 4 implemented 2026-11-24 by the orchestrator inline (a single small block);
+  `test_smoke_plane_viewer.py` 7 pass, 1 skip (ipywidgets 8.1.9, Pillow 12.3.0); `test_smoke_soma_view.py` 7 pass,
+  1 skip, unchanged **[run, sandbox]**; on a stack of the pilot's size (85 planes of 701 x 701 px, view +-20 um, x2)
+  the viewer builds in 0.26 s and shows a new plane in 3 ms (PNG 109 kB) **[run, sandbox]**. Not checked here: the
+  widget in a browser (the play link, the rendering in Colab), the sandbox having no front end; the widget's state
+  serialises (`ipywidgets.embed.embed_minimal_html`).
 
 ### Block 45: the soma's forward model -- an ellipsoid rendered with the partition absorption (D-215, D-216, D-218, D-219)
 

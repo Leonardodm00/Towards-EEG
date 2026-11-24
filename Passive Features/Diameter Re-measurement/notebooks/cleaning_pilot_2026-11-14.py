@@ -789,6 +789,52 @@ for name in ("soma_%d_focus.png" % SPECIMEN, "soma_%d_planes.png" % SPECIMEN):
     display(Image(filename=SOMA_OUT + "/" + name))
 
 
+
+# %% [markdown]
+# ## Cell 24 (b): the soma's planes one at a time -- a slider, nothing drawn over them; the plane you pick becomes SOMA_K (D-211, D-239; Block 44 amendment 4)
+#
+# Run after Cells 0, 1 and 16 (Cell 1 pulls the branch); Cell 24 need not run first. The same crop and window as Cell
+# 24 (show_soma.py, which also rewrites Cell 24's figures, not shown here; planes already fetched come from CACHE_DIR),
+# shown one plane at a time with nothing of Allen's reconstruction drawn over them, centred on Allen's traced soma.
+# Drag the slider, or click its handle and step with the arrow keys, or press play to run through focus. CONTRAST
+# "fixed" shows every plane on one grey range, so the soma's darkening and sharpening compare across planes; "per
+# plane" stretches each plane to its own range (the toggle under the slider switches between them). The button sets
+# SOMA_K to the plane shown: Cell 25 starts from it when its SOMA_FIT_K is None. Running Cell 24 again resets SOMA_K
+# to its own line, so type the plane there if you rerun it. VIEW_HALF_UM crops the view about the traced soma (None:
+# the whole crop, +-SOMA_HALF_UM), ZOOM enlarges it in whole pixels; SOMA_Z_MARGIN_UM widens the window beyond the
+# traced radius + 6 um (on the pilot k = 75..159; more planes to fetch the first time). Nothing to send back: tell me
+# the plane you picked.
+
+# %%
+from IPython.display import display   # the cell's own imports
+from allen_diameter.loading import soma_io
+from allen_diameter.plotting import plane_viewer
+VIEW_HALF_UM = 20        # the view's half-size about the traced soma (um); None: the whole crop
+ZOOM = 2                 # whole-pixel enlargement of the view
+CONTRAST = "fixed"       # "fixed": one grey range for every plane; "per plane": each plane its own
+SOMA_Z_MARGIN_UM = None  # the window: the planes within the traced radius + this of the traced depth (um); None: 6
+SOMA_OUT = OUT + "/soma"
+run("scripts/show_soma.py", "--specimen", SPECIMEN, "--cache-dir", CACHE_DIR, *ALIGN, *CLEAN_CFG, "--out", SOMA_OUT,
+    *([] if SOMA_Z_MARGIN_UM is None else ["--z-margin-um", SOMA_Z_MARGIN_UM]),
+    *([] if globals().get("SOMA_HALF_UM") is None else ["--half-um", SOMA_HALF_UM]))
+soma24b = soma_io.read_soma_view(SOMA_OUT, SPECIMEN)
+
+
+def use_plane(k):
+    """The viewer's button: the plane shown becomes SOMA_K."""
+    globals()["SOMA_K"] = int(k)
+    return "SOMA_K = %d: Cell 25 starts from this plane (with its SOMA_FIT_K None)" % k
+
+
+viewer24b = plane_viewer.PlaneViewer(
+    soma24b.block, soma24b.ks, soma24b.valid, left=soma24b.left, top=soma24b.top, res0_um=soma24b.res0_um,
+    dz_um=soma24b.dz_um, centre_xy_um=soma24b.centre_um[:2], view_half_um=VIEW_HALF_UM, k_ref=soma24b.k_traced,
+    title="specimen %s: the soma's planes, centred on Allen's traced soma (k %d: the traced depth's plane)"
+          % (SPECIMEN, soma24b.k_traced),
+    zoom=ZOOM, contrast=CONTRAST, k_start=globals().get("SOMA_K"), on_pick=use_plane,
+    pick_label="use this plane as SOMA_K")
+display(viewer24b.widget)
+
 # %% [markdown]
 # ## Cell 25: the soma fitted with an ellipsoid; the corrected SWC (D-215, D-216, D-218, D-222; Blocks 45-48)
 #
