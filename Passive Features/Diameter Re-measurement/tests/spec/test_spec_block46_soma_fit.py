@@ -258,7 +258,9 @@ B_TRUE = 100.0 + 2.0 * np.sin(KS)
 
 
 def toy_scfg(**kw):
-    base = dict(plane_half_um=5.0, plane_step=2, region_radius_um=6.0)
+    # [2026-11-24, D-240] far_slope "fit" here: these checks exercise the fitted-slope path, an opt-in comparison
+    # since D-240 made "fixed" the default (test_config_defaults_and_outside_signatures)
+    base = dict(plane_half_um=5.0, plane_step=2, region_radius_um=6.0, far_slope="fit")
     base.update(kw)
     return dataclasses.replace(C.default_config().soma_fit, **base)
 
@@ -483,12 +485,13 @@ def test_nan_forward_failure_determinism_and_refusals():
 
 
 def test_config_defaults_and_outside_signatures():
+    # [2026-11-24, D-240 (user): the far slope is held by default; was "fit" under D-218.1]
     cfg = C.default_config()
     q = cfg.soma_fit
     assert (q.fine_factor, q.dzeta_um, q.plane_step, q.plane_half_um, q.region_radius_um, q.mask_widen_um,
             q.far_slope, q.shift_xy_um, q.shift_z_um, q.axis_bounds_um, q.mu_bounds_per_um, q.slope_bounds,
             q.max_nfev, q.ftol, q.xtol, q.diff_steps) == (
-        1, 0.14, 2, 10.0, 13.0, 2.0, "fit", 4.0, 6.0, (1.0, 15.0), (0.001, 3.0), (0.2, 3.0), 80, 1e-6, 1e-6,
+        1, 0.14, 2, 10.0, 13.0, 2.0, "fixed", 4.0, 6.0, (1.0, 15.0), (0.001, 3.0), (0.2, 3.0), 80, 1e-6, 1e-6,
         (0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.004, 1e-4, 0.005))
     assert cfg.signature_hash("estimator") == "16be09f944e45972"       # the pinned hashes (Block 1)
     assert cfg.signature_hash("simulation") == "dc84ed2e89bcfea6"

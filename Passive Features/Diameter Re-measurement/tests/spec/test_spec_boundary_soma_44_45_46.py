@@ -42,7 +42,9 @@ def test_renderer_as_the_fits_forward_recovers_its_own_truth():
     forward model, wired as SPEC states; the planes reach the renderer as ks[K] dz in ascending order."""
     cfg = C.default_config()
     rcfg = cfg.renderer
-    scfg = dataclasses.replace(cfg.soma_fit, plane_half_um=3.0, plane_step=2, region_radius_um=4.0, max_nfev=150,
+    # [2026-11-24, D-240] far_slope "fit": the fitted-slope path, an opt-in comparison since D-240
+    scfg = dataclasses.replace(cfg.soma_fit, far_slope="fit", plane_half_um=3.0, plane_step=2,
+                               region_radius_um=4.0, max_nfev=150,
                                ftol=1e-10, xtol=1e-10)
     light = cfg.acquisition.light_direction
     crop = (-42, -40, 85, 81)

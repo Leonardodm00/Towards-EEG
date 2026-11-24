@@ -64,7 +64,7 @@ def _run(out, *extra, config=None):
 @pytest.fixture(scope="module")
 def default_run():
     out = os.path.join(tempfile.mkdtemp(prefix="tester_fit_soma_"), "run")
-    rc, rec = _run(out)
+    rc, rec = _run(out, "--far-slope", "fit")      # [2026-11-24, D-240] the fitted-slope path, now an opt-in comparison
     return rc, rec, out
 
 
@@ -153,12 +153,14 @@ def test_default_run_corrected_swc(default_run):
 
 
 def test_reduced_runs_soma_k_fixed_slope_and_determinism(tmp_path):
-    rc1, r1 = _run(str(tmp_path / "a"), "--soma-k", "2", "--far-slope", "fixed", "--slope0", "0.79", config=REDUCED)
+    # [2026-11-24, D-240] run a takes the default, which now holds the slope; run b says "fixed": the same results
+    rc1, r1 = _run(str(tmp_path / "a"), "--soma-k", "2", "--slope0", "0.79", config=REDUCED)
     rc2, r2 = _run(str(tmp_path / "b"), "--soma-k", "2", "--far-slope", "fixed", "--slope0", "0.79", config=REDUCED)
     assert rc1 == 0 and rc2 == 0
     assert _no_seconds(r1) == _no_seconds(_no_seconds(r2) | {"swc_out": r1["swc_out"]})
     assert open(r1["swc_out"]).read() == open(r2["swc_out"]).read()
     fit = r1["fit"]
+    assert r1["settings"]["far_slope"] == "fixed", r1["settings"]["far_slope"]
     assert fit["theta"][8] == 0.79 and fit["se"][8] is None
     assert fit["fitted"] == list(fit["params"][:8])
     assert r1["start"]["centre_um"][2] == 2 * DZ and r1["start"]["source"] == "plane 2 (by eye)"

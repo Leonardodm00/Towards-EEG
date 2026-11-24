@@ -88,7 +88,9 @@ def _data(truth=TRUTH, noise=0.0, seed=0, crop=(-40, -40, 81, 81), ks=np.arange(
 
 
 def _scfg(**kw):
-    base = dict(plane_step=2, plane_half_um=5.0, region_radius_um=9.0, ftol=1e-10, xtol=1e-10, max_nfev=200)
+    # [2026-11-24, D-240] far_slope "fit": the fitted-slope path, an opt-in comparison since D-240 ("fixed" the default)
+    base = dict(plane_step=2, plane_half_um=5.0, region_radius_um=9.0, ftol=1e-10, xtol=1e-10, max_nfev=200,
+                far_slope="fit")
     base.update(kw)
     return dataclasses.replace(SomaFitConfig(), **base)
 

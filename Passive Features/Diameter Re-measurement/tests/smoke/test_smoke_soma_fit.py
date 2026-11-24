@@ -224,8 +224,14 @@ def noisy(sc, seed):
     return sc["block"] + make_rng(seed).normal(0.0, NOISE_GL, sc["block"].shape)
 
 
+def fit_cfg(**kw):
+    """The settings these checks exercise: Block 46's defaults with the far slope fitted -- the nine-parameter path,
+    kept as an opt-in comparison since D-240 made "fixed" the default -- so that path stays tested."""
+    return dataclasses.replace(SomaFitConfig(), far_slope="fit", **kw)
+
+
 def fit(sc, data=None, scfg=None, slope0=SLOPE0, mask=None, factory=None, radius=None):
-    scfg = SomaFitConfig() if scfg is None else scfg
+    scfg = fit_cfg() if scfg is None else scfg
     mask = np.zeros((sc["H"], sc["W"]), dtype=bool) if mask is None else mask
     return SF.fit_soma(sc["block"] if data is None else data, sc["ks"], sc["valid"], sc["left"], sc["top"], P_UM,
                        DZ_UM, sc["centre"], sc["radius"] if radius is None else radius, mask,
@@ -233,7 +239,7 @@ def fit(sc, data=None, scfg=None, slope0=SLOPE0, mask=None, factory=None, radius
 
 
 def tight():
-    return dataclasses.replace(SomaFitConfig(), ftol=1e-10, xtol=1e-10)
+    return fit_cfg(ftol=1e-10, xtol=1e-10)
 
 
 def fit_noise_free():
@@ -481,6 +487,7 @@ def test_noise_free_recovery():
     report("T5 fixed slope: max |error| %.1e over the eight, theta[8] = %.17g (slope0 %.17g), %d evaluations"
            % (float(err5.max()), f5.theta[8], SLOPE0, f5.n_eval))
     # a held slope0 outside slope_bounds is held as it is (not clipped): only gamma's start is clipped
+    assert SomaFitConfig().far_slope == "fixed", SomaFitConfig().far_slope     # the default (D-240, user)
     f5b = fit(sc5, scfg=dataclasses.replace(SomaFitConfig(), far_slope="fixed", max_nfev=1), slope0=5.0)
     assert f5b.theta[8] == 5.0 and "slope_um_per_um" not in f5b.message, (f5b.theta[8], f5b.message)
 
@@ -600,14 +607,14 @@ def test_bounds():
     expect = [SF.PARAMS[j] for j in range(9) if not lo[j] <= st[j] <= hi[j]]
     assert {"a_um", "c_um", "slope_um_per_um"} <= set(expect), expect
     toy = ToyForward((sc["H"], sc["W"]), sc["left"], sc["top"], P_UM)
-    f = fit(sc, scfg=dataclasses.replace(SomaFitConfig(), max_nfev=1), slope0=5.0, radius=20.0, factory=toy.factory)
+    f = fit(sc, scfg=fit_cfg(max_nfev=1), slope0=5.0, radius=20.0, factory=toy.factory)
     th0, g0 = toy.calls[0]
     assert np.array_equal(np.r_[th0, g0], np.clip(st, lo, hi)), (th0, g0)   # the first render: the clipped start
     assert f.message.split("start clipped into the bounds: ")[-1] == ", ".join(expect), f.message
     assert all(np.all(c[0] >= lo[:8]) and np.all(c[0] <= hi[:8]) and lo[8] <= c[1] <= hi[8] for c in toy.calls)
 
     # the truth 1 um from the traced centre in x and y, the bound 0.5 um: x0 and y0 at their bounds
-    f2 = fit(sc, scfg=dataclasses.replace(SomaFitConfig(), shift_xy_um=0.5))
+    f2 = fit(sc, scfg=fit_cfg(shift_xy_um=0.5))
     assert "x0_um" in f2.at_bound and "y0_um" in f2.at_bound, (f2.at_bound, f2.theta)
     check_close("x0 at bound", f2.theta[0], sc["centre"][0] + 0.5, rtol=0, atol=1e-6)
     check_close("y0 at bound", f2.theta[1], sc["centre"][1] - 0.5, rtol=0, atol=1e-6)
@@ -708,7 +715,7 @@ def test_edge_cases():
     # (ii) a fit through it returns without raising, its iterate on the finite side (the NaN wall stops trf's
     # descent there: the entry does not promise convergence through it, and Block 45 is finite inside the bounds);
     # (iii) a column NaN both ways ends the fit with status "failed", without raising
-    scfg = SomaFitConfig()
+    scfg = fit_cfg()
     sel = SF.select_planes(sc["ks"], sc["valid"], sc["centre"][2], DZ_UM, scfg.plane_half_um, scfg.plane_step)
     region = disk_um(sc, scfg.region_radius_um)
     lo, hi = SF._bounds(scfg, *sc["centre"])
@@ -776,23 +783,23 @@ def test_edge_cases():
         "fit far_slope": lambda: fit(sc, scfg=dataclasses.replace(SomaFitConfig(), far_slope="free")),
         "fit block 2-D": lambda: SF.fit_soma(sc["block"][0], sc["ks"], sc["valid"], sc["left"], sc["top"], P_UM,
                                              DZ_UM, sc["centre"], sc["radius"], np.zeros((sc["H"], sc["W"]), bool),
-                                             sc["toy"].factory, SomaFitConfig(), SLOPE0),
+                                             sc["toy"].factory, fit_cfg(), SLOPE0),
         "fit ks length": lambda: SF.fit_soma(sc["block"], sc["ks"][1:], sc["valid"], sc["left"], sc["top"], P_UM,
                                              DZ_UM, sc["centre"], sc["radius"], np.zeros((sc["H"], sc["W"]), bool),
-                                             sc["toy"].factory, SomaFitConfig(), SLOPE0),
+                                             sc["toy"].factory, fit_cfg(), SLOPE0),
         "fit valid length": lambda: SF.fit_soma(sc["block"], sc["ks"], sc["valid"][1:], sc["left"], sc["top"], P_UM,
                                                 DZ_UM, sc["centre"], sc["radius"], np.zeros((sc["H"], sc["W"]), bool),
-                                                sc["toy"].factory, SomaFitConfig(), SLOPE0),
+                                                sc["toy"].factory, fit_cfg(), SLOPE0),
         "fit mask shape": lambda: fit(sc, mask=np.zeros((sc["H"], sc["W"] + 1), bool)),
         "fit mask dtype": lambda: fit(sc, mask=np.zeros((sc["H"], sc["W"]))),
         "fit region empty": lambda: fit(sc, mask=np.ones((sc["H"], sc["W"]), bool)),
-        "fit < 3 planes": lambda: fit(sc, scfg=dataclasses.replace(SomaFitConfig(), plane_half_um=0.2)),
+        "fit < 3 planes": lambda: fit(sc, scfg=fit_cfg(plane_half_um=0.2)),
         "fit radius 0": lambda: fit(sc, radius=0.0),
         "fit slope0 < 0": lambda: fit(sc, slope0=-0.1),
         "fit slope0 nan": lambda: fit(sc, slope0=float("nan")),
         "fit res0 0": lambda: SF.fit_soma(sc["block"], sc["ks"], sc["valid"], sc["left"], sc["top"], 0.0, DZ_UM,
                                           sc["centre"], sc["radius"], np.zeros((sc["H"], sc["W"]), bool),
-                                          sc["toy"].factory, SomaFitConfig(), SLOPE0),
+                                          sc["toy"].factory, fit_cfg(), SLOPE0),
         "fit data nan": lambda: fit(sc, data=np.where(disk_um(sc, 1.0)[None], np.nan, sc["block"])),
         "fit forward shape": lambda: fit(sc, factory=lambda z: (lambda th, g: np.ones((len(z), 3, 3)))),
     }

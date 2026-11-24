@@ -1580,7 +1580,8 @@ orchestrator's (D-210).
   the $k$ of the valid plane nearest $z_s$ (ties: the lower $k$). Region $R$: the pixels whose centre lies within
   `region_radius_um` of $(x_s, y_s)$ and whose mask is False. Parameters $\theta = (x_0, y_0, z_0, a, b, c, \varphi,
   \mu, \gamma)$: Block 45's $\theta_g$ and the far slope; with `far_slope` = "fit" (D-218.1, the default) $\gamma$ is
-  fitted, with "fixed" (D-218.2) $\gamma$ = `slope0` and the fit is over the first eight. Model: $D_k(x, y) \approx
+  fitted, with "fixed" (D-218.2) $\gamma$ = `slope0` and the fit is over the first eight. [amended 2026-11-24, D-240
+  [user]: "fixed" is the default, "fit" a labelled comparison only (D-218.1 superseded)] Model: $D_k(x, y) \approx
   B_k\,\tau_k(x, y; \theta)$ on $R$, $\tau$ the forward model (Block 45 in production). For each $\theta$ each plane's
   scale is solved exactly (variable projection; D-219.3),
   $$\hat B_k(\theta) = \frac{\sum_R D_k\,\tau_k}{\sum_R \tau_k^2},\qquad r_k = D_k - \hat B_k\,\tau_k\ \text{on } R:$$
@@ -1628,7 +1629,8 @@ orchestrator's (D-210).
     `n_samples` ($|K|\,|R|$), `status` ("converged" | "max_nfev" | "failed"), `at_bound` (names), `n_eval` (forward
     evaluations, the Jacobian's included), `seconds`, `area_um2`, `se_area_um2`, `volume_um3`, `r_eq_um`, `message`.
 - Parameters: `SomaFitConfig` (`config.soma_fit`): `plane_step` 2, `plane_half_um` 10.0, `region_radius_um` 13.0,
-  `mask_widen_um` 2.0 (read by the caller, Block 47), `far_slope` "fit" (D-218.1; "fixed" D-218.2), `shift_xy_um` 4.0,
+  `mask_widen_um` 2.0 (read by the caller, Block 47), `far_slope` "fit" (D-218.1; "fixed" D-218.2) [amended
+  2026-11-24, D-240: "fixed"], `shift_xy_um` 4.0,
   `shift_z_um` 6.0, `axis_bounds_um` (1.0, 15.0), `mu_bounds_per_um` (0.001, 3.0), `slope_bounds` (0.2, 3.0),
   `max_nfev` 80, `ftol` 1e-6, `xtol` 1e-6, `diff_steps` (0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.004, 1e-4, 0.005) --
   PROVISIONAL (D-219.4) except `far_slope`'s default (the user's).
@@ -1683,6 +1685,18 @@ orchestrator's (D-210).
   residual is not finite; grad S with a step of 1e-5 of each axis; the 5th percentile numpy's linear rule, the moments
   numpy.cov (aweights, bias); a failed fit NaN in every result; more refusals (masks not bool, data not finite on the
   region, B_far <= 0, ks not strictly ascending, a forward of the wrong shape).
+
+- Amendment (2026-11-24; D-240 [user], superseding D-218.1: "the far slope fit is to be drop. the only thing we might
+  fit is the in-focus blur"). `SomaFitConfig.far_slope` defaults to "fixed": the far slope is held at `slope0`
+  (`fit_soma.py --slope0`, default `renderer.kernel_continuation_slope`, the configured 0.79 of D-024); "fit" stays as
+  an opt-in comparison, labelled in the figures' title ("far slope fit"). `fit_soma.py`'s help says so; notebook Cell
+  25 passes `--far-slope fixed` and offers no choice (`SLOPE0` the held value). Fitting the in-focus blur instead: not
+  decided, not specified. Tests: the defaults' spec test (`test_config_defaults_and_outside_signatures`) and the smoke
+  test's T5 expect "fixed"; the checks that exercise the fitted slope ask for it (smoke `fit_cfg`, spec `toy_scfg`,
+  `_scfg`, the boundary recovery, the end-to-end default run with `--far-slope fit`); the end-to-end held-slope run
+  takes the default. `test_smoke_soma_fit.py` 9 pass, 1 skip; `test_smoke_config.py` 6 pass, 1 skip; the soma's
+  spec tests (Blocks 45, 46, the boundary 44-46, the entry point) 92 pass **[run, sandbox]**; the configuration's
+  signature hashes unchanged (`soma_fit` lies outside every signature).
 
 ### Block 47: the soma in the morphology -- the sphere of equal area and the stems' first nodes (D-215.2, D-216.3, D-222.5)
 
@@ -2237,7 +2251,7 @@ set, inside the table's configuration hash. Rerun: smoke `coarse_fit` 6, `soma_f
 | `python tests/smoke/test_smoke_soma_fit.py` [2026-11-22, D-220] | Block 46 checks: the area, the planes, the scales, recovery with a stand-in forward model, coverage, the fixed slope, masks, bounds, failure | none | 1 min |
 | `python tests/smoke/test_smoke_soma_morphology.py` [2026-11-23, wave 6] | Block 47 checks: the frames, the crossings, the corrected soma and stems, the walk and flags, the SWC editor, several somas, the reflection | none | 5 s |
 | `python tests/smoke/test_smoke_soma_fit_figures.py` [2026-11-23, wave 6] | Block 48 checks: the three figures' axes and PNGs, the arrays drawn, the contour's pixel convention, the residual's shared scale, no mutation, the refusals | none | 15 s |
-| `python scripts/fit_soma.py --specimen S [ALIGN] [--config-json CLEANING] [--soma-k K] [--far-slope fit|fixed] [--slope0 G] --out DIR` (Cell 25) [2026-11-23, wave 6; D-222.5] | Blocks 45-48's entry point: the traced soma's start (depth from --soma-k, else the traced depth), the crop (`soma_fit.region_radius_um` + `crop_margin_um`), the trace's mask (+ `mask_widen_um`), the fit, `soma_fit_<S>.json`, `_planes.png` (the fitted planes nearest `figure_planes_um` from the fitted centre), `_summary.png` (with SE(V) and SE(r_eq) by the delta method on the fit's covariance), `_morphology.png`, `reconstruction_soma_<S>.swc`; refuses a kernel continuation that is not "linear" (D-220.2) | `--synthetic`: the synthetic cell's trace over a known ellipsoid on a uniform background, noise 3 gl -- recovered to 0.007 um, S +0.17 % (1.6 SE), chi2/dof 9.07 [run, sandbox, 2026-11-23] | 2 min |
+| `python scripts/fit_soma.py --specimen S [ALIGN] [--config-json CLEANING] [--soma-k K] [--far-slope fit|fixed] [--slope0 G] --out DIR` (Cell 25) [2026-11-23, wave 6; D-222.5; 2026-11-24, D-240: `--far-slope` defaults to fixed, `fit` a labelled comparison only] | Blocks 45-48's entry point: the traced soma's start (depth from --soma-k, else the traced depth), the crop (`soma_fit.region_radius_um` + `crop_margin_um`), the trace's mask (+ `mask_widen_um`), the fit, `soma_fit_<S>.json`, `_planes.png` (the fitted planes nearest `figure_planes_um` from the fitted centre), `_summary.png` (with SE(V) and SE(r_eq) by the delta method on the fit's covariance), `_morphology.png`, `reconstruction_soma_<S>.swc`; refuses a kernel continuation that is not "linear" (D-220.2) | `--synthetic`: the synthetic cell's trace over a known ellipsoid on a uniform background, noise 3 gl -- recovered to 0.007 um, S +0.17 % (1.6 SE), chi2/dof 9.07 [run, sandbox, 2026-11-23] | 2 min |
 | `python scripts/clean_cell.py clean --no-clean [--pilot-diameter allen|free] [--sigma-r0-um S]`, `python scripts/clean_cell.py clear --d-bins ...` [2026-11-22, S4] | Block 36 amendments 14-17: the preparation without cleaning, the first stage's diameter rule, the in-focus width override, the clear nodes by diameter bin | `--synthetic` | 1-2 min |
 | `python scripts/infer_nodes.py real --weights ... [--bump-sd S] [--weight-kappa K]` [2026-11-22, S4] | Block 36 amendment 16: the per-node fit with Block 39's weights | `--synthetic` | 1-3 min a node |
 | `python scripts/infer_nodes.py real ... [--kernel gaussian\|sgt] [--sgt-skew off\|fit] [--cov-fine-factor N] [--nodes IDS] [--kernel-width fixed\|calibrated --sigma-json FILE]` (Cells 20, 26) [2026-11-23, wave 7] | Block 36 amendments 22-23 (D-224, D-225): the Gaussian fit with its error bars from the model at `cov_fine_factor`; under `sgt` the SGT fit from its estimate (Blocks 30 amendment 3, 49), the node's estimate, the Gaussian beside it; the width switch | `--synthetic` | the Gaussian stage with its p/32 error bars 68-93 s a synthetic node (10-33 s with `--cov-fine-factor 0`); with the SGT stage ($\zeta$ held) 351-499 s a node in all, the skew 769 s a node with the fit's own Jacobian (the pilot-run suite's fast configuration: partition, 4 x 8 directions, one start; 9 planes; this sandbox) [measured 2026-11-23, D-233: the final check's S1]; with Cell 26's settings (hybrid, 8 x 16 directions, starts 1.0 and 1.6, centre weights) on a 0.8 um synthetic node: the Gaussian fit 107 s, with its p/32 error bars 223 s, with the SGT stage 624 s (5.9 times the fit alone) [run, sandbox, 2026-11-23 18:19] |

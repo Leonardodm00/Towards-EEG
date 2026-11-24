@@ -539,7 +539,7 @@ class SomaFitConfig:
     plane_half_um: float = 10.0            # source: PROVISIONAL (D-219.4 [orchestrator]): the planes within this of the start depth (um)
     region_radius_um: float = 13.0         # source: PROVISIONAL (D-219.4 [orchestrator]): the fit's disk about the traced centre (um)
     mask_widen_um: float = 2.0             # source: PROVISIONAL (D-219.4 [orchestrator]): the caller's widening of Allen's trace mask (um; read by scripts/fit_soma.py)
-    far_slope: str = "fit"                 # source: D-218.1 [user]: the kernel's far slope fitted with the soma; "fixed" (D-218.2) holds it
+    far_slope: str = "fixed"               # source: D-240 [user] (supersedes D-218.1): the kernel's far slope held at slope0; "fit" only as a labelled comparison
     shift_xy_um: float = 4.0               # source: PROVISIONAL (D-219.4 [orchestrator]): the centre's in-plane bound about the traced centre (um)
     shift_z_um: float = 6.0                # source: PROVISIONAL (D-219.4 [orchestrator]): the centre's depth bound about the start depth (um)
     axis_bounds_um: Tuple[float, float] = (1.0, 15.0)        # source: PROVISIONAL (D-219.4 [orchestrator]): a, b, c (um)

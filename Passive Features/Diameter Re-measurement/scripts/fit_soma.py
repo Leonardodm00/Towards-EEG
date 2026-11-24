@@ -99,7 +99,8 @@ def main(argv=None):
     ap.add_argument("--soma-k", type=int, default=None, help="the start plane (the soma judged in focus, Cell 24); "
                     "default: the traced depth")
     ap.add_argument("--far-slope", choices=("fit", "fixed"), default=None,
-                    help="fit the kernel's far slope (D-218.1) or hold it at --slope0 (D-218.2); default soma_fit.far_slope")
+                    help="hold the kernel's far slope at --slope0 (D-240, the default: soma_fit.far_slope) or, as a "
+                         "labelled comparison only, fit it (D-218.1, superseded)")
     ap.add_argument("--slope0", type=float, default=None,
                     help="the far slope's start, or its held value (um/um); default renderer.kernel_continuation_slope")
     import kernel_width                                           # Block 36 amendment 22 (D-221.1, D-222.3)
