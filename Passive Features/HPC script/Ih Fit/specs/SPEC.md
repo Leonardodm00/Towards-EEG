@@ -961,6 +961,68 @@ the same quantity at the truth and compares them by a log ratio; it is reported,
 `dv_h` is not an axis of the arm and its absence does not fail the gate. The control row "gbar on its lower bound" is
 kept as defined.
 
+### 2.9 After run tw2: a local refinement, g_h on two decades, dv_h fitted again, the sweeps of one evaluation in parallel (D-234)
+
+Run `tw2` (Block 17, 35 twins) failed the gate; the loss at the truth was below the loss at the estimate in 14 of
+the 15 twins fitted with I_h, so the search stopped above a point it could reach (decision log D-234). The user's
+decisions of 2026-11-24 are stated here. Where 2.8 says the arm `ih5` is the I_h arm, the box of $\bar g_h$ is
+$[10^{-6}, 10^{-2}]$ or one core per twin, this section supersedes it.
+
+**(a) Parameters and boxes.** A new arm `ih6_d207`: the six parameters
+$(C_m, R_m, R_a, \bar g_h, \Delta v_h, \kappa_\tau)$, in the code's names `("Cm","Rm","Ra","gbar","dv_h","kappa_tau")`,
+under the protocol of 2.8 (b)-(d) (roles `d207`, step weight `ls_amplitude`, sample weight `peak_decay`).
+$\Delta v_h$ (mV) shifts the half-activation voltage: $m_\infty(v) = 1/(1 + e^{(v - v_h - \Delta v_h)/k})$ for each
+fixed $v$, as `param_spec` already applies `dv_h`; its box is $[-10, 10]$ mV, linear axis (D-005). The arm `ih5`
+(2.8 (a), $\Delta v_h = 0$) is kept. The default box of $\bar g_h$ is $[10^{-5}, 10^{-3}]$ S/cm$^2$, log scale, for
+every arm. The boxes of $C_m$, $R_m$, $R_a$ and $\tau_h^{\rm pk}$ (2.8 (a)) are unchanged.
+
+**(b) The local refinement; name `nelder_mead`.** Notation: $p$ the number of fitted parameters; $q \in \mathbb{R}^p$
+the optimiser's coordinates (`param_spec`: $q_i = \ln \theta_i$ for a log axis, $q_i = \theta_i$ for a linear one);
+the box $B = \prod_{i=1}^{p} [q_i^{\rm lo}, q_i^{\rm hi}]$; the unit coordinates
+$u_i(q) = (q_i - q_i^{\rm lo})/(q_i^{\rm hi} - q_i^{\rm lo}) \in [0, 1]$; $L(q)$ the training loss the global search
+minimises (2.8 (c), (d)); $(q^{(j)}, L_j)$, $j = 1, \dots, N$, the global search's evaluations in the order made
+(`x_iters`, `func_vals` of the result of `skopt.gp_minimize`).
+
+*Starts.* Order the evaluations by increasing $L_j$, ties by increasing $j$; evaluations with $L_j \ge 10^6$ (the
+loss's penalty) or non-finite $L_j$ are left out. The first start $s_1$ is the first of the order; $s_k$ is the next
+of the order whose distance $\max_i \lvert u_i(q^{(j)}) - u_i(s_{k'})\rvert$ from every start $s_{k'}$ already chosen
+is at least $d_{\min} = 0.1$; at most $n_{\rm starts} = 3$ starts, fewer when no further evaluation qualifies, none
+when every evaluation is left out.
+
+*One start.* From $s_k$: `scipy.optimize.minimize(f, u(s_k), method="Nelder-Mead", bounds=[(0, 1)] * p, options=...)`
+on $f(u) = L(q(u))$, with `initial_simplex` the $p + 1$ points $u(s_k)$ and $u(s_k) + \delta_i e_i$ ($e_i$ the $i$-th
+unit vector; $\delta_i = +0.05$ if $u_i(s_k) + 0.05 \le 1$, else $-0.05$), `maxfev = 100`, `xatol = 1e-3` (unit
+coordinates), `fatol = 1e-4 * L(s_k)` (scipy's `fatol` is absolute; this makes it relative to the start's loss),
+`adaptive = False`. Every evaluation $f(u)$ scipy makes is recorded with its point (scipy may exceed `maxfev` by the
+evaluations of the iteration in progress: the count recorded is the count made).
+
+*Estimate.* $\hat q$ is the point of lowest loss among the global search's evaluations and every recorded local
+evaluation (ties: the global search's point, then the earlier start, then the earlier evaluation). `improved` is true
+when a local evaluation is strictly lower than $\min_j L_j$. With no start the estimate is the global search's.
+The refinement applies to the Phase-2 fit of each cell only (not to bootstrap or Phase-3 refits).
+
+**(c) The sweeps of one evaluation in parallel.** $L(q)$ of 2.8 (c) is a fixed combination of the pairs
+$(\mathrm{RMSD}_b(q), D_b(q))$ over the training bundles $b$, each computed by simulating bundle $b$ on the cell at
+$q$. With `n_workers` $= W > 1$ the pairs are computed by $W$ worker processes, each holding its own copy of the cell
+(made by `fork` after the loss is built), each applying $q$ to its copy before simulating; the parent applies $q$ to
+its own cell too (the serial code's side effect) and combines the pairs in the bundles' order by the serial code's
+arithmetic. Requirement: for every $q \in B$ and every $W \ge 1$, $L_W(q) = L_1(q)$ exactly (equal float64), penalties
+included. $W = 1$ is the serial code, unchanged.
+
+**(d) The twins.** The run's I_h arm is `ih6_d207` (default) or `ih5`. With `ih6_d207` the truth of $\Delta v_h$ of a
+twin with I_h is drawn uniformly in $[-5, 5]$ mV by the existing drawer (`ih_dvh_range_mV`), and a `full_no_noise`
+twin copies its partner's; with `ih5` it is 0 (2.8 (e)). A twin without I_h (`active_fit`) has
+$\bar g_h = 10^{-5}$ S/cm$^2$ (`gbar_floor`, the box's lower bound) and $\Delta v_h = 0$. The truths of $\bar g_h$
+(log-uniform in $[2 \times 10^{-5}, 3 \times 10^{-4}]$ S/cm$^2$) and of $\tau_h^{\rm pk}$ (2.8 (e)) are unchanged.
+
+**(e) What a fit records.** Besides 2.8 (f): the refinement's name; $\min_j L_j$ (`loss_after_search`); $L(\hat q)$
+(`loss_after_refine`; equal to `loss_after_search` when not improved or not refined); `refine_improved`; the number of
+starts, the number of local evaluations, the start that gave the estimate ($-1$ when the global search's point is
+kept); `n_workers`.
+
+**(f) The gate.** On the run's I_h arm. `ih6_d207`: $C_m$, $\bar g_h$, $\Delta v_h$ (absolute error in mV, D-011's 3
+mV), $\kappa_\tau$ and the two control rows at D-011's tolerances. `ih5`: 2.8 (g).
+
 ## 3. Data contracts
 
 | Item | Source / format | Shape and axis order | dtype | Units | Conventions |
@@ -1440,6 +1502,198 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Confirmed: yes -- D-204, D-206 to D-209 (user); the report's layout is the orchestrator's.
 - As built [orchestrator, accepted at the gate]: `loss_verdict` compares with 2 % of the other loss; `recovery_extras.csv` for `passive_fit` has the truths filled and the estimates NaN, for `active_fit` the I_h truths NaN; an unknown name in `required_axes` raises; TS8 and TS14 are one check; a run planned by Block 8's code (run `tw1`) cannot be continued or re-merged by this code; the fit's command line carries `--tau-h-pk-bounds-ms` in place of `--kappa-bounds`.
 - Status: smoke-tested 2026-11-22 (sandbox: `smoke_twin_recovery.py` 13 pass, 2 skip, implementer and orchestrator; `smoke_ih_recovery.py` R1-R14; four planted defects caught; commit `fad47f5`, merged `a4b4298`). Not run here: PBS, the real cohort, full-size fits. [2026-11-22, after the final check (report `specs/test_reports/2026-11-22_1554_incremental.md`: PASS WITH ISSUES, two NOTEs) and amendment 3: 14 pass, 2 skip; the tester's spec tests 255 passed, 2 skipped (real data); every twins' suite re-run on the merged branch exits 0; commit `577b375`, merged `dbbcc06`.]
+
+### Block 19: the sweeps of one loss evaluation in parallel (2.9 (c))
+
+- Purpose: a pool of worker processes for `build_multi_protocol_loss`, exact against the serial loss.
+- Module: `passive_long_step_training.py`; smoke `smoke_ls_pool.py` (new).
+- Public API:
+  - `build_multi_protocol_loss(..., n_workers: int = 1)`: with `n_workers == 1` the code path and the returned
+    values are today's. With `n_workers > 1` the returned `loss(*q)` computes the pairs of 2.9 (c) in
+    `min(n_workers, number of training bundles)` processes of a `multiprocessing.get_context("fork")` pool, created
+    at the FIRST call of that loss (so the workers inherit the cell as it is then) and reused by later calls; one
+    task per bundle (`chunksize=1`), results in the bundles' order. The parent calls `spec.apply_q(cell, q, v_rest_mV)`
+    at every evaluation. A non-finite RMSD, or any exception in a worker other than a dt-enforcement failure, gives
+    1e6 as now; a `DtEnforcementError` raised in a worker (matched by class name) is raised in the parent as an
+    exception whose class name is `DtEnforcementError`. `n_workers < 1` or non-integer: ValueError at build time.
+  - The returned loss carries `loss.n_workers` (int, the value asked) and `loss.close()` (terminates the pool if
+    one was created; idempotent; a later call of the loss creates a new pool); the pool is also terminated when the
+    loss is garbage-collected and at interpreter exit. For `n_workers == 1` both exist and `close()` does nothing.
+  - `integrate_long_step(..., n_workers: int = 1)`: passed to the loss the patched `mono._build_loss_function`
+    builds; validated as above.
+- Inputs / outputs: as today; `loss(*q) -> float` (dimensionless under `relative`/`ls_amplitude`).
+- Parameters: `n_workers` (processes), default 1.
+- Library calls: `multiprocessing` (standard library), fork context.
+- Custom code: none.
+- Test oracles (`smoke_ls_pool.py`, on the fixture cell and bundles the existing smokes use; NEURON): W1 for at
+  least 8 points $q$ spread over the box of the six-parameter spec (including two on its faces), for
+  weighting `ls_amplitude` with `peak_decay` and for `relative` with `none`: `loss_2(q) == loss_1(q)` with `==`
+  on float64, and the same for `n_workers=3` (more workers than cores is allowed). W2 after `loss_W(q)` the parent
+  cell is at $q$: a serial loss evaluated on it right after at the same $q$ gives the same value and
+  `spec`-applied quantities read back from the cell (cm, g_pas, gbar of one section) equal those after `loss_1(q)`.
+  W3 the worker processes are distinct from the parent (pids) and at most `min(n_workers, n_bundles)`; after
+  `close()` no child process of the pool is alive; `close()` twice is harmless; a call after `close()` works and
+  equals the serial value. W4 a bundle whose simulation returns a non-finite RMSD gives 1e6 for every W (inject with a
+  bundle whose recorded trace holds a NaN in the window, or by the means the existing smokes use). W5 a
+  `DtEnforcementError` raised in a worker reaches the caller with that class name (inject by monkeypatching, before
+  the first call, the function the workers call). W6 `n_workers=0`, `-1`, `1.5` raise ValueError; W7 through
+  `integrate_long_step(mono, ..., n_workers=2)` the loss `mono._build_loss_function` returns has `n_workers == 2`
+  and equals the serial one at 3 points. W8 wall time of 5 evaluations with W=2 against W=1, REPORTED (not
+  asserted: the sandbox has 2 cores). W9 `smoke_ls_protocol.py` still 9/9. W10 ASCII/LF.
+- Data flow: Block 20 passes `n_workers` to `integrate_long_step` and calls `close()` on losses it builds itself.
+- Confirmed: yes -- D-234 (user: "the sweeps of one evaluation"). Fork, the lazy pool and `close()` are the
+  orchestrator's.
+- Status: drafted
+
+### Block 20: the local refinement, the arm `ih6_d207`, the new box of gbar (2.9 (a), (b), (e))
+
+- Purpose: the refinement of 2.9 (b) as a pure module, and its use by the fit; the six-parameter arm under the
+  protocol of 2.8; `--n-workers`.
+- Module: `local_refine.py` (new; no NEURON, no file I/O), `run_ih_fit.py`, `param_spec.py`
+  (`DEFAULT_GBAR_BOUNDS` only); smokes `smoke_local_refine.py` (new), `smoke_ih_refine.py` (new); `smoke_ih5.py` and
+  `smoke_ih_fit.py` adapted only where a changed default makes an existing assertion false (say which).
+- Public API (`local_refine.py`; signatures in the stub committed with the contract):
+  - `RefineConfig` (frozen dataclass): `n_starts=3`, `maxfev_per_start=100`, `min_start_dist_unit=0.1`,
+    `simplex_step_unit=0.05`, `xatol_unit=1e-3`, `fatol_rel=1e-4`, `penalty=1e6`; validated in `__post_init__`.
+  - `select_starts(x_iters, func_vals, bounds, cfg) -> List[int]`: the indices $j$ (0-based) of the starts of 2.9 (b).
+  - `refine(objective, x_iters, func_vals, bounds, cfg) -> RefineResult`: `objective(x: List[float]) -> float` takes
+    $q$ as a list of $p$ floats; `x_iters` (N, p) and `func_vals` (N,) the global evaluations; `bounds` a list of
+    $p$ pairs `(lo, hi)` in $q$. `RefineResult`: `x` (list of p floats, $\hat q$), `fun` (float), `improved` (bool),
+    `x_search`, `fun_search` (the global best), `best_start` (int, 0-based position among the starts, -1 when not
+    improved), `n_evals` (int, local evaluations made), `starts` (list of dicts: `index`, `x0`, `f0`, `x`, `fun`
+    (the lowest recorded of that start), `nfev`, `nit`, `status`, `message`), `x_evals` float64 (n_evals, p) in $q$,
+    `f_evals` float64 (n_evals,), `start_of_eval` int64 (n_evals,).
+  - `wrap_minimizer(minimizer, cfg) -> callable`: a function with `skopt.gp_minimize`'s call form
+    `(func, dimensions, **kwargs)` that calls `minimizer`, runs `refine` on `func` with the result's `x_iters`,
+    `func_vals` and the bounds of `dimensions` (each a `skopt.space.Real` in $q$; any other dimension type:
+    ValueError), and returns the SAME result object with `x` and `fun` set to $\hat q$ and $L(\hat q)$ and the new
+    attribute `refine` (the `RefineResult`); `x_iters`, `func_vals`, `models` and `space` untouched.
+- Public API (`run_ih_fit.py`):
+  - `ArmConfig` gains `refine: str`. `ARMS["ih6_d207"]`: `ih6` with `role_rule="d207"`, `weighting="ls_amplitude"`,
+    `ls_sample_weight="peak_decay"`, `refine="nelder_mead"`. `ih5` and `passive_fullstep`: `refine="nelder_mead"`.
+    `ih6` and `baseline_runB`: `refine="none"` (the labelled comparisons, unchanged).
+  - CLI: `--refine {none,nelder_mead}` (default None = the arm's), `--refine-starts` (3), `--refine-maxfev` (100),
+    `--n-workers` (1; passed to `integrate_long_step`); `--gbar-bounds` default `1e-5,1e-3` and
+    `param_spec.DEFAULT_GBAR_BOUNDS = (1e-5, 1e-3)`; `--arm` accepts `ih6_d207`; `--eval-theta` for it names the six.
+  - The fit: for the Phase-2 fit of each cell, with refinement on, `mono.gp_minimize` is replaced by
+    `local_refine.wrap_minimizer(<the original>, cfg)` around the call of `mono.fit_one_cell` and restored after it
+    (also on an exception), so every quantity `fit_one_cell` derives (the estimate, the validation RMSDs, the
+    status) is at $\hat q$. The monolith `passive_fitting_hpc_fixed.py` is not edited. Losses built by
+    `run_ih_fit.py` itself (`_loss_at`, the liveness check) are closed after use (`close()`, Block 19).
+- Outputs: `phase2_results.csv` gains, after the existing columns: `refine` (str), `loss_after_search`,
+  `loss_after_refine` (float; NaN for a failed fit), `refine_improved` (bool), `refine_n_starts`, `refine_n_evals`,
+  `refine_best_start` (int), `n_workers` (int). With refinement off: `refine="none"`, `loss_after_refine` =
+  `loss_after_search` = the search's best, `refine_improved=False`, 0, 0, -1. `train_rel_loss` and
+  `loss_at_estimate` are at $\hat q$. New file `refine_starts.csv` in the output directory: one row per cell and
+  start (`specimen_id`, `start`, `search_index`, `f0`, `fun`, `nfev`, `nit`, `status`, then `x0_<name>` and
+  `x_<name>` in PHYSICAL units for each fitted name); written with its header even when empty.
+- Library calls: `scipy.optimize.minimize(method="Nelder-Mead")`; `skopt` as today.
+- Custom code: the selection of the starts and the bookkeeping only. Custom: scipy offers no multi-start from a
+  list of evaluated points. Checked: `scipy.optimize.minimize`, `basinhopping`, `shgo`, `dual_annealing`,
+  `differential_evolution(polish=True)`.
+- Test oracles (`smoke_local_refine.py`, pure): R1 on $f(q) = \sum_i (q_i - c_i)^2$ in $p = 5$ with $c$ inside the
+  box and 30 random evaluations, `refine` returns `fun` < 1e-6 x the search's best and
+  $\max_i \lvert u_i(\hat q) - u_i(c)\rvert < 5 \times 10^{-3}$ within the 3 x 100 evaluations (report the numbers; if
+  100 evaluations cannot reach it in 5-D, STOP with an ISSUE giving the reached values). R2 with $c$ outside the box
+  along one axis the estimate lies on that face (within 1e-9) and never leaves the box (every recorded point checked).
+  R3 `select_starts` against a brute-force re-implementation on 200 random draws, and hand cases: ties by index;
+  penalised and non-finite left out; fewer than 3 when the points are closer than 0.1; none when all are penalised.
+  R4 the initial simplex: the first $p + 1$ recorded points of a start are those of 2.9 (b), including a start on the
+  upper face (the step flips). R5 `n_evals == len(f_evals) == sum(nfev)` and equals a counter wrapped around the
+  objective; `fun == min(min f_evals, min func_vals)`; not improved when the search's best is the exact minimum
+  (`improved False`, `best_start -1`, `x == x_search`). R6 a two-basin function with the search's best in the
+  shallow basin and its third-best, more than 0.1 away, in the deep one: the estimate is in the deep basin and
+  `best_start` names that start. R7 an objective returning 1e6 everywhere off a small region: no crash, the
+  estimate is the search's. R8 `wrap_minimizer` around a fake minimizer returning a canned result: the returned
+  object is the same object, `x`/`fun` replaced, `x_iters`/`func_vals` equal to the canned ones, `refine` attached;
+  with `skopt.gp_minimize` on the R1 function (20 calls): runs, `fun` not above the search's. R9 determinism: two
+  calls give identical `x_evals`. R10 `RefineConfig` refusals. (`smoke_ih_refine.py`, NEURON, fixture): F1 the arm
+  table: each arm's names, protocol and `refine`; overrides. F2 a fit `--arm ih6_d207 --n-calls 8 --n-initial 4
+  --refine-maxfev 12 --refine-starts 2` on the noise-free fixture archive built at a known truth: runs; six names;
+  `ls_roles.csv` follows `d207`; the new columns present; `loss_after_refine <= loss_after_search`;
+  `loss_at_estimate == train_rel_loss == loss_after_refine` (1e-9 relative); `refine_starts.csv` has 2 rows or
+  fewer with finite entries; `mono.gp_minimize` is the original object after the fit. F3 the same fit with
+  `--refine none` reproduces, in every pre-existing column, the same command at the contract commit run with the same
+  options (the search is untouched by the code change). F4 the same fit with `--n-workers 2` gives the same
+  `phase2_results.csv` as `--n-workers 1` in every column but `n_workers` and the wall time (this needs Block 19:
+  see the brief). F5 `--eval-theta` with the six names at the fixture's truth: finite, and below the loss at the
+  truth with `dv_h` moved by 5 mV. F6 the default box of gbar is (1e-5, 1e-3) in the spec and the run header.
+  F7 ASCII/LF.
+- Data flow: consumes Block 19's `n_workers` and `close()`; Block 22 builds the command line and reads the columns.
+- Confirmed: yes -- D-234 (user: Nelder-Mead from the best 3 points, at most 100 evaluations each; the box; dv_h
+  fitted again). The distance rule between starts, the simplex step, the two tolerances, wrapping `mono.gp_minimize`
+  and the refinement of `passive_fullstep` are the orchestrator's (decision log, tagged [orchestrator]).
+- Status: drafted
+
+### Block 21: the manifest with the run's I_h arm (2.9 (d))
+
+- Purpose: the `arm` column and the truth of dv_h follow the run's I_h arm.
+- Module: `twin_manifest.py`; smoke `smoke_twin_manifest.py` (extended).
+- Public API:
+  - `IH_ARMS = ("ih5", "ih6_d207")`; `arm_of(configuration: str, ih_arm: str) -> str`: `passive_fit` ->
+    `"passive_fullstep"`, every other configuration -> `ih_arm`; unknown names: ValueError. `ARM_OF` stays as it is
+    (the `ih5` table), for the code that reads it.
+  - `draw_twin_manifest(..., ih_arm: str = "ih6_d207", dvh_truth_mV: Optional[float] = None, ...)`: the `arm` column
+    is `arm_of(configuration, ih_arm)`. `dvh_truth_mV=None` keeps the drawer's values in the rows with I_h (drawn
+    when `truth_kwargs` carries `ih_dvh_range_mV`, else 0); a float sets it in every row with I_h, as today. With
+    `ih_arm="ih5"` a row with I_h whose dv_h truth is not 0 is refused (ValueError naming the option): that arm's
+    model cannot hold it. A row without I_h has dv_h 0 whatever the options. `full_no_noise` rows copy their
+    partner's truths, dv_h included. Everything else (ids, seeds, cells drawn, columns, dtypes, refusals) unchanged:
+    with `ih_arm="ih5", dvh_truth_mV=0.0` the manifest equals the contract commit's, cell for cell.
+- Custom code: none.
+- Test oracles: M1 `ih_arm="ih5", dvh_truth_mV=0.0` reproduces the contract commit's manifest exactly (same seed and
+  cells; compare with `pandas.testing.assert_frame_equal`). M2 default arguments with
+  `truth_kwargs["ih_dvh_range_mV"] = (-5, 5)`: `arm` is `ih6_d207` in `full`, `active_fit`, `full_no_noise` and
+  `passive_fullstep` in `passive_fit`; dv_h truths of the rows with I_h lie in [-5, 5], are not all equal, and equal
+  what `synth_gt_grid.draw_manifest` returns for the same seeds; `active_fit` rows: dv_h 0 and gbar = the floor
+  given; each `full_no_noise` row equals its partner in every truth column. M3 `ih_arm="ih5"` with the range given
+  and `dvh_truth_mV=None`: ValueError. M4 unknown `ih_arm`: ValueError; `arm_of` table. M5 save/load round trip of
+  the new manifest. M6 the existing 13 checks still pass (adapted only where the default arm changes an assertion:
+  say which). M7 ASCII/LF.
+- Data flow: Block 22 calls `draw_twin_manifest` and `arm_of`.
+- Confirmed: yes -- D-234; the truths' range of dv_h (the user's go of 2026-11-24 to the default "as in tw1").
+- Status: drafted
+
+### Block 22: the third Stage-7 run -- the I_h arm as an option, the refinement and the workers passed to the fit
+
+- Purpose: `run_twin_recovery.py`, its submitter and the report follow 2.9.
+- Module: `run_twin_recovery.py`, `submit_twin_recovery.sh`, `ih_recovery_report.py` (only if the gate's call needs
+  it); smoke `smoke_twin_recovery.py` (extended).
+- Public API:
+  - `plan`: `--ih-arm {ih5,ih6_d207}` (default `ih6_d207`); `--dvh-truth-range-mV LO,HI` (default `-5,5`; used with
+    `ih6_d207`: passed as `ih_dvh_range_mV` with `dvh_truth_mV=None`; with `ih5`: no range, `dvh_truth_mV=0.0`);
+    `--gbar-bounds` default `1e-5,1e-3`; `--gbar-floor` default `1e-5`; `--refine {none,nelder_mead}` (default
+    `nelder_mead`), `--refine-starts` (3), `--refine-maxfev` (100): fit options, recorded in the plan and passed by
+    `fit_argv`. The plan is refused when the floor lies outside the gbar box or the truth range of dv_h outside the
+    dv_h box. The arm of each twin is the manifest's `arm` column; `GATE_ARM` and `GATE_REQUIRED_AXES` become
+    functions of the plan's `ih_arm` (2.9 (f)) and are recorded in the run's config as today.
+  - `twin`: `--n-workers N` (default 1), passed to the fit as `--n-workers`; it is NOT a plan option (changing it
+    never invalidates a plan or a finished twin). `eval_theta_of` gives the six names for `ih6_d207`.
+  - `merge`: the three reports on the run's gate arm; `recovery_extras.csv` gains `loss_after_search`,
+    `refine_improved`, `refine_n_evals`, `refine_best_start` (from the fit's columns) and, for a twin fitted with
+    `dv_h`, `dvh_true_mV`, `dvh_est_mV`; `g_h(v*)` at the truth and at the estimate each with its own dv_h.
+  - `submit_twin_recovery.sh`: `NCPUS` default 3 (was 1); the twin job runs `twin ... --n-workers $TWIN_NCPUS`;
+    `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS` are 1 in the twin job whatever `NCPUS` (the
+    workers are forked processes; threaded linear algebra in a forked child can hang); the 120-core cap (D-185)
+    unchanged; `PLAN_ARGS` carries `--ih-arm` when the user wants `ih5`.
+- Custom code: none.
+- Test oracles (`smoke_twin_recovery.py`): the existing checks, adapted to the new defaults (say which), plus: T1
+  `plan` with defaults: the manifest's arms and dv_h truths as Block 21's M2; the config records `ih_arm`, the gate
+  arm `ih6_d207` and the required axes `Cm, gbar, dv_h, kappa_tau`. T2 `plan --ih-arm ih5`: the arms, dv_h 0, gate
+  axes `Cm, gbar, kappa_tau`. T3 `fit_argv` carries `--refine`, `--refine-starts`, `--refine-maxfev`,
+  `--gbar-bounds=1e-5,1e-3` and is accepted by `run_ih_fit._parse_args`; with `n_workers=2` the twin's command
+  carries `--n-workers 2`; re-running `twin` with another `--n-workers` on a finished twin does not refit. T4 the
+  refusals of the floor and of the dv_h range. T5 `eval_theta_of` for an `ih6_d207` twin names the six, with the
+  manifest's dv_h. T6 merge on synthetic result frames for `ih6_d207` (built as the existing merge tests build
+  them): the gate's verdict requires dv_h (a frame with dv_h off by 5 mV fails; within 1 mV passes), and the new
+  columns of `recovery_extras.csv` are filled. T7 the submitter's dry run with `NCPUS=3`: the twin command carries
+  `--n-workers 3`, the core count is N x 3 against the cap, and the three thread variables are 1 in the job's
+  environment text. T8 `bash -n`; ASCII/LF. The NEURON end-to-end checks that exist stay, with
+  `--refine-maxfev` small.
+- Data flow: consumes Block 20's CLI and columns and Block 21's API (contract: their Public API above).
+- Confirmed: yes -- D-234 and the user's go of 2026-11-24 (dv_h truths in +-5 mV, 3 cores per twin for a full run).
+  The thread variables at 1 are the orchestrator's.
+- Status: drafted
 
 ## 6. Pipeline entry points
 
