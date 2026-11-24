@@ -293,6 +293,7 @@ the "Binds" column.
 | 2026-11-24 (the defocus-table chat, 16:50) | No decision changed. The status lines of **D-174** and **D-178** brought in step with the row of 2026-11-18 (later, 25): implemented at `513ad9e` (they still said "not implemented"; evidence: `MeasureConfig.pilot_diameter` = "allen" in `config.py` at `7b4a9ab`). Kernel calibration step 2 (roadmap NS1, theory T10): not started; its implementation handoff `Passive Features/Diameter Re-measurement/docs/TEEG_kernel_calibration_step2_implementation_handoff_2026-11-24.md` on `sci/diameter-pipeline` (`786977b`). Next free IDs: D-241, I-007. |
 | 2026-11-24 (the gallery chat, 17:40) | Logs **D-241** (user, 17:32): the soma fit's region of Allen's soma radius, only the branches' pixels masked. Next free IDs: D-242, I-007. |
 | 2026-11-24 (the gallery chat, 17:41) | Logs **D-242** (user, 17:32): the SGT dropped from the node fit, the Gaussian the only kernel. Next free IDs: D-243, I-007. |
+| 2026-11-24 (the gallery chat, 17:58) | Logs **D-243** (orchestrator): the soma fit's crop sized for the renderer (at least 14 um half-width), correcting D-241.1's crop sentence; the region of D-241 unchanged. Next free IDs: D-244, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -523,6 +524,7 @@ would be needed*, *Status*.
 | D-240 | 2026-11-24 | SPEC Block 46 (`soma_fit.far_slope`), `fit_soma.py --far-slope`, notebook Cell 25; supersedes D-218.1 | the soma fit holds the far slope (default "fixed", "fit" a labelled comparison only); only the in-focus blur might be fitted, not decided [user] | active |
 | D-241 | 2026-11-24 | SPEC Block 46 (`soma_fit.region_radius_um`, `mask_widen_um`), `fit_soma.py`, notebook Cell 25; supersedes D-219.4's disc and the +2 um widening | the soma fit's region: a disc of Allen's soma radius; only the pixels under the traced branches left out, the processes otherwise kept in the data [user] | active |
 | D-242 | 2026-11-24 | the node fit's SGT option (Blocks 49, 30 am. 3, 36 am. 22-23; Cells 26, 26 (b)); supersedes D-221's SGT option, D-222.1-2 | the node fit renders and fits with the Gaussian only; the SGT dropped (cells removed now, code removed in the next chat) [user] | active |
+| D-243 | 2026-11-24 | SPEC Block 46 (`soma_fit.render_half_um`), `fit_soma.py` (crop, `crop.half_um`, `crop.ellipsoid_inside`), Cell 25 text; corrects D-241.1's crop sentence | the soma fit's crop is the renderer's support: max(14 um, region radius + 1 um); the record flags a fitted ellipsoid beyond it [orchestrator] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15525,3 +15527,43 @@ thin nodes would answer it).
 **Sources.** **[user]** 2026-11-24 17:32. **[run, sandbox]** the checks above. **[data]** the user's Cell 26 upload.
 
 **Status:** active; supersedes D-221's SGT option and D-222.1-2.
+
+## D-243 -- The soma fit's crop is the renderer's support: at least 14 um half-width, whatever the region (orchestrator)
+
+**Date:** 2026-11-24, the gallery chat, while applying D-241. **Binds:** SPEC Block 46 (amendment D-243),
+`SomaFitConfig.render_half_um`, `scripts/fit_soma.py` (the crop, the JSON's `crop.half_um` and
+`crop.ellipsoid_inside`), the notebook's Cell 25 text; corrects the crop sentence of D-241.1 ("The crop is that
+radius plus `crop_margin_um`"), which was the orchestrator's implementation note, not the user's decision.
+
+**Decision [orchestrator].** The crop on which the soma's model is drawn is sized for the model, not for the region:
+its half-width is max(`render_half_um`, region radius + `crop_margin_um`) about the traced centre, `render_half_um`
+14.0 um (PROVISIONAL). The region R stays as D-241 sets it.
+
+**Statement.** (D-243.1) Block 45 renders the ellipsoid on the crop's samples alone (no padding; zero absorption
+outside the crop, FFT on a zero-padded box), so the part of the ellipsoid outside the crop is missing from every
+rendered plane, and on defocused planes its blurred shadow is missing from the region's pixels as well. Under D-241.1
+as first implemented the crop's half-width was the traced radius + 1 um (6.97 um on the pilot), smaller than the
+ellipsoids the fit explores (the pilot's free-slope fit: a = 8.08 um, centre 0.6 um off). (D-243.2)
+`soma_fit.render_half_um` 14.0 um (finite, > 0): the crop before D-241 (13 um disc + 1 um margin), the size of the
+pilot's 48-min Colab run. (D-243.3) The record's `crop.half_um` (the half-width used) and `crop.ellipsoid_inside`:
+True when max(|x0 - x_c|, |y0 - y_c|) + max(a, b) <= half_um (x_c, y_c the traced centre; conservative, convention-free
+in phi), None when the fit failed; False is logged as a warning (raise `render_half_um`).
+
+**Why.** **[code read: `model/soma_render.py`, its docstring and `render`]** the renderer's support is the crop.
+**[data: the pilot's `soma_fit_529878215.json`]** a = 8.08 um against a crop half of 6.97 um under the first
+implementation. **[own reasoning]** the region decides which pixels are compared, the crop what the model can draw;
+the two were tied only because the region used to be larger than the soma.
+
+**What it implies for code and tables.** `SomaFitConfig.render_half_um` (validated); `fit_soma.py`: the crop rule,
+the warning, the two JSON fields; SPEC Block 46 amendment, D-241's amendment marked corrected; tests: the defaults'
+spec test expects 14.0, the validation refuses 0 and inf, the end-to-end default run checks the crop rule and
+`ellipsoid_inside` True on the synthetic soma; the notebook's Cell 25 says so. The run time on the pilot returns to
+that of the pre-D-241 crop.
+
+**What it does not decide.** Whether 14 um is enough for a soma larger than the pilot's (the flag will say); the
+blurred shadows of structures outside the crop (other cells, processes), which stay unmodelled as before.
+
+**Sources.** **[code read]** `soma_render.py`. **[data]** the pilot's JSON of 2026-11-24 14:15. **[run, sandbox]** the
+suites listed in `docs/TEEG_soma_fit_handoff_2026-11-24.md`, section 7.
+
+**Status:** active; corrects D-241.1's crop sentence (D-241's region and mask stand).
