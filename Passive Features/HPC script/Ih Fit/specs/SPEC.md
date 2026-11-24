@@ -1521,6 +1521,8 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
     loss is garbage-collected and at interpreter exit. For `n_workers == 1` both exist and `close()` does nothing.
   - `integrate_long_step(..., n_workers: int = 1)`: passed to the loss the patched `mono._build_loss_function`
     builds; validated as above.
+  - One live pool per process [amendment 2, D-236]: before a loss creates its pool, the live pool of any OTHER loss of this module is closed (as `close()` does; that loss creates a new pool at its next call). Reason: a pool keeps a manager thread in the parent, and a `fork` made while another thread runs can deadlock the child (Python 3.12 warns "process is multi-threaded, use of fork() may lead to deadlocks"); the fit keeps its loss alive (the optimiser's result holds it) while `run_ih_fit.py` builds further losses, so the callers cannot be relied on to close in time.
+  - As built [orchestrator, accepted at the gate]: the pool is `concurrent.futures.ProcessPoolExecutor` on the fork context (a `multiprocessing.Pool` hangs when a worker dies); a worker that dies raises `BrokenProcessPool` in the parent, never 1e6; every bundle is computed even when an earlier one fails, the outcome decided in the bundles' order; `n_workers` must be an integer that is not a bool; with no training bundle no pool is made.
 - Inputs / outputs: as today; `loss(*q) -> float` (dimensionless under `relative`/`ls_amplitude`).
 - Parameters: `n_workers` (processes), default 1.
 - Library calls: `multiprocessing` (standard library), fork context.
@@ -1539,7 +1541,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   the first call, the function the workers call). W6 `n_workers=0`, `-1`, `1.5` raise ValueError; W7 through
   `integrate_long_step(mono, ..., n_workers=2)` the loss `mono._build_loss_function` returns has `n_workers == 2`
   and equals the serial one at 3 points. W8 wall time of 5 evaluations with W=2 against W=1, REPORTED (not
-  asserted: the sandbox has 2 cores). W9 `smoke_ls_protocol.py` still 9/9. W10 ASCII/LF.
+  asserted: the sandbox has 2 cores). W9 `smoke_ls_protocol.py` still 9/9. W10 ASCII/LF. W13 [amendment 2] two losses with `n_workers=2` on the same cell (different bundle subsets), evaluated alternately 3 times each with `warnings.simplefilter("error")`: every value equals its serial loss, no warning is raised, and after each call the parent has at most `min(2, n_bundles)` live worker children (one pool).
 - Data flow: Block 20 passes `n_workers` to `integrate_long_step` and calls `close()` on losses it builds itself.
 - Confirmed: yes -- D-234 (user: "the sweeps of one evaluation"). Fork, the lazy pool and `close()` are the
   orchestrator's.
