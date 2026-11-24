@@ -40,6 +40,30 @@ What it adds over run_biological_fit.py
    gh_at_v_deepest_S_cm2 = gbar x m_inf(v*). --tau-h-pk-bounds-ms gives the
    box of kappa_tau in ms.
 
+     ih6_d207          SPEC 2.9 (a), D-234: the six parameters of ih6
+                       (dv_h fitted again, box [-10, 10] mV, linear) on the
+                       protocol of ih5 (d207, ls_amplitude, peak_decay).
+
+   THE LOCAL REFINEMENT (SPEC 2.9 (b), Block 20). On ih5, ih6_d207 and
+   passive_fullstep (`refine="nelder_mead"`; ih6 and baseline_runB: "none")
+   the Phase-2 fit of each cell ends with bounded Nelder-Mead searches from
+   the best points of the global search (local_refine.py). It is applied by
+   replacing `mono.gp_minimize` with `local_refine.wrap_minimizer(<the
+   original>)` around the call of `mono.fit_one_cell` only, restored after it
+   (also on an exception), so everything fit_one_cell derives is at the
+   refined estimate; the monolith is not edited. --refine / --refine-starts /
+   --refine-maxfev override it. phase2_results.csv gains refine,
+   loss_after_search, loss_after_refine, refine_improved, refine_n_starts,
+   refine_n_evals, refine_best_start and n_workers; refine_starts.csv has
+   one row per cell and start. --n-workers W computes the sweeps of one loss
+   evaluation in W processes (SPEC 2.9 (c), Block 19).
+   Reading a refined fit: the *_sigma columns come from the global search's
+   GP around `result.fun` (at a refined fun they shrink, or are 0), the loss
+   history is that of the global evaluations, and Phase 3 uses the search's
+   GP (SPEC Block 20, notes for the reader).
+
+   The default box of gbar is [1e-5, 1e-3] S/cm^2 on every arm (SPEC 2.9 (a)).
+
    `--fit-params` overrides an arm's axis list, so the 4-D arm of Stage 7 is
    `--arm ih6 --fit-params Cm,Rm,Ra,gbar`.
 
@@ -232,6 +256,7 @@ class ArmConfig:
     role_rule: str                         # d006 | d207 (SPEC 2.8 (b))
     weighting: str                         # relative | ls_amplitude | ... (2.8 (c))
     ls_sample_weight: str                  # none | peak_decay (2.8 (d))
+    refine: str                            # none | nelder_mead (SPEC 2.9 (b))
 
 
 ARMS: Dict[str, ArmConfig] = {
@@ -244,7 +269,7 @@ ARMS: Dict[str, ArmConfig] = {
         n_long_train=2, ls_deflection_cap_mV=12.0,
         gate_valid_via="legacy_early",
         role_rule=PROTOCOL_D006[0], weighting=PROTOCOL_D006[1],
-        ls_sample_weight=PROTOCOL_D006[2]),
+        ls_sample_weight=PROTOCOL_D006[2], refine="none"),
     # Still passive: the control for "was it I_h or the window?". Since SPEC
     # 2.8 (D-207) it runs on the protocol of ih5, so that it stays ih5's control.
     "passive_fullstep": ArmConfig(
@@ -255,7 +280,7 @@ ARMS: Dict[str, ArmConfig] = {
         n_long_train=0, ls_deflection_cap_mV=None,
         gate_valid_via="same_window",
         role_rule=PROTOCOL_D207[0], weighting=PROTOCOL_D207[1],
-        ls_sample_weight=PROTOCOL_D207[2]),
+        ls_sample_weight=PROTOCOL_D207[2], refine="nelder_mead"),
     # The D-006 deliverable, kept as a labelled comparison (SPEC 2.8).
     "ih6": ArmConfig(
         name="ih6", fit_params=IH6_NAMES,
@@ -265,13 +290,21 @@ ARMS: Dict[str, ArmConfig] = {
         n_long_train=0, ls_deflection_cap_mV=None,
         gate_valid_via="same_window",
         role_rule=PROTOCOL_D006[0], weighting=PROTOCOL_D006[1],
-        ls_sample_weight=PROTOCOL_D006[2]),
+        ls_sample_weight=PROTOCOL_D006[2], refine="none"),
 }
 # SPEC 2.8 (a)-(d), D-206 to D-209: ih6 without dv_h, on the D-207 protocol.
 ARMS["ih5"] = replace(
     ARMS["ih6"], name="ih5", fit_params=IH5_NAMES,
     role_rule=PROTOCOL_D207[0], weighting=PROTOCOL_D207[1],
-    ls_sample_weight=PROTOCOL_D207[2])
+    ls_sample_weight=PROTOCOL_D207[2], refine="nelder_mead")
+# SPEC 2.9 (a), (b), D-234: the six parameters on the D-207 protocol, refined.
+ARMS["ih6_d207"] = replace(
+    ARMS["ih6"], name="ih6_d207", fit_params=IH6_NAMES,
+    role_rule=PROTOCOL_D207[0], weighting=PROTOCOL_D207[1],
+    ls_sample_weight=PROTOCOL_D207[2], refine="nelder_mead")
+
+#: The refinements --refine names (SPEC 2.9 (b)).
+REFINE_CHOICES: Tuple[str, ...] = ("none", "nelder_mead")
 
 
 def resolve_arm_config(args) -> ArmConfig:
@@ -304,6 +337,9 @@ def resolve_arm_config(args) -> ArmConfig:
         over["weighting"] = str(args.weighting)
     if getattr(args, "ls_sample_weight", None) is not None:
         over["ls_sample_weight"] = str(args.ls_sample_weight)
+    # SPEC 2.9 (b) / Block 20: None = the arm's refinement.
+    if getattr(args, "refine", None) is not None:
+        over["refine"] = str(args.refine)
     return replace(cfg, **over) if over else cfg
 
 
@@ -412,6 +448,91 @@ def gh_at_voltage_S_cm2(gbar_S_cm2: float, v_mV: float, ih_spec,
         float(v_mV), str(ih_spec.mechanism),
         vshift_mV=float(ih_spec.vshift_base_mV),
         vshift_minf_mV=float(dv_h_mV)))
+
+
+# ===========================================================================
+#  SPEC 2.9 (b), (e): the refinement's settings and what a fit records (PURE)
+# ===========================================================================
+#: Columns of SPEC 2.9 (e) / Block 20, written after the Block 15 ones.
+REFINE_RECORD_COLUMNS: Tuple[str, ...] = (
+    "refine", "loss_after_search", "loss_after_refine", "refine_improved",
+    "refine_n_starts", "refine_n_evals", "refine_best_start", "n_workers")
+
+#: The fixed head of refine_starts.csv; x0_<name> then x_<name> follow.
+REFINE_STARTS_HEAD: Tuple[str, ...] = (
+    "specimen_id", "start", "search_index", "f0", "fun", "nfev", "nit",
+    "status")
+
+
+def refine_config_from_args(args, cfg):
+    """local_refine.RefineConfig for the arm's refinement with the CLI's
+    --refine-starts / --refine-maxfev, or None when the refinement is
+    'none'. The other settings are SPEC 2.9 (b)'s defaults."""
+    if cfg.refine == "none":
+        return None
+    if cfg.refine != "nelder_mead":
+        raise ValueError("unknown refinement {!r}; choose from {}"
+                         .format(cfg.refine, REFINE_CHOICES))
+    import local_refine as LR
+    return LR.RefineConfig(n_starts=int(args.refine_starts),
+                           maxfev_per_start=int(args.refine_maxfev))
+
+
+def refine_record(fr, cfg, n_workers: int) -> Dict[str, object]:
+    """The Block 20 columns of one cell's row (SPEC 2.9 (e)).
+
+    A failed fit (no global-search result) has NaN losses; with the
+    refinement off, both losses are the search's best (result.fun), not
+    improved, 0 starts, 0 evaluations, best start -1."""
+    nan = float("nan")
+    rec: Dict[str, object] = dict(
+        refine=str(cfg.refine), loss_after_search=nan, loss_after_refine=nan,
+        refine_improved=False, refine_n_starts=0, refine_n_evals=0,
+        refine_best_start=-1, n_workers=int(n_workers))
+    gp = getattr(fr, "gp_result", None)
+    if gp is None:
+        return rec
+    rr = getattr(gp, "refine", None)
+    if rr is None:
+        best = float(gp.fun)
+        rec.update(loss_after_search=best, loss_after_refine=best)
+        return rec
+    rec.update(loss_after_search=float(rr.fun_search),
+               loss_after_refine=float(rr.fun),
+               refine_improved=bool(rr.improved),
+               refine_n_starts=int(len(rr.starts)),
+               refine_n_evals=int(rr.n_evals),
+               refine_best_start=int(rr.best_start))
+    return rec
+
+
+def refine_starts_columns(spec) -> List[str]:
+    """Header of refine_starts.csv for the spec's fitted names."""
+    return (list(REFINE_STARTS_HEAD) + ["x0_" + n for n in spec.names]
+            + ["x_" + n for n in spec.names])
+
+
+def refine_start_rows(fr, spec, specimen_id: int) -> List[dict]:
+    """One row per start of this cell's refinement; the points in PHYSICAL
+    units (spec.to_physical of the starts' q). Empty without a refinement."""
+    rr = getattr(getattr(fr, "gp_result", None), "refine", None)
+    if rr is None:
+        return []
+    rows = []
+    for k, st in enumerate(rr.starts):
+        row: Dict[str, object] = dict(
+            specimen_id=int(specimen_id), start=int(k),
+            search_index=int(st["index"]), f0=float(st["f0"]),
+            fun=float(st["fun"]), nfev=int(st["nfev"]), nit=int(st["nit"]),
+            status=int(st["status"]))
+        x0 = spec.to_physical(st["x0"])
+        x = spec.to_physical(st["x"])
+        for n in spec.names:
+            row["x0_" + n] = float(x0[n])
+        for n in spec.names:
+            row["x_" + n] = float(x[n])
+        rows.append(row)
+    return rows
 
 
 # ===========================================================================
@@ -565,6 +686,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     import passive_long_step_training as plst
     import passive_fitting_hpc_fixed as mono
     import ih_mechanism as IM
+    import local_refine as LR
     from neuron import h
     h.load_file("stdrun.hoc")
 
@@ -584,6 +706,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                    else float("nan"))
     eval_theta = (parse_eval_theta(args.eval_theta, spec.names)
                   if args.eval_theta is not None else None)
+    refine_cfg = refine_config_from_args(args, cfg)
 
     if cfg.attach_ih and "gbar" not in spec.names:
         raise SystemExit("[FATAL] arm attaches I_h but gbar is not fitted; "
@@ -617,6 +740,15 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                 (", ".join("%s=%.6g" % kv for kv in eval_theta.items())
                  if eval_theta is not None else "none")))
     log("box: {}".format(_box_text(spec, tau_base_ms)))
+    log("refinement (SPEC 2.9 (b)): {} | workers per loss evaluation: {}"
+        .format(("nelder_mead: {} start(s), maxfev {} each, d_min {} "
+                 "(unit), step {}, xatol {}, fatol {} x L(start)".format(
+                     refine_cfg.n_starts, refine_cfg.maxfev_per_start,
+                     refine_cfg.min_start_dist_unit,
+                     refine_cfg.simplex_step_unit, refine_cfg.xatol_unit,
+                     refine_cfg.fatol_rel)
+                 if refine_cfg is not None else "none"),
+                int(args.n_workers)))
     log("dt (ENFORCED): brief={} ms  long={} ms | tau_w={} ms (fixed) | "
         "budget {}/{}"
         .format(args.dt_brief_ms, args.dt_long_ms, tau_w_ms,
@@ -645,6 +777,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         ls_window_ms_after_onset=float(cfg.ls_window_ms),
         dt_brief_ms=float(args.dt_brief_ms),
         dt_long_ms=float(args.dt_long_ms),
+        n_workers=int(args.n_workers),
         verbose=True)
     log("[1/5] PATCH -- done.")
 
@@ -678,6 +811,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     log("[3/5] FIT -- {} cell(s), sequential ...".format(len(cells_data)))
     results: List[object] = []
     diag_rows: List[dict] = []
+    start_rows: List[dict] = []
     failed_ids: List[int] = []
     for i, (cd, oi) in enumerate(zip(cells_data, opt_inputs)):
         sid = int(cd.specimen_id)
@@ -706,9 +840,19 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             log("  cell {}/{} ({}): FIT ({}-D, n_calls={}) ..."
                 .format(i + 1, len(cells_data), sid, spec.n, args.n_calls))
             t_fit = time.time()
-            fr = mono.fit_one_cell(cell, cd, oi, spec=spec, F=args.F,
-                                   n_calls=args.n_calls,
-                                   n_initial=args.n_initial, seed=i)
+            # SPEC 2.9 (b): the refinement wraps the global search of the
+            # Phase-2 fit only; the original is back before anything else
+            # (Phase 2.5, Phase 3) can call it.
+            orig_gp_minimize = mono.gp_minimize
+            if refine_cfg is not None:
+                mono.gp_minimize = LR.wrap_minimizer(orig_gp_minimize,
+                                                     refine_cfg)
+            try:
+                fr = mono.fit_one_cell(cell, cd, oi, spec=spec, F=args.F,
+                                       n_calls=args.n_calls,
+                                       n_initial=args.n_initial, seed=i)
+            finally:
+                mono.gp_minimize = orig_gp_minimize
             fr.tau_w_chosen_ms = float(tau_w_ms)
             fr.tau_w_hw_rho = float("nan")
             fr.tau_w_reason = "fixed_by_cli"
@@ -717,6 +861,8 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             # it moves the cell, so the estimate is re-applied just below.
             fr.fit_record = _fit_record(mono, cell, oi, fr, spec, cfg, args,
                                         ih_spec, tau_base_ms, eval_theta)
+            fr.fit_record.update(refine_record(fr, cfg, int(args.n_workers)))
+            start_rows.extend(refine_start_rows(fr, spec, sid))
 
             # theta is ON the cell already (fit_one_cell's last apply), but be
             # explicit: every post-fit diagnostic below assumes the fit point.
@@ -740,6 +886,14 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                 mono, plst, IM, cell, oi, fr, cfg, args))
 
             results.append(fr)
+            log("    search best {:.6g} -> refined {:.6g} (improved {}; {} "
+                "start(s), {} local evaluation(s), best start {})"
+                .format(fr.fit_record["loss_after_search"],
+                        fr.fit_record["loss_after_refine"],
+                        fr.fit_record["refine_improved"],
+                        fr.fit_record["refine_n_starts"],
+                        fr.fit_record["refine_n_evals"],
+                        fr.fit_record["refine_best_start"]))
             log("    tau_h_pk={:.4g} ms (base {:.4g} ms) | loss at estimate="
                 "{:.6g}, at eval-theta={:.6g} | v*={:.3f} mV, g_h(v*)={:.4g} "
                 "S/cm^2".format(fr.fit_record["tau_h_pk_ms"], tau_base_ms,
@@ -780,6 +934,8 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         results, arm=cfg.name, ih_label=ih_label,
         morphology_source=(str(args.swc_dir) if args.swc_dir else "archive"),
     ).to_csv(out / "phase2_results.csv", index=False)
+    pd.DataFrame(start_rows, columns=refine_starts_columns(spec)).to_csv(
+        out / "refine_starts.csv", index=False)
     if diag_rows:
         pd.DataFrame(diag_rows).to_csv(out / "ls_diagnostics.csv", index=False)
         log("[3/5] FIT -- per-step residuals + sag -> ls_diagnostics.csv")
@@ -881,7 +1037,10 @@ def _loss_at(mono, cell, oi, spec, theta) -> float:
     L = mono._build_loss_function(
         cell, oi.train_bundles, float(oi.v_rest_mV),
         tuple(oi.train_window_ms), spec=spec)
-    return float(L(*spec.to_q(theta)))
+    try:
+        return float(L(*spec.to_q(theta)))
+    finally:
+        L.close()                     # Block 19: its worker pool, if any
 
 
 #: Columns of SPEC 2.8 (f) / Block 15, written after the existing ones.
@@ -958,10 +1117,13 @@ def _assert_loss_live(mono, cell, oi, spec) -> None:
     q0 = _q_box_centre(spec)
     icm = spec.index("Cm")
     vals = []
-    for cm in (0.5, 1.0, 2.0):
-        q = list(q0)
-        q[icm] = float(np.log(cm))
-        vals.append(float(L(*q)))
+    try:
+        for cm in (0.5, 1.0, 2.0):
+            q = list(q0)
+            q[icm] = float(np.log(cm))
+            vals.append(float(L(*q)))
+    finally:
+        L.close()                     # Block 19: its worker pool, if any
     if not np.all(np.isfinite(vals)):
         raise RuntimeError(
             "loss NOT FINITE across C_m {} at the q-box centre."
@@ -1282,8 +1444,9 @@ def _parse_args(argv):
     ap.add_argument("--cm-bounds", default="0.3,3.0")
     ap.add_argument("--rm-bounds", default="1000.0,100000.0")
     ap.add_argument("--ra-bounds", default="50.0,1000.0")
-    ap.add_argument("--gbar-bounds", default="1e-6,1e-2",
-                    help="S/cm^2 (D-208; was 1e-6,1e-3).")
+    ap.add_argument("--gbar-bounds", default="1e-5,1e-3",
+                    help="S/cm^2 (SPEC 2.9 (a), D-234; was 1e-6,1e-2 under "
+                         "D-208).")
     ap.add_argument("--dvh-bounds", default="-10.0,10.0")
     ap.add_argument("--kappa-bounds", default="0.5,2.0")
     ap.add_argument("--tau-h-pk-bounds-ms", default=None,
@@ -1292,7 +1455,7 @@ def _parse_args(argv):
                          "peak of the mechanism's tau_h at kappa_tau = 1 "
                          "(SPEC 2.8 (a)).")
     ap.add_argument("--eval-theta", default=None,
-                    help="'Cm=..,Rm=..,Ra=..,gbar=..,kappa_tau=..': the "
+                    help="'Cm=..,Rm=..,Ra=..,gbar=..[,dv_h=..],kappa_tau=..': the "
                          "training loss is also evaluated here and written as "
                          "loss_at_eval_theta. Every name of the arm's spec "
                          "exactly once, else exit 2.")
@@ -1374,6 +1537,16 @@ def _parse_args(argv):
                     help="ONE value (no sweep here; see the module docstring).")
     ap.add_argument("--dt-brief-ms", type=float, default=0.1)
     ap.add_argument("--dt-long-ms", type=float, default=0.1)
+    ap.add_argument("--refine", default=None, choices=list(REFINE_CHOICES),
+                    help="Local refinement after the global search; default "
+                         "None = the arm's (SPEC 2.9 (b)).")
+    ap.add_argument("--refine-starts", type=int, default=3,
+                    help="At most this many Nelder-Mead starts.")
+    ap.add_argument("--refine-maxfev", type=int, default=100,
+                    help="scipy's maxfev of one start.")
+    ap.add_argument("--n-workers", type=int, default=1,
+                    help="Processes computing the sweeps of one loss "
+                         "evaluation (SPEC 2.9 (c)); 1 = serial.")
 
     # --- diagnostics -------------------------------------------------------
     ap.add_argument("--charge-ms", type=float, default=150.0,
@@ -1413,6 +1586,10 @@ def _parse_args(argv):
         if init > calls:
             ap.error("--%sn-initial (%d) exceeds --%sn-calls (%d): gp_minimize "
                      "refuses this." % (name, init, name, calls))
+    for name in ("refine_starts", "refine_maxfev", "n_workers"):
+        if getattr(args, name) < 1:
+            ap.error("--%s must be >= 1, got %d"
+                     % (name.replace("_", "-"), getattr(args, name)))
     # --eval-theta names the arm's spec exactly: refuse it here (exit 2)
     # rather than after the cells are loaded.
     if args.eval_theta is not None:

@@ -261,6 +261,8 @@ def test_I1_arm_table():
         "passive_fullstep": (("Cm", "Rm", "Ra"), "d207", "ls_amplitude", "peak_decay"),
         "ih6": (("Cm", "Rm", "Ra", "gbar", "dv_h", "kappa_tau"), "d006", "relative", "none"),
         "baseline_runB": (("Cm", "Rm", "Ra"), "d006", "relative", "none"),
+        # Block 20 (SPEC 2.9 (a)): a fifth arm [adapted in Block 20]
+        "ih6_d207": (("Cm", "Rm", "Ra", "gbar", "dv_h", "kappa_tau"), "d207", "ls_amplitude", "peak_decay"),
     }
     bad = []
     assert R.IH5_NAMES == ("Cm", "Rm", "Ra", "gbar", "kappa_tau"), R.IH5_NAMES
@@ -280,11 +282,11 @@ def test_I1_arm_table():
     a = _parse(["--arm", "ih5"])
     for name, want in (("ls_role_rule", None), ("weighting", None), ("ls_sample_weight", None),
                        ("ls_tau_d_ms", 500.0), ("tau_h_pk_bounds_ms", None), ("eval_theta", None),
-                       ("gbar_bounds", "1e-6,1e-2")):
+                       ("gbar_bounds", "1e-5,1e-3")):        # Block 20, SPEC 2.9 (a) [adapted]
         if getattr(a, name) != want:
             bad.append("default --%s = %r, not %r" % (name.replace("_", "-"), getattr(a, name), want))
     import param_spec as PS
-    if tuple(PS.DEFAULT_GBAR_BOUNDS) != (1e-6, 1e-2):
+    if tuple(PS.DEFAULT_GBAR_BOUNDS) != (1e-5, 1e-3):              # Block 20 [adapted]
         bad.append("param_spec.DEFAULT_GBAR_BOUNDS = %s" % (PS.DEFAULT_GBAR_BOUNDS,))
     # each override applies, alone, on both protocols
     for arm in ("ih5", "ih6"):
@@ -329,7 +331,8 @@ def test_I2_tau_base_peak():
     check_close("I2_kappa_box", [ax.lo, ax.hi], [50.0 / base, 1000.0 / base], rtol=1e-15)
     assert ax.log, "kappa_tau axis is not log-scaled"
     assert spec.names == R.IH5_NAMES, spec.names
-    check_close("I2_gbar_box", [spec.axis("gbar").lo, spec.axis("gbar").hi], [1e-6, 1e-2], rtol=0.0)
+    # the default box of gbar is Block 20's (SPEC 2.9 (a)) [adapted in Block 20; was 1e-6, 1e-2]
+    check_close("I2_gbar_box", [spec.axis("gbar").lo, spec.axis("gbar").hi], [1e-5, 1e-3], rtol=0.0)
     # without the option the kappa box is --kappa-bounds
     a = _parse(["--arm", "ih5", "--kappa-bounds", "0.5,2.0"])
     ax = R.build_spec_from_args(a, R.resolve_arm_config(a)).axis("kappa_tau")
@@ -378,7 +381,9 @@ def test_I3_ih5_fit():
     if "ls_tau_d_ms" in res.columns and float(row["ls_tau_d_ms"]) != 500.0:
         bad.append("ls_tau_d_ms = %r" % row["ls_tau_d_ms"])
     # the new columns are written after every existing one
-    old_last = max(list(res.columns).index(c) for c in res.columns if c not in NEW_COLUMNS)
+    # (Block 20's columns come after Block 15's: they are not "existing" here [adapted in Block 20])
+    old_last = max(list(res.columns).index(c) for c in res.columns
+                   if c not in NEW_COLUMNS and c not in R.REFINE_RECORD_COLUMNS)
     if min(list(res.columns).index(c) for c in NEW_COLUMNS if c in res.columns) < old_last:
         bad.append("the Block 15 columns are not after the existing ones")
     assert not bad, "; ".join(bad)
