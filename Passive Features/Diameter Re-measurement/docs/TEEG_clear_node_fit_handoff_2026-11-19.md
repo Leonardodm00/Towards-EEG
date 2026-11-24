@@ -30,6 +30,7 @@
 | 2026-11-24 (later, 4) | Section 14.6: the far slope is no longer fitted (D-240, the user). Evidence: the code's default and the soma's suites **[run, sandbox]**. |
 | 2026-11-24 (later, 5) | Section 14.6: the fit region's make-up corrected (82 / 12 / 6 %, not 72 / 11 / 17 %; 94 % of the outline masked): the first rebuild lacked the moved stems' inner stretch. Evidence: the better rebuild, 7486 px against the run's 7644 **[run, sandbox]**. |
 | 2026-11-24 (later, 6) | Section 15.3: the FWHM rule of D-222.2 against the calibration's Gaussian-core estimator (exact only for the Gaussian member). Evidence: `core_fit_proxy.py` **[run, sandbox]**. |
+| 2026-11-24 (later, 7) | The user, 17:32: the soma fit's region is the disc of Allen's soma radius with only the branches' pixels left out (D-241): section 14.6's last bullet; the SGT dropped, the node fit renders and fits with the Gaussian only (D-242): sections 15 to 15.3 marked, the notebook's Cells 26 and 26 (b) removed; the soma fit's crop kept at its pre-D-241 size as the renderer's support (D-243, orchestrator). The work goes on in a new chat from `docs/TEEG_soma_fit_handoff_2026-11-24.md`, which supersedes this file as the entry point for the soma fit and the node fit's kernel. Evidence: `checks/soma_diagnosis_2026-11-24/region_new_check.py` **[run, sandbox]**; the soma's suites (that handoff, section 7). |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -665,6 +666,13 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
 - **The far slope is no longer fitted (D-240, the user, 16:46)**: `soma_fit.far_slope` defaults to "fixed" (held at
   `SLOPE0`, the configured 0.79 when None); Cell 25 offers no choice; "fit" is kept as a labelled comparison only.
   Fitting the in-focus blur instead: not decided.
+- **The region changed (D-241, the user, 17:32)** [added 2026-11-24, later 7]: R is the disc of Allen's traced soma
+  radius (5.97 um on the pilot) about the traced centre, minus the traced branches at their traced radius (no
+  widening); the processes' shadows stay in the data. On the pilot: 7442 px per plane; a compact soma differs from the
+  fitted one by 2.3 gl RMS per plane against 1.4 gl on the old region, the old fit's imitator by 1.9 against 1.4 (the
+  trade-off reduced, not removed) **[run, sandbox: `region_new_check.py`]**. The crop, the model's support, stays
+  at least 14 um half-width (D-243, orchestrator: the renderer draws the ellipsoid on the crop alone). Continued in
+  `docs/TEEG_soma_fit_handoff_2026-11-24.md`.
 
 ### 14.7 Cell 24 (b): the soma's planes in a slider viewer (2026-11-24) [added 2026-11-24]
 
@@ -681,6 +689,12 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
 - **Rerunning Cell 24 resets `SOMA_K`** to its own line: type the picked plane there if Cell 24 is run again.
 
 ## 15. The kernel of the node fit: the switch to the calibrated sigma_0 and the SGT option (D-221, D-222) [added 2026-11-23]
+
+[2026-11-24, later 7: the SGT DROPPED (D-242, the user: "keep the rendering and the fit with the Gaussian kernel and
+totally drop the SGT"). Sections 15 to 15.3 are history: the node fit renders and fits with the Gaussian only; the
+notebook's Cells 26 and 26 (b) are removed; the SGT code is removed in the next chat
+(`docs/TEEG_soma_fit_handoff_2026-11-24.md`, section 5). The calibrated-sigma_0 switch of D-221 and the fine-lattice
+error bars stay.]
 
 - **Decided [user, D-221, D-222]**: sigma_0 stays 0.080 um (D-172) with a switch to Block 42's calibration (the weighted
   means of sigma_0 and c, `kernel.with_kernel`); the node's joint fit across planes (Block 30) gets the SGT kernel as an
