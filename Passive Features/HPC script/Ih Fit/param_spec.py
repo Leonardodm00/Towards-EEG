@@ -80,9 +80,10 @@ DEFAULT_RA_BOUNDS = (50.0, 1_000.0)        # Ohm*cm
 #            Rich base.
 #   kappa  : human voltage-clamp tau maxima are 400-500 ms and the Rich model
 #            peaks at ~343 ms; [0.5, 2] spans peak tau 171-685 ms.
-#   gbar   : upper bound 1e-2 S/cm^2 since D-208 (SPEC 2.8 (a), Block 15);
-#            it was 1e-3 before.
-DEFAULT_GBAR_BOUNDS = (1e-6, 1e-2)         # S/cm^2 (D-208; was (1e-6, 1e-3))
+#   gbar   : [1e-5, 1e-3] S/cm^2 since D-234 (SPEC 2.9 (a), Block 20), for
+#            every arm; it was [1e-6, 1e-2] under D-208 (SPEC 2.8 (a)) and
+#            [1e-6, 1e-3] before.
+DEFAULT_GBAR_BOUNDS = (1e-5, 1e-3)         # S/cm^2 (D-234; was (1e-6, 1e-2), D-208)
 DEFAULT_DVH_BOUNDS = (-10.0, 10.0)         # mV
 DEFAULT_KAPPA_BOUNDS = (0.5, 2.0)          # dimensionless
 
