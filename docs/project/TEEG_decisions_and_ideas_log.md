@@ -286,6 +286,7 @@ the "Binds" column.
 | 2026-11-24 (the twins chat) | Logs **D-234** (user, 14:33 and the answers to three multiple-choice questions): run `tw2` FAILED the gate in its three reports with the loss at the truth below the loss at the estimate in 14 of 15 twins fitted with I_h **[run, here, on the user's `tw2_results.tar.gz`]**; the user chose the local refinement (three Nelder-Mead starts), $\bar g_h$ on two decades, $\Delta v_h$ fitted again (D-206 superseded), and a pool over the sweeps of one evaluation. **Roadmap allen-mtg-fit: T18 added, open** ("Local refinement after the global search", under TG3). D-206, D-208 and D-195 annotated in the index. Written after re-reading this log (last ID D-233, by another chat). Next free IDs: D-235, I-008. |
 | 2026-11-24 (the twins chat, 2) | Logs **D-235** [orchestrator] (coding directive 7) with the user's go of 14:42 ("Perfect all go on") to the plan: the build choices of D-234, stated in SPEC 2.9 and Blocks 19 to 22; contract commit `1e3fe25` on `sci/twins`; four Opus implementers started (Blocks 19 to 22). The user, 14:41: "the Ra must be fitted as well" -- it is, in every arm (no change). Next free IDs: D-236, I-008. |
 | 2026-11-24 (15:05) | Logs **D-236** (user + orchestrator): the inference route's bound flag, 1e-3 of the width or the solver's mark. Next free IDs: D-237, I-007. |
+| 2026-11-24 (the twins chat, 3) | Logs **D-237** [orchestrator] (coding directive 7): amendments 1 (`33a6a70`) and 2 (`3fe1582`) of the wave of D-234. Blocks 19 to 22 returned, passed the gate and are merged on `sci/twins` (`74f3c85`); the final check by an independent Opus agent is running. **Roadmap allen-mtg-fit: B13 to B22 added** at the user's word (14:50, "update the roadmap"; `13885a8`). Next free IDs: D-238, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -510,6 +511,7 @@ would be needed*, *Status*.
 | D-234 | 2026-11-24 | the I_h fit's optimiser, parameter vector and boxes (`run_ih_fit.py`, `param_spec.py`, `passive_long_step_training.py`, `submit_twin_recovery.sh`); D-206 (superseded), D-208 (superseded in part), D-195 (superseded in part); the next Stage-7 run | after run `tw2` failed the gate with the optimiser as the limit: a local refinement after the global search (bounded Nelder-Mead from the best 3 points, at most 100 evaluations each); $\bar g_h \in [10^{-5}, 10^{-3}]$ S/cm$^2$; $\Delta v_h$ fitted again (six parameters); the sweeps of one loss evaluation simulated in parallel on the job's cores; roadmap topic T18 and a brief study document [user] | active; not implemented |
 | D-235 | 2026-11-24 | SPEC 2.9 and Blocks 19 to 22 of `Ih Fit/specs/SPEC.md` (`local_refine.py`, `run_ih_fit.py`, `passive_long_step_training.py`, `twin_manifest.py`, `run_twin_recovery.py`, `submit_twin_recovery.sh`); D-234 | the build choices of D-234: the starts at least 0.1 apart in unit coordinates, the simplex step 0.05, stopping at 1e-3 (unit) and 1e-4 (relative loss), the refinement by wrapping `mono.gp_minimize`, also for `passive_fullstep`; the arm `ih6_d207`; a fork pool created at the first evaluation; linear-algebra threads at 1 in a twin's job [orchestrator]; dv_h truths in $\pm 5$ mV and 3 cores per twin [user, 14:42] | active; in implementation |
 | D-236 | 2026-11-24 | the bound flag of Blocks 29, 30, 42, 46 (and Block 48's summary, `fit_soma.py`'s log) | at a bound = within 1e-3 of the bound interval's width, or the solver's active_mask; the table route's 1e-6 unchanged [user: "Fix it"; orchestrator: the rule] | active |
+| D-237 | 2026-11-24 | SPEC Blocks 19 and 20 (`passive_long_step_training.py`, `local_refine.py`, their smoke suites); D-234, D-235 | two contract amendments of the wave: Block 20's oracle R1 restated on what the refinement reaches (a validation target); at most one live worker pool per process, a dead worker stops the fit instead of counting as a penalty (conventions) [orchestrator] | active; implemented |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15331,3 +15333,30 @@ shape at its box's edge: not decided here.
 2026-11-24 14:15. **[code]** the four modules. **[run, sandbox]** the reruns above.
 
 **Status:** active.
+
+## D-237 -- Two contract amendments of the wave of D-234 (orchestrator)
+
+**Date:** 2026-11-24, the twins chat. **Binds:** SPEC Blocks 19 and 20 on `sci/twins`.
+
+**Decision [orchestrator].**
+1. *Amendment 1 (`33a6a70`), a validation target.* Block 20's oracle R1 asked the refinement, on a 5-parameter
+   quadratic, for a loss below $10^{-6}$ times the search's best within 3 x 100 evaluations. It now asks: with the
+   default budget, a ratio below $10^{-3}$ and a distance below $2 \times 10^{-2}$ in unit coordinates (R1a); with
+   `maxfev_per_start=10000`, every start stopping on its tolerances, a ratio below $10^{-5}$ and a distance below
+   $2 \times 10^{-3}$ (R1b).
+2. *Amendment 2 (`3fe1582`), conventions.* A loss about to create its worker pool first closes the live pool of any
+   other loss (at most one live pool per process). A worker process that dies raises an error in the fit; it is not
+   turned into the loss's penalty $10^6$.
+
+**Why.** **[run, here]** (1) The implementer's evidence, reproduced: seed 0 gives a ratio of $6.2 \times 10^{-5}$ and a
+distance of $4.2 \times 10^{-3}$ with every start stopped by `maxfev`; without the cap $1.1 \times 10^{-6}$ and
+$5.3 \times 10^{-4}$ after 118 to 190 evaluations per start. The stopping tolerances of D-235.2 bound the reachable
+ratio near $10^{-6}$, so the first target was inconsistent with them. Consequence told to the user: 100 evaluations
+per start (D-234.1) do not converge a 5-parameter simplex; the cap is the option `--refine-maxfev`. (2) Two live
+pools mean a `fork` while another pool's thread runs (Python 3.12 warns of a possible deadlock); the fit keeps its
+loss alive while `run_ih_fit.py` builds others. A dead worker has no serial analogue but a crash.
+
+**Sources.** **[run, here]** the implementers' reports and the orchestrator's reproduction; `smoke_local_refine.py`
+R1a/R1b, `smoke_ls_pool.py` W11, W13. **[log]** D-234, D-235.
+
+**Status:** active; implemented.
