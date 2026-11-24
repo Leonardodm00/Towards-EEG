@@ -288,6 +288,7 @@ the "Binds" column.
 | 2026-11-24 (15:05) | Logs **D-236** (user + orchestrator): the inference route's bound flag, 1e-3 of the width or the solver's mark. Next free IDs: D-237, I-007. |
 | 2026-11-24 (the twins chat, 3) | Logs **D-237** [orchestrator] (coding directive 7): amendments 1 (`33a6a70`) and 2 (`3fe1582`) of the wave of D-234. Blocks 19 to 22 returned, passed the gate and are merged on `sci/twins` (`74f3c85`); the final check by an independent Opus agent is running. **Roadmap allen-mtg-fit: B13 to B22 added** at the user's word (14:50, "update the roadmap"; `13885a8`). Next free IDs: D-238, I-008. |
 | 2026-11-24 (the twins chat, 4) | Logs **D-238** (user, 16:14: "Let's increase the total available core up to 200 to be used"): the twins' submitter's cap on the cores of one submission is 200 (was 120, D-185). The final check of Blocks 19 to 22 returned PASS WITH ISSUES (one MINOR, six spec-text points, settled; `257b351` on `sci/twins`). Next free IDs: D-239, I-008. |
+| 2026-11-24 (the gallery chat, 16:40) | Logs **D-239** (user, 16:30: a cell like Cell 24 without the skeleton, a slider across the planes to choose the one in focus): Cell 24 (b), SPEC Block 44 amendment 4. Next free IDs: D-240, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -514,6 +515,7 @@ would be needed*, *Status*.
 | D-236 | 2026-11-24 | the bound flag of Blocks 29, 30, 42, 46 (and Block 48's summary, `fit_soma.py`'s log) | at a bound = within 1e-3 of the bound interval's width, or the solver's active_mask; the table route's 1e-6 unchanged [user: "Fix it"; orchestrator: the rule] | active |
 | D-237 | 2026-11-24 | SPEC Blocks 19 and 20 (`passive_long_step_training.py`, `local_refine.py`, their smoke suites); D-234, D-235 | two contract amendments of the wave: Block 20's oracle R1 restated on what the refinement reaches (a validation target); at most one live worker pool per process, a dead worker stops the fit instead of counting as a penalty (conventions) [orchestrator] | active; implemented |
 | D-238 | 2026-11-24 | the twins' submitter (`Ih Fit/submit_twin_recovery.sh`, `MAX_CORES`; SPEC Block 22); D-185 (its cap superseded for this submitter) | one submission of the twins' run may use up to 200 cores (was 120) [user] | active; implemented |
+| D-239 | 2026-11-24 | SPEC Block 44 amendment 4 (`plotting/plane_viewer.py`, `loading/soma_io.py`, `show_soma.py --z-margin-um`), notebook Cell 24 (b); D-211.1 in part | the soma's plane picked with a slider over the planes, nothing drawn over them, the pick becoming SOMA_K [user]; the view, the contrast and the window's margin [orchestrator] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15383,3 +15385,42 @@ cap is per submission: two submissions made together add up, and the submitter d
 **Sources.** **[user]**. **[log]** D-185, D-195, D-235.
 
 **Status:** active; implemented (`sci/twins`).
+
+## D-239 -- The soma's plane picked in an interactive viewer: a slider over the planes, nothing drawn over them (user); the viewer's settings and the window's margin (orchestrator)
+
+**Date:** 2026-11-24, 16:30 (Europe/Rome), the gallery chat. **Binds:** SPEC Block 44 amendment 4
+(`plotting/plane_viewer.py`, `loading/soma_io.py`, `scripts/show_soma.py --z-margin-um`) and the notebook's Cell 24 (b)
+on `sci/diameter-pipeline`; D-211.1 (the soma's plane chosen by eye) in part: the tool the choice is made with.
+
+**Decision [user].** "I need a cell like [Cell 24] without the superimposition of the skeleton. I need an interactive
+thing that slides across the planes so that I can choose the right one (the one at focus)".
+
+**Statement.** (D-239.1) [user] Cell 24 (b) shows the soma's crop one plane at a time, with a slider over the recorded
+planes and nothing of Allen's reconstruction drawn over them; the plane the user picks with its button becomes
+`SOMA_K`, which Cell 25 starts from when `SOMA_FIT_K` is None (D-211). (D-239.2) [orchestrator, PROVISIONAL] The view
++-20 um about the traced soma, shown x2 in whole pixels; contrast "fixed" by default (percentiles 0.5 and 99.5 of the
+pixels of every recorded plane of the view, one grey range for all planes), "per plane" on a toggle (each plane its
+own percentiles); a play button; the first plane shown is `SOMA_K` when it is a recorded plane of the window, else
+the traced depth's. (D-239.3) [orchestrator] `show_soma.py --z-margin-um M` sets the window's margin beyond the
+traced radius (default `soma_view.z_margin_um`, 6 um, D-211.2); Cell 24 (b)'s `SOMA_Z_MARGIN_UM`; the JSON records
+`z_margin_um`.
+
+**Why.** **[user]** as stated. **[reasoning]** D-211 leaves the soma's plane to the user's eye; the montage shows every
+second plane at a fixed size, with the trace of D-213 over it, which hides the soma's own edge; scrolling through
+every plane with nothing over it is how focus is judged. One grey range for all planes keeps a plane's darkening and
+sharpening comparable across planes; the per-plane stretch is the fallback when detail is faint. The margin option:
+the pilot's soma fit pushed its absorption toward small z (handoff 14.6), so the user may need planes beyond the
+traced radius + 6 um.
+
+**What it implies for code and tables.** Block 44 amendment 4: `plane_viewer.view_slices`, `grey_ranges`,
+`plane_png`, `PlaneViewer` (ipywidgets and PIL imported there only, notebook-side); `soma_io.read_soma_view` reads
+`soma_<S>_block.npz` and `soma_<S>.json` back and checks that they agree; `show_soma.py --z-margin-um`; smoke test
+`test_smoke_plane_viewer.py`; notebook Cell 24 (b).
+
+**What it does not decide.** How the soma is measured, and its fit's next runs (open after handoff 14.6); Cell 24's
+static figures, which keep the trace (D-213); any automatic focus pick (none, D-211.1).
+
+**Sources.** **[user]** 2026-11-24 16:30. **[run, sandbox]** the smoke test and Cell 24 (b) through a stand-in on the
+synthetic cell.
+
+**Status:** active.
