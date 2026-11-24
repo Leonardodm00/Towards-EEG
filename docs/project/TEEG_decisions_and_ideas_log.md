@@ -289,6 +289,7 @@ the "Binds" column.
 | 2026-11-24 (the twins chat, 3) | Logs **D-237** [orchestrator] (coding directive 7): amendments 1 (`33a6a70`) and 2 (`3fe1582`) of the wave of D-234. Blocks 19 to 22 returned, passed the gate and are merged on `sci/twins` (`74f3c85`); the final check by an independent Opus agent is running. **Roadmap allen-mtg-fit: B13 to B22 added** at the user's word (14:50, "update the roadmap"; `13885a8`). Next free IDs: D-238, I-008. |
 | 2026-11-24 (the twins chat, 4) | Logs **D-238** (user, 16:14: "Let's increase the total available core up to 200 to be used"): the twins' submitter's cap on the cores of one submission is 200 (was 120, D-185). The final check of Blocks 19 to 22 returned PASS WITH ISSUES (one MINOR, six spec-text points, settled; `257b351` on `sci/twins`). Next free IDs: D-239, I-008. |
 | 2026-11-24 (the gallery chat, 16:40) | Logs **D-239** (user, 16:30: a cell like Cell 24 without the skeleton, a slider across the planes to choose the one in focus): Cell 24 (b), SPEC Block 44 amendment 4. Next free IDs: D-240, I-007. |
+| 2026-11-24 (the gallery chat, 16:50) | Logs **D-240** (user, 16:46: "the far slope fit is to be drop. the only thing we might fit is the in-focus blur"): the soma fit's far slope held by default; supersedes D-218.1. Next free IDs: D-241, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -516,6 +517,7 @@ would be needed*, *Status*.
 | D-237 | 2026-11-24 | SPEC Blocks 19 and 20 (`passive_long_step_training.py`, `local_refine.py`, their smoke suites); D-234, D-235 | two contract amendments of the wave: Block 20's oracle R1 restated on what the refinement reaches (a validation target); at most one live worker pool per process, a dead worker stops the fit instead of counting as a penalty (conventions) [orchestrator] | active; implemented |
 | D-238 | 2026-11-24 | the twins' submitter (`Ih Fit/submit_twin_recovery.sh`, `MAX_CORES`; SPEC Block 22); D-185 (its cap superseded for this submitter) | one submission of the twins' run may use up to 200 cores (was 120) [user] | active; implemented |
 | D-239 | 2026-11-24 | SPEC Block 44 amendment 4 (`plotting/plane_viewer.py`, `loading/soma_io.py`, `show_soma.py --z-margin-um`), notebook Cell 24 (b); D-211.1 in part | the soma's plane picked with a slider over the planes, nothing drawn over them, the pick becoming SOMA_K [user]; the view, the contrast and the window's margin [orchestrator] | active |
+| D-240 | 2026-11-24 | SPEC Block 46 (`soma_fit.far_slope`), `fit_soma.py --far-slope`, notebook Cell 25; supersedes D-218.1 | the soma fit holds the far slope (default "fixed", "fit" a labelled comparison only); only the in-focus blur might be fitted, not decided [user] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15424,3 +15426,35 @@ static figures, which keep the trace (D-213); any automatic focus pick (none, D-
 synthetic cell.
 
 **Status:** active.
+
+## D-240 -- The soma fit does not fit the far slope; the in-focus blur is the only kernel quantity it might fit (user)
+
+**Date:** 2026-11-24, 16:46 (Europe/Rome), the gallery chat. **Binds:** SPEC Block 46 (`config.soma_fit.far_slope`,
+`analysis/soma_fit.py`), `scripts/fit_soma.py --far-slope`, the notebook's Cell 25; supersedes D-218.1 (the far slope
+fitted with the soma, the default) and makes D-218.2 (held at `--slope0`, default the configured 0.79) the rule.
+
+**Decision [user].** "the far slope fit is to be drop. the only thing we might fit is the in-focus blur."
+
+**Statement.** (D-240.1) The soma fit holds the kernel's far slope at `slope0` (the configured
+`renderer.kernel_continuation_slope`, 0.79, D-024, or a value given): `soma_fit.far_slope` defaults to "fixed"; Cell
+25 no longer offers the choice. "fit" stays in the code only as an opt-in comparison, labelled in the figure's title
+("far slope fit"). (D-240.2) Of the kernel, only the in-focus blur may later become a fitted parameter of the soma
+fit: not decided, not specified.
+
+**Why.** **[user]** as stated. **[run, sandbox; handoff 14.6]** on the pilot the fitted slope (0.367) traded with c
+and z0 along a valley and the fit ended on the bounds; with the slope held the user's run of 16:30 put z0 inside its
+box (30.96 um).
+
+**What it implies for code and tables.** `SomaFitConfig.far_slope` "fixed" (was "fit"); `fit_soma.py`'s help; Cell
+25 without `FAR_SLOPE` (its `SLOPE0` the held value); SPEC Block 46 amended; the defaults' spec test updated. The
+held value is uncalibrated: on simulated stacks a slope 20 % off, held, moved c by -16.5 % and S by -7.5 % (handoff
+14.4).
+
+**What it does not decide.** Whether, and how, the in-focus blur is fitted (which quantity of the kernel law, its
+bounds); the far slope's calibration on Allen's data (roadmap far-field stage); the node fit's kernel (Blocks 30, 36,
+49), untouched.
+
+**Sources.** **[user]** 2026-11-24 16:46. **[run, sandbox]** handoff 14.4 and 14.6. **[data]** the user's planes
+figure of 16:30.
+
+**Status:** active; supersedes D-218.1.
