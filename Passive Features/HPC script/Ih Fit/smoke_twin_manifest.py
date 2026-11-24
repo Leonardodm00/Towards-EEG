@@ -1,5 +1,5 @@
-"""Smoke test for the twins' manifest -- Blocks 13 and 16 in specs/SPEC.md
-(sections 2.7 (i) and 2.8 (e)).
+"""Smoke test for the twins' manifest -- Blocks 13, 16 and 21 in specs/SPEC.md
+(sections 2.7 (i), 2.8 (e) and 2.9 (d)).
 
 Checks (the oracles TM1-TM9 of the Block 13 entry, plus TM10, adapted to the
 four configurations of Block 16; TM11-TM13 of the Block 16 entry)
@@ -45,6 +45,31 @@ four configurations of Block 16; TM11-TM13 of the Block 16 entry)
     TM13 twin_theta of a full_no_noise row equals its partner's (and
          twin_spec_of carries the same theta, its own ids and configuration)
 
+Block 21 (the run's I_h arm; oracles M1-M7 of the entry)
+    M1   ih_arm="ih5", dvh_truth_mV=0.0 reproduces the manifest of the contract
+         commit's twin_manifest.py (CONTRACT_COMMIT_B21, read with git show and
+         imported under another name) exactly (assert_frame_equal), for several
+         seeds, n, n_no_noise and truth kwargs
+    M2   default arguments with ih_dvh_range_mV = (-5, 5): arm ih6_d207 in
+         full, active_fit, full_no_noise and passive_fullstep in passive_fit;
+         the dv_h truths of the rows with I_h lie in [-5, 5], are not all equal
+         and equal synth_gt_grid.draw_manifest's for the same seeds; active_fit
+         dv_h 0 and gbar the floor given; each full_no_noise row equals its
+         partner in every truth column
+    M3   ih_arm="ih5" with the range given and dvh_truth_mV=None: ValueError
+         naming the option (and with dvh_truth_mV != 0); ih5 without the range
+         or with dvh_truth_mV=0.0 passes
+    M4   unknown ih_arm: ValueError; the arm_of table over CONFIGURATIONS x
+         IH_ARMS; arm_of refuses unknown names; ARM_OF unchanged
+    M5   save/load round trip of the new manifest
+    M6   the 13 checks above pass (adapted where the new defaults, arm
+         ih6_d207 and dvh_truth_mV=None, change an assertion: TM4 (dv_h is the
+         drawn value, not 0), TM6 (arm = arm_of(conf, "ih6_d207")), TM11 (the
+         "dv_h 0, ih5" frame passes ih_arm="ih5", dvh_truth_mV=0.0 explicitly;
+         the None and -2.5 frames run on ih6_d207), TM12 (arm ih6_d207)); M6
+         itself re-runs them and checks that they are all present
+    M7   the two files are pure ASCII and LF
+
 Fixture: 18 fictitious real cells (ids unsorted in the frame, swc paths
 .../specimen_<id>/reconstruction.swc that do not exist: draw_manifest reads
 the paths only as strings -- morph names and, with a noise table, the
@@ -84,7 +109,8 @@ if str(HERE) not in sys.path:
 import twin_manifest as TM  # noqa: E402
 
 SEED = 0                    # the entry's default seed
-CONTRACT_COMMIT = "aac46d3"
+CONTRACT_COMMIT = "aac46d3"       # Block 13's contract (TM9, TM11)
+CONTRACT_COMMIT_B21 = "1e3fe25"   # Block 21's contract (M1)
 REPORT_PACKAGES = ("numpy", "pandas")
 N = 10                      # n per configuration (Stage 7)
 N0 = 5                      # n_no_noise (the entry's default)
@@ -134,11 +160,13 @@ def quiet(fn, *a, **k):
 _DEFAULT = object()
 
 
-def manifest(seed=SEED, real=None, n=N, n0=_DEFAULT, dvh=_DEFAULT, **tk):
-    """draw_twin_manifest at the entry's defaults for n_no_noise and
-    dvh_truth_mV unless given (n0, dvh)."""
+def manifest(seed=SEED, real=None, n=N, n0=_DEFAULT, dvh=_DEFAULT, arm=_DEFAULT, **tk):
+    """draw_twin_manifest at the entry's defaults for n_no_noise, dvh_truth_mV
+    and ih_arm unless given (n0, dvh, arm)."""
     real = make_real_cells() if real is None else real
     kw = {}
+    if arm is not _DEFAULT:
+        kw["ih_arm"] = arm
     if n0 is not _DEFAULT:
         kw["n_no_noise"] = n0
     if dvh is not _DEFAULT:
@@ -234,14 +262,15 @@ def test_tm4_truths_reference():
     import synth_gt_grid as G
     m = base_manifest()
     box = G.SearchBox()
-    m_drawn = manifest(dvh=None)   # ih_dvh_mV as drawn (TM11 covers the default 0)
+    m_drawn = manifest(dvh=None)   # ih_dvh_mV as drawn (TM11 covers the setting to 0)
     for q, conf in enumerate(DRAWN):
         sub = m[m["configuration"] == conf].reset_index(drop=True)
         subd = m_drawn[m_drawn["configuration"] == conf].reset_index(drop=True)
         ref = reference_truths(sub["real_swc_path"].tolist(), SEED, q)
         cols = TRUTH_COLS if TM.HAS_IH[conf] else TRUTH_COLS[:3]
         if TM.HAS_IH[conf]:
-            assert (sub["ih_dvh_mV"] == 0.0).all(), (conf, sub["ih_dvh_mV"].tolist())
+            # [Block 21, M6] the default is now dvh_truth_mV=None: the drawn value
+            assert np.array_equal(sub["ih_dvh_mV"].to_numpy(), ref["ih_dvh_mV"].to_numpy()), conf
             assert np.array_equal(subd["ih_dvh_mV"].to_numpy(), ref["ih_dvh_mV"].to_numpy()), conf
         for col in [c for c in cols if c != "ih_dvh_mV"] + ["tau_m_true_ms", "F", "ih_ehcn_mV",
                                                              "ih_vshift_base_mV"]:
@@ -301,7 +330,8 @@ def test_tm6_arms_theta_spec():
                          "full_no_noise": "ih5"}, TM.ARM_OF
     assert TM.HAS_IH == {"full": True, "passive_fit": True, "active_fit": False, "full_no_noise": True}
     assert TM.WITH_NOISE == {"full": True, "passive_fit": True, "active_fit": True, "full_no_noise": False}
-    assert (m["arm"] == m["configuration"].map(TM.ARM_OF)).all()
+    # [Block 21, M6] the default arm is ih6_d207: arm = arm_of(conf, "ih6_d207")
+    assert (m["arm"] == m["configuration"].map(lambda c: TM.arm_of(c, "ih6_d207"))).all()
     names6 = {"Cm": "cm_true", "Rm": "rm_true", "Ra": "ra_true",
               "gbar": "ih_gihbar_S_cm2", "dv_h": "ih_dvh_mV", "kappa_tau": "ih_kappa_tau"}
     for _, r in m.iterrows():
@@ -449,24 +479,27 @@ def test_tm10_recovery_report_reads_it():
     assert list(fp["arm"]) == ["ih5"] and int(fp["n_fp_cells"].iloc[0]) == N, fp
 
 
-def _contract_module():
-    """twin_manifest.py of the contract commit, imported under another name."""
+def _contract_module(commit=CONTRACT_COMMIT, configurations=DRAWN):
+    """twin_manifest.py of a contract commit, imported under another name."""
     import importlib.util
-    if "contract" in _CACHE:
-        return _CACHE["contract"]
+    key = "contract_" + commit
+    if key in _CACHE:
+        return _CACHE[key]
     try:
-        src = subprocess.run(["git", "show", CONTRACT_COMMIT + ":./twin_manifest.py"], cwd=str(HERE),
+        src = subprocess.run(["git", "show", commit + ":./twin_manifest.py"], cwd=str(HERE),
                              capture_output=True, text=True, check=True).stdout
     except (OSError, subprocess.CalledProcessError) as exc:
         raise unittest.SkipTest("git show not available here: {}".format(exc))
     d = tempfile.mkdtemp(prefix="tm_contract_")
-    path = Path(d) / "twin_manifest_contract.py"
+    name = "twin_manifest_contract_" + commit
+    path = Path(d) / (name + ".py")
     path.write_text(src)
-    spec = importlib.util.spec_from_file_location("twin_manifest_contract", str(path))
+    spec = importlib.util.spec_from_file_location(name, str(path))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    assert mod.CONFIGURATIONS == DRAWN, "the contract module is not Block 13's"
-    _CACHE["contract"] = mod
+    assert mod.CONFIGURATIONS == tuple(configurations), "the contract module at {} is not the expected one".format(
+        commit)
+    _CACHE[key] = mod
     return mod
 
 
@@ -481,13 +514,16 @@ def test_tm11_regression_against_contract():
         old = quiet(old_mod.draw_twin_manifest, real, n_per_configuration=n, seed=sd, id_base=ID_BASE,
                     truth_kwargs=truth_kwargs(**case["tk"]))
         assert len(old) == 3 * n
-        new = manifest(seed=sd, n=n, n0=k0, **case["tk"]).iloc[:3 * n].reset_index(drop=True)
+        # [Block 21, M6] the Block 16 frame (arm ih5, dv_h 0) is now asked for
+        # explicitly; the None and -2.5 frames run on the default arm ih6_d207
+        # (ih5 refuses a dv_h truth other than 0)
+        new = manifest(seed=sd, n=n, n0=k0, arm="ih5", dvh=0.0, **case["tk"]).iloc[:3 * n].reset_index(drop=True)
         new_none = manifest(seed=sd, n=n, n0=k0, dvh=None, **case["tk"]).iloc[:3 * n].reset_index(drop=True)
         new_m25 = manifest(seed=sd, n=n, n0=k0, dvh=-2.5, **case["tk"]).iloc[:3 * n].reset_index(drop=True)
-        for nm in (new, new_none, new_m25):
+        for nm, ih_arm in ((new, "ih5"), (new_none, "ih6_d207"), (new_m25, "ih6_d207")):
             assert list(nm.columns) == list(old.columns) + list(TM.TAIL_COLUMNS), list(nm.columns)
             assert nm["configuration"].tolist() == old["configuration"].tolist()
-            exp_arm = old["arm"].map({"ih6": "ih5", "passive_fullstep": "passive_fullstep"})
+            exp_arm = old["arm"].map({"ih6": ih_arm, "passive_fullstep": "passive_fullstep"})
             assert nm["arm"].tolist() == exp_arm.tolist(), (nm["arm"].tolist(), old["arm"].tolist())
         has_ih = old["configuration"].map(TM.HAS_IH).to_numpy(dtype=bool)
         assert has_ih.sum() == 2 * n
@@ -509,7 +545,7 @@ def test_tm11_regression_against_contract():
         assert np.array_equal(new_m25.loc[~has_ih, "ih_dvh_mV"].to_numpy(), b[~has_ih])
         # the drawn rows are the same whatever n_no_noise
         for n0 in (0, n):
-            alt = manifest(seed=sd, n=n, n0=n0, **case["tk"]).iloc[:3 * n].reset_index(drop=True)
+            alt = manifest(seed=sd, n=n, n0=n0, arm="ih5", dvh=0.0, **case["tk"]).iloc[:3 * n].reset_index(drop=True)
             assert_frame_equal(alt, new, check_exact=True)
 
 
@@ -525,7 +561,7 @@ def test_tm12_no_noise_rows():
         assert nn["specimen_id"].tolist() == [ID_BASE + 300 + i for i in range(N0)]
         assert nn["paired_with"].tolist() == full["specimen_id"].tolist()[:N0]
         assert nn["paired_with"].tolist() == [ID_BASE + i for i in range(N0)]
-        assert (nn["arm"] == "ih5").all()
+        assert (nn["arm"] == "ih6_d207").all()   # [Block 21, M6] the default arm
         assert (~nn["with_noise"]).all()
         rest = m[m["configuration"] != "full_no_noise"]
         assert rest["with_noise"].all() and (rest["paired_with"] == -1).all()
@@ -573,6 +609,147 @@ def test_tm13_theta_of_paired_row():
         assert sp.twin_id == int(r["specimen_id"]) != spp.twin_id
         assert sp.configuration == "full_no_noise" and sp.twin_of_specimen_id == spp.twin_of_specimen_id
         assert sp.v_rest_mV == spp.v_rest_mV and sp.F == spp.F
+
+
+# ------------------------------------------------------ Block 21: M1-M7 ---
+
+def test_m1_ih5_reproduces_contract():
+    old_mod = _contract_module(CONTRACT_COMMIT_B21, DRAWN + ("full_no_noise",))
+    assert old_mod.ARM_OF["full"] == "ih5", "the contract module at {} is not Block 16's".format(CONTRACT_COMMIT_B21)
+    real = make_real_cells()
+    cases = [dict(seed=SEED, n=N, n0=N0, tk={}),
+             dict(seed=7, n=4, n0=2, tk=dict(ra_mode="per_cell")),
+             dict(seed=3, n=18, n0=18, tk=dict(ih_dvh_range_mV=(-8.0, 2.0))),
+             dict(seed=11, n=6, n0=0, tk=dict(ih_dvh_range_mV=None, ih_gbar_floor_S_cm2=1e-5))]
+    for case in cases:
+        tk = truth_kwargs(**case["tk"])
+        old = quiet(old_mod.draw_twin_manifest, real, n_per_configuration=case["n"], n_no_noise=case["n0"],
+                    seed=case["seed"], id_base=ID_BASE, dvh_truth_mV=0.0, truth_kwargs=tk)
+        new = quiet(TM.draw_twin_manifest, real, n_per_configuration=case["n"], n_no_noise=case["n0"],
+                    seed=case["seed"], id_base=ID_BASE, ih_arm="ih5", dvh_truth_mV=0.0, truth_kwargs=tk)
+        assert_frame_equal(new, old, check_exact=True)
+        assert (new["arm"] != "ih6_d207").all()
+
+
+def test_m2_default_arm_and_drawn_dvh():
+    import synth_gt_grid as G
+    floor = 1e-5
+    tk = truth_kwargs(ih_dvh_range_mV=(-5, 5), ih_gbar_range_S_cm2=(2e-5, 3e-4), ih_gbar_floor_S_cm2=floor)
+    m = quiet(TM.draw_twin_manifest, make_real_cells(), truth_kwargs=tk)   # every option at its default
+    assert len(m) == 3 * N + N0
+    exp_arm = {"full": "ih6_d207", "passive_fit": "passive_fullstep", "active_fit": "ih6_d207",
+               "full_no_noise": "ih6_d207"}
+    assert m["arm"].tolist() == m["configuration"].map(exp_arm).tolist(), m["arm"].tolist()
+    has_ih = m["configuration"].map(TM.HAS_IH).to_numpy(dtype=bool)
+    dv = m.loc[has_ih, "ih_dvh_mV"].to_numpy(dtype=float)
+    assert np.all((dv >= -5.0) & (dv <= 5.0)), dv
+    assert len(np.unique(dv)) > 1, "the dv_h truths are all equal"
+    # equal to draw_manifest's for the same seeds (q = 0 full, q = 1 passive_fit)
+    for q, conf in ((0, "full"), (1, "passive_fit")):
+        sub = m[m["configuration"] == conf].reset_index(drop=True)
+        ref = quiet(G.draw_manifest, sub["real_swc_path"].tolist(), draws_per_morph=1,
+                    seed=int(np.random.SeedSequence([SEED, q, 1]).generate_state(1)[0]),
+                    id_base=ID_BASE + 100 * q, use_ih=True, fp_control_frac=0.0, **tk)
+        assert np.array_equal(sub["ih_dvh_mV"].to_numpy(), ref["ih_dvh_mV"].to_numpy(dtype=float)), conf
+    act = m[m["configuration"] == "active_fit"]
+    assert (act["ih_dvh_mV"] == 0.0).all(), act["ih_dvh_mV"].tolist()
+    assert (act["ih_gihbar_S_cm2"] == floor).all(), act["ih_gihbar_S_cm2"].tolist()
+    assert (act["ih_kappa_tau"] == 1.0).all()
+    full = m[m["configuration"] == "full"].reset_index(drop=True)
+    nn = m[m["configuration"] == "full_no_noise"].reset_index(drop=True)
+    assert len(nn) == N0
+    for i in range(N0):
+        assert int(nn.loc[i, "paired_with"]) == int(full.loc[i, "specimen_id"])
+        for col in TRUTH_COLS + ("tau_m_true_ms", "F"):
+            assert nn.loc[i, col] == full.loc[i, col], (i, col)
+    # a float dvh_truth_mV still sets every row with I_h (and not active_fit)
+    m3 = quiet(TM.draw_twin_manifest, make_real_cells(), dvh_truth_mV=3.0, truth_kwargs=tk)
+    assert (m3.loc[has_ih, "ih_dvh_mV"] == 3.0).all() and (m3.loc[~has_ih, "ih_dvh_mV"] == 0.0).all()
+    # without the range the drawer gives 0
+    m0 = quiet(TM.draw_twin_manifest, make_real_cells(), truth_kwargs=dict(tk, ih_dvh_range_mV=None))
+    assert (m0["ih_dvh_mV"] == 0.0).all()
+    assert (m0["arm"] == m["arm"]).all()
+
+
+def test_m3_ih5_refuses_nonzero_dvh():
+    real = make_real_cells()
+    tk = truth_kwargs(ih_dvh_range_mV=(-5, 5))
+    for dvh in (None, 2.0, -0.5):
+        try:
+            quiet(TM.draw_twin_manifest, real, ih_arm="ih5", dvh_truth_mV=dvh, truth_kwargs=tk)
+        except ValueError as exc:
+            assert "ih_arm" in str(exc) and "ih5" in str(exc) and "dvh_truth_mV" in str(exc), str(exc)
+        else:
+            raise AssertionError("ih_arm='ih5' with dvh_truth_mV={!r} and the range was not refused".format(dvh))
+    # n_no_noise = 0 and n = 1: still refused (the full row has I_h)
+    assert _raises(TM.draw_twin_manifest, real, n_per_configuration=1, n_no_noise=0, ih_arm="ih5",
+                   truth_kwargs=tk)
+    # the allowed ih5 cases
+    a = quiet(TM.draw_twin_manifest, real, ih_arm="ih5", dvh_truth_mV=0.0, truth_kwargs=tk)
+    b = quiet(TM.draw_twin_manifest, real, ih_arm="ih5", truth_kwargs=truth_kwargs(ih_dvh_range_mV=None))
+    for mm in (a, b):
+        assert (mm["ih_dvh_mV"] == 0.0).all()
+        assert set(mm["arm"]) == {"ih5", "passive_fullstep"}
+
+
+def test_m4_ih_arm_names_and_arm_of():
+    assert TM.IH_ARMS == ("ih5", "ih6_d207"), TM.IH_ARMS
+    assert TM.ARM_OF == {"full": "ih5", "passive_fit": "passive_fullstep", "active_fit": "ih5",
+                         "full_no_noise": "ih5"}, TM.ARM_OF
+    for ih_arm in TM.IH_ARMS:
+        for conf in TM.CONFIGURATIONS:
+            exp = "passive_fullstep" if conf == "passive_fit" else ih_arm
+            assert TM.arm_of(conf, ih_arm) == exp, (conf, ih_arm)
+    assert [TM.arm_of(c, "ih5") for c in TM.CONFIGURATIONS] == [TM.ARM_OF[c] for c in TM.CONFIGURATIONS]
+    bad = []
+    for args in (("full", "ih6"), ("full", "IH5"), ("full", ""), ("full", None), ("full", 5),
+                 ("full_noise", "ih5"), ("", "ih5"), (None, "ih6_d207"), ("passive_fit", "ih4")):
+        try:
+            TM.arm_of(*args)
+        except ValueError:
+            continue
+        bad.append(args)
+    real = make_real_cells()
+    for v in ("ih6", "passive_fullstep", "IH6_D207", None, 1):
+        if not _raises(TM.draw_twin_manifest, real, ih_arm=v, truth_kwargs=truth_kwargs()):
+            bad.append(("draw_twin_manifest", v))
+    assert not bad, "not refused: {}".format(bad)
+
+
+def test_m5_round_trip_new_manifest():
+    tk = truth_kwargs(ih_dvh_range_mV=(-5, 5), ih_gbar_floor_S_cm2=1e-5)
+    m = quiet(TM.draw_twin_manifest, make_real_cells(), truth_kwargs=tk)
+    assert (m["arm"] == "ih6_d207").sum() == 2 * N + N0
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "twin_manifest.csv"
+        TM.save_twin_manifest(m, p)
+        raw = p.read_bytes()
+        assert b"\r" not in raw and all(b < 128 for b in raw)
+        back = TM.load_twin_manifest(p)
+    assert list(back.columns) == list(m.columns)
+    assert list(back.dtypes) == list(m.dtypes)
+    assert_frame_equal(back, m, check_exact=True)
+    assert back["ih_dvh_mV"].to_numpy().tobytes() == m["ih_dvh_mV"].to_numpy().tobytes()
+
+
+_EXISTING = ("test_tm1_counts_and_order", "test_tm2_cells", "test_tm3_seeds", "test_tm4_truths_reference",
+             "test_tm5_active_fit", "test_tm6_arms_theta_spec", "test_tm7_csv_round_trip", "test_tm8_refusals",
+             "test_tm9_ascii_lf_and_frozen_generator", "test_tm10_recovery_report_reads_it",
+             "test_tm11_regression_against_contract", "test_tm12_no_noise_rows", "test_tm13_theta_of_paired_row")
+
+
+def test_m6_existing_checks_present():
+    """The 13 existing checks are all still defined (each runs as its own row of
+    the table; M6 passes only if they are present -- their PASS is in the table)."""
+    missing = [n for n in _EXISTING if not callable(globals().get(n))]
+    assert not missing, missing
+
+
+def test_m7_ascii_lf():
+    for name in ("twin_manifest.py", "smoke_twin_manifest.py"):
+        raw = (HERE / name).read_bytes()
+        assert all(b < 128 for b in raw), name + " is not pure ASCII"
+        assert b"\r" not in raw, name + " has CR"
 
 
 # ---------------------------------------------------------------- runner ---

@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 twin_manifest.py -- the twins' manifest: three configurations of n twins on real cells drawn at random (Block 13),
-and the noise-free configuration (Block 16)
+the noise-free configuration (Block 16) and the run's I_h arm (Block 21)
 ================================================================================================================
 
 specs/SPEC.md, section 2.7 (i) and the entry of Block 13 (D-184, D-188);
-section 2.8 (e) and the entry of Block 16 (D-207, D-209).
+section 2.8 (e) and the entry of Block 16 (D-207, D-209);
+section 2.9 (d) and the entry of Block 21 (D-234).
 Pure: numpy and pandas; no NEURON, no archive I/O (synth_gt_grid is imported
 lazily inside draw_twin_manifest; it does not import NEURON).
 
@@ -30,8 +31,9 @@ leak-reversal column `e_pas_mV`, are dropped (D-192; the twins' noise lives in
 the twins' table). Every other draw_manifest column is kept under its own name.
 
 Block 16 (SPEC 2.8 (e)): after the three drawn configurations, ih_dvh_mV is
-set to `dvh_truth_mV` (0 mV by default; None keeps the drawn values) in every
-row whose configuration has I_h (HAS_IH). Then the fourth configuration
+set to `dvh_truth_mV` in every row whose configuration has I_h (HAS_IH); None
+(the default since Block 21) keeps the drawn values -- drawn uniformly when
+truth_kwargs carries `ih_dvh_range_mV`, else 0. Then the fourth configuration
 `full_no_noise` (q = 3): its i-th row, i < n_no_noise, is a copy of the i-th
 `full` row with specimen_id = id_base + 300 + i, configuration
 `full_no_noise` and arm ARM_OF["full_no_noise"]; every other column (truths,
@@ -39,6 +41,13 @@ real cell, manifest_seed, flags, paths) is the `full` row's. Two columns are
 appended after draw_manifest's, in every row: `with_noise` (bool,
 WITH_NOISE[configuration]) and `paired_with` (int64: the `full` twin's id for
 a `full_no_noise` row, -1 otherwise).
+
+Block 21 (SPEC 2.9 (d)): the run's I_h arm `ih_arm` (IH_ARMS; default
+`ih6_d207`) sets the `arm` column: arm_of(configuration, ih_arm) is
+`passive_fullstep` for `passive_fit` and `ih_arm` for every other
+configuration. ARM_OF stays the `ih5` table. With ih_arm = "ih5" a row with
+I_h whose dv_h truth is not 0 is refused (ValueError): the arm's model has no
+dv_h. A row without I_h (active_fit) has dv_h 0 whatever the options.
 
 Units: the truth columns as synth_gt_grid writes them -- cm_true uF/cm^2,
 rm_true Ohm cm^2, ra_true Ohm cm, ih_gihbar_S_cm2 S/cm^2, ih_dvh_mV mV,
@@ -57,6 +66,13 @@ CONFIGURATIONS = ("full", "passive_fit", "active_fit", "full_no_noise")
 ARM_OF = {"full": "ih5", "passive_fit": "passive_fullstep", "active_fit": "ih5", "full_no_noise": "ih5"}
 HAS_IH = {"full": True, "passive_fit": True, "active_fit": False, "full_no_noise": True}
 WITH_NOISE = {"full": True, "passive_fit": True, "active_fit": True, "full_no_noise": False}
+
+#: the run's I_h arms (Block 21, SPEC 2.9 (d)); the arm of passive_fit is
+#: always PASSIVE_ARM
+IH_ARMS = ("ih5", "ih6_d207")
+DEFAULT_IH_ARM = "ih6_d207"
+PASSIVE_ARM = "passive_fullstep"
+PASSIVE_CONFIGURATION = "passive_fit"
 
 #: the configurations drawn by draw_manifest (q = 0, 1, 2); full_no_noise
 #: (q = 3) copies rows of `full`
@@ -138,6 +154,23 @@ def _check_dvh(dvh_truth_mV) -> Optional[float]:
     return float(dvh_truth_mV)
 
 
+def _check_ih_arm(ih_arm) -> str:
+    """One of IH_ARMS, else ValueError."""
+    if not isinstance(ih_arm, str) or ih_arm not in IH_ARMS:
+        raise ValueError("ih_arm must be one of {}, got {!r}".format(IH_ARMS, ih_arm))
+    return ih_arm
+
+
+def arm_of(configuration: str, ih_arm: str) -> str:
+    """The arm a twin of `configuration` is fitted with when the run's I_h arm
+    is `ih_arm` (SPEC, Block 21): passive_fit -> passive_fullstep, every other
+    configuration -> ih_arm. Unknown names: ValueError."""
+    ih_arm = _check_ih_arm(ih_arm)
+    if not isinstance(configuration, str) or configuration not in CONFIGURATIONS:
+        raise ValueError("configuration must be one of {}, got {!r}".format(CONFIGURATIONS, configuration))
+    return PASSIVE_ARM if configuration == PASSIVE_CONFIGURATION else ih_arm
+
+
 def _check_inputs(real_cells: pd.DataFrame, n: int, truth_kwargs: Mapping) -> np.ndarray:
     missing = [c for c in REAL_CELL_COLUMNS if c not in real_cells.columns]
     if missing:
@@ -199,7 +232,8 @@ def truth_seed(seed: int, q: int) -> int:
 
 
 def draw_twin_manifest(real_cells: pd.DataFrame, *, n_per_configuration: int = 10, n_no_noise: int = 5,
-                       seed: int = 0, id_base: int = 900_000_000, dvh_truth_mV: Optional[float] = 0.0,
+                       seed: int = 0, id_base: int = 900_000_000, ih_arm: str = DEFAULT_IH_ARM,
+                       dvh_truth_mV: Optional[float] = None,
                        truth_kwargs: Optional[Mapping] = None) -> pd.DataFrame:
     """The manifest of SPEC 2.7 (i) and 2.8 (e): 3 * n_per_configuration +
     n_no_noise rows, one per twin, in the order of CONFIGURATIONS and, within
@@ -207,8 +241,13 @@ def draw_twin_manifest(real_cells: pd.DataFrame, *, n_per_configuration: int = 1
 
     n_no_noise : the number of full_no_noise twins, 0 <= n_no_noise <=
                  n_per_configuration; the i-th copies the i-th `full` twin
+    ih_arm     : the run's I_h arm, one of IH_ARMS (Block 21); the `arm`
+                 column is arm_of(configuration, ih_arm)
     dvh_truth_mV : the truth of dv_h (mV) set in every row with I_h after the
-                 draw; None keeps draw_manifest's drawn values
+                 draw; None (default) keeps draw_manifest's values (drawn when
+                 truth_kwargs carries ih_dvh_range_mV, else 0). With
+                 ih_arm = "ih5" a row with I_h whose dv_h truth is not 0 is
+                 refused (ValueError).
 
     real_cells : one row per real cell available -- specimen_id (int64),
                  swc_path (str), v_rest_mV (float64), cell_tau_s_above_window
@@ -227,6 +266,7 @@ def draw_twin_manifest(real_cells: pd.DataFrame, *, n_per_configuration: int = 1
     n = int(n)
     n0 = _check_no_noise(n_no_noise, n)
     dvh = _check_dvh(dvh_truth_mV)
+    ih_arm = _check_ih_arm(ih_arm)
     twin_ids = _twin_ids(n, int(id_base))
     used = [int(x) for x in twin_ids[:len(DRAWN_CONFIGURATIONS)].ravel()] + \
         [int(x) for x in twin_ids[CONFIGURATIONS.index(NO_NOISE_CONFIGURATION), :n0]]
@@ -261,7 +301,7 @@ def draw_twin_manifest(real_cells: pd.DataFrame, *, n_per_configuration: int = 1
         lead = pd.DataFrame({
             "specimen_id": twin_ids[q].astype(np.int64),
             "configuration": conf,
-            "arm": ARM_OF[conf],
+            "arm": arm_of(conf, ih_arm),
             "twin_of_specimen_id": cells.astype(np.int64),
             "v_rest_mV": [float(by_id.loc[int(c), "v_rest_mV"]) for c in cells],
             "real_swc_path": swcs,
@@ -276,6 +316,16 @@ def draw_twin_manifest(real_cells: pd.DataFrame, *, n_per_configuration: int = 1
     if dvh is not None:
         has_ih = df["configuration"].map(HAS_IH).to_numpy(dtype=bool)
         df.loc[has_ih, "ih_dvh_mV"] = dvh
+    if ih_arm == "ih5":
+        has_ih = df["configuration"].map(HAS_IH).to_numpy(dtype=bool)
+        dv = df["ih_dvh_mV"].to_numpy(dtype=np.float64)
+        bad = has_ih & ~(dv == 0.0)
+        if bad.any():
+            raise ValueError(
+                "ih_arm='ih5' cannot hold a dv_h truth other than 0 (the arm does not fit dv_h): twin(s) {} have "
+                "ih_dvh_mV {}; pass dvh_truth_mV=0.0, or drop ih_dvh_range_mV from truth_kwargs, or use "
+                "ih_arm='ih6_d207'".format([int(x) for x in df.loc[bad, "specimen_id"]][:5],
+                                           [float(x) for x in dv[bad]][:5]))
     df["with_noise"] = df["configuration"].map(WITH_NOISE).to_numpy(dtype=bool)
     df["paired_with"] = np.full(len(df), PAIRED_WITH_NONE, dtype=np.int64)
 
@@ -284,7 +334,7 @@ def draw_twin_manifest(real_cells: pd.DataFrame, *, n_per_configuration: int = 1
     partner["paired_with"] = partner["specimen_id"].to_numpy(dtype=np.int64)
     partner["specimen_id"] = twin_ids[q0, :n0].astype(np.int64)
     partner["configuration"] = NO_NOISE_CONFIGURATION
-    partner["arm"] = ARM_OF[NO_NOISE_CONFIGURATION]
+    partner["arm"] = arm_of(NO_NOISE_CONFIGURATION, ih_arm)
     partner["with_noise"] = WITH_NOISE[NO_NOISE_CONFIGURATION]
     if n0:
         df = pd.concat([df, partner], ignore_index=True)
