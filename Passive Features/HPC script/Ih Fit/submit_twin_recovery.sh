@@ -10,7 +10,7 @@
 #   run by hand        THE SUBMITTER. Plans the run (run_twin_recovery.py plan;
 #                      a no-op when the run directory is already planned with
 #                      the same options), lists the twins (list), refuses a
-#                      submission of more than 120 cores at once (twins x
+#                      submission of more than 200 cores at once (twins x
 #                      NCPUS, D-185), writes the run file and submits the PBS
 #                      array -- one subjob per twin, NCPUS cores each -- and
 #                      the merge job after it (-W depend=afterany:<array>).
@@ -46,8 +46,8 @@
 #   TWINS            comma-separated twin ids (a subset of the manifest); empty = every twin
 #   MAX_TWINS        submit only the first k twins (of the manifest, or of TWINS): the pilot
 #   NCPUS            3 cores per twin job (Block 22; was 1): the fit runs with --n-workers NCPUS
-#                    (forked workers, SPEC 2.9 (c)); 35 twins x 3 = 105 cores, inside the 120-core
-#                    cap of D-185 (twins x NCPUS <= 120, refused otherwise)
+#                    (forked workers, SPEC 2.9 (c)); 35 twins x 3 = 105 cores, inside the 200-core
+#                    cap of D-238 (was 120, D-185; twins x NCPUS <= 200, refused otherwise)
 #   WALLTIME         24:00:00 per twin job, until the pilot's timings set it
 #   CONDA_ENV        prova
 #   PLAN_ARGS        extra options for `plan` (e.g. --base-seed <int>), split on white space (use the '=' form for a
@@ -104,7 +104,7 @@ export OMP_NUM_THREADS=$TWIN_JOB_THREADS OPENBLAS_NUM_THREADS=$TWIN_JOB_THREADS 
 # this run opens a window (the merge's figure is written without a display).
 unset DISPLAY
 
-MAX_CORES=120                 # D-185: never more than 120 cores at once
+MAX_CORES=200                 # D-238 (was 120, D-185): never more than 200 cores at once
 MERGE_WALLTIME=01:00:00       # the merge reads CSVs and writes the report: minutes
 JOB_NAME_TWIN=twin_recovery   # roadmap allen-mtg-fit S7
 JOB_NAME_MERGE=twin_merge
@@ -315,9 +315,9 @@ say "noise:     $NOISE_DIR"
 say "outputs:   $OUT_DIR"
 say "run file:  $RUN_FILE"
 say "twins:     $N of ${#ALL_IDS[@]}: ${IDS[*]}"
-say "cores:     $N twin(s) x NCPUS $NCPUS = $TOTAL (cap $MAX_CORES, D-185); walltime $WALLTIME per twin job"
+say "cores:     $N twin(s) x NCPUS $NCPUS = $TOTAL (cap $MAX_CORES, D-238); walltime $WALLTIME per twin job"
 if [ "$TOTAL" -gt "$MAX_CORES" ]; then
-    die "$N twin(s) x $NCPUS cores = $TOTAL cores > $MAX_CORES (D-185): submit fewer twins (TWINS, MAX_TWINS) or fewer cores per twin (NCPUS)" 3
+    die "$N twin(s) x $NCPUS cores = $TOTAL cores > $MAX_CORES (D-238): submit fewer twins (TWINS, MAX_TWINS) or fewer cores per twin (NCPUS)" 3
 fi
 
 write_run_file() {

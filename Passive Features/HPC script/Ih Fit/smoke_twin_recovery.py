@@ -980,7 +980,7 @@ def test_TS7_submitter():
     parts = {"bash -n": subprocess.run(["bash", "-n", str(script)]).returncode == 0}
     parts["the marker lines of submit_noise_fit.sh (stage S7), the cap"] = all(s in text for s in (
         "export ROADMAP_STAGE=S7", "export ROADMAP_N_TASKS=", "specs/roadmap/hpc_status.sh", "roadmap_job_start",
-        "trap 'roadmap_job_end $?' EXIT", "MAX_CORES=120", "set -u relaxed", "conda activate \"$1\"",
+        "trap 'roadmap_job_end $?' EXIT", "MAX_CORES=200", "set -u relaxed", "conda activate \"$1\"",
         "JOB_NAME_TWIN=twin_recovery", "JOB_NAME_MERGE=twin_merge"))
     usage = "\n".join(ln for ln in text.splitlines() if ln.startswith("#"))
     parts["the usage text names Block 17's plan options"] = all(o in usage for o in (
@@ -1016,12 +1016,12 @@ def test_TS7_submitter():
         p.returncode == 0 and "can't open DISPLAY" not in p.stdout + p.stderr and "\nunset DISPLAY\n" in text)
     dry_text = p.stdout
 
-    # the cap, NCPUS=4 given explicitly: 31 x 4 = 124 refused, 30 x 4 = 120 accepted
+    # the cap (200, D-238), NCPUS=4 given explicitly: 51 x 4 = 204 refused, 50 x 4 = 200 accepted
     reset()
-    p31 = sh(env(RUN_TAG="t7c", PY_STUB_LIST=31, NCPUS=4))
-    p30 = sh(env(RUN_TAG="t7c", PY_STUB_LIST=30, NCPUS=4, DRY_RUN=1))
-    parts["31 twins x 4 cores refused (exit 3), 30 x 4 = 120 accepted"] = (
-        p31.returncode == 3 and "124 cores > 120" in p31.stderr and not qlog.exists() and p30.returncode == 0)
+    p31 = sh(env(RUN_TAG="t7c", PY_STUB_LIST=51, NCPUS=4))
+    p30 = sh(env(RUN_TAG="t7c", PY_STUB_LIST=50, NCPUS=4, DRY_RUN=1))
+    parts["51 twins x 4 cores refused (exit 3), 50 x 4 = 200 accepted"] = (
+        p31.returncode == 3 and "204 cores > 200" in p31.stderr and not qlog.exists() and p30.returncode == 0)
 
     # MAX_TWINS=2: a stubbed submission of 2 subjobs (it plans the run for real)
     reset()
@@ -1871,14 +1871,14 @@ def test_T7_submitter_workers():
         p.returncode == 0 and len(sub) == 4 and all(shlex.split(ln)[-2:] == ["--n-workers", "3"] for ln in sub)
         and len(q) == 2 and " select=1:ncpus=3 " in q[0])}
     parts["the core count: 4 twin(s) x NCPUS 3 = 12 against the cap"] = any(
-        "4 twin(s) x NCPUS 3 = 12 (cap 120" in ln for ln in lines)
+        "4 twin(s) x NCPUS 3 = 12 (cap 200" in ln for ln in lines)
     parts["the twin job's environment text: OMP/OPENBLAS/MKL_NUM_THREADS=1"] = (
         len(envl) == 1 and all("%s=1" % v in envl[0] for v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS",
                                                                  "MKL_NUM_THREADS")))
-    p41 = sh(env(RUN_TAG="t7w", PY_STUB_LIST=41, NCPUS=3))
-    p40 = sh(env(RUN_TAG="t7w", PY_STUB_LIST=40, NCPUS=3, DRY_RUN=1))
-    parts["41 x 3 = 123 cores refused (3), 40 x 3 = 120 accepted (D-185)"] = (
-        p41.returncode == 3 and "123 cores > 120" in p41.stderr and p40.returncode == 0
+    p41 = sh(env(RUN_TAG="t7w", PY_STUB_LIST=67, NCPUS=3))
+    p40 = sh(env(RUN_TAG="t7w", PY_STUB_LIST=66, NCPUS=3, DRY_RUN=1))
+    parts["67 x 3 = 201 cores refused (3), 66 x 3 = 198 accepted (D-238)"] = (
+        p41.returncode == 3 and "201 cores > 200" in p41.stderr and p40.returncode == 0
         and not (tmp / "qsub.log").exists())
     # the twin role with NCPUS=5 in the run file and PBS's OMP_NUM_THREADS=5: threads 1, --n-workers 5
     rf = tmp / "run.env"

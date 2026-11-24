@@ -1675,8 +1675,8 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
     `dv_h`, `dvh_true_mV`, `dvh_est_mV`; `g_h(v*)` at the truth and at the estimate each with its own dv_h.
   - `submit_twin_recovery.sh`: `NCPUS` default 3 (was 1); the twin job runs `twin ... --n-workers $TWIN_NCPUS`;
     `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS` are 1 in the twin job whatever `NCPUS` (the
-    workers are forked processes; threaded linear algebra in a forked child can hang); the 120-core cap (D-185)
-    unchanged; `PLAN_ARGS` carries `--ih-arm` when the user wants `ih5`.
+    workers are forked processes; threaded linear algebra in a forked child can hang); the cap on the cores of one submission is 200 (D-238, the user, 2026-11-24; it was 120, D-185:
+    wherever Blocks 8 and 17 say 120, 200 holds); `PLAN_ARGS` carries `--ih-arm` when the user wants `ih5`.
 - Custom code: none.
 - Test oracles (`smoke_twin_recovery.py`): the existing checks, adapted to the new defaults (say which), plus: T1
   `plan` with defaults: the manifest's arms and dv_h truths as Block 21's M2; the config records `ih_arm`, the gate
