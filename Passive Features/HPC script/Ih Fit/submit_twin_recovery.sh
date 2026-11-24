@@ -3,8 +3,9 @@
 #PBS -q cpu
 #PBS -k eo
 ##########################################################################
-# submit_twin_recovery.sh -- Block 8 of specs/SPEC.md: the Stage-7 run on the
-# twins on davinci (D-184, D-185, D-188, D-182.3). One script, three roles:
+# submit_twin_recovery.sh -- Blocks 8, 17 and 22 of specs/SPEC.md: the Stage-7
+# run on the twins on davinci (D-184, D-185, D-188, D-182.3; D-234). One script,
+# three roles:
 #
 #   run by hand        THE SUBMITTER. Plans the run (run_twin_recovery.py plan;
 #                      a no-op when the run directory is already planned with
@@ -13,23 +14,25 @@
 #                      NCPUS, D-185), writes the run file and submits the PBS
 #                      array -- one subjob per twin, NCPUS cores each -- and
 #                      the merge job after it (-W depend=afterany:<array>).
-#   TWIN_ROLE=twin     AN ARRAY SUBJOB: `run_twin_recovery.py twin` on the
-#                      PBS_ARRAY_INDEX-th twin: the build (Block 12), then the
-#                      fit of its configuration's arm (run_ih_fit).
+#   TWIN_ROLE=twin     AN ARRAY SUBJOB: `run_twin_recovery.py twin --n-workers
+#                      NCPUS` on the PBS_ARRAY_INDEX-th twin: the build (Block
+#                      12), then the fit of its configuration's arm (run_ih_fit),
+#                      the training bundles of one loss evaluation simulated by
+#                      NCPUS worker processes (SPEC 2.9 (c)).
 #   TWIN_ROLE=merge    THE MERGE JOB: `run_twin_recovery.py merge` -> report/,
 #                      report_without_flagged/, recovery_by_configuration.csv,
 #                      twins_status.csv.
 #
 # Run it from the "Ih Fit" folder, after `git pull`, with the conda env
 # active (the script activates CONDA_ENV itself as well). The order on the
-# cluster: the gates, DRY_RUN=1, a pilot (MAX_TWINS), then the 30 twins. The gates
+# cluster: the gates, DRY_RUN=1, a pilot (MAX_TWINS), then the 35 twins. The gates
 # (amendment 8.2) are the six twins' suites, each exiting 0, run from this folder:
 #
 #   python smoke_twin_table.py && python smoke_twin_noise.py && python smoke_twin_manifest.py && python smoke_twin_response.py --build && python smoke_twin_build.py && python smoke_twin_recovery.py
 #
-#   RUN_TAG=tw1 NOISE_TAG=nf2 DRY_RUN=1 bash submit_twin_recovery.sh
-#   RUN_TAG=tw1 NOISE_TAG=nf2 MAX_TWINS=2 bash submit_twin_recovery.sh
-#   RUN_TAG=tw1 NOISE_TAG=nf2 WALLTIME=<from the pilot> bash submit_twin_recovery.sh
+#   RUN_TAG=tw3 NOISE_TAG=nf2 DRY_RUN=1 bash submit_twin_recovery.sh
+#   RUN_TAG=tw3 NOISE_TAG=nf2 MAX_TWINS=2 bash submit_twin_recovery.sh
+#   RUN_TAG=tw3 NOISE_TAG=nf2 WALLTIME=<from the pilot> bash submit_twin_recovery.sh
 #
 # The third line resubmits every twin with the pilot's run tag: a twin whose
 # archive and fit exist is neither rebuilt nor refitted (run_twin_recovery.py
@@ -42,8 +45,9 @@
 #   GROUP            L3_exc
 #   TWINS            comma-separated twin ids (a subset of the manifest); empty = every twin
 #   MAX_TWINS        submit only the first k twins (of the manifest, or of TWINS): the pilot
-#   NCPUS            1 core per twin job: the fit is one sequential process (amendment 7);
-#                    30 twins = 30 cores, inside the 120-core cap of D-185
+#   NCPUS            3 cores per twin job (Block 22; was 1): the fit runs with --n-workers NCPUS
+#                    (forked workers, SPEC 2.9 (c)); 35 twins x 3 = 105 cores, inside the 120-core
+#                    cap of D-185 (twins x NCPUS <= 120, refused otherwise)
 #   WALLTIME         24:00:00 per twin job, until the pilot's timings set it
 #   CONDA_ENV        prova
 #   PLAN_ARGS        extra options for `plan` (e.g. --base-seed <int>), split on white space (use the '=' form for a
@@ -51,7 +55,12 @@
 #                    options: --n-no-noise <k> (5: the full_no_noise twins, counted in the twins and the cap),
 #                    --gbar-bounds (1e-6,1e-2), --tau-h-pk-bounds-ms LO,HI (50,1000: the box of tau_h_pk, ms)
 #                    and --tau-h-pk-truth-ms LO,HI (150,700: the range of its truth, ms), which replace
-#                    --kappa-bounds and --kappa-range; --dvh-range is gone (the truth of dv_h is 0)
+#                    --kappa-bounds and --kappa-range; --dvh-range is gone. Block 22's plan options
+#                    (SPEC 2.9): --ih-arm ih6_d207|ih5 (ih6_d207: six parameters, dv_h fitted; pass
+#                    --ih-arm ih5 for the five-parameter arm), --dvh-truth-range-mV=LO,HI (-5,5: the
+#                    range of dv_h's truth under ih6_d207; 0 under ih5), --gbar-bounds (now 1e-5,1e-3),
+#                    --gbar-floor (1e-5), --refine none|nelder_mead (nelder_mead), --refine-starts (3),
+#                    --refine-maxfev (100)
 #   IH_CODE_DIR      the folder of run_twin_recovery.py; default: this script's folder
 #   IH_ARCHIVE_ROOT  /davinci-1/home/ldellamea/Human Neurons Fitting (the cells: $IH_ARCHIVE_ROOT/$GROUP/specimen_<id>/)
 #   IH_OUTPUT_BASE   $IH_ARCHIVE_ROOT/pipeline_outputs_ih
@@ -68,24 +77,26 @@
 # $TWIN_RUN_DIR/<RUN_TAG>_<GROUP>_<UTC>.env (a copy goes to logs/), and the
 # jobs receive only that file's path.
 #
-# Threads: the submitter and the merge run with the BLAS threads at 1; a twin
-# job runs one process (NEURON and run_ih_fit are sequential), with the BLAS
-# threads at NCPUS (1 by default, amendment 7) for the optimiser's linear algebra.
+# Threads: OMP_NUM_THREADS, OPENBLAS_NUM_THREADS and MKL_NUM_THREADS are 1 in
+# every role, the twin job included, whatever NCPUS (Block 22): the twin's NCPUS
+# cores go to the fit's forked worker processes (--n-workers), and threaded
+# linear algebra in a forked child can hang.
 #
 # Logs: PBS keeps each job's own .o/.e in $HOME (-k eo: twin_recovery.o<id>,
 # twin_merge.o<id>); each job also tees its output to
 # <outputs>/logs/twin_<id>_<job>.log or merge_<job>.log.
 # Exit codes: 2 usage, 3 refused (archive, noise tables, plan, twins or core cap), 4 qsub, 5 conda.
 #
-# Pure ASCII, LF (hpc-python-compat). Spec: specs/SPEC.md, Block 8.
+# Pure ASCII, LF (hpc-python-compat). Spec: specs/SPEC.md, Blocks 8, 17, 22.
 ##########################################################################
 
 set -euo pipefail
 
-# The BLAS threads at 1 for the submitter and the merge; a twin job sets them
-# to NCPUS below (PBS exports OMP_NUM_THREADS = ncpus to a job; overridden
-# here, before any python starts).
-export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+# The BLAS threads at 1 in every role, the twin job included (Block 22: its
+# cores are the fit's forked workers; PBS exports OMP_NUM_THREADS = ncpus to a
+# job: overridden here, before any python starts).
+TWIN_JOB_THREADS=1
+export OMP_NUM_THREADS=$TWIN_JOB_THREADS OPENBLAS_NUM_THREADS=$TWIN_JOB_THREADS MKL_NUM_THREADS=$TWIN_JOB_THREADS
 
 # No display, in every role (amendment 10): NEURON exits ("can't open DISPLAY")
 # when DISPLAY is set and no X server answers -- an X11-forwarded login whose
@@ -114,8 +125,8 @@ activate_env() {
     set -u
 }
 
-twin_cmd() {   # twin_cmd CODE_DIR OUT_DIR TWIN_ID -> the array CMD
-    CMD=(python "$1/run_twin_recovery.py" twin --out "$2" --twin "$3")
+twin_cmd() {   # twin_cmd CODE_DIR OUT_DIR TWIN_ID N_WORKERS -> the array CMD
+    CMD=(python "$1/run_twin_recovery.py" twin --out "$2" --twin "$3" --n-workers "$4")
 }
 
 merge_cmd() {  # merge_cmd CODE_DIR OUT_DIR -> the array CMD
@@ -159,11 +170,11 @@ if [ -n "$ROLE" ]; then
         case "$IDX" in ''|*[!0-9]*) die "no array index (PBS_ARRAY_INDEX or TWIN_INDEX)" 2 ;; esac
         [ "$IDX" -lt "$N_TWINS" ] || die "array index $IDX outside the $N_TWINS twin(s) of the run file" 2
         TWIN_ID="${TWIN_IDS[$IDX]}"
-        twin_cmd "$TWIN_CODE_DIR" "$TWIN_OUT_DIR" "$TWIN_ID"
+        twin_cmd "$TWIN_CODE_DIR" "$TWIN_OUT_DIR" "$TWIN_ID" "$TWIN_NCPUS"
         LOG="$TWIN_OUT_DIR/logs/twin_${TWIN_ID}_${JOB_TAG}.log"
         TASKS="$N_TWINS"
-        # one process per twin: the BLAS threads may use the job's cores
-        export OMP_NUM_THREADS="$TWIN_NCPUS" OPENBLAS_NUM_THREADS="$TWIN_NCPUS" MKL_NUM_THREADS="$TWIN_NCPUS"
+        # the job's cores are the fit's worker processes; the BLAS threads stay at 1 (Block 22)
+        export OMP_NUM_THREADS=$TWIN_JOB_THREADS OPENBLAS_NUM_THREADS=$TWIN_JOB_THREADS MKL_NUM_THREADS=$TWIN_JOB_THREADS
     else
         merge_cmd "$TWIN_CODE_DIR" "$TWIN_OUT_DIR"
         LOG="$TWIN_OUT_DIR/logs/merge_${JOB_TAG}.log"
@@ -213,7 +224,7 @@ case "$TWINS" in *[!0-9,]*) die "TWINS: comma-separated twin ids (got '$TWINS')"
 MAX_TWINS="${MAX_TWINS:-}"
 case "$MAX_TWINS" in ''|[1-9]|[1-9]*[0-9]) ;; *) die "MAX_TWINS: a positive integer (got '$MAX_TWINS')" 2 ;; esac
 case "$MAX_TWINS" in *[!0-9]*) die "MAX_TWINS: a positive integer (got '$MAX_TWINS')" 2 ;; esac
-NCPUS="${NCPUS:-1}"
+NCPUS="${NCPUS:-3}"
 case "$NCPUS" in ""|*[!0-9]*|0*) die "NCPUS: a positive integer (got '$NCPUS')" 2 ;; esac
 WALLTIME="${WALLTIME:-24:00:00}"
 [[ "$WALLTIME" =~ ^[0-9]+:[0-5][0-9]:[0-5][0-9]$ ]] || die "WALLTIME: HH:MM:SS (got '$WALLTIME')" 2
@@ -355,7 +366,7 @@ PYEOF
     ) || die "run_twin_recovery.py's parser refused the arguments of the $label job (above)" 2
 }
 for i in "${!IDS[@]}"; do
-    twin_cmd "$CODE_DIR" "$OUT_DIR" "${IDS[$i]}"
+    twin_cmd "$CODE_DIR" "$OUT_DIR" "${IDS[$i]}" "$NCPUS"
     check_args "twin ${IDS[$i]}" "${CMD[@]:2}"
 done
 merge_cmd "$CODE_DIR" "$OUT_DIR"
@@ -366,8 +377,9 @@ if [ "$DRY_RUN" = "1" ]; then
     say "DRY RUN -- the run file would read:"
     write_run_file | sed 's/^/    /'
     print_cmd "[twin_recovery] DRY RUN: cd $(printf '%q' "$SELF_DIR") &&" "${QSUB_TWIN[@]}"
+    say "DRY RUN: twin job environment: OMP_NUM_THREADS=$TWIN_JOB_THREADS OPENBLAS_NUM_THREADS=$TWIN_JOB_THREADS MKL_NUM_THREADS=$TWIN_JOB_THREADS (NCPUS $NCPUS = the fit's --n-workers)"
     for i in "${!IDS[@]}"; do
-        twin_cmd "$CODE_DIR" "$OUT_DIR" "${IDS[$i]}"
+        twin_cmd "$CODE_DIR" "$OUT_DIR" "${IDS[$i]}" "$NCPUS"
         print_cmd "[twin_recovery] DRY RUN:   subjob $i:" "${CMD[@]}"
     done
     merge_qsub "ARRAY_JOB_ID"
