@@ -25,6 +25,7 @@
 | 2026-11-23 (later, 5) | Cell 23B on the pilot, node 7 alone (the user's run, 18:20): section 12.3, new. Cell 26's time measured with its own settings on a synthetic node: section 15.2's time bullet; the notebook's Cell 23B, 25 and 26 time notes corrected. Evidence: the user's log **[data]**; `infer_nodes.py` at the production settings **[run, sandbox]**. |
 | 2026-11-24 | The user's uploads of 14:15 (Cells 25 and 26, Cell 23B again): sections 14.6 and 15.3, new -- the soma's polar semi-axis and the SGT's beta end at their bounds unflagged; the notebook's Cell 26 (b), new. Evidence: the uploaded JSON and CSV **[data]**; `soma_fit._at_bound`, `node_inference` (active_mask) **[code]**. |
 | 2026-11-24 (later) | The bound flag fixed (D-236, the user: "Fix it"): sections 14.6 and 15.3 marked. Evidence: the rule on the pilot's numbers and the four fits' suites **[run, sandbox]**. |
+| 2026-11-24 (later, 2) | Section 14.6: the diagnosis of c and z0 at their bounds (the user: "what do you think is the problem?") -- the c-z0-slope trade-off, what the fit's region covers, two background patterns ruled out, the next runs proposed; its "only their product being pinned" marked as understated. Evidence: five standalone checks on the uploaded JSON and corrected SWC **[run, sandbox]**. |
 
 Tags: **[user]** said by the user; **[log]** the decision log on `main` (`docs/project/TEEG_decisions_and_ideas_log.md`);
 **[src]** read in the code at `7c05a01`; **[data]** read from the user's uploads, by eye or by a script named next to it;
@@ -624,7 +625,31 @@ um) and 28 (0.755), judged clean by D-198's verdict; 6049 (0.474, basal) and 265
   iterates strictly inside the bounds, so its last step stops short of them. The area is therefore set by the bound,
   not by the data, and `at_bound` is empty. mu is 0.029 /um, against 0.18 /um fitted on nodes 7 and 5353 **[data]**:
   through the centre mu x 2c = 0.87, the absorbance a 0.18 /um soma would reach with c near 2.4 um, so the fit appears
-  to trade depth extent for absorption, only their product being pinned **[reasoning]**.
+  to trade depth extent for absorption, only their product being pinned **[reasoning]** [corrected 2026-11-24, later:
+  understated -- z0 and the far slope trade with c as well, next bullet].
+- **Why c and z0 end at their bounds: the diagnosis so far [added 2026-11-24, later; the user: "what do you think is
+  the problem?"]** Standalone checks on the uploaded JSON and corrected SWC, delivered to the user, not in the repository
+  (`depth_signal.py`, `tradeoff.py`, `region_makeup.py`, `region_signal.py`, `sensitivity.py`) **[run, sandbox]**:
+  - Three parameters trade off. A compact soma (c 7.26 um, mu scaled to keep 2 mu c = 0.87) with z0 28.39 um and far
+    slope 0.513, both re-fitted to imitate the fitted soma, renders its planes within 2.14 gl RMS on the fit's own
+    pixels (2.40 gl over the 13 um disc); c 10 um (z0 28.45 um, slope 0.490) within 1.18 gl. The fit's residual is
+    3.5-6.3 gl per plane (4.33 gl RMS overall), largest on the top planes. The planes pin a combination of c, z0 and
+    the far slope, not c.
+  - The fit sees little of the soma. R is 7644 px per plane (100 um^2, 19 % of the disc): every traced process, at
+    every depth, is masked at its radius + 2 um. Rebuilt from the corrected SWC (approximate: 8610 px), 72 % of R lies
+    more than 1 um outside the fitted silhouette, 11 % within 1 um of its edge, 17 % inside; 14 % of the silhouette
+    enters the fit.
+  - Ruled out: the residual's bright top-left wedge and a background tilt move c by at most 0.10 um per gl (the fit's
+    linear response at the compact soma).
+  - Reading **[reasoning]**: z0 stopped at its shallow end (6 um above Allen's traced depth) and c at 15 um, so the fit
+    pushes absorption toward the upper planes and the box stops it. The start was Allen's traced depth (the JSON's
+    `start.source`), not a plane chosen by eye (D-211; Cell 25's `SOMA_FIT_K`), so the window and z0's box are
+    centred on it. What pulls upward is not identified: a soma shallower than traced (against the user's D-211 reading,
+    the soma seen from k = 107 on), a dark structure in the soma's column that the mask misses, or a far blur that is
+    not the Gaussian law. Holding mu at the dendrites' 0.18 /um (suggested in chat, withdrawn the same day) would force
+    2c = 0.87 / 0.18 = 4.8 um against 16 x 13 um in-plane.
+  - Next [proposed to the user]: Cell 25 from the plane the user judges the soma's centre; then with `FAR_SLOPE`
+    "fixed" as a sensitivity test. This run's area is not used.
 
 ## 15. The kernel of the node fit: the switch to the calibrated sigma_0 and the SGT option (D-221, D-222) [added 2026-11-23]
 
