@@ -285,6 +285,7 @@ the "Binds" column.
 | 2026-11-23 (17:07) | Logs **D-233** (orchestrator): wave 7's final check settled (F1-F5 fixed, S1-S7 stated in the spec). Next free IDs: D-234, I-007. |
 | 2026-11-24 (the twins chat) | Logs **D-234** (user, 14:33 and the answers to three multiple-choice questions): run `tw2` FAILED the gate in its three reports with the loss at the truth below the loss at the estimate in 14 of 15 twins fitted with I_h **[run, here, on the user's `tw2_results.tar.gz`]**; the user chose the local refinement (three Nelder-Mead starts), $\bar g_h$ on two decades, $\Delta v_h$ fitted again (D-206 superseded), and a pool over the sweeps of one evaluation. **Roadmap allen-mtg-fit: T18 added, open** ("Local refinement after the global search", under TG3). D-206, D-208 and D-195 annotated in the index. Written after re-reading this log (last ID D-233, by another chat). Next free IDs: D-235, I-008. |
 | 2026-11-24 (the twins chat, 2) | Logs **D-235** [orchestrator] (coding directive 7) with the user's go of 14:42 ("Perfect all go on") to the plan: the build choices of D-234, stated in SPEC 2.9 and Blocks 19 to 22; contract commit `1e3fe25` on `sci/twins`; four Opus implementers started (Blocks 19 to 22). The user, 14:41: "the Ra must be fitted as well" -- it is, in every arm (no change). Next free IDs: D-236, I-008. |
+| 2026-11-24 (15:05) | Logs **D-236** (user + orchestrator): the inference route's bound flag, 1e-3 of the width or the solver's mark. Next free IDs: D-237, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -508,6 +509,7 @@ would be needed*, *Status*.
 | D-233 | 2026-11-23 | wave 7's final check (`kernel_width.py`, `infer_nodes.py`, `clean_cell.py`, `fit_soma.py`, `config.validate`); SPEC Blocks 30 am. 3, 36 am. 22-23, 49, section 6 | F1-F5 fixed (the recorded base read back by config_from_dict's rule; the suite's runner; a failed SGT stage keeps the Gaussian fit and the clearance; the switch's record by argument; the figures closed); S1-S7 stated (cov_fine_factor 32; the covariance at a bound marginal, as since Block 30's entry; the zeta box within +-ln 2.1; a missing calibration refused; the box's corners an oracle) [orchestrator] | active |
 | D-234 | 2026-11-24 | the I_h fit's optimiser, parameter vector and boxes (`run_ih_fit.py`, `param_spec.py`, `passive_long_step_training.py`, `submit_twin_recovery.sh`); D-206 (superseded), D-208 (superseded in part), D-195 (superseded in part); the next Stage-7 run | after run `tw2` failed the gate with the optimiser as the limit: a local refinement after the global search (bounded Nelder-Mead from the best 3 points, at most 100 evaluations each); $\bar g_h \in [10^{-5}, 10^{-3}]$ S/cm$^2$; $\Delta v_h$ fitted again (six parameters); the sweeps of one loss evaluation simulated in parallel on the job's cores; roadmap topic T18 and a brief study document [user] | active; not implemented |
 | D-235 | 2026-11-24 | SPEC 2.9 and Blocks 19 to 22 of `Ih Fit/specs/SPEC.md` (`local_refine.py`, `run_ih_fit.py`, `passive_long_step_training.py`, `twin_manifest.py`, `run_twin_recovery.py`, `submit_twin_recovery.sh`); D-234 | the build choices of D-234: the starts at least 0.1 apart in unit coordinates, the simplex step 0.05, stopping at 1e-3 (unit) and 1e-4 (relative loss), the refinement by wrapping `mono.gp_minimize`, also for `passive_fullstep`; the arm `ih6_d207`; a fork pool created at the first evaluation; linear-algebra threads at 1 in a twin's job [orchestrator]; dv_h truths in $\pm 5$ mV and 3 cores per twin [user, 14:42] | active; in implementation |
+| D-236 | 2026-11-24 | the bound flag of Blocks 29, 30, 42, 46 (and Block 48's summary, `fit_soma.py`'s log) | at a bound = within 1e-3 of the bound interval's width, or the solver's active_mask; the table route's 1e-6 unchanged [user: "Fix it"; orchestrator: the rule] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15292,3 +15294,40 @@ twins with five and with six parameters. **[orchestrator]** the choices the plan
 **Sources.** **[user]**; **[reasoning]**; **[log]** D-011, D-185, D-195, D-207, D-234.
 
 **Status:** active; in implementation.
+
+## D-236 -- The bound flag of the inference route's fits: within 1e-3 of the bound interval's width, or the solver's mark (user's request; orchestrator's rule)
+
+**Date:** 2026-11-24 (Europe/Rome), the gallery chat. **Binds:** `analysis/soma_fit.py` (Block 46, `AT_BOUND_REL`),
+`analysis/sigma_calibration.py` (Block 42, `AT_BOUND_REL`), `analysis/node_inference.py` (Block 30, `_bound_side`),
+`analysis/coarse_fit.py` (Block 29), `plotting/soma_fit_figures.py` (Block 48, `figure_soma_fit_summary(at_bound=)`),
+`scripts/fit_soma.py`; SPEC Blocks 29, 30 (amendment 3 (B)), 42, 46, and the paragraph after wave 7's final check.
+
+**Decision.** The user (14:26, on the pilot's soma fit and node 5353's SGT fit, both "converged" with nothing
+flagged though a parameter sat on its bound): "Fix it" **[user]**. The rule, the orchestrator's **[orchestrator]**:
+a fitted parameter is at a bound when it lies within 1e-3 of its bound interval's width from it, or when the solver's
+`active_mask` marks it; one rule for the four trust-region fits of the inference route (Blocks 29, 30, 42, 46).
+
+**Statement.** For a parameter $x$ with bounds $[\ell, h]$, at the lower bound when $x - \ell \le 10^{-3}(h - \ell)$,
+at the upper when $h - x \le 10^{-3}(h - \ell)$, or when `least_squares`' `active_mask` is $-1$ / $+1$. Block 30's
+at-bound set feeds, as before, its status (`xi_lo` alone stays "converged", D-225.5; any other gives "at_bound") and
+its covariance (NaN rows and columns); Block 42's decides `ok` and the calibration summary; Block 46's is listed in the
+JSON, logged by `fit_soma.py` and marked in the summary figure (red row, "at bound"); Block 29's sets "at_bound" and the
+cleaning's flag `refine_at_bound` (the refined features are used as before).
+
+**Why.** **[data]** the pilot's soma fit (the user's upload of 14:15): c 2.1e-6 and z0 1.0e-4 of their bound widths
+from the bounds (c at 15 um, z0 at start - 6 um), not flagged by 1e-6; node 5353's SGT fit: log10 beta 4.8e-8 below 1,
+not marked by `active_mask`. **[reasoning]** `least_squares`' "trf" keeps its iterates strictly inside the box and
+stops by xtol or ftol short of a bound, so a parameter pressed against a bound ends a little inside it; 1e-3 of the
+width covers the largest gap seen (1.0e-4) tenfold, and a value that close to a bound is at it for every reading made
+of it. **[run, sandbox]** on those numbers the rule flags z0_um and c_um, and log10_beta_hi; the suites of the four
+fits and of the soma's figures pass unchanged (smoke 46 pass, spec 129 pass, the soma fit end to end 12).
+
+**What it does not decide.** The table route's fits (Blocks 3, 11, 12; `measure.fit_at_bound_rel_tol` = 1e-6), whose
+flag decides the phantoms' success set inside the table's configuration hash: unchanged, to be decided with the table.
+What to do about the soma's depth (c and z0 at their bounds; the user's question of 14:26 on the problem) and the SGT
+shape at its box's edge: not decided here.
+
+**Sources.** **[data]** `soma_fit_529878215.json`, `inference_529878215.csv` (OUT/inference_sgt), the user's upload of
+2026-11-24 14:15. **[code]** the four modules. **[run, sandbox]** the reruns above.
+
+**Status:** active.
