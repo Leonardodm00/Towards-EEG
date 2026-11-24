@@ -48,6 +48,14 @@ max |deflection| within the window rather than its tail mean.
 """
 from __future__ import annotations
 
+import itertools
+import multiprocessing
+import numbers
+import pickle
+import traceback
+import weakref
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -417,6 +425,158 @@ def bundle_rmsd(cell, bundle, v_rest_mV: float, *,
 
 
 # ---------------------------------------------------------------------------
+#  The sweeps of one loss evaluation in parallel (SPEC 2.9 (c), Block 19)
+# ---------------------------------------------------------------------------
+#  A forked worker inherits the parent's memory, so the cell, the bundles and
+#  the RMSD options reach it through this registry, never through pickling
+#  (a NEURON cell cannot be pickled). Each loss with n_workers > 1 registers
+#  its context under a token right before its pool forks, and removes it when
+#  the pool is closed. Only (token, q, bundle index, dt) cross the pipe.
+_POOL_CONTEXTS: Dict[int, tuple] = {}
+_POOL_TOKENS = itertools.count(1)
+
+
+class _RemoteDtEnforcementError(RuntimeError):
+    """Raised in the parent for a worker's dt-enforcement failure when the
+    worker's own exception could not be sent back (not picklable)."""
+
+
+# The class name is the contract (SPEC Block 19): callers match by name.
+_RemoteDtEnforcementError.__name__ = "DtEnforcementError"
+_RemoteDtEnforcementError.__qualname__ = "DtEnforcementError"
+
+
+def _check_n_workers(n_workers) -> int:
+    """n_workers must be an integer >= 1 (bool refused); returns it as int."""
+    if (isinstance(n_workers, bool)
+            or not isinstance(n_workers, numbers.Integral)
+            or int(n_workers) < 1):
+        raise ValueError("n_workers must be an integer >= 1, got %r"
+                         % (n_workers,))
+    return int(n_workers)
+
+
+def _pool_task(token: int, q: tuple, i: int, dt_brief_ms: float,
+               dt_long_ms: float) -> tuple:
+    """Worker side: apply q to this process's copy of the cell, return the
+    pair (RMSD_b, D_b) of bundle i as the serial loop computes it.
+
+    Every exception is caught and sent back tagged, so the parent can apply
+    the serial loop's rules in the bundles' order:
+        ("ok", rmsd, defl) | ("dt", pickled exception or None, text)
+        | ("err", class name, text)
+    """
+    try:
+        cell, spec, bundles, v_rest_mV, kw = _POOL_CONTEXTS[token]
+        spec.apply_q(cell, q, v_rest_mV)
+        rmsd, defl = bundle_rmsd(cell, bundles[i], v_rest_mV,
+                                 dt_brief_ms=dt_brief_ms,
+                                 dt_long_ms=dt_long_ms, **kw)
+        return ("ok", rmsd, defl)
+    except Exception as exc:  # noqa: BLE001 - sent back, judged by the parent
+        text = "".join(traceback.format_exception(type(exc), exc,
+                                                  exc.__traceback__))
+        if type(exc).__name__ == "DtEnforcementError":
+            try:
+                blob = pickle.dumps(exc)
+            except Exception:  # noqa: BLE001 - fall back to the named class
+                blob = None
+            return ("dt", blob, text)
+        return ("err", type(exc).__name__, text)
+
+
+def _raise_remote_dt(blob, text):
+    """Raise a worker's DtEnforcementError in the parent: the original
+    exception when it could be sent back, else one of the same class name."""
+    exc = None
+    if blob is not None:
+        try:
+            exc = pickle.loads(blob)
+        except Exception:  # noqa: BLE001
+            exc = None
+    if exc is None:
+        exc = _RemoteDtEnforcementError(text)
+    raise exc
+
+
+def _close_pool(state: dict) -> None:
+    """Shut the pool of one loss down and drop its context. Idempotent; used
+    by loss.close(), by the garbage-collection finalizer and at exit. The
+    workers are idle between evaluations (the loss waits for every task), so
+    shutdown(wait=True) returns once they have exited."""
+    pool, token = state.get("pool"), state.get("token")
+    state["pool"] = None
+    state["token"] = None
+    try:
+        if pool is not None:
+            pool.shutdown(wait=True, cancel_futures=True)
+    finally:
+        if token is not None:
+            _POOL_CONTEXTS.pop(token, None)
+
+
+def _make_pooled_loss(cell, train_bundles, v_rest_mV, spec, n_workers,
+                      rmsd_kw, dt_brief_ms, dt_long_ms, combine):
+    """The loss of build_multi_protocol_loss with the pairs (RMSD_b, D_b)
+    computed by a fork pool (SPEC 2.9 (c)). `combine(outs)` is the serial
+    loop's body over the workers' tagged outcomes, in the bundles' order."""
+    bundles = tuple(train_bundles)
+    n_proc = min(int(n_workers), len(bundles))
+    state = {"pool": None, "token": None}
+
+    def _pool():
+        if state["pool"] is None:
+            token = next(_POOL_TOKENS)
+            _POOL_CONTEXTS[token] = (cell, spec, bundles, v_rest_mV, rmsd_kw)
+            state["token"] = token
+            # The workers fork at the first submit, with the cell as it is
+            # now (SPEC Block 19: the pool is created at the first call).
+            state["pool"] = ProcessPoolExecutor(
+                max_workers=n_proc,
+                mp_context=multiprocessing.get_context("fork"))
+        return state["pool"], state["token"]
+
+    def loss(*q: float) -> float:
+        try:
+            # The serial code's side effect: the parent's cell is left at q.
+            spec.apply_q(cell, q, v_rest_mV)
+        except Exception as exc:  # noqa: BLE001 - as the serial loss
+            if type(exc).__name__ == "DtEnforcementError":
+                raise
+            return 1e6
+        if not bundles:
+            try:
+                return combine([])
+            except Exception:  # noqa: BLE001 - as the serial loss
+                return 1e6
+        # dt resolved now, as the serial loop resolves it at each call
+        dtb = float(DEFAULT_DT_BRIEF_MS if dt_brief_ms is None else dt_brief_ms)
+        dtl = float(DEFAULT_DT_LONG_MS if dt_long_ms is None else dt_long_ms)
+        pool, token = _pool()
+        n = len(bundles)
+        try:
+            outs = list(pool.map(_pool_task, [token] * n, [tuple(q)] * n,
+                                 range(n), [dtb] * n, [dtl] * n, chunksize=1))
+        except BrokenProcessPool:
+            # A worker died (not an exception inside it): the pool is
+            # unusable and this evaluation has no value. Never a penalty.
+            _close_pool(state)
+            raise
+        try:
+            return combine(outs)
+        except Exception as exc:  # noqa: BLE001 - as the serial loss
+            if type(exc).__name__ == "DtEnforcementError":
+                raise
+            return 1e6
+
+    loss.n_workers = int(n_workers)
+    loss.close = lambda: _close_pool(state)
+    # terminated when the loss is garbage-collected, and at interpreter exit
+    weakref.finalize(loss, _close_pool, state)
+    return loss
+
+
+# ---------------------------------------------------------------------------
 #  Multi-protocol loss (log-space, drop-in for _build_loss_function)
 # ---------------------------------------------------------------------------
 def build_multi_protocol_loss(
@@ -433,6 +593,7 @@ def build_multi_protocol_loss(
     spec: Optional[object] = None,
     ls_sample_weight: str = "none",
     ls_tau_d_ms: float = 500.0,
+    n_workers: int = 1,
 ) -> Callable[..., float]:
     """Return loss(*q) -> scalar, q in the spec's axis order.
 
@@ -466,7 +627,23 @@ def build_multi_protocol_loss(
     ls_sample_weight, ls_tau_d_ms:
       the long bundles' per-sample weight of 2.8 (d) ('none' | 'peak_decay'),
       passed to bundle_rmsd. 'none' (default) is the previous behaviour.
+
+    n_workers (SPEC 2.9 (c), Block 19):
+      1 (default) -> the serial loop below, unchanged. W > 1 -> the pairs
+      (RMSD_b, D_b) are computed by min(W, number of bundles) processes of a
+      fork pool created at the FIRST call of the loss (the workers inherit
+      the cell as it is then) and reused; each worker applies q to its own
+      copy of the cell, the parent applies q to its cell too and combines
+      the pairs in the bundles' order by the serial arithmetic, so the value
+      equals the serial one exactly. A worker's exception gives 1e6 as the
+      serial loop does, except a DtEnforcementError (raised in the parent
+      under that class name); a worker that dies raises BrokenProcessPool.
+      The loss carries `loss.n_workers` and `loss.close()` (terminates the
+      pool; idempotent; a later call creates a new pool; also run when the
+      loss is garbage-collected and at exit; a no-op for W = 1).
+      ValueError unless an integer >= 1.
     """
+    n_workers = _check_n_workers(n_workers)
     _check_ls_sample_weight(ls_sample_weight)
     if weighting == "custom":
         if weights is None or len(weights) != len(train_bundles):
@@ -534,7 +711,41 @@ def build_multi_protocol_loss(
                 raise
             return 1e6
 
-    return loss
+    if n_workers == 1:
+        loss.n_workers = 1
+        loss.close = lambda: None
+        return loss
+
+    def combine(outs) -> float:
+        # The body of the serial loop above, on the workers' outcomes in the
+        # bundles' order: same tests, same order, same arithmetic.
+        terms = []
+        for out in outs:
+            if out[0] == "dt":
+                _raise_remote_dt(out[1], out[2])
+            if out[0] == "err":
+                return 1e6
+            rmsd, defl = out[1], out[2]
+            if not np.isfinite(rmsd):
+                return 1e6
+            if weighting in ("relative", "ls_amplitude"):
+                terms.append(rmsd / max(abs(defl), 1e-6))
+            else:
+                terms.append(rmsd)
+        terms = np.asarray(terms, dtype=float)
+        if weighting == "custom":
+            return float(np.sum(w * terms) / np.sum(w))
+        if weighting == "ls_amplitude":
+            return float(np.sum(w * terms) / len(terms))
+        return float(np.mean(terms))
+
+    rmsd_kw = dict(ss_window_ms=ss_window_ms,
+                   ls_window_ms_after_onset=ls_window_ms_after_onset,
+                   ls_window_mode=ls_window_mode, r_in_target=r_in_target,
+                   ss_sample_weight_fn=ss_sample_weight_fn,
+                   ls_sample_weight=ls_sample_weight, ls_tau_d_ms=ls_tau_d_ms)
+    return _make_pooled_loss(cell, train_bundles, v_rest_mV, spec, n_workers,
+                             rmsd_kw, dt_brief_ms, dt_long_ms, combine)
 
 
 # ---------------------------------------------------------------------------
@@ -963,6 +1174,7 @@ def integrate_long_step(
     role_rule: str = "d006",
     ls_sample_weight: str = "none",
     ls_tau_d_ms: float = 500.0,
+    n_workers: int = 1,
 ):
     """Monkeypatch the imported monolith module `mono` so Phase 2 trains on the
     brief hyperpolarising pulses PLUS the `n_long_train` smallest hyperpolarising
@@ -998,6 +1210,9 @@ def integrate_long_step(
                           only. The monolith's validation RMSDs and every
                           diagnostic are not routed through them and stay
                           unweighted.
+        n_workers         SPEC 2.9 (c) (Block 19): passed to the loss the
+                          patched _build_loss_function builds (1: serial);
+                          ValueError unless an integer >= 1.
 
     Returns the original `prepare_optimiser_inputs` so you can restore it.
     """
@@ -1012,6 +1227,7 @@ def integrate_long_step(
     _check_ls_sample_weight(ls_sample_weight)
     if ls_sample_weight != "none" and not (float(ls_tau_d_ms) > 0):
         raise ValueError("ls_tau_d_ms must be > 0, got %r" % (ls_tau_d_ms,))
+    n_workers = _check_n_workers(n_workers)
     OptimiserInputs = mono.OptimiserInputs
     PassiveSearchSpace = mono.PassiveSearchSpace
     orig_prepare = mono.prepare_optimiser_inputs
@@ -1110,7 +1326,8 @@ def integrate_long_step(
             ss_sample_weight_fn=_make_ss_weight_fn(tuple(train_window_ms)),
             dt_brief_ms=DEFAULT_DT_BRIEF_MS, dt_long_ms=DEFAULT_DT_LONG_MS,
             spec=(spec if spec is not None else globals().get("_INTEGRATE_SPEC")),
-            ls_sample_weight=ls_sample_weight, ls_tau_d_ms=ls_tau_d_ms)
+            ls_sample_weight=ls_sample_weight, ls_tau_d_ms=ls_tau_d_ms,
+            n_workers=n_workers)
 
     global _INTEGRATE_SPEC
     _INTEGRATE_SPEC = spec
