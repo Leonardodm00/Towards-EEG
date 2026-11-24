@@ -284,6 +284,7 @@ the "Binds" column.
 | 2026-11-23 | Logs **D-232** (orchestrator): Block 49's issue (oracle (iii) at the raised reach infeasible here) settled, the implementer's readings accepted, the SGT path's cost recorded. Evidence: Block 49's report (`fde033b`), the gate's rerun. Next free IDs: D-233, I-007. |
 | 2026-11-23 (17:07) | Logs **D-233** (orchestrator): wave 7's final check settled (F1-F5 fixed, S1-S7 stated in the spec). Next free IDs: D-234, I-007. |
 | 2026-11-24 (the twins chat) | Logs **D-234** (user, 14:33 and the answers to three multiple-choice questions): run `tw2` FAILED the gate in its three reports with the loss at the truth below the loss at the estimate in 14 of 15 twins fitted with I_h **[run, here, on the user's `tw2_results.tar.gz`]**; the user chose the local refinement (three Nelder-Mead starts), $\bar g_h$ on two decades, $\Delta v_h$ fitted again (D-206 superseded), and a pool over the sweeps of one evaluation. **Roadmap allen-mtg-fit: T18 added, open** ("Local refinement after the global search", under TG3). D-206, D-208 and D-195 annotated in the index. Written after re-reading this log (last ID D-233, by another chat). Next free IDs: D-235, I-008. |
+| 2026-11-24 (the twins chat, 2) | Logs **D-235** [orchestrator] (coding directive 7) with the user's go of 14:42 ("Perfect all go on") to the plan: the build choices of D-234, stated in SPEC 2.9 and Blocks 19 to 22; contract commit `1e3fe25` on `sci/twins`; four Opus implementers started (Blocks 19 to 22). The user, 14:41: "the Ra must be fitted as well" -- it is, in every arm (no change). Next free IDs: D-236, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -506,6 +507,7 @@ would be needed*, *Status*.
 | D-232 | 2026-11-23 | SPEC Block 49 (oracle (iii), the skew's sample drawing, the table's key, level 0), `test_smoke_line_sgt.py` | Block 49's issue settled: (iii) at the default reach against an independently truncated reference where the raised reach cannot run here; the implementer's readings accepted; the SGT path's cost recorded [orchestrator] | active |
 | D-233 | 2026-11-23 | wave 7's final check (`kernel_width.py`, `infer_nodes.py`, `clean_cell.py`, `fit_soma.py`, `config.validate`); SPEC Blocks 30 am. 3, 36 am. 22-23, 49, section 6 | F1-F5 fixed (the recorded base read back by config_from_dict's rule; the suite's runner; a failed SGT stage keeps the Gaussian fit and the clearance; the switch's record by argument; the figures closed); S1-S7 stated (cov_fine_factor 32; the covariance at a bound marginal, as since Block 30's entry; the zeta box within +-ln 2.1; a missing calibration refused; the box's corners an oracle) [orchestrator] | active |
 | D-234 | 2026-11-24 | the I_h fit's optimiser, parameter vector and boxes (`run_ih_fit.py`, `param_spec.py`, `passive_long_step_training.py`, `submit_twin_recovery.sh`); D-206 (superseded), D-208 (superseded in part), D-195 (superseded in part); the next Stage-7 run | after run `tw2` failed the gate with the optimiser as the limit: a local refinement after the global search (bounded Nelder-Mead from the best 3 points, at most 100 evaluations each); $\bar g_h \in [10^{-5}, 10^{-3}]$ S/cm$^2$; $\Delta v_h$ fitted again (six parameters); the sweeps of one loss evaluation simulated in parallel on the job's cores; roadmap topic T18 and a brief study document [user] | active; not implemented |
+| D-235 | 2026-11-24 | SPEC 2.9 and Blocks 19 to 22 of `Ih Fit/specs/SPEC.md` (`local_refine.py`, `run_ih_fit.py`, `passive_long_step_training.py`, `twin_manifest.py`, `run_twin_recovery.py`, `submit_twin_recovery.sh`); D-234 | the build choices of D-234: the starts at least 0.1 apart in unit coordinates, the simplex step 0.05, stopping at 1e-3 (unit) and 1e-4 (relative loss), the refinement by wrapping `mono.gp_minimize`, also for `passive_fullstep`; the arm `ih6_d207`; a fork pool created at the first evaluation; linear-algebra threads at 1 in a twin's job [orchestrator]; dv_h truths in $\pm 5$ mV and 3 cores per twin [user, 14:42] | active; in implementation |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15257,3 +15259,36 @@ tolerances (D-011).
 D-204, D-206 to D-209, D-217.
 
 **Status:** active; not implemented.
+
+## D-235 -- The build choices of D-234 (orchestrator; the user's go to the plan)
+
+**Date:** 2026-11-24, 14:42 (Europe/Rome), the twins chat. **Binds:** SPEC 2.9 and Blocks 19 to 22
+(`Passive Features/HPC script/Ih Fit/specs/SPEC.md`, contract commit `1e3fe25` on `sci/twins`).
+
+**Decision.** **[user]** "Perfect all go on" to the plan put at 14:41: four blocks; the truths of $\Delta v_h$ drawn in
+$[-5, 5]$ mV as in run `tw1`; 3 cores per twin for a full run and 8 for the test; the first test on the 5 noise-free
+twins with five and with six parameters. **[orchestrator]** the choices the plan left to the code:
+
+1. *Starts.* The 3 starts are the evaluated points of lowest loss that are at least 0.1 apart in the unit
+   coordinates $u_i = (q_i - q_i^{\rm lo})/(q_i^{\rm hi} - q_i^{\rm lo})$ (max-norm), so that three starts are three
+   places and not one; penalised evaluations ($L \ge 10^6$) are never a start.
+2. *One start.* `scipy.optimize.minimize(method="Nelder-Mead")` in unit coordinates, bounds $[0, 1]^p$, initial
+   simplex step 0.05 per axis (flipped at the upper face), `xatol` $10^{-3}$, `fatol` $10^{-4}$ times the start's
+   loss, `adaptive=False`, `maxfev` 100.
+3. *Where.* The refinement wraps `mono.gp_minimize` around `fit_one_cell` (the monolith is not edited), so the
+   validation numbers are at the refined estimate; it applies to the Phase-2 fit only, and to the arms `ih5`,
+   `ih6_d207` and `passive_fullstep`; `ih6` and `baseline_runB` stay unrefined comparisons.
+4. *Arm.* The six-parameter arm under the loss of D-207 is `ih6_d207`; the run's I_h arm is a plan option
+   (`--ih-arm`, default `ih6_d207`); the gate on it requires $C_m$, $\bar g_h$, $\Delta v_h$ (3 mV, D-011),
+   $\kappa_\tau$.
+5. *Pool.* Worker processes made by `fork` at the first evaluation of a loss, one task per sweep bundle; the loss
+   must equal the serial one exactly (float64 `==`). `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS` and
+   `MKL_NUM_THREADS` are 1 in a twin's job (they were the job's core count): threaded linear algebra in a forked
+   child can hang, and the Gaussian-process algebra is small beside one evaluation.
+6. *The control twins* take $\bar g_h = 10^{-5}$ S/cm$^2$, the new floor (D-234.2).
+
+**Why.** **[reasoning]** as stated per item. **What it does not decide.** The gate's tolerances (D-011).
+
+**Sources.** **[user]**; **[reasoning]**; **[log]** D-011, D-185, D-195, D-207, D-234.
+
+**Status:** active; in implementation.
