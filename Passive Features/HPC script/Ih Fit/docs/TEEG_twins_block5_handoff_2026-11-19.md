@@ -23,6 +23,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-22 (later, 2) | Section 7: the user's decision after the FAIL (D-204: a new training set, step and sample weights, 5 noise-free twins; forms pending) and the split of the 10 `full` twins by sag against noise. |
 | 2026-11-22 (later, 3) | Section 7: the settled forms (D-206 to D-209), the fan-out in progress (contract `aac46d3`), and the loss-at-truth diagnostic delivered for davinci. |
 | 2026-11-22 (later, 4) | Section 7: Blocks 14-18 built and checked (`c974a62`), the commands of run `tw2`, the real-cell check of the new loss. |
+| 2026-11-24 | Section 7: the result of run `tw2` (gate FAIL; the truth fits better than the estimate in 14 of 15 twins fitted with I_h: the optimiser is the limit). |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -397,6 +398,16 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   estimate, `loss_verdict`, $\tau_h^{\rm pk}$ in ms, $g_h$ at the deepest trained voltage), `report/`,
   `report_without_flagged/`, `report_no_noise/`. Real-cell check here: the new loss on a real twin of 508282493
   is 0.0109 at the truth, 0.042 with $\bar g_h$ x3, 0.018 with $\bar g_h$ /3.
+- **Result of run tw2 (2026-11-24) [data inspected: the run's tables, the user's extract].** 35 twins `ok` (build +
+  fit median 10.7 h, max 25.5 h). **STAGE 7 GATE: FAIL** in `report/`, `report_without_flagged/` and
+  `report_no_noise/`. `ih5`, the 10 `full` twins, median $|\varepsilon|$: $C_m$ 0.364 (FAIL; 0.126 in `tw1`),
+  $\bar g_h$ 0.883 (1.84 in `tw1`), $\kappa_\tau$ 1.124, $R_m$ 0.246, $R_a$ 0.727; control: $\bar g_h$ on its lower
+  bound in 1 of 10. The 5 noise-free twins: $C_m$ 0.331, $\bar g_h$ 0.293, $\kappa_\tau$ 0.980. **The cause is the
+  search [recovery_extras.csv]:** the loss at the truth is below the loss at the estimate in 9 of 10 `full` twins
+  (estimate/truth median 1.30) and in 5 of 5 noise-free twins (median 7.1, range 2.0-10.9: truth 0.001-0.002,
+  estimate 0.004-0.019). $C_m$ ends on its lower bound in 6 of 10 `full` twins and $\kappa_\tau$ on a bound in 5.
+  So the 200-call Bayesian search (100 random) does not reach the minimum of the five-parameter loss; noise is not
+  the limit. Next: the optimiser (the user's decision; proposals in the chat of 2026-11-24).
 - **Block 7** (roadmap N7): the fitted laws and flags into the Stage-7 manifest and the noise table, and the
   decision-log and plan entries that close the noise prerequisite (N7's summary; the S0-S3 report dropped, D-125.3).
 - **Stage 8** (the campaign) waits for the gate's verdict and the corrected SWCs (S8's note).
