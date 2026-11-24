@@ -486,13 +486,15 @@ def test_nan_forward_failure_determinism_and_refusals():
 
 def test_config_defaults_and_outside_signatures():
     # [2026-11-24, D-240 (user): the far slope is held by default; was "fit" under D-218.1]
+    # [2026-11-24, D-241 (user): the region is Allen's soma radius (None; was 13.0), the mask unwidened (was 2.0)]
     cfg = C.default_config()
     q = cfg.soma_fit
     assert (q.fine_factor, q.dzeta_um, q.plane_step, q.plane_half_um, q.region_radius_um, q.mask_widen_um,
             q.far_slope, q.shift_xy_um, q.shift_z_um, q.axis_bounds_um, q.mu_bounds_per_um, q.slope_bounds,
             q.max_nfev, q.ftol, q.xtol, q.diff_steps) == (
-        1, 0.14, 2, 10.0, 13.0, 2.0, "fixed", 4.0, 6.0, (1.0, 15.0), (0.001, 3.0), (0.2, 3.0), 80, 1e-6, 1e-6,
+        1, 0.14, 2, 10.0, None, 0.0, "fixed", 4.0, 6.0, (1.0, 15.0), (0.001, 3.0), (0.2, 3.0), 80, 1e-6, 1e-6,
         (0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.004, 1e-4, 0.005))
+    assert q.render_half_um == 14.0                                    # [2026-11-24, D-243 (orchestrator)] the crop's floor
     assert cfg.signature_hash("estimator") == "16be09f944e45972"       # the pinned hashes (Block 1)
     assert cfg.signature_hash("simulation") == "dc84ed2e89bcfea6"
     h = {w: cfg.signature_hash(w) for w in ("estimator", "simulation", "full")}

@@ -109,7 +109,11 @@ def test_block44_outputs_feed_block46(soma_outputs):
     types it accepts; the crop cut to the region's bounding box with a margin and a widened trace mask run through
     fit_soma with Block 45 as the forward (a plumbing run: the synthetic stack holds no soma, one solver step)."""
     cfg = C.default_config()
-    q = cfg.soma_fit
+    # [2026-11-24, D-241] the explicit-radius path (a number overrides the traced radius) with a widened mask: under
+    # the defaults (region = the traced radius, no widening) the synthetic cell has no traced branch inside the cut
+    # (the soma-rooted segments are left out by Block 44), the mask is empty and this plumbing check would test
+    # nothing; the default path is run end to end in test_spec_e2e_fit_soma.py
+    q = dataclasses.replace(cfg.soma_fit, region_radius_um=13.0, mask_widen_um=2.0)
     rec = json.load(open(soma_outputs / "soma_7.json"))
     z = np.load(soma_outputs / "soma_7_block.npz")
     block, ks, valid = z["block"], z["ks"], z["valid"]
@@ -118,14 +122,16 @@ def test_block44_outputs_feed_block46(soma_outputs):
     assert block.dtype == np.uint8 and ks.dtype.kind == "i" and valid.dtype == bool
     assert p == cfg.acquisition.res0_um and dz == cfg.acquisition.dz_um
     # the cut: the region's bounding box plus a margin of 1 um, in the crop's pixel frame
+    # [2026-11-24, D-241] region_radius_um None (the default) = the traced soma radius, as fit_soma.py resolves it
+    r_reg = float(radius) if q.region_radius_um is None else float(q.region_radius_um)
     margin = 1.0
-    c0 = max(0, int(math.floor((centre[0] - q.region_radius_um - margin) / p)) - left)
-    c1 = min(block.shape[2], int(math.ceil((centre[0] + q.region_radius_um + margin) / p)) - left + 1)
-    r0 = max(0, int(math.floor((centre[1] - q.region_radius_um - margin) / p)) - top)
-    r1 = min(block.shape[1], int(math.ceil((centre[1] + q.region_radius_um + margin) / p)) - top + 1)
+    c0 = max(0, int(math.floor((centre[0] - r_reg - margin) / p)) - left)
+    c1 = min(block.shape[2], int(math.ceil((centre[0] + r_reg + margin) / p)) - left + 1)
+    r0 = max(0, int(math.floor((centre[1] - r_reg - margin) / p)) - top)
+    r1 = min(block.shape[1], int(math.ceil((centre[1] + r_reg + margin) / p)) - top + 1)
     sub = block[:, r0:r1, c0:c1]
     sl, st = left + c0, top + r0
-    # the trace mask (Block 44) on the cut, widened by mask_widen_um
+    # the trace mask (Block 44) on the cut, widened by mask_widen_um (0 by default since D-241)
     from allen_diameter.analysis import cell                               # noqa: E402
     seg = None
     box = (sl * p, (sl + sub.shape[2]) * p, st * p, (st + sub.shape[1]) * p)

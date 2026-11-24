@@ -485,8 +485,8 @@ def _failed(fitted, ks_sel, dof, n_samples, n_eval, t0, message):
 def fit_soma(block, ks, valid, left, top, res0_um, dz_um, centre_um, radius_um, mask, forward_factory, scfg,
              slope0):
     """-> SomaFit: the ellipsoid of SPEC Block 46 fitted to the planes select_planes chooses (scfg.plane_half_um,
-    plane_step), over the region R (the pixels whose centre lies within scfg.region_radius_um of the traced centre,
-    minus mask, True: left out).
+    plane_step), over the region R (the pixels whose centre lies within scfg.region_radius_um of the traced centre --
+    radius_um, the traced radius, when it is None (D-241) -- minus mask, True: left out).
 
     block (n, H, W) grey levels (any real dtype; not modified), ks (n,) whole plane numbers ascending, valid (n,)
     bool; (left, top) px the crop's corner; res0_um, dz_um um; centre_um (3,) um, radius_um um: the traced soma
@@ -536,7 +536,7 @@ def fit_soma(block, ks, valid, left, top, res0_um, dz_um, centre_um, radius_um, 
 
     idx = select_planes(k, v, zs, dz, scfg.plane_half_um, scfg.plane_step)
     x_px, y_px = _pixel_centres((H, W), left_i, top_i, p)
-    r_reg = _positive(scfg.region_radius_um, "scfg.region_radius_um")
+    r_reg = rs if scfg.region_radius_um is None else _positive(scfg.region_radius_um, "scfg.region_radius_um")
     disk = (x_px[None, :] - xs) ** 2 + (y_px[:, None] - ys) ** 2 <= r_reg ** 2
     region = disk & ~msk
     if not region.any():

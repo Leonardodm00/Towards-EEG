@@ -537,8 +537,8 @@ class SomaFitConfig:
     # Block 46, the fit
     plane_step: int = 2                    # source: PROVISIONAL (D-219.4 [orchestrator]): planes whose index differs from k_0 by a multiple of this
     plane_half_um: float = 10.0            # source: PROVISIONAL (D-219.4 [orchestrator]): the planes within this of the start depth (um)
-    region_radius_um: float = 13.0         # source: PROVISIONAL (D-219.4 [orchestrator]): the fit's disk about the traced centre (um)
-    mask_widen_um: float = 2.0             # source: PROVISIONAL (D-219.4 [orchestrator]): the caller's widening of Allen's trace mask (um; read by scripts/fit_soma.py)
+    region_radius_um: Optional[float] = None  # source: D-241 [user]: the fit's disk about the traced centre: None = Allen's traced soma radius; a number (um) overrides
+    mask_widen_um: float = 0.0             # source: D-241 [user] (was 2.0, D-219.4): only the pixels the traced branches cover are left out (um; read by scripts/fit_soma.py)
     far_slope: str = "fixed"               # source: D-240 [user] (supersedes D-218.1): the kernel's far slope held at slope0; "fit" only as a labelled comparison
     shift_xy_um: float = 4.0               # source: PROVISIONAL (D-219.4 [orchestrator]): the centre's in-plane bound about the traced centre (um)
     shift_z_um: float = 6.0                # source: PROVISIONAL (D-219.4 [orchestrator]): the centre's depth bound about the start depth (um)
@@ -557,6 +557,7 @@ class SomaFitConfig:
     start_ratio_none: float = 0.5          # source: PROVISIONAL (D-219.5 [orchestrator]): varrho when the core holds no region pixel
     # the entry point, scripts/fit_soma.py (wave 6; D-222.5)
     crop_margin_um: float = 1.0            # source: PROVISIONAL (D-222.5 [orchestrator]; the recovery check's margin): the crop beyond the fit's disk (um)
+    render_half_um: float = 14.0           # source: PROVISIONAL (D-243 [orchestrator]; the crop before D-241, 13 um disc + 1 um): the crop's least half-width (um), the renderer's support -- Block 45 draws the ellipsoid on the crop alone
     figure_planes_um: Tuple[float, ...] = (-8.0, -3.0, 0.0, 3.0, 8.0)  # source: PROVISIONAL (D-222.5 [orchestrator]; the recovery figures' planes): depths from the fitted centre shown (um)
 
 
@@ -981,7 +982,8 @@ def _check_soma_fit(q: "SomaFitConfig") -> None:
     widening >= 0), far_slope "fit" or "fixed", bounds finite and increasing, tolerances in (0, 1), nine steps > 0."""
     def pair(b):
         return len(tuple(b)) == 2 and all(math.isfinite(float(x)) for x in b) and float(b[0]) < float(b[1])
-    pos = (q.dzeta_um, q.plane_half_um, q.region_radius_um, q.shift_xy_um, q.shift_z_um)
+    pos = (q.dzeta_um, q.plane_half_um, q.shift_xy_um, q.shift_z_um) + (() if q.region_radius_um is None
+                                                                          else (q.region_radius_um,))
     ok = (_is_count(q.fine_factor, 1) and _is_count(q.plane_step, 1) and _is_count(q.max_nfev, 1)
           and all(math.isfinite(float(x)) and float(x) > 0 for x in pos)
           and math.isfinite(q.mask_widen_um) and q.mask_widen_um >= 0 and q.far_slope in ("fit", "fixed")
@@ -995,6 +997,7 @@ def _check_soma_fit(q: "SomaFitConfig") -> None:
           and pair(q.start_ratio_clip) and 0 < q.start_ratio_clip[0] and q.start_ratio_clip[1] < 1
           and math.isfinite(q.start_ratio_none) and 0 < q.start_ratio_none < 1
           and math.isfinite(q.crop_margin_um) and q.crop_margin_um >= 0
+          and math.isfinite(q.render_half_um) and q.render_half_um > 0
           and len(tuple(q.figure_planes_um)) >= 1 and all(math.isfinite(float(x)) for x in q.figure_planes_um))
     if not ok:
         raise ValueError("soma_fit: a count, length, far_slope, bound, tolerance, step or start setting is out of range "

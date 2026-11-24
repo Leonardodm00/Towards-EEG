@@ -274,8 +274,9 @@ def test_soma_sections_defaults_as_specified():
     c = C.default_config()
     q, v = c.soma_fit, c.soma_view
     assert (q.fine_factor, q.dzeta_um) == (1, 0.14)                                         # Block 45
-    assert (q.plane_step, q.plane_half_um, q.region_radius_um, q.mask_widen_um) == (2, 10.0, 13.0, 2.0)
-    assert (q.far_slope, q.shift_xy_um, q.shift_z_um) == ("fit", 4.0, 6.0)
+    # [2026-11-24] D-241 (user): the region is Allen's soma radius (None), the mask unwidened; D-240: the slope held
+    assert (q.plane_step, q.plane_half_um, q.region_radius_um, q.mask_widen_um) == (2, 10.0, None, 0.0)
+    assert (q.far_slope, q.shift_xy_um, q.shift_z_um) == ("fixed", 4.0, 6.0)
     assert tuple(q.axis_bounds_um) == (1.0, 15.0) and tuple(q.mu_bounds_per_um) == (0.001, 3.0)
     assert tuple(q.slope_bounds) == (0.2, 3.0) and (q.max_nfev, q.ftol, q.xtol) == (80, 1e-6, 1e-6)
     assert tuple(q.diff_steps) == (0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.004, 1e-4, 0.005)
@@ -313,6 +314,8 @@ def test_pre_wave6_file_loads_with_the_defaults():
     {"soma_fit.start_core_radii": -0.5},
     {"soma_fit.crop_margin_um": float("nan")},
     {"soma_fit.figure_planes_um": [float("inf")]},
+    {"soma_fit.render_half_um": 0.0},            # [2026-11-24, D-243] the crop's floor: finite and > 0
+    {"soma_fit.render_half_um": float("inf")},
 ])
 def test_validate_refuses_illegal_soma_start_values(override):
     with pytest.raises(ValueError):

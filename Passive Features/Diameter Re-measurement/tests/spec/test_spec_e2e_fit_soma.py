@@ -11,8 +11,9 @@ Oracles (SPEC section 6's row and Blocks 46-48):
     SE(S) / (8 pi r_eq) and SE(V) by the delta method on the (a, b, c) block of the covariance (section 6);
   - the corrected SWC (Block 47 through Block 8): the soma node at the fitted centre in the SWC frame with r_eq, every
     stem's first node on the fitted surface (to the file's 4 decimals), every other data line byte for byte;
-  - the crop: soma_fit.region_radius_um + crop_margin_um about the traced centre (Block 44's crop_box), the planes
-    within plane_half_um of the start depth (Block 44's plane_range); --soma-k K sets the start depth to K dz;
+  - the crop: the region's radius (Allen's traced soma radius, or soma_fit.region_radius_um when set; D-241) +
+    crop_margin_um about the traced centre, at least render_half_um (D-243) (Block 44's crop_box), the planes within
+    plane_half_um of the start depth (Block 44's plane_range); --soma-k K sets the start depth to K dz;
   - --far-slope fixed: theta[8] = slope0 exactly, its SE null, eight names fitted;
   - a kernel continuation that is not "linear" and a negative --slope0 are refused (argparse error, status 2);
   - the same seed gives the same results (determinism);
@@ -23,6 +24,7 @@ Oracles (SPEC section 6's row and Blocks 46-48):
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 import math
 import os
@@ -92,7 +94,12 @@ def test_default_run_outputs_and_recovery(default_run):
     assert abs(chi2_dof - (9.0 + 1.0 / 12.0)) < 0.1, chi2_dof
     # the crop and the planes (Block 44's rules with the fit's settings)
     q = rec["settings"]
-    left, top, w, h = SV.crop_box(rec["traced"]["centre_um"][:2], q["region_radius_um"] + q["crop_margin_um"], P)
+    # [2026-11-24, D-241] the region's radius is Allen's traced soma radius by default, recorded in the crop
+    assert q["region_radius_um"] is None and rec["crop"]["region_radius_um"] == rec["traced"]["radius_um"]
+    # [2026-11-24, D-243] the crop's half-width: the region + margin, at least render_half_um (the renderer's support)
+    half = max(q["render_half_um"], rec["crop"]["region_radius_um"] + q["crop_margin_um"])
+    assert rec["crop"]["half_um"] == half and rec["crop"]["ellipsoid_inside"] is True
+    left, top, w, h = SV.crop_box(rec["traced"]["centre_um"][:2], half, P)
     assert (rec["crop"]["left"], rec["crop"]["top"], rec["crop"]["width"], rec["crop"]["height"]) == (left, top, w, h)
     win = H.ref_window(rec["start"]["centre_um"][2], q["plane_half_um"], DZ, np.arange(-100, 101))
     assert (rec["crop"]["k_lo"], rec["crop"]["k_hi"]) == (win[0], win[-1])
@@ -199,7 +206,9 @@ def test_refusals(tmp_path, extra, config):
 def test_mask_holds_widened_segments_outside_the_crop():
     """The trace's mask (+ mask_widen_um): a traced dendrite running 0.9 um outside the crop's edge, radius 0.5 um,
     reaches 1.6 um into the crop once widened by 2 um -- into the fit's 13 um disk (crop half 14 um)."""
-    q = default_config().soma_fit
+    # [2026-11-24, D-241] the widening's mechanics at the old settings (13 um disk, + 2 um): the defaults are now
+    # Allen's soma radius and no widening
+    q = dataclasses.replace(default_config().soma_fit, region_radius_um=13.0, mask_widen_um=2.0)
     half = q.region_radius_um + q.crop_margin_um
     left, top, W, Hh = SV.crop_box((0.0, 0.0), half, P)
     xs, r, widen = (left + W) * P + 0.9, 0.5, q.mask_widen_um

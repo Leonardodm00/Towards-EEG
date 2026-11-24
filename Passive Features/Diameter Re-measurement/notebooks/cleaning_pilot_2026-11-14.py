@@ -836,11 +836,15 @@ viewer24b = plane_viewer.PlaneViewer(
 display(viewer24b.widget)
 
 # %% [markdown]
-# ## Cell 25: the soma fitted with an ellipsoid; the corrected SWC (D-215, D-216, D-218, D-222, D-240; Blocks 45-48)
+# ## Cell 25: the soma fitted with an ellipsoid; the corrected SWC (D-215, D-216, D-218, D-222, D-240, D-241, D-243; Blocks 45-48)
 #
 # Run after Cells 0, 1, 16 and 24 or 24 (b) (Cell 1 pulls the branch). The soma is fitted with an ellipsoid -- centre,
 # three semi-axes, in-plane orientation, absorption -- rendered with the partition absorption and Cell 16's kernel, on
-# the planes within 10 um of the start, Allen's traced processes masked (D-216). The start is Allen's traced soma; its
+# the planes within 10 um of the start, over a disc of Allen's soma radius in which only the pixels under the traced
+# branches are left out (D-241; the processes' shadows stay in the data, a slight bias accepted for the pilot). The
+# model is drawn on a crop of at least 14 um half-width about the traced centre, so that the whole ellipsoid is
+# rendered (D-243; the record's crop.ellipsoid_inside says whether the fitted soma stayed inside it). The
+# start is Allen's traced soma; its
 # depth is SOMA_FIT_K (default: the SOMA_K of Cell 24 or 24 (b), else the traced depth). The kernel's far slope is not
 # fitted (D-240, superseding D-218.1): it is held at SLOPE0 (None: the configured 0.79, uncalibrated; the far-slope
 # calibration's value when there is one). A fit took 8-21 min in the sandbox (36 planes of a 280 px
@@ -869,71 +873,3 @@ for name in ("soma_fit_%d_planes.png" % SPECIMEN, "soma_fit_%d_summary.png" % SP
     print(SOMA_FIT_OUT + "/" + name)
     display(Image(filename=SOMA_FIT_OUT + "/" + name))
 
-# %% [markdown]
-# ## Cell 26: the per-node fit with the SGT kernel -- Cell 20's nodes, the Gaussian fit and the SGT fit side by side (D-221, D-222, D-224, D-225; SPEC Block 49, Block 30 amendment 3, Block 36 amendment 23)
-#
-# Run after Cells 0, 1 and 16, once Cell 20 has prepared its nodes (OUT/cleaning_d169, read here; no download): Cell 20
-# need not run again in this runtime, its knobs taking Cell 20's values when they are not defined. Per node the
-# Gaussian fit of Cell 20 is run again, then the fit with the skewed generalized-t kernel (D-052.1) started from its
-# estimate at the Gaussian member: the kernel's FWHM at each slab-plane defocus is the Gaussian law's (D-222.2), its
-# shape (beta: the core, xi: the tails) is fitted per node, the skew zeta held at 1 (SGT_SKEW "off": the isotropic PSF;
-# "fit" frees it, as an asymmetry along the node's measuring line). The node's estimate is the SGT fit's; the Gaussian
-# fit's d is beside it (gauss_d_um). If the SGT fit fails, the node's status is "failed" (flag sgt_error when it
-# raised) and its Gaussian fit and same-node clearance are kept (D-233.3). The error bars of both fits come from the
-# model at line_fine_factor COV_FINE_FACTOR (D-224.2; 0 = the fit's own Jacobian). Cell 16's KERNEL_WIDTH applies.
-# Time: Cell 20's Gaussian fits took 6 min (5353, 0.77 um) to 111 min (639, 2.82 um) on the pilot. With this cell's
-# settings (hybrid, 8 x 16 directions, two starts, centre weights, p/32 error bars) a 0.8 um synthetic node took 624 s
-# against 107 s for the Gaussian fit alone, 5.9 times [run, sandbox, 2026-11-23]: the Gaussian fit's error bars add
-# about the fit's time again, the SGT stage about 400 s. Carried over to 5353, about 35 min -- an estimate, not
-# measured on the pilot [corrected 2026-11-23, 18:25: the earlier "1.5 to 3.5 h" came from the test suite's fast
-# configuration, which makes the Gaussian fit unusually cheap]. All five of Cell 20's nodes would take of the order of
-# a day, beyond a Colab session: the cell starts with 5353 alone (SGT_NODES; "5353,2620" adds a node; None: all).
-# COV_FINE_FACTOR = 0 drops the error bars' renders for a first look at the shape.
-# Output to send back: the lines `node <id>: d ...` of the log, the table, and the `fit_node<id>.png` figures.
-
-# %%
-import glob, os                       # the cell's own imports
-import pandas as pd
-from IPython.display import Image, display
-SGT_SKEW = "off"                      # "off": zeta = 1 (the isotropic PSF, D-222.1); "fit": zeta fitted too
-COV_FINE_FACTOR = 32                  # the error bars' lattice (D-224.2); 0 = the fit's own Jacobian (faster)
-SGT_NODES = "5353"                    # the thinnest of Cell 20's nodes first; "5353,2620" adds one; None: all of them
-CLEAN_D, INFER_S = OUT + "/cleaning_d169", OUT + "/inference_sgt"
-if "KW_ARGS" not in globals():        # a Cell 16 from before wave 7: the kernel's width fixed, the default (D-221.1)
-    KW_ARGS = ["--kernel-width", "fixed"]
-print("[cell 26] kernel width:", " ".join(str(x) for x in KW_ARGS), "| nodes:", SGT_NODES or "all of Cell 20's")
-os.makedirs(INFER_S, exist_ok=True)
-run("scripts/infer_nodes.py", "real", "--specimen", SPECIMEN, "--cleaning-dir", CLEAN_D, "--out", INFER_S,
-    "--weights", globals().get("D169_WEIGHTS", "allen"), "--bump-sd", globals().get("BUMP_SD", 2.0),   # Cell 20's
-    "--weight-kappa", globals().get("WEIGHT_KAPPA", 1.25), "--starts", globals().get("D169_STARTS", "1.0,1.6"),
-    "--kernel", "sgt", "--sgt-skew", SGT_SKEW, "--cov-fine-factor", COV_FINE_FACTOR, *KW_ARGS,
-    *([] if SGT_NODES is None else ["--nodes", SGT_NODES]))
-res_s = pd.read_csv("%s/inference_%d.csv" % (INFER_S, SPECIMEN))
-res_s["sgt_over_gauss"] = res_s["d_hat_um"] / res_s["gauss_d_um"]
-display(res_s[["node_id", "d_allen_um", "gauss_d_um", "gauss_se_d_um", "d_hat_um", "se_d_um", "sgt_over_gauss",
-               "beta", "se_beta", "xi", "se_xi", "zeta", "truncated_mass", "chi2_mean", "gauss_chi2_mean", "status",
-               "gauss_status", "at_bound", "flags", "cov_source", "seconds"]].round(4))
-for path in sorted(glob.glob(INFER_S + "/fit_node*.png")):
-    print(path)
-    display(Image(filename=path))
-
-# %% [markdown]
-# ## Cell 26 (b): the fitted tube on the node's in-focus image (scripts/show_focal.py; SPEC Block 36, amendment 12)
-#
-# Cell 26's estimate drawn on the node's patch at the first stage's sharpest plane k* (FOCAL26_PLANE = "axis": the
-# recorded plane nearest the fitted axis depth): the estimated diameter's two edges (solid), Allen's diameter about the
-# trace (dashed), the measuring line. Reads the files Cells 20 and 26 wrote; seconds. Cell 20's Gaussian fits of the
-# five nodes are already drawn the same way in OUT/cleaning_d169/focal_<S>.png. On 5353 the Gaussian and the SGT
-# diameters differ by 0.003 um, far below a pixel.
-
-# %%
-import pandas as pd
-from IPython.display import Image, display
-FOCAL26_NODES = "5353"         # Cell 26's nodes, comma-separated; None: all of them
-FOCAL26_PLANE = "kstar"        # or "axis"
-INF26 = OUT + "/inference_sgt"
-png26 = "%s/focal_%d.png" % (INF26, SPECIMEN)
-run("scripts/show_focal.py", "--cleaning-dir", OUT + "/cleaning_d169", "--specimen", SPECIMEN, "--inference-dir", INF26,
-    "--plane", FOCAL26_PLANE, "--zoom-um", 4.0, "--out", png26, *(["--nodes", FOCAL26_NODES] if FOCAL26_NODES else []))
-display(Image(filename=png26))
-display(pd.read_csv("%s/focal_%d.csv" % (INF26, SPECIMEN)))

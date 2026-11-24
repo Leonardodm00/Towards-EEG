@@ -3,12 +3,15 @@ D-219, D-220, D-222).
 
 The traced soma (the SWC's type-1 node in the image frame, ALIGN's transform; Block 44) gives the start: its centre and
 radius, and its depth from --soma-k (the plane judged in focus by eye in Cell 24) or else the traced depth. The crop is
-the fit's disk (soma_fit.region_radius_um) plus soma_fit.crop_margin_um about the traced centre, on the planes within
-soma_fit.plane_half_um of the start depth (Block 44's window rule). Every traced process in the crop is masked at its
-traced radius plus soma_fit.mask_widen_um (Block 44's segments; those from the soma node to the stems' first nodes lie
-inside the soma and are not masked). The ellipsoid is fitted by Block 46 with Block 45's renderer as the forward model
-(the kernel of --config-json, whose continuation must be "linear", D-220.2), the kernel's far slope fitted or held
-(soma_fit.far_slope or --far-slope; D-218). Written into --out (default ./soma_fit_<S>):
+the fit's disk (Allen's traced soma radius, or soma_fit.region_radius_um; D-241) plus soma_fit.crop_margin_um about
+the traced centre, at least soma_fit.render_half_um (the renderer draws the ellipsoid on the crop alone; D-243; the
+record's crop.ellipsoid_inside says whether the fitted footprint stayed inside), on the planes within
+soma_fit.plane_half_um of the start depth (Block 44's window rule). Every
+traced process in the crop is masked at its traced radius plus soma_fit.mask_widen_um (0 by default, D-241: only the
+pixels the branches cover; Block 44's segments; those from the soma node to the stems' first nodes lie inside the soma
+and are not masked). The ellipsoid is fitted by Block 46 with Block 45's renderer as the forward model (the kernel of
+--config-json, whose continuation must be "linear", D-220.2), the kernel's far slope held (D-240) or, as a labelled
+comparison, fitted (soma_fit.far_slope or --far-slope; D-218). Written into --out (default ./soma_fit_<S>):
 
   soma_fit_<S>.json              the fit (theta, SEs, covariance, the planes' scales, chi2, status), the membrane area,
                                  volume and equivalent radius, the start, the crop, the settings, Allen's soma and the
@@ -145,8 +148,11 @@ def main(argv=None):
     start_src = "traced depth" if a.soma_k is None else "plane %d (by eye)" % int(a.soma_k)
     start = (float(centre[0]), float(centre[1]), z_start)
 
-    # the crop: the fit's disk plus a margin, the planes within plane_half_um of the start depth
-    half = float(q.region_radius_um) + float(q.crop_margin_um)
+    # the crop: the fit's disk plus a margin, at least render_half_um (the renderer draws the ellipsoid on the crop
+    # alone, D-243), the planes within plane_half_um of the start depth; the disk's radius is Allen's traced soma radius
+    # unless soma_fit.region_radius_um sets one (D-241)
+    r_region = float(radius) if q.region_radius_um is None else float(q.region_radius_um)
+    half = max(float(q.render_half_um), r_region + float(q.crop_margin_um))
     left, top, width, height = soma_view.crop_box(centre[:2], half, res0)
     k_lo, k_hi = soma_view.plane_range(z_start, float(q.plane_half_um), dz)
     log("%s cell: traced soma at (%.2f, %.2f, %.2f) um, radius %.2f um; start depth %.2f um (%s); crop %d x %d px at "
@@ -178,8 +184,9 @@ def main(argv=None):
     parent_index = np.array([index_of.get(int(pp), -1) for pp in np.asarray(swc.parent)])
     box = (left * res0, (left + width) * res0, top * res0, (top + height) * res0)
     mask, n_seg = _mask(xyz, swc, parent_index, types, box, block.shape[1:], left, top, res0, float(q.mask_widen_um))
-    log("mask: %d traced segments at their radii + %.1f um, %.1f %% of the crop" % (n_seg, q.mask_widen_um,
-                                                                                   100.0 * mask.mean()))
+    log("region: the %.2f um disk about the traced centre (%s); mask: %d traced segments at their radii + %.1f um, "
+        "%.1f %% of the crop" % (r_region, "Allen's soma radius" if q.region_radius_um is None else "configured",
+                                  n_seg, q.mask_widen_um, 100.0 * mask.mean()))
 
     # the fit (Block 46 with Block 45's renderer)
     fit = soma_fit.fit_soma(block, ks, valid, left, top, res0, dz, start, float(radius), mask, make, q, slope0)
@@ -189,6 +196,11 @@ def main(argv=None):
             % ", ".join(fit.at_bound))
     th = np.asarray(fit.theta, dtype=float)
     ok = bool(np.all(np.isfinite(th[:8])))
+    # the fitted ellipsoid's footprint inside the rendered crop (D-243; conservative: the larger in-plane semi-axis)
+    inside = (bool(max(abs(th[0] - centre[0]), abs(th[1] - centre[1])) + max(th[3], th[4]) <= half) if ok else None)
+    if inside is False:
+        log("WARNING: the fitted ellipsoid reaches beyond the %.2f um crop half-width: the renderer drew only its part "
+            "inside the crop (D-243); raise soma_fit.render_half_um" % half)
     if ok:
         log("centre (%.2f, %.2f, %.2f) um; a %.2f, b %.2f, c %.2f um (+- %.3f, %.3f, %.3f); phi %.2f rad; mu %.3f /um; "
             "slope %.3f; S %.1f +- %.1f um^2 (Allen's 4 pi r^2 %.1f), r_eq %.3f um (Allen's r %.3f); chi2/dof %.3f"
@@ -208,7 +220,7 @@ def main(argv=None):
             % (len(stems), ", ".join("%s %s %.2f um" % (s["id"], s["flag"], s["moved_um"]) for s in stems)))
         frame_ns = _types.SimpleNamespace(left=int(left), top=int(top), res_um_px=res0, downsample=0)
         ext = image_extent_um(frame_ns, block.shape)
-        region = soma_view.disk_mask(block.shape[1:], left, top, res0, centre[:2], float(q.region_radius_um)) & ~mask
+        region = soma_view.disk_mask(block.shape[1:], left, top, res0, centre[:2], r_region) & ~mask
         z_fit = fit.ks * dz
         model_all = fit.B_gl[:, None, None] * make(z_fit)(th[:8], float(th[8]))
         i_of_k = {int(k): i for i, k in enumerate(ks)}
@@ -244,7 +256,8 @@ def main(argv=None):
                traced=dict(centre_um=[float(x) for x in centre], radius_um=float(radius),
                            area_um2=4 * math.pi * float(radius) ** 2),
                crop=dict(left=int(left), top=int(top), width=int(width), height=int(height), res0_um=res0,
-                         k_lo=int(k_lo), k_hi=int(k_hi), n_mask_segments=n_seg, mask_fraction=float(mask.mean())),
+                         k_lo=int(k_lo), k_hi=int(k_hi), n_mask_segments=n_seg, mask_fraction=float(mask.mean()),
+                         region_radius_um=r_region, half_um=half, ellipsoid_inside=inside),
                fit=dict(params=list(soma_fit.PARAMS), theta=th, se=fit.se, cov=fit.cov, fitted=list(fit.fitted),
                         ks=fit.ks, B_gl=fit.B_gl, chi2=fit.chi2, dof=fit.dof, n_samples=fit.n_samples,
                         status=fit.status, at_bound=list(fit.at_bound), n_eval=fit.n_eval, seconds=fit.seconds,

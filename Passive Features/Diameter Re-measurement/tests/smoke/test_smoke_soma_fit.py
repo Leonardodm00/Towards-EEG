@@ -226,8 +226,11 @@ def noisy(sc, seed):
 
 def fit_cfg(**kw):
     """The settings these checks exercise: Block 46's defaults with the far slope fitted -- the nine-parameter path,
-    kept as an opt-in comparison since D-240 made "fixed" the default -- so that path stays tested."""
-    return dataclasses.replace(SomaFitConfig(), far_slope="fit", **kw)
+    kept as an opt-in comparison since D-240 made "fixed" the default -- so that path stays tested; and the 13 um
+    region the toy scenes were built for (CROP_HALF_UM), the default being Allen's traced radius since D-241."""
+    base = dict(far_slope="fit", region_radius_um=13.0)
+    base.update(kw)
+    return dataclasses.replace(SomaFitConfig(), **base)
 
 
 def fit(sc, data=None, scfg=None, slope0=SLOPE0, mask=None, factory=None, radius=None):
@@ -488,6 +491,12 @@ def test_noise_free_recovery():
            % (float(err5.max()), f5.theta[8], SLOPE0, f5.n_eval))
     # a held slope0 outside slope_bounds is held as it is (not clipped): only gamma's start is clipped
     assert SomaFitConfig().far_slope == "fixed", SomaFitConfig().far_slope     # the default (D-240, user)
+    # D-241 (user): with region_radius_um None the region is the disc of the traced radius passed in [exact count]
+    assert SomaFitConfig().region_radius_um is None and SomaFitConfig().mask_widen_um == 0.0
+    assert SomaFitConfig().render_half_um == 14.0                     # the crop's floor (D-243, orchestrator)
+    f_none = fit(sc5, scfg=dataclasses.replace(SomaFitConfig(), max_nfev=1), slope0=5.0)
+    n_disc = int(np.count_nonzero(disk_um(sc5, sc5["radius"])))
+    assert f_none.n_samples == len(f_none.ks) * n_disc, (f_none.n_samples, len(f_none.ks), n_disc)
     f5b = fit(sc5, scfg=dataclasses.replace(SomaFitConfig(), far_slope="fixed", max_nfev=1), slope0=5.0)
     assert f5b.theta[8] == 5.0 and "slope_um_per_um" not in f5b.message, (f5b.theta[8], f5b.message)
 

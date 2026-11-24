@@ -1033,7 +1033,7 @@ accepted and are part of this entry.
 - Confirmed: D-129.1, D-130.O9, D-132.2 (the user); the plane rule, the bounds, the starts and the coverage band are the assistant's, PROVISIONAL
 - Status: drafted 2026-11-13; implemented 2026-11-13 (wave 2, merged `ab8c6ee`); `test_smoke_node_inference.py` 6 pass, 1 skip: recovery to 1e-16, coverage 0.743 over 300 sets, the mean $\hat d$ +1.2 SE, $\chi^2/N$ 0.989 **[run, sandbox]**. `z_bounds_um` is about the start's depth; a start outside the box is clipped; `at_bound` names are `d_lo`/`d_hi` and so on; a parameter at a bound has NaN rows and columns in `cov`; `cost` is $\chi^2$. Tested with a stand-in `forward`, not with Block 26. Smoke-tested
 
-Block 30, amendment 3 (2026-11-23, drafted; wave 7): the SGT option and the error bars on the fine lattice -- stated after Block 49's entry, in the wave 7 section.
+Block 30, amendment 3 (2026-11-23, drafted; wave 7) [its SGT option DROPPED 2026-11-24, D-242; the error bars on the fine lattice stay]: the SGT option and the error bars on the fine lattice -- stated after Block 49's entry, in the wave 7 section.
 
 ### Block 31: the cleaning figures (plan step C6; D-129.4)
 
@@ -1697,6 +1697,36 @@ orchestrator's (D-210).
   takes the default. `test_smoke_soma_fit.py` 9 pass, 1 skip; `test_smoke_config.py` 6 pass, 1 skip; the soma's
   spec tests (Blocks 45, 46, the boundary 44-46, the entry point) 92 pass **[run, sandbox]**; the configuration's
   signature hashes unchanged (`soma_fit` lies outside every signature).
+- Amendment (2026-11-24; D-241 [user], superseding D-219.4's 13 um disk and the + 2 um widening: "for the region take
+  the radius of the Allen database ... remove only the pixels that are superimposed with the branches"). The region R
+  is the disk of the traced soma radius (the `radius_um` passed to `fit_soma`; 5.97 um on the pilot) about the traced
+  centre: `SomaFitConfig.region_radius_um` is Optional, None by default (that radius), a number overriding it;
+  `mask_widen_um` 0.0 (the traced branches at their traced radius only; every depth, the soma-rooted segments excepted
+  as before); the processes' shadows stay in the data, unmodelled (a slight bias accepted for the pilot).
+  `fit_soma.py` sizes the crop as that radius + `crop_margin_um` [corrected 2026-11-24, D-243: at least
+  `render_half_um`, the next amendment], logs the region, and records the radius used as the
+  JSON's `crop.region_radius_um`. Tests: the defaults' spec tests expect None and 0.0; the smoke checks keep the
+  13 um region their toy scenes were built for and assert that None takes the traced radius (n_samples = K x the
+  disk's pixels); the end-to-end default run checks the recorded radius; the widening's test keeps the old settings
+  explicitly. On the pilot the new region holds 7442 px per plane (the old region rebuilt by the same rule: 7486; the
+  run counted 7644) and shows the soma's depth somewhat better: a compact soma (c 7.26 um, 2 mu c kept, z0 and slope
+  as fitted) against the fitted one differs by 2.3 gl RMS per plane (median, each plane's brightness re-solved)
+  against 1.4 gl on the old region; the old fit's imitator (c 7.26 um, z0 28.39 um, slope 0.513, re-fitted on the old
+  region) by 1.9 gl against 1.4 -- the trade-off reduced, not removed; no recovery check on simulated stacks with this
+  region yet **[run, sandbox: `checks/soma_diagnosis_2026-11-24/region_new_check.py`]**.
+- Amendment (2026-11-24; D-243 [orchestrator], correcting the crop rule of D-241's amendment above). The crop is the
+  forward model's support, not only the region's bounding box: Block 45 renders the ellipsoid on the crop's samples
+  alone (no padding; zero absorption outside), so a part of the ellipsoid outside the crop is missing from every plane,
+  and on defocused planes its blurred shadow is missing from the region's pixels too. With the region now Allen's
+  radius (5.97 um on the pilot), a crop of that radius + 1 um would cut the ellipsoid the fit explores (the pilot's
+  free-slope fit reached a = 8.08 um). `SomaFitConfig.render_half_um` (14.0 um, PROVISIONAL: the crop before D-241,
+  13 um disc + 1 um margin, the size the pilot's 48-min Colab run used; finite, > 0): `fit_soma.py`'s crop half-width
+  is max(render_half_um, region radius + crop_margin_um) about the traced centre; the region R is unchanged (D-241).
+  The JSON's crop records `half_um` and `ellipsoid_inside`: True when the fitted ellipsoid's in-plane footprint lies in
+  the crop by the conservative test max(|x0 - x_c|, |y0 - y_c|) + max(a, b) <= half_um (x_c, y_c the traced centre);
+  False is logged as a warning (the fit then misses part of its own model). Tests: the defaults' spec test expects
+  14.0; the end-to-end default run checks the crop against the new rule and `ellipsoid_inside` True on the synthetic
+  soma.
 
 ### Block 47: the soma in the morphology -- the sphere of equal area and the stems' first nodes (D-215.2, D-216.3, D-222.5)
 
@@ -1884,6 +1914,8 @@ of D-222.1 by up to 1.9 noise SD on tilted tubes (0.01-0.04 on flat ones), and f
 with the isotropic PSF it moves a tilted thin node's $d$ by -5 % (-1.2 SE).
 
 ### Block 49: the SGT point-spread function in the fast line renderer (D-221.2-3, D-222.1-2, D-224.1, D-225)
+
+[DROPPED 2026-11-24, D-242 [user]: the node fit renders and fits with the Gaussian only; the SGT option left the pipeline (notebook Cells 26 and 26 (b) removed); its code is removed in the next chat (handoff `TEEG_soma_fit_handoff_2026-11-24.md`)]
 
 - Modules: `src/allen_diameter/model/line_sgt.py` (new) and `src/allen_diameter/model/line_fast.py` (Block 35: the
   `kernel` argument and its dispatch; the Gaussian path unchanged bit for bit); smoke test
@@ -2115,7 +2147,7 @@ help says so. The recorded base is read back by `config.config_from_dict`'s rule
 `renderer.jpeg_qtables`). `clean_cell.py` hands the switch's record to `config_sections(cfg, kernel_width_record)` as a
 required argument: no module state, so no path records a re-anchored table without its base.
 
-Block 36, amendment 23 (2026-11-23, drafted; D-221.2-3, D-222, D-224.1-2, D-225.5-6; the orchestrator's). The SGT
+Block 36, amendment 23 (2026-11-23, drafted; D-221.2-3, D-222, D-224.1-2, D-225.5-6; the orchestrator's) [its SGT stage, `--kernel sgt` and `--sgt-skew` DROPPED 2026-11-24, D-242; `--cov-fine-factor` stays]. The SGT
 stage and the error bars in `scripts/infer_nodes.py`. (i) `node_inputs.forward_factory(pilot, half_length, node, cfg,
 cache, kernel_family="gaussian")`: "sgt" returns `forward(d, mu, v0, z_ax, beta, xi, zeta)` =
 `line_fast.line_profiles(..., kernel=line_sgt.SGTKernel(beta, xi, zeta))` (NaN on `ExtrusionInvalid`, as today);
@@ -2254,7 +2286,7 @@ set, inside the table's configuration hash. Rerun: smoke `coarse_fit` 6, `soma_f
 | `python scripts/fit_soma.py --specimen S [ALIGN] [--config-json CLEANING] [--soma-k K] [--far-slope fit|fixed] [--slope0 G] --out DIR` (Cell 25) [2026-11-23, wave 6; D-222.5; 2026-11-24, D-240: `--far-slope` defaults to fixed, `fit` a labelled comparison only] | Blocks 45-48's entry point: the traced soma's start (depth from --soma-k, else the traced depth), the crop (`soma_fit.region_radius_um` + `crop_margin_um`), the trace's mask (+ `mask_widen_um`), the fit, `soma_fit_<S>.json`, `_planes.png` (the fitted planes nearest `figure_planes_um` from the fitted centre), `_summary.png` (with SE(V) and SE(r_eq) by the delta method on the fit's covariance), `_morphology.png`, `reconstruction_soma_<S>.swc`; refuses a kernel continuation that is not "linear" (D-220.2) | `--synthetic`: the synthetic cell's trace over a known ellipsoid on a uniform background, noise 3 gl -- recovered to 0.007 um, S +0.17 % (1.6 SE), chi2/dof 9.07 [run, sandbox, 2026-11-23] | 2 min |
 | `python scripts/clean_cell.py clean --no-clean [--pilot-diameter allen|free] [--sigma-r0-um S]`, `python scripts/clean_cell.py clear --d-bins ...` [2026-11-22, S4] | Block 36 amendments 14-17: the preparation without cleaning, the first stage's diameter rule, the in-focus width override, the clear nodes by diameter bin | `--synthetic` | 1-2 min |
 | `python scripts/infer_nodes.py real --weights ... [--bump-sd S] [--weight-kappa K]` [2026-11-22, S4] | Block 36 amendment 16: the per-node fit with Block 39's weights | `--synthetic` | 1-3 min a node |
-| `python scripts/infer_nodes.py real ... [--kernel gaussian\|sgt] [--sgt-skew off\|fit] [--cov-fine-factor N] [--nodes IDS] [--kernel-width fixed\|calibrated --sigma-json FILE]` (Cells 20, 26) [2026-11-23, wave 7] | Block 36 amendments 22-23 (D-224, D-225): the Gaussian fit with its error bars from the model at `cov_fine_factor`; under `sgt` the SGT fit from its estimate (Blocks 30 amendment 3, 49), the node's estimate, the Gaussian beside it; the width switch | `--synthetic` | the Gaussian stage with its p/32 error bars 68-93 s a synthetic node (10-33 s with `--cov-fine-factor 0`); with the SGT stage ($\zeta$ held) 351-499 s a node in all, the skew 769 s a node with the fit's own Jacobian (the pilot-run suite's fast configuration: partition, 4 x 8 directions, one start; 9 planes; this sandbox) [measured 2026-11-23, D-233: the final check's S1]; with Cell 26's settings (hybrid, 8 x 16 directions, starts 1.0 and 1.6, centre weights) on a 0.8 um synthetic node: the Gaussian fit 107 s, with its p/32 error bars 223 s, with the SGT stage 624 s (5.9 times the fit alone) [run, sandbox, 2026-11-23 18:19] |
+| `python scripts/infer_nodes.py real ... [--kernel gaussian\|sgt] [--sgt-skew off\|fit] [--cov-fine-factor N] [--nodes IDS] [--kernel-width fixed\|calibrated --sigma-json FILE]` (Cells 20, 26) [2026-11-23, wave 7] [2026-11-24, D-242: `--kernel sgt`, `--sgt-skew` and Cell 26 dropped; the code is removed in the next chat] | Block 36 amendments 22-23 (D-224, D-225): the Gaussian fit with its error bars from the model at `cov_fine_factor`; under `sgt` the SGT fit from its estimate (Blocks 30 amendment 3, 49), the node's estimate, the Gaussian beside it; the width switch | `--synthetic` | the Gaussian stage with its p/32 error bars 68-93 s a synthetic node (10-33 s with `--cov-fine-factor 0`); with the SGT stage ($\zeta$ held) 351-499 s a node in all, the skew 769 s a node with the fit's own Jacobian (the pilot-run suite's fast configuration: partition, 4 x 8 directions, one start; 9 planes; this sandbox) [measured 2026-11-23, D-233: the final check's S1]; with Cell 26's settings (hybrid, 8 x 16 directions, starts 1.0 and 1.6, centre weights) on a 0.8 um synthetic node: the Gaussian fit 107 s, with its p/32 error bars 223 s, with the SGT stage 624 s (5.9 times the fit alone) [run, sandbox, 2026-11-23 18:19] |
 | `python scripts/clean_cell.py ... [--kernel-width fixed\|calibrated --sigma-json FILE]`, `python scripts/fit_soma.py ... [--kernel-width ... --sigma-json FILE]`, `python scripts/calibrate_sigma.py ...` (`summary_growth_scale`) [2026-11-23, wave 7] | Block 36 amendment 22 (D-221.1, D-222.3): the kernel's in-focus width re-anchored at Cell 23B's weighted means of sigma0 and c, recorded with the base renderer | `--synthetic` | as before |
 | `python tests/smoke/test_smoke_line_sgt.py` [quick, about 8 min] and `LINE_SGT_LONG=1 python tests/smoke/test_smoke_line_sgt.py` [about 2.5 h] [2026-11-23, wave 7] | Block 49 checks | none | as stated |
 | `python tests/smoke/test_smoke_kernel_width.py` [2026-11-23, wave 7; its script runner D-233] | Block 36 amendment 22's switch (the refusals, the recorded base read back, the growth scale's summary) | none | seconds; 7 pass |
