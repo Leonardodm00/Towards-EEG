@@ -292,6 +292,7 @@ the "Binds" column.
 | 2026-11-24 (the gallery chat, 16:50) | Logs **D-240** (user, 16:46: "the far slope fit is to be drop. the only thing we might fit is the in-focus blur"): the soma fit's far slope held by default; supersedes D-218.1. Next free IDs: D-241, I-007. |
 | 2026-11-24 (the defocus-table chat, 16:50) | No decision changed. The status lines of **D-174** and **D-178** brought in step with the row of 2026-11-18 (later, 25): implemented at `513ad9e` (they still said "not implemented"; evidence: `MeasureConfig.pilot_diameter` = "allen" in `config.py` at `7b4a9ab`). Kernel calibration step 2 (roadmap NS1, theory T10): not started; its implementation handoff `Passive Features/Diameter Re-measurement/docs/TEEG_kernel_calibration_step2_implementation_handoff_2026-11-24.md` on `sci/diameter-pipeline` (`786977b`). Next free IDs: D-241, I-007. |
 | 2026-11-24 (the gallery chat, 17:40) | Logs **D-241** (user, 17:32): the soma fit's region of Allen's soma radius, only the branches' pixels masked. Next free IDs: D-242, I-007. |
+| 2026-11-24 (the gallery chat, 17:41) | Logs **D-242** (user, 17:32): the SGT dropped from the node fit, the Gaussian the only kernel. Next free IDs: D-243, I-007. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -521,6 +522,7 @@ would be needed*, *Status*.
 | D-239 | 2026-11-24 | SPEC Block 44 amendment 4 (`plotting/plane_viewer.py`, `loading/soma_io.py`, `show_soma.py --z-margin-um`), notebook Cell 24 (b); D-211.1 in part | the soma's plane picked with a slider over the planes, nothing drawn over them, the pick becoming SOMA_K [user]; the view, the contrast and the window's margin [orchestrator] | active |
 | D-240 | 2026-11-24 | SPEC Block 46 (`soma_fit.far_slope`), `fit_soma.py --far-slope`, notebook Cell 25; supersedes D-218.1 | the soma fit holds the far slope (default "fixed", "fit" a labelled comparison only); only the in-focus blur might be fitted, not decided [user] | active |
 | D-241 | 2026-11-24 | SPEC Block 46 (`soma_fit.region_radius_um`, `mask_widen_um`), `fit_soma.py`, notebook Cell 25; supersedes D-219.4's disc and the +2 um widening | the soma fit's region: a disc of Allen's soma radius; only the pixels under the traced branches left out, the processes otherwise kept in the data [user] | active |
+| D-242 | 2026-11-24 | the node fit's SGT option (Blocks 49, 30 am. 3, 36 am. 22-23; Cells 26, 26 (b)); supersedes D-221's SGT option, D-222.1-2 | the node fit renders and fits with the Gaussian only; the SGT dropped (cells removed now, code removed in the next chat) [user] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15495,3 +15497,31 @@ carry a margin later; the soma's depth problem (handoff 14.6), which the next ru
 **Sources.** **[user]** 2026-11-24 17:32. **[run, sandbox]** the check above.
 
 **Status:** active; supersedes D-219.4 (the disc's radius) and the +2 um widening (D-216, D-219.4).
+
+## D-242 -- The SGT dropped: the node fit renders and fits with the Gaussian kernel only (user)
+
+**Date:** 2026-11-24, 17:32 (Europe/Rome), the gallery chat. **Binds:** the node fit's SGT option (D-221, D-222.1-2,
+D-224, D-225; SPEC Block 49, Block 30 amendment 3's SGT stage, Block 36 amendments 22-23's `--kernel sgt` and
+`--sgt-skew`), the notebook's Cells 26 and 26 (b); supersedes D-221's SGT option and D-222.1-2.
+
+**Decision [user].** "let's keep the rendering and the fit with the Gaussian kernel and totally drop the SGT", after
+the assistant's advice of 17:25 (the FWHM rule of D-222.2 matches the calibration's Gaussian-core width only for the
+Gaussian member; the shape is not identified per node; on node 5353 d moved 0.3 %).
+
+**Statement.** (D-242.1) The node fit renders and fits with the Gaussian kernel only (D-221.2's default stays, now
+the only kernel). (D-242.2) The SGT option leaves the pipeline: Cells 26 and 26 (b) are removed from the notebook
+(2026-11-24); its code (Block 49's `model/line_sgt.py`, the SGT stage of `analysis/node_inference.py` and
+`scripts/infer_nodes.py`, `inference.sgt_*`, their tests) is removed in the next chat, as its first coding task.
+
+**Why.** **[user]** as stated. **[run, sandbox]** `core_fit_proxy.py`: on an SGT blur the calibration's Gaussian-core
+fit gives 2.355 s / FWHM = 0.77-0.96 for node 5353's shape, so the FWHM rule gives the SGT another width than the
+calibrated one; **[data]** node 5353: d 0.7713 against the Gaussian's 0.7738 um; **[run]** handoff 15: beta and xi
+correlated 0.97-1.00.
+
+**What it does not decide.** The table route's per-plane SGT fit (Block 12, D-052): a separate piece, not discussed;
+whether the real blur's shape biases the Gaussian fit's d on thin nodes (open; a cell-level shape estimated from many
+thin nodes would answer it).
+
+**Sources.** **[user]** 2026-11-24 17:32. **[run, sandbox]** the checks above. **[data]** the user's Cell 26 upload.
+
+**Status:** active; supersedes D-221's SGT option and D-222.1-2.
