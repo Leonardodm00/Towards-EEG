@@ -230,7 +230,7 @@ theory:
     status: open
     closed_on:
     decision:
-    note: "Added at the user's word, 2026-11-24 (D-234), after run tw2. Study document in preparation: TEEG_topic_local_refinement_after_global_search_2026-11-24.md (to be sent as files in the twins chat)."
+    note: "Added at the user's word, 2026-11-24 (D-234), after run tw2. No study document yet: the agent writing one was stopped by the user before it was written (2026-11-24)."
 
 implementation:
   # ---- groups (no block of their own; coloured by their least advanced member)

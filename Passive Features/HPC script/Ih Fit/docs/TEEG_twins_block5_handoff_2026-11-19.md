@@ -411,6 +411,29 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
 - **Block 7** (roadmap N7): the fitted laws and flags into the Stage-7 manifest and the noise table, and the
   decision-log and plan entries that close the noise prerequisite (N7's summary; the S0-S3 report dropped, D-125.3).
 - **Stage 8** (the campaign) waits for the gate's verdict and the corrected SWCs (S8's note).
+- **After tw2: the optimiser changed (2026-11-24) [user: D-234; orchestrator: D-235, D-237; src at `257b351` on
+  `sci/twins`; run].** SPEC 2.9 and Blocks 19-22 are implemented, gated, merged and checked by an independent tester
+  (PASS WITH ISSUES: one MINOR, six spec-text points, all settled; report
+  `specs/test_reports/2026-11-24_1510_incremental.md`; `tests/spec` 361 passed, 2 skipped in the tester's run).
+  What changed: (1) after the 200-evaluation search, bounded Nelder-Mead from the 3 lowest-loss points at least 0.1
+  apart in unit coordinates, at most 100 evaluations each (`local_refine.py`; `--refine`, `--refine-starts`,
+  `--refine-maxfev`); (2) $\bar g_h \in [10^{-5}, 10^{-3}]$ S/cm$^2$, control twins at $10^{-5}$; (3) the arm
+  `ih6_d207`: $\Delta v_h$ fitted again under the loss of D-207, truths in $\pm 5$ mV; the run's arm is the plan
+  option `--ih-arm` (default `ih6_d207`; `ih5` keeps $\Delta v_h = 0$); (4) the sweeps of one loss evaluation in
+  `--n-workers` forked processes, the loss equal to the serial one exactly; `NCPUS` default 3, linear-algebra threads
+  at 1. New columns in `phase2_results.csv` and `recovery_extras.csv`: `loss_after_search`, `loss_after_refine`,
+  `refine_improved`, `refine_n_evals`, `refine_best_start`, `n_workers`, `dvh_true_mV`, `dvh_est_mV`; per start,
+  `refine_starts.csv`. **Measured here:** on a 5-parameter quadratic, 100 evaluations per start stop on the cap at a
+  loss ratio of 6.2e-5; uncapped, 140-190 evaluations converge to 1.1e-6 -- if the test below stops short, raise
+  `--refine-maxfev`. **Not verified here:** the speed-up beyond 2 cores; PBS.
+  **Next on davinci: the test on the 5 noise-free twins, five and six parameters (10 jobs, 80 cores).** Gates:
+  `conda activate prova && git pull && cd "Passive Features/HPC script/Ih Fit" && python smoke_ls_pool.py && python smoke_local_refine.py && python smoke_ih_refine.py && python smoke_twin_manifest.py && python smoke_twin_recovery.py`;
+  then `RUN_TAG=tw3a NOISE_TAG=nf2 NCPUS=8 PLAN_ARGS="--ih-arm ih5" TWINS=900000300,900000301,900000302,900000303,900000304 WALLTIME=48:00:00 bash submit_twin_recovery.sh`
+  and `RUN_TAG=tw3b NOISE_TAG=nf2 NCPUS=8 TWINS=900000300,900000301,900000302,900000303,900000304 WALLTIME=48:00:00 bash submit_twin_recovery.sh`
+  (add `DRY_RUN=1` first; expect `-J 0-4` and `--n-workers 8`). Pass condition per twin, in `recovery_extras.csv`:
+  `loss_at_estimate` down to `loss_at_truth` (`loss_verdict` not `optimiser`). A run planned before Block 22 (tw1,
+  tw2) is merged only with the code of its own commit. The study document of roadmap topic T18 was started by an
+  agent and stopped by the user before it was written.
 
 ## 8. Repository, environment, cluster
 
