@@ -51,8 +51,9 @@ def test_arm_table():
         c = R.ARMS[a]
         assert (c.role_rule, c.weighting, c.ls_sample_weight) == ("d006", "relative", "none"), a
     # "as ih6" apart from the names and the protocol
+    # renewed 2026-11-24 (Block 20): ArmConfig gained `refine`, nelder_mead on ih5 and none on ih6 by design
     for f in ih6.__dataclass_fields__:
-        if f not in ("name", "fit_params", "role_rule", "weighting", "ls_sample_weight"):
+        if f not in ("name", "fit_params", "role_rule", "weighting", "ls_sample_weight", "refine"):
             assert getattr(ih5, f) == getattr(ih6, f), f
 
 
@@ -60,8 +61,9 @@ def test_overrides_and_defaults():
     a = R._parse_args(BASE_ARGS + ["--arm", "ih5"])
     c = R.resolve_arm_config(a)
     assert (c.role_rule, c.weighting, c.ls_sample_weight) == ("d207", "ls_amplitude", "peak_decay")
-    assert a.ls_tau_d_ms == 500.0 and a.gbar_bounds == "1e-6,1e-2"
-    assert PS.DEFAULT_GBAR_BOUNDS == (1e-6, 1e-2)
+    # renewed 2026-11-24: the default gbar box is [1e-5, 1e-3] since SPEC 2.9 (a) (Block 20)
+    assert a.ls_tau_d_ms == 500.0 and a.gbar_bounds == "1e-5,1e-3"
+    assert PS.DEFAULT_GBAR_BOUNDS == (1e-5, 1e-3)
     a = R._parse_args(BASE_ARGS + ["--arm", "ih5", "--ls-role-rule", "d006", "--weighting", "relative",
                                    "--ls-sample-weight", "none"])
     c = R.resolve_arm_config(a)
@@ -97,7 +99,7 @@ def test_kappa_box_from_tau_ms():
     assert ax.log
     assert ax.lo == pytest.approx(50.0 / base, rel=1e-15) and ax.hi == pytest.approx(1000.0 / base, rel=1e-15)
     g = spec.axis("gbar")
-    assert (g.lo, g.hi, g.log) == (1e-6, 1e-2, True)
+    assert (g.lo, g.hi, g.log) == (1e-5, 1e-3, True)     # renewed 2026-11-24, SPEC 2.9 (a)
     assert "dv_h" not in spec.names
     # without the option --kappa-bounds holds
     a = R._parse_args(BASE_ARGS + ["--arm", "ih5", "--kappa-bounds", "0.7,0.8"])

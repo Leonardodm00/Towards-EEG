@@ -61,7 +61,10 @@ def test_constants():
 @pytest.mark.parametrize("seed,n,n0", [(0, 10, 5), (3, 4, 4), (11, 3, 0), (5, 2, 1)])
 def test_first_rows_equal_base_code(seed, n, n0):
     real = _real()
-    new = tm.draw_twin_manifest(real, n_per_configuration=n, n_no_noise=n0, seed=seed, truth_kwargs=KW)
+    # renewed 2026-11-24 (Block 21): the defaults are now ih_arm='ih6_d207', dvh_truth_mV=None; the Block 16
+    # contract (TM11) is stated for the ih5 arm with dv_h's truth 0, so both are passed explicitly
+    new = tm.draw_twin_manifest(real, n_per_configuration=n, n_no_noise=n0, seed=seed, ih_arm="ih5",
+                                dvh_truth_mV=0.0, truth_kwargs=KW)
     old = _old().draw_twin_manifest(real, n_per_configuration=n, seed=seed, truth_kwargs=KW)
     assert len(new) == 3 * n + n0
     head = new.iloc[:3 * n].reset_index(drop=True)
@@ -83,7 +86,7 @@ def test_first_rows_equal_base_code(seed, n, n0):
     assert_array_equal(keep["ih_dvh_mV"].to_numpy()[:3 * n], old["ih_dvh_mV"].to_numpy())
     # another value is set on every row with I_h, the paired rows included
     sh = tm.draw_twin_manifest(real, n_per_configuration=n, n_no_noise=n0, seed=seed, dvh_truth_mV=-2.5,
-                               truth_kwargs=KW)
+                               ih_arm="ih6_d207", truth_kwargs=KW)   # ih5 refuses dv_h != 0 (Block 21)
     has = sh["configuration"].map(tm.HAS_IH).astype(bool)
     assert (sh.loc[has, "ih_dvh_mV"] == -2.5).all()
 
@@ -91,7 +94,8 @@ def test_first_rows_equal_base_code(seed, n, n0):
 @pytest.mark.parametrize("n,n0", [(10, 5), (4, 4), (3, 1)])
 def test_no_noise_rows(n, n0):
     real = _real()
-    man = tm.draw_twin_manifest(real, n_per_configuration=n, n_no_noise=n0, seed=2, truth_kwargs=KW)
+    man = tm.draw_twin_manifest(real, n_per_configuration=n, n_no_noise=n0, seed=2, ih_arm="ih5",
+                                dvh_truth_mV=0.0, truth_kwargs=KW)   # renewed 2026-11-24 (Block 21 defaults)
     full = man[man["configuration"] == "full"].reset_index(drop=True)
     nn = man[man["configuration"] == "full_no_noise"].reset_index(drop=True)
     assert len(nn) == n0

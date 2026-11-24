@@ -243,12 +243,14 @@ def test_a8_1_merge_controls_only_reports(group, tmp_path):
     import ih_recovery_report as RR
     seed = _seed_with_unflagged_control()
     out = tmp_path / "a81"
-    assert _plan(group, out, "--seed", str(seed)) == 0
+    # renewed 2026-11-24 (Block 22): the default I_h arm is ih6_d207; this 8.1 check is written for ih5, and the
+    # gbar box's low rail is 1e-5 since SPEC 2.9 (a)
+    assert _plan(group, out, "--seed", str(seed), "--ih-arm", "ih5") == 0
     man = pd.read_csv(out / "manifest.csv")
     row = man[man["configuration"] == "active_fit"].iloc[0]
     tid = int(row["specimen_id"])
     vals = {n: float(row[TRUTH_COL[n]]) * 1.1 for n in IH5}
-    vals["gbar"] = 1e-6                                     # the low rail: what a control should give
+    vals["gbar"] = 1e-5                                     # the low rail: what a control should give
     _results(out, tid, IH5, vals, "ih5")
     assert rtr.main(["merge", "--out", str(out), "--no-plot"]) == 0
     gated = [a for a in IH5 if RR.RecoveryTolerances().for_axis(a) is not None]
@@ -476,7 +478,10 @@ import math                                    # noqa: E402
 import re                                      # noqa: E402
 import subprocess                              # noqa: E402
 
-B17_SMALL = ["--n-per-configuration", "1", "--n-no-noise", "1", "--n-calls", "1", "--n-initial", "1"]
+# renewed 2026-11-24 (Block 22): the Block 17 tests below pin the run's I_h arm to ih5 (the default is now
+# ih6_d207) and keep the refinement's budget small (its default, nelder_mead with maxfev 100, is a plan option)
+B17_SMALL = ["--n-per-configuration", "1", "--n-no-noise", "1", "--n-calls", "1", "--n-initial", "1",
+             "--ih-arm", "ih5", "--refine-maxfev", "4", "--refine-starts", "1"]
 BASE17 = "216ecf13ccca455903b2cb05d740dd64f3feff08"
 
 
@@ -510,7 +515,7 @@ def test_b17_plan_records_and_manifest(group, tmp_path):
     assert rc["dvh_truth_mV"] == 0.0 and rc["gate_arm"] == "ih5"
     assert rc["gate_required_axes"] == ["Cm", "gbar", "kappa_tau"]
     o = rc["options"]
-    assert o["gbar_bounds"] == "1e-6,1e-2" and o["tau_h_pk_bounds_ms"] == "50,1000" and o["n_no_noise"] == 1
+    assert o["gbar_bounds"] == "1e-5,1e-3" and o["tau_h_pk_bounds_ms"] == "50,1000" and o["n_no_noise"] == 1
     assert "kappa_bounds" not in o and "kappa_range" not in o and "dvh_range" not in o
     assert rc["truth_kwargs"]["ih_kappa_range"] == tau["truth_kappa"] and rc["truth_kwargs"]["ih_dvh_range_mV"] is None
     import twin_manifest as TM
@@ -533,7 +538,7 @@ def test_b17_plan_records_and_manifest(group, tmp_path):
             kw[key] = tuple(kw[key])
     kw["ih_regions"] = tuple(kw["ih_regions"])
     ref = TM.draw_twin_manifest(rc_cells[list(TM.REAL_CELL_COLUMNS)], n_per_configuration=1, n_no_noise=1, seed=4,
-                                id_base=900000000, dvh_truth_mV=0.0, truth_kwargs=kw)
+                                id_base=900000000, ih_arm="ih5", dvh_truth_mV=0.0, truth_kwargs=kw)
     pd.testing.assert_frame_equal(man, ref)
     # list: the four twins (the submitter counts them for the cap)
     import io
@@ -713,7 +718,10 @@ def test_b17_merge_reports_and_extras(e2e17):
     assert list(ex.columns) == ["twin_id", "configuration", "twin_of_specimen_id", "paired_with", "with_noise",
                                 "cell_tau_s_above_window", "tau_h_pk_true_ms", "tau_h_pk_est_ms", "loss_at_truth",
                                 "loss_at_estimate", "loss_verdict", "v_deepest_train_mV", "gh_deep_true_S_cm2",
-                                "gh_deep_est_S_cm2", "ln_gh_deep_ratio"]
+                                "gh_deep_est_S_cm2", "ln_gh_deep_ratio",
+                                # renewed 2026-11-24: Block 22's columns (SPEC 2.9 (e))
+                                "loss_after_search", "refine_improved", "refine_n_evals", "refine_best_start",
+                                "dvh_true_mV", "dvh_est_mV"]
     assert list(ex["twin_id"]) == list(man["specimen_id"])
     for _, e in ex.iterrows():
         tid = int(e["twin_id"])

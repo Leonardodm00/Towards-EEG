@@ -50,6 +50,7 @@ Paths this spec covers (relative to `Passive Features/HPC script/Ih Fit/`):
 - `twin_build.py`, `smoke_twin_build.py` (Block 12: the twin build; drafted 2026-11-20)
 - `twin_manifest.py`, `smoke_twin_manifest.py` (Block 13: the twins' manifest; drafted 2026-11-20)
 - `run_twin_recovery.py`, `submit_twin_recovery.sh`, `smoke_twin_recovery.py` (Block 8: the Stage-7 run; drafted 2026-11-20)
+- of the I_h fitter, the parts Blocks 14 to 22 specify [added 2026-11-24, the final check's S1]: `passive_long_step_training.py` (the roles, the weights and the worker pool: Blocks 14, 19), `run_ih_fit.py` and `param_spec.py` as far as Blocks 15 and 20 state them, `local_refine.py` (Block 20), `twin_manifest.py` (Blocks 13, 16, 21), `twin_build.py` (Blocks 12, 18), `ih_recovery_report.evaluate_gate`'s `required_axes` (Block 17), and the smoke suites `smoke_ls_protocol.py`, `smoke_ls_pool.py`, `smoke_ih5.py`, `smoke_local_refine.py`, `smoke_ih_refine.py`; the rest of the I_h fitter stays outside this spec
 - (to be added block by block) [2026-11-12: the `sens_*.py` scripts dropped for now, D-125.3] the OU term of `synthetic_ground_truth.add_recording_noise`
 
 Everything else in `Ih Fit/` (the I_h fitter, the loader, the recovery gate,
@@ -993,7 +994,7 @@ when every evaluation is left out.
 on $f(u) = L(q(u))$, with `initial_simplex` the $p + 1$ points $u(s_k)$ and $u(s_k) + \delta_i e_i$ ($e_i$ the $i$-th
 unit vector; $\delta_i = +0.05$ if $u_i(s_k) + 0.05 \le 1$, else $-0.05$), `maxfev = 100`, `xatol = 1e-3` (unit
 coordinates), `fatol = 1e-4 * L(s_k)` (scipy's `fatol` is absolute; this makes it relative to the start's loss),
-`adaptive = False`. Every evaluation $f(u)$ scipy makes is recorded with its point (scipy may exceed `maxfev` by the
+`adaptive = False` (the code takes $\lvert L(s_k)\rvert$; when $L(s_k) = 0$ exactly `fatol` is 0 and the start runs until scipy finds equal values or `maxfev` -- accepted: a loss of exactly 0 does not occur on data [the final check's S5]). Every evaluation $f(u)$ scipy makes is recorded with its point (scipy may exceed `maxfev` by the
 evaluations of the iteration in progress: the count recorded is the count made).
 
 *Estimate.* $\hat q$ is the point of lowest loss among the global search's evaluations and every recorded local
@@ -1007,7 +1008,7 @@ $q$. With `n_workers` $= W > 1$ the pairs are computed by $W$ worker processes, 
 (made by `fork` after the loss is built), each applying $q$ to its copy before simulating; the parent applies $q$ to
 its own cell too (the serial code's side effect) and combines the pairs in the bundles' order by the serial code's
 arithmetic. Requirement: for every $q \in B$ and every $W \ge 1$, $L_W(q) = L_1(q)$ exactly (equal float64), penalties
-included. $W = 1$ is the serial code, unchanged.
+included. $W = 1$ is the serial code, unchanged. The requirement is on the values of evaluations that complete: a worker process that dies has no serial counterpart and stops the fit with an error (Block 19, as built) [the final check's S6].
 
 **(d) The twins.** The run's I_h arm is `ih6_d207` (default) or `ih5`. With `ih6_d207` the truth of $\Delta v_h$ of a
 twin with I_h is drawn uniformly in $[-5, 5]$ mV by the existing drawer (`ih_dvh_range_mV`), and a `full_no_noise`
@@ -1545,7 +1546,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Data flow: Block 20 passes `n_workers` to `integrate_long_step` and calls `close()` on losses it builds itself.
 - Confirmed: yes -- D-234 (user: "the sweeps of one evaluation"). Fork, the lazy pool and `close()` are the
   orchestrator's.
-- Status: drafted
+- Status: smoke-tested 2026-11-24 (sandbox, NEURON 9.0.2, 2 cores: `smoke_ls_pool.py` W1-W13 13/13, seven planted defects caught; commits `51ce741`, `4ca7793`, merged `b1d20c8`; the final check: exact equality with 2, 3, 4 and 9 workers). Not verified: the speed-up on the cluster's cores
 
 ### Block 20: the local refinement, the arm `ih6_d207`, the new box of gbar (2.9 (a), (b), (e))
 
@@ -1623,7 +1624,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   fitted again). The distance rule between starts, the simplex step, the two tolerances, wrapping `mono.gp_minimize`
   and the refinement of `passive_fullstep` are the orchestrator's (decision log, tagged [orchestrator]).
 - Notes for the reader of a refined fit [amendment 1; read in `fit_one_cell` by the implementer, the monolith is not edited]: (i) the `*_sigma` columns come from the global search's Gaussian process, keeping its predicted points within a margin of `result.fun`; at a refined (lower) `fun` fewer points pass, so they shrink, or are 0 when fewer than 5 pass -- they are not an uncertainty of the refined estimate and the gate does not use them; (ii) the stored loss history is the running minimum of the global evaluations only, so its last value is `loss_after_search`; (iii) Phase 3 uses the search's Gaussian process centred on the refined estimate.
-- Status: drafted
+- Status: smoke-tested 2026-11-24 (sandbox: `smoke_local_refine.py` R1-R10 10/10 and `smoke_ih_refine.py` F1-F7 7/7, run by the orchestrator on the merged branch with Block 19's pool; `smoke_ih5.py` adapted in I1-I3 to the new arm, box and columns; five planted defects caught; commit `f9a017b`, merged `e6da190`). The final check's F1 [orchestrator, accepted]: the loss's penalty 1e6 is repeated as `RefineConfig.penalty`; one shared constant is left for a later change
 
 ### Block 21: the manifest with the run's I_h arm (2.9 (d))
 
@@ -1652,7 +1653,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   say which). M7 ASCII/LF.
 - Data flow: Block 22 calls `draw_twin_manifest` and `arm_of`.
 - Confirmed: yes -- D-234; the truths' range of dv_h (the user's go of 2026-11-24 to the default "as in tw1").
-- Status: drafted
+- Status: smoke-tested 2026-11-24 (sandbox: `smoke_twin_manifest.py` 20/20, four planted defects caught; commit `625683d`, merged `04b6c19`)
 
 ### Block 22: the third Stage-7 run -- the I_h arm as an option, the refinement and the workers passed to the fit
 
@@ -1693,7 +1694,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Data flow: consumes Block 20's CLI and columns and Block 21's API (contract: their Public API above).
 - Confirmed: yes -- D-234 and the user's go of 2026-11-24 (dv_h truths in +-5 mV, 3 cores per twin for a full run).
   The thread variables at 1 are the orchestrator's.
-- Status: drafted
+- Status: smoke-tested 2026-11-24 (sandbox: `smoke_twin_recovery.py` 22 pass and 2 skip against stand-ins by the implementer, and exit 0 on the merged branch in the final check, which also ran plan, twin and merge end to end on the fixture group; four planted defects caught; commit `ff72a44`, merged `74f3c85`). As built [orchestrator, accepted; the final check's S4]: `gate_arm(ih_arm)` and `gate_required_axes(ih_arm)` replace the two constants; `merge` refuses (exit 2) a run planned before this block (no recorded `ih_arm`) -- merge such a run with the code of its own commit; the plan's two new refusals use exit 3 and closed intervals; `recovery_extras.csv`'s six new columns come last. Not run here: PBS
 
 ## 6. Pipeline entry points
 
@@ -1719,6 +1720,8 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 | `RUN_TAG=... NOISE_TAG=... [TWINS=...] [DRY_RUN=1] bash submit_twin_recovery.sh` | Blocks 8 and 17 on the cluster: the plan, one PBS array job (one sub-job per twin) and the merge | PBS, conda | 35 twins (30 + 5 noise-free), 1 core each |
 | `python smoke_ls_protocol.py` / `python smoke_ih5.py` | Block 14 (LP1-LP9) and Block 15 (I1-I8) smokes | NEURON for the losses and fits | under 1 min each |
 | `python smoke_twin_recovery.py [--build]` | Blocks 8 and 17 smoke (TS1-TS15) | NEURON; `./x86_64`; scikit-optimize; bash | minutes |
+| `python smoke_ls_pool.py` / `python smoke_local_refine.py` / `python smoke_ih_refine.py` | Block 19 (W1-W13) and Block 20 (R1-R10; F1-F7) smokes [added 2026-11-24, the final check's S2] | NEURON for the first and the third; the second is pure | under 1 min each |
+| `RUN_TAG=... NOISE_TAG=... [NCPUS=3] [PLAN_ARGS="--ih-arm ih5"] [TWINS=...] bash submit_twin_recovery.sh` | Block 22 on the cluster: as the row above, 3 cores per twin by default (`--n-workers`), the I_h arm `ih6_d207` unless `--ih-arm ih5` [the final check's S2: the row above states Block 17's one core] | PBS, conda | 35 twins x 3 = 105 cores |
 
 ## 7. Not executable in the sandbox
 

@@ -37,8 +37,9 @@ def _real(n=18):
 def test_draw_ids_cells_truths(seed, n):
     real = _real()
     kw = dict(ra_mode="per_cell", F=1.9, ih_gbar_floor_S_cm2=2e-6)
+    # renewed 2026-11-24 (Block 21): the default I_h arm is now ih6_d207; this Block 13/16 check pins ih5
     man = tm.draw_twin_manifest(real, n_per_configuration=n, n_no_noise=0, dvh_truth_mV=None, seed=seed,
-                                truth_kwargs=kw)
+                                ih_arm="ih5", truth_kwargs=kw)
     assert len(man) == 3 * n
     assert list(man["configuration"]) == sum([[c] * n for c in ("full", "passive_fit", "active_fit")], [])
     by_id = real.set_index("specimen_id")
