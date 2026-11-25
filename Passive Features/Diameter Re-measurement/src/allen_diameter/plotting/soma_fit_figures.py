@@ -478,3 +478,13 @@ def figure_soma_morphology(top, side, title=""):
     if title:
         fig.suptitle(title, fontsize=10, color=INK)
     return fig
+
+
+def figure_soma_c_grid(table, best_index, delivered, check_mean_gl, tol_gl, allen_area_um2, neighbourhood_um=None,
+                       title=""):
+    """-> Figure: the soma fit over the grid of held depth semi-axes c (SPEC Block 48, the amendment of wave 8): four
+    panels against the held c (um) -- the residual RMS (gl), the fitted a and b (um), the membrane area S (um^2) with
+    Allen's 4 pi r^2 as a line, the far-background check's mean mismatch (gl) with lines at +-tol_gl. table: Block 50's
+    grid_table dict of (n,) arrays; best_index int (-1: none); delivered: dict(source, c_um, rms_gl, a_um, b_um,
+    area_um2, check_mean_gl); check_mean_gl (n,) gl; neighbourhood_um (lo, hi) or None. CONTRACT STUB."""
+    raise NotImplementedError("Block 48, wave 8: figure_soma_c_grid")

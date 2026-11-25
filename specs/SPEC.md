@@ -1850,7 +1850,10 @@ orchestrator's (D-210).
     "refined_c_at_bound" "c_um" is in the refinement's `at_bound`.
   - `grid_table(cgrid) -> dict` of (n,) arrays for the report and the figure: `c_um`, `chi2`, `rms_gl`
     ($\sqrt{\chi^2/{\rm n\_samples}}$), `x0_um`, `y0_um`, `z0_um`, `a_um`, `b_um`, `phi_rad`, `mu_per_um`,
-    `area_um2`, `r_eq_um` (read from the results' attributes of those names where present, else NaN), `usable` (bool).
+    `area_um2`, `r_eq_um`, `usable` (bool): `c_um` the grid's value; `x0_um` to `mu_per_um` the result's attribute of
+    that name where it has one, otherwise its `theta` in Block 46's PARAMS order; `area_um2`, `r_eq_um` its attributes;
+    NaN where neither exists; values as the results hold them, `usable` saying which to trust [wording corrected
+    2026-11-25 at the gate: a `SomaFit` has no attributes named after its parameters].
   - `far_mask(shape, left, top, res0_um, centre_xy_um, far_um, mask) -> (H, W) bool`; pixel (row, col) centred on
     ((left + col) p, (top + row) p).
   - `far_background(planes, far, left, top, res0_um, centre_xy_um, trim_sigmas, min_frac=0.0) -> (b (K, 3), ok (K,)
@@ -1883,7 +1886,9 @@ orchestrator's (D-210).
 - Confirmed: the grid, the refinement in the neighbourhood, the delivered fit, the check and its settings are the
   user's (D-252, D-254.3, D-256, D-257); the neighbourhood's exact rule, the delivery rule's tolerance and the flag's
   threshold are the orchestrator's, PROVISIONAL (D-259).
-- Status: drafted 2026-11-25 (wave 8).
+- Status: implemented 2026-11-25 (wave 8), merged `9792fa0` (block commit `822b266`); `test_smoke_soma_profile.py` 6
+  pass, 1 skip (no discretisation), rerun by the orchestrator at the gate **[run, sandbox]**. Not yet run with Block
+  46's real fit (the entry point, Block 51).
 
 ### Block 47: the soma in the morphology -- the sphere of equal area and the stems' first nodes (D-215.2, D-216.3, D-222.5)
 
@@ -2069,6 +2074,89 @@ construction of the SGT kernel in 2-D (D-225.1-4) rests on `checks/sgt_psf_2d_20
 across the measuring line and the law's Gaussian along it -- the cheaper construction -- differs from the isotropic PSF
 of D-222.1 by up to 1.9 noise SD on tilted tubes (0.01-0.04 on flat ones), and fitted with the shape free to data made
 with the isotropic PSF it moves a tilted thin node's $d$ by -5 % (-1.2 SE).
+- Amendment (2026-11-25, drafted; wave 8, second part; D-252, D-256, D-257): one more figure.
+  `figure_soma_c_grid(table, best_index, delivered, check_mean_gl, tol_gl, allen_area_um2, neighbourhood_um=None,
+  title="") -> Figure`: `table` Block 50's `grid_table` dict ((n,) arrays); `best_index` int (-1: none); `delivered` a
+  dict with `source` ("grid" | "refinement" | "none"), `c_um`, `rms_gl`, `a_um`, `b_um`, `area_um2`,
+  `check_mean_gl` (floats; ignored when the source is "none"); `check_mean_gl` (n,) the far-background check's mean
+  mismatch of each grid fit (gl; NaN where not available); `tol_gl` the flag's threshold; `allen_area_um2` Allen's
+  $4\pi r^2$; `neighbourhood_um` (lo, hi) or None. Four panels against the held c (um): the residual RMS (gl); the
+  fitted in-plane semi-axes a and b (um); the membrane area S (um^2) with Allen's as a horizontal line; the check's
+  mean mismatch (gl) with horizontal lines at +-tol. The usable grid fits as joined markers, the others as open
+  markers on the axis; the best grid value marked; the delivered fit drawn as a distinct marker when its source is
+  "refinement", with the neighbourhood shaded. Figures only: every number drawn is passed in. Oracles: the figure
+  builds for (i) an ordinary grid with a refinement, (ii) a grid with one unusable fit and no refinement, (iii) no
+  usable fit; four axes; the plotted y-data of the RMS panel equal the table's values (read back from the line
+  artist); the figure is closed by the caller.
+
+### Block 51: the soma fit's entry point over the grid, and notebook Cell 25 (D-252 to D-258)
+
+- Modules: `scripts/fit_soma.py`; notebook `notebooks/cleaning_pilot_2026-11-14.py`, Cell 25. No smoke test of its own:
+  the dry run `--synthetic` is its check, and the end-to-end spec tests are the tester's.
+- What changes (wave 8, second part); everything else of the entry point stands (the start, the crop rule of D-243, the
+  mask, the kernel-width switch, the outputs' names).
+  (1) The region's radius is `soma_fit.region_radius_um` when a number, otherwise `soma_fit.region_radius_scale` x the
+  traced radius (D-255): the crop's half-width, the log, the figures' region and the record's `crop.region_radius_um`
+  use that one value; the record adds `crop.region_radius_scale`.
+  (2) Options: `--c-grid` (comma-separated um; default `soma_fit.c_grid_um`), `--c-refine on|off` (default
+  `soma_fit.c_refine`), `--sigma0 fixed|fit` (default `soma_fit.sigma0`), `--background tilted|constant` (default
+  `soma_fit.background`); each replaces the configuration's field (`dataclasses.replace`), so the record's `settings`
+  hold what ran. An invalid grid is an argparse error.
+  (3) The fits. `fit_one(hold, start, c_bounds_um)` = `soma_fit.fit_soma(..., slope0, hold=hold, start=start,
+  c_bounds_um=c_bounds_um, sigma0_um=s0)` with s0 = `kernel.sigma_r(0.0, rcfg)`, the configured kernel's in-focus
+  width (um), and the forward `SomaRenderer(...).render` (which takes `sigma0_um` under "fit"). `cg =
+  soma_profile.fit_c_grid(fit_one, c_grid, refine, soma_fit.axis_bounds_um)`; the fit delivered is `cg.delivered`
+  (D-256.2). Each fit is logged as it ends (c, status, RMS, a, b, S, evaluations, seconds); then the best, the
+  neighbourhood, the refinement, the source and the flags.
+  (4) The far-background check (Block 50, D-257), for every usable grid fit, the refinement and so the delivered fit:
+  `far = far_mask(crop shape, left, top, res0, traced centre (x, y), soma_fit.bgcheck_far_um, mask)`; `far_b, far_ok,
+  n_used = far_background(the block's planes in the fit's ks order, far, left, top, res0, traced centre (x, y),
+  calibration.background_trim_sigmas)` (once: every fit has the same planes); `background_check(fit.beta, ks dz,
+  fit.theta[2], far_b, far_ok, soma_fit.bgcheck_near_um, soma_fit.bgcheck_tol_gl)`. A raised flag is logged as a
+  WARNING naming the mean mismatch; the fit is delivered either way.
+  (5) The model drawn and its residuals: `soma_fit.background_planes(fit.beta, crop shape, left, top, res0, traced
+  centre (x, y)) * tau`, tau rendered at the delivered theta (with `sigma0_um=fit.sigma0_um` under "fit").
+  (6) Comparisons (D-240, D-254.1, D-258.2). The run is the deliverable when far_slope is "fixed", background
+  "tilted" and sigma0 "fixed"; otherwise it is a comparison: the figures' titles begin with "COMPARISON (" + the
+  settings that differ + ")", the record has `analysis` = "comparison" with `comparison` listing them, and no corrected
+  SWC is written (`swc_out` null; the morphology figure is still drawn). The deliverable has `analysis` =
+  "deliverable".
+  (7) The record `soma_fit_<S>.json` adds: `fit.beta`, `fit.background`, `fit.sigma0_um`, `fit.se_sigma0_um`,
+  `fit.cov_fit` (the delivered fit; `fit.B_gl` stays); `grid`: `c_grid_um`, `table` (Block 50's `grid_table`, lists),
+  per grid fit `status`, `at_bound`, `n_eval`, `seconds`, `check_mean_gl`, and `best_index`, `neighbourhood_um`,
+  `refinement` (null, or its theta, chi2, status, at_bound, n_eval, seconds, check_mean_gl), `delivered_source`,
+  `flags`; `background_check`: the delivered fit's dict (lists) with `far_pixels` (the far mask's count) and
+  `far_ok_planes`; `kernel.sigma0_start_um` = s0.
+  (8) Figures: the planes, summary and morphology figures of the delivered fit as before (the summary's scales panel
+  shows `beta[:, 0]`; its title names c's source, "c held at <v> um (the grid's best)" or "c refined in [lo, hi]
+  um"), and `soma_fit_<S>_cgrid.png` (Block 48's `figure_soma_c_grid`), written whenever at least one grid fit was
+  made, also when nothing is delivered.
+  (9) No usable fit: the record is written with `fit` holding NaN (as a failed fit today), the grid's table and
+  flags; exit status 1. Otherwise 0.
+  (10) `--synthetic` (the dry run): the known soma is rendered on a tilted background, $B(u, v) = 110 + 0.10\,u -
+  0.05\,v$ gl ($u$, $v$ um from the traced centre), with the noise as before; when `--c-grid` is not given the grid is
+  (0.8, 1.0, 1.2) x the true c, so that the dry run stays a recovery check: the best grid value must be the true c and
+  the logged errors are those of the delivered fit against the truth.
+  (11) Cell 25: settings `C_GRID` (None: the configuration's four values, D-256.1), `C_REFINE` (False on Colab,
+  D-252.1), `SIGMA0_PARALLEL` (True: after the deliverable run, the same run with `--sigma0 fit` into `SOMA_FIT_OUT +
+  "_sigma0fit"`, D-258.2), and the existing ones; it shows the four figures of the deliverable run and, for the
+  parallel run, its summary and c-grid figures under a printed "COMPARISON" line. Its text states the model (tilted
+  background, the region of 1.2 traced radii), the grid, what is delivered, the flag, and that the run now makes one
+  fit per grid value (about four times the single fit's time on Colab, and as much again for the parallel run). No
+  line of the notebook's .py may start with a percent sign.
+- Library calls: Blocks 45 to 50's functions named above; `kernel.sigma_r`. Custom code: none (wiring).
+- Checks (the implementer's check 2): the dry run `--synthetic` to the end with its default grid -- best index 1,
+  delivered source "grid", the errors against the truth logged, the four figures and the record written, exit 0; the
+  same with `--c-refine on` -- the refinement delivered or the reason flagged; with `--sigma0 fit` -- a comparison, no
+  SWC; the record parsed back and its new keys checked; `tests/smoke/test_smoke_config.py` (no configuration field
+  left unread) and `tests/smoke/test_smoke_soma_fit_figures.py`.
+- Data flow: consumes Block 44 (the crop, the trace's mask), Block 45 (the renderer), Block 46 (`fit_soma`,
+  `background_planes`), Block 50 (`fit_c_grid`, `grid_table`, `far_mask`, `far_background`, `background_check`),
+  Block 47 (the corrected SWC, from the delivered fit), Block 48 (the figures).
+- Confirmed: (1), the grid and its delivery, the flag and the parallel analysis are the user's (D-252 to D-258); the
+  options' names, the record's layout, the comparison rule's "no SWC" and the dry run's tilt and grid are the
+  orchestrator's (D-259), PROVISIONAL.
+- Status: drafted 2026-11-25 (wave 8, second part).
 
 ### Block 49: the SGT point-spread function in the fast line renderer (D-221.2-3, D-222.1-2, D-224.1, D-225)
 
