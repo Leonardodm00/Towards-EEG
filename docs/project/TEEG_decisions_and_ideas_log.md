@@ -300,7 +300,8 @@ the "Binds" column.
 | 2026-11-25 (the review chat, 14:08) | Logs **D-246** (user): the review's sensitivity module (CR-2) is built after all, to settle the exclusion rule of D-244 item 3 and the sample weight's $\tau_d$; D-245 item 3 reversed, its items 1 and 2 stand. |
 | 2026-11-25 (the review chat, after 14:13) | Logs **D-247** (orchestrator): the build choices of D-245/D-246 written into `Ih Fit/specs/SPEC.md` 2.10 and Blocks 23 to 28 on `sci/twins` (contracts `43ae62f`, `87df33a`; amendment 1 `d43d80c`: a failed point's $L_2$ is $10^6$, first 100). Next free IDs: D-248, I-008. |
 | 2026-11-25 (the review chat, about 15:30) | D-245's "Why" corrected in place with a dated mark: the fits integrate at 0.1 ms (D-007), not 0.025 ms as written; the twins at 0.025 ms (D-192 (iv)). No new decision ID. |
-| 2026-11-25 (the review chat, 15:33) | Logs **D-248** (user): the next twins' run is the noisy twins only, fitted at 0.1 ms; the noise-free twins later if time allows, their long steps at 0.025 ms and their short squares at the usual 0.1 ms. Two changelog hours of this chat (15:10, 16:10) were not read from a clock and are corrected above. Next free IDs: D-249, I-008. |
+| 2026-11-25 (the review chat, 15:33) | Logs **D-248** (user): the next twins' run is the noisy twins only, fitted at 0.1 ms; the noise-free twins later if time allows, their long steps at 0.025 ms and their short squares at the usual 0.1 ms. Two changelog hours of this chat (15:10, 16:10) were not read from a clock and are corrected above. |
+| 2026-11-25 (the review chat, later) | Logs **D-249** (orchestrator): amendment 2 of the wave's contract (`6d5f9e4` on `sci/twins`), after Block 28's implementer stopped on it: the sensitivity files under the run directory, and the partner-twin oracle restated. Blocks 23 to 28 merged on `sci/twins`. Next free IDs: D-250, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -537,6 +538,7 @@ would be needed*, *Status*.
 | D-246 | 2026-11-25 | the review's sensitivity module (CR-2): a new module of `Ih Fit/` and its report; D-245 item 3 (reversed); D-244 item 3 (the exclusion rule), D-207 (3) (the sample weight's $\tau_d$) | the sensitivity module is built: the Jacobian of the residuals at a twin's truth, its singular values and directions, the predicted scatter of each parameter under the twin's noise; it is what the exclusion rule and the $\tau_d$ question are settled on [user] | active; not implemented |
 | D-247 | 2026-11-25 | SPEC 2.10 and Blocks 23 to 28 of `Ih Fit/specs/SPEC.md` on `sci/twins` (`passive_long_step_training.py`, `fd_jacobian.py`, `local_refine.py`, `identifiability.py`, `trace_sensitivity.py`, `run_ih_fit.py`, `run_twin_recovery.py`, `submit_twin_recovery.sh`); D-245, D-246 | the build choices of D-245 and D-246: the estimate among the points the least-squares stage evaluated; a failed point's $L_2 = 10^6$; the bound flag at 0.01 of the unit box; the weighting without decay as $\tau_d = 10^{12}$ ms; how a bundle's noise is drawn for the predicted scatter; the global stage unchanged for this round [orchestrator] | active; being implemented |
 | D-248 | 2026-11-25 | the next twins' runs (`submit_twin_recovery.sh`, `PLAN_ARGS`: `--dt-long-ms`, `--dt-brief-ms`); D-007 (unchanged), D-192 (iv), D-244 item 5 | the next run is the noisy twins only, at the fit's usual step (0.1 ms); the noise-free twins are fitted later if time allows, long steps at 0.025 ms, short squares at the usual 0.1 ms [user] | active; a run option, no code default changed |
+| D-249 | 2026-11-25 | SPEC Block 28 of `Ih Fit/specs/SPEC.md` on `sci/twins` (`run_twin_recovery.py`, `smoke_twin_sensitivity.py`); D-247 | amendment 2: the sensitivity files are `DIR/sensitivity/twin_<ID>/...`, `DIR/identifiability.csv`, `DIR/truth_trace_check.csv` (no group level); the oracle on a noise-free twin and its noisy partner asks identical sensitivities and identical predicted scatter under shared seeds and layout, not identical scatter as built [orchestrator] | active; implemented (`07e9b76`) |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15762,3 +15764,29 @@ SS mismatch of 6.1e-3 mV at 0.1 ms): the noise-free run will show a smaller resi
 **Sources.** **[user]**; **[run]**, **[log]**, **[reasoning]** as above.
 
 **Status:** active.
+
+## D-249 -- Amendment 2 of the wave: the sensitivity files' place, and the partner-twin oracle restated (orchestrator)
+
+**Date:** 2026-11-25 (Europe/Rome), the review chat. **Binds:** SPEC Block 28 of
+`Passive Features/HPC script/Ih Fit/specs/SPEC.md` on `sci/twins` (contract amendment `6d5f9e4`).
+
+**Decision [orchestrator].** Two defects of the contract of D-247, found by Block 28's implementer (the second
+reported as an issue, the block stopped):
+1. *Place.* The sensitivity files of a twin are `DIR/sensitivity/twin_<ID>/...` and the merged tables
+   `DIR/identifiability.csv`, `DIR/truth_trace_check.csv`, `DIR` the run directory that holds `fits/` and `twins/`.
+   First written with a `<group>` level, which repeats the group on the cluster.
+2. *Oracle V2.* First written: the predicted scatter of a noise-free twin and of its noisy partner are identical
+   (1e-9). Now: their stored sensitivities are identical, and with the partner's seeds and layout the noise-free
+   twin reproduces the partner's predicted scatter (1e-9); the difference as built is reported.
+
+**Why.** **[run, the implementer's `smoke_twin_sensitivity.py`, the fixture's twins 900000000 and 900000300,
+K = 20]** the sensitivities are identical (max difference 0); the predicted scatters differ by 0.22 (current
+weighting) and 0.27 (no decay) relative, all of it from the seeds (each twin's realisations are seeded with its own
+`twin_id`, D-247.6) but under 0.01 from the weights, which are read on each twin's own traces (SPEC 2.10 (a)); with
+shared seeds and layout the difference is 0. The seeds stay as built.
+
+**What it does not decide.** Whether twins of one cell should share noise realisations (a change of D-247.6).
+
+**Sources.** **[orchestrator]**; **[run]** as above; **[log]** D-247.
+
+**Status:** active; implemented.
