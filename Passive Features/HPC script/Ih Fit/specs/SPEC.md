@@ -51,6 +51,7 @@ Paths this spec covers (relative to `Passive Features/HPC script/Ih Fit/`):
 - `twin_manifest.py`, `smoke_twin_manifest.py` (Block 13: the twins' manifest; drafted 2026-11-20)
 - `run_twin_recovery.py`, `submit_twin_recovery.sh`, `smoke_twin_recovery.py` (Block 8: the Stage-7 run; drafted 2026-11-20)
 - of the I_h fitter, the parts Blocks 14 to 22 specify [added 2026-11-24, the final check's S1]: `passive_long_step_training.py` (the roles, the weights and the worker pool: Blocks 14, 19), `run_ih_fit.py` and `param_spec.py` as far as Blocks 15 and 20 state them, `local_refine.py` (Block 20), `twin_manifest.py` (Blocks 13, 16, 21), `twin_build.py` (Blocks 12, 18), `ih_recovery_report.evaluate_gate`'s `required_axes` (Block 17), and the smoke suites `smoke_ls_protocol.py`, `smoke_ls_pool.py`, `smoke_ih5.py`, `smoke_local_refine.py`, `smoke_ih_refine.py`; the rest of the I_h fitter stays outside this spec
+- of the I_h fitter, the parts Blocks 23 to 28 specify [added 2026-11-25]: `passive_long_step_training.py` (the residual vector, the layout, the trace evaluator: Block 23), `smoke_residuals.py`; `fd_jacobian.py`, `smoke_fd_jacobian.py` (Block 24); `local_refine.py` (`TrfConfig`, `TrfResult`, `refine_trf`, `wrap_minimizer_trf`: Block 25), `smoke_refine_trf.py`; `identifiability.py`, `trace_sensitivity.py`, `smoke_identifiability.py` (Block 26); `run_ih_fit.py` (the `trf` refinement, the bound flags, the sensitivity mode, `layout_from_stored`: Block 27), `smoke_ih_trf.py`; `run_twin_recovery.py` (the `sensitivity` sub-command, the bundle noise, the merged tables), `submit_twin_recovery.sh` (`MODE=sensitivity`), `smoke_twin_sensitivity.py` (Block 28)
 - (to be added block by block) [2026-11-12: the `sens_*.py` scripts dropped for now, D-125.3] the OU term of `synthetic_ground_truth.add_recording_noise`
 
 Everything else in `Ih Fit/` (the I_h fitter, the loader, the recovery gate,
@@ -1813,7 +1814,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   wires both.
 - Confirmed: yes -- D-245 (the squared loss), D-246; the user's "go on with the implementation" (2026-11-25, 14:13)
   on the plan and settings shown. The failed point's constant, the evaluator's interface: the orchestrator's.
-- Status: drafted.
+- Status: smoke-tested 2026-11-25 (sandbox, NEURON 9: `smoke_residuals.py` T1-T10 10/10 on the merged branch; seven planted defects caught by the implementer; commit `2f05b43`). Amendment 1 (`fail_l2` $10^6$) applied by the orchestrator (`d43d80c`).
 
 ### Block 24: finite-difference Jacobian with an absolute step in unit coordinates (2.10 (b))
 
@@ -1847,7 +1848,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   ASCII/LF.
 - Data flow: Block 25 (the solver's Jacobian) and Block 26 (the sensitivities) call `fd_jacobian`.
 - Confirmed: yes -- the review's CR-2/CR-4 numerics, taken with the plan (user, 2026-11-25 14:13).
-- Status: drafted.
+- Status: smoke-tested 2026-11-25 (`smoke_fd_jacobian.py` J1-J7 7/7 on the merged branch; commit `f728bc9`).
 
 ### Block 25: the least-squares refinement (2.10 (c))
 
@@ -1891,7 +1892,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   refusals. L10 `smoke_local_refine.py` still 10/10 (nothing existing changed). L11 ASCII/LF.
 - Data flow: consumes Block 24; Block 27 passes Block 23's `resid` through `get_residuals` and reads `TrfResult`.
 - Confirmed: yes -- D-245; the settings shown to the user and taken with the plan (2026-11-25, 14:13).
-- Status: drafted.
+- Status: smoke-tested 2026-11-25 (`smoke_refine_trf.py` L1-L11 11/11 on the merged branch with Block 24's module; `smoke_local_refine.py` 10/10; commit `4631fa4`). L2 at condition number 1e4: worst distance 9.65e-5 against the limit 1e-4 (`xtol` stops the solver there).
 
 ### Block 26: sensitivities and identifiability (2.10 (d))
 
@@ -1936,7 +1937,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   case; refusals. I8 ASCII/LF.
 - Data flow: consumes Block 24 and, by duck typing, Block 23's evaluator and layout; Block 27 runs it per twin.
 - Confirmed: yes -- D-246; the step, the scheme and K = 200 shown to the user and taken with the plan.
-- Status: drafted.
+- Status: smoke-tested 2026-11-25 (`smoke_identifiability.py` I1-I8 8/8 on the merged branch with Block 24's module; commit `5d02be2`).
 
 ### Block 27: the fit's `trf` refinement, the bound flags and the sensitivity mode of `run_ih_fit.py`
 
@@ -2019,7 +2020,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Data flow: Block 28 builds the command line, reads the columns and the sensitivity files.
 - Confirmed: yes -- D-245, D-246; the settings shown to the user (2026-11-25, 14:13). The 0.01 threshold of the
   bound flag is the review's (CR-3 b); the file layout is the orchestrator's.
-- Status: drafted.
+- Status: smoke-tested 2026-11-25 (sandbox, NEURON 9: `smoke_ih_trf.py` U1-U10 10/10 on the merged branch; `smoke_ih_refine.py` 7/7, `smoke_ih5.py` 8/8 after the adaptations the implementer lists; commit `1f3c8dd`). As measured: the smoke's fits run at `--dt-brief-ms 0.025 --dt-long-ms 0.025` (the twin's step); at the default 0.1 ms the fixture's truth is not the minimum (U5 would end 2.1e-2 from it); U8's truth trace check is 0.236 mV at the sample after the step's end (the loader's one-sample-short long step, D-193), below 1e-13 inside the windows' first 5 ms.
 
 ### Block 28: the twins' run with `trf`, the sensitivity sub-command and its noise, the merged tables
 
@@ -2068,7 +2069,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Data flow: consumes Block 27's CLI, columns and files.
 - Confirmed: yes -- D-246; K = 200 shown to the user. The seeds, the averaging of sweep noise into a bundle and
   the file layout are the orchestrator's (D-247).
-- Status: drafted.
+- Status: smoke-tested 2026-11-25 (sandbox, NEURON 9: `smoke_twin_sensitivity.py` V1-V7 7/7 on the merged branch; `smoke_twin_recovery.py` 22 pass, 2 skip, after the adaptations the implementer lists; commit `07e9b76`, amendment 2 applied).
 
 ## 6. Pipeline entry points
 
@@ -2095,6 +2096,10 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 | `python smoke_ls_protocol.py` / `python smoke_ih5.py` | Block 14 (LP1-LP9) and Block 15 (I1-I8) smokes | NEURON for the losses and fits | under 1 min each |
 | `python smoke_twin_recovery.py [--build]` | Blocks 8 and 17 smoke (TS1-TS15) | NEURON; `./x86_64`; scikit-optimize; bash | minutes |
 | `python smoke_ls_pool.py` / `python smoke_local_refine.py` / `python smoke_ih_refine.py` | Block 19 (W1-W13) and Block 20 (R1-R10; F1-F7) smokes [added 2026-11-24, the final check's S2] | NEURON for the first and the third; the second is pure | under 1 min each |
+| `python smoke_residuals.py` / `smoke_fd_jacobian.py` / `smoke_refine_trf.py` / `smoke_identifiability.py` / `smoke_ih_trf.py` / `smoke_twin_sensitivity.py` | Blocks 23 to 28 smokes [added 2026-11-25] | NEURON, `./x86_64`, scikit-optimize, statsmodels for the first and the last two; the others are pure | about 1 min, seconds, seconds, seconds, about 6 min, about 1 min |
+| `python run_ih_fit.py ... --sensitivity-theta "Cm=..,Rm=..,.." --sensitivity-out DIR` | Block 27: the sensitivities of each loaded cell at the given point, no fit | as a fit | about 11 simulations of every bundle per cell |
+| `python run_twin_recovery.py sensitivity --run-dir DIR --twin ID [--n-workers N] [--n-noise 200]` | Block 28: the sensitivity run of one twin at its truth, with the predicted scatter | as `twin` | as above |
+| `MODE=sensitivity RUN_TAG=... NOISE_TAG=... [NCPUS=..] [N_NOISE=200] [TWINS=...] bash submit_twin_recovery.sh` | Block 28 on the cluster: one sub-job per twin, then the merge (`identifiability.csv`, `truth_trace_check.csv`) | PBS, conda | minutes per twin |
 | `RUN_TAG=... NOISE_TAG=... [NCPUS=3] [PLAN_ARGS="--ih-arm ih5"] [TWINS=...] bash submit_twin_recovery.sh` | Block 22 on the cluster: as the row above, 3 cores per twin by default (`--n-workers`), the I_h arm `ih6_d207` unless `--ih-arm ih5` [the final check's S2: the row above states Block 17's one core] | PBS, conda | 35 twins x 3 = 105 cores |
 
 ## 7. Not executable in the sandbox
