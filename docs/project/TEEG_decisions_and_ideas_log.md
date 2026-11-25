@@ -299,6 +299,7 @@ the "Binds" column.
 | 2026-11-25 (the review chat, 13:17) | Logs **D-245** (user) after the independent review of the I_h fit (`TEEG_tech_Ih_fit_change_requests_2026-11-25.md`, sent to the user as files, not in the repository): the local stage becomes a bounded least-squares solver (scipy TRF) on the squared loss $L_2$; the review's sensitivity module (its CR-2) is dropped. D-207 (the loss's combination across bundles) and D-234/D-244 (Nelder-Mead) annotated. |
 | 2026-11-25 (the review chat, 14:08) | Logs **D-246** (user): the review's sensitivity module (CR-2) is built after all, to settle the exclusion rule of D-244 item 3 and the sample weight's $\tau_d$; D-245 item 3 reversed, its items 1 and 2 stand. |
 | 2026-11-25 (the review chat, 15:10) | Logs **D-247** (orchestrator): the build choices of D-245/D-246 written into `Ih Fit/specs/SPEC.md` 2.10 and Blocks 23 to 28 on `sci/twins` (contracts `43ae62f`, `87df33a`; amendment 1 `d43d80c`: a failed point's $L_2$ is $10^6$, first 100). Next free IDs: D-248, I-008. |
+| 2026-11-25 (the review chat, 16:10) | D-245's "Why" corrected in place with a dated mark: the fits integrate at 0.1 ms (D-007), not 0.025 ms as written; the twins at 0.025 ms (D-192 (iv)). No new decision ID. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -15639,7 +15640,7 @@ stops on its tolerances in 11 of 20 runs, 5 of them farther than 0.05 (unit box,
 reaches the minimum in at most 60 evaluations, Jacobian included. **[data inspected: `tw3_results.tar.gz`]** in
 `tw3a`/`tw3b` the three Nelder-Mead endpoints of one fit are up to 0.99 apart (unit box, max-norm), mostly along
 $\tau_h^{\rm pk}$, with losses within a factor of about 2 of each other. **[src at `393b681`]** the simulation is
-fixed-step (0.025 ms, `cnexp`) and the weights depend on the recorded trace only, so $r(q)$ is smooth in $q$.
+fixed-step (`cnexp`; **[corrected 2026-11-25, 16:10: first written "0.025 ms"; the fits run at 0.1 ms, D-007, the twins are built at 0.025 ms, D-192 (iv)]**) and the weights depend on the recorded trace only, so $r(q)$ is smooth in $q$.
 **[reasoning]** a Gauss-Newton-type method needs the objective as a sum of squared residuals; $L$ is a sum of norms
 and has no such form.
 
