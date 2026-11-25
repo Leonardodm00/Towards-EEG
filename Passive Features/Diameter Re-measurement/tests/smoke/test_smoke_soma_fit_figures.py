@@ -10,6 +10,13 @@ references for the image frame (the region's contour about one marked pixel lies
 a disk's contour within half a pixel of its circle) and for the residual's scale (its percentile by a loop over the
 fitted pixels) (test_reference).
 
+The c-grid figure (Block 48, the amendment of wave 8): it builds, with four axes, for (i) an ordinary grid with a
+refinement, (ii) a grid with one unusable fit and no refinement, (iii) no usable fit, saved to a non-empty PNG, and is
+not closed by the function (test_contract); the y-data of every panel read back from its line artists equal the table's
+usable values, the unusable fits on the lower edge, the best value, the delivered refinement, the neighbourhood, Allen's
+area and +-tol where passed and only there (test_known_answer); no input mutated and the ValueErrors (test_edge_cases);
+determinism (test_determinism).
+
 The inputs are synthetic, built here from the shapes SPEC Blocks 46-48 state (Block 47 is written in parallel, so its
 outlines and stems are made here, not imported); the model planes are a smooth shadow, not Block 45's renderer: the
 figures only draw them.
@@ -224,6 +231,47 @@ def morphology_case():
     return dict(top=top, side=side, title="specimen 0 (synthetic)  |  the soma in the morphology")
 
 
+C_GRID = np.array([1.5, 2.5, 3.5, 5.0])          # Colab's grid of held c (um; D-256.1)
+TOL_GL = 1.0                                     # the background check's threshold (gl; D-257.2)
+ALLEN_AREA = 4.0 * math.pi * RS ** 2             # Allen's 4 pi r^2 (um^2)
+
+
+def cgrid_case(kind="refined"):
+    """The c-grid figure's inputs (SPEC Block 48, the amendment of wave 8), with Block 50's grid_table layout: "refined"
+    (i) an ordinary grid, every fit usable, the best at index 1 and a refinement delivered in [1.5, 3.5] um;
+    "one_unusable" (ii) the fit at 3.5 um failed (NaN, as Block 46's failed fit), the best grid fit delivered, no
+    refinement; "none" (iii) no usable fit, nothing delivered."""
+    n = C_GRID.size
+    usable = np.ones(n, dtype=bool)
+    if kind == "one_unusable":
+        usable[2] = False
+    elif kind == "none":
+        usable[:] = False
+    def col(vals):
+        return np.where(usable, np.asarray(vals, dtype=float), np.nan)
+    rms = col([3.41, 3.05, 3.12, 3.63])
+    table = dict(c_um=C_GRID.copy(), chi2=rms ** 2 * 5.0e5, rms_gl=rms, x0_um=col([0.61] * n),
+                 y0_um=col([-0.39] * n), z0_um=col([0.92] * n), a_um=col([4.21, 4.39, 4.52, 4.83]),
+                 b_um=col([3.28, 3.41, 3.49, 3.66]), phi_rad=col([0.6] * n), mu_per_um=col([0.17, 0.15, 0.14, 0.12]),
+                 area_um2=col([138.0, 163.2, 190.4, 238.9]), r_eq_um=col([3.31, 3.6, 3.89, 4.36]), usable=usable)
+    check = col([0.81, 0.27, -0.33, -1.42])
+    if kind == "refined":
+        best, nb = 1, (1.5, 3.5)
+        dl = dict(source="refinement", c_um=2.83, rms_gl=3.01, a_um=4.42, b_um=3.44, area_um2=171.5, check_mean_gl=0.06)
+    elif kind == "one_unusable":
+        best, nb = 1, None
+        dl = dict(source="grid", c_um=2.5, rms_gl=3.05, a_um=4.39, b_um=3.41, area_um2=163.2, check_mean_gl=0.27)
+    else:
+        best, nb = -1, None
+        dl = dict(source="none")
+    return dict(table=table, best_index=best, delivered=dl, check_mean_gl=check, tol_gl=TOL_GL,
+                allen_area_um2=ALLEN_AREA, neighbourhood_um=nb,
+                title="specimen 0 (synthetic)  |  the soma fit over the grid of held c (%s)" % kind)
+
+
+CGRID_PANELS = (("rms", "rms_gl"), ("a", "a_um"), ("b", "b_um"), ("area", "area_um2"), ("check", None))
+
+
 def _lines(fig, gid):
     return [ln for ax in fig.axes for ln in ax.get_lines() if ln.get_gid() == gid]
 
@@ -423,6 +471,73 @@ def test_known_answer():
     assert fig.get_suptitle() == m["title"]
     _close(fig)
 
+    # the c-grid figure: every panel's y-data read back from its line artists equal the inputs at the usable fits
+    for kind in ("refined", "one_unusable", "none"):
+        cg = cgrid_case(kind)
+        fig = SFF.figure_soma_c_grid(**cg)
+        tab, use = cg["table"], cg["table"]["usable"]
+        best, dl = cg["best_index"], cg["delivered"]
+        a_rms, a_ab, a_S, a_chk = fig.axes
+        for gid, key in CGRID_PANELS:
+            vals = cg["check_mean_gl"] if key is None else tab[key]
+            (ln,) = _lines(fig, gid)
+            assert ln.axes is {"rms": a_rms, "a": a_ab, "b": a_ab, "area": a_S, "check": a_chk}[gid], gid
+            ok = use & np.isfinite(vals)
+            assert_array_equal(ln.get_xdata(), tab["c_um"][ok])
+            assert_array_equal(ln.get_ydata(), vals[ok])                     # the oracle of the entry [exact]
+        # the unusable fits: open markers at their c on each panel's lower edge (y = 0 in axes units)
+        unus = _lines(fig, "unusable")
+        assert len(unus) == (4 if np.any(~use) else 0), (kind, len(unus))
+        for ln in unus:
+            assert_array_equal(ln.get_xdata(), tab["c_um"][~use])
+            assert_array_equal(ln.get_ydata(), np.zeros(int(np.sum(~use))))
+            assert ln.get_markerfacecolor() == "none" and not ln.get_clip_on()
+            # x in data units, y in axes units: the point (c, 0) lands on the axis' lower edge
+            disp = ln.get_transform().transform([[tab["c_um"][~use][0], 0.0]])
+            want = ln.axes.transAxes.transform([[0.0, 0.0]])[0][1]
+            check_close("unusable_on_edge", disp[0][1], want, rtol=0, atol=1e-9)
+        # the best grid value: a ring on each value series and a dotted line on each panel, only when there is one
+        rings, vlines = _lines(fig, "best"), _lines(fig, "best_line")
+        if best >= 0:
+            assert len(rings) == 5 and len(vlines) == 4
+            for ln in rings:
+                assert_array_equal(ln.get_xdata(), [tab["c_um"][best]])
+            assert sorted(float(ln.get_ydata()[0]) for ln in rings) == sorted(
+                [tab["rms_gl"][best], tab["a_um"][best], tab["b_um"][best], tab["area_um2"][best],
+                 cg["check_mean_gl"][best]])
+            for ln in vlines:
+                assert_array_equal(np.asarray(ln.get_xdata(), dtype=float), [tab["c_um"][best]] * 2)
+                assert ln.get_linestyle() == ":"
+        else:
+            assert not rings and not vlines
+        # the delivered fit: a diamond per series only when it is the refinement, at its own values
+        dia = _lines(fig, "delivered")
+        if dl["source"] == "refinement":
+            assert len(dia) == 5
+            assert sorted(float(ln.get_ydata()[0]) for ln in dia) == sorted(
+                [dl["rms_gl"], dl["a_um"], dl["b_um"], dl["area_um2"], dl["check_mean_gl"]])
+            assert all(ln.get_xdata()[0] == dl["c_um"] and ln.get_marker() == "D" for ln in dia)
+        else:
+            assert not dia
+        # the neighbourhood shaded on every panel exactly when passed: the span's x-extent is (lo, hi)
+        spans = _patches(fig, "neighbourhood")
+        if cg["neighbourhood_um"] is not None:
+            assert len(spans) == 4
+            for p in spans:
+                # the patch's own vertices before the axes' (blended: x data, y axes) transform
+                xs = p.get_path().transformed(p.get_patch_transform()).vertices[:, 0]
+                check_close("neighbourhood_span", [xs.min(), xs.max()], cg["neighbourhood_um"], rtol=0, atol=1e-12)
+        else:
+            assert not spans
+        # Allen's area on the area panel, +-tol and 0 on the check panel
+        (al,) = _lines(fig, "allen")
+        assert al.axes is a_S and np.all(np.asarray(al.get_ydata(), dtype=float) == ALLEN_AREA)
+        tols = _lines(fig, "tol")
+        assert len(tols) == 2 and all(ln.axes is a_chk for ln in tols)
+        assert sorted(float(ln.get_ydata()[0]) for ln in tols) == [-TOL_GL, TOL_GL]
+        assert fig.get_suptitle().startswith(cg["title"] + "\n") and ("delivered: " in fig.get_suptitle())
+        _close(fig)
+
 
 def test_reference():
     # the image frame: a region of one pixel at (row 13, col 88) is drawn around the pixel centre
@@ -563,11 +678,32 @@ def test_contract():
     assert len(fig.axes) == 2
     _close(fig)
 
+    # the c-grid figure: four axes for each of the entry's three cases, a non-empty PNG, left open for the caller
+    import matplotlib.pyplot as plt
+    for kind in ("refined", "one_unusable", "none"):
+        f = SFF.figure_soma_c_grid(**cgrid_case(kind))
+        assert isinstance(f, Figure) and len(f.axes) == 4, (kind, len(f.axes))
+        assert plt.fignum_exists(f.number), "the figure is closed by the caller, not by the function"
+        out = Path(SFF.save(f, ARTIFACT_DIR / ("soma_fit_cgrid_%s_example.png" % kind), dpi=90))
+        with open(out, "rb") as fh:
+            head = fh.read(8)
+        assert head == b"\x89PNG\r\n\x1a\n" and out.stat().st_size > 20000, (kind, out.stat().st_size)
+        _close(f)
+    # one grid value (no neighbourhood), and Allen's area not available (NaN: no line)
+    one = cgrid_case("one_unusable")
+    t1 = {k: v[:1] for k, v in one["table"].items()}
+    f = SFF.figure_soma_c_grid(**dict(one, table=t1, best_index=0, check_mean_gl=one["check_mean_gl"][:1],
+                                      allen_area_um2=float("nan")))
+    assert len(f.axes) == 4 and not _lines(f, "allen") and len(_lines(f, "rms")[0].get_xdata()) == 1
+    _close(f)
+
 
 def test_determinism():
     for build in (lambda: SFF.figure_soma_fit_planes(**planes_case()),
                   lambda: SFF.figure_soma_fit_summary(**summary_case(held=True)),
-                  lambda: SFF.figure_soma_morphology(**morphology_case())):
+                  lambda: SFF.figure_soma_morphology(**morphology_case()),
+                  lambda: SFF.figure_soma_c_grid(**cgrid_case("refined")),
+                  lambda: SFF.figure_soma_c_grid(**cgrid_case("one_unusable"))):
         pix = []
         for _ in range(2):
             fig = build()
@@ -703,6 +839,31 @@ def test_edge_cases():
     fig = SFF.figure_soma_morphology(top=dict(m["top"], stems=odd), side=dict(m["side"], stems=odd_side))
     assert "flag: unforeseen" in [t.get_text() for t in fig.legends[0].get_texts()]
     _close(fig)
+
+    # the c-grid figure: no input mutated (each case), and the ValueErrors
+    for kind in ("refined", "one_unusable", "none"):
+        cg = cgrid_case(kind)
+        keep = copy.deepcopy(cg)
+        _close(SFF.figure_soma_c_grid(**cg))
+        _same(cg, keep)
+    cg = cgrid_case("refined")
+    tab = cg["table"]
+    no_key = {k: v for k, v in tab.items() if k != "area_um2"}
+    for bad in (dict(table=no_key), dict(table=[tab]), dict(table=dict(tab, rms_gl=tab["rms_gl"][:-1])),
+                dict(table=dict(tab, usable=tab["usable"].astype(int))), dict(table=dict(tab, usable=tab["usable"][1:])),
+                dict(table=dict(tab, c_um=np.array([1.5, np.nan, 3.5, 5.0]))),
+                dict(table={k: v[:0] for k, v in tab.items()}, check_mean_gl=np.zeros(0)),
+                dict(best_index=4), dict(best_index=-2), dict(best_index=1.0), dict(best_index=True),
+                dict(delivered=dict(cg["delivered"], source="best")), dict(delivered={"c_um": 2.0}),
+                dict(delivered={k: v for k, v in cg["delivered"].items() if k != "a_um"}),
+                dict(delivered=dict(cg["delivered"], rms_gl="small")),
+                dict(check_mean_gl=cg["check_mean_gl"][:-1]), dict(tol_gl=-1.0), dict(tol_gl=float("nan")),
+                dict(allen_area_um2="large"), dict(neighbourhood_um=(3.5, 1.5)), dict(neighbourhood_um=(1.5,)),
+                dict(neighbourhood_um=(1.5, float("inf")))):
+        _raises(ValueError, SFF.figure_soma_c_grid, **dict(cg, **bad))
+    ii = cgrid_case("one_unusable")
+    _raises(ValueError, SFF.figure_soma_c_grid, **dict(ii, best_index=2))      # the best must be a usable fit
+    _close(SFF.figure_soma_c_grid(**dict(cg, best_index=np.int64(1))))       # numpy ints are ints
 
 
 # ---------------------------------------------------------------- runner ---
