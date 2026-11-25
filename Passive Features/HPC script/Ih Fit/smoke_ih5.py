@@ -382,8 +382,10 @@ def test_I3_ih5_fit():
         bad.append("ls_tau_d_ms = %r" % row["ls_tau_d_ms"])
     # the new columns are written after every existing one
     # (Block 20's columns come after Block 15's: they are not "existing" here [adapted in Block 20])
+    # (and Block 27's after Block 20's [adapted in Block 27])
     old_last = max(list(res.columns).index(c) for c in res.columns
-                   if c not in NEW_COLUMNS and c not in R.REFINE_RECORD_COLUMNS)
+                   if c not in NEW_COLUMNS and c not in R.REFINE_RECORD_COLUMNS
+                   and c not in R.TRF_RECORD_COLUMNS and not c.startswith("on_bound_"))
     if min(list(res.columns).index(c) for c in NEW_COLUMNS if c in res.columns) < old_last:
         bad.append("the Block 15 columns are not after the existing ones")
     assert not bad, "; ".join(bad)
@@ -413,7 +415,8 @@ def test_I4_eval_theta():
     # --eval-theta changes nothing else: the two runs fit the same cell with the same seed, so
     # every other column (the gate, the I_h summary, ...) is identical, and ls_diagnostics.csv too
     # (the estimate is back on the cell after the loss at the given theta was evaluated)
-    leak = [c for c in res3.columns if c not in ("loss_at_eval_theta", "wall_time_s")
+    # (sqrt_l2_at_eval_theta is the same point's sqrt(L_2) [adapted in Block 27])
+    leak = [c for c in res3.columns if c not in ("loss_at_eval_theta", "sqrt_l2_at_eval_theta", "wall_time_s")
             and not (str(res3.iloc[0][c]) == str(row[c]))]
     if (out3 / "ls_diagnostics.csv").read_bytes() != (st["out"] / "ls_diagnostics.csv").read_bytes():
         leak.append("ls_diagnostics.csv")
