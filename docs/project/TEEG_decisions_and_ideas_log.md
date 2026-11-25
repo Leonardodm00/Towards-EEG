@@ -295,6 +295,7 @@ the "Binds" column.
 | 2026-11-24 (the gallery chat, 17:41) | Logs **D-242** (user, 17:32): the SGT dropped from the node fit, the Gaussian the only kernel. Next free IDs: D-243, I-007. |
 | 2026-11-24 (the gallery chat, 17:58) | Logs **D-243** (orchestrator): the soma fit's crop sized for the renderer (at least 14 um half-width), correcting D-241.1's crop sentence; the region of D-241 unchanged. Next free IDs: D-244, I-007. |
 | 2026-11-25 (the twins chat) | Logs **D-244** (user, 11:49) after the test runs `tw3a` and `tw3b` **[data inspected: the user's `tw3_results.tar.gz`]**: no fit reached the loss at the truth, all 30 Nelder-Mead starts stopped on the 100-evaluation cap; five parameters median ratio 1.48, six 2.38, $\Delta v_h$ within 3 mV in 2 of 5. D-206, D-234 and D-238 annotated. Next free IDs: D-245, I-008. |
+| 2026-11-25 (the twins chat, 2) | D-244 item 5 corrected in place with a dated mark, on the user's word (12:08, "All noisy"): the pilot `tw4` is the 10 noisy `full` twins, not 5 noise-free and 5 noisy. No new decision ID. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -15589,7 +15590,7 @@ cores where to run the 10 pilot fits".
    open is removed from the I_h fit. **The rule (which quantity, which threshold) is not set**: the pilot keeps all
    its twins and the rule is chosen on its tables.
 4. *Cores.* The twins' submitter accepts up to 240 cores per submission (was 200, D-238).
-5. *Pilot.* 10 fits; read by the assistant as the 5 noise-free twins and their 5 noisy partners (run `tw4`).
+5. *Pilot.* 10 fits; read by the assistant as the 5 noise-free twins and their 5 noisy partners (run `tw4`). **[corrected 2026-11-25, 12:08, user: "All noisy"]** the pilot is the 10 noisy twins with I_h (`full`, ids 900000000 to 900000009).
 
 **Why.** **[data inspected: `tw3_results.tar.gz`, code `257b351`]** Ratio of the loss at the estimate to the loss at
 the truth on the 5 noise-free twins: five parameters 2.84, 1.10, 1.13, 2.41, 1.48; six parameters 3.64, 1.95, 4.02,

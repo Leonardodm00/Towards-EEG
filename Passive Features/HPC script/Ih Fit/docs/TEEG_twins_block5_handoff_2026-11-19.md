@@ -456,8 +456,8 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   the deepest trained voltage $v^\ast$ or on $m_\infty(v^\ast)$; in tw3a the three badly recovered twins are the
   three shallowest, $v^\ast$ of $-66.0$, $-66.8$, $-59.7$ mV); the submitter's cap is 240 cores. Pilot, from the
   code folder on davinci:
-  `RUN_TAG=tw4 NOISE_TAG=nf2 NCPUS=24 PLAN_ARGS="--ih-arm ih5 --refine-maxfev 300" TWINS=900000000,900000001,900000002,900000003,900000004,900000300,900000301,900000302,900000303,900000304 WALLTIME=48:00:00 bash submit_twin_recovery.sh`
-  (the 5 noise-free twins and their noisy partners; about 1,100 evaluations per fit; told to the user: 24 cores per
+  `RUN_TAG=tw4 NOISE_TAG=nf2 NCPUS=24 PLAN_ARGS="--ih-arm ih5 --refine-maxfev 300" TWINS=900000000,900000001,900000002,900000003,900000004,900000005,900000006,900000007,900000008,900000009 WALLTIME=48:00:00 bash submit_twin_recovery.sh`
+  (the 10 noisy `full` twins [corrected 2026-11-25, 12:08: the user, "All noisy"; first written as 5 noise-free and 5 noisy]; about 1,100 evaluations per fit; told to the user: 24 cores per
   cell are unlikely to beat 8, a cell trains on 3 to 4 long steps). Read first, per twin: `status` in
   `refine_starts.csv` (0 = converged), then `loss_at_estimate / loss_at_truth`. Not investigated: why the loss at
   the truth of a noise-free twin is not 0 (8e-4 to 2.2e-3). A study document for an independent evaluation of the
