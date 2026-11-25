@@ -185,7 +185,8 @@ PLAN_OPTION_NAMES = ("seed", "id_base", "ra_mode", "cm_phys_lo", "cm_phys_hi", "
 #: Block 17's and Block 22's new options and defaults; the options Block 17 removes
 NEW_DEFAULTS = {"n_no_noise": 5, "gbar_bounds": "1e-5,1e-3", "tau_h_pk_bounds_ms": "50,1000",
                 "tau_h_pk_truth_ms": "150,700", "gbar_floor": 1e-5, "ih_arm": "ih6_d207",
-                "dvh_truth_range_mV": "-5,5", "refine": "nelder_mead", "refine_starts": 3, "refine_maxfev": 100}
+                "dvh_truth_range_mV": "-5,5", "refine": "trf", "refine_starts": 3, "refine_maxfev": 100,
+                "refine_max_nfev": 30}    # Block 28: refine trf (was nelder_mead), refine_max_nfev 30
 REMOVED_OPTIONS = ("--kappa-bounds=0.5,2.0", "--kappa-range=0.7,1.4", "--dvh-range=-5,5")
 
 _STATE = {}
@@ -341,7 +342,8 @@ def test_TS1_plan():
     parts["plan's options carry run_ih_recovery's names and defaults"] = all(
         hasattr(pa, k) and getattr(pa, k) == rd[k] for k in PLAN_OPTION_NAMES) and pa.n_per_configuration == 10
     parts["Block 17's and 22's options and defaults (n_no_noise 5, gbar 1e-5,1e-3 and floor 1e-5, tau_h_pk "
-          "50,1000 and 150,700, ih_arm ih6_d207, dv_h truth -5,5, nelder_mead 3 x 100)"] = all(
+          "50,1000 and 150,700, ih_arm ih6_d207, dv_h truth -5,5; Block 28: trf, 3 starts, maxfev 100, "
+          "max_nfev 30)"] = all(
         getattr(pa, k, None) == v for k, v in NEW_DEFAULTS.items())
     gone = []
     for opt in REMOVED_OPTIONS:
@@ -545,7 +547,8 @@ def _ref_fit_argv(options, archive, fit_dir, row, n_workers=None):
     i = ref.index("--kappa-bounds=KAPPA_PLACEHOLDER")
     ref[i] = "--tau-h-pk-bounds-ms=%s" % options["tau_h_pk_bounds_ms"]
     ref += ["--refine", str(options["refine"]), "--refine-starts", str(options["refine_starts"]),
-            "--refine-maxfev", str(options["refine_maxfev"])]
+            "--refine-maxfev", str(options["refine_maxfev"]),
+            "--refine-max-nfev", str(options["refine_max_nfev"])]    # Block 28
     if conf in WITH_EVAL:
         th = TM.twin_theta(row)
         ref.append("--eval-theta=" + ",".join("%s=%r" % (n, th[n]) for n in FITTED[arm]))
@@ -1365,7 +1368,8 @@ def test_TS12_no_noise_extras():
     # round_trip: written with 17 significant digits, read back as the same float64
     ex = pd.read_csv(out / "recovery_extras.csv", float_precision="round_trip")
     parts["merge exit 0; recovery_extras.csv: its columns in order, one row per twin with results"] = (
-        code == 0 and list(ex.columns) == list(T.EXTRAS_COLUMNS) and list(ex["twin_id"]) == list(man["specimen_id"]))
+        code == 0 and list(ex.columns) == T.extras_columns(cfg)    # Block 28: + on_bound_<name>
+        and list(ex["twin_id"]) == list(man["specimen_id"]))
     base = _tau_base_ms(cfg["options"])
     ok_rows, notes = True, []
     for _, e in ex.iterrows():
@@ -1639,14 +1643,16 @@ def test_T3_fit_argv_workers():
     opts = json.loads((out / "run_config.json").read_text())["options"]
     argv = T.fit_argv(opts, "/a", "/o", "ih6_d207")
     i = argv.index("--refine")
-    parts = {"fit_argv: --refine nelder_mead --refine-starts 3 --refine-maxfev 2 (SMALL), --gbar-bounds=1e-5,1e-3, "
-             "no --n-workers when not given": (
-                 argv[i:i + 6] == ["--refine", "nelder_mead", "--refine-starts", "3", "--refine-maxfev", "2"]
+    # Block 28: the default refinement is trf, and --refine-max-nfev 30 follows --refine-maxfev
+    parts = {"fit_argv: --refine trf --refine-starts 3 --refine-maxfev 2 (SMALL) --refine-max-nfev 30, "
+             "--gbar-bounds=1e-5,1e-3, no --n-workers when not given": (
+                 argv[i:i + 8] == ["--refine", "trf", "--refine-starts", "3", "--refine-maxfev", "2",
+                                   "--refine-max-nfev", "30"]
                  and "--gbar-bounds=1e-5,1e-3" in argv and "--n-workers" not in argv)}
     try:
         fa = R._parse_args(T.fit_argv(opts, "/a", "/o", "ih6_d207", n_workers=2))
-        accepted = (fa.refine == "nelder_mead" and fa.refine_starts == 3 and fa.refine_maxfev == 2
-                    and fa.n_workers == 2 and fa.arm == "ih6_d207" and fa.gbar_bounds == "1e-5,1e-3")
+        accepted = (fa.refine == "trf" and fa.refine_starts == 3 and fa.refine_maxfev == 2
+                    and fa.refine_max_nfev == 30 and fa.n_workers == 2 and fa.arm == "ih6_d207" and fa.gbar_bounds == "1e-5,1e-3")
     except SystemExit as exc:
         accepted = False
         print("\n  [T3] run_ih_fit._parse_args refused: exit %r" % (exc.code,))
@@ -1792,7 +1798,8 @@ def test_T6_merge_ih6_d207():
                                    and abs(float(row["median_abs_err"].iloc[0]) - 1.0) < 1e-9
                                    and "STAGE 7 GATE: PASS" in txt)
             ex = pd.read_csv(out / "recovery_extras.csv", float_precision="round_trip")
-            ok = list(ex.columns) == list(T.EXTRAS_COLUMNS) and len(ex) == len(man)
+            ok = (list(ex.columns) == list(T.EXTRAS_COLUMNS) + ["on_bound_" + n for n in IH6]   # Block 28
+                  and len(ex) == len(man))
             for _, e in ex.iterrows():
                 tid = int(e["twin_id"])
                 m = man[man["specimen_id"] == tid].iloc[0]

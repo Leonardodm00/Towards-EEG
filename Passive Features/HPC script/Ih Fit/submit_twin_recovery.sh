@@ -3,9 +3,9 @@
 #PBS -q cpu
 #PBS -k eo
 ##########################################################################
-# submit_twin_recovery.sh -- Blocks 8, 17 and 22 of specs/SPEC.md: the Stage-7
-# run on the twins on davinci (D-184, D-185, D-188, D-182.3; D-234). One script,
-# three roles:
+# submit_twin_recovery.sh -- Blocks 8, 17, 22 and 28 of specs/SPEC.md: the Stage-7
+# run on the twins on davinci (D-184, D-185, D-188, D-182.3; D-234; D-245, D-246).
+# One script, three roles:
 #
 #   run by hand        THE SUBMITTER. Plans the run (run_twin_recovery.py plan;
 #                      a no-op when the run directory is already planned with
@@ -21,7 +21,15 @@
 #                      NCPUS worker processes (SPEC 2.9 (c)).
 #   TWIN_ROLE=merge    THE MERGE JOB: `run_twin_recovery.py merge` -> report/,
 #                      report_without_flagged/, recovery_by_configuration.csv,
-#                      twins_status.csv.
+#                      twins_status.csv (Block 28: and <GROUP>/identifiability.csv,
+#                      <GROUP>/truth_trace_check.csv when sensitivity files exist).
+#
+# MODE=sensitivity (Block 28, SPEC 2.10 (d)): the array subjobs run
+# `run_twin_recovery.py sensitivity --run-dir <outputs> --twin <id> --n-workers
+# NCPUS --n-noise N_NOISE` instead of `twin` (the twin built as `twin` builds it,
+# a built one reused; run_ih_fit's sensitivity mode at the twin's truth; the
+# predicted scatter from the twin's own noise model), with the same resources;
+# then the merge. MODE unset (or empty) = the fit run, as before.
 #
 # Run it from the "Ih Fit" folder, after `git pull`, with the conda env
 # active (the script activates CONDA_ENV itself as well). The order on the
@@ -33,6 +41,7 @@
 #   RUN_TAG=tw3 NOISE_TAG=nf2 DRY_RUN=1 bash submit_twin_recovery.sh
 #   RUN_TAG=tw3 NOISE_TAG=nf2 MAX_TWINS=2 bash submit_twin_recovery.sh
 #   RUN_TAG=tw3 NOISE_TAG=nf2 WALLTIME=<from the pilot> bash submit_twin_recovery.sh
+#   RUN_TAG=tw3 NOISE_TAG=nf2 MODE=sensitivity DRY_RUN=1 bash submit_twin_recovery.sh
 #
 # The third line resubmits every twin with the pilot's run tag: a twin whose
 # archive and fit exist is neither rebuilt nor refitted (run_twin_recovery.py
@@ -59,8 +68,11 @@
 #                    (SPEC 2.9): --ih-arm ih6_d207|ih5 (ih6_d207: six parameters, dv_h fitted; pass
 #                    --ih-arm ih5 for the five-parameter arm), --dvh-truth-range-mV=LO,HI (-5,5: the
 #                    range of dv_h's truth under ih6_d207; 0 under ih5), --gbar-bounds (now 1e-5,1e-3),
-#                    --gbar-floor (1e-5), --refine none|nelder_mead (nelder_mead), --refine-starts (3),
-#                    --refine-maxfev (100)
+#                    --gbar-floor (1e-5), --refine none|nelder_mead|trf, --refine-starts (3),
+#                    --refine-maxfev (100, nelder_mead only). Block 28 (SPEC 2.10 (c)): --refine
+#                    defaults to trf (was nelder_mead); --refine-max-nfev (30: trf's max_nfev per start)
+#   MODE             empty (default): the fit run; sensitivity: the sensitivity sub-command per twin (Block 28)
+#   N_NOISE          200: MODE=sensitivity only, the noise realisations K of the predicted scatter (>= 2)
 #   IH_CODE_DIR      the folder of run_twin_recovery.py; default: this script's folder
 #   IH_ARCHIVE_ROOT  /davinci-1/home/ldellamea/Human Neurons Fitting (the cells: $IH_ARCHIVE_ROOT/$GROUP/specimen_<id>/)
 #   IH_OUTPUT_BASE   $IH_ARCHIVE_ROOT/pipeline_outputs_ih
@@ -87,7 +99,7 @@
 # <outputs>/logs/twin_<id>_<job>.log or merge_<job>.log.
 # Exit codes: 2 usage, 3 refused (archive, noise tables, plan, twins or core cap), 4 qsub, 5 conda.
 #
-# Pure ASCII, LF (hpc-python-compat). Spec: specs/SPEC.md, Blocks 8, 17, 22.
+# Pure ASCII, LF (hpc-python-compat). Spec: specs/SPEC.md, Blocks 8, 17, 22, 28.
 ##########################################################################
 
 set -euo pipefail
@@ -127,6 +139,18 @@ activate_env() {
 
 twin_cmd() {   # twin_cmd CODE_DIR OUT_DIR TWIN_ID N_WORKERS -> the array CMD
     CMD=(python "$1/run_twin_recovery.py" twin --out "$2" --twin "$3" --n-workers "$4")
+}
+
+sens_cmd() {   # sens_cmd CODE_DIR OUT_DIR TWIN_ID N_WORKERS N_NOISE -> the array CMD (Block 28)
+    CMD=(python "$1/run_twin_recovery.py" sensitivity --run-dir "$2" --twin "$3" --n-workers "$4" --n-noise "$5")
+}
+
+job_cmd() {    # job_cmd MODE CODE_DIR OUT_DIR TWIN_ID N_WORKERS N_NOISE -> the array CMD of one subjob
+    if [ "$1" = sensitivity ]; then
+        sens_cmd "$2" "$3" "$4" "$5" "$6"
+    else
+        twin_cmd "$2" "$3" "$4" "$5"
+    fi
 }
 
 merge_cmd() {  # merge_cmd CODE_DIR OUT_DIR -> the array CMD
@@ -170,8 +194,16 @@ if [ -n "$ROLE" ]; then
         case "$IDX" in ''|*[!0-9]*) die "no array index (PBS_ARRAY_INDEX or TWIN_INDEX)" 2 ;; esac
         [ "$IDX" -lt "$N_TWINS" ] || die "array index $IDX outside the $N_TWINS twin(s) of the run file" 2
         TWIN_ID="${TWIN_IDS[$IDX]}"
-        twin_cmd "$TWIN_CODE_DIR" "$TWIN_OUT_DIR" "$TWIN_ID" "$TWIN_NCPUS"
-        LOG="$TWIN_OUT_DIR/logs/twin_${TWIN_ID}_${JOB_TAG}.log"
+        case "${TWIN_MODE:-}" in
+            sensitivity)
+                case "${TWIN_N_NOISE:-}" in ''|*[!0-9]*) die "the run file $TWIN_RUN_FILE sets no TWIN_N_NOISE" 2 ;; esac
+                job_cmd sensitivity "$TWIN_CODE_DIR" "$TWIN_OUT_DIR" "$TWIN_ID" "$TWIN_NCPUS" "$TWIN_N_NOISE"
+                LOG="$TWIN_OUT_DIR/logs/sensitivity_${TWIN_ID}_${JOB_TAG}.log" ;;
+            '')
+                job_cmd "" "$TWIN_CODE_DIR" "$TWIN_OUT_DIR" "$TWIN_ID" "$TWIN_NCPUS" ""
+                LOG="$TWIN_OUT_DIR/logs/twin_${TWIN_ID}_${JOB_TAG}.log" ;;
+            *) die "the run file $TWIN_RUN_FILE sets TWIN_MODE '${TWIN_MODE}' (empty or sensitivity)" 2 ;;
+        esac
         TASKS="$N_TWINS"
         # the job's cores are the fit's worker processes; the BLAS threads stay at 1 (Block 22)
         export OMP_NUM_THREADS=$TWIN_JOB_THREADS OPENBLAS_NUM_THREADS=$TWIN_JOB_THREADS MKL_NUM_THREADS=$TWIN_JOB_THREADS
@@ -230,6 +262,10 @@ WALLTIME="${WALLTIME:-24:00:00}"
 [[ "$WALLTIME" =~ ^[0-9]+:[0-5][0-9]:[0-5][0-9]$ ]] || die "WALLTIME: HH:MM:SS (got '$WALLTIME')" 2
 CONDA_ENV="${CONDA_ENV:-prova}"
 DRY_RUN="${DRY_RUN:-0}"
+MODE="${MODE:-}"
+case "$MODE" in ''|sensitivity) ;; *) die "MODE: empty (the fit run) or sensitivity (got '$MODE')" 2 ;; esac
+N_NOISE="${N_NOISE:-200}"
+case "$N_NOISE" in ""|*[!0-9]*|0*|1) die "N_NOISE: an integer >= 2 (got '$N_NOISE')" 2 ;; esac
 PLAN_EXTRA=()
 if [ -n "${PLAN_ARGS:-}" ]; then
     read -r -a PLAN_EXTRA <<< "$PLAN_ARGS"
@@ -316,6 +352,11 @@ say "outputs:   $OUT_DIR"
 say "run file:  $RUN_FILE"
 say "twins:     $N of ${#ALL_IDS[@]}: ${IDS[*]}"
 say "cores:     $N twin(s) x NCPUS $NCPUS = $TOTAL (cap $MAX_CORES, D-244); walltime $WALLTIME per twin job"
+if [ "$MODE" = sensitivity ]; then
+    say "mode:      sensitivity (Block 28): one sensitivity sub-job per twin, N_NOISE $N_NOISE"
+else
+    say "mode:      the fit run (MODE unset)"
+fi
 if [ "$TOTAL" -gt "$MAX_CORES" ]; then
     die "$N twin(s) x $NCPUS cores = $TOTAL cores > $MAX_CORES (D-244): submit fewer twins (TWINS, MAX_TWINS) or fewer cores per twin (NCPUS)" 3
 fi
@@ -331,6 +372,8 @@ write_run_file() {
     printf 'TWIN_NOISE_TAG=%q\n' "$NOISE_TAG"
     printf 'TWIN_NCPUS=%q\n' "$NCPUS"
     printf 'TWIN_CONDA_ENV=%q\n' "$CONDA_ENV"
+    printf 'TWIN_MODE=%q\n' "$MODE"
+    printf 'TWIN_N_NOISE=%q\n' "$N_NOISE"
     printf 'TWIN_IDS=('
     printf ' %q' "${IDS[@]}"
     printf ' )\n'
@@ -366,12 +409,12 @@ PYEOF
     ) || die "run_twin_recovery.py's parser refused the arguments of the $label job (above)" 2
 }
 for i in "${!IDS[@]}"; do
-    twin_cmd "$CODE_DIR" "$OUT_DIR" "${IDS[$i]}" "$NCPUS"
-    check_args "twin ${IDS[$i]}" "${CMD[@]:2}"
+    job_cmd "$MODE" "$CODE_DIR" "$OUT_DIR" "${IDS[$i]}" "$NCPUS" "$N_NOISE"
+    check_args "${MODE:-twin} ${IDS[$i]}" "${CMD[@]:2}"
 done
 merge_cmd "$CODE_DIR" "$OUT_DIR"
 check_args merge "${CMD[@]:2}"
-say "CLI contract: run_twin_recovery.py's parser accepts the twin and the merge arguments"
+say "CLI contract: run_twin_recovery.py's parser accepts the ${MODE:-twin} and the merge arguments"
 
 if [ "$DRY_RUN" = "1" ]; then
     say "DRY RUN -- the run file would read:"
@@ -379,7 +422,7 @@ if [ "$DRY_RUN" = "1" ]; then
     print_cmd "[twin_recovery] DRY RUN: cd $(printf '%q' "$SELF_DIR") &&" "${QSUB_TWIN[@]}"
     say "DRY RUN: twin job environment: OMP_NUM_THREADS=$TWIN_JOB_THREADS OPENBLAS_NUM_THREADS=$TWIN_JOB_THREADS MKL_NUM_THREADS=$TWIN_JOB_THREADS (NCPUS $NCPUS = the fit's --n-workers)"
     for i in "${!IDS[@]}"; do
-        twin_cmd "$CODE_DIR" "$OUT_DIR" "${IDS[$i]}" "$NCPUS"
+        job_cmd "$MODE" "$CODE_DIR" "$OUT_DIR" "${IDS[$i]}" "$NCPUS" "$N_NOISE"
         print_cmd "[twin_recovery] DRY RUN:   subjob $i:" "${CMD[@]}"
     done
     merge_qsub "ARRAY_JOB_ID"
@@ -404,6 +447,11 @@ MERGE_ID="$("${QSUB_MERGE[@]}")" \
 MERGE_ID="${MERGE_ID//[[:space:]]/}"
 say "merge job submitted:   $MERGE_ID (after $ARRAY_ID)"
 printf '# twin job(s): %s\n# merge job: %s\n' "$ARRAY_ID" "$MERGE_ID" | tee -a "$RUN_FILE" >> "$OUT_DIR/logs/$(basename "$RUN_FILE")"
-say "expect: one 'TWIN <id>: status=...' line per twin in $OUT_DIR/logs/twin_*.log, then"
-say "        the report and the gate's verdict in logs/merge_*.log ($OUT_DIR/report/gate_verdict.txt)"
+if [ "$MODE" = sensitivity ]; then
+    say "expect: one 'SENSITIVITY <id>: done ...' line per twin in $OUT_DIR/logs/sensitivity_*.log, then"
+    say "        $OUT_DIR/$GROUP/identifiability.csv and truth_trace_check.csv from the merge (logs/merge_*.log)"
+else
+    say "expect: one 'TWIN <id>: status=...' line per twin in $OUT_DIR/logs/twin_*.log, then"
+    say "        the report and the gate's verdict in logs/merge_*.log ($OUT_DIR/report/gate_verdict.txt)"
+fi
 exit 0
