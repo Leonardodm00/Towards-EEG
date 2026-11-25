@@ -1857,7 +1857,7 @@ def build_multi_protocol_residuals(
         dt_brief_ms: Optional[float] = None,
         dt_long_ms: Optional[float] = None,
         n_workers: int = 1,
-        fail_l2: float = 100.0):
+        fail_l2: float = 1e6):
     """resid(Q (m, p) in q) -> float64 (m, N), row k = r(Q[k]) of SPEC
     2.10 (a); a failed point the constant row sqrt(fail_l2 / N), so its
     L_2 is fail_l2. Attributes layout, evaluator, n_residuals, n_points,
@@ -1886,7 +1886,7 @@ def _residuals_factory(cell, train_bundles, v_rest_mV, *, weighting, spec,
     """loss.make_residuals of SPEC Block 23: build_multi_protocol_residuals
     with the loss's own cell, bundles, protocol arguments, spec, dt and
     n_workers. Holds no reference to the loss itself."""
-    def make_residuals(fail_l2: float = 100.0):
+    def make_residuals(fail_l2: float = 1e6):
         if weighting not in ("relative", "ls_amplitude"):
             raise ValueError("make_residuals: the residual vector is defined "
                              "for weighting 'relative' or 'ls_amplitude', "

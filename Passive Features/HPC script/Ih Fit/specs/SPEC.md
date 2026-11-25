@@ -1042,7 +1042,7 @@ $L(q) = \sum_b c_b\,\big[\sum_{s \in W_b} r_{b,s}(q)^2 / c_b\big]^{1/2}$, and $L
 vector $r(q) \in \mathbb{R}^N$, $N = \sum_b \lvert W_b\rvert$, lists the bundles in the training order and, inside a
 bundle, the samples in time order. A point $q$ at which the model cannot be simulated (an exception other than a
 dt-enforcement failure, or a non-finite trace) gets the constant vector with every entry $\sqrt{\ell_{\rm fail}/N}$,
-$\ell_{\rm fail} = 100$, so $L_2 = \ell_{\rm fail}$ there; the event is counted.
+$\ell_{\rm fail} = 10^6$ [amendment 1 of wave 5, 2026-11-25, D-247, orchestrator: first written 100, the review's proposal; on the smoke fixture $L_2$ at valid points reaches 133 (Block 23's implementer), so a failed point could have had the lowest recorded $L_2$ and been taken as the estimate], so $L_2 = \ell_{\rm fail}$ there; the event is counted.
 
 (b) **Jacobian by finite differences.** With $u \in [0,1]^p$ the unit coordinates of 2.9 (b) and a function
 $f : [0,1]^p \to \mathbb{R}^N$, absolute step $h$ (default $10^{-3}$): *forward*,
@@ -1783,15 +1783,15 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
     Attributes: `n_workers`, `n_points` (points asked since built), `n_failed` (points returned `None`), `close()`
     (as Block 19's). ValueError: `n_workers` not an integer >= 1; `Q` not 2-D with `p` columns or non-finite.
   - `build_multi_protocol_residuals(cell, train_bundles, v_rest_mV, *, <the protocol arguments of residual_layout>,
-    spec=None, dt_brief_ms=None, dt_long_ms=None, n_workers=1, fail_l2=100.0) -> resid`: `resid(Q)` returns float64
+    spec=None, dt_brief_ms=None, dt_long_ms=None, n_workers=1, fail_l2=1e6) -> resid`: `resid(Q)` returns float64
     `(m, N)`, row `k` $= r(Q_k)$, a failed point the constant row of 2.10 (a). Attributes: `layout`, `evaluator`,
     `n_residuals`, `n_points`, `n_failed`, `l_and_l2(row)`, `close()`.
-  - The loss returned by `build_multi_protocol_loss` (serial and pooled) gains `loss.make_residuals(fail_l2=100.0)`:
+  - The loss returned by `build_multi_protocol_loss` (serial and pooled) gains `loss.make_residuals(fail_l2=1e6)`:
     `build_multi_protocol_residuals` with the loss's own cell, bundles, protocol arguments, spec, dt and
     `n_workers`. ValueError when the loss's `weighting` is `equal` or `custom`. Nothing else of the loss changes:
     its values are those of the contract commit bit for bit.
 - Inputs / outputs: as above; voltages mV, times s, $q$ as `param_spec`.
-- Parameters: `n_workers` (1), `fail_l2` (100).
+- Parameters: `n_workers` (1), `fail_l2` ($10^6$; amendment 1, D-247).
 - Library calls: `numpy.interp`; `concurrent.futures.ProcessPoolExecutor` (fork context).
 - Custom code: the assembly of 2.10 (a) (no library function; it is the project's own loss).
 - Test oracles (`smoke_residuals.py`, NEURON, on the fixture cell and bundles `smoke_ls_pool.py` uses): T1 at >= 6
