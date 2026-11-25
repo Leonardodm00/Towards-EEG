@@ -4,6 +4,7 @@
 |---|---|
 | 2026-11-24 | Created at the end of the gallery chat (the user, 17:32: "Let's also continue the pipeline in another chat. Write an handoff with also the instruction to start with the explanation of the soma fit"). State after D-233 to D-243. |
 | 2026-11-24 (later) | Section 5's SGT scope checked file by file and split by route (the first list mixed in the table route's Block 12-13 files and `measure.sgt_lambda_um`'s users); section 4's two attributions checked against handoff 14.1 and 14.6; D-243 named in sections 1-2; the roadmap's I49 noted. Evidence: `grep -rni sgt` on `src`, `scripts`, `tests`, `notebooks` **[run, sandbox]**. |
+| 2026-11-25 | Section 1 done: the soma fit explained to the user (the chat of 2026-11-25). Section 4: a recovery check with the D-241 region now run on a simulated pilot-like soma -- recovered (a, b, c within 0.06 %, S +0.07 %). Evidence: `checks/soma_explain_2026-11-25/recovery_d241.py` **[run, sandbox]**. `fit_soma.py --synthetic` rerun under today's defaults: recovered (axes within 0.005 um, chi2/dof 9.03). |
 
 Repository `Leonardodm00/Towards-EEG`, branch `sci/diameter-pipeline` (workstream `Passive Features/Diameter
 Re-measurement/`, called W below); SPEC at the repository root `specs/SPEC.md`; the decision log on `main`
@@ -84,13 +85,13 @@ depth signal is somewhat larger **[run, sandbox: `region_new_check.py`]**: a com
 and slope as fitted) differs from the fitted one by 2.3 gl RMS per plane (median, each plane's brightness re-solved)
 against 1.4 gl on the old region; the old fit's imitator (c 7.26, z0 28.39, slope 0.513, re-fitted on the old region)
 by 1.9 against 1.4 gl -- the trade-off is reduced, not removed (and with the slope now held, D-240, one of its three
-legs is gone). A recovery check on simulated stacks with the D-241 region has not been run.
+legs is gone). A recovery check on simulated stacks with the D-241 region has not been run. [corrected 2026-11-25: run -- a simulated pilot-like soma (a 7.0, b 5.6, c 5.0 um, z0 1.8 um above the traced depth, noise 3 gl, no branches, the model true) is recovered with the far slope held and the D-241 region: converged, nothing at a bound, a, b, c within 0.06 %, S +0.07 %, chi2/dof 9.07 (`W/checks/soma_explain_2026-11-25/`) **[run, sandbox]**. So the fit's settings identify c when the model holds; what happens on the pilot's stack is still step 2 of section 5.]
 
 Withdrawn in this chat: holding mu at the dendrites' 0.18 /um (it forces 2c = 0.87 / 0.18 = 4.8 um).
 
 ## 5. Next steps, in order
 
-1. **Explain the soma fit** (section 1).
+1. **Explain the soma fit** (section 1). [done 2026-11-25]
 2. **The user picks SOMA_K** with Cell 24 (b) (slider; contrast "fixed" or "per plane"; the button sets SOMA_K), then
    runs Cell 25 (Cell 1 pulls the branch first) and sends back `soma_fit_529878215.json`, `_planes.png`,
    `_summary.png`, `_morphology.png`. Check: the D-236 flags (c, z0 at a bound?), `crop.ellipsoid_inside` (D-243),
