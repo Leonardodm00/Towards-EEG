@@ -29,3 +29,7 @@ Results (`sensitivity.out`; run in the sandbox, 2026-11-25):
 
 What it does not show: anything about the pilot's stack; the effect of structure the model lacks (processes crossing
 the soma, a non-Gaussian far blur, phase contrast, a tilted illumination cone).
+
+`figures_revised.py sensitivity.json OUT_DIR` -- the three figures of the explanation of the revised approach (2026-11-25, 14:12):
+fig5 the approach (schematic), fig6 the bias of c and of a against the true far slope (from `sensitivity.json`), fig7 S against
+c with an illustrative carried range. The revised approach is proposed, not decided (handoff section 9).
