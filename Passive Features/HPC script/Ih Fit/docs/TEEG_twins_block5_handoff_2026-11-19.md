@@ -467,7 +467,7 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
 - **After the independent review (2026-11-25, 13:17) [user: D-245; src at `393b681`; data inspected:
   `tw3_results.tar.gz`; run in the review chat].** The local stage becomes scipy `least_squares` (TRF, bounded) on
   the squared loss $L_2(q) = \sum_b c_b (\mathrm{RMSD}_b(q)/D_b)^2$ (D-245; not implemented); the review's
-  sensitivity module (its CR-2) is not built. The review's files (`TEEG_tech_Ih_fit_change_requests_2026-11-25.md`,
+  sensitivity module (its CR-2) is not built [corrected 2026-11-25, 14:08: built after all, D-246, to settle the exclusion rule and the sample weight's $\tau_d$]. The review's files (`TEEG_tech_Ih_fit_change_requests_2026-11-25.md`,
   `smoke_sensitivity_reference.py`, `check02_nm_vs_lsq_anisotropic.py`, `check03_nm_restart.py`) were sent to the
   user as files and are not in the repository; its three scripts re-run in the review chat reproduce its numbers.
   *Code facts the review asked for [src]:* (a) `ih_mechanism.balance_e_pas` resets each segment's `e_pas` at every

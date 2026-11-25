@@ -296,7 +296,8 @@ the "Binds" column.
 | 2026-11-24 (the gallery chat, 17:58) | Logs **D-243** (orchestrator): the soma fit's crop sized for the renderer (at least 14 um half-width), correcting D-241.1's crop sentence; the region of D-241 unchanged. Next free IDs: D-244, I-007. |
 | 2026-11-25 (the twins chat) | Logs **D-244** (user, 11:49) after the test runs `tw3a` and `tw3b` **[data inspected: the user's `tw3_results.tar.gz`]**: no fit reached the loss at the truth, all 30 Nelder-Mead starts stopped on the 100-evaluation cap; five parameters median ratio 1.48, six 2.38, $\Delta v_h$ within 3 mV in 2 of 5. D-206, D-234 and D-238 annotated. Next free IDs: D-245, I-008. |
 | 2026-11-25 (the twins chat, 2) | D-244 item 5 corrected in place with a dated mark, on the user's word (12:08, "All noisy"): the pilot `tw4` is the 10 noisy `full` twins, not 5 noise-free and 5 noisy. No new decision ID. |
-| 2026-11-25 (the review chat, 13:17) | Logs **D-245** (user) after the independent review of the I_h fit (`TEEG_tech_Ih_fit_change_requests_2026-11-25.md`, sent to the user as files, not in the repository): the local stage becomes a bounded least-squares solver (scipy TRF) on the squared loss $L_2$; the review's sensitivity module (its CR-2) is dropped. D-207 (the loss's combination across bundles) and D-234/D-244 (Nelder-Mead) annotated. Next free IDs: D-246, I-008. |
+| 2026-11-25 (the review chat, 13:17) | Logs **D-245** (user) after the independent review of the I_h fit (`TEEG_tech_Ih_fit_change_requests_2026-11-25.md`, sent to the user as files, not in the repository): the local stage becomes a bounded least-squares solver (scipy TRF) on the squared loss $L_2$; the review's sensitivity module (its CR-2) is dropped. D-207 (the loss's combination across bundles) and D-234/D-244 (Nelder-Mead) annotated. |
+| 2026-11-25 (the review chat, 14:08) | Logs **D-246** (user): the review's sensitivity module (CR-2) is built after all, to settle the exclusion rule of D-244 item 3 and the sample weight's $\tau_d$; D-245 item 3 reversed, its items 1 and 2 stand. Next free IDs: D-247, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -529,7 +530,8 @@ would be needed*, *Status*.
 | D-242 | 2026-11-24 | the node fit's SGT option (Blocks 49, 30 am. 3, 36 am. 22-23; Cells 26, 26 (b)); supersedes D-221's SGT option, D-222.1-2 | the node fit renders and fits with the Gaussian only; the SGT dropped (cells removed now, code removed in the next chat) [user] | active |
 | D-243 | 2026-11-24 | SPEC Block 46 (`soma_fit.render_half_um`), `fit_soma.py` (crop, `crop.half_um`, `crop.ellipsoid_inside`), Cell 25 text; corrects D-241.1's crop sentence | the soma fit's crop is the renderer's support: max(14 um, region radius + 1 um); the record flags a fitted ellipsoid beyond it [orchestrator] | active |
 | D-244 | 2026-11-25 | the I_h fit and the twins' run after the tests `tw3a`/`tw3b` (`run_ih_fit.py` options, `submit_twin_recovery.sh` `MAX_CORES`); D-234 (items 1 and 3 changed), D-238 (superseded) | after `tw3a`/`tw3b`: five parameters kept ($\Delta v_h$ fixed, as D-206); a larger local budget (300 evaluations per start in the pilot); a cell whose training steps do not reach voltages where I_h is open is removed from the I_h fit (rule to be set); the twins' submitter's cap is 240 cores; a pilot of 10 fits [user] | active; the exclusion rule open; item 2's Nelder-Mead replaced by D-245 (2026-11-25) |
-| D-245 | 2026-11-25 | the I_h fit's local stage and optimised loss (`local_refine.py`, `passive_long_step_training.py`, `run_ih_fit.py`; SPEC 2.8 (c), 2.9 (b)); D-207 (2) in part, D-234 item 1, D-244 item 2; the review's change requests CR-2, CR-4 | the local refinement is a bounded Gauss-Newton-type least-squares solver (scipy `least_squares`, TRF) minimising $L_2(q) = \sum_b c_b (\mathrm{RMSD}_b(q)/D_b)^2$; the review's sensitivity module (CR-2) is not built [user] | active; not implemented |
+| D-245 | 2026-11-25 | the I_h fit's local stage and optimised loss (`local_refine.py`, `passive_long_step_training.py`, `run_ih_fit.py`; SPEC 2.8 (c), 2.9 (b)); D-207 (2) in part, D-234 item 1, D-244 item 2; the review's change requests CR-2, CR-4 | the local refinement is a bounded Gauss-Newton-type least-squares solver (scipy `least_squares`, TRF) minimising $L_2(q) = \sum_b c_b (\mathrm{RMSD}_b(q)/D_b)^2$; the review's sensitivity module (CR-2) is not built [user] | active; not implemented; item 3 (the sensitivity module not built) reversed by D-246 (2026-11-25) |
+| D-246 | 2026-11-25 | the review's sensitivity module (CR-2): a new module of `Ih Fit/` and its report; D-245 item 3 (reversed); D-244 item 3 (the exclusion rule), D-207 (3) (the sample weight's $\tau_d$) | the sensitivity module is built: the Jacobian of the residuals at a twin's truth, its singular values and directions, the predicted scatter of each parameter under the twin's noise; it is what the exclusion rule and the $\tau_d$ question are settled on [user] | active; not implemented |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15650,5 +15652,35 @@ which loses the quantity the review proposed for it (CR-2's predicted scatter); 
 
 **Sources.** **[user]**; **[run]**, **[data inspected]**, **[src]**, **[reasoning]** as above; **[log]** D-006, D-207,
 D-234, D-244.
+
+**Status:** active; not implemented.
+
+## D-246 -- The sensitivity module is built after all, to settle the exclusion rule and the sample weight's decay (user)
+
+**Date:** 2026-11-25, 14:08 (Europe/Rome), the review chat. **Binds:** a new module of
+`Passive Features/HPC script/Ih Fit/` (SPEC entry to write) and its report; D-245 item 3 (reversed); D-244 item 3;
+D-207 (3).
+
+**Decision [user].** "LEt's do also the CR2 so that we settle the exclusion rule and the taud_d question. THe rest
+is ok let's go on".
+
+**Statement.** With $r(q)$ the residual vector of D-245 item 1 and $J(q) = \partial r(q)/\partial q$ its Jacobian,
+for each fixed $q \in B$: the module computes, per twin, the raw trace sensitivities
+$S_{b,s,i}(q_{\rm true}) = \partial \hat V_b(t_s; q)/\partial q_i$ at $q = q_{\rm true}$ by finite differences and
+stores them; from them and a weighting (window, $\tau_d$, training bundles), $J(q_{\rm true})$, its singular values
+and right singular vectors, and the predicted standard deviation of each $\hat q_i$ under noise drawn from the
+twin's own per-sweep noise model (linearised: $\delta q = -(J^\top J)^{-1} J^\top r_\eta$). Two questions are
+settled on its output: (i) the rule that removes a cell from the I_h fit (D-244 item 3); (ii) whether the sample
+weight keeps its decay $\tau_d = 500$ ms (D-207 (3)). D-245 items 1 and 2 (the squared loss, TRF) stand.
+
+**Why.** **[user]** as quoted. **[reasoning, told to the user]** without the module the exclusion rule loses the
+quantity the review proposed for it and $\tau_d$ can only be compared by full fits.
+
+**What it does not decide.** The rule's quantity and threshold, and $\tau_d$'s value: both wait for the module's
+tables. The finite-difference step, the number of noise draws, which twins and cells it runs on. The window: the
+rebound stays out of training (D-006 (ii)); a weighting that includes it is a labelled comparison only.
+
+**Sources.** **[user]**; **[log]** D-006, D-207, D-244, D-245; the review's
+`TEEG_tech_Ih_fit_change_requests_2026-11-25.md` (CR-2), sent to the user as files.
 
 **Status:** active; not implemented.
