@@ -1,33 +1,42 @@
-"""The soma fit -- Block 46 in specs/SPEC.md (D-215, D-216, D-218, D-219).
+"""The soma fit -- Block 46 in specs/SPEC.md (D-215, D-216, D-218, D-219; wave 8: D-252, D-254, D-255, D-256, D-258).
 
 An ellipsoid fitted to the planes about the soma. Data: the soma's crop D (n, H, W) grey levels (gl) on the planes
 ks (n,) with valid (n,), the crop's corner (left, top) px, the pixel size p and the plane spacing dz (um); the traced
 soma's centre (x_s, y_s, z_s) um (image frame; depth in stage units, plane k at depth k dz) and radius r_s um; a mask
-(H, W) bool, True where a pixel is left out (Allen's traced stems and the neuropil, widened by the caller).
+(H, W) bool, True where a pixel is left out (Allen's traced stems, at their traced radius: D-241).
 
     planes K   select_planes: the valid planes with |k dz - z_s| <= plane_half_um and k - k_0 divisible by
                plane_step, k_0 the valid plane nearest z_s (ties: the lower k);
-    region R   the pixels whose centre ((left + col) p, (top + row) p) lies within region_radius_um of (x_s, y_s)
-               (Block 44's disk_mask convention) and whose mask is False;
+    region R   the pixels whose centre ((left + col) p, (top + row) p) lies within r_R of (x_s, y_s) and whose mask
+               is False; r_R = region_radius_um when it is a number, otherwise region_radius_scale x r_s (D-255);
     theta      (x0, y0, z0, a, b, c, phi, mu, gamma): Block 45's theta_g and the kernel's far slope gamma, fitted
-               (far_slope "fit", D-218.1) or held at slope0 ("fixed", D-218.2, the fit then over the first eight);
-    model      D_k ~ B_k tau_k(theta) on R, tau the forward model passed in (Block 45 in production); for each theta
-               B_k = sum_R D_k tau_k / sum_R tau_k^2 and r_k = D_k - B_k tau_k on R (variable projection, D-219.3).
+               (far_slope "fit") or held at slope0 ("fixed", the default since D-240); with sigma0 "fit" (D-258) the
+               kernel's in-focus width sigma0_um is one more fitted parameter, after them; any of the first eight can
+               be held at a given value (hold; D-252, D-256);
+    model      background "tilted" (the default, D-254.1): D_k(x, y) ~ (b0_k + b1_k u + b2_k v) tau_k(theta) on R,
+               u = x - x_s, v = y - y_s (um, from the traced centre, a fixed point); for each theta the three
+               coefficients of each plane are the least-squares solution of the columns [tau, u tau, v tau] on R
+               (numpy.linalg.lstsq per plane), and r_k the misfit left. background "constant" (the model before wave
+               8, a labelled comparison): D_k ~ B_k tau_k, B_k = sum_R D_k tau_k / sum_R tau_k^2 (D-219.3), beta_k =
+               (B_k, 0, 0). Both are variable projection: the backgrounds are solved exactly at every theta.
 
 theta_hat = argmin 1/2 sum_K sum_R r^2 within the bounds -- |x0 - x_s|, |y0 - y_s| <= shift_xy_um,
-|z0 - z_s| <= shift_z_um, a, b, c in axis_bounds_um, phi in [-pi, pi], mu in mu_bounds_per_um, gamma in
-slope_bounds -- by scipy.optimize.least_squares (method "trf", x_scale "jac", max_nfev, ftol, xtol of the
-configuration) with jac the callable _Problem.jac: forward differences with the absolute steps diff_steps, taken
+|z0 - z_s| <= shift_z_um, a, b, c in axis_bounds_um (c in c_bounds_um when given), phi in [-pi, pi], mu in
+mu_bounds_per_um, gamma in slope_bounds, sigma0 in sigma0_bounds_um -- by scipy.optimize.least_squares (method
+"trf", x_scale "jac", max_nfev, ftol, xtol of the configuration) over the fitted parameters only, with jac the
+callable _Problem.jac: forward differences with the absolute steps diff_steps (sigma0_diff_step_um for sigma0), taken
 backwards where the forward step would cross an upper bound or gives a non-finite residual (as Block 42).
-Cov = (J^T J)^-1 chi2 / dof, J the solver's final Jacobian of the projected residual at theta_hat (Golub-Pereyra),
-chi2 = sum r^2 (gl^2), dof = |K| |R| - (fitted parameters) - |K|; numpy.linalg.pinv when J^T J is singular, with NaN
-for the parameters along its null space (Block 42's rule); SE = sqrt(diag(Cov)). A parameter is at a bound when
-within 1e-6 of the bound interval's width from it.
+cov_fit = (J^T J)^-1 chi2 / dof over the fitted parameters, J the solver's final Jacobian of the projected residual at
+theta_hat (Golub-Pereyra), chi2 = sum r^2 (gl^2), dof = |K| |R| - (fitted parameters) - n_bg |K|, n_bg = 3
+("tilted") or 1 ("constant"); numpy.linalg.pinv when J^T J is singular, with NaN for the parameters along its null
+space (Block 42's rule); SE = sqrt(diag). A held parameter has NaN in se and in its row and column of cov. A
+parameter is at a bound when within 1e-3 of the bound interval's width from it (D-236).
 
-The start (start_theta, on the plane k_0; D-219.5): the traced centre and size, with the shadow's orientation (its
-weighted second moments) and an aspect of the same mean radius, mu_0 from the darkest core; clipped into the bounds
-by fit_soma. Derived: the membrane area S (ellipsoid_area, Legendre's form), the volume 4/3 pi a b c, the
-equivalent radius sqrt(S / 4 pi) (D-216.3) and SE(S) by the delta method on the (a, b, c) block of Cov, the
+The start (start_theta, on the plane k_0; D-219.5), or a given start (its slope entry ignored): the traced centre and
+size, with the shadow's orientation (its weighted second moments) and an aspect of the same mean radius, mu_0 from the
+darkest core; clipped into the bounds by fit_soma, the held entries then set to their values. Derived: the membrane
+area S (ellipsoid_area, Legendre's form), the volume 4/3 pi a b c, the equivalent radius sqrt(S / 4 pi) (D-216.3)
+and SE(S) by the delta method over the fitted axes among (a, b, c) (a held axis contributes no variance), the
 gradient of S by central differences.
 
 Units: um, rad, 1/um, um of SD per um of defocus, gl. No file access, no plotting. Pure ASCII, LF, for the cluster
@@ -51,6 +60,9 @@ from .soma_view import plane_range
 PARAMS = ("x0_um", "y0_um", "z0_um", "a_um", "b_um", "c_um", "phi_rad", "mu_per_um", "slope_um_per_um")
 STATUSES = ("converged", "max_nfev", "failed")
 FAR_SLOPES = ("fit", "fixed")
+BACKGROUNDS = ("tilted", "constant")   # SPEC Block 46, wave 8 (D-254.1): "tilted" the default
+SIGMA0_MODES = ("fixed", "fit")        # SPEC Block 46, wave 8 (D-258): "fixed" the default
+SIGMA0_NAME = "sigma0_um"              # the fitted in-focus width's name in SomaFit.fitted (after PARAMS)
 
 MIN_PLANES = 3                   # SPEC Block 46: select_planes and the fit need at least 3 planes
 AT_BOUND_REL = 1e-3              # SPEC Block 46: "within 1e-3 of the bound interval's width from it" (D-236: the
@@ -64,16 +76,22 @@ _MEMO_SIZE = 4                   # residual evaluations kept: the solver's point
 
 @dataclass(frozen=True)
 class SomaFit:
-    """The soma fit's result (SPEC Block 46). K the planes fitted.
+    """The soma fit's result (SPEC Block 46 and its wave-8 amendment). K the planes fitted, n_fit = len(fitted).
 
     theta (9,) in the order and units of PARAMS (um, um, um, um, um, um, rad, 1/um, um/um; theta[8] = slope0 exactly
-    when gamma is held); se (9,) = sqrt(diag(cov)), NaN for gamma when held; cov (9, 9) = (J^T J)^-1 chi2 / dof (NaN
-    in gamma's row and column when held, and for parameters along J's null space); fitted: the names fitted, in
-    PARAMS order; B_gl (K,) the planes' scales (gl); ks (K,) the plane numbers fitted; chi2 = sum r^2 (gl^2);
-    dof = n_samples - len(fitted) - K; n_samples = K |R|; status one of STATUSES; at_bound: the fitted names at a
-    bound; n_eval: the forward evaluations (the Jacobian's included); seconds (wall); area_um2, se_area_um2,
-    volume_um3, r_eq_um: S(a, b, c), its SE (delta method), 4/3 pi a b c, sqrt(S / 4 pi); message. A "failed" fit
-    has NaN in theta, se, cov, B_gl, chi2 and the derived quantities, and at_bound empty."""
+    when gamma is held, a held parameter its value exactly); se (9,) = sqrt(diag(cov)), NaN for a held parameter;
+    cov (9, 9) the fitted parameters' block of cov_fit placed in PARAMS order (NaN in a held parameter's row and
+    column, and for parameters along J's null space); fitted: the names fitted, in PARAMS order, then "sigma0_um"
+    when the in-focus blur is fitted; B_gl (K,) = beta[:, 0], the background at the traced centre (under "constant"
+    the plane's scale) (gl); ks (K,) the plane numbers fitted; chi2 = sum r^2 (gl^2); dof = n_samples - n_fit -
+    n_bg K (n_bg 3 "tilted", 1 "constant"); n_samples = K |R|; status one of STATUSES; at_bound: the fitted names
+    at a bound; n_eval: the forward evaluations (the Jacobian's included); seconds (wall); area_um2, se_area_um2,
+    volume_um3, r_eq_um: S(a, b, c), its SE (delta method over the fitted axes), 4/3 pi a b c, sqrt(S / 4 pi);
+    message. Wave 8: beta (K, 3) the planes' backgrounds (gl, gl/um, gl/um; (B_k, 0, 0) under "constant");
+    background the setting ("tilted" | "constant"); sigma0_um, se_sigma0_um: the fitted in-focus width and its SE
+    under sigma0 "fit" (um), under "fixed" the argument as passed (NaN when None) and NaN; cov_fit (n_fit, n_fit)
+    the scaled covariance of the fitted parameters in fitted order. A "failed" fit has NaN in theta, se, cov, B_gl,
+    beta, cov_fit, chi2, the fitted sigma0 and the derived quantities, and at_bound empty."""
     theta: np.ndarray
     se: np.ndarray
     cov: np.ndarray
@@ -92,6 +110,11 @@ class SomaFit:
     volume_um3: float
     r_eq_um: float
     message: str
+    beta: np.ndarray
+    background: str
+    sigma0_um: float
+    se_sigma0_um: float
+    cov_fit: np.ndarray
 
 
 class _FitFailed(Exception):
@@ -273,19 +296,87 @@ def vp_scale(D, tau, region):
     return _vp_columns(Dv[:, reg], T[:, reg])
 
 
+# Custom: the per-plane loop of the three-column projection (SPEC Block 46, wave 8: no library projects out a
+# per-plane linear background of a stacked model). Library: numpy.linalg.lstsq per plane (SVD-based; its rank with
+# the default rcond decides rank < 3). Checked: numpy.linalg.qr (stacked; no rank decision), scipy.linalg.lstsq (the
+# same as numpy's here), the normal equations (refused by the entry).
+def _vp_tilted(DR, TR, UR, VR):
+    """(beta (K, 3), resid (K, n)) from the data DR and the model TR (K, n) on the region's pixels and the pixel
+    coordinates UR, VR (n,) um from the traced centre: per plane beta_k = argmin ||d_k - [t, u t, v t] beta||^2
+    (numpy.linalg.lstsq) and resid = d_k - M_k beta_k; NaN coefficients and residual for a plane whose M_k is not
+    finite or has rank < 3."""
+    K, n = DR.shape
+    beta = np.full((K, 3), np.nan)
+    resid = np.full((K, n), np.nan)
+    for kk in range(K):
+        t = TR[kk]
+        M = np.column_stack((t, UR * t, VR * t))
+        if not np.all(np.isfinite(M)):
+            continue
+        sol, _res, rank, _sv = np.linalg.lstsq(M, DR[kk], rcond=None)
+        if rank < 3:
+            continue
+        beta[kk] = sol
+        resid[kk] = DR[kk] - M @ sol
+    return beta, resid
+
+
+def _vp_project(DR, TR, UR, VR, background):
+    """(beta (K, 3), resid (K, n)): "tilted" -> _vp_tilted; "constant" -> _vp_columns with beta = (B, 0, 0)."""
+    if background == "tilted":
+        return _vp_tilted(DR, TR, UR, VR)
+    B, resid = _vp_columns(DR, TR)
+    beta = np.zeros((B.size, 3))
+    beta[:, 0] = B
+    beta[~np.isfinite(B), :] = np.nan
+    return beta, resid
+
+
 def vp_background(D, tau, region, u_um, v_um):
     """-> (beta (K, 3) [gl, gl/um, gl/um], resid (K, n_region) gl): per plane the least-squares coefficients of the
-    columns [tau, u tau, v tau] on the region's pixels and the residual D - M beta there (C order, as vp_scale). D, tau
-    (K, H, W); region (H, W) bool; u_um, v_um (H, W) float, um from the traced centre. NaN coefficients and residual
-    for a plane whose columns are not finite or have rank < 3. SPEC Block 46, the amendment of wave 8 (D-254.1)."""
-    raise NotImplementedError("Block 46, wave 8: vp_background")
+    columns [tau, u tau, v tau] on the region's pixels (numpy.linalg.lstsq) and the residual D - M beta there (the
+    region's pixels in C order, as D[k][region] and vp_scale). D, tau (K, H, W) (gl, dimensionless); region (H, W)
+    bool; u_um, v_um (H, W) float, um from the traced centre (u = x - x_s, v = y - y_s). NaN coefficients and
+    residual for a plane whose columns are not finite or have rank < 3. ValueError for shapes that disagree, a region
+    that is not bool or is empty. SPEC Block 46, the amendment of wave 8 (D-254.1)."""
+    Dv = np.asarray(D, dtype=float)
+    T = np.asarray(tau, dtype=float)
+    if Dv.ndim != 3 or T.shape != Dv.shape:
+        raise ValueError("D and tau must be (K, H, W) of one shape, got %s and %s" % (Dv.shape, T.shape))
+    reg = _bool_mask(region, Dv.shape[1:], "region")
+    if not reg.any():
+        raise ValueError("region is empty")
+    U = np.asarray(u_um, dtype=float)
+    V = np.asarray(v_um, dtype=float)
+    if U.shape != reg.shape or V.shape != reg.shape:
+        raise ValueError("u_um and v_um must have shape %s, got %s and %s" % (reg.shape, U.shape, V.shape))
+    return _vp_tilted(Dv[:, reg], T[:, reg], U[reg], V[reg])
 
 
 def background_planes(beta, shape, left, top, res0_um, centre_xy_um):
     """-> (K, H, W) gl: b0_k + b1_k u + b2_k v at the pixel centres of a crop, u = x - x_s, v = y - y_s (um), pixel
-    (row, col) centred on ((left + col) p, (top + row) p). beta (K, 3); shape (H, W); centre_xy_um (x_s, y_s). SPEC
-    Block 46, the amendment of wave 8."""
-    raise NotImplementedError("Block 46, wave 8: background_planes")
+    (row, col) centred on ((left + col) p, (top + row) p). beta (K, 3) (gl, gl/um, gl/um); shape (H, W); left, top
+    whole px; res0_um p um (> 0); centre_xy_um (x_s, y_s) um. A caller draws the model as
+    background_planes(...) * tau. ValueError for a beta that is not (K, 3), a shape that is not two whole numbers
+    >= 1, a corner not whole, a pixel size not finite > 0, a centre not two finite numbers. SPEC Block 46, the
+    amendment of wave 8."""
+    bt = np.asarray(beta, dtype=float)
+    if bt.ndim != 2 or bt.shape[1] != 3:
+        raise ValueError("beta must be (K, 3), got shape %s" % (bt.shape,))
+    sh = tuple(np.asarray(shape).reshape(-1).tolist())
+    if len(sh) != 2:
+        raise ValueError("shape must be (H, W), got %r" % (shape,))
+    H, W = _whole(sh[0], "shape[0]"), _whole(sh[1], "shape[1]")
+    if H < 1 or W < 1:
+        raise ValueError("shape must be >= 1 in both axes, got %r" % (shape,))
+    p = _positive(res0_um, "res0_um")
+    c = np.asarray(centre_xy_um, dtype=float).reshape(-1)
+    if c.shape != (2,) or not np.all(np.isfinite(c)):
+        raise ValueError("centre_xy_um must hold 2 finite numbers (um), got %r" % (centre_xy_um,))
+    x, y = _pixel_centres((H, W), _whole(left, "left"), _whole(top, "top"), p)
+    u = (x - c[0])[None, None, :]
+    v = (y - c[1])[None, :, None]
+    return bt[:, 0, None, None] + bt[:, 1, None, None] * u + bt[:, 2, None, None] * v
 
 
 # ------------------------------------------------------------------- start ---
@@ -353,12 +444,18 @@ def start_theta(block_k0, left, top, res0_um, centre_um, radius_um, region, slop
 
 # --------------------------------------------------------------------- fit ---
 
-def _bounds(scfg, xs, ys, zs):
-    """(lo, hi) (9,): the boxes of SPEC Block 46 about the traced centre (x_s, y_s, z_s)."""
+def _bounds(scfg, xs, ys, zs, c_bounds_um=None):
+    """(lo, hi) (10,): the boxes of SPEC Block 46 about the traced centre (x_s, y_s, z_s), in the order PARAMS then
+    sigma0 (sigma0_bounds_um); c_bounds_um (lo, hi), when given, replaces axis_bounds_um for c only."""
     sxy, sz = float(scfg.shift_xy_um), float(scfg.shift_z_um)
-    ax, mu, g = scfg.axis_bounds_um, scfg.mu_bounds_per_um, scfg.slope_bounds
-    lo = np.array([xs - sxy, ys - sxy, zs - sz, ax[0], ax[0], ax[0], -math.pi, mu[0], g[0]], dtype=float)
-    hi = np.array([xs + sxy, ys + sxy, zs + sz, ax[1], ax[1], ax[1], math.pi, mu[1], g[1]], dtype=float)
+    ax, mu, g, s0 = scfg.axis_bounds_um, scfg.mu_bounds_per_um, scfg.slope_bounds, scfg.sigma0_bounds_um
+    lo = np.array([xs - sxy, ys - sxy, zs - sz, ax[0], ax[0], ax[0], -math.pi, mu[0], g[0], s0[0]], dtype=float)
+    hi = np.array([xs + sxy, ys + sxy, zs + sz, ax[1], ax[1], ax[1], math.pi, mu[1], g[1], s0[1]], dtype=float)
+    if c_bounds_um is not None:
+        cb = np.asarray(c_bounds_um, dtype=float).reshape(-1)
+        if cb.shape != (2,) or not np.all(np.isfinite(cb)) or not (0.0 < cb[0] < cb[1]):
+            raise ValueError("c_bounds_um must be (lo, hi) with 0 < lo < hi finite (um), got %r" % (c_bounds_um,))
+        lo[5], hi[5] = float(cb[0]), float(cb[1])
     if not (np.all(np.isfinite(lo)) and np.all(np.isfinite(hi)) and np.all(lo < hi)):
         raise ValueError("soma_fit bounds must be finite with lo < hi")
     return lo, hi
@@ -367,43 +464,57 @@ def _bounds(scfg, xs, ys, zs):
 class _Problem(object):
     """The projected residual of the soma's planes and its Jacobian, with the forward evaluations counted.
 
-    DR (K, n_R) the data on the region; region (H, W) bool; shape (K, H, W) the forward's; forward(theta_g (8,),
-    slope) -> tau (K, H, W); slope0 the held gamma (used when n_par = 8); hi (n_par,) the upper bounds; steps (n_par,)
-    the absolute difference steps. A memo of the last _MEMO_SIZE solver points (key: the parameters' bytes) holds
-    (r, B); the Jacobian's steps are evaluated without it (never requested again)."""
+    DR (K, n_R) the data on the region; region (H, W) bool; UR, VR (n_R,) um the region's pixel coordinates from the
+    traced centre; shape (K, H, W) the forward's; forward(theta_g (8,), slope[, sigma0_um=]) -> tau (K, H, W);
+    full0 (10,) the full vector (PARAMS, then sigma0) holding the held values; free (n_fit,) the indices into it of
+    the fitted parameters; background "tilted" | "constant"; sigma_fit: pass sigma0_um to the forward; hi (n_fit,)
+    the upper bounds; steps (n_fit,) the absolute difference steps; names (n_fit,) the fitted names. A memo of the
+    last _MEMO_SIZE solver points (key: the parameters' bytes) holds (r, beta); the Jacobian's steps are evaluated
+    without it (never requested again)."""
 
-    def __init__(self, DR, region, shape, forward, slope0, n_par, hi, steps):
+    def __init__(self, DR, region, UR, VR, shape, forward, full0, free, background, sigma_fit, hi, steps, names):
         self.DR = DR
         self.region = region
+        self.UR = UR
+        self.VR = VR
         self.shape = tuple(shape)
         self.forward = forward
-        self.slope0 = float(slope0)
-        self.n_par = int(n_par)
+        self.full0 = np.array(full0, dtype=float)
+        self.free = np.asarray(free, dtype=np.int64)
+        self.background = background
+        self.sigma_fit = bool(sigma_fit)
         self.hi = np.asarray(hi, dtype=float)
         self.steps = np.asarray(steps, dtype=float)
+        self.names = tuple(names)
         self.n_eval = 0
         self._memo = OrderedDict()
 
-    def theta_full(self, x):
-        """(9,): x (n_par,) with gamma = slope0 appended when it is held."""
-        th = np.empty(9)
-        th[:self.n_par] = x
-        if self.n_par == 8:
-            th[8] = self.slope0
+    def full(self, x):
+        """(10,): the held values with x (n_fit,) at the free indices."""
+        th = self.full0.copy()
+        th[self.free] = x
         return th
 
+    def theta_full(self, x):
+        """(9,): theta in PARAMS order at x."""
+        return self.full(x)[:9]
+
     def compute(self, x):
-        """(r (K n_R,), B (K,)) at x, without the memo."""
-        th = self.theta_full(x)
+        """(r (K n_R,), beta (K, 3)) at x, without the memo."""
+        th = self.full(x)
         self.n_eval += 1
-        tau = np.asarray(self.forward(th[:8].copy(), float(th[8])), dtype=float)
+        if self.sigma_fit:
+            tau = self.forward(th[:8].copy(), float(th[8]), sigma0_um=float(th[9]))
+        else:
+            tau = self.forward(th[:8].copy(), float(th[8]))
+        tau = np.asarray(tau, dtype=float)
         if tau.shape != self.shape:
             raise _ForwardShapeError("the forward model returned shape %s, expected %s" % (tau.shape, self.shape))
-        B, resid = _vp_columns(self.DR, tau[:, self.region])
-        return resid.reshape(-1), B
+        beta, resid = _vp_project(self.DR, tau[:, self.region], self.UR, self.VR, self.background)
+        return resid.reshape(-1), beta
 
     def evaluate(self, x):
-        """(r, B) at x (n_par,), through the memo."""
+        """(r, beta) at x (n_fit,), through the memo."""
         x = np.ascontiguousarray(x, dtype=np.float64)
         key = x.tobytes()
         hit = self._memo.get(key)
@@ -426,7 +537,7 @@ class _Problem(object):
     # forward being piecewise smooth in its slab grid) and scipy.optimize.approx_fprime (absolute steps, but neither
     # bounds nor a backward step).
     def jac(self, x):
-        """(K n_R, n_par): column j = [r(x + h_j e_j) - r(x)] / h_j, or [r(x) - r(x - h_j e_j)] / h_j when
+        """(K n_R, n_fit): column j = [r(x + h_j e_j) - r(x)] / h_j, or [r(x) - r(x - h_j e_j)] / h_j when
         x_j + h_j > hi_j or r(x + h_j e_j) is not finite; _FitFailed when r(x) is not finite or a column is not
         finite either way. The step is the representable difference of the two points."""
         x = np.array(x, dtype=np.float64)
@@ -451,7 +562,7 @@ class _Problem(object):
                     col = (r0 - rm) / (x[j] - xm[j])
             if col is None:
                 raise _FitFailed("the Jacobian's column %s is not finite either way at %s"
-                                 % (PARAMS[j], np.array2string(x, precision=6)))
+                                 % (self.names[j], np.array2string(x, precision=6)))
             J[:, j] = col
         return J
 
@@ -488,43 +599,80 @@ def _at_bound(x, lo, hi, names):
     return tuple(names[j] for j in range(len(names)) if near[j])
 
 
-def _failed(fitted, ks_sel, dof, n_samples, n_eval, t0, message):
+def _failed(fitted, ks_sel, dof, n_samples, n_eval, t0, message, background, sigma0_out):
     nan = float("nan")
+    n_fit = len(fitted)
     return SomaFit(theta=np.full(9, np.nan), se=np.full(9, np.nan), cov=np.full((9, 9), np.nan),
                    fitted=tuple(fitted), B_gl=np.full(ks_sel.size, np.nan), ks=ks_sel, chi2=nan, dof=int(dof),
                    n_samples=int(n_samples), status="failed", at_bound=(), n_eval=int(n_eval),
                    seconds=time.perf_counter() - t0, area_um2=nan, se_area_um2=nan, volume_um3=nan, r_eq_um=nan,
-                   message=str(message))
+                   message=str(message), beta=np.full((ks_sel.size, 3), np.nan), background=str(background),
+                   sigma0_um=float(sigma0_out), se_sigma0_um=nan, cov_fit=np.full((n_fit, n_fit), np.nan))
+
+
+def _hold_values(hold, lo, hi):
+    """{index into PARAMS: value} from the mapping hold (names among PARAMS[:8]; values finite, inside the bounds in
+    force, closed). ValueError for an unknown name (sigma0_um and the far slope included), a value not finite or
+    outside its bounds."""
+    if hold is None:
+        return {}
+    try:
+        items = list(hold.items())
+    except AttributeError:
+        raise ValueError("hold must be a mapping from parameter names to values, got %r" % (hold,))
+    out = {}
+    for name, value in items:
+        if name not in PARAMS[:8]:
+            raise ValueError("hold: %r is not one of the holdable parameters %s" % (name, PARAMS[:8]))
+        j = PARAMS.index(name)
+        v = _finite(value, "hold[%r]" % name)
+        if not lo[j] <= v <= hi[j]:
+            raise ValueError("hold[%r] = %r lies outside its bounds [%r, %r]" % (name, v, lo[j], hi[j]))
+        out[j] = v
+    return out
 
 
 def fit_soma(block, ks, valid, left, top, res0_um, dz_um, centre_um, radius_um, mask, forward_factory, scfg,
              slope0, hold=None, start=None, c_bounds_um=None, sigma0_um=None):
-    """-> SomaFit: the ellipsoid of SPEC Block 46 fitted to the planes select_planes chooses (scfg.plane_half_um,
-    plane_step), over the region R (the pixels whose centre lies within scfg.region_radius_um of the traced centre --
-    radius_um, the traced radius, when it is None (D-241) -- minus mask, True: left out).
+    """-> SomaFit: the ellipsoid of SPEC Block 46 (and its wave-8 amendment) fitted to the planes select_planes
+    chooses (scfg.plane_half_um, plane_step), over the region R: the pixels whose centre lies within r_R of the
+    traced centre, r_R = scfg.region_radius_um when it is a number, otherwise scfg.region_radius_scale x radius_um
+    (D-255), minus mask (True: left out). Each plane's background is solved at every theta: scfg.background
+    "tilted" (b0 + b1 u + b2 v, u, v um from the traced centre; D-254.1) or "constant" (one scale).
 
     block (n, H, W) grey levels (any real dtype; not modified), ks (n,) whole plane numbers ascending, valid (n,)
     bool; (left, top) px the crop's corner; res0_um, dz_um um; centre_um (3,) um, radius_um um: the traced soma
     (image frame; depth in stage units, plane k at depth k dz); mask (H, W) bool; forward_factory(z_planes_um (K,))
-    -> forward, forward(theta_g (8,), slope) -> tau (K, H, W) dimensionless, slope a float (the fitted gamma, or
-    slope0 when held); scfg the SomaFitConfig (far_slope "fit" | "fixed", the bounds, diff_steps, max_nfev, ftol,
-    xtol); slope0 the kernel's configured slope (um/um, finite, >= 0): the start of gamma (clipped into
-    slope_bounds) or its held value. The start is start_theta on the valid plane nearest the traced depth, clipped
-    into the bounds (the clipped names in the message). scipy.optimize.least_squares (trf, x_scale "jac"; jac
-    _Problem.jac). Never raises on a solver failure or a non-finite forward: status "failed" with NaN results (a
-    non-finite residual at the start, a Jacobian column not finite either way, the solver's linear algebra).
-    ValueError for inputs that disagree (shapes, dtypes, a forward of the wrong shape, a forward that refuses the
-    slope -- Block 45 under a continuation other than "linear", D-220.2 --), an empty region, fewer than 3 planes, a far_slope other than "fit" or "fixed", data not finite on the region of the planes fitted, a
-    centre, radius, pixel size, spacing or slope0 that is not finite (radius, sizes > 0, slope0 >= 0)."""
-    # CONTRACT STUB (wave 8; SPEC Block 46, the amendment of 2026-11-25): hold (name -> value, the first eight of
-    # PARAMS), start ((9,) theta), c_bounds_um ((lo, hi)), sigma0_um (um); scfg.background, scfg.sigma0,
-    # scfg.region_radius_scale; SomaFit's beta, background, sigma0_um, se_sigma0_um, cov_fit. Not implemented yet.
-    if hold is not None or start is not None or c_bounds_um is not None or sigma0_um is not None:
-        raise NotImplementedError("Block 46, wave 8: hold, start, c_bounds_um, sigma0_um")
+    -> forward: forward(theta_g (8,), slope) -> tau (K, H, W) dimensionless, slope a float (the fitted gamma, or
+    slope0 when held), called with these two positional arguments only under scfg.sigma0 "fixed", and as
+    forward(theta_g, slope, sigma0_um=value) under "fit"; scfg the SomaFitConfig (far_slope, background, sigma0,
+    the region, the bounds, diff_steps, sigma0_diff_step_um, max_nfev, ftol, xtol); slope0 the kernel's configured
+    slope (um/um, finite, >= 0): the start of gamma (clipped into slope_bounds) or its held value.
+    hold: None or a mapping from names among PARAMS[:8] to values (finite, inside the bounds in force): held
+    exactly, not fitted. start: None (start_theta on the valid plane nearest the traced depth) or a (9,) theta whose
+    first eight entries are finite (the slope entry ignored). c_bounds_um: None or (lo, hi), 0 < lo < hi, replacing
+    axis_bounds_um for c. sigma0_um: the kernel's in-focus width (um): the start of the fitted sigma0 under "fit"
+    (required finite > 0, clipped into sigma0_bounds_um), recorded as passed under "fixed" (None or finite > 0).
+    The start is clipped into the bounds (the clipped names in the message), then the held entries set.
+    scipy.optimize.least_squares (trf, x_scale "jac"; jac _Problem.jac) over the fitted parameters. Never raises
+    on a solver failure or a non-finite forward: status "failed" with NaN results (a non-finite residual at the
+    start, a Jacobian column not finite either way, the solver's linear algebra). ValueError for inputs that
+    disagree (shapes, dtypes, a forward of the wrong shape, a forward that refuses the slope -- Block 45 under a
+    continuation other than "linear", D-220.2 --), an empty region, fewer than 3 planes, a far_slope, background or
+    sigma0 setting not among its names, data not finite on the region of the planes fitted, a centre, radius, pixel
+    size, spacing or slope0 that is not finite (radius, sizes > 0, slope0 >= 0), a bad hold, start, c_bounds_um or
+    sigma0_um, and no parameter left to fit."""
     t0 = time.perf_counter()
     far = scfg.far_slope
     if far not in FAR_SLOPES:
         raise ValueError("scfg.far_slope must be one of %s, got %r" % (FAR_SLOPES, far))
+    bg = scfg.background
+    if bg not in BACKGROUNDS:
+        raise ValueError("scfg.background must be one of %s, got %r" % (BACKGROUNDS, bg))
+    s0_mode = scfg.sigma0
+    if s0_mode not in SIGMA0_MODES:
+        raise ValueError("scfg.sigma0 must be one of %s, got %r" % (SIGMA0_MODES, s0_mode))
+    sigma_fit = s0_mode == "fit"
     data = np.asarray(block)
     if data.ndim != 3 or data.size == 0:
         raise ValueError("block must be a non-empty (n, H, W) stack, got shape %s" % (data.shape,))
@@ -544,19 +692,39 @@ def fit_soma(block, ks, valid, left, top, res0_um, dz_um, centre_um, radius_um, 
     g0 = _finite(slope0, "slope0")
     if g0 < 0:
         raise ValueError("slope0 must be >= 0, got %r" % (slope0,))
+    if sigma_fit:
+        if sigma0_um is None:
+            raise ValueError("scfg.sigma0 'fit' needs sigma0_um, the kernel's in-focus width (um), as its start")
+        s0_arg = _positive(sigma0_um, "sigma0_um")
+    else:
+        s0_arg = float("nan") if sigma0_um is None else _positive(sigma0_um, "sigma0_um")
     if not callable(forward_factory):
         raise ValueError("forward_factory must be callable")
-    n_par = 9 if far == "fit" else 8
-    fitted = PARAMS[:n_par]
-    steps = np.asarray(scfg.diff_steps, dtype=float).reshape(-1)
-    if steps.shape != (9,) or not np.all(np.isfinite(steps)) or np.any(steps <= 0):
+    steps9 = np.asarray(scfg.diff_steps, dtype=float).reshape(-1)
+    if steps9.shape != (9,) or not np.all(np.isfinite(steps9)) or np.any(steps9 <= 0):
         raise ValueError("scfg.diff_steps must be 9 finite steps > 0")
-    lo, hi = _bounds(scfg, xs, ys, zs)
-    lo, hi = lo[:n_par], hi[:n_par]
+    s0_step = _positive(scfg.sigma0_diff_step_um, "scfg.sigma0_diff_step_um")
+    steps = np.r_[steps9, s0_step]
+    lo, hi = _bounds(scfg, xs, ys, zs, c_bounds_um)
+    held = _hold_values(hold, lo, hi)
+    free = [j for j in range(8) if j not in held]
+    if far == "fit":
+        free.append(8)
+    if sigma_fit:
+        free.append(9)
+    free = np.asarray(free, dtype=np.int64)
+    names = tuple(PARAMS[j] if j < 9 else SIGMA0_NAME for j in free)
+    n_fit = int(free.size)
+    if n_fit == 0:
+        raise ValueError("every parameter is held: nothing to fit")
+    n_bg = 3 if bg == "tilted" else 1
 
     idx = select_planes(k, v, zs, dz, scfg.plane_half_um, scfg.plane_step)
     x_px, y_px = _pixel_centres((H, W), left_i, top_i, p)
-    r_reg = rs if scfg.region_radius_um is None else _positive(scfg.region_radius_um, "scfg.region_radius_um")
+    if scfg.region_radius_um is None:
+        r_reg = _positive(scfg.region_radius_scale, "scfg.region_radius_scale") * rs
+    else:
+        r_reg = _positive(scfg.region_radius_um, "scfg.region_radius_um")
     disk = (x_px[None, :] - xs) ** 2 + (y_px[:, None] - ys) ** 2 <= r_reg ** 2
     region = disk & ~msk
     if not region.any():
@@ -565,62 +733,95 @@ def fit_soma(block, ks, valid, left, top, res0_um, dz_um, centre_um, radius_um, 
     DR = np.asarray(data[idx], dtype=float)[:, region]
     if not np.all(np.isfinite(DR)):
         raise ValueError("block must be finite on the region of the planes fitted")
+    UR = np.broadcast_to((x_px - xs)[None, :], (H, W))[region]
+    VR = np.broadcast_to((y_px - ys)[:, None], (H, W))[region]
     ks_sel = k[idx].copy()
     K, nR = int(idx.size), int(np.count_nonzero(region))
     n_samples = K * nR
-    dof = n_samples - n_par - K
+    dof = n_samples - n_fit - n_bg * K
 
-    i0 = _nearest_valid(k, v, zs, dz)
-    th0 = start_theta(data[i0], left_i, top_i, p, (xs, ys, zs), rs, region, g0, scfg)
-    x0 = np.clip(th0[:n_par], lo, hi)
-    clipped = tuple(fitted[j] for j in range(n_par) if x0[j] != th0[j])
+    if start is None:
+        i0 = _nearest_valid(k, v, zs, dz)
+        th0 = start_theta(data[i0], left_i, top_i, p, (xs, ys, zs), rs, region, g0, scfg)
+    else:
+        st = np.asarray(start, dtype=float).reshape(-1)
+        if st.shape != (9,) or not np.all(np.isfinite(st[:8])):
+            raise ValueError("start must be a (9,) theta whose first eight entries are finite, got %r" % (start,))
+        th0 = st.copy()
+    full_start = np.r_[th0[:8], g0, s0_arg if sigma_fit else 0.0]
+    full0 = full_start.copy()
+    clip_ix = list(free)
+    full0[clip_ix] = np.clip(full_start[clip_ix], lo[clip_ix], hi[clip_ix])
+    clipped = tuple(PARAMS[j] if j < 9 else SIGMA0_NAME for j in clip_ix if full0[j] != full_start[j])
     note = ("; start clipped into the bounds: %s" % ", ".join(clipped)) if clipped else ""
+    for j, val in held.items():
+        full0[j] = val
+    if not sigma_fit:
+        full0[9] = s0_arg
+    x0 = full0[free].copy()
+    lo_f, hi_f = lo[free], hi[free]
+    s0_fail = float("nan") if sigma_fit else s0_arg
+
+    def failed(prob_n_eval, message):
+        return _failed(names, ks_sel, dof, n_samples, prob_n_eval, t0, message, bg, s0_fail)
 
     forward = forward_factory(ks_sel.astype(float) * dz)
-    prob = _Problem(DR, region, (K, H, W), forward, g0, n_par, hi, steps[:n_par])
+    prob = _Problem(DR, region, UR, VR, (K, H, W), forward, full0, free, bg, sigma_fit, hi_f, steps[free], names)
     r_start = prob.evaluate(x0)[0]                       # the shape checked; served to the solver by the memo
     if not np.all(np.isfinite(r_start)):
-        return _failed(fitted, ks_sel, dof, n_samples, prob.n_eval, t0,
-                       "the residual is not finite at the start %s%s" % (np.array2string(x0, precision=6), note))
+        return failed(prob.n_eval, "the residual is not finite at the start %s%s"
+                      % (np.array2string(x0, precision=6), note))
     try:
-        res = least_squares(prob.residual, x0, jac=prob.jac, bounds=(lo, hi), method="trf", x_scale="jac",
+        res = least_squares(prob.residual, x0, jac=prob.jac, bounds=(lo_f, hi_f), method="trf", x_scale="jac",
                             ftol=float(scfg.ftol), xtol=float(scfg.xtol), max_nfev=int(scfg.max_nfev))
     except _FitFailed as exc:
-        return _failed(fitted, ks_sel, dof, n_samples, prob.n_eval, t0, str(exc) + note)
+        return failed(prob.n_eval, str(exc) + note)
     except _ForwardShapeError:
         raise
     except ValueError as exc:
         if "not finite in the initial point" not in str(exc):     # scipy's message for a non-finite start
             raise
-        return _failed(fitted, ks_sel, dof, n_samples, prob.n_eval, t0, str(exc) + note)
+        return failed(prob.n_eval, str(exc) + note)
     except np.linalg.LinAlgError as exc:
-        return _failed(fitted, ks_sel, dof, n_samples, prob.n_eval, t0, "the solver's linear algebra: %s%s"
-                       % (exc, note))
+        return failed(prob.n_eval, "the solver's linear algebra: %s%s" % (exc, note))
 
     x = np.array(res.x, dtype=float)
-    r, B = prob.evaluate(x)
+    r, beta = prob.evaluate(x)
     if not np.all(np.isfinite(r)):                       # trf never accepts a non-finite point; kept as a guard
-        return _failed(fitted, ks_sel, dof, n_samples, prob.n_eval, t0,
-                       "the residual at the solution is not finite" + note)
+        return failed(prob.n_eval, "the residual at the solution is not finite" + note)
     chi2 = float(np.dot(r, r))
     cov_u, how = _covariance(np.asarray(res.jac, dtype=float))
     s2 = chi2 / dof if dof > 0 else float("nan")
+    cov_fit = np.asarray(cov_u * s2, dtype=float)
+    in9 = [i for i, j in enumerate(free) if j < 9]       # positions in cov_fit of the fitted PARAMS
+    j9 = free[in9]
     cov = np.full((9, 9), np.nan)
-    cov[:n_par, :n_par] = cov_u * s2
+    cov[np.ix_(j9, j9)] = cov_fit[np.ix_(in9, in9)]
     with np.errstate(invalid="ignore"):
         se = np.sqrt(np.diag(cov))
-    theta = prob.theta_full(x)
+        se_s0 = float(np.sqrt(cov_fit[-1, -1])) if sigma_fit else float("nan")
+    full = prob.full(x)
+    theta = full[:9].copy()
+    s0_out = float(full[9]) if sigma_fit else s0_arg
     a, b, c = (float(t) for t in theta[3:6])
     area = ellipsoid_area(a, b, c)
     g = _area_gradient(a, b, c)
-    C = cov[3:6, 3:6]
-    se_area = math.sqrt(max(0.0, float(g @ C @ g))) if np.all(np.isfinite(C)) else float("nan")
+    ax_fit = [i for i in range(3) if (3 + i) in set(j9.tolist())]   # the fitted axes among (a, b, c)
+    if not ax_fit:
+        se_area = 0.0                                    # every axis held: no variance (conditional on them)
+    else:
+        ia = np.asarray(ax_fit)
+        C = cov[np.ix_(3 + ia, 3 + ia)]
+        gs = g[ia]
+        se_area = math.sqrt(max(0.0, float(gs @ C @ gs))) if np.all(np.isfinite(C)) else float("nan")
     status = "converged" if res.status > 0 else "max_nfev"
     msg = "%s (scipy status %d, nfev %d, njev %d, covariance %s)%s" % (res.message, res.status, res.nfev, res.njev,
                                                                        how, note)
-    return SomaFit(theta=theta, se=se, cov=cov, fitted=tuple(fitted), B_gl=np.asarray(B, dtype=float), ks=ks_sel,
+    beta = np.asarray(beta, dtype=float)
+    return SomaFit(theta=theta, se=se, cov=cov, fitted=names, B_gl=beta[:, 0].copy(), ks=ks_sel,
                    chi2=chi2, dof=int(dof), n_samples=int(n_samples), status=status,
-                   at_bound=_at_bound(x, lo, hi, fitted), n_eval=int(prob.n_eval),
+                   at_bound=_at_bound(x, lo_f, hi_f, names), n_eval=int(prob.n_eval),
                    seconds=time.perf_counter() - t0, area_um2=float(area), se_area_um2=float(se_area),
                    volume_um3=4.0 / 3.0 * math.pi * a * b * c, r_eq_um=math.sqrt(area / (4.0 * math.pi)),
-                   message=msg)
+                   message=msg, beta=beta, background=str(bg), sigma0_um=float(s0_out), se_sigma0_um=se_s0,
+                   cov_fit=cov_fit)
