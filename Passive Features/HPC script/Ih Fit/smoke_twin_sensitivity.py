@@ -22,20 +22,17 @@ Checks
                               name, both weightings; the rows equal identifiability_<id>.csv's on the shared
                               columns; the sensitivities S of the two twins are identical; with the noisy
                               twin's seeds and layout the noise-free twin's S gives the noisy twin's sd_lin
-                              (1e-9 relative)
-    test_V2b_identity_as_written
-                              SKIP with the measured numbers: the identity of sd_lin between the noise-free
-                              twin and its partner as SPEC Block 28 writes it does not hold (the seeds carry
-                              the twin's own id; a_{b,s} and D_b are read on each twin's recorded traces);
-                              raised to the orchestrator
+                              (1e-9 relative); the difference as built (own seeds and layouts) reported on
+                              the PASS line (amendment 2, D-249)
     test_V3_bundle_noise      the bundle noise: length = the bundle's; two calls identical; a one-sweep long
                               bundle = ls_sweep_noise of that sweep (exactly); a two-sweep long bundle = the
                               mean of the two sweeps' draws; a brief bundle = the mean of the rows of its
                               polarity (recomputed here), its SD below one window's; a bundle on another
                               grid raises BundleGridError (the entry's STOP case)
-    test_V4_merge             merge gathers <group>/identifiability.csv (two rows, W0 and W1, per twin) and
-                              <group>/truth_trace_check.csv (one row per bundle per twin, twin_id first),
-                              one twin_id per twin run
+    test_V4_merge             merge gathers <run>/identifiability.csv (two rows, W0 and W1, per twin) and
+                              <run>/truth_trace_check.csv (one row per bundle per twin, twin_id first),
+                              one twin_id per twin run; no <group> level under the run directory
+                              (amendment 2, D-249)
     test_V6_submitter         DRY_RUN=1 MODE=sensitivity prints one sensitivity command per twin with
                               --n-workers NCPUS --n-noise N_NOISE (each accepted by the parser), the merge,
                               and PLAN_ARGS' --refine-max-nfev in the plan command; MODE unset prints the twin
@@ -124,7 +121,7 @@ def _sens(tid):
 def _sdir(tid):
     import run_twin_recovery as T
     st = _run_dir()
-    return T.sens_dir_of(st["out"], st["cfg"]["group"], tid)
+    return T.sens_dir_of(st["out"], tid)
 
 
 def _protocol_table(real_id):
@@ -322,7 +319,7 @@ def test_V2_sensitivity():
         parts["%s: the noise-free twin's S with the noisy twin's layout and seeds -> its sd_lin (max rel %.2g)"
               % (tag, rel)] = rel <= REL_TOL
         sdn = tab[t0_].loc[tab[t0_]["weighting"] == tag, ["sd_lin_" + n for n in IH6]].to_numpy()[0]
-        _S.setdefault("v2b", []).append((tag, float(np.max(np.abs(sdn - sdf) / sdf))))
+        _S.setdefault("v2_as_built", []).append((tag, float(np.max(np.abs(sdn - sdf) / sdf))))
         # the two causes apart (printed, not gated): the seeds alone (the noisy twin's layout, the noise-free
         # twin's seeds) and the layout alone (the noise-free twin's layout, the noisy twin's seeds)
         lay0, tix0 = R.layout_from_stored(z[t0_], meta[t0_], ls_tau_d_ms=tau)
@@ -335,21 +332,14 @@ def test_V2_sensitivity():
             b0, br0, tix0, prot, table, int(rf["twin_of_specimen_id"]), twin_id=tf, n_noise=N_NOISE)])
         seeds_only = float(np.max(np.abs(IDF.predicted_scatter(J0, Rs)["sd"] - sdf) / sdf))
         layout_only = float(np.max(np.abs(IDF.predicted_scatter(J00, Rl)["sd"] - sdf) / sdf))
-        print("\n  [V2] %s: max |dS| %.3g (max |S| %.3g); shared seeds and layout: max rel %.2g; as written: %.3g; "
+        print("\n  [V2] %s: max |dS| %.3g (max |S| %.3g); shared seeds and layout: max rel %.2g; as built: %.3g; "
               "seeds alone %.3g; layout alone %.3g; ||J0 - Jf|| / ||Jf|| %.3g"
-              % (tag, s_diff, s_max, rel, _S["v2b"][-1][1], seeds_only, layout_only,
+              % (tag, s_diff, s_max, rel, _S["v2_as_built"][-1][1], seeds_only, layout_only,
                  IDF.relative_difference(J00, J0)))
     _fail_parts(parts)
-
-
-def test_V2b_identity_as_written():
-    if "v2b" not in _S:
-        test_V2_sensitivity()
-    raise unittest.SkipTest(
-        "the identity of sd_lin_<name> between the noise-free twin and its noisy partner within 1e-9 does not hold "
-        "as SPEC Block 28 writes it: max relative difference %s (the seeds carry each twin's own id; a_{b,s} and "
-        "D_b are read on each twin's recorded traces); V2 shows these are the only causes; raised to the "
-        "orchestrator" % ", ".join("%s %.3g" % kv for kv in _S["v2b"]))
+    # amendment 2 (D-249): the difference as built is reported, not gated; it is the PASS line's detail
+    return ("sd_lin as built, noise-free twin vs its partner (own seeds and layouts), max relative difference: "
+            + ", ".join("%s %.3g" % kv for kv in _S["v2_as_built"]))
 
 
 def test_V3_bundle_noise():
@@ -430,14 +420,15 @@ def test_V4_merge():
         test_V2_sensitivity()
     import run_ih_fit as R
     st = _run_dir()
-    out, group = st["out"], st["cfg"]["group"]
+    out = st["out"]
     tids = sorted((st["tid"]["full"], st["tid"]["full_no_noise"]))
     code, so, se = STR._run(["merge", "--out", out, "--no-plot"])
-    idf = pd.read_csv(out / group / "identifiability.csv") if (out / group / "identifiability.csv").is_file() else None
-    ttc = pd.read_csv(out / group / "truth_trace_check.csv") if (out / group / "truth_trace_check.csv").is_file() \
-        else None
+    idf = pd.read_csv(out / "identifiability.csv") if (out / "identifiability.csv").is_file() else None
+    ttc = pd.read_csv(out / "truth_trace_check.csv") if (out / "truth_trace_check.csv").is_file() else None
+    parts0 = {"no <group> level under the run directory (amendment 2)": not (out / st["cfg"]["group"]).exists()
+              and (out / "sensitivity").is_dir()}
     nb = {t: int(np.asarray(R._read_bundles_npz(_sdir(t) / ("bundles_%d.npz" % t))["is_train"]).size) for t in tids}
-    parts = {"merge exits 0": code == 0,
+    parts = {"merge exits 0": code == 0, **parts0,
              "identifiability.csv: twin_ids %s, rows W0 and W1 for each" % tids:
              idf is not None and sorted(set(int(x) for x in idf["twin_id"])) == tids
              and all(list(idf.loc[idf["twin_id"] == t, "weighting"]) == ["W0", "W1"] for t in tids),
@@ -591,8 +582,8 @@ def main(argv=None):
     for name, func in checks:
         start = time.perf_counter()
         try:
-            func()
-            status, detail = "PASS", ""
+            ret = func()
+            status, detail = "PASS", (ret if isinstance(ret, str) else "")
         except unittest.SkipTest as exc:
             status, detail = "SKIP", str(exc)
         except NotImplementedError as exc:

@@ -21,8 +21,8 @@
 #                      NCPUS worker processes (SPEC 2.9 (c)).
 #   TWIN_ROLE=merge    THE MERGE JOB: `run_twin_recovery.py merge` -> report/,
 #                      report_without_flagged/, recovery_by_configuration.csv,
-#                      twins_status.csv (Block 28: and <GROUP>/identifiability.csv,
-#                      <GROUP>/truth_trace_check.csv when sensitivity files exist).
+#                      twins_status.csv (Block 28: and identifiability.csv,
+#                      truth_trace_check.csv when sensitivity files exist).
 #
 # MODE=sensitivity (Block 28, SPEC 2.10 (d)): the array subjobs run
 # `run_twin_recovery.py sensitivity --run-dir <outputs> --twin <id> --n-workers
@@ -449,7 +449,7 @@ say "merge job submitted:   $MERGE_ID (after $ARRAY_ID)"
 printf '# twin job(s): %s\n# merge job: %s\n' "$ARRAY_ID" "$MERGE_ID" | tee -a "$RUN_FILE" >> "$OUT_DIR/logs/$(basename "$RUN_FILE")"
 if [ "$MODE" = sensitivity ]; then
     say "expect: one 'SENSITIVITY <id>: done ...' line per twin in $OUT_DIR/logs/sensitivity_*.log, then"
-    say "        $OUT_DIR/$GROUP/identifiability.csv and truth_trace_check.csv from the merge (logs/merge_*.log)"
+    say "        $OUT_DIR/identifiability.csv and truth_trace_check.csv from the merge (logs/merge_*.log)"
 else
     say "expect: one 'TWIN <id>: status=...' line per twin in $OUT_DIR/logs/twin_*.log, then"
     say "        the report and the gate's verdict in logs/merge_*.log ($OUT_DIR/report/gate_verdict.txt)"

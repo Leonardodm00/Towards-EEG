@@ -22,8 +22,8 @@ The run directory <out> (SPEC, Block 8, "Outputs"):
     twins/twin_<id>/specimen_<id>/, fits/twin_<id>/, status/twin_<id>.json            (twin)
     report/, report_without_flagged/, report_no_noise/, recovery_by_configuration.csv,
     recovery_extras.csv, twins_status.csv                                             (merge)
-    <group>/sensitivity/twin_<id>/                                                    (sensitivity)
-    <group>/identifiability.csv, <group>/truth_trace_check.csv                        (merge, Block 28)
+    sensitivity/twin_<id>/                                                            (sensitivity)
+    identifiability.csv, truth_trace_check.csv                                        (merge, Block 28)
 
 Block 17: four configurations (the fourth, full_no_noise, built without noise
 and reported apart in report_no_noise/); the box and the truth of the I_h time
@@ -139,7 +139,7 @@ N_NOISE_DEFAULT = 200
 SENS_H_DEFAULT = 1e-3
 SENS_CHECK_H_DEFAULT = 1e-2
 NOISE_BASE_SEED_ROOT = 1000000
-#: the directory of the sensitivity files under the run directory: <run>/<group>/SENS_DIR/twin_<id>/
+#: the directory of the sensitivity files under the run directory: <run>/SENS_DIR/twin_<id>/ (amendment 2, D-249)
 SENS_DIR = "sensitivity"
 #: loss_verdict of recovery_extras.csv: one loss lower than the other by more than this fraction of
 #: the other (Block 17)
@@ -1102,11 +1102,11 @@ def cmd_merge(args) -> int:
     _write_csv_atomic(out / "twins_status.csv", pd.DataFrame(srows, columns=list(STATUS_FIELDS)))
 
     # Block 28: the sensitivity tables, when any twin has them (written whether or not a fit has results)
-    n_sens = gather_sensitivity(out, str(run["config"]["group"]))
+    n_sens = gather_sensitivity(out)
     if any(n_sens.values()):
         _say("merge: sensitivity tables of %d twin(s) -> %s, %d twin(s) -> %s"
-             % (n_sens["identifiability"], out / str(run["config"]["group"]) / "identifiability.csv",
-                n_sens["truth_trace_check"], out / str(run["config"]["group"]) / "truth_trace_check.csv"))
+             % (n_sens["identifiability"], out / "identifiability.csv",
+                n_sens["truth_trace_check"], out / "truth_trace_check.csv"))
 
     # the results: each twin's row of its own phase2_results.csv, tagged with its arm
     frames: Dict[int, pd.DataFrame] = {}
@@ -1316,9 +1316,10 @@ class BundleGridError(ValueError):
     the twin's noise onto the bundle would then be a scientific choice the entry does not make)."""
 
 
-def sens_dir_of(out: Path, group: str, twin_id: int) -> Path:
-    """<run>/<group>/sensitivity/twin_<id>/ (SPEC Block 28)."""
-    return Path(out) / str(group) / SENS_DIR / ("twin_%d" % int(twin_id))
+def sens_dir_of(out: Path, twin_id: int) -> Path:
+    """<run>/sensitivity/twin_<id>/ (SPEC Block 28, amendment 2: no group level; the run directory is
+    already the group's, as <run>/fits and <run>/twins)."""
+    return Path(out) / SENS_DIR / ("twin_%d" % int(twin_id))
 
 
 def sensitivity_theta_of(row, arm: str) -> str:
@@ -1480,7 +1481,7 @@ def scatter_tables(sens_dir: Path, specimen_id: int, protocol, table, real_id: i
 
 def cmd_sensitivity(args) -> int:
     """Block 28: build the twin as `twin` does (a built one reused), run run_ih_fit.main with the twin's
-    fit argv plus --sensitivity-theta <truth> and --sensitivity-out <run>/<group>/sensitivity/twin_<id>,
+    fit argv plus --sensitivity-theta <truth> and --sensitivity-out <run>/sensitivity/twin_<id>,
     then write identifiability.csv there: the sensitivity mode's rows with sd_lin_<name>, corr_<a>_<b>,
     twin_id, configuration, n_noise. Exit 0 done, 1 failed, 2 usage."""
     import passive_fitting_hpc_fixed as mono
@@ -1498,9 +1499,8 @@ def cmd_sensitivity(args) -> int:
     row = rows.iloc[0]
     tid, conf, arm = int(row["specimen_id"]), str(row["configuration"]), str(row["arm"])
     real_id = int(row["twin_of_specimen_id"])
-    group = str(run["config"]["group"])
     twin_group_dir = out / "twins" / ("twin_%d" % tid)
-    sdir = sens_dir_of(out, group, tid)
+    sdir = sens_dir_of(out, tid)
     status = dict(twin_id=tid, built=False, build_seconds=0.0, code_commit=code_commit(),
                   code_dirty=code_dirty())
     t0 = time.time()
@@ -1559,12 +1559,12 @@ def cmd_sensitivity(args) -> int:
     return EXIT_OK
 
 
-def gather_sensitivity(out: Path, group: str) -> Dict[str, int]:
-    """merge's part of Block 28: every <run>/<group>/sensitivity/twin_*/identifiability.csv into
-    <run>/<group>/identifiability.csv and every truth_trace_check_*.csv of those directories into
-    <run>/<group>/truth_trace_check.csv (a twin_id column first), in increasing twin id; nothing written
+def gather_sensitivity(out: Path) -> Dict[str, int]:
+    """merge's part of Block 28: every <run>/sensitivity/twin_*/identifiability.csv into
+    <run>/identifiability.csv and every truth_trace_check_*.csv of those directories into
+    <run>/truth_trace_check.csv (a twin_id column first), in increasing twin id; nothing written
     when no file exists. Returns the number of twins gathered per table."""
-    root = Path(out) / str(group) / SENS_DIR
+    root = Path(out) / SENS_DIR
     dirs = []
     if root.is_dir():
         for d in root.glob("twin_*"):
@@ -1585,11 +1585,11 @@ def gather_sensitivity(out: Path, group: str) -> Dict[str, int]:
     n = {"identifiability": 0, "truth_trace_check": 0}
     if ident:
         df = pd.concat(ident, ignore_index=True, sort=False)
-        _write_csv_atomic(Path(out) / str(group) / "identifiability.csv", df)
+        _write_csv_atomic(Path(out) / "identifiability.csv", df)
         n["identifiability"] = int(df["twin_id"].nunique())
     if trace:
         df = pd.concat(trace, ignore_index=True, sort=False)
-        _write_csv_atomic(Path(out) / str(group) / "truth_trace_check.csv", df)
+        _write_csv_atomic(Path(out) / "truth_trace_check.csv", df)
         n["truth_trace_check"] = int(df["twin_id"].nunique())
     return n
 
