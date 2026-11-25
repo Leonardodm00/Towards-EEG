@@ -54,6 +54,7 @@ import numbers
 import pickle
 import traceback
 import weakref
+from dataclasses import dataclass
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
@@ -725,9 +726,22 @@ def build_multi_protocol_loss(
                 raise
             return 1e6
 
+    # SPEC Block 23: the residual vector of 2.10 (a) of this loss's protocol
+    make_residuals = _residuals_factory(
+        cell, train_bundles, v_rest_mV, weighting=weighting, spec=spec,
+        dt_brief_ms=dt_brief_ms, dt_long_ms=dt_long_ms, n_workers=n_workers,
+        protocol_kw=dict(ss_window_ms=ss_window_ms,
+                         ls_window_ms_after_onset=ls_window_ms_after_onset,
+                         ls_window_mode=ls_window_mode,
+                         r_in_target=r_in_target,
+                         ss_sample_weight_fn=ss_sample_weight_fn,
+                         ls_sample_weight=ls_sample_weight,
+                         ls_tau_d_ms=ls_tau_d_ms))
+
     if n_workers == 1:
         loss.n_workers = 1
         loss.close = lambda: None
+        loss.make_residuals = make_residuals
         return loss
 
     def combine(outs) -> float:
@@ -758,8 +772,10 @@ def build_multi_protocol_loss(
                    ls_window_mode=ls_window_mode, r_in_target=r_in_target,
                    ss_sample_weight_fn=ss_sample_weight_fn,
                    ls_sample_weight=ls_sample_weight, ls_tau_d_ms=ls_tau_d_ms)
-    return _make_pooled_loss(cell, train_bundles, v_rest_mV, spec, n_workers,
-                             rmsd_kw, dt_brief_ms, dt_long_ms, combine)
+    pooled = _make_pooled_loss(cell, train_bundles, v_rest_mV, spec, n_workers,
+                               rmsd_kw, dt_brief_ms, dt_long_ms, combine)
+    pooled.make_residuals = make_residuals
+    return pooled
 
 
 # ---------------------------------------------------------------------------
@@ -1378,17 +1394,108 @@ def integrate_long_step(
     return orig_prepare
 
 
+
+
 # ---------------------------------------------------------------------------
 #  SPEC 2.10 (a), Block 23: the residual vector and the trace evaluator
-#  (contract stubs; signatures and shapes as the Block 23 entry of SPEC.md)
 # ---------------------------------------------------------------------------
+#  r_{b,s}(q) = sqrt(a_{b,s}) d_{b,s}(q) / D_b,
+#  a_{b,s} = c_b w_b(t_s) / sum_{s' in W_b} w_b(t_s'),
+#  d_{b,s}(q) = Vhat_b(t_s; q) - V_b(t_s), both minus their pre-window means,
+#  so that sum_s r_{b,s}^2 = c_b (RMSD_b / D_b)^2 with RMSD_b of bundle_rmsd.
+#  The model side (bundle_trace) and the data side (residual_layout) are
+#  separate: the layout depends on the recorded traces only and is built
+#  once; the traces are what an evaluation costs.
+#  Custom: the assembly of SPEC 2.10 (a) is the project's own loss; no library
+#  function computes it. Checked: none applies (np.interp does the resampling).
+
+def _bundle_windows_s(bundle, ss_window_ms, ls_window_mode,
+                      ls_window_ms_after_onset):
+    """(pre-window, RMSD window) in s of one bundle, exactly as bundle_rmsd
+    chooses them."""
+    if _is_brief(bundle):
+        return ((-10e-3, 0.0),
+                (ss_window_ms[0] * 1e-3, ss_window_ms[1] * 1e-3))
+    return ((0.0, float(bundle.stim_onset_s)),
+            ls_rmsd_window_s(bundle, ls_window_mode, ls_window_ms_after_onset))
+
+
 def bundle_trace(cell, bundle, v_rest_mV: float, *,
                  dt_brief_ms: Optional[float] = None,
                  dt_long_ms: Optional[float] = None) -> np.ndarray:
     """float64 (len(bundle.t),), mV: the model's trace of `bundle` at the
     cell's CURRENT parameters minus its own pre-window mean (taken on the
-    simulation grid), interpolated on bundle.t (np.interp). SPEC Block 23."""
-    raise NotImplementedError("Block 23")
+    simulation grid), interpolated on bundle.t (np.interp: constant outside
+    the simulated interval). SPEC Block 23.
+
+    Simulated as bundle_rmsd simulates it (_simulate_brief / _simulate_long,
+    the same dt resolution); pre-window (-10 ms, 0) for a brief bundle,
+    (0, onset) for a long one, ends included as in _baseline_subtracted_rmsd.
+    The subtraction is made on the simulation grid before the interpolation,
+    as _baseline_subtracted_rmsd makes it, so the window samples equal the
+    ones the RMSD uses. A pre-window with no simulated sample gives an
+    all-NaN trace (the RMSD is inf there); the caller judges finiteness.
+    """
+    if _is_brief(bundle):
+        t_s, v = _simulate_brief(cell, bundle, v_rest_mV, dt_ms=dt_brief_ms)
+        pre_w = (-10e-3, 0.0)
+    else:
+        t_s, v = _simulate_long(cell, bundle, v_rest_mV, dt_ms=dt_long_ms)
+        pre_w = (0.0, float(bundle.stim_onset_s))
+    t_s = np.asarray(t_s, dtype=float)
+    v = np.asarray(v, dtype=float)
+    pm = (t_s >= pre_w[0]) & (t_s <= pre_w[1])
+    bs = float(np.mean(v[pm])) if pm.any() else np.nan
+    t_exp = np.asarray(bundle.t, dtype=float)
+    if not np.isfinite(bs):
+        return np.full(t_exp.shape, np.nan, dtype=np.float64)
+    return np.asarray(np.interp(t_exp, t_s, v - bs), dtype=np.float64)
+
+
+@dataclass(frozen=True)
+class ResidualLayout:
+    """The data-only part of the residual vector of SPEC 2.10 (a), one entry
+    per training bundle in the training order.
+
+    masks      list of bool (n_t_b,): the samples of W_b (the RMSD window)
+    pre_masks  list of bool (n_t_b,): the pre-window samples
+    sqrt_a     list of float64 (|W_b|,): sqrt(a_{b,s})
+    v_exp      list of float64 (|W_b|,): recorded samples of W_b minus the
+               recorded pre-window mean, mV
+    D          float64 (n_bundles,): D_b, mV
+    c          float64 (n_bundles,): c_b, sums to 1
+    slices     list of slice: bundle b's entries of the residual vector
+    n_residuals  int N = sum_b |W_b|
+    """
+    masks: list
+    pre_masks: list
+    sqrt_a: list
+    v_exp: list
+    D: np.ndarray
+    c: np.ndarray
+    slices: list
+    n_residuals: int
+
+
+def _bundle_weights(train_bundles, weighting: str) -> np.ndarray:
+    """c_b of SPEC 2.10 (a): the loss's cross-bundle weight divided by the
+    number of bundles, so that L = sum_b c_b RMSD_b / D_b is the loss of
+    build_multi_protocol_loss with the same arithmetic for the weights."""
+    n_all = len(train_bundles)
+    if weighting == "relative":
+        return np.full(n_all, 1.0 / n_all, dtype=np.float64)
+    # ls_amplitude: as build_multi_protocol_loss builds w, then w / n
+    is_ls = np.array([not _is_brief(b) for b in train_bundles], dtype=bool)
+    n_ls = int(is_ls.sum())
+    amps = np.array([abs(float(b.amplitude_pA)) for b in train_bundles],
+                    dtype=float)
+    tot = float(np.sum(amps[is_ls]))
+    if n_ls and not (np.isfinite(tot) and tot > 0):
+        raise ValueError("weighting='ls_amplitude' needs a positive total "
+                         "|amplitude| over the training long squares, got %r"
+                         % tot)
+    w = np.where(is_ls, n_ls * amps / (tot if n_ls else 1.0), 1.0)
+    return np.asarray(w / n_all, dtype=np.float64)
 
 
 def residual_layout(train_bundles: Sequence, *,
@@ -1399,21 +1506,277 @@ def residual_layout(train_bundles: Sequence, *,
                     weighting: str = "relative",
                     ss_sample_weight_fn: Optional[Callable[[np.ndarray], np.ndarray]] = None,
                     ls_sample_weight: str = "none",
-                    ls_tau_d_ms: float = 500.0):
+                    ls_tau_d_ms: float = 500.0) -> ResidualLayout:
     """ResidualLayout of SPEC 2.10 (a): masks, pre_masks, sqrt_a, v_exp, D,
-    c, slices, n_residuals -- from the recorded traces only. SPEC Block 23."""
-    raise NotImplementedError("Block 23")
+    c, slices, n_residuals -- from the recorded traces only (no cell).
+    SPEC Block 23.
+
+    Windows, sample weights and D_b are those of bundle_rmsd for the same
+    arguments (D_b = _peak_deflection: r_in_target "steady" takes the last
+    20 ms of the window, anything else the whole window, as bundle_rmsd).
+    ValueError: weighting not 'relative' or 'ls_amplitude'; no bundle; a
+    bundle with no pre-window sample, fewer than 2 window samples, a
+    non-finite recorded sample in either, sample weights non-finite or of
+    non-positive sum, or D_b not finite and positive; and the refusals of
+    build_multi_protocol_loss (ls_sample_weight, a long square peak_decay
+    cannot serve, ls_amplitude with no positive long-square amplitude).
+    """
+    if weighting not in ("relative", "ls_amplitude"):
+        raise ValueError("residual_layout: weighting must be 'relative' or "
+                         "'ls_amplitude', got %r" % (weighting,))
+    _check_ls_sample_weight(ls_sample_weight)
+    bundles = list(train_bundles)
+    if not bundles:
+        raise ValueError("residual_layout: no training bundle")
+    c = _bundle_weights(bundles, weighting)
+    masks, pre_masks, sqrt_a, v_exp, slices = [], [], [], [], []
+    D = np.empty(len(bundles), dtype=np.float64)
+    start = 0
+    for i, b in enumerate(bundles):
+        pre_w, win = _bundle_windows_s(b, ss_window_ms, ls_window_mode,
+                                       ls_window_ms_after_onset)
+        if _is_brief(b):
+            weight_fn = ss_sample_weight_fn
+        else:
+            weight_fn = _ls_weight_fn(b, ls_sample_weight, ls_tau_d_ms)
+        t = np.asarray(b.t, dtype=float)
+        v = np.asarray(b.v_mV, dtype=float)
+        pm = (t >= pre_w[0]) & (t <= pre_w[1])
+        wm = (t >= win[0]) & (t <= win[1])
+        tag = "residual_layout: bundle %d (%g pA)" % (i, float(b.amplitude_pA))
+        if not pm.any():
+            raise ValueError("%s has no pre-window sample in [%g, %g] s"
+                             % (tag, pre_w[0], pre_w[1]))
+        if int(wm.sum()) < 2:
+            raise ValueError("%s has %d sample(s) in its window [%g, %g] s; "
+                             "at least 2 are needed"
+                             % (tag, int(wm.sum()), win[0], win[1]))
+        if not (np.all(np.isfinite(v[pm])) and np.all(np.isfinite(v[wm]))):
+            raise ValueError("%s has a non-finite recorded sample in its "
+                             "pre-window or window" % tag)
+        tg = t[wm]
+        if weight_fn is None:
+            w = np.ones(tg.shape, dtype=float)
+        else:
+            w = np.asarray(weight_fn(tg), dtype=float)
+        sw = float(np.sum(w))
+        if w.shape != tg.shape or not np.all(np.isfinite(w)) or not (sw > 0):
+            raise ValueError("%s: sample weights non-finite, of the wrong shape "
+                             "or of non-positive sum (%r)" % (tag, sw))
+        if r_in_target == "steady":
+            d_b = _peak_deflection(b, pre_w, (win[1] - 20e-3, win[1]))
+        else:
+            d_b = _peak_deflection(b, pre_w, win)
+        if not (np.isfinite(d_b) and d_b > 0):
+            raise ValueError("%s: deflection D_b = %r mV is not finite and "
+                             "positive" % (tag, d_b))
+        be = float(np.mean(v[pm]))
+        masks.append(wm)
+        pre_masks.append(pm)
+        sqrt_a.append(np.sqrt(c[i] * w / sw).astype(np.float64))
+        v_exp.append(np.asarray((v - be)[wm], dtype=np.float64))
+        D[i] = float(d_b)
+        n_b = int(wm.sum())
+        slices.append(slice(start, start + n_b))
+        start += n_b
+    return ResidualLayout(masks=masks, pre_masks=pre_masks, sqrt_a=sqrt_a,
+                          v_exp=v_exp, D=D, c=c, slices=slices,
+                          n_residuals=int(start))
 
 
 def assemble_residuals(layout, traces: Sequence[np.ndarray]) -> np.ndarray:
     """float64 (N,): sqrt_a[b] * (traces[b][masks[b]] - v_exp[b]) / D[b],
     bundles in order. SPEC Block 23."""
-    raise NotImplementedError("Block 23")
+    if len(traces) != len(layout.masks):
+        raise ValueError("assemble_residuals: %d traces for %d bundles"
+                         % (len(traces), len(layout.masks)))
+    r = np.empty(int(layout.n_residuals), dtype=np.float64)
+    for b, tr in enumerate(traces):
+        tr = np.asarray(tr, dtype=np.float64)
+        if tr.shape != layout.masks[b].shape:
+            raise ValueError("assemble_residuals: trace %d has shape %s, "
+                             "expected %s" % (b, tr.shape, layout.masks[b].shape))
+        r[layout.slices[b]] = (layout.sqrt_a[b]
+                               * (tr[layout.masks[b]] - layout.v_exp[b])
+                               / layout.D[b])
+    return r
 
 
 def l_and_l2(layout, r: np.ndarray) -> Tuple[float, float]:
-    """(L, L_2) of SPEC 2.10 (a) from a residual vector (N,)."""
-    raise NotImplementedError("Block 23")
+    """(L, L_2) of SPEC 2.10 (a) from a residual vector (N,):
+    L_2 = sum r^2;  L = sum_b c_b [sum_{s in W_b} r_{b,s}^2 / c_b]^(1/2)
+    (= sum_b c_b RMSD_b / D_b, the loss of 2.8). A bundle with c_b = 0
+    contributes 0 to L (its residuals are 0)."""
+    r = np.asarray(r, dtype=np.float64)
+    if r.shape != (int(layout.n_residuals),):
+        raise ValueError("l_and_l2: r has shape %s, expected (%d,)"
+                         % (r.shape, int(layout.n_residuals)))
+    l2 = float(np.sum(r * r))
+    terms = []
+    for b, sl in enumerate(layout.slices):
+        cb = float(layout.c[b])
+        if cb > 0:
+            rb = r[sl]
+            terms.append(cb * np.sqrt(float(np.sum(rb * rb)) / cb))
+        else:
+            terms.append(0.0)
+    return float(np.sum(np.asarray(terms, dtype=np.float64))), l2
+
+
+# ------------------------------------------------------- the evaluator ---
+def _spec_dim(spec) -> Optional[int]:
+    """p of a ParamSpec (len); None for a duck-typed spec without one."""
+    try:
+        return int(len(spec))
+    except TypeError:
+        names = getattr(spec, "names", None)
+        return None if names is None else len(tuple(names))
+
+
+def _trace_task(token: int, q: tuple, i: int, dt_brief_ms: float,
+                dt_long_ms: float) -> tuple:
+    """Worker side of the evaluator: apply q to this process's copy of the
+    cell, return bundle i's trace as the serial loop computes it, tagged:
+        ("ok", trace) | ("dt", pickled exception or None, text)
+        | ("err", class name, text)
+    """
+    try:
+        cell, spec, bundles, v_rest_mV = _POOL_CONTEXTS[token]
+        spec.apply_q(cell, q, v_rest_mV)
+        tr = bundle_trace(cell, bundles[i], v_rest_mV,
+                          dt_brief_ms=dt_brief_ms, dt_long_ms=dt_long_ms)
+        return ("ok", tr)
+    except Exception as exc:  # noqa: BLE001 - sent back, judged by the parent
+        text = "".join(traceback.format_exception(type(exc), exc,
+                                                  exc.__traceback__))
+        if type(exc).__name__ == "DtEnforcementError":
+            try:
+                blob = pickle.dumps(exc)
+            except Exception:  # noqa: BLE001 - fall back to the named class
+                blob = None
+            return ("dt", blob, text)
+        return ("err", type(exc).__name__, text)
+
+
+class _TraceEvaluator:
+    """ev(Q) of SPEC Block 23 (build_trace_evaluator)."""
+
+    def __init__(self, cell, bundles, v_rest_mV, spec, dt_brief_ms,
+                 dt_long_ms, n_workers):
+        self._cell = cell
+        self._bundles = tuple(bundles)
+        self._v_rest = v_rest_mV
+        self._spec = spec
+        self._p = _spec_dim(spec)
+        self._dtb = dt_brief_ms
+        self._dtl = dt_long_ms
+        self.n_workers = int(n_workers)
+        self.n_points = 0
+        self.n_failed = 0
+        self._state = {"pool": None, "token": None}
+        # terminated when the evaluator is garbage-collected, and at exit
+        weakref.finalize(self, _close_pool, self._state)
+
+    def close(self) -> None:
+        """Terminate the pool if one was made (idempotent; a later call makes
+        a new one). A no-op for n_workers == 1."""
+        _close_pool(self._state)
+
+    def _check_Q(self, Q) -> np.ndarray:
+        Q = np.asarray(Q, dtype=np.float64)
+        if Q.ndim != 2 or (self._p is not None and Q.shape[1] != self._p):
+            raise ValueError("ev: Q must be 2-D with %s columns, got shape %s"
+                             % (self._p, Q.shape))
+        if not np.all(np.isfinite(Q)):
+            raise ValueError("ev: Q holds a non-finite value")
+        return Q
+
+    def _pool(self):
+        state = self._state
+        if state["pool"] is None:
+            # One live pool per process (Block 19, amendment 2): close every
+            # other loss's or evaluator's pool before this one forks.
+            for other in list(_LIVE_POOLS.values()):
+                if other is not state:
+                    _close_pool(other)
+            token = next(_POOL_TOKENS)
+            _POOL_CONTEXTS[token] = (self._cell, self._spec, self._bundles,
+                                     self._v_rest)
+            state["token"] = token
+            state["pool"] = ProcessPoolExecutor(
+                max_workers=self.n_workers,
+                mp_context=multiprocessing.get_context("fork"))
+            _LIVE_POOLS[id(state)] = state
+        return state["pool"], state["token"]
+
+    def _serial_point(self, q: tuple):
+        """One point in the process: the list of traces, or None."""
+        try:
+            self._spec.apply_q(self._cell, q, self._v_rest)
+            out = []
+            for b in self._bundles:
+                tr = bundle_trace(self._cell, b, self._v_rest,
+                                  dt_brief_ms=self._dtb, dt_long_ms=self._dtl)
+                if not np.all(np.isfinite(tr)):
+                    return None
+                out.append(tr)
+            return out
+        except Exception as exc:  # noqa: BLE001 - a failed point, judged here
+            if type(exc).__name__ == "DtEnforcementError":
+                raise
+            return None
+
+    def _pooled(self, qs):
+        dtb = float(DEFAULT_DT_BRIEF_MS if self._dtb is None else self._dtb)
+        dtl = float(DEFAULT_DT_LONG_MS if self._dtl is None else self._dtl)
+        n_b = len(self._bundles)
+        pool, token = self._pool()
+        n_t = len(qs) * n_b
+        q_args = [qs[k // n_b] for k in range(n_t)]
+        i_args = [k % n_b for k in range(n_t)]
+        try:
+            outs = list(pool.map(_trace_task, [token] * n_t, q_args, i_args,
+                                 [dtb] * n_t, [dtl] * n_t, chunksize=1))
+        except BrokenProcessPool:
+            # A worker died: no value for this call, never a failed point.
+            _close_pool(self._state)
+            raise
+        # The serial code's side effect: the parent's cell is left at Q[-1].
+        # A DtEnforcementError here is also one the workers met at the same
+        # point (same code); it is raised only if the outcomes below do not
+        # raise first, as the serial loop would order them.
+        parent_dt = None
+        try:
+            self._spec.apply_q(self._cell, qs[-1], self._v_rest)
+        except Exception as exc:  # noqa: BLE001 - judged as the serial loop
+            if type(exc).__name__ == "DtEnforcementError":
+                parent_dt = exc
+        # The serial loop's outcome, point by point, bundle by bundle.
+        res = []
+        for k in range(len(qs)):
+            traces = []
+            for out in outs[k * n_b:(k + 1) * n_b]:
+                if out[0] == "dt":
+                    _raise_remote_dt(out[1], out[2])
+                if out[0] == "err" or not np.all(np.isfinite(out[1])):
+                    traces = None
+                    break
+                traces.append(out[1])
+            res.append(traces)
+        if parent_dt is not None:
+            raise parent_dt
+        return res
+
+    def __call__(self, Q) -> list:
+        Q = self._check_Q(Q)
+        qs = [tuple(float(x) for x in row) for row in Q]
+        self.n_points += len(qs)
+        if self.n_workers == 1 or not self._bundles or not qs:
+            res = [self._serial_point(q) for q in qs]
+        else:
+            res = self._pooled(qs)
+        self.n_failed += sum(1 for x in res if x is None)
+        return res
 
 
 def build_trace_evaluator(cell, bundles: Sequence, v_rest_mV: float, *,
@@ -1422,9 +1785,62 @@ def build_trace_evaluator(cell, bundles: Sequence, v_rest_mV: float, *,
                           dt_long_ms: Optional[float] = None,
                           n_workers: int = 1):
     """ev(Q (m, p) in q) -> list of m entries: the list of bundle_trace
-    arrays at Q[k], or None for a failed point. Attributes n_workers,
-    n_points, n_failed, close(). SPEC Block 23."""
-    raise NotImplementedError("Block 23")
+    arrays (bundles in order) at Q[k], or None when spec.apply_q or a
+    bundle's simulation raised (a DtEnforcementError is raised in the caller
+    under that class name) or a trace is non-finite. SPEC Block 23.
+
+    n_workers == 1: a serial loop in the process. n_workers > 1: the
+    m * n_bundles (point, bundle) tasks on a fork ProcessPoolExecutor of
+    n_workers processes, created at the first call and reused (chunksize=1);
+    the values are exactly the serial loop's; a worker that dies raises
+    BrokenProcessPool; one live pool per process, shared with the losses of
+    build_multi_protocol_loss (Block 19, amendment 2). After a call the
+    parent's cell is at Q[-1]. dt None resolves DEFAULT_DT_* at call time.
+    Attributes: n_workers, n_points (points asked since built), n_failed
+    (points returned None), close(). ValueError: n_workers not an integer
+    >= 1; Q not 2-D with p columns or non-finite.
+    """
+    n_workers = _check_n_workers(n_workers)
+    if spec is None:
+        import param_spec as _ps
+        spec = _ps.PASSIVE_3D
+    return _TraceEvaluator(cell, bundles, v_rest_mV, spec, dt_brief_ms,
+                           dt_long_ms, n_workers)
+
+
+class _MultiProtocolResiduals:
+    """resid(Q) of SPEC Block 23 (build_multi_protocol_residuals)."""
+
+    def __init__(self, layout, evaluator, fail_l2):
+        self.layout = layout
+        self.evaluator = evaluator
+        self.n_residuals = int(layout.n_residuals)
+        self.fail_l2 = float(fail_l2)
+        self._fail_value = float(np.sqrt(self.fail_l2 / self.n_residuals))
+
+    @property
+    def n_points(self) -> int:
+        return self.evaluator.n_points
+
+    @property
+    def n_failed(self) -> int:
+        return self.evaluator.n_failed
+
+    def l_and_l2(self, row) -> Tuple[float, float]:
+        return l_and_l2(self.layout, row)
+
+    def close(self) -> None:
+        self.evaluator.close()
+
+    def __call__(self, Q) -> np.ndarray:
+        traces = self.evaluator(Q)
+        out = np.empty((len(traces), self.n_residuals), dtype=np.float64)
+        for k, tr in enumerate(traces):
+            if tr is None:
+                out[k] = self._fail_value
+            else:
+                out[k] = assemble_residuals(self.layout, tr)
+        return out
 
 
 def build_multi_protocol_residuals(
@@ -1442,7 +1858,42 @@ def build_multi_protocol_residuals(
         dt_long_ms: Optional[float] = None,
         n_workers: int = 1,
         fail_l2: float = 100.0):
-    """resid(Q (m, p) in q) -> float64 (m, N), row k = r(Q[k]); a failed
-    point the constant row sqrt(fail_l2 / N). Attributes layout, evaluator,
-    n_residuals, n_points, n_failed, l_and_l2(row), close(). SPEC Block 23."""
-    raise NotImplementedError("Block 23")
+    """resid(Q (m, p) in q) -> float64 (m, N), row k = r(Q[k]) of SPEC
+    2.10 (a); a failed point the constant row sqrt(fail_l2 / N), so its
+    L_2 is fail_l2. Attributes layout, evaluator, n_residuals, n_points,
+    n_failed, l_and_l2(row), close(). SPEC Block 23.
+
+    ValueError: the refusals of residual_layout and build_trace_evaluator;
+    fail_l2 not finite and positive.
+    """
+    if not (np.isfinite(float(fail_l2)) and float(fail_l2) > 0):
+        raise ValueError("fail_l2 must be finite and > 0, got %r" % (fail_l2,))
+    n_workers = _check_n_workers(n_workers)
+    layout = residual_layout(
+        train_bundles, ss_window_ms=ss_window_ms,
+        ls_window_ms_after_onset=ls_window_ms_after_onset,
+        ls_window_mode=ls_window_mode, r_in_target=r_in_target,
+        weighting=weighting, ss_sample_weight_fn=ss_sample_weight_fn,
+        ls_sample_weight=ls_sample_weight, ls_tau_d_ms=ls_tau_d_ms)
+    ev = build_trace_evaluator(cell, train_bundles, v_rest_mV, spec=spec,
+                               dt_brief_ms=dt_brief_ms, dt_long_ms=dt_long_ms,
+                               n_workers=n_workers)
+    return _MultiProtocolResiduals(layout, ev, fail_l2)
+
+
+def _residuals_factory(cell, train_bundles, v_rest_mV, *, weighting, spec,
+                       dt_brief_ms, dt_long_ms, n_workers, protocol_kw):
+    """loss.make_residuals of SPEC Block 23: build_multi_protocol_residuals
+    with the loss's own cell, bundles, protocol arguments, spec, dt and
+    n_workers. Holds no reference to the loss itself."""
+    def make_residuals(fail_l2: float = 100.0):
+        if weighting not in ("relative", "ls_amplitude"):
+            raise ValueError("make_residuals: the residual vector is defined "
+                             "for weighting 'relative' or 'ls_amplitude', "
+                             "this loss has %r" % (weighting,))
+        return build_multi_protocol_residuals(
+            cell, list(train_bundles), v_rest_mV, weighting=weighting,
+            spec=spec,
+            dt_brief_ms=dt_brief_ms, dt_long_ms=dt_long_ms,
+            n_workers=n_workers, fail_l2=fail_l2, **protocol_kw)
+    return make_residuals
