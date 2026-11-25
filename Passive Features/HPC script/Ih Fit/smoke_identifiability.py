@@ -332,7 +332,10 @@ def test_I1_null_direction():
         if V[j, int(np.argmax(np.abs(V[j])))] <= 0:
             bad.append("row %d: largest component not positive" % j)
     sv_np = np.linalg.svd(J6, compute_uv=False)
-    if not np.allclose(s, sv_np, rtol=1e-12, atol=0):
+    # tolerance: relative to sigma_1 (float64 roundoff of the SVD). The six-parameter toy is rank
+    # deficient, so its last singular value is roundoff itself (about 1e-17) and differs between
+    # LAPACK builds and between the compute_uv=True and False drivers: no relative test on it.
+    if not np.allclose(s, sv_np, rtol=0, atol=1e-12 * s[0]):
         bad.append("sigma differs from numpy.linalg.svd")
     # J v_j = sigma_j u_j: |J v_j| == sigma_j (relative to sigma_1, float64 roundoff)
     if not np.allclose(np.linalg.norm(J6 @ V.T, axis=0), s, rtol=0, atol=1e-12 * s[0]):
