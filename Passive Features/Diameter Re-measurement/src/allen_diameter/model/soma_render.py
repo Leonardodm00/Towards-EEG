@@ -2,7 +2,8 @@
 
 An ellipsoid soma E(theta_g), theta_g = (x0, y0, z0, a, b, c, phi, mu), rendered with the partition absorption
 (procedure Eq. 5: Delta A_j = T_<j (1 - exp(-a_j)) per column and slab, model.geometry) and the pipeline's kernel
-(model.kernel.sigma_r; the continuation slope replaceable by a parameter, D-218):
+(model.kernel.sigma_r; the continuation slope replaceable by a parameter, D-218; the in-focus width replaceable by
+an argument, re-anchored by model.kernel.with_kernel before the slope is applied, wave 8, D-258):
 
     tau_k = pixel_integrate(1 - sum_j g_{s_jk} (*) Delta A_j, f),   s_jk = sigma_r(zeta_j - z_k; gamma)
 
@@ -16,7 +17,8 @@ p = res0; depth in stage units; light toward +z when light_direction = +1. See S
 statement, the parameters and the oracles (tests/smoke/test_smoke_soma_render.py).
 
 Library calls: scipy.fft (rfft2, irfft2, next_fast_len, fftfreq, rfftfreq); model.render.block_fine_grid,
-pixel_integrate; model.geometry.slab_centres, slab_absorbance, transmitted_before; model.kernel.sigma_r.
+pixel_integrate; model.geometry.slab_centres, slab_absorbance, transmitted_before; model.kernel.sigma_r,
+with_kernel.
 Custom code (marked below): the ellipsoid's column interval, the sampled Gaussian's transfer, the accumulation.
 
 No file access, no plotting. Pure ASCII, LF, for the cluster.
@@ -30,7 +32,7 @@ import numpy as np
 from scipy import fft as sfft
 
 from . import geometry
-from .kernel import sigma_r
+from .kernel import sigma_r, with_kernel
 from .render import block_fine_grid, pixel_integrate
 
 _THETA_NAMES = ("x0_um", "y0_um", "z0_um", "a_um", "b_um", "c_um", "phi_rad", "mu_per_um")
@@ -220,21 +222,22 @@ class SomaRenderer:
         self._light = light
         self._freq = {}                               # box shape (N_y, N_x) -> (fftfreq (N_y,), rfftfreq (N_x//2+1,))
 
-    def _kernel_config(self, slope):
-        """The renderer configuration whose sigma_r the render uses: rcfg, or rcfg with its continuation slope
-        replaced by slope (D-218; the continuation must then be "linear")."""
+    def _kernel_config(self, slope, base):
+        """The renderer configuration whose sigma_r the render uses: base (rcfg, or rcfg re-anchored at the in-focus
+        width by with_kernel), or base with its continuation slope replaced by slope (D-218; the continuation must
+        then be "linear")."""
         if slope is None:
-            return self._rcfg
+            return base
         try:
             g = float(slope)
         except (TypeError, ValueError):
             raise ValueError("slope must be a finite number >= 0 (um/um), got %r" % (slope,)) from None
         if not (math.isfinite(g) and g >= 0.0):
             raise ValueError("slope must be a finite number >= 0 (um/um), got %r" % (slope,))
-        if self._rcfg.kernel_continuation != "linear":
+        if base.kernel_continuation != "linear":
             raise ValueError("a slope replaces the continuation's slope only for kernel_continuation 'linear', got %r"
-                             % (self._rcfg.kernel_continuation,))
-        return dataclasses.replace(self._rcfg, kernel_continuation_slope=g)
+                             % (base.kernel_continuation,))
+        return dataclasses.replace(base, kernel_continuation_slope=g)
 
     def _frequencies(self, shape):
         freq = self._freq.get(shape)
@@ -251,11 +254,13 @@ class SomaRenderer:
 
         sigma0_um (SPEC Block 45, the amendment of wave 8; D-258): None, the render as before, bit for bit; a number
         (um, finite, > 0; ValueError otherwise) re-anchors the kernel at that in-focus width with its growth kept,
-        kernel.with_kernel(rcfg, sigma0_um), before slope replaces the continuation's slope."""
-        if sigma0_um is not None:
-            raise NotImplementedError("Block 45, wave 8: sigma0_um")
+        kernel.with_kernel(rcfg, sigma0_um) (growth scale 1: sigma'(delta_m)^2 = sigma(delta_m)^2 - sigma(0)^2 +
+        sigma0_um^2 at every knot, the linear continuation's slope unchanged), before slope replaces the
+        continuation's slope. with_kernel's refusals pass through (a kernel family other than "gaussian_table"; a
+        knot whose new variance is not > 0)."""
         th = _theta(theta_g)
-        rc = self._kernel_config(slope)
+        base = self._rcfg if sigma0_um is None else with_kernel(self._rcfg, _positive(sigma0_um, "sigma0_um"))
+        rc = self._kernel_config(slope, base)
         z0, c, mu = th[2], th[5], th[7]
         K = self._z.size
         H, W = self._shape_px

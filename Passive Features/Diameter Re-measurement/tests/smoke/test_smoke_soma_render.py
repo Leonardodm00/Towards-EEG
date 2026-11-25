@@ -8,7 +8,11 @@ Gaussian on a periodic grid, and 1 at nu = 0; (T3) the light of every plane equa
 pixel and in the slab thickness, the differences at the defaults reported; (T6) the far slope: the configured slope
 gives the result of slope None, a larger one keeps the light and widens the far planes; (T7) tau <= 1, mu = 0,
 shapes, dtypes, the planes' order, the light direction, determinism, the ValueErrors; (T8) the speed and peak memory
-of the fit's render, measured in a fresh process.
+of the fit's render, measured in a fresh process. Amendment of wave 8 (D-258, D-259): the in-focus blur as an
+argument, render(theta_g, slope, sigma0_um) -- (R1) sigma0_um equal to the table's own sigma(0) gives the tau of
+sigma0_um None; (R2) for a width below and one above the table's, with a slope, the tau of a renderer built on
+kernel.with_kernel(rcfg, s); (R3) on the plane nearest z0 the steepest edge along a row through the centre softens
+as sigma0_um grows; (R4) the ValueErrors (with_kernel's refusals passing through), and mu = 0 still gives 1 exactly.
 
 Checks, from the strongest oracle to the weakest
     test_known_answer   analytic or tabulated solution
@@ -68,7 +72,7 @@ sys.path.insert(0, SRC)
 from allen_diameter.config import RendererConfig, SomaFitConfig   # noqa: E402
 from allen_diameter.model import geometry                         # noqa: E402
 from allen_diameter.model import soma_render as SR                # noqa: E402
-from allen_diameter.model.kernel import sigma_r                    # noqa: E402
+from allen_diameter.model.kernel import sigma_r, with_kernel       # noqa: E402
 from allen_diameter.model.render import block_fine_grid, pixel_integrate   # noqa: E402
 
 SEED = 20261122  # no randomness in the block; kept for the runner's header
@@ -498,6 +502,65 @@ def test_edge_cases():
         _expect_value_error("slope with %s" % cont, lambda Rc=Rc: Rc.render(good, 0.79))
         _expect_value_error("slope with %s, mu 0" % cont, lambda Rc=Rc: Rc.render(good[:7] + [0.0], 0.79))
         assert Rc.render(good).shape == (2, 11, 11)                  # slope None: any continuation
+
+
+def test_sigma0():
+    """Amendment of wave 8 (D-258, D-259): render(theta_g, slope=None, sigma0_um=None). (R1) sigma0_um equal to the
+    table's own sigma(0) gives the tau of sigma0_um None [1e-12: with_kernel recomputes each knot as
+    sqrt(sigma^2 - sigma(0)^2 + sigma(0)^2), equal to the knot within roundoff]; (R2) for 0.05 um (below the
+    table's 0.08 um) and 0.2 um (above), each with slope None and slope 1.1, the tau of a SomaRenderer built on
+    with_kernel(rcfg, s) and rendered without sigma0_um [1e-12] -- the re-anchoring first, then the slope; (R3) on the
+    plane nearest z0 the largest |d tau / d x| (finite differences along the row through the centre) decreases over
+    sigma0_um = 0.05, 0.15, 0.3 um; (R4) ValueError for sigma0_um not finite and > 0, for a kernel family other than
+    "gaussian_table" and for a knot whose new variance is not > 0 (with_kernel's refusals); mu = 0 gives 1 exactly
+    with sigma0_um given; sigma0_um None is the render as before, bit for bit (the same renderer, twice)."""
+    th = [0.03, -0.02, 0.3, 1.3, 1.0, 0.9, 0.4, 0.8]
+    zk = 0.3 + np.array([-1.2, -0.3, 0.05, 0.7])
+    crop = (-20, -18, 41, 37)
+    rcfg, scfg = _cfgs()
+    R = SR.SomaRenderer(crop, P, zk, rcfg, scfg, +1)
+    t_none = R.render(th)
+    assert_array_equal(R.render(th, None, None), t_none, err_msg="sigma0_um None: the render as before")
+    s_tab = rcfg.kernel_table_sigma_um[0]
+    for slope in (None, 1.1):
+        t_tab = R.render(th, slope, sigma0_um=s_tab)
+        e1 = float(np.max(np.abs(t_tab - R.render(th, slope))))
+        print("  R1: slope %s, sigma0_um = table's %.3f um: max |tau - tau(None)| %.1e" % (slope, s_tab, e1))
+        check_close("R1 sigma0 = table's (slope %s)" % slope, t_tab, R.render(th, slope), rtol=0, atol=1e-12)
+    for s0 in (0.05, 0.2):
+        Rs = SR.SomaRenderer(crop, P, zk, with_kernel(rcfg, s0), scfg, +1)
+        for slope in (None, 1.1):
+            got, ref = R.render(th, slope, sigma0_um=s0), Rs.render(th, slope)
+            print("  R2: sigma0_um %.2f um, slope %s: max |tau - tau(with_kernel)| %.1e, max |tau - tau(None)| %.1e"
+                  % (s0, slope, float(np.max(np.abs(got - ref))), float(np.max(np.abs(got - R.render(th, slope))))))
+            check_close("R2 sigma0 %g slope %s" % (s0, slope), got, ref, rtol=0, atol=1e-12)
+            assert float(np.max(np.abs(got - R.render(th, slope)))) > 1e-6, "the in-focus width must matter"
+
+    k = int(np.argmin(np.abs(zk - th[2])))
+    row = int(round(th[1] / P)) - crop[1]
+    grads = []
+    for s0 in (0.05, 0.15, 0.3):
+        line = R.render(th, sigma0_um=s0)[k, row]
+        grads.append(float(np.max(np.abs(np.diff(line)))) / P)
+    print("  R3: plane z = %.2f um, row %d: max |d tau/dx| (1/um) at sigma0_um 0.05, 0.15, 0.3 um: %.4f, %.4f, %.4f"
+          % (zk[k], row + crop[1], grads[0], grads[1], grads[2]))
+    assert grads[0] > grads[1] > grads[2], grads
+
+    for s0 in (0.0, -0.1, math.nan, math.inf, -math.inf, "x", [0.1, 0.2], np.array([0.1])):
+        _expect_value_error("sigma0_um %r" % (s0,), lambda s0=s0: R.render(th, sigma0_um=s0))
+        _expect_value_error("sigma0_um %r, mu 0" % (s0,), lambda s0=s0: R.render(th[:7] + [0.0], sigma0_um=s0))
+    Re = SR.SomaRenderer(crop, P, zk, dataclasses.replace(rcfg, kernel_family="empirical"), scfg, +1)
+    _expect_value_error("sigma0_um with kernel_family empirical", lambda: Re.render(th[:7] + [0.0], sigma0_um=0.1))
+    tab = (0.3,) + tuple(rcfg.kernel_table_sigma_um[1:])            # knot 0.086 um below sigma(0) = 0.3 um
+    Rn = SR.SomaRenderer(crop, P, zk, dataclasses.replace(rcfg, sigma_r0_um=0.3, kernel_table_sigma_um=tab), scfg, +1)
+    _expect_value_error("sigma0_um 0.05: a knot's variance <= 0", lambda: Rn.render(th, sigma0_um=0.05))
+    assert Rn.render(th, sigma0_um=0.29).shape == (4, 37, 41)       # 0.086^2 - 0.3^2 + 0.29^2 > 0: accepted
+    for s0, slope in ((0.05, None), (0.2, 1.1), (np.float64(0.3), 0.0)):
+        one = R.render(th[:7] + [0.0], slope, sigma0_um=s0)
+        assert one.dtype == np.float64 and np.array_equal(one, np.ones((4, 37, 41))), "mu = 0 gives 1 exactly"
+    t = R.render(th, 1.1, sigma0_um=0.2)
+    assert t.shape == (4, 37, 41) and t.dtype == np.float64 and float(t.max()) <= 1.0 + 1e-12
+    assert_array_equal(R.render(th), t_none, err_msg="sigma0_um leaves the renderer unchanged for later renders")
 
 
 def test_speed_memory():
