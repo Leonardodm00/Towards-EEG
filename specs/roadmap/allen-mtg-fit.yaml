@@ -675,6 +675,60 @@ implementation:
     needs_theory: [T14]
     needs_hpc: true
     jobs: ["Passive Features/HPC script/Ih Fit/submit_twin_recovery.sh", twin_recovery, twin_merge]
+  - id: B23
+    title: "Block 23: the residual vector and the trace evaluator"
+    summary: "The residual vector r(q) with sum r^2 = L_2, for several points at once on the worker pool; the data-only layout of the weights; the bundle traces."
+    block: 23
+    parent: G5
+    depends_on: [B19]
+    needs_theory: [T19]
+    needs_hpc: false
+    jobs: []
+  - id: B24
+    title: "Block 24: finite-difference Jacobian"
+    summary: "Forward and central differences with an absolute step in the unit box, all perturbed points in one batch call."
+    block: 24
+    parent: G5
+    depends_on: []
+    needs_theory: [T19]
+    needs_hpc: false
+    jobs: []
+  - id: B25
+    title: "Block 25: the least-squares refinement"
+    summary: "scipy least_squares (TRF, bounded) from the best points of the global search; convergence, active bounds and J^T J recorded per start."
+    block: 25
+    parent: G5
+    depends_on: [B20, B24]
+    needs_theory: [T19, T18]
+    needs_hpc: false
+    jobs: []
+  - id: B26
+    title: "Block 26: sensitivities and identifiability"
+    summary: "Stored trace sensitivities at a point; singular values and directions of the Jacobian; predicted scatter of each parameter under the twin's noise."
+    block: 26
+    parent: G5
+    depends_on: [B24]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: B27
+    title: "Block 27: the fit's trf refinement, bound flags, sensitivity mode"
+    summary: "run_ih_fit.py applies the least-squares refinement on the residual vector, flags estimates on a bound, and can store a cell's sensitivities instead of fitting."
+    block: 27
+    parent: G5
+    depends_on: [B23, B25, B26]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: B28
+    title: "Block 28: the twins' run with trf and the sensitivity sub-command"
+    summary: "The twins' run passes the new fit options and gains a per-twin sensitivity run with the predicted scatter from the twin's noise; the submitter can submit it."
+    block: 28
+    parent: G5
+    depends_on: [B27, B22]
+    needs_theory: []
+    needs_hpc: true
+    jobs: ["Passive Features/HPC script/Ih Fit/submit_twin_recovery.sh", twin_recovery, twin_merge]
 
 revisions:
   - stage: N3
