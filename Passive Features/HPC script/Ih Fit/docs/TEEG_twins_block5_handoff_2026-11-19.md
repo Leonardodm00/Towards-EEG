@@ -25,6 +25,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-22 (later, 4) | Section 7: Blocks 14-18 built and checked (`c974a62`), the commands of run `tw2`, the real-cell check of the new loss. |
 | 2026-11-24 | Section 7: the result of run `tw2` (gate FAIL; the truth fits better than the estimate in 14 of 15 twins fitted with I_h: the optimiser is the limit). |
 | 2026-11-25 (the review chat) | Section 7: the user's decision after the independent review (D-245: TRF on the squared loss; the sensitivity module dropped), the code facts the review asked for **[src at `393b681`]** and the re-read of tw3a/tw3b's `refine_starts.csv` **[data inspected]**. |
+| 2026-11-25 (the review chat, evening) | Section 7: Blocks 23 to 28 built and checked on `sci/twins` (`de4cc53`), what changed in the fit and the twins' run, the final check's verdict, and the two commands for the next run on the noisy twins (D-245 to D-250). |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -486,6 +487,27 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   is $-0.59, +0.03, +0.21, -1.04, -0.74$: zero under the $\bar g_h$-$\Delta v_h$ trade-off, so twins 900000301 and
   900000302 follow it and the three shallow twins do not. Not in the archive: the search's 200 evaluations (the
   count of penalty evaluations), any noisy twin.
+- **Blocks 23 to 28 built (2026-11-25) [src: `sci/twins` at `de4cc53`; run: the smoke suites and the final check
+  on the merged branch; log: D-245 to D-250].** The fit's refinement is `trf` by default (scipy `least_squares` on
+  the residual vector, `--refine-max-nfev 30`, 3 starts; `--refine nelder_mead` a comparison); `phase2_results.csv`
+  and `recovery_extras.csv` carry $L_2$, the converged starts, the failed points and `on_bound_<name>`; the twins'
+  verdict is on $\sqrt{L_2}$. New: `run_twin_recovery.py sensitivity` and `MODE=sensitivity` of the submitter (the
+  sensitivities at a twin's truth, the singular values, the predicted scatter of each parameter for the current
+  weighting `W0` and for no decay `W1`, and the truth trace check). Final check: PASS WITH ISSUES
+  (`specs/test_reports/2026-11-25_1700_incremental.md`); its 7 new spec test files are NOT committed and 8 earlier
+  spec tests are stale (the old default, the old column lists): both put to the user. Next on davinci, the noisy
+  twins only, at the fit's usual 0.1 ms (D-248), from the code folder after `git pull` on `sci/twins`, the gates
+  first (the header of `submit_twin_recovery.sh`, plus `python smoke_residuals.py && python smoke_fd_jacobian.py &&
+  python smoke_refine_trf.py && python smoke_identifiability.py && python smoke_ih_trf.py && python
+  smoke_twin_sensitivity.py`), each line first with `DRY_RUN=1`:
+  `MODE=sensitivity RUN_TAG=tw5 NOISE_TAG=nf2 NCPUS=24 PLAN_ARGS="--ih-arm ih5" TWINS=900000000,900000001,900000002,900000003,900000004,900000005,900000006,900000007,900000008,900000009 WALLTIME=04:00:00 bash submit_twin_recovery.sh`
+  then
+  `RUN_TAG=tw5 NOISE_TAG=nf2 NCPUS=24 PLAN_ARGS="--ih-arm ih5" TWINS=900000000,900000001,900000002,900000003,900000004,900000005,900000006,900000007,900000008,900000009 WALLTIME=48:00:00 bash submit_twin_recovery.sh`
+  (the walltimes are the assistant's guesses, not measured). Read: `identifiability.csv` (`sd_lin_gbar` per twin
+  and weighting: the exclusion rule of D-244 item 3 and the $\tau_d$ question of D-246 are decided on it),
+  `truth_trace_check.csv`, then per fit `refine_n_converged`, the endpoints' agreement in `refine_starts.csv`
+  (`x_solver_*`, `sv_*`), `on_bound_*`, and the errors against `sd_lin_*`. Noise-free twins later, if time allows,
+  with `--dt-long-ms 0.025` in `PLAN_ARGS` (D-248). Not built: the review's CR-5 (the global stage).
 
 ## 8. Repository, environment, cluster
 

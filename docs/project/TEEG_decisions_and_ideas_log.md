@@ -301,7 +301,8 @@ the "Binds" column.
 | 2026-11-25 (the review chat, after 14:13) | Logs **D-247** (orchestrator): the build choices of D-245/D-246 written into `Ih Fit/specs/SPEC.md` 2.10 and Blocks 23 to 28 on `sci/twins` (contracts `43ae62f`, `87df33a`; amendment 1 `d43d80c`: a failed point's $L_2$ is $10^6$, first 100). Next free IDs: D-248, I-008. |
 | 2026-11-25 (the review chat, about 15:30) | D-245's "Why" corrected in place with a dated mark: the fits integrate at 0.1 ms (D-007), not 0.025 ms as written; the twins at 0.025 ms (D-192 (iv)). No new decision ID. |
 | 2026-11-25 (the review chat, 15:33) | Logs **D-248** (user): the next twins' run is the noisy twins only, fitted at 0.1 ms; the noise-free twins later if time allows, their long steps at 0.025 ms and their short squares at the usual 0.1 ms. Two changelog hours of this chat (15:10, 16:10) were not read from a clock and are corrected above. |
-| 2026-11-25 (the review chat, later) | Logs **D-249** (orchestrator): amendment 2 of the wave's contract (`6d5f9e4` on `sci/twins`), after Block 28's implementer stopped on it: the sensitivity files under the run directory, and the partner-twin oracle restated. Blocks 23 to 28 merged on `sci/twins`. Next free IDs: D-250, I-008. |
+| 2026-11-25 (the review chat, later) | Logs **D-249** (orchestrator): amendment 2 of the wave's contract (`6d5f9e4` on `sci/twins`), after Block 28's implementer stopped on it: the sensitivity files under the run directory, and the partner-twin oracle restated. Blocks 23 to 28 merged on `sci/twins`. |
+| 2026-11-25 (the review chat, evening) | Logs **D-250** (orchestrator): the final check of Blocks 23 to 28 (report `Ih Fit/specs/test_reports/2026-11-25_1700_incremental.md`, PASS WITH ISSUES) settled: amendment 3, the twins' loss verdict compares $\sqrt{L_2}$ under the least-squares refinement. `sci/twins` at `de4cc53`. Next free IDs: D-251, I-008. |
 | 2026-11-25 (the soma-fit chat, 16:10) | Logs **D-250** (user, 15:02): the soma's depth semi-axis c ranged from the literature on human pyramidal somata (`Passive Features/Diameter Re-measurement/docs/TEEG_soma_fit_handoff_2026-11-24.md` section 9, on `sci/diameter-pipeline`; held there as "D-248" while pushes to `main` were refused, the ID since taken by the review chat). |
 | 2026-11-25 (the soma-fit chat, 16:10) | Logs **D-251** (user, 15:27 and 15:38): the passive model gets the soma as fitted on the stack and its equal-area sphere. |
 | 2026-11-25 (the soma-fit chat, 16:10) | Logs **D-252** (user, 15:27 and 15:38): the hold-c grid, 4 values on Colab, more with a local refinement on the HPC. |
@@ -544,6 +545,7 @@ would be needed*, *Status*.
 | D-247 | 2026-11-25 | SPEC 2.10 and Blocks 23 to 28 of `Ih Fit/specs/SPEC.md` on `sci/twins` (`passive_long_step_training.py`, `fd_jacobian.py`, `local_refine.py`, `identifiability.py`, `trace_sensitivity.py`, `run_ih_fit.py`, `run_twin_recovery.py`, `submit_twin_recovery.sh`); D-245, D-246 | the build choices of D-245 and D-246: the estimate among the points the least-squares stage evaluated; a failed point's $L_2 = 10^6$; the bound flag at 0.01 of the unit box; the weighting without decay as $\tau_d = 10^{12}$ ms; how a bundle's noise is drawn for the predicted scatter; the global stage unchanged for this round [orchestrator] | active; being implemented |
 | D-248 | 2026-11-25 | the next twins' runs (`submit_twin_recovery.sh`, `PLAN_ARGS`: `--dt-long-ms`, `--dt-brief-ms`); D-007 (unchanged), D-192 (iv), D-244 item 5 | the next run is the noisy twins only, at the fit's usual step (0.1 ms); the noise-free twins are fitted later if time allows, long steps at 0.025 ms, short squares at the usual 0.1 ms [user] | active; a run option, no code default changed |
 | D-249 | 2026-11-25 | SPEC Block 28 of `Ih Fit/specs/SPEC.md` on `sci/twins` (`run_twin_recovery.py`, `smoke_twin_sensitivity.py`); D-247 | amendment 2: the sensitivity files are `DIR/sensitivity/twin_<ID>/...`, `DIR/identifiability.csv`, `DIR/truth_trace_check.csv` (no group level); the oracle on a noise-free twin and its noisy partner asks identical sensitivities and identical predicted scatter under shared seeds and layout, not identical scatter as built [orchestrator] | active; implemented (`07e9b76`) |
+| D-250 | 2026-11-25 | the final check of Blocks 23 to 28 (report 2026-11-25_1700, PASS WITH ISSUES): `run_twin_recovery.loss_verdict`, `recovery_extras.csv`; SPEC Blocks 27, 28 | F1 fixed (amendment 3: under the least-squares refinement the twins' verdict compares $\sqrt{L_2}$ at the truth and at the estimate; a column names the quantity); F3, F4, S1, S2 written into the SPEC as notes; F2 (8 stale spec tests) left for the user [orchestrator] | active; implemented (`9e7be5a`) |
 | D-250 | 2026-11-25 | the range of the soma's depth semi-axis c (the soma fit's hold-c values; soma-fit handoff section 9 on `sci/diameter-pipeline`) | c's range is set from published measurements of human pyramidal somata read in full text or in the data, each value with its preparation [user] | active |
 | D-251 | 2026-11-25 | what the passive model receives from the soma fit (SPEC Blocks 46-47; the corrected SWC) | the soma as fitted on the stack: the held c with the smallest misfit, S(a_hat, b_hat, c), its equal-area sphere; assumes the membrane kept its area when the slice flattened [user] | active |
 | D-252 | 2026-11-25 | the hold-c grid of the soma fit (Block 46, not built; Cell 25; the HPC job) | Colab: 4 held values of c; HPC: a finer grid up to the low end of the living range and a local refinement; the values proposed, not confirmed [user] | active |
@@ -15927,3 +15929,35 @@ is calibrated (D-218.2).
 **Sources.** **[user]** 15:38, 16:04; the check above.
 
 **Status:** active; not implemented.
+
+## D-250 -- The final check of Blocks 23 to 28 settled: the twins' verdict on the quantity the refinement minimises (orchestrator)
+
+**Date:** 2026-11-25 (Europe/Rome), the review chat. **Binds:** `run_twin_recovery.py` (`loss_verdict`,
+`verdict_pair`, `recovery_extras.csv`); SPEC Blocks 27 and 28 on `sci/twins` (amendment 3, `bb57e1c`; merged
+`de4cc53`).
+
+**Decision [orchestrator].** The findings of the independent final check (an Opus agent given the SPEC only; report
+`specs/test_reports/2026-11-25_1700_incremental.md`, verdict PASS WITH ISSUES, 103 new spec tests passing):
+1. *F1 (minor), fixed.* Under the least-squares refinement the twins' `loss_verdict` (SPEC 2.8 (f): optimiser /
+   data / tie) compares $\sqrt{L_2}$ at the truth and at the estimate, by the same rule and tolerance as it
+   compared $L$; with Nelder-Mead, no refinement or a nan it compares $L$ as before. `recovery_extras.csv` gains
+   `loss_verdict_on`. A point with $\sqrt{L_2} \ge 10^3$ (a failed point) gives `na`.
+2. *S1.* `loss_after_refine <= loss_after_search` is not guaranteed under the least-squares refinement;
+   `l2_after_refine <= l2_after_search` is. Stated in the SPEC.
+3. *S2.* The truth trace check has no acceptance value over the whole sweep (0.236 mV at the sample after the
+   step's end on the fixture, D-193); the quantities to read are its first-5-ms and window RMS.
+4. *F3, F4 (notes).* Written into the SPEC, not changed: a bundle the residual layout refuses and the scalar loss
+   accepts fails the cell's fit; a short square is simulated to 100.5 ms after the pulse.
+5. *F2 (minor), not done.* 8 earlier spec tests assert the old default (`nelder_mead`) or exact column lists:
+   stale, the tester's files; put to the user.
+
+**Why.** (1) **[run, the final check's reproducer; the implementer's V8]** $L$ and $L_2$ can rank two points
+oppositely: two bundles of weight 0.5, estimate $L$ 0.1414 and $L_2$ 0.0400, truth $L$ 0.1732 and $L_2$ 0.0300 --
+the verdict on $L$ is `data`, on $\sqrt{L_2}$ `optimiser`; the refinement minimises $L_2$ (D-245).
+
+**What it does not decide.** A second independent round on amendment 3 was not run: the orchestrator re-ran the
+final check's 103 tests and the two smoke suites on the merged branch.
+
+**Sources.** **[orchestrator]**; **[run]** as above; **[log]** D-245, D-247.
+
+**Status:** active; implemented.
