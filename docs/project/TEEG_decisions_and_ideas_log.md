@@ -297,7 +297,8 @@ the "Binds" column.
 | 2026-11-25 (the twins chat) | Logs **D-244** (user, 11:49) after the test runs `tw3a` and `tw3b` **[data inspected: the user's `tw3_results.tar.gz`]**: no fit reached the loss at the truth, all 30 Nelder-Mead starts stopped on the 100-evaluation cap; five parameters median ratio 1.48, six 2.38, $\Delta v_h$ within 3 mV in 2 of 5. D-206, D-234 and D-238 annotated. Next free IDs: D-245, I-008. |
 | 2026-11-25 (the twins chat, 2) | D-244 item 5 corrected in place with a dated mark, on the user's word (12:08, "All noisy"): the pilot `tw4` is the 10 noisy `full` twins, not 5 noise-free and 5 noisy. No new decision ID. |
 | 2026-11-25 (the review chat, 13:17) | Logs **D-245** (user) after the independent review of the I_h fit (`TEEG_tech_Ih_fit_change_requests_2026-11-25.md`, sent to the user as files, not in the repository): the local stage becomes a bounded least-squares solver (scipy TRF) on the squared loss $L_2$; the review's sensitivity module (its CR-2) is dropped. D-207 (the loss's combination across bundles) and D-234/D-244 (Nelder-Mead) annotated. |
-| 2026-11-25 (the review chat, 14:08) | Logs **D-246** (user): the review's sensitivity module (CR-2) is built after all, to settle the exclusion rule of D-244 item 3 and the sample weight's $\tau_d$; D-245 item 3 reversed, its items 1 and 2 stand. Next free IDs: D-247, I-008. |
+| 2026-11-25 (the review chat, 14:08) | Logs **D-246** (user): the review's sensitivity module (CR-2) is built after all, to settle the exclusion rule of D-244 item 3 and the sample weight's $\tau_d$; D-245 item 3 reversed, its items 1 and 2 stand. |
+| 2026-11-25 (the review chat, 15:10) | Logs **D-247** (orchestrator): the build choices of D-245/D-246 written into `Ih Fit/specs/SPEC.md` 2.10 and Blocks 23 to 28 on `sci/twins` (contracts `43ae62f`, `87df33a`; amendment 1 `d43d80c`: a failed point's $L_2$ is $10^6$, first 100). Next free IDs: D-248, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -532,6 +533,7 @@ would be needed*, *Status*.
 | D-244 | 2026-11-25 | the I_h fit and the twins' run after the tests `tw3a`/`tw3b` (`run_ih_fit.py` options, `submit_twin_recovery.sh` `MAX_CORES`); D-234 (items 1 and 3 changed), D-238 (superseded) | after `tw3a`/`tw3b`: five parameters kept ($\Delta v_h$ fixed, as D-206); a larger local budget (300 evaluations per start in the pilot); a cell whose training steps do not reach voltages where I_h is open is removed from the I_h fit (rule to be set); the twins' submitter's cap is 240 cores; a pilot of 10 fits [user] | active; the exclusion rule open; item 2's Nelder-Mead replaced by D-245 (2026-11-25) |
 | D-245 | 2026-11-25 | the I_h fit's local stage and optimised loss (`local_refine.py`, `passive_long_step_training.py`, `run_ih_fit.py`; SPEC 2.8 (c), 2.9 (b)); D-207 (2) in part, D-234 item 1, D-244 item 2; the review's change requests CR-2, CR-4 | the local refinement is a bounded Gauss-Newton-type least-squares solver (scipy `least_squares`, TRF) minimising $L_2(q) = \sum_b c_b (\mathrm{RMSD}_b(q)/D_b)^2$; the review's sensitivity module (CR-2) is not built [user] | active; not implemented; item 3 (the sensitivity module not built) reversed by D-246 (2026-11-25) |
 | D-246 | 2026-11-25 | the review's sensitivity module (CR-2): a new module of `Ih Fit/` and its report; D-245 item 3 (reversed); D-244 item 3 (the exclusion rule), D-207 (3) (the sample weight's $\tau_d$) | the sensitivity module is built: the Jacobian of the residuals at a twin's truth, its singular values and directions, the predicted scatter of each parameter under the twin's noise; it is what the exclusion rule and the $\tau_d$ question are settled on [user] | active; not implemented |
+| D-247 | 2026-11-25 | SPEC 2.10 and Blocks 23 to 28 of `Ih Fit/specs/SPEC.md` on `sci/twins` (`passive_long_step_training.py`, `fd_jacobian.py`, `local_refine.py`, `identifiability.py`, `trace_sensitivity.py`, `run_ih_fit.py`, `run_twin_recovery.py`, `submit_twin_recovery.sh`); D-245, D-246 | the build choices of D-245 and D-246: the estimate among the points the least-squares stage evaluated; a failed point's $L_2 = 10^6$; the bound flag at 0.01 of the unit box; the weighting without decay as $\tau_d = 10^{12}$ ms; how a bundle's noise is drawn for the predicted scatter; the global stage unchanged for this round [orchestrator] | active; being implemented |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15684,3 +15686,47 @@ rebound stays out of training (D-006 (ii)); a weighting that includes it is a la
 `TEEG_tech_Ih_fit_change_requests_2026-11-25.md` (CR-2), sent to the user as files.
 
 **Status:** active; not implemented.
+
+## D-247 -- The build choices of D-245 and D-246: the estimate, the failed point, the bound flag, the bundle's noise (orchestrator)
+
+**Date:** 2026-11-25, 15:10 (Europe/Rome), the review chat. **Binds:** SPEC 2.10 and Blocks 23 to 28 of
+`Passive Features/HPC script/Ih Fit/specs/SPEC.md` on `sci/twins` (contract commits `43ae62f`, `87df33a`; amendment 1
+`d43d80c`).
+
+**Decision [orchestrator].** Choices made while writing the contract of the user's D-245 and D-246, after the user's
+"Push everyting in main and go on with the implementatio" (14:13) on the plan and settings shown at 14:08 (forward
+differences with step $10^{-3}$ in unit coordinates, `xtol` $10^{-4}$, `ftol` = `gtol` $10^{-8}$, at most 30
+iterations per start, 3 starts; central differences and 200 noise draws for the sensitivities; the weighting with
+and without decay; the global stage unchanged).
+
+**Statement.**
+1. *The estimate* is the point of lowest $L_2$ among the points whose residual vector the least-squares stage
+   computed (trial points and the Jacobian's perturbed points). The global search's other points have only $L$ and
+   do not enter; the first start is the search's best point.
+2. *A failed point* (the model cannot be simulated there) gets the constant residual vector with $L_2 = 10^6$
+   **[amendment 1; first written 100, the review's proposal]** and is counted.
+3. *The starts* are still chosen on the global search's values of $L$ (2.9 (b)'s rule, unchanged).
+4. *The bound flag* of a parameter: the estimate's unit coordinate below 0.01 or above 0.99 (the review's CR-3 b).
+5. *The weighting without decay* (the comparison D-246 asks for) is the `peak_decay` weight with
+   $\tau_d = 10^{12}$ ms: the ramp to the peak, then 1.
+6. *A bundle's noise* for the predicted scatter: realisation $k$ uses `base_seed` $= 10^6 + k$; a long bundle's
+   noise is the mean over its sweeps of the twin generator's per-sweep draw with each sweep's own law and tilt; a
+   brief bundle's is the mean over every stored window of its polarity. A noise-free twin uses its real cell's laws.
+7. *The global stage* (`gp_minimize` on $L$, seed 0 for every twin, the $10^6$ penalty unclipped) is unchanged in
+   this round, so that the least-squares runs start from the points of `tw3a` and `tw4`. The review's CR-5 (the
+   surrogate fed $\ln L$, a seed per twin, a Sobol design) is not built.
+8. *The wiring* is two blocks (27: `run_ih_fit.py`; 28: the twins' run), written by implementer agents, not one
+   inline block as the plan said.
+
+**Why.** (1) **[reasoning]** a point without residuals has no $L_2$; evaluating 197 more points per fit would cost
+more than a start. (2) **[run: Block 23's smoke fixture]** $L_2$ at valid points reaches 133 there, above 100, so a
+failed point could have been taken as the estimate. (4) **[data inspected: `tw3_results.tar.gz`]** twin
+900000303's $\tau_h^{\rm pk}$ sits at unit coordinate 0.0012 and 0.0085 and the report's flag misses it. (7)
+**[reasoning]** one change at a time.
+
+**What it does not decide.** The exclusion rule and $\tau_d$ (D-246: on the module's tables); the production
+budget; CR-5.
+
+**Sources.** **[orchestrator]**; **[run]**, **[data inspected]**, **[reasoning]** as above; **[log]** D-245, D-246.
+
+**Status:** active; being implemented.
