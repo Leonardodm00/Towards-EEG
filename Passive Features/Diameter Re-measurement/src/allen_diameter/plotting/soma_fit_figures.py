@@ -14,6 +14,9 @@ here; no input is written to.
   figure_soma_morphology   the top view (x, y) and the side view (u, w): Allen's soma, the fitted outline, the sphere of
                            equal area, and per stem its old first node (open), the new one (filled), an arrow from old
                            to new and its next nodes as a line; a flag other than "moved" named in the legend
+  figure_soma_c_grid       the fits over the grid of held c (wave 8): the residual RMS, a and b, the area S beside
+                           Allen's, the far-background check's mean mismatch with +-tol; the best grid value, the
+                           delivered refinement and its neighbourhood marked
   save                     the PNG of a figure (plotting.cleaning_figures.save)
 
 Image panels in the image frame, um, with matplotlib's extent (left, right, bottom, top) and origin "upper", as Block
@@ -33,7 +36,7 @@ from allen_diameter.plotting.cleaning_figures import (BLUE, IMAGE_PERCENTILES, I
 from allen_diameter.plotting.figures import _DIV
 from allen_diameter.plotting.soma_figures import SOMA_COLOUR
 
-__all__ = ["figure_soma_fit_planes", "figure_soma_fit_summary", "figure_soma_morphology", "save"]
+__all__ = ["figure_soma_fit_planes", "figure_soma_fit_summary", "figure_soma_morphology", "figure_soma_c_grid", "save"]
 
 FIT_COLOUR = ORANGE              # the fitted ellipsoid: its silhouette (dashed) and the plane's section (solid)
 EQ_COLOUR = BLUE                 # the sphere of equal area (dash-dot)
@@ -59,6 +62,15 @@ ALLEN_KEYS = ("radius_um", "area_um2")         # Allen's traced radius r and 4 p
 ALLEN_OPTIONAL_KEYS = ("volume_um3",)          # 4/3 pi r^3, beside the fitted volume
 VIEW_KEYS = ("allen", "silhouette", "sphere", "stems")
 STEM_KEYS = ("old", "new", "next", "flag")
+# the c-grid figure (SPEC Block 48, the amendment of wave 8)
+GRID_TABLE_KEYS = ("c_um", "rms_gl", "a_um", "b_um", "area_um2", "usable")   # read from Block 50's grid_table
+DELIVERED_SOURCES = ("grid", "refinement", "none")
+DELIVERED_KEYS = ("c_um", "rms_gl", "a_um", "b_um", "area_um2", "check_mean_gl")
+GRID_COLOUR, A_COLOUR, B_COLOUR = INK, BLUE, ORANGE
+UNUSABLE_COLOUR = "#e34948"      # a grid fit that is not usable: an open marker on the panel's lower edge
+BEST_COLOUR = "#1baf7a"          # the best grid value: a ring and a dotted vertical line
+DELIVERED_COLOUR = "#7b3fb5"     # the delivered refinement: a diamond
+NEIGHBOURHOOD_COLOUR = "#e4e3df"  # the refinement's neighbourhood, shaded
 
 
 # ------------------------------------------------------------- the inputs ---
@@ -480,11 +492,138 @@ def figure_soma_morphology(top, side, title=""):
     return fig
 
 
+def _grid_table(table):
+    """The c-grid figure's table: Block 50's grid_table dict, the keys GRID_TABLE_KEYS as (n,) arrays, n >= 1, c_um
+    finite, usable bool."""
+    if not isinstance(table, Mapping) or any(k not in table for k in GRID_TABLE_KEYS):
+        raise ValueError("table must be Block 50's grid_table dict with the keys %s" % ", ".join(GRID_TABLE_KEYS))
+    c = np.asarray(table["c_um"], dtype=float)
+    if c.ndim != 1 or c.size < 1 or not np.all(np.isfinite(c)):
+        raise ValueError("table['c_um'] must be (n,) finite values, n >= 1, got %r" % (table["c_um"],))
+    n = c.size
+    out = {"c_um": c}
+    for key in GRID_TABLE_KEYS[1:-1]:
+        out[key] = _vector(table[key], n, "table[%r]" % key)
+    usable = np.asarray(table["usable"])
+    if usable.shape != (n,) or usable.dtype != bool:
+        raise ValueError("table['usable'] must be a bool array (%d,), got %s %r" % (n, usable.dtype, usable.shape))
+    out["usable"] = usable
+    return out
+
+
+def _delivered(d):
+    if not isinstance(d, Mapping) or d.get("source") not in DELIVERED_SOURCES:
+        raise ValueError("delivered must be a dict whose 'source' is one of %s" % (DELIVERED_SOURCES,))
+    if d["source"] == "none":
+        return {"source": "none"}
+    return dict(_numbers(d, DELIVERED_KEYS, (), "delivered"), source=d["source"])
+
+
 def figure_soma_c_grid(table, best_index, delivered, check_mean_gl, tol_gl, allen_area_um2, neighbourhood_um=None,
                        title=""):
-    """-> Figure: the soma fit over the grid of held depth semi-axes c (SPEC Block 48, the amendment of wave 8): four
-    panels against the held c (um) -- the residual RMS (gl), the fitted a and b (um), the membrane area S (um^2) with
-    Allen's 4 pi r^2 as a line, the far-background check's mean mismatch (gl) with lines at +-tol_gl. table: Block 50's
-    grid_table dict of (n,) arrays; best_index int (-1: none); delivered: dict(source, c_um, rms_gl, a_um, b_um,
-    area_um2, check_mean_gl); check_mean_gl (n,) gl; neighbourhood_um (lo, hi) or None. CONTRACT STUB."""
-    raise NotImplementedError("Block 48, wave 8: figure_soma_c_grid")
+    """The soma fit over the grid of held depth semi-axes c (SPEC Block 48, the amendment of wave 8). Returns the
+    matplotlib Figure (4 axes), not closed: the caller closes it.
+
+    table: Block 50's grid_table dict of (n,) arrays (c_um, rms_gl, a_um, b_um, area_um2, usable; the other keys
+    ignored); best_index: int, the best grid fit's index (-1: none); delivered: dict with source ("grid" |
+    "refinement" | "none") and, unless "none", c_um, rms_gl, a_um, b_um, area_um2, check_mean_gl (floats);
+    check_mean_gl: (n,) the far-background check's mean mismatch of each grid fit (gl; NaN where not available);
+    tol_gl: the flag's threshold (gl, finite >= 0); allen_area_um2: Allen's 4 pi r^2 (um^2; not drawn when NaN);
+    neighbourhood_um: (lo, hi) um of the refinement or None.
+    Four panels against the held c (um): the residual RMS (gl); the fitted in-plane semi-axes a and b (um); the
+    membrane area S (um^2) with Allen's as a horizontal line; the check's mean mismatch (gl) with lines at +-tol_gl.
+    The usable grid fits as joined markers, the others as open markers on the panel's lower edge (they hold no value);
+    the best grid value ringed, with a dotted vertical line; the delivered fit as a diamond when its source is
+    "refinement"; the neighbourhood shaded when given. Every number drawn is passed in. ValueError for a table without
+    the keys or with lengths that disagree, a best_index that is not an int in [-1, n) or names an unusable fit, a
+    delivered dict without its source or numbers, a check_mean_gl not (n,), a tol_gl not finite >= 0, an
+    allen_area_um2 that is not a number, a neighbourhood not two finite values lo <= hi.
+    """
+    tab = _grid_table(table)
+    c, usable = tab["c_um"], tab["usable"]
+    n = c.size
+    if isinstance(best_index, (bool, np.bool_)) or not isinstance(best_index, (int, np.integer)):
+        raise ValueError("best_index must be an int, got %r" % (best_index,))
+    best = int(best_index)
+    if not -1 <= best < n:
+        raise ValueError("best_index must lie in [-1, %d), got %d" % (n, best))
+    if best >= 0 and not usable[best]:
+        raise ValueError("best_index %d names a grid fit that is not usable" % best)
+    dl = _delivered(delivered)
+    chk = _vector(check_mean_gl, n, "check_mean_gl")
+    tol = _scalar(tol_gl, "tol_gl")
+    if not (np.isfinite(tol) and tol >= 0.0):
+        raise ValueError("tol_gl must be finite and >= 0, got %r" % (tol_gl,))
+    allen = _scalar(allen_area_um2, "allen_area_um2")
+    nb = None
+    if neighbourhood_um is not None:
+        nb = np.asarray(neighbourhood_um, dtype=float)
+        if nb.shape != (2,) or not np.all(np.isfinite(nb)) or nb[0] > nb[1]:
+            raise ValueError("neighbourhood_um must be None or (lo, hi) finite with lo <= hi, got %r"
+                             % (neighbourhood_um,))
+
+    plt = _plt()
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
+    from matplotlib.transforms import blended_transform_factory
+    fig, axes = plt.subplots(2, 2, figsize=(11.6, 7.6), facecolor=SURFACE, sharex=True, squeeze=False,
+                             layout="constrained")
+    a_rms, a_ab, a_S, a_chk = axes[0, 0], axes[0, 1], axes[1, 0], axes[1, 1]
+    # (axis, [(values, the delivered dict's key, colour, marker, gid)], y label, title)
+    panels = ((a_rms, [(tab["rms_gl"], "rms_gl", GRID_COLOUR, "o", "rms")], "residual RMS (gl)",
+               "the residual RMS over the region, all planes"),
+              (a_ab, [(tab["a_um"], "a_um", A_COLOUR, "o", "a"), (tab["b_um"], "b_um", B_COLOUR, "s", "b")],
+               "in-plane semi-axis (um)", "the fitted in-plane semi-axes a and b"),
+              (a_S, [(tab["area_um2"], "area_um2", GRID_COLOUR, "o", "area")], "membrane area S (um^2)",
+               "the membrane area S"),
+              (a_chk, [(chk, "check_mean_gl", GRID_COLOUR, "o", "check")], "mean b0 - far b0 (gl)",
+               "the far-background check: mean mismatch on the near planes"))
+    for ax, series, ylab, ttl in panels:
+        _style(ax)
+        if nb is not None:
+            ax.axvspan(nb[0], nb[1], color=NEIGHBOURHOOD_COLOUR, alpha=0.6, lw=0, zorder=0).set_gid("neighbourhood")
+        if best >= 0:
+            ax.axvline(c[best], color=BEST_COLOUR, ls=":", lw=1.2, zorder=1, gid="best_line")
+        for vals, key, colour, marker, gid in series:
+            ok = usable & np.isfinite(vals)
+            ax.plot(c[ok], vals[ok], color=colour, marker=marker, ms=5, lw=1.3, zorder=3, gid=gid)
+            if best >= 0 and np.isfinite(vals[best]):
+                ax.plot([c[best]], [vals[best]], ls="none", marker="o", ms=12, mfc="none", mec=BEST_COLOUR, mew=1.6,
+                        zorder=4, gid="best")
+            if dl["source"] == "refinement" and np.isfinite(dl[key]):
+                ax.plot([dl["c_um"]], [dl[key]], ls="none", marker="D", ms=7, mfc=DELIVERED_COLOUR,
+                        mec=DELIVERED_COLOUR, zorder=5, gid="delivered")
+        if np.any(~usable):
+            tr = blended_transform_factory(ax.transData, ax.transAxes)
+            ax.plot(c[~usable], np.zeros(int(np.sum(~usable))), ls="none", marker="o", ms=7, mfc="none",
+                    mec=UNUSABLE_COLOUR, mew=1.4, transform=tr, clip_on=False, zorder=6, gid="unusable")
+        ax.set_ylabel(ylab, fontsize=8, color=INK2)
+        ax.set_title(ttl, fontsize=9, color=INK)
+    if np.isfinite(allen):
+        a_S.axhline(allen, color=ALLEN_COLOUR_LIGHT, ls="--", lw=1.3, zorder=2, gid="allen")
+    for sgn in (-1.0, 1.0):
+        a_chk.axhline(sgn * tol, color=BOUND_COLOUR, ls="--", lw=1.1, zorder=2, gid="tol")
+    a_chk.axhline(0.0, color=INK2, ls="-", lw=0.6, zorder=1, gid="zero")
+    for ax in axes[1]:
+        ax.set_xlabel("held depth semi-axis c (um)", fontsize=8, color=INK2)
+    handles = [Line2D([], [], color=GRID_COLOUR, marker="o", ms=5, lw=1.3, label="the usable grid fits"),
+               Line2D([], [], color=A_COLOUR, marker="o", ms=5, lw=1.3, label="a"),
+               Line2D([], [], color=B_COLOUR, marker="s", ms=5, lw=1.3, label="b")]
+    if np.any(~usable):                                # the legend names only what is drawn
+        handles.append(Line2D([], [], ls="none", marker="o", ms=7, mfc="none", mec=UNUSABLE_COLOUR, mew=1.4,
+                              label="a grid fit not usable (no value; on the lower edge)"))
+    if best >= 0:
+        handles.append(Line2D([], [], ls=":", marker="o", ms=12, mfc="none", mec=BEST_COLOUR, color=BEST_COLOUR,
+                              mew=1.6, label="the best grid value"))
+    if dl["source"] == "refinement":
+        handles.append(Line2D([], [], ls="none", marker="D", ms=7, mfc=DELIVERED_COLOUR, mec=DELIVERED_COLOUR,
+                              label="the delivered fit (refinement)"))
+    if nb is not None:
+        handles.append(Patch(facecolor=NEIGHBOURHOOD_COLOUR, alpha=0.6, label="the refinement's neighbourhood"))
+    if np.isfinite(allen):
+        handles.append(Line2D([], [], color=ALLEN_COLOUR_LIGHT, ls="--", lw=1.3, label="Allen's 4 pi r^2"))
+    handles.append(Line2D([], [], color=BOUND_COLOUR, ls="--", lw=1.1, label="+-tol %.3g gl (the flag)" % tol))
+    fig.legend(handles=handles, loc="outside lower center", ncol=5, fontsize=7.5, frameon=False)
+    src = {"grid": "the best grid fit", "refinement": "the refinement", "none": "nothing (no usable fit)"}[dl["source"]]
+    fig.suptitle((title + "\n" if title else "") + "delivered: %s" % src, fontsize=9.5, color=INK)
+    return fig

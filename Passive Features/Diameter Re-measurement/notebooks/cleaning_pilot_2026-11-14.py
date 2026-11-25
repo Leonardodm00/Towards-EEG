@@ -836,40 +836,74 @@ viewer24b = plane_viewer.PlaneViewer(
 display(viewer24b.widget)
 
 # %% [markdown]
-# ## Cell 25: the soma fitted with an ellipsoid; the corrected SWC (D-215, D-216, D-218, D-222, D-240, D-241, D-243; Blocks 45-48)
+# ## Cell 25: the soma fitted with an ellipsoid over a grid of held depths; the corrected SWC (D-215, D-216, D-222, D-240, D-241, D-243, D-252 to D-258; Blocks 45-48, 50, 51)
 #
-# Run after Cells 0, 1, 16 and 24 or 24 (b) (Cell 1 pulls the branch). The soma is fitted with an ellipsoid -- centre,
-# three semi-axes, in-plane orientation, absorption -- rendered with the partition absorption and Cell 16's kernel, on
-# the planes within 10 um of the start, over a disc of Allen's soma radius in which only the pixels under the traced
-# branches are left out (D-241; the processes' shadows stay in the data, a slight bias accepted for the pilot). The
-# model is drawn on a crop of at least 14 um half-width about the traced centre, so that the whole ellipsoid is
-# rendered (D-243; the record's crop.ellipsoid_inside says whether the fitted soma stayed inside it). The
-# start is Allen's traced soma; its
-# depth is SOMA_FIT_K (default: the SOMA_K of Cell 24 or 24 (b), else the traced depth). The kernel's far slope is not
-# fitted (D-240, superseding D-218.1): it is held at SLOPE0 (None: the configured 0.79, uncalibrated; the far-slope
-# calibration's value when there is one). A fit took 8-21 min in the sandbox (36 planes of a 280 px
-# crop, 50-100 renders); Colab ran Cell 23B's renders 2-3 times slower, so allow up to about an hour. The fitted soma enters the
-# corrected SWC as the sphere of equal membrane area at the fitted centre, each stem's first node moved onto the fitted
-# surface (D-216.3, D-222.5). Output to send back: soma_fit_<S>_planes.png, _summary.png, _morphology.png and
-# soma_fit_<S>.json; the corrected SWC is reconstruction_soma_<S>.swc. On the simulated stacks (D-216.2) chi2/dof near
-# the noise's level means an ellipsoid fits; a wedge in the in-focus residuals toward the apical side is the
-# pyramidal soma's signature (the area then about 5 % low).
+# Run after Cells 0, 1, 16 and 24 or 24 (b) (Cell 1 pulls the branch). The model: the soma an ellipsoid -- centre,
+# three semi-axes, in-plane orientation, absorption -- rendered with the partition absorption and Cell 16's kernel
+# (its far slope held at SLOPE0, D-240; its in-focus width held, D-258), times each plane's own tilted background
+# b0 + b1 u + b2 v (its grey level at the traced centre and its slopes in x and y, solved inside the fit, D-254.1), on
+# the planes within 10 um of the start, over a disc of 1.2 traced soma radii about the traced centre (D-255), in which
+# only the pixels under the traced branches are left out (D-241). The model is drawn on a crop of at least 14 um
+# half-width (D-243; crop.ellipsoid_inside in the record says whether the fitted soma stayed inside it). The start is
+# Allen's traced soma; its depth is SOMA_FIT_K (default: the SOMA_K of Cell 24 or 24 (b), else the traced depth).
+#
+# The planes alone do not fix the soma's depth semi-axis c, so c is held at each value of a grid -- C_GRID, None: the
+# configuration's 1.5, 2.5, 3.5 and 5.0 um (D-256.1) -- and everything else is fitted at each; the grid fit with the
+# smallest residual is the one delivered (D-256.2). C_REFINE adds one fit with c free between the best value's
+# neighbours; it is off on Colab (D-252.1: the cluster refines). Each fit's background at the centre is compared with
+# the background measured on the same planes at least 12 um from the soma, on the planes within 1.2 um of the fitted
+# centre: when their mean differs by more than 1 gl a flag is raised, printed as a WARNING, and the fit is delivered
+# all the same (D-257). Time: the run makes one fit per grid value, about four times a single fit's time (a single
+# fit took 8-21 min in the sandbox, and Colab runs these renders 2-3 times slower, so allow up to a few hours), and
+# the parallel run below as much again.
+#
+# SIGMA0_PARALLEL (D-258.2): after the deliverable run, the same run with the in-focus width fitted (--sigma0 fit),
+# into SOMA_FIT_OUT + "_sigma0fit": a labelled COMPARISON, not a deliverable -- its figures' titles begin with
+# "COMPARISON", its record says "comparison", and it writes no SWC.
+#
+# The delivered fit enters the corrected SWC as the sphere of equal membrane area at the fitted centre, each stem's
+# first node moved onto the fitted surface (D-216.3, D-222.5). Output to send back: soma_fit_<S>_planes.png,
+# _summary.png, _morphology.png, _cgrid.png and soma_fit_<S>.json (and, for the parallel run, its _summary.png,
+# _cgrid.png and JSON); the corrected SWC is reconstruction_soma_<S>.swc. The c-grid figure shows, against the held c,
+# the residual RMS, the fitted a and b, the area beside Allen's and the background check with its +-1 gl band.
 
 # %%
-from IPython.display import Image, display   # the cell's own imports
-SOMA_FIT_K = None     # the start plane, e.g. 115; None: Cell 24's SOMA_K, else the traced depth
-SLOPE0 = None         # the far slope's held value (um/um, D-240); None: the configured renderer.kernel_continuation_slope
+import os                                     # the cell's own imports
+from IPython.display import Image, display
+SOMA_FIT_K = None       # the start plane, e.g. 115; None: Cell 24's SOMA_K, else the traced depth
+SLOPE0 = None           # the far slope's held value (um/um, D-240); None: the configured renderer.kernel_continuation_slope
+C_GRID = None           # the held values of c (um), e.g. (1.5, 2.5, 3.5, 5.0); None: the configuration's (D-256.1)
+C_REFINE = False        # one more fit with c free near the best grid value (D-252.1: off on Colab)
+SIGMA0_PARALLEL = True  # then the same run with the in-focus width fitted, a labelled comparison (D-258.2)
 SOMA_FIT_OUT = OUT + "/soma_fit"
 if "KW_ARGS" not in globals():        # a Cell 16 from before wave 7: the kernel's width fixed, the default (D-221.1)
     KW_ARGS = ["--kernel-width", "fixed"]
 print("[cell 25] kernel width:", " ".join(str(x) for x in KW_ARGS))
 k_start = SOMA_FIT_K if SOMA_FIT_K is not None else globals().get("SOMA_K")
-choice = (([] if k_start is None else ["--soma-k", k_start]) + ["--far-slope", "fixed"]
-          + ([] if SLOPE0 is None else ["--slope0", SLOPE0]))
-run("scripts/fit_soma.py", "--specimen", SPECIMEN, "--cache-dir", CACHE_DIR, *ALIGN, *CLEAN_CFG, "--out", SOMA_FIT_OUT,
-    *choice, *KW_ARGS)       # Cell 16's KERNEL_WIDTH (Block 36 amendment 22)
-for name in ("soma_fit_%d_planes.png" % SPECIMEN, "soma_fit_%d_summary.png" % SPECIMEN,
-             "soma_fit_%d_morphology.png" % SPECIMEN):
-    print(SOMA_FIT_OUT + "/" + name)
-    display(Image(filename=SOMA_FIT_OUT + "/" + name))
+common = (([] if k_start is None else ["--soma-k", k_start]) + ["--far-slope", "fixed", "--background", "tilted"]
+          + ([] if SLOPE0 is None else ["--slope0", SLOPE0])
+          + ([] if C_GRID is None else ["--c-grid", ",".join(str(float(c)) for c in C_GRID)])
+          + ["--c-refine", "on" if C_REFINE else "off"])
 
+
+def show_files(out_dir, names):
+    for name in names:
+        path = out_dir + "/" + name
+        if os.path.exists(path):
+            print(path)
+            display(Image(filename=path))
+        else:
+            print("not written:", path)
+
+
+rc25 = run("scripts/fit_soma.py", "--specimen", SPECIMEN, "--cache-dir", CACHE_DIR, *ALIGN, *CLEAN_CFG,
+           "--out", SOMA_FIT_OUT, *common, "--sigma0", "fixed", *KW_ARGS, check=False)   # Cell 16's KERNEL_WIDTH
+if rc25 != 0:
+    print("[cell 25] the deliverable run exited with %d: no usable grid fit, or an error (the log above)" % rc25)
+show_files(SOMA_FIT_OUT, ["soma_fit_%d_%s.png" % (SPECIMEN, n) for n in ("planes", "summary", "morphology", "cgrid")])
+if SIGMA0_PARALLEL:
+    out_s0 = SOMA_FIT_OUT + "_sigma0fit"
+    rc25s = run("scripts/fit_soma.py", "--specimen", SPECIMEN, "--cache-dir", CACHE_DIR, *ALIGN, *CLEAN_CFG,
+                "--out", out_s0, *common, "--sigma0", "fit", *KW_ARGS, check=False)
+    print("COMPARISON (sigma0 fit, D-258.2): the in-focus width fitted -- not the deliverable, no SWC; exit %d" % rc25s)
+    show_files(out_s0, ["soma_fit_%d_%s.png" % (SPECIMEN, n) for n in ("summary", "cgrid")])
