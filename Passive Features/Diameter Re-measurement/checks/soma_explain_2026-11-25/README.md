@@ -13,3 +13,8 @@ noise SD 3 gl, seed 529). Python 3 with the repository's `src/` (set `TEEG_W` to
 
 The recovery shows what the fit does when its model is true (ellipsoid, Gaussian blur law with the slope it holds, no
 unmodelled structure); it says nothing about whether that model holds on the pilot's stack.
+
+[corrected 2026-11-25, later] `common.py` here renders with the configuration's default blur table (0.080 ... 0.603 um
+at 0 ... 0.84 um), not the pilot's own table (0.080, 0.1536, 0.3924, 0.5620 um at 0, 0.28, 0.56, 0.84 um; D-170) that
+Cell 25 uses: fig1's right panel and the recovery are for the default table. `checks/soma_review_2026-11-25/` uses the
+pilot's table.

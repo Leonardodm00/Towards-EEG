@@ -5,6 +5,7 @@
 | 2026-11-24 | Created at the end of the gallery chat (the user, 17:32: "Let's also continue the pipeline in another chat. Write an handoff with also the instruction to start with the explanation of the soma fit"). State after D-233 to D-243. |
 | 2026-11-24 (later) | Section 5's SGT scope checked file by file and split by route (the first list mixed in the table route's Block 12-13 files and `measure.sgt_lambda_um`'s users); section 4's two attributions checked against handoff 14.1 and 14.6; D-243 named in sections 1-2; the roadmap's I49 noted. Evidence: `grep -rni sgt` on `src`, `scripts`, `tests`, `notebooks` **[run, sandbox]**. |
 | 2026-11-25 | Section 1 done: the soma fit explained to the user (the chat of 2026-11-25). Section 4: a recovery check with the D-241 region now run on a simulated pilot-like soma -- recovered (a, b, c within 0.06 %, S +0.07 %). Evidence: `checks/soma_explain_2026-11-25/recovery_d241.py` **[run, sandbox]**. `fit_soma.py --synthetic` rerun under today's defaults: recovered (axes within 0.005 um, chi2/dof 9.03). |
+| 2026-11-25 (later) | Section 9 added: the independent review of the approach (the user's upload of 13:03) discussed with the user; its soma claims tested on simulated stacks (`checks/soma_review_2026-11-25/sensitivity.py` **[run, sandbox]**); a revised order of work proposed, **not decided**. Sections 3 and 5 are unchanged until the user decides. |
 
 Repository `Leonardodm00/Towards-EEG`, branch `sci/diameter-pipeline` (workstream `Passive Features/Diameter
 Re-measurement/`, called W below); SPEC at the repository root `specs/SPEC.md`; the decision log on `main`
@@ -160,3 +161,26 @@ the held-slope planes figure (16:30). Ask the user to upload them again if a che
 | D-243 | the soma fit's crop is the renderer's support: at least 14 um half-width, whatever the region; the record flags a fitted ellipsoid beyond it (corrects D-241.1's crop sentence, the orchestrator's) | orchestrator |
 
 D-237 and D-238 are another chat's (the twins).
+
+## 9. The independent review of 2026-11-25 and what was tested (plan revision proposed, not decided) [added 2026-11-25]
+
+The user had the approach reviewed in an independent chat (brief `TEEG_soma_and_dendrite_estimation_review_brief_2026-11-25.md`,
+sent from the gallery chat; the review's handoff `TEEG_soma_dendrite_approach_review_handoff_2026-11-25.md` is the
+user's upload, not in the repository) and asked this chat to discuss its soma suggestions and revise the plan.
+
+| Review's soma point | What this chat found | Evidence |
+|---|---|---|
+| c is fixed by the held far slope, not by the data | supported: a slope 20-24 % off moves c by -59 to +90 % and S by -18 to +28 % (flat somas worst); noise SEs are under 0.4 % | `checks/soma_review_2026-11-25/` **[run, sandbox; linearised]** |
+| hold B_k at the value measured outside the soma | not supported: no gain in SE worth having, the slope's bias about doubles on the D-241 region | same |
+| the D-241 region holds no soma edge | the premise (a 8.08, b 6.52 um) is the unusable fit's; the silhouette's equivalent radius is 5.95-6.55 um (handoff 14.2 **[data inspected]**); with the edge outside, a and b are still identified in simulation | same; handoff 14.2 |
+| a, b from the in-focus outline | a thresholded outline's area depends on c (0.89-0.97 of pi a b); the fit's a, b move at most 3.9 % under the four mis-specifications tried | same |
+| c by a prior, the range carried (the review's action 7) | this is option (2) of handoff 14.2; the stems leave the soma over 6.9 um of depth (14.2) | handoff 14.2 |
+| the soma's area may not matter | partly: the soma is 1.45 % of the membrane the fit charges; S x 0.75 moves the fitted Cm by +7 to +17 % under the cell-matched parameters, under 3 % under Eyal's | handoff 14.2 **[run, earlier chat]** |
+| a mounted soma with c > b is implausible (z-shrinkage) | the stack's depth is stage units; Allen's z-shrinkage factor is not measured (rough bound 2.4, unverified: `docs/handoff_diameter_remeasurement.md`); which c the passive model should get is open | project documents |
+| the blur table's last segment (0.61) is below the held 0.79 | the arithmetic holds for the pilot's table (D-170); if the true slope is nearer 0.6, the held-slope fit over-estimates c | **[run]** |
+
+Proposed to the user (awaiting the answer): keep the fit for the centre and the in-plane axes; hold c at the ends and
+the middle of a range set from independent constraints and carry S as a range (a hold-c option for Block 46); settle
+first what c means under z-shrinkage; run the variants in the sandbox on an exported crop block instead of repeated
+Colab runs; the far slope's calibration (D-218.2) only if the range's effect on Cm is too large. Not adopted: holding
+B_k; fitting the in-focus blur in the soma fit (D-240.2's open question: under 4 % on c in simulation).
