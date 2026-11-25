@@ -308,6 +308,8 @@ the "Binds" column.
 | 2026-11-25 (the soma-fit chat, 16:10) | Logs **D-252** (user, 15:27 and 15:38): the hold-c grid, 4 values on Colab, more with a local refinement on the HPC. |
 | 2026-11-25 (the soma-fit chat, 16:10) | Logs **D-253** (user, 15:27): production cleans the close branches' shadows before the soma fit. |
 | 2026-11-25 (the soma-fit chat, 16:10) | Logs **D-254** (user, 16:04): the soma fit's background a tilted plane per plane solved in the fit, R enlarged for it, and the far-background check. Next free IDs: D-255, I-008. |
+| 2026-11-25 (the soma-fit chat, 17:35) | **ID clash noted, nothing renamed:** D-250 names two entries, the soma fit's (user: c ranged from the literature; logged 16:05, `751397e`) and the review chat's (orchestrator: the final check of Blocks 23 to 28; logged 16:26, `4ad1ca5`, without reading the rows above it). Until the user says which is renumbered, cite them as "D-250 (soma)" and "D-250 (twins)". |
+| 2026-11-25 (the soma-fit chat, 17:35) | Logs **D-255** to **D-258** (user, 17:27): the soma fit's region Allen's radius times a coefficient (1.2); the hold-c grid confirmed, the refinement in the neighbourhood of the best grid value, the active model receives the best fit; the far-background check a flag; the in-focus blur held, a parallel analysis fitting it. Next free IDs: D-259, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -551,6 +553,10 @@ would be needed*, *Status*.
 | D-252 | 2026-11-25 | the hold-c grid of the soma fit (Block 46, not built; Cell 25; the HPC job) | Colab: 4 held values of c; HPC: a finer grid up to the low end of the living range and a local refinement; the values proposed, not confirmed [user] | active |
 | D-253 | 2026-11-25 | the order of the production soma fit (HPC) against the cleaning; D-241.3 | production cleans the close branches' shadows before the soma fit; the pilot keeps D-241's region, shadows in [user] | active |
 | D-254 | 2026-11-25 | the soma fit's background and region (Block 46: `vp_scale`, `region_radius_um`); D-241.1's radius; the soma fit's report | each plane's background is a tilted plane solved exactly inside the fit; R enlarged so the tilt is constrained (how much: open); the fitted background checked against one measured far from the soma on near-focus planes [user] | active |
+| D-255 | 2026-11-25 | SPEC Block 46's region (`SomaFitConfig.region_radius_scale`); D-254.2 | the region's radius is Allen's traced soma radius times a coefficient, 1.2 as the example taken for the default [user] | active |
+| D-256 | 2026-11-25 | the hold-c grid and its refinement (Block 50, `fit_soma.py`, Cell 25, the HPC job); D-252.3, D-251's wording | the grid's values confirmed; the refinement in the neighbourhood of the best grid c; the active model downstream receives the best fit [user] | active |
+| D-257 | 2026-11-25 | the far-background check (Block 50; the fit's record); D-254.3 | the check's settings as proposed, its outcome a flag [user]; the 1.0 gl threshold the orchestrator's, PROVISIONAL | active |
+| D-258 | 2026-11-25 | the in-focus blur in the soma fit (Blocks 45-46, `--sigma0`, Cell 25); D-240 | held in the deliverable; a parallel, labelled analysis fits it [user] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15961,3 +15967,101 @@ final check's 103 tests and the two smoke suites on the merged branch.
 **Sources.** **[orchestrator]**; **[run]** as above; **[log]** D-245, D-247.
 
 **Status:** active; implemented.
+
+## D-255 -- The soma fit's region is Allen's soma radius times a coefficient (user)
+
+**Date:** 2026-11-25, 17:27 (Europe/Rome), the soma-fit chat. **Binds:** SPEC Block 46's region
+(`SomaFitConfig.region_radius_scale`, new; `region_radius_um`); settles D-254.2 (the radius was open).
+
+**Decision [user].** To the orchestrator's question "8 um or 10 um": "Make it the Allen's radius scaled by a coefficient
+like 1.2".
+
+**Statement.** (D-255.1 [user]) The region $R$ is the disc of radius $r_R = s\,r_s$ about the traced centre, $r_s$ (um)
+Allen's traced soma radius of the cell and $s$ a dimensionless coefficient, minus the traced branches' pixels (D-241.2).
+(D-255.2 [orchestrator], PROVISIONAL) $s$ = 1.2, the user's example taken as the default (7.16 um on the pilot); a setting.
+
+**Why.** **[user]** as quoted: the region follows each cell's soma instead of a fixed length. **[run, sandbox:
+`checks/soma_review_2026-11-25/tilt_figures.py`'s `rho2`, simulated soma a 7.0, b 5.6, c 4.5 um]** the share of a
+sideways shift that the planes' tilts can mimic is 0.76 at $s$ = 1.0, 0.62 at 1.2, 0.50 at 1.34 (8 um), 0.38 at 1.5,
+0.28 at 1.68 (10 um).
+
+**What it implies for code and tables.** `region_radius_scale` (1.2) in `SomaFitConfig`; `region_radius_um` stays an
+override in um (None by default). The crop rule of D-243 unchanged.
+
+**What it does not decide.** The coefficient's final value (1.2 is the example; 1.34 gives the 8 um proposed at 16:20).
+
+**Sources.** **[user]** 17:27; the check named.
+
+**Status:** active.
+
+## D-256 -- The hold-c grid confirmed; the refinement in the neighbourhood of the best grid value; the model receives the best fit (user)
+
+**Date:** 2026-11-25, 17:27 (Europe/Rome), the soma-fit chat. **Binds:** SPEC Block 50 (new: the grid over the held
+$c$), `fit_soma.py`, Cell 25, the HPC job; confirms D-252.3; amends D-251's wording.
+
+**Decision [user].** On D-252.3's proposed values: "perfect". On which $c$ is delivered: "The refinement is done in the
+neighbourhood of the best fit c in the grid and the (active non passive, because of the Ih currents) fit receives the best
+fit".
+
+**Statement.** (D-256.1 [user]) Colab holds $c$ at 1.5, 2.5, 3.5 and 5.0 um; the HPC at 1.5 to 5.5 um in steps of 0.5 um,
+followed by a refinement. (D-256.2 [user]) The refinement is a fit in the neighbourhood of the grid's best value (the
+smallest misfit); the fit delivered downstream is the best one: the refinement's where it ran, the grid's best otherwise.
+(D-256.3 [orchestrator], PROVISIONAL) The neighbourhood is the interval between the grid's values on either side of the
+best one, $c$ free inside it, started from the best grid fit; at an end of the grid the missing side is the same distance
+as the other. (D-256.4 [user], correcting D-251's wording) The model that receives the soma is the active model fitted
+downstream (the $I_h$ fit), not "the passive model".
+
+**Why.** **[user]** as quoted.
+
+**What it implies for code and tables.** Block 50's driver; Colab's default grid without refinement (D-252.1), the HPC's
+with it; the record names the fit delivered and why.
+
+**What it does not decide.** Told to the user before (D-251): with the far slope held the best $c$ rests on that slope.
+
+**Sources.** **[user]** 17:27.
+
+**Status:** active.
+
+## D-257 -- The far-background check is a flag (user)
+
+**Date:** 2026-11-25, 17:27 (Europe/Rome), the soma-fit chat. **Binds:** SPEC Block 50 (the background check),
+`fit_soma.py`'s record; settles D-254.3's settings.
+
+**Decision [user].** On the proposed settings (near-focus: within 1.2 um of the fitted centre depth; far: at least 12 um
+from the traced centre, minus the branches' pixels, the nodes' trimmed plane; no pass/fail threshold yet): "Perfect as a
+flag".
+
+**Statement.** (D-257.1 [user]) The check's settings are as proposed, and its outcome is a flag in the fit's record.
+(D-257.2 [orchestrator], PROVISIONAL) The flag is raised when the mean over the near-focus planes of $\hat b_{0k} -
+b^{\rm far}_{0k}$ exceeds 1.0 gl in absolute value; the fit is delivered either way.
+
+**Why.** **[user]** as quoted. **[run, sandbox: `tilt_cost_check.py`]** in simulation a far slope wrong by 0.16-0.19
+gives 0.7-3.3 gl, the model exact at most 0.04 gl; the real stack's floor is unknown, hence PROVISIONAL.
+
+**What it does not decide.** The threshold after the pilot's run; what a raised flag triggers.
+
+**Sources.** **[user]** 17:27.
+
+**Status:** active.
+
+## D-258 -- The in-focus blur stays held; a parallel analysis fits it (user)
+
+**Date:** 2026-11-25, 17:27 (Europe/Rome), the soma-fit chat. **Binds:** SPEC Blocks 45 and 46 (`SomaFitConfig.sigma0`),
+`fit_soma.py --sigma0`, Cell 25; follows D-240's "the only thing we might fit is the in-focus blur".
+
+**Decision [user].** "We have for now agreed that we do not fit also the in focus blur. but I would do a parallel
+analysis with also it fitted."
+
+**Statement.** (D-258.1) The deliverable soma fit holds the in-focus blur $\sigma_r(0)$ at the configured kernel's value.
+(D-258.2) Beside it, a parallel analysis runs the same fit with $\sigma_r(0)$ a fitted parameter (the table's growth with
+defocus kept, D-201's re-anchoring); its outputs are labelled as a comparison and never enter the corrected SWC that is
+delivered.
+
+**Why.** **[user]** as quoted. **[run, sandbox: `sigma0_identifiability.py`]** in simulation the soma fit determines
+$\sigma_r(0)$ to 0.005-0.007 um with correlations of at most 0.40 and SE($c$) unchanged.
+
+**What it does not decide.** Whether the fitted value replaces node 7's calibrated 0.258 um.
+
+**Sources.** **[user]** 17:27.
+
+**Status:** active.
