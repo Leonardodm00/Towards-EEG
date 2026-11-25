@@ -6,7 +6,7 @@ submit_twin_recovery.sh: the third Stage-7 run), SPEC 2.9. Integration tester,
 The end-to-end part runs the real entry point (`run_twin_recovery.py plan /
 twin / merge`) on the writer-like fixture group of the Block 8 tests (4 real
 cells, ball-and-stick morphologies, hand-written noise tables) at the smallest
-budget, with the run's defaults (I_h arm ih6_d207, refinement nelder_mead) and a
+budget, with the run's defaults (I_h arm ih6_d207, refinement trf since Blocks 27-28) and a
 small refinement budget. Expected values: SPEC 2.9 (a)-(f) and the entries'
 Public API written out; m_inf(v) = 1 / (1 + exp((v - v_h - dv_h) / k)), v_h =
 -90.87 mV, k = 8.05 mV (2.8 (a), 2.9 (a)); the fit's own CSVs for the columns
@@ -54,8 +54,11 @@ def test_b20_arm_table_and_defaults():
     a = R.ARMS
     assert a["ih6_d207"].fit_params == IH6 == R.IH6_NAMES
     assert (a["ih6_d207"].role_rule, a["ih6_d207"].weighting, a["ih6_d207"].ls_sample_weight,
-            a["ih6_d207"].refine) == ("d207", "ls_amplitude", "peak_decay", "nelder_mead")
-    assert a["ih5"].refine == "nelder_mead" and a["passive_fullstep"].refine == "nelder_mead"
+            a["ih6_d207"].refine) == ("d207", "ls_amplitude", "peak_decay", "trf")
+    # updated 2026-11-25: SPEC Block 27, Refinement (D-245) -- ih5, ih6_d207, passive_fullstep have refine="trf"
+    # (was "nelder_mead", Block 20 Public API); nelder_mead is a labelled comparison by --refine nelder_mead
+    assert R.REFINE_CHOICES == ("none", "nelder_mead", "trf")
+    assert a["ih5"].refine == "trf" and a["passive_fullstep"].refine == "trf"
     assert a["ih6"].refine == "none" and a["baseline_runB"].refine == "none"
     # ih6_d207 is ih6 apart from the name, the protocol and the refinement
     for f in a["ih6"].__dataclass_fields__:
@@ -63,6 +66,7 @@ def test_b20_arm_table_and_defaults():
             assert getattr(a["ih6_d207"], f) == getattr(a["ih6"], f), f
     p = R._parse_args(BASE + ["--arm", "ih6_d207"])
     assert (p.refine, p.refine_starts, p.refine_maxfev, p.n_workers) == (None, 3, 100, 1)
+    assert p.refine_max_nfev == 30                       # SPEC Block 27: --refine-max-nfev (int, 30)
     assert p.gbar_bounds == "1e-5,1e-3" and PS.DEFAULT_GBAR_BOUNDS == (1e-5, 1e-3)
     spec = R.build_spec_from_args(p, R.resolve_arm_config(p))
     assert spec.names == IH6
@@ -72,10 +76,21 @@ def test_b20_arm_table_and_defaults():
     assert R.resolve_arm_config(R._parse_args(BASE + ["--arm", "ih6", "--refine", "nelder_mead"])).refine == \
         "nelder_mead"
     assert R.resolve_arm_config(R._parse_args(BASE + ["--arm", "ih5", "--refine", "none"])).refine == "none"
-    cfg = R.refine_config_from_args(R._parse_args(BASE + ["--arm", "ih5", "--refine-starts", "2",
-                                                          "--refine-maxfev", "7"]), R.ARMS["ih5"])
+    # updated 2026-11-25: ih5's own refinement is now trf (SPEC Block 27), so the Nelder-Mead config of Block 20
+    # is reached through --refine nelder_mead; refine_config_from_args returns a RefineConfig, a TrfConfig or None
+    pn = R._parse_args(BASE + ["--arm", "ih5", "--refine", "nelder_mead", "--refine-starts", "2",
+                               "--refine-maxfev", "7"])
+    cfg = R.refine_config_from_args(pn, R.resolve_arm_config(pn))
     assert (cfg.n_starts, cfg.maxfev_per_start, cfg.min_start_dist_unit, cfg.simplex_step_unit, cfg.xatol_unit,
             cfg.fatol_rel) == (2, 7, 0.1, 0.05, 1e-3, 1e-4)
+    # SPEC Block 27 (--refine-starts serves both refinements; --refine-max-nfev = TrfConfig.max_nfev) and
+    # Block 25 (TrfConfig's defaults; 2.10 (c): h 1e-3, xtol 1e-4, ftol = gtol 1e-8)
+    import local_refine as LR
+    tc = R.refine_config_from_args(R._parse_args(BASE + ["--arm", "ih5", "--refine-starts", "2",
+                                                         "--refine-max-nfev", "9"]), R.ARMS["ih5"])
+    assert isinstance(tc, LR.TrfConfig)
+    assert (tc.n_starts, tc.max_nfev, tc.min_start_dist_unit, tc.fd_step_unit, tc.xtol, tc.ftol, tc.gtol) == \
+        (2, 9, 0.1, 1e-3, 1e-4, 1e-8, 1e-8)
     assert R.refine_config_from_args(p, R.ARMS["ih6"]) is None
 
 
@@ -95,7 +110,8 @@ def test_b20_refine_record_rules():
     fr = FR()
     fr.gp_result = None
     rec = R.refine_record(fr, R.ARMS["ih6_d207"], 3)
-    assert rec["refine"] == "nelder_mead" and math.isnan(rec["loss_after_search"])
+    # updated 2026-11-25: the arm's refinement is "trf" (SPEC Block 27, Refinement; was "nelder_mead", Block 20)
+    assert rec["refine"] == "trf" and math.isnan(rec["loss_after_search"])
     assert math.isnan(rec["loss_after_refine"]) and rec["n_workers"] == 3
     fr.gp_result = GP()
     fr.gp_result.fun = 0.25
@@ -122,7 +138,9 @@ def test_b22_plan_parser_defaults_and_gate_functions():
     a = ap.parse_args(["plan", "--group-dir", "g", "--noise-dir", "n", "--out", "o"])
     assert a.ih_arm == "ih6_d207" and a.dvh_truth_range_mV == "-5,5"
     assert a.gbar_bounds == "1e-5,1e-3" and a.gbar_floor == 1e-5
-    assert (a.refine, a.refine_starts, a.refine_maxfev) == ("nelder_mead", 3, 100)
+    # updated 2026-11-25: SPEC Block 28, Fit options -- --refine accepts trf and it is the plan's default (was
+    # nelder_mead, Block 22 Public API); --refine-max-nfev (30) recorded in the plan
+    assert (a.refine, a.refine_starts, a.refine_maxfev, a.refine_max_nfev) == ("trf", 3, 100, 30)
     assert a.gbar_range == "2e-5,3e-4"                       # 2.9 (d): the truth's range unchanged
     assert a.tol_dvh_mV == 3.0                               # 2.9 (f): D-011's 3 mV
     assert not hasattr(a, "n_workers")                       # not a plan option
@@ -193,8 +211,10 @@ def test_e2e_plan_records(e2e22):
     assert rc["gate_required_axes"] == ["Cm", "gbar", "dv_h", "kappa_tau"]
     assert rc["dvh_truth_mV"] is None
     o = rc["options"]
-    assert (o["gbar_bounds"], o["gbar_floor"], o["refine"], o["dvh_truth_range_mV"]) == \
-        ("1e-5,1e-3", 1e-5, "nelder_mead", "-5,5")
+    # updated 2026-11-25: SPEC Block 28, Fit options and oracle V1 -- the plan records refine "trf" (its default;
+    # was "nelder_mead", Block 22) and refine_max_nfev (30)
+    assert (o["gbar_bounds"], o["gbar_floor"], o["refine"], o["dvh_truth_range_mV"], o["refine_max_nfev"]) == \
+        ("1e-5,1e-3", 1e-5, "trf", "-5,5", 30)
     tk = rc["truth_kwargs"]
     assert tk["ih_dvh_range_mV"] == [-5.0, 5.0] and tk["ih_gbar_floor_S_cm2"] == 1e-5
     assert tk["ih_gbar_range_S_cm2"] == [2e-5, 3e-4]
@@ -227,7 +247,10 @@ def test_e2e_fit_command_line(e2e22):
         argv = rec["argv"]
         assert argv[argv.index("--arm") + 1] == row["arm"]
         assert "--gbar-bounds=1e-5,1e-3" in argv or argv[argv.index("--gbar-bounds") + 1] == "1e-5,1e-3"
-        assert argv[argv.index("--refine") + 1] == "nelder_mead"
+        # updated 2026-11-25: SPEC Block 28, Fit options / V1 -- the fit argv carries --refine trf (was nelder_mead)
+        # and --refine-max-nfev (30); --refine-maxfev passed as before
+        assert argv[argv.index("--refine") + 1] == "trf"
+        assert argv[argv.index("--refine-max-nfev") + 1] == "30"
         assert argv[argv.index("--refine-starts") + 1] == "2" and argv[argv.index("--refine-maxfev") + 1] == "6"
         assert argv[argv.index("--n-workers") + 1] == str(workers)
         ev = [x for x in argv if x.startswith("--eval-theta")]
@@ -256,27 +279,41 @@ def test_e2e_phase2_refinement_columns(e2e22):
         names = r["param_names"].split("|")
         exp = ["Cm", "Rm", "Ra"] if row["configuration"] == "passive_fit" else list(IH6)
         assert names == exp
-        assert r["refine"] == "nelder_mead" and int(r["n_workers"]) == workers
+        # updated 2026-11-25 to the SPEC as it stands: the run's refinement is trf (Block 28, Fit options; Block 27,
+        # Refinement). Under trf: loss_after_search = L at the first start (l_search), loss_after_refine = L(q_hat),
+        # refine_n_evals = n_sims (Block 27); q_hat is the recorded point of lowest L2 (2.10 (c)), so
+        # l2_after_refine <= l2_after_search holds and loss_after_refine <= loss_after_search does not in general
+        # (Block 28, loss_verdict amendment, D-250; the final check's S1); improved = l2 < l2_search (Block 25).
+        assert r["refine"] == "trf" and int(r["n_workers"]) == workers
         ls, lr = r["loss_after_search"], r["loss_after_refine"]
-        assert np.isfinite(ls) and lr <= ls
-        # 2.9 (e): train_rel_loss and loss_at_estimate are at q_hat; 1e-9 relative (the entry's F2)
+        l2s, l2r = r["l2_after_search"], r["l2_after_refine"]
+        assert np.isfinite(ls) and np.isfinite(lr) and np.isfinite(l2s) and l2r <= l2s
+        # 2.9 (e) / Block 27: train_rel_loss and loss_at_estimate are at q_hat; 1e-9 relative
         assert r["train_rel_loss"] == pytest.approx(lr, rel=1e-9)
         assert r["loss_at_estimate"] == pytest.approx(lr, rel=1e-9)
         st = pd.read_csv(fd / "refine_starts.csv", float_precision="round_trip")
+        # Block 27: the head and the x0_/x_ columns as before, then appended l2_0, l2, converged, optimality,
+        # n_sims, x_solver_<name>, active_<name>, sv_1..sv_p
         assert list(st.columns) == (["specimen_id", "start", "search_index", "f0", "fun", "nfev", "nit", "status"]
-                                    + ["x0_" + n for n in names] + ["x_" + n for n in names])
+                                    + ["x0_" + n for n in names] + ["x_" + n for n in names]
+                                    + ["l2_0", "l2", "converged", "optimality", "n_sims"]
+                                    + ["x_solver_" + n for n in names] + ["active_" + n for n in names]
+                                    + ["sv_%d" % (i + 1) for i in range(len(names))])
         assert len(st) == int(r["refine_n_starts"]) and 1 <= len(st) <= 2
-        assert int(r["refine_n_evals"]) == int(st["nfev"].sum())
-        assert (st["f0"].min() == ls)                    # the first start is the search's best
+        assert int(r["refine_n_evals"]) == int(st["n_sims"].sum())      # Block 27: refine_n_evals = n_sims
+        assert int(r["refine_n_converged"]) == int(st["converged"].astype(bool).sum())
+        # the first start is the search's best (2.10 (c)); under trf f0 = l_0 (Block 27)
+        assert st.loc[0, "f0"] == ls and st.loc[0, "l2_0"] == l2s
         assert list(st["start"]) == list(range(len(st)))
         if bool(r["refine_improved"]):
             k = int(r["refine_best_start"])
             assert 0 <= k < len(st)
-            assert st.loc[k, "fun"] == lr and lr < ls
+            assert l2r < l2s
+            assert st.loc[k, "l2"] == l2r and st.loc[k, "fun"] == lr
             for n in names:                              # the estimate in physical units is the best start's
                 assert st.loc[k, "x_" + n] == pytest.approx(r[n], rel=1e-12, abs=1e-12)
         else:
-            assert int(r["refine_best_start"]) == -1 and lr == ls
+            assert int(r["refine_best_start"]) == -1 and l2r == l2s
         # the x0 of the first start is a point of the box, physical units
         for n in names:
             ax = PS.make_ih_spec(gbar_bounds=(1e-5, 1e-3)).axis(n) if n != "dv_h" else None
@@ -416,6 +453,16 @@ def test_swap_refine_none_through_the_plan(group, tmp_path):
     assert r["loss_after_refine"] == r["loss_after_search"] == pytest.approx(r["train_rel_loss"], rel=1e-15)
     st = pd.read_csv(fd / "refine_starts.csv")
     assert len(st) == 0
+    # updated 2026-11-25: SPEC Block 27, refine_starts.csv -- after the head and the x0_/x_ columns, the columns
+    # l2_0, l2, converged, optimality, n_sims, x_solver_<name>, active_<name>, sv_1..sv_p are appended (the
+    # file's one header; written even when empty, Block 20)
+    n3 = ("Cm", "Rm", "Ra")
     assert list(st.columns) == (["specimen_id", "start", "search_index", "f0", "fun", "nfev", "nit", "status"]
-                                + ["x0_" + n for n in ("Cm", "Rm", "Ra")] + ["x_" + n for n in ("Cm", "Rm", "Ra")])
+                                + ["x0_" + n for n in n3] + ["x_" + n for n in n3]
+                                + ["l2_0", "l2", "converged", "optimality", "n_sims"]
+                                + ["x_solver_" + n for n in n3] + ["active_" + n for n in n3]
+                                + ["sv_1", "sv_2", "sv_3"])
+    # Block 27: without trf, l2_after_* nan, refine_n_converged 0, refine_n_failed 0
+    assert math.isnan(r["l2_after_search"]) and math.isnan(r["l2_after_refine"])
+    assert int(r["refine_n_converged"]) == 0 and int(r["refine_n_failed"]) == 0
     assert rtr.main(["merge", "--out", str(out), "--no-plot"]) == 0

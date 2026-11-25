@@ -480,6 +480,8 @@ import subprocess                              # noqa: E402
 
 # renewed 2026-11-24 (Block 22): the Block 17 tests below pin the run's I_h arm to ih5 (the default is now
 # ih6_d207) and keep the refinement's budget small (its default, nelder_mead with maxfev 100, is a plan option)
+# [note 2026-11-25: since Block 28 the plan's default refinement is trf, --refine-max-nfev 30; --refine-maxfev is
+# then unused by the fit (Block 27)]
 B17_SMALL = ["--n-per-configuration", "1", "--n-no-noise", "1", "--n-calls", "1", "--n-initial", "1",
              "--ih-arm", "ih5", "--refine-maxfev", "4", "--refine-starts", "1"]
 BASE17 = "216ecf13ccca455903b2cb05d740dd64f3feff08"
@@ -692,6 +694,7 @@ def test_b17_end_to_end_fits_and_records(e2e17):
 
 def test_b17_merge_reports_and_extras(e2e17):
     import twin_manifest as TM
+    import run_ih_fit as R
     out, _ = e2e17[0]
     rc = json.loads((out / "run_config.json").read_text())
     base = rc["tau_h_pk"]["base_ms"]
@@ -715,13 +718,25 @@ def test_b17_merge_reports_and_extras(e2e17):
     byc = pd.read_csv(out / "recovery_by_configuration.csv")
     assert set(byc["configuration"]) == {"full", "passive_fit", "active_fit", "full_no_noise"}
     ex = pd.read_csv(out / "recovery_extras.csv", float_precision="round_trip")
-    assert list(ex.columns) == ["twin_id", "configuration", "twin_of_specimen_id", "paired_with", "with_noise",
-                                "cell_tau_s_above_window", "tau_h_pk_true_ms", "tau_h_pk_est_ms", "loss_at_truth",
-                                "loss_at_estimate", "loss_verdict", "v_deepest_train_mV", "gh_deep_true_S_cm2",
-                                "gh_deep_est_S_cm2", "ln_gh_deep_ratio",
-                                # renewed 2026-11-24: Block 22's columns (SPEC 2.9 (e))
-                                "loss_after_search", "refine_improved", "refine_n_evals", "refine_best_start",
-                                "dvh_true_mV", "dvh_est_mV"]
+    # updated 2026-11-25: SPEC Block 28 -- recovery_extras.csv gains l2_after_search, l2_after_refine,
+    # refine_n_converged, refine_n_failed, sqrt_l2_at_estimate, sqrt_l2_at_truth and on_bound_<name> for the arm's
+    # names (Fit options), and loss_verdict_on (loss_verdict amendment 3, D-250). The SPEC fixes no position for
+    # these, so the earlier columns are checked in their order and the new ones by name.
+    arm_names = set()
+    for arm in set(man["arm"]):
+        arm_names |= set(R.ARMS[arm].fit_params)
+    new28 = ["l2_after_search", "l2_after_refine", "refine_n_converged", "refine_n_failed",
+             "sqrt_l2_at_estimate", "sqrt_l2_at_truth", "loss_verdict_on"] + ["on_bound_" + n for n in arm_names]
+    assert set(new28) <= set(ex.columns)
+    assert {c for c in ex.columns if c.startswith("on_bound_")} == {"on_bound_" + n for n in arm_names}
+    assert [c for c in ex.columns if c not in new28] == [
+        "twin_id", "configuration", "twin_of_specimen_id", "paired_with", "with_noise",
+        "cell_tau_s_above_window", "tau_h_pk_true_ms", "tau_h_pk_est_ms", "loss_at_truth",
+        "loss_at_estimate", "loss_verdict", "v_deepest_train_mV", "gh_deep_true_S_cm2",
+        "gh_deep_est_S_cm2", "ln_gh_deep_ratio",
+        # renewed 2026-11-24: Block 22's columns (SPEC 2.9 (e))
+        "loss_after_search", "refine_improved", "refine_n_evals", "refine_best_start",
+        "dvh_true_mV", "dvh_est_mV"]
     assert list(ex["twin_id"]) == list(man["specimen_id"])
     for _, e in ex.iterrows():
         tid = int(e["twin_id"])
@@ -732,6 +747,18 @@ def test_b17_merge_reports_and_extras(e2e17):
         assert e["configuration"] == conf and int(e["paired_with"]) == int(row["paired_with"])
         assert bool(e["with_noise"]) == bool(row["with_noise"])
         assert e["v_deepest_train_mV"] == pytest.approx(r["v_deepest_train_mV"], rel=1e-15)
+        # SPEC Block 28: the new columns are the fit's (Block 27)
+        for c in ("l2_after_search", "l2_after_refine"):
+            assert e[c] == pytest.approx(r[c], rel=1e-15, nan_ok=True), c
+        for c in ("refine_n_converged", "refine_n_failed"):
+            assert int(e[c]) == int(r[c]), c
+        fitted = set(r["param_names"].split("|"))
+        for n in arm_names:                              # empty for a name the arm does not fit
+            v = e["on_bound_" + n]
+            if n not in fitted:
+                assert pd.isna(v) or v == "", (n, v)
+            else:
+                assert (pd.isna(v) and pd.isna(r["on_bound_" + n])) or v == r["on_bound_" + n], (n, v)
         if conf == "active_fit":
             assert math.isnan(e["tau_h_pk_true_ms"]) and math.isnan(e["gh_deep_true_S_cm2"])
         else:
@@ -742,7 +769,22 @@ def test_b17_merge_reports_and_extras(e2e17):
             # 1e-15 relative: merge reads phase2_results.csv with pandas' default float parser (last digit)
             assert lt == pytest.approx(r["loss_at_eval_theta"], rel=1e-15)
             assert le == pytest.approx(r["loss_at_estimate"], rel=1e-15)
-            exp = "optimiser" if le - lt > 0.02 * le else ("data" if lt - le > 0.02 * lt else "tie")
+            # updated 2026-11-25: SPEC Block 28, loss_verdict under trf (amendment 3, D-250): with finite
+            # sqrt_l2_at_estimate and sqrt_l2_at_truth the verdict of 2.8 (f) compares THESE two by the same rule
+            # and tolerance (a value at or above 1e3, a failed point, gives na); otherwise it compares L as before
+            se, sq = e["sqrt_l2_at_estimate"], e["sqrt_l2_at_truth"]
+            assert se == pytest.approx(r["sqrt_l2_at_estimate"], rel=1e-15)
+            assert sq == pytest.approx(r["sqrt_l2_at_eval_theta"], rel=1e-15)   # Block 28: the fit's column
+            if np.isfinite(se) and np.isfinite(sq):
+                assert e["loss_verdict_on"] == "sqrt_l2"
+                a_e, a_t = se, sq
+            else:
+                assert e["loss_verdict_on"] == "loss"
+                a_e, a_t = le, lt
+            if np.isfinite(se) and np.isfinite(sq) and max(se, sq) >= 1e3:
+                exp = "na"
+            else:
+                exp = "optimiser" if a_e - a_t > 0.02 * a_e else ("data" if a_t - a_e > 0.02 * a_t else "tie")
             assert e["loss_verdict"] == exp
         else:
             assert math.isnan(lt) and e["loss_verdict"] == "na"
