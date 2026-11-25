@@ -56,3 +56,7 @@ Readings: (1) with gamma held, the misfit's minimum over c is the c-free fit's c
 the joint minimum), so it cannot test c; (2) a_hat and b_hat compensate the held c, so they are not fixed independently of
 it; (3) because they compensate, the stack's S varies far less over the held c than with fixed axes. All three are for this
 simulated configuration with the model otherwise true; the real stack is untested.
+
+`sigma0_identifiability.py` (2026-11-25, 14:50) -- if the in-focus blur sigma_r(0) were a ninth free parameter of the soma
+fit: at a true 0.080 um its noise SE would be 0.0069 um, at 0.258 um 0.0052 um; its largest correlations 0.20 (a, mu) and
+0.40 (a, mu); SE(c) unchanged (0.0074 and 0.0082 um, free or held). Model-true simulation, D-241 region, noise 3 gl.

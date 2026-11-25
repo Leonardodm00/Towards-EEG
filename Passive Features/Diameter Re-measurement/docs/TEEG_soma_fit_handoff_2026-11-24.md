@@ -196,3 +196,10 @@ noise-free, gamma held at 0.79; stopped early) **[run, sandbox]**:
 - Finding: because of that compensation S(a_hat(c), b_hat(c), c) stays within -6.2 to +6.3 % of the truth over c 2.5-5.5 um
   (world gamma 0.79) and 407-433 um^2 over c 2.5-5.0 um (world 0.60), against 315 to about 455 um^2 with the axes fixed: in
   simulation the stack fixes S far better than c. The living cell's S, if c is to be scaled for z-shrinkage, needs c itself.
+
+[added 2026-11-25, 14:50] D-240.2 (fit the in-focus blur in the soma fit?), discussed with the user, not decided: in a
+model-true simulation sigma_r(0) would be well determined by the soma fit (SE 0.005-0.007 um, correlations <= 0.4, SE(c)
+unchanged: `W/checks/soma_review_2026-11-25/sigma0_identifiability.py` **[run, sandbox]**), but it moves c by at most 4 %
+and S by at most 1.3 % (0.080 against 0.258 um, `sensitivity.py`). Proposed: keep it out of the default; run Cell 25 at
+KERNEL_WIDTH "fixed" and "calibrated" for the systematic; free it once only as a second, independent estimate of
+sigma_r(0) (an edge test on the soma's rim), to compare with node 7's 0.258 +- 0.022 um.
