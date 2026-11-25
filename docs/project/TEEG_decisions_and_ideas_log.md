@@ -298,8 +298,9 @@ the "Binds" column.
 | 2026-11-25 (the twins chat, 2) | D-244 item 5 corrected in place with a dated mark, on the user's word (12:08, "All noisy"): the pilot `tw4` is the 10 noisy `full` twins, not 5 noise-free and 5 noisy. No new decision ID. |
 | 2026-11-25 (the review chat, 13:17) | Logs **D-245** (user) after the independent review of the I_h fit (`TEEG_tech_Ih_fit_change_requests_2026-11-25.md`, sent to the user as files, not in the repository): the local stage becomes a bounded least-squares solver (scipy TRF) on the squared loss $L_2$; the review's sensitivity module (its CR-2) is dropped. D-207 (the loss's combination across bundles) and D-234/D-244 (Nelder-Mead) annotated. |
 | 2026-11-25 (the review chat, 14:08) | Logs **D-246** (user): the review's sensitivity module (CR-2) is built after all, to settle the exclusion rule of D-244 item 3 and the sample weight's $\tau_d$; D-245 item 3 reversed, its items 1 and 2 stand. |
-| 2026-11-25 (the review chat, 15:10) | Logs **D-247** (orchestrator): the build choices of D-245/D-246 written into `Ih Fit/specs/SPEC.md` 2.10 and Blocks 23 to 28 on `sci/twins` (contracts `43ae62f`, `87df33a`; amendment 1 `d43d80c`: a failed point's $L_2$ is $10^6$, first 100). Next free IDs: D-248, I-008. |
-| 2026-11-25 (the review chat, 16:10) | D-245's "Why" corrected in place with a dated mark: the fits integrate at 0.1 ms (D-007), not 0.025 ms as written; the twins at 0.025 ms (D-192 (iv)). No new decision ID. |
+| 2026-11-25 (the review chat, after 14:13) | Logs **D-247** (orchestrator): the build choices of D-245/D-246 written into `Ih Fit/specs/SPEC.md` 2.10 and Blocks 23 to 28 on `sci/twins` (contracts `43ae62f`, `87df33a`; amendment 1 `d43d80c`: a failed point's $L_2$ is $10^6$, first 100). Next free IDs: D-248, I-008. |
+| 2026-11-25 (the review chat, about 15:30) | D-245's "Why" corrected in place with a dated mark: the fits integrate at 0.1 ms (D-007), not 0.025 ms as written; the twins at 0.025 ms (D-192 (iv)). No new decision ID. |
+| 2026-11-25 (the review chat, 15:33) | Logs **D-248** (user): the next twins' run is the noisy twins only, fitted at 0.1 ms; the noise-free twins later if time allows, their long steps at 0.025 ms and their short squares at the usual 0.1 ms. Two changelog hours of this chat (15:10, 16:10) were not read from a clock and are corrected above. Next free IDs: D-249, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -535,6 +536,7 @@ would be needed*, *Status*.
 | D-245 | 2026-11-25 | the I_h fit's local stage and optimised loss (`local_refine.py`, `passive_long_step_training.py`, `run_ih_fit.py`; SPEC 2.8 (c), 2.9 (b)); D-207 (2) in part, D-234 item 1, D-244 item 2; the review's change requests CR-2, CR-4 | the local refinement is a bounded Gauss-Newton-type least-squares solver (scipy `least_squares`, TRF) minimising $L_2(q) = \sum_b c_b (\mathrm{RMSD}_b(q)/D_b)^2$; the review's sensitivity module (CR-2) is not built [user] | active; not implemented; item 3 (the sensitivity module not built) reversed by D-246 (2026-11-25) |
 | D-246 | 2026-11-25 | the review's sensitivity module (CR-2): a new module of `Ih Fit/` and its report; D-245 item 3 (reversed); D-244 item 3 (the exclusion rule), D-207 (3) (the sample weight's $\tau_d$) | the sensitivity module is built: the Jacobian of the residuals at a twin's truth, its singular values and directions, the predicted scatter of each parameter under the twin's noise; it is what the exclusion rule and the $\tau_d$ question are settled on [user] | active; not implemented |
 | D-247 | 2026-11-25 | SPEC 2.10 and Blocks 23 to 28 of `Ih Fit/specs/SPEC.md` on `sci/twins` (`passive_long_step_training.py`, `fd_jacobian.py`, `local_refine.py`, `identifiability.py`, `trace_sensitivity.py`, `run_ih_fit.py`, `run_twin_recovery.py`, `submit_twin_recovery.sh`); D-245, D-246 | the build choices of D-245 and D-246: the estimate among the points the least-squares stage evaluated; a failed point's $L_2 = 10^6$; the bound flag at 0.01 of the unit box; the weighting without decay as $\tau_d = 10^{12}$ ms; how a bundle's noise is drawn for the predicted scatter; the global stage unchanged for this round [orchestrator] | active; being implemented |
+| D-248 | 2026-11-25 | the next twins' runs (`submit_twin_recovery.sh`, `PLAN_ARGS`: `--dt-long-ms`, `--dt-brief-ms`); D-007 (unchanged), D-192 (iv), D-244 item 5 | the next run is the noisy twins only, at the fit's usual step (0.1 ms); the noise-free twins are fitted later if time allows, long steps at 0.025 ms, short squares at the usual 0.1 ms [user] | active; a run option, no code default changed |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15640,7 +15642,7 @@ stops on its tolerances in 11 of 20 runs, 5 of them farther than 0.05 (unit box,
 reaches the minimum in at most 60 evaluations, Jacobian included. **[data inspected: `tw3_results.tar.gz`]** in
 `tw3a`/`tw3b` the three Nelder-Mead endpoints of one fit are up to 0.99 apart (unit box, max-norm), mostly along
 $\tau_h^{\rm pk}$, with losses within a factor of about 2 of each other. **[src at `393b681`]** the simulation is
-fixed-step (`cnexp`; **[corrected 2026-11-25, 16:10: first written "0.025 ms"; the fits run at 0.1 ms, D-007, the twins are built at 0.025 ms, D-192 (iv)]**) and the weights depend on the recorded trace only, so $r(q)$ is smooth in $q$.
+fixed-step (`cnexp`; **[corrected 2026-11-25, about 15:30: first written "0.025 ms"; the fits run at 0.1 ms, D-007, the twins are built at 0.025 ms, D-192 (iv)]**) and the weights depend on the recorded trace only, so $r(q)$ is smooth in $q$.
 **[reasoning]** a Gauss-Newton-type method needs the objective as a sum of squared residuals; $L$ is a sum of norms
 and has no such form.
 
@@ -15690,7 +15692,7 @@ rebound stays out of training (D-006 (ii)); a weighting that includes it is a la
 
 ## D-247 -- The build choices of D-245 and D-246: the estimate, the failed point, the bound flag, the bundle's noise (orchestrator)
 
-**Date:** 2026-11-25, 15:10 (Europe/Rome), the review chat. **Binds:** SPEC 2.10 and Blocks 23 to 28 of
+**Date:** 2026-11-25, between 14:13 and 15:30 (Europe/Rome; the hour first written, 15:10, was not read from a clock), the review chat. **Binds:** SPEC 2.10 and Blocks 23 to 28 of
 `Passive Features/HPC script/Ih Fit/specs/SPEC.md` on `sci/twins` (contract commits `43ae62f`, `87df33a`; amendment 1
 `d43d80c`).
 
@@ -15731,3 +15733,32 @@ budget; CR-5.
 **Sources.** **[orchestrator]**; **[run]**, **[data inspected]**, **[reasoning]** as above; **[log]** D-245, D-246.
 
 **Status:** active; being implemented.
+
+## D-248 -- The next twins' run is the noisy twins at 0.1 ms; the noise-free twins later, long steps at 0.025 ms (user)
+
+**Date:** 2026-11-25, 15:33 (Europe/Rome), the review chat. **Binds:** the twins' runs after Blocks 23 to 28
+(`submit_twin_recovery.sh`, `PLAN_ARGS`); D-192 (iv); D-244 item 5.
+
+**Decision [user].** To the assistant's recommendation "0.025 ms for the noise-free twins, 0.1 ms for the noisy
+ones": "We will for now run only on the noisy traces then if have time the noise-fre optimization. THe SS steps keep
+the usual integration."
+
+**Statement.**
+1. The next run (the least-squares refinement, and the sensitivity run) is on the noisy twins with I_h only, fitted
+   at the fit's usual steps: `--dt-brief-ms 0.1 --dt-long-ms 0.1` (the defaults, D-007).
+2. The noise-free twins are fitted later, if time allows, with the long squares integrated at the twins' own step,
+   `--dt-long-ms 0.025`, and the short squares at the usual `--dt-brief-ms 0.1`.
+3. No default of the code changes.
+
+**Why.** **[run, Block 27's implementer, the fixture of `smoke_ih_trf.py`]** at 0.1 ms a converged least-squares
+fit of a noise-free twin ends 2.1e-2 (unit box, max-norm) from the truth at an $L_2$ below the truth's; at 0.025 ms
+it ends 2.2e-6 from it: on noise-free twins the distance to the truth tests the optimiser only at the twin's step.
+**[log]** D-192 (iv): twins built at 0.025 ms, fits at 0.1 ms, by design.
+
+**What it does not decide.** The step of the real cells' fits (D-007, unchanged). **[reasoning, to tell the user]**
+with the short squares at 0.1 ms the noise-free truth is still not exactly the minimum (D-193 measured a noise-free
+SS mismatch of 6.1e-3 mV at 0.1 ms): the noise-free run will show a smaller residual bias, not none.
+
+**Sources.** **[user]**; **[run]**, **[log]**, **[reasoning]** as above.
+
+**Status:** active.
