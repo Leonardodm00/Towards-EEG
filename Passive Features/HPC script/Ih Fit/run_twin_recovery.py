@@ -150,7 +150,7 @@ REPORT_DIR, REPORT_UNFLAGGED_DIR, REPORT_NO_NOISE_DIR = "report", "report_withou
 #: the columns of recovery_extras.csv (Block 17), in order
 EXTRAS_COLUMNS = ("twin_id", "configuration", "twin_of_specimen_id", "paired_with", "with_noise",
                   "cell_tau_s_above_window", "tau_h_pk_true_ms", "tau_h_pk_est_ms", "loss_at_truth",
-                  "loss_at_estimate", "loss_verdict", "v_deepest_train_mV", "gh_deep_true_S_cm2",
+                  "loss_at_estimate", "loss_verdict", "loss_verdict_on", "v_deepest_train_mV", "gh_deep_true_S_cm2",
                   "gh_deep_est_S_cm2", "ln_gh_deep_ratio",
                   # Block 22 (SPEC 2.9 (e)): the refinement, from the fit's columns; dv_h for a twin fitted with it
                   "loss_after_search", "refine_improved", "refine_n_evals", "refine_best_start",
@@ -1204,24 +1204,40 @@ def _int_or_nan(r: pd.Series, col: str):
     return int(v) if np.isfinite(v) and float(v) == int(v) else float("nan")
 
 
-def loss_verdict(loss_at_truth: float, loss_at_estimate: float, rel: float = LOSS_VERDICT_REL) -> str:
+def loss_verdict(loss_at_truth: float, loss_at_estimate: float, rel: float = LOSS_VERDICT_REL,
+                 penalty: Optional[float] = None) -> str:
     """'optimiser' when the loss at the truth is lower than at the estimate by more than rel of the
     latter (the optimiser missed a better point), 'data' when the estimate's is lower than the truth's
     by more than rel of the truth's (the data prefer another point), 'tie' otherwise, 'na' when either is
     not finite or is at or above the training loss's penalty (Block 17; amendment 3: a loss of
     run_ih_fit._LOSS_CRASH_PENALTY = 1e6, the value the loss builders return when a simulation fails,
-    is not a loss)."""
+    is not a loss). `penalty` (default run_ih_fit._LOSS_CRASH_PENALTY) is the value at or above which
+    a loss is a failed point's: verdict_pair passes sqrt(1e6) for sqrt(L_2) (Block 28, amendment 3)."""
     import run_ih_fit as R
+    pen = float(R._LOSS_CRASH_PENALTY if penalty is None else penalty)
     lt, le = float(loss_at_truth), float(loss_at_estimate)
     if not (np.isfinite(lt) and np.isfinite(le)):
         return "na"
-    if lt >= R._LOSS_CRASH_PENALTY or le >= R._LOSS_CRASH_PENALTY:
+    if lt >= pen or le >= pen:
         return "na"
     if lt < (1.0 - rel) * le:
         return "optimiser"
     if le < (1.0 - rel) * lt:
         return "data"
     return "tie"
+
+
+def verdict_pair(loss_at_truth: float, loss_at_estimate: float, sqrt_l2_at_truth: float,
+                 sqrt_l2_at_estimate: float, rel: float = LOSS_VERDICT_REL) -> tuple:
+    """(loss_verdict, loss_verdict_on) of one twin (SPEC Block 28, amendment 3, D-250): when both
+    sqrt(L_2) values are finite -- a trf fit, the quantity its refinement minimises -- loss_verdict on
+    them, 'sqrt_l2'; otherwise loss_verdict on L, 'loss'. A failed point's L_2 is 1e6 (2.10 (a), the
+    same value as the loss's penalty), so the penalty on the sqrt(L_2) scale is sqrt(1e6)."""
+    import run_ih_fit as R
+    st, se = float(sqrt_l2_at_truth), float(sqrt_l2_at_estimate)
+    if np.isfinite(st) and np.isfinite(se):
+        return loss_verdict(st, se, rel, penalty=float(np.sqrt(R._LOSS_CRASH_PENALTY))), "sqrt_l2"
+    return loss_verdict(loss_at_truth, loss_at_estimate, rel), "loss"
 
 
 def recovery_extras(man: pd.DataFrame, frames: Dict[int, pd.DataFrame], config: Dict[str, object]) -> pd.DataFrame:
@@ -1239,7 +1255,9 @@ def recovery_extras(man: pd.DataFrame, frames: Dict[int, pd.DataFrame], config: 
     Block 28 (SPEC 2.10 (c)): l2_after_search, l2_after_refine, refine_n_converged, refine_n_failed,
     sqrt_l2_at_estimate are the fit's columns, sqrt_l2_at_truth its sqrt_l2_at_eval_theta (NaN when the
     fit's row has none); on_bound_<name> for every name of the run's I_h arm (extras_columns): the fit's
-    flag ("lo", "hi" or ""), "" for a name the twin's arm does not fit."""
+    flag ("lo", "hi" or ""), "" for a name the twin's arm does not fit. Amendment 3 (D-250): loss_verdict
+    on sqrt(L_2) when the fit's sqrt_l2_at_estimate and sqrt_l2_at_eval_theta are finite, else on L
+    (verdict_pair); loss_verdict_on names which ('sqrt_l2' or 'loss')."""
     import run_ih_fit as R
     import twin_build as TB
     import twin_manifest as TM
@@ -1262,6 +1280,7 @@ def recovery_extras(man: pd.DataFrame, frames: Dict[int, pd.DataFrame], config: 
         gh_est = _num(r, "gh_at_v_deepest_S_cm2")
         ok = np.isfinite(gh_true) and np.isfinite(gh_est) and gh_true > 0.0 and gh_est > 0.0
         lt, le = _num(r, "loss_at_eval_theta"), _num(r, "loss_at_estimate")
+        verdict, verdict_on = verdict_pair(lt, le, _num(r, "sqrt_l2_at_eval_theta"), _num(r, "sqrt_l2_at_estimate"))
         fitted = str(r["param_names"]).split("|") if "param_names" in r.index else []
         with_dvh = "dv_h" in fitted
         rows.append(dict(
@@ -1269,7 +1288,7 @@ def recovery_extras(man: pd.DataFrame, frames: Dict[int, pd.DataFrame], config: 
             paired_with=int(m["paired_with"]), with_noise=bool(m["with_noise"]),
             cell_tau_s_above_window=bool(m["cell_tau_s_above_window"]),
             tau_h_pk_true_ms=tau_true, tau_h_pk_est_ms=_num(r, "tau_h_pk_ms"),
-            loss_at_truth=lt, loss_at_estimate=le, loss_verdict=loss_verdict(lt, le),
+            loss_at_truth=lt, loss_at_estimate=le, loss_verdict=verdict, loss_verdict_on=verdict_on,
             v_deepest_train_mV=v_star, gh_deep_true_S_cm2=float(gh_true), gh_deep_est_S_cm2=gh_est,
             ln_gh_deep_ratio=float(np.log(gh_est / gh_true)) if ok else float("nan"),
             loss_after_search=_num(r, "loss_after_search"), refine_improved=_bool_or_nan(r, "refine_improved"),

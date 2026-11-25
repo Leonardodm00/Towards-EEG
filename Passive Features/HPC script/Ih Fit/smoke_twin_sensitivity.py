@@ -33,6 +33,11 @@ Checks
                               <run>/truth_trace_check.csv (one row per bundle per twin, twin_id first),
                               one twin_id per twin run; no <group> level under the run directory
                               (amendment 2, D-249)
+    test_V8_verdict_sqrt_l2   amendment 3 (D-250): the entry's hand case (two bundles of weight 0.5; estimate L
+                              0.1414, L_2 0.0400; truth L 0.1732, L_2 0.0300) gives 'optimiser' on sqrt_l2 and
+                              'data' on L; with the sqrt_l2 values nan the verdict is the one on L ('loss'); a
+                              failed point's sqrt(L_2) = sqrt(1e6) gives 'na'; on V5's run the trf twin's row
+                              has loss_verdict_on 'sqrt_l2' and the verdict recomputed from the fit's columns
     test_V6_submitter         DRY_RUN=1 MODE=sensitivity prints one sensitivity command per twin with
                               --n-workers NCPUS --n-noise N_NOISE (each accepted by the parser), the merge,
                               and PLAN_ARGS' --refine-max-nfev in the plan command; MODE unset prints the twin
@@ -444,6 +449,45 @@ def test_V4_merge():
     if ttc is not None:
         print("\n  [V4] truth_trace_check max_abs_mV per twin: %s" % {
             int(t): float(ttc.loc[ttc["twin_id"] == t, "max_abs_mV"].max()) for t in tids})
+    _fail_parts(parts)
+
+
+def test_V8_verdict_sqrt_l2():
+    import run_twin_recovery as T
+    # the entry's hand case, built from per-bundle ratios RMSD_b / D_b with c_b = 0.5 (2.10 (a)):
+    # L = sum c_b x_b, L_2 = sum c_b x_b^2; estimate x = (0.4 / sqrt(2), 0), truth x = (sqrt(0.03), sqrt(0.03))
+    c = np.array([0.5, 0.5])
+    x_est, x_tru = np.array([0.4 / np.sqrt(2.0), 0.0]), np.array([np.sqrt(0.03), np.sqrt(0.03)])
+    L_e, L2_e = float(c @ x_est), float(c @ x_est ** 2)
+    L_t, L2_t = float(c @ x_tru), float(c @ x_tru ** 2)
+    nan = float("nan")
+    parts = {"hand case values: L_est %.4f, L2_est %.4f, L_truth %.4f, L2_truth %.4f" % (L_e, L2_e, L_t, L2_t): (
+        abs(L_e - 0.1414) < 5e-5 and abs(L2_e - 0.04) < 1e-12 and abs(L_t - 0.1732) < 5e-5
+        and abs(L2_t - 0.03) < 1e-12)}
+    parts["sqrt_l2 finite: ('optimiser', 'sqrt_l2')"] = (
+        T.verdict_pair(L_t, L_e, np.sqrt(L2_t), np.sqrt(L2_e)) == ("optimiser", "sqrt_l2"))
+    parts["the same pair on L alone: 'data'"] = T.loss_verdict(L_t, L_e) == "data"
+    parts["sqrt_l2 nan (either or both): the verdict on L, ('data', 'loss')"] = all(
+        T.verdict_pair(L_t, L_e, a, b) == ("data", "loss") for a, b in ((nan, nan), (nan, np.sqrt(L2_e)),
+                                                                        (np.sqrt(L2_t), nan)))
+    parts["a failed point's sqrt(L_2) = sqrt(1e6): ('na', 'sqrt_l2')"] = (
+        T.verdict_pair(L_t, L_e, 1e3, np.sqrt(L2_e)) == ("na", "sqrt_l2"))
+    parts["a tie within 2 % on sqrt_l2"] = T.verdict_pair(L_t, L_e, 0.1, 0.101) == ("tie", "sqrt_l2")
+    # on V5's run: the trf twin's row
+    _ensure_v5()
+    st = _run_dir()
+    out, tf = st["out"], st["tid"]["full"]
+    code, _so, _se = STR._run(["merge", "--out", out, "--no-plot"])
+    ex = pd.read_csv(out / "recovery_extras.csv", float_precision="round_trip")
+    fr = pd.read_csv(out / "fits" / ("twin_%d" % tf) / "phase2_results.csv", float_precision="round_trip").iloc[0]
+    e = ex[ex["twin_id"] == tf].iloc[0]
+    want = T.loss_verdict(float(fr["sqrt_l2_at_eval_theta"]), float(fr["sqrt_l2_at_estimate"]),
+                          penalty=float(np.sqrt(1e6)))
+    parts["V5's trf twin: loss_verdict_on 'sqrt_l2' after loss_verdict, verdict %r = the one on the fit's "
+          "sqrt_l2 columns" % (e["loss_verdict"],)] = (
+        code == 0 and list(ex.columns).index("loss_verdict_on") == list(ex.columns).index("loss_verdict") + 1
+        and e["loss_verdict_on"] == "sqrt_l2" and e["loss_verdict"] == want)
+    print("\n  [V8] " + "\n  [V8] ".join(parts))
     _fail_parts(parts)
 
 
