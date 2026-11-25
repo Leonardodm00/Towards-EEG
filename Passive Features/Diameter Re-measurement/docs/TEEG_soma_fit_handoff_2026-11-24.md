@@ -6,6 +6,7 @@
 | 2026-11-24 (later) | Section 5's SGT scope checked file by file and split by route (the first list mixed in the table route's Block 12-13 files and `measure.sgt_lambda_um`'s users); section 4's two attributions checked against handoff 14.1 and 14.6; D-243 named in sections 1-2; the roadmap's I49 noted. Evidence: `grep -rni sgt` on `src`, `scripts`, `tests`, `notebooks` **[run, sandbox]**. |
 | 2026-11-25 | Section 1 done: the soma fit explained to the user (the chat of 2026-11-25). Section 4: a recovery check with the D-241 region now run on a simulated pilot-like soma -- recovered (a, b, c within 0.06 %, S +0.07 %). Evidence: `checks/soma_explain_2026-11-25/recovery_d241.py` **[run, sandbox]**. `fit_soma.py --synthetic` rerun under today's defaults: recovered (axes within 0.005 um, chi2/dof 9.03). |
 | 2026-11-25 (later) | Section 9 added: the independent review of the approach (the user's upload of 13:03) discussed with the user; its soma claims tested on simulated stacks (`checks/soma_review_2026-11-25/sensitivity.py` **[run, sandbox]**); a revised order of work proposed, **not decided**. Sections 3 and 5 are unchanged until the user decides. |
+| 2026-11-25 (14:45) | Section 9: two statements of the proposal corrected and one finding added from a profile of the fit over a held c on simulated stacks (`checks/soma_review_2026-11-25/profile_c.py`, stopped early at the user's call) **[run, sandbox]**. Plan still not decided. |
 
 Repository `Leonardodm00/Towards-EEG`, branch `sci/diameter-pipeline` (workstream `Passive Features/Diameter
 Re-measurement/`, called W below); SPEC at the repository root `specs/SPEC.md`; the decision log on `main`
@@ -184,3 +185,14 @@ the middle of a range set from independent constraints and carry S as a range (a
 first what c means under z-shrinkage; run the variants in the sandbox on an exported crop block instead of repeated
 Colab runs; the far slope's calibration (D-218.2) only if the range's effect on Cm is too large. Not adopted: holding
 B_k; fitting the in-focus blur in the soma fit (D-240.2's open question: under 4 % on c in simulation).
+
+[added 2026-11-25, 14:45] Profile over a held c (`W/checks/soma_review_2026-11-25/`, simulated a 7.0, b 5.6, c 4.5 um,
+noise-free, gamma held at 0.79; stopped early) **[run, sandbox]**:
+- [corrected 2026-11-25] "Q(c) shows whether the stack prefers a c" (the chat's explanation of 14:12) is withdrawn: with
+  gamma held, Q's minimum is the c-free fit's c_hat by construction; in a world of slope 0.60 it lies above 5.0 um (truth 4.5).
+- [corrected 2026-11-25] "keep the fit for the centre and the in-plane axes" holds only per held c: a_hat and b_hat
+  compensate the held c (+11.7 and +13.9 % at c 2.5 um, -3.9 and -4.1 % at 5.5 um); the 3.9 % of the table above is for
+  kernel mis-specifications with c free, not for a held c.
+- Finding: because of that compensation S(a_hat(c), b_hat(c), c) stays within -6.2 to +6.3 % of the truth over c 2.5-5.5 um
+  (world gamma 0.79) and 407-433 um^2 over c 2.5-5.0 um (world 0.60), against 315 to about 455 um^2 with the axes fixed: in
+  simulation the stack fixes S far better than c. The living cell's S, if c is to be scaled for z-shrinkage, needs c itself.

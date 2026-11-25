@@ -33,3 +33,26 @@ the soma, a non-Gaussian far blur, phase contrast, a tilted illumination cone).
 `figures_revised.py sensitivity.json OUT_DIR` -- the three figures of the explanation of the revised approach (2026-11-25, 14:12):
 fig5 the approach (schematic), fig6 the bias of c and of a against the true far slope (from `sensitivity.json`), fig7 S against
 c with an illustrative carried range. The revised approach is proposed, not decided (handoff section 9).
+
+## The notation figures and the profile over c (2026-11-25, 14:17-14:43)
+
+`notation_figures.py OUT_DIR` -- figN1 where each symbol comes from (schematic; statuses read from `fit_soma.py`, `soma_fit.py`
+and the notebook's `cleaning_config`); figN2 the ellipsoid's parameters (schematic to scale); figN3 D_k, R, tau_k, B_k on
+three planes (simulated, noise 3 gl, the pilot's table); figN4 sigma_r(delta) and gamma (the pilot's table, D-170).
+
+`profile_c.py GAMMA_TRUE OUT.json` (run with OMP_NUM_THREADS=1) -- the misfit, a_hat, b_hat and S with c held at 2.5-6.5 um,
+the far slope held at 0.79 in the fit, the world's slope GAMMA_TRUE; noise-free; then a fit with c free. **Stopped early**
+(the user's call, 14:43): the logs `profile_g079.out` (c 2.5-5.5) and `profile_g060.out` (c 2.5-5.0) hold the points
+finished; c 6.0-6.5 and the c-free fits were not run. `profile_figure.py A B OUT_DIR` draws figN5 from the JSONs or the logs.
+
+| Result (simulated, a 7.0, b 5.6, c 4.5 um) | world gamma 0.79 (held value right) | world gamma 0.60 (held value wrong) |
+|---|---|---|
+| misfit's minimum over held c | at the true c (RMS 0) | above 5.0 um (RMS still falling: 0.95 gl at 5.0); the linearised check put c_hat near 5.3 um |
+| a_hat, b_hat over the held c | +11.7 / +13.9 % at c 2.5, -3.9 / -4.1 % at c 5.5 | +19.2 / +21.9 % at c 2.5 |
+| S(a_hat, b_hat, c) over the held c | 380-431 um^2 (truth 405.6): -6.2 to +6.3 % over c 2.5-5.5 | 407-433 um^2 over c 2.5-5.0 |
+| S(7.0, 5.6, c), the axes held at the truth | 315 to about 455 um^2 over c 2.5-5.5 | -- |
+
+Readings: (1) with gamma held, the misfit's minimum over c is the c-free fit's c_hat by construction (a profile's minimum is
+the joint minimum), so it cannot test c; (2) a_hat and b_hat compensate the held c, so they are not fixed independently of
+it; (3) because they compensate, the stack's S varies far less over the held c than with fixed axes. All three are for this
+simulated configuration with the model otherwise true; the real stack is untested.

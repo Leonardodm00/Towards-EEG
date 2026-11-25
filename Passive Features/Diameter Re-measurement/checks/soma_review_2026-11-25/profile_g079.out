@@ -1,0 +1,7 @@
+c 4.50  rms 0.0000 gl  a 7.0000 b 5.6000 z0 30.9600 mu 0.09667 mu*c 0.4350  S 405.6  status 1  9 renders 30 s
+c 4.00  rms 0.3556 gl  a 7.1515 b 5.7304 z0 30.8929 mu 0.10782 mu*c 0.4313  S 394.3  status 3  57 renders 164 s
+c 3.50  rms 0.6720 gl  a 7.3183 b 5.8804 z0 30.8313 mu 0.12279 mu*c 0.4298  S 385.0  status 2  66 renders 173 s
+c 3.00  rms 0.9325 gl  a 7.5266 b 6.0781 z0 30.8023 mu 0.14467 mu*c 0.4340  S 380.4  status 3  82 renders 169 s
+c 2.50  rms 1.1027 gl  a 7.8224 b 6.3804 z0 30.7868 mu 0.18116 mu*c 0.4529  S 385.9  status 3  85 renders 150 s
+c 5.00  rms 0.3766 gl  a 6.8590 b 5.4816 z0 31.0336 mu 0.08791 mu*c 0.4395  S 418.0  status 3  60 renders 232 s
+c 5.50  rms 0.7555 gl  a 6.7243 b 5.3683 z0 31.1140 mu 0.08078 mu*c 0.4443  S 431.0  status 3  43 renders 192 s
