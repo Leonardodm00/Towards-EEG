@@ -24,6 +24,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-22 (later, 3) | Section 7: the settled forms (D-206 to D-209), the fan-out in progress (contract `aac46d3`), and the loss-at-truth diagnostic delivered for davinci. |
 | 2026-11-22 (later, 4) | Section 7: Blocks 14-18 built and checked (`c974a62`), the commands of run `tw2`, the real-cell check of the new loss. |
 | 2026-11-24 | Section 7: the result of run `tw2` (gate FAIL; the truth fits better than the estimate in 14 of 15 twins fitted with I_h: the optimiser is the limit). |
+| 2026-11-25 (the review chat) | Section 7: the user's decision after the independent review (D-245: TRF on the squared loss; the sensitivity module dropped), the code facts the review asked for **[src at `393b681`]** and the re-read of tw3a/tw3b's `refine_starts.csv` **[data inspected]**. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -463,6 +464,30 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   the truth of a noise-free twin is not 0 (8e-4 to 2.2e-3). A study document for an independent evaluation of the
   whole approach was sent to the user as files in this chat:
   `TEEG_topic_Ih_fit_and_optimisation_2026-11-25.md` (with `figures/`, `scripts/`); it is not in the repository.
+- **After the independent review (2026-11-25, 13:17) [user: D-245; src at `393b681`; data inspected:
+  `tw3_results.tar.gz`; run in the review chat].** The local stage becomes scipy `least_squares` (TRF, bounded) on
+  the squared loss $L_2(q) = \sum_b c_b (\mathrm{RMSD}_b(q)/D_b)^2$ (D-245; not implemented); the review's
+  sensitivity module (its CR-2) is not built. The review's files (`TEEG_tech_Ih_fit_change_requests_2026-11-25.md`,
+  `smoke_sensitivity_reference.py`, `check02_nm_vs_lsq_anisotropic.py`, `check03_nm_restart.py`) were sent to the
+  user as files and are not in the repository; its three scripts re-run in the review chat reproduce its numbers.
+  *Code facts the review asked for [src]:* (a) `ih_mechanism.balance_e_pas` resets each segment's `e_pas` at every
+  $q$, so $V_{\rm rest}$ is stationary; (b) `vshift_minf` in `mod/Ih_human.mod` shifts $m_\infty$ only, not the time
+  constant; (c) fixed step 0.025 ms in the builder (`TwinConfig.neuron_dt_ms`) and in the fit
+  (`DEFAULT_DT_LONG_MS`), `cnexp`, float64, `settle_ms` 0: the non-zero loss at a noise-free twin's truth is not a
+  time-step mismatch; (d) `gp_minimize` receives the raw loss, the $10^6$ penalty included; (f) `fit_one_cell` gets
+  `seed=i`, the cell's index in its run, so every twin's search has seed 0 and the same initial design; (g) $F$
+  scales `cm` and `g_pas` beyond the proximal cutoff, not `gIhbar`; (h) a long bundle holds the whole sweep and
+  `--ls-window sweep` exists, the rebound kept out of training by D-006 (ii).
+  *Re-read of `refine_starts.csv` of tw3a and tw3b [data inspected]:* the three endpoints of one fit are far apart
+  in 9 of 10 fits (largest pairwise max-norm distance in the unit box 0.53 to 0.99; 0.12 in twin 900000302 of
+  tw3a), mostly along $\tau_h^{\rm pk}$, with losses within a factor of about 2 in the shallow twins; estimates on a
+  bound that the report's rail flag does not mark: $\tau_h^{\rm pk}$ of twin 900000303 at the lower bound in both
+  runs (50.2 ms against a truth of 664 ms in tw3a; 51.3 against 243 in tw3b); endpoints that are not the estimate
+  also end on bounds ($\tau_h^{\rm pk}$ at its upper bound in twin 900000300; $C_m$ and $R_a$ at their upper bounds
+  in two starts of twin 900000303, tw3a). In tw3b, $\ln(\hat{\bar g}_h/\bar g_h) + (\widehat{\Delta v_h} - \Delta v_h)/k$
+  is $-0.59, +0.03, +0.21, -1.04, -0.74$: zero under the $\bar g_h$-$\Delta v_h$ trade-off, so twins 900000301 and
+  900000302 follow it and the three shallow twins do not. Not in the archive: the search's 200 evaluations (the
+  count of penalty evaluations), any noisy twin.
 
 ## 8. Repository, environment, cluster
 
