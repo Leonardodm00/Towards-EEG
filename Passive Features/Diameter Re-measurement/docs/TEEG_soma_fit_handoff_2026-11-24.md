@@ -9,6 +9,7 @@
 | 2026-11-25 (14:45) | Section 9: two statements of the proposal corrected and one finding added from a profile of the fit over a held c on simulated stacks (`checks/soma_review_2026-11-25/profile_c.py`, stopped early at the user's call) **[run, sandbox]**. Plan still not decided. |
 | 2026-11-25 (15:40) | Section 9: D-248 (user, 15:02, c ranged from the literature on human pyramidal somata) and the literature search it asked for; the decision's log entry is held here because the push to `main` was refused in this session (to be copied into the log). |
 | 2026-11-25 (15:35) | Section 9: three decisions of the user (15:27) held here until they can be logged on `main` (the push to `main` is refused in this session): the passive model gets the fitted soma's equal-area sphere; the held-c grid extends toward the living range; production cleans the close branches' shadows before the fit. Timing of the held-c fits measured. |
+| 2026-11-25 (15:45) | Section 9: the user's points of 15:38 (area conservation under flattening; 4 held c values on Colab, more with a local refinement on the HPC; a background measured per plane and held) with the check on the last (`background_check.py`). |
 
 Repository `Leonardodm00/Towards-EEG`, branch `sci/diameter-pipeline` (workstream `Passive Features/Diameter
 Re-measurement/`, called W below); SPEC at the repository root `specs/SPEC.md`; the decision log on `main`
@@ -248,3 +249,19 @@ IDs there):
 Timing **[run, sandbox: `checks/soma_review_2026-11-25/profile_g0*.out`]**: 15 held-c fits on simulated noise-free
 stacks with warm starts took 30-320 s (median 169 s), 9-113 renders (median 60), about 3 s per render at c 2.5-6.5 um on
 2 shared CPUs; the render's cost scales with the slab count (22 slabs at c 1.5 um, 72 at 5.0 um).
+
+[added 2026-11-25, 15:45] The user's points of 15:38:
+1. "Flattening doesn't change the superficial area, but the volume" -- recorded as the assumption under decision 1 of
+   15:27: the membrane keeps its area, so the soma widened as it flattened and the fitted ellipsoid's S is the living
+   area. Told to the user: true of a membrane that cannot stretch, not of the fitted ellipsoid at fixed in-plane axes
+   (pilot radius 6.26 um: S 306 um^2 at c 2.3 against 492 at c 6.26 **[run]**); if the membrane folded below the
+   microscope's resolution, the fit reads the envelope and under-reads S. Not settled by any source read.
+2. **Decision (user)**: Colab runs 4 held values of c; the HPC runs more, "maybe with a local refinement" (proposed:
+   1.5, 2.5, 3.5, 5.0 um on Colab; the refinement a fit with c free started from the best grid value -- not confirmed).
+   NOT YET IN THE LOG (push to `main` refused).
+3. The user's proposal: each plane's background measured first, as for the nodes (a planar background with its tilt), and
+   held in the fit. Check **[run, sandbox: `checks/soma_review_2026-11-25/background_check.py`]**: beside the soma the
+   annulus reads up to 4.9 gl low on defocused planes (the soma's own halo); held, it biases c -15.7 % and S -10.2 % even
+   with the model otherwise true. Counter-proposal (awaiting the user): keep B_k solved at every step and give it the tilt
+   (b_0k + b_1k x + b_2k y, still linear, still exact), as the sigma_0 calibration's straight background (D-201.3); check
+   first on simulation that the tilt does not trade with the centre.

@@ -65,3 +65,8 @@ fit: at a true 0.080 um its noise SE would be 0.0069 um, at 0.258 um 0.0052 um; 
 over sqrt(A/pi) from Benavides-Piccione et al. 2024's group means (human CA1 1.02, mouse CA1 1.07); the pilot's in-plane
 radius 5.94-6.56 um (silhouette 111-135 um^2, handoff 14.2); living c 5.1-7.0 um (c/r 0.86-1.07); stack c 1.4-3.3 um
 (x 0.27-0.47, Mohan et al. 2015's mounted/original thickness); living S 403-565 um^2. Assumptions in the docstring.
+
+`background_check.py` (2026-11-25, 15:45) -- a background measured beside the soma (median of an 8-14 um annulus per
+plane) and then held, in a simulated world where the model is otherwise true: the annulus reads 0.1-4.9 gl below the true
+110 gl, more on defocused planes (the soma's own blurred halo); held, it biases c by -15.7 % and S by -10.2 % (one
+linearised Gauss-Newton step). B_k re-solved at every step (as now) has no bias in that world.
