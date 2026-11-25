@@ -8,6 +8,7 @@
 | 2026-11-25 (later) | Section 9 added: the independent review of the approach (the user's upload of 13:03) discussed with the user; its soma claims tested on simulated stacks (`checks/soma_review_2026-11-25/sensitivity.py` **[run, sandbox]**); a revised order of work proposed, **not decided**. Sections 3 and 5 are unchanged until the user decides. |
 | 2026-11-25 (14:45) | Section 9: two statements of the proposal corrected and one finding added from a profile of the fit over a held c on simulated stacks (`checks/soma_review_2026-11-25/profile_c.py`, stopped early at the user's call) **[run, sandbox]**. Plan still not decided. |
 | 2026-11-25 (15:40) | Section 9: D-248 (user, 15:02, c ranged from the literature on human pyramidal somata) and the literature search it asked for; the decision's log entry is held here because the push to `main` was refused in this session (to be copied into the log). |
+| 2026-11-25 (15:35) | Section 9: three decisions of the user (15:27) held here until they can be logged on `main` (the push to `main` is refused in this session): the passive model gets the fitted soma's equal-area sphere; the held-c grid extends toward the living range; production cleans the close branches' shadows before the fit. Timing of the held-c fits measured. |
 
 Repository `Leonardodm00/Towards-EEG`, branch `sci/diameter-pipeline` (workstream `Passive Features/Diameter
 Re-measurement/`, called W below); SPEC at the repository root `specs/SPEC.md`; the decision log on `main`
@@ -229,3 +230,21 @@ documentation) and its arithmetic (`W/checks/soma_review_2026-11-25/literature_c
 - Open: Suppl. Table 1A of Benavides-Piccione 2024 (the user can upload it); whether that lab corrected z for somata;
   Allen's z-shrinkage for this specimen (the stack's tissue thickness against 350 um would measure it); H01's per-cell
   soma meshes (EM, human temporal cortex), the most direct data, not reachable from this session.
+
+[added 2026-11-25, 15:35] **Decisions of the user, 15:27, NOT YET IN THE LOG** (copy them to `main`, taking the next free
+IDs there):
+1. "the fitted model will have the soma (rounded) that we find here, we will find the best fitting c, calculate the S and
+   determine the radius of the sphere that has the same superficial area" -- the passive model gets the soma of the stack
+   as fitted: the held c with the smallest misfit, S(a_hat, b_hat, c), and the equal-area sphere r_eq = sqrt(S / 4 pi)
+   (Block 47's rule). Closes D-248's open frame question: the stack's, not the living cell's. Told to the user: with the
+   far slope held, the best-fitting c is the c-free fit's c_hat (a profile's minimum is the joint minimum), so it rests
+   on gamma = 0.79; and if the soma flattened with the slice, the stack's S is about 0.6-0.7 of a round living soma's
+   (pilot radius 5.94-6.56 um: 249-374 against 403-566 um^2) **[run, sandbox]**.
+2. "I would do more C fits also towards the lower end of the living cells" -- the held-c grid runs from the stack's range
+   up to about the low end of the living range; proposed 1.5-5.5 um in 0.5 um steps (9 fits), not yet confirmed.
+3. "we will first clear the close branches' shadow and then doing the fit in the HPC; now for the pilot we keep this" --
+   production (HPC): the close branches' shadows are cleaned before the soma fit (settles the when of D-241.3); the pilot
+   keeps D-241's region with the shadows in.
+Timing **[run, sandbox: `checks/soma_review_2026-11-25/profile_g0*.out`]**: 15 held-c fits on simulated noise-free
+stacks with warm starts took 30-320 s (median 169 s), 9-113 renders (median 60), about 3 s per render at c 2.5-6.5 um on
+2 shared CPUs; the render's cost scales with the slab count (22 slabs at c 1.5 um, 72 at 5.0 um).
