@@ -434,6 +434,22 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   `loss_at_estimate` down to `loss_at_truth` (`loss_verdict` not `optimiser`). A run planned before Block 22 (tw1,
   tw2) is merged only with the code of its own commit. The study document of roadmap topic T18 was started by an
   agent and stopped by the user before it was written.
+- **Result of the test runs tw3a and tw3b (2026-11-25) [data inspected: the runs' tables, the user's extract
+  `tw3_results.tar.gz`; code `257b351`].** The 5 noise-free twins (900000300-304), 8 workers, 200 search + 300 local
+  evaluations each; all 10 `ok`. **Pass condition not met in any twin** (`loss_verdict = optimiser` in all 10), but
+  the gap closed a great deal. Ratio loss at estimate / loss at truth, twins 300 to 304: `tw2` (search only, five
+  parameters) 10.9, 10.9, 7.1, 5.7, 2.0; `tw3a` (five parameters, refined) 2.84, 1.10, 1.13, 2.41, 1.48 (median
+  1.48; after the search alone, median 5.1); `tw3b` (six parameters, refined) 3.64, 1.95, 4.02, 2.38, 1.63 (median
+  2.38; search alone 11.0). **Every one of the 30 Nelder-Mead starts stopped on the 100-evaluation cap** (`status 1`
+  in `refine_starts.csv`), each having lowered its loss: the budget is the limit, as the 5-parameter quadratic
+  measured here predicted. The estimate came from the start of lowest initial loss in only 4 of 10 fits. Parameters:
+  $\ln(\hat{\bar g}_h/\bar g_h)$ in `tw3a` $-0.40, -0.03, -0.03, -0.67, -2.37$ (2 of 5 inside the gate's 0.223; twin
+  304 on the floor $10^{-5}$ with a loss ratio of only 1.48 -- its deepest trained voltage is $-59.7$ mV, where I_h
+  is nearly closed); in `tw3b` $-0.70, +0.02, -1.16, -0.21, +0.13$, with $\Delta v_h$ errors $+0.9, +0.1, +11.0,
+  -6.6, -7.0$ mV (2 of 5 inside 3 mV; twin 302 shows the trade: $\bar g_h$ a third of the truth, $\Delta v_h$ 11 mV
+  too high). Time: 29 to 102 s per evaluation against 98 to 401 s in `tw2` on one core, a factor of 3.0 to 4.3 from
+  8 workers (approximate: total fit time over evaluations); fits of 3.9 to 14.1 h. Open, the user's: the local
+  budget (`--refine-maxfev`), and five against six parameters.
 
 ## 8. Repository, environment, cluster
 
