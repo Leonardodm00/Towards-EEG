@@ -60,3 +60,8 @@ simulated configuration with the model otherwise true; the real stack is unteste
 `sigma0_identifiability.py` (2026-11-25, 14:50) -- if the in-focus blur sigma_r(0) were a ninth free parameter of the soma
 fit: at a true 0.080 um its noise SE would be 0.0069 um, at 0.258 um 0.0052 um; its largest correlations 0.20 (a, mu) and
 0.40 (a, mu); SE(c) unchanged (0.0074 and 0.0082 um, free or held). Model-true simulation, D-241 region, noise 3 gl.
+
+`literature_c_range.py` (2026-11-25, 15:40; D-248) -- the arithmetic behind the literature-based range of c: c/r = 3V/(4A)
+over sqrt(A/pi) from Benavides-Piccione et al. 2024's group means (human CA1 1.02, mouse CA1 1.07); the pilot's in-plane
+radius 5.94-6.56 um (silhouette 111-135 um^2, handoff 14.2); living c 5.1-7.0 um (c/r 0.86-1.07); stack c 1.4-3.3 um
+(x 0.27-0.47, Mohan et al. 2015's mounted/original thickness); living S 403-565 um^2. Assumptions in the docstring.

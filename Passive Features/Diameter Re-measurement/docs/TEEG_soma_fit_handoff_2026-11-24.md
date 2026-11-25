@@ -7,6 +7,7 @@
 | 2026-11-25 | Section 1 done: the soma fit explained to the user (the chat of 2026-11-25). Section 4: a recovery check with the D-241 region now run on a simulated pilot-like soma -- recovered (a, b, c within 0.06 %, S +0.07 %). Evidence: `checks/soma_explain_2026-11-25/recovery_d241.py` **[run, sandbox]**. `fit_soma.py --synthetic` rerun under today's defaults: recovered (axes within 0.005 um, chi2/dof 9.03). |
 | 2026-11-25 (later) | Section 9 added: the independent review of the approach (the user's upload of 13:03) discussed with the user; its soma claims tested on simulated stacks (`checks/soma_review_2026-11-25/sensitivity.py` **[run, sandbox]**); a revised order of work proposed, **not decided**. Sections 3 and 5 are unchanged until the user decides. |
 | 2026-11-25 (14:45) | Section 9: two statements of the proposal corrected and one finding added from a profile of the fit over a held c on simulated stacks (`checks/soma_review_2026-11-25/profile_c.py`, stopped early at the user's call) **[run, sandbox]**. Plan still not decided. |
+| 2026-11-25 (15:40) | Section 9: D-248 (user, 15:02, c ranged from the literature on human pyramidal somata) and the literature search it asked for; the decision's log entry is held here because the push to `main` was refused in this session (to be copied into the log). |
 
 Repository `Leonardodm00/Towards-EEG`, branch `sci/diameter-pipeline` (workstream `Passive Features/Diameter
 Re-measurement/`, called W below); SPEC at the repository root `specs/SPEC.md`; the decision log on `main`
@@ -203,3 +204,28 @@ unchanged: `W/checks/soma_review_2026-11-25/sigma0_identifiability.py` **[run, s
 and S by at most 1.3 % (0.080 against 0.258 um, `sensitivity.py`). Proposed: keep it out of the default; run Cell 25 at
 KERNEL_WIDTH "fixed" and "calibrated" for the systematic; free it once only as a second, independent estimate of
 sigma_r(0) (an edge test on the soma's rim), to compare with node 7's 0.258 +- 0.022 um.
+
+[added 2026-11-25, 15:40] **D-248 (user, 15:02)**: "I would say it is better to search across the literature for human
+cells for this" -- the range of c is set from published measurements of human pyramidal somata, read in full text or in
+the data, each value with its preparation. NOT YET IN THE LOG: the push to `main` was refused by this session's safety
+check; copy the entry into `docs/project/TEEG_decisions_and_ideas_log.md` on `main` as D-248 (the next free ID at 15:10;
+check before taking it) when the user allows it or does it.
+Literature search (PubMed with full texts, the project's files, bioRxiv's published-version lookup, Allen's technical
+documentation) and its arithmetic (`W/checks/soma_review_2026-11-25/literature_c_range.py` **[run, sandbox]**):
+- Benavides-Piccione et al. 2024, Cereb Cortex, doi 10.1093/cercor/bhae180 **[full text]**: human L3a temporal somata,
+  area of the maximum perimeter 244 +- 5.1 (BA20, n 90) and 253 +- 7.5 um^2 (BA21, n 50); human CA1 5041 +- 273.1 um^3 and
+  350 +- 9.7 um^2 -> c/r = 1.02 (ratio of means, ellipsoid assumed); mouse CA1 1.07. Lucifer Yellow in fixed 300 um
+  sections, confocal 63x, Neurolucida 360 soma contours, ProLong Gold or 50 % glycerol; no z correction stated. Their
+  neocortical volumes are only in Fig. 3A / Suppl. Table 1A (not read).
+- Mohan et al. 2015, Cereb Cortex, doi 10.1093/cercor/bhv188 **[full text]**: human 350 um slices, DAB, mowiol; 140.7 um
+  after mounting (median), z-shrinkage 63 +- 10 %.
+- Allen's technical white paper (Cell Morphology and Histology, v.7, 2018) **[documentation, read through a fetch]**:
+  350 um slices, PFA/glutaraldehyde, DAB, glycerol-based Mowiol; no shrinkage measurement or correction stated; the soma
+  radius from an outline drawn on one section.
+- Derived: living c ~ 5.1-7.0 um (c/r 0.86-1.07 times the pilot's in-plane radius 5.94-6.56 um); stack c ~ 1.4-3.3 um
+  (times 0.27-0.47, Mohan's mounted/original), central 1.9-2.8 um, within the stems' bound c <= 3.45 um; living S ~ 403-565
+  um^2 (Allen's sphere 448). Assumptions: the soma shrinks in depth like the slice; x-y shrinkage negligible; the 0.84
+  confocal factor of the same lab (Eyal et al. 2018) sets the low end of c/r.
+- Open: Suppl. Table 1A of Benavides-Piccione 2024 (the user can upload it); whether that lab corrected z for somata;
+  Allen's z-shrinkage for this specimen (the stack's tissue thickness against 350 um would measure it); H01's per-cell
+  soma meshes (EM, human temporal cortex), the most direct data, not reachable from this session.
