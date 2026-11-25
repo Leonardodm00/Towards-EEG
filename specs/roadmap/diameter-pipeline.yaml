@@ -189,6 +189,7 @@ theory:
     status: open
     closed_on:
     decision:
+    note: "Review brief (2026-11-25): TEEG_soma_and_dendrite_estimation_review_brief_2026-11-25.md, the soma fit and the node diameters as they stand, written for an independent evaluation; sent as .md + .zip (figures/, scripts/) in the gallery chat, not in the repository."
   - id: T10
     title: "Kernel calibration, step 2: the width-diameter trade-off"
     summary: "The width-diameter trade-off the first stage leaves, what to match (the mean profiles or the core widths) and at which d and mu to render each calibration node (procedure s.3.4 step 2, SPEC section 8)."
@@ -250,7 +251,7 @@ theory:
     status: open
     closed_on:
     decision: D-132
-    note: "2026-11-13 (D-132): close neighbours (the survey's classes close_in_focus and overlap) stay inside the node's fit as a joint hybrid scene; the fit's cost per node and the split between the tiers are fixed after the line renderer's timings and the survey's shares. Document (2026-11-17, D-156): TEEG_diameter_pipeline_theory_2026-11-17.md, the theory document on the main route (forward model, neighbours' cleaning, joint per-node fit, same-node clearance), sent as files in the chat of the same-node clearance and on sci/diameter-pipeline under Passive Features/Diameter Re-measurement/docs/TEEG_diameter_pipeline_theory_2026-11-17/; status unchanged, the user's."
+    note: "2026-11-13 (D-132): close neighbours (the survey's classes close_in_focus and overlap) stay inside the node's fit as a joint hybrid scene; the fit's cost per node and the split between the tiers are fixed after the line renderer's timings and the survey's shares. Document (2026-11-17, D-156): TEEG_diameter_pipeline_theory_2026-11-17.md, the theory document on the main route (forward model, neighbours' cleaning, joint per-node fit, same-node clearance), sent as files in the chat of the same-node clearance and on sci/diameter-pipeline under Passive Features/Diameter Re-measurement/docs/TEEG_diameter_pipeline_theory_2026-11-17/; status unchanged, the user's. Review brief (2026-11-25): TEEG_soma_and_dendrite_estimation_review_brief_2026-11-25.md, the soma fit and the node diameters as they stand, written for an independent evaluation; sent as .md + .zip (figures/, scripts/) in the gallery chat, not in the repository."
 implementation:
   # ---- groups (no block of their own; coloured by their least advanced member)
   - id: G1
