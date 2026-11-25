@@ -708,7 +708,7 @@ implementation:
     block: 26
     parent: G5
     depends_on: [B24]
-    needs_theory: []
+    needs_theory: [T14]
     needs_hpc: false
     jobs: []
   - id: B27
