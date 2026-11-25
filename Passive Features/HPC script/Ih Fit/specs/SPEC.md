@@ -1024,6 +1024,56 @@ kept); `n_workers`.
 **(f) The gate.** On the run's I_h arm. `ih6_d207`: $C_m$, $\bar g_h$, $\Delta v_h$ (absolute error in mV, D-011's 3
 mV), $\kappa_\tau$ and the two control rows at D-011's tolerances. `ih5`: 2.8 (g).
 
+### 2.10 After the review of 2026-11-25: the squared loss, a least-squares refinement, the sensitivity module (D-245, D-246)
+
+Notation as 2.8 and 2.9; in addition, for one cell and one protocol (roles, windows, weights):
+
+(a) **Residuals and the squared loss.** For a training bundle $b$ let $W_b$ be the recorded samples $t_s$ inside
+its RMSD window (2.8), $d_{b,s}(q) = \hat V_b(t_s; q) - V_b(t_s)$ with both traces minus their own pre-window mean
+(the simulated one taken on the simulation grid, then interpolated linearly on the recorded samples, as
+`_baseline_subtracted_rmsd` does), $w_b(t_s)$ the sample weight (2.8 (d) for a long bundle under `peak_decay`; the
+SS weight function for a brief bundle; 1 otherwise), $D_b$ the recorded deflection, and $c_b$ the bundle weight:
+under `relative` $c_b = 1/n$ with $n$ the number of training bundles; under `ls_amplitude`
+$c_b = 1/(n_{\rm SS}+n_{\rm LS})$ for a brief bundle and $c_b = n_{\rm LS}\,\omega_b/(n_{\rm SS}+n_{\rm LS})$ for a
+long one, so $\sum_b c_b = 1$. For each fixed $q \in B$:
+$$a_{b,s} = c_b\,\frac{w_b(t_s)}{\sum_{s' \in W_b} w_b(t_{s'})}, \qquad r_{b,s}(q) = \sqrt{a_{b,s}}\;\frac{d_{b,s}(q)}{D_b}, \qquad L_2(q) = \sum_b \sum_{s \in W_b} r_{b,s}(q)^2 = \sum_b c_b \Big(\frac{\mathrm{RMSD}_b(q)}{D_b}\Big)^2 .$$
+$a_{b,s}$ and $D_b$ depend on the recorded traces only. The loss of 2.8 is recovered from the same vector:
+$L(q) = \sum_b c_b\,\big[\sum_{s \in W_b} r_{b,s}(q)^2 / c_b\big]^{1/2}$, and $L(q) \le \sqrt{L_2(q)}$. The residual
+vector $r(q) \in \mathbb{R}^N$, $N = \sum_b \lvert W_b\rvert$, lists the bundles in the training order and, inside a
+bundle, the samples in time order. A point $q$ at which the model cannot be simulated (an exception other than a
+dt-enforcement failure, or a non-finite trace) gets the constant vector with every entry $\sqrt{\ell_{\rm fail}/N}$,
+$\ell_{\rm fail} = 100$, so $L_2 = \ell_{\rm fail}$ there; the event is counted.
+
+(b) **Jacobian by finite differences.** With $u \in [0,1]^p$ the unit coordinates of 2.9 (b) and a function
+$f : [0,1]^p \to \mathbb{R}^N$, absolute step $h$ (default $10^{-3}$): *forward*,
+$\partial f/\partial u_i \approx (f(u + \delta_i e_i) - f(u))/\delta_i$ with $\delta_i = +h$, or $-h$ when
+$u_i + h > 1$; *central*, $(f(u + h e_i) - f(u - h e_i))/(2h)$, replaced for that axis by the forward rule when
+$u_i + h > 1$ or $u_i - h < 0$. All the perturbed points of one Jacobian are evaluated in ONE call of a batch
+function. In optimiser coordinates $\partial/\partial q_i = (q_i^{\rm hi} - q_i^{\rm lo})^{-1}\,\partial/\partial u_i$.
+
+(c) **The least-squares refinement (D-245).** From the starts of 2.9 (b) (chosen on the global search's values of
+$L$): `scipy.optimize.least_squares(method="trf", bounds=(0, 1), x_scale=1.0)` on $u \mapsto r(q(u))$, Jacobian by
+(b) forward with $h = 10^{-3}$, `xtol` $= 10^{-4}$, `ftol` $=$ `gtol` $= 10^{-8}$, `max_nfev` $= 30$ per start. Every
+point whose residual vector is computed (the solver's trial points and the Jacobian's perturbed points) is recorded
+with its $L_2$. The estimate $\hat q$ is the recorded point of lowest $L_2$ (ties: the earlier start, then the
+earlier evaluation). A start is *converged* when scipy's `status` is 1, 2, 3 or 4 (0 = the budget ran out; -1 =
+improper input). Reported per start: `status`, `optimality`, `active_mask`, the number of residual vectors computed,
+the endpoint, its $L_2$ and $L$, and $J^\top J$ in $q$ coordinates at the endpoint with its singular values. The
+global points other than the starts have no $L_2$ and do not enter the estimate (the first start is the search's
+best point). Nelder-Mead (2.9 (b)) stays selectable as a labelled comparison.
+
+(d) **Sensitivities and identifiability (D-246).** For a point $q$ (a twin's truth; a real cell's estimate), each
+bundle $b$ (training or not) and every recorded sample $t_s$ of the bundle's whole sweep,
+$S_{b,s,i}(q) = \partial \hat V_b(t_s; q)/\partial q_i$ (mV per unit of $q_i$; the simulated trace minus its own
+pre-window mean), by (b) central with $h = 10^{-3}$, stored. For a protocol (window, weights, training bundles),
+$J_{(b,s),i}(q) = \sqrt{a_{b,s}}\,S_{b,s,i}(q)/D_b$ over $s \in W_b$, with singular values
+$\sigma_1(q) \ge \dots \ge \sigma_p(q) \ge 0$ and right singular vectors $v_1(q), \dots, v_p(q)$. For $K$ noise
+realisations $\eta_b^{(k)}(t_s)$ of the bundles (mV), each minus its own pre-window mean ($\tilde\eta$),
+$r_{\eta,(b,s)}^{(k)} = -\sqrt{a_{b,s}}\,\tilde\eta_b^{(k)}(t_s)/D_b$ and the linearised displacement of the estimate is
+$\delta q^{(k)} = -(J^\top J)^{-1} J^\top r_\eta^{(k)}$ (least-squares solution; $J = J(q)$); the predicted standard
+deviation of $\hat q_i$ is the standard deviation of $\delta q_i^{(k)}$ over $k$ (ddof 1), and the predicted
+correlations those of $\delta q$. First order in the noise; the weights are held fixed; the box is ignored.
+
 ## 3. Data contracts
 
 | Item | Source / format | Shape and axis order | dtype | Units | Conventions |
@@ -1695,6 +1745,208 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Confirmed: yes -- D-234 and the user's go of 2026-11-24 (dv_h truths in +-5 mV, 3 cores per twin for a full run).
   The thread variables at 1 are the orchestrator's.
 - Status: smoke-tested 2026-11-24 (sandbox: `smoke_twin_recovery.py` 22 pass and 2 skip against stand-ins by the implementer, and exit 0 on the merged branch in the final check, which also ran plan, twin and merge end to end on the fixture group; four planted defects caught; commit `ff72a44`, merged `74f3c85`). As built [orchestrator, accepted; the final check's S4]: `gate_arm(ih_arm)` and `gate_required_axes(ih_arm)` replace the two constants; `merge` refuses (exit 2) a run planned before this block (no recorded `ih_arm`) -- merge such a run with the code of its own commit; the plan's two new refusals use exit 3 and closed intervals; `recovery_extras.csv`'s six new columns come last. Not run here: PBS
+
+### Block 23: the residual vector and the trace evaluator (2.10 (a))
+
+- Purpose: the residual vector $r(q)$ of 2.10 (a) for several points $q$ at once, on a pool of (point, bundle)
+  tasks; the data-only layout of the weights; the bundle traces the sensitivity module stores.
+- Module: `passive_long_step_training.py`; smoke `smoke_residuals.py` (new).
+- Public API (signatures in the stubs committed with the contract):
+  - `bundle_trace(cell, bundle, v_rest_mV, *, dt_brief_ms=None, dt_long_ms=None) -> np.ndarray`: float64
+    `(len(bundle.t),)`, mV: the model's trace of the bundle at the cell's CURRENT parameters (simulated as
+    `bundle_rmsd` simulates it), minus its own pre-window mean taken on the simulation grid (pre-window: (-10 ms, 0)
+    for a brief bundle, (0, onset) for a long one), interpolated on `bundle.t` with `np.interp` (constant outside the
+    simulated interval).
+  - `residual_layout(train_bundles, *, ss_window_ms=(0.5, 100.0), ls_window_ms_after_onset=150.0,
+    ls_window_mode="after_onset", r_in_target="peak", weighting="relative", ss_sample_weight_fn=None,
+    ls_sample_weight="none", ls_tau_d_ms=500.0) -> ResidualLayout`: pure (recorded data only, no cell).
+    `ResidualLayout` (frozen dataclass): `masks` (list of bool `(n_t_b,)`: the samples of $W_b$), `pre_masks` (list
+    of bool `(n_t_b,)`: the pre-window samples), `sqrt_a` (list of float64 `(|W_b|,)`: $\sqrt{a_{b,s}}$), `v_exp`
+    (list of float64 `(|W_b|,)`: the recorded samples of $W_b$ minus the recorded pre-window mean, mV), `D` (float64
+    `(n_bundles,)`, mV), `c` (float64 `(n_bundles,)`, sums to 1), `slices` (list of `slice` into the residual
+    vector), `n_residuals` (int $N$). ValueError: `weighting` not `relative` or `ls_amplitude`; no bundle; a bundle
+    with no pre-window sample, fewer than 2 window samples, a non-finite recorded sample in either, weights
+    non-finite or of non-positive sum, or $D_b$ not finite and positive; the refusals of `build_multi_protocol_loss`
+    for the same arguments.
+  - `assemble_residuals(layout, traces) -> np.ndarray`: `traces` a list of `bundle_trace` outputs in the bundles'
+    order; float64 `(N,)`: `sqrt_a[b] * (traces[b][masks[b]] - v_exp[b]) / D[b]`.
+  - `l_and_l2(layout, r) -> (float, float)`: $(L, L_2)$ of 2.10 (a) from a residual vector.
+  - `build_trace_evaluator(cell, bundles, v_rest_mV, *, spec=None, dt_brief_ms=None, dt_long_ms=None, n_workers=1)
+    -> ev`: `ev(Q)` for `Q` float64 `(m, p)` in $q$ (the spec's axis order; `spec=None` = the 3-D passive spec)
+    returns a list of length `m`; entry `k` is the list of `bundle_trace` arrays of the bundles at `Q[k]`, or `None`
+    when `spec.apply_q` or any bundle's simulation raised (other than a dt-enforcement failure, raised in the caller
+    under the class name `DtEnforcementError` as in Block 19) or a trace is non-finite. `n_workers == 1`: a serial
+    loop in the process. `n_workers > 1`: the `m * n_bundles` (point, bundle) tasks on a fork
+    `ProcessPoolExecutor` of `n_workers` processes, created at the first call, reused, `chunksize=1`; a worker that
+    dies raises `BrokenProcessPool`; the one-live-pool rule of Block 19 (amendment 2) holds across losses and
+    evaluators. After a call the parent's cell is at `Q[-1]`. The values are EXACTLY those of the serial loop.
+    Attributes: `n_workers`, `n_points` (points asked since built), `n_failed` (points returned `None`), `close()`
+    (as Block 19's). ValueError: `n_workers` not an integer >= 1; `Q` not 2-D with `p` columns or non-finite.
+  - `build_multi_protocol_residuals(cell, train_bundles, v_rest_mV, *, <the protocol arguments of residual_layout>,
+    spec=None, dt_brief_ms=None, dt_long_ms=None, n_workers=1, fail_l2=100.0) -> resid`: `resid(Q)` returns float64
+    `(m, N)`, row `k` $= r(Q_k)$, a failed point the constant row of 2.10 (a). Attributes: `layout`, `evaluator`,
+    `n_residuals`, `n_points`, `n_failed`, `l_and_l2(row)`, `close()`.
+  - The loss returned by `build_multi_protocol_loss` (serial and pooled) gains `loss.make_residuals(fail_l2=100.0)`:
+    `build_multi_protocol_residuals` with the loss's own cell, bundles, protocol arguments, spec, dt and
+    `n_workers`. ValueError when the loss's `weighting` is `equal` or `custom`. Nothing else of the loss changes:
+    its values are those of the contract commit bit for bit.
+- Inputs / outputs: as above; voltages mV, times s, $q$ as `param_spec`.
+- Parameters: `n_workers` (1), `fail_l2` (100).
+- Library calls: `numpy.interp`; `concurrent.futures.ProcessPoolExecutor` (fork context).
+- Custom code: the assembly of 2.10 (a) (no library function; it is the project's own loss).
+- Test oracles (`smoke_residuals.py`, NEURON, on the fixture cell and bundles `smoke_ls_pool.py` uses): T1 at >= 6
+  points of the box (two on faces), protocols (`ls_amplitude`, `peak_decay`, window `step`, the SS exponential
+  weight) and (`relative`, `none`): for every bundle $\sum_{s \in W_b} r_{b,s}^2$ equals
+  $c_b (\mathrm{RMSD}_b/D_b)^2$ from `bundle_rmsd` (relative 1e-10); `l_and_l2(row)[0]` equals the loss of
+  `build_multi_protocol_loss` (relative 1e-10); $\sum_b c_b = 1$; $L \le \sqrt{L_2}$. T2 `resid(Q)` with
+  `n_workers` 2 and 3 `np.array_equal` to `n_workers` 1 for a `Q` of 6 points; `ev(Q)` likewise. T3 the parent's
+  cell is at `Q[-1]` after a call (soma `cm`, `g_pas`, `gIhbar`, `e_pas`). T4 a point made to fail (a patched
+  simulation raising for one point): its row is the constant, $L_2$ = `fail_l2`, `n_failed` counts it, the other
+  rows unchanged; a `DtEnforcementError` reaches the caller under that name, serial and pooled. T5 the refusals of
+  `residual_layout` and of `n_workers`. T6 `loss(q)` of `build_multi_protocol_loss` equals the contract commit's bit
+  for bit at 4 points, W = 1 and 2; `smoke_ls_pool.py` and `smoke_ls_protocol.py` still pass. T7 `n_points` equals
+  the number of rows asked; `close()` twice; a call after `close()`. T8 a loss with a live pool and its
+  `make_residuals()` evaluated alternately, warnings as errors: values equal the serial ones, no warning. T9
+  `bundle_trace` on a long bundle: its window samples minus `v_exp`, weighted, reproduce `bundle_rmsd` (1e-10);
+  constant outside the simulated interval for a brief bundle. T10 ASCII/LF.
+- Data flow: Block 25's refinement takes `resid` as its `residuals`; Block 26 takes `ev`, `ResidualLayout`; Block 27
+  wires both.
+- Confirmed: yes -- D-245 (the squared loss), D-246; the user's "go on with the implementation" (2026-11-25, 14:13)
+  on the plan and settings shown. The failed point's constant, the evaluator's interface: the orchestrator's.
+- Status: drafted.
+
+### Block 24: finite-difference Jacobian with an absolute step in unit coordinates (2.10 (b))
+
+- Purpose: 2.10 (b) as a pure module; one batch call per Jacobian.
+- Module: `fd_jacobian.py` (new; numpy only); smoke `smoke_fd_jacobian.py` (new).
+- Public API:
+  - `to_unit(q, bounds) -> np.ndarray`, `to_q(u, bounds) -> np.ndarray` (clipped into the box), `bounds` a sequence
+    of `p` pairs `(lo, hi)` in $q$, `hi > lo`; both accept `(p,)` or `(m, p)`.
+  - `fd_points(u, *, h=1e-3, scheme="forward") -> (U, plan)`: `U` float64 `(k, p)` the perturbed points in the order
+    axis 0, 1, ... (forward: `k = p`; central: 2 per two-sided axis, plus then minus, 1 per one-sided axis);
+    `plan` a list of `p` tuples `("forward", row, delta)` or `("central", row_plus, row_minus, h)`.
+  - `fd_jacobian(batch_fun, u, *, h=1e-3, scheme="forward", f0=None) -> FdResult`: `batch_fun(U)` maps float64
+    `(k, p)` in unit coordinates to float64 `(k, N)`. Called exactly once: with `U` when `f0` is given (or not
+    needed: central with every axis two-sided), else with `u` as the first row followed by `U`. `FdResult`:
+    `J` float64 `(N, p)` $= \partial f/\partial u$, `f0` float64 `(N,)` or `None` when not computed, `n_points`
+    (rows asked), `plan`.
+  - `jac_unit_to_q(J_u, bounds) -> np.ndarray`: `J_u / (hi - lo)` per column.
+  - ValueError: `u` not 1-D, non-finite or outside $[0, 1]$; `h` not in $(0, 0.5]$; unknown scheme; `batch_fun`
+    returning a wrong shape or a non-finite value; `f0` of the wrong length; bounds with `hi <= lo`.
+- Library calls: numpy.
+- Custom code: the batched differences. Checked: `scipy.optimize.approx_fprime` and scipy's private
+  `_numdiff.approx_derivative` evaluate one point per call and take a relative step by default; the fit needs the
+  perturbed points in one call (they run in parallel) and an absolute step in unit coordinates.
+- Test oracles (`smoke_fd_jacobian.py`): J1 a linear map: `J` exact (1e-9) for both schemes, interior and on each
+  face. J2 the toy model of the review's `smoke_sensitivity_reference.py` (reproduced in the smoke) against its
+  exact Jacobian at $h = 10^{-3}$: forward within 2e-2 relative, central within 1e-4, forward at a point on an upper
+  bound within 2e-2 (the sign of the flipped step). J3 against `scipy.optimize.approx_fprime` on a smooth scalar
+  field per residual at an interior point (forward, same absolute step; 1e-6 relative). J4 `batch_fun` called once;
+  the rows it receives are `fd_points`' (and `u` first when `f0` is None); with `f0` given, `u` is not asked. J5
+  `to_unit`/`to_q` inverse on the box, clipping; `jac_unit_to_q` against a chain-rule case. J6 refusals. J7
+  ASCII/LF.
+- Data flow: Block 25 (the solver's Jacobian) and Block 26 (the sensitivities) call `fd_jacobian`.
+- Confirmed: yes -- the review's CR-2/CR-4 numerics, taken with the plan (user, 2026-11-25 14:13).
+- Status: drafted.
+
+### Block 25: the least-squares refinement (2.10 (c))
+
+- Purpose: 2.10 (c) as pure functions of `local_refine.py`; Nelder-Mead untouched.
+- Module: `local_refine.py` (additions only: nothing existing changes); smoke `smoke_refine_trf.py` (new).
+- Public API:
+  - `TrfConfig` (frozen dataclass): `n_starts=3`, `min_start_dist_unit=0.1`, `max_nfev=30`, `fd_step_unit=1e-3`,
+    `xtol=1e-4`, `ftol=1e-8`, `gtol=1e-8`, `penalty=1e6`; validated in `__post_init__`.
+  - `refine_trf(residuals, x_iters, func_vals, bounds, cfg=None, loss_of_row=None) -> TrfResult`:
+    `residuals(Q)` maps float64 `(m, p)` in $q$ to float64 `(m, N)`; `x_iters` `(n, p)`, `func_vals` `(n,)` the
+    global evaluations ($L$); starts by `select_starts` with a `RefineConfig` carrying `n_starts`,
+    `min_start_dist_unit`, `penalty`. Per start: the residual at the start, then `scipy.optimize.least_squares`
+    as 2.10 (c), `fun(u)` one row, `jac(u)` one `fd_jacobian` call (forward, `f0` = the row of the same `u` when it
+    is the last one computed). `loss_of_row(row) -> float` gives $L$ (None: nan). `TrfResult`: `x` (list, $\hat q$),
+    `l2`, `l`, `fun` (= `l`; the name the fit reads), `x_search` and `l2_search`, `l_search` (the first start),
+    `improved` (`l2 < l2_search`), `best_start` (-1 when not improved), `n_sims` (= `n_evals`: residual vectors
+    computed), `starts` (list of dicts: `index`, `x0`, `l2_0`, `l_0`, `x` (the lowest recorded point of that start),
+    `l2`, `l`, `x_solver` (scipy's endpoint), `status`, `converged`, `optimality`, `active_mask` (list of p ints),
+    `nfev`, `njev`, `n_sims`, `message`, `jtj` (float64 `(p, p)`, $J^\top J$ in $q$ coordinates at `x_solver`),
+    `sv` (its square-rooted eigenvalues = the singular values of $J$, descending)), `x_evals` float64 `(n_sims, p)`,
+    `l2_evals` `(n_sims,)`, `start_of_eval` int64 `(n_sims,)`. No start (every global value penalised): the
+    search's best point returned, `n_sims` 0, `improved` False.
+  - `wrap_minimizer_trf(minimizer, get_residuals, cfg=None) -> callable`: `skopt.gp_minimize`'s call form;
+    calls `minimizer`, then `residuals = get_residuals()` and `refine_trf` with `loss_of_row` =
+    `lambda row: residuals.l_and_l2(row)[0]` when `residuals` has `l_and_l2`; returns the SAME result object with
+    `x` $= \hat q$, `fun` $= L(\hat q)$ (when nan: `func(x)`), and the attribute `refine` (the `TrfResult`);
+    `x_iters`, `func_vals`, `models`, `space` untouched.
+- Library calls: `scipy.optimize.least_squares`; `fd_jacobian.fd_jacobian`, `to_unit`, `to_q`, `jac_unit_to_q`.
+- Custom code: none beyond the wrapper and the records.
+- Test oracles (`smoke_refine_trf.py`, pure): L1 the nonlinear toy model of the review's
+  `smoke_sensitivity_reference.py` (five parameters, noise-free): from 20 uniformly random single starts the
+  estimate is within 1e-4 (max-norm, unit box) of the truth, every start converged, `n_sims` per start <= 180. L2
+  the quadratic bowls of the review's `check02` (condition numbers 1, 1e2, 1e4; 20 seeds; start = best of 200
+  random points): within 1e-4 of the minimum in every case. L3 a minimum outside the box along one axis: the
+  estimate on that face (1e-6), `active_mask` non-zero there, every recorded point inside the box. L4 `n_sims ==
+  len(l2_evals) ==` a counter of the rows `residuals` returned; each Jacobian is one `residuals` call of `p` rows;
+  the estimate is the lowest recorded $L_2$; `l2_evals[k]` equals the squared norm of the row. L5 two basins: the
+  estimate in the deep one, `best_start` naming it. L6 `residuals` returning the constant failed row everywhere off
+  a region: no crash, finite result. L7 `wrap_minimizer_trf` around a fake minimizer: the same object back, `x`/`fun`
+  replaced, `refine` attached, `get_residuals` called once and after the minimizer. L8 determinism. L9 `TrfConfig`
+  refusals. L10 `smoke_local_refine.py` still 10/10 (nothing existing changed). L11 ASCII/LF.
+- Data flow: consumes Block 24; Block 27 passes Block 23's `resid` through `get_residuals` and reads `TrfResult`.
+- Confirmed: yes -- D-245; the settings shown to the user and taken with the plan (2026-11-25, 14:13).
+- Status: drafted.
+
+### Block 26: sensitivities and identifiability (2.10 (d))
+
+- Purpose: 2.10 (d): the stored sensitivities of a cell at a point, and the identifiability table of a protocol.
+- Module: `identifiability.py` (new; numpy only, pure), `trace_sensitivity.py` (new; numpy, no NEURON import: it
+  takes an evaluator); smoke `smoke_identifiability.py` (new).
+- Public API (`trace_sensitivity.py`):
+  - `compute_sensitivities(evaluator, q, bounds, *, h=1e-3, scheme="central") -> dict`: `evaluator(Q)` as Block
+    23's `ev` (a list per point of per-bundle float64 arrays, or `None`); one `fd_jacobian` call on the
+    concatenated traces, the base point included. Returns `q` `(p,)`, `h`, `scheme`, `traces0` (list of
+    `(n_t_b,)`, mV), `S` (list of `(n_t_b, p)`, mV per unit of $q_i$), `n_points`. RuntimeError when a point
+    returns `None`.
+  - `save_sensitivities(path, sens, *, t_list, names, meta=None)` and `load_sensitivities(path) -> dict`: one
+    `.npz` (no pickle) holding `q`, `h`, `scheme`, `names`, per bundle `t_<b>`, `V0_<b>`, `S_<b>`, and `meta` as a
+    JSON string.
+- Public API (`identifiability.py`; `layout` is duck-typed on Block 23's `ResidualLayout`: `masks`, `pre_masks`,
+  `sqrt_a`, `D`, `slices`, `n_residuals`):
+  - `jacobian_from_sensitivities(S_list, layout) -> np.ndarray` `(N, p)`: 2.10 (d)'s $J$ (the layout's bundles
+    are `S_list`'s, in order).
+  - `svd_summary(J) -> dict`: `sigma` `(p,)` descending, `V` `(p, p)` with ROW `j` $= v_{j+1}$ (sign: the largest
+    component positive), `ratio` $= \sigma_p/\sigma_1$.
+  - `noise_residuals(layout, noise_list) -> np.ndarray` `(N,)`: 2.10 (d)'s $r_\eta$ from per-bundle noise arrays
+    `(n_t_b,)` (mV), each minus its own mean over `pre_masks[b]`.
+  - `predicted_scatter(J, R_eta) -> dict`: `R_eta` `(K, N)`; `dq` `(K, p)` by `numpy.linalg.lstsq(J, -R_eta.T)`,
+    `sd` `(p,)` (ddof 1), `corr` `(p, p)`. ValueError: `K < 2`, shapes, non-finite, `J` of rank below `p`.
+  - `relative_difference(J_a, J_b) -> float`: $\lVert J_a - J_b\rVert_F / \lVert J_b\rVert_F$.
+  - `identifiability_row(J, names, R_eta=None) -> dict`: `sigma_1..sigma_p`, `sigma_ratio`, `v_p_<name>`,
+    `v_pm1_<name>`, and with `R_eta`: `sd_lin_<name>`, `corr_<a>_<b>` for every pair `a < b` in `names`' order.
+- Library calls: `numpy.linalg.svd`, `numpy.linalg.lstsq`; `fd_jacobian.fd_jacobian`.
+- Custom code: none beyond the assembly.
+- Test oracles (`smoke_identifiability.py`, pure; the toy model of the review's `smoke_sensitivity_reference.py`
+  reproduced in the smoke with a hand-built layout): I1 on the six-parameter toy built with
+  $g\,e^{\Delta v/k}$ only: `sigma_ratio` < 1e-8 and $v_p \propto (1, -k)$ on (ln g, dv) (|cos| > 1 - 1e-8); the
+  five-parameter toy has `sigma_ratio` > 1e-3. I2 `predicted_scatter` against 200 noisy toy fits by
+  `scipy.optimize.least_squares` (white noise): empirical over predicted standard deviation within 0.8 to 1.25 for
+  every parameter; and a covariance WITHOUT the sandwich (the naive $\sigma^2 (J^\top J)^{-1}$ under the unequal
+  weights) is outside that band for at least one parameter (the planted-defect check). I3
+  `compute_sensitivities` on an evaluator built from the toy: `S` within 1e-4 relative of the exact derivative
+  traces; a `None` point raises. I4 `jacobian_from_sensitivities` equals a direct `fd_jacobian` of the toy's
+  residual vector (1e-6 relative). I5 `noise_residuals`: a constant added to a bundle's noise changes nothing; the
+  sign of 2.10 (d). I6 save/load round trip, `np.array_equal`, `allow_pickle=False`. I7 `relative_difference` hand
+  case; refusals. I8 ASCII/LF.
+- Data flow: consumes Block 24 and, by duck typing, Block 23's evaluator and layout; Block 27 runs it per twin.
+- Confirmed: yes -- D-246; the step, the scheme and K = 200 shown to the user and taken with the plan.
+- Status: drafted.
+
+### Block 27: the wiring -- the fit's `trf` refinement, the twins' sensitivity sub-command, the report's flags
+
+- Purpose: `run_ih_fit.py` uses Block 25 on Block 23's residuals (`--refine trf`, the default of `ih5`,
+  `ih6_d207`, `passive_fullstep`; `nelder_mead` an opt-in comparison); `run_twin_recovery.py` gains the
+  sensitivity run of 2.10 (d) per twin and the loss-at-truth trace check; the report gains a bound flag per
+  parameter and prints $L$ beside $\sqrt{L_2}$; `submit_twin_recovery.sh` passes the options.
+- Module: `run_ih_fit.py`, `run_twin_recovery.py`, `ih_recovery_report.py`, `submit_twin_recovery.sh`; smokes
+  adapted. Written by the orchestrator after Blocks 23 to 26 are merged; entry completed then.
+- Status: drafted (interface to complete after the wave).
 
 ## 6. Pipeline entry points
 

@@ -316,3 +316,37 @@ def wrap_minimizer(minimizer: Callable[..., Any],
     _wrapped.refine_config = cfg
     _wrapped.wrapped_minimizer = minimizer
     return _wrapped
+
+
+# ---------------------------------------------------------------------------
+#  SPEC 2.10 (c), Block 25: the least-squares refinement (contract stubs;
+#  signatures and fields as the Block 25 entry of SPEC.md)
+# ---------------------------------------------------------------------------
+@dataclass(frozen=True)
+class TrfConfig:
+    """Settings of the least-squares refinement (SPEC 2.10 (c))."""
+    n_starts: int = 3
+    min_start_dist_unit: float = 0.1
+    max_nfev: int = 30                 # scipy least_squares, per start
+    fd_step_unit: float = 1e-3         # absolute, unit coordinates
+    xtol: float = 1e-4
+    ftol: float = 1e-8
+    gtol: float = 1e-8
+    penalty: float = 1e6               # global values >= penalty are no start
+
+
+def refine_trf(residuals: Callable[[np.ndarray], np.ndarray],
+               x_iters: Sequence[Sequence[float]], func_vals: Sequence[float],
+               bounds: Sequence[Tuple[float, float]],
+               cfg: "TrfConfig" = None,
+               loss_of_row: Callable[[np.ndarray], float] = None):
+    """The refinement of SPEC 2.10 (c); returns a TrfResult (Block 25)."""
+    raise NotImplementedError("Block 25")
+
+
+def wrap_minimizer_trf(minimizer: Callable[..., Any],
+                       get_residuals: Callable[[], Callable],
+                       cfg: "TrfConfig" = None) -> Callable[..., Any]:
+    """A drop-in for skopt.gp_minimize that runs refine_trf after it
+    (Block 25)."""
+    raise NotImplementedError("Block 25")

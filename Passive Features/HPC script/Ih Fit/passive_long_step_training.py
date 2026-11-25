@@ -1376,3 +1376,73 @@ def integrate_long_step(
               f"{DEFAULT_DT_BRIEF_MS:g} ms, long={DEFAULT_DT_LONG_MS:g} ms "
               f"(applied to training, validation, Phase 2.5 and Phase 3)")
     return orig_prepare
+
+
+# ---------------------------------------------------------------------------
+#  SPEC 2.10 (a), Block 23: the residual vector and the trace evaluator
+#  (contract stubs; signatures and shapes as the Block 23 entry of SPEC.md)
+# ---------------------------------------------------------------------------
+def bundle_trace(cell, bundle, v_rest_mV: float, *,
+                 dt_brief_ms: Optional[float] = None,
+                 dt_long_ms: Optional[float] = None) -> np.ndarray:
+    """float64 (len(bundle.t),), mV: the model's trace of `bundle` at the
+    cell's CURRENT parameters minus its own pre-window mean (taken on the
+    simulation grid), interpolated on bundle.t (np.interp). SPEC Block 23."""
+    raise NotImplementedError("Block 23")
+
+
+def residual_layout(train_bundles: Sequence, *,
+                    ss_window_ms: Tuple[float, float] = (0.5, 100.0),
+                    ls_window_ms_after_onset: float = 150.0,
+                    ls_window_mode: str = "after_onset",
+                    r_in_target: str = "peak",
+                    weighting: str = "relative",
+                    ss_sample_weight_fn: Optional[Callable[[np.ndarray], np.ndarray]] = None,
+                    ls_sample_weight: str = "none",
+                    ls_tau_d_ms: float = 500.0):
+    """ResidualLayout of SPEC 2.10 (a): masks, pre_masks, sqrt_a, v_exp, D,
+    c, slices, n_residuals -- from the recorded traces only. SPEC Block 23."""
+    raise NotImplementedError("Block 23")
+
+
+def assemble_residuals(layout, traces: Sequence[np.ndarray]) -> np.ndarray:
+    """float64 (N,): sqrt_a[b] * (traces[b][masks[b]] - v_exp[b]) / D[b],
+    bundles in order. SPEC Block 23."""
+    raise NotImplementedError("Block 23")
+
+
+def l_and_l2(layout, r: np.ndarray) -> Tuple[float, float]:
+    """(L, L_2) of SPEC 2.10 (a) from a residual vector (N,)."""
+    raise NotImplementedError("Block 23")
+
+
+def build_trace_evaluator(cell, bundles: Sequence, v_rest_mV: float, *,
+                          spec: Optional[object] = None,
+                          dt_brief_ms: Optional[float] = None,
+                          dt_long_ms: Optional[float] = None,
+                          n_workers: int = 1):
+    """ev(Q (m, p) in q) -> list of m entries: the list of bundle_trace
+    arrays at Q[k], or None for a failed point. Attributes n_workers,
+    n_points, n_failed, close(). SPEC Block 23."""
+    raise NotImplementedError("Block 23")
+
+
+def build_multi_protocol_residuals(
+        cell, train_bundles: Sequence, v_rest_mV: float, *,
+        ss_window_ms: Tuple[float, float] = (0.5, 100.0),
+        ls_window_ms_after_onset: float = 150.0,
+        ls_window_mode: str = "after_onset",
+        r_in_target: str = "peak",
+        weighting: str = "relative",
+        ss_sample_weight_fn: Optional[Callable[[np.ndarray], np.ndarray]] = None,
+        ls_sample_weight: str = "none",
+        ls_tau_d_ms: float = 500.0,
+        spec: Optional[object] = None,
+        dt_brief_ms: Optional[float] = None,
+        dt_long_ms: Optional[float] = None,
+        n_workers: int = 1,
+        fail_l2: float = 100.0):
+    """resid(Q (m, p) in q) -> float64 (m, N), row k = r(Q[k]); a failed
+    point the constant row sqrt(fail_l2 / N). Attributes layout, evaluator,
+    n_residuals, n_points, n_failed, l_and_l2(row), close(). SPEC Block 23."""
+    raise NotImplementedError("Block 23")
