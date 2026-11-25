@@ -2036,10 +2036,10 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - `sensitivity` sub-command: `run_twin_recovery.py sensitivity --run-dir DIR --twin ID [--n-workers N]
   [--n-noise 200] [--h 1e-3] [--check-h 1e-2]`: builds the twin as `twin` does (reusing a built one), runs
   `run_ih_fit.main` with the twin's fit argv plus `--sensitivity-theta <the twin's truth>` and
-  `--sensitivity-out DIR/<group>/sensitivity/twin_<ID>`; then, for the weightings `W0` and `W1` of Block 27, with
+  `--sensitivity-out DIR/sensitivity/twin_<ID>` [amendment 2 of wave 6, D-249: first written `DIR/<group>/sensitivity/...`; the run directory is already the group's, as `DIR/fits`, `DIR/twins` are]; then, for the weightings `W0` and `W1` of Block 27, with
   `layout_from_stored` and `identifiability.noise_residuals` / `predicted_scatter`, adds to each row of
   `identifiability_<specimen>.csv` the columns `sd_lin_<name>` and `corr_<a>_<b>` and writes
-  `DIR/<group>/sensitivity/twin_<ID>/identifiability.csv` (plus `twin_id`, `configuration`, `n_noise`).
+  `DIR/sensitivity/twin_<ID>/identifiability.csv` (plus `twin_id`, `configuration`, `n_noise`).
 - The noise of a bundle (2.10 (d); the twin's own per-sweep laws, also for a noise-free twin: the laws of its real
   cell in the twins' table): for realisation $k = 0..K-1$ with `base_seed = 1000000 + k` and the twin's `twin_id`,
   a long bundle's noise is the mean over its `sweep_numbers` of `twin_noise.ls_sweep_noise(law, tilt, 1/fs,
@@ -2048,8 +2048,8 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   `twin_noise.ss_sweep_noise(...)` of the window's sweep (positions, period and sampling as `twin_build` passes
   them). The noise array must have the bundle's length (`len(t_<b>)`); if the loader's bundle grid is not the
   stored sweep's or window's grid, STOP (issue): the mapping is then a scientific choice.
-- `merge` also gathers every `sensitivity/twin_*/identifiability.csv` into `DIR/<group>/identifiability.csv` and
-  every `truth_trace_check_*.csv` into `DIR/<group>/truth_trace_check.csv` (with `twin_id`), when any exists.
+- `merge` also gathers every `sensitivity/twin_*/identifiability.csv` into `DIR/identifiability.csv` and
+  every `truth_trace_check_*.csv` into `DIR/truth_trace_check.csv` (with `twin_id`), when any exists.
 - `submit_twin_recovery.sh`: `MODE=sensitivity` submits one sub-job per twin running the `sensitivity` sub-command
   (the same resources and `NCPUS` as a fit; `N_NOISE`, default 200), then the merge; `MODE` unset = today's run.
   `PLAN_ARGS` passes `--refine-max-nfev`. The roadmap's marker lines kept as they are.
@@ -2058,8 +2058,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Test oracles (`smoke_twin_sensitivity.py`, NEURON, the fixture of `smoke_twin_recovery.py`): V1 `plan` records
   `refine` `trf` and `refine_max_nfev`; the fit argv carries them. V2 `sensitivity` on one noise-free and one
   noisy twin of the fixture (`--n-noise 20`): the files exist; `sd_lin_<name>` finite and positive for every name,
-  both weightings; identical for a noise-free twin and its noisy partner when their truths are equal (the noise
-  model is the real cell's) within 1e-9, or the reason stated if the sensitivities differ. V3 the bundle noise:
+  both weightings; for a noise-free twin and its noisy partner of equal truths the stored sensitivities are identical, and the noise-free twin's sensitivities with the partner's seeds and layout reproduce the partner's `sd_lin` (1e-9); the difference as built is reported [amendment 2, D-249: first written "identical ... within 1e-9", which cannot hold: the realisations are seeded with each twin's own `twin_id`, and the weights $a_{b,s}$, $D_b$ are read on each twin's own traces; measured on the fixture at K = 20: 0.22 (W0) and 0.27 (W1) relative from the seeds, under 0.01 from the layout]. V3 the bundle noise:
   length equals the bundle's; two calls give identical arrays; for a one-sweep long bundle it equals
   `ls_sweep_noise` of that sweep; the brief bundle's noise has a standard deviation below a single window's. V4
   `merge` writes `identifiability.csv` and `truth_trace_check.csv` with one `twin_id` per twin run. V5 a `twin`
