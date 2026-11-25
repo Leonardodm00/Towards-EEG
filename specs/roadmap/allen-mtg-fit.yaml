@@ -231,6 +231,15 @@ theory:
     closed_on:
     decision:
     note: "Added at the user's word, 2026-11-24 (D-234), after run tw2. No study document yet: the agent writing one was stopped by the user before it was written (2026-11-24)."
+  - id: T19
+    title: "Why a Gauss-Newton solver needs a sum of squares"
+    summary: "Why a least-squares solver (Gauss-Newton, Levenberg-Marquardt, trust-region reflective) needs the loss as a sum of squared residuals: the Jacobian of the residuals gives the curvature J^T J for free; why the fit's loss L, a weighted sum of per-bundle RMSDs, has no such form and L_2, the weighted sum of their squares, has; what the change does to the estimate."
+    refs: []
+    parent: TG3
+    depends_on: [T18]
+    status: open
+    closed_on:
+    decision:
 
 implementation:
   # ---- groups (no block of their own; coloured by their least advanced member)
