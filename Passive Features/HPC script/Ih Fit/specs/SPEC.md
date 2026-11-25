@@ -1938,15 +1938,138 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Confirmed: yes -- D-246; the step, the scheme and K = 200 shown to the user and taken with the plan.
 - Status: drafted.
 
-### Block 27: the wiring -- the fit's `trf` refinement, the twins' sensitivity sub-command, the report's flags
+### Block 27: the fit's `trf` refinement, the bound flags and the sensitivity mode of `run_ih_fit.py`
 
-- Purpose: `run_ih_fit.py` uses Block 25 on Block 23's residuals (`--refine trf`, the default of `ih5`,
-  `ih6_d207`, `passive_fullstep`; `nelder_mead` an opt-in comparison); `run_twin_recovery.py` gains the
-  sensitivity run of 2.10 (d) per twin and the loss-at-truth trace check; the report gains a bound flag per
-  parameter and prints $L$ beside $\sqrt{L_2}$; `submit_twin_recovery.sh` passes the options.
-- Module: `run_ih_fit.py`, `run_twin_recovery.py`, `ih_recovery_report.py`, `submit_twin_recovery.sh`; smokes
-  adapted. Written by the orchestrator after Blocks 23 to 26 are merged; entry completed then.
-- Status: drafted (interface to complete after the wave).
+- Purpose: `run_ih_fit.py` applies Block 25 on Block 23's residuals; records convergence, $L_2$ and a bound flag
+  per parameter; and gains a mode that computes and stores the sensitivities of 2.10 (d) at a given point instead of
+  fitting, with the trace check of the loss at that point.
+- Module: `run_ih_fit.py`; smoke `smoke_ih_trf.py` (new); `smoke_ih_refine.py`, `smoke_ih5.py`, `smoke_ih_fit.py`
+  adapted only where a changed default makes an existing assertion false (say which).
+- Refinement:
+  - `REFINE_CHOICES = ("none", "nelder_mead", "trf")`. `ARMS`: `ih5`, `ih6_d207`, `passive_fullstep` have
+    `refine="trf"` (D-245: the default; `nelder_mead` a labelled comparison by `--refine nelder_mead`); `ih6`,
+    `baseline_runB` stay `"none"`.
+  - CLI: `--refine-max-nfev` (int, 30: `TrfConfig.max_nfev`); `--refine-starts` serves both refinements;
+    `--refine-maxfev` Nelder-Mead only. `refine_config_from_args` returns a `RefineConfig`, a `TrfConfig` or None.
+  - Under `trf`: the loss `mono._build_loss_function` builds during `fit_one_cell` is captured (a shim around
+    `mono._build_loss_function`, removed in a `finally`), `mono.gp_minimize` is replaced for the fit by
+    `local_refine.wrap_minimizer_trf(orig, get_residuals, cfg)` with `get_residuals` returning the captured loss's
+    `make_residuals()` (built once); its `close()` is called after the fit. The monolith is not edited. The global
+    search is untouched: with the same options its `x_iters` and `func_vals` equal those of `--refine none`.
+  - `phase2_results.csv` gains, after the Block 20 columns: `l2_after_search`, `l2_after_refine` (the
+    `TrfResult`'s `l2_search`, `l2`; nan without `trf`), `refine_n_converged` (starts with `converged`; 0 without
+    `trf`), `refine_n_failed` (the residual function's `n_failed`; 0 without `trf`), `sqrt_l2_at_estimate`,
+    `sqrt_l2_at_eval_theta` ($\sqrt{L_2}$ at the estimate and at `--eval-theta`'s point, through
+    `loss.make_residuals()` of a loss built as `loss_at_estimate`'s is; nan when the arm's weighting is not
+    `relative` or `ls_amplitude`, or without `--eval-theta` for the second), and `on_bound_<name>` for every fitted
+    name: `"lo"` when the estimate's unit coordinate is below 0.01, `"hi"` when above 0.99, else `""`. Under `trf`,
+    `loss_after_search` $= L$ at the first start (`l_search`), `loss_after_refine` $= L(\hat q)$,
+    `refine_n_evals` = `n_sims`; `loss_at_estimate == train_rel_loss == loss_after_refine` (1e-9 relative).
+  - `refine_starts.csv`: the head and the `x0_<name>`, `x_<name>` columns as now (under `trf`: `f0` = `l_0`, `fun`
+    = `l`, `nit` = `njev`), then appended for both refinements: `l2_0`, `l2`, `converged`, `optimality`, `n_sims`,
+    `x_solver_<name>` (physical units), `active_<name>` (scipy's `active_mask`), `sv_1..sv_p`; under Nelder-Mead
+    these are nan (`converged`: `status == 0`; `n_sims`: `nfev`; `x_solver_<name>`: `x_<name>`; `active_<name>`: 0).
+- Sensitivity mode (no fit): `--sensitivity-theta "name=value,..."` (every fitted name, physical units, the
+  grammar of `--eval-theta`; inside the box, else exit 2), `--sensitivity-out DIR`, `--sensitivity-h` (1e-3),
+  `--sensitivity-check-h` (1e-2; 0 = no check). For each loaded cell, after the cell is built as for a fit:
+  - bundles = the cell's training bundles followed by its validation bundles (as the fit holds them);
+    `ev = plst.build_trace_evaluator(cell, bundles, v_rest, spec=spec, dt..., n_workers=--n-workers)`;
+    `sens = trace_sensitivity.compute_sensitivities(ev, q, bounds, h, scheme="central")`, saved with
+    `save_sensitivities` as `DIR/sensitivity_<specimen>.npz` (`meta`: see below);
+  - `DIR/bundles_<specimen>.npz` (no pickle): per bundle `b` `t_<b>` (s), `v_<b>` (mV, recorded), and arrays over
+    bundles `is_train` (bool), `is_brief` (bool), `amplitude_pA`, `stim_onset_s`, `stim_duration_s`,
+    `n_repeats_averaged` (int), `sweep_numbers` (a JSON string: a list of lists);
+  - `meta` (JSON, also written as `DIR/sensitivity_<specimen>.json`): `specimen_id`, `names`, `bounds` (q),
+    `theta` (physical), `v_rest_mV`, `arm`, the protocol of the fit's loss (`ss_window_ms`, `ls_window_mode`,
+    `ls_window_ms_after_onset`, `r_in_target`, `weighting`, `ls_sample_weight`, `ls_tau_d_ms`, the SS time weight's
+    kind and its parameters), `dt_brief_ms`, `dt_long_ms`, `h`, `check_h`, `n_workers`;
+  - `DIR/identifiability_<specimen>.csv`: one row per weighting, `W0` = the arm's protocol and `W1` = the same
+    with `ls_tau_d_ms = 1e12` (no decay after the peak; D-246), columns `specimen_id`, `weighting`, `ls_tau_d_ms`,
+    then `identifiability.identifiability_row(J, names)` with $J$ =
+    `jacobian_from_sensitivities` of the TRAINING bundles under that layout; and on the `W0` row only
+    `fd_step_check` = `relative_difference(J(check_h), J(h))` (nan when 0), `loss_at_theta`, `sqrt_l2_at_theta`
+    (from `traces0`), `v_deepest_train_mV` and `m_inf_at_v_deepest` (as the fit record computes them at theta);
+  - `DIR/truth_trace_check_<specimen>.csv`: per bundle the difference `traces0[b] - (v_b - its pre-window mean)`:
+    `max_abs_mV`, `t_max_s`, and its RMS (mV) over three segments of a long bundle (`rms_first5ms`: the first 5 ms
+    after onset; `rms_rest_of_step`; `rms_after_offset`, nan when no sample), for a brief bundle `rms_window` (its
+    RMSD window) with the three nan.
+  - Public helper (pure, no NEURON): `layout_from_stored(bundles_npz, meta, *, ls_tau_d_ms=None,
+    ls_window_mode=None, ls_sample_weight=None) -> (layout, train_index)`: `plst.residual_layout` of the stored
+    TRAINING bundles under `meta`'s protocol with the given overrides; `train_index` the positions of the training
+    bundles among the stored ones. The layouts of the csv are built through it.
+- Library calls: Blocks 23 to 26.
+- Custom code: none.
+- Test oracles (`smoke_ih_trf.py`, NEURON, the fixture archive of `smoke_ih_refine.py` built at a known truth,
+  noise-free): U1 the arm table and overrides. U2 a fit `--arm ih5 --n-calls 12 --n-initial 8 --refine-starts 2
+  --refine-max-nfev 8`: runs; the new columns present and finite; `l2_after_refine <= l2_after_search`;
+  `loss_at_estimate == loss_after_refine` (1e-9); `sqrt_l2_at_estimate**2 == l2_after_refine` (1e-9);
+  `sqrt_l2_at_estimate >= loss_at_estimate`; `refine_starts.csv` rows with the appended columns; `mono.gp_minimize`
+  and `mono._build_loss_function` are the original objects after the fit. U3 the same fit with `--refine none`: its
+  pre-existing columns equal those of the contract commit's run with the same options, and the `trf` run's
+  `loss_after_search` equals its search best (the search is untouched). U4 `--n-workers 2` gives the same
+  `phase2_results.csv` as 1 but `n_workers` and the wall time. U5 a start AT the fixture's truth displaced by 0.05
+  in every unit coordinate (a canned global result through a fake `gp_minimize`): the estimate is within 5e-3
+  (unit box, max-norm) of the truth, the start converged. U6 `on_bound_<name>`: hand cases on the pure function.
+  U7 `--refine nelder_mead` still runs and fills the appended columns as stated. U8 the sensitivity mode at the
+  truth: the four files exist; `fd_step_check` < 0.05; `sqrt_l2_at_theta` equals `sqrt_l2_at_eval_theta` of a fit
+  run with `--eval-theta` at the same point (1e-9); `sigma_1 >= ... >= sigma_p > 0`; the `W1` row differs from
+  `W0`; `layout_from_stored` on the files reproduces `residual_layout` of the live bundles (`np.array_equal` on
+  `sqrt_a`, `masks`, `D`); `truth_trace_check` max below 1e-6 mV on the fixture (twin and fit share one code path
+  there) -- or the measured value reported if not. U9 `--sensitivity-theta` outside the box: exit 2. U10 ASCII/LF.
+- Data flow: Block 28 builds the command line, reads the columns and the sensitivity files.
+- Confirmed: yes -- D-245, D-246; the settings shown to the user (2026-11-25, 14:13). The 0.01 threshold of the
+  bound flag is the review's (CR-3 b); the file layout is the orchestrator's.
+- Status: drafted.
+
+### Block 28: the twins' run with `trf`, the sensitivity sub-command and its noise, the merged tables
+
+- Purpose: `run_twin_recovery.py` passes the new fit options, reports the new columns, and gains `sensitivity`:
+  per twin, Block 27's sensitivity mode at the twin's truth plus the predicted scatter of 2.10 (d) from the twin's
+  own noise model; `submit_twin_recovery.sh` can submit it.
+- Module: `run_twin_recovery.py`, `ih_recovery_report.py` (only if a column has to pass through it),
+  `submit_twin_recovery.sh`; smoke `smoke_twin_sensitivity.py` (new); `smoke_twin_recovery.py` adapted only where a
+  changed default makes an existing assertion false (say which).
+- Fit options: `--refine` accepts `trf` and it is the plan's default; `--refine-max-nfev` (30) recorded in the plan
+  and passed to the fit; `--refine-maxfev` passed as now. `recovery_extras.csv` gains `l2_after_search`,
+  `l2_after_refine`, `refine_n_converged`, `refine_n_failed`, `sqrt_l2_at_estimate`, `sqrt_l2_at_truth` (the fit's
+  `sqrt_l2_at_eval_theta`) and `on_bound_<name>` for the arm's names (empty for a name the arm does not fit).
+- `sensitivity` sub-command: `run_twin_recovery.py sensitivity --run-dir DIR --twin ID [--n-workers N]
+  [--n-noise 200] [--h 1e-3] [--check-h 1e-2]`: builds the twin as `twin` does (reusing a built one), runs
+  `run_ih_fit.main` with the twin's fit argv plus `--sensitivity-theta <the twin's truth>` and
+  `--sensitivity-out DIR/<group>/sensitivity/twin_<ID>`; then, for the weightings `W0` and `W1` of Block 27, with
+  `layout_from_stored` and `identifiability.noise_residuals` / `predicted_scatter`, adds to each row of
+  `identifiability_<specimen>.csv` the columns `sd_lin_<name>` and `corr_<a>_<b>` and writes
+  `DIR/<group>/sensitivity/twin_<ID>/identifiability.csv` (plus `twin_id`, `configuration`, `n_noise`).
+- The noise of a bundle (2.10 (d); the twin's own per-sweep laws, also for a noise-free twin: the laws of its real
+  cell in the twins' table): for realisation $k = 0..K-1$ with `base_seed = 1000000 + k` and the twin's `twin_id`,
+  a long bundle's noise is the mean over its `sweep_numbers` of `twin_noise.ls_sweep_noise(law, tilt, 1/fs,
+  n_samples, ...)` with each sweep's `(law, tilt)` from `twin_table.sweep_law(table, specimen, "LS", s)`; a brief
+  bundle's noise is the mean, over every stored SS window of the bundle's polarity, of the rows of
+  `twin_noise.ss_sweep_noise(...)` of the window's sweep (positions, period and sampling as `twin_build` passes
+  them). The noise array must have the bundle's length (`len(t_<b>)`); if the loader's bundle grid is not the
+  stored sweep's or window's grid, STOP (issue): the mapping is then a scientific choice.
+- `merge` also gathers every `sensitivity/twin_*/identifiability.csv` into `DIR/<group>/identifiability.csv` and
+  every `truth_trace_check_*.csv` into `DIR/<group>/truth_trace_check.csv` (with `twin_id`), when any exists.
+- `submit_twin_recovery.sh`: `MODE=sensitivity` submits one sub-job per twin running the `sensitivity` sub-command
+  (the same resources and `NCPUS` as a fit; `N_NOISE`, default 200), then the merge; `MODE` unset = today's run.
+  `PLAN_ARGS` passes `--refine-max-nfev`. The roadmap's marker lines kept as they are.
+- Library calls: Blocks 5, 10, 12, 26, 27.
+- Custom code: none.
+- Test oracles (`smoke_twin_sensitivity.py`, NEURON, the fixture of `smoke_twin_recovery.py`): V1 `plan` records
+  `refine` `trf` and `refine_max_nfev`; the fit argv carries them. V2 `sensitivity` on one noise-free and one
+  noisy twin of the fixture (`--n-noise 20`): the files exist; `sd_lin_<name>` finite and positive for every name,
+  both weightings; identical for a noise-free twin and its noisy partner when their truths are equal (the noise
+  model is the real cell's) within 1e-9, or the reason stated if the sensitivities differ. V3 the bundle noise:
+  length equals the bundle's; two calls give identical arrays; for a one-sweep long bundle it equals
+  `ls_sweep_noise` of that sweep; the brief bundle's noise has a standard deviation below a single window's. V4
+  `merge` writes `identifiability.csv` and `truth_trace_check.csv` with one `twin_id` per twin run. V5 a `twin`
+  run with the default `trf` (reduced budget): `recovery_extras.csv` has the new columns. V6 the submitter's
+  `DRY_RUN=1 MODE=sensitivity` prints the sub-command with the options; `MODE` unset prints today's. V7 ASCII/LF,
+  `bash -n`.
+- Data flow: consumes Block 27's CLI, columns and files.
+- Confirmed: yes -- D-246; K = 200 shown to the user. The seeds, the averaging of sweep noise into a bundle and
+  the file layout are the orchestrator's (D-247).
+- Status: drafted.
 
 ## 6. Pipeline entry points
 

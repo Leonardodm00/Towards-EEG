@@ -1600,5 +1600,18 @@ def _parse_args(argv):
     return args
 
 
+# ---------------------------------------------------------------------------
+#  SPEC Block 27 (contract stub): the layout of stored bundles, pure
+# ---------------------------------------------------------------------------
+def layout_from_stored(bundles_npz, meta, *, ls_tau_d_ms=None,
+                       ls_window_mode=None, ls_sample_weight=None):
+    """(layout, train_index): passive_long_step_training.residual_layout of
+    the stored TRAINING bundles of `bundles_npz` (Block 27's
+    bundles_<specimen>.npz, a path or a loaded mapping) under `meta`'s
+    protocol, with the given overrides; train_index: the positions of the
+    training bundles among the stored ones. No NEURON. SPEC Block 27."""
+    raise NotImplementedError("Block 27")
+
+
 if __name__ == "__main__":
     main()
