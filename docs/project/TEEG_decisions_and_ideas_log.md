@@ -302,6 +302,11 @@ the "Binds" column.
 | 2026-11-25 (the review chat, about 15:30) | D-245's "Why" corrected in place with a dated mark: the fits integrate at 0.1 ms (D-007), not 0.025 ms as written; the twins at 0.025 ms (D-192 (iv)). No new decision ID. |
 | 2026-11-25 (the review chat, 15:33) | Logs **D-248** (user): the next twins' run is the noisy twins only, fitted at 0.1 ms; the noise-free twins later if time allows, their long steps at 0.025 ms and their short squares at the usual 0.1 ms. Two changelog hours of this chat (15:10, 16:10) were not read from a clock and are corrected above. |
 | 2026-11-25 (the review chat, later) | Logs **D-249** (orchestrator): amendment 2 of the wave's contract (`6d5f9e4` on `sci/twins`), after Block 28's implementer stopped on it: the sensitivity files under the run directory, and the partner-twin oracle restated. Blocks 23 to 28 merged on `sci/twins`. Next free IDs: D-250, I-008. |
+| 2026-11-25 (the soma-fit chat, 16:10) | Logs **D-250** (user, 15:02): the soma's depth semi-axis c ranged from the literature on human pyramidal somata (`Passive Features/Diameter Re-measurement/docs/TEEG_soma_fit_handoff_2026-11-24.md` section 9, on `sci/diameter-pipeline`; held there as "D-248" while pushes to `main` were refused, the ID since taken by the review chat). |
+| 2026-11-25 (the soma-fit chat, 16:10) | Logs **D-251** (user, 15:27 and 15:38): the passive model gets the soma as fitted on the stack and its equal-area sphere. |
+| 2026-11-25 (the soma-fit chat, 16:10) | Logs **D-252** (user, 15:27 and 15:38): the hold-c grid, 4 values on Colab, more with a local refinement on the HPC. |
+| 2026-11-25 (the soma-fit chat, 16:10) | Logs **D-253** (user, 15:27): production cleans the close branches' shadows before the soma fit. |
+| 2026-11-25 (the soma-fit chat, 16:10) | Logs **D-254** (user, 16:04): the soma fit's background a tilted plane per plane solved in the fit, R enlarged for it, and the far-background check. Next free IDs: D-255, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -539,6 +544,11 @@ would be needed*, *Status*.
 | D-247 | 2026-11-25 | SPEC 2.10 and Blocks 23 to 28 of `Ih Fit/specs/SPEC.md` on `sci/twins` (`passive_long_step_training.py`, `fd_jacobian.py`, `local_refine.py`, `identifiability.py`, `trace_sensitivity.py`, `run_ih_fit.py`, `run_twin_recovery.py`, `submit_twin_recovery.sh`); D-245, D-246 | the build choices of D-245 and D-246: the estimate among the points the least-squares stage evaluated; a failed point's $L_2 = 10^6$; the bound flag at 0.01 of the unit box; the weighting without decay as $\tau_d = 10^{12}$ ms; how a bundle's noise is drawn for the predicted scatter; the global stage unchanged for this round [orchestrator] | active; being implemented |
 | D-248 | 2026-11-25 | the next twins' runs (`submit_twin_recovery.sh`, `PLAN_ARGS`: `--dt-long-ms`, `--dt-brief-ms`); D-007 (unchanged), D-192 (iv), D-244 item 5 | the next run is the noisy twins only, at the fit's usual step (0.1 ms); the noise-free twins are fitted later if time allows, long steps at 0.025 ms, short squares at the usual 0.1 ms [user] | active; a run option, no code default changed |
 | D-249 | 2026-11-25 | SPEC Block 28 of `Ih Fit/specs/SPEC.md` on `sci/twins` (`run_twin_recovery.py`, `smoke_twin_sensitivity.py`); D-247 | amendment 2: the sensitivity files are `DIR/sensitivity/twin_<ID>/...`, `DIR/identifiability.csv`, `DIR/truth_trace_check.csv` (no group level); the oracle on a noise-free twin and its noisy partner asks identical sensitivities and identical predicted scatter under shared seeds and layout, not identical scatter as built [orchestrator] | active; implemented (`07e9b76`) |
+| D-250 | 2026-11-25 | the range of the soma's depth semi-axis c (the soma fit's hold-c values; soma-fit handoff section 9 on `sci/diameter-pipeline`) | c's range is set from published measurements of human pyramidal somata read in full text or in the data, each value with its preparation [user] | active |
+| D-251 | 2026-11-25 | what the passive model receives from the soma fit (SPEC Blocks 46-47; the corrected SWC) | the soma as fitted on the stack: the held c with the smallest misfit, S(a_hat, b_hat, c), its equal-area sphere; assumes the membrane kept its area when the slice flattened [user] | active |
+| D-252 | 2026-11-25 | the hold-c grid of the soma fit (Block 46, not built; Cell 25; the HPC job) | Colab: 4 held values of c; HPC: a finer grid up to the low end of the living range and a local refinement; the values proposed, not confirmed [user] | active |
+| D-253 | 2026-11-25 | the order of the production soma fit (HPC) against the cleaning; D-241.3 | production cleans the close branches' shadows before the soma fit; the pilot keeps D-241's region, shadows in [user] | active |
+| D-254 | 2026-11-25 | the soma fit's background and region (Block 46: `vp_scale`, `region_radius_um`); D-241.1's radius; the soma fit's report | each plane's background is a tilted plane solved exactly inside the fit; R enlarged so the tilt is constrained (how much: open); the fitted background checked against one measured far from the soma on near-focus planes [user] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15790,3 +15800,130 @@ shared seeds and layout the difference is 0. The seeds stay as built.
 **Sources.** **[orchestrator]**; **[run]** as above; **[log]** D-247.
 
 **Status:** active; implemented.
+
+## D-250 -- The soma's depth semi-axis is ranged from the literature on human pyramidal somata (user)
+
+**Date:** 2026-11-25, 15:02 (Europe/Rome), the soma-fit chat. **Binds:** the values of the soma's depth semi-axis $c$
+that the soma fit holds in turn (SPEC Block 46's hold-$c$ option, not built; `Passive Features/Diameter Re-measurement/docs/TEEG_soma_fit_handoff_2026-11-24.md` section 9 on `sci/diameter-pipeline`).
+
+**Decision [user].** On how to set the range of $c$, which the stack does not determine: "I would say it is better to
+search across the literature for human cells for this".
+
+**Statement.** (D-250.1 [user]) The range of $c$ (um) is set from published measurements of human cortical pyramidal
+somata -- their 3D dimensions, or a shape ratio and a size from which $c$ follows -- read in a full text or in the data,
+not from the stems' exit depths and the shrinkage argument alone. (D-250.2 [orchestrator]) Each value carries its
+preparation (living or fixed, imaging, shrinkage corrected or not), because the stack's $c$ is in stage units of a mounted
+slice.
+
+**Why.** **[user]** as quoted. With the far slope held, the fit's $c$ is fixed by that slope (`checks/soma_review_2026-11-25/`
+**[run, sandbox]**).
+
+**What it implies for code and tables.** The search was run in the same chat: Benavides-Piccione et al. 2024 (doi
+10.1093/cercor/bhae180, full text) gives human CA1 somata with $c/r$ = 1.02 (ratio of means, ellipsoid assumed); Mohan et
+al. 2015 (doi 10.1093/cercor/bhv188, full text) a z-shrinkage of mounted human slices of 63 +- 10 %; for the pilot this gives
+$c$ of about 5.1-7.0 um living and 1.4-3.3 um in the stack (`literature_c_range.py` **[run]**; assumptions in the handoff).
+
+**What it does not decide.** The frame given to the passive model (decided by D-251); the held values (D-252).
+
+**Sources.** **[user]** 15:02; the full texts above; Allen's technical white paper (Cell Morphology and Histology, 2018).
+
+**Status:** active.
+
+## D-251 -- The passive model gets the soma as fitted on the stack, as its equal-area sphere (user)
+
+**Date:** 2026-11-25, 15:27 and 15:38 (Europe/Rome), the soma-fit chat. **Binds:** what SPEC Block 47 writes into the
+corrected SWC from the soma fit; closes D-250's question of the frame.
+
+**Decision [user].** 15:27: "the fitted model will have the soma (rouded) that we find here, we will find the best
+fitting c, calcualte te S and determine the radius of the sphere that has the same superficial area". 15:38:
+"Flattening doesn't change the superficial area. but the volume".
+
+**Statement.** (D-251.1) The soma passed to the passive model is the stack's fitted ellipsoid at the held $c$ with the
+smallest misfit: its area $S(\hat a, \hat b, c)$ and the sphere of equal area, $r_{m eq} = (S/4\pi)^{1/2}$ (Block 47's
+rule). No living-frame correction of $c$. (D-251.2) The assumption it rests on: the membrane kept its area when the slice
+flattened (the soma widened rather than folded), so the fitted $S$ is the living area.
+
+**Why.** **[user]** as quoted.
+
+**What it implies for code and tables.** Block 47 unchanged; the soma fit reports $S$ at every held $c$ and the chosen one.
+
+**What it does not decide.** Told to the user and recorded: with the far slope held, the best-fitting $c$ is the
+$c$-free fit's $\hat c$ (a profile's minimum is the joint minimum), so it rests on $\gamma$ = 0.79; and D-251.2 is not
+established -- if the membrane folded below the microscope's resolution the fit reads the envelope and under-reads $S$
+(pilot radius 6.26 um: 306 um^2 at $c$ 2.3 against 492 for a round soma **[run]**).
+
+**Sources.** **[user]** 15:27, 15:38; soma-fit handoff section 9.
+
+**Status:** active.
+
+## D-252 -- The hold-c grid: four values on Colab, more with a local refinement on the HPC (user)
+
+**Date:** 2026-11-25, 15:27 and 15:38 (Europe/Rome), the soma-fit chat. **Binds:** the hold-$c$ option of SPEC Block 46
+(not built), notebook Cell 25, the HPC job of the soma fit.
+
+**Decision [user].** 15:27: "I would do more C fits also towards the lower end of the living cells". 15:38: "In colab
+let's do just 4 of these c values in the HPC more maybe with a local refinement".
+
+**Statement.** (D-252.1) Colab: four held values of $c$. (D-252.2) HPC: a grid from the stack's range up to about the low
+end of the living range (D-250), then a local refinement. (D-252.3 [orchestrator], PROPOSED, not confirmed) Colab 1.5,
+2.5, 3.5, 5.0 um; HPC 1.5-5.5 um in 0.5 um steps, the refinement a fit with $c$ free started from the best grid value.
+
+**Why.** **[user]** as quoted. Cost **[run, sandbox]**: a held-$c$ fit took 30-320 s (median 169 s) on simulated stacks;
+a render costs in proportion to the slabs (22 at $c$ 1.5 um, 72 at 5.0 um).
+
+**What it does not decide.** The values (D-252.3 awaits the user); whether the refinement is that fit or a finer grid.
+
+**Sources.** **[user]** 15:27, 15:38.
+
+**Status:** active; not implemented.
+
+## D-253 -- Production cleans the close branches' shadows before the soma fit (user)
+
+**Date:** 2026-11-25, 15:27 (Europe/Rome), the soma-fit chat. **Binds:** the order of the production pipeline on the
+HPC (the cleaning, then SPEC Block 46); settles the "when" of D-241.3.
+
+**Decision [user].** "Indeed we will first clear the close branches' shadow and then doing the fit in the HPC now for the
+pilot we keep this".
+
+**Statement.** (D-253.1) In production the shadows of the branches close to the soma are cleaned from the soma's planes
+before the soma fit. (D-253.2) The pilot keeps D-241's treatment: the branches' pixels masked, their shadows in the data.
+
+**Why.** **[user]** as quoted.
+
+**What it does not decide.** Which cleaning (the existing one of D-241.3 presumably) and its settings for a soma's planes.
+
+**Sources.** **[user]** 15:27.
+
+**Status:** active; not implemented.
+
+## D-254 -- The soma fit's background: a tilted plane per plane solved in the fit, a wider region, a far-background check (user)
+
+**Date:** 2026-11-25, 16:04 (Europe/Rome), the soma-fit chat. **Binds:** SPEC Block 46 (`vp_scale` / `_vp_columns`, the
+region `region_radius_um`), `fit_soma.py`, Cell 25; supersedes D-241.1's radius (the disc of Allen's soma radius); D-241.2
+(the branches' pixels masked) unchanged.
+
+**Decision [user].** On the orchestrator's proposal of 15:45 (keep each plane's background solved inside the fit and give
+it a tilt) and its two points: "There the soma's shadow is small ..., so a mismatch would point to model error. I would
+do like that" and "R is mostly soma, I would enlarge this however so that the tilt is better constrained".
+
+**Statement.** (D-254.1) Each plane's background is $B_k(x, y) = b_{0k} + b_{1k} x + b_{2k} y$ (gl), the model of plane
+$k$ is $B_k(x,y)\,	au_k(x,y;	heta)$, and the three coefficients are solved exactly by linear least squares on the region
+at every trial $	heta$ (variable projection), replacing the constant $B_k$. (D-254.2) The region is enlarged beyond
+Allen's soma radius so that the tilt is constrained; the radius is open. (D-254.3) The fitted background is compared with a
+background measured far from the soma on the near-focus planes, where the soma's own halo is small; a mismatch flags model
+error. (D-254.4) The user's proposal of 15:38 -- each plane's background measured beside the soma first and held in the
+fit -- is not adopted: in a simulation with the model otherwise exact it biased $c$ by -15.7 % and $S$ by -10.2 %
+(`checks/soma_review_2026-11-25/background_check.py` **[run, sandbox]**).
+
+**Why.** **[user]** as quoted; **[run]** the check above.
+
+**What it implies for code and tables.** Block 46 amended (SPEC first): the per-plane projection on three columns; the
+region's radius a setting; the report gains the background coefficients and the far-background comparison. Checked on
+simulation before use: that the tilt does not trade with the centre, at the chosen radius.
+
+**What it does not decide.** The region's radius; where "far" is for the background measurement; whether the far slope
+is calibrated (D-218.2).
+
+**Sources.** **[user]** 15:38, 16:04; the check above.
+
+**Status:** active; not implemented.
