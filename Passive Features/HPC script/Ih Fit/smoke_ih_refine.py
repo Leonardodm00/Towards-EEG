@@ -170,7 +170,9 @@ def _f2_run():
     orig = mono.gp_minimize
     out = _new_out("f2")
     t0 = time.time()
-    logtxt = _run_main(_fit_args(out, "ih6_d207", *(F2_OPTS + ["--eval-theta", _theta_arg(THETA6)])))
+    # [adapted in Block 27: --refine nelder_mead, the refinement this suite tests; trf is the default now]
+    logtxt = _run_main(_fit_args(out, "ih6_d207", *(F2_OPTS + ["--refine", "nelder_mead",
+                                                               "--eval-theta", _theta_arg(THETA6)])))
     secs = time.time() - t0
     _STATE["f2"] = dict(out=out, res=pd.read_csv(out / "phase2_results.csv", float_precision="round_trip"),
                         roles=pd.read_csv(out / "ls_roles.csv"),
@@ -193,10 +195,11 @@ def test_F1_arm_table():
     five = ("Cm", "Rm", "Ra", "gbar", "kappa_tau")
     three = ("Cm", "Rm", "Ra")
     # SPEC Blocks 15 and 20, written out: (names, role_rule, weighting, ls_sample_weight, refine)
+    # [adapted in Block 27: the default refinement of the three D-207 arms is trf (SPEC 2.10 (c))]
     expect = {
-        "ih6_d207": (six, "d207", "ls_amplitude", "peak_decay", "nelder_mead"),
-        "ih5": (five, "d207", "ls_amplitude", "peak_decay", "nelder_mead"),
-        "passive_fullstep": (three, "d207", "ls_amplitude", "peak_decay", "nelder_mead"),
+        "ih6_d207": (six, "d207", "ls_amplitude", "peak_decay", "trf"),
+        "ih5": (five, "d207", "ls_amplitude", "peak_decay", "trf"),
+        "passive_fullstep": (three, "d207", "ls_amplitude", "peak_decay", "trf"),
         "ih6": (six, "d006", "relative", "none", "none"),
         "baseline_runB": (three, "d006", "relative", "none", "none"),
     }
@@ -228,8 +231,9 @@ def test_F1_arm_table():
             c = R.resolve_arm_config(_parse(["--arm", arm, "--refine", val]))
             if c.refine != val or c.fit_params != R.ARMS[arm].fit_params or c.role_rule != R.ARMS[arm].role_rule:
                 bad.append("%s --refine %s -> %s" % (arm, val, c))
-    rc = R.refine_config_from_args(_parse(["--arm", "ih5", "--refine-starts", "2", "--refine-maxfev", "12"]),
-                                   R.ARMS["ih5"])
+    # [adapted in Block 27: ih5's own refinement is trf; Nelder-Mead is asked for by --refine]
+    _a = _parse(["--arm", "ih5", "--refine", "nelder_mead", "--refine-starts", "2", "--refine-maxfev", "12"])
+    rc = R.refine_config_from_args(_a, R.resolve_arm_config(_a))
     import local_refine as LR
     if rc != LR.RefineConfig(n_starts=2, maxfev_per_start=12):
         bad.append("refine config %s" % (rc,))
@@ -285,7 +289,10 @@ def test_F2_ih6_d207_fit():
     want_cols = R.refine_starts_columns(R.build_spec_from_args(_parse(["--arm", "ih6_d207"]), R.ARMS["ih6_d207"]))
     if list(starts.columns) != want_cols:
         bad.append("refine_starts.csv columns %s" % list(starts.columns))
-    num = starts.drop(columns=["specimen_id"]).to_numpy(dtype=float)
+    # [adapted in Block 27: the columns Block 27 appends are NaN under Nelder-Mead by contract]
+    num = starts[list(R.REFINE_STARTS_HEAD[1:]) + [c for c in starts.columns if c.startswith("x0_")
+                                                   or (c.startswith("x_") and not c.startswith("x_solver_"))]
+                 ].to_numpy(dtype=float)
     if not np.all(np.isfinite(num)):
         bad.append("refine_starts.csv has non-finite entries")
     if int(starts["nfev"].sum()) != int(row["refine_n_evals"]):
