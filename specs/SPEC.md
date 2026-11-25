@@ -1564,6 +1564,18 @@ orchestrator's (D-210).
   the wave's recovery check (truth rendered at f = 4, fitted at f = 1). Choices the entry left open: q evaluated as
   1 - min(A, B) rho^2 - |A - B| w^2 (exact phi-independence at a = b); rows and columns where a transfer is exactly 0
   skipped (bit-identical, tested); no chunking of the planes (memory about K N_y (N_x/2 + 1) 16 B).
+- Amendment (2026-11-25, drafted; wave 8; D-258 [user], D-259 [orchestrator]): the in-focus blur as an argument.
+  `SomaRenderer.render(theta_g, slope=None, sigma0_um=None)`. With `sigma0_um` None the render is unchanged, bit for
+  bit. With a number (um; finite, > 0; ValueError otherwise) the kernel is first re-anchored at that in-focus width with
+  its growth kept, `kernel.with_kernel(rcfg, sigma0_um)` (growth scale 1: at every knot $\sigma'(\delta_m) =
+  \sqrt{\sigma(\delta_m)^2 - \sigma(0)^2 + \sigma_0^2}$, the linear continuation's slope unchanged; Block 4, amendment
+  2), and then `slope`, when given, replaces the continuation's slope as before. `with_kernel`'s refusals pass through
+  (a kernel family other than "gaussian_table"; a knot whose new variance is not > 0). Library: `kernel.with_kernel`.
+  Custom code: none. Test oracles: (R1) `sigma0_um` equal to the table's own $\sigma(0)$ gives the tau of
+  `sigma0_um=None` [1e-12]; (R2) for two other widths (one below, one above the table's) and a slope, the tau of a
+  `SomaRenderer` built on `with_kernel(rcfg, s)` and rendered without `sigma0_um` [1e-12]; (R3) on the plane nearest
+  $z_0$ the largest $|\partial\tau/\partial x|$ (finite differences along a row through the centre) decreases as
+  `sigma0_um` grows over three values; (R4) the ValueErrors; mu = 0 still gives 1 exactly.
 
 ### Block 46: the soma fit -- an ellipsoid fitted to the planes about the soma (D-215, D-216, D-218, D-219)
 
@@ -1727,6 +1739,151 @@ orchestrator's (D-210).
   False is logged as a warning (the fit then misses part of its own model). Tests: the defaults' spec test expects
   14.0; the end-to-end default run checks the crop against the new rule and `ellipsoid_inside` True on the synthetic
   soma.
+- Amendment (2026-11-25, drafted; wave 8; D-254, D-255, D-256, D-258 [user]; D-259 [orchestrator] for the choices marked
+  PROVISIONAL). Five changes; everything not named here stands.
+  (a) The region's radius (D-255). $r_R$ = `region_radius_um` when it is a number, otherwise `region_radius_scale`
+  $\times$ `radius_um` (the traced soma radius passed to `fit_soma`; scale 1.2). $R$ is the disc of radius $r_R$ about
+  $(x_s, y_s)$ minus the mask, as before.
+  (b) The background (D-254.1). `SomaFitConfig.background` = "tilted" (the default) or "constant" (the model before
+  this amendment, kept as a labelled comparison). With $u = x - x_s$, $v = y - y_s$ (um; pixel centres from the traced
+  centre, a fixed point, not the fitted one) the model of plane $k$ on $R$ is
+  $$D_k(x, y) \approx \big(b_{0k} + b_{1k}\,u + b_{2k}\,v\big)\,\tau_k(x, y; \theta),$$
+  the plane's background -- its grey level at the traced centre and its slopes along x and y (gl, gl/um, gl/um) -- times
+  the soma's transmittance. For each $\theta$ the three coefficients of each plane are solved exactly (variable
+  projection),
+  $$\hat\beta_k(\theta) = \arg\min_{\beta \in \mathbb R^3} \big\|d_k - M_k(\theta)\,\beta\big\|^2,\qquad M_k(\theta) =
+  \big[\tau_k,\ u\,\tau_k,\ v\,\tau_k\big]\ \text{on } R,\qquad r_k = d_k - M_k\,\hat\beta_k:$$
+  the least-squares combination of the three columns (the transmittance, and the transmittance times each coordinate)
+  nearest the plane's data $d_k$, and the misfit left (gl). Solved with `numpy.linalg.lstsq` (or a QR of $M_k$), not by
+  inverting the normal equations; a plane whose $M_k$ is not finite or has rank < 3 gives NaN coefficients and a NaN
+  residual (the fit then fails as for a non-finite forward). Under "constant" the model is $B_k\,\tau_k$ as before and
+  $\beta_k = (B_k, 0, 0)$. dof = $|K|\,|R|$ - (fitted parameters) - $n_{\rm bg}\,|K|$, $n_{\rm bg}$ = 3 ("tilted") or
+  1 ("constant"). The start (`start_theta`) is unchanged.
+  (c) Held parameters, a given start, bounds for c (D-252, D-256). `fit_soma(..., slope0, hold=None, start=None,
+  c_bounds_um=None, sigma0_um=None)`. `hold`: a mapping from names among the first eight of PARAMS to values (finite,
+  inside that parameter's bounds; ValueError otherwise, and for an unknown name): a held parameter keeps its value
+  exactly, is not in `fitted` nor in `at_bound`, has NaN in `se` and in its row and column of `cov` (as the held far
+  slope). `start`: a (9,) theta replacing `start_theta`'s (finite; its slope entry ignored: `slope0` rules), clipped
+  into the bounds as before; held entries take their held values. `c_bounds_um`: (lo, hi), 0 < lo < hi finite,
+  replacing `axis_bounds_um` for c only. SE(S) is the delta method over the fitted axes among (a, b, c): a held axis
+  contributes no variance (the SE is conditional on the held value); NaN when a fitted axis has a NaN covariance.
+  (d) The in-focus blur (D-258). `SomaFitConfig.sigma0` = "fixed" (the default: the forward is called
+  `forward(theta_g, slope)`, two positional arguments, exactly as before) or "fit" (a labelled parallel analysis): one
+  more fitted parameter, named "sigma0_um", after the PARAMS names in `fitted`; the forward is then called
+  `forward(theta_g, slope, sigma0_um=value)`; its start is `fit_soma`'s `sigma0_um` argument (the configured kernel's
+  in-focus width; required finite > 0 under "fit", ValueError otherwise), clipped into `sigma0_bounds_um`; its
+  difference step `sigma0_diff_step_um`. Not holdable through `hold`.
+  (e) The result. `SomaFit` gains: `beta` (K, 3) float64 (gl, gl/um, gl/um; the planes in `ks` order); `background`
+  (the setting); `sigma0_um`, `se_sigma0_um` (floats: the fitted value and its SE under "fit"; under "fixed" the
+  `sigma0_um` argument as passed, NaN when it was None, and SE NaN); `cov_fit` (n_fit, n_fit): the scaled covariance of
+  the fitted parameters in `fitted` order (the one matrix from which `se`, `cov`, `se_sigma0_um` and SE(S) are read).
+  `B_gl` = `beta[:, 0]` (the background at the traced centre; under "constant" the plane's scale, as before). `theta`,
+  `se`, `cov` keep their (9,), (9,), (9, 9) layouts. A failed fit has NaN in the new arrays too.
+  New public functions:
+  - `vp_background(D, tau, region, u_um, v_um) -> (beta (K, 3), resid (K, n_region))`: D, tau (K, H, W); region (H, W)
+    bool; u_um, v_um (H, W) float (um). The residual on the region's pixels in C order, as `vp_scale`.
+  - `background_planes(beta, shape, left, top, res0_um, centre_xy_um) -> (K, H, W)` gl: $b_{0k} + b_{1k}u + b_{2k}v$ at
+    the pixel centres of a crop (`shape` = (H, W); pixel (row, col) centred on ((left + col) p, (top + row) p), as
+    everywhere in this block), so that a caller draws the model as `background_planes(...) * tau`.
+  Parameters (`SomaFitConfig`): `region_radius_scale` 1.2 (D-255; PROVISIONAL value), `background` "tilted" (D-254.1),
+  `sigma0` "fixed" (D-258), `sigma0_bounds_um` (0.02, 0.6) and `sigma0_diff_step_um` 0.005 (PROVISIONAL).
+  Library calls added: `numpy.linalg.lstsq`. Custom code: the per-plane loop of the three-column projection (no library
+  projects out a per-plane linear background of a stacked model); the free-parameter bookkeeping.
+  Test oracles added (T1 to T8 stand; where a toy scene of T4 to T8 was built for the constant background and a
+  tolerance no longer holds under "tilted", the check asks for `background="constant"` explicitly and says so):
+  (T9) `vp_background`: D = (b0 + b1 u + b2 v) tau exactly, different coefficients per plane, gives them [1e-9
+  relative] and a zero residual [1e-8 gl]; equals `numpy.linalg.lstsq` written out for one plane [1e-10]; with b1 = b2
+  = 0 its b0 equals `vp_scale`'s B [1e-10 relative]; `background_planes` against its formula at three pixels [1e-12].
+  (T10) recovery under a tilt: T4's forward and truth, the data (b0k + b1k u + b2k v) tau with slopes of up to 0.3
+  gl/um differing between planes, noise-free, ftol = xtol = 1e-10: under "tilted" every fitted parameter within 1e-4 of
+  the truth and beta within 1e-5 (gl, gl/um); under "constant" on the same data chi2 is at least 1e3 times the tilted
+  fit's. (T11) `hold`: c held at the truth -- theta[5] is the value exactly, se[5] NaN, "c_um" not in `fitted`, the
+  others within 1e-4, dof counted without c, SE(S) finite; c held 20 % off -- chi2 larger than at the truth. (T12) a
+  `start` at the truth returns the truth [1e-8] with chi2 < 1e-12 of sum d^2; `c_bounds_um` that exclude the true c put
+  c at the nearer bound and "c_um" in `at_bound`; the ValueErrors of (c). (T13) `sigma0` "fit" with a stand-in forward
+  that takes `sigma0_um` (its blur added in quadrature) and a truth 30 % from the start: recovered within 1e-4 um,
+  `fitted` ends with "sigma0_um", `cov_fit` (n_fit, n_fit) with `se_sigma0_um` its last diagonal's root; under "fixed"
+  a forward that accepts no keyword is called without error. (T14) region: with `region_radius_um` None,
+  `n_samples` = K x the pixels of the disc of 1.2 x the traced radius minus the mask; a number overrides the scale.
+
+### Block 50: the soma fit over a grid of held depths, and the far-background check (D-252, D-254.3, D-256, D-257)
+
+- Modules: `src/allen_diameter/analysis/soma_profile.py`; smoke test `tests/smoke/test_smoke_soma_profile.py`.
+- Purpose. With the kernel's far slope held (D-240), the stack does not fix the soma's depth semi-axis c by itself
+  (handoff of 2026-11-24, section 9). The fit is therefore run with c held at each value of a grid, the best one found,
+  and -- on the cluster -- refined in its neighbourhood (D-252, D-256). Independently, each fit's backgrounds are
+  compared with a background measured far from the soma on the planes near focus, and a flag is raised when they
+  disagree (D-254.3, D-257). No file access, no plotting; it does not import Block 46: the fit arrives as a callable.
+- Mathematics.
+  (1) The grid. `c_grid_um`: n >= 1 values (um), finite, strictly ascending, inside `axis_bounds_um` (ValueError
+  otherwise). For each $c_i$: `fit_one({"c_um": c_i}, None, None)`. A fit is usable when its status is not "failed" and
+  its chi2 is finite. The best index $i^*$ = the usable fit of smallest chi2 (a tie: the lower c); all fits have the
+  same planes and region, so chi2 is comparable. No usable fit: nothing is delivered.
+  (2) The refinement (`refine` True; needs n >= 2, ValueError otherwise). The neighbourhood of $c_{i^*}$ (D-256.3,
+  PROVISIONAL): $[c_{i^*-1}, c_{i^*+1}]$; at an end of the grid the missing side is mirrored, $c_{i^*} \mp |c_{i^*} -
+  c_{\rm neighbour}|$; then clipped into `axis_bounds_um`. One more fit with c free inside it, started from the best
+  grid fit: `fit_one({}, theta_best, (c_lo, c_hi))`.
+  (3) What is delivered (D-256.2). The refinement when it ran, is usable and its chi2 does not exceed the best grid
+  fit's by more than 1e-9 relative; otherwise the best grid fit.
+  (4) The far background. `far_mask`: the pixels whose centre lies at least `far_um` from the traced centre $(x_s,
+  y_s)$ and whose mask is False. `far_background`: for each plane the least-squares plane through its far pixels,
+  $B^{\rm far}_k(x, y) = b^{\rm far}_{0k} + b^{\rm far}_{1k}(x - x_s) + b^{\rm far}_{2k}(y - y_s)$, by
+  `calibration_scene.planar_background` (the nodes' trimmed plane, Block 10.P: refitted once without the pixels beyond
+  `trim_sigmas` robust SDs), `ok` False where it refuses. Its origin is the traced centre, the origin of Block 46's
+  $\hat\beta_k$, so the two $b_0$ are grey levels at one point.
+  (5) The check (D-257). Near planes: $|z_k - z_0| \le$ `near_um` (closed, with a tolerance of 1e-9 um), $z_0$ the
+  fitted centre depth, among the planes with `far_ok` and finite coefficients.
+  $$\Delta_k = \hat b_{0k} - b^{\rm far}_{0k}\ \text{(gl)},\qquad \text{flag} \iff \Big|\tfrac{1}{n}\textstyle\sum_{k\
+  {\rm near}} \Delta_k\Big| > \text{tol}:$$
+  the fitted background at the traced centre minus the far one, plane by plane, and a flag when their mean over the
+  $n$ near planes exceeds the tolerance in absolute value. No near plane: status "no_planes", flag False, mean NaN.
+- Public API:
+  - `FLAGS = ("grid_fit_failed", "best_at_grid_edge", "refinement_failed", "refinement_worse", "refined_c_at_bound")`.
+  - `fit_c_grid(fit_one, c_grid_um, refine, axis_bounds_um) -> CGrid`. `fit_one(hold, start, c_bounds_um)` returns an
+    object with the attributes `theta` (9,), `chi2`, `status`, `at_bound`, `n_samples` (Block 46's `SomaFit`); it is
+    called n times, plus once when refining and a usable best exists; exceptions it raises pass through.
+  - `CGrid` (frozen dataclass): `c_grid_um` (n,) float64; `fits` (tuple of the n results, in grid order); `best_index`
+    (int, -1 when none is usable); `neighbourhood_um` ((lo, hi) or None); `refinement` (the result or None);
+    `delivered` (a result or None); `delivered_source` ("grid" | "refinement" | "none"); `flags` (tuple of names from
+    FLAGS, in that order): "grid_fit_failed" a grid fit is not usable; "best_at_grid_edge" n >= 2 and $i^*$ is 0 or
+    n - 1; "refinement_failed" it ran and is not usable; "refinement_worse" it is usable and was not delivered;
+    "refined_c_at_bound" "c_um" is in the refinement's `at_bound`.
+  - `grid_table(cgrid) -> dict` of (n,) arrays for the report and the figure: `c_um`, `chi2`, `rms_gl`
+    ($\sqrt{\chi^2/{\rm n\_samples}}$), `x0_um`, `y0_um`, `z0_um`, `a_um`, `b_um`, `phi_rad`, `mu_per_um`,
+    `area_um2`, `r_eq_um` (read from the results' attributes of those names where present, else NaN), `usable` (bool).
+  - `far_mask(shape, left, top, res0_um, centre_xy_um, far_um, mask) -> (H, W) bool`; pixel (row, col) centred on
+    ((left + col) p, (top + row) p).
+  - `far_background(planes, far, left, top, res0_um, centre_xy_um, trim_sigmas, min_frac=0.0) -> (b (K, 3), ok (K,)
+    bool, n_used (K,) int)`: planes (K, H, W) gl; b in (gl, gl/um, gl/um), NaN where not ok.
+  - `background_check(beta, z_planes_um, z0_um, far_b, far_ok, near_um, tol_gl) -> dict`: `planes` (int indices into
+    the K planes), `delta_gl` (their $\Delta_k$), `mean_gl`, `max_abs_gl`, `n_planes`, `near_um`, `tol_gl`, `flag`
+    (bool), `status` ("ok" | "no_planes"). ValueError for shapes that disagree or a z0, near_um or tol_gl not finite
+    (near_um, tol_gl >= 0).
+- Parameters (`SomaFitConfig`): `c_grid_um` (1.5, 2.5, 3.5, 5.0) (D-256.1: Colab's; the cluster passes 1.5 to 5.5 in
+  0.5), `c_refine` False (D-252.1: Colab; the cluster True), `bgcheck_near_um` 1.2, `bgcheck_far_um` 12.0 (D-257.1),
+  `bgcheck_tol_gl` 1.0 (D-257.2, PROVISIONAL); the trim is `calibration.background_trim_sigmas`, passed by the caller.
+- Library calls: `calibration_scene.planar_background`; numpy.
+- Custom code: none beyond the grid's loop and the bookkeeping.
+- Test oracles: (P1) `fit_c_grid` with a stand-in `fit_one` whose chi2 is a known function of the held c (a parabola
+  with its minimum between two grid values, and at each end): `best_index`, the neighbourhood (interior, both mirrored
+  ends, the clip into the bounds), the arguments `fit_one` received (the holds; the refinement's start is the best
+  fit's theta, its bounds the neighbourhood), `delivered` and its source, each flag raised by a case built for it and
+  absent otherwise, the tie's rule, no usable fit, refine with one value (ValueError), a grid not ascending or outside
+  the bounds (ValueError). (P2) `grid_table` against the stand-ins' values; `rms_gl` by its formula [1e-12]. (P3)
+  `far_mask` against the distance written out on a small crop, the mask respected. (P4) `far_background`: a known
+  tilted plane noise-free [1e-9 gl, gl/um]; with Gaussian noise (seeded) within 4 SE of the truth, the SE from the
+  design matrix; with 5 % of the far pixels darkened by 30 gl the trimmed b0 moves by less than 0.5 gl where an
+  untrimmed `numpy.linalg.lstsq` moves by more than 1 gl; equal to `planar_background` called directly [exact]. (P5)
+  `background_check`: arrays built by hand -- the near window's closed ends, planes not ok or not finite left out, the
+  mean and the largest |Delta|, the flag just below and just above the tolerance, no near plane; the ValueErrors.
+  Determinism; the inputs are not modified.
+- Data flow: consumes Block 46's `fit_soma` through the caller's `fit_one` closure (its `hold`, `start`,
+  `c_bounds_um`), the fitted `beta` and `theta[2]` of a `SomaFit`, the soma's crop and mask (Block 44, the entry
+  point); feeds the entry point `scripts/fit_soma.py` (the fit delivered to Block 47, the record, Block 48's figures).
+- Confirmed: the grid, the refinement in the neighbourhood, the delivered fit, the check and its settings are the
+  user's (D-252, D-254.3, D-256, D-257); the neighbourhood's exact rule, the delivery rule's tolerance and the flag's
+  threshold are the orchestrator's, PROVISIONAL (D-259).
+- Status: drafted 2026-11-25 (wave 8).
 
 ### Block 47: the soma in the morphology -- the sphere of equal area and the stems' first nodes (D-215.2, D-216.3, D-222.5)
 

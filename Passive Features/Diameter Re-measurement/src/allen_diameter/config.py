@@ -58,6 +58,8 @@ FOCUS_GRAD_WINDOWS = ("radius_margin", "whole_profile")        # D-030 (provisio
 ABSORPTIONS = ("partition_vertical", "linear", "ray_world", "hybrid")    # D-024 / procedure s.3.6; "hybrid": Block 21 (D-084, D-092)
 KERNEL_FAMILIES = ("gaussian_table", "empirical")              # procedure s.3.4
 KERNEL_CONTINUATIONS = ("linear", "frozen", "proportional")    # D-024 / mathematics Eq. 17
+SOMA_BACKGROUNDS = ("tilted", "constant")                       # D-254.1 (SPEC Block 46, wave 8)
+SOMA_SIGMA0_MODES = ("fixed", "fit")                            # D-258 (SPEC Blocks 45-46, wave 8)
 RESPONSE_ESTIMATORS = ("local_linear", "tps_spline", "grid_mean")  # D-024, D-063.2, D-067.3 (grid_mean: not built)
 PHANTOM_DESIGNS = ("random", "grid")                           # D-024
 END_CUTS = ("axial", "vertical")                               # Block 2 (provisional default, see RendererConfig.end_cut)
@@ -537,7 +539,12 @@ class SomaFitConfig:
     # Block 46, the fit
     plane_step: int = 2                    # source: PROVISIONAL (D-219.4 [orchestrator]): planes whose index differs from k_0 by a multiple of this
     plane_half_um: float = 10.0            # source: PROVISIONAL (D-219.4 [orchestrator]): the planes within this of the start depth (um)
-    region_radius_um: Optional[float] = None  # source: D-241 [user]: the fit's disk about the traced centre: None = Allen's traced soma radius; a number (um) overrides
+    region_radius_um: Optional[float] = None  # source: D-241, D-255 [user]: the fit's disk about the traced centre: None = region_radius_scale x Allen's traced soma radius; a number (um) overrides
+    region_radius_scale: float = 1.2       # source: D-255 [user] (the value the user's example, PROVISIONAL): the disk's radius in traced soma radii when region_radius_um is None
+    background: str = "tilted"             # source: D-254.1 [user]: each plane's background b0 + b1 u + b2 v solved inside the fit; "constant" (one scale per plane, D-219.3) only as a labelled comparison
+    sigma0: str = "fixed"                  # source: D-258 [user]: the in-focus blur held at the kernel's; "fit" only as a labelled parallel analysis
+    sigma0_bounds_um: Tuple[float, float] = (0.02, 0.6)      # source: PROVISIONAL (D-259 [orchestrator]): the fitted in-focus blur's bounds (um)
+    sigma0_diff_step_um: float = 0.005     # source: PROVISIONAL (D-259 [orchestrator]): its forward-difference step (um)
     mask_widen_um: float = 0.0             # source: D-241 [user] (was 2.0, D-219.4): only the pixels the traced branches cover are left out (um; read by scripts/fit_soma.py)
     far_slope: str = "fixed"               # source: D-240 [user] (supersedes D-218.1): the kernel's far slope held at slope0; "fit" only as a labelled comparison
     shift_xy_um: float = 4.0               # source: PROVISIONAL (D-219.4 [orchestrator]): the centre's in-plane bound about the traced centre (um)
@@ -555,6 +562,12 @@ class SomaFitConfig:
     start_core_percentile: float = 5.0     # source: PROVISIONAL (D-219.5 [orchestrator]): the core's percentile (numpy.percentile, linear)
     start_ratio_clip: Tuple[float, float] = (0.05, 0.95)  # source: PROVISIONAL (D-219.5 [orchestrator]): varrho clipped into this
     start_ratio_none: float = 0.5          # source: PROVISIONAL (D-219.5 [orchestrator]): varrho when the core holds no region pixel
+    # Block 50, the grid over the held depth semi-axis and the far-background check (wave 8)
+    c_grid_um: Tuple[float, ...] = (1.5, 2.5, 3.5, 5.0)    # source: D-256.1 [user]: the held values of c on Colab (um); the cluster passes 1.5 to 5.5 in 0.5
+    c_refine: bool = False                 # source: D-252.1, D-256.2 [user]: no refinement on Colab; the cluster refines in the neighbourhood of the best grid value
+    bgcheck_near_um: float = 1.2           # source: D-257.1 [user]: the check's planes lie within this of the fitted centre depth (um)
+    bgcheck_far_um: float = 12.0           # source: D-257.1 [user]: the far background's pixels lie at least this far from the traced centre (um)
+    bgcheck_tol_gl: float = 1.0            # source: PROVISIONAL (D-257.2 [orchestrator]): the flag's threshold on the mean mismatch (gl)
     # the entry point, scripts/fit_soma.py (wave 6; D-222.5)
     crop_margin_um: float = 1.0            # source: PROVISIONAL (D-222.5 [orchestrator]; the recovery check's margin): the crop beyond the fit's disk (um)
     render_half_um: float = 14.0           # source: PROVISIONAL (D-243 [orchestrator]; the crop before D-241, 13 um disc + 1 um): the crop's least half-width (um), the renderer's support -- Block 45 draws the ellipsoid on the crop alone
@@ -998,6 +1011,16 @@ def _check_soma_fit(q: "SomaFitConfig") -> None:
           and math.isfinite(q.start_ratio_none) and 0 < q.start_ratio_none < 1
           and math.isfinite(q.crop_margin_um) and q.crop_margin_um >= 0
           and math.isfinite(q.render_half_um) and q.render_half_um > 0
+          and math.isfinite(q.region_radius_scale) and q.region_radius_scale > 0
+          and q.background in SOMA_BACKGROUNDS and q.sigma0 in SOMA_SIGMA0_MODES
+          and pair(q.sigma0_bounds_um) and q.sigma0_bounds_um[0] > 0
+          and math.isfinite(q.sigma0_diff_step_um) and q.sigma0_diff_step_um > 0
+          and len(tuple(q.c_grid_um)) >= 1 and all(math.isfinite(float(x)) for x in q.c_grid_um)
+          and all(float(x) < float(y) for x, y in zip(q.c_grid_um[:-1], q.c_grid_um[1:]))
+          and q.axis_bounds_um[0] <= float(q.c_grid_um[0]) and float(q.c_grid_um[-1]) <= q.axis_bounds_um[1]
+          and isinstance(q.c_refine, bool) and (not q.c_refine or len(tuple(q.c_grid_um)) >= 2)
+          and all(math.isfinite(float(x)) and float(x) >= 0 for x in (q.bgcheck_near_um, q.bgcheck_tol_gl))
+          and math.isfinite(q.bgcheck_far_um) and q.bgcheck_far_um > 0
           and len(tuple(q.figure_planes_um)) >= 1 and all(math.isfinite(float(x)) for x in q.figure_planes_um))
     if not ok:
         raise ValueError("soma_fit: a count, length, far_slope, bound, tolerance, step or start setting is out of range "

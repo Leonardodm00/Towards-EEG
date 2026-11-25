@@ -243,11 +243,17 @@ class SomaRenderer:
             self._freq[shape] = freq
         return freq
 
-    def render(self, theta_g, slope=None):
+    def render(self, theta_g, slope=None, sigma0_um=None):
         """-> tau (K, height, width) float64, dimensionless, the planes in the order of z_planes_um; tau <= 1, no
         lower bound imposed (the model does not clip). theta_g (8,) as ellipsoid_columns; slope (um of SD per um of
         defocus, finite, >= 0) replaces the kernel's continuation slope (the continuation must be "linear";
-        ValueError otherwise). mu = 0 gives tau = 1 exactly."""
+        ValueError otherwise). mu = 0 gives tau = 1 exactly.
+
+        sigma0_um (SPEC Block 45, the amendment of wave 8; D-258): None, the render as before, bit for bit; a number
+        (um, finite, > 0; ValueError otherwise) re-anchors the kernel at that in-focus width with its growth kept,
+        kernel.with_kernel(rcfg, sigma0_um), before slope replaces the continuation's slope."""
+        if sigma0_um is not None:
+            raise NotImplementedError("Block 45, wave 8: sigma0_um")
         th = _theta(theta_g)
         rc = self._kernel_config(slope)
         z0, c, mu = th[2], th[5], th[7]

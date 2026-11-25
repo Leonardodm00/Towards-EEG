@@ -273,6 +273,21 @@ def vp_scale(D, tau, region):
     return _vp_columns(Dv[:, reg], T[:, reg])
 
 
+def vp_background(D, tau, region, u_um, v_um):
+    """-> (beta (K, 3) [gl, gl/um, gl/um], resid (K, n_region) gl): per plane the least-squares coefficients of the
+    columns [tau, u tau, v tau] on the region's pixels and the residual D - M beta there (C order, as vp_scale). D, tau
+    (K, H, W); region (H, W) bool; u_um, v_um (H, W) float, um from the traced centre. NaN coefficients and residual
+    for a plane whose columns are not finite or have rank < 3. SPEC Block 46, the amendment of wave 8 (D-254.1)."""
+    raise NotImplementedError("Block 46, wave 8: vp_background")
+
+
+def background_planes(beta, shape, left, top, res0_um, centre_xy_um):
+    """-> (K, H, W) gl: b0_k + b1_k u + b2_k v at the pixel centres of a crop, u = x - x_s, v = y - y_s (um), pixel
+    (row, col) centred on ((left + col) p, (top + row) p). beta (K, 3); shape (H, W); centre_xy_um (x_s, y_s). SPEC
+    Block 46, the amendment of wave 8."""
+    raise NotImplementedError("Block 46, wave 8: background_planes")
+
+
 # ------------------------------------------------------------------- start ---
 
 def start_theta(block_k0, left, top, res0_um, centre_um, radius_um, region, slope0, scfg=None):
@@ -483,7 +498,7 @@ def _failed(fitted, ks_sel, dof, n_samples, n_eval, t0, message):
 
 
 def fit_soma(block, ks, valid, left, top, res0_um, dz_um, centre_um, radius_um, mask, forward_factory, scfg,
-             slope0):
+             slope0, hold=None, start=None, c_bounds_um=None, sigma0_um=None):
     """-> SomaFit: the ellipsoid of SPEC Block 46 fitted to the planes select_planes chooses (scfg.plane_half_um,
     plane_step), over the region R (the pixels whose centre lies within scfg.region_radius_um of the traced centre --
     radius_um, the traced radius, when it is None (D-241) -- minus mask, True: left out).
@@ -501,6 +516,11 @@ def fit_soma(block, ks, valid, left, top, res0_um, dz_um, centre_um, radius_um, 
     ValueError for inputs that disagree (shapes, dtypes, a forward of the wrong shape, a forward that refuses the
     slope -- Block 45 under a continuation other than "linear", D-220.2 --), an empty region, fewer than 3 planes, a far_slope other than "fit" or "fixed", data not finite on the region of the planes fitted, a
     centre, radius, pixel size, spacing or slope0 that is not finite (radius, sizes > 0, slope0 >= 0)."""
+    # CONTRACT STUB (wave 8; SPEC Block 46, the amendment of 2026-11-25): hold (name -> value, the first eight of
+    # PARAMS), start ((9,) theta), c_bounds_um ((lo, hi)), sigma0_um (um); scfg.background, scfg.sigma0,
+    # scfg.region_radius_scale; SomaFit's beta, background, sigma0_um, se_sigma0_um, cov_fit. Not implemented yet.
+    if hold is not None or start is not None or c_bounds_um is not None or sigma0_um is not None:
+        raise NotImplementedError("Block 46, wave 8: hold, start, c_bounds_um, sigma0_um")
     t0 = time.perf_counter()
     far = scfg.far_slope
     if far not in FAR_SLOPES:
