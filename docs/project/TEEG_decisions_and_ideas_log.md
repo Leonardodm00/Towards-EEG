@@ -309,7 +309,8 @@ the "Binds" column.
 | 2026-11-25 (the soma-fit chat, 16:10) | Logs **D-253** (user, 15:27): production cleans the close branches' shadows before the soma fit. |
 | 2026-11-25 (the soma-fit chat, 16:10) | Logs **D-254** (user, 16:04): the soma fit's background a tilted plane per plane solved in the fit, R enlarged for it, and the far-background check. Next free IDs: D-255, I-008. |
 | 2026-11-25 (the soma-fit chat, 17:35) | **ID clash noted, nothing renamed:** D-250 names two entries, the soma fit's (user: c ranged from the literature; logged 16:05, `751397e`) and the review chat's (orchestrator: the final check of Blocks 23 to 28; logged 16:26, `4ad1ca5`, without reading the rows above it). Until the user says which is renumbered, cite them as "D-250 (soma)" and "D-250 (twins)". |
-| 2026-11-25 (the soma-fit chat, 17:35) | Logs **D-255** to **D-258** (user, 17:27): the soma fit's region Allen's radius times a coefficient (1.2); the hold-c grid confirmed, the refinement in the neighbourhood of the best grid value, the active model receives the best fit; the far-background check a flag; the in-focus blur held, a parallel analysis fitting it. Next free IDs: D-259, I-008. |
+| 2026-11-25 (the soma-fit chat, 17:35) | Logs **D-255** to **D-258** (user, 17:27): the soma fit's region Allen's radius times a coefficient (1.2); the hold-c grid confirmed, the refinement in the neighbourhood of the best grid value, the active model receives the best fit; the far-background check a flag; the in-focus blur held, a parallel analysis fitting it. |
+| 2026-11-25 (the soma-fit chat, 17:50) | Logs **D-259** (orchestrator): the build choices of wave 8 of the diameter pipeline (the soma fit's amendment; contract `8aec906` on `sci/diameter-pipeline`); three implementers launched. Next free IDs: D-260, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -557,6 +558,7 @@ would be needed*, *Status*.
 | D-256 | 2026-11-25 | the hold-c grid and its refinement (Block 50, `fit_soma.py`, Cell 25, the HPC job); D-252.3, D-251's wording | the grid's values confirmed; the refinement in the neighbourhood of the best grid c; the active model downstream receives the best fit [user] | active |
 | D-257 | 2026-11-25 | the far-background check (Block 50; the fit's record); D-254.3 | the check's settings as proposed, its outcome a flag [user]; the 1.0 gl threshold the orchestrator's, PROVISIONAL | active |
 | D-258 | 2026-11-25 | the in-focus blur in the soma fit (Blocks 45-46, `--sigma0`, Cell 25); D-240 | held in the deliverable; a parallel, labelled analysis fits it [user] | active |
+| D-259 | 2026-11-25 | `specs/SPEC.md` Blocks 45, 46 (wave 8) and 50 on `sci/diameter-pipeline`; contract `8aec906` | the build choices of the soma fit's amendment: coordinates from the traced centre, held parameters reported like the held slope, independent grid fits, the refinement's delivery rule, Colab without refinement, the fitted in-focus blur's re-anchoring, the far background's plane and the 1.0 gl flag [orchestrator], PROVISIONAL | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -16065,3 +16067,36 @@ $\sigma_r(0)$ to 0.005-0.007 um with correlations of at most 0.40 and SE($c$) un
 **Sources.** **[user]** 17:27.
 
 **Status:** active.
+
+## D-259 -- Wave 8 of the diameter pipeline: the build choices of the soma fit's amendment (orchestrator)
+
+**Date:** 2026-11-25, about 17:50 (Europe/Rome), the soma-fit chat. **Binds:** `specs/SPEC.md` on
+`sci/diameter-pipeline`, Blocks 45 and 46 (amendments of wave 8) and Block 50 (new); contract commit `8aec906`.
+
+**Decision [orchestrator].** The choices the user's decisions D-252 to D-258 left open, made so that the wave could start
+(the user, 17:27: "Launch Opus agents and orchestrate"); each is PROVISIONAL and the user's to reverse.
+
+**Statement.** (D-259.1) The tilted background's coordinates are measured from the traced centre, not the fitted one,
+so they are data; the three coefficients per plane by `numpy.linalg.lstsq`; dof loses 3 per plane; "constant" stays as a
+labelled comparison (`SomaFitConfig.background`). (D-259.2) A held parameter (`fit_soma(hold=...)`) is reported like the
+held far slope (value exact, SE NaN); SE($S$) with $c$ held is the delta method over the fitted axes only, i.e.
+conditional on the held $c$. (D-259.3) The grid's fits each start from the fit's own start (independent of one another
+and of their order); the best is the smallest $\chi^2$; the refinement's neighbourhood is D-256.3's and it starts from
+the best grid fit; it is delivered unless it failed or ended above the best grid fit's $\chi^2$ (1e-9 relative).
+(D-259.4) Colab's default is the grid without refinement (`c_refine` False, D-252.1); the cluster passes the finer grid
+and the refinement. (D-259.5) The fitted in-focus blur (D-258.2) re-anchors the kernel with its growth kept
+(`kernel.with_kernel`), bounds 0.02-0.6 um, step 0.005 um, start the configured kernel's value; the result keeps its
+nine-parameter arrays and adds `sigma0_um`, `se_sigma0_um` and the fitted parameters' covariance `cov_fit`. (D-259.6) The
+far background is the nodes' trimmed plane (`calibration_scene.planar_background`) on the pixels at least 12 um from the
+traced centre minus the branches' pixels, its origin the traced centre; the flag's threshold 1.0 gl (D-257.2).
+(D-259.7) The SGT code's removal (D-242) is not part of this wave.
+
+**Why.** **[reasoning]** each keeps the user's decision as stated and takes the reading that changes least code;
+**[run, sandbox]** the checks of 2026-11-25 (`checks/soma_review_2026-11-25/`).
+
+**What it does not decide.** The entry point, Cell 25 and the figures (wave 8's second part, specified after the first
+merges); the cluster job.
+
+**Sources.** SPEC.md at `8aec906`; D-252 to D-258.
+
+**Status:** active; implementation running.
