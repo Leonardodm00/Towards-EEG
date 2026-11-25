@@ -15839,7 +15839,7 @@ fitting c, calcualte te S and determine the radius of the sphere that has the sa
 "Flattening doesn't change the superficial area. but the volume".
 
 **Statement.** (D-251.1) The soma passed to the passive model is the stack's fitted ellipsoid at the held $c$ with the
-smallest misfit: its area $S(\hat a, \hat b, c)$ and the sphere of equal area, $r_{m eq} = (S/4\pi)^{1/2}$ (Block 47's
+smallest misfit: its area $S(\hat a, \hat b, c)$ and the sphere of equal area, $r_{\rm eq} = (S/4\pi)^{1/2}$ (Block 47's
 rule). No living-frame correction of $c$. (D-251.2) The assumption it rests on: the membrane kept its area when the slice
 flattened (the soma widened rather than folded), so the fitted $S$ is the living area.
 
@@ -15907,8 +15907,8 @@ it a tilt) and its two points: "There the soma's shadow is small ..., so a misma
 do like that" and "R is mostly soma, I would enlarge this however so that the tilt is better constrained".
 
 **Statement.** (D-254.1) Each plane's background is $B_k(x, y) = b_{0k} + b_{1k} x + b_{2k} y$ (gl), the model of plane
-$k$ is $B_k(x,y)\,	au_k(x,y;	heta)$, and the three coefficients are solved exactly by linear least squares on the region
-at every trial $	heta$ (variable projection), replacing the constant $B_k$. (D-254.2) The region is enlarged beyond
+$k$ is $B_k(x,y)\,\tau_k(x,y;\theta)$, and the three coefficients are solved exactly by linear least squares on the region
+at every trial $\theta$ (variable projection), replacing the constant $B_k$. (D-254.2) The region is enlarged beyond
 Allen's soma radius so that the tilt is constrained; the radius is open. (D-254.3) The fitted background is compared with a
 background measured far from the soma on the near-focus planes, where the soma's own halo is small; a mismatch flags model
 error. (D-254.4) The user's proposal of 15:38 -- each plane's background measured beside the soma first and held in the
