@@ -450,6 +450,19 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   too high). Time: 29 to 102 s per evaluation against 98 to 401 s in `tw2` on one core, a factor of 3.0 to 4.3 from
   8 workers (approximate: total fit time over evaluations); fits of 3.9 to 14.1 h. Open, the user's: the local
   budget (`--refine-maxfev`), and five against six parameters.
+- **After tw3: the user's decisions and the pilot tw4 (2026-11-25) [user: D-244; src at `393b681` on `sci/twins`].**
+  Five parameters kept (`--ih-arm ih5`; the code's default arm is still `ih6_d207`); a larger local budget; cells
+  whose training steps do not open I_h are to be removed from the I_h fit (rule NOT set: candidates a threshold on
+  the deepest trained voltage $v^\ast$ or on $m_\infty(v^\ast)$; in tw3a the three badly recovered twins are the
+  three shallowest, $v^\ast$ of $-66.0$, $-66.8$, $-59.7$ mV); the submitter's cap is 240 cores. Pilot, from the
+  code folder on davinci:
+  `RUN_TAG=tw4 NOISE_TAG=nf2 NCPUS=24 PLAN_ARGS="--ih-arm ih5 --refine-maxfev 300" TWINS=900000000,900000001,900000002,900000003,900000004,900000300,900000301,900000302,900000303,900000304 WALLTIME=48:00:00 bash submit_twin_recovery.sh`
+  (the 5 noise-free twins and their noisy partners; about 1,100 evaluations per fit; told to the user: 24 cores per
+  cell are unlikely to beat 8, a cell trains on 3 to 4 long steps). Read first, per twin: `status` in
+  `refine_starts.csv` (0 = converged), then `loss_at_estimate / loss_at_truth`. Not investigated: why the loss at
+  the truth of a noise-free twin is not 0 (8e-4 to 2.2e-3). A study document for an independent evaluation of the
+  whole approach was sent to the user as files in this chat:
+  `TEEG_topic_Ih_fit_and_optimisation_2026-11-25.md` (with `figures/`, `scripts/`); it is not in the repository.
 
 ## 8. Repository, environment, cluster
 
