@@ -1,0 +1,5 @@
+r_R  5.97 um: rho^2 0.761 -> 1/sqrt(1 - rho^2) = 2.05 (x0 alone); full check's SE ratio 2.88
+r_R  8.00 um: rho^2 0.499 -> 1/sqrt(1 - rho^2) = 1.41 (x0 alone); full check's SE ratio 1.47
+r_R 10.00 um: rho^2 0.286 -> 1/sqrt(1 - rho^2) = 1.18 (x0 alone); full check's SE ratio 1.19
+r_R 12.00 um: rho^2 0.172 -> 1/sqrt(1 - rho^2) = 1.10 (x0 alone); full check's SE ratio 1.10
+r_R 14.00 um: rho^2 0.109 -> 1/sqrt(1 - rho^2) = 1.06 (x0 alone); full check's SE ratio 1.06

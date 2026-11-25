@@ -10,6 +10,7 @@
 | 2026-11-25 (15:40) | Section 9: D-248 (user, 15:02, c ranged from the literature on human pyramidal somata) and the literature search it asked for; the decision's log entry is held here because the push to `main` was refused in this session (to be copied into the log). |
 | 2026-11-25 (15:35) | Section 9: three decisions of the user (15:27) held here until they can be logged on `main` (the push to `main` is refused in this session): the passive model gets the fitted soma's equal-area sphere; the held-c grid extends toward the living range; production cleans the close branches' shadows before the fit. Timing of the held-c fits measured. |
 | 2026-11-25 (15:45) | Section 9: the user's points of 15:38 (area conservation under flattening; 4 held c values on Colab, more with a local refinement on the HPC; a background measured per plane and held) with the check on the last (`background_check.py`). |
+| 2026-11-25 (16:20) | Section 9: the held decisions logged on `main` as D-250 to D-254 (the user's go-ahead of 16:04; D-248 and D-249 had been taken by other chats), the notes that held them marked; the user's decisions of 16:04 (D-254: the tilted background solved in the fit, R enlarged, the far-background check); the check of the tilt against the region's radius (`checks/soma_review_2026-11-25/tilt_*.py`) and the radius proposed. |
 
 Repository `Leonardodm00/Towards-EEG`, branch `sci/diameter-pipeline` (workstream `Passive Features/Diameter
 Re-measurement/`, called W below); SPEC at the repository root `specs/SPEC.md`; the decision log on `main`
@@ -211,7 +212,7 @@ sigma_r(0) (an edge test on the soma's rim), to compare with node 7's 0.258 +- 0
 cells for this" -- the range of c is set from published measurements of human pyramidal somata, read in full text or in
 the data, each value with its preparation. NOT YET IN THE LOG: the push to `main` was refused by this session's safety
 check; copy the entry into `docs/project/TEEG_decisions_and_ideas_log.md` on `main` as D-248 (the next free ID at 15:10;
-check before taking it) when the user allows it or does it.
+check before taking it) when the user allows it or does it. [corrected 2026-11-25, 16:10: logged on `main` as **D-250** (commit 751397e); D-248 was taken meanwhile by another chat, so "D-248" in this section means D-250]
 Literature search (PubMed with full texts, the project's files, bioRxiv's published-version lookup, Allen's technical
 documentation) and its arithmetic (`W/checks/soma_review_2026-11-25/literature_c_range.py` **[run, sandbox]**):
 - Benavides-Piccione et al. 2024, Cereb Cortex, doi 10.1093/cercor/bhae180 **[full text]**: human L3a temporal somata,
@@ -233,7 +234,7 @@ documentation) and its arithmetic (`W/checks/soma_review_2026-11-25/literature_c
   soma meshes (EM, human temporal cortex), the most direct data, not reachable from this session.
 
 [added 2026-11-25, 15:35] **Decisions of the user, 15:27, NOT YET IN THE LOG** (copy them to `main`, taking the next free
-IDs there):
+IDs there) [corrected 2026-11-25, 16:10: logged on `main` -- 1 as D-251, 2 as D-252 (with 15:38's point 2), 3 as D-253]:
 1. "the fitted model will have the soma (rounded) that we find here, we will find the best fitting c, calculate the S and
    determine the radius of the sphere that has the same superficial area" -- the passive model gets the soma of the stack
    as fitted: the held c with the smallest misfit, S(a_hat, b_hat, c), and the equal-area sphere r_eq = sqrt(S / 4 pi)
@@ -258,10 +259,41 @@ stacks with warm starts took 30-320 s (median 169 s), 9-113 renders (median 60),
    microscope's resolution, the fit reads the envelope and under-reads S. Not settled by any source read.
 2. **Decision (user)**: Colab runs 4 held values of c; the HPC runs more, "maybe with a local refinement" (proposed:
    1.5, 2.5, 3.5, 5.0 um on Colab; the refinement a fit with c free started from the best grid value -- not confirmed).
-   NOT YET IN THE LOG (push to `main` refused).
+   NOT YET IN THE LOG (push to `main` refused). [corrected 2026-11-25, 16:10: logged as D-252]
 3. The user's proposal: each plane's background measured first, as for the nodes (a planar background with its tilt), and
    held in the fit. Check **[run, sandbox: `checks/soma_review_2026-11-25/background_check.py`]**: beside the soma the
    annulus reads up to 4.9 gl low on defocused planes (the soma's own halo); held, it biases c -15.7 % and S -10.2 % even
    with the model otherwise true. Counter-proposal (awaiting the user): keep B_k solved at every step and give it the tilt
    (b_0k + b_1k x + b_2k y, still linear, still exact), as the sigma_0 calibration's straight background (D-201.3); check
-   first on simulation that the tilt does not trade with the centre.
+   first on simulation that the tilt does not trade with the centre. [corrected 2026-11-25, 16:20: adopted by the user at 16:04 and logged as D-254; the check is the note of 16:20 below]
+
+[added 2026-11-25, 16:20] **The held decisions are in the log.** At 16:04 the user allowed the push ("Push them, you have
+full access to the repo"): D-250 (c ranged from the literature; this section's "D-248"), D-251 (the passive model gets the
+fitted soma and its equal-area sphere; the area-conservation assumption), D-252 (the hold-c grid: 4 values on Colab, a
+finer grid and a local refinement on the HPC; the values still proposed), D-253 (production cleans the close branches'
+shadows before the soma fit), D-254 (below); `main` commits 751397e and a14e270.
+
+**Decision of the user, 16:04 (D-254)**: the counter-proposal of 15:45 adopted -- each plane's background a tilted plane
+b_0k + b_1k x + b_2k y (x, y from the traced centre), its three coefficients solved by linear least squares on R at every
+trial theta (variable projection, as B_k now); R enlarged "so that the tilt is better constrained" (the radius open); the
+fitted background compared with one measured far from the soma on the near-focus planes ("a mismatch would point to model
+error. I would do like that"). The pre-measured, held background of 15:38 is not adopted.
+
+Check **[run, sandbox: `W/checks/soma_review_2026-11-25/tilt_check.py`, `tilt_cost_check.py`, `tilt_figures.py`; table
+and readings in that folder's README]**, simulated soma a 7.0, b 5.6, c 4.5 um, background 110 + 0.15 x gl:
+- the tilted projection removes the tilt's bias at every radius; the constant one leaves x0 -0.05 to -0.11 um, S -0.3 to
+  -0.8 %;
+- the per-plane tilts can mimic 76 % of the shift column on Allen's radius (SE x0 x2.88), 50 % at 8 um (x1.47), 29 % at
+  10 um (x1.19), 11 % at 14 um (x1.06); absolute noise SEs stay below 0.004 um, so the risk is systematic error along the
+  shift, not noise (untested);
+- a held wrong far slope biases S more on a larger region (slope 0.95: -3.8 % at 5.97 um, -5.9 % at 8, -7.3 % at 10, -7.6 %
+  from 12; slope 0.60: +7.5, +11.0, +13.2, +13.7 %), with or without the tilt;
+- the background check sees that slope error at -1.8 / +3.2 gl (5.97 um) down to -0.7 / +1.0 gl (14 um), against at most
+  0.04 gl when the model is exact; the sign gives the direction (a handle on D-218.2's open question, not decided).
+**Proposed radius (awaiting the user)**: r_R = 8 um -- halves what the tilt can mimic while adding about half the slope's
+extra leverage that 10 um would; 10 um if the centre's accuracy is weighed above S's, or once the far slope is calibrated.
+Implementation notes for Block 46, after the user's confirmation and SPEC first: `_vp_columns` on three columns per plane
+(numpy.linalg.lstsq; 0.009-0.034 s for the 35 planes per residual evaluation, against about 3.5 s per render); the
+covariance's dof |K||R| - n_par - 3|K|; `region_radius_um` a setting (D-241.1's radius superseded by D-254.2; D-241.2's
+capsules unchanged); the report gains beta_hat_k and the background check, whose far measurement can reuse
+`calibration_scene.planar_background` (the nodes' trimmed plane) on the near-focus planes.
