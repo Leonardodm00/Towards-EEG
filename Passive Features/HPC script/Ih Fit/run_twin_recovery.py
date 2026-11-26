@@ -1416,7 +1416,7 @@ def bundle_noise(bundle, is_brief: bool, protocol, table, specimen_id: int, *, t
         n_win = int(sum(r.shape[0] for r in rows))
         named = sorted(int(x) for x in (getattr(bundle, "sweep_numbers", None) or []))
         have = sorted(int(s) for s in np.unique(sweeps[pol == dep]))
-        # The sweeps a brief bundle NAMES are not compared with the stored ones (amendment 4, D-251): the
+        # The sweeps a brief bundle NAMES are not compared with the stored ones (amendment 4, D-260): the
         # archive loader averages every stored window of the polarity (n_repeats_averaged of them) but fills
         # sweep_numbers through a mis-indexed lookup (passive_fitting_hpc_fixed.py, the index of the window
         # within its polarity used as a row of ss_pulses.npz), so the list is a subset on most real cells

@@ -410,7 +410,7 @@ def test_V3_bundle_noise():
     bb = [b for b, br in zip(bundles, brief) if br][0]
     shifted = SimpleNamespace(t=bb.t + 1e-6, amplitude_pA=bb.amplitude_pA, n_repeats_averaged=bb.n_repeats_averaged,
                               sweep_numbers=list(bb.sweep_numbers))
-    # amendment 4 (D-251): a brief bundle that names only some of its polarity's sweeps (the loader's
+    # amendment 4 (D-260): a brief bundle that names only some of its polarity's sweeps (the loader's
     # mis-indexed sweep_numbers; run tw5) is accepted and gives the same noise; a wrong window COUNT stops
     subset = SimpleNamespace(t=bb.t, amplitude_pA=bb.amplitude_pA, n_repeats_averaged=bb.n_repeats_averaged,
                              sweep_numbers=list(bb.sweep_numbers)[:1])
