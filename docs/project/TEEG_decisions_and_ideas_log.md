@@ -310,7 +310,8 @@ the "Binds" column.
 | 2026-11-25 (the soma-fit chat, 16:10) | Logs **D-254** (user, 16:04): the soma fit's background a tilted plane per plane solved in the fit, R enlarged for it, and the far-background check. Next free IDs: D-255, I-008. |
 | 2026-11-25 (the soma-fit chat, 17:35) | **ID clash noted, nothing renamed:** D-250 names two entries, the soma fit's (user: c ranged from the literature; logged 16:05, `751397e`) and the review chat's (orchestrator: the final check of Blocks 23 to 28; logged 16:26, `4ad1ca5`, without reading the rows above it). Until the user says which is renumbered, cite them as "D-250 (soma)" and "D-250 (twins)". |
 | 2026-11-25 (the soma-fit chat, 17:35) | Logs **D-255** to **D-258** (user, 17:27): the soma fit's region Allen's radius times a coefficient (1.2); the hold-c grid confirmed, the refinement in the neighbourhood of the best grid value, the active model receives the best fit; the far-background check a flag; the in-focus blur held, a parallel analysis fitting it. |
-| 2026-11-25 (the soma-fit chat, 17:50) | Logs **D-259** (orchestrator): the build choices of wave 8 of the diameter pipeline (the soma fit's amendment; contract `8aec906` on `sci/diameter-pipeline`); three implementers launched. Next free IDs: D-260, I-008. |
+| 2026-11-25 (the soma-fit chat, 17:50) | Logs **D-259** (orchestrator): the build choices of wave 8 of the diameter pipeline (the soma fit's amendment; contract `8aec906` on `sci/diameter-pipeline`); three implementers launched. |
+| 2026-11-26 (the review chat, 11:50) | Logs **D-260** (orchestrator): amendment 4 of the I_h fit's wave 6 after the sensitivity run tw5 stopped on 7 of 10 twins: a brief bundle's noise is identified by its grid and window count, not by the sweeps it names (`sci/twins` `718c778`). Next free IDs: D-261, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -559,6 +560,7 @@ would be needed*, *Status*.
 | D-257 | 2026-11-25 | the far-background check (Block 50; the fit's record); D-254.3 | the check's settings as proposed, its outcome a flag [user]; the 1.0 gl threshold the orchestrator's, PROVISIONAL | active |
 | D-258 | 2026-11-25 | the in-focus blur in the soma fit (Blocks 45-46, `--sigma0`, Cell 25); D-240 | held in the deliverable; a parallel, labelled analysis fits it [user] | active |
 | D-259 | 2026-11-25 | `specs/SPEC.md` Blocks 45, 46 (wave 8) and 50 on `sci/diameter-pipeline`; contract `8aec906` | the build choices of the soma fit's amendment: coordinates from the traced centre, held parameters reported like the held slope, independent grid fits, the refinement's delivery rule, Colab without refinement, the fitted in-focus blur's re-anchoring, the far background's plane and the 1.0 gl flag [orchestrator], PROVISIONAL | active |
+| D-260 | 2026-11-26 | `run_twin_recovery.bundle_noise` (SPEC Block 28 of `Ih Fit/specs/SPEC.md` on `sci/twins`); D-247 item 6, D-249 | amendment 4: for a short-square bundle the stop condition of the noise draw is the grid and the window count; the sweeps the bundle names are not compared, because the archive loader fills that list wrongly [orchestrator] | active; implemented (`84665eb`) |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -16100,3 +16102,29 @@ merges); the cluster job.
 **Sources.** SPEC.md at `8aec906`; D-252 to D-258.
 
 **Status:** active; implementation running.
+
+## D-260 -- Amendment 4 of the I_h fit's wave 6: a short-square bundle's noise is identified by its grid and window count (orchestrator)
+
+**Date:** 2026-11-26, 11:50 (Europe/Rome), the review chat. **Binds:** `run_twin_recovery.bundle_noise`, SPEC Block 28
+of `Passive Features/HPC script/Ih Fit/specs/SPEC.md` on `sci/twins` (`84665eb`).
+
+**Decision [orchestrator].** The sensitivity run `tw5` (the ten noisy twins, 2026-11-25) finished for 3 twins
+(900000003, 900000004, 900000009) and stopped for 7 with "the loader's bundle grid is not the stored grid: brief
+bundle (-200 pA): N stored window(s) of its polarity in sweeps [...], the bundle averages N in sweeps [fewer]". The
+stop was wrong: Block 28 as built compared the sweeps a brief bundle names with the stored sweeps of its polarity,
+a check the SPEC entry did not ask for. Now the stop condition for a brief bundle is the grid (length, times) and
+the window count (`n_repeats_averaged`); the named sweeps are not compared.
+
+**Why.** **[data inspected: `tw5_sensitivity.tar.gz`, the seven logs]** in every stopped twin the window counts agree
+(21 and 21, 30 and 30, 149 and 149, 99 and 99, 19, 16, 17) and only the sweep lists differ. **[src]** the archive
+loader (`passive_fitting_hpc_fixed.py`, the SS bundles of `load_archive`) averages every window of the polarity but
+fills `sweep_numbers` with `ss_npz["sweep_number"][i]` for `i` the window's index WITHIN its polarity, not its row in
+the file: the list is wrong whenever the two polarities are interleaved. The monolith is not edited (the list is
+read nowhere else in the fit). **[run]** `smoke_twin_sensitivity.py` 8/8 with two new checks (a subset of sweeps
+named gives the same noise; one window fewer stops).
+
+**What it does not decide.** Correcting the loader's list.
+
+**Sources.** **[orchestrator]**; **[data inspected]**, **[src]**, **[run]** as above; **[log]** D-247, D-249.
+
+**Status:** active; implemented.
