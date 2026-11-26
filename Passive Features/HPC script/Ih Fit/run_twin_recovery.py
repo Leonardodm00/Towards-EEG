@@ -1416,7 +1416,12 @@ def bundle_noise(bundle, is_brief: bool, protocol, table, specimen_id: int, *, t
         n_win = int(sum(r.shape[0] for r in rows))
         named = sorted(int(x) for x in (getattr(bundle, "sweep_numbers", None) or []))
         have = sorted(int(s) for s in np.unique(sweeps[pol == dep]))
-        if n_win == 0 or n_win != int(bundle.n_repeats_averaged) or (named and named != have):
+        # The sweeps a brief bundle NAMES are not compared with the stored ones (amendment 4, D-251): the
+        # archive loader averages every stored window of the polarity (n_repeats_averaged of them) but fills
+        # sweep_numbers through a mis-indexed lookup (passive_fitting_hpc_fixed.py, the index of the window
+        # within its polarity used as a row of ss_pulses.npz), so the list is a subset on most real cells
+        # (run tw5: 7 of 10 twins). The window COUNT and the grid are what identify the average.
+        if n_win == 0 or n_win != int(bundle.n_repeats_averaged):
             raise BundleGridError("brief bundle (%+.6g pA): %d stored window(s) of its polarity in sweeps %s, "
                                   "the bundle averages %d in sweeps %s"
                                   % (float(bundle.amplitude_pA), n_win, have, int(bundle.n_repeats_averaged),

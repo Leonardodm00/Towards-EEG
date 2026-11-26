@@ -410,7 +410,18 @@ def test_V3_bundle_noise():
     bb = [b for b, br in zip(bundles, brief) if br][0]
     shifted = SimpleNamespace(t=bb.t + 1e-6, amplitude_pA=bb.amplitude_pA, n_repeats_averaged=bb.n_repeats_averaged,
                               sweep_numbers=list(bb.sweep_numbers))
-    for lab, bad, isb in (("long, one sample short", short, False), ("brief, times shifted", shifted, True)):
+    # amendment 4 (D-251): a brief bundle that names only some of its polarity's sweeps (the loader's
+    # mis-indexed sweep_numbers; run tw5) is accepted and gives the same noise; a wrong window COUNT stops
+    subset = SimpleNamespace(t=bb.t, amplitude_pA=bb.amplitude_pA, n_repeats_averaged=bb.n_repeats_averaged,
+                             sweep_numbers=list(bb.sweep_numbers)[:1])
+    parts["brief, a subset of its sweeps named: same noise"] = np.array_equal(
+        T.bundle_noise(subset, True, prot, table, real, twin_id=tf, base_seed=bs),
+        T.bundle_noise(bb, True, prot, table, real, twin_id=tf, base_seed=bs))
+    miscount = SimpleNamespace(t=bb.t, amplitude_pA=bb.amplitude_pA,
+                               n_repeats_averaged=int(bb.n_repeats_averaged) - 1,
+                               sweep_numbers=list(bb.sweep_numbers))
+    for lab, bad, isb in (("long, one sample short", short, False), ("brief, times shifted", shifted, True),
+                          ("brief, one window fewer", miscount, True)):
         try:
             T.bundle_noise(bad, isb, prot, table, real, twin_id=tf, base_seed=bs)
             parts["%s: BundleGridError" % lab] = False
