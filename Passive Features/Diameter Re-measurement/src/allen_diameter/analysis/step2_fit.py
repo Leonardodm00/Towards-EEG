@@ -147,7 +147,8 @@ def fit_shared_local(model, y, w, group, shared0, shared_bounds, local0=None, lo
     def jac(x):
         # structured 2-point forward difference with absolute steps (amendment 1): one call per shared unknown,
         # one per local index l with every group's l-th local shifted at once; -h where x + h passes the upper
-        # bound; the step actually used is (x + h) - x, exact in floating point
+        # bound, and where x - h would then pass the lower bound the larger of the two rooms (amendment 3); the
+        # step actually used is the probe point minus x, exact in floating point
         base = fun_pred(x)
         J = np.zeros((nk, P))
 
@@ -161,16 +162,14 @@ def fit_shared_local(model, y, w, group, shared0, shared_bounds, local0=None, lo
             return p
 
         for s in range(S):
-            h = h_s[s] if x[s] + h_s[s] <= ub[s] else -h_s[s]
             xs = x.copy()
-            xs[s] = x[s] + h
+            xs[s] = _probe_point(x[s], h_s[s], lb[s], ub[s])
             dx = xs[s] - x[s]
             J[:, s] = -swk * (probe(xs) - base) / dx
         for l in range(L):
             idx = S + np.arange(N) * L + l
-            h = np.where(x[idx] + h_l[l] <= ub[idx], h_l[l], -h_l[l])
             xs = x.copy()
-            xs[idx] = x[idx] + h
+            xs[idx] = _probe_point(x[idx], h_l[l], lb[idx], ub[idx])
             dx = xs[idx] - x[idx]
             J[np.arange(nk), idx[gk]] = -swk * (probe(xs) - base) / dx[gk]
         return J
@@ -197,6 +196,21 @@ def fit_shared_local(model, y, w, group, shared0, shared_bounds, local0=None, lo
                      se_cluster=ro(se_cl), se_classical=ro(se_cs), n_model_calls=int(calls[0]),
                      nfev=int(res.nfev), n_nan_filled=int(state["filled"]), status=int(res.status),
                      message=str(res.message), success=bool(res.success))
+
+
+def _probe_point(x, h, lo, hi):
+    """The probe point of a forward difference with absolute step h (> 0) inside [lo, hi] (SPEC Block 56,
+    amendments 1 and 3): x + h if it stays below hi; else x - h if it stays above lo; else the larger room, hi or
+    lo itself. Elementwise; the result never leaves [lo, hi]."""
+    x = np.asarray(x, dtype=np.float64)
+    up = x + h
+    down = x - h
+    room_up = hi - x
+    room_down = x - lo
+    out = np.where(up <= hi, up, np.where(down >= lo, down, np.where(room_up >= room_down, hi, lo)))
+    # a probe point equal to x would give a zero divisor: impossible, since lo < hi and lo <= x <= hi make the
+    # larger room > 0
+    return np.minimum(np.maximum(out, lo), hi)
 
 
 def _readonly(a):
