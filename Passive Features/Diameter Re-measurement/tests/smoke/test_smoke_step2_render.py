@@ -115,7 +115,8 @@ def make_twin(d_um=0.4, mu=1.0, cx=100.03, cy=50.02, theta=0.3, phi=0.1, ks=KS, 
     ks.setflags(write=False)
     return Twin(cell_id=7, node_id=11, set=node_set, role="train", d_um=float(d_um), mu_per_um=float(mu),
                 k_star=0, z_sub_um=0.0, cx_um=float(cx), cy_um=float(cy), theta_rad=float(theta),
-                phi_rad=float(phi), ks=ks, status=("ok",) * n, **arrs)
+                phi_rad=float(phi), B_pilot_gl=200.0, d_pilot_um=float(d_um), alpha_pilot=float(mu) * float(d_um),
+                ks=ks, status=("ok",) * n, **arrs)
 
 
 def make_cfg(patch_half_um, fast=False):
