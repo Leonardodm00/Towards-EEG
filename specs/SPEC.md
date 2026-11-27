@@ -2580,7 +2580,7 @@ planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
 - Data flow: produces `CellScans` and the chosen ids for Block 53; the start for Blocks 57 and 58; writes Block 59's
   report.
 - Confirmed: the node list's format is the orchestrator's (D-273.5 leaves it open), to be shown to the user.
-- Status: drafted 2026-11-27.
+- Status: implemented 2026-11-27 by one implementer (wave 9), merged `d5b4713`; `test_smoke_step2_io.py` 5 pass, 2 skip; awaiting the wave's final check.
 
 ### Block 53: the twins -- settings and real measurements per chosen node; the training/validation split (D-261, D-274)
 
@@ -2623,7 +2623,7 @@ planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
 - Data flow: consumes Block 52's `CellScans`; produces `Twin`s for Blocks 54, 55, 57 to 59.
 - Confirmed: D-261.5, D-274.1, D-274.4 [user]; the allocation rule is the orchestrator's reading of "stratified by
   set and by cell".
-- Status: drafted 2026-11-27.
+- Status: implemented 2026-11-27 by one implementer (wave 9), merged `74d3cad`; `test_smoke_step2_twins.py` 6 pass, 1 skip (amendment 1); awaiting the wave's final check.
 
 ### Block 54: a twin's rendered stack under a trial table (D-270.1, D-270.3, D-265, D-272)
 
@@ -2663,7 +2663,7 @@ planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
   within 1e-3; (R5) shapes, dtypes, determinism (two calls bit for bit).
 - Data flow: consumes Block 53's `Twin`, Block 4 (amendment 4); produces `TwinStack` for Block 55.
 - Confirmed: D-270.1, D-270.3, D-265, D-272 [user].
-- Status: drafted 2026-11-27.
+- Status: implemented 2026-11-27 by one implementer (wave 9), merged `245a79f`; `test_smoke_step2_render.py` 6 pass, 1 skip; awaiting the wave's final check.
 
 ### Block 55: a twin's measurement -- the camera plane by plane, then the real scan (D-270.1, D-270.2)
 
@@ -2724,7 +2724,7 @@ planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
   real scan's support was built from the cell's trace and scene, neighbours and soma included, which the twin does
   not carry: the twin's background support approximates the real one. Passing the cell's own branch and scene to
   the twin's scan would make the supports equal; not built (it needs the morphology in step 2's inputs).
-- Status: drafted 2026-11-27.
+- Status: implemented 2026-11-27 by one implementer (wave 9), merged `da0be67`; `test_smoke_step2_measure.py` 7 pass, 1 skip (amendments 1 and 2); awaiting the wave's final check.
 
 ### Block 56: the estimator -- weighted least squares with shared and per-group unknowns (D-273.3)
 
@@ -2781,7 +2781,7 @@ planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
   Jacobian are $S + L$, and a step is reversed at an upper bound; (F7) the NaN rules; (F8) $L$ = 0; determinism.
 - Data flow: consumed by Blocks 57 and 58, which build `model` from Blocks 54 and 55.
 - Confirmed: D-273.3 [user]; the NaN rule and the two covariances are the orchestrator's.
-- Status: drafted 2026-11-27.
+- Status: implemented 2026-11-27 by one implementer (wave 9), merged `e796e68`; `test_smoke_step2_fit.py` 6 pass, 1 skip (amendment 1); a forward difference of step h shifts the solution by about h times the residual (7.7e-5 in the toy at 0.02): the steps, or a central difference, to settle in wave 2; awaiting the wave's final check.
 
 ### Blocks 57 to 60 (wave 2; outlines -- the entries are completed before wave 2 starts)
 
