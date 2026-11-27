@@ -2452,6 +2452,325 @@ set, inside the table's configuration hash. Rerun: smoke `coarse_fit` 6, `soma_f
 28), 48 (14) and the soma fit end to end (12) pass; on the pilot's numbers the rule flags z0_um and c_um, and node
 5353's log10_beta_hi **[run, sandbox]**.
 
+### Kernel calibration, step 2 (roadmap NS1; D-228 to D-230, D-261, D-263 to D-265, D-270 to D-275): common definitions
+
+Contract of 2026-11-27 (wave 9). Blocks 52 to 56 are wave 1 of step 2, Blocks 57 to 60 wave 2 (their entries are
+completed against what wave 1 returns, before wave 2 starts). Everything here is binding for those blocks.
+
+- What step 2 does. For every calibration node $i$ chosen by the user (D-261) a *twin* is rendered: a straight capped
+  tube with node $i$'s settings, imaged by Block 4 under a trial kernel table and measured by the scan that measured
+  the real node (Block 10's `plane_scan` for the near set, Block 15's `far_plane_scan` for the far set). The table is
+  adjusted until the twins' core widths match the real ones (form B, D-229.1):
+  $$S_{\mathcal T}(\theta, z) = \sum_{i \in \mathcal T}\ \sum_{k \in K_i} \varpi\big(|k - k^*_i|\big)\,\Big[\omega_{i,k} - \omega^{\rm sim}_{i,k}\big(\theta;\, z_{{\rm ax},i},\, \xi_i\big)\Big]^2 .$$
+  $\mathcal T$: a set of twins; $k^*_i$: node $i$'s sharpest plane (the pilot's `k_star`); $K_i$: the planes of twin
+  $i$ that enter (below); $\omega_{i,k}$ (um$^2$): the real scan's squared core width of node $i$ in plane $k$
+  (`PlaneScan.omega_um2`); $\omega^{\rm sim}_{i,k}$: the same statistic of the twin, the mean over its noise replicates;
+  $\theta = (\theta_1, \theta_2, \theta_3, \gamma)$: the trial table, $\theta_m = \sigma_{\rm r}(\delta_m)$ (um) at
+  $\delta_m$ = 0.28, 0.56, 0.84 um, $\gamma$ (um per um) the slope of the linear continuation beyond 0.84 um (D-228.1);
+  $z_{{\rm ax},i}$ (um): the twin's axis depth; $\xi_i$: the twin's held settings; $\varpi \ge 0$: the plane weight.
+- The twin's held settings $\xi_i$: the diameter is Allen's, $\tilde d_i = D_{{\rm A},i}$ (twice the traced radius,
+  the node record's `allen_diameter_um`; D-261.5); the absorption coefficient is the pilot's $\hat\mu_i$
+  (`mu_hat_per_um`; D-274.1); the lateral centre, heading and tilt are the pilot's (`cx_um`, `cy_um`, `theta_rad`,
+  `phi_rad`); the planes are the real scan's (`PlaneScan.ks`); per plane the background level is the real scan's
+  `B_bar` (grey levels) and the noise SD the real scan's `bg_sd_gl` times `noise_scale` (D-270.2; PROVISIONAL: the
+  SD is applied before quantisation and JPEG, the real one was measured after them); $\sigma_{\rm r}(0)$ is held
+  (D-274.3; its value by D-221.1's switch).
+- The forward model (D-270.1): the full stack. Render: Block 4 with `absorption` = "hybrid" (D-270.3), the trial
+  table on the knots (0, 0.28, 0.56, 0.84) um with the values ($\sigma_{\rm r}(0)$, $\theta_1$, $\theta_2$,
+  $\theta_3$), read by the spline of Block 4's amendment 4 (`kernel_family` = "gaussian_table_spline"; D-272), and
+  beyond 0.84 um the continuation "tangent" in the near stage (D-265) and "linear" with slope $\gamma$ in the far
+  stage. Camera: Block 4's chain, plane by plane, with the plane's background and noise. Measurement: the real scan
+  under the real scans' own configuration (`meta.config` of the scans file), which is NOT the render's
+  configuration: the scan reads the configured kernel for its masks and, in the far scan, for its prior width, so a
+  scan under the trial table would change the statistic with $\theta$ (handoff of 2026-11-24, section 8, item 2).
+- Noise (D-270.2). Each twin plane's noise is drawn from `numpy.random.default_rng([seed, cell_id, node_id,
+  replicate, q])`, $q$ the plane's position in the twin's `ks`: the same draws for every trial table (common random
+  numbers), so the objective is a deterministic function of its unknowns. `noise_replicates` $R$ replicates share one
+  rendered stack. With the noise switched off (a test setting, D-273.4) $R$ = 1.
+- Stages (D-230.1-2, D-263, D-264, D-274.2), each run once:
+  1. Near stage: unknowns $\theta_1, \theta_2, \theta_3$ and one $z_{{\rm ax},i}$ per training near-set twin
+     (D-271.1); $K_i = \{k : |k - k^*_i| \le 3\}$; continuation "tangent" (no $\gamma$).
+  2. Far twins' depths: for each far-set twin, $z_{{\rm ax},i}$ alone is fitted on its planes $|k - k^*_i| \le 3$ with
+     the knots held at stage 1's values (D-274.2), continuation "tangent".
+  3. Far stage: unknown $\gamma$ alone, on the training far-set twins, $K_i = \{k : 4 \le |k - k^*_i| \le 16\}$
+     (D-229.2, D-273.2), knots and depths held (D-271.3), continuation "linear".
+  A plane enters only when the real scan's status is "ok" and its $\omega_{i,k}$ is finite.
+- Weights (D-273.1): $\varpi(j) = 1/s_\omega(j)^2$, $j = |k - k^*_i|$, $s_\omega(j)$ (um$^2$) the noise SD of the core
+  width at offset $j$ estimated from the twins' noise replicates (Block 59); `weights` = "none" gives $\varpi \equiv 1$.
+- Bounds (D-273.3): $\sigma_{\rm r}(0)$ + `knot_min_margin_um` $\le \theta_m \le$ `knot_max_um`; $\gamma \ge 0$;
+  $|z_{{\rm ax},i} - z_{{\rm sub},i}| \le$ `z_ax_bound_um`, $z_{{\rm sub},i}$ the pilot's sub-plane depth, the start.
+- Training and validation (D-273.4, D-274.4): the chosen nodes are split by node, stratified by set and by cell,
+  `validation_fraction` = 0.25 to validation; only training twins enter stages 1 and 3.
+- Frames and units. A twin lives in its real node's image frame: x, y in um from the full image's pixel centres, plane
+  index $k$ with depth $z_k = k\,\Delta z$ ($\Delta z$ = `acquisition.dz_um`), defocus $\delta$ = object minus plane.
+  Lengths um, absorption 1/um, grey levels gl, core widths um$^2$, areas gl x um.
+- Configuration: `Step2Config` (`DiameterConfig.step2`, outside every signature): `absorption` "hybrid";
+  `kernel_family` "gaussian_table_spline"; `knots_um` (0.28, 0.56, 0.84); `knot_min_margin_um` 0.001 (PROVISIONAL);
+  `knot_max_um` 2.0; `near_planes` 3 (D-263, not a tunable default); `far_planes` (4, 16); `z_ax_bound_um` 0.28
+  (PROVISIONAL, Block 10's); `weights` "inverse_variance" | "none"; `noise_replicates` 4 (PROVISIONAL);
+  `noise_scale` 1.0 (PROVISIONAL); `seed` 20261127; `validation_fraction` 0.25; `split_seed` 20261127;
+  `diff_step_knot_um` 0.005 and `diff_step_z_um` 0.02 (PROVISIONAL: finite-difference steps on a noisy, quantised
+  objective, to be set from wave 2's smoothness check); `diff_step_gamma` 0.02 (PROVISIONAL); `max_nfev` 40;
+  `fit_sigma0` False (True: the labelled comparison of D-274.3); `tube_half_length_um` 40.0 (PROVISIONAL: the twin's
+  tube crosses the whole patch); `max_workers` 1.
+
+Block 4, amendment 4 (2026-11-27; D-181, D-265, D-272, D-275 [orchestrator]; implemented inline by the orchestrator).
+`kernel.sigma_r` reads the table in one of two ways, chosen by `RendererConfig.kernel_family`: "gaussian_table",
+linear in $|\delta|$ between the knots, unchanged bit for bit and still the default; "gaussian_table_spline", the
+not-a-knot cubic spline $S$ of the growth of the variance $G(\delta) = \sigma_{\rm r}(\delta)^2 -
+\sigma_{\rm r}(0)^2$ through the knot values on the signed knots $-\delta_{\max} \dots \delta_{\max}$
+(`scipy.interpolate.CubicSpline`, `bc_type="not-a-knot"`; at least three knots), Block 10's reading of its own
+growth curve (`calibration._basis`, "symmetric", "cubic"):
+$$\sigma_{\rm r}(\delta) = \sqrt{\sigma_{\rm r}(0)^2 + \max\{S(|\delta|),\, 0\}}, \qquad |\delta| \le \delta_{\max}.$$
+The floor at 0 (D-275 [orchestrator], PROVISIONAL) keeps $\sigma_{\rm r}(\delta) \ge \sigma_{\rm r}(0)$: on the
+pilot cell's table (0.080, 0.1536, 0.3924, 0.5620 um) the spline is negative for $|\delta| <$ 0.130 um, with minimum
+-6.06e-4 um$^2$ at 0.090 um, where the unfloored width would be 0.0761 um **[run]**; on the default six-knot table
+it is never negative **[run]**. Beyond $\delta_{\max}$: "linear", "frozen", "proportional" as before (the default
+"linear" with $\gamma$: D-265.3, D-272.2); new, with the spline reading only, "tangent" (D-265.1):
+$G(\delta) = S(\delta_{\max}) + S'(\delta_{\max})\,(|\delta| - \delta_{\max})$, floored at 0. `kernel.growth_spline(rcfg)`
+returns $S$; `with_in_focus_width` and `with_kernel` accept both table families and keep the family
+(`kernel.TABLE_FAMILIES`). `config.KERNEL_FAMILIES` gains "gaussian_table_spline", `KERNEL_CONTINUATIONS` gains
+"tangent"; no field is added to `RendererConfig`, so the default configuration's hashes are unchanged
+(`test_smoke_config` 6 pass). The default family is switched to the spline (D-272.1) in a later commit, after D-231's
+commit is on `origin`; `sigma_calibration.forward_with_kernel` still refuses any family but "gaussian_table" and is
+adapted then. Oracles (`tests/smoke/test_smoke_kernel_spline.py`, 6 pass, 1 skip, 2026-11-27): the knot values
+[1e-13]; D-265's numbers on the pilot table, $S'(0.84)$ = 0.469 um and $\sigma_{\rm r}$ = 0.618, 0.669, 0.723 um at
+0.98, 1.12, 1.28 um [5e-4, the log's digits]; $G$ against Block 10's `_basis` on 281 points in $\pm 1.4$ um, floored
+[1e-12 um$^2$]; even in $\delta$; continuous at the last knot for the four continuations; $C^1$ in $G$ for
+"tangent"; the first reading against `np.interp` bit for bit; refusals ("tangent" without the spline family, two
+knots, a non-finite $\delta$, "empirical"). `test_smoke_render` 7 pass, `test_smoke_kernel_width` 7,
+`test_smoke_kernel_scale` 6 (1 skip), unchanged.
+
+Block 15, amendment (2026-11-27; D-273.2 [user]). `CalibrationConfig.far_min_k_offset` = 4 (was 5, PROVISIONAL): the
+planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
+
+### Block 52: step 2's files -- the chosen nodes, a cell's scans, the starting kernel, the result (D-261, D-273.5)
+
+- Modules: `src/allen_diameter/loading/step2_io.py`; smoke test `tests/smoke/test_smoke_step2_io.py`.
+- Purpose. File reading and writing only (section 4): no fit, no rendering, no plotting.
+- Public API:
+  - `read_chosen_nodes(path) -> dict[int, tuple[int, ...]]`. A CSV text file, UTF-8, with the header line
+    `specimen_id,node_id` and one row per chosen node; blank lines and lines starting with `#` are skipped; spaces
+    around values are stripped. Returns `{specimen_id: node ids ascending}`. ValueError (naming the line): a
+    missing or different header, a row without exactly two integers, a node listed twice for one cell, no row.
+  - `CellScans` (frozen dataclass): `cell_id` int; `scans` tuple of `PlaneScan`; `nodes` dict node id -> the node
+    record of the scans file's `meta["nodes"]` (`node_id`, `allen_diameter_um`, `set`, `reasons`, `scanned`,
+    `pilot`); `config` the `DiameterConfig` the scans were made with: `config.config_from_dict(meta["config"])` (the full
+    signature) with its `calibration` replaced by `CalibrationConfig(**meta["calibration"])` (lists to tuples), validated;
+    `meta` dict.
+  - `load_cell(cell_id, scans_path) -> CellScans` by `calibration_io.load_scans`. ValueError: `meta` without
+    `config`, `calibration` or `nodes`; two scans or two records with one node id.
+  - `load_start(calibration_path, far_fit_path=None) -> dict` with `kernel_table_delta_um` (tuple), 
+    `kernel_table_sigma_um` (tuple), `sigma_r0_um` (float), `gamma` (float): the `kernel` of the calibration JSON
+    (`calibration_io.load_calibration`), and `gamma` from the far-fit JSON's `kernel.kernel_continuation_slope`
+    when a path is given, else the calibration kernel's. ValueError when the calibration JSON has no `kernel`
+    (its `kernel_error` in the message).
+  - `save_step2(path, kernel, report, meta=None)`: JSON with `kernel` = `calibration_io.kernel_to_dict(kernel)` plus
+    `kernel_family` (the keys notebook Cell 16 reads from `calibration_<S>.json` and `far_fit_<S>.json`), `step2`
+    = `report` (a JSON-ready dict, written as given, NaN as null) and `meta`. `load_step2(path) -> dict`.
+- Parameters: none.
+- Library calls: `csv`, `json`; `calibration_io`; `config.config_from_dict`.
+- Custom code: none.
+- Test oracles: round trips on files written in a temporary directory (a scans file made by
+  `calibration_io.save_scans` from synthetic `PlaneScan`s and `default_config`'s dictionary): the scans' arrays
+  and the configuration's `signature_hash("full")` survive; `read_chosen_nodes` on a hand-written file (comments,
+  blank lines, unordered rows) and each refusal; `load_start` with and without the far-fit file; `save_step2` then
+  `load_step2`, and `kernel` readable by the lines of notebook Cell 16 that read `kernel_table_delta_um`,
+  `kernel_table_sigma_um`, `sigma_r0_um`, `kernel_continuation_slope`.
+- Data flow: produces `CellScans` and the chosen ids for Block 53; the start for Blocks 57 and 58; writes Block 59's
+  report.
+- Confirmed: the node list's format is the orchestrator's (D-273.5 leaves it open), to be shown to the user.
+- Status: drafted 2026-11-27.
+
+### Block 53: the twins -- settings and real measurements per chosen node; the training/validation split (D-261, D-274)
+
+- Modules: `src/allen_diameter/analysis/step2_twins.py`; smoke test `tests/smoke/test_smoke_step2_twins.py`.
+- Purpose. Turn a cell's scans and node records into one `Twin` per chosen node, and mark each as training or
+  validation. No file access, no rendering.
+- Public API:
+  - `Twin` (frozen dataclass; arrays (n,) over the real scan's planes, read-only): `cell_id` int; `node_id` int;
+    `set` "near" | "far"; `role` "train" | "validation"; `d_um` float (Allen's diameter); `mu_per_um` float (the
+    pilot's); `k_star` int; `z_sub_um`, `cx_um`, `cy_um`, `theta_rad`, `phi_rad` float (the pilot's); `ks` int64;
+    `B_gl` float64 (`PlaneScan.B_bar`); `noise_sd_gl` float64 (`PlaneScan.bg_sd_gl`); `omega_um2`, `se_omega_um2`,
+    `area_gl_um` float64; `status` tuple of str.
+  - `build_twins(cell_id, scans, nodes, chosen_ids) -> list[Twin]`, in the order of `chosen_ids`, role "train".
+    ValueError naming every offending node id: no scan, no record, a record whose `set` differs from the scan's
+    `set`, a non-finite or non-positive `allen_diameter_um`, a pilot without finite `mu_hat_per_um` > 0, `cx_um`,
+    `cy_um`, `theta_rad`, `phi_rad`, `z_sub_um` or without `k_star`, a scan without `bg_sd_gl`.
+  - `split_twins(twins, validation_fraction, seed) -> list[Twin]` (same order, roles set). Within each set $s$
+    with $N_s$ twins the number of validation twins is $V_s = \lfloor f N_s + 1/2 \rfloor$; it is shared among the
+    cells in proportion to their $n_{c,s}$ twins by largest remainders (ties to the lower `cell_id`), a cell never
+    giving more than $n_{c,s} - 1$ (a cell with one twin gives none; what cannot be placed is dropped, so
+    $\sum_c V_{c,s} \le V_s$). Inside a cell and set the validation twins are the first $V_{c,s}$ of
+    `default_rng([seed, cell_id, 0 if near else 1]).permutation` applied to the node ids sorted ascending. The
+    result does not depend on the order of `twins`. ValueError: $f$ outside [0, 1); two twins with one
+    (`cell_id`, `node_id`).
+  - `fit_planes(twin, s2cfg, which) -> (n,) bool`: `which` "near": $|k - k^*| \le$ `near_planes`; "far":
+    `far_planes[0]` $\le |k - k^*| \le$ `far_planes[1]`; and in both `status` "ok" with a finite `omega_um2`.
+- Parameters: `Step2Config.near_planes`, `far_planes`, `validation_fraction`, `split_seed`.
+- Library calls: numpy.
+- Custom code: the largest-remainder allocation (no library function fits the caps).
+- Test oracles: `build_twins` on synthetic scans and records: every field equals its source; each refusal names the
+  node; `split_twins`: the counts by the rule on hand-computed cases (one cell of 8 near; cells of 1, 2, 5 near and
+  3 far; $f$ = 0, 0.25, 0.5), no cell emptied of training twins, the same roles under a shuffled input, another seed
+  changes the choice but not the counts; `fit_planes` on a scan with a non-ok and a NaN plane.
+- Data flow: consumes Block 52's `CellScans`; produces `Twin`s for Blocks 54, 55, 57 to 59.
+- Confirmed: D-261.5, D-274.1, D-274.4 [user]; the allocation rule is the orchestrator's reading of "stratified by
+  set and by cell".
+- Status: drafted 2026-11-27.
+
+### Block 54: a twin's rendered stack under a trial table (D-270.1, D-270.3, D-265, D-272)
+
+- Modules: `src/allen_diameter/analysis/step2_render.py`; smoke test `tests/smoke/test_smoke_step2_render.py`.
+- Purpose. From a `Twin`, an axis depth and a trial table, the pixel-integrated transmittance of the twin's planes on
+  the node's patch, before the camera. The expensive, noise-free part of the forward model. No file access.
+- Public API:
+  - `trial_renderer(rcfg, sigma_r0_um, theta_um, gamma, s2cfg, stage) -> RendererConfig`: `rcfg` with
+    `kernel_family` = `s2cfg.kernel_family`, `kernel_table_delta_um` = (0,) + `s2cfg.knots_um`,
+    `kernel_table_sigma_um` = (`sigma_r0_um`,) + `theta_um`, `sigma_r0_um`, `absorption` = `s2cfg.absorption`, and
+    for `stage` "near" `kernel_continuation` = "tangent" (`gamma` ignored, may be None), for "far" "linear" with
+    `kernel_continuation_slope` = `gamma`. ValueError: a stage other than "near" or "far"; `theta_um` not of the
+    knots' length or not finite and > 0; `sigma_r0_um` not finite and > 0; "far" with `gamma` None, not finite or
+    < 0.
+  - `twin_tube(twin, z_ax_um, cfg, s2cfg) -> geometry.Tube`: centre (`cx_um`, `cy_um`, `z_ax_um`), radius
+    `d_um`/2, tilt `phi_rad`, heading `theta_rad`, `cfg.renderer.cross_section_aspect`, half-length
+    `s2cfg.tube_half_length_um`, `cfg.renderer.end_cut`.
+  - `TwinStack` (frozen dataclass): `tau` (n_planes, H, W) float64, dimensionless, the pixel means of the
+    transmittance; `ks` (n_planes,) int64; `left`, `top` int (px of the full image); `res0_um` float.
+  - `render_twin(twin, z_ax_um, rcfg_trial, cfg, s2cfg, ks=None, backend=None) -> TwinStack`: the patch is
+    `calibration_scene.patch_bounds(twin.cx_um, twin.cy_um, cfg.calibration.patch_half_um, cfg.acquisition.res0_um)`;
+    `ks` None: `twin.ks`; the rendering is `render.synthetic_block`'s up to and without the camera chain
+    (`fine_factor`, `block_fine_grid` with `pad_px = ceil(cfg.renderer.pad_um / res0_um)`, `render_transmittance`
+    with `rcfg_trial`, the planes' depths `ks * dz_um`, `cfg.acquisition.light_direction`, reduced by
+    `pixel_integrate`). `cfg` is the real scans' configuration (acquisition, patch); only `rcfg_trial` carries the
+    trial table.
+- Parameters: `Step2Config.knots_um`, `kernel_family`, `absorption`, `tube_half_length_um`.
+- Library calls: `model.render`, `model.geometry`, `analysis.calibration_scene.patch_bounds`.
+- Custom code: none.
+- Test oracles: (R1) `render_twin`'s `tau`, sent through `camera.camera_chain` with one generator, equals
+  `render.synthetic_block` called with the same tube, absorption, planes, patch and generator, bit for bit (a small
+  patch and a thin tube for time: replace `calibration.patch_half_um`); (R2) `trial_renderer`: the fields above;
+  `kernel.sigma_r` at the knots returns ($\sigma_{\rm r}(0)$, $\theta$); "near" gives "tangent", "far" "linear"
+  with $\gamma$; each refusal; (R3) invariants: `tau` in (-0.1, 1 + 1e-12] (the hybrid may go slightly below 0 in
+  dark stain, SPEC Block 21), `tau` = 1 far from the tube to 1e-12, the dip on the twin's line deeper at focus than
+  three planes away; (R4) a larger $\theta_3$ widens the dip three planes from focus and leaves the focus plane's
+  within 1e-3; (R5) shapes, dtypes, determinism (two calls bit for bit).
+- Data flow: consumes Block 53's `Twin`, Block 4 (amendment 4); produces `TwinStack` for Block 55.
+- Confirmed: D-270.1, D-270.3, D-265, D-272 [user].
+- Status: drafted 2026-11-27.
+
+### Block 55: a twin's measurement -- the camera plane by plane, then the real scan (D-270.1, D-270.2)
+
+- Modules: `src/allen_diameter/analysis/step2_measure.py`; smoke test `tests/smoke/test_smoke_step2_measure.py`.
+- Purpose. From a `TwinStack`, the twin's core widths as the real scan measures them: each plane through Block 4's
+  camera chain with the real plane's background and noise, then `plane_scan` (near set) or `far_plane_scan` (far
+  set) under the real scans' configuration. No file access.
+- Public API:
+  - `camera_planes(stack, B_gl, noise_sd_gl, rcfg, rngs) -> (block uint8 (n, H, W), valid (n,) bool)`: plane $q$
+    goes through `camera.camera_chain(stack.tau[q], rcfg_q, rngs[q])` with `rcfg_q` = `rcfg` with
+    `background_B_gl` = `(B_gl[q] - rcfg.black_level_gl) / rcfg.gain` and `noise_sd_gl` = `noise_sd_gl[q]`; a plane
+    whose `B_gl[q]` is not finite or whose `background_B_gl` would be <= 0 is all zeros with `valid[q]` False.
+    `rngs`: a sequence of n generators (unused where the SD is 0).
+  - `twin_scene(twin, cfg, s2cfg) -> (node, branch, scene)`: `node` an object with the attributes the scans read
+    (`node_id`, `d_hat_um` = `d_um`, `phi_rad`, `alpha_hat` = `mu_per_um * d_um / cos(phi_rad)`, `k_star`,
+    `z_sub_um`, `cx_um`, `cy_um`, `theta_rad`), all the real pilot's, so that the line and the planes are the real
+    node's; `branch` a straight `Branch` along the twin's axis through (`cx_um`, `cy_um`, `z_sub_um`), nodes every
+    `cfg.phantom.phantom_node_step_um` over +-`tube_half_length_um`, radius `d_um`/2 (`Branch.from_points`);
+    `scene` = `Scene.from_branch(branch)`.
+  - `noise_rngs(twin, n_planes, s2cfg, replicate) -> list` of n_planes generators, plane $q$ from
+    `numpy.random.default_rng([s2cfg.seed, twin.cell_id, twin.node_id, replicate, q])`.
+  - `measure_twin(twin, stack, scan_cfg, s2cfg, replicate=0, noise=True) -> PlaneScan`: `camera_planes` with
+    `twin.B_gl`, the SDs `s2cfg.noise_scale * twin.noise_sd_gl` (zeros when `noise` is False) and the generators of
+    the common definitions; the patch `(block, stack.ks, valid, CropFrame(left, top, 0, res0_um))`; then
+    `calibration.plane_scan` for `twin.set` "near", `far_field.far_plane_scan` for "far", with `scan_cfg`.
+    ValueError when `stack.ks` is not the scan's `stage_planes`.
+  - `twin_statistics(twin, stack, scan_cfg, s2cfg, noise=True) -> dict` of (n,) arrays over `stack.ks`: over the
+    $R$ = `noise_replicates` replicates (1 when `noise` is False), `omega_um2` the mean of the finite values, NaN
+    where fewer than $\lceil R/2 \rceil$ are finite; `omega_sd_um2` their sample SD (NaN for fewer than two);
+    `area_gl_um` and `bg_sd_gl` means; `n_ok` int.
+- Parameters: `Step2Config.noise_replicates`, `noise_scale`, `seed`, `tube_half_length_um`.
+- Library calls: `model.camera.camera_chain`; `analysis.calibration.plane_scan`; `analysis.far_field.far_plane_scan`;
+  `analysis.plane_iteration.Scene`; `allen_image_io.CropFrame`.
+- Custom code: none.
+- Test oracles (stacks built here by `render.render_transmittance` on a small patch with the partition absorption,
+  for time; Block 54 is not imported): (M1) with one background and one SD for every plane, `camera_planes` equals
+  `camera.camera_chain` on the whole stack with the matching per-plane generators, bit for bit; (M2) noise off, a
+  flat phantom: `measure_twin` equals `calibration.scan_node`'s scan of the same tube rendered through
+  `render.synthetic_block` with `noise_sd_gl` = 0 -- the core widths to 1e-9 um$^2$ where both are ok -- when the
+  twin's pilot values are that scan's; (M3) the twin's measured background equals `B_gl` within 0.5 gl per plane,
+  and its `bg_sd_gl` within 30 % of the SD put in with `jpeg` off (statistical; the number of far pixels in the
+  tolerance's comment); (M4) common random numbers: two calls bit for bit; another replicate differs; a different
+  stack with the same seed uses the same noise field (the difference of the two blocks before quantisation is the
+  difference of the grey mappings: checked with `bit_depth` 16, `jpeg` off, to 1 gl); (M5) `twin_statistics`: the
+  mean and SD of the replicates' values, the NaN rule, $R$ = 1 without noise; (M6) a far twin goes through
+  `far_plane_scan` (set "far", 2 x 16 + 1 planes); (M7) a non-finite `B_gl` gives an invalid plane and a status that
+  is not "ok".
+- Data flow: consumes Block 53's `Twin` and Block 54's `TwinStack`; produces the statistics Blocks 57 to 59 fit and
+  report.
+- Confirmed: D-270.1, D-270.2 [user]; the mapping of the background and the noise SD into the chain is the
+  orchestrator's reading (PROVISIONAL in D-270).
+- Status: drafted 2026-11-27.
+
+### Block 56: the estimator -- weighted least squares with shared and per-group unknowns (D-273.3)
+
+- Modules: `src/allen_diameter/analysis/step2_fit.py`; smoke test `tests/smoke/test_smoke_step2_fit.py`.
+- Purpose. The least-squares solver of step 2, independent of rendering: the forward model arrives as a callable.
+  No file access.
+- Mathematics. Observations $y_j$, $j = 1..n$, each in a group $g(j) \in \{0..N-1\}$ (a twin); unknowns: shared
+  $a \in \mathbb R^S$ and local $b \in \mathbb R^{N \times L}$ ($L$ may be 0); model $\hat y_j(a, b_{g(j)})$, an
+  observation depending on its own group's row of $b$ only; weights $w_j \ge 0$. The fit minimises
+  $\sum_j w_j\,[y_j - \hat y_j(a, b_{g(j)})]^2$ within box bounds, by `scipy.optimize.least_squares`
+  (`method="trf"`, `jac="2-point"` with `jac_sparsity`: the shared columns dense, a local column non-zero on its
+  group's observations only, so one Jacobian costs $S + L$ model calls; `diff_step` per unknown; `x_scale="jac"`).
+  Covariance of the estimates, clustered by group **[textbook, from memory; the sandwich estimator of generalised
+  estimating equations]**: with $r_j = \sqrt{w_j}\,(y_j - \hat y_j)$ and $J$ the Jacobian of $r$ at the solution over
+  the free unknowns (those not at a bound),
+  $$\widehat{\rm Cov} = (J^\top J)^{-1} \Big(\sum_{g=0}^{N-1} J_g^\top r_g r_g^\top J_g\Big) (J^\top J)^{-1},$$
+  $J_g$, $r_g$ the rows of group $g$; no small-sample factor (CR0). With few groups this estimator can be biased
+  low (Chen, Harhay and Li 2023, Biom J 65:e2200002, doi 10.1002/bimj.202200002 -- **abstract only**), so the
+  result also carries the classical $s^2 (J^\top J)^{-1}$, $s^2 = \sum_j r_j^2 / (n - p)$, $p$ the free unknowns.
+  A NaN in $y$ or in the model at the start drops the observation for the whole fit; a NaN arising later at a kept
+  observation is replaced by that observation's last finite prediction and counted (PROVISIONAL).
+- Public API:
+  - `fit_shared_local(model, y, w, group, shared0, shared_bounds, local0=None, local_bounds=None,
+    diff_step_shared=None, diff_step_local=None, max_nfev=None) -> FitResult`. `model(shared (S,), local (N, L))
+    -> (n,)`; `y`, `w` (n,); `group` (n,) int; `shared_bounds` (lo (S,), hi (S,)); `local0` (N, L); `local_bounds`
+    (lo (N, L), hi (N, L)); the steps (S,) and (L,), absolute, in the unknowns' units. ValueError: shapes that do
+    not agree, a negative or non-finite weight, a start outside its bounds, a group index outside 0..N-1, no kept
+    observation.
+  - `FitResult` (frozen dataclass): `shared` (S,); `local` (N, L); `residual` (n,) (NaN where dropped); `kept` (n,)
+    bool; `cost` float ($\tfrac12 \sum r^2$); `jac` (n_kept, S + N L) dense float64 at the solution; `free`
+    (S + N L,) bool; `cov_cluster`, `cov_classical` (S, S), NaN rows and columns for a shared unknown at a bound;
+    `se_cluster`, `se_classical` (S,); `n_model_calls` int; `nfev` int; `n_nan_filled` int; `status` int;
+    `message` str; `success` bool.
+- Parameters: none of its own (the callers pass `Step2Config`'s steps and `max_nfev`).
+- Library calls: `scipy.optimize.least_squares`; `scipy.sparse` for the pattern; numpy.
+- Custom code: the clustered covariance (a few lines of linear algebra; scipy has none).
+- Test oracles: (F1) a linear model $\hat y = A a + B_g b_g$ without noise: `shared` and `local` to 1e-8; (F2) a
+  non-linear analytic toy (a parabola in the plane offset whose curvature is shared and whose centre is local, the
+  shape of step 2's near stage) against `least_squares` without sparsity: the same solution to 1e-6; (F3)
+  `cov_cluster` and `cov_classical` on a linear model against `statsmodels` OLS with `cov_type="cluster"`,
+  `use_correction=False`, and its non-robust covariance (1e-8 relative; statsmodels installed for the test, else
+  SkipTest naming it); (F4) Monte Carlo, 400 datasets with noise correlated inside groups: the SD of `shared`
+  across datasets against the mean `se_cluster` within 15 %, and `se_classical` too small by the expected factor
+  (the comment derives it); (F5) bounds respected and `free` False at an active bound; (F6) `n_model_calls` per
+  Jacobian is $S + L$; (F7) the NaN rules; (F8) $L$ = 0; determinism.
+- Data flow: consumed by Blocks 57 and 58, which build `model` from Blocks 54 and 55.
+- Confirmed: D-273.3 [user]; the NaN rule and the two covariances are the orchestrator's.
+- Status: drafted 2026-11-27.
+
+### Blocks 57 to 60 (wave 2; outlines -- the entries are completed before wave 2 starts)
+
+- Block 57, the near stage: `analysis/step2_near.py`. Stage 1 and stage 2 of the common definitions on Blocks 53
+  to 56; the comparison run with $\sigma_{\rm r}(0)$ fitted (D-274.3); a pool over twins (`max_workers`).
+- Block 58, the far stage: `analysis/step2_far.py`. Stage 3; reports $\hat\gamma$ with both SEs (D-229.3).
+- Block 59, weights and validation: `analysis/step2_validation.py`. $s_\omega(j)$ from the replicates' SDs
+  (D-273.1); the validation twins predicted under the fitted table, near and far (D-273.4), with each node's ratio
+  of twin to real dip area and of twin to real background SD (D-274); the report `save_step2` writes.
+- Block 60, the figures: `plotting/step2_figures.py`. Real against twin core widths by plane, training and
+  validation, near and far.
+- Entry point `scripts/calibrate_step2.py` and the davinci job script: by the orchestrator, after wave 2.
+
 ## 6. Pipeline entry points
 
 | Command | Purpose | Minimal configuration for testing | Expected runtime |
@@ -2593,6 +2912,6 @@ All commands run from `Passive Features/Diameter Re-measurement/`.
 - Whether a root-level `tests/smoke/` redirect is needed for the scheduled tester (D-022).
 - `RendererConfig.end_cut` default `"axial"` (Block 2): the handoff's vertical cut makes the depth span $2U\tan\varphi$ diverge as $\varphi \to 90°$ (raised 2026-10-06).
 - The fit's start rule `fit_start_rule = "profile"` and its fallback `fit_d0_um` (Block 3; raised 2026-10-06).
-- Kernel calibration, step 2 (procedure s.3.4: tune $\sigma_{\rm r}$ at the plane-offset knots so that rendered thin phantoms reproduce the real profiles, or their core widths, plane by plane): not built. The first stage (Block 10) is biased near focus by about 0.01 um$^2$ in $G$ on thin phantoms, the size of the growth itself at one plane; what to match (mean profiles or core widths), which $d$ and $\mu$ to render each calibration node with ($\hat d_i$ reads 5-25 % wide), and the cost (a renderer in the loop) are open (raised 2026-10-06).
+- Kernel calibration, step 2 (procedure s.3.4: tune $\sigma_{\rm r}$ at the plane-offset knots so that rendered thin phantoms reproduce the real profiles, or their core widths, plane by plane): being built since 2026-11-27 (section 5, "Kernel calibration, step 2": Block 4 amendment 4, Blocks 52 to 60; D-270 to D-275). [2026-11-27; the rest of this item is the state before the build:] The first stage (Block 10) is biased near focus by about 0.01 um$^2$ in $G$ on thin phantoms, the size of the growth itself at one plane; what to match (mean profiles or core widths), which $d$ and $\mu$ to render each calibration node with ($\hat d_i$ reads 5-25 % wide), and the cost (a renderer in the loop) are open (raised 2026-10-06).
 - Kernel resolution: plane scans identify the growth at plane offsets only (Block 10 finding); the sub-plane shape of $\sigma_{\rm r}$ between 0 and $\Delta z$ (the default table's 0.086 um at 0.14 um) stays configured (raised 2026-10-06).
 - The alternative generator of the end-to-end acceptance (procedure s.3.10, last row): the ray world has no diffraction, so ray-world test phantoms corrected with a Gaussian-kernel table mix the absorption treatment with a blur mismatch (its own $\hat d/d$ is 1.20-1.32, impl-handoff (S10)); a clean end-to-end use needs the cone kernel in Block 4 ((S7)/(S8), not built). Proposal: the empirical kernel (Block 10) as the acceptance's alternative, the ray world for absorption checks (raised 2026-10-06).

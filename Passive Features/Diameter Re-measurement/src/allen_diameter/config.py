@@ -56,8 +56,8 @@ SGT_STRETCH_ALLOWANCE = 2.1     # = model.line_sgt.STRETCH_ALLOWANCE: the zeta i
                                 # inference.sgt_ln_zeta_bounds stays within +-ln of it (D-233, the final check's S5)
 FOCUS_GRAD_WINDOWS = ("radius_margin", "whole_profile")        # D-030 (provisional default, see MeasureConfig.focus_grad_window)
 ABSORPTIONS = ("partition_vertical", "linear", "ray_world", "hybrid")    # D-024 / procedure s.3.6; "hybrid": Block 21 (D-084, D-092)
-KERNEL_FAMILIES = ("gaussian_table", "empirical")              # procedure s.3.4
-KERNEL_CONTINUATIONS = ("linear", "frozen", "proportional")    # D-024 / mathematics Eq. 17
+KERNEL_FAMILIES = ("gaussian_table", "gaussian_table_spline", "empirical")   # procedure s.3.4; "gaussian_table_spline": Block 4 amendment 4 (D-181, D-265, D-272): the table read by the cubic spline of the growth of the variance
+KERNEL_CONTINUATIONS = ("linear", "frozen", "proportional", "tangent")    # D-024 / mathematics Eq. 17; "tangent" (D-265): the spline reading only
 SOMA_BACKGROUNDS = ("tilted", "constant")                       # D-254.1 (SPEC Block 46, wave 8)
 SOMA_SIGMA0_MODES = ("fixed", "fit")                            # D-258 (SPEC Blocks 45-46, wave 8)
 RESPONSE_ESTIMATORS = ("local_linear", "tps_spline", "grid_mean")  # D-024, D-063.2, D-067.3 (grid_mean: not built)
@@ -309,7 +309,7 @@ class CalibrationConfig:
     far_offsets_planes: int = 16             # source: D-074.1 [user]: the far scan reads k* +- this (4.48 um on both sides of focus)
     far_profile_half_um: float = 10.0        # source: D-074.2 [user]: half-length of the far line (um); a calibration setting, not MeasureConfig's
     far_min_snr: float = 3.0                 # source: D-074.1 [user]: a plane enters the far fit when its PREDICTED dip A_j / (sqrt(2 pi) sigma_p) >= this x RMS_j (D-078.3)
-    far_min_k_offset: int = 5                # source: PROVISIONAL (D-026 (g)): planes with |k - k*| >= this enter the far fit (x >= 0.4 um >= r_j)
+    far_min_k_offset: int = 4                # source: D-273.2 [user, 2026-11-27: "start at 4 in both cases"] (was 5, PROVISIONAL, D-026 (g)): planes with |k - k*| >= this enter the far fit and step 2's far stage
     far_area_offsets: Tuple[int, int] = (4, 6)  # source: PROVISIONAL (S2b checks): the node's dip area A_j is the median of a s sqrt(2 pi) over the ok planes with |k - k*| in this range
     far_min_planes_per_node: int = 6         # source: PROVISIONAL: a far node enters the fit with at least this many selected planes
     # 2026-10-29, D-109 and D-112 (Block 10.C): where each set's candidates come from
@@ -575,6 +575,37 @@ class SomaFitConfig:
 
 
 @dataclass(frozen=True)
+class Step2Config:
+    """Step 2 of the kernel calibration: the twins' least squares (SPEC section 5, "Kernel calibration, step 2";
+    Blocks 52 to 60; roadmap NS1). Outside every signature."""
+
+    absorption: str = "hybrid"                 # source: D-270.3 [user]: every render of steps 1 and 2 uses the hybrid (named here: D-231's default is not on origin)
+    kernel_family: str = "gaussian_table_spline"  # source: D-272 [user], D-265: the twins' table is read by the spline of Block 4's amendment 4
+    knots_um: Tuple[float, ...] = (0.28, 0.56, 0.84)  # source: D-228.1 [user]: the defocus of theta_1, theta_2, theta_3 (um)
+    knot_min_margin_um: float = 0.001          # source: PROVISIONAL (the T10 study's checks bounded the knots at 0.081 to 0.083 um): theta_m >= sigma_r(0) + this
+    knot_max_um: float = 2.0                   # source: D-273.3 [user]: theta_m <= this (um)
+    near_planes: int = 3                       # source: D-263.1 [user]: the near stage reads |k - k*| <= 3, the anchor's plane; a decision, not a tunable default
+    far_planes: Tuple[int, int] = (4, 16)      # source: D-229.2, D-273.2 [user]: the far stage reads 4 <= |k - k*| <= 16
+    z_ax_bound_um: float = 0.28                # source: PROVISIONAL (Block 10's z_ax_bound_um): a twin's fitted axis depth stays within this of the pilot's sub-plane depth
+    weights: str = "inverse_variance"          # source: D-273.1 [user]: 1 / s_omega(j)^2 from the twins' noise replicates; "none" the labelled alternative
+    noise_replicates: int = 4                  # source: PROVISIONAL (D-270's open point): noise replicates of each twin, sharing one rendered stack
+    noise_scale: float = 1.0                   # source: PROVISIONAL (D-270.2's reading): the twin plane's noise SD before the chain = this x the real plane's background SD
+    seed: int = 20261127                       # source: the contract of 2026-11-27: the twins' noise (common random numbers)
+    validation_fraction: float = 0.25          # source: D-274.4 [user]: the share of the chosen nodes kept for validation
+    split_seed: int = 20261127                 # source: D-274.4 [user: a fixed seed]; the value is the contract's
+    diff_step_knot_um: float = 0.005           # source: PROVISIONAL: finite-difference step of a knot (um) on the noisy, quantised objective
+    diff_step_z_um: float = 0.02               # source: PROVISIONAL: finite-difference step of an axis depth (um)
+    diff_step_gamma: float = 0.02              # source: PROVISIONAL: finite-difference step of the slope
+    max_nfev: int = 40                         # source: PROVISIONAL: least_squares' cap on its evaluations in one stage
+    fit_sigma0: bool = False                   # source: D-274.3 [user]: sigma_r(0) held; True is the labelled comparison, judged on the validation set
+    tube_half_length_um: float = 40.0          # source: PROVISIONAL: the twin's straight tube crosses the whole +-patch_half_um patch
+    max_workers: int = 1                       # source: D-274.5 [user]: at most 100 on davinci; 1 here
+
+
+STEP2_WEIGHTS = ("inverse_variance", "none")                    # D-273.1
+
+
+@dataclass(frozen=True)
 class DiameterConfig:
     """The whole configuration. Build with ``DiameterConfig()`` for the
     deliverable defaults, or ``dataclasses.replace`` for a labelled variant."""
@@ -592,6 +623,7 @@ class DiameterConfig:
     sigma_calibration: SigmaCalibrationConfig = field(default_factory=SigmaCalibrationConfig)  # source: D-201 (sub-config; outside every signature)
     soma_view: SomaViewConfig = field(default_factory=SomaViewConfig)  # source: D-210, D-211 (sub-config; outside every signature)
     soma_fit: SomaFitConfig = field(default_factory=SomaFitConfig)  # source: D-216, D-218, D-219 (sub-config; outside every signature)
+    step2: Step2Config = field(default_factory=Step2Config)  # source: D-270 to D-274 (sub-config; outside every signature)
 
     # ------------------------------------------------------------ checks --
     def validate(self) -> None:
@@ -738,6 +770,7 @@ class DiameterConfig:
         _check_sigma_calibration(self.sigma_calibration)
         _check_soma_view(self.soma_view)
         _check_soma_fit(self.soma_fit)
+        _check_step2(self.step2)
         sv = self.survey
         types = [str(t).strip().lower() for t, _ in sv.class_map] if all(len(x) == 2 for x in sv.class_map) else None
         if not (isinstance(sv.species, str) and sv.species.strip() and sv.cells_per_group >= 1
@@ -977,6 +1010,33 @@ def _check_sigma_calibration(q: "SigmaCalibrationConfig") -> None:
         raise ValueError("sigma_calibration: a plane count, bound, start, step, max_nfev, tolerance or workers is out "
                          "of range "
                          "(SPEC Block 42)")
+
+
+def _check_step2(q: "Step2Config") -> None:
+    """Step2Config (Blocks 52 to 60): the absorption among the rendered ones, a table family with the spline,
+    ascending positive knots, ordered plane ranges, positive bounds, steps and counts, a fraction in [0, 1)."""
+    _check_in(q.absorption, ABSORPTIONS, "step2.absorption")
+    _check_in(q.kernel_family, ("gaussian_table_spline", "gaussian_table"), "step2.kernel_family")
+    _check_in(q.weights, STEP2_WEIGHTS, "step2.weights")
+    kn = tuple(float(x) for x in q.knots_um)
+    fp = tuple(q.far_planes)
+    ok = (len(kn) >= 2 and all(math.isfinite(x) and x > 0 for x in kn) and all(b > a for a, b in zip(kn, kn[1:]))
+          and math.isfinite(q.knot_min_margin_um) and q.knot_min_margin_um >= 0
+          and math.isfinite(q.knot_max_um) and q.knot_max_um > 0
+          and _is_count(q.near_planes, 1) and len(fp) == 2 and _is_count(fp[0], 1) and _is_count(fp[1], 1)
+          and q.near_planes < fp[0] <= fp[1]
+          and math.isfinite(q.z_ax_bound_um) and q.z_ax_bound_um > 0
+          and _is_count(q.noise_replicates, 1) and math.isfinite(q.noise_scale) and q.noise_scale >= 0
+          and _is_count(q.seed, 0) and _is_count(q.split_seed, 0)
+          and math.isfinite(q.validation_fraction) and 0 <= q.validation_fraction < 1
+          and all(math.isfinite(x) and x > 0 for x in (q.diff_step_knot_um, q.diff_step_z_um, q.diff_step_gamma))
+          and _is_count(q.max_nfev, 1) and isinstance(q.fit_sigma0, bool)
+          and math.isfinite(q.tube_half_length_um) and q.tube_half_length_um > 0 and _is_count(q.max_workers, 1))
+    if not ok:
+        raise ValueError("step2: knots ascending and > 0 (at least two); knot_min_margin_um >= 0; knot_max_um > 0; "
+                         "near_planes >= 1 and < far_planes[0] <= far_planes[1]; z_ax_bound_um > 0; noise_replicates "
+                         ">= 1; noise_scale >= 0; seeds >= 0; 0 <= validation_fraction < 1; the steps > 0; max_nfev "
+                         ">= 1; fit_sigma0 a bool; tube_half_length_um > 0; max_workers >= 1")
 
 
 def _check_soma_view(q: "SomaViewConfig") -> None:

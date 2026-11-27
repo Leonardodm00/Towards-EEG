@@ -125,7 +125,7 @@ def test_reference():
             continue
         name = m.group(1)
         if name in ("acquisition", "measure", "correction", "renderer", "phantom", "calibration", "survey",
-                    "cleaning", "inference", "clearness", "sigma_calibration", "soma_view", "soma_fit"):
+                    "cleaning", "inference", "clearness", "sigma_calibration", "soma_view", "soma_fit", "step2"):
             continue  # the container's sub-config fields
         if "# source:" in line:
             n_tagged += 1
@@ -138,7 +138,7 @@ def test_reference():
                                                         C.RendererConfig, C.PhantomConfig, C.CalibrationConfig,
                                                         C.SurveyConfig, C.CleaningConfig, C.InferenceConfig,
                                                         C.ClearnessConfig, C.SigmaCalibrationConfig,
-                                                        C.SomaViewConfig, C.SomaFitConfig))   # Blocks 40, 42, 44, 45-46 (D-194, D-201, D-210, D-218)
+                                                        C.SomaViewConfig, C.SomaFitConfig, C.Step2Config))   # Blocks 40, 42, 44, 45-46 (D-194, D-201, D-210, D-218)
     assert n_tagged == n_fields, (n_tagged, n_fields)
     # every field is read by some code outside config.py (attribute access or getattr, parsed with ast,
     # so a docstring naming a field does not count) [added 2026-10-07: renderer.jpeg_qtables_file was
@@ -164,6 +164,10 @@ def test_reference():
     # [2026-11-13, contract of wave 1 (D-129, D-130)] the fields of the cleaning and inference sections are declared
     # with the contract, before the blocks that read them (Blocks 23-34); they are exempt until wave 3 is merged
     pending = {u for u in unread if u.split(".")[0] in ("cleaning", "inference")}
+    # [2026-11-27, contract of wave 9 (D-270 to D-274)] step 2's fields are declared with the contract, before
+    # Blocks 52 to 60 and the entry point read them; exempt until wave 2 of step 2 and scripts/calibrate_step2.py
+    # are merged
+    pending |= {u for u in unread if u.split(".")[0] == "step2"}
     # [2026-11-22, contract of wave 5 (D-218, D-219)] the soma fit's fields are declared before Blocks 45-46 and the
     # entry point read them (mask_widen_um is read by Block 47, scripts/fit_soma.py); exempt until Block 47 is merged
     # [2026-11-22, D-220.6 (final check F5)] the soma fit's exemption was narrowed to soma_fit.mask_widen_um; removed
