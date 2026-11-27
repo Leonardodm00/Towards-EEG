@@ -317,6 +317,7 @@ the "Binds" column.
 | 2026-11-27 (the defocus-table chat, 10:35) | Logs **D-263** (user): the near stage of D-230 -- step 1 and step 2 on the near-set twins -- uses only the planes up to the third on each side of focus, the anchor's plane; already met by `offsets_planes` = 3 and by D-229.2, now binding. Next free IDs: D-264, I-008. |
 | 2026-11-27 (the defocus-table chat, 10:40) | Logs **D-264** (user): D-230.3's alternation of the calibration's stages is dropped; each stage runs once, near then far (D-230 marked superseded in part; D-263 annotated). Next free IDs: D-265, I-008. |
 | 2026-11-27 (the defocus-table chat, 10:50) | Logs **D-265** (user): in the near stage the kernel past the anchor is the spline's extrapolation, not the linear continuation with a held slope (D-263's and D-264's open points annotated). Next free IDs: D-266, I-008. |
+| 2026-11-27 (the defocus-table chat, 10:45) | D-265.3 confirmed by the user (10:41): the spline's extrapolation is for the near-field calibration only, where a third plane lies slightly past 0.84 um; the far stage and the tables keep the linear continuation with gamma. No new ID. Next free IDs: D-266, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -16309,7 +16310,9 @@ $G$. Continuing its last cubic piece instead makes $\sigma_{\rm r}$ fall with de
 table (computed below), so it is not used. (D-265.2) The near stage therefore holds no $\gamma$: D-264's open point is
 moot, and the outer planes are not weighted down on this account (D-263's open point) [the assistant's reading].
 (D-265.3) The far stage and the calibrated table are unchanged: beyond 0.84 um the table continues linearly with the
-far stage's $\gamma$ (D-080.1, D-228, D-230.2) [the assistant's reading].
+far stage's $\gamma$ (D-080.1, D-228, D-230.2) [the assistant's reading; confirmed by the user, 2026-11-27 10:41: "Scope:
+the near stage only. Yes just if the indexed plane is slightly further than the 0.84 um during the near-field
+calibration"].
 
 **Why.** The near stage then depends on its own knots and $\sigma_{\rm r}(0)$ only, as step 1 already does (its growth
 fit has a knot at 1.12 um and its spline covers the outer planes, D-080.1, D-181.1), instead of on a slope it does not
@@ -16334,5 +16337,9 @@ measured); the rest of D-229's weights $\varpi$.
 knots; `fit_growth`: knots up to $Mh$, $M = \lceil (P + 1/2)\,\Delta z / h\rceil$) on `sci/diameter-pipeline` at
 `e2c4a4e`. **[run, sandbox]** `check_spline_extrapolation.py`. **[doc]** the T10 study document, check 10.
 
-**Status:** active; not built (needs D-181's spline in the renderer).
+**Status:** active; not built (needs D-181's spline in the renderer). [2026-11-27 10:41: D-265.3's scope confirmed by the user;
+the tangent reading of D-265.1 stays PROVISIONAL. In the renderer the law is read per slice, so the extrapolation
+serves every defocus past 0.84 um that a near-stage twin reaches: the third plane's own (up to 0.98 um) and its
+slices' (up to about 1.28 um for a 0.6 um tube).]
+
 
