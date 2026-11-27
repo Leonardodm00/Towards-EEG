@@ -324,6 +324,7 @@ the "Binds" column.
 | 2026-11-27 (the review chat, 12:04) | Logs **D-268** (user): two more twins' campaigns on the ten noisy twins with `tw5`'s settings: `tw6`, six parameters; `tw7`, five parameters with the twins simulated on a morphology whose soma and dendrite diameters are x 1.5 within 300 um of path length from the soma, the fit on the original. Block 29 on `sci/twins` (`8e1fbdb`). |
 | 2026-11-27 (the review chat, afternoon) | Logs **D-269** (orchestrator): the independent check of Block 29 (report `Ih Fit/specs/test_reports/2026-11-27_1300_incremental.md`, PASS WITH ISSUES) settled; `sci/twins` `8b05c56`. Next free IDs: D-270, I-008. |
 | 2026-11-27 (the step-2 implementation chat, 18:06) | Logs **D-270** to **D-273** (user), the answers to the open questions of kernel calibration step 2 (roadmap NS1; the step-2 implementation handoff's section 9): the full stack as the forward model, noisy twins plane by plane, the hybrid in steps 1 and 2 (D-270); each near twin's depth fitted and its absorption searched in the near stage, both held in the slope's fit (D-271; the absorption's statistic to confirm); the spline as the renderer's default between knots (D-272, makes D-181 effective); the weights, the far planes from the fourth in both fits, the solver, a training/validation split, the nodes' delivery (D-273; whether $\sigma_{\rm r}(0)$ is fitted is not decided). Check run: `checks/step2_identifiability_2026-11-27/` on `sci/diameter-pipeline`. D-181 and D-229 annotated. Next free IDs: D-274, I-008. |
+| 2026-11-27 (the step-2 implementation chat, 18:34) | Logs **D-274** (user): step 2's absorption held at the pilot's value (no area term; D-271.2 superseded); a far twin's depth fitted on its own near planes with the knots held; $\sigma_{\rm r}(0)$ held, a fit with it free compared on the validation set; the split by node, stratified, 75/25; davinci with at most 100 cores, NS1 `needs_hpc: true`; the staged plan approved (Block 4 amendment, Blocks 52 to 60). D-271 and D-273 annotated. Next free IDs: D-275, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -585,6 +586,7 @@ would be needed*, *Status*.
 | D-271 | 2026-11-27 | step 2's per-twin axis depth and absorption; the near and far stages (D-230, D-264) | in the near stage each twin's axis depth is fitted and its absorption searched (the latter to confirm, with its statistic); both are held in the slope's fit [user] | active; D-271.2 to confirm; not built |
 | D-272 | 2026-11-27 | SPEC Block 4's kernel law (`model/kernel.py`, `RendererConfig`); D-181, D-265 | the renderer reads the table between knots with D-181's spline by default, the linear reading a labelled alternative; the far-set nodes serve the far stage only [user] | active; not built |
 | D-273 | 2026-11-27 | step 2's weights, far planes (`far_min_k_offset`), solver, acceptance and validation set, the nodes' delivery; D-221.1 | weights $1/s_\omega(j)^2$ with the unweighted fit selectable; far planes from the fourth in step 2 and in the far fit; `least_squares` with SEs clustered by node, no bootstrap for now; the chosen nodes split into training and validation; whether $\sigma_{\rm r}(0)$ is fitted is not decided [user] | active; D-273.6 to confirm; not built |
+| D-274 | 2026-11-27 | step 2's absorption, the far twins' depth, $\sigma_{\rm r}(0)$, the split, the davinci run, the roadmap's NS1; D-271.2, D-273.6, D-229.2 | the absorption is held at the pilot's value for every twin; a far twin's depth is fitted on its own near planes with the knots held; $\sigma_{\rm r}(0)$ is held and a fit with it free is compared on the validation set; split by node 75/25; at most 100 cores; the plan approved [user] | active; not built |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -16583,7 +16585,7 @@ beyond supplying starting values.
 hold for the configuration run and for the proxy forward model, not for the full stack of D-270. **[log]** D-229,
 D-230, D-263, D-264, D-270.
 
-**Status:** active (D-271.1, D-271.3); D-271.2 to confirm; not built.
+**Status:** active (D-271.1, D-271.3); D-271.2 to confirm; not built. [2026-11-27 18:34: D-271.2 superseded by D-274.1 -- the absorption is held at the pilot's value; the far twins' depth settled by D-274.2]
 
 ---
 
@@ -16678,4 +16680,54 @@ which twins); D-229.2's validation on the far nodes' $\pm 3$ planes beside the n
 **Sources.** **[user]** 2026-11-27, 18:06. **[run]** as above. **[src]** `config.py` (`far_min_k_offset`),
 `scripts/kernel_width.py` on `sci/diameter-pipeline` at `aadac6a`. **[log]** D-221, D-229, D-231, D-261, D-270, D-271.
 
-**Status:** active; D-273.6 to confirm; not built.
+**Status:** active; D-273.6 to confirm; not built. [2026-11-27 18:34: D-273.6 settled by D-274.3 -- held, a fit with it free compared in validation; the split by D-274.4]
+
+---
+
+## D-274 -- Step 2: the absorption held at the pilot's value, a far twin's depth fitted on its own near planes, the in-focus width held and compared in validation, the split, the cores; the plan approved (user)
+
+**Date:** 2026-11-27, 18:34 (Europe/Rome), the step-2 implementation chat. **Binds:** step 2 of the kernel calibration
+(NS1; D-270 to D-273): the twins' absorption (D-271.2), the far-set twins' depth and absorption (D-271's open point),
+$\sigma_{\rm r}(0)$ (D-273.6), the training/validation split (D-273.4), the davinci run, the roadmap's NS1; D-229.2's
+validation planes.
+
+**Decision [user].** To the five points left by D-271 and D-273: "Far twins' depth and absorption: As you recommend";
+"The area term for $\mu_i$. hold mu"; "$\sigma_{\rm r}(0)$. held fixed but in validation compare"; "4 and 5 ok as you
+say"; and, on the plan and the pending pushes, "For the rest ok push everyting".
+
+**Statement.** (D-274.1) The absorption is not searched: every twin, near-set and far-set, is rendered at its node's
+pilot value $\hat\mu_i$ (`mu_hat_per_um` of the pilot record), and no area term enters the least squares; D-271.2 is
+superseded [user]. (D-274.2) A far-set twin's axis depth is fitted on that node's own planes $|k - k^*_i| \le 3$ with
+the knots held at the near stage's values, before the far stage, and is then held in the fit of $\gamma$ [user, on the
+assistant's recommendation]; its absorption is the pilot's by D-274.1 [the assistant's reading: the recommendation
+named both, and "hold mu" came with it]. (D-274.3) $\sigma_{\rm r}(0)$ is held in step 2 (D-221.1's switch chooses its
+value); a second near stage with $\sigma_{\rm r}(0)$ fitted is run as a labelled comparison, and the validation set
+compares the two [user]. (D-274.4) The chosen nodes are split by node, stratified by set (near, far) and by cell, 75 %
+training and 25 % validation, with a fixed seed [user, on the assistant's proposal]. (D-274.5) Step 2 runs on davinci
+with at most 100 cores at once (as D-175.3), and NS1 becomes `needs_hpc: true` in the roadmap [user, on the assistant's
+proposal]. (D-274.6) The staged plan of 2026-11-27 is approved: the contract and the Block 4 amendment by the
+orchestrator, then Blocks 52 to 56 (the loading, the twin settings, the twin render, the twin measurement, the
+estimator) and Blocks 57 to 60 (the near stage, the far stage, the weights and validation, the figures) by independent
+implementers, then the entry point, the job script and D-272's default [user].
+
+**Why.** **[user]**. For D-274.1, D-271's check: on core widths a twin's absorption and depth are almost collinear
+(correlation +1.00 on the proxy model), so with the depth fitted an error of $\hat\mu_i$ is taken up by the fitted
+depth, and the knots' SEs stay at 1.00, 1.03, 1.16 times the knots-only fit's **[run, this chat:
+`checks/step2_identifiability_2026-11-27/`; proxy forward model]**.
+
+**What it implies for code and tables.** The near stage's unknowns are the three knots and one depth per training
+near-set twin; the far stage's are $\gamma$ alone, after one depth per far-set twin fitted on its near planes. The far
+nodes' planes $|k - k^*| \le 3$ now fit their twin's depth, so they are no longer the untouched validation planes of
+D-229.2: the validation is D-273.4's set. The pilot's $\hat\mu_i$ is a partition-model fit (Block 3) while the twin is
+a hybrid render, whose dip is deeper at equal $\mu$ (1.447 times in the faint limit, D-231), so a twin can be darker
+than its node; the validation report gives the ratio of the twin's dip area to the real one per node, so that a
+systematic mismatch is seen **[the orchestrator's addition]**. Not built.
+
+**What it does not decide.** Whether the pilot's $\hat\mu_i$ is rescaled for the hybrid if the validation shows the
+twins darker than their nodes; the seed's value; the davinci screening export from which the user chooses the nodes
+(D-226, D-227, D-261.1: not built, outside step 2's blocks).
+
+**Sources.** **[user]** 2026-11-27, 18:34. **[run]** as above. **[log]** D-175, D-221, D-229, D-231, D-261, D-271,
+D-273.
+
+**Status:** active; not built.
