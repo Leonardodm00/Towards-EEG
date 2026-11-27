@@ -45,6 +45,7 @@ def fit_shared_local(model, y, w, group, shared0, shared_bounds, local0=None, lo
     local (N, L)) -> (n,), observation j depending on local[group[j]] only; y, w (n,); group (n,) int in 0..N-1;
     shared_bounds (lo (S,), hi (S,)); local0 (N, L) or None (L = 0); local_bounds (lo (N, L), hi (N, L));
     diff_step_shared (S,), diff_step_local (L,): absolute finite-difference steps. scipy.optimize.least_squares
-    (trf, 2-point Jacobian with its sparsity). ValueError: shapes that do not agree, a negative or non-finite
+    (trf, x_scale "jac", tr_solver "exact") with the Jacobian as a callable: a structured 2-point forward
+    difference with these absolute steps, S + L model calls, dense (amendment 1). ValueError: shapes that do not agree, a negative or non-finite
     weight, a start outside its bounds, a group index outside 0..N-1, no kept observation."""
     raise NotImplementedError("Block 56")

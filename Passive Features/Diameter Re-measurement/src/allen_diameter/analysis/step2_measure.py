@@ -16,7 +16,8 @@ def camera_planes(stack, B_gl, noise_sd_gl, rcfg, rngs):
 
 def twin_scene(twin, cfg, s2cfg):
     """(node, branch, scene) for the scans: node carries the real pilot's node_id, k_star, z_sub_um, cx_um, cy_um,
-    theta_rad, phi_rad, d_hat_um = d_um and alpha_hat = mu_per_um d_um / cos(phi_rad); branch a straight Branch
+    theta_rad, phi_rad, d_hat_um = twin.d_pilot_um, alpha_hat = twin.alpha_pilot, B_bar = twin.B_pilot_gl and
+    mu_hat_per_um = twin.mu_per_um (amendment 1: the stripe support reads the last three); branch a straight Branch
     along the twin's axis through (cx_um, cy_um, z_sub_um), nodes every cfg.phantom.phantom_node_step_um over
     +-s2cfg.tube_half_length_um, radius d_um / 2; scene = Scene.from_branch(branch)."""
     raise NotImplementedError("Block 55")
@@ -39,5 +40,6 @@ def measure_twin(twin, stack, scan_cfg, s2cfg, replicate=0, noise=True):
 def twin_statistics(twin, stack, scan_cfg, s2cfg, noise=True):
     """dict of (n,) arrays over stack.ks from R = s2cfg.noise_replicates replicates (1 when noise is False):
     "omega_um2" the mean of the finite values, NaN where fewer than ceil(R / 2) are finite; "omega_sd_um2" their
-    sample SD (NaN for fewer than two); "area_gl_um", "bg_sd_gl" means; "n_ok" int."""
+    sample SD (NaN for fewer than two); "area_gl_um", "bg_sd_gl" means over the replicates with a finite value (NaN when none); "n_ok" (n,) int, the
+    replicates with a finite core width (amendment 1)."""
     raise NotImplementedError("Block 55")
