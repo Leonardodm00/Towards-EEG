@@ -62,15 +62,16 @@ def camera_planes(stack, B_gl, noise_sd_gl, rcfg, rngs):
 
 def twin_scene(twin, cfg, s2cfg):
     """(node, branch, scene) for the scans: node carries the real pilot's node_id, k_star, z_sub_um, cx_um, cy_um,
-    theta_rad, phi_rad, d_hat_um = d_um and alpha_hat = mu_per_um d_um / cos(phi_rad); branch a straight Branch
+    theta_rad, phi_rad, d_hat_um = twin.d_pilot_um, alpha_hat = twin.alpha_pilot, B_bar = twin.B_pilot_gl and
+    mu_hat_per_um = twin.mu_per_um (amendment 1: the stripe support reads the last three); branch a straight Branch
     along the twin's axis through (cx_um, cy_um, z_sub_um), nodes every cfg.phantom.phantom_node_step_um over
     +-s2cfg.tube_half_length_um, radius d_um / 2; scene = Scene.from_branch(branch)."""
     phi = float(twin.phi_rad)
     d = float(twin.d_um)
     node = types.SimpleNamespace(
-        node_id=int(twin.node_id), d_hat_um=d, phi_rad=phi, alpha_hat=float(twin.mu_per_um) * d / math.cos(phi),
-        k_star=int(twin.k_star), z_sub_um=float(twin.z_sub_um), cx_um=float(twin.cx_um), cy_um=float(twin.cy_um),
-        theta_rad=float(twin.theta_rad))
+        node_id=int(twin.node_id), k_star=int(twin.k_star), z_sub_um=float(twin.z_sub_um), cx_um=float(twin.cx_um),
+        cy_um=float(twin.cy_um), theta_rad=float(twin.theta_rad), phi_rad=phi, d_hat_um=float(twin.d_pilot_um),
+        alpha_hat=float(twin.alpha_pilot), B_bar=float(twin.B_pilot_gl), mu_hat_per_um=float(twin.mu_per_um))
     step = float(cfg.phantom.phantom_node_step_um)
     m = int(math.floor(float(s2cfg.tube_half_length_um) / step + 1e-9))
     s = np.arange(-m, m + 1) * step
@@ -121,7 +122,8 @@ def measure_twin(twin, stack, scan_cfg, s2cfg, replicate=0, noise=True):
 def twin_statistics(twin, stack, scan_cfg, s2cfg, noise=True):
     """dict of (n,) arrays over stack.ks from R = s2cfg.noise_replicates replicates (1 when noise is False):
     "omega_um2" the mean of the finite values, NaN where fewer than ceil(R / 2) are finite; "omega_sd_um2" their
-    sample SD (NaN for fewer than two); "area_gl_um", "bg_sd_gl" means; "n_ok" int."""
+    sample SD (NaN for fewer than two); "area_gl_um", "bg_sd_gl" means over the replicates with a finite value
+    (NaN when none); "n_ok" (n,) int, the replicates with a finite core width (amendment 1)."""
     R = int(s2cfg.noise_replicates) if noise else 1
     if R < 1:
         raise ValueError("twin_statistics: noise_replicates must be >= 1")
@@ -138,5 +140,13 @@ def twin_statistics(twin, stack, scan_cfg, s2cfg, noise=True):
         ss = np.where(fin, (om - mean[None, :]) ** 2, 0.0).sum(axis=0)
         sd = np.where(n_ok >= 2, np.sqrt(ss / np.maximum(n_ok - 1, 1)), np.nan)
     mean = np.where(n_ok >= int(math.ceil(R / 2.0)), mean, np.nan)
-    return {"omega_um2": mean, "omega_sd_um2": sd,
-            "area_gl_um": area.mean(axis=0), "bg_sd_gl": bsd.mean(axis=0), "n_ok": n_ok}
+    return {"omega_um2": mean, "omega_sd_um2": sd, "area_gl_um": _finite_mean(area), "bg_sd_gl": _finite_mean(bsd),
+            "n_ok": n_ok}
+
+
+def _finite_mean(a):
+    """Column means of (R, n) over the finite entries; NaN where none is finite."""
+    fin = np.isfinite(a)
+    cnt = fin.sum(axis=0)
+    tot = np.where(fin, a, 0.0).sum(axis=0)
+    return np.where(cnt > 0, tot / np.maximum(cnt, 1), np.nan)
