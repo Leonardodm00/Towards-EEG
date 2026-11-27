@@ -27,6 +27,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-25 (the review chat) | Section 7: the user's decision after the independent review (D-245: TRF on the squared loss; the sensitivity module dropped), the code facts the review asked for **[src at `393b681`]** and the re-read of tw3a/tw3b's `refine_starts.csv` **[data inspected]**. |
 | 2026-11-25 (the review chat, evening) | Section 7: Blocks 23 to 28 built and checked on `sci/twins` (`de4cc53`), what changed in the fit and the twins' run, the final check's verdict, and the two commands for the next run on the noisy twins (D-245 to D-250 [corrected 2026-11-27: the last is now D-262, renumbered; D-250 is the soma fit's]). |
 | 2026-11-27 (the defocus-table chat) | With the user's OK, the review chat's D-250 (the final check of Blocks 23 to 28) is renumbered **D-262** in the log, ending the clash with the soma fit's D-250; this handoff's two citations corrected. The citations of D-250 in `Ih Fit/` on `sci/twins` (SPEC Block 28's notes, `run_twin_recovery.py`, `smoke_twin_sensitivity.py`, `tests/spec/test_spec_block8_twin_recovery.py`, `tests/spec/test_spec_block22_twin_recovery_run3.py`) were left untouched so as not to mark Block 28 as changed: they mean D-262; update them the next time those files change. |
+| 2026-11-27 (the review chat) | Section 7: the results of the sensitivity run `tw5` on the ten noisy twins **[data inspected]** and what they imply for the gate, the exclusion rule and $\tau_d$ (not decided). |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -509,6 +510,23 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   `truth_trace_check.csv`, then per fit `refine_n_converged`, the endpoints' agreement in `refine_starts.csv`
   (`x_solver_*`, `sv_*`), `on_bound_*`, and the errors against `sd_lin_*`. Noise-free twins later, if time allows,
   with `--dt-long-ms 0.025` in `PLAN_ARGS` (D-248). Not built: the review's CR-5 (the global stage).
+- **The sensitivity run `tw5` on the ten noisy twins (2026-11-25/27) [data inspected: `tw5_sensitivity_1.tar.gz`,
+  `identifiability.csv`, 20 rows, K = 200; code `718c778` after amendment 4, D-260].** Predicted standard deviation
+  of $\ln \bar g_h$ at the truth under the twin's own noise, current weighting (`W0`, $\tau_d = 500$ ms), by twin in
+  order of $m_\infty(v^\ast)$: 900000001 (0.58) 0.55; 900000009 (0.36) 0.14; 900000007 (0.23) 0.012; 900000002
+  (0.17) 0.019; 900000008 (0.13) 1.22; 900000005 (0.10) 0.43; 900000003 (0.05) 2.5; 900000000 (0.05) 0.24;
+  900000006 (0.03) 21.5; 900000004 (0.02) 9.4. So: (i) depth and predicted scatter are related (Spearman -0.65 on
+  ten twins) but depth alone misorders them (900000001 the deepest and the noisiest, `loss_at_theta` 0.020;
+  900000000 shallow yet 0.24; 900000008 at 0.13 yet 1.2); (ii) $\ln \kappa_\tau$ is the least-determined direction
+  in 9 of 10 twins (predicted sd 0.025 to 32); (iii) the passive parameters are predicted within 0.15 in all ten;
+  (iv) without decay (`W1`) the predicted sd of $\ln \bar g_h$ is smaller in 4 of 10 twins, geometric-mean ratio
+  W1/W0 1.06 ($\ln \kappa_\tau$: 1.00): no gain from removing the decay; (v) `fd_step_check` at most 8e-4. A
+  predicted sd above about 1 is outside the linear regime and reads as "not determined", not as a number.
+  **[reasoning]** a perfect optimiser would not pass the gate of D-011 on these ten twins as a group: with
+  median absolute error about 0.67 sd per twin, the group's median is about 0.33 for $\ln \bar g_h$ (tolerance
+  0.223) and about 0.95 for $\ln \kappa_\tau$ (0.405). Not decided: the exclusion rule (D-244 item 3) and
+  $\tau_d$ (D-246), put to the user on these numbers. The fit run on the same twins (array 2104213) was queued on
+  2026-11-26.
 
 ## 8. Repository, environment, cluster
 
