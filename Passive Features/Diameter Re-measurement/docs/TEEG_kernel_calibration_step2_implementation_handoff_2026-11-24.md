@@ -10,6 +10,7 @@
 | 2026-11-27 (later, 3) | **D-265** [user]: in the near stage the twins' slices past the anchor take the spline's extrapolation (the assistant's reading: D-181's not-a-knot spline in G, continued along its tangent), not the linear continuation with a held slope; so the near stage holds no slope and the renderer needs D-181's spline for it (sections 1, 4.5, 5, 8 and 9 Q13). Log on `main` at `ac66aec`; next free IDs D-266, I-008. |
 | 2026-11-27 (later, 4) | D-265's scope confirmed by the user: near-field calibration only, where a third plane lies slightly past 0.84 um; the far stage and the tables keep $\gamma$. The tangent reading stays PROVISIONAL. Log on `main` at `b2752a7`. |
 | 2026-11-27 (later, 5) | D-265's tangent confirmed by the user (10:45): past 0.84 um the near stage's spline is continued along its tangent in $G$, not by its last cubic piece. Log on `main` at `b5788ef`. |
+| 2026-11-27 (18:06, the step-2 implementation chat) | The user answered section 9: **D-270** (the full stack as the forward model; noisy twins, each plane as its real plane; the hybrid in steps 1 and 2), **D-271** (each near twin's depth fitted, its absorption searched, in the near stage only; held in the slope's fit), **D-272** (the spline as the renderer's default between knots), **D-273** (weights, far planes from 4 in both fits, solver, a training/validation split, the nodes' delivery). New section 9a lists what is settled and what is still open. Check of this chat: `checks/step2_identifiability_2026-11-27/`. The log entries are committed (`ca2695e`) but not yet on `main`: the push to `main` was refused in this session and waits for the user. Branch at `aadac6a` before this row. |
 
 **Status [2026-11-24]:** not started. D-228 to D-230 fix the estimator (form B, on core widths), its trial table and
 its order. The twins' settings -- diameter, absorption, axis depth -- and their forward model are open (section 9) and
@@ -488,6 +489,30 @@ Order of magnitude for near-set twins of about 0.5 um: about 1.75 $N$ core-hours
 | Q11 | Which nodes | D-226's chosen nodes (not built). Step 2 can be built and tested on phantoms first; the roadmap keeps the two decoupled |
 | Q12 | Acceptance | The far validation planes (D-229.2): the criterion is open |
 | Q13 | D-181 | Whether the renderer's spline reading is built before step 2 (item 4 of section 8). [2026-11-27: needed for the near stage at least, D-265: its twins read the spline and its tangent extrapolation past 0.84 um.] |
+
+## 9a. Section 9 after the user's answers of 2026-11-27, 18:06 (D-270 to D-273)
+
+| Q | Settled | By |
+|---|---|---|
+| Q1 | Allen's diameter, taken as true; form B with the diameters held | D-261 |
+| Q2 | Not settled. The user would fit $\sigma_{\rm r}(0)$ in step 2 but does not want too many correlated unknowns; D-221.1 (held, switch `--kernel-width fixed\|calibrated --sigma-json FILE`) stands until confirmed. Evidence in D-273's "Why" | D-273.6 |
+| Q3 | $\mu_i$ searched per near twin in the near stage, held in the far stage; PROVISIONAL until its statistic is agreed. Core widths alone cannot separate $\mu_i$ from the depth (correlation +1.00 on the proxy); the dip's area (`PlaneScan.area_gl_um`) is proposed as the second statistic | D-271.2 |
+| Q4 | $z_{{\rm ax},i}$ fitted per near twin in the near stage, held in the far stage | D-271.1, D-271.3 |
+| Q5 | The full stack: render, camera chain, `plane_scan` / `far_plane_scan` | D-270.1 |
+| Q6 | Noisy twins, each plane with its real plane's noise; common random numbers across trial tables (the assistant's reading) | D-270.2 |
+| Q7 | $\varpi(j) = 1/s_\omega(j)^2$ from noisy replicates, $\varpi \equiv 1$ selectable, the focus plane in; no far-against-near weight (D-264) | D-273.1 |
+| Q8 | Far planes from 4 in step 2 and in the far fit (`far_min_k_offset` = 4); no alternation (D-264); the near stage holds no slope (D-265) | D-273.2 |
+| Q9 | `least_squares` (trf), finite-difference Jacobian with sparsity, SEs clustered by node, no bootstrap for now | D-273.3 |
+| Q10 | davinci follows from the full stack (the assistant's inference); cores and NS1's `needs_hpc` to confirm | D-270 |
+| Q11 | Screening on davinci, the user selects and delivers per cell (specimen number) its nodes | D-261, D-273.5 |
+| Q12 | A training/validation split of the chosen nodes, near and far both validated; on phantoms every knot within 0.002 um with the twins' noise off | D-273.4 |
+| Q13 | The spline is the renderer's default between knots; the tangent continuation an option for the near stage | D-272, D-265 |
+
+Still open, asked on 2026-11-27: (a) where a far-set twin's depth and absorption come from (far-set nodes never enter
+the near stage); (b) the statistic that determines $\mu_i$; (c) whether $\sigma_{\rm r}(0)$ is fitted; (d) the split's
+fraction, unit, stratification and seed; (e) the cores on davinci and NS1's `needs_hpc`. Section 10's breakdown is
+superseded by the plan given to the user on 2026-11-27 (Block 4 amendment, then Blocks 52 onward); it is written here
+once the user approves it.
 
 ## 10. A block breakdown (proposal, to agree with the user)
 
