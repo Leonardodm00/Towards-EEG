@@ -6,6 +6,7 @@
 | 2026-11-24 (later) | Pushed at `786977b`, rebased onto `9c7e8bb`: the commits in between (Block 44 amendment 4, D-239) do not touch step 2's code, but they moved SPEC s.8, so its line numbers are dropped here. The log on `main` at `c7822ad`: D-174 and D-178 marked implemented (section 5); D-240 (the soma fit holds the far slope, uncalibrated) added to section 5 as a consumer of step 2's $\gamma$; next free IDs D-241, I-007. |
 | 2026-11-27 | **D-261** [user] settles Q1: the user chooses the calibration nodes from the davinci export (the image at focus shows Allen's diameter) on its agreement with the image and on clean backgrounds; no diameter is set by eye (D-226.4 withdrawn); the chosen nodes go to steps 1 and 2 (D-230's order unchanged), and step 2's twins carry Allen's diameter as the true one: form B with the diameters held. Q4 gains a toy result of 2026-11-27: form B with every twin's depth fitted, started from the configured table and nothing from step 1, recovered the table and the depths on the faint toy and on the hybrid toy. Blocks 50 and 51 now exist in SPEC (wave 8). Log on `main` at `69fc18e`; next free IDs D-262, I-008. Branch at `e019d12` before this row. |
 | 2026-11-27 (later) | **D-263** [user]: the near stage -- step 1 and step 2 on the near-set twins -- uses only the planes $\lvert k - k^*\rvert \le 3$, up to the third plane on each side of focus, the anchor's plane; farther planes only in the far stage. Already met by `offsets_planes` = 3 and D-229.2, now binding (sections 1, 4.3, 4.5 and 5). Log on `main` at `957bcdc`; next free IDs D-264, I-008. |
+| 2026-11-27 (later, 2) | **D-264** [user]: D-230.3's alternation dropped; each stage runs once, near then far (sections 1, 4.5, 5, 7.5, 9 Q8 and 10). Open instead: the slope the near stage holds. Log on `main` at `330c9ad`; next free IDs D-265, I-008. |
 
 **Status [2026-11-24]:** not started. D-228 to D-230 fix the estimator (form B, on core widths), its trial table and
 its order. The twins' settings -- diameter, absorption, axis depth -- and their forward model are open (section 9) and
@@ -24,7 +25,7 @@ Paths are relative to `Passive Features/Diameter Re-measurement/`, except those 
 ## 1. First actions in the next chat
 
 1. Read this file; then, in the log on `main`, by ID: D-165, D-172, D-175, D-178, D-181, D-201, D-221, D-226 to D-231,
-   D-261, D-263, I-006. Read the changelog's last rows again before taking an ID (several chats log there); at `c7822ad` the newest
+   D-261, D-263, D-264, I-006. Read the changelog's last rows again before taking an ID (several chats log there); at `c7822ad` the newest
    row gives the next free IDs as D-241 and I-007.
 2. Ask the user:
    - whether D-231's code has reached `origin`: `git log origin/sci/diameter-pipeline --oneline --grep "D-231"`. At
@@ -158,7 +159,8 @@ Reading it:
 2. **Far stage.** The far fit, then Eq. (3) on the far-set twins, gives $\gamma$ with the knots held.
 3. **D-230.3** (the assistant's condition, PROVISIONAL until the user confirms): alternate the two stages until neither
    moves by more than a set fraction of its SE. This is block-coordinate descent toward the joint least squares of
-   Eq. (3). The fraction and the maximum number of passes are open.
+   Eq. (3). The fraction and the maximum number of passes are open. [dropped 2026-11-27, D-264: no alternation; each
+   stage runs once, near then far, and the table is the near knots with the far slope.]
 
 ### 4.6 Variants, not chosen (doc s.3.8)
 
@@ -220,7 +222,8 @@ table too, since it is computed by the same renderer **[doc, Likely]**. H2 is th
 | D-227 | Beside each plane's image, the profile along the measuring line | active; not built |
 | D-228 | $\theta = (\theta_1, \theta_2, \theta_3, \gamma)$, with $\sigma_{\rm r}(0)$ held; the far-set twins fix $\gamma$ | active; not built |
 | D-229 | Form B on core widths for near and far twins; planes weighted by distance from focus; the far nodes' $\pm 3$ planes kept for validation; $\gamma$ always fitted | active; not built |
-| D-230 | Near stage, then far stage; D-230.3's alternation PROVISIONAL | active; not built |
+| D-230 | Near stage, then far stage; D-230.3's alternation PROVISIONAL [dropped by D-264] | active; not built; superseded in part by D-264 |
+| D-264 | D-230.3 dropped: the stages are not alternated; each runs once, near then far. Open: the slope held in the near stage (0.79 configured, or a first far fit on step 1's anchor), now never revisited | active; not built |
 | D-231 | The hybrid is the renderer's default absorption. Implemented at `2812d4d` in the defocus-table chat's sandbox; not on `origin` (section 8, item 1) | active |
 | I-006 | Form P | idea; not used in step 2 under D-261 |
 | D-261 | The user chooses the calibration nodes from the davinci export, whose image at focus shows Allen's diameter, on its agreement with the image and on clean backgrounds across planes; no diameter by eye; the chosen nodes go to steps 1 and 2; **step 2's twins carry Allen's diameter as the true one**, $\tilde d_i = D_{{\rm A},i}$: form B with the diameters held, forms C and P not used | active; not built |
@@ -404,7 +407,7 @@ Order of magnitude for near-set twins of about 0.5 um: about 1.75 $N$ core-hours
 
 - davinci's speed per core (not measured);
 - the far twins, with up to 26 planes each;
-- the alternation.
+- the alternation [none since D-264].
 
 ### 7.6 What follows for the implementation [doc, Likely]
 
@@ -472,7 +475,7 @@ Order of magnitude for near-set twins of about 0.5 um: about 1.75 $N$ core-hours
 | Q5 | The forward model | The full stack (`synthetic_block`, then `plane_scan` / `far_plane_scan`; the procedure's "full camera chain, same profile extraction"; 89.3 s per near phantom under the hybrid) or the fast line renderer (Block 35) with `dip_statistics` / `far_plane_statistics` (no 2-D background and no camera chain; its speed for this use not measured) **[open]** |
 | Q6 | Noise in the twins | Noise-free, which gives a deterministic objective; or the camera chain's noise with common random numbers (a fixed seed per twin across $\theta$). The core fit's low-signal effects at faint far planes enter the real core widths and only noisy twins (doc s.3.6) |
 | Q7 | The weights $\varpi$ | Open in D-229: their form and direction (e.g. the inverse of each plane's core-width noise variance); whether $k^*$ enters; the weight of far against near twins |
-| Q8 | The far stage | The far twins' statistic (the assistant's reading of D-229.1: `far_plane_scan`'s core width, the far fit's own); first plane 4 (D-229.2) against the far fit's 5 (`far_min_k_offset`, PROVISIONAL); D-230.3's stop fraction and maximum number of passes; the starting $\gamma$ (0.79, or a first far fit on step 1's anchor) |
+| Q8 | The far stage | The far twins' statistic (the assistant's reading of D-229.1: `far_plane_scan`'s core width, the far fit's own); first plane 4 (D-229.2) against the far fit's 5 (`far_min_k_offset`, PROVISIONAL); D-230.3's stop fraction and maximum number of passes [moot: D-264 drops the alternation; open instead, the slope held in the near stage]; the starting $\gamma$ (0.79, or a first far fit on step 1's anchor) |
 | Q9 | The solver | `scipy.optimize.least_squares` (trf, the bounds of $\Theta$); a finite-difference Jacobian (the checks used `diff_step` 1e-3), with `jac_sparsity` when per-twin unknowns are added; each column of $J$ costs one render of every twin |
 | Q10 | Where it runs | Colab or davinci. If davinci: how many cores (D-175.3's 100 were for the table run), and the roadmap's `needs_hpc` for NS1 |
 | Q11 | Which nodes | D-226's chosen nodes (not built). Step 2 can be built and tested on phantoms first; the roadmap keeps the two decoupled |
@@ -489,7 +492,7 @@ Each block, once agreed, gets a SPEC entry and joins the roadmap under NS1. At w
 | Twin settings | `analysis/step2_twins.py` | $\xi_i$ per node, from the scans file's `nodes` and `PlaneScan`s, step 1's (or the far fit's) depths, and, when built, the user's list of chosen nodes. $\tilde d_i$ is the node record's `allen_diameter_um` (D-261). Q2 to Q4 become config fields |
 | Twin forward model | `analysis/step2_forward.py` | $\omega^{\rm sim}_{i,k}(\theta;\xi_i)$ for all twins: $\theta$ -> `RendererConfig` (section 8, item 3); render (Q5); measure with the frozen scan configuration (section 8, item 2); parallel over twins |
 | Estimator | `analysis/step2_fit.py` | Eq. (3) with $\varpi$ and the bounds; optional per-twin unknowns (depth, diameter, $\mu$); forms C and P as options; returns $\hat\theta$, cond $J$, the residuals by node and plane, and the per-twin fitted settings |
-| Stages and loop | same, or `analysis/step2_stages.py` | D-230: near stage, far stage, the alternation with its stop rule. Writes the production kernel in the `calibration_<S>.json` / `far_fit_<S>.json` format Cell 16 reads |
+| Stages | same, or `analysis/step2_stages.py` | D-230 and D-264: the near stage, then the far stage, each once, no loop. Writes the production kernel in the `calibration_<S>.json` / `far_fit_<S>.json` format Cell 16 reads |
 | Entry point, report, figures | `scripts/calibrate_kernel.py step2` (a new subcommand) and `plotting/` | Runs, JSON and report. Figure: real against twin core widths by plane, near and far, with the validation planes marked |
 
 Candidate smoke-test oracles **[reasoning]**:
