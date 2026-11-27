@@ -319,7 +319,8 @@ the "Binds" column.
 | 2026-11-27 (the defocus-table chat, 10:50) | Logs **D-265** (user): in the near stage the kernel past the anchor is the spline's extrapolation, not the linear continuation with a held slope (D-263's and D-264's open points annotated). Next free IDs: D-266, I-008. |
 | 2026-11-27 (the defocus-table chat, 10:45) | D-265.3 confirmed by the user (10:41): the spline's extrapolation is for the near-field calibration only, where a third plane lies slightly past 0.84 um; the far stage and the tables keep the linear continuation with gamma. No new ID. Next free IDs: D-266, I-008. |
 | 2026-11-27 (the defocus-table chat, 10:47) | D-265.1's reading confirmed by the user (10:45): past the anchor the near stage's spline is extrapolated along its tangent in G (linear in G, step 1's own rule), not by its last cubic piece. No new ID. |
-| 2026-11-27 (the review chat, 11:34) | Logs **D-266** (user), on the sensitivity run `tw5`'s tables: the sample weight keeps $\tau_d = 500$ ms; no exclusion rule is implemented in the I_h fit. D-244 item 3 and D-246 annotated. Next free IDs: D-267, I-008. |
+| 2026-11-27 (the review chat, 11:34) | Logs **D-266** (user), on the sensitivity run `tw5`'s tables: the sample weight keeps $\tau_d = 500$ ms; no exclusion rule is implemented in the I_h fit. D-244 item 3 and D-246 annotated. |
+| 2026-11-27 (the review chat, 11:47) | Logs **D-267** (user): the budget of the real cells' I_h fit (global search 300 evaluations of which 200 initial; 5 starts of at most 60 iterations), and two more twins' campaigns asked for (six parameters; diameters inflated by 1.5), their design not yet settled. Next free IDs: D-268, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -574,6 +575,7 @@ would be needed*, *Status*.
 | D-264 | 2026-11-27 | D-230.3 and the loop of step 2; the order of the kernel calibration's stages | D-230.3 dropped: no alternation; each stage runs once, near (steps 1 and 2, gamma held) then far (far fit and step 2, knots held); the table is the near knots with the far slope [user] | active; not built |
 | D-265 | 2026-11-27 | step 2's near stage: the twins' slices past the anchor (0.84 um); D-263's and D-264's open points; D-181 | in the near stage the kernel past 0.84 um is the spline through the near knots, extrapolated (the assistant's reading: D-181's not-a-knot spline in G, along its tangent), not the linear continuation with a held gamma; the far stage and the table keep gamma [user] | active; not built (needs D-181) |
 | D-266 | 2026-11-27 | the I_h fit's loss (SPEC 2.8 (d), D-207 (3)) and its cell selection; D-244 item 3 (the exclusion decided in principle: not implemented), D-246 (its two questions, closed) | the sample weight keeps its decay $\tau_d = 500$ ms; no rule that removes a cell from the I_h fit is implemented [user] | active |
+| D-267 | 2026-11-27 | the real cells' I_h fit (`run_ih_fit.py`: `--n-calls`, `--n-initial`, `--refine-starts`, `--refine-max-nfev`); D-245, D-247 | for the real cells: global search of 300 evaluations, 200 of them initial; least-squares refinement from 5 starts of at most 60 iterations each [user] | active; a run option, no default changed |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -16372,5 +16374,31 @@ them as a group (group median about 0.33 against 0.223; $\ln \kappa_\tau$ about 
 cell's $\bar g_h$ is reported with a flag when it is not determined.
 
 **Sources.** **[user]**; **[data inspected]**, **[reasoning]** as above; **[log]** D-011, D-207, D-244, D-246.
+
+**Status:** active.
+
+## D-267 -- The budget of the real cells' I_h fit: 300 evaluations (200 initial), 5 starts of at most 60 iterations (user)
+
+**Date:** 2026-11-27, 11:47 (Europe/Rome), the review chat. **Binds:** the command line of the real cells' I_h fit
+(`run_ih_fit.py`); D-245; D-247.
+
+**Decision [user].** On the fit run `tw5`'s results: "I would just increase the numebr of initial points and
+iterations for the real cells' fit"; then, to the assistant's table (iterations per start 30 -> 60, starts 3 -> 5,
+initial points 100 -> 200, evaluations 200 -> 300): "Your suggestions are perfect so take note of it for when I
+will run the full optimziation on the real cells."
+
+**Statement.** The real cells' I_h fit runs with `--n-calls 300 --n-initial 200 --refine trf --refine-starts 5
+--refine-max-nfev 60`. The code's defaults (200, 100, 3, 30) are not changed: the twins' runs keep them unless a run
+says otherwise.
+
+**Why.** **[data inspected: `tw5_results.tar.gz`, `refine_starts.csv`]** twin 900000003's three starts needed 25, 26
+and 28 iterations against the cap of 30; the other twins 5 to 20. The three starts reached one minimum in every
+twin, so more starts and more initial points are insurance for real cells, where the model is not exactly right
+**[reasoning]**; not tested.
+
+**What it does not decide.** The step, the arm (five parameters, D-244 item 1, unless the six-parameter campaign
+the user asked for on the same day changes it), the cores.
+
+**Sources.** **[user]**; **[data inspected]**, **[reasoning]** as above.
 
 **Status:** active.

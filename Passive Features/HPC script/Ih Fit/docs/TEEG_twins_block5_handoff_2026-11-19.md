@@ -546,6 +546,8 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   **[corrected 2026-11-27]** the assistant's estimate of the same day, that a perfect optimiser would not pass
   the gate on these twins (group median about 0.33 for $\ln \bar g_h$), was wrong: the realised median is 0.17.
   Not compared here: `tw4` (Nelder-Mead, cap 300, the same twins), whose tables the assistant has not seen.
+- **For the real cells [user, D-267, 2026-11-27]:** `--n-calls 300 --n-initial 200 --refine trf --refine-starts 5
+  --refine-max-nfev 60`; the sample weight keeps $\tau_d = 500$ ms and no cell is excluded (D-266).
 
 ## 8. Repository, environment, cluster
 
