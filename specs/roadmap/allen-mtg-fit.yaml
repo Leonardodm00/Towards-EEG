@@ -729,6 +729,15 @@ implementation:
     needs_theory: []
     needs_hpc: true
     jobs: ["Passive Features/HPC script/Ih Fit/submit_twin_recovery.sh", twin_recovery, twin_merge]
+  - id: B29
+    title: "Block 29: twins simulated on an inflated morphology"
+    summary: "A twin's traces are simulated on its real cell's morphology with soma and dendrite diameters multiplied by a factor within a path length from the soma, while the fit reads the original reconstruction: a test of what a diameter error does to the estimates."
+    block: 29
+    parent: G5
+    depends_on: [B28]
+    needs_theory: []
+    needs_hpc: true
+    jobs: ["Passive Features/HPC script/Ih Fit/submit_twin_recovery.sh", twin_recovery, twin_merge]
 
 revisions:
   - stage: N3
