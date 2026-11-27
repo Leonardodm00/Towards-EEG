@@ -2702,10 +2702,13 @@ planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
 - Custom code: none.
 - Test oracles (stacks built here by `render.render_transmittance` on a small patch with the partition absorption,
   for time; Block 54 is not imported): (M1) with one background and one SD for every plane, `camera_planes` equals
-  `camera.camera_chain` on the whole stack with the matching per-plane generators, bit for bit; (M2) noise off, a
-  flat phantom: `measure_twin` equals `calibration.scan_node`'s scan of the same tube rendered through
-  `render.synthetic_block` with `noise_sd_gl` = 0 -- the core widths to 1e-9 um$^2$ where both are ok -- when the
-  twin's pilot values are that scan's; (M3) the twin's measured background equals `B_gl` within 0.5 gl per plane,
+  `camera.camera_chain` on the whole stack with the matching per-plane generators, bit for bit; (M2, amendment 2) noise off, a
+  flat phantom scanned by `calibration.scan_node` through `render.synthetic_block` with `noise_sd_gl` = 0, the twin's
+  pilot values that scan's: (M2a) with `scan_node`'s own branch and scene in place of `twin_scene`'s, `measure_twin`'s
+  core widths equal the scan's to 1e-9 um$^2$ where both are ok (the camera, the patch and the node are exact);
+  (M2b) with `twin_scene`'s branch they agree to 5e-4 um$^2$: the twin's branch runs along the pilot's fitted axis, the
+  scan's along the trace, so the stripe support differs by a few pixels and with it the planar background (6.3e-5
+  um$^2$ on one plane of seven in the implementer's case, 3.9e-4 gl in its background) **[run]**; (M3) the twin's measured background equals `B_gl` within 0.5 gl per plane,
   and its `bg_sd_gl` within 30 % of the SD put in with `jpeg` off (statistical; the number of far pixels in the
   tolerance's comment); (M4) common random numbers: two calls bit for bit; another replicate differs; a different
   stack with the same seed uses the same noise field (the difference of the two blocks before quantisation is the
@@ -2717,6 +2720,10 @@ planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
   report.
 - Confirmed: D-270.1, D-270.2 [user]; the mapping of the background and the noise SD into the chain is the
   orchestrator's reading (PROVISIONAL in D-270).
+- Known limit (amendment 2): the twin is scanned with its own straight branch as the only traced structure. The
+  real scan's support was built from the cell's trace and scene, neighbours and soma included, which the twin does
+  not carry: the twin's background support approximates the real one. Passing the cell's own branch and scene to
+  the twin's scan would make the supports equal; not built (it needs the morphology in step 2's inputs).
 - Status: drafted 2026-11-27.
 
 ### Block 56: the estimator -- weighted least squares with shared and per-group unknowns (D-273.3)
