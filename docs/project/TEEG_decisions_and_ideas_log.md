@@ -323,6 +323,7 @@ the "Binds" column.
 | 2026-11-27 (the review chat, 11:47) | Logs **D-267** (user): the budget of the real cells' I_h fit (global search 300 evaluations of which 200 initial; 5 starts of at most 60 iterations), and two more twins' campaigns asked for (six parameters; diameters inflated by 1.5), their design not yet settled. |
 | 2026-11-27 (the review chat, 12:04) | Logs **D-268** (user): two more twins' campaigns on the ten noisy twins with `tw5`'s settings: `tw6`, six parameters; `tw7`, five parameters with the twins simulated on a morphology whose soma and dendrite diameters are x 1.5 within 300 um of path length from the soma, the fit on the original. Block 29 on `sci/twins` (`8e1fbdb`). |
 | 2026-11-27 (the review chat, afternoon) | Logs **D-269** (orchestrator): the independent check of Block 29 (report `Ih Fit/specs/test_reports/2026-11-27_1300_incremental.md`, PASS WITH ISSUES) settled; `sci/twins` `8b05c56`. Next free IDs: D-270, I-008. |
+| 2026-11-27 (the step-2 implementation chat, 18:06) | Logs **D-270** to **D-273** (user), the answers to the open questions of kernel calibration step 2 (roadmap NS1; the step-2 implementation handoff's section 9): the full stack as the forward model, noisy twins plane by plane, the hybrid in steps 1 and 2 (D-270); each near twin's depth fitted and its absorption searched in the near stage, both held in the slope's fit (D-271; the absorption's statistic to confirm); the spline as the renderer's default between knots (D-272, makes D-181 effective); the weights, the far planes from the fourth in both fits, the solver, a training/validation split, the nodes' delivery (D-273; whether $\sigma_{\rm r}(0)$ is fitted is not decided). Check run: `checks/step2_identifiability_2026-11-27/` on `sci/diameter-pipeline`. D-181 and D-229 annotated. Next free IDs: D-274, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -580,6 +581,10 @@ would be needed*, *Status*.
 | D-267 | 2026-11-27 | the real cells' I_h fit (`run_ih_fit.py`: `--n-calls`, `--n-initial`, `--refine-starts`, `--refine-max-nfev`); D-245, D-247 | for the real cells: global search of 300 evaluations, 200 of them initial; least-squares refinement from 5 starts of at most 60 iterations each [user] | active; a run option, no default changed |
 | D-268 | 2026-11-27 | the twins' runs `tw6` and `tw7` (`submit_twin_recovery.sh`, `PLAN_ARGS`); SPEC 2.11 and Block 29 of `Ih Fit/specs/SPEC.md` on `sci/twins` (`morph_inflate.py`, `twin_build.py`, `run_twin_recovery.py`); D-244 item 1 (five parameters: to be settled on `tw6`) | two campaigns on the ten noisy twins, `tw5`'s optimisation settings: one with six parameters; one with five parameters and the twins' traces generated on morphologies with soma and dendrite diameters x 1.5 up to 300 um of path length from the soma (hard step), the fit on the non-inflated ones [user] | active; code implemented (`8e1fbdb`), runs to submit |
 | D-269 | 2026-11-27 | Block 29 of `Ih Fit/specs/SPEC.md` on `sci/twins` (`morph_inflate.py`, `run_twin_recovery.py`); D-268 | after the independent check: only the tree of the soma's root node is inflated and the reconstruction must have exactly one soma root; an invalid inflation option is a clean refusal; the copy is exact; the reports of an inflated run carry no mark of the inflation (not changed) [orchestrator] | active; implemented (`8b05c56`) |
+| D-270 | 2026-11-27 | step 2 of the kernel calibration (NS1, T10): the twins' forward model, their noise, the absorption of steps 1 and 2; the calibration nodes' criteria | the twins are rendered as the full image stack and measured by the real scan; they carry the camera's noise, each plane as its real plane; every render of steps 1 and 2 uses the hybrid; faintness is not a criterion [user] | active; not built |
+| D-271 | 2026-11-27 | step 2's per-twin axis depth and absorption; the near and far stages (D-230, D-264) | in the near stage each twin's axis depth is fitted and its absorption searched (the latter to confirm, with its statistic); both are held in the slope's fit [user] | active; D-271.2 to confirm; not built |
+| D-272 | 2026-11-27 | SPEC Block 4's kernel law (`model/kernel.py`, `RendererConfig`); D-181, D-265 | the renderer reads the table between knots with D-181's spline by default, the linear reading a labelled alternative; the far-set nodes serve the far stage only [user] | active; not built |
+| D-273 | 2026-11-27 | step 2's weights, far planes (`far_min_k_offset`), solver, acceptance and validation set, the nodes' delivery; D-221.1 | weights $1/s_\omega(j)^2$ with the unweighted fit selectable; far planes from the fourth in step 2 and in the far fit; `least_squares` with SEs clustered by node, no bootstrap for now; the chosen nodes split into training and validation; whether $\sigma_{\rm r}(0)$ is fitted is not decided [user] | active; D-273.6 to confirm; not built |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -13149,7 +13154,7 @@ for $U(0.75, 0.95)$ um (check 9) -- step 2's business (T10, NS1).
 `model/kernel.py` (`sigma_r`) at `513ad9e`; SPEC Block 4 (kernel law), Block 10 (`growth_interp`). **[run, sandbox]**
 `check08_thin_nodes.py` and `check09_cubic_truth.py`, in the study document's `scripts/` (this chat, 2026-11-19).
 
-**Status:** active; not built (SPEC Block 4 amendment and the code change to plan with the user).
+**Status:** active; not built (SPEC Block 4 amendment and the code change to plan with the user). [2026-11-27: made the renderer's default by D-272; still not built]
 
 ## D-182 -- A Long Square twin carries its sweep's law as fitted, continuous over the whole sweep; D-180's limit binds the SS windows (user)
 
@@ -15056,7 +15061,7 @@ criterion.
 **Sources.** **[user]** 2026-11-23, 09:31. **[code]** `config.py` at `bac0c1c`: `far_offsets_planes` = 16,
 `far_min_k_offset` = 5 (PROVISIONAL). **[run, sandbox]** check 10 (D-228). **[log]** D-228.
 
-**Status:** active; not built.
+**Status:** active; not built. [2026-11-27: D-273 settles the weights' form ($1/s_\omega(j)^2$, the unweighted fit selectable, the focus plane in), the first far plane (4, in the far fit too) and adds a training/validation split of the nodes]
 
 ## D-230 -- The calibration's order: the near kernel by step 1 then step 2, then the far slope by the far fit then a step 2 on far twins (user)
 
@@ -16475,3 +16480,202 @@ checked here (the real archive is on the cluster); a cell that has not fails its
 **Sources.** **[orchestrator]**; **[run]** as above; **[log]** D-268.
 
 **Status:** active; implemented.
+
+---
+
+## D-270 -- Step 2's forward model is the full image stack; its twins are noisy, plane by plane as the real planes; steps 1 and 2 render with the hybrid; faintness is not a criterion (user)
+
+**Date:** 2026-11-27, 18:06 (Europe/Rome), the step-2 implementation chat. **Binds:** step 2 of the kernel calibration
+(roadmap NS1, not built; theory T10; D-228 to D-230, D-261, D-263 to D-265): how a twin's core widths
+$\omega^{\rm sim}_{i,k}(\theta;\xi_i)$ are computed (Q5 and Q6 of
+`Passive Features/Diameter Re-measurement/docs/TEEG_kernel_calibration_step2_implementation_handoff_2026-11-24.md` on
+`sci/diameter-pipeline`); the absorption of every render of steps 1 and 2 (D-231); the calibration nodes' criteria.
+
+**Decision [user].** To the questions on the forward model, the noise and the absorption: "Render the full image
+stack"; "Noisy twins absolutely. The noise features per plane must be specific as in the real data planes"; "First step
+1 and 2 always use the hybrid model. Secondly it is not said we will use faint tubes this is not a criterion we will
+use."
+
+**Statement.** (D-270.1) A twin's core widths come from the full stack: the stack rendered by Block 4
+(`render.synthetic_block`'s transmittance), the camera chain, then the real scan's own measurement (`plane_scan` for a
+near-set twin, `far_plane_scan` for a far-set twin) under the real scans' configuration; the fast line renderer
+(Block 35) is not step 2's forward model [user]. (D-270.2) The twins carry the camera's noise, and each plane of a twin
+has the noise of the same plane of its real node [user]. The assistant's reading, PROVISIONAL: twin $i$'s plane $k$
+takes the background level the real scan fitted at the node in that plane (`PlaneScan.b_coef`) and a noise SD chosen so
+that the twin's scan reads the real plane's background SD (`PlaneScan.bg_sd_gl`); the noise uses a fixed seed per twin
+and plane, the same for every trial table (common random numbers), so that the objective is a deterministic function
+of the parameters. (D-270.3) Every render of steps 1 and 2 uses the hybrid absorption (SPEC Block 21; D-231), named
+explicitly in their configurations while D-231's default is not on `origin` [user]. (D-270.4) Faintness is not a
+criterion for choosing the calibration nodes (cf. D-094, D-261.2) [user].
+
+**Why.** The user's call. The assistant's notes: the full stack is what procedure s.3.4 item 2 words ("the full camera
+chain, the same profile extraction"); it costs 89.3 s per near phantom under the hybrid in the defocus-table chat's
+sandbox (handoff 7.5) against 0.32, 0.62 and 1.32 s per near twin and evaluation through the line renderer at
+$d$ = 0.30, 0.50 and 0.85 um **[run, this chat's sandbox, 2026-11-24: `checks/step2_identifiability_2026-11-27/line_twin_timing.py`;
+not like for like]**. With one noisy twin per node the noise variance of a residual
+$\omega_{i,k} - \omega^{\rm sim}_{i,k}(\theta;\xi_i)$ is the real plane's plus the twin's; averaging $R$ independent
+noise replicates of the twin divides the twin's part by $R$ **[textbook, from memory: the variance of a sum of
+independent terms]**.
+
+**What it implies for code and tables.** Step 2 runs on davinci **[the assistant's inference; NS1's `needs_hpc` is
+proposed to the user]**. The render (the expensive part) is separate from the camera chain and the scan, so noise
+replicates reuse one rendered stack. `camera.camera_chain` takes one background and one noise SD per call
+(`RendererConfig.background_B_gl`, `noise_sd_gl`) **[src at `aadac6a`]**, so the twin's planes go through it one by
+one. Finite-difference derivatives are taken on the noisy objective under common random numbers; their step has to
+be large against the grey-level quantisation. Not built.
+
+**What it does not decide.** The number of noise replicates per twin; how the noise SD before the chain maps to the
+background SD measured after quantisation and JPEG (`config.py`: "matched to the real background SD AFTER the chain");
+whether the background's tilt (`b_coef`'s slopes) is reproduced; the number of cores.
+
+**Sources.** **[user]** 2026-11-27, 18:06. **[src]** `model/camera.py`, `model/render.py`, `analysis/calibration.py`
+(`PlaneScan`) on `sci/diameter-pipeline` at `aadac6a`. **[log]** D-094, D-231, D-261. **[run]** as above.
+
+**Status:** active; not built.
+
+---
+
+## D-271 -- In step 2's near stage each twin's axis depth is fitted and its absorption is searched; both are held in the slope's fit (user)
+
+**Date:** 2026-11-27, 18:06 (Europe/Rome), the step-2 implementation chat. **Binds:** step 2's per-twin settings
+$z_{{\rm ax},i}$ (axis depth, um) and $\mu_i$ (absorption coefficient, 1/um) (Q3 and Q4 of the step-2 implementation
+handoff); D-230.1's near stage and D-230.2's far stage (D-264: each runs once); form B (D-229.1), which as written fits
+no per-twin unknown.
+
+**Decision [user].** On the depth: "Fit it per twin only during the near-field fit. It will be held fixed during the
+gamma fit". On the absorption: "aren't the absorption and the z axis correlated slighlty ? Nonetheless the pilot
+calculates it at focus with all the shadow mixture of previous and subsequent layers where the node lives so maybe is
+better to search it as well. If we choose to search it this is done only only during the near-field fit. It will be
+held fixed during the gamma fit".
+
+**Statement.** (D-271.1) In the near stage every near-set twin's axis depth $z_{{\rm ax},i}$ is an unknown of the least
+squares, beside the knots [user]. (D-271.2) The twin's absorption $\mu_i$ is searched per twin in the near stage as
+well -- the user's leaning ("maybe", "if we choose"), PROVISIONAL until the statistic that determines it is agreed
+(below). (D-271.3) In the far stage (the fit of $\gamma$) no depth and no absorption is fitted: they are held [user].
+
+**Why.** **[user]** the pilot fit reads $\mu$ at focus on a profile that mixes the shadows of the layers above and
+below the node. **[run, this chat, 2026-11-27: `checks/step2_identifiability_2026-11-27/identifiability_probe.py`]**
+On 12 synthetic near twins ($d \sim U(0.20, 0.60)$ um, $\mu d \sim U(0.3, 1.5)$, axis offsets $U(-0.14, 0.14)$ um, the
+pilot cell's table, planes $k^* \pm 3$, seed 20261127; the forward model a proxy: the fast line renderer under the
+hybrid, noise-free, the table read linearly between knots), by a finite-difference Jacobian and iid noise on the core
+widths: (i) fitting the depths costs the knots little -- the SEs of $\ln\theta_1, \ln\theta_2, \ln\theta_3$ are 1.00,
+1.03, 1.16 times those of the knots-only fit, scaled condition number 2.2 against 1.9; (ii) on core widths alone a
+twin's absorption and depth are almost collinear -- the cosine between the two patterns
+$\partial\omega_{i,k}/\partial\ln\mu_i$ and $\partial\omega_{i,k}/\partial z_{{\rm ax},i}$ over the seven planes is
+-1.00 (range -1.00 to -0.98), the two estimates correlate at +1.00 (0.98 to 1.00), the condition number rises to 59,
+and $\ln\mu_i$ is determined 73 times worse than $\ln\theta_1$; a 10 % change of $\mu_i$ moves a core width by at most
+0.0007 to 0.0037 um$^2$, a 0.05 um change of depth by 0.039 to 0.052 um$^2$; (iii) with the dip's windowed area
+(`PlaneScan.area_gl_um`) added as a second statistic on the same planes (relative residuals, equal relative noise
+assumed) the correlation falls to +0.12, the condition number to 1.9, $\ln\mu_i$ is determined 2.5 times worse than
+$\ln\theta_1$ and the knots' SEs are unchanged (1.00, 1.01, 1.01).
+
+**What it implies for code and tables.** The near stage's least squares has the shared knots and two unknowns per
+near-set twin, each touching only its twin's planes (a sparse Jacobian). Core widths alone cannot determine $\mu_i$
+beside $z_{{\rm ax},i}$ (ii): either the dip's area enters the near stage's residuals for $\mu_i$ (the assistant's
+proposal, (iii)), or $\mu_i$ is held and the depth absorbs its error. Not built.
+
+**What it does not decide.** The statistic that determines $\mu_i$ (asked 2026-11-27); where a far-set twin's depth
+and absorption come from, since far-set nodes do not enter the near stage (D-263.2; D-272.3) (asked 2026-11-27);
+the bounds of the depth (step 1 uses `z_ax_bound_um` = 0.28 um) and of $\mu_i$; whether step 1 is still needed
+beyond supplying starting values.
+
+**Sources.** **[user]** 2026-11-27, 18:06. **[run]** as above, on `sci/diameter-pipeline` at `aadac6a`; the numbers
+hold for the configuration run and for the proxy forward model, not for the full stack of D-270. **[log]** D-229,
+D-230, D-263, D-264, D-270.
+
+**Status:** active (D-271.1, D-271.3); D-271.2 to confirm; not built.
+
+---
+
+## D-272 -- The renderer reads the kernel table between knots with the spline by default; the far-set nodes serve the far stage only (user)
+
+**Date:** 2026-11-27, 18:06 (Europe/Rome), the step-2 implementation chat. **Binds:** SPEC Block 4's kernel law
+(`model/kernel.py::sigma_r`; `RendererConfig`), read by every renderer of the pipeline, the fast line renderer
+included; D-181 (active, not built); D-265 (the near stage's tangent continuation); the default configuration's
+simulation hash.
+
+**Decision [user].** To the choice between a selectable spline and the spline as the renderer's default: "Add the
+spline as default to interpoalte between knots". On the far-set twins' slices nearer than 0.84 um: "just as a check
+the far node are used only for the far field calibration".
+
+**Statement.** (D-272.1) Between the knots of its table the renderer reads $\sigma_{\rm r}(\delta)$ from D-181's spline
+by default -- the not-a-knot cubic spline of $G(\delta) = \sigma_{\rm r}(\delta)^2 - \sigma_{\rm r}(0)^2$ on the signed
+knots (D-181.1, D-265.1) -- and the reading linear in $|\delta|$ stays selectable as a labelled alternative [user; the
+spline's form is D-181's and D-265's]. (D-272.2) Beyond the last knot the default is unchanged: the linear
+continuation with slope $\gamma$ (D-080.1, D-265.3); the continuation along the spline's tangent in $G$ is a
+selectable option, used by step 2's near stage (D-265.1) [the assistant's reading]. (D-272.3) The far-set nodes enter
+the far stage only (D-263.2) [user]; their twins are rendered with the same law -- the spline between the knots held at
+the near stage's values, the slope $\gamma$ beyond 0.84 um [the assistant's reading].
+
+**Why.** **[user]**; it makes D-181 effective. One law for the renderer and for step 1's growth fit removes the change
+of meaning of the knots that handoff section 8, item 4 warned of.
+
+**What it implies for code and tables.** `RendererConfig` gains the interpolation's name (default the spline) and
+`KERNEL_CONTINUATIONS` the tangent option; `sigma_r` uses `scipy.interpolate.CubicSpline` (not-a-knot). The default
+simulation hash moves, and the smoke tests whose expected numbers were set under the linear reading name it
+explicitly (D-231.2's pattern). The default is switched after D-231's commit is on `origin`, since both touch
+`config.py` and the same smoke files **[the orchestrator's sequencing]**; until then step 2 names the spline
+explicitly. Oracles from D-265: on the pilot table the tangent at 0.84 um is $dG/d\delta$ = 0.469 um and
+$\sigma_{\rm r}$ = 0.618, 0.669, 0.723 um at 0.98, 1.12, 1.28 um. Not built.
+
+**What it does not decide.** What the renderer does when the spline makes $\sigma_{\rm r}(\delta)^2 \le 0$ between two
+knots; whether tables already rendered under the linear reading are rebuilt.
+
+**Sources.** **[user]** 2026-11-27, 18:06. **[src]** `model/kernel.py`, `config.py` on `sci/diameter-pipeline` at
+`aadac6a`. **[log]** D-080, D-181, D-231, D-263, D-265.
+
+**Status:** active; not built.
+
+---
+
+## D-273 -- Step 2's settings: the weights, the far planes from the fourth in both fits, the solver, acceptance on a validation set, the nodes' delivery; the in-focus width still to settle (user)
+
+**Date:** 2026-11-27, 18:06 (Europe/Rome), the step-2 implementation chat. **Binds:** step 2 (NS1): Q2, Q7 to Q12 of
+the step-2 implementation handoff; D-229's open points; `CalibrationConfig.far_min_k_offset` (Block 15's far fit);
+D-221.1 ($\sigma_{\rm r}(0)$); D-261 (the nodes' choice).
+
+**Decision [user].** Weights: "as you suggest but allow also without weights". Far planes: "start at 4 in both cases".
+Solver: "ok all. A node bootstrap as an option: for now do not implement". Acceptance: "Perfect. We will split the
+selected by me dataset into training and validation. In the validation both near and far fit nodes will be
+evaluated". Nodes: "Choice of candidates (as already decided) on the DaVinci. I will do the selection by myself and
+deliver for each cell (that has a number) its calibration nodes". The in-focus width: "WHich is the switch briefly?
+However I would fit it as well (but i do not want to fit too many things especialy if correlated)". D-231's push by
+the defocus-table chat and the upload and commit of the T10 study document: "ok".
+
+**Statement.** (D-273.1) A plane's weight is $\varpi(j) = 1/s_\omega(j)^2$, with $j = |k - k^*_i|$ and $s_\omega(j)$
+(um$^2$) the noise SD of the core width at that offset, estimated from noisy phantom replicates; the unweighted fit
+($\varpi \equiv 1$) is selectable; the focus plane ($j$ = 0) enters [user, on the assistant's proposal].
+(D-273.2) The far planes start at $|k - k^*|$ = 4 in step 2's far twins and in the far fit:
+`far_min_k_offset` = 4 (was 5, PROVISIONAL) [user]. (D-273.3) The solver is `scipy.optimize.least_squares` (trf) with
+the bounds $\sigma_{\rm r}(0) < \theta_m \le 2.0$ um and $\gamma \ge 0$, a finite-difference Jacobian with its sparsity
+pattern; the SEs come from the Jacobian, clustered by node; no node bootstrap for now [user, on the assistant's
+proposal]. (D-273.4) The user's chosen nodes are split into a training set, which the fits use, and a validation set;
+the validation evaluates near-set and far-set nodes under the fitted table [user]. On phantoms the acceptance is
+every knot within 0.002 um of the table they were rendered with, with the twins' noise switched off (a test setting;
+D-270.2 holds for the fits); on real nodes the validation is reported as predicted against measured core widths, with
+no pass/fail threshold until a first real run shows the noise [user, on the assistant's proposal]. (D-273.5) The
+candidates are screened on davinci, the user selects, and delivers for each cell, named by its specimen number, its
+calibration nodes (D-261) [user]. (D-273.6) Not decided: whether $\sigma_{\rm r}(0)$ is fitted in step 2. The user
+would fit it, with the reservation quoted; D-221.1 (held, with the switch `--kernel-width fixed|calibrated
+--sigma-json FILE`) stands until the user confirms.
+
+**Why.** **[user]**. For D-273.6, the same check as D-271's **[run, this chat, 2026-11-27:
+`checks/step2_identifiability_2026-11-27/identifiability_probe.py`; proxy forward model, the configuration of D-271]**:
+with the depths fitted, adding $\ln\sigma_{\rm r}(0)$ keeps the scaled condition number at 2.4;
+$\ln\sigma_{\rm r}(0)$ is determined 4.8 times worse than $\ln\theta_1$ and correlates with it at -0.49; the SE of
+$\ln\theta_1$ grows by 15 %. To first order, twins all 10 % too wide move $\theta_1, \theta_2, \theta_3$ by -5.4, +0.5,
+-0.2 % with $\sigma_{\rm r}(0)$ held, and by -2.5, +0.2, -0.2 % with it fitted, the fitted $\sigma_{\rm r}(0)$ then
+moving by -29 %: a fitted in-focus width absorbs the error of Allen's diameters (D-261.5).
+
+**What it implies for code and tables.** `far_min_k_offset` = 4 changes Block 15's far fit and its smoke numbers.
+The step-2 dataset carries a training/validation mark per node. The estimator returns the Jacobian-based covariance
+clustered by node. Not built.
+
+**What it does not decide.** D-273.6; the split's fraction, its unit (node or cell), its stratification by set and
+its seed; the file format of the delivered node lists; the weight's estimate in detail (which replicates, pooled over
+which twins); D-229.2's validation on the far nodes' $\pm 3$ planes beside the new validation set.
+
+**Sources.** **[user]** 2026-11-27, 18:06. **[run]** as above. **[src]** `config.py` (`far_min_k_offset`),
+`scripts/kernel_width.py` on `sci/diameter-pipeline` at `aadac6a`. **[log]** D-221, D-229, D-231, D-261, D-270, D-271.
+
+**Status:** active; D-273.6 to confirm; not built.
