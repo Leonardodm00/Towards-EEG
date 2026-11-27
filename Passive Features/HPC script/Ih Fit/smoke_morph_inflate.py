@@ -77,7 +77,25 @@ def test_M1_path_length_and_step():
                 c["n_nodes"] == 9 and c["n_inflated"] == 5 and c["n_by_type"] == {1: 1, 3: 3, 4: 1}),
             "header kept, one comment added": header2[:len(header)] == header and len(header2) == len(header) + 1,
             "the source file is untouched": src.read_text() == HAND,
+            "every value but the inflated radii reads back exactly": (
+                np.array_equal(out[:, :5], rows[:, :5]) and np.array_equal(out[[4, 5, 7, 8], 5], rows[[4, 5, 7, 8], 5])),
         }
+        # the final check's F3: a detached tree is not inflated; no soma root or two of them is refused
+        two = Path(tmp) / "two.swc"
+        two.write_text(HAND + "10 3 0 0 900 1.0 -1\n11 3 0 0 910 1.0 10\n")
+        c2 = MI.inflate_swc(two, Path(tmp) / "two_out.swc", factor=FACTOR, max_path_um=MAX_PATH)
+        o2, _ = MI.read_swc(Path(tmp) / "two_out.swc")
+        parts["a detached dendrite tree is copied unchanged and counted"] = (
+            np.array_equal(o2[9:, 5], [1.0, 1.0]) and c2["n_outside_soma_tree"] == 2 and c2["n_inflated"] == 5)
+        for lab, text in (("no soma root", HAND.replace("1 1 0 0 0 5.0 -1", "1 3 0 0 0 5.0 -1")),
+                          ("two soma roots", HAND + "10 1 0 0 900 5.0 -1\n")):
+            p = Path(tmp) / "bad.swc"
+            p.write_text(text)
+            try:
+                MI.inflate_swc(p, Path(tmp) / "bad_out.swc", factor=FACTOR, max_path_um=MAX_PATH)
+                parts[lab + ": refused"] = False
+            except ValueError:
+                parts[lab + ": refused"] = True
         _fail_parts(parts)
 
 
@@ -259,6 +277,20 @@ def test_M6_archive_check_and_fit_morphology():
              "plain archive, inflated run: refused": d is not None and "inflation" in d,
              "inflated archive, another factor: refused": e is not None and "inflation" in e,
              "the inflated twin's fit read the archive's morphology": src == "archive"}
+    _fail_parts(parts)
+
+
+def test_M8_plan_refusals():
+    """The final check's F1: an invalid inflation option is a clean refusal of plan (exit 2, one message, no
+    traceback), and nothing is written."""
+    import run_twin_recovery as T
+    parts = {}
+    for lab, extra in (("factor 0", ("--twin-diam-factor", "0")), ("factor nan", ("--twin-diam-factor", "nan")),
+                       ("path -1", ("--twin-diam-factor", "1.5", "--twin-diam-max-path-um", "-1"))):
+        out = STR._new_out("mi_bad")
+        code, so, se = STR._plan(out, *extra)
+        parts["%s: exit %d, no traceback, nothing written" % (lab, T.EXIT_USAGE)] = (
+            code == T.EXIT_USAGE and "Traceback" not in se and not (out / "run_config.json").exists())
     _fail_parts(parts)
 
 

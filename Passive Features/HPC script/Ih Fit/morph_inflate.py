@@ -12,7 +12,7 @@ from typing import Dict, Sequence, Tuple
 
 import numpy as np
 
-__all__ = ["read_swc", "path_length_from_root", "inflate_swc"]
+__all__ = ["read_swc", "path_length_from_root", "root_of_each_node", "inflate_swc"]
 
 SWC_SOMA, SWC_AXON, SWC_BASAL, SWC_APICAL = 1, 2, 3, 4
 
@@ -73,15 +73,39 @@ def path_length_from_root(rows: np.ndarray) -> np.ndarray:
     return dist
 
 
+def root_of_each_node(rows: np.ndarray) -> np.ndarray:
+    """int64 (n,): for each node the row index of the root of its tree."""
+    ids = rows[:, 0].astype(np.int64)
+    par = rows[:, 6].astype(np.int64)
+    index = {int(i): k for k, i in enumerate(ids)}
+    out = np.full(ids.size, -1, dtype=np.int64)
+    for k in range(ids.size):
+        chain, j = [], k
+        while out[j] < 0:
+            chain.append(j)
+            p = int(par[j])
+            if p < 0:
+                out[j] = j
+                break
+            j = index[p]
+        for c in chain:
+            out[c] = out[j]
+    return out
+
+
 def inflate_swc(src, dst, *, factor: float, max_path_um: float,
                 types: Sequence[int] = (SWC_SOMA, SWC_BASAL, SWC_APICAL)) -> Dict[str, object]:
     """Write `dst`: `src` with radius * factor on every node whose type is in
-    `types` and whose path length from its root is <= max_path_um (a hard
-    step: * 1 beyond; the soma's root node is at 0). Everything else is
-    copied (ids, types, coordinates, parents, the header plus one comment
-    line). Returns counts: n_nodes, n_inflated, n_by_type (type -> inflated
+    `types`, that belongs to the tree of the soma's root node, and whose path
+    length from that root is <= max_path_um (a hard step: * 1 beyond; the
+    root is at 0). Everything else is copied exactly (ids, types,
+    coordinates, parents, the other radii; floats written with 17
+    significant digits), with the header plus one comment line. A detached
+    tree (another root) is copied unchanged and counted. Returns counts:
+    n_nodes, n_inflated, n_outside_soma_tree, n_by_type (type -> inflated
     nodes), max_path_um, factor. ValueError: factor not finite and > 0,
-    max_path_um not finite and >= 0, src == dst."""
+    max_path_um not finite and >= 0, src == dst, not exactly one root node
+    of soma type."""
     factor, max_path_um = float(factor), float(max_path_um)
     if not (np.isfinite(factor) and factor > 0.0):
         raise ValueError("factor must be finite and > 0, got %r" % (factor,))
@@ -93,17 +117,27 @@ def inflate_swc(src, dst, *, factor: float, max_path_um: float,
     rows, header = read_swc(src)
     dist = path_length_from_root(rows)
     typ = rows[:, 1].astype(np.int64)
-    sel = np.isin(typ, np.asarray(list(types), dtype=np.int64)) & (dist <= max_path_um)
+    root = root_of_each_node(rows)
+    roots = np.flatnonzero(rows[:, 6].astype(np.int64) < 0)
+    soma_roots = [int(k) for k in roots if int(typ[k]) == SWC_SOMA]
+    if len(soma_roots) != 1:
+        raise ValueError("%s: %d root node(s) of soma type; the path length of SPEC 2.11 is measured from "
+                         "THE soma's root node" % (src, len(soma_roots)))
+    # only the tree of the soma's root: a detached tree (its own root) is copied unchanged
+    sel = (np.isin(typ, np.asarray(list(types), dtype=np.int64)) & (dist <= max_path_um)
+           & (root == soma_roots[0]))
     out = rows.copy()
     out[sel, 5] = rows[sel, 5] * factor
     lines = list(header)
     lines.append("# morph_inflate: radius * %.10g for types %s within %.10g um of path length from the root"
                  % (factor, ",".join(str(int(t)) for t in types), max_path_um))
     for r in out:
-        lines.append("%d %d %.10g %.10g %.10g %.10g %d" % (int(r[0]), int(r[1]), r[2], r[3], r[4], r[5], int(r[6])))
+        # %.17g: every float64 is written so that it reads back exactly (nothing but the inflated radii changes)
+        lines.append("%d %d %.17g %.17g %.17g %.17g %d" % (int(r[0]), int(r[1]), r[2], r[3], r[4], r[5], int(r[6])))
     dst.parent.mkdir(parents=True, exist_ok=True)
     with open(dst, "w", newline="\n") as fh:
         fh.write("\n".join(lines) + "\n")
     return dict(n_nodes=int(rows.shape[0]), n_inflated=int(sel.sum()),
+                n_outside_soma_tree=int((root != soma_roots[0]).sum()),
                 n_by_type={int(t): int((sel & (typ == t)).sum()) for t in np.unique(typ[sel])},
                 max_path_um=max_path_um, factor=factor)

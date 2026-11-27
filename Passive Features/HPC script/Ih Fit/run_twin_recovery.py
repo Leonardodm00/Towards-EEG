@@ -178,6 +178,10 @@ def gate_required_axes(ih_arm: str) -> tuple:
     return tuple(_GATE_REQUIRED_AXES_OF[gate_arm(ih_arm)])
 
 
+#: Block 29 (SPEC 2.11, D-268): the default path length (um) within which --twin-diam-factor applies
+TWIN_DIAM_MAX_PATH_UM_DEFAULT = 300.0
+
+
 class Refused(Exception):
     """A refusal of the entry: exit code and message."""
 
@@ -331,7 +335,7 @@ def build_parser() -> argparse.ArgumentParser:
                         "with the radii of soma and dendrites multiplied by this factor within "
                         "--twin-diam-max-path-um of path length from the soma; the fit still reads the "
                         "original reconstruction. 1 (default) = no inflation")
-    p.add_argument("--twin-diam-max-path-um", type=float, default=300.0,
+    p.add_argument("--twin-diam-max-path-um", type=float, default=TWIN_DIAM_MAX_PATH_UM_DEFAULT,
                    help="Block 29: path length from the soma (um) up to which --twin-diam-factor applies "
                         "(a hard step); used only when the factor is not 1")
     p.add_argument("--force", action="store_true", help="re-plan a run directory planned with other options")
@@ -460,11 +464,11 @@ def plan_options(args) -> Dict[str, object]:
     # Block 29: recorded only when the twins are inflated, so that a run planned before Block 29 (no such
     # keys) still compares equal to the same plan made now
     factor = float(getattr(args, "twin_diam_factor", 1.0))
-    max_path = float(getattr(args, "twin_diam_max_path_um", 300.0))
+    max_path = float(getattr(args, "twin_diam_max_path_um", TWIN_DIAM_MAX_PATH_UM_DEFAULT))
     if not (np.isfinite(factor) and factor > 0.0):
-        raise Refused("--twin-diam-factor must be finite and > 0, got %r" % (factor,))
+        raise Refused(EXIT_USAGE, "--twin-diam-factor must be finite and > 0, got %r" % (factor,))
     if not (np.isfinite(max_path) and max_path >= 0.0):
-        raise Refused("--twin-diam-max-path-um must be finite and >= 0, got %r" % (max_path,))
+        raise Refused(EXIT_USAGE, "--twin-diam-max-path-um must be finite and >= 0, got %r" % (max_path,))
     if factor != 1.0:
         opts["twin_diam_factor"] = factor
         opts["twin_diam_max_path_um"] = max_path
@@ -864,7 +868,7 @@ def twin_inflation(opts: Mapping[str, object]) -> Optional[Dict[str, float]]:
     factor = float(opts.get("twin_diam_factor", 1.0))
     if factor == 1.0:
         return None
-    return dict(factor=factor, max_path_um=float(opts.get("twin_diam_max_path_um", 300.0)))
+    return dict(factor=factor, max_path_um=float(opts.get("twin_diam_max_path_um", TWIN_DIAM_MAX_PATH_UM_DEFAULT)))
 
 
 def _archive_matches(spec_dir: Path, spec, tcfg: TwinConfig, with_noise: bool,
