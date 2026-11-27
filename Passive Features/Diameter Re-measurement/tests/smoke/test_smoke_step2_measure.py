@@ -1,7 +1,7 @@
 """Smoke test for a twin's measurement -- Block 55 in specs/SPEC.md (section 5, "Kernel calibration, step 2";
-amendment 1 of 2026-11-27).
+amendments 1 to 3 of 2026-11-27).
 
-Oracles M1 to M7 of the entry. The stacks are rendered here by render.render_transmittance with the default
+Oracles M1 to M8 of the entry. The stacks are rendered here by render.render_transmittance with the default
 renderer (absorption "partition_vertical", the partition absorption, for time; Block 54 and its hybrid are not
 imported) on small patches; the Twin and TwinStack objects are constructed here (Block 53's and 54's functions are
 not called).
@@ -10,8 +10,8 @@ Shortcuts and what they do not cover
     near patch +-8 um (default 25 um): the stripe support and the background on a smaller square only
     far patch +-10.5 um, a single far tube: the far line (+-far_profile_half_um = 10 um) fits, but neighbours,
         the soma and a cell's scene are not exercised
-    gof_check off in M2a/M2b only: without noise the background SD is near 0 and the goodness of fit drops most planes;
-        the scan's code path with the check on is covered by M3 to M7
+    gof_check off in the config of M2a/M2b: scan_node's reference scan would drop most planes without noise;
+        measure_twin turns the check off itself (amendment 3, M8)
 
 Run
     python tests/smoke/test_smoke_step2_measure.py
@@ -319,6 +319,24 @@ def test_contract():
     assert np.allclose(branch.radius_um, 0.5 * d)
     assert abs(branch.xyz_um[:, 0].max() - branch.xyz_um[:, 0].min()
                - 2 * math.floor(40.0 / 1.18) * 1.18 * math.cos(theta)) < 1e-9
+
+
+def test_gof_off():
+    # M8 (amendment 3): with gof_check True in the scan_cfg passed in, no plane of the twin's scan is "poor_fit",
+    # noise on and off, and the scan equals the one made with gof_check False in scan_cfg
+    cfg_on, _tube, st = _near()
+    assert cfg_on.calibration.gof_check is True
+    cfg_off = dataclasses.replace(cfg_on, calibration=dataclasses.replace(cfg_on.calibration, gof_check=False))
+    n = st.ks.size
+    tw = _twin(st.ks, np.full(n, 200.0), np.full(n, 3.0))
+    for noise in (True, False):
+        a = M.measure_twin(tw, st, cfg_on, cfg_on.step2, noise=noise)
+        b = M.measure_twin(tw, st, cfg_off, cfg_off.step2, noise=noise)
+        assert "poor_fit" not in a.status, (noise, a.status)
+        assert a.status == b.status, (a.status, b.status)
+        for name in ("omega_um2", "vw_um2", "area_gl_um", "B_bar", "se_omega_um2", "rms_gl", "bg_sd_gl", "w_gl"):
+            assert_array_equal(getattr(a, name), getattr(b, name), err_msg="%s noise=%s" % (name, noise))
+        assert sum(x == "ok" for x in a.status) >= 3, (noise, a.status)
 
 
 def test_determinism():

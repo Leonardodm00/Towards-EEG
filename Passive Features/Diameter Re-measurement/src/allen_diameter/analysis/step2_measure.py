@@ -9,7 +9,7 @@ scan -- Block 55 in specs/SPEC.md (section 5, "Kernel calibration, step 2"; D-27
   noise_rngs       the per-plane generators default_rng([seed, cell_id, node_id, replicate, q]) (common random
                    numbers: the same draws for every trial table)
   measure_twin     the PlaneScan of one replicate: calibration.plane_scan (near) or far_field.far_plane_scan (far)
-                   under the real scans' configuration
+                   under the real scans' configuration without the goodness-of-fit screen (amendment 3)
   twin_statistics  the replicates' mean and SD per plane
 
 Pure ASCII, for the cluster (hpc-python-compat).
@@ -91,13 +91,15 @@ def noise_rngs(twin, n_planes, s2cfg, replicate):
 def measure_twin(twin, stack, scan_cfg, s2cfg, replicate=0, noise=True):
     """The PlaneScan of the twin's stack: camera_planes with twin.B_gl and the SDs s2cfg.noise_scale x
     twin.noise_sd_gl (zeros when noise is False), then calibration.plane_scan (set "near") or
-    far_field.far_plane_scan (set "far") under scan_cfg, the real scans' configuration. ValueError when stack.ks is
-    not the scan's stage_planes."""
+    far_field.far_plane_scan (set "far") under scan_cfg, the real scans' configuration, with its
+    calibration.gof_check set to False (amendment 3: Block 10.G's screen is a quality filter of real planes; which
+    planes enter the fit is the real scan's status). ValueError when stack.ks is not the scan's stage_planes."""
     from allen_image_io import CropFrame
     from . import calibration, far_field
 
     if twin.set not in ("near", "far"):
         raise ValueError("measure_twin: twin.set must be 'near' or 'far', got %r" % (twin.set,))
+    scan_cfg = dataclasses.replace(scan_cfg, calibration=dataclasses.replace(scan_cfg.calibration, gof_check=False))
     node, branch, scene = twin_scene(twin, scan_cfg, s2cfg)
     kk = calibration.stage_planes(node, scan_cfg, twin.set)
     ks = np.asarray(stack.ks)
