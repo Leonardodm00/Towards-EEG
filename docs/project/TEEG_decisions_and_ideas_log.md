@@ -318,6 +318,7 @@ the "Binds" column.
 | 2026-11-27 (the defocus-table chat, 10:40) | Logs **D-264** (user): D-230.3's alternation of the calibration's stages is dropped; each stage runs once, near then far (D-230 marked superseded in part; D-263 annotated). Next free IDs: D-265, I-008. |
 | 2026-11-27 (the defocus-table chat, 10:50) | Logs **D-265** (user): in the near stage the kernel past the anchor is the spline's extrapolation, not the linear continuation with a held slope (D-263's and D-264's open points annotated). Next free IDs: D-266, I-008. |
 | 2026-11-27 (the defocus-table chat, 10:45) | D-265.3 confirmed by the user (10:41): the spline's extrapolation is for the near-field calibration only, where a third plane lies slightly past 0.84 um; the far stage and the tables keep the linear continuation with gamma. No new ID. Next free IDs: D-266, I-008. |
+| 2026-11-27 (the defocus-table chat, 10:47) | D-265.1's reading confirmed by the user (10:45): past the anchor the near stage's spline is extrapolated along its tangent in G (linear in G, step 1's own rule), not by its last cubic piece. No new ID. Next free IDs: D-266, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -16307,7 +16308,7 @@ reading, PROVISIONAL: the spline is D-181's -- the not-a-knot cubic spline of $G
 on the signed knots, here $-0.84 \dots 0.84$ um with the values $\sigma_{\rm r}(0)$, $\theta_1$, $\theta_2$, $\theta_3$ --
 and it is extrapolated as step 1 extrapolates its own spline (D-181.1): along its tangent at the end knot, linear in
 $G$. Continuing its last cubic piece instead makes $\sigma_{\rm r}$ fall with defocus past about 1.1 um on the pilot
-table (computed below), so it is not used. (D-265.2) The near stage therefore holds no $\gamma$: D-264's open point is
+table (computed below), so it is not used. [The tangent confirmed by the user, 2026-11-27 10:45: "use the tangent then".] (D-265.2) The near stage therefore holds no $\gamma$: D-264's open point is
 moot, and the outer planes are not weighted down on this account (D-263's open point) [the assistant's reading].
 (D-265.3) The far stage and the calibrated table are unchanged: beyond 0.84 um the table continues linearly with the
 far stage's $\gamma$ (D-080.1, D-228, D-230.2) [the assistant's reading; confirmed by the user, 2026-11-27 10:41: "Scope:
@@ -16338,8 +16339,9 @@ knots; `fit_growth`: knots up to $Mh$, $M = \lceil (P + 1/2)\,\Delta z / h\rceil
 `e2c4a4e`. **[run, sandbox]** `check_spline_extrapolation.py`. **[doc]** the T10 study document, check 10.
 
 **Status:** active; not built (needs D-181's spline in the renderer). [2026-11-27 10:41: D-265.3's scope confirmed by the user;
-the tangent reading of D-265.1 stays PROVISIONAL. In the renderer the law is read per slice, so the extrapolation
+the tangent reading of D-265.1 stays PROVISIONAL [confirmed by the user, 10:45: the tangent]. In the renderer the law is read per slice, so the extrapolation
 serves every defocus past 0.84 um that a near-stage twin reaches: the third plane's own (up to 0.98 um) and its
 slices' (up to about 1.28 um for a 0.6 um tube).]
+
 
 
