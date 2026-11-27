@@ -321,7 +321,8 @@ the "Binds" column.
 | 2026-11-27 (the defocus-table chat, 10:47) | D-265.1's reading confirmed by the user (10:45): past the anchor the near stage's spline is extrapolated along its tangent in G (linear in G, step 1's own rule), not by its last cubic piece. No new ID. |
 | 2026-11-27 (the review chat, 11:34) | Logs **D-266** (user), on the sensitivity run `tw5`'s tables: the sample weight keeps $\tau_d = 500$ ms; no exclusion rule is implemented in the I_h fit. D-244 item 3 and D-246 annotated. |
 | 2026-11-27 (the review chat, 11:47) | Logs **D-267** (user): the budget of the real cells' I_h fit (global search 300 evaluations of which 200 initial; 5 starts of at most 60 iterations), and two more twins' campaigns asked for (six parameters; diameters inflated by 1.5), their design not yet settled. |
-| 2026-11-27 (the review chat, 12:04) | Logs **D-268** (user): two more twins' campaigns on the ten noisy twins with `tw5`'s settings: `tw6`, six parameters; `tw7`, five parameters with the twins simulated on a morphology whose soma and dendrite diameters are x 1.5 within 300 um of path length from the soma, the fit on the original. Block 29 on `sci/twins` (`8e1fbdb`). Next free IDs: D-269, I-008. |
+| 2026-11-27 (the review chat, 12:04) | Logs **D-268** (user): two more twins' campaigns on the ten noisy twins with `tw5`'s settings: `tw6`, six parameters; `tw7`, five parameters with the twins simulated on a morphology whose soma and dendrite diameters are x 1.5 within 300 um of path length from the soma, the fit on the original. Block 29 on `sci/twins` (`8e1fbdb`). |
+| 2026-11-27 (the review chat, afternoon) | Logs **D-269** (orchestrator): the independent check of Block 29 (report `Ih Fit/specs/test_reports/2026-11-27_1300_incremental.md`, PASS WITH ISSUES) settled; `sci/twins` `8b05c56`. Next free IDs: D-270, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -578,6 +579,7 @@ would be needed*, *Status*.
 | D-266 | 2026-11-27 | the I_h fit's loss (SPEC 2.8 (d), D-207 (3)) and its cell selection; D-244 item 3 (the exclusion decided in principle: not implemented), D-246 (its two questions, closed) | the sample weight keeps its decay $\tau_d = 500$ ms; no rule that removes a cell from the I_h fit is implemented [user] | active |
 | D-267 | 2026-11-27 | the real cells' I_h fit (`run_ih_fit.py`: `--n-calls`, `--n-initial`, `--refine-starts`, `--refine-max-nfev`); D-245, D-247 | for the real cells: global search of 300 evaluations, 200 of them initial; least-squares refinement from 5 starts of at most 60 iterations each [user] | active; a run option, no default changed |
 | D-268 | 2026-11-27 | the twins' runs `tw6` and `tw7` (`submit_twin_recovery.sh`, `PLAN_ARGS`); SPEC 2.11 and Block 29 of `Ih Fit/specs/SPEC.md` on `sci/twins` (`morph_inflate.py`, `twin_build.py`, `run_twin_recovery.py`); D-244 item 1 (five parameters: to be settled on `tw6`) | two campaigns on the ten noisy twins, `tw5`'s optimisation settings: one with six parameters; one with five parameters and the twins' traces generated on morphologies with soma and dendrite diameters x 1.5 up to 300 um of path length from the soma (hard step), the fit on the non-inflated ones [user] | active; code implemented (`8e1fbdb`), runs to submit |
+| D-269 | 2026-11-27 | Block 29 of `Ih Fit/specs/SPEC.md` on `sci/twins` (`morph_inflate.py`, `run_twin_recovery.py`); D-268 | after the independent check: only the tree of the soma's root node is inflated and the reconstruction must have exactly one soma root; an invalid inflation option is a clean refusal; the copy is exact; the reports of an inflated run carry no mark of the inflation (not changed) [orchestrator] | active; implemented (`8b05c56`) |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -16445,3 +16447,31 @@ from the soma's root node as the sum of the distances between consecutive nodes.
 twin's long-step deflections are 0.63 of the plain twin's, input resistance 194.8 to 122.4 MOhm).
 
 **Status:** active.
+
+## D-269 -- The independent check of Block 29 settled: one soma root, its tree only; clean refusals; an exact copy (orchestrator)
+
+**Date:** 2026-11-27 (Europe/Rome), the review chat. **Binds:** Block 29 of
+`Passive Features/HPC script/Ih Fit/specs/SPEC.md` on `sci/twins` (`8b05c56`); D-268.
+
+**Decision [orchestrator].** The findings of the independent check of Block 29 (an Opus agent given the SPEC only;
+verdict PASS WITH ISSUES; it reproduced an inflated twin to 1e-12 mV from a reconstruction inflated by its own
+writer):
+1. *F3, a convention made exact.* D-268's "path length ... from the soma" is measured from THE soma's root node:
+   the reconstruction must have exactly one root node of soma type, else the twin's build fails with the reason;
+   only the nodes of that root's tree are inflated; a detached tree (its own root) is copied unchanged and counted.
+   As first built, each tree was measured from its own root, so a detached tree would have been inflated near it.
+2. *F1, fixed.* An invalid `--twin-diam-factor` or `--twin-diam-max-path-um` is a refusal of `plan` (exit 2); it
+   crashed with a traceback.
+3. *F2, fixed.* The copy writes every float with 17 significant digits: nothing but the inflated radii changes.
+4. *F4, not changed.* The merged reports of an inflated run do not say it is one (the record is in
+   `run_config.json` and in each archive); its gate verdict and loss verdict are not a test of the optimiser.
+
+**Why.** **[run]** the check's 43 spec tests: 36 passed before the fixes, 43 after; `smoke_morph_inflate.py` 8/8;
+`smoke_twin_recovery.py` 22 pass.
+
+**What it does not decide.** Whether every one of the 18 real reconstructions has exactly one soma root: not
+checked here (the real archive is on the cluster); a cell that has not fails its twin's build with a message.
+
+**Sources.** **[orchestrator]**; **[run]** as above; **[log]** D-268.
+
+**Status:** active; implemented.
