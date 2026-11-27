@@ -25,7 +25,8 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-22 (later, 4) | Section 7: Blocks 14-18 built and checked (`c974a62`), the commands of run `tw2`, the real-cell check of the new loss. |
 | 2026-11-24 | Section 7: the result of run `tw2` (gate FAIL; the truth fits better than the estimate in 14 of 15 twins fitted with I_h: the optimiser is the limit). |
 | 2026-11-25 (the review chat) | Section 7: the user's decision after the independent review (D-245: TRF on the squared loss; the sensitivity module dropped), the code facts the review asked for **[src at `393b681`]** and the re-read of tw3a/tw3b's `refine_starts.csv` **[data inspected]**. |
-| 2026-11-25 (the review chat, evening) | Section 7: Blocks 23 to 28 built and checked on `sci/twins` (`de4cc53`), what changed in the fit and the twins' run, the final check's verdict, and the two commands for the next run on the noisy twins (D-245 to D-250). |
+| 2026-11-25 (the review chat, evening) | Section 7: Blocks 23 to 28 built and checked on `sci/twins` (`de4cc53`), what changed in the fit and the twins' run, the final check's verdict, and the two commands for the next run on the noisy twins (D-245 to D-250 [corrected 2026-11-27: the last is now D-262, renumbered; D-250 is the soma fit's]). |
+| 2026-11-27 (the defocus-table chat) | With the user's OK, the review chat's D-250 (the final check of Blocks 23 to 28) is renumbered **D-262** in the log, ending the clash with the soma fit's D-250; this handoff's two citations corrected. The citations of D-250 in `Ih Fit/` on `sci/twins` (SPEC Block 28's notes, `run_twin_recovery.py`, `smoke_twin_sensitivity.py`, `tests/spec/test_spec_block8_twin_recovery.py`, `tests/spec/test_spec_block22_twin_recovery_run3.py`) were left untouched so as not to mark Block 28 as changed: they mean D-262; update them the next time those files change. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -488,7 +489,7 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   900000302 follow it and the three shallow twins do not. Not in the archive: the search's 200 evaluations (the
   count of penalty evaluations), any noisy twin.
 - **Blocks 23 to 28 built (2026-11-25) [src: `sci/twins` at `de4cc53`; run: the smoke suites and the final check
-  on the merged branch; log: D-245 to D-250].** The fit's refinement is `trf` by default (scipy `least_squares` on
+  on the merged branch; log: D-245 to D-249 and D-262 [corrected 2026-11-27: D-262 was logged as D-250]].** The fit's refinement is `trf` by default (scipy `least_squares` on
   the residual vector, `--refine-max-nfev 30`, 3 starts; `--refine nelder_mead` a comparison); `phase2_results.csv`
   and `recovery_extras.csv` carry $L_2$, the converged starts, the failed points and `on_bound_<name>`; the twins'
   verdict is on $\sqrt{L_2}$. New: `run_twin_recovery.py sensitivity` and `MODE=sensitivity` of the submitter (the
