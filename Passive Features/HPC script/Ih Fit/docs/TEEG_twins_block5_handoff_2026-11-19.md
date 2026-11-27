@@ -28,6 +28,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-25 (the review chat, evening) | Section 7: Blocks 23 to 28 built and checked on `sci/twins` (`de4cc53`), what changed in the fit and the twins' run, the final check's verdict, and the two commands for the next run on the noisy twins (D-245 to D-250 [corrected 2026-11-27: the last is now D-262, renumbered; D-250 is the soma fit's]). |
 | 2026-11-27 (the defocus-table chat) | With the user's OK, the review chat's D-250 (the final check of Blocks 23 to 28) is renumbered **D-262** in the log, ending the clash with the soma fit's D-250; this handoff's two citations corrected. The citations of D-250 in `Ih Fit/` on `sci/twins` (SPEC Block 28's notes, `run_twin_recovery.py`, `smoke_twin_sensitivity.py`, `tests/spec/test_spec_block8_twin_recovery.py`, `tests/spec/test_spec_block22_twin_recovery_run3.py`) were left untouched so as not to mark Block 28 as changed: they mean D-262; update them the next time those files change. |
 | 2026-11-27 (the review chat) | Section 7: the results of the sensitivity run `tw5` on the ten noisy twins **[data inspected]** and what they imply for the gate, the exclusion rule and $\tau_d$ (not decided). |
+| 2026-11-27 (the review chat, 2) | Section 7: the results of the fit run `tw5` (least-squares refinement, the ten noisy twins) **[data inspected]**: every start converged, one minimum per twin, the gate's medians pass; the assistant's earlier estimate that the gate could not pass corrected. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -527,6 +528,24 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   0.223) and about 0.95 for $\ln \kappa_\tau$ (0.405). Decided on these numbers [user, D-266, 2026-11-27]: $\tau_d = 500$ ms is kept; no exclusion rule is
   implemented. The fit run on the same twins (array 2104213) was queued on
   2026-11-26.
+- **The fit run `tw5` on the ten noisy twins with the least-squares refinement (2026-11-26) [data inspected:
+  `tw5_results.tar.gz`; code `718c778`; five parameters, 0.1 ms, global search 200, 3 starts of at most 30
+  iterations, 24 workers].** All ten `ok`. (i) *Convergence:* 30 of 30 starts converged (scipy status 1, 2 or 3),
+  5 to 28 iterations, 25 to 149 residual vectors per start, 75 to 417 per fit; no failed point. (ii) *One minimum
+  per twin:* the three endpoints of a fit agree within 0.001 (unit box, max-norm) in every twin, with equal $L_2$;
+  in `tw3a`/`tw3b` (Nelder-Mead) they were 0.53 to 0.99 apart in 9 of 10 fits. (iii) *At or below the truth:*
+  $\sqrt{L_2}$ at the estimate is below its value at the truth in 9 twins (verdict `data`) and within 2 % in one
+  (`tie`); none `optimiser`. (iv) *Errors:* median absolute log error $C_m$ 0.037, $R_m$ 0.056, $R_a$ 0.080,
+  $\bar g_h$ 0.17, $\kappa_\tau$ 0.157; `gate_verdict.txt`: PASS (tolerances 0.223, 0.223, 0.405). The
+  false-positive control twins were NOT in this run, so that leg of the gate is untested. (v) *Against the
+  predicted scatter* (`identifiability.csv`, W0): error over predicted sd of $\ln \bar g_h$ is within 1.1 in 9
+  twins and -3.3 in 900000007 (error -0.041, predicted sd 0.012; $\ln \kappa_\tau$ +2.6 there): the one twin
+  where the error exceeds the noise's prediction, at the level of the 0.1 ms against 0.025 ms step (D-192 (iv)).
+  The large errors are where the scatter is predicted large: 900000003 +1.92, 900000006 +2.64, 900000008 -1.08
+  (`on_bound_gbar` lo), 900000004 +0.67 (`on_bound_kappa_tau` hi). (vi) *Cost:* 1.9 to 7.9 h per fit.
+  **[corrected 2026-11-27]** the assistant's estimate of the same day, that a perfect optimiser would not pass
+  the gate on these twins (group median about 0.33 for $\ln \bar g_h$), was wrong: the realised median is 0.17.
+  Not compared here: `tw4` (Nelder-Mead, cap 300, the same twins), whose tables the assistant has not seen.
 
 ## 8. Repository, environment, cluster
 
