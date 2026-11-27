@@ -524,8 +524,8 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   predicted sd above about 1 is outside the linear regime and reads as "not determined", not as a number.
   **[reasoning]** a perfect optimiser would not pass the gate of D-011 on these ten twins as a group: with
   median absolute error about 0.67 sd per twin, the group's median is about 0.33 for $\ln \bar g_h$ (tolerance
-  0.223) and about 0.95 for $\ln \kappa_\tau$ (0.405). Not decided: the exclusion rule (D-244 item 3) and
-  $\tau_d$ (D-246), put to the user on these numbers. The fit run on the same twins (array 2104213) was queued on
+  0.223) and about 0.95 for $\ln \kappa_\tau$ (0.405). Decided on these numbers [user, D-266, 2026-11-27]: $\tau_d = 500$ ms is kept; no exclusion rule is
+  implemented. The fit run on the same twins (array 2104213) was queued on
   2026-11-26.
 
 ## 8. Repository, environment, cluster

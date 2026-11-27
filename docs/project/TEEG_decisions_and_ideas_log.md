@@ -318,7 +318,8 @@ the "Binds" column.
 | 2026-11-27 (the defocus-table chat, 10:40) | Logs **D-264** (user): D-230.3's alternation of the calibration's stages is dropped; each stage runs once, near then far (D-230 marked superseded in part; D-263 annotated). Next free IDs: D-265, I-008. |
 | 2026-11-27 (the defocus-table chat, 10:50) | Logs **D-265** (user): in the near stage the kernel past the anchor is the spline's extrapolation, not the linear continuation with a held slope (D-263's and D-264's open points annotated). Next free IDs: D-266, I-008. |
 | 2026-11-27 (the defocus-table chat, 10:45) | D-265.3 confirmed by the user (10:41): the spline's extrapolation is for the near-field calibration only, where a third plane lies slightly past 0.84 um; the far stage and the tables keep the linear continuation with gamma. No new ID. Next free IDs: D-266, I-008. |
-| 2026-11-27 (the defocus-table chat, 10:47) | D-265.1's reading confirmed by the user (10:45): past the anchor the near stage's spline is extrapolated along its tangent in G (linear in G, step 1's own rule), not by its last cubic piece. No new ID. Next free IDs: D-266, I-008. |
+| 2026-11-27 (the defocus-table chat, 10:47) | D-265.1's reading confirmed by the user (10:45): past the anchor the near stage's spline is extrapolated along its tangent in G (linear in G, step 1's own rule), not by its last cubic piece. No new ID. |
+| 2026-11-27 (the review chat, 11:34) | Logs **D-266** (user), on the sensitivity run `tw5`'s tables: the sample weight keeps $\tau_d = 500$ ms; no exclusion rule is implemented in the I_h fit. D-244 item 3 and D-246 annotated. Next free IDs: D-267, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -550,9 +551,9 @@ would be needed*, *Status*.
 | D-241 | 2026-11-24 | SPEC Block 46 (`soma_fit.region_radius_um`, `mask_widen_um`), `fit_soma.py`, notebook Cell 25; supersedes D-219.4's disc and the +2 um widening | the soma fit's region: a disc of Allen's soma radius; only the pixels under the traced branches left out, the processes otherwise kept in the data [user] | active |
 | D-242 | 2026-11-24 | the node fit's SGT option (Blocks 49, 30 am. 3, 36 am. 22-23; Cells 26, 26 (b)); supersedes D-221's SGT option, D-222.1-2 | the node fit renders and fits with the Gaussian only; the SGT dropped (cells removed now, code removed in the next chat) [user] | active |
 | D-243 | 2026-11-24 | SPEC Block 46 (`soma_fit.render_half_um`), `fit_soma.py` (crop, `crop.half_um`, `crop.ellipsoid_inside`), Cell 25 text; corrects D-241.1's crop sentence | the soma fit's crop is the renderer's support: max(14 um, region radius + 1 um); the record flags a fitted ellipsoid beyond it [orchestrator] | active |
-| D-244 | 2026-11-25 | the I_h fit and the twins' run after the tests `tw3a`/`tw3b` (`run_ih_fit.py` options, `submit_twin_recovery.sh` `MAX_CORES`); D-234 (items 1 and 3 changed), D-238 (superseded) | after `tw3a`/`tw3b`: five parameters kept ($\Delta v_h$ fixed, as D-206); a larger local budget (300 evaluations per start in the pilot); a cell whose training steps do not reach voltages where I_h is open is removed from the I_h fit (rule to be set); the twins' submitter's cap is 240 cores; a pilot of 10 fits [user] | active; the exclusion rule open; item 2's Nelder-Mead replaced by D-245 (2026-11-25) |
+| D-244 | 2026-11-25 | the I_h fit and the twins' run after the tests `tw3a`/`tw3b` (`run_ih_fit.py` options, `submit_twin_recovery.sh` `MAX_CORES`); D-234 (items 1 and 3 changed), D-238 (superseded) | after `tw3a`/`tw3b`: five parameters kept ($\Delta v_h$ fixed, as D-206); a larger local budget (300 evaluations per start in the pilot); a cell whose training steps do not reach voltages where I_h is open is removed from the I_h fit (rule to be set); the twins' submitter's cap is 240 cores; a pilot of 10 fits [user] | active; the exclusion rule open; item 2's Nelder-Mead replaced by D-245 (2026-11-25); item 3 (exclusion in principle): no exclusion is implemented, D-266 (2026-11-27) |
 | D-245 | 2026-11-25 | the I_h fit's local stage and optimised loss (`local_refine.py`, `passive_long_step_training.py`, `run_ih_fit.py`; SPEC 2.8 (c), 2.9 (b)); D-207 (2) in part, D-234 item 1, D-244 item 2; the review's change requests CR-2, CR-4 | the local refinement is a bounded Gauss-Newton-type least-squares solver (scipy `least_squares`, TRF) minimising $L_2(q) = \sum_b c_b (\mathrm{RMSD}_b(q)/D_b)^2$; the review's sensitivity module (CR-2) is not built [user] | active; not implemented; item 3 (the sensitivity module not built) reversed by D-246 (2026-11-25) |
-| D-246 | 2026-11-25 | the review's sensitivity module (CR-2): a new module of `Ih Fit/` and its report; D-245 item 3 (reversed); D-244 item 3 (the exclusion rule), D-207 (3) (the sample weight's $\tau_d$) | the sensitivity module is built: the Jacobian of the residuals at a twin's truth, its singular values and directions, the predicted scatter of each parameter under the twin's noise; it is what the exclusion rule and the $\tau_d$ question are settled on [user] | active; not implemented |
+| D-246 | 2026-11-25 | the review's sensitivity module (CR-2): a new module of `Ih Fit/` and its report; D-245 item 3 (reversed); D-244 item 3 (the exclusion rule), D-207 (3) (the sample weight's $\tau_d$) | the sensitivity module is built: the Jacobian of the residuals at a twin's truth, its singular values and directions, the predicted scatter of each parameter under the twin's noise; it is what the exclusion rule and the $\tau_d$ question are settled on [user] | active; not implemented; its two questions closed by D-266 (2026-11-27): $\tau_d$ kept, no exclusion |
 | D-247 | 2026-11-25 | SPEC 2.10 and Blocks 23 to 28 of `Ih Fit/specs/SPEC.md` on `sci/twins` (`passive_long_step_training.py`, `fd_jacobian.py`, `local_refine.py`, `identifiability.py`, `trace_sensitivity.py`, `run_ih_fit.py`, `run_twin_recovery.py`, `submit_twin_recovery.sh`); D-245, D-246 | the build choices of D-245 and D-246: the estimate among the points the least-squares stage evaluated; a failed point's $L_2 = 10^6$; the bound flag at 0.01 of the unit box; the weighting without decay as $\tau_d = 10^{12}$ ms; how a bundle's noise is drawn for the predicted scatter; the global stage unchanged for this round [orchestrator] | active; being implemented |
 | D-248 | 2026-11-25 | the next twins' runs (`submit_twin_recovery.sh`, `PLAN_ARGS`: `--dt-long-ms`, `--dt-brief-ms`); D-007 (unchanged), D-192 (iv), D-244 item 5 | the next run is the noisy twins only, at the fit's usual step (0.1 ms); the noise-free twins are fitted later if time allows, long steps at 0.025 ms, short squares at the usual 0.1 ms [user] | active; a run option, no code default changed |
 | D-249 | 2026-11-25 | SPEC Block 28 of `Ih Fit/specs/SPEC.md` on `sci/twins` (`run_twin_recovery.py`, `smoke_twin_sensitivity.py`); D-247 | amendment 2: the sensitivity files are `DIR/sensitivity/twin_<ID>/...`, `DIR/identifiability.csv`, `DIR/truth_trace_check.csv` (no group level); the oracle on a noise-free twin and its noisy partner asks identical sensitivities and identical predicted scatter under shared seeds and layout, not identical scatter as built [orchestrator] | active; implemented (`07e9b76`) |
@@ -572,6 +573,7 @@ would be needed*, *Status*.
 | D-263 | 2026-11-27 | D-230.1's near stage: step 1 (Block 10, `offsets_planes`) and step 2's near-set twins (Eq. (13); D-229.2) | the near stage, steps 1 and 2, uses only the planes \|k - k*\| <= 3, up to the third plane on each side of focus, the anchor's plane (0.84 um); farther planes only in the far stage [user] | active; met by step 1's code and D-229.2; step 2 not built |
 | D-264 | 2026-11-27 | D-230.3 and the loop of step 2; the order of the kernel calibration's stages | D-230.3 dropped: no alternation; each stage runs once, near (steps 1 and 2, gamma held) then far (far fit and step 2, knots held); the table is the near knots with the far slope [user] | active; not built |
 | D-265 | 2026-11-27 | step 2's near stage: the twins' slices past the anchor (0.84 um); D-263's and D-264's open points; D-181 | in the near stage the kernel past 0.84 um is the spline through the near knots, extrapolated (the assistant's reading: D-181's not-a-knot spline in G, along its tangent), not the linear continuation with a held gamma; the far stage and the table keep gamma [user] | active; not built (needs D-181) |
+| D-266 | 2026-11-27 | the I_h fit's loss (SPEC 2.8 (d), D-207 (3)) and its cell selection; D-244 item 3 (the exclusion decided in principle: not implemented), D-246 (its two questions, closed) | the sample weight keeps its decay $\tau_d = 500$ ms; no rule that removes a cell from the I_h fit is implemented [user] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -16343,5 +16345,32 @@ the tangent reading of D-265.1 stays PROVISIONAL [confirmed by the user, 10:45: 
 serves every defocus past 0.84 um that a near-stage twin reaches: the third plane's own (up to 0.98 um) and its
 slices' (up to about 1.28 um for a 0.6 um tube).]
 
+## D-266 -- The sample weight keeps its decay; no exclusion rule is implemented in the I_h fit (user)
 
+**Date:** 2026-11-27, 11:34 (Europe/Rome), the review chat. **Binds:** the I_h fit's training loss (SPEC 2.8 (d);
+D-207 (3)) and which cells it fits; D-244 item 3; D-246.
 
+**Decision [user].** To the two questions put on the sensitivity run's tables: "1. Keep $\tau_d = 500$ ms? keep it
+as you suggest. 2. Exclusion on predicted scatter of $\ln \bar g_h$, and at which threshold? do not implement any
+exclusion".
+
+**Statement.**
+1. The sample weight of a training long square keeps its form and its decay, $\tau_d = 500$ ms (D-207 (3)).
+2. No rule that removes a cell from the I_h fit is implemented: every cell the loader admits is fitted. The
+   exclusion "decided in principle" by D-244 item 3 is not built.
+
+**Why.** (1) **[data inspected: `tw5_sensitivity_1.tar.gz`, `identifiability.csv`, the ten noisy twins, K = 200]**
+without the decay the predicted standard deviation of $\ln \bar g_h$ at the truth is smaller in 4 of 10 twins and
+larger in 6, geometric-mean ratio 1.06; of $\ln \kappa_\tau$, 1.00. (2) **[user]** as quoted.
+
+**What it implies for code and tables.** Nothing changes in the code. The sensitivity mode and its predicted
+scatter stay available as a report.
+
+**What it does not decide.** How the gate of D-011 is read: **[reasoning, told to the user]** on these ten twins the
+predicted scatter of $\ln \bar g_h$ ranges from 0.012 to 21.5 and a perfect optimiser would not pass the gate on
+them as a group (group median about 0.33 against 0.223; $\ln \kappa_\tau$ about 0.95 against 0.405). Whether a
+cell's $\bar g_h$ is reported with a flag when it is not determined.
+
+**Sources.** **[user]**; **[data inspected]**, **[reasoning]** as above; **[log]** D-011, D-207, D-244, D-246.
+
+**Status:** active.
