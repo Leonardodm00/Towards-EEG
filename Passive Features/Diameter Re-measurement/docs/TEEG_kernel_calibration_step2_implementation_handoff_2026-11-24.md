@@ -7,6 +7,7 @@
 | 2026-11-27 | **D-261** [user] settles Q1: the user chooses the calibration nodes from the davinci export (the image at focus shows Allen's diameter) on its agreement with the image and on clean backgrounds; no diameter is set by eye (D-226.4 withdrawn); the chosen nodes go to steps 1 and 2 (D-230's order unchanged), and step 2's twins carry Allen's diameter as the true one: form B with the diameters held. Q4 gains a toy result of 2026-11-27: form B with every twin's depth fitted, started from the configured table and nothing from step 1, recovered the table and the depths on the faint toy and on the hybrid toy. Blocks 50 and 51 now exist in SPEC (wave 8). Log on `main` at `69fc18e`; next free IDs D-262, I-008. Branch at `e019d12` before this row. |
 | 2026-11-27 (later) | **D-263** [user]: the near stage -- step 1 and step 2 on the near-set twins -- uses only the planes $\lvert k - k^*\rvert \le 3$, up to the third plane on each side of focus, the anchor's plane; farther planes only in the far stage. Already met by `offsets_planes` = 3 and D-229.2, now binding (sections 1, 4.3, 4.5 and 5). Log on `main` at `957bcdc`; next free IDs D-264, I-008. |
 | 2026-11-27 (later, 2) | **D-264** [user]: D-230.3's alternation dropped; each stage runs once, near then far (sections 1, 4.5, 5, 7.5, 9 Q8 and 10). Open instead: the slope the near stage holds. Log on `main` at `330c9ad`; next free IDs D-265, I-008. |
+| 2026-11-27 (later, 3) | **D-265** [user]: in the near stage the twins' slices past the anchor take the spline's extrapolation (the assistant's reading: D-181's not-a-knot spline in G, continued along its tangent), not the linear continuation with a held slope; so the near stage holds no slope and the renderer needs D-181's spline for it (sections 1, 4.5, 5, 8 and 9 Q13). Log on `main` at `ac66aec`; next free IDs D-266, I-008. |
 
 **Status [2026-11-24]:** not started. D-228 to D-230 fix the estimator (form B, on core widths), its trial table and
 its order. The twins' settings -- diameter, absorption, axis depth -- and their forward model are open (section 9) and
@@ -25,7 +26,7 @@ Paths are relative to `Passive Features/Diameter Re-measurement/`, except those 
 ## 1. First actions in the next chat
 
 1. Read this file; then, in the log on `main`, by ID: D-165, D-172, D-175, D-178, D-181, D-201, D-221, D-226 to D-231,
-   D-261, D-263, D-264, I-006. Read the changelog's last rows again before taking an ID (several chats log there); at `c7822ad` the newest
+   D-261, D-263, D-264, D-265, I-006. Read the changelog's last rows again before taking an ID (several chats log there); at `c7822ad` the newest
    row gives the next free IDs as D-241 and I-007.
 2. Ask the user:
    - whether D-231's code has reached `origin`: `git log origin/sci/diameter-pipeline --oneline --grep "D-231"`. At
@@ -155,7 +156,9 @@ Reading it:
 ### 4.5 The order, decided (D-230)
 
 1. **Near stage.** Step 1, then Eq. (3) on the near-set twins, gives $\theta_1, \theta_2, \theta_3$ with $\gamma$ held.
-   Both steps use only the planes $|k - k^*_i| \le 3$, up to the anchor's plane on each side of focus (D-263).
+   Both steps use only the planes $|k - k^*_i| \le 3$, up to the anchor's plane on each side of focus (D-263). The
+   twins' slices past 0.84 um take the spline through $\sigma_{\rm r}(0)$, $\theta_1$, $\theta_2$, $\theta_3$, extrapolated along
+   its tangent in $G$, so the near stage holds no $\gamma$ (D-265).
 2. **Far stage.** The far fit, then Eq. (3) on the far-set twins, gives $\gamma$ with the knots held.
 3. **D-230.3** (the assistant's condition, PROVISIONAL until the user confirms): alternate the two stages until neither
    moves by more than a set fraction of its SE. This is block-coordinate descent toward the joint least squares of
@@ -224,6 +227,7 @@ table too, since it is computed by the same renderer **[doc, Likely]**. H2 is th
 | D-229 | Form B on core widths for near and far twins; planes weighted by distance from focus; the far nodes' $\pm 3$ planes kept for validation; $\gamma$ always fitted | active; not built |
 | D-230 | Near stage, then far stage; D-230.3's alternation PROVISIONAL [dropped by D-264] | active; not built; superseded in part by D-264 |
 | D-264 | D-230.3 dropped: the stages are not alternated; each runs once, near then far. Open: the slope held in the near stage (0.79 configured, or a first far fit on step 1's anchor), now never revisited | active; not built |
+| D-265 | In the near stage the twins' slices past the anchor (0.84 um) take the spline's extrapolation -- in the assistant's reading D-181's not-a-knot spline in $G$, continued along its tangent -- not the linear continuation with a held $\gamma$; the far stage and the table keep $\gamma$. On the pilot table the tangent's slope of $\sigma_{\rm r}$ is 0.417 against $\gamma$ = 0.79; the last cubic piece would make $\sigma_{\rm r}$ fall past 1.1 um | active; not built (needs D-181) |
 | D-231 | The hybrid is the renderer's default absorption. Implemented at `2812d4d` in the defocus-table chat's sandbox; not on `origin` (section 8, item 1) | active |
 | I-006 | Form P | idea; not used in step 2 under D-261 |
 | D-261 | The user chooses the calibration nodes from the davinci export, whose image at focus shows Allen's diameter, on its agreement with the image and on clean backgrounds across planes; no diameter by eye; the chosen nodes go to steps 1 and 2; **step 2's twins carry Allen's diameter as the true one**, $\tilde d_i = D_{{\rm A},i}$: form B with the diameters held, forms C and P not used | active; not built |
@@ -454,7 +458,8 @@ Order of magnitude for near-set twins of about 0.5 um: about 1.75 $N$ core-hours
    This is `kernel_from_growth`'s grid, not the configured default's six knots.
 4. **Between knots the renderer is linear in $|\delta|$; step 1's $G$ is cubic** (D-181, not built). Step 2 is
    self-consistent, because $\theta$ enters the same renderer that later makes the bias table. If D-181 is built after
-   step 2, the knots change meaning and step 2 reruns.
+   step 2, the knots change meaning and step 2 reruns. [2026-11-27: under D-265 the near stage's twins need the spline
+   and its tangent extrapolation past 0.84 um, so D-181 is built before step 2's near stage.]
 5. **Dark stain.** The hybrid's planes go below zero in dark stain (SPEC Block 21, finding (i): for $d$ = 0.5 um the
    node plane's minimum transmittance is 0.036 at $\mu d$ = 1.5 and -0.057 at 2). The camera chain clips at 0 gl. A twin
    made with the line renderer, which has no camera chain, does not clip.
@@ -480,7 +485,7 @@ Order of magnitude for near-set twins of about 0.5 um: about 1.75 $N$ core-hours
 | Q10 | Where it runs | Colab or davinci. If davinci: how many cores (D-175.3's 100 were for the table run), and the roadmap's `needs_hpc` for NS1 |
 | Q11 | Which nodes | D-226's chosen nodes (not built). Step 2 can be built and tested on phantoms first; the roadmap keeps the two decoupled |
 | Q12 | Acceptance | The far validation planes (D-229.2): the criterion is open |
-| Q13 | D-181 | Whether the renderer's spline reading is built before step 2 (item 4 of section 8) |
+| Q13 | D-181 | Whether the renderer's spline reading is built before step 2 (item 4 of section 8). [2026-11-27: needed for the near stage at least, D-265: its twins read the spline and its tangent extrapolation past 0.84 um.] |
 
 ## 10. A block breakdown (proposal, to agree with the user)
 
