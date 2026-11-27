@@ -379,6 +379,9 @@ class SurveyConfig:
     inputs_z0_flag_um: float = 1.0           # source: D-089 [user, the assistant's default confirmed]: a cell whose median dz* exceeds this (um) is flagged z0
     # Block 19, S3c (D-088)
     calib_scans_per_cell: int = 30           # source: D-118.1 [user] (was 5, D-089): per cell and set, the scans S3c's step takes, and the most the pool takes from a cell
+    screening_near_half_um: float = 4.0     # source: PROVISIONAL (D-278 [orchestrator]): half-width (um) of a near-set node's image crop in the screening export (the near line reaches 3 um)
+    screening_far_half_um: float = 11.0     # source: PROVISIONAL (D-278 [orchestrator]): half-width (um) of a far-set node's crop (the far line reaches 10 um)
+    screening_dpi: int = 110                # source: PROVISIONAL (D-278 [orchestrator]): resolution of the screening sheets
     calib_pool_max_per_set: Optional[int] = None  # source: D-118.2 [user]: no cap on the pooled set (every cell's scans); an integer M restores the round-robin's cap of M (D-088.3: 30)
 
 
