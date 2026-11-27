@@ -5,6 +5,7 @@
 | 2026-11-24 | Created at the user's request (16:36) for the chat that implements step 2 of the defocus kernel's calibration. Written on `sci/diameter-pipeline` at `7b4a9ab` (this file's commit follows it); decision log on `main` at `44b6e6a`. Nothing of step 2 is built (section 3). The defocus-table chat wrote no step-2 code; its study of step 2 is the T10 document (section 4.1), which is not in the repository, so sections 4 and 7 restate what the implementation needs from it. |
 | 2026-11-24 (later) | Pushed at `786977b`, rebased onto `9c7e8bb`: the commits in between (Block 44 amendment 4, D-239) do not touch step 2's code, but they moved SPEC s.8, so its line numbers are dropped here. The log on `main` at `c7822ad`: D-174 and D-178 marked implemented (section 5); D-240 (the soma fit holds the far slope, uncalibrated) added to section 5 as a consumer of step 2's $\gamma$; next free IDs D-241, I-007. |
 | 2026-11-27 | **D-261** [user] settles Q1: the user chooses the calibration nodes from the davinci export (the image at focus shows Allen's diameter) on its agreement with the image and on clean backgrounds; no diameter is set by eye (D-226.4 withdrawn); the chosen nodes go to steps 1 and 2 (D-230's order unchanged), and step 2's twins carry Allen's diameter as the true one: form B with the diameters held. Q4 gains a toy result of 2026-11-27: form B with every twin's depth fitted, started from the configured table and nothing from step 1, recovered the table and the depths on the faint toy and on the hybrid toy. Blocks 50 and 51 now exist in SPEC (wave 8). Log on `main` at `69fc18e`; next free IDs D-262, I-008. Branch at `e019d12` before this row. |
+| 2026-11-27 (later) | **D-263** [user]: the near stage -- step 1 and step 2 on the near-set twins -- uses only the planes $\lvert k - k^*\rvert \le 3$, up to the third plane on each side of focus, the anchor's plane; farther planes only in the far stage. Already met by `offsets_planes` = 3 and D-229.2, now binding (sections 1, 4.3, 4.5 and 5). Log on `main` at `957bcdc`; next free IDs D-264, I-008. |
 
 **Status [2026-11-24]:** not started. D-228 to D-230 fix the estimator (form B, on core widths), its trial table and
 its order. The twins' settings -- diameter, absorption, axis depth -- and their forward model are open (section 9) and
@@ -23,7 +24,7 @@ Paths are relative to `Passive Features/Diameter Re-measurement/`, except those 
 ## 1. First actions in the next chat
 
 1. Read this file; then, in the log on `main`, by ID: D-165, D-172, D-175, D-178, D-181, D-201, D-221, D-226 to D-231,
-   D-261, I-006. Read the changelog's last rows again before taking an ID (several chats log there); at `c7822ad` the newest
+   D-261, D-263, I-006. Read the changelog's last rows again before taking an ID (several chats log there); at `c7822ad` the newest
    row gives the next free IDs as D-241 and I-007.
 2. Ask the user:
    - whether D-231's code has reached `origin`: `git log origin/sci/diameter-pipeline --oneline --grep "D-231"`. At
@@ -133,7 +134,7 @@ Reading it:
 - $S_k$ is the measurement in plane $k$: the plane scan along the node's measuring line, then the core-width statistic.
   It is the same code with the same settings that measured the real node (section 8, item 2).
 - $K_i$ is node $i$'s planes in step 2 (D-229.2):
-  - for a near-set node, $k^*_i \pm 3$;
+  - for a near-set node, $k^*_i \pm 3$ (D-229.2; binding for steps 1 and 2 of the near stage, D-263);
   - for a far-set node, $4 \le |k - k^*_i| \le 16$. Its planes within $\pm 3$ stay out of the fit and serve as a
     validation set.
 
@@ -153,6 +154,7 @@ Reading it:
 ### 4.5 The order, decided (D-230)
 
 1. **Near stage.** Step 1, then Eq. (3) on the near-set twins, gives $\theta_1, \theta_2, \theta_3$ with $\gamma$ held.
+   Both steps use only the planes $|k - k^*_i| \le 3$, up to the anchor's plane on each side of focus (D-263).
 2. **Far stage.** The far fit, then Eq. (3) on the far-set twins, gives $\gamma$ with the knots held.
 3. **D-230.3** (the assistant's condition, PROVISIONAL until the user confirms): alternate the two stages until neither
    moves by more than a set fraction of its SE. This is block-coordinate descent toward the joint least squares of
@@ -222,6 +224,7 @@ table too, since it is computed by the same renderer **[doc, Likely]**. H2 is th
 | D-231 | The hybrid is the renderer's default absorption. Implemented at `2812d4d` in the defocus-table chat's sandbox; not on `origin` (section 8, item 1) | active |
 | I-006 | Form P | idea; not used in step 2 under D-261 |
 | D-261 | The user chooses the calibration nodes from the davinci export, whose image at focus shows Allen's diameter, on its agreement with the image and on clean backgrounds across planes; no diameter by eye; the chosen nodes go to steps 1 and 2; **step 2's twins carry Allen's diameter as the true one**, $\tilde d_i = D_{{\rm A},i}$: form B with the diameters held, forms C and P not used | active; not built |
+| D-263 | The near stage -- step 1 and step 2 on the near-set twins -- uses only the planes $\lvert k - k^*_i\rvert \le 3$, up to the third plane on each side of focus, the anchor's plane (0.84 um); farther planes only in the far stage. Met by `offsets_planes` = 3 and D-229.2; `offsets_planes` is now a decision, not a tunable default | active; step 2 not built |
 | D-240 | Not binding on step 2: the soma fit (Block 46) holds the far slope at the configured 0.79, which the entry calls uncalibrated. A calibrated $\gamma$ from step 2 is a candidate for it **[reasoning]** | active |
 
 The log's status lines of D-174 and D-178 said "not implemented" although the changelog row of 2026-11-18 (later, 25)
