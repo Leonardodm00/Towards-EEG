@@ -325,6 +325,7 @@ the "Binds" column.
 | 2026-11-27 (the review chat, afternoon) | Logs **D-269** (orchestrator): the independent check of Block 29 (report `Ih Fit/specs/test_reports/2026-11-27_1300_incremental.md`, PASS WITH ISSUES) settled; `sci/twins` `8b05c56`. Next free IDs: D-270, I-008. |
 | 2026-11-27 (the step-2 implementation chat, 18:06) | Logs **D-270** to **D-273** (user), the answers to the open questions of kernel calibration step 2 (roadmap NS1; the step-2 implementation handoff's section 9): the full stack as the forward model, noisy twins plane by plane, the hybrid in steps 1 and 2 (D-270); each near twin's depth fitted and its absorption searched in the near stage, both held in the slope's fit (D-271; the absorption's statistic to confirm); the spline as the renderer's default between knots (D-272, makes D-181 effective); the weights, the far planes from the fourth in both fits, the solver, a training/validation split, the nodes' delivery (D-273; whether $\sigma_{\rm r}(0)$ is fitted is not decided). Check run: `checks/step2_identifiability_2026-11-27/` on `sci/diameter-pipeline`. D-181 and D-229 annotated. Next free IDs: D-274, I-008. |
 | 2026-11-27 (the step-2 implementation chat, 18:34) | Logs **D-274** (user): step 2's absorption held at the pilot's value (no area term; D-271.2 superseded); a far twin's depth fitted on its own near planes with the knots held; $\sigma_{\rm r}(0)$ held, a fit with it free compared on the validation set; the split by node, stratified, 75/25; davinci with at most 100 cores, NS1 `needs_hpc: true`; the staged plan approved (Block 4 amendment, Blocks 52 to 60). D-271 and D-273 annotated. Next free IDs: D-275, I-008. |
+| 2026-11-27 (the step-2 implementation chat, evening) | Logs **D-275** [orchestrator] (coding directive 7): the choices of step 2's contract -- the spline as the table family `gaussian_table_spline` with the continuation `tangent` (no new renderer field, hashes unchanged), its growth floored at zero (PROVISIONAL), the node list's CSV format, the split's allocation, the twins' camera settings, the estimator's two covariances. Block 4's amendment 4 implemented and smoke-tested; Blocks 52 to 56 drafted and added to the roadmap under NS1 (`needs_hpc: true`). Next free IDs: D-276, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -587,6 +588,7 @@ would be needed*, *Status*.
 | D-272 | 2026-11-27 | SPEC Block 4's kernel law (`model/kernel.py`, `RendererConfig`); D-181, D-265 | the renderer reads the table between knots with D-181's spline by default, the linear reading a labelled alternative; the far-set nodes serve the far stage only [user] | active; not built |
 | D-273 | 2026-11-27 | step 2's weights, far planes (`far_min_k_offset`), solver, acceptance and validation set, the nodes' delivery; D-221.1 | weights $1/s_\omega(j)^2$ with the unweighted fit selectable; far planes from the fourth in step 2 and in the far fit; `least_squares` with SEs clustered by node, no bootstrap for now; the chosen nodes split into training and validation; whether $\sigma_{\rm r}(0)$ is fitted is not decided [user] | active; D-273.6 to confirm; not built |
 | D-274 | 2026-11-27 | step 2's absorption, the far twins' depth, $\sigma_{\rm r}(0)$, the split, the davinci run, the roadmap's NS1; D-271.2, D-273.6, D-229.2 | the absorption is held at the pilot's value for every twin; a far twin's depth is fitted on its own near planes with the knots held; $\sigma_{\rm r}(0)$ is held and a fit with it free is compared on the validation set; split by node 75/25; at most 100 cores; the plan approved [user] | active; not built |
+| D-275 | 2026-11-27 | SPEC section 5 'Kernel calibration, step 2' on `sci/diameter-pipeline`: Block 4 amendment 4, `Step2Config`, Blocks 52 to 56; D-181, D-265, D-270 to D-274 | the contract's choices: the spline as a table family (no new field, hashes unchanged), its growth floored at zero (PROVISIONAL), the node list as a CSV, the split's allocation, the twins' camera settings, the clustered and classical covariances [orchestrator] | active; amendment implemented, blocks drafted |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -16731,3 +16733,57 @@ twins darker than their nodes; the seed's value; the davinci screening export fr
 D-273.
 
 **Status:** active; not built.
+
+---
+
+## D-275 -- Step 2's contract (wave 9): the spline as a table family, its growth floored at zero, the node list's format, the split's allocation, the twins' camera settings, the estimator's covariances (orchestrator)
+
+**Date:** 2026-11-27, evening (Europe/Rome), the step-2 implementation chat. **Binds:** SPEC section 5, "Kernel
+calibration, step 2" on `sci/diameter-pipeline`: Block 4's amendment 4 (`model/kernel.py`), `Step2Config`
+(`config.py`), Blocks 52 to 56 (stubs), the outlines of Blocks 57 to 60; D-181, D-265, D-270 to D-274.
+
+**Decision [orchestrator]** (coding directive 7; choices made in writing the contract the user's decisions leave
+open; each can be reversed by the user).
+
+**Statement.** (D-275.1) *The spline is a table family, not a new field.* The reading of D-181 and D-272 is selected
+by `RendererConfig.kernel_family` = "gaussian_table_spline" (the first reading stays "gaussian_table", still the
+default), and D-265's continuation by `kernel_continuation` = "tangent"; no field is added to `RendererConfig`, so the
+default configuration's hashes do not move (simulation `dc84ed2e89bcfea6`, estimator `16be09f944e45972`) and D-231's
+unpushed commit, which asserts a hash, is not invalidated. The default family is switched (D-272.1) after D-231 is on
+`origin`. (D-275.2) *The growth is floored at zero*, PROVISIONAL: $\sigma_{\rm r}(\delta) = [\sigma_{\rm r}(0)^2 +
+\max\{S(|\delta|), 0\}]^{1/2}$, $S$ the not-a-knot spline of $G$ on the signed knots, also along the tangent. On the
+pilot cell's table (0.080, 0.1536, 0.3924, 0.5620 um) $S$ is negative for $|\delta| <$ 0.130 um, with minimum
+-6.06e-4 um$^2$ at 0.090 um, where the unfloored width would be 0.0761 um, below the in-focus width; on the default
+six-knot table it is never negative **[run: `test_smoke_kernel_spline.py`]**. Step 1's growth fit (Block 10) keeps its
+unfloored spline. (D-275.3) *The node list* the user delivers (D-273.5) is one CSV text file with the header
+`specimen_id,node_id` and one row per chosen node, `#` comments allowed. (D-275.4) *The split's allocation*
+(D-274.4): per set, $V_s = \lfloor f N_s + 1/2 \rfloor$ validation twins shared among the cells by largest remainders,
+no cell losing all its training twins of a set, a seeded permutation inside each cell and set. (D-275.5) *The twin's
+camera* (D-270.2's reading): plane $q$'s background level is the real scan's `B_bar`, its noise SD before the chain
+`noise_scale` (1.0) times the real `bg_sd_gl`; `noise_replicates` = 4; the generator of plane $q$ is
+`default_rng([seed, cell_id, node_id, replicate, q])`; the background's tilt is not reproduced (the scan fits and
+removes a plane). The twin is a straight capped tube of half-length 40 um in the real node's image frame, scanned
+along the real pilot's line and planes. (D-275.6) *The estimator's covariances*: the covariance clustered by twin
+without a small-sample factor, and beside it the classical $s^2 (J^\top J)^{-1}$; a prediction that becomes NaN
+during the fit is replaced by its last finite value and counted. The finite-difference steps (0.005 um for a knot,
+0.02 um for a depth, 0.02 for the slope) are PROVISIONAL until wave 2 measures the objective's smoothness.
+
+**Why.** (1) A new field in `RendererConfig` changes the simulation hash at once, at its default
+(`simulation_signature` hashes every renderer field) **[src]**. (2) The in-focus width is the kernel's narrowest;
+a trial table met by the solver can make the unfloored variance negative, which the renderer could not evaluate
+**[own reasoning]**. (5) `camera.camera_chain` takes one background and one SD per call **[src]**. (6) With few
+clusters the clustered estimator can be biased low (Chen, Harhay and Li 2023, Biom J 65:e2200002, doi
+10.1002/bimj.202200002 -- **abstract only**; full text not accessible through the connector).
+
+**What it implies for code and tables.** As in SPEC. The floor makes the renderer's law differ from step 1's own
+curve inside $|\delta| <$ 0.13 um on the pilot table by up to 6.1e-4 um$^2$ in $G$.
+
+**What it does not decide.** Whether the floor is wanted (the alternative: the unfloored spline, refusing a table whose
+variance is not positive); the calibration of `noise_scale` through quantisation and JPEG; the number of replicates;
+a small-sample correction of the clustered SEs.
+
+**Sources.** **[orchestrator]**; **[src]** `config.py`, `model/kernel.py`, `model/camera.py` on
+`sci/diameter-pipeline`; **[run]** `tests/smoke/test_smoke_kernel_spline.py` (6 pass, 1 skip), `test_smoke_config.py`
+(6 pass); **[log]** D-181, D-231, D-265, D-270 to D-274.
+
+**Status:** active; the amendment implemented, Blocks 52 to 56 drafted.
