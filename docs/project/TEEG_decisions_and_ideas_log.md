@@ -315,6 +315,7 @@ the "Binds" column.
 | 2026-11-27 (the defocus-table chat, 10:05) | Logs **D-261** (user): the calibration nodes are chosen by the user from the davinci export, whose image at focus shows Allen's diameter, on its agreement and on clean backgrounds; no diameter by eye (D-226.4 withdrawn; D-226 marked superseded in part; D-227 and I-006 annotated); the chosen nodes go to steps 1 and 2, and step 2's twins carry Allen's diameter as the true one. Next free IDs: D-262, I-008. |
 | 2026-11-27 (the defocus-table chat, 10:15) | With the user's OK (10:05), the ID clash of 2026-11-25 is resolved: the review chat's D-250 (the final check of Blocks 23 to 28, orchestrator), logged 21 minutes after the soma fit's, is renumbered **D-262**; the soma fit's keeps D-250. Changed: the entry's heading and status, its index row (moved after D-261), the two rows of 2026-11-25 above (annotated), the soma entry's status, and the twins handoff on `main` (`Passive Features/HPC script/Ih Fit/docs/TEEG_twins_block5_handoff_2026-11-19.md`). Left as they are: the citations of D-250 in `Ih Fit/` on `sci/twins` (SPEC Block 28's notes, `run_twin_recovery.py`, `smoke_twin_sensitivity.py`, two spec tests), so that Block 28 is not marked changed; they mean D-262. Next free IDs: D-263, I-008. |
 | 2026-11-27 (the defocus-table chat, 10:35) | Logs **D-263** (user): the near stage of D-230 -- step 1 and step 2 on the near-set twins -- uses only the planes up to the third on each side of focus, the anchor's plane; already met by `offsets_planes` = 3 and by D-229.2, now binding. Next free IDs: D-264, I-008. |
+| 2026-11-27 (the defocus-table chat, 10:40) | Logs **D-264** (user): D-230.3's alternation of the calibration's stages is dropped; each stage runs once, near then far (D-230 marked superseded in part; D-263 annotated). Next free IDs: D-265, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -566,6 +567,7 @@ would be needed*, *Status*.
 | D-261 | 2026-11-27 | D-226's screening export (D-226.3, D-227) and the user's choice of calibration nodes; D-226.4; step 2's twins' diameter (D-228 to D-230; the step-2 handoff's Q1) | the image at focus shows Allen's diameter; the user chooses the nodes on its agreement and on clean backgrounds; no diameter by eye (D-226.4 withdrawn); the chosen nodes go to steps 1 and 2; step 2's twins carry Allen's diameter as the true one (form B, diameters held) [user] | active; not built |
 | D-262 (was D-250) | 2026-11-25 | the final check of Blocks 23 to 28 (report 2026-11-25_1700, PASS WITH ISSUES): `run_twin_recovery.loss_verdict`, `recovery_extras.csv`; SPEC Blocks 27, 28 | F1 fixed (amendment 3: under the least-squares refinement the twins' verdict compares $\sqrt{L_2}$ at the truth and at the estimate; a column names the quantity); F3, F4, S1, S2 written into the SPEC as notes; F2 (8 stale spec tests) left for the user [orchestrator] | active; implemented (`9e7be5a`) |
 | D-263 | 2026-11-27 | D-230.1's near stage: step 1 (Block 10, `offsets_planes`) and step 2's near-set twins (Eq. (13); D-229.2) | the near stage, steps 1 and 2, uses only the planes \|k - k*\| <= 3, up to the third plane on each side of focus, the anchor's plane (0.84 um); farther planes only in the far stage [user] | active; met by step 1's code and D-229.2; step 2 not built |
+| D-264 | 2026-11-27 | D-230.3 and the loop of step 2; the order of the kernel calibration's stages | D-230.3 dropped: no alternation; each stage runs once, near (steps 1 and 2, gamma held) then far (far fit and step 2, knots held); the table is the near knots with the far slope [user] | active; not built |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -15084,7 +15086,8 @@ weight of far against near).
 with `kernel_continuation_slope` = the fitted $\gamma$) on `sci/diameter-pipeline`. **[run, sandbox]** check 10 (D-228).
 **[log]** D-228, D-229.
 
-**Status:** active; not built; D-230.3 to confirm.
+**Status:** active; not built; D-230.3 to confirm. [superseded in part by D-264, 2026-11-27: D-230.3 is dropped -- no
+alternation, each stage runs once -- and the loop and stopping rule of the implications go with it]
 
 ## D-231 -- The hybrid becomes the renderer's default absorption (user)
 
@@ -16232,7 +16235,7 @@ plus or minus the axis's offset from the nearest plane (up to 0.14 um), and a tu
 radius, so the outer planes still read the held $\gamma$ through some slices -- on the faint toy a relative change of
 $\gamma$ moves near-set core widths 0.108 (d 0.45-0.55 um) and 0.138 (d 0.75-0.95 um) times as much as the same change
 of $\theta_3$ (T10 study document, check 10) **[doc, run]**; whether those planes are weighted down ($\varpi$, D-229);
-D-230.3's alternation (PROVISIONAL); the far stage's first plane (4 in D-229.2, 5 in the far fit,
+D-230.3's alternation (PROVISIONAL) [dropped by D-264, 2026-11-27]; the far stage's first plane (4 in D-229.2, 5 in the far fit,
 `far_min_k_offset`, PROVISIONAL).
 
 **Sources.** **[user]** 2026-11-27, 10:33. **[log]** D-228, D-229, D-230. **[src]** `config.py` (`offsets_planes` = 3)
@@ -16240,4 +16243,42 @@ and `analysis/calibration.py` (the near scan's $k^* \pm P$) on `sci/diameter-pip
 study document, check 10.
 
 **Status:** active; met by step 1's code and by D-229.2; step 2 not built.
+
+---
+
+## D-264 -- No alternation between the calibration's stages: D-230.3 dropped; each stage runs once, near then far (user)
+
+**Date:** 2026-11-27, 10:35 (Europe/Rome), the defocus-table chat. **Binds:** D-230.3 and the loop D-230 implied for
+step 2; the order of the kernel calibration's stages (D-230.1, D-230.2); the step-2 implementation handoff
+(`Passive Features/Diameter Re-measurement/docs/TEEG_kernel_calibration_step2_implementation_handoff_2026-11-24.md`, on
+`sci/diameter-pipeline`), sections 4.5, 5, 9 (Q8) and 10.
+
+**Decision [user].** Quoting the T10 study document's passage on D-230.3 (the two stages alternated until neither moves
+by more than a set fraction of its SE; block-coordinate descent; not tested, the toys having no far twins): "I would
+drop this".
+
+**Statement.** (D-264.1) D-230.3 is dropped: the near and far stages are not alternated [user]. (D-264.2) Each stage
+runs once, in D-230's order: the near stage (step 1, then step 2 on the near-set twins, on the planes
+$|k - k^*| \le 3$ of D-263) gives $\theta_1, \theta_2, \theta_3$ with $\gamma$ held; then the far stage (the far fit,
+then step 2 on the far-set twins) gives $\gamma$ with the knots held at the near stage's values; the calibrated table is
+the near stage's knots with the far stage's slope [D-230.1, D-230.2, unchanged].
+
+**Why.** The user's call; no reason was stated. The assistant's note: the stages are weakly coupled -- near-set core
+widths respond to $\gamma$ only through the slices of their outer planes that lie beyond 0.84 um, 0.108 to 0.138 times as
+much as to the same relative change of $\theta_3$ on the faint toy (T10 study document, check 10), and D-263 keeps the
+near stage to the third plane -- while every pass of an alternation would re-render all the twins **[doc, run; own
+reasoning]**.
+
+**What it implies for code and tables.** Step 2 is two fitting blocks run once in sequence, near then far, with no loop
+and no stopping rule (the "loop around them and a stopping rule" of D-230's implications goes). Not built.
+
+**What it does not decide.** The value of $\gamma$ held in the near stage -- the configured
+`kernel_continuation_slope` = 0.79 (D-024) or a first far fit on step 1's anchor, D-230's open point -- which, without
+the alternation, is the slope the near knots are fitted under and is not revisited after the far stage; how large the
+resulting mismatch between the near knots and the final slope is (not measured: the toys have no far twins).
+
+**Sources.** **[user]** 2026-11-27, 10:35. **[log]** D-024, D-230, D-263. **[doc]** the T10 study document, check 10.
+**[src]** `config.py` (`kernel_continuation_slope` = 0.79) on `sci/diameter-pipeline` at `e2c4a4e`.
+
+**Status:** active; not built.
 
