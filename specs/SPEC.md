@@ -2884,7 +2884,7 @@ the user chooses the calibration nodes on it (D-261.2) and returns them as Block
 - Figures only: every number drawn is passed in (a `NodeView` and `diameter_marks`' and `image_extent`'s values); the
   module computes nothing scientific (section 4). Matplotlib with the Agg backend, as the other plotting modules.
 - Public API:
-  - `node_sheet(view, marks, extent, dz_um, title="") -> Figure`. One pair of panels per plane, in the order of
+  - `node_sheet(view, marks, extent, dz_um, title="", zoom_half_um=None) -> Figure`. One pair of panels per plane, in the order of
     `view.ks`: left the plane's image (grey scale, one `vmin`/`vmax` for all the node's planes: the 1st and 99th
     percentiles of the valid planes' pixels; `extent`, `origin="upper"`, equal aspect), right its profile
     $I_k(v)$ (solid) with the background (dashed), both against $v$ (um), one y-range for all the node's planes.
@@ -2893,8 +2893,12 @@ the user chooses the calibration nodes on it (D-261.2) and returns them as Block
     its status when it is not "ok". Nothing is drawn over an image, except on the plane $k^*$: two marks at
     `marks["xy_um"]` (D-261.1) and a frame colour that singles the pair out; on that plane's profile two vertical
     lines at `marks["v_um"]`. A plane with `valid` False shows "not fetched" in place of its image. The figure's
-    title is `title` or "cell <cell_id>, node <node_id> (<set>), Allen's diameter <D> um".
-  - `write_node_sheet(view, marks, extent, dz_um, path, dpi, title="") -> None`: `node_sheet`, saved to `path`
+    title is `title` or "cell <cell_id>, node <node_id> (<set>), Allen's diameter <D> um". With `zoom_half_um`
+    given (amendment 1; the entry point passes `screening_near_half_um` for a far view, whose 22 um crop shows
+    Allen's diameter as two marks that nearly touch) the sheet opens with one more row holding one pair: the plane
+    $k^*$ again, its image limited to $\pm$ `zoom_half_um` about (`view.cx_um`, `view.cy_um`) and its profile to
+    $|v| \le$ `zoom_half_um`, with the marks, titled "k* +0, zoomed"; the rows of the planes follow unchanged.
+  - `write_node_sheet(view, marks, extent, dz_um, path, dpi, title="", zoom_half_um=None) -> None`: `node_sheet`, saved to `path`
     (PNG), the figure closed.
 - Parameters: `SurveyConfig.screening_dpi` (passed by the caller).
 - Library calls: matplotlib.
@@ -2905,7 +2909,10 @@ the user chooses the calibration nodes on it (D-261.2) and returns them as Block
   focus image has one artist set at `marks["xy_um"]`, its profile two vertical lines at `marks["v_um"]`, the other
   axes none; (S3) every image shares `vmin`, `vmax` and every profile the y-range; (S4) the pair titles name the
   offsets $-3 \dots 3$ (near) and a non-ok status; (S5) `write_node_sheet` writes a non-empty PNG and leaves no
-  open figure; (S6) a plane with `valid` False; a view whose `ks` do not contain `k_star` raises ValueError.
+  open figure; (S6) a plane with `valid` False; a view whose `ks` do not contain `k_star` raises ValueError; (S7, amendment 1)
+  with `zoom_half_um` a far view has 68 axes, the first pair shows `stack` at $k^*$ with x- and y-limits
+  $\pm$ `zoom_half_um` about the pilot's centre (y increasing downwards) and the profile's x-limits
+  $\pm$ `zoom_half_um`, both with the marks; the other 66 axes are as without it.
 - Data flow: consumes Block 61's `NodeView`, `diameter_marks`, `image_extent`; called by the entry point's step.
 - Confirmed: D-226.3, D-227.1, D-261.1 [user]; the layout is the orchestrator's.
 - Status: drafted 2026-11-27.
