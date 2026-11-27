@@ -168,6 +168,8 @@ def test_reference():
     # Blocks 52 to 60 and the entry point read them; exempt until wave 2 of step 2 and scripts/calibrate_step2.py
     # are merged
     pending |= {u for u in unread if u.split(".")[0] == "step2"}
+    # [2026-11-27, contract of wave 10 (D-278)] the screening export's fields, before Blocks 61, 62 and the step read them
+    pending |= {u for u in unread if u.startswith("survey.screening_")}
     # [2026-11-22, contract of wave 5 (D-218, D-219)] the soma fit's fields are declared before Blocks 45-46 and the
     # entry point read them (mask_widen_um is read by Block 47, scripts/fit_soma.py); exempt until Block 47 is merged
     # [2026-11-22, D-220.6 (final check F5)] the soma fit's exemption was narrowed to soma_fit.mask_widen_um; removed

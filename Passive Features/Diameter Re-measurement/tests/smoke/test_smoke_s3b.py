@@ -170,6 +170,41 @@ def run_cell():
     return _RUN
 
 
+def test_screening_export():
+    # D-278 (SPEC "The screening export"): the step screening, run by run_cell() with the other steps, writes for
+    # every apt node of the cell (a node with a calibration scan) one sheet, and per cell the views, the index and
+    # the candidates file in step 2's chosen-nodes format; and the scans file the calibration step writes is read by
+    # step 2's reader (Block 52), which needs meta["config"].
+    import csv
+    from allen_diameter.loading import calibration_io, screening_io, step2_io
+    r = run_cell()
+    cell, cfg = r["cell"], r["cfg"]
+    assert cell.done("screening"), [str(x) for x in r["logs"]][-6:]
+    scans, meta = calibration_io.load_scans(cell.path_of("calibration", "scans_%d.json" % cell.sid))
+    assert len(scans) >= 1, "the fixture cell must give at least one calibration scan"
+    sdir = os.path.dirname(cell.path_of("screening", "x"))
+    views = screening_io.load_views(os.path.join(sdir, "screening_%d.npz" % cell.sid))
+    assert sorted(v.node_id for v in views) == sorted(int(sc.node_id) for sc in scans)
+    for v in views:
+        png = os.path.join(sdir, "%s_%d.png" % (v.set, v.node_id))
+        assert os.path.getsize(png) > 1000, png
+        assert v.stack.shape[0] == len(v.ks) and bool(np.all(v.valid)), (v.node_id, v.valid)
+        assert int(v.k_star) in [int(k) for k in v.ks]
+        # the crop is the configured half-width about the pilot's centre: (2 half / p) + 1 pixels, within one
+        half = cfg.survey.screening_near_half_um if v.set == "near" else cfg.survey.screening_far_half_um
+        assert abs(v.stack.shape[1] - (2 * half / cfg.acquisition.res0_um + 1)) <= 1.0, v.stack.shape
+    chosen = step2_io.read_chosen_nodes(os.path.join(sdir, "candidates_%d.csv" % cell.sid))
+    assert chosen == {cell.sid: tuple(sorted(v.node_id for v in views))}, chosen
+    with open(os.path.join(sdir, "screening_index_%d.csv" % cell.sid), newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert len(rows) == len(views) and tuple(rows[0].keys()) == screening_io.INDEX_COLUMNS
+    cs = step2_io.load_cell(cell.sid, cell.path_of("calibration", "scans_%d.json" % cell.sid))
+    assert cs.config.signature_hash("full") == cfg.signature_hash("full") and cs.config.calibration == cfg.calibration
+    assert sorted(cs.nodes) == sorted(int(n["node_id"]) for n in meta["nodes"])
+    print("    screening: %d sheet(s) for cell %d; candidates %s; the scans file read by step2_io.load_cell"
+          % (len(views), cell.sid, chosen))
+
+
 def test_contract():
     r = run_cell()
     st, cell, cfg = r["st"][0], r["cell"], r["cfg"]

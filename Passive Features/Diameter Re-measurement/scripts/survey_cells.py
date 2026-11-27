@@ -258,6 +258,7 @@ def step_calibration(ctx, cfg):
     the cell's per-node CSV giving the typical background and absorption -- or that CSV's rows for a set whose
     calibration.<set>_candidates is "table"; the search's records go to <sid>/calibration/<set>_search_<sid>.csv."""
     import dataclasses
+    import json
     import calibrate_kernel
     import run_cell
     from allen_diameter.analysis import calibration
@@ -274,8 +275,10 @@ def step_calibration(ctx, cfg):
     cand = calibrate_kernel.cell_candidates(swc, cfg, transform, rows, os.path.dirname(path), sid,
                                             log=lambda m: print("    %d %s" % (sid, m), flush=True),
                                             reuse_dir=ctx.reuse_search)       # D-117.6: Cell 15 reuses Cell 7's
+    # config: the full configuration the scans are made with (D-278: Block 52's reader of step 2 needs it, as
+    # calibrate_kernel.py real writes it)
     meta = dict(source="survey", specimen=str(sid), n_candidates=len(cand), calibration=dataclasses.asdict(cfg.calibration),
-                max_per_set=int(cfg.survey.calib_scans_per_cell))
+                max_per_set=int(cfg.survey.calib_scans_per_cell), config=json.loads(cfg.to_json()))
     if not cand:
         calibration_io.save_scans([], path, dict(meta, nodes=[], reasons_count={}))
         return dict(n_candidates=0, n_near=0, n_far=0, reasons={})
@@ -297,9 +300,53 @@ def step_calibration(ctx, cfg):
                 n_far=sum(1 for x in scans if x.set == "far"), reasons=reasons)
 
 
+def step_screening(ctx, cfg):
+    """The screening export of one cell (SPEC section 5, "The screening export"; D-226, D-227, D-261, D-278): for
+    every apt calibration node -- a node with a scan in the cell's scans file -- the crop of the image stack over
+    the scan's planes is fetched, the node's view built (Block 61) and its sheet written (Block 62: each plane's
+    image beside its profile along the measuring line, Allen's diameter on the plane at focus; a far node's sheet
+    opens with that plane zoomed). Writes, under <sid>/screening/: <set>_<node_id>.png per node,
+    screening_<sid>.npz (the views), screening_index_<sid>.csv and candidates_<sid>.csv (every apt node in the
+    chosen-nodes format of step 2, for the user to cut down)."""
+    import run_cell
+    from allen_diameter.analysis import screening
+    from allen_diameter.loading import calibration_io, screening_io
+    from allen_diameter.plotting import screening_figures
+    sid = ctx.sid
+    if not ctx.cell.done("calibration"):
+        raise RuntimeError("screening needs the step calibration of %d (its scans file)" % sid)
+    scans, meta = calibration_io.load_scans(ctx.cell.path_of("calibration", "scans_%d.json" % sid))
+    pairs = screening.apt_nodes(scans, meta.get("nodes", []))
+    views_path = ctx.cell.path_of("screening", "screening_%d.npz" % sid)
+    out_dir = os.path.dirname(views_path)
+    views = []
+    if pairs:
+        provider = run_cell.real_provider(ctx.source.fetcher, ctx.source.planes(sid), cfg.acquisition.res0_um)
+    for sc, rec in pairs:
+        left, top, width, height = screening.crop_bounds(rec, sc.set, cfg)
+        ks = np.asarray(sc.ks, dtype=int)
+        patch = provider(left, top, width, height, int(ks[0]), int(ks[-1]))
+        view = screening.node_view(sid, sc, rec, patch)
+        zoom = float(cfg.survey.screening_near_half_um) if view.set == "far" else None
+        screening_figures.write_node_sheet(view, screening.diameter_marks(view), screening.image_extent(view),
+                                           float(cfg.acquisition.dz_um),
+                                           os.path.join(out_dir, "%s_%d.png" % (view.set, view.node_id)),
+                                           int(cfg.survey.screening_dpi), zoom_half_um=zoom)
+        views.append(view)
+    screening_io.save_views(views_path, views)
+    screening_io.write_index(os.path.join(out_dir, "screening_index_%d.csv" % sid), [screening.index_row(v) for v in views])
+    screening_io.write_candidates(os.path.join(out_dir, "candidates_%d.csv" % sid), views)
+    return dict(n_near=sum(1 for v in views if v.set == "near"), n_far=sum(1 for v in views if v.set == "far"),
+                n_sheets=len(views))
+
+
 def _say_calibration(s):
     return "%d candidates: %d near-field, %d far-field scans; reasons %s" % (s["n_candidates"], s["n_near"], s["n_far"],
                                                                           s["reasons"])
+
+
+def _say_screening(s):
+    return "%d sheets: %d near-field, %d far-field nodes" % (s["n_sheets"], s["n_near"], s["n_far"])
 
 
 def _say_radius(s):
@@ -324,10 +371,11 @@ def _say_align(s):
 
 
 STEPS = {"align": step_align, "nodes": step_nodes, "radius": step_radius, "registration": step_registration,
-         "camera": step_camera, "calibration": step_calibration}
-ORDER = ("align", "nodes", "radius", "registration", "camera", "calibration")
+         "camera": step_camera, "calibration": step_calibration, "screening": step_screening}
+ORDER = ("align", "nodes", "radius", "registration", "camera", "calibration", "screening")
+DEFAULT_STEPS = ORDER[:-1]      # screening (D-278) runs when it is named: it exports images for the user's choice
 SAY = {"align": _say_align, "nodes": _say_nodes, "radius": _say_radius, "registration": _say_registration,
-       "camera": _say_camera, "calibration": _say_calibration}
+       "camera": _say_camera, "calibration": _say_calibration, "screening": _say_screening}
 
 
 # ----------------------------------------------------------------- runner ---
@@ -742,7 +790,7 @@ def main(argv=None):
     r.add_argument("--selection", required=True)
     r.add_argument("--out-dir", required=True)
     r.add_argument("--cache-dir", default="allen_cache")
-    r.add_argument("--steps", default=",".join(ORDER), help="comma-separated, from: %s" % ",".join(ORDER))
+    r.add_argument("--steps", default=",".join(DEFAULT_STEPS), help="comma-separated, from: %s (default: all but screening)" % ",".join(ORDER))
     r.add_argument("--cells", default="", help="comma-separated specimen ids (default: every selected cell)")
     r.add_argument("--task-index", type=int, default=None,
                    help="run the one cell of this 0-based row of the selection (a PBS array task; exclusive with --cells)")

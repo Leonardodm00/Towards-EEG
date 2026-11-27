@@ -9,6 +9,7 @@
 | 2026-11-23 | The defocus-table chat (09:01): **D-226** (user) changes the plan -- the calibration's nodes are chosen by the user from per-node images (focus and $k^* \pm 3$ for the near set, $k^* \pm 1$ to $\pm 16$ for the far set) of the cells of the passive + I_h fit only, with diameters set by eye in a Colab notebook. A status note added under the title; sections 2, 5, 7 and 9 are kept as the record of the 158-cell plan, superseded for the cell set and the choice of nodes. Log on `main` at `cfcd1ae`. |
 | 2026-11-23 (later) | The status note gains D-227 (user, 09:05): beside each plane's image, the intensity profile along the node's measuring line. Log on `main`. |
 | 2026-11-27 | The defocus-table chat (10:00): **D-261** (user) -- the image at focus also shows Allen's diameter; the user chooses the nodes on its agreement with the image and on clean backgrounds across planes; no diameter is set by eye (D-226.4 and its Colab notebook withdrawn); the chosen nodes go to steps 1 and 2, step 2's twins carrying Allen's diameter as the true one. Status note updated. Log on `main` at `69fc18e`. |
+| 2026-11-27 (night) | The step-2 implementation chat: **D-278** (user) -- the screening export of D-226, D-227 and D-261 is built (SPEC Blocks 61 and 62; the step `screening` of `scripts/survey_cells.py`). New section 10: the screening run on the 18 L3_exc cells, command by command. Not run on real images yet. |
 
 **Status [updated 2026-11-23, D-226]:** the run below -- every eligible cell of the 158 (D-175.1), the nodes chosen by Block 10's rules -- is superseded for the cell set and the choice of nodes. The screening runs on davinci only on the cells of the passive + I_h fit (in the assistant's reading the 18 L3_exc cells, to be confirmed) and exports, for every apt node, its image at focus with $k^* \pm 3$ (near set) or $k^* \pm 1$ to $k^* \pm 16$ (far set, `far_offsets_planes`, D-074.1), each plane's image beside its intensity profile along the node's measuring line (D-227); the user picks the clearest nodes and sets their diameters by eye in a Colab notebook [corrected 2026-11-27, D-261: no diameter is set by eye and there is no such notebook; the image at focus also shows Allen's diameter, and the user picks the nodes whose Allen's diameter agrees with that image and whose background is clean across planes]; the calibration then runs on the picked nodes (steps 1 and 2, step 2's twins at Allen's diameter, D-261). None of this is built yet; sections 2, 5, 7 and 9 stay as the record of the 158-cell plan.
 
@@ -183,3 +184,36 @@ Round 2 (D-175.2), after reading round 1: keep `s3c/` as `s3c_round1/`; a second
 law (`renderer.kernel_table_delta_um`, `kernel_table_sigma_um`, `sigma_r0_um`, `kernel_continuation_slope`); the
 array again with `DIAM_FORCE=calibration` (only the calibration step reruns), then step 8; stop when the anchor and
 the far slope each move by less than one SE, at most 5 rounds.
+
+## 10. The screening run (D-226, D-227, D-261, D-278) [added 2026-11-27]
+
+What it does: on the 18 L3_exc cells of the passive + I_h fit (D-124.2: the cells under
+`/davinci-1/home/ldellamea/Human Neurons Fitting/L3_exc/specimen_*`), per cell: the alignment, the node sample, the
+calibration scans of every apt node (the cap of 30 scans per cell and set lifted by `configs/survey_screen1.json`),
+then the step `screening`, which writes under `<survey>/<sid>/screening/` one sheet per apt node
+(`near_<node>.png`, `far_<node>.png`: each plane's image beside its profile along the measuring line, Allen's
+diameter marked on the plane at focus, a far node's sheet opening with that plane zoomed), `screening_<sid>.npz`,
+`screening_index_<sid>.csv` and `candidates_<sid>.csv`. Run tag `screen1`; survey directory
+`/davinci-1/home/ldellamea/Human Neurons Fitting/diameter_survey/screen1`. A value with commas goes to `qsub -v` by
+name, exported; paths given to `qsub -v` have no spaces (section 9).
+
+Checked in the sandbox **[run]**: `test_smoke_s3b.py` runs the four steps on a synthetic cell (one sheet, the files,
+the candidates read back by step 2's reader); `test_smoke_survey_pbs.py` (the job script against stubs);
+`py_compile`, `bash -n`, no non-ASCII byte and no CR in the files touched. Not checked: a run on real images (it
+needs Allen's server), the time one cell takes with the cap lifted **[open]** -- the probe of step 5 measures it.
+
+| # | Command (login node, one line each) | Expect |
+|---|---|---|
+| 1 | `cd "/davinci-1/home/ldellamea/TEEG/Towards-EEG/Passive Features/Diameter Re-measurement" && git fetch origin && git checkout sci/diameter-pipeline && git pull --ff-only && git log -1 --oneline && bash -n scripts/pbs/survey_common.sh scripts/pbs/survey_prepare.pbs scripts/pbs/survey_cells.pbs && python3 -m py_compile scripts/survey_cells.py src/allen_diameter/analysis/screening.py src/allen_diameter/loading/screening_io.py src/allen_diameter/plotting/screening_figures.py && python3 -c "import sys; b=[p for p in sys.argv[1:] if any(c>127 or c==13 for c in open(p,'rb').read())]; print('OK: bytes' if not b else 'BAD: %s' % b)" scripts/survey_cells.py scripts/pbs/survey_cells.pbs scripts/pbs/survey_common.sh src/allen_diameter/analysis/screening.py src/allen_diameter/loading/screening_io.py src/allen_diameter/plotting/screening_figures.py && grep -c "def step_screening" scripts/survey_cells.py` | the commit that carries this section or a later one; `OK: bytes`; `1` |
+| 2 | `mkdir -p ~/diam && cp configs/survey_screen1.json ~/diam/ && cat ~/diam/survey_screen1.json` | `{"survey": {"calib_scans_per_cell": 100000}}` |
+| 3 | `qsub -v RUN_TAG=screen1,DIAM_CONFIG_JSON=$HOME/diam/survey_screen1.json scripts/pbs/survey_prepare.pbs` | in its log: `api.brain-map.org reachable`, `pool: ...`, `select: ...` (the selection it writes is replaced in step 4) |
+| 4 | after 3, with the environment of the jobs active (`conda activate spine_env`): `SV="/davinci-1/home/ldellamea/Human Neurons Fitting/diameter_survey/screen1" && IDS=$(ls -d "/davinci-1/home/ldellamea/Human Neurons Fitting/L3_exc"/specimen_* \| sed 's/.*specimen_//' \| paste -sd, -) && echo "$IDS" \| tr ',' '\n' \| wc -l && python3 scripts/cell_pool.py pick --pool "$SV/pool.csv" --cells "$IDS" --out "$HOME/diam/selection_L3exc.csv" && wc -l < "$HOME/diam/selection_L3exc.csv"` | `18`; `pick: 18 cells -> ...`; `19` (the header and 18 rows) |
+| 5 | the dry run, then the probe on the first cell: `export DIAM_STEPS=align,nodes,calibration,screening && qsub -v RUN_TAG=screen1,DIAM_STEPS,DIAM_DRYRUN=1,DIAM_SELECTION=$HOME/diam/selection_L3exc.csv,DIAM_CONFIG_JSON=$HOME/diam/survey_screen1.json scripts/pbs/survey_cells.pbs` and, after reading its log, the same without `DIAM_DRYRUN=1,` and with `-l walltime=48:00:00` and `ROADMAP_DISABLE=1` | dry run: a `DRYRUN: python3 scripts/survey_cells.py run` line with `--steps align,nodes,calibration,screening` and `--config-json`; probe: a line with `near-field, ... far-field scans` (the calibration) and one with `sheets:` (the screening), then `task 0 ... done`; note the seconds it took |
+| 6 | after the probe: `SV="/davinci-1/home/ldellamea/Human Neurons Fitting/diameter_survey/screen1" && S=$(sed -n 2p "$HOME/diam/selection_L3exc.csv" \| cut -d, -f1) && ls "$SV/$S/screening" \| head -5 && ls "$SV/$S/screening" \| grep -c png && wc -l < "$SV/$S/screening/candidates_$S.csv"` | sheet names `near_<node>.png` / `far_<node>.png`; the number of sheets; that number plus one (if the first column of the selection is not the specimen id, read it off the file) |
+| 7 | after 6 looks right: `export DIAM_STEPS=align,nodes,calibration,screening && qsub -J 0-17 -l walltime=48:00:00 -v RUN_TAG=screen1,DIAM_STEPS,DIAM_SELECTION=$HOME/diam/selection_L3exc.csv,DIAM_CONFIG_JSON=$HOME/diam/survey_screen1.json scripts/pbs/survey_cells.pbs` | 18 tasks, each ending with `task <i> ... done`; a cell whose step failed shows in `status.csv` as `pending` and is rerun by the same command (done steps are skipped) |
+| 8 | after 7: `cd "/davinci-1/home/ldellamea/Human Neurons Fitting/diameter_survey/screen1" && ls -d */screening \| wc -l && tar -czf screening_screen1.tgz */screening && ls -lh screening_screen1.tgz` | `18`; the archive to download (binary transfer) |
+
+What comes back from the user (D-261.2, D-275.3): one file `chosen_nodes.csv` with the header `specimen_id,node_id`
+once and the chosen nodes' rows, made from the `candidates_<sid>.csv` files by deleting the rows not wanted. Step 2
+reads it with `step2_io.read_chosen_nodes`; the cells' scans files (`<sid>/calibration/scans_<sid>.json`, now with
+the full configuration in `meta`) are step 2's other input.

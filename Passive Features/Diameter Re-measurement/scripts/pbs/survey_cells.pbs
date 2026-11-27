@@ -37,7 +37,8 @@
 #   DIAM_SURVEY        the survey directory   (default: <archive>/diameter_survey/<RUN_TAG>)
 #   DIAM_SELECTION     the selection CSV      (default: <DIAM_SURVEY>/selection.csv)
 #   DIAM_CACHE         the crop cache root    (default: <archive>/allen_cache)
-#   DIAM_STEPS         comma-separated steps  (default: align,nodes,radius,registration,camera,calibration)
+#   DIAM_STEPS         comma-separated steps  (default: align,nodes,radius,registration,camera,calibration;
+#                      add screening for the export of D-226, D-227, D-261: the apt nodes' images and profiles)
 #   DIAM_CELLS         comma-separated ids: run these instead of the task's row (default: empty)
 #   DIAM_FORCE         steps to run again, with every step after each (default: empty)
 #   DIAM_INCLUDE_SET_ASIDE  1 = run the later steps on a set-aside cell too (default: 0)

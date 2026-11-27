@@ -893,6 +893,24 @@ implementation:
     needs_theory: [T10]
     needs_hpc: false
     jobs: []
+  - id: I61
+    title: "Screening views and files"
+    summary: "For every apt calibration node: the crop of the image stack over the scan's planes, the raw profile along the measuring line with the fitted background, Allen's diameter marks; the per-cell views, index and candidates files (D-226, D-227, D-261, D-278)."
+    block: 61
+    parent: S3c
+    depends_on: [I19]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
+  - id: I62
+    title: "Screening sheets"
+    summary: "One sheet per node: each plane's image beside its intensity profile, Allen's diameter on the plane at focus, a zoomed focus pair for far-set nodes; the user chooses the calibration nodes on them."
+    block: 62
+    parent: S3c
+    depends_on: [I61]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
 # Revisions: a change one side has to absorb because of the other
 # (roadmap.py revise). An implementation stage's flag clears when its
 # code changes after the flag's commit; a topic's when its status

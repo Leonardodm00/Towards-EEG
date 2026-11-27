@@ -2814,6 +2814,130 @@ planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
   validation, near and far.
 - Entry point `scripts/calibrate_step2.py` and the davinci job script: by the orchestrator, after wave 2.
 
+### The screening export (D-226, D-227, D-261, D-278): common definitions
+
+Contract of 2026-11-27 (wave 10). For every apt calibration node of a cell -- a node with a calibration scan in the
+cell's scans file -- the export shows the user the image at focus and the planes of D-226.3, each beside its
+intensity profile along the node's measuring line (D-227.1), the image at focus showing Allen's diameter (D-261.1);
+the user chooses the calibration nodes on it (D-261.2) and returns them as Block 52's CSV (D-275.3).
+
+- Planes shown: the scan's own planes -- $k^* - 3 \dots k^* + 3$ for a near-set node, $k^* - 16 \dots k^* + 16$ for a
+  far-set node (D-226.3; every far plane is shown).
+- The image of a plane: the crop of the raw image stack (grey levels, uint8) within $\pm$ `screening_near_half_um`
+  (near set) or $\pm$ `screening_far_half_um` (far set) of the pilot's centre (`cx_um`, `cy_um`), by
+  `calibration_scene.patch_bounds`. Nothing is drawn over a plane's image except, on the image at focus, the two
+  marks of Allen's diameter.
+- The profile of a plane (D-227.1's reading): the raw intensity along the measuring line, $I_k(v) = \hat B_k(v) -
+  w_k(v)$ (grey levels) from the scan's `bhat_gl` and `w_gl`, against $v$ (um, `v_um`); the scan's fitted background
+  along the line, $\hat B_k(v)$, is marked.
+- Allen's diameter (D-261.1's reading): $D_{{\rm A},i}$ = the node record's `allen_diameter_um`; the two marks are at
+  $v = \pm D_{{\rm A},i}/2$ on the measuring line, i.e. at the image points (`cx_um`, `cy_um`) $\pm
+  (D_{{\rm A},i}/2)\,(-\sin\theta, \cos\theta)$, $\theta$ the pilot's heading, and at the same $v$ on the focus plane's
+  profile.
+- Per cell the export writes, under `<survey>/<sid>/screening/`: one sheet per node, `<set>_<node_id>.png`; the views
+  `screening_<sid>.npz`; the index `screening_index_<sid>.csv`; and `candidates_<sid>.csv`, every apt node in Block
+  52's chosen-nodes format, for the user to cut down (D-278.2).
+- Configuration (`SurveyConfig`, outside every signature): `screening_near_half_um` 4.0 (the near line reaches 3 um);
+  `screening_far_half_um` 11.0 (the far line reaches 10 um); `screening_dpi` 110. PROVISIONAL, the orchestrator's.
+
+### Block 61: the screening views -- a node's planes, profiles and marks; the export's files (D-226, D-227, D-261.1)
+
+- Modules: `src/allen_diameter/analysis/screening.py`; `src/allen_diameter/loading/screening_io.py`; smoke test
+  `tests/smoke/test_smoke_screening.py`.
+- Purpose. `analysis/screening.py` assembles, from a node's scan, its record and the fetched crop, what a sheet shows
+  (arrays only; no file access, no plotting). `loading/screening_io.py` writes and reads the export's files.
+- Public API (`analysis/screening.py`):
+  - `NodeView` (frozen dataclass): `cell_id`, `node_id` int; `set` "near" | "far"; `allen_diameter_um` float;
+    `k_star` int; `ks` (n,) int64; `stack` (n, H, W) uint8; `valid` (n,) bool (False: the plane could not be
+    fetched, its image zeros); `left`, `top` int (px of the full image); `res0_um` float; `cx_um`, `cy_um`,
+    `theta_rad`, `phi_rad` float (the pilot's); `v_um` (n_v,) float64; `profile_gl` (n, n_v) float64 ($I_k(v)$, NaN
+    where the scan has none); `background_gl` (n, n_v) float64; `status` tuple of str; `omega_um2` (n,) float64;
+    `B_bar` (n,) float64.
+  - `apt_nodes(scans, nodes) -> list[(PlaneScan, dict)]`: the scans with their node records, near set first, then by
+    node id. ValueError naming the node: a scan without a record, a record without a pilot.
+  - `crop_bounds(record, which, cfg) -> (left, top, width, height)`: `calibration_scene.patch_bounds` about the
+    pilot's (`cx_um`, `cy_um`) with the half-width of the set (`which` "near" | "far") and `acquisition.res0_um`.
+  - `node_view(cell_id, scan, record, patch) -> NodeView`: `patch` = (block, ks, valid, frame) in the `fetch_zblock`
+    contract over the scan's planes. ValueError: the patch's `ks` are not the scan's `ks`; a scan without `v_um`,
+    `w_gl` or `bhat_gl`; a non-finite `allen_diameter_um`.
+  - `diameter_marks(view) -> dict`: `v_um` = ($-D_{\rm A}/2$, $+D_{\rm A}/2$); `xy_um` (2, 2), the two image points.
+  - `image_extent(view) -> (x0, x1, y0, y1)` um: the crop's outer pixel edges, pixel (row, col) centred on
+    ((`left` + col) p, (`top` + row) p), for `imshow(extent=..., origin="upper")` with y increasing downwards.
+  - `index_row(view) -> dict`: `specimen_id`, `node_id`, `set`, `allen_diameter_um`, `k_star`, `phi_deg`,
+    `n_planes`, `n_ok` (planes with status "ok"), `B_focus_gl` and `omega_focus_um2` (the plane $k^*$; NaN if absent).
+- Public API (`loading/screening_io.py`):
+  - `save_views(path, views)` / `load_views(path) -> list[NodeView]`: one compressed `.npz` per cell, every field,
+    round trip exact.
+  - `write_index(path, rows)`: CSV with `index_row`'s columns in that order, one row per node.
+  - `write_candidates(path, views)`: the header `specimen_id,node_id` and one row per view, near set first then by
+    node id: a file `step2_io.read_chosen_nodes` reads back as `{cell_id: every node id}`.
+- Parameters: `SurveyConfig.screening_near_half_um`, `screening_far_half_um`; `AcquisitionConfig.res0_um`.
+- Library calls: numpy; `csv`; `calibration_scene.patch_bounds`.
+- Custom code: none.
+- Test oracles (synthetic `PlaneScan`s with `v_um`, `w_gl`, `bhat_gl`, synthetic records and blocks built in the
+  test): (V1) `profile_gl` = `bhat_gl - w_gl` and `background_gl` = `bhat_gl` bit for bit, the stack and `ks`
+  unchanged, a 33-plane far view and a 7-plane near view; (V2) `diameter_marks`: for $\theta$ = 0 the points are
+  (`cx`, `cy` $\pm D/2$), for $\theta = \pi/2$ (`cx` $\mp D/2$, `cy`), and their distance is $D$ for any $\theta$
+  [1e-12]; (V3) `crop_bounds` equals `patch_bounds` with the set's half-width, and `image_extent` puts the pilot's
+  centre within half a pixel of the crop's middle; (V4) `save_views` then `load_views`: every field bit for bit;
+  (V5) `write_candidates` read by `step2_io.read_chosen_nodes` gives every node id of the cell; `write_index`'s rows
+  read by `csv.DictReader` equal `index_row`'s values; (V6) each refusal; (V7) `apt_nodes`' order.
+- Data flow: consumes Block 10's and Block 15's scans (the scans file) and a crop fetched by the entry point;
+  produces `NodeView`s for Block 62 and the files the user downloads.
+- Confirmed: D-226.3, D-227.1, D-261.1, D-278 [user]; the crops' half-widths and the files' formats are the
+  orchestrator's.
+- Status: implemented 2026-11-27 by one implementer (wave 10), merged into the screening contract branch; `test_smoke_screening.py` 5 pass, 2 skip.
+
+### Block 62: the screening sheets -- each plane's image beside its profile (D-226.3, D-227, D-261.1)
+
+- Modules: `src/allen_diameter/plotting/screening_figures.py`; smoke test
+  `tests/smoke/test_smoke_screening_figures.py`.
+- Figures only: every number drawn is passed in (a `NodeView` and `diameter_marks`' and `image_extent`'s values); the
+  module computes nothing scientific (section 4). Matplotlib with the Agg backend, as the other plotting modules.
+- Public API:
+  - `node_sheet(view, marks, extent, dz_um, title="", zoom_half_um=None) -> Figure`. One pair of panels per plane, in the order of
+    `view.ks`: left the plane's image (grey scale, one `vmin`/`vmax` for all the node's planes: the 1st and 99th
+    percentiles of the valid planes' pixels; `extent`, `origin="upper"`, equal aspect), right its profile
+    $I_k(v)$ (solid) with the background (dashed), both against $v$ (um), one y-range for all the node's planes.
+    Layout: a near view (7 planes) as 7 rows of one pair; a far view (33 planes) as 11 rows of three pairs,
+    row-major. Each pair is titled "k* + o (o dz um)" with its offset $o = k - k^*$ and defocus $o\,\Delta z$, and
+    its status when it is not "ok". Nothing is drawn over an image, except on the plane $k^*$: two marks at
+    `marks["xy_um"]` (D-261.1) and a frame colour that singles the pair out; on that plane's profile two vertical
+    lines at `marks["v_um"]`. A plane with `valid` False shows "not fetched" in place of its image. The figure's
+    title is `title` or "cell <cell_id>, node <node_id> (<set>), Allen's diameter <D> um". With `zoom_half_um`
+    given (amendment 1; the entry point passes `screening_near_half_um` for a far view, whose 22 um crop shows
+    Allen's diameter as two marks that nearly touch) the sheet opens with one more row holding one pair: the plane
+    $k^*$ again, its image limited to $\pm$ `zoom_half_um` about (`view.cx_um`, `view.cy_um`) and its profile to
+    $|v| \le$ `zoom_half_um`, with the marks, titled "k* +0, zoomed"; the rows of the planes follow unchanged.
+  - `write_node_sheet(view, marks, extent, dz_um, path, dpi, title="", zoom_half_um=None) -> None`: `node_sheet`, saved to `path`
+    (PNG), the figure closed.
+- Parameters: `SurveyConfig.screening_dpi` (passed by the caller).
+- Library calls: matplotlib.
+- Custom code: none.
+- Test oracles (views built in the test as plain objects with `NodeView`'s fields; Block 61 is not imported): (S1)
+  a near view gives 14 axes and a far view 66; each profile line's data equal `v_um` and `profile_gl[q]`, each
+  dashed line's `background_gl[q]`, each image's array `stack[q]`; (S2) only the focus pair carries the marks: the
+  focus image has one artist set at `marks["xy_um"]`, its profile two vertical lines at `marks["v_um"]`, the other
+  axes none; (S3) every image shares `vmin`, `vmax` and every profile the y-range; (S4) the pair titles name the
+  offsets $-3 \dots 3$ (near) and a non-ok status; (S5) `write_node_sheet` writes a non-empty PNG and leaves no
+  open figure; (S6) a plane with `valid` False; a view whose `ks` do not contain `k_star` raises ValueError; (S7, amendment 1)
+  with `zoom_half_um` a far view has 68 axes, the first pair shows `stack` at $k^*$ with x- and y-limits
+  $\pm$ `zoom_half_um` about the pilot's centre (y increasing downwards) and the profile's x-limits
+  $\pm$ `zoom_half_um`, both with the marks; the other 66 axes are as without it.
+- Data flow: consumes Block 61's `NodeView`, `diameter_marks`, `image_extent`; called by the entry point's step.
+- Confirmed: D-226.3, D-227.1, D-261.1 [user]; the layout is the orchestrator's.
+- Status: implemented 2026-11-27 by one implementer (wave 10), with amendment 1 (the zoomed focus pair of a far sheet); `test_smoke_screening_figures.py` 8 pass, 1 skip; the sheets seen on synthetic views only.
+
+Entry point (the orchestrator's, after Blocks 61 and 62): the step `screening` of `scripts/survey_cells.py` (after
+`calibration`): for every apt node of the cell it fetches the crop over the scan's planes, builds the view, writes
+the sheet, then the cell's views, index and candidates; `step_calibration` writes the full configuration into the
+scans file's `meta["config"]` (Block 52's reader needs it; the survey's step did not write it).
+Implemented 2026-11-27 by the orchestrator: `survey_cells.step_screening`, named in `--steps` / `DIAM_STEPS` (it is
+not among the default steps); `tests/smoke/test_smoke_s3b.py::test_screening_export` runs it with the other steps on
+the fixture cell (one sheet, the views, the index, the candidates read back by `step2_io.read_chosen_nodes`, and the
+scans file read by `step2_io.load_cell`): 7 pass, 1 skip. Not run on real images here (it needs Allen's server).
+
+
 ## 6. Pipeline entry points
 
 | Command | Purpose | Minimal configuration for testing | Expected runtime |
