@@ -10,7 +10,7 @@ Shortcuts and what they do not cover
     near patch +-8 um (default 25 um): the stripe support and the background on a smaller square only
     far patch +-10.5 um, a single far tube: the far line (+-far_profile_half_um = 10 um) fits, but neighbours,
         the soma and a cell's scene are not exercised
-    gof_check off in M2 only: without noise the background SD is near 0 and the goodness of fit drops most planes;
+    gof_check off in M2a/M2b only: without noise the background SD is near 0 and the goodness of fit drops most planes;
         the scan's code path with the check on is covered by M3 to M7
 
 Run
@@ -195,26 +195,26 @@ def _m2_case():
     return _CACHE["m2"]
 
 
-def _compare_m2(ms, scan, name):
+def _compare_m2(ms, scan, name, atol):
     assert_array_equal(ms.ks, scan.ks)
     both = (np.array(ms.status) == "ok") & (np.array(scan.status) == "ok")
     assert both.sum() >= 3, (scan.status, ms.status)
-    check_close(name, ms.omega_um2[both], scan.omega_um2[both], rtol=0.0, atol=1e-9)
+    check_close(name, ms.omega_um2[both], scan.omega_um2[both], rtol=0.0, atol=atol)
 
 
 def test_reference():
-    # M2 as SPEC.md writes it: noise off, a flat phantom: measure_twin equals calibration.scan_node's scan of the
-    # same tube rendered through render.synthetic_block with noise_sd_gl = 0, the core widths to 1e-9 um^2 where
-    # both are ok, the twin's pilot values those of scan_node's own pilot (amendment 1). The scans' branches differ:
-    # scan_node's is the phantom's trace along the TRUE axis, the twin's is twin_scene's straight branch along the
-    # PILOT's axis; the stripe support follows the branch, so a plane's background can differ (reported as ISSUE).
+    # M2b (amendment 2): noise off, a flat phantom: measure_twin with twin_scene's own branch agrees with
+    # calibration.scan_node's scan of the same tube (rendered through render.synthetic_block with noise_sd_gl = 0)
+    # to 5e-4 um^2 where both are ok, the twin's pilot values those of scan_node's own pilot. Not exact: the
+    # twin's branch runs along the pilot's fitted axis, the scan's along the phantom's trace (the true axis), so
+    # the stripe support differs by a few pixels; observed here 6.3e-5 um^2 on 1 of 7 planes, 0 on the others.
     cfg, _br, scan, st, tw = _m2_case()
-    _compare_m2(M.measure_twin(tw, st, cfg, cfg.step2, noise=False), scan, "M2_omega")
+    _compare_m2(M.measure_twin(tw, st, cfg, cfg.step2, noise=False), scan, "M2b_omega", atol=5e-4)
 
 
 def test_reference_same_branch():
-    # M2a: the same comparison with twin_scene's branch replaced by scan_node's own branch (the node stays
-    # twin_scene's): isolates the camera, the patch and the node from the branch. Exact to 1e-9 um^2.
+    # M2a (amendment 2): the same comparison with twin_scene's branch and scene replaced by scan_node's own (the
+    # node stays twin_scene's): isolates the camera, the patch and the node from the branch. To 1e-9 um^2.
     cfg, br, scan, st, tw = _m2_case()
     orig = M.twin_scene
 
@@ -226,7 +226,7 @@ def test_reference_same_branch():
         ms = M.measure_twin(tw, st, cfg, cfg.step2, noise=False)
     finally:
         M.twin_scene = orig
-    _compare_m2(ms, scan, "M2a_omega")
+    _compare_m2(ms, scan, "M2a_omega", atol=1e-9)
 
 
 def test_convergence():
