@@ -33,7 +33,7 @@ Checks
                         carries the stripe of k*, drawn by the figure and the
                         overview, and (2026-10-28) the stripe of every plane
                         of the stage -- support_masks' own, the planes the
-                        fit uses marked (near: all 7; far: |k - k*| >= 5 of
+                        fit uses marked (near: all 7; far: |k - k*| >= 4 of
                         33, the dip-area planes 4-6) -- drawn as panel (c),
                         n/N in the overview's labels; the notebooks' Cell 7
                         knob block writes the defaults, read back by
@@ -457,8 +457,11 @@ def _real_command_line(tmp, cfg_cell, swc, fetcher, planes):
         assert ("calibration knobs: background_support stripe, tau 0.05 gl, W 1, 2, 4, 8, 12 um, at least 50 px and "
                 "3 um per side, patch +-3.5 um; flatness phi <= 10 deg near, 15 deg far; near set from the pilot "
                 "table; far set from the pilot table") in text, text
-        assert "far-set candidates with a usable stripe in at least 6 of the far fit's planes (|k - k*| >= 5): 0 of 0" \
-            in text, text
+        # the bound printed is far_min_k_offset (Block 10.F; 4 since 2026-11-27, D-273.2, 5 before) and the count
+        # far_min_planes_per_node (6); the pilot table here has no far-set candidate, hence 0 of 0
+        cal0 = default_config().calibration
+        assert ("far-set candidates with a usable stripe in at least %d of the far fit's planes (|k - k*| >= %d): "
+                "0 of 0" % (cal0.far_min_planes_per_node, cal0.far_min_k_offset)) in text, text
         meta = json.load(open(os.path.join(out_dir, "scans.json")))["meta"]["calibration"]
         want = dict(dataclasses.asdict(default_config().calibration), **knobs)
         assert {k: (list(v) if isinstance(v, tuple) else v) for k, v in want.items()} == meta, \

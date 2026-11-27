@@ -2,7 +2,7 @@
 found over the whole cell from its trace, for both sets (D-109, the far set;
 D-112, both sets; 2026-10-29), before any image is read: the trace's tilt
 against the set's bound, the stripe of 10.S at the trace's plane, the stripes
-of the set's fit planes (far: all 24; near: k_tr +- 3 by pairs until the near
+of the set's fit planes (far: all 26; near: k_tr +- 3 by pairs until the near
 fit's minimum), then the greedy choice at the set's spacing along each
 stretch; calibrate_kernel.cell_candidates, which `real` and S3's calibration
 step use.
@@ -49,7 +49,7 @@ Checks
                         B_bar and mu NaN: the geometric margins, the search
                         runs; spacing 0: every passing node kept; with
                         support_masks stubbed by the plane offset, the far
-                        threshold (5 of 24 usable: few_planes; 6: passes)
+                        threshold (5 of 26 usable: few_planes; 6: passes)
                         and the near walk (which pairs are evaluated, when
                         it stops, n_fit and n_fit_usable, few_planes); a
                         bad set name or a validation error for a bad
@@ -185,7 +185,10 @@ def test_known_answer():
         assert set(far) == ids_of(clear, cfg, "far") and set(near) == ids_of(clear, cfg, "near"), (sorted(far), sorted(near))
         assert all(r["set"] == "far" for r in far.values()) and all(r["set"] == "near" for r in near.values())
         good = far[id_at(clear, 44.0, 0.0)]
-        assert good["reason"] == "" and good["n_fit_usable"] == good["n_fit"] == 24, good
+        # 10.C: the far fit planes are k_tr + o, far_min_k_offset <= |o| <= far_offsets_planes, 2 (P - m + 1) of
+        # them (26 at P = 16, m = 4, D-273.2; 24 before 2026-11-27, m = 5), every one evaluated and, here, usable
+        n_far = 2 * (cal.far_offsets_planes - cal.far_min_k_offset + 1)
+        assert good["reason"] == "" and good["n_fit_usable"] == good["n_fit"] == n_far, (good, n_far)
         assert abs(good["phi_deg"]) < 1e-6 and good["k_trace"] == k_z, good
         # a clear near node: the trace's plane and the pair +-1 are usable, so the walk stops at 3 of 3
         good = near[id_at(clear, -44.0, 0.0)]
@@ -600,10 +603,12 @@ def test_edge_cases():
         raise AssertionError("a bad set name was not refused")
     # the far threshold far_min_planes_per_node: usable at the trace's plane and at m of the far fit's planes
     need = cfg.calibration.far_min_planes_per_node
-    fit = [o for o in range(-16, 17) if abs(o) >= cfg.calibration.far_min_k_offset]
+    # 10.C's far fit planes, far_min_k_offset <= |o| <= far_offsets_planes (26 at the defaults, D-273.2; 24 before)
+    p_far = cfg.calibration.far_offsets_planes
+    fit = [o for o in range(-p_far, p_far + 1) if abs(o) >= cfg.calibration.far_min_k_offset]
     for m, want in ((need - 1, "few_planes"), (need, "")):
         recs, asked = _search_stubbed(cfg, "far", {0} | set(fit[:m]), [far_dendrite()])
-        assert recs and all(r["reason"] == want and r["n_fit_usable"] == m and r["n_fit"] == 24 for r in recs), \
+        assert recs and all(r["reason"] == want and r["n_fit_usable"] == m and r["n_fit"] == len(fit) for r in recs), \
             (m, want, recs[:2])
         assert asked[:2] == [[0], fit], asked[:2]
     # the near walk: the trace's plane counts; the pairs +-1, +-2, +-3 in turn until 3 are usable or cannot be
