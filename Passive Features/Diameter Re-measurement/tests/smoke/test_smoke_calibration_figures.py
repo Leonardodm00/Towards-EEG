@@ -171,7 +171,11 @@ def test_known_answer():
     assert stf["has_fit"] and stf["offsets"] == list(range(-16, 17))
     for nd, (c, z_ax) in zip(stf["nodes"], t_far):
         used = nd["used"]
-        assert used.sum() == 24 and np.all(np.abs(nd["offsets"][used]) >= 5), used.sum()
+        # Block 15.3 (D-273.2): the used planes are far_min_k_offset <= |k - k*| <= far_offsets_planes on both
+        # sides, 2 (P - m + 1) of them (26 at the defaults P = 16, m = 4; 24 before 2026-11-27, m = 5)
+        m_off = cfg.calibration.far_min_k_offset
+        n_used = 2 * (cfg.calibration.far_offsets_planes - m_off + 1)
+        assert used.sum() == n_used and np.all(np.abs(nd["offsets"][used]) >= m_off), (used.sum(), n_used)
         assert np.max(np.abs(nd["centred"][used] - (nd["omega"][used] - c))) <= 1e-6
         assert np.nanmax(np.abs(nd["residual"][used])) <= 1e-6, np.nanmax(np.abs(nd["residual"][used]))
     # the kernel law: the planted sigma_r at every used far plane and every near plane

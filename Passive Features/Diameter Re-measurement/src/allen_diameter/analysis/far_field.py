@@ -12,7 +12,8 @@
   far_plane_scan        the far scan of one node over k* +- far_offsets_planes
                         on the +-patch_half_um patch with the planar far-pixel
                         background (15.1; Block 10.P)
-  select_far_planes     the planes of the far fit (15.3): |k - k*| >= 5 and the
+  select_far_planes     the planes of the far fit (15.3): |k - k*| >= 4
+                        (far_min_k_offset; 5 before 2026-11-27, D-273.2) and the
                         PREDICTED dip A_j / (sqrt(2 pi) sigma_p) >= 3 RMS_j
   se_model              the SE a core fit would have at a plane if the dip were
                         the Gaussian the far law predicts (the IRLS weights)

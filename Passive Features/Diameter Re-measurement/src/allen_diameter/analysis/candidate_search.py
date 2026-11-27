@@ -21,9 +21,9 @@ diameter puts it in calibration set `which` (calibration.calibration_set:
        sigma_r(P dz) (P = offsets_planes near, far_offsets_planes far):
        first at k_tr (not_isolated:too_few / not_isolated:side_short --
        D-101.4's verdict at the trace's plane), then at the set's fit planes:
-         far:  k_tr + o, far_min_k_offset <= |o| <= far_offsets_planes (24
-               planes), every one evaluated; few_planes when fewer than
-               far_min_planes_per_node have a usable stripe;
+         far:  k_tr + o, far_min_k_offset <= |o| <= far_offsets_planes (26
+               planes; 24 before 2026-11-27, D-273.2), every one evaluated;
+               few_planes when fewer than far_min_planes_per_node have a usable stripe;
          near: k_tr + o, |o| <= offsets_planes (k_tr itself counted), the
                pairs +-o evaluated from |o| = 1 outward until
                min_planes_per_node planes are usable or can no longer be;

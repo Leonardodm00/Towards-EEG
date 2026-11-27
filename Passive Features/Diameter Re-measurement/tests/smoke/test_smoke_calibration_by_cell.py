@@ -164,7 +164,12 @@ def test_known_answer():
         err = max(err, abs(p["residual_um"] - expect))
     assert len(near_in) >= 60 and err <= 1e-6, (len(near_in), err)
     far_used = [p for p in kc["points"] if p["set"] == "far" and p["used"]]
-    assert len(far_used) == 4 * 3 * 24, len(far_used)                       # 24 used planes per far node (Block 15)
+    # Block 15.3 (D-273.2): the far fit uses the planes far_min_k_offset <= |k - k*| <= far_offsets_planes on both
+    # sides of focus, 2 (P - m + 1) per node (26 at the defaults P = 16, m = 4; 24 before 2026-11-27, m = 5); the
+    # fixture's exact scans are ok with a dip far above the SNR bound at every plane, so all of them are used
+    cal = cfg.calibration
+    n_used = 2 * (cal.far_offsets_planes - cal.far_min_k_offset + 1)
+    assert len(far_used) == len(CELLS) * 3 * n_used, (len(far_used), n_used)   # 4 cells x 3 far nodes each
     for p in far_used:
         g = st["truth"][p["node_id"]][1]
         x = p["abs_delta_um"] - d0
@@ -175,9 +180,9 @@ def test_known_answer():
         xs = [p["abs_delta_um"] - d0 for p in far_used if p["cell"] == c]
         expect = (s0 - s0_cal) + ((GAMMA_DEV - GAMMA) * float(np.median(xs)) if c == DEV else 0.0)
         assert abs(r["median_residual_um"] - expect) <= 1e-9, (c, r, expect)
-        assert (r["n_nodes"], r["n_points_used"]) == (3, 72), r
+        assert (r["n_nodes"], r["n_points_used"]) == (3, 3 * n_used), (r, n_used)   # 3 far nodes x n_used (78)
         assert row(kc, c, "near")["n_nodes"] == 3
-    assert row(kc, DEV, "far")["median_residual_um"] > 0.1                    # 0.2 x the median x of 1-4 um
+    assert row(kc, DEV, "far")["median_residual_um"] > 0.1                    # 0.2 x the median x (about 2 um: x from 0.1 to 3.8 um)
 
 
 def test_reference():
