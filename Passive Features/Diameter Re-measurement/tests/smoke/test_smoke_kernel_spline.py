@@ -129,6 +129,12 @@ def test_reference():
     # happens only next to focus, inside the first knot interval, and by less than 1e-3 um^2
     neg = g_ref < 0.0
     assert np.all(np.abs(delta[neg]) < 0.28) and float(np.min(g_ref)) > -1e-3
+    from scipy.optimize import brentq, minimize_scalar
+    sp = K.growth_spline(r)
+    low = minimize_scalar(sp, bounds=(0.01, 0.2), method="bounded")
+    # the exact figures quoted in SPEC (root 0.138 um, minimum -6.07e-4 um^2 at 0.092 um), to the digits quoted
+    check_close("negative_range_um", [brentq(sp, 0.05, 0.27), low.x], [0.138, 0.092], rtol=0.0, atol=5e-4)
+    check_close("negative_min_um2", low.fun, -6.07e-4, rtol=0.0, atol=5e-7)
     print("    pilot table: Block 10's spline of G is negative for |delta| < %.3f um, min %.3e um^2 at %.3f um; "
           "floored: sigma_r = sigma_r(0) there (unfloored it would be %.4f um)"
           % (float(np.max(np.abs(delta[neg]))), float(np.min(g_ref)), float(abs(delta[np.argmin(g_ref)])),

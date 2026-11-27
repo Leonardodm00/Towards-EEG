@@ -641,6 +641,10 @@ class DiameterConfig:
         _check_in(r.absorption, ABSORPTIONS, "renderer.absorption")
         _check_in(r.kernel_family, KERNEL_FAMILIES, "renderer.kernel_family")
         _check_in(r.kernel_continuation, KERNEL_CONTINUATIONS, "renderer.kernel_continuation")
+        if r.kernel_continuation == "tangent" and r.kernel_family != "gaussian_table_spline":
+            raise ValueError("renderer.kernel_continuation 'tangent' needs kernel_family 'gaussian_table_spline' (Block 4, amendment 4)")
+        if r.kernel_family == "gaussian_table_spline" and len(r.kernel_table_delta_um) < 3:
+            raise ValueError("renderer.kernel_family 'gaussian_table_spline' needs at least three knots (Block 4, amendment 4)")
         _check_in(c.response_estimator, RESPONSE_ESTIMATORS, "correction.response_estimator")
         _check_in(c.table_statistic, TABLE_STATISTICS, "correction.table_statistic")
         _check_in(c.fill_policy, FILL_POLICIES, "correction.fill_policy")
@@ -1016,7 +1020,7 @@ def _check_step2(q: "Step2Config") -> None:
     """Step2Config (Blocks 52 to 60): the absorption among the rendered ones, a table family with the spline,
     ascending positive knots, ordered plane ranges, positive bounds, steps and counts, a fraction in [0, 1)."""
     _check_in(q.absorption, ABSORPTIONS, "step2.absorption")
-    _check_in(q.kernel_family, ("gaussian_table_spline", "gaussian_table"), "step2.kernel_family")
+    _check_in(q.kernel_family, ("gaussian_table_spline",), "step2.kernel_family")   # the near stage's tangent continuation needs the spline (D-265)
     _check_in(q.weights, STEP2_WEIGHTS, "step2.weights")
     kn = tuple(float(x) for x in q.knots_um)
     fp = tuple(q.far_planes)
