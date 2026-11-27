@@ -19,6 +19,8 @@ import math
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
+import numpy as np
+
 from . import calibration_io
 from ..config import CalibrationConfig, config_from_dict
 
@@ -138,22 +140,30 @@ def load_start(calibration_path, far_fit_path=None) -> Dict[str, Any]:
     return out
 
 
-def _nan_to_none(value):
-    if isinstance(value, float) and math.isnan(value):
-        return None
+def _json_ready(value):
+    """Amendment 3: a float that is not finite (NaN, +-inf) -> None; numpy scalars and arrays -> Python numbers and
+    lists (ndarray.tolist, numpy.generic.item); dicts, lists and tuples recursively; anything else as given."""
+    if isinstance(value, np.ndarray):
+        value = value.tolist()
+    elif isinstance(value, np.generic):
+        value = value.item()
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
     if isinstance(value, dict):
-        return {k: _nan_to_none(v) for k, v in value.items()}
+        return {k: _json_ready(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
-        return [_nan_to_none(v) for v in value]
+        return [_json_ready(v) for v in value]
     return value
 
 
 def save_step2(path, kernel, report, meta: Optional[Dict[str, Any]] = None) -> None:
     """Write step 2's result as JSON: "kernel" = calibration_io.kernel_to_dict(kernel) plus "kernel_family";
-    "step2" = report (a JSON-ready dict; NaN written as null); "meta". kernel: a RendererConfig."""
+    "step2" = report (written as given, except that a float that is not finite -- NaN, +-inf -- becomes null and numpy
+    scalars and arrays become Python numbers and lists, in kernel, report and meta alike; amendment 3); "meta".
+    kernel: a RendererConfig."""
     kd = calibration_io.kernel_to_dict(kernel)
     kd["kernel_family"] = str(kernel.kernel_family)
-    out = {"kernel": _nan_to_none(kd), "step2": _nan_to_none(report), "meta": _nan_to_none(meta or {})}
+    out = {"kernel": _json_ready(kd), "step2": _json_ready(report), "meta": _json_ready(meta or {})}
     calibration_io._write_json(out, str(path))
 
 

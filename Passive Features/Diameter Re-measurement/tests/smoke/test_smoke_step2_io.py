@@ -19,7 +19,8 @@ Checks
     test_edge_cases     each refusal: read_chosen_nodes (no header, a different header, a row of one or three
                         values, a non-integer, a duplicate node, no row), naming the line; load_cell (meta without
                         config / calibration / nodes, two scans or two records with one node id); load_start
-                        (no kernel, its kernel_error in the message)
+                        (no kernel, its kernel_error in the message); save_step2 under amendment 3 (NaN, +-inf,
+                        numpy float32 / int64 / bool / arrays in kernel, report and meta)
 
 Run (from Passive Features/Diameter Re-measurement/)
     python tests/smoke/test_smoke_step2_io.py
@@ -321,6 +322,22 @@ def test_edge_cases():
         _expect_value_error(S2.load_cell, 1, p, must=["scans", "5"])
         p = _write_scans(tmp, scans, records + [_record(6, "far")], cfg, name="tworecs.json")
         _expect_value_error(S2.load_cell, 1, p, must=["records", "6"])
+        # amendment 3: non-finite floats -> null, numpy scalars and arrays -> Python numbers and lists
+        rcfg = dataclasses.replace(cfg.renderer, kernel_continuation_slope=float("inf"))
+        rep = {"inf": float("inf"), "minf": -np.inf, "nan": np.nan, "f32": np.float32(0.5), "i64": np.int64(7),
+               "b": np.bool_(True), "f32nan": np.float32("nan"), "arr": np.array([[1.0, np.nan], [np.inf, 2.0]]),
+               "iarr": np.arange(3, dtype=np.int32), "nested": [(np.float64(-np.inf), {"x": np.array(1.5)})]}
+        p = os.path.join(tmp, "amend3.json")
+        S2.save_step2(p, rcfg, rep, {"m": np.float32(np.inf), "a": np.zeros(2, dtype=np.float32)})
+        got = S2.load_step2(p)
+        assert got["kernel"]["kernel_continuation_slope"] is None, got["kernel"]
+        assert got["step2"] == {"inf": None, "minf": None, "nan": None, "f32": 0.5, "i64": 7, "b": True,
+                                "f32nan": None, "arr": [[1.0, None], [None, 2.0]], "iarr": [0, 1, 2],
+                                "nested": [[None, {"x": 1.5}]]}, got["step2"]
+        assert got["meta"] == {"m": None, "a": [0.0, 0.0]}, got["meta"]
+        with open(p) as f:
+            text = f.read()
+        assert "NaN" not in text and "Infinity" not in text
         cal_bad = _calibration_json(tmp, "nokernel.json", None, error="insufficient: 4 near-field nodes")
         _expect_value_error(S2.load_start, cal_bad, must=["insufficient: 4 near-field nodes"])
         _expect_value_error(S2.load_start, cal_bad, _calibration_json(tmp, "far.json", _FAR_KERNEL),
