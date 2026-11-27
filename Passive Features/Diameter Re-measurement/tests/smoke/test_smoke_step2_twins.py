@@ -166,7 +166,7 @@ def three_cells():
 # ---------------------------------------------------------------- checks ---
 
 def test_known_answer():
-    # Rule (SPEC Block 53): per set, V_s = floor(f N_s + 1/2); quota of cell c = V_s n_c / N_s; floors, then the
+    # Rule (SPEC Block 53): per set, V_s = floor(f N_s + 1/2) (computed with + 1e-9, amendment 3); quota of cell c = V_s n_c / N_s; floors, then the
     # leftover seats by largest remainder (ties to the lower cell_id); cap V_c <= n_c - 1.
     # -- one cell (7) of 8 near
     one = twins_of({7: (8, 0)})
@@ -200,6 +200,12 @@ def test_known_answer():
     #   V_204 = 7 (sum 7 = V), the second seat in a second pass (amendment 1).
     got = counts(T.split_twins(twins_of({201: (1, 0), 202: (1, 0), 203: (1, 0), 204: (10, 0)}), 0.5, SEED))
     assert got == {(201, "near"): 0, (202, "near"): 0, (203, "near"): 0, (204, "near"): 7}, got
+    # -- an exact half (amendment 3): one cell (9) of 45 near, f = 0.7: f N = 31.5 exactly in decimal, so
+    #    V = floor(31.5 + 0.5) = 32 (cap 44). In float64 0.7 * 45 + 0.5 = 31.999999999999996, whose floor is 31:
+    #    the 1e-9 guard of the amendment restores 32. Also f = 0.1, N = 5: f N = 0.5, V = floor(1.0) = 1 (cap 4).
+    assert 0.7 * 45 + 0.5 < 32.0                       # the floating-point trap is real on this machine
+    assert counts(T.split_twins(twins_of({9: (45, 0)}), 0.7, SEED)) == {(9, "near"): 32}
+    assert counts(T.split_twins(twins_of({9: (5, 0)}), 0.1, SEED)) == {(9, "near"): 1}
     # -- what cannot be placed is dropped: one cell with 1 near, f = 0.5: V = floor(0.5 + 0.5) = 1, cap 0 -> 0.
     #    Two one-twin cells, f = 0.75: V = floor(1.5 + 0.5) = 2, caps 0, 0 -> 0, 0.
     assert counts(T.split_twins(twins_of({5: (1, 0)}), 0.5, SEED)) == {(5, "near"): 0}
@@ -293,7 +299,7 @@ def test_invariants():
         for s_i, s in enumerate(T.SETS):
             n_s = {c: layout[c][s_i] for c in layout if layout[c][s_i] > 0}
             N = sum(n_s.values())
-            V = int(np.floor(f * N + 0.5))
+            V = int(np.floor(f * N + 0.5 + 1e-9))     # SPEC amendment 3
             total = sum(cnt[(c, s)] for c in n_s)
             assert total <= V, (layout, f, s, total, V)
             # every seat that fits under the caps is placed (the reading of "what cannot be placed")

@@ -23,6 +23,8 @@ _PILOT_FLOAT_FIELDS = ("mu_hat_per_um", "cx_um", "cy_um", "theta_rad", "phi_rad"
 _PILOT_POSITIVE = ("mu_hat_per_um", "B_bar", "d_hat_um")
 # A scan's z_sub_um and its pilot's are one number written twice: they agree to this (um; SPEC amendment 1).
 _Z_SUB_TOL_UM = 1e-9
+# Added to f N + 1/2 before the floor of V_s (SPEC Block 53, amendment 3).
+_HALF_GUARD = 1e-9
 
 
 @dataclass(frozen=True)
@@ -239,7 +241,9 @@ def split_twins(twins, validation_fraction, seed):
             if t.set == s:
                 ids.setdefault(int(t.cell_id), []).append(int(t.node_id))
         N = sum(len(v) for v in ids.values())
-        V = int(math.floor(f * N + 0.5))
+        # floor(f N + 1/2), with 1e-9 so that an exact half is not lost to floating point (amendment 3:
+        # 0.7 * 45 + 0.5 = 31.999999999999996 in float64)
+        V = int(math.floor(f * N + 0.5 + _HALF_GUARD))
         alloc = _allocate(V, {c: len(v) for c, v in ids.items()})
         for c, nodes_c in ids.items():
             if alloc[c] == 0:
