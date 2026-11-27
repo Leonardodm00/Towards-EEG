@@ -511,7 +511,7 @@ implementation:
     parent: NS
     depends_on: [S3c]
     needs_theory: [T10]
-    needs_hpc: false
+    needs_hpc: true
   - id: HR
     title: "Hybrid absorption renderer"
     summary: "The renderer actually used (D-084), scheduled 2026-10-27 (D-091; was NS2): a new absorption mode for Block 4 -- each slice's absorbed light from the condenser's rays (NA 1.4, n_oil 1.515, averaged over directions), then the calibrated defocus kernel on every image plane (I-004); inside the simulation hash, so every table is rendered with it; S3d waits for it (D-085.11). Built 2026-10-27 as Block 21 (I21), the default not switched: its dark-stain planes go below zero (D-092, SPEC section 8)."
@@ -846,6 +846,51 @@ implementation:
     parent: NC2
     depends_on: [I35, I12]
     needs_theory: [T5, T7, T15]
+    needs_hpc: false
+    jobs: []
+  - id: I52
+    title: "Step 2's files"
+    summary: "Reads the user's per-cell lists of chosen calibration nodes, a cell's scans file with its configuration, and the starting kernel; writes step 2's result in the kernel format the notebook reads."
+    block: 52
+    parent: NS1
+    depends_on: []
+    needs_theory: [T10]
+    needs_hpc: false
+    jobs: []
+  - id: I53
+    title: "The twins and the training/validation split"
+    summary: "One twin per chosen node: Allen's diameter, the pilot's absorption and geometry, the real planes' background, noise and core widths; the nodes split 75/25 by set and cell."
+    block: 53
+    parent: NS1
+    depends_on: [I52]
+    needs_theory: [T10]
+    needs_hpc: false
+    jobs: []
+  - id: I54
+    title: "A twin's rendered stack"
+    summary: "The twin's planes rendered by the hybrid under a trial kernel table read by the spline, before the camera: the expensive, noise-free part of the forward model."
+    block: 54
+    parent: NS1
+    depends_on: [I53]
+    needs_theory: [T10]
+    needs_hpc: false
+    jobs: []
+  - id: I55
+    title: "A twin's measurement"
+    summary: "Each plane through the camera chain with the real plane's background and noise (fixed seeds), then the real scan's core width under the real scans' configuration."
+    block: 55
+    parent: NS1
+    depends_on: [I54]
+    needs_theory: [T10]
+    needs_hpc: false
+    jobs: []
+  - id: I56
+    title: "Step 2's estimator"
+    summary: "Weighted least squares with shared unknowns (the table) and per-twin unknowns (the depth), a sparse finite-difference Jacobian, standard errors clustered by node."
+    block: 56
+    parent: NS1
+    depends_on: []
+    needs_theory: [T10]
     needs_hpc: false
     jobs: []
 # Revisions: a change one side has to absorb because of the other
