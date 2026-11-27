@@ -312,6 +312,7 @@ the "Binds" column.
 | 2026-11-25 (the soma-fit chat, 17:35) | Logs **D-255** to **D-258** (user, 17:27): the soma fit's region Allen's radius times a coefficient (1.2); the hold-c grid confirmed, the refinement in the neighbourhood of the best grid value, the active model receives the best fit; the far-background check a flag; the in-focus blur held, a parallel analysis fitting it. |
 | 2026-11-25 (the soma-fit chat, 17:50) | Logs **D-259** (orchestrator): the build choices of wave 8 of the diameter pipeline (the soma fit's amendment; contract `8aec906` on `sci/diameter-pipeline`); three implementers launched. |
 | 2026-11-26 (the review chat, 11:50) | Logs **D-260** (orchestrator): amendment 4 of the I_h fit's wave 6 after the sensitivity run tw5 stopped on 7 of 10 twins: a brief bundle's noise is identified by its grid and window count, not by the sweeps it names (`sci/twins` `718c778`). Next free IDs: D-261, I-008. |
+| 2026-11-27 (the defocus-table chat, 10:05) | Logs **D-261** (user): the calibration nodes are chosen by the user from the davinci export, whose image at focus shows Allen's diameter, on its agreement and on clean backgrounds; no diameter by eye (D-226.4 withdrawn; D-226 marked superseded in part; D-227 and I-006 annotated); the chosen nodes go to steps 1 and 2, and step 2's twins carry Allen's diameter as the true one. Next free IDs: D-262, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -561,6 +562,7 @@ would be needed*, *Status*.
 | D-258 | 2026-11-25 | the in-focus blur in the soma fit (Blocks 45-46, `--sigma0`, Cell 25); D-240 | held in the deliverable; a parallel, labelled analysis fits it [user] | active |
 | D-259 | 2026-11-25 | `specs/SPEC.md` Blocks 45, 46 (wave 8) and 50 on `sci/diameter-pipeline`; contract `8aec906` | the build choices of the soma fit's amendment: coordinates from the traced centre, held parameters reported like the held slope, independent grid fits, the refinement's delivery rule, Colab without refinement, the fitted in-focus blur's re-anchoring, the far background's plane and the 1.0 gl flag [orchestrator], PROVISIONAL | active |
 | D-260 | 2026-11-26 | `run_twin_recovery.bundle_noise` (SPEC Block 28 of `Ih Fit/specs/SPEC.md` on `sci/twins`); D-247 item 6, D-249 | amendment 4: for a short-square bundle the stop condition of the noise draw is the grid and the window count; the sweeps the bundle names are not compared, because the archive loader fills that list wrongly [orchestrator] | active; implemented (`84665eb`) |
+| D-261 | 2026-11-27 | D-226's screening export (D-226.3, D-227) and the user's choice of calibration nodes; D-226.4; step 2's twins' diameter (D-228 to D-230; the step-2 handoff's Q1) | the image at focus shows Allen's diameter; the user chooses the nodes on its agreement and on clean backgrounds; no diameter by eye (D-226.4 withdrawn); the chosen nodes go to steps 1 and 2; step 2's twins carry Allen's diameter as the true one (form B, diameters held) [user] | active; not built |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -13076,7 +13078,8 @@ Dogrusoz 2019, Med Biol Eng Comput 57:2093-2113, PMID 31363890: MAP estimation w
 (generalized) Tikhonov regularization -- abstract only. **[doc]** the T10 study document, §3.8 (form C), §3.10 (the
 width-diameter trade-off).
 
-**Status:** idea; not scheduled; roadmap unchanged (T10 open, NS1 planned).
+**Status:** idea; not scheduled; roadmap unchanged (T10 open, NS1 planned). [2026-11-27: D-261.5 takes Allen's diameters as
+the true ones in step 2, so form P is not used there; the idea stays recorded.]
 
 ## D-181 -- The near-field table read between knots with the growth fit's cubic spline, not linearly; the growth fit's cubic interpolation confirmed (user)
 
@@ -14928,7 +14931,9 @@ near-field law is built before this calibration runs.
 D-175, D-178, D-194, D-198, D-199, D-211, D-213, I-006.
 
 **Status:** active; not built (the export, the selection list, the notebook and the pool step's reading of it to plan
-with the user).
+with the user). [superseded in part by D-261, 2026-11-27: D-226.4, the by-eye diameter and its notebook, is withdrawn;
+the image at focus shows Allen's diameter and the user chooses on its agreement and on clean backgrounds; step 2's
+twins carry Allen's diameter as the true one, which settles the first open point above]
 
 ## D-227 -- Beside each plane's image of a node, its intensity profile along the measuring line (user)
 
@@ -14955,7 +14960,7 @@ panel; the display of the far set's sixteen planes on each side (all, or $|k - k
 
 **Sources.** **[user]** 2026-11-23, 09:05. **[log]** D-198, D-226.
 
-**Status:** active; not built.
+**Status:** active; not built. [2026-11-27: D-261.1 adds Allen's diameter to the image at focus.]
 
 ## D-228 -- Step 2's trial table includes the far-field slope; the far-set twins fix it (user)
 
@@ -16128,3 +16133,63 @@ named gives the same noise; one window fewer stops).
 **Sources.** **[orchestrator]**; **[data inspected]**, **[src]**, **[run]** as above; **[log]** D-247, D-249.
 
 **Status:** active; implemented.
+
+---
+
+## D-261 -- The calibration nodes: the screening shows Allen's diameter at focus, the user chooses on its agreement and on clean backgrounds, no diameter by eye; step 2's twins carry Allen's diameter as the true one (user)
+
+**Date:** 2026-11-27, 10:00 (Europe/Rome), the defocus-table chat. **Binds:** D-226's screening export on davinci
+(D-226.3, D-227) and the user's choice of calibration nodes; D-226.4 (the Colab notebook for by-eye diameters); the
+diameter of step 2's twins (D-228 to D-230; the T10 study document `TEEG_diameter_kernel_calibration_step2_2026-11-18.md`
+s.3.8, s.3.10; Q1 of `Passive Features/Diameter Re-measurement/docs/TEEG_kernel_calibration_step2_implementation_handoff_2026-11-24.md`
+on `sci/diameter-pipeline`); the first stage's held diameter (D-178, unchanged).
+
+**Decision [user].** "Just to be clear about this part. The first step on the DaVinci will choose all the apt
+calibration nodes and save the images across planes as decided (from per-node images at focus and on the planes of
+D-226.3, each beside its intensity profile along the measuring line (D-227)) with the in focus image showed the
+Allen's diameter. I will then download all this and choose the best calibation nodes (based on agreement of the
+Allen's diameter with the actual in focus image, clean background across planes). I will not set the diameter by eye.
+Then the chosen nodes will be given to the step 1 and 2 with in the latter the Allen's diameters considered the TRUE
+one. Take note of the decision."
+
+**Statement.** (D-261.1) The davinci screening of D-226 proposes every apt calibration node by the pipeline's criteria
+and saves, per node, the images at focus and on the planes of D-226.3, each beside its intensity profile along the
+measuring line (D-227); the image at focus also shows the node's Allen's diameter $D_{{\rm A},i}$ (twice the traced
+radius) [user]. How it is shown is the assistant's reading, PROVISIONAL: two marks at $\pm D_{{\rm A},i}/2$ from the
+measuring line's centre, across the branch, and the same two positions marked on that plane's profile.
+(D-261.2) The user downloads the export and chooses the calibration nodes on two criteria: Allen's diameter agrees with
+the dendrite in the image at focus, and the background is clean across planes [user].
+(D-261.3) No diameter is set by eye: D-226.4, the interactive Colab notebook for by-eye diameters, is withdrawn [user].
+(D-261.4) The chosen nodes go to step 1 and to step 2, in D-230's order [user].
+(D-261.5) In step 2 every twin carries its node's Allen's diameter, taken as the true diameter:
+$\tilde d_i = D_{{\rm A},i}$ for every chosen node $i$ [user]. So the diameters are not fitted: form B of D-229.1 at
+Allen's diameters; forms C and P (I-006) are not used in this step 2 [the assistant's reading of "considered the TRUE
+one"].
+
+**Why.** The choice moves the check of the diameter from a number set by eye to a filter: a node enters only if
+Allen's diameter matches what the image at focus shows, so the twins' diameter is one the user has seen agree with the
+data, and the eye's own bias on a blurred dip (D-226's note) does not enter as a number [the assistant's reading of the
+user's criteria]. Form B is only as good as its twins' diameters: on the faint toy, twins 20 % too wide leave the knot at
+0.28 um off by -21 % (d 0.45-0.55 um) and -47 % (d 0.75-0.95 um), against step 1's -16 % and -11 % (T10 study
+document, check 2) [doc, run].
+
+**What it implies for code and tables.** The screening export of D-226 and D-227 also draws Allen's diameter on the
+image at focus (D-261.1). The user's choice comes back as a list of chosen nodes per cell, with no diameter column; the
+pool step and steps 1 and 2 read it. No by-eye notebook is built. Step 2's twin settings take $\tilde d_i$ from the
+node record's `allen_diameter_um` (`calibration.node_records`; equal to the pilot record's `d_hat_um` since D-178);
+step 2 is form B with the diameters held. Q1 of the step-2 implementation handoff is settled by this entry. Not built.
+
+**What it does not decide.** How close the agreement must be: it is judged by eye on a dip already blurred by the
+in-focus kernel and by the out-of-focus slices, and how fine that judgement is at the thin end has not been measured
+[own reasoning]; what "clean background across planes" requires beyond the eye; how Allen's diameter is drawn
+(D-261.1's reading); the twins' absorption and axis depth, their noise, the weights $\varpi$ and the forward model
+(Q3 to Q9 of the handoff); whether step 1 is kept only as a start and cross-check (asked 2026-11-27 09:17: step 2
+recovered the table on the toys without it) -- this entry keeps D-230's order unchanged; D-226.2's cell list; the
+minimum number of chosen nodes.
+
+**Sources.** **[user]** 2026-11-27, 10:00. **[log]** D-178, D-226, D-227, D-228, D-229, D-230, I-006. **[doc]** the T10
+study document, s.3.8, s.3.10, check 2. **[src]** `calibration.node_records` (`allen_diameter_um` in each node record)
+on `sci/diameter-pipeline` at `7b4a9ab`.
+
+**Status:** active; not built.
+
