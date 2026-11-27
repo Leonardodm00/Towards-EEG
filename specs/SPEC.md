@@ -2875,7 +2875,7 @@ the user chooses the calibration nodes on it (D-261.2) and returns them as Block
   produces `NodeView`s for Block 62 and the files the user downloads.
 - Confirmed: D-226.3, D-227.1, D-261.1, D-278 [user]; the crops' half-widths and the files' formats are the
   orchestrator's.
-- Status: drafted 2026-11-27.
+- Status: implemented 2026-11-27 by one implementer (wave 10), merged into the screening contract branch; `test_smoke_screening.py` 5 pass, 2 skip.
 
 ### Block 62: the screening sheets -- each plane's image beside its profile (D-226.3, D-227, D-261.1)
 
@@ -2915,12 +2915,16 @@ the user chooses the calibration nodes on it (D-261.2) and returns them as Block
   $\pm$ `zoom_half_um`, both with the marks; the other 66 axes are as without it.
 - Data flow: consumes Block 61's `NodeView`, `diameter_marks`, `image_extent`; called by the entry point's step.
 - Confirmed: D-226.3, D-227.1, D-261.1 [user]; the layout is the orchestrator's.
-- Status: drafted 2026-11-27.
+- Status: implemented 2026-11-27 by one implementer (wave 10), with amendment 1 (the zoomed focus pair of a far sheet); `test_smoke_screening_figures.py` 8 pass, 1 skip; the sheets seen on synthetic views only.
 
 Entry point (the orchestrator's, after Blocks 61 and 62): the step `screening` of `scripts/survey_cells.py` (after
 `calibration`): for every apt node of the cell it fetches the crop over the scan's planes, builds the view, writes
 the sheet, then the cell's views, index and candidates; `step_calibration` writes the full configuration into the
 scans file's `meta["config"]` (Block 52's reader needs it; the survey's step did not write it).
+Implemented 2026-11-27 by the orchestrator: `survey_cells.step_screening`, named in `--steps` / `DIAM_STEPS` (it is
+not among the default steps); `tests/smoke/test_smoke_s3b.py::test_screening_export` runs it with the other steps on
+the fixture cell (one sheet, the views, the index, the candidates read back by `step2_io.read_chosen_nodes`, and the
+scans file read by `step2_io.load_cell`): 7 pass, 1 skip. Not run on real images here (it needs Allen's server).
 
 
 ## 6. Pipeline entry points
