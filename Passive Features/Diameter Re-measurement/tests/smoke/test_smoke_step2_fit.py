@@ -15,7 +15,8 @@ Checks (the SPEC's oracles F1 to F8)
                         against the mean se_cluster, and se_classical too small by the derived factor.
                         F5: bounds respected, free False at an active bound, NaN covariance rows there
     test_contract       shapes, dtypes, cost and residual definitions; F6: S + L model calls per Jacobian, the
-                        step reversed at an upper bound (shared and local)
+                        step reversed at an upper bound (shared and local); a box narrower than the step: the
+                        larger room taken and no model call outside the box (amendment 3)
     test_determinism    F8: two runs bit for bit
     test_edge_cases     F7: the NaN rules (y NaN, model NaN at the start, NaN arising later); F8: L = 0 against
                         numpy's lstsq; every ValueError of the entry
@@ -394,6 +395,27 @@ def test_contract():
     expect[1] = -h_l[0]
     check_close("F6_reversed_local", steps0[2], expect, rtol=1e-9)
     check_close("F6_reversed_shared", steps0[1], [-h_s[1]], rtol=1e-9)
+
+    # F6, amendment 3: a box narrower than the step. shared[1] in [0.01, 0.013] with step 0.005 (rooms from the
+    # start 0.011: 0.002 up, 0.001 down, so the probe goes to the upper bound 0.013), the centres in [-0.005,
+    # 0.005] with step 0.02 (from 0.002: 0.003 up, 0.007 down, so the probe goes to the lower bound -0.005).
+    # Every model call of the whole fit must stay inside the box (no tolerance: the probe points are clipped).
+    lm2 = Logged(model)
+    lo_s2, hi_s2 = np.array([-1.0, 0.01]), np.array([1.0, 0.013])
+    lo_l2, hi_l2 = np.full((N, 1), -0.005), np.full((N, 1), 0.005)
+    h_s2 = np.array([0.005, 0.005])
+    r2 = fit_shared_local(lm2, y, w, group, np.array([0.0, 0.011]), (lo_s2, hi_s2), local0=np.full((N, 1), 0.002),
+                          local_bounds=(lo_l2, hi_l2), diff_step_shared=h_s2, diff_step_local=h_l)
+    outside = [i for i, (a, b) in enumerate(lm2.log)
+               if np.any(a < lo_s2) or np.any(a > hi_s2) or np.any(b < lo_l2) or np.any(b > hi_l2)]
+    assert not outside, "model calls outside the box: %s" % outside[:5]
+    assert r2.n_model_calls == len(lm2.log)
+    # the first Jacobian (calls 1 to 3, after the start at call 0): shared[0] by +h, shared[1] to its upper bound,
+    # every centre to its lower bound
+    assert lm2.log[1][0][0] == 0.0 + h_s2[0] and lm2.log[1][0][1] == 0.011, lm2.log[1][0]
+    assert lm2.log[2][0][1] == hi_s2[1], lm2.log[2][0]
+    assert_array_equal(lm2.log[3][1], lo_l2)
+    print("    F6 narrow box: %d model calls, none outside the box" % len(lm2.log))
 
 
 def test_determinism():
