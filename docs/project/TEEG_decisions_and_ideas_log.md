@@ -320,7 +320,8 @@ the "Binds" column.
 | 2026-11-27 (the defocus-table chat, 10:45) | D-265.3 confirmed by the user (10:41): the spline's extrapolation is for the near-field calibration only, where a third plane lies slightly past 0.84 um; the far stage and the tables keep the linear continuation with gamma. No new ID. Next free IDs: D-266, I-008. |
 | 2026-11-27 (the defocus-table chat, 10:47) | D-265.1's reading confirmed by the user (10:45): past the anchor the near stage's spline is extrapolated along its tangent in G (linear in G, step 1's own rule), not by its last cubic piece. No new ID. |
 | 2026-11-27 (the review chat, 11:34) | Logs **D-266** (user), on the sensitivity run `tw5`'s tables: the sample weight keeps $\tau_d = 500$ ms; no exclusion rule is implemented in the I_h fit. D-244 item 3 and D-246 annotated. |
-| 2026-11-27 (the review chat, 11:47) | Logs **D-267** (user): the budget of the real cells' I_h fit (global search 300 evaluations of which 200 initial; 5 starts of at most 60 iterations), and two more twins' campaigns asked for (six parameters; diameters inflated by 1.5), their design not yet settled. Next free IDs: D-268, I-008. |
+| 2026-11-27 (the review chat, 11:47) | Logs **D-267** (user): the budget of the real cells' I_h fit (global search 300 evaluations of which 200 initial; 5 starts of at most 60 iterations), and two more twins' campaigns asked for (six parameters; diameters inflated by 1.5), their design not yet settled. |
+| 2026-11-27 (the review chat, 12:04) | Logs **D-268** (user): two more twins' campaigns on the ten noisy twins with `tw5`'s settings: `tw6`, six parameters; `tw7`, five parameters with the twins simulated on a morphology whose soma and dendrite diameters are x 1.5 within 300 um of path length from the soma, the fit on the original. Block 29 on `sci/twins` (`8e1fbdb`). Next free IDs: D-269, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -576,6 +577,7 @@ would be needed*, *Status*.
 | D-265 | 2026-11-27 | step 2's near stage: the twins' slices past the anchor (0.84 um); D-263's and D-264's open points; D-181 | in the near stage the kernel past 0.84 um is the spline through the near knots, extrapolated (the assistant's reading: D-181's not-a-knot spline in G, along its tangent), not the linear continuation with a held gamma; the far stage and the table keep gamma [user] | active; not built (needs D-181) |
 | D-266 | 2026-11-27 | the I_h fit's loss (SPEC 2.8 (d), D-207 (3)) and its cell selection; D-244 item 3 (the exclusion decided in principle: not implemented), D-246 (its two questions, closed) | the sample weight keeps its decay $\tau_d = 500$ ms; no rule that removes a cell from the I_h fit is implemented [user] | active |
 | D-267 | 2026-11-27 | the real cells' I_h fit (`run_ih_fit.py`: `--n-calls`, `--n-initial`, `--refine-starts`, `--refine-max-nfev`); D-245, D-247 | for the real cells: global search of 300 evaluations, 200 of them initial; least-squares refinement from 5 starts of at most 60 iterations each [user] | active; a run option, no default changed |
+| D-268 | 2026-11-27 | the twins' runs `tw6` and `tw7` (`submit_twin_recovery.sh`, `PLAN_ARGS`); SPEC 2.11 and Block 29 of `Ih Fit/specs/SPEC.md` on `sci/twins` (`morph_inflate.py`, `twin_build.py`, `run_twin_recovery.py`); D-244 item 1 (five parameters: to be settled on `tw6`) | two campaigns on the ten noisy twins, `tw5`'s optimisation settings: one with six parameters; one with five parameters and the twins' traces generated on morphologies with soma and dendrite diameters x 1.5 up to 300 um of path length from the soma (hard step), the fit on the non-inflated ones [user] | active; code implemented (`8e1fbdb`), runs to submit |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -16400,5 +16402,46 @@ twin, so more starts and more initial points are insurance for real cells, where
 the user asked for on the same day changes it), the cores.
 
 **Sources.** **[user]**; **[data inspected]**, **[reasoning]** as above.
+
+**Status:** active.
+
+## D-268 -- Two more twins' campaigns: six parameters; twins on inflated diameters fitted on the original morphology (user)
+
+**Date:** 2026-11-27, 12:04 (Europe/Rome), the review chat. **Binds:** the twins' runs `tw6` and `tw7`; SPEC 2.11
+and Block 29 of `Passive Features/HPC script/Ih Fit/specs/SPEC.md` on `sci/twins` (`8e1fbdb`); D-244 item 1.
+
+**Decision [user].** "Let's launch two campaigns for the L3 cells as now but: one with 6 parameters so that I can
+definitely settle this choice (use the parameters for the optimization as now for this campaign). The other uses the
+same configurations as the last one you inspected the results but inflates the diameters of the cells' segments by
+1.5 so that I can prove that the whole pipeline for the parameter estimation has reason to be done". To the
+assistant's questions: the ten noisy twins; "The traces that simulate the real ones are generated from the inflated
+morphologies (up to 300 um of path length thourgh the branches from the soma) while the fit uses the non-inflated
+ones. YOur reading is ok."; dendrites and soma; "The hard step is perfect".
+
+**Statement.**
+1. *`tw6`, six parameters.* The ten noisy twins with I_h (ids 900000000 to 900000009) under the arm `ih6_d207`
+   ($\Delta v_h$ fitted in $\pm 10$ mV, its truth drawn in $\pm 5$ mV), with `tw5`'s optimisation settings: global
+   search 200 evaluations of which 100 initial, the least-squares refinement from 3 starts of at most 30 iterations,
+   0.1 ms.
+2. *`tw7`, inflated diameters.* The same ten twins and settings as `tw5` (five parameters), except that each
+   twin's traces are simulated on its real cell's morphology with the diameter of every soma and dendrite node
+   multiplied by 1.5 where the node's path length from the soma along the branches is at most 300 um, and
+   unchanged beyond (a hard step). The fit runs on the original morphology.
+3. The purpose of (2), in the user's words: to prove that the pipeline that estimates the parameters has reason
+   to be done, i.e. to measure what a diameter error of that size does to the fitted parameters.
+
+**Why.** **[user]** as quoted. (1) closes D-244 item 1's question (five against six parameters) with a converged
+optimiser, which `tw3b` could not (**[log]** D-244).
+
+**What it implies for code and tables.** Block 29 (SPEC 2.11): `plan --twin-diam-factor 1.5
+--twin-diam-max-path-um 300`; the archive stores the original reconstruction and records the inflation; an archive
+is reused only by a run with the same inflation. No default changes: a run without the option is as before.
+**[orchestrator]** the step is applied at the reconstruction's nodes (SWC radii), and the path length is measured
+from the soma's root node as the sum of the distances between consecutive nodes.
+
+**What it does not decide.** Whether five or six parameters are kept (on `tw6`'s results). The real cells' fit.
+
+**Sources.** **[user]**; **[log]** D-244; **[run]** `smoke_morph_inflate.py` 7/7 (on its fixture cell the inflated
+twin's long-step deflections are 0.63 of the plain twin's, input resistance 194.8 to 122.4 MOhm).
 
 **Status:** active.

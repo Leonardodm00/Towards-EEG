@@ -548,6 +548,14 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   Not compared here: `tw4` (Nelder-Mead, cap 300, the same twins), whose tables the assistant has not seen.
 - **For the real cells [user, D-267, 2026-11-27]:** `--n-calls 300 --n-initial 200 --refine trf --refine-starts 5
   --refine-max-nfev 60`; the sample weight keeps $\tau_d = 500$ ms and no cell is excluded (D-266).
+- **Two more campaigns on the ten noisy twins [user, D-268, 2026-11-27; code `sci/twins` `8e1fbdb`, Block 29].**
+  `tw6`: six parameters, `tw5`'s settings:
+  `RUN_TAG=tw6 NOISE_TAG=nf2 NCPUS=24 PLAN_ARGS="--ih-arm ih6_d207" TWINS=900000000,...,900000009 WALLTIME=48:00:00 bash submit_twin_recovery.sh`.
+  `tw7`: five parameters, the twins simulated on diameters x 1.5 (soma and dendrites, up to 300 um of path length
+  from the soma, hard step), the fit on the original morphology:
+  `RUN_TAG=tw7 NOISE_TAG=nf2 NCPUS=24 PLAN_ARGS="--ih-arm ih5 --twin-diam-factor 1.5 --twin-diam-max-path-um 300" TWINS=900000000,...,900000009 WALLTIME=48:00:00 bash submit_twin_recovery.sh`.
+  Both build their own twins (`tw6`: other truths; `tw7`: other traces), so nothing is copied from `tw4`/`tw5`.
+  Read `tw7` against `tw5` twin by twin: same truths, same noise seeds, only the generating morphology differs.
 
 ## 8. Repository, environment, cluster
 
